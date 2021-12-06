@@ -33,8 +33,12 @@ static constexpr int kNumGPUDims = 3;
 //===----------------------------------------------------------------------===//
 // Attribute utils
 //===----------------------------------------------------------------------===//
+
 /// Given an operation, return the `spv.target_env` attribute.
 spirv::TargetEnvAttr getSPIRVTargetEnvAttr(Operation *op);
+
+/// Returns the attribute name carrying information about distribution.
+const char *getSPIRVDistributeAttrName();
 
 //===----------------------------------------------------------------------===//
 // Workgroup memory utils

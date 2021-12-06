@@ -93,13 +93,21 @@ void SPIRVLowerExecutableTargetPass::runOnOperation() {
     }
   }
 
-  executableLoweringPipeline.addPass(createSetNumWorkgroupsPass());
-  executableLoweringPipeline.addPass(createCanonicalizerPass());
+  if (*passPipeline !=
+      IREE::Codegen::DispatchLoweringPassPipeline::SPIRVDistributeCopy) {
+    // SPIRVDistributeCopy handles these passes by itself.
+    executableLoweringPipeline.addPass(createSetNumWorkgroupsPass());
+    executableLoweringPipeline.addPass(createCanonicalizerPass());
+  }
+
   if (!testLoweringConfiguration && passPipeline.hasValue()) {
     OpPassManager &nestedModulePM = executableLoweringPipeline.nest<ModuleOp>();
     switch (*passPipeline) {
       case IREE::Codegen::DispatchLoweringPassPipeline::SPIRVDistribute:
         addSPIRVTileAndDistributePassPipeline(nestedModulePM);
+        break;
+      case IREE::Codegen::DispatchLoweringPassPipeline::SPIRVDistributeCopy:
+        addSPIRVTileAndDistributeCopyPassPipeline(executableLoweringPipeline);
         break;
       case IREE::Codegen::DispatchLoweringPassPipeline::SPIRVVectorize:
         addSPIRVTileAndVectorizePassPipeline(nestedModulePM);
@@ -114,7 +122,7 @@ void SPIRVLowerExecutableTargetPass::runOnOperation() {
   }
 
   LLVM_DEBUG({
-    llvm::dbgs() << "Using SPIRV Lowering Pass pipeline :\n";
+    llvm::dbgs() << "Using SPIR-V lowering pass pipeline:\n";
     executableLoweringPipeline.printAsTextualPipeline(llvm::dbgs());
     llvm::dbgs() << "\n";
   });

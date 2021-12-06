@@ -149,7 +149,7 @@ class HalMappedMemory {
         "Error getting buffer view shape");
     iree_hal_element_type_t element_type =
         iree_hal_buffer_view_element_type(bv_);
-    int32_t element_size = iree_hal_element_byte_count(element_type);
+    int32_t element_size = iree_hal_element_dense_byte_count(element_type);
     std::vector<py::ssize_t> dims(shape.size());
     for (int i = 0; i < shape.size(); ++i) {
       dims[i] = shape[i];

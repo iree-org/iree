@@ -614,6 +614,36 @@ IREE_VM_ABI_EXPORT(iree_hal_module_buffer_view_create,  //
   return iree_ok_status();
 }
 
+// Returns true if the |expected_type| can be satisfied with |actual_type|.
+// This allows for basic type widening and bypassing instead of requiring an
+// exact match in all cases.
+static bool iree_hal_element_types_are_compatible(
+    iree_hal_element_type_t actual_type,
+    iree_hal_element_type_t expected_type) {
+  if (iree_hal_element_numerical_type_is_opaque(actual_type)) {
+    // If the provided type is opaque it can map to anything. This allows
+    // applications to bypass the checks when they are treating all the data as
+    // opaque, such as when carrying around buffer data in binary blobs.
+    return true;
+  }
+
+  if (iree_hal_element_numerical_type_is_integer(actual_type) &&
+      iree_hal_element_numerical_type_is_integer(expected_type) &&
+      iree_hal_element_bit_count(actual_type) ==
+          iree_hal_element_bit_count(expected_type)) {
+    // Integer types of the same bit width are allowed to be cast.
+    // This allows users or the compiler to treat data as signless while still
+    // allowing signedness. For example, tensor<1xi32> can successfully match
+    // a tensor<1xui32> expectation.
+    return true;
+  }
+
+  // Otherwise we require an exact match. This may be overly conservative but
+  // in most cases is a useful error message. Users can pass in OPAQUE types if
+  // hitting this to bypass.
+  return actual_type == expected_type;
+}
+
 IREE_VM_ABI_EXPORT(iree_hal_module_buffer_view_assert,  //
                    iree_hal_module_state_t,             //
                    rriiCiD, v) {
@@ -634,9 +664,13 @@ IREE_VM_ABI_EXPORT(iree_hal_module_buffer_view_assert,  //
                              &expected_shape_rank, &expected_shape_dims);
 
   // Check encoding first; getting the encoding wrong is worse than the shape.
+  // If the actual encoding is opaque we allow it to pass through - this lets
+  // users override the assertion in the case where they are just passing data
+  // around and don't care about the contents.
   iree_hal_encoding_type_t actual_encoding_type =
       iree_hal_buffer_view_encoding_type(buffer_view);
-  if (actual_encoding_type != expected_encoding_type) {
+  if (actual_encoding_type != IREE_HAL_ENCODING_TYPE_OPAQUE &&
+      actual_encoding_type != expected_encoding_type) {
     // TODO(benvanik): string formatting of encodings.
     return iree_make_status(
         IREE_STATUS_INVALID_ARGUMENT,
@@ -646,9 +680,11 @@ IREE_VM_ABI_EXPORT(iree_hal_module_buffer_view_assert,  //
   }
 
   // Element types determine the storage requirements.
+  // If the actual element type is opaque we allow it to pass through.
   iree_hal_element_type_t actual_element_type =
       iree_hal_buffer_view_element_type(buffer_view);
-  if (actual_element_type != expected_element_type) {
+  if (!iree_hal_element_types_are_compatible(actual_element_type,
+                                             expected_element_type)) {
 #if IREE_HAL_MODULE_STRING_UTIL_ENABLE
     char actual_element_type_str[32];
     iree_host_size_t actual_element_type_str_length = 0;

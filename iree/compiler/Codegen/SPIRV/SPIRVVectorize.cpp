@@ -69,24 +69,20 @@ Optional<SmallVector<int64_t, 4>> getNativeVectorShape(Operation *op) {
   return llvm::None;
 }
 
-/// Add patterns to vectorize Linalg ops with vectorization marker.
-void populateVectorizationPatterns(MLIRContext *context,
-                                   RewritePatternSet &patterns) {
+/// Add patterns to vectorize any supported Linalg ops.
+void populateVectorizationPatterns(RewritePatternSet &patterns) {
   linalg::insertVectorizationPatterns<linalg::FillOp, linalg::GenericOp,
                                       linalg::ContractionOpInterface>(
-      patterns, linalg::LinalgVectorizationOptions(),
-      linalg::LinalgTransformationFilter(
-          Identifier::get(getVectorizeMarker(), context)));
+      patterns, linalg::LinalgVectorizationOptions());
   vector::populateVectorTransferPermutationMapLoweringPatterns(patterns);
   vector::populateVectorReductionToContractPatterns(patterns);
 }
 
 /// Adds patterns to unroll vector ops to SPIR-V native vector size.
-void populateVectorUnrollPatterns(MLIRContext *context,
-                                  RewritePatternSet &patterns) {
-  vector::populateVectorUnrollPatterns(
-      patterns,
-      vector::UnrollVectorOptions().setNativeShapeFn(getNativeVectorShape));
+void populateVectorUnrollPatterns(RewritePatternSet &patterns) {
+  auto options =
+      vector::UnrollVectorOptions().setNativeShapeFn(getNativeVectorShape);
+  vector::populateVectorUnrollPatterns(patterns, options);
 }
 
 /// Vectorizes Linalg ops on buffer semantics.
@@ -104,21 +100,18 @@ class SPIRVVectorizePass : public SPIRVVectorizeBase<SPIRVVectorizePass> {
     FuncOp funcOp = getOperation();
 
     {
-      RewritePatternSet vectorizationPatterns(&getContext());
-      populateVectorizationPatterns(context, vectorizationPatterns);
-      populateLinalgToVectorVectorizeConvPatterns(context,
-                                                  vectorizationPatterns);
-      if (failed(applyPatternsAndFoldGreedily(
-              funcOp, std::move(vectorizationPatterns)))) {
+      RewritePatternSet patterns(context);
+      populateVectorizationPatterns(patterns);
+      populateLinalgToVectorVectorizeConvPatterns(context, patterns);
+      if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
         return signalPassFailure();
       }
 
+      RewritePatternSet foldPatterns(context);
       // Fold consumer add ops into the contraction op itself.
-      RewritePatternSet canonicalizationPatterns(context);
-      vector::ContractionOp::getCanonicalizationPatterns(
-          canonicalizationPatterns, context);
-      if (failed(applyPatternsAndFoldGreedily(
-              funcOp, std::move(canonicalizationPatterns)))) {
+      vector::ContractionOp::getCanonicalizationPatterns(foldPatterns, context);
+      if (failed(
+              applyPatternsAndFoldGreedily(funcOp, std::move(foldPatterns)))) {
         return signalPassFailure();
       }
     }
@@ -130,10 +123,10 @@ class SPIRVVectorizePass : public SPIRVVectorizeBase<SPIRVVectorizePass> {
     });
 
     {
-      RewritePatternSet vectorUnrollPatterns(funcOp.getContext());
-      populateVectorUnrollPatterns(funcOp.getContext(), vectorUnrollPatterns);
-      if (failed(applyPatternsAndFoldGreedily(
-              funcOp, std::move(vectorUnrollPatterns)))) {
+      RewritePatternSet unrollPatterns(context);
+      populateVectorUnrollPatterns(unrollPatterns);
+      if (failed(applyPatternsAndFoldGreedily(funcOp,
+                                              std::move(unrollPatterns)))) {
         return signalPassFailure();
       }
     }
@@ -144,7 +137,7 @@ class SPIRVVectorizePass : public SPIRVVectorizeBase<SPIRVVectorizePass> {
       llvm::dbgs() << "\n\n";
     });
 
-    linalg::hoistRedundantVectorTransfers(funcOp);
+    linalg::hoistRedundantVectorTransfersOnTensor(funcOp);
 
     LLVM_DEBUG({
       llvm::dbgs() << "--- After hoisting vector transfers ---\n";
@@ -152,14 +145,12 @@ class SPIRVVectorizePass : public SPIRVVectorizeBase<SPIRVVectorizePass> {
       llvm::dbgs() << "\n\n";
     });
 
-    {
-      RewritePatternSet canonicalizationPatterns(funcOp.getContext());
-      vector::ExtractStridedSliceOp::getCanonicalizationPatterns(
-          canonicalizationPatterns, context);
-      vector::populateVectorTransferPermutationMapLoweringPatterns(
-          canonicalizationPatterns);
-      if (failed(applyPatternsAndFoldGreedily(
-              funcOp, std::move(canonicalizationPatterns)))) {
+    {  // Canonicalization
+      RewritePatternSet patterns(context);
+      vector::ExtractStridedSliceOp::getCanonicalizationPatterns(patterns,
+                                                                 context);
+      vector::populateVectorTransferPermutationMapLoweringPatterns(patterns);
+      if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
         return signalPassFailure();
       }
     }
@@ -171,7 +162,7 @@ class SPIRVVectorizePass : public SPIRVVectorizeBase<SPIRVVectorizePass> {
     });
 
     {
-      RewritePatternSet contractLoweringPatterns(funcOp.getContext());
+      RewritePatternSet contractLoweringPatterns(context);
       vector::populateVectorBroadcastLoweringPatterns(contractLoweringPatterns);
       vector::populateVectorContractLoweringPatterns(
           contractLoweringPatterns,
@@ -188,6 +179,18 @@ class SPIRVVectorizePass : public SPIRVVectorizeBase<SPIRVVectorizePass> {
       funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
       llvm::dbgs() << "\n\n";
     });
+
+    {  // Canonicalization
+      RewritePatternSet patterns(context);
+      // We need to pull in casting way leading one dims to allow cancelling
+      // some read/write ops.
+      vector::populateCastAwayVectorLeadingOneDimPatterns(patterns);
+      vector::TransferReadOp::getCanonicalizationPatterns(patterns, context);
+      vector::TransferWriteOp::getCanonicalizationPatterns(patterns, context);
+      if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
+        return signalPassFailure();
+      }
+    }
   }
 };
 

@@ -1,20 +1,19 @@
 // RUN: iree-opt -split-input-file -pass-pipeline='hal.executable(hal.executable.variant(iree-codegen-linalg-to-spirv-pipeline))' %s | IreeFileCheck %s
 
-#config = #iree_codegen.lowering.config<tile_sizes = [[8, 64], [8, 4], [0, 0, 4]], native_vector_size = []>
-#translation = #iree_codegen.translation.info<"SPIRVVectorize", workload_per_wg = [64, 8]>
 hal.executable private @fuse_and_vectorize_fill_matmul  {
   hal.interface @io {
     hal.interface.binding @s0b0_ro_external, set=0, binding=0, type="StorageBuffer"
     hal.interface.binding @s0b1_ro_external, set=0, binding=1, type="StorageBuffer"
     hal.interface.binding @s0b2_xw_external, set=0, binding=2, type="StorageBuffer"
   }
-  hal.executable.variant @vulkan, target = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
-      spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], [SPV_KHR_storage_buffer_storage_class]>, ARM:IntegratedGPU, {}>}> {
-    hal.executable.entry_point @fuse_and_vectorize_fill_matmul attributes {
-      interface = @io, ordinal = 0 : index,
-      workgroup_size = [16: index, 1: index, 1: index],
-      translation.info = #translation
-    }
+  hal.executable.variant @vulkan_spirv_fb, target = #hal.executable.target<"vulkan", "vulkan-spirv-fb", {
+      spv.target_env = #spv.target_env<#spv.vce<v1.4, [Shader], []>, ARM:IntegratedGPU, {
+        max_compute_shared_memory_size = 32768 : i32,
+        max_compute_workgroup_invocations = 512 : i32,
+        max_compute_workgroup_size = dense<512> : vector<3xi32>,
+       subgroup_size = 16 : i32}>
+    }> {
+    hal.executable.entry_point @fuse_and_vectorize_fill_matmul attributes {interface = @io, ordinal = 0 : index}
     builtin.module {
       func @fuse_and_vectorize_fill_matmul() {
         %c0 = arith.constant 0 : index
@@ -44,8 +43,8 @@ hal.executable private @fuse_and_vectorize_fill_matmul  {
             %13 = affine.min affine_map<(d0)[s0] -> (-d0 + 4096, s0)>(%arg0)[%workgroup_size_y]
             %14 = affine.min affine_map<(d0)[s0] -> (-d0 + 4096, s0)>(%arg1)[%workgroup_size_x]
             %15 = linalg.init_tensor [%13, %14] : tensor<?x?xf32>
-            %16 = linalg.fill(%cst, %15) {lowering.config = #config} : f32, tensor<?x?xf32> -> tensor<?x?xf32>
-            %17 = linalg.matmul {lowering.config = #config} ins(%8, %10 : tensor<?x4096xf32>, tensor<4096x?xf32>) outs(%16 : tensor<?x?xf32>) -> tensor<?x?xf32>
+            %16 = linalg.fill(%cst, %15) : f32, tensor<?x?xf32> -> tensor<?x?xf32>
+            %17 = linalg.matmul ins(%8, %10 : tensor<?x4096xf32>, tensor<4096x?xf32>) outs(%16 : tensor<?x?xf32>) -> tensor<?x?xf32>
             flow.dispatch.tensor.store %17, %2, offsets = [%arg0, %arg1], sizes = [%11, %12], strides = [1, 1] : tensor<?x?xf32> -> !flow.dispatch.tensor<writeonly:4096x4096xf32>
           }
         }
@@ -64,27 +63,26 @@ hal.executable private @fuse_and_vectorize_fill_matmul  {
 //      CHECK-NOT:   spv.Store "StorageBuffer"
 //      CHECK-NOT:   spv.Load "StorageBuffer"
 //          CHECK:   spv.mlir.loop
-// CHECK-COUNT-12:   spv.Load "StorageBuffer" %{{.*}} : vector<4xf32>
-// CHECK-COUNT-32:   spv.GLSL.Fma %{{.*}}, %{{.*}} : vector<4xf32>
-//  CHECK-COUNT-8:   spv.Store "StorageBuffer" %{{.*}}, %{{.*}} : vector<4xf32>
+//  CHECK-COUNT-8:   spv.Load "StorageBuffer" %{{.*}} : vector<4xf32>
+// CHECK-COUNT-16:   spv.GLSL.Fma %{{.*}}, %{{.*}} : vector<4xf32>
+//  CHECK-COUNT-4:   spv.Store "StorageBuffer" %{{.*}}, %{{.*}} : vector<4xf32>
 
 // -----
 
-#config = #iree_codegen.lowering.config<tile_sizes = [[8, 64], [8, 4], [0, 0, 4]], native_vector_size = []>
-#translation = #iree_codegen.translation.info<"SPIRVVectorize", workload_per_wg = [64, 8]>
 hal.executable private @fuse_and_vectorize_matmul_add  {
   hal.interface @io {
     hal.interface.binding @s0b0_ro_external, set=0, binding=0, type="StorageBuffer"
     hal.interface.binding @s0b1_ro_external, set=0, binding=1, type="StorageBuffer"
     hal.interface.binding @s0b2_xw_external, set=0, binding=2, type="StorageBuffer"
   }
-  hal.executable.variant @vulkan, target = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
-      spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], [SPV_KHR_storage_buffer_storage_class]>, ARM:IntegratedGPU, {}>}> {
-    hal.executable.entry_point @fuse_and_vectorize_matmul_add attributes {
-      interface = @io, ordinal = 0 : index,
-      workgroup_size = [16: index, 1: index, 1: index],
-      translation.info = #translation
-    }
+  hal.executable.variant @vulkan_spirv_fb, target = #hal.executable.target<"vulkan", "vulkan-spirv-fb", {
+      spv.target_env = #spv.target_env<#spv.vce<v1.4, [Shader], []>, ARM:IntegratedGPU, {
+        max_compute_shared_memory_size = 32768 : i32,
+        max_compute_workgroup_invocations = 512 : i32,
+        max_compute_workgroup_size = dense<512> : vector<3xi32>,
+       subgroup_size = 16 : i32}>
+    }> {
+    hal.executable.entry_point @fuse_and_vectorize_matmul_add attributes {interface = @io, ordinal = 0 : index}
     builtin.module {
       func @fuse_and_vectorize_matmul_add() {
         %c0 = arith.constant 0 : index
@@ -120,9 +118,9 @@ hal.executable private @fuse_and_vectorize_matmul_add  {
             %18 = affine.min affine_map<(d0)[s0] -> (-d0 + 1024, s0)>(%arg0)[%workgroup_size_y]
             %19 = affine.min affine_map<(d0)[s0] -> (-d0 + 256, s0)>(%arg1)[%workgroup_size_x]
             %20 = linalg.init_tensor [%18, %19] : tensor<?x?xf32>
-            %21 = linalg.fill(%cst, %20) {lowering.config = #config} : f32, tensor<?x?xf32> -> tensor<?x?xf32>
-            %22 = linalg.matmul {lowering.config = #config} ins(%15, %17 : tensor<?x512xf32>, tensor<512x?xf32>) outs(%21 : tensor<?x?xf32>) -> tensor<?x?xf32>
-            %23 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]} ins(%22, %10 : tensor<?x?xf32>, tensor<?x?xf32>) outs(%13 : tensor<?x?xf32>) attrs =  {lowering.config = #config} {
+            %21 = linalg.fill(%cst, %20) : f32, tensor<?x?xf32> -> tensor<?x?xf32>
+            %22 = linalg.matmul ins(%15, %17 : tensor<?x512xf32>, tensor<512x?xf32>) outs(%21 : tensor<?x?xf32>) -> tensor<?x?xf32>
+            %23 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]} ins(%22, %10 : tensor<?x?xf32>, tensor<?x?xf32>) outs(%13 : tensor<?x?xf32>) {
             ^bb0(%arg2: f32, %arg3: f32, %arg4: f32):  // no predecessors
               %24 = arith.addf %arg2, %arg3 : f32
               linalg.yield %24 : f32
@@ -146,11 +144,11 @@ hal.executable private @fuse_and_vectorize_matmul_add  {
 //      CHECK-NOT:   spv.Store "StorageBuffer"
 //      CHECK-NOT:   spv.Load "StorageBuffer"
 //          CHECK:   spv.mlir.loop
-// CHECK-COUNT-12:     spv.Load "StorageBuffer" %{{.*}} : vector<4xf32>
-// CHECK-COUNT-32:     spv.GLSL.Fma %{{.*}}, %{{.*}} : vector<4xf32>
+//  CHECK-COUNT-8:     spv.Load "StorageBuffer" %{{.*}} : vector<4xf32>
+// CHECK-COUNT-16:     spv.GLSL.Fma %{{.*}}, %{{.*}} : vector<4xf32>
 //          CHECK:   spv.mlir.merge
-//  CHECK-COUNT-8:   spv.Load "StorageBuffer" %{{.*}} : vector<4xf32>
+//  CHECK-COUNT-4:   spv.Load "StorageBuffer" %{{.*}} : vector<4xf32>
 //      CHECK-NOT:   spv.Load "StorageBuffer"
 //      CHECK-NOT:   spv.Store "StorageBuffer"
-//  CHECK-COUNT-8:   spv.FAdd %{{.*}}, %{{.*}} : vector<4xf32>
-//  CHECK-COUNT-8:   spv.Store "StorageBuffer" %{{.*}}, %{{.*}} : vector<4xf32>
+//  CHECK-COUNT-4:   spv.FAdd %{{.*}}, %{{.*}} : vector<4xf32>
+//  CHECK-COUNT-4:   spv.Store "StorageBuffer" %{{.*}}, %{{.*}} : vector<4xf32>

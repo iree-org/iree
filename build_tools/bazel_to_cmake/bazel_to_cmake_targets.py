@@ -13,67 +13,51 @@ EXPLICIT_TARGET_MAPPING = {
     "//build_tools:dl": ["${CMAKE_DL_LIBS}"],
 
     # IREE llvm-external-projects
-    "//llvm-external-projects/iree-dialects:IREEInputDialect":
-        ["IREEInputDialect"],
-    "//llvm-external-projects/iree-dialects:IREELinalgExtDialect":
-        ["IREELinalgExtDialect"],
-    "//llvm-external-projects/iree-dialects:IREELinalgExtTransforms":
-        ["IREELinalgExtPasses"],
+    "//llvm-external-projects/iree-dialects:IREEInputDialect": [
+        "IREEInputDialect"
+    ],
+    "//llvm-external-projects/iree-dialects:IREELinalgExtDialect": [
+        "IREELinalgExtDialect"
+    ],
+    "//llvm-external-projects/iree-dialects:IREELinalgExtTransforms": [
+        "IREELinalgExtPasses"
+    ],
     "//llvm-external-projects/iree-dialects:IREEPyDMDialect": [
         "IREEPyDMDialect"
     ],
-    "//llvm-external-projects/iree-dialects:IREEPyDMTransforms":
-        ["IREEPyDMPasses"],
+    "//llvm-external-projects/iree-dialects:IREEPyDMTransforms": [
+        "IREEPyDMPasses"
+    ],
 
     # LLVM
     "@llvm-project//llvm:IPO": ["LLVMipo"],
     "@llvm-project//lld": ["lld"],
     # MLIR
-    "@llvm-project//mlir:AllPassesAndDialects": [
-        "MLIRAllDialects"
-    ],
-    "@llvm-project//mlir:AffineToStandardTransforms": [
-        "MLIRAffineToStandard"
-    ],
+    "@llvm-project//mlir:AllPassesAndDialects": ["MLIRAllDialects"],
+    "@llvm-project//mlir:AffineToStandardTransforms": ["MLIRAffineToStandard"],
     "@llvm-project//mlir:CFGTransforms": ["MLIRSCFToStandard"],
     "@llvm-project//mlir:ComplexDialect": ["MLIRComplex"],
     "@llvm-project//mlir:DialectUtils": [""],
-    "@llvm-project//mlir:ExecutionEngineUtils": [
-        "MLIRExecutionEngine"
-    ],
+    "@llvm-project//mlir:ExecutionEngineUtils": ["MLIRExecutionEngine"],
     "@llvm-project//mlir:GPUDialect": ["MLIRGPUOps"],
     "@llvm-project//mlir:GPUTransforms": ["MLIRGPUTransforms"],
     "@llvm-project//mlir:LinalgInterfaces": ["MLIRLinalg"],
     "@llvm-project//mlir:LinalgOps": ["MLIRLinalg"],
     "@llvm-project//mlir:LLVMDialect": ["MLIRLLVMIR"],
-    "@llvm-project//mlir:LLVMTransforms": [
-        "MLIRStandardToLLVM"
-    ],
+    "@llvm-project//mlir:LLVMTransforms": ["MLIRStandardToLLVM"],
     "@llvm-project//mlir:MathDialect": ["MLIRMath"],
-    "@llvm-project//mlir:ArithmeticDialect": [
-        "MLIRArithmetic"
-    ],
-    "@llvm-project//mlir:BufferizationDialect": [
-        "MLIRBufferization"
-    ],
+    "@llvm-project//mlir:ArithmeticDialect": ["MLIRArithmetic"],
+    "@llvm-project//mlir:BufferizationDialect": ["MLIRBufferization"],
     "@llvm-project//mlir:MemRefDialect": ["MLIRMemRef"],
     "@llvm-project//mlir:SCFToGPUPass": ["MLIRSCFToGPU"],
     "@llvm-project//mlir:SCFDialect": ["MLIRSCF"],
     "@llvm-project//mlir:StandardOps": ["MLIRStandard"],
-    "@llvm-project//mlir:ShapeTransforms": [
-        "MLIRShapeOpsTransforms"
-    ],
-    "@llvm-project//mlir:SideEffects": [
-        "MLIRSideEffectInterfaces"
-    ],
+    "@llvm-project//mlir:ShapeTransforms": ["MLIRShapeOpsTransforms"],
+    "@llvm-project//mlir:SideEffects": ["MLIRSideEffectInterfaces"],
     "@llvm-project//mlir:SPIRVDialect": ["MLIRSPIRV"],
     "@llvm-project//mlir:TosaDialect": ["MLIRTosa"],
-    "@llvm-project//mlir:ToLLVMIRTranslation": [
-        "MLIRTargetLLVMIRExport"
-    ],
-    "@llvm-project//mlir:mlir_c_runner_utils": [
-        "MLIRExecutionEngine"
-    ],
+    "@llvm-project//mlir:ToLLVMIRTranslation": ["MLIRTargetLLVMIRExport"],
+    "@llvm-project//mlir:mlir_c_runner_utils": ["MLIRExecutionEngine"],
     "@llvm-project//mlir:mlir-translate": ["mlir-translate"],
     "@llvm-project//mlir:MlirTableGenMain": ["MLIRTableGen"],
     "@llvm-project//mlir:MlirOptLib": ["MLIROptLib"],
@@ -100,16 +84,14 @@ EXPLICIT_TARGET_MAPPING = {
         "tensorflow::external_mhlo_includes",
         "MhloToStandard",
     ],
-    "@mlir-hlo//:legalize_einsum_to_dot_general":
-        [
-            "tensorflow::external_mhlo_includes",
-            "MhloPasses",
-        ],
-    "@mlir-hlo//:legalize_gather_to_torch_index_select":
-        [
-            "tensorflow::external_mhlo_includes",
-            "MhloPasses",
-        ],
+    "@mlir-hlo//:legalize_einsum_to_dot_general": [
+        "tensorflow::external_mhlo_includes",
+        "MhloPasses",
+    ],
+    "@mlir-hlo//:legalize_gather_to_torch_index_select": [
+        "tensorflow::external_mhlo_includes",
+        "MhloPasses",
+    ],
     "@mlir-hlo//:legalize_to_linalg": [
         "tensorflow::external_mhlo_includes",
         "MhloLhloToLinalg",
@@ -135,11 +117,10 @@ EXPLICIT_TARGET_MAPPING = {
         "tensorflow::external_mhlo_includes",
         "MhloToStandard",
     ],
-    "@mlir-hlo//:mhlo_to_mhlo_lowering_patterns":
-        [
-            "tensorflow::external_mhlo_includes",
-            "MhloPasses",
-        ],
+    "@mlir-hlo//:mhlo_to_mhlo_lowering_patterns": [
+        "tensorflow::external_mhlo_includes",
+        "MhloPasses",
+    ],
     "@mlir-hlo//:unfuse_batch_norm": [
         "tensorflow::external_mhlo_includes",
         "MhloPasses",
@@ -160,10 +141,8 @@ EXPLICIT_TARGET_MAPPING = {
     "@com_google_googletest//:gtest": ["gmock", "gtest"],
     "@spirv_cross//:spirv_cross_lib": ["spirv-cross-msl"],
     "@cpuinfo": ["cpuinfo"],
-    "@vulkan_memory_allocator//:impl_header_only":
-        ["vulkan_memory_allocator"],
+    "@vulkan_memory_allocator//:impl_header_only": ["vulkan_memory_allocator"],
 }
-
 
 def _convert_mlir_target(target):
   # Default to a pattern substitution approach.

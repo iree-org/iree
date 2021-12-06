@@ -307,13 +307,8 @@ static LogicalResult setDefaultOpConfig(spirv::ResourceLimitsAttr limits,
   if (partitionedLoops.empty()) {
     // No tiled loops means we cannot tile (and distribute) at all. Use just one
     // single thread to run everything.
-    auto pipeline = IREE::Codegen::DispatchLoweringPassPipeline::SPIRVVectorize;
-    if (auto linalgOp = dyn_cast<linalg::GenericOp>(op)) {
-      auto untiledResultShape = getUntiledResultShape(linalgOp, 0);
-      if (untiledResultShape.empty()) {
-        pipeline = IREE::Codegen::DispatchLoweringPassPipeline::SPIRVDistribute;
-      }
-    }
+    auto pipeline =
+        IREE::Codegen::DispatchLoweringPassPipeline::SPIRVDistribute;
     std::array<int64_t, 3> workgroupSize = {1, 1, 1};
     return setOpConfigAndEntryPointFnTranslation(funcOp, op, {}, {}, pipeline,
                                                  workgroupSize);
@@ -397,6 +392,10 @@ static LogicalResult setDefaultOpConfig(spirv::ResourceLimitsAttr limits,
   auto untiledResultShape = getUntiledResultShape(linalgOp, 0);
   bool vectorizable =
       !linalgOp.hasIndexSemantics() &&
+      // TODO: Skip vectorization for linalg.copy ops. Right now handling of
+      // it still goes through the old bufferization-first pipeline, while
+      // vectorization pipeline expects tensor-semantic ops.
+      !isa<linalg::CopyOp>(op) &&
       // Skip vectorization for non-minor identity inputs as it generates
       // vector.transfer_read ops with permutation maps that we currently
       // cannot lower.
@@ -605,7 +604,6 @@ LogicalResult initSPIRVLaunchConfig(ModuleOp module) {
   for (auto funcOp : module.getOps<FuncOp>()) {
     auto entryPointOp = entryPointOps.lookup(funcOp.getName());
     if (!entryPointOp) continue;
-    if (getTranslationInfo(entryPointOp)) continue;
 
     SmallVector<Operation *> computeOps;
     SmallVector<LoopTilingAndDistributionInfo> tiledLoops;
@@ -649,18 +647,20 @@ LogicalResult initSPIRVLaunchConfig(ModuleOp module) {
       // If the tiled loops are not empty then this could be a corner case of
       // tensor.insert_slice being tiled and distributed, that just shows up as
       // a `flow.dispatch.tensor.load` and a `flow.dispatch.tensor.store` (or as
-      // a copy. For now just treat the tiled loops not being empty as an
+      // a copy). For now just treat the tiled loops not being empty as an
       // indicator of that. Need a better way of information flow from flow
       // dialect to hal.
       if (!tiledLoops.empty()) {
+        // These configuration parameters will be overwritten by the
+        // SPIRVDistributeCopy pipeline later.
         const int64_t subgroupSize =
             limits.subgroup_size().getValue().getSExtValue();
         std::array<int64_t, 3> workgroupSize = {subgroupSize, 1, 1};
         SmallVector<int64_t> workloadPerWorkgroup(tiledLoops.size(), 1);
-        workloadPerWorkgroup.front() = subgroupSize * 4;
+        workloadPerWorkgroup.front() = subgroupSize;
         setTranslationInfo(
             funcOp,
-            IREE::Codegen::DispatchLoweringPassPipeline::SPIRVDistribute,
+            IREE::Codegen::DispatchLoweringPassPipeline::SPIRVDistributeCopy,
             workloadPerWorkgroup, workgroupSize);
         return success();
       }
