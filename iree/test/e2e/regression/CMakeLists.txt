@@ -15,14 +15,15 @@ iree_lit_test_suite(
     lit
   SRCS
     "globals.mlir"
+    "libm_linking.mlir"
     "scalar.mlir"
     "trace_dispatch_tensors.mlir"
     "unused_args.mlir"
   DATA
     iree::tools::IreeFileCheck
-    iree::tools::iree-benchmark-module
+    iree::tools::iree-opt
     iree::tools::iree-run-mlir
-    iree::tools::iree-translate
+    lld
   LABELS
     "hostonly"
 )

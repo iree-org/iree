@@ -113,7 +113,7 @@ class WindowsLinkerTool : public LinkerTool {
         // Builds a DLL and exports functions with the dllexport storage class.
         "/dll",
 
-        // Forces a fixed timestamp to ensure files are reproducable across
+        // Forces a fixed timestamp to ensure files are reproducible across
         // builds. Undocumented but accepted by both link and lld-link.
         // https://blog.conan.io/2019/09/02/Deterministic-builds-with-C-C++.html
         "/Brepro",
