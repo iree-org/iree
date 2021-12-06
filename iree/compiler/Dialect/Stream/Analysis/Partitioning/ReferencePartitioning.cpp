@@ -136,14 +136,21 @@ PartitionSet partitionStreamableOpsReference(
     if (consumers.any()) {
       // If we are a clonable op (like splat) clone us into every partition.
       // Otherwise we just pick the first we find (probably a bad heuristic).
-      bool shouldClone = streamableOp.preferCloneToConsumers();
-      for (auto consumerOrdinal : consumers.set_bits()) {
-        LLVM_DEBUG(llvm::dbgs() << "Cloning into consumer partition "
+      if (streamableOp.preferCloneToConsumers()) {
+        for (auto consumerOrdinal : consumers.set_bits()) {
+          LLVM_DEBUG(llvm::dbgs() << "Cloning into consumer partition "
+                                  << consumerOrdinal << "\n");
+          builders[consumerOrdinal]->ops.insert(&op);
+          opInfo.membership.set(consumerOrdinal);
+          opInfo.hazards.reset(consumerOrdinal);
+        }
+      } else {
+        int consumerOrdinal = consumers.find_last();
+        LLVM_DEBUG(llvm::dbgs() << "Moving into consumer partition "
                                 << consumerOrdinal << "\n");
         builders[consumerOrdinal]->ops.insert(&op);
         opInfo.membership.set(consumerOrdinal);
         opInfo.hazards.reset(consumerOrdinal);
-        if (!shouldClone) break;
       }
       LLVM_DEBUG(llvm::dbgs() << "Handled streamable (continue)\n");
       continue;
