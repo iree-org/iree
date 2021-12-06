@@ -92,19 +92,6 @@ LogicalResult PartitionSet::verify(Location loc) {
     if (failed(partition.verify(loc))) return failure();
   }
 
-  // Ensure no partitions duplicate escaping values as we need a single def to
-  // remap the value in the parent block.
-  SetVector<Value> outs;
-  for (auto &partition : partitions) {
-    for (auto out : partition.outs) {
-      if (outs.contains(out)) {
-        return mlir::emitError(loc)
-               << "duplicate value found in partition set outputs";
-      }
-      outs.insert(out);
-    }
-  }
-
   // Ensure a correct topological order of partitions. This only checks the
   // order of the partitions and not any ops that aren't covered. We do this
   // by walking backwards and checking that no partition captures values
@@ -114,7 +101,8 @@ LogicalResult PartitionSet::verify(Location loc) {
     for (auto in : partition.ins) {
       if (declaredBelow.contains(in)) {
         return mlir::emitError(loc) << "partition set out of order; value "
-                                       "captured declared as escaping below";
+                                       "captured declared as escaping below: "
+                                    << in;
       }
     }
     for (auto out : partition.outs) {

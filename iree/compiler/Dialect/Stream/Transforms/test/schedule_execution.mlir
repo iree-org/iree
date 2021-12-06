@@ -141,3 +141,41 @@ func @dontHoistPastAsserts(%arg0: !stream.resource<external>, %arg1: !stream.res
 
   return %6 : !stream.resource<external>
 }
+
+// -----
+
+// Tests that cloning across partition boundaries inserts the cloned op into the
+// correct partitions.
+
+// CHECK-LABEL: @cloneAcrossPartitions
+func @cloneAcrossPartitions(%cond: i1) -> (!stream.resource<external>) {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %c123_i8 = arith.constant 123 : i8
+
+  // CHECK: stream.async.execute
+  // CHECK-NEXT: stream.async.splat
+  %splat = stream.async.splat %c123_i8 : i8 -> !stream.resource<transient>{%c1}
+  // CHECK-NEXT: stream.async.dispatch
+  %dispatch0 = stream.async.dispatch @ex::@dispatch0[%c1, %c1, %c1](%splat) : (!stream.resource<transient>{%c1}) -> !stream.resource<transient>{%c1}
+  // CHECK-NEXT: stream.async.transfer
+  %download = stream.async.transfer %dispatch0 : !stream.resource<transient>{%c1} -> !stream.resource<staging>{%c1}
+  // CHECK: stream.timepoint.await
+
+  // CHECK: stream.async.load
+  %load = stream.async.load %download[%c0] : !stream.resource<staging>{%c1} -> i8
+  // CHECK: stream.async.store
+  %updated = stream.async.store %load, %download[%c0] : i8 -> !stream.resource<staging>{%c1}
+
+  // CHECK: stream.async.execute
+  // CHECK-NEXT: stream.async.splat
+  // CHECK-NEXT: stream.async.transfer
+  %upload = stream.async.transfer %updated : !stream.resource<staging>{%c1} -> !stream.resource<transient>{%c1}
+  // CHECK-NEXT: stream.async.dispatch
+  %dispatch1 = stream.async.dispatch @ex::@dispatch1[%c1, %c1, %c1](%upload, %splat) : (!stream.resource<transient>{%c1}, !stream.resource<transient>{%c1}) -> !stream.resource<transient>{%c1}
+  // CHECK-NEXT: stream.async.transfer
+  %result = stream.async.transfer %dispatch1 : !stream.resource<transient>{%c1} -> !stream.resource<external>{%c1}
+
+  // CHECK: return
+  return %result : !stream.resource<external>
+}
