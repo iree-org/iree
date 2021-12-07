@@ -12,6 +12,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
+#include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Affine/Utils.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/PatternMatch.h"

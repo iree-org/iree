@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
+#include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Affine/Utils.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
