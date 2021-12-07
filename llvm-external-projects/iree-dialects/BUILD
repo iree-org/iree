@@ -181,11 +181,17 @@ gentbl_cc_library(
             "include/iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.cpp.inc",
         ),
         (
-            ["-gen-typedef-decls"],
+            [
+                "-gen-typedef-decls",
+                "-typedefs-dialect=iree_linalg_ext",
+            ],
             "include/iree-dialects/Dialect/LinalgExt/IR/LinalgExtTypes.h.inc",
         ),
         (
-            ["-gen-typedef-defs"],
+            [
+                "-gen-typedef-defs",
+                "-typedefs-dialect=iree_linalg_ext",
+            ],
             "include/iree-dialects/Dialect/LinalgExt/IR/LinalgExtTypes.cpp.inc",
         ),
     ],

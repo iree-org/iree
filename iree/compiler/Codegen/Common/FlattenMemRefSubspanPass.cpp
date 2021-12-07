@@ -376,7 +376,8 @@ struct LinearizeTransferReadIndices final
 
     rewriter.replaceOpWithNewOp<vector::TransferReadOp>(
         transferReadOp, transferReadOp.getVectorType(), adaptor.source(),
-        linearIndex, rewriter.getDimIdentityMap(), transferReadOp.padding(),
+        linearIndex, AffineMapAttr::get(rewriter.getDimIdentityMap()),
+        transferReadOp.padding(), /*mask=*/Value(),
         transferReadOp.in_boundsAttr());
     return success();
   }
@@ -407,7 +408,8 @@ struct LinearizeTransferWriteIndices final
 
     rewriter.replaceOpWithNewOp<vector::TransferWriteOp>(
         transferWriteOp, adaptor.vector(), adaptor.source(), linearIndex,
-        rewriter.getDimIdentityMap(), transferWriteOp.in_boundsAttr());
+        AffineMapAttr::get(rewriter.getDimIdentityMap()),
+        transferWriteOp.in_boundsAttr());
     return success();
   }
 };

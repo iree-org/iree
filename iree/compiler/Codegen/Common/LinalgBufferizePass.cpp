@@ -747,9 +747,9 @@ static LogicalResult convertVectorTransferWriteOp(OpBuilder &b,
   }
 
   // Create a new vector.transfer_write operation without a result value.
-  b.create<vector::TransferWriteOp>(
-      loc, op.vector(), resultBuffer, op.indices(), op.permutation_map(),
-      op.mask(), op.in_bounds() ? *op.in_bounds() : ArrayAttr());
+  b.create<vector::TransferWriteOp>(loc, op.vector(), resultBuffer,
+                                    op.indices(), op.permutation_mapAttr(),
+                                    op.mask(), op.in_boundsAttr());
   return success();
 }
 
