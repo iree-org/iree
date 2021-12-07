@@ -22,7 +22,6 @@
 #include "llvm/Support/Path.h"
 #include "llvm/Support/ToolOutputFile.h"
 #include "mlir/Dialect/GPU/GPUDialect.h"
-#include "mlir/Dialect/Linalg/IR/LinalgTypes.h"
 #include "mlir/Dialect/SPIRV/IR/SPIRVDialect.h"
 #include "mlir/Dialect/SPIRV/IR/SPIRVOps.h"
 #include "mlir/Dialect/SPIRV/IR/TargetAndABI.h"
@@ -88,7 +87,7 @@ VulkanSPIRVTargetOptions getVulkanSPIRVTargetOptionsFromFlags() {
   VulkanSPIRVTargetOptions targetOptions;
   targetOptions.vulkanTargetEnv = clVulkanTargetEnv;
   targetOptions.vulkanTargetTriple = clVulkanTargetTriple;
-  targetOptions.vulkanKeepShaderModules = clVulkanKeepShaderModules;
+  targetOptions.keepShaderModules = clVulkanKeepShaderModules;
 
   return targetOptions;
 }
@@ -297,7 +296,7 @@ class VulkanSPIRVTargetBackend : public TargetBackend {
     }
     auto spvCodeRef = flatbuffers_uint32_vec_create(builder, spvBinary.data(),
                                                     spvBinary.size());
-    if (options_.vulkanKeepShaderModules) {
+    if (options_.keepShaderModules) {
       saveSpirvBinary(variantOp, spvBinary);
     }
 
@@ -354,7 +353,7 @@ class VulkanSPIRVTargetBackend : public TargetBackend {
                        ArrayRef<uint32_t> binary) {
     llvm::SmallString<32> filePath;
     if (std::error_code error = llvm::sys::fs::createTemporaryFile(
-            variantOp.getName(), "spvasm", filePath)) {
+            variantOp.getName(), "spv", filePath)) {
       llvm::errs() << "failed to generate file for SPIR-V binary: "
                    << error.message();
       return;

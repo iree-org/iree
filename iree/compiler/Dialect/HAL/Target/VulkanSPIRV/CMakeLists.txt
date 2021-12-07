@@ -25,7 +25,6 @@ iree_cc_library(
     LLVMSupport
     MLIRGPUOps
     MLIRIR
-    MLIRLinalg
     MLIRParser
     MLIRSPIRV
     MLIRSPIRVModuleCombiner
