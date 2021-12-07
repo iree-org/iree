@@ -355,7 +355,7 @@ class VulkanSPIRVTargetBackend : public TargetBackend {
     llvm::SmallString<32> filePath;
     if (std::error_code error = llvm::sys::fs::createTemporaryFile(
             variantOp.getName(), "spvasm", filePath)) {
-      llvm::errs() << "failed to generate file for spirv binary: "
+      llvm::errs() << "failed to generate file for SPIR-V binary: "
                    << error.message();
       return;
     }
@@ -363,13 +363,13 @@ class VulkanSPIRVTargetBackend : public TargetBackend {
     auto file = std::make_unique<llvm::ToolOutputFile>(filePath, error,
                                                        llvm::sys::fs::OF_None);
     if (error) {
-      llvm::errs() << "failed to open file for spirv binary '" << filePath
+      llvm::errs() << "failed to open file for SPIR-V binary '" << filePath
                    << "': " << error.message();
       return;
     }
 
     mlir::emitRemark(variantOp.getLoc())
-        << "spirv binary for " << variantOp.getName() << " preserved:\n"
+        << "SPIR-V binary for " << variantOp.getName() << " preserved:\n"
         << "    " << filePath;
     file->os().write(reinterpret_cast<const char *>(binary.data()),
                      binary.size() * sizeof(uint32_t));
