@@ -28,6 +28,37 @@ namespace iree_compiler {
 
 namespace {
 
+LogicalResult sanitizeSymbolNames(IREE::VM::ModuleOp &moduleOp) {
+  auto replaceIllegalChars = [](std::string &symbolName) {
+    // replace illegal characters in symbol name with "_"
+    std::replace(symbolName.begin(), symbolName.end(), '>', '_');
+    std::replace(symbolName.begin(), symbolName.end(), '<', '_');
+  };
+
+  std::string symbolName(moduleOp.getName());
+
+  // Sanitize name
+  replaceIllegalChars(symbolName);
+
+  if (failed(moduleOp.replaceAllSymbolUses(
+          StringAttr::get(moduleOp.getContext(), symbolName), moduleOp)))
+    return failure();
+
+  SymbolTable::setSymbolName(moduleOp, symbolName);
+
+  for (auto rodataOp : moduleOp.getOps<IREE::VM::RodataOp>()) {
+    std::string symbolName(rodataOp.getName());
+    replaceIllegalChars(symbolName);
+
+    // Sanitize name
+    if (failed(rodataOp.replaceAllSymbolUses(
+            StringAttr::get(moduleOp.getContext(), symbolName), moduleOp)))
+      return failure();
+    SymbolTable::setSymbolName(rodataOp, symbolName);
+  }
+  return success();
+}
+
 // TODO(simon-camp/marbre): Use this function throughout the conversions.
 Optional<std::string> getCType(Type type) {
   if (auto iType = type.dyn_cast<IntegerType>()) {
@@ -3748,6 +3779,9 @@ class ConvertVMToEmitCPass
 
   void runOnOperation() override {
     IREE::VM::ModuleOp module = getOperation();
+
+    // Replace illegal characters in symbol names and replace them with "_"
+    if (failed(sanitizeSymbolNames(module))) return signalPassFailure();
 
     ConversionTarget target(getContext());
     EmitCTypeConverter typeConverter;
