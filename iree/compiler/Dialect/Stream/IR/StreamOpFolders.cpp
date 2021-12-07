@@ -626,11 +626,47 @@ struct FoldResourceSubviewOps : public OpRewritePattern<ResourceSubviewOp> {
   }
 };
 
+// Turns selects of subviews of a resource into selects of the offset.
+// This only works if the subview sizes match.
+//
+// Example:
+//  %subview0 = stream.resource.subview %src[%offset0]
+//  %subview1 = stream.resource.subview %src[%offset1]
+//  %subview = select %cond, %subview0, %subview1 : !stream.resource<transient>
+// ->
+//  %offset = select %cond, %offset0, %offset1 : index
+//  %subview = stream.resource.subview %src[%offset]
+struct SinkSubviewAcrossSelectOps : public OpRewritePattern<mlir::SelectOp> {
+  using OpRewritePattern::OpRewritePattern;
+  LogicalResult matchAndRewrite(mlir::SelectOp op,
+                                PatternRewriter &rewriter) const override {
+    if (!op.getType().isa<IREE::Stream::ResourceType>()) return failure();
+    auto trueSubview = dyn_cast_or_null<IREE::Stream::ResourceSubviewOp>(
+        op.true_value().getDefiningOp());
+    auto falseSubview = dyn_cast_or_null<IREE::Stream::ResourceSubviewOp>(
+        op.false_value().getDefiningOp());
+    if (!trueSubview || !falseSubview) return failure();
+    if (trueSubview.source() != falseSubview.source() ||
+        trueSubview.result_size() != falseSubview.result_size()) {
+      return failure();
+    }
+    auto offsetSelectOp = rewriter.create<mlir::SelectOp>(
+        op.getLoc(), op.condition(), trueSubview.source_offset(),
+        falseSubview.source_offset());
+    rewriter.replaceOpWithNewOp<IREE::Stream::ResourceSubviewOp>(
+        op, op.result().getType(), trueSubview.source(),
+        trueSubview.source_size(), offsetSelectOp.result(),
+        trueSubview.result_size());
+    return success();
+  }
+};
+
 }  // namespace
 
 void ResourceSubviewOp::getCanonicalizationPatterns(
     OwningRewritePatternList &results, MLIRContext *context) {
   results.insert<FoldResourceSubviewOps>(context);
+  results.insert<SinkSubviewAcrossSelectOps>(context);
 }
 
 //===----------------------------------------------------------------------===//

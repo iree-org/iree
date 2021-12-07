@@ -180,6 +180,24 @@ func @FoldResourceSubviewOps(%arg0: !stream.resource<*>, %arg1: index) -> !strea
 
 // -----
 
+// CHECK-LABEL: @SinkSubviewAcrossSelectOps
+func @SinkSubviewAcrossSelectOps(%arg0: !stream.resource<*>, %arg1: i1) -> !stream.resource<*> {
+  %c0 = arith.constant 0 : index
+  %c128 = arith.constant 128 : index
+  %c256 = arith.constant 256 : index
+  // CHECK-NOT: stream.resource.subview
+  %0 = stream.resource.subview %arg0[%c0] : !stream.resource<*>{%c256} -> !stream.resource<*>{%c128}
+  // CHECK-NOT: stream.resource.subview
+  %1 = stream.resource.subview %arg0[%c128] : !stream.resource<*>{%c256} -> !stream.resource<*>{%c128}
+  // CHECK: %[[OFFSET:.+]] = select %arg1, %c0, %c128 : index
+  %2 = select %arg1, %0, %1 : !stream.resource<*>
+  // CHECK-NEXT: %[[SUBVIEW:.+]] = stream.resource.subview %arg0[%[[OFFSET]]] : !stream.resource<*>{%c256} -> !stream.resource<*>{%c128}
+  // CHECK-NEXT: return %[[SUBVIEW]]
+  return %2 : !stream.resource<*>
+}
+
+// -----
+
 // Tests that unrealized_conversion_casts on resources are properly cleaned up.
 
 // CHECK-LABEL: unrealizedCastCleanup
