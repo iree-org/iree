@@ -312,11 +312,10 @@ def Stream_TimepointAttr : AttrDef<Stream_Dialect, "Timepoint", []> {
   let description = [{}];
   let parameters = (ins AttributeSelfTypeParameter<"">:$type);
   let valueType = Stream_Timepoint;
-  let typeBuilder = "IREE::Stream::TimepointType::get(type.getContext())";
   let constBuilderCall = [{
     IREE::Stream::TimepointAttr::get(
         $_builder.getContext(),
-        IREE::Stream::TimepointType::get($_value.getContext()));
+        IREE::Stream::TimepointType::get($_builder.getContext()));
   }];
 }
 
