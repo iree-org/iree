@@ -208,8 +208,8 @@ static iree_status_t iree_hal_cuda_stream_command_buffer_fill_buffer(
       break;
     }
     default:
-      assert(0 && "Unsupported element size");
-      break;
+      return iree_make_status(IREE_STATUS_INTERNAL,
+                              "unsupported fill pattern length");
   }
   return iree_ok_status();
 }

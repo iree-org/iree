@@ -188,6 +188,23 @@ static void iree_hal_deferred_command_buffer_destroy(
   IREE_TRACE_ZONE_END(z0);
 }
 
+static iree_hal_command_buffer_mode_t iree_hal_deferred_command_buffer_mode(
+    const iree_hal_command_buffer_t* base_command_buffer) {
+  iree_hal_deferred_command_buffer_t* command_buffer =
+      iree_hal_deferred_command_buffer_cast(
+          (iree_hal_command_buffer_t*)base_command_buffer);
+  return command_buffer->mode;
+}
+
+static void* iree_hal_deferred_command_buffer_dyn_cast(
+    iree_hal_command_buffer_t* command_buffer, const void* vtable) {
+  if (vtable == &iree_hal_deferred_command_buffer_vtable) {
+    IREE_HAL_ASSERT_TYPE(command_buffer, vtable);
+    return command_buffer;
+  }
+  return NULL;
+}
+
 static iree_hal_command_category_t
 iree_hal_deferred_command_buffer_allowed_categories(
     const iree_hal_command_buffer_t* base_command_buffer) {
@@ -801,23 +818,6 @@ IREE_API_EXPORT iree_status_t iree_hal_deferred_command_buffer_apply(
 
   IREE_TRACE_ZONE_END(z0);
   return status;
-}
-
-static iree_hal_command_buffer_mode_t iree_hal_deferred_command_buffer_mode(
-    const iree_hal_command_buffer_t* base_command_buffer) {
-  iree_hal_deferred_command_buffer_t* command_buffer =
-      iree_hal_deferred_command_buffer_cast(
-          (iree_hal_command_buffer_t*)base_command_buffer);
-  return command_buffer->mode;
-}
-
-static void* iree_hal_deferred_command_buffer_dyn_cast(
-    iree_hal_command_buffer_t* command_buffer, const void* vtable) {
-  if (vtable == &iree_hal_deferred_command_buffer_vtable) {
-    IREE_HAL_ASSERT_TYPE(command_buffer, vtable);
-    return command_buffer;
-  }
-  return NULL;
 }
 
 static const iree_hal_command_buffer_vtable_t
