@@ -773,7 +773,8 @@ IREE_API_EXPORT iree_status_t iree_hal_deferred_command_buffer_apply(
   IREE_TRACE_ZONE_BEGIN(z0);
 
   iree_hal_deferred_command_buffer_t* command_buffer =
-      iree_hal_deferred_command_buffer_cast(base_command_buffer);
+      (iree_hal_deferred_command_buffer_t*)iree_hal_command_buffer_dyn_cast(
+          base_command_buffer, &iree_hal_deferred_command_buffer_vtable);
   iree_hal_cmd_list_t* cmd_list = &command_buffer->cmd_list;
 
   iree_status_t status = iree_hal_command_buffer_begin(target_command_buffer);
@@ -802,9 +803,28 @@ IREE_API_EXPORT iree_status_t iree_hal_deferred_command_buffer_apply(
   return status;
 }
 
+static iree_hal_command_buffer_mode_t iree_hal_deferred_command_buffer_mode(
+    const iree_hal_command_buffer_t* base_command_buffer) {
+  iree_hal_deferred_command_buffer_t* command_buffer =
+      iree_hal_deferred_command_buffer_cast(
+          (iree_hal_command_buffer_t*)base_command_buffer);
+  return command_buffer->mode;
+}
+
+static void* iree_hal_deferred_command_buffer_dyn_cast(
+    iree_hal_command_buffer_t* command_buffer, const void* vtable) {
+  if (vtable == &iree_hal_deferred_command_buffer_vtable) {
+    IREE_HAL_ASSERT_TYPE(command_buffer, vtable);
+    return command_buffer;
+  }
+  return NULL;
+}
+
 static const iree_hal_command_buffer_vtable_t
     iree_hal_deferred_command_buffer_vtable = {
         .destroy = iree_hal_deferred_command_buffer_destroy,
+        .dyn_cast = iree_hal_deferred_command_buffer_dyn_cast,
+        .mode = iree_hal_deferred_command_buffer_mode,
         .allowed_categories =
             iree_hal_deferred_command_buffer_allowed_categories,
         .begin = iree_hal_deferred_command_buffer_begin,
