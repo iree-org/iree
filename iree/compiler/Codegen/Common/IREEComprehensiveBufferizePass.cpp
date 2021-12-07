@@ -141,8 +141,6 @@ void addIREEComprehensiveBufferizePasses(
     OpPassManager &passManager,
     std::unique_ptr<linalg::comprehensive_bufferize::AllocationCallbacks>
         allocationFns) {
-  passManager.addNestedPass<FuncOp>(
-      createConvertToDestinationPassingStylePass());
   passManager.addPass(
       createIREEComprehensiveBufferizePass(std::move(allocationFns)));
   passManager.addPass(memref::createResolveShapedTypeResultDimsPass());

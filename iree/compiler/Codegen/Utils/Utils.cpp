@@ -55,6 +55,12 @@ bool isVMVXBackend(IREE::HAL::ExecutableVariantOp variantOp) {
   return variantOp.target().getBackend().getValue() == "vmvx";
 }
 
+bool isVMVXBackend(FuncOp entryPointFn) {
+  auto variantOp =
+      entryPointFn->getParentOfType<IREE::HAL::ExecutableVariantOp>();
+  return isVMVXBackend(variantOp);
+}
+
 //===----------------------------------------------------------------------===//
 // Utility functions to get untiled op shapes
 //===----------------------------------------------------------------------===//

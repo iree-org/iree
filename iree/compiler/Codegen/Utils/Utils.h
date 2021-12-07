@@ -33,6 +33,7 @@ llvm::StringMap<IREE::HAL::ExecutableEntryPointOp> getAllEntryPoints(
 IREE::HAL::ExecutableEntryPointOp getEntryPoint(FuncOp funcOp);
 
 bool isVMVXBackend(IREE::HAL::ExecutableVariantOp variantOp);
+bool isVMVXBackend(FuncOp entryPointFn);
 
 //===----------------------------------------------------------------------===//
 // Utility functions to get untiled op shapes
