@@ -31,6 +31,7 @@ cc_library(
         "//iree/base:cc",
         "//iree/base:core_headers",
         "//iree/base:tracing",
+        "//iree/base/internal:flags",
         "//iree/hal",
         "//iree/hal/cuda",
     ],

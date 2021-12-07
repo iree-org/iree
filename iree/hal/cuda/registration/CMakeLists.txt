@@ -23,6 +23,7 @@ iree_cc_library(
     iree::base
     iree::base::cc
     iree::base::core_headers
+    iree::base::internal::flags
     iree::base::tracing
     iree::hal
     iree::hal::cuda
