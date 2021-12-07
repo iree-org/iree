@@ -234,9 +234,15 @@ static LogicalResult buildModuleDescriptors(IREE::VM::ModuleOp &moduleOp,
   // module descriptor
   // TODO(simon-camp): support module-level reflection attributes
   std::string descriptorName = moduleName + "_descriptor_";
+  // The module name can be manipulated. At this point we need the original
+  // name.
+  auto originalModuleName =
+      moduleOp->hasAttr("vm.module_name")
+          ? moduleOp->getAttr("vm.module_name").cast<StringAttr>().getValue()
+          : moduleName;
   output << "static const iree_vm_native_module_descriptor_t " << descriptorName
          << " = {\n"
-         << printStringView(moduleName) << ",\n"
+         << printStringView(originalModuleName) << ",\n"
          << importOps.size() << ",\n"
          << importName << ",\n"
          << exportOps.size() << ",\n"

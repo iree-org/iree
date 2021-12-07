@@ -6,6 +6,8 @@
 
 #include "iree/compiler/Dialect/VM/Conversion/VMToEmitC/ConvertVMToEmitC.h"
 
+#include <regex>
+
 #include "iree/compiler/Dialect/Util/Conversion/ConversionPatterns.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
@@ -27,6 +29,46 @@ namespace mlir {
 namespace iree_compiler {
 
 namespace {
+
+LogicalResult sanitizeSymbolNames(IREE::VM::ModuleOp &moduleOp) {
+  auto replaceIllegalChars = [](std::string &symbolName) {
+    std::regex illegalCharactersRe("<|>");
+    auto beginIt = std::sregex_iterator(symbolName.begin(), symbolName.end(),
+                                        illegalCharactersRe);
+    auto endIt = std::sregex_iterator();
+
+    // Replace illegal characters in symbol name with "_" using iterator
+    for (std::sregex_iterator i = beginIt; i != endIt; ++i)
+      symbolName.replace(i->position(), i->length(), "_");
+
+    // Returns true if there was a match
+    return beginIt != endIt;
+  };
+
+  std::string symbolName(moduleOp.getName());
+
+  // Sanitize name and save original name if needed
+  if (replaceIllegalChars(symbolName)) {
+    // Save original module name as an attribute
+    moduleOp.getOperation()->setAttr(
+        "vm.module_name",
+        StringAttr::get(moduleOp.getContext(), moduleOp.getName()));
+  }
+
+  SymbolTable::setSymbolName(moduleOp, symbolName);
+
+  for (auto op : moduleOp.getOps<SymbolOpInterface>()) {
+    std::string symbolName(op.getName());
+    replaceIllegalChars(symbolName);
+
+    // Sanitize name
+    if (failed(op.replaceAllSymbolUses(
+            StringAttr::get(moduleOp.getContext(), symbolName), moduleOp)))
+      return failure();
+    SymbolTable::setSymbolName(op, symbolName);
+  }
+  return success();
+}
 
 // TODO(simon-camp/marbre): Use this function throughout the conversions.
 Optional<std::string> getCType(Type type) {
@@ -3748,6 +3790,9 @@ class ConvertVMToEmitCPass
 
   void runOnOperation() override {
     IREE::VM::ModuleOp module = getOperation();
+
+    // Replace illegal characters in symbol names and replace them with "_"
+    if (failed(sanitizeSymbolNames(module))) return signalPassFailure();
 
     ConversionTarget target(getContext());
     EmitCTypeConverter typeConverter;
