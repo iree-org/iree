@@ -38,6 +38,7 @@ iree_cc_library(
     MLIRLinalgBufferizableOpInterfaceImpl
     MLIRMemRef
     MLIRSCFBufferizableOpInterfaceImpl
+    MLIRSupport
     MLIRTensorBufferizableOpInterfaceImpl
     MLIRVectorBufferizableOpInterfaceImpl
     iree::compiler::Dialect::Flow::IR

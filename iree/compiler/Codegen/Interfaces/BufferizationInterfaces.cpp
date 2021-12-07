@@ -6,12 +6,14 @@
 
 #include "iree/compiler/Codegen/Interfaces/BufferizationInterfaces.h"
 
+#include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowTypes.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "mlir/Dialect/Linalg/ComprehensiveBufferize/AffineInterfaceImpl.h"
 #include "mlir/Dialect/Linalg/ComprehensiveBufferize/ArithInterfaceImpl.h"
 #include "mlir/Dialect/Linalg/ComprehensiveBufferize/BufferizableOpInterface.h"
+#include "mlir/Dialect/Linalg/ComprehensiveBufferize/BufferizationInterfaceImpl.h"
 #include "mlir/Dialect/Linalg/ComprehensiveBufferize/ComprehensiveBufferize.h"
 #include "mlir/Dialect/Linalg/ComprehensiveBufferize/LinalgInterfaceImpl.h"
 #include "mlir/Dialect/Linalg/ComprehensiveBufferize/ModuleBufferization.h"
@@ -19,10 +21,12 @@
 #include "mlir/Dialect/Linalg/ComprehensiveBufferize/TensorInterfaceImpl.h"
 #include "mlir/Dialect/Linalg/ComprehensiveBufferize/VectorInterfaceImpl.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
+#include "mlir/Support/LLVM.h"
 
 using mlir::linalg::comprehensive_bufferize::BufferizableOpInterface;
 using mlir::linalg::comprehensive_bufferize::BufferizationAliasInfo;
 using mlir::linalg::comprehensive_bufferize::BufferizationState;
+using mlir::linalg::comprehensive_bufferize::DialectBufferizationState;
 using mlir::linalg::comprehensive_bufferize::linalg_ext::
     InitTensorEliminationStep;
 
@@ -32,6 +36,19 @@ namespace iree_compiler {
 //===----------------------------------------------------------------------===//
 // Utility functions.
 //===----------------------------------------------------------------------===//
+
+namespace {
+/// Flow dialect-specific bufferization state.
+struct FlowBufferizationState : public DialectBufferizationState {
+  DenseMap<Value, Value> subspan_to_buffer;
+};
+}  // namespace
+
+static FlowBufferizationState &getFlowBufferizationState(
+    BufferizationState &state) {
+  return state.getDialectState<FlowBufferizationState>(
+      IREE::Flow::FlowDialect::getDialectNamespace());
+}
 
 template <typename TensorType>
 static MemRefType getMemrefTypeForTensor(TensorType tensorType,
@@ -43,7 +60,9 @@ static MemRefType getMemrefTypeForTensor(TensorType tensorType,
 
 static Value getSubspanBuffer(Value tensor, OpBuilder &b,
                               BufferizationState &state) {
-  if (!state.isMapped(tensor)) {
+  FlowBufferizationState &flowState = getFlowBufferizationState(state);
+
+  if (!flowState.subspan_to_buffer.count(tensor)) {
     OpBuilder::InsertionGuard g(b);
     auto subspanOp =
         tensor.getDefiningOp<IREE::HAL::InterfaceBindingSubspanOp>();
@@ -57,15 +76,14 @@ static Value getSubspanBuffer(Value tensor, OpBuilder &b,
     b.setInsertionPoint(subspanOp);
     // Just change the result type of the InterfaceBindingSubspanOp.
     auto memRefType = getMemrefTypeForTensor(shapedType);
-    auto baseBuffer = b.create<IREE::HAL::InterfaceBindingSubspanOp>(
+    Value baseBuffer = b.create<IREE::HAL::InterfaceBindingSubspanOp>(
         subspanOp->getLoc(), memRefType, subspanOp.binding(),
         subspanOp.byte_offset(), subspanOp.byte_length(),
         subspanOp.dynamic_dims(), subspanOp.alignmentAttr());
-    state.mapValue(subspanOp, baseBuffer);
-    state.aliasInfo.createAliasInfoEntry(subspanOp.result());
+    flowState.subspan_to_buffer[tensor] = baseBuffer;
   }
 
-  return state.lookupValue(tensor);
+  return flowState.subspan_to_buffer[tensor];
 }
 
 namespace {
@@ -77,11 +95,6 @@ namespace {
 struct DispatchTensorLoadOpInterface
     : public BufferizableOpInterface::ExternalModel<
           DispatchTensorLoadOpInterface, IREE::Flow::DispatchTensorLoadOp> {
-  SmallVector<OpOperand *> getAliasingOpOperand(Operation *op,
-                                                OpResult opResult) const {
-    return {};
-  }
-
   bool isWritable(Operation *op, Value value) const {
     auto loadOp = cast<IREE::Flow::DispatchTensorLoadOp>(op);
     auto shapedType =
@@ -156,7 +169,8 @@ struct DispatchTensorStoreOpInterface
           storeOp->getLoc(), target, storeOp.getMixedOffsets(),
           storeOp.getMixedSizes(), storeOp.getMixedStrides());
       Value srcMemref = state.lookupBuffer(storeOp.value());
-      state.allocationFns.memCpyFn(b, storeOp->getLoc(), srcMemref, subView);
+      state.options.allocationFns->memCpyFn(b, storeOp->getLoc(), srcMemref,
+                                            subView);
     }
 
     state.markOpObsolete(storeOp);
@@ -206,9 +220,13 @@ void registerBufferizationInterfaces(DialectRegistry &registry) {
       registerBufferizableOpInterfaceExternalModels(registry);
   linalg::comprehensive_bufferize::arith_ext::
       registerBufferizableOpInterfaceExternalModels(registry);
+  linalg::comprehensive_bufferize::bufferization_ext::
+      registerBufferizableOpInterfaceExternalModels(registry);
   linalg::comprehensive_bufferize::linalg_ext::
       registerBufferizableOpInterfaceExternalModels(registry);
   linalg::comprehensive_bufferize::scf_ext::
+      registerBufferizableOpInterfaceExternalModels(registry);
+  linalg::comprehensive_bufferize::std_ext::
       registerBufferizableOpInterfaceExternalModels(registry);
   linalg::comprehensive_bufferize::tensor_ext::
       registerBufferizableOpInterfaceExternalModels(registry);
