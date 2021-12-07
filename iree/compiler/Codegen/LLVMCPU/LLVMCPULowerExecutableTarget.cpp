@@ -34,7 +34,7 @@ class LLVMCPULowerExecutableTargetPass
       const LLVMCPULowerExecutableTargetPass &pass) {}
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<IREE::Codegen::IREECodegenDialect, IREE::HAL::HALDialect,
-                    linalg::LinalgDialect, LLVM::LLVMDialect,
+                    linalg::LinalgDialect, LLVM::LLVMDialect, scf::SCFDialect,
                     vector::VectorDialect>();
   }
 
@@ -174,6 +174,12 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
           case IREE::Codegen::DispatchLoweringPassPipeline::CPUDefault:
           case IREE::Codegen::DispatchLoweringPassPipeline::None:
             addCPUDefaultPassPipeline(nestedModulePM);
+            break;
+          case IREE::Codegen::DispatchLoweringPassPipeline::
+              CPUSingleTilingExpert:
+            nestedModulePM.addNestedPass<FuncOp>(
+                createConvertToDestinationPassingStylePass());
+            addSingleTilingExpertPassPipeline(nestedModulePM);
             break;
           case IREE::Codegen::DispatchLoweringPassPipeline::CPUTensorToVectors:
             addTensorToVectorsPassPipeline(nestedModulePM, lowerToVectors);
