@@ -10,6 +10,7 @@
 #include "iree-dialects/Dialect/LinalgExt/Transforms/Passes.h"
 #include "iree/compiler/Codegen/LLVMCPU/KernelDispatch.h"
 #include "iree/compiler/Codegen/PassDetail.h"
+#include "iree/compiler/Codegen/Sandbox/Passes.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "mlir/Conversion/SCFToStandard/SCFToStandard.h"
 #include "mlir/Dialect/Arithmetic/Transforms/Passes.h"
@@ -165,6 +166,25 @@ void addTensorToVectorsPassPipeline(OpPassManager &passManager,
   passManager.addNestedPass<FuncOp>(createForOpCanonicalizationPass());
 
   passManager.addNestedPass<FuncOp>(createOptimizeVectorTransferPass());
+}
+
+void addSingleTilingExpertPassPipeline(OpPassManager &passManager) {
+  passManager.addPass(createCanonicalizerPass());
+  // Add the sandbox single tiling expert to tile and vectorize.
+  passManager.addNestedPass<FuncOp>(createLinalgSingleTilingExpertPass(
+      static_cast<int64_t>(TilingLevel::L1Tiles), true));
+
+  // Bufferize
+  auto callbacks =
+      std::make_unique<linalg::comprehensive_bufferize::AllocationCallbacks>(
+          cpuComprehensiveBufferizeAllocationFn,
+          cpuComprehensiveBufferizeDeallocationFn,
+          cpuComprehensiveBufferizeCopyFn);
+  addIREEComprehensiveBufferizePasses(passManager, std::move(callbacks));
+
+  // Add the vector lowering expert.
+  OpPassManager &nestedFuncPassManager = passManager.nest<FuncOp>();
+  addLowerToVectorTransforms(nestedFuncPassManager);
 }
 
 void addTileFuseAndVectorizePassPipeline(OpPassManager &passManager,
