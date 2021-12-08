@@ -83,11 +83,6 @@ static StringRef sanitizePipelineString(StringRef input) {
   return input;
 }
 
-/// Returns true if vector ops are allowed in the piepeline.
-static bool lowerToVectors(IREE::HAL::ExecutableVariantOp variantOp) {
-  return isVMVXBackend(variantOp);
-}
-
 /// Verify that valid configuration is set for all ops within the compiled
 /// module.
 template <typename F>
@@ -171,6 +166,7 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
 
       executableLoweringPipeline.addPass(createSetNumWorkgroupsPass());
       executableLoweringPipeline.addPass(createCanonicalizerPass());
+      bool lowerToVectors = !isVMVXBackend(variantOp);
       if (!testLoweringConfiguration) {
         OpPassManager &nestedModulePM =
             executableLoweringPipeline.nest<ModuleOp>();
@@ -180,13 +176,11 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
             addCPUDefaultPassPipeline(nestedModulePM);
             break;
           case IREE::Codegen::DispatchLoweringPassPipeline::CPUTensorToVectors:
-            addTensorToVectorsPassPipeline(nestedModulePM,
-                                           lowerToVectors(variantOp));
+            addTensorToVectorsPassPipeline(nestedModulePM, lowerToVectors);
             break;
           case IREE::Codegen::DispatchLoweringPassPipeline::
               CPUTileFuseAndVectorize:
-            addTileFuseAndVectorizePassPipeline(nestedModulePM,
-                                                lowerToVectors(variantOp));
+            addTileFuseAndVectorizePassPipeline(nestedModulePM, lowerToVectors);
             break;
           default:
             llvm_unreachable("Unsupported pipeline on CPU target.");
