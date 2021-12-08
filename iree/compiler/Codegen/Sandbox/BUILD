@@ -45,6 +45,10 @@ cc_library(
     srcs = [
         "LinalgTensorCodegenDriver.cpp",
     ],
+    hdrs = [
+        "PassDetail.h",
+        "Passes.h",
+    ],
     deps = [
         ":PassHeaders",
         ":PassesIncGen",

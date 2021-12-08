@@ -37,6 +37,9 @@ iree_cc_library(
 iree_cc_library(
   NAME
     Sandbox
+  HDRS
+    "PassDetail.h"
+    "Passes.h"
   SRCS
     "LinalgTensorCodegenDriver.cpp"
   DEPS
