@@ -58,10 +58,6 @@ Builds the IREE TFLite C API compatibility shim. Defaults to `ON`.
 
 Builds the IREE TFLite Java bindings with the C API compatibility shim. Defaults to `ON`.
 
-#### `IREE_BUILD_EXPERIMENTAL_JAVA_BINDINGS`:BOOL
-
-Builds the experimental java bindings. Defaults to `OFF`.
-
 #### `IREE_BUILD_EXPERIMENTAL_REMOTING`:BOOL
 
 Builds experimental remoting component. Defaults to `OFF`.
