@@ -80,12 +80,7 @@ static DispatchLoweringPassPipeline getDispatchLoweringPassPipeline(
     FuncOp entryPointFn, Operation *op) {
   return TypeSwitch<Operation *, DispatchLoweringPassPipeline>(op)
       .Case<linalg::ContractionOpInterface>([&](auto op) {
-        Optional<llvm::Triple> triple = getTargetTriple(entryPointFn);
-        if (triple && triple.getValue().isX86()) {
-          return DispatchLoweringPassPipeline::CPUTileFuseAndVectorize;
-        } else {
-          return DispatchLoweringPassPipeline::CPUTensorToVectors;
-        }
+        return DispatchLoweringPassPipeline::CPUTileFuseAndVectorize;
       })
       .Case<linalg::Mmt4DOp>([&](auto op) {
         return DispatchLoweringPassPipeline::CPUTensorToVectors;
@@ -305,21 +300,24 @@ static LogicalResult setARMRootConfig(FuncOp entryPointFn,
                      workloadPerWorkgroup,
                      /*workgroupSize=*/ArrayRef<int64_t>{});
 
+  // Hardcoded tile sizes.
+  // L1 tile sizes are {1, ..., 20, 4, 64}.
+  // Vector tile sizes are {1, ..., 4, 4, 4}
   SmallVector<int64_t> l1TileSizes, vectorTileSizes;
-  const int kDefaultL1TileSize = 32;
   int64_t nLoops = cast<linalg::LinalgOp>(op.getOperation()).getNumLoops();
   l1TileSizes.append(nLoops - 3, 1);
-  l1TileSizes.push_back(getMaxTileSize(0, workloadPerWorkgroup[1],
-                                       kDefaultL1TileSize, vectorSize));
-  l1TileSizes.push_back(getMaxTileSize(0, workloadPerWorkgroup[0],
-                                       kDefaultL1TileSize, vectorSize));
+  l1TileSizes.push_back(
+      getMaxTileSize(0, workloadPerWorkgroup[1], 20, vectorSize));
+  l1TileSizes.push_back(
+      getMaxTileSize(0, workloadPerWorkgroup[0], 4, vectorSize));
   vectorTileSizes.append(nLoops - 3, 1);
-  vectorTileSizes.append(2, vectorSize);
+  vectorTileSizes.push_back(vectorSize);
+  vectorTileSizes.push_back(vectorSize);
 
   // L1/vector tile size for k dimensions.
   auto lhsShapedType = op.lhs().getType().cast<ShapedType>();
   int64_t K = lhsShapedType.getShape().back();
-  l1TileSizes.push_back(getMaxTileSize(0, K, kDefaultL1TileSize, vectorSize));
+  l1TileSizes.push_back(getMaxTileSize(0, K, 64, vectorSize));
   vectorTileSizes.push_back(vectorSize);
   TileSizesListType tileSizes;
   tileSizes.push_back({});  // Empty here since there is nothing to do in first

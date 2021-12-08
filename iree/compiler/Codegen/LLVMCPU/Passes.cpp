@@ -167,11 +167,13 @@ void addTensorToVectorsPassPipeline(OpPassManager &passManager,
   passManager.addNestedPass<FuncOp>(createOptimizeVectorTransferPass());
 }
 
-void addTileFuseAndVectorizePassPipeline(OpPassManager &passManager) {
+void addTileFuseAndVectorizePassPipeline(OpPassManager &passManager,
+                                         bool lowerToVectors) {
   passManager.addPass(createCanonicalizerPass());
 
   // Tile and vectorize linalg ops on tensors.
-  passManager.addNestedPass<FuncOp>(createLLVMCPUTileFuseAndVectorizePass());
+  passManager.addNestedPass<FuncOp>(
+      createLLVMCPUTileFuseAndVectorizePass(lowerToVectors));
   passManager.addNestedPass<FuncOp>(createCSEPass());
   passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
 

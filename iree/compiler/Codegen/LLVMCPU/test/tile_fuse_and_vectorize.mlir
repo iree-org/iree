@@ -155,7 +155,7 @@ func @nonvectorizable_matmul_and_vectorizable_generic() {
   %c1152 = arith.constant 1152 : index
   %c768 = arith.constant 768 : index
   %c0 = arith.constant 0 : index
-  %c48 = arith.constant 48 : index
+  %c49 = arith.constant 49 : index
   %c16 = arith.constant 16 : index
   %0 = hal.interface.binding.subspan @io::@s0b0_ro_constant[%c768] : !flow.dispatch.tensor<readonly:96xf32>
   %1 = hal.interface.binding.subspan @io::@s0b0_ro_constant[%c0] : !flow.dispatch.tensor<readonly:96xf32>
@@ -171,20 +171,20 @@ func @nonvectorizable_matmul_and_vectorizable_generic() {
   %7 = affine.apply affine_map<()[s0] -> (s0 * 16)>()[%workgroup_id_y]
   %8 = affine.apply affine_map<()[s0] -> (s0 * 16)>()[%workgroup_count_y]
   scf.for %arg0 = %7 to %c784 step %8 {
-    %9 = affine.apply affine_map<()[s0] -> (s0 * 48)>()[%workgroup_id_x]
-    %10 = affine.apply affine_map<()[s0] -> (s0 * 48)>()[%workgroup_count_x]
+    %9 = affine.apply affine_map<()[s0] -> (s0 * 49)>()[%workgroup_id_x]
+    %10 = affine.apply affine_map<()[s0] -> (s0 * 49)>()[%workgroup_count_x]
     scf.for %arg1 = %9 to %c96 step %10 {
-      %11 = flow.dispatch.tensor.load %0, offsets = [%arg1], sizes = [48], strides = [1] : !flow.dispatch.tensor<readonly:96xf32> -> tensor<48xf32>
-      %12 = flow.dispatch.tensor.load %1, offsets = [%arg1], sizes = [48], strides = [1] : !flow.dispatch.tensor<readonly:96xf32> -> tensor<48xf32>
-      %13 = flow.dispatch.tensor.load %2, offsets = [%arg1], sizes = [48], strides = [1] : !flow.dispatch.tensor<readonly:96xf32> -> tensor<48xf32>
-      %14 = flow.dispatch.tensor.load %3, offsets = [%arg1], sizes = [48], strides = [1] : !flow.dispatch.tensor<readonly:96xf32> -> tensor<48xf32>
-      %15 = linalg.init_tensor [16, 48] : tensor<16x48xf32>
+      %11 = flow.dispatch.tensor.load %0, offsets = [%arg1], sizes = [49], strides = [1] : !flow.dispatch.tensor<readonly:96xf32> -> tensor<49xf32>
+      %12 = flow.dispatch.tensor.load %1, offsets = [%arg1], sizes = [49], strides = [1] : !flow.dispatch.tensor<readonly:96xf32> -> tensor<49xf32>
+      %13 = flow.dispatch.tensor.load %2, offsets = [%arg1], sizes = [49], strides = [1] : !flow.dispatch.tensor<readonly:96xf32> -> tensor<49xf32>
+      %14 = flow.dispatch.tensor.load %3, offsets = [%arg1], sizes = [49], strides = [1] : !flow.dispatch.tensor<readonly:96xf32> -> tensor<49xf32>
+      %15 = linalg.init_tensor [16, 49] : tensor<16x49xf32>
       %16 = flow.dispatch.tensor.load %4, offsets = [%arg0, 0], sizes = [16, 24], strides = [1, 1] : !flow.dispatch.tensor<readonly:784x24xf32> -> tensor<16x24xf32>
-      %17 = flow.dispatch.tensor.load %5, offsets = [0, %arg1], sizes = [24, 48], strides = [1, 1] : !flow.dispatch.tensor<readonly:24x96xf32> -> tensor<24x48xf32>
-      %18 = linalg.init_tensor [16, 48] : tensor<16x48xf32>
-      %19 = linalg.fill(%cst, %18) : f32, tensor<16x48xf32> -> tensor<16x48xf32>
-      %20 = linalg.matmul {lowering.config = #iree_codegen.lowering.config<tile_sizes = [[], [16, 16, 32], [16, 16, 16]], native_vector_size = [16, 16, 16]>} ins(%16, %17 : tensor<16x24xf32>, tensor<24x48xf32>) outs(%19 : tensor<16x48xf32>) -> tensor<16x48xf32>
-      %21 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d1)>, affine_map<(d0, d1) -> (d1)>, affine_map<(d0, d1) -> (d1)>, affine_map<(d0, d1) -> (d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]} ins(%20, %11, %12, %13, %14 : tensor<16x48xf32>, tensor<48xf32>, tensor<48xf32>, tensor<48xf32>, tensor<48xf32>) outs(%15 : tensor<16x48xf32>) {
+      %17 = flow.dispatch.tensor.load %5, offsets = [0, %arg1], sizes = [24, 49], strides = [1, 1] : !flow.dispatch.tensor<readonly:24x96xf32> -> tensor<24x49xf32>
+      %18 = linalg.init_tensor [16, 49] : tensor<16x49xf32>
+      %19 = linalg.fill(%cst, %18) : f32, tensor<16x49xf32> -> tensor<16x49xf32>
+      %20 = linalg.matmul {lowering.config = #iree_codegen.lowering.config<tile_sizes = [[], [16, 16, 32], [16, 16, 16]], native_vector_size = [16, 16, 16]>} ins(%16, %17 : tensor<16x24xf32>, tensor<24x49xf32>) outs(%19 : tensor<16x49xf32>) -> tensor<16x49xf32>
+      %21 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d1)>, affine_map<(d0, d1) -> (d1)>, affine_map<(d0, d1) -> (d1)>, affine_map<(d0, d1) -> (d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]} ins(%20, %11, %12, %13, %14 : tensor<16x49xf32>, tensor<49xf32>, tensor<49xf32>, tensor<49xf32>, tensor<49xf32>) outs(%15 : tensor<16x49xf32>) {
       ^bb0(%arg2: f32, %arg3: f32, %arg4: f32, %arg5: f32, %arg6: f32, %arg7: f32):  // no predecessors
         %22 = arith.addf %arg5, %cst_0 : f32
         %23 = math.sqrt %22 : f32
@@ -198,15 +198,23 @@ func @nonvectorizable_matmul_and_vectorizable_generic() {
         %31 = arith.mulf %30, %cst_3 : f32
         %32 = arith.mulf %31, %27 : f32
         linalg.yield %32 : f32
-      } -> tensor<16x48xf32>
-      flow.dispatch.tensor.store %21, %6, offsets = [%arg0, %arg1], sizes = [%c16, %c48], strides = [1, 1] : tensor<16x48xf32> -> !flow.dispatch.tensor<writeonly:784x96xf32>
+      } -> tensor<16x49xf32>
+      flow.dispatch.tensor.store %21, %6, offsets = [%arg0, %arg1], sizes = [%c16, %c49], strides = [1, 1] : tensor<16x49xf32> -> !flow.dispatch.tensor<writeonly:784x96xf32>
     }
   }
   return
 }
 
-
 // CHECK: func @nonvectorizable_matmul_and_vectorizable_generic
 // Verify that both matmul and generic ops are not vectorized.
-// CHECK:   linalg.matmul
-// CHECK:   linalg.generic
+// CHECK-DAG: %[[C0:.+]] = arith.constant 0 : index
+// CHECK-DAG: %[[C16:.+]] = arith.constant 16 : index
+// CHECK-DAG: %[[C49:.+]] = arith.constant 49 : index
+// CHECK:     scf.for
+// CHECK:       scf.for
+// CHECK:         %{{.+}} = scf.for %{{.*}} = %[[C0]] to %[[C49]] step %[[C16]]
+// CHECK:           %{{.+}} = linalg.fill
+// CHECK:           %{{.+}} = scf.for
+// CHECK:             %{{.+}} = scf.for
+// CHECK:               linalg.matmul
+// CHECK:           linalg.generic
