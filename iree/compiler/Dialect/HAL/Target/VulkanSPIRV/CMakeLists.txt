@@ -23,7 +23,6 @@ iree_cc_library(
     "VulkanSPIRVTarget.cpp"
   DEPS
     LLVMSupport
-    MLIRAffine
     MLIRGPUOps
     MLIRIR
     MLIRLinalg
@@ -32,13 +31,11 @@ iree_cc_library(
     MLIRSPIRVModuleCombiner
     MLIRSPIRVSerialization
     MLIRSupport
-    MLIRVector
     iree::compiler::Codegen::Common
     iree::compiler::Codegen::Dialect::IREECodegenDialect
     iree::compiler::Codegen::PassHeaders
     iree::compiler::Codegen::SPIRV
     iree::compiler::Codegen::Utils
-    iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::HAL::Target
     iree::compiler::Dialect::Vulkan::IR
     iree::compiler::Dialect::Vulkan::Utils

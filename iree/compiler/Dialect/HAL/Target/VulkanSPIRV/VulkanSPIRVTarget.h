@@ -23,6 +23,8 @@ struct VulkanSPIRVTargetOptions {
   std::string vulkanTargetEnv;
   // Vulkan target triple.
   std::string vulkanTargetTriple;
+
+  bool vulkanKeepShaderModules;
 };
 
 // Returns a VulkanSPIRVTargetOptions struct initialized with Vulkan/SPIR-V

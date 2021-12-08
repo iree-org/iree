@@ -8,7 +8,6 @@
 
 #include "iree/compiler/Codegen/Dialect/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/Passes.h"
-#include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
 #include "iree/compiler/Dialect/Vulkan/IR/VulkanAttributes.h"
 #include "iree/compiler/Dialect/Vulkan/IR/VulkanDialect.h"
@@ -18,17 +17,16 @@
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/CommandLine.h"
+#include "llvm/Support/FileSystem.h"
 #include "llvm/Support/FormatVariadic.h"
 #include "llvm/Support/Path.h"
-#include "mlir/Dialect/Affine/IR/AffineOps.h"
+#include "llvm/Support/ToolOutputFile.h"
 #include "mlir/Dialect/GPU/GPUDialect.h"
 #include "mlir/Dialect/Linalg/IR/LinalgTypes.h"
 #include "mlir/Dialect/SPIRV/IR/SPIRVDialect.h"
 #include "mlir/Dialect/SPIRV/IR/SPIRVOps.h"
 #include "mlir/Dialect/SPIRV/IR/TargetAndABI.h"
 #include "mlir/Dialect/SPIRV/Linking/ModuleCombiner.h"
-#include "mlir/Dialect/Vector/VectorOps.h"
-#include "mlir/IR/BlockAndValueMapping.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/SymbolTable.h"
@@ -82,9 +80,15 @@ VulkanSPIRVTargetOptions getVulkanSPIRVTargetOptionsFromFlags() {
           "Vulkan target environment as #vk.target_env attribute assembly"),
       llvm::cl::init(""));
 
+  static llvm::cl::opt<bool> clVulkanKeepShaderModules(
+      "iree-vulkan-keep-shader-modules",
+      llvm::cl::desc("Save SPIR-V shader modules to disk separately"),
+      llvm::cl::init(false));
+
   VulkanSPIRVTargetOptions targetOptions;
   targetOptions.vulkanTargetEnv = clVulkanTargetEnv;
   targetOptions.vulkanTargetTriple = clVulkanTargetTriple;
+  targetOptions.vulkanKeepShaderModules = clVulkanKeepShaderModules;
 
   return targetOptions;
 }
@@ -293,6 +297,9 @@ class VulkanSPIRVTargetBackend : public TargetBackend {
     }
     auto spvCodeRef = flatbuffers_uint32_vec_create(builder, spvBinary.data(),
                                                     spvBinary.size());
+    if (options_.vulkanKeepShaderModules) {
+      saveSpirvBinary(variantOp, spvBinary);
+    }
 
     // The sequencer and runtime use ordinals instead of names. We provide the
     // list of entry point names here that are then passed in
@@ -341,6 +348,32 @@ class VulkanSPIRVTargetBackend : public TargetBackend {
     return IREE::HAL::ExecutableTargetAttr::get(
         context, b.getStringAttr("vulkan"), b.getStringAttr("vulkan-spirv-fb"),
         configAttr);
+  }
+
+  void saveSpirvBinary(IREE::HAL::ExecutableVariantOp variantOp,
+                       ArrayRef<uint32_t> binary) {
+    llvm::SmallString<32> filePath;
+    if (std::error_code error = llvm::sys::fs::createTemporaryFile(
+            variantOp.getName(), "spvasm", filePath)) {
+      llvm::errs() << "failed to generate file for SPIR-V binary: "
+                   << error.message();
+      return;
+    }
+    std::error_code error;
+    auto file = std::make_unique<llvm::ToolOutputFile>(filePath, error,
+                                                       llvm::sys::fs::OF_None);
+    if (error) {
+      llvm::errs() << "failed to open file for SPIR-V binary '" << filePath
+                   << "': " << error.message();
+      return;
+    }
+
+    mlir::emitRemark(variantOp.getLoc())
+        << "SPIR-V binary for " << variantOp.getName() << " preserved:\n"
+        << "    " << filePath;
+    file->os().write(reinterpret_cast<const char *>(binary.data()),
+                     binary.size() * sizeof(uint32_t));
+    file->keep();
   }
 
   VulkanSPIRVTargetOptions options_;

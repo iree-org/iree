@@ -157,7 +157,8 @@ std::unique_ptr<OperationPass<FuncOp>> createLLVMCPUTileAndVectorizePass(
     bool lowerToVectors = true);
 
 /// Multi-level tiling, fusing and vectorization of linalg ops on tensors.
-std::unique_ptr<OperationPass<FuncOp>> createLLVMCPUTileFuseAndVectorizePass();
+std::unique_ptr<OperationPass<FuncOp>> createLLVMCPUTileFuseAndVectorizePass(
+    bool lowerToVectors = true);
 
 /// Vectorizes linalg ops executed in the same hal.interface.workgroup.
 std::unique_ptr<OperationPass<FuncOp>> createLLVMCPUVectorizationPass(
@@ -202,7 +203,8 @@ void addTensorToVectorsPassPipeline(OpPassManager &passManager,
 
 /// Populates the passes needed to multi level tile, fuse and vectorize lowering
 /// of linalg ops on tensors to vectors operations.
-void addTileFuseAndVectorizePassPipeline(OpPassManager &passManager);
+void addTileFuseAndVectorizePassPipeline(OpPassManager &passManager,
+                                         bool lowerToVectors = true);
 
 //----------------------------------------------------------------------------//
 // LLVMCPU Pass Pipelines for lowering to LLVM dialect.

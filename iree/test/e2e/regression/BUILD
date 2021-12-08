@@ -37,6 +37,7 @@ iree_lit_test_suite(
     srcs = enforce_glob(
         [
             "globals.mlir",
+            "libm_linking.mlir",
             "scalar.mlir",
             "trace_dispatch_tensors.mlir",
             "unused_args.mlir",
@@ -56,9 +57,9 @@ iree_lit_test_suite(
     ),
     data = [
         "//iree/tools:IreeFileCheck",
-        "//iree/tools:iree-benchmark-module",
+        "//iree/tools:iree-opt",
         "//iree/tools:iree-run-mlir",
-        "//iree/tools:iree-translate",
+        "@llvm-project//lld",
     ],
     tags = ["hostonly"],
 )

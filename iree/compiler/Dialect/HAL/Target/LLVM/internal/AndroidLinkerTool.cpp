@@ -122,17 +122,7 @@ class AndroidLinkerTool : public LinkerTool {
 
         // Statically link all dependencies so we don't have any runtime deps.
         // We cannot have any imports in the module we produce.
-        // "-static",
-
-        // HACK: we insert mallocs and junk. This is *not good*.
-        // We should be statically linking and not require anything from libc.
-        "-shared",
-        "-lc",
-
-        // Currently we are emitting calls to libm (expf, cosf, etc). We ideally
-        // should not be doing this - those functions are all generally terrible
-        // and indicate some extremely non-optimal code paths.
-        "-lm",
+        "-static",
 
         "-o " + artifacts.libraryFile.path,
     };

@@ -16,7 +16,6 @@ cc_library(
         "AndroidLinkerTool.cpp",
         "EmbeddedLinkerTool.cpp",
         "LinkerTools.cpp",
-        "RiscvLinkerTool.cpp",
         "UnixLinkerTool.cpp",
         "WasmLinkerTool.cpp",
         "WindowsLinkerTool.cpp",

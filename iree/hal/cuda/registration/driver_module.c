@@ -10,10 +10,13 @@
 #include <stddef.h>
 
 #include "iree/base/api.h"
+#include "iree/base/internal/flags.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/cuda/api.h"
 
 #define IREE_HAL_CUDA_DRIVER_ID 0x43554441u  // CUDA
+
+IREE_FLAG(bool, cuda_use_streams, false, "Force to use cuda streams");
 
 static iree_status_t iree_hal_cuda_driver_factory_enumerate(
     void* self, const iree_hal_driver_info_t** out_driver_infos,
@@ -44,6 +47,10 @@ static iree_status_t iree_hal_cuda_driver_factory_try_create(
 
   iree_hal_cuda_device_params_t default_params;
   iree_hal_cuda_device_params_initialize(&default_params);
+  if (FLAG_cuda_use_streams) {
+    default_params.command_buffer_mode =
+        IREE_HAL_CUDA_COMMAND_BUFFER_MODE_STREAM;
+  }
 
   iree_hal_cuda_driver_options_t driver_options;
   iree_hal_cuda_driver_options_initialize(&driver_options);
