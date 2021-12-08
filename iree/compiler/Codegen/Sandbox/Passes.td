@@ -163,8 +163,9 @@ def LinalgVectorLowering : Pass<"linalg-vector-lowering", "FuncOp"> {
   ];
   let dependentDialects = [
     "::mlir::arith::ArithmeticDialect", "::mlir::AffineDialect",
-    "::mlir::memref::MemRefDialect", "::mlir::scf::SCFDialect",
-    "::mlir::StandardOpsDialect", "::mlir::vector::VectorDialect"
+    "::mlir::linalg::LinalgDialect", "::mlir::memref::MemRefDialect",
+    "::mlir::scf::SCFDialect", "::mlir::StandardOpsDialect",
+    "::mlir::vector::VectorDialect"
   ];
 }
 
