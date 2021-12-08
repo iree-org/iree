@@ -783,6 +783,30 @@ class CallOpConversion : public OpConversionPattern<CallOp> {
   }
 };
 
+class FloorDivSIOpConversion : public OpConversionPattern<arith::FloorDivSIOp> {
+  using OpConversionPattern::OpConversionPattern;
+
+  LogicalResult matchAndRewrite(
+      arith::FloorDivSIOp srcOp, OpAdaptor adaptor,
+      ConversionPatternRewriter &rewriter) const override {
+    if (adaptor.lhs().getType() != adaptor.rhs().getType())
+      return rewriter.notifyMatchFailure(srcOp, "argument types must match");
+
+    if (adaptor.lhs().getType().isInteger(32)) {
+      rewriter.replaceOpWithNewOp<IREE::VM::DivI32SOp>(
+          srcOp, rewriter.getI32Type(), adaptor.lhs(), adaptor.rhs());
+      return success();
+    }
+    if (adaptor.lhs().getType().isInteger(64)) {
+      rewriter.replaceOpWithNewOp<IREE::VM::DivI64SOp>(
+          srcOp, rewriter.getI64Type(), adaptor.lhs(), adaptor.rhs());
+      return success();
+    }
+
+    return failure();
+  }
+};
+
 }  // namespace
 
 void populateStandardToVMPatterns(MLIRContext *context,
@@ -792,6 +816,8 @@ void populateStandardToVMPatterns(MLIRContext *context,
                   CmpIOpConversion, CmpFOpConversion, CondBranchOpConversion,
                   ModuleOpConversion, FuncOpConversion, ReturnOpConversion,
                   SelectOpConversion>(typeConverter, context);
+
+  patterns.insert<FloorDivSIOpConversion>(typeConverter, context);
 
   // TODO(#2878): figure out how to pass the type converter in a supported way.
   // Right now if we pass the type converter as the first argument - triggering
