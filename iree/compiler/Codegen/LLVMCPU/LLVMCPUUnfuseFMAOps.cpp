@@ -26,9 +26,9 @@ class UnfusedFMAOpsPassConversion : public OpRewritePattern<LLVM::FMAOp> {
                                 PatternRewriter &rewriter) const override {
     auto loc = op.getLoc();
     auto mulPart = rewriter.create<LLVM::FMulOp>(loc, op.getResult().getType(),
-                                                 op.a(), op.b());
+                                                 op.getA(), op.getB());
     auto fmaResult = rewriter.create<LLVM::FAddOp>(
-        loc, mulPart.getResult().getType(), mulPart.getResult(), op.c());
+        loc, mulPart.getResult().getType(), mulPart.getResult(), op.getC());
     rewriter.replaceOp(op, fmaResult.getResult());
     return success();
   }

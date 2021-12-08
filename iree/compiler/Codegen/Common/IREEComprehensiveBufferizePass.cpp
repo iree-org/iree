@@ -30,6 +30,7 @@
 #include "llvm/Support/ErrorHandling.h"
 #include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
+#include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/Linalg/ComprehensiveBufferize/ModuleBufferization.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
@@ -83,11 +84,12 @@ class IREEComprehensiveBufferizePass
   }
 
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<arith::ArithmeticDialect, IREE::Util::UtilDialect,
-                    linalg::LinalgDialect, memref::MemRefDialect,
-                    scf::SCFDialect, StandardOpsDialect, tensor::TensorDialect,
-                    vector::VectorDialect, AffineDialect,
-                    IREE::Flow::FlowDialect>();
+    registry
+        .insert<arith::ArithmeticDialect, IREE::Util::UtilDialect,
+                linalg::LinalgDialect, memref::MemRefDialect, scf::SCFDialect,
+                StandardOpsDialect, tensor::TensorDialect,
+                vector::VectorDialect, AffineDialect, IREE::Flow::FlowDialect,
+                bufferization::BufferizationDialect>();
   }
 
   void runOnOperation() override;

@@ -104,10 +104,10 @@ class ValuePVS : public DFX::StateWrapper<DFX::PotentialConstantIntValuesState,
           if (auto selectOp =
                   dyn_cast<mlir::SelectOp>(result.getDefiningOp())) {
             auto lhs = solver.getElementFor<ValuePVS>(
-                *this, Position::forValue(selectOp.true_value()),
+                *this, Position::forValue(selectOp.getTrueValue()),
                 DFX::Resolution::REQUIRED);
             auto rhs = solver.getElementFor<ValuePVS>(
-                *this, Position::forValue(selectOp.false_value()),
+                *this, Position::forValue(selectOp.getFalseValue()),
                 DFX::Resolution::REQUIRED);
             if (!lhs.isValidState() || !rhs.isValidState()) {
               newState.unionAssumedWithUndef();

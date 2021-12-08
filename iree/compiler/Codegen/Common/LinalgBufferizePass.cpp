@@ -747,9 +747,9 @@ static LogicalResult convertVectorTransferWriteOp(OpBuilder &b,
   }
 
   // Create a new vector.transfer_write operation without a result value.
-  b.create<vector::TransferWriteOp>(
-      loc, op.vector(), resultBuffer, op.indices(), op.permutation_map(),
-      op.mask(), op.in_bounds() ? *op.in_bounds() : ArrayAttr());
+  b.create<vector::TransferWriteOp>(loc, op.vector(), resultBuffer,
+                                    op.indices(), op.permutation_mapAttr(),
+                                    op.mask(), op.in_boundsAttr());
   return success();
 }
 
@@ -843,7 +843,7 @@ static LogicalResult convertPadTensorOp(OpBuilder &b,
     return padTensorOp.emitError(
         "Converting linalg.pad_tensor with non-constant padding value");
   }
-  if (constOp.value().isa<DenseElementsAttr>()) {
+  if (constOp.getValue().isa<DenseElementsAttr>()) {
     return padTensorOp.emitError(
         "Converting linalg.pad_tensor with non-scalar constant padding "
         "value");

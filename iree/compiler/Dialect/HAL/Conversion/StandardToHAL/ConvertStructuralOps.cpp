@@ -77,7 +77,7 @@ class CallOpConversion : public OpConversionPattern<mlir::CallOp> {
                                                 resultTypes))) {
       return rewriter.notifyMatchFailure(op, "unable to convert result types");
     }
-    rewriter.replaceOpWithNewOp<mlir::CallOp>(op, resultTypes, op.callee(),
+    rewriter.replaceOpWithNewOp<mlir::CallOp>(op, resultTypes, op.getCallee(),
                                               adaptor.operands());
     return success();
   }
@@ -90,8 +90,8 @@ class BranchOpConversion : public OpConversionPattern<mlir::BranchOp> {
   LogicalResult matchAndRewrite(
       mlir::BranchOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    rewriter.replaceOpWithNewOp<mlir::BranchOp>(op, op.dest(),
-                                                adaptor.destOperands());
+    rewriter.replaceOpWithNewOp<mlir::BranchOp>(op, op.getDest(),
+                                                adaptor.getDestOperands());
     return success();
   }
 };
@@ -104,8 +104,9 @@ class CondBranchOpConversion : public OpConversionPattern<mlir::CondBranchOp> {
       mlir::CondBranchOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     rewriter.replaceOpWithNewOp<mlir::CondBranchOp>(
-        op, adaptor.condition(), op.trueDest(), adaptor.trueDestOperands(),
-        op.falseDest(), adaptor.falseDestOperands());
+        op, adaptor.getCondition(), op.getTrueDest(),
+        adaptor.getTrueDestOperands(), op.getFalseDest(),
+        adaptor.getFalseDestOperands());
     return success();
   }
 };
@@ -129,9 +130,9 @@ class SelectOpConversion : public OpConversionPattern<mlir::SelectOp> {
   LogicalResult matchAndRewrite(
       mlir::SelectOp selectOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    rewriter.replaceOpWithNewOp<mlir::SelectOp>(selectOp, adaptor.condition(),
-                                                adaptor.true_value(),
-                                                adaptor.false_value());
+    rewriter.replaceOpWithNewOp<mlir::SelectOp>(
+        selectOp, adaptor.getCondition(), adaptor.getTrueValue(),
+        adaptor.getFalseValue());
     return success();
   }
 };

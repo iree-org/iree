@@ -359,20 +359,20 @@ static bool isAlignedTo(Value value, Value alignment) {
   // ops.
   if (auto sourceAddOp = value.getDefiningOp<arith::AddIOp>()) {
     // Two aligned values added together are still aligned.
-    if (isAlignedTo(sourceAddOp.lhs(), alignment) &&
-        isAlignedTo(sourceAddOp.rhs(), alignment)) {
+    if (isAlignedTo(sourceAddOp.getLhs(), alignment) &&
+        isAlignedTo(sourceAddOp.getRhs(), alignment)) {
       return true;
     }
   } else if (auto sourceSubOp = value.getDefiningOp<arith::SubIOp>()) {
     // An aligned value subtracted from an aligned value is still aligned.
-    if (isAlignedTo(sourceSubOp.lhs(), alignment) &&
-        isAlignedTo(sourceSubOp.rhs(), alignment)) {
+    if (isAlignedTo(sourceSubOp.getLhs(), alignment) &&
+        isAlignedTo(sourceSubOp.getRhs(), alignment)) {
       return true;
     }
   } else if (auto sourceMulOp = value.getDefiningOp<arith::MulIOp>()) {
     // Two aligned values multiplied together are still aligned.
-    if (isAlignedTo(sourceMulOp.lhs(), alignment) &&
-        isAlignedTo(sourceMulOp.rhs(), alignment)) {
+    if (isAlignedTo(sourceMulOp.getLhs(), alignment) &&
+        isAlignedTo(sourceMulOp.getRhs(), alignment)) {
       return true;
     }
   }

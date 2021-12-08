@@ -432,7 +432,7 @@ static void expandCallOp(mlir::CallOp op, IndexSet &indexSet,
   auto operands =
       expandOperands(op.getLoc(), op.operands(), subviewMap, indexSet, builder);
   auto resultTypes = expandTypes(op.getResultTypes());
-  auto newOp = builder.create<mlir::CallOp>(op.getLoc(), op.callee(),
+  auto newOp = builder.create<mlir::CallOp>(op.getLoc(), op.getCallee(),
                                             resultTypes, operands);
 
   // Insert subviews on results that we are sinking across the call edge.
@@ -495,9 +495,9 @@ static void expandReturnOp(mlir::ReturnOp op, IndexSet &indexSet,
 static void expandBranchOp(mlir::BranchOp op, IndexSet &indexSet,
                            SubviewMap &subviewMap) {
   OpBuilder builder(op);
-  auto operands = expandOperands(op.getLoc(), op.destOperands(), subviewMap,
+  auto operands = expandOperands(op.getLoc(), op.getDestOperands(), subviewMap,
                                  indexSet, builder);
-  builder.create<mlir::BranchOp>(op.getLoc(), op.dest(), operands);
+  builder.create<mlir::BranchOp>(op.getLoc(), op.getDest(), operands);
   op.erase();
 }
 
@@ -506,12 +506,12 @@ static void expandCondBranchOp(mlir::CondBranchOp op, IndexSet &indexSet,
   if (!usesResources(op)) return;
   OpBuilder builder(op);
   builder.create<mlir::CondBranchOp>(
-      op.getLoc(), op.condition(), op.trueDest(),
-      expandOperands(op.getLoc(), op.trueDestOperands(), subviewMap, indexSet,
-                     builder),
-      op.falseDest(),
-      expandOperands(op.getLoc(), op.falseDestOperands(), subviewMap, indexSet,
-                     builder));
+      op.getLoc(), op.getCondition(), op.getTrueDest(),
+      expandOperands(op.getLoc(), op.getTrueDestOperands(), subviewMap,
+                     indexSet, builder),
+      op.getFalseDest(),
+      expandOperands(op.getLoc(), op.getFalseDestOperands(), subviewMap,
+                     indexSet, builder));
   op.erase();
 }
 

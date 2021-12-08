@@ -23,7 +23,6 @@ add_mlir_public_c_api_library(IREECompilerAPICompilerCAPI
     # LLD.
     lldCommon
     lldCOFF
-    lldDriver
     lldELF
     lldMachO
     lldMinGW

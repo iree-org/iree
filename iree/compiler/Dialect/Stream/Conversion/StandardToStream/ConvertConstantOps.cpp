@@ -32,7 +32,7 @@ struct ConvertTensorConstantOp : public OpConversionPattern<arith::ConstantOp> {
         getContext(), IREE::Stream::Lifetime::Constant);
     auto newOp = rewriter.create<IREE::Stream::TensorConstantOp>(
         constantOp.getLoc(), constantType,
-        constantOp.value().cast<ElementsAttr>(),
+        constantOp.getValue().cast<ElementsAttr>(),
         TypeAttr::get(constantOp.getType()),
         /*result_encoding_dims=*/ValueRange{},
         /*affinity=*/nullptr);

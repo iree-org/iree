@@ -12,6 +12,7 @@
 #ifndef IREE_COMPILER_CODEGEN_COMMON_TRANSFORMS_H_
 #define IREE_COMPILER_CODEGEN_COMMON_TRANSFORMS_H_
 
+#include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/Vector/VectorOps.h"
