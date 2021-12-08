@@ -20,7 +20,7 @@ package(
 )
 
 iree_check_single_backend_test_suite(
-    name = "check_cuda",
+    name = "check_cuda_graph",
     srcs = enforce_glob(
         # keep sorted
         [
@@ -87,6 +87,7 @@ iree_check_single_backend_test_suite(
     ),
     compiler_flags = ["-iree-input-type=mhlo"],
     driver = "cuda",
+    runner_args = ["--cuda_use_streams=false"],
     tags = [
         # CUDA cuInit fails with sanitizer on.
         "noasan",
