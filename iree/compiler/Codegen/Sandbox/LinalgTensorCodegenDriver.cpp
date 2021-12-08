@@ -328,13 +328,13 @@ std::unique_ptr<OperationPass<FuncOp>> mlir::createLinalgVectorLoweringPass(
 //===----------------------------------------------------------------------===//
 
 void mlir::addLowerToVectorTransforms(OpPassManager &passManager) {
-  passManager.addNestedPass<FuncOp>(createLinalgVectorLoweringPass(0));
-  passManager.addNestedPass<FuncOp>(createLinalgVectorLoweringPass(1));
-  passManager.addNestedPass<FuncOp>(createLinalgVectorLoweringPass(2));
-  passManager.addNestedPass<FuncOp>(createLinalgVectorLoweringPass(3));
-  passManager.addNestedPass<FuncOp>(createLinalgVectorLoweringPass(4));
-  passManager.addNestedPass<FuncOp>(createLinalgVectorLoweringPass(5));
-  passManager.addNestedPass<FuncOp>(createLinalgVectorLoweringPass(6));
+  passManager.addPass(createLinalgVectorLoweringPass(0));
+  passManager.addPass(createLinalgVectorLoweringPass(1));
+  passManager.addPass(createLinalgVectorLoweringPass(2));
+  passManager.addPass(createLinalgVectorLoweringPass(3));
+  passManager.addPass(createLinalgVectorLoweringPass(4));
+  passManager.addPass(createLinalgVectorLoweringPass(5));
+  passManager.addPass(createLinalgVectorLoweringPass(6));
 }
 
 //===----------------------------------------------------------------------===//
