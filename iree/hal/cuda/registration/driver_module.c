@@ -16,7 +16,9 @@
 
 #define IREE_HAL_CUDA_DRIVER_ID 0x43554441u  // CUDA
 
-IREE_FLAG(bool, cuda_use_streams, false, "Force to use cuda streams");
+// Force using CUDA streams until we support command buffer caching to avoid the
+// overhead of graph creation.
+IREE_FLAG(bool, cuda_use_streams, true, "Force to use cuda streams");
 
 static iree_status_t iree_hal_cuda_driver_factory_enumerate(
     void* self, const iree_hal_driver_info_t** out_driver_infos,
