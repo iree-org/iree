@@ -912,6 +912,9 @@ void LinalgBufferizePass::runOnOperation() {
     auto baseBuffer = b.create<IREE::HAL::InterfaceBindingSubspanOp>(
         op->getLoc(), memRefType, op.binding(), op.byte_offset(),
         op.byte_length(), op.dynamic_dims(), op.alignmentAttr());
+    auto alignment = baseBuffer.calculateAlignment();
+    b.create<memref::AssumeAlignmentOp>(op->getLoc(), baseBuffer,
+                                        alignment.value());
     bvm.map(op, baseBuffer);
   });
 
