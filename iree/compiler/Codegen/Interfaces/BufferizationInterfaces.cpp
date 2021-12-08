@@ -27,6 +27,7 @@ using mlir::linalg::comprehensive_bufferize::BufferizableOpInterface;
 using mlir::linalg::comprehensive_bufferize::BufferizationAliasInfo;
 using mlir::linalg::comprehensive_bufferize::BufferizationState;
 using mlir::linalg::comprehensive_bufferize::DialectBufferizationState;
+using mlir::linalg::comprehensive_bufferize::PostAnalysisStep;
 using mlir::linalg::comprehensive_bufferize::linalg_ext::
     InitTensorEliminationStep;
 
@@ -41,6 +42,9 @@ namespace {
 /// Flow dialect-specific bufferization state.
 struct FlowBufferizationState : public DialectBufferizationState {
   DenseMap<Value, Value> subspan_to_buffer;
+
+  /// DispatchTensorStoreOps that do not require a copy.
+  DenseSet<Operation *> store_ops_without_copy;
 };
 }  // namespace
 
@@ -95,7 +99,7 @@ namespace {
 struct DispatchTensorLoadOpInterface
     : public BufferizableOpInterface::ExternalModel<
           DispatchTensorLoadOpInterface, IREE::Flow::DispatchTensorLoadOp> {
-  bool isWritable(Operation *op, Value value) const {
+  bool isWritable(Operation *op, Value value, BufferizationState &state) const {
     auto loadOp = cast<IREE::Flow::DispatchTensorLoadOp>(op);
     auto shapedType =
         loadOp.source().getType().dyn_cast<IREE::Flow::DispatchTensorType>();
@@ -140,6 +144,21 @@ static bool isValueEquivalentToAnInplaceTensorLoadOp(
   return foundOp;
 }
 
+struct InplaceTensorStoreOpAnalysis : public PostAnalysisStep {
+  LogicalResult run(FuncOp funcOp, BufferizationState &state,
+                    BufferizationAliasInfo &aliasInfo,
+                    SmallVector<Operation *> &newOps) override {
+    auto &flowState = getFlowBufferizationState(state);
+    funcOp.walk([&](IREE::Flow::DispatchTensorStoreOp storeOp) {
+      // If a store op's dest is eqivalent to a load op's source, no copy is
+      // needed for the store op. All writes already happened inplace.
+      if (isValueEquivalentToAnInplaceTensorLoadOp(aliasInfo, storeOp))
+        flowState.store_ops_without_copy.insert(storeOp);
+    });
+    return success();
+  }
+};
+
 struct DispatchTensorStoreOpInterface
     : public BufferizableOpInterface::ExternalModel<
           DispatchTensorStoreOpInterface, IREE::Flow::DispatchTensorStoreOp> {
@@ -160,17 +179,18 @@ struct DispatchTensorStoreOpInterface
     OpBuilder::InsertionGuard g(b);
     b.setInsertionPoint(op);
     auto storeOp = cast<IREE::Flow::DispatchTensorStoreOp>(op);
+    auto &flowState = getFlowBufferizationState(state);
 
     // If everything bufferized inplace, no copy is needed. We wrote to the
     // target buffer already.
-    if (!isValueEquivalentToAnInplaceTensorLoadOp(state.aliasInfo, storeOp)) {
+    bool needCopy = !flowState.store_ops_without_copy.contains(op);
+    if (needCopy) {
       Value target = getSubspanBuffer(storeOp.target(), b, state);
       Value subView = b.create<memref::SubViewOp>(
           storeOp->getLoc(), target, storeOp.getMixedOffsets(),
           storeOp.getMixedSizes(), storeOp.getMixedStrides());
       Value srcMemref = state.lookupBuffer(storeOp.value());
-      state.options.allocationFns->memCpyFn(b, storeOp->getLoc(), srcMemref,
-                                            subView);
+      state.createMemCpy(b, storeOp->getLoc(), srcMemref, subView);
     }
 
     state.markOpObsolete(storeOp);
@@ -192,9 +212,10 @@ struct DispatchTensorStoreOpInterface
 struct StoreTensorOpAnchoredInitTensorEliminationStep
     : public InitTensorEliminationStep {
   LogicalResult run(FuncOp funcOp, BufferizationState &state,
+                    BufferizationAliasInfo &aliasInfo,
                     SmallVector<Operation *> &newOps) override {
     return eliminateInitTensors(
-        funcOp, state,
+        funcOp, state, aliasInfo,
         /*anchorMatchFunc=*/
         [&](OpOperand &operand) {
           return isa<IREE::Flow::DispatchTensorStoreOp>(operand.getOwner());
@@ -243,8 +264,11 @@ void registerBufferizationInterfaces(DialectRegistry &registry) {
 void addPostAnalysisTransformations(
     linalg::comprehensive_bufferize::BufferizationOptions &options) {
   options.addPostAnalysisStep<StoreTensorOpAnchoredInitTensorEliminationStep>();
+  options.addPostAnalysisStep<InplaceTensorStoreOpAnalysis>();
   options.addPostAnalysisStep<linalg::comprehensive_bufferize::tensor_ext::
                                   InplaceInsertSliceOpAnalysis>();
+  options.addPostAnalysisStep<linalg::comprehensive_bufferize::scf_ext::
+                                  AssertDestinationPassingStyle>();
 }
 
 }  // namespace iree_compiler
