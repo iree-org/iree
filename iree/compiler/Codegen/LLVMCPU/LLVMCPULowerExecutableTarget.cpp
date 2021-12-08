@@ -83,9 +83,9 @@ static StringRef sanitizePipelineString(StringRef input) {
   return input;
 }
 
+/// Returns true if vector ops are allowed in the piepeline.
 static bool lowerToVectors(IREE::HAL::ExecutableVariantOp variantOp) {
-  StringRef backend = variantOp.target().getBackend().getValue();
-  return backend != "vmvx";
+  return isVMVXBackend(variantOp);
 }
 
 /// Verify that valid configuration is set for all ops within the compiled
