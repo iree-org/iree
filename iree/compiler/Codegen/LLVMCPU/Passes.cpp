@@ -162,7 +162,7 @@ void addTensorToVectorsPassPipeline(OpPassManager &passManager,
   passManager.addNestedPass<FuncOp>(createCSEPass());
   passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
 
-  passManager.addNestedPass<FuncOp>(createForOpCanonicalizationPass());
+  passManager.addNestedPass<FuncOp>(createCrossSCFRegionFoldingPass());
 
   passManager.addNestedPass<FuncOp>(createOptimizeVectorTransferPass());
 }
@@ -193,7 +193,7 @@ void addTileFuseAndVectorizePassPipeline(OpPassManager &passManager,
   passManager.addNestedPass<FuncOp>(createCSEPass());
   passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
 
-  passManager.addNestedPass<FuncOp>(createForOpCanonicalizationPass());
+  passManager.addNestedPass<FuncOp>(createCrossSCFRegionFoldingPass());
   passManager.addNestedPass<FuncOp>(createOptimizeVectorTransferPass());
 }
 

@@ -52,11 +52,10 @@ def FoldTensorExtractOp :
   let constructor = "mlir::iree_compiler::createFoldTensorExtractOpPass()";
 }
 
-def ForOpCanonicalization :
-  Pass<"iree-codegen-canonicalize-scf-for", "FuncOp"> {
-  let summary =
-      "Adhoc canonicalization of selected loop-carried values/dependencies for scf.for ops";
-  let constructor = "mlir::iree_compiler::createForOpCanonicalizationPass()";
+def CrossSCFRegionFolding :
+  Pass<"iree-codegen-fold-across-scf-region", "FuncOp"> {
+  let summary = "Fold reciprocal ops across SCF region boundaries";
+  let constructor = "mlir::iree_compiler::createCrossSCFRegionFoldingPass()";
 }
 
 def LinalgBufferize :

@@ -74,9 +74,8 @@ createFoldAffineMinInDistributedLoopsPass();
 /// of the created memref object that holds the constant values.
 std::unique_ptr<OperationPass<>> createFoldTensorExtractOpPass();
 
-/// An ad-hoc pass to canonicalize selected loop carried dependencies on
-/// scf.for.
-std::unique_ptr<OperationPass<FuncOp>> createForOpCanonicalizationPass();
+/// Fold reciprocal ops across SCF region boundaries.
+std::unique_ptr<OperationPass<FuncOp>> createCrossSCFRegionFoldingPass();
 
 /// Pass to perform linalg on tensor bufferization. The function passed into the
 /// pass through the `allocationFn` argument is invoked whenever a new buffer is

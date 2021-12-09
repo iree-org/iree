@@ -97,8 +97,8 @@ static void addMemRefLoweringPasses(OpPassManager &pm) {
   // gives better memory access patterns, which is very important for perf.
   pm.addPass(createSPIRVVectorizeLoadStore());
 
-  // Perform optimizations that need to across the scf.for region boundary.
-  pm.addNestedPass<FuncOp>(createForOpCanonicalizationPass());
+  // Perform optimizations that need to across the SCF region boundary.
+  pm.addNestedPass<FuncOp>(createCrossSCFRegionFoldingPass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 

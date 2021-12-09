@@ -76,7 +76,7 @@ static void buildLoopOptimizationVMVXTransformPassPipeline(
   OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
 
   nestedModulePM.addNestedPass<FuncOp>(createLowerAffinePass());
-  nestedModulePM.addNestedPass<FuncOp>(createForOpCanonicalizationPass());
+  nestedModulePM.addNestedPass<FuncOp>(createCrossSCFRegionFoldingPass());
   nestedModulePM.addNestedPass<FuncOp>(createLoopInvariantCodeMotionPass());
 }
 

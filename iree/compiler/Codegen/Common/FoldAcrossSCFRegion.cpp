@@ -357,8 +357,8 @@ struct PackForOpInductionVarVector final : public OpRewritePattern<scf::ForOp> {
   }
 };
 
-struct ForOpCanonicalizationPass
-    : public ForOpCanonicalizationBase<ForOpCanonicalizationPass> {
+struct CrossSCFRegionFoldingPass
+    : public CrossSCFRegionFoldingBase<CrossSCFRegionFoldingPass> {
   void getDependentDialects(DialectRegistry& registry) const override {
     registry.insert<scf::SCFDialect, vector::VectorDialect>();
   }
@@ -379,8 +379,8 @@ struct ForOpCanonicalizationPass
 
 }  // namespace
 
-std::unique_ptr<OperationPass<FuncOp>> createForOpCanonicalizationPass() {
-  return std::make_unique<ForOpCanonicalizationPass>();
+std::unique_ptr<OperationPass<FuncOp>> createCrossSCFRegionFoldingPass() {
+  return std::make_unique<CrossSCFRegionFoldingPass>();
 }
 
 }  // namespace iree_compiler
