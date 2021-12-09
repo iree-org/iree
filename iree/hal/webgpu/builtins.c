@@ -24,18 +24,6 @@ static const char* iree_hal_webgpu_builtins_find_code(const char* file_name) {
 static iree_status_t iree_hal_webgpu_builtins_initialize_fill_buffer(
     WGPUDevice device, iree_hal_webgpu_staging_buffer_t* staging_buffer,
     iree_hal_webgpu_builtin_fill_buffer_t* out_fill_buffer) {
-  const WGPUBindGroupLayoutEntry params_binding = {
-      .nextInChain = NULL,
-      .binding = 0,
-      .visibility = WGPUShaderStage_Compute,
-      .buffer =
-          {
-              .nextInChain = NULL,
-              .type = WGPUBufferBindingType_Uniform,
-              .hasDynamicOffset = true,
-              .minBindingSize = 2 * sizeof(uint32_t),
-          },
-  };
   const WGPUBindGroupLayoutEntry buffer_binding = {
       .nextInChain = NULL,
       .binding = 0,
@@ -49,37 +37,24 @@ static iree_status_t iree_hal_webgpu_builtins_initialize_fill_buffer(
           },
   };
 
-  const WGPUBindGroupLayoutDescriptor group_layout_descriptors[] = {
-      {
-          .nextInChain = NULL,
-          .label = WGPU_DEBUG_LABEL("_builtin_fill_buffer_params"),
-          .entryCount = 1,
-          .entries = &params_binding,
-      },
-      {
-          .nextInChain = NULL,
-          .label = WGPU_DEBUG_LABEL("_builtin_fill_buffer_buffer"),
-          .entryCount = 1,
-          .entries = &buffer_binding,
-      },
+  const WGPUBindGroupLayoutDescriptor buffer_group_layout_descriptor = {
+      .nextInChain = NULL,
+      .label = WGPU_DEBUG_LABEL("_builtin_fill_buffer_buffer"),
+      .entryCount = 1,
+      .entries = &buffer_binding,
   };
-  const WGPUBindGroupLayout group_layouts[] = {
-      wgpuDeviceCreateBindGroupLayout(device, &group_layout_descriptors[0]),
-      wgpuDeviceCreateBindGroupLayout(device, &group_layout_descriptors[1]),
-  };
-  static_assert(
-      IREE_ARRAYSIZE(group_layout_descriptors) == IREE_ARRAYSIZE(group_layouts),
-      "group layout mismatch");
-  for (iree_host_size_t i = 0; i < IREE_ARRAYSIZE(group_layouts); ++i) {
-    if (group_layouts[i]) continue;
-    for (iree_host_size_t j = 0; j < IREE_ARRAYSIZE(group_layouts); ++j) {
-      if (j != i) iree_wgpuBindGroupLayoutDrop(group_layouts[j]);
-    }
+  WGPUBindGroupLayout buffer_group_layout =
+      wgpuDeviceCreateBindGroupLayout(device, &buffer_group_layout_descriptor);
+  if (!buffer_group_layout) {
     return iree_make_status(
         IREE_STATUS_INTERNAL,
-        "failed to create fill_buffer builtin bind group layout %zu", i);
+        "failed to create fill_buffer builtin bind group layout");
   }
 
+  const WGPUBindGroupLayout group_layouts[] = {
+      staging_buffer->bind_group_layout,
+      buffer_group_layout,
+  };
   const WGPUPipelineLayoutDescriptor pipeline_layout_descriptor = {
       .nextInChain = NULL,
       .label = WGPU_DEBUG_LABEL("_builtin_fill_buffer_layout"),
@@ -88,9 +63,7 @@ static iree_status_t iree_hal_webgpu_builtins_initialize_fill_buffer(
   };
   WGPUPipelineLayout pipeline_layout =
       wgpuDeviceCreatePipelineLayout(device, &pipeline_layout_descriptor);
-  for (iree_host_size_t i = 0; i < IREE_ARRAYSIZE(group_layouts); ++i) {
-    iree_wgpuBindGroupLayoutDrop(group_layouts[i]);
-  }
+  iree_wgpuBindGroupLayoutDrop(buffer_group_layout);
   if (!pipeline_layout) {
     return iree_make_status(
         IREE_STATUS_INTERNAL,
@@ -128,7 +101,6 @@ static iree_status_t iree_hal_webgpu_builtins_initialize_fill_buffer(
               .entryPoint = "main",
           },
   };
-
   WGPUComputePipeline pipeline =
       wgpuDeviceCreateComputePipeline(device, &pipeline_descriptor);
   if (!pipeline) {
@@ -136,8 +108,7 @@ static iree_status_t iree_hal_webgpu_builtins_initialize_fill_buffer(
                             "failed to create fill_buffer builtin pipeline");
   }
   out_fill_buffer->pipeline = pipeline;
-  out_fill_buffer->param_group_layout = group_layouts[0];
-  out_fill_buffer->buffer_group_layout = group_layouts[1];
+  out_fill_buffer->buffer_group_layout = buffer_group_layout;
   return iree_ok_status();
 }
 
@@ -163,7 +134,6 @@ void iree_hal_webgpu_builtins_deinitialize(
   IREE_ASSERT_ARGUMENT(builtins);
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  iree_wgpuBindGroupLayoutDrop(builtins->fill_buffer.param_group_layout);
   iree_wgpuBindGroupLayoutDrop(builtins->fill_buffer.buffer_group_layout);
   iree_wgpuComputePipelineDrop(builtins->fill_buffer.pipeline);
 

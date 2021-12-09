@@ -17,17 +17,9 @@ extern "C" {
 #endif  // __cplusplus
 
 typedef struct iree_hal_webgpu_builtin_fill_buffer_t {
-  // groupIndex[0]
-  //  binding[0]: params
-  //    offset: u32;
-  //    length : u32;
-  //    pattern : u32;
-  WGPUBindGroupLayout param_group_layout;
-
   // groupIndex[1]
   //  binding[0]: target
   WGPUBindGroupLayout buffer_group_layout;
-
   WGPUComputePipeline pipeline;
 } iree_hal_webgpu_builtin_fill_buffer_t;
 

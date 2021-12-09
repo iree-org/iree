@@ -11,7 +11,12 @@
 #include "iree/hal/api.h"
 
 #define WGPU_SKIP_PROCS 1
+#if defined(IREE_HAL_WEBGPU_PLATFORM_WGPU_NATIVE)
+#include <webgpu-headers/webgpu.h>
+#include <wgpu.h>  // wgpu-native implementation only
+#else
 #include "third_party/webgpu-headers/webgpu.h"  // IWYU pragma: export
+#endif  // IREE_HAL_WEBGPU_PLATFORM_WGPU_NATIVE
 
 //===----------------------------------------------------------------------===//
 // WebGPU API utilities

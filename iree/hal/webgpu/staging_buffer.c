@@ -77,7 +77,7 @@ iree_status_t iree_hal_webgpu_staging_buffer_initialize(
           .binding = 0,
           .buffer = out_staging_buffer->device_buffer_handle,
           .offset = 0,
-          .size = 0,
+          .size = limits->maxUniformBufferBindingSize,
       },
   };
   const WGPUBindGroupDescriptor descriptor = {

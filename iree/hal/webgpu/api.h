@@ -11,7 +11,7 @@
 
 #include "iree/base/api.h"
 #include "iree/hal/api.h"
-#include "third_party/webgpu-headers/webgpu.h"
+#include "iree/hal/webgpu/platform/webgpu.h"
 
 #ifdef __cplusplus
 extern "C" {

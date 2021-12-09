@@ -31,7 +31,7 @@ static iree_status_t iree_hal_webgpu_native_driver_factory_enumerate(
   static const iree_hal_driver_info_t driver_infos[1] = {
       {
           .driver_id = IREE_HAL_WEBGPU_DRIVER_ID,
-          .driver_name = iree_string_view_literal("webgpu-native"),
+          .driver_name = iree_string_view_literal("webgpu"),
           .full_name = iree_string_view_literal("Experimental WebGPU"),
       },
   };
