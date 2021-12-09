@@ -18,7 +18,7 @@ iree_cc_test(
     iree::base::logging
     iree::testing::gtest
     iree::testing::gtest_main
-    iree::vm::cc
+    iree::vm
     ::arithmetic_ops
     ::arithmetic_ops_f32
     ::arithmetic_ops_i64

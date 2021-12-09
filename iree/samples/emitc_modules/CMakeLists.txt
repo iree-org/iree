@@ -38,7 +38,6 @@ if(${IREE_ENABLE_EMITC})
     SRCS
       "import_module_test.cc"
     DEPS
-      ::add_module
       ::import_module_a
       ::import_module_b
       iree::base
