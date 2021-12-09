@@ -222,42 +222,49 @@
 
 #define ARGUMENTS_SIZE(types) (0 FOR_EACH(ARGUMENT_SIZE, TUPLE_UNPACK(types)))
 #define ARGUMENT_SIZE(idx, arg) +ARGUMENT_SIZE_##arg
+#define ARGUMENT_SIZE_f sizeof(float)
 #define ARGUMENT_SIZE_i sizeof(int32_t)
 #define ARGUMENT_SIZE_r sizeof(iree_vm_ref_t)
 #define ARGUMENT_SIZE_v 0
 
 #define INPUT_ARGUMENTS(types) FOR_EACH(INPUT_ARGUMENT, TUPLE_UNPACK(types))
 #define INPUT_ARGUMENT(idx, arg) INPUT_ARGUMENT_##arg(idx)
+#define INPUT_ARGUMENT_f(idx) , args->f##idx
 #define INPUT_ARGUMENT_i(idx) , args->i##idx
 #define INPUT_ARGUMENT_r(idx) , &args->r##idx
 #define INPUT_ARGUMENT_v(idx)
 
 #define OUTPUT_ARGUMENTS(types) FOR_EACH(OUTPUT_ARGUMENT, TUPLE_UNPACK(types))
 #define OUTPUT_ARGUMENT(idx, arg) OUTPUT_ARGUMENT_##arg(idx)
+#define OUTPUT_ARGUMENT_f(idx) , &rets->f##idx
 #define OUTPUT_ARGUMENT_i(idx) , &rets->i##idx
 #define OUTPUT_ARGUMENT_r(idx) , &rets->r##idx
 #define OUTPUT_ARGUMENT_v(idx)
 
 #define INPUT_PARAMETERS(types) FOR_EACH(INPUT_PARAMETER, TUPLE_UNPACK(types))
 #define INPUT_PARAMETER(idx, arg) INPUT_PARAMETER_##arg(idx)
+#define INPUT_PARAMETER_f(idx) , float arg##idx
 #define INPUT_PARAMETER_i(idx) , int32_t arg##idx
 #define INPUT_PARAMETER_r(idx) , iree_vm_ref_t* arg##idx
 #define INPUT_PARAMETER_v(idx)
 
 #define OUTPUT_PARAMETERS(types) FOR_EACH(OUTPUT_PARAMETER, TUPLE_UNPACK(types))
 #define OUTPUT_PARAMETER(idx, arg) OUTPUT_PARAMETER_##arg(idx)
+#define OUTPUT_PARAMETER_f(idx) , float* ret##idx
 #define OUTPUT_PARAMETER_i(idx) , int32_t* ret##idx
 #define OUTPUT_PARAMETER_r(idx) , iree_vm_ref_t* ret##idx
 #define OUTPUT_PARAMETER_v(idx)
 
 #define PACK_ARGUMENTS(types) FOR_EACH(PACK_ARGUMENT, TUPLE_UNPACK(types))
 #define PACK_ARGUMENT(idx, arg) PACK_ARGUMENT_##arg(idx)
+#define PACK_ARGUMENT_f(idx) arguments.f##idx = arg##idx;
 #define PACK_ARGUMENT_i(idx) arguments.i##idx = arg##idx;
 #define PACK_ARGUMENT_r(idx) iree_vm_ref_assign(arg##idx, &arguments.r##idx);
 #define PACK_ARGUMENT_v(idx)
 
 #define UNPACK_RESULTS(types) FOR_EACH(UNPACK_RESULT, TUPLE_UNPACK(types))
 #define UNPACK_RESULT(idx, arg) UNPACK_RESULT_##arg(idx)
+#define UNPACK_RESULT_f(idx) *ret##idx = results.f##idx;
 #define UNPACK_RESULT_i(idx) *ret##idx = results.i##idx;
 #define UNPACK_RESULT_r(idx) iree_vm_ref_move(&results.r##idx, ret##idx);
 #define UNPACK_RESULT_v(idx)
@@ -291,25 +298,51 @@
 
 EMITC_DEFINE_SHIMS((i), (i))
 EMITC_DEFINE_SHIMS((i, i), (i))
+EMITC_DEFINE_SHIMS((i, r, i, i), (v))
+EMITC_DEFINE_SHIMS((r), (i))
+EMITC_DEFINE_SHIMS((r), (i, i))
+EMITC_DEFINE_SHIMS((r), (i, i, i))
+EMITC_DEFINE_SHIMS((r), (i, i, i, i))
 EMITC_DEFINE_SHIMS((r), (r))
 EMITC_DEFINE_SHIMS((r), (v))
+EMITC_DEFINE_SHIMS((r, i), (i))
+// TODO(dajuro): Enable as soon as #7845 has landed
+// EMITC_DEFINE_SHIMS((r, i), (f))
+EMITC_DEFINE_SHIMS((r, i), (r))
+EMITC_DEFINE_SHIMS((r, i), (v))
+EMITC_DEFINE_SHIMS((r, i, i), (i))
 EMITC_DEFINE_SHIMS((r, i, i), (r))
+EMITC_DEFINE_SHIMS((r, i, i), (v))
+EMITC_DEFINE_SHIMS((r, i, f), (v))
 EMITC_DEFINE_SHIMS((r, i, i, i), (r))
 EMITC_DEFINE_SHIMS((r, i, i, i), (v))
-EMITC_DEFINE_SHIMS((r, r, i, i, i, i), (v))
-EMITC_DEFINE_SHIMS((r, r, r, i, i, i), (v))
+EMITC_DEFINE_SHIMS((r, i, i, r, i, i), (r))
+EMITC_DEFINE_SHIMS((r, i, i, i, r, i, i), (r))
+EMITC_DEFINE_SHIMS((r, i, r, i, i), (v))
+EMITC_DEFINE_SHIMS((r, r), (i))
 EMITC_DEFINE_SHIMS((r, r), (r))
 EMITC_DEFINE_SHIMS((r, r), (v))
+EMITC_DEFINE_SHIMS((r, r), (i, i))
 EMITC_DEFINE_SHIMS((r, r, r), (i, i))
+EMITC_DEFINE_SHIMS((r, r, i, i, i, i), (v))
+EMITC_DEFINE_SHIMS((r, r, i, r, i), (v))
+EMITC_DEFINE_SHIMS((r, r, i, r, i, i), (v))
+EMITC_DEFINE_SHIMS((r, r, r, i, i, i), (v))
 EMITC_DEFINE_SHIMS((v), (i))
 EMITC_DEFINE_SHIMS((v), (r))
 EMITC_DEFINE_SHIMS((v), (v))
 
+EMITC_VLA_IMPORT((r), (i), (i))
+EMITC_VLA_IMPORT((r), (r), (v))
+EMITC_VLA_IMPORT((r, i), (i), (r))
+EMITC_VLA_IMPORT((r, i, i), (i), (r))
 EMITC_VLA_IMPORT((r, i), (i, i), (r))
 EMITC_VLA_IMPORT((r, i), (r), (r))
-EMITC_VLA_IMPORT((r, i, i), (i), (r))
-EMITC_VLA_IMPORT((r, r, i), (i, r, i, i), (v))
 EMITC_VLA_IMPORT((r, r, r), (r), (r))
+EMITC_VLA_IMPORT((r, r), (i, r, i, i), (r))
+EMITC_VLA_IMPORT((r, r, i), (i), (v))
 EMITC_VLA_IMPORT((r, r, i, i), (i), (v))
+EMITC_VLA_IMPORT((r, r, i), (i, r, i, i), (v))
+EMITC_VLA_IMPORT((r, r, i, r), (i), (v))
 
 #endif  // IREE_VM_SHIMS_EMITC_H_
