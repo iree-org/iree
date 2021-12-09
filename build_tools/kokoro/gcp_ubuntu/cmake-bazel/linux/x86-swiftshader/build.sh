@@ -35,8 +35,12 @@ echo "Initializing submodules"
 pushd integrations/tensorflow
 BAZEL_CMD=(bazel --noworkspace_rc --bazelrc=build_tools/bazel/iree-tf.bazelrc)
 BAZEL_BINDIR="$(${BAZEL_CMD[@]?} info bazel-bin)"
+# xargs is set to high arg limits to avoid multiple Bazel invocations and will
+# hard fail if the limits are exceeded.
+# See https://github.com/bazelbuild/bazel/issues/12479
 "${BAZEL_CMD[@]?}" query //iree_tf_compiler/... | \
-   xargs "${BAZEL_CMD[@]?}" test \
+   xargs --max-args 1000000 --max-chars 1000000 --exit \
+    "${BAZEL_CMD[@]?}" test \
       --config=remote_cache_tf_integrations \
       --config=generic_clang \
       --test_tag_filters="-nokokoro" \
