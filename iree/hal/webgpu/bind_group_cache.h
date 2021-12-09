@@ -16,14 +16,6 @@
 extern "C" {
 #endif  // __cplusplus
 
-// NOTE: WebGPU bind groups strongly retain the buffers bound in them - this
-// means that if we maintain a persistent cache of bind groups we're
-// overextending the lifetime of all referenced buffers potentially forever.
-// There's no way to weakly reference the bind groups or buffers and as such we
-// can't keep this cache around for long periods of time. Users should call
-// iree_hal_webgpu_bind_group_cache_trim frequently to reset the cache and drop
-// all references.
-
 // NOTE: this is probably too small, but this is all a hack anyway.
 // TODO(benvanik): build a real cache - today this is assuming the compiler does
 // a much better job than it currently does as reducing the number of push

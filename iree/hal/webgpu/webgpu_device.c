@@ -315,12 +315,6 @@ static iree_status_t iree_hal_webgpu_device_queue_submit(
     }
   }
 
-  // HACK: reset the bind group cache to drop all WGPUBindGroups - these retain
-  // the buffers bound to them and we can end up hanging on to 100's of MB of
-  // memory just to save a few calls to create bind groups. WebGPU should have
-  // a better bind group pooling mechanism with weak references to avoid this.
-  iree_hal_webgpu_bind_group_cache_trim(&device->bind_group_cache);
-
   // HACK: fully synchronize with the device... maybe.
   // TODO(benvanik): make semaphores work so that we don't have to synchronize.
   return iree_hal_device_wait_idle(base_device, iree_infinite_timeout());
