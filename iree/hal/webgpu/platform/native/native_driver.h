@@ -4,8 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#ifndef IREE_HAL_WEBGPU_PLATFORM_WGPU_WGPU_DRIVER_H_
-#define IREE_HAL_WEBGPU_PLATFORM_WGPU_WGPU_DRIVER_H_
+#ifndef IREE_HAL_WEBGPU_PLATFORM_NATIVE_NATIVE_DRIVER_H_
+#define IREE_HAL_WEBGPU_PLATFORM_NATIVE_NATIVE_DRIVER_H_
 
 #include "iree/base/api.h"
 #include "iree/hal/api.h"
@@ -25,4 +25,4 @@ iree_status_t iree_hal_webgpu_native_driver_create(
 }  // extern "C"
 #endif  // __cplusplus
 
-#endif  // IREE_HAL_WEBGPU_PLATFORM_WGPU_WGPU_DRIVER_H_
+#endif  // IREE_HAL_WEBGPU_PLATFORM_NATIVE_NATIVE_DRIVER_H_

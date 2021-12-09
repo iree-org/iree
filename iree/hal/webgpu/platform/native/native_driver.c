@@ -4,7 +4,11 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/hal/webgpu/platform/wgpu/wgpu_driver.h"
+#include "iree/hal/webgpu/platform/native/native_driver.h"
+
+#if !defined(IREE_HAL_WEBGPU_PLATFORM_WGPU_NATIVE)
+#error "dawn support not yet implemented; this file needs cleanup"
+#endif !defined(IREE_HAL_WEBGPU_PLATFORM_WGPU_NATIVE)
 
 #include <wgpu.h>  // wgpu-native implementation only
 

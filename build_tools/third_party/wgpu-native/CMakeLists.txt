@@ -4,7 +4,7 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-if(NOT ${IREE_HAL_DRIVER_WEBGPU_NATIVE})
+if(NOT (${IREE_HAL_WEBGPU_PLATFORM} STREQUAL "wgpu-native"))
   return()
 endif()
 
@@ -13,7 +13,7 @@ include(FetchContent)
 FetchContent_Declare(
   wgpu-native
   GIT_REPOSITORY https://github.com/gfx-rs/wgpu-native.git
-  GIT_TAG origin/master
+  GIT_TAG a2e81dc1271b876ebf0c0d35857040838ed58297 # 2021-12-04
 )
 FetchContent_MakeAvailable(wgpu-native)
 FetchContent_GetProperties(wgpu-native SOURCE_DIR WGPU_NATIVE_SOURCE)

@@ -4,14 +4,13 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/hal/webgpu/registration/driver_module_native.h"
-
 #include <inttypes.h>
 #include <stddef.h>
 
 #include "iree/base/api.h"
 #include "iree/base/internal/flags.h"
-#include "iree/hal/webgpu/platform/wgpu/wgpu_driver.h"
+#include "iree/hal/webgpu/platform/native/native_driver.h"
+#include "iree/hal/webgpu/registration/driver_module.h"
 
 // TODO(#4298): remove this driver registration and wrapper.
 
@@ -33,7 +32,7 @@ static iree_status_t iree_hal_webgpu_native_driver_factory_enumerate(
       {
           .driver_id = IREE_HAL_WEBGPU_DRIVER_ID,
           .driver_name = iree_string_view_literal("webgpu-native"),
-          .full_name = iree_string_view_literal("WebGPU via wgpu-native"),
+          .full_name = iree_string_view_literal("Experimental WebGPU"),
       },
   };
   *out_driver_info_count = IREE_ARRAYSIZE(driver_infos);
@@ -83,8 +82,8 @@ static iree_status_t iree_hal_webgpu_native_driver_factory_try_create(
       out_driver);
 }
 
-IREE_API_EXPORT iree_status_t iree_hal_webgpu_native_driver_module_register(
-    iree_hal_driver_registry_t* registry) {
+IREE_API_EXPORT iree_status_t
+iree_hal_webgpu_driver_module_register(iree_hal_driver_registry_t* registry) {
   static const iree_hal_driver_factory_t factory = {
       .self = NULL,
       .enumerate = iree_hal_webgpu_native_driver_factory_enumerate,

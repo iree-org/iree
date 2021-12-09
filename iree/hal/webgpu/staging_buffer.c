@@ -12,7 +12,7 @@
 #include "iree/base/tracing.h"
 #include "iree/hal/webgpu/buffer.h"
 
-static iree_status_t iree_hal_webgpu_staging_buffer_initialize(
+iree_status_t iree_hal_webgpu_staging_buffer_initialize(
     WGPUDevice device, const WGPULimits* limits,
     iree_hal_allocator_t* device_allocator, uint8_t* host_buffer,
     iree_host_size_t host_buffer_capacity,
@@ -94,7 +94,7 @@ static iree_status_t iree_hal_webgpu_staging_buffer_initialize(
   return iree_ok_status();
 }
 
-static void iree_hal_webgpu_staging_buffer_deinitialize(
+void iree_hal_webgpu_staging_buffer_deinitialize(
     iree_hal_webgpu_staging_buffer_t* staging_buffer) {
   iree_wgpuBindGroupDrop(staging_buffer->bind_group);
   iree_wgpuBindGroupLayoutDrop(staging_buffer->bind_group_layout);

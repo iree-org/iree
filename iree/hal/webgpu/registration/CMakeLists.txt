@@ -4,24 +4,32 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-if(${IREE_HAL_DRIVER_WEBGPU_NATIVE})
-
 iree_cc_library(
   NAME
-    native
+    registration
   HDRS
-    "driver_module_native.h"
-  SRCS
-    "driver_module_native.c"
+    "driver_module.h"
   DEPS
     iree::base
     iree::base::internal::flags
     iree::hal
     iree::hal::webgpu
-    iree::hal::webgpu::platform::wgpu
   DEFINES
-    "IREE_HAL_HAVE_WEBGPU_NATIVE_DRIVER_MODULE=1"
+    "IREE_HAL_HAVE_WEBGPU_DRIVER_MODULE=1"
   PUBLIC
 )
 
+if(${EMSCRIPTEN})
+  # TODO(benvanik): emscripten driver.
+else()
+  target_sources(
+    iree_hal_webgpu_registration_registration
+    PUBLIC
+      "driver_module_native.c"
+  )
+  target_link_libraries(
+    iree_hal_webgpu_registration_registration
+    INTERFACE
+      iree::hal::webgpu::platform::native
+  )
 endif()

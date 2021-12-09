@@ -8,8 +8,7 @@
 # To disable autogeneration for this file entirely, delete this header.        #
 ################################################################################
 
-if(NOT ("${IREE_HAL_DRIVER_WEBGPU_EMSCRIPTEN}" OR
-        "${IREE_HAL_DRIVER_WEBGPU_NATIVE}"))
+if(NOT ("${IREE_HAL_DRIVER_WEBGPU}"))
   return()
 endif()
 

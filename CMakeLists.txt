@@ -66,7 +66,6 @@ if(${IREE_BUILD_TENSORFLOW_ALL} OR
   set(IREE_ENABLE_TENSORFLOW ON)
 endif()
 
-
 option(IREE_BUILD_BINDINGS_TFLITE "Builds the IREE TFLite C API compatibility shim" ON)
 option(IREE_BUILD_BINDINGS_TFLITE_JAVA "Builds the IREE TFLite Java bindings with the C API compatibility shim" ON)
 
@@ -87,6 +86,10 @@ option(IREE_ENABLE_NEW_INTEGRATION_TESTS "Enables new integration tests and disa
 
 option(IREE_ENABLE_EMITC "Enables MLIR EmitC dependencies." ${IREE_BUILD_COMPILER})
 
+set(IREE_HAL_WEBGPU_PLATFORM_DEFAULT "wgpu-native")
+set(IREE_HAL_WEBGPU_PLATFORM "${IREE_HAL_WEBGPU_PLATFORM_DEFAULT}"
+    CACHE STRING "Native WebGPU implementation ('dawn' or 'wgpu-native').")
+
 #-------------------------------------------------------------------------------
 # Target and backend configuration
 #-------------------------------------------------------------------------------
@@ -99,12 +102,11 @@ set(IREE_ALL_HAL_DRIVERS
   VMVX
   VMVX_Sync
   Vulkan
-  WebGPU_Native
+  WebGPU
 )
 
 if(IREE_HAL_DRIVERS_TO_BUILD STREQUAL "all")
   set(IREE_HAL_DRIVERS_TO_BUILD ${IREE_ALL_HAL_DRIVERS})
-
   # For Apple platforms we need to use Metal instead of Vulkan.
   if(APPLE)
     list(REMOVE_ITEM IREE_HAL_DRIVERS_TO_BUILD Vulkan)
@@ -138,7 +140,7 @@ set(IREE_ALL_TARGET_BACKENDS
   ROCM
   Vulkan-SPIRV
   VMVX
-  WGSL-SPIRV
+  WebGPU
 )
 
 if(${IREE_BUILD_COMPILER})
@@ -423,12 +425,13 @@ else()
 endif()
 
 #-------------------------------------------------------------------------------
-# Other dependencies.
+# Other dependencies
 #-------------------------------------------------------------------------------
 
 include(external_cc_library)
 include(flatbuffer_c_library)
 
+add_subdirectory(build_tools/third_party/dawn EXCLUDE_FROM_ALL)
 add_subdirectory(build_tools/third_party/cuda EXCLUDE_FROM_ALL)
 add_subdirectory(build_tools/third_party/libyaml EXCLUDE_FROM_ALL)
 add_subdirectory(build_tools/third_party/stblib EXCLUDE_FROM_ALL)
