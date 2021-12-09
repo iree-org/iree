@@ -9,7 +9,7 @@ hal.executable private @static_scatter_update_slice  {
     hal.interface.binding @s0b2_rw_external, set=0, binding=2, type="StorageBuffer"
   }
 
-  hal.executable.variant @vulkan_spirv_fb, target = #hal.executable.target<"vulkan", "vulkan-spirv-fb"> {
+  hal.executable.variant @vulkan_spirv_fb, target = <"vulkan", "vulkan-spirv-fb"> {
     hal.executable.entry_point @static_scatter_update_slice attributes {
       interface = @io, ordinal = 0 : index,
       translation.info = #translation,

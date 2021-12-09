@@ -116,7 +116,7 @@ hal.executable @exe {
     hal.interface.binding @s0b1, set=0, binding=1, type="StorageBuffer"
     hal.interface.binding @s0b2, set=0, binding=2, type="StorageBuffer"
   }
-  hal.executable.variant @vmvx, target = #hal.executable.target<"vmvx", "vmvx-bytecode-fb"> {
+  hal.executable.variant @vmvx, target = <"vmvx", "vmvx-bytecode-fb"> {
     hal.executable.entry_point @entry0 attributes {
       interface = @interface0,
       ordinal = 0 : index,

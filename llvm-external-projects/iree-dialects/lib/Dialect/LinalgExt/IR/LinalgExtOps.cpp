@@ -193,7 +193,7 @@ SmallVector<StringRef> ScatterOp::getLoopIteratorTypes() {
   return iteratorTypes;
 }
 
-SmallVector<Range> ScatterOp::getLoopBounds(OpBuilder &builder) {
+SmallVector<Range> ScatterOp::getIterationDomain(OpBuilder &builder) {
   Location loc = getLoc();
   Value zero = builder.create<arith::ConstantIndexOp>(loc, 0);
   Value one = builder.create<arith::ConstantIndexOp>(loc, 1);
@@ -376,7 +376,7 @@ SmallVector<StringRef> SortOp::getLoopIteratorTypes() {
   return iteratorTypes;
 }
 
-SmallVector<Range> SortOp::getLoopBounds(OpBuilder &builder) {
+SmallVector<Range> SortOp::getIterationDomain(OpBuilder &builder) {
   int64_t operandRank = getOperandRank();
   SmallVector<Range> loopBounds(operandRank);
   Location loc = getLoc();
@@ -552,7 +552,7 @@ SmallVector<StringRef> FftOp::getLoopIteratorTypes() {
   return iteratorTypes;
 }
 
-SmallVector<Range> FftOp::getLoopBounds(OpBuilder &builder) {
+SmallVector<Range> FftOp::getIterationDomain(OpBuilder &builder) {
   SmallVector<Range> res;
   Location loc = getLoc();
   Value zero = builder.create<arith::ConstantIndexOp>(loc, 0);
@@ -822,7 +822,7 @@ SmallVector<StringRef> ReverseOp::getLoopIteratorTypes() {
   return iteratorTypes;
 }
 
-SmallVector<Range> ReverseOp::getLoopBounds(OpBuilder &builder) {
+SmallVector<Range> ReverseOp::getIterationDomain(OpBuilder &builder) {
   Location loc = getLoc();
   Value zero = builder.create<arith::ConstantIndexOp>(loc, 0);
   Value one = builder.create<arith::ConstantIndexOp>(loc, 1);

@@ -50,7 +50,7 @@ def TiledOpInterface : OpInterface<"TiledOpInterface"> {
           step for the loops of the operation.
         }],
         /*retTy=*/"SmallVector<Range>",
-        /*methodName=*/"getLoopBounds",
+        /*methodName=*/"getIterationDomain",
         /*args=*/(ins "OpBuilder &":$b)
       >,
       InterfaceMethod<

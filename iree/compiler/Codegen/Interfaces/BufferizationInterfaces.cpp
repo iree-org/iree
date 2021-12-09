@@ -145,11 +145,11 @@ static bool isValueEquivalentToAnInplaceTensorLoadOp(
 }
 
 struct InplaceTensorStoreOpAnalysis : public PostAnalysisStep {
-  LogicalResult run(FuncOp funcOp, BufferizationState &state,
+  LogicalResult run(Operation *op, BufferizationState &state,
                     BufferizationAliasInfo &aliasInfo,
                     SmallVector<Operation *> &newOps) override {
     auto &flowState = getFlowBufferizationState(state);
-    funcOp.walk([&](IREE::Flow::DispatchTensorStoreOp storeOp) {
+    op->walk([&](IREE::Flow::DispatchTensorStoreOp storeOp) {
       // If a store op's dest is eqivalent to a load op's source, no copy is
       // needed for the store op. All writes already happened inplace.
       if (isValueEquivalentToAnInplaceTensorLoadOp(aliasInfo, storeOp))
@@ -211,11 +211,11 @@ struct DispatchTensorStoreOpInterface
 ///   DispatchTensorStoreOp to the InitTensorOp must have bufferized in-place.
 struct StoreTensorOpAnchoredInitTensorEliminationStep
     : public InitTensorEliminationStep {
-  LogicalResult run(FuncOp funcOp, BufferizationState &state,
+  LogicalResult run(Operation *op, BufferizationState &state,
                     BufferizationAliasInfo &aliasInfo,
                     SmallVector<Operation *> &newOps) override {
     return eliminateInitTensors(
-        funcOp, state, aliasInfo,
+        op, state, aliasInfo,
         /*anchorMatchFunc=*/
         [&](OpOperand &operand) {
           return isa<IREE::Flow::DispatchTensorStoreOp>(operand.getOwner());

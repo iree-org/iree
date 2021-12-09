@@ -8,7 +8,7 @@ hal.executable @conv_112x112x512 {
     hal.interface.binding public @s0b1_ro_external, set=0, binding=1, type="StorageBuffer"
     hal.interface.binding public @s0b2_xw_external, set=0, binding=2, type="StorageBuffer"
   }
-  hal.executable.variant public @vulkan_spirv_fb, target = #hal.executable.target<"vulkan", "vulkan-spirv-fb", {
+  hal.executable.variant public @vulkan_spirv_fb, target = <"vulkan", "vulkan-spirv-fb", {
       spv.target_env = #spv.target_env<#spv.vce<v1.4, [Shader], []>, ARM:IntegratedGPU, {
         max_compute_shared_memory_size = 32768 : i32,
         max_compute_workgroup_invocations = 512 : i32,
@@ -100,7 +100,7 @@ hal.executable @conv_112x112x32 {
     hal.interface.binding public @s0b1_ro_external, set=0, binding=1, type="StorageBuffer"
     hal.interface.binding public @s0b2_xw_external, set=0, binding=2, type="StorageBuffer"
   }
-  hal.executable.variant public @vulkan_spirv_fb, target = #hal.executable.target<"vulkan", "vulkan-spirv-fb", {
+  hal.executable.variant public @vulkan_spirv_fb, target = <"vulkan", "vulkan-spirv-fb", {
       spv.target_env = #spv.target_env<#spv.vce<v1.4, [Shader], []>, ARM:IntegratedGPU, {
         max_compute_shared_memory_size = 32768 : i32,
         max_compute_workgroup_invocations = 512 : i32,
@@ -192,7 +192,7 @@ hal.executable @conv_16x16x16 {
     hal.interface.binding public @s0b1_ro_external, set=0, binding=1, type="StorageBuffer"
     hal.interface.binding public @s0b2_xw_external, set=0, binding=2, type="StorageBuffer"
   }
-  hal.executable.variant public @vulkan_spirv_fb, target = #hal.executable.target<"vulkan", "vulkan-spirv-fb", {
+  hal.executable.variant public @vulkan_spirv_fb, target = <"vulkan", "vulkan-spirv-fb", {
       spv.target_env = #spv.target_env<#spv.vce<v1.4, [Shader], []>, ARM:IntegratedGPU, {
         max_compute_shared_memory_size = 32768 : i32,
         max_compute_workgroup_invocations = 512 : i32,
@@ -284,7 +284,7 @@ hal.executable @dwconv_28x28x144 {
     hal.interface.binding public @s0b1_ro_external, set=0, binding=1, type="StorageBuffer"
     hal.interface.binding public @s0b2_xw_external, set=0, binding=2, type="StorageBuffer"
   }
-  hal.executable.variant public @vulkan_spirv_fb, target = #hal.executable.target<"vulkan", "vulkan-spirv-fb", {
+  hal.executable.variant public @vulkan_spirv_fb, target = <"vulkan", "vulkan-spirv-fb", {
       spv.target_env = #spv.target_env<#spv.vce<v1.4, [Shader], []>, ARM:IntegratedGPU, {
         max_compute_shared_memory_size = 32768 : i32,
         max_compute_workgroup_invocations = 512 : i32,
@@ -378,7 +378,7 @@ hal.executable @dwconv_1x2x8 {
     hal.interface.binding public @s0b1_ro_external, set=0, binding=1, type="StorageBuffer"
     hal.interface.binding public @s0b2_xw_external, set=0, binding=2, type="StorageBuffer"
   }
-  hal.executable.variant public @vulkan_spirv_fb, target = #hal.executable.target<"vulkan", "vulkan-spirv-fb", {
+  hal.executable.variant public @vulkan_spirv_fb, target = <"vulkan", "vulkan-spirv-fb", {
       spv.target_env = #spv.target_env<#spv.vce<v1.4, [Shader], []>, ARM:IntegratedGPU, {
         max_compute_shared_memory_size = 32768 : i32,
         max_compute_workgroup_invocations = 512 : i32,

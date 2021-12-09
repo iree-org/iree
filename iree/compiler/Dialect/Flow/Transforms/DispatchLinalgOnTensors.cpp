@@ -836,7 +836,7 @@ struct TiledOpInterfacePattern
     }
 
     SmallVector<StringRef> iteratorTypes = tilableOp.getLoopIteratorTypes();
-    SmallVector<Range> loopRanges = tilableOp.getLoopBounds(rewriter);
+    SmallVector<Range> loopRanges = tilableOp.getIterationDomain(rewriter);
     SmallVector<unsigned> partitionedLoops = getPartitionedLoops(tilableOp);
     SmallVector<Value> count;
     for (auto dim : partitionedLoops) {

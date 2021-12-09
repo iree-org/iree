@@ -10,7 +10,7 @@ hal.executable public @matmul_256x1024x128_div_sub {
     hal.interface.binding public @s0b3_ro_external, set=0, binding=3, type="StorageBuffer"
     hal.interface.binding public @s0b4_xw_external, set=0, binding=4, type="StorageBuffer"
   }
-  hal.executable.variant @vulkan, target = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
+  hal.executable.variant @vulkan, target = <"vulkan-spirv", "vulkan-spirv-fb", {
       spv.target_env =
         #spv.target_env<#spv.vce<v1.5,
           [Shader, Float16, StorageBuffer16BitAccess, StorageUniform16, CooperativeMatrixNV],

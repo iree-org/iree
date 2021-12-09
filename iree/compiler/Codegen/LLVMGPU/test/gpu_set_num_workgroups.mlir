@@ -5,7 +5,7 @@ hal.executable @add_dispatch_0 {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer"
     hal.interface.binding @ret0, set=0, binding=1, type="StorageBuffer"
   }
-  hal.executable.variant @cuda, target = #hal.executable.target<"cuda", "cuda-nvptx-fb"> {
+  hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
   hal.executable.entry_point @add_dispatch_0 attributes {interface = @io, ordinal = 0 : index}
   builtin.module  {
     func @add_dispatch_0() {
@@ -50,7 +50,7 @@ hal.executable @add_dispatch_0 {
 // -----
 
 hal.executable private @dot_dispatch_1  {
-  hal.executable.variant @cuda, target = #hal.executable.target<"cuda", "cuda-nvptx-fb"> {
+  hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
     hal.executable.entry_point @dot_dispatch_1 attributes {interface = @legacy_io, ordinal = 0 : index}
     builtin.module  {
       func @dot_dispatch_1() {
@@ -113,7 +113,7 @@ hal.executable private @dot_dispatch_1  {
 // -----
 
 hal.executable @reduction_dispatch {
-  hal.executable.variant @cuda, target = #hal.executable.target<"cuda", "cuda-nvptx-fb"> {
+  hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
     hal.executable.entry_point @predict_dispatch_153 attributes {
       interface = @io,
       ordinal = 0 : index}
@@ -159,7 +159,7 @@ hal.executable @reduction_dispatch {
 // -----
 
 hal.executable @tensor_insert {
-  hal.executable.variant @cuda, target = #hal.executable.target<"cuda", "cuda-nvptx-fb"> {
+  hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
     hal.executable.entry_point @tensor_insert_slice attributes {interface = @io, ordinal = 0 : index}
     builtin.module  {
       builtin.func @tensor_insert_slice() {
@@ -212,7 +212,7 @@ hal.executable @tensor_insert {
 // -----
 
 hal.executable @tensor_insert {
-  hal.executable.variant @cuda, target = #hal.executable.target<"cuda", "cuda-nvptx-fb"> {
+  hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
     hal.executable.entry_point @tensor_insert_slice attributes {interface = @io, ordinal = 0 : index}
     builtin.module  {
       builtin.func @tensor_insert_slice() {
@@ -267,7 +267,7 @@ hal.executable private @static_1d_fft_stage2  {
     hal.interface.binding @s0b0_rw_external, set=0, binding=0, type="StorageBuffer"
     hal.interface.binding @s0b1_rw_external, set=0, binding=1, type="StorageBuffer"
   }
-  hal.executable.variant @cuda, target = #hal.executable.target<"cuda", "cuda-nvptx-fb"> {
+  hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
     hal.executable.entry_point @static_1d_fft_stage2 attributes {interface = @io, ordinal = 0 : index}
     builtin.module {
       builtin.func @static_1d_fft_stage2() {
@@ -311,7 +311,7 @@ hal.executable private @static_3d_fft_stage3  {
     hal.interface.binding @s0b0_rw_external, set=0, binding=0, type="StorageBuffer"
     hal.interface.binding @s0b1_rw_external, set=0, binding=1, type="StorageBuffer"
   }
-  hal.executable.variant @cuda, target = #hal.executable.target<"cuda", "cuda-nvptx-fb"> {
+  hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
     hal.executable.entry_point @static_3d_fft_stage3 attributes {interface = @io, ordinal = 0 : index}
     builtin.module {
       builtin.func @static_3d_fft_stage3() {
@@ -374,7 +374,7 @@ hal.executable private @static_3d_fft_stage3  {
     #iree_codegen.translation.info<"LLVMGPUMatmulSimt", workload_per_wg = [256, 32]>,
     workgroup_size = [16, 8, 1]>
 hal.executable @user_config {
-hal.executable.variant public @cuda_nvptx_fb, target = #hal.executable.target<"cuda", "cuda-nvptx-fb"> {
+hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb"> {
   hal.executable.entry_point public @_lowering_config_test_dispatch_1 attributes {interface = @io, ordinal = 0 : index}
   builtin.module  {
     func @_lowering_config_test_dispatch_1() {

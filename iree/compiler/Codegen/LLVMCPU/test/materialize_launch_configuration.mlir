@@ -6,7 +6,7 @@ hal.executable private @matmul_tensors  {
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer"
     hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer"
   }
-  hal.executable.variant @llvm, target = #hal.executable.target<"llvm", "embedded-elf-arm_64", {
+  hal.executable.variant @llvm, target = <"llvm", "embedded-elf-arm_64", {
        data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
        native_vector_size = 16 : index,
        target_triple = "aarch64-unknown-unknown-eabi-elf"
@@ -76,7 +76,7 @@ hal.executable private @add_no_config  {
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer"
     hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer"
   }
-  hal.executable.variant @llvm, target = #hal.executable.target<"llvm", "embedded-elf-x86_64", {
+  hal.executable.variant @llvm, target = <"llvm", "embedded-elf-x86_64", {
        data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
        native_vector_size = 16 : index,
        target_triple = "x86_64-unknown-linux-gnu"
@@ -130,7 +130,7 @@ hal.executable private @add  {
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer"
     hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer"
   }
-  hal.executable.variant @llvm, target = #hal.executable.target<"llvm", "embedded-elf-x86_64", {
+  hal.executable.variant @llvm, target = <"llvm", "embedded-elf-x86_64", {
        data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
        native_vector_size = 16 : index,
        target_triple = "x86_64-unknown-linux-gnu"
@@ -211,7 +211,7 @@ hal.executable private @add4D  {
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer"
     hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer"
   }
-  hal.executable.variant @llvm, target = #hal.executable.target<"llvm", "embedded-elf-x86_64", {
+  hal.executable.variant @llvm, target = <"llvm", "embedded-elf-x86_64", {
        data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
        native_vector_size = 16 : index,
        target_triple = "x86_64-unknown-linux-gnu"
@@ -315,7 +315,7 @@ hal.executable private @batch_matmul_tensors  {
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer"
     hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer"
   }
-  hal.executable.variant @llvm, target = #hal.executable.target<"llvm", "embedded-elf-arm_64", {
+  hal.executable.variant @llvm, target = <"llvm", "embedded-elf-arm_64", {
        data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
        native_vector_size = 16 : index,
        target_triple = "aarch64-unknown-unknown-eabi-elf"
@@ -398,7 +398,7 @@ hal.executable private @batch_matmul_tensors  {
     #iree_codegen.translation.info<"CPUTensorToVectors", workload_per_wg = [32, 32]>,
     workgroup_size = []>
 hal.executable private @preset_config_matmul_tensors  {
-  hal.executable.variant @system_elf_x86_64, target = #hal.executable.target<"llvm", "system-elf-x86_64"> {
+  hal.executable.variant @system_elf_x86_64, target = <"llvm", "system-elf-x86_64"> {
     hal.executable.entry_point @preset_config attributes {interface = @io, ordinal = 0 : index}
     builtin.module  {
       builtin.func @preset_config() {
@@ -480,7 +480,7 @@ hal.executable private @preset_config_matmul_tensors  {
 // -----
 
 hal.executable @tensor_insert {
-  hal.executable.variant @system_elf_x86_64, target = #hal.executable.target<"llvm", "system-elf-x86_64"> {
+  hal.executable.variant @system_elf_x86_64, target = <"llvm", "system-elf-x86_64"> {
     hal.executable.entry_point @tensor_insert_slice attributes {interface = @io, ordinal = 0 : index}
     builtin.module  {
       builtin.func @tensor_insert_slice() {
@@ -538,7 +538,7 @@ hal.executable private @static_1d_fft_stage2  {
     hal.interface.binding @s0b0_rw_external, set=0, binding=0, type="StorageBuffer"
     hal.interface.binding @s0b1_rw_external, set=0, binding=1, type="StorageBuffer"
   }
-  hal.executable.variant @system_elf_x86_64, target = #hal.executable.target<"llvm", "system-elf-x86_64"> {
+  hal.executable.variant @system_elf_x86_64, target = <"llvm", "system-elf-x86_64"> {
     hal.executable.entry_point @static_1d_fft_stage2 attributes {interface = @io, ordinal = 0 : index}
     builtin.module {
       builtin.func @static_1d_fft_stage2() {
@@ -580,7 +580,7 @@ hal.executable private @static_3d_fft_stage3  {
     hal.interface.binding @s0b0_rw_external, set=0, binding=0, type="StorageBuffer"
     hal.interface.binding @s0b1_rw_external, set=0, binding=1, type="StorageBuffer"
   }
-  hal.executable.variant @system_elf_x86_64, target = #hal.executable.target<"llvm", "system-elf-x86_64"> {
+  hal.executable.variant @system_elf_x86_64, target = <"llvm", "system-elf-x86_64"> {
     hal.executable.entry_point @static_3d_fft_stage3 attributes {interface = @io, ordinal = 0 : index}
     builtin.module {
       builtin.func @static_3d_fft_stage3() {
@@ -652,7 +652,7 @@ hal.executable private @outs_fusion {
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer"
     hal.interface.binding @arg2, set=0, binding=2, type="StorageBuffer"
   }
-  hal.executable.variant @system_elf_x86_64, target = #hal.executable.target<"llvm", "system-elf-x86_64"> {
+  hal.executable.variant @system_elf_x86_64, target = <"llvm", "system-elf-x86_64"> {
     hal.executable.entry_point @outs_fusion_fn attributes {interface = @io, ordinal = 0 : index}
     builtin.module {
       builtin.func @outs_fusion_fn() {
@@ -715,7 +715,7 @@ hal.executable private @outs_fusion {
 // -----
 
 hal.executable private @conv {
-  hal.executable.variant public @system_elf_x86_64, target = #hal.executable.target<"llvm", "system-elf-x86_64", {data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128", native_vector_size = 16 : index, target_triple = "x86_64-unknown-linux-gnu"}> {
+  hal.executable.variant public @system_elf_x86_64, target = <"llvm", "system-elf-x86_64", {data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128", native_vector_size = 16 : index, target_triple = "x86_64-unknown-linux-gnu"}> {
     hal.executable.entry_point public @conv attributes {interface = @io, ordinal = 0 : index}
     builtin.module  {
       func @conv() {
@@ -792,7 +792,7 @@ hal.executable private @conv {
 // -----
 
 hal.executable private @conv_static {
-  hal.executable.variant public @system_elf_x86_64, target = #hal.executable.target<"llvm", "system-elf-x86_64", {data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128", native_vector_size = 64 : index, target_triple = "x86_64-pc-linux-gnu"}> {
+  hal.executable.variant public @system_elf_x86_64, target = <"llvm", "system-elf-x86_64", {data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128", native_vector_size = 64 : index, target_triple = "x86_64-pc-linux-gnu"}> {
     hal.executable.entry_point public @conv_static attributes {interface = @io, ordinal = 0 : index}
     builtin.module  {
       func @conv_static() {
@@ -868,7 +868,7 @@ hal.executable private @conv_static {
 // -----
 
 hal.executable private @generic_static {
-  hal.executable.variant public @system_elf_x86_64, target = #hal.executable.target<"llvm", "system-elf-x86_64", {data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128", native_vector_size = 64 : index, target_triple = "x86_64-pc-linux-gnu"}> {
+  hal.executable.variant public @system_elf_x86_64, target = <"llvm", "system-elf-x86_64", {data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128", native_vector_size = 64 : index, target_triple = "x86_64-pc-linux-gnu"}> {
     hal.executable.entry_point public @generic_static attributes {interface = @io, ordinal = 0 : index}
     builtin.module  {
       func @generic_static() {
@@ -927,7 +927,7 @@ hal.executable private @generic_static {
 // -----
 
 hal.executable private @matmul_static {
-  hal.executable.variant public @system_elf_arm_64, target = #hal.executable.target<"llvm", "system-elf-arm_64", {data_layout = "e-m:e-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128", native_vector_size = 16 : index, target_triple = "aarch64-none-linux-android30"}> {
+  hal.executable.variant public @system_elf_arm_64, target = <"llvm", "system-elf-arm_64", {data_layout = "e-m:e-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128", native_vector_size = 16 : index, target_triple = "aarch64-none-linux-android30"}> {
     hal.executable.entry_point public @matmul_static attributes {interface = @io, ordinal = 0 : index}
     builtin.module  {
       func @matmul_static() {
@@ -989,7 +989,7 @@ hal.executable private @matmul_static {
 // -----
 
 hal.executable private @restrict_num_workgroups {
-  hal.executable.variant public @system_elf_arm_64, target = #hal.executable.target<"llvm", "system-elf-arm_64", {data_layout = "e-m:e-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128", native_vector_size = 16 : index, target_triple = "aarch64-none-linux-android30"}> {
+  hal.executable.variant public @system_elf_arm_64, target = <"llvm", "system-elf-arm_64", {data_layout = "e-m:e-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128", native_vector_size = 16 : index, target_triple = "aarch64-none-linux-android30"}> {
     hal.executable.entry_point public @restrict_num_workgroups attributes {interface = @io, ordinal = 0 : index}
     builtin.module  {
       func @restrict_num_workgroups() {
@@ -1060,7 +1060,7 @@ hal.executable private @restrict_num_workgroups {
 // -----
 
 hal.executable private @test_exp_0 {
-  hal.executable.variant public @system_elf_arm_64, target = #hal.executable.target<"llvm", "system-elf-arm_64", {data_layout = "e-m:e-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128", native_vector_size = 16 : index, target_triple = "aarch64-none-linux-android30"}> {
+  hal.executable.variant public @system_elf_arm_64, target = <"llvm", "system-elf-arm_64", {data_layout = "e-m:e-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128", native_vector_size = 16 : index, target_triple = "aarch64-none-linux-android30"}> {
     hal.executable.entry_point public @test_exp_0 attributes {interface = @io, ordinal = 0 : index}
     builtin.module  {
       func @test_exp_0() {
@@ -1100,7 +1100,7 @@ hal.executable private @test_exp_0 {
 // -----
 
 hal.executable private @test_exp_1 {
-  hal.executable.variant public @system_elf_arm_64, target = #hal.executable.target<"llvm", "system-elf-arm_64", {data_layout = "e-m:e-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128", native_vector_size = 16 : index, target_triple = "aarch64-none-linux-android30"}> {
+  hal.executable.variant public @system_elf_arm_64, target = <"llvm", "system-elf-arm_64", {data_layout = "e-m:e-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128", native_vector_size = 16 : index, target_triple = "aarch64-none-linux-android30"}> {
     hal.executable.entry_point public @test_exp_1 attributes {interface = @io, ordinal = 0 : index}
     builtin.module  {
       func @test_exp_1() {
@@ -1140,7 +1140,7 @@ hal.executable private @test_exp_1 {
 // -----
 
 hal.executable private @test_exp_2 {
-  hal.executable.variant public @system_elf_arm_64, target = #hal.executable.target<"llvm", "system-elf-arm_64", {data_layout = "e-m:e-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128", native_vector_size = 16 : index, target_triple = "aarch64-none-linux-android30"}> {
+  hal.executable.variant public @system_elf_arm_64, target = <"llvm", "system-elf-arm_64", {data_layout = "e-m:e-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128", native_vector_size = 16 : index, target_triple = "aarch64-none-linux-android30"}> {
     hal.executable.entry_point public @test_exp_2 attributes {interface = @io, ordinal = 0 : index}
     builtin.module  {
       func @test_exp_2() {
@@ -1180,7 +1180,7 @@ hal.executable private @test_exp_2 {
 // -----
 
 hal.executable private @test_exp_3 {
-  hal.executable.variant public @system_elf_arm_64, target = #hal.executable.target<"llvm", "system-elf-arm_64", {data_layout = "e-m:e-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128", native_vector_size = 16 : index, target_triple = "aarch64-none-linux-android30"}> {
+  hal.executable.variant public @system_elf_arm_64, target = <"llvm", "system-elf-arm_64", {data_layout = "e-m:e-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128", native_vector_size = 16 : index, target_triple = "aarch64-none-linux-android30"}> {
     hal.executable.entry_point public @test_exp_3 attributes {interface = @io, ordinal = 0 : index}
     builtin.module  {
       func @test_exp_3() {
@@ -1220,7 +1220,7 @@ hal.executable private @test_exp_3 {
 // -----
 
 hal.executable private @test_exp_4 {
-  hal.executable.variant public @system_elf_arm_64, target = #hal.executable.target<"llvm", "system-elf-arm_64", {data_layout = "e-m:e-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128", native_vector_size = 16 : index, target_triple = "aarch64-none-linux-android30"}> {
+  hal.executable.variant public @system_elf_arm_64, target = <"llvm", "system-elf-arm_64", {data_layout = "e-m:e-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128", native_vector_size = 16 : index, target_triple = "aarch64-none-linux-android30"}> {
     hal.executable.entry_point public @test_exp_4 attributes {interface = @io, ordinal = 0 : index}
     builtin.module  {
       func @test_exp_4() {
@@ -1260,7 +1260,7 @@ hal.executable private @test_exp_4 {
 // -----
 
 hal.executable private @test_exp_5 {
-  hal.executable.variant public @system_elf_arm_64, target = #hal.executable.target<"llvm", "system-elf-arm_64", {data_layout = "e-m:e-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128", native_vector_size = 16 : index, target_triple = "aarch64-none-linux-android30"}> {
+  hal.executable.variant public @system_elf_arm_64, target = <"llvm", "system-elf-arm_64", {data_layout = "e-m:e-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128", native_vector_size = 16 : index, target_triple = "aarch64-none-linux-android30"}> {
     hal.executable.entry_point public @test_exp_5 attributes {interface = @io, ordinal = 0 : index}
     builtin.module  {
       func @test_exp_5() {

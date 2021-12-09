@@ -8,7 +8,7 @@ hal.executable @simpleMath_ex_dispatch_0 {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer"
     hal.interface.binding @ret0, set=0, binding=1, type="StorageBuffer"
   }
-  hal.executable.variant @cuda, target = #hal.executable.target<"cuda", "cuda-nvptx-fb"> {
+  hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
   hal.executable.entry_point @add_dispatch_0 attributes {interface = @io, ordinal = 0 : index}
   builtin.module  {
     func @add_dispatch_0() {
@@ -51,7 +51,7 @@ hal.executable @dot_dispatch_0 {
     hal.interface.binding @ro1, set=0, binding=1, type="StorageBuffer"
     hal.interface.binding @wo2, set=0, binding=2, type="StorageBuffer"
   }
-  hal.executable.variant @cuda, target = #hal.executable.target<"cuda", "cuda-nvptx-fb"> {
+  hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
     hal.executable.entry_point @dot_dispatch_0 attributes {interface = @io, ordinal = 0 : index}
     builtin.module  {
       func @dot_dispatch_0() {
@@ -139,7 +139,7 @@ hal.executable @dot_dispatch_0 {
     hal.interface.binding @ro1, set=0, binding=1, type="StorageBuffer"
     hal.interface.binding @wo2, set=0, binding=2, type="StorageBuffer"
   }
-  hal.executable.variant @cuda, target = #hal.executable.target<"cuda", "cuda-nvptx-fb"> {
+  hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
     hal.executable.entry_point @dot_dispatch_0 attributes {interface = @io, ordinal = 0 : index}
     builtin.module  {
       func @dot_dispatch_0() {
@@ -202,7 +202,7 @@ hal.executable @dot_dispatch_0 {
 // -----
 
 hal.executable @conv2d_dispatch_0 {
-hal.executable.variant @cuda, target = #hal.executable.target<"cuda", "cuda-nvptx-fb"> {
+hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
   hal.interface @io {
     hal.interface.binding @ro0, set=0, binding=0, type="StorageBuffer"
     hal.interface.binding @ro1, set=0, binding=1, type="StorageBuffer"
@@ -280,7 +280,7 @@ hal.executable @simpleMath_ex_dispatch_0 {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer"
     hal.interface.binding @ret0, set=0, binding=1, type="StorageBuffer"
   }
-  hal.executable.variant @cuda, target = #hal.executable.target<"cuda", "cuda-nvptx-fb"> {
+  hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
   hal.executable.entry_point @add_dispatch_0 attributes {interface = @io, ordinal = 0 : index}
   builtin.module  {
     func @add_dispatch_0() {
@@ -314,7 +314,7 @@ hal.executable @simpleMath_ex_dispatch_0 {
 // -----
 
 hal.executable @reduction_dispatch {
-hal.executable.variant @cuda, target = #hal.executable.target<"cuda", "cuda-nvptx-fb"> {
+hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
   hal.executable.entry_point @reduction attributes {interface = @io, ordinal = 0 : index}
   builtin.module  {
     func @reduction() {
@@ -359,7 +359,7 @@ hal.executable.variant @cuda, target = #hal.executable.target<"cuda", "cuda-nvpt
 // -----
 
 hal.executable @vector_add_dispatch {
-hal.executable.variant @cuda, target = #hal.executable.target<"cuda", "cuda-nvptx-fb"> {
+hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
   hal.executable.entry_point @vector_add_dispatch attributes {interface = @io, ordinal = 0 : index}
   builtin.module  {
     builtin.func @vector_add_dispatch() {
@@ -412,7 +412,7 @@ hal.executable.variant @cuda, target = #hal.executable.target<"cuda", "cuda-nvpt
 #map4 = affine_map<(d0, d1) -> (d0)>
 
 hal.executable @vector_reduction_dispatch {
-hal.executable.variant @cuda, target = #hal.executable.target<"cuda", "cuda-nvptx-fb"> {
+hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
   hal.executable.entry_point @vector_reduction_dispatch attributes {interface = @io, ordinal = 0 : index}
   builtin.module  {
     builtin.func @vector_reduction_dispatch() {
