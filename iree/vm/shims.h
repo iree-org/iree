@@ -164,6 +164,8 @@ static inline void iree_vm_abi_v_reset(iree_vm_abi_v_t* value) {}
 
 IREE_VM_ABI_FIXED_STRUCT(i, { int32_t i0; });
 
+IREE_VM_ABI_FIXED_STRUCT(f, { float f0; });
+
 IREE_VM_ABI_FIXED_STRUCT(ii, {
   int32_t i0;
   int32_t i1;
