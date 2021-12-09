@@ -119,3 +119,37 @@ func @loop_pack_v8f16(%arg0: vector<8xf16>, %arg1: vector<8xf16>, %arg2: vector<
 //       CHECK:    %[[CAST_FOR0:.+]] = vector.bitcast %[[FOR]]#0 : vector<4xf32> to vector<8xf16>
 //       CHECK:    %[[CAST_FOR1:.+]] = vector.bitcast %[[FOR]]#1 : vector<4xf32> to vector<8xf16>
 //       CHECK:    return %[[CAST_FOR0]], %[[CAST_FOR1]], %[[FOR]]#2 : vector<8xf16>, vector<8xf16>, vector<4xf16>
+
+// -----
+
+func @if_result_extract(%cond: i1, %v0: f32, %v1: vector<4xf32>, %v2: vector<3xf32>) -> (f32, f32, f32) {
+  %c0 = arith.constant dense<0.0> : vector<1x4xf32>
+  %c1 = arith.constant dense<0.0> : vector<4xf32>
+  %c2 = arith.constant dense<0.0> : vector<1x3xf32>
+  %0:3 = scf.if %cond -> (vector<1x4xf32>, vector<4xf32>, vector<1x3xf32>) {
+    %1 = vector.broadcast %v0 : f32 to vector<1x4xf32>
+    %2 = vector.broadcast %v2 : vector<3xf32> to vector<1x3xf32>
+    scf.yield %1, %v1, %2 : vector<1x4xf32>, vector<4xf32>, vector<1x3xf32>
+  } else {
+    scf.yield %c0, %c1, %c2 : vector<1x4xf32>, vector<4xf32>, vector<1x3xf32>
+  }
+  %3 = vector.extract %0#0[0, 0] : vector<1x4xf32>
+  %4 = vector.extract %0#1[0] : vector<4xf32>
+  %5 = vector.extract %0#2[0, 0] : vector<1x3xf32>
+  return %3, %4, %5: f32, f32, f32
+}
+
+
+// CHECK-LABEL: func @if_result_extract
+//  CHECK-SAME: (%[[COND:.+]]: i1, %[[V0:.+]]: f32, %[[V1:.+]]: vector<4xf32>, %[[V2:.+]]: vector<3xf32>)
+//   CHECK-DAG:   %[[CST0:.+]] = arith.constant 0.000000e+00 : f32
+//   CHECK-DAG:   %[[CST1:.+]] = arith.constant dense<0.000000e+00> : vector<4xf32>
+//   CHECK-DAG:   %[[CST2:.+]] = arith.constant dense<0.000000e+00> : vector<3xf32>
+//       CHECK:   %[[IF:.+]]:3 = scf.if %[[COND]] -> (f32, vector<4xf32>, vector<3xf32>) {
+//  CHECK-NEXT:     scf.yield %[[V0]], %[[V1]], %[[V2]] : f32, vector<4xf32>, vector<3xf32>
+//  CHECK-NEXT:   } else {
+//  CHECK-NEXT:     scf.yield %[[CST0]], %[[CST1]], %[[CST2]] : f32, vector<4xf32>, vector<3xf32>
+//  CHECK-NEXT:   }
+//       CHECK:   %[[EXTRACT0:.+]] = vector.extract %[[IF]]#1[0] : vector<4xf32>
+//       CHECK:   %[[EXTRACT1:.+]] = vector.extract %[[IF]]#2[0] : vector<3xf32>
+//       CHECK:   return %[[IF]]#0, %[[EXTRACT0]], %[[EXTRACT1]]

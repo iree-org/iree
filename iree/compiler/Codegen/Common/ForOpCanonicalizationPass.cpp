@@ -6,11 +6,13 @@
 
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
+#include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
 #include "mlir/Dialect/SCF/SCF.h"
 #include "mlir/Dialect/Vector/VectorOps.h"
 #include "mlir/IR/BlockAndValueMapping.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinOps.h"
+#include "mlir/IR/Matchers.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/PassRegistry.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -20,15 +22,57 @@ namespace iree_compiler {
 
 namespace {
 
-/// Pattern to combine instructions across ForOp boundary. It is common when
-/// doing incremental lowering to generate transient ops that cancel each others
-/// out. Canonicalization usually clean up those operations. When the value is
-/// loop carried, MLIR canonicalization currently doesn't remove the redundant
+/// Folds a value that has its definition and usage across SCF region
+/// boundaries if possible. Returns null value otherwise.
+///
+/// Such cases won't have def-use relationship via direct SSA reference; rather
+/// it's via value yielding and usage of the SCF op as a whole.
+static Value foldValueDefUse(Operation* user, Operation* def) {
+  if (auto shapeCast = dyn_cast_or_null<vector::ShapeCastOp>(user)) {
+    if (auto souceOp = dyn_cast_or_null<vector::ShapeCastOp>(def)) {
+      if (shapeCast.getType() == souceOp.source().getType())
+        return souceOp.source();
+    }
+  } else if (auto extractOp = dyn_cast_or_null<vector::ExtractOp>(user)) {
+    if (auto broadcastOp = dyn_cast_or_null<vector::BroadcastOp>(def)) {
+      if (extractOp.getType() == broadcastOp.getSourceType())
+        return broadcastOp.source();
+      // If we are extracting a scalar element, it's also okay to fold.
+      if (extractOp.getType().isIntOrFloat()) return broadcastOp.source();
+    }
+  } else if (auto targetOp =
+                 dyn_cast_or_null<UnrealizedConversionCastOp>(user)) {
+    if (auto sourceOp = dyn_cast_or_null<UnrealizedConversionCastOp>(def)) {
+      if (sourceOp->getNumOperands() == 1 && targetOp->getNumResults() == 1 &&
+          sourceOp->getOperandTypes().front() ==
+              targetOp.getResultTypes().front())
+        return sourceOp.inputs().front();
+    }
+  }
+  return Value();
+}
+
+/// Moves all ops from the `source` block into the `dest` block and updates the
+/// yield terminator op to yield values in `results`.
+static void transferBody(Block* source, Block* dest, ArrayRef<Value> results,
+                         RewriterBase& rewriter) {
+  // Move all operations to the destination block.
+  rewriter.mergeBlocks(source, dest, dest->getArguments());
+  // Replace the yield op by one that returns only the used values.
+  auto yieldOp = cast<scf::YieldOp>(dest->getTerminator());
+  yieldOp.getOperation()->setOperands(results);
+}
+
+/// Fold reciprocal ops across ForOp boundary. It is common when doing
+/// incremental lowering to generate transient ops that cancel each others out.
+/// Canonicalization usually clean up those operations. When the value is loop
+/// carried, MLIR canonicalization currently doesn't remove the redundant
 /// operations.
 ///
 /// This pass allow to workaround MLIR limitation and does ad hoc clean up of
 /// instructions found in IREE. Once we have a more general mechanism in MLIR
 /// this pass can be completely removed.
+///
 /// This pass does this kind of transformation:
 /// ```
 /// %21 = vector.shape_cast %20 : vector<4xf32> to vector<1x4xf32>
@@ -50,86 +94,184 @@ namespace {
 ///    scf.yield %108 : vector<4xf32>
 ///  }
 /// ```
-struct CanonicalizeForOpInductionVarShape final
+struct CanoncalizeForOpCarriedValueShape final
     : public OpRewritePattern<scf::ForOp> {
-  using OpRewritePattern<scf::ForOp>::OpRewritePattern;
-
-  Value FoldCarryDep(scf::ForOp forOp, Operation* ivUser,
-                     Operation* ivDef) const {
-    if (auto shapeCast = dyn_cast<vector::ShapeCastOp>(ivUser)) {
-      if (auto souceOp = dyn_cast<vector::ShapeCastOp>(ivDef)) {
-        if (shapeCast.getType() == souceOp.source().getType())
-          return souceOp.source();
-      }
-    } else if (auto extractOp = dyn_cast<vector::ExtractOp>(ivUser)) {
-      if (auto broadcastOp = dyn_cast<vector::BroadcastOp>(ivDef)) {
-        if (extractOp.getType() == broadcastOp.getSourceType())
-          return broadcastOp.source();
-      }
-    } else if (auto targetOp = dyn_cast<UnrealizedConversionCastOp>(ivUser)) {
-      if (auto sourceOp = dyn_cast<UnrealizedConversionCastOp>(ivDef)) {
-        if (sourceOp->getNumOperands() == 1 && targetOp->getNumResults() == 1 &&
-            sourceOp->getOperandTypes().front() ==
-                targetOp.getResultTypes().front())
-          return sourceOp.inputs().front();
-      }
-    }
-    return Value();
-  }
-
-  void transferBody(Block* source, Block* dest, ArrayRef<Value> results,
-                    PatternRewriter& rewriter) const {
-    // Move all operations to the destination block.
-    rewriter.mergeBlocks(source, dest, dest->getArguments());
-    // Replace the yield op by one that returns only the used values.
-    auto yieldOp = cast<scf::YieldOp>(dest->getTerminator());
-    yieldOp.getOperation()->setOperands(results);
-  }
+  using OpRewritePattern::OpRewritePattern;
 
   LogicalResult matchAndRewrite(scf::ForOp forOp,
                                 PatternRewriter& rewriter) const override {
-    SmallVector<unsigned, 8> iteratorFolded;
+    SmallVector<unsigned, 8> foldedCarriedValueIndices;
     SmallVector<Operation*, 8> resultOps;
-    auto terminator = cast<scf::YieldOp>(forOp.getBody()->getTerminator());
-    auto returnValues = llvm::to_vector<8>(terminator.getOperands());
-    auto initArgs = llvm::to_vector<8>(forOp.getIterOperands());
-    for (auto it : llvm::enumerate(forOp.getRegionIterArgs())) {
-      if (!it.value().hasOneUse()) continue;
-      Operation* op = it.value().use_begin()->getOwner();
+
+    auto yieldOp = cast<scf::YieldOp>(forOp.getBody()->getTerminator());
+    auto yieldValues = llvm::to_vector<8>(yieldOp.getOperands());
+    auto initValues = llvm::to_vector<8>(forOp.getIterOperands());
+
+    for (const auto& it : llvm::enumerate(forOp.getRegionIterArgs())) {
+      unsigned index = it.index();
+      Value iterArg = it.value();
+      if (!iterArg.hasOneUse()) continue;
+
+      Operation* userOp = iterArg.use_begin()->getOwner();
       if (!isa<vector::ShapeCastOp, vector::ExtractOp,
-               UnrealizedConversionCastOp>(op))
+               UnrealizedConversionCastOp>(userOp))
         continue;
-      Operation* returnValDef = returnValues[it.index()].getDefiningOp();
-      Value newReturn = FoldCarryDep(forOp, op, returnValDef);
-      if (!newReturn) continue;
-      iteratorFolded.push_back(it.index());
-      resultOps.push_back(returnValDef);
-      returnValues[it.index()] = newReturn;
 
+      Operation* defOp = yieldValues[index].getDefiningOp();
+      Value newYieldValue = foldValueDefUse(userOp, defOp);
+      if (!newYieldValue) continue;
+
+      foldedCarriedValueIndices.push_back(index);
+      resultOps.push_back(defOp);
+      yieldValues[index] = newYieldValue;
+
+      // The current iterator argument involves shape ops that can be cancelled
+      // across the region boundary. This means pushing the original user op to
+      // before the region. So clone it outside and take the initial value as
+      // operands.
       BlockAndValueMapping mapping;
-      mapping.map(it.value(), initArgs[it.index()]);
-      initArgs[it.index()] = rewriter.clone(*op, mapping)->getResult(0);
+      mapping.map(iterArg, initValues[index]);
+      initValues[index] = rewriter.clone(*userOp, mapping)->getResult(0);
     }
-    if (iteratorFolded.empty()) return failure();
-    auto newLoop =
-        rewriter.create<scf::ForOp>(forOp.getLoc(), forOp.lowerBound(),
-                                    forOp.upperBound(), forOp.step(), initArgs);
-    transferBody(forOp.getBody(), newLoop.getBody(), returnValues, rewriter);
+    if (foldedCarriedValueIndices.empty()) return failure();
 
-    // Replace the operation by the new one.
-    SmallVector<Value, 8> repResults(newLoop.getResults().begin(),
+    auto newLoop = rewriter.create<scf::ForOp>(
+        forOp.getLoc(), forOp.lowerBound(), forOp.upperBound(), forOp.step(),
+        initValues);
+    transferBody(forOp.getBody(), newLoop.getBody(), yieldValues, rewriter);
+
+    // Replace the results with the new loop's results.
+    SmallVector<Value, 8> newResults(newLoop.getResults().begin(),
                                      newLoop.getResults().end());
-    for (auto en : llvm::enumerate(iteratorFolded)) {
+    for (const auto& it : llvm::enumerate(foldedCarriedValueIndices)) {
+      // The current iterator argument involves shape ops that can be cancelled
+      // across the region boundary. This means pushing the original def to
+      // after the region. So clone it outside and take the new result as
+      // operands.
       BlockAndValueMapping mapping;
-      mapping.map(returnValues[en.value()], newLoop.getResult(en.value()));
-      repResults[en.index()] =
-          rewriter.clone(*resultOps[en.index()], mapping)->getResult(0);
+      mapping.map(yieldValues[it.value()], newLoop.getResult(it.value()));
+      newResults[it.index()] =
+          rewriter.clone(*resultOps[it.index()], mapping)->getResult(0);
+
       Operation* oldOp =
-          newLoop.getRegionIterArgs()[en.index()].use_begin()->getOwner();
-      SmallVector<Value, 1> arg(1, newLoop.getRegionIterArgs()[en.index()]);
+          newLoop.getRegionIterArgs()[it.index()].use_begin()->getOwner();
+      SmallVector<Value, 1> arg(1, newLoop.getRegionIterArgs()[it.index()]);
       oldOp->replaceAllUsesWith(arg);
     }
-    rewriter.replaceOp(forOp, repResults);
+    rewriter.replaceOp(forOp, newResults);
+    return success();
+  }
+};
+
+/// Fold reciprocal ops across IfOp boundary. This is similar to the above
+/// pattern for ForOps.
+///
+/// This pass does this kind of transformation:
+/// ```
+/// %0 = scf.if %cond -> (vector<1x4xf32>) {
+///   %1 = scf.broadcast %scalar : f32 into vector<1x4xf32>
+/// } else {
+///   scf.yield %zero : vector<1x4xf32>
+/// }
+/// %2 = vector.extract %0[0, 0] : vector<1x4xf32>
+/// ```
+/// ->
+/// ```
+/// %0 = scf.if %cond -> (f32) {
+///   scf.yield %scalar : f32
+/// } else {
+///   scf.yield %zero : f32
+/// }
+/// ```
+struct CanoncalizeIfReturnedValueShape final
+    : public OpRewritePattern<scf::IfOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(scf::IfOp ifOp,
+                                PatternRewriter& rewriter) const override {
+    auto resultTypes = llvm::to_vector<8>(ifOp.getResultTypes());
+    if (resultTypes.empty()) return failure();
+
+    // Require all yield values in the "else" branch to be splat constant for
+    // now. Merging different cases between the "then" and "else" branches can
+    // be complicated; leave that to only when needed.
+    if (ifOp.elseBlock()) {
+      SplatElementsAttr splat;
+      for (Value v : ifOp.elseYield().getOperands()) {
+        if (!matchPattern(v, m_Constant(&splat))) return failure();
+      }
+    }
+
+    // All yielded values from the "then" branch.
+    auto thenYieldValues = llvm::to_vector<8>(ifOp.thenYield().getOperands());
+    // Shape casting ops that should be used to build the new results.
+    SmallVector<std::pair<unsigned, Operation*>, 8> resultOps;
+
+    bool folded = false;
+    for (const auto& it : llvm::enumerate(thenYieldValues)) {
+      unsigned index = it.index();
+      Value result = ifOp.getResult(index);
+      if (!result.hasOneUse()) continue;
+      Operation* userOp = result.use_begin()->getOwner();
+
+      // Only support broadcast-extract pairs for now.
+      if (!isa<vector::ExtractOp>(userOp)) continue;
+
+      Operation* defOp = it.value().getDefiningOp();
+      Value newYieldValue = foldValueDefUse(userOp, defOp);
+      if (!newYieldValue) continue;
+
+      resultTypes[index] = newYieldValue.getType();
+      // Update to record the source value to yield after pushing shape casting
+      // ops to be after the if region.
+      thenYieldValues[index] = newYieldValue;
+      // Also record the shape cast op so later we can clone it after the
+      // if region.
+      resultOps.emplace_back(index, defOp);
+      folded = true;
+    }
+
+    if (!folded) return failure();
+
+    auto newIf = rewriter.create<scf::IfOp>(ifOp.getLoc(), resultTypes,
+                                            ifOp.condition(), ifOp.elseBlock());
+
+    transferBody(ifOp.thenBlock(), newIf.thenBlock(), thenYieldValues,
+                 rewriter);
+
+    if (ifOp.elseBlock()) {
+      OpBuilder elseBuilder = newIf.getElseBodyBuilder(rewriter.getListener());
+      auto elseYieldValues = llvm::to_vector<8>(ifOp.elseYield().getOperands());
+      // Reshape all splat constants to match shape.
+      for (int i = 0; i < elseYieldValues.size(); ++i) {
+        Value oldValue = elseYieldValues[i];
+        auto oldAttr = oldValue.getDefiningOp<arith::ConstantOp>().getValue();
+        Attribute newAttr;
+        if (auto shapedType = resultTypes[i].dyn_cast<ShapedType>()) {
+          newAttr = oldAttr.cast<SplatElementsAttr>().reshape(shapedType);
+        } else {
+          newAttr =
+              oldAttr.cast<SplatElementsAttr>().getSplatValue<Attribute>();
+        }
+        elseYieldValues[i] =
+            elseBuilder.create<arith::ConstantOp>(oldValue.getLoc(), newAttr);
+      }
+      elseBuilder.create<scf::YieldOp>(ifOp.elseYield().getLoc(),
+                                       elseYieldValues);
+    }
+
+    // Replace the results with the new if's results.
+    SmallVector<Value, 8> newResults(newIf.getResults().begin(),
+                                     newIf.getResults().end());
+    for (const auto& it : resultOps) {
+      // Push the original def to after the region. So clone it outside and take
+      // the new result as operands.
+      BlockAndValueMapping mapping;
+      mapping.map(thenYieldValues[it.first], newIf.getResult(it.first));
+      newResults[it.first] = rewriter.clone(*it.second, mapping)->getResult(0);
+    }
+
+    rewriter.replaceOp(ifOp, newResults);
     return success();
   }
 };
@@ -150,7 +292,7 @@ struct PackForOpInductionVarVector final : public OpRewritePattern<scf::ForOp> {
     VectorType v4f32Type = VectorType::get({4}, rewriter.getF32Type());
 
     SmallVector<unsigned, 8> ivIndices;
-    for (auto it : llvm::enumerate(forOp.getRegionIterArgs())) {
+    for (const auto& it : llvm::enumerate(forOp.getRegionIterArgs())) {
       if (it.value().getType() == v8f16Type) ivIndices.push_back(it.index());
     }
     if (ivIndices.empty()) return failure();
@@ -223,9 +365,12 @@ struct ForOpCanonicalizationPass
 
   void runOnOperation() override {
     FuncOp fn = getOperation();
-    OwningRewritePatternList patterns(&getContext());
-    patterns.insert<CanonicalizeForOpInductionVarShape,
-                    PackForOpInductionVarVector>(fn.getContext());
+    MLIRContext* context = &getContext();
+    OwningRewritePatternList patterns(context);
+    patterns
+        .insert<CanoncalizeForOpCarriedValueShape,
+                CanoncalizeIfReturnedValueShape, PackForOpInductionVarVector>(
+            context);
     if (failed(applyPatternsAndFoldGreedily(fn, std::move(patterns)))) {
       return signalPassFailure();
     }
