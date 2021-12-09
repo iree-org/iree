@@ -74,6 +74,12 @@ function(iree_c_module)
   
   add_library(${_NAME} INTERFACE)
   add_dependencies(${_NAME} ${_GEN_TARGET})
+  add_dependencies(${_NAME}
+    iree::vm
+    iree::vm::ops
+    iree::vm::ops_emitc
+    iree::vm::shims_emitc
+  )
 
   # Alias the iree_package_name library to iree::package::name.
   # This lets us more clearly map to Bazel and makes it possible to
