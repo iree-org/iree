@@ -9,7 +9,7 @@ func @tile_from_tensor_load() {
   %M = hal.interface.load.constant offset = 0 : index
   %N = hal.interface.load.constant offset = 1 : index
   %K = hal.interface.load.constant offset = 2 : index
-  %0 = hal.interface.binding.subspan @io::@TENSOR_LHS[%c0] : !flow.dispatch.tensor<readonly:?x?xf32>{%M, %K}
+  %0 = hal.interface.binding.subspan @io::@TENSOR_LHS[%c0] {alignment = 32 : index}: !flow.dispatch.tensor<readonly:?x?xf32>{%M, %K}
   %1 = hal.interface.binding.subspan @io::@TENSOR_RHS[%c0] : !flow.dispatch.tensor<readonly:?x?xf32>{%K, %N}
   %2 = hal.interface.binding.subspan @io::@TENSOR_INIT[%c0] : !flow.dispatch.tensor<readonly:?x?xf32>{%M, %N}
   %3 = hal.interface.binding.subspan @io::@ret0[%c0] : !flow.dispatch.tensor<writeonly:?x?xf32>{%M, %N}
@@ -35,6 +35,7 @@ hal.interface private @io  {
 }
 // CHECK-LABEL: func @tile_from_tensor_load()
 //   CHECK-DAG:   %[[TENSOR_LHS:.+]] = hal.interface.binding.subspan @io::@TENSOR_LHS
+//   CHECK-DAG:   memref.assume_alignment %[[TENSOR_LHS]], 32 : memref<?x?xf32>
 //   CHECK-DAG:   %[[TENSOR_RHS:.+]] = hal.interface.binding.subspan @io::@TENSOR_RHS
 //   CHECK-DAG:   %[[TENSOR_INIT:.+]] = hal.interface.binding.subspan @io::@TENSOR_INIT
 //   CHECK-DAG:   %[[RETURN:.+]] = hal.interface.binding.subspan @io::@ret0

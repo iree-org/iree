@@ -124,10 +124,6 @@ LogicalResult getFilteredOps(
 
 /// Specialization of `getFilteredOps` for filtering `LinalgOp`s and
 /// `LinagExtOp`s.
-/// TODO(ravishankarm) This methods also adds the "workgroup" marker to all ops
-/// within the loop. The marker is the way to tie into rest of the
-/// codegen. Refactor the downstream passes and get rid of the markers once and
-/// for all.
 LogicalResult getComputeOps(
     FuncOp funcOp, SmallVectorImpl<Operation *> &computeOps,
     SmallVectorImpl<LoopTilingAndDistributionInfo> &tiledLoops);

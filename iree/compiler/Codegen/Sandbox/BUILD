@@ -1,4 +1,4 @@
-# Copyright 2020 The IREE Authors
+# Copyright 2021 The IREE Authors
 #
 # Licensed under the Apache License v2.0 with LLVM Exceptions.
 # See https://llvm.org/LICENSE.txt for license information.
@@ -34,8 +34,6 @@ cc_library(
     ],
     deps = [
         ":PassesIncGen",
-        "//iree/compiler/Codegen/Dialect:IREECodegenDialect",
-        "//iree/compiler/Dialect/HAL/IR",
         "@llvm-project//mlir:LinalgTransforms",
         "@llvm-project//mlir:Pass",
         "@llvm-project//mlir:Transforms",
@@ -43,18 +41,28 @@ cc_library(
 )
 
 cc_library(
-    name = "Codegen",
+    name = "Sandbox",
     srcs = [
-        "Passes.cpp",
+        "LinalgTensorCodegenDriver.cpp",
+    ],
+    hdrs = [
+        "PassDetail.h",
+        "Passes.h",
     ],
     deps = [
         ":PassHeaders",
         ":PassesIncGen",
-        "//iree/compiler/Codegen/Common",
         "//iree/compiler/Codegen/Dialect:IREECodegenDialect",
-        "//iree/compiler/Codegen/LLVMCPU",
-        "//iree/compiler/Codegen/LLVMGPU",
-        "//iree/compiler/Codegen/SPIRV",
-        "//iree/compiler/Codegen/Sandbox",
+        "//iree/compiler/Codegen/Utils",
+        "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:Affine",
+        "@llvm-project//mlir:ArithmeticDialect",
+        "@llvm-project//mlir:LinalgOps",
+        "@llvm-project//mlir:LinalgTransforms",
+        "@llvm-project//mlir:Pass",
+        "@llvm-project//mlir:SCFDialect",
+        "@llvm-project//mlir:TensorDialect",
+        "@llvm-project//mlir:VectorOps",
+        "@llvm-project//mlir:X86VectorTransforms",
     ],
 )

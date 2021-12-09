@@ -12,7 +12,7 @@ iree_add_all_subdirs()
 
 iree_check_single_backend_test_suite(
   NAME
-    check_cuda
+    check_cuda_graph
   SRCS
     "abs.mlir"
     "add.mlir"
@@ -75,6 +75,8 @@ iree_check_single_backend_test_suite(
     "cuda"
   COMPILER_FLAGS
     "-iree-input-type=mhlo"
+  RUNNER_ARGS
+    "--cuda_use_streams=false"
   LABELS
     "noasan"
     "nomsan"
