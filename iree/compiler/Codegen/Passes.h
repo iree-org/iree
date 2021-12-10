@@ -146,7 +146,7 @@ std::unique_ptr<OperationPass<ModuleOp>> createConvertToLLVMPass();
 /// dialect. Currently this pass lowers to LLVM dialect, but could be
 /// generalized to lower to any "final" dialect like SPIR-V/NVVM, etc.
 std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
-createLLVMCPULowerExecutableTargetPass(bool lowerToVectors = true);
+createLLVMCPULowerExecutableTargetPass();
 
 /// Synchronizes LLVM linkage with MLIR symbol visibility.
 std::unique_ptr<OperationPass<ModuleOp>>

@@ -69,11 +69,11 @@ def logical_not():
 # CHECK: %[[XBOOL:.*]] = as_bool %[[XVAL]]
 # CHECK: %[[R1:.*]] = functional_if %[[XBOOL]] {{.*}} {
 # CHECK:   %[[TWOVAL:.*]] = constant 2
-# CHECK:   %[[TWOBOXED:.*]] = box %[[TWOVAL]] : !iree_pydm.integer -> !iree_pydm.object
+# CHECK:   %[[TWOBOXED:.*]] = box %[[TWOVAL]] : !iree_pydm.integer ->
 # CHECK:   yield %[[TWOBOXED]]
 # CHECK: } else {
 # CHECK:   %[[THREEVAL:.*]] = constant 3
-# CHECK:   %[[THREEBOXED:.*]] = box %[[THREEVAL]] : !iree_pydm.integer -> !iree_pydm.object
+# CHECK:   %[[THREEBOXED:.*]] = box %[[THREEVAL]] : !iree_pydm.integer ->
 # CHECK:   yield %[[THREEBOXED]]
 # CHECK: }
 @test_import_global

@@ -28,10 +28,7 @@ namespace IREE {
 namespace VMVX {
 
 static void buildVectorVMVXTransformPassPipeline(OpPassManager &passManager) {
-  // For now lower using the default CPU pass-pipeline which doesn't
-  // vectorize. When VMVX can lower vector operations, this can be relaxed.
-  passManager.addPass(
-      createLLVMCPULowerExecutableTargetPass(/*lowerToVectors=*/false));
+  passManager.addPass(createLLVMCPULowerExecutableTargetPass());
 
   OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
 

@@ -32,6 +32,8 @@ llvm::StringMap<IREE::HAL::ExecutableEntryPointOp> getAllEntryPoints(
 /// Returns the entry point op for the `funcOp`. Returns `nullptr` on failure.
 IREE::HAL::ExecutableEntryPointOp getEntryPoint(FuncOp funcOp);
 
+bool isVMVXBackend(IREE::HAL::ExecutableVariantOp variantOp);
+
 //===----------------------------------------------------------------------===//
 // Utility functions to get untiled op shapes
 //===----------------------------------------------------------------------===//

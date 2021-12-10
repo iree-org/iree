@@ -29,16 +29,14 @@ class LLVMCPULowerExecutableTargetPass
     : public LLVMCPULowerExecutableTargetBase<
           LLVMCPULowerExecutableTargetPass> {
  public:
+  LLVMCPULowerExecutableTargetPass() = default;
+  LLVMCPULowerExecutableTargetPass(
+      const LLVMCPULowerExecutableTargetPass &pass) {}
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<IREE::Codegen::IREECodegenDialect, IREE::HAL::HALDialect,
                     linalg::LinalgDialect, LLVM::LLVMDialect,
                     vector::VectorDialect>();
   }
-
-  LLVMCPULowerExecutableTargetPass(bool vectorize = true)
-      : lowerToVectors(vectorize) {}
-  LLVMCPULowerExecutableTargetPass(
-      const LLVMCPULowerExecutableTargetPass &pass) {}
 
   void runOnOperation() override;
 
@@ -67,13 +65,6 @@ class LLVMCPULowerExecutableTargetPass
       llvm::cl::desc(
           "Specifies the workload per workgroup to use in x, y, z order. Is "
           "expected for use only with use-lowering-pipeline option")};
-
-  /// TODO(ravishankarm): Option to not generate any `vector.` instructions. The
-  /// VMVX backend uses the same lowering as the CPU pass but there is no
-  /// lowering of these `vector.` operations to scalar code. So as a WAR do the
-  /// same tiling scheme but avoid generating vector instructions. When VMVX can
-  /// handle vector instructions, drop this options.
-  bool lowerToVectors;
 };
 }  // namespace
 
@@ -175,6 +166,7 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
 
       executableLoweringPipeline.addPass(createSetNumWorkgroupsPass());
       executableLoweringPipeline.addPass(createCanonicalizerPass());
+      bool lowerToVectors = !isVMVXBackend(variantOp);
       if (!testLoweringConfiguration) {
         OpPassManager &nestedModulePM =
             executableLoweringPipeline.nest<ModuleOp>();
@@ -203,8 +195,8 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
 }
 
 std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
-createLLVMCPULowerExecutableTargetPass(bool lowerToVectors) {
-  return std::make_unique<LLVMCPULowerExecutableTargetPass>(lowerToVectors);
+createLLVMCPULowerExecutableTargetPass() {
+  return std::make_unique<LLVMCPULowerExecutableTargetPass>();
 }
 
 }  // namespace iree_compiler

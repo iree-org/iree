@@ -74,35 +74,46 @@ iree_status_t iree_hal_cuda_native_executable_create(
       entry_count * sizeof(iree_hal_executable_layout_t*);
   iree_status_t status = iree_allocator_malloc(context->host_allocator,
                                                total_size, (void**)&executable);
-  executable->executable_layouts =
-      (void*)((char*)executable + sizeof(*executable) +
-              entry_count * sizeof(iree_hal_cuda_native_executable_function_t));
   CUmodule module = NULL;
-  CUDA_RETURN_IF_ERROR(context->syms,
-                       cuModuleLoadDataEx(&module, ptx_image, 0, NULL, NULL),
-                       "cuModuleLoadDataEx");
-
-  for (iree_host_size_t i = 0; i < entry_count; i++) {
-    CUfunction function = NULL;
-    const char* entry_name = flatbuffers_string_vec_at(entry_points_vec, i);
-    CUDA_RETURN_IF_ERROR(context->syms,
-                         cuModuleGetFunction(&function, module, entry_name),
-                         "cuModuleGetFunction");
-    executable->entry_functions[i].cu_function = function;
-    executable->entry_functions[i].block_size_x = block_sizes_vec[i].x;
-    executable->entry_functions[i].block_size_y = block_sizes_vec[i].y;
-    executable->entry_functions[i].block_size_z = block_sizes_vec[i].z;
-    executable->executable_layouts[i] = executable_spec->executable_layouts[i];
-    iree_hal_executable_layout_retain(executable_spec->executable_layouts[i]);
+  if (iree_status_is_ok(status)) {
+    executable->executable_layouts =
+        (void*)((char*)executable + sizeof(*executable) +
+                entry_count *
+                    sizeof(iree_hal_cuda_native_executable_function_t));
+    status = CU_RESULT_TO_STATUS(
+        context->syms, cuModuleLoadDataEx(&module, ptx_image, 0, NULL, NULL),
+        "cuModuleLoadDataEx");
   }
 
-  iree_hal_resource_initialize(&iree_hal_cuda_native_executable_vtable,
-                               &executable->resource);
-  executable->module = module;
-  executable->context = context;
-  *out_executable = (iree_hal_executable_t*)executable;
+  for (iree_host_size_t i = 0; i < entry_count; i++) {
+    if (iree_status_is_ok(status)) {
+      CUfunction function = NULL;
+      const char* entry_name = flatbuffers_string_vec_at(entry_points_vec, i);
+      status = CU_RESULT_TO_STATUS(
+          context->syms, cuModuleGetFunction(&function, module, entry_name),
+          "cuModuleGetFunction");
+      executable->entry_functions[i].cu_function = function;
+      executable->entry_functions[i].block_size_x = block_sizes_vec[i].x;
+      executable->entry_functions[i].block_size_y = block_sizes_vec[i].y;
+      executable->entry_functions[i].block_size_z = block_sizes_vec[i].z;
+      executable->executable_layouts[i] =
+          executable_spec->executable_layouts[i];
+      iree_hal_executable_layout_retain(executable_spec->executable_layouts[i]);
+    }
+  }
+
+  if (iree_status_is_ok(status)) {
+    iree_hal_resource_initialize(&iree_hal_cuda_native_executable_vtable,
+                                 &executable->resource);
+    executable->module = module;
+    executable->context = context;
+    *out_executable = (iree_hal_executable_t*)executable;
+  } else {
+    iree_hal_executable_destroy((iree_hal_executable_t*)executable);
+  }
+
   IREE_TRACE_ZONE_END(z0);
-  return iree_ok_status();
+  return status;
 }
 
 CUfunction iree_hal_cuda_native_executable_for_entry_point(

@@ -42,7 +42,6 @@ cc_library(
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:GPUDialect",
         "@llvm-project//mlir:IR",
-        "@llvm-project//mlir:LinalgOps",
         "@llvm-project//mlir:Parser",
         "@llvm-project//mlir:SPIRVDialect",
         "@llvm-project//mlir:SPIRVModuleCombiner",
