@@ -10,8 +10,6 @@
 #include <functional>
 #include <string>
 
-#include "iree/compiler/Codegen/Passes.h"
-
 namespace mlir {
 namespace iree_compiler {
 namespace IREE {
@@ -24,7 +22,8 @@ struct VulkanSPIRVTargetOptions {
   // Vulkan target triple.
   std::string vulkanTargetTriple;
 
-  bool vulkanKeepShaderModules;
+  // True to keep shader modules for debugging.
+  bool keepShaderModules;
 };
 
 // Returns a VulkanSPIRVTargetOptions struct initialized with Vulkan/SPIR-V

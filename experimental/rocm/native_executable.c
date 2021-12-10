@@ -72,29 +72,38 @@ iree_status_t iree_hal_rocm_native_executable_create(
   iree_status_t status = iree_allocator_malloc(context->host_allocator,
                                                total_size, (void**)&executable);
   hipModule_t module = NULL;
-  ROCM_RETURN_IF_ERROR(context->syms,
-                       hipModuleLoadDataEx(&module, hsaco_image, 0, NULL, NULL),
-                       "hipModuleLoadDataEx");
-
-  for (iree_host_size_t i = 0; i < entry_count; i++) {
-    hipFunction_t function = NULL;
-    const char* entry_name = flatbuffers_string_vec_at(entry_points_vec, i);
-    ROCM_RETURN_IF_ERROR(context->syms,
-                         hipModuleGetFunction(&function, module, entry_name),
-                         "hipModuleGetFunction");
-    executable->entry_functions[i].rocm_function = function;
-    executable->entry_functions[i].block_size_x = block_sizes_vec[i].x;
-    executable->entry_functions[i].block_size_y = block_sizes_vec[i].y;
-    executable->entry_functions[i].block_size_z = block_sizes_vec[i].z;
+  if (iree_status_is_ok(status)) {
+    status = ROCM_RESULT_TO_STATUS(
+        context->syms, hipModuleLoadDataEx(&module, hsaco_image, 0, NULL, NULL),
+        "hipModuleLoadDataEx");
   }
 
-  iree_hal_resource_initialize(&iree_hal_rocm_native_executable_vtable,
-                               &executable->resource);
-  executable->module = module;
-  executable->context = context;
-  *out_executable = (iree_hal_executable_t*)executable;
+  for (iree_host_size_t i = 0; i < entry_count; i++) {
+    if (iree_status_is_ok(status)) {
+      hipFunction_t function = NULL;
+      const char* entry_name = flatbuffers_string_vec_at(entry_points_vec, i);
+      status = ROCM_RESULT_TO_STATUS(
+          context->syms, hipModuleGetFunction(&function, module, entry_name),
+          "hipModuleGetFunction");
+      executable->entry_functions[i].rocm_function = function;
+      executable->entry_functions[i].block_size_x = block_sizes_vec[i].x;
+      executable->entry_functions[i].block_size_y = block_sizes_vec[i].y;
+      executable->entry_functions[i].block_size_z = block_sizes_vec[i].z;
+    }
+  }
+
+  if (iree_status_is_ok(status)) {
+    iree_hal_resource_initialize(&iree_hal_rocm_native_executable_vtable,
+                                 &executable->resource);
+    executable->module = module;
+    executable->context = context;
+    *out_executable = (iree_hal_executable_t*)executable;
+  } else {
+    iree_hal_executable_destroy((iree_hal_executable_t*)executable);
+  }
+
   IREE_TRACE_ZONE_END(z0);
-  return iree_ok_status();
+  return status;
 }
 
 hipFunction_t iree_hal_rocm_native_executable_for_entry_point(
