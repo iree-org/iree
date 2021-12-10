@@ -249,8 +249,7 @@ class ConvertHALInterfaceBindingSubspanOp
             elementCount);
       }
       memrefValue = rewriter.createOrFold<memref::SubViewOp>(
-          op.getLoc(), bindingType.cast<MemRefType>(), memrefValue,
-          ArrayRef<OpFoldResult>{op.byte_offset()},
+          op.getLoc(), memrefValue, ArrayRef<OpFoldResult>{op.byte_offset()},
           ArrayRef<OpFoldResult>{byteLength},
           ArrayRef<OpFoldResult>{rewriter.getIndexAttr(1)});
     }
