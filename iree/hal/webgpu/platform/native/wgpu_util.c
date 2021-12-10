@@ -124,7 +124,3 @@ iree_status_t iree_webgpu_queue_wait_idle(WGPUInstance instance,
   wgpuDevicePoll(device, true);
   return iree_ok_status();
 }
-
-void iree_webgpu_device_wait_idle(WGPUDevice device) {
-  wgpuDevicePoll(device, true);
-}

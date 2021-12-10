@@ -77,6 +77,42 @@ void iree_wgpuShaderModuleDrop(WGPUShaderModule shaderModule) {
 }
 
 //===----------------------------------------------------------------------===//
+// Speculative WebGPU API additions
+//===----------------------------------------------------------------------===//
+
+static void iree_hal_webgpu_buffer_map_sync_callback(
+    WGPUBufferMapAsyncStatus status, void* userdata) {
+  IREEWGPUBufferMapSyncStatus* sync_status =
+      (IREEWGPUBufferMapSyncStatus*)userdata;
+  switch (status) {
+    case WGPUBufferMapAsyncStatus_Success:
+      *sync_status = IREEWGPUBufferMapAsyncStatus_Success;
+      break;
+    case WGPUBufferMapAsyncStatus_Error:
+      *sync_status = IREEWGPUBufferMapAsyncStatus_Error;
+      break;
+    default:
+    case WGPUBufferMapAsyncStatus_Unknown:
+      *sync_status = IREEWGPUBufferMapAsyncStatus_Unknown;
+      break;
+    case WGPUBufferMapAsyncStatus_DeviceLost:
+      *sync_status = IREEWGPUBufferMapAsyncStatus_DeviceLost;
+      break;
+  }
+}
+
+IREEWGPUBufferMapSyncStatus iree_wgpuBufferMapSync(WGPUDevice device,
+                                                   WGPUBuffer buffer,
+                                                   WGPUMapModeFlags mode,
+                                                   size_t offset, size_t size) {
+  IREEWGPUBufferMapSyncStatus status = WGPUBufferMapAsyncStatus_Unknown;
+  wgpuBufferMapAsync(buffer, mode, offset, size,
+                     iree_hal_webgpu_buffer_map_sync_callback, &status);
+  wgpuDevicePoll(device, /*force_wait=*/true);
+  return status;
+}
+
+//===----------------------------------------------------------------------===//
 // Platform abstraction layer
 //===----------------------------------------------------------------------===//
 

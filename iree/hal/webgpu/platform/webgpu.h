@@ -85,6 +85,4 @@ iree_status_t iree_webgpu_queue_wait_idle(WGPUInstance instance,
                                           WGPUDevice device, WGPUQueue queue,
                                           iree_timeout_t timeout);
 
-void iree_webgpu_device_wait_idle(WGPUDevice device);
-
 #endif  // IREE_HAL_WEBGPU_PLATFORM_WEBGPU_H_
