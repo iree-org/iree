@@ -153,8 +153,7 @@ static iree_status_t iree_hal_webgpu_simple_allocator_allocate_buffer(
       .label = NULL,
       .usage = usage_flags,
       .size = allocation_size,
-      .mappedAtCreation =
-          iree_all_bits_set(allowed_usage, IREE_HAL_BUFFER_USAGE_MAPPING),
+      .mappedAtCreation = false,
   };
   WGPUBuffer buffer_handle =
       wgpuDeviceCreateBuffer(allocator->device, &descriptor);
@@ -165,8 +164,8 @@ static iree_status_t iree_hal_webgpu_simple_allocator_allocate_buffer(
   }
 
   iree_status_t status = iree_hal_webgpu_buffer_wrap(
-      base_allocator, memory_type, allowed_access, allowed_usage,
-      allocation_size,
+      allocator->device, base_allocator, memory_type, allowed_access,
+      allowed_usage, allocation_size,
       /*byte_offset=*/0,
       /*byte_length=*/allocation_size, buffer_handle, allocator->host_allocator,
       out_buffer);
