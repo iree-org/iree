@@ -56,16 +56,20 @@ iree_status_t iree_hal_webgpu_descriptor_set_layout_create(
                               IREE_HAL_WEBGPU_MAX_DESCRIPTOR_SET_BINDING_COUNT,
                               i, bindings[i].binding);
     }
-    binding_mask = 1u << bindings[i].binding;
+    binding_mask |= 1u << bindings[i].binding;
     WGPUBufferBindingType binding_type = WGPUBufferBindingType_Undefined;
     bool has_dynamic_offset = false;
     switch (bindings[i].type) {
       case IREE_HAL_DESCRIPTOR_TYPE_STORAGE_BUFFER:
+        binding_type = WGPUBufferBindingType_Storage;
+        break;
       case IREE_HAL_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC:
         binding_type = WGPUBufferBindingType_Storage;
         has_dynamic_offset = true;
         break;
       case IREE_HAL_DESCRIPTOR_TYPE_UNIFORM_BUFFER:
+        binding_type = WGPUBufferBindingType_Uniform;
+        break;
       case IREE_HAL_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC:
         binding_type = WGPUBufferBindingType_Uniform;
         has_dynamic_offset = true;

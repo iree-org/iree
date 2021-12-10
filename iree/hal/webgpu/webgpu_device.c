@@ -317,7 +317,18 @@ static iree_status_t iree_hal_webgpu_device_queue_submit(
 
   // HACK: fully synchronize with the device... maybe.
   // TODO(benvanik): make semaphores work so that we don't have to synchronize.
-  return iree_hal_device_wait_idle(base_device, iree_infinite_timeout());
+  IREE_RETURN_IF_ERROR(
+      iree_hal_device_wait_idle(base_device, iree_infinite_timeout()));
+
+  for (iree_host_size_t i = 0; i < batch_count; ++i) {
+    for (iree_host_size_t j = 0; j < batches[i].signal_semaphores.count; ++j) {
+      IREE_RETURN_IF_ERROR(iree_hal_semaphore_signal(
+          batches[i].signal_semaphores.semaphores[j],
+          batches[i].signal_semaphores.payload_values[j]));
+    }
+  }
+
+  return iree_ok_status();
 }
 
 static iree_status_t iree_hal_webgpu_device_submit_and_wait(

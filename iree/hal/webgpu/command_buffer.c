@@ -293,7 +293,9 @@ iree_hal_webgpu_command_buffer_allowed_categories(
 iree_status_t iree_hal_webgpu_command_buffer_issue(
     iree_hal_command_buffer_t* base_command_buffer, WGPUQueue queue) {
   iree_hal_webgpu_command_buffer_t* command_buffer =
-      iree_hal_webgpu_command_buffer_cast(base_command_buffer);
+      iree_hal_command_buffer_dyn_cast(base_command_buffer,
+                                       &iree_hal_webgpu_command_buffer_vtable);
+  IREE_ASSERT(command_buffer);
   IREE_TRACE_ZONE_BEGIN(z0);
 
   for (iree_hal_webgpu_command_segment_t* segment =

@@ -141,6 +141,8 @@ static void iree_hal_webgpu_make_entry_name(uint32_t entry_ordinal,
   // Inlined base 10 unsigned itoa-like.
   // Generates the string in reverse and then flips it around.
   // It's not worth pulling in snprintf for this.
+  buffer[0] = 'd';
+  ++buffer;
   uint32_t n = entry_ordinal;
   int length = 0;
   do {
