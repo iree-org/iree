@@ -86,7 +86,7 @@ option(IREE_ENABLE_NEW_INTEGRATION_TESTS "Enables new integration tests and disa
 
 option(IREE_ENABLE_EMITC "Enables MLIR EmitC dependencies." ${IREE_BUILD_COMPILER})
 
-set(IREE_HAL_WEBGPU_PLATFORM_DEFAULT "wgpu-native")
+set(IREE_HAL_WEBGPU_PLATFORM_DEFAULT "dawn")
 set(IREE_HAL_WEBGPU_PLATFORM "${IREE_HAL_WEBGPU_PLATFORM_DEFAULT}"
     CACHE STRING "Native WebGPU implementation ('dawn' or 'wgpu-native').")
 
@@ -431,7 +431,11 @@ endif()
 include(external_cc_library)
 include(flatbuffer_c_library)
 
+# Order matters here, unfortunately:
+add_subdirectory(build_tools/third_party/spirv-tools EXCLUDE_FROM_ALL)
+add_subdirectory(build_tools/third_party/tint EXCLUDE_FROM_ALL)
 add_subdirectory(build_tools/third_party/dawn EXCLUDE_FROM_ALL)
+
 add_subdirectory(build_tools/third_party/cuda EXCLUDE_FROM_ALL)
 add_subdirectory(build_tools/third_party/libyaml EXCLUDE_FROM_ALL)
 add_subdirectory(build_tools/third_party/stblib EXCLUDE_FROM_ALL)

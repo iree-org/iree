@@ -117,15 +117,15 @@ static iree_status_t iree_hal_webgpu_buffer_map_range(
         buffer->device, buffer->handle, map_mode, (size_t)local_byte_offset,
         (size_t)local_byte_length);
     switch (sync_status) {
-      case IREEWGPUBufferMapAsyncStatus_Success:
+      case IREEWGPUBufferMapSyncStatus_Success:
         // Succeeded!
         break;
-      case IREEWGPUBufferMapAsyncStatus_Error:
+      case IREEWGPUBufferMapSyncStatus_Error:
         return iree_make_status(IREE_STATUS_INTERNAL, "failed to map buffer");
       default:
-      case IREEWGPUBufferMapAsyncStatus_Unknown:
+      case IREEWGPUBufferMapSyncStatus_Unknown:
         return iree_make_status(IREE_STATUS_UNKNOWN, "failed to map buffer");
-      case IREEWGPUBufferMapAsyncStatus_DeviceLost:
+      case IREEWGPUBufferMapSyncStatus_DeviceLost:
         return iree_make_status(IREE_STATUS_UNAVAILABLE,
                                 "device lost while mapping buffer");
     }

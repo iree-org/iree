@@ -112,7 +112,7 @@ static iree_status_t iree_hal_webgpu_create_wgsl_shader_module(
               .next = NULL,
               .sType = WGPUSType_ShaderModuleWGSLDescriptor,
           },
-      .source = code,
+      .code = code,
   };
   const WGPUShaderModuleDescriptor module_descriptor = {
       .nextInChain = &descriptor.chain,

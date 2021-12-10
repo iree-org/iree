@@ -16,6 +16,10 @@
 
 #define IREE_HAL_WEBGPU_DRIVER_ID 0x57475055u  // WGPU
 
+IREE_FLAG(string, webgpu_backend, "",
+          "[any, d3d12, metal, vulkan]; indicates a preference for the WebGPU "
+          "backend implementation to use, if possible.");
+
 IREE_FLAG(string, webgpu_log_level, "warning",
           "[off, error, warning, info, debug, trace]; controls the verbosity "
           "level of the logging from the WebGPU "
@@ -52,6 +56,24 @@ static iree_status_t iree_hal_webgpu_native_driver_factory_try_create(
 
   iree_hal_webgpu_driver_options_t options;
   iree_hal_webgpu_driver_options_initialize(&options);
+
+  // Let the user override the backend that will be used or choose based on
+  // platform; if on Windows we want D3D12 and on Apple OS' we want Metal.
+  if (strcmp(FLAG_webgpu_backend, "d3d12") == 0) {
+    options.backend_preference = IREE_HAL_WEBGPU_DRIVER_BACKEND_D3D12;
+  } else if (strcmp(FLAG_webgpu_backend, "metal") == 0) {
+    options.backend_preference = IREE_HAL_WEBGPU_DRIVER_BACKEND_METAL;
+  } else if (strcmp(FLAG_webgpu_backend, "vulkan") == 0) {
+    options.backend_preference = IREE_HAL_WEBGPU_DRIVER_BACKEND_VULKAN;
+  } else {
+#if defined(IREE_PLATFORM_WINDOWS)
+    options.backend_preference = IREE_HAL_WEBGPU_DRIVER_BACKEND_D3D12;
+#elif defined(IREE_PLATFORM_APPLE)
+    options.backend_preference = IREE_HAL_WEBGPU_DRIVER_BACKEND_METAL;
+#else
+    options.backend_preference = IREE_HAL_WEBGPU_DRIVER_BACKEND_VULKAN;
+#endif
+  }
 
   if (strcmp(FLAG_webgpu_log_level, "error") == 0) {
     options.log_level = IREE_HAL_WEBGPU_DRIVER_LOG_LEVEL_ERROR;

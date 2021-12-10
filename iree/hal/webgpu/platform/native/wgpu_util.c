@@ -105,7 +105,7 @@ IREEWGPUBufferMapSyncStatus iree_wgpuBufferMapSync(WGPUDevice device,
                                                    WGPUBuffer buffer,
                                                    WGPUMapModeFlags mode,
                                                    size_t offset, size_t size) {
-  IREEWGPUBufferMapSyncStatus status = WGPUBufferMapAsyncStatus_Unknown;
+  IREEWGPUBufferMapSyncStatus status = IREEWGPUBufferMapSyncStatus_Unknown;
   wgpuBufferMapAsync(buffer, mode, offset, size,
                      iree_hal_webgpu_buffer_map_sync_callback, &status);
   wgpuDevicePoll(device, /*force_wait=*/true);

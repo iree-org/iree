@@ -14,9 +14,15 @@
 #if defined(IREE_HAL_WEBGPU_PLATFORM_WGPU_NATIVE)
 #include <webgpu-headers/webgpu.h>
 #include <wgpu.h>  // wgpu-native implementation only
+#elif defined(IREE_HAL_WEBGPU_PLATFORM_DAWN)
+#include <dawn/webgpu.h>
 #else
 #include "third_party/webgpu-headers/webgpu.h"  // IWYU pragma: export
 #endif  // IREE_HAL_WEBGPU_PLATFORM_WGPU_NATIVE
+
+#ifdef __cplusplus
+extern "C" {
+#endif  // __cplusplus
 
 //===----------------------------------------------------------------------===//
 // WebGPU API utilities
@@ -34,6 +40,17 @@
 // The webgpu-native headers don't yet line up across implementations or expose
 // everything we need. These methods attempt to paper over that such that we
 // can avoid including implementation-specific headers and #ifdefing everywhere.
+
+// Everything has different WebGPU headers and that makes me very sad.
+#if defined(IREE_HAL_WEBGPU_PLATFORM_DAWN)
+typedef struct WGPUAdapterImpl* WGPUAdapter;
+typedef enum WGPUPowerPreference {
+  WGPUPowerPreference_Undefined = 0x00000000,
+  WGPUPowerPreference_LowPower = 0x00000001,
+  WGPUPowerPreference_HighPerformance = 0x00000002,
+  WGPUPowerPreference_Force32 = 0x7FFFFFFF
+} WGPUPowerPreference;
+#endif  // IREE_HAL_WEBGPU_PLATFORM_DAWN
 
 // Methods for dropping references to objects.
 // The base header does have some *Destroy methods but they are not implemented
@@ -62,11 +79,11 @@ void iree_wgpuShaderModuleDrop(WGPUShaderModule shaderModule);
 // get a synchronous method so we can use this on the web too 🤞.
 
 typedef enum IREEWGPUBufferMapSyncStatus {
-  IREEWGPUBufferMapAsyncStatus_Success = 0x00000000,
-  IREEWGPUBufferMapAsyncStatus_Error = 0x00000001,
-  IREEWGPUBufferMapAsyncStatus_Unknown = 0x00000002,
-  IREEWGPUBufferMapAsyncStatus_DeviceLost = 0x00000003,
-  IREEWGPUBufferMapAsyncStatus_Force32 = 0x7FFFFFFF
+  IREEWGPUBufferMapSyncStatus_Success = 0x00000000,
+  IREEWGPUBufferMapSyncStatus_Error = 0x00000001,
+  IREEWGPUBufferMapSyncStatus_Unknown = 0x00000002,
+  IREEWGPUBufferMapSyncStatus_DeviceLost = 0x00000003,
+  IREEWGPUBufferMapSyncStatus_Force32 = 0x7FFFFFFF
 } IREEWGPUBufferMapSyncStatus;
 
 IREEWGPUBufferMapSyncStatus iree_wgpuBufferMapSync(WGPUDevice device,
@@ -84,5 +101,9 @@ IREEWGPUBufferMapSyncStatus iree_wgpuBufferMapSync(WGPUDevice device,
 iree_status_t iree_webgpu_queue_wait_idle(WGPUInstance instance,
                                           WGPUDevice device, WGPUQueue queue,
                                           iree_timeout_t timeout);
+
+#ifdef __cplusplus
+}  // extern "C"
+#endif  // __cplusplus
 
 #endif  // IREE_HAL_WEBGPU_PLATFORM_WEBGPU_H_

@@ -28,16 +28,22 @@ if(${IREE_HAL_WEBGPU_PLATFORM} STREQUAL "dawn")
       "IREE_HAL_WEBGPU_PLATFORM_DAWN=1"
   )
   target_sources(
-    native
+    iree_hal_webgpu_platform_native_native
     PRIVATE
-      "dawn_util.c"
+      "dawn_util.cc"
+      "native_driver_dawn.cc"
   )
-  # DO NOT SUBMIT
-  # target_link_libraries(
-  #   native
-  #   PUBLIC
-  #     dawn
-  # )
+  target_link_libraries(
+    iree_hal_webgpu_platform_native_native
+    PUBLIC
+      dawn_internal_config
+      dawncpp
+      dawn_proc
+      dawn_common
+      dawn_native
+      dawn_wire
+      dawn_utils
+  )
 elseif(${IREE_HAL_WEBGPU_PLATFORM} STREQUAL "wgpu-native")
   target_compile_definitions(
     iree_hal_webgpu_platform_native_native
@@ -47,6 +53,7 @@ elseif(${IREE_HAL_WEBGPU_PLATFORM} STREQUAL "wgpu-native")
   target_sources(
     iree_hal_webgpu_platform_native_native
     PRIVATE
+      "native_driver_wgpu.cc"
       "wgpu_util.c"
   )
   target_link_libraries(

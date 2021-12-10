@@ -49,6 +49,13 @@ IREE_API_EXPORT iree_status_t iree_hal_webgpu_wrap_device(
 // iree_hal_webgpu_driver_t
 //===----------------------------------------------------------------------===//
 
+typedef enum iree_hal_webgpu_driver_backend_e {
+  IREE_HAL_WEBGPU_DRIVER_BACKEND_ANY = 0u,
+  IREE_HAL_WEBGPU_DRIVER_BACKEND_D3D12 = 1u,
+  IREE_HAL_WEBGPU_DRIVER_BACKEND_METAL = 2u,
+  IREE_HAL_WEBGPU_DRIVER_BACKEND_VULKAN = 3u,
+} iree_hal_webgpu_driver_backend_t;
+
 typedef enum iree_hal_webgpu_driver_log_level_e {
   IREE_HAL_WEBGPU_DRIVER_LOG_LEVEL_OFF = 0u,
   IREE_HAL_WEBGPU_DRIVER_LOG_LEVEL_ERROR = 1u,
@@ -62,6 +69,9 @@ typedef enum iree_hal_webgpu_driver_log_level_e {
 typedef struct iree_hal_webgpu_driver_options_t {
   // Logging level for messages logged to stderr. Disabled by default.
   iree_hal_webgpu_driver_log_level_t log_level;
+
+  // Preferred backend - ignored if backend is not available.
+  iree_hal_webgpu_driver_backend_t backend_preference;
 
   // TODO(benvanik): remove this single setting - it would be nice instead to
   // pass a list to force device enumeration/matrix expansion or omit entirely

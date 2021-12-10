@@ -11,6 +11,25 @@ endif()
 include(FetchContent)
 
 FetchContent_Declare(
+  abseil-cpp
+  GIT_REPOSITORY https://github.com/abseil/abseil-cpp.git
+  GIT_TAG fb7dd24b18e82893e5922be5d1c8ae0f3fe3c9fa # 2021-12-10
+)
+
+set(ABSL_BUILD_TESTING OFF CACHE BOOL "" FORCE)
+set(ABSL_PROPAGATE_CXX_STD ON CACHE BOOL "" FORCE)
+
+FetchContent_MakeAvailable(abseil-cpp)
+FetchContent_GetProperties(abseil-cpp SOURCE_DIR ABSEIL_CPP_SOURCE)
+
+FetchContent_Declare(
+  glfw
+  GIT_REPOSITORY https://github.com/glfw/glfw.git
+  GIT_TAG 900848ad0ce0c94a5d4cb8e0ac2489ff11973477 # 2021-12-10
+)
+FetchContent_MakeAvailable(glfw)
+
+FetchContent_Declare(
   dawn
   GIT_REPOSITORY https://dawn.googlesource.com/dawn
   GIT_TAG 908f4fe689b372439850e91858683a5273249cee # 2021-12-04
@@ -23,26 +42,16 @@ set(DAWN_USE_X11 OFF)
 set(DAWN_BUILD_EXAMPLES OFF)
 
 set(DAWN_THIRD_PARTY_DIR "${PROJECT_SOURCE_DIR}/third_party")
+set(DAWN_ABSEIL_DIR "${ABSEIL_CPP_SOURCE}")
 set(DAWN_SPIRV_CROSS_DIR "${DAWN_THIRD_PARTY_DIR}/spirv_cross")
 set(DAWN_SPIRV_HEADERS_DIR "${DAWN_THIRD_PARTY_DIR}/spirv_headers")
-set(DAWN_SPIRV_TOOLS_DIR "${DAWN_THIRD_PARTY_DIR}/spirv-tools")
-set(DAWN_TINT_DIR "${DAWN_THIRD_PARTY_DIR}/tint")
+set(DAWN_SPIRV_TOOLS_DIR "${SPIRV_TOOLS_SOURCE}")
+set(DAWN_TINT_DIR "${TINT_SOURCE}")
 
-# DO NOT SUBMIT iree_set_tint_cmake_options
-macro(iree_set_tint_cmake_options)
-set(TINT_BUILD_SAMPLES OFF CACHE BOOL "" FORCE)
-set(TINT_BUILD_TESTS OFF CACHE BOOL "" FORCE)
-
-set(TINT_BUILD_SPV_READER ON CACHE BOOL "" FORCE)
-set(TINT_BUILD_WGSL_READER OFF CACHE BOOL "" FORCE)
-
-set(TINT_BUILD_GLSL_WRITER OFF CACHE BOOL "" FORCE)
-set(TINT_BUILD_HLSL_WRITER OFF CACHE BOOL "" FORCE)
-set(TINT_BUILD_MSL_WRITER ON CACHE BOOL "" FORCE)
-set(TINT_BUILD_SPV_WRITER ON CACHE BOOL "" FORCE)
-set(TINT_BUILD_WGSL_WRITER ON CACHE BOOL "" FORCE)
-endmacro()
-iree_set_tint_cmake_options()
+# HACK: dawn looks for these targets instead of trusting the dirs set above,
+# leading to weird double inclusion of things like abseil. I have no idea why
+# it requires glfw even when opengl and examples are off.
+add_library(libabsl STATIC EXCLUDE_FROM_ALL dummy.c)
 
 FetchContent_MakeAvailable(dawn)
 FetchContent_GetProperties(dawn SOURCE_DIR DAWN_SOURCE)
