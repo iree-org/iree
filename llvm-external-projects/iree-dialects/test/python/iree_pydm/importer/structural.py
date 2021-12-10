@@ -28,7 +28,7 @@ def literal_list(x, y) -> list:
   # CHECK: %[[X:.*]] = load_var %x
   # CHECK: %[[Y:.*]] = load_var %y
   # CHECK: %[[RESULT:.*]] = make_list %[[X]], %[[Y]]
-  # CHECK: %[[BOXED:.*]] = box %[[RESULT]] : !iree_pydm.list -> !iree_pydm.object<!iree_pydm.list>
+  # CHECK: %[[BOXED:.*]] = box %[[RESULT]] : !iree_pydm.list -> <!iree_pydm.list>
   # CHECK: return %[[BOXED]]
   return [x, y]
 

@@ -89,7 +89,7 @@ hal.executable.variant @cuda, target = #executable_target_cuda_nvptx_fb {
 #translation = #iree_codegen.translation.info<"LLVMGPUVectorize", workload_per_wg = []>
 // Pure reducion case, skip tiling.
 hal.executable @reduction_dispatch {
-hal.executable.variant @cuda, target = #hal.executable.target<"cuda", "cuda-nvptx-fb"> {
+hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
     hal.executable.entry_point @predict_dispatch_153 attributes {
       interface = @io,
       ordinal = 0 : index,

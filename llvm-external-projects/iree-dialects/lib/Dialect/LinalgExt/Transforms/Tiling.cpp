@@ -209,7 +209,7 @@ FailureOr<TiledOp> tileInterfaceOp(OpBuilder &b, TiledOpInterface tilableOp,
     return TiledOp{tilableOp, {}, {}};
   }
 
-  SmallVector<Range> loopBounds = tilableOp.getLoopBounds(b);
+  SmallVector<Range> loopBounds = tilableOp.getIterationDomain(b);
   SmallVector<linalg::ProcInfo> distributionInfo;
   // If the tiled loops are distributed, get the proc_id and nprocs for the
   // distributed loops. First collect the parallel loops by iterating over the

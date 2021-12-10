@@ -34,4 +34,4 @@ module attributes {
       #iree_codegen.translation.info<"CPUDefault", workload_per_wg = []>,
       workgroup_size = []>
 } { }
-// CHECK: #compilation = #iree_codegen.compilation.info<#iree_codegen.lowering.config<tile_sizes = [], native_vector_size = []>, #iree_codegen.translation.info<"CPUDefault", workload_per_wg = []>, workgroup_size = []>
+// CHECK: #compilation = #iree_codegen.compilation.info<<tile_sizes = [], native_vector_size = []>, <"CPUDefault", workload_per_wg = []>, workgroup_size = []>

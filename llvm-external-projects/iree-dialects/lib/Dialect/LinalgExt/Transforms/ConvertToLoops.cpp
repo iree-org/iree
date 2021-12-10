@@ -51,7 +51,7 @@ static LogicalResult lowerToLoopsImpl(OpBuilder &builder,
 /// Main entry point for lowering `TiledOpInterface` op to loops.
 static LogicalResult lowerToLoops(OpBuilder &builder,
                                   TiledOpInterface tilableOp) {
-  SmallVector<Range> loopBounds = tilableOp.getLoopBounds(builder);
+  SmallVector<Range> loopBounds = tilableOp.getIterationDomain(builder);
   SmallVector<Value> ivs;
   return lowerToLoopsImpl(builder, tilableOp, loopBounds, 0, ivs);
 }

@@ -6,7 +6,7 @@
 #map3 = affine_map<(d0, d1, d2) -> (d0, d1)>
 
 hal.executable private @matmul_contract  {
-  hal.executable.variant @vulkan, target = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
+  hal.executable.variant @vulkan, target = <"vulkan-spirv", "vulkan-spirv-fb", {
     spv.target_env = #spv.target_env<#spv.vce<v1.0,
         [Shader, CooperativeMatrixNV, Int8, StorageBuffer8BitAccess],
         [SPV_KHR_storage_buffer_storage_class, SPV_NV_cooperative_matrix, SPV_KHR_8bit_storage]>,
@@ -51,7 +51,7 @@ hal.executable private @matmul_contract  {
 #map3 = affine_map<(d0, d1, d2) -> (d0, d1)>
 
 hal.executable private @matmul_contract_licm  {
-  hal.executable.variant @vulkan, target = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
+  hal.executable.variant @vulkan, target = <"vulkan-spirv", "vulkan-spirv-fb", {
       spv.target_env = #spv.target_env<#spv.vce<v1.0,
           [Shader, CooperativeMatrixNV, Int8, Float16, StorageUniform16, StorageBuffer8BitAccess, Float16Buffer],
           [SPV_KHR_storage_buffer_storage_class, SPV_NV_cooperative_matrix, SPV_KHR_8bit_storage, SPV_KHR_16bit_storage]>,
@@ -97,7 +97,7 @@ hal.executable private @matmul_contract_licm  {
 #map3 = affine_map<(d0, d1, d2) -> (d0, d1)>
 
 hal.executable private @matmul_contract_vector_memref  {
-  hal.executable.variant @vulkan, target = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
+  hal.executable.variant @vulkan, target = <"vulkan-spirv", "vulkan-spirv-fb", {
       spv.target_env = #spv.target_env<#spv.vce<v1.0,
         [Shader, CooperativeMatrixNV, Int8, Float16, StorageUniform16, StorageBuffer8BitAccess, Float16Buffer],
         [SPV_KHR_storage_buffer_storage_class, SPV_NV_cooperative_matrix, SPV_KHR_8bit_storage, SPV_KHR_16bit_storage]>,
@@ -132,7 +132,7 @@ hal.executable private @matmul_contract_vector_memref  {
 // -----
 
 hal.executable private @const_elementwise_ops  {
-  hal.executable.variant @vulkan, target = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
+  hal.executable.variant @vulkan, target = <"vulkan-spirv", "vulkan-spirv-fb", {
     spv.target_env = #spv.target_env<#spv.vce<v1.0,
         [Shader, CooperativeMatrixNV, Int8, Float16, StorageBuffer8BitAccess],
         [SPV_KHR_storage_buffer_storage_class, SPV_NV_cooperative_matrix, SPV_KHR_8bit_storage]>,

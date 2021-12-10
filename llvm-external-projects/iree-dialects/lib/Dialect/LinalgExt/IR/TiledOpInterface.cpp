@@ -62,7 +62,7 @@ struct ExtractSliceTiledOpInterface
                                   getParallelIteratorTypeName());
   }
 
-  SmallVector<Range> getLoopBounds(Operation *op, OpBuilder &b) const {
+  SmallVector<Range> getIterationDomain(Operation *op, OpBuilder &b) const {
     auto extractSliceOp = cast<tensor::ExtractSliceOp>(op);
     SmallVector<Value> dest;
     ReifiedRankedShapedTypeDims returnShape;
@@ -152,7 +152,7 @@ struct InsertSliceTiledOpInterface
                                   getParallelIteratorTypeName());
   }
 
-  SmallVector<Range> getLoopBounds(Operation *op, OpBuilder &b) const {
+  SmallVector<Range> getIterationDomain(Operation *op, OpBuilder &b) const {
     auto insertSliceOp = cast<tensor::InsertSliceOp>(op);
     Value source = insertSliceOp.source();
     RankedTensorType sourceType = insertSliceOp.getSourceType();
@@ -257,20 +257,22 @@ struct ForwardToTilingInterface
   SmallVector<StringRef> getLoopIteratorTypes(Operation *op) const {
     return cast<OpTy>(op).getLoopIteratorTypes();
   }
-  SmallVector<Range> getLoopBounds(Operation *op, OpBuilder &b) const {
-    return cast<OpTy>(op).getLoopBounds(b);
+  SmallVector<Range> getIterationDomain(Operation *op, OpBuilder &b) const {
+    return cast<OpTy>(op).getIterationDomain(b);
   }
   Operation *getTiledImplementation(Operation *op, OpBuilder &b,
                                     ValueRange dest,
                                     ArrayRef<OpFoldResult> offsets,
                                     ArrayRef<OpFoldResult> sizes,
                                     SmallVectorImpl<Value> &results) const {
-    Operation *tiledOp =
-        cast<OpTy>(op).getTiledImplementation(b, dest, offsets, sizes);
-    if (!tiledOp) {
+    SmallVector<Operation *> tiledOps = cast<OpTy>(op).getTiledImplementation(
+        b, dest, offsets, sizes, /*tileDestOperands=*/true);
+    if (tiledOps.empty()) {
       op->emitOpError("failed to tile operation");
       return nullptr;
     }
+    assert(tiledOps.size() == 1 && "expected single tiled op");
+    Operation *tiledOp = tiledOps.front();
     if (tiledOp->getNumResults() != dest.size()) {
       op->emitOpError(
           "mismatch in the number of results of the tiled operation and the "
