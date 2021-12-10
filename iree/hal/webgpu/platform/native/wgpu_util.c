@@ -52,7 +52,8 @@ void iree_wgpuBindGroupLayoutDrop(WGPUBindGroupLayout bindGroupLayout) {
 void iree_wgpuBufferDrop(WGPUBuffer buffer) { wgpuBufferDrop(buffer); }
 
 void iree_wgpuCommandBufferDrop(WGPUCommandBuffer commandBuffer) {
-  wgpuCommandBufferDrop(commandBuffer);
+  // wgpu-native crashes if this method is called. I have no idea why - rust...
+  // wgpuCommandBufferDrop(commandBuffer);
 }
 
 void iree_wgpuCommandEncoderDrop(WGPUCommandEncoder commandEncoder) {
