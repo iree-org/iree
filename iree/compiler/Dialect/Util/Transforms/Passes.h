@@ -19,6 +19,8 @@ std::unique_ptr<OperationPass<mlir::ModuleOp>> createCombineInitializersPass();
 std::unique_ptr<OperationPass<void>> createDropCompilerHintsPass();
 std::unique_ptr<OperationPass<mlir::ModuleOp>> createFoldGlobalsPass();
 std::unique_ptr<OperationPass<mlir::ModuleOp>> createFuseGlobalsPass();
+std::unique_ptr<OperationPass<mlir::ModuleOp>>
+createGreedyHoistIntoGlobalsPass();
 std::unique_ptr<OperationPass<void>> createSimplifyGlobalAccessesPass();
 
 // Register all Passes
@@ -28,6 +30,7 @@ inline void registerTransformPasses() {
   createDropCompilerHintsPass();
   createFoldGlobalsPass();
   createFuseGlobalsPass();
+  createGreedyHoistIntoGlobalsPass();
   createSimplifyGlobalAccessesPass();
 }
 
