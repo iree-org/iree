@@ -10,6 +10,7 @@
 #include "llvm/Support/Debug.h"
 #include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
+#include "mlir/Dialect/Linalg/IR/LinalgOps.h"
 #include "mlir/IR/BlockAndValueMapping.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/SymbolTable.h"
@@ -39,16 +40,18 @@ bool canHoistOperand(OpOperand *operand) {
 }
 
 bool isHoistableLeaf(const ConstExprAnalysis::ConstValueInfo *info) {
-  if (auto linalgOp = dyn_cast<linalg::LinalgOp>(info->getOperation())) {
-    // Generally, we prefer to not hoist broadcasts.
-    // TODO: Is there a better way to do this?
-    if (linalgOp.getNumParallelLoops() > 0 &&
-        linalgOp.getNumReductionLoops() == 0) {
-      // If the body only yields, this is just a metadata op. Better to leave
-      // it to fuse.
-      Block *body = linalgOp.getBlock();
-      if (!body->empty() && (++body->begin()) == body->end()) {
-        return false;
+  // Generally, we prefer to not hoist broadcasts.
+  if (auto genericOp = dyn_cast<linalg::GenericOp>(info->getOperation())) {
+    // Detect op that only broadcast input as fusing them makes the new
+    // op cheaper.
+    if (genericOp.getNumParallelLoops() == genericOp.getNumLoops() &&
+        isa<linalg::YieldOp>(genericOp.getBody()->front())) {
+      for (OpOperand *opOperand : genericOp.getInputOperands()) {
+        AffineMap indexingMap = genericOp.getTiedIndexingMap(opOperand);
+        if (indexingMap.isProjectedPermutation() &&
+            indexingMap.getNumDims() != indexingMap.getNumResults()) {
+          return false;
+        }
       }
     }
   }
