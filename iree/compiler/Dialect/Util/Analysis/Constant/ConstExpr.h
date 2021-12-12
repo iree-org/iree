@@ -25,10 +25,24 @@ namespace Util {
 // Modifying any of the analyzed operations invalidates this analysis.
 class ConstExprAnalysis {
  public:
+  struct ConstValueInfo;
   explicit ConstExprAnalysis(Operation *rootOp);
 
   void print(raw_ostream &os) const;
   void dump() const;
+
+  // Returns const-expr info for an operation (or nullptr if unknown).
+  const ConstValueInfo *lookup(Value queryValue) const {
+    return constInfoMap.lookup(queryValue);
+  }
+
+  // Return const-expr info for an operation (or nullptr if unknown). Presently,
+  // an operation's results will either all be const-expr or not, so we just
+  // check the first. 0-result ops cannot be const-expr.
+  const ConstValueInfo *lookup(Operation *queryOp) const {
+    if (queryOp->getNumResults() == 0) return false;
+    return lookup(queryOp->getResult(0));
+  }
 
   // Returns true if the given value is only derived from immutable inputs.
   // Note that this only returns true for derived values. Direct use of
@@ -102,6 +116,15 @@ class ConstExprAnalysis {
 
     // Whether this is a root.
     bool isRoot = false;
+
+    // Whether this is a const-expr value.
+    bool isConstExpr() const { return state == CONSTANT; }
+
+    Operation *getOperation() const {
+      Operation *ret = constValue.getDefiningOp();
+      assert(ret && "const-expr must have a defining op");
+      return ret;
+    }
   };
 
  private:
