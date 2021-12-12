@@ -47,7 +47,7 @@ struct ConvertExplicitSqueezePattern
           op, "could not compute reassociation indices");
     }
 
-    rewriter.replaceOpWithNewOp<linalg::TensorCollapseShapeOp>(
+    rewriter.replaceOpWithNewOp<tensor::CollapseShapeOp>(
         op, resultType, op.input(), *reassociationIndices);
     return success();
   }
@@ -99,7 +99,7 @@ struct ConvertConstExpandDimsPattern
           op, "could not compute reassociation indices");
     }
 
-    rewriter.replaceOpWithNewOp<linalg::TensorExpandShapeOp>(
+    rewriter.replaceOpWithNewOp<tensor::ExpandShapeOp>(
         op, expandedType, op.input(), *reassociationIndices);
     return success();
   }

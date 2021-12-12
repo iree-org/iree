@@ -265,7 +265,7 @@ func @always_fuse_reshape
   %cst = arith.constant 0.0 : f32
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
-  %0 = linalg.tensor_expand_shape %lhs [[0, 1]]
+  %0 = tensor.expand_shape %lhs [[0, 1]]
     : tensor<?xf32> into tensor<?x4xf32>
   %m = tensor.dim %0, %c0 : tensor<?x4xf32>
   %n1 = tensor.dim %rhs1, %c1 : tensor<4x?xf32>
@@ -543,14 +543,14 @@ func @fuse_non_tiled_reduction_fill(%input1: tensor<1000xf32>, %input2: tensor<1
 func @inline_dag_1(
     %arg0: tensor<?xf32>, %arg1 : tensor<1x?xf32>, %arg2 : tensor<i32>,
     %arg3 : index) -> tensor<?xf32> {
-  %0 = linalg.tensor_expand_shape %arg0 [[0, 1]] : tensor<?xf32> into tensor<1x?xf32>
+  %0 = tensor.expand_shape %arg0 [[0, 1]] : tensor<?xf32> into tensor<1x?xf32>
   %1 = tensor.extract_slice %0[0, 20] [1, %arg3] [1, 1] : tensor<1x?xf32> to tensor<1x?xf32>
-  %2 = linalg.tensor_collapse_shape %1 [[0, 1]] : tensor<1x?xf32> into tensor<?xf32>
-  %3 = linalg.tensor_collapse_shape %arg1 [[0, 1]] : tensor<1x?xf32> into tensor<?xf32>
+  %2 = tensor.collapse_shape %1 [[0, 1]] : tensor<1x?xf32> into tensor<?xf32>
+  %3 = tensor.collapse_shape %arg1 [[0, 1]] : tensor<1x?xf32> into tensor<?xf32>
   %4 = tensor.extract_slice %0[0, 10] [1, %arg3] [1, 1] : tensor<1x?xf32> to tensor<1x?xf32>
-  %5 = linalg.tensor_collapse_shape %4 [[0, 1]] : tensor<1x?xf32> into tensor<?xf32>
+  %5 = tensor.collapse_shape %4 [[0, 1]] : tensor<1x?xf32> into tensor<?xf32>
   %6 = tensor.extract_slice %0[0, 0] [1, %arg3] [1, 1] : tensor<1x?xf32> to tensor<1x?xf32>
-  %7 = linalg.tensor_collapse_shape %6 [[0, 1]] : tensor<1x?xf32> into tensor<?xf32>
+  %7 = tensor.collapse_shape %6 [[0, 1]] : tensor<1x?xf32> into tensor<?xf32>
   %8 = linalg.init_tensor [%arg3] : tensor<?xf32>
   %9 = linalg.generic {
       indexing_maps = [#map0, #map1, #map1, #map1, #map1, #map1],
@@ -580,14 +580,14 @@ func @inline_dag_1(
 //       CHECK:     %[[LEAF1:.+]] = flow.dispatch.tensor.load %[[ARG4]], {{.*}}
 //       CHECK:     %[[LEAF2:.+]] = flow.dispatch.tensor.load %[[ARG5]], {{.*}}
 //       CHECK:     %[[LEAF3:.+]] = flow.dispatch.tensor.load %[[ARG6]], {{.*}}
-//       CHECK:     %[[OP1:.+]] = linalg.tensor_expand_shape %[[LEAF2]]
-//       CHECK:     %[[OP2:.+]] = linalg.tensor_collapse_shape %[[LEAF1]]
+//       CHECK:     %[[OP1:.+]] = tensor.expand_shape %[[LEAF2]]
+//       CHECK:     %[[OP2:.+]] = tensor.collapse_shape %[[LEAF1]]
 //       CHECK:     %[[OP3:.+]] = tensor.extract_slice %[[OP1]][0, 0]
 //       CHECK:     %[[OP4:.+]] = tensor.extract_slice %[[OP1]][0, 10]
 //       CHECK:     %[[OP5:.+]] = tensor.extract_slice %[[OP1]][0, 20]
-//       CHECK:     %[[OP6:.+]] = linalg.tensor_collapse_shape %[[OP3]]
-//       CHECK:     %[[OP7:.+]] = linalg.tensor_collapse_shape %[[OP4]]
-//       CHECK:     %[[OP8:.+]] = linalg.tensor_collapse_shape %[[OP5]]
+//       CHECK:     %[[OP6:.+]] = tensor.collapse_shape %[[OP3]]
+//       CHECK:     %[[OP7:.+]] = tensor.collapse_shape %[[OP4]]
+//       CHECK:     %[[OP8:.+]] = tensor.collapse_shape %[[OP5]]
 
 // -----
 
@@ -596,16 +596,16 @@ func @inline_dag_1(
 func @inline_dag_2(
     %arg0: tensor<?xf32>, %arg1 : tensor<1x?xf32>, %arg2 : tensor<i32>,
     %arg3 : index) -> tensor<?xf32> {
-  %0 = linalg.tensor_expand_shape %arg0 [[0, 1]] : tensor<?xf32> into tensor<1x?xf32>
+  %0 = tensor.expand_shape %arg0 [[0, 1]] : tensor<?xf32> into tensor<1x?xf32>
   %1 = tensor.extract_slice %0[0, 20] [1, %arg3] [1, 1] : tensor<1x?xf32> to tensor<1x?xf32>
-  %2 = linalg.tensor_collapse_shape %arg1 [[0, 1]] : tensor<1x?xf32> into tensor<?xf32>
+  %2 = tensor.collapse_shape %arg1 [[0, 1]] : tensor<1x?xf32> into tensor<?xf32>
   br ^bb1
 ^bb1:
-  %3 = linalg.tensor_collapse_shape %1 [[0, 1]] : tensor<1x?xf32> into tensor<?xf32>
+  %3 = tensor.collapse_shape %1 [[0, 1]] : tensor<1x?xf32> into tensor<?xf32>
   %4 = tensor.extract_slice %0[0, 10] [1, %arg3] [1, 1] : tensor<1x?xf32> to tensor<1x?xf32>
-  %5 = linalg.tensor_collapse_shape %4 [[0, 1]] : tensor<1x?xf32> into tensor<?xf32>
+  %5 = tensor.collapse_shape %4 [[0, 1]] : tensor<1x?xf32> into tensor<?xf32>
   %6 = tensor.extract_slice %0[0, 0] [1, %arg3] [1, 1] : tensor<1x?xf32> to tensor<1x?xf32>
-  %7 = linalg.tensor_collapse_shape %6 [[0, 1]] : tensor<1x?xf32> into tensor<?xf32>
+  %7 = tensor.collapse_shape %6 [[0, 1]] : tensor<1x?xf32> into tensor<?xf32>
   %8 = linalg.init_tensor [%arg3] : tensor<?xf32>
   %9 = linalg.generic {
       indexing_maps = [#map0, #map1, #map1, #map1, #map1, #map1],
@@ -635,14 +635,14 @@ func @inline_dag_2(
 //       CHECK:     %[[LEAF1:.+]] = flow.dispatch.tensor.load %[[ARG4]], {{.*}}
 //       CHECK:     %[[LEAF2:.+]] = flow.dispatch.tensor.load %[[ARG5]], {{.*}}
 //       CHECK:     %[[LEAF3:.+]] = flow.dispatch.tensor.load %[[ARG6]], {{.*}}
-//       CHECK:     %[[OP1:.+]] = linalg.tensor_expand_shape %[[LEAF2]]
-//       CHECK:     %[[OP2:.+]] = linalg.tensor_collapse_shape %[[LEAF1]]
+//       CHECK:     %[[OP1:.+]] = tensor.expand_shape %[[LEAF2]]
+//       CHECK:     %[[OP2:.+]] = tensor.collapse_shape %[[LEAF1]]
 //       CHECK:     %[[OP3:.+]] = tensor.extract_slice %[[OP1]][0, 0]
 //       CHECK:     %[[OP4:.+]] = tensor.extract_slice %[[OP1]][0, 10]
 //       CHECK:     %[[OP5:.+]] = tensor.extract_slice %[[OP1]][0, 20]
-//       CHECK:     %[[OP6:.+]] = linalg.tensor_collapse_shape %[[OP3]]
-//       CHECK:     %[[OP7:.+]] = linalg.tensor_collapse_shape %[[OP4]]
-//       CHECK:     %[[OP8:.+]] = linalg.tensor_collapse_shape %[[OP5]]
+//       CHECK:     %[[OP6:.+]] = tensor.collapse_shape %[[OP3]]
+//       CHECK:     %[[OP7:.+]] = tensor.collapse_shape %[[OP4]]
+//       CHECK:     %[[OP8:.+]] = tensor.collapse_shape %[[OP5]]
 
 // -----
 

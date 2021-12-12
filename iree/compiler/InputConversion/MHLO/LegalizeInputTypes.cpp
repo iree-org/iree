@@ -81,8 +81,8 @@ static LogicalResult convertOperation(Operation *oldOp,
                                       BlockAndValueMapping &mapping,
                                       OpBuilder &builder) {
   if (isa<linalg::LinalgDialect>(oldOp->getDialect()) &&
-      !isa<linalg::TensorCollapseShapeOp>(oldOp) &&
-      !isa<linalg::TensorExpandShapeOp>(oldOp)) {
+      !isa<tensor::CollapseShapeOp>(oldOp) &&
+      !isa<tensor::ExpandShapeOp>(oldOp)) {
     // Currently we assume all Linalg structured ops only contain valid types.
     builder.clone(*oldOp, mapping);
     return success();

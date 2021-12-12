@@ -162,9 +162,9 @@ static bool isRootOp(Operation *op) {
 /// Operations that are cloned into dispatch regions formed with other
 /// operations as roots.
 static bool isClonableIntoDispatchOp(Operation *op) {
-  if (isa<arith::IndexCastOp, linalg::InitTensorOp,
-          linalg::TensorCollapseShapeOp, linalg::TensorExpandShapeOp,
-          tensor::ExtractOp, tensor::ExtractSliceOp>(op)) {
+  if (isa<arith::IndexCastOp, linalg::InitTensorOp, tensor::CollapseShapeOp,
+          tensor::ExpandShapeOp, tensor::ExtractOp, tensor::ExtractSliceOp>(
+          op)) {
     return true;
   }
   if (auto constantOp = dyn_cast<arith::ConstantOp>(op)) {

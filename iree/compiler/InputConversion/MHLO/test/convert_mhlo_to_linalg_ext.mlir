@@ -336,9 +336,9 @@ func @scatter_update_batch_scalar_1D(%arg0: tensor<8xi32>,
 // CHECK:         %[[ARG0:[a-zA-Z0-9]+]]
 // CHECK:         %[[ARG1:[a-zA-Z0-9]+]]
 // CHECK:         %[[ARG2:[a-zA-Z0-9]+]]
-// CHECK:         %[[COLLAPSED_INDICES:.+]] = linalg.tensor_collapse_shape
+// CHECK:         %[[COLLAPSED_INDICES:.+]] = tensor.collapse_shape
 // CHECK-SAME:        %[[ARG1]] {{\[}}[0, 1], [2]] : tensor<3x4x1xi32> into tensor<12x1xi32>
-// CHECK:         %[[COLLAPSED_UPDATES:.+]] = linalg.tensor_collapse_shape
+// CHECK:         %[[COLLAPSED_UPDATES:.+]] = tensor.collapse_shape
 // CHECK-SAME:        %[[ARG2]] {{\[}}[0, 1]] : tensor<3x4xi32> into tensor<12xi32>
 // CHECK:         %[[SCATTER:.+]] = iree_linalg_ext.scatter
 // CHECK-SAME:       ins(%[[COLLAPSED_UPDATES]], %[[COLLAPSED_INDICES]] : tensor<12xi32>, tensor<12x1xi32>)
@@ -369,9 +369,9 @@ func @scatter_update_batch_slice_3D_dynamic(%arg0: tensor<1x24x512xi32>,
 // CHECK:         %[[ARG0:[a-zA-Z0-9]+]]
 // CHECK:         %[[ARG1:[a-zA-Z0-9]+]]
 // CHECK:         %[[ARG2:[a-zA-Z0-9]+]]
-// CHECK:         %[[COLLAPSED_INDICES:.+]] = linalg.tensor_collapse_shape
+// CHECK:         %[[COLLAPSED_INDICES:.+]] = tensor.collapse_shape
 // CHECK-SAME:        %[[ARG1]] {{\[}}[0, 1], [2]] : tensor<?x3x2xi32> into tensor<?x2xi32>
-// CHECK:         %[[COLLAPSED_UPDATES:.+]] = linalg.tensor_collapse_shape
+// CHECK:         %[[COLLAPSED_UPDATES:.+]] = tensor.collapse_shape
 // CHECK-SAME:        %[[ARG2]] {{\[}}[0, 1], [2]] : tensor<?x3x512xi32> into tensor<?x512xi32>
 // CHECK:         %[[SCATTER:.+]] = iree_linalg_ext.scatter
 // CHECK-SAME:        ins(%[[COLLAPSED_UPDATES]], %[[COLLAPSED_INDICES]] : tensor<?x512xi32>, tensor<?x2xi32>)

@@ -13,6 +13,7 @@
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/PatternMatch.h"
+#include "mlir/Interfaces/InferTypeOpInterface.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Support/LLVM.h"
@@ -51,7 +52,10 @@ struct LinalgTensorReshapeToFlowTensorReshape
       return failure();
     }
     SmallVector<SmallVector<Value>> outputShape;
-    if (failed(reshapeOp.reifyResultShapes(rewriter, outputShape))) {
+    ReifyRankedShapedTypeOpInterface reifyShapedTypeInterface =
+        cast<ReifyRankedShapedTypeOpInterface>(reshapeOp.getOperation());
+    if (failed(reifyShapedTypeInterface.reifyResultShapes(rewriter,
+                                                          outputShape))) {
       return failure();
     }
     SmallVector<Value> outputDynamicShapes;

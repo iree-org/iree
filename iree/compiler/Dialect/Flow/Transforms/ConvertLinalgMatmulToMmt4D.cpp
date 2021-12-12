@@ -44,7 +44,7 @@ static Value expandTo4D(mlir::Location loc, PatternRewriter &rewriter,
       RankedTensorType::get(targetShape, inputType.getElementType());
   std::array<ReassociationIndices, 2> expandIndices = {
       ReassociationIndices{0, 1}, ReassociationIndices{2, 3}};
-  Value reshapedOperand = rewriter.create<linalg::TensorExpandShapeOp>(
+  Value reshapedOperand = rewriter.create<tensor::ExpandShapeOp>(
       loc, targetType, input, expandIndices);
   return reshapedOperand;
 }
@@ -103,7 +103,7 @@ static Value collapseTo2D(mlir::Location loc, PatternRewriter &rewriter,
       RankedTensorType::get(targetShape, inputType.getElementType());
   std::array<ReassociationIndices, 2> collapseIndices = {
       ReassociationIndices{0, 1}, ReassociationIndices{2, 3}};
-  Value reshapedOperand = rewriter.create<linalg::TensorCollapseShapeOp>(
+  Value reshapedOperand = rewriter.create<tensor::CollapseShapeOp>(
       loc, targetType, input, collapseIndices);
   return reshapedOperand;
 }
@@ -368,8 +368,9 @@ class ConvertLinalgMatmulToMmt4DPass final
     // Canonicalization.
     {
       OwningRewritePatternList patterns(&getContext());
-      linalg::TensorExpandShapeOp::getCanonicalizationPatterns(patterns,
-                                                               context);
+      tensor::ExpandShapeOp::getCanonicalizationPatterns(patterns, context);
+      linalg::InitTensorOp::getCanonicalizationPatterns(patterns, context);
+      linalg::FillOp::getCanonicalizationPatterns(patterns, context);
       patterns.insert<FoldFillGenericOpPattern>(context);
       if (failed(applyPatternsAndFoldGreedily(getOperation(),
                                               std::move(patterns)))) {

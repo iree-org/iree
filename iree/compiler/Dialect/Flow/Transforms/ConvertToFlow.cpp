@@ -52,7 +52,10 @@ struct LinalgTensorReshapeToFlowTensorReshape
       return failure();
     }
     SmallVector<SmallVector<Value>> outputShape;
-    if (failed(reshapeOp.reifyResultShapes(rewriter, outputShape))) {
+    ReifyRankedShapedTypeOpInterface reifyShapedTypeInterface =
+        cast<ReifyRankedShapedTypeOpInterface>(reshapeOp.getOperation());
+    if (failed(reifyShapedTypeInterface.reifyResultShapes(rewriter,
+                                                          outputShape))) {
       return failure();
     }
     SmallVector<Value> outputDynamicShapes;
@@ -105,10 +108,10 @@ struct ConvertToFlowBeforeDispatchFormation
     context->allowUnregisteredDialects(true);
     RewritePatternSet patterns(&getContext());
 
-    patterns.insert<
-        LinalgTensorReshapeToFlowTensorReshape<linalg::TensorCollapseShapeOp>,
-        LinalgTensorReshapeToFlowTensorReshape<linalg::TensorExpandShapeOp>>(
-        context);
+    patterns
+        .insert<LinalgTensorReshapeToFlowTensorReshape<tensor::CollapseShapeOp>,
+                LinalgTensorReshapeToFlowTensorReshape<tensor::ExpandShapeOp>>(
+            context);
     populateTensorToFlowPatternsBeforeDispatchFormation(context, patterns);
     IREE::Flow::TensorReshapeOp::getCanonicalizationPatterns(patterns, context);
 

@@ -118,8 +118,8 @@ template <typename TensorReshapeOpTy>
 static Value getReverseOfReshapeOp(OpBuilder &b, TensorReshapeOpTy reshapeOp,
                                    Value resultBuffer) {
   using ReverseReshapeOpTy = typename std::conditional<
-      std::is_same<TensorReshapeOpTy, linalg::TensorCollapseShapeOp>::value,
-      linalg::TensorExpandShapeOp, linalg::TensorCollapseShapeOp>::type;
+      std::is_same<TensorReshapeOpTy, tensor::CollapseShapeOp>::value,
+      tensor::ExpandShapeOp, tensor::CollapseShapeOp>::type;
   return b.create<ReverseReshapeOpTy>(reshapeOp.getLoc(),
                                       reshapeOp.getSrcType(), resultBuffer,
                                       reshapeOp.reassociation());
@@ -244,7 +244,7 @@ static LogicalResult modifyResultToUseStoreBuffer(
               }
               return nullptr;
             })
-            .Case<linalg::TensorCollapseShapeOp, linalg::TensorExpandShapeOp>(
+            .Case<tensor::CollapseShapeOp, tensor::ExpandShapeOp>(
                 [&](auto reshapeOp) {
                   return getReverseOfReshapeOp(b, reshapeOp, resultBuffer);
                 })

@@ -139,15 +139,14 @@ class Conv2DImg2ColMatmulConversion
         RankedTensorType::get({outputShape[1] * outputShape[2], outputShape[3]},
                               outputShapeType.getElementType());
 
-    Value reshapedImg2ColTensor =
-        rewriter.create<linalg::TensorCollapseShapeOp>(
-            loc, reshapedImg2ColTensorType, img2ColTensor.getResult(0),
-            img2ColTensorReassociationIndices);
+    Value reshapedImg2ColTensor = rewriter.create<tensor::CollapseShapeOp>(
+        loc, reshapedImg2ColTensorType, img2ColTensor.getResult(0),
+        img2ColTensorReassociationIndices);
 
-    Value reshapedFilter = rewriter.create<linalg::TensorCollapseShapeOp>(
+    Value reshapedFilter = rewriter.create<tensor::CollapseShapeOp>(
         loc, reshapedFilterType, filter, filterAndOutputReassociationIndices);
 
-    Value reshapedOutput = rewriter.create<linalg::TensorCollapseShapeOp>(
+    Value reshapedOutput = rewriter.create<tensor::CollapseShapeOp>(
         loc, reshapedOutputType, output, filterAndOutputReassociationIndices);
 
     auto matmulResult = rewriter.create<linalg::MatmulOp>(
@@ -155,7 +154,7 @@ class Conv2DImg2ColMatmulConversion
         ArrayRef<Value>{reshapedImg2ColTensor, reshapedFilter},
         ArrayRef<Value>{reshapedOutput});
 
-    auto reshapedResult = rewriter.create<linalg::TensorExpandShapeOp>(
+    auto reshapedResult = rewriter.create<tensor::ExpandShapeOp>(
         loc, outputShapeType, matmulResult.getResults()[0],
         filterAndOutputReassociationIndices);
 
@@ -308,14 +307,13 @@ class DepthwiseConv2DNHWCHWCImg2ColMatmulConversion
          transposedOutputTensorShape[2] * transposedOutputTensorShape[3]},
         outputTensorType.getElementType());
 
-    Value reshapedImg2ColTensor =
-        rewriter.create<linalg::TensorCollapseShapeOp>(
-            loc, reshapedImg2ColTensorType, img2ColTensor.getResult(0),
-            img2ColTensorReassociationIndices);
-    Value reshapedFilterTensor = rewriter.create<linalg::TensorCollapseShapeOp>(
+    Value reshapedImg2ColTensor = rewriter.create<tensor::CollapseShapeOp>(
+        loc, reshapedImg2ColTensorType, img2ColTensor.getResult(0),
+        img2ColTensorReassociationIndices);
+    Value reshapedFilterTensor = rewriter.create<tensor::CollapseShapeOp>(
         loc, reshapedFilterTensorType, transposedFilter,
         filterReassociationIndice);
-    Value reshapedoutputTensor = rewriter.create<linalg::TensorCollapseShapeOp>(
+    Value reshapedoutputTensor = rewriter.create<tensor::CollapseShapeOp>(
         loc, reshapedOutputTensorType, transposedOutputTensor,
         outputReassociationIndice);
 
@@ -327,10 +325,9 @@ class DepthwiseConv2DNHWCHWCImg2ColMatmulConversion
     SmallVector<ReassociationIndices> batchMatVecReassociationIndice = {{0, 1},
                                                                         {2, 3}};
 
-    Value batchMatVecResultReshaped =
-        rewriter.create<linalg::TensorExpandShapeOp>(
-            loc, transposedOutputTensor.getType(),
-            batchMatVecResult.getResult(0), batchMatVecReassociationIndice);
+    Value batchMatVecResultReshaped = rewriter.create<tensor::ExpandShapeOp>(
+        loc, transposedOutputTensor.getType(), batchMatVecResult.getResult(0),
+        batchMatVecReassociationIndice);
 
     auto transposedResult =
         transposeOperand(batchMatVecResultReshaped, {0, 2, 3, 1});

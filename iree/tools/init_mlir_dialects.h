@@ -25,6 +25,7 @@
 #include "mlir/Dialect/Shape/IR/Shape.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/Dialect/Tensor/IR/TensorInferTypeOpInterfaceImpl.h"
 #include "mlir/Dialect/Tosa/IR/TosaOps.h"
 #include "mlir/Dialect/Vector/VectorOps.h"
 #include "mlir/IR/Dialect.h"
@@ -55,6 +56,7 @@ inline void registerMlirDialects(DialectRegistry &registry) {
                   tosa::TosaDialect,
                   shape::ShapeDialect>();
   // clang-format on
+  tensor::registerInferTypeOpInterfaceExternalModels(registry);
 
 #ifdef IREE_HAVE_EMITC_DIALECT
   registry.insert<emitc::EmitCDialect>();
