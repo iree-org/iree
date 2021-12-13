@@ -83,7 +83,7 @@ llvm::Expected<std::unique_ptr<llvm::Module>> loadDeviceBitcode(
   // Inject target-specific flags.
   overridePlatformGlobal(*bitcodeModule, "libdevice_platform_example_flag", 0u);
 
-  return bitcodeModule;
+  return std::move(bitcodeModule);
 }
 
 }  // namespace HAL
