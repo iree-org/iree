@@ -4,13 +4,12 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include <string>
-#include <vector>
+#ifndef IREE_HAL_CTS_ALLOCATOR_TEST_H_
+#define IREE_HAL_CTS_ALLOCATOR_TEST_H_
 
 #include "iree/base/api.h"
 #include "iree/hal/api.h"
 #include "iree/hal/cts/cts_test_base.h"
-#include "iree/hal/testing/driver_registry.h"
 #include "iree/testing/gtest.h"
 #include "iree/testing/status_matchers.h"
 
@@ -115,11 +114,8 @@ TEST_P(AllocatorTest, AllocateEmptyBuffer) {
   iree_hal_buffer_release(buffer);
 }
 
-INSTANTIATE_TEST_SUITE_P(
-    AllDrivers, AllocatorTest,
-    ::testing::ValuesIn(testing::EnumerateAvailableDrivers()),
-    GenerateTestName());
-
 }  // namespace cts
 }  // namespace hal
 }  // namespace iree
+
+#endif  // IREE_HAL_CTS_ALLOCATOR_TEST_H_

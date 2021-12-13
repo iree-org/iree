@@ -4,15 +4,14 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include <cstddef>
+#ifndef IREE_HAL_CTS_SEMAPHORE_SUBMISSION_TEST_H_
+#define IREE_HAL_CTS_SEMAPHORE_SUBMISSION_TEST_H_
+
 #include <cstdint>
-#include <string>
-#include <vector>
 
 #include "iree/base/api.h"
 #include "iree/hal/api.h"
 #include "iree/hal/cts/cts_test_base.h"
-#include "iree/hal/testing/driver_registry.h"
 #include "iree/testing/gtest.h"
 #include "iree/testing/status_matchers.h"
 
@@ -20,16 +19,7 @@ namespace iree {
 namespace hal {
 namespace cts {
 
-class SemaphoreSubmissionTest : public CtsTestBase {
- public:
-  SemaphoreSubmissionTest() {
-    // Disable cuda backend for this test as semaphores are not implemented yet.
-    SkipUnavailableDriver("cuda");
-    // TODO(#4680): command buffer recording so that this can run on sync HAL.
-    SkipUnavailableDriver("dylib-sync");
-    SkipUnavailableDriver("vmvx-sync");
-  }
-};
+class SemaphoreSubmissionTest : public CtsTestBase {};
 
 TEST_P(SemaphoreSubmissionTest, SubmitWithNoCommandBuffers) {
   // No waits, one signal which we immediately wait on after submit.
@@ -212,11 +202,8 @@ TEST_P(SemaphoreSubmissionTest, SubmitWithMultipleSemaphores) {
   iree_hal_semaphore_release(signal_semaphore_2);
 }
 
-INSTANTIATE_TEST_SUITE_P(
-    AllDrivers, SemaphoreSubmissionTest,
-    ::testing::ValuesIn(testing::EnumerateAvailableDrivers()),
-    GenerateTestName());
-
 }  // namespace cts
 }  // namespace hal
 }  // namespace iree
+
+#endif  // IREE_HAL_CTS_SEMAPHORE_SUBMISSION_TEST_H_

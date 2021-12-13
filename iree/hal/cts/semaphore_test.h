@@ -4,16 +4,15 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include <cstddef>
+#ifndef IREE_HAL_CTS_SEMAPHORE_TEST_H_
+#define IREE_HAL_CTS_SEMAPHORE_TEST_H_
+
 #include <cstdint>
-#include <string>
 #include <thread>
-#include <vector>
 
 #include "iree/base/api.h"
 #include "iree/hal/api.h"
 #include "iree/hal/cts/cts_test_base.h"
-#include "iree/hal/testing/driver_registry.h"
 #include "iree/testing/gtest.h"
 #include "iree/testing/status_matchers.h"
 
@@ -21,11 +20,7 @@ namespace iree {
 namespace hal {
 namespace cts {
 
-class SemaphoreTest : public CtsTestBase {
- public:
-  // Disable cuda backend for this test as semaphores are not implemented yet.
-  SemaphoreTest() { SkipUnavailableDriver("cuda"); }
-};
+class SemaphoreTest : public CtsTestBase {};
 
 // Tests that a semaphore that is unused properly cleans itself up.
 TEST_P(SemaphoreTest, NoOp) {
@@ -235,11 +230,8 @@ TEST_P(SemaphoreTest, PingPong) {
   iree_hal_semaphore_release(b2a);
 }
 
-INSTANTIATE_TEST_SUITE_P(
-    AllDrivers, SemaphoreTest,
-    ::testing::ValuesIn(testing::EnumerateAvailableDrivers()),
-    GenerateTestName());
-
 }  // namespace cts
 }  // namespace hal
 }  // namespace iree
+
+#endif  // IREE_HAL_CTS_SEMAPHORE_TEST_H_

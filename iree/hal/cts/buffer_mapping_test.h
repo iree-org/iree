@@ -4,15 +4,15 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#ifndef IREE_HAL_CTS_BUFFER_MAPPING_TEST_H_
+#define IREE_HAL_CTS_BUFFER_MAPPING_TEST_H_
+
 #include <cstdint>
-#include <cstring>
-#include <string>
 #include <vector>
 
 #include "iree/base/api.h"
 #include "iree/hal/api.h"
 #include "iree/hal/cts/cts_test_base.h"
-#include "iree/hal/testing/driver_registry.h"
 #include "iree/testing/gtest.h"
 #include "iree/testing/status_matchers.h"
 
@@ -196,11 +196,8 @@ TEST_P(BufferMappingTest, Copy) {
 // TODO(scotttodd): revive old tests:
 //   https://github.com/google/iree/blob/440edee8a3190d73dbceb24986eed847cac8bd31/iree/hal/buffer_mapping_test.cc
 
-INSTANTIATE_TEST_SUITE_P(
-    AllDrivers, BufferMappingTest,
-    ::testing::ValuesIn(testing::EnumerateAvailableDrivers()),
-    GenerateTestName());
-
 }  // namespace cts
 }  // namespace hal
 }  // namespace iree
+
+#endif  // IREE_HAL_CTS_BUFFER_MAPPING_TEST_H_

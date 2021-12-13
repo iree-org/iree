@@ -1,0 +1,28 @@
+// Copyright 2021 The IREE Authors
+//
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+// clang-format off
+#cmakedefine IREE_CTS_TEST_FILE_PATH "@IREE_CTS_TEST_FILE_PATH@"
+#cmakedefine IREE_CTS_TEST_CLASS_NAME @IREE_CTS_TEST_CLASS_NAME@
+#cmakedefine IREE_CTS_DRIVER_NAME "@IREE_CTS_DRIVER_NAME@"
+// clang-format on
+
+#include IREE_CTS_TEST_FILE_PATH
+
+#include "iree/hal/cts/cts_test_base.h"
+#include "iree/testing/gtest.h"
+
+namespace iree {
+namespace hal {
+namespace cts {
+
+INSTANTIATE_TEST_SUITE_P(CTS, IREE_CTS_TEST_CLASS_NAME,
+                         ::testing::Values(IREE_CTS_DRIVER_NAME),
+                         GenerateTestName());
+
+}  // namespace cts
+}  // namespace hal
+}  // namespace iree

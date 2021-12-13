@@ -4,15 +4,15 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#ifndef IREE_HAL_CTS_COMMAND_BUFFER_TEST_H_
+#define IREE_HAL_CTS_COMMAND_BUFFER_TEST_H_
+
 #include <cstdint>
-#include <cstring>
-#include <string>
 #include <vector>
 
 #include "iree/base/api.h"
 #include "iree/hal/api.h"
 #include "iree/hal/cts/cts_test_base.h"
-#include "iree/hal/testing/driver_registry.h"
 #include "iree/testing/gtest.h"
 #include "iree/testing/status_matchers.h"
 
@@ -29,13 +29,6 @@ namespace cts {
 using ::testing::ContainerEq;
 
 class CommandBufferTest : public CtsTestBase {
- public:
-  CommandBufferTest() {
-    // TODO(#4680): command buffer recording so that this can run on sync HAL.
-    SkipUnavailableDriver("dylib-sync");
-    SkipUnavailableDriver("vmvx-sync");
-  }
-
  protected:
   std::vector<uint8_t> RunFillBufferTest(iree_device_size_t buffer_size,
                                          iree_device_size_t target_offset,
@@ -423,11 +416,8 @@ TEST_P(CommandBufferTest, FillBuffer_pattern4_size16_offset0_length8) {
   EXPECT_THAT(actual_buffer, ContainerEq(reference_buffer));
 }
 
-INSTANTIATE_TEST_SUITE_P(
-    AllDrivers, CommandBufferTest,
-    ::testing::ValuesIn(testing::EnumerateAvailableDrivers()),
-    GenerateTestName());
-
 }  // namespace cts
 }  // namespace hal
 }  // namespace iree
+
+#endif  // IREE_HAL_CTS_COMMAND_BUFFER_TEST_H_
