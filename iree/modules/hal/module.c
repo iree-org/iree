@@ -284,7 +284,8 @@ IREE_VM_ABI_EXPORT(iree_hal_module_allocator_allocate,  //
 
   iree_hal_buffer_t* buffer = NULL;
   IREE_RETURN_IF_ERROR(iree_hal_allocator_allocate_buffer(
-      allocator, memory_types, buffer_usage, allocation_size, &buffer));
+      allocator, memory_types, buffer_usage, allocation_size,
+      iree_const_byte_span_empty(), &buffer));
   rets->r0 = iree_hal_buffer_move_ref(buffer);
   return iree_ok_status();
 }
@@ -403,18 +404,14 @@ IREE_VM_ABI_EXPORT(iree_hal_module_allocator_wrap_byte_buffer,  //
 
   iree_hal_buffer_t* buffer = NULL;
   IREE_RETURN_IF_ERROR(
-      iree_hal_allocator_allocate_buffer(allocator, memory_types, buffer_usage,
-                                         length, &buffer),
+      iree_hal_allocator_allocate_buffer(
+          allocator, memory_types, buffer_usage, length,
+          iree_make_const_byte_span(source->data.data + offset, length),
+          &buffer),
       "failed to allocate buffer of length %d", length);
 
-  iree_status_t status =
-      iree_hal_buffer_write_data(buffer, 0, source->data.data + offset, length);
-  if (iree_status_is_ok(status)) {
-    rets->r0 = iree_hal_buffer_move_ref(buffer);
-  } else {
-    iree_hal_buffer_release(buffer);
-  }
-  return status;
+  rets->r0 = iree_hal_buffer_move_ref(buffer);
+  return iree_ok_status();
 }
 
 //===----------------------------------------------------------------------===//

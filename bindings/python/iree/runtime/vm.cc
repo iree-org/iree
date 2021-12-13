@@ -218,16 +218,15 @@ void VmVariantList::PushBufferView(HalDevice& device,
   // TODO(laurenzo): Expand to other layouts as needed.
   // TODO(laurenzo): Wrap and retain original buffer (depends_on_pyobject=true).
   iree_hal_buffer_t* raw_buffer;
-  CheckApiStatus(iree_hal_allocator_allocate_buffer(
-                     device.allocator(),
-                     static_cast<iree_hal_memory_type_t>(
-                         IREE_HAL_MEMORY_TYPE_HOST_LOCAL |
-                         IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE),
-                     IREE_HAL_BUFFER_USAGE_ALL, py_view.len, &raw_buffer),
-                 "Failed to allocate device visible buffer");
   CheckApiStatus(
-      iree_hal_buffer_write_data(raw_buffer, 0, py_view.buf, py_view.len),
-      "Error writing to input buffer");
+      iree_hal_allocator_allocate_buffer(
+          device.allocator(),
+          static_cast<iree_hal_memory_type_t>(
+              IREE_HAL_MEMORY_TYPE_HOST_LOCAL |
+              IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE),
+          IREE_HAL_BUFFER_USAGE_ALL, py_view.len,
+          iree_make_const_byte_span(py_view.buf, py_view.len), &raw_buffer),
+      "Failed to allocate device visible buffer");
 
   // Only capture the reference to the exporting object (incrementing it)
   // once guaranteed successful.

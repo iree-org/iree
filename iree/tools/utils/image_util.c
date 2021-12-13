@@ -174,7 +174,8 @@ iree_status_t iree_tools_utils_buffer_view_from_image_rescaled(
     result = iree_hal_allocator_allocate_buffer(
         allocator,
         IREE_HAL_MEMORY_TYPE_HOST_LOCAL | IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE,
-        IREE_HAL_BUFFER_USAGE_ALL, element_byte * buffer_length, &buffer);
+        IREE_HAL_BUFFER_USAGE_ALL, element_byte * buffer_length,
+        iree_const_byte_span_empty(), &buffer);
   }
   if (iree_status_is_ok(result)) {
     result = iree_hal_buffer_map_range(

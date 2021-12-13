@@ -244,7 +244,8 @@ static iree_status_t iree_hal_vulkan_vma_allocator_allocate_internal(
     iree_hal_vulkan_vma_allocator_t* allocator,
     iree_hal_memory_type_t memory_type, iree_hal_buffer_usage_t allowed_usage,
     iree_hal_memory_access_t allowed_access, iree_host_size_t allocation_size,
-    VmaAllocationCreateFlags flags, iree_hal_buffer_t** out_buffer) {
+    iree_const_byte_span_t initial_data, VmaAllocationCreateFlags flags,
+    iree_hal_buffer_t** out_buffer) {
   // Guard against the corner case where the requested buffer size is 0. The
   // application is unlikely to do anything when requesting a 0-byte buffer; but
   // it can happen in real world use cases. So we should at least not crash.
@@ -324,18 +325,36 @@ static iree_status_t iree_hal_vulkan_vma_allocator_allocate_internal(
                                      &allocation, &allocation_info),
                      "vmaCreateBuffer");
 
-  return iree_hal_vulkan_vma_buffer_wrap(
+  iree_hal_buffer_t* buffer = NULL;
+  iree_status_t status = iree_hal_vulkan_vma_buffer_wrap(
       (iree_hal_allocator_t*)allocator, memory_type, allowed_access,
       allowed_usage, allocation_size,
       /*byte_offset=*/0,
       /*byte_length=*/allocation_size, allocator->vma, handle, allocation,
-      allocation_info, out_buffer);
+      allocation_info, &buffer);
+  if (!iree_status_is_ok(status)) {
+    vmaDestroyBuffer(allocator->vma, handle, allocation);
+    return status;
+  }
+
+  // TODO(benvanik): this approach (map + write + unmap) is suboptimal.
+  if (!iree_const_byte_span_is_empty(initial_data)) {
+    status = iree_hal_buffer_write_data(buffer, 0, initial_data.data,
+                                        initial_data.data_length);
+  }
+
+  if (iree_status_is_ok(status)) {
+    *out_buffer = buffer;
+  } else {
+    iree_hal_buffer_release(buffer);
+  }
+  return status;
 }
 
 static iree_status_t iree_hal_vulkan_vma_allocator_allocate_buffer(
     iree_hal_allocator_t* base_allocator, iree_hal_memory_type_t memory_type,
     iree_hal_buffer_usage_t allowed_usage, iree_host_size_t allocation_size,
-    iree_hal_buffer_t** out_buffer) {
+    iree_const_byte_span_t initial_data, iree_hal_buffer_t** out_buffer) {
   iree_hal_vulkan_vma_allocator_t* allocator =
       iree_hal_vulkan_vma_allocator_cast(base_allocator);
 
@@ -346,6 +365,7 @@ static iree_status_t iree_hal_vulkan_vma_allocator_allocate_buffer(
 
   return iree_hal_vulkan_vma_allocator_allocate_internal(
       allocator, memory_type, allowed_usage, allowed_access, allocation_size,
+      initial_data,
       /*flags=*/0, out_buffer);
 }
 

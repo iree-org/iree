@@ -86,13 +86,14 @@ iree_hal_allocator_query_buffer_compatibility(
 IREE_API_EXPORT iree_status_t iree_hal_allocator_allocate_buffer(
     iree_hal_allocator_t* allocator, iree_hal_memory_type_t memory_type,
     iree_hal_buffer_usage_t allowed_usage, iree_host_size_t allocation_size,
-    iree_hal_buffer_t** out_buffer) {
+    iree_const_byte_span_t initial_data, iree_hal_buffer_t** out_buffer) {
   IREE_ASSERT_ARGUMENT(allocator);
   IREE_ASSERT_ARGUMENT(out_buffer);
   *out_buffer = NULL;
   IREE_TRACE_ZONE_BEGIN(z0);
   iree_status_t status = _VTABLE_DISPATCH(allocator, allocate_buffer)(
-      allocator, memory_type, allowed_usage, allocation_size, out_buffer);
+      allocator, memory_type, allowed_usage, allocation_size, initial_data,
+      out_buffer);
   IREE_TRACE_ZONE_END(z0);
   return status;
 }

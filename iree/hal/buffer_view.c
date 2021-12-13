@@ -98,7 +98,7 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_view_allocate_buffer(
     iree_hal_allocator_t* allocator, const iree_hal_dim_t* shape,
     iree_host_size_t shape_rank, iree_hal_element_type_t element_type,
     iree_hal_encoding_type_t encoding_type, iree_hal_memory_type_t memory_type,
-    iree_hal_buffer_usage_t allowed_usage,
+    iree_hal_buffer_usage_t allowed_usage, iree_const_byte_span_t initial_data,
     iree_hal_buffer_view_t** out_buffer_view) {
   IREE_ASSERT_ARGUMENT(allocator);
   IREE_ASSERT_ARGUMENT(out_buffer_view);
@@ -110,8 +110,9 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_view_allocate_buffer(
 
   iree_hal_buffer_t* buffer = NULL;
   if (iree_status_is_ok(status)) {
-    status = iree_hal_allocator_allocate_buffer(
-        allocator, memory_type, allowed_usage, allocation_size, &buffer);
+    status = iree_hal_allocator_allocate_buffer(allocator, memory_type,
+                                                allowed_usage, allocation_size,
+                                                initial_data, &buffer);
   }
 
   if (iree_status_is_ok(status)) {
@@ -121,40 +122,6 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_view_allocate_buffer(
   }
 
   iree_hal_buffer_release(buffer);
-  IREE_TRACE_ZONE_END(z0);
-  return status;
-}
-
-IREE_API_EXPORT iree_status_t iree_hal_buffer_view_clone_heap_buffer(
-    iree_hal_allocator_t* allocator, const iree_hal_dim_t* shape,
-    iree_host_size_t shape_rank, iree_hal_element_type_t element_type,
-    iree_hal_encoding_type_t encoding_type, iree_hal_memory_type_t memory_type,
-    iree_hal_buffer_usage_t allowed_usage, iree_const_byte_span_t data,
-    iree_hal_buffer_view_t** out_buffer_view) {
-  IREE_ASSERT_ARGUMENT(allocator);
-  IREE_ASSERT_ARGUMENT(out_buffer_view);
-  IREE_TRACE_ZONE_BEGIN(z0);
-
-  // Allocate the buffer.
-  iree_hal_buffer_view_t* buffer_view = NULL;
-  IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_hal_buffer_view_allocate_buffer(
-              allocator, shape, shape_rank, element_type, encoding_type,
-              memory_type, allowed_usage, &buffer_view));
-
-  // Copy all of the data into it in the worst way possible.
-  // If you find yourself coming here from profiling:
-  //   Don't clone data. Allocate and then populate it in-place.
-  //   -or-
-  //   Schedule sequences of DMA transfers using iree_hal_command_buffer_t.
-  iree_status_t status = iree_hal_buffer_write_data(
-      iree_hal_buffer_view_buffer(buffer_view), 0, data.data, data.data_length);
-
-  if (iree_status_is_ok(status)) {
-    *out_buffer_view = buffer_view;
-  } else {
-    iree_hal_buffer_view_release(buffer_view);
-  }
   IREE_TRACE_ZONE_END(z0);
   return status;
 }
@@ -212,7 +179,7 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_view_wrap_or_clone_heap_buffer(
         allocator, shape, shape_rank, element_type, encoding_type, memory_type,
         allowed_access, allowed_usage, data, data_allocator, out_buffer_view);
   } else {
-    return iree_hal_buffer_view_clone_heap_buffer(
+    return iree_hal_buffer_view_allocate_buffer(
         allocator, shape, shape_rank, element_type, encoding_type, memory_type,
         allowed_usage, iree_make_const_byte_span(data.data, data.data_length),
         out_buffer_view);
@@ -572,7 +539,7 @@ static iree_status_t iree_hal_buffer_view_parse_impl(
       IREE_HAL_MEMORY_TYPE_HOST_LOCAL | IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE,
       IREE_HAL_BUFFER_USAGE_TRANSFER | IREE_HAL_BUFFER_USAGE_MAPPING |
           IREE_HAL_BUFFER_USAGE_DISPATCH,
-      buffer_length, &buffer));
+      buffer_length, iree_const_byte_span_empty(), &buffer));
 
   // Parse the elements directly into the buffer.
   iree_hal_buffer_mapping_t buffer_mapping;

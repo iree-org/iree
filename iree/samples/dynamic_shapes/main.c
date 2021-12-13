@@ -21,7 +21,7 @@ iree_status_t reduce_sum_1d(iree_runtime_session_t* session, const int* values,
   //   * debugging some apparent memory corruption with the stack-local value
   iree_status_t status = iree_ok_status();
   if (iree_status_is_ok(status)) {
-    status = iree_hal_buffer_view_clone_heap_buffer(
+    status = iree_hal_buffer_view_allocate_buffer(
         iree_runtime_session_device_allocator(session), arg0_shape,
         IREE_ARRAYSIZE(arg0_shape), IREE_HAL_ELEMENT_TYPE_SINT_32,
         IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR,
@@ -43,16 +43,10 @@ iree_status_t reduce_sum_1d(iree_runtime_session_t* session, const int* values,
     status =
         iree_runtime_call_outputs_pop_front_buffer_view(&call, &buffer_view);
   }
-  iree_hal_buffer_mapping_t buffer_mapping;
   if (iree_status_is_ok(status)) {
-    status = iree_hal_buffer_map_range(iree_hal_buffer_view_buffer(buffer_view),
-                                       IREE_HAL_MEMORY_ACCESS_READ, 0,
-                                       IREE_WHOLE_BUFFER, &buffer_mapping);
+    status = iree_hal_buffer_read_data(iree_hal_buffer_view_buffer(buffer_view),
+                                       0, out_result, sizeof(*out_result));
   }
-  if (iree_status_is_ok(status)) {
-    *out_result = *buffer_mapping.contents.data;
-  }
-  iree_hal_buffer_unmap_range(&buffer_mapping);
   iree_hal_buffer_view_release(buffer_view);
 
   iree_runtime_call_deinitialize(&call);
@@ -73,7 +67,7 @@ iree_status_t reduce_sum_2d(iree_runtime_session_t* session, const int* values,
   //   * debugging some apparent memory corruption with the stack-local value
   iree_status_t status = iree_ok_status();
   if (iree_status_is_ok(status)) {
-    status = iree_hal_buffer_view_clone_heap_buffer(
+    status = iree_hal_buffer_view_allocate_buffer(
         iree_runtime_session_device_allocator(session), arg0_shape,
         IREE_ARRAYSIZE(arg0_shape), IREE_HAL_ELEMENT_TYPE_SINT_32,
         IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR,
@@ -113,7 +107,7 @@ iree_status_t add_one(iree_runtime_session_t* session, const int* values,
   //   * debugging some apparent memory corruption with the stack-local value
   iree_status_t status = iree_ok_status();
   if (iree_status_is_ok(status)) {
-    status = iree_hal_buffer_view_clone_heap_buffer(
+    status = iree_hal_buffer_view_allocate_buffer(
         iree_runtime_session_device_allocator(session), arg0_shape,
         IREE_ARRAYSIZE(arg0_shape), IREE_HAL_ELEMENT_TYPE_SINT_32,
         IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR,

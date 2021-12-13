@@ -213,23 +213,7 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_view_allocate_buffer(
     iree_hal_allocator_t* allocator, const iree_hal_dim_t* shape,
     iree_host_size_t shape_rank, iree_hal_element_type_t element_type,
     iree_hal_encoding_type_t encoding_type, iree_hal_memory_type_t memory_type,
-    iree_hal_buffer_usage_t allowed_usage,
-    iree_hal_buffer_view_t** out_buffer_view);
-
-// Clones a host buffer using |allocator| and wraps it in a buffer view.
-// This is equivalent to:
-//   1. iree_hal_allocator_allocate_buffer
-//   2. iree_hal_buffer_write_data
-//   3. iree_hal_buffer_view_create
-//
-// Always prefer allocating a device buffer and populating it in place.
-// If cloning multiple buffers it is better to use iree_hal_command_buffer_ts to
-// batch up the memory transfer operations.
-IREE_API_EXPORT iree_status_t iree_hal_buffer_view_clone_heap_buffer(
-    iree_hal_allocator_t* allocator, const iree_hal_dim_t* shape,
-    iree_host_size_t shape_rank, iree_hal_element_type_t element_type,
-    iree_hal_encoding_type_t encoding_type, iree_hal_memory_type_t memory_type,
-    iree_hal_buffer_usage_t allowed_usage, iree_const_byte_span_t data,
+    iree_hal_buffer_usage_t allowed_usage, iree_const_byte_span_t initial_data,
     iree_hal_buffer_view_t** out_buffer_view);
 
 // Imports a host buffer using |allocator| and wraps it in a buffer view.

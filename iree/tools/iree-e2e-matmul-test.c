@@ -478,13 +478,15 @@ static iree_status_t allocate_buffer_like(iree_hal_allocator_t* hal_allocator,
       iree_hal_buffer_view_element_type(src),
       iree_hal_buffer_view_encoding_type(src),
       IREE_HAL_MEMORY_TYPE_HOST_LOCAL | IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE,
-      IREE_HAL_BUFFER_USAGE_ALL, dst);
+      IREE_HAL_BUFFER_USAGE_ALL, iree_const_byte_span_empty(), dst);
 }
 
 // Performs a deep copy of |src| into |dst|. Takes care of allocating |dst|.
 static iree_status_t copy_buffer(iree_hal_allocator_t* hal_allocator,
                                  iree_hal_buffer_view_t* src,
                                  iree_hal_buffer_view_t** dst) {
+  // TODO(benvanik): change this to use iree_hal_buffer_copy_data. Or something.
+  // I can't understand what all this code is doing.
   iree_hal_buffer_mapping_t src_mapping;
   IREE_RETURN_IF_ERROR(iree_hal_buffer_map_range(
       iree_hal_buffer_view_buffer(src), IREE_HAL_MEMORY_ACCESS_READ, 0,
@@ -492,7 +494,7 @@ static iree_status_t copy_buffer(iree_hal_allocator_t* hal_allocator,
   iree_const_byte_span_t src_span;
   src_span.data = src_mapping.contents.data;
   src_span.data_length = src_mapping.contents.data_length;
-  return iree_hal_buffer_view_clone_heap_buffer(
+  return iree_hal_buffer_view_allocate_buffer(
       hal_allocator, iree_hal_buffer_view_shape_dims(src),
       iree_hal_buffer_view_shape_rank(src),
       iree_hal_buffer_view_element_type(src),

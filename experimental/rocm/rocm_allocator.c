@@ -128,7 +128,7 @@ static void iree_hal_rocm_buffer_free(iree_hal_rocm_context_wrapper_t* context,
 static iree_status_t iree_hal_rocm_allocator_allocate_buffer(
     iree_hal_allocator_t* base_allocator, iree_hal_memory_type_t memory_type,
     iree_hal_buffer_usage_t allowed_usage, iree_host_size_t allocation_size,
-    iree_hal_buffer_t** out_buffer) {
+    iree_const_byte_span_t initial_data, iree_hal_buffer_t** out_buffer) {
   iree_hal_rocm_allocator_t* allocator =
       iree_hal_rocm_allocator_cast(base_allocator);
   // Guard against the corner case where the requested buffer size is 0. The
@@ -172,6 +172,14 @@ static iree_status_t iree_hal_rocm_allocator_allocate_buffer(
         /*byte_offset=*/0,
         /*byte_length=*/allocation_size, device_ptr, host_ptr, out_buffer);
   }
+
+  // NOTE: there may be HIP methods for doing this more efficiently.
+  if (iree_status_is_ok(status) &&
+      !iree_const_byte_span_is_empty(initial_data)) {
+    status = iree_hal_buffer_write_data(*out_buffer, 0, initial_data.data,
+                                        initial_data.data_length);
+  }
+
   if (iree_status_is_ok(status)) {
     IREE_STATISTICS(iree_hal_allocator_statistics_record_alloc(
         &allocator->statistics, memory_type, allocation_size));
