@@ -46,6 +46,15 @@ iree_cc_library(
     ::PassesIncGen
     MLIRIR
     MLIRPass
+    iree::compiler::Dialect::Flow::Transforms
+    iree::compiler::Dialect::HAL::Transforms
+    iree::compiler::Dialect::Stream::Transforms
+    iree::compiler::Dialect::Util::IR
+    iree::compiler::Dialect::Util::Transforms
+    iree::compiler::Dialect::VM::Conversion
+    iree::compiler::Dialect::VM::Conversion::StandardToVM
+    iree::compiler::Dialect::VM::Target::Bytecode
+    iree::compiler::Dialect::VM::Transforms
   PUBLIC
 )
 
