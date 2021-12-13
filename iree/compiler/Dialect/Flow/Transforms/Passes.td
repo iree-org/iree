@@ -10,25 +10,25 @@
 include "mlir/Pass/PassBase.td"
 
 def ConvertConv2D1x1ConvToMatmul :
-    Pass<"iree-flow-convert-conv2d-1x1-to-matmul", "mlir::FuncOp"> {
+    Pass<"iree-flow-convert-conv2d-1x1-to-matmul", ""> {
   let summary = "Convert linalg convolution ops with 1x1 kernels into linalg matrix multiplication ops.";
   let constructor = "mlir::iree_compiler::IREE::Flow::createConvertConv2D1x1ToMatmulPass()";
 }
 
 def ConvertConv2DToImg2Col :
-    Pass<"iree-flow-convert-conv2d-to-img2col", "mlir::FuncOp"> {
+    Pass<"iree-flow-convert-conv2d-to-img2col", ""> {
   let summary = "Convert linalg convolution ops to matmul img2col based implementation";
   let constructor = "mlir::iree_compiler::IREE::Flow::createConvertConv2DToImg2ColPass()";
 }
 
 def ConvertToFlowBeforeDispatchFormation :
-    Pass<"iree-flow-convert-to-flow-before-dispatch-formation", "mlir::FuncOp"> {
+    Pass<"iree-flow-convert-to-flow-before-dispatch-formation", ""> {
   let summary = "Convert operations to flow before dispatch formation";
   let constructor = "mlir::iree_compiler::IREE::Flow::createConvertToFlowBeforeDispatchFormation()";
 }
 
 def ConvertToFlowAfterDispatchFormation :
-    Pass<"iree-flow-convert-to-flow-after-dispatch-formation", "mlir::FuncOp"> {
+    Pass<"iree-flow-convert-to-flow-after-dispatch-formation", ""> {
   let summary = "Convert operations to flow after dispatch formation";
   let constructor = "mlir::iree_compiler::IREE::Flow::createConvertToFlowAfterDispatchFormation()";
 }
@@ -40,7 +40,7 @@ def DeduplicateExecutables :
 }
 
 def DispatchLinalgOnTensors :
-    Pass<"iree-flow-dispatch-linalg-on-tensors-pass", "mlir::FuncOp"> {
+    Pass<"iree-flow-dispatch-linalg-on-tensors-pass", ""> {
   let summary = "Dispatch Linalg operations on tensors by using tile and distribute";
   let constructor = "mlir::iree_compiler::IREE::Flow::createDispatchLinalgOnTensorsPass()";
 }
@@ -58,13 +58,13 @@ def FusionOfTensorOps :
 }
 
 def InjectDispatchTracing :
-    Pass<"iree-flow-inject-dispatch-tracing", "mlir::FuncOp"> {
+    Pass<"iree-flow-inject-dispatch-tracing", ""> {
   let summary = "Injects dispatch region tracing.";
   let constructor = "mlir::iree_compiler::IREE::Flow::createInjectDispatchTracingPass()";
 }
 
 def InterchangeGenericOps :
-    Pass<"iree-flow-interchange-generic-ops", "mlir::FuncOp"> {
+    Pass<"iree-flow-interchange-generic-ops", ""> {
   let summary = "Interchange generic op loops to have all the reduction loops to be inner loops.";
   let constructor = "mlir::iree_compiler::IREE::Flow::createInterchangeGenericOpsPass()";
 }
@@ -76,7 +76,7 @@ def OutlineDispatchRegions :
 }
 
 def PadLinalgOps :
-    Pass<"iree-flow-pad-linalg-ops", "mlir::FuncOp"> {
+    Pass<"iree-flow-pad-linalg-ops", ""> {
   let summary = "Pad linalg ops to the next integer multiple of paddingSize.";
   let constructor = "mlir::iree_compiler::IREE::Flow::createPadLinalgOpsToIntegerMultiplePass()";
 }
@@ -119,7 +119,7 @@ def StripAndSplatConstantVariables :
   let constructor = "mlir::iree_compiler::IREE::Flow::createStripAndSplatConstantVariablesPass()";
 }
 
-def VerifyInputLegality: Pass<"iree-verify-input-legality", "mlir::FuncOp"> {
+def VerifyInputLegality: Pass<"iree-verify-input-legality", ""> {
   let summary = "Checks the legality of the IR at the start of IREE flow transformation pipeline.";
   let constructor = "mlir::iree_compiler::IREE::Flow::createVerifyInputLegalityPass()";
 }
