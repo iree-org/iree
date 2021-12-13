@@ -119,6 +119,7 @@ cc_library(
         "//iree/compiler/InputConversion/Common",
         "//iree/compiler/InputConversion/MHLO",
         "//iree/compiler/InputConversion/TOSA",
+        "//iree/compiler/JitEval",
         "//iree/compiler/Translation:IREEVM",
         "//llvm-external-projects/iree-dialects:IREEInputDialect",
         "//llvm-external-projects/iree-dialects:IREELinalgExtDialect",

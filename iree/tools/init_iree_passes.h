@@ -27,6 +27,7 @@
 #include "iree/compiler/InputConversion/Common/Passes.h"
 #include "iree/compiler/InputConversion/MHLO/Passes.h"
 #include "iree/compiler/InputConversion/TOSA/Passes.h"
+#include "iree/compiler/JitEval/Passes.h"
 #include "iree/compiler/Translation/IREEVM.h"
 
 namespace mlir {
@@ -43,6 +44,7 @@ inline void registerAllIreePasses() {
   registerCommonInputConversionPasses();
   MHLO::registerMHLOConversionPasses();
   registerTOSAConversionPasses();
+  JitEval::registerJitEvalPasses();
 
   IREE::Flow::registerFlowPasses();
   IREE::HAL::registerHALPasses();
