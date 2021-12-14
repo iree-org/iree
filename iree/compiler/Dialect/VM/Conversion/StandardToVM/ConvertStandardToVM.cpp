@@ -7,6 +7,7 @@
 #include "iree/compiler/Dialect/VM/Conversion/StandardToVM/ConvertStandardToVM.h"
 
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
+#include "iree/compiler/Dialect/VM/Conversion/ConversionTarget.h"
 #include "iree/compiler/Dialect/VM/Conversion/TargetOptions.h"
 #include "iree/compiler/Dialect/VM/Conversion/TypeConverter.h"
 #include "iree/compiler/Dialect/VM/IR/VMOps.h"
@@ -32,7 +33,7 @@ class ModuleOpConversion : public OpConversionPattern<ModuleOp> {
       ConversionPatternRewriter &rewriter) const override {
     // Do not attempt to convert the top level module.
     // This mechanism can only support rewriting non top-level modules.
-    if (!srcOp->getParentOp() || !isa<ModuleOp>(srcOp->getParentOp())) {
+    if (VMConversionTarget::isTopLevelModule(srcOp)) {
       return failure();
     }
 

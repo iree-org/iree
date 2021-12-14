@@ -40,22 +40,3 @@ module {
 }
 
 }
-
-// -----
-
-// CHECK: module
-module {
-  // CHECK: module
-  module {
-    // CHECK: module
-    module {
-      // CHECK-LABEL: vm.module public @deeplyNested
-      module @deeplyNested {
-        // CHECK: vm.func private @foo
-        func @foo() {
-          return
-        }
-      }
-    }
-  }
-}

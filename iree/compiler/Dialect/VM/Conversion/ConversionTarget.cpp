@@ -24,7 +24,15 @@ VMConversionTarget::nestModuleForConversion(mlir::ModuleOp outerModuleOp) {
     outerModuleOp.getBodyRegion().getBlocks().push_back(new Block());
     outerModuleOp.push_back(innerModuleOp);
   }
+
+  outerModuleOp->setAttr("vm.toplevel",
+                         UnitAttr::get(outerModuleOp.getContext()));
   return std::make_pair(outerModuleOp, innerModuleOp);
+}
+
+// static
+bool VMConversionTarget::isTopLevelModule(mlir::ModuleOp moduleOp) {
+  return !moduleOp->getParentOp() || moduleOp->hasAttr("vm.toplevel");
 }
 
 VMConversionTarget::VMConversionTarget(MLIRContext *context)
@@ -33,9 +41,8 @@ VMConversionTarget::VMConversionTarget(MLIRContext *context)
 
   // NOTE: we need to allow the outermost std.module to be legal to support the
   // double-nesting (module { vm.module { ... } }).
-  addDynamicallyLegalOp<mlir::ModuleOp>(+[](mlir::ModuleOp op) {
-    return !op->getParentOp() || !isa<ModuleOp>(op->getParentOp());
-  });
+  addDynamicallyLegalOp<mlir::ModuleOp>(
+      +[](mlir::ModuleOp op) { return isTopLevelModule(op); });
 }
 
 }  // namespace iree_compiler
