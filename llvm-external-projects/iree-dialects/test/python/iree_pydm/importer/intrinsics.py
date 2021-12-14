@@ -1,4 +1,6 @@
 # RUN: %PYTHON %s | iree-dialects-opt -split-input-file | FileCheck --enable-var-scope --dump-input-filter=all %s
+# TODO(#7879): Enable the test
+# XFAIL: *
 
 from typing import List
 from iree.compiler.dialects.iree_pydm.importer import *
