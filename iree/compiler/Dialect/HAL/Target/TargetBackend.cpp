@@ -143,8 +143,9 @@ static LogicalResult mergeModuleInto(
 static void replaceEntryPointUses(
     mlir::ModuleOp moduleOp,
     const DenseMap<Attribute, Attribute> &replacements) {
-  for (auto funcOp : moduleOp.getOps<mlir::FuncOp>()) {
-    funcOp.walk([&](IREE::HAL::CommandBufferDispatchSymbolOp dispatchOp) {
+  for (Operation &funcLikeOp : moduleOp.getOps()) {
+    if (!funcLikeOp.hasTrait<OpTrait::FunctionLike>()) continue;
+    funcLikeOp.walk([&](IREE::HAL::CommandBufferDispatchSymbolOp dispatchOp) {
       auto it = replacements.find(dispatchOp.entry_point());
       if (it != replacements.end()) {
         dispatchOp.entry_pointAttr(it->second.cast<SymbolRefAttr>());
