@@ -391,11 +391,11 @@ struct FoldSplatReshapeIntoSplat : public OpRewritePattern<TensorSplatOp> {
   }
 };
 
-struct ResolveShapedRank : public OpRewritePattern<RankOp> {
-  using OpRewritePattern<RankOp>::OpRewritePattern;
-  LogicalResult matchAndRewrite(RankOp op,
+struct ResolveShapedRank : public OpRewritePattern<tensor::RankOp> {
+  using OpRewritePattern<tensor::RankOp>::OpRewritePattern;
+  LogicalResult matchAndRewrite(tensor::RankOp op,
                                 PatternRewriter &rewriter) const override {
-    auto shapedType = op.getMemrefOrTensor().getType().cast<ShapedType>();
+    auto shapedType = op.tensor().getType().cast<ShapedType>();
     rewriter.replaceOpWithNewOp<arith::ConstantIndexOp>(op,
                                                         shapedType.getRank());
     return success();

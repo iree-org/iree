@@ -34,18 +34,16 @@ struct BufferViewDimPattern : public OpConversionPattern<tensor::DimOp> {
   }
 };
 
-struct BufferViewRankPattern : public OpConversionPattern<mlir::RankOp> {
+struct BufferViewRankPattern : public OpConversionPattern<tensor::RankOp> {
   using OpConversionPattern::OpConversionPattern;
   LogicalResult matchAndRewrite(
-      mlir::RankOp rankOp, OpAdaptor adaptor,
+      tensor::RankOp rankOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    if (!adaptor.getMemrefOrTensor()
-             .getType()
-             .isa<IREE::HAL::BufferViewType>()) {
+    if (!adaptor.tensor().getType().isa<IREE::HAL::BufferViewType>()) {
       return failure();
     }
     rewriter.replaceOpWithNewOp<IREE::HAL::BufferViewRankOp>(
-        rankOp, rankOp.getResult().getType(), adaptor.getMemrefOrTensor());
+        rankOp, rankOp.getResult().getType(), adaptor.tensor());
     return success();
   }
 };
@@ -58,8 +56,7 @@ void populateStandardShapeToHALPatterns(MLIRContext *context,
                                         TypeConverter &typeConverter) {
   // Ensure all shape related ops are fully converted as we should no longer
   // have any types they are valid to be used on after this conversion.
-  conversionTarget.addIllegalOp<mlir::RankOp>();
-  conversionTarget.addIllegalOp<tensor::DimOp>();
+  conversionTarget.addIllegalOp<tensor::DimOp, tensor::RankOp>();
 
   patterns.insert<BufferViewDimPattern, BufferViewRankPattern>(context);
 }
