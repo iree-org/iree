@@ -178,7 +178,7 @@ static Value createSubviewOp(OpBuilder &b, Location loc, unsigned resultRank,
 //   %buffer = hal.interface.binding.subspan .. : tensor<?xf32>
 //   %result = linalg.matmul ins(%lhs, %rhs : tensor<?x?xf32>, tensor<?x?xf32>)
 //       outs(%init : tensor<?x?xf32>) -> tensor<?x?xf32>
-//   %value = linalg.tensor_reshape %result [affine_map<(d0, d1) -> (d0, d1)]
+//   %value = tensor.collapse_shape %result [[0, 1]]
 //       : tensor<?x?xf32> into tensor<?xf32>
 //   flow.dispatch.tensor.store %value, %buffer[..] [..] [..]
 // ```
@@ -269,10 +269,9 @@ static Value getSubviewOpForTensorStoreOp(OpBuilder &b, Operation *storeOp,
   return subview;
 }
 
-/// Gets the reverse of a
-/// `linalg.tensor_expand_shape`/`linalg.tensor_collapse_shape` op to get a
-/// memref type that can be used for in-place computation of the result of a
-/// dispatch region.
+/// Gets the reverse of a `tensor.expand_shape`/`tensor.collapse_shape` op to
+/// get a memref type that can be used for in-place computation of the result
+/// of a dispatch region.
 template <typename TensorReshapeOpTy>
 static Value getReverseOfReshapeOp(OpBuilder &b, TensorReshapeOpTy reshapeOp,
                                    Value resultBuffer) {
@@ -414,7 +413,7 @@ static Value getAliasingBufferForResult(OpBuilder &b,
                          loadOp.getMixedSizes(), loadOp.getMixedStrides());
 }
 
-/// Converts a `linalg.tensor_collapse/expand_shape` operation to a
+/// Converts a `tensor.collapse/expand_shape` operation to a
 /// `linalg.collapse/expand_shape` operation with the result aliasing the buffer
 /// for the operand.
 template <typename TensorReshapeOpTy>
