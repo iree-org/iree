@@ -15,10 +15,9 @@
 namespace mlir {
 namespace iree_compiler {
 
-void populateVMToEmitCPatterns(MLIRContext *context,
+void populateVMToEmitCPatterns(ConversionTarget &conversionTarget,
                                IREE::VM::EmitCTypeConverter &typeConverter,
-                               OwningRewritePatternList &patterns,
-                               VMAnalysisCache &vmAnalysisCache);
+                               OwningRewritePatternList &patterns);
 
 namespace IREE {
 namespace VM {

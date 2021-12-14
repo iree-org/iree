@@ -15,11 +15,17 @@
 #include "iree/hal/buffer.h"
 #include "iree/hal/command_buffer.h"
 #include "iree/hal/descriptor_set.h"
+#include "iree/hal/detail.h"
 #include "iree/hal/device.h"
 #include "iree/hal/event.h"
 #include "iree/hal/executable.h"
 #include "iree/hal/executable_layout.h"
 #include "iree/hal/resource.h"
+
+// We directly call into the underlying command buffer as we don't need to
+// double-verify arguments and double-trace each method.
+#define BASE_VTABLE_DISPATCH(command_buffer, method_name) \
+  IREE_HAL_VTABLE_DISPATCH(command_buffer, iree_hal_command_buffer, method_name)
 
 typedef struct iree_hal_validating_command_buffer_t {
   iree_hal_resource_t resource;
@@ -197,7 +203,8 @@ static iree_status_t iree_hal_validating_command_buffer_begin(
   }
   command_buffer->is_recording = true;
 
-  return iree_hal_command_buffer_begin(command_buffer->target_command_buffer);
+  return BASE_VTABLE_DISPATCH(command_buffer->target_command_buffer,
+                              begin)(command_buffer->target_command_buffer);
 }
 
 static iree_status_t iree_hal_validating_command_buffer_end(
@@ -216,7 +223,8 @@ static iree_status_t iree_hal_validating_command_buffer_end(
   }
   command_buffer->is_recording = false;
 
-  return iree_hal_command_buffer_end(command_buffer->target_command_buffer);
+  return BASE_VTABLE_DISPATCH(command_buffer->target_command_buffer,
+                              end)(command_buffer->target_command_buffer);
 }
 
 static void iree_hal_validating_command_buffer_begin_debug_group(
@@ -225,8 +233,8 @@ static void iree_hal_validating_command_buffer_begin_debug_group(
     const iree_hal_label_location_t* location) {
   iree_hal_validating_command_buffer_t* command_buffer =
       iree_hal_validating_command_buffer_cast(base_command_buffer);
-  iree_hal_command_buffer_begin_debug_group(
-      command_buffer->target_command_buffer, label, label_color, location);
+  BASE_VTABLE_DISPATCH(command_buffer->target_command_buffer, begin_debug_group)
+  (command_buffer->target_command_buffer, label, label_color, location);
 }
 
 static void iree_hal_validating_command_buffer_end_debug_group(
@@ -234,8 +242,8 @@ static void iree_hal_validating_command_buffer_end_debug_group(
   iree_hal_validating_command_buffer_t* command_buffer =
       iree_hal_validating_command_buffer_cast(base_command_buffer);
   --command_buffer->debug_group_depth;
-  iree_hal_command_buffer_end_debug_group(
-      command_buffer->target_command_buffer);
+  BASE_VTABLE_DISPATCH(command_buffer->target_command_buffer, end_debug_group)
+  (command_buffer->target_command_buffer);
 }
 
 static iree_status_t iree_hal_validating_command_buffer_execution_barrier(
@@ -254,7 +262,8 @@ static iree_status_t iree_hal_validating_command_buffer_execution_barrier(
 
   // TODO(benvanik): additional synchronization validation.
 
-  return iree_hal_command_buffer_execution_barrier(
+  return BASE_VTABLE_DISPATCH(command_buffer->target_command_buffer,
+                              execution_barrier)(
       command_buffer->target_command_buffer, source_stage_mask,
       target_stage_mask, flags, memory_barrier_count, memory_barriers,
       buffer_barrier_count, buffer_barriers);
@@ -271,7 +280,8 @@ static iree_status_t iree_hal_validating_command_buffer_signal_event(
 
   // TODO(benvanik): additional synchronization validation.
 
-  return iree_hal_command_buffer_signal_event(
+  return BASE_VTABLE_DISPATCH(command_buffer->target_command_buffer,
+                              signal_event)(
       command_buffer->target_command_buffer, event, source_stage_mask);
 }
 
@@ -286,7 +296,8 @@ static iree_status_t iree_hal_validating_command_buffer_reset_event(
 
   // TODO(benvanik): additional synchronization validation.
 
-  return iree_hal_command_buffer_reset_event(
+  return BASE_VTABLE_DISPATCH(command_buffer->target_command_buffer,
+                              reset_event)(
       command_buffer->target_command_buffer, event, source_stage_mask);
 }
 
@@ -307,7 +318,8 @@ static iree_status_t iree_hal_validating_command_buffer_wait_events(
 
   // TODO(benvanik): additional synchronization validation.
 
-  return iree_hal_command_buffer_wait_events(
+  return BASE_VTABLE_DISPATCH(command_buffer->target_command_buffer,
+                              wait_events)(
       command_buffer->target_command_buffer, event_count, events,
       source_stage_mask, target_stage_mask, memory_barrier_count,
       memory_barriers, buffer_barrier_count, buffer_barriers);
@@ -325,7 +337,8 @@ static iree_status_t iree_hal_validating_command_buffer_discard_buffer(
       iree_hal_buffer_memory_type(buffer),
       IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE));
 
-  return iree_hal_command_buffer_discard_buffer(
+  return BASE_VTABLE_DISPATCH(command_buffer->target_command_buffer,
+                              discard_buffer)(
       command_buffer->target_command_buffer, buffer);
 }
 
@@ -374,7 +387,8 @@ static iree_status_t iree_hal_validating_command_buffer_fill_buffer(
         target_offset, length, pattern_length);
   }
 
-  return iree_hal_command_buffer_fill_buffer(
+  return BASE_VTABLE_DISPATCH(command_buffer->target_command_buffer,
+                              fill_buffer)(
       command_buffer->target_command_buffer, target_buffer, target_offset,
       length, pattern, pattern_length);
 }
@@ -405,7 +419,8 @@ static iree_status_t iree_hal_validating_command_buffer_update_buffer(
   IREE_RETURN_IF_ERROR(
       iree_hal_buffer_validate_range(target_buffer, target_offset, length));
 
-  return iree_hal_command_buffer_update_buffer(
+  return BASE_VTABLE_DISPATCH(command_buffer->target_command_buffer,
+                              update_buffer)(
       command_buffer->target_command_buffer, source_buffer, source_offset,
       target_buffer, target_offset, length);
 }
@@ -478,7 +493,8 @@ static iree_status_t iree_hal_validating_command_buffer_copy_buffer(
         "source and target ranges overlap within the same buffer");
   }
 
-  return iree_hal_command_buffer_copy_buffer(
+  return BASE_VTABLE_DISPATCH(command_buffer->target_command_buffer,
+                              copy_buffer)(
       command_buffer->target_command_buffer, source_buffer, source_offset,
       target_buffer, target_offset, length);
 }
@@ -501,7 +517,8 @@ static iree_status_t iree_hal_validating_command_buffer_push_constants(
 
   // TODO(benvanik): validate offset and value count with layout.
 
-  return iree_hal_command_buffer_push_constants(
+  return BASE_VTABLE_DISPATCH(command_buffer->target_command_buffer,
+                              push_constants)(
       command_buffer->target_command_buffer, executable_layout, offset, values,
       values_length);
 }
@@ -521,7 +538,8 @@ static iree_status_t iree_hal_validating_command_buffer_push_descriptor_set(
   // TODO(benvanik): validate binding_offset.
   // TODO(benvanik): validate bindings.
 
-  return iree_hal_command_buffer_push_descriptor_set(
+  return BASE_VTABLE_DISPATCH(command_buffer->target_command_buffer,
+                              push_descriptor_set)(
       command_buffer->target_command_buffer, executable_layout, set,
       binding_count, bindings);
 }
@@ -541,7 +559,8 @@ static iree_status_t iree_hal_validating_command_buffer_bind_descriptor_set(
   // TODO(benvanik): validate set index.
   // TODO(benvanik): validate dynamic offsets (both count and offsets).
 
-  return iree_hal_command_buffer_bind_descriptor_set(
+  return BASE_VTABLE_DISPATCH(command_buffer->target_command_buffer,
+                              bind_descriptor_set)(
       command_buffer->target_command_buffer, executable_layout, set,
       descriptor_set, dynamic_offset_count, dynamic_offsets);
 }
@@ -558,9 +577,9 @@ static iree_status_t iree_hal_validating_command_buffer_dispatch(
   IREE_RETURN_IF_ERROR(iree_hal_command_buffer_validate_dispatch_bindings(
       command_buffer, executable, entry_point));
 
-  return iree_hal_command_buffer_dispatch(command_buffer->target_command_buffer,
-                                          executable, entry_point, workgroup_x,
-                                          workgroup_y, workgroup_z);
+  return BASE_VTABLE_DISPATCH(command_buffer->target_command_buffer, dispatch)(
+      command_buffer->target_command_buffer, executable, entry_point,
+      workgroup_x, workgroup_y, workgroup_z);
 }
 
 static iree_status_t iree_hal_validating_command_buffer_dispatch_indirect(
@@ -593,7 +612,8 @@ static iree_status_t iree_hal_validating_command_buffer_dispatch_indirect(
   IREE_RETURN_IF_ERROR(iree_hal_command_buffer_validate_dispatch_bindings(
       command_buffer, executable, entry_point));
 
-  return iree_hal_command_buffer_dispatch_indirect(
+  return BASE_VTABLE_DISPATCH(command_buffer->target_command_buffer,
+                              dispatch_indirect)(
       command_buffer->target_command_buffer, executable, entry_point,
       workgroups_buffer, workgroups_offset);
 }
