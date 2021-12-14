@@ -110,10 +110,9 @@ static Value getTensorLoadOpForTensorStoreOp(
   return tensorLoadOp;
 }
 
-/// Gets the reverse of a
-/// `linalg.tensor_expand_shape`/`linalg.tensor_collapse_shape` op to get a
-/// memref type that can be used for in-place computation of the result of a
-/// dispatch region.
+/// Gets the reverse of a `tensor.expand_shape`/`tensor.collapse_shape` op to
+/// get a memref type that can be used for in-place computation of the result
+/// of a dispatch region.
 template <typename TensorReshapeOpTy>
 static Value getReverseOfReshapeOp(OpBuilder &b, TensorReshapeOpTy reshapeOp,
                                    Value resultBuffer) {
