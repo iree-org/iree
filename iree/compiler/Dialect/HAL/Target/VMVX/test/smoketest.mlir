@@ -47,7 +47,7 @@ stream.executable public @add_dispatch_0 {
 //  CHECK-SAME:       interface = @io,
 //  CHECK-SAME:       ordinal = 0 : index
 //  CHECK-SAME:     }
-//       CHECK:     module {
+//       CHECK:     module attributes {vm.toplevel} {
 //  CHECK-NEXT:       vm.module public @module {
 //  CHECK-NEXT:         vm.func private @add_dispatch_0(
 //  CHECK-SAME:             %[[SCRATCHPAD:.+]]: !vm.buffer, %[[CONSTANTS:.+]]: !vm.buffer,
