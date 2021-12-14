@@ -24,6 +24,7 @@ iree_lit_test_suite(
             "control_flow_ops.mlir",
             "conversion_ops.mlir",
             "func_attrs.mlir",
+            "nesting.mlir",
             "structural_ops.mlir",
         ],
         include = ["*.mlir"],

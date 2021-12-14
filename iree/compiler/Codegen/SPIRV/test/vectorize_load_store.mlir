@@ -1,12 +1,13 @@
-// RUN: iree-opt -split-input-file -iree-spirv-vectorize-load-store -canonicalize %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -iree-spirv-vectorize-load-store -canonicalize -cse -mlir-print-local-scope %s | IreeFileCheck %s
 
 // CHECK-LABEL: func @alloc_copy
-//  CHECK-SAME: (%[[ARG0:.+]]: memref<4096x1024xvector<4xf32>>
+//  CHECK-SAME: (%[[ARG0:.+]]: memref<4096x1024xvector<4xf32>>, %[[X:.+]]: index, %[[Y:.+]]: index)
 //       CHECK: %[[ALLOC:.+]] = memref.alloc() : memref<128x8xvector<4xf32>, 3>
-//       CHECK: %[[V:.+]] = memref.load %[[ARG0]][%{{.*}}, %{{.*}}] : memref<4096x1024xvector<4xf32>>
-//       CHECK: memref.store %[[V]], %[[ALLOC]][%{{.*}}, %{{.*}}] : memref<128x8xvector<4xf32>, 3>
-//       CHECK: %[[MAT:.+]] = vector.transfer_read %[[ARG0]][%{{.*}}, %{{.*}}], %{{.*}} : memref<4096x1024xvector<4xf32>>, vector<32x8xf32>
-//       CHECK: vector.transfer_write %[[MAT]], %[[ALLOC]][%{{.*}}, %{{.*}}] : vector<32x8xf32>, memref<128x8xvector<4xf32>, 3>
+//       CHECK: %[[IDX:.+]] = affine.apply affine_map<()[s0] -> (s0 floordiv 4)>()[%[[Y]]]
+//       CHECK: %[[V:.+]] = memref.load %[[ARG0]][%[[X]], %[[IDX]]] : memref<4096x1024xvector<4xf32>>
+//       CHECK: memref.store %[[V]], %[[ALLOC]][%[[X]], %[[IDX]]] : memref<128x8xvector<4xf32>, 3>
+//       CHECK: %[[MAT:.+]] = vector.transfer_read %[[ARG0]][%[[X]], %[[IDX]]], %{{.*}} : memref<4096x1024xvector<4xf32>>, vector<32x8xf32>
+//       CHECK: vector.transfer_write %[[MAT]], %[[ALLOC]][%[[X]], %[[IDX]]] : vector<32x8xf32>, memref<128x8xvector<4xf32>, 3>
 //       CHECK: memref.dealloc %[[ALLOC]] : memref<128x8xvector<4xf32>, 3>
 func @alloc_copy(%arg0: memref<4096x4096xf32>, %x: index, %y: index) {
   %cst = arith.constant 0.000000e+00 : f32

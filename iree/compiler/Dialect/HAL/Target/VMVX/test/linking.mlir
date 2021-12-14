@@ -66,6 +66,15 @@ func @basic_linking() -> () {
   hal.command_buffer.dispatch.symbol<%cmd : !hal.command_buffer> target(@dispatch_2::@vmvx::@dispatch_2) workgroups([%c1, %c1, %c1])
   return
 }
+util.initializer {
+  %device = hal.ex.shared_device : !hal.device
+  %cmd = hal.command_buffer.create device(%device : !hal.device) mode("OneShot") categories("Transfer|Dispatch") : !hal.command_buffer
+  %c1 = arith.constant 1 : index
+  hal.command_buffer.dispatch.symbol<%cmd : !hal.command_buffer> target(@dispatch_0::@vmvx::@dispatch_0) workgroups([%c1, %c1, %c1])
+  hal.command_buffer.dispatch.symbol<%cmd : !hal.command_buffer> target(@dispatch_1::@vmvx::@dispatch_1) workgroups([%c1, %c1, %c1])
+  hal.command_buffer.dispatch.symbol<%cmd : !hal.command_buffer> target(@dispatch_2::@vmvx::@dispatch_2) workgroups([%c1, %c1, %c1])
+  util.initializer.return
+}
 
 // All executables (including their interfaces and entry points) should be
 // linked together into a single executable.
@@ -113,7 +122,13 @@ func @basic_linking() -> () {
 // CHECK-NEXT:    hal.command_buffer.dispatch.symbol<%cmd : !hal.command_buffer> target(@vmvx_linked::@vmvx_bytecode_fb::@dispatch_2) workgroups([%c1, %c1, %c1])
 // CHECK-NEXT:    return
 // CHECK-NEXT:  }
-
+//
+// CHECK:       util.initializer {
+// CHECK:         hal.command_buffer.dispatch.symbol<%cmd : !hal.command_buffer> target(@vmvx_linked::@vmvx_bytecode_fb::@dispatch_0) workgroups([%c1, %c1, %c1])
+// CHECK-NEXT:    hal.command_buffer.dispatch.symbol<%cmd : !hal.command_buffer> target(@vmvx_linked::@vmvx_bytecode_fb::@dispatch_1) workgroups([%c1, %c1, %c1])
+// CHECK-NEXT:    hal.command_buffer.dispatch.symbol<%cmd : !hal.command_buffer> target(@vmvx_linked::@vmvx_bytecode_fb::@dispatch_2) workgroups([%c1, %c1, %c1])
+// CHECK-NEXT:    util.initializer.return
+// CHECK-NEXT:  }
 // -----
 
 #cuda_target = #hal.executable.target<"cuda", "cuda-nvptx-fb">
