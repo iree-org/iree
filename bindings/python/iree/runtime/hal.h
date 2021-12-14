@@ -135,10 +135,11 @@ class HalMappedMemory {
     iree_hal_buffer_t* buffer = iree_hal_buffer_view_buffer(bv.raw_ptr());
     iree_device_size_t byte_length = iree_hal_buffer_byte_length(buffer);
     iree_hal_buffer_mapping_t mapped_memory;
-    CheckApiStatus(iree_hal_buffer_map_range(
-                       buffer, IREE_HAL_MEMORY_ACCESS_READ,
-                       0 /* element_offset */, byte_length, &mapped_memory),
-                   "Could not map memory");
+    CheckApiStatus(
+        iree_hal_buffer_map_range(buffer, IREE_HAL_MAPPING_MODE_SCOPED,
+                                  IREE_HAL_MEMORY_ACCESS_READ, 0, byte_length,
+                                  &mapped_memory),
+        "Could not map memory");
     return HalMappedMemory(mapped_memory, bv.raw_ptr());
   }
 

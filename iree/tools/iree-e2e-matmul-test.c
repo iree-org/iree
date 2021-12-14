@@ -68,7 +68,8 @@ static iree_status_t get_buffer_view_dense_row_major_data(
   }
   iree_hal_buffer_mapping_t mapping;
   IREE_RETURN_IF_ERROR(iree_hal_buffer_map_range(
-      iree_hal_buffer_view_buffer(buffer_view), IREE_HAL_MEMORY_ACCESS_READ, 0,
+      iree_hal_buffer_view_buffer(buffer_view),
+      IREE_HAL_MAPPING_MODE_PERSISTENT, IREE_HAL_MEMORY_ACCESS_READ, 0,
       IREE_WHOLE_BUFFER, &mapping));
   *data = mapping.contents.data;
   return iree_ok_status();
@@ -489,8 +490,8 @@ static iree_status_t copy_buffer(iree_hal_allocator_t* hal_allocator,
   // I can't understand what all this code is doing.
   iree_hal_buffer_mapping_t src_mapping;
   IREE_RETURN_IF_ERROR(iree_hal_buffer_map_range(
-      iree_hal_buffer_view_buffer(src), IREE_HAL_MEMORY_ACCESS_READ, 0,
-      IREE_WHOLE_BUFFER, &src_mapping));
+      iree_hal_buffer_view_buffer(src), IREE_HAL_MAPPING_MODE_PERSISTENT,
+      IREE_HAL_MEMORY_ACCESS_READ, 0, IREE_WHOLE_BUFFER, &src_mapping));
   iree_const_byte_span_t src_span;
   src_span.data = src_mapping.contents.data;
   src_span.data_length = src_mapping.contents.data_length;

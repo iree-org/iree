@@ -509,9 +509,9 @@ iree_hal_buffer_fill(iree_hal_buffer_t* buffer, iree_device_size_t byte_offset,
   IREE_TRACE_ZONE_BEGIN(z0);
   iree_hal_buffer_mapping_t target_mapping;
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0,
-      iree_hal_buffer_map_range(buffer, IREE_HAL_MEMORY_ACCESS_DISCARD_WRITE,
-                                byte_offset, byte_length, &target_mapping));
+      z0, iree_hal_buffer_map_range(buffer, IREE_HAL_MAPPING_MODE_SCOPED,
+                                    IREE_HAL_MEMORY_ACCESS_DISCARD_WRITE,
+                                    byte_offset, byte_length, &target_mapping));
   if (byte_length == IREE_WHOLE_BUFFER) {
     byte_length = target_mapping.contents.data_length;
   }
@@ -666,8 +666,9 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_transfer_mappable_range(
   if (iree_status_is_ok(status)) {
     if (source.device_buffer) {
       status = iree_hal_buffer_map_range(
-          source.device_buffer, IREE_HAL_MEMORY_ACCESS_READ, source_offset,
-          data_length, &source_mapping);
+          source.device_buffer, IREE_HAL_MAPPING_MODE_SCOPED,
+          IREE_HAL_MEMORY_ACCESS_READ, source_offset, data_length,
+          &source_mapping);
     } else {
       source_mapping = (iree_hal_buffer_mapping_t){
           .contents = source.host_buffer,
@@ -679,8 +680,9 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_transfer_mappable_range(
   if (iree_status_is_ok(status)) {
     if (target.device_buffer) {
       status = iree_hal_buffer_map_range(
-          target.device_buffer, IREE_HAL_MEMORY_ACCESS_DISCARD_WRITE,
-          target_offset, data_length, &target_mapping);
+          target.device_buffer, IREE_HAL_MAPPING_MODE_SCOPED,
+          IREE_HAL_MEMORY_ACCESS_DISCARD_WRITE, target_offset, data_length,
+          &target_mapping);
     } else {
       target_mapping = (iree_hal_buffer_mapping_t){
           .contents = target.host_buffer,
@@ -753,8 +755,9 @@ static_assert(offsetof(iree_hal_buffer_mapping_impl_t, contents) ==
               "contents byte span must match the external struct offset");
 
 IREE_API_EXPORT iree_status_t iree_hal_buffer_map_range(
-    iree_hal_buffer_t* buffer, iree_hal_memory_access_t memory_access,
-    iree_device_size_t byte_offset, iree_device_size_t byte_length,
+    iree_hal_buffer_t* buffer, iree_hal_mapping_mode_t mapping_mode,
+    iree_hal_memory_access_t memory_access, iree_device_size_t byte_offset,
+    iree_device_size_t byte_length,
     iree_hal_buffer_mapping_t* out_buffer_mapping) {
   IREE_ASSERT_ARGUMENT(buffer);
   IREE_ASSERT_ARGUMENT(out_buffer_mapping);
@@ -766,6 +769,14 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_map_range(
   IREE_RETURN_IF_ERROR(iree_hal_buffer_validate_usage(
       iree_hal_buffer_allowed_usage(buffer), IREE_HAL_BUFFER_USAGE_MAPPING));
 
+  if (iree_all_bits_set(mapping_mode, IREE_HAL_MAPPING_MODE_PERSISTENT) &&
+      !iree_all_bits_set(iree_hal_buffer_allowed_usage(buffer),
+                         IREE_HAL_BUFFER_USAGE_MAPPING)) {
+    return iree_make_status(
+        IREE_STATUS_FAILED_PRECONDITION,
+        "persistent mapping requires that buffers support mapping usage");
+  }
+
   iree_hal_buffer_mapping_impl_t* buffer_mapping =
       (iree_hal_buffer_mapping_impl_t*)out_buffer_mapping;
   buffer_mapping->backing_buffer = buffer;
@@ -775,9 +786,6 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_map_range(
       iree_hal_buffer_byte_offset(buffer), iree_hal_buffer_byte_length(buffer),
       byte_offset, byte_length, &buffer_mapping->byte_offset, &data_length));
   buffer_mapping->contents.data_length = data_length;
-
-  // TODO(benvanik): add mode arg to the HAL API.
-  iree_hal_mapping_mode_t mapping_mode = IREE_HAL_MAPPING_MODE_SCOPED;
 
   IREE_TRACE_ZONE_BEGIN(z0);
   iree_status_t status = _VTABLE_DISPATCH(buffer, map_range)(

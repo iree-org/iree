@@ -178,38 +178,6 @@ enum iree_hal_transfer_buffer_flag_bits_t {
 };
 typedef uint32_t iree_hal_transfer_buffer_flags_t;
 
-typedef struct iree_hal_transfer_buffer_t {
-  iree_byte_span_t host_buffer;
-  iree_hal_buffer_t* device_buffer;
-} iree_hal_transfer_buffer_t;
-
-static inline iree_hal_transfer_buffer_t iree_hal_make_host_transfer_buffer(
-    iree_byte_span_t host_buffer) {
-  iree_hal_transfer_buffer_t transfer_buffer = {
-      host_buffer,
-      NULL,
-  };
-  return transfer_buffer;
-}
-
-static inline iree_hal_transfer_buffer_t
-iree_hal_make_host_transfer_buffer_span(void* ptr, iree_host_size_t length) {
-  iree_hal_transfer_buffer_t transfer_buffer = {
-      iree_make_byte_span(ptr, length),
-      NULL,
-  };
-  return transfer_buffer;
-}
-
-static inline iree_hal_transfer_buffer_t iree_hal_make_device_transfer_buffer(
-    iree_hal_buffer_t* device_buffer) {
-  iree_hal_transfer_buffer_t transfer_buffer = {
-      iree_byte_span_empty(),
-      device_buffer,
-  };
-  return transfer_buffer;
-}
-
 enum iree_hal_mapping_mode_bits_t {
   IREE_HAL_MAPPING_MODE_SCOPED = 1u << 0,
   IREE_HAL_MAPPING_MODE_PERSISTENT = 1u << 1,
@@ -442,6 +410,38 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_copy_data(
     iree_hal_buffer_t* target_buffer, iree_device_size_t target_offset,
     iree_device_size_t data_length);
 
+typedef struct iree_hal_transfer_buffer_t {
+  iree_byte_span_t host_buffer;
+  iree_hal_buffer_t* device_buffer;
+} iree_hal_transfer_buffer_t;
+
+static inline iree_hal_transfer_buffer_t iree_hal_make_host_transfer_buffer(
+    iree_byte_span_t host_buffer) {
+  iree_hal_transfer_buffer_t transfer_buffer = {
+      host_buffer,
+      NULL,
+  };
+  return transfer_buffer;
+}
+
+static inline iree_hal_transfer_buffer_t
+iree_hal_make_host_transfer_buffer_span(void* ptr, iree_host_size_t length) {
+  iree_hal_transfer_buffer_t transfer_buffer = {
+      iree_make_byte_span(ptr, length),
+      NULL,
+  };
+  return transfer_buffer;
+}
+
+static inline iree_hal_transfer_buffer_t iree_hal_make_device_transfer_buffer(
+    iree_hal_buffer_t* device_buffer) {
+  iree_hal_transfer_buffer_t transfer_buffer = {
+      iree_byte_span_empty(),
+      device_buffer,
+  };
+  return transfer_buffer;
+}
+
 // Synchronously copies data from |source| into |target|.
 //
 // Supports host->device, device->host, and device->device transfer,
@@ -474,8 +474,9 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_transfer_range(
 // invalidate the byte range they want to access to update the visibility of the
 // mapped memory.
 IREE_API_EXPORT iree_status_t iree_hal_buffer_map_range(
-    iree_hal_buffer_t* buffer, iree_hal_memory_access_t memory_access,
-    iree_device_size_t byte_offset, iree_device_size_t byte_length,
+    iree_hal_buffer_t* buffer, iree_hal_mapping_mode_t mapping_mode,
+    iree_hal_memory_access_t memory_access, iree_device_size_t byte_offset,
+    iree_device_size_t byte_length,
     iree_hal_buffer_mapping_t* out_buffer_mapping);
 
 // Unmaps the buffer as was previously mapped to |buffer_mapping|.

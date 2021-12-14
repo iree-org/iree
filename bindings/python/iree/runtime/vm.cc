@@ -391,8 +391,9 @@ py::object VmVariantList::GetAsSerializedTraceValue(int index) {
       iree_device_size_t byte_length = iree_hal_buffer_byte_length(raw_buffer);
       iree_hal_buffer_mapping_t mapped_memory;
       CheckApiStatus(iree_hal_buffer_map_range(
-                         raw_buffer, IREE_HAL_MEMORY_ACCESS_READ,
-                         0 /* element_offset */, byte_length, &mapped_memory),
+                         raw_buffer, IREE_HAL_MAPPING_MODE_SCOPED,
+                         IREE_HAL_MEMORY_ACCESS_READ, 0 /* element_offset */,
+                         byte_length, &mapped_memory),
                      "Could not map memory");
       record["contents"] =
           py::bytes(reinterpret_cast<const char*>(mapped_memory.contents.data),
@@ -490,8 +491,9 @@ py::object VmVariantList::GetAsNdarray(int index) {
       iree_hal_buffer_byte_length(buffer.raw_ptr());
   iree_hal_buffer_mapping_t mapped_memory;
   CheckApiStatus(iree_hal_buffer_map_range(
-                     buffer.raw_ptr(), IREE_HAL_MEMORY_ACCESS_READ,
-                     0 /* element_offset */, byte_length, &mapped_memory),
+                     buffer.raw_ptr(), IREE_HAL_MAPPING_MODE_SCOPED,
+                     IREE_HAL_MEMORY_ACCESS_READ, 0 /* element_offset */,
+                     byte_length, &mapped_memory),
                  "Could not map memory");
 
   // Turn the mapping into a python object that retains until the array is
