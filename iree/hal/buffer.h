@@ -140,7 +140,8 @@ enum iree_hal_buffer_usage_bits_t {
   // accesses will happen via command buffers.
   IREE_HAL_BUFFER_USAGE_TRANSFER = 1u << 1,
 
-  // The buffer can be mapped by the host application for reading and writing.
+  // The buffer can be mapped by the host application for reading and writing
+  // without a copy.
   //
   // As mapping may require placement in special address ranges or system
   // calls to enable visibility the driver can use the presence (or lack of)

@@ -71,11 +71,13 @@ static iree_status_t iree_hal_cuda_buffer_map_range(
     void** out_data_ptr) {
   iree_hal_cuda_buffer_t* buffer = iree_hal_cuda_buffer_cast(base_buffer);
 
-  if (!iree_all_bits_set(buffer->base.memory_type,
-                         IREE_HAL_MEMORY_TYPE_HOST_VISIBLE)) {
-    return iree_make_status(IREE_STATUS_INTERNAL,
-                            "trying to map memory not host visible");
-  }
+  // TODO(benvanik): add upload/download for unmapped buffers.
+  IREE_RETURN_IF_ERROR(iree_hal_buffer_validate_memory_type(
+      iree_hal_buffer_memory_type(base_buffer),
+      IREE_HAL_MEMORY_TYPE_HOST_VISIBLE));
+  IREE_RETURN_IF_ERROR(
+      iree_hal_buffer_validate_usage(iree_hal_buffer_allowed_usage(base_buffer),
+                                     IREE_HAL_BUFFER_USAGE_MAPPING));
 
   uint8_t* data_ptr = (uint8_t*)(buffer->host_ptr) + local_byte_offset;
   // If we mapped for discard scribble over the bytes. This is not a mandated

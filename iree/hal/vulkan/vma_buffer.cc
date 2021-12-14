@@ -107,6 +107,14 @@ static iree_status_t iree_hal_vulkan_vma_buffer_map_range(
   iree_hal_vulkan_vma_buffer_t* buffer =
       iree_hal_vulkan_vma_buffer_cast(base_buffer);
 
+  // TODO(benvanik): add upload/download for unmapped buffers.
+  IREE_RETURN_IF_ERROR(iree_hal_buffer_validate_memory_type(
+      iree_hal_buffer_memory_type(base_buffer),
+      IREE_HAL_MEMORY_TYPE_HOST_VISIBLE));
+  IREE_RETURN_IF_ERROR(
+      iree_hal_buffer_validate_usage(iree_hal_buffer_allowed_usage(base_buffer),
+                                     IREE_HAL_BUFFER_USAGE_MAPPING));
+
   uint8_t* data_ptr = nullptr;
   VK_RETURN_IF_ERROR(
       vmaMapMemory(buffer->vma, buffer->allocation, (void**)&data_ptr),

@@ -762,19 +762,16 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_map_range(
   IREE_ASSERT_ARGUMENT(buffer);
   IREE_ASSERT_ARGUMENT(out_buffer_mapping);
   memset(out_buffer_mapping, 0, sizeof(*out_buffer_mapping));
-  IREE_RETURN_IF_ERROR(iree_hal_buffer_validate_memory_type(
-      iree_hal_buffer_memory_type(buffer), IREE_HAL_MEMORY_TYPE_HOST_VISIBLE));
   IREE_RETURN_IF_ERROR(iree_hal_buffer_validate_access(
       iree_hal_buffer_allowed_access(buffer), memory_access));
-  IREE_RETURN_IF_ERROR(iree_hal_buffer_validate_usage(
-      iree_hal_buffer_allowed_usage(buffer), IREE_HAL_BUFFER_USAGE_MAPPING));
 
-  if (iree_all_bits_set(mapping_mode, IREE_HAL_MAPPING_MODE_PERSISTENT) &&
-      !iree_all_bits_set(iree_hal_buffer_allowed_usage(buffer),
-                         IREE_HAL_BUFFER_USAGE_MAPPING)) {
-    return iree_make_status(
-        IREE_STATUS_FAILED_PRECONDITION,
-        "persistent mapping requires that buffers support mapping usage");
+  // Persistent mapping requires the buffer be allocated to support it.
+  if (iree_all_bits_set(mapping_mode, IREE_HAL_MAPPING_MODE_PERSISTENT)) {
+    IREE_RETURN_IF_ERROR(iree_hal_buffer_validate_memory_type(
+        iree_hal_buffer_memory_type(buffer),
+        IREE_HAL_MEMORY_TYPE_HOST_VISIBLE));
+    IREE_RETURN_IF_ERROR(iree_hal_buffer_validate_usage(
+        iree_hal_buffer_allowed_usage(buffer), IREE_HAL_BUFFER_USAGE_MAPPING));
   }
 
   iree_hal_buffer_mapping_impl_t* buffer_mapping =
