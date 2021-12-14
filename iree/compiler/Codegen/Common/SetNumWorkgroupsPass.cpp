@@ -129,7 +129,7 @@ void SetNumWorkgroupsPass::runOnOperation() {
         Value one = b.create<arith::ConstantIndexOp>(loc, 1);
         std::array<Value, 3> returnValues = {one, one, one};
         for (auto ts : llvm::enumerate(currWorkloadPerWorkgroup)) {
-          returnValues[ts.index()] = linalg::applyMapToValues(
+          returnValues[ts.index()] = applyMapToValues(
               b, loc,
               AffineMap::get(0, 1,
                              b.getAffineSymbolExpr(0).ceilDiv(ts.value())),

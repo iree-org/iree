@@ -85,7 +85,8 @@ struct ConvertToROCDLPass : public ConvertToROCDLBase<ConvertToROCDLPass> {
       arith::populateArithmeticToLLVMConversionPatterns(converter,
                                                         llvmPatterns);
       populateVectorToLLVMConversionPatterns(converter, llvmPatterns);
-      populateGpuToROCDLConversionPatterns(converter, llvmPatterns);
+      populateGpuToROCDLConversionPatterns(converter, llvmPatterns,
+                                           gpu::amd::Runtime::Unknown);
       LLVMConversionTarget target(getContext());
       populateStdToLLVMFuncOpConversionPattern(converter, llvmPatterns);
       configureGpuToROCDLConversionLegality(target);

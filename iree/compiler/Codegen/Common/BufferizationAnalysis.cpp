@@ -56,8 +56,8 @@ static bool canUsersHandleSubviews(Operation *op) {
   // TODO(ravishankarm): Maybe this is too aggressive, might have to switch this
   // to have a white-list instead of blacklist.
   for (Operation *user : op->getUsers()) {
-    if (isa<IREE::Flow::DispatchTensorStoreOp, linalg::TensorCollapseShapeOp,
-            linalg::TensorExpandShapeOp>(user)) {
+    if (isa<IREE::Flow::DispatchTensorStoreOp, tensor::CollapseShapeOp,
+            tensor::ExpandShapeOp>(user)) {
       return false;
     }
   }
@@ -82,7 +82,7 @@ static bool isFromReadOnlyTensor(Value v, const BufferizationPlan &plan) {
   return TypeSwitch<Operation *, bool>(definingOp)
       .Case<arith::ConstantOp>(
           [&](arith::ConstantOp constantOp) { return true; })
-      .Case<linalg::TensorCollapseShapeOp, linalg::TensorExpandShapeOp>(
+      .Case<tensor::CollapseShapeOp, tensor::ExpandShapeOp>(
           [&](auto op) { return isFromReadOnlyTensor(op.src(), plan); })
       .Case<tensor::ExtractSliceOp>([&](tensor::ExtractSliceOp sliceOp) {
         return isFromReadOnlyTensor(sliceOp.source(), plan);
@@ -159,7 +159,7 @@ static bool canSetStoreValueAndTargetAsEquivalent(
       // reshapes not working well together, but there is no comment about why
       // this was added with the change that added this.
       Operation *op = v.getDefiningOp();
-      if (op && isa<linalg::TensorCollapseShapeOp, linalg::TensorExpandShapeOp>(
+      if (op && isa<tensor::CollapseShapeOp, tensor::ExpandShapeOp>(
                     v.getDefiningOp())) {
         return false;
       }
@@ -519,7 +519,7 @@ LogicalResult createTensorEquivalenceClasses(FuncOp funcOp,
             [&](IREE::LinalgExt::LinalgExtOp linalgExtOp) {
               return analyseLinalgExtOps(linalgExtOp, plan);
             })
-        .Case<linalg::TensorCollapseShapeOp, linalg::TensorExpandShapeOp>(
+        .Case<tensor::CollapseShapeOp, tensor::ExpandShapeOp>(
             [&](auto reshapeOp) {
               return analyseSingleOperandResultOp(reshapeOp.src(),
                                                   reshapeOp.result(), plan);

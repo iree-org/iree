@@ -117,10 +117,9 @@ struct CleanupBufferAllocViewPass
     : public CleanupBufferAllocViewBase<CleanupBufferAllocViewPass> {
   void runOnOperation() override {
     OwningRewritePatternList patterns(&getContext());
-    patterns.insert<
-        FoldReshapeIntoInterfaceTensorLoad<linalg::TensorCollapseShapeOp>,
-        FoldReshapeIntoInterfaceTensorLoad<linalg::TensorExpandShapeOp>,
-        RemoveDeadMemAllocs>(&getContext());
+    patterns.insert<FoldReshapeIntoInterfaceTensorLoad<tensor::CollapseShapeOp>,
+                    FoldReshapeIntoInterfaceTensorLoad<tensor::ExpandShapeOp>,
+                    RemoveDeadMemAllocs>(&getContext());
     if (failed(applyPatternsAndFoldGreedily(getOperation(),
                                             std::move(patterns)))) {
       return signalPassFailure();

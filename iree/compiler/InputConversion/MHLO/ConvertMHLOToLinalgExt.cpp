@@ -257,7 +257,7 @@ struct ScatterOpConversion : public OpConversionPattern<mhlo::ScatterOp> {
     map.emplace_back(1, indicesRank - 1);
     auto resultType = RankedTensorType::get({batchSize, shape.back()},
                                             indicesType.getElementType());
-    indices = b.create<linalg::TensorCollapseShapeOp>(resultType, indices, map);
+    indices = b.create<tensor::CollapseShapeOp>(resultType, indices, map);
 
     auto updateShape = updatesType.getShape().drop_front(shape.size() - 1);
     SmallVector<int64_t> collapsedUpdateShape = {batchSize};
@@ -269,7 +269,7 @@ struct ScatterOpConversion : public OpConversionPattern<mhlo::ScatterOp> {
     for (auto i : llvm::seq<int64_t>(indicesRank - 1, updatesType.getRank())) {
       map.emplace_back(1, i);
     }
-    updates = b.create<linalg::TensorCollapseShapeOp>(resultType, updates, map);
+    updates = b.create<tensor::CollapseShapeOp>(resultType, updates, map);
 
     return success();
   }

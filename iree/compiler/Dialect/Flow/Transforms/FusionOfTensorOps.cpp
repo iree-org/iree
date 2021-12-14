@@ -112,11 +112,10 @@ struct FusionOfTensorOpsPass
     // to the consumer linalg op.
     linalg::ControlElementwiseOpsFusionFn foldReshapeBetweenLinalgFn =
         [](const OpResult &producer, const OpOperand &consumer) {
-          auto collapseOp =
-              producer.getDefiningOp<linalg::TensorCollapseShapeOp>();
+          auto collapseOp = producer.getDefiningOp<tensor::CollapseShapeOp>();
           if (collapseOp)
             return collapseOp.src().getDefiningOp<LinalgOp>() != nullptr;
-          auto expandOp = producer.getDefiningOp<linalg::TensorExpandShapeOp>();
+          auto expandOp = producer.getDefiningOp<tensor::ExpandShapeOp>();
           if (expandOp)
             return expandOp.src().getDefiningOp<LinalgOp>() != nullptr;
           return false;
@@ -135,10 +134,14 @@ struct FusionOfTensorOpsPass
     OwningRewritePatternList reshapeCanonicalizations(&getContext());
     linalg::populateFoldUnitDimsReshapeOpsByLinearizationPatterns(
         reshapeCanonicalizations);
-    linalg::TensorCollapseShapeOp::getCanonicalizationPatterns(
+    tensor::CollapseShapeOp::getCanonicalizationPatterns(
         reshapeCanonicalizations, context);
-    linalg::TensorExpandShapeOp::getCanonicalizationPatterns(
-        reshapeCanonicalizations, context);
+    tensor::ExpandShapeOp::getCanonicalizationPatterns(reshapeCanonicalizations,
+                                                       context);
+    linalg::InitTensorOp::getCanonicalizationPatterns(reshapeCanonicalizations,
+                                                      context);
+    linalg::FillOp::getCanonicalizationPatterns(reshapeCanonicalizations,
+                                                context);
     if (failed(applyPatternsAndFoldGreedily(
             op->getRegions(), std::move(reshapeCanonicalizations)))) {
       return signalPassFailure();
@@ -147,10 +150,13 @@ struct FusionOfTensorOpsPass
     // Push the remaining reshapes down the graphs.
     OwningRewritePatternList pushReshapePatterns(&getContext());
     linalg::populatePushReshapeOpsPatterns(pushReshapePatterns);
-    linalg::TensorCollapseShapeOp::getCanonicalizationPatterns(
-        pushReshapePatterns, context);
-    linalg::TensorExpandShapeOp::getCanonicalizationPatterns(
-        pushReshapePatterns, context);
+    tensor::CollapseShapeOp::getCanonicalizationPatterns(pushReshapePatterns,
+                                                         context);
+    tensor::ExpandShapeOp::getCanonicalizationPatterns(pushReshapePatterns,
+                                                       context);
+    linalg::InitTensorOp::getCanonicalizationPatterns(pushReshapePatterns,
+                                                      context);
+    linalg::FillOp::getCanonicalizationPatterns(pushReshapePatterns, context);
     if (failed(applyPatternsAndFoldGreedily(op->getRegions(),
                                             std::move(pushReshapePatterns)))) {
       return signalPassFailure();
