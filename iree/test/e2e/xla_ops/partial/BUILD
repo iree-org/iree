@@ -35,6 +35,7 @@ iree_check_single_backend_test_suite(
     ],
     driver = "vulkan",
     tags = [
+        "manual",
         "notap",
         "vulkan_uses_vk_khr_shader_float16_int8",
     ],
