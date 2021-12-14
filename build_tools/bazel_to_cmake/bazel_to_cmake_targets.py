@@ -94,7 +94,7 @@ EXPLICIT_TARGET_MAPPING = {
     ],
     "@mlir-hlo//:legalize_to_linalg": [
         "tensorflow::external_mhlo_includes",
-        "MhloLhloToLinalg",
+        "MhloToLinalg",
     ],
     "@mlir-hlo//:legalize_to_standard": [
         "tensorflow::external_mhlo_includes",
