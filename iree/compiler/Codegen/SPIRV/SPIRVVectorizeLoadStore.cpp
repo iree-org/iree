@@ -18,15 +18,17 @@
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Debug.h"
+#include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/Dialect/Vector/VectorOps.h"
+#include "mlir/IR/AffineExpr.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
-#define DEBUG_TYPE "spirv-vectorize-load-store"
+#define DEBUG_TYPE "iree-spirv-vectorize-load-store"
 
 constexpr int kMaxVectorNumBits = 128;
 constexpr int kMaxVectorNumElements = 4;
@@ -216,11 +218,16 @@ class ProcessTransferRead final
     if (!vectorMemrefElemSize || !scalarMemrefElemSize || !readVecSize)
       return failure();
 
+    MLIRContext *context = rewriter.getContext();
+    AffineExpr sym0, sym1;
+    bindSymbols(context, sym0, sym1);
+    auto divMap = AffineMap::get(0, 2, {sym0.floorDiv(sym1)}, context);
+
     unsigned ratio = *vectorMemrefElemSize / *scalarMemrefElemSize;
+    Value valueRatio = rewriter.create<arith::ConstantIndexOp>(loc, ratio);
     auto indices = llvm::to_vector<4>(adaptor.indices());
-    indices.back() = rewriter.create<arith::DivSIOp>(
-        loc, indices.back(),
-        rewriter.create<arith::ConstantIndexOp>(loc, ratio));
+    indices.back() = rewriter.create<AffineApplyOp>(
+        loc, divMap, ValueRange{indices.back(), valueRatio});
 
     // If the transfer_read can be replaced by a load after vectorization use
     // LoadOp and cast back to the original type.
@@ -271,11 +278,16 @@ class ProcessTransferWrite final
     if (!vectorMemrefElemSize || !scalarMemrefElemSize || !writeVecSize)
       return failure();
 
+    MLIRContext *context = rewriter.getContext();
+    AffineExpr sym0, sym1;
+    bindSymbols(context, sym0, sym1);
+    auto divMap = AffineMap::get(0, 2, {sym0.floorDiv(sym1)}, context);
+
     unsigned ratio = *vectorMemrefElemSize / *scalarMemrefElemSize;
+    Value valueRatio = rewriter.create<arith::ConstantIndexOp>(loc, ratio);
     SmallVector<Value, 4> indices(adaptor.indices());
-    indices.back() = rewriter.create<arith::DivSIOp>(
-        loc, indices.back(),
-        rewriter.create<arith::ConstantIndexOp>(loc, ratio));
+    indices.back() = rewriter.create<AffineApplyOp>(
+        loc, divMap, ValueRange{indices.back(), valueRatio});
 
     // If the transfer_write can be replaced by a store after vectorization cast
     // the original value and use StoreOp.
@@ -407,14 +419,19 @@ struct ScalarizeVectorTransferRead final
         !readOp.permutation_map().isMinorIdentity())
       return failure();
 
+    MLIRContext *context = rewriter.getContext();
+    AffineExpr sym0, sym1;
+    bindSymbols(context, sym0, sym1);
+    auto addMap = AffineMap::get(0, 2, {sym0 + sym1}, context);
+
     Location loc = readOp.getLoc();
     Value newVector = rewriter.create<arith::ConstantOp>(
         loc, vectorType, rewriter.getZeroAttr(vectorType));
     for (int i = 0; i < vectorType.getDimSize(0); ++i) {
+      Value iVal = rewriter.create<arith::ConstantIndexOp>(loc, i);
       auto indices = llvm::to_vector<4>(readOp.indices());
-      indices.back() = rewriter.createOrFold<arith::AddIOp>(
-          loc, indices.back(),
-          rewriter.createOrFold<arith::ConstantIndexOp>(loc, i));
+      indices.back() = rewriter.create<AffineApplyOp>(
+          loc, addMap, ValueRange{indices.back(), iVal});
       Value scalar = rewriter.create<memref::LoadOp>(loc, scalarType,
                                                      readOp.source(), indices);
       newVector = rewriter.create<vector::InsertOp>(loc, scalar, newVector, i);
@@ -436,12 +453,16 @@ struct ScalarizeVectorTransferWrite final
       return failure();
 
     Location loc = writeOp.getLoc();
+    MLIRContext *context = rewriter.getContext();
+    AffineExpr sym0, sym1;
+    bindSymbols(context, sym0, sym1);
+    auto addMap = AffineMap::get(0, 2, {sym0 + sym1}, context);
 
     for (int i = 0; i < vectorType.getDimSize(0); ++i) {
+      Value iVal = rewriter.create<arith::ConstantIndexOp>(loc, i);
       auto indices = llvm::to_vector<4>(writeOp.indices());
-      indices.back() = rewriter.createOrFold<arith::AddIOp>(
-          loc, indices.back(),
-          rewriter.createOrFold<arith::ConstantIndexOp>(loc, i));
+      indices.back() = rewriter.create<AffineApplyOp>(
+          loc, addMap, ValueRange{indices.back(), iVal});
       Value scalar =
           rewriter.create<vector::ExtractOp>(loc, writeOp.vector(), i);
       rewriter.create<memref::StoreOp>(loc, scalar, writeOp.source(), indices);
@@ -454,7 +475,7 @@ struct ScalarizeVectorTransferWrite final
 class SPIRVVectorizeLoadStorePass final
     : public SPIRVVectorizeLoadStoreBase<SPIRVVectorizeLoadStorePass> {
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<memref::MemRefDialect>();
+    registry.insert<AffineDialect, memref::MemRefDialect>();
   }
 
   void runOnOperation() override;
