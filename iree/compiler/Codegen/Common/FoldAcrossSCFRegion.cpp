@@ -54,7 +54,7 @@ static Value foldValueDefUse(Operation* user, Operation* def) {
 
 /// Moves all ops from the `source` block into the `dest` block and updates the
 /// yield terminator op to yield values in `results`.
-static void transferBody(Block* source, Block* dest, ArrayRef<Value> results,
+static void transferBody(Block* source, Block* dest, ValueRange results,
                          RewriterBase& rewriter) {
   // Move all operations to the destination block.
   rewriter.mergeBlocks(source, dest, dest->getArguments());
@@ -63,7 +63,7 @@ static void transferBody(Block* source, Block* dest, ArrayRef<Value> results,
   yieldOp.getOperation()->setOperands(results);
 }
 
-/// Fold reciprocal ops across ForOp boundary. It is common when doing
+/// Fold cancelling op pairs across ForOp boundary. It is common when doing
 /// incremental lowering to generate transient ops that cancel each others out.
 /// Canonicalization usually clean up those operations. When the value is loop
 /// carried, MLIR canonicalization currently doesn't remove the redundant
@@ -163,7 +163,7 @@ struct CanoncalizeForOpCarriedValueShape final
   }
 };
 
-/// Fold reciprocal ops across IfOp boundary. This is similar to the above
+/// Fold cancelling op pairs across IfOp boundary. This is similar to the above
 /// pattern for ForOps.
 ///
 /// This pass does this kind of transformation:
@@ -192,86 +192,69 @@ struct CanoncalizeIfReturnedValueShape final
     auto resultTypes = llvm::to_vector<8>(ifOp.getResultTypes());
     if (resultTypes.empty()) return failure();
 
-    // Require all yield values in the "else" branch to be splat constant for
-    // now. Merging different cases between the "then" and "else" branches can
-    // be complicated; leave that to only when needed.
-    if (ifOp.elseBlock()) {
-      SplatElementsAttr splat;
-      for (Value v : ifOp.elseYield().getOperands()) {
-        if (!matchPattern(v, m_Constant(&splat))) return failure();
-      }
-    }
-
-    // All yielded values from the "then" branch.
-    auto thenYieldValues = llvm::to_vector<8>(ifOp.thenYield().getOperands());
-    // Shape casting ops that should be used to build the new results.
-    SmallVector<std::pair<unsigned, Operation*>, 8> resultOps;
+    // Shape casting ops that uses the if op's results. We'll move these ops
+    // into if regions later in order to cancel with shape casting ops there.
+    SmallVector<Operation*, 8> userOps(ifOp.getNumResults());
 
     bool folded = false;
-    for (const auto& it : llvm::enumerate(thenYieldValues)) {
+    for (const auto& it : llvm::enumerate(ifOp.thenYield().getOperands())) {
       unsigned index = it.index();
       Value result = ifOp.getResult(index);
       if (!result.hasOneUse()) continue;
-      Operation* userOp = result.use_begin()->getOwner();
 
       // Only support broadcast-extract pairs for now.
+      Operation* userOp = result.use_begin()->getOwner();
       if (!isa<vector::ExtractOp>(userOp)) continue;
 
       Operation* defOp = it.value().getDefiningOp();
-      Value newYieldValue = foldValueDefUse(userOp, defOp);
-      if (!newYieldValue) continue;
+      if (!foldValueDefUse(userOp, defOp)) continue;
 
-      resultTypes[index] = newYieldValue.getType();
-      // Update to record the source value to yield after pushing shape casting
-      // ops to be after the if region.
-      thenYieldValues[index] = newYieldValue;
-      // Also record the shape cast op so later we can clone it after the
-      // if region.
-      resultOps.emplace_back(index, defOp);
+      // Update to the new result type that the if op should return eventually.
+      resultTypes[index] = userOp->getResult(0).getType();
+      // Record the shape cast op so later we can clone it into the if regions.
+      userOps[index] = userOp;
       folded = true;
     }
-
     if (!folded) return failure();
 
     auto newIf = rewriter.create<scf::IfOp>(ifOp.getLoc(), resultTypes,
                                             ifOp.condition(), ifOp.elseBlock());
 
-    transferBody(ifOp.thenBlock(), newIf.thenBlock(), thenYieldValues,
-                 rewriter);
+    // Move the original regions to the new if op.
+    rewriter.mergeBlocks(ifOp.thenBlock(), newIf.thenBlock(),
+                         newIf.thenBlock()->getArguments());
+    rewriter.mergeBlocks(ifOp.elseBlock(), newIf.elseBlock(),
+                         newIf.elseBlock()->getArguments());
 
-    if (ifOp.elseBlock()) {
-      OpBuilder elseBuilder = newIf.getElseBodyBuilder(rewriter.getListener());
-      auto elseYieldValues = llvm::to_vector<8>(ifOp.elseYield().getOperands());
-      // Reshape all splat constants to match shape.
-      for (int i = 0; i < elseYieldValues.size(); ++i) {
-        Value oldValue = elseYieldValues[i];
-        auto oldAttr = oldValue.getDefiningOp<arith::ConstantOp>().getValue();
-        Attribute newAttr;
-        if (auto shapedType = resultTypes[i].dyn_cast<ShapedType>()) {
-          newAttr = oldAttr.cast<SplatElementsAttr>().reshape(shapedType);
-        } else {
-          newAttr =
-              oldAttr.cast<SplatElementsAttr>().getSplatValue<Attribute>();
-        }
-        elseYieldValues[i] =
-            elseBuilder.create<arith::ConstantOp>(oldValue.getLoc(), newAttr);
-      }
-      elseBuilder.create<scf::YieldOp>(ifOp.elseYield().getLoc(),
-                                       elseYieldValues);
-    }
-
-    // Replace the results with the new if's results.
-    SmallVector<Value, 8> newResults(newIf.getResults().begin(),
-                                     newIf.getResults().end());
-    for (const auto& it : resultOps) {
-      // Push the original def to after the region. So clone it outside and take
-      // the new result as operands.
+    // Clone user shape cast ops into the if regions.
+    auto cloneUserOpsIntoRegion = [&](scf::YieldOp yieldOp) {
+      OpBuilder::InsertionGuard guard(rewriter);
+      rewriter.setInsertionPoint(yieldOp);
       BlockAndValueMapping mapping;
-      mapping.map(thenYieldValues[it.first], newIf.getResult(it.first));
-      newResults[it.first] = rewriter.clone(*it.second, mapping)->getResult(0);
-    }
+      SmallVector<Value> newYieldValues;
+      for (int i = 0; i < userOps.size(); ++i) {
+        // If this yield value has a cancelling shape cast op, clone the user
+        // shape cast op inside this region and update the yield. Otherwise,
+        // yield the original value.
+        if (userOps[i]) {
+          mapping.map(ifOp.getResult(i), yieldOp.getOperand(i));
+          Operation* clonedOp = rewriter.clone(*userOps[i], mapping);
+          newYieldValues.push_back(clonedOp->getResult(0));
+        } else {
+          newYieldValues.push_back(yieldOp.getOperand(i));
+        }
+      }
+      yieldOp.getOperation()->setOperands(newYieldValues);
+    };
+    cloneUserOpsIntoRegion(newIf.thenYield());
+    cloneUserOpsIntoRegion(newIf.elseYield());
 
-    rewriter.replaceOp(ifOp, newResults);
+    rewriter.replaceOp(ifOp, newIf.getResults());
+    // Now these user ops have been cloned in the if regions, they can be
+    // replaced with the new if ops' results.
+    for (int i = 0; i < userOps.size(); ++i) {
+      if (userOps[i]) rewriter.replaceOp(userOps[i], newIf.getResult(i));
+    }
     return success();
   }
 };

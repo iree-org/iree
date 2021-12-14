@@ -142,14 +142,16 @@ func @if_result_extract(%cond: i1, %v0: f32, %v1: vector<4xf32>, %v2: vector<3xf
 
 // CHECK-LABEL: func @if_result_extract
 //  CHECK-SAME: (%[[COND:.+]]: i1, %[[V0:.+]]: f32, %[[V1:.+]]: vector<4xf32>, %[[V2:.+]]: vector<3xf32>)
-//   CHECK-DAG:   %[[CST0:.+]] = arith.constant 0.000000e+00 : f32
+//   CHECK-DAG:   %[[CST0:.+]] = arith.constant dense<0.000000e+00> : vector<1x4xf32>
 //   CHECK-DAG:   %[[CST1:.+]] = arith.constant dense<0.000000e+00> : vector<4xf32>
-//   CHECK-DAG:   %[[CST2:.+]] = arith.constant dense<0.000000e+00> : vector<3xf32>
-//       CHECK:   %[[IF:.+]]:3 = scf.if %[[COND]] -> (f32, vector<4xf32>, vector<3xf32>) {
-//  CHECK-NEXT:     scf.yield %[[V0]], %[[V1]], %[[V2]] : f32, vector<4xf32>, vector<3xf32>
+//   CHECK-DAG:   %[[CST2:.+]] = arith.constant dense<0.000000e+00> : vector<1x3xf32>
+//       CHECK:   %[[IF:.+]]:3 = scf.if %[[COND]] -> (f32, vector<4xf32>, f32) {
+//  CHECK-NEXT:     %[[V2_0:.+]] = vector.extract %[[V2]][0] : vector<3xf32>
+//  CHECK-NEXT:     scf.yield %[[V0]], %[[V1]], %[[V2_0]]
 //  CHECK-NEXT:   } else {
-//  CHECK-NEXT:     scf.yield %[[CST0]], %[[CST1]], %[[CST2]] : f32, vector<4xf32>, vector<3xf32>
+//  CHECK-NEXT:     %[[V0_0:.+]] = vector.extract %[[CST0]][0, 0] : vector<1x4xf32>
+//  CHECK-NEXT:     %[[V2_0:.+]] = vector.extract %[[CST2]][0, 0] : vector<1x3xf32>
+//  CHECK-NEXT:     scf.yield %[[V0_0]], %[[CST1]], %[[V2_0]]
 //  CHECK-NEXT:   }
-//       CHECK:   %[[EXTRACT0:.+]] = vector.extract %[[IF]]#1[0] : vector<4xf32>
-//       CHECK:   %[[EXTRACT1:.+]] = vector.extract %[[IF]]#2[0] : vector<3xf32>
-//       CHECK:   return %[[IF]]#0, %[[EXTRACT0]], %[[EXTRACT1]]
+//       CHECK:   %[[EXTRACT1:.+]] = vector.extract %[[IF]]#1[0] : vector<4xf32>
+//       CHECK:   return %[[IF]]#0, %[[EXTRACT1]], %[[IF]]#2
