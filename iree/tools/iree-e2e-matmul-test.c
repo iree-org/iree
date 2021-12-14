@@ -553,7 +553,8 @@ static iree_status_t replay_event_call(iree_trace_replay_t* replay,
   // linalg.matmul. We need to preserve the original test inputs to run the
   // reference matmul on and to use in test failure logs.
   iree_vm_list_t* copy_of_input_list = NULL;
-  copy_list_of_buffer_views(device_allocator, input_list, &copy_of_input_list);
+  IREE_CHECK_OK(copy_list_of_buffer_views(device_allocator, input_list,
+                                          &copy_of_input_list));
 
   // Invoke the function to produce the actual result.
   iree_vm_list_t* output_list = NULL;

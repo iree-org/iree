@@ -54,9 +54,10 @@ iree_status_t iree_tools_utils_buffer_view_from_image_rescaled(
     const iree_string_view_t filename, const iree_hal_dim_t* shape,
     iree_host_size_t shape_rank, iree_hal_element_type_t element_type,
     iree_hal_allocator_t* allocator, const float* input_range,
-    iree_host_size_t range_length, iree_hal_buffer_view_t** out_buffer_view);
+    iree_host_size_t input_range_length,
+    iree_hal_buffer_view_t** out_buffer_view);
 
-// Normalize uint8_t |pixel data| of the size |buffer_length| to float buffer
+// Normalize uint8_t |pixel_data| of the size |buffer_length| to float buffer
 // |out_buffer| with the range |input_range|.
 //
 // float32_x = (uint8_x - 127.5) / 127.5 * input_scale + input_offset, where
@@ -66,7 +67,8 @@ iree_status_t iree_tools_utils_buffer_view_from_image_rescaled(
 // |out_buffer| needs to be allocated before the call.
 iree_status_t iree_tools_utils_pixel_rescaled_to_buffer(
     const uint8_t* pixel_data, iree_host_size_t buffer_length,
-    const float* input_range, iree_host_size_t range_length, float* out_buffer);
+    const float* input_range, iree_host_size_t input_range_length,
+    float* out_buffer);
 
 #if __cplusplus
 }

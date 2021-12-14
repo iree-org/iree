@@ -205,6 +205,7 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_view_create(
     iree_hal_buffer_view_t** out_buffer_view);
 
 // Allocates a buffer from |allocator| and wraps it in a buffer view.
+//
 // This is equivalent to:
 //   1. iree_hal_buffer_compute_view_size
 //   2. iree_hal_allocator_allocate_buffer
@@ -217,6 +218,7 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_view_allocate_buffer(
     iree_hal_buffer_view_t** out_buffer_view);
 
 // Imports a host buffer using |allocator| and wraps it in a buffer view.
+//
 // This is equivalent to:
 //   1. iree_hal_allocator_wrap_buffer
 //   2. iree_hal_buffer_view_create
@@ -235,6 +237,7 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_view_wrap_heap_buffer(
 // Tries to import a host buffer using |allocator| and wrap it in a buffer view.
 // If the buffer cannot be imported then a new buffer will be allocated and the
 // source data will be copied into it.
+//
 // This is equivalent to:
 //   if iree_hal_allocator_query_buffer_compatibility ok:
 //     1. iree_hal_allocator_wrap_buffer
@@ -250,6 +253,39 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_view_wrap_or_clone_heap_buffer(
     iree_hal_memory_access_t allowed_access,
     iree_hal_buffer_usage_t allowed_usage, iree_byte_span_t data,
     iree_allocator_t data_allocator, iree_hal_buffer_view_t** out_buffer_view);
+
+typedef iree_status_t(IREE_API_PTR* iree_hal_buffer_view_generator_callback_t)(
+    iree_hal_buffer_mapping_t* mapping, void* user_data);
+
+// Generates a buffer view with its initial contents produced by a callback.
+// When host and device memory are shared this allows direct generation into the
+// target device buffer. If not shared this can avoid expensive transfer mapping
+// operations at the cost of a transient host memory allocation. The mapped host
+// pointer passed to the callback is only valid within the callback.
+//
+// Buffers allocated like this do not need the IREE_HAL_BUFFER_USAGE_MAPPING bit
+// set; it will be added automatically if the allocator needs it and otherwise
+// the memory can remain unmappable (and thus fully device isolated).
+//
+// As this _may_ require allocation of the entire buffer content in host memory
+// it is always preferable to stage and issue copy commands via the device
+// queue. Even better is to do all generation on-device via dispatches without
+// the need to ever transfer. Usage of this method should be limited to times
+// where device-side generation isn't possible or memory consumption is not a
+// concern.
+//
+// This is equivalent to:
+//   1. iree_hal_buffer_compute_view_size
+//   2. iree_hal_allocator_allocate_buffer
+//   3. iree_hal_buffer_map_range + callback + iree_hal_buffer_unmap_range
+//   4. iree_hal_buffer_view_create
+IREE_API_EXPORT iree_status_t iree_hal_buffer_view_generate_buffer(
+    iree_hal_allocator_t* allocator, const iree_hal_dim_t* shape,
+    iree_host_size_t shape_rank, iree_hal_element_type_t element_type,
+    iree_hal_encoding_type_t encoding_type, iree_hal_memory_type_t memory_type,
+    iree_hal_buffer_usage_t allowed_usage,
+    iree_hal_buffer_view_generator_callback_t callback, void* user_data,
+    iree_hal_buffer_view_t** out_buffer_view);
 
 // Retains the given |buffer_view| for the caller.
 IREE_API_EXPORT void iree_hal_buffer_view_retain(
