@@ -173,6 +173,30 @@ IREE_API_EXPORT iree_status_t iree_hal_device_query_i32(
     iree_hal_device_t* device, iree_string_view_t category,
     iree_string_view_t key, int32_t* out_value);
 
+// Synchronously executes one or more transfer operations against a queue.
+// All buffers must be compatible with |device| and ranges must not overlap
+// (same as with memcpy).
+//
+// This is a blocking operation and may incur significant overheads as
+// internally it issues a command buffer with the transfer operations and waits
+// for it to complete. Users should do that themselves so that the work can be
+// issued concurrently and batched effectively. This is only useful as a
+// fallback for implementations that require it or tools where things like I/O
+// are transferred without worrying about performance. When submitting other
+// work it's preferable to use iree_hal_create_transfer_command_buffer and a
+// normal queue submission that allows for more fine-grained sequencing and
+// amortizes the submission cost by batching other work.
+//
+// The transfer will begin after the optional |wait_semaphore| reaches
+// |wait_value|. Behavior is undefined if no semaphore is provided and there are
+// in-flight operations concurrently using the buffer ranges.
+// Returns only after all transfers have completed and been flushed.
+IREE_API_EXPORT iree_status_t iree_hal_device_transfer_and_wait(
+    iree_hal_device_t* device, iree_hal_semaphore_t* wait_semaphore,
+    uint64_t wait_value, iree_host_size_t transfer_count,
+    const iree_hal_transfer_command_t* transfer_commands,
+    iree_timeout_t timeout);
+
 // Submits one or more batches of work to a device queue.
 //
 // The queue is selected based on the flags set in |command_categories| and the
