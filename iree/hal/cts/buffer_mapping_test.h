@@ -28,11 +28,11 @@ constexpr iree_device_size_t kAllocationSize = 1024;
 
 }  // namespace
 
-class BufferMappingTest : public CtsTestBase {};
+class buffer_mapping_test : public CtsTestBase {};
 
 // TODO(scotttodd): move this check to SetUp() and skip tests if not supported
 //   or add general support for optional features/tests into the CTS framework?
-TEST_P(BufferMappingTest, AllocatorSupportsBufferMapping) {
+TEST_P(buffer_mapping_test, AllocatorSupportsBufferMapping) {
   iree_hal_memory_type_t memory_type = IREE_HAL_MEMORY_TYPE_HOST_VISIBLE;
   iree_hal_buffer_usage_t buffer_usage = IREE_HAL_BUFFER_USAGE_MAPPING;
 
@@ -58,7 +58,7 @@ TEST_P(BufferMappingTest, AllocatorSupportsBufferMapping) {
   iree_hal_buffer_release(buffer);
 }
 
-TEST_P(BufferMappingTest, Zero) {
+TEST_P(buffer_mapping_test, Zero) {
   iree_hal_memory_type_t memory_type = IREE_HAL_MEMORY_TYPE_HOST_VISIBLE;
   iree_hal_buffer_usage_t buffer_usage = IREE_HAL_BUFFER_USAGE_MAPPING;
 
@@ -80,7 +80,7 @@ TEST_P(BufferMappingTest, Zero) {
   iree_hal_buffer_release(buffer);
 }
 
-TEST_P(BufferMappingTest, FillEmpty) {
+TEST_P(buffer_mapping_test, FillEmpty) {
   iree_hal_memory_type_t memory_type = IREE_HAL_MEMORY_TYPE_HOST_VISIBLE;
   iree_hal_buffer_usage_t buffer_usage = IREE_HAL_BUFFER_USAGE_MAPPING;
 
@@ -108,7 +108,7 @@ TEST_P(BufferMappingTest, FillEmpty) {
   iree_hal_buffer_release(buffer);
 }
 
-TEST_P(BufferMappingTest, Fill) {
+TEST_P(buffer_mapping_test, Fill) {
   iree_hal_memory_type_t memory_type = IREE_HAL_MEMORY_TYPE_HOST_VISIBLE;
   iree_hal_buffer_usage_t buffer_usage = IREE_HAL_BUFFER_USAGE_MAPPING;
 
@@ -133,7 +133,7 @@ TEST_P(BufferMappingTest, Fill) {
   iree_hal_buffer_release(buffer);
 }
 
-TEST_P(BufferMappingTest, Write) {
+TEST_P(buffer_mapping_test, Write) {
   iree_hal_memory_type_t memory_type = IREE_HAL_MEMORY_TYPE_HOST_VISIBLE;
   iree_hal_buffer_usage_t buffer_usage = IREE_HAL_BUFFER_USAGE_MAPPING;
 
@@ -155,7 +155,7 @@ TEST_P(BufferMappingTest, Write) {
 
   iree_hal_buffer_release(buffer);
 }
-TEST_P(BufferMappingTest, Copy) {
+TEST_P(buffer_mapping_test, Copy) {
   iree_hal_memory_type_t memory_type = IREE_HAL_MEMORY_TYPE_HOST_VISIBLE;
   iree_hal_buffer_usage_t buffer_usage = IREE_HAL_BUFFER_USAGE_MAPPING;
 

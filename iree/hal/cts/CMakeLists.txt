@@ -4,22 +4,17 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-# List of lists where each element is [test_name, TestClassName].
-#   * `test_name`s in underscore_case are used for target and file names.
-#   * `TestClassName` in TitleCase corresponds to subclasses of CtsTestBase.
-# An automated mapping and more implicit generation is certainly possible, but
-# this was simplest at the time of writing.
 set(IREE_ALL_CTS_TESTS
-  "allocator,AllocatorTest"
-  "buffer_mapping,BufferMappingTest"
-  "command_buffer,CommandBufferTest"
-  "descriptor_set_layout,DescriptorSetLayoutTest"
-  "descriptor_set,DescriptorSetTest"
-  "driver,DriverTest"
-  "event,EventTest"
-  "executable_layout,ExecutableLayoutTest"
-  "semaphore_submission,SemaphoreSubmissionTest"
-  "semaphore,SemaphoreTest"
+  "allocator"
+  "buffer_mapping"
+  "command_buffer"
+  "descriptor_set_layout"
+  "descriptor_set"
+  "driver"
+  "event"
+  "executable_layout"
+  "semaphore_submission"
+  "semaphore"
   PARENT_SCOPE
 )
 

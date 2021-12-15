@@ -20,9 +20,9 @@ namespace iree {
 namespace hal {
 namespace cts {
 
-class DriverTest : public CtsTestBase {};
+class driver_test : public CtsTestBase {};
 
-TEST_P(DriverTest, QueryAndCreateAvailableDevices) {
+TEST_P(driver_test, QueryAndCreateAvailableDevices) {
   iree_hal_device_info_t* device_infos;
   iree_host_size_t device_info_count;
   IREE_ASSERT_OK(iree_hal_driver_query_available_devices(

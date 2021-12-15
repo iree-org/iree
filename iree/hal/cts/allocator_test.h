@@ -23,7 +23,7 @@ constexpr iree_device_size_t kAllocationSize = 1024;
 
 }  // namespace
 
-class AllocatorTest : public CtsTestBase {};
+class allocator_test : public CtsTestBase {};
 
 // All allocators must support some baseline capabilities.
 //
@@ -31,7 +31,7 @@ class AllocatorTest : public CtsTestBase {};
 // driver implementations or target devices, such as:
 //   IREE_HAL_MEMORY_TYPE_HOST_LOCAL | IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL
 //   IREE_HAL_BUFFER_USAGE_MAPPING
-TEST_P(AllocatorTest, BaselineBufferCompatibility) {
+TEST_P(allocator_test, BaselineBufferCompatibility) {
   // Need at least one way to get data between the host and device.
   iree_hal_buffer_compatibility_t transfer_compatibility_host =
       iree_hal_allocator_query_buffer_compatibility(
@@ -65,7 +65,7 @@ TEST_P(AllocatorTest, BaselineBufferCompatibility) {
                             IREE_HAL_BUFFER_COMPATIBILITY_QUEUE_DISPATCH));
 }
 
-TEST_P(AllocatorTest, BufferAllowedUsageDeterminesCompatibility) {
+TEST_P(allocator_test, BufferAllowedUsageDeterminesCompatibility) {
   iree_hal_buffer_compatibility_t compatibility =
       iree_hal_allocator_query_buffer_compatibility(
           device_allocator_, IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE,
@@ -79,7 +79,7 @@ TEST_P(AllocatorTest, BufferAllowedUsageDeterminesCompatibility) {
                                  IREE_HAL_BUFFER_COMPATIBILITY_QUEUE_DISPATCH));
 }
 
-TEST_P(AllocatorTest, AllocateBuffer) {
+TEST_P(allocator_test, AllocateBuffer) {
   iree_hal_memory_type_t memory_type = IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE;
   iree_hal_buffer_usage_t buffer_usage = IREE_HAL_BUFFER_USAGE_TRANSFER;
 
@@ -102,7 +102,7 @@ TEST_P(AllocatorTest, AllocateBuffer) {
 
 // While empty allocations aren't particularly useful, they can occur in
 // practice so we should at least be able to create them without errors.
-TEST_P(AllocatorTest, AllocateEmptyBuffer) {
+TEST_P(allocator_test, AllocateEmptyBuffer) {
   iree_hal_memory_type_t memory_type = IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE;
   iree_hal_buffer_usage_t buffer_usage = IREE_HAL_BUFFER_USAGE_TRANSFER;
 

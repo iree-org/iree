@@ -19,9 +19,9 @@ namespace iree {
 namespace hal {
 namespace cts {
 
-class SemaphoreSubmissionTest : public CtsTestBase {};
+class semaphore_submission_test : public CtsTestBase {};
 
-TEST_P(SemaphoreSubmissionTest, SubmitWithNoCommandBuffers) {
+TEST_P(semaphore_submission_test, SubmitWithNoCommandBuffers) {
   // No waits, one signal which we immediately wait on after submit.
   iree_hal_submission_batch_t submission_batch;
   submission_batch.wait_semaphores.count = 0;
@@ -48,7 +48,7 @@ TEST_P(SemaphoreSubmissionTest, SubmitWithNoCommandBuffers) {
   iree_hal_semaphore_release(signal_semaphore);
 }
 
-TEST_P(SemaphoreSubmissionTest, SubmitAndSignal) {
+TEST_P(semaphore_submission_test, SubmitAndSignal) {
   iree_hal_command_buffer_t* command_buffer;
   IREE_ASSERT_OK(iree_hal_command_buffer_create(
       device_, IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT,
@@ -85,7 +85,7 @@ TEST_P(SemaphoreSubmissionTest, SubmitAndSignal) {
   iree_hal_semaphore_release(signal_semaphore);
 }
 
-TEST_P(SemaphoreSubmissionTest, SubmitWithWait) {
+TEST_P(semaphore_submission_test, SubmitWithWait) {
   // Empty command buffer.
   iree_hal_command_buffer_t* command_buffer;
   IREE_ASSERT_OK(iree_hal_command_buffer_create(
@@ -135,7 +135,7 @@ TEST_P(SemaphoreSubmissionTest, SubmitWithWait) {
   iree_hal_semaphore_release(signal_semaphore);
 }
 
-TEST_P(SemaphoreSubmissionTest, SubmitWithMultipleSemaphores) {
+TEST_P(semaphore_submission_test, SubmitWithMultipleSemaphores) {
   iree_hal_command_buffer_t* command_buffer;
   IREE_ASSERT_OK(iree_hal_command_buffer_create(
       device_, IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT,
