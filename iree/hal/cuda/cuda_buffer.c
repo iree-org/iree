@@ -94,10 +94,11 @@ static iree_status_t iree_hal_cuda_buffer_map_range(
   return iree_ok_status();
 }
 
-static void iree_hal_cuda_buffer_unmap_range(
+static iree_status_t iree_hal_cuda_buffer_unmap_range(
     iree_hal_buffer_t* base_buffer, iree_device_size_t local_byte_offset,
     iree_device_size_t local_byte_length, iree_hal_buffer_mapping_t* mapping) {
-  // nothing to do.
+  // Nothing to do (today).
+  return iree_ok_status();
 }
 
 static iree_status_t iree_hal_cuda_buffer_invalidate_range(

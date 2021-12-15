@@ -519,8 +519,12 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_map_range(
 //
 // If the buffer is not IREE_HAL_MEMORY_TYPE_HOST_COHERENT then the caller must
 // flush the byte range they want to make available to other threads/devices.
-IREE_API_EXPORT void iree_hal_buffer_unmap_range(
-    iree_hal_buffer_mapping_t* buffer_mapping);
+//
+// May fail, though unlikely to do so for read-only mapping and the result can
+// be safely ignored using iree_status_ignore. If writing then users must check
+// the status to ensure their writes succeeded.
+IREE_API_EXPORT iree_status_t
+iree_hal_buffer_unmap_range(iree_hal_buffer_mapping_t* buffer_mapping);
 
 // Invalidates ranges of non-coherent memory from the host caches.
 // This guarantees that device writes to the memory ranges provided are
@@ -608,10 +612,10 @@ typedef struct iree_hal_buffer_vtable_t {
                                          iree_device_size_t local_byte_length,
                                          iree_hal_buffer_mapping_t* mapping);
 
-  void(IREE_API_PTR* unmap_range)(iree_hal_buffer_t* buffer,
-                                  iree_device_size_t local_byte_offset,
-                                  iree_device_size_t local_byte_length,
-                                  iree_hal_buffer_mapping_t* mapping);
+  iree_status_t(IREE_API_PTR* unmap_range)(iree_hal_buffer_t* buffer,
+                                           iree_device_size_t local_byte_offset,
+                                           iree_device_size_t local_byte_length,
+                                           iree_hal_buffer_mapping_t* mapping);
 
   iree_status_t(IREE_API_PTR* invalidate_range)(
       iree_hal_buffer_t* buffer, iree_device_size_t local_byte_offset,

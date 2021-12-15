@@ -86,7 +86,7 @@ iree_status_t Run(const iree_string_view_t image_path) {
       result_idx = i;
     }
   }
-  iree_hal_buffer_unmap_range(&mapped_memory);
+
   // Get the highest index from the output.
   fprintf(stdout, "Detected number: %d\n", result_idx);
   iree_hal_buffer_view_release(ret_buffer_view);

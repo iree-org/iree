@@ -213,7 +213,8 @@ static iree_status_t iree_hal_buffer_view_generate_buffer_in_situ(
     status = callback(&buffer_mapping, user_data);
   }
 
-  iree_hal_buffer_unmap_range(&buffer_mapping);
+  status =
+      iree_status_join(status, iree_hal_buffer_unmap_range(&buffer_mapping));
   if (iree_status_is_ok(status)) {
     *out_buffer_view = buffer_view;
   } else {
@@ -759,7 +760,8 @@ static iree_status_t iree_hal_buffer_view_format_impl(
       buffer ? buffer_capacity - buffer_length : 0,
       buffer ? buffer + buffer_length : NULL, &elements_length);
   buffer_length += elements_length;
-  iree_hal_buffer_unmap_range(&buffer_mapping);
+  status =
+      iree_status_join(status, iree_hal_buffer_unmap_range(&buffer_mapping));
   if (iree_status_is_out_of_range(status)) {
     status = iree_status_ignore(status);
     buffer = NULL;

@@ -7,6 +7,10 @@
 // A example of setting up the HAL module to run simple pointwise array
 // multiplication with the device implemented by different backends via
 // create_sample_driver().
+//
+// NOTE: this file does not properly handle error cases and will leak on
+// failure. Applications that are just going to exit()/abort() on failure can
+// probably get away with the same thing but really should prefer not to.
 
 #include <stdio.h>
 
@@ -139,7 +143,6 @@ iree_status_t Run() {
       return iree_make_status(IREE_STATUS_UNKNOWN, "result mismatches");
     }
   }
-  iree_hal_buffer_unmap_range(&mapped_memory);
 
   iree_vm_list_release(inputs);
   iree_vm_list_release(outputs);

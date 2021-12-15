@@ -121,12 +121,12 @@ static iree_status_t iree_hal_subspan_buffer_map_range(
       local_byte_length, mapping);
 }
 
-static void iree_hal_subspan_buffer_unmap_range(
+static iree_status_t iree_hal_subspan_buffer_unmap_range(
     iree_hal_buffer_t* buffer, iree_device_size_t local_byte_offset,
     iree_device_size_t local_byte_length, iree_hal_buffer_mapping_t* mapping) {
-  if (!buffer->allocated_buffer) return;
-  _VTABLE_DISPATCH(buffer->allocated_buffer, unmap_range)
-  (buffer->allocated_buffer, local_byte_offset, local_byte_length, mapping);
+  if (!buffer->allocated_buffer) return iree_ok_status();
+  return _VTABLE_DISPATCH(buffer->allocated_buffer, unmap_range)(
+      buffer->allocated_buffer, local_byte_offset, local_byte_length, mapping);
 }
 
 static iree_status_t iree_hal_subspan_buffer_invalidate_range(
@@ -522,7 +522,7 @@ iree_hal_buffer_fill(iree_hal_buffer_t* buffer, iree_device_size_t byte_offset,
 
   if (IREE_UNLIKELY((byte_offset % pattern_length) != 0) ||
       IREE_UNLIKELY((byte_length % pattern_length) != 0)) {
-    iree_hal_buffer_unmap_range(&target_mapping);
+    iree_status_ignore(iree_hal_buffer_unmap_range(&target_mapping));
     IREE_TRACE_ZONE_END(z0);
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                             "attempting to fill a range with %zu byte values "
@@ -576,7 +576,8 @@ iree_hal_buffer_fill(iree_hal_buffer_t* buffer, iree_device_size_t byte_offset,
     status = iree_hal_buffer_flush_range(&target_mapping, 0, IREE_WHOLE_BUFFER);
   }
 
-  iree_hal_buffer_unmap_range(&target_mapping);
+  status =
+      iree_status_join(status, iree_hal_buffer_unmap_range(&target_mapping));
   IREE_TRACE_ZONE_END(z0);
   return status;
 }
@@ -716,7 +717,8 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_transfer_mappable_range(
   }
 
   if (source.device_buffer) {
-    iree_hal_buffer_unmap_range(&source_mapping);
+    status =
+        iree_status_join(status, iree_hal_buffer_unmap_range(&source_mapping));
   }
   if (target.device_buffer) {
     if (adjusted_data_length > 0 &&
@@ -726,7 +728,8 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_transfer_mappable_range(
           status, iree_hal_buffer_flush_range(&target_mapping, 0,
                                               adjusted_data_length));
     }
-    iree_hal_buffer_unmap_range(&target_mapping);
+    status =
+        iree_status_join(status, iree_hal_buffer_unmap_range(&target_mapping));
   }
   return status;
 }
@@ -791,16 +794,16 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_map_range(
   return status;
 }
 
-IREE_API_EXPORT void iree_hal_buffer_unmap_range(
-    iree_hal_buffer_mapping_t* buffer_mapping) {
+IREE_API_EXPORT iree_status_t
+iree_hal_buffer_unmap_range(iree_hal_buffer_mapping_t* buffer_mapping) {
   IREE_ASSERT_ARGUMENT(buffer_mapping);
   iree_hal_buffer_t* buffer = buffer_mapping->buffer;
-  if (!buffer) return;
+  if (!buffer) return iree_ok_status();
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  _VTABLE_DISPATCH(buffer, unmap_range)
-  (buffer, buffer_mapping->impl.byte_offset,
-   buffer_mapping->contents.data_length, buffer_mapping);
+  iree_status_t status = _VTABLE_DISPATCH(buffer, unmap_range)(
+      buffer, buffer_mapping->impl.byte_offset,
+      buffer_mapping->contents.data_length, buffer_mapping);
 
   if (!buffer_mapping->impl.is_persistent) {
     iree_hal_buffer_release(buffer);
@@ -808,6 +811,7 @@ IREE_API_EXPORT void iree_hal_buffer_unmap_range(
   memset(buffer_mapping, 0, sizeof(*buffer_mapping));
 
   IREE_TRACE_ZONE_END(z0);
+  return status;
 }
 
 IREE_API_EXPORT iree_status_t iree_hal_buffer_invalidate_range(

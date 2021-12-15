@@ -195,7 +195,6 @@ iree_status_t Run() {
   }
 
   // Cleanup call and buffers.
-  iree_hal_buffer_unmap_range(&mapped_memory);
   iree_hal_buffer_view_release(ret_buffer_view);
   iree_runtime_call_deinitialize(&call);
 

@@ -135,12 +135,13 @@ static iree_status_t iree_hal_vulkan_vma_buffer_map_range(
   return iree_ok_status();
 }
 
-static void iree_hal_vulkan_vma_buffer_unmap_range(
+static iree_status_t iree_hal_vulkan_vma_buffer_unmap_range(
     iree_hal_buffer_t* base_buffer, iree_device_size_t local_byte_offset,
     iree_device_size_t local_byte_length, iree_hal_buffer_mapping_t* mapping) {
   iree_hal_vulkan_vma_buffer_t* buffer =
       iree_hal_vulkan_vma_buffer_cast(base_buffer);
   vmaUnmapMemory(buffer->vma, buffer->allocation);
+  return iree_ok_status();
 }
 
 static iree_status_t iree_hal_vulkan_vma_buffer_invalidate_range(
