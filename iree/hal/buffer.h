@@ -597,6 +597,19 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_transfer_mappable_range(
     iree_hal_transfer_buffer_t target, iree_device_size_t target_offset,
     iree_device_size_t data_length, iree_hal_transfer_buffer_flags_t flags);
 
+// Generic implementation of iree_hal_buffer_map_range and unmap_range for when
+// the buffer is not mappable and a full device transfer is required. This will
+// allocate additional host-local buffers and submit copy commands.
+// Implementations able to do this more efficiently should do so.
+IREE_API_EXPORT iree_status_t iree_hal_buffer_emulated_buffer_map_range(
+    iree_hal_buffer_t* buffer, iree_hal_mapping_mode_t mapping_mode,
+    iree_hal_memory_access_t memory_access,
+    iree_device_size_t local_byte_offset, iree_device_size_t local_byte_length,
+    iree_hal_buffer_mapping_t* mapping);
+IREE_API_EXPORT iree_status_t iree_hal_buffer_emulated_buffer_unmap_range(
+    iree_hal_buffer_t* buffer, iree_device_size_t local_byte_offset,
+    iree_device_size_t local_byte_length, iree_hal_buffer_mapping_t* mapping);
+
 typedef struct iree_hal_buffer_vtable_t {
   void(IREE_API_PTR* destroy)(iree_hal_buffer_t* buffer);
 

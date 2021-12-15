@@ -859,3 +859,140 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_mapping_subspan(
   out_span->data = buffer_mapping->contents.data + byte_offset;
   return iree_ok_status();
 }
+
+typedef struct iree_hal_emulated_buffer_mapping_t {
+  iree_hal_buffer_t* host_local_buffer;
+  iree_hal_buffer_mapping_t host_local_mapping;
+} iree_hal_emulated_buffer_mapping_t;
+
+IREE_API_EXPORT iree_status_t iree_hal_buffer_emulated_buffer_map_range(
+    iree_hal_buffer_t* buffer, iree_hal_mapping_mode_t mapping_mode,
+    iree_hal_memory_access_t memory_access,
+    iree_device_size_t local_byte_offset, iree_device_size_t local_byte_length,
+    iree_hal_buffer_mapping_t* mapping) {
+  IREE_ASSERT_ARGUMENT(buffer);
+  IREE_ASSERT_ARGUMENT(mapping);
+
+  iree_hal_allocator_t* device_allocator =
+      iree_hal_buffer_allocator(mapping->buffer);
+  iree_allocator_t host_allocator =
+      iree_hal_allocator_host_allocator(device_allocator);
+
+  // We can't perform persistent mapping with this as we need to manage the
+  // scratch buffer lifetime.
+  if (IREE_UNLIKELY(mapping_mode == IREE_HAL_MAPPING_MODE_PERSISTENT)) {
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "emulated buffer mapping only possible with scoped mappings");
+  }
+
+  // No implementation should be using this emulated method with memory that is
+  // allocated as mappable.
+  if (IREE_UNLIKELY(iree_all_bits_set(iree_hal_buffer_memory_type(buffer),
+                                      IREE_HAL_BUFFER_USAGE_MAPPING))) {
+    return iree_make_status(
+        IREE_STATUS_FAILED_PRECONDITION,
+        "emulated buffer mapping should not be used with mappable buffers");
+  }
+
+  IREE_TRACE_ZONE_BEGIN(z0);
+  IREE_TRACE_ZONE_APPEND_VALUE(z0, (uint64_t)local_byte_length);
+
+  // NOTE: this is assuming that the host is going to be doing a lot of work
+  // on the mapped memory and wants read/write caching and such. If the user
+  // wants write combining on device memory and other things they should ensure
+  // this emulated mapping path is not hit.
+
+  // Create a transient struct we use to track the emulated operation.
+  // We could pack this into the mapping but this composes better - it's small
+  // and pooled by the host allocator anyway.
+  iree_hal_emulated_buffer_mapping_t* emulation_state = NULL;
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_allocator_malloc(host_allocator, sizeof(*emulation_state),
+                                (void**)&emulation_state));
+
+  // Allocate the buffer we'll be using to stage our copy of the device memory.
+  // All devices should be able to satisfy this host-local + mapping request.
+  iree_status_t status = iree_hal_allocator_allocate_buffer(
+      device_allocator, IREE_HAL_MEMORY_TYPE_HOST_LOCAL,
+      IREE_HAL_BUFFER_USAGE_TRANSFER | IREE_HAL_BUFFER_USAGE_MAPPING,
+      local_byte_length, iree_const_byte_span_empty(),
+      &emulation_state->host_local_buffer);
+
+  // We need to capture a copy of the device buffer to work with; unless the
+  // user was nice and said they don't care about the contents with the DISCARD
+  // bit. Ideally we'd also enable invalidate_range to specify subranges we want
+  // to map.
+  if (iree_status_is_ok(status) &&
+      !iree_all_bits_set(memory_access, IREE_HAL_MEMORY_ACCESS_DISCARD)) {
+    // Download (device->host) the data.
+    status = iree_hal_buffer_copy_data(mapping->buffer, local_byte_offset,
+                                       emulation_state->host_local_buffer, 0,
+                                       local_byte_length);
+  }
+
+  if (iree_status_is_ok(status)) {
+    // Map the scratch buffer: map-ception.
+    // Code-wise it looks like this may loop back onto this emulated path
+    // but no implementation should be using this emulation if they have host
+    // local IREE_HAL_BUFFER_USAGE_MAPPING memory - and we check that above.
+    status = iree_hal_buffer_map_range(emulation_state->host_local_buffer,
+                                       IREE_HAL_MAPPING_MODE_SCOPED,
+                                       memory_access, 0, local_byte_length,
+                                       &emulation_state->host_local_mapping);
+  }
+
+  // Retain the scratch buffer for the duration of the mapping.
+  if (iree_status_is_ok(status)) {
+    // Note that we are giving back the host-local mapped contents to the user -
+    // they don't need to know it's from our staging buffer.
+    mapping->contents = emulation_state->host_local_mapping.contents;
+    mapping->impl.reserved[0] = (uint64_t)((uintptr_t)emulation_state);
+  } else {
+    status = iree_status_join(
+        status,
+        iree_hal_buffer_unmap_range(&emulation_state->host_local_mapping));
+    iree_hal_buffer_release(emulation_state->host_local_buffer);
+    iree_allocator_free(host_allocator, emulation_state);
+  }
+  IREE_TRACE_ZONE_END(z0);
+  return status;
+}
+
+IREE_API_EXPORT iree_status_t iree_hal_buffer_emulated_buffer_unmap_range(
+    iree_hal_buffer_t* buffer, iree_device_size_t local_byte_offset,
+    iree_device_size_t local_byte_length, iree_hal_buffer_mapping_t* mapping) {
+  IREE_ASSERT_ARGUMENT(buffer);
+  IREE_ASSERT_ARGUMENT(mapping);
+  IREE_TRACE_ZONE_BEGIN(z0);
+  iree_hal_emulated_buffer_mapping_t* emulation_state =
+      (iree_hal_emulated_buffer_mapping_t*)((uintptr_t)
+                                                mapping->impl.reserved[0]);
+  IREE_ASSERT_NE(emulation_state, NULL);
+
+  // Unmap the scratch buffer first to make it available for copying (if
+  // needed).
+  iree_status_t status =
+      iree_hal_buffer_unmap_range(&emulation_state->host_local_mapping);
+
+  // If we were writing then we'll need to flush the range.
+  // Ideally we'd keep track of this on the mapping itself based on the user's
+  // calls to flush_range to limit how much we need to transfer.
+  if (iree_status_is_ok(status) &&
+      iree_all_bits_set(mapping->impl.allowed_access,
+                        IREE_HAL_MEMORY_ACCESS_WRITE)) {
+    // Upload (host->device) the data.
+    status = iree_hal_buffer_copy_data(emulation_state->host_local_buffer, 0,
+                                       mapping->buffer, local_byte_offset,
+                                       local_byte_length);
+  }
+
+  // Deallocate the scratch buffer and our emulation state.
+  iree_hal_buffer_release(emulation_state->host_local_buffer);
+  iree_allocator_t host_allocator =
+      iree_hal_allocator_host_allocator(iree_hal_buffer_allocator(buffer));
+  iree_allocator_free(host_allocator, emulation_state);
+
+  IREE_TRACE_ZONE_END(z0);
+  return status;
+}
