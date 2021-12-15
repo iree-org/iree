@@ -9,6 +9,7 @@
 #include <memory>
 
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
+#include "iree/compiler/Utils/PassUtils.h"
 #include "mlir/Dialect/Linalg/Passes.h"
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
 #include "mlir/Pass/PassOptions.h"
@@ -65,72 +66,81 @@ namespace iree_compiler {
 namespace IREE {
 namespace Flow {
 
+namespace {
+
+using FunctionLikeNest = MultiOpNest<FuncOp, IREE::Util::InitializerOp>;
+
+}  // namespace
+
 void buildFlowTransformPassPipeline(OpPassManager &passManager,
                                     const TransformOptions &transformOptions) {
   // Special case peephole optimizations.
-  {
-    passManager.addNestedPass<FuncOp>(createConvertConv2D1x1ToMatmulPass());
-    if (clEnableConvToImg2Col) {
-      passManager.addNestedPass<FuncOp>(createConvertConv2DToImg2ColPass());
-    }
-    // Pad linalg op
-    if (clEnablePaddingLinalgOps) {
-      passManager.addNestedPass<FuncOp>(
-          createPadLinalgOpsToIntegerMultiplePass(clLinalgOpsPaddingSize));
-    }
-  }
+  FunctionLikeNest(passManager)
+      .addPass(createConvertConv2D1x1ToMatmulPass)
+      .addPredicatedPass(clEnableConvToImg2Col,
+                         createConvertConv2DToImg2ColPass)
+      // Pad linalg op
+      .addPredicatedPass(clEnablePaddingLinalgOps,
+                         []() {
+                           return createPadLinalgOpsToIntegerMultiplePass(
+                               clLinalgOpsPaddingSize);
+                         })
 
-  passManager.addNestedPass<mlir::FuncOp>(createVerifyInputLegalityPass());
+      // Input should now be legal.
+      .addPass(createVerifyInputLegalityPass)
 
-  // Simplify util.global accesses early on; this can help with dispatch
-  // region formation as redundant store-loads are removed.
-  passManager.addNestedPass<IREE::Util::InitializerOp>(
-      IREE::Util::createSimplifyGlobalAccessesPass());
-  passManager.addNestedPass<mlir::FuncOp>(
-      IREE::Util::createSimplifyGlobalAccessesPass());
+      // Simplify util.global accesses early on; this can help with dispatch
+      // region formation as redundant store-loads are removed.
+      .addPass(IREE::Util::createSimplifyGlobalAccessesPass);
 
-  // Cleanup and canonicalization of util.global (and other util ops).
+  // Module level cleanup and canonicalization of util.global (and other util
+  // ops).
   passManager.addPass(IREE::Util::createApplyPatternsPass());
   passManager.addPass(IREE::Util::createFoldGlobalsPass());
 
   // Perform cleanup after variable simplification as more canonicalizers may be
   // able to kick in.
-  passManager.addNestedPass<mlir::FuncOp>(mlir::createCanonicalizerPass());
-  passManager.addNestedPass<mlir::FuncOp>(mlir::createCSEPass());
+  FunctionLikeNest(passManager)
+      .addPass(mlir::createCanonicalizerPass)
+      .addPass(mlir::createCSEPass)
 
-  passManager.addPass(createPadTensorToSubTensorInsertPass());
+      // Pad tensors.
+      .addPass(createPadTensorToSubTensorInsertPass)
 
-  // Elementwise, fusion, tiling and distribution.
-  passManager.addNestedPass<mlir::FuncOp>(
-      mlir::createConvertElementwiseToLinalgPass());
-  passManager.addNestedPass<mlir::FuncOp>(
-      mlir::createLinalgFoldUnitExtentDimsPass());
-  passManager.addNestedPass<mlir::FuncOp>(createInterchangeGenericOpsPass());
-  passManager.addNestedPass<mlir::FuncOp>(mlir::createCanonicalizerPass());
-  passManager.addPass(memref::createResolveShapedTypeResultDimsPass());
-  passManager.addNestedPass<mlir::FuncOp>(createFusionOfTensorOpsPass());
-  passManager.addNestedPass<mlir::FuncOp>(mlir::createCSEPass());
-  if (clEnableLinalgDetensorize) {
-    passManager.addNestedPass<mlir::FuncOp>(
-        mlir::createLinalgDetensorizePass());
-  }
-  passManager.addNestedPass<mlir::FuncOp>(
-      createConvertToFlowBeforeDispatchFormation());
-  passManager.addNestedPass<mlir::FuncOp>(mlir::createCanonicalizerPass());
-  passManager.addNestedPass<mlir::FuncOp>(createDispatchLinalgOnTensorsPass());
-  passManager.addPass(memref::createResolveShapedTypeResultDimsPass());
-  passManager.addNestedPass<mlir::FuncOp>(
-      createConvertToFlowAfterDispatchFormation());
-  // NOTE: required because the current dispatch-linalg-on-tensors pass
-  // creates a lot of dead IR that needs to be cleaned up.
-  passManager.addNestedPass<mlir::FuncOp>(mlir::createCanonicalizerPass());
+      // Elementwise, fusion, tiling and distribution.
+      .addPass(mlir::createConvertElementwiseToLinalgPass)
+      .addPass(mlir::createLinalgFoldUnitExtentDimsPass)
+      .addPass(createInterchangeGenericOpsPass)
+      .addPass(mlir::createCanonicalizerPass)
+      .addPass(memref::createResolveShapedTypeResultDimsPass)
 
-  // Outline the dispatch regions into their own functions wrapped in
-  // executables.
+      // Fusion.
+      .addPass(createFusionOfTensorOpsPass)
+      .addPass(mlir::createCSEPass)
+      .addPredicatedPass(clEnableLinalgDetensorize,
+                         mlir::createLinalgDetensorizePass)
+
+      // Dispatch region formation.
+      .addPass(createConvertToFlowBeforeDispatchFormation)
+      .addPass(mlir::createCanonicalizerPass)
+      .addPass(createDispatchLinalgOnTensorsPass)
+      .addPass(memref::createResolveShapedTypeResultDimsPass)
+      .addPass(createConvertToFlowAfterDispatchFormation)
+      .addPass(mlir::createCanonicalizerPass)
+      .addPass(memref::createResolveShapedTypeResultDimsPass)
+
+      // Cleanup again?
+      .addPass(createConvertToFlowAfterDispatchFormation)
+      // NOTE: required because the current dispatch-linalg-on-tensors pass
+      // creates a lot of dead IR that needs to be cleaned up.
+      .addPass(mlir::createCanonicalizerPass);
+
+  // Module pass to outline the dispatch regions into their own functions
+  // wrapped in executables.
   passManager.addPass(createOutlineDispatchRegionsPass());
 
   // Cleanup identity ops that clutter up the IR and canonicalize.
-  passManager.addNestedPass<mlir::FuncOp>(mlir::createCanonicalizerPass());
+  FunctionLikeNest(passManager).addPass(mlir::createCanonicalizerPass);
 
   // Deduplicate executables created from dispatch regions.
   // Note: this only deduplicates equivalent executables. We could in addition
@@ -145,16 +155,15 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
     passManager.addPass(IREE::Flow::createExportBenchmarkFuncsPass());
   }
 
-  // Inject tracing that logs both input and output tensors from all dispatches.
-  // We do this after deduping so that the executable names match later stages.
-  if (clTraceDispatchTensors) {
-    passManager.addNestedPass<mlir::FuncOp>(
-        IREE::Flow::createInjectDispatchTracingPass());
-  }
-
-  // Cleanup the IR after we are done.
-  passManager.addNestedPass<mlir::FuncOp>(mlir::createCanonicalizerPass());
-  passManager.addNestedPass<mlir::FuncOp>(mlir::createCSEPass());
+  FunctionLikeNest(passManager)
+      // Inject tracing that logs both input and output tensors from all
+      // dispatches. We do this after deduping so that the executable names
+      // match later stages.
+      .addPredicatedPass(clTraceDispatchTensors,
+                         IREE::Flow::createInjectDispatchTracingPass)
+      // Cleanup the IR after we are done.
+      .addPass(mlir::createCanonicalizerPass)
+      .addPass(mlir::createCSEPass);
 
   passManager.addNestedPass<IREE::Flow::ExecutableOp>(
       mlir::createCanonicalizerPass());

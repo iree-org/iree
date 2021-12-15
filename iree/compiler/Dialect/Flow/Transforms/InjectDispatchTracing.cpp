@@ -34,7 +34,8 @@ class InjectDispatchTracingPass
   InjectDispatchTracingPass() = default;
 
   void runOnOperation() override {
-    for (auto dispatchOp : getOperation().getOps<DispatchOp>()) {
+    for (auto dispatchOp : function_like_impl::getFunctionBody(getOperation())
+                               .getOps<DispatchOp>()) {
       std::string entryPointName =
           dispatchOp.entry_point().getRootReference().getValue().str();
       for (FlatSymbolRefAttr nestedRef :
@@ -59,7 +60,7 @@ class InjectDispatchTracingPass
   }
 };
 
-std::unique_ptr<OperationPass<mlir::FuncOp>> createInjectDispatchTracingPass() {
+std::unique_ptr<Pass> createInjectDispatchTracingPass() {
   return std::make_unique<InjectDispatchTracingPass>();
 }
 

@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -verify-diagnostics -iree-flow-dispatch-linalg-on-tensors-pass -canonicalize -cse %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -verify-diagnostics -pass-pipeline="builtin.func(iree-flow-dispatch-linalg-on-tensors-pass, canonicalize, cse)" %s | IreeFileCheck %s
 
 func @tile_generic_op_alone(%A: tensor<?x?xf32>, %B: tensor<?xf32>) -> tensor<?x?xf32> {
   %c0 = arith.constant 0 : index

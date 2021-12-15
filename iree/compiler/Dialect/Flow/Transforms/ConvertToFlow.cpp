@@ -147,13 +147,11 @@ struct ConvertToFlowAfterDispatchFormation
 
 }  // namespace
 
-std::unique_ptr<OperationPass<mlir::FuncOp>>
-createConvertToFlowBeforeDispatchFormation() {
+std::unique_ptr<Pass> createConvertToFlowBeforeDispatchFormation() {
   return std::make_unique<ConvertToFlowBeforeDispatchFormation>();
 }
 
-std::unique_ptr<OperationPass<mlir::FuncOp>>
-createConvertToFlowAfterDispatchFormation() {
+std::unique_ptr<Pass> createConvertToFlowAfterDispatchFormation() {
   return std::make_unique<ConvertToFlowAfterDispatchFormation>();
 }
 

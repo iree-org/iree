@@ -25,6 +25,7 @@ cc_library(
         "FlatbufferUtils.h",
         "GraphUtils.h",
         "IndexSet.h",
+        "PassUtils.h",
         "PatternUtils.h",
         "TracingUtils.h",
     ],
