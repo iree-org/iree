@@ -8,9 +8,9 @@ capabilities are optional.
 
 ## Usage
 
-Each HAL driver (in-tree or out-of-tree) can use the `iree_cts_target()` CMake
+Each HAL driver (in-tree or out-of-tree) can use the `iree_hal_cts_target()` CMake
 function to create a set of tests. See the documentation in
-[iree_cts_target.cmake](../build_tools/cmake/iree_cts_target.cmake) and
+[iree_hal_cts_target.cmake](../build_tools/cmake/iree_hal_cts_target.cmake) and
 [cts_test_base.h](cts_test_base.h) for concrete details.
 
 ## On testing for error conditions

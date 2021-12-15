@@ -6,11 +6,13 @@
 
 if(${IREE_HAL_DRIVER_VMVX})
 
-iree_cts_target(
+iree_hal_cts_target(
   DRIVER_NAME
     vmvx
-  SRCS
-    "driver_registration.cc"
+  DRIVER_REGISTRATION_HDR
+    "iree/hal/vmvx/registration/driver_module.h"
+  DRIVER_REGISTRATION_FN
+    "iree_hal_vmvx_driver_module_register"
   DEPS
     iree::hal::vmvx::registration
 )
@@ -19,11 +21,13 @@ endif()
 
 if(${IREE_HAL_DRIVER_VMVX_SYNC})
 
-iree_cts_target(
+iree_hal_cts_target(
   DRIVER_NAME
     vmvx-sync
-  SRCS
-    "sync_driver_registration.cc"
+  DRIVER_REGISTRATION_HDR
+    "iree/hal/vmvx/registration/driver_module_sync.h"
+  DRIVER_REGISTRATION_FN
+    "iree_hal_vmvx_sync_driver_module_register"
   DEPS
     iree::hal::vmvx::registration::sync
   EXCLUDED_TESTS

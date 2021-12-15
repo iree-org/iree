@@ -6,18 +6,25 @@
 
 // clang-format off
 #cmakedefine IREE_CTS_TEST_FILE_PATH "@IREE_CTS_TEST_FILE_PATH@"
+#cmakedefine IREE_CTS_DRIVER_REGISTRATION_HDR "@IREE_CTS_DRIVER_REGISTRATION_HDR@"
+#cmakedefine IREE_CTS_DRIVER_REGISTRATION_FN @IREE_CTS_DRIVER_REGISTRATION_FN@
 #cmakedefine IREE_CTS_TEST_CLASS_NAME @IREE_CTS_TEST_CLASS_NAME@
 #cmakedefine IREE_CTS_DRIVER_NAME "@IREE_CTS_DRIVER_NAME@"
 // clang-format on
 
 #include IREE_CTS_TEST_FILE_PATH
 
+#include IREE_CTS_DRIVER_REGISTRATION_HDR
 #include "iree/hal/cts/cts_test_base.h"
 #include "iree/testing/gtest.h"
 
 namespace iree {
 namespace hal {
 namespace cts {
+
+iree_status_t register_test_driver(iree_hal_driver_registry_t* registry) {
+  return IREE_CTS_DRIVER_REGISTRATION_FN(registry);
+}
 
 INSTANTIATE_TEST_SUITE_P(CTS, IREE_CTS_TEST_CLASS_NAME,
                          ::testing::Values(IREE_CTS_DRIVER_NAME),

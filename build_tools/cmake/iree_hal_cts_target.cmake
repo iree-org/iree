@@ -6,7 +6,7 @@
 
 include(CMakeParseArguments)
 
-# iree_cts_target()
+# iree_hal_cts_target()
 #
 # Creates a set of tests for a provided Hardware Abstraction Layer (HAL) driver,
 # with one generated test for each test in the Conformance Test Suite (CTS).
@@ -14,14 +14,14 @@ include(CMakeParseArguments)
 # Parameters:
 #   DRIVER_NAME: The name of the driver to test. Used for both target names and
 #       for `iree_hal_driver_registry_try_create_by_name()` within test code.
-#   SRCS: List of source files for test binaries. One of these must implement
-#       the `register_test_driver()` function declared in `cts_test_base.h`.
+#   DRIVER_REGISTRATION_HDR: The C #include path for `DRIVER_REGISTRATION_FN`.
+#   DRIVER_REGISTRATION_FN: The C function which registers `DRIVER_NAME`.
 #   DEPS: List of other libraries to link in to the binary targets (typically
-#       the dependencies for the file(s) in SRCS).
+#       the dependency for `DRIVER_REGISTRATION_HDR`).
 #   EXCLUDED_TESTS: List of test names from `IREE_ALL_CTS_TESTS` to
 #       exclude from the test suite for this driver.
 #   LABELS: Additional labels to forward to `iree_cc_test`.
-function(iree_cts_target)
+function(iree_hal_cts_target)
   if(NOT IREE_BUILD_TESTS)
     return()
   endif()
@@ -29,8 +29,8 @@ function(iree_cts_target)
   cmake_parse_arguments(
     _RULE
     ""
-    "DRIVER_NAME"
-    "SRCS;DEPS;EXCLUDED_TESTS;LABELS"
+    "DRIVER_NAME;DRIVER_REGISTRATION_HDR;DRIVER_REGISTRATION_FN"
+    "DEPS;EXCLUDED_TESTS;LABELS"
     ${ARGN}
   )
 
@@ -53,8 +53,10 @@ function(iree_cts_target)
     # Generate the source file for this [test x driver] pair.
     # TODO(scotttodd): Move to build time instead of configure time?
     set(IREE_CTS_TEST_FILE_PATH "iree/hal/cts/${_TEST_NAME}_test.h")
+    set(IREE_CTS_DRIVER_REGISTRATION_HDR "${_RULE_DRIVER_REGISTRATION_HDR}")
+    set(IREE_CTS_DRIVER_REGISTRATION_FN "${_RULE_DRIVER_REGISTRATION_FN}")
     set(IREE_CTS_TEST_CLASS_NAME "${_TEST_CLASS_NAME}")
-    set(IREE_CTS_DRIVER_NAME ${_RULE_DRIVER_NAME})
+    set(IREE_CTS_DRIVER_NAME "${_RULE_DRIVER_NAME}")
     configure_file(
       "${IREE_ROOT_DIR}/iree/hal/cts/cts_test_template.cc.in"
       ${_TEST_SOURCE_NAME}
@@ -65,7 +67,6 @@ function(iree_cts_target)
         ${_RULE_DRIVER_NAME}_${_TEST_NAME}_test
       SRCS
         "${CMAKE_CURRENT_BINARY_DIR}/${_TEST_SOURCE_NAME}"
-        ${_RULE_SRCS}
       DEPS
         ${_RULE_DEPS}
         ${_TEST_LIBRARY_DEP}

@@ -6,11 +6,13 @@
 
 if(${IREE_HAL_DRIVER_DYLIB})
 
-iree_cts_target(
+iree_hal_cts_target(
   DRIVER_NAME
     dylib
-  SRCS
-    "driver_registration.cc"
+  DRIVER_REGISTRATION_HDR
+    "iree/hal/dylib/registration/driver_module.h"
+  DRIVER_REGISTRATION_FN
+    "iree_hal_dylib_driver_module_register"
   DEPS
     iree::hal::dylib::registration
 )
@@ -19,11 +21,13 @@ endif()
 
 if(${IREE_HAL_DRIVER_DYLIB_SYNC})
 
-iree_cts_target(
+iree_hal_cts_target(
   DRIVER_NAME
     dylib-sync
-  SRCS
-    "sync_driver_registration.cc"
+  DRIVER_REGISTRATION_HDR
+    "iree/hal/dylib/registration/driver_module_sync.h"
+  DRIVER_REGISTRATION_FN
+    "iree_hal_dylib_sync_driver_module_register"
   DEPS
     iree::hal::dylib::registration::sync
   EXCLUDED_TESTS

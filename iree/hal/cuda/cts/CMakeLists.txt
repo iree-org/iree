@@ -4,11 +4,13 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-iree_cts_target(
+iree_hal_cts_target(
   DRIVER_NAME
     cuda
-  SRCS
-    "driver_registration.cc"
+  DRIVER_REGISTRATION_HDR
+    "iree/hal/cuda/registration/driver_module.h"
+  DRIVER_REGISTRATION_FN
+    "iree_hal_cuda_driver_module_register"
   DEPS
     iree::hal::cuda::registration
   EXCLUDED_TESTS
