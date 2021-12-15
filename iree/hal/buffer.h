@@ -179,11 +179,38 @@ enum iree_hal_transfer_buffer_flag_bits_t {
 };
 typedef uint32_t iree_hal_transfer_buffer_flags_t;
 
+// Determines buffer mapping behavior.
 enum iree_hal_mapping_mode_bits_t {
+  // Buffers are mapped as part of a scoped map-access-unmap sequence.
+  // If there are any in-flight operations using the buffer contents are
+  // undefined though they may deceivingly still seem correct under certain
+  // implementations.
   IREE_HAL_MAPPING_MODE_SCOPED = 1u << 0,
+
+  // Buffers are mapped persistently and concurrently accessible by both the
+  // host and device. Mapping happens once and so long as there are any live
+  // mappings the buffer will remain accessible. Not all implementations or
+  // buffer memory types support this, and even ones that do may not support
+  // coherent cross-device sharing.
   IREE_HAL_MAPPING_MODE_PERSISTENT = 1u << 1,
 };
 typedef uint32_t iree_hal_mapping_mode_t;
+
+// Implementation-specific mapping data.
+typedef struct iree_hal_buffer_mapping_impl_t {
+  // Byte offset within the buffer where the mapped data begins.
+  iree_device_size_t byte_offset;
+  // Used for validation only.
+  iree_hal_memory_access_t allowed_access;
+  // Tracking flags.
+  uint32_t is_persistent : 1;
+  uint32_t reserved_flags : 31;
+  // Backing implementation data.
+  // For backends that require additional tracking (shadow data structures/etc)
+  // this can be used to store references to them for the duration of the
+  // mapping.
+  uint64_t reserved[1];
+} iree_hal_buffer_mapping_impl_t;
 
 // Reference to a buffer's mapped memory.
 typedef struct iree_hal_buffer_mapping_t {
@@ -195,8 +222,16 @@ typedef struct iree_hal_buffer_mapping_t {
   // accessed.
   iree_byte_span_t contents;
 
+  // Buffer providing the backing storage for the mapping.
+  // When mapped with IREE_HAL_MAPPING_MODE_SCOPED the buffer will be retained
+  // until it is unmapped. When mapped with IREE_HAL_MAPPING_MODE_PERSISTENT the
+  // caller is responsible for retaining the buffer.
+  struct iree_hal_buffer_t* buffer;
+
   // Used internally - do not modify.
-  uint64_t reserved[4];
+  // Implementations are allowed to use the reserved fields for their own
+  // storage but should otherwise ignore the remaining parts.
+  iree_hal_buffer_mapping_impl_t impl;
 } iree_hal_buffer_mapping_t;
 
 // Formats a memory type bitfield as a string.
@@ -571,12 +606,12 @@ typedef struct iree_hal_buffer_vtable_t {
                                          iree_hal_memory_access_t memory_access,
                                          iree_device_size_t local_byte_offset,
                                          iree_device_size_t local_byte_length,
-                                         void** out_data_ptr);
+                                         iree_hal_buffer_mapping_t* mapping);
 
   void(IREE_API_PTR* unmap_range)(iree_hal_buffer_t* buffer,
                                   iree_device_size_t local_byte_offset,
                                   iree_device_size_t local_byte_length,
-                                  void* data_ptr);
+                                  iree_hal_buffer_mapping_t* mapping);
 
   iree_status_t(IREE_API_PTR* invalidate_range)(
       iree_hal_buffer_t* buffer, iree_device_size_t local_byte_offset,

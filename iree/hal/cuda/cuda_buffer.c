@@ -68,7 +68,7 @@ static iree_status_t iree_hal_cuda_buffer_map_range(
     iree_hal_buffer_t* base_buffer, iree_hal_mapping_mode_t mapping_mode,
     iree_hal_memory_access_t memory_access,
     iree_device_size_t local_byte_offset, iree_device_size_t local_byte_length,
-    void** out_data_ptr) {
+    iree_hal_buffer_mapping_t* mapping) {
   iree_hal_cuda_buffer_t* buffer = iree_hal_cuda_buffer_cast(base_buffer);
 
   // TODO(benvanik): add upload/download for unmapped buffers.
@@ -89,13 +89,14 @@ static iree_status_t iree_hal_cuda_buffer_map_range(
     memset(data_ptr, 0xCD, local_byte_length);
   }
 #endif  // !NDEBUG
-  *out_data_ptr = data_ptr;
+
+  mapping->contents = iree_make_byte_span(data_ptr, local_byte_length);
   return iree_ok_status();
 }
 
 static void iree_hal_cuda_buffer_unmap_range(
     iree_hal_buffer_t* base_buffer, iree_device_size_t local_byte_offset,
-    iree_device_size_t local_byte_length, void* data_ptr) {
+    iree_device_size_t local_byte_length, iree_hal_buffer_mapping_t* mapping) {
   // nothing to do.
 }
 

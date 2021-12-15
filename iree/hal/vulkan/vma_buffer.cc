@@ -103,7 +103,7 @@ static iree_status_t iree_hal_vulkan_vma_buffer_map_range(
     iree_hal_buffer_t* base_buffer, iree_hal_mapping_mode_t mapping_mode,
     iree_hal_memory_access_t memory_access,
     iree_device_size_t local_byte_offset, iree_device_size_t local_byte_length,
-    void** out_data_ptr) {
+    iree_hal_buffer_mapping_t* mapping) {
   iree_hal_vulkan_vma_buffer_t* buffer =
       iree_hal_vulkan_vma_buffer_cast(base_buffer);
 
@@ -119,7 +119,8 @@ static iree_status_t iree_hal_vulkan_vma_buffer_map_range(
   VK_RETURN_IF_ERROR(
       vmaMapMemory(buffer->vma, buffer->allocation, (void**)&data_ptr),
       "vmaMapMemory");
-  *out_data_ptr = data_ptr + local_byte_offset;
+  mapping->contents =
+      iree_make_byte_span(data_ptr + local_byte_offset, local_byte_length);
 
   // If we mapped for discard scribble over the bytes. This is not a mandated
   // behavior but it will make debugging issues easier. Alternatively for
@@ -127,7 +128,7 @@ static iree_status_t iree_hal_vulkan_vma_buffer_map_range(
   // would only work if the entire buffer was discarded.
 #ifndef NDEBUG
   if (iree_any_bit_set(memory_access, IREE_HAL_MEMORY_ACCESS_DISCARD)) {
-    memset(*out_data_ptr, 0xCD, local_byte_length);
+    memset(mapping->contents.data, 0xCD, local_byte_length);
   }
 #endif  // !NDEBUG
 
@@ -136,7 +137,7 @@ static iree_status_t iree_hal_vulkan_vma_buffer_map_range(
 
 static void iree_hal_vulkan_vma_buffer_unmap_range(
     iree_hal_buffer_t* base_buffer, iree_device_size_t local_byte_offset,
-    iree_device_size_t local_byte_length, void* data_ptr) {
+    iree_device_size_t local_byte_length, iree_hal_buffer_mapping_t* mapping) {
   iree_hal_vulkan_vma_buffer_t* buffer =
       iree_hal_vulkan_vma_buffer_cast(base_buffer);
   vmaUnmapMemory(buffer->vma, buffer->allocation);
