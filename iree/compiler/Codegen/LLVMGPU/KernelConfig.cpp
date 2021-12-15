@@ -224,6 +224,13 @@ static LogicalResult setFftConfig(FuncOp entryPoint,
 static LogicalResult setSortConfig(FuncOp entryPoint, Operation *op) {
   TileSizesListType tileSizes;
   SmallVector<unsigned> partitionedLoops = getPartitionedLoops(op);
+  if (partitionedLoops.empty()) {
+    tileSizes.push_back({});
+    return setOpConfigAndEntryPointFnTranslation(
+        entryPoint, op, tileSizes, /*nativeVectorSizes=*/ArrayRef<int64_t>{},
+        IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUDistribute,
+        {1, 1, 1});
+  }
   size_t numLoops = partitionedLoops.back() + 1;
   // To get peak occupancy we need a workgroup size of at least two warps
   std::array<int64_t, 3> workgroupSize = {2 * cudaWarpSize, 1, 1};
