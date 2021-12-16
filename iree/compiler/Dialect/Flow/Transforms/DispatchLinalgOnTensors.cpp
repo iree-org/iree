@@ -25,6 +25,7 @@
 #include "mlir/IR/BlockAndValueMapping.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinAttributes.h"
+#include "mlir/IR/FunctionSupport.h"
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/PatternMatch.h"
@@ -906,11 +907,11 @@ struct TiledOpInterfacePattern
 /// fuse with multiple root operations (i.e. replicated). For now a very simple
 /// heuristic is used below, but the mechanism should be general enough to
 /// capture any heuristic.
-static unsigned decideFusableLinalgOps(mlir::FuncOp funcOp) {
+static unsigned decideFusableLinalgOps(Operation *funcOp) {
   unsigned numRootOps = 0;
-  MLIRContext *context = funcOp.getContext();
+  MLIRContext *context = funcOp->getContext();
   OpBuilder builder(context);
-  for (Block &block : funcOp) {
+  for (Block &block : function_like_impl::getFunctionBody(funcOp)) {
     // Tiling and fusion works by tiling the last operation in the fusion group
     // and then pull producer ops into the tiled loops. So go in the reverse
     // order here.
@@ -998,7 +999,7 @@ struct DispatchLinalgOnTensorsPass
 }  // namespace
 
 /// For all ops within `funcOp` tagged as root ops, create dispatch regions.
-LogicalResult createDispatchRegionsFromRootOps(FuncOp funcOp) {
+LogicalResult createDispatchRegionsFromRootOps(mlir::Operation *funcOp) {
   MLIRContext *context = funcOp->getContext();
   // Distribution strategy along at most 3 dimensions with WorkgroupIdOp in
   // range [0, WorkgroupSizeOp).
@@ -1092,7 +1093,7 @@ LogicalResult createDispatchRegionsFromRootOps(FuncOp funcOp) {
 
   LLVM_DEBUG({
     llvm::dbgs() << "\n--- After dispatch op formation ---\n";
-    funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
+    funcOp->print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
     llvm::dbgs() << "\n\n";
   });
 
@@ -1117,7 +1118,7 @@ LogicalResult createDispatchRegionsFromRootOps(FuncOp funcOp) {
   // After outlining in dispatch region we can rewrite the dispatch ops with
   // proper captures to make it isolated from above.
   if (funcOp
-          .walk([&](IREE::Flow::DispatchWorkgroupsOp op) -> WalkResult {
+          ->walk([&](IREE::Flow::DispatchWorkgroupsOp op) -> WalkResult {
             return legalizeDispatchWorkgroupOperands(op);
           })
           .wasInterrupted()) {
@@ -1126,7 +1127,7 @@ LogicalResult createDispatchRegionsFromRootOps(FuncOp funcOp) {
 
   LLVM_DEBUG({
     llvm::dbgs() << "\n--- After dispatch op legalization ---\n";
-    funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
+    funcOp->print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
     llvm::dbgs() << "\n\n";
   });
 
@@ -1143,7 +1144,7 @@ void DispatchLinalgOnTensorsPass::runOnOperation() {
 
   LLVM_DEBUG({
     llvm::dbgs() << "\n--- After annotating linalg op fusion scheme ---\n";
-    funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
+    funcOp->print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
     llvm::dbgs() << "\n\n";
   });
 
@@ -1153,30 +1154,28 @@ void DispatchLinalgOnTensorsPass::runOnOperation() {
 
   LLVM_DEBUG({
     llvm::dbgs() << "\n--- After first step of dispatch region formation ---\n";
-    funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
+    funcOp->print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
     llvm::dbgs() << "\n\n";
   });
 
   /// Iterate over the remaining ops and pick up whatever needs to go into
   /// dispatch regions and mark them as root ops.
-  for (Block &block : funcOp) {
-    for (Operation &op : block) {
-      // Ignore ops that
-      // - Do not implement the `LinalgOp` interface.
-      // - linalg.fill ops.
-      if (!isa<linalg::LinalgOp>(&op)) continue;
-      if (isa<linalg::FillOp>(&op)) continue;
-      assert(!hasRootOpAttribute(&op) &&
-             "unexpected root operation outside of dispatch region");
-      removeFusionGroupsAttribute(&op);
-      setRootAttribute(context, &op, numRoots++);
-    }
+  for (Operation &op : function_like_impl::getFunctionBody(funcOp).getOps()) {
+    // Ignore ops that
+    // - Do not implement the `LinalgOp` interface.
+    // - linalg.fill ops.
+    if (!isa<linalg::LinalgOp>(&op)) continue;
+    if (isa<linalg::FillOp>(&op)) continue;
+    assert(!hasRootOpAttribute(&op) &&
+           "unexpected root operation outside of dispatch region");
+    removeFusionGroupsAttribute(&op);
+    setRootAttribute(context, &op, numRoots++);
   }
 
   LLVM_DEBUG({
     llvm::dbgs()
         << "\n--- After annotating remaining linalg ops as roots ---\n";
-    funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
+    funcOp->print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
     llvm::dbgs() << "\n\n";
   });
 
@@ -1187,26 +1186,24 @@ void DispatchLinalgOnTensorsPass::runOnOperation() {
   LLVM_DEBUG({
     llvm::dbgs()
         << "\n--- After second step of dispatch region formation ---\n";
-    funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
+    funcOp->print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
     llvm::dbgs() << "\n\n";
   });
 
   /// Iterate over the remaining ops and pick up whatever needs to go into
   /// dispatch regions and mark them as root ops.
-  for (Block &block : funcOp) {
-    for (Operation &op : block) {
-      // Ignore ops that do not implement the `TiledOpInterface` interface.
-      if (!isa<IREE::LinalgExt::TiledOpInterface>(&op)) continue;
-      assert(!hasRootOpAttribute(&op) &&
-             "unexpected root operation outside of dispatch region");
-      removeFusionGroupsAttribute(&op);
-      setRootAttribute(context, &op, numRoots++);
-    }
+  for (Operation &op : function_like_impl::getFunctionBody(funcOp).getOps()) {
+    // Ignore ops that do not implement the `TiledOpInterface` interface.
+    if (!isa<IREE::LinalgExt::TiledOpInterface>(&op)) continue;
+    assert(!hasRootOpAttribute(&op) &&
+           "unexpected root operation outside of dispatch region");
+    removeFusionGroupsAttribute(&op);
+    setRootAttribute(context, &op, numRoots++);
   }
 
   LLVM_DEBUG({
     llvm::dbgs() << "\n--- After annotating remaining ops as roots ---\n";
-    funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
+    funcOp->print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
     llvm::dbgs() << "\n\n";
   });
 
@@ -1217,9 +1214,9 @@ void DispatchLinalgOnTensorsPass::runOnOperation() {
   // Rewrite destructive updates and ensure no remaining store remains to the
   // full output.
   if (funcOp
-          .walk([&](IREE::Flow::DispatchWorkgroupsOp op) {
+          ->walk([&](IREE::Flow::DispatchWorkgroupsOp op) {
             if (failed(rewriteLinalgDestructiveUpdates(op))) {
-              funcOp.emitError("Failed to rewrite destructive updates in:\n")
+              funcOp->emitError("Failed to rewrite destructive updates in:\n")
                   << *op.getOperation();
               return WalkResult::interrupt();
             }
@@ -1231,7 +1228,7 @@ void DispatchLinalgOnTensorsPass::runOnOperation() {
 
   LLVM_DEBUG({
     llvm::dbgs() << "\n--- After rewriting destructive updates ---\n";
-    funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
+    funcOp->print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
     llvm::dbgs() << "\n\n";
   });
 
@@ -1239,13 +1236,12 @@ void DispatchLinalgOnTensorsPass::runOnOperation() {
   // indicate sharing storage. This need to happen here because it needs to
   // access region block arguments for input/output tensors, which aren't
   // available until now.
-  funcOp.walk([&](IREE::Flow::DispatchWorkgroupsOp op) {
+  funcOp->walk([&](IREE::Flow::DispatchWorkgroupsOp op) {
     tryToTieOperandsAndResults(op);
   });
 }
 
-std::unique_ptr<OperationPass<mlir::FuncOp>>
-createDispatchLinalgOnTensorsPass() {
+std::unique_ptr<Pass> createDispatchLinalgOnTensorsPass() {
   return std::make_unique<DispatchLinalgOnTensorsPass>();
 }
 

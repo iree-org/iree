@@ -297,6 +297,13 @@ static SmallVector<Value> makeBindingDynamicDims(
                                                builder.getInsertionPoint());
   if (foundDims.hasValue()) return llvm::to_vector<4>(foundDims.getValue());
 
+  // The issue here is that at this point we no longer have the information we
+  // need to reconstitute the dimensions. We expect that whoever created the
+  // executable captured the shape dimensions they needed and we can find them
+  // with the simple logic above. If we do hit this case we'll need to add a new
+  // dispatch argument for the dimension and then go to each dispatch site and
+  // insert the dimension query - if that feels like a nasty hack it's because
+  // it is and it'd be better if we could avoid needing it.
   llvm_unreachable("TODO: synthesize dynamic dimensions/hoist logic");
   return {};
 }

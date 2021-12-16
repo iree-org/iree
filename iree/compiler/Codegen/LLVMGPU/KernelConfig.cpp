@@ -221,6 +221,43 @@ static LogicalResult setFftConfig(FuncOp entryPoint,
       workgroupSize);
 }
 
+static LogicalResult setSortConfig(FuncOp entryPoint, Operation *op) {
+  TileSizesListType tileSizes;
+  SmallVector<unsigned> partitionedLoops = getPartitionedLoops(op);
+  if (partitionedLoops.empty()) {
+    tileSizes.push_back({});
+    return setOpConfigAndEntryPointFnTranslation(
+        entryPoint, op, tileSizes, /*nativeVectorSizes=*/ArrayRef<int64_t>{},
+        IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUDistribute,
+        {1, 1, 1});
+  }
+  size_t numLoops = partitionedLoops.back() + 1;
+  // To get peak occupancy we need a workgroup size of at least two warps
+  std::array<int64_t, 3> workgroupSize = {2 * cudaWarpSize, 1, 1};
+  SmallVector<int64_t, 4> workgroupTileSizes(numLoops, 1);
+  // Set all non-parallel loops to zero tile size.
+  llvm::DenseSet<unsigned> partitionedLoopsSet(partitionedLoops.begin(),
+                                               partitionedLoops.end());
+  for (auto depth : llvm::seq<int64_t>(0, numLoops)) {
+    if (!partitionedLoopsSet.count(depth)) {
+      workgroupTileSizes[depth] = 0;
+    }
+  }
+
+  // Tile to have one element per thread.
+  for (int64_t depth = numLoops; depth > 0; depth--) {
+    if (partitionedLoopsSet.count(depth - 1)) {
+      workgroupTileSizes[depth - 1] = workgroupSize[0];
+      break;
+    }
+  }
+  tileSizes.emplace_back(std::move(workgroupTileSizes));  // Workgroup level
+  return setOpConfigAndEntryPointFnTranslation(
+      entryPoint, op, tileSizes, /*nativeVectorSizes=*/ArrayRef<int64_t>{},
+      IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUDistribute,
+      workgroupSize);
+}
+
 // Basic default properties for linalg ops that haven't been tuned.
 static LogicalResult setRootDefaultConfig(FuncOp entryPoint, Operation *op) {
   IREE::Codegen::DispatchLoweringPassPipeline passPipeline =
@@ -327,6 +364,9 @@ static LogicalResult setRootConfig(FuncOp entryPointFn, Operation *computeOp) {
   }
   if (auto fftOp = dyn_cast<IREE::LinalgExt::FftOp>(computeOp)) {
     return setFftConfig(entryPointFn, fftOp);
+  }
+  if (auto sortOp = dyn_cast<IREE::LinalgExt::SortOp>(computeOp)) {
+    return setSortConfig(entryPointFn, sortOp);
   }
   return setRootDefaultConfig(entryPointFn, computeOp);
 }

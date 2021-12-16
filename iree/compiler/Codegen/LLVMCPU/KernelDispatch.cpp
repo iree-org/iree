@@ -261,23 +261,23 @@ static LogicalResult setX86RootConfig(FuncOp entryPointFn,
                      workloadPerWorkgroup,
                      /*workgroupSize=*/ArrayRef<int64_t>{});
 
-  // Hardcoded tile sizes.
-  // L1 tile sizes are {1, 1, ..., 8, 32, 32}.
-  // Vector tile sizes are {1, ..., 1, 16, 16}
+  // Hardcoded tile sizes, where v is the native vector size.
+  // L1 tile sizes are {1, 1, ..., 8, 2v, 2v}.
+  // Vector tile sizes are {1, ..., 1, v, v}
   SmallVector<int64_t> l1TileSizes, vectorTileSizes;
   int64_t nLoops = cast<linalg::LinalgOp>(op.getOperation()).getNumLoops();
   l1TileSizes.append(nLoops - 3, 1);
   l1TileSizes.push_back(
       getMaxTileSize(0, workloadPerWorkgroup[1], 8, vectorSize));
   l1TileSizes.push_back(
-      getMaxTileSize(0, workloadPerWorkgroup[0], 32, vectorSize));
+      getMaxTileSize(0, workloadPerWorkgroup[0], 2 * vectorSize, vectorSize));
   vectorTileSizes.append(nLoops - 2, 1);
   vectorTileSizes.push_back(vectorSize);
 
   // L1/vector tile size for k dimensions.
   auto lhsShapedType = op.lhs().getType().cast<ShapedType>();
   int64_t K = lhsShapedType.getShape().back();
-  l1TileSizes.push_back(getMaxTileSize(0, K, 32, vectorSize));
+  l1TileSizes.push_back(getMaxTileSize(0, K, 2 * vectorSize, vectorSize));
   vectorTileSizes.push_back(vectorSize);
   TileSizesListType tileSizes;
   tileSizes.push_back({});  // Empty here since there is nothing to do in first
@@ -300,16 +300,16 @@ static LogicalResult setARMRootConfig(FuncOp entryPointFn,
                      workloadPerWorkgroup,
                      /*workgroupSize=*/ArrayRef<int64_t>{});
 
-  // Hardcoded tile sizes.
-  // L1 tile sizes are {1, ..., 20, 4, 64}.
-  // Vector tile sizes are {1, ..., 4, 4, 4}
+  // Hardcoded tile sizes, where v is the native vector size.
+  // L1 tile sizes are {1, ..., 5v, v, 16v}.
+  // Vector tile sizes are {1, ..., v, v, v}
   SmallVector<int64_t> l1TileSizes, vectorTileSizes;
   int64_t nLoops = cast<linalg::LinalgOp>(op.getOperation()).getNumLoops();
   l1TileSizes.append(nLoops - 3, 1);
   l1TileSizes.push_back(
-      getMaxTileSize(0, workloadPerWorkgroup[1], 20, vectorSize));
+      getMaxTileSize(0, workloadPerWorkgroup[1], 5 * vectorSize, vectorSize));
   l1TileSizes.push_back(
-      getMaxTileSize(0, workloadPerWorkgroup[0], 4, vectorSize));
+      getMaxTileSize(0, workloadPerWorkgroup[0], vectorSize, vectorSize));
   vectorTileSizes.append(nLoops - 3, 1);
   vectorTileSizes.push_back(vectorSize);
   vectorTileSizes.push_back(vectorSize);
@@ -317,7 +317,7 @@ static LogicalResult setARMRootConfig(FuncOp entryPointFn,
   // L1/vector tile size for k dimensions.
   auto lhsShapedType = op.lhs().getType().cast<ShapedType>();
   int64_t K = lhsShapedType.getShape().back();
-  l1TileSizes.push_back(getMaxTileSize(0, K, 64, vectorSize));
+  l1TileSizes.push_back(getMaxTileSize(0, K, 16 * vectorSize, vectorSize));
   vectorTileSizes.push_back(vectorSize);
   TileSizesListType tileSizes;
   tileSizes.push_back({});  // Empty here since there is nothing to do in first
