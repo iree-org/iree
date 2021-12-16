@@ -6,7 +6,7 @@
 
 if(${IREE_HAL_DRIVER_VMVX})
 
-iree_hal_cts_target(
+iree_hal_cts_test_suite(
   DRIVER_NAME
     vmvx
   DRIVER_REGISTRATION_HDR
@@ -21,7 +21,7 @@ endif()
 
 if(${IREE_HAL_DRIVER_VMVX_SYNC})
 
-iree_hal_cts_target(
+iree_hal_cts_test_suite(
   DRIVER_NAME
     vmvx-sync
   DRIVER_REGISTRATION_HDR

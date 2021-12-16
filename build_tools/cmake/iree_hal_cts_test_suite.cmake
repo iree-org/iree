@@ -6,7 +6,7 @@
 
 include(CMakeParseArguments)
 
-# iree_hal_cts_target()
+# iree_hal_cts_test_suite()
 #
 # Creates a set of tests for a provided Hardware Abstraction Layer (HAL) driver,
 # with one generated test for each test in the Conformance Test Suite (CTS).
@@ -22,7 +22,7 @@ include(CMakeParseArguments)
 #       exclude from the test suite for this driver.
 #   LABELS: Additional labels to forward to `iree_cc_test`. The package path
 #     and "driver=${DRIVER}" are added automatically.
-function(iree_hal_cts_target)
+function(iree_hal_cts_test_suite)
   if(NOT IREE_BUILD_TESTS)
     return()
   endif()

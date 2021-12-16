@@ -6,7 +6,7 @@
 
 if(${IREE_HAL_DRIVER_DYLIB})
 
-iree_hal_cts_target(
+iree_hal_cts_test_suite(
   DRIVER_NAME
     dylib
   DRIVER_REGISTRATION_HDR
@@ -21,7 +21,7 @@ endif()
 
 if(${IREE_HAL_DRIVER_DYLIB_SYNC})
 
-iree_hal_cts_target(
+iree_hal_cts_test_suite(
   DRIVER_NAME
     dylib-sync
   DRIVER_REGISTRATION_HDR
