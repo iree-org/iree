@@ -1171,7 +1171,7 @@ hal.executable private @matmul_x86  {
       "llvm",
       "embedded-elf-x86_64", {
           data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
-          native_vector_size = 64 : index,
+          native_vector_size = 16 : index,
           target_triple = "x86_64-unknown-unknown-eabi-elf"
     }> {
     hal.executable.entry_point public @matmul_x86 attributes {interface = @io, ordinal = 0 : index}
@@ -1219,5 +1219,5 @@ hal.executable private @matmul_x86  {
   }
 }
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"CPUTileFuseAndVectorize", workload_per_wg = [64, 64]>
-//  CHECK-DAG: #[[CONFIG:.+]] =  #iree_codegen.lowering.config<tile_sizes = [{{\[}}], [8, 32, 32], [1, 16, 16]], native_vector_size = [1, 16, 16]>
+//  CHECK-DAG: #[[CONFIG:.+]] =  #iree_codegen.lowering.config<tile_sizes = [{{\[}}], [8, 8, 8], [1, 4, 4]], native_vector_size = [1, 4, 4]>
 //  CHECK:       linalg.matmul {lowering.config = #[[CONFIG]]}
