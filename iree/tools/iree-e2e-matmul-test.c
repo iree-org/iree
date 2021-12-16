@@ -66,7 +66,7 @@ static iree_status_t get_buffer_view_dense_row_major_data(
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                             "buffer_view is not dense row major");
   }
-  iree_hal_buffer_mapping_t mapping;
+  iree_hal_buffer_mapping_t mapping = {{0}};
   IREE_RETURN_IF_ERROR(iree_hal_buffer_map_range(
       iree_hal_buffer_view_buffer(buffer_view),
       IREE_HAL_MAPPING_MODE_PERSISTENT, IREE_HAL_MEMORY_ACCESS_READ, 0,
@@ -488,7 +488,7 @@ static iree_status_t copy_buffer(iree_hal_allocator_t* hal_allocator,
                                  iree_hal_buffer_view_t** dst) {
   // TODO(benvanik): change this to use iree_hal_buffer_copy_data. Or something.
   // I can't understand what all this code is doing.
-  iree_hal_buffer_mapping_t src_mapping;
+  iree_hal_buffer_mapping_t src_mapping = {{0}};
   IREE_RETURN_IF_ERROR(iree_hal_buffer_map_range(
       iree_hal_buffer_view_buffer(src), IREE_HAL_MAPPING_MODE_PERSISTENT,
       IREE_HAL_MEMORY_ACCESS_READ, 0, IREE_WHOLE_BUFFER, &src_mapping));

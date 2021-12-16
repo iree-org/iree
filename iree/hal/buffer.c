@@ -511,7 +511,7 @@ iree_hal_buffer_fill(iree_hal_buffer_t* buffer, iree_device_size_t byte_offset,
   }
 
   IREE_TRACE_ZONE_BEGIN(z0);
-  iree_hal_buffer_mapping_t target_mapping;
+  iree_hal_buffer_mapping_t target_mapping = {{0}};
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0, iree_hal_buffer_map_range(buffer, IREE_HAL_MAPPING_MODE_SCOPED,
                                     IREE_HAL_MEMORY_ACCESS_DISCARD_WRITE,
@@ -667,7 +667,7 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_transfer_mappable_range(
     iree_device_size_t data_length, iree_hal_transfer_buffer_flags_t flags) {
   iree_status_t status = iree_ok_status();
 
-  iree_hal_buffer_mapping_t source_mapping = {0};
+  iree_hal_buffer_mapping_t source_mapping = {{0}};
   if (iree_status_is_ok(status)) {
     if (source.device_buffer) {
       status = iree_hal_buffer_map_range(
@@ -681,7 +681,7 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_transfer_mappable_range(
     }
   }
 
-  iree_hal_buffer_mapping_t target_mapping = {0};
+  iree_hal_buffer_mapping_t target_mapping = {{0}};
   if (iree_status_is_ok(status)) {
     if (target.device_buffer) {
       status = iree_hal_buffer_map_range(

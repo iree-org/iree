@@ -202,7 +202,7 @@ static iree_status_t iree_hal_buffer_view_generate_buffer_in_situ(
       iree_const_byte_span_empty(), &buffer_view));
 
   // Map the buffer into host-visible memory.
-  iree_hal_buffer_mapping_t buffer_mapping;
+  iree_hal_buffer_mapping_t buffer_mapping = {{0}};
   iree_status_t status = iree_hal_buffer_map_range(
       iree_hal_buffer_view_buffer(buffer_view), IREE_HAL_MAPPING_MODE_SCOPED,
       IREE_HAL_MEMORY_ACCESS_DISCARD_WRITE, 0, IREE_WHOLE_BUFFER,
@@ -746,7 +746,7 @@ static iree_status_t iree_hal_buffer_view_format_impl(
   APPEND_CHAR('=');
 
   // Buffer contents: 0 1 2 3 ...
-  iree_hal_buffer_mapping_t buffer_mapping;
+  iree_hal_buffer_mapping_t buffer_mapping = {{0}};
   IREE_RETURN_IF_ERROR(iree_hal_buffer_map_range(
       iree_hal_buffer_view_buffer(buffer_view), IREE_HAL_MAPPING_MODE_SCOPED,
       IREE_HAL_MEMORY_ACCESS_READ, 0, IREE_WHOLE_BUFFER, &buffer_mapping));

@@ -389,7 +389,7 @@ py::object VmVariantList::GetAsSerializedTraceValue(int index) {
 
       // Map memory.
       iree_device_size_t byte_length = iree_hal_buffer_byte_length(raw_buffer);
-      iree_hal_buffer_mapping_t mapped_memory;
+      iree_hal_buffer_mapping_t mapped_memory = {{0}};
       CheckApiStatus(iree_hal_buffer_map_range(
                          raw_buffer, IREE_HAL_MAPPING_MODE_SCOPED,
                          IREE_HAL_MEMORY_ACCESS_READ, 0 /* element_offset */,
@@ -489,7 +489,7 @@ py::object VmVariantList::GetAsNdarray(int index) {
   // Map memory.
   iree_device_size_t byte_length =
       iree_hal_buffer_byte_length(buffer.raw_ptr());
-  iree_hal_buffer_mapping_t mapped_memory;
+  iree_hal_buffer_mapping_t mapped_memory = {{0}};
   CheckApiStatus(iree_hal_buffer_map_range(
                      buffer.raw_ptr(), IREE_HAL_MAPPING_MODE_SCOPED,
                      IREE_HAL_MEMORY_ACCESS_READ, 0 /* element_offset */,
