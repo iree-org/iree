@@ -403,6 +403,7 @@ def Util_GlobalOp : Util_Op<"global", [
 
     Attribute getInitialValueAttr() { return initial_valueAttr(); }
     void clearInitialValue() { (*this)->removeAttr("initial_value"); }
+    void setInitialValue(Attribute attr) { (*this)->setAttr("initial_value", attr); }
   }];
 
   let verifier = [{ return verifyGlobalOp(*this); }];

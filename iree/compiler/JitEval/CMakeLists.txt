@@ -44,8 +44,10 @@ iree_cc_library(
   DEPS
     ::PassHeaders
     ::PassesIncGen
+    ::Runtime
     MLIRIR
     MLIRPass
+    iree::compiler::Bindings::Native::Transforms
     iree::compiler::Dialect::Flow::Transforms
     iree::compiler::Dialect::HAL::Transforms
     iree::compiler::Dialect::Stream::Transforms
@@ -55,6 +57,26 @@ iree_cc_library(
     iree::compiler::Dialect::VM::Conversion::StandardToVM
     iree::compiler::Dialect::VM::Target::Bytecode
     iree::compiler::Dialect::VM::Transforms
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    Runtime
+  HDRS
+    "Runtime.h"
+  SRCS
+    "Runtime.cpp"
+  DEPS
+    MLIRIR
+    iree::compiler::Dialect::VM::Target::Bytecode
+    iree::hal
+    iree::hal::vmvx::registration
+    iree::modules::hal
+    iree::tools::utils::vm_util
+    iree::vm
+    iree::vm::bytecode_module
+    iree::vm::cc
   PUBLIC
 )
 

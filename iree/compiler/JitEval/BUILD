@@ -53,7 +53,9 @@ cc_library(
     deps = [
         ":PassHeaders",
         ":PassesIncGen",
+        ":Runtime",
         # TODO: Prune.
+        "//iree/compiler/Bindings/Native/Transforms",
         "//iree/compiler/Dialect/Flow/Transforms",
         "//iree/compiler/Dialect/HAL/Transforms",
         "//iree/compiler/Dialect/Stream/Transforms",
@@ -65,5 +67,26 @@ cc_library(
         "//iree/compiler/Dialect/VM/Transforms",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:Pass",
+    ],
+)
+
+cc_library(
+    name = "Runtime",
+    srcs = [
+        "Runtime.cpp",
+    ],
+    hdrs = [
+        "Runtime.h",
+    ],
+    deps = [
+        "//iree/compiler/Dialect/VM/Target/Bytecode",
+        "//iree/hal",
+        "//iree/hal/vmvx/registration",
+        "//iree/modules/hal",
+        "//iree/tools/utils:vm_util",
+        "//iree/vm",
+        "//iree/vm:bytecode_module",
+        "//iree/vm:cc",
+        "@llvm-project//mlir:IR",
     ],
 )

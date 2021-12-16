@@ -4,6 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "iree/compiler/Bindings/Native/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "iree/compiler/Dialect/HAL/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Stream/Transforms/Passes.h"
@@ -13,8 +14,10 @@
 #include "iree/compiler/Dialect/VM/Transforms/Passes.h"
 #include "iree/compiler/JitEval/PassDetail.h"
 #include "iree/compiler/JitEval/Passes.h"
+#include "iree/compiler/JitEval/Runtime.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/Support/Debug.h"
+#include "llvm/Support/raw_ostream.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/BlockAndValueMapping.h"
 #include "mlir/IR/Builders.h"
@@ -131,6 +134,7 @@ struct JitEvalGlobalsPass : public JitEvalGlobalsBase<JitEvalGlobalsPass> {
     options->targetOptions.f32Extension = true;
     options->targetOptions.f64Extension = true;
 
+    IREE::ABI::buildTransformPassPipeline(compilePipeline);
     IREE::Flow::buildFlowTransformPassPipeline(compilePipeline,
                                                options->flowOptions);
     IREE::Stream::buildStreamTransformPassPipeline(compilePipeline,
@@ -147,15 +151,16 @@ struct JitEvalGlobalsPass : public JitEvalGlobalsBase<JitEvalGlobalsPass> {
 
   void runOnOperation() override {
     auto outerModule = getOperation();
+    SymbolTable outerSymbolTable(outerModule);
     OpBuilder builder = OpBuilder::atBlockEnd(outerModule.getBody());
     auto innerModule = builder.create<ModuleOp>(outerModule.getLoc());
     ProgramExtractor extractor(outerModule, innerModule);
+    SmallVector<Operation *> pruneOps;
 
     // Import initializers.
-    for (Operation &childOp : *outerModule.getBody()) {
-      if (llvm::isa<IREE::Util::InitializerOp>(childOp)) {
-        extractor.importOperation(&childOp);
-      }
+    for (auto childOp : outerModule.getOps<IREE::Util::InitializerOp>()) {
+      extractor.importOperation(childOp);
+      pruneOps.push_back(childOp);
     }
 
     // Transitively import any dependencies.
@@ -176,12 +181,40 @@ struct JitEvalGlobalsPass : public JitEvalGlobalsBase<JitEvalGlobalsPass> {
       }
     }
 
+    // Run the IREE compiler, transforming the inner module into a vm.module.
     if (failed(runPipeline(compilePipeline, innerModule))) {
       return signalPassFailure();
     }
 
-    // Make sure to kill the temporary program we constructed.
-    // innerModule.erase();
+    // Generate a binary.
+    InMemoryCompiledBinary binary;
+    if (failed(binary.translateFromModule(innerModule))) {
+      return signalPassFailure();
+    }
+
+    // Kill the temporary program we constructed.
+    innerModule.erase();
+
+    for (auto &it : uninitializedGlobals) {
+      StringAttr funcSymbol = it.first;
+      StringAttr globalSymbol = it.second;
+      auto targetGlobal = llvm::cast<IREE::Util::GlobalOp>(
+          outerSymbolTable.lookup(globalSymbol));
+      Location loc = targetGlobal->getLoc();
+
+      Attribute value =
+          binary.invokeNullaryAsElements(loc, funcSymbol.strref());
+      if (!value) {
+        return signalPassFailure();
+      }
+
+      targetGlobal.setInitialValue(value);
+    }
+
+    // Delete any ops noted for pruning.
+    for (Operation *op : pruneOps) {
+      op->erase();
+    }
   }
 
   std::shared_ptr<CompileOptions> options;
