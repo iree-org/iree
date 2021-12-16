@@ -20,7 +20,8 @@ include(CMakeParseArguments)
 #       the dependency for `DRIVER_REGISTRATION_HDR`).
 #   EXCLUDED_TESTS: List of test names from `IREE_ALL_CTS_TESTS` to
 #       exclude from the test suite for this driver.
-#   LABELS: Additional labels to forward to `iree_cc_test`.
+#   LABELS: Additional labels to forward to `iree_cc_test`. The package path
+#     and "driver=${DRIVER}" are added automatically.
 function(iree_hal_cts_target)
   if(NOT IREE_BUILD_TESTS)
     return()
@@ -33,6 +34,8 @@ function(iree_hal_cts_target)
     "DEPS;EXCLUDED_TESTS;LABELS"
     ${ARGN}
   )
+
+  list(APPEND _RULE_LABELS "driver=${_RULE_DRIVER_NAME}")
 
   foreach(_TEST_NAME ${IREE_ALL_CTS_TESTS})
     if("${_TEST_NAME}" IN_LIST _RULE_EXCLUDED_TESTS)
