@@ -15,7 +15,7 @@
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/SymbolTable.h"
 
-#define DEBUG_TYPE "iree-greedy-hoist-into-globals"
+#define DEBUG_TYPE "iree-util-hoist-into-globals"
 
 using llvm::dbgs;
 
@@ -66,12 +66,11 @@ bool isHoistableLeaf(const ConstExprAnalysis::ConstValueInfo *info) {
 // necessary. Either this algorithm can be made smarter or a follow-on pass
 // can sink globals into the program where it is profitable to reduce
 // working set size.
-class GreedyHoistIntoGlobalsPass
-    : public PassWrapper<GreedyHoistIntoGlobalsPass,
-                         OperationPass<mlir::ModuleOp>> {
+class HoistIntoGlobalsPass
+    : public PassWrapper<HoistIntoGlobalsPass, OperationPass<mlir::ModuleOp>> {
  public:
   StringRef getArgument() const override {
-    return "iree-greedy-hoist-into-globals";
+    return "iree-util-greedy-hoist-into-globals";
   }
 
   StringRef getDescription() const override {
@@ -132,37 +131,6 @@ class GreedyHoistIntoGlobalsPass
         }
       }
 
-      // // We only want to look at const-expr ops (non roots) since they may
-      // // have interesting escapes.
-      // if (!constExprs.isConstExprOperation(childOp)) {
-      //   return WalkResult::advance();
-      // }
-
-      // LLVM_DEBUG(dbgs() << "PROCESSING CONST-EXPR OP: " << *childOp << "\n");
-      // for (Value constExprResult : childOp->getResults()) {
-      //   SmallVector<OpOperand *> escapeOperands =
-      //       constExprs.getNonConstExprEscapes(constExprResult);
-      //   LLVM_DEBUG(dbgs() << "  : Escapes " << escapeOperands.size()
-      //                     << " to non-const-expr ops\n");
-      //   for (OpOperand *operand : escapeOperands) {
-      //     if (canHoistOperand(operand)) {
-      //       // Bingo.
-      //       Operation *targetOp = operand->getOwner();
-      //       LLVM_DEBUG(dbgs() << "HOIST CONST-EXPR:\n");
-      //       LLVM_DEBUG(dbgs() << "  : Operand #" <<
-      //       operand->getOperandNumber()
-      //                         << " of " << *targetOp << "\n");
-      //       LLVM_DEBUG(dbgs() << "  : From " << operand->get() << "\n\n");
-
-      //       hoistConstExpr(targetOp, operand, hoistedMap, moduleSymbols,
-      //                      constExprs);
-      //     } else {
-      //       LLVM_DEBUG(dbgs() << "CANNOT HOIST CONST-EXPR OPERAND #"
-      //                         << operand->getOperandNumber() << " of "
-      //                         << operand->getOwner() << "\n");
-      //     }
-      //   }
-      // }
       return WalkResult::advance();
     });
 
@@ -295,12 +263,11 @@ class GreedyHoistIntoGlobalsPass
 
 }  // namespace
 
-std::unique_ptr<OperationPass<mlir::ModuleOp>>
-createGreedyHoistIntoGlobalsPass() {
-  return std::make_unique<GreedyHoistIntoGlobalsPass>();
+std::unique_ptr<OperationPass<mlir::ModuleOp>> createHoistIntoGlobalsPass() {
+  return std::make_unique<HoistIntoGlobalsPass>();
 }
 
-static PassRegistration<GreedyHoistIntoGlobalsPass> pass;
+static PassRegistration<HoistIntoGlobalsPass> pass;
 
 }  // namespace Util
 }  // namespace IREE

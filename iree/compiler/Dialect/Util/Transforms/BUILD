@@ -18,7 +18,7 @@ cc_library(
         "DropCompilerHints.cpp",
         "FoldGlobals.cpp",
         "FuseGlobals.cpp",
-        "GreedyHoistIntoGlobals.cpp",
+        "HoistIntoGlobals.cpp",
         "Patterns.cpp",
         "SimplifyGlobalAccesses.cpp",
     ],
