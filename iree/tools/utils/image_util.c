@@ -159,7 +159,7 @@ static iree_status_t iree_tools_utils_buffer_view_load_image_rescaled(
   iree_tools_utils_buffer_view_load_params_t* params =
       (iree_tools_utils_buffer_view_load_params_t*)user_data;
   return iree_tools_utils_pixel_rescaled_to_buffer(
-      params->pixel_data, mapping->contents.data_length, params->input_range,
+      params->pixel_data, params->pixel_data_length, params->input_range,
       params->input_range_length, (float*)mapping->contents.data);
 }
 

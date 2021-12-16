@@ -171,25 +171,17 @@ iree_status_t Run() {
   }
 
   // Read back the results and ensure we got the right values.
-  iree_hal_buffer_mapping_t mapped_memory;
-  memset(&mapped_memory, 0, sizeof(mapped_memory));
+  float results[] = {0.0f, 0.0f, 0.0f, 0.0f};
   if (iree_status_is_ok(status)) {
-    status = iree_hal_buffer_map_range(
-        iree_hal_buffer_view_buffer(ret_buffer_view),
-        IREE_HAL_MEMORY_ACCESS_READ, 0, IREE_WHOLE_BUFFER, &mapped_memory);
+    status =
+        iree_hal_buffer_read_data(iree_hal_buffer_view_buffer(ret_buffer_view),
+                                  0, results, sizeof(results));
   }
   if (iree_status_is_ok(status)) {
-    if (mapped_memory.contents.data_length / sizeof(float) != kElementCount) {
-      status = iree_make_status(IREE_STATUS_UNKNOWN,
-                                "result does not match element count ");
-    }
-  }
-  if (iree_status_is_ok(status)) {
-    const float* data = (const float*)mapped_memory.contents.data;
-    for (iree_host_size_t i = 0;
-         i < mapped_memory.contents.data_length / sizeof(float); ++i) {
-      if (data[i] != 8.0f) {
+    for (iree_host_size_t i = 0; i < IREE_ARRAYSIZE(results); ++i) {
+      if (results[i] != 8.0f) {
         status = iree_make_status(IREE_STATUS_UNKNOWN, "result mismatches");
+        break;
       }
     }
   }

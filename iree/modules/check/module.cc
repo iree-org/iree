@@ -220,6 +220,9 @@ class CheckModuleState final {
     iree_hal_element_type_t rhs_element_type =
         iree_hal_buffer_view_element_type(rhs);
 
+    // HACK: this is all broken and will leak. Let's kill this entire module
+    // please.
+
     iree_hal_buffer_t* lhs_buf = iree_hal_buffer_view_buffer(lhs);
     iree_hal_buffer_mapping_t lhs_mapped_memory;
     IREE_RETURN_IF_ERROR(iree_hal_buffer_map_range(

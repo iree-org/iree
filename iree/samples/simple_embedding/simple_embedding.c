@@ -72,12 +72,11 @@ iree_status_t Run() {
 
   // Initial buffer contents for 4 * 2 = 8.
   const float kFloat4[] = {4.0f, 4.0f, 4.0f, 4.0f};
-  const float kFloat2[] = {2.0f, 2.0f, 2.0f, .0f};
-  const int kElementCount = IREE_ARRAYSIZE(kFloat4);
+  const float kFloat2[] = {2.0f, 2.0f, 2.0f, 2.0f};
 
   // Allocate buffers in device-local memory so that if the device has an
   // independent address space they live on the fast side of the fence.
-  iree_hal_dim_t shape[1] = {kElementCount};
+  iree_hal_dim_t shape[1] = {IREE_ARRAYSIZE(kFloat4)};
   iree_hal_buffer_view_t* arg0_buffer_view = NULL;
   iree_hal_buffer_view_t* arg1_buffer_view = NULL;
   IREE_RETURN_IF_ERROR(iree_hal_buffer_view_allocate_buffer(
@@ -134,12 +133,12 @@ iree_status_t Run() {
   }
 
   // Read back the results and ensure we got the right values.
-  iree_hal_buffer_mapping_t mapped_memory;
-  IREE_RETURN_IF_ERROR(iree_hal_buffer_map_range(
-      iree_hal_buffer_view_buffer(ret_buffer_view), IREE_HAL_MEMORY_ACCESS_READ,
-      0, IREE_WHOLE_BUFFER, &mapped_memory));
-  for (int i = 0; i < mapped_memory.contents.data_length / sizeof(float); ++i) {
-    if (((const float*)mapped_memory.contents.data)[i] != 8.0f) {
+  float results[] = {0.0f, 0.0f, 0.0f, 0.0f};
+  IREE_RETURN_IF_ERROR(
+      iree_hal_buffer_read_data(iree_hal_buffer_view_buffer(ret_buffer_view), 0,
+                                results, sizeof(results)));
+  for (iree_host_size_t i = 0; i < IREE_ARRAYSIZE(results); ++i) {
+    if (results[i] != 8.0f) {
       return iree_make_status(IREE_STATUS_UNKNOWN, "result mismatches");
     }
   }

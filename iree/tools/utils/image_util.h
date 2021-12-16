@@ -66,7 +66,7 @@ iree_status_t iree_tools_utils_buffer_view_from_image_rescaled(
 //
 // |out_buffer| needs to be allocated before the call.
 iree_status_t iree_tools_utils_pixel_rescaled_to_buffer(
-    const uint8_t* pixel_data, iree_host_size_t buffer_length,
+    const uint8_t* pixel_data, iree_host_size_t pixel_count,
     const float* input_range, iree_host_size_t input_range_length,
     float* out_buffer);
 

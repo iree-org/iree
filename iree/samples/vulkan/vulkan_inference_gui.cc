@@ -71,9 +71,10 @@ extern "C" int iree_main(int argc, char** argv) {
   }
 
   // Setup window
-  SDL_WindowFlags window_flags =
-      (SDL_WindowFlags)(SDL_WINDOW_VULKAN | SDL_WINDOW_RESIZABLE |
-                        SDL_WINDOW_ALLOW_HIGHDPI);
+  // clang-format off
+  SDL_WindowFlags window_flags = (SDL_WindowFlags)(
+      SDL_WINDOW_VULKAN | SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI);
+  // clang-format on
   SDL_Window* window = SDL_CreateWindow(
       "IREE Samples - Vulkan Inference GUI", SDL_WINDOWPOS_CENTERED,
       SDL_WINDOWPOS_CENTERED, 1280, 720, window_flags);

@@ -73,23 +73,22 @@ iree_status_t Run(const iree_string_view_t image_path) {
 
   // Read back the results. The output of the mnist model is a 1x10 prediction
   // confidence values for each digit in [0, 9].
-  iree_hal_buffer_mapping_t mapped_memory;
-  IREE_RETURN_IF_ERROR(iree_hal_buffer_map_range(
-      iree_hal_buffer_view_buffer(ret_buffer_view), IREE_HAL_MEMORY_ACCESS_READ,
-      0, IREE_WHOLE_BUFFER, &mapped_memory));
+  float predictions[1 * 10] = {0.0f};
+  IREE_RETURN_IF_ERROR(
+      iree_hal_buffer_read_data(iree_hal_buffer_view_buffer(ret_buffer_view), 0,
+                                predictions, sizeof(predictions)));
+  iree_hal_buffer_view_release(ret_buffer_view);
+
+  // Get the highest index from the output.
   float result_val = FLT_MIN;
   int result_idx = 0;
-  const float* data_ptr = (const float*)mapped_memory.contents.data;
-  for (int i = 0; i < mapped_memory.contents.data_length / sizeof(float); ++i) {
-    if (data_ptr[i] > result_val) {
-      result_val = data_ptr[i];
+  for (iree_host_size_t i = 0; i < IREE_ARRAYSIZE(predictions); ++i) {
+    if (predictions[i] > result_val) {
+      result_val = predictions[i];
       result_idx = i;
     }
   }
-
-  // Get the highest index from the output.
   fprintf(stdout, "Detected number: %d\n", result_idx);
-  iree_hal_buffer_view_release(ret_buffer_view);
 
   iree_runtime_call_deinitialize(&call);
   iree_runtime_session_release(session);
