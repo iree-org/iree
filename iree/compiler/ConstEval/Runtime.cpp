@@ -4,7 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/JitEval/Runtime.h"
+#include "iree/compiler/ConstEval/Runtime.h"
 
 #include "iree/compiler/Dialect/VM/Target/Bytecode/BytecodeModuleTarget.h"
 #include "iree/hal/buffer_view.h"
@@ -15,7 +15,7 @@
 
 namespace mlir {
 namespace iree_compiler {
-namespace JitEval {
+namespace ConstEval {
 
 namespace {
 
@@ -227,6 +227,6 @@ Runtime& Runtime::getInstance() {
   return instance;
 }
 
-}  // namespace JitEval
+}  // namespace ConstEval
 }  // namespace iree_compiler
 }  // namespace mlir

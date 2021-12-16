@@ -4,8 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#ifndef IREE_COMPILER_JITEVAL_RUNTIME_H_
-#define IREE_COMPILER_JITEVAL_RUNTIME_H_
+#ifndef IREE_COMPILER_CONSTEVAL_RUNTIME_H_
+#define IREE_COMPILER_CONSTEVAL_PASSES_H_
 
 #include "iree/compiler/Dialect/VM/Target/Bytecode/BytecodeModuleTarget.h"
 #include "iree/hal/driver_registry.h"
@@ -20,7 +20,7 @@ namespace mlir {
 class ModuleOp;
 
 namespace iree_compiler {
-namespace JitEval {
+namespace ConstEval {
 
 // Abstract base class for a compiled binary.
 class CompiledBinary {
@@ -69,8 +69,8 @@ class Runtime {
   Runtime();
 };
 
-}  // namespace JitEval
+}  // namespace ConstEval
 }  // namespace iree_compiler
 }  // namespace mlir
 
-#endif  // IREE_COMPILER_JITEVAL_RUNTIME_H_
+#endif  // IREE_COMPILER_CONSTEVAL_RUNTIME_H_

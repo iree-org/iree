@@ -17,6 +17,7 @@
 #include "iree-dialects/Dialect/LinalgExt/Transforms/Passes.h"
 #include "iree/compiler/Bindings/Native/Transforms/Passes.h"
 #include "iree/compiler/Bindings/TFLite/Transforms/Passes.h"
+#include "iree/compiler/ConstEval/Passes.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "iree/compiler/Dialect/HAL/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Modules/VMVX/Transforms/Passes.h"
@@ -27,7 +28,6 @@
 #include "iree/compiler/InputConversion/Common/Passes.h"
 #include "iree/compiler/InputConversion/MHLO/Passes.h"
 #include "iree/compiler/InputConversion/TOSA/Passes.h"
-#include "iree/compiler/JitEval/Passes.h"
 #include "iree/compiler/Translation/IREEVM.h"
 
 namespace mlir {
@@ -44,7 +44,7 @@ inline void registerAllIreePasses() {
   registerCommonInputConversionPasses();
   MHLO::registerMHLOConversionPasses();
   registerTOSAConversionPasses();
-  JitEval::registerJitEvalPasses();
+  ConstEval::registerConstEvalPasses();
 
   IREE::Flow::registerFlowPasses();
   IREE::HAL::registerHALPasses();

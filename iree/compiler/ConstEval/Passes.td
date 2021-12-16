@@ -9,10 +9,10 @@
 
 include "mlir/Pass/PassBase.td"
 
-def JitEvalGlobals :
-  Pass<"iree-jiteval-globals", "ModuleOp"> {
-  let summary = "Jits global initializers and evaluates them";
-  let constructor = "mlir::iree_compiler::JitEval::createJitEvalGlobalsPass()";
+def JitGlobals :
+  Pass<"iree-consteval-jit-globals", "ModuleOp"> {
+  let summary = "Jits global initializers and evaluates them into concrete values";
+  let constructor = "mlir::iree_compiler::ConstEval::createJitGlobalsPass()";
 }
 
 #endif // IREE_COMPILER_JITEVAL_PASSES

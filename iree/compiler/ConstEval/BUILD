@@ -42,9 +42,9 @@ cc_library(
 )
 
 cc_library(
-    name = "JitEval",
+    name = "ConstEval",
     srcs = [
-        "JitEvalGlobals.cpp",
+        "JitGlobals.cpp",
         "Passes.cpp",
     ],
     hdrs = [

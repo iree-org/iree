@@ -5,6 +5,9 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Bindings/Native/Transforms/Passes.h"
+#include "iree/compiler/ConstEval/PassDetail.h"
+#include "iree/compiler/ConstEval/Passes.h"
+#include "iree/compiler/ConstEval/Runtime.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "iree/compiler/Dialect/HAL/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Stream/Transforms/Passes.h"
@@ -12,9 +15,6 @@
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
 #include "iree/compiler/Dialect/VM/Target/Bytecode/TranslationFlags.h"
 #include "iree/compiler/Dialect/VM/Transforms/Passes.h"
-#include "iree/compiler/JitEval/PassDetail.h"
-#include "iree/compiler/JitEval/Passes.h"
-#include "iree/compiler/JitEval/Runtime.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
@@ -26,7 +26,7 @@
 
 namespace mlir {
 namespace iree_compiler {
-namespace JitEval {
+namespace ConstEval {
 
 namespace {
 
@@ -122,8 +122,8 @@ struct CompileOptions {
   IREE::VM::TargetOptions targetOptions;
 };
 
-struct JitEvalGlobalsPass : public JitEvalGlobalsBase<JitEvalGlobalsPass> {
-  JitEvalGlobalsPass()
+struct JitGlobalsPass : public JitGlobalsBase<JitGlobalsPass> {
+  JitGlobalsPass()
       : options(std::make_shared<CompileOptions>()),
         compilePipeline("builtin.module") {
     // Invoke IREE compilation flow.
@@ -223,10 +223,10 @@ struct JitEvalGlobalsPass : public JitEvalGlobalsBase<JitEvalGlobalsPass> {
 
 }  // namespace
 
-std::unique_ptr<OperationPass<ModuleOp>> createJitEvalGlobalsPass() {
-  return std::make_unique<JitEvalGlobalsPass>();
+std::unique_ptr<OperationPass<ModuleOp>> createJitGlobalsPass() {
+  return std::make_unique<JitGlobalsPass>();
 }
 
-}  // namespace JitEval
+}  // namespace ConstEval
 }  // namespace iree_compiler
 }  // namespace mlir

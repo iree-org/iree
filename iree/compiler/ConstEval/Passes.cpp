@@ -4,22 +4,22 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/JitEval/Passes.h"
+#include "iree/compiler/ConstEval/Passes.h"
 
 namespace mlir {
 namespace iree_compiler {
-namespace JitEval {
+namespace ConstEval {
 
 namespace {
 #define GEN_PASS_REGISTRATION
-#include "iree/compiler/JitEval/Passes.h.inc"  // IWYU pragma: export
+#include "iree/compiler/ConstEval/Passes.h.inc"  // IWYU pragma: export
 }  // namespace
 
-void registerJitEvalPasses() {
+void registerConstEvalPasses() {
   // Generated.
   registerPasses();
 }
 
-} // namespace JitEval
-} // namespace iree_compiler
-} // namespace mlir
+}  // namespace ConstEval
+}  // namespace iree_compiler
+}  // namespace mlir
