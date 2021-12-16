@@ -115,10 +115,9 @@ struct DispatchTensorLoadOpInterface
     Value source = getSubspanBuffer(loadOp.source(), b, state);
 
     // Bufferize to subview.
-    Value subView = b.create<memref::SubViewOp>(
-        loadOp->getLoc(), source, loadOp.getMixedOffsets(),
-        loadOp.getMixedSizes(), loadOp.getMixedStrides());
-    state.mapBuffer(loadOp.result(), subView);
+    state.replaceOpWithNewOp<memref::SubViewOp>(
+        b, op, source, loadOp.getMixedOffsets(), loadOp.getMixedSizes(),
+        loadOp.getMixedStrides());
 
     return success();
   }
@@ -193,7 +192,7 @@ struct DispatchTensorStoreOpInterface
       state.createMemCpy(b, storeOp->getLoc(), srcMemref, subView);
     }
 
-    state.markOpObsolete(storeOp);
+    storeOp.erase();
     return success();
   }
 };
