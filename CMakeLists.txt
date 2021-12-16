@@ -45,10 +45,10 @@ option(IREE_BUILD_TENSORFLOW_COMPILER "Builds TensorFlow compiler frontend." "${
 option(IREE_BUILD_TFLITE_COMPILER "Builds the TFLite compiler frontend." "${IREE_BUILD_TENSORFLOW_ALL}")
 option(IREE_BUILD_XLA_COMPILER "Builds TensorFlow XLA compiler frontend." "${IREE_BUILD_TENSORFLOW_ALL}")
 
-set(IREE_HAL_DRIVERS_TO_BUILD "all"
-  CACHE STRING "Semicolon-separated list of HAL drivers to build, or \"all\".")
-set(IREE_TARGET_BACKENDS_TO_BUILD "all"
-  CACHE STRING "Semicolon-separated list of target backends to build, or \"all\".")
+set(IREE_HAL_DRIVERS_TO_BUILD "default"
+  CACHE STRING "Semicolon-separated list of HAL drivers to build, or \"default\"")
+set(IREE_TARGET_BACKENDS_TO_BUILD "default"
+  CACHE STRING "Semicolon-separated list of target backends to build, or \"default\"")
 
 # Properties controlling version and naming of release artifacts.
 set(IREE_RELEASE_PACKAGE_SUFFIX "-dev" CACHE STRING "Suffix to append to distributed package names")
@@ -66,7 +66,6 @@ if(${IREE_BUILD_TENSORFLOW_ALL} OR
   set(IREE_ENABLE_TENSORFLOW ON)
 endif()
 
-
 option(IREE_BUILD_BINDINGS_TFLITE "Builds the IREE TFLite C API compatibility shim" ON)
 option(IREE_BUILD_BINDINGS_TFLITE_JAVA "Builds the IREE TFLite Java bindings with the C API compatibility shim" ON)
 
@@ -78,7 +77,7 @@ option(IREE_BUILD_PYTHON_BINDINGS "Builds the IREE python bindings" "${IREE_ENAB
 #-------------------------------------------------------------------------------
 
 option(IREE_BUILD_EXPERIMENTAL_REMOTING "Builds experimental remoting support." OFF)
-option(IREE_BUILD_EXPERIMENTAL_ROCM "Builds the experimental ROCM Backend." OFF)
+option(IREE_BUILD_EXPERIMENTAL_ROCM "Builds the experimental ROCm Backend." OFF)
 option(IREE_ENABLE_NEW_INTEGRATION_TESTS "Enables new integration tests and disables old." OFF)
 
 #-------------------------------------------------------------------------------
@@ -91,59 +90,59 @@ option(IREE_ENABLE_EMITC "Enables MLIR EmitC dependencies." ${IREE_BUILD_COMPILE
 # Target and backend configuration
 #-------------------------------------------------------------------------------
 
-# List of all HAL drivers to be built by default:
+# List of all runtime HAL drivers included in the project:
 set(IREE_ALL_HAL_DRIVERS
-  Cuda
-  DyLib
+  CUDA
+  Dylib
   Dylib_Sync
   VMVX
   VMVX_Sync
   Vulkan
 )
 
-if(IREE_HAL_DRIVERS_TO_BUILD STREQUAL "all")
+if(IREE_HAL_DRIVERS_TO_BUILD STREQUAL "default")
   set(IREE_HAL_DRIVERS_TO_BUILD ${IREE_ALL_HAL_DRIVERS})
 
-  # For Apple platforms we need to use Metal instead of Vulkan.
+  # Vulkan is not natively supported on Apple platforms.
+  # Metal should generally be used instead, though MoltenVK may also work.
   if(APPLE)
     list(REMOVE_ITEM IREE_HAL_DRIVERS_TO_BUILD Vulkan)
   endif()
-  # Remove Cuda from Android and Apple platforms.
+
+  # CUDA is not natively supported on Android or Apple platforms.
   if(ANDROID OR APPLE)
-    list(REMOVE_ITEM IREE_HAL_DRIVERS_TO_BUILD Cuda)
+    list(REMOVE_ITEM IREE_HAL_DRIVERS_TO_BUILD CUDA)
   endif()
 endif()
-message(STATUS "Building HAL drivers: ${IREE_HAL_DRIVERS_TO_BUILD}")
+message(STATUS "Building runtime HAL drivers: ${IREE_HAL_DRIVERS_TO_BUILD}")
 
-# Default every IREE_HAL_DRIVER_* to OFF
+# Start each IREE_HAL_DRIVER_* OFF, then enable from IREE_HAL_DRIVERS_TO_BUILD.
 foreach(_backend ${IREE_ALL_HAL_DRIVERS})
   string(TOUPPER "${_backend}" uppercase_backend)
   set(IREE_HAL_DRIVER_${uppercase_backend} OFF CACHE BOOL "" FORCE)
 endforeach()
-
-# Set IREE_HAL_DRIVER_* based on configuration
 foreach(_backend ${IREE_HAL_DRIVERS_TO_BUILD})
   string(TOUPPER "${_backend}" uppercase_backend)
   string(REPLACE "\"" "" uppercase_backend ${uppercase_backend})
   set(IREE_HAL_DRIVER_${uppercase_backend} ON CACHE BOOL "" FORCE)
 endforeach()
 
-# List of all target backends to be built by default:
+# List of all compiler target backends included in the project:
 set(IREE_ALL_TARGET_BACKENDS
   CUDA
-  DYLIB-LLVM-AOT
+  Dylib-LLVM-AOT
   WASM-LLVM-AOT
   Metal-SPIRV
-  ROCM
+  ROCm
   Vulkan-SPIRV
   VMVX
 )
 
 if(${IREE_BUILD_COMPILER})
-  if(IREE_TARGET_BACKENDS_TO_BUILD STREQUAL "all")
+  if(IREE_TARGET_BACKENDS_TO_BUILD STREQUAL "default")
     set(IREE_TARGET_BACKENDS_TO_BUILD ${IREE_ALL_TARGET_BACKENDS})
   endif()
-  message(STATUS "Building target backends: ${IREE_TARGET_BACKENDS_TO_BUILD}")
+  message(STATUS "Building compiler target backends: ${IREE_TARGET_BACKENDS_TO_BUILD}")
 else()
   set(IREE_TARGET_BACKENDS_TO_BUILD "" CACHE STRING "" FORCE)
   message(STATUS "Compiler is disabled, building no target backends")
@@ -421,7 +420,7 @@ else()
 endif()
 
 #-------------------------------------------------------------------------------
-# Other dependencies.
+# Other dependencies
 #-------------------------------------------------------------------------------
 
 include(external_cc_library)
