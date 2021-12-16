@@ -7,6 +7,9 @@
 #include "iree/hal/device.h"
 
 #include "iree/base/tracing.h"
+#include "iree/hal/allocator.h"
+#include "iree/hal/buffer.h"
+#include "iree/hal/command_buffer.h"
 #include "iree/hal/detail.h"
 #include "iree/hal/resource.h"
 
@@ -56,6 +59,85 @@ IREE_API_EXPORT iree_status_t iree_hal_device_query_i32(
   }
 
   return _VTABLE_DISPATCH(device, query_i32)(device, category, key, out_value);
+}
+
+// Performs a synchronous host->device or device->host transfer.
+static iree_status_t iree_hal_device_transfer_buffer(
+    iree_hal_device_t* device, iree_hal_buffer_t* source_buffer,
+    iree_hal_memory_type_t memory_type, iree_hal_buffer_usage_t allowed_usage,
+    iree_hal_buffer_t** out_target_buffer) {
+  IREE_ASSERT_ARGUMENT(device);
+  IREE_ASSERT_ARGUMENT(source_buffer);
+  IREE_ASSERT_ARGUMENT(out_target_buffer);
+  *out_target_buffer = NULL;
+  IREE_TRACE_ZONE_BEGIN(z0);
+
+  if (iree_all_bits_set(iree_hal_buffer_memory_type(source_buffer),
+                        memory_type) &&
+      iree_all_bits_set(iree_hal_buffer_allowed_usage(source_buffer),
+                        allowed_usage)) {
+    // Source is already usable for the intended purposes - avoid the copy.
+    *out_target_buffer = source_buffer;
+    iree_hal_buffer_retain(source_buffer);
+    IREE_TRACE_ZONE_END(z0);
+    return iree_ok_status();
+  }
+
+  iree_device_size_t allocation_size =
+      iree_hal_buffer_allocation_size(source_buffer);
+  IREE_TRACE_ZONE_APPEND_VALUE(z0, allocation_size);
+
+  // Allocate a new buffer of the desired memory type. It needs to be at least
+  // large enough to hold the requested data.
+  iree_hal_buffer_t* target_buffer = NULL;
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_hal_allocator_allocate_buffer(
+              iree_hal_device_allocator(device), memory_type,
+              allowed_usage | IREE_HAL_BUFFER_USAGE_TRANSFER, allocation_size,
+              iree_const_byte_span_empty(), &target_buffer));
+
+  // Perform the transfer and wait for it to complete.
+  const iree_hal_transfer_command_t transfer_command = {
+      .type = IREE_HAL_TRANSFER_COMMAND_TYPE_COPY,
+      .copy =
+          {
+              .source_buffer = source_buffer,
+              .source_offset = 0,
+              .target_buffer = target_buffer,
+              .target_offset = 0,
+              .length = IREE_WHOLE_BUFFER,
+          },
+  };
+  iree_status_t status = iree_hal_device_transfer_and_wait(
+      device, /*wait_semaphore=*/NULL,
+      /*wait_value=*/0ull, 1, &transfer_command, iree_infinite_timeout());
+
+  if (iree_status_is_ok(status)) {
+    *out_target_buffer = target_buffer;
+  } else {
+    iree_hal_buffer_release(target_buffer);
+  }
+  IREE_TRACE_ZONE_END(z0);
+  return status;
+}
+
+IREE_API_EXPORT iree_status_t iree_hal_device_transfer_to_device(
+    iree_hal_device_t* device, iree_hal_buffer_t* source_buffer,
+    iree_hal_buffer_usage_t allowed_usage,
+    iree_hal_buffer_t** out_target_buffer) {
+  return iree_hal_device_transfer_buffer(device, source_buffer,
+                                         IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL,
+                                         allowed_usage, out_target_buffer);
+}
+
+IREE_API_EXPORT iree_status_t iree_hal_device_transfer_to_host(
+    iree_hal_device_t* device, iree_hal_buffer_t* source_buffer,
+    iree_hal_buffer_t** out_target_buffer) {
+  iree_hal_buffer_usage_t allowed_usage =
+      IREE_HAL_BUFFER_USAGE_TRANSFER | IREE_HAL_BUFFER_USAGE_MAPPING;
+  return iree_hal_device_transfer_buffer(device, source_buffer,
+                                         IREE_HAL_MEMORY_TYPE_HOST_LOCAL,
+                                         allowed_usage, out_target_buffer);
 }
 
 IREE_API_EXPORT iree_status_t iree_hal_device_transfer_and_wait(
