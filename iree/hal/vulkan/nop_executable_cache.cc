@@ -20,8 +20,10 @@ typedef struct iree_hal_vulkan_nop_executable_cache_t {
   VkDeviceHandle* logical_device;
 } iree_hal_vulkan_nop_executable_cache_t;
 
+namespace {
 extern const iree_hal_executable_cache_vtable_t
     iree_hal_vulkan_nop_executable_cache_vtable;
+}  // namespace
 
 static iree_hal_vulkan_nop_executable_cache_t*
 iree_hal_vulkan_nop_executable_cache_cast(
@@ -87,6 +89,7 @@ static iree_status_t iree_hal_vulkan_nop_executable_cache_prepare_executable(
       /*pipeline_cache=*/VK_NULL_HANDLE, executable_spec, out_executable);
 }
 
+namespace {
 const iree_hal_executable_cache_vtable_t
     iree_hal_vulkan_nop_executable_cache_vtable = {
         /*.destroy=*/iree_hal_vulkan_nop_executable_cache_destroy,
@@ -95,3 +98,4 @@ const iree_hal_executable_cache_vtable_t
         /*.prepare_executable=*/
         iree_hal_vulkan_nop_executable_cache_prepare_executable,
 };
+}  // namespace

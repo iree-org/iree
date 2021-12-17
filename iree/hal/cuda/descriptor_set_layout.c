@@ -17,7 +17,7 @@ typedef struct iree_hal_cuda_descriptor_set_layout_t {
   iree_host_size_t binding_count;
 } iree_hal_cuda_descriptor_set_layout_t;
 
-extern const iree_hal_descriptor_set_layout_vtable_t
+static const iree_hal_descriptor_set_layout_vtable_t
     iree_hal_cuda_descriptor_set_layout_vtable;
 
 static iree_hal_cuda_descriptor_set_layout_t*
@@ -75,7 +75,7 @@ static void iree_hal_cuda_descriptor_set_layout_destroy(
   IREE_TRACE_ZONE_END(z0);
 }
 
-const iree_hal_descriptor_set_layout_vtable_t
+static const iree_hal_descriptor_set_layout_vtable_t
     iree_hal_cuda_descriptor_set_layout_vtable = {
         .destroy = iree_hal_cuda_descriptor_set_layout_destroy,
 };

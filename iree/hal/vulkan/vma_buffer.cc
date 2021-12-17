@@ -23,7 +23,9 @@ typedef struct iree_hal_vulkan_vma_buffer_t {
   VmaAllocationInfo allocation_info;
 } iree_hal_vulkan_vma_buffer_t;
 
+namespace {
 extern const iree_hal_buffer_vtable_t iree_hal_vulkan_vma_buffer_vtable;
+}  // namespace
 
 static iree_hal_vulkan_vma_buffer_t* iree_hal_vulkan_vma_buffer_cast(
     iree_hal_buffer_t* base_value) {
@@ -161,6 +163,7 @@ static iree_status_t iree_hal_vulkan_vma_buffer_flush_range(
   return iree_ok_status();
 }
 
+namespace {
 const iree_hal_buffer_vtable_t iree_hal_vulkan_vma_buffer_vtable = {
     /*.destroy=*/iree_hal_vulkan_vma_buffer_destroy,
     /*.map_range=*/iree_hal_vulkan_vma_buffer_map_range,
@@ -168,3 +171,4 @@ const iree_hal_buffer_vtable_t iree_hal_vulkan_vma_buffer_vtable = {
     /*.invalidate_range=*/iree_hal_vulkan_vma_buffer_invalidate_range,
     /*.flush_range=*/iree_hal_vulkan_vma_buffer_flush_range,
 };
+}  // namespace

@@ -39,7 +39,7 @@ typedef struct iree_hal_elf_executable_t {
   iree_hal_local_executable_layout_t* layouts[];
 } iree_hal_elf_executable_t;
 
-extern const iree_hal_local_executable_vtable_t iree_hal_elf_executable_vtable;
+static const iree_hal_local_executable_vtable_t iree_hal_elf_executable_vtable;
 
 static iree_status_t iree_hal_elf_executable_query_library(
     iree_hal_elf_executable_t* executable) {
@@ -254,12 +254,13 @@ static iree_status_t iree_hal_elf_executable_issue_call(
                         ret);
 }
 
-const iree_hal_local_executable_vtable_t iree_hal_elf_executable_vtable = {
-    .base =
-        {
-            .destroy = iree_hal_elf_executable_destroy,
-        },
-    .issue_call = iree_hal_elf_executable_issue_call,
+static const iree_hal_local_executable_vtable_t iree_hal_elf_executable_vtable =
+    {
+        .base =
+            {
+                .destroy = iree_hal_elf_executable_destroy,
+            },
+        .issue_call = iree_hal_elf_executable_issue_call,
 };
 
 //===----------------------------------------------------------------------===//
@@ -271,7 +272,7 @@ typedef struct iree_hal_embedded_library_loader_t {
   iree_allocator_t host_allocator;
 } iree_hal_embedded_library_loader_t;
 
-extern const iree_hal_executable_loader_vtable_t
+static const iree_hal_executable_loader_vtable_t
     iree_hal_embedded_library_loader_vtable;
 
 iree_status_t iree_hal_embedded_library_loader_create(
@@ -337,7 +338,7 @@ static iree_status_t iree_hal_embedded_library_loader_try_load(
   return status;
 }
 
-const iree_hal_executable_loader_vtable_t
+static const iree_hal_executable_loader_vtable_t
     iree_hal_embedded_library_loader_vtable = {
         .destroy = iree_hal_embedded_library_loader_destroy,
         .query_support = iree_hal_embedded_library_loader_query_support,

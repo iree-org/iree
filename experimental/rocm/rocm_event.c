@@ -17,7 +17,7 @@ typedef struct iree_hal_rocm_event_t {
   iree_hal_rocm_context_wrapper_t* context_wrapper;
 } iree_hal_rocm_event_t;
 
-extern const iree_hal_event_vtable_t iree_hal_rocm_event_vtable;
+static const iree_hal_event_vtable_t iree_hal_rocm_event_vtable;
 
 static iree_hal_rocm_event_t* iree_hal_rocm_event_cast(
     iree_hal_event_t* base_value) {
@@ -56,6 +56,6 @@ static void iree_hal_rocm_event_destroy(iree_hal_event_t* base_event) {
   IREE_TRACE_ZONE_END(z0);
 }
 
-const iree_hal_event_vtable_t iree_hal_rocm_event_vtable = {
+static const iree_hal_event_vtable_t iree_hal_rocm_event_vtable = {
     .destroy = iree_hal_rocm_event_destroy,
 };

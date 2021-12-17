@@ -30,7 +30,7 @@ typedef struct iree_hal_rocm_driver_t {
 // Pick a fixed lenght size for device names.
 #define IREE_MAX_ROCM_DEVICE_NAME_LENGTH 100
 
-extern const iree_hal_driver_vtable_t iree_hal_rocm_driver_vtable;
+static const iree_hal_driver_vtable_t iree_hal_rocm_driver_vtable;
 
 static iree_hal_rocm_driver_t* iree_hal_rocm_driver_cast(
     iree_hal_driver_t* base_value) {
@@ -201,7 +201,7 @@ static iree_status_t iree_hal_rocm_driver_create_device(
   return status;
 }
 
-const iree_hal_driver_vtable_t iree_hal_rocm_driver_vtable = {
+static const iree_hal_driver_vtable_t iree_hal_rocm_driver_vtable = {
     .destroy = iree_hal_rocm_driver_destroy,
     .query_available_devices = iree_hal_rocm_driver_query_available_devices,
     .create_device = iree_hal_rocm_driver_create_device,

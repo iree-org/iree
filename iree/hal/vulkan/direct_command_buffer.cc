@@ -61,8 +61,10 @@ typedef struct iree_hal_vulkan_direct_command_buffer_t {
   uint8_t push_constants_storage[IREE_HAL_VULKAN_BUILTIN_PUSH_CONSTANT_COUNT];
 } iree_hal_vulkan_direct_command_buffer_t;
 
+namespace {
 extern const iree_hal_command_buffer_vtable_t
     iree_hal_vulkan_direct_command_buffer_vtable;
+}  // namespace
 
 static iree_hal_vulkan_direct_command_buffer_t*
 iree_hal_vulkan_direct_command_buffer_cast(
@@ -785,6 +787,7 @@ static iree_status_t iree_hal_vulkan_direct_command_buffer_dispatch_indirect(
   return iree_ok_status();
 }
 
+namespace {
 const iree_hal_command_buffer_vtable_t
     iree_hal_vulkan_direct_command_buffer_vtable = {
         /*.destroy=*/iree_hal_vulkan_direct_command_buffer_destroy,
@@ -821,3 +824,4 @@ const iree_hal_command_buffer_vtable_t
         /*.dispatch_indirect=*/
         iree_hal_vulkan_direct_command_buffer_dispatch_indirect,
 };
+}  // namespace

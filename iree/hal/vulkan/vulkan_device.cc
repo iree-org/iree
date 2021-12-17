@@ -368,7 +368,9 @@ typedef struct iree_hal_vulkan_device_t {
   BuiltinExecutables* builtin_executables;
 } iree_hal_vulkan_device_t;
 
+namespace {
 extern const iree_hal_device_vtable_t iree_hal_vulkan_device_vtable;
+}  // namespace
 
 static iree_hal_vulkan_device_t* iree_hal_vulkan_device_cast(
     iree_hal_device_t* base_value) {
@@ -1111,6 +1113,7 @@ static iree_status_t iree_hal_vulkan_device_wait_idle(
   return iree_ok_status();
 }
 
+namespace {
 const iree_hal_device_vtable_t iree_hal_vulkan_device_vtable = {
     /*.destroy=*/iree_hal_vulkan_device_destroy,
     /*.id=*/iree_hal_vulkan_device_id,
@@ -1133,3 +1136,4 @@ const iree_hal_device_vtable_t iree_hal_vulkan_device_vtable = {
     /*.wait_semaphores=*/iree_hal_vulkan_device_wait_semaphores,
     /*.wait_idle=*/iree_hal_vulkan_device_wait_idle,
 };
+}  // namespace
