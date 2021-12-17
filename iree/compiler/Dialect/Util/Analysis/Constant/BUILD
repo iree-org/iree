@@ -14,9 +14,11 @@ cc_library(
     name = "Constant",
     srcs = [
         "ConstExpr.cpp",
+        "OpOracle.cpp",
     ],
     hdrs = [
         "ConstExpr.h",
+        "OpOracle.h",
     ],
     deps = [
         "//iree/compiler/Dialect/Util/IR",

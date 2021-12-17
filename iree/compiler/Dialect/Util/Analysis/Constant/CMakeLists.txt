@@ -15,8 +15,10 @@ iree_cc_library(
     Constant
   HDRS
     "ConstExpr.h"
+    "OpOracle.h"
   SRCS
     "ConstExpr.cpp"
+    "OpOracle.cpp"
   DEPS
     LLVMSupport
     MLIRIR

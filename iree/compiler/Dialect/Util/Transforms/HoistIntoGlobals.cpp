@@ -5,12 +5,11 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Dialect/Util/Analysis/Constant/ConstExpr.h"
+#include "iree/compiler/Dialect/Util/Analysis/Constant/OpOracle.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Analysis/SliceAnalysis.h"
-#include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
-#include "mlir/Dialect/Linalg/IR/LinalgOps.h"
 #include "mlir/IR/BlockAndValueMapping.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/SymbolTable.h"
@@ -28,38 +27,6 @@ namespace {
 // Maps an original value in the program to the symbol name of a global.
 using HoistedValueMap = llvm::DenseMap<Value, GlobalOp>;
 
-bool canHoistOperand(OpOperand *operand) {
-  Operation *op = operand->getOwner();
-  // For linalg ops, we only want to hoist inputs.
-  if (auto structuredOp = dyn_cast<linalg::LinalgOp>(op)) {
-    return operand->getOperandNumber() < structuredOp.getNumInputs();
-  }
-
-  // Fallback to yes.
-  return true;
-}
-
-bool isHoistableLeaf(const ConstExprAnalysis::ConstValueInfo *info) {
-  // Generally, we prefer to not hoist broadcasts.
-  if (auto genericOp = dyn_cast<linalg::GenericOp>(info->getOperation())) {
-    // Detect op that only broadcast input as fusing them makes the new
-    // op cheaper.
-    if (genericOp.getNumParallelLoops() == genericOp.getNumLoops() &&
-        isa<linalg::YieldOp>(genericOp.getBody()->front())) {
-      for (OpOperand *opOperand : genericOp.getInputOperands()) {
-        AffineMap indexingMap = genericOp.getTiedIndexingMap(opOperand);
-        if (indexingMap.isProjectedPermutation() &&
-            indexingMap.getNumDims() != indexingMap.getNumResults()) {
-          return false;
-        }
-      }
-    }
-  }
-
-  return true;
-}
-
-// Greedily hoists all eligible constants that escape to non constant
 // expressions into globals. It is not expected that such a greedy algorithm
 // is great, but it is simple. Naive use of this algorithm very likely
 // favors programs that consume more memory at runtime than is strictly
@@ -70,11 +37,15 @@ class HoistIntoGlobalsPass
     : public PassWrapper<HoistIntoGlobalsPass, OperationPass<mlir::ModuleOp>> {
  public:
   StringRef getArgument() const override {
-    return "iree-util-greedy-hoist-into-globals";
+    return "iree-util-hoist-into-globals";
   }
 
   StringRef getDescription() const override {
     return "Greedily hoists eligible constant expressions into globals";
+  }
+
+  void getDependentDialects(DialectRegistry &registry) const override {
+    registerConstExprDependentDialects(registry);
   }
 
   void runOnOperation() override {
@@ -100,32 +71,43 @@ class HoistIntoGlobalsPass
       }
 
       // Skip if our policy prohibits this being treated as a hoistable leaf.
-      if (!isHoistableLeaf(iterInfo)) return WalkResult::advance();
+      if (!isHoistableConstExprLeaf(iterInfo)) return WalkResult::advance();
 
       // This op is hoistable - for each result find eligible escapes and
       // hoist them.
       LLVM_DEBUG(dbgs() << "PROCESSING CONST-EXPR OP: " << *iterOp << "\n");
       for (Value constExprResult : iterOp->getResults()) {
-        for (OpOperand &operand : constExprResult.getUses()) {
-          auto *targetInfo = constExprs.lookup(operand.getOwner());
+        // Need to snapshot the uses since we modify them during iteration.
+        SmallVector<OpOperand *> uses;
+        for (OpOperand &use : constExprResult.getUses()) {
+          uses.push_back(&use);
+        }
 
-          // We want to treat it as a const escape if:
-          //   - We don't have any const-expr info about it (normal op)
-          //   - It is non-const-expr
-          //   - It is const-expr but is a non hoistable leaf per our policy
-          //     (must match above check during forward iteration).
-          //   - It is legal to hoist this operand
+        // Iterate over uses snapshots.
+        for (OpOperand *operand : uses) {
+          auto *targetInfo = constExprs.lookup(operand->getOwner());
+
+          // We do not treat is as a const escape if the target is:
+          //   - Not a valid operand to convert to a constant.
+          //   - Const-expr and is an allowed leaf by policy
+          // Note that we never touch an operand that is part of a const-expr.
           if (targetInfo && targetInfo->isConstExpr() &&
-              isHoistableLeaf(targetInfo)) {
+              isHoistableConstExprLeaf(targetInfo)) {
+            LLVM_DEBUG(dbgs() << "  - SKIP (CONST-EXPR): "
+                              << *operand->getOwner() << "\n");
             continue;
           }
-          if (!canHoistOperand(&operand)) continue;
+          if (!isHoistableConstExprConsumingOperand(operand)) {
+            LLVM_DEBUG(dbgs() << "  - SKIP (INVALID OPERAND): "
+                              << *operand->getOwner() << "\n");
+            continue;
+          }
 
           // Bingo.
-          LLVM_DEBUG(dbgs() << "HOIST CONST-EXPR:\n");
-          LLVM_DEBUG(dbgs() << "  : Operand #" << operand.getOperandNumber()
-                            << " of " << *operand.getOwner() << "\n");
-          LLVM_DEBUG(dbgs() << "  : From " << operand.get() << "\n\n");
+          LLVM_DEBUG(dbgs() << "  + HOIST CONST-EXPR:\n");
+          LLVM_DEBUG(dbgs() << "    : Operand #" << operand->getOperandNumber()
+                            << "   of " << *operand->getOwner() << "\n");
+          LLVM_DEBUG(dbgs() << "    : From " << operand->get() << "\n\n");
 
           hoistConstExpr(operand, hoistedMap, moduleSymbols, constExprs);
         }
@@ -137,11 +119,11 @@ class HoistIntoGlobalsPass
     cleanupDeadOps(constExprs);
   }
 
-  void hoistConstExpr(OpOperand &operand, HoistedValueMap &hoistedMap,
+  void hoistConstExpr(OpOperand *operand, HoistedValueMap &hoistedMap,
                       SymbolTable &moduleSymbols,
                       const ConstExprAnalysis &constExprs) {
-    Operation *targetOp = operand.getOwner();
-    Value originalValue = operand.get();
+    Operation *targetOp = operand->getOwner();
+    Value originalValue = operand->get();
     GlobalOp existingGlobal = hoistedMap.lookup(originalValue);
 
     if (!existingGlobal) {
@@ -162,7 +144,7 @@ class HoistIntoGlobalsPass
     OpBuilder builder(targetOp);
     auto load =
         builder.create<GlobalLoadOp>(targetOp->getLoc(), existingGlobal);
-    operand.set(load);
+    operand->set(load);
   }
 
   // Clones the const expr tree rooted at `constExprValue` into the given
@@ -205,7 +187,9 @@ class HoistIntoGlobalsPass
 
     // Now, for the defining op itself, create a global for each result and
     // store into it.
-    OpBuilder globalBuilder(initializerOp);
+    // Note that we create globals at the beginning of the module because
+    // they must precede accesses and this is guaranteed here.
+    OpBuilder globalBuilder = getModuleBeginBuilder();
     Operation *clonedRootOp = rootOp->clone(cloneMap);
     initBuilder.insert(clonedRootOp);
     for (Value origResult : rootOp->getResults()) {
@@ -253,6 +237,11 @@ class HoistIntoGlobalsPass
         }
       }
     }
+  }
+
+  OpBuilder getModuleBeginBuilder() {
+    Block *block = getOperation().getBody();
+    return OpBuilder::atBlockBegin(block);
   }
 
   OpBuilder getModuleEndBuilder() {

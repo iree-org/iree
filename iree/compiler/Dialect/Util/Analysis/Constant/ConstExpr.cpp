@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Dialect/Util/Analysis/Constant/ConstExpr.h"
 
+#include "iree/compiler/Dialect/Util/Analysis/Constant/OpOracle.h"
 #include "iree/compiler/Dialect/Util/Analysis/Explorer.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "llvm/Support/Debug.h"
@@ -19,17 +20,6 @@ namespace mlir {
 namespace iree_compiler {
 namespace IREE {
 namespace Util {
-
-namespace {
-
-// Whether an op can be considered a pure expression, producing a constant if
-// provided constants and having no side effects beyond that.
-bool isEligibleConstantExprOp(Operation *op) {
-  // TODO: Obvi needs more.
-  return op->getNumResults() > 0;
-}
-
-}  // namespace
 
 ConstExprAnalysis::ConstExprAnalysis(Operation *rootOp) {
   Explorer explorer(rootOp, TraversalAction::SHALLOW);
@@ -137,7 +127,7 @@ ConstExprAnalysis::ConstValueInfo *ConstExprAnalysis::addInfo(
 }
 
 void ConstExprAnalysis::expandToOp(Operation *op) {
-  bool eligible = isEligibleConstantExprOp(op);
+  bool eligible = isEligibleConstExprOp(op);
   for (auto result : op->getResults()) {
     auto foundIt = constInfoMap.find(result);
     if (foundIt != constInfoMap.end()) continue;
