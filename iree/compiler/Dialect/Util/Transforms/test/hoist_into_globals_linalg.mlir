@@ -12,7 +12,6 @@ module @compute_hoisted {
 
     // A non-leaf broadcast.
     %0 = linalg.init_tensor [5, 6] : tensor<5x6xf32>
-    // A broadcast.
     %1 = linalg.generic {indexing_maps = [#map0, #map1], iterator_types = ["parallel", "parallel"]} ins(%cst_0 : tensor<f32>) outs(%0 : tensor<5x6xf32>) {
     ^bb0(%arg1: f32, %arg2: f32):  // no predecessors
       linalg.yield %arg1 : f32
