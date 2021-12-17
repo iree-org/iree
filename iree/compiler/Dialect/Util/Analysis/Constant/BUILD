@@ -21,9 +21,13 @@ cc_library(
         "OpOracle.h",
     ],
     deps = [
+        "//iree/compiler/Dialect/Util/Analysis",
         "//iree/compiler/Dialect/Util/IR",
         "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:ArithmeticDialect",
         "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:LinalgInterfaces",
+        "@llvm-project//mlir:LinalgOps",
         "@llvm-project//mlir:StandardOps",
         "@llvm-project//mlir:Support",
     ],

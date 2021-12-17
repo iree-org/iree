@@ -7,7 +7,7 @@
 #include "iree/compiler/ConstEval/Runtime.h"
 
 #include "iree/compiler/Dialect/VM/Target/Bytecode/BytecodeModuleTarget.h"
-#include "iree/hal/buffer_view.h"
+#include "iree/hal/api.h"
 #include "iree/hal/vmvx/registration/driver_module.h"
 #include "iree/modules/hal/module.h"
 #include "iree/vm/ref_cc.h"

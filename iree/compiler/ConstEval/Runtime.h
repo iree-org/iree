@@ -5,7 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #ifndef IREE_COMPILER_CONSTEVAL_RUNTIME_H_
-#define IREE_COMPILER_CONSTEVAL_PASSES_H_
+#define IREE_COMPILER_CONSTEVAL_RUNTIME_H_
 
 #include "iree/compiler/Dialect/VM/Target/Bytecode/BytecodeModuleTarget.h"
 #include "iree/hal/driver_registry.h"

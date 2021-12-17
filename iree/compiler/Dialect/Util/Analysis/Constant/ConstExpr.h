@@ -40,7 +40,7 @@ class ConstExprAnalysis {
   // an operation's results will either all be const-expr or not, so we just
   // check the first. 0-result ops cannot be const-expr.
   const ConstValueInfo *lookup(Operation *queryOp) const {
-    if (queryOp->getNumResults() == 0) return false;
+    if (queryOp->getNumResults() == 0) return nullptr;
     return lookup(queryOp->getResult(0));
   }
 
@@ -59,19 +59,6 @@ class ConstExprAnalysis {
   bool isConstExprOperation(Operation *queryOp) const {
     if (queryOp->getNumResults() == 0) return false;
     return isConstExprValue(queryOp->getResult(0));
-  }
-
-  // Returns uses of a const-expr value that are not const-expr.
-  SmallVector<OpOperand *> getNonConstExprEscapes(Value queryValue) const {
-    ConstValueInfo *found = constInfoMap.lookup(queryValue);
-    if (!found || found->state != ConstValueInfo::CONSTANT) return {};
-
-    SmallVector<OpOperand *> escapes;
-    for (auto &use : queryValue.getUses()) {
-      if (isConstExprOperation(use.getOwner())) continue;
-      escapes.push_back(&use);
-    }
-    return escapes;
   }
 
   // Populates a set, in arbitrary order, of all const-expr ops in the
