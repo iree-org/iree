@@ -18,6 +18,7 @@
 #include "iree/hal/local/local_executable_layout.h"
 #include "iree/hal/local/sync_event.h"
 #include "iree/hal/local/sync_semaphore.h"
+#include "iree/hal/utils/buffer_transfer.h"
 
 typedef struct iree_hal_sync_device_t {
   iree_hal_resource_t resource;
@@ -303,6 +304,7 @@ static const iree_hal_device_vtable_t iree_hal_sync_device_vtable = {
     .create_executable_cache = iree_hal_sync_device_create_executable_cache,
     .create_executable_layout = iree_hal_sync_device_create_executable_layout,
     .create_semaphore = iree_hal_sync_device_create_semaphore,
+    .transfer_range = iree_hal_device_transfer_mappable_range,
     .queue_submit = iree_hal_sync_device_queue_submit,
     .submit_and_wait = iree_hal_sync_device_submit_and_wait,
     .wait_semaphores = iree_hal_sync_device_wait_semaphores,

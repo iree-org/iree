@@ -585,152 +585,133 @@ iree_hal_buffer_fill(iree_hal_buffer_t* buffer, iree_device_size_t byte_offset,
 IREE_API_EXPORT iree_status_t iree_hal_buffer_read_data(
     iree_hal_buffer_t* source_buffer, iree_device_size_t source_offset,
     void* target_buffer, iree_device_size_t data_length) {
-  return iree_hal_buffer_transfer_range(
-      iree_hal_make_device_transfer_buffer(source_buffer), source_offset,
-      iree_hal_make_host_transfer_buffer_span(target_buffer, data_length), 0,
-      data_length, IREE_HAL_TRANSFER_BUFFER_FLAG_DEFAULT);
+  if (data_length == 0) {
+    return iree_ok_status();  // No-op.
+  }
+  IREE_ASSERT_ARGUMENT(source_buffer);
+  IREE_ASSERT_ARGUMENT(target_buffer);
+
+  IREE_TRACE_ZONE_BEGIN(z0);
+  IREE_TRACE_ZONE_APPEND_VALUE(z0, data_length);
+  iree_hal_buffer_mapping_t source_mapping = {{0}};
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_hal_buffer_map_range(source_buffer, IREE_HAL_MAPPING_MODE_SCOPED,
+                                    IREE_HAL_MEMORY_ACCESS_READ, source_offset,
+                                    data_length, &source_mapping));
+
+  memcpy(target_buffer, source_mapping.contents.data, data_length);
+
+  iree_hal_buffer_unmap_range(&source_mapping);
+  IREE_TRACE_ZONE_END(z0);
+  return iree_ok_status();
 }
 
 IREE_API_EXPORT iree_status_t iree_hal_buffer_write_data(
     iree_hal_buffer_t* target_buffer, iree_device_size_t target_offset,
     const void* source_buffer, iree_device_size_t data_length) {
-  return iree_hal_buffer_transfer_range(
-      iree_hal_make_host_transfer_buffer_span((void*)source_buffer,
-                                              data_length),
-      0, iree_hal_make_device_transfer_buffer(target_buffer), target_offset,
-      data_length, IREE_HAL_TRANSFER_BUFFER_FLAG_DEFAULT);
+  if (data_length == 0) {
+    return iree_ok_status();  // No-op.
+  }
+  IREE_ASSERT_ARGUMENT(target_buffer);
+  IREE_ASSERT_ARGUMENT(source_buffer);
+
+  IREE_TRACE_ZONE_BEGIN(z0);
+  IREE_TRACE_ZONE_APPEND_VALUE(z0, data_length);
+  iree_hal_buffer_mapping_t target_mapping;
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0,
+      iree_hal_buffer_map_range(target_buffer, IREE_HAL_MAPPING_MODE_SCOPED,
+                                IREE_HAL_MEMORY_ACCESS_DISCARD_WRITE,
+                                target_offset, data_length, &target_mapping));
+
+  memcpy(target_mapping.contents.data, source_buffer, data_length);
+
+  iree_status_t status = iree_ok_status();
+  if (!iree_all_bits_set(iree_hal_buffer_memory_type(target_buffer),
+                         IREE_HAL_MEMORY_TYPE_HOST_COHERENT)) {
+    status = iree_hal_buffer_flush_range(&target_mapping, 0, IREE_WHOLE_BUFFER);
+  }
+
+  iree_hal_buffer_unmap_range(&target_mapping);
+  IREE_TRACE_ZONE_END(z0);
+  return status;
 }
 
 IREE_API_EXPORT iree_status_t iree_hal_buffer_copy_data(
     iree_hal_buffer_t* source_buffer, iree_device_size_t source_offset,
     iree_hal_buffer_t* target_buffer, iree_device_size_t target_offset,
     iree_device_size_t data_length) {
-  return iree_hal_buffer_transfer_range(
-      iree_hal_make_device_transfer_buffer(source_buffer), source_offset,
-      iree_hal_make_device_transfer_buffer(target_buffer), target_offset,
-      data_length, IREE_HAL_TRANSFER_BUFFER_FLAG_DEFAULT);
-}
-
-IREE_API_EXPORT iree_status_t iree_hal_buffer_transfer_range(
-    iree_hal_transfer_buffer_t source, iree_device_size_t source_offset,
-    iree_hal_transfer_buffer_t target, iree_device_size_t target_offset,
-    iree_device_size_t data_length, iree_hal_transfer_buffer_flags_t flags) {
   if (data_length == 0) {
     return iree_ok_status();  // No-op.
   }
-
-  // host->host is not allowed. We may want to support this one day to allow for
-  // parallelized copies and such, however the validation code differs quite a
-  // bit and it'd be better to have this as part of a task system API.
-  bool is_source_host = source.device_buffer == NULL;
-  bool is_target_host = target.device_buffer == NULL;
-  if (is_source_host && is_target_host) {
-    return iree_make_status(
-        IREE_STATUS_INVALID_ARGUMENT,
-        "cannot perform host->host transfers via this API, use memcpy/memmove");
-  }
+  IREE_ASSERT_ARGUMENT(source_buffer);
+  IREE_ASSERT_ARGUMENT(target_buffer);
 
   // Check for overlap - like memcpy we require that the two ranges don't have
-  // any overlap as we may use memcpy. This only matters if the buffers are
-  // both device buffers - host and device should never alias: behavior is
-  // undefined if a user tries to pass a mapped device pointer as if it was a
-  // host pointer.
-  if (!is_source_host && !is_target_host &&
-      iree_hal_buffer_test_overlap(source.device_buffer, source_offset,
-                                   data_length, target.device_buffer,
-                                   target_offset, data_length) !=
-          IREE_HAL_BUFFER_OVERLAP_DISJOINT) {
+  // any overlap - because we use memcpy below!
+  if (iree_hal_buffer_test_overlap(source_buffer, source_offset, data_length,
+                                   target_buffer, target_offset, data_length) !=
+      IREE_HAL_BUFFER_OVERLAP_DISJOINT) {
     return iree_make_status(
         IREE_STATUS_INVALID_ARGUMENT,
         "source and target ranges must not overlap within the same buffer");
   }
 
   IREE_TRACE_ZONE_BEGIN(z0);
-  IREE_TRACE_ZONE_APPEND_TEXT(
-      z0, is_source_host ? "h2d" : (is_target_host ? "d2h" : "d2d"));
   IREE_TRACE_ZONE_APPEND_VALUE(z0, data_length);
 
-  // Defer to the backing implementation.
-  // We prefer the target as that's likely to be where the data is used next.
-  iree_hal_buffer_t* vtable_buffer =
-      !is_target_host ? target.device_buffer : source.device_buffer;
-  iree_status_t status = _VTABLE_DISPATCH(vtable_buffer, transfer_range)(
-      source, source_offset, target, target_offset, data_length, flags);
+  // Map source, which may have IREE_WHOLE_BUFFER length.
+  iree_hal_buffer_mapping_t source_mapping;
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_hal_buffer_map_range(source_buffer, IREE_HAL_MAPPING_MODE_SCOPED,
+                                    IREE_HAL_MEMORY_ACCESS_READ, source_offset,
+                                    data_length, &source_mapping));
 
-  IREE_TRACE_ZONE_END(z0);
-  return status;
-}
-
-IREE_API_EXPORT iree_status_t iree_hal_buffer_transfer_mappable_range(
-    iree_hal_transfer_buffer_t source, iree_device_size_t source_offset,
-    iree_hal_transfer_buffer_t target, iree_device_size_t target_offset,
-    iree_device_size_t data_length, iree_hal_transfer_buffer_flags_t flags) {
-  iree_status_t status = iree_ok_status();
-
-  iree_hal_buffer_mapping_t source_mapping = {{0}};
-  if (iree_status_is_ok(status)) {
-    if (source.device_buffer) {
-      status = iree_hal_buffer_map_range(
-          source.device_buffer, IREE_HAL_MAPPING_MODE_SCOPED,
-          IREE_HAL_MEMORY_ACCESS_READ, source_offset, data_length,
-          &source_mapping);
-    } else {
-      source_mapping = (iree_hal_buffer_mapping_t){
-          .contents = source.host_buffer,
-      };
-    }
+  // Map target, which may also have IREE_WHOLE_BUFFER length.
+  iree_hal_buffer_mapping_t target_mapping;
+  iree_status_t status =
+      iree_hal_buffer_map_range(target_buffer, IREE_HAL_MAPPING_MODE_SCOPED,
+                                IREE_HAL_MEMORY_ACCESS_DISCARD_WRITE,
+                                target_offset, data_length, &target_mapping);
+  if (!iree_status_is_ok(status)) {
+    iree_hal_buffer_unmap_range(&source_mapping);
+    IREE_TRACE_ZONE_END(z0);
+    return status;
   }
 
-  iree_hal_buffer_mapping_t target_mapping = {{0}};
-  if (iree_status_is_ok(status)) {
-    if (target.device_buffer) {
-      status = iree_hal_buffer_map_range(
-          target.device_buffer, IREE_HAL_MAPPING_MODE_SCOPED,
-          IREE_HAL_MEMORY_ACCESS_DISCARD_WRITE, target_offset, data_length,
-          &target_mapping);
-    } else {
-      target_mapping = (iree_hal_buffer_mapping_t){
-          .contents = target.host_buffer,
-      };
-    }
-  }
-
+  // Adjust the data length based on the min we have.
   iree_device_size_t adjusted_data_length = 0;
-  if (iree_status_is_ok(status)) {
-    // Adjust the data length based on the min we have.
-    if (data_length == IREE_WHOLE_BUFFER) {
-      // Whole buffer copy requested - that could mean either, so take the min.
-      adjusted_data_length = iree_min(source_mapping.contents.data_length,
-                                      target_mapping.contents.data_length);
-    } else {
-      // Specific length requested - validate that we have matching lengths.
-      IREE_ASSERT_EQ(source_mapping.contents.data_length,
-                     target_mapping.contents.data_length);
-      adjusted_data_length = target_mapping.contents.data_length;
-    }
-
-    // Perform the copy, assuming there's anything to do.
-    if (adjusted_data_length != 0) {
-      memcpy(target_mapping.contents.data, source_mapping.contents.data,
-             adjusted_data_length);
-    }
+  if (data_length == IREE_WHOLE_BUFFER) {
+    // Whole buffer copy requested - that could mean either, so take the min.
+    adjusted_data_length = iree_min(source_mapping.contents.data_length,
+                                    target_mapping.contents.data_length);
+  } else {
+    // Specific length requested - validate that we have matching lengths.
+    IREE_ASSERT_EQ(source_mapping.contents.data_length,
+                   target_mapping.contents.data_length);
+    adjusted_data_length = target_mapping.contents.data_length;
   }
 
-  if (source.device_buffer) {
-    status =
-        iree_status_join(status, iree_hal_buffer_unmap_range(&source_mapping));
+  // Elide zero length copies. It's been expensive to get to this point just to
+  // bail but we need to have mapped to resolve IREE_WHOLE_BUFFERs that may
+  // result in zero lengths.
+  if (IREE_UNLIKELY(adjusted_data_length == 0)) {
+    IREE_TRACE_ZONE_END(z0);
+    return iree_ok_status();
   }
-  if (target.device_buffer) {
-    if (adjusted_data_length > 0 &&
-        !iree_all_bits_set(iree_hal_buffer_memory_type(target.device_buffer),
-                           IREE_HAL_MEMORY_TYPE_HOST_COHERENT)) {
-      status = iree_status_join(
-          status, iree_hal_buffer_flush_range(&target_mapping, 0,
-                                              adjusted_data_length));
-    }
+
+  memcpy(target_mapping.contents.data, source_mapping.contents.data,
+         adjusted_data_length);
+
+  if (!iree_all_bits_set(iree_hal_buffer_memory_type(target_buffer),
+                         IREE_HAL_MEMORY_TYPE_HOST_COHERENT)) {
     status =
-        iree_status_join(status, iree_hal_buffer_unmap_range(&target_mapping));
+        iree_hal_buffer_flush_range(&target_mapping, 0, adjusted_data_length);
   }
+
+  iree_hal_buffer_unmap_range(&source_mapping);
+  iree_hal_buffer_unmap_range(&target_mapping);
+  IREE_TRACE_ZONE_END(z0);
   return status;
 }
 
@@ -858,141 +839,4 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_mapping_subspan(
   out_span->data_length = data_length;
   out_span->data = buffer_mapping->contents.data + byte_offset;
   return iree_ok_status();
-}
-
-typedef struct iree_hal_emulated_buffer_mapping_t {
-  iree_hal_buffer_t* host_local_buffer;
-  iree_hal_buffer_mapping_t host_local_mapping;
-} iree_hal_emulated_buffer_mapping_t;
-
-IREE_API_EXPORT iree_status_t iree_hal_buffer_emulated_buffer_map_range(
-    iree_hal_buffer_t* buffer, iree_hal_mapping_mode_t mapping_mode,
-    iree_hal_memory_access_t memory_access,
-    iree_device_size_t local_byte_offset, iree_device_size_t local_byte_length,
-    iree_hal_buffer_mapping_t* mapping) {
-  IREE_ASSERT_ARGUMENT(buffer);
-  IREE_ASSERT_ARGUMENT(mapping);
-
-  iree_hal_allocator_t* device_allocator =
-      iree_hal_buffer_allocator(mapping->buffer);
-  iree_allocator_t host_allocator =
-      iree_hal_allocator_host_allocator(device_allocator);
-
-  // We can't perform persistent mapping with this as we need to manage the
-  // scratch buffer lifetime.
-  if (IREE_UNLIKELY(mapping_mode == IREE_HAL_MAPPING_MODE_PERSISTENT)) {
-    return iree_make_status(
-        IREE_STATUS_INVALID_ARGUMENT,
-        "emulated buffer mapping only possible with scoped mappings");
-  }
-
-  // No implementation should be using this emulated method with memory that is
-  // allocated as mappable.
-  if (IREE_UNLIKELY(iree_all_bits_set(iree_hal_buffer_memory_type(buffer),
-                                      IREE_HAL_BUFFER_USAGE_MAPPING))) {
-    return iree_make_status(
-        IREE_STATUS_FAILED_PRECONDITION,
-        "emulated buffer mapping should not be used with mappable buffers");
-  }
-
-  IREE_TRACE_ZONE_BEGIN(z0);
-  IREE_TRACE_ZONE_APPEND_VALUE(z0, (uint64_t)local_byte_length);
-
-  // NOTE: this is assuming that the host is going to be doing a lot of work
-  // on the mapped memory and wants read/write caching and such. If the user
-  // wants write combining on device memory and other things they should ensure
-  // this emulated mapping path is not hit.
-
-  // Create a transient struct we use to track the emulated operation.
-  // We could pack this into the mapping but this composes better - it's small
-  // and pooled by the host allocator anyway.
-  iree_hal_emulated_buffer_mapping_t* emulation_state = NULL;
-  IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_allocator_malloc(host_allocator, sizeof(*emulation_state),
-                                (void**)&emulation_state));
-
-  // Allocate the buffer we'll be using to stage our copy of the device memory.
-  // All devices should be able to satisfy this host-local + mapping request.
-  iree_status_t status = iree_hal_allocator_allocate_buffer(
-      device_allocator, IREE_HAL_MEMORY_TYPE_HOST_LOCAL,
-      IREE_HAL_BUFFER_USAGE_TRANSFER | IREE_HAL_BUFFER_USAGE_MAPPING,
-      local_byte_length, iree_const_byte_span_empty(),
-      &emulation_state->host_local_buffer);
-
-  // We need to capture a copy of the device buffer to work with; unless the
-  // user was nice and said they don't care about the contents with the DISCARD
-  // bit. Ideally we'd also enable invalidate_range to specify subranges we want
-  // to map.
-  if (iree_status_is_ok(status) &&
-      !iree_all_bits_set(memory_access, IREE_HAL_MEMORY_ACCESS_DISCARD)) {
-    // Download (device->host) the data.
-    status = iree_hal_buffer_copy_data(mapping->buffer, local_byte_offset,
-                                       emulation_state->host_local_buffer, 0,
-                                       local_byte_length);
-  }
-
-  if (iree_status_is_ok(status)) {
-    // Map the scratch buffer: map-ception.
-    // Code-wise it looks like this may loop back onto this emulated path
-    // but no implementation should be using this emulation if they have host
-    // local IREE_HAL_BUFFER_USAGE_MAPPING memory - and we check that above.
-    status = iree_hal_buffer_map_range(emulation_state->host_local_buffer,
-                                       IREE_HAL_MAPPING_MODE_SCOPED,
-                                       memory_access, 0, local_byte_length,
-                                       &emulation_state->host_local_mapping);
-  }
-
-  // Retain the scratch buffer for the duration of the mapping.
-  if (iree_status_is_ok(status)) {
-    // Note that we are giving back the host-local mapped contents to the user -
-    // they don't need to know it's from our staging buffer.
-    mapping->contents = emulation_state->host_local_mapping.contents;
-    mapping->impl.reserved[0] = (uint64_t)((uintptr_t)emulation_state);
-  } else {
-    status = iree_status_join(
-        status,
-        iree_hal_buffer_unmap_range(&emulation_state->host_local_mapping));
-    iree_hal_buffer_release(emulation_state->host_local_buffer);
-    iree_allocator_free(host_allocator, emulation_state);
-  }
-  IREE_TRACE_ZONE_END(z0);
-  return status;
-}
-
-IREE_API_EXPORT iree_status_t iree_hal_buffer_emulated_buffer_unmap_range(
-    iree_hal_buffer_t* buffer, iree_device_size_t local_byte_offset,
-    iree_device_size_t local_byte_length, iree_hal_buffer_mapping_t* mapping) {
-  IREE_ASSERT_ARGUMENT(buffer);
-  IREE_ASSERT_ARGUMENT(mapping);
-  IREE_TRACE_ZONE_BEGIN(z0);
-  iree_hal_emulated_buffer_mapping_t* emulation_state =
-      (iree_hal_emulated_buffer_mapping_t*)((uintptr_t)
-                                                mapping->impl.reserved[0]);
-  IREE_ASSERT_NE(emulation_state, NULL);
-
-  // Unmap the scratch buffer first to make it available for copying (if
-  // needed).
-  iree_status_t status =
-      iree_hal_buffer_unmap_range(&emulation_state->host_local_mapping);
-
-  // If we were writing then we'll need to flush the range.
-  // Ideally we'd keep track of this on the mapping itself based on the user's
-  // calls to flush_range to limit how much we need to transfer.
-  if (iree_status_is_ok(status) &&
-      iree_all_bits_set(mapping->impl.allowed_access,
-                        IREE_HAL_MEMORY_ACCESS_WRITE)) {
-    // Upload (host->device) the data.
-    status = iree_hal_buffer_copy_data(emulation_state->host_local_buffer, 0,
-                                       mapping->buffer, local_byte_offset,
-                                       local_byte_length);
-  }
-
-  // Deallocate the scratch buffer and our emulation state.
-  iree_hal_buffer_release(emulation_state->host_local_buffer);
-  iree_allocator_t host_allocator =
-      iree_hal_allocator_host_allocator(iree_hal_buffer_allocator(buffer));
-  iree_allocator_free(host_allocator, emulation_state);
-
-  IREE_TRACE_ZONE_END(z0);
-  return status;
 }

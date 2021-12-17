@@ -23,6 +23,7 @@
 #include "iree/hal/cuda/nop_executable_cache.h"
 #include "iree/hal/cuda/status_util.h"
 #include "iree/hal/cuda/stream_command_buffer.h"
+#include "iree/hal/utils/buffer_transfer.h"
 #include "iree/hal/utils/deferred_command_buffer.h"
 
 //===----------------------------------------------------------------------===//
@@ -108,7 +109,8 @@ static iree_status_t iree_hal_cuda_device_create_internal(
   device->context_wrapper.syms = syms;
 
   iree_status_t status = iree_hal_cuda_allocator_create(
-      &device->context_wrapper, cu_device, stream, &device->device_allocator);
+      (iree_hal_device_t*)device, &device->context_wrapper, cu_device, stream,
+      &device->device_allocator);
 
   device->command_buffer_mode = params->command_buffer_mode;
   if (iree_status_is_ok(status) &&
@@ -379,6 +381,7 @@ static const iree_hal_device_vtable_t iree_hal_cuda_device_vtable = {
     .create_executable_cache = iree_hal_cuda_device_create_executable_cache,
     .create_executable_layout = iree_hal_cuda_device_create_executable_layout,
     .create_semaphore = iree_hal_cuda_device_create_semaphore,
+    .transfer_range = iree_hal_device_submit_transfer_range_and_wait,
     .queue_submit = iree_hal_cuda_device_queue_submit,
     .submit_and_wait = iree_hal_cuda_device_submit_and_wait,
     .wait_semaphores = iree_hal_cuda_device_wait_semaphores,

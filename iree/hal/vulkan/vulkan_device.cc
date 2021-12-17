@@ -13,6 +13,7 @@
 
 #include "iree/base/internal/math.h"
 #include "iree/base/tracing.h"
+#include "iree/hal/utils/buffer_transfer.h"
 #include "iree/hal/vulkan/api.h"
 #include "iree/hal/vulkan/builtin_executables.h"
 #include "iree/hal/vulkan/command_queue.h"
@@ -582,8 +583,8 @@ static iree_status_t iree_hal_vulkan_device_create_internal(
   VmaRecordSettings vma_record_settings;
   memset(&vma_record_settings, 0, sizeof(vma_record_settings));
   iree_status_t status = iree_hal_vulkan_vma_allocator_create(
-      instance, physical_device, logical_device, vma_record_settings,
-      &device->device_allocator);
+      instance, physical_device, logical_device, (iree_hal_device_t*)device,
+      vma_record_settings, &device->device_allocator);
 
   // Create command pools for each queue family. If we don't have a transfer
   // queue then we'll ignore that one and just use the dispatch pool.
@@ -1139,6 +1140,7 @@ const iree_hal_device_vtable_t iree_hal_vulkan_device_vtable = {
     /*.create_executable_layout=*/
     iree_hal_vulkan_device_create_executable_layout,
     /*.create_semaphore=*/iree_hal_vulkan_device_create_semaphore,
+    /*.transfer_range=*/iree_hal_device_submit_transfer_range_and_wait,
     /*.queue_submit=*/iree_hal_vulkan_device_queue_submit,
     /*.submit_and_wait=*/
     iree_hal_vulkan_device_submit_and_wait,

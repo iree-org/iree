@@ -193,6 +193,9 @@ static iree_status_t iree_hal_buffer_view_generate_buffer_in_situ(
     iree_hal_buffer_usage_t allowed_usage,
     iree_hal_buffer_view_generator_callback_t callback, void* user_data,
     iree_hal_buffer_view_t** out_buffer_view) {
+  // DO NOT SUBMIT
+  memory_type |= IREE_HAL_MEMORY_TYPE_HOST_VISIBLE;
+
   // Allocate the buffer view and entire buffer contents with the target memory
   // type and the mapping bits.
   iree_hal_buffer_view_t* buffer_view = NULL;

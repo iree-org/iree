@@ -446,59 +446,6 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_copy_data(
     iree_hal_buffer_t* target_buffer, iree_device_size_t target_offset,
     iree_device_size_t data_length);
 
-typedef struct iree_hal_transfer_buffer_t {
-  iree_byte_span_t host_buffer;
-  iree_hal_buffer_t* device_buffer;
-} iree_hal_transfer_buffer_t;
-
-static inline iree_hal_transfer_buffer_t iree_hal_make_host_transfer_buffer(
-    iree_byte_span_t host_buffer) {
-  iree_hal_transfer_buffer_t transfer_buffer = {
-      host_buffer,
-      NULL,
-  };
-  return transfer_buffer;
-}
-
-static inline iree_hal_transfer_buffer_t
-iree_hal_make_host_transfer_buffer_span(void* ptr, iree_host_size_t length) {
-  iree_hal_transfer_buffer_t transfer_buffer = {
-      iree_make_byte_span(ptr, length),
-      NULL,
-  };
-  return transfer_buffer;
-}
-
-static inline iree_hal_transfer_buffer_t iree_hal_make_device_transfer_buffer(
-    iree_hal_buffer_t* device_buffer) {
-  iree_hal_transfer_buffer_t transfer_buffer = {
-      iree_byte_span_empty(),
-      device_buffer,
-  };
-  return transfer_buffer;
-}
-
-// Synchronously copies data from |source| into |target|.
-//
-// Supports host->device, device->host, and device->device transfer,
-// including across devices. This method will never fail based on device
-// capabilities but may incur some extreme transient allocations and copies in
-// order to perform the transfer.
-//
-// The ordering of the transfer is undefined with respect to queue execution on
-// the source or target device; some may require full device flushes in order to
-// perform this operation while others may immediately perform it while there is
-// still work outstanding.
-//
-// It is strongly recommended that buffer operations are performed on transfer
-// queues; using this synchronous function may incur additional cache flushes
-// and synchronous blocking behavior and is not supported on all buffer types.
-// See iree_hal_command_buffer_copy_buffer.
-IREE_API_EXPORT iree_status_t iree_hal_buffer_transfer_range(
-    iree_hal_transfer_buffer_t source, iree_device_size_t source_offset,
-    iree_hal_transfer_buffer_t target, iree_device_size_t target_offset,
-    iree_device_size_t data_length, iree_hal_transfer_buffer_flags_t flags);
-
 // Maps the buffer to be accessed as a host pointer into |out_buffer_mapping|.
 // The byte offset and byte length may be adjusted for device alignment.
 // The output data pointer will be properly aligned to the start of the data.
@@ -589,34 +536,8 @@ IREE_API_EXPORT iree_status_t iree_hal_heap_buffer_wrap(
 // iree_hal_buffer_t implementation details
 //===----------------------------------------------------------------------===//
 
-// Generic implementation of iree_hal_buffer_transfer_range for when the buffers
-// are mappable. Users should call iree_hal_buffer_transfer_range instead.
-// Precondition: source and target do not overlap.
-IREE_API_EXPORT iree_status_t iree_hal_buffer_transfer_mappable_range(
-    iree_hal_transfer_buffer_t source, iree_device_size_t source_offset,
-    iree_hal_transfer_buffer_t target, iree_device_size_t target_offset,
-    iree_device_size_t data_length, iree_hal_transfer_buffer_flags_t flags);
-
-// Generic implementation of iree_hal_buffer_map_range and unmap_range for when
-// the buffer is not mappable and a full device transfer is required. This will
-// allocate additional host-local buffers and submit copy commands.
-// Implementations able to do this more efficiently should do so.
-IREE_API_EXPORT iree_status_t iree_hal_buffer_emulated_buffer_map_range(
-    iree_hal_buffer_t* buffer, iree_hal_mapping_mode_t mapping_mode,
-    iree_hal_memory_access_t memory_access,
-    iree_device_size_t local_byte_offset, iree_device_size_t local_byte_length,
-    iree_hal_buffer_mapping_t* mapping);
-IREE_API_EXPORT iree_status_t iree_hal_buffer_emulated_buffer_unmap_range(
-    iree_hal_buffer_t* buffer, iree_device_size_t local_byte_offset,
-    iree_device_size_t local_byte_length, iree_hal_buffer_mapping_t* mapping);
-
 typedef struct iree_hal_buffer_vtable_t {
   void(IREE_API_PTR* destroy)(iree_hal_buffer_t* buffer);
-
-  iree_status_t(IREE_API_PTR* transfer_range)(
-      iree_hal_transfer_buffer_t source, iree_device_size_t source_offset,
-      iree_hal_transfer_buffer_t target, iree_device_size_t target_offset,
-      iree_device_size_t data_length, iree_hal_transfer_buffer_flags_t flags);
 
   iree_status_t(IREE_API_PTR* map_range)(iree_hal_buffer_t* buffer,
                                          iree_hal_mapping_mode_t mapping_mode,

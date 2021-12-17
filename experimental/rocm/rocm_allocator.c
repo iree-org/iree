@@ -16,6 +16,7 @@
 
 typedef struct iree_hal_rocm_allocator_t {
   iree_hal_resource_t resource;
+  iree_hal_device_t* base_device;
   iree_hal_rocm_context_wrapper_t* context;
 
   IREE_STATISTICS(iree_hal_allocator_statistics_t statistics;)
@@ -30,8 +31,9 @@ static iree_hal_rocm_allocator_t* iree_hal_rocm_allocator_cast(
 }
 
 iree_status_t iree_hal_rocm_allocator_create(
-    iree_hal_rocm_context_wrapper_t* context,
+    iree_hal_device_t* base_device, iree_hal_rocm_context_wrapper_t* context,
     iree_hal_allocator_t** out_allocator) {
+  IREE_ASSERT_ARGUMENT(base_device);
   IREE_ASSERT_ARGUMENT(context);
   IREE_TRACE_ZONE_BEGIN(z0);
   iree_hal_rocm_allocator_t* allocator = NULL;
@@ -165,6 +167,7 @@ static iree_status_t iree_hal_rocm_allocator_allocate_buffer(
     }
   }
 
+  iree_hal_buffer_t* buffer = NULL;
   if (iree_status_is_ok(status)) {
     status = iree_hal_rocm_buffer_wrap(
         (iree_hal_allocator_t*)allocator, memory_type,
@@ -173,19 +176,29 @@ static iree_status_t iree_hal_rocm_allocator_allocate_buffer(
         /*byte_length=*/allocation_size, device_ptr, host_ptr, out_buffer);
   }
 
-  // NOTE: there may be HIP methods for doing this more efficiently.
+  // Copy the initial contents into the buffer. This may require staging.
   if (iree_status_is_ok(status) &&
       !iree_const_byte_span_is_empty(initial_data)) {
-    status = iree_hal_buffer_write_data(*out_buffer, 0, initial_data.data,
-                                        initial_data.data_length);
+    status = iree_hal_device_transfer_range(
+        allocator->base_device,
+        iree_hal_make_host_transfer_buffer_span((void*)initial_data.data,
+                                                initial_data.data_length),
+        0, iree_hal_make_device_transfer_buffer(buffer), 0,
+        initial_data.data_length, IREE_HAL_TRANSFER_BUFFER_FLAG_DEFAULT,
+        iree_infinite_timeout());
   }
 
   if (iree_status_is_ok(status)) {
     IREE_STATISTICS(iree_hal_allocator_statistics_record_alloc(
         &allocator->statistics, memory_type, allocation_size));
+    *out_buffer = buffer;
   } else {
-    iree_hal_rocm_buffer_free(allocator->context, memory_type, device_ptr,
-                              host_ptr);
+    if (!buffer) {
+      iree_hal_rocm_buffer_free(allocator->context, memory_type, device_ptr,
+                                host_ptr);
+    } else {
+      iree_hal_buffer_release(buffer);
+    }
   }
   return status;
 }

@@ -229,6 +229,12 @@ typedef struct iree_hal_command_buffer_validation_state_t {
   // TODO(benvanik): valid push constant bit ranges.
 } iree_hal_command_buffer_validation_state_t;
 
+// Maximum size of any update in iree_hal_command_buffer_update_buffer.
+// 64KB is the limit on Vulkan and we uniformly use that today across all
+// targets as to not need too much command buffer memory.
+#define IREE_HAL_COMMAND_BUFFER_MAX_UPDATE_SIZE \
+  ((iree_device_size_t)(64 * 1024))
+
 //===----------------------------------------------------------------------===//
 // iree_hal_command_buffer_t
 //===----------------------------------------------------------------------===//

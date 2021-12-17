@@ -20,6 +20,7 @@ using namespace iree::hal::vulkan;
 
 typedef struct iree_hal_vulkan_vma_allocator_t {
   iree_hal_resource_t resource;
+  iree_hal_device_t* device;  // unretained to avoid cycles
   iree_allocator_t host_allocator;
   VmaAllocator vma;
 
@@ -82,11 +83,12 @@ static void VKAPI_PTR iree_hal_vulkan_vma_free_callback(
 
 iree_status_t iree_hal_vulkan_vma_allocator_create(
     VkInstance instance, VkPhysicalDevice physical_device,
-    VkDeviceHandle* logical_device, VmaRecordSettings record_settings,
-    iree_hal_allocator_t** out_allocator) {
+    VkDeviceHandle* logical_device, iree_hal_device_t* device,
+    VmaRecordSettings record_settings, iree_hal_allocator_t** out_allocator) {
   IREE_ASSERT_ARGUMENT(instance);
   IREE_ASSERT_ARGUMENT(physical_device);
   IREE_ASSERT_ARGUMENT(logical_device);
+  IREE_ASSERT_ARGUMENT(device);
   IREE_ASSERT_ARGUMENT(out_allocator);
   IREE_TRACE_ZONE_BEGIN(z0);
 
@@ -98,6 +100,7 @@ iree_status_t iree_hal_vulkan_vma_allocator_create(
   iree_hal_resource_initialize(&iree_hal_vulkan_vma_allocator_vtable,
                                &allocator->resource);
   allocator->host_allocator = host_allocator;
+  allocator->device = device;
 
   const auto& syms = logical_device->syms();
   VmaVulkanFunctions vulkan_fns;
@@ -317,6 +320,9 @@ static iree_status_t iree_hal_vulkan_vma_allocator_allocate_internal(
     allocation_create_info.requiredFlags |= VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
   }
 
+  // TODO(benvanik): if on a unified memory system and initial data is present
+  // we could set the mapping bit and ensure a much more efficient upload.
+
   VkBuffer handle = VK_NULL_HANDLE;
   VmaAllocation allocation = VK_NULL_HANDLE;
   VmaAllocationInfo allocation_info;
@@ -337,10 +343,16 @@ static iree_status_t iree_hal_vulkan_vma_allocator_allocate_internal(
     return status;
   }
 
-  // TODO(benvanik): this approach (map + write + unmap) is suboptimal.
-  if (!iree_const_byte_span_is_empty(initial_data)) {
-    status = iree_hal_buffer_write_data(buffer, 0, initial_data.data,
-                                        initial_data.data_length);
+  // Copy the initial contents into the buffer. This may require staging.
+  if (iree_status_is_ok(status) &&
+      !iree_const_byte_span_is_empty(initial_data)) {
+    status = iree_hal_device_transfer_range(
+        allocator->device,
+        iree_hal_make_host_transfer_buffer_span((void*)initial_data.data,
+                                                initial_data.data_length),
+        0, iree_hal_make_device_transfer_buffer(buffer), 0,
+        initial_data.data_length, IREE_HAL_TRANSFER_BUFFER_FLAG_DEFAULT,
+        iree_infinite_timeout());
   }
 
   if (iree_status_is_ok(status)) {

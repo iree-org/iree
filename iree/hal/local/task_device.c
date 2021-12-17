@@ -21,6 +21,7 @@
 #include "iree/hal/local/task_event.h"
 #include "iree/hal/local/task_queue.h"
 #include "iree/hal/local/task_semaphore.h"
+#include "iree/hal/utils/buffer_transfer.h"
 
 #define IREE_HAL_LOCAL_TASK_EVENT_POOL_CAPACITY 32
 
@@ -368,6 +369,7 @@ static const iree_hal_device_vtable_t iree_hal_task_device_vtable = {
     .create_executable_cache = iree_hal_task_device_create_executable_cache,
     .create_executable_layout = iree_hal_task_device_create_executable_layout,
     .create_semaphore = iree_hal_task_device_create_semaphore,
+    .transfer_range = iree_hal_device_transfer_mappable_range,
     .queue_submit = iree_hal_task_device_queue_submit,
     .submit_and_wait = iree_hal_task_device_submit_and_wait,
     .wait_semaphores = iree_hal_task_device_wait_semaphores,
