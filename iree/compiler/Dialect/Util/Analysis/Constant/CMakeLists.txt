@@ -21,9 +21,12 @@ iree_cc_library(
     "OpOracle.cpp"
   DEPS
     LLVMSupport
+    MLIRArithmetic
     MLIRIR
+    MLIRLinalg
     MLIRStandard
     MLIRSupport
+    iree::compiler::Dialect::Util::Analysis
     iree::compiler::Dialect::Util::IR
   PUBLIC
 )
