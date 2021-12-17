@@ -39,17 +39,23 @@ class CompiledBinary {
  protected:
   CompiledBinary();
   void initialize(void* data, size_t length);
+  // The base class does not clean up initialized state. This must be done
+  // explicitly by subclasses, ensuring that any backing images remain valid
+  // through the call to deinitialize().
+  void deinitialize();
   Attribute convertVariantToAttribute(Location loc, iree_vm_variant_t& variant);
 
-  iree_vm_instance_t* instance = nullptr;
-  iree_vm_context_t* context = nullptr;
+  iree_hal_device_t* device = nullptr;
+  iree_vm_module_t* hal_module = nullptr;
   iree_vm_module_t* main_module = nullptr;
+  iree_vm_context_t* context = nullptr;
 };
 
 // An in-memory compiled binary and accessors for working with it.
 class InMemoryCompiledBinary : public CompiledBinary {
  public:
   LogicalResult translateFromModule(mlir::ModuleOp moduleOp);
+  ~InMemoryCompiledBinary() override;
 
  private:
   std::string binary;
@@ -62,11 +68,10 @@ class Runtime {
   static Runtime& getInstance();
 
   iree_hal_driver_registry_t* registry = nullptr;
-  iree_hal_device_t* device = nullptr;
-  iree_vm_module_t* hal_module = nullptr;
-
+  iree_vm_instance_t* instance = nullptr;
  private:
   Runtime();
+  ~Runtime();
 };
 
 }  // namespace ConstEval

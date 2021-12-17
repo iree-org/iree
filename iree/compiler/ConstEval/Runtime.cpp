@@ -40,22 +40,27 @@ Type mapElementType(Location loc, iree_hal_element_type_t halElementType) {
 
 }  // namespace
 
-CompiledBinary::CompiledBinary() {
-  IREE_CHECK_OK(iree_vm_instance_create(iree_allocator_system(), &instance));
-}
+CompiledBinary::CompiledBinary() {}
 
-CompiledBinary::~CompiledBinary() {
-  iree_vm_context_release(context);
+CompiledBinary::~CompiledBinary() {}
+
+void CompiledBinary::deinitialize() {
+  iree_vm_module_release(hal_module);
   iree_vm_module_release(main_module);
-  iree_vm_instance_release(instance);
+  iree_vm_context_release(context);
+  iree_hal_device_release(device);
 }
 
 LogicalResult CompiledBinary::invokeNullary(Location loc, StringRef name,
                                             ResultsCallback callback) {
   iree_vm_function_t function;
-  IREE_CHECK_OK(main_module->lookup_function(
-      main_module->self, IREE_VM_FUNCTION_LINKAGE_EXPORT,
-      iree_string_view_t{name.data(), name.size()}, &function));
+  if (auto status = iree_vm_module_lookup_function_by_name(
+          main_module, IREE_VM_FUNCTION_LINKAGE_EXPORT,
+          iree_string_view_t{name.data(), name.size()}, &function)) {
+    iree_status_consume_code(status);
+    return emitError(loc) << "internal error evaling constant: func '" << name
+                          << "' not found";
+  }
 
   iree::vm::ref<iree_vm_list_t> inputs;
   IREE_CHECK_OK(iree_vm_list_create(/*element_type=*/nullptr, 0,
@@ -64,9 +69,21 @@ LogicalResult CompiledBinary::invokeNullary(Location loc, StringRef name,
   IREE_CHECK_OK(iree_vm_list_create(/*element_type=*/nullptr, 1,
                                     iree_allocator_system(), &outputs));
 
-  IREE_CHECK_OK(iree_vm_invoke(context, function, IREE_VM_INVOCATION_FLAG_NONE,
-                               /*policy=*/nullptr, inputs.get(), outputs.get(),
-                               iree_allocator_system()));
+  if (auto status =
+          iree_vm_invoke(context, function, IREE_VM_INVOCATION_FLAG_NONE,
+                         /*policy=*/nullptr, inputs.get(), outputs.get(),
+                         iree_allocator_system())) {
+    std::string message;
+    message.resize(512);
+    iree_host_size_t buffer_length;
+    if (!iree_status_format(status, message.size(), &message[0], &buffer_length)) {
+      message.resize(buffer_length + 1);
+      iree_status_format(status, message.size(), &message[0], &buffer_length);
+    }
+    message.resize(buffer_length);
+    iree_status_consume_code(status);
+    return emitError(loc) << "internal error evaling constant: " << message;
+  }
 
   if (failed(callback(outputs.get()))) {
     return failure();
@@ -131,7 +148,7 @@ Attribute CompiledBinary::convertVariantToAttribute(
         shape[i] = iree_hal_buffer_view_shape_dim(bufferView, i);
       }
 
-      // Mape the element type.
+      // Map the element type.
       iree_hal_element_type_t halElementType =
           iree_hal_buffer_view_element_type(bufferView);
       Type elementType = mapElementType(loc, halElementType);
@@ -180,15 +197,33 @@ Attribute CompiledBinary::convertVariantToAttribute(
 
 void CompiledBinary::initialize(void* data, size_t length) {
   Runtime& runtime = Runtime::getInstance();
+
+  // Create driver and device.
+  iree_hal_driver_t* driver = nullptr;
+  IREE_CHECK_OK(iree_hal_driver_registry_try_create_by_name(
+      runtime.registry, iree_make_cstring_view("vmvx"), iree_allocator_system(),
+      &driver));
+  IREE_CHECK_OK(iree_hal_driver_create_default_device(
+      driver, iree_allocator_system(), &device));
+  iree_hal_driver_release(driver);
+
+  // Create hal module.
+  IREE_CHECK_OK(
+      iree_hal_module_create(device, iree_allocator_system(), &hal_module));
+
+  // Bytecode module.
   IREE_CHECK_OK(iree_vm_bytecode_module_create(
       iree_make_const_byte_span(data, length), iree_allocator_null(),
       iree_allocator_system(), &main_module));
 
-  std::array<iree_vm_module_t*, 2> modules = {runtime.hal_module, main_module};
+  // Context.
+  std::array<iree_vm_module_t*, 2> modules = {hal_module, main_module};
   IREE_CHECK_OK(iree_vm_context_create_with_modules(
-      instance, IREE_VM_CONTEXT_FLAG_NONE, modules.data(), modules.size(),
-      iree_allocator_system(), &context));
+      runtime.instance, IREE_VM_CONTEXT_FLAG_NONE, modules.data(),
+      modules.size(), iree_allocator_system(), &context));
 }
+
+InMemoryCompiledBinary::~InMemoryCompiledBinary() { deinitialize(); }
 
 LogicalResult InMemoryCompiledBinary::translateFromModule(
     mlir::ModuleOp moduleOp) {
@@ -207,20 +242,10 @@ Runtime::Runtime() {
   registry = iree_hal_driver_registry_default();
   IREE_CHECK_OK(iree_hal_vmvx_driver_module_register(registry));
   IREE_CHECK_OK(iree_hal_module_register_types());
-
-  // Create driver and device.
-  iree_hal_driver_t* driver = nullptr;
-  IREE_CHECK_OK(iree_hal_driver_registry_try_create_by_name(
-      registry, iree_make_cstring_view("vmvx"), iree_allocator_system(),
-      &driver));
-  IREE_CHECK_OK(iree_hal_driver_create_default_device(
-      driver, iree_allocator_system(), &device));
-  iree_hal_driver_release(driver);
-
-  // Create hal module.
-  IREE_CHECK_OK(
-      iree_hal_module_create(device, iree_allocator_system(), &hal_module));
+  IREE_CHECK_OK(iree_vm_instance_create(iree_allocator_system(), &instance));
 }
+
+Runtime::~Runtime() { iree_vm_instance_release(instance); }
 
 Runtime& Runtime::getInstance() {
   static Runtime instance;

@@ -83,8 +83,7 @@ struct ProgramExtractor {
                  << symbolRef;
         }
 
-        // TODO: Don't force insert to top. Globals out of order causes
-        // segfault: https://github.com/google/iree/issues/7859
+        // Insert at top as ordering is respected.
         auto ip = targetSymbolTable.getOp()->getRegion(0).front().begin();
         Operation *targetOp = sourceOp->clone();
         targetSymbolTable.insert(targetOp, ip);
