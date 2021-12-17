@@ -9,6 +9,7 @@
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
+#include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "llvm/ADT/Triple.h"
 #include "llvm/ADT/TypeSwitch.h"
@@ -482,18 +483,18 @@ static LogicalResult setRootConfig(
       getDispatchLoweringPassPipeline(entryPointFn, fftOp));
 }
 
-/// Sets the lowering configuration for a generic op to use Single tiling
-/// expert.
+/// Sets the lowering configuration for a generic op to use SingleTilingExpert.
 static LogicalResult setRootConfig(
     FuncOp entryPointFn, linalg::GenericOp genericOp,
     ArrayRef<LoopTilingAndDistributionInfo> tiledLoops) {
   // If there is already a set configuration, do nothing.
   if (getLoweringConfig(genericOp)) return success();
-  // For VMVX, do not use vectorization. Just lower as default.
-  if (isVMVX(entryPointFn)) return success();
 
-  unsigned numLoops = genericOp.getNumLoops();
+  // For VMVX, do not use vectorization. Just lower as default.
+  if (isVMVXBackend(entryPointFn)) return success();
+
   // If there are no loops, there is nothing to do.
+  unsigned numLoops = genericOp.getNumLoops();
   if (numLoops == 0) return success();
 
   Optional<int64_t> nativeVectorSizeInBytes =
@@ -515,13 +516,13 @@ static LogicalResult setRootConfig(
     unsigned fastestVaryingDim = fastestVaryingDimExpr.getPosition();
 
     // If the indexing map has result it has to be a shaped type.
-    ShapedType operandType =
+    auto operandType =
         inputOutputOpOperands[map.index()]->get().getType().cast<ShapedType>();
-    Type elementType = operandType.getElementType();
-    if (!elementType.isIntOrFloat()) continue;
+    Type elemType = operandType.getElementType();
+    if (!elemType.isIntOrFloat()) continue;
 
     unsigned byteWidth =
-        std::max<unsigned>(elementType.getIntOrFloatBitWidth() / 8, 1);
+        std::max<unsigned>(elemType.getIntOrFloatBitWidth() / 8, 1);
     unsigned currVectorSize = nativeVectorSizeInBytes.getValue() / byteWidth;
     nativeVectorSize[fastestVaryingDim] =
         std::max<int64_t>(nativeVectorSize[fastestVaryingDim], currVectorSize);
@@ -558,7 +559,7 @@ static LogicalResult setRootConfig(
   return success();
 }
 
-/// Finds the root operation in the given list of linalg operations and sets
+/// Finds the root operation in the given list of Linalg operations and sets
 /// its configuration. Returns error for multiple root operations.
 static LogicalResult setRootConfig(
     FuncOp entryPointFn, ArrayRef<Operation *> computeOps,
@@ -573,9 +574,9 @@ static LogicalResult setRootConfig(
           })
           .Case<linalg::GenericOp>([&](auto genericOp) {
             if (genericOp.getNumLoops() == genericOp.getNumParallelLoops()) {
-              // Ignore parallel elementwise op/*  */erations now. They will be
-              // set as roots ops if there are no other ops that can be treated
-              // as a rootop.
+              // Ignore parallel elementwise operations now. They will be set as
+              // roots ops if there are no other ops that can be treated as a
+              // root op.
               return success();
             }
             return setRootConfig(entryPointFn, genericOp, tiledLoops);

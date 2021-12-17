@@ -183,13 +183,15 @@ void addSingleTilingExpertPassPipeline(OpPassManager &passManager) {
   passManager.addNestedPass<FuncOp>(createLinalgSingleTilingExpertPass(
       static_cast<int64_t>(TilingLevel::L1Tiles), true));
 
-  // Bufferize
-  auto callbacks =
-      std::make_unique<linalg::comprehensive_bufferize::AllocationCallbacks>(
-          cpuComprehensiveBufferizeAllocationFn,
-          cpuComprehensiveBufferizeDeallocationFn,
-          cpuComprehensiveBufferizeCopyFn);
-  addIREEComprehensiveBufferizePasses(passManager, std::move(callbacks));
+  // TODO(ravishankarm): This is commented cause this is WIP, to be enabled
+  // soon.
+  // auto callbacks =
+  //     std::make_unique<linalg::comprehensive_bufferize::AllocationCallbacks>(
+  //         cpuComprehensiveBufferizeAllocationFn,
+  //         cpuComprehensiveBufferizeDeallocationFn,
+  //         cpuComprehensiveBufferizeCopyFn);
+  // addIREEComprehensiveBufferizePasses(passManager, std::move(callbacks));
+  addLinalgBufferizePasses(passManager, cpuAllocationFunction);
 
   // Add the vector lowering expert.
   OpPassManager &nestedFuncPassManager = passManager.nest<FuncOp>();
