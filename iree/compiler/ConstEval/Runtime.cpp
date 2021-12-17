@@ -76,7 +76,8 @@ LogicalResult CompiledBinary::invokeNullary(Location loc, StringRef name,
     std::string message;
     message.resize(512);
     iree_host_size_t buffer_length;
-    if (!iree_status_format(status, message.size(), &message[0], &buffer_length)) {
+    if (!iree_status_format(status, message.size(), &message[0],
+                            &buffer_length)) {
       message.resize(buffer_length + 1);
       iree_status_format(status, message.size(), &message[0], &buffer_length);
     }

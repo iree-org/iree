@@ -17,7 +17,7 @@ iree_lit_test_suite(
     name = "lit",
     srcs = enforce_glob(
         [
-          "jit_globals.mlir",
+            "jit_globals.mlir",
         ],
         include = ["*.mlir"],
     ),

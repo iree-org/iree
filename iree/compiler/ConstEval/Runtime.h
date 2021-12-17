@@ -69,6 +69,7 @@ class Runtime {
 
   iree_hal_driver_registry_t* registry = nullptr;
   iree_vm_instance_t* instance = nullptr;
+
  private:
   Runtime();
   ~Runtime();
