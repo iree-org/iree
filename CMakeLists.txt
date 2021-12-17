@@ -136,11 +136,16 @@ set(IREE_ALL_TARGET_BACKENDS
   ROCm
   Vulkan-SPIRV
   VMVX
+  WebGPU
 )
 
 if(${IREE_BUILD_COMPILER})
   if(IREE_TARGET_BACKENDS_TO_BUILD STREQUAL "default")
     set(IREE_TARGET_BACKENDS_TO_BUILD ${IREE_ALL_TARGET_BACKENDS})
+
+    # Disable the WebGPU backend by default, as it has complex dependencies and
+    # is still early in its development.
+    list(REMOVE_ITEM IREE_TARGET_BACKENDS_TO_BUILD WebGPU)
   endif()
   message(STATUS "Building compiler target backends: ${IREE_TARGET_BACKENDS_TO_BUILD}")
 else()
@@ -475,6 +480,15 @@ if(IREE_TARGET_BACKEND_METAL-SPIRV)
   iree_set_spirv_cross_cmake_options()
   # SPIRV-Cross is needed to cross compile SPIR-V into MSL source code.
   add_subdirectory(third_party/spirv_cross EXCLUDE_FROM_ALL)
+endif()
+
+if(IREE_TARGET_BACKEND_WEBGPU)
+  # Tint is needed to compile SPIR-V into WGSL source code.
+  # Tint also requires SPIRV-Tools, which requires SPIRV-Headers.
+  iree_set_spirv_headers_cmake_options()
+  add_subdirectory(third_party/spirv_headers EXCLUDE_FROM_ALL)
+  add_subdirectory(build_tools/third_party/spirv-tools EXCLUDE_FROM_ALL)
+  add_subdirectory(build_tools/third_party/tint EXCLUDE_FROM_ALL)
 endif()
 
 #-------------------------------------------------------------------------------
