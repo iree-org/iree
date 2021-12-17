@@ -20,6 +20,7 @@ iree_lit_test_suite(
     "fold_globals.mlir"
     "fuse_globals.mlir"
     "hoist_into_globals.mlir"
+    "hoist_into_globals_linalg.mlir"
     "simplify_global_accesses.mlir"
   DATA
     iree::tools::IreeFileCheck
