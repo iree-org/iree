@@ -22,6 +22,7 @@ void registerConstExprDependentDialects(DialectRegistry &registry);
 // provided constants and having no side effects beyond that.
 //
 // In order to enable testing, some unregistered ops are also recognized:
+//   - iree_unregistered.non_leaf_const_expr : Will be treated as const-expr.
 //   - iree_unregistered.const_expr : Will be treated as const-expr
 //   - iree_unregistered.var_expr : Will be treated as not const-expr
 // Any other unregistered ops are treated as not const-expr.
@@ -30,6 +31,9 @@ bool isEligibleConstExprOp(Operation *op);
 // Whether a const-expr op is eligible to be hoistable. This enforces
 // policies for excluding certain, otherwise eligible, const-expr ops from
 // being hoisted to a global.
+//
+// In order to enable testing, some unregistered ops are also recognized:
+//   - iree_unregistered.non_leaf_const_expr : Will return false.
 bool isHoistableConstExprLeaf(const ConstExprAnalysis::ConstValueInfo *info);
 
 // Whether an operand which consumes a const-expr is eligible for hoisting.

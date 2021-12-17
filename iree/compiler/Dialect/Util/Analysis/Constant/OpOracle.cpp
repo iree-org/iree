@@ -24,6 +24,10 @@ void registerConstExprDependentDialects(DialectRegistry &registry) {
 bool isEligibleConstExprOp(Operation *op) {
   // Special carve-out for unregistered testing ops.
   if (!op->isRegistered()) {
+    if (op->getName().getStringRef() ==
+        "iree_unregistered.non_leaf_const_expr") {
+      return true;
+    }
     if (op->getName().getStringRef() == "iree_unregistered.const_expr") {
       return true;
     }
@@ -53,6 +57,13 @@ bool isEligibleConstExprOp(Operation *op) {
 }
 
 bool isHoistableConstExprLeaf(const ConstExprAnalysis::ConstValueInfo *info) {
+  if (!info->getOperation()->isRegistered()) {
+    if (info->getOperation()->getName().getStringRef() ==
+        "iree_unregistered.non_leaf_const_expr") {
+      return false;
+    }
+  }
+
   // Generally, we prefer to not hoist broadcasts.
   if (auto genericOp = dyn_cast<linalg::GenericOp>(info->getOperation())) {
     // Detect op that only broadcast input as fusing them makes the new

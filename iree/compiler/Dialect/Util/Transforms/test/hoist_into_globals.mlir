@@ -91,5 +91,33 @@ module @hoist_tree_const_expr {
   // CHECK:   util.global.store %[[CE1]], @[[HOISTED_1]] : i32
   // CHECK:   util.initializer.return
   // CHECK: }
+}
 
+// -----
+// Ensures that non-leaf const-exprs (i.e. think broadcasts and other ops
+// that should be considered const-expr but that you never want to hoist as
+// a leaf) are hoisted internal to a const-expr but are left as-is at the leaf.
+// CHECK-LABEL: @hoist_non_leaf_const_expr
+module @hoist_non_leaf_const_expr {
+  // CHECK: util.global private @[[HOISTED:.*]] : i32
+  // CHECK: func @main
+  builtin.func @main() -> (i32) {
+    // CHECK: %[[LOAD_HOISTED:.*]] = util.global.load @[[HOISTED]] : i32
+    // CHECK: %[[RESULT:.*]] = "iree_unregistered.non_leaf_const_expr"(%hoisted)
+    // CHECK: return %[[RESULT]]
+    %0 = arith.constant 0 : i32
+    %1 = arith.constant 1 : i32
+    %2 = "iree_unregistered.non_leaf_const_expr"(%0, %1) : (i32, i32) -> i32
+    %3 = "iree_unregistered.const_expr"(%2) : (i32) -> i32
+    %4 = "iree_unregistered.non_leaf_const_expr"(%3) : (i32) -> i32
+    return %4 : i32
+  }
+  // CHECK: util.initializer {
+  // CHECK:   %[[C0:.*]] = arith.constant 0 : i32
+  // CHECK:   %[[C1:.*]] = arith.constant 1 : i32
+  // CHECK:   %[[CE0:.*]] = "iree_unregistered.non_leaf_const_expr"(%[[C0]], %[[C1]])
+  // CHECK:   %[[CE1:.*]] = "iree_unregistered.const_expr"(%[[CE0]])
+  // CHECK:   util.global.store %[[CE1]], @[[HOISTED]] : i32
+  // CHECK:   util.initializer.return
+  // CHECK: }
 }
