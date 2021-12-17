@@ -128,16 +128,31 @@ flow.executable @multiple_entry_points_ex_1 {
 }
 // CHECK-LABEL: func @multiple_entry_points
 func @multiple_entry_points(%arg0: tensor<4xf32>) -> tensor<4xf32> {
+  // CHECK: %[[C4:.*]] = arith.constant 4
   %c4 = arith.constant 4 : index
-  // CHECK: %0 = flow.dispatch @multiple_entry_points_ex_0::@multiple_entry_points_0_entry_0[%c4](%arg0) : (tensor<4xf32>) -> tensor<4xf32>
+  // CHECK:      {{.*}} = flow.dispatch @multiple_entry_points_ex_0::@multiple_entry_points_0_entry_0[%[[C4]]](%arg0) : (tensor<4xf32>) -> tensor<4xf32>
   %0 = flow.dispatch @multiple_entry_points_ex_0::@multiple_entry_points_0_entry_0[%c4] (%arg0) : (tensor<4xf32>) -> tensor<4xf32>
-  // CHECK: %1 = flow.dispatch @multiple_entry_points_ex_0::@multiple_entry_points_0_entry_1[%c4](%arg0) : (tensor<4xf32>) -> tensor<4xf32>
+  // CHECK-NEXT: {{.*}} = flow.dispatch @multiple_entry_points_ex_0::@multiple_entry_points_0_entry_1[%[[C4]]](%arg0) : (tensor<4xf32>) -> tensor<4xf32>
   %1 = flow.dispatch @multiple_entry_points_ex_0::@multiple_entry_points_0_entry_1[%c4] (%arg0) : (tensor<4xf32>) -> tensor<4xf32>
-  // CHECK: %2 = flow.dispatch @multiple_entry_points_ex_0::@multiple_entry_points_0_entry_0[%c4](%arg0) : (tensor<4xf32>) -> tensor<4xf32>
+  // CHECK-NEXT: {{.*}} = flow.dispatch @multiple_entry_points_ex_0::@multiple_entry_points_0_entry_0[%[[C4]]](%arg0) : (tensor<4xf32>) -> tensor<4xf32>
   %2 = flow.dispatch @multiple_entry_points_ex_1::@multiple_entry_points_1_entry_0[%c4] (%arg0) : (tensor<4xf32>) -> tensor<4xf32>
-  // CHECK: %3 = flow.dispatch @multiple_entry_points_ex_0::@multiple_entry_points_0_entry_1[%c4](%arg0) : (tensor<4xf32>) -> tensor<4xf32>
+  // CHECK-NEXT: {{.*}} = flow.dispatch @multiple_entry_points_ex_0::@multiple_entry_points_0_entry_1[%[[C4]]](%arg0) : (tensor<4xf32>) -> tensor<4xf32>
   %3 = flow.dispatch @multiple_entry_points_ex_1::@multiple_entry_points_1_entry_1[%c4] (%arg0) : (tensor<4xf32>) -> tensor<4xf32>
   return %0 : tensor<4xf32>
+}
+
+// Ensure that symbol renaming is done within initializers.
+util.global private @result : tensor<4xf32>
+// CHECK: util.initializer
+util.initializer {
+  // CHECK: %[[C4:.*]] = arith.constant 4
+  %c4 = arith.constant 4 : index
+  // CHECK: %[[CST:.*]] = arith.constant dense<1.000000e+00>
+  %cst = arith.constant dense<1.000000e+00> : tensor<4xf32>
+  // CHECK: {{.*}} = flow.dispatch @multiple_entry_points_ex_0::@multiple_entry_points_0_entry_1[%[[C4]]](%[[CST]]) : (tensor<4xf32>) -> tensor<4xf32>
+  %0 = flow.dispatch @multiple_entry_points_ex_1::@multiple_entry_points_1_entry_1[%c4] (%cst) : (tensor<4xf32>) -> tensor<4xf32>
+  util.global.store %0, @result : tensor<4xf32>
+  util.initializer.return
 }
 
 // -----
