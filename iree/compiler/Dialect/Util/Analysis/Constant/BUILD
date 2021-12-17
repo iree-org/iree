@@ -11,30 +11,24 @@ package(
 )
 
 cc_library(
-    name = "Transforms",
+    name = "Constant",
     srcs = [
-        "ApplyPatterns.cpp",
-        "CombineInitializers.cpp",
-        "DropCompilerHints.cpp",
-        "FoldGlobals.cpp",
-        "FuseGlobals.cpp",
-        "HoistIntoGlobals.cpp",
-        "Patterns.cpp",
-        "SimplifyGlobalAccesses.cpp",
+        "ConstExpr.cpp",
+        "OpOracle.cpp",
     ],
     hdrs = [
-        "Passes.h",
-        "Patterns.h",
+        "ConstExpr.h",
+        "OpOracle.h",
     ],
     deps = [
-        "//iree/compiler/Dialect/Util/Analysis/Constant",
+        "//iree/compiler/Dialect/Util/Analysis",
         "//iree/compiler/Dialect/Util/IR",
         "@llvm-project//llvm:Support",
-        "@llvm-project//mlir:Analysis",
+        "@llvm-project//mlir:ArithmeticDialect",
         "@llvm-project//mlir:IR",
-        "@llvm-project//mlir:Pass",
+        "@llvm-project//mlir:LinalgInterfaces",
+        "@llvm-project//mlir:LinalgOps",
         "@llvm-project//mlir:StandardOps",
         "@llvm-project//mlir:Support",
-        "@llvm-project//mlir:Transforms",
     ],
 )
