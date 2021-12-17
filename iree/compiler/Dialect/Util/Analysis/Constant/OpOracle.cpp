@@ -7,8 +7,7 @@
 #include "iree/compiler/Dialect/Util/Analysis/Constant/OpOracle.h"
 
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
-#include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
-#include "mlir/Dialect/Linalg/IR/LinalgOps.h"
+#include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Interfaces/SideEffectInterfaces.h"
 
 namespace mlir {
