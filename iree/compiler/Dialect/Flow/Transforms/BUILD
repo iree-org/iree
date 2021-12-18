@@ -42,6 +42,7 @@ cc_library(
         "FusionOfTensorOps.cpp",
         "InjectDispatchTracing.cpp",
         "InterchangeGenericOps.cpp",
+        "OptimizeNumericPrecision.cpp",
         "OutlineDispatchRegions.cpp",
         "PadLinalgOps.cpp",
         "PadTensorToSubTensorInsert.cpp",

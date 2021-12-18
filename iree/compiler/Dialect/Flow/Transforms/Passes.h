@@ -120,6 +120,10 @@ std::unique_ptr<Pass> createPadLinalgOpsToIntegerMultiplePass(
 std::unique_ptr<OperationPass<mlir::ModuleOp>>
 createOutlineLargeConstantsPass();
 
+// Optimizes the precision of key math operations.
+std::unique_ptr<OperationPass<mlir::ModuleOp>>
+createOptimizeNumericPrecisionPass();
+
 // Deduplicates equivalent executables.
 std::unique_ptr<OperationPass<mlir::ModuleOp>>
 createDeduplicateExecutablesPass();

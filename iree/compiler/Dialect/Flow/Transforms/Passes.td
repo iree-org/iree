@@ -75,6 +75,12 @@ def OutlineDispatchRegions :
   let constructor = "mlir::iree_compiler::IREE::Flow::createOutlineDispatchRegionsPass()";
 }
 
+def OptimizeNumericPrecision :
+    Pass<"iree-flow-optimize-numeric-precision", "mlir::ModuleOp"> {
+  let summary = "Optimizes the precision of key math operations";
+  let constructor = "mlir::iree_compiler::IREE::Flow::createOptimizeNumericPrecisionPass()";
+}
+
 def PadLinalgOps :
     Pass<"iree-flow-pad-linalg-ops", ""> {
   let summary = "Pad linalg ops to the next integer multiple of paddingSize.";
