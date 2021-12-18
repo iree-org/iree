@@ -43,7 +43,7 @@ steps:
       - "trace-captures-pixel-4-${BUILDKITE_BUILD_NUMBER}.tgz"
     timeout_in_minutes: "60"
 
-  - label: "Benchmark on Galaxy S20 (exynos-990, mali-g77)"
+  - label: "Benchmark on Pixel 6 (google-tensor, mali-g78)"
     commands:
       - "git clean -fdx"
       - "buildkite-agent artifact download --step Build benchmark-suites-${BUILDKITE_BUILD_NUMBER}.tgz ./"
@@ -52,15 +52,15 @@ steps:
       - "tar -xzvf benchmark-suites-${BUILDKITE_BUILD_NUMBER}.tgz"
       - "tar -xzvf iree-android-tools-${BUILDKITE_BUILD_NUMBER}.tgz"
       - "tar -xzvf tracy-capture-058e8901.tgz"
-      - "python3 build_tools/benchmarks/run_benchmarks_on_android.py --normal_benchmark_tool=build-android/iree/tools/iree-benchmark-module --traced_benchmark_tool=build-android-trace/iree/tools/iree-benchmark-module --trace_capture_tool=tracy-capture -o benchmark-results-galaxy-s20-${BUILDKITE_BUILD_NUMBER}.json --capture_tarball=trace-captures-galaxy-s20-${BUILDKITE_BUILD_NUMBER}.tgz --verbose build-host/"
+      - "python3 build_tools/benchmarks/run_benchmarks_on_android.py --pin-cpu-freq --pin-gpu-freq --normal_benchmark_tool=build-android/iree/tools/iree-benchmark-module --traced_benchmark_tool=build-android-trace/iree/tools/iree-benchmark-module --trace_capture_tool=tracy-capture -o benchmark-results-galaxy-pixel6-${BUILDKITE_BUILD_NUMBER}.json --capture_tarball=trace-captures-galaxy-pixel6-${BUILDKITE_BUILD_NUMBER}.tgz --verbose build-host/"
     if: "build.pull_request.id == null || (build.pull_request.labels includes 'buildkite:benchmark')"
     agents:
-      - "android-soc=exynos-990"
-      - "android-version=11"
+      - "android-soc=google-tensor"
+      - "android-version=12"
       - "queue=benchmark-android"
     artifact_paths:
-      - "benchmark-results-galaxy-s20-${BUILDKITE_BUILD_NUMBER}.json"
-      - "trace-captures-galaxy-s20-${BUILDKITE_BUILD_NUMBER}.tgz"
+      - "benchmark-results-galaxy-pixel6-${BUILDKITE_BUILD_NUMBER}.json"
+      - "trace-captures-galaxy-pixel6-${BUILDKITE_BUILD_NUMBER}.tgz"
     timeout_in_minutes: "60"
 
   - wait
