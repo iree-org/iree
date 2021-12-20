@@ -33,7 +33,7 @@ typedef struct iree_hal_rocm_native_executable_t {
   iree_hal_rocm_native_executable_function_t entry_functions[];
 } iree_hal_rocm_native_executable_t;
 
-extern const iree_hal_executable_vtable_t
+static const iree_hal_executable_vtable_t
     iree_hal_rocm_native_executable_vtable;
 
 static iree_hal_rocm_native_executable_t* iree_hal_rocm_native_executable_cast(
@@ -136,6 +136,7 @@ static void iree_hal_rocm_native_executable_destroy(
   IREE_TRACE_ZONE_END(z0);
 }
 
-const iree_hal_executable_vtable_t iree_hal_rocm_native_executable_vtable = {
-    .destroy = iree_hal_rocm_native_executable_destroy,
+static const iree_hal_executable_vtable_t
+    iree_hal_rocm_native_executable_vtable = {
+        .destroy = iree_hal_rocm_native_executable_destroy,
 };

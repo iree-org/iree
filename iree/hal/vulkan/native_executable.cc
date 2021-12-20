@@ -199,8 +199,10 @@ typedef struct iree_hal_vulkan_native_executable_t {
   iree_hal_vulkan_entry_point_t entry_points[];
 } iree_hal_vulkan_native_executable_t;
 
+namespace {
 extern const iree_hal_executable_vtable_t
     iree_hal_vulkan_native_executable_vtable;
+}  // namespace
 
 static iree_hal_vulkan_native_executable_t*
 iree_hal_vulkan_native_executable_cast(iree_hal_executable_t* base_value) {
@@ -335,6 +337,8 @@ iree_status_t iree_hal_vulkan_native_executable_pipeline_for_entry_point(
   return iree_ok_status();
 }
 
+namespace {
 const iree_hal_executable_vtable_t iree_hal_vulkan_native_executable_vtable = {
     /*.destroy=*/iree_hal_vulkan_native_executable_destroy,
 };
+}  // namespace

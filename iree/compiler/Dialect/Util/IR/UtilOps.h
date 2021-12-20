@@ -7,6 +7,7 @@
 #ifndef IREE_COMPILER_DIALECT_UTIL_IR_UTILOPS_H_
 #define IREE_COMPILER_DIALECT_UTIL_IR_UTILOPS_H_
 
+#include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/BuiltinTypes.h"

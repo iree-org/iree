@@ -18,6 +18,7 @@ cc_library(
         "DropCompilerHints.cpp",
         "FoldGlobals.cpp",
         "FuseGlobals.cpp",
+        "HoistIntoGlobals.cpp",
         "Patterns.cpp",
         "SimplifyGlobalAccesses.cpp",
     ],
@@ -26,8 +27,10 @@ cc_library(
         "Patterns.h",
     ],
     deps = [
+        "//iree/compiler/Dialect/Util/Analysis/Constant",
         "//iree/compiler/Dialect/Util/IR",
         "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:Analysis",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:Pass",
         "@llvm-project//mlir:StandardOps",

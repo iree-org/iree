@@ -95,6 +95,29 @@ def Util_ClosureOpInterface : OpInterface<"ClosureOpInterface"> {
 }
 
 //===----------------------------------------------------------------------===//
+// IREE::Util::GlobalAccessorOpInterface
+//===----------------------------------------------------------------------===//
+
+def Util_GlobalAccessorOpInterface : OpInterface<"GlobalAccessorOpInterface"> {
+  let cppNamespace = "::mlir::iree_compiler::IREE::Util";
+
+  let description = [{
+    Interface for ops that reference globals (load/store).
+  }];
+
+  let methods = [
+    InterfaceMethod<
+      /*desc=*/[{
+        Returns the body region of the closure (may have multiple blocks).
+      }],
+      /*retTy=*/"FlatSymbolRefAttr",
+      /*methodName=*/"getGlobalRefAttr",
+      /*args=*/(ins)
+    >,
+  ];
+}
+
+//===----------------------------------------------------------------------===//
 // IREE::Util::TiedOpInterface
 //===----------------------------------------------------------------------===//
 

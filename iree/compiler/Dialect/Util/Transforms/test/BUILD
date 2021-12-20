@@ -22,6 +22,8 @@ iree_lit_test_suite(
             "drop_compiler_hints.mlir",
             "fold_globals.mlir",
             "fuse_globals.mlir",
+            "hoist_into_globals.mlir",
+            "hoist_into_globals_linalg.mlir",
             "simplify_global_accesses.mlir",
         ],
         include = ["*.mlir"],

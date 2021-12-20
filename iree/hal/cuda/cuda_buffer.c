@@ -20,7 +20,7 @@ typedef struct iree_hal_cuda_buffer_t {
   CUdeviceptr device_ptr;
 } iree_hal_cuda_buffer_t;
 
-extern const iree_hal_buffer_vtable_t iree_hal_cuda_buffer_vtable;
+static const iree_hal_buffer_vtable_t iree_hal_cuda_buffer_vtable;
 
 static iree_hal_cuda_buffer_t* iree_hal_cuda_buffer_cast(
     iree_hal_buffer_t* base_value) {
@@ -129,7 +129,7 @@ CUdeviceptr iree_hal_cuda_buffer_device_pointer(
   return buffer->device_ptr;
 }
 
-const iree_hal_buffer_vtable_t iree_hal_cuda_buffer_vtable = {
+static const iree_hal_buffer_vtable_t iree_hal_cuda_buffer_vtable = {
     .destroy = iree_hal_cuda_buffer_destroy,
     .map_range = iree_hal_cuda_buffer_map_range,
     .unmap_range = iree_hal_cuda_buffer_unmap_range,

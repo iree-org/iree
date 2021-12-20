@@ -21,7 +21,7 @@ typedef struct iree_hal_cuda_executable_layout_t {
   iree_hal_descriptor_set_layout_t* set_layouts[];
 } iree_hal_cuda_executable_layout_t;
 
-extern const iree_hal_executable_layout_vtable_t
+static const iree_hal_executable_layout_vtable_t
     iree_hal_cuda_executable_layout_vtable;
 
 static iree_hal_cuda_executable_layout_t* iree_hal_cuda_executable_layout_cast(
@@ -120,7 +120,7 @@ iree_host_size_t iree_hal_cuda_executable_layout_num_constants(
   return executable_layout->push_constant_count;
 }
 
-const iree_hal_executable_layout_vtable_t
+static const iree_hal_executable_layout_vtable_t
     iree_hal_cuda_executable_layout_vtable = {
         .destroy = iree_hal_cuda_executable_layout_destroy,
 };

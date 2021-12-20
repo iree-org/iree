@@ -102,6 +102,7 @@ cc_library(
         "//iree/compiler/Bindings/TFLite/Transforms",
         "//iree/compiler/Codegen/Dialect:IREECodegenDialect",
         "//iree/compiler/Codegen/Interfaces",
+        "//iree/compiler/ConstEval",
         "//iree/compiler/Dialect/Flow/IR",
         "//iree/compiler/Dialect/Flow/Transforms",
         "//iree/compiler/Dialect/HAL/IR:HALDialect",

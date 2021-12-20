@@ -27,8 +27,10 @@ typedef struct iree_hal_vulkan_native_executable_layout_t {
   iree_hal_descriptor_set_layout_t* set_layouts[];
 } iree_hal_vulkan_native_executable_layout_t;
 
+namespace {
 extern const iree_hal_executable_layout_vtable_t
     iree_hal_vulkan_native_executable_layout_vtable;
+}  // namespace
 
 static iree_hal_vulkan_native_executable_layout_t*
 iree_hal_vulkan_native_executable_layout_cast(
@@ -165,7 +167,9 @@ iree_hal_descriptor_set_layout_t* iree_hal_vulkan_native_executable_layout_set(
   return executable_layout->set_layouts[set_index];
 }
 
+namespace {
 const iree_hal_executable_layout_vtable_t
     iree_hal_vulkan_native_executable_layout_vtable = {
         /*.destroy=*/iree_hal_vulkan_native_executable_layout_destroy,
 };
+}  // namespace

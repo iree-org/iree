@@ -8,6 +8,7 @@
 #define IREE_DIALECT_UTIL_IR_UTIL_OPS
 
 include "iree/compiler/Dialect/Util/IR/UtilBase.td"
+include "iree/compiler/Dialect/Util/IR/UtilInterfaces.td"
 include "mlir/IR/OpAsmInterface.td"
 include "mlir/IR/SymbolInterfaces.td"
 include "mlir/Interfaces/CallInterfaces.td"
@@ -400,8 +401,9 @@ def Util_GlobalOp : Util_Op<"global", [
     bool isMutable() { return is_mutable(); }
     void makeMutable() { (*this)->setAttr("is_mutable", UnitAttr::get(getContext())); }
 
-    Optional<Attribute> getInitialValueAttr() { return initial_valueAttr(); }
+    Attribute getInitialValueAttr() { return initial_valueAttr(); }
     void clearInitialValue() { (*this)->removeAttr("initial_value"); }
+    void setInitialValue(Attribute attr) { (*this)->setAttr("initial_value", attr); }
   }];
 
   let verifier = [{ return verifyGlobalOp(*this); }];
@@ -411,6 +413,7 @@ def Util_GlobalOp : Util_Op<"global", [
 
 def Util_GlobalAddressOp : Util_PureOp<"global.address", [
   DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
+  DeclareOpInterfaceMethods<Util_GlobalAccessorOpInterface>,
 ]> {
   let summary = [{returns an address reference to a global}];
   let description = [{
@@ -438,6 +441,7 @@ def Util_GlobalLoadOp : Util_Op<"global.load", [
   DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
   // HACK: works around the lack of symbol side effects in C++.
   DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
+  DeclareOpInterfaceMethods<Util_GlobalAccessorOpInterface>,
 ]> {
   let summary = [{loads a value from a global variable}];
   let description = [{
@@ -492,7 +496,9 @@ def Util_GlobalLoadIndirectOp : Util_Op<"global.load.indirect"> {
   let hasCanonicalizer = 1;
 }
 
-def Util_GlobalStoreOp : Util_Op<"global.store"> {
+def Util_GlobalStoreOp : Util_Op<"global.store", [
+  DeclareOpInterfaceMethods<Util_GlobalAccessorOpInterface>,
+]> {
   let summary = [{stores a value into a global variable}];
   let description = [{
     Stores a copy of the value into a global variable.
