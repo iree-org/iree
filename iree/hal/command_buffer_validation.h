@@ -10,7 +10,7 @@
 #include "iree/base/api.h"
 #include "iree/hal/command_buffer.h"
 
-iree_status_t iree_hal_command_buffer_initialize_validation(
+void iree_hal_command_buffer_initialize_validation(
     iree_hal_device_t* device, iree_hal_command_buffer_t* command_buffer);
 
 iree_status_t iree_hal_command_buffer_begin_validation(

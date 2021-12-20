@@ -23,7 +23,7 @@ extern "C" {
 // Used for replaying commands in special situations and
 // never returned to a user from the device_create_command_buffer
 iree_status_t iree_hal_cuda_stream_command_buffer_create(
-    iree_hal_cuda_context_wrapper_t *context,
+    iree_hal_device_t *device, iree_hal_cuda_context_wrapper_t *context,
     iree_hal_command_buffer_mode_t mode,
     iree_hal_command_category_t command_categories, CUstream stream,
     iree_hal_command_buffer_t **out_command_buffer);

@@ -20,6 +20,7 @@ extern "C" {
 
 // Creates a command buffer that directly records into a VkCommandBuffer.
 iree_status_t iree_hal_vulkan_direct_command_buffer_allocate(
+    iree_hal_device_t* device,
     iree::hal::vulkan::VkDeviceHandle* logical_device,
     iree::hal::vulkan::VkCommandPoolHandle* command_pool,
     iree_hal_command_buffer_mode_t mode,

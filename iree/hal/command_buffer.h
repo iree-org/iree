@@ -625,7 +625,7 @@ struct iree_hal_command_buffer_t {
 };
 
 IREE_API_EXPORT void iree_hal_command_buffer_initialize(
-    iree_hal_command_buffer_mode_t mode,
+    iree_hal_device_t* device, iree_hal_command_buffer_mode_t mode,
     iree_hal_command_category_t command_categories,
     iree_hal_queue_affinity_t queue_affinity,
     const iree_hal_command_buffer_vtable_t* vtable,

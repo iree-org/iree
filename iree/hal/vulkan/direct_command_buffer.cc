@@ -72,6 +72,7 @@ iree_hal_vulkan_direct_command_buffer_cast(
 }
 
 iree_status_t iree_hal_vulkan_direct_command_buffer_allocate(
+    iree_hal_device_t* device,
     iree::hal::vulkan::VkDeviceHandle* logical_device,
     iree::hal::vulkan::VkCommandPoolHandle* command_pool,
     iree_hal_command_buffer_mode_t mode,
@@ -104,7 +105,7 @@ iree_status_t iree_hal_vulkan_direct_command_buffer_allocate(
                             sizeof(*command_buffer), (void**)&command_buffer);
   if (iree_status_is_ok(status)) {
     iree_hal_command_buffer_initialize(
-        mode, command_categories, queue_affinity,
+        device, mode, command_categories, queue_affinity,
         &iree_hal_vulkan_direct_command_buffer_vtable, &command_buffer->base);
     command_buffer->logical_device = logical_device;
     command_buffer->tracing_context = tracing_context;

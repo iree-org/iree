@@ -55,8 +55,8 @@ static FailureOr<LinalgTilingAndFusionOptions> getTileAndFuseOptionsFromConfig(
     for (auto op : computeOps) {
       if (auto currLoweringConfig = iree_compiler::getLoweringConfig(op)) {
         if (loweringConfig) {
-          return {funcOp.emitOpError(
-              "unhandled multiple lowering configurations in compute ops")};
+          return LogicalResult(funcOp.emitOpError(
+              "unhandled multiple lowering configurations in compute ops"));
         }
         loweringConfig = currLoweringConfig;
       }

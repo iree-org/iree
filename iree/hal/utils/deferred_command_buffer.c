@@ -147,7 +147,7 @@ iree_hal_deferred_command_buffer_cast(iree_hal_command_buffer_t* base_value) {
 }
 
 IREE_API_EXPORT iree_status_t iree_hal_deferred_command_buffer_create(
-    iree_hal_command_buffer_mode_t mode,
+    iree_hal_device_t* device, iree_hal_command_buffer_mode_t mode,
     iree_hal_command_category_t command_categories,
     iree_arena_block_pool_t* block_pool, iree_allocator_t host_allocator,
     iree_hal_command_buffer_t** out_command_buffer) {
@@ -161,7 +161,7 @@ IREE_API_EXPORT iree_status_t iree_hal_deferred_command_buffer_create(
       host_allocator, sizeof(*command_buffer), (void**)&command_buffer);
   if (iree_status_is_ok(status)) {
     iree_hal_command_buffer_initialize(
-        mode, command_categories, IREE_HAL_QUEUE_AFFINITY_ANY,
+        device, mode, command_categories, IREE_HAL_QUEUE_AFFINITY_ANY,
         &iree_hal_deferred_command_buffer_vtable, &command_buffer->base);
     command_buffer->host_allocator = host_allocator;
     iree_hal_cmd_list_initialize(block_pool, &command_buffer->cmd_list);

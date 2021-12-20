@@ -67,7 +67,7 @@ IREE_API_EXPORT iree_string_view_t iree_hal_command_category_format(
 IREE_HAL_API_RETAIN_RELEASE(command_buffer);
 
 IREE_API_EXPORT void iree_hal_command_buffer_initialize(
-    iree_hal_command_buffer_mode_t mode,
+    iree_hal_device_t* device, iree_hal_command_buffer_mode_t mode,
     iree_hal_command_category_t command_categories,
     iree_hal_queue_affinity_t queue_affinity,
     const iree_hal_command_buffer_vtable_t* vtable,
@@ -76,6 +76,12 @@ IREE_API_EXPORT void iree_hal_command_buffer_initialize(
   command_buffer->mode = mode;
   command_buffer->allowed_categories = command_categories;
   command_buffer->queue_affinity = queue_affinity;
+
+  // Perform initialization validation after we allocate/initialize the concrete
+  // implementation.
+  IF_VALIDATING(command_buffer, {
+    iree_hal_command_buffer_initialize_validation(device, command_buffer);
+  });
 }
 
 IREE_API_EXPORT iree_status_t iree_hal_command_buffer_create(
@@ -86,27 +92,21 @@ IREE_API_EXPORT iree_status_t iree_hal_command_buffer_create(
   IREE_ASSERT_ARGUMENT(device);
   IREE_ASSERT_ARGUMENT(out_command_buffer);
   *out_command_buffer = NULL;
-  IREE_TRACE_ZONE_BEGIN(z0);
 
-  iree_hal_command_buffer_t* command_buffer = NULL;
+  if (iree_all_bits_set(mode,
+                        IREE_HAL_COMMAND_BUFFER_MODE_ALLOW_INLINE_EXECUTION)) {
+    // Inline command buffers must be one-shot and primary.
+    if (!iree_all_bits_set(mode, IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT)) {
+      return iree_make_status(
+          IREE_STATUS_INVALID_ARGUMENT,
+          "inline command buffers must be one-shot and primary");
+    }
+  }
+
+  IREE_TRACE_ZONE_BEGIN(z0);
   iree_status_t status =
       IREE_HAL_VTABLE_DISPATCH(device, iree_hal_device, create_command_buffer)(
-          device, mode, command_categories, queue_affinity, &command_buffer);
-
-  // Perform initialization validation after we allocate/initialize the concrete
-  // implementation.
-  if (iree_status_is_ok(status)) {
-    IF_VALIDATING(command_buffer, {
-      status =
-          iree_hal_command_buffer_initialize_validation(device, command_buffer);
-    });
-  }
-
-  if (iree_status_is_ok(status)) {
-    *out_command_buffer = command_buffer;
-  } else {
-    iree_hal_command_buffer_release(command_buffer);
-  }
+          device, mode, command_categories, queue_affinity, out_command_buffer);
   IREE_TRACE_ZONE_END(z0);
   return status;
 }
