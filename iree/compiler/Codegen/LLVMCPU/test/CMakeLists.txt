@@ -14,6 +14,7 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
+    "check_ir.mlir"
     "hal_interface_bindings.mlir"
     "hal_interface_constants.mlir"
     "hal_interface_workgroup_info.mlir"

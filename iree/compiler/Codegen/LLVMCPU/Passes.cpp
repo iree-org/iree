@@ -11,6 +11,7 @@
 #include "iree/compiler/Codegen/LLVMCPU/KernelDispatch.h"
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
+#include "llvm/Support/CommandLine.h"
 #include "mlir/Conversion/SCFToStandard/SCFToStandard.h"
 #include "mlir/Dialect/Arithmetic/Transforms/Passes.h"
 #include "mlir/Dialect/Linalg/Passes.h"
@@ -20,6 +21,13 @@
 
 namespace mlir {
 namespace iree_compiler {
+
+/// Command line options used purely for development purposes. Not to be relied
+/// on in any way.
+static llvm::cl::opt<bool> clCheckIR(
+    "iree-codegen-llvm-check-ir",
+    llvm::cl::desc("Runs the pass to check the IR generated from LLVMCPU"),
+    llvm::cl::init(true));
 
 //===---------------------------------------------------------------------===//
 // Default allocation functions for CPU backend
@@ -218,6 +226,9 @@ static void addLowerToLLVMPasses(OpPassManager &passManager) {
   passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
   passManager.addNestedPass<FuncOp>(createCSEPass());
 
+  if (clCheckIR) {
+    passManager.addPass(createLLVMCPUCheckIRPass());
+  }
   // Handled tensor-type constants.
   passManager.addPass(createTensorConstantBufferizePass());
   passManager.addPass(createFoldTensorExtractOpPass());
