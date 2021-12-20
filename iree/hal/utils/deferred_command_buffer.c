@@ -132,10 +132,8 @@ static iree_status_t iree_hal_cmd_list_clone_data(iree_hal_cmd_list_t* cmd_list,
 //===----------------------------------------------------------------------===//
 
 typedef struct iree_hal_deferred_command_buffer_t {
-  iree_hal_resource_t resource;
+  iree_hal_command_buffer_t base;
   iree_allocator_t host_allocator;
-  iree_hal_command_buffer_mode_t mode;
-  iree_hal_command_category_t allowed_categories;
   iree_hal_cmd_list_t cmd_list;
 } iree_hal_deferred_command_buffer_t;
 
@@ -162,15 +160,14 @@ IREE_API_EXPORT iree_status_t iree_hal_deferred_command_buffer_create(
   iree_status_t status = iree_allocator_malloc(
       host_allocator, sizeof(*command_buffer), (void**)&command_buffer);
   if (iree_status_is_ok(status)) {
-    iree_hal_resource_initialize(&iree_hal_deferred_command_buffer_vtable,
-                                 &command_buffer->resource);
+    iree_hal_command_buffer_initialize(
+        mode, command_categories, IREE_HAL_QUEUE_AFFINITY_ANY,
+        &iree_hal_deferred_command_buffer_vtable, &command_buffer->base);
     command_buffer->host_allocator = host_allocator;
-    command_buffer->mode = mode;
-    command_buffer->allowed_categories = command_categories;
     iree_hal_cmd_list_initialize(block_pool, &command_buffer->cmd_list);
   }
 
-  *out_command_buffer = (iree_hal_command_buffer_t*)command_buffer;
+  *out_command_buffer = &command_buffer->base;
   IREE_TRACE_ZONE_END(z0);
   return status;
 }
@@ -188,14 +185,6 @@ static void iree_hal_deferred_command_buffer_destroy(
   IREE_TRACE_ZONE_END(z0);
 }
 
-static iree_hal_command_buffer_mode_t iree_hal_deferred_command_buffer_mode(
-    const iree_hal_command_buffer_t* base_command_buffer) {
-  iree_hal_deferred_command_buffer_t* command_buffer =
-      iree_hal_deferred_command_buffer_cast(
-          (iree_hal_command_buffer_t*)base_command_buffer);
-  return command_buffer->mode;
-}
-
 static void* iree_hal_deferred_command_buffer_dyn_cast(
     iree_hal_command_buffer_t* command_buffer, const void* vtable) {
   if (vtable == &iree_hal_deferred_command_buffer_vtable) {
@@ -203,15 +192,6 @@ static void* iree_hal_deferred_command_buffer_dyn_cast(
     return command_buffer;
   }
   return NULL;
-}
-
-static iree_hal_command_category_t
-iree_hal_deferred_command_buffer_allowed_categories(
-    const iree_hal_command_buffer_t* base_command_buffer) {
-  iree_hal_deferred_command_buffer_t* command_buffer =
-      iree_hal_deferred_command_buffer_cast(
-          (iree_hal_command_buffer_t*)base_command_buffer);
-  return command_buffer->allowed_categories;
 }
 
 static iree_status_t iree_hal_deferred_command_buffer_begin(
@@ -811,7 +791,7 @@ IREE_API_EXPORT iree_status_t iree_hal_deferred_command_buffer_apply(
   // execution this prevents us from hanging on to the commands we will never
   // use again.
   if (iree_status_is_ok(status) &&
-      iree_all_bits_set(command_buffer->mode,
+      iree_all_bits_set(command_buffer->base.mode,
                         IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT)) {
     iree_hal_cmd_list_reset(cmd_list);
   }
@@ -824,9 +804,6 @@ static const iree_hal_command_buffer_vtable_t
     iree_hal_deferred_command_buffer_vtable = {
         .destroy = iree_hal_deferred_command_buffer_destroy,
         .dyn_cast = iree_hal_deferred_command_buffer_dyn_cast,
-        .mode = iree_hal_deferred_command_buffer_mode,
-        .allowed_categories =
-            iree_hal_deferred_command_buffer_allowed_categories,
         .begin = iree_hal_deferred_command_buffer_begin,
         .end = iree_hal_deferred_command_buffer_end,
         .execution_barrier = iree_hal_deferred_command_buffer_execution_barrier,

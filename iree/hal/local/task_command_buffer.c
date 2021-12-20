@@ -35,13 +35,10 @@
 // command buffer here is essentially just a builder for the task system types
 // and manager of the lifetime of the tasks.
 typedef struct iree_hal_task_command_buffer_t {
-  iree_hal_resource_t resource;
+  iree_hal_command_buffer_t base;
   iree_allocator_t host_allocator;
 
   iree_task_scope_t* scope;
-  iree_hal_command_buffer_mode_t mode;
-  iree_hal_command_category_t allowed_categories;
-  iree_hal_queue_affinity_t queue_affinity;
 
   // Arena used for all allocations; references the shared device block pool.
   iree_arena_allocator_t arena;
@@ -132,18 +129,16 @@ iree_status_t iree_hal_task_command_buffer_create(
   iree_status_t status = iree_allocator_malloc(
       host_allocator, sizeof(*command_buffer), (void**)&command_buffer);
   if (iree_status_is_ok(status)) {
-    iree_hal_resource_initialize(&iree_hal_task_command_buffer_vtable,
-                                 &command_buffer->resource);
+    iree_hal_command_buffer_initialize(mode, command_categories, queue_affinity,
+                                       &iree_hal_task_command_buffer_vtable,
+                                       &command_buffer->base);
     command_buffer->host_allocator = host_allocator;
     command_buffer->scope = scope;
-    command_buffer->mode = mode;
-    command_buffer->allowed_categories = command_categories;
-    command_buffer->queue_affinity = queue_affinity;
     iree_arena_initialize(block_pool, &command_buffer->arena);
     iree_task_list_initialize(&command_buffer->root_tasks);
     iree_task_list_initialize(&command_buffer->leaf_tasks);
     memset(&command_buffer->state, 0, sizeof(command_buffer->state));
-    *out_command_buffer = (iree_hal_command_buffer_t*)command_buffer;
+    *out_command_buffer = &command_buffer->base;
   }
 
   IREE_TRACE_ZONE_END(z0);
@@ -185,18 +180,6 @@ static void* iree_hal_task_command_buffer_dyn_cast(
     return command_buffer;
   }
   return NULL;
-}
-
-static iree_hal_command_buffer_mode_t iree_hal_task_command_buffer_mode(
-    const iree_hal_command_buffer_t* base_command_buffer) {
-  return ((const iree_hal_task_command_buffer_t*)base_command_buffer)->mode;
-}
-
-static iree_hal_command_category_t
-iree_hal_task_command_buffer_allowed_categories(
-    const iree_hal_command_buffer_t* base_command_buffer) {
-  return ((const iree_hal_task_command_buffer_t*)base_command_buffer)
-      ->allowed_categories;
 }
 
 //===----------------------------------------------------------------------===//
@@ -970,8 +953,6 @@ static const iree_hal_command_buffer_vtable_t
     iree_hal_task_command_buffer_vtable = {
         .destroy = iree_hal_task_command_buffer_destroy,
         .dyn_cast = iree_hal_task_command_buffer_dyn_cast,
-        .mode = iree_hal_task_command_buffer_mode,
-        .allowed_categories = iree_hal_task_command_buffer_allowed_categories,
         .begin = iree_hal_task_command_buffer_begin,
         .end = iree_hal_task_command_buffer_end,
         .begin_debug_group = iree_hal_task_command_buffer_begin_debug_group,

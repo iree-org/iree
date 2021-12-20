@@ -33,6 +33,7 @@ cc_library(
         "command_buffer.c",
         "command_buffer.h",
         "command_buffer_validation.c",
+        "command_buffer_validation.h",
         "descriptor_set.c",
         "descriptor_set.h",
         "descriptor_set_layout.c",

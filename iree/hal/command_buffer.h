@@ -60,6 +60,12 @@ enum iree_hal_command_buffer_mode_bits_t {
   // IREE_HAL_COMMAND_BUFFER_MODE_PRIMARY. Compatible with
   // IREE_HAL_COMMAND_BUFFER_MODE_REUSABLE.
   IREE_HAL_COMMAND_BUFFER_MODE_ALLOW_INLINE_EXECUTION = 1u << 4,
+
+  // Disables additional command buffer validation (if present).
+  // By default all command buffers will be validated if
+  // `IREE_HAL_COMMAND_BUFFER_VALIDATION_ENABLE=1` - if shimming command buffers
+  // or performing replay this validation can be disabled per-command buffer.
+  IREE_HAL_COMMAND_BUFFER_MODE_UNVALIDATED = 1u << 5,
 };
 typedef uint32_t iree_hal_command_buffer_mode_t;
 
@@ -212,6 +218,16 @@ iree_hal_command_buffer_mode_format(iree_hal_command_buffer_mode_t value,
 // See iree_bitfield_format for usage.
 IREE_API_EXPORT iree_string_view_t iree_hal_command_category_format(
     iree_hal_command_category_t value, iree_bitfield_string_temp_t* out_temp);
+
+// Storage for command buffer validation state.
+// Designed to be embedded in concrete implementations that want validation.
+typedef struct iree_hal_command_buffer_validation_state_t {
+  iree_hal_device_t* device;
+  bool is_recording;
+  int32_t debug_group_depth;
+  // TODO(benvanik): current executable layout/descriptor set layout info.
+  // TODO(benvanik): valid push constant bit ranges.
+} iree_hal_command_buffer_validation_state_t;
 
 //===----------------------------------------------------------------------===//
 // iree_hal_command_buffer_t
@@ -509,11 +525,6 @@ typedef struct iree_hal_command_buffer_vtable_t {
   void*(IREE_API_PTR* dyn_cast)(iree_hal_command_buffer_t* command_buffer,
                                 const void* vtable);
 
-  iree_hal_command_buffer_mode_t(IREE_API_PTR* mode)(
-      const iree_hal_command_buffer_t* command_buffer);
-  iree_hal_command_category_t(IREE_API_PTR* allowed_categories)(
-      const iree_hal_command_buffer_t* command_buffer);
-
   iree_status_t(IREE_API_PTR* begin)(iree_hal_command_buffer_t* command_buffer);
   iree_status_t(IREE_API_PTR* end)(iree_hal_command_buffer_t* command_buffer);
 
@@ -601,6 +612,24 @@ typedef struct iree_hal_command_buffer_vtable_t {
       iree_hal_buffer_t* workgroups_buffer,
       iree_device_size_t workgroups_offset);
 } iree_hal_command_buffer_vtable_t;
+
+struct iree_hal_command_buffer_t {
+  iree_hal_resource_t resource;
+  iree_hal_command_buffer_mode_t mode;
+  iree_hal_command_category_t allowed_categories;
+  iree_hal_queue_affinity_t queue_affinity;
+
+#if IREE_HAL_COMMAND_BUFFER_VALIDATION_ENABLE
+  iree_hal_command_buffer_validation_state_t validation;
+#endif  // IREE_HAL_COMMAND_BUFFER_VALIDATION_ENABLE
+};
+
+IREE_API_EXPORT void iree_hal_command_buffer_initialize(
+    iree_hal_command_buffer_mode_t mode,
+    iree_hal_command_category_t command_categories,
+    iree_hal_queue_affinity_t queue_affinity,
+    const iree_hal_command_buffer_vtable_t* vtable,
+    iree_hal_command_buffer_t* command_buffer);
 
 IREE_API_EXPORT void iree_hal_command_buffer_destroy(
     iree_hal_command_buffer_t* command_buffer);

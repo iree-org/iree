@@ -20,11 +20,10 @@
 // indirection.
 
 typedef struct {
-  iree_hal_resource_t resource;
+  iree_hal_command_buffer_t base;
   iree_hal_cuda_context_wrapper_t* context;
-  iree_hal_command_buffer_mode_t mode;
-  iree_hal_command_category_t allowed_categories;
   CUstream stream;
+
   int32_t push_constant[IREE_HAL_CUDA_MAX_PUSH_CONSTANT_COUNT];
   // Keep track of the current set of kernel arguments.
   void* current_descriptor[IREE_HAL_CUDA_MAX_KERNEL_ARG];
@@ -56,18 +55,17 @@ iree_status_t iree_hal_cuda_stream_command_buffer_create(
   iree_status_t status = iree_allocator_malloc(
       context->host_allocator, total_size, (void**)&command_buffer);
   if (iree_status_is_ok(status)) {
-    iree_hal_resource_initialize(&iree_hal_cuda_stream_command_buffer_vtable,
-                                 &command_buffer->resource);
+    iree_hal_command_buffer_initialize(
+        mode, command_categories, IREE_HAL_QUEUE_AFFINITY_ANY,
+        &iree_hal_cuda_stream_command_buffer_vtable, &command_buffer->base);
     command_buffer->context = context;
-    command_buffer->mode = mode;
-    command_buffer->allowed_categories = command_categories;
     command_buffer->stream = stream;
     for (size_t i = 0; i < IREE_HAL_CUDA_MAX_KERNEL_ARG; i++) {
       command_buffer->current_descriptor[i] = &command_buffer->device_ptrs[i];
     }
   }
 
-  *out_command_buffer = (iree_hal_command_buffer_t*)command_buffer;
+  *out_command_buffer = &command_buffer->base;
   IREE_TRACE_ZONE_END(z0);
   return status;
 }
@@ -96,21 +94,6 @@ static void* iree_hal_cuda_stream_command_buffer_dyn_cast(
     return command_buffer;
   }
   return NULL;
-}
-
-static iree_hal_command_buffer_mode_t iree_hal_cuda_stream_command_buffer_mode(
-    const iree_hal_command_buffer_t* base_command_buffer) {
-  const iree_hal_cuda_stream_command_buffer_t* command_buffer =
-      (const iree_hal_cuda_stream_command_buffer_t*)(base_command_buffer);
-  return command_buffer->mode;
-}
-
-static iree_hal_command_category_t
-iree_hal_cuda_stream_command_buffer_allowed_categories(
-    const iree_hal_command_buffer_t* base_command_buffer) {
-  const iree_hal_cuda_stream_command_buffer_t* command_buffer =
-      (const iree_hal_cuda_stream_command_buffer_t*)(base_command_buffer);
-  return command_buffer->allowed_categories;
 }
 
 static iree_status_t iree_hal_cuda_stream_command_buffer_begin(
@@ -363,9 +346,6 @@ static const iree_hal_command_buffer_vtable_t
     iree_hal_cuda_stream_command_buffer_vtable = {
         .destroy = iree_hal_cuda_stream_command_buffer_destroy,
         .dyn_cast = iree_hal_cuda_stream_command_buffer_dyn_cast,
-        .mode = iree_hal_cuda_stream_command_buffer_mode,
-        .allowed_categories =
-            iree_hal_cuda_stream_command_buffer_allowed_categories,
         .begin = iree_hal_cuda_stream_command_buffer_begin,
         .end = iree_hal_cuda_stream_command_buffer_end,
         .execution_barrier =
