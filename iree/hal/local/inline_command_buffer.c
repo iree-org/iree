@@ -82,7 +82,7 @@ static void iree_hal_inline_command_buffer_reset(
 }
 
 iree_status_t iree_hal_inline_command_buffer_create(
-    iree_hal_command_buffer_mode_t mode,
+    iree_hal_device_t* device, iree_hal_command_buffer_mode_t mode,
     iree_hal_command_category_t command_categories,
     iree_hal_queue_affinity_t queue_affinity, iree_allocator_t host_allocator,
     iree_hal_command_buffer_t** out_command_buffer) {
@@ -105,9 +105,9 @@ iree_status_t iree_hal_inline_command_buffer_create(
   iree_status_t status = iree_allocator_malloc(
       host_allocator, sizeof(*command_buffer), (void**)&command_buffer);
   if (iree_status_is_ok(status)) {
-    iree_hal_command_buffer_initialize(mode, command_categories, queue_affinity,
-                                       &iree_hal_inline_command_buffer_vtable,
-                                       &command_buffer->base);
+    iree_hal_command_buffer_initialize(
+        device, mode, command_categories, queue_affinity,
+        &iree_hal_inline_command_buffer_vtable, &command_buffer->base);
     command_buffer->host_allocator = host_allocator;
     iree_hal_inline_command_buffer_reset(command_buffer);
 

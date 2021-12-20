@@ -102,7 +102,8 @@ static iree_hal_task_command_buffer_t* iree_hal_task_command_buffer_cast(
 }
 
 iree_status_t iree_hal_task_command_buffer_create(
-    iree_task_scope_t* scope, iree_hal_command_buffer_mode_t mode,
+    iree_hal_device_t* device, iree_task_scope_t* scope,
+    iree_hal_command_buffer_mode_t mode,
     iree_hal_command_category_t command_categories,
     iree_hal_queue_affinity_t queue_affinity,
     iree_arena_block_pool_t* block_pool, iree_allocator_t host_allocator,
@@ -129,9 +130,9 @@ iree_status_t iree_hal_task_command_buffer_create(
   iree_status_t status = iree_allocator_malloc(
       host_allocator, sizeof(*command_buffer), (void**)&command_buffer);
   if (iree_status_is_ok(status)) {
-    iree_hal_command_buffer_initialize(mode, command_categories, queue_affinity,
-                                       &iree_hal_task_command_buffer_vtable,
-                                       &command_buffer->base);
+    iree_hal_command_buffer_initialize(
+        device, mode, command_categories, queue_affinity,
+        &iree_hal_task_command_buffer_vtable, &command_buffer->base);
     command_buffer->host_allocator = host_allocator;
     command_buffer->scope = scope;
     iree_arena_initialize(block_pool, &command_buffer->arena);

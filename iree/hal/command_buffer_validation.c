@@ -91,24 +91,10 @@ static iree_status_t iree_hal_command_buffer_validate_dispatch_bindings(
   return iree_ok_status();
 }
 
-iree_status_t iree_hal_command_buffer_initialize_validation(
+void iree_hal_command_buffer_initialize_validation(
     iree_hal_device_t* device, iree_hal_command_buffer_t* command_buffer) {
   VALIDATION_STATE(command_buffer)->device = device;
   VALIDATION_STATE(command_buffer)->is_recording = false;
-
-  iree_hal_command_buffer_mode_t mode =
-      iree_hal_command_buffer_mode(command_buffer);
-  if (iree_all_bits_set(mode,
-                        IREE_HAL_COMMAND_BUFFER_MODE_ALLOW_INLINE_EXECUTION)) {
-    // Inline command buffers must be one-shot and primary.
-    if (!iree_all_bits_set(mode, IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT)) {
-      return iree_make_status(
-          IREE_STATUS_INVALID_ARGUMENT,
-          "inline command buffers must be one-shot and primary");
-    }
-  }
-
-  return iree_ok_status();
 }
 
 iree_status_t iree_hal_command_buffer_begin_validation(

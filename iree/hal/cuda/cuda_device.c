@@ -114,7 +114,7 @@ static iree_status_t iree_hal_cuda_device_create_internal(
   if (iree_status_is_ok(status) &&
       device->command_buffer_mode == IREE_HAL_CUDA_COMMAND_BUFFER_MODE_STREAM) {
     status = iree_hal_cuda_stream_command_buffer_create(
-        &device->context_wrapper,
+        (iree_hal_device_t*)device, &device->context_wrapper,
         IREE_HAL_COMMAND_BUFFER_MODE_ALLOW_INLINE_EXECUTION,
         IREE_HAL_COMMAND_CATEGORY_ANY, device->stream,
         &device->stream_command_buffer);
@@ -228,11 +228,11 @@ static iree_status_t iree_hal_cuda_device_create_command_buffer(
   switch (device->command_buffer_mode) {
     case IREE_HAL_CUDA_COMMAND_BUFFER_MODE_GRAPH:
       return iree_hal_cuda_graph_command_buffer_create(
-          &device->context_wrapper, mode, command_categories, queue_affinity,
-          out_command_buffer);
+          base_device, &device->context_wrapper, mode, command_categories,
+          queue_affinity, out_command_buffer);
     case IREE_HAL_CUDA_COMMAND_BUFFER_MODE_STREAM:
       return iree_hal_deferred_command_buffer_create(
-          mode, command_categories, &device->block_pool,
+          base_device, mode, command_categories, &device->block_pool,
           iree_hal_device_host_allocator(base_device), out_command_buffer);
     default:
       return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,

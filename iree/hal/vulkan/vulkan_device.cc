@@ -996,9 +996,10 @@ static iree_status_t iree_hal_vulkan_device_create_command_buffer(
       device, command_categories, queue_affinity);
 
   return iree_hal_vulkan_direct_command_buffer_allocate(
-      device->logical_device, command_pool, mode, command_categories,
-      queue_affinity, queue->tracing_context(), device->descriptor_pool_cache,
-      device->builtin_executables, out_command_buffer);
+      base_device, device->logical_device, command_pool, mode,
+      command_categories, queue_affinity, queue->tracing_context(),
+      device->descriptor_pool_cache, device->builtin_executables,
+      out_command_buffer);
 }
 
 static iree_status_t iree_hal_vulkan_device_create_descriptor_set(

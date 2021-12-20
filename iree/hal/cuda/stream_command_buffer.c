@@ -41,7 +41,7 @@ iree_hal_cuda_stream_command_buffer_cast(
 }
 
 iree_status_t iree_hal_cuda_stream_command_buffer_create(
-    iree_hal_cuda_context_wrapper_t* context,
+    iree_hal_device_t* device, iree_hal_cuda_context_wrapper_t* context,
     iree_hal_command_buffer_mode_t mode,
     iree_hal_command_category_t command_categories, CUstream stream,
     iree_hal_command_buffer_t** out_command_buffer) {
@@ -51,12 +51,12 @@ iree_status_t iree_hal_cuda_stream_command_buffer_create(
   IREE_TRACE_ZONE_BEGIN(z0);
 
   iree_hal_cuda_stream_command_buffer_t* command_buffer = NULL;
-  size_t total_size = sizeof(*command_buffer);
-  iree_status_t status = iree_allocator_malloc(
-      context->host_allocator, total_size, (void**)&command_buffer);
+  iree_status_t status =
+      iree_allocator_malloc(context->host_allocator, sizeof(*command_buffer),
+                            (void**)&command_buffer);
   if (iree_status_is_ok(status)) {
     iree_hal_command_buffer_initialize(
-        mode, command_categories, IREE_HAL_QUEUE_AFFINITY_ANY,
+        device, mode, command_categories, IREE_HAL_QUEUE_AFFINITY_ANY,
         &iree_hal_cuda_stream_command_buffer_vtable, &command_buffer->base);
     command_buffer->context = context;
     command_buffer->stream = stream;
