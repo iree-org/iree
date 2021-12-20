@@ -41,7 +41,7 @@ typedef struct iree_hal_cuda_graph_command_buffer_t {
   void* current_descriptor[];
 } iree_hal_cuda_graph_command_buffer_t;
 
-extern const iree_hal_command_buffer_vtable_t
+static const iree_hal_command_buffer_vtable_t
     iree_hal_cuda_graph_command_buffer_vtable;
 
 static iree_hal_cuda_graph_command_buffer_t*
@@ -478,7 +478,7 @@ CUgraphExec iree_hal_cuda_graph_command_buffer_exec(
   return command_buffer->exec;
 }
 
-const iree_hal_command_buffer_vtable_t
+static const iree_hal_command_buffer_vtable_t
     iree_hal_cuda_graph_command_buffer_vtable = {
         .destroy = iree_hal_cuda_graph_command_buffer_destroy,
         .dyn_cast = iree_hal_cuda_graph_command_buffer_dyn_cast,

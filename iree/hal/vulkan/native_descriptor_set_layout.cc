@@ -24,8 +24,10 @@ typedef struct iree_hal_vulkan_native_descriptor_set_layout_t {
   VkDescriptorSetLayout handle;
 } iree_hal_vulkan_native_descriptor_set_layout_t;
 
+namespace {
 extern const iree_hal_descriptor_set_layout_vtable_t
     iree_hal_vulkan_native_descriptor_set_layout_vtable;
+}  // namespace
 
 static iree_hal_vulkan_native_descriptor_set_layout_t*
 iree_hal_vulkan_native_descriptor_set_layout_cast(
@@ -152,7 +154,9 @@ VkDescriptorSetLayout iree_hal_vulkan_native_descriptor_set_layout_handle(
   return descriptor_set_layout->handle;
 }
 
+namespace {
 const iree_hal_descriptor_set_layout_vtable_t
     iree_hal_vulkan_native_descriptor_set_layout_vtable = {
         /*.destroy=*/iree_hal_vulkan_native_descriptor_set_layout_destroy,
 };
+}  // namespace

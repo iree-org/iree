@@ -19,7 +19,7 @@ typedef struct iree_hal_rocm_executable_layout_t {
   iree_hal_descriptor_set_layout_t* set_layouts[];
 } iree_hal_rocm_executable_layout_t;
 
-extern const iree_hal_executable_layout_vtable_t
+static const iree_hal_executable_layout_vtable_t
     iree_hal_rocm_executable_layout_vtable;
 
 static iree_hal_rocm_executable_layout_t* iree_hal_rocm_executable_layout_cast(
@@ -91,7 +91,7 @@ iree_host_size_t iree_hal_rocm_base_binding_index(
   return base_binding;
 }
 
-const iree_hal_executable_layout_vtable_t
+static const iree_hal_executable_layout_vtable_t
     iree_hal_rocm_executable_layout_vtable = {
         .destroy = iree_hal_rocm_executable_layout_destroy,
 };

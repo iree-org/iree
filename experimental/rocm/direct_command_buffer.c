@@ -35,7 +35,7 @@ typedef struct {
 
 #define IREE_HAL_ROCM_MAX_BINDING_COUNT 64
 
-extern const iree_hal_command_buffer_vtable_t
+static const iree_hal_command_buffer_vtable_t
     iree_hal_rocm_direct_command_buffer_vtable;
 
 static iree_hal_rocm_direct_command_buffer_t*
@@ -371,7 +371,7 @@ static iree_status_t iree_hal_rocm_direct_command_buffer_dispatch_indirect(
                           "need rocm implementation");
 }
 
-const iree_hal_command_buffer_vtable_t
+static const iree_hal_command_buffer_vtable_t
     iree_hal_rocm_direct_command_buffer_vtable = {
         .destroy = iree_hal_rocm_direct_command_buffer_destroy,
         .dyn_cast = iree_hal_rocm_direct_command_buffer_dyn_cast,

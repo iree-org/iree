@@ -31,7 +31,7 @@ typedef struct {
   CUdeviceptr* device_ptrs[IREE_HAL_CUDA_MAX_KERNEL_ARG];
 } iree_hal_cuda_stream_command_buffer_t;
 
-extern const iree_hal_command_buffer_vtable_t
+static const iree_hal_command_buffer_vtable_t
     iree_hal_cuda_stream_command_buffer_vtable;
 
 static iree_hal_cuda_stream_command_buffer_t*
@@ -359,7 +359,7 @@ static iree_status_t iree_hal_cuda_stream_command_buffer_dispatch_indirect(
                           "need cuda implementation of dispatch indirect");
 }
 
-const iree_hal_command_buffer_vtable_t
+static const iree_hal_command_buffer_vtable_t
     iree_hal_cuda_stream_command_buffer_vtable = {
         .destroy = iree_hal_cuda_stream_command_buffer_destroy,
         .dyn_cast = iree_hal_cuda_stream_command_buffer_dyn_cast,

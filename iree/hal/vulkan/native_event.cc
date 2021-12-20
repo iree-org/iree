@@ -22,7 +22,9 @@ typedef struct iree_hal_vulkan_native_event_t {
   VkEvent handle;
 } iree_hal_vulkan_native_event_t;
 
+namespace {
 extern const iree_hal_event_vtable_t iree_hal_vulkan_native_event_vtable;
+}  // namespace
 
 static iree_hal_vulkan_native_event_t* iree_hal_vulkan_native_event_cast(
     iree_hal_event_t* base_value) {
@@ -94,6 +96,8 @@ VkEvent iree_hal_vulkan_native_event_handle(
   return ((const iree_hal_vulkan_native_event_t*)base_event)->handle;
 }
 
+namespace {
 const iree_hal_event_vtable_t iree_hal_vulkan_native_event_vtable = {
     /*.destroy=*/iree_hal_vulkan_native_event_destroy,
 };
+}  // namespace

@@ -43,7 +43,7 @@ typedef struct iree_hal_rocm_device_t {
 
 } iree_hal_rocm_device_t;
 
-extern const iree_hal_device_vtable_t iree_hal_rocm_device_vtable;
+static const iree_hal_device_vtable_t iree_hal_rocm_device_vtable;
 
 static iree_hal_rocm_device_t* iree_hal_rocm_device_cast(
     iree_hal_device_t* base_value) {
@@ -284,7 +284,7 @@ static iree_status_t iree_hal_rocm_device_wait_idle(
   return iree_ok_status();
 }
 
-const iree_hal_device_vtable_t iree_hal_rocm_device_vtable = {
+static const iree_hal_device_vtable_t iree_hal_rocm_device_vtable = {
     .destroy = iree_hal_rocm_device_destroy,
     .id = iree_hal_rocm_device_id,
     .host_allocator = iree_hal_rocm_device_host_allocator,
