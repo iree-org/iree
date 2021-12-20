@@ -5,7 +5,7 @@ hal.executable private @push_constant  {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer"
     hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer"
   }
-  hal.executable.variant @vulkan, target = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
+  hal.executable.variant @vulkan, target = <"vulkan-spirv", "vulkan-spirv-fb", {
       spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], []>, {}>}> {
     hal.executable.entry_point @push_constant attributes {
       interface = @io, ordinal = 0 : index,
@@ -41,7 +41,7 @@ hal.executable private @resource_bindings_in_same_func  {
     hal.interface.binding @arg1, set=1, binding=3, type="StorageBuffer"
     hal.interface.binding @ret0, set=3, binding=4, type="StorageBuffer"
   }
-  hal.executable.variant @vulkan, target = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
+  hal.executable.variant @vulkan, target = <"vulkan-spirv", "vulkan-spirv-fb", {
       spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], []>, {}>}> {
     hal.executable.entry_point @resource_bindings_in_same_func attributes {
       interface = @io, ordinal = 0 : index,
@@ -99,7 +99,7 @@ hal.executable private @resource_bindings_in_multi_entry_func  {
     hal.interface.binding @arg0, set=1, binding=2, type="StorageBuffer"
     hal.interface.binding @ret0, set=3, binding=4, type="StorageBuffer"
   }
-  hal.executable.variant @vulkan, target = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
+  hal.executable.variant @vulkan, target = <"vulkan-spirv", "vulkan-spirv-fb", {
       spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], []>, {}>}> {
     hal.executable.entry_point @resource_bindings_in_entry_func1 attributes {
       interface = @io, ordinal = 0 : index,
@@ -160,7 +160,7 @@ hal.executable private @interface_binding  {
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer"
     hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer"
   }
-  hal.executable.variant @vulkan, target = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
+  hal.executable.variant @vulkan, target = <"vulkan-spirv", "vulkan-spirv-fb", {
       spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], []>, {}>}> {
     hal.executable.entry_point @interface_binding attributes {
       interface = @io, ordinal = 0 : index,
@@ -207,7 +207,7 @@ hal.executable private @interface_wg_id  {
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer"
     hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer"
   }
-  hal.executable.variant @vulkan, target = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
+  hal.executable.variant @vulkan, target = <"vulkan-spirv", "vulkan-spirv-fb", {
       spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], []>, {}>}> {
     hal.executable.entry_point @interface_wg_id attributes {
       interface = @io, ordinal = 0 : index,
@@ -246,7 +246,7 @@ hal.executable private @interface_wg_count  {
     hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer"
     hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer"
   }
-  hal.executable.variant @vulkan, target = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
+  hal.executable.variant @vulkan, target = <"vulkan-spirv", "vulkan-spirv-fb", {
       spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], []>, {}>}> {
     hal.executable.entry_point @interface_wg_count attributes {
       interface = @io, ordinal = 0 : index,

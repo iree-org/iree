@@ -14,7 +14,7 @@
 
 #include "iree/compiler/Dialect/Flow/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
-#include "mlir/Dialect/Linalg/IR/LinalgOps.h"
+#include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
@@ -63,7 +63,10 @@ struct PadTensorOpConversion : public OpRewritePattern<linalg::PadTensorOp> {
       SmallVector<Value> mapValues;
       Value sourceDim = rewriter.createOrFold<tensor::DimOp>(loc, source, dim);
       mapValues.push_back(sourceDim);
-      sourceShape.push_back(sourceDim);
+      if (auto cstDim = sourceDim.getDefiningOp<arith::ConstantIndexOp>())
+        sourceShape.push_back(cstDim.getValue());
+      else
+        sourceShape.push_back(sourceDim);
       AffineExpr expr = rewriter.getAffineDimExpr(0);
       unsigned numSymbols = 0;
       auto addValueOrAttr = [&](AffineExpr e, OpFoldResult valueOrAttr) {
@@ -77,10 +80,10 @@ struct PadTensorOpConversion : public OpRewritePattern<linalg::PadTensorOp> {
       };
       expr = addValueOrAttr(expr, lowPad[dim]);
       expr = addValueOrAttr(expr, highPad[dim]);
-      Value v = linalg::applyMapToValues(
+      Value v = applyMapToValues(
           rewriter, loc, AffineMap::get(1, numSymbols, expr), mapValues)[0];
       if (auto cst = v.getDefiningOp<arith::ConstantOp>()) {
-        outputShape.push_back(cst.value());
+        outputShape.push_back(cst.getValue());
       } else {
         outputShape.push_back(v);
       }

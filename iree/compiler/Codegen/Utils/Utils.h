@@ -9,7 +9,7 @@
 
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "llvm/ADT/StringMap.h"
-#include "mlir/Dialect/Linalg/IR/LinalgOps.h"
+#include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/SCF/SCF.h"
 #include "mlir/IR/BuiltinOps.h"
 
@@ -31,6 +31,8 @@ llvm::StringMap<IREE::HAL::ExecutableEntryPointOp> getAllEntryPoints(
 
 /// Returns the entry point op for the `funcOp`. Returns `nullptr` on failure.
 IREE::HAL::ExecutableEntryPointOp getEntryPoint(FuncOp funcOp);
+
+bool isVMVXBackend(IREE::HAL::ExecutableVariantOp variantOp);
 
 //===----------------------------------------------------------------------===//
 // Utility functions to get untiled op shapes
@@ -124,10 +126,6 @@ LogicalResult getFilteredOps(
 
 /// Specialization of `getFilteredOps` for filtering `LinalgOp`s and
 /// `LinagExtOp`s.
-/// TODO(ravishankarm) This methods also adds the "workgroup" marker to all ops
-/// within the loop. The marker is the way to tie into rest of the
-/// codegen. Refactor the downstream passes and get rid of the markers once and
-/// for all.
 LogicalResult getComputeOps(
     FuncOp funcOp, SmallVectorImpl<Operation *> &computeOps,
     SmallVectorImpl<LoopTilingAndDistributionInfo> &tiledLoops);

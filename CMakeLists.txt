@@ -78,7 +78,6 @@ option(IREE_BUILD_PYTHON_BINDINGS "Builds the IREE python bindings" "${IREE_ENAB
 #-------------------------------------------------------------------------------
 
 option(IREE_BUILD_EXPERIMENTAL_REMOTING "Builds experimental remoting support." OFF)
-option(IREE_BUILD_EXPERIMENTAL_JAVA_BINDINGS "Builds the experimental java bindings." OFF)
 option(IREE_BUILD_EXPERIMENTAL_ROCM "Builds the experimental ROCM Backend." OFF)
 option(IREE_ENABLE_NEW_INTEGRATION_TESTS "Enables new integration tests and disables old." OFF)
 
@@ -341,7 +340,7 @@ if(Python3_FOUND AND Git_FOUND)
     RESULT_VARIABLE SHORT_HASH_RESULT
     OUTPUT_VARIABLE SHORT_HASH)
   string(REGEX REPLACE "\n$" "" SHORT_HASH "${SHORT_HASH}")
-  if(SHORT_HASH_RESULT EQUAL "0" AND NOT "${IREE_GIT_SHORT_HASH}" EQUAL "${SHORT_HASH}")
+  if(SHORT_HASH_RESULT EQUAL "0" AND NOT "${IREE_GIT_SHORT_HASH}" STREQUAL "${SHORT_HASH}")
     execute_process(
       COMMAND ${Python3_EXECUTABLE} scripts/git/check_submodule_init.py
       WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
@@ -560,10 +559,6 @@ if(${IREE_BUILD_EXPERIMENTAL_REMOTING})
     add_subdirectory(build_tools/third_party/liburing EXCLUDE_FROM_ALL)
   endif()
   add_subdirectory(experimental/remoting)
-endif()
-
-if(${IREE_BUILD_EXPERIMENTAL_JAVA_BINDINGS})
-  add_subdirectory(experimental/bindings/java)
 endif()
 
 if(${IREE_ENABLE_TENSORFLOW})

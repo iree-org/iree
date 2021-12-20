@@ -333,10 +333,29 @@ static LogicalResult verifyDispatchWorkgroupsOp(DispatchWorkgroupsOp op) {
   if (op.workgroup_count().empty()) {
     return op.emitOpError() << "at least one workgroup dimension is required";
   }
+
   if (failed(verifyOpDynamicDims(op, op.operands(), op.operand_dims())) ||
       failed(verifyOpDynamicDims(op, op.results(), op.result_dims()))) {
     return failure();
   }
+
+  auto verifyIOType = [&](Type type) -> LogicalResult {
+    if (auto shapedType = type.dyn_cast<ShapedType>()) {
+      if (shapedType.getElementType().isIndex()) {
+        return op.emitOpError() << "I/O type " << type
+                                << " is invalid: index types must not cross "
+                                   "the dispatch boundary";
+      }
+    }
+    return success();
+  };
+  for (auto type : op.getOperandTypes()) {
+    if (failed(verifyIOType(type))) return failure();
+  }
+  for (auto type : op.getResultTypes()) {
+    if (failed(verifyIOType(type))) return failure();
+  }
+
   return success();
 }
 
@@ -352,7 +371,7 @@ Operation::result_range DispatchWorkgroupsOp::getClosureResults() {
 static bool canDispatchRegionContainOp(Operation *op) {
   // Inline constant operations that are splat or small constants.
   if (auto constantOp = dyn_cast<arith::ConstantOp>(op)) {
-    auto constantValueAttr = constantOp.value();
+    auto constantValueAttr = constantOp.getValue();
     auto constantType = constantOp.getType();
     if (constantValueAttr.isa<SplatElementsAttr>()) {
       return true;

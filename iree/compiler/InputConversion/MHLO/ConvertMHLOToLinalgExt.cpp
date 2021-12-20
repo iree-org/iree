@@ -17,7 +17,7 @@
 #include "iree/compiler/InputConversion/MHLO/Rewriters.h"
 #include "mlir-hlo/Dialect/mhlo/IR/hlo_ops.h"
 #include "mlir-hlo/Dialect/mhlo/transforms/map_mhlo_to_scalar_op.h"
-#include "mlir/Dialect/Linalg/IR/LinalgOps.h"
+#include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Utils/ReshapeOpsUtils.h"
 #include "mlir/IR/BuiltinAttributes.h"
@@ -257,7 +257,7 @@ struct ScatterOpConversion : public OpConversionPattern<mhlo::ScatterOp> {
     map.emplace_back(1, indicesRank - 1);
     auto resultType = RankedTensorType::get({batchSize, shape.back()},
                                             indicesType.getElementType());
-    indices = b.create<linalg::TensorCollapseShapeOp>(resultType, indices, map);
+    indices = b.create<tensor::CollapseShapeOp>(resultType, indices, map);
 
     auto updateShape = updatesType.getShape().drop_front(shape.size() - 1);
     SmallVector<int64_t> collapsedUpdateShape = {batchSize};
@@ -269,7 +269,7 @@ struct ScatterOpConversion : public OpConversionPattern<mhlo::ScatterOp> {
     for (auto i : llvm::seq<int64_t>(indicesRank - 1, updatesType.getRank())) {
       map.emplace_back(1, i);
     }
-    updates = b.create<linalg::TensorCollapseShapeOp>(resultType, updates, map);
+    updates = b.create<tensor::CollapseShapeOp>(resultType, updates, map);
 
     return success();
   }

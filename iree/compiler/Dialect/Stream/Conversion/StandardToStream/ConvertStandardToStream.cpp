@@ -34,9 +34,8 @@ void populateStandardToStreamConversionPatterns(
 
   // Ensure all shape related ops are fully converted as we should no longer
   // have any types they are valid to be used on after this conversion.
-  conversionTarget.addIllegalOp<memref::DimOp>();
-  conversionTarget.addIllegalOp<mlir::RankOp>();
-  conversionTarget.addIllegalOp<tensor::DimOp>();
+  conversionTarget.addIllegalOp<memref::DimOp, memref::RankOp, tensor::DimOp,
+                                tensor::RankOp>();
 
   populateStandardConstantToStreamPatterns(context, conversionTarget,
                                            typeConverter, patterns);

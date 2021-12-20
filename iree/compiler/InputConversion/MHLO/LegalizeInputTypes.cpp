@@ -9,7 +9,7 @@
 #include "iree/compiler/InputConversion/MHLO/PassDetail.h"
 #include "iree/compiler/InputConversion/MHLO/Passes.h"
 #include "mlir-hlo/Dialect/mhlo/IR/hlo_ops.h"
-#include "mlir/Dialect/Linalg/IR/LinalgOps.h"
+#include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/BlockAndValueMapping.h"
 #include "mlir/IR/Builders.h"
@@ -81,8 +81,8 @@ static LogicalResult convertOperation(Operation *oldOp,
                                       BlockAndValueMapping &mapping,
                                       OpBuilder &builder) {
   if (isa<linalg::LinalgDialect>(oldOp->getDialect()) &&
-      !isa<linalg::TensorCollapseShapeOp>(oldOp) &&
-      !isa<linalg::TensorExpandShapeOp>(oldOp)) {
+      !isa<tensor::CollapseShapeOp>(oldOp) &&
+      !isa<tensor::ExpandShapeOp>(oldOp)) {
     // Currently we assume all Linalg structured ops only contain valid types.
     builder.clone(*oldOp, mapping);
     return success();

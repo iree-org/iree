@@ -19,16 +19,16 @@ func @conv_16433136(%arg0: tensor<1x16x16x4xf32>, %arg1: tensor<3x3x4x16xf32>, %
 //           CHECK-SAME: #[[MAP1]]
 //                CHECK: ^bb0(%[[IN_DATA:.+]]: f32, %[[OUT_DATA:.+]]: f32)
 //                CHECK: linalg.yield %[[IN_DATA]] : f32
-//      CHECK-DAG: %[[RESHAPED_INIT_COL_TENSOR:.+]] = linalg.tensor_collapse_shape %[[COL_TENSOR]]
+//      CHECK-DAG: %[[RESHAPED_INIT_COL_TENSOR:.+]] = tensor.collapse_shape %[[COL_TENSOR]]
 //           CHECK-SAME: [0, 1, 2], [3, 4, 5]
 //           CHECK-SAME: tensor<1x14x14x3x3x4xf32> into tensor<196x36xf32>
-//      CHECK-DAG: %[[RESHAPED_FILTER:.+]] = linalg.tensor_collapse_shape %[[FILTER]]
+//      CHECK-DAG: %[[RESHAPED_FILTER:.+]] = tensor.collapse_shape %[[FILTER]]
 //           CHECK-SAME: [0, 1, 2], [3]
 //           CHECK-SAME: tensor<3x3x4x16xf32> into tensor<36x16xf32>
-//      CHECK-DAG: %[[RESHAPED_OUTPUT:.+]] = linalg.tensor_collapse_shape %[[OUTPUT]]
+//      CHECK-DAG: %[[RESHAPED_OUTPUT:.+]] = tensor.collapse_shape %[[OUTPUT]]
 //           CHECK-SAME: [0, 1, 2], [3]
 //      CHECK: %[[MATMUL_RESULT:.+]] = linalg.matmul ins(%[[RESHAPED_INIT_COL_TENSOR]], %[[RESHAPED_FILTER]] : tensor<196x36xf32>, tensor<36x16xf32>) outs(%[[RESHAPED_OUTPUT]] : tensor<196x16xf32>)
-//      CHECK: %[[RESULT:.+]] = linalg.tensor_expand_shape %[[MATMUL_RESULT]] {{\[}}[0, 1, 2], [3]] : tensor<196x16xf32> into tensor<1x14x14x16xf32>
+//      CHECK: %[[RESULT:.+]] = tensor.expand_shape %[[MATMUL_RESULT]] {{\[}}[0, 1, 2], [3]] : tensor<196x16xf32> into tensor<1x14x14x16xf32>
 //      CHECK: return %[[RESULT]]
 
 // -----
@@ -84,14 +84,14 @@ func @depthwise_conv_hwc_114x16x3(%input: tensor<1x114x114x16xf32>, %filter: ten
 // CHECK-NEXT:      ^bb0(%{{.*}}: f32, %{{.*}}: f32):
 // CHECK-NEXT:         linalg.yield
 // CHECK-NEXT:    } -> tensor<1x16x112x112x3x3xf32>
-//      CHECK: %[[COL_TENSOR_R:.+]] = linalg.tensor_collapse_shape %[[COL_TENSOR]]
+//      CHECK: %[[COL_TENSOR_R:.+]] = tensor.collapse_shape %[[COL_TENSOR]]
 // CHECK-SAME:    tensor<1x16x112x112x3x3xf32> into tensor<16x12544x9xf32>
-//      CHECK: %[[FILTER_T_R:.+]] = linalg.tensor_collapse_shape %[[FILTER_T]]
+//      CHECK: %[[FILTER_T_R:.+]] = tensor.collapse_shape %[[FILTER_T]]
 // CHECK-SAME:    tensor<16x3x3xf32> into tensor<16x9xf32>
-//      CHECK: %[[OUTPUT_T_R:.+]] = linalg.tensor_collapse_shape %[[OUTPUT_T]]
+//      CHECK: %[[OUTPUT_T_R:.+]] = tensor.collapse_shape %[[OUTPUT_T]]
 // CHECK-SAME:    tensor<1x16x112x112xf32> into tensor<16x12544xf32>
 //      CHECK: %[[BMV_RESULT:.+]] = linalg.batch_matvec ins(%[[COL_TENSOR_R]], %[[FILTER_T_R]] : tensor<16x12544x9xf32>, tensor<16x9xf32>) outs(%[[OUTPUT_T_R]] : tensor<16x12544xf32>) -> tensor<16x12544xf32>
-//      CHECK: %[[RESULT_R:.+]] = linalg.tensor_expand_shape %[[BMV_RESULT]]
+//      CHECK: %[[RESULT_R:.+]] = tensor.expand_shape %[[BMV_RESULT]]
 // CHECK-SAME:    tensor<16x12544xf32> into tensor<1x16x112x112xf32>
 //      CHECK: %[[RESULT_INIT:.+]] = linalg.init_tensor [1, 112, 112, 16] : tensor<1x112x112x16xf32>
 //      CHECK: %[[RESULT:.+]] = linalg.generic

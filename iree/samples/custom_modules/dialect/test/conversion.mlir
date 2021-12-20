@@ -74,7 +74,7 @@ func @messageToTensorReturnDim(%arg0 : !custom.message) -> index {
 // CHECK-LABEL: @messageToTensorReturnRank
 func @messageToTensorReturnRank(%arg0 : !custom.message) -> index {
   %0 = "custom.message_to_tensor"(%arg0) : (!custom.message) -> tensor<*xf32>
-  %1 = rank %0 : tensor<*xf32>
+  %1 = tensor.rank %0 : tensor<*xf32>
   // CHECK-DAG: %[[VIEW:.+]] = vm.call @custom.message_to_buffer(%arg0) {nosideeffects} : (!vm.ref<!custom.message>) -> !vm.ref<!hal.buffer_view>
   // CHECK-DAG: %[[RANK:.+]] = vm.call @hal.buffer_view.rank(%[[VIEW]])
   // CHECK: vm.return %[[RANK]]

@@ -80,10 +80,8 @@ class AndroidLinkerTool : public LinkerTool {
     }
 
     // Extract the Android version from the `android30` like triple piece.
-    unsigned androidEnv[3];
-    targetTriple.getEnvironmentVersion(androidEnv[0], androidEnv[1],
-                                       androidEnv[2]);
-    unsigned androidVersion = androidEnv[0];  // like '30'
+    llvm::VersionTuple androidEnv = targetTriple.getEnvironmentVersion();
+    unsigned androidVersion = androidEnv.getMajor();  // like '30'
 
     // Select prebuilt toolchain based on both host and target
     // architecture/platform:

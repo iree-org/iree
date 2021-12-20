@@ -11,7 +11,7 @@
 #include "iree_tf_compiler/TF/Passes.h"
 #include "mlir-hlo/Dialect/mhlo/IR/chlo_ops.h"
 #include "mlir-hlo/Dialect/mhlo/IR/hlo_ops.h"
-#include "mlir/Dialect/Linalg/IR/LinalgOps.h"
+#include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/IR/PatternMatch.h"
 #include "tensorflow/compiler/mlir/tensorflow/ir/tf_ops.h"
 
@@ -47,7 +47,7 @@ struct ConvertExplicitSqueezePattern
           op, "could not compute reassociation indices");
     }
 
-    rewriter.replaceOpWithNewOp<linalg::TensorCollapseShapeOp>(
+    rewriter.replaceOpWithNewOp<tensor::CollapseShapeOp>(
         op, resultType, op.input(), *reassociationIndices);
     return success();
   }
@@ -99,7 +99,7 @@ struct ConvertConstExpandDimsPattern
           op, "could not compute reassociation indices");
     }
 
-    rewriter.replaceOpWithNewOp<linalg::TensorExpandShapeOp>(
+    rewriter.replaceOpWithNewOp<tensor::ExpandShapeOp>(
         op, expandedType, op.input(), *reassociationIndices);
     return success();
   }

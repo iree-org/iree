@@ -28,7 +28,7 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "mlir/Analysis/SliceAnalysis.h"
-#include "mlir/Dialect/Linalg/IR/LinalgOps.h"
+#include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
 #include "mlir/Dialect/SCF/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
@@ -110,16 +110,15 @@ static Value getTensorLoadOpForTensorStoreOp(
   return tensorLoadOp;
 }
 
-/// Gets the reverse of a
-/// `linalg.tensor_expand_shape`/`linalg.tensor_collapse_shape` op to get a
-/// memref type that can be used for in-place computation of the result of a
-/// dispatch region.
+/// Gets the reverse of a `tensor.expand_shape`/`tensor.collapse_shape` op to
+/// get a memref type that can be used for in-place computation of the result
+/// of a dispatch region.
 template <typename TensorReshapeOpTy>
 static Value getReverseOfReshapeOp(OpBuilder &b, TensorReshapeOpTy reshapeOp,
                                    Value resultBuffer) {
   using ReverseReshapeOpTy = typename std::conditional<
-      std::is_same<TensorReshapeOpTy, linalg::TensorCollapseShapeOp>::value,
-      linalg::TensorExpandShapeOp, linalg::TensorCollapseShapeOp>::type;
+      std::is_same<TensorReshapeOpTy, tensor::CollapseShapeOp>::value,
+      tensor::ExpandShapeOp, tensor::CollapseShapeOp>::type;
   return b.create<ReverseReshapeOpTy>(reshapeOp.getLoc(),
                                       reshapeOp.getSrcType(), resultBuffer,
                                       reshapeOp.reassociation());
@@ -244,7 +243,7 @@ static LogicalResult modifyResultToUseStoreBuffer(
               }
               return nullptr;
             })
-            .Case<linalg::TensorCollapseShapeOp, linalg::TensorExpandShapeOp>(
+            .Case<tensor::CollapseShapeOp, tensor::ExpandShapeOp>(
                 [&](auto reshapeOp) {
                   return getReverseOfReshapeOp(b, reshapeOp, resultBuffer);
                 })

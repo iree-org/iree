@@ -1,7 +1,7 @@
 // RUN: iree-opt -split-input-file -pass-pipeline='hal.executable(hal.executable.variant(iree-spirv-lower-executable-target-pass{test-lowering-configuration=true}))' %s | IreeFileCheck %s
 
 hal.executable @tensor_insert {
-  hal.executable.variant @vulkan_spirv_fb, target = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
+  hal.executable.variant @vulkan_spirv_fb, target = <"vulkan-spirv", "vulkan-spirv-fb", {
       spv.target_env = #spv.target_env<#spv.vce<v1.4, [Shader], []>, Unknown:IntegratedGPU, {
         max_compute_shared_memory_size = 32768 : i32,
         max_compute_workgroup_invocations = 512 : i32,
@@ -56,7 +56,7 @@ hal.executable @tensor_insert {
 // -----
 
 hal.executable @tensor_insert {
-  hal.executable.variant @vulkan_spirv_fb, target = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
+  hal.executable.variant @vulkan_spirv_fb, target = <"vulkan-spirv", "vulkan-spirv-fb", {
       spv.target_env = #spv.target_env<#spv.vce<v1.4, [Shader], []>, Unknown:IntegratedGPU, {
         max_compute_shared_memory_size = 32768 : i32,
         max_compute_workgroup_invocations = 512 : i32,
@@ -114,7 +114,7 @@ hal.executable @tensor_insert {
 // -----
 
 hal.executable @tensor_insert {
-  hal.executable.variant @vulkan_spirv_fb, target = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
+  hal.executable.variant @vulkan_spirv_fb, target = <"vulkan-spirv", "vulkan-spirv-fb", {
       spv.target_env = #spv.target_env<#spv.vce<v1.4, [Shader], []>, Unknown:IntegratedGPU, {
         max_compute_shared_memory_size = 32768 : i32,
         max_compute_workgroup_invocations = 512 : i32,
@@ -197,7 +197,7 @@ hal.executable @avg_pool {
     hal.interface.binding public @s0b0_ro_external, set=0, binding=0, type="StorageBuffer"
     hal.interface.binding public @s0b1_xw_external, set=0, binding=1, type="StorageBuffer"
   }
-  hal.executable.variant @vulkan_spirv_fb, target = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
+  hal.executable.variant @vulkan_spirv_fb, target = <"vulkan-spirv", "vulkan-spirv-fb", {
       spv.target_env = #spv.target_env<#spv.vce<v1.4, [Shader], []>, Unknown:IntegratedGPU, {
         max_compute_shared_memory_size = 32768 : i32,
         max_compute_workgroup_invocations = 512 : i32,

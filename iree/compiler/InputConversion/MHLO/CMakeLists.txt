@@ -80,8 +80,8 @@ iree_cc_library(
     MLIRTensor
     MLIRTransforms
     MhloDialect
-    MhloLhloToLinalg
     MhloPasses
+    MhloToLinalg
     MhloToStandard
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::Flow::Transforms

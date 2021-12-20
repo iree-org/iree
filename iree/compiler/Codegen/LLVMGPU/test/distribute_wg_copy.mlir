@@ -8,7 +8,7 @@
 // CHECK-DAG: #[[$MAP5:.*]] = affine_map<()[s0, s1, s2] -> (s0 * 4 + s1 * 128 + s2 * 512)>
 
 hal.executable private @shared_mem_cpy  {
-  hal.executable.variant @cuda, target = #hal.executable.target<"cuda", "cuda-nvptx-fb"> {
+  hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
     hal.executable.entry_point @shared_mem_cpy attributes {
       interface = @io,
       ordinal = 0 : index,

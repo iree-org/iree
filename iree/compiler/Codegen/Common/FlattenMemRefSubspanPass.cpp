@@ -376,7 +376,8 @@ struct LinearizeTransferReadIndices final
 
     rewriter.replaceOpWithNewOp<vector::TransferReadOp>(
         transferReadOp, transferReadOp.getVectorType(), adaptor.source(),
-        linearIndex, rewriter.getDimIdentityMap(), transferReadOp.padding(),
+        linearIndex, AffineMapAttr::get(rewriter.getDimIdentityMap()),
+        transferReadOp.padding(), /*mask=*/Value(),
         transferReadOp.in_boundsAttr());
     return success();
   }
@@ -407,7 +408,8 @@ struct LinearizeTransferWriteIndices final
 
     rewriter.replaceOpWithNewOp<vector::TransferWriteOp>(
         transferWriteOp, adaptor.vector(), adaptor.source(), linearIndex,
-        rewriter.getDimIdentityMap(), transferWriteOp.in_boundsAttr());
+        AffineMapAttr::get(rewriter.getDimIdentityMap()),
+        transferWriteOp.in_boundsAttr());
     return success();
   }
 };
@@ -544,6 +546,19 @@ struct FoldSubspanOffsetIntoLoadStore final : public OpRewritePattern<OpType> {
   }
 };
 
+/// Erase alignment hints.
+struct RemoveAssumeAlignOp
+    : public OpRewritePattern<memref::AssumeAlignmentOp> {
+ public:
+  using OpRewritePattern<memref::AssumeAlignmentOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(memref::AssumeAlignmentOp op,
+                                PatternRewriter &rewriter) const override {
+    rewriter.eraseOp(op);
+    return success();
+  }
+};
+
 //===----------------------------------------------------------------------===//
 // Pass
 //===----------------------------------------------------------------------===//
@@ -562,6 +577,12 @@ struct FlattenMemRefSubspanPass
     // ops. This requires setting up conversion targets with type converter.
 
     MLIRContext &context = getContext();
+
+    // This pass currently doesn't support alignment hints so remove them first.
+    OwningRewritePatternList patterns(&context);
+    patterns.add<RemoveAssumeAlignOp>(&context);
+    (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
+
     FlattenMemRefTypeConverter typeConverter;
     RewritePatternSet flattenPatterns(&context);
     flattenPatterns

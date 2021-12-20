@@ -3549,7 +3549,6 @@ def VM_ReturnOp : VM_Op<"return", [
 
 def VM_FailOp : VM_Op<"fail", [
     DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
-    HasParent<"IREE::VM::FuncOp">,
     Terminator,
   ]> {
   let summary = [{raises a global failure}];

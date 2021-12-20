@@ -6,12 +6,14 @@
 
 #include "iree/compiler/Codegen/Interfaces/BufferizationInterfaces.h"
 
+#include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowTypes.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "mlir/Dialect/Linalg/ComprehensiveBufferize/AffineInterfaceImpl.h"
 #include "mlir/Dialect/Linalg/ComprehensiveBufferize/ArithInterfaceImpl.h"
 #include "mlir/Dialect/Linalg/ComprehensiveBufferize/BufferizableOpInterface.h"
+#include "mlir/Dialect/Linalg/ComprehensiveBufferize/BufferizationInterfaceImpl.h"
 #include "mlir/Dialect/Linalg/ComprehensiveBufferize/ComprehensiveBufferize.h"
 #include "mlir/Dialect/Linalg/ComprehensiveBufferize/LinalgInterfaceImpl.h"
 #include "mlir/Dialect/Linalg/ComprehensiveBufferize/ModuleBufferization.h"
@@ -19,10 +21,13 @@
 #include "mlir/Dialect/Linalg/ComprehensiveBufferize/TensorInterfaceImpl.h"
 #include "mlir/Dialect/Linalg/ComprehensiveBufferize/VectorInterfaceImpl.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
+#include "mlir/Support/LLVM.h"
 
 using mlir::linalg::comprehensive_bufferize::BufferizableOpInterface;
 using mlir::linalg::comprehensive_bufferize::BufferizationAliasInfo;
 using mlir::linalg::comprehensive_bufferize::BufferizationState;
+using mlir::linalg::comprehensive_bufferize::DialectBufferizationState;
+using mlir::linalg::comprehensive_bufferize::PostAnalysisStep;
 using mlir::linalg::comprehensive_bufferize::linalg_ext::
     InitTensorEliminationStep;
 
@@ -32,6 +37,22 @@ namespace iree_compiler {
 //===----------------------------------------------------------------------===//
 // Utility functions.
 //===----------------------------------------------------------------------===//
+
+namespace {
+/// Flow dialect-specific bufferization state.
+struct FlowBufferizationState : public DialectBufferizationState {
+  DenseMap<Value, Value> subspan_to_buffer;
+
+  /// DispatchTensorStoreOps that do not require a copy.
+  DenseSet<Operation *> store_ops_without_copy;
+};
+}  // namespace
+
+static FlowBufferizationState &getFlowBufferizationState(
+    BufferizationState &state) {
+  return state.getDialectState<FlowBufferizationState>(
+      IREE::Flow::FlowDialect::getDialectNamespace());
+}
 
 template <typename TensorType>
 static MemRefType getMemrefTypeForTensor(TensorType tensorType,
@@ -43,7 +64,9 @@ static MemRefType getMemrefTypeForTensor(TensorType tensorType,
 
 static Value getSubspanBuffer(Value tensor, OpBuilder &b,
                               BufferizationState &state) {
-  if (!state.isMapped(tensor)) {
+  FlowBufferizationState &flowState = getFlowBufferizationState(state);
+
+  if (!flowState.subspan_to_buffer.count(tensor)) {
     OpBuilder::InsertionGuard g(b);
     auto subspanOp =
         tensor.getDefiningOp<IREE::HAL::InterfaceBindingSubspanOp>();
@@ -57,15 +80,14 @@ static Value getSubspanBuffer(Value tensor, OpBuilder &b,
     b.setInsertionPoint(subspanOp);
     // Just change the result type of the InterfaceBindingSubspanOp.
     auto memRefType = getMemrefTypeForTensor(shapedType);
-    auto baseBuffer = b.create<IREE::HAL::InterfaceBindingSubspanOp>(
+    Value baseBuffer = b.create<IREE::HAL::InterfaceBindingSubspanOp>(
         subspanOp->getLoc(), memRefType, subspanOp.binding(),
         subspanOp.byte_offset(), subspanOp.byte_length(),
         subspanOp.dynamic_dims(), subspanOp.alignmentAttr());
-    state.mapValue(subspanOp, baseBuffer);
-    state.aliasInfo.createAliasInfoEntry(subspanOp.result());
+    flowState.subspan_to_buffer[tensor] = baseBuffer;
   }
 
-  return state.lookupValue(tensor);
+  return flowState.subspan_to_buffer[tensor];
 }
 
 namespace {
@@ -77,12 +99,7 @@ namespace {
 struct DispatchTensorLoadOpInterface
     : public BufferizableOpInterface::ExternalModel<
           DispatchTensorLoadOpInterface, IREE::Flow::DispatchTensorLoadOp> {
-  SmallVector<OpOperand *> getAliasingOpOperand(Operation *op,
-                                                OpResult opResult) const {
-    return {};
-  }
-
-  bool isWritable(Operation *op, Value value) const {
+  bool isWritable(Operation *op, Value value, BufferizationState &state) const {
     auto loadOp = cast<IREE::Flow::DispatchTensorLoadOp>(op);
     auto shapedType =
         loadOp.source().getType().dyn_cast<IREE::Flow::DispatchTensorType>();
@@ -98,10 +115,9 @@ struct DispatchTensorLoadOpInterface
     Value source = getSubspanBuffer(loadOp.source(), b, state);
 
     // Bufferize to subview.
-    Value subView = b.create<memref::SubViewOp>(
-        loadOp->getLoc(), source, loadOp.getMixedOffsets(),
-        loadOp.getMixedSizes(), loadOp.getMixedStrides());
-    state.mapBuffer(loadOp.result(), subView);
+    state.replaceOpWithNewOp<memref::SubViewOp>(
+        b, op, source, loadOp.getMixedOffsets(), loadOp.getMixedSizes(),
+        loadOp.getMixedStrides());
 
     return success();
   }
@@ -127,18 +143,36 @@ static bool isValueEquivalentToAnInplaceTensorLoadOp(
   return foundOp;
 }
 
+struct InplaceTensorStoreOpAnalysis : public PostAnalysisStep {
+  LogicalResult run(Operation *op, BufferizationState &state,
+                    BufferizationAliasInfo &aliasInfo,
+                    SmallVector<Operation *> &newOps) override {
+    auto &flowState = getFlowBufferizationState(state);
+    op->walk([&](IREE::Flow::DispatchTensorStoreOp storeOp) {
+      // If a store op's dest is eqivalent to a load op's source, no copy is
+      // needed for the store op. All writes already happened inplace.
+      if (isValueEquivalentToAnInplaceTensorLoadOp(aliasInfo, storeOp))
+        flowState.store_ops_without_copy.insert(storeOp);
+    });
+    return success();
+  }
+};
+
 struct DispatchTensorStoreOpInterface
     : public BufferizableOpInterface::ExternalModel<
           DispatchTensorStoreOpInterface, IREE::Flow::DispatchTensorStoreOp> {
-  bool bufferizesToMemoryRead(Operation *op, OpOperand &opOperand) const {
+  bool bufferizesToMemoryRead(Operation *op, OpOperand &opOperand,
+                              BufferizationState &state) const {
     return true;
   }
 
-  bool bufferizesToMemoryWrite(Operation *op, OpOperand &opOperand) const {
+  bool bufferizesToMemoryWrite(Operation *op, OpOperand &opOperand,
+                               BufferizationState &state) const {
     return false;
   }
 
-  OpResult getAliasingOpResult(Operation *op, OpOperand &opOperand) const {
+  OpResult getAliasingOpResult(Operation *op, OpOperand &opOperand,
+                               BufferizationState &state) const {
     return OpResult();
   }
 
@@ -147,19 +181,21 @@ struct DispatchTensorStoreOpInterface
     OpBuilder::InsertionGuard g(b);
     b.setInsertionPoint(op);
     auto storeOp = cast<IREE::Flow::DispatchTensorStoreOp>(op);
+    auto &flowState = getFlowBufferizationState(state);
 
     // If everything bufferized inplace, no copy is needed. We wrote to the
     // target buffer already.
-    if (!isValueEquivalentToAnInplaceTensorLoadOp(state.aliasInfo, storeOp)) {
+    bool needCopy = !flowState.store_ops_without_copy.contains(op);
+    if (needCopy) {
       Value target = getSubspanBuffer(storeOp.target(), b, state);
       Value subView = b.create<memref::SubViewOp>(
           storeOp->getLoc(), target, storeOp.getMixedOffsets(),
           storeOp.getMixedSizes(), storeOp.getMixedStrides());
       Value srcMemref = state.lookupBuffer(storeOp.value());
-      state.allocationFns.memCpyFn(b, storeOp->getLoc(), srcMemref, subView);
+      state.createMemCpy(b, storeOp->getLoc(), srcMemref, subView);
     }
 
-    state.markOpObsolete(storeOp);
+    storeOp.erase();
     return success();
   }
 };
@@ -177,10 +213,11 @@ struct DispatchTensorStoreOpInterface
 ///   DispatchTensorStoreOp to the InitTensorOp must have bufferized in-place.
 struct StoreTensorOpAnchoredInitTensorEliminationStep
     : public InitTensorEliminationStep {
-  LogicalResult run(FuncOp funcOp, BufferizationState &state,
+  LogicalResult run(Operation *op, BufferizationState &state,
+                    BufferizationAliasInfo &aliasInfo,
                     SmallVector<Operation *> &newOps) override {
     return eliminateInitTensors(
-        funcOp, state,
+        op, state, aliasInfo,
         /*anchorMatchFunc=*/
         [&](OpOperand &operand) {
           return isa<IREE::Flow::DispatchTensorStoreOp>(operand.getOwner());
@@ -206,9 +243,13 @@ void registerBufferizationInterfaces(DialectRegistry &registry) {
       registerBufferizableOpInterfaceExternalModels(registry);
   linalg::comprehensive_bufferize::arith_ext::
       registerBufferizableOpInterfaceExternalModels(registry);
+  linalg::comprehensive_bufferize::bufferization_ext::
+      registerBufferizableOpInterfaceExternalModels(registry);
   linalg::comprehensive_bufferize::linalg_ext::
       registerBufferizableOpInterfaceExternalModels(registry);
   linalg::comprehensive_bufferize::scf_ext::
+      registerBufferizableOpInterfaceExternalModels(registry);
+  linalg::comprehensive_bufferize::std_ext::
       registerBufferizableOpInterfaceExternalModels(registry);
   linalg::comprehensive_bufferize::tensor_ext::
       registerBufferizableOpInterfaceExternalModels(registry);
@@ -225,8 +266,11 @@ void registerBufferizationInterfaces(DialectRegistry &registry) {
 void addPostAnalysisTransformations(
     linalg::comprehensive_bufferize::BufferizationOptions &options) {
   options.addPostAnalysisStep<StoreTensorOpAnchoredInitTensorEliminationStep>();
+  options.addPostAnalysisStep<InplaceTensorStoreOpAnalysis>();
   options.addPostAnalysisStep<linalg::comprehensive_bufferize::tensor_ext::
                                   InplaceInsertSliceOpAnalysis>();
+  options.addPostAnalysisStep<linalg::comprehensive_bufferize::scf_ext::
+                                  AssertDestinationPassingStyle>();
 }
 
 }  // namespace iree_compiler

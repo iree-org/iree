@@ -11,7 +11,7 @@ iree_pydm.func @elide_boxing_noop(%arg0 : !iree_pydm.object) -> (!iree_pydm.exce
 // CHECK-LABEL: @preserves_boxing
 iree_pydm.func @preserves_boxing(%arg0 : !iree_pydm.integer) -> (!iree_pydm.exception_result, !iree_pydm.object) {
   // NOTE: Canonicalizes to a specialized object.
-  // CHECK: %[[BOXED:.*]] = box %arg0 : !iree_pydm.integer -> !iree_pydm.object<!iree_pydm.integer>
+  // CHECK: %[[BOXED:.*]] = box %arg0 : !iree_pydm.integer -> <!iree_pydm.integer>
   // CHECK: %[[CASTED:.*]] = static_info_cast %[[BOXED]] : !iree_pydm.object<!iree_pydm.integer> -> !iree_pydm.object
   %0 = box %arg0 : !iree_pydm.integer -> !iree_pydm.object
   // CHECK: return %[[CASTED]]
@@ -45,8 +45,8 @@ iree_pydm.func @preserve_unboxing(%arg0 : !iree_pydm.object) -> (!iree_pydm.exce
 // Note that many ops use the generic operand unboxing facility. It is exhaustively checked
 // here and then just checked for indications on others.
 iree_pydm.func @unbox_apply_binary(%arg0 : !iree_pydm.object<!iree_pydm.integer<32>>, %arg1 : !iree_pydm.object<!iree_pydm.integer<32>>) -> (!iree_pydm.exception_result, !iree_pydm.object) {
-  // CHECK: %[[EL:.*]], %[[LHS:.*]] = unbox %arg0 : !iree_pydm.object<!iree_pydm.integer<32>> -> !iree_pydm.integer<32>
-  // CHECK: %[[ER:.*]], %[[RHS:.*]] = unbox %arg1 : !iree_pydm.object<!iree_pydm.integer<32>> -> !iree_pydm.integer<32>
+  // CHECK: %[[EL:.*]], %[[LHS:.*]] = unbox %arg0 : <!iree_pydm.integer<32>> -> !iree_pydm.integer<32>
+  // CHECK: %[[ER:.*]], %[[RHS:.*]] = unbox %arg1 : <!iree_pydm.integer<32>> -> !iree_pydm.integer<32>
   // CHECK: %[[R:.*]] = apply_binary "add", %[[LHS]], %[[RHS]] : !iree_pydm.integer<32>, !iree_pydm.integer<32> -> !iree_pydm.object
   %0 = apply_binary "add", %arg0, %arg1 : !iree_pydm.object<!iree_pydm.integer<32>>, !iree_pydm.object<!iree_pydm.integer<32>> -> !iree_pydm.object
   return %0 : !iree_pydm.object

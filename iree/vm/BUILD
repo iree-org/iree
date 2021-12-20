@@ -332,4 +332,8 @@ cc_library(
     hdrs = [
         "shims_emitc.h",
     ],
+    deps = [
+        ":impl",
+        "//iree/base:core_headers",
+    ],
 )

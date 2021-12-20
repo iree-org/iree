@@ -8,7 +8,7 @@ hal.executable @simpleMath_ex_dispatch_0 {
     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer"
     hal.interface.binding @ret0, set=0, binding=1, type="StorageBuffer"
   }
-  hal.executable.variant @rocm, target = #hal.executable.target<"rocm", "rocm-hsaco-fb"> {
+  hal.executable.variant @rocm, target = <"rocm", "rocm-hsaco-fb"> {
   hal.executable.entry_point @add_dispatch_0 attributes {interface = @io, ordinal = 0 : index, signature = (!flow.dispatch.tensor<readonly:16xf32>, !flow.dispatch.tensor<readonly:16xf32>, !flow.dispatch.tensor<writeonly:16xf32>) -> ()}
   builtin.module  {
     func @add_dispatch_0() {
@@ -51,7 +51,7 @@ hal.executable @dot_dispatch_0 {
     hal.interface.binding @ro1, set=0, binding=1, type="StorageBuffer"
     hal.interface.binding @wo2, set=0, binding=2, type="StorageBuffer"
   }
-  hal.executable.variant @rocm, target = #hal.executable.target<"rocm", "rocm-hsaco-fb"> {
+  hal.executable.variant @rocm, target = <"rocm", "rocm-hsaco-fb"> {
     hal.executable.entry_point @dot_dispatch_0 attributes {interface = @io, ordinal = 0 : index, signature = (!flow.dispatch.tensor<readonly:1024x1024xf32>, !flow.dispatch.tensor<readonly:1024x1024xf32>, !flow.dispatch.tensor<writeonly:1024x1024xf32>) -> ()}
     builtin.module  {
       func @dot_dispatch_0() {

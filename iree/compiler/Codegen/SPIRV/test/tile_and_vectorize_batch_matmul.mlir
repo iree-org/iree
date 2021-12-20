@@ -9,7 +9,7 @@ hal.executable private @fused_fill_batch_matmul {
     hal.interface.binding public @in1, set=0, binding=1, type="StorageBuffer"
     hal.interface.binding public @out0, set=0, binding=2, type="StorageBuffer"
   }
-  hal.executable.variant @vulkan, target = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb"> {
+  hal.executable.variant @vulkan, target = <"vulkan-spirv", "vulkan-spirv-fb"> {
     hal.executable.entry_point @fused_fill_batch_matmul attributes {
       interface = @io, ordinal = 0 : index,
       workgroup_size = [16: index, 1: index, 1: index],

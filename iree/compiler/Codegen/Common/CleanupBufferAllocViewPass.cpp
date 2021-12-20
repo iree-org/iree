@@ -16,7 +16,7 @@
 #include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
-#include "mlir/Dialect/Linalg/IR/LinalgOps.h"
+#include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Matchers.h"
@@ -117,10 +117,9 @@ struct CleanupBufferAllocViewPass
     : public CleanupBufferAllocViewBase<CleanupBufferAllocViewPass> {
   void runOnOperation() override {
     OwningRewritePatternList patterns(&getContext());
-    patterns.insert<
-        FoldReshapeIntoInterfaceTensorLoad<linalg::TensorCollapseShapeOp>,
-        FoldReshapeIntoInterfaceTensorLoad<linalg::TensorExpandShapeOp>,
-        RemoveDeadMemAllocs>(&getContext());
+    patterns.insert<FoldReshapeIntoInterfaceTensorLoad<tensor::CollapseShapeOp>,
+                    FoldReshapeIntoInterfaceTensorLoad<tensor::ExpandShapeOp>,
+                    RemoveDeadMemAllocs>(&getContext());
     if (failed(applyPatternsAndFoldGreedily(getOperation(),
                                             std::move(patterns)))) {
       return signalPassFailure();

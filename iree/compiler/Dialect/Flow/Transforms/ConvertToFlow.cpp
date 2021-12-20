@@ -10,7 +10,7 @@
 #include "iree/compiler/Dialect/Flow/IR/FlowTypes.h"
 #include "iree/compiler/Dialect/Flow/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
-#include "mlir/Dialect/Linalg/IR/LinalgOps.h"
+#include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/PatternMatch.h"
@@ -52,7 +52,10 @@ struct LinalgTensorReshapeToFlowTensorReshape
       return failure();
     }
     SmallVector<SmallVector<Value>> outputShape;
-    if (failed(reshapeOp.reifyResultShapes(rewriter, outputShape))) {
+    ReifyRankedShapedTypeOpInterface reifyShapedTypeInterface =
+        cast<ReifyRankedShapedTypeOpInterface>(reshapeOp.getOperation());
+    if (failed(reifyShapedTypeInterface.reifyResultShapes(rewriter,
+                                                          outputShape))) {
       return failure();
     }
     SmallVector<Value> outputDynamicShapes;
@@ -105,10 +108,10 @@ struct ConvertToFlowBeforeDispatchFormation
     context->allowUnregisteredDialects(true);
     RewritePatternSet patterns(&getContext());
 
-    patterns.insert<
-        LinalgTensorReshapeToFlowTensorReshape<linalg::TensorCollapseShapeOp>,
-        LinalgTensorReshapeToFlowTensorReshape<linalg::TensorExpandShapeOp>>(
-        context);
+    patterns
+        .insert<LinalgTensorReshapeToFlowTensorReshape<tensor::CollapseShapeOp>,
+                LinalgTensorReshapeToFlowTensorReshape<tensor::ExpandShapeOp>>(
+            context);
     populateTensorToFlowPatternsBeforeDispatchFormation(context, patterns);
     IREE::Flow::TensorReshapeOp::getCanonicalizationPatterns(patterns, context);
 
@@ -144,13 +147,11 @@ struct ConvertToFlowAfterDispatchFormation
 
 }  // namespace
 
-std::unique_ptr<OperationPass<mlir::FuncOp>>
-createConvertToFlowBeforeDispatchFormation() {
+std::unique_ptr<Pass> createConvertToFlowBeforeDispatchFormation() {
   return std::make_unique<ConvertToFlowBeforeDispatchFormation>();
 }
 
-std::unique_ptr<OperationPass<mlir::FuncOp>>
-createConvertToFlowAfterDispatchFormation() {
+std::unique_ptr<Pass> createConvertToFlowAfterDispatchFormation() {
   return std::make_unique<ConvertToFlowAfterDispatchFormation>();
 }
 

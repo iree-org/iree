@@ -193,12 +193,12 @@ struct VariablesToSSAPass : public VariablesToSSABase<VariablesToSSAPass> {
       }
 
       if (auto branchOp = llvm::dyn_cast<BranchOp>(terminator)) {
-        branchOp.destOperandsMutable().append(newLoadValues);
+        branchOp.getDestOperandsMutable().append(newLoadValues);
       } else if (auto condBranchOp = llvm::dyn_cast<CondBranchOp>(terminator)) {
-        if (condBranchOp.trueDest() == &block) {
-          condBranchOp.trueDestOperandsMutable().append(newLoadValues);
-        } else if (condBranchOp.falseDest() == &block) {
-          condBranchOp.falseDestOperandsMutable().append(newLoadValues);
+        if (condBranchOp.getTrueDest() == &block) {
+          condBranchOp.getTrueDestOperandsMutable().append(newLoadValues);
+        } else if (condBranchOp.getFalseDest() == &block) {
+          condBranchOp.getFalseDestOperandsMutable().append(newLoadValues);
         }
       }
     }

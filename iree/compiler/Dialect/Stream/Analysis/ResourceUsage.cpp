@@ -235,10 +235,10 @@ class ValueResourceUsage : public AbstractResourceUsage<DFX::ValueElement> {
     TypeSwitch<Operation *, void>(result.getOwner())
         .Case([&](mlir::SelectOp op) {
           auto trueUsage = solver.getElementFor<ValueResourceUsage>(
-              *this, Position::forValue(op.true_value()),
+              *this, Position::forValue(op.getTrueValue()),
               DFX::Resolution::REQUIRED);
           auto falseUsage = solver.getElementFor<ValueResourceUsage>(
-              *this, Position::forValue(op.false_value()),
+              *this, Position::forValue(op.getFalseValue()),
               DFX::Resolution::REQUIRED);
           getState() ^= trueUsage.getState();
           getState() ^= falseUsage.getState();
@@ -405,7 +405,7 @@ class ValueResourceUsage : public AbstractResourceUsage<DFX::ValueElement> {
     TypeSwitch<Operation *, void>(userOp)
         .Case([&](mlir::SelectOp op) {
           auto resultUsage = solver.getElementFor<ValueResourceUsage>(
-              *this, Position::forValue(op.result()),
+              *this, Position::forValue(op.getResult()),
               DFX::Resolution::REQUIRED);
           getState() ^= resultUsage.getState();
         })

@@ -8,9 +8,9 @@
 // close to a trivial full test.
 // Subsequent tests will test more local characteristics only if possible.
 iree_pydm.func @sink_static_info_cast_into_refinable(%arg0 : !iree_pydm.object<!iree_pydm.integer<32>>) -> (!iree_pydm.exception_result, !iree_pydm.list) {
-  // CHECK: %{{.*}}, %[[UNBOXED:.*]] = unbox %arg0 : !iree_pydm.object<!iree_pydm.integer<32>> -> !iree_pydm.integer<32>
+  // CHECK: %{{.*}}, %[[UNBOXED:.*]] = unbox %arg0 : <!iree_pydm.integer<32>> -> !iree_pydm.integer<32>
   // CHECK: %[[NEG:.*]] = neg %[[UNBOXED]] : !iree_pydm.integer<32> -> !iree_pydm.integer<32>
-  // CHECK: %[[BOXED:.*]] = box %[[NEG]] : !iree_pydm.integer<32> -> !iree_pydm.object<!iree_pydm.integer<32>>
+  // CHECK: %[[BOXED:.*]] = box %[[NEG]] : !iree_pydm.integer<32> -> <!iree_pydm.integer<32>>
   // CHECK: make_list %[[BOXED]]
   %0 = static_info_cast %arg0 : !iree_pydm.object<!iree_pydm.integer<32>> -> !iree_pydm.object
   %1 = neg %0 : !iree_pydm.object -> !iree_pydm.object

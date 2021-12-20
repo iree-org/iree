@@ -18,6 +18,7 @@ if(${IREE_ENABLE_EMITC})
     SRCS
       "ConvertVMToEmitC.cpp"
       "DropExcludedExports.cpp"
+      "EmitCTypeConverter.cpp"
     DEPS
       MLIREmitC
       MLIRIR

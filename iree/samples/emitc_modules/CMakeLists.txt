@@ -30,8 +30,6 @@ if(${IREE_ENABLE_EMITC})
       iree::testing::gtest_main
       iree::vm
       iree::vm::cc
-      iree::vm::ops
-      iree::vm::shims_emitc
   )
 
   iree_cc_test(
@@ -40,7 +38,6 @@ if(${IREE_ENABLE_EMITC})
     SRCS
       "import_module_test.cc"
     DEPS
-      ::add_module
       ::import_module_a
       ::import_module_b
       iree::base
@@ -49,8 +46,6 @@ if(${IREE_ENABLE_EMITC})
       iree::testing::gtest_main
       iree::vm
       iree::vm::cc
-      iree::vm::ops
-      iree::vm::shims_emitc
   )
 
   iree_c_module(

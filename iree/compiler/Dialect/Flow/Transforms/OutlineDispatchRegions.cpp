@@ -9,6 +9,7 @@
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/Flow/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
+#include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/BlockAndValueMapping.h"
@@ -122,7 +123,8 @@ static LogicalResult outlineDispatchWorkgroupsOp(
   }
 
   // Create the executable with the region cloned into it.
-  auto parentFuncOp = regionOp->getParentOfType<mlir::FuncOp>();
+  Operation *parentFuncOp =
+      regionOp->getParentWithTrait<OpTrait::FunctionLike>();
   auto executableOp =
       createExecutable(regionOp.getLoc(), namePrefix, {workgroupFuncOp},
                        parentFuncOp->getParentOfType<mlir::ModuleOp>());
@@ -149,13 +151,28 @@ class OutlineDispatchRegionsPass
 
   void runOnOperation() override {
     // Convert each dispatch region into a flow.executable + dispatch op.
-    for (auto funcOp : getOperation().getOps<mlir::FuncOp>()) {
+    int initializerCount = 0;
+    for (auto it : llvm::enumerate(getOperation().getOps())) {
+      Operation &op = it.value();
+      if (!op.hasTrait<OpTrait::FunctionLike>()) continue;
+
+      // Generate a nice name if possible.
+      std::string opName;
+      if (auto funcOp = llvm::dyn_cast<mlir::FuncOp>(op)) {
+        opName = funcOp.getName().str();
+      } else if (llvm::isa<IREE::Util::InitializerOp>(op)) {
+        opName =
+            std::string("_initializer_") + std::to_string(initializerCount++);
+      } else {
+        opName = std::string("_function_like_") + std::to_string(it.index());
+      }
+
+      auto &bodyRegion = function_like_impl::getFunctionBody(&op);
       // Outline all of the dispatch regions ops in this function.
       auto dispatchWorkgroupsOps =
-          llvm::to_vector<8>(funcOp.getOps<DispatchWorkgroupsOp>());
+          llvm::to_vector<8>(bodyRegion.getOps<DispatchWorkgroupsOp>());
       for (int i = 0; i < dispatchWorkgroupsOps.size(); ++i) {
-        std::string namePrefix =
-            funcOp.getName().str() + "_dispatch_" + std::to_string(i);
+        std::string namePrefix = (opName + "_dispatch_" + llvm::Twine(i)).str();
         if (failed(outlineDispatchWorkgroupsOp(namePrefix,
                                                dispatchWorkgroupsOps[i]))) {
           return signalPassFailure();

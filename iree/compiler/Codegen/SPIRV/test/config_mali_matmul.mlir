@@ -8,7 +8,7 @@ hal.executable @matmul_1024x2048x512 {
     hal.interface.binding @s0b1_ro_external, set=0, binding=1, type="StorageBuffer"
     hal.interface.binding @s0b2_xw_external, set=0, binding=2, type="StorageBuffer"
   }
-  hal.executable.variant @vulkan_spirv_fb, target = #hal.executable.target<"vulkan", "vulkan-spirv-fb", {
+  hal.executable.variant @vulkan_spirv_fb, target = <"vulkan", "vulkan-spirv-fb", {
       spv.target_env = #spv.target_env<#spv.vce<v1.4, [Shader], []>, ARM:IntegratedGPU, {
         max_compute_shared_memory_size = 32768 : i32,
         max_compute_workgroup_invocations = 512 : i32,
@@ -89,7 +89,7 @@ hal.executable @matmul_3136x24x96 {
     hal.interface.binding @s0b1_ro_external, set=0, binding=1, type="StorageBuffer"
     hal.interface.binding @s0b2_xw_external, set=0, binding=2, type="StorageBuffer"
   }
-  hal.executable.variant @vulkan_spirv_fb, target = #hal.executable.target<"vulkan", "vulkan-spirv-fb", {
+  hal.executable.variant @vulkan_spirv_fb, target = <"vulkan", "vulkan-spirv-fb", {
       spv.target_env = #spv.target_env<#spv.vce<v1.4, [Shader], []>, ARM:IntegratedGPU, {
         max_compute_shared_memory_size = 32768 : i32,
         max_compute_workgroup_invocations = 512 : i32,
@@ -170,7 +170,7 @@ hal.executable @matmul_196x64x192 {
     hal.interface.binding @s0b1_ro_external, set=0, binding=1, type="StorageBuffer"
     hal.interface.binding @s0b2_xw_external, set=0, binding=2, type="StorageBuffer"
   }
-  hal.executable.variant @vulkan_spirv_fb, target = #hal.executable.target<"vulkan", "vulkan-spirv-fb", {
+  hal.executable.variant @vulkan_spirv_fb, target = <"vulkan", "vulkan-spirv-fb", {
       spv.target_env = #spv.target_env<#spv.vce<v1.4, [Shader], []>, ARM:IntegratedGPU, {
         max_compute_shared_memory_size = 32768 : i32,
         max_compute_workgroup_invocations = 512 : i32,
@@ -251,7 +251,7 @@ hal.executable @matmul_12544x96x16 {
     hal.interface.binding @s0b1_ro_external, set=0, binding=1, type="StorageBuffer"
     hal.interface.binding @s0b2_xw_external, set=0, binding=2, type="StorageBuffer"
   }
-  hal.executable.variant @vulkan_spirv_fb, target = #hal.executable.target<"vulkan", "vulkan-spirv-fb", {
+  hal.executable.variant @vulkan_spirv_fb, target = <"vulkan", "vulkan-spirv-fb", {
       spv.target_env = #spv.target_env<#spv.vce<v1.4, [Shader], []>, ARM:IntegratedGPU, {
         max_compute_shared_memory_size = 32768 : i32,
         max_compute_workgroup_invocations = 512 : i32,
@@ -327,7 +327,7 @@ hal.executable @matmul_49x160x576 {
     hal.interface.binding @s0b1_ro_external, set=0, binding=1, type="StorageBuffer"
     hal.interface.binding @s0b2_xw_external, set=0, binding=2, type="StorageBuffer"
   }
-  hal.executable.variant @vulkan_spirv_fb, target = #hal.executable.target<"vulkan", "vulkan-spirv-fb", {
+  hal.executable.variant @vulkan_spirv_fb, target = <"vulkan", "vulkan-spirv-fb", {
       spv.target_env = #spv.target_env<#spv.vce<v1.4, [Shader], []>, ARM:IntegratedGPU, {
         max_compute_shared_memory_size = 32768 : i32,
         max_compute_workgroup_invocations = 512 : i32,
@@ -406,7 +406,7 @@ hal.executable @batch_matmul_4x384x384 {
     hal.interface.binding @s0b1_ro_external, set=0, binding=1, type="StorageBuffer"
     hal.interface.binding @s0b2_xw_external, set=0, binding=2, type="StorageBuffer"
   }
-  hal.executable.variant @vulkan_spirv_fb, target = #hal.executable.target<"vulkan", "vulkan-spirv-fb", {
+  hal.executable.variant @vulkan_spirv_fb, target = <"vulkan", "vulkan-spirv-fb", {
       spv.target_env = #spv.target_env<#spv.vce<v1.4, [Shader], []>, ARM:IntegratedGPU, {
         max_compute_shared_memory_size = 32768 : i32,
         max_compute_workgroup_invocations = 512 : i32,
@@ -497,7 +497,7 @@ hal.executable @batch_matmul_4x2x8 {
     hal.interface.binding @s0b1_ro_external, set=0, binding=1, type="StorageBuffer"
     hal.interface.binding @s0b2_xw_external, set=0, binding=2, type="StorageBuffer"
   }
-  hal.executable.variant @vulkan_spirv_fb, target = #hal.executable.target<"vulkan", "vulkan-spirv-fb", {
+  hal.executable.variant @vulkan_spirv_fb, target = <"vulkan", "vulkan-spirv-fb", {
       spv.target_env = #spv.target_env<#spv.vce<v1.4, [Shader], []>, ARM:IntegratedGPU, {
         max_compute_shared_memory_size = 32768 : i32,
         max_compute_workgroup_invocations = 512 : i32,

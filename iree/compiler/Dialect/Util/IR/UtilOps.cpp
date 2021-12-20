@@ -6,7 +6,6 @@
 
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 
-#include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/SMLoc.h"
@@ -769,6 +768,8 @@ IREE::Util::GlobalOp GlobalAddressOp::getGlobalOp() {
       getOperation()->getParentOp(), globalAttr());
 }
 
+FlatSymbolRefAttr GlobalAddressOp::getGlobalRefAttr() { return globalAttr(); }
+
 void GlobalAddressOp::getAsmResultNames(
     function_ref<void(Value, StringRef)> setNameFn) {
   setNameFn(result(), Twine("ptr_" + global()).str());
@@ -793,6 +794,8 @@ IREE::Util::GlobalOp GlobalLoadOp::getGlobalOp() {
   return SymbolTable::lookupNearestSymbolFrom<IREE::Util::GlobalOp>(
       getOperation()->getParentOp(), globalAttr());
 }
+
+FlatSymbolRefAttr GlobalLoadOp::getGlobalRefAttr() { return globalAttr(); }
 
 bool GlobalLoadOp::isGlobalImmutable() { return !getGlobalOp().is_mutable(); }
 
@@ -842,6 +845,8 @@ IREE::Util::GlobalOp GlobalStoreOp::getGlobalOp() {
   return SymbolTable::lookupNearestSymbolFrom<IREE::Util::GlobalOp>(
       getOperation()->getParentOp(), globalAttr());
 }
+
+FlatSymbolRefAttr GlobalStoreOp::getGlobalRefAttr() { return globalAttr(); }
 
 static LogicalResult verifyGlobalStoreOp(GlobalStoreOp op) {
   auto globalOp = op.getGlobalOp();

@@ -55,5 +55,6 @@ cc_library(
         "//iree/compiler/Codegen/LLVMCPU",
         "//iree/compiler/Codegen/LLVMGPU",
         "//iree/compiler/Codegen/SPIRV",
+        "//iree/compiler/Codegen/Sandbox",
     ],
 )

@@ -519,8 +519,10 @@ typedef struct iree_hal_vulkan_emulated_semaphore_t {
   EmulatedTimelineSemaphore* handle;
 } iree_hal_vulkan_emulated_semaphore_t;
 
+namespace {
 extern const iree_hal_semaphore_vtable_t
     iree_hal_vulkan_emulated_semaphore_vtable;
+}  // namespace
 
 static EmulatedTimelineSemaphore* iree_hal_vulkan_emulated_semaphore_cast(
     iree_hal_semaphore_t* base_value) {
@@ -635,6 +637,7 @@ iree_status_t iree_hal_vulkan_emulated_semaphore_multi_wait(
   return iree_ok_status();
 }
 
+namespace {
 const iree_hal_semaphore_vtable_t iree_hal_vulkan_emulated_semaphore_vtable = {
     /*.destroy=*/iree_hal_vulkan_emulated_semaphore_destroy,
     /*.query=*/iree_hal_vulkan_emulated_semaphore_query,
@@ -643,3 +646,4 @@ const iree_hal_semaphore_vtable_t iree_hal_vulkan_emulated_semaphore_vtable = {
     /*.wait=*/
     iree_hal_vulkan_emulated_semaphore_wait,
 };
+}  // namespace

@@ -22,15 +22,18 @@ iree_cc_library(
     "DropCompilerHints.cpp"
     "FoldGlobals.cpp"
     "FuseGlobals.cpp"
+    "HoistIntoGlobals.cpp"
     "Patterns.cpp"
     "SimplifyGlobalAccesses.cpp"
   DEPS
     LLVMSupport
+    MLIRAnalysis
     MLIRIR
     MLIRPass
     MLIRStandard
     MLIRSupport
     MLIRTransforms
+    iree::compiler::Dialect::Util::Analysis::Constant
     iree::compiler::Dialect::Util::IR
   PUBLIC
 )

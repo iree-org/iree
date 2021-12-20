@@ -1,4 +1,6 @@
 # RUN: %PYTHON %s | iree-dialects-opt -split-input-file | FileCheck --enable-var-scope --dump-input-filter=all %s
+# TODO(#7879): Enable the test
+# XFAIL: *
 
 from typing import List
 from iree.compiler.dialects.iree_pydm.importer import *
@@ -69,7 +71,7 @@ def macro_box_arg(stage: ImportStage, arg: ir.Value) -> ir.Value:
 
 # CHECK-LABEL: @test_intrinsic_macro_no_args
 # CHECK: %[[ONE:.*]] = constant 1
-# CHECK: box %[[ONE]] : !iree_pydm.integer -> !iree_pydm.object<!iree_pydm.integer>
+# CHECK: box %[[ONE]] : !iree_pydm.integer -> <!iree_pydm.integer>
 @test_import_global
 def test_intrinsic_macro_no_args() -> int:
   return macro_box_arg(1)

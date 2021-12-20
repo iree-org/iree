@@ -11,7 +11,7 @@
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
-#include "mlir/Dialect/Linalg/IR/LinalgOps.h"
+#include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/SCF.h"
@@ -51,7 +51,7 @@ static LogicalResult lowerToLoopsImpl(OpBuilder &builder,
 /// Main entry point for lowering `TiledOpInterface` op to loops.
 static LogicalResult lowerToLoops(OpBuilder &builder,
                                   TiledOpInterface tilableOp) {
-  SmallVector<Range> loopBounds = tilableOp.getLoopBounds(builder);
+  SmallVector<Range> loopBounds = tilableOp.getIterationDomain(builder);
   SmallVector<Value> ivs;
   return lowerToLoopsImpl(builder, tilableOp, loopBounds, 0, ivs);
 }

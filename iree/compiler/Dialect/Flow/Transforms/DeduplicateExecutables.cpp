@@ -225,8 +225,9 @@ bool areExecutablesEquivalent(ExecutableOp lhs, ExecutableOp rhs) {
 void replaceEntryPointUses(
     mlir::ModuleOp moduleOp,
     const DenseMap<Attribute, SymbolRefAttr> &replacements) {
-  for (auto funcOp : moduleOp.getOps<mlir::FuncOp>()) {
-    funcOp.walk([&](DispatchOp dispatchOp) {
+  for (Operation &funcLikeOp : moduleOp.getOps()) {
+    if (!funcLikeOp.hasTrait<OpTrait::FunctionLike>()) continue;
+    funcLikeOp.walk([&](DispatchOp dispatchOp) {
       auto it = replacements.find(dispatchOp.entry_point());
       if (it != replacements.end()) {
         dispatchOp.entry_pointAttr(it->second.cast<SymbolRefAttr>());
