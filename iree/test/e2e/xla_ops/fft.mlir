@@ -1,5 +1,6 @@
 // TODO(hanchung): Add other types of fft tests, e.g. fft, ifft, irfft.
 
+// TODO(#7918): Running this function by itself passes. Running this with the other function in this file fails.
 // func @rfft_1d() {
 //   %input = util.unfoldable_constant dense<[
 //     9.0, 1.0, 4.5, -0.3, 10.0, -1.0, 5.5, 0.3, 299.0, 3.5, -0.777, 2.0, 1.7,
