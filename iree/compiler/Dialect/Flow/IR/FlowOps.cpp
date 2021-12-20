@@ -27,12 +27,6 @@
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/RegionUtils.h"
 
-static llvm::cl::opt<int> clInlineConstantByteLength(
-    "iree-flow-inline-constants-max-byte-length",
-    llvm::cl::desc("Maximum byte-length of constant that can be inlined into a "
-                   "dispatch region"),
-    llvm::cl::init(256));
-
 namespace mlir {
 namespace iree_compiler {
 namespace IREE {
@@ -371,21 +365,8 @@ Operation::result_range DispatchWorkgroupsOp::getClosureResults() {
 static bool canDispatchRegionContainOp(Operation *op) {
   // Inline constant operations that are splat or small constants.
   if (auto constantOp = dyn_cast<arith::ConstantOp>(op)) {
-    auto constantValueAttr = constantOp.getValue();
     auto constantType = constantOp.getType();
-    if (constantValueAttr.isa<SplatElementsAttr>()) {
-      return true;
-    } else if (auto denseAttr =
-                   constantValueAttr.dyn_cast<DenseElementsAttr>()) {
-      // TODO(#4897): Non-splat constants seems to have an issue on the LLVM
-      // side. Uncomment after that is fixed.
-      auto shapedType = constantOp.getType().cast<ShapedType>();
-      uint64_t estimatedByteLength =
-          (shapedType.getNumElements() * shapedType.getElementTypeBitWidth()) /
-          8;
-      return denseAttr.isSplat() ||
-             estimatedByteLength <= clInlineConstantByteLength;
-    } else if (constantType.isIntOrIndexOrFloat()) {
+    if (constantType.isIntOrIndexOrFloat()) {
       return true;
     }
   }

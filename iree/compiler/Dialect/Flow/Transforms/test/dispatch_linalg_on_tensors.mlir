@@ -1163,3 +1163,22 @@ func @pad_tensor(%arg0 : tensor<?x?xf32>, %arg1 : index, %arg2 : index,
 //      CHECK:     scf.for
 //      CHECK:       flow.dispatch.tensor.load %[[ARG6]]
 //      CHECK:       flow.dispatch.tensor.store %{{.+}}, %[[ARG12]]
+
+// -----
+
+func @inline_cst(%arg0 : tensor<4x32xi32>) -> tensor<32xi32> {
+  %cst = arith.constant dense<0> : tensor<32xi32>
+  %0 = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d1)>],
+      iterator_types = ["reduction", "parallel"]}
+      ins(%arg0 : tensor<4x32xi32>) outs(%cst : tensor<32xi32>) {
+      ^bb0(%arg1 : i32, %arg2 : i32) :
+        %1 = arith.addi %arg1, %arg2 : i32
+        linalg.yield %1 : i32
+      } -> tensor<32xi32>
+  return %0 : tensor<32xi32>
+}
+//      CHECK: func @inline_cst(%[[ARG0:.+]]: tensor<4x32xi32>)
+//      CHECK:   flow.dispatch.workgroups
+// CHECK-SAME:     (%[[ARG0]])
+//      CHECK:     %[[CST:.+]] = arith.constant dense<0> : tensor<32xi32>
