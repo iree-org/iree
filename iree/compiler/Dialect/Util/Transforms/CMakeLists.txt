@@ -34,7 +34,10 @@ iree_cc_library(
     MLIRStandard
     MLIRSupport
     MLIRTransforms
+    iree::compiler::Dialect::Util::Analysis
+    iree::compiler::Dialect::Util::Analysis::Attributes
     iree::compiler::Dialect::Util::Analysis::Constant
+    iree::compiler::Dialect::Util::Analysis::DFX
     iree::compiler::Dialect::Util::IR
   PUBLIC
 )

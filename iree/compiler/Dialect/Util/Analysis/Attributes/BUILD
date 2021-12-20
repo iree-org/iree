@@ -21,6 +21,7 @@ cc_library(
         "Range.h",
     ],
     deps = [
+        "//iree/compiler/Dialect/Util/Analysis/DFX",
         "//iree/compiler/Dialect/Util/IR",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:Analysis",

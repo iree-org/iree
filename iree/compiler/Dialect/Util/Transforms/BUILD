@@ -28,7 +28,10 @@ cc_library(
         "Patterns.h",
     ],
     deps = [
+        "//iree/compiler/Dialect/Util/Analysis",
+        "//iree/compiler/Dialect/Util/Analysis/Attributes",
         "//iree/compiler/Dialect/Util/Analysis/Constant",
+        "//iree/compiler/Dialect/Util/Analysis/DFX",
         "//iree/compiler/Dialect/Util/IR",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:Analysis",

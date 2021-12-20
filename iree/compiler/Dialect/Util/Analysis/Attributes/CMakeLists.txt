@@ -26,6 +26,7 @@ iree_cc_library(
     MLIRLinalg
     MLIRPass
     MLIRSupport
+    iree::compiler::Dialect::Util::Analysis::DFX
     iree::compiler::Dialect::Util::IR
   PUBLIC
 )
