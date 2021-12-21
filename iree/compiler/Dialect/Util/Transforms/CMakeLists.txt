@@ -20,6 +20,7 @@ iree_cc_library(
     "ApplyPatterns.cpp"
     "CombineInitializers.cpp"
     "DropCompilerHints.cpp"
+    "FixedPointIterator.cpp"
     "FoldGlobals.cpp"
     "FuseGlobals.cpp"
     "HoistIntoGlobals.cpp"

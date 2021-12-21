@@ -56,12 +56,23 @@ struct InputDialectOptions {
   Type type = Type::none;
 };
 
+// Options controlling high level optimizations.
+struct HighLevelOptimizationOptions {
+  // Enables const-expr hoisting into globals.
+  bool constExprHoisting = false;
+
+  // Enables recursive evaluation of immutable globals using the compiler
+  // and runtime.
+  bool constEval = false;
+};
+
 // Builds the translation pipeline with defaults.
 void buildDefaultIREEVMTransformPassPipeline(OpPassManager &passManager);
 
 // Builds the translation pipeline with explicit options.
 void buildIREEVMTransformPassPipeline(
     BindingOptions bindingOptions, InputDialectOptions inputOptions,
+    HighLevelOptimizationOptions highLevelOptimizationOptions,
     IREE::HAL::TargetOptions executableOptions,
     IREE::VM::TargetOptions targetOptions, OpPassManager &passManager);
 
