@@ -119,10 +119,10 @@ def ConvertToLLVM :
   let constructor = "mlir::iree_compiler::createConvertToLLVMPass()";
 }
 
-def LLVMCPUCheckIR :
-    Pass<"iree-llvmcpu-check-ir", "ModuleOp"> {
+def LLVMCPUCheckIRBeforeLLVMConversion :
+    Pass<"iree-llvmcpu-check-ir-before-llvm-conversion", "ModuleOp"> {
   let summary = "Checks CPU backend specific IR constraints (like no allocas)";
-  let constructor = "mlir::iree_compiler::createLLVMCPUCheckIRPass()";
+  let constructor = "mlir::iree_compiler::createLLVMCPUCheckIRBeforeLLVMConversionPass()";
 }
 
 def LLVMCPULowerExecutableTarget :

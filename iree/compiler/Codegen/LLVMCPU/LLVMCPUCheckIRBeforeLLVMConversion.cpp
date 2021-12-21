@@ -12,12 +12,14 @@ namespace mlir {
 namespace iree_compiler {
 
 namespace {
-struct LLVMCPUCheckIRPass : LLVMCPUCheckIRBase<LLVMCPUCheckIRPass> {
+struct LLVMCPUCheckIRBeforeLLVMConversionPass
+    : LLVMCPUCheckIRBeforeLLVMConversionBase<
+          LLVMCPUCheckIRBeforeLLVMConversionPass> {
   void runOnOperation() override;
 };
 }  // namespace
 
-void LLVMCPUCheckIRPass::runOnOperation() {
+void LLVMCPUCheckIRBeforeLLVMConversionPass::runOnOperation() {
   auto moduleOp = getOperation();
   // For now only check that there are no stack allocations.
   auto walkResult = moduleOp.walk([](memref::AllocaOp allocaOp) -> WalkResult {
@@ -28,8 +30,9 @@ void LLVMCPUCheckIRPass::runOnOperation() {
   }
 }
 
-std::unique_ptr<OperationPass<ModuleOp>> createLLVMCPUCheckIRPass() {
-  return std::make_unique<LLVMCPUCheckIRPass>();
+std::unique_ptr<OperationPass<ModuleOp>>
+createLLVMCPUCheckIRBeforeLLVMConversionPass() {
+  return std::make_unique<LLVMCPUCheckIRBeforeLLVMConversionPass>();
 }
 
 }  // namespace iree_compiler

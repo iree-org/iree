@@ -24,9 +24,10 @@ namespace iree_compiler {
 
 /// Command line options used purely for development purposes. Not to be relied
 /// on in any way.
-static llvm::cl::opt<bool> clCheckIR(
-    "iree-codegen-llvm-check-ir",
-    llvm::cl::desc("Runs the pass to check the IR generated from LLVMCPU"),
+static llvm::cl::opt<bool> clCheckIRBeforeLLVMConversion(
+    "iree-codegen-check-ir-before-llvm-conversion",
+    llvm::cl::desc("Runs the pass to check the IR generated from LLVMCPU "
+                   "before conversion to LLVM IR"),
     llvm::cl::init(true));
 
 //===---------------------------------------------------------------------===//
@@ -226,8 +227,8 @@ static void addLowerToLLVMPasses(OpPassManager &passManager) {
   passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
   passManager.addNestedPass<FuncOp>(createCSEPass());
 
-  if (clCheckIR) {
-    passManager.addPass(createLLVMCPUCheckIRPass());
+  if (clCheckIRBeforeLLVMConversion) {
+    passManager.addPass(createLLVMCPUCheckIRBeforeLLVMConversionPass());
   }
   // Handled tensor-type constants.
   passManager.addPass(createTensorConstantBufferizePass());
