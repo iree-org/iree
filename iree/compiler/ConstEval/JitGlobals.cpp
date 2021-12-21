@@ -25,6 +25,9 @@
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/SymbolTable.h"
 
+#define DEBUG_TYPE "iree-const-eval"
+using llvm::dbgs;
+
 namespace mlir {
 namespace iree_compiler {
 namespace ConstEval {
@@ -181,7 +184,16 @@ struct JitGlobalsPass : public JitGlobalsBase<JitGlobalsPass> {
       }
     }
 
+    // Early exit without compiling if no entry-points (this is not just an
+    // optimization: the low level compiler will fail on an empty module).
+    if (uninitializedGlobals.empty()) {
+      LLVM_DEBUG(dbgs() << "Not JIT'ing globals: no undefined globals found\n");
+      return;
+    }
+
     // Run the IREE compiler, transforming the inner module into a vm.module.
+    LLVM_DEBUG(dbgs() << "JIT'ing " << uninitializedGlobals.size()
+                      << " uninitialized globals\n");
     if (failed(runPipeline(compilePipeline, innerModule))) {
       return signalPassFailure();
     }

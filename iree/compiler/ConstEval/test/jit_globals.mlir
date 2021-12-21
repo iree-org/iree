@@ -2,6 +2,15 @@
 
 // TODO: Full type matrix for tests.
 
+module @no_uninitialized {
+  util.global private @hoisted : tensor<5x6xf32> = dense<4.0> : tensor<5x6xf32>
+  func @main() -> tensor<5x6xf32> {
+    %hoisted = util.global.load @hoisted : tensor<5x6xf32>
+    return %hoisted : tensor<5x6xf32>
+  }
+}
+
+// -----
 // CHECK-LABEL: @linalg_tensor_jit
 // CHECK: util.global private @{{.*}} = dense<4.000000e+04> : tensor<5x6xf32>
 #map0 = affine_map<(d0, d1) -> ()>
