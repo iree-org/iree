@@ -4,6 +4,8 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+load("//iree:build_defs.oss.bzl", "iree_cmake_extra_content")
+
 package(
     default_visibility = ["//visibility:public"],
     features = ["layering_check"],
@@ -48,6 +50,13 @@ cc_library(
     ],
 )
 
+iree_cmake_extra_content(
+    content = """
+if(${IREE_HAL_DRIVER_VMVX})
+""",
+    inline = True,
+)
+
 cc_test(
     name = "vm_util_test",
     srcs = ["vm_util_test.cc"],
@@ -62,6 +71,13 @@ cc_test(
         "//iree/vm",
         "//iree/vm:cc",
     ],
+)
+
+iree_cmake_extra_content(
+    content = """
+endif()
+""",
+    inline = True,
 )
 
 cc_library(
