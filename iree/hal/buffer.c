@@ -76,29 +76,24 @@ IREE_API_EXPORT iree_string_view_t iree_hal_buffer_usage_format(
 
 static const iree_hal_buffer_vtable_t iree_hal_subspan_buffer_vtable;
 
-static iree_status_t iree_hal_subspan_buffer_create(
+IREE_API_EXPORT iree_status_t iree_hal_subspan_buffer_create(
     iree_hal_buffer_t* allocated_buffer, iree_device_size_t byte_offset,
-    iree_device_size_t byte_length, iree_hal_buffer_t** out_buffer) {
+    iree_device_size_t byte_length, iree_hal_allocator_t* device_allocator,
+    iree_allocator_t host_allocator, iree_hal_buffer_t** out_buffer) {
   IREE_ASSERT_ARGUMENT(allocated_buffer);
   IREE_ASSERT_ARGUMENT(out_buffer);
   IREE_TRACE_ZONE_BEGIN(z0);
 
   iree_hal_buffer_t* buffer = NULL;
-  iree_status_t status = iree_allocator_malloc(
-      iree_hal_allocator_host_allocator(allocated_buffer->allocator),
-      sizeof(*buffer), (void**)&buffer);
+  iree_status_t status =
+      iree_allocator_malloc(host_allocator, sizeof(*buffer), (void**)&buffer);
   if (iree_status_is_ok(status)) {
-    iree_hal_resource_initialize(&iree_hal_subspan_buffer_vtable,
-                                 &buffer->resource);
-    buffer->allocator = allocated_buffer->allocator;
-    buffer->allocated_buffer = allocated_buffer;
-    iree_hal_buffer_retain(buffer->allocated_buffer);
-    buffer->allocation_size = allocated_buffer->allocation_size;
-    buffer->byte_offset = byte_offset;
-    buffer->byte_length = byte_length;
-    buffer->memory_type = allocated_buffer->memory_type;
-    buffer->allowed_access = allocated_buffer->allowed_access;
-    buffer->allowed_usage = allocated_buffer->allowed_usage;
+    iree_hal_buffer_initialize(
+        host_allocator, device_allocator, allocated_buffer,
+        allocated_buffer->allocation_size, byte_offset, byte_length,
+        allocated_buffer->memory_type, allocated_buffer->allowed_access,
+        allocated_buffer->allowed_usage, &iree_hal_subspan_buffer_vtable,
+        buffer);
     *out_buffer = buffer;
   }
 
@@ -107,8 +102,7 @@ static iree_status_t iree_hal_subspan_buffer_create(
 }
 
 static void iree_hal_subspan_buffer_destroy(iree_hal_buffer_t* base_buffer) {
-  iree_allocator_t host_allocator =
-      iree_hal_allocator_host_allocator(iree_hal_buffer_allocator(base_buffer));
+  iree_allocator_t host_allocator = base_buffer->host_allocator;
   IREE_TRACE_ZONE_BEGIN(z0);
 
   iree_hal_buffer_release(base_buffer->allocated_buffer);
@@ -161,7 +155,58 @@ static const iree_hal_buffer_vtable_t iree_hal_subspan_buffer_vtable = {
 // iree_hal_buffer_t
 //===----------------------------------------------------------------------===//
 
-IREE_HAL_API_RETAIN_RELEASE(buffer);
+IREE_API_EXPORT void iree_hal_buffer_initialize(
+    iree_allocator_t host_allocator, iree_hal_allocator_t* device_allocator,
+    iree_hal_buffer_t* allocated_buffer, iree_device_size_t allocation_size,
+    iree_device_size_t byte_offset, iree_device_size_t byte_length,
+    iree_hal_memory_type_t memory_type, iree_hal_memory_access_t allowed_access,
+    iree_hal_buffer_usage_t allowed_usage,
+    const iree_hal_buffer_vtable_t* vtable, iree_hal_buffer_t* buffer) {
+  iree_hal_resource_initialize(vtable, &buffer->resource);
+  buffer->host_allocator = host_allocator;
+  buffer->device_allocator = device_allocator;
+  buffer->allocated_buffer = allocated_buffer;
+  buffer->allocation_size = allocation_size;
+  buffer->byte_offset = byte_offset;
+  buffer->byte_length = byte_length;
+  buffer->memory_type = memory_type;
+  buffer->allowed_access = allowed_access;
+  buffer->allowed_usage = allowed_usage;
+
+  // Retain the base allocated buffer if it's unique from the buffer we are
+  // initializing.
+  if (allocated_buffer != buffer) {
+    iree_hal_buffer_retain(buffer->allocated_buffer);
+  }
+}
+
+IREE_API_EXPORT void iree_hal_buffer_destroy(iree_hal_buffer_t* buffer) {
+  if (IREE_LIKELY(buffer)) {
+    IREE_HAL_VTABLE_DISPATCH(buffer, iree_hal_buffer, destroy)
+    (buffer);
+  }
+}
+
+IREE_API_EXPORT void iree_hal_buffer_retain(iree_hal_buffer_t* buffer) {
+  if (IREE_LIKELY(buffer)) {
+    iree_atomic_ref_count_inc(&((iree_hal_resource_t*)(buffer))->ref_count);
+  }
+}
+
+IREE_API_EXPORT void iree_hal_buffer_release(iree_hal_buffer_t* buffer) {
+  if (IREE_LIKELY(buffer) &&
+      iree_atomic_ref_count_dec(&((iree_hal_resource_t*)(buffer))->ref_count) ==
+          1) {
+    // If the buffer comes from an allocator then we route back the destruction
+    // request to that. It may decide to keep the buffer alive in a pool or
+    // do some allocator-specific cleanup.
+    if (buffer->device_allocator) {
+      iree_hal_allocator_deallocate_buffer(buffer->device_allocator, buffer);
+    } else {
+      iree_hal_buffer_destroy(buffer);
+    }
+  }
+}
 
 IREE_API_EXPORT iree_status_t iree_hal_buffer_validate_memory_type(
     iree_hal_memory_type_t actual_memory_type,
@@ -387,13 +432,8 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_subspan(
   }
 
   return iree_hal_subspan_buffer_create(buffer, byte_offset, byte_length,
-                                        out_buffer);
-}
-
-IREE_API_EXPORT iree_hal_allocator_t* iree_hal_buffer_allocator(
-    const iree_hal_buffer_t* buffer) {
-  IREE_ASSERT_ARGUMENT(buffer);
-  return buffer->allocator;
+                                        /*device_allocator=*/NULL,
+                                        buffer->host_allocator, out_buffer);
 }
 
 IREE_API_EXPORT iree_hal_buffer_t* iree_hal_buffer_allocated_buffer(

@@ -439,13 +439,6 @@ IREE_VM_ABI_EXPORT(iree_hal_module_buffer_assert,  //
   // target device. This needs some iree_hal_allocator_* methods for checking
   // whether the external buffer can be used. To start we just compare if the
   // allocators are identical.
-  if (iree_hal_buffer_allocator(buffer) != allocator) {
-    return iree_make_status(
-        IREE_STATUS_INVALID_ARGUMENT,
-        "%.*s imported buffer allocator mismatch; must be from "
-        "the same allocator (today)",
-        (int)message_str.size, message_str.data);
-  }
 
   // All memory type bits expected (indicating where the program intends to use
   // the buffer data) must be set in the buffer while the buffer is allowed to
@@ -505,15 +498,6 @@ IREE_VM_ABI_EXPORT(iree_hal_module_buffer_assert,  //
 #endif  // IREE_HAL_MODULE_STRING_UTIL_ENABLE
   }
 
-  return iree_ok_status();
-}
-
-IREE_VM_ABI_EXPORT(iree_hal_module_buffer_allocator,  //
-                   iree_hal_module_state_t,           //
-                   r, r) {
-  iree_hal_buffer_t* buffer = NULL;
-  IREE_RETURN_IF_ERROR(iree_hal_buffer_check_deref(args->r0, &buffer));
-  rets->r0 = iree_hal_allocator_retain_ref(iree_hal_buffer_allocator(buffer));
   return iree_ok_status();
 }
 
@@ -607,9 +591,9 @@ IREE_VM_ABI_EXPORT(iree_hal_module_buffer_view_create,  //
                              &shape_rank, &shape_dims);
 
   iree_hal_buffer_view_t* buffer_view = NULL;
-  IREE_RETURN_IF_ERROR(
-      iree_hal_buffer_view_create(source_buffer, shape_dims, shape_rank,
-                                  element_type, encoding_type, &buffer_view));
+  IREE_RETURN_IF_ERROR(iree_hal_buffer_view_create(
+      source_buffer, shape_dims, shape_rank, element_type, encoding_type,
+      state->host_allocator, &buffer_view));
   rets->r0 = iree_hal_buffer_view_move_ref(buffer_view);
   return iree_ok_status();
 }

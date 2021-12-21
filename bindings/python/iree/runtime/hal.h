@@ -102,10 +102,10 @@ class HalBuffer : public ApiRefCounted<HalBuffer, iree_hal_buffer_t> {
         IREE_HAL_ELEMENT_TYPE_NONE, element_size * 8);
     iree_hal_encoding_type_t encoding_type =
         IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR;
-    CheckApiStatus(
-        iree_hal_buffer_view_create(raw_ptr(), shape.s.data(), shape.s.size(),
-                                    element_type, encoding_type, &bv),
-        "Error creating buffer view");
+    CheckApiStatus(iree_hal_buffer_view_create(
+                       raw_ptr(), shape.s.data(), shape.s.size(), element_type,
+                       encoding_type, iree_allocator_system(), &bv),
+                   "Error creating buffer view");
     return HalBufferView::CreateRetained(bv);
   }
 };

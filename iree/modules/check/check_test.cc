@@ -91,7 +91,8 @@ class CheckTest : public ::testing::Test {
         buffer.get(), 0, contents.data(), contents.size() * sizeof(int32_t)));
     IREE_ASSERT_OK(iree_hal_buffer_view_create(
         buffer.get(), shape.data(), shape.size(), IREE_HAL_ELEMENT_TYPE_INT_32,
-        IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR, &*out_buffer_view));
+        IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR, iree_allocator_system(),
+        &*out_buffer_view));
   }
 
   void CreateFloat16BufferView(iree::span<const uint16_t> contents,
@@ -115,7 +116,7 @@ class CheckTest : public ::testing::Test {
     IREE_ASSERT_OK(iree_hal_buffer_view_create(
         buffer.get(), shape.data(), shape.size(),
         IREE_HAL_ELEMENT_TYPE_FLOAT_16, IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR,
-        &*out_buffer_view));
+        iree_allocator_system(), &*out_buffer_view));
   }
 
   void CreateFloat32BufferView(iree::span<const float> contents,
@@ -138,7 +139,7 @@ class CheckTest : public ::testing::Test {
     IREE_ASSERT_OK(iree_hal_buffer_view_create(
         buffer.get(), shape.data(), shape.size(),
         IREE_HAL_ELEMENT_TYPE_FLOAT_32, IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR,
-        &*out_buffer_view));
+        iree_allocator_system(), &*out_buffer_view));
   }
 
   void CreateFloat64BufferView(iree::span<const double> contents,
@@ -161,7 +162,7 @@ class CheckTest : public ::testing::Test {
     IREE_ASSERT_OK(iree_hal_buffer_view_create(
         buffer.get(), shape.data(), shape.size(),
         IREE_HAL_ELEMENT_TYPE_FLOAT_64, IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR,
-        &*out_buffer_view));
+        iree_allocator_system(), &*out_buffer_view));
   }
 
   iree_status_t Invoke(const char* function_name) {

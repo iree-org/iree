@@ -331,15 +331,6 @@ Value AllocatorTryMapOp::getOperandSize(unsigned idx) { return {}; }
 Value AllocatorTryMapOp::getResultSize(unsigned idx) { return length(); }
 
 //===----------------------------------------------------------------------===//
-// hal.buffer.allocator
-//===----------------------------------------------------------------------===//
-
-void BufferAllocatorOp::getAsmResultNames(
-    function_ref<void(Value, StringRef)> setNameFn) {
-  setNameFn(result(), "allocator");
-}
-
-//===----------------------------------------------------------------------===//
 // hal.buffer.subspan
 //===----------------------------------------------------------------------===//
 
