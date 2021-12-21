@@ -76,20 +76,20 @@ IREE_API_EXPORT iree_string_view_t iree_hal_buffer_usage_format(
 
 static const iree_hal_buffer_vtable_t iree_hal_subspan_buffer_vtable;
 
-static iree_status_t iree_hal_subspan_buffer_create(
+IREE_API_EXPORT iree_status_t iree_hal_subspan_buffer_create(
     iree_hal_buffer_t* allocated_buffer, iree_device_size_t byte_offset,
-    iree_device_size_t byte_length, iree_hal_buffer_t** out_buffer) {
+    iree_device_size_t byte_length, iree_hal_allocator_t* device_allocator,
+    iree_allocator_t host_allocator, iree_hal_buffer_t** out_buffer) {
   IREE_ASSERT_ARGUMENT(allocated_buffer);
   IREE_ASSERT_ARGUMENT(out_buffer);
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  iree_allocator_t host_allocator = allocated_buffer->host_allocator;
   iree_hal_buffer_t* buffer = NULL;
   iree_status_t status =
       iree_allocator_malloc(host_allocator, sizeof(*buffer), (void**)&buffer);
   if (iree_status_is_ok(status)) {
     iree_hal_buffer_initialize(
-        host_allocator, /*device_allocator=*/NULL, allocated_buffer,
+        host_allocator, device_allocator, allocated_buffer,
         allocated_buffer->allocation_size, byte_offset, byte_length,
         allocated_buffer->memory_type, allocated_buffer->allowed_access,
         allocated_buffer->allowed_usage, &iree_hal_subspan_buffer_vtable,
@@ -432,7 +432,8 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_subspan(
   }
 
   return iree_hal_subspan_buffer_create(buffer, byte_offset, byte_length,
-                                        out_buffer);
+                                        /*device_allocator=*/NULL,
+                                        buffer->host_allocator, out_buffer);
 }
 
 IREE_API_EXPORT iree_hal_buffer_t* iree_hal_buffer_allocated_buffer(

@@ -454,6 +454,18 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_mapping_subspan(
     iree_device_size_t byte_length, iree_byte_span_t* out_span);
 
 //===----------------------------------------------------------------------===//
+// iree_hal_subspan_buffer_t
+//===----------------------------------------------------------------------===//
+
+// Creates a buffer referencing a subspan of some base allocation.
+// Optionally |device_allocator| can be provided if this subspan references
+// managed buffers that need deallocation callbacks.
+IREE_API_EXPORT iree_status_t iree_hal_subspan_buffer_create(
+    iree_hal_buffer_t* allocated_buffer, iree_device_size_t byte_offset,
+    iree_device_size_t byte_length, iree_hal_allocator_t* device_allocator,
+    iree_allocator_t host_allocator, iree_hal_buffer_t** out_buffer);
+
+//===----------------------------------------------------------------------===//
 // iree_hal_heap_buffer_t
 //===----------------------------------------------------------------------===//
 
