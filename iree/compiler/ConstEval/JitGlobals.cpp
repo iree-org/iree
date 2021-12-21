@@ -15,6 +15,7 @@
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
 #include "iree/compiler/Dialect/VM/Target/Bytecode/TranslationFlags.h"
 #include "iree/compiler/Dialect/VM/Transforms/Passes.h"
+#include "iree/compiler/Utils/PassUtils.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
@@ -194,6 +195,7 @@ struct JitGlobalsPass : public JitGlobalsBase<JitGlobalsPass> {
     // Kill the temporary program we constructed.
     innerModule.erase();
 
+    bool modified = false;
     for (auto &it : uninitializedGlobals) {
       StringAttr funcSymbol = it.first;
       StringAttr globalSymbol = it.second;
@@ -207,12 +209,19 @@ struct JitGlobalsPass : public JitGlobalsBase<JitGlobalsPass> {
         return signalPassFailure();
       }
 
+      modified = true;
       targetGlobal.setInitialValue(value);
     }
 
     // Delete any ops noted for pruning.
     for (Operation *op : pruneOps) {
       op->erase();
+    }
+
+    // Signal any outer fixed point iterator that we have modified
+    // globals and need another pass.
+    if (modified) {
+      signalFixedPointModified(outerModule);
     }
   }
 

@@ -78,6 +78,10 @@ struct MultiOpNest {
   std::array<OpPassManager *, sizeof...(OpTys)> nestedPassManagers;
 };
 
+// If running under a FixedPointIterator pass, annotate that a modification
+// has been made which requires another iteration. No-op otherwise.
+void signalFixedPointModified(Operation *rootOp);
+
 }  // namespace iree_compiler
 }  // namespace mlir
 

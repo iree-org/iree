@@ -19,6 +19,7 @@ cc_library(
     deps = [
         "//iree/compiler/Bindings/Native/Transforms",
         "//iree/compiler/Bindings/TFLite/Transforms",
+        "//iree/compiler/ConstEval",
         "//iree/compiler/Dialect/Flow/IR",
         "//iree/compiler/Dialect/Flow/Transforms",
         "//iree/compiler/Dialect/HAL/Conversion/HALToVM",
