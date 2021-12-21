@@ -120,9 +120,8 @@ to build IREE for Linux/Windows and the [Android cross-compilation][android-cc]
 page for Android. The SPIR-V compiler backend is compiled in by default on all
 platforms.
 
-If you want to explicitly specify HAL drivers to support, you will need to add
-`Vulkan-SPIRV` to the `IREE_TARGET_BACKENDS_TO_BUILD` CMake list variable when
-configuring (for host).
+Ensure that the `IREE_TARGET_BACKEND_VULKAN-SPIRV` CMake option is `ON` when
+configuring for the host.
 
 ## Compile and run the model
 
