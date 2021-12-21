@@ -15,6 +15,7 @@ cc_library(
     srcs = [
         "ConvertToLLVM.cpp",
         "KernelDispatch.cpp",
+        "LLVMCPUCheckIRBeforeLLVMConversion.cpp",
         "LLVMCPULowerExecutableTarget.cpp",
         "LLVMCPUSynchronizeSymbolVisibility.cpp",
         "LLVMCPUTileAndVectorizeLinalgTensorOps.cpp",

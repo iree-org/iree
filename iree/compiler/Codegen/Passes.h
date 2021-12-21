@@ -142,6 +142,10 @@ void populateLinalgToVectorVectorizeMMT4dPatterns(
 /// Performs the final conversion to LLVM dialect.
 std::unique_ptr<OperationPass<ModuleOp>> createConvertToLLVMPass();
 
+/// Checks CPU backend specific IR constraints (like no stack allocations)
+std::unique_ptr<OperationPass<ModuleOp>>
+createLLVMCPUCheckIRBeforeLLVMConversionPass();
+
 /// Pass to lower the module an hal.executable.variant operation to external
 /// dialect. Currently this pass lowers to LLVM dialect, but could be
 /// generalized to lower to any "final" dialect like SPIR-V/NVVM, etc.
