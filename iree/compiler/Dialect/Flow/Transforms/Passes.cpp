@@ -93,6 +93,9 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
       // region formation as redundant store-loads are removed.
       .addPass(IREE::Util::createSimplifyGlobalAccessesPass);
 
+  // Named op conversion to more canonical named op forms.
+  passManager.addPass(mlir::createLinalgNamedOpConversionPass());
+
   // Module level cleanup and canonicalization of util.global (and other util
   // ops).
   passManager.addPass(IREE::Util::createApplyPatternsPass());
@@ -119,7 +122,6 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
       .addPass(mlir::createCSEPass)
       .addPredicatedPass(clEnableLinalgDetensorize,
                          mlir::createLinalgDetensorizePass)
-
       // Dispatch region formation.
       .addPass(createConvertToFlowBeforeDispatchFormation)
       .addPass(mlir::createCanonicalizerPass)
