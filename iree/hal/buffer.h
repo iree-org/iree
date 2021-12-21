@@ -294,10 +294,6 @@ IREE_API_EXPORT void iree_hal_buffer_retain(iree_hal_buffer_t* buffer);
 // Releases the given |buffer| from the caller.
 IREE_API_EXPORT void iree_hal_buffer_release(iree_hal_buffer_t* buffer);
 
-// Returns the allocator this buffer was allocated from.
-IREE_API_EXPORT iree_hal_allocator_t* iree_hal_buffer_allocator(
-    const iree_hal_buffer_t* buffer);
-
 // Returns a pointer to the buffer containing the actual allocation.
 // The buffer represents a span of the allocated bytes defined by byte_offset
 // and byte_length. If the provided buffer *is* the allocated buffer then the
@@ -507,7 +503,8 @@ typedef struct iree_hal_buffer_vtable_t {
 struct iree_hal_buffer_t {
   iree_hal_resource_t resource;
 
-  iree_hal_allocator_t* allocator;
+  iree_allocator_t host_allocator;
+  iree_hal_allocator_t* device_allocator;
 
   iree_hal_buffer_t* allocated_buffer;
   iree_device_size_t allocation_size;
@@ -518,6 +515,14 @@ struct iree_hal_buffer_t {
   iree_hal_memory_access_t allowed_access;
   iree_hal_buffer_usage_t allowed_usage;
 };
+
+IREE_API_EXPORT void iree_hal_buffer_initialize(
+    iree_allocator_t host_allocator, iree_hal_allocator_t* device_allocator,
+    iree_hal_buffer_t* allocated_buffer, iree_device_size_t allocation_size,
+    iree_device_size_t byte_offset, iree_device_size_t byte_length,
+    iree_hal_memory_type_t memory_type, iree_hal_memory_access_t allowed_access,
+    iree_hal_buffer_usage_t allowed_usage,
+    const iree_hal_buffer_vtable_t* vtable, iree_hal_buffer_t* buffer);
 
 IREE_API_EXPORT void iree_hal_buffer_destroy(iree_hal_buffer_t* buffer);
 

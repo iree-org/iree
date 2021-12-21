@@ -430,9 +430,9 @@ struct BufferView final
     iree_hal_encoding_type_t encoding_type =
         IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR;
     BufferView buffer_view;
-    iree_status_t status =
-        iree_hal_buffer_view_create(buffer, shape.data(), shape.size(),
-                                    element_type, encoding_type, &buffer_view);
+    iree_status_t status = iree_hal_buffer_view_create(
+        buffer, shape.data(), shape.size(), element_type, encoding_type,
+        iree_allocator_system(), &buffer_view);
     IREE_RETURN_IF_ERROR(std::move(status));
     return std::move(buffer_view);
   }

@@ -247,10 +247,10 @@ void VmVariantList::PushBufferView(HalDevice& device,
   std::vector<int> dims(py_view.ndim);
   std::copy(py_view.shape, py_view.shape + py_view.ndim, dims.begin());
   iree_hal_buffer_view_t* buffer_view;
-  CheckApiStatus(
-      iree_hal_buffer_view_create(raw_buffer, dims.data(), dims.size(),
-                                  element_type, encoding_type, &buffer_view),
-      "Error allocating buffer_view");
+  CheckApiStatus(iree_hal_buffer_view_create(
+                     raw_buffer, dims.data(), dims.size(), element_type,
+                     encoding_type, iree_allocator_system(), &buffer_view),
+                 "Error allocating buffer_view");
   iree_hal_buffer_release(raw_buffer);
   iree_vm_ref_t buffer_view_ref = iree_hal_buffer_view_move_ref(buffer_view);
   CheckApiStatus(iree_vm_list_push_ref_move(raw_ptr(), &buffer_view_ref),
