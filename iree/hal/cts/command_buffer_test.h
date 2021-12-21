@@ -4,15 +4,15 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#ifndef IREE_HAL_CTS_COMMAND_BUFFER_TEST_H_
+#define IREE_HAL_CTS_COMMAND_BUFFER_TEST_H_
+
 #include <cstdint>
-#include <cstring>
-#include <string>
 #include <vector>
 
 #include "iree/base/api.h"
 #include "iree/hal/api.h"
 #include "iree/hal/cts/cts_test_base.h"
-#include "iree/hal/testing/driver_registry.h"
 #include "iree/testing/gtest.h"
 #include "iree/testing/status_matchers.h"
 
@@ -28,14 +28,7 @@ namespace cts {
 
 using ::testing::ContainerEq;
 
-class CommandBufferTest : public CtsTestBase {
- public:
-  CommandBufferTest() {
-    // TODO(#4680): command buffer recording so that this can run on sync HAL.
-    SkipUnavailableDriver("dylib-sync");
-    SkipUnavailableDriver("vmvx-sync");
-  }
-
+class command_buffer_test : public CtsTestBase {
  protected:
   std::vector<uint8_t> RunFillBufferTest(iree_device_size_t buffer_size,
                                          iree_device_size_t target_offset,
@@ -98,7 +91,7 @@ class CommandBufferTest : public CtsTestBase {
   static constexpr iree_device_size_t kBufferSize = 4096;
 };
 
-TEST_P(CommandBufferTest, Create) {
+TEST_P(command_buffer_test, Create) {
   iree_hal_command_buffer_t* command_buffer;
   IREE_ASSERT_OK(iree_hal_command_buffer_create(
       device_, IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT,
@@ -112,7 +105,7 @@ TEST_P(CommandBufferTest, Create) {
   iree_hal_command_buffer_release(command_buffer);
 }
 
-TEST_P(CommandBufferTest, BeginEnd) {
+TEST_P(command_buffer_test, BeginEnd) {
   iree_hal_command_buffer_t* command_buffer;
   IREE_ASSERT_OK(iree_hal_command_buffer_create(
       device_, IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT,
@@ -125,7 +118,7 @@ TEST_P(CommandBufferTest, BeginEnd) {
   iree_hal_command_buffer_release(command_buffer);
 }
 
-TEST_P(CommandBufferTest, SubmitEmpty) {
+TEST_P(command_buffer_test, SubmitEmpty) {
   iree_hal_command_buffer_t* command_buffer;
   IREE_ASSERT_OK(iree_hal_command_buffer_create(
       device_, IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT,
@@ -141,7 +134,7 @@ TEST_P(CommandBufferTest, SubmitEmpty) {
   iree_hal_command_buffer_release(command_buffer);
 }
 
-TEST_P(CommandBufferTest, CopyWholeBuffer) {
+TEST_P(command_buffer_test, CopyWholeBuffer) {
   iree_hal_command_buffer_t* command_buffer;
   IREE_ASSERT_OK(iree_hal_command_buffer_create(
       device_, IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT,
@@ -193,7 +186,7 @@ TEST_P(CommandBufferTest, CopyWholeBuffer) {
   iree_hal_buffer_release(host_buffer);
 }
 
-TEST_P(CommandBufferTest, CopySubBuffer) {
+TEST_P(command_buffer_test, CopySubBuffer) {
   iree_hal_command_buffer_t* command_buffer;
   IREE_ASSERT_OK(iree_hal_command_buffer_create(
       device_, IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT,
@@ -254,7 +247,7 @@ TEST_P(CommandBufferTest, CopySubBuffer) {
   iree_hal_buffer_release(host_buffer);
 }
 
-TEST_P(CommandBufferTest, FillBuffer_pattern1_size1_offset0_length1) {
+TEST_P(command_buffer_test, FillBuffer_pattern1_size1_offset0_length1) {
   iree_device_size_t buffer_size = 1;
   iree_device_size_t target_offset = 0;
   iree_device_size_t fill_length = 1;
@@ -266,7 +259,7 @@ TEST_P(CommandBufferTest, FillBuffer_pattern1_size1_offset0_length1) {
   EXPECT_THAT(actual_buffer, ContainerEq(reference_buffer));
 }
 
-TEST_P(CommandBufferTest, FillBuffer_pattern1_size5_offset0_length5) {
+TEST_P(command_buffer_test, FillBuffer_pattern1_size5_offset0_length5) {
   iree_device_size_t buffer_size = 5;
   iree_device_size_t target_offset = 0;
   iree_device_size_t fill_length = 5;
@@ -279,7 +272,7 @@ TEST_P(CommandBufferTest, FillBuffer_pattern1_size5_offset0_length5) {
   EXPECT_THAT(actual_buffer, ContainerEq(reference_buffer));
 }
 
-TEST_P(CommandBufferTest, FillBuffer_pattern1_size16_offset0_length1) {
+TEST_P(command_buffer_test, FillBuffer_pattern1_size16_offset0_length1) {
   iree_device_size_t buffer_size = 16;
   iree_device_size_t target_offset = 0;
   iree_device_size_t fill_length = 1;
@@ -294,7 +287,7 @@ TEST_P(CommandBufferTest, FillBuffer_pattern1_size16_offset0_length1) {
   EXPECT_THAT(actual_buffer, ContainerEq(reference_buffer));
 }
 
-TEST_P(CommandBufferTest, FillBuffer_pattern1_size16_offset0_length3) {
+TEST_P(command_buffer_test, FillBuffer_pattern1_size16_offset0_length3) {
   iree_device_size_t buffer_size = 16;
   iree_device_size_t target_offset = 0;
   iree_device_size_t fill_length = 3;
@@ -309,7 +302,7 @@ TEST_P(CommandBufferTest, FillBuffer_pattern1_size16_offset0_length3) {
   EXPECT_THAT(actual_buffer, ContainerEq(reference_buffer));
 }
 
-TEST_P(CommandBufferTest, FillBuffer_pattern1_size16_offset0_length8) {
+TEST_P(command_buffer_test, FillBuffer_pattern1_size16_offset0_length8) {
   iree_device_size_t buffer_size = 16;
   iree_device_size_t target_offset = 0;
   iree_device_size_t fill_length = 8;
@@ -324,7 +317,7 @@ TEST_P(CommandBufferTest, FillBuffer_pattern1_size16_offset0_length8) {
   EXPECT_THAT(actual_buffer, ContainerEq(reference_buffer));
 }
 
-TEST_P(CommandBufferTest, FillBuffer_pattern1_size16_offset2_length8) {
+TEST_P(command_buffer_test, FillBuffer_pattern1_size16_offset2_length8) {
   iree_device_size_t buffer_size = 16;
   iree_device_size_t target_offset = 2;
   iree_device_size_t fill_length = 8;
@@ -339,7 +332,7 @@ TEST_P(CommandBufferTest, FillBuffer_pattern1_size16_offset2_length8) {
   EXPECT_THAT(actual_buffer, ContainerEq(reference_buffer));
 }
 
-TEST_P(CommandBufferTest, FillBuffer_pattern2_size2_offset0_length2) {
+TEST_P(command_buffer_test, FillBuffer_pattern2_size2_offset0_length2) {
   iree_device_size_t buffer_size = 2;
   iree_device_size_t target_offset = 0;
   iree_device_size_t fill_length = 2;
@@ -351,7 +344,7 @@ TEST_P(CommandBufferTest, FillBuffer_pattern2_size2_offset0_length2) {
   EXPECT_THAT(actual_buffer, ContainerEq(reference_buffer));
 }
 
-TEST_P(CommandBufferTest, FillBuffer_pattern2_size16_offset0_length8) {
+TEST_P(command_buffer_test, FillBuffer_pattern2_size16_offset0_length8) {
   iree_device_size_t buffer_size = 16;
   iree_device_size_t target_offset = 0;
   iree_device_size_t fill_length = 8;
@@ -366,7 +359,7 @@ TEST_P(CommandBufferTest, FillBuffer_pattern2_size16_offset0_length8) {
   EXPECT_THAT(actual_buffer, ContainerEq(reference_buffer));
 }
 
-TEST_P(CommandBufferTest, FillBuffer_pattern2_size16_offset0_length10) {
+TEST_P(command_buffer_test, FillBuffer_pattern2_size16_offset0_length10) {
   iree_device_size_t buffer_size = 16;
   iree_device_size_t target_offset = 0;
   iree_device_size_t fill_length = 10;
@@ -381,7 +374,7 @@ TEST_P(CommandBufferTest, FillBuffer_pattern2_size16_offset0_length10) {
   EXPECT_THAT(actual_buffer, ContainerEq(reference_buffer));
 }
 
-TEST_P(CommandBufferTest, FillBuffer_pattern2_size16_offset2_length8) {
+TEST_P(command_buffer_test, FillBuffer_pattern2_size16_offset2_length8) {
   iree_device_size_t buffer_size = 16;
   iree_device_size_t target_offset = 2;
   iree_device_size_t fill_length = 8;
@@ -396,7 +389,7 @@ TEST_P(CommandBufferTest, FillBuffer_pattern2_size16_offset2_length8) {
   EXPECT_THAT(actual_buffer, ContainerEq(reference_buffer));
 }
 
-TEST_P(CommandBufferTest, FillBuffer_pattern4_size4_offset0_length4) {
+TEST_P(command_buffer_test, FillBuffer_pattern4_size4_offset0_length4) {
   iree_device_size_t buffer_size = 4;
   iree_device_size_t target_offset = 0;
   iree_device_size_t fill_length = 4;
@@ -408,7 +401,7 @@ TEST_P(CommandBufferTest, FillBuffer_pattern4_size4_offset0_length4) {
   EXPECT_THAT(actual_buffer, ContainerEq(reference_buffer));
 }
 
-TEST_P(CommandBufferTest, FillBuffer_pattern4_size16_offset0_length8) {
+TEST_P(command_buffer_test, FillBuffer_pattern4_size16_offset0_length8) {
   iree_device_size_t buffer_size = 16;
   iree_device_size_t target_offset = 0;
   iree_device_size_t fill_length = 8;
@@ -423,11 +416,8 @@ TEST_P(CommandBufferTest, FillBuffer_pattern4_size16_offset0_length8) {
   EXPECT_THAT(actual_buffer, ContainerEq(reference_buffer));
 }
 
-INSTANTIATE_TEST_SUITE_P(
-    AllDrivers, CommandBufferTest,
-    ::testing::ValuesIn(testing::EnumerateAvailableDrivers()),
-    GenerateTestName());
-
 }  // namespace cts
 }  // namespace hal
 }  // namespace iree
+
+#endif  // IREE_HAL_CTS_COMMAND_BUFFER_TEST_H_

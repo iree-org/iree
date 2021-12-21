@@ -4,16 +4,15 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include <cstddef>
+#ifndef IREE_HAL_CTS_SEMAPHORE_TEST_H_
+#define IREE_HAL_CTS_SEMAPHORE_TEST_H_
+
 #include <cstdint>
-#include <string>
 #include <thread>
-#include <vector>
 
 #include "iree/base/api.h"
 #include "iree/hal/api.h"
 #include "iree/hal/cts/cts_test_base.h"
-#include "iree/hal/testing/driver_registry.h"
 #include "iree/testing/gtest.h"
 #include "iree/testing/status_matchers.h"
 
@@ -21,14 +20,10 @@ namespace iree {
 namespace hal {
 namespace cts {
 
-class SemaphoreTest : public CtsTestBase {
- public:
-  // Disable cuda backend for this test as semaphores are not implemented yet.
-  SemaphoreTest() { SkipUnavailableDriver("cuda"); }
-};
+class semaphore_test : public CtsTestBase {};
 
 // Tests that a semaphore that is unused properly cleans itself up.
-TEST_P(SemaphoreTest, NoOp) {
+TEST_P(semaphore_test, NoOp) {
   iree_hal_semaphore_t* semaphore;
   IREE_ASSERT_OK(iree_hal_semaphore_create(device_, 123ull, &semaphore));
 
@@ -40,7 +35,7 @@ TEST_P(SemaphoreTest, NoOp) {
 }
 
 // Tests that a semaphore will accept new values as it is signaled.
-TEST_P(SemaphoreTest, NormalSignaling) {
+TEST_P(semaphore_test, NormalSignaling) {
   iree_hal_semaphore_t* semaphore;
   IREE_ASSERT_OK(iree_hal_semaphore_create(device_, 2ull, &semaphore));
 
@@ -62,7 +57,7 @@ TEST_P(SemaphoreTest, NormalSignaling) {
 // while others may accept the new, decreasing, values.
 
 // Tests semaphore failure handling.
-TEST_P(SemaphoreTest, Failure) {
+TEST_P(semaphore_test, Failure) {
   iree_hal_semaphore_t* semaphore;
   IREE_ASSERT_OK(iree_hal_semaphore_create(device_, 2ull, &semaphore));
 
@@ -83,7 +78,7 @@ TEST_P(SemaphoreTest, Failure) {
 }
 
 // Tests waiting on no semaphores.
-TEST_P(SemaphoreTest, EmptyWait) {
+TEST_P(semaphore_test, EmptyWait) {
   IREE_ASSERT_OK(iree_hal_device_wait_semaphores(
       device_, IREE_HAL_WAIT_MODE_ANY, NULL,
       iree_make_deadline(IREE_TIME_INFINITE_FUTURE)));
@@ -101,7 +96,7 @@ TEST_P(SemaphoreTest, EmptyWait) {
 
 // Tests waiting on a semaphore that has already been signaled.
 // **Never completes when using SwiftShader**
-TEST_P(SemaphoreTest, DISABLED_WaitAlreadySignaled) {
+TEST_P(semaphore_test, DISABLED_WaitAlreadySignaled) {
   iree_hal_semaphore_t* semaphore;
   IREE_ASSERT_OK(iree_hal_semaphore_create(device_, 2ull, &semaphore));
 
@@ -120,7 +115,7 @@ TEST_P(SemaphoreTest, DISABLED_WaitAlreadySignaled) {
 }
 
 // Tests waiting on a semaphore that has not been signaled.
-TEST_P(SemaphoreTest, WaitUnsignaled) {
+TEST_P(semaphore_test, WaitUnsignaled) {
   iree_hal_semaphore_t* semaphore;
   IREE_ASSERT_OK(iree_hal_semaphore_create(device_, 2ull, &semaphore));
 
@@ -137,7 +132,7 @@ TEST_P(SemaphoreTest, WaitUnsignaled) {
 // return UnknownError while others may succeed.
 
 // Tests IREE_HAL_WAIT_MODE_ALL when not all are signaled.
-TEST_P(SemaphoreTest, WaitAllButNotAllSignaled) {
+TEST_P(semaphore_test, WaitAllButNotAllSignaled) {
   iree_hal_semaphore_t* semaphore_a;
   iree_hal_semaphore_t* semaphore_b;
   IREE_ASSERT_OK(iree_hal_semaphore_create(device_, 0ull, &semaphore_a));
@@ -162,7 +157,7 @@ TEST_P(SemaphoreTest, WaitAllButNotAllSignaled) {
 }
 
 // Tests IREE_HAL_WAIT_MODE_ALL when all are signaled.
-TEST_P(SemaphoreTest, WaitAllAndAllSignaled) {
+TEST_P(semaphore_test, WaitAllAndAllSignaled) {
   iree_hal_semaphore_t* semaphore_a;
   iree_hal_semaphore_t* semaphore_b;
   IREE_ASSERT_OK(iree_hal_semaphore_create(device_, 1ull, &semaphore_a));
@@ -188,7 +183,7 @@ TEST_P(SemaphoreTest, WaitAllAndAllSignaled) {
 
 // Tests IREE_HAL_WAIT_MODE_ANY.
 // **Fails using timeline semaphore emulation**
-TEST_P(SemaphoreTest, DISABLED_WaitAny) {
+TEST_P(semaphore_test, DISABLED_WaitAny) {
   iree_hal_semaphore_t* semaphore_a;
   iree_hal_semaphore_t* semaphore_b;
   IREE_ASSERT_OK(iree_hal_semaphore_create(device_, 0ull, &semaphore_a));
@@ -211,7 +206,7 @@ TEST_P(SemaphoreTest, DISABLED_WaitAny) {
 
 // Tests threading behavior by ping-ponging between the test main thread and
 // a little thread.
-TEST_P(SemaphoreTest, PingPong) {
+TEST_P(semaphore_test, PingPong) {
   iree_hal_semaphore_t* a2b;
   iree_hal_semaphore_t* b2a;
   IREE_ASSERT_OK(iree_hal_semaphore_create(device_, 0ull, &a2b));
@@ -235,11 +230,8 @@ TEST_P(SemaphoreTest, PingPong) {
   iree_hal_semaphore_release(b2a);
 }
 
-INSTANTIATE_TEST_SUITE_P(
-    AllDrivers, SemaphoreTest,
-    ::testing::ValuesIn(testing::EnumerateAvailableDrivers()),
-    GenerateTestName());
-
 }  // namespace cts
 }  // namespace hal
 }  // namespace iree
+
+#endif  // IREE_HAL_CTS_SEMAPHORE_TEST_H_

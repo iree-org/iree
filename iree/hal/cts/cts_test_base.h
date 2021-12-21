@@ -7,9 +7,8 @@
 #ifndef IREE_HAL_CTS_CTS_TEST_BASE_H_
 #define IREE_HAL_CTS_CTS_TEST_BASE_H_
 
-#include <map>
-#include <mutex>
 #include <set>
+#include <string>
 
 #include "iree/base/api.h"
 #include "iree/hal/api.h"
@@ -20,17 +19,21 @@ namespace iree {
 namespace hal {
 namespace cts {
 
-// Common setup for tests parameterized across all registered drivers.
+// Leaf test binaries must implement this function, registering the driver
+// that will be used with INSTANTIATE_TEST_SUITE_P.
+// Multiple drivers _may_ be registered and used with parameterized test suite
+// construction, but the expected use is 1 driver : 1 test suite.
+iree_status_t register_test_driver(iree_hal_driver_registry_t* registry);
+
+// Common setup for tests parameterized on driver names.
 class CtsTestBase : public ::testing::TestWithParam<std::string> {
  protected:
+  static void SetUpTestSuite() {
+    IREE_CHECK_OK(register_test_driver(iree_hal_driver_registry_default()));
+  }
+
   virtual void SetUp() {
     const std::string& driver_name = GetParam();
-    if (driver_block_list_.find(driver_name) != driver_block_list_.end()) {
-      IREE_LOG(WARNING) << "Skipping test as '" << driver_name
-                        << "' driver is explicitly disabled for this test";
-      GTEST_SKIP();
-      return;
-    }
 
     // Get driver with the given name and create its default device.
     // Skip drivers that are (gracefully) unavailable, fail if creation fails.
@@ -43,6 +46,7 @@ class CtsTestBase : public ::testing::TestWithParam<std::string> {
       GTEST_SKIP();
       return;
     }
+    IREE_ASSERT_OK(status);
     driver_ = driver;
 
     iree_hal_device_t* device;
@@ -66,15 +70,15 @@ class CtsTestBase : public ::testing::TestWithParam<std::string> {
   virtual void TearDown() {
     if (device_allocator_) {
       iree_hal_allocator_release(device_allocator_);
-      device_allocator_ = nullptr;
+      device_allocator_ = NULL;
     }
     if (device_) {
       iree_hal_device_release(device_);
-      device_ = nullptr;
+      device_ = NULL;
     }
     if (driver_) {
       iree_hal_driver_release(driver_);
-      driver_ = nullptr;
+      driver_ = NULL;
     }
   }
 
@@ -119,17 +123,9 @@ class CtsTestBase : public ::testing::TestWithParam<std::string> {
     return status;
   }
 
-  iree_hal_driver_t* driver_ = nullptr;
-  iree_hal_device_t* device_ = nullptr;
-  iree_hal_allocator_t* device_allocator_ = nullptr;
-  // Allow skipping tests for driver under development.
-  void declareUnimplementedDriver(const std::string& driver_name) {
-    driver_block_list_.insert(driver_name);
-  }
-  // Allow skipping tests for unsupported features.
-  void SkipUnavailableDriver(const std::string& driver_name) {
-    driver_block_list_.insert(driver_name);
-  }
+  iree_hal_driver_t* driver_ = NULL;
+  iree_hal_device_t* device_ = NULL;
+  iree_hal_allocator_t* device_allocator_ = NULL;
 
  private:
   // Gets a HAL driver with the provided name, if available.
@@ -157,7 +153,6 @@ class CtsTestBase : public ::testing::TestWithParam<std::string> {
     }
     return status;
   }
-  std::set<std::string> driver_block_list_;
 };
 
 struct GenerateTestName {

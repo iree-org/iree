@@ -4,16 +4,15 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include <cstddef>
+#ifndef IREE_HAL_CTS_DRIVER_TEST_H_
+#define IREE_HAL_CTS_DRIVER_TEST_H_
+
 #include <iostream>
-#include <ostream>
 #include <string>
-#include <vector>
 
 #include "iree/base/api.h"
 #include "iree/hal/api.h"
 #include "iree/hal/cts/cts_test_base.h"
-#include "iree/hal/testing/driver_registry.h"
 #include "iree/testing/gtest.h"
 #include "iree/testing/status_matchers.h"
 
@@ -21,9 +20,9 @@ namespace iree {
 namespace hal {
 namespace cts {
 
-class DriverTest : public CtsTestBase {};
+class driver_test : public CtsTestBase {};
 
-TEST_P(DriverTest, QueryAndCreateAvailableDevices) {
+TEST_P(driver_test, QueryAndCreateAvailableDevices) {
   iree_hal_device_info_t* device_infos;
   iree_host_size_t device_info_count;
   IREE_ASSERT_OK(iree_hal_driver_query_available_devices(
@@ -47,11 +46,8 @@ TEST_P(DriverTest, QueryAndCreateAvailableDevices) {
   iree_allocator_free(iree_allocator_system(), device_infos);
 }
 
-INSTANTIATE_TEST_SUITE_P(
-    AllDrivers, DriverTest,
-    ::testing::ValuesIn(testing::EnumerateAvailableDrivers()),
-    GenerateTestName());
-
 }  // namespace cts
 }  // namespace hal
 }  // namespace iree
+
+#endif  // IREE_HAL_CTS_DRIVER_TEST_H_

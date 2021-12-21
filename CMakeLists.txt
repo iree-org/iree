@@ -263,6 +263,7 @@ include(iree_check_test)
 include(iree_trace_runner_test)
 include(iree_run_binary_test)
 include(iree_benchmark_suite)
+include(iree_hal_cts_test_suite)
 
 set(DEFAULT_CMAKE_BUILD_TYPE "Release")
 if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
