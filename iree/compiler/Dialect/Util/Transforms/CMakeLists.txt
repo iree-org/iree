@@ -25,7 +25,7 @@ iree_cc_library(
     "HoistIntoGlobals.cpp"
     "Patterns.cpp"
     "SimplifyGlobalAccesses.cpp"
-    "TestFpRangeAnalysis.cpp"
+    "TestFloatRangeAnalysis.cpp"
   DEPS
     LLVMSupport
     MLIRAnalysis

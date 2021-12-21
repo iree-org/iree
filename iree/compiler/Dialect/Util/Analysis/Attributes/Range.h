@@ -31,7 +31,7 @@ namespace Util {
 //
 // Note that regardless of the program type, this tracks statistics using
 // doubles. For the level of analysis envisioned, this is sufficient.
-struct FpRangeStats {
+struct FloatRangeStats {
   enum TruncationFlag {
     TRUNC = 0,
     TRUNC_UNKNOWN = 1,
@@ -42,12 +42,14 @@ struct FpRangeStats {
   bool valid = false;
   TruncationFlag truncationFlag = TRUNC_UNKNOWN;
 
-  FpRangeStats() {}
-  FpRangeStats(double minValue, double maxValue)
+  FloatRangeStats() {}
+  FloatRangeStats(double minValue, double maxValue)
       : minValue(minValue), maxValue(maxValue), valid(true) {}
 
-  static FpRangeStats getInvalid() { return FpRangeStats(); }
-  static FpRangeStats getWidest() { return FpRangeStats(-INFINITY, INFINITY); }
+  static FloatRangeStats getInvalid() { return FloatRangeStats(); }
+  static FloatRangeStats getWidest() {
+    return FloatRangeStats(-INFINITY, INFINITY);
+  }
 
   static TruncationFlag unionTruncationFlag(TruncationFlag lhs,
                                             TruncationFlag rhs) {
@@ -55,7 +57,7 @@ struct FpRangeStats {
   }
 
   // Reset to initial state.
-  void reset() { *this = FpRangeStats(); }
+  void reset() { *this = FloatRangeStats(); }
 
   // Adds a value to the range for the case when all possible values are
   // known. Call reset() prior to iteration to enter the open-range state.
@@ -63,15 +65,17 @@ struct FpRangeStats {
 
   bool isInvalid() const { return !valid; }
 
-  bool operator==(const FpRangeStats &other) const {
+  bool operator==(const FloatRangeStats &other) const {
     return valid == other.valid && minValue == other.minValue &&
            maxValue == other.maxValue;
   }
 
-  bool operator!=(const FpRangeStats &other) const { return !(*this == other); }
+  bool operator!=(const FloatRangeStats &other) const {
+    return !(*this == other);
+  }
 
   // Makes this state the union of information known by both.
-  void operator+=(const FpRangeStats &rhs) {
+  void operator+=(const FloatRangeStats &rhs) {
     // If invalid, just accept the rhs as-is.
     if (!valid) {
       *this = rhs;
@@ -88,10 +92,12 @@ struct FpRangeStats {
 };
 
 // State that tracks floating point ranges and flags.
-struct FpRangeState : public DFX::AbstractState {
+struct FloatRangeState : public DFX::AbstractState {
   // Returns the worst possible representable state.
-  static FpRangeStats getWorstState() { return FpRangeStats::getWidest(); }
-  static FpRangeStats getWorstState(const FpRangeState &) {
+  static FloatRangeStats getWorstState() {
+    return FloatRangeStats::getWidest();
+  }
+  static FloatRangeStats getWorstState(const FloatRangeState &) {
     return getWorstState();
   }
 
@@ -108,45 +114,47 @@ struct FpRangeState : public DFX::AbstractState {
     return ChangeStatus::CHANGED;
   }
 
-  FpRangeStats getAssumed() const { return assumed; }
-  FpRangeStats getKnown() const { return known; }
+  FloatRangeStats getAssumed() const { return assumed; }
+  FloatRangeStats getKnown() const { return known; }
 
   // Resets the assumed value to the given value. This does no unioning and
   // assumes it is a proper fixpoint minimum.
-  void setAssumed(FpRangeStats newAssumed) { assumed = newAssumed; }
+  void setAssumed(FloatRangeStats newAssumed) { assumed = newAssumed; }
 
   // Apply stats derived from operands of common math operations to this.
-  void applyMinf(const FpRangeStats &lhs, const FpRangeStats &rhs);
-  void applyMaxf(const FpRangeStats &lhs, const FpRangeStats &rhs);
-  void applyFloor(const FpRangeStats &operand);
+  void applyMinf(const FloatRangeStats &lhs, const FloatRangeStats &rhs);
+  void applyMaxf(const FloatRangeStats &lhs, const FloatRangeStats &rhs);
+  void applyFloor(const FloatRangeStats &operand);
 
   // "Clamps" this state with |rhs|. The assumed value will contain the union
   // of information assumed by both states.
-  void operator^=(const FpRangeState &rhs) {
-    FpRangeStats rhsAssumed = rhs.getAssumed();
+  void operator^=(const FloatRangeState &rhs) {
+    FloatRangeStats rhsAssumed = rhs.getAssumed();
     assumed += rhsAssumed;
   }
 
  private:
-  FpRangeStats assumed = FpRangeStats::getInvalid();
-  FpRangeStats known = FpRangeStats::getWidest();
+  FloatRangeStats assumed = FloatRangeStats::getInvalid();
+  FloatRangeStats known = FloatRangeStats::getWidest();
 };
 
 // Attribute known floating point range and flags to an IR Value.
-class FpRangeValueElement
-    : public DFX::StateWrapper<FpRangeState, DFX::ValueElement> {
+class FloatRangeValueElement
+    : public DFX::StateWrapper<FloatRangeState, DFX::ValueElement> {
  public:
-  using BaseType = DFX::StateWrapper<FpRangeState, DFX::ValueElement>;
+  using BaseType = DFX::StateWrapper<FloatRangeState, DFX::ValueElement>;
   using BaseType::BaseType;
 
-  static FpRangeValueElement &createForPosition(const Position &pos,
-                                                DFX::Solver &solver) {
-    return *(new (solver.getAllocator()) FpRangeValueElement(pos));
+  static FloatRangeValueElement &createForPosition(const Position &pos,
+                                                   DFX::Solver &solver) {
+    return *(new (solver.getAllocator()) FloatRangeValueElement(pos));
   }
 
   // Identity definitions.
   static const char ID;
-  const std::string getName() const override { return "FpRangeValueElement"; }
+  const std::string getName() const override {
+    return "FloatRangeValueElement";
+  }
   const void *getID() const override { return &ID; }
   static bool classof(const DFX::AbstractElement *element) {
     return (element->getID() == &ID);

@@ -23,7 +23,7 @@ std::unique_ptr<OperationPass<mlir::ModuleOp>> createHoistIntoGlobalsPass();
 std::unique_ptr<OperationPass<void>> createSimplifyGlobalAccessesPass();
 
 // Test passes.
-std::unique_ptr<OperationPass<void>> createTestFpRangeAnalsysis();
+std::unique_ptr<OperationPass<void>> createTestFloatRangeAnalysis();
 
 // Register all Passes
 inline void registerTransformPasses() {
@@ -34,7 +34,7 @@ inline void registerTransformPasses() {
   createFuseGlobalsPass();
   createHoistIntoGlobalsPass();
   createSimplifyGlobalAccessesPass();
-  createTestFpRangeAnalsysis();
+  createTestFloatRangeAnalysis();
 }
 
 }  // namespace Util

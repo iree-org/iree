@@ -21,7 +21,7 @@ cc_library(
         "HoistIntoGlobals.cpp",
         "Patterns.cpp",
         "SimplifyGlobalAccesses.cpp",
-        "TestFpRangeAnalysis.cpp",
+        "TestFloatRangeAnalysis.cpp",
     ],
     hdrs = [
         "Passes.h",

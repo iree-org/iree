@@ -19,17 +19,17 @@ namespace IREE {
 namespace Util {
 
 //===----------------------------------------------------------------------===//
-// FpRangeStats
+// FloatRangeStats
 //===----------------------------------------------------------------------===//
 
-static FpRangeStats::TruncationFlag determineTruncationFlag(double value) {
+static FloatRangeStats::TruncationFlag determineTruncationFlag(double value) {
   double truncValue = trunc(value);
   // TODO: I'm sure I need to be doing some ULP comparison.
-  return truncValue == value ? FpRangeStats::TRUNC
-                             : FpRangeStats::TRUNC_UNKNOWN;
+  return truncValue == value ? FloatRangeStats::TRUNC
+                             : FloatRangeStats::TRUNC_UNKNOWN;
 }
 
-void FpRangeStats::addDomainValue(double value) {
+void FloatRangeStats::addDomainValue(double value) {
   if (!valid) {
     minValue = value;
     maxValue = value;
@@ -43,7 +43,7 @@ void FpRangeStats::addDomainValue(double value) {
   }
 }
 
-std::string FpRangeStats::getAsStr() const {
+std::string FloatRangeStats::getAsStr() const {
   if (!valid) return std::string("<<INVALID>>");
   std::string s("[");
   s += std::to_string(minValue);
@@ -63,10 +63,11 @@ std::string FpRangeStats::getAsStr() const {
 }
 
 //===----------------------------------------------------------------------===//
-// FpRangeState
+// FloatRangeState
 //===----------------------------------------------------------------------===//
 
-void FpRangeState::applyMinf(const FpRangeStats &lhs, const FpRangeStats &rhs) {
+void FloatRangeState::applyMinf(const FloatRangeStats &lhs,
+                                const FloatRangeStats &rhs) {
   assumed += lhs;
   assumed += rhs;
   // Narrow the upper bound and preserve the truncation flag.
@@ -75,7 +76,8 @@ void FpRangeState::applyMinf(const FpRangeStats &lhs, const FpRangeStats &rhs) {
   }
 }
 
-void FpRangeState::applyMaxf(const FpRangeStats &lhs, const FpRangeStats &rhs) {
+void FloatRangeState::applyMaxf(const FloatRangeStats &lhs,
+                                const FloatRangeStats &rhs) {
   assumed += lhs;
   assumed += rhs;
   // Narrow the lower bound and preserve the truncation flag.
@@ -84,21 +86,21 @@ void FpRangeState::applyMaxf(const FpRangeStats &lhs, const FpRangeStats &rhs) {
   }
 }
 
-void FpRangeState::applyFloor(const FpRangeStats &operand) {
+void FloatRangeState::applyFloor(const FloatRangeStats &operand) {
   assumed += operand;
   // Apply floor to the bounds and set the truncation flag.
   if (assumed.valid) {
     assumed.minValue = std::floor(assumed.minValue);
     assumed.maxValue = std::floor(assumed.maxValue);
-    assumed.truncationFlag = FpRangeStats::TRUNC;
+    assumed.truncationFlag = FloatRangeStats::TRUNC;
   }
 }
 
 //===----------------------------------------------------------------------===//
-// FpRangeValueElement
+// FloatRangeValueElement
 //===----------------------------------------------------------------------===//
 
-const char FpRangeValueElement::ID = 0;
+const char FloatRangeValueElement::ID = 0;
 
 // Returns whether the given type is a valid scalar fp type or a shaped type
 // of fp types.
@@ -107,18 +109,18 @@ static bool isFpType(Type type) {
   return getElementTypeOrSelf(type).isa<FloatType>();
 }
 
-void FpRangeValueElement::initializeValue(Value value, DFX::Solver &solver) {
+void FloatRangeValueElement::initializeValue(Value value, DFX::Solver &solver) {
   if (!isFpType(value.getType())) {
     indicatePessimisticFixpoint();
     return;
   }
 }
 
-ChangeStatus FpRangeValueElement::updateValue(Value value,
-                                              DFX::Solver &solver) {
+ChangeStatus FloatRangeValueElement::updateValue(Value value,
+                                                 DFX::Solver &solver) {
   // TODO: This could be modularized substantially and made common with
   // other attributes.
-  FpRangeState newState = getState();
+  FloatRangeState newState = getState();
 
   // If this is a block argument to a supported parent operation, then
   // remap the value we are working on to the correct input from the
@@ -143,14 +145,12 @@ ChangeStatus FpRangeValueElement::updateValue(Value value,
   if (pvs.isValidState() && !pvs.isUndefContained()) {
     for (Attribute constValue : pvs.getAssumedSet()) {
       if (auto scalarValue = constValue.dyn_cast<FloatAttr>()) {
-        FpRangeStats stats;
-        stats.reset();
+        FloatRangeStats stats;
         stats.addDomainValue(scalarValue.getValueAsDouble());
         newState.setAssumed(stats);
         newState.indicateOptimisticFixpoint();
       } else if (auto elements = constValue.dyn_cast<ElementsAttr>()) {
-        FpRangeStats stats;
-        stats.reset();
+        FloatRangeStats stats;
         for (APFloat elementValue : elements.getValues<APFloat>()) {
           stats.addDomainValue(elementValue.convertToDouble());
         }
@@ -167,81 +167,82 @@ ChangeStatus FpRangeValueElement::updateValue(Value value,
     }
   }
 
-  if (!newState.isAtFixpoint()) {
-    if (solver.getExplorer().walkDefiningOps(value, [&](OpResult result) {
-          LLVM_DEBUG(dbgs() << "  WALK: " << result << "\n");
-          Operation *definingOp = result.getDefiningOp();
-          // TODO: We shouldn't need to hard switch on LinalgOp here and should
-          // be relying on some kind of concept/interface. It just isn't
-          // clear what that would be.
-          if (auto linalgOp = dyn_cast<linalg::LinalgOp>(definingOp)) {
-            // Because we are working on per-layer statistics, we get to
-            // ignore the entire loop structure of the linalg op and just
-            // chase the stats up through the terminator (which will have
-            // values that match the results).
-            Block *loopBody = linalgOp.getBlock();
-            assert(!loopBody->empty());
-            Operation &terminator = loopBody->back();
-            Value loopBodyValue =
-                terminator.getOperand(result.getResultNumber());
-            auto inner = solver.getElementFor<FpRangeValueElement>(
-                *this, Position::forValue(loopBodyValue),
-                DFX::Resolution::REQUIRED);
+  if (newState.isAtFixpoint()) {
+    return DFX::clampStateAndIndicateChange(getState(), newState);
+  }
 
-            newState ^= inner;
-            return WalkResult::advance();
-          } else if (auto minfOp = dyn_cast<arith::MinFOp>(definingOp)) {
-            auto lhs = solver.getElementFor<FpRangeValueElement>(
-                *this, Position::forValue(minfOp.getLhs()),
-                DFX::Resolution::REQUIRED);
-            auto rhs = solver.getElementFor<FpRangeValueElement>(
-                *this, Position::forValue(minfOp.getRhs()),
-                DFX::Resolution::REQUIRED);
+  if (solver.getExplorer().walkDefiningOps(value, [&](OpResult result) {
+        LLVM_DEBUG(dbgs() << "  WALK: " << result << "\n");
+        Operation *definingOp = result.getDefiningOp();
+        // TODO: We shouldn't need to hard switch on LinalgOp here and should
+        // be relying on some kind of concept/interface. It just isn't
+        // clear what that would be.
+        if (auto linalgOp = dyn_cast<linalg::LinalgOp>(definingOp)) {
+          // Because we are working on per-layer statistics, we get to
+          // ignore the entire loop structure of the linalg op and just
+          // chase the stats up through the terminator (which will have
+          // values that match the results).
+          Block *loopBody = linalgOp.getBlock();
+          assert(!loopBody->empty());
+          Operation &terminator = loopBody->back();
+          Value loopBodyValue = terminator.getOperand(result.getResultNumber());
+          auto inner = solver.getElementFor<FloatRangeValueElement>(
+              *this, Position::forValue(loopBodyValue),
+              DFX::Resolution::REQUIRED);
 
-            newState.applyMinf(lhs.getAssumed(), rhs.getAssumed());
-            LLVM_DEBUG(dbgs() << "VISITING minf: lhs = " << lhs.getAsStr()
-                              << ", rhs = " << rhs.getAsStr() << " -> "
-                              << newState.getAssumed().getAsStr() << "\n");
-            return WalkResult::advance();
-          } else if (auto maxfOp = dyn_cast<arith::MaxFOp>(definingOp)) {
-            auto lhs = solver.getElementFor<FpRangeValueElement>(
-                *this, Position::forValue(maxfOp.getLhs()),
-                DFX::Resolution::REQUIRED);
-            auto rhs = solver.getElementFor<FpRangeValueElement>(
-                *this, Position::forValue(maxfOp.getRhs()),
-                DFX::Resolution::REQUIRED);
-
-            newState.applyMaxf(lhs.getAssumed(), rhs.getAssumed());
-            LLVM_DEBUG(dbgs() << "VISITING maxf: lhs = " << lhs.getAsStr()
-                              << ", rhs = " << rhs.getAsStr() << " -> "
-                              << newState.getAssumed().getAsStr() << "\n");
-            return WalkResult::advance();
-          } else if (auto floorOp = dyn_cast<math::FloorOp>(definingOp)) {
-            auto operand = solver.getElementFor<FpRangeValueElement>(
-                *this, Position::forValue(floorOp.getOperand()),
-                DFX::Resolution::REQUIRED);
-            newState.applyFloor(operand.getAssumed());
-            LLVM_DEBUG(dbgs()
-                       << "VISITING floor: " << operand.getAsStr() << " -> "
-                       << newState.getAssumed().getAsStr() << "\n");
-            return WalkResult::advance();
-          }
-
-          // Unrecognized op.
-          LLVM_DEBUG(dbgs() << "UNRECOGNIZED OP: " << *definingOp
-                            << " (signalling pessimistic fixpoint for " << value
-                            << ")\n");
-          newState.indicatePessimisticFixpoint();
+          newState ^= inner;
           return WalkResult::advance();
-        }) == TraversalResult::INCOMPLETE) {
-      newState.indicatePessimisticFixpoint();
-    }
+        } else if (auto minfOp = dyn_cast<arith::MinFOp>(definingOp)) {
+          auto lhs = solver.getElementFor<FloatRangeValueElement>(
+              *this, Position::forValue(minfOp.getLhs()),
+              DFX::Resolution::REQUIRED);
+          auto rhs = solver.getElementFor<FloatRangeValueElement>(
+              *this, Position::forValue(minfOp.getRhs()),
+              DFX::Resolution::REQUIRED);
+
+          newState.applyMinf(lhs.getAssumed(), rhs.getAssumed());
+          LLVM_DEBUG(dbgs() << "VISITING minf: lhs = " << lhs.getAsStr()
+                            << ", rhs = " << rhs.getAsStr() << " -> "
+                            << newState.getAssumed().getAsStr() << "\n");
+          return WalkResult::advance();
+        } else if (auto maxfOp = dyn_cast<arith::MaxFOp>(definingOp)) {
+          auto lhs = solver.getElementFor<FloatRangeValueElement>(
+              *this, Position::forValue(maxfOp.getLhs()),
+              DFX::Resolution::REQUIRED);
+          auto rhs = solver.getElementFor<FloatRangeValueElement>(
+              *this, Position::forValue(maxfOp.getRhs()),
+              DFX::Resolution::REQUIRED);
+
+          newState.applyMaxf(lhs.getAssumed(), rhs.getAssumed());
+          LLVM_DEBUG(dbgs() << "VISITING maxf: lhs = " << lhs.getAsStr()
+                            << ", rhs = " << rhs.getAsStr() << " -> "
+                            << newState.getAssumed().getAsStr() << "\n");
+          return WalkResult::advance();
+        } else if (auto floorOp = dyn_cast<math::FloorOp>(definingOp)) {
+          auto operand = solver.getElementFor<FloatRangeValueElement>(
+              *this, Position::forValue(floorOp.getOperand()),
+              DFX::Resolution::REQUIRED);
+          newState.applyFloor(operand.getAssumed());
+          LLVM_DEBUG(dbgs()
+                     << "VISITING floor: " << operand.getAsStr() << " -> "
+                     << newState.getAssumed().getAsStr() << "\n");
+          return WalkResult::advance();
+        }
+
+        // Unrecognized op.
+        LLVM_DEBUG(dbgs() << "UNRECOGNIZED OP: " << *definingOp
+                          << " (signalling pessimistic fixpoint for " << value
+                          << ")\n");
+        newState.indicatePessimisticFixpoint();
+        return WalkResult::advance();
+      }) == TraversalResult::INCOMPLETE) {
+    newState.indicatePessimisticFixpoint();
   }
 
   return DFX::clampStateAndIndicateChange(getState(), newState);
 }
 
-const std::string FpRangeValueElement::getAsStr() const {
+const std::string FloatRangeValueElement::getAsStr() const {
   auto range = getAssumed();
   std::string s("fp-range: ");
   s += range.getAsStr();
