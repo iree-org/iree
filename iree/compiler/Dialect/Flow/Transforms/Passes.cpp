@@ -123,6 +123,7 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
       // Input should now be legal.
       .addPass(createVerifyInputLegalityPass);
 
+  passManager.addPass(mlir::createLinalgNamedOpConversionPass());
   buildGlobalOptimizationPassPipeline(passManager, transformOptions);
 
   // Perform cleanup after variable simplification as more canonicalizers may be
@@ -143,7 +144,6 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
       .addPass(mlir::createCSEPass)
       .addPredicatedPass(clEnableLinalgDetensorize,
                          mlir::createLinalgDetensorizePass)
-
       // Dispatch region formation.
       .addPass(createConvertToFlowBeforeDispatchFormation)
       .addPass(mlir::createCanonicalizerPass)
