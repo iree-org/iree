@@ -33,7 +33,7 @@ WebGPUTargetOptions getWebGPUTargetOptionsFromFlags() {
       "iree-webgpu-debug-symbols",
       llvm::cl::desc(
           "Include debug information like variable names in outputs"),
-      llvm::cl::init(false));
+      llvm::cl::init(true));
 
   static llvm::cl::opt<bool> clWebGPUKeepShaderModules(
       "iree-webgpu-keep-shader-modules",
@@ -130,7 +130,12 @@ class WebGPUTargetBackend : public TargetBackend {
 
     // Serialize the spirv::ModuleOp into binary format.
     SmallVector<uint32_t, 0> spvBinary;
-    if (failed(spirv::serialize(spvModuleOp, spvBinary)) || spvBinary.empty()) {
+    spirv::SerializationOptions serializationOptions;
+    serializationOptions.emitSymbolName = options_.debugSymbols;
+    serializationOptions.emitDebugInfo = options_.debugSymbols;
+    if (failed(
+            spirv::serialize(spvModuleOp, spvBinary, serializationOptions)) ||
+        spvBinary.empty()) {
       return variantOp.emitError() << "failed to serialize spv.module";
     }
     if (options_.keepShaderModules) {
