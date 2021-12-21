@@ -95,6 +95,7 @@ class WebGPUTargetBackend : public TargetBackend {
     ModuleOp innerModuleOp = variantOp.getInnerModule();
     auto spirvModuleOps = innerModuleOp.getOps<spirv::ModuleOp>();
     if (!llvm::hasSingleElement(spirvModuleOps)) {
+      // TODO(#7824): Implement linking / shader module combining and relax this
       return variantOp.emitError()
              << "should only contain exactly one spv.module op";
     }
@@ -128,7 +129,7 @@ class WebGPUTargetBackend : public TargetBackend {
     }
 
     // Serialize the spirv::ModuleOp into binary format.
-    SmallVector<uint32_t, 256> spvBinary;
+    SmallVector<uint32_t, 0> spvBinary;
     if (failed(spirv::serialize(spvModuleOp, spvBinary)) || spvBinary.empty()) {
       return variantOp.emitError() << "failed to serialize spv.module";
     }
@@ -138,6 +139,8 @@ class WebGPUTargetBackend : public TargetBackend {
                            spvBinary.size_in_bytes());
 
       // Disassemble the shader and save that too.
+      // Note: this should match what getWebGPUTargetEnv used.
+      // TODO(scotttodd): Query spirv env from the executable variant?
       spvtools::SpirvTools spirvTools(SPV_ENV_VULKAN_1_0);
       std::string spvDisassembled;
       if (spirvTools.Disassemble(
