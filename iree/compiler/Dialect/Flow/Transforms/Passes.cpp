@@ -70,6 +70,40 @@ namespace {
 
 using FunctionLikeNest = MultiOpNest<FuncOp, IREE::Util::InitializerOp>;
 
+// Subset of the overall pass pipeline for optimizing globals and numerics.
+// We may ultimately break this out separately so creating a syntactic
+// distinction to keep that as an option.
+void buildGlobalOptimizationPassPipeline(
+    OpPassManager &mainPassManager, const TransformOptions &transformOptions) {
+  OpPassManager pipeline(ModuleOp::getOperationName());
+
+  FunctionLikeNest(pipeline)
+      // Simplify util.global accesses early on; this can help with dispatch
+      // region formation as redundant store-loads are removed.
+      .addPass(IREE::Util::createSimplifyGlobalAccessesPass);
+
+  // Module level cleanup and canonicalization of util.global (and other util
+  // ops).
+  pipeline.addPass(IREE::Util::createApplyPatternsPass());
+  pipeline.addPass(IREE::Util::createFoldGlobalsPass());
+
+  if (transformOptions.constExprHoisting) {
+    pipeline.addPass(IREE::Util::createHoistIntoGlobalsPass());
+  }
+
+  if (transformOptions.buildConstEvalPassPipeline) {
+    transformOptions.buildConstEvalPassPipeline(pipeline);
+  }
+
+  FunctionLikeNest(pipeline)
+      .addPass(mlir::createCanonicalizerPass)
+      .addPass(mlir::createCSEPass);
+
+  // Add the whole fixed point iterator.
+  mainPassManager.addPass(
+      IREE::Util::createFixedPointIteratorPass(std::move(pipeline)));
+}
+
 }  // namespace
 
 void buildFlowTransformPassPipeline(OpPassManager &passManager,
@@ -87,26 +121,14 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
                          })
 
       // Input should now be legal.
-      .addPass(createVerifyInputLegalityPass)
+      .addPass(createVerifyInputLegalityPass);
 
-      // Simplify util.global accesses early on; this can help with dispatch
-      // region formation as redundant store-loads are removed.
-      .addPass(IREE::Util::createSimplifyGlobalAccessesPass);
-
-  // Named op conversion to more canonical named op forms.
   passManager.addPass(mlir::createLinalgNamedOpConversionPass());
-
-  // Module level cleanup and canonicalization of util.global (and other util
-  // ops).
-  passManager.addPass(IREE::Util::createApplyPatternsPass());
-  passManager.addPass(IREE::Util::createFoldGlobalsPass());
+  buildGlobalOptimizationPassPipeline(passManager, transformOptions);
 
   // Perform cleanup after variable simplification as more canonicalizers may be
   // able to kick in.
   FunctionLikeNest(passManager)
-      .addPass(mlir::createCanonicalizerPass)
-      .addPass(mlir::createCSEPass)
-
       // Pad tensors.
       .addPass(createPadTensorToSubTensorInsertPass)
 

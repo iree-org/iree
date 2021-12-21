@@ -7,6 +7,8 @@
 #ifndef IREE_COMPILER_DIALECT_FLOW_TRANSFORMS_PASSES_H_
 #define IREE_COMPILER_DIALECT_FLOW_TRANSFORMS_PASSES_H_
 
+#include <functional>
+
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "llvm/ADT/StringMap.h"
 #include "mlir/IR/BuiltinOps.h"
@@ -23,7 +25,17 @@ namespace Flow {
 // Pipelines
 //===----------------------------------------------------------------------===//
 
-struct TransformOptions : public PassPipelineOptions<TransformOptions> {};
+struct TransformOptions : public PassPipelineOptions<TransformOptions> {
+  // Enables the iree-util-hoist-into-globals pass. This should eventually
+  // become the default.
+  bool constExprHoisting = false;
+
+  // Hook to populate a constant evaluation pass pipeline. If nullptr, then
+  // no passes are added for constant evaluation. This must be injected in
+  // because constant-evaluators can depend on the whole compiler, of which
+  // this is a part, and we maintain strict optionality for this component.
+  std::function<void(OpPassManager &passManager)> buildConstEvalPassPipeline;
+};
 
 // Adds a set of passes to the given pass manager that run the required flow
 // transforms in the canonical order.

@@ -8,6 +8,7 @@
 
 #include "iree/compiler/Bindings/Native/Transforms/Passes.h"
 #include "iree/compiler/Bindings/TFLite/Transforms/Passes.h"
+#include "iree/compiler/ConstEval/Passes.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "iree/compiler/Dialect/HAL/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Stream/Transforms/Passes.h"
@@ -77,8 +78,31 @@ static InputDialectOptions getInputDialectOptionsFromFlags() {
   return options;
 }
 
+static HighLevelOptimizationOptions getHighLevelOptimizationOptionsFromFlags() {
+  static llvm::cl::OptionCategory category(
+      "IREE options for controlling high level optimizations");
+
+  static llvm::cl::opt<bool> *constEval = new llvm::cl::opt<bool>{
+      "iree-const-eval",
+      llvm::cl::desc("Enables eager evaluation of constants using the full "
+                     "compiler and runtime"),
+      llvm::cl::init(false), llvm::cl::cat(category)};
+  static llvm::cl::opt<bool> *constExprHoisting = new llvm::cl::opt<bool>{
+      "iree-const-expr-hoisting",
+      llvm::cl::desc(
+          "Hoists the results of latent constant expressions into immutable "
+          "global initializers for evaluation at program load"),
+      llvm::cl::init(false), llvm::cl::cat(category)};
+
+  HighLevelOptimizationOptions options;
+  options.constEval = *constEval;
+  options.constExprHoisting = *constExprHoisting;
+  return options;
+}
+
 void buildIREEVMTransformPassPipeline(
     BindingOptions bindingOptions, InputDialectOptions inputOptions,
+    HighLevelOptimizationOptions highLevelOptimizationOptions,
     IREE::HAL::TargetOptions executableOptions,
     IREE::VM::TargetOptions targetOptions, OpPassManager &passManager) {
   // Input pipelines can result in changes to the exported functions and types
@@ -110,6 +134,14 @@ void buildIREEVMTransformPassPipeline(
   }
 
   IREE::Flow::TransformOptions flowOptions;
+  flowOptions.constExprHoisting =
+      highLevelOptimizationOptions.constExprHoisting;
+  if (highLevelOptimizationOptions.constEval) {
+    flowOptions.buildConstEvalPassPipeline = [](OpPassManager &passManager) {
+      passManager.addPass(ConstEval::createJitGlobalsPass());
+    };
+  }
+
   IREE::Flow::buildFlowTransformPassPipeline(passManager, flowOptions);
   IREE::Stream::TransformOptions streamOptions;
   IREE::Stream::buildStreamTransformPassPipeline(passManager, streamOptions);
@@ -121,6 +153,7 @@ void buildIREEVMTransformPassPipeline(
 void buildDefaultIREEVMTransformPassPipeline(OpPassManager &passManager) {
   buildIREEVMTransformPassPipeline(
       getBindingOptionsFromFlags(), getInputDialectOptionsFromFlags(),
+      getHighLevelOptimizationOptionsFromFlags(),
       IREE::HAL::getTargetOptionsFromFlags(),
       IREE::VM::getTargetOptionsFromFlags(), passManager);
 }
@@ -140,15 +173,16 @@ void registerIREEVMTransformPassPipeline() {
 static LogicalResult translateFromMLIRToVM(
     ModuleOp moduleOp, BindingOptions bindingOptions,
     InputDialectOptions inputOptions,
+    HighLevelOptimizationOptions highLevelOptimizationOptions,
     IREE::HAL::TargetOptions executableOptions,
     IREE::VM::TargetOptions targetOptions) {
   PassManager passManager(moduleOp.getContext());
   mlir::applyPassManagerCLOptions(passManager);
   mlir::applyDefaultTimingPassManagerCLOptions(passManager);
   passManager.addInstrumentation(std::make_unique<PassTracing>());
-  buildIREEVMTransformPassPipeline(bindingOptions, inputOptions,
-                                   executableOptions, targetOptions,
-                                   passManager);
+  buildIREEVMTransformPassPipeline(
+      bindingOptions, inputOptions, highLevelOptimizationOptions,
+      executableOptions, targetOptions, passManager);
   if (failed(passManager.run(moduleOp))) {
     return moduleOp.emitError() << "conversion from source -> vm failed";
   }
@@ -167,10 +201,13 @@ static LogicalResult translateFromMLIRToVMBytecodeModuleWithFlags(
   mlir::registerPassManagerCLOptions();
   auto bindingOptions = getBindingOptionsFromFlags();
   auto inputOptions = getInputDialectOptionsFromFlags();
+  auto highLevelOptimizationOptions =
+      getHighLevelOptimizationOptionsFromFlags();
   auto halTargetOptions = IREE::HAL::getTargetOptionsFromFlags();
   auto vmTargetOptions = IREE::VM::getTargetOptionsFromFlags();
   auto bytecodeTargetOptions = IREE::VM::getBytecodeTargetOptionsFromFlags();
   auto result = translateFromMLIRToVM(moduleOp, bindingOptions, inputOptions,
+                                      highLevelOptimizationOptions,
                                       halTargetOptions, vmTargetOptions);
   if (failed(result)) {
     return result;
@@ -188,10 +225,13 @@ static LogicalResult translateFromMLIRToVMCModuleWithFlags(
   mlir::registerPassManagerCLOptions();
   auto bindingOptions = getBindingOptionsFromFlags();
   auto inputOptions = getInputDialectOptionsFromFlags();
+  auto highLevelOptimizationOptions =
+      getHighLevelOptimizationOptionsFromFlags();
   auto halTargetOptions = IREE::HAL::getTargetOptionsFromFlags();
   auto vmTargetOptions = IREE::VM::getTargetOptionsFromFlags();
   auto cTargetOptions = IREE::VM::getCTargetOptionsFromFlags();
   auto result = translateFromMLIRToVM(moduleOp, bindingOptions, inputOptions,
+                                      highLevelOptimizationOptions,
                                       halTargetOptions, vmTargetOptions);
   if (failed(result)) {
     return result;

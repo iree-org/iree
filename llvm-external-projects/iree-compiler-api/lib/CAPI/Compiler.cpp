@@ -35,6 +35,7 @@ namespace {
 struct CompilerOptions {
   BindingOptions bindingOptions;
   InputDialectOptions inputDialectOptions;
+  HighLevelOptimizationOptions highLevelOptimizationOptions;
   HALTargetOptions executableOptions;
   VMTargetOptions vmTargetOptions;
   VMBytecodeTargetOptions vmBytecodeTargetOptions;
@@ -95,8 +96,8 @@ void ireeCompilerBuildIREEVMPassPipeline(IreeCompilerOptions options,
   auto *passManagerCpp = unwrap(passManager);
   buildIREEVMTransformPassPipeline(
       optionsCpp->bindingOptions, optionsCpp->inputDialectOptions,
-      optionsCpp->executableOptions, optionsCpp->vmTargetOptions,
-      *passManagerCpp);
+      optionsCpp->highLevelOptimizationOptions, optionsCpp->executableOptions,
+      optionsCpp->vmTargetOptions, *passManagerCpp);
 }
 
 // Translates a module op derived from the ireeCompilerBuildIREEVMPassPipeline

@@ -20,11 +20,13 @@ iree_cc_library(
     "ApplyPatterns.cpp"
     "CombineInitializers.cpp"
     "DropCompilerHints.cpp"
+    "FixedPointIterator.cpp"
     "FoldGlobals.cpp"
     "FuseGlobals.cpp"
     "HoistIntoGlobals.cpp"
     "Patterns.cpp"
     "SimplifyGlobalAccesses.cpp"
+    "TestFloatRangeAnalysis.cpp"
   DEPS
     LLVMSupport
     MLIRAnalysis
@@ -33,7 +35,10 @@ iree_cc_library(
     MLIRStandard
     MLIRSupport
     MLIRTransforms
+    iree::compiler::Dialect::Util::Analysis
+    iree::compiler::Dialect::Util::Analysis::Attributes
     iree::compiler::Dialect::Util::Analysis::Constant
+    iree::compiler::Dialect::Util::Analysis::DFX
     iree::compiler::Dialect::Util::IR
   PUBLIC
 )

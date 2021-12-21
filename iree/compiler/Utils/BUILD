@@ -18,6 +18,7 @@ cc_library(
         "ConversionUtils.cpp",
         "FlatbufferUtils.cpp",
         "GraphUtils.cpp",
+        "PassUtils.cpp",
         "TracingUtils.cpp",
     ],
     hdrs = [
