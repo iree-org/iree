@@ -1,4 +1,4 @@
-# Copyright 2019 The IREE Authors
+# Copyright 2021 The IREE Authors
 #
 # Licensed under the Apache License v2.0 with LLVM Exceptions.
 # See https://llvm.org/LICENSE.txt for license information.
@@ -11,34 +11,23 @@ package(
 )
 
 cc_library(
-    name = "Transforms",
+    name = "Attributes",
     srcs = [
-        "ApplyPatterns.cpp",
-        "CombineInitializers.cpp",
-        "DropCompilerHints.cpp",
-        "FoldGlobals.cpp",
-        "FuseGlobals.cpp",
-        "HoistIntoGlobals.cpp",
-        "Patterns.cpp",
-        "SimplifyGlobalAccesses.cpp",
-        "TestFloatRangeAnalysis.cpp",
+        "PotentialValues.cpp",
+        "Range.cpp",
     ],
     hdrs = [
-        "Passes.h",
-        "Patterns.h",
+        "PotentialValues.h",
+        "Range.h",
     ],
     deps = [
-        "//iree/compiler/Dialect/Util/Analysis",
-        "//iree/compiler/Dialect/Util/Analysis/Attributes",
-        "//iree/compiler/Dialect/Util/Analysis/Constant",
         "//iree/compiler/Dialect/Util/Analysis/DFX",
         "//iree/compiler/Dialect/Util/IR",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:Analysis",
         "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:LinalgOps",
         "@llvm-project//mlir:Pass",
-        "@llvm-project//mlir:StandardOps",
         "@llvm-project//mlir:Support",
-        "@llvm-project//mlir:Transforms",
     ],
 )
