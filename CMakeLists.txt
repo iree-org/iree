@@ -335,9 +335,11 @@ endif()
 # This will only run if python3 is available.
 #-------------------------------------------------------------------------------
 
+option(IREE_ERROR_ON_MISSING_SUBMODULES "Error if submodules have not been initialized." ON)
+
 find_package(Python3 COMPONENTS Interpreter QUIET)
 find_package(Git)
-if(Python3_FOUND AND Git_FOUND)
+if(IREE_ERROR_ON_MISSING_SUBMODULES AND Python3_FOUND AND Git_FOUND)
   # Only check submodule status when the git commit changes.
   execute_process(
     COMMAND git rev-parse --short HEAD
