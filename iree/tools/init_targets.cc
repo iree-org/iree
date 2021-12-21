@@ -26,6 +26,9 @@
 #ifdef IREE_HAVE_VULKANSPIRV_TARGET
 #include "iree/compiler/Dialect/HAL/Target/VulkanSPIRV/VulkanSPIRVTarget.h"
 #endif  // IREE_HAVE_VULKANSPIRV_TARGET
+#ifdef IREE_HAVE_WEBGPU_TARGET
+#include "iree/compiler/Dialect/HAL/Target/WebGPU/WebGPUTarget.h"
+#endif  // IREE_HAVE_WEBGPU_TARGET
 
 namespace mlir {
 namespace iree_compiler {
@@ -58,6 +61,10 @@ void registerHALTargetBackends() {
     IREE::HAL::registerVulkanSPIRVTargetBackends(
         []() { return IREE::HAL::getVulkanSPIRVTargetOptionsFromFlags(); });
 #endif  // IREE_HAVE_VULKANSPIRV_TARGET
+#ifdef IREE_HAVE_WEBGPU_TARGET
+    IREE::HAL::registerWebGPUTargetBackends(
+        []() { return IREE::HAL::getWebGPUTargetOptionsFromFlags(); });
+#endif  // IREE_HAVE_WEBGPU_TARGET
     return true;
   }();
   (void)init_once;
