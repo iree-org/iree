@@ -28,7 +28,7 @@ static llvm::cl::opt<bool> clCheckIRBeforeLLVMConversion(
     "iree-codegen-check-ir-before-llvm-conversion",
     llvm::cl::desc("Runs the pass to check the IR generated from LLVMCPU "
                    "before conversion to LLVM IR"),
-    llvm::cl::init(true));
+    llvm::cl::init(false));
 
 //===---------------------------------------------------------------------===//
 // Default allocation functions for CPU backend
