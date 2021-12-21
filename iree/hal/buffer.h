@@ -234,14 +234,14 @@ IREE_API_EXPORT iree_string_view_t iree_hal_buffer_usage_format(
 // it will never be used in a way that requires coherency may occupy address
 // space reservations or memory mapping that would otherwise not be needed.
 //
-// As buffers may sometimes not be accessible from the host the base Buffer type
+// As buffers may sometimes not be accessible from the host the base buffer type
 // does not allow for direct void* access and instead buffers must be either
 // manipulated using utility functions (such as ReadData or WriteData) or by
-// mapping them into a host-accessible address space via MapMemory. Buffer must
-// be unmapped before any command may use it.
+// mapping them into a host-accessible address space via MapMemory. Buffers must
+// be unmapped before any command may use them.
 //
-// Buffers may map (roughly) 1:1 with an allocation either from the host heap or
-// a device. iree_hal_buffer_subspan can be used to reference subspans of
+// Buffers may equate (roughly) 1:1 with an allocation either from the host heap
+// or a device. iree_hal_buffer_subspan can be used to reference subspans of
 // buffers like std::span - though unlike std::span the returned buffer holds
 // a reference to the parent buffer.
 typedef struct iree_hal_buffer_t iree_hal_buffer_t;

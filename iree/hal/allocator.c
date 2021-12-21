@@ -104,6 +104,15 @@ IREE_API_EXPORT iree_status_t iree_hal_allocator_wrap_buffer(
   return status;
 }
 
+IREE_API_EXPORT void iree_hal_allocator_deallocate_buffer(
+    iree_hal_allocator_t* allocator, iree_hal_buffer_t* buffer) {
+  IREE_ASSERT_ARGUMENT(allocator);
+  IREE_ASSERT_ARGUMENT(buffer);
+  IREE_TRACE_ZONE_BEGIN(z0);
+  _VTABLE_DISPATCH(allocator, deallocate_buffer)(allocator, buffer);
+  IREE_TRACE_ZONE_END(z0);
+}
+
 IREE_API_EXPORT iree_status_t iree_hal_allocator_statistics_fprint(
     FILE* file, iree_hal_allocator_t* allocator) {
 #if IREE_STATISTICS_ENABLE
@@ -111,7 +120,8 @@ IREE_API_EXPORT iree_status_t iree_hal_allocator_statistics_fprint(
   iree_hal_allocator_query_statistics(allocator, &statistics);
 
   iree_string_builder_t builder;
-  iree_string_builder_initialize(iree_allocator_system(), &builder);
+  iree_string_builder_initialize(iree_hal_allocator_host_allocator(allocator),
+                                 &builder);
 
   // TODO(benvanik): query identifier for the allocator so we can denote which
   // device is being reported.
@@ -126,6 +136,7 @@ IREE_API_EXPORT iree_status_t iree_hal_allocator_statistics_fprint(
     fprintf(file, "%.*s", (int)iree_string_builder_size(&builder),
             iree_string_builder_buffer(&builder));
   }
+
   iree_string_builder_deinitialize(&builder);
   return status;
 #else

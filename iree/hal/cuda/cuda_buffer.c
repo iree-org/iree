@@ -12,7 +12,6 @@
 
 #include "iree/base/api.h"
 #include "iree/base/tracing.h"
-#include "iree/hal/cuda/cuda_allocator.h"
 
 typedef struct iree_hal_cuda_buffer_t {
   iree_hal_buffer_t base;
@@ -61,12 +60,7 @@ static void iree_hal_cuda_buffer_destroy(iree_hal_buffer_t* base_buffer) {
   iree_hal_cuda_buffer_t* buffer = iree_hal_cuda_buffer_cast(base_buffer);
   iree_allocator_t host_allocator = base_buffer->host_allocator;
   IREE_TRACE_ZONE_BEGIN(z0);
-
-  iree_hal_cuda_allocator_free(buffer->base.device_allocator,
-                               buffer->base.memory_type, buffer->device_ptr,
-                               buffer->host_ptr, buffer->base.allocation_size);
   iree_allocator_free(host_allocator, buffer);
-
   IREE_TRACE_ZONE_END(z0);
 }
 
@@ -121,6 +115,11 @@ CUdeviceptr iree_hal_cuda_buffer_device_pointer(
     iree_hal_buffer_t* base_buffer) {
   iree_hal_cuda_buffer_t* buffer = iree_hal_cuda_buffer_cast(base_buffer);
   return buffer->device_ptr;
+}
+
+void* iree_hal_cuda_buffer_host_pointer(iree_hal_buffer_t* base_buffer) {
+  iree_hal_cuda_buffer_t* buffer = iree_hal_cuda_buffer_cast(base_buffer);
+  return buffer->host_ptr;
 }
 
 static const iree_hal_buffer_vtable_t iree_hal_cuda_buffer_vtable = {

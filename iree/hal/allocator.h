@@ -215,10 +215,16 @@ typedef struct iree_hal_allocator_vtable_t {
       iree_hal_memory_access_t allowed_access,
       iree_hal_buffer_usage_t allowed_usage, iree_byte_span_t data,
       iree_allocator_t data_allocator, iree_hal_buffer_t** out_buffer);
+
+  void(IREE_API_PTR* deallocate_buffer)(iree_hal_allocator_t* allocator,
+                                        iree_hal_buffer_t* buffer);
 } iree_hal_allocator_vtable_t;
 
 IREE_API_EXPORT void iree_hal_allocator_destroy(
     iree_hal_allocator_t* allocator);
+
+IREE_API_EXPORT void iree_hal_allocator_deallocate_buffer(
+    iree_hal_allocator_t* allocator, iree_hal_buffer_t* buffer);
 
 #if IREE_STATISTICS_ENABLE
 

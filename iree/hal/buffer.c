@@ -155,8 +155,6 @@ static const iree_hal_buffer_vtable_t iree_hal_subspan_buffer_vtable = {
 // iree_hal_buffer_t
 //===----------------------------------------------------------------------===//
 
-IREE_HAL_API_RETAIN_RELEASE(buffer);
-
 IREE_API_EXPORT void iree_hal_buffer_initialize(
     iree_allocator_t host_allocator, iree_hal_allocator_t* device_allocator,
     iree_hal_buffer_t* allocated_buffer, iree_device_size_t allocation_size,
@@ -179,6 +177,34 @@ IREE_API_EXPORT void iree_hal_buffer_initialize(
   // initializing.
   if (allocated_buffer != buffer) {
     iree_hal_buffer_retain(buffer->allocated_buffer);
+  }
+}
+
+IREE_API_EXPORT void iree_hal_buffer_destroy(iree_hal_buffer_t* buffer) {
+  if (IREE_LIKELY(buffer)) {
+    IREE_HAL_VTABLE_DISPATCH(buffer, iree_hal_buffer, destroy)
+    (buffer);
+  }
+}
+
+IREE_API_EXPORT void iree_hal_buffer_retain(iree_hal_buffer_t* buffer) {
+  if (IREE_LIKELY(buffer)) {
+    iree_atomic_ref_count_inc(&((iree_hal_resource_t*)(buffer))->ref_count);
+  }
+}
+
+IREE_API_EXPORT void iree_hal_buffer_release(iree_hal_buffer_t* buffer) {
+  if (IREE_LIKELY(buffer) &&
+      iree_atomic_ref_count_dec(&((iree_hal_resource_t*)(buffer))->ref_count) ==
+          1) {
+    // If the buffer comes from an allocator then we route back the destruction
+    // request to that. It may decide to keep the buffer alive in a pool or
+    // do some allocator-specific cleanup.
+    if (buffer->device_allocator) {
+      iree_hal_allocator_deallocate_buffer(buffer->device_allocator, buffer);
+    } else {
+      iree_hal_buffer_destroy(buffer);
+    }
   }
 }
 

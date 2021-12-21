@@ -180,6 +180,13 @@ static iree_status_t iree_hal_heap_allocator_wrap_buffer(
                                    data_allocator, out_buffer);
 }
 
+static void iree_hal_heap_allocator_deallocate_buffer(
+    iree_hal_allocator_t* base_allocator, iree_hal_buffer_t* base_buffer) {
+  // We don't do any pooling yet.
+  // TODO(benvanik): move stats tracking here.
+  iree_hal_buffer_destroy(base_buffer);
+}
+
 static const iree_hal_allocator_vtable_t iree_hal_heap_allocator_vtable = {
     .destroy = iree_hal_heap_allocator_destroy,
     .host_allocator = iree_hal_heap_allocator_host_allocator,
@@ -188,4 +195,5 @@ static const iree_hal_allocator_vtable_t iree_hal_heap_allocator_vtable = {
         iree_hal_heap_allocator_query_buffer_compatibility,
     .allocate_buffer = iree_hal_heap_allocator_allocate_buffer,
     .wrap_buffer = iree_hal_heap_allocator_wrap_buffer,
+    .deallocate_buffer = iree_hal_heap_allocator_deallocate_buffer,
 };

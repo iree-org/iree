@@ -10,7 +10,6 @@
 #include <stdint.h>
 #include <string.h>
 
-#include "experimental/rocm/rocm_allocator.h"
 #include "iree/base/api.h"
 #include "iree/base/tracing.h"
 
@@ -61,12 +60,7 @@ static void iree_hal_rocm_buffer_destroy(iree_hal_buffer_t* base_buffer) {
   iree_hal_rocm_buffer_t* buffer = iree_hal_rocm_buffer_cast(base_buffer);
   iree_allocator_t host_allocator = base_buffer->host_allocator;
   IREE_TRACE_ZONE_BEGIN(z0);
-
-  iree_hal_rocm_allocator_free(buffer->base.allocator, buffer->base.memory_type,
-                               buffer->device_ptr, buffer->host_ptr,
-                               buffer->base.allocation_size);
   iree_allocator_free(host_allocator, buffer);
-
   IREE_TRACE_ZONE_END(z0);
 }
 
@@ -121,6 +115,11 @@ hipDeviceptr_t iree_hal_rocm_buffer_device_pointer(
     iree_hal_buffer_t* base_buffer) {
   iree_hal_rocm_buffer_t* buffer = iree_hal_rocm_buffer_cast(base_buffer);
   return buffer->device_ptr;
+}
+
+void* iree_hal_rocm_buffer_host_pointer(iree_hal_buffer_t* base_buffer) {
+  iree_hal_rocm_buffer_t* buffer = iree_hal_rocm_buffer_cast(base_buffer);
+  return buffer->host_ptr;
 }
 
 static const iree_hal_buffer_vtable_t iree_hal_rocm_buffer_vtable = {
