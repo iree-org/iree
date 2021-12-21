@@ -67,12 +67,6 @@ vm.import @buffer.assert(
   %buffer_usage : i32
 )
 
-// Returns the allocator the buffer was allocated with.
-vm.import @buffer.allocator(
-  %buffer : !vm.ref<!hal.buffer>
-) -> !vm.ref<!hal.allocator>
-attributes {nosideeffects}
-
 // Returns a reference to a subspan of the buffer.
 vm.import @buffer.subspan(
   %source_buffer : !vm.ref<!hal.buffer>,

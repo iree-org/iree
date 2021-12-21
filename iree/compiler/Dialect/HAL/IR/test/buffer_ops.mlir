@@ -1,15 +1,4 @@
-// Tests printing and parsing of hal.buffer ops.
-
 // RUN: iree-opt -split-input-file %s | iree-opt -split-input-file | IreeFileCheck %s
-
-// CHECK-LABEL: @buffer_allocator
-func @buffer_allocator(%arg0: !hal.buffer) -> !hal.allocator {
-  // CHECK: %allocator = hal.buffer.allocator<%arg0 : !hal.buffer> : !hal.allocator
-  %allocator = hal.buffer.allocator<%arg0 : !hal.buffer> : !hal.allocator
-  return %allocator : !hal.allocator
-}
-
-// -----
 
 // CHECK-LABEL: @buffer_subspan
 func @buffer_subspan(%arg0: !hal.buffer) -> !hal.buffer {

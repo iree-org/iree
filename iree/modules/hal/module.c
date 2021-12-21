@@ -508,15 +508,6 @@ IREE_VM_ABI_EXPORT(iree_hal_module_buffer_assert,  //
   return iree_ok_status();
 }
 
-IREE_VM_ABI_EXPORT(iree_hal_module_buffer_allocator,  //
-                   iree_hal_module_state_t,           //
-                   r, r) {
-  iree_hal_buffer_t* buffer = NULL;
-  IREE_RETURN_IF_ERROR(iree_hal_buffer_check_deref(args->r0, &buffer));
-  rets->r0 = iree_hal_allocator_retain_ref(iree_hal_buffer_allocator(buffer));
-  return iree_ok_status();
-}
-
 IREE_VM_ABI_EXPORT(iree_hal_module_buffer_subspan,  //
                    iree_hal_module_state_t,         //
                    rii, r) {

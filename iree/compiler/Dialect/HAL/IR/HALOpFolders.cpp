@@ -49,40 +49,6 @@ OpFoldResult TensorExportOp::fold(ArrayRef<Attribute> operands) {
 }
 
 //===----------------------------------------------------------------------===//
-// hal.buffer.*
-//===----------------------------------------------------------------------===//
-
-namespace {
-
-/// Skips a hal.buffer.allocator accessor when the buffer view was created in
-/// the same scope and we know the origin buffer.
-struct SkipBufferAllocatorOp : public OpRewritePattern<BufferAllocatorOp> {
-  using OpRewritePattern<BufferAllocatorOp>::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(BufferAllocatorOp op,
-                                PatternRewriter &rewriter) const override {
-    if (auto allocateOp = dyn_cast_or_null<AllocatorAllocateOp>(
-            op.buffer().getDefiningOp())) {
-      rewriter.replaceOp(op, allocateOp.allocator());
-      return success();
-    } else if (auto subspanOp = dyn_cast_or_null<BufferSubspanOp>(
-                   op.buffer().getDefiningOp())) {
-      rewriter.replaceOpWithNewOp<BufferAllocatorOp>(op, op.result().getType(),
-                                                     subspanOp.source_buffer());
-      return success();
-    }
-    return failure();
-  }
-};
-
-}  // namespace
-
-void BufferAllocatorOp::getCanonicalizationPatterns(
-    OwningRewritePatternList &results, MLIRContext *context) {
-  results.insert<SkipBufferAllocatorOp>(context);
-}
-
-//===----------------------------------------------------------------------===//
 // hal.buffer_view.*
 //===----------------------------------------------------------------------===//
 

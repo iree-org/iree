@@ -16,7 +16,6 @@ iree_lit_test_suite(
   SRCS
     "allocator_ops.mlir"
     "attributes.mlir"
-    "buffer_folding.mlir"
     "buffer_ops.mlir"
     "buffer_view_folding.mlir"
     "buffer_view_ops.mlir"

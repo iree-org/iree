@@ -90,8 +90,6 @@ void populateHALBufferToVMPatterns(MLIRContext *context,
                                    OwningRewritePatternList &patterns) {
   patterns.insert<VMImportOpConversion<IREE::HAL::BufferAssertOp>>(
       context, importSymbols, typeConverter, "hal.buffer.assert");
-  patterns.insert<VMImportOpConversion<IREE::HAL::BufferAllocatorOp>>(
-      context, importSymbols, typeConverter, "hal.buffer.allocator");
   patterns.insert<VMImportOpConversion<IREE::HAL::BufferSubspanOp>>(
       context, importSymbols, typeConverter, "hal.buffer.subspan");
   patterns.insert<VMImportOpConversion<IREE::HAL::BufferLengthOp>>(
