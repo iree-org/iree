@@ -37,7 +37,7 @@ class VerifyInputLegalityPass
 };
 }  // namespace
 
-std::unique_ptr<OperationPass<mlir::FuncOp>> createVerifyInputLegalityPass() {
+std::unique_ptr<Pass> createVerifyInputLegalityPass() {
   return std::make_unique<VerifyInputLegalityPass>();
 }
 

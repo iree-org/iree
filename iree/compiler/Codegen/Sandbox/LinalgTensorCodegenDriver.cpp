@@ -9,7 +9,7 @@
 #include "iree/compiler/Codegen/Sandbox/Passes.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
-#include "mlir/Dialect/Linalg/IR/LinalgOps.h"
+#include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Passes.h"
 #include "mlir/Dialect/Linalg/Transforms/CodegenStrategy.h"
 #include "mlir/Dialect/Linalg/Transforms/Hoisting.h"
@@ -55,8 +55,8 @@ static FailureOr<LinalgTilingAndFusionOptions> getTileAndFuseOptionsFromConfig(
     for (auto op : computeOps) {
       if (auto currLoweringConfig = iree_compiler::getLoweringConfig(op)) {
         if (loweringConfig) {
-          return {funcOp.emitOpError(
-              "unhandled multiple lowering configurations in compute ops")};
+          return LogicalResult(funcOp.emitOpError(
+              "unhandled multiple lowering configurations in compute ops"));
         }
         loweringConfig = currLoweringConfig;
       }

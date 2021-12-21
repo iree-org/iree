@@ -10,7 +10,7 @@
 #include "iree/compiler/Dialect/Flow/IR/FlowTypes.h"
 #include "iree/compiler/Dialect/Flow/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
-#include "mlir/Dialect/Linalg/IR/LinalgOps.h"
+#include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/PatternMatch.h"
@@ -147,13 +147,11 @@ struct ConvertToFlowAfterDispatchFormation
 
 }  // namespace
 
-std::unique_ptr<OperationPass<mlir::FuncOp>>
-createConvertToFlowBeforeDispatchFormation() {
+std::unique_ptr<Pass> createConvertToFlowBeforeDispatchFormation() {
   return std::make_unique<ConvertToFlowBeforeDispatchFormation>();
 }
 
-std::unique_ptr<OperationPass<mlir::FuncOp>>
-createConvertToFlowAfterDispatchFormation() {
+std::unique_ptr<Pass> createConvertToFlowAfterDispatchFormation() {
   return std::make_unique<ConvertToFlowAfterDispatchFormation>();
 }
 

@@ -24,7 +24,7 @@ typedef struct iree_hal_cuda_allocator_t {
   IREE_STATISTICS(iree_hal_allocator_statistics_t statistics;)
 } iree_hal_cuda_allocator_t;
 
-extern const iree_hal_allocator_vtable_t iree_hal_cuda_allocator_vtable;
+static const iree_hal_allocator_vtable_t iree_hal_cuda_allocator_vtable;
 
 static iree_hal_cuda_allocator_t* iree_hal_cuda_allocator_cast(
     iree_hal_allocator_t* base_value) {
@@ -239,7 +239,7 @@ static iree_status_t iree_hal_cuda_allocator_wrap_buffer(
                           "wrapping of external buffers not supported");
 }
 
-const iree_hal_allocator_vtable_t iree_hal_cuda_allocator_vtable = {
+static const iree_hal_allocator_vtable_t iree_hal_cuda_allocator_vtable = {
     .destroy = iree_hal_cuda_allocator_destroy,
     .host_allocator = iree_hal_cuda_allocator_host_allocator,
     .query_statistics = iree_hal_cuda_allocator_query_statistics,

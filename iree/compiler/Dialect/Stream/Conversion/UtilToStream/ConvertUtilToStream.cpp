@@ -188,6 +188,7 @@ struct GlobalStoreOpExpansion
     // refinement will make this go away if possible.
     auto value =
         consumeTensorOperand(storeOp.getLoc(), adaptor.value(), rewriter);
+    assert(expandedGlobal.resourceOp && "Missing resource op");
     auto transferOp = rewriter.create<IREE::Stream::AsyncTransferOp>(
         storeOp.getLoc(), expandedGlobal.resourceOp.type(), value.resource,
         value.resourceSize, value.resourceSize, /*source_affinity=*/nullptr,

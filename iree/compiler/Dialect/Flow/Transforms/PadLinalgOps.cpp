@@ -6,7 +6,7 @@
 
 #include "iree/compiler/Dialect/Flow/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
-#include "mlir/Dialect/Linalg/IR/LinalgOps.h"
+#include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
@@ -150,8 +150,7 @@ class PadLinalgOpsPass : public PadLinalgOpsBase<PadLinalgOpsPass> {
 };
 }  // namespace
 
-std::unique_ptr<OperationPass<mlir::FuncOp>>
-createPadLinalgOpsToIntegerMultiplePass(int paddingSize) {
+std::unique_ptr<Pass> createPadLinalgOpsToIntegerMultiplePass(int paddingSize) {
   return std::make_unique<PadLinalgOpsPass>(paddingSize);
 }
 

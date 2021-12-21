@@ -17,6 +17,7 @@
 #include "iree-dialects/Dialect/LinalgExt/Transforms/Passes.h"
 #include "iree/compiler/Bindings/Native/Transforms/Passes.h"
 #include "iree/compiler/Bindings/TFLite/Transforms/Passes.h"
+#include "iree/compiler/ConstEval/Passes.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "iree/compiler/Dialect/HAL/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Modules/VMVX/Transforms/Passes.h"
@@ -43,6 +44,7 @@ inline void registerAllIreePasses() {
   registerCommonInputConversionPasses();
   MHLO::registerMHLOConversionPasses();
   registerTOSAConversionPasses();
+  ConstEval::registerConstEvalPasses();
 
   IREE::Flow::registerFlowPasses();
   IREE::HAL::registerHALPasses();

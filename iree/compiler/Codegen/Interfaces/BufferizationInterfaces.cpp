@@ -115,10 +115,9 @@ struct DispatchTensorLoadOpInterface
     Value source = getSubspanBuffer(loadOp.source(), b, state);
 
     // Bufferize to subview.
-    Value subView = b.create<memref::SubViewOp>(
-        loadOp->getLoc(), source, loadOp.getMixedOffsets(),
-        loadOp.getMixedSizes(), loadOp.getMixedStrides());
-    state.mapBuffer(loadOp.result(), subView);
+    state.replaceOpWithNewOp<memref::SubViewOp>(
+        b, op, source, loadOp.getMixedOffsets(), loadOp.getMixedSizes(),
+        loadOp.getMixedStrides());
 
     return success();
   }
@@ -162,15 +161,18 @@ struct InplaceTensorStoreOpAnalysis : public PostAnalysisStep {
 struct DispatchTensorStoreOpInterface
     : public BufferizableOpInterface::ExternalModel<
           DispatchTensorStoreOpInterface, IREE::Flow::DispatchTensorStoreOp> {
-  bool bufferizesToMemoryRead(Operation *op, OpOperand &opOperand) const {
+  bool bufferizesToMemoryRead(Operation *op, OpOperand &opOperand,
+                              BufferizationState &state) const {
     return true;
   }
 
-  bool bufferizesToMemoryWrite(Operation *op, OpOperand &opOperand) const {
+  bool bufferizesToMemoryWrite(Operation *op, OpOperand &opOperand,
+                               BufferizationState &state) const {
     return false;
   }
 
-  OpResult getAliasingOpResult(Operation *op, OpOperand &opOperand) const {
+  OpResult getAliasingOpResult(Operation *op, OpOperand &opOperand,
+                               BufferizationState &state) const {
     return OpResult();
   }
 
@@ -193,7 +195,7 @@ struct DispatchTensorStoreOpInterface
       state.createMemCpy(b, storeOp->getLoc(), srcMemref, subView);
     }
 
-    state.markOpObsolete(storeOp);
+    storeOp.erase();
     return success();
   }
 };

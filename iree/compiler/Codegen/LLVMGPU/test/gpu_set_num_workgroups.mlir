@@ -432,3 +432,62 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb">
 // CHECK-SAME:       lowering.config = #[[CONFIG]]
 //      CHECK:   linalg.matmul
 // CHECK-SAME:       lowering.config = #[[CONFIG]]
+
+// -----
+
+hal.executable private @sort_op {
+  hal.interface public @io attributes {push_constants = 0 : index} {
+    hal.interface.binding public @s0b0, set=0, binding=0, type="StorageBuffer"
+    hal.interface.binding public @s0b1, set=0, binding=1, type="StorageBuffer"
+    hal.interface.binding public @s0b2, set=0, binding=2, type="StorageBuffer"
+    hal.interface.binding public @s0b3, set=0, binding=3, type="StorageBuffer"
+  }
+  hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb", {target_arch = "sm_35"}> {
+    hal.executable.entry_point public @sort_op attributes {interface = @io, ordinal = 0 : index}
+    builtin.module  {
+      func @sort_op() {
+        %c1 = arith.constant 1 : index
+        %c0 = arith.constant 0 : index
+        %c2304000 = arith.constant 2304000 : index
+        %0 = hal.interface.binding.subspan @io::@s0b0[%c0] {alignment = 32 : index} : !flow.dispatch.tensor<readonly:1x576000xf32>
+        %1 = hal.interface.binding.subspan @io::@s0b1[%c0] {alignment = 32 : index} : !flow.dispatch.tensor<readonly:1x576000xi32>
+        %2 = hal.interface.binding.subspan @io::@s0b2[%c0] {alignment = 32 : index} : !flow.dispatch.tensor<writeonly:1x576000xf32>
+        %3 = hal.interface.binding.subspan @io::@s0b3[%c2304000] {alignment = 32 : index} : !flow.dispatch.tensor<writeonly:1x576000xi32>
+        %workgroup_size_x = hal.interface.workgroup.size[0] : index
+        %workgroup_id_x = hal.interface.workgroup.id[0] : index
+        %workgroup_count_x = hal.interface.workgroup.count[0] : index
+        %4 = affine.apply affine_map<()[s0, s1] -> (s1 * s0)>()[%workgroup_size_x, %workgroup_id_x]
+        %5 = affine.apply affine_map<()[s0, s1] -> (s1 * s0)>()[%workgroup_size_x, %workgroup_count_x]
+        scf.for %arg0 = %4 to %c1 step %5 {
+          %6 = affine.min affine_map<(d0)[s0] -> (s0, -d0 + 1)>(%arg0)[%workgroup_size_x]
+          %7 = flow.dispatch.tensor.load %0, offsets = [%arg0, 0], sizes = [%6, 576000], strides = [1, 1] : !flow.dispatch.tensor<readonly:1x576000xf32> -> tensor<?x576000xf32>
+          %8 = flow.dispatch.tensor.load %1, offsets = [%arg0, 0], sizes = [%6, 576000], strides = [1, 1] : !flow.dispatch.tensor<readonly:1x576000xi32> -> tensor<?x576000xi32>
+          %9:2 = iree_linalg_ext.sort dimension(1) outs(%7, %8 : tensor<?x576000xf32>, tensor<?x576000xi32>)  {
+          ^bb0(%arg1: f32, %arg2: f32, %arg3: i32, %arg4: i32):  // no predecessors
+            %10 = arith.cmpf ogt, %arg1, %arg2 : f32
+            iree_linalg_ext.yield %10 : i1
+          } -> tensor<?x576000xf32>, tensor<?x576000xi32>
+          flow.dispatch.tensor.store %9#0, %2, offsets = [%arg0, 0], sizes = [%6, 576000], strides = [1, 1] : tensor<?x576000xf32> -> !flow.dispatch.tensor<writeonly:1x576000xf32>
+          flow.dispatch.tensor.store %9#1, %3, offsets = [%arg0, 0], sizes = [%6, 576000], strides = [1, 1] : tensor<?x576000xi32> -> !flow.dispatch.tensor<writeonly:1x576000xi32>
+        }
+        return
+      }
+      hal.interface private @io attributes {push_constants = 0 : index} {
+        hal.interface.binding public @s0b0, set=0, binding=0, type="StorageBuffer"
+        hal.interface.binding public @s0b1, set=0, binding=1, type="StorageBuffer"
+        hal.interface.binding public @s0b2, set=0, binding=2, type="StorageBuffer"
+        hal.interface.binding public @s0b3, set=0, binding=3, type="StorageBuffer"
+      }
+    }
+  }
+}
+
+//   CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering.config<tile_sizes = {{\[}}[64]{{\]}}, native_vector_size = []>
+//   CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 64)>
+//   CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"LLVMGPUDistribute", workload_per_wg = [64]>
+//       CHECK: hal.executable.entry_point public @sort_op
+//  CHECK-SAME:   translation.info = #[[TRANSLATION]]
+
+//       CHECK: func @sort_op()
+//       CHECK:   iree_linalg_ext.sort
+//  CHECK-SAME:     lowering.config = #[[CONFIG]]

@@ -11,7 +11,7 @@
 #include "iree_tf_compiler/TF/Passes.h"
 #include "mlir-hlo/Dialect/mhlo/IR/chlo_ops.h"
 #include "mlir-hlo/Dialect/mhlo/IR/hlo_ops.h"
-#include "mlir/Dialect/Linalg/IR/LinalgOps.h"
+#include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/IR/PatternMatch.h"
 #include "tensorflow/compiler/mlir/tensorflow/ir/tf_ops.h"
 

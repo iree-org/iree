@@ -53,7 +53,9 @@ typedef struct iree_hal_vulkan_driver_t {
   iree_hal_vulkan_debug_reporter_t* debug_reporter;
 } iree_hal_vulkan_driver_t;
 
+namespace {
 extern const iree_hal_driver_vtable_t iree_hal_vulkan_driver_vtable;
+}  // namespace
 
 static iree_hal_vulkan_driver_t* iree_hal_vulkan_driver_cast(
     iree_hal_driver_t* base_value) {
@@ -469,9 +471,11 @@ static iree_status_t iree_hal_vulkan_driver_create_device(
   return status;
 }
 
+namespace {
 const iree_hal_driver_vtable_t iree_hal_vulkan_driver_vtable = {
     /*.destroy=*/iree_hal_vulkan_driver_destroy,
     /*.query_available_devices=*/
     iree_hal_vulkan_driver_query_available_devices,
     /*.create_device=*/iree_hal_vulkan_driver_create_device,
 };
+}  // namespace

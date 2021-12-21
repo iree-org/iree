@@ -235,6 +235,7 @@ if(${IREE_BUILD_COMPILER})
       iree::compiler::InputConversion::Common
       iree::compiler::InputConversion::MHLO
       iree::compiler::InputConversion::TOSA
+      iree::compiler::ConstEval
       iree::compiler::Translation::IREEVM
     PUBLIC
   )

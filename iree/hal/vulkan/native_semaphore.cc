@@ -44,8 +44,10 @@ typedef struct iree_hal_vulkan_native_semaphore_t {
   iree_atomic_intptr_t failure_status;
 } iree_hal_vulkan_native_semaphore_t;
 
+namespace {
 extern const iree_hal_semaphore_vtable_t
     iree_hal_vulkan_native_semaphore_vtable;
+}  // namespace
 
 static iree_hal_vulkan_native_semaphore_t*
 iree_hal_vulkan_native_semaphore_cast(iree_hal_semaphore_t* base_value) {
@@ -266,6 +268,7 @@ static iree_status_t iree_hal_vulkan_native_semaphore_wait(
       semaphore->logical_device, &semaphore_list, timeout, 0);
 }
 
+namespace {
 const iree_hal_semaphore_vtable_t iree_hal_vulkan_native_semaphore_vtable = {
     /*.destroy=*/iree_hal_vulkan_native_semaphore_destroy,
     /*.query=*/iree_hal_vulkan_native_semaphore_query,
@@ -273,3 +276,4 @@ const iree_hal_semaphore_vtable_t iree_hal_vulkan_native_semaphore_vtable = {
     /*.fail=*/iree_hal_vulkan_native_semaphore_fail,
     /*.wait=*/iree_hal_vulkan_native_semaphore_wait,
 };
+}  // namespace

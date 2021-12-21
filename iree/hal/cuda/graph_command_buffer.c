@@ -26,13 +26,12 @@
 // This records the commands on the calling thread without additional threading
 // indirection.
 typedef struct iree_hal_cuda_graph_command_buffer_t {
-  iree_hal_resource_t resource;
+  iree_hal_command_buffer_t base;
   iree_hal_cuda_context_wrapper_t* context;
-  iree_hal_command_buffer_mode_t mode;
-  iree_hal_command_category_t allowed_categories;
-  iree_hal_queue_affinity_t queue_affinity;
+
   CUgraph graph;
   CUgraphExec exec;
+
   // Keep track of the last node added to the command buffer as we are currently
   // serializing all the nodes (each node depends on the previous one).
   CUgraphNode last_node;
@@ -41,7 +40,7 @@ typedef struct iree_hal_cuda_graph_command_buffer_t {
   void* current_descriptor[];
 } iree_hal_cuda_graph_command_buffer_t;
 
-extern const iree_hal_command_buffer_vtable_t
+static const iree_hal_command_buffer_vtable_t
     iree_hal_cuda_graph_command_buffer_vtable;
 
 static iree_hal_cuda_graph_command_buffer_t*
@@ -51,7 +50,7 @@ iree_hal_cuda_graph_command_buffer_cast(iree_hal_command_buffer_t* base_value) {
 }
 
 iree_status_t iree_hal_cuda_graph_command_buffer_create(
-    iree_hal_cuda_context_wrapper_t* context,
+    iree_hal_device_t* device, iree_hal_cuda_context_wrapper_t* context,
     iree_hal_command_buffer_mode_t mode,
     iree_hal_command_category_t command_categories,
     iree_hal_queue_affinity_t queue_affinity,
@@ -70,12 +69,10 @@ iree_status_t iree_hal_cuda_graph_command_buffer_create(
   iree_status_t status = iree_allocator_malloc(
       context->host_allocator, total_size, (void**)&command_buffer);
   if (iree_status_is_ok(status)) {
-    iree_hal_resource_initialize(&iree_hal_cuda_graph_command_buffer_vtable,
-                                 &command_buffer->resource);
+    iree_hal_command_buffer_initialize(
+        device, mode, command_categories, queue_affinity,
+        &iree_hal_cuda_graph_command_buffer_vtable, &command_buffer->base);
     command_buffer->context = context;
-    command_buffer->mode = mode;
-    command_buffer->allowed_categories = command_categories;
-    command_buffer->queue_affinity = queue_affinity;
     command_buffer->graph = graph;
     command_buffer->exec = NULL;
     command_buffer->last_node = NULL;
@@ -87,7 +84,7 @@ iree_status_t iree_hal_cuda_graph_command_buffer_create(
       command_buffer->current_descriptor[i] = &device_ptrs[i];
     }
 
-    *out_command_buffer = (iree_hal_command_buffer_t*)command_buffer;
+    *out_command_buffer = &command_buffer->base;
   } else {
     context->syms->cuGraphDestroy(graph);
   }
@@ -135,21 +132,6 @@ static void* iree_hal_cuda_graph_command_buffer_dyn_cast(
     return command_buffer;
   }
   return NULL;
-}
-
-static iree_hal_command_buffer_mode_t iree_hal_cuda_graph_command_buffer_mode(
-    const iree_hal_command_buffer_t* base_command_buffer) {
-  const iree_hal_cuda_graph_command_buffer_t* command_buffer =
-      (const iree_hal_cuda_graph_command_buffer_t*)(base_command_buffer);
-  return command_buffer->mode;
-}
-
-static iree_hal_command_category_t
-iree_hal_cuda_graph_command_buffer_allowed_categories(
-    const iree_hal_command_buffer_t* base_command_buffer) {
-  const iree_hal_cuda_graph_command_buffer_t* command_buffer =
-      (const iree_hal_cuda_graph_command_buffer_t*)(base_command_buffer);
-  return command_buffer->allowed_categories;
 }
 
 static iree_status_t iree_hal_cuda_graph_command_buffer_begin(
@@ -478,13 +460,10 @@ CUgraphExec iree_hal_cuda_graph_command_buffer_exec(
   return command_buffer->exec;
 }
 
-const iree_hal_command_buffer_vtable_t
+static const iree_hal_command_buffer_vtable_t
     iree_hal_cuda_graph_command_buffer_vtable = {
         .destroy = iree_hal_cuda_graph_command_buffer_destroy,
         .dyn_cast = iree_hal_cuda_graph_command_buffer_dyn_cast,
-        .mode = iree_hal_cuda_graph_command_buffer_mode,
-        .allowed_categories =
-            iree_hal_cuda_graph_command_buffer_allowed_categories,
         .begin = iree_hal_cuda_graph_command_buffer_begin,
         .end = iree_hal_cuda_graph_command_buffer_end,
         .begin_debug_group =

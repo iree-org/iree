@@ -36,7 +36,7 @@ typedef struct iree_hal_vmvx_executable_t {
   iree_vm_function_t entry_fns[];
 } iree_hal_vmvx_executable_t;
 
-extern const iree_hal_local_executable_vtable_t iree_hal_vmvx_executable_vtable;
+static const iree_hal_local_executable_vtable_t iree_hal_vmvx_executable_vtable;
 
 // Verifies that an entry point function exported by the bytecode module matches
 // the calling convention we expect. This avoids the need to check it during
@@ -327,12 +327,13 @@ static iree_status_t iree_hal_vmvx_executable_issue_call(
   return status;
 }
 
-const iree_hal_local_executable_vtable_t iree_hal_vmvx_executable_vtable = {
-    .base =
-        {
-            .destroy = iree_hal_vmvx_executable_destroy,
-        },
-    .issue_call = iree_hal_vmvx_executable_issue_call,
+static const iree_hal_local_executable_vtable_t
+    iree_hal_vmvx_executable_vtable = {
+        .base =
+            {
+                .destroy = iree_hal_vmvx_executable_destroy,
+            },
+        .issue_call = iree_hal_vmvx_executable_issue_call,
 };
 
 //===----------------------------------------------------------------------===//
@@ -346,7 +347,7 @@ typedef struct iree_hal_vmvx_module_loader_t {
   iree_vm_module_t* vmvx_module;
 } iree_hal_vmvx_module_loader_t;
 
-extern const iree_hal_executable_loader_vtable_t
+static const iree_hal_executable_loader_vtable_t
     iree_hal_vmvx_module_loader_vtable;
 
 iree_status_t iree_hal_vmvx_module_loader_create(
@@ -469,8 +470,9 @@ static iree_status_t iree_hal_vmvx_module_loader_try_load(
   return status;
 }
 
-const iree_hal_executable_loader_vtable_t iree_hal_vmvx_module_loader_vtable = {
-    .destroy = iree_hal_vmvx_module_loader_destroy,
-    .query_support = iree_hal_vmvx_module_loader_query_support,
-    .try_load = iree_hal_vmvx_module_loader_try_load,
+static const iree_hal_executable_loader_vtable_t
+    iree_hal_vmvx_module_loader_vtable = {
+        .destroy = iree_hal_vmvx_module_loader_destroy,
+        .query_support = iree_hal_vmvx_module_loader_query_support,
+        .try_load = iree_hal_vmvx_module_loader_try_load,
 };

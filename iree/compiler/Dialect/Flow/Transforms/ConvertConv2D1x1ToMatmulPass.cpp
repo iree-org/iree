@@ -6,7 +6,7 @@
 
 #include "iree/compiler/Dialect/Flow/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
-#include "mlir/Dialect/Linalg/IR/LinalgOps.h"
+#include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -110,8 +110,7 @@ struct ConvertConv2D1x1ConvToMatmulPass
 };
 }  // namespace
 
-std::unique_ptr<OperationPass<mlir::FuncOp>>
-createConvertConv2D1x1ToMatmulPass() {
+std::unique_ptr<Pass> createConvertConv2D1x1ToMatmulPass() {
   return std::make_unique<ConvertConv2D1x1ConvToMatmulPass>();
 }
 
