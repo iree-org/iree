@@ -79,20 +79,8 @@ task cmakeConfigureHost(type: Exec) {
     commandLine "cmake",
             "-G" , "Ninja",
             "-B", hostBuildDir ,
+            "-DIREE_HAL_DRIVER_DEFAULT=OFF"
             "-DIREE_HAL_DRIVER_VMVX=ON"
-            "-DIREE_TARGET_BACKEND_VMVX=ON"
-            "-DIREE_HAL_DRIVER_CUDA=OFF"
-            "-DIREE_HAL_DRIVER_DYLIB=OFF"
-            "-DIREE_HAL_DRIVER_DYLIB_SYNC=OFF"
-            "-DIREE_HAL_DRIVER_VMVX_SYNC=OFF"
-            "-DIREE_HAL_DRIVER_VULKAN=OFF"
-            "-DIREE_TARGET_BACKEND_CUDA=OFF"
-            "-DIREE_TARGET_BACKEND_DYLIB-LLVM-AOT=OFF"
-            "-DIREE_TARGET_BACKEND_WASM-LLVM-AOT=OFF"
-            "-DIREE_TARGET_BACKEND_METAL-SPIRV=OFF"
-            "-DIREE_TARGET_BACKEND_ROCM=OFF"
-            "-DIREE_TARGET_BACKEND_VULKAN-SPIRV=OFF"
-            "-DIREE_TARGET_BACKEND_WEBGPU=OFF"
             "-DIREE_BUILD_COMPILER=OFF",
             "-DIREE_BUILD_TESTS=OFF ",
             "-DIREE_BUILD_SAMPLES=OFF",
