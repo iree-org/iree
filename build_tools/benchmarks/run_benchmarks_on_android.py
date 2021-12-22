@@ -559,7 +559,7 @@ def set_cpu_frequency_scaling_governor(governor: str):
 def set_gpu_frequency_scaling_policy(policy: str):
   git_root = execute_cmd_and_get_output(["git", "rev-parse", "--show-toplevel"])
   device_model = get_android_device_model()
-  if device_model == "Pixel-6":
+  if device_model == "Pixel-6" or device_model == "Pixel-6-Pro":
     gpu_script = os.path.join(
         git_root, "build_tools/benchmarks/set_pixel6_gpu_scaling_policy.sh")
   else:
