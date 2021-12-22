@@ -234,14 +234,14 @@ IREE_API_EXPORT iree_string_view_t iree_hal_buffer_usage_format(
 // it will never be used in a way that requires coherency may occupy address
 // space reservations or memory mapping that would otherwise not be needed.
 //
-// As buffers may sometimes not be accessible from the host the base Buffer type
+// As buffers may sometimes not be accessible from the host the base buffer type
 // does not allow for direct void* access and instead buffers must be either
 // manipulated using utility functions (such as ReadData or WriteData) or by
-// mapping them into a host-accessible address space via MapMemory. Buffer must
-// be unmapped before any command may use it.
+// mapping them into a host-accessible address space via MapMemory. Buffers must
+// be unmapped before any command may use them.
 //
-// Buffers may map (roughly) 1:1 with an allocation either from the host heap or
-// a device. iree_hal_buffer_subspan can be used to reference subspans of
+// Buffers may equate (roughly) 1:1 with an allocation either from the host heap
+// or a device. iree_hal_buffer_subspan can be used to reference subspans of
 // buffers like std::span - though unlike std::span the returned buffer holds
 // a reference to the parent buffer.
 typedef struct iree_hal_buffer_t iree_hal_buffer_t;
@@ -293,10 +293,6 @@ IREE_API_EXPORT void iree_hal_buffer_retain(iree_hal_buffer_t* buffer);
 
 // Releases the given |buffer| from the caller.
 IREE_API_EXPORT void iree_hal_buffer_release(iree_hal_buffer_t* buffer);
-
-// Returns the allocator this buffer was allocated from.
-IREE_API_EXPORT iree_hal_allocator_t* iree_hal_buffer_allocator(
-    const iree_hal_buffer_t* buffer);
 
 // Returns a pointer to the buffer containing the actual allocation.
 // The buffer represents a span of the allocated bytes defined by byte_offset
@@ -458,6 +454,18 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_mapping_subspan(
     iree_device_size_t byte_length, iree_byte_span_t* out_span);
 
 //===----------------------------------------------------------------------===//
+// iree_hal_subspan_buffer_t
+//===----------------------------------------------------------------------===//
+
+// Creates a buffer referencing a subspan of some base allocation.
+// Optionally |device_allocator| can be provided if this subspan references
+// managed buffers that need deallocation callbacks.
+IREE_API_EXPORT iree_status_t iree_hal_subspan_buffer_create(
+    iree_hal_buffer_t* allocated_buffer, iree_device_size_t byte_offset,
+    iree_device_size_t byte_length, iree_hal_allocator_t* device_allocator,
+    iree_allocator_t host_allocator, iree_hal_buffer_t** out_buffer);
+
+//===----------------------------------------------------------------------===//
 // iree_hal_heap_buffer_t
 //===----------------------------------------------------------------------===//
 
@@ -507,7 +515,8 @@ typedef struct iree_hal_buffer_vtable_t {
 struct iree_hal_buffer_t {
   iree_hal_resource_t resource;
 
-  iree_hal_allocator_t* allocator;
+  iree_allocator_t host_allocator;
+  iree_hal_allocator_t* device_allocator;
 
   iree_hal_buffer_t* allocated_buffer;
   iree_device_size_t allocation_size;
@@ -518,6 +527,14 @@ struct iree_hal_buffer_t {
   iree_hal_memory_access_t allowed_access;
   iree_hal_buffer_usage_t allowed_usage;
 };
+
+IREE_API_EXPORT void iree_hal_buffer_initialize(
+    iree_allocator_t host_allocator, iree_hal_allocator_t* device_allocator,
+    iree_hal_buffer_t* allocated_buffer, iree_device_size_t allocation_size,
+    iree_device_size_t byte_offset, iree_device_size_t byte_length,
+    iree_hal_memory_type_t memory_type, iree_hal_memory_access_t allowed_access,
+    iree_hal_buffer_usage_t allowed_usage,
+    const iree_hal_buffer_vtable_t* vtable, iree_hal_buffer_t* buffer);
 
 IREE_API_EXPORT void iree_hal_buffer_destroy(iree_hal_buffer_t* buffer);
 

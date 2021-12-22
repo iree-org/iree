@@ -21,12 +21,6 @@ iree_status_t iree_hal_cuda_allocator_create(
     iree_hal_cuda_context_wrapper_t* context, CUdevice device, CUstream stream,
     iree_hal_allocator_t** out_allocator);
 
-// Free an allocation represent by the given device or host pointer.
-void iree_hal_cuda_allocator_free(iree_hal_allocator_t* allocator,
-                                  iree_hal_memory_type_t memory_type,
-                                  CUdeviceptr device_ptr, void* host_ptr,
-                                  iree_device_size_t allocation_size);
-
 #ifdef __cplusplus
 }  // extern "C"
 #endif  // __cplusplus

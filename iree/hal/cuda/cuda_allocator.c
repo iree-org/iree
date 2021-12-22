@@ -136,6 +136,18 @@ iree_hal_cuda_allocator_query_buffer_compatibility(
   return compatibility;
 }
 
+static void iree_hal_cuda_buffer_free(iree_hal_cuda_context_wrapper_t* context,
+                                      iree_hal_memory_type_t memory_type,
+                                      CUdeviceptr device_ptr, void* host_ptr) {
+  if (iree_all_bits_set(memory_type, IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL)) {
+    // Device local.
+    CUDA_IGNORE_ERROR(context->syms, cuMemFree(device_ptr));
+  } else {
+    // Host local.
+    CUDA_IGNORE_ERROR(context->syms, cuMemFreeHost(host_ptr));
+  }
+}
+
 static iree_status_t iree_hal_cuda_allocator_allocate_buffer(
     iree_hal_allocator_t* base_allocator, iree_hal_memory_type_t memory_type,
     iree_hal_buffer_usage_t allowed_usage, iree_host_size_t allocation_size,
@@ -199,35 +211,20 @@ static iree_status_t iree_hal_cuda_allocator_allocate_buffer(
     }
   }
   if (iree_status_is_ok(status)) {
-    IREE_STATISTICS(iree_hal_allocator_statistics_record_alloc(
-        &allocator->statistics, memory_type, allocation_size));
     status = iree_hal_cuda_buffer_wrap(
         (iree_hal_allocator_t*)allocator, memory_type,
         IREE_HAL_MEMORY_ACCESS_ALL, allowed_usage, allocation_size,
         /*byte_offset=*/0,
         /*byte_length=*/allocation_size, device_ptr, host_ptr, out_buffer);
   }
-  if (!iree_status_is_ok(status)) {
-    iree_hal_cuda_allocator_free(base_allocator, memory_type, device_ptr,
-                                 host_ptr, allocation_size);
+  if (iree_status_is_ok(status)) {
+    IREE_STATISTICS(iree_hal_allocator_statistics_record_alloc(
+        &allocator->statistics, memory_type, allocation_size));
+  } else {
+    iree_hal_cuda_buffer_free(allocator->context, memory_type, device_ptr,
+                              host_ptr);
   }
   return status;
-}
-
-void iree_hal_cuda_allocator_free(iree_hal_allocator_t* base_allocator,
-                                  iree_hal_memory_type_t memory_type,
-                                  CUdeviceptr device_ptr, void* host_ptr,
-                                  iree_device_size_t allocation_size) {
-  iree_hal_cuda_allocator_t* allocator =
-      iree_hal_cuda_allocator_cast(base_allocator);
-  if (iree_all_bits_set(memory_type, IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL)) {
-    CUDA_IGNORE_ERROR(allocator->context->syms, cuMemFree(device_ptr));
-  } else {
-    // Host local.
-    CUDA_IGNORE_ERROR(allocator->context->syms, cuMemFreeHost(host_ptr));
-  }
-  IREE_STATISTICS(iree_hal_allocator_statistics_record_free(
-      &allocator->statistics, memory_type, allocation_size));
 }
 
 static iree_status_t iree_hal_cuda_allocator_wrap_buffer(
@@ -239,6 +236,22 @@ static iree_status_t iree_hal_cuda_allocator_wrap_buffer(
                           "wrapping of external buffers not supported");
 }
 
+static void iree_hal_cuda_allocator_deallocate_buffer(
+    iree_hal_allocator_t* base_allocator, iree_hal_buffer_t* base_buffer) {
+  iree_hal_cuda_allocator_t* allocator =
+      iree_hal_cuda_allocator_cast(base_allocator);
+  iree_hal_memory_type_t memory_type = iree_hal_buffer_memory_type(base_buffer);
+  iree_hal_cuda_buffer_free(allocator->context, memory_type,
+                            iree_hal_cuda_buffer_device_pointer(base_buffer),
+                            iree_hal_cuda_buffer_host_pointer(base_buffer));
+
+  IREE_STATISTICS(iree_hal_allocator_statistics_record_free(
+      &allocator->statistics, memory_type,
+      iree_hal_buffer_allocation_size(base_buffer)));
+
+  iree_hal_buffer_destroy(base_buffer);
+}
+
 static const iree_hal_allocator_vtable_t iree_hal_cuda_allocator_vtable = {
     .destroy = iree_hal_cuda_allocator_destroy,
     .host_allocator = iree_hal_cuda_allocator_host_allocator,
@@ -247,4 +260,5 @@ static const iree_hal_allocator_vtable_t iree_hal_cuda_allocator_vtable = {
         iree_hal_cuda_allocator_query_buffer_compatibility,
     .allocate_buffer = iree_hal_cuda_allocator_allocate_buffer,
     .wrap_buffer = iree_hal_cuda_allocator_wrap_buffer,
+    .deallocate_buffer = iree_hal_cuda_allocator_deallocate_buffer,
 };

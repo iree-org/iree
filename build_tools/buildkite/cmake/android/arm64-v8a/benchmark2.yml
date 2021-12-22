@@ -43,6 +43,26 @@ steps:
       - "trace-captures-pixel-4-${BUILDKITE_BUILD_NUMBER}.tgz"
     timeout_in_minutes: "60"
 
+  - label: "Benchmark on Pixel 6 Pro (google-tensor, mali-g78)"
+    commands:
+      - "git clean -fdx"
+      - "buildkite-agent artifact download --step Build benchmark-suites-${BUILDKITE_BUILD_NUMBER}.tgz ./"
+      - "buildkite-agent artifact download --step Build iree-android-tools-${BUILDKITE_BUILD_NUMBER}.tgz ./"
+      - "wget https://storage.googleapis.com/iree-shared-files/tracy-capture-058e8901.tgz"
+      - "tar -xzvf benchmark-suites-${BUILDKITE_BUILD_NUMBER}.tgz"
+      - "tar -xzvf iree-android-tools-${BUILDKITE_BUILD_NUMBER}.tgz"
+      - "tar -xzvf tracy-capture-058e8901.tgz"
+      - "python3 build_tools/benchmarks/run_benchmarks_on_android.py --pin-cpu-freq --pin-gpu-freq --normal_benchmark_tool=build-android/iree/tools/iree-benchmark-module --traced_benchmark_tool=build-android-trace/iree/tools/iree-benchmark-module --trace_capture_tool=tracy-capture -o benchmark-results-galaxy-pixel6-pro-${BUILDKITE_BUILD_NUMBER}.json --capture_tarball=trace-captures-galaxy-pixel6-pro-${BUILDKITE_BUILD_NUMBER}.tgz --verbose build-host/"
+    if: "build.pull_request.id == null || (build.pull_request.labels includes 'buildkite:benchmark')"
+    agents:
+      - "android-soc=google-tensor"
+      - "android-version=12"
+      - "queue=benchmark-android"
+    artifact_paths:
+      - "benchmark-results-galaxy-pixel6-pro-${BUILDKITE_BUILD_NUMBER}.json"
+      - "trace-captures-galaxy-pixel6-pro-${BUILDKITE_BUILD_NUMBER}.tgz"
+    timeout_in_minutes: "60"
+
   - label: "Benchmark on Galaxy S20 (exynos-990, mali-g77)"
     commands:
       - "git clean -fdx"

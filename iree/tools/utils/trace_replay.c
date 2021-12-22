@@ -732,7 +732,8 @@ static iree_status_t iree_trace_replay_parse_hal_buffer_view(
 
   iree_hal_buffer_view_t* buffer_view = NULL;
   status = iree_hal_buffer_view_create(buffer, shape, shape_rank, element_type,
-                                       encoding_type, &buffer_view);
+                                       encoding_type, replay->host_allocator,
+                                       &buffer_view);
   iree_hal_buffer_release(buffer);
   IREE_RETURN_IF_ERROR(status);
 

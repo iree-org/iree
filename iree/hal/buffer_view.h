@@ -201,7 +201,7 @@ typedef struct iree_hal_buffer_view_t iree_hal_buffer_view_t;
 IREE_API_EXPORT iree_status_t iree_hal_buffer_view_create(
     iree_hal_buffer_t* buffer, const iree_hal_dim_t* shape,
     iree_host_size_t shape_rank, iree_hal_element_type_t element_type,
-    iree_hal_encoding_type_t encoding_type,
+    iree_hal_encoding_type_t encoding_type, iree_allocator_t host_allocator,
     iree_hal_buffer_view_t** out_buffer_view);
 
 // Allocates a buffer from |allocator| and wraps it in a buffer view.

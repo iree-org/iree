@@ -191,9 +191,9 @@ iree_status_t iree_tools_utils_buffer_view_from_image_rescaled(
   if (iree_status_is_ok(result)) {
     iree_hal_encoding_type_t encoding_type =
         IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR;
-    result =
-        iree_hal_buffer_view_create(buffer, shape, shape_rank, element_type,
-                                    encoding_type, out_buffer_view);
+    result = iree_hal_buffer_view_create(
+        buffer, shape, shape_rank, element_type, encoding_type,
+        iree_hal_allocator_host_allocator(allocator), out_buffer_view);
   }
   iree_hal_buffer_release(buffer);
   stbi_image_free(pixel_data);

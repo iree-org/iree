@@ -17,6 +17,7 @@
 
 struct iree_hal_buffer_view_t {
   iree_atomic_ref_count_t ref_count;
+  iree_allocator_t host_allocator;
   iree_hal_buffer_t* buffer;
   iree_hal_element_type_t element_type;
   iree_hal_encoding_type_t encoding_type;
@@ -28,7 +29,7 @@ struct iree_hal_buffer_view_t {
 IREE_API_EXPORT iree_status_t iree_hal_buffer_view_create(
     iree_hal_buffer_t* buffer, const iree_hal_dim_t* shape,
     iree_host_size_t shape_rank, iree_hal_element_type_t element_type,
-    iree_hal_encoding_type_t encoding_type,
+    iree_hal_encoding_type_t encoding_type, iree_allocator_t host_allocator,
     iree_hal_buffer_view_t** out_buffer_view) {
   IREE_ASSERT_ARGUMENT(buffer);
   IREE_ASSERT_ARGUMENT(out_buffer_view);
@@ -41,9 +42,6 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_view_create(
 
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  iree_allocator_t host_allocator =
-      iree_hal_allocator_host_allocator(iree_hal_buffer_allocator(buffer));
-
   // Allocate and initialize the iree_hal_buffer_view_t struct.
   // Note that we have the dynamically-sized shape dimensions on the end.
   iree_hal_buffer_view_t* buffer_view = NULL;
@@ -53,6 +51,7 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_view_create(
       (void**)&buffer_view);
   if (iree_status_is_ok(status)) {
     iree_atomic_ref_count_init(&buffer_view->ref_count);
+    buffer_view->host_allocator = host_allocator;
     buffer_view->buffer = buffer;
     iree_hal_buffer_retain(buffer_view->buffer);
     buffer_view->element_type = element_type;
@@ -88,10 +87,11 @@ IREE_API_EXPORT void iree_hal_buffer_view_release(
 
 IREE_API_EXPORT void iree_hal_buffer_view_destroy(
     iree_hal_buffer_view_t* buffer_view) {
-  iree_allocator_t host_allocator = iree_hal_allocator_host_allocator(
-      iree_hal_buffer_allocator(buffer_view->buffer));
+  iree_allocator_t host_allocator = buffer_view->host_allocator;
+  IREE_TRACE_ZONE_BEGIN(z0);
   iree_hal_buffer_release(buffer_view->buffer);
   iree_allocator_free(host_allocator, buffer_view);
+  IREE_TRACE_ZONE_END(z0);
 }
 
 IREE_API_EXPORT iree_status_t iree_hal_buffer_view_allocate_buffer(
@@ -115,9 +115,9 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_view_allocate_buffer(
   }
 
   if (iree_status_is_ok(status)) {
-    status =
-        iree_hal_buffer_view_create(buffer, shape, shape_rank, element_type,
-                                    encoding_type, out_buffer_view);
+    status = iree_hal_buffer_view_create(
+        buffer, shape, shape_rank, element_type, encoding_type,
+        iree_hal_allocator_host_allocator(allocator), out_buffer_view);
   }
 
   iree_hal_buffer_release(buffer);
@@ -177,9 +177,9 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_view_wrap_heap_buffer(
       data_allocator, &buffer);
 
   if (iree_status_is_ok(status)) {
-    status =
-        iree_hal_buffer_view_create(buffer, shape, shape_rank, element_type,
-                                    encoding_type, out_buffer_view);
+    status = iree_hal_buffer_view_create(
+        buffer, shape, shape_rank, element_type, encoding_type,
+        iree_hal_allocator_host_allocator(allocator), out_buffer_view);
   }
 
   iree_hal_buffer_release(buffer);
@@ -592,8 +592,9 @@ static iree_status_t iree_hal_buffer_view_parse_impl(
   }
 
   // Wrap and pass ownership of the buffer to the buffer view.
-  status = iree_hal_buffer_view_create(buffer, shape, shape_rank, element_type,
-                                       encoding_type, out_buffer_view);
+  status = iree_hal_buffer_view_create(
+      buffer, shape, shape_rank, element_type, encoding_type,
+      iree_hal_allocator_host_allocator(buffer_allocator), out_buffer_view);
   iree_hal_buffer_release(buffer);
   return status;
 }
@@ -737,8 +738,7 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_view_fprint(
 
   // Allocate scratch space to format in to.
   // We should be streaming.
-  iree_allocator_t host_allocator = iree_hal_allocator_host_allocator(
-      iree_hal_buffer_allocator(iree_hal_buffer_view_buffer(buffer_view)));
+  iree_allocator_t host_allocator = buffer_view->host_allocator;
   iree_host_size_t buffer_capacity = buffer_length + 1;  // NUL
   char* buffer = NULL;
   status =

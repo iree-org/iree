@@ -48,7 +48,6 @@ TEST_P(buffer_mapping_test, AllocatorSupportsBufferMapping) {
   IREE_ASSERT_OK(iree_hal_allocator_allocate_buffer(
       device_allocator_, memory_type, buffer_usage, kAllocationSize, &buffer));
 
-  EXPECT_EQ(device_allocator_, iree_hal_buffer_allocator(buffer));
   EXPECT_TRUE(
       iree_all_bits_set(iree_hal_buffer_memory_type(buffer), memory_type));
   EXPECT_TRUE(

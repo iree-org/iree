@@ -8,6 +8,7 @@
 #define IREE_COMPILER_DIALECT_IREE_UTIL_ANALYSIS_CONSTANT_OP_ORACLE_H_
 
 #include "iree/compiler/Dialect/Util/Analysis/Constant/ConstExpr.h"
+#include "llvm/ADT/SmallPtrSet.h"
 #include "mlir/IR/Operation.h"
 
 namespace mlir {
@@ -18,15 +19,28 @@ namespace Util {
 // Registers dialects needed to query or construct const-expr information.
 void registerConstExprDependentDialects(DialectRegistry &registry);
 
-// Whether an op can be considered a pure expression, producing a constant if
-// provided constants and having no side effects beyond that.
-//
-// In order to enable testing, some unregistered ops are also recognized:
-//   - iree_unregistered.non_leaf_const_expr : Will be treated as const-expr.
-//   - iree_unregistered.const_expr : Will be treated as const-expr
-//   - iree_unregistered.var_expr : Will be treated as not const-expr
-// Any other unregistered ops are treated as not const-expr.
-bool isEligibleConstExprOp(Operation *op);
+// Information about a possible const-expr op.
+struct ConstExprOpInfo {
+  // Whether the op is eligible to be considered const-expr, assuming that
+  // all of its producers are eligible.
+  bool isEligible = false;
+
+  // Producer values that must be const-expr for this op to be considered
+  // const-expr. This minimally includes operands, and for region-based ops
+  // may include implicit captures.
+  llvm::SmallPtrSet<Value, 8> producers;
+
+  // Gets information for an op.
+  // Whether an op can be considered a pure expression, producing a constant if
+  // provided constants and having no side effects beyond that.
+  //
+  // In order to enable testing, some unregistered ops are also recognized:
+  //   - iree_unregistered.non_leaf_const_expr : Will be treated as const-expr.
+  //   - iree_unregistered.const_expr : Will be treated as const-expr
+  //   - iree_unregistered.var_expr : Will be treated as not const-expr
+  // Any other unregistered ops are treated as not const-expr.
+  static ConstExprOpInfo getForOp(Operation *op);
+};
 
 // Whether a const-expr op is eligible to be hoistable. This enforces
 // policies for excluding certain, otherwise eligible, const-expr ops from

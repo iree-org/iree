@@ -15,7 +15,7 @@
 extern "C" {
 #endif  // __cplusplus
 
-// Wraps a cuda allocation in an iree_hal_buffer_t.
+// Wraps a CUDA allocation in an iree_hal_buffer_t.
 iree_status_t iree_hal_cuda_buffer_wrap(
     iree_hal_allocator_t* allocator, iree_hal_memory_type_t memory_type,
     iree_hal_memory_access_t allowed_access,
@@ -23,10 +23,13 @@ iree_status_t iree_hal_cuda_buffer_wrap(
     iree_device_size_t byte_offset, iree_device_size_t byte_length,
     CUdeviceptr device_ptr, void* host_ptr, iree_hal_buffer_t** out_buffer);
 
-// Returns the cuda base pointer for the given |buffer|.
+// Returns the CUDA base pointer for the given |buffer|.
 // This is the entire allocated_buffer and must be offset by the buffer
 // byte_offset and byte_length when used.
 CUdeviceptr iree_hal_cuda_buffer_device_pointer(iree_hal_buffer_t* buffer);
+
+// Returns the CUDA host pointer for the given |buffer|, if available.
+void* iree_hal_cuda_buffer_host_pointer(iree_hal_buffer_t* buffer);
 
 #ifdef __cplusplus
 }  // extern "C"

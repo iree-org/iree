@@ -131,8 +131,11 @@ class HoistIntoGlobalsPass
       Location loc = originalValue.getLoc();
       OpBuilder builder = getModuleEndBuilder();
       auto initializerOp = builder.create<InitializerOp>(loc);
-      cloneConstExprInto(initializerOp, originalValue, hoistedMap,
-                         moduleSymbols);
+      Block *entryBlock = initializerOp.addEntryBlock();
+      OpBuilder initBuilder = OpBuilder::atBlockEnd(entryBlock);
+      BlockAndValueMapping valueMapping;
+      cloneConstExprInto(initializerOp.getLoc(), initBuilder, originalValue,
+                         hoistedMap, moduleSymbols, valueMapping, constExprs);
 
       existingGlobal = hoistedMap.lookup(originalValue);
     }
@@ -147,54 +150,59 @@ class HoistIntoGlobalsPass
     operand->set(load);
   }
 
+  void cloneProducerTreeInto(
+      OpBuilder &builder, const ConstExprAnalysis::ConstValueInfo *producerInfo,
+      HoistedValueMap &hoistedMap, BlockAndValueMapping &cloneMapping,
+      const ConstExprAnalysis &constExprs) {
+    if (cloneMapping.contains(producerInfo->constValue)) return;
+
+    // We either have a global associated already or we need to traverse
+    // down and materialize producers.
+    GlobalOp existingGlobal = hoistedMap.lookup(producerInfo->constValue);
+    if (existingGlobal) {
+      cloneMapping.map(producerInfo->constValue,
+                       builder.create<GlobalLoadOp>(existingGlobal.getLoc(),
+                                                    existingGlobal));
+      return;
+    }
+
+    // Materialize all producers recursively.
+    for (auto *producerInfo : producerInfo->producers) {
+      cloneProducerTreeInto(builder, producerInfo, hoistedMap, cloneMapping,
+                            constExprs);
+    }
+
+    // And clone the requested op.
+    Operation *sourceOp = producerInfo->constValue.getDefiningOp();
+    assert(sourceOp && "must have defining op for const-expr values");
+    LLVM_DEBUG(dbgs() << "    CLONE OP: " << *sourceOp << "\n");
+    Operation *clonedOp = sourceOp->clone(cloneMapping);
+    builder.insert(clonedOp);
+  }
+
   // Clones the const expr tree rooted at `constExprValue` into the given
   // initializer, noting any new hoisted value mappings that result. At
   // a minimum, a mapping will be created for the requested value.
-  void cloneConstExprInto(InitializerOp initializerOp, Value constExprValue,
-                          HoistedValueMap &hoistedMap,
-                          SymbolTable &moduleSymbols) {
-    Block *entryBlock = initializerOp.addEntryBlock();
-    OpBuilder initBuilder = OpBuilder::atBlockEnd(entryBlock);
-
-    // Clone all dependents of the defining op.
+  void cloneConstExprInto(Location loc, OpBuilder &builder,
+                          Value constExprValue, HoistedValueMap &hoistedMap,
+                          SymbolTable &moduleSymbols,
+                          BlockAndValueMapping &cloneMapping,
+                          const ConstExprAnalysis &constExprs) {
+    // Do a depth first traversal of the producers, emitting them in a valid
+    // def-use order.
     Operation *rootOp = constExprValue.getDefiningOp();
     assert(rootOp && "const-expr value should have a defining op");
-    SetVector<Operation *> slice;
-    getBackwardSlice(rootOp, &slice);
-    BlockAndValueMapping cloneMap;
+    auto *rootInfo = constExprs.lookup(rootOp);
+    assert(rootInfo && "must have const-value-info for const-expr root op");
 
-    for (Operation *sourceOp : slice) {
-      // Iterate over the source results and see if we have already hoisted.
-      // Note that because we hoist all results of an op below, we can count
-      // on all or none of them having hoisted. Initialization order is
-      // correct because we greedily hoist in topological order of const-expr
-      // ops above.
-      bool needsClone = true;
-      for (Value origResult : sourceOp->getResults()) {
-        GlobalOp existingGlobal = hoistedMap.lookup(origResult);
-        if (!existingGlobal) break;
-        needsClone = false;
-        cloneMap.map(origResult, initBuilder.create<GlobalLoadOp>(
-                                     existingGlobal.getLoc(), existingGlobal));
-      }
+    // Clone the whole tree as needed.
+    cloneProducerTreeInto(builder, rootInfo, hoistedMap, cloneMapping,
+                          constExprs);
 
-      if (needsClone) {
-        LLVM_DEBUG(dbgs() << "    CLONE OP: " << *sourceOp << "\n");
-        Operation *cloneOp = sourceOp->clone(cloneMap);
-        initBuilder.insert(cloneOp);
-      }
-    }
-
-    // Now, for the defining op itself, create a global for each result and
-    // store into it.
-    // Note that we create globals at the beginning of the module because
-    // they must precede accesses and this is guaranteed here.
+    // And for each result, create a global and store into it.
     OpBuilder globalBuilder = getModuleBeginBuilder();
-    Operation *clonedRootOp = rootOp->clone(cloneMap);
-    initBuilder.insert(clonedRootOp);
     for (Value origResult : rootOp->getResults()) {
-      Value clonedResult = cloneMap.lookup(origResult);
-      Location loc = clonedRootOp->getLoc();
+      Value clonedResult = cloneMapping.lookup(origResult);
       GlobalOp globalOp = globalBuilder.create<GlobalOp>(loc, "hoisted", false,
                                                          origResult.getType());
       StringAttr globalSymbol = moduleSymbols.insert(globalOp);
@@ -205,10 +213,12 @@ class HoistIntoGlobalsPass
       hoistedMap[origResult] = globalOp;
 
       // And store into it.
-      initBuilder.create<GlobalStoreOp>(loc, clonedResult, globalSymbol);
+      LLVM_DEBUG(dbgs() << "    CREATE GLOBAL " << globalSymbol << " = "
+                        << clonedResult << "\n");
+      builder.create<GlobalStoreOp>(loc, clonedResult, globalSymbol);
     }
 
-    initBuilder.create<InitializerReturnOp>(initializerOp.getLoc());
+    builder.create<InitializerReturnOp>(loc);
   }
 
   void cleanupDeadOps(const ConstExprAnalysis &constExprs) {

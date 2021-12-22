@@ -321,30 +321,6 @@ def HAL_BufferAssertOp : HAL_Op<"buffer.assert", []> {
   // (such as when we create it ourselves earlier on) or we've already asserted.
 }
 
-def HAL_BufferAllocatorOp : HAL_PureOp<"buffer.allocator", [
-    DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
-  ]> {
-  let summary = [{buffer allocator accessor operation}];
-  let description = [{
-    Returns the allocator this buffer was allocated from.
-  }];
-
-  let arguments = (ins
-    HAL_BufferType:$buffer
-  );
-  let results = (outs
-    HAL_Allocator:$result
-  );
-
-  let assemblyFormat = [{
-    `<` $buffer `:` type($buffer) `>`
-    `:` type($result)
-    attr-dict-with-keyword
-  }];
-
-  let hasCanonicalizer = 1;
-}
-
 def HAL_BufferSubspanOp : HAL_PureOp<"buffer.subspan", [
     DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
     DeclareOpInterfaceMethods<Util_SizeAwareOp>,

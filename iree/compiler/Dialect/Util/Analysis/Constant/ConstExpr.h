@@ -99,7 +99,7 @@ class ConstExprAnalysis {
     SmallPtrSet<Value, 4> roots;
 
     // Direct producers that feed into this constant value.
-    SmallVector<ConstValueInfo *> producers;
+    SmallPtrSet<ConstValueInfo *, 8> producers;
 
     // Whether this is a root.
     bool isRoot = false;
