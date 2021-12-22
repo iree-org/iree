@@ -51,8 +51,7 @@ void registerHALTargetBackends() {
     IREE::HAL::registerMetalSPIRVTargetBackends();
 #endif  // IREE_HAVE_METALSPIRV_TARGET
 #ifdef IREE_HAVE_ROCM_TARGET
-    IREE::HAL::registerROCMTargetBackends(
-        []() { return IREE::HAL::getROCMTargetOptionsFromFlags(); });
+    IREE::HAL::registerROCMTargetBackends();
 #endif  // IREE_HAVE_ROCM_TARGET
 #ifdef IREE_HAVE_VMVX_TARGET
     IREE::HAL::registerVMVXTargetBackends();

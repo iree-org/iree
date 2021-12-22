@@ -15,20 +15,8 @@ namespace iree_compiler {
 namespace IREE {
 namespace HAL {
 
-struct ROCMTargetOptions {
-  // ROCm target Chip
-  std::string ROCMTargetChip;
-  // Whether to try Linking to AMD Bitcodes
-  bool ROCMLinkBC;
-  // AMD Bitcodes Directory
-  std::string ROCMBitcodeDir;
-};
-
-ROCMTargetOptions getROCMTargetOptionsFromFlags();
-
 // Registers the ROCM backend.
-void registerROCMTargetBackends(
-    std::function<ROCMTargetOptions()> queryOptions);
+void registerROCMTargetBackends();
 
 // Links LLVM module to ROC Device Library Bit Code
 void LinkROCDLIfNecessary(llvm::Module *module, std::string targetChip,

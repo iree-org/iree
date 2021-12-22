@@ -20,6 +20,7 @@
 #include "experimental/rocm/rocm_allocator.h"
 #include "experimental/rocm/rocm_event.h"
 #include "experimental/rocm/status_util.h"
+#include "iree/base/internal/arena.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/utils/buffer_transfer.h"
 
@@ -30,6 +31,10 @@
 typedef struct iree_hal_rocm_device_t {
   iree_hal_resource_t resource;
   iree_string_view_t identifier;
+
+  // Block pool used for command buffers with a larger block size (as command
+  // buffers can contain inlined data uploads).
+  iree_arena_block_pool_t block_pool;
 
   // Optional driver that owns the ROCM symbols. We retain it for our lifetime
   // to ensure the symbols remains valid.
@@ -184,7 +189,7 @@ static iree_status_t iree_hal_rocm_device_create_command_buffer(
   iree_hal_rocm_device_t* device = iree_hal_rocm_device_cast(base_device);
   return iree_hal_rocm_direct_command_buffer_create(
       base_device, &device->context_wrapper, mode, command_categories,
-      queue_affinity, out_command_buffer);
+      queue_affinity, &device->block_pool, out_command_buffer);
 }
 
 static iree_status_t iree_hal_rocm_device_create_descriptor_set(
@@ -249,8 +254,8 @@ static iree_status_t iree_hal_rocm_device_queue_submit(
     const iree_hal_submission_batch_t* batches) {
   iree_hal_rocm_device_t* device = iree_hal_rocm_device_cast(base_device);
   // TODO(raikonenfnu): Once semaphore is implemented wait for semaphores
-  // TODO(thomasraoux): Conservatively syncronize after every submit until we
-  // support semaphores.
+  // TODO(thomasraoux): implement semaphores - for now this conservatively
+  // synchronizes after every submit.
   // TODO(raikonenfnu): currently run on default/null stream, when cmd buffer
   // stream work with device->stream, we'll change
   ROCM_RETURN_IF_ERROR(device->context_wrapper.syms, hipStreamSynchronize(0),
