@@ -41,8 +41,10 @@ for general instructions on building using CMake):
   ```shell
   cmake -B ../iree-build/
     -DIREE_BUILD_SAMPLES=ON \
-    -DIREE_TARGET_BACKENDS_TO_BUILD=DYLIB-LLVM-AOT \
-    -DIREE_HAL_DRIVERS_TO_BUILD=Dylib_Sync \
+    -DIREE_TARGET_BACKEND_DEFAULTS=OFF \
+    -DIREE_TARGET_BACKEND_DYLIB_LLVM_AOT=ON \
+    -DIREE_HAL_DRIVER_DEFAULTS=OFF \
+    -DIREE_HAL_DRIVER_DYLIB_SYNC=ON \
     -DIREE_BUILD_COMPILER=ON \
     -DCMAKE_BUILD_TYPE=RelWithDebInfo .
   ```

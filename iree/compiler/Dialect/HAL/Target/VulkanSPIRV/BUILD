@@ -14,7 +14,7 @@ package(
 
 iree_cmake_extra_content(
     content = """
-if(NOT "${IREE_TARGET_BACKEND_VULKAN-SPIRV}")
+if(NOT "${IREE_TARGET_BACKEND_VULKAN_SPIRV}")
   return()
 endif()
 """,
