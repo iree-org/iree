@@ -69,7 +69,7 @@ to build IREE for your host platform and the
 page if you are cross compiling for Android. The dylib compiler backend is
 compiled in by default on all platforms.
 
-Ensure that the `IREE_TARGET_BACKEND_DYLIB-LLVM-AOT` CMake option is `ON` when
+Ensure that the `IREE_TARGET_BACKEND_DYLIB_LLVM_AOT` CMake option is `ON` when
 configuring for the host.
 
 ## Compile and run the model

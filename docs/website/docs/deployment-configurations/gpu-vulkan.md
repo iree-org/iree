@@ -120,7 +120,7 @@ to build IREE for Linux/Windows and the [Android cross-compilation][android-cc]
 page for Android. The SPIR-V compiler backend is compiled in by default on all
 platforms.
 
-Ensure that the `IREE_TARGET_BACKEND_VULKAN-SPIRV` CMake option is `ON` when
+Ensure that the `IREE_TARGET_BACKEND_VULKAN_SPIRV` CMake option is `ON` when
 configuring for the host.
 
 ## Compile and run the model

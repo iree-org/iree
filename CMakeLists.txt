@@ -111,12 +111,12 @@ option(IREE_HAL_DRIVER_VMVX_SYNC "Enables the 'vmvx-sync' runtime HAL driver" ${
 option(IREE_HAL_DRIVER_VULKAN "Enables the 'vulkan' runtime HAL driver" ${IREE_HAL_DRIVER_VULKAN_DEFAULT})
 
 option(IREE_TARGET_BACKEND_CUDA "Enables the 'cuda' compiler target backend" ${IREE_BUILD_COMPILER})
-option(IREE_TARGET_BACKEND_DYLIB-LLVM-AOT "Enables the 'dylib-llvm-aot' compiler target backend" ${IREE_BUILD_COMPILER})
-option(IREE_TARGET_BACKEND_METAL-SPIRV "Enables the 'metal-spirv' compiler target backend" ${IREE_BUILD_COMPILER})
+option(IREE_TARGET_BACKEND_DYLIB_LLVM_AOT "Enables the 'dylib-llvm-aot' compiler target backend" ${IREE_BUILD_COMPILER})
+option(IREE_TARGET_BACKEND_METAL_SPIRV "Enables the 'metal-spirv' compiler target backend" ${IREE_BUILD_COMPILER})
 option(IREE_TARGET_BACKEND_ROCM "Enables the 'rocm' compiler target backend" ${IREE_BUILD_COMPILER})
 option(IREE_TARGET_BACKEND_VMVX "Enables the 'vmvx' compiler target backend" ${IREE_BUILD_COMPILER})
-option(IREE_TARGET_BACKEND_VULKAN-SPIRV "Enables the 'vulkan-spirv' compiler target backend" ${IREE_BUILD_COMPILER})
-option(IREE_TARGET_BACKEND_WASM-LLVM-AOT "Enables the 'wasm-llvm-aot' compiler target backend" ${IREE_BUILD_COMPILER})
+option(IREE_TARGET_BACKEND_VULKAN_SPIRV "Enables the 'vulkan-spirv' compiler target backend" ${IREE_BUILD_COMPILER})
+option(IREE_TARGET_BACKEND_WASM_LLVM_AOT "Enables the 'wasm-llvm-aot' compiler target backend" ${IREE_BUILD_COMPILER})
 # Disable WebGPU by default - it has complex deps and is under development.
 option(IREE_TARGET_BACKEND_WEBGPU "Enables the 'webgpu' compiler target backend" OFF)
 
@@ -128,11 +128,11 @@ message(STATUS "IREE build runtime HAL driver 'vmvx-sync': ${IREE_HAL_DRIVER_VMV
 message(STATUS "IREE build runtime HAL driver 'vulkan': ${IREE_HAL_DRIVER_VULKAN}")
 
 message(STATUS "IREE build compiler target backend 'cuda': ${IREE_TARGET_BACKEND_CUDA}")
-message(STATUS "IREE build compiler target backend 'dylib-llvm-aot': ${IREE_TARGET_BACKEND_DYLIB-LLVM-AOT}")
-message(STATUS "IREE build compiler target backend 'wasm-llvm-aot': ${IREE_TARGET_BACKEND_WASM-LLVM-AOT}")
-message(STATUS "IREE build compiler target backend 'metal-spirv': ${IREE_TARGET_BACKEND_METAL-SPIRV}")
+message(STATUS "IREE build compiler target backend 'dylib-llvm-aot': ${IREE_TARGET_BACKEND_DYLIB_LLVM_AOT}")
+message(STATUS "IREE build compiler target backend 'wasm-llvm-aot': ${IREE_TARGET_BACKEND_WASM_LLVM_AOT}")
+message(STATUS "IREE build compiler target backend 'metal-spirv': ${IREE_TARGET_BACKEND_METAL_SPIRV}")
 message(STATUS "IREE build compiler target backend 'rocm': ${IREE_TARGET_BACKEND_ROCM}")
-message(STATUS "IREE build compiler target backend 'vulkan-spirv': ${IREE_TARGET_BACKEND_VULKAN-SPIRV}")
+message(STATUS "IREE build compiler target backend 'vulkan-spirv': ${IREE_TARGET_BACKEND_VULKAN_SPIRV}")
 message(STATUS "IREE build compiler target backend 'vmvx': ${IREE_TARGET_BACKEND_VMVX}")
 message(STATUS "IREE build compiler target backend 'webgpu': ${IREE_TARGET_BACKEND_WEBGPU}")
 
@@ -449,7 +449,7 @@ if(IREE_BUILD_PYTHON_BINDINGS)
   endif()
 endif()
 
-if(IREE_TARGET_BACKEND_METAL-SPIRV)
+if(IREE_TARGET_BACKEND_METAL_SPIRV)
   iree_set_spirv_cross_cmake_options()
   # SPIRV-Cross is needed to cross compile SPIR-V into MSL source code.
   add_subdirectory(third_party/spirv_cross EXCLUDE_FROM_ALL)
