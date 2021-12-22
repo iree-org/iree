@@ -64,10 +64,9 @@ module @hoist_tree_const_expr {
 
   // CHECK: func @main
   builtin.func @main() -> (i32, i32, i32) {
-    // CHECK: %[[LOAD_HOISTED_1:.*]] = util.global.load @[[HOISTED_1]] : i32
-    // CHECK: %[[RESULT:.*]] = "iree_unregistered.var_expr"(%[[LOAD_HOISTED_1]])
     // CHECK-DAG: %[[LOAD_HOISTED_0:.*]] = util.global.load @[[HOISTED_0]] : i32
     // CHECK-DAG: %[[LOAD_HOISTED_1:.*]] = util.global.load @[[HOISTED_1]] : i32
+    // CHECK-DAG: %[[RESULT:.*]] = "iree_unregistered.var_expr"(%[[LOAD_HOISTED_1]])
     // CHECK: return %[[LOAD_HOISTED_0]], %[[LOAD_HOISTED_1]], %[[RESULT]]
     %0 = arith.constant 0 : i32
     %1 = arith.constant 1 : i32

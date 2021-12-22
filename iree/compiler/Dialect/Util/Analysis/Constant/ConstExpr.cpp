@@ -21,6 +21,31 @@ namespace iree_compiler {
 namespace IREE {
 namespace Util {
 
+//===----------------------------------------------------------------------===//
+// ConstExprAnalysis
+//===----------------------------------------------------------------------===//
+
+namespace {
+OpOperand *findOperandFor(Operation *op, Value input) {
+  for (OpOperand &operand : op->getOpOperands()) {
+    if (operand.get() == input) return &operand;
+  }
+  return nullptr;
+}
+
+}  // namespace
+
+bool ConstExprAnalysis::ConstValueInfo::hasNonAnalyzedConsumer() const {
+  // The analysis cannot represent zero-result operations, so detect that
+  // and return.
+  for (Operation *user : getOperation()->getUsers()) {
+    if (user->getNumResults() == 0) {
+      return true;
+    }
+  }
+  return false;
+}
+
 ConstExprAnalysis::ConstExprAnalysis(Operation *rootOp) {
   Explorer explorer(rootOp, TraversalAction::SHALLOW);
   explorer.initialize();
@@ -116,6 +141,14 @@ ConstExprAnalysis::ConstExprAnalysis(Operation *rootOp) {
       }
     }
   }
+
+  // Go through and populate all consumer sets now that producers are known.
+  for (auto it : constInfoMap) {
+    ConstValueInfo *consumer = it.second;
+    for (ConstValueInfo *producer : consumer->producers) {
+      producer->consumers.insert(consumer);
+    }
+  }
 }
 
 ConstExprAnalysis::ConstValueInfo *ConstExprAnalysis::addInfo(
@@ -181,6 +214,136 @@ void ConstExprAnalysis::print(raw_ostream &os) const {
 }
 
 void ConstExprAnalysis::dump() const { print(llvm::errs()); }
+
+//===----------------------------------------------------------------------===//
+// ConstExprHoistingPolicy
+//===----------------------------------------------------------------------===//
+
+ConstExprHoistingPolicy::ConstExprHoistingPolicy(
+    const ConstExprAnalysis &analysis)
+    : analysis(analysis), decisions(analysis.allocedConstInfos.size()) {
+  for (auto &it : analysis.allocedConstInfos) {
+    decisions[it.get()] = {};
+  }
+}
+
+void ConstExprHoistingPolicy::initialize() {
+  // Bootstrap the worklist in analysis order, which is topological (def, use)
+  // order.
+  // TODO: Do a secondary sort?
+  Worklist worklist;
+  worklist.reserve(analysis.allocedConstInfos.size());
+  for (auto &it : analysis.allocedConstInfos) {
+    worklist.push_back(it.get());
+  }
+
+  // Since just initializing invariants, which are local, iteration order
+  // doesn't matter.
+  for (auto *info : worklist) {
+    Decision *decision = getDecision(info);
+    makeInvariantDecision(info, decision);
+    Outcome outcome = decision->getOutcome();
+    if (outcome != UNDECIDED) {
+      LLVM_DEBUG(dbgs() << "ConstExprHoistPolicy(INVARIANT, ");
+      if (outcome == ENABLE_HOIST) {
+        LLVM_DEBUG(dbgs() << "ENABLE_HOIST");
+      } else if (outcome == DISABLE_HOIST) {
+        LLVM_DEBUG(dbgs() << "DISABLE_HOIST");
+      }
+      LLVM_DEBUG(dbgs() << "): " << info->constValue << "\n");
+    }
+  }
+
+  // Work iteratively until converged.
+  for (int i = 0;; ++i) {
+    bool madeChange = false;
+    for (auto *info : worklist) {
+      Decision *decision = getDecision(info);
+      if (decision->getOutcome() != UNDECIDED) continue;
+      makeDecision(info, decision);
+
+      if (decision->getOutcome() != UNDECIDED) {
+        madeChange = true;
+        LLVM_DEBUG(dbgs() << "ConstExprHoistPolicy(" << i << ", ");
+        if (decision->getOutcome() == ENABLE_HOIST) {
+          LLVM_DEBUG(dbgs() << "ENABLE_HOIST");
+        } else if (decision->getOutcome() == DISABLE_HOIST) {
+          LLVM_DEBUG(dbgs() << "DISABLE_HOIST");
+        }
+        LLVM_DEBUG(dbgs() << "): " << info->constValue << "\n");
+      }
+    }
+
+    if (!madeChange) {
+      LLVM_DEBUG(dbgs() << "ConstExprHoistPolicy(" << i << ", CONVERGED)\n");
+      break;
+    }
+  }
+
+  for (auto *info : worklist) {
+    Decision *decision = getDecision(info);
+    if (decision->getOutcome() == UNDECIDED) {
+      LLVM_DEBUG(dbgs() << "ConstExprHoistPolicy: Value did not converge: "
+                        << info->constValue << "\n");
+    }
+  }
+}
+
+void ConstExprHoistingPolicy::makeInvariantDecision(
+    const ConstExprAnalysis::ConstValueInfo *info, Decision *decision) {
+  // Check 1: Is it not const-expr.
+  if (!info->isConstExpr()) {
+    return decision->disableHoist();
+  }
+
+  // Check 2: Is it a root (these are already hoisted).
+  if (info->isRoot) {
+    decision->disableHoist();
+  }
+
+  // Check 3: Is the op itself a valid "leaf" that can become a global.
+  if (!isHoistableConstExprLeaf(info)) {
+    return decision->disableHoist();
+  }
+}
+
+void ConstExprHoistingPolicy::makeDecision(
+    const ConstExprAnalysis::ConstValueInfo *info, Decision *decision) {
+  // A const-expr value has a legal escape if:
+  //   - Has a non analyzed consumer
+  //   - It has an anlyzed consumer that:
+  //     - Has been marked as DISABLE_HOIST (must feed into something that is
+  //       not being hoisted).
+  //     - Is consumed by a hoistable operand or no operand (signals implicit
+  //       capture).
+  bool hasLegalEscape = info->hasNonAnalyzedConsumer();
+  if (!hasLegalEscape) {
+    for (auto *consumerInfo : info->consumers) {
+      Decision *consumerDecision = getDecision(consumerInfo);
+      if (consumerDecision->getOutcome() != DISABLE_HOIST) continue;
+
+      Operation *consumerOp = consumerInfo->getOperation();
+      OpOperand *consumerOperand = findOperandFor(consumerOp, info->constValue);
+      if (!consumerOperand) {
+        // Must be an implicit capture.
+        hasLegalEscape = true;
+        break;
+      } else if (isHoistableConstExprConsumingOperand(consumerOperand)) {
+        hasLegalEscape = true;
+      }
+    }
+  }
+
+  // If there is no legal escape, we can concretely disable.
+  if (!hasLegalEscape) {
+    decision->disableHoist();
+    return;
+  }
+
+  // Otherwise, we can conditionally enable hoisting (based on cost model, etc).
+  // TODO: Implement further conditions.
+  decision->enableHoist();
+}
 
 }  // namespace Util
 }  // namespace IREE
