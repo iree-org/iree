@@ -120,21 +120,21 @@ option(IREE_TARGET_BACKEND_WASM_LLVM_AOT "Enables the 'wasm-llvm-aot' compiler t
 # Disable WebGPU by default - it has complex deps and is under development.
 option(IREE_TARGET_BACKEND_WEBGPU "Enables the 'webgpu' compiler target backend" OFF)
 
-message(STATUS "IREE build runtime HAL driver 'cuda': ${IREE_HAL_DRIVER_CUDA}")
-message(STATUS "IREE build runtime HAL driver 'dylib': ${IREE_HAL_DRIVER_DYLIB}")
-message(STATUS "IREE build runtime HAL driver 'dylib-sync': ${IREE_HAL_DRIVER_DYLIB_SYNC}")
-message(STATUS "IREE build runtime HAL driver 'vmvx': ${IREE_HAL_DRIVER_VMVX}")
-message(STATUS "IREE build runtime HAL driver 'vmvx-sync': ${IREE_HAL_DRIVER_VMVX_SYNC}")
-message(STATUS "IREE build runtime HAL driver 'vulkan': ${IREE_HAL_DRIVER_VULKAN}")
+message(VERBOSE "IREE build runtime HAL driver 'cuda': ${IREE_HAL_DRIVER_CUDA}")
+message(VERBOSE "IREE build runtime HAL driver 'dylib': ${IREE_HAL_DRIVER_DYLIB}")
+message(VERBOSE "IREE build runtime HAL driver 'dylib-sync': ${IREE_HAL_DRIVER_DYLIB_SYNC}")
+message(VERBOSE "IREE build runtime HAL driver 'vmvx': ${IREE_HAL_DRIVER_VMVX}")
+message(VERBOSE "IREE build runtime HAL driver 'vmvx-sync': ${IREE_HAL_DRIVER_VMVX_SYNC}")
+message(VERBOSE "IREE build runtime HAL driver 'vulkan': ${IREE_HAL_DRIVER_VULKAN}")
 
-message(STATUS "IREE build compiler target backend 'cuda': ${IREE_TARGET_BACKEND_CUDA}")
-message(STATUS "IREE build compiler target backend 'dylib-llvm-aot': ${IREE_TARGET_BACKEND_DYLIB_LLVM_AOT}")
-message(STATUS "IREE build compiler target backend 'wasm-llvm-aot': ${IREE_TARGET_BACKEND_WASM_LLVM_AOT}")
-message(STATUS "IREE build compiler target backend 'metal-spirv': ${IREE_TARGET_BACKEND_METAL_SPIRV}")
-message(STATUS "IREE build compiler target backend 'rocm': ${IREE_TARGET_BACKEND_ROCM}")
-message(STATUS "IREE build compiler target backend 'vulkan-spirv': ${IREE_TARGET_BACKEND_VULKAN_SPIRV}")
-message(STATUS "IREE build compiler target backend 'vmvx': ${IREE_TARGET_BACKEND_VMVX}")
-message(STATUS "IREE build compiler target backend 'webgpu': ${IREE_TARGET_BACKEND_WEBGPU}")
+message(VERBOSE "IREE build compiler target backend 'cuda': ${IREE_TARGET_BACKEND_CUDA}")
+message(VERBOSE "IREE build compiler target backend 'dylib-llvm-aot': ${IREE_TARGET_BACKEND_DYLIB_LLVM_AOT}")
+message(VERBOSE "IREE build compiler target backend 'wasm-llvm-aot': ${IREE_TARGET_BACKEND_WASM_LLVM_AOT}")
+message(VERBOSE "IREE build compiler target backend 'metal-spirv': ${IREE_TARGET_BACKEND_METAL_SPIRV}")
+message(VERBOSE "IREE build compiler target backend 'rocm': ${IREE_TARGET_BACKEND_ROCM}")
+message(VERBOSE "IREE build compiler target backend 'vulkan-spirv': ${IREE_TARGET_BACKEND_VULKAN_SPIRV}")
+message(VERBOSE "IREE build compiler target backend 'vmvx': ${IREE_TARGET_BACKEND_VMVX}")
+message(VERBOSE "IREE build compiler target backend 'webgpu': ${IREE_TARGET_BACKEND_WEBGPU}")
 
 #-------------------------------------------------------------------------------
 # IREE compilation toolchain configuration
