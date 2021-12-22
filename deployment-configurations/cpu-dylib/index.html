@@ -11,7 +11,7 @@
         <link rel="canonical" href="https://google.github.io/iree/deployment-configurations/cpu-dylib/">
       
       <link rel="icon" href="../../ghost.svg">
-      <meta name="generator" content="mkdocs-1.2.3, mkdocs-material-8.0.3">
+      <meta name="generator" content="mkdocs-1.2.3, mkdocs-material-8.1.3">
     
     
       
@@ -19,10 +19,10 @@
       
     
     
-      <link rel="stylesheet" href="../../assets/stylesheets/main.62128196.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.edf004c2.min.css">
       
         
-        <link rel="stylesheet" href="../../assets/stylesheets/palette.9204c3b2.min.css">
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.e6a45f82.min.css">
         
       
     
@@ -38,7 +38,7 @@
     
       <link rel="stylesheet" href="../../assets/stylesheets/extra.css">
     
-    <script>function __md_scope(e,t,_){return new URL(_||(t===localStorage?"../..":"../.."),location).pathname+"."+e}function __md_get(e,t=localStorage,_){return JSON.parse(t.getItem(__md_scope(e,t,_)))}function __md_set(e,t,_=localStorage,o){try{_.setItem(__md_scope(e,_,o),JSON.stringify(t))}catch(e){}}</script>
+    <script>__md_scope=new URL("../..",location),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
       
 
@@ -287,7 +287,6 @@
         <ul class="md-nav__list" data-md-scrollfix>
           
             
-            
           
             
               
@@ -387,7 +386,6 @@
         </label>
         <ul class="md-nav__list" data-md-scrollfix>
           
-            
             
           
             
@@ -636,7 +634,6 @@
         <ul class="md-nav__list" data-md-scrollfix>
           
             
-            
           
             
               
@@ -749,7 +746,6 @@
         <ul class="md-nav__list" data-md-scrollfix>
           
             
-            
           
             
               
@@ -838,7 +834,6 @@
         <ul class="md-nav__list" data-md-scrollfix>
           
             
-            
           
         </ul>
       </nav>
@@ -884,7 +879,6 @@
         </label>
         <ul class="md-nav__list" data-md-scrollfix>
           
-            
             
           
         </ul>
@@ -941,7 +935,6 @@
         </label>
         <ul class="md-nav__list" data-md-scrollfix>
           
-            
             
           
             
@@ -1173,9 +1166,8 @@ page if you are cross compiling for Android. The dylib HAL driver is compiled
 in by default on all platforms.</p>
 <!-- TODO(??): a way to verify dylib is compiled in and supported -->
 
-<p>If you want to explicitly specify HAL drivers to support, you will need to add
-<code>DyLib</code> to the <code>IREE_HAL_DRIVERS_TO_BUILD</code> CMake list variable when configuring
-(for target).</p>
+<p>Ensure that the <code>IREE_HAL_DRIVER_DYLIB</code> CMake option is <code>ON</code> when configuring
+for the target.</p>
 <h3 id="get-compiler-for-cpu-native-instructions">Get compiler for CPU native instructions<a class="headerlink" href="#get-compiler-for-cpu-native-instructions" title="Permanent link">&para;</a></h3>
 <!-- TODO(??): vcpkg -->
 
@@ -1199,9 +1191,8 @@ to build IREE for your host platform and the
 <a href="../../building-from-source/android/">Android cross-compilation</a>
 page if you are cross compiling for Android. The dylib compiler backend is
 compiled in by default on all platforms.</p>
-<p>If you want to explicitly specify HAL drivers to support, you will need to add
-<code>DYLIB-LLVM-AOT</code> to the <code>IREE_TARGET_BACKENDS_TO_BUILD</code> CMake list variable when
-configuring (for host).</p>
+<p>Ensure that the <code>IREE_TARGET_BACKEND_DYLIB_LLVM_AOT</code> CMake option is <code>ON</code> when
+configuring for the host.</p>
 <h2 id="compile-and-run-the-model">Compile and run the model<a class="headerlink" href="#compile-and-run-the-model" title="Permanent link">&para;</a></h2>
 <p>With the compiler and runtime for dynamic libraries, we can now compile a model
 and run it on the CPU.</p>
@@ -1312,10 +1303,10 @@ concrete values.</p>
     <div class="md-dialog" data-md-component="dialog">
       <div class="md-dialog__inner md-typeset"></div>
     </div>
-    <script id="__config" type="application/json">{"base": "../..", "features": ["navigation.instant", "navigation.tracking", "navigation.sections", "navigation.top", "navigation.indexes"], "translations": {"clipboard.copy": "Copy to clipboard", "clipboard.copied": "Copied to clipboard", "search.config.lang": "en", "search.config.pipeline": "trimmer, stopWordFilter", "search.config.separator": "[\\s\\-]+", "search.placeholder": "Search", "search.result.placeholder": "Type to start searching", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.term.missing": "Missing", "select.version.title": "Select version"}, "search": "../../assets/javascripts/workers/search.01824240.min.js"}</script>
+    <script id="__config" type="application/json">{"base": "../..", "features": ["navigation.instant", "navigation.tracking", "navigation.sections", "navigation.top", "navigation.indexes"], "translations": {"clipboard.copy": "Copy to clipboard", "clipboard.copied": "Copied to clipboard", "search.config.lang": "en", "search.config.pipeline": "trimmer, stopWordFilter", "search.config.separator": "[\\s\\-]+", "search.placeholder": "Search", "search.result.placeholder": "Type to start searching", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.term.missing": "Missing", "select.version.title": "Select version"}, "search": "../../assets/javascripts/workers/search.0bbba5b5.min.js"}</script>
     
     
-      <script src="../../assets/javascripts/bundle.e0abf5b0.min.js"></script>
+      <script src="../../assets/javascripts/bundle.e1a181d9.min.js"></script>
       
     
   </body>
