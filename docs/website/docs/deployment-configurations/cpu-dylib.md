@@ -35,9 +35,8 @@ in by default on all platforms.
 
 <!-- TODO(??): a way to verify dylib is compiled in and supported -->
 
-If you want to explicitly specify HAL drivers to support, you will need to add
-`DyLib` to the `IREE_HAL_DRIVERS_TO_BUILD` CMake list variable when configuring
-(for target).
+Ensure that the `IREE_HAL_DRIVER_DYLIB` CMake option is `ON` when configuring
+for the target.
 
 ### Get compiler for CPU native instructions
 
