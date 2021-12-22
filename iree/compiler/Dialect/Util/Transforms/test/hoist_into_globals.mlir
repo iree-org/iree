@@ -121,3 +121,35 @@ module @hoist_non_leaf_const_expr {
   // CHECK:   util.initializer.return
   // CHECK: }
 }
+
+// -----
+// CHECK-LABEL: @hoist_implicit_capture
+module @hoist_implicit_capture {
+  // CHECK: util.global private @[[HOISTED_SYM:.*]] : i32
+  // CHECK: func @main
+  builtin.func @main() -> (i32) {
+    %0 = arith.constant 0 : i32
+    %1 = arith.constant 1 : i32
+    // CHECK-NOT: arith.constant
+    // CHECK-NOT: iree_unregistered.const_expr
+    // CHECK: %[[VAL:.*]] = util.global.load @[[HOISTED_SYM]] : i32
+    // CHECK: return %[[VAL]]
+    %2 = "iree_unregistered.const_expr"(%0) ({
+    ^bb0(%inner0 : i32):
+      %3 = arith.addi %inner0, %1 : i32
+      "iree_unregistered.yield"(%3) : (i32) -> i32
+    }) : (i32) -> i32
+    return %2 : i32
+  }
+  // Key checks: arith.constant 1 gets pulled in to the initializer
+  // and the reference is updated correctly in the custom op region.
+  // CHECK: util.initializer {
+  // CHECK-DAG:   %[[C0:.*]] = arith.constant 0 : i32
+  // CHECK-DAG:   %[[C1:.*]] = arith.constant 1 : i32
+  // CHECK:       %[[CE0:.*]] = "iree_unregistered.const_expr"(%[[C0]])
+  // CHECK:         ^bb0(%[[B0:.*]]: i32):
+  // CHECK:         arith.addi %[[B0]], %[[C1]]
+  // CHECK:       util.global.store %[[CE0]], @[[HOISTED_SYM]] : i32
+  // CHECK:       util.initializer.return
+  // CHECK: }
+}

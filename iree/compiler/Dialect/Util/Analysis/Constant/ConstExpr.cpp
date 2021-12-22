@@ -127,37 +127,37 @@ ConstExprAnalysis::ConstValueInfo *ConstExprAnalysis::addInfo(
 }
 
 void ConstExprAnalysis::expandToOp(Operation *op) {
-  bool eligible = isEligibleConstExprOp(op);
+  ConstExprOpInfo opInfo = ConstExprOpInfo::getForOp(op);
   for (auto result : op->getResults()) {
     auto foundIt = constInfoMap.find(result);
     if (foundIt != constInfoMap.end()) continue;
 
     // Generate new info record.
-    auto *info = addInfo(result);
-    if (!eligible) {
+    auto *valueInfo = addInfo(result);
+    if (!opInfo.isEligible) {
       // Put it in a NON_CONSTANT state and bail. This is terminal.
-      info->state = ConstValueInfo::NON_CONSTANT;
+      valueInfo->state = ConstValueInfo::NON_CONSTANT;
       LLVM_DEBUG(dbgs() << "  EXPAND TO INELIGIBLE: " << result << "\n");
       continue;
     }
 
     // If here, then an unknown state.
     LLVM_DEBUG(dbgs() << "  EXPAND TO UNKNOWN: " << result << "\n");
-    worklist.push_back(info);
+    worklist.push_back(valueInfo);
 
-    // Process operands.
-    for (auto operand : op->getOperands()) {
-      Operation *definingOp = operand.getDefiningOp();
+    // Process producers.
+    for (auto producer : opInfo.producers) {
+      Operation *definingOp = producer.getDefiningOp();
       if (!definingOp) {
         // Consider crossing out of block to be non-const.
-        info->state = ConstValueInfo::NON_CONSTANT;
+        valueInfo->state = ConstValueInfo::NON_CONSTANT;
         break;
       }
       expandToOp(definingOp);
 
-      ConstValueInfo *producerInfo = constInfoMap.lookup(operand);
+      ConstValueInfo *producerInfo = constInfoMap.lookup(producer);
       assert(producerInfo && "should have producer info in map");
-      info->producers.push_back(producerInfo);
+      valueInfo->producers.insert(producerInfo);
     }
   }
 }
@@ -171,6 +171,10 @@ void ConstExprAnalysis::print(raw_ostream &os) const {
       os << "    WITH ROOTS:\n";
       for (Value root : info->roots) {
         os << "      " << root << "\n";
+      }
+      os << "    WITH PRODUCERS:\n";
+      for (ConstValueInfo *producerInfo : info->producers) {
+        os << "      " << producerInfo->constValue << "\n";
       }
     }
   }

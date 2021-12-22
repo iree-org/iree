@@ -7,6 +7,7 @@
 #include "iree/compiler/Dialect/Util/Analysis/Constant/OpOracle.h"
 
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
+#include "llvm/ADT/SmallPtrSet.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Interfaces/SideEffectInterfaces.h"
 
@@ -15,44 +16,86 @@ namespace iree_compiler {
 namespace IREE {
 namespace Util {
 
+namespace {
+
+void populateEscapingProducers(Operation *parentOp, ConstExprOpInfo &info) {
+  SmallPtrSet<Operation *, 8> containedOps;
+  parentOp->walk<WalkOrder::PreOrder>([&](Operation *itOp) {
+    containedOps.insert(parentOp);
+    // For the outer-most op, consider that all operands escape.
+    if (itOp == parentOp) {
+      info.producers.insert(itOp->getOperands().begin(),
+                            itOp->getOperands().end());
+      return;
+    }
+
+    // For nested operations, only consider that they escape if they are
+    // defined outside of the parent.
+    for (Value operand : itOp->getOperands()) {
+      Block *block = operand.getParentBlock();
+      if (!containedOps.contains(block->getParentOp())) {
+        info.producers.insert(operand);
+      }
+    }
+  });
+}
+
+ConstExprOpInfo getInfoForDefaultConstExprOp(Operation *op) {
+  ConstExprOpInfo info;
+  info.isEligible = true;
+  populateEscapingProducers(op, info);
+  return info;
+}
+
+}  // namespace
+
 void registerConstExprDependentDialects(DialectRegistry &registry) {
   registry.insert<IREE::Util::UtilDialect>();
   registry.insert<linalg::LinalgDialect>();
 }
 
-bool isEligibleConstExprOp(Operation *op) {
+ConstExprOpInfo ConstExprOpInfo::getForOp(Operation *op) {
   // Special carve-out for unregistered testing ops.
   if (!op->isRegistered()) {
-    if (op->getName().getStringRef() ==
-        "iree_unregistered.non_leaf_const_expr") {
-      return true;
-    }
-    if (op->getName().getStringRef() == "iree_unregistered.const_expr") {
-      return true;
-    }
+    // Reject.
     if (op->getName().getStringRef() == "iree_unregistered.var_expr") {
-      return false;
+      return {};
     }
-    return false;
+    // Accept.
+    if (op->getName().getStringRef() ==
+            "iree_unregistered.non_leaf_const_expr" ||
+        op->getName().getStringRef() == "iree_unregistered.const_expr") {
+      return getInfoForDefaultConstExprOp(op);
+    }
+    return {};
   }
 
-  // Allow linalg ops, even though they are not effect annotated.
+  // We have a specific allow-list for Linalg ops because we want to consider
+  // new additions carefully.
   if (op->getDialect() ==
       op->getContext()->getOrLoadDialect<linalg::LinalgDialect>()) {
-    return true;
+    // Structured op implementations and a handful of pure ops are included.
+    // Notably: IndexOp is not included because it establishes a hidden
+    // dependency to the iterator and is non-const.
+    if (llvm::isa<linalg::LinalgOp>(op) || llvm::isa<linalg::PadTensorOp>(op) ||
+        llvm::isa<linalg::InitTensorOp>(op)) {
+      return getInfoForDefaultConstExprOp(op);
+    }
+
+    return {};
   }
 
   // By default any effects make it non const-expr.
   if (!MemoryEffectOpInterface::hasNoEffect(op)) {
-    return false;
+    return {};
   }
 
   // By default, ops without results are not const-expr.
   if (op->getNumResults() == 0) {
-    return false;
+    return {};
   }
 
-  return true;
+  return getInfoForDefaultConstExprOp(op);
 }
 
 bool isHoistableConstExprLeaf(const ConstExprAnalysis::ConstValueInfo *info) {
