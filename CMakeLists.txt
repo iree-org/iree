@@ -85,14 +85,14 @@ option(IREE_ENABLE_EMITC "Enables MLIR EmitC dependencies." ${IREE_BUILD_COMPILE
 # Target and backend configuration
 #-------------------------------------------------------------------------------
 
-option(IREE_HAL_DRIVER_DEFAULT "Sets the default value for all runtime HAL drivers" ON)
-option(IREE_TARGET_BACKEND_DEFAULT "Sets the default value for all compiler target backends" ${IREE_BUILD_COMPILER})
+option(IREE_HAL_DRIVER_DEFAULTS "Sets the default value for all runtime HAL drivers" ON)
+option(IREE_TARGET_BACKEND_DEFAULTS "Sets the default value for all compiler target backends" ${IREE_BUILD_COMPILER})
 
 # CUDA is not natively supported on Android or Apple platforms.
 if(ANDROID OR APPLE)
   set(IREE_HAL_DRIVER_CUDA_DEFAULT OFF)
 else()
-  set(IREE_HAL_DRIVER_CUDA_DEFAULT ${IREE_HAL_DRIVER_DEFAULT})
+  set(IREE_HAL_DRIVER_CUDA_DEFAULT ${IREE_HAL_DRIVER_DEFAULTS})
 endif()
 
 # Vulkan is not natively supported on Apple platforms.
@@ -100,14 +100,14 @@ endif()
 if (APPLE)
   set(IREE_HAL_DRIVER_VULKAN_DEFAULT OFF)
 else()
-  set(IREE_HAL_DRIVER_VULKAN_DEFAULT ${IREE_HAL_DRIVER_DEFAULT})
+  set(IREE_HAL_DRIVER_VULKAN_DEFAULT ${IREE_HAL_DRIVER_DEFAULTS})
 endif()
 
 option(IREE_HAL_DRIVER_CUDA "Enables the 'cuda' runtime HAL driver" ${IREE_HAL_DRIVER_CUDA_DEFAULT})
-option(IREE_HAL_DRIVER_DYLIB "Enables the 'dylib' runtime HAL driver" ${IREE_HAL_DRIVER_DEFAULT})
-option(IREE_HAL_DRIVER_DYLIB_SYNC "Enables the 'dylib-sync' runtime HAL driver" ${IREE_HAL_DRIVER_DEFAULT})
-option(IREE_HAL_DRIVER_VMVX "Enables the 'vmvx' runtime HAL driver" ${IREE_HAL_DRIVER_DEFAULT})
-option(IREE_HAL_DRIVER_VMVX_SYNC "Enables the 'vmvx-sync' runtime HAL driver" ${IREE_HAL_DRIVER_DEFAULT})
+option(IREE_HAL_DRIVER_DYLIB "Enables the 'dylib' runtime HAL driver" ${IREE_HAL_DRIVER_DEFAULTS})
+option(IREE_HAL_DRIVER_DYLIB_SYNC "Enables the 'dylib-sync' runtime HAL driver" ${IREE_HAL_DRIVER_DEFAULTS})
+option(IREE_HAL_DRIVER_VMVX "Enables the 'vmvx' runtime HAL driver" ${IREE_HAL_DRIVER_DEFAULTS})
+option(IREE_HAL_DRIVER_VMVX_SYNC "Enables the 'vmvx-sync' runtime HAL driver" ${IREE_HAL_DRIVER_DEFAULTS})
 option(IREE_HAL_DRIVER_VULKAN "Enables the 'vulkan' runtime HAL driver" ${IREE_HAL_DRIVER_VULKAN_DEFAULT})
 
 option(IREE_TARGET_BACKEND_CUDA "Enables the 'cuda' compiler target backend" ${IREE_BUILD_COMPILER})

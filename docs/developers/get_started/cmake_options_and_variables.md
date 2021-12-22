@@ -62,7 +62,7 @@ Builds the IREE TFLite Java bindings with the C API compatibility shim. Defaults
 
 Builds experimental remoting component. Defaults to `OFF`.
 
-#### `IREE_HAL_DRIVER_DEFAULT`:BOOL
+#### `IREE_HAL_DRIVER_DEFAULTS`:BOOL
 
 Default setting for each `IREE_HAL_DRIVER_*` option.
 
@@ -70,7 +70,7 @@ Default setting for each `IREE_HAL_DRIVER_*` option.
 
 Individual options enabling the build for each runtime HAL driver.
 
-#### `IREE_TARGET_BACKEND_DEFAULT`:BOOL
+#### `IREE_TARGET_BACKEND_DEFAULTS`:BOOL
 
 Default setting for each `IREE_TARGET_BACKEND_*` option.
 

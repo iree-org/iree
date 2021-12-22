@@ -41,7 +41,7 @@ cd build-emscripten
 # Configure using Emscripten's CMake wrapper, then build.
 emcmake "${CMAKE_BIN?}" -G Ninja .. \
   -DIREE_HOST_BINARY_ROOT=$PWD/../build-host/install \
-  -DIREE_HAL_DRIVER_DEFAULT=OFF \
+  -DIREE_HAL_DRIVER_DEFAULTS=OFF \
   -DIREE_HAL_DRIVER_VMVX=ON \
   -DIREE_BUILD_COMPILER=OFF \
   -DIREE_BUILD_TESTS=OFF \
