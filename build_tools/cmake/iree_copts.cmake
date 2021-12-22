@@ -128,6 +128,9 @@ iree_select_compiler_opts(IREE_DEFAULT_COPTS
 
     # Use the modern C preprocessor to more closely match standards/clang/gcc behavior.
     "/Zc:preprocessor"
+
+    # Enable C11 standards conforming mode.
+    "$<$<COMPILE_LANGUAGE:C>:/std:c11>"
 )
 
 # Compiler diagnostics.
