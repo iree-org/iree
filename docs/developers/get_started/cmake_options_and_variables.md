@@ -62,18 +62,21 @@ Builds the IREE TFLite Java bindings with the C API compatibility shim. Defaults
 
 Builds experimental remoting component. Defaults to `OFF`.
 
-#### `IREE_HAL_DRIVERS_TO_BUILD`:STRING
+#### `IREE_HAL_DRIVER_DEFAULTS`:BOOL
 
-Semicolon-separated list of HAL drivers to build, or `all` for building all HAL
-drivers. Case-insensitive. If an empty list is provided, will build no HAL
-drivers. Defaults to `all`. Example: `-DIREE_HAL_DRIVERS_TO_BUILD=Vulkan;VMLA`.
+Default setting for each `IREE_HAL_DRIVER_*` option.
 
-#### `IREE_TARGET_BACKENDS_TO_BUILD`:STRING
+#### `IREE_HAL_DRIVER_*`:BOOL
 
-Semicolon-separated list of target backend to build, or `all` for building all
-compiler target backends. Case-insensitive. If an empty list is provided, will
-build no target backends. Defaults to `all`. Example:
-`-DIREE_TARGET_BACKENDS_TO_BUILD=Vulkan-SPIRV;VMLA`.
+Individual options enabling the build for each runtime HAL driver.
+
+#### `IREE_TARGET_BACKEND_DEFAULTS`:BOOL
+
+Default setting for each `IREE_TARGET_BACKEND_*` option.
+
+#### `IREE_TARGET_BACKEND_*`:BOOL
+
+Individual options enabling the build for each compiler target backend.
 
 #### `IREE_DEV_MODE`:BOOL
 

@@ -45,11 +45,6 @@ option(IREE_BUILD_TENSORFLOW_COMPILER "Builds TensorFlow compiler frontend." "${
 option(IREE_BUILD_TFLITE_COMPILER "Builds the TFLite compiler frontend." "${IREE_BUILD_TENSORFLOW_ALL}")
 option(IREE_BUILD_XLA_COMPILER "Builds TensorFlow XLA compiler frontend." "${IREE_BUILD_TENSORFLOW_ALL}")
 
-set(IREE_HAL_DRIVERS_TO_BUILD "default"
-  CACHE STRING "Semicolon-separated list of HAL drivers to build, or \"default\"")
-set(IREE_TARGET_BACKENDS_TO_BUILD "default"
-  CACHE STRING "Semicolon-separated list of target backends to build, or \"default\"")
-
 # Properties controlling version and naming of release artifacts.
 set(IREE_RELEASE_PACKAGE_SUFFIX "-dev" CACHE STRING "Suffix to append to distributed package names")
 set(IREE_RELEASE_VERSION "0.1a1" CACHE STRING "Version to embed in distributed packages")
@@ -90,86 +85,56 @@ option(IREE_ENABLE_EMITC "Enables MLIR EmitC dependencies." ${IREE_BUILD_COMPILE
 # Target and backend configuration
 #-------------------------------------------------------------------------------
 
-# List of all runtime HAL drivers included in the project:
-set(IREE_ALL_HAL_DRIVERS
-  CUDA
-  Dylib
-  Dylib_Sync
-  VMVX
-  VMVX_Sync
-  Vulkan
-)
+option(IREE_HAL_DRIVER_DEFAULTS "Sets the default value for all runtime HAL drivers" ON)
+option(IREE_TARGET_BACKEND_DEFAULTS "Sets the default value for all compiler target backends" ${IREE_BUILD_COMPILER})
 
-if(IREE_HAL_DRIVERS_TO_BUILD STREQUAL "default")
-  set(IREE_HAL_DRIVERS_TO_BUILD ${IREE_ALL_HAL_DRIVERS})
-
-  # Vulkan is not natively supported on Apple platforms.
-  # Metal should generally be used instead, though MoltenVK may also work.
-  if(APPLE)
-    list(REMOVE_ITEM IREE_HAL_DRIVERS_TO_BUILD Vulkan)
-  endif()
-
-  # CUDA is not natively supported on Android or Apple platforms.
-  if(ANDROID OR APPLE)
-    list(REMOVE_ITEM IREE_HAL_DRIVERS_TO_BUILD CUDA)
-  endif()
-endif()
-message(STATUS "Building runtime HAL drivers: ${IREE_HAL_DRIVERS_TO_BUILD}")
-
-# Start each IREE_HAL_DRIVER_* OFF, then enable from IREE_HAL_DRIVERS_TO_BUILD.
-foreach(_backend ${IREE_ALL_HAL_DRIVERS})
-  string(TOUPPER "${_backend}" uppercase_backend)
-  set(IREE_HAL_DRIVER_${uppercase_backend} OFF CACHE BOOL "" FORCE)
-endforeach()
-foreach(_backend ${IREE_HAL_DRIVERS_TO_BUILD})
-  string(TOUPPER "${_backend}" uppercase_backend)
-  string(REPLACE "\"" "" uppercase_backend ${uppercase_backend})
-  set(IREE_HAL_DRIVER_${uppercase_backend} ON CACHE BOOL "" FORCE)
-endforeach()
-
-# List of all compiler target backends included in the project:
-set(IREE_ALL_TARGET_BACKENDS
-  CUDA
-  Dylib-LLVM-AOT
-  WASM-LLVM-AOT
-  Metal-SPIRV
-  ROCm
-  Vulkan-SPIRV
-  VMVX
-  WebGPU
-)
-
-if(${IREE_BUILD_COMPILER})
-  if(IREE_TARGET_BACKENDS_TO_BUILD STREQUAL "default")
-    set(IREE_TARGET_BACKENDS_TO_BUILD ${IREE_ALL_TARGET_BACKENDS})
-
-    # Disable the WebGPU backend by default, as it has complex dependencies and
-    # is still early in its development.
-    list(REMOVE_ITEM IREE_TARGET_BACKENDS_TO_BUILD WebGPU)
-  endif()
-  message(STATUS "Building compiler target backends: ${IREE_TARGET_BACKENDS_TO_BUILD}")
+# CUDA is not natively supported on Android or Apple platforms.
+if(ANDROID OR APPLE)
+  set(IREE_HAL_DRIVER_CUDA_DEFAULT OFF)
 else()
-  set(IREE_TARGET_BACKENDS_TO_BUILD "" CACHE STRING "" FORCE)
-  message(STATUS "Compiler is disabled, building no target backends")
+  set(IREE_HAL_DRIVER_CUDA_DEFAULT ${IREE_HAL_DRIVER_DEFAULTS})
 endif()
 
-# Default every IREE_TARGET_BACKEND_* to OFF
-foreach(_backend ${IREE_ALL_TARGET_BACKENDS})
-  string(TOUPPER "${_backend}" uppercase_backend)
-  set(IREE_TARGET_BACKEND_${uppercase_backend} OFF CACHE BOOL "" FORCE)
-endforeach()
+# Vulkan is not natively supported on Apple platforms.
+# Metal should generally be used instead, though MoltenVK may also work.
+if (APPLE)
+  set(IREE_HAL_DRIVER_VULKAN_DEFAULT OFF)
+else()
+  set(IREE_HAL_DRIVER_VULKAN_DEFAULT ${IREE_HAL_DRIVER_DEFAULTS})
+endif()
 
-# Set IREE_TARGET_BACKEND_* based on configuration
-foreach(_backend ${IREE_TARGET_BACKENDS_TO_BUILD})
-  string(TOUPPER "${_backend}" uppercase_backend)
-  string(REPLACE "\"" "" uppercase_backend ${uppercase_backend})
-  set(IREE_TARGET_BACKEND_${uppercase_backend} ON CACHE BOOL "" FORCE)
-endforeach()
+option(IREE_HAL_DRIVER_CUDA "Enables the 'cuda' runtime HAL driver" ${IREE_HAL_DRIVER_CUDA_DEFAULT})
+option(IREE_HAL_DRIVER_DYLIB "Enables the 'dylib' runtime HAL driver" ${IREE_HAL_DRIVER_DEFAULTS})
+option(IREE_HAL_DRIVER_DYLIB_SYNC "Enables the 'dylib-sync' runtime HAL driver" ${IREE_HAL_DRIVER_DEFAULTS})
+option(IREE_HAL_DRIVER_VMVX "Enables the 'vmvx' runtime HAL driver" ${IREE_HAL_DRIVER_DEFAULTS})
+option(IREE_HAL_DRIVER_VMVX_SYNC "Enables the 'vmvx-sync' runtime HAL driver" ${IREE_HAL_DRIVER_DEFAULTS})
+option(IREE_HAL_DRIVER_VULKAN "Enables the 'vulkan' runtime HAL driver" ${IREE_HAL_DRIVER_VULKAN_DEFAULT})
 
-list(APPEND CMAKE_MODULE_PATH
-  ${CMAKE_CURRENT_LIST_DIR}/build_tools/cmake/
-  ${CMAKE_CURRENT_LIST_DIR}/bindings/python/build_tools/cmake/
-)
+option(IREE_TARGET_BACKEND_CUDA "Enables the 'cuda' compiler target backend" ${IREE_BUILD_COMPILER})
+option(IREE_TARGET_BACKEND_DYLIB_LLVM_AOT "Enables the 'dylib-llvm-aot' compiler target backend" ${IREE_BUILD_COMPILER})
+option(IREE_TARGET_BACKEND_METAL_SPIRV "Enables the 'metal-spirv' compiler target backend" ${IREE_BUILD_COMPILER})
+option(IREE_TARGET_BACKEND_ROCM "Enables the 'rocm' compiler target backend" ${IREE_BUILD_COMPILER})
+option(IREE_TARGET_BACKEND_VMVX "Enables the 'vmvx' compiler target backend" ${IREE_BUILD_COMPILER})
+option(IREE_TARGET_BACKEND_VULKAN_SPIRV "Enables the 'vulkan-spirv' compiler target backend" ${IREE_BUILD_COMPILER})
+option(IREE_TARGET_BACKEND_WASM_LLVM_AOT "Enables the 'wasm-llvm-aot' compiler target backend" ${IREE_BUILD_COMPILER})
+# Disable WebGPU by default - it has complex deps and is under development.
+option(IREE_TARGET_BACKEND_WEBGPU "Enables the 'webgpu' compiler target backend" OFF)
+
+message(VERBOSE "IREE build runtime HAL driver 'cuda': ${IREE_HAL_DRIVER_CUDA}")
+message(VERBOSE "IREE build runtime HAL driver 'dylib': ${IREE_HAL_DRIVER_DYLIB}")
+message(VERBOSE "IREE build runtime HAL driver 'dylib-sync': ${IREE_HAL_DRIVER_DYLIB_SYNC}")
+message(VERBOSE "IREE build runtime HAL driver 'vmvx': ${IREE_HAL_DRIVER_VMVX}")
+message(VERBOSE "IREE build runtime HAL driver 'vmvx-sync': ${IREE_HAL_DRIVER_VMVX_SYNC}")
+message(VERBOSE "IREE build runtime HAL driver 'vulkan': ${IREE_HAL_DRIVER_VULKAN}")
+
+message(VERBOSE "IREE build compiler target backend 'cuda': ${IREE_TARGET_BACKEND_CUDA}")
+message(VERBOSE "IREE build compiler target backend 'dylib-llvm-aot': ${IREE_TARGET_BACKEND_DYLIB_LLVM_AOT}")
+message(VERBOSE "IREE build compiler target backend 'wasm-llvm-aot': ${IREE_TARGET_BACKEND_WASM_LLVM_AOT}")
+message(VERBOSE "IREE build compiler target backend 'metal-spirv': ${IREE_TARGET_BACKEND_METAL_SPIRV}")
+message(VERBOSE "IREE build compiler target backend 'rocm': ${IREE_TARGET_BACKEND_ROCM}")
+message(VERBOSE "IREE build compiler target backend 'vulkan-spirv': ${IREE_TARGET_BACKEND_VULKAN_SPIRV}")
+message(VERBOSE "IREE build compiler target backend 'vmvx': ${IREE_TARGET_BACKEND_VMVX}")
+message(VERBOSE "IREE build compiler target backend 'webgpu': ${IREE_TARGET_BACKEND_WEBGPU}")
 
 #-------------------------------------------------------------------------------
 # IREE compilation toolchain configuration
@@ -243,6 +208,11 @@ iree_fix_ndebug()
 #-------------------------------------------------------------------------------
 # IREE utility definitions
 #-------------------------------------------------------------------------------
+
+list(APPEND CMAKE_MODULE_PATH
+  ${CMAKE_CURRENT_LIST_DIR}/build_tools/cmake/
+  ${CMAKE_CURRENT_LIST_DIR}/bindings/python/build_tools/cmake/
+)
 
 include(iree_macros)
 include(iree_copts)
@@ -479,7 +449,7 @@ if(IREE_BUILD_PYTHON_BINDINGS)
   endif()
 endif()
 
-if(IREE_TARGET_BACKEND_METAL-SPIRV)
+if(IREE_TARGET_BACKEND_METAL_SPIRV)
   iree_set_spirv_cross_cmake_options()
   # SPIRV-Cross is needed to cross compile SPIR-V into MSL source code.
   add_subdirectory(third_party/spirv_cross EXCLUDE_FROM_ALL)

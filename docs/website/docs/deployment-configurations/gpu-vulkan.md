@@ -84,9 +84,8 @@ platforms.
 
 <!-- TODO(??): a way to verify Vulkan is compiled in and supported -->
 
-If you want to explicitly specify HAL drivers to support, you will need to add
-`Vulkan` to the `IREE_HAL_DRIVERS_TO_BUILD` CMake list variable when
-configuring (for target).
+Ensure that the `IREE_HAL_DRIVER_VULKAN` CMake option is `ON` when configuring
+for the target.
 
 ### Get compiler for SPIR-V exchange format
 
@@ -120,9 +119,8 @@ to build IREE for Linux/Windows and the [Android cross-compilation][android-cc]
 page for Android. The SPIR-V compiler backend is compiled in by default on all
 platforms.
 
-If you want to explicitly specify HAL drivers to support, you will need to add
-`Vulkan-SPIRV` to the `IREE_TARGET_BACKENDS_TO_BUILD` CMake list variable when
-configuring (for host).
+Ensure that the `IREE_TARGET_BACKEND_VULKAN_SPIRV` CMake option is `ON` when
+configuring for the host.
 
 ## Compile and run the model
 

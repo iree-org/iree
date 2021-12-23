@@ -365,7 +365,6 @@ iree_benchmark_suite(
     "CPU-ARM64-v8A"
   TRANSLATION_FLAGS
     ${ANDROID_CPU_TRANSLATION_FLAGS}
-    "--iree-flow-inline-constants-max-byte-length=2048"
     "--iree-llvm-loop-unrolling=true"
   DRIVER
     "dylib-sync"
@@ -393,7 +392,6 @@ iree_benchmark_suite(
     "CPU-ARM64-v8A"
   TRANSLATION_FLAGS
     ${ANDROID_CPU_TRANSLATION_FLAGS}
-    "--iree-flow-inline-constants-max-byte-length=2048"
     "--iree-llvm-loop-unrolling=true"
   DRIVER
     "dylib"
@@ -421,7 +419,6 @@ iree_benchmark_suite(
 #     "CPU-ARM64-v8A"
 #   TRANSLATION_FLAGS
 #     ${ANDROID_CPU_TRANSLATION_FLAGS}
-#     "--iree-flow-inline-constants-max-byte-length=2048"
 #     "--iree-llvm-loop-unrolling=true"
 #   DRIVER
 #     "dylib"
@@ -447,7 +444,6 @@ iree_benchmark_suite(
 #     "CPU-ARM64-v8A"
 #   TRANSLATION_FLAGS
 #     ${ANDROID_CPU_TRANSLATION_FLAGS}
-#     "--iree-flow-inline-constants-max-byte-length=2048"
 #     "--iree-llvm-loop-unrolling=true"
 #   DRIVER
 #     "dylib"
@@ -473,7 +469,6 @@ iree_benchmark_suite(
     "CPU-ARM64-v8A"
   TRANSLATION_FLAGS
     ${ANDROID_CPU_TRANSLATION_FLAGS}
-    "--iree-flow-inline-constants-max-byte-length=2048"
     "--iree-llvm-loop-unrolling=true"
   DRIVER
     "dylib"
@@ -500,7 +495,6 @@ iree_benchmark_suite(
     "CPU-ARM64-v8A"
   TRANSLATION_FLAGS
     "--iree-input-type=tosa"
-    "--iree-flow-inline-constants-max-byte-length=2048"
   DRIVER
     "vmvx"
   RUNTIME_FLAGS
@@ -526,7 +520,6 @@ iree_benchmark_suite(
     "GPU-Adreno"
   TRANSLATION_FLAGS
     ${ANDROID_ADRENO_GPU_TRANSLATION_FLAGS}
-    "--iree-flow-inline-constants-max-byte-length=2048"
     "--iree-enable-fusion-with-reduction-ops"
   DRIVER
     "vulkan"
@@ -550,7 +543,6 @@ iree_benchmark_suite(
     "GPU-Mali-Valhall"
   TRANSLATION_FLAGS
     ${ANDROID_MALI_GPU_TRANSLATION_FLAGS}
-    "--iree-flow-inline-constants-max-byte-length=16"
     "--iree-enable-fusion-with-reduction-ops"
   DRIVER
     "vulkan"
@@ -570,7 +562,6 @@ iree_benchmark_suite(
     "--iree-input-type=tosa"
     "--iree-flow-demote-f32-to-f16"
     "--iree-vulkan-target-triple=valhall-unknown-android11"
-    "--iree-flow-inline-constants-max-byte-length=16"
     "--iree-enable-fusion-with-reduction-ops"
   DRIVER
     "vulkan"
@@ -606,7 +597,6 @@ iree_benchmark_suite(
     "GPU-Adreno"
   TRANSLATION_FLAGS
     ${ANDROID_ADRENO_GPU_TRANSLATION_FLAGS}
-    "--iree-flow-inline-constants-max-byte-length=2048"
     "--iree-enable-fusion-with-reduction-ops"
     "--iree-hal-benchmark-dispatch-repeat-count=16"
   DRIVER
@@ -633,7 +623,6 @@ iree_benchmark_suite(
     "GPU-Mali-Valhall"
   TRANSLATION_FLAGS
     ${ANDROID_MALI_GPU_TRANSLATION_FLAGS}
-    "--iree-flow-inline-constants-max-byte-length=16"
     "--iree-enable-fusion-with-reduction-ops"
     "--iree-hal-benchmark-dispatch-repeat-count=32"
   DRIVER
@@ -656,7 +645,6 @@ iree_benchmark_suite(
     "--iree-input-type=tosa"
     "--iree-flow-demote-f32-to-f16"
     "--iree-vulkan-target-triple=valhall-unknown-android11"
-    "--iree-flow-inline-constants-max-byte-length=16"
     "--iree-enable-fusion-with-reduction-ops"
     "--iree-hal-benchmark-dispatch-repeat-count=32"
   DRIVER

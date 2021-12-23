@@ -83,8 +83,9 @@ model execution is in a single-thread synchronous fashion.
 operating system
 * `set(IREE_BINDINGS_TFLITE OFF)`: Disable the TFLite binding support
 * `set(IREE_ENABLE_THREADING OFF)`: Disable multi-thread library support
-* `set(IREE_HAL_DRIVERS_TO_BUILD "Dylib_Sync;VMVX_Sync")`: Build only the
-dynamic library and VMVX runtime synchronous HAL drivers
+* `set(IREE_HAL_DRIVER_DEFAULTS OFF)`: Disable HAL drivers by default, then
+enable the synchronous HAL drivers with `set(IREE_HAL_DRIVER_VMVX_SYNC ON)` and
+`set(IREE_HAL_DRIVER_DYLIB_SYNC ON)`
 * `set(IREE_BUILD_TESTS OFF)`: Disable tests until IREE supports running them on
 bare-metal platforms
 * `set(IREE_BUILD_SAMPLES ON)`: Build
