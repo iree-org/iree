@@ -17,30 +17,10 @@ exports_files(glob(["python/*.cpp"]))
 
 filegroup(
     name = "python_dialects",
-    srcs = glob(["python/iree/compiler/dialects/*.py"]) + [
-        ":python/iree/compiler/_iree_ops_gen.py",
-        ":python/iree/compiler/_iree_pydm_ops_gen.py",
+    srcs = glob(["python/iree/compiler/dialects/**/*.py"]) + [
+        ":python/iree/compiler/dialects/_iree_ops_gen.py",
+        ":python/iree/compiler/dialects/_iree_pydm_ops_gen.py",
     ],
-)
-
-filegroup(
-    name = "python_dialects_iree_pydm",
-    srcs = glob(["python/iree/compiler/dialects/iree_pydm/*.py"]),
-)
-
-filegroup(
-    name = "python_dialects_iree_pydm_importer",
-    srcs = glob(["python/iree/compiler/dialects/iree_pydm/importer/*.py"]),
-)
-
-filegroup(
-    name = "python_dialects_iree_pydm_rtl",
-    srcs = glob(["python/iree/compiler/dialects/iree_pydm/rtl/*.py"]),
-)
-
-filegroup(
-    name = "python_dialects_iree_pydm_rtl_modules",
-    srcs = glob(["python/iree/compiler/dialects/iree_pydm/rtl/modules/*.py"]),
 )
 
 ################################################################################
@@ -140,7 +120,7 @@ gentbl_filegroup(
                 "-gen-python-op-bindings",
                 "-bind-dialect=iree",
             ],
-            "python/iree/compiler/_iree_ops_gen.py",
+            "python/iree/compiler/dialects/_iree_ops_gen.py",
         ),
     ],
     tblgen = "@llvm-project//mlir:mlir-tblgen",
@@ -438,7 +418,7 @@ gentbl_filegroup(
                 "-gen-python-op-bindings",
                 "-bind-dialect=iree_pydm",
             ],
-            "python/iree/compiler/_iree_pydm_ops_gen.py",
+            "python/iree/compiler/dialects/_iree_pydm_ops_gen.py",
         ),
     ],
     tblgen = "@llvm-project//mlir:mlir-tblgen",
