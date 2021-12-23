@@ -39,7 +39,12 @@
 
 #define DEBUG_TYPE "iree-flow-dispatch-linalg-on-tensors"
 
-// TODO(ravishankarm): Prune this list. These flags should go away ASAP!!
+// TODO(ravishankarm): Prune this list.
+static llvm::cl::opt<int> clInlineConstantByteLength(
+    "iree-flow-inline-constants-max-byte-length",
+    llvm::cl::desc("Maximum byte-length of constant that can be inlined into a "
+                   "dispatch region"),
+    llvm::cl::init(256));
 
 static llvm::cl::list<int64_t> clLinalgOnTensorsTileSizes(
     "iree-flow-dispatch-linalg-on-tensors-tile-sizes",
@@ -169,7 +174,21 @@ static bool isClonableIntoDispatchOp(Operation *op) {
     return true;
   }
   if (auto constantOp = dyn_cast<arith::ConstantOp>(op)) {
-    return constantOp.getResult().getType().isIntOrIndexOrFloat();
+    auto constantValueAttr = constantOp.getValue();
+    auto constantType = constantOp.getType();
+    if (constantValueAttr.isa<SplatElementsAttr>()) {
+      return true;
+    } else if (auto denseAttr =
+                   constantValueAttr.dyn_cast<DenseElementsAttr>()) {
+      auto shapedType = constantOp.getType().cast<ShapedType>();
+      uint64_t estimatedByteLength =
+          (shapedType.getNumElements() * shapedType.getElementTypeBitWidth()) /
+          8;
+      return denseAttr.isSplat() ||
+             estimatedByteLength <= clInlineConstantByteLength;
+    } else if (constantType.isIntOrIndexOrFloat()) {
+      return true;
+    }
   }
   if (llvm::all_of(op->getOperands(),
                    [&](Value v) { return v.getType().isIntOrFloat(); }) &&
