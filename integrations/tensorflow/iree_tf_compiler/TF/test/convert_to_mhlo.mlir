@@ -13,7 +13,7 @@ func @sigmoid(%arg0: tensor<2xf32>) -> tensor<2xf32> {
 
 // CHECK-LABEL: @sigmoid_complex
 func @sigmoid_complex(%arg0: tensor<2xcomplex<f32>>) -> tensor<2xcomplex<f32>> {
-  // CHECK: [[R0:%.+]] = mhlo.constant dense<(5.000000e-01,0.000000e+00)> : tensor<complex<f32>>
+  // CHECK: [[R0:%.+]] = mhlo.constant dense<(5.000000e-01,0.000000e+00)> : tensor<2xcomplex<f32>>
   // CHECK-NOT: tf.Sigmoid
   %0 = "tf.Sigmoid"(%arg0) : (tensor<2xcomplex<f32>>) -> tensor<2xcomplex<f32>>
   return %0 : tensor<2xcomplex<f32>>
