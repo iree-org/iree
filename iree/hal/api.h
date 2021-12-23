@@ -10,9 +10,7 @@
 #define IREE_HAL_API_H_
 
 #include "iree/hal/allocator.h"              // IWYU pragma: export
-#include "iree/hal/allocator_caching.h"      // IWYU pragma: export
 #include "iree/hal/buffer.h"                 // IWYU pragma: export
-#include "iree/hal/buffer_caching.h"         // IWYU pragma: export
 #include "iree/hal/buffer_view.h"            // IWYU pragma: export
 #include "iree/hal/buffer_view_util.h"       // IWYU pragma: export
 #include "iree/hal/command_buffer.h"         // IWYU pragma: export
@@ -28,5 +26,9 @@
 #include "iree/hal/resource.h"               // IWYU pragma: export
 #include "iree/hal/semaphore.h"              // IWYU pragma: export
 #include "iree/hal/string_util.h"            // IWYU pragma: export
+
+#if defined(IREE_BUILD_EXPERIMENTAL_ALLOCATOR_CACHING)
+#include "experimental/hal/allocator_caching.h"  // IWYU pragma: export
+#endif  // IREE_BUILD_EXPERIMENTAL_ALLOCATOR_CACHING
 
 #endif  // IREE_HAL_API_H_
