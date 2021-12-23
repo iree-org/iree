@@ -12,7 +12,7 @@
 
 load("@iree//build_tools/bazel:enforce_glob.bzl", "enforce_glob")
 load(
-    "@iree//integrations/tensorflow/e2e:iree_e2e_cartesian_product_test_suite.bzl",
+    "@iree//integrations/tensorflow/e2e/TF:iree_e2e_cartesian_product_test_suite.bzl",
     "iree_e2e_cartesian_product_test_suite",
 )
 

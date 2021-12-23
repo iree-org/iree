@@ -61,16 +61,16 @@ preferred.
 
 ```shell
 # Run conv_test on all backends.
-bazel run //integrations/tensorflow/e2e:conv_test_manual
+bazel run //integrations/tensorflow/e2e/TF:conv_test_manual
 
 # Run conv_test comparing TensorFlow to itself (e.g. to debug randomization).
-bazel run //integrations/tensorflow/e2e:conv_test_manual -- --target_backends=tf
+bazel run //integrations/tensorflow/e2e/TF:conv_test_manual -- --target_backends=tf
 
 # Run conv_test comparing the VMLA backend and TensorFlow.
-bazel run //integrations/tensorflow/e2e:conv_test_manual -- --target_backends=iree_vmvx
+bazel run //integrations/tensorflow/e2e/TF:conv_test_manual -- --target_backends=iree_vmvx
 
 # Run conv_test comparing the VMLA backend to itself multiple times.
-bazel run //integrations/tensorflow/e2e:conv_test_manual -- \
+bazel run //integrations/tensorflow/e2e/TF:conv_test_manual -- \
   --reference_backend=iree_vmvx --target_backends=iree_vmvx,iree_vmvx
 ```
 
@@ -90,7 +90,7 @@ This is preferred in the cases where
 1. Only a single call to the module needs to be tested at once
 2. The inputs are simple to automatically generate or specify inline.
 3. The functions that you want to test are generated automatically from a
-   configuration (e.g. in `.../e2e/keras/layers/layers_test.py`)
+   configuration (e.g. in `.../e2e/TF/keras/layers/layers_test.py`)
 
 Tests are specified by writing modules that inherit from
 `tf_test_utils.TestModule` (which is a thin wrapper around `tf.Module`) with
@@ -99,7 +99,7 @@ wrapper around `tf.function`).
 
 #### Basic example
 
-We use part of `.../e2e/conv_test.py` as an example. The first component is
+We use part of `.../e2e/TF/conv_test.py` as an example. The first component is
 the `TestModule` itself:
 
 ```python
@@ -264,16 +264,16 @@ suite. Test targets in these test suites can be run as follows:
 
 ```shell
 # Run all e2e tests that are expected to pass.
-bazel test //integrations/tensorflow/e2e:e2e_tests
+bazel test //integrations/tensorflow/e2e/TF:e2e_tests
 
 # Run all e2e tests that are expected to fail.
-bazel test //integrations/tensorflow/e2e:e2e_tests_failing
+bazel test //integrations/tensorflow/e2e/TF:e2e_tests_failing
 
 # Run a specific failing e2e test target.
 # Note that generated test targets are prefixed with their test suite name.
 # Also, if broadcasting_test starts working on iree_vulkan after the time
 # of writing then this command will fail.
-bazel test //integrations/tensorflow/e2e:e2e_tests_failing_broadcasting_test__tf__iree_vulkan
+bazel test //integrations/tensorflow/e2e/TF:e2e_tests_failing_broadcasting_test__tf__iree_vulkan
 ```
 
 ## Generated Artifacts
@@ -283,7 +283,7 @@ benchmarking artifacts. These artifacts will be saved
 
 - in `/tmp/iree/modules/` when using `bazel run` or `bazel_test` with
   `--test_arg=--artifacts_dir=/tmp/iree/modules/`.
-- in `bazel-testlogs/integrations/tensorflow/e2e/test_suite_target_name` when
+- in `bazel-testlogs/integrations/tensorflow/e2e/TF/test_suite_target_name` when
   using `bazel test` without specifying `--artifacts_dir`.
 
 The generated directory structure for each module is as follows:

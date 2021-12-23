@@ -11,7 +11,7 @@
 # for our integration testing.
 
 load(
-    "@iree//integrations/tensorflow/e2e:iree_e2e_cartesian_product_test_suite.bzl",
+    "@iree//integrations/tensorflow/e2e/TF:iree_e2e_cartesian_product_test_suite.bzl",
     "iree_e2e_cartesian_product_test_suite",
 )
 
@@ -25,7 +25,7 @@ package(
 DOC = """
 applications_test_manual is for manual testing of all keras vision models.
 Test will run only manually with all parameters specified manually, for example:
-bazel run -c opt integrations/tensorflow/e2e/keras/applications:applications_test_manual -- \
+bazel run -c opt integrations/tensorflow/e2e/TF/keras/applications:applications_test_manual -- \
 --target_backends=tf,iree_llvmaot \
 --data=imagenet \
 --url=https://storage.googleapis.com/iree_models/ \
