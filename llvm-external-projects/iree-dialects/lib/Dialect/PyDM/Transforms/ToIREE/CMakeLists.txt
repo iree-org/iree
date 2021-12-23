@@ -11,6 +11,7 @@ add_mlir_library(IREEPyDMToIREEPasses
   IREEPyDMDialect
   MLIRArithmetic
   MLIRIR
+  MLIRMath
   MLIRStandard
   MLIRTransformUtils
 )
