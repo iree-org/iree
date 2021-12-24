@@ -11,6 +11,10 @@ iree_hal_cts_test_suite(
     "iree/hal/vulkan/registration/driver_module.h"
   DRIVER_REGISTRATION_FN
     "iree_hal_vulkan_driver_module_register"
+  COMPILER_TARGET_BACKEND
+    "vulkan-spirv"
+  EXECUTABLE_FORMAT
+    "\"SPVE\""
   DEPS
     iree::hal::vulkan::registration
 )

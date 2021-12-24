@@ -21,9 +21,11 @@ namespace cts {
 
 // Leaf test binaries must implement this function, registering the driver
 // that will be used with INSTANTIATE_TEST_SUITE_P.
-// Multiple drivers _may_ be registered and used with parameterized test suite
-// construction, but the expected use is 1 driver : 1 test suite.
 iree_status_t register_test_driver(iree_hal_driver_registry_t* registry);
+
+// Leaf test binaries must implement this function, returning the executable
+// format for the driver under test.
+const char* get_test_executable_format();
 
 // Common setup for tests parameterized on driver names.
 class CtsTestBase : public ::testing::TestWithParam<std::string> {

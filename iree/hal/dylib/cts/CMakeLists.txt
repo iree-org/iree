@@ -4,8 +4,6 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-if(${IREE_HAL_DRIVER_DYLIB})
-
 iree_hal_cts_test_suite(
   DRIVER_NAME
     dylib
@@ -13,13 +11,13 @@ iree_hal_cts_test_suite(
     "iree/hal/dylib/registration/driver_module.h"
   DRIVER_REGISTRATION_FN
     "iree_hal_dylib_driver_module_register"
+  COMPILER_TARGET_BACKEND
+    "dylib-llvm-aot"
+  EXECUTABLE_FORMAT
+    "\"embedded-elf-\" IREE_ARCH"
   DEPS
     iree::hal::dylib::registration
 )
-
-endif()
-
-if(${IREE_HAL_DRIVER_DYLIB_SYNC})
 
 iree_hal_cts_test_suite(
   DRIVER_NAME
@@ -28,6 +26,10 @@ iree_hal_cts_test_suite(
     "iree/hal/dylib/registration/driver_module_sync.h"
   DRIVER_REGISTRATION_FN
     "iree_hal_dylib_sync_driver_module_register"
+  COMPILER_TARGET_BACKEND
+    "dylib-llvm-aot"
+  EXECUTABLE_FORMAT
+    "\"embedded-elf-\" IREE_ARCH"
   DEPS
     iree::hal::dylib::registration::sync
   EXCLUDED_TESTS
@@ -36,5 +38,3 @@ iree_hal_cts_test_suite(
     "event"
     "semaphore_submission"
 )
-
-endif()
