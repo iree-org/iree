@@ -245,6 +245,7 @@ static LogicalResult translateFromMLIRToVMCModuleWithFlags(
 void registerIREEVMTranslationFlags() {
   getBindingOptionsFromFlags();
   getInputDialectOptionsFromFlags();
+  getHighLevelOptimizationOptionsFromFlags();
 }
 
 void registerIREEVMTranslation() {
