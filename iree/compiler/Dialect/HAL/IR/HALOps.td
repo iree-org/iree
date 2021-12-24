@@ -1951,7 +1951,8 @@ def HAL_InterfaceLoadConstantOp : HAL_PureOp<"interface.load.constant"> {
 }
 
 def HAL_InterfaceBindingSubspanOp : HAL_Op<"interface.binding.subspan", [
-    AttrSizedOperandSegments, MemoryEffects<[MemAlloc]>,
+    AttrSizedOperandSegments,
+    MemoryEffects<[MemAlloc]>,
     Util_ShapeAwareOp,
   ]> {
   let summary = [{returns an alias to a subspan of interface binding data}];
@@ -1966,9 +1967,10 @@ def HAL_InterfaceBindingSubspanOp : HAL_Op<"interface.binding.subspan", [
   }];
 
   let arguments = (ins
-    SymbolRefAttr:$binding,
-    HAL_DeviceSize:$byte_offset,
-    Optional<HAL_DeviceSize>:$byte_length,
+    HAL_DescriptorTypeAttr:$type,
+    IndexAttr:$set,
+    IndexAttr:$binding,
+    Optional<HAL_DeviceSize>:$byte_offset,
     HAL_ShapeDynamicDims:$dynamic_dims,
     OptionalAttr<IndexAttr>:$alignment
   );
@@ -1977,7 +1979,11 @@ def HAL_InterfaceBindingSubspanOp : HAL_Op<"interface.binding.subspan", [
   );
 
   let assemblyFormat = [{
-    $binding `[` $byte_offset ( `,` $byte_length^ )? `]`
+    `type` `(` $type `)`
+    `set` `(` $set `)`
+    `binding` `(` $binding `)`
+    (`offset` `(` $byte_offset^ `)`)?
+    (`alignment` `(` $alignment^ `)`)?
     attr-dict `:` type($result) (`{` $dynamic_dims^ `}`)?
   }];
 
@@ -1986,10 +1992,6 @@ def HAL_InterfaceBindingSubspanOp : HAL_Op<"interface.binding.subspan", [
   let extraClassDeclaration = [{
     ValueRange getOperandDynamicDims(unsigned idx) { return ValueRange{}; }
     ValueRange getResultDynamicDims(unsigned idx) { return dynamic_dims(); }
-
-    /// Returns the hal.interface.binding op associated with this op.
-    /// Returns null op if not found.
-    IREE::HAL::InterfaceBindingOp queryBindingOp();
 
     // Attempts to calculate an alignment of the final subspan offset in the
     // parent storage buffer. This is a combination of both the binding

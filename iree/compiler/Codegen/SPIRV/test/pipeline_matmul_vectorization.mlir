@@ -19,9 +19,9 @@ hal.executable private @fuse_and_vectorize_fill_matmul  {
         %c0 = arith.constant 0 : index
         %cst = arith.constant 0.000000e+00 : f32
         %c4096 = arith.constant 4096 : index
-        %0 = hal.interface.binding.subspan @io::@s0b0_ro_external[%c0] : !flow.dispatch.tensor<readonly:4096x4096xf32>
-        %1 = hal.interface.binding.subspan @io::@s0b1_ro_external[%c0] : !flow.dispatch.tensor<readonly:4096x4096xf32>
-        %2 = hal.interface.binding.subspan @io::@s0b2_xw_external[%c0] : !flow.dispatch.tensor<writeonly:4096x4096xf32>
+        %0 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) : !flow.dispatch.tensor<readonly:4096x4096xf32>
+        %1 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(1) : !flow.dispatch.tensor<readonly:4096x4096xf32>
+        %2 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(2) : !flow.dispatch.tensor<writeonly:4096x4096xf32>
         %workgroup_size_x = hal.interface.workgroup.size[0] : index
         %workgroup_size_y = hal.interface.workgroup.size[1] : index
         %workgroup_id_x = hal.interface.workgroup.id[0] : index
@@ -49,11 +49,6 @@ hal.executable private @fuse_and_vectorize_fill_matmul  {
           }
         }
         return
-      }
-      hal.interface private @io  {
-        hal.interface.binding @s0b0_ro_external, set=0, binding=0, type="StorageBuffer"
-        hal.interface.binding @s0b1_ro_external, set=0, binding=1, type="StorageBuffer"
-        hal.interface.binding @s0b2_xw_external, set=0, binding=2, type="StorageBuffer"
       }
     }
   }
@@ -89,10 +84,10 @@ hal.executable private @fuse_and_vectorize_matmul_add  {
         %cst = arith.constant 0.000000e+00 : f32
         %c1024 = arith.constant 1024 : index
         %c256 = arith.constant 256 : index
-        %0 = hal.interface.binding.subspan @io::@s0b0_ro_external[%c0] : !flow.dispatch.tensor<readonly:1024x256xf32>
-        %1 = hal.interface.binding.subspan @io::@s0b1_ro_external[%c0] : !flow.dispatch.tensor<readonly:1024x512xf32>
-        %2 = hal.interface.binding.subspan @io::@s0b2_ro_external[%c0] : !flow.dispatch.tensor<readonly:512x256xf32>
-        %3 = hal.interface.binding.subspan @io::@s0b3_xw_external[%c0] : !flow.dispatch.tensor<writeonly:1024x256xf32>
+        %0 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) : !flow.dispatch.tensor<readonly:1024x256xf32>
+        %1 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(1) : !flow.dispatch.tensor<readonly:1024x512xf32>
+        %2 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(2) : !flow.dispatch.tensor<readonly:512x256xf32>
+        %3 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(3) : !flow.dispatch.tensor<writeonly:1024x256xf32>
         %workgroup_size_x = hal.interface.workgroup.size[0] : index
         %workgroup_size_y = hal.interface.workgroup.size[1] : index
         %workgroup_id_x = hal.interface.workgroup.id[0] : index
@@ -129,12 +124,6 @@ hal.executable private @fuse_and_vectorize_matmul_add  {
           }
         }
         return
-      }
-      hal.interface private @io  {
-        hal.interface.binding @s0b0_ro_external, set=0, binding=0, type="StorageBuffer"
-        hal.interface.binding @s0b1_ro_external, set=0, binding=1, type="StorageBuffer"
-        hal.interface.binding @s0b2_ro_external, set=0, binding=2, type="StorageBuffer"
-        hal.interface.binding @s0b3_xw_external, set=0, binding=3, type="StorageBuffer"
       }
     }
   }

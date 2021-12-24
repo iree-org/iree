@@ -951,11 +951,6 @@ static LogicalResult verifyInterfaceBindingSubspanOp(
   return success();
 }
 
-InterfaceBindingOp InterfaceBindingSubspanOp::queryBindingOp() {
-  return dyn_cast_or_null<InterfaceBindingOp>(
-      SymbolTable::lookupNearestSymbolFrom(getOperation(), binding()));
-}
-
 // TODO(benvanik): share with align op folder and analysis.
 // May need an interface for querying the alignment from ops that can carry it.
 
@@ -995,6 +990,10 @@ llvm::Align InterfaceBindingSubspanOp::calculateAlignment() {
   if (!bindingAlignmentInt) return naturalAlignment;
   auto bindingAlignment =
       llvm::Align(bindingAlignmentInt.getValue().getZExtValue());
+
+  // If there's no offset specified then we can use the binding alignment
+  // directly.
+  if (!byte_offset()) return bindingAlignment;
 
   // Try to get the alignment of the byte offset. If it's a constant then we can
   // find a common alignment between it and the base and otherwise we need to

@@ -213,41 +213,34 @@ class ConvertHALInterfaceBindingSubspanOp
     assert(bindingsArg && bindingsArg.getType().isa<IREE::Util::ListType>() &&
            "entry point not conforming to requirements");
 
-    // Lookup the source interface binding.
-    auto interfaceBindingOp = op.queryBindingOp();
-
     // TODO(benvanik): compact the indices - the bindings we have on the ABI
     // interface are dense.
-    if (interfaceBindingOp.set().getZExtValue() != 0) {
+    if (op.set().getZExtValue() != 0) {
       return op.emitOpError() << "sparse binding sets not yet implemented";
     }
 
     auto bindingType =
         bindingsArg.getType().cast<IREE::Util::ListType>().getElementType();
-    auto memrefValue =
-        rewriter
-            .create<IREE::Util::ListGetOp>(
-                op.getLoc(), bindingType, bindingsArg,
-                rewriter.createOrFold<arith::ConstantIndexOp>(
-                    op.getLoc(), interfaceBindingOp.binding().getZExtValue()))
-            .result();
-    if (!matchPattern(op.byte_offset(), m_Zero())) {
+    auto memrefValue = rewriter
+                           .create<IREE::Util::ListGetOp>(
+                               op.getLoc(), bindingType, bindingsArg,
+                               rewriter.createOrFold<arith::ConstantIndexOp>(
+                                   op.getLoc(), op.binding().getZExtValue()))
+                           .result();
+    if (op.byte_offset() && !matchPattern(op.byte_offset(), m_Zero())) {
       auto memrefType = op.result().getType().cast<MemRefType>();
-      auto byteLength = op.byte_length();
-      if (!byteLength) {
-        Value elementCount;
-        if (memrefType.isDynamicDim(0)) {
-          elementCount = op.dynamic_dims().front();
-        } else {
-          elementCount = rewriter.createOrFold<arith::ConstantIndexOp>(
-              op.getLoc(), memrefType.getDimSize(0));
-        }
-        byteLength = rewriter.createOrFold<arith::MulIOp>(
-            op.getLoc(),
-            rewriter.createOrFold<arith::ConstantIndexOp>(
-                op.getLoc(), memrefType.getElementTypeBitWidth()),
-            elementCount);
+      Value elementCount;
+      if (memrefType.isDynamicDim(0)) {
+        elementCount = op.dynamic_dims().front();
+      } else {
+        elementCount = rewriter.createOrFold<arith::ConstantIndexOp>(
+            op.getLoc(), memrefType.getDimSize(0));
       }
+      auto byteLength = rewriter.createOrFold<arith::MulIOp>(
+          op.getLoc(),
+          rewriter.createOrFold<arith::ConstantIndexOp>(
+              op.getLoc(), memrefType.getElementTypeBitWidth()),
+          elementCount);
       memrefValue = rewriter.createOrFold<memref::SubViewOp>(
           op.getLoc(), memrefValue, ArrayRef<OpFoldResult>{op.byte_offset()},
           ArrayRef<OpFoldResult>{byteLength},

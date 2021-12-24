@@ -22,10 +22,10 @@ hal.executable private @matmul_tensors  {
         %M = hal.interface.load.constant offset = 0 : index
         %N = hal.interface.load.constant offset = 1 : index
         %K = hal.interface.load.constant offset = 2 : index
-        %0 = hal.interface.binding.subspan @io::@arg0[%c0] : !flow.dispatch.tensor<readonly:?x?xf32>{%M, %K}
-        %2 = hal.interface.binding.subspan @io::@arg1[%c0] : !flow.dispatch.tensor<readonly:?x?xf32>{%K, %N}
-        %4 = hal.interface.binding.subspan @io::@arg2[%c0] : !flow.dispatch.tensor<readonly:?x?xf32>{%M, %N}
-        %6 = hal.interface.binding.subspan @io::@ret0[%c0] : !flow.dispatch.tensor<writeonly:?x?xf32>{%M, %N}
+        %0 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) : !flow.dispatch.tensor<readonly:?x?xf32>{%M, %K}
+        %2 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(1) : !flow.dispatch.tensor<readonly:?x?xf32>{%K, %N}
+        %4 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(2) : !flow.dispatch.tensor<readonly:?x?xf32>{%M, %N}
+        %6 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(3) : !flow.dispatch.tensor<writeonly:?x?xf32>{%M, %N}
         %workgroup_size_x = hal.interface.workgroup.size[0] : index
         %workgroup_size_y = hal.interface.workgroup.size[1] : index
         %workgroup_id_x = hal.interface.workgroup.id[0] : index
@@ -90,9 +90,9 @@ hal.executable private @add_no_config  {
         %c0 = arith.constant 0 : index
         %dim0 = hal.interface.load.constant offset = 0 : index
         %dim1 = hal.interface.load.constant offset = 1 : index
-        %0 = hal.interface.binding.subspan @io::@arg0[%c0] : !flow.dispatch.tensor<readonly:?x?xf32>{%dim0, %dim1}
-        %1 = hal.interface.binding.subspan @io::@arg1[%c0] : !flow.dispatch.tensor<readonly:?xf32>{%dim1}
-        %2 = hal.interface.binding.subspan @io::@ret0[%c0] : !flow.dispatch.tensor<writeonly:?x?xf32>{%dim0, %dim1}
+        %0 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) : !flow.dispatch.tensor<readonly:?x?xf32>{%dim0, %dim1}
+        %1 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(1) : !flow.dispatch.tensor<readonly:?xf32>{%dim1}
+        %2 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(2) : !flow.dispatch.tensor<writeonly:?x?xf32>{%dim0, %dim1}
         %3 = flow.dispatch.tensor.load %0, offsets=[], sizes=[], strides=[] : !flow.dispatch.tensor<readonly:?x?xf32> -> tensor<?x?xf32>
         %4 = flow.dispatch.tensor.load %1, offsets=[], sizes=[], strides=[] : !flow.dispatch.tensor<readonly:?xf32> -> tensor<?xf32>
         %5 = linalg.init_tensor [%dim0, %dim1] : tensor<?x?xf32>
@@ -117,6 +117,7 @@ hal.executable private @add_no_config  {
     }
   }
 }
+
 //      CHECK:  #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"CPUDefault", workload_per_wg = []>
 //      CHECK:  hal.executable private @add_no_config
 //      CHECK:  hal.executable.entry_point public @add_no_config
@@ -139,9 +140,8 @@ hal.executable private @add4D  {
        target_triple = "x86_64-unknown-linux-gnu"
     }> {
     hal.executable.entry_point @add4D attributes {
-      interface = @io, ordinal = 0 : index,
-      signature = (!flow.dispatch.tensor<readonly:?x?x?x?xf32>, !flow.dispatch.tensor<readonly:?xf32>,
-        !flow.dispatch.tensor<writeonly:?x?x?x?xf32>) -> ()}
+      interface = @io, ordinal = 0 : index
+    }
     builtin.module  {
       func @add4D() {
         %c0 = arith.constant 0 : index
@@ -153,9 +153,9 @@ hal.executable private @add4D  {
         %5 = hal.interface.load.constant offset = 5 : index
         %6 = hal.interface.load.constant offset = 6 : index
         %7 = hal.interface.load.constant offset = 7 : index
-        %8 = hal.interface.binding.subspan @io::@s0b0[%c0] {alignment = 32 : index} : !flow.dispatch.tensor<readonly:?x?x?x?xf32>{%0, %1, %2, %3}
-        %9 = hal.interface.binding.subspan @io::@s0b1[%c0] {alignment = 32 : index} : !flow.dispatch.tensor<readonly:?x?x?x?xf32>{%4, %5, %6, %7}
-        %10 = hal.interface.binding.subspan @io::@s0b2[%c0] {alignment = 32 : index} : !flow.dispatch.tensor<writeonly:?x?x?x?xf32>{%0, %1, %2, %3}
+        %8 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) alignment(32) : !flow.dispatch.tensor<readonly:?x?x?x?xf32>{%0, %1, %2, %3}
+        %9 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(1) alignment(32) : !flow.dispatch.tensor<readonly:?x?x?x?xf32>{%4, %5, %6, %7}
+        %10 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(2) alignment(32) : !flow.dispatch.tensor<writeonly:?x?x?x?xf32>{%0, %1, %2, %3}
         %workgroup_size_x = hal.interface.workgroup.size[0] : index
         %workgroup_size_y = hal.interface.workgroup.size[1] : index
         %workgroup_size_z = hal.interface.workgroup.size[2] : index
@@ -191,14 +191,10 @@ hal.executable private @add4D  {
         }
         return
       }
-      hal.interface private @io attributes {push_constants = 8 : index} {
-        hal.interface.binding public @s0b0, set=0, binding=0, type="StorageBuffer"
-        hal.interface.binding public @s0b1, set=0, binding=1, type="StorageBuffer"
-        hal.interface.binding public @s0b2, set=0, binding=2, type="StorageBuffer"
-      }
     }
   }
 }
+
 //  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 64)>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"CPUDefault", workload_per_wg = [64, 64, 64]>
 //      CHECK: hal.executable.entry_point public @add4D
@@ -238,9 +234,9 @@ hal.executable private @batch_matmul_tensors {
         %3 = hal.interface.load.constant offset = 3 : index
         %4 = hal.interface.load.constant offset = 4 : index
         %5 = hal.interface.load.constant offset = 5 : index
-        %6 = hal.interface.binding.subspan @io::@s0b0[%c0] {alignment = 32 : index} : !flow.dispatch.tensor<readonly:?x?x?xf32>{%0, %1, %2}
-        %7 = hal.interface.binding.subspan @io::@s0b1[%c0] {alignment = 32 : index} : !flow.dispatch.tensor<readonly:?x?x?xf32>{%3, %4, %5}
-        %8 = hal.interface.binding.subspan @io::@s0b2[%c0] {alignment = 32 : index} : !flow.dispatch.tensor<writeonly:?x?x?xf32>{%0, %1, %5}
+        %6 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) alignment(32) : !flow.dispatch.tensor<readonly:?x?x?xf32>{%0, %1, %2}
+        %7 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(1) alignment(32) : !flow.dispatch.tensor<readonly:?x?x?xf32>{%3, %4, %5}
+        %8 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(2) alignment(32) : !flow.dispatch.tensor<writeonly:?x?x?xf32>{%0, %1, %5}
         %workgroup_size_x = hal.interface.workgroup.size[0] : index
         %workgroup_size_y = hal.interface.workgroup.size[1] : index
         %workgroup_size_z = hal.interface.workgroup.size[2] : index
@@ -276,11 +272,6 @@ hal.executable private @batch_matmul_tensors {
         }
         return
       }
-      hal.interface private @io attributes {push_constants = 6 : index} {
-        hal.interface.binding public @s0b0, set=0, binding=0, type="StorageBuffer"
-        hal.interface.binding public @s0b1, set=0, binding=1, type="StorageBuffer"
-        hal.interface.binding public @s0b2, set=0, binding=2, type="StorageBuffer"
-      }
     }
   }
 }
@@ -313,9 +304,9 @@ hal.executable private @preset_config_matmul_tensors  {
         %c512 = arith.constant 512 : index
         %c128 = arith.constant 128 : index
         %cst = arith.constant 0.000000e+00 : f32
-        %0 = hal.interface.binding.subspan @io::@s0b0_ro_external[%c0] : !flow.dispatch.tensor<readonly:128x256xf32>
-        %1 = hal.interface.binding.subspan @io::@s0b1_ro_external[%c0] : !flow.dispatch.tensor<readonly:256x512xf32>
-        %2 = hal.interface.binding.subspan @io::@s0b2_xw_external[%c0] : !flow.dispatch.tensor<writeonly:128x512xf32>
+        %0 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) : !flow.dispatch.tensor<readonly:128x256xf32>
+        %1 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(1) : !flow.dispatch.tensor<readonly:256x512xf32>
+        %2 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(2) : !flow.dispatch.tensor<writeonly:128x512xf32>
         %workgroup_size_x = hal.interface.workgroup.size[0] : index
         %workgroup_size_y = hal.interface.workgroup.size[1] : index
         %workgroup_id_x = hal.interface.workgroup.id[0] : index
@@ -348,14 +339,10 @@ hal.executable private @preset_config_matmul_tensors  {
         }
         return
       }
-      hal.interface private @io  {
-        hal.interface.binding @s0b0_ro_external, set=0, binding=0, type="StorageBuffer"
-        hal.interface.binding @s0b1_ro_external, set=0, binding=1, type="StorageBuffer"
-        hal.interface.binding @s0b2_xw_external, set=0, binding=2, type="StorageBuffer"
-      }
     }
   }
 }
+
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering.config<tile_sizes = {{\[}}[], [32, 32, 32], [4, 4, 4]{{\]}}, native_vector_size = [4, 4, 4]>
 //  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 32)>
 //  CHECK-DAG: #[[MAP1:.+]] = affine_map<()[s0] -> (s0 * 32)>
@@ -392,10 +379,10 @@ hal.executable @tensor_insert {
     builtin.module  {
       builtin.func @tensor_insert_slice() {
         %c0 = arith.constant 0 : index
-        %0 = hal.interface.binding.subspan @io::@s0b0_ro_external[%c0] : !flow.dispatch.tensor<readonly:?x?xi32>
+        %0 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) : !flow.dispatch.tensor<readonly:?x?xi32>
         %1 = hal.interface.load.constant offset = 0 : index
         %2 = hal.interface.load.constant offset = 1 : index
-        %3 = hal.interface.binding.subspan @io::@s0b1_xw_external[%c0] : !flow.dispatch.tensor<writeonly:?x?xi32>
+        %3 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(1) : !flow.dispatch.tensor<writeonly:?x?xi32>
         %workgroup_size_x = hal.interface.workgroup.size[0] : index
         %workgroup_size_y = hal.interface.workgroup.size[1] : index
         %workgroup_id_x = hal.interface.workgroup.id[0] : index
@@ -420,13 +407,10 @@ hal.executable @tensor_insert {
         }
         return
       }
-      hal.interface @io attributes {push_constants = 2 : index, sym_visibility = "private"} {
-        hal.interface.binding @s0b0_ro_external, set=0, binding=0, type="StorageBuffer"
-        hal.interface.binding @s0b1_xw_external, set=0, binding=1, type="StorageBuffer"
-      }
     }
   }
 }
+
 //  CHECK-DAG: #[[MAP:.+]] = affine_map<()[s0] -> (s0 ceildiv 64)>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"CPUDefault", workload_per_wg = [64, 64]>
 //      CHECK: hal.executable.entry_point public @tensor_insert_slice
@@ -453,8 +437,8 @@ hal.executable private @static_1d_fft_stage2  {
         %c2 = arith.constant 2 : index
         %cst = arith.constant dense<[1.000000e+00, 6.12323426E-17]> : tensor<2xf32>
         %cst_0 = arith.constant dense<[-0.000000e+00, -1.000000e+00]> : tensor<2xf32>
-        %0 = hal.interface.binding.subspan @io::@s0b0_rw_external[%c0] : !flow.dispatch.tensor<readwrite:32xf32>
-        %1 = hal.interface.binding.subspan @io::@s0b1_rw_external[%c0] : !flow.dispatch.tensor<readwrite:32xf32>
+        %0 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) : !flow.dispatch.tensor<readwrite:32xf32>
+        %1 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(1) : !flow.dispatch.tensor<readwrite:32xf32>
         %2 = flow.dispatch.tensor.load %0, offsets = [], sizes = [], strides = [] : !flow.dispatch.tensor<readwrite:32xf32> -> tensor<32xf32>
         %3 = flow.dispatch.tensor.load %1, offsets = [], sizes = [], strides = [] : !flow.dispatch.tensor<readwrite:32xf32> -> tensor<32xf32>
         %4:2 = iree_linalg_ext.fft {__internal_linalg_transform__ = "workgroup"} ins(%c2, %cst, %cst_0 : index, tensor<2xf32>, tensor<2xf32>) outs(%2, %3 : tensor<32xf32>, tensor<32xf32>) : tensor<32xf32>, tensor<32xf32>
@@ -465,6 +449,7 @@ hal.executable private @static_1d_fft_stage2  {
     }
   }
 }
+
 //   CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering.config<tile_sizes = {{\[}}[64]{{\]}}, native_vector_size = []>
 //   CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 64)>
 //   CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"CPUDefault", workload_per_wg = [64]>
@@ -500,8 +485,8 @@ hal.executable private @static_3d_fft_stage3  {
         %cst_0 = arith.constant dense<[-0.000000e+00, -0.707106769, -1.000000e+00, -0.707106769]> : tensor<4xf32>
         %0 = bufferization.to_memref %cst_0 : memref<4xf32>
         %1 = bufferization.to_memref %cst : memref<4xf32>
-        %2 = hal.interface.binding.subspan @io::@s0b0_rw_external[%c0] : memref<64x128x32xf32>
-        %3 = hal.interface.binding.subspan @io::@s0b1_rw_external[%c0] : memref<64x128x32xf32>
+        %2 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) : memref<64x128x32xf32>
+        %3 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(1) : memref<64x128x32xf32>
         %workgroup_id_x = hal.interface.workgroup.id[0] : index
         %workgroup_count_x = hal.interface.workgroup.count[0] : index
         %workgroup_size_x = hal.interface.workgroup.size[0] : index
@@ -565,12 +550,12 @@ hal.executable private @outs_fusion {
       builtin.func @outs_fusion_fn() {
         %c0 = arith.constant 0 : index
         %cst = arith.constant 0.0 : f32
-        %0 = hal.interface.binding.subspan @io::@arg0[%c0] : !flow.dispatch.tensor<readonly:?x?xf32>
-        %1 = hal.interface.binding.subspan @io::@arg1[%c0] : !flow.dispatch.tensor<readonly:?x?xf32>
+        %0 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) : !flow.dispatch.tensor<readonly:?x?xf32>
+        %1 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(1) : !flow.dispatch.tensor<readonly:?x?xf32>
         %2 = hal.interface.load.constant offset = 0 : index
         %3 = hal.interface.load.constant offset = 1 : index
         %4 = hal.interface.load.constant offset = 2 : index
-        %5 = hal.interface.binding.subspan @io::@arg2[%c0] : !flow.dispatch.tensor<writeonly:?x?xf32>
+        %5 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(2) : !flow.dispatch.tensor<writeonly:?x?xf32>
         %workgroup_id_x = hal.interface.workgroup.id[0] : index
         %workgroup_count_x = hal.interface.workgroup.count[0] : index
         %workgroup_size_x = hal.interface.workgroup.size[0] : index
@@ -615,6 +600,7 @@ hal.executable private @outs_fusion {
     }
   }
 }
+
 //      CHECK: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"CPUDefault", workload_per_wg = [64, 64]>
 //      CHECK: hal.executable.entry_point public @outs_fusion_fn
 // CHECK-SAME:   translation.info = #[[TRANSLATION]]
@@ -639,9 +625,9 @@ hal.executable private @conv {
         %9 = hal.interface.load.constant offset = 9 : index
         %10 = hal.interface.load.constant offset = 10 : index
         %11 = hal.interface.load.constant offset = 11 : index
-        %12 = hal.interface.binding.subspan @io::@s0b0_ro_external[%c0] : !flow.dispatch.tensor<readonly:?x?x?x?xf32>{%0, %1, %2, %3}
-        %13 = hal.interface.binding.subspan @io::@s0b1_rw_external[%c0] : !flow.dispatch.tensor<readwrite:?x?x?x?xf32>{%4, %5, %6, %7}
-        %14 = hal.interface.binding.subspan @io::@s0b2_ro_external[%c0] : !flow.dispatch.tensor<readonly:?x?x?x?xf32>{%8, %9, %10, %11}
+        %12 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) : !flow.dispatch.tensor<readonly:?x?x?x?xf32>{%0, %1, %2, %3}
+        %13 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(1) : !flow.dispatch.tensor<readwrite:?x?x?x?xf32>{%4, %5, %6, %7}
+        %14 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(2) : !flow.dispatch.tensor<readonly:?x?x?x?xf32>{%8, %9, %10, %11}
         %workgroup_size_x = hal.interface.workgroup.size[0] : index
         %workgroup_size_y = hal.interface.workgroup.size[1] : index
         %workgroup_size_z = hal.interface.workgroup.size[2] : index
@@ -676,14 +662,10 @@ hal.executable private @conv {
         }
         return
       }
-      hal.interface private @io attributes {push_constants = 12 : index} {
-        hal.interface.binding public @s0b0_ro_external, set=0, binding=0, type="StorageBuffer"
-        hal.interface.binding public @s0b1_rw_external, set=0, binding=1, type="StorageBuffer"
-        hal.interface.binding public @s0b2_ro_external, set=0, binding=2, type="StorageBuffer"
-      }
     }
   }
 }
+
 //  CHECK-DAG: #[[MAP:.+]] = affine_map<()[s0] -> (s0 ceildiv 64)>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"CPUDefault", workload_per_wg = [64, 64, 64]>
 //      CHECK: hal.executable.entry_point public @conv attributes
@@ -707,9 +689,9 @@ hal.executable private @conv_static {
         %c80 = arith.constant 80 : index
         %c96 = arith.constant 96 : index
         %c0 = arith.constant 0 : index
-        %0 = hal.interface.binding.subspan @io::@s0b1_ro_external[%c0] : !flow.dispatch.tensor<readonly:1x161x161x96xf32>
-        %1 = hal.interface.binding.subspan @io::@s0b0_ro_constant[%c0] : !flow.dispatch.tensor<readonly:3x3x96xf32>
-        %2 = hal.interface.binding.subspan @io::@s0b2_xw_external[%c0] : !flow.dispatch.tensor<writeonly:1x80x80x96xf32>
+        %0 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) : !flow.dispatch.tensor<readonly:1x161x161x96xf32>
+        %1 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(1) : !flow.dispatch.tensor<readonly:3x3x96xf32>
+        %2 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(2) : !flow.dispatch.tensor<writeonly:1x80x80x96xf32>
         %workgroup_size_x = hal.interface.workgroup.size[0] : index
         %workgroup_size_y = hal.interface.workgroup.size[1] : index
         %workgroup_size_z = hal.interface.workgroup.size[2] : index
@@ -751,14 +733,10 @@ hal.executable private @conv_static {
         }
         return
       }
-      hal.interface private @io {
-        hal.interface.binding public @s0b0_ro_constant, set=0, binding=0, type="StorageBuffer"
-        hal.interface.binding public @s0b1_ro_external, set=0, binding=1, type="StorageBuffer"
-        hal.interface.binding public @s0b2_xw_external, set=0, binding=2, type="StorageBuffer"
-      }
     }
   }
 }
+
 //  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 64)>
 //  CHECK-DAG: #[[MAP1:.+]] = affine_map<()[s0] -> (s0 ceildiv 32)>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"CPUDefault", workload_per_wg = [64, 64, 32]>
@@ -782,8 +760,8 @@ hal.executable private @generic_static {
         %c16 = arith.constant 16 : index
         %c96 = arith.constant 96 : index
         %c0 = arith.constant 0 : index
-        %0 = hal.interface.binding.subspan @io::@s0b0_ro_constant[%c0] : !flow.dispatch.tensor<readonly:96x16xf32>
-        %1 = hal.interface.binding.subspan @io::@s0b1_xw_external[%c0] : !flow.dispatch.tensor<writeonly:16x96xf32>
+        %0 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) : !flow.dispatch.tensor<readonly:96x16xf32>
+        %1 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(1) : !flow.dispatch.tensor<writeonly:16x96xf32>
         %workgroup_size_x = hal.interface.workgroup.size[0] : index
         %workgroup_size_y = hal.interface.workgroup.size[1] : index
         %workgroup_id_x = hal.interface.workgroup.id[0] : index
@@ -811,13 +789,10 @@ hal.executable private @generic_static {
         }
         return
       }
-      hal.interface private @io {
-        hal.interface.binding public @s0b0_ro_constant, set=0, binding=0, type="StorageBuffer"
-        hal.interface.binding public @s0b1_xw_external, set=0, binding=1, type="StorageBuffer"
-      }
     }
   }
 }
+
 //  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 32)>
 //  CHECK-DAG: #[[MAP1:.+]] = affine_map<()[s0] -> (s0 ceildiv 8)>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"CPUDefault", workload_per_wg = [32, 8]>
@@ -844,9 +819,9 @@ hal.executable private @matmul_static {
         %c0 = arith.constant 0 : index
         %c8 = arith.constant 8 : index
         %c28 = arith.constant 28 : index
-        %0 = hal.interface.binding.subspan @io::@s0b0_ro_external[%c0] : !flow.dispatch.tensor<readonly:196x240xf32>
-        %1 = hal.interface.binding.subspan @io::@s0b1_ro_external[%c0] : !flow.dispatch.tensor<readonly:240x40xf32>
-        %2 = hal.interface.binding.subspan @io::@s0b2_xw_external[%c0] : !flow.dispatch.tensor<writeonly:196x40xf32>
+        %0 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) : !flow.dispatch.tensor<readonly:196x240xf32>
+        %1 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(1) : !flow.dispatch.tensor<readonly:240x40xf32>
+        %2 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(2) : !flow.dispatch.tensor<writeonly:196x40xf32>
         %workgroup_id_x = hal.interface.workgroup.id[0] : index
         %workgroup_count_x = hal.interface.workgroup.count[0] : index
         %workgroup_size_x = hal.interface.workgroup.size[0] : index
@@ -871,14 +846,10 @@ hal.executable private @matmul_static {
         }
         return
       }
-      hal.interface private @io {
-        hal.interface.binding public @s0b0_ro_external, set=0, binding=0, type="StorageBuffer"
-        hal.interface.binding public @s0b1_ro_external, set=0, binding=1, type="StorageBuffer"
-        hal.interface.binding public @s0b2_xw_external, set=0, binding=2, type="StorageBuffer"
-      }
     }
   }
 }
+
 //   CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering.config<tile_sizes = {{\[}}[], [4, 4, 60], [4, 4, 4]{{\]}}, native_vector_size = [4, 4, 4]>
 //   CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 8)>
 //   CHECK-DAG: #[[MAP1:.+]] = affine_map<()[s0] -> (s0 ceildiv 28)>
@@ -906,9 +877,9 @@ hal.executable private @restrict_num_workgroups {
         %c0 = arith.constant 0 : index
         %c64 = arith.constant 64 : index
         %c2 = arith.constant 2 : index
-        %0 = hal.interface.binding.subspan @io::@s0b1_ro_external[%c0] : !flow.dispatch.tensor<readonly:1x11x11x576xf32>
-        %1 = hal.interface.binding.subspan @io::@s0b0_ro_constant[%c0] : !flow.dispatch.tensor<readonly:5x5x576xf32>
-        %2 = hal.interface.binding.subspan @io::@s0b2_xw_external[%c0] : !flow.dispatch.tensor<writeonly:1x7x7x576xf32>
+        %0 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) : !flow.dispatch.tensor<readonly:1x11x11x576xf32>
+        %1 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(1) : !flow.dispatch.tensor<readonly:5x5x576xf32>
+        %2 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(2) : !flow.dispatch.tensor<writeonly:1x7x7x576xf32>
         %workgroup_id_x = hal.interface.workgroup.id[0] : index
         %workgroup_count_x = hal.interface.workgroup.count[0] : index
         %workgroup_size_x = hal.interface.workgroup.size[0] : index
@@ -944,14 +915,10 @@ hal.executable private @restrict_num_workgroups {
         }
         return
       }
-      hal.interface private @io {
-        hal.interface.binding public @s0b0_ro_external, set=0, binding=0, type="StorageBuffer"
-        hal.interface.binding public @s0b1_ro_external, set=0, binding=1, type="StorageBuffer"
-        hal.interface.binding public @s0b2_xw_external, set=0, binding=2, type="StorageBuffer"
-      }
     }
   }
 }
+
 //   CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 64)>
 //   CHECK-DAG: #[[MAP1:.+]] = affine_map<()[s0] -> (s0 ceildiv 8)>
 //   CHECK-DAG: #[[MAP2:.+]] = affine_map<()[s0] -> (s0 ceildiv 4)>
@@ -978,8 +945,8 @@ hal.executable private @test_exp_0 {
         %lb = hal.interface.load.constant offset = 0 : index
         %ub = hal.interface.load.constant offset = 1 : index
         %step = hal.interface.load.constant offset = 2 : index
-        %read = hal.interface.binding.subspan @i0::@arg0[%c0] : memref<?xf32>{%ub}
-        %write = hal.interface.binding.subspan @i0::@arg0[%c0] : memref<?xf32>{%ub}
+        %read = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) : memref<?xf32>{%ub}
+        %write = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(1) : memref<?xf32>{%ub}
         %offset = affine.apply affine_map<(d0)[s0,s1] -> (d0 + s0 * s1)>(%lb)[%id, %size]
         %stride = affine.apply affine_map<(d0)[s0,s1] -> (d0 * s0 * s1)>(%step)[%count, %size]
         scf.for %iv = %offset to %ub step %stride {
@@ -988,13 +955,10 @@ hal.executable private @test_exp_0 {
         }
         return
       }
-      hal.interface private @io {
-        hal.interface.binding public @arg0, set=0, binding=0, type="StorageBuffer"
-        hal.interface.binding public @arg1, set=0, binding=1, type="StorageBuffer"
-      }
     }
   }
 }
+
 //  CHECK-DAG: #[[MAP:.+]] = affine_map<()[s0] -> (s0 ceildiv 64)>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"CPUDefault", workload_per_wg = [64]>
 //      CHECK: hal.executable.entry_point public @test_exp_0 attributes
@@ -1018,8 +982,8 @@ hal.executable private @test_exp_1 {
         %lb = hal.interface.load.constant offset = 0 : index
         %ub = hal.interface.load.constant offset = 1 : index
         %step = hal.interface.load.constant offset = 2 : index
-        %read = hal.interface.binding.subspan @i0::@arg0[%c0] : memref<?xf32>{%ub}
-        %write = hal.interface.binding.subspan @i0::@arg0[%c0] : memref<?xf32>{%ub}
+        %read = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) : memref<?xf32>{%ub}
+        %write = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(1) : memref<?xf32>{%ub}
         %offset = affine.apply affine_map<()[s0,s1] -> (5 + s0 * s1)>()[%id, %size]
         %stride = affine.apply affine_map<(d0)[s0,s1] -> (s0 * d0 * s1)>(%step)[%count, %size]
         scf.for %iv = %offset to %ub step %stride {
@@ -1028,13 +992,10 @@ hal.executable private @test_exp_1 {
         }
         return
       }
-      hal.interface private @io {
-        hal.interface.binding public @arg0, set=0, binding=0, type="StorageBuffer"
-        hal.interface.binding public @arg1, set=0, binding=1, type="StorageBuffer"
-      }
     }
   }
 }
+
 //  CHECK-DAG: #[[MAP:.+]] = affine_map<()[s0] -> (s0 ceildiv 64)>
 //  CHECk-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"CPUDefault", workload_per_wg = [64]>
 //      CHECK: hal.executable.entry_point public @test_exp_1 attributes
@@ -1058,8 +1019,8 @@ hal.executable private @test_exp_2 {
         %lb = hal.interface.load.constant offset = 0 : index
         %ub = hal.interface.load.constant offset = 1 : index
         %step = hal.interface.load.constant offset = 2 : index
-        %read = hal.interface.binding.subspan @i0::@arg0[%c0] : memref<?xf32>{%ub}
-        %write = hal.interface.binding.subspan @i0::@arg0[%c0] : memref<?xf32>{%ub}
+        %read = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) : memref<?xf32>{%ub}
+        %write = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(1) : memref<?xf32>{%ub}
         %offset = affine.apply affine_map<(d0)[s0,s1] -> (d0 + s0 * s1)>(%lb)[%id, %size]
         %stride = affine.apply affine_map<()[s0,s1] -> (5 * s0 * s1)>()[%count, %size]
         scf.for %iv = %offset to %ub step %stride {
@@ -1068,13 +1029,10 @@ hal.executable private @test_exp_2 {
         }
         return
       }
-      hal.interface private @io {
-        hal.interface.binding public @arg0, set=0, binding=0, type="StorageBuffer"
-        hal.interface.binding public @arg1, set=0, binding=1, type="StorageBuffer"
-      }
     }
   }
 }
+
 //  CHECK-DAG: #[[MAP:.+]] = affine_map<()[s0] -> (s0 ceildiv 64)>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"CPUDefault", workload_per_wg = [64]>
 //      CHECK: hal.executable.entry_point public @test_exp_3 attributes
@@ -1098,8 +1056,8 @@ hal.executable private @test_exp_3 {
         %lb = hal.interface.load.constant offset = 0 : index
         %ub = hal.interface.load.constant offset = 1 : index
         %step = hal.interface.load.constant offset = 2 : index
-        %read = hal.interface.binding.subspan @i0::@arg0[%c0] : memref<?xf32>{%ub}
-        %write = hal.interface.binding.subspan @i0::@arg0[%c0] : memref<?xf32>{%ub}
+        %read = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) : memref<?xf32>{%ub}
+        %write = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(1) : memref<?xf32>{%ub}
         %offset = affine.apply affine_map<(d0)[s0,s1] -> (s0 * s1 + d0)>(%lb)[%id, %size]
         %stride = affine.apply affine_map<()[s0,s1] -> (s0 * 5 * s1)>()[%count, %size]
         scf.for %iv = %offset to %ub step %stride {
@@ -1108,13 +1066,10 @@ hal.executable private @test_exp_3 {
         }
         return
       }
-      hal.interface private @io {
-        hal.interface.binding public @arg0, set=0, binding=0, type="StorageBuffer"
-        hal.interface.binding public @arg1, set=0, binding=1, type="StorageBuffer"
-      }
     }
   }
 }
+
 //  CHECK-DAG: #[[MAP:.+]] = affine_map<()[s0] -> (s0 ceildiv 64)>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"CPUDefault", workload_per_wg = [64]>
 //      CHECK: hal.executable.entry_point public @test_exp_4 attributes
@@ -1138,8 +1093,8 @@ hal.executable private @test_exp_4 {
         %lb = hal.interface.load.constant offset = 0 : index
         %ub = hal.interface.load.constant offset = 1 : index
         %step = hal.interface.load.constant offset = 2 : index
-        %read = hal.interface.binding.subspan @i0::@arg0[%c0] : memref<?xf32>{%ub}
-        %write = hal.interface.binding.subspan @i0::@arg0[%c0] : memref<?xf32>{%ub}
+        %read = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) : memref<?xf32>{%ub}
+        %write = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(1) : memref<?xf32>{%ub}
         %offset = affine.apply affine_map<()[s0,s1] -> (s0 * s1 + 5)>()[%id, %size]
         %stride = affine.apply affine_map<()[s0,s1] -> (s0 * s1 * 5)>()[%count, %size]
         scf.for %iv = %offset to %ub step %stride {
@@ -1148,13 +1103,10 @@ hal.executable private @test_exp_4 {
         }
         return
       }
-      hal.interface private @io {
-        hal.interface.binding public @arg0, set=0, binding=0, type="StorageBuffer"
-        hal.interface.binding public @arg1, set=0, binding=1, type="StorageBuffer"
-      }
     }
   }
 }
+
 //  CHECK-DAG: #[[MAP:.+]] = affine_map<()[s0] -> (s0 ceildiv 64)>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"CPUDefault", workload_per_wg = [64]>
 //      CHECK: hal.executable.entry_point public @test_exp_5 attributes
@@ -1181,9 +1133,9 @@ hal.executable private @matmul_x86  {
         %c384 = arith.constant 384 : index
         %cst = arith.constant 0.000000e+00 : f32
         %c0 = arith.constant 0 : index
-        %0 = hal.interface.binding.subspan @io::@s0b0_ro_external[%c0] : !flow.dispatch.tensor<readonly:384x512xf32>
-        %1 = hal.interface.binding.subspan @io::@s0b1_ro_external[%c0] : !flow.dispatch.tensor<readonly:512x128xf32>
-        %2 = hal.interface.binding.subspan @io::@s0b2_xw_external[%c0] : !flow.dispatch.tensor<writeonly:384x128xf32>
+        %0 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) : !flow.dispatch.tensor<readonly:384x512xf32>
+        %1 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(1) : !flow.dispatch.tensor<readonly:512x128xf32>
+        %2 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(2) : !flow.dispatch.tensor<writeonly:384x128xf32>
         %workgroup_size_x = hal.interface.workgroup.size[0] : index
         %workgroup_size_y = hal.interface.workgroup.size[1] : index
         %workgroup_id_x = hal.interface.workgroup.id[0] : index
@@ -1210,14 +1162,10 @@ hal.executable private @matmul_x86  {
         }
         return
       }
-      hal.interface private @io {
-        hal.interface.binding public @s0b0_ro_external, set=0, binding=0, type="StorageBuffer"
-        hal.interface.binding public @s0b1_ro_external, set=0, binding=1, type="StorageBuffer"
-        hal.interface.binding public @s0b2_xw_external, set=0, binding=2, type="StorageBuffer"
-      }
     }
   }
 }
+
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"CPUTileFuseAndVectorize", workload_per_wg = [64, 64]>
 //  CHECK-DAG: #[[CONFIG:.+]] =  #iree_codegen.lowering.config<tile_sizes = [{{\[}}], [8, 8, 8], [1, 4, 4]], native_vector_size = [1, 4, 4]>
 //  CHECK:       linalg.matmul {lowering.config = #[[CONFIG]]}

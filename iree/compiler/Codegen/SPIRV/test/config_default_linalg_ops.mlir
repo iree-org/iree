@@ -14,8 +14,8 @@ hal.executable @tensor_insert {
         %c0 = arith.constant 0 : index
         %1 = hal.interface.load.constant offset = 0 : index
         %2 = hal.interface.load.constant offset = 1 : index
-        %0 = hal.interface.binding.subspan @io::@s0b0_ro_external[%c0] : !flow.dispatch.tensor<readonly:?x?xi32>{%1, %2}
-        %3 = hal.interface.binding.subspan @io::@s0b1_xw_external[%c0] : !flow.dispatch.tensor<writeonly:?x?xi32>{%1, %2}
+        %0 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) : !flow.dispatch.tensor<readonly:?x?xi32>{%1, %2}
+        %3 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(1) : !flow.dispatch.tensor<writeonly:?x?xi32>{%1, %2}
         %workgroup_size_x = hal.interface.workgroup.size[0] : index
         %workgroup_size_y = hal.interface.workgroup.size[1] : index
         %workgroup_id_x = hal.interface.workgroup.id[0] : index
@@ -39,10 +39,6 @@ hal.executable @tensor_insert {
           }
         }
         return
-      }
-      hal.interface @io attributes {push_constants = 2 : index, sym_visibility = "private"} {
-        hal.interface.binding @s0b0_ro_external, set=0, binding=0, type="StorageBuffer"
-        hal.interface.binding @s0b1_xw_external, set=0, binding=1, type="StorageBuffer"
       }
     }
   }
@@ -69,8 +65,8 @@ hal.executable @tensor_insert {
         %c0 = arith.constant 0 : index
         %d0 = hal.interface.load.constant offset = 0 : index
         %d1 = hal.interface.load.constant offset = 1 : index
-        %0 = hal.interface.binding.subspan @io::@s0b0_ro_external[%c0] : memref<?x?xi32>{%d0, %d1}
-        %1 = hal.interface.binding.subspan @io::@s0b1_xw_external[%c0] : memref<?x?xi32>{%d0, %d1}
+        %0 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) : memref<?x?xi32>{%d0, %d1}
+        %1 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(1) : memref<?x?xi32>{%d0, %d1}
         %workgroup_size_x = hal.interface.workgroup.size[0] : index
         %workgroup_size_y = hal.interface.workgroup.size[1] : index
         %workgroup_id_x = hal.interface.workgroup.id[0] : index
@@ -127,8 +123,8 @@ hal.executable @tensor_insert {
         %c0 = arith.constant 0 : index
         %c224 = arith.constant 224 : index
         %c3 = arith.constant 3 : index
-        %0 = hal.interface.binding.subspan @io::@s0b0_rw_external[%c0] : memref<1x225x225x3xf32>
-        %1 = hal.interface.binding.subspan @io::@s0b1_ro_external[%c0] : memref<1x224x224x3xf32>
+        %0 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) : memref<1x225x225x3xf32>
+        %1 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(1) : memref<1x224x224x3xf32>
         %workgroup_size_x = hal.interface.workgroup.size[0] : index
         %workgroup_size_y = hal.interface.workgroup.size[1] : index
         %workgroup_size_z = hal.interface.workgroup.size[2] : index
@@ -157,10 +153,6 @@ hal.executable @tensor_insert {
           }
         }
         return
-      }
-      hal.interface @io attributes {sym_visibility = "private"} {
-        hal.interface.binding @s0b0_ro_external, set=0, binding=0, type="StorageBuffer"
-        hal.interface.binding @s0b1_xw_external, set=0, binding=1, type="StorageBuffer"
       }
     }
   }
@@ -211,8 +203,8 @@ hal.executable @avg_pool {
         %cst = arith.constant 0.000000e+00 : f32
         %c2 = arith.constant 2 : index
         %c8 = arith.constant 8 : index
-        %0 = hal.interface.binding.subspan @io::@s0b0_ro_external[%c0] : !flow.dispatch.tensor<readonly:1x24x24x8xf32>
-        %1 = hal.interface.binding.subspan @io::@s0b1_xw_external[%c0] : !flow.dispatch.tensor<writeonly:1x2x2x8xf32>
+        %0 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) : !flow.dispatch.tensor<readonly:1x24x24x8xf32>
+        %1 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(1) : !flow.dispatch.tensor<writeonly:1x2x2x8xf32>
         %2 = linalg.init_tensor [12, 12] : tensor<12x12xf32>
         %workgroup_size_x = hal.interface.workgroup.size[0] : index
         %workgroup_size_y = hal.interface.workgroup.size[1] : index
@@ -251,10 +243,6 @@ hal.executable @avg_pool {
           }
         }
         return
-      }
-      hal.interface private @io {
-        hal.interface.binding public @s0b0_ro_external, set=0, binding=0, type="StorageBuffer"
-        hal.interface.binding public @s0b1_xw_external, set=0, binding=1, type="StorageBuffer"
       }
     }
   }
@@ -297,9 +285,9 @@ hal.executable @elementwise {
         %c0 = arith.constant 0 : index
         %c1 = arith.constant 1 : index
         %c10 = arith.constant 10 : index
-        %0 = hal.interface.binding.subspan @io::@s0b1_ro_external[%c0] : !flow.dispatch.tensor<readonly:1x10xf32>
-        %1 = hal.interface.binding.subspan @io::@s0b0_ro_constant[%c0] : !flow.dispatch.tensor<readonly:10xf32>
-        %2 = hal.interface.binding.subspan @io::@s0b2_xw_external[%c0] : !flow.dispatch.tensor<writeonly:10xf32>
+        %0 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) : !flow.dispatch.tensor<readonly:1x10xf32>
+        %1 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(1) : !flow.dispatch.tensor<readonly:10xf32>
+        %2 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(2) : !flow.dispatch.tensor<writeonly:10xf32>
         %workgroup_size_x = hal.interface.workgroup.size[0] : index
         %workgroup_size_y = hal.interface.workgroup.size[1] : index
         %workgroup_id_x = hal.interface.workgroup.id[0] : index
@@ -332,11 +320,6 @@ hal.executable @elementwise {
           }
         }
         return
-      }
-      hal.interface private @io {
-        hal.interface.binding public @s0b0_ro_constant, set=0, binding=0, type="StorageBuffer"
-        hal.interface.binding public @s0b1_ro_external, set=0, binding=1, type="StorageBuffer"
-        hal.interface.binding public @s0b2_xw_external, set=0, binding=2, type="StorageBuffer"
       }
     }
   }

@@ -32,7 +32,7 @@ namespace {
 ///
 /// For example, this matches the following pattern:
 ///
-///   %subspan = hal.interface.binding.subspan @... :
+///   %subspan = hal.interface.binding.subspan ... :
 ///       !flow.dispatch.tensor<readonly:3x3x1x96xf32>
 ///   %tensor = flow.dispatch.tensor.load %subspan :
 ///       !flow.dispatch.tensor<readonly:3x3x1x96xf32> -> tensor<3x3x1x96xf32>
@@ -42,7 +42,7 @@ namespace {
 ///
 /// And turns it into:
 ///
-///   %subspan = hal.interface.binding.subspan @... :
+///   %subspan = hal.interface.binding.subspan ... :
 ///       !flow.dispatch.tensor<readonly:864xf32>
 ///   %0 = flow.dispatch.tensor.load %subspan :
 ///       !flow.dispatch.tensor<readonly:864xf32> -> tensor<864xf32>
@@ -83,9 +83,9 @@ struct FoldReshapeIntoInterfaceTensorLoad : OpRewritePattern<TensorReshapeOp> {
         tensorAccess, reshapeOp.getResultType());
 
     Value newSubspanOp = rewriter.create<IREE::HAL::InterfaceBindingSubspanOp>(
-        subspanOp.getLoc(), newSubspanType, subspanOp.binding(),
-        subspanOp.byte_offset(), subspanOp.byte_length(),
-        subspanOp.dynamic_dims(), subspanOp.alignmentAttr());
+        subspanOp.getLoc(), newSubspanType, subspanOp.type(), subspanOp.set(),
+        subspanOp.binding(), subspanOp.byte_offset(), subspanOp.dynamic_dims(),
+        subspanOp.alignmentAttr());
 
     rewriter.replaceOpWithNewOp<IREE::Flow::DispatchTensorLoadOp>(
         reshapeOp, reshapeOp.getResultType(), newSubspanOp,
