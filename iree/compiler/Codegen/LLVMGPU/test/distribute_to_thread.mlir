@@ -10,11 +10,10 @@
 #map4 = affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>
 hal.executable private @dot_dispatch_0  {
 hal.executable.variant @cuda, target = #executable_target_cuda_nvptx_fb {
-  hal.executable.entry_point @dot_dispatch_0 attributes {
-    interface = @legacy_io,
-    ordinal = 0 : index,
+  hal.executable.entry_point @dot_dispatch_0 interface(@io) {
     translation.info = #translation,
-    workgroup_size = [64 : index, 1 : index, 1 : index]}
+    workgroup_size = [64 : index, 1 : index, 1 : index]
+  }
   builtin.module {
     builtin.func @dot_dispatch_0() {
       %cst = arith.constant 0.000000e+00 : f32
@@ -85,11 +84,10 @@ hal.executable.variant @cuda, target = #executable_target_cuda_nvptx_fb {
 // Pure reducion case, skip tiling.
 hal.executable @reduction_dispatch {
 hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
-    hal.executable.entry_point @predict_dispatch_153 attributes {
-      interface = @io,
-      ordinal = 0 : index,
+    hal.executable.entry_point @predict_dispatch_153 interface(@io) {
       translation.info = #translation,
-      workgroup_size = [1: index, 1: index, 1: index]}
+      workgroup_size = [1: index, 1: index, 1: index]
+    }
     builtin.module  {
       builtin.func @predict_dispatch_153() {
         %c0 = arith.constant 0 : index

@@ -136,8 +136,7 @@ class TargetBackend {
   //       hal.interface.binding @arg1, set=0, binding=1, ...
   //     }
   //     hal.executable.variant @target, target="target-backend" {
-  //       hal.executable.entry_point @main attributes {
-  //         interface = @main_io,
+  //       hal.executable.entry_point @main interface(@main_io) {
   //         ordinal = 0 : index
   //       }
   //       module { ... }

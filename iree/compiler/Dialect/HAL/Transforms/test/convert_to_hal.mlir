@@ -21,8 +21,7 @@ module attributes {hal.device.targets = [#device_target_cpu]}  {
       hal.interface.binding public @s0b2_wo, set=0, binding=2, type="StorageBuffer"
     }
     hal.executable.variant public @embedded_elf_x86_64, target = #executable_target_embedded_elf_x86_64_ {
-      hal.executable.entry_point public @dispatch attributes {
-        interface = @io,
+      hal.executable.entry_point public @dispatch interface(@io) {
         ordinal = 0 : index,
         translation.info = #translation
       } {

@@ -11,7 +11,7 @@ hal.executable private @mmt4d_384x384x512_4x1x4_dispatch_0 {
       hal.interface.binding public @s0b2_rw_external, set=0, binding=2, type="StorageBuffer"
     }
     hal.executable.variant public @embedded_elf_arm_64, target = #executable_target_embedded_elf_arm_64_ {
-      hal.executable.entry_point public @mmt4d_384x384x512_4x1x4_dispatch_0 attributes {interface = @io, ordinal = 0 : index}
+      hal.executable.entry_point public @mmt4d_384x384x512_4x1x4_dispatch_0 interface(@io)
       builtin.module  {
         func @mmt4d_384x384x512_4x1x4_dispatch_0() {
           %c0 = arith.constant 0 : index

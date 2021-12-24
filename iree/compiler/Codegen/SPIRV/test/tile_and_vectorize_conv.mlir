@@ -10,8 +10,7 @@ hal.executable private @conv_static_shape_f32 {
     hal.interface.binding public @ret0, set=0, binding=2, type="StorageBuffer"
   }
   hal.executable.variant @vulkan, target = <"vulkan-spirv", "vulkan-spirv-fb"> {
-    hal.executable.entry_point @conv_static_shape_f32 attributes {
-      interface = @io, ordinal = 0 : index,
+    hal.executable.entry_point @conv_static_shape_f32 interface(@io) {
       workgroup_size = [4: index, 4: index, 1: index],
       translation.info = #translation
     }
@@ -101,8 +100,7 @@ hal.executable private @depthwise_conv_static_shape_f32 {
     hal.interface.binding public @ret0, set=0, binding=2, type="StorageBuffer"
   }
   hal.executable.variant @vulkan, target = <"vulkan-spirv", "vulkan-spirv-fb"> {
-    hal.executable.entry_point @depthwise_conv_static_shape_f32 attributes {
-      interface = @io, ordinal = 0 : index,
+    hal.executable.entry_point @depthwise_conv_static_shape_f32 interface(@io) {
       workgroup_size = [4: index, 4: index, 4: index],
       translation.info = #translation
     }

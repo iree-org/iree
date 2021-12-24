@@ -8,8 +8,7 @@ hal.executable private @static_3d_sort  {
     hal.interface.binding @s0b1_xw_external, set=0, binding=1, type="StorageBuffer"
   }
   hal.executable.variant @vulkan_spirv_fb, target = <"vulkan-spirv", "vulkan-spirv-fb"> {
-    hal.executable.entry_point @static_3d_sort attributes {
-      interface = @io, ordinal = 0 : index,
+    hal.executable.entry_point @static_3d_sort interface(@io) {
       translation.info = #translation,
       workgroup_size = [16 : index, 1 : index, 1 : index]
     }

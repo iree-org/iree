@@ -1478,7 +1478,7 @@ def HAL_ExecutableEntryPointOp : HAL_Op<"executable.entry_point", [
   let arguments = (ins
     OptionalAttr<StrAttr>:$sym_visibility,
     SymbolNameAttr:$sym_name,
-    HAL_OrdinalAttr:$ordinal,
+    OptionalAttr<HAL_OrdinalAttr>:$ordinal,
     FlatSymbolRefAttr:$interface,
     OptionalAttr<HAL_WorkgroupSizeAttr>:$workgroup_size,
     OptionalAttr<IndexAttr>:$workgroup_local_memory
@@ -1487,16 +1487,6 @@ def HAL_ExecutableEntryPointOp : HAL_Op<"executable.entry_point", [
   let regions = (region VariadicRegion<SizedRegion<1>>:$workgroup_count_region);
 
   let builders = [
-    OpBuilder<(ins
-      "::llvm::StringRef":$sym_name,
-      "::llvm::APInt":$ordinal,
-      "::llvm::StringRef":$interface,
-      "::mlir::ArrayAttr":$workgroup_size,
-      "::mlir::IntegerAttr":$workgroup_local_memory
-    ), [{
-      build($_builder, $_state, nullptr, sym_name, ordinal, interface,
-            workgroup_size, workgroup_local_memory, 0);
-    }]>,
     OpBuilder<(ins
       "::mlir::StringAttr":$sym_name,
       "::mlir::IntegerAttr":$ordinal,

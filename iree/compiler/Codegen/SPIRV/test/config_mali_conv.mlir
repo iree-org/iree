@@ -15,8 +15,8 @@ hal.executable @conv_112x112x512 {
         max_compute_workgroup_size = dense<512> : vector<3xi32>,
        subgroup_size = 16 : i32}>
     }> {
-    hal.executable.entry_point public @conv_112x112x512 attributes {interface = @io, ordinal = 0 : index}
-    builtin.module  {
+    hal.executable.entry_point public @conv_112x112x512 interface(@io)
+    builtin.module {
       func @conv_112x112x512() {
         %c0 = arith.constant 0 : index
         %c512 = arith.constant 512 : index
@@ -102,8 +102,8 @@ hal.executable @conv_112x112x32 {
         max_compute_workgroup_size = dense<512> : vector<3xi32>,
        subgroup_size = 16 : i32}>
     }> {
-    hal.executable.entry_point public @conv_112x112x32 attributes {interface = @io, ordinal = 0 : index}
-    builtin.module  {
+    hal.executable.entry_point public @conv_112x112x32 interface(@io)
+    builtin.module {
       func @conv_112x112x32() {
         %c0 = arith.constant 0 : index
         %c32 = arith.constant 32 : index
@@ -189,8 +189,8 @@ hal.executable @conv_16x16x16 {
         max_compute_workgroup_size = dense<512> : vector<3xi32>,
        subgroup_size = 16 : i32}>
     }> {
-    hal.executable.entry_point public @conv_16x16x16 attributes {interface = @io, ordinal = 0 : index}
-    builtin.module  {
+    hal.executable.entry_point public @conv_16x16x16 interface(@io)
+    builtin.module {
       func @conv_16x16x16() {
         %c0 = arith.constant 0 : index
         %c16 = arith.constant 16 : index
@@ -276,8 +276,8 @@ hal.executable @dwconv_28x28x144 {
         max_compute_workgroup_size = dense<512> : vector<3xi32>,
        subgroup_size = 16 : i32}>
     }> {
-    hal.executable.entry_point public @dwconv_28x28x144 attributes {interface = @io, ordinal = 0 : index}
-    builtin.module  {
+    hal.executable.entry_point public @dwconv_28x28x144 interface(@io)
+    builtin.module {
       func @dwconv_28x28x144() {
         %c0 = arith.constant 0 : index
         %c144 = arith.constant 144 : index
@@ -365,8 +365,8 @@ hal.executable @dwconv_1x2x8 {
         max_compute_workgroup_size = dense<512> : vector<3xi32>,
        subgroup_size = 16 : i32}>
     }> {
-    hal.executable.entry_point public @dwconv_1x2x8 attributes {interface = @io, ordinal = 0 : index}
-    builtin.module  {
+    hal.executable.entry_point public @dwconv_1x2x8 interface(@io)
+    builtin.module {
       func @dwconv_1x2x8() {
         %c0 = arith.constant 0 : index
         %c8 = arith.constant 8 : index

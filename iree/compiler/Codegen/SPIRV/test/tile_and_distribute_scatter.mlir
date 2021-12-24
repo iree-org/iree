@@ -10,12 +10,10 @@ hal.executable private @static_scatter_update_slice  {
   }
 
   hal.executable.variant @vulkan_spirv_fb, target = <"vulkan", "vulkan-spirv-fb"> {
-    hal.executable.entry_point @static_scatter_update_slice attributes {
-      interface = @io, ordinal = 0 : index,
+    hal.executable.entry_point @static_scatter_update_slice interface(@io) {
       translation.info = #translation,
       workgroup_size = [16 : index, 1 : index, 1 : index]
     }
-
     builtin.module {
       builtin.func @static_scatter_update_slice() {
         %c40 = arith.constant 40 : index

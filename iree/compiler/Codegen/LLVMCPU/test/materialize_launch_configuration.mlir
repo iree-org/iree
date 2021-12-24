@@ -11,10 +11,7 @@ hal.executable private @matmul_tensors  {
        native_vector_size = 16 : index,
        target_triple = "aarch64-unknown-unknown-eabi-elf"
     }> {
-    hal.executable.entry_point @matmul_tensors attributes {
-      interface = @io,
-      ordinal = 0 : index
-    }
+    hal.executable.entry_point @matmul_tensors interface(@io)
     builtin.module {
       func @matmul_tensors() {
         %c0 = arith.constant 0 : index
@@ -81,11 +78,8 @@ hal.executable private @add_no_config  {
        native_vector_size = 16 : index,
        target_triple = "x86_64-unknown-linux-gnu"
     }> {
-    hal.executable.entry_point @add_no_config attributes {
-      interface = @io,
-      ordinal = 0 : index
-    }
-    builtin.module  {
+    hal.executable.entry_point @add_no_config interface(@io)
+    builtin.module {
       func @add_no_config() {
         %c0 = arith.constant 0 : index
         %dim0 = hal.interface.load.constant offset = 0 : index
@@ -139,10 +133,8 @@ hal.executable private @add4D  {
        native_vector_size = 16 : index,
        target_triple = "x86_64-unknown-linux-gnu"
     }> {
-    hal.executable.entry_point @add4D attributes {
-      interface = @io, ordinal = 0 : index
-    }
-    builtin.module  {
+    hal.executable.entry_point @add4D interface(@io)
+    builtin.module {
       func @add4D() {
         %c0 = arith.constant 0 : index
         %0 = hal.interface.load.constant offset = 0 : index
@@ -220,11 +212,8 @@ hal.executable private @batch_matmul_tensors {
        native_vector_size = 16 : index,
        target_triple = "aarch64-unknown-unknown-eabi-elf"
     }> {
-    hal.executable.entry_point @batch_matmul_tensors attributes {
-      interface = @io,
-      ordinal = 0 : index
-    }
-    builtin.module  {
+    hal.executable.entry_point @batch_matmul_tensors interface(@io)
+    builtin.module {
       func @batch_matmul_tensors() {
         %cst = arith.constant 0.000000e+00 : f32
         %c0 = arith.constant 0 : index
@@ -297,8 +286,8 @@ hal.executable private @batch_matmul_tensors {
     workgroup_size = []>
 hal.executable private @preset_config_matmul_tensors  {
   hal.executable.variant @system_elf_x86_64, target = <"llvm", "system-elf-x86_64"> {
-    hal.executable.entry_point @preset_config attributes {interface = @io, ordinal = 0 : index}
-    builtin.module  {
+    hal.executable.entry_point @preset_config interface(@io)
+    builtin.module {
       builtin.func @preset_config() {
         %c0 = arith.constant 0 : index
         %c512 = arith.constant 512 : index
@@ -375,8 +364,8 @@ hal.executable private @preset_config_matmul_tensors  {
 
 hal.executable @tensor_insert {
   hal.executable.variant @system_elf_x86_64, target = <"llvm", "system-elf-x86_64"> {
-    hal.executable.entry_point @tensor_insert_slice attributes {interface = @io, ordinal = 0 : index}
-    builtin.module  {
+    hal.executable.entry_point @tensor_insert_slice interface(@io)
+    builtin.module {
       builtin.func @tensor_insert_slice() {
         %c0 = arith.constant 0 : index
         %0 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) : !flow.dispatch.tensor<readonly:?x?xi32>
@@ -430,7 +419,7 @@ hal.executable private @static_1d_fft_stage2  {
     hal.interface.binding @s0b1_rw_external, set=0, binding=1, type="StorageBuffer"
   }
   hal.executable.variant @system_elf_x86_64, target = <"llvm", "system-elf-x86_64"> {
-    hal.executable.entry_point @static_1d_fft_stage2 attributes {interface = @io, ordinal = 0 : index}
+    hal.executable.entry_point @static_1d_fft_stage2 interface(@io)
     builtin.module {
       builtin.func @static_1d_fft_stage2() {
         %c0 = arith.constant 0 : index
@@ -473,7 +462,7 @@ hal.executable private @static_3d_fft_stage3  {
     hal.interface.binding @s0b1_rw_external, set=0, binding=1, type="StorageBuffer"
   }
   hal.executable.variant @system_elf_x86_64, target = <"llvm", "system-elf-x86_64"> {
-    hal.executable.entry_point @static_3d_fft_stage3 attributes {interface = @io, ordinal = 0 : index}
+    hal.executable.entry_point @static_3d_fft_stage3 interface(@io)
     builtin.module {
       builtin.func @static_3d_fft_stage3() {
         %c0 = arith.constant 0 : index
@@ -545,7 +534,7 @@ hal.executable private @outs_fusion {
     hal.interface.binding @arg2, set=0, binding=2, type="StorageBuffer"
   }
   hal.executable.variant @system_elf_x86_64, target = <"llvm", "system-elf-x86_64"> {
-    hal.executable.entry_point @outs_fusion_fn attributes {interface = @io, ordinal = 0 : index}
+    hal.executable.entry_point @outs_fusion_fn interface(@io)
     builtin.module {
       builtin.func @outs_fusion_fn() {
         %c0 = arith.constant 0 : index
@@ -609,8 +598,8 @@ hal.executable private @outs_fusion {
 
 hal.executable private @conv {
   hal.executable.variant public @system_elf_x86_64, target = <"llvm", "system-elf-x86_64", {data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128", native_vector_size = 16 : index, target_triple = "x86_64-unknown-linux-gnu"}> {
-    hal.executable.entry_point public @conv attributes {interface = @io, ordinal = 0 : index}
-    builtin.module  {
+    hal.executable.entry_point public @conv interface(@io)
+    builtin.module {
       func @conv() {
         %c0 = arith.constant 0 : index
         %0 = hal.interface.load.constant offset = 0 : index
@@ -668,7 +657,7 @@ hal.executable private @conv {
 
 //  CHECK-DAG: #[[MAP:.+]] = affine_map<()[s0] -> (s0 ceildiv 64)>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"CPUDefault", workload_per_wg = [64, 64, 64]>
-//      CHECK: hal.executable.entry_point public @conv attributes
+//      CHECK: hal.executable.entry_point public @conv
 // CHECK-SAME:     translation.info = #[[TRANSLATION]]
 // CHECK-NEXT:   ^bb0(%[[ARG0:[a-zA-Z0-9]+]]: index, %[[ARG1:[a-zA-Z0-9]+]]: index, %[[ARG2:[a-zA-Z0-9]+]]: index)
 //  CHECK-DAG:     %[[D0:.+]] = affine.apply #[[MAP0]]()[%[[ARG0]]
@@ -682,8 +671,8 @@ hal.executable private @conv {
 
 hal.executable private @conv_static {
   hal.executable.variant public @system_elf_x86_64, target = <"llvm", "system-elf-x86_64", {data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128", native_vector_size = 64 : index, target_triple = "x86_64-pc-linux-gnu"}> {
-    hal.executable.entry_point public @conv_static attributes {interface = @io, ordinal = 0 : index}
-    builtin.module  {
+    hal.executable.entry_point public @conv_static interface(@io)
+    builtin.module {
       func @conv_static() {
         %cst = arith.constant 0.000000e+00 : f32
         %c80 = arith.constant 80 : index
@@ -740,7 +729,7 @@ hal.executable private @conv_static {
 //  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 64)>
 //  CHECK-DAG: #[[MAP1:.+]] = affine_map<()[s0] -> (s0 ceildiv 32)>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"CPUDefault", workload_per_wg = [64, 64, 32]>
-//      CHECK: hal.executable.entry_point public @conv_static attributes
+//      CHECK: hal.executable.entry_point public @conv_static
 // CHECK-SAME:     translation.info = #[[TRANSLATION]]
 // CHECK-NEXT:   ^bb0(%[[ARG0:[a-zA-Z0-9]+]]: index, %[[ARG1:[a-zA-Z0-9]+]]: index, %[[ARG2:[a-zA-Z0-9]+]]: index)
 //  CHECK-DAG:     %[[D0:.+]] = affine.apply #[[MAP0]]()[%[[ARG0]]
@@ -754,8 +743,8 @@ hal.executable private @conv_static {
 
 hal.executable private @generic_static {
   hal.executable.variant public @system_elf_x86_64, target = <"llvm", "system-elf-x86_64", {data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128", native_vector_size = 64 : index, target_triple = "x86_64-pc-linux-gnu"}> {
-    hal.executable.entry_point public @generic_static attributes {interface = @io, ordinal = 0 : index}
-    builtin.module  {
+    hal.executable.entry_point public @generic_static interface(@io)
+    builtin.module {
       func @generic_static() {
         %c16 = arith.constant 16 : index
         %c96 = arith.constant 96 : index
@@ -796,7 +785,7 @@ hal.executable private @generic_static {
 //  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 32)>
 //  CHECK-DAG: #[[MAP1:.+]] = affine_map<()[s0] -> (s0 ceildiv 8)>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"CPUDefault", workload_per_wg = [32, 8]>
-//      CHECK: hal.executable.entry_point public @generic_static attributes
+//      CHECK: hal.executable.entry_point public @generic_static
 // CHECK-SAME:     translation.info = #[[TRANSLATION]]
 // CHECK-NEXT:   ^bb0(%[[ARG0:[a-zA-Z0-9]+]]: index, %[[ARG1:[a-zA-Z0-9]+]]: index, %[[ARG2:[a-zA-Z0-9]+]]: index)
 //  CHECK-DAG:     %[[C1:.+]] = arith.constant 1 : index
@@ -810,8 +799,8 @@ hal.executable private @generic_static {
 
 hal.executable private @matmul_static {
   hal.executable.variant public @system_elf_arm_64, target = <"llvm", "system-elf-arm_64", {data_layout = "e-m:e-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128", native_vector_size = 16 : index, target_triple = "aarch64-none-linux-android30"}> {
-    hal.executable.entry_point public @matmul_static attributes {interface = @io, ordinal = 0 : index}
-    builtin.module  {
+    hal.executable.entry_point public @matmul_static interface(@io)
+    builtin.module {
       func @matmul_static() {
         %cst = arith.constant 0.000000e+00 : f32
         %c196 = arith.constant 196 : index
@@ -854,7 +843,7 @@ hal.executable private @matmul_static {
 //   CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 8)>
 //   CHECK-DAG: #[[MAP1:.+]] = affine_map<()[s0] -> (s0 ceildiv 28)>
 //   CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"CPUTileFuseAndVectorize", workload_per_wg = [8, 28]>
-//       CHECK: hal.executable.entry_point public @matmul_static attributes
+//       CHECK: hal.executable.entry_point public @matmul_static
 //  CHECK-SAME:     translation.info = #[[TRANSLATION]]
 //  CHECK-NEXT:   ^bb0(%[[ARG0:[a-zA-Z0-9]+]]: index, %[[ARG1:[a-zA-Z0-9]+]]: index, %[[ARG2:[a-zA-Z0-9]+]]: index)
 //   CHECK-DAG:     %[[C1:.+]] = arith.constant 1 : index
@@ -868,8 +857,8 @@ hal.executable private @matmul_static {
 
 hal.executable private @restrict_num_workgroups {
   hal.executable.variant public @system_elf_arm_64, target = <"llvm", "system-elf-arm_64", {data_layout = "e-m:e-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128", native_vector_size = 16 : index, target_triple = "aarch64-none-linux-android30"}> {
-    hal.executable.entry_point public @restrict_num_workgroups attributes {interface = @io, ordinal = 0 : index}
-    builtin.module  {
+    hal.executable.entry_point public @restrict_num_workgroups interface(@io)
+    builtin.module {
       func @restrict_num_workgroups() {
         %cst = arith.constant 0.000000e+00 : f32
         %c7 = arith.constant 7 : index
@@ -923,7 +912,7 @@ hal.executable private @restrict_num_workgroups {
 //   CHECK-DAG: #[[MAP1:.+]] = affine_map<()[s0] -> (s0 ceildiv 8)>
 //   CHECK-DAG: #[[MAP2:.+]] = affine_map<()[s0] -> (s0 ceildiv 4)>
 //   CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"CPUDefault", workload_per_wg = [64, 8, 4]>
-//       CHECK: hal.executable.entry_point public @restrict_num_workgroups attributes
+//       CHECK: hal.executable.entry_point public @restrict_num_workgroups
 //  CHECK-SAME:     translation.info = #[[TRANSLATION]]
 //  CHECK-NEXT:   ^bb0(%[[ARG0:[a-zA-Z0-9]+]]: index, %[[ARG1:[a-zA-Z0-9]+]]: index, %[[ARG2:[a-zA-Z0-9]+]]: index)
 //   CHECK-DAG:     %[[D0:.+]] = affine.apply #[[MAP0]]()[%[[ARG0]]]
@@ -935,8 +924,8 @@ hal.executable private @restrict_num_workgroups {
 
 hal.executable private @test_exp_0 {
   hal.executable.variant public @system_elf_arm_64, target = <"llvm", "system-elf-arm_64", {data_layout = "e-m:e-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128", native_vector_size = 16 : index, target_triple = "aarch64-none-linux-android30"}> {
-    hal.executable.entry_point public @test_exp_0 attributes {interface = @io, ordinal = 0 : index}
-    builtin.module  {
+    hal.executable.entry_point public @test_exp_0 interface(@io)
+    builtin.module {
       func @test_exp_0() {
         %c0 = arith.constant 0 : index
         %size = hal.interface.workgroup.size[0] : index
@@ -961,7 +950,7 @@ hal.executable private @test_exp_0 {
 
 //  CHECK-DAG: #[[MAP:.+]] = affine_map<()[s0] -> (s0 ceildiv 64)>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"CPUDefault", workload_per_wg = [64]>
-//      CHECK: hal.executable.entry_point public @test_exp_0 attributes
+//      CHECK: hal.executable.entry_point public @test_exp_0
 // CHECK-SAME:     translation.info = #[[TRANSLATION]]
 // CHECK-NEXT:   ^bb0(%[[ARG0:[a-zA-Z0-9]+]]: index
 //  CHECK-DAG:     %[[C1:.+]] = arith.constant 1 : index
@@ -972,8 +961,8 @@ hal.executable private @test_exp_0 {
 
 hal.executable private @test_exp_1 {
   hal.executable.variant public @system_elf_arm_64, target = <"llvm", "system-elf-arm_64", {data_layout = "e-m:e-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128", native_vector_size = 16 : index, target_triple = "aarch64-none-linux-android30"}> {
-    hal.executable.entry_point public @test_exp_1 attributes {interface = @io, ordinal = 0 : index}
-    builtin.module  {
+    hal.executable.entry_point public @test_exp_1 interface(@io)
+    builtin.module {
       func @test_exp_1() {
         %c0 = arith.constant 0 : index
         %size = hal.interface.workgroup.size[0] : index
@@ -998,7 +987,7 @@ hal.executable private @test_exp_1 {
 
 //  CHECK-DAG: #[[MAP:.+]] = affine_map<()[s0] -> (s0 ceildiv 64)>
 //  CHECk-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"CPUDefault", workload_per_wg = [64]>
-//      CHECK: hal.executable.entry_point public @test_exp_1 attributes
+//      CHECK: hal.executable.entry_point public @test_exp_1
 // CHECK-SAME:     translation.info = #[[TRANSLATION]]
 // CHECK-NEXT:   ^bb0(%[[ARG0:[a-zA-Z0-9]+]]: index
 //  CHECK-DAG:     %[[C1:.+]] = arith.constant 1 : index
@@ -1009,8 +998,8 @@ hal.executable private @test_exp_1 {
 
 hal.executable private @test_exp_2 {
   hal.executable.variant public @system_elf_arm_64, target = <"llvm", "system-elf-arm_64", {data_layout = "e-m:e-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128", native_vector_size = 16 : index, target_triple = "aarch64-none-linux-android30"}> {
-    hal.executable.entry_point public @test_exp_3 attributes {interface = @io, ordinal = 0 : index}
-    builtin.module  {
+    hal.executable.entry_point public @test_exp_3 interface(@io)
+    builtin.module {
       func @test_exp_3() {
         %c0 = arith.constant 0 : index
         %size = hal.interface.workgroup.size[0] : index
@@ -1035,7 +1024,7 @@ hal.executable private @test_exp_2 {
 
 //  CHECK-DAG: #[[MAP:.+]] = affine_map<()[s0] -> (s0 ceildiv 64)>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"CPUDefault", workload_per_wg = [64]>
-//      CHECK: hal.executable.entry_point public @test_exp_3 attributes
+//      CHECK: hal.executable.entry_point public @test_exp_3
 // CHECK-SAME:     translation.info = #[[TRANSLATION]]
 // CHECK-NEXT:   ^bb0(%[[ARG0:[a-zA-Z0-9]+]]: index
 //  CHECK-DAG:     %[[C1:.+]] = arith.constant 1 : index
@@ -1046,8 +1035,8 @@ hal.executable private @test_exp_2 {
 
 hal.executable private @test_exp_3 {
   hal.executable.variant public @system_elf_arm_64, target = <"llvm", "system-elf-arm_64", {data_layout = "e-m:e-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128", native_vector_size = 16 : index, target_triple = "aarch64-none-linux-android30"}> {
-    hal.executable.entry_point public @test_exp_4 attributes {interface = @io, ordinal = 0 : index}
-    builtin.module  {
+    hal.executable.entry_point public @test_exp_4 interface(@io)
+    builtin.module {
       func @test_exp_4() {
         %c0 = arith.constant 0 : index
         %size = hal.interface.workgroup.size[0] : index
@@ -1072,7 +1061,7 @@ hal.executable private @test_exp_3 {
 
 //  CHECK-DAG: #[[MAP:.+]] = affine_map<()[s0] -> (s0 ceildiv 64)>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"CPUDefault", workload_per_wg = [64]>
-//      CHECK: hal.executable.entry_point public @test_exp_4 attributes
+//      CHECK: hal.executable.entry_point public @test_exp_4
 // CHECK-SAME:     translation.info = #[[TRANSLATION]]
 // CHECK-NEXT:   ^bb0(%[[ARG0:[a-zA-Z0-9]+]]: index
 //  CHECK-DAG:     %[[C1:.+]] = arith.constant 1 : index
@@ -1083,8 +1072,8 @@ hal.executable private @test_exp_3 {
 
 hal.executable private @test_exp_4 {
   hal.executable.variant public @system_elf_arm_64, target = <"llvm", "system-elf-arm_64", {data_layout = "e-m:e-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128", native_vector_size = 16 : index, target_triple = "aarch64-none-linux-android30"}> {
-    hal.executable.entry_point public @test_exp_5 attributes {interface = @io, ordinal = 0 : index}
-    builtin.module  {
+    hal.executable.entry_point public @test_exp_5 interface(@io)
+    builtin.module {
       func @test_exp_5() {
         %c0 = arith.constant 0 : index
         %size = hal.interface.workgroup.size[0] : index
@@ -1109,7 +1098,7 @@ hal.executable private @test_exp_4 {
 
 //  CHECK-DAG: #[[MAP:.+]] = affine_map<()[s0] -> (s0 ceildiv 64)>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"CPUDefault", workload_per_wg = [64]>
-//      CHECK: hal.executable.entry_point public @test_exp_5 attributes
+//      CHECK: hal.executable.entry_point public @test_exp_5
 // CHECK-SAME:     translation.info = #[[TRANSLATION]]
 // CHECK-NEXT:   ^bb0(%[[ARG0:[a-zA-Z0-9]+]]: index
 //  CHECK-DAG:     %[[C1:.+]] = arith.constant 1 : index
@@ -1126,8 +1115,8 @@ hal.executable private @matmul_x86  {
           native_vector_size = 16 : index,
           target_triple = "x86_64-unknown-unknown-eabi-elf"
     }> {
-    hal.executable.entry_point public @matmul_x86 attributes {interface = @io, ordinal = 0 : index}
-    builtin.module  {
+    hal.executable.entry_point public @matmul_x86 interface(@io)
+    builtin.module {
       func @matmul_x86() {
         %c128 = arith.constant 128 : index
         %c384 = arith.constant 384 : index

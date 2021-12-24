@@ -9,10 +9,8 @@ hal.executable private @matmul_tensors  {
     hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer"
   }
   hal.executable.variant @llvm, target = #hal.executable.target<"llvm", "embedded-elf-x86_64", {}> {
-    hal.executable.entry_point @illegal attributes {
-      translation.info = #translation,
-      interface = @io,
-      ordinal = 0 : index
+    hal.executable.entry_point @illegal interface(@io) {
+      translation.info = #translation
     }
     builtin.module {
       func @illegal() {
@@ -40,10 +38,8 @@ hal.executable private @matmul_tensors  {
     hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer"
   }
   hal.executable.variant @llvm, target = #hal.executable.target<"llvm", "embedded-elf-x86_64", {}> {
-    hal.executable.entry_point @illegal attributes {
-      translation.info = #translation,
-      interface = @io,
-      ordinal = 0 : index
+    hal.executable.entry_point @illegal interface(@io) {
+      translation.info = #translation
     }
     builtin.module {
       func @illegal() {
@@ -71,10 +67,8 @@ hal.executable private @matmul_tensors  {
     hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer"
   }
   hal.executable.variant @llvm, target = #hal.executable.target<"llvm", "embedded-elf-x86_64", {}> {
-    hal.executable.entry_point @illegal attributes {
-      translation.info = #translation,
-      interface = @io,
-      ordinal = 0 : index
+    hal.executable.entry_point @illegal interface(@io) {
+      translation.info = #translation
     }
     builtin.module {
       func @illegal() {
@@ -102,10 +96,8 @@ hal.executable private @matmul_tensors  {
     hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer"
   }
   hal.executable.variant @llvm, target = #hal.executable.target<"llvm", "embedded-elf-x86_64", {}> {
-    hal.executable.entry_point @illegal attributes {
-      translation.info = #translation,
-      interface = @io,
-      ordinal = 0 : index
+    hal.executable.entry_point @illegal interface(@io) {
+      translation.info = #translation
     }
     builtin.module {
       func @illegal() {
@@ -133,10 +125,8 @@ hal.executable private @matmul_tensors  {
     hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer"
   }
   hal.executable.variant @llvm, target = #hal.executable.target<"llvm", "embedded-elf-x86_64", {}> {
-    hal.executable.entry_point @illegal attributes {
-      translation.info = #translation,
-      interface = @io,
-      ordinal = 0 : index
+    hal.executable.entry_point @illegal interface(@io) {
+      translation.info = #translation
     }
     builtin.module {
       func @illegal() {
@@ -164,10 +154,8 @@ hal.executable private @matmul_tensors  {
     hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer"
   }
   hal.executable.variant @llvm, target = #hal.executable.target<"llvm", "embedded-elf-x86_64", {}> {
-    hal.executable.entry_point @illegal attributes {
-      translation.info = #translation,
-      interface = @io,
-      ordinal = 0 : index
+    hal.executable.entry_point @illegal interface(@io) {
+      translation.info = #translation
     }
     builtin.module {
       func @illegal() {

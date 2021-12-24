@@ -9,10 +9,9 @@
 
 hal.executable private @shared_mem_cpy  {
   hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
-    hal.executable.entry_point @shared_mem_cpy attributes {
-      interface = @io,
-      ordinal = 0 : index,
-      workgroup_size = [32: index, 4: index, 1:index]}
+    hal.executable.entry_point @shared_mem_cpy interface(@io) {
+      workgroup_size = [32: index, 4: index, 1:index]
+    }
     builtin.module  {
       memref.global "private" @__shared_memory___1 : memref<3x512xf32, 3>
       memref.global "private" @__shared_memory___0 : memref<256x4xf32, 3>

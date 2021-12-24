@@ -6,8 +6,8 @@ hal.executable @add_dispatch_0 {
     hal.interface.binding @ret0, set=0, binding=1, type="StorageBuffer"
   }
   hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
-  hal.executable.entry_point @add_dispatch_0 attributes {interface = @io, ordinal = 0 : index}
-  builtin.module  {
+  hal.executable.entry_point @add_dispatch_0 interface(@io)
+  builtin.module {
     func @add_dispatch_0() {
       %c0 = arith.constant 0 : index
       %0 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) : !flow.dispatch.tensor<readonly:16384xf32>
@@ -46,8 +46,8 @@ hal.executable @add_dispatch_0 {
 
 hal.executable private @dot_dispatch_1  {
   hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
-    hal.executable.entry_point @dot_dispatch_1 attributes {interface = @legacy_io, ordinal = 0 : index}
-    builtin.module  {
+    hal.executable.entry_point @dot_dispatch_1 interface(@io)
+    builtin.module {
       func @dot_dispatch_1() {
         %c0 = arith.constant 0 : index
         %c4 = arith.constant 4 : index
@@ -105,10 +105,8 @@ hal.executable private @dot_dispatch_1  {
 
 hal.executable @reduction_dispatch {
   hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
-    hal.executable.entry_point @predict_dispatch_153 attributes {
-      interface = @io,
-      ordinal = 0 : index}
-    builtin.module  {
+    hal.executable.entry_point @predict_dispatch_153 interface(@io)
+    builtin.module {
       func @predict_dispatch_153() {
         %c0 = arith.constant 0 : index
         %cst = arith.constant 0x7FC00000 : f32
@@ -147,8 +145,8 @@ hal.executable @reduction_dispatch {
 
 hal.executable @tensor_insert {
   hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
-    hal.executable.entry_point @tensor_insert_slice attributes {interface = @io, ordinal = 0 : index}
-    builtin.module  {
+    hal.executable.entry_point @tensor_insert_slice interface(@io)
+    builtin.module {
       builtin.func @tensor_insert_slice() {
         %c0 = arith.constant 0 : index
         %0 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) : !flow.dispatch.tensor<readonly:?x?xi32>
@@ -197,8 +195,8 @@ hal.executable @tensor_insert {
 
 hal.executable @tensor_insert {
   hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
-    hal.executable.entry_point @tensor_insert_slice attributes {interface = @io, ordinal = 0 : index}
-    builtin.module  {
+    hal.executable.entry_point @tensor_insert_slice interface(@io)
+    builtin.module {
       builtin.func @tensor_insert_slice() {
         %c0 = arith.constant 0 : index
         %d0 = hal.interface.load.constant offset = 0 : index
@@ -253,7 +251,7 @@ hal.executable private @static_1d_fft_stage2  {
     hal.interface.binding @s0b1_rw_external, set=0, binding=1, type="StorageBuffer"
   }
   hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
-    hal.executable.entry_point @static_1d_fft_stage2 attributes {interface = @io, ordinal = 0 : index}
+    hal.executable.entry_point @static_1d_fft_stage2 interface(@io)
     builtin.module {
       builtin.func @static_1d_fft_stage2() {
         %c0 = arith.constant 0 : index
@@ -297,7 +295,7 @@ hal.executable private @static_3d_fft_stage3  {
     hal.interface.binding @s0b1_rw_external, set=0, binding=1, type="StorageBuffer"
   }
   hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
-    hal.executable.entry_point @static_3d_fft_stage3 attributes {interface = @io, ordinal = 0 : index}
+    hal.executable.entry_point @static_3d_fft_stage3 interface(@io)
     builtin.module {
       builtin.func @static_3d_fft_stage3() {
         %c0 = arith.constant 0 : index
@@ -360,8 +358,8 @@ hal.executable private @static_3d_fft_stage3  {
     workgroup_size = [16, 8, 1]>
 hal.executable @user_config {
 hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb"> {
-  hal.executable.entry_point public @_lowering_config_test_dispatch_1 attributes {interface = @io, ordinal = 0 : index}
-  builtin.module  {
+  hal.executable.entry_point public @_lowering_config_test_dispatch_1 interface(@io)
+  builtin.module {
     func @_lowering_config_test_dispatch_1() {
       %cst = arith.constant 0.000000e+00 : f32
       %c128 = arith.constant 128 : index
@@ -423,8 +421,8 @@ hal.executable private @sort_op {
     hal.interface.binding public @s0b3, set=0, binding=3, type="StorageBuffer"
   }
   hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb", {target_arch = "sm_35"}> {
-    hal.executable.entry_point public @sort_op attributes {interface = @io, ordinal = 0 : index}
-    builtin.module  {
+    hal.executable.entry_point public @sort_op interface(@io)
+    builtin.module {
       func @sort_op() {
         %c1 = arith.constant 1 : index
         %c0 = arith.constant 0 : index

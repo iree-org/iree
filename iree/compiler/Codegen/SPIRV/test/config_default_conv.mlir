@@ -25,8 +25,8 @@ hal.executable private @conv_pointwise_112x112x32 {
         max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>,
         subgroup_size = 32 : i32}>
     }> {
-    hal.executable.entry_point public @conv_pointwise_112x112x32 attributes {interface = @io, ordinal = 0 : index}
-    builtin.module  {
+    hal.executable.entry_point public @conv_pointwise_112x112x32 interface(@io)
+    builtin.module {
       func @conv_pointwise_112x112x32() {
         %c0 = arith.constant 0 : index
         %cst = arith.constant 0.000000e+00 : f32

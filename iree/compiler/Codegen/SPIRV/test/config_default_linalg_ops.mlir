@@ -8,8 +8,8 @@ hal.executable @tensor_insert {
         max_compute_workgroup_size = dense<512> : vector<3xi32>,
         subgroup_size = 16 : i32}>
     }> {
-    hal.executable.entry_point @tensor_insert_slice attributes {interface = @io, ordinal = 0 : index}
-    builtin.module  {
+    hal.executable.entry_point @tensor_insert_slice interface(@io)
+    builtin.module {
       builtin.func @tensor_insert_slice() {
         %c0 = arith.constant 0 : index
         %1 = hal.interface.load.constant offset = 0 : index
@@ -59,8 +59,8 @@ hal.executable @tensor_insert {
         max_compute_workgroup_size = dense<512> : vector<3xi32>,
         subgroup_size = 16 : i32}>
     }> {
-    hal.executable.entry_point @tensor_insert_slice attributes {interface = @io, ordinal = 0 : index}
-    builtin.module  {
+    hal.executable.entry_point @tensor_insert_slice interface(@io)
+    builtin.module {
       builtin.func @tensor_insert_slice() {
         %c0 = arith.constant 0 : index
         %d0 = hal.interface.load.constant offset = 0 : index
@@ -117,8 +117,8 @@ hal.executable @tensor_insert {
         max_compute_workgroup_size = dense<512> : vector<3xi32>,
         subgroup_size = 64 : i32}>
     }> {
-    hal.executable.entry_point @copy attributes {interface = @io, ordinal = 0 : index}
-    builtin.module  {
+    hal.executable.entry_point @copy interface(@io)
+    builtin.module {
       builtin.func @copy() {
         %c0 = arith.constant 0 : index
         %c224 = arith.constant 224 : index
@@ -196,8 +196,8 @@ hal.executable @avg_pool {
         max_compute_workgroup_size = dense<512> : vector<3xi32>,
         subgroup_size = 32 : i32}>
     }> {
-    hal.executable.entry_point public @avg_pool attributes {interface = @io, ordinal = 0 : index}
-    builtin.module  {
+    hal.executable.entry_point public @avg_pool interface(@io)
+    builtin.module {
       func @avg_pool() {
         %c0 = arith.constant 0 : index
         %cst = arith.constant 0.000000e+00 : f32
@@ -279,8 +279,8 @@ hal.executable @elementwise {
         max_compute_workgroup_size = dense<512> : vector<3xi32>,
         subgroup_size = 32 : i32}>
     }> {
-    hal.executable.entry_point public @elementwise attributes {interface = @io, ordinal = 0 : index}
-    builtin.module  {
+    hal.executable.entry_point public @elementwise interface(@io)
+    builtin.module {
       func @elementwise() {
         %c0 = arith.constant 0 : index
         %c1 = arith.constant 1 : index

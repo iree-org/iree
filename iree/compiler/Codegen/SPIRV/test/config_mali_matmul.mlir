@@ -15,8 +15,8 @@ hal.executable @matmul_1024x2048x512 {
         max_compute_workgroup_size = dense<512> : vector<3xi32>,
        subgroup_size = 16 : i32}>
     }> {
-    hal.executable.entry_point @matmul_1024x2048x512 attributes {interface = @io, ordinal = 0 : index}
-    builtin.module  {
+    hal.executable.entry_point @matmul_1024x2048x512 interface(@io)
+    builtin.module {
       func @matmul_1024x2048x512() {
         %c0 = arith.constant 0 : index
         %c2048 = arith.constant 2048 : index
@@ -91,8 +91,8 @@ hal.executable @matmul_3136x24x96 {
         max_compute_workgroup_size = dense<512> : vector<3xi32>,
        subgroup_size = 16 : i32}>
     }> {
-    hal.executable.entry_point @matmul_3136x24x96 attributes {interface = @io, ordinal = 0 : index}
-    builtin.module  {
+    hal.executable.entry_point @matmul_3136x24x96 interface(@io)
+    builtin.module {
       func @matmul_3136x24x96() {
         %c0 = arith.constant 0 : index
         %c24 = arith.constant 24 : index
@@ -167,8 +167,8 @@ hal.executable @matmul_196x64x192 {
         max_compute_workgroup_size = dense<512> : vector<3xi32>,
        subgroup_size = 16 : i32}>
     }> {
-    hal.executable.entry_point @matmul_196x64x192 attributes {interface = @io, ordinal = 0 : index}
-    builtin.module  {
+    hal.executable.entry_point @matmul_196x64x192 interface(@io)
+    builtin.module {
       func @matmul_196x64x192() {
         %c0 = arith.constant 0 : index
         %c64 = arith.constant 64 : index
@@ -243,8 +243,8 @@ hal.executable @matmul_12544x96x16 {
         max_compute_workgroup_size = dense<512> : vector<3xi32>,
        subgroup_size = 16 : i32}>
     }> {
-    hal.executable.entry_point @matmul_12544x96x16 attributes {interface = @io, ordinal = 0 : index}
-    builtin.module  {
+    hal.executable.entry_point @matmul_12544x96x16 interface(@io)
+    builtin.module {
       func @matmul_12544x96x16() {
         %c0 = arith.constant 0 : index
         %c96 = arith.constant 96 : index
@@ -314,8 +314,8 @@ hal.executable @matmul_49x160x576 {
         max_compute_workgroup_size = dense<512> : vector<3xi32>,
        subgroup_size = 16 : i32}>
     }> {
-    hal.executable.entry_point @matmul_49x160x576 attributes {interface = @io, ordinal = 0 : index}
-    builtin.module  {
+    hal.executable.entry_point @matmul_49x160x576 interface(@io)
+    builtin.module {
       func @matmul_49x160x576() {
         %c0 = arith.constant 0 : index
         %c160 = arith.constant 160 : index
@@ -388,8 +388,8 @@ hal.executable @batch_matmul_4x384x384 {
         max_compute_workgroup_size = dense<512> : vector<3xi32>,
        subgroup_size = 16 : i32}>
     }> {
-    hal.executable.entry_point @batch_matmul_4x384x384 attributes {interface = @io, ordinal = 0 : index}
-    builtin.module  {
+    hal.executable.entry_point @batch_matmul_4x384x384 interface(@io)
+    builtin.module {
       func @batch_matmul_4x384x384() {
         %c0 = arith.constant 0 : index
         %c384 = arith.constant 384 : index
@@ -474,8 +474,8 @@ hal.executable @batch_matmul_4x2x8 {
         max_compute_workgroup_size = dense<512> : vector<3xi32>,
        subgroup_size = 16 : i32}>
     }> {
-    hal.executable.entry_point @batch_matmul_4x2x8 attributes {interface = @io, ordinal = 0 : index}
-    builtin.module  {
+    hal.executable.entry_point @batch_matmul_4x2x8 interface(@io)
+    builtin.module {
       func @batch_matmul_4x2x8() {
         %c0 = arith.constant 0 : index
         %c8 = arith.constant 8 : index

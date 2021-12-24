@@ -10,7 +10,7 @@ hal.executable private @static_1d_sort  {
         max_compute_workgroup_size = dense<512> : vector<3xi32>,
         subgroup_size = 16 : i32}>
     }> {
-    hal.executable.entry_point @static_1d_sort attributes {interface = @io, ordinal = 0 : index}
+    hal.executable.entry_point @static_1d_sort interface(@io)
     builtin.module {
       builtin.func @static_1d_sort() {
         %c0 = arith.constant 0 : index
@@ -57,7 +57,7 @@ hal.executable private @static_3d_sort  {
         max_compute_workgroup_size = dense<512> : vector<3xi32>,
         subgroup_size = 16 : i32}>
     }> {
-    hal.executable.entry_point @static_3d_sort attributes {interface = @io, ordinal = 0 : index}
+    hal.executable.entry_point @static_3d_sort interface(@io)
     builtin.module {
       builtin.func @static_3d_sort() {
         %c64 = arith.constant 64 : index
@@ -125,7 +125,7 @@ hal.executable private @static_1d_fft_stage2  {
         max_compute_workgroup_size = dense<512> : vector<3xi32>,
         subgroup_size = 16 : i32}>
     }> {
-    hal.executable.entry_point @static_1d_fft_stage2 attributes {interface = @io, ordinal = 0 : index}
+    hal.executable.entry_point @static_1d_fft_stage2 interface(@io)
     builtin.module {
       builtin.func @static_1d_fft_stage2() {
         %c0 = arith.constant 0 : index
@@ -175,7 +175,7 @@ hal.executable private @static_3d_fft_stage3  {
         max_compute_workgroup_size = dense<512> : vector<3xi32>,
         subgroup_size = 16 : i32}>
     }> {
-    hal.executable.entry_point @static_3d_fft_stage3 attributes {interface = @io, ordinal = 0 : index}
+    hal.executable.entry_point @static_3d_fft_stage3 interface(@io)
     builtin.module {
       builtin.func @static_3d_fft_stage3() {
         %c0 = arith.constant 0 : index

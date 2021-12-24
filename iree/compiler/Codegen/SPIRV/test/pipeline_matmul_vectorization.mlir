@@ -13,7 +13,7 @@ hal.executable private @fuse_and_vectorize_fill_matmul  {
         max_compute_workgroup_size = dense<512> : vector<3xi32>,
        subgroup_size = 16 : i32}>
     }> {
-    hal.executable.entry_point @fuse_and_vectorize_fill_matmul attributes {interface = @io, ordinal = 0 : index}
+    hal.executable.entry_point @fuse_and_vectorize_fill_matmul interface(@io)
     builtin.module {
       func @fuse_and_vectorize_fill_matmul() {
         %c0 = arith.constant 0 : index
@@ -77,7 +77,7 @@ hal.executable private @fuse_and_vectorize_matmul_add  {
         max_compute_workgroup_size = dense<512> : vector<3xi32>,
        subgroup_size = 16 : i32}>
     }> {
-    hal.executable.entry_point @fuse_and_vectorize_matmul_add attributes {interface = @io, ordinal = 0 : index}
+    hal.executable.entry_point @fuse_and_vectorize_matmul_add interface(@io)
     builtin.module {
       func @fuse_and_vectorize_matmul_add() {
         %c0 = arith.constant 0 : index
