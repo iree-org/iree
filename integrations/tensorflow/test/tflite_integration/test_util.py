@@ -20,18 +20,20 @@ import time
 import urllib.request
 
 targets = {
-  'dylib' : 'dylib-llvm-aot',
-  'vulkan' : 'vulkan-spirv',
+    'dylib': 'dylib-llvm-aot',
+    'vulkan': 'vulkan-spirv',
 }
 
 configs = {
-  'dylib' : 'dylib',
-  'vulkan' : 'vulkan',
+    'dylib': 'dylib',
+    'vulkan': 'vulkan',
 }
 
 absl.flags.DEFINE_string('config', 'dylib', 'model path to execute')
 
+
 class TFLiteModelTest(testing.absltest.TestCase):
+
   def __init__(self, model_path, *args, **kwargs):
     super(TFLiteModelTest, self).__init__(*args, **kwargs)
     self.model_path = model_path
@@ -54,13 +56,14 @@ class TFLiteModelTest(testing.absltest.TestCase):
   def generate_inputs(self, input_details):
     args = []
     for input in input_details:
-      absl.logging.info("\t%s, %s", str(input["shape"]), input["dtype"].__name__)
+      absl.logging.info("\t%s, %s", str(input["shape"]),
+                        input["dtype"].__name__)
       args.append(np.zeros(shape=input["shape"], dtype=input["dtype"]))
     return args
 
   def compare_results(self, iree_results, tflite_results, details):
-    self.assertEqual(
-      len(iree_results), len(tflite_results), "Number of results do not match")
+    self.assertEqual(len(iree_results), len(tflite_results),
+                     "Number of results do not match")
 
     for i in range(len(details)):
       iree_result = iree_results[i]
@@ -95,8 +98,8 @@ class TFLiteModelTest(testing.absltest.TestCase):
     tflite_results = []
     absl.logging.info(f"Invocation time: {end - start:0.4f} seconds")
     for output_detail in self.output_details:
-      tflite_results.append(np.array(self.tflite_interpreter.get_tensor(
-        output_detail['index'])))
+      tflite_results.append(
+          np.array(self.tflite_interpreter.get_tensor(output_detail['index'])))
 
     for i in range(len(self.output_details)):
       dtype = self.output_details[i]["dtype"]
@@ -118,12 +121,13 @@ class TFLiteModelTest(testing.absltest.TestCase):
 
     absl.logging.info("Setting up for IREE")
     iree_tflite_compile.compile_file(
-      self.tflite_file, input_type="tosa",
-      output_file=self.binary,
-      save_temp_tfl_input=self.tflite_ir,
-      save_temp_iree_input=self.iree_ir,
-      target_backends=[targets[absl.flags.FLAGS.config]],
-      import_only=False)
+        self.tflite_file,
+        input_type="tosa",
+        output_file=self.binary,
+        save_temp_tfl_input=self.tflite_ir,
+        save_temp_iree_input=self.iree_ir,
+        target_backends=[targets[absl.flags.FLAGS.config]],
+        import_only=False)
 
     self.setup_tflite()
     self.setup_iree()
@@ -142,6 +146,5 @@ class TFLiteModelTest(testing.absltest.TestCase):
     for i in range(len(self.output_details)):
       dtype = self.output_details[i]["dtype"]
       iree_results[i] = iree_results[i].astype(dtype)
-
 
     self.compare_results(iree_results, tflite_results, self.output_details)
