@@ -300,17 +300,21 @@ void iree_thread_request_affinity(iree_thread_t* thread,
   if (!affinity.specified) return;
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  // NOTE: Android uses Linux lightweight processes (LWP) for threads, so the
-  // pid is really the tid. This is *not* anything related to pthreads_self.
-  pid_t tid = gettid();
-
   cpu_set_t cpu_set;
   CPU_ZERO(&cpu_set);
   CPU_SET(affinity.id, &cpu_set);
   if (affinity.smt) {
     CPU_SET(affinity.id + 1, &cpu_set);
   }
+
+#if defined(IREE_PLATFORM_ANDROID)
+  // Android doesn't have pthread_setaffinity_np but that's usually just
+  // implemented as this sequence anyway:
+  pid_t tid = pthread_gettid_np(thread->handle);
   sched_setaffinity(tid, sizeof(cpu_set), &cpu_set);
+#else
+  pthread_setaffinity_np(thread->handle, sizeof(cpu_set), &cpu_set);
+#endif  // IREE_PLATFORM_ANDROID
 
   IREE_TRACE_ZONE_END(z0);
 }
