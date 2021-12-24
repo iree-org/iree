@@ -86,13 +86,13 @@ static HighLevelOptimizationOptions getHighLevelOptimizationOptionsFromFlags() {
       "iree-const-eval",
       llvm::cl::desc("Enables eager evaluation of constants using the full "
                      "compiler and runtime"),
-      llvm::cl::init(false), llvm::cl::cat(category)};
+      llvm::cl::init(true), llvm::cl::cat(category)};
   static llvm::cl::opt<bool> *constExprHoisting = new llvm::cl::opt<bool>{
       "iree-const-expr-hoisting",
       llvm::cl::desc(
           "Hoists the results of latent constant expressions into immutable "
           "global initializers for evaluation at program load"),
-      llvm::cl::init(false), llvm::cl::cat(category)};
+      llvm::cl::init(true), llvm::cl::cat(category)};
 
   HighLevelOptimizationOptions options;
   options.constEval = *constEval;
