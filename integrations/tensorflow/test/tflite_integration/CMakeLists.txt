@@ -4,5 +4,17 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-add_subdirectory(tf_integration)
-add_subdirectory(tflite_integration)
+
+iree_py_library(
+  NAME
+    test_util
+  SRCS
+    "test_util.py"
+)
+
+iree_py_test (
+  NAME
+    mobilenet_v1
+  SRCS
+    "mobilenet_v1_test.py"
+)
