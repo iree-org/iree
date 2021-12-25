@@ -153,7 +153,7 @@ static void convertOperandUsage(mlir::FuncOp sourceFuncOp, BlockArgument arg,
       arg.getArgNumber(), "stream.alignment");
   auto valuesAttr = sourceFuncOp.getArgAttrOfType<ArrayAttr>(arg.getArgNumber(),
                                                              "stream.values");
-  auto loadOp = builder.create<IREE::HAL::InterfaceLoadConstantOp>(
+  auto loadOp = builder.create<IREE::HAL::InterfaceConstantLoadOp>(
       arg.getLoc(), arg.getType(), builder.getIndexAttr(pushConstantIdx),
       alignmentAttr, valuesAttr);
   arg.replaceAllUsesWith(loadOp);

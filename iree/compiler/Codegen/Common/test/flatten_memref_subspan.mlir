@@ -60,7 +60,7 @@ func @load_subspan_with_16bit_element(%offset : index, %i0: index, %i1: index, %
 // -----
 
 func @store_subspan_with_leading_dynamic_dim(%value: f32, %offset : index, %i0: index, %i1: index, %i2: index) {
-  %dim = hal.interface.load.constant offset = 0 : index
+  %dim = hal.interface.constant.load offset = 0 : index
   %subspan = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) offset(%offset) : memref<?x3x4xf32>{%dim}
   memref.store %value, %subspan[%i0, %i1, %i2] : memref<?x3x4xf32>
   return
@@ -71,7 +71,7 @@ func @store_subspan_with_leading_dynamic_dim(%value: f32, %offset : index, %i0: 
 //      CHECK: func @store_subspan_with_leading_dynamic_dim
 // CHECK-SAME: (%[[VALUE:.+]]: f32, %[[OFFSET:.+]]: index, %[[I0:.+]]: index, %[[I1:.+]]: index, %[[I2:.+]]: index)
 //      CHECK:   %[[C0:.+]] = arith.constant 0 : index
-//      CHECK:   %[[DIM:.+]] = hal.interface.load.constant offset = 0 : index
+//      CHECK:   %[[DIM:.+]] = hal.interface.constant.load offset = 0 : index
 //      CHECK:   %[[SIZE:.+]] = affine.apply #[[SIZE_MAP]]()[%[[DIM]]]
 //      CHECK:   %[[DST:.+]] = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) offset(%[[C0]]) : memref<?xf32>{%[[SIZE]]}
 //      CHECK:   %[[INDEX:.+]] = affine.apply #[[OFFSET_MAP]]()[%[[I0]], %[[I1]], %[[I2]], %[[OFFSET]]]
@@ -80,10 +80,10 @@ func @store_subspan_with_leading_dynamic_dim(%value: f32, %offset : index, %i0: 
 // -----
 
 func @store_subspan_with_all_dynamic_dim(%value: f32, %offset : index, %i0: index, %i1: index, %i2: index, %i3: index) {
-  %dim0 = hal.interface.load.constant offset = 0 : index
-  %dim1 = hal.interface.load.constant offset = 1 : index
-  %dim2 = hal.interface.load.constant offset = 2 : index
-  %dim3 = hal.interface.load.constant offset = 3 : index
+  %dim0 = hal.interface.constant.load offset = 0 : index
+  %dim1 = hal.interface.constant.load offset = 1 : index
+  %dim2 = hal.interface.constant.load offset = 2 : index
+  %dim3 = hal.interface.constant.load offset = 3 : index
   %subspan = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) offset(%offset) : memref<?x?x?x?xf32>{%dim0, %dim1, %dim2, %dim3}
   memref.store %value, %subspan[%i0, %i1, %i2, %i3] : memref<?x?x?x?xf32>
   return
@@ -94,10 +94,10 @@ func @store_subspan_with_all_dynamic_dim(%value: f32, %offset : index, %i0: inde
 //      CHECK: func @store_subspan_with_all_dynamic_dim
 // CHECK-SAME: (%[[VALUE:.+]]: f32, %[[OFFSET:.+]]: index, %[[I0:.+]]: index, %[[I1:.+]]: index, %[[I2:.+]]: index, %[[I3:.+]]: index)
 //      CHECK:   %[[C0:.+]] = arith.constant 0 : index
-//      CHECK:   %[[DIM0:.+]] = hal.interface.load.constant offset = 0 : index
-//      CHECK:   %[[DIM1:.+]] = hal.interface.load.constant offset = 1 : index
-//      CHECK:   %[[DIM2:.+]] = hal.interface.load.constant offset = 2 : index
-//      CHECK:   %[[DIM3:.+]] = hal.interface.load.constant offset = 3 : index
+//      CHECK:   %[[DIM0:.+]] = hal.interface.constant.load offset = 0 : index
+//      CHECK:   %[[DIM1:.+]] = hal.interface.constant.load offset = 1 : index
+//      CHECK:   %[[DIM2:.+]] = hal.interface.constant.load offset = 2 : index
+//      CHECK:   %[[DIM3:.+]] = hal.interface.constant.load offset = 3 : index
 //      CHECK:   %[[SIZE:.+]] = affine.apply #[[SIZE_MAP]]()[%[[DIM0]], %[[DIM1]], %[[DIM2]], %[[DIM3]]]
 //      CHECK:   %[[DST:.+]] = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) offset(%[[C0]]) : memref<?xf32>{%[[SIZE]]}
 //      CHECK:   %[[INDEX:.+]] = affine.apply #[[OFFSET_MAP]]()[%[[DIM3]], %[[I3]], %[[DIM2]], %[[I2]], %[[I0]], %[[DIM1]], %[[I1]], %[[OFFSET]]]
@@ -106,8 +106,8 @@ func @store_subspan_with_all_dynamic_dim(%value: f32, %offset : index, %i0: inde
 // -----
 
 func @store_subspan_with_mixed_dynamic_dim(%value: f32, %offset : index, %i0: index, %i1: index, %i2: index, %i3: index) {
-  %dim0 = hal.interface.load.constant offset = 0 : index
-  %dim1 = hal.interface.load.constant offset = 1 : index
+  %dim0 = hal.interface.constant.load offset = 0 : index
+  %dim1 = hal.interface.constant.load offset = 1 : index
   %subspan = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) offset(%offset) : memref<?x4x?x8xf32>{%dim0, %dim1}
   memref.store %value, %subspan[%i0, %i1, %i2, %i3] : memref<?x4x?x8xf32>
   return
@@ -118,8 +118,8 @@ func @store_subspan_with_mixed_dynamic_dim(%value: f32, %offset : index, %i0: in
 //      CHECK: func @store_subspan_with_mixed_dynamic_dim
 // CHECK-SAME: (%[[VALUE:.+]]: f32, %[[OFFSET:.+]]: index, %[[I0:.+]]: index, %[[I1:.+]]: index, %[[I2:.+]]: index, %[[I3:.+]]: index)
 //      CHECK:   %[[C0:.+]] = arith.constant 0 : index
-//      CHECK:   %[[DIM0:.+]] = hal.interface.load.constant offset = 0 : index
-//      CHECK:   %[[DIM2:.+]] = hal.interface.load.constant offset = 1 : index
+//      CHECK:   %[[DIM0:.+]] = hal.interface.constant.load offset = 0 : index
+//      CHECK:   %[[DIM2:.+]] = hal.interface.constant.load offset = 1 : index
 //      CHECK:   %[[SIZE:.+]] = affine.apply #[[SIZE_MAP]]()[%[[DIM0]], %[[DIM2]]]
 //      CHECK:   %[[DST:.+]] = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) offset(%[[C0]]) : memref<?xf32>{%[[SIZE]]}
 //      CHECK:   %[[INDEX:.+]] = affine.apply #[[OFFSET_MAP]]()[%[[I3]], %[[DIM2]], %[[I2]], %[[I0]], %[[I1]], %[[OFFSET]]]
@@ -128,7 +128,7 @@ func @store_subspan_with_mixed_dynamic_dim(%value: f32, %offset : index, %i0: in
 // -----
 
 func @store_subspan_with_flow_control(%value: f32, %offset : index, %i0: index, %i1: index, %i2: index) {
-  %dim = hal.interface.load.constant offset = 0 : index
+  %dim = hal.interface.constant.load offset = 0 : index
   %subspan = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) offset(%offset) : memref<?x3x4xf32>{%dim}
   scf.for %i = %i0 to %i1 step %i2 {
     memref.store %value, %subspan[%i0, %i1, %i2] : memref<?x3x4xf32>
@@ -141,7 +141,7 @@ func @store_subspan_with_flow_control(%value: f32, %offset : index, %i0: index, 
 //      CHECK: func @store_subspan_with_flow_control
 // CHECK-SAME: (%[[VALUE:.+]]: f32, %[[OFFSET:.+]]: index, %[[I0:.+]]: index, %[[I1:.+]]: index, %[[I2:.+]]: index)
 //      CHECK:   %[[C0:.+]] = arith.constant 0 : index
-//      CHECK:   %[[DIM:.+]] = hal.interface.load.constant offset = 0 : index
+//      CHECK:   %[[DIM:.+]] = hal.interface.constant.load offset = 0 : index
 //      CHECK:   %[[SIZE:.+]] = affine.apply #[[SIZE_MAP]]()[%[[DIM]]]
 //      CHECK:   %[[DST:.+]] = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) offset(%[[C0]]) : memref<?xf32>{%[[SIZE]]}
 //      CHECK: scf.for

@@ -1907,7 +1907,7 @@ def HAL_InterfaceWorkgroupSizeOp : HAL_PureOp<"interface.workgroup.size", [
   }];
 }
 
-def HAL_InterfaceLoadConstantOp : HAL_PureOp<"interface.load.constant"> {
+def HAL_InterfaceConstantLoadOp : HAL_PureOp<"interface.constant.load"> {
   let summary = [{loads a constant value from the interface constant block}];
   let description = [{
     Loads a scalar constant value from an executable IO push constant block.

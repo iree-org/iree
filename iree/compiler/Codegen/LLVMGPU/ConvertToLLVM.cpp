@@ -172,7 +172,7 @@ class ConvertFunc : public ConvertToLLVMPattern {
     // As a convention with HAL, push constants are appended as kernel arguments
     // after all the binding inputs.
     uint64_t numConstants = 0;
-    funcOp.walk([&](IREE::HAL::InterfaceLoadConstantOp constantOp) {
+    funcOp.walk([&](IREE::HAL::InterfaceConstantLoadOp constantOp) {
       numConstants =
           std::max(constantOp.offset().getZExtValue() + 1, numConstants);
     });
@@ -304,7 +304,7 @@ class ConvertIREEConstantOp : public ConvertToLLVMPattern {
   explicit ConvertIREEConstantOp(MLIRContext *context,
                                  LLVMTypeConverter &converter)
       : ConvertToLLVMPattern(
-            IREE::HAL::InterfaceLoadConstantOp::getOperationName(), context,
+            IREE::HAL::InterfaceConstantLoadOp::getOperationName(), context,
             converter) {}
   LogicalResult matchAndRewrite(
       Operation *op, ArrayRef<Value> operands,
@@ -315,7 +315,7 @@ class ConvertIREEConstantOp : public ConvertToLLVMPattern {
     assert(llvmFuncOp.getNumArguments() > 0);
 
     auto argMapping = getKernelArgMapping(llvmFuncOp);
-    auto ireeConstantOp = cast<IREE::HAL::InterfaceLoadConstantOp>(op);
+    auto ireeConstantOp = cast<IREE::HAL::InterfaceConstantLoadOp>(op);
     mlir::BlockArgument llvmBufferArg = llvmFuncOp.getArgument(
         argMapping.size() + ireeConstantOp.offset().getZExtValue());
     assert(llvmBufferArg.getType().isInteger(32));

@@ -12,8 +12,8 @@ hal.executable @tensor_insert {
     builtin.module {
       builtin.func @tensor_insert_slice() {
         %c0 = arith.constant 0 : index
-        %1 = hal.interface.load.constant offset = 0 : index
-        %2 = hal.interface.load.constant offset = 1 : index
+        %1 = hal.interface.constant.load offset = 0 : index
+        %2 = hal.interface.constant.load offset = 1 : index
         %0 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) : !flow.dispatch.tensor<readonly:?x?xi32>{%1, %2}
         %3 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(1) : !flow.dispatch.tensor<writeonly:?x?xi32>{%1, %2}
         %workgroup_size_x = hal.interface.workgroup.size[0] : index
@@ -24,8 +24,8 @@ hal.executable @tensor_insert {
         %workgroup_count_y = hal.interface.workgroup.count[1] : index
         %4 = affine.apply affine_map<()[s0, s1] -> (s1 * s0)>()[%workgroup_size_y, %workgroup_id_y]
         %5 = affine.apply affine_map<()[s0, s1] -> (s1 * s0)>()[%workgroup_size_y, %workgroup_count_y]
-        %d0 = hal.interface.load.constant offset = 2 : index
-        %d1 = hal.interface.load.constant offset = 2 : index
+        %d0 = hal.interface.constant.load offset = 2 : index
+        %d1 = hal.interface.constant.load offset = 2 : index
         scf.for %arg0 = %4 to %d0 step %5 {
           %6 = affine.min affine_map<(d0)[s0, s1] -> (s0, -d0 + s1)>(%arg0)[%workgroup_size_y, %d0]
           %7 = affine.apply affine_map<()[s0, s1] -> (s1 * s0)>()[%workgroup_size_x, %workgroup_id_x]
@@ -63,8 +63,8 @@ hal.executable @tensor_insert {
     builtin.module {
       builtin.func @tensor_insert_slice() {
         %c0 = arith.constant 0 : index
-        %d0 = hal.interface.load.constant offset = 0 : index
-        %d1 = hal.interface.load.constant offset = 1 : index
+        %d0 = hal.interface.constant.load offset = 0 : index
+        %d1 = hal.interface.constant.load offset = 1 : index
         %0 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) : memref<?x?xi32>{%d0, %d1}
         %1 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(1) : memref<?x?xi32>{%d0, %d1}
         %workgroup_size_x = hal.interface.workgroup.size[0] : index
