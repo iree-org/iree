@@ -41,9 +41,9 @@ func @dont_fold_reshape_with_not_full_load() {
 func @dont_fold_dynamic_reshape() {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
-  %dim0 = hal.interface.constant.load offset = 0 : index
-  %dim1 = hal.interface.constant.load offset = 1 : index
-  %dim2 = hal.interface.constant.load offset = 2 : index
+  %dim0 = hal.interface.constant.load[0] : index
+  %dim1 = hal.interface.constant.load[1] : index
+  %dim2 = hal.interface.constant.load[2] : index
   %1 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) : !flow.dispatch.tensor<readonly:?x?x96xf32>{%dim0, %dim1}
   %2 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) : !flow.dispatch.tensor<writeonly:?x12x8xf32>{%dim2}
   %3 = flow.dispatch.tensor.load %1, offsets=[], sizes =[], strides=[] : !flow.dispatch.tensor<readonly:?x?x96xf32> -> tensor<?x?x96xf32>

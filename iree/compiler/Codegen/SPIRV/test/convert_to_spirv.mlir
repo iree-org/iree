@@ -20,7 +20,7 @@ hal.executable private @push_constant  {
         // CHECK: %[[ADDR:.+]] = spv.mlir.addressof @__push_constant_var__ : !spv.ptr<!spv.struct<(!spv.array<5 x i32, stride=4> [0])>, PushConstant>
         // CHECK: %[[AC:.+]] = spv.AccessChain %[[ADDR]][%[[INDEX_0]], %[[INDEX_1]]] : !spv.ptr<!spv.struct<(!spv.array<5 x i32, stride=4> [0])>, PushConstant>
         // CHECK: spv.Load "PushConstant" %[[AC]] : i32
-        %0 = hal.interface.constant.load offset = 2 : index
+        %0 = hal.interface.constant.load[2] : index
         return
       }
 

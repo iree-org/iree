@@ -188,10 +188,10 @@ class ConvertHALInterfaceConstantLoadOp
 
     auto resultType = getTypeConverter()->convertType(op.result().getType());
 
-    auto constantOrdinal = rewriter.createOrFold<arith::ConstantIndexOp>(
-        op.getLoc(), op.offset().getZExtValue());
+    auto constantIndex = rewriter.createOrFold<arith::ConstantIndexOp>(
+        op.getLoc(), op.index().getZExtValue());
     auto loadedValue = rewriter.createOrFold<memref::LoadOp>(
-        op.getLoc(), constantType, constantsArg, ValueRange{constantOrdinal});
+        op.getLoc(), constantType, constantsArg, ValueRange{constantIndex});
     rewriter.replaceOpWithNewOp<arith::IndexCastOp>(op, loadedValue,
                                                     resultType);
     return success();

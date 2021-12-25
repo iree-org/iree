@@ -1927,7 +1927,7 @@ def HAL_InterfaceConstantLoadOp : HAL_PureOp<"interface.constant.load"> {
   }];
 
   let arguments = (ins
-    HAL_HostSizeAttr:$offset,
+    HAL_HostSizeAttr:$index,
     OptionalAttr<IndexAttr>:$alignment,
     OptionalAttr<ArrayAttr>:$values
   );
@@ -1936,7 +1936,10 @@ def HAL_InterfaceConstantLoadOp : HAL_PureOp<"interface.constant.load"> {
   );
 
   let assemblyFormat = [{
-    `offset` `=` $offset attr-dict `:` type($result)
+    `` `[` $index `]`
+    (`alignment` `(` $alignment^ `)`)?
+    (`values` `(` $values^ `)`)?
+    attr-dict `:` type($result)
   }];
 }
 

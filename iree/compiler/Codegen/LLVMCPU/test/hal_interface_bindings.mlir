@@ -13,7 +13,7 @@ func @binding_ptrs() {
   // CHECK: %[[DIM_PTR:.+]] = llvm.getelementptr %[[PC]][%[[C2]]] : (!llvm.ptr<i32>, i64) -> !llvm.ptr<i32>
   // CHECK: %[[DIM_I32:.+]] = llvm.load %[[DIM_PTR]] : !llvm.ptr<i32>
   // CHECK: %[[DIM:.+]] = llvm.zext %[[DIM_I32]] : i32 to i64
-  %dim = hal.interface.constant.load offset = 2 : index
+  %dim = hal.interface.constant.load[2] : index
 
   // CHECK: %[[STATE:.+]] = llvm.load %arg0 : !llvm.ptr<struct<[[DISPATCH_STATE_TYPE]]>>
   // CHECK: %[[BINDING_PTRS:.+]] = llvm.extractvalue %[[STATE]][5] : !llvm.struct<[[DISPATCH_STATE_TYPE]]>

@@ -174,7 +174,7 @@ class ConvertFunc : public ConvertToLLVMPattern {
     uint64_t numConstants = 0;
     funcOp.walk([&](IREE::HAL::InterfaceConstantLoadOp constantOp) {
       numConstants =
-          std::max(constantOp.offset().getZExtValue() + 1, numConstants);
+          std::max(constantOp.index().getZExtValue() + 1, numConstants);
     });
     llvmInputTypes.resize(argMapping.size() + numConstants,
                           rewriter.getI32Type());
@@ -317,7 +317,7 @@ class ConvertIREEConstantOp : public ConvertToLLVMPattern {
     auto argMapping = getKernelArgMapping(llvmFuncOp);
     auto ireeConstantOp = cast<IREE::HAL::InterfaceConstantLoadOp>(op);
     mlir::BlockArgument llvmBufferArg = llvmFuncOp.getArgument(
-        argMapping.size() + ireeConstantOp.offset().getZExtValue());
+        argMapping.size() + ireeConstantOp.index().getZExtValue());
     assert(llvmBufferArg.getType().isInteger(32));
     Type dstType = getTypeConverter()->convertType(ireeConstantOp.getType());
     rewriter.replaceOpWithNewOp<LLVM::ZExtOp>(op, dstType, llvmBufferArg);

@@ -568,10 +568,10 @@ class ConvertHALInterfaceLoadConstant : public ConvertToLLVMPattern {
     if (!llvmFuncOp) return failure();
     HALDispatchABI abi(llvmFuncOp, getTypeConverter());
     auto loadConstantOp = cast<IREE::HAL::InterfaceConstantLoadOp>(op);
-    int64_t offset = loadConstantOp.offset().getZExtValue();
+    int64_t index = loadConstantOp.index().getZExtValue();
     auto resultType = typeConverter->convertType(op->getResult(0).getType());
     rewriter.replaceOp(
-        op, abi.loadPushConstant(op->getLoc(), offset, resultType, rewriter));
+        op, abi.loadPushConstant(op->getLoc(), index, resultType, rewriter));
     return success();
   }
 };

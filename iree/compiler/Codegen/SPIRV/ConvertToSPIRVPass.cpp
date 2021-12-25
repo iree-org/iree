@@ -173,12 +173,12 @@ struct HALInterfaceLoadConstantConverter final
 
     uint64_t elementCount =
         (*halInterfaceOps.front().push_constants()).getZExtValue();
-    unsigned offset = loadOp.offset().getZExtValue();
+    unsigned index = loadOp.index().getZExtValue();
 
     // The following function generates SPIR-V ops with i32 types. So it does
     // type "conversion" (index -> i32) implicitly.
     auto i32Type = rewriter.getIntegerType(32);
-    auto value = spirv::getPushConstantValue(loadOp, elementCount, offset,
+    auto value = spirv::getPushConstantValue(loadOp, elementCount, index,
                                              i32Type, rewriter);
 
     rewriter.replaceOp(loadOp, value);

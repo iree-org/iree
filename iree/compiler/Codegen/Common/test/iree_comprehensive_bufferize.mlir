@@ -2,9 +2,9 @@
 
 func @matmul() {
   %c0 = arith.constant 0 : index
-  %m = hal.interface.constant.load offset = 0 : index
-  %n = hal.interface.constant.load offset = 1 : index
-  %k = hal.interface.constant.load offset = 2 : index
+  %m = hal.interface.constant.load[0] : index
+  %n = hal.interface.constant.load[1] : index
+  %k = hal.interface.constant.load[2] : index
   %lhs = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) : !flow.dispatch.tensor<readonly:?x?xf32>{%m, %k}
   %rhs = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(1) : !flow.dispatch.tensor<readonly:?x?xf32>{%k, %n}
   %init = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(2) : !flow.dispatch.tensor<readonly:?x?xf32>{%m, %n}
@@ -37,9 +37,9 @@ func @matmul() {
 //  CHECK-DAG: #[[MAP1:.+]] = affine_map<(d0)[s0, s1] -> (s0, -d0 + s1)>
 //  CHECK-DAG: #[[MAP2:.+]] = affine_map<(d0, d1)[s0, s1] -> (d0 * s1 + s0 + d1)>
 //      CHECK: func @matmul()
-//  CHECK-DAG:   %[[M:.+]] = hal.interface.constant.load offset = 0
-//  CHECK-DAG:   %[[N:.+]] = hal.interface.constant.load offset = 1
-//  CHECK-DAG:   %[[K:.+]] = hal.interface.constant.load offset = 2
+//  CHECK-DAG:   %[[M:.+]] = hal.interface.constant.load[0]
+//  CHECK-DAG:   %[[N:.+]] = hal.interface.constant.load[1]
+//  CHECK-DAG:   %[[K:.+]] = hal.interface.constant.load[2]
 //  CHECK-DAG:   %[[LHS:.+]] = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0)
 //  CHECK-DAG:   %[[RHS:.+]] = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(1)
 //  CHECK-DAG:   %[[INIT:.+]] = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(2)
@@ -76,9 +76,9 @@ func @matmul() {
 func @matmul_fill() {
   %cst = arith.constant 0.0 : f32
   %c0 = arith.constant 0 : index
-  %m = hal.interface.constant.load offset = 0 : index
-  %n = hal.interface.constant.load offset = 1 : index
-  %k = hal.interface.constant.load offset = 2 : index
+  %m = hal.interface.constant.load[0] : index
+  %n = hal.interface.constant.load[1] : index
+  %k = hal.interface.constant.load[2] : index
   %lhs = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) : !flow.dispatch.tensor<readonly:?x?xf32>{%m, %k}
   %rhs = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(1) : !flow.dispatch.tensor<readonly:?x?xf32>{%k, %n}
   %result = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(2) : !flow.dispatch.tensor<readwrite:?x?xf32>{%m, %n}
@@ -111,9 +111,9 @@ func @matmul_fill() {
 //  CHECK-DAG: #[[MAP1:.+]] = affine_map<(d0)[s0, s1] -> (s0, -d0 + s1)>
 //      CHECK: func @matmul_fill()
 //  CHECK-DAG:   %[[CST:.+]] = arith.constant 0.000000e+00 : f32
-//  CHECK-DAG:   %[[M:.+]] = hal.interface.constant.load offset = 0
-//  CHECK-DAG:   %[[N:.+]] = hal.interface.constant.load offset = 1
-//  CHECK-DAG:   %[[K:.+]] = hal.interface.constant.load offset = 2
+//  CHECK-DAG:   %[[M:.+]] = hal.interface.constant.load[0]
+//  CHECK-DAG:   %[[N:.+]] = hal.interface.constant.load[1]
+//  CHECK-DAG:   %[[K:.+]] = hal.interface.constant.load[2]
 //  CHECK-DAG:   %[[LHS:.+]] = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0)
 //  CHECK-DAG:   %[[RHS:.+]] = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(1)
 //  CHECK-DAG:   %[[RESULT:.+]] = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(2)
