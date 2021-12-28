@@ -1,5 +1,3 @@
-// Tests printing and parsing of comparison ops.
-
 // RUN: iree-opt -split-input-file %s | IreeFileCheck %s
 
 // CHECK-LABEL: @cmp_eq_i32

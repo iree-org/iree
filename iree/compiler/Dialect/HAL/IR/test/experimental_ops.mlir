@@ -1,5 +1,3 @@
-// Tests printing and parsing of experimental ops.
-
 // RUN: iree-opt -allow-unregistered-dialect -split-input-file %s | iree-opt -allow-unregistered-dialect -split-input-file | IreeFileCheck %s
 
 // CHECK-LABEL: @shared_device
