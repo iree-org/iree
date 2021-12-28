@@ -54,6 +54,56 @@ module @do_not_hoist_variable_operands {
 }
 
 // -----
+// CHECK-LABEL: @do_not_hoist_sub_byte_aligned_scalar_leaf
+// CHECK-NOT: util.global
+// CHECK-NOT: util.initializer
+module @do_not_hoist_sub_byte_aligned_scalar_leaf {
+  builtin.func @main() -> (i32) {
+    %0 = arith.constant 1 : i1
+    %2 = "iree_unregistered.var_expr"(%0) : (i1) -> i32
+    return %2 : i32
+  }
+}
+
+// -----
+// CHECK-LABEL: @do_not_hoist_sub_byte_aligned_tensor_leaf
+// CHECK-NOT: util.global
+// CHECK-NOT: util.initializer
+module @do_not_hoist_sub_byte_aligned_tensor_leaf {
+  builtin.func @main() -> (i32) {
+    %0 = arith.constant dense<true> : tensor<i1>
+    %2 = "iree_unregistered.var_expr"(%0) : (tensor<i1>) -> i32
+    return %2 : i32
+  }
+}
+
+// -----
+// CHECK-LABEL: @hoist_sub_byte_aligned_scalar_transitive
+// CHECK: util.global private {{.*}} : i32
+// Can hoist a const-expr tree that transitively includes sub-byte aligned
+// values.
+module @hoist_sub_byte_aligned_scalar_transitive {
+  builtin.func @main() -> (i32) {
+    %0 = arith.constant 1 : i1
+    %2 = "iree_unregistered.const_expr"(%0) : (i1) -> i32
+    return %2 : i32
+  }
+}
+
+// -----
+// CHECK-LABEL: @hoist_sub_byte_aligned_tensor_transitive
+// CHECK: util.global private {{.*}} : i32
+// Can hoist a const-expr tree that transitively includes sub-byte aligned
+// values.
+module @hoist_sub_byte_aligned_tensor_transitive {
+  builtin.func @main() -> (i32) {
+    %0 = arith.constant dense<true> : tensor<i1>
+    %2 = "iree_unregistered.const_expr"(%0) : (tensor<i1>) -> i32
+    return %2 : i32
+  }
+}
+
+// -----
 // Tests a const-expr tree with multiple uses at different levels.
 // CHECK-LABEL: @hoist_tree_const_expr
 module @hoist_tree_const_expr {
