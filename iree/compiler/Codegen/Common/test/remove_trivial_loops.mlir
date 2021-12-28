@@ -4,10 +4,9 @@
 // CHECK-LABEL: func @dispatch_0()
 hal.executable private @dispatch_0  {
   hal.executable.variant @cuda, target = #hal.executable.target<"cuda", "cuda-nvptx-fb"> {
-    hal.executable.entry_point @dispatch_0 attributes {
-      interface = @io,
-      ordinal = 0 : index,
-      workgroup_size = [64: index, 1: index, 1:index]}
+    hal.executable.entry_point @dispatch_0 interface(@io) {
+      workgroup_size = [64: index, 1: index, 1:index]
+    }
     builtin.module {
       builtin.func @dispatch_0() {
         %c2 = arith.constant 2 : index
@@ -45,9 +44,7 @@ hal.executable private @dispatch_0  {
 #translation = #iree_codegen.translation.info<"LLVMGPUDistribute", workload_per_wg = [32]>
 hal.executable private @workgroup_tile_loop  {
   hal.executable.variant @cuda, target = #hal.executable.target<"cuda", "cuda-nvptx-fb"> {
-    hal.executable.entry_point @workgroup_tile_loop attributes {
-      interface = @io,
-      ordinal = 0 : index,
+    hal.executable.entry_point @workgroup_tile_loop interface(@io) {
       translation.info = #translation
     }
     builtin.module {
@@ -75,9 +72,7 @@ hal.executable private @workgroup_tile_loop  {
 #translation = #iree_codegen.translation.info<"LLVMGPUDistribute", workload_per_wg = [16]>
 hal.executable private @workgroup_tile_loop_negative  {
   hal.executable.variant @cuda, target = #hal.executable.target<"cuda", "cuda-nvptx-fb"> {
-    hal.executable.entry_point @workgroup_tile_loop_negative attributes {
-      interface = @io,
-      ordinal = 0 : index,
+    hal.executable.entry_point @workgroup_tile_loop_negative interface(@io) {
       translation.info = #translation
     }
     builtin.module {
@@ -107,8 +102,7 @@ hal.executable private @workgroup_tile_loop_negative  {
 #translation = #iree_codegen.translation.info<"LLVMGPUDistribute", workload_per_wg = [32, 8, 1]>
 hal.executable private @both_workgroup_and_workitem  {
   hal.executable.variant @cuda, target = #hal.executable.target<"cuda", "cuda-nvptx-fb"> {
-    hal.executable.entry_point @both_workgroup_and_workitem attributes {
-      interface = @io, ordinal = 0 : index,
+    hal.executable.entry_point @both_workgroup_and_workitem interface(@io) {
       translation.info = #translation,
       workgroup_size = [8: index, 2: index, 1: index]
     }

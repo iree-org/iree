@@ -112,6 +112,8 @@ class TestLLVMGPULegalizeOpPass
   }
 };
 
+using SetBinding = std::pair<APInt, APInt>;
+
 /// Convention with the HAL side to pass kernel arguments.
 /// The bindings are ordered based on binding set and binding index then
 /// compressed and mapped to dense set of arguments.
@@ -119,33 +121,20 @@ class TestLLVMGPULegalizeOpPass
 /// InterfaceBindingOp and kernel argument index.
 /// For instance if the kernel has (set, bindings) A(0, 1), B(1, 5), C(0, 6) it
 /// will return the mapping [A, 0], [C, 1], [B, 2]
-static llvm::SmallDenseMap<Operation *, size_t> getKernelArgMapping(
-    Operation *func) {
-  llvm::SmallDenseMap<Operation *, size_t> mapBindingArgIndex;
-  llvm::SmallVector<IREE::HAL::InterfaceBindingOp> bindingUsed;
-  Operation *symbolTableOp = SymbolTable::getNearestSymbolTable(func);
-  SymbolTable::walkSymbolTables(symbolTableOp, true, [&](Operation *op, bool) {
-    if (auto interface = dyn_cast<IREE::HAL::InterfaceOp>(op)) {
-      interface.walk([&](Operation *symbolOp) {
-        if (auto binding = dyn_cast<IREE::HAL::InterfaceBindingOp>(symbolOp)) {
-          bindingUsed.push_back(binding);
-        }
-      });
-    }
+static llvm::SmallDenseMap<SetBinding, size_t> getKernelArgMapping(
+    Operation *funcOp) {
+  llvm::SetVector<SetBinding> usedBindingSet;
+  funcOp->walk([&](IREE::HAL::InterfaceBindingSubspanOp subspanOp) {
+    usedBindingSet.insert(SetBinding(subspanOp.set(), subspanOp.binding()));
   });
-
-  std::sort(bindingUsed.begin(), bindingUsed.end(),
-            [](IREE::HAL::InterfaceBindingOp bindingA,
-               IREE::HAL::InterfaceBindingOp bindingB) {
-              uint64_t bindingAIndex = bindingA.binding().getZExtValue();
-              uint64_t bindingASet = bindingA.set().getZExtValue();
-              uint64_t bindingBIndex = bindingB.binding().getZExtValue();
-              uint64_t bindingBSet = bindingB.set().getZExtValue();
-              if (bindingASet == bindingBSet)
-                return bindingAIndex < bindingBIndex;
-              return bindingASet < bindingBSet;
+  auto sparseBindings = usedBindingSet.takeVector();
+  std::sort(sparseBindings.begin(), sparseBindings.end(),
+            [](SetBinding lhs, SetBinding rhs) {
+              if (lhs.first == rhs.first) return lhs.second.ult(rhs.second);
+              return lhs.first.ult(rhs.first);
             });
-  for (auto binding : llvm::enumerate(bindingUsed)) {
+  llvm::SmallDenseMap<SetBinding, size_t> mapBindingArgIndex;
+  for (auto binding : llvm::enumerate(sparseBindings)) {
     mapBindingArgIndex[binding.value()] = binding.index();
   }
   return mapBindingArgIndex;
@@ -168,25 +157,24 @@ class ConvertFunc : public ConvertToLLVMPattern {
     assert(fnType.getNumInputs() == 0 && fnType.getNumResults() == 0);
 
     TypeConverter::SignatureConversion signatureConverter(/*numOrigInputs=*/0);
-    llvm::SmallDenseMap<Operation *, size_t> argMapping =
-        getKernelArgMapping(funcOp);
+    auto argMapping = getKernelArgMapping(funcOp);
     // There may be dead symbols, we pick i32 pointer as default argument type.
     SmallVector<Type, 8> llvmInputTypes(
         argMapping.size(), LLVM::LLVMPointerType::get(rewriter.getI32Type()));
-    funcOp.walk([&](IREE::HAL::InterfaceBindingSubspanOp input) {
-      auto memrefType = input.getType().cast<MemRefType>();
+    funcOp.walk([&](IREE::HAL::InterfaceBindingSubspanOp subspanOp) {
+      auto memrefType = subspanOp.getType().cast<MemRefType>();
       Type elType = memrefType.getElementType();
       auto llvmType =
           LLVM::LLVMPointerType::get(elType, memrefType.getMemorySpaceAsInt());
-      IREE::HAL::InterfaceBindingOp binding = input.queryBindingOp();
-      llvmInputTypes[argMapping[binding]] = llvmType;
+      llvmInputTypes[argMapping[SetBinding(subspanOp.set(),
+                                           subspanOp.binding())]] = llvmType;
     });
     // As a convention with HAL, push constants are appended as kernel arguments
     // after all the binding inputs.
     uint64_t numConstants = 0;
-    funcOp.walk([&](IREE::HAL::InterfaceLoadConstantOp constant) {
+    funcOp.walk([&](IREE::HAL::InterfaceLoadConstantOp constantOp) {
       numConstants =
-          std::max(constant.offset().getZExtValue() + 1, numConstants);
+          std::max(constantOp.offset().getZExtValue() + 1, numConstants);
     });
     llvmInputTypes.resize(argMapping.size() + numConstants,
                           rewriter.getI32Type());
@@ -221,10 +209,10 @@ class ConvertFunc : public ConvertToLLVMPattern {
   }
 };
 
-class ConvertIREEBindingOp : public ConvertToLLVMPattern {
+class ConvertIREEBindingSubspanOp : public ConvertToLLVMPattern {
  public:
-  explicit ConvertIREEBindingOp(MLIRContext *context,
-                                LLVMTypeConverter &converter)
+  explicit ConvertIREEBindingSubspanOp(MLIRContext *context,
+                                       LLVMTypeConverter &converter)
       : ConvertToLLVMPattern(
             IREE::HAL::InterfaceBindingSubspanOp::getOperationName(), context,
             converter) {}
@@ -236,19 +224,17 @@ class ConvertIREEBindingOp : public ConvertToLLVMPattern {
     if (!llvmFuncOp) return failure();
     assert(llvmFuncOp.getNumArguments() > 0);
 
-    llvm::SmallDenseMap<Operation *, size_t> argMapping =
-        getKernelArgMapping(llvmFuncOp);
+    auto argMapping = getKernelArgMapping(llvmFuncOp);
     Location loc = op->getLoc();
-    auto ireeBindingOp = cast<IREE::HAL::InterfaceBindingSubspanOp>(op);
+    auto subspanOp = cast<IREE::HAL::InterfaceBindingSubspanOp>(op);
     IREE::HAL::InterfaceBindingSubspanOpAdaptor adaptor(
         operands, op->getAttrDictionary());
     MemRefType memrefType =
-        ireeBindingOp.getResult().getType().dyn_cast<MemRefType>();
-    IREE::HAL::InterfaceBindingOp binding = ireeBindingOp.queryBindingOp();
-    mlir::BlockArgument llvmBufferArg =
-        llvmFuncOp.getArgument(argMapping[binding]);
+        subspanOp.getResult().getType().dyn_cast<MemRefType>();
+    mlir::BlockArgument llvmBufferArg = llvmFuncOp.getArgument(
+        argMapping[SetBinding(subspanOp.set(), subspanOp.binding())]);
     // As a convention with HAL all the kernel argument pointers are 16Bytes
-    // aliigned.
+    // aligned.
     llvmFuncOp.setArgAttr(llvmBufferArg.getArgNumber(),
                           LLVM::LLVMDialect::getAlignAttrName(),
                           rewriter.getI32IntegerAttr(16));
@@ -260,9 +246,11 @@ class ConvertIREEBindingOp : public ConvertToLLVMPattern {
                                        .cast<LLVM::LLVMPointerType>()
                                        .getAddressSpace()),
         llvmBufferArg);
-    llvmBufferBasei8Ptr = rewriter.create<LLVM::GEPOp>(
-        loc, llvmBufferBasei8Ptr.getType(), llvmBufferBasei8Ptr,
-        adaptor.byte_offset());
+    if (adaptor.byte_offset()) {
+      llvmBufferBasei8Ptr = rewriter.create<LLVM::GEPOp>(
+          loc, llvmBufferBasei8Ptr.getType(), llvmBufferBasei8Ptr,
+          adaptor.byte_offset());
+    }
     auto llvmPtrType = LLVM::LLVMPointerType::get(
         memrefType.getElementType(), memrefType.getMemorySpaceAsInt());
     Value llvmBufferBasePtr =
@@ -326,8 +314,7 @@ class ConvertIREEConstantOp : public ConvertToLLVMPattern {
     if (!llvmFuncOp) return failure();
     assert(llvmFuncOp.getNumArguments() > 0);
 
-    llvm::SmallDenseMap<Operation *, size_t> argMapping =
-        getKernelArgMapping(llvmFuncOp);
+    auto argMapping = getKernelArgMapping(llvmFuncOp);
     auto ireeConstantOp = cast<IREE::HAL::InterfaceLoadConstantOp>(op);
     mlir::BlockArgument llvmBufferArg = llvmFuncOp.getArgument(
         argMapping.size() + ireeConstantOp.offset().getZExtValue());
@@ -360,8 +347,9 @@ struct HALInterfaceWorkgroupOpsConverter final
 void populateLLVMConversionPatterns(MLIRContext *context,
                                     OwningRewritePatternList &patterns,
                                     LLVMTypeConverter &converter) {
-  patterns.insert<ConvertFunc, ConvertIREEBindingOp, ConvertIREEConstantOp>(
-      context, converter);
+  patterns
+      .insert<ConvertFunc, ConvertIREEBindingSubspanOp, ConvertIREEConstantOp>(
+          context, converter);
 }
 
 void populateScalarizeMathOps(RewritePatternSet &patterns) {

@@ -698,12 +698,19 @@ static ParseResult parseExecutableEntryPointOp(OpAsmParser &parser,
   }
 
   StringAttr nameAttr;
+  SymbolRefAttr interfaceAttr;
   if (failed(parser.parseSymbolName(nameAttr,
                                     mlir::SymbolTable::getSymbolAttrName(),
                                     result->attributes)) ||
-      failed(parser.parseOptionalAttrDictWithKeyword(result->attributes))) {
+      failed(parser.parseKeyword("interface")) ||
+      failed(parser.parseLParen()) ||
+      failed(parser.parseAttribute(interfaceAttr)) ||
+      failed(parser.parseRParen()) ||
+      failed(parser.parseOptionalAttrDict(result->attributes))) {
     return failure();
   }
+  result->addAttribute("interface", interfaceAttr);
+
   // For now assume that the workload is at max 3D. So arguments to the region
   // are workload along x, y and z.
   std::unique_ptr<Region> region;
@@ -714,6 +721,7 @@ static ParseResult parseExecutableEntryPointOp(OpAsmParser &parser,
   if (!parseResult.hasValue()) return success();
   if (failed(*parseResult)) return failure();
   result->addRegion(std::move(region));
+
   return success();
 }
 
@@ -723,8 +731,11 @@ static void printExecutableEntryPointOp(OpAsmPrinter &p,
   printSymbolVisibility(p, op, op->getAttrOfType<StringAttr>("sym_visibility"));
   p << ' ';
   p.printSymbolName(op.sym_name());
-  p.printOptionalAttrDictWithKeyword(op->getAttrs(),
-                                     /*elidedAttrs=*/{"sym_name"});
+  p << " interface(";
+  p.printAttributeWithoutType(op.interfaceAttr());
+  p << ")";
+  p.printOptionalAttrDict(op->getAttrs(),
+                          /*elidedAttrs=*/{"sym_name", "interface"});
   if (op.workgroup_count_region().empty()) return;
   p.printRegion(op.workgroup_count_region().front());
 }
@@ -951,11 +962,6 @@ static LogicalResult verifyInterfaceBindingSubspanOp(
   return success();
 }
 
-InterfaceBindingOp InterfaceBindingSubspanOp::queryBindingOp() {
-  return dyn_cast_or_null<InterfaceBindingOp>(
-      SymbolTable::lookupNearestSymbolFrom(getOperation(), binding()));
-}
-
 // TODO(benvanik): share with align op folder and analysis.
 // May need an interface for querying the alignment from ops that can carry it.
 
@@ -995,6 +1001,10 @@ llvm::Align InterfaceBindingSubspanOp::calculateAlignment() {
   if (!bindingAlignmentInt) return naturalAlignment;
   auto bindingAlignment =
       llvm::Align(bindingAlignmentInt.getValue().getZExtValue());
+
+  // If there's no offset specified then we can use the binding alignment
+  // directly.
+  if (!byte_offset()) return bindingAlignment;
 
   // Try to get the alignment of the byte offset. If it's a constant then we can
   // find a common alignment between it and the base and otherwise we need to

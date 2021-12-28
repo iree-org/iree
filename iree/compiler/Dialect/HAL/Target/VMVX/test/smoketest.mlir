@@ -43,8 +43,7 @@ stream.executable public @add_dispatch_0 {
 //  CHECK-NEXT:    hal.interface.binding public @s0b2, set=0, binding=2, type="StorageBuffer"
 //  CHECK-NEXT:   }
 //  CHECK-NEXT:   hal.executable.variant public @vmvx_bytecode_fb, target = #executable_target_vmvx_bytecode_fb {
-//  CHECK-NEXT:     hal.executable.entry_point public @add_dispatch_0 attributes {
-//  CHECK-SAME:       interface = @io,
+//  CHECK-NEXT:     hal.executable.entry_point public @add_dispatch_0 interface(@io) {
 //  CHECK-SAME:       ordinal = 0 : index
 //  CHECK-SAME:     }
 //       CHECK:     module attributes {vm.toplevel} {

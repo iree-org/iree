@@ -117,18 +117,15 @@ hal.executable @exe {
     hal.interface.binding @s0b2, set=0, binding=2, type="StorageBuffer"
   }
   hal.executable.variant @vmvx, target = <"vmvx", "vmvx-bytecode-fb"> {
-    hal.executable.entry_point @entry0 attributes {
-      interface = @interface0,
+    hal.executable.entry_point @entry0 interface(@interface0) {
       ordinal = 0 : index,
       workgroup_size = [32 : index, 1 : index, 1 : index]
     }
-    hal.executable.entry_point @entry0_alias attributes {
-      interface = @interface0,
+    hal.executable.entry_point @entry0_alias interface(@interface0) {
       ordinal = 0 : index,
       workgroup_size = [32 : index, 1 : index, 1 : index]
     }
-    hal.executable.entry_point @entry1 attributes {
-      interface = @interface1,
+    hal.executable.entry_point @entry1 interface(@interface1) {
       ordinal = 1 : index,
       workgroup_size = [32 : index, 1 : index, 1 : index]
     }

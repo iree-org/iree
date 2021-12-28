@@ -5,10 +5,10 @@ func @matmul() {
   %m = hal.interface.load.constant offset = 0 : index
   %n = hal.interface.load.constant offset = 1 : index
   %k = hal.interface.load.constant offset = 2 : index
-  %lhs = hal.interface.binding.subspan @io::@arg0[%c0] : !flow.dispatch.tensor<readonly:?x?xf32>{%m, %k}
-  %rhs = hal.interface.binding.subspan @io::@arg1[%c0] : !flow.dispatch.tensor<readonly:?x?xf32>{%k, %n}
-  %init = hal.interface.binding.subspan @io::@arg2[%c0] : !flow.dispatch.tensor<readonly:?x?xf32>{%m, %n}
-  %result = hal.interface.binding.subspan @io::@ret0[%c0] : !flow.dispatch.tensor<writeonly:?x?xf32>{%m, %n}
+  %lhs = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) : !flow.dispatch.tensor<readonly:?x?xf32>{%m, %k}
+  %rhs = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(1) : !flow.dispatch.tensor<readonly:?x?xf32>{%k, %n}
+  %init = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(2) : !flow.dispatch.tensor<readonly:?x?xf32>{%m, %n}
+  %result = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(3) : !flow.dispatch.tensor<writeonly:?x?xf32>{%m, %n}
   %wg_id_y = hal.interface.workgroup.id[1] : index
   %wg_count_y = hal.interface.workgroup.count[1] : index
   %wg_size_y = hal.interface.workgroup.size[1] : index
@@ -32,12 +32,7 @@ func @matmul() {
   }
   return
 }
-hal.interface private @io  {
-  hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer"
-  hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer"
-  hal.interface.binding @arg2, set=0, binding=2, type="StorageBuffer"
-  hal.interface.binding @ret0, set=0, binding=3, type="StorageBuffer"
-}
+
 //  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0, s1] -> (s0 * s1)>
 //  CHECK-DAG: #[[MAP1:.+]] = affine_map<(d0)[s0, s1] -> (s0, -d0 + s1)>
 //  CHECK-DAG: #[[MAP2:.+]] = affine_map<(d0, d1)[s0, s1] -> (d0 * s1 + s0 + d1)>
@@ -45,10 +40,10 @@ hal.interface private @io  {
 //  CHECK-DAG:   %[[M:.+]] = hal.interface.load.constant offset = 0
 //  CHECK-DAG:   %[[N:.+]] = hal.interface.load.constant offset = 1
 //  CHECK-DAG:   %[[K:.+]] = hal.interface.load.constant offset = 2
-//  CHECK-DAG:   %[[LHS:.+]] = hal.interface.binding.subspan @io::@arg0
-//  CHECK-DAG:   %[[RHS:.+]] = hal.interface.binding.subspan @io::@arg1
-//  CHECK-DAG:   %[[INIT:.+]] = hal.interface.binding.subspan @io::@arg2
-//  CHECK-DAG:   %[[RESULT:.+]] = hal.interface.binding.subspan @io::@ret0
+//  CHECK-DAG:   %[[LHS:.+]] = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0)
+//  CHECK-DAG:   %[[RHS:.+]] = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(1)
+//  CHECK-DAG:   %[[INIT:.+]] = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(2)
+//  CHECK-DAG:   %[[RESULT:.+]] = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(3)
 //  CHECK-DAG:   %[[WG_ID_Y:.+]] = hal.interface.workgroup.id[1]
 //  CHECK-DAG:   %[[WG_COUNT_Y:.+]] = hal.interface.workgroup.count[1]
 //  CHECK-DAG:   %[[WG_SIZE_Y:.+]] = hal.interface.workgroup.size[1]
@@ -84,9 +79,9 @@ func @matmul_fill() {
   %m = hal.interface.load.constant offset = 0 : index
   %n = hal.interface.load.constant offset = 1 : index
   %k = hal.interface.load.constant offset = 2 : index
-  %lhs = hal.interface.binding.subspan @io::@arg0[%c0] : !flow.dispatch.tensor<readonly:?x?xf32>{%m, %k}
-  %rhs = hal.interface.binding.subspan @io::@arg1[%c0] : !flow.dispatch.tensor<readonly:?x?xf32>{%k, %n}
-  %result = hal.interface.binding.subspan @io::@ret0[%c0] : !flow.dispatch.tensor<readwrite:?x?xf32>{%m, %n}
+  %lhs = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) : !flow.dispatch.tensor<readonly:?x?xf32>{%m, %k}
+  %rhs = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(1) : !flow.dispatch.tensor<readonly:?x?xf32>{%k, %n}
+  %result = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(2) : !flow.dispatch.tensor<readwrite:?x?xf32>{%m, %n}
   %wg_id_y = hal.interface.workgroup.id[1] : index
   %wg_count_y = hal.interface.workgroup.count[1] : index
   %wg_size_y = hal.interface.workgroup.size[1] : index
@@ -111,11 +106,7 @@ func @matmul_fill() {
   }
   return
 }
-hal.interface private @io  {
-  hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer"
-  hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer"
-  hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer"
-}
+
 //  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0, s1] -> (s0 * s1)>
 //  CHECK-DAG: #[[MAP1:.+]] = affine_map<(d0)[s0, s1] -> (s0, -d0 + s1)>
 //      CHECK: func @matmul_fill()
@@ -123,9 +114,9 @@ hal.interface private @io  {
 //  CHECK-DAG:   %[[M:.+]] = hal.interface.load.constant offset = 0
 //  CHECK-DAG:   %[[N:.+]] = hal.interface.load.constant offset = 1
 //  CHECK-DAG:   %[[K:.+]] = hal.interface.load.constant offset = 2
-//  CHECK-DAG:   %[[LHS:.+]] = hal.interface.binding.subspan @io::@arg0
-//  CHECK-DAG:   %[[RHS:.+]] = hal.interface.binding.subspan @io::@arg1
-//  CHECK-DAG:   %[[RESULT:.+]] = hal.interface.binding.subspan @io::@ret0
+//  CHECK-DAG:   %[[LHS:.+]] = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0)
+//  CHECK-DAG:   %[[RHS:.+]] = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(1)
+//  CHECK-DAG:   %[[RESULT:.+]] = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(2)
 //  CHECK-DAG:   %[[WG_ID_Y:.+]] = hal.interface.workgroup.id[1]
 //  CHECK-DAG:   %[[WG_COUNT_Y:.+]] = hal.interface.workgroup.count[1]
 //  CHECK-DAG:   %[[WG_SIZE_Y:.+]] = hal.interface.workgroup.size[1]
@@ -148,4 +139,3 @@ hal.interface private @io  {
 //      CHECK:       linalg.matmul
 // CHECK-SAME:           ins(%[[LHS_TILE]], %[[RHS_TILE]]
 // CHECK-SAME:           outs(%[[RESULT_TILE]]
-

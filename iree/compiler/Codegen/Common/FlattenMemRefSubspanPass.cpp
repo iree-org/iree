@@ -223,8 +223,9 @@ struct FlattenBindingSubspan final
     Type newType = getTypeConverter()->convertType(oldType);
 
     rewriter.replaceOpWithNewOp<IREE::HAL::InterfaceBindingSubspanOp>(
-        subspanOp, newType, subspanOp.binding(), subspanOp.byte_offset(),
-        subspanOp.byte_length(), dynamicDim, subspanOp.alignmentAttr());
+        subspanOp, newType, subspanOp.type(), subspanOp.set(),
+        subspanOp.binding(), subspanOp.byte_offset(), dynamicDim,
+        subspanOp.alignmentAttr());
     return success();
   }
 };
@@ -493,10 +494,9 @@ struct FoldSubspanOffsetIntoLoadStore final : public OpRewritePattern<OpType> {
     if (!subspanOp) return failure();
 
     // If the subspan op has a zero byte offset then we are done.
-    if (matchPattern(subspanOp.byte_offset(), m_Zero())) return failure();
-    // Byte length is unsupported for now.
-    if (subspanOp.byte_length()) {
-      return rewriter.notifyMatchFailure(op, "byte length unsupported");
+    if (!subspanOp.byte_offset() ||
+        matchPattern(subspanOp.byte_offset(), m_Zero())) {
+      return failure();
     }
 
     // Calculate the offset we need to add to the load/store op, in terms of how
@@ -512,8 +512,8 @@ struct FoldSubspanOffsetIntoLoadStore final : public OpRewritePattern<OpType> {
     Value zero =
         rewriter.create<arith::ConstantIndexOp>(op.memref().getLoc(), 0);
     Value newSubspan = rewriter.create<IREE::HAL::InterfaceBindingSubspanOp>(
-        op.memref().getLoc(), subspanOp.getType(), subspanOp.binding(), zero,
-        subspanOp.byte_length(), subspanOp.dynamic_dims(),
+        op.memref().getLoc(), subspanOp.getType(), subspanOp.type(),
+        subspanOp.set(), subspanOp.binding(), zero, subspanOp.dynamic_dims(),
         subspanOp.alignmentAttr());
     rewriter.restoreInsertionPoint(ip);
 

@@ -171,11 +171,9 @@ static void convertBindingUsage(mlir::FuncOp sourceFuncOp, BlockArgument arg,
     auto alignmentAttr = sourceFuncOp.getArgAttrOfType<IntegerAttr>(
         arg.getArgNumber(), "stream.alignment");
     auto newOp = builder.create<IREE::HAL::InterfaceBindingSubspanOp>(
-        oldOp.getLoc(), oldOp.getType(),
-        SymbolRefAttr::get(interfaceOp.sym_nameAttr(),
-                           {SymbolRefAttr::get(bindingOp)}),
-        oldOp.byte_offset(), /*byte_length=*/Value{}, oldOp.dynamic_dims(),
-        alignmentAttr);
+        oldOp.getLoc(), oldOp.getType(), bindingOp.typeAttr(),
+        bindingOp.setAttr(), bindingOp.bindingAttr(), oldOp.byte_offset(),
+        oldOp.dynamic_dims(), alignmentAttr);
     oldOp.replaceAllUsesWith(newOp.result());
     oldOp.erase();
   }
@@ -278,12 +276,6 @@ static LogicalResult declareEntryPointOps(
       // Clone the updated interface-based function into the target.
       auto targetFuncOp = baseFuncOp.clone();
       variantOp.getInnerModule().push_back(targetFuncOp);
-
-      // Copy interface bindings into the target module so symbol references
-      // work.
-      auto inlinedInterfaceOp = interface.op.clone();
-      inlinedInterfaceOp.setPrivate();
-      variantOp.getInnerModule().push_back(inlinedInterfaceOp);
     }
 
     // Update all dispatch sites with the binding information.

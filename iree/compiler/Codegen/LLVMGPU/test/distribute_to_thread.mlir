@@ -10,19 +10,18 @@
 #map4 = affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>
 hal.executable private @dot_dispatch_0  {
 hal.executable.variant @cuda, target = #executable_target_cuda_nvptx_fb {
-  hal.executable.entry_point @dot_dispatch_0 attributes {
-    interface = @legacy_io,
-    ordinal = 0 : index,
+  hal.executable.entry_point @dot_dispatch_0 interface(@io) {
     translation.info = #translation,
-    workgroup_size = [64 : index, 1 : index, 1 : index]}
-  builtin.module  {
+    workgroup_size = [64 : index, 1 : index, 1 : index]
+  }
+  builtin.module {
     builtin.func @dot_dispatch_0() {
       %cst = arith.constant 0.000000e+00 : f32
       %c0 = arith.constant 0 : index
       %c1024 = arith.constant 1024 : index
-      %0 = hal.interface.binding.subspan @legacy_io::@ro0[%c0] : memref<1024x1024xf32>
-      %1 = hal.interface.binding.subspan @legacy_io::@ro1[%c0] : memref<1024x1024xf32>
-      %2 = hal.interface.binding.subspan @legacy_io::@wo2[%c0] : memref<1024x1024xf32>
+      %0 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) : memref<1024x1024xf32>
+      %1 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(1) : memref<1024x1024xf32>
+      %2 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(2) : memref<1024x1024xf32>
       %workgroup_size_x = hal.interface.workgroup.size[0] : index
       %workgroup_size_y = hal.interface.workgroup.size[1] : index
       %workgroup_id_x = hal.interface.workgroup.id[0] : index
@@ -49,11 +48,6 @@ hal.executable.variant @cuda, target = #executable_target_cuda_nvptx_fb {
         }
       }
       return
-    }
-    hal.interface private @legacy_io  {
-      hal.interface.binding @ro0, set=0, binding=0, type="StorageBuffer"
-      hal.interface.binding @ro1, set=0, binding=1, type="StorageBuffer"
-      hal.interface.binding @wo2, set=0, binding=2, type="StorageBuffer"
     }
   }
 }
@@ -90,18 +84,17 @@ hal.executable.variant @cuda, target = #executable_target_cuda_nvptx_fb {
 // Pure reducion case, skip tiling.
 hal.executable @reduction_dispatch {
 hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
-    hal.executable.entry_point @predict_dispatch_153 attributes {
-      interface = @io,
-      ordinal = 0 : index,
+    hal.executable.entry_point @predict_dispatch_153 interface(@io) {
       translation.info = #translation,
-      workgroup_size = [1: index, 1: index, 1: index]}
+      workgroup_size = [1: index, 1: index, 1: index]
+    }
     builtin.module  {
       builtin.func @predict_dispatch_153() {
         %c0 = arith.constant 0 : index
         %cst = arith.constant 0x7FC00000 : f32
         %cst_0 = arith.constant 0xFF800000 : f32
-        %0 = hal.interface.binding.subspan @io::@s0b0_ro_external[%c0] : memref<1000xf32>
-        %1 = hal.interface.binding.subspan @io::@s0b1_xw_external[%c0] : memref<f32>
+        %0 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) : memref<1000xf32>
+        %1 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(1) : memref<f32>
         linalg.fill(%cst_0, %1) {lowering.config = #config}  : f32, memref<f32>
         linalg.generic {indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> ()>], iterator_types = ["reduction"]} ins(%0 : memref<1000xf32>) outs(%1 : memref<f32>) attrs = {lowering.config = #config} {
         ^bb0(%arg0: f32, %arg1: f32):  // no predecessors
@@ -113,13 +106,10 @@ hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
         }
         return
       }
-      hal.interface private @io  {
-        hal.interface.binding @s0b0_ro_external, set=0, binding=0, type="StorageBuffer"
-        hal.interface.binding @s0b1_xw_external, set=0, binding=1, type="StorageBuffer"
-      }
     }
   }
 }
+
 //      CHECK: #[[CONFIG:.+]] = #iree_codegen.lowering.config<tile_sizes = {{\[}}[]{{\]}}, native_vector_size = []>
 //      CHECK: hal.executable public @reduction_dispatch
 //      CHECK: linalg.fill

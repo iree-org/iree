@@ -897,24 +897,26 @@ void LinalgBufferizePass::runOnOperation() {
 
   // First go over all hal.interface.binding.subspan ops and create counterparts
   // working with memrefs.
-  funcOp.walk([&](IREE::HAL::InterfaceBindingSubspanOp op) {
-    auto shapedType =
-        op.getResult().getType().dyn_cast<IREE::Flow::DispatchTensorType>();
+  funcOp.walk([&](IREE::HAL::InterfaceBindingSubspanOp subspanOp) {
+    auto shapedType = subspanOp.getResult()
+                          .getType()
+                          .dyn_cast<IREE::Flow::DispatchTensorType>();
     if (!shapedType || !shapedType.hasRank()) return;
     OpBuilder::InsertionGuard g(b);
-    b.setInsertionPoint(op);
+    b.setInsertionPoint(subspanOp);
     // Just change the result type of the InterfaceBindingSubspanOp to form
     // the base buffer.
     auto tensorType =
-        op.result().getType().cast<IREE::Flow::DispatchTensorType>();
+        subspanOp.result().getType().cast<IREE::Flow::DispatchTensorType>();
     auto memRefType = getMemrefTypeForTensor(tensorType);
     auto baseBuffer = b.create<IREE::HAL::InterfaceBindingSubspanOp>(
-        op->getLoc(), memRefType, op.binding(), op.byte_offset(),
-        op.byte_length(), op.dynamic_dims(), op.alignmentAttr());
+        subspanOp->getLoc(), memRefType, subspanOp.type(), subspanOp.set(),
+        subspanOp.binding(), subspanOp.byte_offset(), subspanOp.dynamic_dims(),
+        subspanOp.alignmentAttr());
     auto alignment = baseBuffer.calculateAlignment();
-    b.create<memref::AssumeAlignmentOp>(op->getLoc(), baseBuffer,
+    b.create<memref::AssumeAlignmentOp>(subspanOp->getLoc(), baseBuffer,
                                         alignment.value());
-    bvm.map(op, baseBuffer);
+    bvm.map(subspanOp, baseBuffer);
   });
 
   // Visit all the operations that return `tensor`s and convert them to using
@@ -943,19 +945,20 @@ void LinalgBufferizePass::runOnOperation() {
           return convertScfIfOp(b, ifOp, bvm, plan);
         })
         .Case<IREE::Flow::DispatchTensorLoadOp, tensor::CollapseShapeOp,
-              tensor::ExpandShapeOp, tensor::ExtractSliceOp,
-              tensor::CastOp>([&](auto aliasingOp) {
-          auto aliasingBuffers =
-              getAliasingBuffersForResults(b, aliasingOp, bvm);
-          if (failed(getOrAllocateResultBuffers(b, aliasingOp, aliasingBuffers,
-                                                bvm, plan, allocationFn))) {
-            return failure();
-          }
-          copyFromAliasingBufferToResultBuffer(
-              b, aliasingOp->getLoc(), aliasingOp->getOperand(0),
-              aliasingOp->getResult(0), aliasingBuffers, bvm, plan);
-          return success();
-        })
+              tensor::ExpandShapeOp, tensor::ExtractSliceOp, tensor::CastOp>(
+            [&](auto aliasingOp) {
+              auto aliasingBuffers =
+                  getAliasingBuffersForResults(b, aliasingOp, bvm);
+              if (failed(getOrAllocateResultBuffers(b, aliasingOp,
+                                                    aliasingBuffers, bvm, plan,
+                                                    allocationFn))) {
+                return failure();
+              }
+              copyFromAliasingBufferToResultBuffer(
+                  b, aliasingOp->getLoc(), aliasingOp->getOperand(0),
+                  aliasingOp->getResult(0), aliasingBuffers, bvm, plan);
+              return success();
+            })
         .Case<linalg::PadTensorOp>([&](linalg::PadTensorOp padTensorOp) {
           if (failed(getOrAllocateResultBuffers(b, padTensorOp, bvm, plan,
                                                 allocationFn))) {

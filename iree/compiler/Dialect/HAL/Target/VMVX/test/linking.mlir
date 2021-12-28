@@ -9,7 +9,7 @@ hal.executable private @dispatch_0 {
     hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer"
   }
   hal.executable.variant @vmvx, target = #vmvx_target {
-    hal.executable.entry_point @dispatch_0 attributes {interface = @io, ordinal = 0 : index}
+    hal.executable.entry_point @dispatch_0 interface(@io) {ordinal = 0 : index}
     builtin.module {
       vm.module @module {
         vm.func @dispatch_0() {
@@ -27,7 +27,7 @@ hal.executable private @dispatch_1 {
     hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer"
   }
   hal.executable.variant @vmvx, target = #vmvx_target {
-    hal.executable.entry_point @dispatch_1 attributes {interface = @io, ordinal = 0 : index}
+    hal.executable.entry_point @dispatch_1 interface(@io) {ordinal = 0 : index}
     builtin.module {
       vm.module @module {
         vm.func @dispatch_1() {
@@ -46,7 +46,7 @@ hal.executable private @dispatch_2 {
     hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer"
   }
   hal.executable.variant @vmvx, target = #vmvx_target {
-    hal.executable.entry_point @dispatch_2 attributes {interface = @io, ordinal = 0 : index}
+    hal.executable.entry_point @dispatch_2 interface(@io) {ordinal = 0 : index}
     builtin.module {
       vm.module @module {
         vm.func @dispatch_2() {
@@ -94,9 +94,9 @@ util.initializer {
 // CHECK-NEXT:      hal.interface.binding public @ret0, set=0, binding=2, type="StorageBuffer"
 // CHECK-NEXT:    }
 // CHECK-NEXT:    hal.executable.variant public @vmvx_bytecode_fb, target = #executable_target_vmvx_bytecode_fb {
-// CHECK-NEXT:      hal.executable.entry_point public @dispatch_0 attributes {interface = @io_0, ordinal = 0 : index}
-// CHECK-NEXT:      hal.executable.entry_point public @dispatch_1 attributes {interface = @io_0, ordinal = 1 : index}
-// CHECK-NEXT:      hal.executable.entry_point public @dispatch_2 attributes {interface = @io_1, ordinal = 2 : index}
+// CHECK-NEXT:      hal.executable.entry_point public @dispatch_0 interface(@io_0) {ordinal = 0 : index}
+// CHECK-NEXT:      hal.executable.entry_point public @dispatch_1 interface(@io_0) {ordinal = 1 : index}
+// CHECK-NEXT:      hal.executable.entry_point public @dispatch_2 interface(@io_1) {ordinal = 2 : index}
 // CHECK-NEXT:      module {
 // CHECK-NEXT:        vm.module public @linked_module {
 // CHECK-NEXT:          vm.func @dispatch_0() {
@@ -141,7 +141,7 @@ hal.executable private @dispatch_0 {
     hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer"
   }
   hal.executable.variant @vmvx, target = #vmvx_target {
-    hal.executable.entry_point @dispatch_0 attributes {interface = @io, ordinal = 0 : index}
+    hal.executable.entry_point @dispatch_0 interface(@io) {ordinal = 0 : index}
     builtin.module {
       vm.module @module {
         vm.func @dispatch_0() {
@@ -162,7 +162,7 @@ hal.executable private @dispatch_1 {
     hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer"
   }
   hal.executable.variant @vmvx, target = #vmvx_target {
-    hal.executable.entry_point @dispatch_1 attributes {interface = @io, ordinal = 0 : index}
+    hal.executable.entry_point @dispatch_1 interface(@io) {ordinal = 0 : index}
     builtin.module {
       vm.module @module {
         vm.func @dispatch_1() {
@@ -209,8 +209,8 @@ func @other_targets() -> () {
 // CHECK-NEXT:      hal.interface.binding public @ret0, set=0, binding=2, type="StorageBuffer"
 // CHECK-NEXT:    }
 // CHECK-NEXT:    hal.executable.variant public @vmvx_bytecode_fb, target = #executable_target_vmvx_bytecode_fb {
-// CHECK-NEXT:      hal.executable.entry_point public @dispatch_0 attributes {interface = @io_0, ordinal = 0 : index}
-// CHECK-NEXT:      hal.executable.entry_point public @dispatch_1 attributes {interface = @io_1, ordinal = 1 : index}
+// CHECK-NEXT:      hal.executable.entry_point public @dispatch_0 interface(@io_0) {ordinal = 0 : index}
+// CHECK-NEXT:      hal.executable.entry_point public @dispatch_1 interface(@io_1) {ordinal = 1 : index}
 // CHECK-NEXT:      module {
 // CHECK-NEXT:        vm.module public @linked_module {
 // CHECK-NEXT:          vm.func @dispatch_0() {
@@ -263,7 +263,7 @@ module {
       hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer"
     }
     hal.executable.variant @vmvx, target = #vmvx_target {
-      hal.executable.entry_point @dispatch_0 attributes {interface = @io, ordinal = 0 : index}
+      hal.executable.entry_point @dispatch_0 interface(@io) {ordinal = 0 : index}
       builtin.module {
         vm.module @module {}
       }
@@ -276,7 +276,7 @@ module {
       hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer"
     }
     hal.executable.variant @vmvx, target = #vmvx_target {
-      hal.executable.entry_point @dispatch_1 attributes {interface = @io, ordinal = 0 : index}
+      hal.executable.entry_point @dispatch_1 interface(@io) {ordinal = 0 : index}
       builtin.module {
         vm.module @module {}
       }
@@ -289,7 +289,7 @@ module {
       hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer"
     }
     hal.executable.variant @vmvx, target = #vmvx_target {
-      hal.executable.entry_point @dispatch_2 attributes {interface = @io, ordinal = 0 : index}
+      hal.executable.entry_point @dispatch_2 interface(@io) {ordinal = 0 : index}
       builtin.module {
         vm.module @module {}
       }
@@ -320,7 +320,7 @@ module {
 hal.executable private @dispatch_0 {
   hal.interface @io {}
   hal.executable.variant @vmvx, target = #vmvx_target {
-    hal.executable.entry_point @dispatch_0 attributes {interface = @io, ordinal = 0 : index}
+    hal.executable.entry_point @dispatch_0 interface(@io) {ordinal = 0 : index}
     builtin.module {
       vm.module @module {
         vm.rodata public @rodata_a dense<[0]> : tensor<1xi32>
@@ -343,7 +343,7 @@ hal.executable private @dispatch_0 {
 hal.executable private @dispatch_1 {
   hal.interface @io {}
   hal.executable.variant @vmvx, target = #vmvx_target {
-    hal.executable.entry_point @dispatch_1 attributes {interface = @io, ordinal = 0 : index}
+    hal.executable.entry_point @dispatch_1 interface(@io) {ordinal = 0 : index}
     builtin.module {
       vm.module @module {
         // Conflict with a public symbol, this should be renamed when linked.

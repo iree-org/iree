@@ -1,13 +1,9 @@
 // RUN: iree-opt -split-input-file -iree-codegen-flatten-memref-subspan -canonicalize %s | IreeFileCheck %s
 
 func @load_subspan_with_offset(%offset : index, %i0: index, %i1: index, %i2: index) -> f32 {
-  %subspan = hal.interface.binding.subspan @io::@s0b0_ro_constant[%offset] : memref<6x7x8xf32>
+  %subspan = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) offset(%offset) : memref<6x7x8xf32>
   %val = memref.load %subspan[%i0, %i1, %i2] : memref<6x7x8xf32>
   return %val: f32
-}
-
-hal.interface private @io  {
-  hal.interface.binding @s0b0_ro_constant, set=0, binding=0, type="StorageBuffer"
 }
 
 //      CHECK: #[[MAP:.+]] = affine_map<()[s0, s1, s2, s3] -> (s0 * 56 + s1 * 8 + s2 + s3 floordiv 4)>
@@ -15,7 +11,7 @@ hal.interface private @io  {
 // CHECK-SAME: (%[[OFFSET:.+]]: index, %[[I0:.+]]: index, %[[I1:.+]]: index, %[[I2:.+]]: index)
 //  CHECK-DAG:   %[[ZERO:.+]] = arith.constant 0 : index
 //  CHECK-DAG:   %[[C336:.+]] = arith.constant 336 : index
-//      CHECK:   %[[SUBSPAN:.+]] = hal.interface.binding.subspan @io::@s0b0_ro_constant[%[[ZERO]]] : memref<?xf32>{%[[C336]]}
+//      CHECK:   %[[SUBSPAN:.+]] = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) offset(%[[ZERO]]) : memref<?xf32>{%[[C336]]}
 //      CHECK:   %[[INDEX:.+]] = affine.apply #[[MAP]]()[%[[I0]], %[[I1]], %[[I2]], %[[OFFSET]]]
 //      CHECK:   %[[LOAD:.+]] = memref.load %[[SUBSPAN]][%[[INDEX]]]
 //      CHECK:   return %[[LOAD]]
@@ -23,13 +19,9 @@ hal.interface private @io  {
 // -----
 
 func @store_subspan_with_offset(%value: f32, %offset : index, %i0: index, %i1: index, %i2: index) {
-  %subspan = hal.interface.binding.subspan @io::@s0b0_xw_external[%offset] : memref<2x3x4xf32>
+  %subspan = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) offset(%offset) : memref<2x3x4xf32>
   memref.store %value, %subspan[%i0, %i1, %i2] : memref<2x3x4xf32>
   return
-}
-
-hal.interface private @io  {
-  hal.interface.binding @s0b0_xw_external, set=0, binding=0, type="StorageBuffer"
 }
 
 //      CHECK: #[[MAP:.+]] = affine_map<()[s0, s1, s2, s3] -> (s0 * 12 + s1 * 4 + s2 + s3 floordiv 4)>
@@ -37,20 +29,16 @@ hal.interface private @io  {
 // CHECK-SAME: (%[[VALUE:.+]]: f32, %[[OFFSET:.+]]: index, %[[I0:.+]]: index, %[[I1:.+]]: index, %[[I2:.+]]: index)
 //  CHECK-DAG:   %[[ZERO:.+]] = arith.constant 0 : index
 //  CHECK-DAG:   %[[C24:.+]] = arith.constant 24 : index
-//      CHECK:   %[[SUBSPAN:.+]] = hal.interface.binding.subspan @io::@s0b0_xw_external[%[[ZERO]]] : memref<?xf32>{%[[C24]]}
+//      CHECK:   %[[SUBSPAN:.+]] = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) offset(%[[ZERO]]) : memref<?xf32>{%[[C24]]}
 //      CHECK:   %[[INDEX:.+]] = affine.apply #[[MAP]]()[%[[I0]], %[[I1]], %[[I2]], %[[OFFSET]]]
 //      CHECK:   memref.store %[[VALUE]], %[[SUBSPAN]][%[[INDEX]]] : memref<?xf32>
 
 // -----
 
 func @load_subspan_with_vector_element(%offset : index, %i0: index, %i1: index, %i2: index) -> vector<4xf32> {
-  %subspan = hal.interface.binding.subspan @io::@s0b0_ro_constant[%offset] : memref<6x7x8xvector<4xf32>>
+  %subspan = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) offset(%offset) : memref<6x7x8xvector<4xf32>>
   %val = memref.load %subspan[%i0, %i1, %i2] : memref<6x7x8xvector<4xf32>>
   return %val: vector<4xf32>
-}
-
-hal.interface private @io  {
-  hal.interface.binding @s0b0_ro_constant, set=0, binding=0, type="StorageBuffer"
 }
 
 //      CHECK: #[[MAP:.+]] = affine_map<()[s0, s1, s2, s3] -> (s0 * 56 + s1 * 8 + s2 + s3 floordiv 16)>
@@ -60,13 +48,9 @@ hal.interface private @io  {
 // -----
 
 func @load_subspan_with_16bit_element(%offset : index, %i0: index, %i1: index, %i2: index) -> f16 {
-  %subspan = hal.interface.binding.subspan @io::@s0b0_ro_constant[%offset] : memref<6x7x8xf16>
+  %subspan = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) offset(%offset) : memref<6x7x8xf16>
   %val = memref.load %subspan[%i0, %i1, %i2] : memref<6x7x8xf16>
   return %val: f16
-}
-
-hal.interface private @io  {
-  hal.interface.binding @s0b0_ro_constant, set=0, binding=0, type="StorageBuffer"
 }
 
 //      CHECK: #[[MAP:.+]] = affine_map<()[s0, s1, s2, s3] -> (s0 * 56 + s1 * 8 + s2 + s3 floordiv 2)>
@@ -77,13 +61,9 @@ hal.interface private @io  {
 
 func @store_subspan_with_leading_dynamic_dim(%value: f32, %offset : index, %i0: index, %i1: index, %i2: index) {
   %dim = hal.interface.load.constant offset = 0 : index
-  %subspan = hal.interface.binding.subspan @io::@s0b0_xw_external[%offset] : memref<?x3x4xf32>{%dim}
+  %subspan = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) offset(%offset) : memref<?x3x4xf32>{%dim}
   memref.store %value, %subspan[%i0, %i1, %i2] : memref<?x3x4xf32>
   return
-}
-
-hal.interface private @io  {
-  hal.interface.binding @s0b0_xw_external, set=0, binding=0, type="StorageBuffer"
 }
 
 //      CHECK: #[[SIZE_MAP:.+]] = affine_map<()[s0] -> (s0 * 12)
@@ -93,7 +73,7 @@ hal.interface private @io  {
 //      CHECK:   %[[C0:.+]] = arith.constant 0 : index
 //      CHECK:   %[[DIM:.+]] = hal.interface.load.constant offset = 0 : index
 //      CHECK:   %[[SIZE:.+]] = affine.apply #[[SIZE_MAP]]()[%[[DIM]]]
-//      CHECK:   %[[DST:.+]] = hal.interface.binding.subspan @io::@s0b0_xw_external[%[[C0]]] : memref<?xf32>{%[[SIZE]]}
+//      CHECK:   %[[DST:.+]] = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) offset(%[[C0]]) : memref<?xf32>{%[[SIZE]]}
 //      CHECK:   %[[INDEX:.+]] = affine.apply #[[OFFSET_MAP]]()[%[[I0]], %[[I1]], %[[I2]], %[[OFFSET]]]
 //      CHECK:   memref.store %[[VALUE]], %[[DST]][%[[INDEX]]] : memref<?xf32>
 
@@ -104,13 +84,9 @@ func @store_subspan_with_all_dynamic_dim(%value: f32, %offset : index, %i0: inde
   %dim1 = hal.interface.load.constant offset = 1 : index
   %dim2 = hal.interface.load.constant offset = 2 : index
   %dim3 = hal.interface.load.constant offset = 3 : index
-  %subspan = hal.interface.binding.subspan @io::@s0b0_xw_external[%offset] : memref<?x?x?x?xf32>{%dim0, %dim1, %dim2, %dim3}
+  %subspan = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) offset(%offset) : memref<?x?x?x?xf32>{%dim0, %dim1, %dim2, %dim3}
   memref.store %value, %subspan[%i0, %i1, %i2, %i3] : memref<?x?x?x?xf32>
   return
-}
-
-hal.interface @io attributes {sym_visibility = "private"} {
-  hal.interface.binding @s0b0_xw_external, set=0, binding=0, type="StorageBuffer"
 }
 
 //      CHECK: #[[SIZE_MAP:.+]] = affine_map<()[s0, s1, s2, s3] -> (((s0 * s1) * s2) * s3)>
@@ -123,7 +99,7 @@ hal.interface @io attributes {sym_visibility = "private"} {
 //      CHECK:   %[[DIM2:.+]] = hal.interface.load.constant offset = 2 : index
 //      CHECK:   %[[DIM3:.+]] = hal.interface.load.constant offset = 3 : index
 //      CHECK:   %[[SIZE:.+]] = affine.apply #[[SIZE_MAP]]()[%[[DIM0]], %[[DIM1]], %[[DIM2]], %[[DIM3]]]
-//      CHECK:   %[[DST:.+]] = hal.interface.binding.subspan @io::@s0b0_xw_external[%[[C0]]] : memref<?xf32>{%[[SIZE]]}
+//      CHECK:   %[[DST:.+]] = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) offset(%[[C0]]) : memref<?xf32>{%[[SIZE]]}
 //      CHECK:   %[[INDEX:.+]] = affine.apply #[[OFFSET_MAP]]()[%[[DIM3]], %[[I3]], %[[DIM2]], %[[I2]], %[[I0]], %[[DIM1]], %[[I1]], %[[OFFSET]]]
 //      CHECK:   memref.store %[[VALUE]], %[[DST]][%[[INDEX]]]
 
@@ -132,13 +108,9 @@ hal.interface @io attributes {sym_visibility = "private"} {
 func @store_subspan_with_mixed_dynamic_dim(%value: f32, %offset : index, %i0: index, %i1: index, %i2: index, %i3: index) {
   %dim0 = hal.interface.load.constant offset = 0 : index
   %dim1 = hal.interface.load.constant offset = 1 : index
-  %subspan = hal.interface.binding.subspan @io::@s0b0_xw_external[%offset] : memref<?x4x?x8xf32>{%dim0, %dim1}
+  %subspan = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) offset(%offset) : memref<?x4x?x8xf32>{%dim0, %dim1}
   memref.store %value, %subspan[%i0, %i1, %i2, %i3] : memref<?x4x?x8xf32>
   return
-}
-
-hal.interface @io attributes {sym_visibility = "private"} {
-  hal.interface.binding @s0b0_xw_external, set=0, binding=0, type="StorageBuffer"
 }
 
 //      CHECK: #[[SIZE_MAP:.+]] = affine_map<()[s0, s1] -> ((s0 * s1) * 32)>
@@ -149,7 +121,7 @@ hal.interface @io attributes {sym_visibility = "private"} {
 //      CHECK:   %[[DIM0:.+]] = hal.interface.load.constant offset = 0 : index
 //      CHECK:   %[[DIM2:.+]] = hal.interface.load.constant offset = 1 : index
 //      CHECK:   %[[SIZE:.+]] = affine.apply #[[SIZE_MAP]]()[%[[DIM0]], %[[DIM2]]]
-//      CHECK:   %[[DST:.+]] = hal.interface.binding.subspan @io::@s0b0_xw_external[%[[C0]]] : memref<?xf32>{%[[SIZE]]}
+//      CHECK:   %[[DST:.+]] = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) offset(%[[C0]]) : memref<?xf32>{%[[SIZE]]}
 //      CHECK:   %[[INDEX:.+]] = affine.apply #[[OFFSET_MAP]]()[%[[I3]], %[[DIM2]], %[[I2]], %[[I0]], %[[I1]], %[[OFFSET]]]
 //      CHECK:   memref.store %[[VALUE]], %[[DST]][%[[INDEX]]]
 
@@ -157,15 +129,11 @@ hal.interface @io attributes {sym_visibility = "private"} {
 
 func @store_subspan_with_flow_control(%value: f32, %offset : index, %i0: index, %i1: index, %i2: index) {
   %dim = hal.interface.load.constant offset = 0 : index
-  %subspan = hal.interface.binding.subspan @io::@s0b0_xw_external[%offset] : memref<?x3x4xf32>{%dim}
+  %subspan = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) offset(%offset) : memref<?x3x4xf32>{%dim}
   scf.for %i = %i0 to %i1 step %i2 {
     memref.store %value, %subspan[%i0, %i1, %i2] : memref<?x3x4xf32>
   }
   return
-}
-
-hal.interface private @io  {
-  hal.interface.binding @s0b0_xw_external, set=0, binding=0, type="StorageBuffer"
 }
 
 //      CHECK: #[[SIZE_MAP:.+]] = affine_map<()[s0] -> (s0 * 12)
@@ -175,7 +143,7 @@ hal.interface private @io  {
 //      CHECK:   %[[C0:.+]] = arith.constant 0 : index
 //      CHECK:   %[[DIM:.+]] = hal.interface.load.constant offset = 0 : index
 //      CHECK:   %[[SIZE:.+]] = affine.apply #[[SIZE_MAP]]()[%[[DIM]]]
-//      CHECK:   %[[DST:.+]] = hal.interface.binding.subspan @io::@s0b0_xw_external[%[[C0]]] : memref<?xf32>{%[[SIZE]]}
+//      CHECK:   %[[DST:.+]] = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) offset(%[[C0]]) : memref<?xf32>{%[[SIZE]]}
 //      CHECK: scf.for
 //      CHECK:   %[[INDEX:.+]] = affine.apply #[[OFFSET_MAP]]()[%[[I0]], %[[I1]], %[[I2]], %[[OFFSET]]]
 //      CHECK:   memref.store %[[VALUE]], %[[DST]][%[[INDEX]]] : memref<?xf32>
@@ -224,21 +192,17 @@ func @load_store_alloca_dynamic(%value : f32, %dim0 : index, %dim1: index, %dim2
 // -----
 
 func @use_subspan_with_unrealized_conversion_cast(%offset : index, %i: index) -> f32 {
-  %subspan = hal.interface.binding.subspan @io::@s0b0_ro_constant[%offset] : memref<6x7x8xf32>
+  %subspan = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) offset(%offset) : memref<6x7x8xf32>
   %use = builtin.unrealized_conversion_cast %subspan : memref<6x7x8xf32> to memref<?xf32>
   %val = memref.load %use[%i] : memref<?xf32>
   return %val: f32
-}
-
-hal.interface private @io  {
-  hal.interface.binding @s0b0_ro_constant, set=0, binding=0, type="StorageBuffer"
 }
 
 //      CHECK: #[[MAP:.+]] = affine_map<()[s0, s1] -> (s0 + s1 floordiv 4)>
 //      CHECK: func @use_subspan_with_unrealized_conversion_cast
 // CHECK-SAME: (%[[OFFSET:.+]]: index, %[[I:.+]]: index)
 //      CHECK:   %[[C0:.+]] = arith.constant 0 : index
-//      CHECK:   %[[SUBSPAN:.+]] = hal.interface.binding.subspan @io::@s0b0_ro_constant[%[[C0]]] : memref<?xf32>
+//      CHECK:   %[[SUBSPAN:.+]] = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) offset(%[[C0]]) : memref<?xf32>
 //      CHECK:   %[[INDEX:.+]] = affine.apply #[[MAP]]()[%[[I]], %[[OFFSET]]]
 //      CHECK:   memref.load %[[SUBSPAN]][%[[INDEX]]]
 
@@ -264,21 +228,19 @@ func @load_global_with_offset(%i0: index, %i1: index, %i2: index, %i3: index) ->
 
 func @transfer_read_subspan_with_offset(
     %arg0 : index, %arg1: index, %arg2: index, %arg3: index) -> vector<4xf32> {
-  %subspan = hal.interface.binding.subspan @io::@ro[%arg0] : memref<6x7x8xf32>
+  %subspan = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) offset(%arg0) : memref<6x7x8xf32>
   %cst = arith.constant 0.0 : f32
   %val = vector.transfer_read %subspan[%arg1, %arg2, %arg3], %cst {in_bounds = [true]} : memref<6x7x8xf32>, vector<4xf32>
   return %val: vector<4xf32>
 }
-hal.interface private @io  {
-  hal.interface.binding @ro, set=0, binding=0, type="StorageBuffer"
-}
+
 //      CHECK: #[[MAP:.+]] =  affine_map<()[s0, s1, s2] -> (s0 * 56 + s1 * 8 + s2)>
 //      CHECK: func @transfer_read_subspan_with_offset
 // CHECK-SAME:   %[[ARG0:[a-zA-Z0-9_]+]]: index
 // CHECK-SAME:   %[[ARG1:[a-zA-Z0-9_]+]]: index
 // CHECK-SAME:   %[[ARG2:[a-zA-Z0-9_]+]]: index
 // CHECK-SAME:   %[[ARG3:[a-zA-Z0-9_]+]]: index
-//      CHECK:   %[[MEMREF:.+]] = hal.interface.binding.subspan @io::@ro[%[[ARG0]]] : memref<?xf32>
+//      CHECK:   %[[MEMREF:.+]] = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) offset(%[[ARG0]]) : memref<?xf32>
 //      CHECK:   %[[INDEX:.+]] = affine.apply #[[MAP]]()[%[[ARG1]], %[[ARG2]], %[[ARG3]]]
 //      CHECK:   %[[VEC:.+]] = vector.transfer_read %[[MEMREF]][%[[INDEX]]]
 //      CHECK:   return %[[VEC]]
@@ -287,13 +249,11 @@ hal.interface private @io  {
 
 func @transfer_write_subspan_with_offset(
     %arg0 : index, %arg1: index, %arg2: index, %arg3: index, %arg4 : vector<4xf32>) {
-  %subspan = hal.interface.binding.subspan @io::@ro[%arg0] : memref<6x7x8xf32>
+  %subspan = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) offset(%arg0) : memref<6x7x8xf32>
   vector.transfer_write %arg4, %subspan[%arg1, %arg2, %arg3] {in_bounds = [true]} :  vector<4xf32>, memref<6x7x8xf32>
   return
 }
-hal.interface private @io  {
-  hal.interface.binding @ro, set=0, binding=0, type="StorageBuffer"
-}
+
 //      CHECK: #[[MAP:.+]] = affine_map<()[s0, s1, s2] -> (s0 * 56 + s1 * 8 + s2)>
 //      CHECK: func @transfer_write_subspan_with_offset
 // CHECK-SAME:   %[[ARG0:[a-zA-Z0-9_]+]]: index
@@ -301,23 +261,18 @@ hal.interface private @io  {
 // CHECK-SAME:   %[[ARG2:[a-zA-Z0-9_]+]]: index
 // CHECK-SAME:   %[[ARG3:[a-zA-Z0-9_]+]]: index
 // CHECK-SAME:   %[[ARG4:[a-zA-Z0-9_]+]]: vector<4xf32>
-//      CHECK:   %[[MEMREF:.+]] = hal.interface.binding.subspan @io::@ro[%[[ARG0]]] : memref<?xf32>
+//      CHECK:   %[[MEMREF:.+]] = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) offset(%[[ARG0]]) : memref<?xf32>
 //      CHECK:   %[[INDEX:.+]] = affine.apply #[[MAP]]()[%[[ARG1]], %[[ARG2]], %[[ARG3]]]
 //      CHECK:   vector.transfer_write %[[ARG4]], %[[MEMREF]][%[[INDEX]]]
 
 // -----
 
 func @load_store_rank_zero_subspan_with_offset(%offset : index) {
-  %subspan0 = hal.interface.binding.subspan @io::@s0b0_ro_constant[%offset] : memref<f32>
-  %subspan1 = hal.interface.binding.subspan @io::@s0b1_xw_external[%offset] : memref<f32>
+  %subspan0 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) offset(%offset) : memref<f32>
+  %subspan1 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(1) offset(%offset) : memref<f32>
   %val = memref.load %subspan0[] : memref<f32>
   memref.store %val, %subspan1[] : memref<f32>
   return
-}
-
-hal.interface private @io  {
-  hal.interface.binding @s0b0_ro_constant, set=0, binding=0, type="StorageBuffer"
-  hal.interface.binding @s0b1_xw_external, set=0, binding=1, type="StorageBuffer"
 }
 
 //      CHECK: #[[MAP:.+]] = affine_map<()[s0] -> (s0 floordiv 4)>
@@ -325,8 +280,8 @@ hal.interface private @io  {
 // CHECK-SAME: (%[[OFFSET:.+]]: index)
 //  CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
 //  CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
-//      CHECK:   %[[SPAN0:.+]] = hal.interface.binding.subspan @io::@s0b0_ro_constant[%[[C0]]] : memref<?xf32>{%[[C1]]}
-//      CHECK:   %[[SPAN1:.+]] = hal.interface.binding.subspan @io::@s0b1_xw_external[%[[C0]]] : memref<?xf32>{%[[C1]]}
+//      CHECK:   %[[SPAN0:.+]] = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) offset(%[[C0]]) : memref<?xf32>{%[[C1]]}
+//      CHECK:   %[[SPAN1:.+]] = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(1) offset(%[[C0]]) : memref<?xf32>{%[[C1]]}
 //      CHECK:   %[[INDEX0:.+]] = affine.apply #[[MAP]]()[%[[OFFSET]]]
 //      CHECK:   %[[LOAD:.+]] = memref.load %[[SPAN0]][%[[INDEX0]]] : memref<?xf32>
 //      CHECK:   %[[INDEX1:.+]] = affine.apply #[[MAP]]()[%[[OFFSET]]]
@@ -335,14 +290,10 @@ hal.interface private @io  {
 // -----
 
 func @collapse_shape(%offset : index, %i0 : index, %i1 : index) -> f32 {
-  %subspan = hal.interface.binding.subspan @io::@s0b0_ro_constant[%offset] : memref<4x5x6x7xf32>
+  %subspan = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) offset(%offset) : memref<4x5x6x7xf32>
   %collapse = memref.collapse_shape %subspan[[0, 1], [2, 3]] : memref<4x5x6x7xf32> into memref<20x42xf32>
   %value = memref.load %collapse[%i0, %i1] : memref<20x42xf32>
   return %value : f32
-}
-
-hal.interface @io attributes {sym_visibility = "private"} {
-  hal.interface.binding @s0b0_ro_constant, set=0, binding=0, type="StorageBuffer"
 }
 
 //      CHECK: #[[MAP:.+]] = affine_map<()[s0, s1, s2] -> (s0 * 42 + s1 + s2 floordiv 4)>
@@ -350,21 +301,17 @@ hal.interface @io attributes {sym_visibility = "private"} {
 // CHECK-SAME: (%[[OFFSET:.+]]: index, %[[I0:.+]]: index, %[[I1:.+]]: index)
 //      CHECK:   %[[C0:.+]] = arith.constant 0 : index
 //      CHECK:   %[[SIZE:.+]] = arith.constant 840 : index
-//      CHECK:   %[[SUBSPAN:.+]] = hal.interface.binding.subspan @io::@s0b0_ro_constant[%[[C0]]] : memref<?xf32>{%[[SIZE]]}
+//      CHECK:   %[[SUBSPAN:.+]] = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) offset(%[[C0]]) : memref<?xf32>{%[[SIZE]]}
 //      CHECK:   %[[INDEX:.+]] = affine.apply #[[MAP]]()[%[[I0]], %[[I1]], %[[OFFSET]]]
 //      CHECK:   memref.load %[[SUBSPAN]][%[[INDEX]]]
 
 // -----
 
 func @expand_shape(%offset : index, %i0: index, %i1: index, %i2: index, %i3: index) -> f32 {
-  %subspan = hal.interface.binding.subspan @io::@s0b0_ro_constant[%offset] : memref<20x42xf32>
+  %subspan = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) offset(%offset) : memref<20x42xf32>
   %expand = memref.expand_shape %subspan[[0, 1], [2, 3]] : memref<20x42xf32> into memref<4x5x6x7xf32>
   %value = memref.load %expand[%i0, %i1, %i2, %i3] : memref<4x5x6x7xf32>
   return %value : f32
-}
-
-hal.interface @io attributes {sym_visibility = "private"} {
-  hal.interface.binding @s0b0_ro_constant, set=0, binding=0, type="StorageBuffer"
 }
 
 //      CHECK: #[[MAP:.+]] = affine_map<()[s0, s1, s2, s3, s4] -> (s0 * 210 + s1 * 42 + s2 * 7 + s3 + s4 floordiv 4)>
@@ -372,6 +319,6 @@ hal.interface @io attributes {sym_visibility = "private"} {
 // CHECK-SAME: (%[[OFFSET:.+]]: index, %[[I0:.+]]: index, %[[I1:.+]]: index, %[[I2:.+]]: index, %[[I3:.+]]: index)
 //      CHECK:   %[[C0:.+]] = arith.constant 0 : index
 //      CHECK:   %[[SIZE:.+]] = arith.constant 840 : index
-//      CHECK:   %[[SUBSPAN:.+]] = hal.interface.binding.subspan @io::@s0b0_ro_constant[%[[C0]]] : memref<?xf32>{%[[SIZE]]}
+//      CHECK:   %[[SUBSPAN:.+]] = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) offset(%[[C0]]) : memref<?xf32>{%[[SIZE]]}
 //      CHECK:   %[[INDEX:.+]] = affine.apply #[[MAP]]()[%[[I0]], %[[I1]], %[[I2]], %[[I3]], %[[OFFSET]]]
 //      CHECK:   memref.load %[[SUBSPAN]][%[[INDEX]]]

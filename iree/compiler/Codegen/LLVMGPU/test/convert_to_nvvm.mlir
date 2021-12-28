@@ -4,9 +4,9 @@
 func @abs_ex_dispatch_0() {
   %c0 = arith.constant 0 : index
   %c128 = arith.constant 128 : index
-  %0 = hal.interface.binding.subspan @io::@arg0[%c128] : memref<16xf32>
-  %1 = hal.interface.binding.subspan @io::@arg1[%c0] : memref<16xi32>
-  %2 = hal.interface.binding.subspan @io::@ret0[%c0] : memref<16xf32>
+  %0 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(4) offset(%c128) : memref<16xf32>
+  %1 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) : memref<16xi32>
+  %2 = hal.interface.binding.subspan type(StorageBuffer) set(1) binding(2) : memref<16xf32>
   %3 = "gpu.block_id"() {dimension = "x"} : () -> index
   %4 = "gpu.block_dim"() {dimension = "x"} : () -> index
   %5 = "gpu.thread_id"() {dimension = "x"} : () -> index
@@ -18,11 +18,6 @@ func @abs_ex_dispatch_0() {
   %12 = arith.addf %9, %11 : f32
   memref.store %12, %2[%7] : memref<16xf32>
   return
-}
-hal.interface private @io  {
-  hal.interface.binding @arg0, set=0, binding=4, type="StorageBuffer"
-  hal.interface.binding @arg1, set=0, binding=0, type="StorageBuffer"
-  hal.interface.binding @ret0, set=1, binding=2, type="StorageBuffer"
 }
 
 // CHECK-LABEL: llvm.func @abs_ex_dispatch_0
@@ -44,9 +39,9 @@ func @abs_dynamic() {
   %c0 = arith.constant 0 : index
   %c128 = arith.constant 128 : index
   %s = hal.interface.load.constant offset = 1 : index
-  %0 = hal.interface.binding.subspan @io::@arg0[%c128] : memref<?xf32>{%s}
-  %1 = hal.interface.binding.subspan @io::@arg1[%c0] : memref<16xi32>
-  %2 = hal.interface.binding.subspan @io::@ret0[%c0] : memref<16xf32>
+  %0 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(4) offset(%c128) : memref<?xf32>{%s}
+  %1 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) : memref<16xi32>
+  %2 = hal.interface.binding.subspan type(StorageBuffer) set(1) binding(2) : memref<16xf32>
   %3 = "gpu.block_id"() {dimension = "x"} : () -> index
   %4 = "gpu.block_dim"() {dimension = "x"} : () -> index
   %5 = "gpu.thread_id"() {dimension = "x"} : () -> index
@@ -58,11 +53,6 @@ func @abs_dynamic() {
   %12 = arith.addf %9, %11 : f32
   memref.store %12, %2[%7] : memref<16xf32>
   return
-}
-hal.interface @io attributes {sym_visibility = "private"} {
-  hal.interface.binding @arg0, set=0, binding=4, type="StorageBuffer"
-  hal.interface.binding @arg1, set=0, binding=0, type="StorageBuffer"
-  hal.interface.binding @ret0, set=1, binding=2, type="StorageBuffer"
 }
 
 // CHECK-LABEL: llvm.func @abs_dynamic
@@ -81,12 +71,13 @@ hal.interface @io attributes {sym_visibility = "private"} {
 
 // -----
 
-// Test that we handle correctly the case where a symbol is dead.
+// Test that we handle correctly the case where bindings are sparse (set 0
+// binding 0 is not used).
 func @dead_symbol() {
   %c0 = arith.constant 0 : index
   %c128 = arith.constant 128 : index
-  %1 = hal.interface.binding.subspan @io::@arg1[%c0] : memref<16xi32>
-  %2 = hal.interface.binding.subspan @io::@ret0[%c0] : memref<16xf32>
+  %1 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(1) : memref<16xi32>
+  %2 = hal.interface.binding.subspan type(StorageBuffer) set(1) binding(2) : memref<16xf32>
   %3 = "gpu.block_id"() {dimension = "x"} : () -> index
   %4 = "gpu.block_dim"() {dimension = "x"} : () -> index
   %5 = "gpu.thread_id"() {dimension = "x"} : () -> index
@@ -98,17 +89,10 @@ func @dead_symbol() {
   memref.store %12, %2[%7] : memref<16xf32>
   return
 }
-hal.interface private @io  {
-  // arg0 is dead
-  hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer"
-  hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer"
-  hal.interface.binding @ret0, set=1, binding=2, type="StorageBuffer"
-}
 
 // CHECK-LABEL: llvm.func @dead_symbol
-//  CHECK-SAME: (%[[ARG0:.+]]: !llvm.ptr<i32>,
-//  CHECK-SAME:  %[[ARG1:.+]]: !llvm.ptr<i32> {llvm.align = 16 : i32},
-//  CHECK-SAME:  %{{.*}}: !llvm.ptr<f32> {llvm.align = 16 : i32})
+//  CHECK-SAME: (%[[ARG0:.+]]: !llvm.ptr<i32> {llvm.align = 16 : i32},
+//  CHECK-SAME:  %[[ARG1:.+]]: !llvm.ptr<f32> {llvm.align = 16 : i32})
 //      CHECK:    llvm.fadd
 
 // -----
@@ -118,9 +102,9 @@ hal.interface private @io  {
 func @mixed_type() {
   %c0 = arith.constant 0 : index
   %c128 = arith.constant 128 : index
-  %0 = hal.interface.binding.subspan @io::@arg0[%c128] : memref<16xf32>
-  %1 = hal.interface.binding.subspan @io::@arg0[%c0] : memref<16xi32>
-  %2 = hal.interface.binding.subspan @io::@ret0[%c0] : memref<16xf32>
+  %0 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) offset(%c128) : memref<16xf32>
+  %1 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) offset(%c0) : memref<16xi32>
+  %2 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(1) : memref<16xf32>
   %3 = "gpu.block_id"() {dimension = "x"} : () -> index
   %4 = "gpu.block_dim"() {dimension = "x"} : () -> index
   %5 = "gpu.thread_id"() {dimension = "x"} : () -> index
@@ -132,10 +116,6 @@ func @mixed_type() {
   %12 = arith.addf %9, %11 : f32
   memref.store %12, %2[%7] : memref<16xf32>
   return
-}
-hal.interface private @io  {
-  hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer"
-  hal.interface.binding @ret0, set=0, binding=1, type="StorageBuffer"
 }
 
 // CHECK-LABEL: llvm.func @mixed_type

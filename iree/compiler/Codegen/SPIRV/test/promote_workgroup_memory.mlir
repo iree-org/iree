@@ -8,8 +8,7 @@ hal.executable private @matmul_promote_workgroup_memory  {
     hal.interface.binding @s0b2_xw_external, set=0, binding=2, type="StorageBuffer"
   }
   hal.executable.variant @vulkan, target = <"vulkan-spirv", "vulkan-spirv-fb"> {
-    hal.executable.entry_point @matmul_promote_workgroup_memory attributes {
-      interface = @io, ordinal = 0 : index,
+    hal.executable.entry_point @matmul_promote_workgroup_memory interface(@io) {
       workgroup_size = [16: index, 8: index, 1: index]
     }
     builtin.module {
@@ -82,8 +81,7 @@ hal.executable private @conv_promote_workgroup_memory  {
     hal.interface.binding @s0b2_xw_external, set=0, binding=2, type="StorageBuffer"
   }
   hal.executable.variant @vulkan, target = <"vulkan-spirv", "vulkan-spirv-fb"> {
-    hal.executable.entry_point @conv_promote_workgroup_memory attributes {
-      interface = @io, ordinal = 0 : index,
+    hal.executable.entry_point @conv_promote_workgroup_memory interface(@io) {
       workgroup_size = [32: index, 4: index, 1: index]
     }
     builtin.module {

@@ -10,9 +10,9 @@ module  {
     %cst = arith.constant 0.000000e+00 : f32
     %c384 = arith.constant 384 : index
     %c128 = arith.constant 128 : index
-    %0 = hal.interface.binding.subspan @io::@s0b0_ro_external[%c0] : !flow.dispatch.tensor<readonly:384x512xf32>
-    %1 = hal.interface.binding.subspan @io::@s0b1_ro_external[%c0] : !flow.dispatch.tensor<readonly:512x128xf32>
-    %2 = hal.interface.binding.subspan @io::@s0b2_xw_external[%c0] : !flow.dispatch.tensor<writeonly:384x128xf32>
+    %0 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) : !flow.dispatch.tensor<readonly:384x512xf32>
+    %1 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(1) : !flow.dispatch.tensor<readonly:512x128xf32>
+    %2 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(2) : !flow.dispatch.tensor<writeonly:384x128xf32>
     %workgroup_id_x = hal.interface.workgroup.id[0] : index
     %workgroup_count_x = hal.interface.workgroup.count[0] : index
     %workgroup_id_y = hal.interface.workgroup.id[1] : index
@@ -38,12 +38,8 @@ module  {
     }
     return
   }
-  hal.interface private @io {
-    hal.interface.binding public @s0b0_ro_external, set=0, binding=0, type="StorageBuffer"
-    hal.interface.binding public @s0b1_ro_external, set=0, binding=1, type="StorageBuffer"
-    hal.interface.binding public @s0b2_xw_external, set=0, binding=2, type="StorageBuffer"
-  }
 }
+
 //      CHECK: #[[MAP:.+]] = affine_map<()[s0] -> (s0 * 64)>
 //      CHECK: func @dot_384x512x128_dispatch_0() {
 //  CHECK-DAG: %[[CST:.+]] = arith.constant 0.000000e+00 : f32
@@ -55,9 +51,9 @@ module  {
 //  CHECK-DAG: %[[C16:.+]] = arith.constant 16 : index
 //  CHECK-DAG: %[[C32:.+]] = arith.constant 32 : index
 //  CHECK-DAG: %[[C64:.+]] = arith.constant 64 : index
-//      CHECK: %[[LHS:.+]] = hal.interface.binding.subspan @io::@s0b0_ro_external[%c0] : !flow.dispatch.tensor<readonly:384x512xf32>
-//      CHECK: %[[RHS:.+]] = hal.interface.binding.subspan @io::@s0b1_ro_external[%c0] : !flow.dispatch.tensor<readonly:512x128xf32>
-//      CHECK: %[[DST:.+]] = hal.interface.binding.subspan @io::@s0b2_xw_external[%c0] : !flow.dispatch.tensor<writeonly:384x128xf32>
+//      CHECK: %[[LHS:.+]] = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) : !flow.dispatch.tensor<readonly:384x512xf32>
+//      CHECK: %[[RHS:.+]] = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(1) : !flow.dispatch.tensor<readonly:512x128xf32>
+//      CHECK: %[[DST:.+]] = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(2) : !flow.dispatch.tensor<writeonly:384x128xf32>
 //      CHECK: %[[DST_TILE_INIT:.+]] = linalg.init_tensor
 //      CHECK: scf.for %[[I_IDX:.+]] = {{.*}} to %[[C384]] step %{{[0-9]*}} {
 //      CHECK:   %[[LHS_TILE:.+]] = flow.dispatch.tensor.load %[[LHS]], {{.*}} -> tensor<64x512xf32>
@@ -90,12 +86,12 @@ func @matmul_gather() {
   %c1835008 = arith.constant 1835008 : index
   %c0 = arith.constant 0 : index
   %c64 = arith.constant 64 : index
-  %0 = hal.interface.binding.subspan @io::@s0b1_ro_external[%c0] : !flow.dispatch.tensor<readonly:384xi32>
-  %1 = hal.interface.binding.subspan @io::@s0b2_ro_external[%c0] : !flow.dispatch.tensor<readonly:384x512xf32>
-  %2 = hal.interface.binding.subspan @io::@s0b3_ro_external[%c0] : !flow.dispatch.tensor<readonly:384x384xf32>
-  %3 = hal.interface.binding.subspan @io::@s0b0_ro_constant[%c0] : !flow.dispatch.tensor<readonly:384x512xf32>
-  %4 = hal.interface.binding.subspan @io::@s0b0_ro_constant[%c1835008] : !flow.dispatch.tensor<readonly:2x512xf32>
-  %5 = hal.interface.binding.subspan @io::@s0b4_xw_external[%c0] : !flow.dispatch.tensor<writeonly:384x512xf32>
+  %0 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) : !flow.dispatch.tensor<readonly:384xi32>
+  %1 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(1) : !flow.dispatch.tensor<readonly:384x512xf32>
+  %2 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(2) : !flow.dispatch.tensor<readonly:384x384xf32>
+  %3 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(3) : !flow.dispatch.tensor<readonly:384x512xf32>
+  %4 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(4) offset(%c1835008) : !flow.dispatch.tensor<readonly:2x512xf32>
+  %5 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(5) : !flow.dispatch.tensor<writeonly:384x512xf32>
   %6 = flow.dispatch.tensor.load %4, offsets = [], sizes = [], strides = [] : !flow.dispatch.tensor<readonly:2x512xf32> -> tensor<2x512xf32>
   %workgroup_id_x = hal.interface.workgroup.id[0] : index
   %workgroup_count_x = hal.interface.workgroup.count[0] : index
@@ -157,13 +153,13 @@ func @nonvectorizable_matmul_and_vectorizable_generic() {
   %c0 = arith.constant 0 : index
   %c49 = arith.constant 49 : index
   %c16 = arith.constant 16 : index
-  %0 = hal.interface.binding.subspan @io::@s0b0_ro_constant[%c768] : !flow.dispatch.tensor<readonly:96xf32>
-  %1 = hal.interface.binding.subspan @io::@s0b0_ro_constant[%c0] : !flow.dispatch.tensor<readonly:96xf32>
-  %2 = hal.interface.binding.subspan @io::@s0b0_ro_constant[%c1152] : !flow.dispatch.tensor<readonly:96xf32>
-  %3 = hal.interface.binding.subspan @io::@s0b0_ro_constant[%c384] : !flow.dispatch.tensor<readonly:96xf32>
-  %4 = hal.interface.binding.subspan @io::@s0b1_ro_external[%c0] : !flow.dispatch.tensor<readonly:784x24xf32>
-  %5 = hal.interface.binding.subspan @io::@s0b2_ro_external[%c0] : !flow.dispatch.tensor<readonly:24x96xf32>
-  %6 = hal.interface.binding.subspan @io::@s0b3_xw_external[%c0] : !flow.dispatch.tensor<writeonly:784x96xf32>
+  %0 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) offset(%c768) : !flow.dispatch.tensor<readonly:96xf32>
+  %1 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) offset(%c0) : !flow.dispatch.tensor<readonly:96xf32>
+  %2 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) offset(%c1152) : !flow.dispatch.tensor<readonly:96xf32>
+  %3 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) offset(%c384) : !flow.dispatch.tensor<readonly:96xf32>
+  %4 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(1) : !flow.dispatch.tensor<readonly:784x24xf32>
+  %5 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(2) : !flow.dispatch.tensor<readonly:24x96xf32>
+  %6 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(3) : !flow.dispatch.tensor<writeonly:784x96xf32>
   %workgroup_id_x = hal.interface.workgroup.id[0] : index
   %workgroup_count_x = hal.interface.workgroup.count[0] : index
   %workgroup_id_y = hal.interface.workgroup.id[1] : index
