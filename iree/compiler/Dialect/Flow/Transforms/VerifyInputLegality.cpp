@@ -30,9 +30,10 @@ class VerifyInputLegalityPass
     target.addIllegalDialect("mhlo");
     target.addIllegalOp<UnrealizedConversionCastOp>();
 
-    if (failed(
-            iree_compiler::verifyAllOperationsAreLegal(getOperation(), target)))
+    if (failed(iree_compiler::verifyAllOperationsAreLegal(getOperation(),
+                                                          target))) {
       return signalPassFailure();
+    }
   }
 };
 }  // namespace

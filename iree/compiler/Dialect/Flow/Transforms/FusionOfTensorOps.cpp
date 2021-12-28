@@ -100,8 +100,9 @@ struct FusionOfTensorOpsPass
           // expensive.
           // TODO: Add a cost model to allow ops to be duplicated.
           if (!isBroadcast && !isa<arith::ConstantOp>(producer) &&
-              !llvm::hasSingleElement(producerResult.getUsers()))
+              !llvm::hasSingleElement(producerResult.getUsers())) {
             return false;
+          }
           return llvm::all_of(producerResult.getUsers(), [](Operation *user) {
             return isa<linalg::GenericOp>(user);
           });
@@ -113,11 +114,13 @@ struct FusionOfTensorOpsPass
     linalg::ControlElementwiseOpsFusionFn foldReshapeBetweenLinalgFn =
         [](const OpResult &producer, const OpOperand &consumer) {
           auto collapseOp = producer.getDefiningOp<tensor::CollapseShapeOp>();
-          if (collapseOp)
+          if (collapseOp) {
             return collapseOp.src().getDefiningOp<LinalgOp>() != nullptr;
+          }
           auto expandOp = producer.getDefiningOp<tensor::ExpandShapeOp>();
-          if (expandOp)
+          if (expandOp) {
             return expandOp.src().getDefiningOp<LinalgOp>() != nullptr;
+          }
           return false;
         };
     linalg::populateElementwiseOpsFusionPatterns(

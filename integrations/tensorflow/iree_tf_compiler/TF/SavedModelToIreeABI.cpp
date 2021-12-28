@@ -391,8 +391,9 @@ struct StructureLevel {
 
   StructureLevel *allocateChild(Location loc, int childIndex,
                                 bool asTuple = false) {
-    if (type == LevelType::None)
+    if (type == LevelType::None) {
       type = asTuple ? LevelType::Tuple : LevelType::List;
+    }
     if (type != LevelType::List && type != LevelType::Tuple) {
       emitError(loc) << "structure path mismatch: dereference a non-sequence "
                      << "with a sequence key " << childIndex;

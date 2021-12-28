@@ -69,9 +69,11 @@ struct ConvertSharedMemAllocOp : public OpRewritePattern<memref::AllocOp> {
                                 PatternRewriter &rewriter) const override {
     if (allocOp.getType().getMemorySpaceAsInt() != 3) return failure();
     ArrayRef<int64_t> shape = allocOp.getType().getShape();
-    if (llvm::any_of(
-            shape, [](int64_t dim) { return dim == ShapedType::kDynamicSize; }))
+    if (llvm::any_of(shape, [](int64_t dim) {
+          return dim == ShapedType::kDynamicSize;
+        })) {
       return failure();
+    }
     // In CUDA workgroup memory is represented by a global variable.
     MemRefType allocType = allocOp.getType();
     auto funcOp = allocOp->getParentOfType<FuncOp>();
@@ -201,8 +203,9 @@ class ConvertFunc : public ConvertToLLVMPattern {
     rewriter.inlineRegionBefore(funcOp.getBody(), newFuncOp.getBody(),
                                 newFuncOp.end());
     if (failed(rewriter.convertRegionTypes(&newFuncOp.getBody(), *typeConverter,
-                                           &signatureConverter)))
+                                           &signatureConverter))) {
       return failure();
+    }
 
     rewriter.eraseOp(funcOp);
     return success();

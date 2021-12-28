@@ -98,9 +98,11 @@ LogicalResult AffineMinCanonicalizationPattern::matchAndRewrite(
                           << *minOp.getOperation() << "\n");
 
   int64_t min = std::numeric_limits<int64_t>::max();
-  for (auto e : minOp.map().getResults())
-    if (auto cstExpr = e.dyn_cast<AffineConstantExpr>())
+  for (auto e : minOp.map().getResults()) {
+    if (auto cstExpr = e.dyn_cast<AffineConstantExpr>()) {
       min = std::min(min, cstExpr.getValue());
+    }
+  }
   if (min == std::numeric_limits<int64_t>::max()) return failure();
 
   MLIRContext *ctx = minOp.getContext();

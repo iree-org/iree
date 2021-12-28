@@ -109,8 +109,9 @@ static SmallVector<int64_t> getNumWorkgroup(
 
   SmallVector<int64_t> workloadPerWorkgroup =
       translationInfo.getWorkloadPerWorkgroupVals();
-  if (workloadSize.size() != workloadPerWorkgroup.size())
+  if (workloadSize.size() != workloadPerWorkgroup.size()) {
     return SmallVector<int64_t>();
+  }
   SmallVector<int64_t> numWorkgroups;
   for (auto pair : llvm::zip(workloadSize, workloadPerWorkgroup)) {
     auto workload = std::get<0>(pair);

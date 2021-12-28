@@ -124,8 +124,10 @@ struct ConvertVectorContractOp final
     // Check that this is a matmul operation.
     auto iterators = contractOp.iterator_types().getValue();
     if (iterators.size() != 3 || !isParallelIterator(iterators[0]) ||
-        !isParallelIterator(iterators[1]) || !isReductionIterator(iterators[2]))
+        !isParallelIterator(iterators[1]) ||
+        !isReductionIterator(iterators[2])) {
       return failure();
+    }
     if (contractOp.kind() != vector::CombiningKind::ADD) return failure();
 
     // Column major matmuls should have been lowered to transpose + contract

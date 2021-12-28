@@ -165,9 +165,10 @@ static void distributeTransferRead(FuncOp funcOp, Value flatThreadId,
       multiplier.push_back(threads);
       Value dimId = id;
       assert(numThreads % threads == 0);
-      if (numThreads / threads > 1)
+      if (numThreads / threads > 1) {
         dimId =
             makeComposedAffineApply(b, funcOp.getLoc(), d0 % threads, {dimId});
+      }
       ids.push_back(dimId);
       numThreads = numThreads / threads;
       id = makeComposedAffineApply(b, funcOp.getLoc(), d0.floorDiv(threads),

@@ -181,9 +181,10 @@ void LinalgSingleTilingExpertPass::runOnOperation() {
     doTiling = true;
     tilingOptions = tilingOptions.setTileSizes(tileSizes);
   }
-  if (!tileInterchange.empty())
+  if (!tileInterchange.empty()) {
     tilingOptions = tilingOptions.setInterchange(
         SmallVector<unsigned>(tileInterchange.begin(), tileInterchange.end()));
+  }
   if (scalarizeDynamicDims) {
     doTiling = true;
     tilingOptions = tilingOptions.scalarizeDynamicDims();
