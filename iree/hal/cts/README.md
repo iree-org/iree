@@ -1,4 +1,4 @@
-# Conformance Test Suite (CTS) for HAL implementations.
+# Conformance Test Suite (CTS) for HAL implementations
 
 These tests exercise IREE's Hardware Abstraction Layer (HAL) in a way that
 checks for conformance across implementations and devices. The tests themselves
