@@ -6,28 +6,26 @@
 #device_target_cpu = #hal.device.target<"cpu", {
   executable_targets = [#executable_target_embedded_elf_x86_64_]
 }>
-#translation = #iree_codegen.translation.info<"CPUDefault", workload_per_wg = [4]>
-
-#map = affine_map<()[s0] -> (s0 ceildiv 4)>
+#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>,
+    #hal.descriptor_set.binding<2, storage_buffer>
+  ]>
+]>
 
 // CHECK: module
 module attributes {hal.device.targets = [#device_target_cpu]}  {
 
   // CHECK: hal.executable private @ex
   hal.executable private @ex {
-    hal.interface public @io attributes {push_constants = 0 : index} {
-      hal.interface.binding public @s0b0_ro, set=0, binding=0, type="StorageBuffer"
-      hal.interface.binding public @s0b1_ro, set=0, binding=1, type="StorageBuffer"
-      hal.interface.binding public @s0b2_wo, set=0, binding=2, type="StorageBuffer"
-    }
     hal.executable.variant public @embedded_elf_x86_64, target = #executable_target_embedded_elf_x86_64_ {
-      hal.executable.entry_point public @dispatch interface(@io) {
-        ordinal = 0 : index,
-        translation.info = #translation
+      hal.executable.entry_point public @dispatch ordinal(0) layout(#executable_layout) attributes {
+        translation.info = #iree_codegen.translation.info<"CPUDefault", workload_per_wg = [4]>
       } {
       ^bb0(%arg0: index, %arg1: index, %arg2: index):  // no predecessors
         %c1 = arith.constant 1 : index
-        %0 = affine.apply #map()[%arg0]
+        %0 = affine.apply affine_map<()[s0] -> (s0 ceildiv 4)>()[%arg0]
         hal.return %0, %c1, %c1 : index, index, index
       }
       builtin.module {
@@ -87,12 +85,7 @@ module attributes {hal.device.targets = [#device_target_cpu]}  {
       // CHECK: #hal.device.match.executable.format<"embedded-elf-x86_64"> {
       // CHECK:   %[[EXECUTABLE_LAYOUT:.+]] = hal.executable_layout.lookup
       // CHECK-SAME: device(%[[DEVICE]] : !hal.device)
-      // CHECK-SAME: push_constants(0)
-      // CHECK-SAME: layouts([
-      // CHECK-SAME:   #hal.descriptor_set_layout_binding<0, "StorageBuffer">,
-      // CHECK-SAME:   #hal.descriptor_set_layout_binding<1, "StorageBuffer">,
-      // CHECK-SAME:   #hal.descriptor_set_layout_binding<2, "StorageBuffer">
-      // CHECK-SAME: ]) : !hal.executable_layout
+      // CHECK-SAME: layout(#executable_layout) : !hal.executable_layout
       // CHECK:   hal.command_buffer.push_descriptor_set<%[[CMD]] : !hal.command_buffer>
       // CHECK-SAME: layout(%[[EXECUTABLE_LAYOUT]] : !hal.executable_layout)[%c0]
       // CHECK-SAME: bindings([
@@ -111,9 +104,9 @@ module attributes {hal.device.targets = [#device_target_cpu]}  {
         wo %result_capture[%c0 for %c16] : !stream.resource<external>{%c16}
       } attributes {
         hal.interface.bindings = [
-          @ex::@io::@s0b0_ro,
-          @ex::@io::@s0b1_ro,
-          @ex::@io::@s0b2_wo
+          #hal.interface.binding<0, 0>,
+          #hal.interface.binding<0, 1>,
+          #hal.interface.binding<0, 2>
         ]
       }
 

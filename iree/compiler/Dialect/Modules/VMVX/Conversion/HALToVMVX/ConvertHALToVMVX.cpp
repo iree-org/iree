@@ -256,20 +256,6 @@ class ConvertHALInterfaceBindingSubspanOp
   }
 };
 
-/// Removes the hal.interface from the IR - it's not used after conversion.
-class RemoveHALInterfaceOpPattern
-    : public OpConversionPattern<IREE::HAL::InterfaceOp> {
- public:
-  using OpConversionPattern::OpConversionPattern;
-
-  LogicalResult matchAndRewrite(
-      IREE::HAL::InterfaceOp op, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
-    rewriter.eraseOp(op);
-    return success();
-  }
-};
-
 }  // namespace
 
 void populateHALToVMVXPatterns(MLIRContext *context,
@@ -280,7 +266,6 @@ void populateHALToVMVXPatterns(MLIRContext *context,
   patterns.insert<ConvertHALInterfaceWorkgroupCountOp>(typeConverter, context);
   patterns.insert<ConvertHALInterfaceConstantLoadOp>(typeConverter, context);
   patterns.insert<ConvertHALInterfaceBindingSubspanOp>(typeConverter, context);
-  patterns.insert<RemoveHALInterfaceOpPattern>(typeConverter, context);
 }
 
 }  // namespace iree_compiler

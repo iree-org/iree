@@ -6,45 +6,46 @@
 #map3 = affine_map<(d0)[s0] -> (-d0 + 256, s0)>
 #map4 = affine_map<(d0)[s0] -> (-d0 + 1024, s0)>
 #map5 = affine_map<(d0, d1) -> (d0, d1)>
-
+#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>,
+    #hal.descriptor_set.binding<2, storage_buffer>,
+    #hal.descriptor_set.binding<3, storage_buffer>,
+    #hal.descriptor_set.binding<4, storage_buffer>
+  ]>
+]>
 hal.executable public @matmul_256x1024x128_div_sub {
-  hal.interface public @io {
-    hal.interface.binding public @s0b0_ro_external, set=0, binding=0, type="StorageBuffer"
-    hal.interface.binding public @s0b1_ro_external, set=0, binding=1, type="StorageBuffer"
-    hal.interface.binding public @s0b2_ro_external, set=0, binding=2, type="StorageBuffer"
-    hal.interface.binding public @s0b3_ro_external, set=0, binding=3, type="StorageBuffer"
-    hal.interface.binding public @s0b4_xw_external, set=0, binding=4, type="StorageBuffer"
-  }
   hal.executable.variant @vulkan, target = <"vulkan-spirv", "vulkan-spirv-fb", {
-      spv.target_env =
-        #spv.target_env<#spv.vce<v1.5,
-          [Shader, Float16, StorageBuffer16BitAccess, StorageUniform16, CooperativeMatrixNV],
-          [SPV_KHR_variable_pointers, SPV_NV_cooperative_matrix]>, NVIDIA:DiscreteGPU,
-          {cooperative_matrix_properties_nv = [
-            {a_type = i8, b_type = i8, c_type = i32, k_size = 32 : i32,
-             m_size = 8 : i32, n_size = 8 : i32, result_type = i32, scope = 3 : i32},
-            {a_type = f16, b_type = f16, c_type = f16, k_size = 16 : i32,
-             m_size = 16 : i32, n_size = 16 : i32, result_type = f16,
-             scope = 3 : i32},
-            {a_type = f16, b_type = f16, c_type = f32, k_size = 16 : i32,
-             m_size = 16 : i32, n_size = 16 : i32, result_type = f32,
-             scope = 3 : i32}],
-           max_compute_shared_memory_size = 49152 : i32,
-           max_compute_workgroup_invocations = 1024 : i32,
-           max_compute_workgroup_size = dense<[2147483647, 65535, 65535]> : vector<3xi32>,
-           subgroup_size = 32 : i32}>}> {
-    hal.executable.entry_point public @matmul_256x1024x128_div_sub interface(@io)
+    spv.target_env =
+      #spv.target_env<#spv.vce<v1.5,
+        [Shader, Float16, StorageBuffer16BitAccess, StorageUniform16, CooperativeMatrixNV],
+        [SPV_KHR_variable_pointers, SPV_NV_cooperative_matrix]>, NVIDIA:DiscreteGPU,
+        {cooperative_matrix_properties_nv = [
+          {a_type = i8, b_type = i8, c_type = i32, k_size = 32 : i32,
+            m_size = 8 : i32, n_size = 8 : i32, result_type = i32, scope = 3 : i32},
+          {a_type = f16, b_type = f16, c_type = f16, k_size = 16 : i32,
+            m_size = 16 : i32, n_size = 16 : i32, result_type = f16,
+            scope = 3 : i32},
+          {a_type = f16, b_type = f16, c_type = f32, k_size = 16 : i32,
+            m_size = 16 : i32, n_size = 16 : i32, result_type = f32,
+            scope = 3 : i32}],
+          max_compute_shared_memory_size = 49152 : i32,
+          max_compute_workgroup_invocations = 1024 : i32,
+          max_compute_workgroup_size = dense<[2147483647, 65535, 65535]> : vector<3xi32>,
+          subgroup_size = 32 : i32}>}> {
+    hal.executable.entry_point public @matmul_256x1024x128_div_sub layout(#executable_layout)
     builtin.module  {
       func @matmul_256x1024x128_div_sub() {
         %c0 = arith.constant 0 : index
         %c1024 = arith.constant 1024 : index
         %c256 = arith.constant 256 : index
         %cst = arith.constant 0.000000e+00 : f16
-        %0 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) : !flow.dispatch.tensor<readonly:256x1024xf16>
-        %1 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(1) : !flow.dispatch.tensor<readonly:256x1024xf16>
-        %2 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(2) : !flow.dispatch.tensor<readonly:256x128xf16>
-        %3 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(3) : !flow.dispatch.tensor<readonly:128x1024xf16>
-        %4 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(4) : !flow.dispatch.tensor<writeonly:256x1024xf16>
+        %0 = hal.interface.binding.subspan type(storage_buffer) set(0) binding(0) : !flow.dispatch.tensor<readonly:256x1024xf16>
+        %1 = hal.interface.binding.subspan type(storage_buffer) set(0) binding(1) : !flow.dispatch.tensor<readonly:256x1024xf16>
+        %2 = hal.interface.binding.subspan type(storage_buffer) set(0) binding(2) : !flow.dispatch.tensor<readonly:256x128xf16>
+        %3 = hal.interface.binding.subspan type(storage_buffer) set(0) binding(3) : !flow.dispatch.tensor<readonly:128x1024xf16>
+        %4 = hal.interface.binding.subspan type(storage_buffer) set(0) binding(4) : !flow.dispatch.tensor<writeonly:256x1024xf16>
         %workgroup_size_x = hal.interface.workgroup.size[0] : index
         %workgroup_size_y = hal.interface.workgroup.size[1] : index
         %workgroup_id_x = hal.interface.workgroup.id[0] : index

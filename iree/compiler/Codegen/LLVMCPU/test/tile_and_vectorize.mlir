@@ -13,9 +13,9 @@ module  {
     %c513 = arith.constant 513 : index
     %c383 = arith.constant 383 : index
     %cst = arith.constant 0.000000e+00 : f32
-    %0 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) : !flow.dispatch.tensor<readonly:383x383xf32>
-    %1 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(1) : !flow.dispatch.tensor<readonly:383x513xf32>
-    %2 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(2) : !flow.dispatch.tensor<writeonly:383x513xf32>
+    %0 = hal.interface.binding.subspan type(storage_buffer) set(0) binding(0) : !flow.dispatch.tensor<readonly:383x383xf32>
+    %1 = hal.interface.binding.subspan type(storage_buffer) set(0) binding(1) : !flow.dispatch.tensor<readonly:383x513xf32>
+    %2 = hal.interface.binding.subspan type(storage_buffer) set(0) binding(2) : !flow.dispatch.tensor<writeonly:383x513xf32>
     %workgroup_id_x = hal.interface.workgroup.id[0] : index
     %workgroup_count_x = hal.interface.workgroup.count[0] : index
     %workgroup_id_y = hal.interface.workgroup.id[1] : index
@@ -53,9 +53,9 @@ module  {
 //  CHECK-DAG: %[[C383:.+]] = arith.constant 383 : index
 //  CHECK-DAG: %[[C513:.+]] = arith.constant 513 : index
 //  CHECK-DAG: %[[C32:.+]] = arith.constant 32 : index
-//      CHECK: %[[LHS:.+]] = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) : !flow.dispatch.tensor<readonly:383x383xf32>
-//      CHECK: %[[RHS:.+]] = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(1) : !flow.dispatch.tensor<readonly:383x513xf32>
-//      CHECK: %[[DST:.+]] = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(2) : !flow.dispatch.tensor<writeonly:383x513xf32>
+//      CHECK: %[[LHS:.+]] = hal.interface.binding.subspan type(storage_buffer) set(0) binding(0) : !flow.dispatch.tensor<readonly:383x383xf32>
+//      CHECK: %[[RHS:.+]] = hal.interface.binding.subspan type(storage_buffer) set(0) binding(1) : !flow.dispatch.tensor<readonly:383x513xf32>
+//      CHECK: %[[DST:.+]] = hal.interface.binding.subspan type(storage_buffer) set(0) binding(2) : !flow.dispatch.tensor<writeonly:383x513xf32>
 //      CHECK: scf.for %[[I_WG_IDX:.+]] = {{.*}} to %c383
 //      CHECK: scf.for %[[J_WG_IDX:.+]] = {{.*}} to %c513
 //      CHECK: %[[LHS_WG_TILE_DIM0:.+]] = affine.min #[[MAP1]](%[[I_WG_IDX]])

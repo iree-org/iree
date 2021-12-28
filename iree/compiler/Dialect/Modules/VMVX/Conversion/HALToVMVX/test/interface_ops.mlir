@@ -24,10 +24,10 @@ func @entry() {
   %0 = memref.get_global @__constant_5xi32 : memref<5xi32>
   //      CHECK: %[[BINDING0_RAW:.+]] = util.list.get %[[BINDINGS]][%c0] : !util.list<memref<?xi8>>
   // CHECK-NEXT: %[[BINDING0:.+]] = builtin.unrealized_conversion_cast %[[BINDING0_RAW]] : memref<?xi8> to memref<5xf32>
-  %1 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) : memref<5xf32>
+  %1 = hal.interface.binding.subspan type(storage_buffer) set(0) binding(0) : memref<5xf32>
   //      CHECK: %[[BINDING1_RAW:.+]] = util.list.get %[[BINDINGS]][%c1] : !util.list<memref<?xi8>>
   // CHECK-NEXT: %[[BINDING1:.+]] = builtin.unrealized_conversion_cast %[[BINDING1_RAW]] : memref<?xi8> to memref<5xi32>
-  %2 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(1) : memref<5xi32>
+  %2 = hal.interface.binding.subspan type(storage_buffer) set(0) binding(1) : memref<5xi32>
   %workgroup_size_x = hal.interface.workgroup.size[0] : index
   %workgroup_id_x = hal.interface.workgroup.id[0] : index
   %workgroup_count_x = hal.interface.workgroup.count[0] : index

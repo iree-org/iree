@@ -2,14 +2,16 @@
 
 #config = #iree_codegen.lowering.config<tile_sizes = [[16, 16, 16], [16, 16, 16]], native_vector_size = []>
 #translation = #iree_codegen.translation.info<"SPIRVVectorizeToCooperativeOps", workload_per_wg = [16, 16]>
+#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>,
+    #hal.descriptor_set.binding<2, storage_buffer>,
+    #hal.descriptor_set.binding<3, storage_buffer>,
+    #hal.descriptor_set.binding<4, storage_buffer>
+  ]>
+]>
 hal.executable public @matmul_256x1024x128_div_sub {
-  hal.interface public @io {
-    hal.interface.binding public @s0b0_ro_external, set=0, binding=0, type="StorageBuffer"
-    hal.interface.binding public @s0b1_ro_external, set=0, binding=1, type="StorageBuffer"
-    hal.interface.binding public @s0b2_ro_external, set=0, binding=2, type="StorageBuffer"
-    hal.interface.binding public @s0b3_ro_external, set=0, binding=3, type="StorageBuffer"
-    hal.interface.binding public @s0b4_xw_external, set=0, binding=4, type="StorageBuffer"
-  }
   hal.executable.variant @vulkan, target = <"vulkan-spirv", "vulkan-spirv-fb", {
       spv.target_env =
         #spv.target_env<#spv.vce<v1.5,
@@ -28,7 +30,7 @@ hal.executable public @matmul_256x1024x128_div_sub {
            max_compute_workgroup_invocations = 1024 : i32,
            max_compute_workgroup_size = dense<[2147483647, 65535, 65535]> : vector<3xi32>,
            subgroup_size = 32 : i32}>}> {
-    hal.executable.entry_point public @matmul_256x1024x128_div_sub interface(@io) {
+    hal.executable.entry_point public @matmul_256x1024x128_div_sub layout(#executable_layout) attributes {
       translation.info = #translation,
       workgroup_size = [32 : index, 1 : index, 1 : index]
     } {
@@ -44,11 +46,11 @@ hal.executable public @matmul_256x1024x128_div_sub {
         %c1024 = arith.constant 1024 : index
         %c256 = arith.constant 256 : index
         %cst = arith.constant 0.000000e+00 : f16
-        %0 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) : memref<256x1024xf16>
-        %1 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(1) : memref<256x1024xf16>
-        %2 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(2) : memref<256x128xf16>
-        %3 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(3) : memref<128x1024xf16>
-        %4 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(4) : memref<256x1024xf16>
+        %0 = hal.interface.binding.subspan type(storage_buffer) set(0) binding(0) : memref<256x1024xf16>
+        %1 = hal.interface.binding.subspan type(storage_buffer) set(0) binding(1) : memref<256x1024xf16>
+        %2 = hal.interface.binding.subspan type(storage_buffer) set(0) binding(2) : memref<256x128xf16>
+        %3 = hal.interface.binding.subspan type(storage_buffer) set(0) binding(3) : memref<128x1024xf16>
+        %4 = hal.interface.binding.subspan type(storage_buffer) set(0) binding(4) : memref<256x1024xf16>
         %workgroup_id_x = hal.interface.workgroup.id[0] : index
         %workgroup_count_x = hal.interface.workgroup.count[0] : index
         %workgroup_id_y = hal.interface.workgroup.id[1] : index
@@ -102,11 +104,11 @@ hal.executable public @matmul_256x1024x128_div_sub {
 // CHECK-DAG: %[[C96:.+]] = arith.constant 96 : index
 // CHECK-DAG: %[[C112:.+]] = arith.constant 112 : index
 
-// CHECK: %[[DIV_BUFFER:.+]] = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) : memref<256x1024xf16>
-// CHECK: %[[SUB_BUFFER:.+]] = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(1) : memref<256x1024xf16>
-// CHECK: %[[LHS_BUFFER:.+]] = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(2) : memref<256x128xf16>
-// CHECK: %[[RHS_BUFFER:.+]] = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(3) : memref<128x1024xf16>
-// CHECK: %[[ACC_BUFFER:.+]] = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(4) : memref<256x1024xf16>
+// CHECK: %[[DIV_BUFFER:.+]] = hal.interface.binding.subspan type(storage_buffer) set(0) binding(0) : memref<256x1024xf16>
+// CHECK: %[[SUB_BUFFER:.+]] = hal.interface.binding.subspan type(storage_buffer) set(0) binding(1) : memref<256x1024xf16>
+// CHECK: %[[LHS_BUFFER:.+]] = hal.interface.binding.subspan type(storage_buffer) set(0) binding(2) : memref<256x128xf16>
+// CHECK: %[[RHS_BUFFER:.+]] = hal.interface.binding.subspan type(storage_buffer) set(0) binding(3) : memref<128x1024xf16>
+// CHECK: %[[ACC_BUFFER:.+]] = hal.interface.binding.subspan type(storage_buffer) set(0) binding(4) : memref<256x1024xf16>
 
 // CHECK: scf.for %[[IV_Y:.+]] =
 // CHECK:   %[[LHS_TILE:.+]] = memref.subview %[[LHS_BUFFER]][%[[IV_Y]], 0] [16, 128] [1, 1]

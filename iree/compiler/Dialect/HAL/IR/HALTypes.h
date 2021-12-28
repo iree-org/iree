@@ -19,6 +19,7 @@
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinTypes.h"
+#include "mlir/IR/DialectImplementation.h"
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/TypeSupport.h"
 #include "mlir/IR/Types.h"
@@ -173,6 +174,27 @@ struct DescriptorSetBindingValue {
 }  // namespace HAL
 }  // namespace IREE
 }  // namespace iree_compiler
+}  // namespace mlir
+
+// It's unfortunate this is required.
+namespace mlir {
+template <>
+struct FieldParser<mlir::iree_compiler::IREE::HAL::DescriptorType> {
+  static FailureOr<mlir::iree_compiler::IREE::HAL::DescriptorType> parse(
+      AsmParser &parser) {
+    std::string value;
+    if (parser.parseKeywordOrString(&value)) return failure();
+    auto result = mlir::iree_compiler::IREE::HAL::symbolizeEnum<
+        mlir::iree_compiler::IREE::HAL::DescriptorType>(value);
+    if (!result.hasValue()) return failure();
+    return result.getValue();
+  }
+};
+static inline AsmPrinter &operator<<(
+    AsmPrinter &printer, mlir::iree_compiler::IREE::HAL::DescriptorType param) {
+  printer << mlir::iree_compiler::IREE::HAL::stringifyEnum(param);
+  return printer;
+}
 }  // namespace mlir
 
 // clang-format off: must be included after all LLVM/MLIR headers.

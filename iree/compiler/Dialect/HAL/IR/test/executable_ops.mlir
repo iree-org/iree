@@ -6,20 +6,16 @@
 hal.executable @ex {
   // CHECK: hal.executable.variant public @backend, target = #executable_target_format
   hal.executable.variant @backend, target = #executable_target_format {
-    // CHECK-DAG: hal.executable.entry_point public @entry0 interface(@interface) {
-    // CHECK-SAME:     ordinal = 0 : index
+    // CHECK-DAG: hal.executable.entry_point public @entry0 ordinal(0) layout(#executable_layout) {
     // CHECK-SAME:     workgroup_size = [4 : index, 1 : index, 1 : index]
-    hal.executable.entry_point @entry0 interface(@interface) {
-      ordinal = 0 : index,
+    hal.executable.entry_point @entry0 ordinal(0) layout(#hal.executable.layout<push_constants = 0, sets = [
+      #hal.descriptor_set.layout<0, bindings = [
+        #hal.descriptor_set.binding<0, storage_buffer>,
+        #hal.descriptor_set.binding<1, storage_buffer>
+      ]>
+    ]>) attributes {
       workgroup_size = [4 : index, 1 : index, 1 : index]
     }
-  }
-  // CHECK-DAG: hal.interface public @interface
-  hal.interface @interface {
-    // CHECK-NEXT: hal.interface.binding public @s0b0, set=0, binding=0, type="StorageBuffer"
-    hal.interface.binding @s0b0, set=0, binding=0, type="StorageBuffer"
-    // CHECK-NEXT: hal.interface.binding public @s0b1, set=0, binding=1, type="StorageBuffer"
-    hal.interface.binding @s0b1, set=0, binding=1, type="StorageBuffer"
   }
   // CHECK: hal.executable.binary
   hal.executable.binary @backend_binary attributes {
@@ -38,23 +34,19 @@ hal.executable @ex {
 hal.executable @ex_with_workgroup_count_region {
   // CHECK: hal.executable.variant public @backend, target = #executable_target_format
   hal.executable.variant @backend, target = #executable_target_format {
-    // CHECK-DAG: hal.executable.entry_point public @entry0 interface(@interface) {
-    // CHECK-SAME:     ordinal = 0 : index
+    // CHECK-DAG: hal.executable.entry_point public @entry0 ordinal(0) layout(#executable_layout) {
     // CHECK-SAME:     workgroup_size = [4 : index, 1 : index, 1 : index]
-    hal.executable.entry_point @entry0 interface(@interface) {
-      ordinal = 0 : index,
+    hal.executable.entry_point @entry0 ordinal(0) layout(#hal.executable.layout<push_constants = 0, sets = [
+      #hal.descriptor_set.layout<0, bindings = [
+        #hal.descriptor_set.binding<0, storage_buffer>,
+        #hal.descriptor_set.binding<1, storage_buffer>
+      ]>
+    ]>) attributes {
       workgroup_size = [4 : index, 1 : index, 1 : index]
     } {
     ^bb0(%arg0: index, %arg1: index, %arg2: index):
       hal.return %arg0, %arg1, %arg2 : index, index, index
     }
-  }
-  // CHECK-DAG: hal.interface public @interface
-  hal.interface @interface {
-    // CHECK-NEXT: hal.interface.binding public @s0b0, set=0, binding=0, type="StorageBuffer"
-    hal.interface.binding @s0b0, set=0, binding=0, type="StorageBuffer"
-    // CHECK-NEXT: hal.interface.binding public @s0b1, set=0, binding=1, type="StorageBuffer"
-    hal.interface.binding @s0b1, set=0, binding=1, type="StorageBuffer"
   }
   // CHECK: hal.executable.binary
   hal.executable.binary @backend_binary attributes {

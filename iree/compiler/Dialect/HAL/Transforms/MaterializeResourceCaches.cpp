@@ -51,18 +51,19 @@ class MaterializeResourceCachesPass
     // other nice thing is that we get ordering similar to the executable
     // variables above.
     for (auto executableOp : executableOps) {
-      for (auto interfaceOp :
-           executableOp.getBlock().getOps<IREE::HAL::InterfaceOp>()) {
-        defineExecutableLayoutOp(interfaceOp.getLoc(),
-                                 interfaceOp.getExecutableSetLayoutsAttr(),
-                                 interfaceOp.push_constantsAttr());
+      for (auto variantOp :
+           executableOp.getOps<IREE::HAL::ExecutableVariantOp>()) {
+        for (auto entryPointOp :
+             variantOp.getOps<IREE::HAL::ExecutableEntryPointOp>()) {
+          defineExecutableLayoutOp(entryPointOp.getLoc(),
+                                   entryPointOp.layout());
+        }
       }
     }
 
     // Declare executable variables so that we can reference them during lookup
     // replacement.
     for (auto executableOp : executableOps) {
-      if (executableOp.getOps<IREE::HAL::InterfaceOp>().empty()) continue;
       if (!defineExecutableOp(executableOp)) {
         signalPassFailure();
         return;
@@ -89,8 +90,8 @@ class MaterializeResourceCachesPass
 
  private:
   IREE::Util::GlobalOp defineDescriptorSetLayoutOp(Location loc,
-                                                   ArrayAttr bindingsAttr) {
-    auto existingIt = descriptorSetLayoutCache_.find(bindingsAttr);
+                                                   ArrayAttr bindingAttrs) {
+    auto existingIt = descriptorSetLayoutCache_.find(bindingAttrs);
     if (existingIt != descriptorSetLayoutCache_.end()) {
       return existingIt->second;
     }
@@ -104,7 +105,7 @@ class MaterializeResourceCachesPass
         loc, symbolName,
         /*isMutable=*/false, layoutType);
     globalOp.setPrivate();
-    descriptorSetLayoutCache_.try_emplace(bindingsAttr, globalOp);
+    descriptorSetLayoutCache_.try_emplace(bindingAttrs, globalOp);
 
     auto initializerOp = moduleBuilder.create<IREE::Util::InitializerOp>(loc);
     OpBuilder blockBuilder =
@@ -112,7 +113,7 @@ class MaterializeResourceCachesPass
     auto deviceValue = blockBuilder.createOrFold<ExSharedDeviceOp>(loc);
     auto layoutUsage = IREE::HAL::DescriptorSetLayoutUsageType::PushOnly;
     auto layoutValue = blockBuilder.createOrFold<DescriptorSetLayoutCreateOp>(
-        loc, layoutType, deviceValue, layoutUsage, bindingsAttr);
+        loc, layoutType, deviceValue, layoutUsage, bindingAttrs);
     blockBuilder.create<IREE::Util::GlobalStoreOp>(loc, layoutValue,
                                                    globalOp.getName());
     blockBuilder.create<IREE::Util::InitializerReturnOp>(loc);
@@ -120,20 +121,9 @@ class MaterializeResourceCachesPass
     return globalOp;
   }
 
-  IREE::Util::GlobalOp defineExecutableLayoutOp(Location loc,
-                                                ArrayAttr setLayoutsArrayAttr,
-                                                IntegerAttr pushConstantsAttr) {
-    // Push constants are optional but we always provide the value.
-    if (!pushConstantsAttr) {
-      pushConstantsAttr = IntegerAttr::get(IndexType::get(loc.getContext()), 0);
-    }
-
-    // We key the layout cache on all attributes that compose an executable
-    // layout.
-    auto cacheKey = ArrayAttr::get(loc.getContext(),
-                                   {setLayoutsArrayAttr, pushConstantsAttr});
-
-    auto existingIt = executableLayoutCache_.find(cacheKey);
+  IREE::Util::GlobalOp defineExecutableLayoutOp(
+      Location loc, IREE::HAL::ExecutableLayoutAttr layoutAttr) {
+    auto existingIt = executableLayoutCache_.find(layoutAttr);
     if (existingIt != executableLayoutCache_.end()) {
       return existingIt->second;
     }
@@ -141,9 +131,13 @@ class MaterializeResourceCachesPass
     // First lookup (or create) all the required descriptor sets. This ensures
     // they end up in the proper initialization order.
     SmallVector<IREE::Util::GlobalOp, 4> setLayoutGlobalOps;
-    for (auto setLayoutsAttr : setLayoutsArrayAttr) {
-      setLayoutGlobalOps.push_back(
-          defineDescriptorSetLayoutOp(loc, setLayoutsAttr.cast<ArrayAttr>()));
+    for (auto setLayoutAttr : layoutAttr.getSetLayouts()) {
+      SmallVector<Attribute> bindingAttrs;
+      for (auto bindingAttr : setLayoutAttr.getBindings()) {
+        bindingAttrs.push_back(bindingAttr);
+      }
+      setLayoutGlobalOps.push_back(defineDescriptorSetLayoutOp(
+          loc, ArrayAttr::get(loc.getContext(), bindingAttrs)));
     }
 
     auto symbolName = (StringRef("_executable_layout_") +
@@ -154,7 +148,7 @@ class MaterializeResourceCachesPass
     auto globalOp = moduleBuilder.create<IREE::Util::GlobalOp>(
         loc, symbolName, /*isMutable=*/false, layoutType);
     globalOp.setPrivate();
-    executableLayoutCache_.try_emplace(cacheKey, globalOp);
+    executableLayoutCache_.try_emplace(layoutAttr, globalOp);
 
     auto initializerOp = moduleBuilder.create<IREE::Util::InitializerOp>(loc);
     OpBuilder blockBuilder =
@@ -168,7 +162,9 @@ class MaterializeResourceCachesPass
     }
     auto deviceValue = blockBuilder.createOrFold<ExSharedDeviceOp>(loc);
     auto layoutValue = blockBuilder.createOrFold<ExecutableLayoutCreateOp>(
-        loc, layoutType, deviceValue, pushConstantsAttr, setLayoutValues);
+        loc, layoutType, deviceValue,
+        blockBuilder.getIndexAttr(layoutAttr.getPushConstants()),
+        setLayoutValues);
     blockBuilder.create<IREE::Util::GlobalStoreOp>(loc, layoutValue,
                                                    globalOp.getName());
     blockBuilder.create<IREE::Util::InitializerReturnOp>(loc);
@@ -211,13 +207,8 @@ class MaterializeResourceCachesPass
       SmallVector<Value, 8> executableLayoutValues;
       for (auto entryPointOp :
            executableVariantOp.getOps<IREE::HAL::ExecutableEntryPointOp>()) {
-        auto interfaceOp =
-            SymbolTable::lookupNearestSymbolFrom<IREE::HAL::InterfaceOp>(
-                executableOp, entryPointOp.interfaceAttr());
-        assert(interfaceOp && "must have an interface available");
         auto executableLayoutGlobalOp = defineExecutableLayoutOp(
-            executableOp.getLoc(), interfaceOp.getExecutableSetLayoutsAttr(),
-            interfaceOp.push_constantsAttr());
+            executableOp.getLoc(), entryPointOp.layout());
         executableLayoutValues.push_back(
             caseBuilder.createOrFold<IREE::Util::GlobalLoadOp>(
                 loc, ExecutableLayoutType::get(loc.getContext()),
@@ -265,8 +256,7 @@ class MaterializeResourceCachesPass
   void replaceExecutableLayoutLookupOp(ExecutableLayoutLookupOp &lookupOp) {
     OpBuilder builder(lookupOp);
     auto globalOp =
-        defineExecutableLayoutOp(lookupOp.getLoc(), lookupOp.set_layouts(),
-                                 lookupOp.push_constantsAttr());
+        defineExecutableLayoutOp(lookupOp.getLoc(), lookupOp.layout());
     auto loadOp = builder.create<IREE::Util::GlobalLoadOp>(
         lookupOp.getLoc(), ExecutableLayoutType::get(lookupOp.getContext()),
         globalOp.sym_name());
