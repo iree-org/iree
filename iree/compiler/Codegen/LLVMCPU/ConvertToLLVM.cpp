@@ -550,7 +550,7 @@ class ConvertHALInterfaceWorkgroupCountOp : public ConvertToLLVMPattern {
   }
 };
 
-/// Rewrites hal.interface.load.constant to ops loading from the ABI structs.
+/// Rewrites hal.interface.constant.load to ops loading from the ABI structs.
 ///
 /// The parent LLVMFuncOp must be compatible with HALDispatchABI.
 class ConvertHALInterfaceLoadConstant : public ConvertToLLVMPattern {
@@ -558,7 +558,7 @@ class ConvertHALInterfaceLoadConstant : public ConvertToLLVMPattern {
   explicit ConvertHALInterfaceLoadConstant(MLIRContext *context,
                                            LLVMTypeConverter &converter)
       : ConvertToLLVMPattern(
-            IREE::HAL::InterfaceLoadConstantOp::getOperationName(), context,
+            IREE::HAL::InterfaceConstantLoadOp::getOperationName(), context,
             converter) {}
 
   LogicalResult matchAndRewrite(
@@ -567,11 +567,11 @@ class ConvertHALInterfaceLoadConstant : public ConvertToLLVMPattern {
     auto llvmFuncOp = op->getParentOfType<LLVM::LLVMFuncOp>();
     if (!llvmFuncOp) return failure();
     HALDispatchABI abi(llvmFuncOp, getTypeConverter());
-    auto loadConstantOp = cast<IREE::HAL::InterfaceLoadConstantOp>(op);
-    int64_t offset = loadConstantOp.offset().getZExtValue();
+    auto loadConstantOp = cast<IREE::HAL::InterfaceConstantLoadOp>(op);
+    int64_t index = loadConstantOp.index().getZExtValue();
     auto resultType = typeConverter->convertType(op->getResult(0).getType());
     rewriter.replaceOp(
-        op, abi.loadPushConstant(op->getLoc(), offset, resultType, rewriter));
+        op, abi.loadPushConstant(op->getLoc(), index, resultType, rewriter));
     return success();
   }
 };

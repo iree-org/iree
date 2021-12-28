@@ -1907,7 +1907,7 @@ def HAL_InterfaceWorkgroupSizeOp : HAL_PureOp<"interface.workgroup.size", [
   }];
 }
 
-def HAL_InterfaceLoadConstantOp : HAL_PureOp<"interface.load.constant"> {
+def HAL_InterfaceConstantLoadOp : HAL_PureOp<"interface.constant.load"> {
   let summary = [{loads a constant value from the interface constant block}];
   let description = [{
     Loads a scalar constant value from an executable IO push constant block.
@@ -1927,7 +1927,7 @@ def HAL_InterfaceLoadConstantOp : HAL_PureOp<"interface.load.constant"> {
   }];
 
   let arguments = (ins
-    HAL_HostSizeAttr:$offset,
+    HAL_HostSizeAttr:$index,
     OptionalAttr<IndexAttr>:$alignment,
     OptionalAttr<ArrayAttr>:$values
   );
@@ -1936,7 +1936,10 @@ def HAL_InterfaceLoadConstantOp : HAL_PureOp<"interface.load.constant"> {
   );
 
   let assemblyFormat = [{
-    `offset` `=` $offset attr-dict `:` type($result)
+    `` `[` $index `]`
+    (`alignment` `(` $alignment^ `)`)?
+    (`values` `(` $values^ `)`)?
+    attr-dict `:` type($result)
   }];
 }
 

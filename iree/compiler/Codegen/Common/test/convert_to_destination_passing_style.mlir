@@ -1,9 +1,9 @@
 // RUN: iree-opt %s -iree-codegen-convert-to-destination-passing-style -canonicalize -cse -split-input-file | IreeFileCheck %s
 
 func @matmul() {
-  %m = hal.interface.load.constant offset = 0 : index
-  %n = hal.interface.load.constant offset = 1 : index
-  %k = hal.interface.load.constant offset = 2 : index
+  %m = hal.interface.constant.load[0] : index
+  %n = hal.interface.constant.load[1] : index
+  %k = hal.interface.constant.load[2] : index
   %lhs = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) : !flow.dispatch.tensor<readonly:?x?xf32>{%m, %k}
   %rhs = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(1) : !flow.dispatch.tensor<readonly:?x?xf32>{%k, %n}
   %init = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(2) : !flow.dispatch.tensor<readonly:?x?xf32>{%m, %n}
@@ -51,9 +51,9 @@ func @matmul() {
 func @matmul_fill() {
   %cst = arith.constant 0.0 : f32
   %c0 = arith.constant 0 : index
-  %m = hal.interface.load.constant offset = 0 : index
-  %n = hal.interface.load.constant offset = 1 : index
-  %k = hal.interface.load.constant offset = 2 : index
+  %m = hal.interface.constant.load[0] : index
+  %n = hal.interface.constant.load[1] : index
+  %k = hal.interface.constant.load[2] : index
   %lhs = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) : !flow.dispatch.tensor<readonly:?x?xf32>{%m, %k}
   %rhs = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(1) : !flow.dispatch.tensor<readonly:?x?xf32>{%k, %n}
   %result = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(2) : !flow.dispatch.tensor<writeonly:?x?xf32>{%m, %n}
@@ -100,9 +100,9 @@ func @matmul_fill() {
 
 func @matmul_inplace() {
   %c0 = arith.constant 0 : index
-  %m = hal.interface.load.constant offset = 0 : index
-  %n = hal.interface.load.constant offset = 1 : index
-  %k = hal.interface.load.constant offset = 2 : index
+  %m = hal.interface.constant.load[0] : index
+  %n = hal.interface.constant.load[1] : index
+  %k = hal.interface.constant.load[2] : index
   %lhs = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) : !flow.dispatch.tensor<readonly:?x?xf32>{%m, %k}
   %rhs = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(1) : !flow.dispatch.tensor<readonly:?x?xf32>{%k, %n}
   %result = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(2) : !flow.dispatch.tensor<readwrite:?x?xf32>{%m, %n}
@@ -336,22 +336,22 @@ func @multi_result() {
   %c4 = arith.constant 4 : index
   %c1 = arith.constant 1 : index
   %c3 = arith.constant 3 : index
-  %dim0 = hal.interface.load.constant offset = 0 : index
-  %dim1 = hal.interface.load.constant offset = 1 : index
-  %dim2 = hal.interface.load.constant offset = 2 : index
-  %dim3 = hal.interface.load.constant offset = 3 : index
-  %dim4 = hal.interface.load.constant offset = 4 : index
-  %dim5 = hal.interface.load.constant offset = 5 : index
-  %dim6 = hal.interface.load.constant offset = 6 : index
-  %dim7 = hal.interface.load.constant offset = 7 : index
+  %dim0 = hal.interface.constant.load[0] : index
+  %dim1 = hal.interface.constant.load[1] : index
+  %dim2 = hal.interface.constant.load[2] : index
+  %dim3 = hal.interface.constant.load[3] : index
+  %dim4 = hal.interface.constant.load[4] : index
+  %dim5 = hal.interface.constant.load[5] : index
+  %dim6 = hal.interface.constant.load[6] : index
+  %dim7 = hal.interface.constant.load[7] : index
   %0 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) : !flow.dispatch.tensor<readonly:?x?xf32>{%dim0, %dim1}
   %1 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(1) : !flow.dispatch.tensor<readonly:?x?xf32>{%dim2, %dim3}
   %2 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(2) : !flow.dispatch.tensor<writeonly:?x?xf32>{%dim4, %dim5}
   %3 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(3) : !flow.dispatch.tensor<writeonly:?x?xf32>{%dim6, %dim7}
-  %4 = hal.interface.load.constant offset = 8 : index
-  %5 = hal.interface.load.constant offset = 9 : index
-  %6 = hal.interface.load.constant offset = 10 : index
-  %7 = hal.interface.load.constant offset = 11 : index
+  %4 = hal.interface.constant.load[8] : index
+  %5 = hal.interface.constant.load[9] : index
+  %6 = hal.interface.constant.load[10] : index
+  %7 = hal.interface.constant.load[11] : index
   %8 = hal.interface.workgroup.id[0] : index
   %9 = hal.interface.workgroup.id[1] : index
   %10 = hal.interface.workgroup.count[0] : index

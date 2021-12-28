@@ -25,9 +25,9 @@ hal.executable private @matmul  {
     builtin.module {
       func @matmul() {
         %c0 = arith.constant 0 : index
-        %M = hal.interface.load.constant offset = 0 : index
-        %N = hal.interface.load.constant offset = 1 : index
-        %K = hal.interface.load.constant offset = 2 : index
+        %M = hal.interface.constant.load[0] : index
+        %N = hal.interface.constant.load[1] : index
+        %K = hal.interface.constant.load[2] : index
         %arg0 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) : memref<?x?xf32>{%M, %K}
         %arg1 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(1) : memref<?x?xf32>{%K, %N}
         %arg2 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(2) : memref<?x?xf32>{%M, %N}
@@ -171,15 +171,15 @@ hal.executable private @conv_2d  {
     builtin.module {
       func @conv_2d() {
         %c0 = arith.constant 0 : index
-        %n = hal.interface.load.constant offset = 0 : index
-        %oh = hal.interface.load.constant offset = 1 : index
-        %ow = hal.interface.load.constant offset = 2 : index
-        %oc = hal.interface.load.constant offset = 3 : index
-        %ih = hal.interface.load.constant offset = 4 : index
-        %iw = hal.interface.load.constant offset = 5 : index
-        %ic = hal.interface.load.constant offset = 6 : index
-        %fh = hal.interface.load.constant offset = 7 : index
-        %fw = hal.interface.load.constant offset = 8 : index
+        %n = hal.interface.constant.load[0] : index
+        %oh = hal.interface.constant.load[1] : index
+        %ow = hal.interface.constant.load[2] : index
+        %oc = hal.interface.constant.load[3] : index
+        %ih = hal.interface.constant.load[4] : index
+        %iw = hal.interface.constant.load[5] : index
+        %ic = hal.interface.constant.load[6] : index
+        %fh = hal.interface.constant.load[7] : index
+        %fw = hal.interface.constant.load[8] : index
         %arg0 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) : memref<?x?x?x?xf32>{%n, %ih, %iw, %ic}
         %arg1 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(1) : memref<?x?x?x?xf32>{%fh, %fw, %ic, %oc}
         %arg2 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(2) : memref<?x?x?x?xf32>{%n, %oh, %ow, %oc}

@@ -104,10 +104,10 @@ func @resource_copy_8xf16() {
 func @resource_copy_dynamic_shape() {
   %cst = arith.constant 0.000000e+00 : f32
   %c0 = arith.constant 0 : index
-  // CHECK: %[[DIM0:.+]] = hal.interface.load.constant offset = 0 : index
-  // CHECK: %[[DIM1:.+]] = hal.interface.load.constant offset = 1 : index
-  %dim0 = hal.interface.load.constant offset = 0 : index
-  %dim1 = hal.interface.load.constant offset = 1 : index
+  // CHECK: %[[DIM0:.+]] = hal.interface.constant.load[0] : index
+  // CHECK: %[[DIM1:.+]] = hal.interface.constant.load[1] : index
+  %dim0 = hal.interface.constant.load[0] : index
+  %dim1 = hal.interface.constant.load[1] : index
 
   // CHECK: %[[INPUT:.+]] = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) : memref<?x8x?x32xvector<4xf32>>{%[[DIM0]], %[[DIM1]]}
   // CHECK: %[[OUTPUT:.+]] = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(1) : memref<?x8x?x32xvector<4xf32>>{%[[DIM0]], %[[DIM1]]}
@@ -132,7 +132,7 @@ func @resource_copy_dynamic_shape() {
 func @resource_copy_dynamic_last_dim() {
   %cst = arith.constant 0.000000e+00 : f32
   %c0 = arith.constant 0 : index
-  %dim = hal.interface.load.constant offset = 0 : index
+  %dim = hal.interface.constant.load[0] : index
   // CHECK: hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) : memref<4096x?xf32>
   // CHECK: hal.interface.binding.subspan type(StorageBuffer) set(0) binding(1) : memref<4096x?xf32>
   %0 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) : memref<4096x?xf32>{%dim}

@@ -975,7 +975,7 @@ static llvm::Optional<APInt> lookupValueOrAlignment(Value value) {
   }
 
   auto op = value.getDefiningOp();
-  if (auto loadOp = dyn_cast_or_null<IREE::HAL::InterfaceLoadConstantOp>(op)) {
+  if (auto loadOp = dyn_cast_or_null<IREE::HAL::InterfaceConstantLoadOp>(op)) {
     // Push constants have an optional value alignment.
     auto alignment = loadOp.alignment();
     if (alignment.hasValue()) return alignment;

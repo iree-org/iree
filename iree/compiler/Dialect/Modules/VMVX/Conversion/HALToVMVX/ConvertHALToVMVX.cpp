@@ -170,14 +170,14 @@ class ConvertHALInterfaceWorkgroupCountOp
   }
 };
 
-/// Rewrites hal.interface.load.constant to ops loading from the ABI structs.
-class ConvertHALInterfaceLoadConstantOp
-    : public OpConversionPattern<IREE::HAL::InterfaceLoadConstantOp> {
+/// Rewrites hal.interface.constant.load to ops loading from the ABI structs.
+class ConvertHALInterfaceConstantLoadOp
+    : public OpConversionPattern<IREE::HAL::InterfaceConstantLoadOp> {
  public:
   using OpConversionPattern::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      IREE::HAL::InterfaceLoadConstantOp op, OpAdaptor adaptor,
+      IREE::HAL::InterfaceConstantLoadOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     // Find the vmvx.interface argument to the function.
     auto constantsArg =
@@ -188,10 +188,10 @@ class ConvertHALInterfaceLoadConstantOp
 
     auto resultType = getTypeConverter()->convertType(op.result().getType());
 
-    auto constantOrdinal = rewriter.createOrFold<arith::ConstantIndexOp>(
-        op.getLoc(), op.offset().getZExtValue());
+    auto constantIndex = rewriter.createOrFold<arith::ConstantIndexOp>(
+        op.getLoc(), op.index().getZExtValue());
     auto loadedValue = rewriter.createOrFold<memref::LoadOp>(
-        op.getLoc(), constantType, constantsArg, ValueRange{constantOrdinal});
+        op.getLoc(), constantType, constantsArg, ValueRange{constantIndex});
     rewriter.replaceOpWithNewOp<arith::IndexCastOp>(op, loadedValue,
                                                     resultType);
     return success();
@@ -278,7 +278,7 @@ void populateHALToVMVXPatterns(MLIRContext *context,
   patterns.insert<ConvertHALInterfaceWorkgroupIDOp>(typeConverter, context);
   patterns.insert<ConvertHALInterfaceWorkgroupSizeOp>(typeConverter, context);
   patterns.insert<ConvertHALInterfaceWorkgroupCountOp>(typeConverter, context);
-  patterns.insert<ConvertHALInterfaceLoadConstantOp>(typeConverter, context);
+  patterns.insert<ConvertHALInterfaceConstantLoadOp>(typeConverter, context);
   patterns.insert<ConvertHALInterfaceBindingSubspanOp>(typeConverter, context);
   patterns.insert<RemoveHALInterfaceOpPattern>(typeConverter, context);
 }

@@ -154,16 +154,16 @@ InterfaceResourceMap createResourceVariables(mlir::ModuleOp module) {
 //===----------------------------------------------------------------------===//
 
 namespace {
-/// A pattern to convert hal.interface.load.constant into a sequence of SPIR-V
+/// A pattern to convert hal.interface.constant.load into a sequence of SPIR-V
 /// ops to load from a global variable representing the push constant storage.
 struct HALInterfaceLoadConstantConverter final
-    : public OpConversionPattern<IREE::HAL::InterfaceLoadConstantOp> {
+    : public OpConversionPattern<IREE::HAL::InterfaceConstantLoadOp> {
   using OpConversionPattern::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      IREE::HAL::InterfaceLoadConstantOp loadOp, OpAdaptor adaptor,
+      IREE::HAL::InterfaceConstantLoadOp loadOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    // TODO(#1519): hal.interface.load.constant should point to the
+    // TODO(#1519): hal.interface.constant.load should point to the
     // hal.interface op.
     auto executableOp = loadOp->getParentOfType<IREE::HAL::ExecutableOp>();
     auto halInterfaceOps =
@@ -173,12 +173,12 @@ struct HALInterfaceLoadConstantConverter final
 
     uint64_t elementCount =
         (*halInterfaceOps.front().push_constants()).getZExtValue();
-    unsigned offset = loadOp.offset().getZExtValue();
+    unsigned index = loadOp.index().getZExtValue();
 
     // The following function generates SPIR-V ops with i32 types. So it does
     // type "conversion" (index -> i32) implicitly.
     auto i32Type = rewriter.getIntegerType(32);
-    auto value = spirv::getPushConstantValue(loadOp, elementCount, offset,
+    auto value = spirv::getPushConstantValue(loadOp, elementCount, index,
                                              i32Type, rewriter);
 
     rewriter.replaceOp(loadOp, value);

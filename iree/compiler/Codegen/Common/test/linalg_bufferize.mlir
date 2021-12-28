@@ -6,9 +6,9 @@ func @tile_from_tensor_load() {
   %c4 = arith.constant 4 : index
   %c1 = arith.constant 1 : index
   %c3 = arith.constant 3 : index
-  %M = hal.interface.load.constant offset = 0 : index
-  %N = hal.interface.load.constant offset = 1 : index
-  %K = hal.interface.load.constant offset = 2 : index
+  %M = hal.interface.constant.load[0] : index
+  %N = hal.interface.constant.load[1] : index
+  %K = hal.interface.constant.load[2] : index
   %0 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) alignment(32) : !flow.dispatch.tensor<readonly:?x?xf32>{%M, %K}
   %1 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(1) : !flow.dispatch.tensor<readonly:?x?xf32>{%K, %N}
   %2 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(2) : !flow.dispatch.tensor<readonly:?x?xf32>{%M, %N}
@@ -52,9 +52,9 @@ func @tile_from_tensor_load_inplace() {
   %c4 = arith.constant 4 : index
   %c1 = arith.constant 1 : index
   %c3 = arith.constant 3 : index
-  %M = hal.interface.load.constant offset = 0 : index
-  %N = hal.interface.load.constant offset = 1 : index
-  %K = hal.interface.load.constant offset = 2 : index
+  %M = hal.interface.constant.load[0] : index
+  %N = hal.interface.constant.load[1] : index
+  %K = hal.interface.constant.load[2] : index
   %0 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) : !flow.dispatch.tensor<readonly:?x?xf32>{%M, %K}
   %1 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(1) : !flow.dispatch.tensor<readonly:?x?xf32>{%K, %N}
   %2 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(2) : !flow.dispatch.tensor<readwrite:?x?xf32>{%M, %N}
@@ -93,9 +93,9 @@ func @tile_from_tensor_load_inplace_and_copy() {
   %c4 = arith.constant 4 : index
   %c1 = arith.constant 1 : index
   %c3 = arith.constant 3 : index
-  %M = hal.interface.load.constant offset = 0 : index
-  %N = hal.interface.load.constant offset = 1 : index
-  %K = hal.interface.load.constant offset = 2 : index
+  %M = hal.interface.constant.load[0] : index
+  %N = hal.interface.constant.load[1] : index
+  %K = hal.interface.constant.load[2] : index
   %0 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) : !flow.dispatch.tensor<readonly:?x?xf32>{%M, %K}
   %1 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(1) : !flow.dispatch.tensor<readonly:?x?xf32>{%K, %N}
   %2 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(2) : !flow.dispatch.tensor<readwrite:?x?xf32>{%M, %N}
@@ -140,9 +140,9 @@ func @tile_from_pointwise_lhs() {
   %c4 = arith.constant 4 : index
   %c1 = arith.constant 1 : index
   %c3 = arith.constant 3 : index
-  %M = hal.interface.load.constant offset = 0 : index
-  %N = hal.interface.load.constant offset = 1 : index
-  %K = hal.interface.load.constant offset = 2 : index
+  %M = hal.interface.constant.load[0] : index
+  %N = hal.interface.constant.load[1] : index
+  %K = hal.interface.constant.load[2] : index
   %0 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) : !flow.dispatch.tensor<readonly:?x?xf32>{%M, %K}
   %1 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(1) : !flow.dispatch.tensor<readonly:?x?xf32>{%K, %N}
   %2 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(2) : !flow.dispatch.tensor<readonly:?x?xf32>{%M, %N}
@@ -196,9 +196,9 @@ func @tile_from_pointwise_lhs_inplace() {
   %c4 = arith.constant 4 : index
   %c1 = arith.constant 1 : index
   %c3 = arith.constant 3 : index
-  %M = hal.interface.load.constant offset = 0 : index
-  %N = hal.interface.load.constant offset = 1 : index
-  %K = hal.interface.load.constant offset = 2 : index
+  %M = hal.interface.constant.load[0] : index
+  %N = hal.interface.constant.load[1] : index
+  %K = hal.interface.constant.load[2] : index
   %0 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) : !flow.dispatch.tensor<readonly:?x?xf32>{%M, %K}
   %1 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(1) : !flow.dispatch.tensor<readonly:?x?xf32>{%K, %N}
   %2 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(2) : !flow.dispatch.tensor<readwrite:?x?xf32>{%M, %N}
@@ -248,9 +248,9 @@ func @tile_from_pointwise_outs() {
   %c4 = arith.constant 4 : index
   %c1 = arith.constant 1 : index
   %c3 = arith.constant 3 : index
-  %M = hal.interface.load.constant offset = 0 : index
-  %N = hal.interface.load.constant offset = 1 : index
-  %K = hal.interface.load.constant offset = 2 : index
+  %M = hal.interface.constant.load[0] : index
+  %N = hal.interface.constant.load[1] : index
+  %K = hal.interface.constant.load[2] : index
   %0 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) : !flow.dispatch.tensor<readonly:?x?xf32>{%M, %K}
   %1 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(1) : !flow.dispatch.tensor<readonly:?x?xf32>{%K, %N}
   %2 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(2) : !flow.dispatch.tensor<readonly:?x?xf32>{%M, %N}
@@ -302,9 +302,9 @@ func @tile_from_pointwise_outs_inplace() {
   %c4 = arith.constant 4 : index
   %c1 = arith.constant 1 : index
   %c3 = arith.constant 3 : index
-  %M = hal.interface.load.constant offset = 0 : index
-  %N = hal.interface.load.constant offset = 1 : index
-  %K = hal.interface.load.constant offset = 2 : index
+  %M = hal.interface.constant.load[0] : index
+  %N = hal.interface.constant.load[1] : index
+  %K = hal.interface.constant.load[2] : index
   %0 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) : !flow.dispatch.tensor<readonly:?x?xf32>{%M, %K}
   %1 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(1) : !flow.dispatch.tensor<readonly:?x?xf32>{%K, %N}
   %2 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(2) : !flow.dispatch.tensor<readwrite:?x?xf32>{%M, %N}
@@ -352,9 +352,9 @@ func @tile_from_matmul_outs() {
   %c4 = arith.constant 4 : index
   %c1 = arith.constant 1 : index
   %c3 = arith.constant 3 : index
-  %M = hal.interface.load.constant offset = 0 : index
-  %N = hal.interface.load.constant offset = 1 : index
-  %K = hal.interface.load.constant offset = 2 : index
+  %M = hal.interface.constant.load[0] : index
+  %N = hal.interface.constant.load[1] : index
+  %K = hal.interface.constant.load[2] : index
   %0 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) : !flow.dispatch.tensor<readonly:?x?xf32>{%M, %K}
   %1 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(1) : !flow.dispatch.tensor<readonly:?x?xf32>{%K, %N}
   %2 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(2) : !flow.dispatch.tensor<readonly:?x?xf32>{%M, %N}
@@ -401,9 +401,9 @@ func @tile_from_matmul_outs_inplace() {
   %c4 = arith.constant 4 : index
   %c1 = arith.constant 1 : index
   %c3 = arith.constant 3 : index
-  %M = hal.interface.load.constant offset = 0 : index
-  %N = hal.interface.load.constant offset = 1 : index
-  %K = hal.interface.load.constant offset = 2 : index
+  %M = hal.interface.constant.load[0] : index
+  %N = hal.interface.constant.load[1] : index
+  %K = hal.interface.constant.load[2] : index
   %0 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) : !flow.dispatch.tensor<readonly:?x?xf32>{%M, %K}
   %1 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(1) : !flow.dispatch.tensor<readonly:?x?xf32>{%K, %N}
   %2 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(2) : !flow.dispatch.tensor<readwrite:?x?xf32>{%M, %N}
@@ -442,14 +442,14 @@ func @tile_from_matmul_outs_inplace() {
 func @bufferize_dynamic() {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
-  %4 = hal.interface.load.constant offset = 0 : index
-  %5 = hal.interface.load.constant offset = 1 : index
-  %6 = hal.interface.load.constant offset = 2 : index
-  %7 = hal.interface.load.constant offset = 3 : index
-  %8 = hal.interface.load.constant offset = 4 : index
-  %9 = hal.interface.load.constant offset = 5 : index
-  %10 = hal.interface.load.constant offset = 6 : index
-  %11 = hal.interface.load.constant offset = 7 : index
+  %4 = hal.interface.constant.load[0] : index
+  %5 = hal.interface.constant.load[1] : index
+  %6 = hal.interface.constant.load[2] : index
+  %7 = hal.interface.constant.load[3] : index
+  %8 = hal.interface.constant.load[4] : index
+  %9 = hal.interface.constant.load[5] : index
+  %10 = hal.interface.constant.load[6] : index
+  %11 = hal.interface.constant.load[7] : index
   %LHS = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) : !flow.dispatch.tensor<readonly:?x?xf32>{%4, %5}
   %RHS = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(1) : !flow.dispatch.tensor<readonly:?x?xf32>{%6, %7}
   %INIT = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(2) : !flow.dispatch.tensor<readonly:?x?xf32>{%8, %9}
@@ -483,14 +483,14 @@ func @bufferize_dynamic() {
 //   CHECK-DAG: #[[MAP0:.+]] = affine_map<(d0)[s0, s1] -> (s1, -d0 + s0)>
 //   CHECK-DAG: #[[MAP2:.+]] = affine_map<(d0)[s0, s1] -> (s0, -d0 + s1)>
 //       CHECK: func @bufferize_dynamic()
-//       CHECK:   %[[DIM0:.+]] = hal.interface.load.constant offset = 0 : index
-//       CHECK:   %[[DIM1:.+]] = hal.interface.load.constant offset = 1 : index
-//       CHECK:   %[[DIM2:.+]] = hal.interface.load.constant offset = 2 : index
-//       CHECK:   %[[DIM3:.+]] = hal.interface.load.constant offset = 3 : index
-//       CHECK:   %[[DIM4:.+]] = hal.interface.load.constant offset = 4 : index
-//       CHECK:   %[[DIM5:.+]] = hal.interface.load.constant offset = 5 : index
-//       CHECK:   %[[DIM6:.+]] = hal.interface.load.constant offset = 6 : index
-//       CHECK:   %[[DIM7:.+]] = hal.interface.load.constant offset = 7 : index
+//       CHECK:   %[[DIM0:.+]] = hal.interface.constant.load[0] : index
+//       CHECK:   %[[DIM1:.+]] = hal.interface.constant.load[1] : index
+//       CHECK:   %[[DIM2:.+]] = hal.interface.constant.load[2] : index
+//       CHECK:   %[[DIM3:.+]] = hal.interface.constant.load[3] : index
+//       CHECK:   %[[DIM4:.+]] = hal.interface.constant.load[4] : index
+//       CHECK:   %[[DIM5:.+]] = hal.interface.constant.load[5] : index
+//       CHECK:   %[[DIM6:.+]] = hal.interface.constant.load[6] : index
+//       CHECK:   %[[DIM7:.+]] = hal.interface.constant.load[7] : index
 //       CHECK:   %[[LHS:.+]] = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) : memref<?x?xf32>{%[[DIM0]], %[[DIM1]]}
 //       CHECK:   %[[RHS:.+]] = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(1) : memref<?x?xf32>{%[[DIM2]], %[[DIM3]]}
 //       CHECK:   %[[INIT:.+]] = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(2) : memref<?x?xf32>{%[[DIM4]], %[[DIM5]]}
@@ -517,12 +517,12 @@ func @bufferize_dynamic() {
 func @bufferize_dynamic_inplace() {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
-  %4 = hal.interface.load.constant offset = 0 : index
-  %5 = hal.interface.load.constant offset = 1 : index
-  %6 = hal.interface.load.constant offset = 2 : index
-  %7 = hal.interface.load.constant offset = 3 : index
-  %8 = hal.interface.load.constant offset = 4 : index
-  %9 = hal.interface.load.constant offset = 5 : index
+  %4 = hal.interface.constant.load[0] : index
+  %5 = hal.interface.constant.load[1] : index
+  %6 = hal.interface.constant.load[2] : index
+  %7 = hal.interface.constant.load[3] : index
+  %8 = hal.interface.constant.load[4] : index
+  %9 = hal.interface.constant.load[5] : index
   %LHS = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) : !flow.dispatch.tensor<readonly:?x?xf32>{%4, %5}
   %RHS = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(1) : !flow.dispatch.tensor<readonly:?x?xf32>{%6, %7}
   %OUT = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(2) : !flow.dispatch.tensor<readwrite:?x?xf32>{%8, %9}
@@ -555,12 +555,12 @@ func @bufferize_dynamic_inplace() {
 //   CHECK-DAG: #[[MAP0:.+]] = affine_map<(d0)[s0, s1] -> (s1, -d0 + s0)>
 //   CHECK-DAG: #[[MAP2:.+]] = affine_map<(d0)[s0, s1] -> (s0, -d0 + s1)>
 //       CHECK: func @bufferize_dynamic_inplace()
-//       CHECK:   %[[DIM0:.+]] = hal.interface.load.constant offset = 0 : index
-//       CHECK:   %[[DIM1:.+]] = hal.interface.load.constant offset = 1 : index
-//       CHECK:   %[[DIM2:.+]] = hal.interface.load.constant offset = 2 : index
-//       CHECK:   %[[DIM3:.+]] = hal.interface.load.constant offset = 3 : index
-//       CHECK:   %[[DIM4:.+]] = hal.interface.load.constant offset = 4 : index
-//       CHECK:   %[[DIM5:.+]] = hal.interface.load.constant offset = 5 : index
+//       CHECK:   %[[DIM0:.+]] = hal.interface.constant.load[0] : index
+//       CHECK:   %[[DIM1:.+]] = hal.interface.constant.load[1] : index
+//       CHECK:   %[[DIM2:.+]] = hal.interface.constant.load[2] : index
+//       CHECK:   %[[DIM3:.+]] = hal.interface.constant.load[3] : index
+//       CHECK:   %[[DIM4:.+]] = hal.interface.constant.load[4] : index
+//       CHECK:   %[[DIM5:.+]] = hal.interface.constant.load[5] : index
 //       CHECK:   %[[LHS:.+]] = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) : memref<?x?xf32>{%[[DIM0]], %[[DIM1]]}
 //       CHECK:   %[[RHS:.+]] = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(1) : memref<?x?xf32>{%[[DIM2]], %[[DIM3]]}
 //       CHECK:   %[[RESULT:.+]] = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(2) : memref<?x?xf32>{%[[DIM4]], %[[DIM5]]}
@@ -761,10 +761,10 @@ func @dot_general_lowering() {
 
 func @slice() {
   %c0 = arith.constant 0 : index
-  %2 = hal.interface.load.constant offset = 0 : index
-  %3 = hal.interface.load.constant offset = 1 : index
-  %4 = hal.interface.load.constant offset = 2 : index
-  %5 = hal.interface.load.constant offset = 3 : index
+  %2 = hal.interface.constant.load[0] : index
+  %3 = hal.interface.constant.load[1] : index
+  %4 = hal.interface.constant.load[2] : index
+  %5 = hal.interface.constant.load[3] : index
   %0 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) : !flow.dispatch.tensor<readonly:?x?xi32>{%2, %3}
   %1 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(1) : !flow.dispatch.tensor<writeonly:?x?xi32>{%4, %5}
   %6 = flow.dispatch.tensor.load %0, offsets = [], sizes = [], strides = [] : !flow.dispatch.tensor<readonly:?x?xi32> -> tensor<?x?xi32>
@@ -783,11 +783,11 @@ func @slice() {
 
 func @slice_rank_reducing() {
   %c0 = arith.constant 0 : index
-  %2 = hal.interface.load.constant offset = 0 : index
-  %3 = hal.interface.load.constant offset = 1 : index
-  %4 = hal.interface.load.constant offset = 2 : index
-  %5 = hal.interface.load.constant offset = 3 : index
-  %8 = hal.interface.load.constant offset = 4 : index
+  %2 = hal.interface.constant.load[0] : index
+  %3 = hal.interface.constant.load[1] : index
+  %4 = hal.interface.constant.load[2] : index
+  %5 = hal.interface.constant.load[3] : index
+  %8 = hal.interface.constant.load[4] : index
   %0 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) : !flow.dispatch.tensor<readonly:?x?x?xi32>{%8, %8, %8}
   %1 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(1) : !flow.dispatch.tensor<writeonly:?x?xi32>{%4, %5}
   %6 = flow.dispatch.tensor.load %0, offsets = [], sizes = [], strides = [] : !flow.dispatch.tensor<readonly:?x?x?xi32> -> tensor<?x?x?xi32>
@@ -806,13 +806,13 @@ func @slice_rank_reducing() {
 
 func @slice_multiple_copy() {
   %c0 = arith.constant 0 : index
-  %3 = hal.interface.load.constant offset = 0 : index
-  %4 = hal.interface.load.constant offset = 1 : index
-  %5 = hal.interface.load.constant offset = 2 : index
-  %6 = hal.interface.load.constant offset = 3 : index
-  %7 = hal.interface.load.constant offset = 4 : index
-  %8 = hal.interface.load.constant offset = 5 : index
-  %12 = hal.interface.load.constant offset = 6 : index
+  %3 = hal.interface.constant.load[0] : index
+  %4 = hal.interface.constant.load[1] : index
+  %5 = hal.interface.constant.load[2] : index
+  %6 = hal.interface.constant.load[3] : index
+  %7 = hal.interface.constant.load[4] : index
+  %8 = hal.interface.constant.load[5] : index
+  %12 = hal.interface.constant.load[6] : index
   %0 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) : !flow.dispatch.tensor<readonly:?x?x?xi32>{%12, %12, %12}
   %1 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(1) : !flow.dispatch.tensor<writeonly:?x?x?xi32>{%6, %7, %8}
   %2 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(2) : !flow.dispatch.tensor<writeonly:?x?xi32>{%6, %8}
@@ -828,9 +828,9 @@ func @slice_multiple_copy() {
 //   CHECK-DAG: %[[ARG:.+]] = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0)
 //   CHECK-DAG: %[[RETURN1:.+]] = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(1)
 //   CHECK-DAG: %[[RETURN2:.+]] = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(2)
-//   CHECK-DAG: %[[SIZE1:.+]] = hal.interface.load.constant offset = 3 : index
-//   CHECK-DAG: %[[SIZE2:.+]] = hal.interface.load.constant offset = 4 : index
-//   CHECK-DAG: %[[SIZE3:.+]] = hal.interface.load.constant offset = 5 : index
+//   CHECK-DAG: %[[SIZE1:.+]] = hal.interface.constant.load[3] : index
+//   CHECK-DAG: %[[SIZE2:.+]] = hal.interface.constant.load[4] : index
+//   CHECK-DAG: %[[SIZE3:.+]] = hal.interface.constant.load[5] : index
 //       CHECK: %[[SUBVIEW1:.+]] = memref.subview %[[ARG]][%{{.+}}, %{{.+}}, %{{.+}}] [%[[SIZE1]], %[[SIZE2]], %[[SIZE3]]]
 //       CHECK: linalg.copy(%[[SUBVIEW1]], %[[RETURN1]])
 //   CHECK-DAG: %[[SUBVIEW2:.+]] = memref.subview %[[ARG]][%{{.+}}, %{{.+}}, %{{.+}}] [%[[SIZE1]], 1, %[[SIZE3]]]
@@ -841,8 +841,8 @@ func @slice_multiple_copy() {
 
 func @slice_in_place() {
   %c0 = arith.constant 0 : index
-  %2 = hal.interface.load.constant offset = 0 : index
-  %3 = hal.interface.load.constant offset = 1 : index
+  %2 = hal.interface.constant.load[0] : index
+  %3 = hal.interface.constant.load[1] : index
   %0 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) : !flow.dispatch.tensor<readwrite:?x?xi32>{%2, %3}
   %6 = flow.dispatch.tensor.load %0, offsets = [], sizes = [], strides = [] : !flow.dispatch.tensor<readwrite:?x?xi32> -> tensor<?x?xi32>
   flow.dispatch.tensor.store %6, %0, offsets = [], sizes = [], strides = [] : tensor<?x?xi32> -> !flow.dispatch.tensor<readwrite:?x?xi32>
@@ -857,10 +857,10 @@ func @slice_in_place() {
 
 func @slice_whole_stride_dispatch_0() {
   %c0 = arith.constant 0 : index
-  %dim0 = hal.interface.load.constant offset = 0 : index
-  %dim1 = hal.interface.load.constant offset = 1 : index
-  %dim2 = hal.interface.load.constant offset = 2 : index
-  %dim3 = hal.interface.load.constant offset = 3 : index
+  %dim0 = hal.interface.constant.load[0] : index
+  %dim1 = hal.interface.constant.load[1] : index
+  %dim2 = hal.interface.constant.load[2] : index
+  %dim3 = hal.interface.constant.load[3] : index
   %0 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) : !flow.dispatch.tensor<readonly:?x?xi32>{%dim0, %dim1}
   %1 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(1) : !flow.dispatch.tensor<writeonly:?x?xi32>{%dim2, %dim3}
   %2 = flow.dispatch.tensor.load %0, offsets = [], sizes = [], strides = [] : !flow.dispatch.tensor<readonly:?x?xi32> -> tensor<?x?xi32>
@@ -880,12 +880,12 @@ func @slice_whole_stride_dispatch_0() {
 func @subtensor_insert() {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
-  %dim0 = hal.interface.load.constant offset = 0 : index
-  %dim1 = hal.interface.load.constant offset = 1 : index
-  %dim2 = hal.interface.load.constant offset = 2 : index
-  %dim3 = hal.interface.load.constant offset = 3 : index
-  %dim4 = hal.interface.load.constant offset = 4 : index
-  %dim5 = hal.interface.load.constant offset = 5 : index
+  %dim0 = hal.interface.constant.load[0] : index
+  %dim1 = hal.interface.constant.load[1] : index
+  %dim2 = hal.interface.constant.load[2] : index
+  %dim3 = hal.interface.constant.load[3] : index
+  %dim4 = hal.interface.constant.load[4] : index
+  %dim5 = hal.interface.constant.load[5] : index
   %0 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) : !flow.dispatch.tensor<readonly:?x?xi32>{%dim0, %dim1}
   %1 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(1) : !flow.dispatch.tensor<readonly:?x?xi32>{%dim2, %dim3}
   %2 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(2) : !flow.dispatch.tensor<writeonly:?x?xi32>{%dim4, %dim5}
@@ -902,8 +902,8 @@ func @subtensor_insert() {
 //   CHECK-DAG:   %[[ARG0:.+]] = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0)
 //   CHECK-DAG:   %[[ARG1:.+]] = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(1)
 //   CHECK-DAG:   %[[RET0:.+]] = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(2)
-//   CHECK-DAG:   %[[D0:.+]] = hal.interface.load.constant offset = 0 : index
-//   CHECK-DAG:   %[[D1:.+]] = hal.interface.load.constant offset = 1 : index
+//   CHECK-DAG:   %[[D0:.+]] = hal.interface.constant.load[0] : index
+//   CHECK-DAG:   %[[D1:.+]] = hal.interface.constant.load[1] : index
 //       CHECK:   linalg.copy(%[[ARG1]], %[[RET0]])
 //       CHECK:   %[[SUBVIEW:.+]] = memref.subview %[[RET0]][3, 4] [%[[D0]], %[[D1]]] [1, 1]
 //       CHECK:   linalg.copy(%[[ARG0]], %[[SUBVIEW]])
@@ -1018,11 +1018,11 @@ func @rhs_non_splat_constant() {
 func @gather() {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
-  %dim0 = hal.interface.load.constant offset = 0 : index
-  %dim1 = hal.interface.load.constant offset = 1 : index
-  %dim2 = hal.interface.load.constant offset = 2 : index
-  %dim3 = hal.interface.load.constant offset = 3 : index
-  %dim4 = hal.interface.load.constant offset = 4 : index
+  %dim0 = hal.interface.constant.load[0] : index
+  %dim1 = hal.interface.constant.load[1] : index
+  %dim2 = hal.interface.constant.load[2] : index
+  %dim3 = hal.interface.constant.load[3] : index
+  %dim4 = hal.interface.constant.load[4] : index
   %0 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) : !flow.dispatch.tensor<readonly:?x?xf32>{%dim0, %dim1}
   %1 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(1) : !flow.dispatch.tensor<readonly:?xi32>{%dim2}
   %2 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(2) : !flow.dispatch.tensor<writeonly:?x?xf32>{%dim3, %dim4}
@@ -1092,12 +1092,12 @@ func @pooling_nhwc_sum() {
 func @read_only_subtensor() {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
-  %pc0 = hal.interface.load.constant offset = 0 : index
-  %pc1 = hal.interface.load.constant offset = 1 : index
-  %pc2 = hal.interface.load.constant offset = 2 : index
-  %pc3 = hal.interface.load.constant offset = 3 : index
-  %pc4 = hal.interface.load.constant offset = 4 : index
-  %pc5 = hal.interface.load.constant offset = 5 : index
+  %pc0 = hal.interface.constant.load[0] : index
+  %pc1 = hal.interface.constant.load[1] : index
+  %pc2 = hal.interface.constant.load[2] : index
+  %pc3 = hal.interface.constant.load[3] : index
+  %pc4 = hal.interface.constant.load[4] : index
+  %pc5 = hal.interface.constant.load[5] : index
   %0 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(2) : !flow.dispatch.tensor<writeonly:?x?xf32>{%pc0, %pc1}
   %1 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) : !flow.dispatch.tensor<readonly:?x?xf32>{%pc2, %pc3}
   %2 = flow.dispatch.tensor.load %1, offsets = [], sizes = [], strides = [] : !flow.dispatch.tensor<readonly:?x?xf32> -> tensor<?x?xf32>
@@ -1163,9 +1163,9 @@ func @read_only_subtensor() {
 
 func @reshape_read_only() {
   %c0 = arith.constant 0 : index
-  %dim0 = hal.interface.load.constant offset = 0 : index
-  %dim1 = hal.interface.load.constant offset = 1 : index
-  %dim2 = hal.interface.load.constant offset = 2 : index
+  %dim0 = hal.interface.constant.load[0] : index
+  %dim1 = hal.interface.constant.load[1] : index
+  %dim2 = hal.interface.constant.load[2] : index
   %0 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) : !flow.dispatch.tensor<readonly:?x?xf32>{%dim0, %dim1}
   %1 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(1) : !flow.dispatch.tensor<writeonly:?xf32>{%dim2}
   %2 = flow.dispatch.tensor.load %0, offsets = [], sizes = [], strides = [] : !flow.dispatch.tensor<readonly:?x?xf32> -> tensor<?x?xf32>
@@ -1389,11 +1389,11 @@ func @rank_reduced_subtensor_insert() {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %c2 = arith.constant 2 : index
-  %dim0 = hal.interface.load.constant offset = 0 : index
-  %dim1 = hal.interface.load.constant offset = 1 : index
-  %dim2 = hal.interface.load.constant offset = 2 : index
-  %dim3 = hal.interface.load.constant offset = 3 : index
-  %dim4 = hal.interface.load.constant offset = 4 : index
+  %dim0 = hal.interface.constant.load[0] : index
+  %dim1 = hal.interface.constant.load[1] : index
+  %dim2 = hal.interface.constant.load[2] : index
+  %dim3 = hal.interface.constant.load[3] : index
+  %dim4 = hal.interface.constant.load[4] : index
   %0 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) : !flow.dispatch.tensor<readonly:?x?xf32>{%dim0, %dim1}
   %1 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(1) : !flow.dispatch.tensor<readwrite:?x?x?xf32>{%dim2, %dim3, %dim4}
   %2 = flow.dispatch.tensor.load %0, offsets = [], sizes = [], strides = [] : !flow.dispatch.tensor<readonly:?x?xf32> -> tensor<?x?xf32>
@@ -1531,22 +1531,22 @@ func @multi_result() {
   %c4 = arith.constant 4 : index
   %c1 = arith.constant 1 : index
   %c3 = arith.constant 3 : index
-  %dim0 = hal.interface.load.constant offset = 0 : index
-  %dim1 = hal.interface.load.constant offset = 1 : index
-  %dim2 = hal.interface.load.constant offset = 2 : index
-  %dim3 = hal.interface.load.constant offset = 3 : index
-  %dim4 = hal.interface.load.constant offset = 4 : index
-  %dim5 = hal.interface.load.constant offset = 5 : index
-  %dim6 = hal.interface.load.constant offset = 6 : index
-  %dim7 = hal.interface.load.constant offset = 7 : index
+  %dim0 = hal.interface.constant.load[0] : index
+  %dim1 = hal.interface.constant.load[1] : index
+  %dim2 = hal.interface.constant.load[2] : index
+  %dim3 = hal.interface.constant.load[3] : index
+  %dim4 = hal.interface.constant.load[4] : index
+  %dim5 = hal.interface.constant.load[5] : index
+  %dim6 = hal.interface.constant.load[6] : index
+  %dim7 = hal.interface.constant.load[7] : index
   %0 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) : !flow.dispatch.tensor<readonly:?x?xf32>{%dim0, %dim1}
   %1 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(1) : !flow.dispatch.tensor<readonly:?x?xf32>{%dim2, %dim3}
   %2 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(2) : !flow.dispatch.tensor<writeonly:?x?xf32>{%dim4, %dim5}
   %3 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(3) : !flow.dispatch.tensor<writeonly:?x?xf32>{%dim6, %dim7}
-  %4 = hal.interface.load.constant offset = 8 : index
-  %5 = hal.interface.load.constant offset = 9 : index
-  %6 = hal.interface.load.constant offset = 10 : index
-  %7 = hal.interface.load.constant offset = 11 : index
+  %4 = hal.interface.constant.load[8] : index
+  %5 = hal.interface.constant.load[9] : index
+  %6 = hal.interface.constant.load[10] : index
+  %7 = hal.interface.constant.load[11] : index
   %8 = hal.interface.workgroup.id[0] : index
   %9 = hal.interface.workgroup.id[1] : index
   %10 = hal.interface.workgroup.count[0] : index
@@ -1661,9 +1661,9 @@ func @dot_general_padded() {
   %c3 = arith.constant 3 : index
   %c1 = arith.constant 1 : index
   %cst = arith.constant 0.000000e+00 : f32
-  %m = hal.interface.load.constant offset = 0 : index
-  %n = hal.interface.load.constant offset = 1 : index
-  %k = hal.interface.load.constant offset = 2 : index
+  %m = hal.interface.constant.load[0] : index
+  %n = hal.interface.constant.load[1] : index
+  %k = hal.interface.constant.load[2] : index
   %0 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) : !flow.dispatch.tensor<readonly:?x?xf32>{%m, %k}
   %1 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(1) : !flow.dispatch.tensor<readonly:?x?xf32>{%k, %n}
   %2 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(2) : !flow.dispatch.tensor<writeonly:?x?xf32>{%m, %n}
@@ -1709,8 +1709,8 @@ func @dot_general_padded() {
 //   CHECK-DAG:  %[[ARG0:.+]] = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) : memref<?x?xf32>
 //   CHECK-DAG:  %[[ARG1:.+]] = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(1) : memref<?x?xf32>
 //   CHECK-DAG:  %[[RET0:.+]] = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(2) : memref<?x?xf32>
-//   CHECK-DAG:  %[[M:.+]] = hal.interface.load.constant offset = 0
-//   CHECK-DAG:  %[[N:.+]] = hal.interface.load.constant offset = 1
+//   CHECK-DAG:  %[[M:.+]] = hal.interface.constant.load[0]
+//   CHECK-DAG:  %[[N:.+]] = hal.interface.constant.load[1]
 //       CHECK:  scf.for %[[IV0:.+]] = %{{.+}} to %[[M]]
 //       CHECK:    scf.for %[[IV1:.+]] = %{{.+}} to %[[N]]
 //   CHECK-DAG:      %[[TILE_M:.+]] = affine.min #[[MAP1]](%[[IV0]])[%[[M]]]
@@ -1816,9 +1816,9 @@ func @multi_result_reduce() {
   %c0_i32 = arith.constant 0 : i32
   %c-2147483648_i32 = arith.constant -2147483648 : i32
   %c2 = arith.constant 2 : index
-  %d0 = hal.interface.load.constant offset = 0 : index
-  %d1 = hal.interface.load.constant offset = 1 : index
-  %d2 = hal.interface.load.constant offset = 2 : index
+  %d0 = hal.interface.constant.load[0] : index
+  %d1 = hal.interface.constant.load[1] : index
+  %d2 = hal.interface.constant.load[2] : index
   %0 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) : !flow.dispatch.tensor<readonly:?x?xi32>{%d0, %d1}
   %1 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(1) : !flow.dispatch.tensor<readonly:?x?xi32>{%d0, %d1}
   %2 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(2) : !flow.dispatch.tensor<writeonly:?xi32>{%d2}
@@ -2262,12 +2262,12 @@ func @iree_linalg_ext_sort_1d() {
 
 builtin.func @tensor_insert_slice() {
   %c0 = arith.constant 0 : index
-  %1 = hal.interface.load.constant offset = 0 : index
-  %2 = hal.interface.load.constant offset = 1 : index
-  %d0 = hal.interface.load.constant offset = 2 : index
-  %d1 = hal.interface.load.constant offset = 3 : index
-  %d2 = hal.interface.load.constant offset = 4 : index
-  %d3 = hal.interface.load.constant offset = 5 : index
+  %1 = hal.interface.constant.load[0] : index
+  %2 = hal.interface.constant.load[1] : index
+  %d0 = hal.interface.constant.load[2] : index
+  %d1 = hal.interface.constant.load[3] : index
+  %d2 = hal.interface.constant.load[4] : index
+  %d3 = hal.interface.constant.load[5] : index
   %0 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) : !flow.dispatch.tensor<readonly:?x?xi32>{%d0, %d1}
   %3 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(1) : !flow.dispatch.tensor<writeonly:?x?xi32>{%d2, %d3}
   %workgroup_size_x = hal.interface.workgroup.size[0] : index
@@ -2297,8 +2297,8 @@ builtin.func @tensor_insert_slice() {
 //       CHECK: func @tensor_insert_slice()
 //   CHECK-DAG:   %[[SRC:.+]] = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) : memref<?x?xi32>
 //   CHECK-DAG:   %[[DST:.+]] = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(1) : memref<?x?xi32>
-//   CHECK-DAG:   %[[OFFSET_Y:.+]] = hal.interface.load.constant offset = 0
-//   CHECK-DAG:   %[[OFFSET_X:.+]] = hal.interface.load.constant offset = 1
+//   CHECK-DAG:   %[[OFFSET_Y:.+]] = hal.interface.constant.load[0]
+//   CHECK-DAG:   %[[OFFSET_X:.+]] = hal.interface.constant.load[1]
 //       CHECK:   scf.for %[[IV0:.+]] =
 //       CHECK:     scf.for %[[IV1:.+]] =
 //   CHECK-DAG:       %[[SRC_VIEW:.+]] = memref.subview %[[SRC]][%[[IV0]], %[[IV1]]]
@@ -2314,8 +2314,8 @@ builtin.func @dynamic_update_slice() {
   %c0 = arith.constant 0 : index
   %c3 = arith.constant 3 : index
   %c0_i32 = arith.constant 0 : i32
-  %d0 = hal.interface.load.constant offset = 0 : index
-  %d1 = hal.interface.load.constant offset = 1 : index
+  %d0 = hal.interface.constant.load[0] : index
+  %d1 = hal.interface.constant.load[1] : index
   %0 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) : !flow.dispatch.tensor<readonly:?xi32>{%d0}
   %1 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(1) : !flow.dispatch.tensor<readonly:i32>
   %2 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(2) : !flow.dispatch.tensor<writeonly:?x?xi32>{%d1, %d0}
@@ -2342,8 +2342,8 @@ builtin.func @dynamic_update_slice() {
 // CHECK-LABEL: func @dynamic_update_slice()
 //   CHECK-DAG:   %[[SRC:.+]] = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) : memref<?xi32>
 //   CHECK-DAG:   %[[DST:.+]] = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(2) : memref<?x?xi32>
-//   CHECK-DAG:   %[[OFFSET_Y:.+]] = hal.interface.load.constant offset = 0
-//   CHECK-DAG:   %[[OFFSET_X:.+]] = hal.interface.load.constant offset = 1
+//   CHECK-DAG:   %[[OFFSET_Y:.+]] = hal.interface.constant.load[0]
+//   CHECK-DAG:   %[[OFFSET_X:.+]] = hal.interface.constant.load[1]
 //       CHECK:   scf.for %[[IV0:.+]] =
 //       CHECK:     %[[SRC_VIEW:.+]] = memref.subview %[[SRC]][%[[IV0]]]
 //  CHECK-SAME:         : memref<?xi32> to memref<?xi32, #{{.+}}>
@@ -2359,9 +2359,9 @@ func @multi_level_tile_fuse() {
   %c1 = arith.constant 1 : index
   %c2 = arith.constant 2 : index
   %cst = arith.constant 0.000000e+00 : f32
-  %m = hal.interface.load.constant offset = 0 : index
-  %n = hal.interface.load.constant offset = 1 : index
-  %k = hal.interface.load.constant offset = 2 : index
+  %m = hal.interface.constant.load[0] : index
+  %n = hal.interface.constant.load[1] : index
+  %k = hal.interface.constant.load[2] : index
   %0 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) : !flow.dispatch.tensor<readonly:?x?xf32>{%m, %k}
   %1 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(1) : !flow.dispatch.tensor<readonly:?x?xf32>{%k, %n}
   %2 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(2) : !flow.dispatch.tensor<readonly:f32>
@@ -2424,9 +2424,9 @@ func @multi_level_tile_fuse() {
 
 // CHECK-LABEL: func @multi_level_tile_fuse()
 //   CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
-//   CHECK-DAG:   %[[M:.+]] = hal.interface.load.constant offset = 0
-//   CHECK-DAG:   %[[N:.+]] = hal.interface.load.constant offset = 1
-//   CHECK-DAG:   %[[K:.+]] = hal.interface.load.constant offset = 2
+//   CHECK-DAG:   %[[M:.+]] = hal.interface.constant.load[0]
+//   CHECK-DAG:   %[[N:.+]] = hal.interface.constant.load[1]
+//   CHECK-DAG:   %[[K:.+]] = hal.interface.constant.load[2]
 //   CHECK-DAG:   %[[LHS:.+]] = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) : memref<?x?xf32>{%[[M]], %[[K]]}
 //   CHECK-DAG:   %[[RHS:.+]] = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(1) : memref<?x?xf32>{%[[K]], %[[N]]}
 //   CHECK-DAG:   %[[SCALAR:.+]] = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(2) : memref<f32>
@@ -2460,9 +2460,9 @@ func @operand_fusion() {
   %c1 = arith.constant 1 : index
   %c2 = arith.constant 2 : index
   %cst = arith.constant 0.000000e+00 : f32
-  %m = hal.interface.load.constant offset = 0 : index
-  %n = hal.interface.load.constant offset = 1 : index
-  %k = hal.interface.load.constant offset = 2 : index
+  %m = hal.interface.constant.load[0] : index
+  %n = hal.interface.constant.load[1] : index
+  %k = hal.interface.constant.load[2] : index
   %0 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) : !flow.dispatch.tensor<readonly:?x?xf32>{%m, %k}
   %1 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(1) : !flow.dispatch.tensor<readonly:?x?xf32>{%k, %n}
   %2 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(2) : !flow.dispatch.tensor<readonly:f32>
@@ -2502,9 +2502,9 @@ func @operand_fusion() {
 }
 
 // CHECK-LABEL: func @operand_fusion()
-//   CHECK-DAG:   %[[M:.+]] = hal.interface.load.constant offset = 0
-//   CHECK-DAG:   %[[N:.+]] = hal.interface.load.constant offset = 1
-//   CHECK-DAG:   %[[K:.+]] = hal.interface.load.constant offset = 2
+//   CHECK-DAG:   %[[M:.+]] = hal.interface.constant.load[0]
+//   CHECK-DAG:   %[[N:.+]] = hal.interface.constant.load[1]
+//   CHECK-DAG:   %[[K:.+]] = hal.interface.constant.load[2]
 //   CHECK-DAG:   %[[LHS:.+]] = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) : memref<?x?xf32>{%[[M]], %[[K]]}
 //   CHECK-DAG:   %[[RHS:.+]] = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(1) : memref<?x?xf32>{%[[K]], %[[N]]}
 //   CHECK-DAG:   %[[SCALAR:.+]] = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(2) : memref<f32>
@@ -2532,9 +2532,9 @@ func @two_level_tile_and_fuse() {
   %c8 = arith.constant 8 : index
   %c16 = arith.constant 16 : index
   %cst = arith.constant 0.0 : f32
-  %m = hal.interface.load.constant offset = 0 : index
-  %n = hal.interface.load.constant offset = 1 : index
-  %k = hal.interface.load.constant offset = 2 : index
+  %m = hal.interface.constant.load[0] : index
+  %n = hal.interface.constant.load[1] : index
+  %k = hal.interface.constant.load[2] : index
   %lhs = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) : !flow.dispatch.tensor<readonly:?x?xf32>{%m, %k}
   %rhs = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(1) : !flow.dispatch.tensor<readonly:?x?xf32>{%k, %n}
   %bias = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(2) : !flow.dispatch.tensor<readonly:?x?xf32>{%m, %n}
