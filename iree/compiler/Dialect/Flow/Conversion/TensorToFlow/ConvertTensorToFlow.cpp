@@ -61,8 +61,9 @@ static bool isOffsetSizeAndStrideMappableToFlow(ArrayRef<OpFoldResult> offsets,
     } else {
       if (!(staticOffset == 0 && staticSize != ShapedType::kDynamicSize &&
             baseShape[dim - 1] != ShapedType::kDynamicSize &&
-            staticSize == baseShape[dim - 1]))
+            staticSize == baseShape[dim - 1])) {
         fullSlices = false;
+      }
     }
   }
   return true;

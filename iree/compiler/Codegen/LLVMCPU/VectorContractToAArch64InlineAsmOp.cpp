@@ -38,8 +38,9 @@ struct ConvertVectorContract4x4x4_i8i8i32_ToAArch64InlineAsmPattern
     auto lhsShape = lhsType.getShape();
     auto rhsShape = rhsType.getShape();
     if (lhsShape[0] != 4 || lhsShape[1] != 4 || rhsShape[0] != 4 ||
-        rhsShape[1] != 4)
+        rhsShape[1] != 4) {
       return failure();
+    }
 
     Value inLhs = contractionOp.lhs();
     Value inRhs = contractionOp.rhs();

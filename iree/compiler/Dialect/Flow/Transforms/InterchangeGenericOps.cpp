@@ -43,8 +43,9 @@ struct GenericOpInterchangePattern
     // If all the parallel loops are outter loops skip the pattern.
     if (!needInterchange) return failure();
     for (auto iter : llvm::enumerate(genericOp.iterator_types())) {
-      if (isReductionIterator(iter.value()))
+      if (isReductionIterator(iter.value())) {
         interchange.push_back(iter.index());
+      }
     }
     rewriter.updateRootInPlace(genericOp, [&]() {
       interchangeGenericOp(rewriter, genericOp, interchange);

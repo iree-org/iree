@@ -45,8 +45,9 @@ static Optional<CooperativeMatrixSize> getCooperativeMatrixSize(
       int64_t matmulM = property.m_size().getValue().getZExtValue();
       int64_t matmulN = property.n_size().getValue().getZExtValue();
       int64_t matmulK = property.k_size().getValue().getZExtValue();
-      if (m % matmulM == 0 && n % matmulN == 0 && k % matmulK == 0)
+      if (m % matmulM == 0 && n % matmulN == 0 && k % matmulK == 0) {
         return CooperativeMatrixSize{matmulM, matmulN, matmulK};
+      }
     }
   }
   return llvm::None;

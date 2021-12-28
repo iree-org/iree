@@ -598,10 +598,11 @@ class ConvertHALInterfaceBindingSubspanOp : public ConvertToLLVMPattern {
     IREE::HAL::InterfaceBindingSubspanOpAdaptor newOperands(
         operands, op->getAttrDictionary());
     MemRefType memRefType = op->getResult(0).getType().dyn_cast<MemRefType>();
-    if (!memRefType)
+    if (!memRefType) {
       return rewriter.notifyMatchFailure(
           op,
           "failed to convert interface.binding.subspan result to memref type");
+    }
     auto memRefDesc = abi.loadBinding(
         op->getLoc(), interfaceBindingOp.binding().getZExtValue(),
         newOperands.byte_offset(), memRefType, newOperands.dynamic_dims(),

@@ -997,10 +997,11 @@ class SequenceCloneBuiltinConversion
   }
 
   Type getElementAccessType(Type t) const {
-    if (auto listType = t.dyn_cast<PYDM::ListType>())
+    if (auto listType = t.dyn_cast<PYDM::ListType>()) {
       return listType.getElementStorageType();
-    else if (auto tupleType = t.dyn_cast<PYDM::TupleType>())
+    } else if (auto tupleType = t.dyn_cast<PYDM::TupleType>()) {
       return tupleType.getElementStorageType();
+    }
 
     llvm_unreachable("unsupported list type");
   }

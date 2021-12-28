@@ -98,8 +98,9 @@ struct ConvertToNVVMPass : public ConvertToNVVMBase<ConvertToNVVMPass> {
         if (isEntryPoint(funcOp)) return false;
         return true;
       });
-      if (failed(applyPartialConversion(m, target, std::move(llvmPatterns))))
+      if (failed(applyPartialConversion(m, target, std::move(llvmPatterns)))) {
         signalPassFailure();
+      }
     }
   }
 };

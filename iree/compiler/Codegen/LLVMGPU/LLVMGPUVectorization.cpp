@@ -51,8 +51,9 @@ static Optional<SmallVector<int64_t, 4>> getGPUNativeVectorSize(Operation *op) {
     // Load 4 elements on the most inner dimension.
     for (auto dim : llvm::enumerate(vt.permutation_map().getResults())) {
       if (auto dimExpr = dim.value().dyn_cast<AffineDimExpr>()) {
-        if (dimExpr.getPosition() == vt.permutation_map().getNumDims() - 1)
+        if (dimExpr.getPosition() == vt.permutation_map().getNumDims() - 1) {
           nativeSize[dim.index()] = 4;
+        }
       }
     }
     return nativeSize;
