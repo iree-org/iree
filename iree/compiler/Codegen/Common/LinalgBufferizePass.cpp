@@ -910,8 +910,8 @@ void LinalgBufferizePass::runOnOperation() {
         subspanOp.result().getType().cast<IREE::Flow::DispatchTensorType>();
     auto memRefType = getMemrefTypeForTensor(tensorType);
     auto baseBuffer = b.create<IREE::HAL::InterfaceBindingSubspanOp>(
-        subspanOp->getLoc(), memRefType, subspanOp.type(), subspanOp.set(),
-        subspanOp.binding(), subspanOp.byte_offset(), subspanOp.dynamic_dims(),
+        subspanOp->getLoc(), memRefType, subspanOp.set(), subspanOp.binding(),
+        subspanOp.type(), subspanOp.byte_offset(), subspanOp.dynamic_dims(),
         subspanOp.alignmentAttr());
     auto alignment = baseBuffer.calculateAlignment();
     b.create<memref::AssumeAlignmentOp>(subspanOp->getLoc(), baseBuffer,

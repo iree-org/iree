@@ -400,28 +400,6 @@ void BufferConstraintsAttr::print(AsmPrinter &p) const {
   os << ">";
 }
 
-// static
-Attribute DescriptorSetLayoutBindingAttr::parse(AsmParser &p) {
-  auto b = p.getBuilder();
-  IntegerAttr bindingAttr;
-  DescriptorTypeAttr typeAttr;
-  if (failed(p.parseLess()) ||
-      failed(p.parseAttribute(bindingAttr, b.getIntegerType(32))) ||
-      failed(p.parseComma()) || failed(parseEnumAttr(p, "type", typeAttr)) ||
-      failed(p.parseGreater())) {
-    return {};
-  }
-  return get(bindingAttr, typeAttr);
-}
-
-void DescriptorSetLayoutBindingAttr::print(AsmPrinter &p) const {
-  auto &os = p.getStream();
-  os << "<";
-  os << binding() << ", ";
-  os << "\"" << stringifyDescriptorType(type()) << "\"";
-  os << ">";
-}
-
 //===----------------------------------------------------------------------===//
 // #hal.device.target
 //===----------------------------------------------------------------------===//
@@ -838,7 +816,7 @@ Value DeviceMatchExecutableFormatAttr::buildConditionExpression(
 #include "iree/compiler/Dialect/HAL/IR/HALTypeInterfaces.cpp.inc"
 
 void HALDialect::registerAttributes() {
-  addAttributes<BufferConstraintsAttr, DescriptorSetLayoutBindingAttr>();
+  addAttributes<BufferConstraintsAttr>();
   addAttributes<
 #define GET_ATTRDEF_LIST
 #include "iree/compiler/Dialect/HAL/IR/HALAttrs.cpp.inc"  // IWYU pragma: keep
@@ -866,8 +844,6 @@ Attribute HALDialect::parseAttribute(DialectAsmParser &parser,
   if (parseResult.hasValue()) return genAttr;
   if (mnemonic == BufferConstraintsAttr::getKindName()) {
     return BufferConstraintsAttr::parse(parser);
-  } else if (mnemonic == DescriptorSetLayoutBindingAttr::getKindName()) {
-    return DescriptorSetLayoutBindingAttr::parse(parser);
   }
   parser.emitError(parser.getNameLoc())
       << "unknown HAL attribute: " << mnemonic;
@@ -876,11 +852,10 @@ Attribute HALDialect::parseAttribute(DialectAsmParser &parser,
 
 void HALDialect::printAttribute(Attribute attr, DialectAsmPrinter &p) const {
   TypeSwitch<Attribute>(attr)
-      .Case<BufferConstraintsAttr, DescriptorSetLayoutBindingAttr>(
-          [&](auto typedAttr) {
-            p << typedAttr.getKindName();
-            typedAttr.print(p);
-          })
+      .Case<BufferConstraintsAttr>([&](auto typedAttr) {
+        p << typedAttr.getKindName();
+        typedAttr.print(p);
+      })
       .Default([&](Attribute) {
         if (failed(generatedAttributePrinter(attr, p))) {
           llvm_unreachable("unhandled HAL attribute kind");

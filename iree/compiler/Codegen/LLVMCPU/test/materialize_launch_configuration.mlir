@@ -1,17 +1,20 @@
 // RUN: iree-opt -pass-pipeline='hal.executable(hal.executable.variant(iree-llvmcpu-lower-executable-target{test-lowering-configuration=true}))' -cse -canonicalize -split-input-file %s | IreeFileCheck %s
 
+#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>,
+    #hal.descriptor_set.binding<2, storage_buffer>,
+    #hal.descriptor_set.binding<3, storage_buffer>
+  ]>
+]>
 hal.executable private @matmul_tensors  {
-  hal.interface @io {
-    hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer"
-    hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer"
-    hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer"
-  }
   hal.executable.variant @llvm, target = <"llvm", "embedded-elf-arm_64", {
-       data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
-       native_vector_size = 16 : index,
-       target_triple = "aarch64-unknown-unknown-eabi-elf"
-    }> {
-    hal.executable.entry_point @matmul_tensors interface(@io)
+    data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
+    native_vector_size = 16 : index,
+    target_triple = "aarch64-unknown-unknown-eabi-elf"
+  }> {
+    hal.executable.entry_point @matmul_tensors layout(#executable_layout)
     builtin.module {
       func @matmul_tensors() {
         %c0 = arith.constant 0 : index
@@ -19,10 +22,10 @@ hal.executable private @matmul_tensors  {
         %M = hal.interface.constant.load[0] : index
         %N = hal.interface.constant.load[1] : index
         %K = hal.interface.constant.load[2] : index
-        %0 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) : !flow.dispatch.tensor<readonly:?x?xf32>{%M, %K}
-        %2 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(1) : !flow.dispatch.tensor<readonly:?x?xf32>{%K, %N}
-        %4 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(2) : !flow.dispatch.tensor<readonly:?x?xf32>{%M, %N}
-        %6 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(3) : !flow.dispatch.tensor<writeonly:?x?xf32>{%M, %N}
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<readonly:?x?xf32>{%M, %K}
+        %2 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : !flow.dispatch.tensor<readonly:?x?xf32>{%K, %N}
+        %4 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : !flow.dispatch.tensor<readonly:?x?xf32>{%M, %N}
+        %6 = hal.interface.binding.subspan set(0) binding(3) type(storage_buffer) : !flow.dispatch.tensor<writeonly:?x?xf32>{%M, %N}
         %workgroup_size_x = hal.interface.workgroup.size[0] : index
         %workgroup_size_y = hal.interface.workgroup.size[1] : index
         %workgroup_id_x = hal.interface.workgroup.id[0] : index
@@ -67,26 +70,28 @@ hal.executable private @matmul_tensors  {
 
 // -----
 
+#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>,
+    #hal.descriptor_set.binding<2, storage_buffer>
+  ]>
+]>
 hal.executable private @add_no_config  {
-  hal.interface @io {
-    hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer"
-    hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer"
-    hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer"
-  }
   hal.executable.variant @llvm, target = <"llvm", "embedded-elf-x86_64", {
-       data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
-       native_vector_size = 16 : index,
-       target_triple = "x86_64-unknown-linux-gnu"
-    }> {
-    hal.executable.entry_point @add_no_config interface(@io)
+    data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
+    native_vector_size = 16 : index,
+    target_triple = "x86_64-unknown-linux-gnu"
+  }> {
+    hal.executable.entry_point @add_no_config layout(#executable_layout)
     builtin.module {
       func @add_no_config() {
         %c0 = arith.constant 0 : index
         %dim0 = hal.interface.constant.load[0] : index
         %dim1 = hal.interface.constant.load[1] : index
-        %0 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) : !flow.dispatch.tensor<readonly:?x?xf32>{%dim0, %dim1}
-        %1 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(1) : !flow.dispatch.tensor<readonly:?xf32>{%dim1}
-        %2 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(2) : !flow.dispatch.tensor<writeonly:?x?xf32>{%dim0, %dim1}
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<readonly:?x?xf32>{%dim0, %dim1}
+        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : !flow.dispatch.tensor<readonly:?xf32>{%dim1}
+        %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : !flow.dispatch.tensor<writeonly:?x?xf32>{%dim0, %dim1}
         %3 = flow.dispatch.tensor.load %0, offsets=[], sizes=[], strides=[] : !flow.dispatch.tensor<readonly:?x?xf32> -> tensor<?x?xf32>
         %4 = flow.dispatch.tensor.load %1, offsets=[], sizes=[], strides=[] : !flow.dispatch.tensor<readonly:?xf32> -> tensor<?xf32>
         %5 = linalg.init_tensor [%dim0, %dim1] : tensor<?x?xf32>
@@ -103,11 +108,6 @@ hal.executable private @add_no_config  {
         flow.dispatch.tensor.store %6, %2, offsets = [], sizes = [], strides = [] : tensor<?x?xf32> -> !flow.dispatch.tensor<writeonly:?x?xf32>
         return
       }
-      hal.interface private @io  {
-        hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer"
-        hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer"
-        hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer"
-      }
     }
   }
 }
@@ -122,18 +122,21 @@ hal.executable private @add_no_config  {
 #map0 = affine_map<()[s0, s1] -> (s0 * s1)>
 #map1 = affine_map<(d0)[s0, s1] -> (s1, -d0 + s0)>
 #map2 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
+#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>,
+    #hal.descriptor_set.binding<2, storage_buffer>,
+    #hal.descriptor_set.binding<3, storage_buffer>
+  ]>
+]>
 hal.executable private @add4D  {
-  hal.interface @io {
-    hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer"
-    hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer"
-    hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer"
-  }
   hal.executable.variant @llvm, target = <"llvm", "embedded-elf-x86_64", {
-       data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
-       native_vector_size = 16 : index,
-       target_triple = "x86_64-unknown-linux-gnu"
-    }> {
-    hal.executable.entry_point @add4D interface(@io)
+    data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
+    native_vector_size = 16 : index,
+    target_triple = "x86_64-unknown-linux-gnu"
+  }> {
+    hal.executable.entry_point @add4D layout(#executable_layout)
     builtin.module {
       func @add4D() {
         %c0 = arith.constant 0 : index
@@ -145,9 +148,9 @@ hal.executable private @add4D  {
         %5 = hal.interface.constant.load[5] : index
         %6 = hal.interface.constant.load[6] : index
         %7 = hal.interface.constant.load[7] : index
-        %8 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) alignment(32) : !flow.dispatch.tensor<readonly:?x?x?x?xf32>{%0, %1, %2, %3}
-        %9 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(1) alignment(32) : !flow.dispatch.tensor<readonly:?x?x?x?xf32>{%4, %5, %6, %7}
-        %10 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(2) alignment(32) : !flow.dispatch.tensor<writeonly:?x?x?x?xf32>{%0, %1, %2, %3}
+        %8 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(32) : !flow.dispatch.tensor<readonly:?x?x?x?xf32>{%0, %1, %2, %3}
+        %9 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(32) : !flow.dispatch.tensor<readonly:?x?x?x?xf32>{%4, %5, %6, %7}
+        %10 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(32) : !flow.dispatch.tensor<writeonly:?x?x?x?xf32>{%0, %1, %2, %3}
         %workgroup_size_x = hal.interface.workgroup.size[0] : index
         %workgroup_size_y = hal.interface.workgroup.size[1] : index
         %workgroup_size_z = hal.interface.workgroup.size[2] : index
@@ -205,14 +208,20 @@ hal.executable private @add4D  {
 #map0 = affine_map<()[s0, s1] -> (s0 * s1)>
 #map1 = affine_map<(d0)[s0, s1] -> (s1, -d0 + s0)>
 #map2 = affine_map<(d0)[s0, s1] -> (-d0 + s0, s1)>
-
+#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>,
+    #hal.descriptor_set.binding<2, storage_buffer>
+  ]>
+]>
 hal.executable private @batch_matmul_tensors {
   hal.executable.variant @llvm, target = <"llvm", "embedded-elf-arm_64", {
-       data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
-       native_vector_size = 16 : index,
-       target_triple = "aarch64-unknown-unknown-eabi-elf"
-    }> {
-    hal.executable.entry_point @batch_matmul_tensors interface(@io)
+    data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
+    native_vector_size = 16 : index,
+    target_triple = "aarch64-unknown-unknown-eabi-elf"
+  }> {
+    hal.executable.entry_point @batch_matmul_tensors layout(#executable_layout)
     builtin.module {
       func @batch_matmul_tensors() {
         %cst = arith.constant 0.000000e+00 : f32
@@ -223,9 +232,9 @@ hal.executable private @batch_matmul_tensors {
         %3 = hal.interface.constant.load[3] : index
         %4 = hal.interface.constant.load[4] : index
         %5 = hal.interface.constant.load[5] : index
-        %6 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) alignment(32) : !flow.dispatch.tensor<readonly:?x?x?xf32>{%0, %1, %2}
-        %7 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(1) alignment(32) : !flow.dispatch.tensor<readonly:?x?x?xf32>{%3, %4, %5}
-        %8 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(2) alignment(32) : !flow.dispatch.tensor<writeonly:?x?x?xf32>{%0, %1, %5}
+        %6 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(32) : !flow.dispatch.tensor<readonly:?x?x?xf32>{%0, %1, %2}
+        %7 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(32) : !flow.dispatch.tensor<readonly:?x?x?xf32>{%3, %4, %5}
+        %8 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(32) : !flow.dispatch.tensor<writeonly:?x?x?xf32>{%0, %1, %5}
         %workgroup_size_x = hal.interface.workgroup.size[0] : index
         %workgroup_size_y = hal.interface.workgroup.size[1] : index
         %workgroup_size_z = hal.interface.workgroup.size[2] : index
@@ -284,18 +293,25 @@ hal.executable private @batch_matmul_tensors {
     #iree_codegen.lowering.config<tile_sizes = [[], [32, 32, 32], [4, 4, 4]], native_vector_size = [4, 4, 4]>,
     #iree_codegen.translation.info<"CPUTensorToVectors", workload_per_wg = [32, 32]>,
     workgroup_size = []>
+#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>,
+    #hal.descriptor_set.binding<2, storage_buffer>
+  ]>
+]>
 hal.executable private @preset_config_matmul_tensors  {
   hal.executable.variant @system_elf_x86_64, target = <"llvm", "system-elf-x86_64"> {
-    hal.executable.entry_point @preset_config interface(@io)
+    hal.executable.entry_point @preset_config layout(#executable_layout)
     builtin.module {
       builtin.func @preset_config() {
         %c0 = arith.constant 0 : index
         %c512 = arith.constant 512 : index
         %c128 = arith.constant 128 : index
         %cst = arith.constant 0.000000e+00 : f32
-        %0 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) : !flow.dispatch.tensor<readonly:128x256xf32>
-        %1 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(1) : !flow.dispatch.tensor<readonly:256x512xf32>
-        %2 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(2) : !flow.dispatch.tensor<writeonly:128x512xf32>
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<readonly:128x256xf32>
+        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : !flow.dispatch.tensor<readonly:256x512xf32>
+        %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : !flow.dispatch.tensor<writeonly:128x512xf32>
         %workgroup_size_x = hal.interface.workgroup.size[0] : index
         %workgroup_size_y = hal.interface.workgroup.size[1] : index
         %workgroup_id_x = hal.interface.workgroup.id[0] : index
@@ -362,16 +378,22 @@ hal.executable private @preset_config_matmul_tensors  {
 
 // -----
 
+#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>
+  ]>
+]>
 hal.executable @tensor_insert {
   hal.executable.variant @system_elf_x86_64, target = <"llvm", "system-elf-x86_64"> {
-    hal.executable.entry_point @tensor_insert_slice interface(@io)
+    hal.executable.entry_point @tensor_insert_slice layout(#executable_layout)
     builtin.module {
       builtin.func @tensor_insert_slice() {
         %c0 = arith.constant 0 : index
-        %0 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) : !flow.dispatch.tensor<readonly:?x?xi32>
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<readonly:?x?xi32>
         %1 = hal.interface.constant.load[0] : index
         %2 = hal.interface.constant.load[1] : index
-        %3 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(1) : !flow.dispatch.tensor<writeonly:?x?xi32>
+        %3 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : !flow.dispatch.tensor<writeonly:?x?xi32>
         %workgroup_size_x = hal.interface.workgroup.size[0] : index
         %workgroup_size_y = hal.interface.workgroup.size[1] : index
         %workgroup_id_x = hal.interface.workgroup.id[0] : index
@@ -413,21 +435,23 @@ hal.executable @tensor_insert {
 
 // -----
 
+#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>
+  ]>
+]>
 hal.executable private @static_1d_fft_stage2  {
-  hal.interface @io {
-    hal.interface.binding @s0b0_rw_external, set=0, binding=0, type="StorageBuffer"
-    hal.interface.binding @s0b1_rw_external, set=0, binding=1, type="StorageBuffer"
-  }
   hal.executable.variant @system_elf_x86_64, target = <"llvm", "system-elf-x86_64"> {
-    hal.executable.entry_point @static_1d_fft_stage2 interface(@io)
+    hal.executable.entry_point @static_1d_fft_stage2 layout(#executable_layout)
     builtin.module {
       builtin.func @static_1d_fft_stage2() {
         %c0 = arith.constant 0 : index
         %c2 = arith.constant 2 : index
         %cst = arith.constant dense<[1.000000e+00, 6.12323426E-17]> : tensor<2xf32>
         %cst_0 = arith.constant dense<[-0.000000e+00, -1.000000e+00]> : tensor<2xf32>
-        %0 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) : !flow.dispatch.tensor<readwrite:32xf32>
-        %1 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(1) : !flow.dispatch.tensor<readwrite:32xf32>
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<readwrite:32xf32>
+        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : !flow.dispatch.tensor<readwrite:32xf32>
         %2 = flow.dispatch.tensor.load %0, offsets = [], sizes = [], strides = [] : !flow.dispatch.tensor<readwrite:32xf32> -> tensor<32xf32>
         %3 = flow.dispatch.tensor.load %1, offsets = [], sizes = [], strides = [] : !flow.dispatch.tensor<readwrite:32xf32> -> tensor<32xf32>
         %4:2 = iree_linalg_ext.fft {__internal_linalg_transform__ = "workgroup"} ins(%c2, %cst, %cst_0 : index, tensor<2xf32>, tensor<2xf32>) outs(%2, %3 : tensor<32xf32>, tensor<32xf32>) : tensor<32xf32>, tensor<32xf32>
@@ -455,14 +479,15 @@ hal.executable private @static_1d_fft_stage2  {
 
 // -----
 
-
+#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>
+  ]>
+]>
 hal.executable private @static_3d_fft_stage3  {
-  hal.interface @io {
-    hal.interface.binding @s0b0_rw_external, set=0, binding=0, type="StorageBuffer"
-    hal.interface.binding @s0b1_rw_external, set=0, binding=1, type="StorageBuffer"
-  }
   hal.executable.variant @system_elf_x86_64, target = <"llvm", "system-elf-x86_64"> {
-    hal.executable.entry_point @static_3d_fft_stage3 interface(@io)
+    hal.executable.entry_point @static_3d_fft_stage3 layout(#executable_layout)
     builtin.module {
       builtin.func @static_3d_fft_stage3() {
         %c0 = arith.constant 0 : index
@@ -474,8 +499,8 @@ hal.executable private @static_3d_fft_stage3  {
         %cst_0 = arith.constant dense<[-0.000000e+00, -0.707106769, -1.000000e+00, -0.707106769]> : tensor<4xf32>
         %0 = bufferization.to_memref %cst_0 : memref<4xf32>
         %1 = bufferization.to_memref %cst : memref<4xf32>
-        %2 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) : memref<64x128x32xf32>
-        %3 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(1) : memref<64x128x32xf32>
+        %2 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<64x128x32xf32>
+        %3 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<64x128x32xf32>
         %workgroup_id_x = hal.interface.workgroup.id[0] : index
         %workgroup_count_x = hal.interface.workgroup.count[0] : index
         %workgroup_size_x = hal.interface.workgroup.size[0] : index
@@ -527,24 +552,26 @@ hal.executable private @static_3d_fft_stage3  {
 
 // -----
 
+#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>,
+    #hal.descriptor_set.binding<2, storage_buffer>
+  ]>
+]>
 hal.executable private @outs_fusion {
-  hal.interface @io {
-    hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer"
-    hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer"
-    hal.interface.binding @arg2, set=0, binding=2, type="StorageBuffer"
-  }
   hal.executable.variant @system_elf_x86_64, target = <"llvm", "system-elf-x86_64"> {
-    hal.executable.entry_point @outs_fusion_fn interface(@io)
+    hal.executable.entry_point @outs_fusion_fn layout(#executable_layout)
     builtin.module {
       builtin.func @outs_fusion_fn() {
         %c0 = arith.constant 0 : index
         %cst = arith.constant 0.0 : f32
-        %0 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) : !flow.dispatch.tensor<readonly:?x?xf32>
-        %1 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(1) : !flow.dispatch.tensor<readonly:?x?xf32>
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<readonly:?x?xf32>
+        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : !flow.dispatch.tensor<readonly:?x?xf32>
         %2 = hal.interface.constant.load[0] : index
         %3 = hal.interface.constant.load[1] : index
         %4 = hal.interface.constant.load[2] : index
-        %5 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(2) : !flow.dispatch.tensor<writeonly:?x?xf32>
+        %5 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : !flow.dispatch.tensor<writeonly:?x?xf32>
         %workgroup_id_x = hal.interface.workgroup.id[0] : index
         %workgroup_count_x = hal.interface.workgroup.count[0] : index
         %workgroup_size_x = hal.interface.workgroup.size[0] : index
@@ -596,9 +623,20 @@ hal.executable private @outs_fusion {
 
 // -----
 
+#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>,
+    #hal.descriptor_set.binding<2, storage_buffer>
+  ]>
+]>
 hal.executable private @conv {
-  hal.executable.variant public @system_elf_x86_64, target = <"llvm", "system-elf-x86_64", {data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128", native_vector_size = 16 : index, target_triple = "x86_64-unknown-linux-gnu"}> {
-    hal.executable.entry_point public @conv interface(@io)
+  hal.executable.variant public @system_elf_x86_64, target = <"llvm", "system-elf-x86_64", {
+    data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
+    native_vector_size = 16 : index,
+    target_triple = "x86_64-unknown-linux-gnu"
+  }> {
+    hal.executable.entry_point public @conv layout(#executable_layout)
     builtin.module {
       func @conv() {
         %c0 = arith.constant 0 : index
@@ -614,9 +652,9 @@ hal.executable private @conv {
         %9 = hal.interface.constant.load[9] : index
         %10 = hal.interface.constant.load[10] : index
         %11 = hal.interface.constant.load[11] : index
-        %12 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) : !flow.dispatch.tensor<readonly:?x?x?x?xf32>{%0, %1, %2, %3}
-        %13 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(1) : !flow.dispatch.tensor<readwrite:?x?x?x?xf32>{%4, %5, %6, %7}
-        %14 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(2) : !flow.dispatch.tensor<readonly:?x?x?x?xf32>{%8, %9, %10, %11}
+        %12 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<readonly:?x?x?x?xf32>{%0, %1, %2, %3}
+        %13 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : !flow.dispatch.tensor<readwrite:?x?x?x?xf32>{%4, %5, %6, %7}
+        %14 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : !flow.dispatch.tensor<readonly:?x?x?x?xf32>{%8, %9, %10, %11}
         %workgroup_size_x = hal.interface.workgroup.size[0] : index
         %workgroup_size_y = hal.interface.workgroup.size[1] : index
         %workgroup_size_z = hal.interface.workgroup.size[2] : index
@@ -669,18 +707,29 @@ hal.executable private @conv {
 
 // -----
 
+#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>,
+    #hal.descriptor_set.binding<2, storage_buffer>
+  ]>
+]>
 hal.executable private @conv_static {
-  hal.executable.variant public @system_elf_x86_64, target = <"llvm", "system-elf-x86_64", {data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128", native_vector_size = 64 : index, target_triple = "x86_64-pc-linux-gnu"}> {
-    hal.executable.entry_point public @conv_static interface(@io)
+  hal.executable.variant public @system_elf_x86_64, target = <"llvm", "system-elf-x86_64", {
+    data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
+    native_vector_size = 64 : index,
+    target_triple = "x86_64-pc-linux-gnu"
+  }> {
+    hal.executable.entry_point public @conv_static layout(#executable_layout)
     builtin.module {
       func @conv_static() {
         %cst = arith.constant 0.000000e+00 : f32
         %c80 = arith.constant 80 : index
         %c96 = arith.constant 96 : index
         %c0 = arith.constant 0 : index
-        %0 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) : !flow.dispatch.tensor<readonly:1x161x161x96xf32>
-        %1 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(1) : !flow.dispatch.tensor<readonly:3x3x96xf32>
-        %2 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(2) : !flow.dispatch.tensor<writeonly:1x80x80x96xf32>
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<readonly:1x161x161x96xf32>
+        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : !flow.dispatch.tensor<readonly:3x3x96xf32>
+        %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : !flow.dispatch.tensor<writeonly:1x80x80x96xf32>
         %workgroup_size_x = hal.interface.workgroup.size[0] : index
         %workgroup_size_y = hal.interface.workgroup.size[1] : index
         %workgroup_size_z = hal.interface.workgroup.size[2] : index
@@ -741,16 +790,26 @@ hal.executable private @conv_static {
 
 // -----
 
+#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>
+  ]>
+]>
 hal.executable private @generic_static {
-  hal.executable.variant public @system_elf_x86_64, target = <"llvm", "system-elf-x86_64", {data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128", native_vector_size = 64 : index, target_triple = "x86_64-pc-linux-gnu"}> {
-    hal.executable.entry_point public @generic_static interface(@io)
+  hal.executable.variant public @system_elf_x86_64, target = <"llvm", "system-elf-x86_64", {
+    data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
+    native_vector_size = 64 : index,
+    target_triple = "x86_64-pc-linux-gnu"
+  }> {
+    hal.executable.entry_point public @generic_static layout(#executable_layout)
     builtin.module {
       func @generic_static() {
         %c16 = arith.constant 16 : index
         %c96 = arith.constant 96 : index
         %c0 = arith.constant 0 : index
-        %0 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) : !flow.dispatch.tensor<readonly:96x16xf32>
-        %1 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(1) : !flow.dispatch.tensor<writeonly:16x96xf32>
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<readonly:96x16xf32>
+        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : !flow.dispatch.tensor<writeonly:16x96xf32>
         %workgroup_size_x = hal.interface.workgroup.size[0] : index
         %workgroup_size_y = hal.interface.workgroup.size[1] : index
         %workgroup_id_x = hal.interface.workgroup.id[0] : index
@@ -797,9 +856,20 @@ hal.executable private @generic_static {
 
 // -----
 
+#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>,
+    #hal.descriptor_set.binding<2, storage_buffer>
+  ]>
+]>
 hal.executable private @matmul_static {
-  hal.executable.variant public @system_elf_arm_64, target = <"llvm", "system-elf-arm_64", {data_layout = "e-m:e-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128", native_vector_size = 16 : index, target_triple = "aarch64-none-linux-android30"}> {
-    hal.executable.entry_point public @matmul_static interface(@io)
+  hal.executable.variant public @system_elf_arm_64, target = <"llvm", "system-elf-arm_64", {
+    data_layout = "e-m:e-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128",
+    native_vector_size = 16 : index,
+    target_triple = "aarch64-none-linux-android30"
+  }> {
+    hal.executable.entry_point public @matmul_static layout(#executable_layout)
     builtin.module {
       func @matmul_static() {
         %cst = arith.constant 0.000000e+00 : f32
@@ -808,9 +878,9 @@ hal.executable private @matmul_static {
         %c0 = arith.constant 0 : index
         %c8 = arith.constant 8 : index
         %c28 = arith.constant 28 : index
-        %0 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) : !flow.dispatch.tensor<readonly:196x240xf32>
-        %1 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(1) : !flow.dispatch.tensor<readonly:240x40xf32>
-        %2 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(2) : !flow.dispatch.tensor<writeonly:196x40xf32>
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<readonly:196x240xf32>
+        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : !flow.dispatch.tensor<readonly:240x40xf32>
+        %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : !flow.dispatch.tensor<writeonly:196x40xf32>
         %workgroup_id_x = hal.interface.workgroup.id[0] : index
         %workgroup_count_x = hal.interface.workgroup.count[0] : index
         %workgroup_size_x = hal.interface.workgroup.size[0] : index
@@ -855,9 +925,20 @@ hal.executable private @matmul_static {
 
 // -----
 
+#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>,
+    #hal.descriptor_set.binding<2, storage_buffer>
+  ]>
+]>
 hal.executable private @restrict_num_workgroups {
-  hal.executable.variant public @system_elf_arm_64, target = <"llvm", "system-elf-arm_64", {data_layout = "e-m:e-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128", native_vector_size = 16 : index, target_triple = "aarch64-none-linux-android30"}> {
-    hal.executable.entry_point public @restrict_num_workgroups interface(@io)
+  hal.executable.variant public @system_elf_arm_64, target = <"llvm", "system-elf-arm_64", {
+    data_layout = "e-m:e-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128",
+    native_vector_size = 16 : index,
+    target_triple = "aarch64-none-linux-android30"
+  }> {
+    hal.executable.entry_point public @restrict_num_workgroups layout(#executable_layout)
     builtin.module {
       func @restrict_num_workgroups() {
         %cst = arith.constant 0.000000e+00 : f32
@@ -866,9 +947,9 @@ hal.executable private @restrict_num_workgroups {
         %c0 = arith.constant 0 : index
         %c64 = arith.constant 64 : index
         %c2 = arith.constant 2 : index
-        %0 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) : !flow.dispatch.tensor<readonly:1x11x11x576xf32>
-        %1 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(1) : !flow.dispatch.tensor<readonly:5x5x576xf32>
-        %2 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(2) : !flow.dispatch.tensor<writeonly:1x7x7x576xf32>
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<readonly:1x11x11x576xf32>
+        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : !flow.dispatch.tensor<readonly:5x5x576xf32>
+        %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : !flow.dispatch.tensor<writeonly:1x7x7x576xf32>
         %workgroup_id_x = hal.interface.workgroup.id[0] : index
         %workgroup_count_x = hal.interface.workgroup.count[0] : index
         %workgroup_size_x = hal.interface.workgroup.size[0] : index
@@ -922,9 +1003,19 @@ hal.executable private @restrict_num_workgroups {
 
 // -----
 
+#executable_layout = #hal.executable.layout<push_constants = 3, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>
+  ]>
+]>
 hal.executable private @test_exp_0 {
-  hal.executable.variant public @system_elf_arm_64, target = <"llvm", "system-elf-arm_64", {data_layout = "e-m:e-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128", native_vector_size = 16 : index, target_triple = "aarch64-none-linux-android30"}> {
-    hal.executable.entry_point public @test_exp_0 interface(@io)
+  hal.executable.variant public @system_elf_arm_64, target = <"llvm", "system-elf-arm_64", {
+    data_layout = "e-m:e-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128",
+    native_vector_size = 16 : index,
+    target_triple = "aarch64-none-linux-android30"
+  }> {
+    hal.executable.entry_point public @test_exp_0 layout(#executable_layout)
     builtin.module {
       func @test_exp_0() {
         %c0 = arith.constant 0 : index
@@ -934,8 +1025,8 @@ hal.executable private @test_exp_0 {
         %lb = hal.interface.constant.load[0] : index
         %ub = hal.interface.constant.load[1] : index
         %step = hal.interface.constant.load[2] : index
-        %read = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) : memref<?xf32>{%ub}
-        %write = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(1) : memref<?xf32>{%ub}
+        %read = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<?xf32>{%ub}
+        %write = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<?xf32>{%ub}
         %offset = affine.apply affine_map<(d0)[s0,s1] -> (d0 + s0 * s1)>(%lb)[%id, %size]
         %stride = affine.apply affine_map<(d0)[s0,s1] -> (d0 * s0 * s1)>(%step)[%count, %size]
         scf.for %iv = %offset to %ub step %stride {
@@ -959,9 +1050,19 @@ hal.executable private @test_exp_0 {
 
 // -----
 
+#executable_layout = #hal.executable.layout<push_constants = 3, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>
+  ]>
+]>
 hal.executable private @test_exp_1 {
-  hal.executable.variant public @system_elf_arm_64, target = <"llvm", "system-elf-arm_64", {data_layout = "e-m:e-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128", native_vector_size = 16 : index, target_triple = "aarch64-none-linux-android30"}> {
-    hal.executable.entry_point public @test_exp_1 interface(@io)
+  hal.executable.variant public @system_elf_arm_64, target = <"llvm", "system-elf-arm_64", {
+    data_layout = "e-m:e-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128",
+    native_vector_size = 16 : index,
+    target_triple = "aarch64-none-linux-android30"
+  }> {
+    hal.executable.entry_point public @test_exp_1 layout(#executable_layout)
     builtin.module {
       func @test_exp_1() {
         %c0 = arith.constant 0 : index
@@ -971,8 +1072,8 @@ hal.executable private @test_exp_1 {
         %lb = hal.interface.constant.load[0] : index
         %ub = hal.interface.constant.load[1] : index
         %step = hal.interface.constant.load[2] : index
-        %read = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) : memref<?xf32>{%ub}
-        %write = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(1) : memref<?xf32>{%ub}
+        %read = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<?xf32>{%ub}
+        %write = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<?xf32>{%ub}
         %offset = affine.apply affine_map<()[s0,s1] -> (5 + s0 * s1)>()[%id, %size]
         %stride = affine.apply affine_map<(d0)[s0,s1] -> (s0 * d0 * s1)>(%step)[%count, %size]
         scf.for %iv = %offset to %ub step %stride {
@@ -996,9 +1097,19 @@ hal.executable private @test_exp_1 {
 
 // -----
 
+#executable_layout = #hal.executable.layout<push_constants = 3, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>
+  ]>
+]>
 hal.executable private @test_exp_2 {
-  hal.executable.variant public @system_elf_arm_64, target = <"llvm", "system-elf-arm_64", {data_layout = "e-m:e-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128", native_vector_size = 16 : index, target_triple = "aarch64-none-linux-android30"}> {
-    hal.executable.entry_point public @test_exp_3 interface(@io)
+  hal.executable.variant public @system_elf_arm_64, target = <"llvm", "system-elf-arm_64", {
+    data_layout = "e-m:e-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128",
+    native_vector_size = 16 : index,
+    target_triple = "aarch64-none-linux-android30"
+  }> {
+    hal.executable.entry_point public @test_exp_3 layout(#executable_layout)
     builtin.module {
       func @test_exp_3() {
         %c0 = arith.constant 0 : index
@@ -1008,8 +1119,8 @@ hal.executable private @test_exp_2 {
         %lb = hal.interface.constant.load[0] : index
         %ub = hal.interface.constant.load[1] : index
         %step = hal.interface.constant.load[2] : index
-        %read = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) : memref<?xf32>{%ub}
-        %write = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(1) : memref<?xf32>{%ub}
+        %read = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<?xf32>{%ub}
+        %write = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<?xf32>{%ub}
         %offset = affine.apply affine_map<(d0)[s0,s1] -> (d0 + s0 * s1)>(%lb)[%id, %size]
         %stride = affine.apply affine_map<()[s0,s1] -> (5 * s0 * s1)>()[%count, %size]
         scf.for %iv = %offset to %ub step %stride {
@@ -1033,9 +1144,19 @@ hal.executable private @test_exp_2 {
 
 // -----
 
+#executable_layout = #hal.executable.layout<push_constants = 3, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>
+  ]>
+]>
 hal.executable private @test_exp_3 {
-  hal.executable.variant public @system_elf_arm_64, target = <"llvm", "system-elf-arm_64", {data_layout = "e-m:e-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128", native_vector_size = 16 : index, target_triple = "aarch64-none-linux-android30"}> {
-    hal.executable.entry_point public @test_exp_4 interface(@io)
+  hal.executable.variant public @system_elf_arm_64, target = <"llvm", "system-elf-arm_64", {
+    data_layout = "e-m:e-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128",
+    native_vector_size = 16 : index,
+    target_triple = "aarch64-none-linux-android30"
+  }> {
+    hal.executable.entry_point public @test_exp_4 layout(#executable_layout)
     builtin.module {
       func @test_exp_4() {
         %c0 = arith.constant 0 : index
@@ -1045,8 +1166,8 @@ hal.executable private @test_exp_3 {
         %lb = hal.interface.constant.load[0] : index
         %ub = hal.interface.constant.load[1] : index
         %step = hal.interface.constant.load[2] : index
-        %read = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) : memref<?xf32>{%ub}
-        %write = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(1) : memref<?xf32>{%ub}
+        %read = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<?xf32>{%ub}
+        %write = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<?xf32>{%ub}
         %offset = affine.apply affine_map<(d0)[s0,s1] -> (s0 * s1 + d0)>(%lb)[%id, %size]
         %stride = affine.apply affine_map<()[s0,s1] -> (s0 * 5 * s1)>()[%count, %size]
         scf.for %iv = %offset to %ub step %stride {
@@ -1070,9 +1191,19 @@ hal.executable private @test_exp_3 {
 
 // -----
 
+#executable_layout = #hal.executable.layout<push_constants = 3, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>
+  ]>
+]>
 hal.executable private @test_exp_4 {
-  hal.executable.variant public @system_elf_arm_64, target = <"llvm", "system-elf-arm_64", {data_layout = "e-m:e-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128", native_vector_size = 16 : index, target_triple = "aarch64-none-linux-android30"}> {
-    hal.executable.entry_point public @test_exp_5 interface(@io)
+  hal.executable.variant public @system_elf_arm_64, target = <"llvm", "system-elf-arm_64", {
+    data_layout = "e-m:e-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128",
+    native_vector_size = 16 : index,
+    target_triple = "aarch64-none-linux-android30"
+  }> {
+    hal.executable.entry_point public @test_exp_5 layout(#executable_layout)
     builtin.module {
       func @test_exp_5() {
         %c0 = arith.constant 0 : index
@@ -1082,8 +1213,8 @@ hal.executable private @test_exp_4 {
         %lb = hal.interface.constant.load[0] : index
         %ub = hal.interface.constant.load[1] : index
         %step = hal.interface.constant.load[2] : index
-        %read = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) : memref<?xf32>{%ub}
-        %write = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(1) : memref<?xf32>{%ub}
+        %read = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<?xf32>{%ub}
+        %write = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<?xf32>{%ub}
         %offset = affine.apply affine_map<()[s0,s1] -> (s0 * s1 + 5)>()[%id, %size]
         %stride = affine.apply affine_map<()[s0,s1] -> (s0 * s1 * 5)>()[%count, %size]
         scf.for %iv = %offset to %ub step %stride {
@@ -1107,24 +1238,31 @@ hal.executable private @test_exp_4 {
 
 // -----
 
+#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>,
+    #hal.descriptor_set.binding<2, storage_buffer>
+  ]>
+]>
 hal.executable private @matmul_x86  {
   hal.executable.variant public @embedded_elf_x86_64, target = #hal.executable.target<
-      "llvm",
-      "embedded-elf-x86_64", {
-          data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
-          native_vector_size = 16 : index,
-          target_triple = "x86_64-unknown-unknown-eabi-elf"
+    "llvm",
+    "embedded-elf-x86_64", {
+      data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
+      native_vector_size = 16 : index,
+      target_triple = "x86_64-unknown-unknown-eabi-elf"
     }> {
-    hal.executable.entry_point public @matmul_x86 interface(@io)
+    hal.executable.entry_point public @matmul_x86 layout(#executable_layout)
     builtin.module {
       func @matmul_x86() {
         %c128 = arith.constant 128 : index
         %c384 = arith.constant 384 : index
         %cst = arith.constant 0.000000e+00 : f32
         %c0 = arith.constant 0 : index
-        %0 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) : !flow.dispatch.tensor<readonly:384x512xf32>
-        %1 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(1) : !flow.dispatch.tensor<readonly:512x128xf32>
-        %2 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(2) : !flow.dispatch.tensor<writeonly:384x128xf32>
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<readonly:384x512xf32>
+        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : !flow.dispatch.tensor<readonly:512x128xf32>
+        %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : !flow.dispatch.tensor<writeonly:384x128xf32>
         %workgroup_size_x = hal.interface.workgroup.size[0] : index
         %workgroup_size_y = hal.interface.workgroup.size[1] : index
         %workgroup_id_x = hal.interface.workgroup.id[0] : index

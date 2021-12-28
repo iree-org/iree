@@ -2,12 +2,14 @@
 
 // Conv - large OC - distribute to only one workgroup dimension.
 
+#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>,
+    #hal.descriptor_set.binding<2, storage_buffer>
+  ]>
+]>
 hal.executable @conv_112x112x512 {
-  hal.interface public @io {
-    hal.interface.binding public @s0b0_ro_external, set=0, binding=0, type="StorageBuffer"
-    hal.interface.binding public @s0b1_ro_external, set=0, binding=1, type="StorageBuffer"
-    hal.interface.binding public @s0b2_xw_external, set=0, binding=2, type="StorageBuffer"
-  }
   hal.executable.variant public @vulkan_spirv_fb, target = <"vulkan", "vulkan-spirv-fb", {
       spv.target_env = #spv.target_env<#spv.vce<v1.4, [Shader], []>, ARM:IntegratedGPU, {
         max_compute_shared_memory_size = 32768 : i32,
@@ -15,16 +17,16 @@ hal.executable @conv_112x112x512 {
         max_compute_workgroup_size = dense<512> : vector<3xi32>,
        subgroup_size = 16 : i32}>
     }> {
-    hal.executable.entry_point public @conv_112x112x512 interface(@io)
+    hal.executable.entry_point public @conv_112x112x512 layout(#executable_layout)
     builtin.module {
       func @conv_112x112x512() {
         %c0 = arith.constant 0 : index
         %c512 = arith.constant 512 : index
         %c112 = arith.constant 112 : index
         %cst = arith.constant 0.000000e+00 : f32
-        %0 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) : !flow.dispatch.tensor<readonly:1x225x225x3xf32>
-        %1 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(1) : !flow.dispatch.tensor<readonly:3x3x3x512xf32>
-        %2 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(2) : !flow.dispatch.tensor<writeonly:1x112x112x512xf32>
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<readonly:1x225x225x3xf32>
+        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : !flow.dispatch.tensor<readonly:3x3x3x512xf32>
+        %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : !flow.dispatch.tensor<writeonly:1x112x112x512xf32>
         %workgroup_size_x = hal.interface.workgroup.size[0] : index
         %workgroup_size_y = hal.interface.workgroup.size[1] : index
         %workgroup_size_z = hal.interface.workgroup.size[2] : index
@@ -89,12 +91,14 @@ hal.executable @conv_112x112x512 {
 
 // Conv - medium OC/OW/OH - distribute to two workgroup dimensions.
 
+#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>,
+    #hal.descriptor_set.binding<2, storage_buffer>
+  ]>
+]>
 hal.executable @conv_112x112x32 {
-  hal.interface public @io {
-    hal.interface.binding public @s0b0_ro_external, set=0, binding=0, type="StorageBuffer"
-    hal.interface.binding public @s0b1_ro_external, set=0, binding=1, type="StorageBuffer"
-    hal.interface.binding public @s0b2_xw_external, set=0, binding=2, type="StorageBuffer"
-  }
   hal.executable.variant public @vulkan_spirv_fb, target = <"vulkan", "vulkan-spirv-fb", {
       spv.target_env = #spv.target_env<#spv.vce<v1.4, [Shader], []>, ARM:IntegratedGPU, {
         max_compute_shared_memory_size = 32768 : i32,
@@ -102,16 +106,16 @@ hal.executable @conv_112x112x32 {
         max_compute_workgroup_size = dense<512> : vector<3xi32>,
        subgroup_size = 16 : i32}>
     }> {
-    hal.executable.entry_point public @conv_112x112x32 interface(@io)
+    hal.executable.entry_point public @conv_112x112x32 layout(#executable_layout)
     builtin.module {
       func @conv_112x112x32() {
         %c0 = arith.constant 0 : index
         %c32 = arith.constant 32 : index
         %c112 = arith.constant 112 : index
         %cst = arith.constant 0.000000e+00 : f32
-        %0 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) : !flow.dispatch.tensor<readonly:1x225x225x3xf32>
-        %1 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(1) : !flow.dispatch.tensor<readonly:3x3x3x32xf32>
-        %2 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(2) : !flow.dispatch.tensor<writeonly:1x112x112x32xf32>
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<readonly:1x225x225x3xf32>
+        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : !flow.dispatch.tensor<readonly:3x3x3x32xf32>
+        %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : !flow.dispatch.tensor<writeonly:1x112x112x32xf32>
         %workgroup_size_x = hal.interface.workgroup.size[0] : index
         %workgroup_size_y = hal.interface.workgroup.size[1] : index
         %workgroup_size_z = hal.interface.workgroup.size[2] : index
@@ -176,12 +180,14 @@ hal.executable @conv_112x112x32 {
 
 // Conv - small OC/OW/OH - distribute to all three workgroup dimensions.
 
+#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>,
+    #hal.descriptor_set.binding<2, storage_buffer>
+  ]>
+]>
 hal.executable @conv_16x16x16 {
-  hal.interface public @io {
-    hal.interface.binding public @s0b0_ro_external, set=0, binding=0, type="StorageBuffer"
-    hal.interface.binding public @s0b1_ro_external, set=0, binding=1, type="StorageBuffer"
-    hal.interface.binding public @s0b2_xw_external, set=0, binding=2, type="StorageBuffer"
-  }
   hal.executable.variant public @vulkan_spirv_fb, target = <"vulkan", "vulkan-spirv-fb", {
       spv.target_env = #spv.target_env<#spv.vce<v1.4, [Shader], []>, ARM:IntegratedGPU, {
         max_compute_shared_memory_size = 32768 : i32,
@@ -189,15 +195,15 @@ hal.executable @conv_16x16x16 {
         max_compute_workgroup_size = dense<512> : vector<3xi32>,
        subgroup_size = 16 : i32}>
     }> {
-    hal.executable.entry_point public @conv_16x16x16 interface(@io)
+    hal.executable.entry_point public @conv_16x16x16 layout(#executable_layout)
     builtin.module {
       func @conv_16x16x16() {
         %c0 = arith.constant 0 : index
         %c16 = arith.constant 16 : index
         %cst = arith.constant 0.000000e+00 : f32
-        %0 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) : !flow.dispatch.tensor<readonly:1x33x33x3xf32>
-        %1 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(1) : !flow.dispatch.tensor<readonly:3x3x3x16xf32>
-        %2 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(2) : !flow.dispatch.tensor<writeonly:1x16x16x16xf32>
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<readonly:1x33x33x3xf32>
+        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : !flow.dispatch.tensor<readonly:3x3x3x16xf32>
+        %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : !flow.dispatch.tensor<writeonly:1x16x16x16xf32>
         %workgroup_size_x = hal.interface.workgroup.size[0] : index
         %workgroup_size_y = hal.interface.workgroup.size[1] : index
         %workgroup_size_z = hal.interface.workgroup.size[2] : index
@@ -263,12 +269,14 @@ hal.executable @conv_16x16x16 {
 
 // Depthwise conv - small OC/OW/OH - distribute to all three workgroup dimensions.
 
+#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>,
+    #hal.descriptor_set.binding<2, storage_buffer>
+  ]>
+]>
 hal.executable @dwconv_28x28x144 {
-  hal.interface public @io {
-    hal.interface.binding public @s0b0_ro_external, set=0, binding=0, type="StorageBuffer"
-    hal.interface.binding public @s0b1_ro_external, set=0, binding=1, type="StorageBuffer"
-    hal.interface.binding public @s0b2_xw_external, set=0, binding=2, type="StorageBuffer"
-  }
   hal.executable.variant public @vulkan_spirv_fb, target = <"vulkan", "vulkan-spirv-fb", {
       spv.target_env = #spv.target_env<#spv.vce<v1.4, [Shader], []>, ARM:IntegratedGPU, {
         max_compute_shared_memory_size = 32768 : i32,
@@ -276,16 +284,16 @@ hal.executable @dwconv_28x28x144 {
         max_compute_workgroup_size = dense<512> : vector<3xi32>,
        subgroup_size = 16 : i32}>
     }> {
-    hal.executable.entry_point public @dwconv_28x28x144 interface(@io)
+    hal.executable.entry_point public @dwconv_28x28x144 layout(#executable_layout)
     builtin.module {
       func @dwconv_28x28x144() {
         %c0 = arith.constant 0 : index
         %c144 = arith.constant 144 : index
         %c28 = arith.constant 28 : index
         %cst = arith.constant 0.000000e+00 : f32
-        %0 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) : !flow.dispatch.tensor<readonly:1x57x57x144xf32>
-        %1 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(1) : !flow.dispatch.tensor<readonly:3x3x144xf32>
-        %2 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(2) : !flow.dispatch.tensor<writeonly:1x28x28x144xf32>
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<readonly:1x57x57x144xf32>
+        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : !flow.dispatch.tensor<readonly:3x3x144xf32>
+        %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : !flow.dispatch.tensor<writeonly:1x28x28x144xf32>
         %workgroup_size_x = hal.interface.workgroup.size[0] : index
         %workgroup_size_y = hal.interface.workgroup.size[1] : index
         %workgroup_size_z = hal.interface.workgroup.size[2] : index
@@ -352,12 +360,14 @@ hal.executable @dwconv_28x28x144 {
 
 // Depthwise conv - tiny OC/OW/OH - starving the GPU.
 
+#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>,
+    #hal.descriptor_set.binding<2, storage_buffer>
+  ]>
+]>
 hal.executable @dwconv_1x2x8 {
-  hal.interface public @io {
-    hal.interface.binding public @s0b0_ro_external, set=0, binding=0, type="StorageBuffer"
-    hal.interface.binding public @s0b1_ro_external, set=0, binding=1, type="StorageBuffer"
-    hal.interface.binding public @s0b2_xw_external, set=0, binding=2, type="StorageBuffer"
-  }
   hal.executable.variant public @vulkan_spirv_fb, target = <"vulkan", "vulkan-spirv-fb", {
       spv.target_env = #spv.target_env<#spv.vce<v1.4, [Shader], []>, ARM:IntegratedGPU, {
         max_compute_shared_memory_size = 32768 : i32,
@@ -365,7 +375,7 @@ hal.executable @dwconv_1x2x8 {
         max_compute_workgroup_size = dense<512> : vector<3xi32>,
        subgroup_size = 16 : i32}>
     }> {
-    hal.executable.entry_point public @dwconv_1x2x8 interface(@io)
+    hal.executable.entry_point public @dwconv_1x2x8 layout(#executable_layout)
     builtin.module {
       func @dwconv_1x2x8() {
         %c0 = arith.constant 0 : index
@@ -373,9 +383,9 @@ hal.executable @dwconv_1x2x8 {
         %c2 = arith.constant 2 : index
         %c1 = arith.constant 1 : index
         %cst = arith.constant 0.000000e+00 : f32
-        %0 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) : !flow.dispatch.tensor<readonly:1x3x5x8xf32>
-        %1 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(1) : !flow.dispatch.tensor<readonly:3x3x8xf32>
-        %2 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(2) : !flow.dispatch.tensor<writeonly:1x1x2x8xf32>
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<readonly:1x3x5x8xf32>
+        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : !flow.dispatch.tensor<readonly:3x3x8xf32>
+        %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : !flow.dispatch.tensor<writeonly:1x1x2x8xf32>
         %workgroup_size_x = hal.interface.workgroup.size[0] : index
         %workgroup_size_y = hal.interface.workgroup.size[1] : index
         %workgroup_size_z = hal.interface.workgroup.size[2] : index

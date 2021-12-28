@@ -1,13 +1,13 @@
 // RUN: iree-opt -split-input-file -iree-hal-resolve-entry-point-ordinals %s | IreeFileCheck %s
 
 hal.executable @exe {
-  hal.interface @interface {
-    hal.interface.binding @s0b0, set=0, binding=0, type="StorageBuffer"
-    hal.interface.binding @s0b1, set=0, binding=1, type="StorageBuffer"
-  }
   hal.executable.variant @target, target = <"vmvx", "vmvx-bytecode-fb"> {
-    hal.executable.entry_point @entry interface(@interface) {
-      ordinal = 0 : index,
+    hal.executable.entry_point @entry ordinal(0) layout(#hal.executable.layout<push_constants = 0, sets = [
+      #hal.descriptor_set.layout<0, bindings = [
+        #hal.descriptor_set.binding<0, storage_buffer>,
+        #hal.descriptor_set.binding<1, storage_buffer>
+      ]>
+    ]>) attributes {
       workgroup_size = [32 : index, 1 : index, 1 : index]
     }
   }
@@ -56,13 +56,13 @@ func @dispatch_already_using_ordinals(
 // -----
 
 hal.executable @exe {
-  hal.interface @interface {
-    hal.interface.binding @s0b0, set=0, binding=0, type="StorageBuffer"
-    hal.interface.binding @s0b1, set=0, binding=1, type="StorageBuffer"
-  }
   hal.executable.variant @target, target = <"vmvx", "vmvx-bytecode-fb"> {
-    hal.executable.entry_point @entry interface(@interface) {
-      ordinal = 0 : index,
+    hal.executable.entry_point @entry ordinal(0) layout(#hal.executable.layout<push_constants = 0, sets = [
+      #hal.descriptor_set.layout<0, bindings = [
+        #hal.descriptor_set.binding<0, storage_buffer>,
+        #hal.descriptor_set.binding<1, storage_buffer>
+      ]>
+    ]>) attributes {
       workgroup_size = [32 : index, 1 : index, 1 : index]
     }
   }

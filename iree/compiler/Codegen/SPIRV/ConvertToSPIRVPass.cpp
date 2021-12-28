@@ -163,16 +163,15 @@ struct HALInterfaceLoadConstantConverter final
   LogicalResult matchAndRewrite(
       IREE::HAL::InterfaceConstantLoadOp loadOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    // TODO(#1519): hal.interface.constant.load should point to the
-    // hal.interface op.
-    auto executableOp = loadOp->getParentOfType<IREE::HAL::ExecutableOp>();
-    auto halInterfaceOps =
-        llvm::to_vector<1>(executableOp.getOps<IREE::HAL::InterfaceOp>());
-    assert(halInterfaceOps.size() == 1);
-    assert(halInterfaceOps.front().push_constants().hasValue());
+    // TODO(#1519): this conversion should look up the entry point information
+    // to get the total push constant count.
+    auto variantOp = loadOp->getParentOfType<IREE::HAL::ExecutableVariantOp>();
+    auto entryPointOps = llvm::to_vector<1>(
+        variantOp.getOps<IREE::HAL::ExecutableEntryPointOp>());
+    assert(entryPointOps.size() == 1);
+    auto layoutAttr = entryPointOps.front().layout();
 
-    uint64_t elementCount =
-        (*halInterfaceOps.front().push_constants()).getZExtValue();
+    uint64_t elementCount = layoutAttr.getPushConstants();
     unsigned index = loadOp.index().getZExtValue();
 
     // The following function generates SPIR-V ops with i32 types. So it does

@@ -381,8 +381,8 @@ class ProcessInterfaceBindingSubspan final
                                          "cannot get vectorized memref type");
     }
     rewriter.replaceOpWithNewOp<IREE::HAL::InterfaceBindingSubspanOp>(
-        subspanOp, *vecMemRef, subspanOp.type(), subspanOp.set(),
-        subspanOp.binding(), subspanOp.byte_offset(), subspanOp.dynamic_dims(),
+        subspanOp, *vecMemRef, subspanOp.set(), subspanOp.binding(),
+        subspanOp.type(), subspanOp.byte_offset(), subspanOp.dynamic_dims(),
         subspanOp.alignmentAttr());
     return success();
   }

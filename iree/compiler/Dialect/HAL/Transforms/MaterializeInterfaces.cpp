@@ -110,40 +110,21 @@ static LogicalResult verifyEntryPointTypes(mlir::FuncOp entryFuncOp) {
   return success();
 }
 
-struct Interface {
-  // Materialized interface op with binding symbols.
-  IREE::HAL::InterfaceOp op;
-  // 1:1 with the function signature bindings. May be a subset of the interface.
-  SmallVector<IREE::HAL::InterfaceBindingOp> resourceBindings;
-};
-
-// Creates an interface from an executable layout provided from analysis.
-static Interface createInterface(Location loc,
-                                 const ExecutableLayout &executableLayout,
-                                 OpBuilder &executableBuilder) {
-  Interface interface;
-  interface.op = executableBuilder.create<IREE::HAL::InterfaceOp>(loc, "io");
-  interface.op.push_constantsAttr(
-      executableBuilder.getIndexAttr(executableLayout.pushConstantCount));
-  auto interfaceBuilder = OpBuilder::atBlockBegin(&interface.op.body().front());
-  DenseMap<std::pair<unsigned, unsigned>, IREE::HAL::InterfaceBindingOp>
-      bindingMap;
+// Creates an executable layout attr from the analysis results.
+static IREE::HAL::ExecutableLayoutAttr makeExecutableLayoutAttr(
+    const ExecutableLayout &executableLayout, OpBuilder &builder) {
+  SmallVector<IREE::HAL::DescriptorSetLayoutAttr> setLayoutAttrs;
   for (const auto &setLayout : executableLayout.setLayouts) {
+    SmallVector<IREE::HAL::DescriptorSetBindingAttr> bindingAttrs;
     for (const auto &binding : setLayout.bindings) {
-      std::string bindingName = "s" + std::to_string(setLayout.ordinal) + "b" +
-                                std::to_string(binding.ordinal);
-      auto bindingOp = interfaceBuilder.create<IREE::HAL::InterfaceBindingOp>(
-          interface.op.getLoc(), bindingName,
-          /*set=*/APInt(64, setLayout.ordinal),
-          /*binding=*/APInt(64, binding.ordinal), binding.type);
-      bindingMap.insert(
-          {std::make_pair(setLayout.ordinal, binding.ordinal), bindingOp});
+      bindingAttrs.push_back(IREE::HAL::DescriptorSetBindingAttr::get(
+          builder.getContext(), binding.ordinal, binding.type));
     }
+    setLayoutAttrs.push_back(IREE::HAL::DescriptorSetLayoutAttr::get(
+        builder.getContext(), setLayout.ordinal, bindingAttrs));
   }
-  for (auto setBinding : executableLayout.resourceMap) {
-    interface.resourceBindings.push_back(bindingMap[setBinding]);
-  }
-  return interface;
+  return IREE::HAL::ExecutableLayoutAttr::get(
+      builder.getContext(), executableLayout.pushConstantCount, setLayoutAttrs);
 }
 
 // Converts the usage of the given primitive |arg| to interface methods.
@@ -160,9 +141,10 @@ static void convertOperandUsage(mlir::FuncOp sourceFuncOp, BlockArgument arg,
 }
 
 // Converts the usage of the given !stream.binding |arg| to interface methods.
-static void convertBindingUsage(mlir::FuncOp sourceFuncOp, BlockArgument arg,
-                                IREE::HAL::InterfaceOp interfaceOp,
-                                IREE::HAL::InterfaceBindingOp bindingOp) {
+static void convertBindingUsage(
+    mlir::FuncOp sourceFuncOp, BlockArgument arg,
+    IREE::HAL::DescriptorSetLayoutAttr setLayoutAttr,
+    IREE::HAL::DescriptorSetBindingAttr bindingAttr) {
   if (arg.use_empty()) return;  // no-op
   for (auto &use : llvm::make_early_inc_range(arg.getUses())) {
     auto oldOp = dyn_cast<IREE::Stream::BindingSubspanOp>(use.getOwner());
@@ -171,9 +153,9 @@ static void convertBindingUsage(mlir::FuncOp sourceFuncOp, BlockArgument arg,
     auto alignmentAttr = sourceFuncOp.getArgAttrOfType<IntegerAttr>(
         arg.getArgNumber(), "stream.alignment");
     auto newOp = builder.create<IREE::HAL::InterfaceBindingSubspanOp>(
-        oldOp.getLoc(), oldOp.getType(), bindingOp.typeAttr(),
-        bindingOp.setAttr(), bindingOp.bindingAttr(), oldOp.byte_offset(),
-        oldOp.dynamic_dims(), alignmentAttr);
+        oldOp.getLoc(), oldOp.getType(), APInt(64, setLayoutAttr.getOrdinal()),
+        APInt(64, bindingAttr.getOrdinal()), bindingAttr.getType(),
+        oldOp.byte_offset(), oldOp.dynamic_dims(), alignmentAttr);
     oldOp.replaceAllUsesWith(newOp.result());
     oldOp.erase();
   }
@@ -183,7 +165,7 @@ static void convertBindingUsage(mlir::FuncOp sourceFuncOp, BlockArgument arg,
 // and use the HAL interface access primitives.
 static mlir::FuncOp cloneFuncWithInterface(
     mlir::FuncOp sourceFuncOp, const ExecutableLayout &executableLayout,
-    Interface &interface) {
+    IREE::HAL::ExecutableLayoutAttr layoutAttr) {
   // Clone so that we can do a bunch of unsafe in-place updates.
   auto clonedFuncOp = sourceFuncOp.clone();
 
@@ -203,12 +185,13 @@ static mlir::FuncOp cloneFuncWithInterface(
       convertOperandUsage(sourceFuncOp, arg, operandIdx++, entryBuilder);
     }
   }
-  unsigned bindingIdx = 0;
+  unsigned resourceIdx = 0;
   for (auto arg : entryBlock->getArguments()) {
-    if (arg.getType().isa<IREE::Stream::BindingType>()) {
-      convertBindingUsage(sourceFuncOp, arg, interface.op,
-                          interface.resourceBindings[bindingIdx++]);
-    }
+    if (!arg.getType().isa<IREE::Stream::BindingType>()) continue;
+    auto setBinding = executableLayout.resourceMap[resourceIdx++];
+    auto setLayoutAttr = layoutAttr.getSetLayouts()[setBinding.first];
+    auto bindingAttr = setLayoutAttr.getBindings()[setBinding.second];
+    convertBindingUsage(sourceFuncOp, arg, setLayoutAttr, bindingAttr);
   }
 
   // Remove all arguments now that we've turned them into lookup ops.
@@ -220,16 +203,14 @@ static mlir::FuncOp cloneFuncWithInterface(
 // Annotates |dispatchOp| with resource binding to interface binding mappings.
 // TODO(benvanik): have a HAL op with structured information instead.
 static void annotateDispatchSite(IREE::Stream::CmdDispatchOp dispatchOp,
-                                 Interface &interface) {
-  SmallVector<Attribute> bindingSymbols;
-  for (auto resourceBinding : interface.resourceBindings) {
-    bindingSymbols.push_back(
-        SymbolRefAttr::get(dispatchOp.entry_pointAttr().getRootReference(),
-                           {SymbolRefAttr::get(interface.op),
-                            SymbolRefAttr::get(resourceBinding)}));
+                                 const ExecutableLayout &executableLayout) {
+  SmallVector<Attribute> bindingAttrs;
+  for (auto setBinding : executableLayout.resourceMap) {
+    bindingAttrs.push_back(IREE::HAL::InterfaceBindingAttr::get(
+        dispatchOp.getContext(), setBinding.first, setBinding.second));
   }
   dispatchOp->setAttr("hal.interface.bindings",
-                      ArrayAttr::get(dispatchOp.getContext(), bindingSymbols));
+                      ArrayAttr::get(dispatchOp.getContext(), bindingAttrs));
 }
 
 // Adds the entry point ops with assigned ordinals for each entry function.
@@ -256,12 +237,12 @@ static LogicalResult declareEntryPointOps(
 
     // Create the interface for this entry point based on the analysis of its
     // usage within the program.
-    auto interface = createInterface(sourceFuncOp.getLoc(), executableLayout,
-                                     executableBuilder);
+    auto layoutAttr =
+        makeExecutableLayoutAttr(executableLayout, executableBuilder);
 
     // Clone the source function and update it to use the new interface.
     auto baseFuncOp =
-        cloneFuncWithInterface(sourceFuncOp, executableLayout, interface);
+        cloneFuncWithInterface(sourceFuncOp, executableLayout, layoutAttr);
 
     // Clone the updated function into each variant.
     for (auto variantOp : variantOps) {
@@ -270,8 +251,8 @@ static LogicalResult declareEntryPointOps(
       targetBuilder.create<IREE::HAL::ExecutableEntryPointOp>(
           exportOp.getLoc(),
           targetBuilder.getStringAttr(exportOp.function_ref()),
-          targetBuilder.getIndexAttr(ordinal), SymbolRefAttr::get(interface.op),
-          ArrayAttr{}, IntegerAttr{});
+          targetBuilder.getIndexAttr(ordinal), layoutAttr, ArrayAttr{},
+          IntegerAttr{});
 
       // Clone the updated interface-based function into the target.
       auto targetFuncOp = baseFuncOp.clone();
@@ -280,7 +261,7 @@ static LogicalResult declareEntryPointOps(
 
     // Update all dispatch sites with the binding information.
     for (auto dispatchOp : layoutAnalysis.getExportDispatches(exportOp)) {
-      annotateDispatchSite(dispatchOp, interface);
+      annotateDispatchSite(dispatchOp, executableLayout);
     }
 
     baseFuncOp.erase();

@@ -1,6 +1,4 @@
-// RUN: iree-opt -split-input-file -pass-pipeline='iree-hal-transformation-pipeline{serialize-executables=false},canonicalize' %s | IreeFileCheck %s
-
-#map = affine_map<(d0) -> (d0)>
+// RUN: iree-opt -split-input-file -pass-pipeline='iree-hal-transformation-pipeline{serialize-executables=false},canonicalize' -mlir-print-local-scope %s | IreeFileCheck %s
 
 module attributes {
   hal.device.targets = [
@@ -37,15 +35,13 @@ stream.executable public @add_dispatch_0 {
 }
 
 // CHECK-LABEL: hal.executable public @add_dispatch_0
-//  CHECK-NEXT:   hal.interface public @io
-//  CHECK-NEXT:    hal.interface.binding public @s0b0, set=0, binding=0, type="StorageBuffer"
-//  CHECK-NEXT:    hal.interface.binding public @s0b1, set=0, binding=1, type="StorageBuffer"
-//  CHECK-NEXT:    hal.interface.binding public @s0b2, set=0, binding=2, type="StorageBuffer"
-//  CHECK-NEXT:   }
-//  CHECK-NEXT:   hal.executable.variant public @vmvx_bytecode_fb, target = #executable_target_vmvx_bytecode_fb {
-//  CHECK-NEXT:     hal.executable.entry_point public @add_dispatch_0 interface(@io) {
-//  CHECK-SAME:       ordinal = 0 : index
-//  CHECK-SAME:     }
+//  CHECK-NEXT:   hal.executable.variant public @vmvx_bytecode_fb, target = <"vmvx", "vmvx-bytecode-fb"> {
+//  CHECK-NEXT:     hal.executable.entry_point public @add_dispatch_0 ordinal(0)
+//  CHECK-SAME:       layout(#hal.executable.layout<push_constants = 0, sets = [
+//  CHECK-SAME:         #hal.descriptor_set.layout<0, bindings = [
+//  CHECK-SAME:           #hal.descriptor_set.binding<0, storage_buffer>,
+//  CHECK-SAME:           #hal.descriptor_set.binding<1, storage_buffer>,
+//  CHECK-SAME:           #hal.descriptor_set.binding<2, storage_buffer>
 //       CHECK:     module attributes {vm.toplevel} {
 //  CHECK-NEXT:       vm.module public @module {
 //  CHECK-NEXT:         vm.func private @add_dispatch_0(

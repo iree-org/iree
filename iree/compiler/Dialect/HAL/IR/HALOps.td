@@ -1456,7 +1456,7 @@ def HAL_ExecutableEndOp : HAL_Op<"executable_end", [
 def HAL_ExecutableEntryPointOp : HAL_Op<"executable.entry_point", [
     Symbol,
     HasParent<"IREE::HAL::ExecutableVariantOp">,
-    IsolatedFromAbove
+    IsolatedFromAbove,
   ]> {
   let summary = [{executable entry point declaration}];
   let description = [{
@@ -1479,7 +1479,7 @@ def HAL_ExecutableEntryPointOp : HAL_Op<"executable.entry_point", [
     OptionalAttr<StrAttr>:$sym_visibility,
     SymbolNameAttr:$sym_name,
     OptionalAttr<HAL_OrdinalAttr>:$ordinal,
-    FlatSymbolRefAttr:$interface,
+    HAL_ExecutableLayoutAttr:$layout,
     OptionalAttr<HAL_WorkgroupSizeAttr>:$workgroup_size,
     OptionalAttr<IndexAttr>:$workgroup_local_memory
   );
@@ -1490,22 +1490,22 @@ def HAL_ExecutableEntryPointOp : HAL_Op<"executable.entry_point", [
     OpBuilder<(ins
       "::mlir::StringAttr":$sym_name,
       "::mlir::IntegerAttr":$ordinal,
-      "::mlir::FlatSymbolRefAttr":$interface,
+      "IREE::HAL::ExecutableLayoutAttr":$layout,
       "::mlir::ArrayAttr":$workgroup_size,
       "::mlir::IntegerAttr":$workgroup_local_memory
     ), [{
-      build($_builder, $_state, nullptr, sym_name, ordinal, interface,
+      build($_builder, $_state, nullptr, sym_name, ordinal, layout,
             workgroup_size, workgroup_local_memory, 0);
     }]>,
     OpBuilder<(ins
       "::mlir::StringAttr":$sym_name,
       "::mlir::IntegerAttr":$ordinal,
-      "::mlir::FlatSymbolRefAttr":$interface,
+      "IREE::HAL::ExecutableLayoutAttr":$layout,
       "::mlir::ArrayAttr":$workgroup_size,
       "::mlir::IntegerAttr":$workgroup_local_memory,
       "int":$workgroup_count_regionCount
     ), [{
-      build($_builder, $_state, nullptr, sym_name, ordinal, interface,
+      build($_builder, $_state, nullptr, sym_name, ordinal, layout,
             workgroup_size, workgroup_local_memory, workgroup_count_regionCount);
     }]>
   ];
@@ -1691,142 +1691,6 @@ def HAL_ExecutableLookupOp : HAL_PureOp<"executable.lookup", [
 // hal.interface
 //===----------------------------------------------------------------------===//
 
-def HAL_InterfaceOp : HAL_Op<"interface", [
-    IsolatedFromAbove,
-    // HasParent<"IREE::HAL::ExecutableOp">,
-    SingleBlockImplicitTerminator<"IREE::HAL::InterfaceEndOp">,
-    Symbol,
-    SymbolTable,
-  ]> {
-  let summary = [{executable IO interface description}];
-  let description = [{
-    Defines a set of IO bindings and associated information required for the
-    scheduler to correctly dispatch the executable. Multiple executable binaries
-    can share the same interface to reduce the amount of scheduling code
-    generated, or a single executable binary can expose entry points with
-    multiple different interfaces to allow for runtime selection based on
-    supported device capabilities.
-
-    The design is modeled on the Vulkan binding model, which uses one or more
-    descriptor sets containing one or more bindings as part of its API. By using
-    the same representation here we can get toll-free lowering on the Vulkan and
-    SPIR-V side, and for other backends that may have simpler models the cost is
-    negligable (just an extra indirection during dispatch). For more information
-    on the Vulkan binding model see the documentation (which contains GLSL,
-    SPIR-V, and Vulkan API examples that directly map to our use here):
-    https://vulkan.lunarg.com/doc/view/1.0.33.0/linux/vkspec.chunked/ch13s02.html
-
-    For background as to how multiple descriptor sets are used by the scheduler
-    see: https://developer.nvidia.com/vulkan-shader-resource-binding
-  }];
-
-  let arguments = (ins
-    OptionalAttr<StrAttr>:$sym_visibility,
-    SymbolNameAttr:$sym_name,
-    OptionalAttr<IndexAttr>:$push_constants
-  );
-
-  let regions = (region SizedRegion<1>:$body);
-
-  let assemblyFormat = [{
-    custom<SymbolVisibility>($sym_visibility)
-    $sym_name
-    attr-dict-with-keyword
-    ``
-    regions
-  }];
-
-  let skipDefaultBuilders = 1;
-  let builders = [
-    OpBuilder<(ins
-      "StringRef":$name,
-      CArg<"IntegerAttr", "{}">:$pushConstants
-    )>,
-  ];
-
-  let extraClassDeclaration = [{
-    Block& getBlock() { return body().front(); }
-
-    // TODO(benvanik): replace with a nested typed attr that works.
-    // Array of HAL_DescriptorSetLayoutBindingArrayAttr.
-    ArrayAttr getExecutableSetLayoutsAttr();
-
-    // Returns true if the all bindings in the interface match exactly those
-    // in |other| (including order).
-    bool isEquivalentTo(IREE::HAL::InterfaceOp other);
-
-    // Returns a hash for the interface, considering the push constant and
-    // all bindings.
-    llvm::hash_code getInterfaceHash();
-  }];
-}
-
-def HAL_InterfaceEndOp : HAL_Op<"interface_end", [
-    HasParent<"IREE::HAL::InterfaceOp">,
-    Terminator,
-  ]> {
-  let summary = [{terminator pseudo-op for the executable interface op}];
-  let assemblyFormat = "attr-dict";
-}
-
-def HAL_InterfaceBindingOp : HAL_Op<"interface.binding", [
-    HasParent<"IREE::HAL::InterfaceOp">,
-    Symbol,
-  ]> {
-  let summary = [{executable IO binding description}];
-  let description = [{
-    Defines an IO binding used to pass buffers into the executable for loads and
-    stores. These bindings will be mapped into descriptor sets by the scheduler
-    based on device support and usage within the command buffer.
-
-    Bindings are typeless and only indicate a resource that is made available to
-    executables. The types that can be loaded-from and stored-into the binding
-    buffers are provided to backends by way of the `hal.interface.load.*` and
-    `hal.interface.store.*` ops.
-
-    Bindings do not need to correlate 1:1 with entry point arguments/results and
-    in many cases will not. For example, the same binding may be used with
-    different offsets if the arguments were packed into a ringbuffer/arena by
-    the scheduler.
-  }];
-
-  let arguments = (ins
-    OptionalAttr<StrAttr>:$sym_visibility,
-    SymbolNameAttr:$sym_name,
-    IndexAttr:$set,
-    IndexAttr:$binding,
-    HAL_DescriptorTypeAttr:$type
-  );
-
-  // TODO(scotttodd): enable assemblyFormat after figuring out how to keep
-  //   quotes around "type". The custom printer uses stringify*
-  // let assemblyFormat = [{
-  //   custom<SymbolVisibility>($sym_visibility)
-  //   $sym_name
-  //   `,` `set` `` `=` `` $set
-  //   `,` `binding` `` `=` `` $binding
-  //   `,` `type` `` `=` `` $type
-  //   attr-dict-with-keyword
-  // }];
-
-  let builders = [
-    OpBuilder<(ins
-      "StringRef":$sym_name,
-      "::llvm::APInt":$set,
-      "::llvm::APInt":$binding,
-      "IREE::HAL::DescriptorType":$type
-    ), [{
-      build($_builder, $_state, nullptr, sym_name, set, binding, type);
-    }]>
-  ];
-
-  let extraClassDeclaration = [{
-    /// Returns a hash for the descriptor, considering the set, binding,
-    /// and type.
-    llvm::hash_code getDescriptorHash();
-  }];
-}
-
 def HAL_InterfaceWorkgroupIDOp : HAL_PureOp<"interface.workgroup.id", [
     DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
   ]> {
@@ -1960,9 +1824,9 @@ def HAL_InterfaceBindingSubspanOp : HAL_Op<"interface.binding.subspan", [
   }];
 
   let arguments = (ins
-    HAL_DescriptorTypeAttr:$type,
     IndexAttr:$set,
     IndexAttr:$binding,
+    HAL_DescriptorTypeAttr:$type,
     Optional<HAL_DeviceSize>:$byte_offset,
     HAL_ShapeDynamicDims:$dynamic_dims,
     OptionalAttr<IndexAttr>:$alignment
@@ -1972,9 +1836,9 @@ def HAL_InterfaceBindingSubspanOp : HAL_Op<"interface.binding.subspan", [
   );
 
   let assemblyFormat = [{
-    `type` `(` $type `)`
     `set` `(` $set `)`
     `binding` `(` $binding `)`
+    `type` `(` $type `)`
     (`offset` `(` $byte_offset^ `)`)?
     (`alignment` `(` $alignment^ `)`)?
     attr-dict `:` type($result) (`{` $dynamic_dims^ `}`)?
@@ -2042,10 +1906,7 @@ def HAL_ExecutableLayoutLookupOp : HAL_PureOp<"executable_layout.lookup", [
 
   let arguments = (ins
     HAL_Device:$device,
-    OptionalAttr<IndexAttr>:$push_constants,
-    // TODO(benvanik): replace with a nested typed attr that works.
-    // Array of HAL_DescriptorSetLayoutBindingArrayAttr.
-    ArrayAttr:$set_layouts
+    HAL_ExecutableLayoutAttr:$layout
   );
   let results = (outs
     HAL_ExecutableLayout:$result
@@ -2053,8 +1914,7 @@ def HAL_ExecutableLayoutLookupOp : HAL_PureOp<"executable_layout.lookup", [
 
   let assemblyFormat = [{
     `device` `(` $device `:` type($device) `)`
-    (`push_constants` `(` $push_constants^ `)`)?
-    `layouts` `(` $set_layouts `)`
+    `layout` `(` $layout `)`
     `:` type($result)
     attr-dict-with-keyword
   }];

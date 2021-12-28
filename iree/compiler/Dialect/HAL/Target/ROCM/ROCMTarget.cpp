@@ -121,11 +121,6 @@ class ROCMTargetBackend final : public TargetBackend {
     for (auto funcOp : illegalFuncOps) {
       funcOp.erase();
     }
-    auto halInterfaceOps = llvm::to_vector<1>(
-        innerModuleOp.getOps<iree_compiler::IREE::HAL::InterfaceOp>());
-    for (auto halOp : halInterfaceOps) {
-      halOp.erase();
-    }
 
     auto llvmModule =
         mlir::translateModuleToLLVMIR(innerModuleOp, context, libraryName);

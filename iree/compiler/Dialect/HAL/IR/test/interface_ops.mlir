@@ -18,11 +18,11 @@ func @interface_workgroup_info() {
 func @interface_io_subspan(%dim0: index, %dim2: index) {
   %c8 = arith.constant 8 : index
 
-  // CHECK: = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) offset(%c8) : memref<?x4x?x16xi8>{%[[DIM0]], %[[DIM2]]}
-  %0 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) offset(%c8) : memref<?x4x?x16xi8>{%dim0, %dim2}
+  // CHECK: = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c8) : memref<?x4x?x16xi8>{%[[DIM0]], %[[DIM2]]}
+  %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c8) : memref<?x4x?x16xi8>{%dim0, %dim2}
 
-  // CHECK: = hal.interface.binding.subspan type(StorageBuffer) set(1) binding(2) alignment(16) : memref<16xi8>
-  %1 = hal.interface.binding.subspan type(StorageBuffer) set(1) binding(2) alignment(16) : memref<16xi8>
+  // CHECK: = hal.interface.binding.subspan set(1) binding(2) type(storage_buffer) alignment(16) : memref<16xi8>
+  %1 = hal.interface.binding.subspan set(1) binding(2) type(storage_buffer) alignment(16) : memref<16xi8>
 
   return
 }
@@ -33,7 +33,7 @@ func @interface_io_subspan_wrong_dynamic_dim(%dim: index) {
   %c8 = arith.constant 8 : index
 
   // expected-error @+1{{result type 'memref<?x4x?x16xi8>' has 2 dynamic dimensions but 1 associated dimension SSA values}}
-  %0 = hal.interface.binding.subspan type(StorageBuffer) set(0) binding(0) offset(%c8) : memref<?x4x?x16xi8>{%dim}
+  %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c8) : memref<?x4x?x16xi8>{%dim}
 
   return
 }

@@ -81,8 +81,8 @@ static Value getSubspanBuffer(Value tensor, OpBuilder &b,
     // Just change the result type of the InterfaceBindingSubspanOp.
     auto memRefType = getMemrefTypeForTensor(shapedType);
     Value baseBuffer = b.create<IREE::HAL::InterfaceBindingSubspanOp>(
-        subspanOp->getLoc(), memRefType, subspanOp.type(), subspanOp.set(),
-        subspanOp.binding(), subspanOp.byte_offset(), subspanOp.dynamic_dims(),
+        subspanOp->getLoc(), memRefType, subspanOp.set(), subspanOp.binding(),
+        subspanOp.type(), subspanOp.byte_offset(), subspanOp.dynamic_dims(),
         subspanOp.alignmentAttr());
     flowState.subspan_to_buffer[tensor] = baseBuffer;
   }

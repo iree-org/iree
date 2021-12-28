@@ -609,20 +609,6 @@ class ConvertHALInterfaceBindingSubspanOp : public ConvertToLLVMPattern {
   }
 };
 
-class RemoveHALInterfaceOpPattern : public ConvertToLLVMPattern {
- public:
-  explicit RemoveHALInterfaceOpPattern(MLIRContext *context,
-                                       LLVMTypeConverter &typeconverter)
-      : ConvertToLLVMPattern(IREE::HAL::InterfaceOp::getOperationName(),
-                             context, typeconverter) {}
-  LogicalResult matchAndRewrite(
-      Operation *op, ArrayRef<Value> operands,
-      ConversionPatternRewriter &rewriter) const override {
-    rewriter.eraseOp(op);
-    return success();
-  }
-};
-
 class ConvertToLLVMPass : public ConvertToLLVMBase<ConvertToLLVMPass> {
  public:
   ConvertToLLVMPass() = default;
@@ -750,16 +736,12 @@ void ConvertToLLVMPass::runOnOperation() {
     ConvertHALInterfaceWorkgroupSizeOp,
     ConvertHALInterfaceWorkgroupCountOp,
     ConvertHALInterfaceLoadConstant,
-    ConvertHALInterfaceBindingSubspanOp,
-    RemoveHALInterfaceOpPattern
+    ConvertHALInterfaceBindingSubspanOp
   >(&getContext(), converter);
   // clang-format on
 
   LLVMConversionTarget target(getContext());
-  // IREE::HAL::InterfaceOp will be removed after successful conversion of the
-  // rest of the IR.
-  target.addLegalOp<ModuleOp, IREE::HAL::InterfaceOp,
-                    IREE::HAL::InterfaceBindingOp, IREE::HAL::InterfaceEndOp>();
+  target.addLegalOp<ModuleOp>();
   target.addIllegalDialect<StandardOpsDialect, mlir::arith::ArithmeticDialect,
                            IREE::Util::UtilDialect, IREE::HAL::HALDialect,
                            math::MathDialect, tosa::TosaDialect>();
@@ -785,9 +767,6 @@ void ConvertToLLVMPass::runOnOperation() {
     signalPassFailure();
     return;
   }
-
-  // Once we're done with conversion, remove InterfaceOp.
-  module.walk([](IREE::HAL::InterfaceOp op) { op.erase(); });
 
   // Post conversion patterns.
   {

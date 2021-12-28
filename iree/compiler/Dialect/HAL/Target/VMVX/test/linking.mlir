@@ -1,15 +1,16 @@
 // RUN: iree-opt -split-input-file -iree-hal-link-executables %s | IreeFileCheck %s
 
 #vmvx_target = #hal.executable.target<"vmvx", "vmvx-bytecode-fb">
+#executable_layout = #hal.executable.layout<push_constants = 1, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>
+  ]>
+]>
 
 hal.executable private @dispatch_0 {
-  hal.interface @io {
-    hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer"
-    hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer"
-    hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer"
-  }
   hal.executable.variant @vmvx, target = #vmvx_target {
-    hal.executable.entry_point @dispatch_0 interface(@io) {ordinal = 0 : index}
+    hal.executable.entry_point @dispatch_0 ordinal(0) layout(#executable_layout)
     builtin.module {
       vm.module @module {
         vm.func @dispatch_0() {
@@ -21,13 +22,8 @@ hal.executable private @dispatch_0 {
   }
 }
 hal.executable private @dispatch_1 {
-  hal.interface @io {
-    hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer"
-    hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer"
-    hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer"
-  }
   hal.executable.variant @vmvx, target = #vmvx_target {
-    hal.executable.entry_point @dispatch_1 interface(@io) {ordinal = 0 : index}
+    hal.executable.entry_point @dispatch_1 ordinal(0) layout(#executable_layout)
     builtin.module {
       vm.module @module {
         vm.func @dispatch_1() {
@@ -39,14 +35,8 @@ hal.executable private @dispatch_1 {
   }
 }
 hal.executable private @dispatch_2 {
-  hal.interface @io {
-    hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer"
-    hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer"
-    hal.interface.binding @arg2, set=0, binding=1, type="StorageBuffer"
-    hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer"
-  }
   hal.executable.variant @vmvx, target = #vmvx_target {
-    hal.executable.entry_point @dispatch_2 interface(@io) {ordinal = 0 : index}
+    hal.executable.entry_point @dispatch_2 ordinal(0) layout(#executable_layout)
     builtin.module {
       vm.module @module {
         vm.func @dispatch_2() {
@@ -82,21 +72,10 @@ util.initializer {
 // CHECK-NOT: hal.executable private @dispatch_1
 // CHECK-NOT: hal.executable private @dispatch_2
 // CHECK:       hal.executable private @vmvx_linked {
-// CHECK-NEXT:    hal.interface public @io_0 {
-// CHECK-NEXT:      hal.interface.binding public @arg0, set=0, binding=0, type="StorageBuffer"
-// CHECK-NEXT:      hal.interface.binding public @arg1, set=0, binding=1, type="StorageBuffer"
-// CHECK-NEXT:      hal.interface.binding public @ret0, set=0, binding=2, type="StorageBuffer"
-// CHECK-NEXT:    }
-// CHECK-NEXT:    hal.interface public @io_1 {
-// CHECK-NEXT:      hal.interface.binding public @arg0, set=0, binding=0, type="StorageBuffer"
-// CHECK-NEXT:      hal.interface.binding public @arg1, set=0, binding=1, type="StorageBuffer"
-// CHECK-NEXT:      hal.interface.binding public @arg2, set=0, binding=1, type="StorageBuffer"
-// CHECK-NEXT:      hal.interface.binding public @ret0, set=0, binding=2, type="StorageBuffer"
-// CHECK-NEXT:    }
 // CHECK-NEXT:    hal.executable.variant public @vmvx_bytecode_fb, target = #executable_target_vmvx_bytecode_fb {
-// CHECK-NEXT:      hal.executable.entry_point public @dispatch_0 interface(@io_0) {ordinal = 0 : index}
-// CHECK-NEXT:      hal.executable.entry_point public @dispatch_1 interface(@io_0) {ordinal = 1 : index}
-// CHECK-NEXT:      hal.executable.entry_point public @dispatch_2 interface(@io_1) {ordinal = 2 : index}
+// CHECK-NEXT:      hal.executable.entry_point public @dispatch_0 ordinal(0)
+// CHECK-NEXT:      hal.executable.entry_point public @dispatch_1 ordinal(1)
+// CHECK-NEXT:      hal.executable.entry_point public @dispatch_2 ordinal(2)
 // CHECK-NEXT:      module {
 // CHECK-NEXT:        vm.module public @linked_module {
 // CHECK-NEXT:          vm.func @dispatch_0() {
@@ -129,19 +108,21 @@ util.initializer {
 // CHECK-NEXT:    hal.command_buffer.dispatch.symbol<%cmd : !hal.command_buffer> target(@vmvx_linked::@vmvx_bytecode_fb::@dispatch_2) workgroups([%c1, %c1, %c1])
 // CHECK-NEXT:    util.initializer.return
 // CHECK-NEXT:  }
+
 // -----
 
 #cuda_target = #hal.executable.target<"cuda", "cuda-nvptx-fb">
 #vmvx_target = #hal.executable.target<"vmvx", "vmvx-bytecode-fb">
+#executable_layout = #hal.executable.layout<push_constants = 1, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>
+  ]>
+]>
 
 hal.executable private @dispatch_0 {
-  hal.interface @io {
-    hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer"
-    hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer"
-    hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer"
-  }
   hal.executable.variant @vmvx, target = #vmvx_target {
-    hal.executable.entry_point @dispatch_0 interface(@io) {ordinal = 0 : index}
+    hal.executable.entry_point @dispatch_0 ordinal(0) layout(#executable_layout)
     builtin.module {
       vm.module @module {
         vm.func @dispatch_0() {
@@ -157,12 +138,8 @@ hal.executable private @dispatch_0 {
   }
 }
 hal.executable private @dispatch_1 {
-  hal.interface @io {
-    hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer"
-    hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer"
-  }
   hal.executable.variant @vmvx, target = #vmvx_target {
-    hal.executable.entry_point @dispatch_1 interface(@io) {ordinal = 0 : index}
+    hal.executable.entry_point @dispatch_1 ordinal(0) layout(#executable_layout)
     builtin.module {
       vm.module @module {
         vm.func @dispatch_1() {
@@ -199,18 +176,9 @@ func @other_targets() -> () {
 // VMVX target should be pulled out from both executables leaving the originals
 // untouched.
 // CHECK:       hal.executable private @vmvx_linked {
-// CHECK-NEXT:    hal.interface public @io_0 {
-// CHECK-NEXT:      hal.interface.binding public @arg0, set=0, binding=0, type="StorageBuffer"
-// CHECK-NEXT:      hal.interface.binding public @arg1, set=0, binding=1, type="StorageBuffer"
-// CHECK-NEXT:      hal.interface.binding public @ret0, set=0, binding=2, type="StorageBuffer"
-// CHECK-NEXT:    }
-// CHECK-NEXT:    hal.interface public @io_1 {
-// CHECK-NEXT:      hal.interface.binding public @arg0, set=0, binding=0, type="StorageBuffer"
-// CHECK-NEXT:      hal.interface.binding public @ret0, set=0, binding=2, type="StorageBuffer"
-// CHECK-NEXT:    }
 // CHECK-NEXT:    hal.executable.variant public @vmvx_bytecode_fb, target = #executable_target_vmvx_bytecode_fb {
-// CHECK-NEXT:      hal.executable.entry_point public @dispatch_0 interface(@io_0) {ordinal = 0 : index}
-// CHECK-NEXT:      hal.executable.entry_point public @dispatch_1 interface(@io_1) {ordinal = 1 : index}
+// CHECK-NEXT:      hal.executable.entry_point public @dispatch_0 ordinal(0)
+// CHECK-NEXT:      hal.executable.entry_point public @dispatch_1 ordinal(1)
 // CHECK-NEXT:      module {
 // CHECK-NEXT:        vm.module public @linked_module {
 // CHECK-NEXT:          vm.func @dispatch_0() {
@@ -228,10 +196,8 @@ func @other_targets() -> () {
 //
 // @dispatch_0/1 should remain, with just @cuda
 // CHECK:  hal.executable private @dispatch_0 {
-// CHECK:    hal.interface public @io
 // CHECK:    hal.executable.variant public @cuda, target = #executable_target_cuda
 // CHECK:  hal.executable private @dispatch_1 {
-// CHECK:    hal.interface public @io
 // CHECK:    hal.executable.variant public @cuda, target = #executable_target_cuda
 //
 // CHECK:       func @other_targets() {
@@ -254,73 +220,16 @@ func @other_targets() -> () {
 // -----
 
 #vmvx_target = #hal.executable.target<"vmvx", "vmvx-bytecode-fb">
-
-module {
-  hal.executable private @dispatch_0 {
-    hal.interface @io {
-      hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer"
-      hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer"
-      hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer"
-    }
-    hal.executable.variant @vmvx, target = #vmvx_target {
-      hal.executable.entry_point @dispatch_0 interface(@io) {ordinal = 0 : index}
-      builtin.module {
-        vm.module @module {}
-      }
-    }
-  }
-  hal.executable private @dispatch_1 {
-    hal.interface @io attributes {push_constants = 2 : index} {
-      hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer"
-      hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer"
-      hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer"
-    }
-    hal.executable.variant @vmvx, target = #vmvx_target {
-      hal.executable.entry_point @dispatch_1 interface(@io) {ordinal = 0 : index}
-      builtin.module {
-        vm.module @module {}
-      }
-    }
-  }
-  hal.executable private @dispatch_2 {
-    hal.interface @io attributes {push_constants = 2 : index} {
-      hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer"
-      hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer"
-      hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer"
-    }
-    hal.executable.variant @vmvx, target = #vmvx_target {
-      hal.executable.entry_point @dispatch_2 interface(@io) {ordinal = 0 : index}
-      builtin.module {
-        vm.module @module {}
-      }
-    }
-  }
-}
-
-// Interfaces with different numbers of push constants should remain separate.
-// CHECK-NOT: hal.executable private @dispatch_0
-// CHECK-NOT: hal.executable private @dispatch_1
-// CHECK-NOT: hal.executable private @dispatch_2
-// CHECK:       hal.executable private @vmvx_linked {
-// CHECK-NEXT:    hal.interface public @io_0 {
-// CHECK-NEXT:      hal.interface.binding public @arg0, set=0, binding=0, type="StorageBuffer"
-// CHECK-NEXT:      hal.interface.binding public @arg1, set=0, binding=1, type="StorageBuffer"
-// CHECK-NEXT:      hal.interface.binding public @ret0, set=0, binding=2, type="StorageBuffer"
-// CHECK-NEXT:    }
-// CHECK-NEXT:    hal.interface public @io_1 attributes {push_constants = 2 : index} {
-// CHECK-NEXT:      hal.interface.binding public @arg0, set=0, binding=0, type="StorageBuffer"
-// CHECK-NEXT:      hal.interface.binding public @arg1, set=0, binding=1, type="StorageBuffer"
-// CHECK-NEXT:      hal.interface.binding public @ret0, set=0, binding=2, type="StorageBuffer"
-// CHECK-NEXT:    }
-
-// -----
-
-#vmvx_target = #hal.executable.target<"vmvx", "vmvx-bytecode-fb">
+#executable_layout = #hal.executable.layout<push_constants = 1, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>
+  ]>
+]>
 
 hal.executable private @dispatch_0 {
-  hal.interface @io {}
   hal.executable.variant @vmvx, target = #vmvx_target {
-    hal.executable.entry_point @dispatch_0 interface(@io) {ordinal = 0 : index}
+    hal.executable.entry_point @dispatch_0 ordinal(0) layout(#executable_layout)
     builtin.module {
       vm.module @module {
         vm.rodata public @rodata_a dense<[0]> : tensor<1xi32>
@@ -341,9 +250,8 @@ hal.executable private @dispatch_0 {
   }
 }
 hal.executable private @dispatch_1 {
-  hal.interface @io {}
   hal.executable.variant @vmvx, target = #vmvx_target {
-    hal.executable.entry_point @dispatch_1 interface(@io) {ordinal = 0 : index}
+    hal.executable.entry_point @dispatch_1 ordinal(0) layout(#executable_layout)
     builtin.module {
       vm.module @module {
         // Conflict with a public symbol, this should be renamed when linked.
