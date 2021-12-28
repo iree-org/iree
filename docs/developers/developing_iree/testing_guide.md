@@ -105,6 +105,11 @@ iree_cc_test(
 Tests for the IREE compilation pipeline are written as lit tests in the same
 style as MLIR.
 
+By convention, IREE includes tests for printing and parsing of MLIR ops in
+`.../IR/test/{OP_CATEGORY}_ops.mlir` files, tests for folding and
+canonicalization in `.../IR/test/{OP_CATEGORY}_folding.mlir` files, and tests
+for compiler passes and pipelines in other `.../test/*.mlir` files.
+
 ### Running a Test
 
 For the test
@@ -134,7 +139,7 @@ dialects and passes and doesn't register some unnecessary core ones. Instead of
 a shell-script wrapper around FileCheck that passes it a few
 `--do-the-right-thing` flags.
 
-As with all parts of the IREE compiler, these should not have a dependency on
+As with most parts of the IREE compiler, these should not have a dependency on
 the runtime.
 
 ### Configuring the Build System

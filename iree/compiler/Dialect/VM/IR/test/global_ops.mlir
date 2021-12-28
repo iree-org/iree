@@ -1,5 +1,3 @@
-// Tests printing and parsing of global ops.
-
 // RUN: iree-opt -split-input-file %s | IreeFileCheck %s
 
 // CHECK-LABEL: @global_load_i32
