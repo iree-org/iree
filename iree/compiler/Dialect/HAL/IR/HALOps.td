@@ -1405,6 +1405,53 @@ def HAL_DeviceQueryOp :
 // !hal.executable / iree_hal_executable_t
 //===----------------------------------------------------------------------===//
 
+def HAL_ExecutableSourceOp : HAL_Op<"executable.source", [
+    IsolatedFromAbove,
+    SingleBlockImplicitTerminator<"IREE::HAL::ExecutableSourceEndOp">,
+    Symbol,
+    SymbolTable,
+  ]> {
+  let summary = [{generic source contents of an executable op}];
+  let description = [{
+    This is an unspecialized source representation of an executable
+    module without an assigned target. This is useful for hand-authoring
+    executables prior to device specification.
+  }];
+
+  let arguments = (ins
+    OptionalAttr<StrAttr>:$sym_visibility,
+    SymbolNameAttr:$sym_name
+  );
+
+  let regions = (region SizedRegion<1>:$body);
+
+  let assemblyFormat = [{
+    custom<SymbolVisibility>($sym_visibility)
+    $sym_name
+    attr-dict-with-keyword
+    ``
+    regions
+  }];
+
+  let extraClassDeclaration = [{
+    Block& getBlock() { return body().front(); }
+
+    ::mlir::ModuleOp getInnerModule() {
+      auto moduleOps = getBlock().getOps<::mlir::ModuleOp>();
+      assert(!moduleOps.empty() && "source ops need inner modules");
+      return *moduleOps.begin();
+    }
+  }];
+}
+
+def HAL_ExecutableSourceEndOp : HAL_Op<"executable.source_end", [
+    HasParent<"IREE::HAL::ExecutableSourceOp">,
+    Terminator,
+  ]> {
+  let summary = [{terminator pseudo-op for the executable source op}];
+  let assemblyFormat = "attr-dict";
+}
+
 def HAL_ExecutableOp : HAL_Op<"executable", [
     IsolatedFromAbove,
     SingleBlockImplicitTerminator<"IREE::HAL::ExecutableEndOp">,
@@ -1455,7 +1502,10 @@ def HAL_ExecutableEndOp : HAL_Op<"executable_end", [
 
 def HAL_ExecutableEntryPointOp : HAL_Op<"executable.entry_point", [
     Symbol,
-    HasParent<"IREE::HAL::ExecutableVariantOp">,
+    ParentOneOf<[
+      "IREE::HAL::ExecutableSourceOp",
+      "IREE::HAL::ExecutableVariantOp",
+    ]>,
     IsolatedFromAbove,
   ]> {
   let summary = [{executable entry point declaration}];

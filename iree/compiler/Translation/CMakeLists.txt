@@ -12,6 +12,26 @@ if(IREE_ENABLE_EMITC)
   )
 endif()
 
+
+iree_cc_library(
+  NAME
+    HALExecutable
+  HDRS
+    "HALExecutable.h"
+  SRCS
+    "HALExecutable.cpp"
+  DEPS
+    LLVMSupport
+    MLIRIR
+    MLIRPass
+    MLIRSupport
+    MLIRTranslation
+    iree::compiler::Dialect::HAL::Target
+    iree::compiler::Dialect::HAL::Transforms
+    iree::compiler::Utils
+  PUBLIC
+)
+
 iree_cc_library(
   NAME
     IREEVM

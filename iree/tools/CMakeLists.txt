@@ -240,6 +240,7 @@ if(${IREE_BUILD_COMPILER})
       iree::compiler::InputConversion::MHLO
       iree::compiler::InputConversion::TOSA
       iree::compiler::ConstEval
+      iree::compiler::Translation::HALExecutable
       iree::compiler::Translation::IREEVM
     PUBLIC
   )
@@ -335,6 +336,7 @@ if(${IREE_BUILD_COMPILER})
     HDRS
       "init_translations.h"
     DEPS
+      iree::compiler::Translation::HALExecutable
       iree::compiler::Translation::IREEVM
       MLIRSPIRVTranslateRegistration
   )
@@ -380,6 +382,7 @@ if(${IREE_BUILD_COMPILER})
       iree::compiler::Codegen::Codegen
       iree::compiler::Dialect::VM::Target::Bytecode
       iree::compiler::Dialect::VM::Target::init_targets
+      iree::compiler::Translation::HALExecutable
       iree::compiler::Translation::IREEVM
       ${IREE_EMITC_CONDITIONAL_DEP}
     PUBLIC

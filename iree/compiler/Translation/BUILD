@@ -11,10 +11,24 @@ package(
 )
 
 cc_library(
-    name = "IREEVM",
-    srcs = [
-        "IREEVM.cpp",
+    name = "HALExecutable",
+    srcs = ["HALExecutable.cpp"],
+    hdrs = ["HALExecutable.h"],
+    deps = [
+        "//iree/compiler/Dialect/HAL/Target",
+        "//iree/compiler/Dialect/HAL/Transforms",
+        "//iree/compiler/Utils",
+        "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:Pass",
+        "@llvm-project//mlir:Support",
+        "@llvm-project//mlir:Translation",
     ],
+)
+
+cc_library(
+    name = "IREEVM",
+    srcs = ["IREEVM.cpp"],
     hdrs = ["IREEVM.h"],
     deps = [
         "//iree/compiler/Bindings/Native/Transforms",

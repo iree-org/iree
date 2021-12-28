@@ -19,14 +19,13 @@ iree_lit_test_suite(
     name = "lit",
     srcs = enforce_glob(
         [
-            "do_not_optimize.mlir",
+            "hal_executable.mlir",
             "smoketest.mlir",
         ],
         include = ["*.mlir"],
     ),
     data = [
         "//iree/tools:IreeFileCheck",
-        "//iree/tools:iree-opt",
         "//iree/tools:iree-translate",
     ],
 )

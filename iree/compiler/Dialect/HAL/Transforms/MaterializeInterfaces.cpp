@@ -33,51 +33,63 @@ namespace HAL {
 namespace {
 
 //===----------------------------------------------------------------------===//
-// hal.executable.variant creation
+// hal.executable.source materialization
 //===----------------------------------------------------------------------===//
 
-// Creates zero or more hal.executable.variant ops for each target backend.
-// The source op will contain the flow.executable contents and any attributes
-// the backend wants to carry along during transformation.
-static LogicalResult declareVariantOps(IREE::Stream::ExecutableOp sourceOp,
-                                       IREE::HAL::ExecutableOp executableOp) {
-  // Gather a list of all #hal.executable.targets that we should produce
-  // variants for.
-  auto executableTargetAttrs =
-      IREE::HAL::DeviceTargetAttr::lookupExecutableTargets(sourceOp);
-  if (executableTargetAttrs.empty()) {
-    return sourceOp.emitError()
-           << "no executable targets specified for translation";
-  }
+static LogicalResult materializeExecutableFromSourceOp(
+    IREE::HAL::ExecutableSourceOp sourceOp,
+    ArrayRef<IREE::HAL::ExecutableTargetAttr> targetAttrs) {
+  OpBuilder moduleBuilder(sourceOp);
+
+  // Create the op that will contain the translated executable.
+  auto executableOp = moduleBuilder.create<IREE::HAL::ExecutableOp>(
+      sourceOp.getLoc(), sourceOp.getName());
+  executableOp.setVisibility(sourceOp.getVisibility());
+
+  // With this hand-authored path all variants have the same layout and entry
+  // points and we can just clone them.
+  auto sourceEntryPointOps =
+      sourceOp.getOps<IREE::HAL::ExecutableEntryPointOp>();
+  auto sourceModuleOp = sourceOp.getInnerModule();
 
   // Materialize all of the hal.executable.variant ops for all backends we are
-  // targeting. Note that each backend may create zero or more target ops.
+  // targeting.
   SymbolTable targetSymbolTable(executableOp);
   OpBuilder targetBuilder(&executableOp.getBlock().back());
-  for (auto &targetAttr : executableTargetAttrs) {
-    auto targetContainerOp =
-        targetBuilder.create<IREE::HAL::ExecutableVariantOp>(
-            sourceOp.getLoc(), targetAttr.getSymbolNameFragment(), targetAttr);
-    targetSymbolTable.insert(targetContainerOp);
-    OpBuilder containerBuilder(&targetContainerOp.getBlock().back());
-    containerBuilder.create<mlir::ModuleOp>(sourceOp.getLoc());
-  }
-
-  // Ensure that at least one target op got created. If it didn't that means
-  // the executable cannot be translated and it's better to fail now.
-  if (executableOp.getBlock()
-          .getOps<IREE::HAL::ExecutableVariantOp>()
-          .empty()) {
-    auto diagnostic = sourceOp.emitError();
-    diagnostic
-        << "no target backend was able to handle this executable; tried = [ ";
-    for (const auto &targetAttr : executableTargetAttrs) {
-      diagnostic << targetAttr.getFormat() << " ";
+  for (auto targetAttr : targetAttrs) {
+    auto targetVariantOp = targetBuilder.create<IREE::HAL::ExecutableVariantOp>(
+        sourceOp->getLoc(), targetAttr.getSymbolNameFragment(), targetAttr);
+    targetSymbolTable.insert(targetVariantOp);
+    OpBuilder variantBuilder(&targetVariantOp.getBlock().back());
+    for (auto sourceEntryPointOp : sourceEntryPointOps) {
+      variantBuilder.clone(*sourceEntryPointOp);
     }
-    diagnostic << "]";
-    return diagnostic;
+    variantBuilder.clone(*sourceModuleOp);
   }
+  // Remove the original.
+  sourceOp.erase();
 
+  return success();
+}
+
+static LogicalResult materializeExecutablesFromSourceOps(
+    mlir::ModuleOp moduleOp) {
+  auto sourceOps =
+      llvm::to_vector<32>(moduleOp.getOps<IREE::HAL::ExecutableSourceOp>());
+  for (auto sourceOp : sourceOps) {
+    // Gather a list of all #hal.executable.targets that we should produce
+    // variants for.
+    auto targetAttrs =
+        IREE::HAL::DeviceTargetAttr::lookupExecutableTargets(sourceOp);
+    if (targetAttrs.empty()) {
+      return sourceOp.emitError()
+             << "no executable targets specified for translation";
+    }
+
+    if (failed(materializeExecutableFromSourceOp(sourceOp, targetAttrs))) {
+      return failure();
+    }
+  }
   return success();
 }
 
@@ -327,7 +339,7 @@ static LogicalResult convertFlowInfoOps(IREE::HAL::ExecutableOp executableOp) {
 }
 
 //===----------------------------------------------------------------------===//
-// -iree-hal-materialize-interfaces2
+// -iree-hal-materialize-interfaces
 //===----------------------------------------------------------------------===//
 
 class MaterializeInterfacesPass
@@ -340,7 +352,7 @@ class MaterializeInterfacesPass
   }
 
   StringRef getArgument() const override {
-    return "iree-hal-materialize-interfaces2";
+    return "iree-hal-materialize-interfaces";
   }
 
   StringRef getDescription() const override {
@@ -349,6 +361,12 @@ class MaterializeInterfacesPass
 
   void runOnOperation() override {
     SymbolTable symbolTable(getOperation());
+
+    // Handle any hand-authored executables; these only need variant expansion
+    // and no layout analysis as the user specified the layout themselves.
+    if (failed(materializeExecutablesFromSourceOps(getOperation()))) {
+      return signalPassFailure();
+    }
 
     const auto &layoutAnalysis = getAnalysis<BindingLayoutAnalysis>();
 
@@ -362,6 +380,16 @@ class MaterializeInterfacesPass
       auto exportOps = sourceOp.getOps<IREE::Stream::ExecutableExportOp>();
       if (exportOps.empty()) continue;
 
+      // Gather a list of all #hal.executable.targets that we should produce
+      // variants for.
+      auto targetAttrs =
+          IREE::HAL::DeviceTargetAttr::lookupExecutableTargets(sourceOp);
+      if (targetAttrs.empty()) {
+        sourceOp.emitError()
+            << "no executable targets specified for translation";
+        return signalPassFailure();
+      }
+
       // Create the op that will contain the translated executable.
       OpBuilder builder = OpBuilder::atBlockEnd(getOperation().getBody());
       builder.setInsertionPointAfter(sourceOp);
@@ -369,9 +397,18 @@ class MaterializeInterfacesPass
           sourceOp.getLoc(), sourceOp.getName());
       executableOp.setVisibility(sourceOp.getVisibility());
 
-      // Embed the hal.executable.variant ops for each source.
-      if (failed(declareVariantOps(sourceOp, executableOp))) {
-        return signalPassFailure();
+      // Materialize all of the hal.executable.variant ops for all backends we
+      // are targeting.
+      SymbolTable targetSymbolTable(executableOp);
+      OpBuilder targetBuilder(&executableOp.getBlock().back());
+      for (auto targetAttr : targetAttrs) {
+        auto targetContainerOp =
+            targetBuilder.create<IREE::HAL::ExecutableVariantOp>(
+                sourceOp->getLoc(), targetAttr.getSymbolNameFragment(),
+                targetAttr);
+        targetSymbolTable.insert(targetContainerOp);
+        OpBuilder containerBuilder(&targetContainerOp.getBlock().back());
+        containerBuilder.create<mlir::ModuleOp>(sourceOp->getLoc());
       }
 
       // Define interfaces for each exported function based on analysis.
