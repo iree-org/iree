@@ -30,6 +30,7 @@
 #define IREE_HAL_MAX_DRIVER_FACTORY_COUNT 8
 
 struct iree_hal_driver_registry_t {
+  iree_allocator_t host_allocator;
   iree_slim_mutex_t mutex;
 
   // Factories in registration order. As factories are unregistered the list is
@@ -52,6 +53,37 @@ IREE_API_EXPORT iree_hal_driver_registry_t* iree_hal_driver_registry_default(
   iree_call_once(&iree_hal_driver_registry_default_flag_,
                  iree_hal_driver_registry_default_initialize);
   return &iree_hal_driver_registry_default_;
+}
+
+IREE_API_EXPORT iree_status_t
+iree_hal_driver_registry_allocate(iree_allocator_t host_allocator,
+                                  iree_hal_driver_registry_t** out_registry) {
+  IREE_ASSERT_ARGUMENT(out_registry);
+  *out_registry = NULL;
+  IREE_TRACE_ZONE_BEGIN(z0);
+
+  iree_hal_driver_registry_t* registry = NULL;
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_allocator_malloc(host_allocator, sizeof(*registry),
+                                (void**)&registry));
+  registry->host_allocator = host_allocator;
+  iree_slim_mutex_initialize(&registry->mutex);
+
+  *out_registry = registry;
+  IREE_TRACE_ZONE_END(z0);
+  return iree_ok_status();
+}
+
+IREE_API_EXPORT void iree_hal_driver_registry_free(
+    iree_hal_driver_registry_t* registry) {
+  if (!registry) return;
+  IREE_TRACE_ZONE_BEGIN(z0);
+  iree_allocator_t host_allocator = registry->host_allocator;
+
+  iree_slim_mutex_deinitialize(&registry->mutex);
+  iree_allocator_free(host_allocator, registry);
+
+  IREE_TRACE_ZONE_END(z0);
 }
 
 IREE_API_EXPORT iree_status_t iree_hal_driver_registry_register_factory(
