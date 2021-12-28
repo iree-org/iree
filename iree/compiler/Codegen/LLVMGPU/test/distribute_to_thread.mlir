@@ -26,9 +26,9 @@ hal.executable private @dot_dispatch_0  {
         %cst = arith.constant 0.000000e+00 : f32
         %c0 = arith.constant 0 : index
         %c1024 = arith.constant 1024 : index
-        %0 = hal.interface.binding.subspan type(storage_buffer) set(0) binding(0) : memref<1024x1024xf32>
-        %1 = hal.interface.binding.subspan type(storage_buffer) set(0) binding(1) : memref<1024x1024xf32>
-        %2 = hal.interface.binding.subspan type(storage_buffer) set(0) binding(2) : memref<1024x1024xf32>
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<1024x1024xf32>
+        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<1024x1024xf32>
+        %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : memref<1024x1024xf32>
         %workgroup_size_x = hal.interface.workgroup.size[0] : index
         %workgroup_size_y = hal.interface.workgroup.size[1] : index
         %workgroup_id_x = hal.interface.workgroup.id[0] : index
@@ -106,8 +106,8 @@ hal.executable @reduction_dispatch {
         %c0 = arith.constant 0 : index
         %cst = arith.constant 0x7FC00000 : f32
         %cst_0 = arith.constant 0xFF800000 : f32
-        %0 = hal.interface.binding.subspan type(storage_buffer) set(0) binding(0) : memref<1000xf32>
-        %1 = hal.interface.binding.subspan type(storage_buffer) set(0) binding(1) : memref<f32>
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<1000xf32>
+        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<f32>
         linalg.fill(%cst_0, %1) {lowering.config = #config}  : f32, memref<f32>
         linalg.generic {indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> ()>], iterator_types = ["reduction"]} ins(%0 : memref<1000xf32>) outs(%1 : memref<f32>) attrs = {lowering.config = #config} {
         ^bb0(%arg0: f32, %arg1: f32):  // no predecessors

@@ -13,9 +13,9 @@ hal.executable @add_dispatch_0 {
   builtin.module {
     func @add_dispatch_0() {
       %c0 = arith.constant 0 : index
-      %0 = hal.interface.binding.subspan type(storage_buffer) set(0) binding(0) : !flow.dispatch.tensor<readonly:16384xf32>
-      %1 = hal.interface.binding.subspan type(storage_buffer) set(0) binding(1) : !flow.dispatch.tensor<readonly:16384xf32>
-      %2 = hal.interface.binding.subspan type(storage_buffer) set(0) binding(2) : !flow.dispatch.tensor<writeonly:16384xf32>
+      %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<readonly:16384xf32>
+      %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : !flow.dispatch.tensor<readonly:16384xf32>
+      %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : !flow.dispatch.tensor<writeonly:16384xf32>
       %3 = linalg.init_tensor [16384] : tensor<16384xf32>
       %4 = flow.dispatch.tensor.load %0, offsets=[], sizes=[], strides=[] : !flow.dispatch.tensor<readonly:16384xf32> -> tensor<16384xf32>
       %5 = flow.dispatch.tensor.load %1, offsets=[], sizes=[], strides=[] : !flow.dispatch.tensor<readonly:16384xf32> -> tensor<16384xf32>
@@ -63,9 +63,9 @@ hal.executable private @dot_dispatch_1  {
         %c4 = arith.constant 4 : index
         %c2 = arith.constant 2 : index
         %cst = arith.constant 0.000000e+00 : f32
-        %0 = hal.interface.binding.subspan type(storage_buffer) set(0) binding(0) : memref<2x3xf32>
-        %1 = hal.interface.binding.subspan type(storage_buffer) set(0) binding(1) : memref<3x4xf32>
-        %2 = hal.interface.binding.subspan type(storage_buffer) set(0) binding(2) : memref<2x4xf32>
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<2x3xf32>
+        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<3x4xf32>
+        %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : memref<2x4xf32>
         %workgroup_size_x = hal.interface.workgroup.size[0] : index
         %workgroup_size_y = hal.interface.workgroup.size[1] : index
         %workgroup_id_x = hal.interface.workgroup.id[0] : index
@@ -127,8 +127,8 @@ hal.executable @reduction_dispatch {
         %c0 = arith.constant 0 : index
         %cst = arith.constant 0x7FC00000 : f32
         %cst_0 = arith.constant 0xFF800000 : f32
-        %0 = hal.interface.binding.subspan type(storage_buffer) set(0) binding(0) : memref<1000xf32>
-        %1 = hal.interface.binding.subspan type(storage_buffer) set(0) binding(1) : memref<f32>
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<1000xf32>
+        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<f32>
         linalg.fill(%cst_0, %1) : f32, memref<f32>
         linalg.generic {indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> ()>], iterator_types = ["reduction"]} ins(%0 : memref<1000xf32>) outs(%1 : memref<f32>) {
         ^bb0(%arg0: f32, %arg1: f32):  // no predecessors
@@ -171,10 +171,10 @@ hal.executable @tensor_insert {
     builtin.module {
       builtin.func @tensor_insert_slice() {
         %c0 = arith.constant 0 : index
-        %0 = hal.interface.binding.subspan type(storage_buffer) set(0) binding(0) : !flow.dispatch.tensor<readonly:?x?xi32>
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<readonly:?x?xi32>
         %1 = hal.interface.constant.load[0] : index
         %2 = hal.interface.constant.load[1] : index
-        %3 = hal.interface.binding.subspan type(storage_buffer) set(0) binding(1) : !flow.dispatch.tensor<writeonly:?x?xi32>
+        %3 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : !flow.dispatch.tensor<writeonly:?x?xi32>
         %workgroup_size_x = hal.interface.workgroup.size[0] : index
         %workgroup_size_y = hal.interface.workgroup.size[1] : index
         %workgroup_id_x = hal.interface.workgroup.id[0] : index
@@ -229,8 +229,8 @@ hal.executable @tensor_insert {
         %c0 = arith.constant 0 : index
         %d0 = hal.interface.constant.load[0] : index
         %d1 = hal.interface.constant.load[1] : index
-        %0 = hal.interface.binding.subspan type(storage_buffer) set(0) binding(0) : memref<?x?xi32>{%d0, %d1}
-        %1 = hal.interface.binding.subspan type(storage_buffer) set(0) binding(1) : memref<?x?xi32>{%d0, %d1}
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<?x?xi32>{%d0, %d1}
+        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<?x?xi32>{%d0, %d1}
         %workgroup_size_x = hal.interface.workgroup.size[0] : index
         %workgroup_size_y = hal.interface.workgroup.size[1] : index
         %workgroup_id_x = hal.interface.workgroup.id[0] : index
@@ -288,8 +288,8 @@ hal.executable private @static_1d_fft_stage2 {
         %c2 = arith.constant 2 : index
         %cst = arith.constant dense<[1.000000e+00, 6.12323426E-17]> : tensor<2xf32>
         %cst_0 = arith.constant dense<[-0.000000e+00, -1.000000e+00]> : tensor<2xf32>
-        %0 = hal.interface.binding.subspan type(storage_buffer) set(0) binding(0) : !flow.dispatch.tensor<readwrite:32xf32>
-        %1 = hal.interface.binding.subspan type(storage_buffer) set(0) binding(1) : !flow.dispatch.tensor<readwrite:32xf32>
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<readwrite:32xf32>
+        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : !flow.dispatch.tensor<readwrite:32xf32>
         %2 = flow.dispatch.tensor.load %0, offsets = [], sizes = [], strides = [] : !flow.dispatch.tensor<readwrite:32xf32> -> tensor<32xf32>
         %3 = flow.dispatch.tensor.load %1, offsets = [], sizes = [], strides = [] : !flow.dispatch.tensor<readwrite:32xf32> -> tensor<32xf32>
         %4:2 = iree_linalg_ext.fft {__internal_linalg_transform__ = "workgroup"} ins(%c2, %cst, %cst_0 : index, tensor<2xf32>, tensor<2xf32>) outs(%2, %3 : tensor<32xf32>, tensor<32xf32>) : tensor<32xf32>, tensor<32xf32>
@@ -338,8 +338,8 @@ hal.executable private @static_3d_fft_stage3 {
         %cst_0 = arith.constant dense<[-0.000000e+00, -0.707106769, -1.000000e+00, -0.707106769]> : tensor<4xf32>
         %0 = bufferization.to_memref %cst_0 : memref<4xf32>
         %1 = bufferization.to_memref %cst : memref<4xf32>
-        %2 = hal.interface.binding.subspan type(storage_buffer) set(0) binding(0) : memref<64x128x32xf32>
-        %3 = hal.interface.binding.subspan type(storage_buffer) set(0) binding(1) : memref<64x128x32xf32>
+        %2 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<64x128x32xf32>
+        %3 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<64x128x32xf32>
         %workgroup_id_x = hal.interface.workgroup.id[0] : index
         %workgroup_count_x = hal.interface.workgroup.count[0] : index
         %workgroup_id_y = hal.interface.workgroup.id[1] : index
@@ -403,9 +403,9 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb">
       %c128 = arith.constant 128 : index
       %c1024 = arith.constant 1024 : index
       %c0 = arith.constant 0 : index
-      %0 = hal.interface.binding.subspan type(storage_buffer) set(0) binding(0) : !flow.dispatch.tensor<readonly:128x256xf32>
-      %1 = hal.interface.binding.subspan type(storage_buffer) set(0) binding(1) : !flow.dispatch.tensor<readonly:256x1024xf32>
-      %2 = hal.interface.binding.subspan type(storage_buffer) set(0) binding(2) : !flow.dispatch.tensor<writeonly:128x1024xf32>
+      %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<readonly:128x256xf32>
+      %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : !flow.dispatch.tensor<readonly:256x1024xf32>
+      %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : !flow.dispatch.tensor<writeonly:128x1024xf32>
       %workgroup_size_x = hal.interface.workgroup.size[0] : index
       %workgroup_size_y = hal.interface.workgroup.size[1] : index
       %workgroup_id_x = hal.interface.workgroup.id[0] : index
@@ -467,10 +467,10 @@ hal.executable private @sort_op {
         %c1 = arith.constant 1 : index
         %c0 = arith.constant 0 : index
         %c2304000 = arith.constant 2304000 : index
-        %0 = hal.interface.binding.subspan type(storage_buffer) set(0) binding(0) alignment(32) : !flow.dispatch.tensor<readonly:1x576000xf32>
-        %1 = hal.interface.binding.subspan type(storage_buffer) set(0) binding(1) alignment(32) : !flow.dispatch.tensor<readonly:1x576000xi32>
-        %2 = hal.interface.binding.subspan type(storage_buffer) set(0) binding(2) alignment(32) : !flow.dispatch.tensor<writeonly:1x576000xf32>
-        %3 = hal.interface.binding.subspan type(storage_buffer) set(0) binding(3) offset(%c2304000) alignment(32) : !flow.dispatch.tensor<writeonly:1x576000xi32>
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(32) : !flow.dispatch.tensor<readonly:1x576000xf32>
+        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(32) : !flow.dispatch.tensor<readonly:1x576000xi32>
+        %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(32) : !flow.dispatch.tensor<writeonly:1x576000xf32>
+        %3 = hal.interface.binding.subspan set(0) binding(3) type(storage_buffer) offset(%c2304000) alignment(32) : !flow.dispatch.tensor<writeonly:1x576000xi32>
         %workgroup_size_x = hal.interface.workgroup.size[0] : index
         %workgroup_id_x = hal.interface.workgroup.id[0] : index
         %workgroup_count_x = hal.interface.workgroup.count[0] : index

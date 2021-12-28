@@ -1824,9 +1824,9 @@ def HAL_InterfaceBindingSubspanOp : HAL_Op<"interface.binding.subspan", [
   }];
 
   let arguments = (ins
-    HAL_DescriptorTypeAttr:$type,
     IndexAttr:$set,
     IndexAttr:$binding,
+    HAL_DescriptorTypeAttr:$type,
     Optional<HAL_DeviceSize>:$byte_offset,
     HAL_ShapeDynamicDims:$dynamic_dims,
     OptionalAttr<IndexAttr>:$alignment
@@ -1836,9 +1836,9 @@ def HAL_InterfaceBindingSubspanOp : HAL_Op<"interface.binding.subspan", [
   );
 
   let assemblyFormat = [{
-    `type` `(` $type `)`
     `set` `(` $set `)`
     `binding` `(` $binding `)`
+    `type` `(` $type `)`
     (`offset` `(` $byte_offset^ `)`)?
     (`alignment` `(` $alignment^ `)`)?
     attr-dict `:` type($result) (`{` $dynamic_dims^ `}`)?

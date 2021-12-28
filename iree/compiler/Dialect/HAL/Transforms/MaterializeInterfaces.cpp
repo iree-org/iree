@@ -153,10 +153,9 @@ static void convertBindingUsage(
     auto alignmentAttr = sourceFuncOp.getArgAttrOfType<IntegerAttr>(
         arg.getArgNumber(), "stream.alignment");
     auto newOp = builder.create<IREE::HAL::InterfaceBindingSubspanOp>(
-        oldOp.getLoc(), oldOp.getType(), bindingAttr.getType(),
-        APInt(64, setLayoutAttr.getOrdinal()),
-        APInt(64, bindingAttr.getOrdinal()), oldOp.byte_offset(),
-        oldOp.dynamic_dims(), alignmentAttr);
+        oldOp.getLoc(), oldOp.getType(), APInt(64, setLayoutAttr.getOrdinal()),
+        APInt(64, bindingAttr.getOrdinal()), bindingAttr.getType(),
+        oldOp.byte_offset(), oldOp.dynamic_dims(), alignmentAttr);
     oldOp.replaceAllUsesWith(newOp.result());
     oldOp.erase();
   }

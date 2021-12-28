@@ -36,7 +36,7 @@ func @binding_ptrs() {
   // CHECK: %[[DIM1:.+]] = llvm.extractvalue %[[DESC_G]][3, 1]
   // CHECK: %[[STRIDE0:.+]] = llvm.mul %[[STRIDE1]], %[[DIM1]]  : i64
   // CHECK: %[[DESC_H:.+]] = llvm.insertvalue %[[STRIDE0]], %[[DESC_G]][4, 0]
-  %memref = hal.interface.binding.subspan type(storage_buffer) set(0) binding(1) offset(%c72) : memref<?x2xf32>{%dim}
+  %memref = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c72) : memref<?x2xf32>{%dim}
 
   // CHECK: %[[VAL:.+]] = llvm.load
   %c0 = arith.constant 0 : index

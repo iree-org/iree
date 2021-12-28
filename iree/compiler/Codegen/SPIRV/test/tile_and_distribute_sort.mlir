@@ -19,8 +19,8 @@ hal.executable private @static_3d_sort  {
         %c64 = arith.constant 64 : index
         %c128 = arith.constant 128 : index
         %c0 = arith.constant 0 : index
-        %0 = hal.interface.binding.subspan type(storage_buffer) set(0) binding(0) : memref<64x32x128xi32>
-        %1 = hal.interface.binding.subspan type(storage_buffer) set(0) binding(1) : memref<64x32x128xi32>
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<64x32x128xi32>
+        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<64x32x128xi32>
         %workgroup_id_x = hal.interface.workgroup.id[0] : index
         %workgroup_count_x = hal.interface.workgroup.count[0] : index
         %workgroup_id_y = hal.interface.workgroup.id[1] : index
@@ -48,8 +48,8 @@ hal.executable private @static_3d_sort  {
 }
 
 // CHECK-LABEL: func @static_3d_sort()
-//       CHECK: %[[ARG0:.+]] = hal.interface.binding.subspan type(storage_buffer) set(0) binding(0)
-//       CHECK: %[[ARG1:.+]] = hal.interface.binding.subspan type(storage_buffer) set(0) binding(1)
+//       CHECK: %[[ARG0:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer)
+//       CHECK: %[[ARG1:.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer)
 //       CHECK: scf.for
 //       CHECK:   scf.for
 //       CHECK:     %[[WG_INPUT:.+]] = memref.subview %[[ARG0]]
