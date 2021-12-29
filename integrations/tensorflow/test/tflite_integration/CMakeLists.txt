@@ -18,3 +18,10 @@ iree_py_test (
   SRCS
     "mobilenet_v1_test.py"
 )
+
+iree_py_test (
+  NAME
+    posenet_i8
+  SRCS
+    "posenet_i8_test.py"
+)
