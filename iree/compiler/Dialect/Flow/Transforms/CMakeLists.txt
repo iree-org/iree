@@ -58,6 +58,7 @@ iree_cc_library(
     IREELinalgExtPasses
     LLVMSupport
     MLIRAffine
+    MLIRArithmetic
     MLIRIR
     MLIRLinalg
     MLIRLinalgTransforms
@@ -74,6 +75,9 @@ iree_cc_library(
     iree::compiler::Dialect::Flow::Conversion::TensorToFlow
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::HAL::IR
+    iree::compiler::Dialect::Util::Analysis
+    iree::compiler::Dialect::Util::Analysis::Attributes
+    iree::compiler::Dialect::Util::Analysis::DFX
     iree::compiler::Dialect::Util::IR
     iree::compiler::Dialect::Util::Transforms
     iree::compiler::Utils
