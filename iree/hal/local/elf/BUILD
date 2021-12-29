@@ -42,7 +42,7 @@ cc_binary(
         "//iree/base",
         "//iree/base:core_headers",
         "//iree/hal/local:executable_library",
-        "//iree/hal/local/elf/testdata:simple_mul_dispatch",
+        "//iree/hal/local/elf/testdata:elementwise_mul",
     ],
 )
 

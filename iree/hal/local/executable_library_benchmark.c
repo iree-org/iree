@@ -356,7 +356,7 @@ int main(int argc, char** argv) {
       "Example --flagfile:\n"
       "  --executable_format=EX_ELF\n"
       "  --executable_file=iree/hal/local/elf/testdata/"
-      "simple_mul_dispatch_x86_64.so\n"
+      "elementwise_mul_x86_64.so\n"
       "  --entry_point=0\n"
       "  --workgroup_count_x=1\n"
       "  --workgroup_count_y=1\n"
