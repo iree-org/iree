@@ -2,16 +2,16 @@
 
 #config = #iree_codegen.lowering.config<tile_sizes = [[0, 4, 4, 16], [0, 4, 1, 4], [0, 0, 0, 0, 1, 1, 4]], native_vector_size = []>
 #translation = #iree_codegen.translation.info<"SPIRVVectorize", workload_per_wg = [16, 4, 4]>
-
+#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>,
+    #hal.descriptor_set.binding<2, storage_buffer>
+  ]>
+]>
 hal.executable private @conv_static_shape_f32 {
-  hal.interface public @io {
-    hal.interface.binding public @arg0, set=0, binding=0, type="StorageBuffer"
-    hal.interface.binding public @arg1, set=0, binding=1, type="StorageBuffer"
-    hal.interface.binding public @ret0, set=0, binding=2, type="StorageBuffer"
-  }
   hal.executable.variant @vulkan, target = <"vulkan-spirv", "vulkan-spirv-fb"> {
-    hal.executable.entry_point @conv_static_shape_f32 attributes {
-      interface = @io, ordinal = 0 : index,
+    hal.executable.entry_point @conv_static_shape_f32 layout(#executable_layout) attributes {
       workgroup_size = [4: index, 4: index, 1: index],
       translation.info = #translation
     }
@@ -21,9 +21,9 @@ hal.executable private @conv_static_shape_f32 {
         %cst = arith.constant 0.000000e+00 : f32
         %c112 = arith.constant 112 : index
         %c16 = arith.constant 16 : index
-        %0 = hal.interface.binding.subspan @io::@arg0[%c0] : !flow.dispatch.tensor<readonly:1x225x225x8xf32>
-        %1 = hal.interface.binding.subspan @io::@arg1[%c0] : !flow.dispatch.tensor<readonly:3x3x8x16xf32>
-        %2 = hal.interface.binding.subspan @io::@ret0[%c0] : !flow.dispatch.tensor<writeonly:1x112x112x16xf32>
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<readonly:1x225x225x8xf32>
+        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : !flow.dispatch.tensor<readonly:3x3x8x16xf32>
+        %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : !flow.dispatch.tensor<writeonly:1x112x112x16xf32>
         %workgroup_size_x = hal.interface.workgroup.size[0] : index
         %workgroup_size_y = hal.interface.workgroup.size[1] : index
         %workgroup_size_z = hal.interface.workgroup.size[2] : index
@@ -65,11 +65,6 @@ hal.executable private @conv_static_shape_f32 {
         }
         return
       }
-      hal.interface private @io {
-        hal.interface.binding public @arg0, set=0, binding=0, type="StorageBuffer"
-        hal.interface.binding public @arg1, set=0, binding=1, type="StorageBuffer"
-        hal.interface.binding public @ret0, set=0, binding=2, type="StorageBuffer"
-      }
     }
   }
 }
@@ -98,16 +93,16 @@ hal.executable private @conv_static_shape_f32 {
 
 #config = #iree_codegen.lowering.config<tile_sizes = [[0, 4, 4, 16], [0, 1, 1, 4], [0, 0, 0, 0, 1, 1]], native_vector_size = []>
 #translation = #iree_codegen.translation.info<"SPIRVVectorize", workload_per_wg = [16, 4, 4]>
-
+#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>,
+    #hal.descriptor_set.binding<2, storage_buffer>
+  ]>
+]>
 hal.executable private @depthwise_conv_static_shape_f32 {
-  hal.interface public @io {
-    hal.interface.binding public @arg0, set=0, binding=0, type="StorageBuffer"
-    hal.interface.binding public @arg1, set=0, binding=1, type="StorageBuffer"
-    hal.interface.binding public @ret0, set=0, binding=2, type="StorageBuffer"
-  }
   hal.executable.variant @vulkan, target = <"vulkan-spirv", "vulkan-spirv-fb"> {
-    hal.executable.entry_point @depthwise_conv_static_shape_f32 attributes {
-      interface = @io, ordinal = 0 : index,
+    hal.executable.entry_point @depthwise_conv_static_shape_f32 layout(#executable_layout) attributes {
       workgroup_size = [4: index, 4: index, 4: index],
       translation.info = #translation
     }
@@ -117,9 +112,9 @@ hal.executable private @depthwise_conv_static_shape_f32 {
         %cst = arith.constant 0.000000e+00 : f32
         %c56 = arith.constant 56 : index
         %c96 = arith.constant 96 : index
-        %0 = hal.interface.binding.subspan @io::@arg0[%c0] : !flow.dispatch.tensor<readonly:1x113x113x96xf32>
-        %1 = hal.interface.binding.subspan @io::@arg1[%c0] : !flow.dispatch.tensor<readonly:3x3x96xf32>
-        %2 = hal.interface.binding.subspan @io::@ret0[%c0] : !flow.dispatch.tensor<writeonly:1x56x56x96xf32>
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<readonly:1x113x113x96xf32>
+        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : !flow.dispatch.tensor<readonly:3x3x96xf32>
+        %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : !flow.dispatch.tensor<writeonly:1x56x56x96xf32>
         %workgroup_size_x = hal.interface.workgroup.size[0] : index
         %workgroup_size_y = hal.interface.workgroup.size[1] : index
         %workgroup_size_z = hal.interface.workgroup.size[2] : index
@@ -160,11 +155,6 @@ hal.executable private @depthwise_conv_static_shape_f32 {
           }
         }
         return
-      }
-      hal.interface private @io {
-        hal.interface.binding public @arg0, set=0, binding=0, type="StorageBuffer"
-        hal.interface.binding public @arg1, set=0, binding=1, type="StorageBuffer"
-        hal.interface.binding public @ret0, set=0, binding=2, type="StorageBuffer"
       }
     }
   }

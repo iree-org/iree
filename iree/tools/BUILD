@@ -120,6 +120,7 @@ cc_library(
         "//iree/compiler/InputConversion/Common",
         "//iree/compiler/InputConversion/MHLO",
         "//iree/compiler/InputConversion/TOSA",
+        "//iree/compiler/Translation:HALExecutable",
         "//iree/compiler/Translation:IREEVM",
         "//llvm-external-projects/iree-dialects:IREEInputDialect",
         "//llvm-external-projects/iree-dialects:IREELinalgExtDialect",
@@ -219,6 +220,7 @@ cc_library(
         "init_translations.h",
     ],
     deps = [
+        "//iree/compiler/Translation:HALExecutable",
         "//iree/compiler/Translation:IREEVM",
         "@llvm-project//mlir:SPIRVTranslateRegistration",
     ],
@@ -388,6 +390,7 @@ cc_library(
         "//iree/compiler/Codegen",
         "//iree/compiler/Dialect/VM/Target:init_targets",
         "//iree/compiler/Dialect/VM/Target/Bytecode",
+        "//iree/compiler/Translation:HALExecutable",
         "//iree/compiler/Translation:IREEVM",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:IR",

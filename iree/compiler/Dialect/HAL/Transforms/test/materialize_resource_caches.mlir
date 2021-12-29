@@ -5,10 +5,10 @@
 // CHECK-NEXT:   %device = hal.ex.shared_device : !hal.device
 // CHECK-NEXT:   %descriptor_set_layout = hal.descriptor_set_layout.create
 // CHECK-SAME:     device(%device : !hal.device)
-// CHECK-SAME:     usage(PushOnly)
+// CHECK-SAME:     usage(push_only)
 // CHECK-SAME:     bindings([
-// CHECK-SAME:       #hal.descriptor_set_layout_binding<0, "StorageBuffer">,
-// CHECK-SAME:       #hal.descriptor_set_layout_binding<1, "StorageBuffer">
+// CHECK-SAME:       #hal.descriptor_set.binding<0, storage_buffer>,
+// CHECK-SAME:       #hal.descriptor_set.binding<1, storage_buffer>
 // CHECK-SAME:     ]) : !hal.descriptor_set_layout
 // CHECK-NEXT:   util.global.store %descriptor_set_layout, @_descriptor_set_layout_0 : !hal.descriptor_set_layout
 
@@ -16,10 +16,10 @@
 func @descriptorSetLayoutLookup(%device : !hal.device) -> !hal.descriptor_set_layout {
   // CHECK-NEXT: %[[LAYOUT:.+]] = util.global.load @_descriptor_set_layout_0 : !hal.descriptor_set_layout
   %0 = hal.descriptor_set_layout.lookup device(%device : !hal.device)
-                                        usage(PushOnly)
+                                        usage(push_only)
                                         bindings([
-    #hal.descriptor_set_layout_binding<0, "StorageBuffer">,
-    #hal.descriptor_set_layout_binding<1, "StorageBuffer">
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>
   ]) : !hal.descriptor_set_layout
   // CHECK-NEXT: return %[[LAYOUT]]
   return %0 : !hal.descriptor_set_layout
@@ -35,7 +35,7 @@ func @descriptorSetLayoutLookup(%device : !hal.device) -> !hal.descriptor_set_la
 // CHECK-NEXT:   %device = hal.ex.shared_device : !hal.device
 // CHECK-NEXT:   %executable_layout = hal.executable_layout.create
 // CHECK-SAME:     device(%device : !hal.device)
-// CHECK-SAME:     push_constants(0)
+// CHECK-SAME:     push_constants(1)
 // CHECK-SAME:     layouts([%[[SET0]]]) : !hal.executable_layout
 // CHECK-NEXT:   util.global.store %executable_layout, @_executable_layout_0 : !hal.executable_layout
 
@@ -43,12 +43,12 @@ func @descriptorSetLayoutLookup(%device : !hal.device) -> !hal.descriptor_set_la
 func @exeLayoutLookup(%device : !hal.device) -> !hal.executable_layout {
   // CHECK: %[[LAYOUT:.+]] = util.global.load @_executable_layout_0 : !hal.executable_layout
   %0 = hal.executable_layout.lookup device(%device : !hal.device)
-                                    layouts([
-    [
-      #hal.descriptor_set_layout_binding<0, "StorageBuffer">,
-      #hal.descriptor_set_layout_binding<1, "StorageBuffer">
-    ]
-  ]) : !hal.executable_layout
+                                    layout(#hal.executable.layout<push_constants = 1, sets = [
+    #hal.descriptor_set.layout<0, bindings = [
+      #hal.descriptor_set.binding<0, storage_buffer>,
+      #hal.descriptor_set.binding<1, storage_buffer>
+    ]>
+  ]>) : !hal.executable_layout
   // CHECK-NEXT: return %[[LAYOUT]]
   return %0 : !hal.executable_layout
 }
@@ -65,7 +65,7 @@ func @exeLayoutLookup(%device : !hal.device) -> !hal.executable_layout {
 // CHECK-NEXT:   %device = hal.ex.shared_device : !hal.device
 // CHECK-NEXT:   %executable_layout = hal.executable_layout.create
 // CHECK-SAME:     device(%device : !hal.device)
-// CHECK-SAME:     push_constants(0)
+// CHECK-SAME:     push_constants(1)
 // CHECK-SAME:     layouts([%[[SET0]], %[[SET1]]]) : !hal.executable_layout
 // CHECK-NEXT:   util.global.store %executable_layout, @_executable_layout_0 : !hal.executable_layout
 
@@ -73,16 +73,16 @@ func @exeLayoutLookup(%device : !hal.device) -> !hal.executable_layout {
 func @sharedLayoutLookup(%device : !hal.device) -> !hal.executable_layout {
   // CHECK: %[[LAYOUT:.+]] = util.global.load @_executable_layout_0 : !hal.executable_layout
   %0 = hal.executable_layout.lookup device(%device : !hal.device)
-                                    layouts([
-    [
-      #hal.descriptor_set_layout_binding<0, "StorageBuffer">,
-      #hal.descriptor_set_layout_binding<1, "StorageBuffer">
-    ],
-    [
-      #hal.descriptor_set_layout_binding<0, "UniformBuffer">,
-      #hal.descriptor_set_layout_binding<1, "UniformBuffer">
-    ]
-  ]) : !hal.executable_layout
+                                    layout(#hal.executable.layout<push_constants = 1, sets = [
+    #hal.descriptor_set.layout<0, bindings = [
+      #hal.descriptor_set.binding<0, storage_buffer>,
+      #hal.descriptor_set.binding<1, storage_buffer>
+    ]>,
+    #hal.descriptor_set.layout<1, bindings = [
+      #hal.descriptor_set.binding<0, uniform_buffer>,
+      #hal.descriptor_set.binding<1, uniform_buffer>
+    ]>
+  ]>) : !hal.executable_layout
   // CHECK-NEXT: return %[[LAYOUT]]
   return %0 : !hal.executable_layout
 }
@@ -91,10 +91,10 @@ func @sharedLayoutLookup(%device : !hal.device) -> !hal.executable_layout {
 func @otherDescriptorSetLayoutLookup(%device : !hal.device) -> !hal.descriptor_set_layout {
   // CHECK: %[[LAYOUT:.+]] = util.global.load @_descriptor_set_layout_0 : !hal.descriptor_set_layout
   %0 = hal.descriptor_set_layout.lookup device(%device : !hal.device)
-                                        usage(PushOnly)
+                                        usage(push_only)
                                         bindings([
-    #hal.descriptor_set_layout_binding<0, "StorageBuffer">,
-    #hal.descriptor_set_layout_binding<1, "StorageBuffer">
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>
   ]) : !hal.descriptor_set_layout
   // CHECK-NEXT: return %[[LAYOUT]]
   return %0 : !hal.descriptor_set_layout
@@ -102,34 +102,33 @@ func @otherDescriptorSetLayoutLookup(%device : !hal.device) -> !hal.descriptor_s
 
 // -----
 
+#executable_layout_0 = #hal.executable.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>
+  ]>
+]>
+#executable_layout_1 = #hal.executable.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>,
+    #hal.descriptor_set.binding<2, storage_buffer>
+  ]>
+]>
+
 module attributes {hal.device.targets = [#hal.device.target<"cpu">]} {
 
 // TODO(scotttodd): Test without depending on a specific HAL target? Or move to HAL/Target/*/test/?
 //   - If there is no matching hal.executable.variant then the executable will not be cached
 hal.executable @exe {
-  hal.interface @interface0 {
-    hal.interface.binding @s0b0, set=0, binding=0, type="StorageBuffer"
-    hal.interface.binding @s0b1, set=0, binding=1, type="StorageBuffer"
-  }
-  hal.interface @interface1 {
-    hal.interface.binding @s0b0, set=0, binding=0, type="StorageBuffer"
-    hal.interface.binding @s0b1, set=0, binding=1, type="StorageBuffer"
-    hal.interface.binding @s0b2, set=0, binding=2, type="StorageBuffer"
-  }
   hal.executable.variant @vmvx, target = <"vmvx", "vmvx-bytecode-fb"> {
-    hal.executable.entry_point @entry0 attributes {
-      interface = @interface0,
-      ordinal = 0 : index,
+    hal.executable.entry_point @entry0 ordinal(0) layout(#executable_layout_0) attributes {
       workgroup_size = [32 : index, 1 : index, 1 : index]
     }
-    hal.executable.entry_point @entry0_alias attributes {
-      interface = @interface0,
-      ordinal = 0 : index,
+    hal.executable.entry_point @entry0_alias ordinal(0) layout(#executable_layout_0) attributes {
       workgroup_size = [32 : index, 1 : index, 1 : index]
     }
-    hal.executable.entry_point @entry1 attributes {
-      interface = @interface1,
-      ordinal = 1 : index,
+    hal.executable.entry_point @entry1 ordinal(1) layout(#executable_layout_1) attributes {
       workgroup_size = [32 : index, 1 : index, 1 : index]
     }
   }

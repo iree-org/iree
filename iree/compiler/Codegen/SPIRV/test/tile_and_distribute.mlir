@@ -10,28 +10,28 @@
 
 #config = #iree_codegen.lowering.config<tile_sizes = [[8, 16], [1, 1], [0, 0, 1]], native_vector_size = []>
 #translation = #iree_codegen.translation.info<"SPIRVDistribute", workload_per_wg = [8, 16]>
-
-hal.executable private @matmul  {
-  hal.interface @io {
-    hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer"
-    hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer"
-    hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer"
-  }
+#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>,
+    #hal.descriptor_set.binding<2, storage_buffer>
+  ]>
+]>
+hal.executable private @matmul {
   hal.executable.variant @vulkan, target = <"vulkan-spirv", "vulkan-spirv-fb"> {
-    hal.executable.entry_point @matmul attributes {
-      interface = @io, ordinal = 0 : index,
+    hal.executable.entry_point @matmul layout(#executable_layout) attributes {
       workgroup_size = [16: index, 8: index, 1: index],
       translation.info = #translation
     }
     builtin.module {
       func @matmul() {
         %c0 = arith.constant 0 : index
-        %M = hal.interface.load.constant offset = 0 : index
-        %N = hal.interface.load.constant offset = 1 : index
-        %K = hal.interface.load.constant offset = 2 : index
-        %arg0 = hal.interface.binding.subspan @io::@arg0[%c0] : memref<?x?xf32>{%M, %K}
-        %arg1 = hal.interface.binding.subspan @io::@arg1[%c0] : memref<?x?xf32>{%K, %N}
-        %arg2 = hal.interface.binding.subspan @io::@ret0[%c0] : memref<?x?xf32>{%M, %N}
+        %M = hal.interface.constant.load[0] : index
+        %N = hal.interface.constant.load[1] : index
+        %K = hal.interface.constant.load[2] : index
+        %arg0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<?x?xf32>{%M, %K}
+        %arg1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<?x?xf32>{%K, %N}
+        %arg2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : memref<?x?xf32>{%M, %N}
         %c4 = arith.constant 4 : index
         %c1 = arith.constant 1 : index
         %0 = memref.dim %arg0, %c1 : memref<?x?xf32>
@@ -60,14 +60,10 @@ hal.executable private @matmul  {
         }
         return
       }
-      hal.interface private @io  {
-        hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer"
-        hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer"
-        hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer"
-      }
     }
   }
 }
+
 // CHECK-LABEL: func @matmul
 //   CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
 //   CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
@@ -84,15 +80,16 @@ hal.executable private @matmul  {
 
 #config = #iree_codegen.lowering.config<tile_sizes = [[1, 4, 32], [1, 1, 1]], native_vector_size = []>
 #translation = #iree_codegen.translation.info<"SPIRVDistribute", workload_per_wg = [32, 4, 1]>
-hal.executable private @conv_1d  {
-  hal.interface @io {
-    hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer"
-    hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer"
-    hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer"
-  }
+#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>,
+    #hal.descriptor_set.binding<2, storage_buffer>
+  ]>
+]>
+hal.executable private @conv_1d {
   hal.executable.variant @vulkan, target = <"vulkan-spirv", "vulkan-spirv-fb"> {
-    hal.executable.entry_point @conv_1d attributes {
-      interface = @io, ordinal = 0 : index,
+    hal.executable.entry_point @conv_1d layout(#executable_layout) attributes {
       workgroup_size = [32: index, 4: index, 1: index],
       translation.info = #translation
     }
@@ -100,9 +97,9 @@ hal.executable private @conv_1d  {
       func @conv_1d() {
         %cst = arith.constant 0.000000e+00 : f32
         %c0 = arith.constant 0 : index
-        %0 = hal.interface.binding.subspan @io::@ret0[%c0] : memref<3x6x1xf32>
-        %1 = hal.interface.binding.subspan @io::@arg0[%c0] : memref<3x8x1xf32>
-        %2 = hal.interface.binding.subspan @io::@arg1[%c0] : memref<3x1x1xf32>
+        %0 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : memref<3x6x1xf32>
+        %1 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<3x8x1xf32>
+        %2 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<3x1x1xf32>
         %3 = "gpu.block_id"() {dimension = "x"} : () -> index
         %4 = "gpu.block_id"() {dimension = "y"} : () -> index
         %5 = "gpu.block_id"() {dimension = "z"} : () -> index
@@ -123,23 +120,17 @@ hal.executable private @conv_1d  {
           outs(%16 : memref<1x?x?xf32, affine_map<(d0, d1, d2)[s0] -> (d0 * 6 + s0 + d1 + d2)>>)
         return
       }
-      hal.interface private @io  {
-        hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer"
-        hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer"
-        hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer"
-      }
     }
   }
 }
 
 // CHECK-LABEL: func @conv_1d
-//       CHECK: %[[C0:.+]] = arith.constant 0 : index
-//       CHECK: %[[RET:.+]] = hal.interface.binding.subspan @io::@ret0
-//       CHECK: %[[ARG0:.+]] = hal.interface.binding.subspan @io::@arg0
-//       CHECK: %[[ARG1:.+]] = hal.interface.binding.subspan @io::@arg1
-//       CHECK: %[[ARG0SV1:.+]] = memref.subview %[[ARG0]]
-//       CHECK: %[[ARG1SV1:.+]] = memref.subview %[[ARG1]]
-//       CHECK: %[[RETSV1:.+]] = memref.subview %[[RET]]
+//       CHECK-DAG: %[[RET:.+]] = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer)
+//       CHECK-DAG: %[[ARG0:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer)
+//       CHECK-DAG: %[[ARG1:.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer)
+//       CHECK-DAG: %[[ARG0SV1:.+]] = memref.subview %[[ARG0]]
+//       CHECK-DAG: %[[ARG1SV1:.+]] = memref.subview %[[ARG1]]
+//       CHECK-DAG: %[[RETSV1:.+]] = memref.subview %[[RET]]
 //       CHECK: %[[TIDX:.+]] = "gpu.thread_id"() {dimension = "x"}
 //       CHECK: %[[BDIMX:.+]] = "gpu.block_dim"() {dimension = "x"}
 //       CHECK: %[[TIDY:.+]] = "gpu.thread_id"() {dimension = "y"}
@@ -156,7 +147,6 @@ hal.executable private @conv_1d  {
 //  CHECK-SAME:         ins(%[[ARG0SV2]], %[[ARG1SV2]]
 //  CHECK-SAME:         outs(%[[RETSV2]]
 
-
 // -----
 
 #map0 = affine_map<()[s0] -> (s0 * 4)>
@@ -170,33 +160,34 @@ hal.executable private @conv_1d  {
 
 #config = #iree_codegen.lowering.config<tile_sizes = [[0, 1, 4, 32], [0, 1, 1, 1], [0, 0, 0, 0, 1, 1, 4]], native_vector_size = []>
 #translation = #iree_codegen.translation.info<"SPIRVDistribute", workload_per_wg = [32, 4, 1]>
-hal.executable private @conv_2d  {
-  hal.interface @io {
-    hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer"
-    hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer"
-    hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer"
-  }
+#executable_layout = #hal.executable.layout<push_constants = 9, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>,
+    #hal.descriptor_set.binding<2, storage_buffer>
+  ]>
+]>
+hal.executable private @conv_2d {
   hal.executable.variant @vulkan, target = <"vulkan-spirv", "vulkan-spirv-fb"> {
-    hal.executable.entry_point @conv_2d attributes {
-      interface = @io, ordinal = 0 : index,
+    hal.executable.entry_point @conv_2d layout(#executable_layout) attributes {
       workgroup_size = [32: index, 4: index, 1: index],
       translation.info = #translation
     }
     builtin.module {
       func @conv_2d() {
         %c0 = arith.constant 0 : index
-        %n = hal.interface.load.constant offset = 0 : index
-        %oh = hal.interface.load.constant offset = 1 : index
-        %ow = hal.interface.load.constant offset = 2 : index
-        %oc = hal.interface.load.constant offset = 3 : index
-        %ih = hal.interface.load.constant offset = 4 : index
-        %iw = hal.interface.load.constant offset = 5 : index
-        %ic = hal.interface.load.constant offset = 6 : index
-        %fh = hal.interface.load.constant offset = 7 : index
-        %fw = hal.interface.load.constant offset = 8 : index
-        %arg0 = hal.interface.binding.subspan @io::@arg0[%c0] : memref<?x?x?x?xf32>{%n, %ih, %iw, %ic}
-        %arg1 = hal.interface.binding.subspan @io::@arg1[%c0] : memref<?x?x?x?xf32>{%fh, %fw, %ic, %oc}
-        %arg2 = hal.interface.binding.subspan @io::@ret0[%c0] : memref<?x?x?x?xf32>{%n, %oh, %ow, %oc}
+        %n = hal.interface.constant.load[0] : index
+        %oh = hal.interface.constant.load[1] : index
+        %ow = hal.interface.constant.load[2] : index
+        %oc = hal.interface.constant.load[3] : index
+        %ih = hal.interface.constant.load[4] : index
+        %iw = hal.interface.constant.load[5] : index
+        %ic = hal.interface.constant.load[6] : index
+        %fh = hal.interface.constant.load[7] : index
+        %fw = hal.interface.constant.load[8] : index
+        %arg0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<?x?x?x?xf32>{%n, %ih, %iw, %ic}
+        %arg1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<?x?x?x?xf32>{%fh, %fw, %ic, %oc}
+        %arg2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : memref<?x?x?x?xf32>{%n, %oh, %ow, %oc}
         %c2 = arith.constant 2 : index
         %c3 = arith.constant 3 : index
         %c1 = arith.constant 1 : index
@@ -244,20 +235,17 @@ hal.executable private @conv_2d  {
         }
         return
       }
-      hal.interface private @io  {
-        hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer"
-        hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer"
-        hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer"
-      }
     }
   }
 }
+
 //     CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 * 4)>
 //     CHECK-DAG: #[[MAP1:.+]] = affine_map<()[s0] -> (s0 * 32)>
 //         CHECK: func @conv_2d
-//     CHECK-DAG:   %[[ARG0:.+]] = hal.interface.binding.subspan @io::@arg0
-//     CHECK-DAG:   %[[ARG1:.+]] = hal.interface.binding.subspan @io::@arg1
-//     CHECK-DAG:   %[[RET0:.+]] = hal.interface.binding.subspan @io::@ret0
+//     CHECK-DAG:   %[[ARG0:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer)
+//     CHECK-DAG:   %[[ARG1:.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer)
+//     CHECK-DAG:   %[[RET0:.+]] = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer)
+//     CHECK-DAG:   %[[C0:.+]] = arith.constant 0
 //     CHECK-DAG:   %[[C1:.+]] = arith.constant 1
 //     CHECK-DAG:   %[[C4:.+]] = arith.constant 4
 //         CHECK:   %[[INPUT_BLOCK:.+]] = memref.subview %[[ARG1]]
@@ -287,15 +275,16 @@ hal.executable private @conv_2d  {
 
 #config = #iree_codegen.lowering.config<tile_sizes = [[0, 0, 1, 4, 32], [0, 0, 1, 1, 1]], native_vector_size = []>
 #translation = #iree_codegen.translation.info<"SPIRVDistribute", workload_per_wg = [32, 4, 1]>
-hal.executable private @conv_3d  {
-  hal.interface @io {
-    hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer"
-    hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer"
-    hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer"
-  }
+#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>,
+    #hal.descriptor_set.binding<2, storage_buffer>
+  ]>
+]>
+hal.executable private @conv_3d {
   hal.executable.variant @vulkan, target = <"vulkan-spirv", "vulkan-spirv-fb"> {
-    hal.executable.entry_point @conv_3d attributes {
-      interface = @io, ordinal = 0 : index,
+    hal.executable.entry_point @conv_3d layout(#executable_layout) attributes {
       workgroup_size = [32: index, 4: index, 1: index],
       translation.info = #translation
     }
@@ -303,9 +292,9 @@ hal.executable private @conv_3d  {
       func @conv_3d() {
         %cst = arith.constant 0.000000e+00 : f32
         %c0 = arith.constant 0 : index
-        %0 = hal.interface.binding.subspan @io::@ret0[%c0] : memref<2x7x7x7x2xf32>
-        %1 = hal.interface.binding.subspan @io::@arg0[%c0] : memref<2x8x8x8x3xf32>
-        %2 = hal.interface.binding.subspan @io::@arg1[%c0] : memref<2x2x2x3x2xf32>
+        %0 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : memref<2x7x7x7x2xf32>
+        %1 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<2x8x8x8x3xf32>
+        %2 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<2x2x2x3x2xf32>
         %3 = "gpu.block_id"() {dimension = "x"} : () -> index
         %4 = "gpu.block_id"() {dimension = "y"} : () -> index
         %5 = "gpu.block_id"() {dimension = "z"} : () -> index
@@ -324,11 +313,6 @@ hal.executable private @conv_3d  {
           ins(%10, %2 : memref<1x?x?x8x3xf32, affine_map<(d0, d1, d2, d3, d4)[s0] -> (d0 * 1536 + s0 + d1 * 192 + d2 * 24 + d3 * 3 + d4)>>, memref<2x2x2x3x2xf32>)
           outs(%15 : memref<1x?x?x7x2xf32, affine_map<(d0, d1, d2, d3, d4)[s0] -> (d0 * 686 + s0 + d1 * 98 + d2 * 14 + d3 * 2 + d4)>>)
         return
-      }
-      hal.interface private @io  {
-        hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer"
-        hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer"
-        hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer"
       }
     }
   }
@@ -361,25 +345,26 @@ hal.executable private @conv_3d  {
 
 #config = #iree_codegen.lowering.config<tile_sizes = [[1, 4, 32], [1, 1, 1]], native_vector_size = []>
 #translation = #iree_codegen.translation.info<"SPIRVDistribute", workload_per_wg = [32, 4, 1]>
+#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>,
+    #hal.descriptor_set.binding<2, storage_buffer>
+  ]>
+]>
 module  {
-  hal.executable private @pooling_nhwc_max  {
-    hal.interface @io {
-      hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer"
-      hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer"
-      hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer"
-    }
+  hal.executable private @pooling_nhwc_max {
     hal.executable.variant @vulkan, target = <"vulkan-spirv", "vulkan-spirv-fb"> {
-      hal.executable.entry_point @pooling_nhwc_max attributes {
-        interface = @io, ordinal = 0 : index,
+      hal.executable.entry_point @pooling_nhwc_max layout(#executable_layout) attributes {
         workgroup_size = [32: index, 4: index, 1: index],
         translation.info = #translation
       }
       builtin.module {
         func @pooling_nhwc_max() {
           %c0 = arith.constant 0 : index
-          %0 = hal.interface.binding.subspan @io::@arg0[%c0] : memref<2x16x16x6xf32>
-          %1 = hal.interface.binding.subspan @io::@arg1[%c0] : memref<3x4xf32>
-          %2 = hal.interface.binding.subspan @io::@ret0[%c0] : memref<2x14x13x6xf32>
+          %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<2x16x16x6xf32>
+          %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<3x4xf32>
+          %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : memref<2x14x13x6xf32>
           %3 = "gpu.block_id"() {dimension = "x"} : () -> index
           %4 = "gpu.block_id"() {dimension = "y"} : () -> index
           %5 = affine.apply #map0()[%4]
@@ -395,11 +380,6 @@ module  {
             outs(%12 : memref<2x?x?x6xf32, #map7>)
           return
         }
-        hal.interface private @io  {
-          hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer"
-          hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer"
-          hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer"
-        }
       }
     }
   }
@@ -408,9 +388,9 @@ module  {
 //     CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 * 4)>
 //     CHECK-DAG: #[[MAP2:.+]] = affine_map<()[s0] -> (s0 * 32)>
 //         CHECK: func @pooling_nhwc_max
-//     CHECK-DAG:   %[[ARG0:.+]] = hal.interface.binding.subspan @io::@arg0
-//     CHECK-DAG:   %[[ARG1:.+]] = hal.interface.binding.subspan @io::@arg1
-//     CHECK-DAG:   %[[RET0:.+]] = hal.interface.binding.subspan @io::@ret0
+//     CHECK-DAG:   %[[ARG0:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer)
+//     CHECK-DAG:   %[[ARG1:.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer)
+//     CHECK-DAG:   %[[RET0:.+]] = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer)
 //         CHECK:   %[[SV1:.+]] = memref.subview %[[ARG0]]
 //         CHECK:   %[[SV2:.+]] = memref.subview %[[RET0]]
 //     CHECK-DAG:   %[[TIDX:.+]] = "gpu.thread_id"() {dimension = "x"}

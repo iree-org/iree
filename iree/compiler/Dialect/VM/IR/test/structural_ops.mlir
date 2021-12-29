@@ -1,5 +1,3 @@
-// Tests printing and parsing of structural ops.
-
 // RUN: iree-opt -split-input-file %s | iree-opt -split-input-file | IreeFileCheck %s
 
 // CHECK-LABEL: @module_empty

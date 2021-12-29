@@ -161,13 +161,10 @@ LogicalResult TargetBackend::linkExecutablesInto(
     IREE::HAL::ExecutableVariantOp linkedTargetOp,
     std::function<Operation *(mlir::ModuleOp moduleOp)> getInnerModuleFn,
     OpBuilder &builder) {
-  llvm::SmallVector<IREE::HAL::InterfaceOp, 4> linkedInterfaceOps;
   int nextEntryPointOrdinal = 0;
   DenseMap<StringRef, Operation *> targetSymbolMap;
   DenseMap<Attribute, Attribute> entryPointRefReplacements;
 
-  auto linkedExecutableBuilder =
-      OpBuilder::atBlockBegin(linkedExecutableOp.getBody());
   auto linkedTargetBuilder = OpBuilder::atBlockBegin(linkedTargetOp.getBody());
   auto linkedModuleOp = getInnerModuleFn(linkedTargetOp.getInnerModule());
 
@@ -183,35 +180,11 @@ LogicalResult TargetBackend::linkExecutablesInto(
       // symbol refs.
       for (auto entryPointOp :
            variantOp.getOps<IREE::HAL::ExecutableEntryPointOp>()) {
-        // Lookup the interface used by this entry point.
-        auto sourceInterfaceOp =
-            SymbolTable::lookupNearestSymbolFrom<IREE::HAL::InterfaceOp>(
-                sourceExecutableOp, entryPointOp.interfaceAttr());
-        assert(sourceInterfaceOp && "cannot find source interface");
-        IREE::HAL::InterfaceOp linkedInterfaceOp;
-        for (auto interfaceOp : linkedInterfaceOps) {
-          if (interfaceOp.isEquivalentTo(sourceInterfaceOp)) {
-            linkedInterfaceOp = interfaceOp;
-            break;
-          }
-        }
-        if (!linkedInterfaceOp) {
-          linkedInterfaceOp = dyn_cast<IREE::HAL::InterfaceOp>(
-              linkedExecutableBuilder.clone(*sourceInterfaceOp));
-          mlir::StringAttr nameAttr = mlir::StringAttr::get(
-              linkedInterfaceOp.getContext(),
-              llvm::formatv("io_{0}", linkedInterfaceOps.size()).str());
-          linkedInterfaceOp.setName(nameAttr);
-          linkedInterfaceOps.push_back(linkedInterfaceOp);
-        }
-
         auto newEntryPointOp =
             linkedTargetBuilder.create<IREE::HAL::ExecutableEntryPointOp>(
                 entryPointOp.getLoc(), entryPointOp.sym_nameAttr(),
                 builder.getIndexAttr(nextEntryPointOrdinal++),
-                SymbolRefAttr::get(builder.getContext(),
-                                   linkedInterfaceOp.getName()),
-                ArrayAttr{}, IntegerAttr{});
+                entryPointOp.layout(), ArrayAttr{}, IntegerAttr{});
 
         // Add to replacement table for fixing up dispatch calls referencing
         // this entry point.

@@ -13,9 +13,9 @@ package(
 )
 
 c_embed_data(
-    name = "simple_mul_dispatch",
-    srcs = glob(["simple_mul_dispatch_*.so"]),
-    c_file_output = "simple_mul_dispatch.c",
+    name = "elementwise_mul",
+    srcs = glob(["elementwise_mul_*.so"]),
+    c_file_output = "elementwise_mul.c",
     flatten = True,
-    h_file_output = "simple_mul_dispatch.h",
+    h_file_output = "elementwise_mul.h",
 )

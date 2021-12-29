@@ -7,13 +7,18 @@
 // CHECK-DAG: #[[$MAP4:.*]] = affine_map<()[s0, s1, s2] -> (s0 + s1 * 32 + s2 * 128 + 128)>
 // CHECK-DAG: #[[$MAP5:.*]] = affine_map<()[s0, s1, s2] -> (s0 * 4 + s1 * 128 + s2 * 512)>
 
+#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>
+  ]>
+]>
 hal.executable private @shared_mem_cpy  {
   hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
-    hal.executable.entry_point @shared_mem_cpy attributes {
-      interface = @io,
-      ordinal = 0 : index,
-      workgroup_size = [32: index, 4: index, 1:index]}
-    builtin.module  {
+    hal.executable.entry_point @shared_mem_cpy layout(#executable_layout) attributes {
+      workgroup_size = [32: index, 4: index, 1:index]
+    }
+    builtin.module {
       memref.global "private" @__shared_memory___1 : memref<3x512xf32, 3>
       memref.global "private" @__shared_memory___0 : memref<256x4xf32, 3>
       memref.global "private" @__shared_memory__ : memref<64x16xf32, 3>

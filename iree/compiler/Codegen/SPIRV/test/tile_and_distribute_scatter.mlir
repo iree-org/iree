@@ -2,28 +2,27 @@
 
 #config = #iree_codegen.lowering.config<tile_sizes = [[1, 16], [1, 1]], native_vector_size = []>
 #translation = #iree_codegen.translation.info<"SPIRVDistribute", workload_per_wg = [16, 1]>
+#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>,
+    #hal.descriptor_set.binding<2, storage_buffer>
+  ]>
+]>
 hal.executable private @static_scatter_update_slice  {
-  hal.interface @io {
-    hal.interface.binding @s0b0_ro_external, set=0, binding=0, type="StorageBuffer"
-    hal.interface.binding @s0b1_ro_external, set=0, binding=1, type="StorageBuffer"
-    hal.interface.binding @s0b2_rw_external, set=0, binding=2, type="StorageBuffer"
-  }
-
   hal.executable.variant @vulkan_spirv_fb, target = <"vulkan", "vulkan-spirv-fb"> {
-    hal.executable.entry_point @static_scatter_update_slice attributes {
-      interface = @io, ordinal = 0 : index,
+    hal.executable.entry_point @static_scatter_update_slice layout(#executable_layout) attributes {
       translation.info = #translation,
       workgroup_size = [16 : index, 1 : index, 1 : index]
     }
-
     builtin.module {
       builtin.func @static_scatter_update_slice() {
         %c40 = arith.constant 40 : index
         %c500 = arith.constant 500 : index
         %c0 = arith.constant 0 : index
-        %0 = hal.interface.binding.subspan @io::@s0b0_ro_external[%c0] : memref<40x500xi32>
-        %1 = hal.interface.binding.subspan @io::@s0b1_ro_external[%c0] : memref<40x1xi32>
-        %2 = hal.interface.binding.subspan @io::@s0b2_rw_external[%c0] : memref<100x500xi32>
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<40x500xi32>
+        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<40x1xi32>
+        %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : memref<100x500xi32>
         %workgroup_id_x = hal.interface.workgroup.id[0] : index
         %workgroup_count_x = hal.interface.workgroup.count[0] : index
         %workgroup_id_y = hal.interface.workgroup.id[1] : index
@@ -46,19 +45,14 @@ hal.executable private @static_scatter_update_slice  {
         }
         return
       }
-      hal.interface private @io  {
-        hal.interface.binding @s0b0_ro_external, set=0, binding=0, type="StorageBuffer"
-        hal.interface.binding @s0b1_ro_external, set=0, binding=1, type="StorageBuffer"
-        hal.interface.binding @s0b2_rw_external, set=0, binding=2, type="StorageBuffer"
-      }
     }
   }
 }
 
 // CHECK-LABEL: func @static_scatter_update_slice()
-//       CHECK: %[[ARG0:.+]] = hal.interface.binding.subspan @io::@s0b0_ro_external
-//       CHECK: %[[ARG1:.+]] = hal.interface.binding.subspan @io::@s0b1_ro_external
-//       CHECK: %[[ARG2:.+]] = hal.interface.binding.subspan @io::@s0b2_rw_external
+//       CHECK: %[[ARG0:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer)
+//       CHECK: %[[ARG1:.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer)
+//       CHECK: %[[ARG2:.+]] = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer)
 //       CHECK: scf.for
 //       CHECK:   scf.for
 //       CHECK:     %[[WG_UPDATE:.+]] = memref.subview %[[ARG0]]

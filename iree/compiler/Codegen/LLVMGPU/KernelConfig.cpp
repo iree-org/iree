@@ -72,8 +72,9 @@ static bool supportsTensorCore(FuncOp entryPoint, linalg::LinalgOp op) {
   // Limit tensor core pipeline to matmul as not all combinations of transpose
   // are supported upstream.
   // TODO(thomasraoux): Enable batchMatmul and generic contraction.
-  if (getTargetArch(entryPoint) != "sm_80" || !isa<linalg::MatmulOp>(op))
+  if (getTargetArch(entryPoint) != "sm_80" || !isa<linalg::MatmulOp>(op)) {
     return false;
+  }
   // Check that we support converting any fused operation. When using the
   // tensorcore pipeline we need to be sure we can generate MMA ops otherwise
   // the code will be highly inneficent.

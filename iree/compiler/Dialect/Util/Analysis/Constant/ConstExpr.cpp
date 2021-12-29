@@ -242,12 +242,12 @@ void ConstExprHoistingPolicy::initialize() {
   for (auto *info : worklist) {
     Decision *decision = getDecision(info);
     makeInvariantDecision(info, decision);
-    Outcome outcome = decision->getOutcome();
-    if (outcome != UNDECIDED) {
+    Outcome postDecisionOutcome = decision->getOutcome();
+    if (postDecisionOutcome != UNDECIDED) {
       LLVM_DEBUG(dbgs() << "ConstExprHoistPolicy(INVARIANT, ");
-      if (outcome == ENABLE_HOIST) {
+      if (postDecisionOutcome == ENABLE_HOIST) {
         LLVM_DEBUG(dbgs() << "ENABLE_HOIST");
-      } else if (outcome == DISABLE_HOIST) {
+      } else if (postDecisionOutcome == DISABLE_HOIST) {
         LLVM_DEBUG(dbgs() << "DISABLE_HOIST");
       }
       LLVM_DEBUG(dbgs() << "): " << info->constValue << "\n");
@@ -298,7 +298,7 @@ void ConstExprHoistingPolicy::makeInvariantDecision(
 
   // Check 2: Is it a root (these are already hoisted).
   if (info->isRoot) {
-    decision->disableHoist();
+    return decision->disableHoist();
   }
 
   // Check 3: Is the op itself a valid "leaf" that can become a global.

@@ -25,7 +25,7 @@ Start here to ensure you have a working build and see the expected output:
 ```
 iree/hal/local/executable_library_benchmark \
     --executable_format=EX_ELF \
-    --executable_file=iree/hal/local/elf/testdata/simple_mul_dispatch_x86_64.so \
+    --executable_file=iree/hal/local/elf/testdata/elementwise_mul_x86_64.so \
     --entry_point=0 \
     --workgroup_count_x=1 \
     --workgroup_count_y=1 \
@@ -47,7 +47,68 @@ BM_dispatch/process_time/real_time       90.7 ns         90.9 ns      7739262 it
 
 ---
 
-### Constructing flags for other modules
+It can be helpful to put the flags in flagfiles (newline separated):
+
+```
+iree/hal/local/executable_library_benchmark --flagfile=my_flags.txt
+```
+
+For an example, the flags for an x86-64 run of a simple element-wise multiply:
+
+```
+iree/hal/local/executable_library_benchmark --flagfile=iree/hal/local/testdata/elementwise_mul_benchmark.txt
+```
+
+---
+
+### Running standalone HAL executables
+
+This approach uses an explicitly specified HAL executable without any associated
+host code. When doing this the executable layout specifying the bindings and
+push constants is chosen by the user instead of being automatically derived by
+the compiler. The design of the layout can have performance implications and
+it's important to try to match the kind of layout the compiler would produce or
+ensure that what's being tested is relatively immune to the potential effects
+(having enough work per workgroup, etc).
+
+1. Hand-author a `hal.executable.source` op or extract a `hal.executable`
+
+See [iree/hal/local/testdata/elementwise_mul.mlir](iree/hal/local/testdata/elementwise_mul.mlir)
+for an example of the former that allows for the same source to be retargeted
+to many different formats/architectures.
+
+2. Translate the executable into the binary form consumed by the IREE loaders:
+
+```
+iree-translate \
+    -iree-mlir-to-hal-executable \
+    iree/hal/local/testdata/elementwise_mul.mlir \
+    -o=elementwise_mul.so \
+    -iree-hal-target-backends=dylib-llvm-aot \
+    -iree-llvm-debug-symbols=false \
+    -iree-llvm-target-triple=x86_64-pc-linux-elf
+```
+
+Note that the architecture and other related LLVM flags must be specified by the
+user. Some examples can be seen in [iree/hal/local/testdata/generate.sh](iree/hal/local/testdata/generate.sh).
+
+3. Setup flags
+
+Use the above example flagfile as a template or read below for details on how
+to map the parameters. You'll need to specify the executable file and entry
+point, the workgroup parameters, and any bindings and push constants used for
+I/O.
+
+---
+
+### Running executables from full user modules
+
+This approach extracts the embedded executable files contained within a full
+IREE module and allows for benchmarking of any of them by using the
+`--entry_point=` flag to select the executable. It's important to remember that
+the exact set of bindings and parameters are implementation details of the
+compiler and subject to change at any time - when using this approach one must
+inspect the IR to find the proper way to call their kernels.
 
 1. Build your module with the flags you want for your target architecture:
 
@@ -160,12 +221,4 @@ things like this but in cases where you know the meaning you can provide values:
 --push_constant=2
 --push_constant=3
 --push_constant=4
-```
-
----
-
-It can be helpful to put the flags in flagfiles (newline separated):
-
-```
-iree/hal/local/executable_library_benchmark --flagfile=my_flags.txt
 ```

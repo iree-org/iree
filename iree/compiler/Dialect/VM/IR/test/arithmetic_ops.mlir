@@ -1,5 +1,3 @@
-// Tests printing and parsing of arithmetic ops.
-
 // RUN: iree-opt -split-input-file %s | IreeFileCheck %s
 
 // CHECK-LABEL: @add_i32

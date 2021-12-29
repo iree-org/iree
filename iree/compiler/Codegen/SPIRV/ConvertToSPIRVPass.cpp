@@ -80,10 +80,9 @@ spirv::GlobalVariableOp createResourceVariable(Location loc, Type type,
 }
 
 /// Returns the (set, binding) pair for the given interface op.
-std::pair<int32_t, int32_t> getInterfaceSetAndBinding(Operation *op) {
-  IREE::HAL::InterfaceBindingOp bindingOp =
-      cast<IREE::HAL::InterfaceBindingSubspanOp>(op).queryBindingOp();
-  return {bindingOp.set().getSExtValue(), bindingOp.binding().getSExtValue()};
+std::pair<int32_t, int32_t> getInterfaceSetAndBinding(
+    IREE::HAL::InterfaceBindingSubspanOp op) {
+  return {op.set().getSExtValue(), op.binding().getSExtValue()};
 }
 
 /// Scans all hal.interface.binding.subspan ops in `module`, creates their
@@ -97,7 +96,7 @@ InterfaceResourceMap createResourceVariables(mlir::ModuleOp module) {
   for (FuncOp func : llvm::reverse(fns)) {
     // Collect all interface ops and their (set, binding) pairs in this
     // function. Use SmallVector here for a deterministic order.
-    SmallVector<IREE::HAL::InterfaceBindingSubspanOp, 8> interfaceOps;
+    SmallVector<IREE::HAL::InterfaceBindingSubspanOp, 8> subspanOps;
     SmallVector<std::pair<uint32_t, uint32_t>, 8> setBindings;
 
     // Use a map to see if we have different types for one (set, binding) pair,
@@ -106,11 +105,11 @@ InterfaceResourceMap createResourceVariables(mlir::ModuleOp module) {
         setBindingTypes;
 
     func.walk([&](Operation *op) {
-      auto interfaceOp = dyn_cast<IREE::HAL::InterfaceBindingSubspanOp>(op);
-      if (!interfaceOp || interfaceOp.use_empty()) return;
-      interfaceOps.emplace_back(interfaceOp);
-      setBindings.emplace_back(getInterfaceSetAndBinding(interfaceOp));
-      setBindingTypes[setBindings.back()].insert(interfaceOp.getType());
+      auto subspanOp = dyn_cast<IREE::HAL::InterfaceBindingSubspanOp>(op);
+      if (!subspanOp || subspanOp.use_empty()) return;
+      subspanOps.emplace_back(subspanOp);
+      setBindings.emplace_back(getInterfaceSetAndBinding(subspanOp));
+      setBindingTypes[setBindings.back()].insert(subspanOp.getType());
     });
 
     // Keep track of created SPIR-V global variables. This allows us to
@@ -119,12 +118,12 @@ InterfaceResourceMap createResourceVariables(mlir::ModuleOp module) {
                    spirv::GlobalVariableOp>
         resourceVars;
 
-    for (int i = interfaceOps.size() - 1; i >= 0; --i) {
-      auto interfaceOp = interfaceOps[i];
+    for (int i = subspanOps.size() - 1; i >= 0; --i) {
+      auto subspanOp = subspanOps[i];
       const auto &setBinding = setBindings[i];
 
       auto key = std::make_tuple(setBinding.first, setBinding.second,
-                                 interfaceOp.getType());
+                                 subspanOp.getType());
       auto var = resourceVars.lookup(key);
       if (!var) {
         // If we have multiple SPIR-V global variables bound to the same (set,
@@ -135,13 +134,13 @@ InterfaceResourceMap createResourceVariables(mlir::ModuleOp module) {
         // We are using the interface op's type for creating the global
         // variable. It's fine. The correctness boundary is the pass.
         // We will fix it up during conversion so it won't leak.
-        var = createResourceVariable(
-            interfaceOp.getLoc(), interfaceOp.getType(), setBinding.first,
-            setBinding.second, alias, module, &symbolTable);
+        var = createResourceVariable(subspanOp.getLoc(), subspanOp.getType(),
+                                     setBinding.first, setBinding.second, alias,
+                                     module, &symbolTable);
         resourceVars[key] = var;
       }
 
-      interfaceToResourceVars[interfaceOp] = var;
+      interfaceToResourceVars[subspanOp] = var;
     }
   }
 
@@ -155,31 +154,30 @@ InterfaceResourceMap createResourceVariables(mlir::ModuleOp module) {
 //===----------------------------------------------------------------------===//
 
 namespace {
-/// A pattern to convert hal.interface.load.constant into a sequence of SPIR-V
+/// A pattern to convert hal.interface.constant.load into a sequence of SPIR-V
 /// ops to load from a global variable representing the push constant storage.
 struct HALInterfaceLoadConstantConverter final
-    : public OpConversionPattern<IREE::HAL::InterfaceLoadConstantOp> {
+    : public OpConversionPattern<IREE::HAL::InterfaceConstantLoadOp> {
   using OpConversionPattern::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      IREE::HAL::InterfaceLoadConstantOp loadOp, OpAdaptor adaptor,
+      IREE::HAL::InterfaceConstantLoadOp loadOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    // TODO(#1519): hal.interface.load.constant should point to the
-    // hal.interface op.
-    auto moduleOp = loadOp->getParentOfType<ModuleOp>();
-    auto halInterfaceOps =
-        llvm::to_vector<1>(moduleOp.getOps<IREE::HAL::InterfaceOp>());
-    assert(halInterfaceOps.size() == 1);
-    assert(halInterfaceOps.front().push_constants().hasValue());
+    // TODO(#1519): this conversion should look up the entry point information
+    // to get the total push constant count.
+    auto variantOp = loadOp->getParentOfType<IREE::HAL::ExecutableVariantOp>();
+    auto entryPointOps = llvm::to_vector<1>(
+        variantOp.getOps<IREE::HAL::ExecutableEntryPointOp>());
+    assert(entryPointOps.size() == 1);
+    auto layoutAttr = entryPointOps.front().layout();
 
-    uint64_t elementCount =
-        (*halInterfaceOps.front().push_constants()).getZExtValue();
-    unsigned offset = loadOp.offset().getZExtValue();
+    uint64_t elementCount = layoutAttr.getPushConstants();
+    unsigned index = loadOp.index().getZExtValue();
 
     // The following function generates SPIR-V ops with i32 types. So it does
     // type "conversion" (index -> i32) implicitly.
     auto i32Type = rewriter.getIntegerType(32);
-    auto value = spirv::getPushConstantValue(loadOp, elementCount, offset,
+    auto value = spirv::getPushConstantValue(loadOp, elementCount, index,
                                              i32Type, rewriter);
 
     rewriter.replaceOp(loadOp, value);
@@ -220,25 +218,25 @@ struct HALInterfaceBindingSubspanConverter final
         interfaceToResourceVars(interfaceToResourceVars) {}
 
   LogicalResult matchAndRewrite(
-      IREE::HAL::InterfaceBindingSubspanOp interfaceOp, OpAdaptor adaptor,
+      IREE::HAL::InterfaceBindingSubspanOp subspanOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    if (interfaceOp.use_empty()) {
-      rewriter.eraseOp(interfaceOp);
+    if (subspanOp.use_empty()) {
+      rewriter.eraseOp(subspanOp);
       return success();
     }
 
-    Type resultType = interfaceOp.getOperation()->getResult(0).getType();
+    Type resultType = subspanOp.getOperation()->getResult(0).getType();
     Type convertedType = this->getTypeConverter()->convertType(resultType);
     if (!convertedType) {
-      return interfaceOp.emitError()
+      return subspanOp.emitError()
              << "failed to convert SPIR-V type: " << resultType;
     }
 
-    auto varOp = interfaceToResourceVars.lookup(interfaceOp);
+    auto varOp = interfaceToResourceVars.lookup(subspanOp);
     // Fix up the variable's type.
     varOp.typeAttr(TypeAttr::get(convertedType));
 
-    rewriter.replaceOpWithNewOp<spirv::AddressOfOp>(interfaceOp, varOp);
+    rewriter.replaceOpWithNewOp<spirv::AddressOfOp>(subspanOp, varOp);
 
     return success();
   }

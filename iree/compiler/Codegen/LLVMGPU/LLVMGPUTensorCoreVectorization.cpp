@@ -41,9 +41,10 @@ struct CombineTransferReadOpBroadcast final
   LogicalResult matchAndRewrite(vector::BroadcastOp op,
                                 PatternRewriter &rewriter) const override {
     auto transferReadOp = op.source().getDefiningOp<vector::TransferReadOp>();
-    if (!transferReadOp) return failure();
-    if (transferReadOp.mask() || transferReadOp.hasOutOfBoundsDim())
+    if (!transferReadOp || transferReadOp.mask() ||
+        transferReadOp.hasOutOfBoundsDim()) {
       return failure();
+    }
     int64_t rankDiff =
         op.getVectorType().getRank() - transferReadOp.getVectorType().getRank();
     SmallVector<AffineExpr> exprs(rankDiff, rewriter.getAffineConstantExpr(0));

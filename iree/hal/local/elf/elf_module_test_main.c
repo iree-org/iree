@@ -10,7 +10,7 @@
 #include "iree/hal/local/executable_library.h"
 
 // ELF modules for various platforms embedded in the binary:
-#include "iree/hal/local/elf/testdata/simple_mul_dispatch.h"
+#include "iree/hal/local/elf/testdata/elementwise_mul.h"
 
 static iree_status_t query_arch_test_file_data(
     iree_const_byte_span_t* out_file_data) {
@@ -34,8 +34,8 @@ static iree_status_t query_arch_test_file_data(
 #endif  // IREE_ARCH_*
 
   if (!iree_string_view_is_empty(pattern)) {
-    for (size_t i = 0; i < simple_mul_dispatch_size(); ++i) {
-      const struct iree_file_toc_t* file_toc = &simple_mul_dispatch_create()[i];
+    for (size_t i = 0; i < elementwise_mul_size(); ++i) {
+      const struct iree_file_toc_t* file_toc = &elementwise_mul_create()[i];
       if (iree_string_view_match_pattern(iree_make_cstring_view(file_toc->name),
                                          pattern)) {
         *out_file_data =
@@ -82,8 +82,7 @@ static iree_status_t run_test() {
                             "library version error");
   }
 
-  if (strncmp(header->name, "simple_mul_dispatch_0", strlen(header->name)) !=
-      0) {
+  if (strncmp(header->name, "ex", strlen(header->name)) != 0) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                             "library name mismatches");
   }

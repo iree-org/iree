@@ -2,16 +2,16 @@
 
 #config = #iree_codegen.lowering.config<tile_sizes = [[1, 8, 64], [1, 8, 4], [0, 0, 0, 4]], native_vector_size = []>
 #translation = #iree_codegen.translation.info<"SPIRVVectorize", workload_per_wg = [64, 8, 1]>
-
+#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>,
+    #hal.descriptor_set.binding<2, storage_buffer>
+  ]>
+]>
 hal.executable private @fused_fill_batch_matmul {
-  hal.interface public @io {
-    hal.interface.binding public @in0, set=0, binding=0, type="StorageBuffer"
-    hal.interface.binding public @in1, set=0, binding=1, type="StorageBuffer"
-    hal.interface.binding public @out0, set=0, binding=2, type="StorageBuffer"
-  }
   hal.executable.variant @vulkan, target = <"vulkan-spirv", "vulkan-spirv-fb"> {
-    hal.executable.entry_point @fused_fill_batch_matmul attributes {
-      interface = @io, ordinal = 0 : index,
+    hal.executable.entry_point @fused_fill_batch_matmul layout(#executable_layout) attributes {
       workgroup_size = [16: index, 1: index, 1: index],
       translation.info = #translation
     }
@@ -21,9 +21,9 @@ hal.executable private @fused_fill_batch_matmul {
         %cst = arith.constant 0.000000e+00 : f32
         %c4 = arith.constant 4 : index
         %c1024 = arith.constant 1024 : index
-        %0 = hal.interface.binding.subspan @io::@in0[%c0] : !flow.dispatch.tensor<readonly:4x1024x1024xf32>
-        %1 = hal.interface.binding.subspan @io::@in1[%c0] : !flow.dispatch.tensor<readonly:4x1024x1024xf32>
-        %2 = hal.interface.binding.subspan @io::@out0[%c0] : !flow.dispatch.tensor<writeonly:4x1024x1024xf32>
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<readonly:4x1024x1024xf32>
+        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : !flow.dispatch.tensor<readonly:4x1024x1024xf32>
+        %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : !flow.dispatch.tensor<writeonly:4x1024x1024xf32>
         %workgroup_size_x = hal.interface.workgroup.size[0] : index
         %workgroup_size_y = hal.interface.workgroup.size[1] : index
         %workgroup_size_z = hal.interface.workgroup.size[2] : index
@@ -58,11 +58,6 @@ hal.executable private @fused_fill_batch_matmul {
           }
         }
         return
-      }
-      hal.interface private @io {
-        hal.interface.binding public @in0, set=0, binding=0, type="StorageBuffer"
-        hal.interface.binding public @in1, set=0, binding=1, type="StorageBuffer"
-        hal.interface.binding public @out1, set=0, binding=2, type="StorageBuffer"
       }
     }
   }

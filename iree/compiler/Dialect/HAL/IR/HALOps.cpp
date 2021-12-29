@@ -698,12 +698,30 @@ static ParseResult parseExecutableEntryPointOp(OpAsmParser &parser,
   }
 
   StringAttr nameAttr;
+  IREE::HAL::ExecutableLayoutAttr layoutAttr;
   if (failed(parser.parseSymbolName(nameAttr,
                                     mlir::SymbolTable::getSymbolAttrName(),
-                                    result->attributes)) ||
+                                    result->attributes))) {
+    return failure();
+  }
+  if (succeeded(parser.parseOptionalKeyword("ordinal"))) {
+    IntegerAttr ordinalAttr;
+    if (failed(parser.parseLParen()) ||
+        failed(parser.parseAttribute(ordinalAttr,
+                                     parser.getBuilder().getIndexType())) ||
+        failed(parser.parseRParen())) {
+      return failure();
+    }
+    result->addAttribute("ordinal", ordinalAttr);
+  }
+  if (failed(parser.parseKeyword("layout")) || failed(parser.parseLParen()) ||
+      failed(parser.parseAttribute(layoutAttr)) ||
+      failed(parser.parseRParen()) ||
       failed(parser.parseOptionalAttrDictWithKeyword(result->attributes))) {
     return failure();
   }
+  result->addAttribute("layout", layoutAttr);
+
   // For now assume that the workload is at max 3D. So arguments to the region
   // are workload along x, y and z.
   std::unique_ptr<Region> region;
@@ -714,6 +732,7 @@ static ParseResult parseExecutableEntryPointOp(OpAsmParser &parser,
   if (!parseResult.hasValue()) return success();
   if (failed(*parseResult)) return failure();
   result->addRegion(std::move(region));
+
   return success();
 }
 
@@ -723,8 +742,16 @@ static void printExecutableEntryPointOp(OpAsmPrinter &p,
   printSymbolVisibility(p, op, op->getAttrOfType<StringAttr>("sym_visibility"));
   p << ' ';
   p.printSymbolName(op.sym_name());
-  p.printOptionalAttrDictWithKeyword(op->getAttrs(),
-                                     /*elidedAttrs=*/{"sym_name"});
+  if (op.ordinalAttr()) {
+    p << " ordinal(";
+    p.printAttributeWithoutType(op.ordinalAttr());
+    p << ")";
+  }
+  p << " layout(";
+  p.printAttribute(op.layout());
+  p << ")";
+  p.printOptionalAttrDict(op->getAttrs(),
+                          /*elidedAttrs=*/{"sym_name", "layout", "ordinal"});
   if (op.workgroup_count_region().empty()) return;
   p.printRegion(op.workgroup_count_region().front());
 }
@@ -817,123 +844,6 @@ void ExecutableLookupOp::getAsmResultNames(
 }
 
 //===----------------------------------------------------------------------===//
-// hal.interface
-//===----------------------------------------------------------------------===//
-
-void InterfaceOp::build(OpBuilder &builder, OperationState &state,
-                        StringRef name, IntegerAttr pushConstants) {
-  ensureTerminator(*state.addRegion(), builder, state.location);
-  state.addAttribute(mlir::SymbolTable::getSymbolAttrName(),
-                     builder.getStringAttr(name));
-  if (pushConstants) {
-    state.addAttribute("push_constants", pushConstants);
-  }
-}
-
-ArrayAttr InterfaceOp::getExecutableSetLayoutsAttr() {
-  Builder builder(getContext());
-  SmallVector<SmallVector<Attribute, 4>, 4> setAttrs;
-  for (auto bindingOp : getBlock().getOps<InterfaceBindingOp>()) {
-    unsigned set = bindingOp.set().getZExtValue();
-    unsigned binding = bindingOp.binding().getZExtValue();
-    if (set >= setAttrs.size()) setAttrs.resize(set + 1);
-    auto &bindingAttrs = setAttrs[set];
-    if (binding >= bindingAttrs.size()) bindingAttrs.resize(binding + 1);
-    bindingAttrs[binding] = DescriptorSetLayoutBindingAttr::get(
-        bindingOp.bindingAttr(), bindingOp.typeAttr());
-  }
-  return builder.getArrayAttr(llvm::to_vector<4>(
-      llvm::map_range(setAttrs, [&](ArrayRef<Attribute> bindingsArray) {
-        return builder.getArrayAttr(bindingsArray).cast<Attribute>();
-      })));
-}
-
-bool InterfaceOp::isEquivalentTo(InterfaceOp other) {
-  auto bindings = llvm::to_vector<4>(getBlock().getOps<InterfaceBindingOp>());
-  auto otherBindings =
-      llvm::to_vector<4>(other.getBlock().getOps<InterfaceBindingOp>());
-  return push_constantsAttr() == other.push_constantsAttr() &&
-         bindings.size() == otherBindings.size() &&
-         llvm::all_of(llvm::zip(bindings, otherBindings), [](auto bindings) {
-           return OperationEquivalence::isEquivalentTo(
-               std::get<0>(bindings), std::get<1>(bindings),
-               OperationEquivalence::exactValueMatch,
-               OperationEquivalence::exactValueMatch,
-               OperationEquivalence::Flags::IgnoreLocations);
-         });
-}
-
-llvm::hash_code InterfaceOp::getInterfaceHash() {
-  auto range = llvm::map_range(getBlock().getOps<InterfaceBindingOp>(),
-                               [](InterfaceBindingOp bindingOp) {
-                                 return bindingOp.getDescriptorHash();
-                               });
-  return llvm::hash_combine(
-      push_constants(), llvm::hash_combine_range(range.begin(), range.end()));
-}
-
-//===----------------------------------------------------------------------===//
-// hal.interface.binding
-//===----------------------------------------------------------------------===//
-
-static ParseResult parseInterfaceBindingOp(OpAsmParser &parser,
-                                           OperationState *result) {
-  StringAttr visibilityAttr;
-  if (failed(parseSymbolVisibility(parser, visibilityAttr))) {
-    return failure();
-  }
-
-  StringAttr nameAttr;
-  IntegerAttr setAttr;
-  IntegerAttr bindingAttr;
-  if (failed(parser.parseSymbolName(nameAttr,
-                                    mlir::SymbolTable::getSymbolAttrName(),
-                                    result->attributes)) ||
-      failed(parser.parseComma()) || failed(parser.parseKeyword("set")) ||
-      failed(parser.parseEqual()) ||
-      failed(parser.parseAttribute(setAttr, parser.getBuilder().getIndexType(),
-                                   "set", result->attributes)) ||
-      failed(parser.parseComma()) || failed(parser.parseKeyword("binding")) ||
-      failed(parser.parseEqual()) ||
-      failed(parser.parseAttribute(bindingAttr,
-                                   parser.getBuilder().getIndexType(),
-                                   "binding", result->attributes)) ||
-      failed(parser.parseComma()) || failed(parser.parseKeyword("type")) ||
-      failed(parser.parseEqual()) ||
-      failed(
-          parseEnumAttr<DescriptorType>(parser, "type", result->attributes)) ||
-      failed(parser.parseOptionalAttrDictWithKeyword(result->attributes))) {
-    return failure();
-  }
-  return success();
-}
-
-static void printInterfaceBindingOp(OpAsmPrinter &p, InterfaceBindingOp op) {
-  p << ' ';
-  printSymbolVisibility(p, op, op->getAttrOfType<StringAttr>("sym_visibility"));
-  p << ' ';
-  p.printSymbolName(op.sym_name());
-  p << ", set=" << op.set();
-  p << ", binding=" << op.binding();
-  p << ", type=\"" << stringifyDescriptorType(op.type()) << "\"";
-  p.printOptionalAttrDictWithKeyword(op->getAttrs(),
-                                     /*elidedAttrs=*/{
-                                         mlir::SymbolTable::getSymbolAttrName(),
-                                         "set",
-                                         "binding",
-                                         "type",
-                                         "access",
-                                     });
-}
-
-llvm::hash_code InterfaceBindingOp::getDescriptorHash() {
-  // Use the unwrapped attribute accessors so that we can have determinstic
-  // hashes. Hashing against the wrapped attributes are hashing against pointer
-  // values, which change per run.
-  return llvm::hash_combine(set(), binding(), type());
-}
-
-//===----------------------------------------------------------------------===//
 // hal.interface.binding.subspan
 //===----------------------------------------------------------------------===//
 
@@ -951,11 +861,6 @@ static LogicalResult verifyInterfaceBindingSubspanOp(
   return success();
 }
 
-InterfaceBindingOp InterfaceBindingSubspanOp::queryBindingOp() {
-  return dyn_cast_or_null<InterfaceBindingOp>(
-      SymbolTable::lookupNearestSymbolFrom(getOperation(), binding()));
-}
-
 // TODO(benvanik): share with align op folder and analysis.
 // May need an interface for querying the alignment from ops that can carry it.
 
@@ -969,7 +874,7 @@ static llvm::Optional<APInt> lookupValueOrAlignment(Value value) {
   }
 
   auto op = value.getDefiningOp();
-  if (auto loadOp = dyn_cast_or_null<IREE::HAL::InterfaceLoadConstantOp>(op)) {
+  if (auto loadOp = dyn_cast_or_null<IREE::HAL::InterfaceConstantLoadOp>(op)) {
     // Push constants have an optional value alignment.
     auto alignment = loadOp.alignment();
     if (alignment.hasValue()) return alignment;
@@ -995,6 +900,10 @@ llvm::Align InterfaceBindingSubspanOp::calculateAlignment() {
   if (!bindingAlignmentInt) return naturalAlignment;
   auto bindingAlignment =
       llvm::Align(bindingAlignmentInt.getValue().getZExtValue());
+
+  // If there's no offset specified then we can use the binding alignment
+  // directly.
+  if (!byte_offset()) return bindingAlignment;
 
   // Try to get the alignment of the byte offset. If it's a constant then we can
   // find a common alignment between it and the base and otherwise we need to

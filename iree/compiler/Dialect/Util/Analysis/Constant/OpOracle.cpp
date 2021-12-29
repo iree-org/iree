@@ -112,6 +112,15 @@ bool isHoistableConstExprLeaf(const ConstExprAnalysis::ConstValueInfo *info) {
     }
   }
 
+  // Never hoist sub-byte aligned values: in legal programs, these will be
+  // cast or packed in some successor.
+  if (auto integerType = getElementTypeOrSelf(info->constValue.getType())
+                             .dyn_cast<IntegerType>()) {
+    if (integerType.getWidth() % 8 != 0) {
+      return false;
+    }
+  }
+
   // Generally, we prefer to not hoist broadcasts.
   if (auto genericOp = dyn_cast<linalg::GenericOp>(op)) {
     // Detect op that only broadcast input as fusing them makes the new

@@ -40,16 +40,6 @@ static Value makeEncodingType(Location loc, Attribute encodingType,
   return constantValue;
 }
 
-static Value lookupExecutableLayout(Location loc, Value device,
-                                    IREE::HAL::InterfaceOp interfaceOp,
-                                    OpBuilder &builder) {
-  auto lookupOp = builder.create<IREE::HAL::ExecutableLayoutLookupOp>(
-      loc, IREE::HAL::ExecutableLayoutType::get(loc.getContext()), device,
-      interfaceOp.push_constantsAttr(),
-      interfaceOp.getExecutableSetLayoutsAttr());
-  return lookupOp.result();
-}
-
 static Value lookupDeviceFor(Operation *op, OpBuilder &builder) {
   // TODO(benvanik): make this do multi-device lookup and other fancy things.
   auto lookupOp = builder.create<IREE::HAL::ExSharedDeviceOp>(op->getLoc());
@@ -694,9 +684,6 @@ struct CmdDispatchOpPattern
                << dispatchOp.entry_point();
       }
       auto entryPointOp = *entryPointIt;
-      auto interfaceOp =
-          dyn_cast<IREE::HAL::InterfaceOp>(SymbolTable::lookupSymbolIn(
-              executableOp, entryPointOp.interfaceAttr()));
 
       auto *region = switchRewriter.addConditionRegion(
           variantOp.target().getMatchExpression());
@@ -705,7 +692,7 @@ struct CmdDispatchOpPattern
 
       // Record push constants and buffer bindings.
       recordParameters(loc, device, commandBuffer, dispatchOp, adaptor,
-                       interfaceOp, caseBuilder);
+                       entryPointOp.layout(), caseBuilder);
 
       // Dispatch with a target-specific workgroup count.
       auto entryPointSymRef =
@@ -729,10 +716,15 @@ struct CmdDispatchOpPattern
 
   void recordParameters(Location loc, Value device, Value commandBuffer,
                         IREE::Stream::CmdDispatchOp dispatchOp,
-                        OpAdaptor adaptor, IREE::HAL::InterfaceOp interfaceOp,
+                        OpAdaptor adaptor,
+                        IREE::HAL::ExecutableLayoutAttr layoutAttr,
                         OpBuilder &builder) const {
     auto executableLayout =
-        lookupExecutableLayout(loc, device, interfaceOp, builder);
+        builder
+            .create<IREE::HAL::ExecutableLayoutLookupOp>(
+                loc, IREE::HAL::ExecutableLayoutType::get(loc.getContext()),
+                device, layoutAttr)
+            .result();
 
     // Push constant values.
     // TODO(#5322): symbolic push constant names on the hal.interface so we can
@@ -761,29 +753,10 @@ struct CmdDispatchOpPattern
     }
 
     // TODO(benvanik): typed accessors for bindings.
-    auto bindingSymbols = dispatchOp->getAttr("hal.interface.bindings")
-                              .dyn_cast_or_null<ArrayAttr>();
-    assert(bindingSymbols &&
+    auto bindingAttrs = dispatchOp->getAttr("hal.interface.bindings")
+                            .dyn_cast_or_null<ArrayAttr>();
+    assert(bindingAttrs &&
            "interface materialization must annotate dispatch sites");
-    auto bindingOps = llvm::to_vector<
-        4>(llvm::map_range(bindingSymbols, [&](Attribute symRefAttr) {
-      auto bindingOp =
-          SymbolTable::lookupNearestSymbolFrom<IREE::HAL::InterfaceBindingOp>(
-              dispatchOp, symRefAttr.cast<SymbolRefAttr>());
-      assert(bindingOp && "binding not found");
-      return bindingOp;
-    }));
-    // Sort in set -> binding order ascending.
-    llvm::sort(bindingOps, [](IREE::HAL::InterfaceBindingOp lhs,
-                              IREE::HAL::InterfaceBindingOp rhs) {
-      int64_t lhsSet = lhs.set().getSExtValue();
-      int64_t rhsSet = rhs.set().getSExtValue();
-      if (lhsSet < rhsSet) return true;
-      if (rhsSet > lhsSet) return false;
-      int64_t lhsBinding = lhs.binding().getSExtValue();
-      int64_t rhsBinding = rhs.binding().getSExtValue();
-      return lhsBinding < rhsBinding;
-    });
 
     // Push descriptor bindings.
     int64_t currentSet = -1;
@@ -794,13 +767,14 @@ struct CmdDispatchOpPattern
       bindings.clear();
     };
     for (unsigned i = 0; i < adaptor.resources().size(); ++i) {
-      auto bindingOp = bindingOps[i];
-      int64_t set = bindingOp.set().getSExtValue();
+      auto bindingAttr =
+          bindingAttrs[i].cast<IREE::HAL::InterfaceBindingAttr>();
+      int64_t set = bindingAttr.getSet();
       if (currentSet != -1 && currentSet != set) flushSet();
       currentSet = set;
       IREE::HAL::DescriptorSetBindingValue binding;
-      binding.ordinal = builder.create<arith::ConstantIndexOp>(
-          loc, bindingOp.binding().getSExtValue());
+      binding.ordinal =
+          builder.create<arith::ConstantIndexOp>(loc, bindingAttr.getBinding());
       binding.buffer = adaptor.resources()[i];
       binding.byteOffset = adaptor.resource_offsets()[i];
       binding.byteLength = adaptor.resource_lengths()[i];

@@ -1,5 +1,3 @@
-// Tests printing and parsing of control flow ops.
-
 // RUN: iree-opt -split-input-file %s | IreeFileCheck %s
 
 // CHECK-LABEL: @branch_empty

@@ -293,8 +293,9 @@ struct FoldFillGenericOpPattern : public OpRewritePattern<linalg::GenericOp> {
     if (genericOp.getNumOutputs() != 1) return failure();
 
     // Check linalg.generic does have copy only semantics.
-    if (genericOp.getNumParallelLoops() != genericOp.getNumLoops())
+    if (genericOp.getNumParallelLoops() != genericOp.getNumLoops()) {
       return failure();
+    }
     auto results =
         llvm::to_vector<4>(genericOp.getBody()->getOps<linalg::YieldOp>());
     if (results.size() != 1) return failure();

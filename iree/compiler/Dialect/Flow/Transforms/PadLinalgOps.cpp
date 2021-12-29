@@ -54,8 +54,9 @@ class PadMatmulOp : public OpRewritePattern<linalg::MatmulOp> {
     int paddingForN = newNSize - N;
     int paddingForK = newKSize - K;
 
-    if (paddingForM == 0 && paddingForN == 0 && paddingForK == 0)
+    if (paddingForM == 0 && paddingForN == 0 && paddingForK == 0) {
       return failure();
+    }
 
     auto lhsPaddedType =
         RankedTensorType::get({newMSize, newKSize}, lhsType.getElementType());

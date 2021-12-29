@@ -33,51 +33,63 @@ namespace HAL {
 namespace {
 
 //===----------------------------------------------------------------------===//
-// hal.executable.variant creation
+// hal.executable.source materialization
 //===----------------------------------------------------------------------===//
 
-// Creates zero or more hal.executable.variant ops for each target backend.
-// The source op will contain the flow.executable contents and any attributes
-// the backend wants to carry along during transformation.
-static LogicalResult declareVariantOps(IREE::Stream::ExecutableOp sourceOp,
-                                       IREE::HAL::ExecutableOp executableOp) {
-  // Gather a list of all #hal.executable.targets that we should produce
-  // variants for.
-  auto executableTargetAttrs =
-      IREE::HAL::DeviceTargetAttr::lookupExecutableTargets(sourceOp);
-  if (executableTargetAttrs.empty()) {
-    return sourceOp.emitError()
-           << "no executable targets specified for translation";
-  }
+static LogicalResult materializeExecutableFromSourceOp(
+    IREE::HAL::ExecutableSourceOp sourceOp,
+    ArrayRef<IREE::HAL::ExecutableTargetAttr> targetAttrs) {
+  OpBuilder moduleBuilder(sourceOp);
+
+  // Create the op that will contain the translated executable.
+  auto executableOp = moduleBuilder.create<IREE::HAL::ExecutableOp>(
+      sourceOp.getLoc(), sourceOp.getName());
+  executableOp.setVisibility(sourceOp.getVisibility());
+
+  // With this hand-authored path all variants have the same layout and entry
+  // points and we can just clone them.
+  auto sourceEntryPointOps =
+      sourceOp.getOps<IREE::HAL::ExecutableEntryPointOp>();
+  auto sourceModuleOp = sourceOp.getInnerModule();
 
   // Materialize all of the hal.executable.variant ops for all backends we are
-  // targeting. Note that each backend may create zero or more target ops.
+  // targeting.
   SymbolTable targetSymbolTable(executableOp);
   OpBuilder targetBuilder(&executableOp.getBlock().back());
-  for (auto &targetAttr : executableTargetAttrs) {
-    auto targetContainerOp =
-        targetBuilder.create<IREE::HAL::ExecutableVariantOp>(
-            sourceOp.getLoc(), targetAttr.getSymbolNameFragment(), targetAttr);
-    targetSymbolTable.insert(targetContainerOp);
-    OpBuilder containerBuilder(&targetContainerOp.getBlock().back());
-    containerBuilder.create<mlir::ModuleOp>(sourceOp.getLoc());
-  }
-
-  // Ensure that at least one target op got created. If it didn't that means
-  // the executable cannot be translated and it's better to fail now.
-  if (executableOp.getBlock()
-          .getOps<IREE::HAL::ExecutableVariantOp>()
-          .empty()) {
-    auto diagnostic = sourceOp.emitError();
-    diagnostic
-        << "no target backend was able to handle this executable; tried = [ ";
-    for (const auto &targetAttr : executableTargetAttrs) {
-      diagnostic << targetAttr.getFormat() << " ";
+  for (auto targetAttr : targetAttrs) {
+    auto targetVariantOp = targetBuilder.create<IREE::HAL::ExecutableVariantOp>(
+        sourceOp->getLoc(), targetAttr.getSymbolNameFragment(), targetAttr);
+    targetSymbolTable.insert(targetVariantOp);
+    OpBuilder variantBuilder(&targetVariantOp.getBlock().back());
+    for (auto sourceEntryPointOp : sourceEntryPointOps) {
+      variantBuilder.clone(*sourceEntryPointOp);
     }
-    diagnostic << "]";
-    return diagnostic;
+    variantBuilder.clone(*sourceModuleOp);
   }
+  // Remove the original.
+  sourceOp.erase();
 
+  return success();
+}
+
+static LogicalResult materializeExecutablesFromSourceOps(
+    mlir::ModuleOp moduleOp) {
+  auto sourceOps =
+      llvm::to_vector<32>(moduleOp.getOps<IREE::HAL::ExecutableSourceOp>());
+  for (auto sourceOp : sourceOps) {
+    // Gather a list of all #hal.executable.targets that we should produce
+    // variants for.
+    auto targetAttrs =
+        IREE::HAL::DeviceTargetAttr::lookupExecutableTargets(sourceOp);
+    if (targetAttrs.empty()) {
+      return sourceOp.emitError()
+             << "no executable targets specified for translation";
+    }
+
+    if (failed(materializeExecutableFromSourceOp(sourceOp, targetAttrs))) {
+      return failure();
+    }
+  }
   return success();
 }
 
@@ -110,40 +122,21 @@ static LogicalResult verifyEntryPointTypes(mlir::FuncOp entryFuncOp) {
   return success();
 }
 
-struct Interface {
-  // Materialized interface op with binding symbols.
-  IREE::HAL::InterfaceOp op;
-  // 1:1 with the function signature bindings. May be a subset of the interface.
-  SmallVector<IREE::HAL::InterfaceBindingOp> resourceBindings;
-};
-
-// Creates an interface from an executable layout provided from analysis.
-static Interface createInterface(Location loc,
-                                 const ExecutableLayout &executableLayout,
-                                 OpBuilder &executableBuilder) {
-  Interface interface;
-  interface.op = executableBuilder.create<IREE::HAL::InterfaceOp>(loc, "io");
-  interface.op.push_constantsAttr(
-      executableBuilder.getIndexAttr(executableLayout.pushConstantCount));
-  auto interfaceBuilder = OpBuilder::atBlockBegin(&interface.op.body().front());
-  DenseMap<std::pair<unsigned, unsigned>, IREE::HAL::InterfaceBindingOp>
-      bindingMap;
+// Creates an executable layout attr from the analysis results.
+static IREE::HAL::ExecutableLayoutAttr makeExecutableLayoutAttr(
+    const ExecutableLayout &executableLayout, OpBuilder &builder) {
+  SmallVector<IREE::HAL::DescriptorSetLayoutAttr> setLayoutAttrs;
   for (const auto &setLayout : executableLayout.setLayouts) {
+    SmallVector<IREE::HAL::DescriptorSetBindingAttr> bindingAttrs;
     for (const auto &binding : setLayout.bindings) {
-      std::string bindingName = "s" + std::to_string(setLayout.ordinal) + "b" +
-                                std::to_string(binding.ordinal);
-      auto bindingOp = interfaceBuilder.create<IREE::HAL::InterfaceBindingOp>(
-          interface.op.getLoc(), bindingName,
-          /*set=*/APInt(64, setLayout.ordinal),
-          /*binding=*/APInt(64, binding.ordinal), binding.type);
-      bindingMap.insert(
-          {std::make_pair(setLayout.ordinal, binding.ordinal), bindingOp});
+      bindingAttrs.push_back(IREE::HAL::DescriptorSetBindingAttr::get(
+          builder.getContext(), binding.ordinal, binding.type));
     }
+    setLayoutAttrs.push_back(IREE::HAL::DescriptorSetLayoutAttr::get(
+        builder.getContext(), setLayout.ordinal, bindingAttrs));
   }
-  for (auto setBinding : executableLayout.resourceMap) {
-    interface.resourceBindings.push_back(bindingMap[setBinding]);
-  }
-  return interface;
+  return IREE::HAL::ExecutableLayoutAttr::get(
+      builder.getContext(), executableLayout.pushConstantCount, setLayoutAttrs);
 }
 
 // Converts the usage of the given primitive |arg| to interface methods.
@@ -153,16 +146,17 @@ static void convertOperandUsage(mlir::FuncOp sourceFuncOp, BlockArgument arg,
       arg.getArgNumber(), "stream.alignment");
   auto valuesAttr = sourceFuncOp.getArgAttrOfType<ArrayAttr>(arg.getArgNumber(),
                                                              "stream.values");
-  auto loadOp = builder.create<IREE::HAL::InterfaceLoadConstantOp>(
+  auto loadOp = builder.create<IREE::HAL::InterfaceConstantLoadOp>(
       arg.getLoc(), arg.getType(), builder.getIndexAttr(pushConstantIdx),
       alignmentAttr, valuesAttr);
   arg.replaceAllUsesWith(loadOp);
 }
 
 // Converts the usage of the given !stream.binding |arg| to interface methods.
-static void convertBindingUsage(mlir::FuncOp sourceFuncOp, BlockArgument arg,
-                                IREE::HAL::InterfaceOp interfaceOp,
-                                IREE::HAL::InterfaceBindingOp bindingOp) {
+static void convertBindingUsage(
+    mlir::FuncOp sourceFuncOp, BlockArgument arg,
+    IREE::HAL::DescriptorSetLayoutAttr setLayoutAttr,
+    IREE::HAL::DescriptorSetBindingAttr bindingAttr) {
   if (arg.use_empty()) return;  // no-op
   for (auto &use : llvm::make_early_inc_range(arg.getUses())) {
     auto oldOp = dyn_cast<IREE::Stream::BindingSubspanOp>(use.getOwner());
@@ -171,11 +165,9 @@ static void convertBindingUsage(mlir::FuncOp sourceFuncOp, BlockArgument arg,
     auto alignmentAttr = sourceFuncOp.getArgAttrOfType<IntegerAttr>(
         arg.getArgNumber(), "stream.alignment");
     auto newOp = builder.create<IREE::HAL::InterfaceBindingSubspanOp>(
-        oldOp.getLoc(), oldOp.getType(),
-        SymbolRefAttr::get(interfaceOp.sym_nameAttr(),
-                           {SymbolRefAttr::get(bindingOp)}),
-        oldOp.byte_offset(), /*byte_length=*/Value{}, oldOp.dynamic_dims(),
-        alignmentAttr);
+        oldOp.getLoc(), oldOp.getType(), APInt(64, setLayoutAttr.getOrdinal()),
+        APInt(64, bindingAttr.getOrdinal()), bindingAttr.getType(),
+        oldOp.byte_offset(), oldOp.dynamic_dims(), alignmentAttr);
     oldOp.replaceAllUsesWith(newOp.result());
     oldOp.erase();
   }
@@ -185,7 +177,7 @@ static void convertBindingUsage(mlir::FuncOp sourceFuncOp, BlockArgument arg,
 // and use the HAL interface access primitives.
 static mlir::FuncOp cloneFuncWithInterface(
     mlir::FuncOp sourceFuncOp, const ExecutableLayout &executableLayout,
-    Interface &interface) {
+    IREE::HAL::ExecutableLayoutAttr layoutAttr) {
   // Clone so that we can do a bunch of unsafe in-place updates.
   auto clonedFuncOp = sourceFuncOp.clone();
 
@@ -205,12 +197,13 @@ static mlir::FuncOp cloneFuncWithInterface(
       convertOperandUsage(sourceFuncOp, arg, operandIdx++, entryBuilder);
     }
   }
-  unsigned bindingIdx = 0;
+  unsigned resourceIdx = 0;
   for (auto arg : entryBlock->getArguments()) {
-    if (arg.getType().isa<IREE::Stream::BindingType>()) {
-      convertBindingUsage(sourceFuncOp, arg, interface.op,
-                          interface.resourceBindings[bindingIdx++]);
-    }
+    if (!arg.getType().isa<IREE::Stream::BindingType>()) continue;
+    auto setBinding = executableLayout.resourceMap[resourceIdx++];
+    auto setLayoutAttr = layoutAttr.getSetLayouts()[setBinding.first];
+    auto bindingAttr = setLayoutAttr.getBindings()[setBinding.second];
+    convertBindingUsage(sourceFuncOp, arg, setLayoutAttr, bindingAttr);
   }
 
   // Remove all arguments now that we've turned them into lookup ops.
@@ -222,16 +215,14 @@ static mlir::FuncOp cloneFuncWithInterface(
 // Annotates |dispatchOp| with resource binding to interface binding mappings.
 // TODO(benvanik): have a HAL op with structured information instead.
 static void annotateDispatchSite(IREE::Stream::CmdDispatchOp dispatchOp,
-                                 Interface &interface) {
-  SmallVector<Attribute> bindingSymbols;
-  for (auto resourceBinding : interface.resourceBindings) {
-    bindingSymbols.push_back(
-        SymbolRefAttr::get(dispatchOp.entry_pointAttr().getRootReference(),
-                           {SymbolRefAttr::get(interface.op),
-                            SymbolRefAttr::get(resourceBinding)}));
+                                 const ExecutableLayout &executableLayout) {
+  SmallVector<Attribute> bindingAttrs;
+  for (auto setBinding : executableLayout.resourceMap) {
+    bindingAttrs.push_back(IREE::HAL::InterfaceBindingAttr::get(
+        dispatchOp.getContext(), setBinding.first, setBinding.second));
   }
   dispatchOp->setAttr("hal.interface.bindings",
-                      ArrayAttr::get(dispatchOp.getContext(), bindingSymbols));
+                      ArrayAttr::get(dispatchOp.getContext(), bindingAttrs));
 }
 
 // Adds the entry point ops with assigned ordinals for each entry function.
@@ -258,12 +249,12 @@ static LogicalResult declareEntryPointOps(
 
     // Create the interface for this entry point based on the analysis of its
     // usage within the program.
-    auto interface = createInterface(sourceFuncOp.getLoc(), executableLayout,
-                                     executableBuilder);
+    auto layoutAttr =
+        makeExecutableLayoutAttr(executableLayout, executableBuilder);
 
     // Clone the source function and update it to use the new interface.
     auto baseFuncOp =
-        cloneFuncWithInterface(sourceFuncOp, executableLayout, interface);
+        cloneFuncWithInterface(sourceFuncOp, executableLayout, layoutAttr);
 
     // Clone the updated function into each variant.
     for (auto variantOp : variantOps) {
@@ -272,23 +263,17 @@ static LogicalResult declareEntryPointOps(
       targetBuilder.create<IREE::HAL::ExecutableEntryPointOp>(
           exportOp.getLoc(),
           targetBuilder.getStringAttr(exportOp.function_ref()),
-          targetBuilder.getIndexAttr(ordinal), SymbolRefAttr::get(interface.op),
-          ArrayAttr{}, IntegerAttr{});
+          targetBuilder.getIndexAttr(ordinal), layoutAttr, ArrayAttr{},
+          IntegerAttr{});
 
       // Clone the updated interface-based function into the target.
       auto targetFuncOp = baseFuncOp.clone();
       variantOp.getInnerModule().push_back(targetFuncOp);
-
-      // Copy interface bindings into the target module so symbol references
-      // work.
-      auto inlinedInterfaceOp = interface.op.clone();
-      inlinedInterfaceOp.setPrivate();
-      variantOp.getInnerModule().push_back(inlinedInterfaceOp);
     }
 
     // Update all dispatch sites with the binding information.
     for (auto dispatchOp : layoutAnalysis.getExportDispatches(exportOp)) {
-      annotateDispatchSite(dispatchOp, interface);
+      annotateDispatchSite(dispatchOp, executableLayout);
     }
 
     baseFuncOp.erase();
@@ -354,7 +339,7 @@ static LogicalResult convertFlowInfoOps(IREE::HAL::ExecutableOp executableOp) {
 }
 
 //===----------------------------------------------------------------------===//
-// -iree-hal-materialize-interfaces2
+// -iree-hal-materialize-interfaces
 //===----------------------------------------------------------------------===//
 
 class MaterializeInterfacesPass
@@ -367,7 +352,7 @@ class MaterializeInterfacesPass
   }
 
   StringRef getArgument() const override {
-    return "iree-hal-materialize-interfaces2";
+    return "iree-hal-materialize-interfaces";
   }
 
   StringRef getDescription() const override {
@@ -376,6 +361,12 @@ class MaterializeInterfacesPass
 
   void runOnOperation() override {
     SymbolTable symbolTable(getOperation());
+
+    // Handle any hand-authored executables; these only need variant expansion
+    // and no layout analysis as the user specified the layout themselves.
+    if (failed(materializeExecutablesFromSourceOps(getOperation()))) {
+      return signalPassFailure();
+    }
 
     const auto &layoutAnalysis = getAnalysis<BindingLayoutAnalysis>();
 
@@ -389,6 +380,16 @@ class MaterializeInterfacesPass
       auto exportOps = sourceOp.getOps<IREE::Stream::ExecutableExportOp>();
       if (exportOps.empty()) continue;
 
+      // Gather a list of all #hal.executable.targets that we should produce
+      // variants for.
+      auto targetAttrs =
+          IREE::HAL::DeviceTargetAttr::lookupExecutableTargets(sourceOp);
+      if (targetAttrs.empty()) {
+        sourceOp.emitError()
+            << "no executable targets specified for translation";
+        return signalPassFailure();
+      }
+
       // Create the op that will contain the translated executable.
       OpBuilder builder = OpBuilder::atBlockEnd(getOperation().getBody());
       builder.setInsertionPointAfter(sourceOp);
@@ -396,9 +397,18 @@ class MaterializeInterfacesPass
           sourceOp.getLoc(), sourceOp.getName());
       executableOp.setVisibility(sourceOp.getVisibility());
 
-      // Embed the hal.executable.variant ops for each source.
-      if (failed(declareVariantOps(sourceOp, executableOp))) {
-        return signalPassFailure();
+      // Materialize all of the hal.executable.variant ops for all backends we
+      // are targeting.
+      SymbolTable targetSymbolTable(executableOp);
+      OpBuilder targetBuilder(&executableOp.getBlock().back());
+      for (auto targetAttr : targetAttrs) {
+        auto targetContainerOp =
+            targetBuilder.create<IREE::HAL::ExecutableVariantOp>(
+                sourceOp->getLoc(), targetAttr.getSymbolNameFragment(),
+                targetAttr);
+        targetSymbolTable.insert(targetContainerOp);
+        OpBuilder containerBuilder(&targetContainerOp.getBlock().back());
+        containerBuilder.create<mlir::ModuleOp>(sourceOp->getLoc());
       }
 
       // Define interfaces for each exported function based on analysis.

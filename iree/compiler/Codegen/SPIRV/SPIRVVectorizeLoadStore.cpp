@@ -360,30 +360,30 @@ class ProcessAlloc final : public MemRefConversionPattern<memref::AllocOp> {
   }
 };
 
-class ProcessInterfaceBinding final
+class ProcessInterfaceBindingSubspan final
     : public MemRefConversionPattern<IREE::HAL::InterfaceBindingSubspanOp> {
  public:
   using MemRefConversionPattern::MemRefConversionPattern;
 
   LogicalResult matchAndRewrite(
-      IREE::HAL::InterfaceBindingSubspanOp bindingOp, OpAdaptor adaptor,
+      IREE::HAL::InterfaceBindingSubspanOp subspanOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    auto memrefType = bindingOp.getType().dyn_cast<MemRefType>();
+    auto memrefType = subspanOp.getType().dyn_cast<MemRefType>();
     if (!memrefType) return failure();
 
     // This should be guaranteed by the analysis step. But just double check.
     assert(memrefType.getRank() > 0 &&
            !ShapedType::isDynamic(memrefType.getShape().back()));
 
-    auto vecMemRef = getVectorizedMemRefType(rewriter, bindingOp.result());
+    auto vecMemRef = getVectorizedMemRefType(rewriter, subspanOp.result());
     if (!vecMemRef) {
-      return rewriter.notifyMatchFailure(bindingOp,
+      return rewriter.notifyMatchFailure(subspanOp,
                                          "cannot get vectorized memref type");
     }
     rewriter.replaceOpWithNewOp<IREE::HAL::InterfaceBindingSubspanOp>(
-        bindingOp, *vecMemRef, bindingOp.binding(), bindingOp.byte_offset(),
-        bindingOp.byte_length(), bindingOp.dynamic_dims(),
-        bindingOp.alignmentAttr());
+        subspanOp, *vecMemRef, subspanOp.set(), subspanOp.binding(),
+        subspanOp.type(), subspanOp.byte_offset(), subspanOp.dynamic_dims(),
+        subspanOp.alignmentAttr());
     return success();
   }
 };
@@ -521,8 +521,8 @@ void SPIRVVectorizeLoadStorePass::runOnOperation() {
   RewritePatternSet conversionPatterns(context);
   conversionPatterns
       .add<ProcessFunctionArgument, ProcessTransferRead, ProcessTransferWrite,
-           ProcessAlloc, ProcessInterfaceBinding>(context,
-                                                  *memrefUsageAnalysis);
+           ProcessAlloc, ProcessInterfaceBindingSubspan>(context,
+                                                         *memrefUsageAnalysis);
   conversionPatterns.add<PassThroughConversion<memref::DeallocOp>,
                          PassThroughConversion<memref::AssumeAlignmentOp>>(
       context);

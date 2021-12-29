@@ -1,5 +1,3 @@
-// Tests printing and parsing of tensor ops.
-
 // RUN: iree-opt -split-input-file %s | iree-opt -split-input-file | IreeFileCheck %s
 
 // CHECK-LABEL: @tensorReshape

@@ -31,8 +31,9 @@ static bool isDivisible(Value v, int64_t dividend);
 /// ```
 static bool affineMinOpDivisible(AffineMinOp minOp, int64_t dividend) {
   if (!minOp.getSymbolOperands().empty() ||
-      minOp.getAffineMap().getNumResults() != 2)
+      minOp.getAffineMap().getNumResults() != 2) {
     return {};
+  }
   Value iv;
   Value ub;
   Value lb;
@@ -68,19 +69,21 @@ static bool affineMinOpDivisible(AffineMinOp minOp, int64_t dividend) {
   AffineExpr ivDim;
   AffineExpr ubDim;
   for (auto dim : llvm::enumerate(minOp.getDimOperands())) {
-    if (dim.value() == iv)
+    if (dim.value() == iv) {
       ivDim = getAffineDimExpr(dim.index(), minOp.getContext());
-    else if (dim.value() == ub)
+    } else if (dim.value() == ub) {
       ubDim = getAffineDimExpr(dim.index(), minOp.getContext());
-    else
+    } else {
       return false;
+    }
   }
 
   if (!ubDim) {
-    if (auto cstUb = ub.getDefiningOp<arith::ConstantIndexOp>())
+    if (auto cstUb = ub.getDefiningOp<arith::ConstantIndexOp>()) {
       ubDim = getAffineConstantExpr(cstUb.value(), minOp.getContext());
-    else
+    } else {
       return false;
+    }
   }
   AffineExpr diffExp = ubDim - ivDim;
   // Check that all the affine map results are either constant divisible by
@@ -134,8 +137,9 @@ static Optional<int64_t> foldAffineMin(AffineMinOp minOp) {
   AffineMap map = minOp.getAffineMap();
   int64_t constantResult = 0;
   for (AffineExpr result : map.getResults()) {
-    if (auto cst = result.dyn_cast<AffineConstantExpr>())
+    if (auto cst = result.dyn_cast<AffineConstantExpr>()) {
       constantResult = cst.getValue();
+    }
   }
   if (constantResult == 0) return {};
   // If afine.min map's results are all positive and divisible by

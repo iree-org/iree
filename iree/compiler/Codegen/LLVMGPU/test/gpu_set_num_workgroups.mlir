@@ -1,18 +1,21 @@
 // RUN: iree-opt -split-input-file -pass-pipeline='hal.executable(hal.executable.variant(iree-llvmgpu-lower-executable-target-pass{test-lowering-configuration}))' %s | IreeFileCheck %s
 
+#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>,
+    #hal.descriptor_set.binding<2, storage_buffer>
+  ]>
+]>
 hal.executable @add_dispatch_0 {
-  hal.interface @io {
-    hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer"
-    hal.interface.binding @ret0, set=0, binding=1, type="StorageBuffer"
-  }
   hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
-  hal.executable.entry_point @add_dispatch_0 attributes {interface = @io, ordinal = 0 : index}
-  builtin.module  {
+  hal.executable.entry_point @add_dispatch_0 layout(#executable_layout)
+  builtin.module {
     func @add_dispatch_0() {
       %c0 = arith.constant 0 : index
-      %0 = hal.interface.binding.subspan @io::@arg0[%c0] : !flow.dispatch.tensor<readonly:16384xf32>
-      %1 = hal.interface.binding.subspan @io::@arg1[%c0] : !flow.dispatch.tensor<readonly:16384xf32>
-      %2 = hal.interface.binding.subspan @io::@ret0[%c0] : !flow.dispatch.tensor<writeonly:16384xf32>
+      %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<readonly:16384xf32>
+      %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : !flow.dispatch.tensor<readonly:16384xf32>
+      %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : !flow.dispatch.tensor<writeonly:16384xf32>
       %3 = linalg.init_tensor [16384] : tensor<16384xf32>
       %4 = flow.dispatch.tensor.load %0, offsets=[], sizes=[], strides=[] : !flow.dispatch.tensor<readonly:16384xf32> -> tensor<16384xf32>
       %5 = flow.dispatch.tensor.load %1, offsets=[], sizes=[], strides=[] : !flow.dispatch.tensor<readonly:16384xf32> -> tensor<16384xf32>
@@ -23,11 +26,6 @@ hal.executable @add_dispatch_0 {
         } -> tensor<16384xf32>
         flow.dispatch.tensor.store %6, %2, offsets=[], sizes=[], strides=[] : tensor<16384xf32> -> !flow.dispatch.tensor<writeonly:16384xf32>
         return
-      }
-      hal.interface private @io  {
-        hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer"
-        hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer"
-        hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer"
       }
     }
   }
@@ -49,18 +47,25 @@ hal.executable @add_dispatch_0 {
 
 // -----
 
+#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>,
+    #hal.descriptor_set.binding<2, storage_buffer>
+  ]>
+]>
 hal.executable private @dot_dispatch_1  {
   hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
-    hal.executable.entry_point @dot_dispatch_1 attributes {interface = @legacy_io, ordinal = 0 : index}
-    builtin.module  {
+    hal.executable.entry_point @dot_dispatch_1 layout(#executable_layout)
+    builtin.module {
       func @dot_dispatch_1() {
         %c0 = arith.constant 0 : index
         %c4 = arith.constant 4 : index
         %c2 = arith.constant 2 : index
         %cst = arith.constant 0.000000e+00 : f32
-        %0 = hal.interface.binding.subspan @io::@ro0[%c0] : memref<2x3xf32>
-        %1 = hal.interface.binding.subspan @io::@ro1[%c0] : memref<3x4xf32>
-        %2 = hal.interface.binding.subspan @io::@wo2[%c0] : memref<2x4xf32>
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<2x3xf32>
+        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<3x4xf32>
+        %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : memref<2x4xf32>
         %workgroup_size_x = hal.interface.workgroup.size[0] : index
         %workgroup_size_y = hal.interface.workgroup.size[1] : index
         %workgroup_id_x = hal.interface.workgroup.id[0] : index
@@ -84,14 +89,10 @@ hal.executable private @dot_dispatch_1  {
         }
         return
       }
-      hal.interface private @legacy_io  {
-        hal.interface.binding @ro0, set=0, binding=0, type="StorageBuffer"
-        hal.interface.binding @ro1, set=0, binding=1, type="StorageBuffer"
-        hal.interface.binding @wo2, set=0, binding=2, type="StorageBuffer"
-      }
     }
   }
 }
+
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering.config<tile_sizes = {{\[}}[4, 2, 4]{{\]}}, native_vector_size = []>
 //  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 2)>
 //  CHECK-DAG: #[[MAP1:.+]] = affine_map<()[s0] -> (s0 ceildiv 4)>
@@ -112,18 +113,22 @@ hal.executable private @dot_dispatch_1  {
 
 // -----
 
+#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>
+  ]>
+]>
 hal.executable @reduction_dispatch {
   hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
-    hal.executable.entry_point @predict_dispatch_153 attributes {
-      interface = @io,
-      ordinal = 0 : index}
-    builtin.module  {
+    hal.executable.entry_point @predict_dispatch_153 layout(#executable_layout)
+    builtin.module {
       func @predict_dispatch_153() {
         %c0 = arith.constant 0 : index
         %cst = arith.constant 0x7FC00000 : f32
         %cst_0 = arith.constant 0xFF800000 : f32
-        %0 = hal.interface.binding.subspan @io::@s0b0_ro_external[%c0] : memref<1000xf32>
-        %1 = hal.interface.binding.subspan @io::@s0b1_xw_external[%c0] : memref<f32>
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<1000xf32>
+        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<f32>
         linalg.fill(%cst_0, %1) : f32, memref<f32>
         linalg.generic {indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> ()>], iterator_types = ["reduction"]} ins(%0 : memref<1000xf32>) outs(%1 : memref<f32>) {
         ^bb0(%arg0: f32, %arg1: f32):  // no predecessors
@@ -134,10 +139,6 @@ hal.executable @reduction_dispatch {
           linalg.yield %5 : f32
         }
         return
-      }
-      hal.interface private @io  {
-        hal.interface.binding @s0b0_ro_external, set=0, binding=0, type="StorageBuffer"
-        hal.interface.binding @s0b1_xw_external, set=0, binding=1, type="StorageBuffer"
       }
     }
   }
@@ -158,16 +159,22 @@ hal.executable @reduction_dispatch {
 
 // -----
 
+#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>
+  ]>
+]>
 hal.executable @tensor_insert {
   hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
-    hal.executable.entry_point @tensor_insert_slice attributes {interface = @io, ordinal = 0 : index}
-    builtin.module  {
+    hal.executable.entry_point @tensor_insert_slice layout(#executable_layout)
+    builtin.module {
       builtin.func @tensor_insert_slice() {
         %c0 = arith.constant 0 : index
-        %0 = hal.interface.binding.subspan @io::@s0b0_ro_external[%c0] : !flow.dispatch.tensor<readonly:?x?xi32>
-        %1 = hal.interface.load.constant offset = 0 : index
-        %2 = hal.interface.load.constant offset = 1 : index
-        %3 = hal.interface.binding.subspan @io::@s0b1_xw_external[%c0] : !flow.dispatch.tensor<writeonly:?x?xi32>
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<readonly:?x?xi32>
+        %1 = hal.interface.constant.load[0] : index
+        %2 = hal.interface.constant.load[1] : index
+        %3 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : !flow.dispatch.tensor<writeonly:?x?xi32>
         %workgroup_size_x = hal.interface.workgroup.size[0] : index
         %workgroup_size_y = hal.interface.workgroup.size[1] : index
         %workgroup_id_x = hal.interface.workgroup.id[0] : index
@@ -176,8 +183,8 @@ hal.executable @tensor_insert {
         %workgroup_count_y = hal.interface.workgroup.count[1] : index
         %4 = affine.apply affine_map<()[s0, s1] -> (s1 * s0)>()[%workgroup_size_y, %workgroup_id_y]
         %5 = affine.apply affine_map<()[s0, s1] -> (s1 * s0)>()[%workgroup_size_y, %workgroup_count_y]
-        %d0 = hal.interface.load.constant offset = 2 : index
-        %d1 = hal.interface.load.constant offset = 2 : index
+        %d0 = hal.interface.constant.load[2] : index
+        %d1 = hal.interface.constant.load[2] : index
         scf.for %arg0 = %4 to %d0 step %5 {
           %6 = affine.min affine_map<(d0)[s0, s1] -> (s0, -d0 + s1)>(%arg0)[%workgroup_size_y, %d0]
           %7 = affine.apply affine_map<()[s0, s1] -> (s1 * s0)>()[%workgroup_size_x, %workgroup_id_x]
@@ -192,13 +199,10 @@ hal.executable @tensor_insert {
         }
         return
       }
-      hal.interface @io attributes {push_constants = 2 : index, sym_visibility = "private"} {
-        hal.interface.binding @s0b0_ro_external, set=0, binding=0, type="StorageBuffer"
-        hal.interface.binding @s0b1_xw_external, set=0, binding=1, type="StorageBuffer"
-      }
     }
   }
 }
+
 //  CHECK-DAG: #[[MAP:.+]] = affine_map<()[s0] -> (s0 ceildiv 128)>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"LLVMGPUDistribute", workload_per_wg = [128, 1]>
 //      CHECK: hal.executable.entry_point public @tensor_insert_slice
@@ -211,16 +215,22 @@ hal.executable @tensor_insert {
 
 // -----
 
+#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>
+  ]>
+]>
 hal.executable @tensor_insert {
   hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
-    hal.executable.entry_point @tensor_insert_slice attributes {interface = @io, ordinal = 0 : index}
-    builtin.module  {
+    hal.executable.entry_point @tensor_insert_slice layout(#executable_layout)
+    builtin.module {
       builtin.func @tensor_insert_slice() {
         %c0 = arith.constant 0 : index
-        %d0 = hal.interface.load.constant offset = 0 : index
-        %d1 = hal.interface.load.constant offset = 1 : index
-        %0 = hal.interface.binding.subspan @io::@s0b0_ro_external[%c0] : memref<?x?xi32>{%d0, %d1}
-        %1 = hal.interface.binding.subspan @io::@s0b1_xw_external[%c0] : memref<?x?xi32>{%d0, %d1}
+        %d0 = hal.interface.constant.load[0] : index
+        %d1 = hal.interface.constant.load[1] : index
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<?x?xi32>{%d0, %d1}
+        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<?x?xi32>{%d0, %d1}
         %workgroup_size_x = hal.interface.workgroup.size[0] : index
         %workgroup_size_y = hal.interface.workgroup.size[1] : index
         %workgroup_id_x = hal.interface.workgroup.id[0] : index
@@ -247,6 +257,7 @@ hal.executable @tensor_insert {
     }
   }
 }
+
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering.config<tile_sizes = {{\[}}[1, 256]{{\]}}, native_vector_size = []>
 //  CHECK-DAG: #[[MAP:.+]] = affine_map<()[s0] -> (s0 ceildiv 256)>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"LLVMGPUVectorize", workload_per_wg = [256, 1]>
@@ -262,21 +273,23 @@ hal.executable @tensor_insert {
 
 // -----
 
-hal.executable private @static_1d_fft_stage2  {
-  hal.interface @io {
-    hal.interface.binding @s0b0_rw_external, set=0, binding=0, type="StorageBuffer"
-    hal.interface.binding @s0b1_rw_external, set=0, binding=1, type="StorageBuffer"
-  }
+#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>
+  ]>
+]>
+hal.executable private @static_1d_fft_stage2 {
   hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
-    hal.executable.entry_point @static_1d_fft_stage2 attributes {interface = @io, ordinal = 0 : index}
+    hal.executable.entry_point @static_1d_fft_stage2 layout(#executable_layout)
     builtin.module {
       builtin.func @static_1d_fft_stage2() {
         %c0 = arith.constant 0 : index
         %c2 = arith.constant 2 : index
         %cst = arith.constant dense<[1.000000e+00, 6.12323426E-17]> : tensor<2xf32>
         %cst_0 = arith.constant dense<[-0.000000e+00, -1.000000e+00]> : tensor<2xf32>
-        %0 = hal.interface.binding.subspan @io::@s0b0_rw_external[%c0] : !flow.dispatch.tensor<readwrite:32xf32>
-        %1 = hal.interface.binding.subspan @io::@s0b1_rw_external[%c0] : !flow.dispatch.tensor<readwrite:32xf32>
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<readwrite:32xf32>
+        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : !flow.dispatch.tensor<readwrite:32xf32>
         %2 = flow.dispatch.tensor.load %0, offsets = [], sizes = [], strides = [] : !flow.dispatch.tensor<readwrite:32xf32> -> tensor<32xf32>
         %3 = flow.dispatch.tensor.load %1, offsets = [], sizes = [], strides = [] : !flow.dispatch.tensor<readwrite:32xf32> -> tensor<32xf32>
         %4:2 = iree_linalg_ext.fft {__internal_linalg_transform__ = "workgroup"} ins(%c2, %cst, %cst_0 : index, tensor<2xf32>, tensor<2xf32>) outs(%2, %3 : tensor<32xf32>, tensor<32xf32>) : tensor<32xf32>, tensor<32xf32>
@@ -305,14 +318,15 @@ hal.executable private @static_1d_fft_stage2  {
 
 // -----
 
-
-hal.executable private @static_3d_fft_stage3  {
-  hal.interface @io {
-    hal.interface.binding @s0b0_rw_external, set=0, binding=0, type="StorageBuffer"
-    hal.interface.binding @s0b1_rw_external, set=0, binding=1, type="StorageBuffer"
-  }
+#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>
+  ]>
+]>
+hal.executable private @static_3d_fft_stage3 {
   hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
-    hal.executable.entry_point @static_3d_fft_stage3 attributes {interface = @io, ordinal = 0 : index}
+    hal.executable.entry_point @static_3d_fft_stage3 layout(#executable_layout)
     builtin.module {
       builtin.func @static_3d_fft_stage3() {
         %c0 = arith.constant 0 : index
@@ -324,8 +338,8 @@ hal.executable private @static_3d_fft_stage3  {
         %cst_0 = arith.constant dense<[-0.000000e+00, -0.707106769, -1.000000e+00, -0.707106769]> : tensor<4xf32>
         %0 = bufferization.to_memref %cst_0 : memref<4xf32>
         %1 = bufferization.to_memref %cst : memref<4xf32>
-        %2 = hal.interface.binding.subspan @io::@s0b0_rw_external[%c0] : memref<64x128x32xf32>
-        %3 = hal.interface.binding.subspan @io::@s0b1_rw_external[%c0] : memref<64x128x32xf32>
+        %2 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<64x128x32xf32>
+        %3 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<64x128x32xf32>
         %workgroup_id_x = hal.interface.workgroup.id[0] : index
         %workgroup_count_x = hal.interface.workgroup.count[0] : index
         %workgroup_id_y = hal.interface.workgroup.id[1] : index
@@ -373,18 +387,25 @@ hal.executable private @static_3d_fft_stage3  {
     #iree_codegen.lowering.config<tile_sizes = [[32, 256, 64]], native_vector_size = []>,
     #iree_codegen.translation.info<"LLVMGPUMatmulSimt", workload_per_wg = [256, 32]>,
     workgroup_size = [16, 8, 1]>
+#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>,
+    #hal.descriptor_set.binding<2, storage_buffer>
+  ]>
+]>
 hal.executable @user_config {
 hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb"> {
-  hal.executable.entry_point public @_lowering_config_test_dispatch_1 attributes {interface = @io, ordinal = 0 : index}
-  builtin.module  {
+  hal.executable.entry_point public @_lowering_config_test_dispatch_1 layout(#executable_layout)
+  builtin.module {
     func @_lowering_config_test_dispatch_1() {
       %cst = arith.constant 0.000000e+00 : f32
       %c128 = arith.constant 128 : index
       %c1024 = arith.constant 1024 : index
       %c0 = arith.constant 0 : index
-      %0 = hal.interface.binding.subspan @io::@s0b0_ro_external[%c0] : !flow.dispatch.tensor<readonly:128x256xf32>
-      %1 = hal.interface.binding.subspan @io::@s0b1_ro_external[%c0] : !flow.dispatch.tensor<readonly:256x1024xf32>
-      %2 = hal.interface.binding.subspan @io::@s0b2_xw_external[%c0] : !flow.dispatch.tensor<writeonly:128x1024xf32>
+      %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<readonly:128x256xf32>
+      %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : !flow.dispatch.tensor<readonly:256x1024xf32>
+      %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : !flow.dispatch.tensor<writeonly:128x1024xf32>
       %workgroup_size_x = hal.interface.workgroup.size[0] : index
       %workgroup_size_y = hal.interface.workgroup.size[1] : index
       %workgroup_id_x = hal.interface.workgroup.id[0] : index
@@ -413,11 +434,6 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb">
       }
       return
     }
-    hal.interface private @io {
-      hal.interface.binding public @s0b0_ro_external, set=0, binding=0, type="StorageBuffer"
-      hal.interface.binding public @s0b1_ro_external, set=0, binding=1, type="StorageBuffer"
-      hal.interface.binding public @s0b2_xw_external, set=0, binding=2, type="StorageBuffer"
-    }
   }
 }
 }
@@ -435,24 +451,26 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb">
 
 // -----
 
+#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>,
+    #hal.descriptor_set.binding<2, storage_buffer>,
+    #hal.descriptor_set.binding<3, storage_buffer>
+  ]>
+]>
 hal.executable private @sort_op {
-  hal.interface public @io attributes {push_constants = 0 : index} {
-    hal.interface.binding public @s0b0, set=0, binding=0, type="StorageBuffer"
-    hal.interface.binding public @s0b1, set=0, binding=1, type="StorageBuffer"
-    hal.interface.binding public @s0b2, set=0, binding=2, type="StorageBuffer"
-    hal.interface.binding public @s0b3, set=0, binding=3, type="StorageBuffer"
-  }
   hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb", {target_arch = "sm_35"}> {
-    hal.executable.entry_point public @sort_op attributes {interface = @io, ordinal = 0 : index}
-    builtin.module  {
+    hal.executable.entry_point public @sort_op layout(#executable_layout)
+    builtin.module {
       func @sort_op() {
         %c1 = arith.constant 1 : index
         %c0 = arith.constant 0 : index
         %c2304000 = arith.constant 2304000 : index
-        %0 = hal.interface.binding.subspan @io::@s0b0[%c0] {alignment = 32 : index} : !flow.dispatch.tensor<readonly:1x576000xf32>
-        %1 = hal.interface.binding.subspan @io::@s0b1[%c0] {alignment = 32 : index} : !flow.dispatch.tensor<readonly:1x576000xi32>
-        %2 = hal.interface.binding.subspan @io::@s0b2[%c0] {alignment = 32 : index} : !flow.dispatch.tensor<writeonly:1x576000xf32>
-        %3 = hal.interface.binding.subspan @io::@s0b3[%c2304000] {alignment = 32 : index} : !flow.dispatch.tensor<writeonly:1x576000xi32>
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(32) : !flow.dispatch.tensor<readonly:1x576000xf32>
+        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(32) : !flow.dispatch.tensor<readonly:1x576000xi32>
+        %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(32) : !flow.dispatch.tensor<writeonly:1x576000xf32>
+        %3 = hal.interface.binding.subspan set(0) binding(3) type(storage_buffer) offset(%c2304000) alignment(32) : !flow.dispatch.tensor<writeonly:1x576000xi32>
         %workgroup_size_x = hal.interface.workgroup.size[0] : index
         %workgroup_id_x = hal.interface.workgroup.id[0] : index
         %workgroup_count_x = hal.interface.workgroup.count[0] : index
@@ -471,12 +489,6 @@ hal.executable private @sort_op {
           flow.dispatch.tensor.store %9#1, %3, offsets = [%arg0, 0], sizes = [%6, 576000], strides = [1, 1] : tensor<?x576000xi32> -> !flow.dispatch.tensor<writeonly:1x576000xi32>
         }
         return
-      }
-      hal.interface private @io attributes {push_constants = 0 : index} {
-        hal.interface.binding public @s0b0, set=0, binding=0, type="StorageBuffer"
-        hal.interface.binding public @s0b1, set=0, binding=1, type="StorageBuffer"
-        hal.interface.binding public @s0b2, set=0, binding=2, type="StorageBuffer"
-        hal.interface.binding public @s0b3, set=0, binding=3, type="StorageBuffer"
       }
     }
   }

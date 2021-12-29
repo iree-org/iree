@@ -121,11 +121,6 @@ class ROCMTargetBackend final : public TargetBackend {
     for (auto funcOp : illegalFuncOps) {
       funcOp.erase();
     }
-    auto halInterfaceOps = llvm::to_vector<1>(
-        innerModuleOp.getOps<iree_compiler::IREE::HAL::InterfaceOp>());
-    for (auto halOp : halInterfaceOps) {
-      halOp.erase();
-    }
 
     auto llvmModule =
         mlir::translateModuleToLLVMIR(innerModuleOp, context, libraryName);
@@ -181,9 +176,10 @@ class ROCMTargetBackend final : public TargetBackend {
     iree_ROCMExecutableDef_start_as_root(builder);
 
     // Link module to Device Library
-    if (options_.ROCMLinkBC)
+    if (options_.ROCMLinkBC) {
       LinkROCDLIfNecessary(llvmModule.get(), options_.ROCMTargetChip,
                            options_.ROCMBitcodeDir);
+    }
 
     // Serialize hsaco kernel into the binary that we will embed in the
     // final flatbuffer.

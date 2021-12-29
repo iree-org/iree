@@ -5,13 +5,24 @@
 
 #executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan", "vulkan-spirv-fb">
 
+#executable_layout_0 = #hal.executable.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>
+  ]>
+]>
+
+#executable_layout_1 = #hal.executable.layout<push_constants = 1, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>,
+    #hal.descriptor_set.binding<2, storage_buffer>
+  ]>
+]>
+
 hal.executable private @call_dispatch_0  {
-  hal.interface @io {
-    hal.interface.binding @s0b0_ro_external, set=0, binding=0, type="StorageBuffer"
-    hal.interface.binding @s0b1_rw_external, set=0, binding=1, type="StorageBuffer"
-  }
   hal.executable.variant @vulkan_spirv_fb, target = #executable_target_vulkan_spirv_fb {
-    hal.executable.entry_point @call_dispatch_0 attributes {interface = @io, ordinal = 0 : index}
+    hal.executable.entry_point @call_dispatch_0 ordinal(0) layout(#executable_layout_0)
     builtin.module {
       spv.module Logical GLSL450 requires #spv.vce<v1.0, [Shader], [SPV_KHR_storage_buffer_storage_class]> {
         spv.func @call_dispatch_0() "None" {
@@ -20,21 +31,12 @@ hal.executable private @call_dispatch_0  {
         spv.EntryPoint "GLCompute" @call_dispatch_0
         spv.ExecutionMode @call_dispatch_0 "LocalSize", 32, 1, 1
       }
-      hal.interface private @io  {
-        hal.interface.binding @s0b0_ro_external, set=0, binding=0, type="StorageBuffer"
-        hal.interface.binding @s0b1_rw_external, set=0, binding=1, type="StorageBuffer"
-      }
     }
   }
 }
 hal.executable private @call_dispatch_1  {
-  hal.interface @io {
-    hal.interface.binding @s0b0_ro_constant, set=0, binding=0, type="StorageBuffer"
-    hal.interface.binding @s0b1_ro_external, set=0, binding=1, type="StorageBuffer"
-    hal.interface.binding @s0b2_xw_external, set=0, binding=2, type="StorageBuffer"
-  }
   hal.executable.variant @vulkan_spirv_fb, target = #executable_target_vulkan_spirv_fb {
-    hal.executable.entry_point @call_dispatch_1 attributes {interface = @io, ordinal = 0 : index}
+    hal.executable.entry_point @call_dispatch_1 ordinal(0) layout(#executable_layout_1)
     builtin.module {
       spv.module Logical GLSL450 requires #spv.vce<v1.0, [Shader], [SPV_KHR_storage_buffer_storage_class]> {
         spv.func @call_dispatch_1() "None" {
@@ -43,21 +45,12 @@ hal.executable private @call_dispatch_1  {
         spv.EntryPoint "GLCompute" @call_dispatch_1
         spv.ExecutionMode @call_dispatch_1 "LocalSize", 4, 4, 1
       }
-      hal.interface private @io  {
-        hal.interface.binding @s0b0_ro_constant, set=0, binding=0, type="StorageBuffer"
-        hal.interface.binding @s0b1_ro_external, set=0, binding=1, type="StorageBuffer"
-        hal.interface.binding @s0b2_xw_external, set=0, binding=2, type="StorageBuffer"
-      }
     }
   }
 }
 hal.executable private @call_dispatch_2  {
-  hal.interface @io {
-    hal.interface.binding @s0b0_ro_external, set=0, binding=0, type="StorageBuffer"
-    hal.interface.binding @s0b1_rw_external, set=0, binding=1, type="StorageBuffer"
-  }
   hal.executable.variant @vulkan_spirv_fb, target = #executable_target_vulkan_spirv_fb {
-    hal.executable.entry_point @call_dispatch_2 attributes {interface = @io, ordinal = 0 : index}
+    hal.executable.entry_point @call_dispatch_2 ordinal(0) layout(#executable_layout_0)
     builtin.module {
       spv.module Logical GLSL450 requires #spv.vce<v1.0, [Shader], [SPV_KHR_storage_buffer_storage_class]> {
         spv.func @call_dispatch_2() "None" {
@@ -66,21 +59,12 @@ hal.executable private @call_dispatch_2  {
         spv.EntryPoint "GLCompute" @call_dispatch_2
         spv.ExecutionMode @call_dispatch_2 "LocalSize", 32, 1, 1
       }
-      hal.interface private @io  {
-        hal.interface.binding @s0b0_ro_external, set=0, binding=0, type="StorageBuffer"
-        hal.interface.binding @s0b1_rw_external, set=0, binding=1, type="StorageBuffer"
-      }
     }
   }
 }
 hal.executable private @call_dispatch_3  {
-  hal.interface @io {
-    hal.interface.binding @s0b0_ro_constant, set=0, binding=0, type="StorageBuffer"
-    hal.interface.binding @s0b1_ro_external, set=0, binding=1, type="StorageBuffer"
-    hal.interface.binding @s0b2_xw_external, set=0, binding=2, type="StorageBuffer"
-  }
   hal.executable.variant @vulkan_spirv_fb, target = #executable_target_vulkan_spirv_fb {
-    hal.executable.entry_point @call_dispatch_3 attributes {interface = @io, ordinal = 0 : index} {
+    hal.executable.entry_point @call_dispatch_3 ordinal(0) layout(#executable_layout_1) {
     ^bb0(%arg0: index, %arg1: index, %arg2: index):  // no predecessors
       %c1 = arith.constant 1 : index
       %c56 = arith.constant 56 : index
@@ -95,22 +79,12 @@ hal.executable private @call_dispatch_3  {
         spv.EntryPoint "GLCompute" @call_dispatch_3
         spv.ExecutionMode @call_dispatch_3 "LocalSize", 8, 2, 2
       }
-      hal.interface private @io  {
-        hal.interface.binding @s0b0_ro_constant, set=0, binding=0, type="StorageBuffer"
-        hal.interface.binding @s0b1_ro_external, set=0, binding=1, type="StorageBuffer"
-        hal.interface.binding @s0b2_xw_external, set=0, binding=2, type="StorageBuffer"
-      }
     }
   }
 }
 hal.executable private @call_dispatch_4  {
-  hal.interface @io {
-    hal.interface.binding @s0b0_ro_constant, set=0, binding=0, type="StorageBuffer"
-    hal.interface.binding @s0b1_ro_external, set=0, binding=1, type="StorageBuffer"
-    hal.interface.binding @s0b2_xw_external, set=0, binding=2, type="StorageBuffer"
-  }
   hal.executable.variant @vulkan_spirv_fb, target = #executable_target_vulkan_spirv_fb {
-    hal.executable.entry_point @call_dispatch_4 attributes {interface = @io, ordinal = 0 : index}
+    hal.executable.entry_point @call_dispatch_4 ordinal(0) layout(#executable_layout_1)
     builtin.module {
       spv.module Logical GLSL450 requires #spv.vce<v1.0, [Shader], [SPV_KHR_storage_buffer_storage_class]> {
         spv.func @call_dispatch_4() "None" {
@@ -119,11 +93,6 @@ hal.executable private @call_dispatch_4  {
         spv.EntryPoint "GLCompute" @call_dispatch_4
         spv.ExecutionMode @call_dispatch_4 "LocalSize", 2, 8, 1
       }
-      hal.interface private @io  {
-        hal.interface.binding @s0b0_ro_constant, set=0, binding=0, type="StorageBuffer"
-        hal.interface.binding @s0b1_ro_external, set=0, binding=1, type="StorageBuffer"
-        hal.interface.binding @s0b2_xw_external, set=0, binding=2, type="StorageBuffer"
-      }
     }
   }
 }
@@ -131,15 +100,10 @@ hal.executable private @call_dispatch_4  {
 // Two groups should be created, according to their interfaces.
 
 //      CHECK: hal.executable private @linking_linked_vulkan_0 {
-// CHECK-NEXT:   hal.interface public @io_0 {
-// CHECK-NEXT:     hal.interface.binding public @s0b0_ro_constant, set=0, binding=0, type="StorageBuffer"
-// CHECK-NEXT:     hal.interface.binding public @s0b1_ro_external, set=0, binding=1, type="StorageBuffer"
-// CHECK-NEXT:     hal.interface.binding public @s0b2_xw_external, set=0, binding=2, type="StorageBuffer"
-// CHECK-NEXT:   }
 // CHECK-NEXT:   hal.executable.variant public @vulkan_spirv_fb, target = #executable_target_vulkan_spirv_fb {
-// CHECK-NEXT:     hal.executable.entry_point public @call_dispatch_1 attributes {interface = @io_0, ordinal = 0 : index}
-// CHECK-NEXT:     hal.executable.entry_point public @call_dispatch_3 attributes {interface = @io_0, ordinal = 1 : index}
-// CHECK-NEXT:     hal.executable.entry_point public @call_dispatch_4 attributes {interface = @io_0, ordinal = 2 : index}
+// CHECK-NEXT:     hal.executable.entry_point public @call_dispatch_1 ordinal(0) layout(#executable_layout_0)
+// CHECK-NEXT:     hal.executable.entry_point public @call_dispatch_3 ordinal(1) layout(#executable_layout_0)
+// CHECK-NEXT:     hal.executable.entry_point public @call_dispatch_4 ordinal(2) layout(#executable_layout_0)
 // CHECK-NEXT:     module  {
 // CHECK-NEXT:       spv.module Logical GLSL450 requires #spv.vce<v1.0, [Shader], [SPV_KHR_storage_buffer_storage_class]> {
 // CHECK-NEXT:         spv.func @call_dispatch_1() "None" {
@@ -163,13 +127,9 @@ hal.executable private @call_dispatch_4  {
 // CHECK-NEXT: }
 
 //      CHECK: hal.executable private @linking_linked_vulkan {
-// CHECK-NEXT:   hal.interface public @io_0 {
-// CHECK-NEXT:     hal.interface.binding public @s0b0_ro_external, set=0, binding=0, type="StorageBuffer"
-// CHECK-NEXT:     hal.interface.binding public @s0b1_rw_external, set=0, binding=1, type="StorageBuffer"
-// CHECK-NEXT:   }
 // CHECK-NEXT:   hal.executable.variant public @vulkan_spirv_fb, target = #executable_target_vulkan_spirv_fb {
-// CHECK-NEXT:     hal.executable.entry_point public @call_dispatch_0 attributes {interface = @io_0, ordinal = 0 : index}
-// CHECK-NEXT:     hal.executable.entry_point public @call_dispatch_2 attributes {interface = @io_0, ordinal = 1 : index}
+// CHECK-NEXT:     hal.executable.entry_point public @call_dispatch_0 ordinal(0) layout(#executable_layout_1)
+// CHECK-NEXT:     hal.executable.entry_point public @call_dispatch_2 ordinal(1) layout(#executable_layout_1)
 // CHECK-NEXT:     module  {
 // CHECK-NEXT:       spv.module Logical GLSL450 requires #spv.vce<v1.0, [Shader], [SPV_KHR_storage_buffer_storage_class]> {
 // CHECK-NEXT:         spv.func @call_dispatch_0() "None" {

@@ -178,12 +178,6 @@ class VulkanSPIRVTargetBackend : public TargetBackend {
 
     int numExecutables = 0;
     for (auto op : moduleOp.getOps<IREE::HAL::ExecutableOp>()) {
-      auto interfaceOps =
-          llvm::to_vector<1>(op.getBlock().getOps<IREE::HAL::InterfaceOp>());
-      if (!llvm::hasSingleElement(interfaceOps)) {
-        return op->emitError("only one hal.interface is supported now");
-      }
-
       llvm::hash_code hash = interfaceOps.front().getInterfaceHash();
       sourceExecutableOpGroups[hash].push_back(op);
 

@@ -135,10 +135,12 @@ func @command_buffer_bind_descriptor_set(
 
 hal.executable @ex {
   hal.executable.variant @backend, target = <"backend", "format"> {
-    hal.executable.entry_point @entry0 attributes {
-      interface = @interface,
-      ordinal = 0 : index
-    }
+    hal.executable.entry_point @entry0 ordinal(0) layout(#hal.executable.layout<push_constants = 0, sets = [
+      #hal.descriptor_set.layout<0, bindings = [
+        #hal.descriptor_set.binding<0, storage_buffer>,
+        #hal.descriptor_set.binding<1, storage_buffer>
+      ]>
+    ]>)
   }
 }
 
@@ -164,10 +166,12 @@ func @command_buffer_dispatch(
 
 hal.executable @ex {
   hal.executable.variant @backend, target = <"backend", "format"> {
-    hal.executable.entry_point @entry0 attributes {
-      interface = @interface,
-      ordinal = 0 : index
-    }
+    hal.executable.entry_point @entry0 ordinal(0) layout(#hal.executable.layout<push_constants = 0, sets = [
+      #hal.descriptor_set.layout<0, bindings = [
+        #hal.descriptor_set.binding<0, storage_buffer>,
+        #hal.descriptor_set.binding<1, storage_buffer>
+      ]>
+    ]>)
   }
 }
 

@@ -19,6 +19,7 @@ iree_lit_test_suite(
     "convert_to_hal.mlir"
     "elide_redundant_commands.mlir"
     "inline_device_switches.mlir"
+    "materialize_interfaces.mlir"
     "materialize_resource_caches.mlir"
     "memoize_device_queries.mlir"
     "resolve_entry_point_ordinals.mlir"

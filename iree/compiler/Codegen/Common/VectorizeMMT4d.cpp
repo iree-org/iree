@@ -57,8 +57,9 @@ struct VectorizeMMT4DOp : public OpRewritePattern<linalg::Mmt4DOp> {
     // to specialized code paths where these inner dimensions become static
     // (M1xK1x?x? --> M1xK1xM0xK0)
     if (!lhsType || !rhsType || !lhsType.hasStaticShape() ||
-        !rhsType.hasStaticShape())
+        !rhsType.hasStaticShape()) {
       return failure();
+    }
 
     // We expect the incoming mmt4d to already have been maximally tiled, so
     // that the outer dimensions are equal to 1.

@@ -80,8 +80,9 @@ static void loopInvariantCodeMotion(FuncOp funcOp) {
   // way, we first LICM from the inner loop, and place the ops in
   // the outer loop, which in turn can be further LICM'ed.
   funcOp.walk([&](LoopLikeOpInterface loopLike) {
-    if (failed(moveLoopInvariantCode(loopLike)))
+    if (failed(moveLoopInvariantCode(loopLike))) {
       llvm_unreachable("Unexpected failure to move invariant code out of loop");
+    }
   });
 }
 

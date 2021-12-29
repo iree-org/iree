@@ -2,14 +2,15 @@
 
 #config = #iree_codegen.lowering.config<tile_sizes = [[1, 0, 16], [1, 0, 1]], native_vector_size = []>
 #translation = #iree_codegen.translation.info<"SPIRVDistribute", workload_per_wg = [16, 1]>
+#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>
+  ]>
+]>
 hal.executable private @static_3d_sort  {
-  hal.interface @io {
-    hal.interface.binding @s0b0_ro_external, set=0, binding=0, type="StorageBuffer"
-    hal.interface.binding @s0b1_xw_external, set=0, binding=1, type="StorageBuffer"
-  }
   hal.executable.variant @vulkan_spirv_fb, target = <"vulkan-spirv", "vulkan-spirv-fb"> {
-    hal.executable.entry_point @static_3d_sort attributes {
-      interface = @io, ordinal = 0 : index,
+    hal.executable.entry_point @static_3d_sort layout(#executable_layout) attributes {
       translation.info = #translation,
       workgroup_size = [16 : index, 1 : index, 1 : index]
     }
@@ -18,8 +19,8 @@ hal.executable private @static_3d_sort  {
         %c64 = arith.constant 64 : index
         %c128 = arith.constant 128 : index
         %c0 = arith.constant 0 : index
-        %0 = hal.interface.binding.subspan @io::@s0b0_ro_external[%c0] : memref<64x32x128xi32>
-        %1 = hal.interface.binding.subspan @io::@s0b1_xw_external[%c0] : memref<64x32x128xi32>
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<64x32x128xi32>
+        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<64x32x128xi32>
         %workgroup_id_x = hal.interface.workgroup.id[0] : index
         %workgroup_count_x = hal.interface.workgroup.count[0] : index
         %workgroup_id_y = hal.interface.workgroup.id[1] : index
@@ -47,8 +48,8 @@ hal.executable private @static_3d_sort  {
 }
 
 // CHECK-LABEL: func @static_3d_sort()
-//       CHECK: %[[ARG0:.+]] = hal.interface.binding.subspan @io::@s0b0_ro_external
-//       CHECK: %[[ARG1:.+]] = hal.interface.binding.subspan @io::@s0b1_xw_external
+//       CHECK: %[[ARG0:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer)
+//       CHECK: %[[ARG1:.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer)
 //       CHECK: scf.for
 //       CHECK:   scf.for
 //       CHECK:     %[[WG_INPUT:.+]] = memref.subview %[[ARG0]]

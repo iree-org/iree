@@ -550,7 +550,7 @@ class ConvertHALInterfaceWorkgroupCountOp : public ConvertToLLVMPattern {
   }
 };
 
-/// Rewrites hal.interface.load.constant to ops loading from the ABI structs.
+/// Rewrites hal.interface.constant.load to ops loading from the ABI structs.
 ///
 /// The parent LLVMFuncOp must be compatible with HALDispatchABI.
 class ConvertHALInterfaceLoadConstant : public ConvertToLLVMPattern {
@@ -558,7 +558,7 @@ class ConvertHALInterfaceLoadConstant : public ConvertToLLVMPattern {
   explicit ConvertHALInterfaceLoadConstant(MLIRContext *context,
                                            LLVMTypeConverter &converter)
       : ConvertToLLVMPattern(
-            IREE::HAL::InterfaceLoadConstantOp::getOperationName(), context,
+            IREE::HAL::InterfaceConstantLoadOp::getOperationName(), context,
             converter) {}
 
   LogicalResult matchAndRewrite(
@@ -567,11 +567,11 @@ class ConvertHALInterfaceLoadConstant : public ConvertToLLVMPattern {
     auto llvmFuncOp = op->getParentOfType<LLVM::LLVMFuncOp>();
     if (!llvmFuncOp) return failure();
     HALDispatchABI abi(llvmFuncOp, getTypeConverter());
-    auto loadConstantOp = cast<IREE::HAL::InterfaceLoadConstantOp>(op);
-    int64_t offset = loadConstantOp.offset().getZExtValue();
+    auto loadConstantOp = cast<IREE::HAL::InterfaceConstantLoadOp>(op);
+    int64_t index = loadConstantOp.index().getZExtValue();
     auto resultType = typeConverter->convertType(op->getResult(0).getType());
     rewriter.replaceOp(
-        op, abi.loadPushConstant(op->getLoc(), offset, resultType, rewriter));
+        op, abi.loadPushConstant(op->getLoc(), index, resultType, rewriter));
     return success();
   }
 };
@@ -593,34 +593,18 @@ class ConvertHALInterfaceBindingSubspanOp : public ConvertToLLVMPattern {
     auto llvmFuncOp = op->getParentOfType<LLVM::LLVMFuncOp>();
     if (!llvmFuncOp) return failure();
     HALDispatchABI abi(llvmFuncOp, getTypeConverter());
-    auto interfaceBindingOp =
-        cast<IREE::HAL::InterfaceBindingSubspanOp>(op).queryBindingOp();
     IREE::HAL::InterfaceBindingSubspanOpAdaptor newOperands(
         operands, op->getAttrDictionary());
     MemRefType memRefType = op->getResult(0).getType().dyn_cast<MemRefType>();
-    if (!memRefType)
+    if (!memRefType) {
       return rewriter.notifyMatchFailure(
           op,
           "failed to convert interface.binding.subspan result to memref type");
+    }
     auto memRefDesc = abi.loadBinding(
-        op->getLoc(), interfaceBindingOp.binding().getZExtValue(),
-        newOperands.byte_offset(), memRefType, newOperands.dynamic_dims(),
-        rewriter);
+        op->getLoc(), newOperands.binding().getInt(), newOperands.byte_offset(),
+        memRefType, newOperands.dynamic_dims(), rewriter);
     rewriter.replaceOp(op, {memRefDesc});
-    return success();
-  }
-};
-
-class RemoveHALInterfaceOpPattern : public ConvertToLLVMPattern {
- public:
-  explicit RemoveHALInterfaceOpPattern(MLIRContext *context,
-                                       LLVMTypeConverter &typeconverter)
-      : ConvertToLLVMPattern(IREE::HAL::InterfaceOp::getOperationName(),
-                             context, typeconverter) {}
-  LogicalResult matchAndRewrite(
-      Operation *op, ArrayRef<Value> operands,
-      ConversionPatternRewriter &rewriter) const override {
-    rewriter.eraseOp(op);
     return success();
   }
 };
@@ -752,16 +736,12 @@ void ConvertToLLVMPass::runOnOperation() {
     ConvertHALInterfaceWorkgroupSizeOp,
     ConvertHALInterfaceWorkgroupCountOp,
     ConvertHALInterfaceLoadConstant,
-    ConvertHALInterfaceBindingSubspanOp,
-    RemoveHALInterfaceOpPattern
+    ConvertHALInterfaceBindingSubspanOp
   >(&getContext(), converter);
   // clang-format on
 
   LLVMConversionTarget target(getContext());
-  // IREE::HAL::InterfaceOp will be removed after successful conversion of the
-  // rest of the IR.
-  target.addLegalOp<ModuleOp, IREE::HAL::InterfaceOp,
-                    IREE::HAL::InterfaceBindingOp, IREE::HAL::InterfaceEndOp>();
+  target.addLegalOp<ModuleOp>();
   target.addIllegalDialect<StandardOpsDialect, mlir::arith::ArithmeticDialect,
                            IREE::Util::UtilDialect, IREE::HAL::HALDialect,
                            math::MathDialect, tosa::TosaDialect>();
@@ -787,9 +767,6 @@ void ConvertToLLVMPass::runOnOperation() {
     signalPassFailure();
     return;
   }
-
-  // Once we're done with conversion, remove InterfaceOp.
-  module.walk([](IREE::HAL::InterfaceOp op) { op.erase(); });
 
   // Post conversion patterns.
   {

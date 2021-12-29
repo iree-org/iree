@@ -169,8 +169,9 @@ struct SimplifyTrivialLoops : public OpRewritePattern<scf::ForOp> {
     // once but the loop may not run at least once by replace the `loop` with an
     // `if`.
     if (!(alwaysRunsFirstIteration(op, getMinMax) &&
-          neverRunsSecondIteration(op, getMinMax)))
+          neverRunsSecondIteration(op, getMinMax))) {
       return failure();
+    }
 
     // The first iteration is always run and the second iteration is never run
     // so the loop always have 1 iteration. Inline its body and remove the loop.

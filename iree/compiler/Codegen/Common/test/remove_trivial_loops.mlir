@@ -1,13 +1,18 @@
 // RUN: iree-opt -split-input-file -pass-pipeline='hal.executable(hal.executable.variant(builtin.module(builtin.func(iree-codegen-remove-single-iteration-loop))))' %s | IreeFileCheck %s
 
+#executable_layout = #hal.executable.layout<push_constants = 1, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>
+  ]>
+]>
 
 // CHECK-LABEL: func @dispatch_0()
 hal.executable private @dispatch_0  {
   hal.executable.variant @cuda, target = #hal.executable.target<"cuda", "cuda-nvptx-fb"> {
-    hal.executable.entry_point @dispatch_0 attributes {
-      interface = @io,
-      ordinal = 0 : index,
-      workgroup_size = [64: index, 1: index, 1:index]}
+    hal.executable.entry_point @dispatch_0 layout(#executable_layout) attributes {
+      workgroup_size = [64: index, 1: index, 1:index]
+    }
     builtin.module {
       builtin.func @dispatch_0() {
         %c2 = arith.constant 2 : index
@@ -41,13 +46,18 @@ hal.executable private @dispatch_0  {
 
 // -----
 
+#executable_layout = #hal.executable.layout<push_constants = 1, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>
+  ]>
+]>
+
 // CHECK-LABEL: func @workgroup_tile_loop()
 #translation = #iree_codegen.translation.info<"LLVMGPUDistribute", workload_per_wg = [32]>
 hal.executable private @workgroup_tile_loop  {
   hal.executable.variant @cuda, target = #hal.executable.target<"cuda", "cuda-nvptx-fb"> {
-    hal.executable.entry_point @workgroup_tile_loop attributes {
-      interface = @io,
-      ordinal = 0 : index,
+    hal.executable.entry_point @workgroup_tile_loop layout(#executable_layout) attributes {
       translation.info = #translation
     }
     builtin.module {
@@ -62,7 +72,6 @@ hal.executable private @workgroup_tile_loop  {
         scf.for %arg0 = %idx to %c2048 step %countx {
           gpu.barrier
         }
-
         return
       }
     }
@@ -71,13 +80,18 @@ hal.executable private @workgroup_tile_loop  {
 
 // -----
 
+#executable_layout = #hal.executable.layout<push_constants = 1, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>
+  ]>
+]>
+
 // CHECK-LABEL: func @workgroup_tile_loop_negative()
 #translation = #iree_codegen.translation.info<"LLVMGPUDistribute", workload_per_wg = [16]>
 hal.executable private @workgroup_tile_loop_negative  {
   hal.executable.variant @cuda, target = #hal.executable.target<"cuda", "cuda-nvptx-fb"> {
-    hal.executable.entry_point @workgroup_tile_loop_negative attributes {
-      interface = @io,
-      ordinal = 0 : index,
+    hal.executable.entry_point @workgroup_tile_loop_negative layout(#executable_layout) attributes {
       translation.info = #translation
     }
     builtin.module {
@@ -92,7 +106,6 @@ hal.executable private @workgroup_tile_loop_negative  {
         scf.for %arg0 = %idx to %c2048 step %countx {
           gpu.barrier
         }
-
         return
       }
     }
@@ -101,14 +114,20 @@ hal.executable private @workgroup_tile_loop_negative  {
 
 // -----
 
+#executable_layout = #hal.executable.layout<push_constants = 1, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>
+  ]>
+]>
+
 // CHECK-LABEL: func @both_workgroup_and_workitem()
 //   CHECK-NOT:   scf.for
 //       CHECK:   gpu.barrier
 #translation = #iree_codegen.translation.info<"LLVMGPUDistribute", workload_per_wg = [32, 8, 1]>
 hal.executable private @both_workgroup_and_workitem  {
   hal.executable.variant @cuda, target = #hal.executable.target<"cuda", "cuda-nvptx-fb"> {
-    hal.executable.entry_point @both_workgroup_and_workitem attributes {
-      interface = @io, ordinal = 0 : index,
+    hal.executable.entry_point @both_workgroup_and_workitem layout(#executable_layout) attributes {
       translation.info = #translation,
       workgroup_size = [8: index, 2: index, 1: index]
     }

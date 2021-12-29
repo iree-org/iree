@@ -42,6 +42,9 @@ struct HALOpAsmInterface : public OpAsmDialectInterface {
     } else if (auto targetAttr = attr.dyn_cast<ExecutableTargetAttr>()) {
       os << "executable_target_" << targetAttr.getSymbolNameFragment();
       return AliasResult::OverridableAlias;
+    } else if (auto layoutAttr = attr.dyn_cast<ExecutableLayoutAttr>()) {
+      os << "executable_layout";
+      return AliasResult::OverridableAlias;
     }
     return AliasResult::NoAlias;
   }
@@ -90,8 +93,13 @@ class HALToVMConversionInterface : public VMConversionDialectInterface {
   void walkAttributeStorage(
       Attribute attr,
       const function_ref<void(Attribute elementAttr)> &fn) const override {
-    if (auto structAttr = attr.dyn_cast<DescriptorSetLayoutBindingAttr>()) {
-      structAttr.walkStorage(fn);
+    // TODO(benvanik): remove this interface or make it an attr interface.
+    if (auto bindingAttr =
+            attr.dyn_cast<IREE::HAL::DescriptorSetBindingAttr>()) {
+      fn(IntegerAttr::get(IndexType::get(attr.getContext()),
+                          APInt(64, bindingAttr.getOrdinal())));
+      fn(IREE::HAL::DescriptorTypeAttr::get(attr.getContext(),
+                                            bindingAttr.getType()));
     }
   }
 };

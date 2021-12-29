@@ -13,9 +13,9 @@ module  {
     %c513 = arith.constant 513 : index
     %c383 = arith.constant 383 : index
     %cst = arith.constant 0.000000e+00 : f32
-    %0 = hal.interface.binding.subspan @io::@s0b0_ro_external[%c0] : !flow.dispatch.tensor<readonly:383x383xf32>
-    %1 = hal.interface.binding.subspan @io::@s0b1_ro_external[%c0] : !flow.dispatch.tensor<readonly:383x513xf32>
-    %2 = hal.interface.binding.subspan @io::@s0b2_xw_external[%c0] : !flow.dispatch.tensor<writeonly:383x513xf32>
+    %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<readonly:383x383xf32>
+    %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : !flow.dispatch.tensor<readonly:383x513xf32>
+    %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : !flow.dispatch.tensor<writeonly:383x513xf32>
     %workgroup_id_x = hal.interface.workgroup.id[0] : index
     %workgroup_count_x = hal.interface.workgroup.count[0] : index
     %workgroup_id_y = hal.interface.workgroup.id[1] : index
@@ -40,12 +40,8 @@ module  {
     }
     return
   }
-  hal.interface private @io  {
-    hal.interface.binding @s0b0_ro_external, set=0, binding=0, type="StorageBuffer"
-    hal.interface.binding @s0b1_ro_external, set=0, binding=1, type="StorageBuffer"
-    hal.interface.binding @s0b2_xw_external, set=0, binding=2, type="StorageBuffer"
-  }
 }
+
 //      CHECK: #[[MAP1:.+]] = affine_map<(d0) -> (64, -d0 + 383)>
 //      CHECK: #[[MAP2:.+]] = affine_map<(d0) -> (64, -d0 + 513)>
 //      CHECK: #[[MAP5:.+]] = affine_map<(d0, d1) -> (32, -d0 + d1)>
@@ -57,9 +53,9 @@ module  {
 //  CHECK-DAG: %[[C383:.+]] = arith.constant 383 : index
 //  CHECK-DAG: %[[C513:.+]] = arith.constant 513 : index
 //  CHECK-DAG: %[[C32:.+]] = arith.constant 32 : index
-//      CHECK: %[[LHS:.+]] = hal.interface.binding.subspan @io::@s0b0_ro_external[%c0] : !flow.dispatch.tensor<readonly:383x383xf32>
-//      CHECK: %[[RHS:.+]] = hal.interface.binding.subspan @io::@s0b1_ro_external[%c0] : !flow.dispatch.tensor<readonly:383x513xf32>
-//      CHECK: %[[DST:.+]] = hal.interface.binding.subspan @io::@s0b2_xw_external[%c0] : !flow.dispatch.tensor<writeonly:383x513xf32>
+//      CHECK: %[[LHS:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<readonly:383x383xf32>
+//      CHECK: %[[RHS:.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : !flow.dispatch.tensor<readonly:383x513xf32>
+//      CHECK: %[[DST:.+]] = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : !flow.dispatch.tensor<writeonly:383x513xf32>
 //      CHECK: scf.for %[[I_WG_IDX:.+]] = {{.*}} to %c383
 //      CHECK: scf.for %[[J_WG_IDX:.+]] = {{.*}} to %c513
 //      CHECK: %[[LHS_WG_TILE_DIM0:.+]] = affine.min #[[MAP1]](%[[I_WG_IDX]])
