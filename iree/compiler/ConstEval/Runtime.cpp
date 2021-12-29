@@ -299,13 +299,17 @@ LogicalResult InMemoryCompiledBinary::translateFromModule(
 }
 
 Runtime::Runtime() {
-  registry = iree_hal_driver_registry_default();
+  IREE_CHECK_OK(
+      iree_hal_driver_registry_allocate(iree_allocator_system(), &registry));
   IREE_CHECK_OK(iree_hal_vmvx_driver_module_register(registry));
   IREE_CHECK_OK(iree_hal_module_register_types());
   IREE_CHECK_OK(iree_vm_instance_create(iree_allocator_system(), &instance));
 }
 
-Runtime::~Runtime() { iree_vm_instance_release(instance); }
+Runtime::~Runtime() {
+  iree_vm_instance_release(instance);
+  iree_hal_driver_registry_free(registry);
+}
 
 Runtime& Runtime::getInstance() {
   static Runtime instance;
