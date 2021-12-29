@@ -183,6 +183,8 @@ static iree_status_t iree_runtime_demo_perform_mul(
   // in other sessions depending on whether they share a compatible device.
   iree_hal_allocator_t* device_allocator =
       iree_runtime_session_device_allocator(session);
+  iree_allocator_t host_allocator =
+      iree_runtime_session_host_allocator(session);
   iree_status_t status = iree_ok_status();
   {
     // %arg0: tensor<4xf32>
@@ -212,7 +214,7 @@ static iree_status_t iree_runtime_demo_perform_mul(
     }
     if (iree_status_is_ok(status)) {
       IREE_IGNORE_ERROR(iree_hal_buffer_view_fprint(
-          stdout, arg0, /*max_element_count=*/4096));
+          stdout, arg0, /*max_element_count=*/4096, host_allocator));
       // Add to the call inputs list (which retains the buffer view).
       status = iree_runtime_call_inputs_push_back_buffer_view(&call, arg0);
     }
@@ -237,7 +239,7 @@ static iree_status_t iree_runtime_demo_perform_mul(
     }
     if (iree_status_is_ok(status)) {
       IREE_IGNORE_ERROR(iree_hal_buffer_view_fprint(
-          stdout, arg1, /*max_element_count=*/4096));
+          stdout, arg1, /*max_element_count=*/4096, host_allocator));
       status = iree_runtime_call_inputs_push_back_buffer_view(&call, arg1);
     }
     iree_hal_buffer_view_release(arg1);
@@ -259,8 +261,8 @@ static iree_status_t iree_runtime_demo_perform_mul(
   if (iree_status_is_ok(status)) {
     // This prints the buffer view out but an application could read its
     // contents, pass it to another call, etc.
-    status =
-        iree_hal_buffer_view_fprint(stdout, ret0, /*max_element_count=*/4096);
+    status = iree_hal_buffer_view_fprint(
+        stdout, ret0, /*max_element_count=*/4096, host_allocator);
   }
   iree_hal_buffer_view_release(ret0);
 

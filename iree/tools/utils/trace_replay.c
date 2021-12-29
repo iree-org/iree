@@ -824,7 +824,8 @@ static iree_status_t iree_trace_replay_parse_item_sequence(
   return iree_ok_status();
 }
 
-static iree_status_t iree_trace_replay_print_item(iree_vm_variant_t* value);
+static iree_status_t iree_trace_replay_print_item(
+    iree_vm_variant_t* value, iree_allocator_t host_allocator);
 
 static iree_status_t iree_trace_replay_print_scalar(iree_vm_variant_t* value) {
   switch (value->type.value_type) {
@@ -853,35 +854,34 @@ static iree_status_t iree_trace_replay_print_scalar(iree_vm_variant_t* value) {
   return iree_ok_status();
 }
 
-static iree_status_t iree_trace_replay_print_vm_list(iree_vm_list_t* list) {
+static iree_status_t iree_trace_replay_print_vm_list(
+    iree_vm_list_t* list, iree_allocator_t host_allocator) {
   for (iree_host_size_t i = 0; i < iree_vm_list_size(list); ++i) {
     iree_vm_variant_t variant = iree_vm_variant_empty();
     IREE_RETURN_IF_ERROR(iree_vm_list_get_variant(list, i, &variant),
                          "variant %zu not present", i);
-    IREE_RETURN_IF_ERROR(iree_trace_replay_print_item(&variant));
+    IREE_RETURN_IF_ERROR(
+        iree_trace_replay_print_item(&variant, host_allocator));
     fprintf(stdout, "\n");
   }
   return iree_ok_status();
 }
 
-static iree_status_t iree_trace_replay_print_hal_buffer_view(
-    iree_hal_buffer_view_t* buffer_view) {
-  return iree_hal_buffer_view_fprint(stdout, buffer_view,
-                                     /*max_element_count=*/1024);
-}
-
-static iree_status_t iree_trace_replay_print_item(iree_vm_variant_t* value) {
+static iree_status_t iree_trace_replay_print_item(
+    iree_vm_variant_t* value, iree_allocator_t host_allocator) {
   if (iree_vm_variant_is_value(*value)) {
     IREE_RETURN_IF_ERROR(iree_trace_replay_print_scalar(value));
   } else if (iree_vm_variant_is_ref(*value)) {
     if (iree_hal_buffer_view_isa(value->ref)) {
       iree_hal_buffer_view_t* buffer_view =
           iree_hal_buffer_view_deref(value->ref);
-      IREE_RETURN_IF_ERROR(
-          iree_trace_replay_print_hal_buffer_view(buffer_view));
+      IREE_RETURN_IF_ERROR(iree_hal_buffer_view_fprint(
+          stdout, buffer_view,
+          /*max_element_count=*/1024, host_allocator));
     } else if (iree_vm_list_isa(value->ref)) {
       iree_vm_list_t* list = iree_vm_list_deref(value->ref);
-      IREE_RETURN_IF_ERROR(iree_trace_replay_print_vm_list(list));
+      IREE_RETURN_IF_ERROR(
+          iree_trace_replay_print_vm_list(list, host_allocator));
     } else {
       // TODO(benvanik): a way for ref types to describe themselves.
       fprintf(stdout, "(no printer)");
@@ -990,7 +990,8 @@ static iree_status_t iree_trace_replay_event_call_stdout(
 
   // Print the outputs.
   if (iree_status_is_ok(status)) {
-    status = iree_trace_replay_print_vm_list(output_list);
+    status =
+        iree_trace_replay_print_vm_list(output_list, replay->host_allocator);
   }
   iree_vm_list_release(output_list);
 

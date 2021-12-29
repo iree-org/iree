@@ -198,8 +198,10 @@ iree_status_t run_sample(iree_string_view_t bytecode_module_path,
     status = reduce_sum_2d(session, input, 6, &result_buffer_view);
     if (iree_status_is_ok(status)) {
       fprintf(stdout, "reduce_sum_2d([[1, 2, 3], [10, 20, 30]]): ");
-      status = iree_hal_buffer_view_fprint(stdout, result_buffer_view,
-                                           /*max_element_count=*/4096);
+      status = iree_hal_buffer_view_fprint(
+          stdout, result_buffer_view,
+          /*max_element_count=*/4096,
+          iree_runtime_session_host_allocator(session));
       fprintf(stdout, "\n");
     }
     iree_hal_buffer_view_release(result_buffer_view);
@@ -213,8 +215,10 @@ iree_status_t run_sample(iree_string_view_t bytecode_module_path,
     if (iree_status_is_ok(status)) {
       fprintf(stdout,
               "reduce_sum_2d([[1, 2, 3], [10, 20, 30], [100, 200, 300]]): ");
-      status = iree_hal_buffer_view_fprint(stdout, result_buffer_view,
-                                           /*max_element_count=*/4096);
+      status = iree_hal_buffer_view_fprint(
+          stdout, result_buffer_view,
+          /*max_element_count=*/4096,
+          iree_runtime_session_host_allocator(session));
       fprintf(stdout, "\n");
     }
     iree_hal_buffer_view_release(result_buffer_view);
@@ -227,8 +231,10 @@ iree_status_t run_sample(iree_string_view_t bytecode_module_path,
     status = add_one(session, input, 3, &result_buffer_view);
     if (iree_status_is_ok(status)) {
       fprintf(stdout, "add_one([1, 10, 100]): ");
-      status = iree_hal_buffer_view_fprint(stdout, result_buffer_view,
-                                           /*max_element_count=*/64);
+      status = iree_hal_buffer_view_fprint(
+          stdout, result_buffer_view,
+          /*max_element_count=*/64,
+          iree_runtime_session_host_allocator(session));
       fprintf(stdout, "\n");
     }
     iree_hal_buffer_view_release(result_buffer_view);
