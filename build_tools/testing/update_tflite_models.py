@@ -19,22 +19,21 @@ BUCKET_NAME = "iree-model-artifacts"
 FOLDER_NAME = "tflite-integration-tests"
 
 
-def upload_model(source, destination):
+def upload_model(source, destination, tmpfile):
   """Uploads a file to the bucket."""
-  tmp = "/".join(
-      [tempfile._get_default_tempdir(),
-       next(tempfile._get_candidate_names())])
-  urllib.request.urlretrieve(source, tmp)
+  urllib.request.urlretrieve(source, tmpfile)
 
   storage_client = storage.Client()
   bucket = storage_client.get_bucket(BUCKET_NAME)
   blob = bucket.blob("/".join([FOLDER_NAME, destination]))
-  blob.upload_from_filename(tmp)
+  blob.upload_from_filename(tmpfile)
 
 
 def main(argv):
+  tf = tempfile.NamedTemporaryFile()
+
   for dst, src in flatbuffers.items():
-    upload_model(src, dst)
+    upload_model(src, dst, tf.name)
 
 
 if __name__ == '__main__':
