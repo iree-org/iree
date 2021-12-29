@@ -178,16 +178,25 @@ struct JitGlobalsPass : public JitGlobalsBase<JitGlobalsPass> {
     for (Operation &childOp : *innerModule.getBody()) {
       auto globalOp = llvm::dyn_cast<IREE::Util::GlobalOp>(childOp);
       if (!globalOp) continue;
-      if (!globalOp.getInitialValueAttr()) {
-        StringAttr funcSymbol = extractor.createAccessor(globalOp);
-        uninitializedGlobals.emplace_back(funcSymbol, globalOp.sym_nameAttr());
+      if (globalOp.getInitialValueAttr()) continue;
+
+      // Only generate an accessor for types our runtime bridge knows how to
+      // handle.
+      Type type = globalOp.type();
+      if (!CompiledBinary::isSupportedResultType(type)) {
+        LLVM_DEBUG(dbgs() << "JitGlobals: unsupported global type " << type);
+        continue;
       }
+
+      StringAttr funcSymbol = extractor.createAccessor(globalOp);
+      uninitializedGlobals.emplace_back(funcSymbol, globalOp.sym_nameAttr());
     }
 
     // Early exit without compiling if no entry-points (this is not just an
     // optimization: the low level compiler will fail on an empty module).
     if (uninitializedGlobals.empty()) {
       LLVM_DEBUG(dbgs() << "Not JIT'ing globals: no undefined globals found\n");
+      innerModule.erase();
       return;
     }
 
@@ -216,7 +225,7 @@ struct JitGlobalsPass : public JitGlobalsBase<JitGlobalsPass> {
       Location loc = targetGlobal->getLoc();
 
       Attribute value =
-          binary.invokeNullaryAsElements(loc, funcSymbol.strref());
+          binary.invokeNullaryAsAttribute(loc, funcSymbol.strref());
       if (!value) {
         return signalPassFailure();
       }

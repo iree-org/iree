@@ -7,6 +7,8 @@
 #ifndef IREE_COMPILER_DIALECT_IREE_UTIL_ANALYSIS_CONSTANT_CONST_EXPR_H_
 #define IREE_COMPILER_DIALECT_IREE_UTIL_ANALYSIS_CONSTANT_CONST_EXPR_H_
 
+#include <vector>
+
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
@@ -101,12 +103,20 @@ class ConstExprAnalysis {
     // Direct producers that feed into this constant value.
     SmallPtrSet<ConstValueInfo *, 8> producers;
 
+    // Direct consumers (constant and non-constant) of this value.
+    SmallPtrSet<ConstValueInfo *, 8> consumers;
+
     // Whether this is a root.
     bool isRoot = false;
 
     // Whether this is a const-expr value.
     bool isConstExpr() const { return state == CONSTANT; }
 
+    // If the value is consumed by an operation that was not analyzed, returns
+    // true. This can be considered a non-constexpr escape.
+    bool hasNonAnalyzedConsumer() const;
+
+    // Gets the defining operation.
     Operation *getOperation() const {
       Operation *ret = constValue.getDefiningOp();
       assert(ret && "const-expr must have a defining op");
@@ -139,6 +149,66 @@ class ConstExprAnalysis {
   // Worklist of const value info structs which need more resolution.
   using ConstValueWorklist = llvm::SmallVector<ConstValueInfo *>;
   ConstValueWorklist worklist;
+  friend class ConstExprHoistingPolicy;
+};
+
+// Mutable base class for implementing policies that make decisions on
+// which expressions to hoist. This wraps a read-only ConstExprAnalysis,
+// overlaying it with cost and decisions about which specific expressions to
+// hoist.
+//
+// The default base class will hoist everything that is eligible.
+class ConstExprHoistingPolicy {
+ public:
+  using Worklist = llvm::SmallVector<const ConstExprAnalysis::ConstValueInfo *>;
+  enum Outcome {
+    UNDECIDED = 0,
+    ENABLE_HOIST = 1,
+    DISABLE_HOIST = 2,
+  };
+  class Decision {
+   public:
+    void disableHoist() {
+      assert(outcome == UNDECIDED &&
+             "can only disable hoisting of an undecided decision");
+      outcome = DISABLE_HOIST;
+    }
+    void enableHoist() {
+      assert(outcome == UNDECIDED &&
+             "can only disable hoisting of an undecided decision");
+      outcome = ENABLE_HOIST;
+    }
+
+    Outcome getOutcome() const { return outcome; }
+
+   private:
+    Outcome outcome = UNDECIDED;
+  };
+
+  ConstExprHoistingPolicy(const ConstExprAnalysis &analysis);
+  void initialize();
+  Decision *getDecision(const ConstExprAnalysis::ConstValueInfo *info) {
+    return &decisions[info];
+  }
+
+ private:
+  // At initialization time, makes any fixed decisions. This hook can only
+  // make decisions that do not depend on any const-exprs outside of what is
+  // passed.
+  void makeInvariantDecision(const ConstExprAnalysis::ConstValueInfo *info,
+                             Decision *decision);
+  // Makes a decision that depends on producers and consumers of a value. This
+  // may be called repeatedly until convergence. The implementation should call
+  // decision.disableHoist() or decision.enableHoist() if it can reach a
+  // decision.
+  void makeDecision(const ConstExprAnalysis::ConstValueInfo *info,
+                    Decision *decision);
+
+  const ConstExprAnalysis &analysis;
+
+  // Map of ConstValueInfo * to decision structs. All are allocated at
+  // initialization and then the structure is not changed.
+  llvm::DenseMap<const ConstExprAnalysis::ConstValueInfo *, Decision> decisions;
 };
 
 inline raw_ostream &operator<<(raw_ostream &os,

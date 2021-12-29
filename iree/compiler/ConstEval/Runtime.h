@@ -34,7 +34,10 @@ class CompiledBinary {
 
   // Invokes a nullary function and returns its (presumed single) single result
   // as an Attribute.
-  Attribute invokeNullaryAsElements(Location loc, StringRef name);
+  Attribute invokeNullaryAsAttribute(Location loc, StringRef name);
+
+  // Whether the given type is supported in *AsAttribute methods.
+  static bool isSupportedResultType(Type type);
 
  protected:
   CompiledBinary();

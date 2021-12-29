@@ -53,6 +53,8 @@ class HoistIntoGlobalsPass
     const auto &constExprs = getAnalysis<ConstExprAnalysis>();
     LLVM_DEBUG(dbgs() << constExprs);
     LLVM_DEBUG(dbgs() << "\n\n");
+    ConstExprHoistingPolicy policy(constExprs);
+    policy.initialize();
 
     // Maps original values to newly materialized values.
     HoistedValueMap hoistedMap;
@@ -64,66 +66,43 @@ class HoistIntoGlobalsPass
     // yet.
     getOperation().walk<WalkOrder::PreOrder>([&](Operation *iterOp) {
       // We only want to look at const-expr ops (non roots) since they may
-      // have interesting escapes.
+      // have interesting escapes. Early exit here for efficiency.
       auto *iterInfo = constExprs.lookup(iterOp);
-      if (!iterInfo || iterInfo->isRoot || !iterInfo->isConstExpr()) {
+      if (!iterInfo) {
         return WalkResult::advance();
       }
 
-      // Skip if our policy prohibits this being treated as a hoistable leaf.
-      if (!isHoistableConstExprLeaf(iterInfo)) return WalkResult::advance();
-
-      // This op is hoistable - for each result find eligible escapes and
-      // hoist them.
-      LLVM_DEBUG(dbgs() << "PROCESSING CONST-EXPR OP: " << *iterOp << "\n");
       for (Value constExprResult : iterOp->getResults()) {
-        // Need to snapshot the uses since we modify them during iteration.
-        SmallVector<OpOperand *> uses;
-        for (OpOperand &use : constExprResult.getUses()) {
-          uses.push_back(&use);
+        auto *resultInfo = constExprs.lookup(constExprResult);
+        assert(resultInfo && "must have const-expr info");
+
+        if (policy.getDecision(resultInfo)->getOutcome() !=
+            ConstExprHoistingPolicy::ENABLE_HOIST) {
+          continue;
         }
 
-        // Iterate over uses snapshots.
-        for (OpOperand *operand : uses) {
-          auto *targetInfo = constExprs.lookup(operand->getOwner());
-
-          // We do not treat is as a const escape if the target is:
-          //   - Not a valid operand to convert to a constant.
-          //   - Const-expr and is an allowed leaf by policy
-          // Note that we never touch an operand that is part of a const-expr.
-          if (targetInfo && targetInfo->isConstExpr() &&
-              isHoistableConstExprLeaf(targetInfo)) {
-            LLVM_DEBUG(dbgs() << "  - SKIP (CONST-EXPR): "
-                              << *operand->getOwner() << "\n");
-            continue;
-          }
-          if (!isHoistableConstExprConsumingOperand(operand)) {
-            LLVM_DEBUG(dbgs() << "  - SKIP (INVALID OPERAND): "
-                              << *operand->getOwner() << "\n");
-            continue;
-          }
-
-          // Bingo.
-          LLVM_DEBUG(dbgs() << "  + HOIST CONST-EXPR:\n");
-          LLVM_DEBUG(dbgs() << "    : Operand #" << operand->getOperandNumber()
-                            << "   of " << *operand->getOwner() << "\n");
-          LLVM_DEBUG(dbgs() << "    : From " << operand->get() << "\n\n");
-
-          hoistConstExpr(operand, hoistedMap, moduleSymbols, constExprs);
-        }
+        hoistConstExpr(constExprResult, hoistedMap, moduleSymbols, constExprs);
       }
-
       return WalkResult::advance();
     });
 
+    // Apply any remaining RAUW cleanups. We have to do these at the cleanup
+    // phase since modifying the source program can invalidate the analysis.
+    // Up to this point, we have only been cloning.
+    OpBuilder builder(&getContext());
+    for (auto it : hoistedMap) {
+      Value originalValue = it.first;
+      GlobalOp globalOp = it.second;
+      builder.setInsertionPointAfterValue(originalValue);
+      auto load = builder.create<GlobalLoadOp>(globalOp->getLoc(), globalOp);
+      originalValue.replaceAllUsesWith(load);
+    }
     cleanupDeadOps(constExprs);
   }
 
-  void hoistConstExpr(OpOperand *operand, HoistedValueMap &hoistedMap,
-                      SymbolTable &moduleSymbols,
-                      const ConstExprAnalysis &constExprs) {
-    Operation *targetOp = operand->getOwner();
-    Value originalValue = operand->get();
+  GlobalOp hoistConstExpr(Value originalValue, HoistedValueMap &hoistedMap,
+                          SymbolTable &moduleSymbols,
+                          const ConstExprAnalysis &constExprs) {
     GlobalOp existingGlobal = hoistedMap.lookup(originalValue);
 
     if (!existingGlobal) {
@@ -142,12 +121,7 @@ class HoistIntoGlobalsPass
     assert(existingGlobal &&
            "hoisting const-expr should have mapped a global for the requested "
            "value");
-
-    // Already hoisted - just convert to a load.
-    OpBuilder builder(targetOp);
-    auto load =
-        builder.create<GlobalLoadOp>(targetOp->getLoc(), existingGlobal);
-    operand->set(load);
+    return existingGlobal;
   }
 
   void cloneProducerTreeInto(

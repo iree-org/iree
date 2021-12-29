@@ -95,19 +95,25 @@ ConstExprOpInfo ConstExprOpInfo::getForOp(Operation *op) {
     return {};
   }
 
+  // Forbid if part of a parent that should be treated atomically.
+  if (op->getParentOfType<linalg::LinalgOp>()) {
+    return {};
+  }
+
   return getInfoForDefaultConstExprOp(op);
 }
 
 bool isHoistableConstExprLeaf(const ConstExprAnalysis::ConstValueInfo *info) {
-  if (!info->getOperation()->isRegistered()) {
-    if (info->getOperation()->getName().getStringRef() ==
+  Operation *op = info->getOperation();
+  if (!op->isRegistered()) {
+    if (op->getName().getStringRef() ==
         "iree_unregistered.non_leaf_const_expr") {
       return false;
     }
   }
 
   // Generally, we prefer to not hoist broadcasts.
-  if (auto genericOp = dyn_cast<linalg::GenericOp>(info->getOperation())) {
+  if (auto genericOp = dyn_cast<linalg::GenericOp>(op)) {
     // Detect op that only broadcast input as fusing them makes the new
     // op cheaper.
     if (genericOp.getNumParallelLoops() == genericOp.getNumLoops() &&
@@ -120,6 +126,12 @@ bool isHoistableConstExprLeaf(const ConstExprAnalysis::ConstValueInfo *info) {
         }
       }
     }
+  }
+
+  // Never hoist init_tensor. These are sometimes used for pure shape metadata
+  // and must not be separated from their consumers.
+  if (isa<linalg::InitTensorOp>(op)) {
+    return false;
   }
 
   return true;

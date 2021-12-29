@@ -12,6 +12,7 @@
 #include "iree/modules/hal/module.h"
 #include "iree/vm/ref_cc.h"
 #include "mlir/IR/BuiltinOps.h"
+#include "mlir/IR/BuiltinTypes.h"
 
 namespace mlir {
 namespace iree_compiler {
@@ -35,6 +36,50 @@ Type mapElementType(Location loc, iree_hal_element_type_t halElementType) {
 
   emitError(loc) << "unrecognized evaluated buffer view element type: "
                  << halElementType;
+  return {};
+}
+
+static Attribute createAttributeFromRawData(Location loc,
+                                            RankedTensorType tensorType,
+                                            MutableArrayRef<char> rawBuffer) {
+  Type elementType = tensorType.getElementType();
+  // For numeric types that are byte-width aligned, we just use the raw buffer
+  // loading support of DenseElementsAttr.
+  if (elementType.isIntOrFloat() &&
+      elementType.getIntOrFloatBitWidth() % 8 == 0) {
+    bool detectedSplat = false;
+    if (DenseElementsAttr::isValidRawBuffer(tensorType, rawBuffer,
+                                            detectedSplat)) {
+      return DenseElementsAttr::getFromRawBuffer(tensorType, rawBuffer,
+                                                 detectedSplat);
+    } else {
+      emitError(loc) << "mapped memory region was not valid for constructing "
+                        "tensor of type "
+                     << tensorType << " (length=" << rawBuffer.size() << ")";
+      return {};
+    }
+  }
+
+  // For i1, IREE (currently) returns these as 8bit integer values and MLIR
+  // has a loader that accepts bool arrays (the raw buffer loader also
+  // supports them but bit-packed, which is not convenient for us). So, if
+  // sizeof(bool) == 1, we just bit-cast. Otherwise, we go through a temporary.
+  if (elementType.isInteger(1)) {
+    if (sizeof(bool) == 1) {
+      ArrayRef<bool> boolArray(reinterpret_cast<bool*>(rawBuffer.data()),
+                               rawBuffer.size());
+      return DenseElementsAttr::get(tensorType, boolArray);
+    } else {
+      // Note: cannot use std::vector because it specializes bool in a way
+      // that is not compatible with ArrayRef.
+      llvm::SmallVector<bool> boolVector(rawBuffer.begin(), rawBuffer.end());
+      ArrayRef<bool> boolArray(boolVector.data(), boolVector.size());
+      return DenseElementsAttr::get(tensorType, boolArray);
+    }
+  }
+
+  emitError(loc) << "unhandled case when converting raw buffer of "
+                 << tensorType << " to Attribute";
   return {};
 }
 
@@ -92,8 +137,8 @@ LogicalResult CompiledBinary::invokeNullary(Location loc, StringRef name,
   return success();
 }
 
-Attribute CompiledBinary::invokeNullaryAsElements(Location loc,
-                                                  StringRef name) {
+Attribute CompiledBinary::invokeNullaryAsAttribute(Location loc,
+                                                   StringRef name) {
   Attribute result;
   if (failed(invokeNullary(
           loc, name, [&](iree_vm_list_t* outputs) -> LogicalResult {
@@ -110,6 +155,30 @@ Attribute CompiledBinary::invokeNullaryAsElements(Location loc,
   }
 
   return result;
+}
+
+bool CompiledBinary::isSupportedResultType(Type type) {
+  // TODO: Not currently supported.
+  if (type.isa<Float16Type>() || type.isa<BFloat16Type>()) {
+    return false;
+  }
+
+  // Support scalar int and float type of byte aligned widths.
+  if (type.isIntOrFloat() && type.getIntOrFloatBitWidth() % 8 == 0) {
+    return true;
+  }
+
+  // Special support for i1.
+  if (type.isa<IntegerType>() && type.getIntOrFloatBitWidth() == 1) {
+    return true;
+  }
+
+  // Support tensors.
+  if (auto tt = type.dyn_cast<RankedTensorType>()) {
+    return isSupportedResultType(tt.getElementType());
+  }
+
+  return false;
 }
 
 Attribute CompiledBinary::convertVariantToAttribute(
@@ -161,28 +230,18 @@ Attribute CompiledBinary::convertVariantToAttribute(
       iree_hal_buffer_t* buffer = iree_hal_buffer_view_buffer(bufferView);
 
       // Map the memory and construct.
-      DenseElementsAttr elementsAttr;
+      Attribute convertedAttr;
       iree_hal_buffer_mapping_t mapping;
       IREE_CHECK_OK(
           iree_hal_buffer_map_range(buffer, IREE_HAL_MEMORY_ACCESS_READ,
                                     /*byte_offset=*/0, length, &mapping));
-      ArrayRef<char> rawBufferArray(
+      MutableArrayRef<char> rawBufferArray(
           reinterpret_cast<char*>(mapping.contents.data),
           mapping.contents.data_length);
-      bool detectedSplat = false;
-      if (DenseElementsAttr::isValidRawBuffer(tensorType, rawBufferArray,
-                                              detectedSplat)) {
-        elementsAttr = DenseElementsAttr::getFromRawBuffer(
-            tensorType, rawBufferArray, detectedSplat);
-      }
+      convertedAttr =
+          createAttributeFromRawData(loc, tensorType, rawBufferArray);
       iree_hal_buffer_unmap_range(&mapping);
-
-      if (!elementsAttr) {
-        emitError(loc) << "mapped memory region was not valid for constructing "
-                          "tensor of type "
-                       << tensorType << " (length=" << length << ")";
-      }
-      return elementsAttr;
+      return convertedAttr;
     } else {
       iree_string_view_t typeName =
           iree_vm_ref_type_name(variant.type.ref_type);
