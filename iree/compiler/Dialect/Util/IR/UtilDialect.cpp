@@ -143,6 +143,36 @@ void UtilDialect::getCanonicalizationPatterns(
   results.insert<FoldDimOp<tensor::DimOp>>(getContext());
 }
 
+// Since all details of the interface are provided via default implementations,
+// we can just have one templated external model to apply per op, vs one
+// explicit model per op.
+template <typename OpTy>
+struct GenericNumericCastOpInterface
+    : public NumericCastOpInterface::ExternalModel<
+          GenericNumericCastOpInterface<OpTy>, OpTy> {
+  static void registerInterface(DialectRegistry &registry) {
+    registry.addOpInterface<OpTy, GenericNumericCastOpInterface<OpTy>>();
+  }
+};
+
+void registerUtilExternalModels(DialectRegistry &registry) {
+  // Must ensure that any dependent dialects are registered.
+  registry.insert<arith::ArithmeticDialect>();
+
+  GenericNumericCastOpInterface<arith::BitcastOp>::registerInterface(registry);
+  GenericNumericCastOpInterface<arith::ExtFOp>::registerInterface(registry);
+  GenericNumericCastOpInterface<arith::ExtUIOp>::registerInterface(registry);
+  GenericNumericCastOpInterface<arith::ExtSIOp>::registerInterface(registry);
+  GenericNumericCastOpInterface<arith::FPToSIOp>::registerInterface(registry);
+  GenericNumericCastOpInterface<arith::FPToUIOp>::registerInterface(registry);
+  GenericNumericCastOpInterface<arith::IndexCastOp>::registerInterface(
+      registry);
+  GenericNumericCastOpInterface<arith::TruncFOp>::registerInterface(registry);
+  GenericNumericCastOpInterface<arith::TruncIOp>::registerInterface(registry);
+  GenericNumericCastOpInterface<arith::SIToFPOp>::registerInterface(registry);
+  GenericNumericCastOpInterface<arith::UIToFPOp>::registerInterface(registry);
+}
+
 }  // namespace Util
 }  // namespace IREE
 }  // namespace iree_compiler

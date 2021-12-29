@@ -26,6 +26,7 @@ iree_lit_test_suite(
             "hint_folding.mlir",
             "hint_ops.mlir",
             "list_ops.mlir",
+            "numeric_ops.mlir",
             "range_folding.mlir",
             "range_ops.mlir",
             "structural_folding.mlir",

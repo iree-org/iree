@@ -663,6 +663,24 @@ void printUnfoldableConstantOp(OpAsmPrinter &p, Operation *op) {
 }
 
 //===----------------------------------------------------------------------===//
+// Numeric ops
+//===----------------------------------------------------------------------===//
+
+Optional<std::pair<int64_t, int64_t>>
+NumericOptionalNarrowOp::getIntegerRange() {
+  if (!min_value() || !max_value()) return {};
+  bool signExtend = isSigned();
+  // Note: Cannot sign extend 0 bit values.
+  int64_t minValue = signExtend && min_value()->getBitWidth() > 0
+                         ? min_value()->getSExtValue()
+                         : min_value()->getZExtValue();
+  int64_t maxValue = signExtend && max_value()->getBitWidth() > 0
+                         ? max_value()->getSExtValue()
+                         : max_value()->getZExtValue();
+  return std::make_pair(minValue, maxValue);
+}
+
+//===----------------------------------------------------------------------===//
 // Structural ops
 //===----------------------------------------------------------------------===//
 

@@ -31,6 +31,7 @@ gentbl_cc_library(
 cc_library(
     name = "Transforms",
     srcs = [
+        "CleanupNumericNarrowing.cpp",
         "ConvertConv2D1x1ToMatmulPass.cpp",
         "ConvertConv2DToImg2ColPass.cpp",
         "ConvertLinalgMatmulToMmt4D.cpp",
@@ -40,8 +41,10 @@ cc_library(
         "DispatchLinalgOnTensors.cpp",
         "ExportBenchmarkFuncs.cpp",
         "FusionOfTensorOps.cpp",
+        "InferNumericNarrowing.cpp",
         "InjectDispatchTracing.cpp",
         "InterchangeGenericOps.cpp",
+        "OptimizeNumerics.cpp",
         "OutlineDispatchRegions.cpp",
         "PadLinalgOps.cpp",
         "PadTensorToSubTensorInsert.cpp",

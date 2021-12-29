@@ -9,6 +9,12 @@
 
 include "mlir/Pass/PassBase.td"
 
+def CleanupNumericNarrowing :
+    Pass<"iree-flow-cleanup-numeric-narrowing", ""> {
+  let summary = "Cleans up any numeric narrowing ops inserted by iree-flow-infer-numeric-narrowing";
+  let constructor = "mlir::iree_compiler::IREE::Flow::createCleanupNumericNarrowingPass()";
+}
+
 def ConvertConv2D1x1ConvToMatmul :
     Pass<"iree-flow-convert-conv2d-1x1-to-matmul", ""> {
   let summary = "Convert linalg convolution ops with 1x1 kernels into linalg matrix multiplication ops.";
@@ -57,6 +63,12 @@ def FusionOfTensorOps :
   let constructor = "mlir::iree_compiler::IREE::Flow::createFusionOfTensorOpsPass()";
 }
 
+def InferNumericNarrowing :
+    Pass<"iree-flow-infer-numeric-narrowing", ""> {
+  let summary = "Infers and inserts util.numeric.optional_narrow ops at points that may be beneficial";
+  let constructor = "mlir::iree_compiler::IREE::Flow::createInferNumericNarrowingPass()";
+}
+
 def InjectDispatchTracing :
     Pass<"iree-flow-inject-dispatch-tracing", ""> {
   let summary = "Injects dispatch region tracing.";
@@ -67,6 +79,12 @@ def InterchangeGenericOps :
     Pass<"iree-flow-interchange-generic-ops", ""> {
   let summary = "Interchange generic op loops to have all the reduction loops to be inner loops.";
   let constructor = "mlir::iree_compiler::IREE::Flow::createInterchangeGenericOpsPass()";
+}
+
+def OptimizeNumerics :
+    Pass<"iree-flow-optimize-numerics", ""> {
+  let summary = "Optimizes numerics given annotations added via iree-flow-infer-numeric-narrowing";
+  let constructor = "mlir::iree_compiler::IREE::Flow::createOptimizeNumericsPass()";
 }
 
 def OutlineDispatchRegions :
