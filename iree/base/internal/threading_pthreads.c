@@ -308,10 +308,14 @@ void iree_thread_request_affinity(iree_thread_t* thread,
   }
 
 #if defined(IREE_PLATFORM_ANDROID)
+  // `pthread_gettid_np` is only available on API 21+ and it is needed to set
+  // affinity so skip it for older API versions.
+#if __ANDROID_API__ >= 21
   // Android doesn't have pthread_setaffinity_np but that's usually just
   // implemented as this sequence anyway:
   pid_t tid = pthread_gettid_np(thread->handle);
   sched_setaffinity(tid, sizeof(cpu_set), &cpu_set);
+#endif
 #else
   pthread_setaffinity_np(thread->handle, sizeof(cpu_set), &cpu_set);
 #endif  // IREE_PLATFORM_ANDROID
