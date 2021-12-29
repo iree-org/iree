@@ -4,6 +4,7 @@ import test_util
 
 model_path = "https://storage.googleapis.com/iree-model-artifacts/tflite-integration-tests/mobilenet_v1.tflite"
 
+
 class MobilenetV1Test(test_util.TFLiteModelTest):
 
   def __init__(self, *args, **kwargs):
