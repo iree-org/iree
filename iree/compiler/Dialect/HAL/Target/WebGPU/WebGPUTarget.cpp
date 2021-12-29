@@ -124,8 +124,10 @@ class WebGPUTargetBackend : public TargetBackend {
       SymbolTable::setSymbolName(entryPointFunc, symbolName);
 
       // We only have one shader module right now, so all point to index 0.
-      // TODO(#7824): Support multiple shader modules per executable
-      entryPointOrdinals[entryPointOp.ordinal().getZExtValue()] = 0;
+      // TODO(#7824): Support multiple shader modules per executable.
+      uint64_t ordinal =
+          entryPointOp.ordinal().getValueOr(APInt(64, 0)).getZExtValue();
+      entryPointOrdinals[ordinal] = 0;
     }
 
     // Serialize the spirv::ModuleOp into binary format.
