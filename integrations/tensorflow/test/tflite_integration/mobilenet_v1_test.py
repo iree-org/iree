@@ -2,8 +2,7 @@ import absl.testing
 import numpy
 import test_util
 
-model_path = "https://tfhub.dev/tensorflow/lite-model/mobilenet_v1_1.0_160/1/default/1?lite-format=tflite"
-
+model_path = "https://storage.googleapis.com/iree-model-artifacts/tflite-integration-tests/mobilenet_v1.tflite"
 
 class MobilenetV1Test(test_util.TFLiteModelTest):
 
