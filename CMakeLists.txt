@@ -25,6 +25,8 @@ else()
   enable_language(ASM)
 endif()
 
+include(CMakeDependentOption)
+
 #-------------------------------------------------------------------------------
 # Project component configuration
 #-------------------------------------------------------------------------------
@@ -79,7 +81,7 @@ option(IREE_ENABLE_NEW_INTEGRATION_TESTS "Enables new integration tests and disa
 # Derived flags based on primary options
 #-------------------------------------------------------------------------------
 
-option(IREE_ENABLE_EMITC "Enables MLIR EmitC dependencies." ${IREE_BUILD_COMPILER})
+cmake_dependent_option(IREE_ENABLE_EMITC "Enables MLIR EmitC dependencies." ON ${IREE_BUILD_COMPILER} OFF)
 
 #-------------------------------------------------------------------------------
 # Target and backend configuration
@@ -110,15 +112,15 @@ option(IREE_HAL_DRIVER_VMVX "Enables the 'vmvx' runtime HAL driver" ${IREE_HAL_D
 option(IREE_HAL_DRIVER_VMVX_SYNC "Enables the 'vmvx-sync' runtime HAL driver" ${IREE_HAL_DRIVER_DEFAULTS})
 option(IREE_HAL_DRIVER_VULKAN "Enables the 'vulkan' runtime HAL driver" ${IREE_HAL_DRIVER_VULKAN_DEFAULT})
 
-option(IREE_TARGET_BACKEND_CUDA "Enables the 'cuda' compiler target backend" ${IREE_BUILD_COMPILER})
-option(IREE_TARGET_BACKEND_DYLIB_LLVM_AOT "Enables the 'dylib-llvm-aot' compiler target backend" ${IREE_BUILD_COMPILER})
-option(IREE_TARGET_BACKEND_METAL_SPIRV "Enables the 'metal-spirv' compiler target backend" ${IREE_BUILD_COMPILER})
-option(IREE_TARGET_BACKEND_ROCM "Enables the 'rocm' compiler target backend" ${IREE_BUILD_COMPILER})
-option(IREE_TARGET_BACKEND_VMVX "Enables the 'vmvx' compiler target backend" ${IREE_BUILD_COMPILER})
-option(IREE_TARGET_BACKEND_VULKAN_SPIRV "Enables the 'vulkan-spirv' compiler target backend" ${IREE_BUILD_COMPILER})
-option(IREE_TARGET_BACKEND_WASM_LLVM_AOT "Enables the 'wasm-llvm-aot' compiler target backend" ${IREE_BUILD_COMPILER})
+cmake_dependent_option(IREE_TARGET_BACKEND_CUDA "Enables the 'cuda' compiler target backend" ON ${IREE_BUILD_COMPILER} OFF)
+cmake_dependent_option(IREE_TARGET_BACKEND_DYLIB_LLVM_AOT "Enables the 'dylib-llvm-aot' compiler target backend" ON ${IREE_BUILD_COMPILER} OFF)
+cmake_dependent_option(IREE_TARGET_BACKEND_METAL_SPIRV "Enables the 'metal-spirv' compiler target backend" ON ${IREE_BUILD_COMPILER} OFF)
+cmake_dependent_option(IREE_TARGET_BACKEND_ROCM "Enables the 'rocm' compiler target backend" ON ${IREE_BUILD_COMPILER} OFF)
+cmake_dependent_option(IREE_TARGET_BACKEND_VMVX "Enables the 'vmvx' compiler target backend" ON ${IREE_BUILD_COMPILER} OFF)
+cmake_dependent_option(IREE_TARGET_BACKEND_VULKAN_SPIRV "Enables the 'vulkan-spirv' compiler target backend" ON ${IREE_BUILD_COMPILER} OFF)
+cmake_dependent_option(IREE_TARGET_BACKEND_WASM_LLVM_AOT "Enables the 'wasm-llvm-aot' compiler target backend" ON ${IREE_BUILD_COMPILER} OFF)
 # Disable WebGPU by default - it has complex deps and is under development.
-option(IREE_TARGET_BACKEND_WEBGPU "Enables the 'webgpu' compiler target backend" OFF)
+cmake_dependent_option(IREE_TARGET_BACKEND_WEBGPU "Enables the 'webgpu' compiler target backend" OFF ${IREE_BUILD_COMPILER} OFF)
 
 message(VERBOSE "IREE build runtime HAL driver 'cuda': ${IREE_HAL_DRIVER_CUDA}")
 message(VERBOSE "IREE build runtime HAL driver 'dylib': ${IREE_HAL_DRIVER_DYLIB}")
