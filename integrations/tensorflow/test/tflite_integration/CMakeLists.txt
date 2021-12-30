@@ -12,14 +12,14 @@ iree_py_library(
     "test_util.py"
 )
 
-iree_py_test (
+iree_py_test(
   NAME
     mobilenet_v1
   SRCS
     "mobilenet_v1_test.py"
 )
 
-iree_py_test (
+iree_py_test(
   NAME
     posenet_i8
   SRCS
