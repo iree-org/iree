@@ -76,6 +76,33 @@ static void processMixedOperands(ArrayRef<OpFoldResult> valueOrAttrs,
   }
 }
 
+/// Implements default offset, sizes and strides, for
+/// `flow.dispatch.tensor.load/store` ops. When no offsets, sizes and strides
+/// are specified, the offsets are all zeros, sizes are same as the dispatch
+/// tensor and strides are all 1.
+static void getDefaultOffsetSizeAndStrides(
+    OpBuilder &builder, IREE::Flow::DispatchTensorType dispatchTensorType,
+    ValueRange dynamicDims, SmallVectorImpl<OpFoldResult> &offsets,
+    SmallVectorImpl<OpFoldResult> &sizes,
+    SmallVectorImpl<OpFoldResult> &strides) {
+  auto zeroAttr = builder.getI64IntegerAttr(0);
+  auto oneAttr = builder.getI64IntegerAttr(1);
+  int64_t dispatchTensorRank = dispatchTensorType.getRank();
+  offsets.assign(dispatchTensorRank, zeroAttr);
+  strides.assign(dispatchTensorRank, oneAttr);
+  sizes.resize(dispatchTensorRank);
+  unsigned pos = 0;
+  for (auto dim : llvm::enumerate(dispatchTensorType.getShape())) {
+    if (ShapedType::isDynamic(dim.value())) {
+      assert(pos < dynamicDims.size() && "missing dynamic dims specifications");
+      sizes[dim.index()] = dynamicDims[pos++];
+      continue;
+    }
+    sizes[dim.index()] = builder.getI64IntegerAttr(dim.value());
+  }
+  return;
+}
+
 RankedTensorType DispatchTensorLoadOp::inferRankReducedResultType(
     unsigned resultRank, IREE::Flow::DispatchTensorType sourceType,
     ArrayRef<OpFoldResult> mixedSizes) {
@@ -123,10 +150,12 @@ void DispatchTensorLoadOp::build(OpBuilder &builder, OperationState &state,
                                  RankedTensorType returnType, Value source,
                                  ValueRange sourceDynamicDims,
                                  ArrayRef<NamedAttribute> attributes) {
-  build(builder, state, returnType, source, sourceDynamicDims,
-        ArrayRef<Value>(), ArrayRef<Value>(), ArrayRef<Value>(),
-        builder.getI64ArrayAttr({}), builder.getI64ArrayAttr({}),
-        builder.getI64ArrayAttr({}));
+  SmallVector<OpFoldResult> offsets, strides, sizes;
+  getDefaultOffsetSizeAndStrides(
+      builder, source.getType().cast<IREE::Flow::DispatchTensorType>(),
+      sourceDynamicDims, offsets, sizes, strides);
+  build(builder, state, returnType, source, sourceDynamicDims, offsets, sizes,
+        strides, attributes);
 }
 
 void DispatchTensorLoadOp::build(OpBuilder &builder, OperationState &state,
@@ -154,6 +183,7 @@ void DispatchTensorLoadOp::build(OpBuilder &builder, OperationState &state,
         strides, builder.getI64ArrayAttr(staticOffsets),
         builder.getI64ArrayAttr(staticSizes),
         builder.getI64ArrayAttr(staticStrides));
+  state.addAttributes(attributes);
 }
 
 void DispatchTensorLoadOp::build(OpBuilder &builder, OperationState &state,
@@ -177,8 +207,8 @@ LogicalResult DispatchTensorLoadOp::reifyResultShapes(
     shape = llvm::to_vector<6>(llvm::map_range(
         getMixedSizes(), [&](OpFoldResult valueOrAttr) -> Value {
           if (auto attr = valueOrAttr.dyn_cast<Attribute>()) {
-            return b.create<arith::ConstantOp>(getLoc(),
-                                               attr.cast<IntegerAttr>());
+            return b.create<arith::ConstantIndexOp>(
+                getLoc(), attr.cast<IntegerAttr>().getInt());
           } else {
             return valueOrAttr.dyn_cast<Value>();
           }
@@ -206,10 +236,35 @@ void DispatchTensorStoreOp::build(OpBuilder &builder, OperationState &state,
                                   Value value, Value target,
                                   ValueRange targetDynamicDims,
                                   ArrayRef<NamedAttribute> attributes) {
+  SmallVector<OpFoldResult> offsets, sizes, strides;
+  getDefaultOffsetSizeAndStrides(
+      builder, target.getType().cast<IREE::Flow::DispatchTensorType>(),
+      targetDynamicDims, offsets, sizes, strides);
+  build(builder, state, value, target, targetDynamicDims, offsets, sizes,
+        strides, attributes);
+}
+
+void DispatchTensorStoreOp::build(OpBuilder &builder, OperationState &state,
+                                  Value value, Value target,
+                                  ValueRange targetDynamicDims,
+                                  ArrayRef<OpFoldResult> mixedOffsets,
+                                  ArrayRef<OpFoldResult> mixedSizes,
+                                  ArrayRef<OpFoldResult> mixedStrides,
+                                  ArrayRef<NamedAttribute> attributes) {
+  SmallVector<Value> offsets, sizes, strides;
+  SmallVector<int64_t> staticOffsets, staticSizes, staticStrides;
+  processMixedOperands(mixedOffsets, offsets, staticOffsets,
+                       ShapedType::kDynamicStrideOrOffset);
+  processMixedOperands(mixedSizes, sizes, staticSizes,
+                       ShapedType::kDynamicSize);
+  processMixedOperands(mixedStrides, strides, staticStrides,
+                       ShapedType::kDynamicStrideOrOffset);
+
   build(builder, state, ArrayRef<Type>(), value, target, targetDynamicDims,
-        ArrayRef<Value>(), ArrayRef<Value>(), ArrayRef<Value>(),
-        builder.getI64ArrayAttr({}), builder.getI64ArrayAttr({}),
-        builder.getI64ArrayAttr({}));
+        offsets, sizes, strides, builder.getI64ArrayAttr(staticOffsets),
+        builder.getI64ArrayAttr(staticSizes),
+        builder.getI64ArrayAttr(staticStrides));
+  state.addAttributes(attributes);
 }
 
 //===----------------------------------------------------------------------===//

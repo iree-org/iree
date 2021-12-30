@@ -8,7 +8,7 @@ func @fold_reshape() {
   %1 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<readonly:3x3x1x96xf32>
   %2 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<writeonly:3x3x96xf32>
   // CHECK: %[[LOAD:.+]] = flow.dispatch.tensor.load %[[ARG]], {{.*}} : !flow.dispatch.tensor<readonly:3x3x96xf32> -> tensor<3x3x96xf32>
-  %3 = flow.dispatch.tensor.load %1, offsets=[], sizes =[], strides=[] : !flow.dispatch.tensor<readonly:3x3x1x96xf32> -> tensor<3x3x1x96xf32>
+  %3 = flow.dispatch.tensor.load %1, offsets=[0, 0, 0, 0], sizes =[3, 3, 1, 96], strides=[1, 1, 1, 1] : !flow.dispatch.tensor<readonly:3x3x1x96xf32> -> tensor<3x3x1x96xf32>
   %4 = tensor.collapse_shape %3 [[0, 1, 2, 3]] : tensor<3x3x1x96xf32> into tensor<864xf32>
   %5 = tensor.expand_shape %4 [[0, 1, 2]] : tensor<864xf32> into tensor<3x3x96xf32>
   //  CHECK: flow.dispatch.tensor.store %[[LOAD]], {{.*}}
@@ -46,7 +46,7 @@ func @dont_fold_dynamic_reshape() {
   %dim2 = hal.interface.constant.load[2] : index
   %1 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<readonly:?x?x96xf32>{%dim0, %dim1}
   %2 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<writeonly:?x12x8xf32>{%dim2}
-  %3 = flow.dispatch.tensor.load %1, offsets=[], sizes =[], strides=[] : !flow.dispatch.tensor<readonly:?x?x96xf32> -> tensor<?x?x96xf32>
+  %3 = flow.dispatch.tensor.load %1, offsets=[0, 0, 0], sizes =[%dim0, %dim1, 96], strides=[1, 1, 1] : !flow.dispatch.tensor<readonly:?x?x96xf32> -> tensor<?x?x96xf32>
   // CHECK: tensor.collapse_shape
   // CHECK: tensor.expand_shape
   %4 = tensor.collapse_shape %3 [[0, 1], [2]] : tensor<?x?x96xf32> into tensor<?x96xf32>

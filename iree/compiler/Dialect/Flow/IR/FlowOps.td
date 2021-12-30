@@ -393,6 +393,16 @@ def FLOW_DispatchTensorStoreOp : FLOW_Op<"dispatch.tensor.store", [
       "ValueRange":$targetDynamicDims,
       CArg<"ArrayRef<NamedAttribute>", "{}">:$attrs
     )>,
+    // Builder for tensor.store with mixed static and dynamic offset, sizes and strides.
+    OpBuilder<(ins
+      "Value":$value,
+      "Value":$target,
+      "ValueRange":$targetDynamicDims,
+      "ArrayRef<OpFoldResult>":$mixedOffsets,
+      "ArrayRef<OpFoldResult>":$mixedSizes,
+      "ArrayRef<OpFoldResult>":$mixedStrides,
+      CArg<"ArrayRef<NamedAttribute>", "{}">:$attrs
+    )>
   ];
 
   let extraClassDeclaration = [{

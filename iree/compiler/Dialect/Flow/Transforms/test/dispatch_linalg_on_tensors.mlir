@@ -1009,9 +1009,11 @@ func @sort_1d(%arg0: tensor<?xi32>, %arg1 : tensor<?xf32>)
 //      CHECK:   %[[RESULT:.+]]:2 = flow.dispatch.workgroups[%[[C1]], %[[C1]], %[[C1]]]
 // CHECK-SAME:       (%[[ARG0]], %[[ARG0_D0]], %[[ARG1]], %[[ARG1_D0]])
 // CHECK-NEXT:       (%[[ARG0_CAPTURE:[a-zA-Z0-9_]+]]: !flow.dispatch.tensor<readwrite:?xi32>
+// CHECK-SAME:        %[[ARG0_D0_CAPTURE:[a-zA-Z0-9_]+]]: index
 // CHECK-SAME:        %[[ARG1_CAPTURE:[a-zA-Z0-9_]+]]: !flow.dispatch.tensor<readwrite:?xf32>
-//  CHECK-DAG:     %[[OUT1_TILE:.+]] = flow.dispatch.tensor.load %[[ARG0_CAPTURE]], offsets = [], sizes = []
-//  CHECK-DAG:     %[[OUT2_TILE:.+]] = flow.dispatch.tensor.load %[[ARG1_CAPTURE]], offsets = [], sizes = []
+// CHECK-SAME:        %[[ARG1_D0_CAPTURE:[a-zA-Z0-9_]+]]: index
+//  CHECK-DAG:     %[[OUT1_TILE:.+]] = flow.dispatch.tensor.load %[[ARG0_CAPTURE]], offsets = [0], sizes = [%[[ARG0_D0_CAPTURE]]]
+//  CHECK-DAG:     %[[OUT2_TILE:.+]] = flow.dispatch.tensor.load %[[ARG1_CAPTURE]], offsets = [0], sizes = [%[[ARG1_D0_CAPTURE]]]
 //      CHECK:     %[[RESULT_TILE:.+]]:2 = iree_linalg_ext.sort dimension(0)
 // CHECK-SAME:         outs(%[[OUT1_TILE]], %[[OUT2_TILE]] : tensor<?xi32>, tensor<?xf32>)
 //  CHECK-DAG:     flow.dispatch.tensor.store %[[RESULT_TILE]]#0, %[[ARG0_CAPTURE]]
@@ -1046,7 +1048,7 @@ func @scatter_static(%arg0 : tensor<4xi32>, %arg1 : tensor<4x1xi32>, %arg2 : ten
 // CHECK-SAME:     %[[ARG5:[a-zA-Z0-9_]+]]: !flow.dispatch.tensor<readwrite:8xi32>
 //      CHECK:     scf.for %[[IV:.+]] = %{{.+}} to %{{.+}} step %{{.+}} {
 //      CHECK:       %[[SCATTER_TILE:.+]] = iree_linalg_ext.scatter
-//      CHECK:       flow.dispatch.tensor.store %[[SCATTER_TILE]], %[[ARG5]], offsets = [], sizes = [], strides = []
+//      CHECK:       flow.dispatch.tensor.store %[[SCATTER_TILE]], %[[ARG5]], offsets = [0], sizes = [8], strides = [1]
 // CHECK-NEXT:     }
 //      CHECK:  return %[[RESULT]]
 
