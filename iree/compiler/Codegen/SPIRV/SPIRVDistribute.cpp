@@ -51,12 +51,13 @@ struct DistributeLoop final : public OpRewritePattern<scf::ForOp> {
     auto mulMap = AffineMap::get(0, 2, {sym0 * sym1}, context);
 
     auto newLb = rewriter.create<AffineApplyOp>(
-        loc, mulAddMap, ValueRange{idOp, forOp.step(), forOp.lowerBound()});
+        loc, mulAddMap,
+        ValueRange{idOp, forOp.getStep(), forOp.getLowerBound()});
     auto newStep = rewriter.create<AffineApplyOp>(
-        loc, mulMap, ValueRange{countOp, forOp.step()});
+        loc, mulMap, ValueRange{countOp, forOp.getStep()});
 
-    forOp.lowerBoundMutable().assign(newLb);
-    forOp.stepMutable().assign(newStep);
+    forOp.getLowerBoundMutable().assign(newLb);
+    forOp.getStepMutable().assign(newStep);
     // Remove the attribute to avoid endless recursion.
     forOp->removeAttr(getSPIRVDistributeAttrName());
     return success();

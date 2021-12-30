@@ -51,9 +51,6 @@
 // IREE_PLATFORM_LINUX
 // IREE_PLATFORM_MACOS
 // IREE_PLATFORM_WINDOWS
-//
-// The special define IREE_PLATFORM_GOOGLE will be specified if the build
-// is being performed within the internal Google repository.
 
 //==============================================================================
 // IREE_ARCH_*

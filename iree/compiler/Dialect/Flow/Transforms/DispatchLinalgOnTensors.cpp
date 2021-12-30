@@ -250,9 +250,7 @@ buildOperandLessFlowDispatchWorkgroupOp(PatternRewriter &rewriter, Location loc,
       rewriter.create<IREE::Flow::DispatchTensorStoreOp>(
           loc, std::get<0>(it), std::get<1>(it),
           resultDynamicDims.slice(dynamicDimIdx,
-                                  resultType.getNumDynamicDims()),
-          llvm::None, llvm::None, llvm::None, rewriter.getArrayAttr({}),
-          rewriter.getArrayAttr({}), rewriter.getArrayAttr({}));
+                                  resultType.getNumDynamicDims()));
       dynamicDimIdx += resultType.getNumDynamicDims();
     }
     rewriter.create<IREE::Flow::ReturnOp>(loc);

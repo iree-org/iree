@@ -110,13 +110,6 @@ static LogicalResult analyseConstantOp(arith::ConstantOp constantOp,
 /// equivalence class as the source.
 static LogicalResult analyseInterfaceLoadTensorOp(
     IREE::Flow::DispatchTensorLoadOp loadOp, BufferizationPlan &plan) {
-  if (!(loadOp.getMixedOffsets().empty() && loadOp.getMixedSizes().empty() &&
-        loadOp.getMixedStrides().empty()) &&
-      !canUsersHandleSubviews(loadOp)) {
-    plan.insert(loadOp.source());
-    plan.insert(loadOp.result());
-    return success();
-  }
   plan.unionSets(loadOp.result(), loadOp.source());
   return success();
 }
@@ -150,22 +143,6 @@ static OpType getEquivalentOpOfType(Value value, BufferizationPlan &plan) {
 static bool canSetStoreValueAndTargetAsEquivalent(
     IREE::Flow::DispatchTensorStoreOp storeOp, BufferizationPlan &plan) {
   Value value = storeOp.value();
-  if (!(storeOp.getMixedOffsets().empty() && storeOp.getMixedSizes().empty() &&
-        storeOp.getMixedStrides().empty())) {
-    SmallVector<Value> mappedTensors = plan.getTensorsMappedToSameSet(value);
-    for (auto v : mappedTensors) {
-      // TODO(ravishankarm): At this point it is not clear why the following
-      // restriction exists. It might have something to do with subviews and
-      // reshapes not working well together, but there is no comment about why
-      // this was added with the change that added this.
-      Operation *op = v.getDefiningOp();
-      if (op && isa<tensor::CollapseShapeOp, tensor::ExpandShapeOp>(
-                    v.getDefiningOp())) {
-        return false;
-      }
-    }
-  }
-
   Value target = storeOp.target();
   auto targetInterfaceOp =
       getEquivalentOpOfType<IREE::HAL::InterfaceBindingSubspanOp>(target, plan);
@@ -357,19 +334,19 @@ static LogicalResult analyseScfIfOp(scf::IfOp ifOp, BufferizationPlan &plan) {
 
 static LogicalResult analyseScfForOp(scf::ForOp forOp,
                                      BufferizationPlan &plan) {
-  if (forOp.results().empty()) return success();
+  if (forOp.getResults().empty()) return success();
   if (!llvm::all_of(forOp->getResultTypes(), [](Type resultType) {
         return resultType.isa<RankedTensorType>();
       })) {
     return success();
   }
 
-  auto yeildOp = cast<scf::YieldOp>(forOp.getBody()->getTerminator());
+  auto yieldOp = cast<scf::YieldOp>(forOp.getBody()->getTerminator());
   auto regionArgs = forOp.getRegionIterArgs();
-  auto initArgs = forOp.initArgs();
-  for (int i = 0; i < yeildOp.results().size(); ++i) {
-    Value yieldTensor = yeildOp.results()[i];
-    Value resultTensor = forOp.results()[i];
+  auto initArgs = forOp.getInitArgs();
+  for (int i = 0; i < yieldOp.getResults().size(); ++i) {
+    Value yieldTensor = yieldOp.getResults()[i];
+    Value resultTensor = forOp.getResults()[i];
     Value initArg = initArgs[i];
     Value arg = regionArgs[i];
     // Always tie the yield, the result tensor, and the region arg

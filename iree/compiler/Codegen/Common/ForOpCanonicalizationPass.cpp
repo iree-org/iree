@@ -115,9 +115,9 @@ struct CanonicalizeForOpInductionVarShape final
       initArgs[it.index()] = rewriter.clone(*op, mapping)->getResult(0);
     }
     if (iteratorFolded.empty()) return failure();
-    auto newLoop =
-        rewriter.create<scf::ForOp>(forOp.getLoc(), forOp.lowerBound(),
-                                    forOp.upperBound(), forOp.step(), initArgs);
+    auto newLoop = rewriter.create<scf::ForOp>(
+        forOp.getLoc(), forOp.getLowerBound(), forOp.getUpperBound(),
+        forOp.getStep(), initArgs);
     transferBody(forOp.getBody(), newLoop.getBody(), returnValues, rewriter);
 
     // Replace the operation by the new one.
@@ -170,8 +170,8 @@ struct PackForOpInductionVarVector final : public OpRewritePattern<scf::ForOp> {
     // Create a new loop with the casted init values. This also creates
     // induction variables with proper type.
     auto newLoop = rewriter.create<scf::ForOp>(
-        forOp.getLoc(), forOp.lowerBound(), forOp.upperBound(), forOp.step(),
-        ivInitValues);
+        forOp.getLoc(), forOp.getLowerBound(), forOp.getUpperBound(),
+        forOp.getStep(), ivInitValues);
 
     // Move all operations to the new for op. This also replaces block
     // arguments. to the new block arguments.

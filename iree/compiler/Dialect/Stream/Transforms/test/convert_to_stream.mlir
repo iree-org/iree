@@ -11,11 +11,11 @@ flow.executable private @executable {
       // CHECK: %[[ARG0_TENSOR:.+]] = stream.binding.subspan %arg0[%c0] : !stream.binding -> !flow.dispatch.tensor<readonly:?x4xf32>{%[[ARG0_DIM0]]}
       // CHECK: %[[ARG1_TENSOR:.+]] = stream.binding.subspan %arg1[%c0] : !stream.binding -> !flow.dispatch.tensor<writeonly:4x?xf32>{%[[ARG1_DIM1]]}
 
-      // CHECK: %[[TILE:.+]] = flow.dispatch.tensor.load %[[ARG0_TENSOR]], offsets = [], sizes = [], strides = [] : !flow.dispatch.tensor<readonly:?x4xf32>{%[[ARG0_DIM0]]} -> tensor<?x4xf32>
-      %0 = flow.dispatch.tensor.load %arg0, offsets = [], sizes = [], strides = [] : !flow.dispatch.tensor<readonly:?x4xf32>{%arg0_dim0} -> tensor<?x4xf32>
+      // CHECK: %[[TILE:.+]] = flow.dispatch.tensor.load %[[ARG0_TENSOR]], offsets = [0, 0], sizes = [%[[ARG0_DIM0]], 4], strides = [1, 1] : !flow.dispatch.tensor<readonly:?x4xf32>{%[[ARG0_DIM0]]} -> tensor<?x4xf32>
+      %0 = flow.dispatch.tensor.load %arg0, offsets = [0, 0], sizes = [%arg0_dim0, 4], strides = [1, 1] : !flow.dispatch.tensor<readonly:?x4xf32>{%arg0_dim0} -> tensor<?x4xf32>
 
-      // CHECK: flow.dispatch.tensor.store %[[TILE]], %[[ARG1_TENSOR]], offsets = [], sizes = [], strides = [] : tensor<?x4xf32> -> !flow.dispatch.tensor<writeonly:4x?xf32>{%[[ARG1_DIM1]]}
-      flow.dispatch.tensor.store %0, %arg1, offsets = [], sizes = [], strides = [] : tensor<?x4xf32> -> !flow.dispatch.tensor<writeonly:4x?xf32>{%arg1_dim1}
+      // CHECK: flow.dispatch.tensor.store %[[TILE]], %[[ARG1_TENSOR]], offsets = [0, 0], sizes = [4, %[[ARG1_DIM1]]], strides = [1, 1] : tensor<?x4xf32> -> !flow.dispatch.tensor<writeonly:4x?xf32>{%[[ARG1_DIM1]]}
+      flow.dispatch.tensor.store %0, %arg1, offsets = [0, 0], sizes = [4, %arg1_dim1], strides = [1, 1] : tensor<?x4xf32> -> !flow.dispatch.tensor<writeonly:4x?xf32>{%arg1_dim1}
 
       return
     }

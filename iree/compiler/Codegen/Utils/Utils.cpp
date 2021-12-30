@@ -489,23 +489,23 @@ Optional<LoopTilingAndDistributionInfo> isTiledAndDistributedLoop(
     scf::ForOp forOp) {
   LoopTilingAndDistributionInfo loopInfo;
   loopInfo.loop = forOp;
-  loopInfo.untiledUpperBound = getAsOpFoldResult(forOp.upperBound());
+  loopInfo.untiledUpperBound = getAsOpFoldResult(forOp.getUpperBound());
 
-  auto lbApplyOp = forOp.lowerBound().getDefiningOp<AffineApplyOp>();
-  auto stepApplyOp = forOp.step().getDefiningOp<AffineApplyOp>();
+  auto lbApplyOp = forOp.getLowerBound().getDefiningOp<AffineApplyOp>();
+  auto stepApplyOp = forOp.getStep().getDefiningOp<AffineApplyOp>();
 
   if (!lbApplyOp || !stepApplyOp) {
     // Try to see if this s a specical case where we have:
     //   scf.for %iv = %id to %ub step %count
     Optional<unsigned> idDim;
     if (auto ifx = dyn_cast_or_null<ProcessorIDInterface>(
-            forOp.lowerBound().getDefiningOp())) {
+            forOp.getLowerBound().getDefiningOp())) {
       idDim = ifx.getDimIndex();
     }
 
     Optional<unsigned> countDim;
     if (auto ifx = dyn_cast_or_null<ProcessorCountInterface>(
-            forOp.step().getDefiningOp())) {
+            forOp.getStep().getDefiningOp())) {
       countDim = ifx.getDimIndex();
     }
 

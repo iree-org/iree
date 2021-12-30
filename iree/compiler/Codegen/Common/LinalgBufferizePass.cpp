@@ -144,6 +144,68 @@ static MemRefType getMemrefTypeForTensor(TensorType tensorType,
                          layout, memorySpace);
 }
 
+/// Checks if the offsets, sizes and strides with src, form a no-op
+/// subview. This is true if
+/// 1) The offsets are 0
+/// 2) The strides are 1
+/// 3) The sizes are same as that of the src.
+/// For (3) when the shape is dynamic if the `src` is defined using an operation
+/// that implements the `ShapeAwareOpInterface` (like
+/// `hal.interface.binding.subspan`) then we can use that to check dynamic
+/// equality.
+static bool generatesNoOpSubView(Value src, ArrayRef<OpFoldResult> offsets,
+                                 ArrayRef<OpFoldResult> sizes,
+                                 ArrayRef<OpFoldResult> strides) {
+  auto interfaceOp =
+      dyn_cast_or_null<IREE::Util::ShapeAwareOpInterface>(src.getDefiningOp());
+  if (!interfaceOp) {
+    return false;
+  }
+  /// Check offsets are 0.
+  if (llvm::any_of(offsets, [](OpFoldResult ofr) {
+        Optional<int64_t> intValue = getConstantIntValue(ofr);
+        return !intValue || intValue.getValue() != 0;
+      })) {
+    return false;
+  }
+  /// Check strides are 0.
+  if (llvm::any_of(strides, [](OpFoldResult ofr) {
+        Optional<int64_t> intValue = getConstantIntValue(ofr);
+        return !intValue || intValue.getValue() != 1;
+      })) {
+    return false;
+  }
+  /// Check sizes are same as the source.
+  auto dynamicDims = interfaceOp.getResultDynamicDims(0);
+  unsigned dynamicDimsPos = 0;
+  ArrayRef<int64_t> srcShape = src.getType().cast<MemRefType>().getShape();
+  for (auto size : enumerate(sizes)) {
+    if (Optional<int64_t> intValue = getConstantIntValue(size.value())) {
+      if (intValue != srcShape[size.index()]) {
+        return false;
+      }
+      continue;
+    }
+    if (size.value().get<Value>() == dynamicDims[dynamicDimsPos]) {
+      dynamicDimsPos++;
+      continue;
+    }
+    auto loadConstOp1 =
+        size.value()
+            .get<Value>()
+            .getDefiningOp<IREE::HAL::InterfaceConstantLoadOp>();
+    auto loadConstOp2 =
+        dynamicDims[dynamicDimsPos]
+            .getDefiningOp<IREE::HAL::InterfaceConstantLoadOp>();
+    if (!loadConstOp1 || !loadConstOp2 ||
+        loadConstOp1.index() != loadConstOp2.index()) {
+      return false;
+    }
+    dynamicDimsPos++;
+  }
+  return true;
+}
+
 /// Creates a subview operation given the `src`, `offsets`, `sizes` and
 /// `strides`. Handles the corner case where the `offsets`, `sizes` and
 /// `strides` are empty in which case just forward the `src` value.  If the
@@ -152,7 +214,9 @@ static Value createSubviewOp(OpBuilder &b, Location loc, unsigned resultRank,
                              Value src, ArrayRef<OpFoldResult> offsets,
                              ArrayRef<OpFoldResult> sizes,
                              ArrayRef<OpFoldResult> strides) {
-  if (offsets.empty() && sizes.empty() && strides.empty()) return src;
+  if (generatesNoOpSubView(src, offsets, sizes, strides)) {
+    return src;
+  }
   MemRefType resultType;
   MemRefType srcType = src.getType().cast<MemRefType>();
   if (srcType.getRank() != resultRank) {
@@ -269,20 +333,25 @@ static Value getSubviewOpForTensorStoreOp(OpBuilder &b, Operation *storeOp,
   return subview;
 }
 
-/// Gets the reverse of a `tensor.expand_shape`/`tensor.collapse_shape` op to
-/// get a memref type that can be used for in-place computation of the result
-/// of a dispatch region.
-template <typename TensorReshapeOpTy>
-static Value getReverseOfReshapeOp(OpBuilder &b, TensorReshapeOpTy reshapeOp,
+/// Gets the reverse of a `tensor.collapse_shape` op to get a memref type that
+/// can be used for in-place computation of the result of a dispatch region.
+static Value getReverseOfReshapeOp(OpBuilder &b,
+                                   tensor::CollapseShapeOp reshapeOp,
                                    Value resultBuffer) {
   auto memrefType = getMemrefTypeForTensor(
       reshapeOp.getSrcType(), {},
       resultBuffer.getType().cast<MemRefType>().getMemorySpace());
-  using ReverseReshapeOpTy = typename std::conditional<
-      std::is_same<TensorReshapeOpTy, tensor::CollapseShapeOp>::value,
-      memref::ExpandShapeOp, memref::CollapseShapeOp>::type;
-  return b.create<ReverseReshapeOpTy>(reshapeOp.getLoc(), memrefType,
-                                      resultBuffer, reshapeOp.reassociation());
+  return b.create<memref::ExpandShapeOp>(
+      reshapeOp.getLoc(), memrefType, resultBuffer, reshapeOp.reassociation());
+}
+
+/// Gets the reverse of a `tensor.expand_shape` op to get a memref type that can
+/// be used for in-place computation of the result of a dispatch region.
+static Value getReverseOfReshapeOp(OpBuilder &b,
+                                   tensor::ExpandShapeOp reshapeOp,
+                                   Value resultBuffer) {
+  return b.create<memref::CollapseShapeOp>(reshapeOp.getLoc(), resultBuffer,
+                                           reshapeOp.getReassociationIndices());
 }
 
 /// Gets the reverse of a `tensor.cast` op to get a memref type that
@@ -413,12 +482,26 @@ static Value getAliasingBufferForResult(OpBuilder &b,
                          loadOp.getMixedSizes(), loadOp.getMixedStrides());
 }
 
-/// Converts a `tensor.collapse/expand_shape` operation to a
-/// `linalg.collapse/expand_shape` operation with the result aliasing the buffer
-/// for the operand.
-template <typename TensorReshapeOpTy>
+/// Converts a `tensor.collapse_shape` operation to a `memref.collapse_shape`
+/// operation with the result aliasing the buffer for the operand.
 static Value getAliasingBufferForReshapeResult(OpBuilder &b,
-                                               TensorReshapeOpTy op,
+                                               tensor::CollapseShapeOp op,
+                                               BlockAndValueMapping &bvm) {
+  Location loc = op.getLoc();
+  Value srcTensor = op.src();
+  Value inputBuffer = bvm.lookup(srcTensor);
+
+  // Create the reshape op.
+  Value bufferReshape = b.create<memref::CollapseShapeOp>(
+      loc, inputBuffer, op.getReassociationIndices());
+  return bufferReshape;
+}
+
+/// Converts a `tensor.expand_shape` operation to a
+/// `memref.expand_shape` operation with the result aliasing the buffer
+/// for the operand.
+static Value getAliasingBufferForReshapeResult(OpBuilder &b,
+                                               tensor::ExpandShapeOp op,
                                                BlockAndValueMapping &bvm) {
   Location loc = op.getLoc();
   Value srcTensor = op.src();
@@ -429,11 +512,8 @@ static Value getAliasingBufferForReshapeResult(OpBuilder &b,
   MemRefType inputBufferType = inputBuffer.getType().cast<MemRefType>();
   auto reshapeResultType = getMemrefTypeForTensor(
       resultTensorType, {}, inputBufferType.getMemorySpace());
-  using ReshapeOpTy = typename std::conditional<
-      std::is_same<TensorReshapeOpTy, tensor::CollapseShapeOp>::value,
-      memref::CollapseShapeOp, memref::ExpandShapeOp>::type;
-  Value bufferReshape = b.create<ReshapeOpTy>(loc, reshapeResultType,
-                                              inputBuffer, op.reassociation());
+  Value bufferReshape = b.create<memref::ExpandShapeOp>(
+      loc, reshapeResultType, inputBuffer, op.reassociation());
   return bufferReshape;
 }
 
@@ -452,9 +532,9 @@ static Value getAliasingBufferForResult(OpBuilder &b, tensor::ExtractSliceOp op,
 /// Returns output buffers that aliases inputs.
 static SmallVector<Value> getAliasingBuffersForResult(
     scf::ForOp scfFor, BlockAndValueMapping &bvm) {
-  SmallVector<Value> aliasedBuffers(scfFor.results().size(), nullptr);
-  for (int i = 0; i < scfFor.results().size(); ++i) {
-    Value inputTensor = scfFor.initArgs()[i];
+  SmallVector<Value> aliasedBuffers(scfFor.getResults().size(), nullptr);
+  for (int i = 0; i < scfFor.getResults().size(); ++i) {
+    Value inputTensor = scfFor.getInitArgs()[i];
     if (!inputTensor.getType().isa<RankedTensorType>()) continue;
     Value inputBuffer = bvm.lookup(inputTensor);
     aliasedBuffers[i] = inputBuffer;

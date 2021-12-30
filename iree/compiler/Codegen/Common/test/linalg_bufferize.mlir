@@ -589,9 +589,9 @@ func @reshape_simple() {
   %c12 = arith.constant 12 : index
   %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<readonly:12xi32>
   %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : !flow.dispatch.tensor<writeonly:3x4xi32>
-  %2 = flow.dispatch.tensor.load %0, offsets = [], sizes = [], strides = [] : !flow.dispatch.tensor<readonly:12xi32> -> tensor<12xi32>
+  %2 = flow.dispatch.tensor.load %0, offsets = [0], sizes = [12], strides = [1] : !flow.dispatch.tensor<readonly:12xi32> -> tensor<12xi32>
   %3 = tensor.expand_shape %2 [[0, 1]] : tensor<12xi32> into tensor<3x4xi32>
-  flow.dispatch.tensor.store %3, %1, offsets = [], sizes = [], strides = [] : tensor<3x4xi32> -> !flow.dispatch.tensor<writeonly:3x4xi32>
+  flow.dispatch.tensor.store %3, %1, offsets = [0, 0], sizes = [3, 4], strides = [1, 1] : tensor<3x4xi32> -> !flow.dispatch.tensor<writeonly:3x4xi32>
   return
 }
 
@@ -611,7 +611,7 @@ func @reshape_fused_source() {
   %c12 = arith.constant 12 : index
   %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<readonly:12xi32>
   %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : !flow.dispatch.tensor<writeonly:3x4xi32>
-  %2 = flow.dispatch.tensor.load %0, offsets = [], sizes = [], strides = [] : !flow.dispatch.tensor<readonly:12xi32> -> tensor<12xi32>
+  %2 = flow.dispatch.tensor.load %0, offsets = [0], sizes = [12], strides = [1] : !flow.dispatch.tensor<readonly:12xi32> -> tensor<12xi32>
   %3 = tensor.expand_shape %2 [[0, 1]] : tensor<12xi32> into tensor<3x4xi32>
   %4 = linalg.init_tensor [3, 4] : tensor<3x4xi32>
   %5 = linalg.generic {
@@ -622,7 +622,7 @@ func @reshape_fused_source() {
       %6 = arith.addi %arg0, %arg0 : i32
       linalg.yield %6 : i32
     } -> tensor<3x4xi32>
-  flow.dispatch.tensor.store %5, %1, offsets = [], sizes = [], strides = [] : tensor<3x4xi32> -> !flow.dispatch.tensor<writeonly:3x4xi32>
+  flow.dispatch.tensor.store %5, %1, offsets = [0, 0], sizes = [3, 4], strides = [1, 1] : tensor<3x4xi32> -> !flow.dispatch.tensor<writeonly:3x4xi32>
   return
 }
 
@@ -645,7 +645,7 @@ func @reshape_fused_source_and_copyout() {
   %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<readonly:12xi32>
   %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : !flow.dispatch.tensor<writeonly:3x4xi32>
   %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : !flow.dispatch.tensor<writeonly:3x4xi32>
-  %3 = flow.dispatch.tensor.load %0, offsets = [], sizes = [], strides = [] : !flow.dispatch.tensor<readonly:12xi32> -> tensor<12xi32>
+  %3 = flow.dispatch.tensor.load %0, offsets = [0], sizes = [12], strides = [1] : !flow.dispatch.tensor<readonly:12xi32> -> tensor<12xi32>
   %4 = tensor.expand_shape %3 [[0, 1]] : tensor<12xi32> into tensor<3x4xi32>
   %5 = linalg.init_tensor [3, 4] : tensor<3x4xi32>
   %6 = linalg.generic {
@@ -656,8 +656,8 @@ func @reshape_fused_source_and_copyout() {
       %7 = arith.addi %arg0, %arg0 : i32
       linalg.yield %7 : i32
     } -> tensor<3x4xi32>
-  flow.dispatch.tensor.store %6, %1, offsets = [], sizes = [], strides = [] : tensor<3x4xi32> -> !flow.dispatch.tensor<writeonly:3x4xi32>
-  flow.dispatch.tensor.store %4, %2, offsets = [], sizes = [], strides = [] : tensor<3x4xi32> -> !flow.dispatch.tensor<writeonly:3x4xi32>
+  flow.dispatch.tensor.store %6, %1, offsets = [0, 0], sizes = [3, 4], strides = [1, 1] : tensor<3x4xi32> -> !flow.dispatch.tensor<writeonly:3x4xi32>
+  flow.dispatch.tensor.store %4, %2, offsets = [0, 0], sizes = [3, 4], strides = [1, 1] : tensor<3x4xi32> -> !flow.dispatch.tensor<writeonly:3x4xi32>
   return
 }
 
@@ -681,7 +681,7 @@ func @reshape_fused_target() {
   %c12 = arith.constant 12 : index
   %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<readonly:3x4xi32>
   %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : !flow.dispatch.tensor<writeonly:12xi32>
-  %2 = flow.dispatch.tensor.load %0, offsets = [], sizes = [], strides = [] : !flow.dispatch.tensor<readonly:3x4xi32> -> tensor<3x4xi32>
+  %2 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [3, 4], strides = [1, 1] : !flow.dispatch.tensor<readonly:3x4xi32> -> tensor<3x4xi32>
   %3 = linalg.init_tensor [3, 4] : tensor<3x4xi32>
   %4 = linalg.generic {
     indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>],
@@ -692,7 +692,7 @@ func @reshape_fused_target() {
       linalg.yield %5 : i32
     } -> tensor<3x4xi32>
   %5 = tensor.collapse_shape %4 [[0, 1]] : tensor<3x4xi32> into tensor<12xi32>
-  flow.dispatch.tensor.store %5, %1, offsets = [], sizes = [], strides = [] : tensor<12xi32> -> !flow.dispatch.tensor<writeonly:12xi32>
+  flow.dispatch.tensor.store %5, %1, offsets = [0], sizes = [12], strides = [1] : tensor<12xi32> -> !flow.dispatch.tensor<writeonly:12xi32>
   return
 }
 
@@ -715,7 +715,7 @@ func @dot_general_lowering() {
   %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<readonly:1x1x2xf32>
   %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : !flow.dispatch.tensor<readonly:2x3xf32>
   %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : !flow.dispatch.tensor<writeonly:1x3xf32>
-  %3 = flow.dispatch.tensor.load %0, offsets = [], sizes = [], strides = [] : !flow.dispatch.tensor<readonly:1x1x2xf32> -> tensor<1x1x2xf32>
+  %3 = flow.dispatch.tensor.load %0, offsets = [0, 0, 0], sizes = [1, 1, 2], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:1x1x2xf32> -> tensor<1x1x2xf32>
   %4 = tensor.collapse_shape %3 [[0, 1], [2]] : tensor<1x1x2xf32> into tensor<1x2xf32>
   %workgroup_size_x = hal.interface.workgroup.size[0] : index
   %workgroup_size_y = hal.interface.workgroup.size[1] : index
@@ -767,9 +767,9 @@ func @slice() {
   %5 = hal.interface.constant.load[3] : index
   %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<readonly:?x?xi32>{%2, %3}
   %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : !flow.dispatch.tensor<writeonly:?x?xi32>{%4, %5}
-  %6 = flow.dispatch.tensor.load %0, offsets = [], sizes = [], strides = [] : !flow.dispatch.tensor<readonly:?x?xi32> -> tensor<?x?xi32>
+  %6 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [%2, %3], strides = [1, 1] : !flow.dispatch.tensor<readonly:?x?xi32> -> tensor<?x?xi32>
   %7 = tensor.extract_slice %6[%2, %3] [%4, %5] [1, 1] : tensor<?x?xi32> to tensor<?x?xi32>
-  flow.dispatch.tensor.store %7, %1, offsets = [], sizes = [], strides = [] : tensor<?x?xi32> -> !flow.dispatch.tensor<writeonly:?x?xi32>
+  flow.dispatch.tensor.store %7, %1, offsets = [0, 0], sizes = [%4, %5], strides = [1, 1] : tensor<?x?xi32> -> !flow.dispatch.tensor<writeonly:?x?xi32>
   return
 }
 
@@ -790,9 +790,9 @@ func @slice_rank_reducing() {
   %8 = hal.interface.constant.load[4] : index
   %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<readonly:?x?x?xi32>{%8, %8, %8}
   %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : !flow.dispatch.tensor<writeonly:?x?xi32>{%4, %5}
-  %6 = flow.dispatch.tensor.load %0, offsets = [], sizes = [], strides = [] : !flow.dispatch.tensor<readonly:?x?x?xi32> -> tensor<?x?x?xi32>
+  %6 = flow.dispatch.tensor.load %0, offsets = [0, 0, 0], sizes = [%8, %8, %8], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:?x?x?xi32> -> tensor<?x?x?xi32>
   %7 = tensor.extract_slice %6[%2, %2, %3] [%4, 1, %5] [1, 1, 1] : tensor<?x?x?xi32> to tensor<?x?xi32>
-  flow.dispatch.tensor.store %7, %1, offsets = [], sizes = [], strides = [] : tensor<?x?xi32> -> !flow.dispatch.tensor<writeonly:?x?xi32>
+  flow.dispatch.tensor.store %7, %1, offsets = [0, 0], sizes = [%4, %5], strides = [1, 1] : tensor<?x?xi32> -> !flow.dispatch.tensor<writeonly:?x?xi32>
   return
 }
 
@@ -816,10 +816,10 @@ func @slice_multiple_copy() {
   %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<readonly:?x?x?xi32>{%12, %12, %12}
   %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : !flow.dispatch.tensor<writeonly:?x?x?xi32>{%6, %7, %8}
   %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : !flow.dispatch.tensor<writeonly:?x?xi32>{%6, %8}
-  %9 = flow.dispatch.tensor.load %0, offsets = [], sizes = [], strides = [] : !flow.dispatch.tensor<readonly:?x?x?xi32> -> tensor<?x?x?xi32>
+  %9 = flow.dispatch.tensor.load %0, offsets = [0, 0, 0], sizes = [%12, %12, %12], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:?x?x?xi32> -> tensor<?x?x?xi32>
   %10 = tensor.extract_slice %9[%3, %4, %5] [%6, %7, %8] [1, 1, 1] : tensor<?x?x?xi32> to tensor<?x?x?xi32>
   %11 = tensor.extract_slice %9[%3, %4, %5] [%6, 1, %8] [1, 1, 1] : tensor<?x?x?xi32> to tensor<?x?xi32>
-  flow.dispatch.tensor.store %10, %1, offsets = [], sizes = [], strides = [] : tensor<?x?x?xi32> -> !flow.dispatch.tensor<writeonly:?x?x?xi32>
+  flow.dispatch.tensor.store %10, %1, offsets = [0, 0, 0], sizes = [%6, %7, %8], strides = [1, 1, 1] : tensor<?x?x?xi32> -> !flow.dispatch.tensor<writeonly:?x?x?xi32>
   flow.dispatch.tensor.store %11, %2, offsets = [%3, %5], sizes = [%6, %8], strides = [1, 1] : tensor<?x?xi32> -> !flow.dispatch.tensor<writeonly:?x?xi32>
   return
 }
@@ -844,8 +844,8 @@ func @slice_in_place() {
   %2 = hal.interface.constant.load[0] : index
   %3 = hal.interface.constant.load[1] : index
   %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<readwrite:?x?xi32>{%2, %3}
-  %6 = flow.dispatch.tensor.load %0, offsets = [], sizes = [], strides = [] : !flow.dispatch.tensor<readwrite:?x?xi32> -> tensor<?x?xi32>
-  flow.dispatch.tensor.store %6, %0, offsets = [], sizes = [], strides = [] : tensor<?x?xi32> -> !flow.dispatch.tensor<readwrite:?x?xi32>
+  %6 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [%2, %3], strides = [1, 1] : !flow.dispatch.tensor<readwrite:?x?xi32> -> tensor<?x?xi32>
+  flow.dispatch.tensor.store %6, %0, offsets = [0, 0], sizes = [%2, %3], strides = [1, 1] : tensor<?x?xi32> -> !flow.dispatch.tensor<readwrite:?x?xi32>
   return
 }
 
@@ -863,17 +863,18 @@ func @slice_whole_stride_dispatch_0() {
   %dim3 = hal.interface.constant.load[3] : index
   %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<readonly:?x?xi32>{%dim0, %dim1}
   %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : !flow.dispatch.tensor<writeonly:?x?xi32>{%dim2, %dim3}
-  %2 = flow.dispatch.tensor.load %0, offsets = [], sizes = [], strides = [] : !flow.dispatch.tensor<readonly:?x?xi32> -> tensor<?x?xi32>
+  %2 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [%dim0, %dim1], strides = [1, 1] : !flow.dispatch.tensor<readonly:?x?xi32> -> tensor<?x?xi32>
   %3 = tensor.extract_slice %2[1, 0] [1, 4] [1, 1] : tensor<?x?xi32> to tensor<1x4xi32>
-  flow.dispatch.tensor.store %3, %1, offsets = [], sizes = [], strides = [] : tensor<1x4xi32> -> !flow.dispatch.tensor<writeonly:?x?xi32>
+  flow.dispatch.tensor.store %3, %1, offsets = [0, 0], sizes = [1, 4], strides = [1, 1] : tensor<1x4xi32> -> !flow.dispatch.tensor<writeonly:?x?xi32>
   return
 }
 
 // CHECK-LABEL: func @slice_whole_stride_dispatch_0()
 //   CHECK-DAG:   %[[INPUT:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer)
 //   CHECK-DAG:   %[[OUTPUT:.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer)
-//       CHECK:   %[[SUBVIEW:.+]] = memref.subview %[[INPUT]]
-//       CHECK:   linalg.copy(%[[SUBVIEW]], %[[OUTPUT]])
+//   CHECK-DAG:   %[[SUBVIEW_INPUT:.+]] = memref.subview %[[INPUT]]
+//   CHECK-DAG:   %[[SUBVIEW_OUTPUT:.+]] = memref.subview %[[OUTPUT]]
+//       CHECK:   linalg.copy(%[[SUBVIEW_INPUT]], %[[SUBVIEW_OUTPUT]])
 
 // -----
 
@@ -889,12 +890,12 @@ func @subtensor_insert() {
   %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<readonly:?x?xi32>{%dim0, %dim1}
   %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : !flow.dispatch.tensor<readonly:?x?xi32>{%dim2, %dim3}
   %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : !flow.dispatch.tensor<writeonly:?x?xi32>{%dim4, %dim5}
-  %3 = flow.dispatch.tensor.load %0, offsets = [], sizes = [], strides = [] : !flow.dispatch.tensor<readonly:?x?xi32> -> tensor<?x?xi32>
-  %4 = flow.dispatch.tensor.load %1, offsets = [], sizes = [], strides = [] : !flow.dispatch.tensor<readonly:?x?xi32> -> tensor<?x?xi32>
+  %3 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [%dim0, %dim1], strides = [1, 1] : !flow.dispatch.tensor<readonly:?x?xi32> -> tensor<?x?xi32>
+  %4 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [%dim2, %dim3], strides = [1, 1] : !flow.dispatch.tensor<readonly:?x?xi32> -> tensor<?x?xi32>
   %5 = tensor.dim %3, %c0 : tensor<?x?xi32>
   %6 = tensor.dim %3, %c1 : tensor<?x?xi32>
   %7 = tensor.insert_slice %3 into %4[3, 4] [%5, %6] [1, 1] : tensor<?x?xi32> into tensor<?x?xi32>
-  flow.dispatch.tensor.store %7, %2, offsets = [], sizes = [], strides = [] : tensor<?x?xi32> -> !flow.dispatch.tensor<writeonly:?x?xi32>
+  flow.dispatch.tensor.store %7, %2, offsets = [0, 0], sizes = [%dim4, %dim5], strides = [1, 1] : tensor<?x?xi32> -> !flow.dispatch.tensor<writeonly:?x?xi32>
   return
 }
 
@@ -918,7 +919,7 @@ func @tensor_extract() {
   %3 = flow.dispatch.tensor.load %0, offsets = [], sizes = [], strides = []  : !flow.dispatch.tensor<readonly:i32> -> tensor<i32>
   %4 = tensor.extract %3[] : tensor<i32>
   %5 = linalg.fill(%4, %2) : i32, tensor<3x9xi32> -> tensor<3x9xi32>
-  flow.dispatch.tensor.store %5, %1, offsets = [], sizes = [], strides = [] : tensor<3x9xi32> -> !flow.dispatch.tensor<writeonly:3x9xi32>
+  flow.dispatch.tensor.store %5, %1, offsets = [0, 0], sizes = [3, 9], strides = [1, 1] : tensor<3x9xi32> -> !flow.dispatch.tensor<writeonly:3x9xi32>
   return
 }
 
@@ -934,8 +935,8 @@ func @load_to_store() {
   %c0 = arith.constant 0 : index
   %1 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<writeonly:3x4xi32>
   %2 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : !flow.dispatch.tensor<readonly:3x4xi32>
-  %3 = flow.dispatch.tensor.load %2, offsets = [], sizes = [], strides = [] : !flow.dispatch.tensor<readonly:3x4xi32> -> tensor<3x4xi32>
-  flow.dispatch.tensor.store %3, %1, offsets = [], sizes = [], strides = [] : tensor<3x4xi32> -> !flow.dispatch.tensor<writeonly:3x4xi32>
+  %3 = flow.dispatch.tensor.load %2, offsets = [0, 0], sizes = [3, 4], strides = [1, 1] : !flow.dispatch.tensor<readonly:3x4xi32> -> tensor<3x4xi32>
+  flow.dispatch.tensor.store %3, %1, offsets = [0, 0], sizes = [3, 4], strides = [1, 1] : tensor<3x4xi32> -> !flow.dispatch.tensor<writeonly:3x4xi32>
   return
 }
 
@@ -950,7 +951,7 @@ func @constant() {
   %c0 = arith.constant 0 : index
   %cst = arith.constant dense<[[[1, 2, 3], [4, 5, 6]], [[7, 8, 9], [10, 11, 12]]]> : tensor<2x2x3xi32>
   %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<writeonly:2x2x3xi32>
-  flow.dispatch.tensor.store %cst, %0, offsets = [], sizes = [], strides = [] : tensor<2x2x3xi32> -> !flow.dispatch.tensor<writeonly:2x2x3xi32>
+  flow.dispatch.tensor.store %cst, %0, offsets = [0, 0, 0], sizes = [2, 2, 3], strides = [1, 1, 1] : tensor<2x2x3xi32> -> !flow.dispatch.tensor<writeonly:2x2x3xi32>
   return
 }
 
@@ -970,7 +971,7 @@ func @rhs_non_splat_constant() {
   %c1 = arith.constant 1 : index
   %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<readonly:1x5x3x1xf32>
   %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : !flow.dispatch.tensor<writeonly:5x5xf32>
-  %2 = flow.dispatch.tensor.load %0, offsets = [], sizes = [], strides = [] : !flow.dispatch.tensor<readonly:1x5x3x1xf32> -> tensor<1x5x3x1xf32>
+  %2 = flow.dispatch.tensor.load %0, offsets = [0, 0, 0, 0], sizes = [1, 5, 3, 1], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:1x5x3x1xf32> -> tensor<1x5x3x1xf32>
   %3 = tensor.collapse_shape %2 [[0, 1], [2, 3]] : tensor<1x5x3x1xf32> into tensor<5x3xf32>
   %workgroup_size_x = hal.interface.workgroup.size[0] : index
   %workgroup_size_y = hal.interface.workgroup.size[1] : index
@@ -1026,8 +1027,8 @@ func @gather() {
   %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<readonly:?x?xf32>{%dim0, %dim1}
   %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : !flow.dispatch.tensor<readonly:?xi32>{%dim2}
   %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : !flow.dispatch.tensor<writeonly:?x?xf32>{%dim3, %dim4}
-  %4 = flow.dispatch.tensor.load %0, offsets = [], sizes = [], strides = []: !flow.dispatch.tensor<readonly:?x?xf32> -> tensor<?x?xf32>
-  %5 = flow.dispatch.tensor.load %1, offsets = [], sizes = [], strides = [] : !flow.dispatch.tensor<readonly:?xi32> -> tensor<?xi32>
+  %4 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [%dim0, %dim1], strides = [1, 1]: !flow.dispatch.tensor<readonly:?x?xf32> -> tensor<?x?xf32>
+  %5 = flow.dispatch.tensor.load %1, offsets = [0], sizes = [%dim2], strides = [1] : !flow.dispatch.tensor<readonly:?xi32> -> tensor<?xi32>
   %d0 = tensor.dim %5, %c0 : tensor<?xi32>
   %d1 = tensor.dim %4, %c1 : tensor<?x?xf32>
   %3 = linalg.init_tensor [%d0, %d1] : tensor<?x?xf32>
@@ -1038,7 +1039,7 @@ func @gather() {
     %9 = tensor.extract %4[%8, %iv1] : tensor<?x?xf32>
     linalg.yield %9 : f32
   } -> tensor<?x?xf32>
-  flow.dispatch.tensor.store %7, %2, offsets = [], sizes = [], strides = [] : tensor<?x?xf32> -> !flow.dispatch.tensor<writeonly:?x?xf32>
+  flow.dispatch.tensor.store %7, %2, offsets = [0, 0], sizes = [%dim3, %dim4], strides = [1, 1] : tensor<?x?xf32> -> !flow.dispatch.tensor<writeonly:?x?xf32>
   return
 }
 
@@ -1062,7 +1063,7 @@ func @pooling_nhwc_sum() {
   %3 = linalg.init_tensor [2, 3] : tensor<2x3xf32>
   %4 = flow.dispatch.tensor.load %0, offsets = [], sizes = [], strides = [] : !flow.dispatch.tensor<readonly:f32> -> tensor<f32>
   %5 = tensor.extract %4[] : tensor<f32>
-  %6 = flow.dispatch.tensor.load %1, offsets = [], sizes = [], strides = [] : !flow.dispatch.tensor<readonly:1x4x6x1xf32> -> tensor<1x4x6x1xf32>
+  %6 = flow.dispatch.tensor.load %1, offsets = [0, 0, 0, 0], sizes = [1, 4, 6, 1], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:1x4x6x1xf32> -> tensor<1x4x6x1xf32>
   %7 = linalg.init_tensor [1, 2, 2, 1] : tensor<1x2x2x1xf32>
   %8 = linalg.fill(%5, %7) : f32, tensor<1x2x2x1xf32> -> tensor<1x2x2x1xf32>
   %9 = linalg.pooling_nhwc_sum {
@@ -1070,7 +1071,7 @@ func @pooling_nhwc_sum() {
     strides = dense<[2, 3]> : vector<2xi64>
   } ins(%6, %3 : tensor<1x4x6x1xf32>, tensor<2x3xf32>)
    outs(%8 : tensor<1x2x2x1xf32>) -> tensor<1x2x2x1xf32>
-  flow.dispatch.tensor.store %9, %2, offsets = [], sizes = [], strides = [] : tensor<1x2x2x1xf32> -> !flow.dispatch.tensor<writeonly:1x2x2x1xf32>
+  flow.dispatch.tensor.store %9, %2, offsets = [0, 0, 0, 0], sizes = [1, 2, 2, 1], strides = [1, 1, 1, 1] : tensor<1x2x2x1xf32> -> !flow.dispatch.tensor<writeonly:1x2x2x1xf32>
   return
 }
 
@@ -1100,9 +1101,9 @@ func @read_only_subtensor() {
   %pc5 = hal.interface.constant.load[5] : index
   %0 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : !flow.dispatch.tensor<writeonly:?x?xf32>{%pc0, %pc1}
   %1 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<readonly:?x?xf32>{%pc2, %pc3}
-  %2 = flow.dispatch.tensor.load %1, offsets = [], sizes = [], strides = [] : !flow.dispatch.tensor<readonly:?x?xf32> -> tensor<?x?xf32>
+  %2 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [%pc2, %pc3], strides = [1, 1] : !flow.dispatch.tensor<readonly:?x?xf32> -> tensor<?x?xf32>
   %3 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : !flow.dispatch.tensor<readonly:?x?xf32>{%pc4, %pc5}
-  %4 = flow.dispatch.tensor.load %3, offsets = [], sizes = [], strides = [] : !flow.dispatch.tensor<readonly:?x?xf32> -> tensor<?x?xf32>
+  %4 = flow.dispatch.tensor.load %3, offsets = [0, 0], sizes = [%pc4, %pc5], strides = [1, 1] : !flow.dispatch.tensor<readonly:?x?xf32> -> tensor<?x?xf32>
   %workgroup_size_x = hal.interface.workgroup.size[0] : index
   %workgroup_size_y = hal.interface.workgroup.size[1] : index
   %workgroup_id_x = hal.interface.workgroup.id[0] : index
@@ -1168,7 +1169,7 @@ func @reshape_read_only() {
   %dim2 = hal.interface.constant.load[2] : index
   %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<readonly:?x?xf32>{%dim0, %dim1}
   %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : !flow.dispatch.tensor<writeonly:?xf32>{%dim2}
-  %2 = flow.dispatch.tensor.load %0, offsets = [], sizes = [], strides = [] : !flow.dispatch.tensor<readonly:?x?xf32> -> tensor<?x?xf32>
+  %2 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [%dim0, %dim1], strides = [1, 1] : !flow.dispatch.tensor<readonly:?x?xf32> -> tensor<?x?xf32>
   %3 = tensor.collapse_shape %2 [[0, 1]]
       : tensor<?x?xf32> into tensor<?xf32>
   %4 = tensor.dim %3, %c0 : tensor<?xf32>
@@ -1181,7 +1182,7 @@ func @reshape_read_only() {
          %7 = arith.addf %arg0, %arg0 : f32
          linalg.yield %7 : f32
       } -> tensor<?xf32>
-  flow.dispatch.tensor.store %6, %1, offsets = [], sizes = [], strides = []: tensor<?xf32> -> !flow.dispatch.tensor<writeonly:?xf32>
+  flow.dispatch.tensor.store %6, %1, offsets = [0], sizes = [%dim2], strides = [1]: tensor<?xf32> -> !flow.dispatch.tensor<writeonly:?xf32>
   return
 }
 
@@ -1203,9 +1204,9 @@ func @use_buffer_for_operand_when_output_tensor_not_used() {
   %offset_subspan = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : !flow.dispatch.tensor<readonly:32xf32>
   %output_subspan = hal.interface.binding.subspan set(0) binding(3) type(storage_buffer) : !flow.dispatch.tensor<writeonly:1x112x112x32xf32>
 
-  %input = flow.dispatch.tensor.load %input_subspan, offsets = [], sizes = [], strides = [] : !flow.dispatch.tensor<readonly:1x225x225x16xf32> -> tensor<1x225x225x16xf32>
-  %filter = flow.dispatch.tensor.load %filter_subspan, offsets = [], sizes = [], strides = [] : !flow.dispatch.tensor<readonly:3x3x16x32xf32> -> tensor<3x3x16x32xf32>
-  %offset = flow.dispatch.tensor.load %offset_subspan, offsets = [], sizes = [], strides = [] : !flow.dispatch.tensor<readonly:32xf32> -> tensor<32xf32>
+  %input = flow.dispatch.tensor.load %input_subspan, offsets = [0, 0, 0, 0], sizes = [1, 255, 255, 16], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:1x225x225x16xf32> -> tensor<1x225x225x16xf32>
+  %filter = flow.dispatch.tensor.load %filter_subspan, offsets = [0, 0, 0, 0], sizes = [3, 3, 16, 32], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:3x3x16x32xf32> -> tensor<3x3x16x32xf32>
+  %offset = flow.dispatch.tensor.load %offset_subspan, offsets = [0], sizes = [32], strides = [1] : !flow.dispatch.tensor<readonly:32xf32> -> tensor<32xf32>
 
   %cst = arith.constant 0.0 : f32
   %0 = linalg.init_tensor [1, 112, 112, 32] : tensor<1x112x112x32xf32>
@@ -1227,7 +1228,7 @@ func @use_buffer_for_operand_when_output_tensor_not_used() {
             %sub = arith.subf %a, %b : f32
             linalg.yield %sub : f32
          } -> tensor<1x112x112x32xf32>
-  flow.dispatch.tensor.store %3, %output_subspan, offsets = [], sizes = [], strides = [] : tensor<1x112x112x32xf32> -> !flow.dispatch.tensor<writeonly:1x112x112x32xf32>
+  flow.dispatch.tensor.store %3, %output_subspan, offsets = [0, 0, 0, 0], sizes = [1, 112, 112, 32], strides = [1, 1, 1, 1] : tensor<1x112x112x32xf32> -> !flow.dispatch.tensor<writeonly:1x112x112x32xf32>
   return
 }
 
@@ -1252,9 +1253,9 @@ func @dont_use_buffer_for_operand_when_output_tensor_used() {
   %offset_subspan = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : !flow.dispatch.tensor<readonly:32xf32>
   %output_subspan = hal.interface.binding.subspan set(0) binding(3) type(storage_buffer) : !flow.dispatch.tensor<writeonly:1x112x112x32xf32>
 
-  %input = flow.dispatch.tensor.load %input_subspan, offsets = [], sizes = [], strides = [] : !flow.dispatch.tensor<readonly:1x225x225x16xf32> -> tensor<1x225x225x16xf32>
-  %filter = flow.dispatch.tensor.load %filter_subspan, offsets = [], sizes = [], strides = [] : !flow.dispatch.tensor<readonly:3x3x16x32xf32> -> tensor<3x3x16x32xf32>
-  %offset = flow.dispatch.tensor.load %offset_subspan, offsets = [], sizes = [], strides = [] : !flow.dispatch.tensor<readonly:32xf32> -> tensor<32xf32>
+  %input = flow.dispatch.tensor.load %input_subspan, offsets = [0, 0, 0, 0], sizes = [1, 225, 225, 16], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:1x225x225x16xf32> -> tensor<1x225x225x16xf32>
+  %filter = flow.dispatch.tensor.load %filter_subspan, offsets = [0, 0, 0, 0], sizes = [3, 3, 16, 32], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:3x3x16x32xf32> -> tensor<3x3x16x32xf32>
+  %offset = flow.dispatch.tensor.load %offset_subspan, offsets = [0], sizes = [32], strides = [1] : !flow.dispatch.tensor<readonly:32xf32> -> tensor<32xf32>
 
   %cst0 = arith.constant 0.0 : f32
   %cst1 = arith.constant 1.0 : f32
@@ -1279,7 +1280,7 @@ func @dont_use_buffer_for_operand_when_output_tensor_used() {
             %add = arith.addf %sub, %c : f32
             linalg.yield %add : f32
          } -> tensor<1x112x112x32xf32>
-  flow.dispatch.tensor.store %4, %output_subspan, offsets = [], sizes = [], strides = []: tensor<1x112x112x32xf32> -> !flow.dispatch.tensor<writeonly:1x112x112x32xf32>
+  flow.dispatch.tensor.store %4, %output_subspan, offsets = [0, 0, 0, 0], sizes = [1, 112, 112, 32], strides = [1, 1, 1, 1]: tensor<1x112x112x32xf32> -> !flow.dispatch.tensor<writeonly:1x112x112x32xf32>
   return
 }
 
@@ -1303,7 +1304,7 @@ func @bufferize_cst_output_tensor() {
   %cst5 = arith.constant dense<[1, 2, 3, 4, 5]> : tensor<5xi32>
   %input = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<readonly:5xf32>
   %output = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : !flow.dispatch.tensor<writeonly:i32>
-  %1 = flow.dispatch.tensor.load %input, offsets=[], sizes=[], strides=[] : !flow.dispatch.tensor<readonly:5xf32> -> tensor<5xf32>
+  %1 = flow.dispatch.tensor.load %input, offsets=[0], sizes=[5], strides=[1] : !flow.dispatch.tensor<readonly:5xf32> -> tensor<5xf32>
   %2 = linalg.generic {
          indexing_maps = [affine_map<(d0) -> (-d0 + 4)>, affine_map<(d0) -> (d0)>, affine_map<(d0) -> ()>],
          iterator_types = ["reduction"]}
@@ -1396,12 +1397,12 @@ func @rank_reduced_subtensor_insert() {
   %dim4 = hal.interface.constant.load[4] : index
   %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<readonly:?x?xf32>{%dim0, %dim1}
   %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : !flow.dispatch.tensor<readwrite:?x?x?xf32>{%dim2, %dim3, %dim4}
-  %2 = flow.dispatch.tensor.load %0, offsets = [], sizes = [], strides = [] : !flow.dispatch.tensor<readonly:?x?xf32> -> tensor<?x?xf32>
-  %3 = flow.dispatch.tensor.load %1, offsets = [], sizes = [], strides = [] : !flow.dispatch.tensor<readwrite:?x?x?xf32> -> tensor<?x?x?xf32>
+  %2 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [%dim0, %dim1], strides = [1, 1] : !flow.dispatch.tensor<readonly:?x?xf32> -> tensor<?x?xf32>
+  %3 = flow.dispatch.tensor.load %1, offsets = [0, 0, 0], sizes = [%dim2, %dim3, %dim4], strides = [1, 1, 1] : !flow.dispatch.tensor<readwrite:?x?x?xf32> -> tensor<?x?x?xf32>
   %4 = tensor.dim %3, %c1 : tensor<?x?x?xf32>
   %5 = tensor.dim %3, %c2 : tensor<?x?x?xf32>
   %6 = tensor.insert_slice %2 into %3[0, 0, 0] [1, %4, %5] [1, 1, 1] : tensor<?x?xf32> into tensor<?x?x?xf32>
-  flow.dispatch.tensor.store %6, %1, offsets = [], sizes = [], strides = [] : tensor<?x?x?xf32> -> !flow.dispatch.tensor<readwrite:?x?x?xf32>
+  flow.dispatch.tensor.store %6, %1, offsets = [0, 0, 0], sizes = [%dim2, %dim3, %dim4], strides = [1, 1, 1] : tensor<?x?x?xf32> -> !flow.dispatch.tensor<readwrite:?x?x?xf32>
   return
 }
 
@@ -1729,85 +1730,6 @@ func @dot_general_padded() {
 //   CHECK-DAG:      %[[RET0_SV:.+]] = memref.subview %[[RET0]]
 //   CHECK-DAG:      %[[ALLOC_RET0_SV:.+]] = memref.subview
 //       CHECK:      linalg.copy(%[[ALLOC_RET0_SV]], %[[RET0_SV]])
-
-// -----
-
-func @im2col() {
-  %c0 = arith.constant 0 : index
-  %cst = arith.constant 0.000000e+00 : f32
-  %c112 = arith.constant 112 : index
-  %c32 = arith.constant 32 : index
-  %c16 = arith.constant 16 : index
-  %c4 = arith.constant 4 : index
-  %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<readonly:1x225x225x8xf32>
-  %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : !flow.dispatch.tensor<readonly:3x3x8x32xf32>
-  %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : !flow.dispatch.tensor<writeonly:1x112x112x32xf32>
-  %workgroup_id_x = hal.interface.workgroup.id[0] : index
-  %workgroup_count_x = hal.interface.workgroup.count[0] : index
-  %workgroup_id_y = hal.interface.workgroup.id[1] : index
-  %workgroup_count_y = hal.interface.workgroup.count[1] : index
-  %workgroup_id_z = hal.interface.workgroup.id[2] : index
-  %workgroup_count_z = hal.interface.workgroup.count[2] : index
-  %3 = affine.apply affine_map<()[s0] -> (s0 * 16)>()[%workgroup_id_z]
-  %4 = affine.apply affine_map<()[s0] -> (s0 * 16)>()[%workgroup_count_z]
-  scf.for %arg0 = %3 to %c112 step %4 {
-    %5 = affine.apply affine_map<()[s0] -> (s0 * 16)>()[%workgroup_id_y]
-    %6 = affine.apply affine_map<()[s0] -> (s0 * 16)>()[%workgroup_count_y]
-    scf.for %arg1 = %5 to %c112 step %6 {
-      %7 = affine.apply affine_map<()[s0] -> (s0 * 4)>()[%workgroup_id_x]
-      %8 = affine.apply affine_map<()[s0] -> (s0 * 4)>()[%workgroup_count_x]
-      scf.for %arg2 = %7 to %c32 step %8 {
-        %9 = affine.apply affine_map<(d0) -> (d0 * 2)>(%arg0)
-        %10 = affine.min affine_map<(d0) -> (33, d0 * -2 + 225)>(%arg0)
-        %11 = affine.apply affine_map<(d0) -> (d0 * 2)>(%arg1)
-        %12 = affine.min affine_map<(d0) -> (33, d0 * -2 + 225)>(%arg1)
-        %13 = flow.dispatch.tensor.load %0, offsets = [0, %9, %11, 0], sizes = [1, %10, %12, 8], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:1x225x225x8xf32> -> tensor<1x?x?x8xf32>
-        %14 = flow.dispatch.tensor.load %1, offsets = [0, 0, 0, %arg2], sizes = [3, 3, 8, 4], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:3x3x8x32xf32> -> tensor<3x3x8x4xf32>
-        %15 = linalg.init_tensor [1, 16, 16, 4] : tensor<1x16x16x4xf32>
-        %16 = linalg.fill(%cst, %15) {__internal_linalg_transform__ = "workgroup"} : f32, tensor<1x16x16x4xf32> -> tensor<1x16x16x4xf32>
-        %17 = linalg.init_tensor [1, 16, 16, 3, 3, 8] : tensor<1x16x16x3x3x8xf32>
-        %18 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1 * 2 + d3, d2 * 2 + d4, d5)>, affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d3, d4, d5)>], iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel", "parallel"]} ins(%13 : tensor<1x?x?x8xf32>) outs(%17 : tensor<1x16x16x3x3x8xf32>) {
-        ^bb0(%arg3: f32, %arg4: f32):  // no predecessors
-          linalg.yield %arg3 : f32
-        } -> tensor<1x16x16x3x3x8xf32>
-        %19 = tensor.collapse_shape %18 [[0, 1, 2], [3, 4, 5]] : tensor<1x16x16x3x3x8xf32> into tensor<256x72xf32>
-        %20 = tensor.collapse_shape %14 [[0, 1, 2], [3]] : tensor<3x3x8x4xf32> into tensor<72x4xf32>
-        %21 = tensor.collapse_shape %16 [[0, 1, 2], [3]] : tensor<1x16x16x4xf32> into tensor<256x4xf32>
-        %22 = linalg.matmul ins(%19, %20 : tensor<256x72xf32>, tensor<72x4xf32>) outs(%21 : tensor<256x4xf32>) -> tensor<256x4xf32>
-        %23 = tensor.expand_shape %22 [[0, 1, 2], [3]] : tensor<256x4xf32> into tensor<1x16x16x4xf32>
-        %24 = tensor.cast %23 : tensor<1x16x16x4xf32> to tensor<1x?x?x?xf32>
-        flow.dispatch.tensor.store %24, %2, offsets = [0, %arg0, %arg1, %arg2], sizes = [1, %c16, %c16, %c4], strides = [1, 1, 1, 1] : tensor<1x?x?x?xf32> -> !flow.dispatch.tensor<writeonly:1x112x112x32xf32>
-      }
-    }
-  }
-  return
-}
-
-// CHECK-LABEL: func @im2col
-//   CHECK-DAG:  %[[ARG0:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer)
-//   CHECK-DAG:  %[[ARG1:.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer)
-//   CHECK-DAG:  %[[RET0:.+]] = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer)
-//   CHECK-DAG:  %[[ALLOC_ARG0:.+]] = memref.alloc() : memref<1x16x16x3x3x8xf32>
-//   CHECK-DAG:  %[[ALLOC_ARG1:.+]] = memref.alloc() : memref<3x3x8x4xf32>
-//   CHECK-DAG:  %[[ALLOC_RET0:.+]] = memref.alloc() : memref<1x16x16x4xf32>
-//       CHECK:  scf.for
-//       CHECK:    scf.for
-//       CHECK:      scf.for
-//   CHECK-DAG:      %[[ARG0_SV:.+]] = memref.subview %[[ARG0]]
-//   CHECK-DAG:      %[[ARG1_SV:.+]] = memref.subview %[[ARG1]]
-//   CHECK-DAG:      linalg.copy(%[[ARG1_SV]], %[[ALLOC_ARG1]])
-//   CHECK-DAG:      linalg.fill(%{{.*}}, %[[ALLOC_RET0]]
-//       CHECK:      linalg.generic
-//  CHECK-SAME:        ins(%[[ARG0_SV]]
-//  CHECK-SAME:        outs(%[[ALLOC_ARG0]]
-//   CHECK-DAG:      %[[ALLOC_ARG0_RESHAPE:.+]] = memref.collapse_shape %[[ALLOC_ARG0]]
-//   CHECK-DAG:      %[[ALLOC_ARG1_RESHAPE:.+]] = memref.collapse_shape %[[ALLOC_ARG1]]
-//   CHECK-DAG:      %[[ALLOC_RET0_RESHAPE:.+]] = memref.collapse_shape %[[ALLOC_RET0]]
-//       CHECK:      linalg.matmul
-//  CHECK-SAME:        ins(%[[ALLOC_ARG0_RESHAPE]], %[[ALLOC_ARG1_RESHAPE]]
-//  CHECK-SAME:        outs(%[[ALLOC_RET0_RESHAPE]]
-//       CHECK:      %[[RET0_SV:.+]] = memref.subview %[[RET0]]
-//       CHECK:      linalg.copy(%[[ALLOC_RET0]], %[[RET0_SV]])
 
 // -----
 
@@ -2161,7 +2083,7 @@ func @sort1D() {
   %c1 = arith.constant 1 : index
   %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<readonly:4xi32>
   %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : !flow.dispatch.tensor<writeonly:4xi32>
-  %2 = flow.dispatch.tensor.load %0, offsets = [], sizes = [], strides = [] : !flow.dispatch.tensor<readonly:4xi32> -> tensor<4xi32>
+  %2 = flow.dispatch.tensor.load %0, offsets = [0], sizes = [4], strides = [1] : !flow.dispatch.tensor<readonly:4xi32> -> tensor<4xi32>
   %3 = scf.for %arg0 = %c0 to %c4 step %c1 iter_args(%arg1 = %2) -> (tensor<4xi32>) {
     %4 = scf.for %arg2 = %c0 to %c3 step %c1 iter_args(%arg3 = %arg1) -> (tensor<4xi32>) {
       %5 = arith.addi %arg2, %c1 : index
@@ -2179,7 +2101,7 @@ func @sort1D() {
     }
     scf.yield %4 : tensor<4xi32>
   }
-  flow.dispatch.tensor.store %3, %1, offsets = [], sizes = [], strides = [] : tensor<4xi32> -> !flow.dispatch.tensor<writeonly:4xi32>
+  flow.dispatch.tensor.store %3, %1, offsets = [0], sizes = [4], strides = [1] : tensor<4xi32> -> !flow.dispatch.tensor<writeonly:4xi32>
   return
 }
 
@@ -2204,7 +2126,7 @@ func @sort1D_inplace() {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<readwrite:4xi32>
-  %2 = flow.dispatch.tensor.load %0, offsets = [], sizes = [], strides = [] : !flow.dispatch.tensor<readwrite:4xi32> -> tensor<4xi32>
+  %2 = flow.dispatch.tensor.load %0, offsets = [0], sizes = [4], strides = [1] : !flow.dispatch.tensor<readwrite:4xi32> -> tensor<4xi32>
   %3 = scf.for %arg0 = %c0 to %c4 step %c1 iter_args(%arg1 = %2) -> (tensor<4xi32>) {
     %4 = scf.for %arg2 = %c0 to %c3 step %c1 iter_args(%arg3 = %arg1) -> (tensor<4xi32>) {
       %5 = arith.addi %arg2, %c1 : index
@@ -2222,7 +2144,7 @@ func @sort1D_inplace() {
     }
     scf.yield %4 : tensor<4xi32>
   }
-  flow.dispatch.tensor.store %3, %0, offsets = [], sizes = [], strides = [] : tensor<4xi32> -> !flow.dispatch.tensor<readwrite:4xi32>
+  flow.dispatch.tensor.store %3, %0, offsets = [0], sizes = [4], strides = [1] : tensor<4xi32> -> !flow.dispatch.tensor<readwrite:4xi32>
   return
 }
 
@@ -2242,13 +2164,13 @@ func @sort1D_inplace() {
 func @iree_linalg_ext_sort_1d() {
   %c0 = arith.constant 0 : index
   %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<readwrite:128xi32>
-  %1 = flow.dispatch.tensor.load %0, offsets = [], sizes = [], strides = [] : !flow.dispatch.tensor<readwrite:128xi32> -> tensor<128xi32>
+  %1 = flow.dispatch.tensor.load %0, offsets = [0], sizes = [128], strides = [1] : !flow.dispatch.tensor<readwrite:128xi32> -> tensor<128xi32>
   %2 = iree_linalg_ext.sort dimension(0) outs(%1 : tensor<128xi32>) {
   ^bb0(%arg0: i32, %arg1: i32):  // no predecessors
     %3 = arith.cmpi sgt, %arg0, %arg1 : i32
     iree_linalg_ext.yield %3 : i1
   } -> tensor<128xi32>
-  flow.dispatch.tensor.store %2, %0, offsets = [], sizes = [], strides = [] : tensor<128xi32> -> !flow.dispatch.tensor<readwrite:128xi32>
+  flow.dispatch.tensor.store %2, %0, offsets = [0], sizes = [128], strides = [1] : tensor<128xi32> -> !flow.dispatch.tensor<readwrite:128xi32>
   return
 }
 

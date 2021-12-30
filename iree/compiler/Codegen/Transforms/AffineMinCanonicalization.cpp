@@ -38,23 +38,25 @@ static void substitute(scf::ForOp forOp, SmallVectorImpl<AffineExpr> &exprs,
                        SmallVectorImpl<Value> &dims,
                        SmallVectorImpl<Value> &symbols) {
   MLIRContext *ctx = forOp.getContext();
-  auto lbConstant = forOp.lowerBound().getDefiningOp<arith::ConstantIndexOp>();
+  auto lbConstant =
+      forOp.getLowerBound().getDefiningOp<arith::ConstantIndexOp>();
   AffineExpr lb = lbConstant ? getAffineConstantExpr(lbConstant.value(), ctx)
                              : getAffineDimExpr(dims.size(), ctx);
 
-  auto stepConstant = forOp.step().getDefiningOp<arith::ConstantIndexOp>();
+  auto stepConstant = forOp.getStep().getDefiningOp<arith::ConstantIndexOp>();
   AffineExpr step = stepConstant
                         ? getAffineConstantExpr(stepConstant.value(), ctx)
                         : getAffineSymbolExpr(symbols.size(), ctx);
 
-  if (!lbConstant) dims.push_back(forOp.lowerBound());
-  if (!stepConstant) symbols.push_back(forOp.step());
+  if (!lbConstant) dims.push_back(forOp.getLowerBound());
+  if (!stepConstant) symbols.push_back(forOp.getStep());
   exprs.push_back(lb + step * getAffineDimExpr(dims.size(), ctx));
 
-  auto ubConstant = forOp.upperBound().getDefiningOp<arith::ConstantIndexOp>();
+  auto ubConstant =
+      forOp.getUpperBound().getDefiningOp<arith::ConstantIndexOp>();
   AffineExpr ub = ubConstant ? getAffineConstantExpr(ubConstant.value(), ctx)
                              : getAffineDimExpr(dims.size(), ctx);
-  if (!ubConstant) dims.push_back(forOp.upperBound());
+  if (!ubConstant) dims.push_back(forOp.getUpperBound());
   exprs.push_back(ub);
 
   dims.push_back(forOp.getInductionVar());
