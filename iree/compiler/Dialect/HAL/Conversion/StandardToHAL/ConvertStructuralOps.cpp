@@ -146,17 +146,17 @@ struct ConvertIfOp : public OpConversionPattern<scf::IfOp> {
         ifOp.getResultTypes(),
         [&](Type type) { return getTypeConverter()->convertType(type); }));
     auto newOp = rewriter.create<scf::IfOp>(ifOp.getLoc(), resultTypes,
-                                            adaptor.condition(),
+                                            adaptor.getCondition(),
                                             ifOp.elseBlock() != nullptr);
-    rewriter.inlineRegionBefore(ifOp.thenRegion(), newOp.thenRegion(),
-                                newOp.thenRegion().end());
-    rewriter.eraseBlock(&newOp.thenRegion().front());
+    rewriter.inlineRegionBefore(ifOp.getThenRegion(), newOp.getThenRegion(),
+                                newOp.getThenRegion().end());
+    rewriter.eraseBlock(&newOp.getThenRegion().front());
     if (ifOp.elseBlock()) {
-      rewriter.inlineRegionBefore(ifOp.elseRegion(), newOp.elseRegion(),
-                                  newOp.elseRegion().end());
-      rewriter.eraseBlock(&newOp.elseRegion().front());
+      rewriter.inlineRegionBefore(ifOp.getElseRegion(), newOp.getElseRegion(),
+                                  newOp.getElseRegion().end());
+      rewriter.eraseBlock(&newOp.getElseRegion().front());
     }
-    rewriter.replaceOp(ifOp, newOp.results());
+    rewriter.replaceOp(ifOp, newOp.getResults());
     return success();
   }
 };
@@ -166,7 +166,7 @@ struct ConvertYieldOp : public OpConversionPattern<scf::YieldOp> {
   LogicalResult matchAndRewrite(
       scf::YieldOp yieldOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    rewriter.replaceOpWithNewOp<scf::YieldOp>(yieldOp, adaptor.results());
+    rewriter.replaceOpWithNewOp<scf::YieldOp>(yieldOp, adaptor.getResults());
     return success();
   }
 };

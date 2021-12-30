@@ -532,9 +532,9 @@ static Value getAliasingBufferForResult(OpBuilder &b, tensor::ExtractSliceOp op,
 /// Returns output buffers that aliases inputs.
 static SmallVector<Value> getAliasingBuffersForResult(
     scf::ForOp scfFor, BlockAndValueMapping &bvm) {
-  SmallVector<Value> aliasedBuffers(scfFor.results().size(), nullptr);
-  for (int i = 0; i < scfFor.results().size(); ++i) {
-    Value inputTensor = scfFor.initArgs()[i];
+  SmallVector<Value> aliasedBuffers(scfFor.getResults().size(), nullptr);
+  for (int i = 0; i < scfFor.getResults().size(); ++i) {
+    Value inputTensor = scfFor.getInitArgs()[i];
     if (!inputTensor.getType().isa<RankedTensorType>()) continue;
     Value inputBuffer = bvm.lookup(inputTensor);
     aliasedBuffers[i] = inputBuffer;

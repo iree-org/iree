@@ -119,9 +119,9 @@ static bool alwaysRunsFirstIteration(scf::ForOp op, GetMinMaxExprFn getMinMax) {
   SmallVector<Value, 4> dims;
   SmallVector<Value, 4> symbols;
   AffineExpr lb = getAffineDimExpr(dims.size(), ctx);
-  dims.push_back(op.lowerBound());
+  dims.push_back(op.getLowerBound());
   AffineExpr ub = getAffineDimExpr(dims.size(), ctx);
-  dims.push_back(op.upperBound());
+  dims.push_back(op.getUpperBound());
   AffineExpr iterZero = ub - lb;
   auto map = AffineMap::get(dims.size(), 0, iterZero);
   AffineMap simplifiedMap = substituteMin(map, dims, symbols, getMinMax);
@@ -141,11 +141,11 @@ static bool neverRunsSecondIteration(scf::ForOp op, GetMinMaxExprFn getMinMax) {
   SmallVector<Value, 4> dims;
   SmallVector<Value, 4> symbols;
   AffineExpr lb = getAffineDimExpr(dims.size(), ctx);
-  dims.push_back(op.lowerBound());
+  dims.push_back(op.getLowerBound());
   AffineExpr ub = getAffineDimExpr(dims.size(), ctx);
-  dims.push_back(op.upperBound());
+  dims.push_back(op.getUpperBound());
   AffineExpr step = getAffineDimExpr(dims.size(), ctx);
-  dims.push_back(op.step());
+  dims.push_back(op.getStep());
   AffineExpr iterOne = lb + step - ub;
   auto map = AffineMap::get(dims.size(), 0, iterOne);
 
@@ -177,7 +177,7 @@ struct SimplifyTrivialLoops : public OpRewritePattern<scf::ForOp> {
     // so the loop always have 1 iteration. Inline its body and remove the loop.
     SmallVector<Value, 4> blockArgs;
     blockArgs.reserve(op.getNumIterOperands() + 1);
-    blockArgs.push_back(op.lowerBound());
+    blockArgs.push_back(op.getLowerBound());
     llvm::append_range(blockArgs, op.getIterOperands());
     replaceOpWithRegion(rewriter, op, op.getLoopBody(), blockArgs);
     return success();

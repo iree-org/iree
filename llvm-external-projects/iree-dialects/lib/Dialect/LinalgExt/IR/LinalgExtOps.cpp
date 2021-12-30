@@ -471,7 +471,7 @@ LogicalResult SortOp::generateScalarImplementation(OpBuilder &b, Location loc,
       });
 
   auto &srcBlock = region().front();
-  Region &region = scfFor.region();
+  Region &region = scfFor.getRegion();
   BlockAndValueMapping bvm;
   {
     OpBuilder::InsertionGuard guard(b);

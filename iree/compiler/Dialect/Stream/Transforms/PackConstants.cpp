@@ -393,8 +393,8 @@ static UploadResult buildTryMapConstantResources(
         ifResults.push_back(stagingResult.timepoint);
         elseBuilder.create<scf::YieldOp>(loc, ifResults);
       });
-  auto ifTimepoint = ifOp.results().back();
-  auto ifResources = ifOp.results().slice(0, ifOp.results().size() - 1);
+  auto ifTimepoint = ifOp.getResults().back();
+  auto ifResources = ifOp.getResults().slice(0, ifOp.getResults().size() - 1);
 
   // Use the result of either the direct mapping or the staging upload.
   UploadResult uploadResult;

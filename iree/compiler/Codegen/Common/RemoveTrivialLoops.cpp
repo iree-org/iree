@@ -70,7 +70,7 @@ static Optional<std::pair<AffineExpr, AffineExpr>> getWorkgroupRange(
 /// Return true if the given tiled loop is distributed to workgroups.
 static bool isWorkgroupLoop(const LoopTilingAndDistributionInfo &info) {
   auto forOp = cast<scf::ForOp>(info.loop);
-  Operation *lbOp = forOp.lowerBound().getDefiningOp();
+  Operation *lbOp = forOp.getLowerBound().getDefiningOp();
   if (isa<IREE::HAL::InterfaceWorkgroupIDOp>(lbOp)) return true;
   auto applyOp = dyn_cast<AffineApplyOp>(lbOp);
   return applyOp && llvm::any_of(applyOp.getMapOperands(), [](Value operand) {

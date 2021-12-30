@@ -166,7 +166,7 @@ static Value isADestructiveUpdatePattern(Value tensor,
         operand->getOperandNumber() - innerForOp.getNumControlOperands();
     Value innerForOpResultTensor = innerForOp.getResult(innerIterArgIdx);
     Value yieldValue =
-        scfForOp.region().front().getTerminator()->getOperand(idx);
+        scfForOp.getRegion().front().getTerminator()->getOperand(idx);
 
     // Check that the return position of dk and the yield position of dk
     // agree (in the loop structure below). This avoids ping-pong effects

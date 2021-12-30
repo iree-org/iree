@@ -88,8 +88,8 @@ LogicalResult distributeCyclicallyToProcessors(
   forBounds.reserve(numLoops);
   permutation.reserve(numLoops);
   Location loc = pLoopOp.getLoc();
-  auto lbs = pLoopOp.lowerBound(), ubs = pLoopOp.upperBound(),
-       steps = pLoopOp.step();
+  auto lbs = pLoopOp.getLowerBound(), ubs = pLoopOp.getUpperBound(),
+       steps = pLoopOp.getStep();
   for (unsigned i : llvm::seq<unsigned>(0, procInfo.size())) {
     Value mappedLb = rewriter.create<arith::AddIOp>(
         loc, lbs[i],

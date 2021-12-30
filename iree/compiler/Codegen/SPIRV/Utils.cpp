@@ -188,9 +188,9 @@ scf::ParallelOp collapseParallelLoops(PatternRewriter &rewriter,
   // iterations of the inner loops.
   SmallVector<Value, 2> iterationStride;
   iterationStride.resize(pLoopOp.getNumLoops());
-  auto lbs = pLoopOp.lowerBound();
-  auto ubs = pLoopOp.upperBound();
-  auto steps = pLoopOp.step();
+  auto lbs = pLoopOp.getLowerBound();
+  auto ubs = pLoopOp.getUpperBound();
+  auto steps = pLoopOp.getStep();
   for (int i = numLoops - 1; i >= 0; --i) {
     Value lb = lbs[i], ub = ubs[i], step = steps[i];
     Value iterCount = rewriter.create<arith::DivSIOp>(
@@ -324,8 +324,8 @@ LogicalResult distributeSingleIterationPerProcessor(
   assert(numLoops == procInfo.size() &&
          "expected as many ids as number of loops");
 
-  auto lbs = pLoopOp.lowerBound();
-  auto step = pLoopOp.step();
+  auto lbs = pLoopOp.getLowerBound();
+  auto step = pLoopOp.getStep();
   SmallVector<Value, 2> ivReplacements;
   for (unsigned i : llvm::seq<unsigned>(0, numLoops)) {
     Value iterValue = rewriter.create<arith::AddIOp>(
@@ -338,7 +338,7 @@ LogicalResult distributeSingleIterationPerProcessor(
   if (generateGuard) {
     TypeConverter::SignatureConversion signatureConverter(numLoops);
     Value cond = nullptr;
-    auto ubs = pLoopOp.upperBound();
+    auto ubs = pLoopOp.getUpperBound();
     for (unsigned i : llvm::seq<unsigned>(0, numLoops)) {
       Value cmp = rewriter.create<arith::CmpIOp>(loc, arith::CmpIPredicate::slt,
                                                  ivReplacements[i], ubs[i]);

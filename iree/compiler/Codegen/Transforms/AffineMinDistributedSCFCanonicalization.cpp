@@ -46,9 +46,9 @@ static bool affineMinOpDivisible(AffineMinOp minOp, int64_t dividend) {
     auto forOp = dyn_cast_or_null<scf::ForOp>(containingOp);
     if (forOp && forOp.getInductionVar() == dim) {
       iv = dim;
-      ub = forOp.upperBound();
-      lb = forOp.lowerBound();
-      step = forOp.step();
+      ub = forOp.getUpperBound();
+      lb = forOp.getLowerBound();
+      step = forOp.getStep();
       break;
     }
     auto parallelOp = dyn_cast_or_null<scf::ParallelOp>(containingOp);
@@ -56,9 +56,9 @@ static bool affineMinOpDivisible(AffineMinOp minOp, int64_t dividend) {
     for (auto inductionVar : llvm::enumerate(parallelOp.getInductionVars())) {
       if (inductionVar.value() == dim) {
         iv = dim;
-        ub = parallelOp.upperBound()[inductionVar.index()];
-        lb = parallelOp.lowerBound()[inductionVar.index()];
-        step = parallelOp.step()[inductionVar.index()];
+        ub = parallelOp.getUpperBound()[inductionVar.index()];
+        lb = parallelOp.getLowerBound()[inductionVar.index()];
+        step = parallelOp.getStep()[inductionVar.index()];
         break;
       }
     }
