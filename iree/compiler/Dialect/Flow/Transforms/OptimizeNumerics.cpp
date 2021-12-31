@@ -60,7 +60,9 @@ Value castNumeric(Value origValue, Type toType, bool isSigned,
       return builder.create<arith::UIToFPOp>(loc, toType, origValue);
     }
   } else {
-    // TODO: If we need int<->int and float<->float, implement those cases.
+    // If we need int<->int and float<->float, implement those cases. Since
+    // this is just needed for things in this file, it is ok to leave it
+    // under implemented.
     llvm_unreachable("unsupported numeric cast");
   }
 }
@@ -161,13 +163,13 @@ struct LinalgFpMatmulToLowP : public OpRewritePattern<linalg::MatmulOp> {
       return rewriter.notifyMatchFailure(matmulOp, "no narrowing annotations");
     }
 
-    // TODO: This could be more flexible, allowing mix and match integer/float
-    // types.
+    // TODO(#7987): This could be more flexible, allowing mix and match
+    // integer/float types.
     if (!lhsParams->isFromFloat() || !rhsParams->isFromFloat()) {
       return rewriter.notifyMatchFailure(matmulOp, "not from floating point");
     }
 
-    // TODO: Could support partial conversion to integer.
+    // TODO(#7987): Could support partial conversion to integer.
     if (!lhsParams->isToInteger() || !rhsParams->isToInteger() ||
         !accumParams->isToInteger()) {
       return rewriter.notifyMatchFailure(matmulOp, "not to an integer type");
@@ -177,7 +179,7 @@ struct LinalgFpMatmulToLowP : public OpRewritePattern<linalg::MatmulOp> {
     int rhsBitWidth = rhsParams->getToBitWidth();
 
     // Handle signed/unsigned mismatch.
-    // TODO: Implement a proper unsigned->signed widening.
+    // TODO(#7987): Implement a proper unsigned->signed widening.
     bool isSigned;
     if (lhsParams->isToSigned() != rhsParams->isToSigned()) {
       // Mixed signed/unsigned. Promote to signed.
@@ -200,12 +202,12 @@ struct LinalgFpMatmulToLowP : public OpRewritePattern<linalg::MatmulOp> {
     // Promote accumulator to match signedness.
     int accumBitWidth = accumParams->getToBitWidth();
     if (isSigned && !accumParams->isToSigned()) {
-      // TODO: A proper unsigned widening based on range.
+      // TODO(#7987): A proper unsigned widening based on range.
       accumBitWidth += 1;
     }
 
     // Determine an appropriate accumulator size.
-    // TODO: Apply the clamp of:
+    // TODO(#7987): Apply the clamp of:
     // lhsBitWidth + rhsBitWidth + log2_ceil(contraction_dim + 1) to determine
     // the accumulator size. Note: Can drop the +1 if one of lhs/rhs is signed
     // and symmetric (i.e. does not use the asymmetric lower bound).
