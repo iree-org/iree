@@ -38,6 +38,9 @@ class UtilDialect : public Dialect {
 
 void registerUtilExternalModels(DialectRegistry& registry);
 
+/// Register external models for PartitionableLoopsInterface.
+void registerPartitionableLoopsInterfaceModels(DialectRegistry& registry);
+
 }  // namespace Util
 }  // namespace IREE
 }  // namespace iree_compiler

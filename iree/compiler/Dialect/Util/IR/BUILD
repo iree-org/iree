@@ -20,6 +20,7 @@ td_library(
     name = "td_files",
     srcs = enforce_glob(
         [
+            "PartitionableLoopsInterface.td",
             "UtilAttrs.td",
             "UtilBase.td",
             "UtilInterfaces.td",
@@ -41,6 +42,7 @@ cc_library(
     name = "IR",
     srcs = [
         "ClosureOpUtils.cpp",
+        "PartitionableLoopsInterface.cpp",
         "UtilAttrs.cpp",
         "UtilDialect.cpp",
         "UtilOpFolders.cpp",
@@ -50,6 +52,7 @@ cc_library(
     ],
     hdrs = [
         "ClosureOpUtils.h",
+        "PartitionableLoopsInterface.h",
         "UtilDialect.h",
         "UtilOps.h",
         "UtilOps.h.inc",
@@ -57,6 +60,8 @@ cc_library(
         "UtilTypes.h",
     ],
     textual_hdrs = [
+        "PartitionableLoopsInterface.cpp.inc",
+        "PartitionableLoopsInterface.h.inc",
         "UtilAttrs.cpp.inc",
         "UtilAttrs.h.inc",
         "UtilAttrInterfaces.cpp.inc",
@@ -67,13 +72,16 @@ cc_library(
         "UtilTypeInterfaces.h.inc",
     ],
     deps = [
+        ":PartitionableLoopsInterfaceGen",
         ":UtilAttrsGen",
         ":UtilInterfacesGen",
         ":UtilOpsGen",
+        "//llvm-external-projects/iree-dialects:IREELinalgExtDialect",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:ArithmeticDialect",
         "@llvm-project//mlir:ControlFlowInterfaces",
         "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:LinalgInterfaces",
         "@llvm-project//mlir:MemRefDialect",
         "@llvm-project//mlir:Parser",
         "@llvm-project//mlir:SideEffectInterfaces",
@@ -83,6 +91,23 @@ cc_library(
         "@llvm-project//mlir:TensorDialect",
         "@llvm-project//mlir:Transforms",
     ],
+)
+
+gentbl_cc_library(
+    name = "PartitionableLoopsInterfaceGen",
+    tbl_outs = [
+        (
+            ["-gen-op-interface-decls"],
+            "PartitionableLoopsInterface.h.inc",
+        ),
+        (
+            ["-gen-op-interface-defs"],
+            "PartitionableLoopsInterface.cpp.inc",
+        ),
+    ],
+    tblgen = "@llvm-project//mlir::mlir-tblgen",
+    td_file = "PartitionableLoopsInterface.td",
+    deps = ["@llvm-project//mlir:OpBaseTdFiles"],
 )
 
 gentbl_cc_library(

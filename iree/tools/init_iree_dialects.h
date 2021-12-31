@@ -48,6 +48,7 @@ inline void registerIreeDialects(DialectRegistry &registry) {
 
   IREE::LinalgExt::registerTiledOpInterfaceExternalModels(registry);
   IREE::Util::registerUtilExternalModels(registry);
+  IREE::Util::registerPartitionableLoopsInterfaceModels(registry);
   registerCodegenInterfaces(registry);
 }
 

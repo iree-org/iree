@@ -23,6 +23,7 @@ cc_library(
         "Patterns.cpp",
         "SimplifyGlobalAccesses.cpp",
         "TestFloatRangeAnalysis.cpp",
+        "TestPartitionableLoopsInterface.cpp",
     ],
     hdrs = [
         "Passes.h",

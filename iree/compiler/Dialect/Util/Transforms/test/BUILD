@@ -27,6 +27,7 @@ iree_lit_test_suite(
             "simplify_global_accesses.mlir",
             "test_float_range_analysis.mlir",
             "test_float_range_analysis_linalg.mlir",
+            "test_partitionable_loops_interface.mlir",
         ],
         include = ["*.mlir"],
     ),

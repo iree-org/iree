@@ -27,6 +27,8 @@ std::unique_ptr<OperationPass<void>> createFixedPointIteratorPass(
 
 // Test passes.
 std::unique_ptr<OperationPass<void>> createTestFloatRangeAnalysis();
+std::unique_ptr<OperationPass<void>>
+createTestPartitionableLoopsInterfacePass();
 
 // Register all Passes
 // TODO: Switch this directory to declarative registration.
@@ -40,6 +42,7 @@ inline void registerTransformPasses() {
   createSimplifyGlobalAccessesPass();
   createFixedPointIteratorPass(OpPassManager("dummy_op"));
   createTestFloatRangeAnalysis();
+  createTestPartitionableLoopsInterfacePass();
 }
 
 }  // namespace Util
