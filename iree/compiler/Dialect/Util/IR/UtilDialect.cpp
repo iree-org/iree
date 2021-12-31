@@ -143,6 +143,45 @@ void UtilDialect::getCanonicalizationPatterns(
   results.insert<FoldDimOp<tensor::DimOp>>(getContext());
 }
 
+//===----------------------------------------------------------------------===//
+// Interface external models
+//===----------------------------------------------------------------------===//
+
+namespace {
+
+// Since all details of the interface are provided via default implementations,
+// we can just have one templated external model to apply per op, vs one
+// explicit model per op.
+struct GenericNumericCastExternalModel {
+  template <typename OpTy>
+  struct ExternalModel
+      : public NumericCastOpInterface::ExternalModel<ExternalModel<OpTy>,
+                                                     OpTy> {};
+
+  template <typename OpTy>
+  static void add(DialectRegistry &registry) {
+    registry.addOpInterface<OpTy, ExternalModel<OpTy>>();
+  }
+
+  template <typename OpTy1, typename OpTy2, typename... More>
+  static void add(DialectRegistry &registry) {
+    add<OpTy1>(registry);
+    add<OpTy2, More...>(registry);
+  }
+};
+
+}  // namespace
+
+void registerUtilExternalModels(DialectRegistry &registry) {
+  // Must ensure that any dependent dialects are registered.
+  registry.insert<arith::ArithmeticDialect>();
+
+  GenericNumericCastExternalModel::add<
+      arith::BitcastOp, arith::ExtFOp, arith::ExtUIOp, arith::ExtSIOp,
+      arith::FPToSIOp, arith::FPToUIOp, arith::IndexCastOp, arith::TruncFOp,
+      arith::TruncIOp, arith::SIToFPOp, arith::UIToFPOp>(registry);
+}
+
 }  // namespace Util
 }  // namespace IREE
 }  // namespace iree_compiler

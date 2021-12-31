@@ -118,6 +118,101 @@ def Util_GlobalAccessorOpInterface : OpInterface<"GlobalAccessorOpInterface"> {
 }
 
 //===----------------------------------------------------------------------===//
+// IREE::Util::NumericCastOpInterface
+//===----------------------------------------------------------------------===//
+
+def Util_NumericCastOpInterface : OpInterface<"NumericCastOpInterface"> {
+  let cppNamespace = "::mlir::iree_compiler::IREE::Util";
+
+  let description = [{
+    Applied to numeric casting ops which can convert between different numeric
+    types or shaped-types thereof. Example ops include `fptosi`, `trunci`, etc.
+    Treating these generically allows us to perform various cast movement
+    optimizations.
+
+    Conforming operations must:
+      * Have no attributes.
+      * Have one operand and one result.
+      * Be able to operate on supported scalar types: IntegerType, FloatType,
+        IndexType.
+      * Be able to operate on tensors/vectors of supported scalar types.
+      * Have a builder that takes (Type, Value).
+  }];
+
+  let methods = [
+    InterfaceMethod<
+      /*desc=*/[{
+        Gets the input value.
+      }],
+      /*retTy=*/"Value",
+      /*methodName=*/"getInput",
+      /*args=*/(ins),
+      /*methodBody=*/[{}],
+      /*defaultImplementation=*/[{
+        return $_op->getOperand(0);
+      }]
+    >,
+
+    InterfaceMethod<
+      /*desc=*/[{
+        Gets the input type.
+      }],
+      /*retTy=*/"Type",
+      /*methodName=*/"getInputType",
+      /*args=*/(ins),
+      /*methodBody=*/[{}],
+      /*defaultImplementation=*/[{
+        return $_op->getOperand(0).getType();
+      }]
+    >,
+
+    InterfaceMethod<
+      /*desc=*/[{
+        Gets the result casted value.
+      }],
+      /*retTy=*/"Value",
+      /*methodName=*/"getCasted",
+      /*args=*/(ins),
+      /*methodBody=*/[{}],
+      /*defaultImplementation=*/[{
+        return $_op->getResult(0);
+      }]
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Gets the result casted type.
+      }],
+      /*retTy=*/"Type",
+      /*methodName=*/"getCastedType",
+      /*args=*/(ins),
+      /*methodBody=*/[{}],
+      /*defaultImplementation=*/[{
+        return $_op->getResult(0).getType();
+      }]
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Clones the operation with a new result type and input.
+        Note that it is generally not legal to generically change the scalar
+        type of the input or the result, but it is legal to transform between
+        a scalar type and a tensor/vector with an element type of the original
+        scalar type (and vica-versa).
+      }],
+      /*retTy=*/"NumericCastOpInterface",
+      /*methodName=*/"cloneWithInput",
+      /*args=*/(ins "OpBuilder &":$builder, "Type":$resultType, "Value":$input),
+      /*methodBody=*/[{}],
+      /*defaultImplementation=*/[{
+          return llvm::cast<NumericCastOpInterface>(
+            builder.create<ConcreteOp>($_op->getLoc(), resultType, input)
+              .getOperation());
+      }]
+    >,
+  ];
+}
+
+
+//===----------------------------------------------------------------------===//
 // IREE::Util::TiedOpInterface
 //===----------------------------------------------------------------------===//
 

@@ -96,6 +96,81 @@ def Util_ByteBufferConstantOp : Util_PureOp<"byte_buffer.constant"> {
 }
 
 //===----------------------------------------------------------------------===//
+// Data type conversions
+//===----------------------------------------------------------------------===//
+
+def Util_NumericOptionalNarrowOp : Util_PureOp<"numeric.optional_narrow", [
+  SameOperandsAndResultType
+]> {
+  let summary = "memorializes an optional numeric narrowing that is valid";
+  let description = [{
+    Serves as a placeholder for points in the computation where an optional
+    numeric narrowing can be performed without loss of information. Such ops
+    can guide optimization passes wishing to perform precision reduction.
+
+    In addition to the operand and result type, this op takes an additional
+    `semantic_type` attribute representing the semantic target type which can
+    be:
+      * FloatType
+      * Signed IntegerType
+      * Unsigned IntegerType
+
+    Note that this `semantic_type` must be a sign-carrying integer if using an
+    integer type and cannot be IndexType (i.e. it can be used to indicate a
+    possible narrowing of an IndexType to a specific integer).
+
+    If the operand is a TensorType, then the result must be a TensorType. The
+    `semantic_type` constrains the element type.
+
+    Optionally, the minimum and maximum integer values (for integer semantic
+    types) are tracked if known.
+  }];
+
+  let arguments = (ins
+    AnyTypeOf<[Util_Element, Util_Tensor]>:$operand,
+    TypeAttr:$semantic_type,
+    OptionalAttr<APIntAttr>:$min_value,
+    OptionalAttr<APIntAttr>:$max_value
+  );
+  let results = (outs
+    AnyTypeOf<[Util_Element, Util_Tensor]>:$result
+  );
+
+  let assemblyFormat = [{
+    $operand `:` type($operand) `as` $semantic_type attr-dict
+  }];
+
+  let builders = [
+    OpBuilder<(ins
+      "Value":$operand,
+      "Type":$type,
+      "Optional<std::pair<int64_t, int64_t>>":$integerRange
+    ),
+    [{
+      IntegerAttr minValueAttr;
+      IntegerAttr maxValueAttr;
+      if (integerRange) {
+        minValueAttr = $_builder.getIntegerAttr(type, integerRange->first);
+        maxValueAttr = $_builder.getIntegerAttr(type, integerRange->second);
+      }
+      build($_builder, $_state, operand.getType(), operand, TypeAttr::get(type),
+        minValueAttr, maxValueAttr);
+    }]>,
+  ];
+
+  let extraClassDeclaration = [{
+    bool isSigned() {
+      if (auto integerType = getType().dyn_cast<IntegerType>()) {
+        return !integerType.isUnsigned();
+      }
+      return true;
+    }
+
+    Optional<std::pair<int64_t, int64_t>> getIntegerRange();
+  }];
+}
+
+//===----------------------------------------------------------------------===//
 // Range arithmetic
 //===----------------------------------------------------------------------===//
 

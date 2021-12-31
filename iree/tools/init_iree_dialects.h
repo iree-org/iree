@@ -47,6 +47,7 @@ inline void registerIreeDialects(DialectRegistry &registry) {
   // clang-format on
 
   IREE::LinalgExt::registerTiledOpInterfaceExternalModels(registry);
+  IREE::Util::registerUtilExternalModels(registry);
   registerCodegenInterfaces(registry);
 }
 

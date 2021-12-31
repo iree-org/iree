@@ -36,6 +36,8 @@ class UtilDialect : public Dialect {
   void registerTypes();
 };
 
+void registerUtilExternalModels(DialectRegistry& registry);
+
 }  // namespace Util
 }  // namespace IREE
 }  // namespace iree_compiler
