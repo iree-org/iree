@@ -95,6 +95,10 @@ IREE_API_EXPORT void iree_hal_allocator_release(
 IREE_API_EXPORT iree_allocator_t
 iree_hal_allocator_host_allocator(const iree_hal_allocator_t* allocator);
 
+// Trims cached/unused pooled buffers, if any.
+IREE_API_EXPORT
+iree_status_t iree_hal_allocator_trim(iree_hal_allocator_t* allocator);
+
 // Queries the aggregate statistics from the allocator since creation.
 // Thread-safe; statistics are captured at the time the call is made.
 //
@@ -194,6 +198,8 @@ typedef struct iree_hal_allocator_vtable_t {
 
   iree_allocator_t(IREE_API_PTR* host_allocator)(
       const iree_hal_allocator_t* allocator);
+
+  iree_status_t(IREE_API_PTR* trim)(iree_hal_allocator_t* allocator);
 
   void(IREE_API_PTR* query_statistics)(
       iree_hal_allocator_t* allocator,

@@ -96,6 +96,11 @@ static iree_allocator_t iree_hal_cuda_allocator_host_allocator(
   return allocator->context->host_allocator;
 }
 
+static iree_status_t iree_hal_cuda_allocator_trim(
+    iree_hal_allocator_t* base_allocator) {
+  return iree_ok_status();
+}
+
 static void iree_hal_cuda_allocator_query_statistics(
     iree_hal_allocator_t* base_allocator,
     iree_hal_allocator_statistics_t* out_statistics) {
@@ -255,6 +260,7 @@ static void iree_hal_cuda_allocator_deallocate_buffer(
 static const iree_hal_allocator_vtable_t iree_hal_cuda_allocator_vtable = {
     .destroy = iree_hal_cuda_allocator_destroy,
     .host_allocator = iree_hal_cuda_allocator_host_allocator,
+    .trim = iree_hal_cuda_allocator_trim,
     .query_statistics = iree_hal_cuda_allocator_query_statistics,
     .query_buffer_compatibility =
         iree_hal_cuda_allocator_query_buffer_compatibility,

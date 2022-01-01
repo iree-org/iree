@@ -53,6 +53,15 @@ iree_hal_allocator_host_allocator(const iree_hal_allocator_t* allocator) {
   return _VTABLE_DISPATCH(allocator, host_allocator)(allocator);
 }
 
+IREE_API_EXPORT
+iree_status_t iree_hal_allocator_trim(iree_hal_allocator_t* allocator) {
+  IREE_ASSERT_ARGUMENT(allocator);
+  IREE_TRACE_ZONE_BEGIN(z0);
+  iree_status_t status = _VTABLE_DISPATCH(allocator, trim)(allocator);
+  IREE_TRACE_ZONE_END(z0);
+  return status;
+}
+
 IREE_API_EXPORT void iree_hal_allocator_query_statistics(
     iree_hal_allocator_t* allocator,
     iree_hal_allocator_statistics_t* out_statistics) {

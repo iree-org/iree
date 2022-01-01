@@ -168,6 +168,12 @@ static iree_status_t iree_hal_rocm_device_query_i32(
       (int)category.size, category.data, (int)key.size, key.data);
 }
 
+static iree_status_t iree_hal_rocm_device_trim(iree_hal_device_t* base_device) {
+  iree_hal_rocm_device_t* device = iree_hal_rocm_device_cast(base_device);
+  // TODO(benvanik): trim of ROCM resources, whenever we care.
+  return iree_hal_allocator_trim(device->device_allocator);
+}
+
 static iree_status_t iree_hal_rocm_device_create_command_buffer(
     iree_hal_device_t* base_device, iree_hal_command_buffer_mode_t mode,
     iree_hal_command_category_t command_categories,
@@ -289,6 +295,7 @@ static const iree_hal_device_vtable_t iree_hal_rocm_device_vtable = {
     .id = iree_hal_rocm_device_id,
     .host_allocator = iree_hal_rocm_device_host_allocator,
     .device_allocator = iree_hal_rocm_device_allocator,
+    .trim = iree_hal_rocm_device_trim,
     .query_i32 = iree_hal_rocm_device_query_i32,
     .create_command_buffer = iree_hal_rocm_device_create_command_buffer,
     .create_descriptor_set = iree_hal_rocm_device_create_descriptor_set,
