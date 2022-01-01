@@ -184,10 +184,8 @@ def build_compile_command_line(input_file: str, tfs: TempFileSaver,
     cl.append(f"--iree-hal-target-backends={target_backend}")
 
   # Output file.
-  output_file = tfs.alloc_optional("core-output.bin",
-                                   export_as=options.output_file)
-  if output_file:
-    cl.append(f"-o={output_file}")
+  if options.output_file:
+    cl.append(f"-o={options.output_file}")
 
   # Translation to perform.
   cl.append("--iree-mlir-to-vm-bytecode-module")
@@ -237,10 +235,25 @@ def compile_file(input_file: str, **kwargs):
   """
   with TempFileSaver.implicit() as tfs:
     options = CompilerOptions(**kwargs)
+    retained_output_file = tfs.alloc_optional("core-output.bin",
+                                              export_as=options.output_file)
+    if options.output_file:
+      options.output_file = retained_output_file
     cl = build_compile_command_line(input_file, tfs, options)
+
+    # Save a temp file with the command line.
+    retained_cl = tfs.alloc_optional("core-command-line.txt")
+    if retained_cl:
+      with open(retained_cl, "wt") as f:
+        f.write(" ".join(cl))
+
     result = invoke_immediate(cl)
     if options.output_file:
       return None
+    # Output as string needs to write to the retained output file itself.
+    if retained_output_file:
+      with open(retained_output_file, "wb") as f:
+        f.write(result)
     return result
 
 
@@ -255,11 +268,32 @@ def compile_str(input_str: Union[str, bytes], **kwargs):
     was specified in the options.
   """
   with TempFileSaver.implicit() as tfs:
+    retained_input_file = tfs.alloc_optional("core-input.mlir")
+    if retained_input_file:
+      with open(retained_input_file,
+                "wt" if isinstance(input_str, str) else "wb") as f:
+        f.write(input_str)
     options = CompilerOptions(**kwargs)
+    retained_output_file = tfs.alloc_optional("core-output.bin",
+                                              export_as=options.output_file)
+    if options.output_file:
+      options.output_file = retained_output_file
     cl = build_compile_command_line("-", tfs, options)
     input_bytes = input_str.encode("utf-8") if isinstance(input_str,
                                                           str) else input_str
+
+    # Save a temp file with the command line.
+    retained_cl = tfs.alloc_optional("core-command-line.txt")
+    if retained_cl:
+      with open(retained_cl, "wt") as f:
+        f.write(" ".join(cl))
+
     result = invoke_immediate(cl, immediate_input=input_bytes)
     if options.output_file:
       return None
+
+    # Output as string needs to write to the retained output file itself.
+    if retained_output_file:
+      with open(retained_output_file, "wb") as f:
+        f.write(result)
     return result
