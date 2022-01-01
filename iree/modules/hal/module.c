@@ -178,6 +178,20 @@ iree_hal_module_free_state(void* self, iree_vm_module_state_t* module_state) {
   iree_allocator_free(state->host_allocator, state);
 }
 
+static iree_status_t IREE_API_PTR iree_hal_module_notify(
+    void* self, iree_vm_module_state_t* module_state, iree_vm_signal_t signal) {
+  iree_hal_module_state_t* state = (iree_hal_module_state_t*)module_state;
+  switch (signal) {
+    case IREE_VM_SIGNAL_SUSPEND:
+    case IREE_VM_SIGNAL_LOW_MEMORY:
+      // TODO(benvanik): trims for the deferred_releases list and our other
+      // tables.
+      return iree_hal_device_trim(state->shared_device);
+    default:
+      return iree_ok_status();
+  }
+}
+
 //===----------------------------------------------------------------------===//
 // Experimental APIs
 //===----------------------------------------------------------------------===//
@@ -1419,6 +1433,7 @@ iree_hal_module_create(iree_hal_device_t* device, iree_allocator_t allocator,
       .destroy = iree_hal_module_destroy,
       .alloc_state = iree_hal_module_alloc_state,
       .free_state = iree_hal_module_free_state,
+      .notify = iree_hal_module_notify,
   };
 
   // Allocate shared module state.

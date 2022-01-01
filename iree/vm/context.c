@@ -487,3 +487,127 @@ IREE_API_EXPORT iree_status_t iree_vm_context_resolve_function(
                           (int)module_name.size, module_name.data,
                           (int)full_name.size, full_name.data);
 }
+
+// Calls the '__notify(i32)' function in |module|, if present.
+static iree_status_t iree_vm_context_call_module_notify(
+    iree_vm_stack_t* stack, iree_vm_module_t* module,
+    iree_vm_module_state_t* module_state, iree_vm_signal_t signal) {
+  // Single i32 argument with the signal number.
+  uint32_t signal_arg = (uint32_t)signal;
+  iree_vm_function_call_t call;
+  memset(&call, 0, sizeof(call));
+  call.arguments = iree_make_byte_span(&signal_arg, sizeof(signal_arg));
+
+  // Try to find the function. Modules are not required to export it.
+  iree_status_t status = iree_vm_module_lookup_function_by_name(
+      module, IREE_VM_FUNCTION_LINKAGE_EXPORT,
+      iree_make_cstring_view("__notify"), &call.function);
+  if (iree_status_is_not_found(status)) {
+    // Function doesn't exist; that's ok as this was an optional call.
+    return iree_status_ignore(status);
+  } else if (!iree_status_is_ok(status)) {
+    // Failed during trim.
+    return status;
+  }
+
+  // Call the resolved function.
+  iree_vm_execution_result_t result;
+  status = module->begin_call(module->self, stack, &call, &result);
+  if (!iree_status_is_ok(status)) {
+    status = IREE_VM_STACK_ANNOTATE_BACKTRACE_IF_ENABLED(stack, status);
+  }
+
+  // TODO(benvanik): ensure completed synchronously.
+
+  return status;
+}
+
+// Calls the module notify methods in registration order.
+static iree_status_t iree_vm_context_notify_forward(iree_vm_stack_t* stack,
+                                                    iree_vm_context_t* context,
+                                                    iree_vm_signal_t signal) {
+  IREE_TRACE_ZONE_BEGIN(z0);
+  iree_status_t status = iree_ok_status();
+  for (iree_host_size_t i = 0; i < context->list.count; ++i) {
+    iree_vm_module_t* module = context->list.modules[i];
+    iree_vm_module_state_t* module_state = context->list.module_states[i];
+
+    // Call the module internal interface notify method.
+    // This handles the resources owned by the module implementation itself
+    // such as JITed binaries or other module infrastructure.
+    status = module->notify(module->self, module_state, signal);
+    if (!iree_status_is_ok(status)) break;
+
+    // Call the user-level notify method.
+    // This may new use the reallocated resources from the module internal
+    // implementation above.
+    status =
+        iree_vm_context_call_module_notify(stack, module, module_state, signal);
+    if (!iree_status_is_ok(status)) break;
+  }
+  IREE_TRACE_ZONE_END(z0);
+  return status;
+}
+
+// Calls the module notify methods in reverse registration order.
+static iree_status_t iree_vm_context_notify_reverse(iree_vm_stack_t* stack,
+                                                    iree_vm_context_t* context,
+                                                    iree_vm_signal_t signal) {
+  IREE_TRACE_ZONE_BEGIN(z0);
+  iree_status_t status = iree_ok_status();
+  for (int i = (int)context->list.count - 1; i >= 0; --i) {
+    iree_vm_module_t* module = context->list.modules[i];
+    iree_vm_module_state_t* module_state = context->list.module_states[i];
+
+    // Call the user-level notify method first.
+    // This allows users to drop any state that they can rematerialize and
+    // return the resources to pools/caches to be trimmed below.
+    status =
+        iree_vm_context_call_module_notify(stack, module, module_state, signal);
+    if (!iree_status_is_ok(status)) break;
+
+    // Call the module internal interface notify method.
+    // This handles the resources owned by the module implementation itself
+    // such as JITed binaries or other module infrastructure. Since we've
+    // already called the user-level function we likely have all of the
+    // resources that could be returned to pools there for this to reclaim.
+    status = module->notify(module->self, module_state, signal);
+    if (!iree_status_is_ok(status)) break;
+  }
+  IREE_TRACE_ZONE_END(z0);
+  return status;
+}
+
+IREE_API_EXPORT iree_status_t iree_vm_context_notify(iree_vm_context_t* context,
+                                                     iree_vm_signal_t signal) {
+  IREE_TRACE_ZONE_BEGIN(z0);
+  IREE_TRACE_ZONE_APPEND_VALUE(z0, (uint64_t)signal);
+
+  // VM stack used to call into module __init methods.
+  IREE_VM_INLINE_STACK_INITIALIZE(
+      stack,
+      context->flags & IREE_VM_CONTEXT_FLAG_TRACE_EXECUTION
+          ? IREE_VM_INVOCATION_FLAG_TRACE_EXECUTION
+          : IREE_VM_INVOCATION_FLAG_NONE,
+      iree_vm_context_state_resolver(context), context->allocator);
+
+  // Resumes are walked forward while suspends are walked backward.
+  // This follows the expected construction/destruction pattern where for
+  // example on suspend one would walk user modules to release resources back
+  // to system module pools before the system modules then clean up the pools.
+  iree_status_t status = iree_ok_status();
+  switch (signal) {
+    default:
+    case IREE_VM_SIGNAL_RESUME:
+      status = iree_vm_context_notify_forward(stack, context, signal);
+      break;
+    case IREE_VM_SIGNAL_SUSPEND:
+    case IREE_VM_SIGNAL_LOW_MEMORY:
+      status = iree_vm_context_notify_reverse(stack, context, signal);
+      break;
+  }
+
+  iree_vm_stack_deinitialize(stack);
+  IREE_TRACE_ZONE_END(z0);
+  return status;
+}
