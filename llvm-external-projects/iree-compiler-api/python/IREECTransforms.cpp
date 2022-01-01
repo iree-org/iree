@@ -55,6 +55,40 @@ class PyFileAccumulator {
   bool binary;
 };
 
+void setOptionsFromArgs(IreeCompilerOptions &options, py::args &args) {
+  std::vector<std::string> allocedArgs;
+  std::vector<const char *> cArgs;
+  for (auto &argObject : args) {
+    allocedArgs.push_back(py::cast<std::string>(argObject));
+    cArgs.push_back(allocedArgs.back().c_str());
+  }
+
+  std::string errorMessage;
+  auto callback = +[](MlirStringRef msg, void *userData) {
+    std::string *innerErrorMessage = static_cast<std::string *>(userData);
+    if (!innerErrorMessage->empty()) innerErrorMessage->append("\n");
+    innerErrorMessage->append(msg.data, msg.length);
+  };
+  if (mlirLogicalResultIsFailure(ireeCompilerOptionsSetFlags(
+          options, cArgs.size(), cArgs.data(), callback,
+          static_cast<void *>(&errorMessage)))) {
+    throw std::invalid_argument(std::move(errorMessage));
+  }
+}
+
+py::list getFlagsFromOptions(IreeCompilerOptions &options,
+                             bool nonDefaultOnly) {
+  py::list flags;
+  auto callback = +[](MlirStringRef flag, void *userData) {
+    py::list *innerFlags = static_cast<py::list *>(userData);
+    py::str s(flag.data, flag.length);
+    innerFlags->append(std::move(s));
+  };
+  ireeCompilerOptionsGetFlags(options, nonDefaultOnly, callback,
+                              static_cast<void *>(&flags));
+  return flags;
+}
+
 }  // namespace
 
 static const char BUILD_MHLO_IMPORT_PASS_PIPELINE_DOCSTRING[] =
@@ -101,40 +135,39 @@ The provided `file` argument must be a valid `IO` object, capable of having
 binary data written to it.
 )";
 
-PYBIND11_MODULE(_ireeCompilerDriver, m) {
-  m.doc() = "iree-compiler driver api";
+PYBIND11_MODULE(_ireecTransforms, m) {
+  m.doc() = "ireec transforms API";
   ireeCompilerRegisterTargetBackends();
 
   py::class_<PyCompilerOptions>(m, "CompilerOptions",
                                 "Options for the IREE backend compiler.")
-      .def(py::init<>())
+      .def(py::init([](py::args args) {
+        PyCompilerOptions self;
+        if (!args.empty()) {
+          setOptionsFromArgs(self.options, args);
+        }
+        return self;
+      }))
       .def(
-          "set_input_dialect_mhlo",
-          [](PyCompilerOptions &self) {
-            ireeCompilerOptionsSetInputDialectMHLO(self.options);
+          "set",
+          [](PyCompilerOptions &self, py::args args) {
+            setOptionsFromArgs(self.options, args);
           },
-          "Sets the input type to the 'mhlo' dialect")
+          "Sets options from flag values in the usual form for command line "
+          "options")
       .def(
-          "set_input_dialect_tosa",
-          [](PyCompilerOptions &self) {
-            ireeCompilerOptionsSetInputDialectTOSA(self.options);
+          "get",
+          [](PyCompilerOptions &self, bool nonDefaultOnly) {
+            return getFlagsFromOptions(self.options, nonDefaultOnly);
           },
-          "Sets the input type to the 'tosa' dialect")
-      .def(
-          "set_input_dialect_xla",
-          [](PyCompilerOptions &self) {
-            ireeCompilerOptionsSetInputDialectTOSA(self.options);
-          },
-          "Sets the input type to the 'mhlo' dialect with XLA compatibility "
-          "cleanups")
-      .def(
-          "add_target_backend",
-          [](PyCompilerOptions &self, const std::string &targetBackend) {
-            ireeCompilerOptionsAddTargetBackend(self.options,
-                                                targetBackend.c_str());
-          },
-          py::arg("target_backend"),
-          "Adds a target backend (i.e. 'cpu', 'vulkan-spirv', etc)");
+          py::arg("non_default_only") = true,
+          "Gets a list of flag values for the options (by default only those "
+          "that have changed).")
+      .def("__repr__", [](PyCompilerOptions &self) {
+        py::list flags =
+            getFlagsFromOptions(self.options, /*nonDefaultOnly=*/true);
+        return py::str("<CompilerOptions:") + py::repr(flags) + py::str(">");
+      });
   m.def(
       "build_mhlo_import_pass_pipeline",
       [](MlirPassManager passManager) {

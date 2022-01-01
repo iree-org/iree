@@ -4,25 +4,6 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-function(iree_compiler_api_py_test)
-  cmake_parse_arguments(
-    ARG
-    ""
-    "NAME;MAIN"
-    ""
-    ${ARGN}
-  )
-  set(TEST_NAME "iree-compiler-api-${ARG_NAME}")
-  add_test(
-    NAME
-      ${TEST_NAME}
-    WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
-    COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/${ARG_MAIN}"
-  )
-  set_tests_properties(${TEST_NAME} PROPERTIES
-    ENVIRONMENT PYTHONPATH=${IREE_COMPILER_API_BINARY_DIR}/python_package)
-endfunction()
-
 iree_compiler_api_py_test(
   NAME
     compiler_core_test
