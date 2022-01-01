@@ -269,7 +269,7 @@ void TensorExportOp::build(OpBuilder &builder, OperationState &result,
   auto dynamicDims =
       IREE::Util::buildDynamicDimsForValue(result.location, source, builder);
   build(builder, result, resultType, source, TypeAttr::get(source.getType()),
-        dynamicDims);
+        dynamicDims, /*target_storage=*/nullptr);
 }
 
 Value TensorExportOp::getTiedResult(unsigned resultIndex) {

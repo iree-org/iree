@@ -128,6 +128,25 @@ class WrapEntryPointsPass
     auto *entryBlock = wrapperFuncOp.addEntryBlock();
     auto entryBuilder = OpBuilder::atBlockBegin(entryBlock);
 
+    // Build a map of result value to the argument that has its backing storage.
+    SmallVector<Value> resultStorages;
+    resultStorages.resize(resultTypes.size());
+    for (unsigned i = 0; i < inputTypes.size(); ++i) {
+      auto outputAttr =
+          entryFuncOp.getArgAttrOfType<IntegerAttr>(i, "iree.abi.output");
+      if (!outputAttr) continue;
+      // Today all outputs need to be a !hal.buffer - we could change this
+      // in the future to be something more generalized.
+      auto storageArg = entryBlock->getArgument(i);
+      if (!storageArg.getType().isa<IREE::HAL::BufferType>()) {
+        entryFuncOp.emitError()
+            << "storage argument " << i << " has an invalid type "
+            << storageArg.getType() << "; must be a !hal.buffer";
+        return {};
+      }
+      resultStorages[outputAttr.getInt()] = storageArg;
+    }
+
     // Marshal arguments.
     SmallVector<Value> arguments;
     for (auto arg : llvm::enumerate(entryBlock->getArguments())) {
@@ -152,8 +171,12 @@ class WrapEntryPointsPass
       auto oldType = entryFuncType.getResult(result.index());
       auto newType = wrapperFuncType.getResult(result.index());
       if (oldType.isa<TensorType>()) {
-        results.push_back(entryBuilder.createOrFold<IREE::HAL::TensorExportOp>(
-            entryFuncOp.getLoc(), newType, result.value()));
+        auto dynamicDims = IREE::Util::buildDynamicDimsForValue(
+            entryFuncOp.getLoc(), result.value(), entryBuilder);
+        results.push_back(entryBuilder.create<IREE::HAL::TensorExportOp>(
+            entryFuncOp.getLoc(), newType, result.value(),
+            TypeAttr::get(result.value().getType()), dynamicDims,
+            resultStorages[result.index()]));
       } else {
         results.push_back(result.value());
       }

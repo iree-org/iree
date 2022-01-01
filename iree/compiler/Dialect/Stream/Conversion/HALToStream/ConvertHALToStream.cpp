@@ -141,18 +141,53 @@ struct ConvertTensorExportOp
     auto externalType = rewriter.getType<IREE::Stream::ResourceType>(
         IREE::Stream::Lifetime::External);
     auto exportSource = adaptor.source();
-    if (source.resource.getType() != externalType) {
-      exportSource = rewriter.create<IREE::Stream::AsyncTransferOp>(
-          op.getLoc(), externalType, source.resource, source.resourceSize,
-          source.resourceSize,
-          /*source_affinity=*/nullptr,
-          /*result_affinity=*/nullptr);
+    auto exportSize = source.resourceSize;
+    if (adaptor.target_storage()) {
+      // Query the target storage buffer length; we will only populate up to
+      // what is required for the output.
+      auto storageSize =
+          rewriter
+              .create<IREE::HAL::BufferLengthOp>(
+                  op.getLoc(), rewriter.getIndexType(), op.target_storage())
+              .result();
+
+      // Import the target storage as a resource that we can use as an update
+      // target. We overwrite the contents and just cast the storage to the
+      // target type so we know we can update it.
+      auto importOp = rewriter.create<IREE::Stream::TensorImportOp>(
+          op.getLoc(), externalType, adaptor.target_storage(),
+          TypeAttr::get(sourceType), adaptor.source_dims(), storageSize,
+          /*affinity=*/nullptr);
+
+      // Copy the source value into the imported target storage.
+      auto zeroOffset = rewriter.create<arith::ConstantIndexOp>(op.getLoc(), 0);
+      auto updateOp = rewriter.create<IREE::Stream::AsyncUpdateOp>(
+          op.getLoc(), externalType, importOp.result(), importOp.result_size(),
+          zeroOffset, source.resourceSize, source.resource, source.resourceSize,
+          /*affinity=*/nullptr);
+
+      // Export the updated resource.
+      // NOTE: the buffer size wrapped in the buffer view is the full size of
+      // the input buffer. This is so that we don't insert a data dependency on
+      // sparse operations or data-dependent dynamic shape dimensions.
+      exportSource = updateOp.result();
+      exportSize = updateOp.target_size();
+    } else {
+      // Exporting a produced value - transfer our source value to an externally
+      // usable resource and directly export it. This will cause an allocation.
+      if (source.resource.getType() != externalType) {
+        exportSource = rewriter.create<IREE::Stream::AsyncTransferOp>(
+            op.getLoc(), externalType, source.resource, source.resourceSize,
+            source.resourceSize,
+            /*source_affinity=*/nullptr,
+            /*result_affinity=*/nullptr);
+      }
     }
 
     // Export (stream resource to buffer view).
     rewriter.replaceOpWithNewOp<IREE::Stream::TensorExportOp>(
         op, targetType, exportSource, TypeAttr::get(sourceType),
-        adaptor.source_dims(), source.resourceSize,
+        adaptor.source_dims(), exportSize,
         /*affinity=*/nullptr);
     return success();
   }

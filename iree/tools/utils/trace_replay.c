@@ -465,7 +465,7 @@ static iree_status_t iree_trace_replay_parse_hal_encoding_type(
 // contents: !!binary |
 //   AACAPwAAAEAAAEBAAACAQA==
 // ```
-static iree_status_t iree_trace_replay_parse_hal_buffer(
+static iree_status_t iree_trace_replay_parse_hal_buffer_contents(
     iree_trace_replay_t* replay, yaml_document_t* document,
     yaml_node_t* contents_node, iree_hal_element_type_t element_type,
     iree_hal_buffer_mapping_t* mapping) {
@@ -651,14 +651,66 @@ static iree_status_t iree_trace_replay_generate_hal_buffer_callback(
   iree_trace_replay_generation_params_t* params =
       (iree_trace_replay_generation_params_t*)user_data;
   if (params->contents_node) {
-    return iree_trace_replay_parse_hal_buffer(params->replay, params->document,
-                                              params->contents_node,
-                                              params->element_type, mapping);
+    return iree_trace_replay_parse_hal_buffer_contents(
+        params->replay, params->document, params->contents_node,
+        params->element_type, mapping);
   } else {
     return iree_trace_replay_generate_hal_buffer(
         params->replay, params->document, params->generator_node,
         params->element_type, params->shape, params->shape_rank, mapping);
   }
+}
+
+// Parses a !hal.buffer and appends it to |target_list|.
+//
+// ```yaml
+// shape:
+// - 4
+// element_type: 553648160
+// ```
+static iree_status_t iree_trace_replay_parse_hal_buffer(
+    iree_trace_replay_t* replay, yaml_document_t* document,
+    yaml_node_t* value_node, iree_vm_list_t* target_list) {
+  yaml_node_t* shape_node = NULL;
+  IREE_RETURN_IF_ERROR(iree_yaml_mapping_try_find(
+      document, value_node, iree_make_cstring_view("shape"), &shape_node));
+  iree_hal_dim_t shape[16];
+  iree_host_size_t shape_rank = 0;
+  IREE_RETURN_IF_ERROR(iree_trace_replay_parse_hal_shape(
+      replay, document, shape_node, IREE_ARRAYSIZE(shape), shape, &shape_rank));
+
+  yaml_node_t* element_type_node = NULL;
+  IREE_RETURN_IF_ERROR(iree_yaml_mapping_find(
+      document, value_node, iree_make_cstring_view("element_type"),
+      &element_type_node));
+  iree_hal_element_type_t element_type = IREE_HAL_ELEMENT_TYPE_NONE;
+  IREE_RETURN_IF_ERROR(iree_trace_replay_parse_hal_element_type(
+      replay, document, element_type_node, &element_type));
+
+  yaml_node_t* encoding_type_node = NULL;
+  IREE_RETURN_IF_ERROR(iree_yaml_mapping_try_find(
+      document, value_node, iree_make_cstring_view("encoding_type"),
+      &encoding_type_node));
+  iree_hal_encoding_type_t encoding_type =
+      IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR;
+  IREE_RETURN_IF_ERROR(iree_trace_replay_parse_hal_encoding_type(
+      replay, document, encoding_type_node, &encoding_type));
+
+  iree_device_size_t allocation_size = 0;
+  IREE_RETURN_IF_ERROR(iree_hal_buffer_compute_view_size(
+      shape, shape_rank, element_type, encoding_type, &allocation_size));
+
+  iree_hal_buffer_t* buffer = NULL;
+  IREE_RETURN_IF_ERROR(iree_hal_allocator_allocate_buffer(
+      iree_hal_device_allocator(replay->device),
+      IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL | IREE_HAL_MEMORY_TYPE_HOST_VISIBLE,
+      IREE_HAL_BUFFER_USAGE_ALL, allocation_size, iree_const_byte_span_empty(),
+      &buffer));
+
+  iree_vm_ref_t buffer_ref = iree_hal_buffer_move_ref(buffer);
+  iree_status_t status = iree_vm_list_push_ref_move(target_list, &buffer_ref);
+  iree_vm_ref_release(&buffer_ref);
+  return status;
 }
 
 // Parses a !hal.buffer_view and appends it to |target_list|.
@@ -748,10 +800,31 @@ static iree_status_t iree_trace_replay_parse_hal_buffer_view(
   return status;
 }
 
+// Parses a !hal.buffer in tensor form and appends it to |target_list|.
+// The tensor form is used to size and initialize the buffer but then the
+// metadata is thrown away.
+//
+// ```yaml
+// !!hal.buffer 4xf32=[0 1 2 3]
+// ```
+static iree_status_t iree_trace_replay_parse_inline_hal_buffer(
+    iree_trace_replay_t* replay, yaml_document_t* document,
+    yaml_node_t* value_node, iree_vm_list_t* target_list) {
+  iree_hal_buffer_view_t* buffer_view = NULL;
+  IREE_RETURN_IF_ERROR(iree_hal_buffer_view_parse(
+      iree_yaml_node_as_string(value_node),
+      iree_hal_device_allocator(replay->device), &buffer_view));
+  iree_vm_ref_t buffer_ref =
+      iree_hal_buffer_retain_ref(iree_hal_buffer_view_buffer(buffer_view));
+  iree_status_t status = iree_vm_list_push_ref_move(target_list, &buffer_ref);
+  iree_hal_buffer_view_release(buffer_view);
+  return status;
+}
+
 // Parses a !hal.buffer_view in tensor form and appends it to |target_list|.
 //
 // ```yaml
-// !tensor 4xf32=[0 1 2 3]
+// !hal.buffer_view 4xf32=[0 1 2 3]
 // ```
 static iree_status_t iree_trace_replay_parse_inline_hal_buffer_view(
     iree_trace_replay_t* replay, yaml_document_t* document,
@@ -761,10 +834,7 @@ static iree_status_t iree_trace_replay_parse_inline_hal_buffer_view(
       iree_yaml_node_as_string(value_node),
       iree_hal_device_allocator(replay->device), &buffer_view));
   iree_vm_ref_t buffer_view_ref = iree_hal_buffer_view_move_ref(buffer_view);
-  iree_status_t status =
-      iree_vm_list_push_ref_move(target_list, &buffer_view_ref);
-  iree_vm_ref_release(&buffer_view_ref);
-  return status;
+  return iree_vm_list_push_ref_move(target_list, &buffer_view_ref);
 }
 
 // Parses a typed item from |value_node| and appends it to |target_list|.
@@ -783,7 +853,10 @@ static iree_status_t iree_trace_replay_parse_item(iree_trace_replay_t* replay,
                                                   yaml_document_t* document,
                                                   yaml_node_t* value_node,
                                                   iree_vm_list_t* target_list) {
-  if (strcmp(value_node->tag, "!hal.buffer_view") == 0) {
+  if (strcmp(value_node->tag, "!hal.buffer") == 0) {
+    return iree_trace_replay_parse_inline_hal_buffer(replay, document,
+                                                     value_node, target_list);
+  } else if (strcmp(value_node->tag, "!hal.buffer_view") == 0) {
     return iree_trace_replay_parse_inline_hal_buffer_view(
         replay, document, value_node, target_list);
   }
@@ -801,6 +874,10 @@ static iree_status_t iree_trace_replay_parse_item(iree_trace_replay_t* replay,
   } else if (iree_string_view_equal(type, iree_make_cstring_view("vm.list"))) {
     return iree_trace_replay_parse_vm_list(replay, document, value_node,
                                            target_list);
+  } else if (iree_string_view_equal(type,
+                                    iree_make_cstring_view("hal.buffer"))) {
+    return iree_trace_replay_parse_hal_buffer(replay, document, value_node,
+                                              target_list);
   } else if (iree_string_view_equal(
                  type, iree_make_cstring_view("hal.buffer_view"))) {
     return iree_trace_replay_parse_hal_buffer_view(replay, document, value_node,

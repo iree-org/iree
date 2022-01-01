@@ -543,7 +543,7 @@ class WrapEntryPointsPass
       }
       callResults.push_back(entryBuilder.create<IREE::HAL::TensorExportOp>(
           result.getLoc(), bufferType, result, outputDynamicDims.tensorType,
-          dynamicDims));
+          dynamicDims, /*target_storage=*/nullptr));
       for (auto it : llvm::zip(dynamicDims, outputDynamicDims.globalOps)) {
         auto dynamicDim = std::get<0>(it);
         auto globalOp = std::get<1>(it);
