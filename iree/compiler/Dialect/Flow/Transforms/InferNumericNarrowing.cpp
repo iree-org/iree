@@ -126,7 +126,7 @@ class InferNumericNarrowingPass
     }
     auto annotationOp = builder.create<IREE::Util::NumericOptionalNarrowOp>(
         probePoint.getLoc(), probePoint, type, range);
-    probePoint.replaceAllUsesExcept(annotationOp, {annotationOp});
+    probePoint.replaceAllUsesExcept(annotationOp, annotationOp);
   }
 };
 
