@@ -34,8 +34,9 @@ IREE_FLAG(
     "threads that would otherwise need to perform the syscalls during\n"
     "coordination.");
 
+// TODO(benvanik): enable this when we use it - though hopefully we don't!
 IREE_FLAG(
-    int32_t, task_worker_local_memory, 64 * 1024,
+    int32_t, task_worker_local_memory, 0,  // 64 * 1024,
     "Specifies the bytes of per-worker local memory allocated for use by\n"
     "dispatched tiles. Tiles may use less than this but will fail to dispatch\n"
     "if they require more. Conceptually it is like a stack reservation and\n"
