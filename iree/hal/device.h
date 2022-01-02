@@ -244,9 +244,6 @@ iree_hal_device_wait_idle(iree_hal_device_t* device, iree_timeout_t timeout);
 //===----------------------------------------------------------------------===//
 
 typedef struct iree_hal_device_vtable_t {
-  // << HAL C porting in progress >>
-  IREE_API_UNSTABLE
-
   void(IREE_API_PTR* destroy)(iree_hal_device_t* device);
 
   iree_string_view_t(IREE_API_PTR* id)(iree_hal_device_t* device);
@@ -315,6 +312,7 @@ typedef struct iree_hal_device_vtable_t {
   iree_status_t(IREE_API_PTR* wait_idle)(iree_hal_device_t* device,
                                          iree_timeout_t timeout);
 } iree_hal_device_vtable_t;
+IREE_HAL_ASSERT_VTABLE_LAYOUT(iree_hal_device_vtable_t);
 
 IREE_API_EXPORT void iree_hal_device_destroy(iree_hal_device_t* device);
 

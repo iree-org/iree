@@ -517,9 +517,6 @@ IREE_API_EXPORT iree_status_t iree_hal_command_buffer_wrap_validation(
 //===----------------------------------------------------------------------===//
 
 typedef struct iree_hal_command_buffer_vtable_t {
-  // << HAL C porting in progress >>
-  IREE_API_UNSTABLE
-
   void(IREE_API_PTR* destroy)(iree_hal_command_buffer_t* command_buffer);
 
   void*(IREE_API_PTR* dyn_cast)(iree_hal_command_buffer_t* command_buffer,
@@ -612,6 +609,7 @@ typedef struct iree_hal_command_buffer_vtable_t {
       iree_hal_buffer_t* workgroups_buffer,
       iree_device_size_t workgroups_offset);
 } iree_hal_command_buffer_vtable_t;
+IREE_HAL_ASSERT_VTABLE_LAYOUT(iree_hal_command_buffer_vtable_t);
 
 struct iree_hal_command_buffer_t {
   iree_hal_resource_t resource;

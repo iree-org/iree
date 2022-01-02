@@ -187,9 +187,6 @@ IREE_API_EXPORT iree_status_t iree_hal_allocator_create_heap(
 //===----------------------------------------------------------------------===//
 
 typedef struct iree_hal_allocator_vtable_t {
-  // << HAL C porting in progress >>
-  IREE_API_UNSTABLE
-
   void(IREE_API_PTR* destroy)(iree_hal_allocator_t* allocator);
 
   iree_allocator_t(IREE_API_PTR* host_allocator)(
@@ -219,6 +216,7 @@ typedef struct iree_hal_allocator_vtable_t {
   void(IREE_API_PTR* deallocate_buffer)(iree_hal_allocator_t* allocator,
                                         iree_hal_buffer_t* buffer);
 } iree_hal_allocator_vtable_t;
+IREE_HAL_ASSERT_VTABLE_LAYOUT(iree_hal_allocator_vtable_t);
 
 IREE_API_EXPORT void iree_hal_allocator_destroy(
     iree_hal_allocator_t* allocator);
