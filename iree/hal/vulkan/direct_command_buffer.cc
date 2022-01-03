@@ -34,6 +34,7 @@ typedef struct iree_hal_vulkan_direct_command_buffer_t {
   iree_hal_command_buffer_t base;
   VkDeviceHandle* logical_device;
   iree_hal_vulkan_tracing_context_t* tracing_context;
+  iree_arena_block_pool_t* block_pool;
 
   VkCommandPoolHandle* command_pool;
   VkCommandBuffer handle;
@@ -81,10 +82,12 @@ iree_status_t iree_hal_vulkan_direct_command_buffer_allocate(
     iree_hal_vulkan_tracing_context_t* tracing_context,
     iree::hal::vulkan::DescriptorPoolCache* descriptor_pool_cache,
     iree::hal::vulkan::BuiltinExecutables* builtin_executables,
+    iree_arena_block_pool_t* block_pool,
     iree_hal_command_buffer_t** out_command_buffer) {
   IREE_ASSERT_ARGUMENT(logical_device);
   IREE_ASSERT_ARGUMENT(command_pool);
   IREE_ASSERT_ARGUMENT(descriptor_pool_cache);
+  IREE_ASSERT_ARGUMENT(block_pool);
   IREE_ASSERT_ARGUMENT(out_command_buffer);
   IREE_TRACE_ZONE_BEGIN(z0);
 
@@ -109,6 +112,7 @@ iree_status_t iree_hal_vulkan_direct_command_buffer_allocate(
         &iree_hal_vulkan_direct_command_buffer_vtable, &command_buffer->base);
     command_buffer->logical_device = logical_device;
     command_buffer->tracing_context = tracing_context;
+    command_buffer->block_pool = block_pool;
     command_buffer->command_pool = command_pool;
     command_buffer->handle = handle;
     command_buffer->syms = logical_device->syms().get();

@@ -91,6 +91,7 @@ cc_library(
         "//iree/base:logging",
         "//iree/base:tracing",
         "//iree/base/internal",
+        "//iree/base/internal:arena",
         "//iree/base/internal:synchronization",
         "//iree/base/internal/flatcc:parsing",
         "//iree/hal",

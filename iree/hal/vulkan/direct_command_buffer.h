@@ -18,7 +18,12 @@
 extern "C" {
 #endif  // __cplusplus
 
+typedef struct iree_arena_block_pool_t iree_arena_block_pool_t;
+
 // Creates a command buffer that directly records into a VkCommandBuffer.
+//
+// NOTE: the |block_pool| must remain live for the lifetime of the command
+// buffers that use it.
 iree_status_t iree_hal_vulkan_direct_command_buffer_allocate(
     iree_hal_device_t* device,
     iree::hal::vulkan::VkDeviceHandle* logical_device,
@@ -29,6 +34,7 @@ iree_status_t iree_hal_vulkan_direct_command_buffer_allocate(
     iree_hal_vulkan_tracing_context_t* tracing_context,
     iree::hal::vulkan::DescriptorPoolCache* descriptor_pool_cache,
     iree::hal::vulkan::BuiltinExecutables* builtin_executables,
+    iree_arena_block_pool_t* block_pool,
     iree_hal_command_buffer_t** out_command_buffer);
 
 // Returns the native Vulkan VkCommandBuffer handle.

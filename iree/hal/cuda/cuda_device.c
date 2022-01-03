@@ -202,7 +202,7 @@ static iree_hal_allocator_t* iree_hal_cuda_device_allocator(
 
 static iree_status_t iree_hal_cuda_device_trim(iree_hal_device_t* base_device) {
   iree_hal_cuda_device_t* device = iree_hal_cuda_device_cast(base_device);
-  // TODO(benvanik): trim of CUDA resources, whenever we care.
+  iree_arena_block_pool_trim(&device->block_pool);
   return iree_hal_allocator_trim(device->device_allocator);
 }
 
@@ -237,7 +237,7 @@ static iree_status_t iree_hal_cuda_device_create_command_buffer(
     case IREE_HAL_CUDA_COMMAND_BUFFER_MODE_GRAPH:
       return iree_hal_cuda_graph_command_buffer_create(
           base_device, &device->context_wrapper, mode, command_categories,
-          queue_affinity, out_command_buffer);
+          queue_affinity, &device->block_pool, out_command_buffer);
     case IREE_HAL_CUDA_COMMAND_BUFFER_MODE_STREAM:
       return iree_hal_deferred_command_buffer_create(
           base_device, mode, command_categories, &device->block_pool,
@@ -324,8 +324,8 @@ static iree_status_t iree_hal_cuda_device_queue_submit(
       }
     }
   }
-  // TODO(thomasraoux): Conservatively syncronize after every submit until we
-  // support semaphores.
+  // TODO(thomasraoux): implement semaphores - for now this conservatively
+  // synchronizes after every submit.
   CUDA_RETURN_IF_ERROR(device->context_wrapper.syms,
                        cuStreamSynchronize(device->stream),
                        "cuStreamSynchronize");
