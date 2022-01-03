@@ -130,9 +130,6 @@ typedef struct iree_hal_module_state_t {
 
   iree_hal_semaphore_t* submit_semaphore;
   uint64_t submit_value;
-
-  void* deferred_lru[6];
-  iree_vm_list_t* deferred_releases;
 } iree_hal_module_state_t;
 
 static void IREE_API_PTR iree_hal_module_destroy(void* base_module) {
@@ -156,11 +153,6 @@ iree_hal_module_alloc_state(void* self, iree_allocator_t host_allocator,
   iree_hal_device_retain(state->shared_device);
 
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_vm_list_create(
-              /*element_type=*/NULL, /*initial_capacity=*/32,
-              state->host_allocator, &state->deferred_releases));
-
-  IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0, iree_hal_executable_cache_create(state->shared_device,
                                            iree_string_view_empty(),
                                            &state->executable_cache));
@@ -181,7 +173,6 @@ iree_hal_module_free_state(void* self, iree_vm_module_state_t* module_state) {
 
   iree_hal_module_state_t* state = (iree_hal_module_state_t*)module_state;
   iree_hal_semaphore_release(state->submit_semaphore);
-  iree_vm_list_release(state->deferred_releases);
   iree_hal_executable_cache_release(state->executable_cache);
   iree_hal_device_release(state->shared_device);
   iree_allocator_free(state->host_allocator, state);
@@ -195,8 +186,6 @@ static iree_status_t IREE_API_PTR iree_hal_module_notify(
   switch (signal) {
     case IREE_VM_SIGNAL_SUSPEND:
     case IREE_VM_SIGNAL_LOW_MEMORY:
-      // TODO(benvanik): trims for the deferred_releases list and our other
-      // tables.
       return iree_hal_device_trim(state->shared_device);
     default:
       return iree_ok_status();
@@ -214,30 +203,6 @@ IREE_VM_ABI_EXPORT(iree_hal_module_ex_shared_device,  //
                    v, r) {
   rets->r0 = iree_hal_device_retain_ref(state->shared_device);
   return iree_ok_status();
-}
-
-void iree_hal_module_ex_defer_release(iree_hal_module_state_t* state,
-                                      const iree_vm_ref_t value) {
-  // A bulk of the calls to this are for the same (or very recently same)
-  // objects, such as constant pool or transient buffer storage that may be
-  // bound 4-10 times per dispatch. This tiny LRU lets us avoid adding such
-  // repeated patterns in the common case.
-  for (iree_host_size_t i = 0; i < IREE_ARRAYSIZE(state->deferred_lru); ++i) {
-    if (state->deferred_lru[i] == value.ptr) {
-      // Hit - keep the list sorted by most->least recently used.
-      state->deferred_lru[i] = state->deferred_lru[0];
-      state->deferred_lru[0] = value.ptr;
-      return;
-    }
-  }
-  // Miss - shift the list down and insert the new item at the head.
-  memmove(&state->deferred_lru[1], &state->deferred_lru[0],
-          sizeof(state->deferred_lru[0]) *
-              (IREE_ARRAYSIZE(state->deferred_lru) - 1));
-  state->deferred_lru[0] = value.ptr;
-
-  IREE_IGNORE_ERROR(
-      iree_vm_list_push_ref_retain(state->deferred_releases, &value));
 }
 
 IREE_VM_ABI_EXPORT(iree_hal_module_ex_submit_and_wait,  //
@@ -270,12 +235,6 @@ IREE_VM_ABI_EXPORT(iree_hal_module_ex_submit_and_wait,  //
   if (!iree_status_is_ok(status)) {
     return status;
   }
-
-  // Drop all pending deferred releases (references to everything in flight).
-  // This will be replaced with resource sets in the future that are attached to
-  // each command buffer.
-  IREE_RETURN_IF_ERROR(iree_vm_list_resize(state->deferred_releases, 0));
-  memset(state->deferred_lru, 0, sizeof(state->deferred_lru));
 
   return iree_ok_status();
 }
@@ -980,9 +939,6 @@ IREE_VM_ABI_EXPORT(iree_hal_module_command_buffer_fill_buffer,  //
   iree_vm_size_t length = (iree_vm_size_t)args->i3;
   uint32_t pattern = (uint32_t)args->i4;
   uint32_t pattern_length = (uint32_t)args->i5;
-
-  iree_hal_module_ex_defer_release(state, args->r1);
-
   return iree_hal_command_buffer_fill_buffer(command_buffer, target_buffer,
                                              target_offset, length, &pattern,
                                              pattern_length);
@@ -1001,10 +957,6 @@ IREE_VM_ABI_EXPORT(iree_hal_module_command_buffer_copy_buffer,  //
   IREE_RETURN_IF_ERROR(iree_hal_buffer_check_deref(args->r3, &target_buffer));
   iree_vm_size_t target_offset = (iree_vm_size_t)args->i4;
   iree_vm_size_t length = (iree_vm_size_t)args->i5;
-
-  iree_hal_module_ex_defer_release(state, args->r1);
-  iree_hal_module_ex_defer_release(state, args->r3);
-
   return iree_hal_command_buffer_copy_buffer(command_buffer, source_buffer,
                                              source_offset, target_buffer,
                                              target_offset, length);
@@ -1055,7 +1007,6 @@ IREE_VM_ABI_EXPORT(iree_hal_module_command_buffer_push_descriptor_set,  //
     bindings[i].binding = (uint32_t)args->a3[i].i0;
     bindings[i].offset = (iree_device_size_t)args->a3[i].i2;
     bindings[i].length = (iree_device_size_t)args->a3[i].i3;
-    iree_hal_module_ex_defer_release(state, args->a3[i].r1);
   }
 
   return iree_hal_command_buffer_push_descriptor_set(
@@ -1079,9 +1030,6 @@ IREE_VM_ABI_EXPORT(iree_hal_module_command_buffer_bind_descriptor_set,  //
   iree_device_size_t* dynamic_offsets = NULL;
   IREE_VM_ABI_VLA_STACK_CAST(args, a4_count, a4, iree_device_size_t, 64,
                              &dynamic_offset_count, &dynamic_offsets);
-
-  iree_hal_module_ex_defer_release(state, args->r3);
-
   return iree_hal_command_buffer_bind_descriptor_set(
       command_buffer, executable_layout, set, descriptor_set,
       dynamic_offset_count, dynamic_offsets);
@@ -1099,9 +1047,6 @@ IREE_VM_ABI_EXPORT(iree_hal_module_command_buffer_dispatch,  //
   uint32_t workgroup_x = (uint32_t)args->i3;
   uint32_t workgroup_y = (uint32_t)args->i4;
   uint32_t workgroup_z = (uint32_t)args->i5;
-
-  iree_hal_module_ex_defer_release(state, args->r1);
-
   return iree_hal_command_buffer_dispatch(command_buffer, executable,
                                           entry_point, workgroup_x, workgroup_y,
                                           workgroup_z);
@@ -1120,10 +1065,6 @@ IREE_VM_ABI_EXPORT(iree_hal_module_command_buffer_dispatch_indirect,  //
   IREE_RETURN_IF_ERROR(
       iree_hal_buffer_check_deref(args->r3, &workgroups_buffer));
   iree_vm_size_t workgroups_offset = (iree_vm_size_t)args->i4;
-
-  iree_hal_module_ex_defer_release(state, args->r1);
-  iree_hal_module_ex_defer_release(state, args->r3);
-
   return iree_hal_command_buffer_dispatch_indirect(
       command_buffer, executable, entry_point, workgroups_buffer,
       workgroups_offset);
