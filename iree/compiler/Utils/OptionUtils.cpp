@@ -6,8 +6,16 @@
 
 #include "iree/compiler/Utils/OptionUtils.h"
 
+#include "llvm/Support/ManagedStatic.h"
+
 namespace mlir {
 namespace iree_compiler {
+
+void OptionsBinder::addGlobalOption(std::unique_ptr<llvm::cl::Option> option) {
+  static llvm::ManagedStatic<std::vector<std::unique_ptr<llvm::cl::Option>>>
+      globalOptions;
+  globalOptions->push_back(std::move(option));
+}
 
 LogicalResult OptionsBinder::parseArguments(int argc, const char *const *argv,
                                             ErrorCallback onError) {

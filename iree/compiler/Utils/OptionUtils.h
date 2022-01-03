@@ -47,9 +47,10 @@ class OptionsBinder {
   void opt(llvm::StringRef name, V &value, Mods... Ms) {
     if (!scope) {
       // Bind global options.
-      new llvm::cl::opt<T, /*ExternalStorage=*/true>(
+      auto opt = std::make_unique<llvm::cl::opt<T, /*ExternalStorage=*/true>>(
           name, llvm::cl::location(value), llvm::cl::init(value),
           std::forward<Mods>(Ms)...);
+      addGlobalOption(std::move(opt));
     } else {
       // Bind local options.
       auto option =
@@ -66,26 +67,30 @@ class OptionsBinder {
 
   template <typename T, typename V, typename... Mods>
   void list(llvm::StringRef name, V &value, Mods... Ms) {
-    llvm::cl::list<T> *list;
     if (!scope) {
       // Bind global options.
-      list = new llvm::cl::list<T>(name, std::forward<Mods>(Ms)...);
+      auto list =
+          std::make_unique<llvm::cl::list<T>>(name, std::forward<Mods>(Ms)...);
+      // Since list does not support external storage, hook the callback
+      // and use it to update.
+      list->setCallback(
+          [&value](const T &newElement) { value.push_back(newElement); });
+      addGlobalOption(std::move(list));
     } else {
       // Bind local options.
-      auto uniqueList = std::make_unique<llvm::cl::list<T>>(
+      auto list = std::make_unique<llvm::cl::list<T>>(
           name, llvm::cl::sub(*scope), std::forward<Mods>(Ms)...);
-      list = uniqueList.get();
-      auto printCallback = makeListPrintCallback(
-          uniqueList->ArgStr, uniqueList->getParser(), &value);
+      auto printCallback =
+          makeListPrintCallback(list->ArgStr, list->getParser(), &value);
       auto changedCallback = makeListChangedCallback(&value);
-      localOptions.push_back(LocalOptionInfo{std::move(uniqueList),
-                                             printCallback, changedCallback});
-    }
+      // Since list does not support external storage, hook the callback
+      // and use it to update.
+      list->setCallback(
+          [&value](const T &newElement) { value.push_back(newElement); });
 
-    // Since list does not support external storage, hook the callback
-    // and use it to update.
-    list->setCallback(
-        [&value](const T &newElement) { value.push_back(newElement); });
+      localOptions.push_back(
+          LocalOptionInfo{std::move(list), printCallback, changedCallback});
+    }
   }
 
   // For a local binder, parses a sequence of flags of the usual form on
@@ -111,6 +116,7 @@ class OptionsBinder {
   OptionsBinder() = default;
   OptionsBinder(std::unique_ptr<llvm::cl::SubCommand> scope)
       : scope(std::move(scope)) {}
+  void addGlobalOption(std::unique_ptr<llvm::cl::Option> option);
 
   // LLVM makes a half-hearted (i.e. "best effort" == "no effort") attempt to
   // handle non-enumerated generic value based options, but the generic
@@ -207,13 +213,13 @@ template <typename DerivedTy>
 class OptionsFromFlags {
  public:
   static DerivedTy &getRegistered() {
-    static DerivedTy singleton;
-    static bool initialized = ([&]() {
-      OptionsBinder binder = OptionsBinder::global();
-      singleton.bindOptions(binder);
-      return true;
-    })();
-    (void)initialized;
+    struct InitializedTy : DerivedTy {
+      InitializedTy() {
+        OptionsBinder binder = OptionsBinder::global();
+        DerivedTy::bindOptions(binder);
+      }
+    };
+    static InitializedTy singleton;
     return singleton;
   }
 };
