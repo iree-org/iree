@@ -243,11 +243,13 @@ typedef struct iree_hal_command_buffer_validation_state_t {
 // Commands are recorded by the implementation for later submission to command
 // queues.
 //
-// Buffers and synchronization objects referenced must remain valid and not be
+// Buffers, events, and programs referenced must remain valid and not be
 // modified or read while there are commands in-flight. The usual flow is to
-// populate input buffers, Dispatch using those buffers, wait on a Semaphore
-// until the buffers are guaranteed to no longer be in use, and then reuse or
-// release the buffers.
+// populate input buffers, dispatch using those buffers, wait on a semaphore
+// until the buffers are guaranteed to no longer be in use, and then reuse the
+// buffers. Lifetimes are managed by the command buffer and all used resources
+// will be retained for as long as the command buffer is live or until it is
+// reset.
 //
 // Errors that can be recognized when operations are enqueued will be returned
 // immediately, such as invalid argument errors. Errors that can only be

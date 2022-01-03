@@ -15,6 +15,7 @@
 #include "iree/base/logging.h"
 #include "iree/base/status_cc.h"
 #include "iree/base/tracing.h"
+#include "iree/hal/utils/resource_set.h"
 #include "iree/hal/vulkan/descriptor_set_arena.h"
 #include "iree/hal/vulkan/dynamic_symbols.h"
 #include "iree/hal/vulkan/native_descriptor_set.h"
@@ -40,6 +41,10 @@ typedef struct iree_hal_vulkan_direct_command_buffer_t {
   VkCommandBuffer handle;
 
   DynamicSymbols* syms;
+
+  // Maintains a reference to all resources used within the command buffer.
+  // Reset on each begin.
+  iree_hal_resource_set_t* resource_set;
 
   // TODO(benvanik): may grow large - should try to reclaim or reuse.
   DescriptorSetArena descriptor_set_arena;
@@ -122,7 +127,11 @@ iree_status_t iree_hal_vulkan_direct_command_buffer_allocate(
     new (&command_buffer->descriptor_set_group) DescriptorSetGroup();
 
     command_buffer->builtin_executables = builtin_executables;
+    status = iree_hal_resource_set_allocate(block_pool,
+                                            &command_buffer->resource_set);
+  }
 
+  if (iree_status_is_ok(status)) {
     *out_command_buffer = &command_buffer->base;
   } else {
     command_pool->Free(handle);
@@ -137,6 +146,7 @@ static void iree_hal_vulkan_direct_command_buffer_reset(
   // NOTE: we require that command buffers not be recorded while they are
   // in-flight so this is safe.
   IREE_IGNORE_ERROR(command_buffer->descriptor_set_group.Reset());
+  iree_hal_resource_set_reset(command_buffer->resource_set);
 }
 
 bool iree_hal_vulkan_direct_command_buffer_isa(
@@ -168,6 +178,7 @@ static void iree_hal_vulkan_direct_command_buffer_destroy(
   command_buffer->descriptor_set_group.~DescriptorSetGroup();
   command_buffer->descriptor_set_arena.~DescriptorSetArena();
 
+  iree_hal_resource_set_reset(command_buffer->resource_set);
   iree_allocator_free(host_allocator, command_buffer);
 
   IREE_TRACE_ZONE_END(z0);
@@ -403,6 +414,9 @@ static iree_status_t iree_hal_vulkan_direct_command_buffer_signal_event(
   iree_hal_vulkan_direct_command_buffer_t* command_buffer =
       iree_hal_vulkan_direct_command_buffer_cast(base_command_buffer);
 
+  IREE_RETURN_IF_ERROR(
+      iree_hal_resource_set_insert(command_buffer->resource_set, 1, &event));
+
   command_buffer->syms->vkCmdSetEvent(
       command_buffer->handle, iree_hal_vulkan_native_event_handle(event),
       iree_hal_vulkan_convert_pipeline_stage_flags(source_stage_mask));
@@ -415,6 +429,9 @@ static iree_status_t iree_hal_vulkan_direct_command_buffer_reset_event(
     iree_hal_execution_stage_t source_stage_mask) {
   iree_hal_vulkan_direct_command_buffer_t* command_buffer =
       iree_hal_vulkan_direct_command_buffer_cast(base_command_buffer);
+
+  IREE_RETURN_IF_ERROR(
+      iree_hal_resource_set_insert(command_buffer->resource_set, 1, &event));
 
   command_buffer->syms->vkCmdResetEvent(
       command_buffer->handle, iree_hal_vulkan_native_event_handle(event),
@@ -436,6 +453,9 @@ static iree_status_t iree_hal_vulkan_direct_command_buffer_wait_events(
       iree_hal_vulkan_direct_command_buffer_cast(base_command_buffer);
   iree_allocator_t host_allocator =
       command_buffer->logical_device->host_allocator();
+
+  IREE_RETURN_IF_ERROR(iree_hal_resource_set_insert(
+      command_buffer->resource_set, event_count, events));
 
   iree_inline_array(VkEvent, event_handles, event_count, host_allocator);
   for (int i = 0; i < event_count; ++i) {
@@ -530,6 +550,9 @@ static iree_status_t iree_hal_vulkan_direct_command_buffer_fill_buffer(
   VkBuffer target_device_buffer = iree_hal_vulkan_vma_buffer_handle(
       iree_hal_buffer_allocated_buffer(target_buffer));
 
+  IREE_RETURN_IF_ERROR(iree_hal_resource_set_insert(
+      command_buffer->resource_set, 1, &target_buffer));
+
   // vkCmdFillBuffer requires a 4 byte alignment for the offset, pattern, and
   // length. We use a polyfill here that fills the unaligned start and end of
   // fill operations, if needed.
@@ -584,6 +607,9 @@ static iree_status_t iree_hal_vulkan_direct_command_buffer_update_buffer(
   VkBuffer target_device_buffer = iree_hal_vulkan_vma_buffer_handle(
       iree_hal_buffer_allocated_buffer(target_buffer));
 
+  IREE_RETURN_IF_ERROR(iree_hal_resource_set_insert(
+      command_buffer->resource_set, 1, &target_buffer));
+
   // Vulkan only allows updates of <= 65536 because you really, really, really
   // shouldn't do large updates like this (as it wastes command buffer space and
   // may be slower than just using write-through mapped memory). The
@@ -616,6 +642,10 @@ static iree_status_t iree_hal_vulkan_direct_command_buffer_copy_buffer(
       iree_hal_buffer_allocated_buffer(source_buffer));
   VkBuffer target_device_buffer = iree_hal_vulkan_vma_buffer_handle(
       iree_hal_buffer_allocated_buffer(target_buffer));
+
+  const iree_hal_buffer_t* buffers[2] = {source_buffer, target_buffer};
+  IREE_RETURN_IF_ERROR(
+      iree_hal_resource_set_insert(command_buffer->resource_set, 2, buffers));
 
   VkBufferCopy region;
   region.srcOffset = iree_hal_buffer_byte_offset(source_buffer) + source_offset;
@@ -659,6 +689,12 @@ static iree_status_t iree_hal_vulkan_direct_command_buffer_push_descriptor_set(
   iree_hal_vulkan_direct_command_buffer_t* command_buffer =
       iree_hal_vulkan_direct_command_buffer_cast(base_command_buffer);
 
+  // TODO(benvanik): batch insert by getting the resources in their own list.
+  for (iree_host_size_t i = 0; i < binding_count; ++i) {
+    IREE_RETURN_IF_ERROR(iree_hal_resource_set_insert(
+        command_buffer->resource_set, 1, &bindings[i].buffer));
+  }
+
   // Either allocate, update, and bind a descriptor set or use push descriptor
   // sets to use the command buffer pool when supported.
   return command_buffer->descriptor_set_arena.BindDescriptorSet(
@@ -675,6 +711,9 @@ static iree_status_t iree_hal_vulkan_direct_command_buffer_bind_descriptor_set(
       iree_hal_vulkan_direct_command_buffer_cast(base_command_buffer);
   iree_allocator_t host_allocator =
       command_buffer->logical_device->host_allocator();
+
+  IREE_RETURN_IF_ERROR(iree_hal_resource_set_insert(
+      command_buffer->resource_set, 1, &descriptor_set));
 
   // Vulkan takes uint32_t as the size here, unlike everywhere else.
   iree_inline_array(uint32_t, dynamic_offsets_i32, dynamic_offset_count,
@@ -717,6 +756,9 @@ static iree_status_t iree_hal_vulkan_direct_command_buffer_dispatch(
         source_location.func_name.data, source_location.func_name.size);
   });
 
+  IREE_RETURN_IF_ERROR(iree_hal_resource_set_insert(
+      command_buffer->resource_set, 1, &executable));
+
   // Get the compiled and linked pipeline for the specified entry point and
   // bind it to the command buffer.
   VkPipeline pipeline_handle = VK_NULL_HANDLE;
@@ -742,6 +784,10 @@ static iree_status_t iree_hal_vulkan_direct_command_buffer_dispatch_indirect(
     iree_device_size_t workgroups_offset) {
   iree_hal_vulkan_direct_command_buffer_t* command_buffer =
       iree_hal_vulkan_direct_command_buffer_cast(base_command_buffer);
+
+  const void* resources[2] = {executable, workgroups_buffer};
+  IREE_RETURN_IF_ERROR(iree_hal_resource_set_insert(
+      command_buffer->resource_set, IREE_ARRAYSIZE(resources), resources));
 
   iree_hal_vulkan_source_location_t source_location;
   iree_hal_vulkan_native_executable_entry_point_source_location(

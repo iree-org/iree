@@ -123,11 +123,14 @@ IREE_API_EXPORT iree_status_t iree_hal_resource_set_allocate(
 // from.
 IREE_API_EXPORT void iree_hal_resource_set_free(iree_hal_resource_set_t* set);
 
+// Resets the set to its initial empty state by releasing all owned resources.
+IREE_API_EXPORT void iree_hal_resource_set_reset(iree_hal_resource_set_t* set);
+
 // Inserts zero or more resources into the set.
 // Each resource will be retained for at least the lifetime of the set.
-IREE_API_EXPORT iree_status_t iree_hal_resource_set_insert(
-    iree_hal_resource_set_t* set, iree_host_size_t count,
-    iree_hal_resource_t* const* resources);
+IREE_API_EXPORT iree_status_t
+iree_hal_resource_set_insert(iree_hal_resource_set_t* set,
+                             iree_host_size_t count, const void* resources);
 
 #ifdef __cplusplus
 }  // extern "C"

@@ -32,6 +32,7 @@ iree_cc_library(
   SRCS
     "deferred_command_buffer.c"
   DEPS
+    ::resource_set
     iree::base
     iree::base::internal::arena
     iree::base::tracing
