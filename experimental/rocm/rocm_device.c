@@ -172,7 +172,7 @@ static iree_status_t iree_hal_rocm_device_query_i32(
 
 static iree_status_t iree_hal_rocm_device_trim(iree_hal_device_t* base_device) {
   iree_hal_rocm_device_t* device = iree_hal_rocm_device_cast(base_device);
-  // TODO(benvanik): trim of ROCM resources, whenever we care.
+  iree_arena_block_pool_trim(&device->block_pool);
   return iree_hal_allocator_trim(device->device_allocator);
 }
 

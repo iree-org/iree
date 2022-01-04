@@ -59,6 +59,7 @@ iree_cc_library(
     iree::hal
     iree::hal::utils::buffer_transfer
     iree::hal::utils::deferred_command_buffer
+    iree::hal::utils::resource_set
     iree::schemas::cuda_executable_def_c_fbs
   PUBLIC
 )

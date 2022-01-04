@@ -28,6 +28,7 @@ cc_library(
     hdrs = ["deferred_command_buffer.h"],
     visibility = ["//visibility:public"],
     deps = [
+        ":resource_set",
         "//iree/base",
         "//iree/base:tracing",
         "//iree/base/internal:arena",

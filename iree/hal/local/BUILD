@@ -170,6 +170,7 @@ cc_library(
         "//iree/base/internal:wait_handle",
         "//iree/hal",
         "//iree/hal/utils:buffer_transfer",
+        "//iree/hal/utils:resource_set",
         "//iree/task",
     ],
 )

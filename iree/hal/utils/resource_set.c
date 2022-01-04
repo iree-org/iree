@@ -8,6 +8,24 @@
 
 #include "iree/base/tracing.h"
 
+// Inlines the first chunk into the block using all of the remaining space.
+// This is a special case chunk that is released back to the pool with the
+// resource set and lets us avoid an additional allocation.
+static void iree_hal_resource_set_setup_inline_chunk(
+    iree_hal_resource_set_t* set) {
+  uint8_t* block_ptr = (uint8_t*)set + sizeof(*set);
+  iree_hal_resource_set_chunk_t* inlined_chunk =
+      (iree_hal_resource_set_chunk_t*)block_ptr;
+  inlined_chunk->flags = IREE_HAL_RESOURCE_SET_CHUNK_FLAG_INLINE;
+  inlined_chunk->capacity = (set->block_pool->total_block_size - sizeof(*set) -
+                             sizeof(*inlined_chunk)) /
+                            sizeof(iree_hal_resource_t*);
+  inlined_chunk->capacity = iree_min(inlined_chunk->capacity,
+                                     IREE_HAL_RESOURCE_SET_CHUNK_MAX_CAPACITY);
+  inlined_chunk->count = 0;
+  set->chunk_head = inlined_chunk;
+}
+
 IREE_API_EXPORT iree_status_t iree_hal_resource_set_allocate(
     iree_arena_block_pool_t* block_pool, iree_hal_resource_set_t** out_set) {
   IREE_TRACE_ZONE_BEGIN(z0);
@@ -25,30 +43,15 @@ IREE_API_EXPORT iree_status_t iree_hal_resource_set_allocate(
   iree_hal_resource_set_t* set = (iree_hal_resource_set_t*)block_ptr;
   memset(set, 0, sizeof(*set));
   set->block_pool = block_pool;
-  block_ptr += sizeof(*set);
-
-  // Inline the first chunk into the block using all of the remaining space.
-  // This is a special case chunk that is released back to the pool with the
-  // resource set and lets us avoid an additional allocation.
-  iree_hal_resource_set_chunk_t* inlined_chunk =
-      (iree_hal_resource_set_chunk_t*)block_ptr;
-  inlined_chunk->flags = IREE_HAL_RESOURCE_SET_CHUNK_FLAG_INLINE;
-  inlined_chunk->capacity =
-      (block_pool->total_block_size - sizeof(*set) - sizeof(*inlined_chunk)) /
-      sizeof(iree_hal_resource_t*);
-  inlined_chunk->capacity = iree_min(inlined_chunk->capacity,
-                                     IREE_HAL_RESOURCE_SET_CHUNK_MAX_CAPACITY);
-  inlined_chunk->count = 0;
-  set->chunk_head = inlined_chunk;
+  iree_hal_resource_set_setup_inline_chunk(set);
 
   *out_set = set;
   IREE_TRACE_ZONE_END(z0);
   return iree_ok_status();
 }
 
-IREE_API_EXPORT void iree_hal_resource_set_free(iree_hal_resource_set_t* set) {
-  IREE_TRACE_ZONE_BEGIN(z0);
-
+static void iree_hal_resource_set_release_blocks(iree_hal_resource_set_t* set,
+                                                 bool preserve_set) {
   // Release all resources in all chunks and stitch together the blocks in a
   // linked list. We do this first so that we can release all of the chunks back
   // to the block pool in one operation. Ideally we'd maintain the linked list
@@ -67,10 +70,16 @@ IREE_API_EXPORT void iree_hal_resource_set_free(iree_hal_resource_set_t* set) {
     iree_arena_block_t* block = NULL;
     if (iree_hal_resource_set_chunk_is_stored_inline(chunk)) {
       // This is the inlined first chunk that also stores the set header.
-      // We use the easily-available set pointer as the base.
-      block = (iree_arena_block_t*)((uint8_t*)set +
-                                    set->block_pool->usable_block_size);
-      next_chunk = NULL;
+      // If we are not freeing the set then we don't release the block back to
+      // the pool.
+      if (preserve_set) {
+        // Don't release the block.
+        break;
+      } else {
+        block = (iree_arena_block_t*)((uint8_t*)set +
+                                      set->block_pool->usable_block_size);
+        next_chunk = NULL;
+      }
     } else {
       // A chunk acquired after the set was acquired.
       block = (iree_arena_block_t*)((uint8_t*)chunk +
@@ -86,6 +95,27 @@ IREE_API_EXPORT void iree_hal_resource_set_free(iree_hal_resource_set_t* set) {
   // NOTE: this invalidates the |set| memory.
   iree_arena_block_pool_t* block_pool = set->block_pool;
   iree_arena_block_pool_release(block_pool, block_head, block_tail);
+}
+
+IREE_API_EXPORT void iree_hal_resource_set_free(iree_hal_resource_set_t* set) {
+  IREE_TRACE_ZONE_BEGIN(z0);
+
+  // Release all resources and the arena block used by the set.
+  // The set pointer is invalid after this call returns.
+  iree_hal_resource_set_release_blocks(set, /*preserve_set=*/false);
+
+  IREE_TRACE_ZONE_END(z0);
+}
+
+IREE_API_EXPORT void iree_hal_resource_set_reset(iree_hal_resource_set_t* set) {
+  IREE_TRACE_ZONE_BEGIN(z0);
+
+  // Release all resources and the blocks besides the base set.
+  iree_hal_resource_set_release_blocks(set, /*preserve_set=*/true);
+
+  // Reset the set state.
+  memset(set->mru, 0, sizeof(set->mru));
+  iree_hal_resource_set_setup_inline_chunk(set);
 
   IREE_TRACE_ZONE_END(z0);
 }
@@ -228,17 +258,19 @@ static iree_status_t iree_hal_resource_set_insert_1(
   return iree_ok_status();
 }
 
-IREE_API_EXPORT iree_status_t iree_hal_resource_set_insert(
-    iree_hal_resource_set_t* set, iree_host_size_t count,
-    iree_hal_resource_t* const* resources) {
+IREE_API_EXPORT iree_status_t
+iree_hal_resource_set_insert(iree_hal_resource_set_t* set,
+                             iree_host_size_t count, const void* resources) {
   // For now we process one at a time. We should have a stride that lets us
   // amortize the cost of doing the MRU update and insertion allocation by
   // say slicing off 4/8/16/32 resources at a time etc. Today each miss that
   // requires a full insertion goes down the whole path of checking chunk
   // capacity and such.
+  iree_hal_resource_t* const* typed_resources =
+      (iree_hal_resource_t* const*)resources;
   for (iree_host_size_t i = 0; i < count; ++i) {
-    iree_hal_resource_t* resource = resources[i];
-    IREE_RETURN_IF_ERROR(iree_hal_resource_set_insert_1(set, resource));
+    IREE_RETURN_IF_ERROR(
+        iree_hal_resource_set_insert_1(set, typed_resources[i]));
   }
   return iree_ok_status();
 }

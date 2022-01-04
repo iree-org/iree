@@ -79,12 +79,14 @@ iree_cc_library(
     iree::base::cc
     iree::base::core_headers
     iree::base::internal
+    iree::base::internal::arena
     iree::base::internal::flatcc::parsing
     iree::base::internal::synchronization
     iree::base::logging
     iree::base::tracing
     iree::hal
     iree::hal::utils::buffer_transfer
+    iree::hal::utils::resource_set
     iree::hal::vulkan::builtin
     iree::hal::vulkan::util::arena
     iree::hal::vulkan::util::intrusive_list
