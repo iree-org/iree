@@ -133,11 +133,10 @@ void buildIREEVMTransformPassPipeline(
 
 void buildDefaultIREEVMTransformPassPipeline(OpPassManager &passManager) {
   buildIREEVMTransformPassPipeline(
-      BindingOptions::FromFlags::getRegistered(),
-      InputDialectOptions::FromFlags::getRegistered(),
-      HighLevelOptimizationOptions::FromFlags::getRegistered(),
-      IREE::HAL::TargetOptions::FromFlags::getRegistered(),
-      IREE::VM::TargetOptions::FromFlags::getRegistered(), passManager);
+      BindingOptions::FromFlags::get(), InputDialectOptions::FromFlags::get(),
+      HighLevelOptimizationOptions::FromFlags::get(),
+      IREE::HAL::TargetOptions::FromFlags::get(),
+      IREE::VM::TargetOptions::FromFlags::get(), passManager);
 }
 
 void registerIREEVMTransformPassPipeline() {
@@ -181,14 +180,14 @@ static LogicalResult translateFromMLIRToVM(
 static LogicalResult translateFromMLIRToVMBytecodeModuleWithFlags(
     ModuleOp moduleOp, llvm::raw_ostream &output) {
   mlir::registerPassManagerCLOptions();
-  auto bindingOptions = BindingOptions::FromFlags::getRegistered();
-  auto inputOptions = InputDialectOptions::FromFlags::getRegistered();
+  auto bindingOptions = BindingOptions::FromFlags::get();
+  auto inputOptions = InputDialectOptions::FromFlags::get();
   auto highLevelOptimizationOptions =
-      HighLevelOptimizationOptions::FromFlags::getRegistered();
-  auto halTargetOptions = IREE::HAL::TargetOptions::FromFlags::getRegistered();
-  auto vmTargetOptions = IREE::VM::TargetOptions::FromFlags::getRegistered();
+      HighLevelOptimizationOptions::FromFlags::get();
+  auto halTargetOptions = IREE::HAL::TargetOptions::FromFlags::get();
+  auto vmTargetOptions = IREE::VM::TargetOptions::FromFlags::get();
   auto bytecodeTargetOptions =
-      IREE::VM::BytecodeTargetOptions::FromFlags::getRegistered();
+      IREE::VM::BytecodeTargetOptions::FromFlags::get();
   auto result = translateFromMLIRToVM(moduleOp, bindingOptions, inputOptions,
                                       highLevelOptimizationOptions,
                                       halTargetOptions, vmTargetOptions);
@@ -206,12 +205,12 @@ static LogicalResult translateFromMLIRToVMBytecodeModuleWithFlags(
 static LogicalResult translateFromMLIRToVMCModuleWithFlags(
     ModuleOp moduleOp, llvm::raw_ostream &output) {
   mlir::registerPassManagerCLOptions();
-  auto bindingOptions = BindingOptions::FromFlags::getRegistered();
-  auto inputOptions = InputDialectOptions::FromFlags::getRegistered();
+  auto bindingOptions = BindingOptions::FromFlags::get();
+  auto inputOptions = InputDialectOptions::FromFlags::get();
   auto highLevelOptimizationOptions =
-      HighLevelOptimizationOptions::FromFlags::getRegistered();
-  auto halTargetOptions = IREE::HAL::TargetOptions::FromFlags::getRegistered();
-  auto vmTargetOptions = IREE::VM::TargetOptions::FromFlags::getRegistered();
+      HighLevelOptimizationOptions::FromFlags::get();
+  auto halTargetOptions = IREE::HAL::TargetOptions::FromFlags::get();
+  auto vmTargetOptions = IREE::VM::TargetOptions::FromFlags::get();
   auto cTargetOptions = IREE::VM::getCTargetOptionsFromFlags();
   auto result = translateFromMLIRToVM(moduleOp, bindingOptions, inputOptions,
                                       highLevelOptimizationOptions,
@@ -226,12 +225,12 @@ static LogicalResult translateFromMLIRToVMCModuleWithFlags(
 #endif  // IREE_HAVE_EMITC_DIALECT
 
 void registerIREEVMTranslationFlags() {
-  BindingOptions::FromFlags::getRegistered();
-  InputDialectOptions::FromFlags::getRegistered();
-  HighLevelOptimizationOptions::FromFlags::getRegistered();
-  IREE::HAL::TargetOptions::FromFlags::getRegistered();
-  IREE::VM::TargetOptions::FromFlags::getRegistered();
-  IREE::VM::BytecodeTargetOptions::FromFlags::getRegistered();
+  BindingOptions::FromFlags::get();
+  InputDialectOptions::FromFlags::get();
+  HighLevelOptimizationOptions::FromFlags::get();
+  IREE::HAL::TargetOptions::FromFlags::get();
+  IREE::VM::TargetOptions::FromFlags::get();
+  IREE::VM::BytecodeTargetOptions::FromFlags::get();
 }
 
 void registerIREEVMTranslation() {

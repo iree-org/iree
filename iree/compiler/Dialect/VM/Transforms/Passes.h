@@ -93,7 +93,7 @@ createConvertStandardToVMTestPass();
 //===----------------------------------------------------------------------===//
 
 inline void registerVMPasses() {
-  auto targetOptions = TargetOptions::FromFlags::getRegistered();
+  auto targetOptions = TargetOptions::FromFlags::get();
   registerVMTransformPassPipeline();
   createConversionPass(targetOptions);
   createHoistInlinedRodataPass();
@@ -104,7 +104,7 @@ inline void registerVMPasses() {
 }
 
 inline void registerVMTestPasses() {
-  TargetOptions::FromFlags::getRegistered();
+  TargetOptions::FromFlags::get();
   createConvertStandardToVMTestPass();
 }
 

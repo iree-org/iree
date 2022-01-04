@@ -23,7 +23,7 @@ namespace iree_compiler {
 //   using FromFlags = OptionsFromFlags<MyStruct>;
 //
 // Then you can get the struct as initialized from global CL options as:
-//   MyStruct::FromFlags::getRegistered()
+//   MyStruct::FromFlags::get()
 //
 // Such use is referred to as a "global binder". You can also create a
 // local binder, which does not interact with global flags by calling the
@@ -212,7 +212,7 @@ class OptionsBinder {
 template <typename DerivedTy>
 class OptionsFromFlags {
  public:
-  static DerivedTy &getRegistered() {
+  static DerivedTy &get() {
     struct InitializedTy : DerivedTy {
       InitializedTy() {
         OptionsBinder binder = OptionsBinder::global();

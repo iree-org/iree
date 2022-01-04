@@ -19,8 +19,7 @@ void registerToVMBytecodeTranslation() {
       "iree-vm-ir-to-bytecode-module",
       [](mlir::ModuleOp moduleOp, llvm::raw_ostream &output) {
         return translateModuleToBytecode(
-            moduleOp, BytecodeTargetOptions::FromFlags::getRegistered(),
-            output);
+            moduleOp, BytecodeTargetOptions::FromFlags::get(), output);
       });
 }
 

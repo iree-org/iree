@@ -54,7 +54,7 @@ void registerVMTransformPassPipeline() {
       "Runs the full IREE VM dialect transformation pipeline",
       [](OpPassManager &passManager) {
         buildVMTransformPassPipeline(passManager,
-                                     TargetOptions::FromFlags::getRegistered());
+                                     TargetOptions::FromFlags::get());
       });
 }
 

@@ -134,7 +134,7 @@ std::unique_ptr<OperationPass<FuncOp>> createBenchmarkBatchDispatchesPass(
 
 inline void registerHALPasses() {
   registerHALTransformPassPipeline();
-  auto targetOptions = TargetOptions::FromFlags::getRegistered();
+  auto targetOptions = TargetOptions::FromFlags::get();
   createAssignTargetDevicesPass({});
   createBenchmarkBatchDispatchesPass(/*repeatCount=*/1);
   createConvertToHALPass();

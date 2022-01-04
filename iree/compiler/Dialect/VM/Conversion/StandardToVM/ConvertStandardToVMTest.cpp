@@ -40,7 +40,7 @@ class ConvertStandardToVMTestPass
                              mlir::arith::ArithmeticDialect>();
 
     IREE::VM::TypeConverter typeConverter(
-        IREE::VM::TargetOptions::FromFlags::getRegistered());
+        IREE::VM::TargetOptions::FromFlags::get());
 
     OwningRewritePatternList patterns(&getContext());
     populateStandardToVMPatterns(&getContext(), typeConverter, patterns);

@@ -294,7 +294,7 @@ std::unique_ptr<OperationPass<ModuleOp>> createMaterializeResourceCachesPass(
 }
 
 static PassRegistration<MaterializeResourceCachesPass> pass([] {
-  auto options = TargetOptions::FromFlags::getRegistered();
+  auto options = TargetOptions::FromFlags::get();
   return std::make_unique<MaterializeResourceCachesPass>(options);
 });
 
