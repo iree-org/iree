@@ -138,7 +138,7 @@ std::unique_ptr<OperationPass<ModuleOp>> createConvertHALToVMPass(
 }
 
 static PassRegistration<ConvertHALToVMPass> pass([] {
-  auto options = IREE::VM::getTargetOptionsFromFlags();
+  auto options = IREE::VM::TargetOptions::FromFlags::get();
   return std::make_unique<ConvertHALToVMPass>(options);
 });
 

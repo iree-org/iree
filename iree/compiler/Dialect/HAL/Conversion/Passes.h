@@ -17,7 +17,7 @@ std::unique_ptr<OperationPass<ModuleOp>> createConvertHALToVMPass(
     IREE::VM::TargetOptions targetOptions);
 
 inline void registerHALConversionPasses() {
-  createConvertHALToVMPass(IREE::VM::getTargetOptionsFromFlags());
+  createConvertHALToVMPass(IREE::VM::TargetOptions::FromFlags::get());
 }
 
 }  // namespace iree_compiler

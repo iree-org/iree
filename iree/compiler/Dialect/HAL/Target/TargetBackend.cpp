@@ -17,7 +17,7 @@ namespace iree_compiler {
 namespace IREE {
 namespace HAL {
 
-TargetOptions getTargetOptionsFromFlags() {
+void TargetOptions::bindOptions(OptionsBinder &binder) {
   static llvm::cl::OptionCategory halTargetOptionsCategory(
       "IREE HAL executable target options");
 
@@ -25,15 +25,10 @@ TargetOptions getTargetOptionsFromFlags() {
   // TranslateExecutablesPass. Pass registery is also staticly
   // initialized, so targetBackendsFlags needs to be here to be initialized
   // first.
-  static llvm::cl::list<std::string> *targetBackendsFlag =
-      new llvm::cl::list<std::string>{
-          "iree-hal-target-backends",
-          llvm::cl::desc("Target backends for executable compilation"),
-          llvm::cl::ZeroOrMore, llvm::cl::cat(halTargetOptionsCategory)};
-
-  TargetOptions targetOptions;
-  targetOptions.targets = *targetBackendsFlag;
-  return targetOptions;
+  binder.list<std::string>(
+      "iree-hal-target-backends", targets,
+      llvm::cl::desc("Target backends for executable compilation"),
+      llvm::cl::ZeroOrMore, llvm::cl::cat(halTargetOptionsCategory));
 }
 
 // Renames |op| within |moduleOp| with a new name that is unique within both

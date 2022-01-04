@@ -10,6 +10,7 @@
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
 #include "iree/compiler/Dialect/VM/Conversion/TargetOptions.h"
 #include "iree/compiler/Dialect/VM/Target/Bytecode/BytecodeModuleTarget.h"
+#include "iree/compiler/Utils/OptionUtils.h"
 #include "llvm/Support/raw_ostream.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/Pass/PassManager.h"
@@ -29,6 +30,9 @@ struct BindingOptions {
   // Whether to include runtime support functions required for the IREE TFLite
   // API compatibility bindings.
   bool tflite = false;
+
+  void bindOptions(OptionsBinder &binder);
+  using FromFlags = OptionsFromFlags<BindingOptions>;
 };
 
 // The transformation to apply to the input prior to main compiler execution.
@@ -54,6 +58,9 @@ struct InputDialectOptions {
     xla,
   };
   Type type = Type::none;
+
+  void bindOptions(OptionsBinder &binder);
+  using FromFlags = OptionsFromFlags<InputDialectOptions>;
 };
 
 // Options controlling high level optimizations.
@@ -64,6 +71,9 @@ struct HighLevelOptimizationOptions {
   // Enables recursive evaluation of immutable globals using the compiler
   // and runtime.
   bool constEval = false;
+
+  void bindOptions(OptionsBinder &binder);
+  using FromFlags = OptionsFromFlags<HighLevelOptimizationOptions>;
 };
 
 // Builds the translation pipeline with defaults.

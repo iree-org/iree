@@ -52,7 +52,7 @@ static LogicalResult translateFromMLIRToHALExecutableWithFlags(
   mlir::registerPassManagerCLOptions();
 
   // Convert into the final target-specific module definition and serialize it.
-  auto executableOptions = IREE::HAL::getTargetOptionsFromFlags();
+  auto executableOptions = IREE::HAL::TargetOptions::FromFlags::get();
   auto result = translateFromMLIRToHALExecutable(moduleOp, executableOptions);
   if (failed(result)) {
     return result;

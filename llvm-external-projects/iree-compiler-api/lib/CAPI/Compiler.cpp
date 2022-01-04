@@ -11,6 +11,7 @@
 #include "iree/compiler/InputConversion/MHLO/Passes.h"
 #include "iree/compiler/InputConversion/TOSA/Passes.h"
 #include "iree/compiler/Translation/IREEVM.h"
+#include "iree/compiler/Utils/OptionUtils.h"
 #include "iree/tools/init_targets.h"
 #include "mlir/CAPI/IR.h"
 #include "mlir/CAPI/Pass.h"
@@ -39,6 +40,17 @@ struct CompilerOptions {
   HALTargetOptions executableOptions;
   VMTargetOptions vmTargetOptions;
   VMBytecodeTargetOptions vmBytecodeTargetOptions;
+
+  OptionsBinder binder;
+
+  CompilerOptions() : binder(OptionsBinder::local()) {
+    bindingOptions.bindOptions(binder);
+    inputDialectOptions.bindOptions(binder);
+    highLevelOptimizationOptions.bindOptions(binder);
+    executableOptions.bindOptions(binder);
+    vmTargetOptions.bindOptions(binder);
+    vmBytecodeTargetOptions.bindOptions(binder);
+  }
 };
 }  // namespace
 
@@ -51,6 +63,31 @@ IreeCompilerOptions ireeCompilerOptionsCreate() {
   // TODO: Make configurable.
   options->vmTargetOptions.f32Extension = true;
   return wrap(options);
+}
+
+MlirLogicalResult ireeCompilerOptionsSetFlags(
+    IreeCompilerOptions options, int argc, const char *const *argv,
+    void (*onError)(MlirStringRef, void *), void *userData) {
+  CompilerOptions *optionsCpp = unwrap(options);
+  auto callback = [&](llvm::StringRef message) {
+    if (onError) {
+      onError(wrap(message), userData);
+    }
+  };
+  if (failed(optionsCpp->binder.parseArguments(argc, argv, callback))) {
+    return mlirLogicalResultFailure();
+  }
+  return mlirLogicalResultSuccess();
+}
+
+void ireeCompilerOptionsGetFlags(IreeCompilerOptions options,
+                                 bool nonDefaultOnly,
+                                 void (*onFlag)(MlirStringRef, void *),
+                                 void *userData) {
+  auto flagVector = unwrap(options)->binder.printArguments(nonDefaultOnly);
+  for (std::string &value : flagVector) {
+    onFlag(wrap(llvm::StringRef(value)), userData);
+  }
 }
 
 void ireeCompilerOptionsDestroy(IreeCompilerOptions options) {
