@@ -38,6 +38,18 @@ class VmUtilTest : public ::testing::Test {
 };
 
 TEST_F(VmUtilTest, ParsePrintBuffer) {
+  std::string buf_string = "&2x2xi32=[42 43][44 45]";
+  vm::ref<iree_vm_list_t> variant_list;
+  IREE_ASSERT_OK(ParseToVariantList(
+      allocator_, std::vector<std::string>{buf_string}, &variant_list));
+  std::stringstream os;
+  IREE_ASSERT_OK(PrintVariantList(variant_list.get(), &os));
+  // TODO(benvanik): add a !hal.buffer printer.
+  EXPECT_EQ(os.str(),
+            std::string("result[0]: hal.buffer\n") + "(no printer)" + "\n");
+}
+
+TEST_F(VmUtilTest, ParsePrintBufferView) {
   std::string buf_string = "2x2xi32=[42 43][44 45]";
   vm::ref<iree_vm_list_t> variant_list;
   IREE_ASSERT_OK(ParseToVariantList(
@@ -58,7 +70,7 @@ TEST_F(VmUtilTest, ParsePrintScalar) {
   EXPECT_EQ(os.str(), std::string("result[0]: i32=") + input_string + "\n");
 }
 
-TEST_F(VmUtilTest, ParsePrintRank0Buffer) {
+TEST_F(VmUtilTest, ParsePrintRank0BufferView) {
   std::string buf_string = "i32=42";
   vm::ref<iree_vm_list_t> variant_list;
   IREE_ASSERT_OK(ParseToVariantList(
@@ -69,7 +81,7 @@ TEST_F(VmUtilTest, ParsePrintRank0Buffer) {
             std::string("result[0]: hal.buffer_view\n") + buf_string + "\n");
 }
 
-TEST_F(VmUtilTest, ParsePrintMultipleBuffers) {
+TEST_F(VmUtilTest, ParsePrintMultipleBufferViews) {
   std::string buf_string1 = "2x2xi32=[42 43][44 45]";
   std::string buf_string2 = "2x3xf64=[1 2 3][4 5 6]";
   vm::ref<iree_vm_list_t> variant_list;

@@ -18,22 +18,32 @@
 void iree_arena_block_pool_initialize(iree_host_size_t total_block_size,
                                       iree_allocator_t block_allocator,
                                       iree_arena_block_pool_t* out_block_pool) {
+  IREE_TRACE_ZONE_BEGIN(z0);
+
   memset(out_block_pool, 0, sizeof(*out_block_pool));
   out_block_pool->total_block_size = total_block_size;
   out_block_pool->usable_block_size =
       total_block_size - sizeof(iree_arena_block_t);
   out_block_pool->block_allocator = block_allocator;
   iree_atomic_arena_block_slist_initialize(&out_block_pool->available_slist);
+
+  IREE_TRACE_ZONE_END(z0);
 }
 
 void iree_arena_block_pool_deinitialize(iree_arena_block_pool_t* block_pool) {
+  IREE_TRACE_ZONE_BEGIN(z0);
+
   // Since all blocks must have been released we can just reuse trim (today) as
   // it doesn't retain any blocks.
   iree_arena_block_pool_trim(block_pool);
   iree_atomic_arena_block_slist_deinitialize(&block_pool->available_slist);
+
+  IREE_TRACE_ZONE_END(z0);
 }
 
 void iree_arena_block_pool_trim(iree_arena_block_pool_t* block_pool) {
+  IREE_TRACE_ZONE_BEGIN(z0);
+
   iree_arena_block_t* head = NULL;
   iree_atomic_arena_block_slist_flush(
       &block_pool->available_slist,
@@ -43,6 +53,8 @@ void iree_arena_block_pool_trim(iree_arena_block_pool_t* block_pool) {
     head = head->next;
     iree_allocator_free(block_pool->block_allocator, ptr);
   }
+
+  IREE_TRACE_ZONE_END(z0);
 }
 
 iree_status_t iree_arena_block_pool_acquire(iree_arena_block_pool_t* block_pool,
@@ -98,6 +110,8 @@ void iree_arena_deinitialize(iree_arena_allocator_t* arena) {
 }
 
 void iree_arena_reset(iree_arena_allocator_t* arena) {
+  IREE_TRACE_ZONE_BEGIN(z0);
+
   if (arena->allocation_head != NULL) {
     iree_arena_oversized_allocation_t* head = arena->allocation_head;
     do {
@@ -113,6 +127,8 @@ void iree_arena_reset(iree_arena_allocator_t* arena) {
     arena->block_head = NULL;
     arena->block_tail = NULL;
   }
+
+  IREE_TRACE_ZONE_END(z0);
 }
 
 iree_status_t iree_arena_allocate(iree_arena_allocator_t* arena,
@@ -126,16 +142,20 @@ iree_status_t iree_arena_allocate(iree_arena_allocator_t* arena,
     // Oversized allocation that can't be handled by the block pool. We'll
     // allocate directly from the system allocator and track it ourselves for
     // freeing during reset.
+    IREE_TRACE_ZONE_BEGIN(z0);
     iree_host_size_t allocation_size =
         sizeof(iree_arena_oversized_allocation_t) + byte_length;
     iree_arena_oversized_allocation_t* allocation = NULL;
-    IREE_RETURN_IF_ERROR(iree_allocator_malloc_uninitialized(
-        block_pool->block_allocator, allocation_size, (void**)&allocation));
+    IREE_RETURN_AND_END_ZONE_IF_ERROR(
+        z0,
+        iree_allocator_malloc_uninitialized(
+            block_pool->block_allocator, allocation_size, (void**)&allocation));
     allocation->next = arena->allocation_head;
     arena->allocation_head = allocation;
     arena->total_allocation_size += allocation_size;
     arena->used_allocation_size += byte_length;
     *out_ptr = (uint8_t*)allocation + sizeof(iree_arena_oversized_allocation_t);
+    IREE_TRACE_ZONE_END(z0);
     return iree_ok_status();
   }
 
@@ -147,14 +167,16 @@ iree_status_t iree_arena_allocate(iree_arena_allocator_t* arena,
   // Check to see if the current block (if any) has space - if not, get another.
   if (arena->block_head == NULL ||
       arena->block_bytes_remaining < aligned_length) {
+    IREE_TRACE_ZONE_BEGIN(z0);
     iree_arena_block_t* block = NULL;
-    IREE_RETURN_IF_ERROR(
-        iree_arena_block_pool_acquire(arena->block_pool, &block));
+    IREE_RETURN_AND_END_ZONE_IF_ERROR(
+        z0, iree_arena_block_pool_acquire(arena->block_pool, &block));
     block->next = arena->block_head;
     arena->block_head = block;
     if (!arena->block_tail) arena->block_tail = block;
     arena->total_allocation_size += block_pool->total_block_size;
     arena->block_bytes_remaining = block_pool->usable_block_size;
+    IREE_TRACE_ZONE_END(z0);
   }
 
   // Slice out the allocation from the current block.

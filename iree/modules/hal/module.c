@@ -143,39 +143,50 @@ static void IREE_API_PTR iree_hal_module_destroy(void* base_module) {
 static iree_status_t IREE_API_PTR
 iree_hal_module_alloc_state(void* self, iree_allocator_t host_allocator,
                             iree_vm_module_state_t** out_module_state) {
+  IREE_TRACE_ZONE_BEGIN(z0);
+
   iree_hal_module_t* module = IREE_HAL_MODULE_CAST(self);
   iree_hal_module_state_t* state = NULL;
-  IREE_RETURN_IF_ERROR(
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0,
       iree_allocator_malloc(host_allocator, sizeof(*state), (void**)&state));
   memset(state, 0, sizeof(*state));
   state->host_allocator = host_allocator;
   state->shared_device = module->shared_device;
   iree_hal_device_retain(state->shared_device);
 
-  IREE_RETURN_IF_ERROR(iree_vm_list_create(
-      /*element_type=*/NULL, /*initial_capacity=*/512, state->host_allocator,
-      &state->deferred_releases));
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_vm_list_create(
+              /*element_type=*/NULL, /*initial_capacity=*/32,
+              state->host_allocator, &state->deferred_releases));
 
-  IREE_RETURN_IF_ERROR(iree_hal_executable_cache_create(
-      state->shared_device, iree_string_view_empty(),
-      &state->executable_cache));
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_hal_executable_cache_create(state->shared_device,
+                                           iree_string_view_empty(),
+                                           &state->executable_cache));
 
   state->submit_value = 0ull;
-  IREE_RETURN_IF_ERROR(iree_hal_semaphore_create(
-      state->shared_device, state->submit_value, &state->submit_semaphore));
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_hal_semaphore_create(state->shared_device, state->submit_value,
+                                    &state->submit_semaphore));
 
   *out_module_state = (iree_vm_module_state_t*)state;
+  IREE_TRACE_ZONE_END(z0);
   return iree_ok_status();
 }
 
 static void IREE_API_PTR
 iree_hal_module_free_state(void* self, iree_vm_module_state_t* module_state) {
+  IREE_TRACE_ZONE_BEGIN(z0);
+
   iree_hal_module_state_t* state = (iree_hal_module_state_t*)module_state;
   iree_hal_semaphore_release(state->submit_semaphore);
   iree_vm_list_release(state->deferred_releases);
   iree_hal_executable_cache_release(state->executable_cache);
   iree_hal_device_release(state->shared_device);
   iree_allocator_free(state->host_allocator, state);
+
+  IREE_TRACE_ZONE_END(z0);
 }
 
 static iree_status_t IREE_API_PTR iree_hal_module_notify(

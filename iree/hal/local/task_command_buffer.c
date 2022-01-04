@@ -493,14 +493,14 @@ static iree_status_t iree_hal_cmd_fill_tile(
   const iree_hal_cmd_fill_buffer_t* cmd =
       (const iree_hal_cmd_fill_buffer_t*)user_context;
   IREE_TRACE_ZONE_BEGIN(z0);
-  uint32_t length_per_slice = tile_context->workgroup_size[0];
-  IREE_TRACE_ZONE_APPEND_VALUE(z0, length_per_slice);
 
+  uint32_t length_per_slice = tile_context->workgroup_size[0];
   iree_device_size_t slice_offset =
       tile_context->workgroup_xyz[0] * length_per_slice;
   iree_device_size_t remaining_length = cmd->length - slice_offset;
   iree_device_size_t slice_length =
       iree_min(length_per_slice, remaining_length);
+  IREE_TRACE_ZONE_APPEND_VALUE(z0, (uint64_t)slice_length);
 
   iree_status_t status = iree_hal_buffer_fill(
       cmd->target_buffer, cmd->target_offset + slice_offset, slice_length,
@@ -626,14 +626,14 @@ static iree_status_t iree_hal_cmd_copy_tile(
   const iree_hal_cmd_copy_buffer_t* cmd =
       (const iree_hal_cmd_copy_buffer_t*)user_context;
   IREE_TRACE_ZONE_BEGIN(z0);
-  uint32_t length_per_slice = tile_context->workgroup_size[0];
-  IREE_TRACE_ZONE_APPEND_VALUE(z0, length_per_slice);
 
+  uint32_t length_per_slice = tile_context->workgroup_size[0];
   iree_device_size_t slice_offset =
       tile_context->workgroup_xyz[0] * length_per_slice;
   iree_device_size_t remaining_length = cmd->length - slice_offset;
   iree_device_size_t slice_length =
       iree_min(length_per_slice, remaining_length);
+  IREE_TRACE_ZONE_APPEND_VALUE(z0, (uint64_t)slice_length);
 
   iree_status_t status = iree_hal_buffer_copy_data(
       cmd->source_buffer, cmd->source_offset + slice_offset, cmd->target_buffer,

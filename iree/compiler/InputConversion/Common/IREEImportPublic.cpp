@@ -110,7 +110,8 @@ class TensorToBufferViewPattern
     if (!resultType) return failure();
     rewriter.replaceOpWithNewOp<IREE::HAL::TensorExportOp>(
         srcOp, resultType, adaptor.source(),
-        TypeAttr::get(adaptor.source().getType()), adaptor.source_dims());
+        TypeAttr::get(adaptor.source().getType()), adaptor.source_dims(),
+        /*target_storage=*/nullptr);
     return success();
   }
 };
