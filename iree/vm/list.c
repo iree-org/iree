@@ -11,6 +11,8 @@
 #include <stdint.h>
 #include <string.h>
 
+#include "iree/base/tracing.h"
+
 // Size of each iree_vm_value_type_t in bytes.
 static const iree_host_size_t kValueTypeSizes[7] = {
     0,  // IREE_VM_VALUE_TYPE_NONE
@@ -114,6 +116,8 @@ IREE_API_EXPORT iree_host_size_t iree_vm_list_storage_size(
 IREE_API_EXPORT iree_status_t iree_vm_list_initialize(
     iree_byte_span_t storage, const iree_vm_type_def_t* element_type,
     iree_host_size_t capacity, iree_vm_list_t** out_list) {
+  IREE_TRACE_ZONE_BEGIN(z0);
+
   iree_vm_list_storage_mode_t storage_mode = IREE_VM_LIST_STORAGE_MODE_VARIANT;
   iree_host_size_t element_size = sizeof(iree_vm_variant_t);
   if (element_type) {
@@ -151,22 +155,30 @@ IREE_API_EXPORT iree_status_t iree_vm_list_initialize(
   list->storage = storage.data + storage_offset;
 
   *out_list = list;
+  IREE_TRACE_ZONE_END(z0);
   return iree_ok_status();
 }
 
 IREE_API_EXPORT void iree_vm_list_deinitialize(iree_vm_list_t* list) {
   IREE_ASSERT_ARGUMENT(list);
+  IREE_TRACE_ZONE_BEGIN(z0);
+
   iree_atomic_ref_count_abort_if_uses(&list->ref_object.counter);
   iree_vm_list_reset_range(list, 0, list->count);
   list->count = 0;
+
+  IREE_TRACE_ZONE_END(z0);
 }
 
 IREE_API_EXPORT iree_status_t iree_vm_list_create(
     const iree_vm_type_def_t* element_type, iree_host_size_t initial_capacity,
     iree_allocator_t allocator, iree_vm_list_t** out_list) {
+  IREE_ASSERT_ARGUMENT(out_list);
+  IREE_TRACE_ZONE_BEGIN(z0);
+
   iree_vm_list_t* list = NULL;
-  IREE_RETURN_IF_ERROR(
-      iree_allocator_malloc(allocator, sizeof(*list), (void**)&list));
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_allocator_malloc(allocator, sizeof(*list), (void**)&list));
   memset(list, 0, sizeof(*list));
   iree_atomic_ref_count_init(&list->ref_object.counter);
   list->allocator = allocator;
@@ -186,20 +198,25 @@ IREE_API_EXPORT iree_status_t iree_vm_list_create(
   }
 
   iree_status_t status = iree_vm_list_reserve(list, initial_capacity);
-  if (!iree_status_is_ok(status)) {
-    iree_allocator_free(allocator, list);
-    return status;
-  }
 
-  *out_list = list;
-  return iree_ok_status();
+  if (iree_status_is_ok(status)) {
+    *out_list = list;
+  } else {
+    iree_allocator_free(allocator, list);
+  }
+  IREE_TRACE_ZONE_END(z0);
+  return status;
 }
 
 static void iree_vm_list_destroy(void* ptr) {
+  IREE_TRACE_ZONE_BEGIN(z0);
+
   iree_vm_list_t* list = (iree_vm_list_t*)ptr;
   iree_vm_list_reset_range(list, 0, list->count);
   iree_allocator_free(list->allocator, list->storage);
   iree_allocator_free(list->allocator, list);
+
+  IREE_TRACE_ZONE_END(z0);
 }
 
 IREE_API_EXPORT void iree_vm_list_retain(iree_vm_list_t* list) {

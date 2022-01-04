@@ -84,14 +84,27 @@ Status ParseToVariantList(iree_hal_allocator_t* allocator,
     bool has_x =
         iree_string_view_find_char(input_view, 'x', 0) != IREE_STRING_VIEW_NPOS;
     if (has_equal || has_x) {
-      // Buffer view (either just a shape or a shape=value).
+      // Buffer view (either just a shape or a shape=value) or buffer.
+      bool is_storage_reference = iree_string_view_consume_prefix(
+          &input_view, iree_make_cstring_view("&"));
       iree_hal_buffer_view_t* buffer_view = nullptr;
       IREE_RETURN_IF_ERROR(
           iree_hal_buffer_view_parse(input_view, allocator, &buffer_view),
           "parsing value '%.*s'", (int)input_view.size, input_view.data);
-      auto buffer_view_ref = iree_hal_buffer_view_move_ref(buffer_view);
-      IREE_RETURN_IF_ERROR(
-          iree_vm_list_push_ref_move(variant_list.get(), &buffer_view_ref));
+      if (is_storage_reference) {
+        // Storage buffer reference; just take the storage for the buffer view -
+        // it'll still have whatever contents were specified (or 0) but we'll
+        // discard the metadata.
+        auto buffer_ref = iree_hal_buffer_retain_ref(
+            iree_hal_buffer_view_buffer(buffer_view));
+        iree_hal_buffer_view_release(buffer_view);
+        IREE_RETURN_IF_ERROR(
+            iree_vm_list_push_ref_move(variant_list.get(), &buffer_ref));
+      } else {
+        auto buffer_view_ref = iree_hal_buffer_view_move_ref(buffer_view);
+        IREE_RETURN_IF_ERROR(
+            iree_vm_list_push_ref_move(variant_list.get(), &buffer_view_ref));
+      }
     } else {
       // Scalar.
       bool has_dot = iree_string_view_find_char(input_view, '.', 0) !=

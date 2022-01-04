@@ -321,6 +321,9 @@ void iree_task_executor_retain(iree_task_executor_t* executor);
 // Releases the given |executor| from the caller.
 void iree_task_executor_release(iree_task_executor_t* executor);
 
+// Trims pools and caches used by the executor and its workers.
+void iree_task_executor_trim(iree_task_executor_t* executor);
+
 // Acquires a fence for the given |scope| from the executor fence pool.
 iree_status_t iree_task_executor_acquire_fence(iree_task_executor_t* executor,
                                                iree_task_scope_t* scope,

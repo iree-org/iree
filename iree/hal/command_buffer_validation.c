@@ -73,7 +73,8 @@ static iree_status_t iree_hal_command_buffer_validate_buffer_compatibility(
     return iree_make_status(
         IREE_STATUS_PERMISSION_DENIED,
         "requested buffer usage is not supported for the buffer on this queue; "
-        "buffer allows %.*s, operation requires %.*s",
+        "buffer allows %.*s, operation requires %.*s (allocator compatibility "
+        "mismatch)",
         (int)allowed_usage_str.size, allowed_usage_str.data,
         (int)intended_usage_str.size, intended_usage_str.data);
   }

@@ -115,6 +115,7 @@ def HAL_TensorImportOp : HAL_PureOp<"tensor.import", [
 }
 
 def HAL_TensorExportOp : HAL_PureOp<"tensor.export", [
+  AttrSizedOperandSegments,
   DeclareOpInterfaceMethods<Util_TiedOpInterface, [
     "getTiedResult",
     "getTiedResultOperandIndex",
@@ -135,19 +136,27 @@ def HAL_TensorExportOp : HAL_PureOp<"tensor.export", [
     dynamically shaped values must have the same number of dynamic dimensions.
     This allows for casting between rank-0 and rank-N types, different element
     types, etc.
+
+    An optional `target_storage` buffer can be provided to hold the exported
+    result. The export will fail at runtime if the storage is null or if it has
+    insufficient capacity to store the output. The storage must be
+    device-visible and defined for transfer-target and dispatch usage.
   }];
 
   let arguments = (ins
     AnyTensor:$source,
     TypeAttr:$source_encoding,
-    HAL_ShapeDynamicDims:$source_dims
+    HAL_ShapeDynamicDims:$source_dims,
+    Optional<HAL_Buffer>:$target_storage
   );
   let results = (outs
     AnyTypeOf<[HAL_Buffer, HAL_BufferView]>:$target
   );
 
   let assemblyFormat = [{
-    $source `:`
+    $source
+    (`into` $target_storage^)?
+    `:`
     custom<TypeAlias>($source_encoding, type($source)) (`{` $source_dims^ `}`)?
     `->`
     type($target)

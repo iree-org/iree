@@ -51,11 +51,9 @@ IREE_API_EXPORT void iree_hal_executable_release(
 //===----------------------------------------------------------------------===//
 
 typedef struct iree_hal_executable_vtable_t {
-  // << HAL C porting in progress >>
-  IREE_API_UNSTABLE
-
   void(IREE_API_PTR* destroy)(iree_hal_executable_t* executable);
 } iree_hal_executable_vtable_t;
+IREE_HAL_ASSERT_VTABLE_LAYOUT(iree_hal_executable_vtable_t);
 
 IREE_API_EXPORT void iree_hal_executable_destroy(
     iree_hal_executable_t* executable);

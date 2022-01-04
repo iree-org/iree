@@ -53,6 +53,7 @@ iree_cc_library(
     iree::base::internal::synchronization
     iree::base::tracing
     iree::hal
+    iree::hal::utils::buffer_transfer
     iree::schemas::rocm_executable_def_c_fbs
   PUBLIC
 )

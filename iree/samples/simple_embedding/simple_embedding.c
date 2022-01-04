@@ -7,6 +7,10 @@
 // A example of setting up the HAL module to run simple pointwise array
 // multiplication with the device implemented by different backends via
 // create_sample_driver().
+//
+// NOTE: this file does not properly handle error cases and will leak on
+// failure. Applications that are just going to exit()/abort() on failure can
+// probably get away with the same thing but really should prefer not to.
 
 #include <stdio.h>
 
@@ -66,42 +70,29 @@ iree_status_t Run() {
   IREE_RETURN_IF_ERROR(iree_vm_context_resolve_function(
       context, iree_make_cstring_view(kMainFunctionName), &main_function));
 
-  // Allocate buffers that can be mapped on the CPU and that can also be used
-  // on the device. Not all devices support this, but the ones we have now do.
-  const int kElementCount = 4;
-  iree_hal_buffer_t* arg0_buffer = NULL;
-  iree_hal_buffer_t* arg1_buffer = NULL;
-  iree_hal_memory_type_t input_memory_type =
-      IREE_HAL_MEMORY_TYPE_HOST_LOCAL | IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE;
-  IREE_RETURN_IF_ERROR(iree_hal_allocator_allocate_buffer(
-      iree_hal_device_allocator(device), input_memory_type,
-      IREE_HAL_BUFFER_USAGE_ALL, sizeof(float) * kElementCount, &arg0_buffer));
-  IREE_RETURN_IF_ERROR(iree_hal_allocator_allocate_buffer(
-      iree_hal_device_allocator(device), input_memory_type,
-      IREE_HAL_BUFFER_USAGE_ALL, sizeof(float) * kElementCount, &arg1_buffer));
+  // Initial buffer contents for 4 * 2 = 8.
+  const float kFloat4[] = {4.0f, 4.0f, 4.0f, 4.0f};
+  const float kFloat2[] = {2.0f, 2.0f, 2.0f, 2.0f};
 
-  // Populate initial values for 4 * 2 = 8.
-  const float kFloat4 = 4.0f;
-  const float kFloat2 = 2.0f;
-  IREE_RETURN_IF_ERROR(iree_hal_buffer_fill(arg0_buffer, 0, IREE_WHOLE_BUFFER,
-                                            &kFloat4, sizeof(float)));
-  IREE_RETURN_IF_ERROR(iree_hal_buffer_fill(arg1_buffer, 0, IREE_WHOLE_BUFFER,
-                                            &kFloat2, sizeof(float)));
-
-  // Wrap buffers in shaped buffer views.
-  iree_hal_dim_t shape[1] = {kElementCount};
+  // Allocate buffers in device-local memory so that if the device has an
+  // independent address space they live on the fast side of the fence.
+  iree_hal_dim_t shape[1] = {IREE_ARRAYSIZE(kFloat4)};
   iree_hal_buffer_view_t* arg0_buffer_view = NULL;
   iree_hal_buffer_view_t* arg1_buffer_view = NULL;
-  IREE_RETURN_IF_ERROR(iree_hal_buffer_view_create(
-      arg0_buffer, shape, IREE_ARRAYSIZE(shape), IREE_HAL_ELEMENT_TYPE_FLOAT_32,
-      IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR, iree_allocator_system(),
-      &arg0_buffer_view));
-  IREE_RETURN_IF_ERROR(iree_hal_buffer_view_create(
-      arg1_buffer, shape, IREE_ARRAYSIZE(shape), IREE_HAL_ELEMENT_TYPE_FLOAT_32,
-      IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR, iree_allocator_system(),
-      &arg1_buffer_view));
-  iree_hal_buffer_release(arg0_buffer);
-  iree_hal_buffer_release(arg1_buffer);
+  IREE_RETURN_IF_ERROR(iree_hal_buffer_view_allocate_buffer(
+      iree_hal_device_allocator(device), shape, IREE_ARRAYSIZE(shape),
+      IREE_HAL_ELEMENT_TYPE_FLOAT_32, IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR,
+      IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL | IREE_HAL_MEMORY_TYPE_HOST_VISIBLE,
+      IREE_HAL_BUFFER_USAGE_DISPATCH | IREE_HAL_BUFFER_USAGE_TRANSFER |
+          IREE_HAL_BUFFER_USAGE_MAPPING,
+      iree_make_const_byte_span(kFloat4, sizeof(kFloat4)), &arg0_buffer_view));
+  IREE_RETURN_IF_ERROR(iree_hal_buffer_view_allocate_buffer(
+      iree_hal_device_allocator(device), shape, IREE_ARRAYSIZE(shape),
+      IREE_HAL_ELEMENT_TYPE_FLOAT_32, IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR,
+      IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL | IREE_HAL_MEMORY_TYPE_HOST_VISIBLE,
+      IREE_HAL_BUFFER_USAGE_DISPATCH | IREE_HAL_BUFFER_USAGE_TRANSFER |
+          IREE_HAL_BUFFER_USAGE_MAPPING,
+      iree_make_const_byte_span(kFloat2, sizeof(kFloat2)), &arg1_buffer_view));
 
   // Setup call inputs with our buffers.
   iree_vm_list_t* inputs = NULL;
@@ -142,16 +133,15 @@ iree_status_t Run() {
   }
 
   // Read back the results and ensure we got the right values.
-  iree_hal_buffer_mapping_t mapped_memory;
-  IREE_RETURN_IF_ERROR(iree_hal_buffer_map_range(
-      iree_hal_buffer_view_buffer(ret_buffer_view), IREE_HAL_MEMORY_ACCESS_READ,
-      0, IREE_WHOLE_BUFFER, &mapped_memory));
-  for (int i = 0; i < mapped_memory.contents.data_length / sizeof(float); ++i) {
-    if (((const float*)mapped_memory.contents.data)[i] != 8.0f) {
+  float results[] = {0.0f, 0.0f, 0.0f, 0.0f};
+  IREE_RETURN_IF_ERROR(
+      iree_hal_buffer_read_data(iree_hal_buffer_view_buffer(ret_buffer_view), 0,
+                                results, sizeof(results)));
+  for (iree_host_size_t i = 0; i < IREE_ARRAYSIZE(results); ++i) {
+    if (results[i] != 8.0f) {
       return iree_make_status(IREE_STATUS_UNKNOWN, "result mismatches");
     }
   }
-  iree_hal_buffer_unmap_range(&mapped_memory);
 
   iree_vm_list_release(inputs);
   iree_vm_list_release(outputs);

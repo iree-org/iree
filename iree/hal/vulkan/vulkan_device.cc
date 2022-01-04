@@ -11,8 +11,10 @@
 #include <cstring>
 #include <vector>
 
+#include "iree/base/internal/arena.h"
 #include "iree/base/internal/math.h"
 #include "iree/base/tracing.h"
+#include "iree/hal/utils/buffer_transfer.h"
 #include "iree/hal/vulkan/api.h"
 #include "iree/hal/vulkan/builtin_executables.h"
 #include "iree/hal/vulkan/command_queue.h"
@@ -361,6 +363,10 @@ typedef struct iree_hal_vulkan_device_t {
   VkCommandPoolHandle* dispatch_command_pool;
   VkCommandPoolHandle* transfer_command_pool;
 
+  // Block pool used for command buffers with a larger block size (as command
+  // buffers can contain inlined data uploads).
+  iree_arena_block_pool_t block_pool;
+
   // Used only for emulated timeline semaphores.
   TimePointSemaphorePool* semaphore_pool;
   TimePointFencePool* fence_pool;
@@ -562,6 +568,9 @@ static iree_status_t iree_hal_vulkan_device_create_internal(
   device->logical_device = logical_device;
   device->logical_device->AddReference();
 
+  iree_arena_block_pool_initialize(32 * 1024, host_allocator,
+                                   &device->block_pool);
+
   // Point the queue storage into the new device allocation. The queues
   // themselves are populated
   device->queues = (CommandQueue**)buffer_ptr;
@@ -582,8 +591,8 @@ static iree_status_t iree_hal_vulkan_device_create_internal(
   VmaRecordSettings vma_record_settings;
   memset(&vma_record_settings, 0, sizeof(vma_record_settings));
   iree_status_t status = iree_hal_vulkan_vma_allocator_create(
-      instance, physical_device, logical_device, vma_record_settings,
-      &device->device_allocator);
+      instance, physical_device, logical_device, (iree_hal_device_t*)device,
+      vma_record_settings, &device->device_allocator);
 
   // Create command pools for each queue family. If we don't have a transfer
   // queue then we'll ignore that one and just use the dispatch pool.
@@ -665,6 +674,9 @@ static void iree_hal_vulkan_device_destroy(iree_hal_device_t* base_device) {
 
   // There should be no more buffers live that use the allocator.
   iree_hal_allocator_release(device->device_allocator);
+
+  // All arena blocks should have been returned.
+  iree_arena_block_pool_deinitialize(&device->block_pool);
 
   // Finally, destroy the device.
   device->logical_device->ReleaseReference();
@@ -915,6 +927,13 @@ static iree_hal_allocator_t* iree_hal_vulkan_device_allocator(
   return device->device_allocator;
 }
 
+static iree_status_t iree_hal_vulkan_device_trim(
+    iree_hal_device_t* base_device) {
+  iree_hal_vulkan_device_t* device = iree_hal_vulkan_device_cast(base_device);
+  iree_arena_block_pool_trim(&device->block_pool);
+  return iree_hal_allocator_trim(device->device_allocator);
+}
+
 static iree_status_t iree_hal_vulkan_device_query_i32(
     iree_hal_device_t* base_device, iree_string_view_t category,
     iree_string_view_t key, int32_t* out_value) {
@@ -999,7 +1018,7 @@ static iree_status_t iree_hal_vulkan_device_create_command_buffer(
       base_device, device->logical_device, command_pool, mode,
       command_categories, queue_affinity, queue->tracing_context(),
       device->descriptor_pool_cache, device->builtin_executables,
-      out_command_buffer);
+      &device->block_pool, out_command_buffer);
 }
 
 static iree_status_t iree_hal_vulkan_device_create_descriptor_set(
@@ -1120,6 +1139,7 @@ const iree_hal_device_vtable_t iree_hal_vulkan_device_vtable = {
     /*.id=*/iree_hal_vulkan_device_id,
     /*.host_allocator=*/iree_hal_vulkan_device_host_allocator,
     /*.device_allocator=*/iree_hal_vulkan_device_allocator,
+    /*.trim=*/iree_hal_vulkan_device_trim,
     /*.query_i32=*/iree_hal_vulkan_device_query_i32,
     /*.create_command_buffer=*/iree_hal_vulkan_device_create_command_buffer,
     /*.create_descriptor_set=*/iree_hal_vulkan_device_create_descriptor_set,
@@ -1131,6 +1151,7 @@ const iree_hal_device_vtable_t iree_hal_vulkan_device_vtable = {
     /*.create_executable_layout=*/
     iree_hal_vulkan_device_create_executable_layout,
     /*.create_semaphore=*/iree_hal_vulkan_device_create_semaphore,
+    /*.transfer_range=*/iree_hal_device_submit_transfer_range_and_wait,
     /*.queue_submit=*/iree_hal_vulkan_device_queue_submit,
     /*.submit_and_wait=*/
     iree_hal_vulkan_device_submit_and_wait,

@@ -21,6 +21,7 @@
 #include "experimental/rocm/rocm_event.h"
 #include "experimental/rocm/status_util.h"
 #include "iree/base/tracing.h"
+#include "iree/hal/utils/buffer_transfer.h"
 
 //===----------------------------------------------------------------------===//
 // iree_hal_rocm_device_t
@@ -91,7 +92,8 @@ static iree_status_t iree_hal_rocm_device_create_internal(
   device->context_wrapper.host_allocator = host_allocator;
   device->context_wrapper.syms = syms;
   iree_status_t status = iree_hal_rocm_allocator_create(
-      &device->context_wrapper, &device->device_allocator);
+      (iree_hal_device_t*)device, &device->context_wrapper,
+      &device->device_allocator);
   if (iree_status_is_ok(status)) {
     *out_device = (iree_hal_device_t*)device;
   } else {
@@ -166,6 +168,12 @@ static iree_status_t iree_hal_rocm_device_query_i32(
       IREE_STATUS_NOT_FOUND,
       "unknown device configuration key value '%.*s :: %.*s'",
       (int)category.size, category.data, (int)key.size, key.data);
+}
+
+static iree_status_t iree_hal_rocm_device_trim(iree_hal_device_t* base_device) {
+  iree_hal_rocm_device_t* device = iree_hal_rocm_device_cast(base_device);
+  iree_arena_block_pool_trim(&device->block_pool);
+  return iree_hal_allocator_trim(device->device_allocator);
 }
 
 static iree_status_t iree_hal_rocm_device_create_command_buffer(
@@ -289,6 +297,7 @@ static const iree_hal_device_vtable_t iree_hal_rocm_device_vtable = {
     .id = iree_hal_rocm_device_id,
     .host_allocator = iree_hal_rocm_device_host_allocator,
     .device_allocator = iree_hal_rocm_device_allocator,
+    .trim = iree_hal_rocm_device_trim,
     .query_i32 = iree_hal_rocm_device_query_i32,
     .create_command_buffer = iree_hal_rocm_device_create_command_buffer,
     .create_descriptor_set = iree_hal_rocm_device_create_descriptor_set,
@@ -298,6 +307,7 @@ static const iree_hal_device_vtable_t iree_hal_rocm_device_vtable = {
     .create_executable_cache = iree_hal_rocm_device_create_executable_cache,
     .create_executable_layout = iree_hal_rocm_device_create_executable_layout,
     .create_semaphore = iree_hal_rocm_device_create_semaphore,
+    .transfer_range = iree_hal_device_submit_transfer_range_and_wait,
     .queue_submit = iree_hal_rocm_device_queue_submit,
     .submit_and_wait = iree_hal_rocm_device_submit_and_wait,
     .wait_semaphores = iree_hal_rocm_device_wait_semaphores,

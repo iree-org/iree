@@ -13,7 +13,6 @@
 #include "iree/compiler/Dialect/HAL/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Stream/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
-#include "iree/compiler/Dialect/VM/Target/Bytecode/TranslationFlags.h"
 #include "iree/compiler/Dialect/VM/Transforms/Passes.h"
 #include "iree/compiler/InputConversion/Common/Passes.h"
 #include "iree/compiler/InputConversion/MHLO/Passes.h"
@@ -31,73 +30,55 @@
 namespace mlir {
 namespace iree_compiler {
 
-static BindingOptions getBindingOptionsFromFlags() {
+void BindingOptions::bindOptions(OptionsBinder &binder) {
   static llvm::cl::OptionCategory bindingOptionsCategory(
       "IREE translation binding support options");
-
-  static llvm::cl::opt<bool> *bindingsNativeFlag = new llvm::cl::opt<bool>{
-      "iree-native-bindings-support",
+  binder.opt<bool>(
+      "iree-native-bindings-support", native,
       llvm::cl::desc(
           "Include runtime support for native IREE ABI-compatible bindings"),
-      llvm::cl::init(true), llvm::cl::cat(bindingOptionsCategory)};
-
-  static llvm::cl::opt<bool> *bindingsTFLiteFlag = new llvm::cl::opt<bool>{
-      "iree-tflite-bindings-support",
+      llvm::cl::cat(bindingOptionsCategory));
+  binder.opt<bool>(
+      "iree-tflite-bindings-support", tflite,
       llvm::cl::desc(
           "Include runtime support for the IREE TFLite compatibility bindings"),
-      llvm::cl::init(false), llvm::cl::cat(bindingOptionsCategory)};
-
-  BindingOptions bindingOptions;
-  bindingOptions.native = *bindingsNativeFlag;
-  bindingOptions.tflite = *bindingsTFLiteFlag;
-  return bindingOptions;
+      llvm::cl::cat(bindingOptionsCategory));
 }
 
-static InputDialectOptions getInputDialectOptionsFromFlags() {
+void InputDialectOptions::bindOptions(OptionsBinder &binder) {
   static llvm::cl::OptionCategory inputDialectOptions(
       "IREE options for controlling the input transformations to apply");
 
-  static llvm::cl::opt<InputDialectOptions::Type> *typeFlag =
-      new llvm::cl::opt<InputDialectOptions::Type>{
-          "iree-input-type", llvm::cl::desc("IREE input type"),
-          llvm::cl::values(
-              clEnumValN(InputDialectOptions::Type::none, "none",
-                         "No input dialect transformation"),
-              clEnumValN(InputDialectOptions::Type::tosa, "tosa",
-                         "Legalize from TOSA ops"),
-              clEnumValN(InputDialectOptions::Type::mhlo, "mhlo",
-                         "Legalize from MHLO ops"),
-              clEnumValN(
-                  InputDialectOptions::Type::xla, "xla",
-                  "Legalize from MHLO ops (with XLA cleanup preprocessing)")),
-          llvm::cl::init(InputDialectOptions::Type::none),
-          llvm::cl::cat(inputDialectOptions)};
-
-  InputDialectOptions options;
-  options.type = *typeFlag;
-  return options;
+  binder.opt<InputDialectOptions::Type>(
+      "iree-input-type", type, llvm::cl::desc("IREE input type"),
+      llvm::cl::values(
+          clEnumValN(InputDialectOptions::Type::none, "none",
+                     "No input dialect transformation"),
+          clEnumValN(InputDialectOptions::Type::tosa, "tosa",
+                     "Legalize from TOSA ops"),
+          clEnumValN(InputDialectOptions::Type::mhlo, "mhlo",
+                     "Legalize from MHLO ops"),
+          clEnumValN(
+              InputDialectOptions::Type::xla, "xla",
+              "Legalize from MHLO ops (with XLA cleanup preprocessing)")),
+      llvm::cl::cat(inputDialectOptions));
 }
 
-static HighLevelOptimizationOptions getHighLevelOptimizationOptionsFromFlags() {
+void HighLevelOptimizationOptions::bindOptions(OptionsBinder &binder) {
   static llvm::cl::OptionCategory category(
       "IREE options for controlling high level optimizations");
 
-  static llvm::cl::opt<bool> *constEval = new llvm::cl::opt<bool>{
-      "iree-const-eval",
+  binder.opt<bool>(
+      "iree-const-eval", constEval,
       llvm::cl::desc("Enables eager evaluation of constants using the full "
                      "compiler and runtime"),
-      llvm::cl::init(false), llvm::cl::cat(category)};
-  static llvm::cl::opt<bool> *constExprHoisting = new llvm::cl::opt<bool>{
-      "iree-const-expr-hoisting",
+      llvm::cl::cat(category));
+  binder.opt<bool>(
+      "iree-const-expr-hoisting", constExprHoisting,
       llvm::cl::desc(
           "Hoists the results of latent constant expressions into immutable "
           "global initializers for evaluation at program load"),
-      llvm::cl::init(false), llvm::cl::cat(category)};
-
-  HighLevelOptimizationOptions options;
-  options.constEval = *constEval;
-  options.constExprHoisting = *constExprHoisting;
-  return options;
+      llvm::cl::cat(category));
 }
 
 void buildIREEVMTransformPassPipeline(
@@ -152,10 +133,10 @@ void buildIREEVMTransformPassPipeline(
 
 void buildDefaultIREEVMTransformPassPipeline(OpPassManager &passManager) {
   buildIREEVMTransformPassPipeline(
-      getBindingOptionsFromFlags(), getInputDialectOptionsFromFlags(),
-      getHighLevelOptimizationOptionsFromFlags(),
-      IREE::HAL::getTargetOptionsFromFlags(),
-      IREE::VM::getTargetOptionsFromFlags(), passManager);
+      BindingOptions::FromFlags::get(), InputDialectOptions::FromFlags::get(),
+      HighLevelOptimizationOptions::FromFlags::get(),
+      IREE::HAL::TargetOptions::FromFlags::get(),
+      IREE::VM::TargetOptions::FromFlags::get(), passManager);
 }
 
 void registerIREEVMTransformPassPipeline() {
@@ -199,13 +180,14 @@ static LogicalResult translateFromMLIRToVM(
 static LogicalResult translateFromMLIRToVMBytecodeModuleWithFlags(
     ModuleOp moduleOp, llvm::raw_ostream &output) {
   mlir::registerPassManagerCLOptions();
-  auto bindingOptions = getBindingOptionsFromFlags();
-  auto inputOptions = getInputDialectOptionsFromFlags();
+  auto bindingOptions = BindingOptions::FromFlags::get();
+  auto inputOptions = InputDialectOptions::FromFlags::get();
   auto highLevelOptimizationOptions =
-      getHighLevelOptimizationOptionsFromFlags();
-  auto halTargetOptions = IREE::HAL::getTargetOptionsFromFlags();
-  auto vmTargetOptions = IREE::VM::getTargetOptionsFromFlags();
-  auto bytecodeTargetOptions = IREE::VM::getBytecodeTargetOptionsFromFlags();
+      HighLevelOptimizationOptions::FromFlags::get();
+  auto halTargetOptions = IREE::HAL::TargetOptions::FromFlags::get();
+  auto vmTargetOptions = IREE::VM::TargetOptions::FromFlags::get();
+  auto bytecodeTargetOptions =
+      IREE::VM::BytecodeTargetOptions::FromFlags::get();
   auto result = translateFromMLIRToVM(moduleOp, bindingOptions, inputOptions,
                                       highLevelOptimizationOptions,
                                       halTargetOptions, vmTargetOptions);
@@ -223,12 +205,12 @@ static LogicalResult translateFromMLIRToVMBytecodeModuleWithFlags(
 static LogicalResult translateFromMLIRToVMCModuleWithFlags(
     ModuleOp moduleOp, llvm::raw_ostream &output) {
   mlir::registerPassManagerCLOptions();
-  auto bindingOptions = getBindingOptionsFromFlags();
-  auto inputOptions = getInputDialectOptionsFromFlags();
+  auto bindingOptions = BindingOptions::FromFlags::get();
+  auto inputOptions = InputDialectOptions::FromFlags::get();
   auto highLevelOptimizationOptions =
-      getHighLevelOptimizationOptionsFromFlags();
-  auto halTargetOptions = IREE::HAL::getTargetOptionsFromFlags();
-  auto vmTargetOptions = IREE::VM::getTargetOptionsFromFlags();
+      HighLevelOptimizationOptions::FromFlags::get();
+  auto halTargetOptions = IREE::HAL::TargetOptions::FromFlags::get();
+  auto vmTargetOptions = IREE::VM::TargetOptions::FromFlags::get();
   auto cTargetOptions = IREE::VM::getCTargetOptionsFromFlags();
   auto result = translateFromMLIRToVM(moduleOp, bindingOptions, inputOptions,
                                       highLevelOptimizationOptions,
@@ -243,9 +225,12 @@ static LogicalResult translateFromMLIRToVMCModuleWithFlags(
 #endif  // IREE_HAVE_EMITC_DIALECT
 
 void registerIREEVMTranslationFlags() {
-  getBindingOptionsFromFlags();
-  getInputDialectOptionsFromFlags();
-  getHighLevelOptimizationOptionsFromFlags();
+  BindingOptions::FromFlags::get();
+  InputDialectOptions::FromFlags::get();
+  HighLevelOptimizationOptions::FromFlags::get();
+  IREE::HAL::TargetOptions::FromFlags::get();
+  IREE::VM::TargetOptions::FromFlags::get();
+  IREE::VM::BytecodeTargetOptions::FromFlags::get();
 }
 
 void registerIREEVMTranslation() {

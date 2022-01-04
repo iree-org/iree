@@ -114,9 +114,6 @@ IREE_API_EXPORT iree_status_t iree_hal_semaphore_wait(
 //===----------------------------------------------------------------------===//
 
 typedef struct iree_hal_semaphore_vtable_t {
-  // << HAL C porting in progress >>
-  IREE_API_UNSTABLE
-
   void(IREE_API_PTR* destroy)(iree_hal_semaphore_t* semaphore);
 
   iree_status_t(IREE_API_PTR* query)(iree_hal_semaphore_t* semaphore,
@@ -129,6 +126,7 @@ typedef struct iree_hal_semaphore_vtable_t {
   iree_status_t(IREE_API_PTR* wait)(iree_hal_semaphore_t* semaphore,
                                     uint64_t value, iree_timeout_t timeout);
 } iree_hal_semaphore_vtable_t;
+IREE_HAL_ASSERT_VTABLE_LAYOUT(iree_hal_semaphore_vtable_t);
 
 IREE_API_EXPORT void iree_hal_semaphore_destroy(
     iree_hal_semaphore_t* semaphore);

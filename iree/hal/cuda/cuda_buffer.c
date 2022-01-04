@@ -68,14 +68,16 @@ static iree_status_t iree_hal_cuda_buffer_map_range(
     iree_hal_buffer_t* base_buffer, iree_hal_mapping_mode_t mapping_mode,
     iree_hal_memory_access_t memory_access,
     iree_device_size_t local_byte_offset, iree_device_size_t local_byte_length,
-    void** out_data_ptr) {
+    iree_hal_buffer_mapping_t* mapping) {
   iree_hal_cuda_buffer_t* buffer = iree_hal_cuda_buffer_cast(base_buffer);
 
-  if (!iree_all_bits_set(buffer->base.memory_type,
-                         IREE_HAL_MEMORY_TYPE_HOST_VISIBLE)) {
-    return iree_make_status(IREE_STATUS_INTERNAL,
-                            "trying to map memory not host visible");
-  }
+  // TODO(benvanik): add upload/download for unmapped buffers.
+  IREE_RETURN_IF_ERROR(iree_hal_buffer_validate_memory_type(
+      iree_hal_buffer_memory_type(base_buffer),
+      IREE_HAL_MEMORY_TYPE_HOST_VISIBLE));
+  IREE_RETURN_IF_ERROR(
+      iree_hal_buffer_validate_usage(iree_hal_buffer_allowed_usage(base_buffer),
+                                     IREE_HAL_BUFFER_USAGE_MAPPING));
 
   uint8_t* data_ptr = (uint8_t*)(buffer->host_ptr) + local_byte_offset;
   // If we mapped for discard scribble over the bytes. This is not a mandated
@@ -87,14 +89,16 @@ static iree_status_t iree_hal_cuda_buffer_map_range(
     memset(data_ptr, 0xCD, local_byte_length);
   }
 #endif  // !NDEBUG
-  *out_data_ptr = data_ptr;
+
+  mapping->contents = iree_make_byte_span(data_ptr, local_byte_length);
   return iree_ok_status();
 }
 
-static void iree_hal_cuda_buffer_unmap_range(
+static iree_status_t iree_hal_cuda_buffer_unmap_range(
     iree_hal_buffer_t* base_buffer, iree_device_size_t local_byte_offset,
-    iree_device_size_t local_byte_length, void* data_ptr) {
-  // nothing to do.
+    iree_device_size_t local_byte_length, iree_hal_buffer_mapping_t* mapping) {
+  // Nothing to do (today).
+  return iree_ok_status();
 }
 
 static iree_status_t iree_hal_cuda_buffer_invalidate_range(

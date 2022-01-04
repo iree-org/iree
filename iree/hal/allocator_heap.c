@@ -81,6 +81,11 @@ static iree_allocator_t iree_hal_heap_allocator_host_allocator(
   return allocator->host_allocator;
 }
 
+static iree_status_t iree_hal_heap_allocator_trim(
+    iree_hal_allocator_t* base_allocator) {
+  return iree_ok_status();
+}
+
 static void iree_hal_heap_allocator_query_statistics(
     iree_hal_allocator_t* base_allocator,
     iree_hal_allocator_statistics_t* out_statistics) {
@@ -148,7 +153,7 @@ static iree_status_t iree_hal_heap_allocator_make_compatible(
 static iree_status_t iree_hal_heap_allocator_allocate_buffer(
     iree_hal_allocator_t* base_allocator, iree_hal_memory_type_t memory_type,
     iree_hal_buffer_usage_t allowed_usage, iree_host_size_t allocation_size,
-    iree_hal_buffer_t** out_buffer) {
+    iree_const_byte_span_t initial_data, iree_hal_buffer_t** out_buffer) {
   iree_hal_heap_allocator_t* allocator =
       iree_hal_heap_allocator_cast(base_allocator);
 
@@ -160,10 +165,24 @@ static iree_status_t iree_hal_heap_allocator_allocate_buffer(
   // Allocate the buffer (both the wrapper and the contents).
   iree_hal_heap_allocator_statistics_t* statistics = NULL;
   IREE_STATISTICS(statistics = &allocator->statistics);
-  return iree_hal_heap_buffer_create(base_allocator, statistics, memory_type,
-                                     allowed_access, allowed_usage,
-                                     allocation_size, allocator->data_allocator,
-                                     allocator->host_allocator, out_buffer);
+  iree_hal_buffer_t* buffer = NULL;
+  IREE_RETURN_IF_ERROR(iree_hal_heap_buffer_create(
+      base_allocator, statistics, memory_type, allowed_access, allowed_usage,
+      allocation_size, allocator->data_allocator, allocator->host_allocator,
+      &buffer));
+
+  iree_status_t status = iree_ok_status();
+  if (!iree_const_byte_span_is_empty(initial_data)) {
+    status = iree_hal_buffer_write_data(buffer, 0, initial_data.data,
+                                        initial_data.data_length);
+  }
+
+  if (iree_status_is_ok(status)) {
+    *out_buffer = buffer;
+  } else {
+    iree_hal_buffer_release(buffer);
+  }
+  return status;
 }
 
 static iree_status_t iree_hal_heap_allocator_wrap_buffer(
@@ -190,6 +209,7 @@ static void iree_hal_heap_allocator_deallocate_buffer(
 static const iree_hal_allocator_vtable_t iree_hal_heap_allocator_vtable = {
     .destroy = iree_hal_heap_allocator_destroy,
     .host_allocator = iree_hal_heap_allocator_host_allocator,
+    .trim = iree_hal_heap_allocator_trim,
     .query_statistics = iree_hal_heap_allocator_query_statistics,
     .query_buffer_compatibility =
         iree_hal_heap_allocator_query_buffer_compatibility,

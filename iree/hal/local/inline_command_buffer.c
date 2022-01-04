@@ -345,10 +345,11 @@ static iree_status_t iree_hal_inline_command_buffer_push_descriptor_set(
     iree_host_size_t binding_ordinal = binding_base + bindings[i].binding;
 
     // TODO(benvanik): track mapping so we can properly map/unmap/flush/etc.
-    iree_hal_buffer_mapping_t buffer_mapping;
+    iree_hal_buffer_mapping_t buffer_mapping = {{0}};
     IREE_RETURN_IF_ERROR(iree_hal_buffer_map_range(
-        bindings[i].buffer, IREE_HAL_MEMORY_ACCESS_ANY, bindings[i].offset,
-        bindings[i].length, &buffer_mapping));
+        bindings[i].buffer, IREE_HAL_MAPPING_MODE_PERSISTENT,
+        IREE_HAL_MEMORY_ACCESS_ANY, bindings[i].offset, bindings[i].length,
+        &buffer_mapping));
     command_buffer->state.full_bindings[binding_ordinal] =
         buffer_mapping.contents.data;
     command_buffer->state.full_binding_lengths[binding_ordinal] =
@@ -475,10 +476,11 @@ static iree_status_t iree_hal_inline_command_buffer_dispatch_indirect(
     iree_hal_buffer_t* workgroups_buffer,
     iree_device_size_t workgroups_offset) {
   // TODO(benvanik): track mapping so we can properly map/unmap/flush/etc.
-  iree_hal_buffer_mapping_t buffer_mapping;
+  iree_hal_buffer_mapping_t buffer_mapping = {{0}};
   IREE_RETURN_IF_ERROR(iree_hal_buffer_map_range(
-      workgroups_buffer, IREE_HAL_MEMORY_ACCESS_READ, workgroups_offset,
-      3 * sizeof(uint32_t), &buffer_mapping));
+      workgroups_buffer, IREE_HAL_MAPPING_MODE_PERSISTENT,
+      IREE_HAL_MEMORY_ACCESS_READ, workgroups_offset, 3 * sizeof(uint32_t),
+      &buffer_mapping));
   iree_hal_vec3_t workgroup_count =
       *(const iree_hal_vec3_t*)buffer_mapping.contents.data;
   return iree_hal_inline_command_buffer_dispatch(

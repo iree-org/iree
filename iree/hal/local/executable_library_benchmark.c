@@ -274,9 +274,10 @@ static iree_status_t iree_hal_executable_library_run(
     iree_hal_buffer_t* buffer = iree_hal_buffer_view_buffer(buffer_views[i]);
     iree_device_size_t buffer_length =
         iree_hal_buffer_view_byte_length(buffer_views[i]);
-    iree_hal_buffer_mapping_t buffer_mapping;
+    iree_hal_buffer_mapping_t buffer_mapping = {{0}};
     IREE_RETURN_IF_ERROR(iree_hal_buffer_map_range(
-        buffer, IREE_HAL_MEMORY_ACCESS_READ | IREE_HAL_MEMORY_ACCESS_WRITE, 0,
+        buffer, IREE_HAL_MAPPING_MODE_PERSISTENT,
+        IREE_HAL_MEMORY_ACCESS_READ | IREE_HAL_MEMORY_ACCESS_WRITE, 0,
         buffer_length, &buffer_mapping));
     binding_ptrs[i] = buffer_mapping.contents.data;
     binding_lengths[i] = (size_t)buffer_mapping.contents.data_length;

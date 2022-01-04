@@ -171,9 +171,6 @@ IREE_API_EXPORT iree_status_t iree_hal_executable_cache_prepare_executable(
 //===----------------------------------------------------------------------===//
 
 typedef struct iree_hal_executable_cache_vtable_t {
-  // << HAL C porting in progress >>
-  IREE_API_UNSTABLE
-
   void(IREE_API_PTR* destroy)(iree_hal_executable_cache_t* executable_cache);
 
   bool(IREE_API_PTR* can_prepare_format)(
@@ -186,6 +183,7 @@ typedef struct iree_hal_executable_cache_vtable_t {
       const iree_hal_executable_spec_t* executable_spec,
       iree_hal_executable_t** out_executable);
 } iree_hal_executable_cache_vtable_t;
+IREE_HAL_ASSERT_VTABLE_LAYOUT(iree_hal_executable_cache_vtable_t);
 
 IREE_API_EXPORT void iree_hal_executable_cache_destroy(
     iree_hal_executable_cache_t* executable_cache);

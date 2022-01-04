@@ -7,6 +7,7 @@
 #ifndef IREE_COMPILER_DIALECT_VM_CONVERSION_TARGETOPTIONS_H_
 #define IREE_COMPILER_DIALECT_VM_CONVERSION_TARGETOPTIONS_H_
 
+#include "iree/compiler/Utils/OptionUtils.h"
 #include "mlir/Transforms/DialectConversion.h"
 
 namespace mlir {
@@ -32,7 +33,7 @@ struct TargetOptions {
   // Whether the i64 extension is enabled in the target VM.
   bool i64Extension = false;
   // Whether the f32 extension is enabled in the target VM.
-  bool f32Extension = false;
+  bool f32Extension = true;
   // Whether the f64 extension is enabled in the target VM.
   bool f64Extension = false;
 
@@ -45,11 +46,10 @@ struct TargetOptions {
 
   // Prefer optimizations that reduce VM stack usage over performance.
   bool optimizeForStackSize = true;
-};
 
-// Returns a TargetOptions struct initialized with the
-// --iree-vm-target-* flags.
-TargetOptions getTargetOptionsFromFlags();
+  void bindOptions(OptionsBinder &binder);
+  using FromFlags = OptionsFromFlags<TargetOptions>;
+};
 
 }  // namespace VM
 }  // namespace IREE

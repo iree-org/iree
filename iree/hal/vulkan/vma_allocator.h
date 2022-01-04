@@ -36,7 +36,8 @@ extern "C" {
 iree_status_t iree_hal_vulkan_vma_allocator_create(
     VkInstance instance, VkPhysicalDevice physical_device,
     iree::hal::vulkan::VkDeviceHandle* logical_device,
-    VmaRecordSettings record_settings, iree_hal_allocator_t** out_allocator);
+    iree_hal_device_t* device, VmaRecordSettings record_settings,
+    iree_hal_allocator_t** out_allocator);
 
 #ifdef __cplusplus
 }  // extern "C"

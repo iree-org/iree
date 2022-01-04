@@ -66,9 +66,10 @@ static iree_status_t get_buffer_view_dense_row_major_data(
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                             "buffer_view is not dense row major");
   }
-  iree_hal_buffer_mapping_t mapping;
+  iree_hal_buffer_mapping_t mapping = {{0}};
   IREE_RETURN_IF_ERROR(iree_hal_buffer_map_range(
-      iree_hal_buffer_view_buffer(buffer_view), IREE_HAL_MEMORY_ACCESS_READ, 0,
+      iree_hal_buffer_view_buffer(buffer_view),
+      IREE_HAL_MAPPING_MODE_PERSISTENT, IREE_HAL_MEMORY_ACCESS_READ, 0,
       IREE_WHOLE_BUFFER, &mapping));
   *data = mapping.contents.data;
   return iree_ok_status();
@@ -478,21 +479,23 @@ static iree_status_t allocate_buffer_like(iree_hal_allocator_t* hal_allocator,
       iree_hal_buffer_view_element_type(src),
       iree_hal_buffer_view_encoding_type(src),
       IREE_HAL_MEMORY_TYPE_HOST_LOCAL | IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE,
-      IREE_HAL_BUFFER_USAGE_ALL, dst);
+      IREE_HAL_BUFFER_USAGE_ALL, iree_const_byte_span_empty(), dst);
 }
 
 // Performs a deep copy of |src| into |dst|. Takes care of allocating |dst|.
 static iree_status_t copy_buffer(iree_hal_allocator_t* hal_allocator,
                                  iree_hal_buffer_view_t* src,
                                  iree_hal_buffer_view_t** dst) {
-  iree_hal_buffer_mapping_t src_mapping;
+  // TODO(benvanik): change this to use iree_hal_buffer_copy_data. Or something.
+  // I can't understand what all this code is doing.
+  iree_hal_buffer_mapping_t src_mapping = {{0}};
   IREE_RETURN_IF_ERROR(iree_hal_buffer_map_range(
-      iree_hal_buffer_view_buffer(src), IREE_HAL_MEMORY_ACCESS_READ, 0,
-      IREE_WHOLE_BUFFER, &src_mapping));
+      iree_hal_buffer_view_buffer(src), IREE_HAL_MAPPING_MODE_PERSISTENT,
+      IREE_HAL_MEMORY_ACCESS_READ, 0, IREE_WHOLE_BUFFER, &src_mapping));
   iree_const_byte_span_t src_span;
   src_span.data = src_mapping.contents.data;
   src_span.data_length = src_mapping.contents.data_length;
-  return iree_hal_buffer_view_clone_heap_buffer(
+  return iree_hal_buffer_view_allocate_buffer(
       hal_allocator, iree_hal_buffer_view_shape_dims(src),
       iree_hal_buffer_view_shape_rank(src),
       iree_hal_buffer_view_element_type(src),
@@ -551,7 +554,8 @@ static iree_status_t replay_event_call(iree_trace_replay_t* replay,
   // linalg.matmul. We need to preserve the original test inputs to run the
   // reference matmul on and to use in test failure logs.
   iree_vm_list_t* copy_of_input_list = NULL;
-  copy_list_of_buffer_views(device_allocator, input_list, &copy_of_input_list);
+  IREE_CHECK_OK(copy_list_of_buffer_views(device_allocator, input_list,
+                                          &copy_of_input_list));
 
   // Invoke the function to produce the actual result.
   iree_vm_list_t* output_list = NULL;

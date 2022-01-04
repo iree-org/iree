@@ -53,7 +53,7 @@ int mlir::iree_compiler::runIreeTranslateMain(int argc, char **argv) {
   mlir::registerMlirTranslations();
   mlir::iree_compiler::registerIreeTranslations();
   // Make sure command line options are registered.
-  (void)mlir::iree_compiler::IREE::HAL::getTargetOptionsFromFlags();
+  (void)mlir::iree_compiler::IREE::HAL::TargetOptions::FromFlags::get();
 
   // Register MLIRContext command-line options like
   // -mlir-print-op-on-diagnostic.

@@ -454,3 +454,70 @@ IREE_API_EXPORT iree_status_t iree_hal_command_buffer_dispatch_indirect(
   IREE_TRACE_ZONE_END(z0);
   return status;
 }
+
+//===----------------------------------------------------------------------===//
+// Utilities for command buffer creation
+//===----------------------------------------------------------------------===//
+
+IREE_API_EXPORT iree_status_t iree_hal_create_transfer_command_buffer(
+    iree_hal_device_t* device, iree_hal_command_buffer_mode_t mode,
+    iree_hal_queue_affinity_t queue_affinity, iree_host_size_t transfer_count,
+    const iree_hal_transfer_command_t* transfer_commands,
+    iree_hal_command_buffer_t** out_command_buffer) {
+  IREE_TRACE_ZONE_BEGIN(z0);
+
+  iree_hal_command_buffer_t* command_buffer = NULL;
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_hal_command_buffer_create(device, mode,
+                                         IREE_HAL_COMMAND_CATEGORY_TRANSFER,
+                                         queue_affinity, &command_buffer));
+
+  iree_status_t status = iree_hal_command_buffer_begin(command_buffer);
+  if (iree_status_is_ok(status)) {
+    for (iree_host_size_t i = 0; i < transfer_count; ++i) {
+      const iree_hal_transfer_command_t* transfer_command =
+          &transfer_commands[i];
+      switch (transfer_command->type) {
+        case IREE_HAL_TRANSFER_COMMAND_TYPE_FILL:
+          status = iree_hal_command_buffer_fill_buffer(
+              command_buffer, transfer_command->fill.target_buffer,
+              transfer_command->fill.target_offset,
+              transfer_command->fill.length, transfer_command->fill.pattern,
+              transfer_command->fill.pattern_length);
+          break;
+        case IREE_HAL_TRANSFER_COMMAND_TYPE_COPY:
+          status = iree_hal_command_buffer_copy_buffer(
+              command_buffer, transfer_command->copy.source_buffer,
+              transfer_command->copy.source_offset,
+              transfer_command->copy.target_buffer,
+              transfer_command->copy.target_offset,
+              transfer_command->copy.length);
+          break;
+        case IREE_HAL_TRANSFER_COMMAND_TYPE_UPDATE:
+          status = iree_hal_command_buffer_update_buffer(
+              command_buffer, transfer_command->update.source_buffer,
+              transfer_command->update.source_offset,
+              transfer_command->update.target_buffer,
+              transfer_command->update.target_offset,
+              transfer_command->update.length);
+          break;
+        default:
+          status = iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                                    "unknown transfer_commands[%zu] type %d", i,
+                                    (int)transfer_command->type);
+          break;
+      }
+      if (!iree_status_is_ok(status)) break;
+    }
+  }
+  status =
+      iree_status_join(status, iree_hal_command_buffer_end(command_buffer));
+
+  if (iree_status_is_ok(status)) {
+    *out_command_buffer = command_buffer;
+  } else {
+    iree_hal_command_buffer_release(command_buffer);
+  }
+  IREE_TRACE_ZONE_END(z0);
+  return status;
+}

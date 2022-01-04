@@ -788,6 +788,11 @@ static iree_status_t iree_vm_bytecode_module_resolve_import(
   return iree_ok_status();
 }
 
+static iree_status_t IREE_API_PTR iree_vm_bytecode_module_notify(
+    void* self, iree_vm_module_state_t* module_state, iree_vm_signal_t signal) {
+  return iree_ok_status();
+}
+
 static iree_status_t iree_vm_bytecode_module_begin_call(
     void* self, iree_vm_stack_t* stack, const iree_vm_function_call_t* call,
     iree_vm_execution_result_t* out_result) {
@@ -914,6 +919,7 @@ IREE_API_EXPORT iree_status_t iree_vm_bytecode_module_create(
   module->interface.alloc_state = iree_vm_bytecode_module_alloc_state;
   module->interface.free_state = iree_vm_bytecode_module_free_state;
   module->interface.resolve_import = iree_vm_bytecode_module_resolve_import;
+  module->interface.notify = iree_vm_bytecode_module_notify;
   module->interface.begin_call = iree_vm_bytecode_module_begin_call;
   module->interface.get_function_reflection_attr =
       iree_vm_bytecode_module_get_function_reflection_attr;

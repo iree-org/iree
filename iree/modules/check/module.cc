@@ -184,13 +184,13 @@ class CheckModuleState final {
         iree_hal_buffer_view_element_type(view);
     iree_hal_buffer_t* buf = iree_hal_buffer_view_buffer(view);
     iree_device_size_t size = iree_hal_buffer_view_byte_length(view);
-    iree_hal_buffer_mapping_t mapped_memory;
-    IREE_RETURN_IF_ERROR(
-        iree_hal_buffer_map_range(buf, IREE_HAL_MEMORY_ACCESS_READ,
-                                  /*byte_offset=*/0, size, &mapped_memory));
+    iree_hal_buffer_mapping_t mapped_memory = {{0}};
+    IREE_RETURN_IF_ERROR(iree_hal_buffer_map_range(
+        buf, IREE_HAL_MAPPING_MODE_SCOPED, IREE_HAL_MEMORY_ACCESS_READ,
+        /*byte_offset=*/0, size, &mapped_memory));
     IREE_RETURN_IF_ERROR(
         ::iree::ExpectAllTrue(mapped_memory.contents, element_type));
-    iree_hal_buffer_unmap_range(&mapped_memory);
+    iree_status_ignore(iree_hal_buffer_unmap_range(&mapped_memory));
     return OkStatus();
   }
 
@@ -220,23 +220,26 @@ class CheckModuleState final {
     iree_hal_element_type_t rhs_element_type =
         iree_hal_buffer_view_element_type(rhs);
 
+    // HACK: this is all broken and will leak. Let's kill this entire module
+    // please.
+
     iree_hal_buffer_t* lhs_buf = iree_hal_buffer_view_buffer(lhs);
-    iree_hal_buffer_mapping_t lhs_mapped_memory;
+    iree_hal_buffer_mapping_t lhs_mapped_memory = {{0}};
     IREE_RETURN_IF_ERROR(iree_hal_buffer_map_range(
-        lhs_buf, IREE_HAL_MEMORY_ACCESS_READ,
+        lhs_buf, IREE_HAL_MAPPING_MODE_SCOPED, IREE_HAL_MEMORY_ACCESS_READ,
         /*byte_offset=*/0, lhs_size, &lhs_mapped_memory));
     iree_hal_buffer_t* rhs_buf = iree_hal_buffer_view_buffer(rhs);
-    iree_hal_buffer_mapping_t rhs_mapped_memory;
+    iree_hal_buffer_mapping_t rhs_mapped_memory = {{0}};
     IREE_RETURN_IF_ERROR(iree_hal_buffer_map_range(
-        rhs_buf, IREE_HAL_MEMORY_ACCESS_READ,
+        rhs_buf, IREE_HAL_MAPPING_MODE_SCOPED, IREE_HAL_MEMORY_ACCESS_READ,
         /*byte_offset=*/0, rhs_size, &rhs_mapped_memory));
 
     bool element_types_eq = lhs_element_type == rhs_element_type;
     bool shape_eq = lhs_shape == rhs_shape;
     bool contents_eq =
         EqByteSpan(lhs_mapped_memory.contents, rhs_mapped_memory.contents);
-    iree_hal_buffer_unmap_range(&lhs_mapped_memory);
-    iree_hal_buffer_unmap_range(&rhs_mapped_memory);
+    iree_status_ignore(iree_hal_buffer_unmap_range(&lhs_mapped_memory));
+    iree_status_ignore(iree_hal_buffer_unmap_range(&rhs_mapped_memory));
 
     if (!element_types_eq || !shape_eq || !contents_eq) {
       std::ostringstream os;
@@ -297,14 +300,14 @@ class CheckModuleState final {
         iree_hal_buffer_view_element_type(rhs);
 
     iree_hal_buffer_t* lhs_buf = iree_hal_buffer_view_buffer(lhs);
-    iree_hal_buffer_mapping_t lhs_mapped_memory;
+    iree_hal_buffer_mapping_t lhs_mapped_memory = {{0}};
     IREE_RETURN_IF_ERROR(iree_hal_buffer_map_range(
-        lhs_buf, IREE_HAL_MEMORY_ACCESS_READ,
+        lhs_buf, IREE_HAL_MAPPING_MODE_SCOPED, IREE_HAL_MEMORY_ACCESS_READ,
         /*byte_offset=*/0, lhs_size, &lhs_mapped_memory));
     iree_hal_buffer_t* rhs_buf = iree_hal_buffer_view_buffer(rhs);
-    iree_hal_buffer_mapping_t rhs_mapped_memory;
+    iree_hal_buffer_mapping_t rhs_mapped_memory = {{0}};
     IREE_RETURN_IF_ERROR(iree_hal_buffer_map_range(
-        rhs_buf, IREE_HAL_MEMORY_ACCESS_READ,
+        rhs_buf, IREE_HAL_MAPPING_MODE_SCOPED, IREE_HAL_MEMORY_ACCESS_READ,
         /*byte_offset=*/0, rhs_size, &rhs_mapped_memory));
 
     bool element_types_eq = lhs_element_type == rhs_element_type;
@@ -317,8 +320,8 @@ class CheckModuleState final {
           AlmostEqByteSpan(lhs_mapped_memory.contents,
                            rhs_mapped_memory.contents, lhs_element_type));
     }
-    iree_hal_buffer_unmap_range(&lhs_mapped_memory);
-    iree_hal_buffer_unmap_range(&rhs_mapped_memory);
+    iree_status_ignore(iree_hal_buffer_unmap_range(&lhs_mapped_memory));
+    iree_status_ignore(iree_hal_buffer_unmap_range(&rhs_mapped_memory));
 
     if (!element_types_eq || !shape_eq || !contents_could_be_almost_eq) {
       std::ostringstream os;

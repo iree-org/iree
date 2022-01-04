@@ -47,3 +47,21 @@ func @exportBufferView(%tensor: tensor<?x?x4xf32>, %dim0: index, %dim1: index) -
   // CHECK: return %[[RESULT]]
   return %0 : !hal.buffer_view
 }
+
+// -----
+
+// CHECK-LABEL: @exportBufferViewInPlace
+// CHECK-SAME: (%[[TENSOR:.+]]: !stream.resource<*>, %[[SIZE:.+]]: index, %[[DIM0:.+]]: index, %[[DIM1:.+]]: index, %[[STORAGE:.+]]: !hal.buffer)
+func @exportBufferViewInPlace(%tensor: tensor<?x?x4xf32>, %dim0: index, %dim1: index, %storage: !hal.buffer) -> !hal.buffer_view {
+  //      CHECK: %[[STORAGE_LENGTH:.+]] = hal.buffer.length<%[[STORAGE]]
+  // CHECK-NEXT: %[[STORAGE_IMPORT:.+]] = stream.tensor.import %[[STORAGE]]
+  // CHECK-SAME:   : !hal.buffer -> tensor<?x?x4xf32>{%[[DIM0]], %[[DIM1]]} in !stream.resource<external>{%[[STORAGE_LENGTH]]}
+  // CHECK-NEXT: %[[STORAGE_UPDATE:.+]] = stream.async.update %[[TENSOR]], %[[STORAGE_IMPORT]][%c0 to %[[SIZE]]]
+  // CHECK-SAME:   : !stream.resource<*>{%[[SIZE]]} -> %[[STORAGE_IMPORT]] as !stream.resource<external>{%[[STORAGE_LENGTH]]}
+  // CHECK-NEXT: %[[STORAGE_RESULT:.+]] = stream.tensor.export %[[STORAGE_UPDATE]] :
+  // CHECK-SAME:     tensor<?x?x4xf32>{%[[DIM0]], %[[DIM1]]} in !stream.resource<external>{%[[STORAGE_LENGTH]]}
+  // CHECK-SAME:     -> !hal.buffer_view
+  %0 = hal.tensor.export %tensor into %storage : tensor<?x?x4xf32>{%dim0, %dim1} -> !hal.buffer_view
+  // CHECK: return %[[STORAGE_RESULT]]
+  return %0 : !hal.buffer_view
+}
