@@ -125,6 +125,9 @@ iree_hal_allocator_query_buffer_compatibility(
     iree_hal_buffer_usage_t intended_usage, iree_device_size_t allocation_size);
 
 // Allocates a buffer from the allocator.
+// If |initial_data| is provided then the bytes will be copied into the device
+// buffer. To avoid the copy when constant data is used prefer
+// iree_hal_allocator_wrap_buffer when available.
 // Fails if the memory type requested for the given usage cannot be serviced.
 // Callers can use iree_hal_allocator_can_allocate to decide their memory use
 // strategy.
@@ -142,7 +145,7 @@ iree_hal_allocator_query_buffer_compatibility(
 IREE_API_EXPORT iree_status_t iree_hal_allocator_allocate_buffer(
     iree_hal_allocator_t* allocator, iree_hal_memory_type_t memory_type,
     iree_hal_buffer_usage_t allowed_usage, iree_host_size_t allocation_size,
-    iree_hal_buffer_t** out_buffer);
+    iree_const_byte_span_t initial_data, iree_hal_buffer_t** out_buffer);
 
 // Wraps an existing host allocation in a buffer.
 //
@@ -211,7 +214,7 @@ typedef struct iree_hal_allocator_vtable_t {
   iree_status_t(IREE_API_PTR* allocate_buffer)(
       iree_hal_allocator_t* allocator, iree_hal_memory_type_t memory_type,
       iree_hal_buffer_usage_t allowed_usage, iree_host_size_t allocation_size,
-      iree_hal_buffer_t** out_buffer);
+      iree_const_byte_span_t initial_data, iree_hal_buffer_t** out_buffer);
 
   iree_status_t(IREE_API_PTR* wrap_buffer)(
       iree_hal_allocator_t* allocator, iree_hal_memory_type_t memory_type,

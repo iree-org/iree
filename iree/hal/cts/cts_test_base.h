@@ -41,7 +41,7 @@ class CtsTestBase : public ::testing::TestWithParam<std::string> {
     iree_status_t status = TryGetDriver(driver_name, &driver);
     if (iree_status_is_unavailable(status)) {
       iree_status_free(status);
-      IREE_LOG(WARNING) << "Skipping test as << '" << driver_name
+      IREE_LOG(WARNING) << "Skipping test as '" << driver_name
                         << "' driver is unavailable";
       GTEST_SKIP();
       return;

@@ -140,7 +140,8 @@ enum iree_hal_buffer_usage_bits_t {
   // accesses will happen via command buffers.
   IREE_HAL_BUFFER_USAGE_TRANSFER = 1u << 1,
 
-  // The buffer can be mapped by the host application for reading and writing.
+  // The buffer can be mapped by the host application for reading and writing
+  // without a copy.
   //
   // As mapping may require placement in special address ranges or system
   // calls to enable visibility the driver can use the presence (or lack of)
@@ -169,11 +170,47 @@ typedef enum iree_hal_buffer_overlap_e {
   IREE_HAL_BUFFER_OVERLAP_COMPLETE,
 } iree_hal_buffer_overlap_t;
 
+// A bitfield specifying buffer transfer behavior.
+enum iree_hal_transfer_buffer_flag_bits_t {
+  // TODO(benvanik): flags controlling blocking, flushing, invalidation, and
+  // persistence. We may also want to set a bit that causes failure on emulated
+  // transfers that would otherwise be really expensive.
+  IREE_HAL_TRANSFER_BUFFER_FLAG_DEFAULT = 0,
+};
+typedef uint32_t iree_hal_transfer_buffer_flags_t;
+
+// Determines buffer mapping behavior.
 enum iree_hal_mapping_mode_bits_t {
+  // Buffers are mapped as part of a scoped map-access-unmap sequence.
+  // If there are any in-flight operations using the buffer contents are
+  // undefined though they may deceivingly still seem correct under certain
+  // implementations.
   IREE_HAL_MAPPING_MODE_SCOPED = 1u << 0,
+
+  // Buffers are mapped persistently and concurrently accessible by both the
+  // host and device. Mapping happens once and so long as there are any live
+  // mappings the buffer will remain accessible. Not all implementations or
+  // buffer memory types support this, and even ones that do may not support
+  // coherent cross-device sharing.
   IREE_HAL_MAPPING_MODE_PERSISTENT = 1u << 1,
 };
 typedef uint32_t iree_hal_mapping_mode_t;
+
+// Implementation-specific mapping data.
+typedef struct iree_hal_buffer_mapping_impl_t {
+  // Byte offset within the buffer where the mapped data begins.
+  iree_device_size_t byte_offset;
+  // Used for validation only.
+  iree_hal_memory_access_t allowed_access;
+  // Tracking flags.
+  uint32_t is_persistent : 1;
+  uint32_t reserved_flags : 31;
+  // Backing implementation data.
+  // For backends that require additional tracking (shadow data structures/etc)
+  // this can be used to store references to them for the duration of the
+  // mapping.
+  uint64_t reserved[1];
+} iree_hal_buffer_mapping_impl_t;
 
 // Reference to a buffer's mapped memory.
 typedef struct iree_hal_buffer_mapping_t {
@@ -185,8 +222,16 @@ typedef struct iree_hal_buffer_mapping_t {
   // accessed.
   iree_byte_span_t contents;
 
+  // Buffer providing the backing storage for the mapping.
+  // When mapped with IREE_HAL_MAPPING_MODE_SCOPED the buffer will be retained
+  // until it is unmapped. When mapped with IREE_HAL_MAPPING_MODE_PERSISTENT the
+  // caller is responsible for retaining the buffer.
+  struct iree_hal_buffer_t* buffer;
+
   // Used internally - do not modify.
-  uint64_t reserved[4];
+  // Implementations are allowed to use the reserved fields for their own
+  // storage but should otherwise ignore the remaining parts.
+  iree_hal_buffer_mapping_impl_t impl;
 } iree_hal_buffer_mapping_t;
 
 // Formats a memory type bitfield as a string.
@@ -389,7 +434,8 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_write_data(
 // Copies data from the provided |source_buffer| into the |target_buffer|.
 //
 // Requires that both buffers have the IREE_HAL_BUFFER_USAGE_MAPPING bit set.
-// The byte range in |target_buffer| will be flushed if needed.
+// The byte range in |target_buffer| will be flushed if needed. Both buffers
+// need not come from the same device.
 //
 // It is strongly recommended that buffer operations are performed on transfer
 // queues; using this synchronous function may incur additional cache flushes
@@ -411,16 +457,21 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_copy_data(
 // invalidate the byte range they want to access to update the visibility of the
 // mapped memory.
 IREE_API_EXPORT iree_status_t iree_hal_buffer_map_range(
-    iree_hal_buffer_t* buffer, iree_hal_memory_access_t memory_access,
-    iree_device_size_t byte_offset, iree_device_size_t byte_length,
+    iree_hal_buffer_t* buffer, iree_hal_mapping_mode_t mapping_mode,
+    iree_hal_memory_access_t memory_access, iree_device_size_t byte_offset,
+    iree_device_size_t byte_length,
     iree_hal_buffer_mapping_t* out_buffer_mapping);
 
 // Unmaps the buffer as was previously mapped to |buffer_mapping|.
 //
 // If the buffer is not IREE_HAL_MEMORY_TYPE_HOST_COHERENT then the caller must
 // flush the byte range they want to make available to other threads/devices.
-IREE_API_EXPORT void iree_hal_buffer_unmap_range(
-    iree_hal_buffer_mapping_t* buffer_mapping);
+//
+// May fail, though unlikely to do so for read-only mapping and the result can
+// be safely ignored using iree_status_ignore. If writing then users must check
+// the status to ensure their writes succeeded.
+IREE_API_EXPORT iree_status_t
+iree_hal_buffer_unmap_range(iree_hal_buffer_mapping_t* buffer_mapping);
 
 // Invalidates ranges of non-coherent memory from the host caches.
 // This guarantees that device writes to the memory ranges provided are
@@ -493,12 +544,12 @@ typedef struct iree_hal_buffer_vtable_t {
                                          iree_hal_memory_access_t memory_access,
                                          iree_device_size_t local_byte_offset,
                                          iree_device_size_t local_byte_length,
-                                         void** out_data_ptr);
+                                         iree_hal_buffer_mapping_t* mapping);
 
-  void(IREE_API_PTR* unmap_range)(iree_hal_buffer_t* buffer,
-                                  iree_device_size_t local_byte_offset,
-                                  iree_device_size_t local_byte_length,
-                                  void* data_ptr);
+  iree_status_t(IREE_API_PTR* unmap_range)(iree_hal_buffer_t* buffer,
+                                           iree_device_size_t local_byte_offset,
+                                           iree_device_size_t local_byte_length,
+                                           iree_hal_buffer_mapping_t* mapping);
 
   iree_status_t(IREE_API_PTR* invalidate_range)(
       iree_hal_buffer_t* buffer, iree_device_size_t local_byte_offset,

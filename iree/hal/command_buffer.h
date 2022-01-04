@@ -229,6 +229,12 @@ typedef struct iree_hal_command_buffer_validation_state_t {
   // TODO(benvanik): valid push constant bit ranges.
 } iree_hal_command_buffer_validation_state_t;
 
+// Maximum size of any update in iree_hal_command_buffer_update_buffer.
+// 64KB is the limit on Vulkan and we uniformly use that today across all
+// targets as to not need too much command buffer memory.
+#define IREE_HAL_COMMAND_BUFFER_MAX_UPDATE_SIZE \
+  ((iree_device_size_t)(64 * 1024))
+
 //===----------------------------------------------------------------------===//
 // iree_hal_command_buffer_t
 //===----------------------------------------------------------------------===//
@@ -491,6 +497,68 @@ IREE_API_EXPORT iree_status_t iree_hal_command_buffer_dispatch_indirect(
     iree_hal_command_buffer_t* command_buffer,
     iree_hal_executable_t* executable, int32_t entry_point,
     iree_hal_buffer_t* workgroups_buffer, iree_device_size_t workgroups_offset);
+
+//===----------------------------------------------------------------------===//
+// Utilities for command buffer creation
+//===----------------------------------------------------------------------===//
+
+// Defines a transfer command operation.
+typedef enum iree_hal_transfer_command_type_t {
+  // iree_hal_command_buffer_fill_buffer
+  IREE_HAL_TRANSFER_COMMAND_TYPE_FILL = 0u,
+  // iree_hal_command_buffer_copy_buffer
+  IREE_HAL_TRANSFER_COMMAND_TYPE_COPY = 1u,
+  // iree_hal_command_buffer_update_buffer
+  IREE_HAL_TRANSFER_COMMAND_TYPE_UPDATE = 2u,
+} iree_hal_transfer_command_type_t;
+
+// Represents a single transfer command within a batch of commands.
+typedef struct iree_hal_transfer_command_t {
+  // The type of the command selecting which of the payload data is used.
+  iree_hal_transfer_command_type_t type;
+  union {
+    // IREE_HAL_TRANSFER_COMMAND_TYPE_FILL
+    struct {
+      iree_hal_buffer_t* target_buffer;
+      iree_device_size_t target_offset;
+      iree_device_size_t length;
+      const void* pattern;
+      iree_host_size_t pattern_length;
+    } fill;
+    // IREE_HAL_TRANSFER_COMMAND_TYPE_COPY
+    struct {
+      iree_hal_buffer_t* source_buffer;
+      iree_device_size_t source_offset;
+      iree_hal_buffer_t* target_buffer;
+      iree_device_size_t target_offset;
+      iree_device_size_t length;
+    } copy;
+    // IREE_HAL_TRANSFER_COMMAND_TYPE_UPDATE
+    struct {
+      const void* source_buffer;
+      iree_host_size_t source_offset;
+      iree_hal_buffer_t* target_buffer;
+      iree_device_size_t target_offset;
+      iree_device_size_t length;
+    } update;
+  };
+} iree_hal_transfer_command_t;
+
+// Builds a command buffer containing a recording of all |transfer_commands|.
+// All buffers must be compatible with |device| and ranges must not overlap
+// (same as with memcpy). All commands are executed concurrently with no
+// barriers. The provided commands and any referenced data needs only remain
+// live during recording, while all referenced buffers must be kept live by
+// the caller until the command buffer has completed execution.
+//
+// This is just a utility to make it easier to quickly construct batches of
+// transfer operations. If more control is required then record the command
+// buffer as normal.
+IREE_API_EXPORT iree_status_t iree_hal_create_transfer_command_buffer(
+    iree_hal_device_t* device, iree_hal_command_buffer_mode_t mode,
+    iree_hal_queue_affinity_t queue_affinity, iree_host_size_t transfer_count,
+    const iree_hal_transfer_command_t* transfer_commands,
+    iree_hal_command_buffer_t** out_command_buffer);
 
 //===----------------------------------------------------------------------===//
 // iree_hal_command_buffer_t validation wrapper

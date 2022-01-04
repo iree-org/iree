@@ -525,6 +525,18 @@ IREE_API_EXPORT iree_status_t iree_status_ignore(iree_status_t status) {
   return iree_ok_status();
 }
 
+IREE_API_EXPORT iree_status_t iree_status_join(iree_status_t base_status,
+                                               iree_status_t new_status) {
+  // TODO(benvanik): annotate |base_status| with |new_status| so we see it?
+  // This is intended for failure handling and usually the first failure is the
+  // root cause and most important to see.
+  if (!iree_status_is_ok(base_status)) {
+    iree_status_ignore(new_status);
+    return base_status;
+  }
+  return new_status;
+}
+
 IREE_API_EXPORT IREE_ATTRIBUTE_NORETURN void iree_status_abort(
     iree_status_t status) {
   IREE_ASSERT(!iree_status_is_ok(status),

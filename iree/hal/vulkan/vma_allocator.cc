@@ -20,6 +20,7 @@ using namespace iree::hal::vulkan;
 
 typedef struct iree_hal_vulkan_vma_allocator_t {
   iree_hal_resource_t resource;
+  iree_hal_device_t* device;  // unretained to avoid cycles
   iree_allocator_t host_allocator;
   VmaAllocator vma;
 
@@ -82,11 +83,12 @@ static void VKAPI_PTR iree_hal_vulkan_vma_free_callback(
 
 iree_status_t iree_hal_vulkan_vma_allocator_create(
     VkInstance instance, VkPhysicalDevice physical_device,
-    VkDeviceHandle* logical_device, VmaRecordSettings record_settings,
-    iree_hal_allocator_t** out_allocator) {
+    VkDeviceHandle* logical_device, iree_hal_device_t* device,
+    VmaRecordSettings record_settings, iree_hal_allocator_t** out_allocator) {
   IREE_ASSERT_ARGUMENT(instance);
   IREE_ASSERT_ARGUMENT(physical_device);
   IREE_ASSERT_ARGUMENT(logical_device);
+  IREE_ASSERT_ARGUMENT(device);
   IREE_ASSERT_ARGUMENT(out_allocator);
   IREE_TRACE_ZONE_BEGIN(z0);
 
@@ -98,6 +100,7 @@ iree_status_t iree_hal_vulkan_vma_allocator_create(
   iree_hal_resource_initialize(&iree_hal_vulkan_vma_allocator_vtable,
                                &allocator->resource);
   allocator->host_allocator = host_allocator;
+  allocator->device = device;
 
   const auto& syms = logical_device->syms();
   VmaVulkanFunctions vulkan_fns;
@@ -220,11 +223,13 @@ iree_hal_vulkan_vma_allocator_query_buffer_compatibility(
   iree_hal_buffer_compatibility_t compatibility =
       IREE_HAL_BUFFER_COMPATIBILITY_ALLOCATABLE;
 
+  // All buffers can be used as transfer source/dest.
+  if (iree_all_bits_set(intended_usage, IREE_HAL_BUFFER_USAGE_TRANSFER)) {
+    compatibility |= IREE_HAL_BUFFER_COMPATIBILITY_QUEUE_TRANSFER;
+  }
+
   // Buffers can only be used on the queue if they are device visible.
   if (iree_all_bits_set(memory_type, IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE)) {
-    if (iree_all_bits_set(intended_usage, IREE_HAL_BUFFER_USAGE_TRANSFER)) {
-      compatibility |= IREE_HAL_BUFFER_COMPATIBILITY_QUEUE_TRANSFER;
-    }
     if (iree_all_bits_set(intended_usage, IREE_HAL_BUFFER_USAGE_DISPATCH)) {
       compatibility |= IREE_HAL_BUFFER_COMPATIBILITY_QUEUE_DISPATCH;
     }
@@ -244,7 +249,8 @@ static iree_status_t iree_hal_vulkan_vma_allocator_allocate_internal(
     iree_hal_vulkan_vma_allocator_t* allocator,
     iree_hal_memory_type_t memory_type, iree_hal_buffer_usage_t allowed_usage,
     iree_hal_memory_access_t allowed_access, iree_host_size_t allocation_size,
-    VmaAllocationCreateFlags flags, iree_hal_buffer_t** out_buffer) {
+    iree_const_byte_span_t initial_data, VmaAllocationCreateFlags flags,
+    iree_hal_buffer_t** out_buffer) {
   // Guard against the corner case where the requested buffer size is 0. The
   // application is unlikely to do anything when requesting a 0-byte buffer; but
   // it can happen in real world use cases. So we should at least not crash.
@@ -316,6 +322,9 @@ static iree_status_t iree_hal_vulkan_vma_allocator_allocate_internal(
     allocation_create_info.requiredFlags |= VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
   }
 
+  // TODO(benvanik): if on a unified memory system and initial data is present
+  // we could set the mapping bit and ensure a much more efficient upload.
+
   VkBuffer handle = VK_NULL_HANDLE;
   VmaAllocation allocation = VK_NULL_HANDLE;
   VmaAllocationInfo allocation_info;
@@ -324,18 +333,42 @@ static iree_status_t iree_hal_vulkan_vma_allocator_allocate_internal(
                                      &allocation, &allocation_info),
                      "vmaCreateBuffer");
 
-  return iree_hal_vulkan_vma_buffer_wrap(
+  iree_hal_buffer_t* buffer = NULL;
+  iree_status_t status = iree_hal_vulkan_vma_buffer_wrap(
       (iree_hal_allocator_t*)allocator, memory_type, allowed_access,
       allowed_usage, allocation_size,
       /*byte_offset=*/0,
       /*byte_length=*/allocation_size, allocator->vma, handle, allocation,
-      allocation_info, out_buffer);
+      allocation_info, &buffer);
+  if (!iree_status_is_ok(status)) {
+    vmaDestroyBuffer(allocator->vma, handle, allocation);
+    return status;
+  }
+
+  // Copy the initial contents into the buffer. This may require staging.
+  if (iree_status_is_ok(status) &&
+      !iree_const_byte_span_is_empty(initial_data)) {
+    status = iree_hal_device_transfer_range(
+        allocator->device,
+        iree_hal_make_host_transfer_buffer_span((void*)initial_data.data,
+                                                initial_data.data_length),
+        0, iree_hal_make_device_transfer_buffer(buffer), 0,
+        initial_data.data_length, IREE_HAL_TRANSFER_BUFFER_FLAG_DEFAULT,
+        iree_infinite_timeout());
+  }
+
+  if (iree_status_is_ok(status)) {
+    *out_buffer = buffer;
+  } else {
+    iree_hal_buffer_release(buffer);
+  }
+  return status;
 }
 
 static iree_status_t iree_hal_vulkan_vma_allocator_allocate_buffer(
     iree_hal_allocator_t* base_allocator, iree_hal_memory_type_t memory_type,
     iree_hal_buffer_usage_t allowed_usage, iree_host_size_t allocation_size,
-    iree_hal_buffer_t** out_buffer) {
+    iree_const_byte_span_t initial_data, iree_hal_buffer_t** out_buffer) {
   iree_hal_vulkan_vma_allocator_t* allocator =
       iree_hal_vulkan_vma_allocator_cast(base_allocator);
 
@@ -346,6 +379,7 @@ static iree_status_t iree_hal_vulkan_vma_allocator_allocate_buffer(
 
   return iree_hal_vulkan_vma_allocator_allocate_internal(
       allocator, memory_type, allowed_usage, allowed_access, allocation_size,
+      initial_data,
       /*flags=*/0, out_buffer);
 }
 

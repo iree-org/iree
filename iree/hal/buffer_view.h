@@ -7,9 +7,7 @@
 #ifndef IREE_HAL_BUFFER_VIEW_H_
 #define IREE_HAL_BUFFER_VIEW_H_
 
-#include <stdbool.h>
 #include <stdint.h>
-#include <stdio.h>
 
 #include "iree/base/api.h"
 #include "iree/hal/buffer.h"
@@ -156,35 +154,6 @@ typedef uint32_t iree_hal_encoding_type_t;
 typedef int32_t iree_hal_dim_t;
 
 //===----------------------------------------------------------------------===//
-// Buffer view math
-//===----------------------------------------------------------------------===//
-
-// Calculates the allocation size of a buffer view.
-IREE_API_EXPORT iree_status_t iree_hal_buffer_compute_view_size(
-    const iree_hal_dim_t* shape, iree_host_size_t shape_rank,
-    iree_hal_element_type_t element_type,
-    iree_hal_encoding_type_t encoding_type,
-    iree_device_size_t* out_allocation_size);
-
-// Calculates a byte offset into a buffer at the given indices.
-// Only works with densely-packed representations.
-IREE_API_EXPORT iree_status_t iree_hal_buffer_compute_view_offset(
-    const iree_hal_dim_t* shape, iree_host_size_t shape_rank,
-    iree_hal_element_type_t element_type,
-    iree_hal_encoding_type_t encoding_type, const iree_hal_dim_t* indices,
-    size_t indices_count, iree_device_size_t* out_offset);
-
-// Calculates a byte range into a buffer of the given contiguous range.
-// Only works with densely-packed representations.
-IREE_API_EXPORT iree_status_t iree_hal_buffer_compute_view_range(
-    const iree_hal_dim_t* shape, iree_host_size_t shape_rank,
-    iree_hal_element_type_t element_type,
-    iree_hal_encoding_type_t encoding_type, const iree_hal_dim_t* start_indices,
-    iree_host_size_t indices_count, const iree_hal_dim_t* lengths,
-    iree_host_size_t lengths_count, iree_device_size_t* out_start_offset,
-    iree_device_size_t* out_length);
-
-//===----------------------------------------------------------------------===//
 // iree_hal_buffer_view_t
 //===----------------------------------------------------------------------===//
 
@@ -203,69 +172,6 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_view_create(
     iree_host_size_t shape_rank, iree_hal_element_type_t element_type,
     iree_hal_encoding_type_t encoding_type, iree_allocator_t host_allocator,
     iree_hal_buffer_view_t** out_buffer_view);
-
-// Allocates a buffer from |allocator| and wraps it in a buffer view.
-// This is equivalent to:
-//   1. iree_hal_buffer_compute_view_size
-//   2. iree_hal_allocator_allocate_buffer
-//   3. iree_hal_buffer_view_create
-IREE_API_EXPORT iree_status_t iree_hal_buffer_view_allocate_buffer(
-    iree_hal_allocator_t* allocator, const iree_hal_dim_t* shape,
-    iree_host_size_t shape_rank, iree_hal_element_type_t element_type,
-    iree_hal_encoding_type_t encoding_type, iree_hal_memory_type_t memory_type,
-    iree_hal_buffer_usage_t allowed_usage,
-    iree_hal_buffer_view_t** out_buffer_view);
-
-// Clones a host buffer using |allocator| and wraps it in a buffer view.
-// This is equivalent to:
-//   1. iree_hal_allocator_allocate_buffer
-//   2. iree_hal_buffer_write_data
-//   3. iree_hal_buffer_view_create
-//
-// Always prefer allocating a device buffer and populating it in place.
-// If cloning multiple buffers it is better to use iree_hal_command_buffer_ts to
-// batch up the memory transfer operations.
-IREE_API_EXPORT iree_status_t iree_hal_buffer_view_clone_heap_buffer(
-    iree_hal_allocator_t* allocator, const iree_hal_dim_t* shape,
-    iree_host_size_t shape_rank, iree_hal_element_type_t element_type,
-    iree_hal_encoding_type_t encoding_type, iree_hal_memory_type_t memory_type,
-    iree_hal_buffer_usage_t allowed_usage, iree_const_byte_span_t data,
-    iree_hal_buffer_view_t** out_buffer_view);
-
-// Imports a host buffer using |allocator| and wraps it in a buffer view.
-// This is equivalent to:
-//   1. iree_hal_allocator_wrap_buffer
-//   2. iree_hal_buffer_view_create
-//
-// NOTE: not all buffers can be imported and not all allocators support
-// importing. See iree_hal_allocator_wrap_buffer for more information.
-// Fails if the buffer cannot be imported.
-IREE_API_EXPORT iree_status_t iree_hal_buffer_view_wrap_heap_buffer(
-    iree_hal_allocator_t* allocator, const iree_hal_dim_t* shape,
-    iree_host_size_t shape_rank, iree_hal_element_type_t element_type,
-    iree_hal_encoding_type_t encoding_type, iree_hal_memory_type_t memory_type,
-    iree_hal_memory_access_t allowed_access,
-    iree_hal_buffer_usage_t allowed_usage, iree_byte_span_t data,
-    iree_allocator_t data_allocator, iree_hal_buffer_view_t** out_buffer_view);
-
-// Tries to import a host buffer using |allocator| and wrap it in a buffer view.
-// If the buffer cannot be imported then a new buffer will be allocated and the
-// source data will be copied into it.
-// This is equivalent to:
-//   if iree_hal_allocator_query_buffer_compatibility ok:
-//     1. iree_hal_allocator_wrap_buffer
-//     2. iree_hal_buffer_view_create
-//   else:
-//     1. iree_hal_allocator_allocate_buffer
-//     2. iree_hal_buffer_write_data
-//     3. iree_hal_buffer_view_create
-IREE_API_EXPORT iree_status_t iree_hal_buffer_view_wrap_or_clone_heap_buffer(
-    iree_hal_allocator_t* allocator, const iree_hal_dim_t* shape,
-    iree_host_size_t shape_rank, iree_hal_element_type_t element_type,
-    iree_hal_encoding_type_t encoding_type, iree_hal_memory_type_t memory_type,
-    iree_hal_memory_access_t allowed_access,
-    iree_hal_buffer_usage_t allowed_usage, iree_byte_span_t data,
-    iree_allocator_t data_allocator, iree_hal_buffer_view_t** out_buffer_view);
 
 // Retains the given |buffer_view| for the caller.
 IREE_API_EXPORT void iree_hal_buffer_view_retain(
@@ -350,42 +256,6 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_view_compute_range(
     const iree_hal_dim_t* start_indices, iree_host_size_t indices_count,
     const iree_hal_dim_t* lengths, iree_host_size_t lengths_count,
     iree_device_size_t* out_start_offset, iree_device_size_t* out_length);
-
-// Parses a serialized set of buffer elements in the canonical tensor format
-// (the same as produced by iree_hal_buffer_view_format). The underlying buffer
-// will be allocated with |buffer_allocator| as a host-local/device-visible
-// buffer.
-IREE_API_EXPORT iree_status_t iree_hal_buffer_view_parse(
-    iree_string_view_t value, iree_hal_allocator_t* buffer_allocator,
-    iree_hal_buffer_view_t** out_buffer_view);
-
-// TODO(#5413): enum for printing mode (include shape, precision).
-
-// Converts buffer view elements into a fully-specified string-form format like
-// `2x4xi16=[[1 2][3 4]]`.
-//
-// |max_element_count| can be used to limit the total number of elements printed
-// when the count may be large. Elided elements will be replaced with `...`.
-//
-// |buffer_capacity| defines the size of |buffer| in bytes and
-// |out_buffer_length| will return the string length in characters. Returns
-// IREE_STATUS_OUT_OF_RANGE if the buffer capacity is insufficient to hold the
-// formatted elements and |out_buffer_length| will contain the required size.
-//
-// Follows the standard API string formatting rules. See iree/base/api.h.
-IREE_API_EXPORT iree_status_t iree_hal_buffer_view_format(
-    const iree_hal_buffer_view_t* buffer_view,
-    iree_host_size_t max_element_count, iree_host_size_t buffer_capacity,
-    char* buffer, iree_host_size_t* out_buffer_length);
-
-// Prints buffer view elements into a fully-specified string-form format like
-// `2x4xi16=[[1 2][3 4]]`.
-//
-// |max_element_count| can be used to limit the total number of elements printed
-// when the count may be large. Elided elements will be replaced with `...`.
-IREE_API_EXPORT iree_status_t iree_hal_buffer_view_fprint(
-    FILE* file, const iree_hal_buffer_view_t* buffer_view,
-    iree_host_size_t max_element_count);
 
 //===----------------------------------------------------------------------===//
 // iree_hal_buffer_view_t implementation details

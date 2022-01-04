@@ -87,8 +87,9 @@ static void iree_runtime_demo_perform_mul(iree_runtime_session_t* session) {
       IREE_HAL_MEMORY_ACCESS_READ, IREE_HAL_BUFFER_USAGE_ALL,
       iree_make_byte_span((void*)arg0_data, sizeof(arg0_data)),
       iree_allocator_null(), &arg0));
-  IREE_CHECK_OK(
-      iree_hal_buffer_view_fprint(stdout, arg0, /*max_element_count=*/4096));
+  IREE_CHECK_OK(iree_hal_buffer_view_fprint(
+      stdout, arg0, /*max_element_count=*/4096,
+      iree_runtime_session_host_allocator(session)));
   IREE_CHECK_OK(iree_runtime_call_inputs_push_back_buffer_view(&call, arg0));
   iree_hal_buffer_view_release(arg0);
 
@@ -106,8 +107,9 @@ static void iree_runtime_demo_perform_mul(iree_runtime_session_t* session) {
       IREE_HAL_MEMORY_ACCESS_READ, IREE_HAL_BUFFER_USAGE_ALL,
       iree_make_byte_span((void*)arg1_data, sizeof(arg1_data)),
       iree_allocator_null(), &arg1));
-  IREE_CHECK_OK(
-      iree_hal_buffer_view_fprint(stdout, arg1, /*max_element_count=*/4096));
+  IREE_CHECK_OK(iree_hal_buffer_view_fprint(
+      stdout, arg1, /*max_element_count=*/4096,
+      iree_runtime_session_host_allocator(session)));
   IREE_CHECK_OK(iree_runtime_call_inputs_push_back_buffer_view(&call, arg1));
   iree_hal_buffer_view_release(arg1);
 
@@ -118,8 +120,9 @@ static void iree_runtime_demo_perform_mul(iree_runtime_session_t* session) {
   // -> tensor<4xf32>
   iree_hal_buffer_view_t* ret0 = NULL;
   IREE_CHECK_OK(iree_runtime_call_outputs_pop_front_buffer_view(&call, &ret0));
-  IREE_CHECK_OK(
-      iree_hal_buffer_view_fprint(stdout, ret0, /*max_element_count=*/4096));
+  IREE_CHECK_OK(iree_hal_buffer_view_fprint(
+      stdout, ret0, /*max_element_count=*/4096,
+      iree_runtime_session_host_allocator(session)));
   iree_hal_buffer_view_release(ret0);
 
   iree_runtime_call_deinitialize(&call);

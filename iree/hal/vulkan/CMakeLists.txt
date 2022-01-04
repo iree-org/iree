@@ -84,6 +84,7 @@ iree_cc_library(
     iree::base::logging
     iree::base::tracing
     iree::hal
+    iree::hal::utils::buffer_transfer
     iree::hal::vulkan::builtin
     iree::hal::vulkan::util::arena
     iree::hal::vulkan::util::intrusive_list

@@ -74,6 +74,41 @@ typedef struct iree_hal_device_info_t {
   iree_string_view_t name;
 } iree_hal_device_info_t;
 
+// A transfer source or destination.
+typedef struct iree_hal_transfer_buffer_t {
+  // A host-allocated void* buffer.
+  iree_byte_span_t host_buffer;
+  // A device-allocated buffer (may be of any memory type).
+  iree_hal_buffer_t* device_buffer;
+} iree_hal_transfer_buffer_t;
+
+static inline iree_hal_transfer_buffer_t iree_hal_make_host_transfer_buffer(
+    iree_byte_span_t host_buffer) {
+  iree_hal_transfer_buffer_t transfer_buffer = {
+      host_buffer,
+      NULL,
+  };
+  return transfer_buffer;
+}
+
+static inline iree_hal_transfer_buffer_t
+iree_hal_make_host_transfer_buffer_span(void* ptr, iree_host_size_t length) {
+  iree_hal_transfer_buffer_t transfer_buffer = {
+      iree_make_byte_span(ptr, length),
+      NULL,
+  };
+  return transfer_buffer;
+}
+
+static inline iree_hal_transfer_buffer_t iree_hal_make_device_transfer_buffer(
+    iree_hal_buffer_t* device_buffer) {
+  iree_hal_transfer_buffer_t transfer_buffer = {
+      iree_byte_span_empty(),
+      device_buffer,
+  };
+  return transfer_buffer;
+}
+
 // A list of semaphores and their corresponding payloads.
 // When signaling each semaphore will be set to the new payload value provided.
 // When waiting each semaphore must reach or exceed the payload value.
@@ -172,6 +207,80 @@ iree_status_t iree_hal_device_trim(iree_hal_device_t* device);
 IREE_API_EXPORT iree_status_t iree_hal_device_query_i32(
     iree_hal_device_t* device, iree_string_view_t category,
     iree_string_view_t key, int32_t* out_value);
+
+// Synchronously transfers the given |source_buffer| to a device-local
+// buffer returned in |out_target_buffer|. Callers must release the target
+// buffer when no longer used. If the source buffer is already device-local it
+// will be returned without an allocation or copy occurring.
+//
+// This utility may incur signficant overhead and is present for simple tooling
+// and prototypes; when transfering multiple buffers users should always prefer
+// asynchronous command buffers submitted to device queues. Note too that the
+// entire buffer is transferred: if reading back smaller portions it is better
+// to perform these as ranged transfers to avoid the amount of data that needs
+// to be moved.
+IREE_API_EXPORT iree_status_t iree_hal_device_transfer_to_device(
+    iree_hal_device_t* device, iree_hal_buffer_t* source_buffer,
+    iree_hal_buffer_usage_t allowed_usage,
+    iree_hal_buffer_t** out_target_buffer);
+
+// Synchronously transfers the given |source_buffer| to a host-local
+// buffer returned in |out_target_buffer|. Callers must release the target
+// buffer when no longer used. If the source buffer is already host-local it
+// will be returned without an allocation or copy occurring.
+//
+// This utility may incur signficant overhead and is present for simple tooling
+// and prototypes; when transfering multiple buffers users should always prefer
+// asynchronous command buffers submitted to device queues.
+IREE_API_EXPORT iree_status_t iree_hal_device_transfer_to_host(
+    iree_hal_device_t* device, iree_hal_buffer_t* source_buffer,
+    iree_hal_buffer_t** out_target_buffer);
+
+// Synchronously copies data from |source| into |target|.
+//
+// Supports host->device, device->host, and device->device transfer,
+// including across devices. This method will never fail based on device
+// capabilities but may incur some extreme transient allocations and copies in
+// order to perform the transfer.
+//
+// The ordering of the transfer is undefined with respect to queue execution on
+// the source or target device; some may require full device flushes in order to
+// perform this operation while others may immediately perform it while there is
+// still work outstanding.
+//
+// It is strongly recommended that buffer operations are performed on transfer
+// queues; using this synchronous function may incur additional cache flushes
+// and synchronous blocking behavior and is not supported on all buffer types.
+// See iree_hal_command_buffer_copy_buffer.
+IREE_API_EXPORT iree_status_t iree_hal_device_transfer_range(
+    iree_hal_device_t* device, iree_hal_transfer_buffer_t source,
+    iree_device_size_t source_offset, iree_hal_transfer_buffer_t target,
+    iree_device_size_t target_offset, iree_device_size_t data_length,
+    iree_hal_transfer_buffer_flags_t flags, iree_timeout_t timeout);
+
+// Synchronously executes one or more transfer operations against a queue.
+// All buffers must be compatible with |device| and ranges must not overlap
+// (same as with memcpy).
+//
+// This is a blocking operation and may incur significant overheads as
+// internally it issues a command buffer with the transfer operations and waits
+// for it to complete. Users should do that themselves so that the work can be
+// issued concurrently and batched effectively. This is only useful as a
+// fallback for implementations that require it or tools where things like I/O
+// are transferred without worrying about performance. When submitting other
+// work it's preferable to use iree_hal_create_transfer_command_buffer and a
+// normal queue submission that allows for more fine-grained sequencing and
+// amortizes the submission cost by batching other work.
+//
+// The transfer will begin after the optional |wait_semaphore| reaches
+// |wait_value|. Behavior is undefined if no semaphore is provided and there are
+// in-flight operations concurrently using the buffer ranges.
+// Returns only after all transfers have completed and been flushed.
+IREE_API_EXPORT iree_status_t iree_hal_device_transfer_and_wait(
+    iree_hal_device_t* device, iree_hal_semaphore_t* wait_semaphore,
+    uint64_t wait_value, iree_host_size_t transfer_count,
+    const iree_hal_transfer_command_t* transfer_commands,
+    iree_timeout_t timeout);
 
 // Submits one or more batches of work to a device queue.
 //
@@ -300,6 +409,12 @@ typedef struct iree_hal_device_vtable_t {
   iree_status_t(IREE_API_PTR* create_semaphore)(
       iree_hal_device_t* device, uint64_t initial_value,
       iree_hal_semaphore_t** out_semaphore);
+
+  iree_status_t(IREE_API_PTR* transfer_range)(
+      iree_hal_device_t* device, iree_hal_transfer_buffer_t source,
+      iree_device_size_t source_offset, iree_hal_transfer_buffer_t target,
+      iree_device_size_t target_offset, iree_device_size_t data_length,
+      iree_hal_transfer_buffer_flags_t flags, iree_timeout_t timeout);
 
   iree_status_t(IREE_API_PTR* queue_submit)(
       iree_hal_device_t* device, iree_hal_command_category_t command_categories,

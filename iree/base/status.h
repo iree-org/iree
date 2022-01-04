@@ -379,6 +379,16 @@ IREE_API_EXPORT void iree_status_free(iree_status_t status);
 // Returns an OK status that can be used when chaining.
 IREE_API_EXPORT iree_status_t iree_status_ignore(iree_status_t status);
 
+// Returns a new status that is |base_status| if not OK and otherwise returns
+// |new_status|. This allows for chaining failure handling code that may also
+// return statuses.
+//
+// Example:
+//   iree_status_t status = do_something();
+//   return iree_status_join(status, do_cleanup());
+IREE_API_EXPORT iree_status_t iree_status_join(iree_status_t base_status,
+                                               iree_status_t new_status);
+
 // Aborts the program with a failing |status|.
 // This will trigger a SIGABRT. It's best not to use this at all outside of
 // demos or tools.
