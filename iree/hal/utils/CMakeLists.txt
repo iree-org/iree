@@ -39,4 +39,45 @@ iree_cc_library(
   PUBLIC
 )
 
+iree_cc_library(
+  NAME
+    resource_set
+  HDRS
+    "resource_set.h"
+  SRCS
+    "resource_set.c"
+  DEPS
+    iree::base
+    iree::base::internal::arena
+    iree::base::tracing
+    iree::hal
+  PUBLIC
+)
+
+iree_cc_test(
+  NAME
+    resource_set_benchmark
+  SRCS
+    "resource_set_benchmark.c"
+  DEPS
+    ::resource_set
+    iree::base
+    iree::base::internal::prng
+    iree::hal
+    iree::testing::benchmark
+)
+
+iree_cc_test(
+  NAME
+    resource_set_test
+  SRCS
+    "resource_set_test.cc"
+  DEPS
+    ::resource_set
+    iree::base
+    iree::hal
+    iree::testing::gtest
+    iree::testing::gtest_main
+)
+
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

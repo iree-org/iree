@@ -64,8 +64,7 @@ iree_status_t iree_arena_block_pool_acquire(iree_arena_block_pool_t* block_pool,
         z0, iree_allocator_malloc_uninitialized(block_pool->block_allocator,
                                                 block_pool->total_block_size,
                                                 (void**)&block_base));
-    block = (iree_arena_block_t*)(block_base + (block_pool->total_block_size -
-                                                sizeof(iree_arena_block_t)));
+    block = (iree_arena_block_t*)(block_base + block_pool->usable_block_size);
   }
 
   block->next = NULL;
