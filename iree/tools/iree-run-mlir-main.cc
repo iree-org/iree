@@ -162,8 +162,7 @@ Status GetTargetBackends(std::vector<std::string>* out_target_backends) {
   IREE_TRACE_SCOPE();
   out_target_backends->clear();
   auto target_backends =
-      mlir::iree_compiler::IREE::HAL::TargetOptions::FromFlags::getRegistered()
-          .targets;
+      mlir::iree_compiler::IREE::HAL::TargetOptions::FromFlags::get().targets;
   if (target_backends.empty()) {
     iree_allocator_t host_allocator = iree_allocator_system();
     iree_hal_driver_info_t* driver_infos = NULL;
@@ -219,8 +218,8 @@ Status PrepareModule(std::string target_backend,
     mlir_module->dump();
   }
 
-  auto bytecode_options = mlir::iree_compiler::IREE::VM::BytecodeTargetOptions::
-      FromFlags::getRegistered();
+  auto bytecode_options =
+      mlir::iree_compiler::IREE::VM::BytecodeTargetOptions::FromFlags::get();
   std::string binary_contents;
   llvm::raw_string_ostream binary_output(binary_contents);
   if (failed(mlir::iree_compiler::IREE::VM::translateModuleToBytecode(
@@ -502,8 +501,7 @@ extern "C" int main(int argc, char** argv) {
   mlir::iree_compiler::registerIREEVMTranslationFlags();
   mlir::registerLLVMDialectTranslation(registry);
   // Make sure command line options are registered.
-  (void)
-      mlir::iree_compiler::IREE::HAL::TargetOptions::FromFlags::getRegistered();
+  (void)mlir::iree_compiler::IREE::HAL::TargetOptions::FromFlags::get();
 
   // Register MLIRContext command-line options like
   // -mlir-print-op-on-diagnostic.
