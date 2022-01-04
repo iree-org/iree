@@ -78,6 +78,7 @@ class NativeModule {
     interface_.alloc_state = NativeModule::ModuleAllocState;
     interface_.free_state = NativeModule::ModuleFreeState;
     interface_.resolve_import = NativeModule::ModuleResolveImport;
+    interface_.notify = NativeModule::ModuleNotify;
     interface_.begin_call = NativeModule::ModuleBeginCall;
   }
 
@@ -90,6 +91,11 @@ class NativeModule {
   // Creates a new per-context module State holder.
   virtual StatusOr<std::unique_ptr<State>> CreateState(
       iree_allocator_t allocator) = 0;
+
+  // Notifies the module a signal has been raised.
+  virtual Status Notify(State* state, iree_vm_signal_t signal) {
+    return OkStatus();
+  }
 
  private:
   static NativeModule* FromModulePointer(void* self) {
@@ -199,6 +205,13 @@ class NativeModule {
       const iree_vm_function_signature_t* signature) {
     return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
                             "C++ API does not support imports");
+  }
+
+  static iree_status_t ModuleNotify(void* self,
+                                    iree_vm_module_state_t* module_state,
+                                    iree_vm_signal_t signal) {
+    auto* module = FromModulePointer(self);
+    return module->Notify(FromStatePointer(module_state), signal);
   }
 
   static iree_status_t ModuleBeginCall(void* self, iree_vm_stack_t* stack,

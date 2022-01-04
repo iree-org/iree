@@ -33,6 +33,15 @@ IREE_API_EXPORT iree_hal_allocator_t* iree_hal_device_allocator(
   return _VTABLE_DISPATCH(device, device_allocator)(device);
 }
 
+IREE_API_EXPORT
+iree_status_t iree_hal_device_trim(iree_hal_device_t* device) {
+  IREE_ASSERT_ARGUMENT(device);
+  IREE_TRACE_ZONE_BEGIN(z0);
+  iree_status_t status = _VTABLE_DISPATCH(device, trim)(device);
+  IREE_TRACE_ZONE_END(z0);
+  return status;
+}
+
 IREE_API_EXPORT iree_status_t iree_hal_device_query_i32(
     iree_hal_device_t* device, iree_string_view_t category,
     iree_string_view_t key, int32_t* out_value) {

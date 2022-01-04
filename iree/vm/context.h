@@ -106,6 +106,10 @@ IREE_API_EXPORT iree_status_t iree_vm_context_resolve_function(
     const iree_vm_context_t* context, iree_string_view_t full_name,
     iree_vm_function_t* out_function);
 
+// Notifies all modules in the context of a system signal.
+IREE_API_EXPORT iree_status_t iree_vm_context_notify(iree_vm_context_t* context,
+                                                     iree_vm_signal_t signal);
+
 #ifdef __cplusplus
 }  // extern "C"
 #endif  // __cplusplus

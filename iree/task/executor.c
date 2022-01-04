@@ -211,6 +211,15 @@ void iree_task_executor_release(iree_task_executor_t* executor) {
   }
 }
 
+void iree_task_executor_trim(iree_task_executor_t* executor) {
+  // TODO(benvanik): figure out a good way to do this; the pools require that
+  // no tasks are in-flight to trim but our caller can't reliably make that
+  // guarantee. We'd need some global executor lock that we did here and
+  // on submit - or rework pools to not have this limitation.
+  // iree_task_pool_trim(&executor->fence_task_pool);
+  // iree_task_pool_trim(&executor->dispatch_task_pool);
+}
+
 iree_status_t iree_task_executor_acquire_fence(iree_task_executor_t* executor,
                                                iree_task_scope_t* scope,
                                                iree_task_fence_t** out_fence) {

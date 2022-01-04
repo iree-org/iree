@@ -192,6 +192,14 @@ static iree_hal_allocator_t* iree_hal_task_device_allocator(
   return device->device_allocator;
 }
 
+static iree_status_t iree_hal_task_device_trim(iree_hal_device_t* base_device) {
+  iree_hal_task_device_t* device = iree_hal_task_device_cast(base_device);
+  iree_arena_block_pool_trim(&device->small_block_pool);
+  iree_arena_block_pool_trim(&device->large_block_pool);
+  iree_task_executor_trim(device->executor);
+  return iree_hal_allocator_trim(device->device_allocator);
+}
+
 static iree_status_t iree_hal_task_device_query_i32(
     iree_hal_device_t* base_device, iree_string_view_t category,
     iree_string_view_t key, int32_t* out_value) {
@@ -350,6 +358,7 @@ static const iree_hal_device_vtable_t iree_hal_task_device_vtable = {
     .id = iree_hal_task_device_id,
     .host_allocator = iree_hal_task_device_host_allocator,
     .device_allocator = iree_hal_task_device_allocator,
+    .trim = iree_hal_task_device_trim,
     .query_i32 = iree_hal_task_device_query_i32,
     .create_command_buffer = iree_hal_task_device_create_command_buffer,
     .create_descriptor_set = iree_hal_task_device_create_descriptor_set,

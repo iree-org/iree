@@ -144,6 +144,12 @@ iree_hal_device_host_allocator(iree_hal_device_t* device);
 IREE_API_EXPORT iree_hal_allocator_t* iree_hal_device_allocator(
     iree_hal_device_t* device);
 
+// Trims pools and caches used by the HAL to the minimum required for live
+// allocations. This can be used on low-memory conditions or when
+// suspending/parking instances.
+IREE_API_EXPORT
+iree_status_t iree_hal_device_trim(iree_hal_device_t* device);
+
 // Queries a configuration value as an int32_t.
 // The |category| and |key| will be provided to the device driver to interpret
 // in a device-specific way and if recognized the value will be converted to an
@@ -251,6 +257,8 @@ typedef struct iree_hal_device_vtable_t {
   iree_allocator_t(IREE_API_PTR* host_allocator)(iree_hal_device_t* device);
   iree_hal_allocator_t*(IREE_API_PTR* device_allocator)(
       iree_hal_device_t* device);
+
+  iree_status_t(IREE_API_PTR* trim)(iree_hal_device_t* device);
 
   iree_status_t(IREE_API_PTR* query_i32)(iree_hal_device_t* device,
                                          iree_string_view_t category,
