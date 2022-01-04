@@ -67,9 +67,6 @@ iree_status_t iree_hal_cuda_graph_command_buffer_create(
   IREE_ASSERT_ARGUMENT(out_command_buffer);
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  CUgraph graph = NULL;
-  CUDA_RETURN_IF_ERROR(context->syms, cuGraphCreate(&graph, /*flags=*/0),
-                       "cuGraphCreate");
   iree_hal_cuda_graph_command_buffer_t* command_buffer = NULL;
   size_t total_size = sizeof(*command_buffer) +
                       IREE_HAL_CUDA_MAX_KERNEL_ARG * sizeof(void*) +
@@ -82,7 +79,7 @@ iree_status_t iree_hal_cuda_graph_command_buffer_create(
         &iree_hal_cuda_graph_command_buffer_vtable, &command_buffer->base);
     command_buffer->context = context;
     command_buffer->block_pool = block_pool;
-    command_buffer->graph = graph;
+    command_buffer->graph = NULL;
     command_buffer->exec = NULL;
     command_buffer->last_node = NULL;
 
@@ -100,11 +97,29 @@ iree_status_t iree_hal_cuda_graph_command_buffer_create(
   if (iree_status_is_ok(status)) {
     *out_command_buffer = &command_buffer->base;
   } else {
-    context->syms->cuGraphDestroy(graph);
+    iree_hal_command_buffer_release(&command_buffer->base);
   }
-
   IREE_TRACE_ZONE_END(z0);
   return status;
+}
+
+static void iree_hal_cuda_graph_command_buffer_reset(
+    iree_hal_cuda_graph_command_buffer_t* command_buffer) {
+  if (command_buffer->graph != NULL) {
+    CUDA_IGNORE_ERROR(command_buffer->context->syms,
+                      cuGraphDestroy(command_buffer->graph));
+    command_buffer->graph = NULL;
+  }
+
+  if (command_buffer->exec != NULL) {
+    CUDA_IGNORE_ERROR(command_buffer->context->syms,
+                      cuGraphExecDestroy(command_buffer->exec));
+    command_buffer->exec = NULL;
+  }
+
+  command_buffer->last_node = NULL;
+
+  iree_hal_resource_set_reset(command_buffer->resource_set);
 }
 
 static void iree_hal_cuda_graph_command_buffer_destroy(
@@ -113,14 +128,7 @@ static void iree_hal_cuda_graph_command_buffer_destroy(
       iree_hal_cuda_graph_command_buffer_cast(base_command_buffer);
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  if (command_buffer->graph != NULL) {
-    CUDA_IGNORE_ERROR(command_buffer->context->syms,
-                      cuGraphDestroy(command_buffer->graph));
-  }
-  if (command_buffer->exec != NULL) {
-    CUDA_IGNORE_ERROR(command_buffer->context->syms,
-                      cuGraphExecDestroy(command_buffer->exec));
-  }
+  iree_hal_cuda_graph_command_buffer_reset(command_buffer);
   iree_hal_resource_set_free(command_buffer->resource_set);
   iree_allocator_free(command_buffer->context->host_allocator, command_buffer);
 
@@ -153,13 +161,15 @@ static iree_status_t iree_hal_cuda_graph_command_buffer_begin(
     iree_hal_command_buffer_t* base_command_buffer) {
   iree_hal_cuda_graph_command_buffer_t* command_buffer =
       iree_hal_cuda_graph_command_buffer_cast(base_command_buffer);
-  // TODO(thomasroux): reset existing state, if present. Right now this leaks.
-  if (command_buffer->graph) {
-    return iree_make_status(
-        IREE_STATUS_UNIMPLEMENTED,
-        "rerecording of command buffers not yet supported with CUDA graphs");
-  }
-  iree_hal_resource_set_reset(command_buffer->resource_set);
+
+  // Reset any prior recorded commands.
+  iree_hal_cuda_graph_command_buffer_reset(command_buffer);
+
+  // Create a new empty graph to record into.
+  CUDA_RETURN_IF_ERROR(command_buffer->context->syms,
+                       cuGraphCreate(&command_buffer->graph, /*flags=*/0),
+                       "cuGraphCreate");
+
   return iree_ok_status();
 }
 
@@ -168,23 +178,24 @@ static iree_status_t iree_hal_cuda_graph_command_buffer_end(
   iree_hal_cuda_graph_command_buffer_t* command_buffer =
       iree_hal_cuda_graph_command_buffer_cast(base_command_buffer);
 
-  size_t num_nodes;
-  CUDA_RETURN_IF_ERROR(command_buffer->context->syms,
-                       cuGraphGetNodes(command_buffer->graph, NULL, &num_nodes),
-                       "cuGraphGetNodes");
+  // Reset state used during recording.
+  command_buffer->last_node = NULL;
 
-  CUgraphNode error_node;
+  // Compile the graph.
+  CUgraphNode error_node = NULL;
   iree_status_t status =
       CU_RESULT_TO_STATUS(command_buffer->context->syms,
                           cuGraphInstantiate(&command_buffer->exec,
                                              command_buffer->graph, &error_node,
                                              /*logBuffer=*/NULL,
-                                             /* bufferSize=*/0));
+                                             /*bufferSize=*/0));
   if (iree_status_is_ok(status)) {
+    // No longer need the source graph used for construction.
     CUDA_IGNORE_ERROR(command_buffer->context->syms,
                       cuGraphDestroy(command_buffer->graph));
+    command_buffer->graph = NULL;
   }
-  command_buffer->graph = NULL;
+
   return iree_ok_status();
 }
 
