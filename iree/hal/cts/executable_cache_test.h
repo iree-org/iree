@@ -14,24 +14,6 @@
 #include "iree/testing/gtest.h"
 #include "iree/testing/status_matchers.h"
 
-// TODO(scotttodd): include a header for this (shared with generate_embed_data)?
-#ifndef IREE_FILE_TOC
-#define IREE_FILE_TOC
-
-extern "C" {
-typedef struct iree_file_toc_t {
-  const char* name;
-  const char* data;
-  size_t size;
-} iree_file_toc_t;
-}
-
-#endif  // IREE_FILE_TOC
-
-extern "C" {
-const iree_file_toc_t* iree_cts_testdata_abs_create();
-}
-
 namespace iree {
 namespace hal {
 namespace cts {
@@ -82,9 +64,7 @@ TEST_P(executable_cache_test, PrepareExecutable) {
       IREE_HAL_EXECUTABLE_CACHING_MODE_ALIAS_PROVIDED_DATA;
   executable_spec.executable_format =
       iree_make_cstring_view(get_test_executable_format());
-  auto* toc = iree_cts_testdata_abs_create();
-  executable_spec.executable_data =
-      iree_make_const_byte_span(toc->data, toc->size);
+  executable_spec.executable_data = get_executable_data_abs();
   executable_spec.executable_layout_count = 1;
   executable_spec.executable_layouts = &executable_layout;
 

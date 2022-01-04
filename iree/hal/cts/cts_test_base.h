@@ -19,13 +19,17 @@ namespace iree {
 namespace hal {
 namespace cts {
 
-// Leaf test binaries must implement this function, registering the driver
-// that will be used with INSTANTIATE_TEST_SUITE_P.
+// Registers the driver that will be used with INSTANTIATE_TEST_SUITE_P.
+// Leaf test binaries must implement this function.
 iree_status_t register_test_driver(iree_hal_driver_registry_t* registry);
 
-// Leaf test binaries must implement this function, returning the executable
-// format for the driver under test.
+// Returns the executable format for the driver under test.
+// Leaf test binaries must implement this function.
 const char* get_test_executable_format();
+
+// Returns executable data for testdata/abs.mlir for the driver under test.
+// Leaf test binaries must implement this function.
+iree_const_byte_span_t get_executable_data_abs();
 
 // Common setup for tests parameterized on driver names.
 class CtsTestBase : public ::testing::TestWithParam<std::string> {

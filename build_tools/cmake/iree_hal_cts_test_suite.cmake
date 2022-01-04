@@ -139,6 +139,10 @@ function(iree_hal_cts_test_suite)
     set(IREE_CTS_TEST_CLASS_NAME "${_TEST_NAME}_test")
     set(IREE_CTS_DRIVER_NAME "${_RULE_DRIVER_NAME}")
     set(IREE_CTS_EXECUTABLE_FORMAT "${_RULE_EXECUTABLE_FORMAT}")
+    if(_ENABLE_EXECUTABLE_TESTS)
+      set(IREE_CTS_EXECUTABLE_ABS_HDR "abs_executable_${_RULE_COMPILER_TARGET_BACKEND}_c.h")
+    endif()
+
     configure_file(
       "${IREE_ROOT_DIR}/iree/hal/cts/cts_test_template.cc.in"
       ${_TEST_SOURCE_NAME}

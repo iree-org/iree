@@ -11,6 +11,7 @@
 #cmakedefine IREE_CTS_TEST_CLASS_NAME @IREE_CTS_TEST_CLASS_NAME@
 #cmakedefine IREE_CTS_DRIVER_NAME "@IREE_CTS_DRIVER_NAME@"
 #cmakedefine IREE_CTS_EXECUTABLE_FORMAT @IREE_CTS_EXECUTABLE_FORMAT@
+#cmakedefine IREE_CTS_EXECUTABLE_ABS_HDR "@IREE_CTS_EXECUTABLE_ABS_HDR@"
 // clang-format on
 
 #include IREE_CTS_TEST_FILE_PATH
@@ -18,6 +19,10 @@
 #include IREE_CTS_DRIVER_REGISTRATION_HDR
 #include "iree/hal/cts/cts_test_base.h"
 #include "iree/testing/gtest.h"
+
+#ifdef IREE_CTS_EXECUTABLE_ABS_HDR
+#include IREE_CTS_EXECUTABLE_ABS_HDR
+#endif
 
 namespace iree {
 namespace hal {
@@ -27,7 +32,22 @@ iree_status_t register_test_driver(iree_hal_driver_registry_t* registry) {
   return IREE_CTS_DRIVER_REGISTRATION_FN(registry);
 }
 
-const char* get_test_executable_format() { return IREE_CTS_EXECUTABLE_FORMAT; }
+const char* get_test_executable_format() {
+#ifdef IREE_CTS_EXECUTABLE_FORMAT
+  return IREE_CTS_EXECUTABLE_FORMAT;
+#else
+  return "UNDEFINED";
+#endif
+}
+
+iree_const_byte_span_t get_executable_data_abs() {
+#ifdef IREE_CTS_EXECUTABLE_ABS_HDR
+  auto* toc = iree_cts_testdata_abs_create();
+  return iree_make_const_byte_span(toc->data, toc->size);
+#else
+  return {NULL, 0};
+#endif
+}
 
 INSTANTIATE_TEST_SUITE_P(CTS, IREE_CTS_TEST_CLASS_NAME,
                          ::testing::Values(IREE_CTS_DRIVER_NAME),
