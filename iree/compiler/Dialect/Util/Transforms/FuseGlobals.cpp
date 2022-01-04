@@ -15,6 +15,7 @@
 #include "llvm/ADT/EquivalenceClasses.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/Debug.h"
+#include "mlir/IR/AsmState.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
@@ -73,6 +74,14 @@ struct GlobalTable {
   }
 };
 
+static llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
+                                     llvm::BitVector &bits) {
+  for (unsigned i = 0; i < bits.size(); ++i) {
+    os << (bits.test(i) ? "1" : "0");
+  }
+  return os;
+}
+
 // Fuses globals that are always set to the same value into one.
 //
 // Example:
@@ -111,17 +120,33 @@ class FuseGlobalsPass
     // Note that we are only looking for stores within the same block - we
     // expect other canonicalizations to have moved stores into the same block
     // that are guaranteed to be on the same execution path.
+    //
+    //
     DenseMap<StringRef, llvm::BitVector> correlationMap;
     llvm::BitVector tempBits(globalTable.size());
     for (auto callableOp : moduleOp.getOps<CallableOpInterface>()) {
+      LLVM_DEBUG(llvm::dbgs()
+                 << "FuseGlobals: analyzing " << callableOp << ":\n");
       for (auto &block : *callableOp.getCallableRegion()) {
         DenseMap<Value, SmallVector<IREE::Util::GlobalStoreOp>> valueStores;
         for (auto storeOp : block.getOps<IREE::Util::GlobalStoreOp>()) {
           auto &global = globalTable.globalMap[storeOp.global()];
+          LLVM_DEBUG(llvm::dbgs()
+                     << " - store #" << global.ordinal << ": " << storeOp
+                     << "; candidate=" << global.isCandidate() << "\n");
           if (!global.isCandidate()) continue;
           valueStores[storeOp.value()].push_back(storeOp);
         }
         for (auto valueStore : valueStores) {
+          LLVM_DEBUG({
+            AsmState asmState(callableOp);
+            llvm::dbgs() << "= storing value ";
+            valueStore.first.printAsOperand(llvm::dbgs(), asmState);
+            llvm::dbgs() << ":\n";
+            for (auto storeOp : valueStore.second) {
+              LLVM_DEBUG(llvm::dbgs() << " => @" << storeOp.global() << "\n");
+            }
+          });
           tempBits.reset();
           for (auto storeOp : valueStore.second) {
             auto &global = globalTable.globalMap[storeOp.global()];
@@ -138,6 +163,43 @@ class FuseGlobalsPass
         }
       }
     }
+
+    // Resolve which globals are always set to the same value.
+    // This ensures that if @a is set to @b that @b is also set to @a.
+    // TODO(benvanik): find a better data structure that avoids the need for
+    // this cleanup step. We should be able to do this during construction.
+    for (auto it : correlationMap) {
+      auto globalName = it.first;
+      auto &correlationBits = it.second;
+      auto &global = globalTable.globalMap[globalName];
+      llvm::BitVector tempBits = correlationBits;
+      for (auto ordinal : correlationBits.set_bits()) {
+        auto &otherGlobalName = globalTable.globalOrder[ordinal];
+        if (otherGlobalName == globalName) continue;
+        auto &otherBits = correlationMap[otherGlobalName];
+        tempBits &= otherBits;
+      }
+      if (!tempBits.test(global.ordinal)) {
+        // If the global we are analyzing isn't correlated with itself then we
+        // can't modify it at all.
+        tempBits.reset();
+      }
+      correlationMap[globalName] = tempBits;
+    }
+
+    LLVM_DEBUG({
+      llvm::dbgs() << "FuseGlobals correlation maps:\n";
+      for (auto it : correlationMap) {
+        auto globalName = it.first;
+        auto &correlationBits = it.second;
+        auto &global = globalTable.globalMap[globalName];
+        llvm::dbgs() << "= #" << global.ordinal << " " << global.op.getName()
+                     << " = " << correlationBits << ":\n";
+        for (auto ordinal : correlationBits.set_bits()) {
+          llvm::dbgs() << "  => " << globalTable.globalOrder[ordinal] << "\n";
+        }
+      }
+    });
 
     // Build equivalence classes for each global, giving us nice clustered sets.
     // We could probably fold this with the step above but my head hurts.
