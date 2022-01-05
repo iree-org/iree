@@ -12,7 +12,6 @@
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Diagnostics.h"
-#include "mlir/IR/Identifier.h"
 #include "mlir/IR/Location.h"
 
 namespace mlir {

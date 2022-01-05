@@ -131,12 +131,12 @@ static LogicalResult setContractConfig(FuncOp entryPoint, linalg::LinalgOp op) {
       break;
     }
   }
-  SmallVector<AffineExpr> exprs;
+  SmallVector<unsigned> exprs;
   op.getReductionDims(exprs);
   if (exprs.size() == 1) {
     for (unsigned i = 0; i < lhsShape.size(); i++) {
       if (op.getTiedIndexingMap(op.getInputOperand(0)).getDimPosition(i) ==
-          exprs[0].cast<AffineDimExpr>().getPosition()) {
+          exprs[0]) {
         sizeK = lhsShape[i];
         break;
       }
