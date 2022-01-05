@@ -40,9 +40,10 @@ class BenchmarkThreshold:
 # Order matters here: if multiple regexes match a single benchmark, the first
 # match is used.
 BENCHMARK_THRESHOLDS = [
-    # Benchmarks that complete around 10ms; using percentage is not suitable.
-    BenchmarkThreshold(re.compile(r"^MobileNet.*GPU"),
-                       1, ThresholdUnit.VALUE_MS),
+    # Benchmarks that complete around 10ms on GPUs; using percentage is not
+    # suitable anymore.
+    BenchmarkThreshold(re.compile(r"^MobileNet.*GPU"), 1,
+                       ThresholdUnit.VALUE_MS),
 
     # Default threshold for all benchmarks: 5%.
     BenchmarkThreshold(re.compile(r".*"), 5, ThresholdUnit.PERCENTAGE),
