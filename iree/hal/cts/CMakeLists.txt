@@ -27,6 +27,12 @@ set(IREE_EXECUTABLE_CTS_TESTS
   PARENT_SCOPE
 )
 
+# List of testdata/{name}.mlir source files.
+set(IREE_ALL_CTS_EXECUTABLE_SOURCES
+  "executable_cache_test"
+  PARENT_SCOPE
+)
+
 iree_cc_library(
   NAME
     cts_test_base

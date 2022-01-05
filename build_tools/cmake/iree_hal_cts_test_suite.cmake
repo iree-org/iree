@@ -82,6 +82,8 @@ function(iree_hal_cts_test_suite)
   # Generate testdata if executable tests are enabled.
   if(_ENABLE_EXECUTABLE_TESTS)
 
+    set(_EXECUTABLES_TESTDATA_NAME "${_RULE_COMPILER_TARGET_BACKEND}_executables")
+
     set(_TRANSLATE_FLAGS
       "-iree-mlir-to-hal-executable"
       "-iree-hal-target-backends=${_RULE_COMPILER_TARGET_BACKEND}"
@@ -91,28 +93,51 @@ function(iree_hal_cts_test_suite)
       list(APPEND _TRANSLATE_FLAGS "--iree-llvm-target-triple=${_TARGET_TRIPLE}")
     endif()
 
-    # Skip over if already created (multiple drivers using the same compiler).
+    # Skip if already created (multiple suites using the same compiler setting).
     iree_package_name(_PACKAGE_NAME)
-    if(NOT TARGET ${_PACKAGE_NAME}_abs_executable_${_RULE_COMPILER_TARGET_BACKEND}_c)
-      # Note: this is an abuse of naming. We are not building a bytecode module,
-      # but this CMake rule already wraps iree-translate and iree_c_embed_data.
-      # We should add a new function like `iree_hal_executable()`.
-      iree_bytecode_module(
+    if(NOT TARGET ${_PACKAGE_NAME}_${_EXECUTABLES_TESTDATA_NAME}_c)
+      set(_EMBED_DATA_SOURCES "")
+      foreach(_FILE_NAME ${IREE_ALL_CTS_EXECUTABLE_SOURCES})
+        # Note: this is an abuse of naming. We are not building a bytecode
+        # module, but this CMake rule already wraps iree-translate.
+        # We should add a new function like `iree_hal_executable()`.
+        iree_bytecode_module(
+          NAME
+            ${_RULE_COMPILER_TARGET_BACKEND}_${_FILE_NAME}
+          MODULE_FILE_NAME
+            "${_RULE_COMPILER_TARGET_BACKEND}_${_FILE_NAME}.bin"
+          SRC
+            "${IREE_ROOT_DIR}/iree/hal/cts/testdata/${_FILE_NAME}.mlir"
+          FLAGS
+            ${_TRANSLATE_FLAGS}
+          PUBLIC
+          TESTONLY
+        )
+        list(APPEND _EMBED_DATA_SOURCES "${_RULE_COMPILER_TARGET_BACKEND}_${_FILE_NAME}.bin")
+      endforeach()
+
+      iree_c_embed_data(
         NAME
-          abs_executable_${_RULE_COMPILER_TARGET_BACKEND}
-        SRC
-          "${IREE_ROOT_DIR}/iree/hal/cts/testdata/abs.mlir"
-        C_IDENTIFIER
-          "iree_cts_testdata_abs"
-        FLAGS
-          ${_TRANSLATE_FLAGS}
+          ${_EXECUTABLES_TESTDATA_NAME}_c
+        GENERATED_SRCS
+          ${_EMBED_DATA_SOURCES}
+        C_FILE_OUTPUT
+          "${_EXECUTABLES_TESTDATA_NAME}_c.c"
+        H_FILE_OUTPUT
+          "${_EXECUTABLES_TESTDATA_NAME}_c.h"
+        IDENTIFIER
+          "iree_cts_testdata_executables"
+        STRIP_PREFIX
+          "${_RULE_COMPILER_TARGET_BACKEND}_"
+        FLATTEN
         PUBLIC
         TESTONLY
       )
+
     endif()
 
     list(APPEND _RULE_DEPS
-      ::abs_executable_${_RULE_COMPILER_TARGET_BACKEND}_c
+      ::${_EXECUTABLES_TESTDATA_NAME}_c
     )
   endif()
 
@@ -140,7 +165,7 @@ function(iree_hal_cts_test_suite)
     set(IREE_CTS_DRIVER_NAME "${_RULE_DRIVER_NAME}")
     set(IREE_CTS_EXECUTABLE_FORMAT "${_RULE_EXECUTABLE_FORMAT}")
     if(_ENABLE_EXECUTABLE_TESTS)
-      set(IREE_CTS_EXECUTABLE_ABS_HDR "abs_executable_${_RULE_COMPILER_TARGET_BACKEND}_c.h")
+      set(IREE_CTS_EXECUTABLES_TESTDATA_HDR "${_EXECUTABLES_TESTDATA_NAME}_c.h")
     endif()
 
     configure_file(

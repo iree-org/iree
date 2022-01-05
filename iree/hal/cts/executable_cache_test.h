@@ -64,7 +64,8 @@ TEST_P(executable_cache_test, PrepareExecutable) {
       IREE_HAL_EXECUTABLE_CACHING_MODE_ALIAS_PROVIDED_DATA;
   executable_spec.executable_format =
       iree_make_cstring_view(get_test_executable_format());
-  executable_spec.executable_data = get_executable_data_abs();
+  executable_spec.executable_data = get_test_executable_data(
+      iree_make_cstring_view("executable_cache_test.bin"));
   executable_spec.executable_layout_count = 1;
   executable_spec.executable_layouts = &executable_layout;
 

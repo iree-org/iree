@@ -11,6 +11,7 @@
 #include <string>
 
 #include "iree/base/api.h"
+#include "iree/base/string_view.h"
 #include "iree/hal/api.h"
 #include "iree/testing/gtest.h"
 #include "iree/testing/status_matchers.h"
@@ -27,9 +28,9 @@ iree_status_t register_test_driver(iree_hal_driver_registry_t* registry);
 // Leaf test binaries must implement this function.
 const char* get_test_executable_format();
 
-// Returns executable data for testdata/abs.mlir for the driver under test.
+// Returns a file's executable data for the driver under test.
 // Leaf test binaries must implement this function.
-iree_const_byte_span_t get_executable_data_abs();
+iree_const_byte_span_t get_test_executable_data(iree_string_view_t file_name);
 
 // Common setup for tests parameterized on driver names.
 class CtsTestBase : public ::testing::TestWithParam<std::string> {
