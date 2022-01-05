@@ -66,25 +66,9 @@
 
 #define TYPE_JOIN(types) JOIN(TUPLE_UNPACK(types))
 
-#define EMITC_DEFINE_SHIMS(arg_types, ret_types)                  \
-  EMITC_FIXED_TYPEDEF(arg_types, TYPE_JOIN(arg_types), ret_types, \
-                      TYPE_JOIN(ret_types))                       \
-  EMITC_FIXED_SHIM(arg_types, TYPE_JOIN(arg_types), ret_types,    \
-                   TYPE_JOIN(ret_types))                          \
-  EMITC_FIXED_IMPORT(arg_types, TYPE_JOIN(arg_types), ret_types,  \
+#define EMITC_DEFINE_SHIMS(arg_types, ret_types)                 \
+  EMITC_FIXED_IMPORT(arg_types, TYPE_JOIN(arg_types), ret_types, \
                      TYPE_JOIN(ret_types))
-
-#define EMITC_FIXED_TYPEDEF(arg_types, arg_types_string, ret_types, \
-                            ret_types_string)                       \
-  EMITC_FIXED_TYPEDEF_IMPL(arg_types_string, ret_types_string,      \
-                           INPUT_PARAMETERS(arg_types),             \
-                           OUTPUT_PARAMETERS(ret_types))
-
-#define EMITC_FIXED_SHIM(arg_types, arg_types_string, ret_types, \
-                         ret_types_string)                       \
-  EMITC_FIXED_SHIM_IMPL(arg_types_string, ret_types_string,      \
-                        INPUT_ARGUMENTS(arg_types),              \
-                        OUTPUT_ARGUMENTS(ret_types))
 
 #define EMITC_FIXED_IMPORT(arg_types, arg_types_string, ret_types,     \
                            ret_types_string)                           \
@@ -106,32 +90,6 @@
       PACK_VARARG_ARGUMENTS(non_var_arg_types),                                \
       PACK_VARARG_ARGUMENTS(var_arg_types), UNPACK_VARARG_RESULTS(ret_types),  \
       UNPACK_RESULTS(ret_types))
-
-#define EMITC_FIXED_TYPEDEF_IMPL(arg_types, ret_types, input_parameters, \
-                                 output_parameters)                      \
-  typedef iree_status_t (*call_0##arg_types##_##ret_types##_t)(          \
-      iree_vm_stack_t * IREE_RESTRICT stack, void* IREE_RESTRICT module, \
-      void* IREE_RESTRICT module_state input_parameters output_parameters);
-
-// TODO(simon-camp): We should check the args and rets pointers for NULL, but
-// need to special case type 'v'
-#define EMITC_FIXED_SHIM_IMPL(arg_types, ret_types, input_arguments, \
-                              output_arguments)                      \
-  static iree_status_t call_0##arg_types##_##ret_types##_shim(       \
-      iree_vm_stack_t* IREE_RESTRICT stack,                          \
-      const iree_vm_function_call_t* IREE_RESTRICT call,             \
-      call_0##arg_types##_##ret_types##_t target_fn,                 \
-      void* IREE_RESTRICT module, void* IREE_RESTRICT module_state,  \
-      iree_vm_execution_result_t* IREE_RESTRICT out_result) {        \
-    /*const*/ IREE_VM_ABI_TYPE_NAME(arg_types)* args =               \
-        iree_vm_abi_##arg_types##_checked_deref(call->arguments);    \
-    IREE_VM_ABI_TYPE_NAME(ret_types)* rets =                         \
-        iree_vm_abi_##ret_types##_checked_deref(call->results);      \
-                                                                     \
-    iree_vm_abi_##ret_types##_reset(rets);                           \
-    return target_fn(stack, module,                                  \
-                     module_state input_arguments output_arguments); \
-  }
 
 #define EMITC_FIXED_IMPORT_IMPL(arg_types, ret_types, input_parameters,    \
                                 output_parameters, pack_arguments,         \
@@ -295,6 +253,21 @@
 #define UNPACK_VARARG_r(idx) \
   iree_vm_ref_t* ret##idx = va_arg(EMITC_VA_LIST_NAME, iree_vm_ref_t*);
 #define UNPACK_VARARG_v(idx)
+
+typedef iree_status_t (*iree_vm_native_function_target_emitc)(
+    iree_vm_stack_t* IREE_RESTRICT stack,
+    iree_vm_function_call_t* IREE_RESTRICT call, void* IREE_RESTRICT module,
+    void* IREE_RESTRICT module_state,
+    iree_vm_execution_result_t* IREE_RESTRICT);
+
+static iree_status_t iree_emitc_shim(
+    iree_vm_stack_t* IREE_RESTRICT stack,
+    /*const*/ iree_vm_function_call_t* IREE_RESTRICT call,
+    iree_vm_native_function_target_emitc target_fn, void* IREE_RESTRICT module,
+    void* IREE_RESTRICT module_state,
+    iree_vm_execution_result_t* IREE_RESTRICT out_result) {
+  return target_fn(stack, call, module, module_state, out_result);
+}
 
 EMITC_DEFINE_SHIMS((i), (i))
 EMITC_DEFINE_SHIMS((i, i), (i))

@@ -22,6 +22,7 @@ struct VMAnalysis {
     Operation *op = funcOp.getOperation();
     registerAllocation = RegisterAllocation(op);
     valueLiveness = ValueLiveness(op);
+    originalFunctionType = funcOp.getType();
   }
 
   VMAnalysis(VMAnalysis &&) = default;
@@ -56,6 +57,7 @@ struct VMAnalysis {
 
   DenseMap<int64_t, Operation *> &localRefs() { return refs; }
   size_t numRefArguments;
+  FunctionType originalFunctionType;
 
  private:
   RegisterAllocation registerAllocation;

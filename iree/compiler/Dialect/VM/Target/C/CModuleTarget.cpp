@@ -117,18 +117,6 @@ static LogicalResult printStructDefinitions(IREE::VM::ModuleOp &moduleOp,
   return success();
 }
 
-static LogicalResult printShim(mlir::FuncOp &funcOp,
-                               llvm::raw_ostream &output) {
-  StringAttr callingConvention = funcOp.getOperation()
-                                     ->getAttr("vm.calling_convention")
-                                     .cast<StringAttr>();
-  if (!callingConvention) {
-    return funcOp.emitError("Couldn't find calling convention attribute");
-  }
-  output << "call_" << callingConvention.getValue() << "_shim";
-  return success();
-}
-
 static LogicalResult buildModuleDescriptors(IREE::VM::ModuleOp &moduleOp,
                                             mlir::emitc::CppEmitter &emitter) {
   SymbolTable symbolTable(moduleOp);
@@ -219,12 +207,7 @@ static LogicalResult buildModuleDescriptors(IREE::VM::ModuleOp &moduleOp,
         return exportOp.emitError("Couldn't find referenced FuncOp");
       }
       output << "{"
-             << "(iree_vm_native_function_shim_t)";
-
-      if (failed(printShim(funcOp, output))) {
-        return funcOp.emitError("Error generating shim");
-      }
-      output << ", "
+             << "(iree_vm_native_function_shim_t)iree_emitc_shim, "
              << "(iree_vm_native_function_target_t)" << funcName << "},\n";
     }
   }
@@ -398,11 +381,14 @@ LogicalResult translateModuleToC(IREE::VM::ModuleOp moduleOp,
   output << "// DEFINE FUNCTIONS\n";
 
   // Emit code for functions skipping those marked with `vm.emit_at_end`.
-  for (auto funcOp : moduleOp.getOps<mlir::FuncOp>()) {
-    Operation *op = funcOp.getOperation();
-    if (op->hasAttr("vm.emit_at_end")) continue;
-    if (op->hasAttr("emitc.static")) output << "static ";
-    if (failed(emitter.emitOperation(*funcOp.getOperation(),
+  for (Operation &op : moduleOp.getOps()) {
+    // TODO(simon-camp): Clean up. We generate calls to a macro that defines a
+    // struct. As we declare all variables at the start of the function, the
+    // macro call cannot be inlined into the function.
+    if (!isa<mlir::FuncOp, emitc::CallOp>(op)) continue;
+    if (op.hasAttr("vm.emit_at_end")) continue;
+    if (op.hasAttr("emitc.static")) output << "static ";
+    if (failed(emitter.emitOperation(op,
                                      /*trailingSemicolon=*/false)))
       return failure();
   }

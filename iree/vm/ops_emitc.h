@@ -26,9 +26,18 @@
 // Access a member of a pointer to a struct
 #define EMITC_STRUCT_PTR_MEMBER(struct, member) (struct)->member
 
+// Access the address of a member of a pointer to a struct
+#define EMITC_STRUCT_PTR_MEMBER_ADDRESS(struct, member) &(struct)->member
+
 // Assign a value to a member of a pointer to a struct
 #define EMITC_STRUCT_PTR_MEMBER_ASSIGN(struct, member, value) \
   (struct)->member = (value)
+
+// Create a typdef struct
+#define EMITC_TYPEDEF_STRUCT(typename, body) \
+  typedef struct {                           \
+    body                                     \
+  } typename;
 
 // Get the address of an array element
 #define EMITC_ARRAY_ELEMENT_ADDRESS(array, index) &(array)[index]
