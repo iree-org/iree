@@ -264,9 +264,9 @@ extern "C" int iree_main(int argc, char** argv) {
       iree_allocator_system(), &iree_context));
   IREE_LOG(INFO) << "Context with modules is ready for use";
 
-  // Lookup the async entry point function.
+  // Lookup the entry point function.
   iree_vm_function_t main_function;
-  const char kMainFunctionName[] = "module.simple_mul$async";
+  const char kMainFunctionName[] = "module.simple_mul";
   IREE_CHECK_OK(iree_vm_context_resolve_function(
       iree_context,
       iree_string_view_t{kMainFunctionName, sizeof(kMainFunctionName) - 1},
@@ -276,22 +276,12 @@ extern "C" int iree_main(int argc, char** argv) {
                  << std::string(main_function_name.data,
                                 main_function_name.size)
                  << "'";
-
-  // Create wait and signal semaphores for async execution.
-  vm::ref<iree_hal_semaphore_t> wait_semaphore;
-  IREE_CHECK_OK(
-      iree_hal_semaphore_create(iree_vk_device, 0ull, &wait_semaphore));
-  vm::ref<iree_hal_semaphore_t> signal_semaphore;
-  IREE_CHECK_OK(
-      iree_hal_semaphore_create(iree_vk_device, 0ull, &signal_semaphore));
   // --------------------------------------------------------------------------
 
   // --------------------------------------------------------------------------
   // Main loop.
   bool done = false;
-  int frame_number = 0;
   while (!done) {
-    frame_number++;
     SDL_Event event;
 
     while (SDL_PollEvent(&event)) {
@@ -382,7 +372,7 @@ extern "C" int iree_main(int argc, char** argv) {
             IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR, input_memory_type,
             input_buffer_usage,
             iree_make_const_byte_span(&input_x, sizeof(input_x)),
-            iree_allocator_system(), &input0_buffer_view));
+            &input0_buffer_view));
         IREE_CHECK_OK(iree_hal_buffer_view_allocate_buffer(
             allocator,
             /*shape=*/&kElementCount, /*shape_rank=*/1,
@@ -390,18 +380,12 @@ extern "C" int iree_main(int argc, char** argv) {
             IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR, input_memory_type,
             input_buffer_usage,
             iree_make_const_byte_span(&input_y, sizeof(input_y)),
-            iree_allocator_system(), &input1_buffer_view));
+            &input1_buffer_view));
         // Marshal inputs through a VM variant list.
-        // [wait_semaphore|wait_value|arg0|arg1|signal_semaphore|signal_value]
+        // [arg0|arg1]
         vm::ref<iree_vm_list_t> inputs;
         IREE_CHECK_OK(iree_vm_list_create(/*element_type=*/nullptr, 6,
                                           iree_allocator_system(), &inputs));
-        IREE_CHECK_OK(
-            iree_vm_list_push_ref_retain(inputs.get(), wait_semaphore));
-        iree_vm_value_t wait_value;
-        wait_value.type = IREE_VM_VALUE_TYPE_I32;
-        wait_value.i32 = 0;
-        IREE_CHECK_OK(iree_vm_list_push_value(inputs.get(), &wait_value));
         auto input0_buffer_view_ref =
             iree_hal_buffer_view_move_ref(input0_buffer_view);
         auto input1_buffer_view_ref =
@@ -410,12 +394,6 @@ extern "C" int iree_main(int argc, char** argv) {
             iree_vm_list_push_ref_move(inputs.get(), &input0_buffer_view_ref));
         IREE_CHECK_OK(
             iree_vm_list_push_ref_move(inputs.get(), &input1_buffer_view_ref));
-        IREE_CHECK_OK(
-            iree_vm_list_push_ref_retain(inputs.get(), signal_semaphore));
-        iree_vm_value_t signal_value;
-        signal_value.type = IREE_VM_VALUE_TYPE_I32;
-        signal_value.i32 = frame_number;
-        IREE_CHECK_OK(iree_vm_list_push_value(inputs.get(), &signal_value));
 
         // Prepare outputs list to accept results from the invocation.
         vm::ref<iree_vm_list_t> outputs;
@@ -423,19 +401,11 @@ extern "C" int iree_main(int argc, char** argv) {
                                           kElementCount * sizeof(float),
                                           iree_allocator_system(), &outputs));
 
-        // Asynchronously invoke the function.
+        // Synchronously invoke the function.
         IREE_CHECK_OK(iree_vm_invoke(iree_context, main_function,
                                      IREE_VM_INVOCATION_FLAG_NONE,
                                      /*policy=*/nullptr, inputs.get(),
                                      outputs.get(), iree_allocator_system()));
-
-        // Wait for completion.
-        // TODO(scotttodd): Samples showing non-blocking async execution
-        //   * poll during update loop
-        //   * pipeline execution (use signal from one as wait for another)
-        IREE_CHECK_OK(iree_hal_semaphore_wait(
-            signal_semaphore.get(), 1,
-            iree_make_timeout(IREE_TIME_INFINITE_FUTURE)));
 
         // Read back the results.
         IREE_DLOG(INFO) << "Reading back results...";
@@ -474,9 +444,6 @@ extern "C" int iree_main(int argc, char** argv) {
 
   // --------------------------------------------------------------------------
   // Cleanup
-  iree_hal_semaphore_release(wait_semaphore.get());
-  iree_hal_semaphore_release(signal_semaphore.get());
-
   iree_vm_module_release(hal_module);
   iree_vm_module_release(bytecode_module);
   iree_vm_context_release(iree_context);
