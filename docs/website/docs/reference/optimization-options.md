@@ -1,7 +1,7 @@
 # Optimization Options
 
 This page documents various supported flags for optimizing IREE programs. Each
-is presented with its English name, flag to enable/disable and default state.
+is presented with its English name, flag to enable/disable, and default state.
 
 These flags can be passed to the:
 
@@ -14,7 +14,7 @@ These flags can be passed to the:
 
 ## High level program optimizations
 
-### Constant Evaluation (`--iree-opt-const-eval` (off))
+### Constant evaluation (`--iree-opt-const-eval` (off))
 
 Performs compile-time evaluation of any global initializers which produce
 the initial values for global constants, storing the global directly in the
@@ -26,7 +26,7 @@ functions, not free-standing operations in the program which may produce
 constant-derived results. See `--iree-opt-const-expr-hoisting` for options to
 optimize these.
 
-### Constant Expression Hoisting (`--iree-opt-const-expr-hoisting` (off))
+### Constant expression hoisting (`--iree-opt-const-expr-hoisting` (off))
 
 Identifies all trees of constant expressions in the program and uses a
 heuristic to determine which would be profitable to hoist into global
@@ -40,7 +40,7 @@ broadcasts, etc) or are expected to fold away as part of operator fusion.
 Notably, the current heuristic is likely to pessimize module size in the case of
 complicated programs with trees of constant, large tensors.
 
-### Numeric Precision Reduction (`--iree-opt-numeric-precision-reduction` (off))
+### Numeric precision reduction (`--iree-opt-numeric-precision-reduction` (off))
 
 Analyzes program constant data and program flow to identify math operations
 which can be safely evaluated with reduced precision (currently with a minimum
