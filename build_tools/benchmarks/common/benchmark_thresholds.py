@@ -42,6 +42,8 @@ class BenchmarkThreshold:
 BENCHMARK_THRESHOLDS = [
     # Benchmarks that complete around 10ms on GPUs; using percentage is not
     # suitable anymore.
+    BenchmarkThreshold(re.compile(r"^DeepLabV3.*GPU-Mali"), 1,
+                       ThresholdUnit.VALUE_MS),
     BenchmarkThreshold(re.compile(r"^MobileNet.*GPU"), 1,
                        ThresholdUnit.VALUE_MS),
 
