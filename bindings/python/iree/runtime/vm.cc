@@ -218,16 +218,15 @@ void VmVariantList::PushBufferView(HalDevice& device,
   // TODO(laurenzo): Expand to other layouts as needed.
   // TODO(laurenzo): Wrap and retain original buffer (depends_on_pyobject=true).
   iree_hal_buffer_t* raw_buffer;
-  CheckApiStatus(iree_hal_allocator_allocate_buffer(
-                     device.allocator(),
-                     static_cast<iree_hal_memory_type_t>(
-                         IREE_HAL_MEMORY_TYPE_HOST_LOCAL |
-                         IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE),
-                     IREE_HAL_BUFFER_USAGE_ALL, py_view.len, &raw_buffer),
-                 "Failed to allocate device visible buffer");
   CheckApiStatus(
-      iree_hal_buffer_write_data(raw_buffer, 0, py_view.buf, py_view.len),
-      "Error writing to input buffer");
+      iree_hal_allocator_allocate_buffer(
+          device.allocator(),
+          static_cast<iree_hal_memory_type_t>(
+              IREE_HAL_MEMORY_TYPE_HOST_LOCAL |
+              IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE),
+          IREE_HAL_BUFFER_USAGE_ALL, py_view.len,
+          iree_make_const_byte_span(py_view.buf, py_view.len), &raw_buffer),
+      "Failed to allocate device visible buffer");
 
   // Only capture the reference to the exporting object (incrementing it)
   // once guaranteed successful.
@@ -390,10 +389,11 @@ py::object VmVariantList::GetAsSerializedTraceValue(int index) {
 
       // Map memory.
       iree_device_size_t byte_length = iree_hal_buffer_byte_length(raw_buffer);
-      iree_hal_buffer_mapping_t mapped_memory;
+      iree_hal_buffer_mapping_t mapped_memory = {{0}};
       CheckApiStatus(iree_hal_buffer_map_range(
-                         raw_buffer, IREE_HAL_MEMORY_ACCESS_READ,
-                         0 /* element_offset */, byte_length, &mapped_memory),
+                         raw_buffer, IREE_HAL_MAPPING_MODE_SCOPED,
+                         IREE_HAL_MEMORY_ACCESS_READ, 0 /* element_offset */,
+                         byte_length, &mapped_memory),
                      "Could not map memory");
       record["contents"] =
           py::bytes(reinterpret_cast<const char*>(mapped_memory.contents.data),
@@ -489,10 +489,11 @@ py::object VmVariantList::GetAsNdarray(int index) {
   // Map memory.
   iree_device_size_t byte_length =
       iree_hal_buffer_byte_length(buffer.raw_ptr());
-  iree_hal_buffer_mapping_t mapped_memory;
+  iree_hal_buffer_mapping_t mapped_memory = {{0}};
   CheckApiStatus(iree_hal_buffer_map_range(
-                     buffer.raw_ptr(), IREE_HAL_MEMORY_ACCESS_READ,
-                     0 /* element_offset */, byte_length, &mapped_memory),
+                     buffer.raw_ptr(), IREE_HAL_MAPPING_MODE_SCOPED,
+                     IREE_HAL_MEMORY_ACCESS_READ, 0 /* element_offset */,
+                     byte_length, &mapped_memory),
                  "Could not map memory");
 
   // Turn the mapping into a python object that retains until the array is

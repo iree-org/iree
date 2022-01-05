@@ -230,15 +230,17 @@ Attribute CompiledBinary::convertVariantToAttribute(
       iree_hal_buffer_t* buffer = iree_hal_buffer_view_buffer(bufferView);
 
       // Map the memory and construct.
-      Attribute convertedAttr;
+      // TODO(benvanik): fallback to alloc + iree_hal_buffer_read_data if
+      // mapping is not available. Today with the CPU backends it's always
+      // possible but would not work with accelerators.
       iree_hal_buffer_mapping_t mapping;
-      IREE_CHECK_OK(
-          iree_hal_buffer_map_range(buffer, IREE_HAL_MEMORY_ACCESS_READ,
-                                    /*byte_offset=*/0, length, &mapping));
+      IREE_CHECK_OK(iree_hal_buffer_map_range(
+          buffer, IREE_HAL_MAPPING_MODE_SCOPED, IREE_HAL_MEMORY_ACCESS_READ,
+          /*byte_offset=*/0, length, &mapping));
       MutableArrayRef<char> rawBufferArray(
           reinterpret_cast<char*>(mapping.contents.data),
           mapping.contents.data_length);
-      convertedAttr =
+      auto convertedAttr =
           createAttributeFromRawData(loc, tensorType, rawBufferArray);
       iree_hal_buffer_unmap_range(&mapping);
       return convertedAttr;
@@ -299,13 +301,17 @@ LogicalResult InMemoryCompiledBinary::translateFromModule(
 }
 
 Runtime::Runtime() {
-  registry = iree_hal_driver_registry_default();
+  IREE_CHECK_OK(
+      iree_hal_driver_registry_allocate(iree_allocator_system(), &registry));
   IREE_CHECK_OK(iree_hal_vmvx_driver_module_register(registry));
   IREE_CHECK_OK(iree_hal_module_register_types());
   IREE_CHECK_OK(iree_vm_instance_create(iree_allocator_system(), &instance));
 }
 
-Runtime::~Runtime() { iree_vm_instance_release(instance); }
+Runtime::~Runtime() {
+  iree_vm_instance_release(instance);
+  iree_hal_driver_registry_free(registry);
+}
 
 Runtime& Runtime::getInstance() {
   static Runtime instance;

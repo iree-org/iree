@@ -103,6 +103,7 @@ cc_library(
         "//iree/base/internal:arena",
         "//iree/base/internal:synchronization",
         "//iree/hal",
+        "//iree/hal/utils:buffer_transfer",
     ],
 )
 
@@ -168,6 +169,8 @@ cc_library(
         "//iree/base/internal:synchronization",
         "//iree/base/internal:wait_handle",
         "//iree/hal",
+        "//iree/hal/utils:buffer_transfer",
+        "//iree/hal/utils:resource_set",
         "//iree/task",
     ],
 )

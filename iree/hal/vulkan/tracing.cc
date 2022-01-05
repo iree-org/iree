@@ -17,7 +17,7 @@
 // Total number of queries the per-queue query pool will contain. This
 // translates to the maximum number of outstanding queries before collection is
 // required.
-#define IREE_HAL_VULKAN_TRACING_DEFAULT_QUERY_CAPACITY (64 * 1024)
+#define IREE_HAL_VULKAN_TRACING_DEFAULT_QUERY_CAPACITY (16 * 1024)
 
 // Total number of queries that can be read back from the API in a single
 // collection.
@@ -163,6 +163,7 @@ static void iree_hal_vulkan_tracing_reset_query_pool(
 static void iree_hal_vulkan_tracing_query_calibration_timestamps(
     iree_hal_vulkan_tracing_context_t* context, uint64_t* out_cpu_time,
     uint64_t* out_gpu_time) {
+  IREE_TRACE_ZONE_BEGIN(z0);
   *out_cpu_time = 0;
   *out_gpu_time = 0;
 
@@ -197,6 +198,8 @@ static void iree_hal_vulkan_tracing_query_calibration_timestamps(
     default:
       break;
   }
+
+  IREE_TRACE_ZONE_END(z0);
 }
 
 // Populates |out_cpu_time| and |out_gpu_time| with calibrated timestamps.
@@ -209,6 +212,12 @@ static void iree_hal_vulkan_tracing_perform_initial_calibration(
   const auto& syms = context->logical_device->syms();
   *out_cpu_time = 0;
   *out_gpu_time = 0;
+
+  IREE_TRACE_ZONE_BEGIN(z0);
+  IREE_TRACE_ZONE_APPEND_TEXT(z0,
+                              context->time_domain == VK_TIME_DOMAIN_DEVICE_EXT
+                                  ? "VK_TIME_DOMAIN_DEVICE_EXT"
+                                  : "VK_TIME_DOMAIN_CLOCK_MONOTONIC_EXT");
 
   // Attempt to get a timestamp from both the device and the host at roughly the
   // same time. There's a gap between when we get control returned to use after
@@ -234,6 +243,7 @@ static void iree_hal_vulkan_tracing_perform_initial_calibration(
 
     // Reset the query used.
     iree_hal_vulkan_tracing_reset_query_pool(context, 0, 1);
+    IREE_TRACE_ZONE_END(z0);
     return;
   }
 
@@ -258,12 +268,14 @@ static void iree_hal_vulkan_tracing_perform_initial_calibration(
   timestamp_infos[1].pNext = NULL;
   timestamp_infos[1].timeDomain = context->time_domain;
   uint64_t max_deviations[IREE_HAL_VULKAN_TRACING_MAX_DEVIATION_PROBE_COUNT];
+  IREE_TRACE_ZONE_BEGIN_NAMED(z1, "vkGetCalibratedTimestampsEXT");
   for (iree_host_size_t i = 0; i < IREE_ARRAYSIZE(max_deviations); ++i) {
     uint64_t timestamps[2] = {0, 0};
     syms->vkGetCalibratedTimestampsEXT(
         *context->logical_device, IREE_ARRAYSIZE(timestamps), timestamp_infos,
         timestamps, &max_deviations[i]);
   }
+  IREE_TRACE_ZONE_END(z1);
   uint64_t min_deviation = max_deviations[0];
   for (iree_host_size_t i = 1; i < IREE_ARRAYSIZE(max_deviations); ++i) {
     min_deviation = iree_min(min_deviation, max_deviations[i]);
@@ -273,6 +285,8 @@ static void iree_hal_vulkan_tracing_perform_initial_calibration(
   iree_hal_vulkan_tracing_query_calibration_timestamps(
       context, &context->previous_cpu_time, out_gpu_time);
   *out_cpu_time = tracy::Profiler::GetTime();
+
+  IREE_TRACE_ZONE_END(z0);
 }
 
 // Performs a periodic calibration (if supported) and sends the data to tracy.
@@ -282,6 +296,7 @@ static void iree_hal_vulkan_tracing_perform_initial_calibration(
 void iree_hal_vulkan_tracing_perform_calibration(
     iree_hal_vulkan_tracing_context_t* context) {
   if (context->time_domain == VK_TIME_DOMAIN_DEVICE_EXT) return;
+  IREE_TRACE_ZONE_BEGIN(z0);
 
   uint64_t cpu_time = 0;
   uint64_t gpu_time = 0;
@@ -300,28 +315,36 @@ void iree_hal_vulkan_tracing_perform_calibration(
     tracy::MemWrite(&item->gpuCalibration.context, context->id);
     tracy::Profiler::QueueSerialFinish();
   }
+
+  IREE_TRACE_ZONE_END(z0);
 }
 
 // Prepares the VkQueryPool backing storage for our query ringbuffer.
 static void iree_hal_vulkan_tracing_prepare_query_pool(
     iree_hal_vulkan_tracing_context_t* context) {
+  IREE_TRACE_ZONE_BEGIN(z0);
+
   // Create a query pool with the largest query capacity it can provide.
   VkQueryPoolCreateInfo pool_info;
   memset(&pool_info, 0, sizeof(pool_info));
   pool_info.sType = VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO;
   pool_info.queryCount = IREE_HAL_VULKAN_TRACING_DEFAULT_QUERY_CAPACITY;
   pool_info.queryType = VK_QUERY_TYPE_TIMESTAMP;
+  IREE_TRACE_ZONE_APPEND_VALUE(z0, pool_info.queryCount);
   while (context->logical_device->syms()->vkCreateQueryPool(
              *context->logical_device, &pool_info,
              context->logical_device->allocator(),
              &context->query_pool) != VK_SUCCESS) {
     pool_info.queryCount /= 2;
+    IREE_TRACE_ZONE_APPEND_VALUE(z0, pool_info.queryCount);
   }
   context->query_capacity = pool_info.queryCount;
 
   // Perform initial reset of the query pool. All queries must be reset upon
   // creation before first use.
   iree_hal_vulkan_tracing_reset_query_pool(context, 0, context->query_capacity);
+
+  IREE_TRACE_ZONE_END(z0);
 }
 
 // Prepares the Tracy-related GPU context that events are fed into. Each context
@@ -329,6 +352,8 @@ static void iree_hal_vulkan_tracing_prepare_query_pool(
 static void iree_hal_vulkan_tracing_prepare_gpu_context(
     iree_hal_vulkan_tracing_context_t* context,
     VkPhysicalDevice physical_device, iree_string_view_t queue_name) {
+  IREE_TRACE_ZONE_BEGIN(z0);
+
   // Allocate the process-unique GPU context ID. There's a max of 255 available;
   // if we are recreating devices a lot we may exceed that. Don't do that, or
   // wrap around and get weird (but probably still usable) numbers.
@@ -386,6 +411,8 @@ static void iree_hal_vulkan_tracing_prepare_gpu_context(
     tracy::MemWrite(&item->gpuContextNameFat.size, queue_name.size);
     tracy::Profiler::QueueSerialFinish();
   }
+
+  IREE_TRACE_ZONE_END(z0);
 }
 
 // Returns the best possible platform-supported time domain, falling back to

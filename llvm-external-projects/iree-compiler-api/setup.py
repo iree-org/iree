@@ -138,6 +138,7 @@ setup(
     ext_modules=[
         CMakeExtension("iree.compiler._mlir_libs._mlir"),
         CMakeExtension("iree.compiler._mlir_libs._ireeDialects"),
+        CMakeExtension("iree.compiler._mlir_libs._ireecTransforms"),
         CMakeExtension("iree.compiler._mlir_libs._mlirHlo"),
         CMakeExtension("iree.compiler._mlir_libs._mlirLinalgPasses"),
     ],

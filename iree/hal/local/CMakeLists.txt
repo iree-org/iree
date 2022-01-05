@@ -99,6 +99,7 @@ iree_cc_library(
     iree::base::internal::synchronization
     iree::base::tracing
     iree::hal
+    iree::hal::utils::buffer_transfer
   PUBLIC
 )
 
@@ -155,6 +156,8 @@ iree_cc_library(
     iree::base::internal::wait_handle
     iree::base::tracing
     iree::hal
+    iree::hal::utils::buffer_transfer
+    iree::hal::utils::resource_set
     iree::task
   PUBLIC
 )

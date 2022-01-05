@@ -57,6 +57,10 @@ void registerFlowTransformPassPipeline();
 // Input canonicalization and legalization
 //===----------------------------------------------------------------------===//
 
+// Cleans up any numeric narrowing ops inserted by
+// iree-flow-infer-numeric-narrowing.
+std::unique_ptr<Pass> createCleanupNumericNarrowingPass();
+
 /// Creates a pass to convert linalg convolution ops with 1x1 kernels into
 /// linalg.matmul
 std::unique_ptr<Pass> createConvertConv2D1x1ToMatmulPass();
@@ -76,6 +80,10 @@ std::unique_ptr<OperationPass<FuncOp>> createConvertLinalgMatmulToMmt4DPass();
 /// Creates a pass to fuse Linalg operations on tensors.
 std::unique_ptr<Pass> createFusionOfTensorOpsPass();
 
+/// Infers and inserts util.numeric.optional_narrow ops at points that may be
+/// beneficial.
+std::unique_ptr<Pass> createInferNumericNarrowingPass();
+
 /// Create a pass to interchange generic ops to force the reduction loop to be
 /// the most inner loops.
 std::unique_ptr<Pass> createInterchangeGenericOpsPass();
@@ -86,6 +94,10 @@ std::unique_ptr<Pass> createConvertToFlowBeforeDispatchFormation();
 // Convert remaining operations that were left outside of dispatch regions to
 // equivalent flow ops.
 std::unique_ptr<Pass> createConvertToFlowAfterDispatchFormation();
+
+// Optimizes numerics given annotations added via
+// iree-flow-infer-numeric-narrowing.
+std::unique_ptr<Pass> createOptimizeNumericsPass();
 
 // Promote I1 tensor constants to I8 tensors to match later operations.
 std::unique_ptr<OperationPass<mlir::FuncOp>> createPromoteI1ToI8Pass();

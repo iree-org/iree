@@ -210,8 +210,8 @@ void registerHALTransformPassPipeline() {
       "iree-hal-transformation-pipeline",
       "Runs the full IREE HAL dialect transformation pipeline",
       [](OpPassManager &passManager, const TransformOptions &transformOptions) {
-        buildHALTransformPassPipeline(passManager, getTargetOptionsFromFlags(),
-                                      transformOptions);
+        buildHALTransformPassPipeline(
+            passManager, TargetOptions::FromFlags::get(), transformOptions);
       });
 }
 

@@ -71,8 +71,10 @@ extern "C" int iree_main(int argc, char** argv) {
   }
 
   // Setup window
+  // clang-format off
   SDL_WindowFlags window_flags = (SDL_WindowFlags)(
       SDL_WINDOW_VULKAN | SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI);
+  // clang-format on
   SDL_Window* window = SDL_CreateWindow(
       "IREE Samples - Vulkan Inference GUI", SDL_WINDOWPOS_CENTERED,
       SDL_WINDOWPOS_CENTERED, 1280, 720, window_flags);
@@ -363,8 +365,6 @@ extern "C" int iree_main(int argc, char** argv) {
         constexpr int32_t kElementCount = 4;
         iree_hal_allocator_t* allocator =
             iree_hal_device_allocator(iree_vk_device);
-        iree_hal_buffer_t* input0_buffer = nullptr;
-        iree_hal_buffer_t* input1_buffer = nullptr;
         iree_hal_memory_type_t input_memory_type =
             static_cast<iree_hal_memory_type_t>(
                 IREE_HAL_MEMORY_TYPE_HOST_LOCAL |
@@ -372,33 +372,25 @@ extern "C" int iree_main(int argc, char** argv) {
         iree_hal_buffer_usage_t input_buffer_usage =
             static_cast<iree_hal_buffer_usage_t>(
                 IREE_HAL_BUFFER_USAGE_ALL | IREE_HAL_BUFFER_USAGE_CONSTANT);
-        IREE_CHECK_OK(iree_hal_allocator_allocate_buffer(
-            allocator, input_memory_type, input_buffer_usage,
-            sizeof(float) * kElementCount, &input0_buffer));
-        IREE_CHECK_OK(iree_hal_allocator_allocate_buffer(
-            allocator, input_memory_type, input_buffer_usage,
-            sizeof(float) * kElementCount, &input1_buffer));
-        IREE_CHECK_OK(iree_hal_buffer_write_data(input0_buffer, 0, &input_x,
-                                                 sizeof(input_x)));
-        IREE_CHECK_OK(iree_hal_buffer_write_data(input1_buffer, 0, &input_y,
-                                                 sizeof(input_y)));
         // Wrap input buffers in buffer views.
         iree_hal_buffer_view_t* input0_buffer_view = nullptr;
         iree_hal_buffer_view_t* input1_buffer_view = nullptr;
-        IREE_CHECK_OK(iree_hal_buffer_view_create(
-            input0_buffer,
+        IREE_CHECK_OK(iree_hal_buffer_view_allocate_buffer(
+            allocator,
             /*shape=*/&kElementCount, /*shape_rank=*/1,
             IREE_HAL_ELEMENT_TYPE_FLOAT_32,
-            IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR, iree_allocator_system(),
-            &input0_buffer_view));
-        IREE_CHECK_OK(iree_hal_buffer_view_create(
-            input1_buffer,
+            IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR, input_memory_type,
+            input_buffer_usage,
+            iree_make_const_byte_span(&input_x, sizeof(input_x)),
+            iree_allocator_system(), &input0_buffer_view));
+        IREE_CHECK_OK(iree_hal_buffer_view_allocate_buffer(
+            allocator,
             /*shape=*/&kElementCount, /*shape_rank=*/1,
             IREE_HAL_ELEMENT_TYPE_FLOAT_32,
-            IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR, iree_allocator_system(),
-            &input1_buffer_view));
-        iree_hal_buffer_release(input0_buffer);
-        iree_hal_buffer_release(input1_buffer);
+            IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR, input_memory_type,
+            input_buffer_usage,
+            iree_make_const_byte_span(&input_y, sizeof(input_y)),
+            iree_allocator_system(), &input1_buffer_view));
         // Marshal inputs through a VM variant list.
         // [wait_semaphore|wait_value|arg0|arg1|signal_semaphore|signal_value]
         vm::ref<iree_vm_list_t> inputs;

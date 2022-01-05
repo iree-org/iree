@@ -158,7 +158,7 @@ std::unique_ptr<OperationPass<mlir::ModuleOp>> createConversionPass(
 static PassRegistration<ConversionPass> pass(
 
     [] {
-      auto options = getTargetOptionsFromFlags();
+      auto options = TargetOptions::FromFlags::get();
       return std::make_unique<ConversionPass>(options);
     });
 

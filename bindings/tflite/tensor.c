@@ -140,7 +140,8 @@ iree_status_t _TfLiteTensorReallocateIfNeeded(
       iree_hal_allocator_allocate_buffer(
           buffer_allocator,
           IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL | IREE_HAL_MEMORY_TYPE_HOST_VISIBLE,
-          IREE_HAL_BUFFER_USAGE_ALL, allocation_size, &tensor->buffer));
+          IREE_HAL_BUFFER_USAGE_ALL, allocation_size,
+          iree_const_byte_span_empty(), &tensor->buffer));
 
   // Map the buffer memory immediately. The tflite API doesn't let us know if
   // this is a buffer the user will actually touch or some state buffer that is
@@ -149,7 +150,8 @@ iree_status_t _TfLiteTensorReallocateIfNeeded(
   // puts potential errors in the same easy to find place.
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0,
-      iree_hal_buffer_map_range(tensor->buffer, IREE_HAL_MEMORY_ACCESS_ALL, 0,
+      iree_hal_buffer_map_range(tensor->buffer, IREE_HAL_MAPPING_MODE_SCOPED,
+                                IREE_HAL_MEMORY_ACCESS_ALL, 0,
                                 IREE_WHOLE_BUFFER, &tensor->buffer_mapping));
 
   IREE_TRACE_ZONE_END(z0);
@@ -173,10 +175,10 @@ iree_status_t _TfLiteTensorBind(TfLiteTensor* tensor,
   iree_device_size_t byte_offset = 0;
   iree_device_size_t byte_length = IREE_WHOLE_BUFFER;
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0,
-      iree_hal_buffer_map_range(
-          buffer, IREE_HAL_MEMORY_ACCESS_READ | IREE_HAL_MEMORY_ACCESS_WRITE,
-          byte_offset, byte_length, &tensor->buffer_mapping));
+      z0, iree_hal_buffer_map_range(
+              buffer, IREE_HAL_MAPPING_MODE_SCOPED,
+              IREE_HAL_MEMORY_ACCESS_READ | IREE_HAL_MEMORY_ACCESS_WRITE,
+              byte_offset, byte_length, &tensor->buffer_mapping));
 
   // Retain the buffer view until discarded/reset.
   tensor->buffer = buffer;

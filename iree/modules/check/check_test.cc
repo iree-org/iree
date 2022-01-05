@@ -80,18 +80,13 @@ class CheckTest : public ::testing::Test {
       num_elements *= dim;
     }
     ASSERT_EQ(contents.size(), num_elements);
-    vm::ref<iree_hal_buffer_t> buffer;
-    IREE_ASSERT_OK(iree_hal_allocator_allocate_buffer(
-        allocator_,
-        static_cast<iree_hal_memory_type_t>(
-            IREE_HAL_MEMORY_TYPE_HOST_LOCAL |
-            IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE),
-        IREE_HAL_BUFFER_USAGE_ALL, contents.size() * sizeof(int32_t), &buffer));
-    IREE_ASSERT_OK(iree_hal_buffer_write_data(
-        buffer.get(), 0, contents.data(), contents.size() * sizeof(int32_t)));
-    IREE_ASSERT_OK(iree_hal_buffer_view_create(
-        buffer.get(), shape.data(), shape.size(), IREE_HAL_ELEMENT_TYPE_INT_32,
-        IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR, iree_allocator_system(),
+    IREE_ASSERT_OK(iree_hal_buffer_view_allocate_buffer(
+        allocator_, shape.data(), shape.size(), IREE_HAL_ELEMENT_TYPE_INT_32,
+        IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR,
+        IREE_HAL_MEMORY_TYPE_HOST_LOCAL | IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE,
+        IREE_HAL_BUFFER_USAGE_ALL,
+        iree_make_const_byte_span(contents.data(),
+                                  contents.size() * sizeof(int32_t)),
         &*out_buffer_view));
   }
 
@@ -103,20 +98,14 @@ class CheckTest : public ::testing::Test {
       num_elements *= dim;
     }
     ASSERT_EQ(contents.size(), num_elements);
-    vm::ref<iree_hal_buffer_t> buffer;
-    IREE_ASSERT_OK(iree_hal_allocator_allocate_buffer(
-        allocator_,
-        static_cast<iree_hal_memory_type_t>(
-            IREE_HAL_MEMORY_TYPE_HOST_LOCAL |
-            IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE),
-        IREE_HAL_BUFFER_USAGE_ALL, contents.size() * sizeof(uint16_t),
-        &buffer));
-    IREE_ASSERT_OK(iree_hal_buffer_write_data(
-        buffer.get(), 0, contents.data(), contents.size() * sizeof(uint16_t)));
-    IREE_ASSERT_OK(iree_hal_buffer_view_create(
-        buffer.get(), shape.data(), shape.size(),
-        IREE_HAL_ELEMENT_TYPE_FLOAT_16, IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR,
-        iree_allocator_system(), &*out_buffer_view));
+    IREE_ASSERT_OK(iree_hal_buffer_view_allocate_buffer(
+        allocator_, shape.data(), shape.size(), IREE_HAL_ELEMENT_TYPE_FLOAT_16,
+        IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR,
+        IREE_HAL_MEMORY_TYPE_HOST_LOCAL | IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE,
+        IREE_HAL_BUFFER_USAGE_ALL,
+        iree_make_const_byte_span(contents.data(),
+                                  contents.size() * sizeof(uint16_t)),
+        &*out_buffer_view));
   }
 
   void CreateFloat32BufferView(iree::span<const float> contents,
@@ -127,19 +116,14 @@ class CheckTest : public ::testing::Test {
       num_elements *= dim;
     }
     ASSERT_EQ(contents.size(), num_elements);
-    vm::ref<iree_hal_buffer_t> buffer;
-    IREE_ASSERT_OK(iree_hal_allocator_allocate_buffer(
-        allocator_,
-        static_cast<iree_hal_memory_type_t>(
-            IREE_HAL_MEMORY_TYPE_HOST_LOCAL |
-            IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE),
-        IREE_HAL_BUFFER_USAGE_ALL, contents.size() * sizeof(float), &buffer));
-    IREE_ASSERT_OK(iree_hal_buffer_write_data(buffer.get(), 0, contents.data(),
-                                              contents.size() * sizeof(float)));
-    IREE_ASSERT_OK(iree_hal_buffer_view_create(
-        buffer.get(), shape.data(), shape.size(),
-        IREE_HAL_ELEMENT_TYPE_FLOAT_32, IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR,
-        iree_allocator_system(), &*out_buffer_view));
+    IREE_ASSERT_OK(iree_hal_buffer_view_allocate_buffer(
+        allocator_, shape.data(), shape.size(), IREE_HAL_ELEMENT_TYPE_FLOAT_32,
+        IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR,
+        IREE_HAL_MEMORY_TYPE_HOST_LOCAL | IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE,
+        IREE_HAL_BUFFER_USAGE_ALL,
+        iree_make_const_byte_span(contents.data(),
+                                  contents.size() * sizeof(float)),
+        &*out_buffer_view));
   }
 
   void CreateFloat64BufferView(iree::span<const double> contents,
@@ -150,19 +134,14 @@ class CheckTest : public ::testing::Test {
       num_elements *= dim;
     }
     ASSERT_EQ(contents.size(), num_elements);
-    vm::ref<iree_hal_buffer_t> buffer;
-    IREE_ASSERT_OK(iree_hal_allocator_allocate_buffer(
-        allocator_,
-        static_cast<iree_hal_memory_type_t>(
-            IREE_HAL_MEMORY_TYPE_HOST_LOCAL |
-            IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE),
-        IREE_HAL_BUFFER_USAGE_ALL, contents.size() * sizeof(double), &buffer));
-    IREE_ASSERT_OK(iree_hal_buffer_write_data(
-        buffer.get(), 0, contents.data(), contents.size() * sizeof(double)));
-    IREE_ASSERT_OK(iree_hal_buffer_view_create(
-        buffer.get(), shape.data(), shape.size(),
-        IREE_HAL_ELEMENT_TYPE_FLOAT_64, IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR,
-        iree_allocator_system(), &*out_buffer_view));
+    IREE_ASSERT_OK(iree_hal_buffer_view_allocate_buffer(
+        allocator_, shape.data(), shape.size(), IREE_HAL_ELEMENT_TYPE_FLOAT_64,
+        IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR,
+        IREE_HAL_MEMORY_TYPE_HOST_LOCAL | IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE,
+        IREE_HAL_BUFFER_USAGE_ALL,
+        iree_make_const_byte_span(contents.data(),
+                                  contents.size() * sizeof(double)),
+        &*out_buffer_view));
   }
 
   iree_status_t Invoke(const char* function_name) {

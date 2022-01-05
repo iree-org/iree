@@ -56,6 +56,12 @@ struct FloatRangeStats {
     return static_cast<TruncationFlag>(std::max(lhs, rhs));
   }
 
+  // Whether the range is known to only contain values that have been
+  // truncated to exclude fractional bits.
+  bool isTruncated() { return truncationFlag == TRUNC; }
+
+  bool isFinite() { return std::isfinite(minValue) && std::isfinite(maxValue); }
+
   // Reset to initial state.
   void reset() { *this = FloatRangeStats(); }
 

@@ -18,6 +18,7 @@ iree_cc_library(
     "FlatbufferUtils.h"
     "GraphUtils.h"
     "IndexSet.h"
+    "OptionUtils.h"
     "PassUtils.h"
     "PatternUtils.h"
     "TracingUtils.h"
@@ -25,6 +26,7 @@ iree_cc_library(
     "ConversionUtils.cpp"
     "FlatbufferUtils.cpp"
     "GraphUtils.cpp"
+    "OptionUtils.cpp"
     "PassUtils.cpp"
     "TracingUtils.cpp"
   DEPS

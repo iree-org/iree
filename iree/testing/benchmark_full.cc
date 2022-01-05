@@ -114,10 +114,11 @@ void iree_benchmark_register(iree_string_view_t name,
                              const iree_benchmark_def_t* benchmark_def) {
   std::string name_str(name.data, name.size);
   std::string prefixed_str = "BM_" + name_str;
+  iree_benchmark_def_t cloned_def = *benchmark_def;
   auto* instance = benchmark::RegisterBenchmark(
       prefixed_str.c_str(),
-      [name_str, benchmark_def](benchmark::State& state) -> void {
-        iree_benchmark_run(name_str.c_str(), benchmark_def, state);
+      [name_str, cloned_def](benchmark::State& state) -> void {
+        iree_benchmark_run(name_str.c_str(), &cloned_def, state);
       });
 
   if (iree_all_bits_set(benchmark_def->flags,

@@ -199,6 +199,54 @@ class CompilerTest(unittest.TestCase):
     self.assertEqual(temp_contents, output_contents)
     temp_dir.cleanup()
 
+  def testExplicitTempFileSaverCompileToStrTextInput(self):
+    temp_dir = tempfile.TemporaryDirectory()
+    with iree.compiler.tools.TempFileSaver(temp_dir.name):
+      output = iree.compiler.tools.compile_str(
+          SIMPLE_MUL_ASM,
+          input_type="mhlo",
+          target_backends=iree.compiler.tools.DEFAULT_TESTING_BACKENDS)
+      self.assertIsNotNone(output)
+      self.assertGreater(len(output), 0)
+
+    # There should be a core-input.mlir and core-output.bin in the temp dir.
+    expected_temp_file = os.path.join(temp_dir.name, "core-output.bin")
+    self.assertTrue(os.path.exists(expected_temp_file))
+    with open(expected_temp_file, "rb") as f:
+      temp_output = f.read()
+    self.assertEqual(output, temp_output)
+
+    expected_temp_file = os.path.join(temp_dir.name, "core-input.mlir")
+    self.assertTrue(os.path.exists(expected_temp_file))
+    with open(expected_temp_file, "rt") as f:
+      input_contents = f.read()
+    self.assertEqual(SIMPLE_MUL_ASM, input_contents)
+    temp_dir.cleanup()
+
+  def testExplicitTempFileSaverBinaryInput(self):
+    temp_dir = tempfile.TemporaryDirectory()
+    with iree.compiler.tools.TempFileSaver(temp_dir.name):
+      output = iree.compiler.tools.compile_str(
+          SIMPLE_MUL_ASM,
+          input_type="mhlo",
+          target_backends=iree.compiler.tools.DEFAULT_TESTING_BACKENDS)
+      self.assertIsNotNone(output)
+      self.assertGreater(len(output), 0)
+
+    # There should be a core-input.mlir and core-output.bin in the temp dir.
+    expected_temp_file = os.path.join(temp_dir.name, "core-output.bin")
+    self.assertTrue(os.path.exists(expected_temp_file))
+    with open(expected_temp_file, "rb") as f:
+      temp_output = f.read()
+    self.assertEqual(output, temp_output)
+
+    expected_temp_file = os.path.join(temp_dir.name, "core-input.mlir")
+    self.assertTrue(os.path.exists(expected_temp_file))
+    with open(expected_temp_file, "rt") as f:
+      input_contents = f.read()
+    self.assertEqual(SIMPLE_MUL_ASM, input_contents)
+    temp_dir.cleanup()
+
   def testEnvTempFileSaver(self):
     temp_dir = tempfile.TemporaryDirectory()
     os.environ["IREE_SAVE_TEMPS"] = temp_dir.name

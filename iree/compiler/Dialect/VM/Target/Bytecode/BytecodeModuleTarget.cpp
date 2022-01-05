@@ -543,6 +543,7 @@ static iree_vm_FunctionSignatureDef_ref_t makeInternalFunctionSignatureDef(
 static LogicalResult buildFlatBufferModule(BytecodeTargetOptions targetOptions,
                                            IREE::VM::ModuleOp moduleOp,
                                            SmallVector<ZIPFileRef> &zipFileRefs,
+                                           bool emitPolyglotZip,
                                            FlatbufferBuilder &fbb) {
   // Start the buffer so that we can begin recording data prior to the root
   // table (which we do at the very end). This does not change the layout of the
@@ -603,8 +604,7 @@ static LogicalResult buildFlatBufferModule(BytecodeTargetOptions targetOptions,
   for (auto rodataOp : llvm::reverse(rodataOps)) {
     // Only include rodata entries in the ZIP if they are file-like. This
     // prevents all of our string tables from getting included.
-    bool includeInZIP =
-        targetOptions.emitPolyglotZip && rodataOp.mime_type().hasValue();
+    bool includeInZIP = emitPolyglotZip && rodataOp.mime_type().hasValue();
 
     // Embed the rodata contents.
     size_t alignment =
@@ -774,6 +774,9 @@ static LogicalResult buildFlatBufferModule(BytecodeTargetOptions targetOptions,
 LogicalResult translateModuleToBytecode(IREE::VM::ModuleOp moduleOp,
                                         BytecodeTargetOptions targetOptions,
                                         llvm::raw_ostream &output) {
+  bool emitPolyglotZip =
+      targetOptions.emitPolyglotZip &&
+      targetOptions.outputFormat == BytecodeOutputFormat::kFlatBufferBinary;
   moduleOp.getContext()->getOrLoadDialect<IREE::Util::UtilDialect>();
 
   uint64_t startOffset = output.tell();
@@ -821,8 +824,8 @@ LogicalResult translateModuleToBytecode(IREE::VM::ModuleOp moduleOp,
   // can be large bulk data.
   FlatbufferBuilder fbb;
   SmallVector<ZIPFileRef> zipFileRefs;
-  if (failed(
-          buildFlatBufferModule(targetOptions, moduleOp, zipFileRefs, fbb))) {
+  if (failed(buildFlatBufferModule(targetOptions, moduleOp, zipFileRefs,
+                                   emitPolyglotZip, fbb))) {
     return moduleOp.emitError()
            << "failed to build FlatBuffer BytecodeModuleDef";
   }
@@ -852,7 +855,7 @@ LogicalResult translateModuleToBytecode(IREE::VM::ModuleOp moduleOp,
   }
   output.flush();
 
-  if (targetOptions.emitPolyglotZip) {
+  if (emitPolyglotZip) {
     // Append the ZIP central directory to the end of the output.
     // We have to do this here as we need to have flushed the flatbuffer
     // contents to the output so that we have their final absolute addresses.
@@ -873,6 +876,48 @@ LogicalResult translateModuleToBytecode(mlir::ModuleOp outerModuleOp,
            << "outer module does not contain a vm.module op";
   }
   return translateModuleToBytecode(*moduleOps.begin(), targetOptions, output);
+}
+
+void BytecodeTargetOptions::bindOptions(OptionsBinder &binder) {
+  static llvm::cl::OptionCategory vmBytecodeOptionsCategory(
+      "IREE VM bytecode options");
+
+  binder.opt<BytecodeOutputFormat>(
+      "iree-vm-bytecode-module-output-format", outputFormat,
+      llvm::cl::cat(vmBytecodeOptionsCategory),
+      llvm::cl::desc("Output format the bytecode module is written in"),
+      llvm::cl::values(
+          clEnumValN(BytecodeOutputFormat::kFlatBufferBinary,
+                     "flatbuffer-binary", "Binary FlatBuffer file"),
+          clEnumValN(BytecodeOutputFormat::kFlatBufferText, "flatbuffer-text",
+                     "Text FlatBuffer file, debug-only"),
+          clEnumValN(BytecodeOutputFormat::kMlirText, "mlir-text",
+                     "MLIR module file in the VM dialect"),
+          clEnumValN(BytecodeOutputFormat::kAnnotatedMlirText,
+                     "annotated-mlir-text",
+                     "MLIR module file in the VM dialect with annotations")));
+  binder.opt<bool>(
+      "iree-vm-bytecode-module-optimize", optimize,
+      llvm::cl::cat(vmBytecodeOptionsCategory),
+      llvm::cl::desc("Optimizes the VM module with CSE/inlining/etc prior to "
+                     "serialization"));
+  binder.opt<std::string>(
+      "iree-vm-bytecode-source-listing", sourceListing,
+      llvm::cl::cat(vmBytecodeOptionsCategory),
+      llvm::cl::desc(
+          "Dump a VM MLIR file and annotate source locations with it"));
+  binder.opt<bool>("iree-vm-bytecode-module-strip-source-map", stripSourceMap,
+                   llvm::cl::cat(vmBytecodeOptionsCategory),
+                   llvm::cl::desc("Strips the source map from the module"));
+  binder.opt<bool>("iree-vm-bytecode-module-strip-debug-ops", stripDebugOps,
+                   llvm::cl::cat(vmBytecodeOptionsCategory),
+                   llvm::cl::desc("Strips debug-only ops from the module"));
+  binder.opt<bool>(
+      "iree-vm-emit-polyglot-zip", emitPolyglotZip,
+      llvm::cl::cat(vmBytecodeOptionsCategory),
+      llvm::cl::desc(
+          "Enables output files to be viewed as zip files for debugging "
+          "(only applies to binary targets)"));
 }
 
 }  // namespace VM

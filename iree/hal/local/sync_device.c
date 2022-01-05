@@ -18,6 +18,7 @@
 #include "iree/hal/local/local_executable_layout.h"
 #include "iree/hal/local/sync_event.h"
 #include "iree/hal/local/sync_semaphore.h"
+#include "iree/hal/utils/buffer_transfer.h"
 
 typedef struct iree_hal_sync_device_t {
   iree_hal_resource_t resource;
@@ -131,6 +132,11 @@ static iree_hal_allocator_t* iree_hal_sync_device_allocator(
     iree_hal_device_t* base_device) {
   iree_hal_sync_device_t* device = iree_hal_sync_device_cast(base_device);
   return device->device_allocator;
+}
+
+static iree_status_t iree_hal_sync_device_trim(iree_hal_device_t* base_device) {
+  iree_hal_sync_device_t* device = iree_hal_sync_device_cast(base_device);
+  return iree_hal_allocator_trim(device->device_allocator);
 }
 
 static iree_status_t iree_hal_sync_device_query_i32(
@@ -288,6 +294,7 @@ static const iree_hal_device_vtable_t iree_hal_sync_device_vtable = {
     .id = iree_hal_sync_device_id,
     .host_allocator = iree_hal_sync_device_host_allocator,
     .device_allocator = iree_hal_sync_device_allocator,
+    .trim = iree_hal_sync_device_trim,
     .query_i32 = iree_hal_sync_device_query_i32,
     .create_command_buffer = iree_hal_sync_device_create_command_buffer,
     .create_descriptor_set = iree_hal_sync_device_create_descriptor_set,
@@ -297,6 +304,7 @@ static const iree_hal_device_vtable_t iree_hal_sync_device_vtable = {
     .create_executable_cache = iree_hal_sync_device_create_executable_cache,
     .create_executable_layout = iree_hal_sync_device_create_executable_layout,
     .create_semaphore = iree_hal_sync_device_create_semaphore,
+    .transfer_range = iree_hal_device_transfer_mappable_range,
     .queue_submit = iree_hal_sync_device_queue_submit,
     .submit_and_wait = iree_hal_sync_device_submit_and_wait,
     .wait_semaphores = iree_hal_sync_device_wait_semaphores,

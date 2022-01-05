@@ -69,6 +69,7 @@ cc_library(
         "//iree/compiler/InputConversion/MHLO",
         "//iree/compiler/InputConversion/TOSA",
         "//iree/compiler/Translation:IREEVM",
+        "//iree/compiler/Utils",
         "//iree/tools:init_targets",
         "//iree/tools:iree_translate_lib",
         "@llvm-project//lld:COFF",

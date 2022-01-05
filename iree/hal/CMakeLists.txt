@@ -25,6 +25,8 @@ iree_cc_library(
     "buffer_heap_impl.h"
     "buffer_view.c"
     "buffer_view.h"
+    "buffer_view_util.c"
+    "buffer_view_util.h"
     "command_buffer.c"
     "command_buffer.h"
     "command_buffer_validation.c"

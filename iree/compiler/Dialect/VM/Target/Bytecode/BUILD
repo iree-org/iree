@@ -12,12 +12,10 @@ cc_library(
         "BytecodeModuleTarget.cpp",
         "DebugDatabaseBuilder.cpp",
         "DebugDatabaseBuilder.h",
-        "TranslationFlags.cpp",
         "TranslationRegistration.cpp",
     ],
     hdrs = [
         "BytecodeModuleTarget.h",
-        "TranslationFlags.h",
     ],
     deps = [
         "//iree/compiler/Dialect/Util/IR",

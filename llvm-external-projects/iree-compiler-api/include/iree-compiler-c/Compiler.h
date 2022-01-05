@@ -37,14 +37,15 @@ MLIR_CAPI_EXPORTED void ireeCompilerRegisterTargetBackends();
 MLIR_CAPI_EXPORTED IreeCompilerOptions ireeCompilerOptionsCreate();
 MLIR_CAPI_EXPORTED void ireeCompilerOptionsDestroy(IreeCompilerOptions options);
 
-MLIR_CAPI_EXPORTED void ireeCompilerOptionsSetInputDialectMHLO(
-    IreeCompilerOptions options);
-MLIR_CAPI_EXPORTED void ireeCompilerOptionsSetInputDialectTOSA(
-    IreeCompilerOptions options);
-MLIR_CAPI_EXPORTED void ireeCompilerOptionsSetInputDialectXLA(
-    IreeCompilerOptions options);
-MLIR_CAPI_EXPORTED void ireeCompilerOptionsAddTargetBackend(
-    IreeCompilerOptions options, const char *targetBackend);
+// Parses argv style arguments into a compiler options structure.
+MLIR_CAPI_EXPORTED MlirLogicalResult ireeCompilerOptionsSetFlags(
+    IreeCompilerOptions options, int argc, const char *const *argv,
+    void (*onError)(MlirStringRef, void *), void *userData);
+
+// Enumerates any non default flags and invokes the callback.
+MLIR_CAPI_EXPORTED void ireeCompilerOptionsGetFlags(
+    IreeCompilerOptions options, bool nonDefaultOnly,
+    void (*onFlag)(MlirStringRef, void *), void *userData);
 
 //===----------------------------------------------------------------------===//
 // Compiler stages.
