@@ -117,6 +117,8 @@ nav:
       - TensorFlow Lite: 'bindings/tensorflow-lite.md'
   - 'Extensions':
       - 'extensions/index.md'
+  - 'Reference':
+      - Optimization Options: 'reference/optimization-options.md'
   - 'Community':
       - 'community/index.md'
   - 'Blog':
