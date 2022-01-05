@@ -482,7 +482,7 @@ SmallVector<ExecutableTargetAttr, 4> DeviceTargetAttr::getExecutableTargets() {
 // static
 SmallVector<IREE::HAL::DeviceTargetAttr, 4> DeviceTargetAttr::lookup(
     Operation *op) {
-  auto attrId = mlir::Identifier::get("hal.device.targets", op->getContext());
+  auto attrId = mlir::StringAttr::get(op->getContext(), "hal.device.targets");
   while (op) {
     auto targetsAttr = op->getAttrOfType<ArrayAttr>(attrId);
     if (targetsAttr) {

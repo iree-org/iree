@@ -21,7 +21,6 @@
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SPIRV/IR/TargetAndABI.h"
 #include "mlir/IR/BuiltinOps.h"
-#include "mlir/IR/Identifier.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/Region.h"
 #include "mlir/Support/LogicalResult.h"
