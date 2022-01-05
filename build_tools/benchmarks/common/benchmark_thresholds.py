@@ -40,22 +40,9 @@ class BenchmarkThreshold:
 # Order matters here: if multiple regexes match a single benchmark, the first
 # match is used.
 BENCHMARK_THRESHOLDS = [
-    # Unstable and noisy GPU benchmarks.
-    BenchmarkThreshold(re.compile(r"^DeepLabV3.*GPU-Mali"), 20,
-                       ThresholdUnit.PERCENTAGE),
-    BenchmarkThreshold(re.compile(r"^MobileNetV3Small.*GPU-Mali"), 30,
-                       ThresholdUnit.PERCENTAGE),
-    BenchmarkThreshold(re.compile(r"^MobileSSD.*GPU-Mali"), 50,
-                       ThresholdUnit.PERCENTAGE),
-    BenchmarkThreshold(re.compile(r"^PoseNet.*GPU-Mali"), 30,
-                       ThresholdUnit.PERCENTAGE),
-
-    # Fast GPU benchmarks that complete around 10ms; using percentage is
-    # not suitable.
-    BenchmarkThreshold(re.compile(r"^MobileNetV2.*kernel-execution.*GPU-Mali"),
+    # Benchmarks that complete around 10ms; using percentage is not suitable.
+    BenchmarkThreshold(re.compile(r"^MobileNet.*GPU"),
                        1, ThresholdUnit.VALUE_MS),
-    BenchmarkThreshold(re.compile(r"^MobileNetV3Small.*GPU-Adreno"), 1,
-                       ThresholdUnit.VALUE_MS),
 
     # Default threshold for all benchmarks: 5%.
     BenchmarkThreshold(re.compile(r".*"), 5, ThresholdUnit.PERCENTAGE),
