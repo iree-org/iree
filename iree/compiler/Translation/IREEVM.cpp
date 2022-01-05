@@ -127,6 +127,8 @@ void buildIREEVMTransformPassPipeline(
       passManager.addPass(ConstEval::createJitGlobalsPass());
     };
   }
+  flowOptions.numericPrecisionReduction =
+      highLevelOptimizationOptions.numericPrecisionReduction;
 
   IREE::Flow::buildFlowTransformPassPipeline(passManager, flowOptions);
   IREE::Stream::TransformOptions streamOptions;
