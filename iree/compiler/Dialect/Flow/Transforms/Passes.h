@@ -30,6 +30,9 @@ struct TransformOptions : public PassPipelineOptions<TransformOptions> {
   // become the default.
   bool constExprHoisting = false;
 
+  // Enables passes to perform numeric precision reduction.
+  bool numericPrecisionReduction = false;
+
   // Hook to populate a constant evaluation pass pipeline. If nullptr, then
   // no passes are added for constant evaluation. This must be injected in
   // because constant-evaluators can depend on the whole compiler, of which

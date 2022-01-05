@@ -95,6 +95,12 @@ void buildGlobalOptimizationPassPipeline(
     transformOptions.buildConstEvalPassPipeline(pipeline);
   }
 
+  if (transformOptions.numericPrecisionReduction) {
+    pipeline.addPass(createInferNumericNarrowingPass());
+    pipeline.addPass(createOptimizeNumericsPass());
+    pipeline.addPass(createCleanupNumericNarrowingPass());
+  }
+
   FunctionLikeNest(pipeline)
       .addPass(mlir::createCanonicalizerPass)
       .addPass(mlir::createCSEPass);
