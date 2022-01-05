@@ -69,15 +69,20 @@ void HighLevelOptimizationOptions::bindOptions(OptionsBinder &binder) {
       "IREE options for controlling high level optimizations");
 
   binder.opt<bool>(
-      "iree-const-eval", constEval,
+      "iree-opt-const-eval", constEval,
       llvm::cl::desc("Enables eager evaluation of constants using the full "
                      "compiler and runtime"),
       llvm::cl::cat(category));
   binder.opt<bool>(
-      "iree-const-expr-hoisting", constExprHoisting,
+      "iree-opt-const-expr-hoisting", constExprHoisting,
       llvm::cl::desc(
           "Hoists the results of latent constant expressions into immutable "
           "global initializers for evaluation at program load"),
+      llvm::cl::cat(category));
+  binder.opt<bool>(
+      "iree-opt-numeric-precision-reduction", numericPrecisionReduction,
+      llvm::cl::desc(
+          "Reduces numeric precision to lower bit depths where possible"),
       llvm::cl::cat(category));
 }
 
@@ -122,6 +127,8 @@ void buildIREEVMTransformPassPipeline(
       passManager.addPass(ConstEval::createJitGlobalsPass());
     };
   }
+  flowOptions.numericPrecisionReduction =
+      highLevelOptimizationOptions.numericPrecisionReduction;
 
   IREE::Flow::buildFlowTransformPassPipeline(passManager, flowOptions);
   IREE::Stream::TransformOptions streamOptions;

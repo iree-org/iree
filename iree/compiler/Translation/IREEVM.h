@@ -72,6 +72,9 @@ struct HighLevelOptimizationOptions {
   // and runtime.
   bool constEval = false;
 
+  // Optimizations to reduce numeric precision where it is safe to do so.
+  bool numericPrecisionReduction = false;
+
   void bindOptions(OptionsBinder &binder);
   using FromFlags = OptionsFromFlags<HighLevelOptimizationOptions>;
 };
