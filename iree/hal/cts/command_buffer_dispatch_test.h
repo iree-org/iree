@@ -84,16 +84,16 @@ TEST_P(command_buffer_dispatch_test, DispatchAbs) {
       device_allocator_, /*shape=*/NULL,
       /*shape_rank=*/0, IREE_HAL_ELEMENT_TYPE_FLOAT_32,
       IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR,
-      IREE_HAL_MEMORY_TYPE_HOST_LOCAL | IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE,
-      IREE_HAL_BUFFER_USAGE_ALL,
+      IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL | IREE_HAL_MEMORY_TYPE_HOST_VISIBLE,
+      IREE_HAL_BUFFER_USAGE_DISPATCH | IREE_HAL_BUFFER_USAGE_TRANSFER,
       iree_make_const_byte_span((void*)input_data, sizeof(input_data)),
       &input_buffer_view));
   iree_hal_buffer_t* output_buffer = NULL;
   IREE_ASSERT_OK(iree_hal_allocator_allocate_buffer(
       device_allocator_,
-      IREE_HAL_MEMORY_TYPE_HOST_VISIBLE | IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE,
-      IREE_HAL_BUFFER_USAGE_ALL, sizeof(float), iree_const_byte_span_empty(),
-      &output_buffer));
+      IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL | IREE_HAL_MEMORY_TYPE_HOST_VISIBLE,
+      IREE_HAL_BUFFER_USAGE_DISPATCH | IREE_HAL_BUFFER_USAGE_MAPPING,
+      sizeof(float), iree_const_byte_span_empty(), &output_buffer));
 
   iree_hal_descriptor_set_binding_t descriptor_set_bindings[] = {
       {/*binding=*/0, iree_hal_buffer_view_buffer(input_buffer_view),
