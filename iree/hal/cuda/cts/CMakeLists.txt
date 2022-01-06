@@ -18,8 +18,6 @@ iree_hal_cts_test_suite(
   DEPS
     iree::hal::cuda::registration
   EXCLUDED_TESTS
-    # Non-push descriptor sets are not implemented in the CUDA backend yet.
-    "descriptor_set"
     # Semaphores are not implemented in the CUDA backend yet.
     "semaphore_submission"
     "semaphore"

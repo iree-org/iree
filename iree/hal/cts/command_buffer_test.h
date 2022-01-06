@@ -16,6 +16,12 @@
 #include "iree/testing/gtest.h"
 #include "iree/testing/status_matchers.h"
 
+// TODO(scotttodd): split into several tests, for example:
+//     command_buffer_recording_test (recording/lifetime)
+//     command_buffer_dispatch_test
+//     command_buffer_fill_test (filling buffers)
+//     command_buffer_e2e_test (barriers, dispatches)
+
 namespace iree {
 namespace hal {
 namespace cts {

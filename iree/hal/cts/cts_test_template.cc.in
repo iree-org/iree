@@ -51,7 +51,7 @@ iree_const_byte_span_t get_test_executable_data(iree_string_view_t file_name) {
   }
   // TODO(scotttodd): error handling / reporting? This a sharp edge.
 #endif
-  return iree_const_byte_span_empty();
+  return {NULL, 0};
 }
 
 INSTANTIATE_TEST_SUITE_P(CTS, IREE_CTS_TEST_CLASS_NAME,

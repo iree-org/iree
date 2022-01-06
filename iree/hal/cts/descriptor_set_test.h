@@ -19,7 +19,10 @@ namespace cts {
 
 class descriptor_set_test : public CtsTestBase {};
 
-TEST_P(descriptor_set_test, CreateWithTwoBindings) {
+// TODO(scotttodd): enable once any driver implements non-push descriptor sets
+//   * also test with buffers in the bindings
+//   * also test usage in iree_hal_command_buffer_bind_descriptor_set
+TEST_P(descriptor_set_test, DISABLED_CreateWithTwoBindings) {
   iree_hal_descriptor_set_layout_t* descriptor_set_layout;
   iree_hal_descriptor_set_layout_binding_t descriptor_set_layout_bindings[] = {
       {/*binding=*/0, /*type=*/IREE_HAL_DESCRIPTOR_TYPE_STORAGE_BUFFER},
