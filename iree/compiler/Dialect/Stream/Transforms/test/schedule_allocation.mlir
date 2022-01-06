@@ -14,7 +14,7 @@ func @extractConstants(%timepoint: !stream.timepoint, %operand: !stream.resource
   %c16 = arith.constant 16 : index
   %c24 = arith.constant 24 : index
   %c128 = arith.constant 128 : index
-  %cst = arith.constant 5.4 : f32
+  %c255_i32 = arith.constant 255 : i32
 
   // Constants get hoisted into a dedicated op.
   // CHECK: %[[CST_RETS:.+]]:2, %[[CST_TIMEPOINT:.+]] = stream.resource.constants :
@@ -29,7 +29,7 @@ func @extractConstants(%timepoint: !stream.timepoint, %operand: !stream.resource
   %results:3, %result_timepoint = stream.async.execute await(%timepoint) => with(%operand as %capture: !stream.resource<transient>{%size}) -> (!stream.resource<constant>{%c8}, !stream.resource<constant>{%c16}, !stream.resource<transient>{%size}) {
     %0 = stream.async.constant : !stream.resource<constant>{%c8} = dense<3> : tensor<8xi8>
     %1 = stream.async.constant : !stream.resource<constant>{%c16} = dense<4> : tensor<4x2xi16>
-    %2 = stream.async.fill %cst, %capture[%c0 to %c128 for %c128] : f32 -> %capture as !stream.resource<transient>{%size}
+    %2 = stream.async.fill %c255_i32, %capture[%c0 to %c128 for %c128] : i32 -> %capture as !stream.resource<transient>{%size}
     stream.yield %0, %1, %2 : !stream.resource<constant>{%c8}, !stream.resource<constant>{%c16}, !stream.resource<transient>{%size}
   } => !stream.timepoint
 
@@ -89,11 +89,11 @@ func @capturedOperands(%operand: !stream.resource<transient>, %size: index) {
 func @tiedOperands(%operand: !stream.resource<transient>, %size: index) {
   %c0 = arith.constant 0 : index
   %c128 = arith.constant 128 : index
-  %cst = arith.constant 5.4 : f32
+  %c255_i32 = arith.constant 255 : i32
   // CHECK: stream.cmd.execute with(%[[OPERAND]] as %[[CAPTURE:.+]]: !stream.resource<transient>{%[[SIZE]]})
   %result, %result_timepoint = stream.async.execute with(%operand as %capture: !stream.resource<transient>{%size}) -> (!stream.resource<transient>{%size}) {
-    // CHECK-NEXT: stream.cmd.fill %cst, %[[CAPTURE]]
-    %0 = stream.async.fill %cst, %capture[%c0 to %c128 for %c128] : f32 -> %capture as !stream.resource<transient>{%size}
+    // CHECK-NEXT: stream.cmd.fill %c255_i32, %[[CAPTURE]]
+    %0 = stream.async.fill %c255_i32, %capture[%c0 to %c128 for %c128] : i32 -> %capture as !stream.resource<transient>{%size}
     stream.yield %0 : !stream.resource<transient>{%size}
   } => !stream.timepoint
   // CHECK: util.do_not_optimize(%[[OPERAND]])
@@ -109,17 +109,17 @@ func @tiedOperands(%operand: !stream.resource<transient>, %size: index) {
 // CHECK-LABEL: @producedResults
 // CHECK-SAME: (%[[SIZE0:.+]]: index, %[[SIZE1:.+]]: index)
 func @producedResults(%size0: index, %size1: index) {
-  %cst = arith.constant 5.4 : f32
-  %cst_0 = arith.constant 6.4 : f32
+  %c254_i32 = arith.constant 254 : i32
+  %c255_i32 = arith.constant 255 : i32
   // CHECK: %[[ALLOC_RETS:.+]]:2 = stream.resource.alloc uninitialized : !stream.resource<transient>{%[[SIZE0]]}, !stream.resource<transient>{%[[SIZE1]]}
   // CHECK: %[[TIMEPOINT:.+]] = stream.cmd.execute
   // CHECK-SAME: with(%[[ALLOC_RETS]]#0 as %[[CAPTURE0:.+]]: !stream.resource<transient>{%[[SIZE0]]},
   // CHECK-SAME:      %[[ALLOC_RETS]]#1 as %[[CAPTURE1:.+]]: !stream.resource<transient>{%[[SIZE1]]})
   %results:2, %result_timepoint = stream.async.execute with() -> (!stream.resource<transient>{%size0}, !stream.resource<transient>{%size1}) {
-    // CHECK: stream.cmd.fill %cst, %[[CAPTURE0]]
-    %0 = stream.async.splat %cst : f32 -> !stream.resource<transient>{%size0}
-    // CHECK: stream.cmd.fill %cst_0, %[[CAPTURE1]]
-    %1 = stream.async.splat %cst_0 : f32 -> !stream.resource<transient>{%size1}
+    // CHECK: stream.cmd.fill %c254_i32, %[[CAPTURE0]]
+    %0 = stream.async.splat %c254_i32 : i32 -> !stream.resource<transient>{%size0}
+    // CHECK: stream.cmd.fill %c255_i32, %[[CAPTURE1]]
+    %1 = stream.async.splat %c255_i32 : i32 -> !stream.resource<transient>{%size1}
     stream.yield %0, %1 : !stream.resource<transient>{%size0}, !stream.resource<transient>{%size1}
   } => !stream.timepoint
   // CHECK: util.do_not_optimize(%[[TIMEPOINT]])
@@ -140,8 +140,8 @@ func @producedResults(%size0: index, %size1: index) {
 // CHECK-LABEL: @locals
 // CHECK-SAME: (%[[SIZE0:.+]]: index, %[[SIZE1:.+]]: index, %[[AWAIT_TIMEPOINT:.+]]: !stream.timepoint)
 func @locals(%size0: index, %size1: index, %await_timepoint: !stream.timepoint) -> !stream.timepoint {
-  %cst = arith.constant 5.4 : f32
-  %cst_0 = arith.constant 6.4 : f32
+  %c254_i32 = arith.constant 254 : i32
+  %c255_i32 = arith.constant 255 : i32
   //      CHECK: %[[SLICES:.+]]:3 = stream.resource.pack slices({
   // CHECK-NEXT:   [0, 0] = %[[SIZE0]],
   // CHECK-NEXT:   [1, 1] = %[[SIZE1]]
@@ -151,10 +151,10 @@ func @locals(%size0: index, %size1: index, %await_timepoint: !stream.timepoint) 
   // CHECK: %[[EXEC_TIMEPOINT:.+]] = stream.cmd.execute await(%[[AWAIT_JOIN]])
   // CHECK-SAME: with(%[[ALLOCA]] as %[[CAPTURE:.+]]: !stream.resource<transient>{%[[SLICES]]#0})
   %result_timepoint = stream.async.execute await(%await_timepoint) => with() {
-    // CHECK: stream.cmd.fill %cst, %[[CAPTURE]][%[[SLICES]]#1 for %[[SIZE0]]] : f32 -> !stream.resource<transient>{%[[SLICES]]#0}
-    %0 = stream.async.splat %cst : f32 -> !stream.resource<transient>{%size0}
-    // CHECK: stream.cmd.fill %cst_0, %[[CAPTURE]][%[[SLICES]]#2 for %[[SIZE1]]] : f32 -> !stream.resource<transient>{%[[SLICES]]#0}
-    %1 = stream.async.splat %cst_0 : f32 -> !stream.resource<transient>{%size1}
+    // CHECK: stream.cmd.fill %c254_i32, %[[CAPTURE]][%[[SLICES]]#1 for %[[SIZE0]]] : i32 -> !stream.resource<transient>{%[[SLICES]]#0}
+    %0 = stream.async.splat %c254_i32 : i32 -> !stream.resource<transient>{%size0}
+    // CHECK: stream.cmd.fill %c255_i32, %[[CAPTURE]][%[[SLICES]]#2 for %[[SIZE1]]] : i32 -> !stream.resource<transient>{%[[SLICES]]#0}
+    %1 = stream.async.splat %c255_i32 : i32 -> !stream.resource<transient>{%size1}
     stream.yield
   } => !stream.timepoint
   // CHECK: %[[DEALLOCA_TIMEPOINT:.+]] = stream.resource.dealloca await(%[[EXEC_TIMEPOINT]]) => %[[ALLOCA]] : !stream.resource<transient>{%[[SLICES]]#0} => !stream.timepoint
@@ -174,8 +174,8 @@ func @locals(%size0: index, %size1: index, %await_timepoint: !stream.timepoint) 
 func @concurrentRegions(%operand: !stream.resource<transient>, %size: index) {
   %c0 = arith.constant 0 : index
   %c128 = arith.constant 128 : index
-  %cst_0 = arith.constant 5.4 : f32
-  %cst_1 = arith.constant 6.4 : f32
+  %c254_i32 = arith.constant 254 : i32
+  %c255_i32 = arith.constant 255 : i32
   // CHECK: %[[ALLOC:.+]] = stream.resource.alloc uninitialized : !stream.resource<transient>{%[[SIZE]]}
   // CHECK: stream.cmd.execute
   // CHECK-SAME: with(%[[OPERAND]] as %[[OPERAND_CAPTURE:.+]]: !stream.resource<transient>{%[[SIZE]]},
@@ -183,10 +183,10 @@ func @concurrentRegions(%operand: !stream.resource<transient>, %size: index) {
   %results:2, %result_timepoint = stream.async.execute with(%operand as %capture: !stream.resource<transient>{%size}) -> (!stream.resource<transient>{%size}, !stream.resource<transient>{%size}) {
     // CHECK: stream.cmd.concurrent
     %0:2 = stream.async.concurrent with(%capture as %concurrent_capture: !stream.resource<transient>{%size}) -> (%capture as !stream.resource<transient>{%size}, !stream.resource<transient>{%size}) {
-      // CHECK-NEXT: stream.cmd.fill %cst, %[[OPERAND_CAPTURE]]
-      %1 = stream.async.fill %cst_0, %concurrent_capture[%c0 to %c128 for %c128] : f32 -> %concurrent_capture as !stream.resource<transient>{%size}
-      // CHECK-NEXT: stream.cmd.fill %cst_0, %[[ALLOC_CAPTURE]]
-      %2 = stream.async.splat %cst_1 : f32 -> !stream.resource<transient>{%size}
+      // CHECK-NEXT: stream.cmd.fill %c254_i32, %[[OPERAND_CAPTURE]]
+      %1 = stream.async.fill %c254_i32, %concurrent_capture[%c0 to %c128 for %c128] : i32 -> %concurrent_capture as !stream.resource<transient>{%size}
+      // CHECK-NEXT: stream.cmd.fill %c255_i32, %[[ALLOC_CAPTURE]]
+      %2 = stream.async.splat %c255_i32 : i32 -> !stream.resource<transient>{%size}
       stream.yield %1, %2 : !stream.resource<transient>{%size}, !stream.resource<transient>{%size}
     }
     stream.yield %0#0, %0#1 : !stream.resource<transient>{%size}, !stream.resource<transient>{%size}
@@ -203,12 +203,12 @@ func @concurrentRegions(%operand: !stream.resource<transient>, %size: index) {
 // CHECK-LABEL: @applyAsyncSplatOp
 // CHECK-SAME: (%[[SIZE:.+]]: index)
 func @applyAsyncSplatOp(%size: index) {
-  %cst = arith.constant 5.4 : f32
+  %c255_i32 = arith.constant 255 : i32
   // CHECK: %[[ALLOC:.+]] = stream.resource.alloc uninitialized : !stream.resource<transient>{%[[SIZE]]}
   // CHECK: stream.cmd.execute with(%[[ALLOC]] as %[[CAPTURE:.+]]: !stream.resource<transient>{%[[SIZE]]})
   %result, %result_timepoint = stream.async.execute with() -> (!stream.resource<transient>{%size}) {
-    // CHECK: stream.cmd.fill %cst, %[[CAPTURE]][%c0 for %[[SIZE]]] : f32 -> !stream.resource<transient>{%[[SIZE]]}
-    %0 = stream.async.splat %cst : f32 -> !stream.resource<transient>{%size}
+    // CHECK: stream.cmd.fill %c255_i32, %[[CAPTURE]][%c0 for %[[SIZE]]] : i32 -> !stream.resource<transient>{%[[SIZE]]}
+    %0 = stream.async.splat %c255_i32 : i32 -> !stream.resource<transient>{%size}
     stream.yield %0 : !stream.resource<transient>{%size}
   } => !stream.timepoint
   // CHECK: util.do_not_optimize(%[[ALLOC]])
@@ -270,11 +270,11 @@ func @applyAsyncFillOp(%operand: !stream.resource<transient>, %size: index) {
   %c16 = arith.constant 16 : index
   %c128 = arith.constant 128 : index
   %c144 = arith.constant 144 : index
-  %cst = arith.constant 5.4 : f32
+  %c255_i32 = arith.constant 255 : i32
   // CHECK: stream.cmd.execute with(%[[OPERAND]] as %[[CAPTURE:.+]]: !stream.resource<transient>{%[[SIZE]]})
   %result, %result_timepoint = stream.async.execute with(%operand as %capture: !stream.resource<transient>{%size}) -> (!stream.resource<transient>{%size}) {
-    // CHECK: stream.cmd.fill %cst, %[[CAPTURE]][%c16_0 for %c128] : f32 -> !stream.resource<transient>{%[[SIZE]]}
-    %0 = stream.async.fill %cst, %capture[%c16 to %c144 for %c128] : f32 -> %capture as !stream.resource<transient>{%size}
+    // CHECK: stream.cmd.fill %c255_i32, %[[CAPTURE]][%c16_0 for %c128] : i32 -> !stream.resource<transient>{%[[SIZE]]}
+    %0 = stream.async.fill %c255_i32, %capture[%c16 to %c144 for %c128] : i32 -> %capture as !stream.resource<transient>{%size}
     stream.yield %0 : !stream.resource<transient>{%size}
   } => !stream.timepoint
   // CHECK: util.do_not_optimize(%[[OPERAND]])

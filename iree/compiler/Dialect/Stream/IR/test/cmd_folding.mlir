@@ -7,7 +7,7 @@ func @FoldSubviewsIntoCmdTOp(%arg0: !stream.resource<transient>, %arg1: index) -
   %c1000 = arith.constant 1000 : index
   %c2000 = arith.constant 2000 : index
   %c3000 = arith.constant 3000 : index
-  %cst = arith.constant 4.2 : f32
+  %c255_i32 = arith.constant 255 : i32
   %0 = stream.resource.subview %arg0[%c64] : !stream.resource<transient>{%arg1} -> !stream.resource<transient>{%c3000}
   %1 = stream.cmd.execute with(%0 as %arg2: !stream.resource<transient>{%arg1}) {
     // CHECK: stream.cmd.flush %arg2[%c1064 for %c2000] : !stream.resource<transient>{%arg1}
@@ -16,8 +16,8 @@ func @FoldSubviewsIntoCmdTOp(%arg0: !stream.resource<transient>, %arg1: index) -
     stream.cmd.invalidate %arg2[%c1000 for %c2000] : !stream.resource<transient>{%c3000}
     // CHECK: stream.cmd.discard %arg2[%c1064 for %c2000] : !stream.resource<transient>{%arg1}
     stream.cmd.discard %arg2[%c1000 for %c2000] : !stream.resource<transient>{%c3000}
-    // CHECK: stream.cmd.fill %cst, %arg2[%c1064 for %c2000] : f32 -> !stream.resource<transient>{%arg1}
-    stream.cmd.fill %cst, %arg2[%c1000 for %c2000] : f32 -> !stream.resource<transient>{%c3000}
+    // CHECK: stream.cmd.fill %c255_i32, %arg2[%c1064 for %c2000] : i32 -> !stream.resource<transient>{%arg1}
+    stream.cmd.fill %c255_i32, %arg2[%c1000 for %c2000] : i32 -> !stream.resource<transient>{%c3000}
   } => !stream.timepoint
   return %1 : !stream.timepoint
 }

@@ -111,6 +111,10 @@ void buildStreamAsyncPassPipeline(OpPassManager &passManager,
       IREE::Stream::createEncodeTensorsPass());
   passManager.addNestedPass<mlir::FuncOp>(
       IREE::Stream::createEncodeTensorsPass());
+
+  // Expand builtins to dispatches. This may introduce new executables.
+  passManager.addPass(IREE::Stream::createMaterializeBuiltinsPass());
+
   addCleanupPatterns(passManager);
 
   // Materialize copy-on-write behavior with explicit stream.async.* ops.

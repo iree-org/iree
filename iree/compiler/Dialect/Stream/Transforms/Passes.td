@@ -33,10 +33,6 @@ def ConvertToStream :
   }];
 }
 
-//===----------------------------------------------------------------------===//
-// Placement/affinity management
-//===----------------------------------------------------------------------===//
-
 def EncodeTensors :
     Pass<"iree-stream-encode-tensors", ""> {
   let summary = "Encodes tensors into binary formats based on affinity and target support.";
@@ -44,6 +40,18 @@ def EncodeTensors :
     mlir::iree_compiler::IREE::Stream::createEncodeTensorsPass()
   }];
 }
+
+def MaterializeBuiltins :
+    Pass<"iree-stream-materialize-builtins", "mlir::ModuleOp"> {
+  let summary = "Materialize stream.builtin.* executables.";
+  let constructor = [{
+    mlir::iree_compiler::IREE::Stream::createMaterializeBuiltinsPass()
+  }];
+}
+
+//===----------------------------------------------------------------------===//
+// Placement/affinity management
+//===----------------------------------------------------------------------===//
 
 def MaterializeCopyOnWrite :
     Pass<"iree-stream-materialize-copy-on-write", ""> {

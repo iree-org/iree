@@ -6,9 +6,11 @@
 
 #include "iree/compiler/Dialect/Stream/IR/StreamOps.h"
 
+#include "iree/compiler/Dialect/Stream/Builtins/Builtins.h"
 #include "iree/compiler/Dialect/Util/IR/ClosureOpUtils.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
+#include "iree/compiler/Utils/ModuleUtils.h"
 #include "llvm/ADT/BitVector.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/CommandLine.h"
@@ -932,6 +934,158 @@ Value TensorStoreOp::getTiedResult(unsigned resultIndex) {
 
 SmallVector<int64_t, 4> TensorStoreOp::getTiedResultOperandIndices() {
   return {0};  // target
+}
+
+//===----------------------------------------------------------------------===//
+// stream.builtin.* utilities
+//===----------------------------------------------------------------------===//
+
+// Merges a builtin module from iree/compiler/Dialect/Stream/Builtins/*.mlir
+// into the user module; this allows for host functions and multiple
+// executables.
+//
+// Fails if there's a name conflict; we have a __ prefix and things outside the
+// compiler shouldn't use it.
+static LogicalResult mergeBuiltinModuleSource(Location loc, StringRef fileName,
+                                              Operation *targetOp,
+                                              OpBuilder &targetBuilder) {
+  // Find the file in the embedded data.
+  const iree_file_toc_t *toc = iree_compiler_Stream_Builtins_create();
+  const iree_file_toc_t *file = nullptr;
+  for (size_t i = 0; i < iree_compiler_Stream_Builtins_size(); ++i) {
+    if (fileName == toc[i].name) {
+      file = &toc[i];
+      break;
+    }
+  }
+  if (!file) {
+    return mlir::emitError(
+        loc, "unable to merge builtin module; file not found " + fileName);
+  }
+  SymbolTable targetSymbols(targetOp);
+  return mergeSourceModuleInto(loc, StringRef(file->data, file->size), targetOp,
+                               targetSymbols, targetBuilder);
+}
+
+//===----------------------------------------------------------------------===//
+// stream.builtin.splat.i64
+//===----------------------------------------------------------------------===//
+
+static LogicalResult verifyOp(BuiltinSplatI64Op op) {
+  if (failed(verifyOpValueSizes(op, op.result(), op.result_size()))) {
+    return failure();
+  }
+  return success();
+}
+
+LogicalResult BuiltinSplatI64Op::mergeBuiltinModule(Operation *targetOp,
+                                                    OpBuilder &targetBuilder) {
+  return mergeBuiltinModuleSource(getLoc(), "splat_i64.mlir", targetOp,
+                                  targetBuilder);
+}
+
+LogicalResult BuiltinSplatI64Op::convertBuiltinOp(OpBuilder &builder) {
+  auto c8 = builder.createOrFold<arith::ConstantIndexOp>(getLoc(), 8);
+  auto count =
+      builder.createOrFold<arith::DivUIOp>(getLoc(), result_size(), c8);
+  auto one = builder.create<arith::ConstantIndexOp>(getLoc(), 1);
+  Value workgroupCount[3] = {
+      count,
+      one,
+      one,
+  };
+  SmallVector<Value> operands = {
+      value(),
+      count,
+  };
+  SmallVector<Value> operandSizes = {};
+  SmallVector<int64_t> tiedOperands = {
+      -1,
+  };
+  SmallVector<Value> resultSizes = {
+      result_size(),
+  };
+  SmallVector<Type> resultTypes{
+      result().getType(),
+  };
+  auto dispatchOp = builder.create<IREE::Stream::AsyncDispatchOp>(
+      getLoc(), resultTypes, workgroupCount,
+      SymbolRefAttr::get(
+          builder.getStringAttr("__builtin_splat_i64"),
+          FlatSymbolRefAttr::get(builder.getContext(), "__builtin_splat_i64")),
+      operands, operandSizes, resultSizes,
+      builder.getIndexArrayAttr(tiedOperands), affinityAttr());
+  result().replaceAllUsesWith(dispatchOp.results().front());
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
+// stream.builtin.fill.i64
+//===----------------------------------------------------------------------===//
+
+static LogicalResult verifyOp(BuiltinFillI64Op op) {
+  if (failed(verifyOpValueSizes(op, op.result(), op.target_size()))) {
+    return failure();
+  }
+  return success();
+}
+
+Value BuiltinFillI64Op::getTiedResult(unsigned resultIndex) {
+  return IREE::Util::TiedOpInterface::findTiedBaseValue(target());
+}
+
+::llvm::Optional<unsigned> BuiltinFillI64Op::getTiedResultOperandIndex(
+    unsigned resultIndex) {
+  return {0};  // target
+}
+
+SmallVector<int64_t, 4> BuiltinFillI64Op::getTiedResultOperandIndices() {
+  return {0};  // target
+}
+
+LogicalResult BuiltinFillI64Op::mergeBuiltinModule(Operation *targetOp,
+                                                   OpBuilder &targetBuilder) {
+  return mergeBuiltinModuleSource(getLoc(), "fill_i64.mlir", targetOp,
+                                  targetBuilder);
+}
+
+LogicalResult BuiltinFillI64Op::convertBuiltinOp(OpBuilder &builder) {
+  auto c8 = builder.createOrFold<arith::ConstantIndexOp>(getLoc(), 8);
+  auto count =
+      builder.createOrFold<arith::DivUIOp>(getLoc(), target_length(), c8);
+  auto one = builder.create<arith::ConstantIndexOp>(getLoc(), 1);
+  Value workgroupCount[3] = {
+      count,
+      one,
+      one,
+  };
+  SmallVector<Value> operands = {
+      target(),
+      value(),
+      target_offset(),
+      count,
+  };
+  SmallVector<Value> operandSizes = {
+      target_size(),
+  };
+  SmallVector<int64_t> tiedOperands = {
+      0,
+  };
+  SmallVector<Value> resultSizes = {
+      target_size(),
+  };
+  SmallVector<Type> resultTypes{
+      result().getType(),
+  };
+  auto dispatchOp = builder.create<IREE::Stream::AsyncDispatchOp>(
+      getLoc(), resultTypes, workgroupCount,
+      SymbolRefAttr::get(
+          builder.getStringAttr("__builtin_fill_i64"),
+          FlatSymbolRefAttr::get(builder.getContext(), "__builtin_fill_i64")),
+      operands, operandSizes, resultSizes,
+      builder.getIndexArrayAttr(tiedOperands), affinityAttr());
+  result().replaceAllUsesWith(dispatchOp.results().front());
+  return success();
 }
 
 //===----------------------------------------------------------------------===//
