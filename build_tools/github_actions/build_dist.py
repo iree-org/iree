@@ -39,7 +39,6 @@ a directory and:
 
   python ./main_checkout/build_tools/github_actions/build_dist.py main-dist
   python ./main_checkout/build_tools/github_actions/build_dist.py py-runtime-pkg
-  python ./main_checkout/build_tools/github_actions/build_dist.py py-pure-pkgs
   python ./main_checkout/build_tools/github_actions/build_dist.py py-xla-compiler-tools-pkg
   python ./main_checkout/build_tools/github_actions/build_dist.py py-tflite-compiler-tools-pkg
   python ./main_checkout/build_tools/github_actions/build_dist.py py-tf-compiler-tools-pkg
@@ -378,8 +377,6 @@ elif command == "py-runtime-pkg":
   build_py_runtime_pkg()
 elif command == "instrumented-py-runtime-pkg":
   build_py_runtime_pkg(instrumented=True)
-elif command == "py-pure-pkgs":
-  build_py_pure_pkgs()
 elif command == "py-xla-compiler-tools-pkg":
   build_py_xla_compiler_tools_pkg()
 elif command == "py-tflite-compiler-tools-pkg":
