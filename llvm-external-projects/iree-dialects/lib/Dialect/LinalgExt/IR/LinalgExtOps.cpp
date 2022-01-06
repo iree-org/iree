@@ -768,6 +768,172 @@ Operation *FftOp::getTiledImplementation(OpBuilder &builder, ValueRange outputs,
 }
 
 //===----------------------------------------------------------------------===//
+// ScanOp
+//===----------------------------------------------------------------------===//
+
+static LogicalResult verifyScanOp(ScanOp op) {
+  if (op.getNumInputs() != 1) {
+    return op.emitOpError("expected one input operands");
+  }
+  if (op.getNumOutputs() != 1) {
+    return op.emitOpError("expected one output operand");
+  }
+  auto identityElementType = op.identity().getType();
+  auto inputType = op.input().getType().cast<ShapedType>();
+  auto outputType = op.output().getType().cast<ShapedType>();
+  if (identityElementType != inputType.getElementType()) {
+    return op.emitOpError(
+        "expected input/identity element types to be identical");
+  }
+  if (inputType.getElementType() != outputType.getElementType()) {
+    return op.emitOpError(
+        "expected input/output element types to be identical");
+  }
+  ArrayRef<int64_t> inputShapes = inputType.getShape();
+  ArrayRef<int64_t> outputShapes = outputType.getShape();
+  if (inputShapes.size() != outputShapes.size()) {
+    return op.emitOpError("expected input/output to have identical ranks");
+  }
+  if (llvm::any_of(llvm::zip(inputShapes, outputShapes),
+                   [](std::tuple<int64_t, int64_t> s) {
+                     return std::get<0>(s) != ShapedType::kDynamicSize &&
+                            std::get<1>(s) != ShapedType::kDynamicSize &&
+                            std::get<0>(s) != std::get<1>(s);
+                   })) {
+    return op.emitOpError("incompatible input/output shapes");
+  }
+  return success();
+}
+
+SmallVector<Range> ScanOp::getIterationDomain(OpBuilder &builder) {
+  int64_t operandRank = getOperandRank();
+  SmallVector<Range> loopBounds(operandRank);
+  Location loc = getLoc();
+  Value zero = builder.create<arith::ConstantIndexOp>(loc, 0);
+  Value one = builder.create<arith::ConstantIndexOp>(loc, 1);
+  Value source = input();
+  for (auto dim : llvm::seq<int64_t>(0, operandRank)) {
+    loopBounds[dim].offset = zero;
+    loopBounds[dim].size = getDimValue(builder, loc, source, dim);
+    loopBounds[dim].stride = one;
+  }
+  return loopBounds;
+}
+
+SmallVector<StringRef> ScanOp::getLoopIteratorTypes() {
+  SmallVector<StringRef> iteratorTypes(getOperandRank(),
+                                       getParallelIteratorTypeName());
+  iteratorTypes[dimension()] = getReductionIteratorTypeName();
+  return iteratorTypes;
+}
+
+SmallVector<unsigned> ScanOp::getPartitionableLoops(
+    unsigned maxNumParallelDims) {
+  auto range = llvm::seq<unsigned>(0, getOperandRank());
+  SmallVector<unsigned> partitionableLoops(range.begin(), range.end());
+  partitionableLoops.erase(std::next(partitionableLoops.begin(), dimension()));
+  return partitionableLoops;
+}
+
+// Generates naive scalar implementation of scan for a given operator f.
+// For inclusive,
+//     output[0] = input[0]
+//     output[i] = f(output[i-1], input[i])
+//
+// For exclusive,
+//     output[0] = 0
+//     output[i] = f(output[i-1], input[i-1])
+
+LogicalResult ScanOp::generateScalarImplementation(OpBuilder &b, Location loc,
+                                                   ValueRange ivs) {
+  SmallVector<Value> indices, scanBlkArgs;
+  indices.append(ivs.begin(), ivs.end());
+  Value zero = b.create<arith::ConstantIndexOp>(loc, 0);
+  Value one = b.create<arith::ConstantIndexOp>(loc, 1);
+  auto scanDim = dimension();
+  auto cond = b.create<arith::CmpIOp>(loc, arith::CmpIPredicate::eq,
+                                      indices[scanDim], zero);
+  bool isInclusive = inclusive();
+  auto scfIf = b.create<scf::IfOp>(
+      loc, TypeRange{}, cond,
+      [&](OpBuilder &b, Location loc) {
+        if (isInclusive) {
+          auto value = b.create<memref::LoadOp>(loc, input(), indices);
+          b.create<memref::StoreOp>(loc, value, output(), indices);
+        } else {
+          b.create<memref::StoreOp>(loc, identity(), output(), indices);
+        }
+        b.create<scf::YieldOp>(loc);
+      },
+      [&](OpBuilder &b, Location loc) {
+        SmallVector<Value> indices(ivs.begin(), ivs.end());
+        Value iv = indices[scanDim];
+        Value ivMinusOne = b.create<arith::SubIOp>(loc, iv, one);
+        indices[scanDim] = ivMinusOne;
+        scanBlkArgs.push_back(b.create<memref::LoadOp>(loc, output(), indices));
+        Value i0;
+        if (!isInclusive) i0 = b.create<memref::LoadOp>(loc, input(), indices);
+        indices[scanDim] = iv;
+        if (isInclusive) i0 = b.create<memref::LoadOp>(loc, input(), indices);
+        scanBlkArgs.push_back(i0);
+      });
+
+  auto &srcBlock = region().front();
+  Region &region = scfIf.getElseRegion();
+  BlockAndValueMapping bvm;
+  {
+    OpBuilder::InsertionGuard guard(b);
+    auto &block = region.front();
+    b.setInsertionPointToEnd(&block);
+    for (auto it : llvm::zip(srcBlock.getArguments(), scanBlkArgs)) {
+      bvm.map(std::get<0>(it), std::get<1>(it));
+    }
+    for (auto &blockOp : srcBlock.without_terminator()) {
+      b.clone(blockOp, bvm);
+    }
+    b.create<memref::StoreOp>(
+        loc, bvm.lookupOrDefault(srcBlock.getTerminator()->getOperand(0)),
+        output(), indices);
+    b.create<scf::YieldOp>(loc);
+  }
+  return success();
+}
+
+Operation *ScanOp::getTiledImplementation(OpBuilder &builder,
+                                          ValueRange outputs,
+                                          ArrayRef<OpFoldResult> offsets,
+                                          ArrayRef<OpFoldResult> sizes,
+                                          SmallVectorImpl<Value> &results) {
+  assert(outputs.size() == this->outputs().size());
+  int64_t rank = getOperandRank();
+  assert(offsets.size() == static_cast<size_t>(rank) &&
+         sizes.size() == static_cast<size_t>(rank));
+  auto oneAttr = builder.getI64IntegerAttr(1);
+  SmallVector<OpFoldResult> strides(rank, oneAttr);
+  Location loc = getLoc();
+  SmallVector<Value> tiledOperands;
+  tiledOperands.emplace_back(
+      getSlice(builder, getLoc(), input(), offsets, sizes, strides));
+  tiledOperands.emplace_back(
+      getSlice(builder, getLoc(), output(), offsets, sizes, strides));
+  tiledOperands.emplace_back(identity());
+
+  SmallVector<Type, 4> resultTypes;
+  if (hasTensorSemantics()) {
+    resultTypes.push_back(tiledOperands[1].getType());
+  }
+
+  Operation *tiledScanOp = cast<LinalgExtOp>(getOperation())
+                               .clone(builder, loc, resultTypes, tiledOperands);
+  for (auto result : llvm::enumerate(tiledScanOp->getResults())) {
+    auto insertSliceOp = builder.create<tensor::InsertSliceOp>(
+        loc, result.value(), outputs[result.index()], offsets, sizes, strides);
+    results.push_back(insertSliceOp.getResult());
+  }
+  return tiledScanOp;
+}
+
+//===----------------------------------------------------------------------===//
 // ReverseOp
 //===----------------------------------------------------------------------===//
 
@@ -913,6 +1079,7 @@ DEFINE_OP_GET_EFFECTS(ScatterOp)
 DEFINE_OP_GET_EFFECTS(SortOp)
 DEFINE_OP_GET_EFFECTS(FftOp)
 DEFINE_OP_GET_EFFECTS(ReverseOp)
+DEFINE_OP_GET_EFFECTS(ScanOp)
 
 namespace {
 /// This is derived from mlir/lib/Dialect/Linalg/IR/LinalgOps.cpp without any
