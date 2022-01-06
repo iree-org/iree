@@ -18,6 +18,9 @@ iree_hal_cts_test_suite(
   DEPS
     experimental::rocm::registration
   EXCLUDED_TESTS
+    # This test depends on iree_hal_rocm_direct_command_buffer_update_buffer
+    # via iree_hal_buffer_view_allocate_buffer, which is not implemented yet.
+    "command_buffer_dispatch"
     # Non-push descriptor sets are not implemented in the ROCm backend yet.
     "descriptor_set"
     # Semaphores are not implemented in the ROCm backend yet.
