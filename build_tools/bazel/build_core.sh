@@ -100,4 +100,4 @@ bazel \
               --keep_going \
               --test_output=errors \
               --config=rs \
-              --config=rbe
+              --config=remote_cache_core
