@@ -386,16 +386,28 @@ static Value walkUseToGetResultBuffer(
     OpBuilder &b, Value value, const BufferizationPlan &plan,
     const BlockAndValueMapping &bvm,
     SmallVectorImpl<std::pair<OpOperand *, Value>> &traversedUses) {
-  Operation *user = nullptr;
+  Operation *op = value.getDefiningOp();
+  if (!op) return nullptr;
+  Operation *opParent = op->getParentOp();
+  if (!opParent) return nullptr;
   while (value.hasOneUse()) {
     OpOperand &use = *value.use_begin();
-    user = use.getOwner();
-    if (isa<IREE::Flow::DispatchTensorStoreOp, tensor::InsertSliceOp>(user)) {
+    Operation *user = use.getOwner();
+    bool isUserInSameScope = user->getParentOp() == opParent;
+    if (isUserInSameScope &&
+        isa<IREE::Flow::DispatchTensorStoreOp, tensor::InsertSliceOp>(user)) {
       return getSubviewOpForTensorStoreOp(b, user, bvm);
     }
-    value = getTiedResultForOperand(use, plan);
+    if (!isUserInSameScope && isa<scf::YieldOp>(user)) {
+      value = cast<scf::ForOp>(user->getParentOp())
+                  .getResult(use.getOperandNumber());
+    } else {
+      value = getTiedResultForOperand(use, plan);
+    }
     if (!value) return nullptr;
-    traversedUses.push_back(std::make_pair(&use, value));
+    if (isUserInSameScope) {
+      traversedUses.push_back(std::make_pair(&use, value));
+    }
     if (auto resultBuffer = bvm.lookupOrNull(value)) return resultBuffer;
   }
   return nullptr;

@@ -215,10 +215,11 @@ void LLVMCPUTileFuseAndVectorizePass::runOnOperation() {
   }
 
   funcOp.walk([&](linalg::ContractionOpInterface op) {
-    if (failed(linalg::vectorizeLinalgOpPrecondition(op))) {
+    if (cast<linalg::LinalgOp>(op.getOperation()).hasDynamicShape()) {
       lowerToVectors = false;
     }
   });
+
   if (!lowerToVectors) {
     // Apply second level of tiling patterns if they are not vectorizable. This
     // will trigger LLVM auto-vectorization, which gains better performance.
