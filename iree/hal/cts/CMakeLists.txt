@@ -8,14 +8,15 @@ set(IREE_ALL_CTS_TESTS
   "allocator"
   "buffer_mapping"
   "command_buffer"
-  "descriptor_set_layout"
+  "command_buffer_dispatch"
   "descriptor_set"
+  "descriptor_set_layout"
   "driver"
   "event"
   "executable_cache"
   "executable_layout"
-  "semaphore_submission"
   "semaphore"
+  "semaphore_submission"
   PARENT_SCOPE
 )
 
@@ -23,12 +24,14 @@ set(IREE_ALL_CTS_TESTS
 # If the compiler is disabled or a HAL driver implementation is not yet
 # connected to a functional compiler target, these tests can be skipped.
 set(IREE_EXECUTABLE_CTS_TESTS
+  "command_buffer_dispatch"
   "executable_cache"
   PARENT_SCOPE
 )
 
 # List of testdata/{name}.mlir source files.
 set(IREE_ALL_CTS_EXECUTABLE_SOURCES
+  "command_buffer_dispatch_test"
   "executable_cache_test"
   PARENT_SCOPE
 )
@@ -75,6 +78,18 @@ iree_cc_library(
     command_buffer_test_library
   HDRS
     "command_buffer_test.h"
+  DEPS
+    ::cts_test_base
+    iree::base
+    iree::hal
+    iree::testing::gtest
+)
+
+iree_cc_library(
+  NAME
+    command_buffer_dispatch_test_library
+  HDRS
+    "command_buffer_dispatch_test.h"
   DEPS
     ::cts_test_base
     iree::base
