@@ -149,8 +149,7 @@ struct GlobalLoadOpExpansion
       ConversionPatternRewriter &rewriter) const override {
     // Only apply to expanded types (tensors/etc).
     if (!isExpandedType(loadOp.getType())) return failure();
-    auto &expandedGlobal =
-        expansionState->globalMap[adaptor.global().getValue()];
+    auto &expandedGlobal = expansionState->globalMap[adaptor.global()];
 
     // Insert a load/transfer to the unknown resource lifetime.
     auto unknownType = IREE::Stream::ResourceType::get(rewriter.getContext());
@@ -181,8 +180,7 @@ struct GlobalStoreOpExpansion
       ConversionPatternRewriter &rewriter) const override {
     // Only apply to expanded types (tensors/etc).
     if (!isExpandedType(storeOp.value().getType())) return failure();
-    auto &expandedGlobal =
-        expansionState->globalMap[adaptor.global().getValue()];
+    auto &expandedGlobal = expansionState->globalMap[adaptor.global()];
 
     // Insert a transfer/store to the global with unknown lifetime. Lifetime
     // refinement will make this go away if possible.

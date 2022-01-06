@@ -280,7 +280,7 @@ struct ConvertDispatchOp : public OpConversionPattern<IREE::Flow::DispatchOp> {
     rewriter.replaceOpWithNewOp<IREE::Stream::AsyncDispatchOp>(
         op, resultTypes, adaptor.workgroup_count(), adaptor.entry_point(),
         dispatchOperands, dispatchOperandSizes, resultSizes,
-        adaptor.tied_operands(),
+        adaptor.tied_operandsAttr(),
         /*affinity=*/nullptr);
     return success();
   }

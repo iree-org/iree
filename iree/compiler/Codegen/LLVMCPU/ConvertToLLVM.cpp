@@ -601,9 +601,10 @@ class ConvertHALInterfaceBindingSubspanOp : public ConvertToLLVMPattern {
           op,
           "failed to convert interface.binding.subspan result to memref type");
     }
-    auto memRefDesc = abi.loadBinding(
-        op->getLoc(), newOperands.binding().getInt(), newOperands.byte_offset(),
-        memRefType, newOperands.dynamic_dims(), rewriter);
+    auto memRefDesc =
+        abi.loadBinding(op->getLoc(), newOperands.bindingAttr().getInt(),
+                        newOperands.byte_offset(), memRefType,
+                        newOperands.dynamic_dims(), rewriter);
     rewriter.replaceOp(op, {memRefDesc});
     return success();
   }

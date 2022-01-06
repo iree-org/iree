@@ -62,12 +62,12 @@ static MemRefType getMemrefTypeForTensor(TensorType tensorType,
                          layout, memorySpace);
 }
 
-static Value getSubspanBuffer(Value tensor, OpBuilder &b,
+static Value getSubspanBuffer(Value tensor, RewriterBase &rewriter,
                               BufferizationState &state) {
   FlowBufferizationState &flowState = getFlowBufferizationState(state);
 
   if (!flowState.subspan_to_buffer.count(tensor)) {
-    OpBuilder::InsertionGuard g(b);
+    OpBuilder::InsertionGuard g(rewriter);
     auto subspanOp =
         tensor.getDefiningOp<IREE::HAL::InterfaceBindingSubspanOp>();
     assert(subspanOp && "expected LoadOp/StoreOp source/target is SubspanOp");
@@ -77,10 +77,10 @@ static Value getSubspanBuffer(Value tensor, OpBuilder &b,
                           .dyn_cast<IREE::Flow::DispatchTensorType>();
     assert(shapedType && shapedType.hasRank());
 
-    b.setInsertionPoint(subspanOp);
+    rewriter.setInsertionPoint(subspanOp);
     // Just change the result type of the InterfaceBindingSubspanOp.
     auto memRefType = getMemrefTypeForTensor(shapedType);
-    Value baseBuffer = b.create<IREE::HAL::InterfaceBindingSubspanOp>(
+    Value baseBuffer = rewriter.create<IREE::HAL::InterfaceBindingSubspanOp>(
         subspanOp->getLoc(), memRefType, subspanOp.set(), subspanOp.binding(),
         subspanOp.type(), subspanOp.byte_offset(), subspanOp.dynamic_dims(),
         subspanOp.alignmentAttr());
@@ -107,16 +107,14 @@ struct DispatchTensorLoadOpInterface
     return shapedType.getAccess() != IREE::Flow::TensorAccess::ReadOnly;
   }
 
-  LogicalResult bufferize(Operation *op, OpBuilder &b,
+  LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
                           BufferizationState &state) const {
-    OpBuilder::InsertionGuard g(b);
-    b.setInsertionPoint(op);
     auto loadOp = cast<IREE::Flow::DispatchTensorLoadOp>(op);
-    Value source = getSubspanBuffer(loadOp.source(), b, state);
+    Value source = getSubspanBuffer(loadOp.source(), rewriter, state);
 
     // Bufferize to subview.
     state.replaceOpWithNewOp<memref::SubViewOp>(
-        b, op, source, loadOp.getMixedOffsets(), loadOp.getMixedSizes(),
+        rewriter, op, source, loadOp.getMixedOffsets(), loadOp.getMixedSizes(),
         loadOp.getMixedStrides());
 
     return success();
@@ -176,10 +174,8 @@ struct DispatchTensorStoreOpInterface
     return OpResult();
   }
 
-  LogicalResult bufferize(Operation *op, OpBuilder &b,
+  LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
                           BufferizationState &state) const {
-    OpBuilder::InsertionGuard g(b);
-    b.setInsertionPoint(op);
     auto storeOp = cast<IREE::Flow::DispatchTensorStoreOp>(op);
     auto &flowState = getFlowBufferizationState(state);
 
@@ -187,15 +183,15 @@ struct DispatchTensorStoreOpInterface
     // target buffer already.
     bool needCopy = !flowState.store_ops_without_copy.contains(op);
     if (needCopy) {
-      Value target = getSubspanBuffer(storeOp.target(), b, state);
-      Value subView = b.create<memref::SubViewOp>(
+      Value target = getSubspanBuffer(storeOp.target(), rewriter, state);
+      Value subView = rewriter.create<memref::SubViewOp>(
           storeOp->getLoc(), target, storeOp.getMixedOffsets(),
           storeOp.getMixedSizes(), storeOp.getMixedStrides());
-      Value srcMemref = state.lookupBuffer(storeOp.value());
-      state.createMemCpy(b, storeOp->getLoc(), srcMemref, subView);
+      Value srcMemref = state.lookupBuffer(rewriter, storeOp.value());
+      state.createMemCpy(rewriter, storeOp->getLoc(), srcMemref, subView);
     }
 
-    storeOp.erase();
+    rewriter.eraseOp(storeOp);
     return success();
   }
 };

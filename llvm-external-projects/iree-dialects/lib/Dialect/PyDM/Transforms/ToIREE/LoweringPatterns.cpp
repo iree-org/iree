@@ -211,7 +211,7 @@ class ApplyBinaryNumericConversion
     if (auto pyIntegerType = pyLeftType.dyn_cast<PYDM::IntegerType>()) {
       bool isSigned = pyIntegerType.isSigned();
       Value converted =
-          convertIntegerOp(srcOp.getLoc(), adaptor.dunder_name().getValue(),
+          convertIntegerOp(srcOp.getLoc(), adaptor.dunder_name(),
                            adaptor.left(), adaptor.right(), isSigned, rewriter);
       if (!converted)
         return rewriter.notifyMatchFailure(srcOp, "unsupported operation");
@@ -219,8 +219,8 @@ class ApplyBinaryNumericConversion
       return success();
     } else if (leftType.isa<mlir::FloatType>()) {
       Value converted =
-          convertFloatOp(srcOp.getLoc(), adaptor.dunder_name().getValue(),
-                         adaptor.left(), adaptor.right(), rewriter);
+          convertFloatOp(srcOp.getLoc(), adaptor.dunder_name(), adaptor.left(),
+                         adaptor.right(), rewriter);
       if (!converted)
         return rewriter.notifyMatchFailure(srcOp, "unsupported operation");
       rewriter.replaceOp(srcOp, converted);
@@ -285,7 +285,7 @@ class ApplyCompareNumericConversion
     }
     if (leftType.isa<mlir::IntegerType>()) {
       bool isSigned = true;  // TODO: Unsigned.
-      auto predicate = convertIntegerComparePredicate(adaptor.dunder_name(),
+      auto predicate = convertIntegerComparePredicate(adaptor.dunder_nameAttr(),
                                                       isSigned, rewriter);
       if (!predicate)
         return rewriter.notifyMatchFailure(srcOp, "unsupported predicate");
@@ -294,7 +294,7 @@ class ApplyCompareNumericConversion
       return success();
     } else if (leftType.isa<mlir::FloatType>()) {
       auto predicate =
-          convertFpComparePredicate(adaptor.dunder_name(), rewriter);
+          convertFpComparePredicate(adaptor.dunder_nameAttr(), rewriter);
       if (!predicate)
         return rewriter.notifyMatchFailure(srcOp, "unsupported predicate");
       rewriter.replaceOpWithNewOp<arith::CmpFOp>(

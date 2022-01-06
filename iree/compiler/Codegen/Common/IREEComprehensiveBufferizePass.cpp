@@ -67,20 +67,14 @@ class IREEComprehensiveBufferizePass
  public:
   explicit IREEComprehensiveBufferizePass(
       std::unique_ptr<linalg::comprehensive_bufferize::AllocationCallbacks>
-          allocationFn) {
-    options.allocationFns = std::move(allocationFn);
-    options.testAnalysisOnly = false;
-    addPostAnalysisTransformations(options);
-  }
+          allocationFn)
+      : allocationFn(std::move(allocationFn)) {}
 
   IREEComprehensiveBufferizePass(const IREEComprehensiveBufferizePass &other) {
-    options.allocationFns =
+    allocationFn =
         std::make_unique<linalg::comprehensive_bufferize::AllocationCallbacks>(
-            other.options.allocationFns->allocationFn,
-            other.options.allocationFns->deallocationFn,
-            other.options.allocationFns->memCpyFn);
-    options.testAnalysisOnly = other.options.testAnalysisOnly;
-    addPostAnalysisTransformations(options);
+            other.allocationFn->allocationFn,
+            other.allocationFn->deallocationFn, other.allocationFn->memCpyFn);
   }
 
   void getDependentDialects(DialectRegistry &registry) const override {
@@ -95,7 +89,8 @@ class IREEComprehensiveBufferizePass
   void runOnOperation() override;
 
  private:
-  linalg::comprehensive_bufferize::BufferizationOptions options;
+  std::unique_ptr<linalg::comprehensive_bufferize::AllocationCallbacks>
+      allocationFn;
 };
 }  // namespace
 
@@ -104,7 +99,16 @@ static bool isaTensor(Type t) { return t.isa<TensorType>(); };
 /// Run comprehensive bufferize.
 void IREEComprehensiveBufferizePass::runOnOperation() {
   ModuleOp moduleOp = getOperation();
-  if (failed(runComprehensiveBufferize(moduleOp, options))) {
+  auto options =
+      std::make_unique<linalg::comprehensive_bufferize::BufferizationOptions>();
+  options->allocationFns =
+      std::make_unique<linalg::comprehensive_bufferize::AllocationCallbacks>(
+          allocationFn->allocationFn, allocationFn->deallocationFn,
+          allocationFn->memCpyFn);
+  options->testAnalysisOnly = false;
+  addPostAnalysisTransformations(*options);
+
+  if (failed(runComprehensiveBufferize(moduleOp, std::move(options)))) {
     return signalPassFailure();
   }
 }

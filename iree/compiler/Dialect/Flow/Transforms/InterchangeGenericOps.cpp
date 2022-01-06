@@ -47,10 +47,7 @@ struct GenericOpInterchangePattern
         interchange.push_back(iter.index());
       }
     }
-    rewriter.updateRootInPlace(genericOp, [&]() {
-      interchangeGenericOp(rewriter, genericOp, interchange);
-    });
-    return success();
+    return interchangeGenericOp(rewriter, genericOp, interchange);
   }
 };
 

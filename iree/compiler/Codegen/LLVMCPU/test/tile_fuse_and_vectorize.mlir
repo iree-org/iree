@@ -43,8 +43,8 @@ module  {
 //      CHECK: #[[MAP:.+]] = affine_map<()[s0] -> (s0 * 64)>
 //      CHECK: func @dot_384x512x128_dispatch_0() {
 //  CHECK-DAG: %[[CST:.+]] = arith.constant 0.000000e+00 : f32
-//  CHECK-DAG: %[[C0:.+]] = arith.constant 0 : index
 //  CHECK-DAG: %[[CST_VECTOR:.+]] = arith.constant dense<0.000000e+00> : vector<16x16xf32>
+//  CHECK-DAG: %[[C0:.+]] = arith.constant 0 : index
 //  CHECK-DAG: %[[C384:.+]] = arith.constant 384 : index
 //  CHECK-DAG: %[[C512:.+]] = arith.constant 512 : index
 //  CHECK-DAG: %[[C128:.+]] = arith.constant 128 : index

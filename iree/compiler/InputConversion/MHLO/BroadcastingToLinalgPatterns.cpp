@@ -428,7 +428,7 @@ struct CompareBinaryBroadcastingAdaptor : public BinaryBroadcastingAdaptor {
     chlo::BroadcastCompareOpAdaptor adaptor(operands, op->getAttrDictionary());
     return builder.create<mhlo::CompareOp>(
         loc, resultType, broadcastValues.first, broadcastValues.second,
-        adaptor.comparison_direction(), adaptor.compare_type());
+        adaptor.comparison_direction(), adaptor.compare_typeAttr());
   }
 };
 
