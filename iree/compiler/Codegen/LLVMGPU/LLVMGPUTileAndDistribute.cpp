@@ -168,29 +168,24 @@ static void populateTilingToInvocationPatterns(
           .setDistributionOptions(invocationDistributionOptions);
 
   MLIRContext *context = patterns.getContext();
-  patterns
-      .insert<linalg::LinalgTilingPattern<linalg::MatmulOp>,
-              linalg::LinalgTilingPattern<linalg::FillOp>,
-              linalg::LinalgTilingPattern<linalg::CopyOp>,
-              linalg::LinalgTilingPattern<linalg::BatchMatmulOp>,
-              linalg::LinalgTilingPattern<linalg::GenericOp>,
-              linalg::LinalgTilingPattern<linalg::Conv2DNhwcHwcfOp>,
-              linalg::LinalgTilingPattern<linalg::DepthwiseConv2DNhwcHwcOp>,
-              linalg::LinalgTilingPattern<linalg::DepthwiseConv2DNhwcHwcmOp>,
-              linalg::LinalgTilingPattern<linalg::PoolingNhwcMaxOp>,
-              linalg::LinalgTilingPattern<linalg::PoolingNhwcMinOp>,
-              linalg::LinalgTilingPattern<linalg::PoolingNhwcSumOp>,
-              IREE::LinalgExt::TiledOpInterfaceTilingPattern>(
-          context, tilingOptions,
-          linalg::LinalgTransformationFilter(
-              {Identifier::get(getWorkgroupKTiledMarker(), context),
-               Identifier::get(getWorkgroupMemoryMarker(), context)},
-              Identifier::get(getVectorizeMarker(), context))
-              .addFilter([](Operation *op) {
-                // FFT doesn't support second level of tiling yet.
-                return success(!isa<IREE::LinalgExt::FftOp>(op));
-              })
-              .setMatchByDefault());
+  inalg::LinalgTransformationFilter({marker}, llvm::None);
+
+  linalg::LinalgTransformationFilter f(
+      {Identifier::get(getWorkgroupKTiledMarker(), context),
+       Identifier::get(getWorkgroupMemoryMarker(), context)},
+      Identifier::get(getVectorizeMarker(), context));
+  f.addFilter([](Operation *op) {
+     // FFT doesn't support second level of tiling yet.
+     return success(!isa<IREE::LinalgExt::FftOp>(op));
+   }).setMatchByDefault();
+  TilingPatterns<linalg::MatmulOp, linalg::FillOp, linalg::CopyOp,
+                 linalg::BatchMatmulOp, linalg::GenericOp,
+                 linalg::Conv2DNhwcHwcfOp, linalg::DepthwiseConv2DNhwcHwcOp,
+                 linalg::DepthwiseConv2DNhwcHwcmOp, linalg::PoolingNhwcMaxOp,
+                 linalg::PoolingNhwcMinOp, linalg::PoolingNhwcSumOp>(
+      patterns context, tilingOptions, f);
+  patterns.insert<IREE::LinalgExt::TiledOpInterfaceTilingPattern>(
+      context, tilingOptions, f);
 }
 
 static LogicalResult copyToWorkgroupMemory(OpBuilder &b, Value src, Value dst) {
