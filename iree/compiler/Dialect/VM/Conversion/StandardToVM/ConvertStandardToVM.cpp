@@ -732,8 +732,8 @@ class AssertOpConversion : public OpConversionPattern<AssertOp> {
     auto invertedCondition = rewriter.createOrFold<IREE::VM::XorI32Op>(
         srcOp.getLoc(), adaptor.getArg().getType(), adaptor.getArg(),
         rewriter.createOrFold<IREE::VM::ConstI32Op>(srcOp.getLoc(), 1));
-    rewriter.replaceOpWithNewOp<IREE::VM::CondFailOp>(
-        srcOp, invertedCondition, status, adaptor.getMsg().getValue());
+    rewriter.replaceOpWithNewOp<IREE::VM::CondFailOp>(srcOp, invertedCondition,
+                                                      status, adaptor.getMsg());
     return success();
   }
 };

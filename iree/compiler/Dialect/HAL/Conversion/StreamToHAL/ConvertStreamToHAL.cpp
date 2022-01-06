@@ -536,8 +536,7 @@ struct TensorExportBufferViewOpPattern
     }
 
     auto loc = exportOp.getLoc();
-    auto tensorType =
-        adaptor.source_encoding().getValue().cast<RankedTensorType>();
+    auto tensorType = adaptor.source_encoding().cast<RankedTensorType>();
     auto dynamicDims = adaptor.source_encoding_dims();
 
     // NOTE: we should have verified supported encodings/types at entry into the
