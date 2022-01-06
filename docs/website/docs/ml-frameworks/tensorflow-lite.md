@@ -17,9 +17,9 @@ Install IREE pip packages, either from pip or by
 
 ```shell
 python -m pip install \
-  iree-compiler-snapshot \
-  iree-runtime-snapshot \
-  iree-tools-tflite-snapshot \
+  iree-compiler \
+  iree-runtime \
+  iree-tools-tflite \
   -f https://github.com/google/iree/releases
 ```
 

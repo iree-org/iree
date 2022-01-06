@@ -51,7 +51,7 @@ snapshots of the `main` development branch.
 You can install the Python package containing the LLVM-based dylib compiler by
 
 ``` shell
-python -m pip install iree-compiler-snapshot \
+python -m pip install iree-compiler \
     -f https://github.com/google/iree/releases
 ```
 
