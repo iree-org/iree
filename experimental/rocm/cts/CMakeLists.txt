@@ -17,10 +17,4 @@ iree_hal_cts_test_suite(
     "\"PTXE\""
   DEPS
     experimental::rocm::registration
-  EXCLUDED_TESTS
-    # Non-push descriptor sets are not implemented in the ROCm backend yet.
-    "descriptor_set"
-    # Semaphores are not implemented in the ROCm backend yet.
-    "semaphore_submission"
-    "semaphore"
 )
