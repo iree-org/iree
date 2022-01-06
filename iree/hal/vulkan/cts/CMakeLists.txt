@@ -17,4 +17,7 @@ iree_hal_cts_test_suite(
     "\"SPVE\""
   DEPS
     iree::hal::vulkan::registration
+  EXCLUDED_TESTS
+    # Non-push descriptor sets are not implemented in the Vulkan backend yet.
+    "descriptor_set"
 )
