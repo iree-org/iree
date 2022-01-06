@@ -11,8 +11,3 @@ set(PYBIND_EXTENSION_COPTS "-fvisibility=hidden")
 
 # Namespace packages.
 add_subdirectory(iree/runtime)
-
-if(IREE_BUILD_LEGACY_JAX)
-  message(STATUS "Building legacy JAX API")
-  add_subdirectory(iree/jax)
-endif()

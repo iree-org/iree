@@ -168,48 +168,6 @@ def build_main_dist():
       tf.add(os.path.join(INSTALL_DIR, entry), arcname=entry, recursive=True)
 
 
-def build_py_pure_pkgs():
-  """Performs a minimal build sufficient to produce pure python packages.
-
-  This installs the following packages:
-    - iree-install/python_packages/iree_jax
-
-  Since these are pure python packages, it is expected that they will be built
-  on a single examplar (i.e. Linux) distribution.
-  """
-  install_python_requirements()
-
-  # Clean up install and build trees.
-  shutil.rmtree(INSTALL_DIR, ignore_errors=True)
-  remove_cmake_cache()
-
-  # CMake configure.
-  print("*** Configuring ***")
-  subprocess.run([
-      sys.executable,
-      CMAKE_CI_SCRIPT,
-      f"-B{BUILD_DIR}",
-      f"-DCMAKE_INSTALL_PREFIX={INSTALL_DIR}",
-      f"-DCMAKE_BUILD_TYPE=Release",
-      f"-DIREE_BUILD_COMPILER=OFF",
-      f"-DIREE_BUILD_PYTHON_BINDINGS=ON",
-      f"-DIREE_BUILD_SAMPLES=OFF",
-      f"-DIREE_BUILD_TESTS=OFF",
-  ],
-                 check=True)
-
-  print("*** Building ***")
-  subprocess.run([
-      sys.executable,
-      CMAKE_CI_SCRIPT,
-      "--build",
-      BUILD_DIR,
-      "--target",
-      "install-IreePythonPackage-jax",
-  ],
-                 check=True)
-
-
 def build_py_runtime_pkg(instrumented: bool = False):
   """Builds the iree-install/python_packages/iree_runtime package.
 
