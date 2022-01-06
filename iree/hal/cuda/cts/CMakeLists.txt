@@ -11,6 +11,10 @@ iree_hal_cts_test_suite(
     "iree/hal/cuda/registration/driver_module.h"
   DRIVER_REGISTRATION_FN
     "iree_hal_cuda_driver_module_register"
+  COMPILER_TARGET_BACKEND
+    "cuda"
+  EXECUTABLE_FORMAT
+    "\"PTXE\""
   DEPS
     iree::hal::cuda::registration
   EXCLUDED_TESTS

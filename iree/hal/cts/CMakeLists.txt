@@ -12,9 +12,24 @@ set(IREE_ALL_CTS_TESTS
   "descriptor_set"
   "driver"
   "event"
+  "executable_cache"
   "executable_layout"
   "semaphore_submission"
   "semaphore"
+  PARENT_SCOPE
+)
+
+# These tests use executables produced by the iree-translate compiler tool.
+# If the compiler is disabled or a HAL driver implementation is not yet
+# connected to a functional compiler target, these tests can be skipped.
+set(IREE_EXECUTABLE_CTS_TESTS
+  "executable_cache"
+  PARENT_SCOPE
+)
+
+# List of testdata/{name}.mlir source files.
+set(IREE_ALL_CTS_EXECUTABLE_SOURCES
+  "executable_cache_test"
   PARENT_SCOPE
 )
 
@@ -120,6 +135,18 @@ iree_cc_library(
     executable_layout_test_library
   HDRS
     "executable_layout_test.h"
+  DEPS
+    ::cts_test_base
+    iree::base
+    iree::hal
+    iree::testing::gtest
+)
+
+iree_cc_library(
+  NAME
+    executable_cache_test_library
+  HDRS
+    "executable_cache_test.h"
   DEPS
     ::cts_test_base
     iree::base
