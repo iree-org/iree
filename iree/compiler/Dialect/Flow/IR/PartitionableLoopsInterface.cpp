@@ -138,10 +138,52 @@ static void registerInterfaceForTiledOpInterfaceOps(DialectRegistry &registry) {
 }
 
 void registerPartitionableLoopsInterfaceModels(DialectRegistry &registry) {
+  // clang-format off
   registerInterfaceForLinalgOps<
-#define GET_OP_LIST
-#include "mlir/Dialect/Linalg/IR/LinalgStructuredOps.cpp.inc"
-      >(registry);
+  
+  // This is copy-pasted from LinalgStructuredOps.cpp.inc. In theory you could
+  // just include that generated file here, but that cause some linking errors.
+  // Copy paste is fine for now.
+
+  ::mlir::linalg::BatchMatmulOp,
+  ::mlir::linalg::BatchMatvecOp,
+  ::mlir::linalg::Conv1DNwcWcfOp,
+  ::mlir::linalg::Conv1DOp,
+  ::mlir::linalg::Conv2DNchwFchwOp,
+  ::mlir::linalg::Conv2DNhwcHwcfOp,
+  ::mlir::linalg::Conv2DNhwcHwcfQOp,
+  ::mlir::linalg::Conv2DOp,
+  ::mlir::linalg::Conv3DNdhwcDhwcfOp,
+  ::mlir::linalg::Conv3DOp,
+  ::mlir::linalg::CopyOp,
+  ::mlir::linalg::DepthwiseConv1DNwcWcOp,
+  ::mlir::linalg::DepthwiseConv2DNhwcHwcOp,
+  ::mlir::linalg::DepthwiseConv2DNhwcHwcQOp,
+  ::mlir::linalg::DepthwiseConv2DNhwcHwcmOp,
+  ::mlir::linalg::DepthwiseConv2DNhwcHwcmQOp,
+  ::mlir::linalg::DotOp,
+  ::mlir::linalg::FillOp,
+  ::mlir::linalg::FillRng2DOp,
+  ::mlir::linalg::GenericOp,
+  ::mlir::linalg::MatmulOp,
+  ::mlir::linalg::MatmulUnsignedOp,
+  ::mlir::linalg::MatvecOp,
+  ::mlir::linalg::Mmt4DOp,
+  ::mlir::linalg::PoolingNchwMaxOp,
+  ::mlir::linalg::PoolingNdhwcMaxOp,
+  ::mlir::linalg::PoolingNdhwcMinOp,
+  ::mlir::linalg::PoolingNdhwcSumOp,
+  ::mlir::linalg::PoolingNhwcMaxOp,
+  ::mlir::linalg::PoolingNhwcMaxUnsignedOp,
+  ::mlir::linalg::PoolingNhwcMinOp,
+  ::mlir::linalg::PoolingNhwcMinUnsignedOp,
+  ::mlir::linalg::PoolingNhwcSumOp,
+  ::mlir::linalg::QuantizedBatchMatmulOp,
+  ::mlir::linalg::QuantizedMatmulOp,
+  ::mlir::linalg::SoftPlus2DOp,
+  ::mlir::linalg::VecmatOp
+  >(registry);
+  // clang-format on
 
   registerInterfaceForTiledOpInterfaceOps<
       LinalgExt::FftOp, LinalgExt::ReverseOp, LinalgExt::ScatterOp,

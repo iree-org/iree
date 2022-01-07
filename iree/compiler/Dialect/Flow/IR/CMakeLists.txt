@@ -118,6 +118,7 @@ iree_cc_library(
   DEPS
     ::PartitionableLoopsInterfaceGen
     IREELinalgExtDialect
+    LLVMSupport
     MLIRLinalg
   PUBLIC
 )

@@ -191,7 +191,9 @@ cc_library(
     deps = [
         ":PartitionableLoopsInterfaceGen",
         "//llvm-external-projects/iree-dialects:IREELinalgExtDialect",
+        "@llvm-project//llvm:Support",
         "@llvm-project//mlir:LinalgInterfaces",
+        "@llvm-project//mlir:LinalgOps",
     ],
 )
 
