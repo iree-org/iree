@@ -12,12 +12,12 @@ components:
 
 | PIP package name             | Description                                                                 |
 |------------------------------|-----------------------------------------------------------------------------|
-| `iree-compiler-snapshot`     | IREE's generic compiler tools and helpers                                   |
-| `iree-runtime-snapshot`      | IREE's runtime, including CPU and GPU backends                              |
-| `iree-tools-tf-snapshot`     | Tools for importing from [TensorFlow](https://www.tensorflow.org/)          |
-| `iree-tools-tflite-snapshot` | Tools for importing from [TensorFlow Lite](https://www.tensorflow.org/lite) |
-| `iree-tools-xla-snapshot`    | Tools for importing from [XLA](https://www.tensorflow.org/xla)              |
-| `iree-jax-snapshot`          | Tools for importing from [JAX](https://github.com/google/jax)               |
+| `iree-compiler`     | IREE's generic compiler tools and helpers                                   |
+| `iree-runtime`      | IREE's runtime, including CPU and GPU backends                              |
+| `iree-tools-tf`     | Tools for importing from [TensorFlow](https://www.tensorflow.org/)          |
+| `iree-tools-tflite` | Tools for importing from [TensorFlow Lite](https://www.tensorflow.org/lite) |
+| `iree-tools-xla`    | Tools for importing from [XLA](https://www.tensorflow.org/xla)              |
+| `iree-jax`          | Tools for importing from [JAX](https://github.com/google/jax)               |
 
 Collectively, these packages allow for importing from frontends, compiling
 towards various targets, and executing compiled code on IREE's backends.
@@ -77,8 +77,8 @@ For now, packages can be installed from our
 
     ``` shell
     python -m pip install \
-      iree-compiler-snapshot \
-      iree-runtime-snapshot \
+      iree-compiler \
+      iree-runtime \
       --find-links https://github.com/google/iree/releases
     ```
 
@@ -88,11 +88,11 @@ For now, packages can be installed from our
 
     ``` shell
     python -m pip install \
-      iree-compiler-snapshot \
-      iree-runtime-snapshot \
-      iree-tools-tf-snapshot \
-      iree-tools-tflite-snapshot \
-      iree-tools-xla-snapshot \
+      iree-compiler \
+      iree-runtime \
+      iree-tools-tf \
+      iree-tools-tflite \
+      iree-tools-xla \
       --find-links https://github.com/google/iree/releases
     ```
 

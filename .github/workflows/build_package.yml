@@ -53,10 +53,6 @@ jobs:
           - os: ubuntu-18.04
             build_package: py-tf-compiler-tools-pkg
             experimental: false
-          # Only needs to be built on Linux because platform independent.
-          - os: ubuntu-18.04
-            build_package: py-pure-pkgs
-            experimental: false
 
           # Windows packages.
           - os: windows-2019
@@ -210,18 +206,6 @@ jobs:
           # pip >= 21.3 from official sources. I'm sorry about this folks.
           export CIBW_BEFORE_BUILD="python -m pip install --upgrade pip==21.3dev0 -f https://github.com/stellaraccident/pip/releases/tag/21.3dev20210925"
           python -m cibuildwheel --output-dir bindist ./main_checkout/llvm-external-projects/iree-compiler-api
-
-      # Pure python packages only need to do a minimal CMake configure and no
-      # actual building, aside from setting up sources. If there are multiples,
-      # it is fairly cheap to build them serially. Using cibuildwheel is a bit
-      # overkill for this, but we keep it the same as the others for maintenance
-      # value.
-      - name: Build pure python wheels
-        if: "matrix.build_package == 'py-pure-pkgs'"
-        shell: bash
-        run: |
-          python ./main_checkout/build_tools/github_actions/build_dist.py py-pure-pkgs
-          python -m pip wheel -w bindist --no-deps ./iree-install/python_packages/iree_jax
 
       # Compiler tools wheels are not python version specific, so just build
       # for one examplar python version.

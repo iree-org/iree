@@ -41,7 +41,7 @@ BAZEL_BINDIR="$(${BAZEL_CMD[@]?} info bazel-bin)"
 "${BAZEL_CMD[@]?}" query //iree_tf_compiler/... | \
    xargs --max-args 1000000 --max-chars 1000000 --exit \
     "${BAZEL_CMD[@]?}" test \
-      --config=remote_cache_tf_integrations \
+      --config=remote_cache_bazel_ci \
       --config=generic_clang \
       --test_tag_filters="-nokokoro" \
       --build_tag_filters="-nokokoro"
