@@ -9,6 +9,7 @@ import subprocess
 
 from iree.compiler import ir
 from iree.compiler import passmanager
+from iree.compiler import version
 from iree.compiler.dialects import arith
 from iree.compiler.dialects import chlo
 from iree.compiler.dialects import mhlo
@@ -53,6 +54,11 @@ with ir.Context() as ctx:
   bytecode_io = io.BytesIO()
   ireec.translate_module_to_vm_bytecode(options, input_module, bytecode_io)
   print(f"Bytecode module len = {len(bytecode_io.getbuffer())}")
+
+# Check version.
+print(f"PACKAGE_SUFFIX={version.PACKAGE_SUFFIX}")
+print(f"VERSION={version.VERSION}")
+print(f"REVISIONS={version.REVISIONS!r}")
 
 # Check console scripts.
 subprocess.check_output(["ireec", "-help"])
