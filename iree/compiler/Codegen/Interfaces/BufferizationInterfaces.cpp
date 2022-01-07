@@ -105,9 +105,9 @@ struct DispatchTensorLoadOpInterface
     Value source = getSubspanBuffer(loadOp.source(), rewriter, state);
 
     // Bufferize to subview.
-    state.replaceOpWithNewOp<memref::SubViewOp>(
-        rewriter, op, source, loadOp.getMixedOffsets(), loadOp.getMixedSizes(),
-        loadOp.getMixedStrides());
+    mlir::linalg::comprehensive_bufferize::replaceOpWithNewBufferizedOp<
+        memref::SubViewOp>(rewriter, op, source, loadOp.getMixedOffsets(),
+                           loadOp.getMixedSizes(), loadOp.getMixedStrides());
 
     return success();
   }
