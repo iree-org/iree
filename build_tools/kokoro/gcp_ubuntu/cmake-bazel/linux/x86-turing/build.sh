@@ -36,7 +36,7 @@ echo "Initializing submodules"
 pushd integrations/tensorflow
 BAZEL_CMD=(bazel --noworkspace_rc --bazelrc=build_tools/bazel/iree-tf.bazelrc)
 BAZEL_BINDIR="$(${BAZEL_CMD[@]?} info bazel-bin)"
-# Technically, the cache key of the `remote_cache_tf_integrations` config
+# Technically, the cache key of the `remote_cache_bazel_ci` config
 # references the Docker image used by the non-GPU build that includes
 # swiftshader. In practice though, the part that matters for building these
 # binaries is common to both of them.
@@ -44,7 +44,7 @@ BAZEL_BINDIR="$(${BAZEL_CMD[@]?} info bazel-bin)"
 # once anyway.
 "${BAZEL_CMD[@]?}" build \
    --config=generic_clang \
-   --config=remote_cache_tf_integrations \
+   --config=remote_cache_bazel_ci \
    //iree_tf_compiler:all
 popd
 

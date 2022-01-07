@@ -8,7 +8,7 @@
 # The NVidia drivers need to *exactly* match between the host machine and the
 # docker image.
 
-FROM gcr.io/iree-oss/frontends@sha256:f9490f31ff09c2053a9972a002f6af65fcace41d834583754ea93c6df35ff1f4
+FROM gcr.io/iree-oss/frontends@sha256:1c085c79f1981ec23d4faef56555d2e3adc6488ac355a5e7eb577d7fff4b105e
 
 # We use .deb files that we host because we have to pin the version exactly to
 # match the host machine and packages routinely dissapear from the Ubuntu

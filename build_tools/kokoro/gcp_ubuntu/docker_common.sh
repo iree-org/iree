@@ -74,8 +74,7 @@ function docker_setup() {
     #   2. When running with Kokoro, we mount a local scratch SSD to KOKORO_ROOT
     #      whereas the home directory is on the persistent SSD boot disk. It
     #      turns out that makes a huge difference in performance for Bazel
-    #      running with local execution (not with RBE) because it is IO bound at
-    #      64 cores.
+    #      because it is IO bound at 64 cores..
     local fake_home_dir="${KOKORO_ROOT?}/fake_home"
     mkdir -p "${fake_home_dir}"
 
@@ -84,7 +83,7 @@ function docker_setup() {
     )
 
     # Make gcloud credentials available. This isn't necessary when running in
-    # GCE but enables using this script locally with RBE.
+    # GCE but enables using this script locally with remote caching.
     DOCKER_RUN_ARGS+=(
       --volume="${HOME?}/.config/gcloud:${HOME?}/.config/gcloud:ro"
     )

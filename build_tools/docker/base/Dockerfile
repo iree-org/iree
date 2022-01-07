@@ -36,6 +36,8 @@ RUN apt-get update \
     unzip \
     wget \
     gnupg2 \
+    # Needed for building lld with Bazel (as currently configured)
+    libxml2-dev \
     # Someone is welcome to tell me a better way to just install lld-9 as lld
     # (lld=9 doesn't work)
     && ln -s lld-9 /usr/bin/lld \
