@@ -37,7 +37,6 @@ iree_cc_library(
     ::FlowInterfacesGen
     ::FlowOpsGen
     ::FlowTypesGen
-    ::PartitionableLoopsInterface
     LLVMSupport
     MLIRControlFlowInterfaces
     MLIRIR

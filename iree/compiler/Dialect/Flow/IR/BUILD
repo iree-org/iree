@@ -64,7 +64,6 @@ cc_library(
         ":FlowInterfacesGen",
         ":FlowOpsGen",
         ":FlowTypesGen",
-        ":PartitionableLoopsInterface",
         "//iree/compiler/Dialect/Util/IR",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:ControlFlowInterfaces",

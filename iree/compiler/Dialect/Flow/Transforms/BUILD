@@ -67,6 +67,7 @@ cc_library(
         ":PassesIncGen",
         "//iree/compiler/Dialect/Flow/Conversion/TensorToFlow",
         "//iree/compiler/Dialect/Flow/IR",
+        "//iree/compiler/Dialect/Flow/IR:PartitionableLoopsInterface",
         "//iree/compiler/Dialect/HAL/IR",
         "//iree/compiler/Dialect/Util/Analysis",
         "//iree/compiler/Dialect/Util/Analysis/Attributes",

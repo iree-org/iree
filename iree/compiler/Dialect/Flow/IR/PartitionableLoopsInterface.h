@@ -7,7 +7,6 @@
 #ifndef IREE_COMPILER_DIALECT_FLOW_IR_PARTITIONABLE_LOOPS_INTERFACE_H_
 #define IREE_COMPILER_DIALECT_FLOW_IR_PARTITIONABLE_LOOPS_INTERFACE_H_
 
-#include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "llvm/ADT/SmallVector.h"
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/Support/LLVM.h"
