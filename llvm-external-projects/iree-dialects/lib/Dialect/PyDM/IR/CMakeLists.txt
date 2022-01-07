@@ -10,6 +10,7 @@ add_mlir_library(IREEPyDMDialect
 
   LINK_LIBS PUBLIC
   MLIRIR
+  MLIRControlFlowInterfaces
   MLIRSideEffectInterfaces
 )
 
