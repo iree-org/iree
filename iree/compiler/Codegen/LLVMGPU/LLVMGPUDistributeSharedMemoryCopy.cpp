@@ -78,7 +78,7 @@ static void populateTilingCopyToWorkgroupMemPatterns(
 }
 
 static void populateVectorizationPatterns(RewritePatternSet &patterns) {
-  linalg::insertVectorizationPatterns<linalg::CopyOp>(
+  linalg::VectorizationPatterns<linalg::CopyOp>::insert(
       patterns, linalg::LinalgVectorizationOptions(),
       linalg::LinalgTransformationFilter(Identifier::get(
           getCopyToWorkgroupMemoryMarker(), patterns.getContext())));

@@ -257,12 +257,14 @@ void LLVMCPUTileFuseAndVectorizePass::runOnOperation() {
   // Apply vectorization patterns.
   {
     OwningRewritePatternList vectorizationPatterns(&getContext());
-    linalg::insertVectorizationPatterns<linalg::ContractionOpInterface,
-                                        linalg::GenericOp, linalg::CopyOp,
-                                        linalg::FillOp>(
-        vectorizationPatterns, linalg::LinalgVectorizationOptions(),
-        linalg::LinalgTransformationFilter(
-            Identifier::get(getVectorizeMarker(), context)));
+    linalg::LinalgVectorizationOptions opt;
+    linalg::LinalgTransformationFilter f(
+        Identifier::get(getVectorizeMarker(), context));
+    linalg::VectorizationPatterns<linalg::GenericOp, linalg::CopyOp,
+                                  linalg::FillOp>::insert(vectorizationPatterns,
+                                                          opt, f);
+    vectorizationPatterns.add<linalg::LinalgVectorizationPattern>(
+        &getContext(), f.addOpFilter<linalg::ContractionOpInterface>(), opt);
     vector::populateVectorTransferPermutationMapLoweringPatterns(
         vectorizationPatterns);
     vector::populateVectorReductionToContractPatterns(vectorizationPatterns);

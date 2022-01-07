@@ -114,9 +114,9 @@ void IREEComprehensiveBufferizePass::runOnOperation() {
 }
 
 // Default allocation functions.
-static Optional<Value> defaultAllocationFn(OpBuilder &builder, Location loc,
-                                           MemRefType allocationType,
-                                           ArrayRef<Value> dynamicSizes) {
+static FailureOr<Value> defaultAllocationFn(OpBuilder &builder, Location loc,
+                                            MemRefType allocationType,
+                                            ArrayRef<Value> dynamicSizes) {
   return builder.create<memref::AllocOp>(loc, allocationType, dynamicSizes)
       .getResult();
 }

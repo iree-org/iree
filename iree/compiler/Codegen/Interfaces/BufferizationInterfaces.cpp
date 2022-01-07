@@ -174,7 +174,8 @@ struct DispatchTensorStoreOpInterface
     Value subView = rewriter.create<memref::SubViewOp>(
         storeOp->getLoc(), target, storeOp.getMixedOffsets(),
         storeOp.getMixedSizes(), storeOp.getMixedStrides());
-    Value srcMemref = state.lookupBuffer(rewriter, storeOp.value());
+    Value srcMemref =
+        *state.getBuffer(rewriter, storeOp->getOpOperand(0) /*tensor*/);
 
     // If everything bufferized inplace, no copy is needed. We wrote to the
     // target buffer already. The copy folds away in that case.
