@@ -21,6 +21,7 @@
 import json
 import os
 import platform
+import re
 import shutil
 import subprocess
 import sys
@@ -70,6 +71,8 @@ class CMakeExtension(Extension):
 class CMakeBuildPy(_build_py):
 
   def run(self):
+    version_py_content = generate_version_py()
+    print(f"Generating version.py:\n{version_py_content}", file=sys.stderr)
     subprocess.check_call(["cmake", "--version"])
 
     target_dir = os.path.abspath(self.build_lib)
@@ -118,6 +121,12 @@ class CMakeBuildPy(_build_py):
                     symlinks=False)
     print("Target populated.", file=sys.stderr)
 
+    # Write version.py.
+    version_py_file = os.path.join(target_dir, "iree", "compiler", "version.py")
+    os.makedirs(os.path.dirname(version_py_file), exist_ok=True)
+    with open(version_py_file, "wt") as f:
+      f.write(version_py_content)
+
 
 class NoopBuildExtension(_build_ext):
 
@@ -126,6 +135,43 @@ class NoopBuildExtension(_build_ext):
 
   def build_extension(self, ext):
     pass
+
+
+def generate_version_py():
+  return f"""# Auto-generated version info.
+PACKAGE_SUFFIX = "{PACKAGE_SUFFIX}"
+VERSION = "{PACKAGE_VERSION}"
+REVISIONS = {json.dumps(find_git_versions())}
+"""
+
+
+def find_git_versions():
+  revisions = {}
+  try:
+    revisions["IREE"] = subprocess.check_output(
+        ["git", "rev-parse", "HEAD"], cwd=IREESRC_DIR).decode("utf-8").strip()
+  except subprocess.SubprocessError as e:
+    print(f"ERROR: Could not get IREE revision: {e}", file=sys.stderr)
+  revisions["LLVM_PROJECT"] = find_git_submodule_revision(
+      "third_party/llvm-project")
+  revisions["TENSORFLOW"] = find_git_submodule_revision(
+      "third_party/tensorflow")
+  revisions["MLIR_HLO"] = find_git_submodule_revision("third_party/mlir-hlo")
+  return revisions
+
+
+def find_git_submodule_revision(submodule_path):
+  try:
+    data = subprocess.check_output(["git", "ls-tree", "HEAD", submodule_path],
+                                   cwd=IREESRC_DIR).decode("utf-8").strip()
+    columns = re.split("\\s+", data)
+    return columns[2]
+  except Exception as e:
+    print(
+        f"ERROR: Could not get submodule revision for {submodule_path}"
+        f" ({e})",
+        file=sys.stderr)
+    return ""
 
 
 setup(
