@@ -15,23 +15,13 @@ namespace iree_compiler {
 namespace IREE {
 namespace VM {
 
-// Defines runtime VM extension opcode sets.
-enum class OpcodeExtension {
-  // Adds ops for manipulating i64 types.
-  kI64,
-  // Adds ops for manipulating f32 types.
-  kF32,
-  // Adds ops for manipulating f64 types.
-  kF64,
-};
-
 // Controls VM translation targets.
 struct TargetOptions {
   // Target size of `index` when converted to an integer in bits.
   int indexBits = 32;
 
   // Whether the i64 extension is enabled in the target VM.
-  bool i64Extension = false;
+  bool i64Extension = true;
   // Whether the f32 extension is enabled in the target VM.
   bool f32Extension = true;
   // Whether the f64 extension is enabled in the target VM.
