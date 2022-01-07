@@ -56,4 +56,4 @@ jobs:
           workflow: Build Native Release Packages
           token: ${{ secrets.WRITE_ACCESS_TOKEN }}
           ref: "${{ env.tag_name }}"
-          inputs: '{"package_suffix": "-candidate", "package_version": "${{ env.package_version }}", "release_id": "${{ steps.create_release.outputs.id }}"}'
+          inputs: '{"package_suffix": "", "package_version": "${{ env.package_version }}", "release_id": "${{ steps.create_release.outputs.id }}"}'
