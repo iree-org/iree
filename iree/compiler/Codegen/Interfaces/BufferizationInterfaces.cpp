@@ -48,9 +48,20 @@ struct FlowBufferizationState : public DialectBufferizationState {
 };
 }  // namespace
 
+/// Get FlowBufferizationState.
+static const FlowBufferizationState &getFlowBufferizationState(
+    const BufferizationState &state) {
+  Optional<const FlowBufferizationState *> maybeState =
+      state.getDialectState<FlowBufferizationState>(
+          IREE::Flow::FlowDialect::getDialectNamespace());
+  assert(maybeState.hasValue() && "FlowBufferizationState does not exist");
+  return **maybeState;
+}
+
+/// Get or create FlowBufferizationState.
 static FlowBufferizationState &getFlowBufferizationState(
     BufferizationState &state) {
-  return state.getDialectState<FlowBufferizationState>(
+  return state.getOrCreateDialectState<FlowBufferizationState>(
       IREE::Flow::FlowDialect::getDialectNamespace());
 }
 
@@ -63,31 +74,11 @@ static MemRefType getMemrefTypeForTensor(TensorType tensorType,
 }
 
 static Value getSubspanBuffer(Value tensor, RewriterBase &rewriter,
-                              BufferizationState &state) {
-  FlowBufferizationState &flowState = getFlowBufferizationState(state);
-
-  if (!flowState.subspan_to_buffer.count(tensor)) {
-    OpBuilder::InsertionGuard g(rewriter);
-    auto subspanOp =
-        tensor.getDefiningOp<IREE::HAL::InterfaceBindingSubspanOp>();
-    assert(subspanOp && "expected LoadOp/StoreOp source/target is SubspanOp");
-
-    auto shapedType = subspanOp.getResult()
-                          .getType()
-                          .dyn_cast<IREE::Flow::DispatchTensorType>();
-    assert(shapedType && shapedType.hasRank());
-
-    rewriter.setInsertionPoint(subspanOp);
-    // Just change the result type of the InterfaceBindingSubspanOp.
-    auto memRefType = getMemrefTypeForTensor(shapedType);
-    Value baseBuffer = rewriter.create<IREE::HAL::InterfaceBindingSubspanOp>(
-        subspanOp->getLoc(), memRefType, subspanOp.set(), subspanOp.binding(),
-        subspanOp.type(), subspanOp.byte_offset(), subspanOp.dynamic_dims(),
-        subspanOp.alignmentAttr());
-    flowState.subspan_to_buffer[tensor] = baseBuffer;
-  }
-
-  return flowState.subspan_to_buffer[tensor];
+                              const BufferizationState &state) {
+  const FlowBufferizationState &flowState = getFlowBufferizationState(state);
+  auto it = flowState.subspan_to_buffer.find(tensor);
+  assert(it != flowState.subspan_to_buffer.end() && "subspan buffer not found");
+  return it->getSecond();
 }
 
 namespace {
@@ -99,7 +90,8 @@ namespace {
 struct DispatchTensorLoadOpInterface
     : public BufferizableOpInterface::ExternalModel<
           DispatchTensorLoadOpInterface, IREE::Flow::DispatchTensorLoadOp> {
-  bool isWritable(Operation *op, Value value, BufferizationState &state) const {
+  bool isWritable(Operation *op, Value value,
+                  const BufferizationState &state) const {
     auto loadOp = cast<IREE::Flow::DispatchTensorLoadOp>(op);
     auto shapedType =
         loadOp.source().getType().dyn_cast<IREE::Flow::DispatchTensorType>();
@@ -108,7 +100,7 @@ struct DispatchTensorLoadOpInterface
   }
 
   LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
-                          BufferizationState &state) const {
+                          const BufferizationState &state) const {
     auto loadOp = cast<IREE::Flow::DispatchTensorLoadOp>(op);
     Value source = getSubspanBuffer(loadOp.source(), rewriter, state);
 
@@ -160,36 +152,33 @@ struct DispatchTensorStoreOpInterface
     : public BufferizableOpInterface::ExternalModel<
           DispatchTensorStoreOpInterface, IREE::Flow::DispatchTensorStoreOp> {
   bool bufferizesToMemoryRead(Operation *op, OpOperand &opOperand,
-                              BufferizationState &state) const {
+                              const BufferizationState &state) const {
     return true;
   }
 
   bool bufferizesToMemoryWrite(Operation *op, OpOperand &opOperand,
-                               BufferizationState &state) const {
+                               const BufferizationState &state) const {
     return false;
   }
 
   OpResult getAliasingOpResult(Operation *op, OpOperand &opOperand,
-                               BufferizationState &state) const {
+                               const BufferizationState &state) const {
     return OpResult();
   }
 
   LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
-                          BufferizationState &state) const {
+                          const BufferizationState &state) const {
     auto storeOp = cast<IREE::Flow::DispatchTensorStoreOp>(op);
-    auto &flowState = getFlowBufferizationState(state);
+
+    Value target = getSubspanBuffer(storeOp.target(), rewriter, state);
+    Value subView = rewriter.create<memref::SubViewOp>(
+        storeOp->getLoc(), target, storeOp.getMixedOffsets(),
+        storeOp.getMixedSizes(), storeOp.getMixedStrides());
+    Value srcMemref = state.lookupBuffer(rewriter, storeOp.value());
 
     // If everything bufferized inplace, no copy is needed. We wrote to the
-    // target buffer already.
-    bool needCopy = !flowState.store_ops_without_copy.contains(op);
-    if (needCopy) {
-      Value target = getSubspanBuffer(storeOp.target(), rewriter, state);
-      Value subView = rewriter.create<memref::SubViewOp>(
-          storeOp->getLoc(), target, storeOp.getMixedOffsets(),
-          storeOp.getMixedSizes(), storeOp.getMixedStrides());
-      Value srcMemref = state.lookupBuffer(rewriter, storeOp.value());
-      state.createMemCpy(rewriter, storeOp->getLoc(), srcMemref, subView);
-    }
+    // target buffer already. The copy folds away in that case.
+    state.createMemCpy(rewriter, storeOp->getLoc(), srcMemref, subView);
 
     rewriter.eraseOp(storeOp);
     return success();
@@ -232,6 +221,53 @@ struct StoreTensorOpAnchoredInitTensorEliminationStep
         newOps);
   }
 };
+
+struct CreateSubSpanBuffers : public PostAnalysisStep {
+  LogicalResult run(Operation *op, BufferizationState &state,
+                    BufferizationAliasInfo &aliasInfo,
+                    SmallVector<Operation *> &newOps) override {
+    FlowBufferizationState &flowState = getFlowBufferizationState(state);
+
+    op->walk([&](Operation *op) {
+      Value tensor;
+      if (auto storeOp = dyn_cast<IREE::Flow::DispatchTensorStoreOp>(op)) {
+        tensor = storeOp.target();
+      } else if (auto loadOp = dyn_cast<IREE::Flow::DispatchTensorLoadOp>(op)) {
+        tensor = loadOp.source();
+      } else {
+        return WalkResult::skip();
+      }
+
+      if (!flowState.subspan_to_buffer.count(tensor)) {
+        IRRewriter rewriter(op->getContext());
+        OpBuilder::InsertionGuard g(rewriter);
+        auto subspanOp =
+            tensor.getDefiningOp<IREE::HAL::InterfaceBindingSubspanOp>();
+        assert(subspanOp &&
+               "expected LoadOp/StoreOp source/target is SubspanOp");
+
+        auto shapedType = subspanOp.getResult()
+                              .getType()
+                              .dyn_cast<IREE::Flow::DispatchTensorType>();
+        assert(shapedType && shapedType.hasRank());
+
+        rewriter.setInsertionPoint(subspanOp);
+        // Just change the result type of the InterfaceBindingSubspanOp.
+        auto memRefType = getMemrefTypeForTensor(shapedType);
+        Value baseBuffer =
+            rewriter.create<IREE::HAL::InterfaceBindingSubspanOp>(
+                subspanOp->getLoc(), memRefType, subspanOp.set(),
+                subspanOp.binding(), subspanOp.type(), subspanOp.byte_offset(),
+                subspanOp.dynamic_dims(), subspanOp.alignmentAttr());
+        flowState.subspan_to_buffer[tensor] = baseBuffer;
+      }
+
+      return WalkResult::advance();
+    });
+
+    return success();
+  }
+};
 }  // namespace
 
 void registerBufferizationInterfaces(DialectRegistry &registry) {
@@ -261,10 +297,9 @@ void registerBufferizationInterfaces(DialectRegistry &registry) {
 
 void addPostAnalysisTransformations(
     linalg::comprehensive_bufferize::BufferizationOptions &options) {
+  options.addPostAnalysisStep<CreateSubSpanBuffers>();
   options.addPostAnalysisStep<StoreTensorOpAnchoredInitTensorEliminationStep>();
   options.addPostAnalysisStep<InplaceTensorStoreOpAnalysis>();
-  options.addPostAnalysisStep<linalg::comprehensive_bufferize::tensor_ext::
-                                  InplaceInsertSliceOpAnalysis>();
   options.addPostAnalysisStep<linalg::comprehensive_bufferize::scf_ext::
                                   AssertDestinationPassingStyle>();
 }
