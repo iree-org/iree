@@ -23,6 +23,7 @@ td_library(
             "FlowOps.td",
         ],
         include = ["*.td"],
+        exclude = ["PartitionableLoopsInterface.td"],
     ),
     deps = [
         "//iree/compiler/Dialect/Util/IR:td_files",
