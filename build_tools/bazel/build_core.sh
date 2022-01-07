@@ -108,4 +108,4 @@ bazel \
               --keep_going \
               --test_output=errors \
               --config=rs \
-              --config=remote_cache_core
+              --config=remote_cache_bazel_ci
