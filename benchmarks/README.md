@@ -71,7 +71,7 @@ These steps help reproduce the failures in TFLite models.
 
 1.  Install `iree-import-tflite`.
     ```
-    $ python -m pip install iree-tools-tflite-snapshot -f https://github.com/google/iree/releases
+    $ python -m pip install iree-tools-tflite -f https://github.com/google/iree/releases
     ```
 
 2. Confirm the binary `iree-import-tflite` is in your path by running

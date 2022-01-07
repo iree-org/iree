@@ -58,9 +58,9 @@ Roughly:
 
 ```shell
 python -m pip install \
-  iree-tools-tf-snapshot \
-  iree-tools-tflite-snapshot \
-  iree-tools-xla-snapshot \
+  iree-tools-tf \
+  iree-tools-tflite \
+  iree-tools-xla \
   -f https://github.com/google/iree/releases
 ```
 
