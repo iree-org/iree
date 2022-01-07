@@ -38,6 +38,7 @@ iree_lit_test_suite(
             "promote_i1_to_i8.mlir",
             "strip_and_splat_constant_variables.mlir",
             "strip_signedness.mlir",
+            "test_partitionable_loops_interface.mlir",
             "transformation.mlir",
             "verify_input_ir.mlir",
         ],

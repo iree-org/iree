@@ -4,7 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Dialect/Util/IR/PartitionableLoopsInterface.h"
+#include "iree/compiler/Dialect/Flow/IR/PartitionableLoopsInterface.h"
 
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree-dialects/Dialect/LinalgExt/IR/TiledOpInterface.h"
@@ -13,7 +13,7 @@
 
 using namespace llvm;
 
-#include "iree/compiler/Dialect/Util/IR/PartitionableLoopsInterface.cpp.inc"  // IWYU pragma: export
+#include "iree/compiler/Dialect/Flow/IR/PartitionableLoopsInterface.cpp.inc"  // IWYU pragma: export
 
 /// Filters out dimensions in `parallelLoops` that have unit range in
 /// `loopRanges`.
@@ -48,7 +48,7 @@ SmallVector<unsigned> getPartitionableLoopsImpl(
 namespace mlir {
 namespace iree_compiler {
 namespace IREE {
-namespace Util {
+namespace Flow {
 
 /// External model implementation for all LinalgOps.
 struct LinalgOpPartitionableLoops
@@ -149,7 +149,7 @@ void registerPartitionableLoopsInterfaceModels(DialectRegistry &registry) {
       registry);
 }
 
-}  // namespace Util
+}  // namespace Flow
 }  // namespace IREE
 }  // namespace iree_compiler
 }  // namespace mlir

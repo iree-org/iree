@@ -53,6 +53,7 @@ cc_library(
         "PromoteI1ToI8Pass.cpp",
         "StripAndSplatConstantVariables.cpp",
         "StripSignednessPass.cpp",
+        "TestPartitionableLoopsInterface.cpp",
         "TypeConverter.cpp",
         "VerifyInputLegality.cpp",
     ],

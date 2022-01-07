@@ -27,7 +27,6 @@ iree_cc_library(
     "Patterns.cpp"
     "SimplifyGlobalAccesses.cpp"
     "TestFloatRangeAnalysis.cpp"
-    "TestPartitionableLoopsInterface.cpp"
   DEPS
     LLVMSupport
     MLIRAnalysis

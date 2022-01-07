@@ -15,15 +15,12 @@ iree_cc_library(
     IR
   HDRS
     "ClosureOpUtils.h"
-    "PartitionableLoopsInterface.h"
     "UtilDialect.h"
     "UtilOps.h"
     "UtilOps.h.inc"
     "UtilTraits.h"
     "UtilTypes.h"
   TEXTUAL_HDRS
-    "PartitionableLoopsInterface.cpp.inc"
-    "PartitionableLoopsInterface.h.inc"
     "UtilAttrInterfaces.cpp.inc"
     "UtilAttrInterfaces.h.inc"
     "UtilAttrs.cpp.inc"
@@ -34,7 +31,6 @@ iree_cc_library(
     "UtilTypeInterfaces.h.inc"
   SRCS
     "ClosureOpUtils.cpp"
-    "PartitionableLoopsInterface.cpp"
     "UtilAttrs.cpp"
     "UtilDialect.cpp"
     "UtilOpFolders.cpp"
@@ -42,16 +38,13 @@ iree_cc_library(
     "UtilOps.cpp.inc"
     "UtilTypes.cpp"
   DEPS
-    ::PartitionableLoopsInterfaceGen
     ::UtilAttrsGen
     ::UtilInterfacesGen
     ::UtilOpsGen
-    IREELinalgExtDialect
     LLVMSupport
     MLIRArithmetic
     MLIRControlFlowInterfaces
     MLIRIR
-    MLIRLinalg
     MLIRMemRef
     MLIRParser
     MLIRSideEffectInterfaces
@@ -60,16 +53,6 @@ iree_cc_library(
     MLIRTensor
     MLIRTransforms
   PUBLIC
-)
-
-iree_tablegen_library(
-  NAME
-    PartitionableLoopsInterfaceGen
-  TD_FILE
-    "PartitionableLoopsInterface.td"
-  OUTS
-    -gen-op-interface-decls PartitionableLoopsInterface.h.inc
-    -gen-op-interface-defs PartitionableLoopsInterface.cpp.inc
 )
 
 iree_tablegen_library(

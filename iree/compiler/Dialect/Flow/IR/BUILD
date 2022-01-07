@@ -63,6 +63,7 @@ cc_library(
         ":FlowInterfacesGen",
         ":FlowOpsGen",
         ":FlowTypesGen",
+        ":PartitionableLoopsInterface",
         "//iree/compiler/Dialect/Util/IR",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:ControlFlowInterfaces",
@@ -173,4 +174,40 @@ iree_tablegen_doc(
     tblgen = "@llvm-project//mlir:mlir-tblgen",
     td_file = "FlowOps.td",
     deps = [":td_files"],
+)
+
+cc_library(
+    name = "PartitionableLoopsInterface",
+    srcs = [
+        "PartitionableLoopsInterface.cpp",
+    ],
+    hdrs = [
+        "PartitionableLoopsInterface.h",
+    ],
+    textual_hdrs = [
+        "PartitionableLoopsInterface.cpp.inc",
+        "PartitionableLoopsInterface.h.inc",
+    ],
+    deps = [
+        ":PartitionableLoopsInterfaceGen",
+        "//llvm-external-projects/iree-dialects:IREELinalgExtDialect",
+        "@llvm-project//mlir:LinalgInterfaces",
+    ],
+)
+
+gentbl_cc_library(
+    name = "PartitionableLoopsInterfaceGen",
+    tbl_outs = [
+        (
+            ["-gen-op-interface-decls"],
+            "PartitionableLoopsInterface.h.inc",
+        ),
+        (
+            ["-gen-op-interface-defs"],
+            "PartitionableLoopsInterface.cpp.inc",
+        ),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "PartitionableLoopsInterface.td",
+    deps = ["@llvm-project//mlir:OpBaseTdFiles"],
 )

@@ -218,9 +218,21 @@ namespace {
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h.inc"  // IWYU pragma: export
 }  // namespace
 
+/// Test passes.
+std::unique_ptr<OperationPass<void>>
+createTestPartitionableLoopsInterfacePass();
+
+/// Register test passes.
+inline void registerTestPasses() {
+  createTestPartitionableLoopsInterfacePass();
+}
+
 void registerFlowPasses() {
   // Generated.
   registerPasses();
+
+  // Test passes.
+  registerTestPasses();
 
   // Pipelines.
   registerFlowTransformPassPipeline();

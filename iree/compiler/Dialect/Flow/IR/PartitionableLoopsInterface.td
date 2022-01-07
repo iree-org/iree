@@ -4,13 +4,13 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#ifndef IREE_DIALECT_UTIL_IR_PARTITIONABLE_LOOPS_INTERFACE
-#define IREE_DIALECT_UTIL_IR_PARTITIONABLE_LOOPS_INTERFACE
+#ifndef IREE_DIALECT_FLOW_IR_PARTITIONABLE_LOOPS_INTERFACE
+#define IREE_DIALECT_FLOW_IR_PARTITIONABLE_LOOPS_INTERFACE
 
 include "mlir/IR/OpBase.td"
 
-def Util_PartitionableLoopsInterface : OpInterface<"PartitionableLoopsInterface"> {
-  let cppNamespace = "::mlir::iree_compiler::IREE::Util";
+def FLOW_PartitionableLoopsInterface : OpInterface<"PartitionableLoopsInterface"> {
+  let cppNamespace = "::mlir::iree_compiler::IREE::Flow";
 
   let description = [{
     An interface for ops to publish the loops that can be partitioned.
@@ -41,4 +41,4 @@ def Util_PartitionableLoopsInterface : OpInterface<"PartitionableLoopsInterface"
   ];
 }
 
-#endif // IREE_DIALECT_UTIL_IR_PARTITIONABLE_LOOPS_INTERFACE
+#endif // IREE_DIALECT_FLOW_IR_PARTITIONABLE_LOOPS_INTERFACE
