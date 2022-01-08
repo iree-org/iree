@@ -31,22 +31,16 @@ namespace iree_compiler {
 namespace {
 // Could just be linalg::TilingPattern with a ContractionOpInterface filter, but
 // that is always templated on an op.
-struct TileWorkgroups : public linalg::LinalgBaseTilingPattern {
-  using Base = linalg::LinalgBaseTilingPattern;
+struct TileWorkgroups : public linalg::LinalgTilingPattern {
+  using Base = linalg::LinalgTilingPattern;
   TileWorkgroups(MLIRContext *context, linalg::LinalgTilingOptions options,
                  linalg::LinalgTransformationFilter marker)
-      : LinalgBaseTilingPattern(context, options, marker) {}
-  LogicalResult matchAndRewrite(Operation *op,
+      : LinalgTilingPattern(context, options, marker) {}
+  LogicalResult matchAndRewrite(linalg::LinalgOp linalgOp,
                                 PatternRewriter &rewriter) const override {
-    auto contractionOp = dyn_cast<linalg::ContractionOpInterface>(op);
-    if (!contractionOp) return failure();
-
-    linalg::TiledLinalgOp tiledLinalgOp;
-    if (failed(Base::matchAndRewriteBase(op, rewriter, tiledLinalgOp))) {
+    if (!isa<linalg::ContractionOpInterface>(linalgOp.getOperation()))
       return failure();
-    }
-    rewriter.replaceOp(op, tiledLinalgOp.tensorResults);
-    return success();
+    return Base::returningMatchAndRewrite(linalgOp, rewriter);
   }
 };
 
@@ -263,12 +257,14 @@ void LLVMCPUTileFuseAndVectorizePass::runOnOperation() {
   // Apply vectorization patterns.
   {
     OwningRewritePatternList vectorizationPatterns(&getContext());
-    linalg::insertVectorizationPatterns<linalg::ContractionOpInterface,
-                                        linalg::GenericOp, linalg::CopyOp,
-                                        linalg::FillOp>(
-        vectorizationPatterns, linalg::LinalgVectorizationOptions(),
-        linalg::LinalgTransformationFilter(
-            Identifier::get(getVectorizeMarker(), context)));
+    linalg::LinalgVectorizationOptions opt;
+    linalg::LinalgTransformationFilter f(
+        Identifier::get(getVectorizeMarker(), context));
+    linalg::VectorizationPatterns<linalg::GenericOp, linalg::CopyOp,
+                                  linalg::FillOp>::insert(vectorizationPatterns,
+                                                          opt, f);
+    vectorizationPatterns.add<linalg::LinalgVectorizationPattern>(
+        &getContext(), f.addOpFilter<linalg::ContractionOpInterface>(), opt);
     vector::populateVectorTransferPermutationMapLoweringPatterns(
         vectorizationPatterns);
     vector::populateVectorReductionToContractPatterns(vectorizationPatterns);

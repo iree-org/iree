@@ -51,13 +51,13 @@ static void populateTilingReductionPatterns(
                            .setLoopType(linalg::LinalgTilingLoopType::Loops)
                            .setTileSizeComputationFunction(tileSizesFn);
   MLIRContext *context = patterns.getContext();
-  patterns.insert<linalg::LinalgTilingPattern<linalg::MatmulOp>,
-                  linalg::LinalgTilingPattern<linalg::BatchMatmulOp>,
-                  linalg::LinalgTilingPattern<linalg::GenericOp>>(
-      context, tilingOptions,
-      linalg::LinalgTransformationFilter(
-          ArrayRef<Identifier>{},
-          Identifier::get(getWorkgroupKTiledMarker(), context)));
+
+  linalg::LinalgTransformationFilter filter(
+      ArrayRef<Identifier>{},
+      Identifier::get(getWorkgroupKTiledMarker(), context));
+  linalg::TilingPatterns<linalg::MatmulOp, linalg::BatchMatmulOp,
+                         linalg::GenericOp>::insert(patterns, tilingOptions,
+                                                    filter);
 }
 
 /// Patterns for warp level tiling.
@@ -108,17 +108,15 @@ static void populateTilingToWarpPatterns(
                            .setTileSizeComputationFunction(getInnerTileSizeFn)
                            .setDistributionOptions(warpDistributionOptions);
   MLIRContext *context = patterns.getContext();
-  patterns.insert<linalg::LinalgTilingPattern<linalg::MatmulOp>,
-                  linalg::LinalgTilingPattern<linalg::FillOp>,
-                  linalg::LinalgTilingPattern<linalg::CopyOp>,
-                  linalg::LinalgTilingPattern<linalg::BatchMatmulOp>,
-                  linalg::LinalgTilingPattern<linalg::GenericOp>>(
-      context, tilingOptions,
-      linalg::LinalgTransformationFilter(
-          {Identifier::get(getWorkgroupKTiledMarker(), context),
-           Identifier::get(getWorkgroupMemoryMarker(), context)},
-          Identifier::get(getVectorizeMarker(), context))
-          .setMatchByDefault());
+  linalg::LinalgTransformationFilter filter(
+      {Identifier::get(getWorkgroupKTiledMarker(), context),
+       Identifier::get(getWorkgroupMemoryMarker(), context)},
+      Identifier::get(getVectorizeMarker(), context));
+  filter.setMatchByDefault();
+  linalg::TilingPatterns<linalg::MatmulOp, linalg::FillOp, linalg::CopyOp,
+                         linalg::BatchMatmulOp,
+                         linalg::GenericOp>::insert(patterns, tilingOptions,
+                                                    filter);
 }
 
 /// Patterns for thread level tiling.
@@ -168,29 +166,22 @@ static void populateTilingToInvocationPatterns(
           .setDistributionOptions(invocationDistributionOptions);
 
   MLIRContext *context = patterns.getContext();
-  patterns
-      .insert<linalg::LinalgTilingPattern<linalg::MatmulOp>,
-              linalg::LinalgTilingPattern<linalg::FillOp>,
-              linalg::LinalgTilingPattern<linalg::CopyOp>,
-              linalg::LinalgTilingPattern<linalg::BatchMatmulOp>,
-              linalg::LinalgTilingPattern<linalg::GenericOp>,
-              linalg::LinalgTilingPattern<linalg::Conv2DNhwcHwcfOp>,
-              linalg::LinalgTilingPattern<linalg::DepthwiseConv2DNhwcHwcOp>,
-              linalg::LinalgTilingPattern<linalg::DepthwiseConv2DNhwcHwcmOp>,
-              linalg::LinalgTilingPattern<linalg::PoolingNhwcMaxOp>,
-              linalg::LinalgTilingPattern<linalg::PoolingNhwcMinOp>,
-              linalg::LinalgTilingPattern<linalg::PoolingNhwcSumOp>,
-              IREE::LinalgExt::TiledOpInterfaceTilingPattern>(
-          context, tilingOptions,
-          linalg::LinalgTransformationFilter(
-              {Identifier::get(getWorkgroupKTiledMarker(), context),
-               Identifier::get(getWorkgroupMemoryMarker(), context)},
-              Identifier::get(getVectorizeMarker(), context))
-              .addFilter([](Operation *op) {
-                // FFT doesn't support second level of tiling yet.
-                return success(!isa<IREE::LinalgExt::FftOp>(op));
-              })
-              .setMatchByDefault());
+  linalg::LinalgTransformationFilter f(
+      {Identifier::get(getWorkgroupKTiledMarker(), context),
+       Identifier::get(getWorkgroupMemoryMarker(), context)},
+      Identifier::get(getVectorizeMarker(), context));
+  f.addFilter([](Operation *op) {
+     // FFT doesn't support second level of tiling yet.
+     return success(!isa<IREE::LinalgExt::FftOp>(op));
+   }).setMatchByDefault();
+  linalg::TilingPatterns<
+      linalg::MatmulOp, linalg::FillOp, linalg::CopyOp, linalg::BatchMatmulOp,
+      linalg::GenericOp, linalg::Conv2DNhwcHwcfOp,
+      linalg::DepthwiseConv2DNhwcHwcOp, linalg::DepthwiseConv2DNhwcHwcmOp,
+      linalg::PoolingNhwcMaxOp, linalg::PoolingNhwcMinOp,
+      linalg::PoolingNhwcSumOp>::insert(patterns, tilingOptions, f);
+  patterns.insert<IREE::LinalgExt::TiledOpInterfaceTilingPattern>(
+      context, tilingOptions, f);
 }
 
 static LogicalResult copyToWorkgroupMemory(OpBuilder &b, Value src, Value dst) {

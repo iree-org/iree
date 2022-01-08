@@ -71,9 +71,13 @@ Optional<SmallVector<int64_t, 4>> getNativeVectorShape(Operation *op) {
 
 /// Add patterns to vectorize any supported Linalg ops.
 void populateVectorizationPatterns(RewritePatternSet &patterns) {
-  linalg::insertVectorizationPatterns<linalg::FillOp, linalg::GenericOp,
-                                      linalg::ContractionOpInterface>(
-      patterns, linalg::LinalgVectorizationOptions());
+  linalg::LinalgVectorizationOptions opt;
+  linalg::LinalgTransformationFilter f;
+  linalg::VectorizationPatterns<linalg::FillOp, linalg::GenericOp>::insert(
+      patterns, opt, f);
+  patterns.add<linalg::LinalgVectorizationPattern>(
+      patterns.getContext(), f.addOpFilter<linalg::ContractionOpInterface>(),
+      opt);
   vector::populateVectorTransferPermutationMapLoweringPatterns(patterns);
   vector::populateVectorReductionToContractPatterns(patterns);
 }

@@ -743,21 +743,19 @@ static void appendDynamicDims(OpBuilder &builder, Location loc, Value v,
 
 namespace {
 // Rewrite pattern to ensure only ops with tensor semantics are tiled.
-struct TileAndDistributeLinalgOpsPattern
-    : public linalg::LinalgBaseTilingPattern {
-  using Base = linalg::LinalgBaseTilingPattern;
+struct TileAndDistributeLinalgOpsPattern : public linalg::LinalgTilingPattern {
+  using Base = linalg::LinalgTilingPattern;
   TileAndDistributeLinalgOpsPattern(MLIRContext *context,
                                     linalg::LinalgTilingOptions options,
                                     linalg::LinalgTransformationFilter marker,
                                     PatternBenefit benefit = 1)
       : Base(context, options, marker, benefit) {}
 
-  LogicalResult matchAndRewrite(Operation *op,
+  LogicalResult matchAndRewrite(linalg::LinalgOp linalgOp,
                                 PatternRewriter &rewriter) const override {
-    auto linalgOp = dyn_cast<linalg::LinalgOp>(op);
-    if (!linalgOp || !linalgOp.hasTensorSemantics()) return failure();
-    if (!hasRootOpAttribute(op)) return failure();
-    if (op->getParentOfType<IREE::Flow::DispatchWorkgroupsOp>()) {
+    if (!linalgOp.hasTensorSemantics()) return failure();
+    if (!hasRootOpAttribute(linalgOp)) return failure();
+    if (linalgOp->getParentOfType<IREE::Flow::DispatchWorkgroupsOp>()) {
       return failure();
     }
 
@@ -768,9 +766,9 @@ struct TileAndDistributeLinalgOpsPattern
 
     // Compute workgroup count to use for the dispatch op. These are the ranges
     // of the outermost parallel loops that can be distributed.
-    Location loc = op->getLoc();
+    Location loc = linalgOp->getLoc();
     SmallVector<Range> loopRanges = linalgOp.createLoopRanges(rewriter, loc);
-    SmallVector<unsigned> partitionedLoops = getPartitionedLoops(op);
+    SmallVector<unsigned> partitionedLoops = getPartitionedLoops(linalgOp);
     SmallVector<Value> count;
     for (auto dim : partitionedLoops) {
       count.push_back(loopRanges[dim].size);
@@ -802,36 +800,30 @@ struct TileAndDistributeLinalgOpsPattern
 
     auto nLoops = linalgOp.getNumParallelLoops();
     if (nLoops) {
-      linalg::TiledLinalgOp tiledLinalgOp;
-      LogicalResult tilingResult =
-          Base::matchAndRewriteBase(clonedLinalgOp, rewriter, tiledLinalgOp);
-      if (failed(tilingResult)) {
+      SmallVector<Value> clonedOpOperands =
+          clonedLinalgOp.getInputAndOutputOperands();
+      FailureOr<linalg::TiledLinalgOp> tiledLinalgOpOr =
+          Base::returningMatchAndRewrite(clonedLinalgOp, rewriter);
+      if (failed(tiledLinalgOpOr)) {
         // GreedyPatternRewriter is not transactional and does not stop on
         // failure. Must explicitly delete on all failure paths.
         rewriter.eraseOp(dispatchOp);
         return failure();
       }
-
-      SmallVector<Value> clonedOpOperands =
-          clonedLinalgOp.getInputAndOutputOperands();
-      pullInProducersInSameGroup(rewriter, dispatchOp, tiledLinalgOp.op,
-                                 clonedOpOperands, tiledLinalgOp.loops,
-                                 getRootNumber(op));
-
-      // Keep track of the tiledOpOperands for fusion.
-      rewriter.replaceOp(clonedLinalgOp, tiledLinalgOp.tensorResults);
-
-      removeRootOpAttribute(tiledLinalgOp.op);
+      pullInProducersInSameGroup(rewriter, dispatchOp, tiledLinalgOpOr->op,
+                                 clonedOpOperands, tiledLinalgOpOr->loops,
+                                 getRootNumber(linalgOp));
+      removeRootOpAttribute(tiledLinalgOpOr->op);
     } else {
       SmallVector<Value> clonedOpOperands =
           clonedLinalgOp.getInputAndOutputOperands();
       pullInProducersInSameGroup(
           rewriter, dispatchOp, clonedLinalgOp, clonedOpOperands,
-          /*tiledLoops =*/ArrayRef<Operation *>{}, getRootNumber(op));
+          /*tiledLoops =*/ArrayRef<Operation *>{}, getRootNumber(linalgOp));
       removeRootOpAttribute(clonedLinalgOp);
     }
 
-    rewriter.replaceOpWithIf(op, dispatchOp.getResults(),
+    rewriter.replaceOpWithIf(linalgOp, dispatchOp.getResults(),
                              [&](OpOperand &operand) {
                                return !isa<tensor::DimOp>(operand.getOwner());
                              });

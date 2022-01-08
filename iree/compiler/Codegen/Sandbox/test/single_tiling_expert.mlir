@@ -17,7 +17,7 @@ func @matmul(%arg0 : tensor<?x?xf32>, %arg1 : tensor<?x?xf32>, %arg2 : tensor<?x
 //      CHECK:       }
 //      CHECK:     }
 //      CHECK:   }
- 
+
 // -----
 
  func @matmul_static(%arg0 : tensor<20x60xf32>, %arg1 : tensor<60x80xf32>, %arg2 : tensor<20x80xf32>) -> tensor<20x80xf32> {
@@ -27,11 +27,11 @@ func @matmul(%arg0 : tensor<?x?xf32>, %arg1 : tensor<?x?xf32>, %arg2 : tensor<?x
   return %0 : tensor<20x80xf32>
 }
 //      CHECK: func @matmul_static(
-//      CHECK:   scf.for 
+//      CHECK:   scf.for
 // CHECK-SAME:   {
-//      CHECK:     scf.for 
+//      CHECK:     scf.for
 // CHECK-SAME:     {
-//      CHECK:       scf.for 
+//      CHECK:       scf.for
 // CHECK-SAME:       {
 //  CHECK-NOT:         linalg.matmul
 //      CHECK:         vector.contract
