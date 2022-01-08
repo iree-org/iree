@@ -49,7 +49,7 @@ except FileNotFoundError:
   print("version_info.json not found. Using defaults")
   version_info = {}
 
-PACKAGE_SUFFIX = version_info.get("package-suffix") or "-dev"
+PACKAGE_SUFFIX = version_info.get("package-suffix") or ""
 PACKAGE_VERSION = version_info.get("package-version") or "0.1dev1"
 
 
