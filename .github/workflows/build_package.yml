@@ -12,7 +12,7 @@ on:
     inputs:
       package_suffix:
         description: 'Suffix to append to package names'
-        required: true
+        required: false
         default: ''
       package_version:
         description: 'Version of the package'
