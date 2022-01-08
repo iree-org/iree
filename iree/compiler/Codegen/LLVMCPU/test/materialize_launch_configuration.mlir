@@ -124,32 +124,29 @@ hal.executable private @add_no_config  {
 
 // -----
 
+#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>,
+    #hal.descriptor_set.binding<2, storage_buffer>
+  ]>
+]>
 hal.executable private @add  {
-  hal.interface @io {
-    hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer"
-    hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer"
-    hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer"
-  }
   hal.executable.variant @llvm, target = <"llvm", "embedded-elf-x86_64", {
        data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
        native_vector_size = 16 : index,
        target_triple = "x86_64-unknown-linux-gnu"
     }> {
-    hal.executable.entry_point @add attributes {
-      interface = @io, ordinal = 0 : index,
-      signature = (!flow.dispatch.tensor<readonly:?x?xf32>, !flow.dispatch.tensor<readonly:?xf32>,
-        !flow.dispatch.tensor<writeonly:?x?xf32>) -> ()}
+    hal.executable.entry_point @add layout(#executable_layout)
     builtin.module  {
       func @add() {
         %c0 = arith.constant 0 : index
         %c1 = arith.constant 1 : index
-        %dim0 = hal.interface.load.constant offset = 0 : index
-        %dim1 = hal.interface.load.constant offset = 1 : index
-        %0 = hal.interface.binding.subspan @io::@arg0[%c0] : memref<?x?xf32>{%dim0, %dim1}
-        %2 = hal.interface.binding.subspan @io::@arg1[%c0] : memref<?xf32>{%dim1}
-        %6 = hal.interface.binding.subspan @io::@ret0[%c0] : memref<?x?xf32>{%dim0, %dim1}
-        %M = memref.dim %0, %c0 : memref<?x?xf32>
-        %N = memref.dim %0, %c1 : memref<?x?xf32>
+        %dim0 = hal.interface.constant.load[0] : index
+        %dim1 = hal.interface.constant.load[1] : index
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<readonly:?x?xf32>{%dim0, %dim1}
+        %2 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : !flow.dispatch.tensor<readonly:?xf32>{%dim1}
+        %3 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : !flow.dispatch.tensor<writeonly:?x?xf32>{%dim0, %dim1}
         %workgroup_size_x = hal.interface.workgroup.size[0] : index
         %workgroup_size_y = hal.interface.workgroup.size[1] : index
         %workgroup_id_x = hal.interface.workgroup.id[0] : index
@@ -158,33 +155,29 @@ hal.executable private @add  {
         %workgroup_count_y = hal.interface.workgroup.count[1] : index
         %8 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_size_y, %workgroup_id_y]
         %9 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_size_y, %workgroup_count_y]
-        scf.for %arg0 = %8 to %M step %9 {
+        scf.for %arg0 = %8 to %dim0 step %9 {
           %10 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_size_x, %workgroup_id_x]
           %11 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_size_x, %workgroup_count_x]
-          scf.for %arg1 = %10 to %N step %11 {
-            %12 = affine.min affine_map<(d0)[s0, s1] -> (s0, -d0 + s1)>(%arg0)[%workgroup_size_y, %M]
-            %13 = affine.min affine_map<(d0)[s0, s1] -> (s0, -d0 + s1)>(%arg1)[%workgroup_size_x, %N]
-            %14 = memref.subview %0[%arg0, %arg1] [%12, %13] [1, 1] : memref<?x?xf32> to memref<?x?xf32, affine_map<(d0, d1)[s0, s1] -> (d0 * s1 + s0 + d1)>>
-            %15 = memref.subview %2[%arg1] [%13] [1] : memref<?xf32> to memref<?xf32, affine_map<(d0)[s0] -> (d0 + s0)>>
-            %16 = memref.subview %6[%arg0, %arg1] [%12, %13] [1, 1] : memref<?x?xf32> to memref<?x?xf32, affine_map<(d0, d1)[s0, s1] -> (d0 * s1 + s0 + d1)>>
-            linalg.generic {
+          scf.for %arg1 = %10 to %dim1 step %11 {
+            %12 = affine.min affine_map<(d0)[s0, s1] -> (s0, -d0 + s1)>(%arg0)[%workgroup_size_y, %dim0]
+            %13 = affine.min affine_map<(d0)[s0, s1] -> (s0, -d0 + s1)>(%arg1)[%workgroup_size_x, %dim1]
+            %14 = flow.dispatch.tensor.load %0, offsets=[%arg0, %arg1], sizes=[%12, %13], strides=[1, 1] : !flow.dispatch.tensor<readonly:?x?xf32> -> tensor<?x?xf32>
+            %15 = flow.dispatch.tensor.load %2, offsets=[%arg1], sizes=[%13], strides=[1] : !flow.dispatch.tensor<readonly:?xf32> -> tensor<?xf32>
+            %16 = linalg.init_tensor [%12, %13] : tensor<?x?xf32>
+            %17 = linalg.generic {
               indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
                                affine_map<(d0, d1) -> (d1)>,
                                affine_map<(d0, d1) -> (d0, d1)>],
               iterator_types = ["parallel", "parallel"]}
-              ins(%14, %15 : memref<?x?xf32, affine_map<(d0, d1)[s0, s1] -> (d0 * s1 + s0 + d1)>>, memref<?xf32, affine_map<(d0)[s0] -> (d0 + s0)>>) outs(%16 : memref<?x?xf32, affine_map<(d0, d1)[s0, s1] -> (d0 * s1 + s0 + d1)>>) {
+              ins(%14, %15 : tensor<?x?xf32>, tensor<?xf32>) outs(%16 : tensor<?x?xf32>) {
               ^bb0(%arg2: f32, %arg3: f32, %arg4: f32):  // no predecessors
-                %3 = arith.addf %arg2, %arg3 : f32
-                linalg.yield %3 : f32
-              }
+                %23 = arith.addf %arg2, %arg3 : f32
+                linalg.yield %23 : f32
+              } -> tensor<?x?xf32>
+            flow.dispatch.tensor.store %17, %3, offsets=[%arg0, %arg1], sizes=[%12, %13], strides=[1, 1] : tensor<?x?xf32> -> !flow.dispatch.tensor<writeonly:?x?xf32>
           }
         }
         return
-      }
-      hal.interface private @io  {
-        hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer"
-        hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer"
-        hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer"
       }
     }
   }
@@ -704,7 +697,7 @@ hal.executable private @outs_fusion {
   }
 }
 
-//      CHECK: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"CPUDefault", workload_per_wg = [64, 64]>
+//      CHECK: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"CPUSingleTilingExpert", workload_per_wg = [64, 64]>
 //      CHECK: hal.executable.entry_point public @outs_fusion_fn
 // CHECK-SAME:   translation.info = #[[TRANSLATION]]
 //      CHECK: func @outs_fusion_fn()
@@ -936,7 +929,7 @@ hal.executable private @generic_static {
 //  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 32)>
 //  CHECK-DAG: #[[MAP1:.+]] = affine_map<()[s0] -> (s0 ceildiv 16)>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"CPUSingleTilingExpert", workload_per_wg = [32, 16]>
-//      CHECK: hal.executable.entry_point public @generic_static attributes
+//      CHECK: hal.executable.entry_point public @generic_static
 // CHECK-SAME:     translation.info = #[[TRANSLATION]]
 // CHECK-NEXT:   ^bb0(%[[ARG0:[a-zA-Z0-9]+]]: index, %[[ARG1:[a-zA-Z0-9]+]]: index, %[[ARG2:[a-zA-Z0-9]+]]: index)
 //  CHECK-DAG:     %[[C1:.+]] = arith.constant 1 : index
