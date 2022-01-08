@@ -13,7 +13,7 @@ on:
       package_suffix:
         description: 'Suffix to append to package names'
         required: true
-        default: '-cidev'
+        default: ''
       package_version:
         description: 'Version of the package'
         required: true
