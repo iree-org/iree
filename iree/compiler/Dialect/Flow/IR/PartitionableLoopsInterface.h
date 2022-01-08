@@ -11,6 +11,8 @@
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/Support/LLVM.h"
 
+// clang-format off
 #include "iree/compiler/Dialect/Flow/IR/PartitionableLoopsInterface.h.inc"  // IWYU pragma: export
+// clang-format on
 
 #endif  // IREE_COMPILER_DIALECT_FLOW_IR_PARTITIONABLE_LOOPS_INTERFACE_H_
