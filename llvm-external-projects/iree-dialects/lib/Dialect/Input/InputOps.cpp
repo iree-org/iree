@@ -91,5 +91,31 @@ static void printTypeOrAttr(OpAsmPrinter &p, Operation *op, TypeAttr type,
   }
 }
 
+//===----------------------------------------------------------------------===//
+// GlobalOp
+//===----------------------------------------------------------------------===//
+
+void GlobalOp::build(OpBuilder &builder, OperationState &result, StringRef name,
+                     bool isMutable, Type type,
+                     Optional<Attribute> initialValue,
+                     ArrayRef<NamedAttribute> attrs) {
+  result.addAttribute(SymbolTable::getSymbolAttrName(),
+                      builder.getStringAttr(name));
+  if (isMutable) {
+    result.addAttribute("is_mutable", builder.getUnitAttr());
+  }
+  if (initialValue.hasValue()) {
+    result.addAttribute("initial_value", initialValue.getValue());
+  }
+  result.addAttribute("type", TypeAttr::get(type));
+  result.attributes.append(attrs.begin(), attrs.end());
+}
+
+void GlobalOp::build(OpBuilder &builder, OperationState &result, StringRef name,
+                     bool isMutable, Type type,
+                     ArrayRef<NamedAttribute> attrs) {
+  build(builder, result, name, isMutable, type, llvm::None, attrs);
+}
+
 #define GET_OP_CLASSES
 #include "iree-dialects/Dialect/Input/InputOps.cpp.inc"
