@@ -181,6 +181,12 @@ setup(
     author_email="iree-discuss@googlegroups.com",
     description="IREE Compiler API",
     long_description="",
+    license="Apache-2.0",
+    classifiers=[
+        "Programming Language :: Python :: 3.7",
+        "Programming Language :: Python :: 3.8",
+        "Programming Language :: Python :: 3.9",
+    ],
     ext_modules=[
         CMakeExtension("iree.compiler._mlir_libs._mlir"),
         CMakeExtension("iree.compiler._mlir_libs._ireeDialects"),
