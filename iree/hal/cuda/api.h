@@ -39,6 +39,11 @@ typedef struct iree_hal_cuda_device_params_t {
 
   // Specifies how command buffers are recorded and executed.
   iree_hal_cuda_command_buffer_mode_t command_buffer_mode;
+
+  // Allow executing command buffers against CUDA streams as they are recorded.
+  // Only command buffers produced by the compiler that have the
+  // IREE_HAL_COMMAND_BUFFER_MODE_ALLOW_INLINE_EXECUTION bit set will use this.
+  bool allow_inline_execution;
 } iree_hal_cuda_device_params_t;
 
 // Initializes |out_params| to default values.
