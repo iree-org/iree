@@ -90,6 +90,22 @@ def IREEInput_GlobalOp : IREEInput_Op<"global", [
     (`initializer` `(` $initializer^ `)`):(``)?
     custom<TypeOrAttr>($type, $initial_value)
   }];
+
+  let builders = [
+    OpBuilder<(ins
+      "StringRef":$name,
+      "bool":$isMutable,
+      "Type":$type,
+      "Optional<Attribute>":$initialValue,
+      CArg<"ArrayRef<NamedAttribute>", "{}">:$attrs
+    )>,
+    OpBuilder<(ins
+      "StringRef":$name,
+      "bool":$isMutable,
+      "Type":$type,
+      CArg<"ArrayRef<NamedAttribute>", "{}">:$attrs
+    )>,
+  ];
 }
 
 def IREEInput_GlobalAddressOp : IREEInput_PureOp<"global.address"> {
