@@ -51,10 +51,6 @@ llvm::StringMap<IREE::HAL::ExecutableEntryPointOp> getAllEntryPoints(
   return entryPointOps;
 }
 
-bool isVMVXBackend(IREE::HAL::ExecutableVariantOp variantOp) {
-  return variantOp.target().getBackend().getValue() == "vmvx";
-}
-
 //===----------------------------------------------------------------------===//
 // Utility functions to get untiled op shapes
 //===----------------------------------------------------------------------===//
