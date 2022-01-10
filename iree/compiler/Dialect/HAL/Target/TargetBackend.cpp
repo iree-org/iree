@@ -57,6 +57,9 @@ static void renameWithDisambiguatedName(
   SymbolTable::setSymbolName(op, disambiguatedName);
 }
 
+// TODO(benvanik): replace with iree/compiler/Utils/ModuleUtils.h version.
+// Only difference is one has the symbol map that we don't even need.
+
 // Destructively merges |sourceModuleOp| into |targetModuleOp|.
 // |targetSymbolMap| is updated with the new symbols.
 //

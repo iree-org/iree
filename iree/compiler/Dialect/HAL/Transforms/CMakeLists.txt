@@ -25,6 +25,7 @@ iree_cc_library(
     "MaterializeInterfaces.cpp"
     "MaterializeResourceCaches.cpp"
     "MemoizeDeviceQueries.cpp"
+    "PackDispatchOperands.cpp"
     "Passes.cpp"
     "ResolveEntryPointOrdinals.cpp"
     "SerializeExecutables.cpp"
@@ -33,6 +34,7 @@ iree_cc_library(
   DEPS
     LLVMSupport
     MLIRAffineToStandard
+    MLIRArithmetic
     MLIRBufferization
     MLIRIR
     MLIRPass

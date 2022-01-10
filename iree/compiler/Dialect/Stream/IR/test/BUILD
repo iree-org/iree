@@ -19,6 +19,7 @@ iree_lit_test_suite(
         [
             "async_folding.mlir",
             "async_ops.mlir",
+            "builtin_ops.mlir",
             "cmd_folding.mlir",
             "cmd_ops.mlir",
             "executable_ops.mlir",

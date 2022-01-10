@@ -22,6 +22,7 @@ cc_library(
         "FoldUniformOperands.cpp",
         "FuseDispatchBindings.cpp",
         "LayoutSlices.cpp",
+        "MaterializeBuiltins.cpp",
         "MaterializeCopyOnWrite.cpp",
         "OutlineConstants.cpp",
         "PackAllocations.cpp",
@@ -63,6 +64,8 @@ cc_library(
         "@llvm-project//mlir:ArithmeticDialect",
         "@llvm-project//mlir:DialectUtils",
         "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:LinalgOps",
+        "@llvm-project//mlir:MemRefDialect",
         "@llvm-project//mlir:Pass",
         "@llvm-project//mlir:SCFDialect",
         "@llvm-project//mlir:StandardOps",
@@ -70,6 +73,7 @@ cc_library(
         "@llvm-project//mlir:TensorDialect",
         "@llvm-project//mlir:TransformUtils",
         "@llvm-project//mlir:Transforms",
+        "@llvm-project//mlir:VectorOps",
     ],
 )
 

@@ -96,10 +96,10 @@ func @PropagateSplatsThroughSlices(%arg0: index) -> !stream.resource<*> {
 // -----
 
 // CHECK-LABEL: @FlattenFullFillToSplat
-func @FlattenFullFillToSplat(%arg0: !stream.resource<*>, %arg1: index, %arg2: f32) -> !stream.resource<*> {
+func @FlattenFullFillToSplat(%arg0: !stream.resource<*>, %arg1: index, %arg2: i32) -> !stream.resource<*> {
   %c0 = arith.constant 0 : index
-  // CHECK: %[[T:.+]] = stream.async.splat %arg2 : f32 -> !stream.resource<*>{%arg1}
-  %0 = stream.async.fill %arg2, %arg0[%c0 to %arg1 for %arg1] : f32 -> %arg0 as !stream.resource<*>{%arg1}
+  // CHECK: %[[T:.+]] = stream.async.splat %arg2 : i32 -> !stream.resource<*>{%arg1}
+  %0 = stream.async.fill %arg2, %arg0[%c0 to %arg1 for %arg1] : i32 -> %arg0 as !stream.resource<*>{%arg1}
   // CHECK: return %[[T]]
   return %0 : !stream.resource<*>
 }

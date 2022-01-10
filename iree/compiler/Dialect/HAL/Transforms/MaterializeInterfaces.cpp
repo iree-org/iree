@@ -100,23 +100,14 @@ static LogicalResult materializeExecutablesFromSourceOps(
 // Verifies that all types used with the given entry point are supportable.
 static LogicalResult verifyEntryPointTypes(mlir::FuncOp entryFuncOp) {
   for (auto inputType : llvm::enumerate(entryFuncOp.getType().getInputs())) {
-    if (inputType.value().isa<IREE::Stream::BindingType>()) {
+    if (inputType.value().isa<IREE::Stream::BindingType>() ||
+        inputType.value().isInteger(32)) {
       // OK - directly translates to a HAL interface binding.
-    } else if (inputType.value().isa<IndexType>()) {
-      // Index types are converted to platform bit-width later on.
-      // TODO(benvanik): pick something here that the target devices support.
-    } else if (auto integerType = inputType.value().dyn_cast<IntegerType>()) {
-      if (integerType.getIntOrFloatBitWidth() != 32) {
-        return entryFuncOp.emitError()
-               << "unsupported argument " << inputType.index() << " bit depth "
-               << integerType.getIntOrFloatBitWidth() << " (" << integerType
-               << "); only 32-bit values are supported right now";
-      }
     } else {
       return entryFuncOp.emitError()
              << "unsupported interface function argument " << inputType.index()
              << " type " << inputType.value()
-             << "; requires tensors or simple primitive values (i32, etc)";
+             << "; requires !stream.binding or i32 operands only";
     }
   }
   return success();
@@ -193,7 +184,6 @@ static mlir::FuncOp cloneFuncWithInterface(
   unsigned operandIdx = 0;
   for (auto arg : entryBlock->getArguments()) {
     if (!arg.getType().isa<IREE::Stream::BindingType>()) {
-      // TODO(benvanik): symbolic push constant indices.
       convertOperandUsage(sourceFuncOp, arg, operandIdx++, entryBuilder);
     }
   }

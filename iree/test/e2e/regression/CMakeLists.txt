@@ -14,6 +14,7 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
+    "fill_i64.mlir"
     "globals.mlir"
     "libm_linking.mlir"
     "scalar.mlir"

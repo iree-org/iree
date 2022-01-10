@@ -24,6 +24,7 @@ iree_cc_library(
     "FoldUniformOperands.cpp"
     "FuseDispatchBindings.cpp"
     "LayoutSlices.cpp"
+    "MaterializeBuiltins.cpp"
     "MaterializeCopyOnWrite.cpp"
     "OutlineConstants.cpp"
     "PackAllocations.cpp"
@@ -45,6 +46,8 @@ iree_cc_library(
     MLIRAnalysis
     MLIRArithmetic
     MLIRIR
+    MLIRLinalg
+    MLIRMemRef
     MLIRPass
     MLIRSCF
     MLIRStandard
@@ -52,6 +55,7 @@ iree_cc_library(
     MLIRTensor
     MLIRTransformUtils
     MLIRTransforms
+    MLIRVector
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::Stream::Analysis
     iree::compiler::Dialect::Stream::Conversion

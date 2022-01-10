@@ -228,6 +228,48 @@ struct EncodeTensorConstantOp
 // stream.tensor.splat
 //===----------------------------------------------------------------------===//
 
+// Canonicalizes a fill pattern into a power of 2 byte-aligned integer type.
+// The stream dialect splat/fill ops require one of I8, I16, or I32 - any other
+// type must be converted to one of those here. This prevents encoding policy
+// such as what to do with i1 or float types from leaking into lower levels of
+// the stack: fill ops are just setting bytes.
+//
+// The other reason to handle things here is that the fill pattern must be
+// <= 32-bits - if it's over that we need to insert a dispatch to perform the
+// fill and the only time we can do that in the pipeline is here.
+// This is a somewhat annoying abstraction leak from the HAL which also has a
+// 32-bit fill limit, but that is an abstraction leak from the underlying APIs
+// and hardware (Metal/Vulkan/CUDA/etc) that also don't have 64-bit fills.
+// Instead of forcing all runtime implementations to include emulation for
+// 64-bit fills we take care of that here on an as-needed basis.
+//
+// Returns the pattern converted to one of [i8, i16, i32, i64] (with i64 needing
+// to be handled via emulation) or nullptr if the type is unsupported.
+static Value canonicalizeFillPattern(Value pattern, PatternRewriter &rewriter) {
+  auto loc = pattern.getLoc();
+
+  // Get floats into integer form.
+  auto patternType = pattern.getType();
+  unsigned bitWidth = patternType.getIntOrFloatBitWidth();
+  if (patternType.isa<FloatType>()) {
+    pattern = rewriter.createOrFold<arith::BitcastOp>(
+        loc, rewriter.getIntegerType(bitWidth), pattern);
+  }
+
+  // HACK: extend i1 to i8. This is really not something we should be doing here
+  // in optimized programs as this is a super shady operation.
+  if (patternType.isInteger(1)) {
+    return rewriter.createOrFold<arith::ExtUIOp>(loc, rewriter.getI8Type(),
+                                                 pattern);
+  } else if ((bitWidth % 8) != 0) {
+    // We'd need some policy to determine how to handle non-byte-aligned widths.
+    return {};
+  }
+
+  // 8/16/32-bit value pass through (possibly after a bitcast).
+  return pattern;
+}
+
 struct EncodeTensorSplatOp
     : public OpRewritePattern<IREE::Stream::TensorSplatOp> {
   using OpRewritePattern::OpRewritePattern;
@@ -240,9 +282,22 @@ struct EncodeTensorSplatOp
     }
 
     // Dense:
-    rewriter.replaceOpWithNewOp<IREE::Stream::AsyncSplatOp>(
-        op, op.result().getType(), op.value(), op.result_size(),
-        op.affinityAttr());
+
+    // Canonicalize the fill pattern into one of [i8, i16, i32, i64].
+    auto pattern = canonicalizeFillPattern(op.value(), rewriter);
+    if (!pattern) {
+      return rewriter.notifyMatchFailure(
+          op, "unsupported pattern width; encoding policy required");
+    } else if (pattern.getType().getIntOrFloatBitWidth() > 32) {
+      // We emulate 64-bit support with a stream.builtin.splat.i64.
+      rewriter.replaceOpWithNewOp<IREE::Stream::BuiltinSplatI64Op>(
+          op, op.result().getType(), pattern, op.result_size(),
+          op.affinityAttr());
+    } else {
+      rewriter.replaceOpWithNewOp<IREE::Stream::AsyncSplatOp>(
+          op, op.result().getType(), pattern, op.result_size(),
+          op.affinityAttr());
+    }
 
     return success();
   }
@@ -332,9 +387,21 @@ struct EncodeTensorFillOp
         op.getLoc(), targetType, targetDims, op.lengths(), rewriter);
     auto targetEnd = rewriter.createOrFold<arith::AddIOp>(
         op.getLoc(), targetOffset, targetLength);
-    rewriter.replaceOpWithNewOp<IREE::Stream::AsyncFillOp>(
-        op, op.result().getType(), op.target(), op.target_size(), targetOffset,
-        targetEnd, targetLength, op.value(), op.affinityAttr());
+
+    // Canonicalize the fill pattern into one of [i8, i16, i32, i64].
+    auto pattern = canonicalizeFillPattern(op.value(), rewriter);
+    if (!pattern) {
+      return rewriter.notifyMatchFailure(
+          op, "unsupported pattern width; encoding policy required");
+    } else if (pattern.getType().getIntOrFloatBitWidth() > 32) {
+      rewriter.replaceOpWithNewOp<IREE::Stream::BuiltinFillI64Op>(
+          op, op.result().getType(), op.target(), op.target_size(),
+          targetOffset, targetEnd, targetLength, pattern, op.affinityAttr());
+    } else {
+      rewriter.replaceOpWithNewOp<IREE::Stream::AsyncFillOp>(
+          op, op.result().getType(), op.target(), op.target_size(),
+          targetOffset, targetEnd, targetLength, pattern, op.affinityAttr());
+    }
 
     return success();
   }

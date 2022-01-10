@@ -84,6 +84,7 @@ std::unique_ptr<OperationPass<mlir::ModuleOp>> createConvertToStreamPass();
 //===----------------------------------------------------------------------===//
 
 std::unique_ptr<OperationPass<>> createEncodeTensorsPass();
+std::unique_ptr<OperationPass<mlir::ModuleOp>> createMaterializeBuiltinsPass();
 std::unique_ptr<OperationPass<>> createMaterializeCopyOnWritePass();
 std::unique_ptr<OperationPass<mlir::ModuleOp>> createElideAsyncCopiesPass();
 std::unique_ptr<OperationPass<mlir::ModuleOp>> createRefineUsagePass();

@@ -19,9 +19,9 @@ func @asyncConstant(%arg0: index) -> !stream.resource<transient> {
 // -----
 
 // CHECK-LABEL: @asyncSplat
-func @asyncSplat(%arg0: index, %arg1: f32) -> !stream.resource<*> {
-  // CHECK: = stream.async.splat %arg1 : f32 -> !stream.resource<*>{%arg0}
-  %0 = stream.async.splat %arg1 : f32 -> !stream.resource<*>{%arg0}
+func @asyncSplat(%arg0: index, %arg1: i32) -> !stream.resource<*> {
+  // CHECK: = stream.async.splat %arg1 : i32 -> !stream.resource<*>{%arg0}
+  %0 = stream.async.splat %arg1 : i32 -> !stream.resource<*>{%arg0}
   return %0 : !stream.resource<*>
 }
 
@@ -48,11 +48,11 @@ func @asyncSlice(%arg0: !stream.resource<*>, %arg1: index) -> !stream.resource<*
 // -----
 
 // CHECK-LABEL: @asyncFill
-func @asyncFill(%arg0: !stream.resource<*>, %arg1: index, %arg2: f32) -> !stream.resource<*> {
+func @asyncFill(%arg0: !stream.resource<*>, %arg1: index, %arg2: i32) -> !stream.resource<*> {
   %c0 = arith.constant 0 : index
   %c128 = arith.constant 128 : index
-  // CHECK: = stream.async.fill %arg2, %arg0[%c0 to %c128 for %c128] : f32 -> %arg0 as !stream.resource<*>{%arg1}
-  %0 = stream.async.fill %arg2, %arg0[%c0 to %c128 for %c128] : f32 -> %arg0 as !stream.resource<*>{%arg1}
+  // CHECK: = stream.async.fill %arg2, %arg0[%c0 to %c128 for %c128] : i32 -> %arg0 as !stream.resource<*>{%arg1}
+  %0 = stream.async.fill %arg2, %arg0[%c0 to %c128 for %c128] : i32 -> %arg0 as !stream.resource<*>{%arg1}
   return %0 : !stream.resource<*>
 }
 
@@ -140,11 +140,11 @@ func @asyncExecute(%arg0: !stream.resource<*>, %arg1: index, %arg2: !stream.time
 // -----
 
 // CHECK-LABEL: @asyncExecuteNoCaptures
-func @asyncExecuteNoCaptures(%arg0: index, %arg1: f32) -> (!stream.resource<*>, !stream.timepoint) {
+func @asyncExecuteNoCaptures(%arg0: index, %arg1: i32) -> (!stream.resource<*>, !stream.timepoint) {
   // CHECK: = stream.async.execute with() -> !stream.resource<*>{%arg0} {
   %0:2 = stream.async.execute with() -> !stream.resource<*>{%arg0} {
     // CHECK: %[[T:.+]] = stream.async.splat
-    %1 = stream.async.splat %arg1 : f32 -> !stream.resource<*>{%arg0}
+    %1 = stream.async.splat %arg1 : i32 -> !stream.resource<*>{%arg0}
     // CHECK: stream.yield %[[T]] : !stream.resource<*>{%arg0}
     stream.yield %1 : !stream.resource<*>{%arg0}
   } => !stream.timepoint
