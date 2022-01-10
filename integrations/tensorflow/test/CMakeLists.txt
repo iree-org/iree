@@ -9,4 +9,6 @@ if(${IREE_ENABLE_NEW_INTEGRATION_TESTS})
   add_subdirectory(tf_integration)
 endif()
 
+if(${IREE_ENABLE_TFLITE_INTEGRATION_TESTS})
 add_subdirectory(tflite_integration)
+endif()

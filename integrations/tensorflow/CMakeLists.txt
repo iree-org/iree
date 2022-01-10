@@ -19,7 +19,7 @@ endif()
 
 if(${IREE_BUILD_TESTS} AND ${IREE_BUILD_PYTHON_BINDINGS})
   add_subdirectory(test)
-  if(NOT ${IREE_ENABLE_NEW_INTEGRATION_TESTS})
+  if(${IREE_ENABLE_OLD_INTEGRATION_TESTS})
     list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/e2e/")
     include(iree_e2e_cartesian_product_test_suite)
     add_subdirectory(e2e)
