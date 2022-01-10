@@ -4,5 +4,9 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-add_subdirectory(tf_integration)
+
+if(${IREE_ENABLE_NEW_INTEGRATION_TESTS})
+  add_subdirectory(tf_integration)
+endif()
+
 add_subdirectory(tflite_integration)
