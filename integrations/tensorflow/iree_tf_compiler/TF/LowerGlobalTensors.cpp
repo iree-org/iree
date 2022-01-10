@@ -4,10 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
-#include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
-#include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
-#include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
+#include "iree-dialects/Dialect/Input/InputDialect.h"
+#include "iree-dialects/Dialect/Input/InputOps.h"
 #include "iree_tf_compiler/TF/Passes.h"
 #include "llvm/ADT/PostOrderIterator.h"
 #include "llvm/ADT/STLExtras.h"
@@ -33,12 +31,13 @@ static LogicalResult rewriteTFVariableOpToFlowVariableOp(Operation &op,
                                                          Value flowPtr) {
   OpBuilder builder(&op);
   if (auto readVariable = dyn_cast<mlir::TF::ReadVariableOp>(op)) {
-    auto load = builder.create<iree_compiler::IREE::Util::GlobalLoadIndirectOp>(
-        readVariable.getLoc(), readVariable.value().getType(), flowPtr);
+    auto load =
+        builder.create<iree_compiler::IREE::Input::GlobalLoadIndirectOp>(
+            readVariable.getLoc(), readVariable.value().getType(), flowPtr);
     readVariable.value().replaceAllUsesWith(load.result());
     readVariable.erase();
   } else if (auto assignVariable = dyn_cast<mlir::TF::AssignVariableOp>(op)) {
-    builder.create<iree_compiler::IREE::Util::GlobalStoreIndirectOp>(
+    builder.create<iree_compiler::IREE::Input::GlobalStoreIndirectOp>(
         assignVariable.getLoc(), assignVariable.value(), flowPtr);
     assignVariable.erase();
   } else {
@@ -51,6 +50,9 @@ static LogicalResult rewriteTFVariableOpToFlowVariableOp(Operation &op,
 static LogicalResult convertTFGlobalTensorsToFlowVariables(ModuleOp module) {
   OpBuilder globalBuilder(module.getBodyRegion());
   SymbolTable symbolTable(module);
+  auto *context = globalBuilder.getContext();
+  auto inputDialect =
+      context->getOrLoadDialect<iree_compiler::IREE::Input::IREEInputDialect>();
 
   if (auto sessionInitializer =
           tf_saved_model::GetSessionInitializerOp(module)) {
@@ -71,9 +73,10 @@ static LogicalResult convertTFGlobalTensorsToFlowVariables(ModuleOp module) {
              << "Multiple exported names for global tensor not supported yet";
     }
     symNameToFlowSymName[globalTensor.sym_name()] = flowSymName;
-    auto variableOp = globalBuilder.create<iree_compiler::IREE::Util::GlobalOp>(
-        globalTensor.getLoc(), flowSymName, globalTensor.is_mutable(),
-        globalTensor.type(), globalTensor.value());
+    auto variableOp =
+        globalBuilder.create<iree_compiler::IREE::Input::GlobalOp>(
+            globalTensor.getLoc(), flowSymName, globalTensor.is_mutable(),
+            globalTensor.type(), globalTensor.value());
     variableOp.setPrivate();
   }
 
@@ -92,9 +95,10 @@ static LogicalResult convertTFGlobalTensorsToFlowVariables(ModuleOp module) {
         continue;
       }
       auto variableAddressOp =
-          builder.create<iree_compiler::IREE::Util::GlobalAddressOp>(
+          builder.create<iree_compiler::IREE::Input::GlobalAddressOp>(
               globalTensor.getLoc(),
-              iree_compiler::IREE::Util::PtrType::get(globalTensor.type()),
+              iree_compiler::IREE::Input::PtrType::get(context,
+                                                       globalTensor.type()),
               SymbolRefAttr::get(
                   builder.getContext(),
                   symNameToFlowSymName[globalTensor.sym_name()]));
@@ -110,8 +114,8 @@ static LogicalResult convertTFGlobalTensorsToFlowVariables(ModuleOp module) {
       for (OpOperand &use : llvm::make_early_inc_range(v.getUses())) {
         Operation *owner = use.getOwner();
 
-        // If the user is already in the flow dialect, then everything is ok.
-        if (iree_compiler::IREE::Flow::FlowDialect::isDialectOp(owner)) {
+        // If the user is already in the input dialect, then everything is ok.
+        if (owner->getDialect() == inputDialect) {
           continue;
         }
 
@@ -164,8 +168,7 @@ class LowerGlobalTensors
  public:
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<mlir::tf_saved_model::TensorFlowSavedModelDialect,
-                    iree_compiler::IREE::Flow::FlowDialect,
-                    iree_compiler::IREE::Util::UtilDialect>();
+                    iree_compiler::IREE::Input::IREEInputDialect>();
   }
 
   StringRef getArgument() const override {
