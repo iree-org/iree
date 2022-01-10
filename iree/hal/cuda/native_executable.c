@@ -76,6 +76,11 @@ iree_status_t iree_hal_cuda_native_executable_create(
                                                total_size, (void**)&executable);
   CUmodule module = NULL;
   if (iree_status_is_ok(status)) {
+    iree_hal_resource_initialize(&iree_hal_cuda_native_executable_vtable,
+                                 &executable->resource);
+    executable->module = module;
+    executable->context = context;
+
     executable->executable_layouts =
         (void*)((char*)executable + sizeof(*executable) +
                 entry_count *
@@ -103,10 +108,6 @@ iree_status_t iree_hal_cuda_native_executable_create(
   }
 
   if (iree_status_is_ok(status)) {
-    iree_hal_resource_initialize(&iree_hal_cuda_native_executable_vtable,
-                                 &executable->resource);
-    executable->module = module;
-    executable->context = context;
     *out_executable = (iree_hal_executable_t*)executable;
   } else {
     iree_hal_executable_destroy((iree_hal_executable_t*)executable);
