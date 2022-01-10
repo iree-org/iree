@@ -94,7 +94,7 @@
 #define EMITC_FIXED_IMPORT_IMPL(arg_types, ret_types, input_parameters,    \
                                 output_parameters, pack_arguments,         \
                                 unpack_results)                            \
-  static iree_status_t call_0##arg_types##_##ret_types##_import(           \
+  static iree_status_t call_0##arg_types##_##ret_types##_import_shim(      \
       iree_vm_stack_t* IREE_RESTRICT stack,                                \
       const iree_vm_function_t* IREE_RESTRICT import input_parameters      \
           output_parameters) {                                             \
@@ -127,55 +127,55 @@
 
 #define EMITC_VA_LIST_NAME varargs
 #define EMITC_CALL_ARG_PTR_NAME ptr
-#define EMITC_VLA_IMPORT_IMPL(non_var_arg_types, var_arg_types, ret_types,    \
-                              non_var_arg_size, var_arg_size, pack_args,      \
-                              pack_var_args, define_results, unpack_results)  \
-  static iree_status_t                                                        \
-      call_0##non_var_arg_types##C##var_arg_types##D_##ret_types##_import(    \
-          iree_vm_stack_t* IREE_RESTRICT stack,                               \
-          const iree_vm_function_t* IREE_RESTRICT import, int32_t span_count, \
-          ...) {                                                              \
-    iree_host_size_t total_size =                                             \
-        non_var_arg_size + sizeof(int32_t) + span_count * var_arg_size;       \
-                                                                              \
-    IREE_VM_ABI_TYPE_NAME(ret_types) results;                                 \
-    iree_vm_abi_##ret_types##_reset(&results);                                \
-                                                                              \
-    iree_vm_function_call_t call;                                             \
-    call.function = *import;                                                  \
-    call.arguments.data_length = total_size;                                  \
-    call.arguments.data = (uint8_t*)iree_alloca(call.arguments.data_length);  \
-    call.results = iree_make_byte_span(&results, sizeof(results));            \
-                                                                              \
-    memset(call.arguments.data, 0, call.arguments.data_length);               \
-                                                                              \
-    uint8_t* EMITC_CALL_ARG_PTR_NAME = call.arguments.data;                   \
-    va_list EMITC_VA_LIST_NAME;                                               \
-    va_start(EMITC_VA_LIST_NAME, span_count);                                 \
-                                                                              \
-    pack_args;                                                                \
-    memcpy(EMITC_CALL_ARG_PTR_NAME, &span_count, sizeof(int32_t));            \
-    EMITC_CALL_ARG_PTR_NAME += sizeof(int32_t);                               \
-    for (int32_t i = 0; i < span_count; i++) {                                \
-      pack_var_args                                                           \
-    }                                                                         \
-    define_results;                                                           \
-                                                                              \
-    va_end(EMITC_VA_LIST_NAME);                                               \
-                                                                              \
-    iree_vm_execution_result_t result;                                        \
-    memset(&result, 0, sizeof(result));                                       \
-                                                                              \
-    iree_status_t status =                                                    \
-        import->module->begin_call(import->module, stack, &call, &result);    \
-                                                                              \
-    if (!iree_status_is_ok(status)) {                                         \
-      return status;                                                          \
-    }                                                                         \
-                                                                              \
-    unpack_results;                                                           \
-                                                                              \
-    return status;                                                            \
+#define EMITC_VLA_IMPORT_IMPL(non_var_arg_types, var_arg_types, ret_types,      \
+                              non_var_arg_size, var_arg_size, pack_args,        \
+                              pack_var_args, define_results, unpack_results)    \
+  static iree_status_t                                                          \
+      call_0##non_var_arg_types##C##var_arg_types##D_##ret_types##_import_shim( \
+          iree_vm_stack_t* IREE_RESTRICT stack,                                 \
+          const iree_vm_function_t* IREE_RESTRICT import, int32_t span_count,   \
+          ...) {                                                                \
+    iree_host_size_t total_size =                                               \
+        non_var_arg_size + sizeof(int32_t) + span_count * var_arg_size;         \
+                                                                                \
+    IREE_VM_ABI_TYPE_NAME(ret_types) results;                                   \
+    iree_vm_abi_##ret_types##_reset(&results);                                  \
+                                                                                \
+    iree_vm_function_call_t call;                                               \
+    call.function = *import;                                                    \
+    call.arguments.data_length = total_size;                                    \
+    call.arguments.data = (uint8_t*)iree_alloca(call.arguments.data_length);    \
+    call.results = iree_make_byte_span(&results, sizeof(results));              \
+                                                                                \
+    memset(call.arguments.data, 0, call.arguments.data_length);                 \
+                                                                                \
+    uint8_t* EMITC_CALL_ARG_PTR_NAME = call.arguments.data;                     \
+    va_list EMITC_VA_LIST_NAME;                                                 \
+    va_start(EMITC_VA_LIST_NAME, span_count);                                   \
+                                                                                \
+    pack_args;                                                                  \
+    memcpy(EMITC_CALL_ARG_PTR_NAME, &span_count, sizeof(int32_t));              \
+    EMITC_CALL_ARG_PTR_NAME += sizeof(int32_t);                                 \
+    for (int32_t i = 0; i < span_count; i++) {                                  \
+      pack_var_args                                                             \
+    }                                                                           \
+    define_results;                                                             \
+                                                                                \
+    va_end(EMITC_VA_LIST_NAME);                                                 \
+                                                                                \
+    iree_vm_execution_result_t result;                                          \
+    memset(&result, 0, sizeof(result));                                         \
+                                                                                \
+    iree_status_t status =                                                      \
+        import->module->begin_call(import->module, stack, &call, &result);      \
+                                                                                \
+    if (!iree_status_is_ok(status)) {                                           \
+      return status;                                                            \
+    }                                                                           \
+                                                                                \
+    unpack_results;                                                             \
+                                                                                \
+    return status;                                                              \
   }
 
 #define ARGUMENTS_SIZE(types) (0 FOR_EACH(ARGUMENT_SIZE, TUPLE_UNPACK(types)))
@@ -269,53 +269,53 @@ static iree_status_t iree_emitc_shim(
   return target_fn(stack, call, module, module_state, out_result);
 }
 
-EMITC_DEFINE_SHIMS((i), (i))
-EMITC_DEFINE_SHIMS((i, i), (i))
-EMITC_DEFINE_SHIMS((i, r, i, i), (v))
-EMITC_DEFINE_SHIMS((r), (i))
-EMITC_DEFINE_SHIMS((r), (i, i))
-EMITC_DEFINE_SHIMS((r), (i, i, i))
-EMITC_DEFINE_SHIMS((r), (i, i, i, i))
-EMITC_DEFINE_SHIMS((r), (r))
-EMITC_DEFINE_SHIMS((r), (v))
-EMITC_DEFINE_SHIMS((r, i), (i))
-// TODO(dajuro): Enable as soon as #7845 has landed
-// EMITC_DEFINE_SHIMS((r, i), (f))
-EMITC_DEFINE_SHIMS((r, i), (r))
-EMITC_DEFINE_SHIMS((r, i), (v))
-EMITC_DEFINE_SHIMS((r, i, i), (i))
-EMITC_DEFINE_SHIMS((r, i, i), (r))
-EMITC_DEFINE_SHIMS((r, i, i), (v))
-EMITC_DEFINE_SHIMS((r, i, f), (v))
-EMITC_DEFINE_SHIMS((r, i, i, i), (r))
-EMITC_DEFINE_SHIMS((r, i, i, i), (v))
-EMITC_DEFINE_SHIMS((r, i, i, r, i, i), (r))
-EMITC_DEFINE_SHIMS((r, i, i, i, r, i, i), (r))
-EMITC_DEFINE_SHIMS((r, i, r, i, i), (v))
-EMITC_DEFINE_SHIMS((r, r), (i))
-EMITC_DEFINE_SHIMS((r, r), (r))
-EMITC_DEFINE_SHIMS((r, r), (v))
-EMITC_DEFINE_SHIMS((r, r), (i, i))
-EMITC_DEFINE_SHIMS((r, r, r), (i, i))
-EMITC_DEFINE_SHIMS((r, r, i, i, i, i), (v))
-EMITC_DEFINE_SHIMS((r, r, i, r, i), (v))
-EMITC_DEFINE_SHIMS((r, r, i, r, i, i), (v))
-EMITC_DEFINE_SHIMS((r, r, r, i, i, i), (v))
-EMITC_DEFINE_SHIMS((v), (i))
-EMITC_DEFINE_SHIMS((v), (r))
-EMITC_DEFINE_SHIMS((v), (v))
+// EMITC_DEFINE_SHIMS((i), (i))
+// EMITC_DEFINE_SHIMS((i, i), (i))
+// EMITC_DEFINE_SHIMS((i, r, i, i), (v))
+// EMITC_DEFINE_SHIMS((r), (i))
+// EMITC_DEFINE_SHIMS((r), (i, i))
+// EMITC_DEFINE_SHIMS((r), (i, i, i))
+// EMITC_DEFINE_SHIMS((r), (i, i, i, i))
+// EMITC_DEFINE_SHIMS((r), (r))
+// EMITC_DEFINE_SHIMS((r), (v))
+// EMITC_DEFINE_SHIMS((r, i), (i))
+// // TODO(dajuro): Enable as soon as #7845 has landed
+// // EMITC_DEFINE_SHIMS((r, i), (f))
+// EMITC_DEFINE_SHIMS((r, i), (r))
+// EMITC_DEFINE_SHIMS((r, i), (v))
+// EMITC_DEFINE_SHIMS((r, i, i), (i))
+// EMITC_DEFINE_SHIMS((r, i, i), (r))
+// EMITC_DEFINE_SHIMS((r, i, i), (v))
+// EMITC_DEFINE_SHIMS((r, i, f), (v))
+// EMITC_DEFINE_SHIMS((r, i, i, i), (r))
+// EMITC_DEFINE_SHIMS((r, i, i, i), (v))
+// EMITC_DEFINE_SHIMS((r, i, i, r, i, i), (r))
+// EMITC_DEFINE_SHIMS((r, i, i, i, r, i, i), (r))
+// EMITC_DEFINE_SHIMS((r, i, r, i, i), (v))
+// EMITC_DEFINE_SHIMS((r, r), (i))
+// EMITC_DEFINE_SHIMS((r, r), (r))
+// EMITC_DEFINE_SHIMS((r, r), (v))
+// EMITC_DEFINE_SHIMS((r, r), (i, i))
+// EMITC_DEFINE_SHIMS((r, r, r), (i, i))
+// EMITC_DEFINE_SHIMS((r, r, i, i, i, i), (v))
+// EMITC_DEFINE_SHIMS((r, r, i, r, i), (v))
+// EMITC_DEFINE_SHIMS((r, r, i, r, i, i), (v))
+// EMITC_DEFINE_SHIMS((r, r, r, i, i, i), (v))
+// EMITC_DEFINE_SHIMS((v), (i))
+// EMITC_DEFINE_SHIMS((v), (r))
+// EMITC_DEFINE_SHIMS((v), (v))
 
-EMITC_VLA_IMPORT((r), (i), (i))
-EMITC_VLA_IMPORT((r), (r), (v))
-EMITC_VLA_IMPORT((r, i), (i), (r))
-EMITC_VLA_IMPORT((r, i, i), (i), (r))
-EMITC_VLA_IMPORT((r, i), (i, i), (r))
-EMITC_VLA_IMPORT((r, i), (r), (r))
-EMITC_VLA_IMPORT((r, r, r), (r), (r))
-EMITC_VLA_IMPORT((r, r), (i, r, i, i), (r))
-EMITC_VLA_IMPORT((r, r, i), (i), (v))
-EMITC_VLA_IMPORT((r, r, i, i), (i), (v))
-EMITC_VLA_IMPORT((r, r, i), (i, r, i, i), (v))
-EMITC_VLA_IMPORT((r, r, i, r), (i), (v))
+// EMITC_VLA_IMPORT((r), (i), (i))
+// EMITC_VLA_IMPORT((r), (r), (v))
+// EMITC_VLA_IMPORT((r, i), (i), (r))
+// EMITC_VLA_IMPORT((r, i, i), (i), (r))
+// EMITC_VLA_IMPORT((r, i), (i, i), (r))
+// EMITC_VLA_IMPORT((r, i), (r), (r))
+// EMITC_VLA_IMPORT((r, r, r), (r), (r))
+// EMITC_VLA_IMPORT((r, r), (i, r, i, i), (r))
+// EMITC_VLA_IMPORT((r, r, i), (i), (v))
+// EMITC_VLA_IMPORT((r, r, i, i), (i), (v))
+// EMITC_VLA_IMPORT((r, r, i), (i, r, i, i), (v))
+// EMITC_VLA_IMPORT((r, r, i, r), (i), (v))
 
 #endif  // IREE_VM_SHIMS_EMITC_H_
