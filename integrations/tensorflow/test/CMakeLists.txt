@@ -10,5 +10,5 @@ if(${IREE_ENABLE_NEW_INTEGRATION_TESTS})
 endif()
 
 if(${IREE_ENABLE_TFLITE_INTEGRATION_TESTS})
-add_subdirectory(tflite_integration)
+  add_subdirectory(tflite_integration)
 endif()
