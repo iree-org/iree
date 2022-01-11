@@ -29,6 +29,8 @@ static bool isOutlinableValue(Attribute value) {
   if (auto elementsAttr = value.dyn_cast<DenseElementsAttr>()) {
     // Don't outline splats - we want those fused.
     return !elementsAttr.isSplat();
+  } else if (auto opaqueAttr = value.dyn_cast<OpaqueElementsAttr>()) {
+    return !opaqueAttr.isSplat();
   }
   return false;
 }
