@@ -75,6 +75,9 @@ struct HighLevelOptimizationOptions {
   // Optimizations to reduce numeric precision where it is safe to do so.
   bool numericPrecisionReduction = false;
 
+  // Strips debug assertions after any useful information has been extracted.
+  bool stripAssertions = false;
+
   void bindOptions(OptionsBinder &binder);
   using FromFlags = OptionsFromFlags<HighLevelOptimizationOptions>;
 };
