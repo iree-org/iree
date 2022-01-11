@@ -55,10 +55,48 @@ builtin.func @tensor_to_buffer_view(%arg0 : tensor<?x?x3xf32>, %arg1 : index, %a
 }
 
 // -----
+// CHECK-LABEL: func @tensor_to_buffer_view_static
+// CHECK: hal.tensor.export %arg0 : tensor<3xf32> -> !hal.buffer_view
+builtin.func @tensor_to_buffer_view_static(%arg0 : tensor<3xf32>) -> !iree_input.buffer_view {
+  %0 = iree_input.cast.tensor_to_buffer_view %arg0 : tensor<3xf32> -> !iree_input.buffer_view
+  return %0 : !iree_input.buffer_view
+}
+
+// -----
+// CHECK-LABEL: func @tensor_to_buffer_view_implicit_dims
+// CHECK: %[[ZERO:.*]] = arith.constant 0
+// CHECK: %[[D0:.*]] = tensor.dim %arg0, %[[ZERO]]
+// CHECK: %[[ONE:.*]] = arith.constant 1
+// CHECK: %[[D1:.*]] = tensor.dim %arg0, %[[ONE]]
+// CHECK: hal.tensor.export %arg0 : tensor<?x?x3xf32>{%[[D0]], %[[D1]]} -> !hal.buffer_view
+builtin.func @tensor_to_buffer_view_implicit_dims(%arg0 : tensor<?x?x3xf32>) -> !iree_input.buffer_view {
+  %0 = iree_input.cast.tensor_to_buffer_view %arg0 : tensor<?x?x3xf32> -> !iree_input.buffer_view
+  return %0 : !iree_input.buffer_view
+}
+
+// -----
 // CHECK-LABEL: func @buffer_view_to_tensor
 // CHECK: hal.tensor.import %arg0 : !hal.buffer_view -> tensor<?x?x3xf32>{%arg1, %arg2}
 builtin.func @buffer_view_to_tensor(%arg0 : !iree_input.buffer_view, %arg1 : index, %arg2 : index) -> tensor<?x?x3xf32> {
   %0 = iree_input.cast.buffer_view_to_tensor %arg0 : !iree_input.buffer_view -> tensor<?x?x3xf32>{%arg1, %arg2}
+  return %0 : tensor<?x?x3xf32>
+}
+
+// -----
+// CHECK-LABEL: func @buffer_view_to_tensor_static
+// CHECK: hal.tensor.import %arg0 : !hal.buffer_view -> tensor<3xf32>
+builtin.func @buffer_view_to_tensor_static(%arg0 : !iree_input.buffer_view) -> tensor<3xf32> {
+  %0 = iree_input.cast.buffer_view_to_tensor %arg0 : !iree_input.buffer_view -> tensor<3xf32>
+  return %0 : tensor<3xf32>
+}
+
+// -----
+// CHECK-LABEL: func @buffer_view_to_tensor_implicit_dims
+// CHECK: %[[D0:.*]] = hal.buffer_view.dim<%arg0 : !hal.buffer_view>[0] : index
+// CHECK: %[[D1:.*]] = hal.buffer_view.dim<%arg0 : !hal.buffer_view>[1] : index
+// CHECK: hal.tensor.import %arg0 : !hal.buffer_view -> tensor<?x?x3xf32>{%[[D0]], %[[D1]]}
+builtin.func @buffer_view_to_tensor_implicit_dims(%arg0 : !iree_input.buffer_view) -> tensor<?x?x3xf32> {
+  %0 = iree_input.cast.buffer_view_to_tensor %arg0 : !iree_input.buffer_view -> tensor<?x?x3xf32>
   return %0 : tensor<?x?x3xf32>
 }
 

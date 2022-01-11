@@ -191,6 +191,9 @@ int main(int argc, char **argv) {
       return failure();
     }
     OpPrintingFlags printFlags;
+    // TODO: Re-enable custom assembly format once fixed:
+    // https://github.com/tensorflow/mlir-hlo/issues/25
+    printFlags.printGenericOpForm();
     module->print(outputFile->os(), printFlags);
     outputFile->os() << "\n";
     outputFile->keep();
