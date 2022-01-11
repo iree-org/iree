@@ -878,6 +878,10 @@ static llvm::Optional<APInt> lookupValueOrAlignment(Value value) {
     // Push constants have an optional value alignment.
     auto alignment = loadOp.alignment();
     if (alignment.hasValue()) return alignment;
+  } else if (auto alignmentAttr =
+                 op->getAttrOfType<IntegerAttr>("stream.alignment")) {
+    // The op has an alignment tagged on it we can use directly.
+    return alignmentAttr.getValue();
   }
 
   // TODO(benvanik): more searching.
