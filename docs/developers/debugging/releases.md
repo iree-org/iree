@@ -21,7 +21,7 @@ you arrange otherwise. `yum` can be used to get some packages.
 Get a docker shell (see exact docker image in build_package.yml workflow):
 
 ```shell
-docker run --rm -it -v $(pwd):/work/main_checkout stellaraccident/manylinux2014_x86_64-bazel-3.7.2:latest /bin/bash
+docker run --rm -it -v $(pwd):/work/main_checkout stellaraccident/manylinux2014_x86_64-bazel-4.2.2:latest /bin/bash
 ```
 
 Remember that docker runs as root unless if you take steps otherwise. Don't

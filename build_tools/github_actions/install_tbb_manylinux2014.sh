@@ -17,7 +17,7 @@
 
 # You can test this with either an official manylinux2014 docker image or
 # our special one (which is really only special in that it includes bazel):
-# docker run --rm -it -v $(pwd):/work stellaraccident/manylinux2014_x86_64-bazel-3.7.2:latest /bin/bash
+# docker run --rm -it -v $(pwd):/work stellaraccident/manylinux2014_x86_64-bazel-4.2.2:latest /bin/bash
 
 set -e
 
