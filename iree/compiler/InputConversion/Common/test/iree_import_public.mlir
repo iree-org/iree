@@ -15,6 +15,15 @@ builtin.func @list_func(%arg0 : !iree_input.list<!iree_input.variant>) -> !iree_
 }
 
 // -----
+// CHECK-LABEL: func @list_func_retains_iree_abi
+// CHECK-SAME: (%arg0: !util.list<?>) -> !util.list<?>
+// CHECK-SAME: iree.abi = "FOOBAR"
+builtin.func @list_func_retains_iree_abi(%arg0 : !iree_input.list<!iree_input.variant>) -> !iree_input.list<!iree_input.variant>
+    attributes {iree.abi = "FOOBAR"} {
+  return %arg0 : !iree_input.list<!iree_input.variant>
+}
+
+// -----
 // CHECK-LABEL: func @list_func_call
 // CHECK: call @list_func_call(%arg0) : (!util.list<?>) -> !util.list<?>
 builtin.func @list_func_call(%arg0 : !iree_input.list<!iree_input.variant>) -> !iree_input.list<!iree_input.variant> {

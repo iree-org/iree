@@ -33,6 +33,7 @@ namespace {
 
 // Allowlist of function attributes to retain when importing funcs.
 constexpr const char *kRetainedAttributes[] = {
+    "iree.abi",
     "iree.reflection",
     "sym_visibility",
     "noinline",
