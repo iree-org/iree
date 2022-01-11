@@ -19,7 +19,6 @@
 #  "@mlir-hlo//"
 #  "@iree_pybind11//"
 #  "@spirv_cross//"
-#  "@com_google_tracing_framework_cpp//"
 #  "@vulkan_headers//"
 #  "@com_github_yaml_libyaml//"
 
