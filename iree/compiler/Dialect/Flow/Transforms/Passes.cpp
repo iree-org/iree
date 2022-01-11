@@ -155,6 +155,7 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
       .addPass(mlir::createCanonicalizerPass)
       .addPass(createDispatchLinalgOnTensorsPass)
       .addPass(memref::createResolveShapedTypeResultDimsPass)
+      .addPass(createCaptureDispatchDynamicDimsPass)
       .addPass(createConvertToFlowAfterDispatchFormation)
       .addPass(mlir::createCanonicalizerPass)
       .addPass(memref::createResolveShapedTypeResultDimsPass)

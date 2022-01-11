@@ -64,31 +64,31 @@ void registerFlowTransformPassPipeline();
 // iree-flow-infer-numeric-narrowing.
 std::unique_ptr<Pass> createCleanupNumericNarrowingPass();
 
-/// Creates a pass to convert linalg convolution ops with 1x1 kernels into
-/// linalg.matmul
+// Creates a pass to convert linalg convolution ops with 1x1 kernels into
+// linalg.matmul
 std::unique_ptr<Pass> createConvertConv2D1x1ToMatmulPass();
 
-/// Creates a pass to convert linalg convolution ops into linalg.matmul ops
-/// using im2col tranformation.
+// Creates a pass to convert linalg convolution ops into linalg.matmul ops
+// using im2col tranformation.
 std::unique_ptr<Pass> createConvertConv2DToImg2ColPass();
 
-/// Pass to convert a linalg.pad_tensor operation into a linalg.fill +
-/// subtensor_insert. This allows lowering the operation into a single kernel.
+// Pass to convert a linalg.pad_tensor operation into a linalg.fill +
+// subtensor_insert. This allows lowering the operation into a single kernel.
 std::unique_ptr<Pass> createPadTensorToSubTensorInsertPass();
 
-/// Pass to convert a linalg.matmul into linalg.mmt4d given M0, N0 and K0 are
-/// compile time constants.
+// Pass to convert a linalg.matmul into linalg.mmt4d given M0, N0 and K0 are
+// compile time constants.
 std::unique_ptr<OperationPass<FuncOp>> createConvertLinalgMatmulToMmt4DPass();
 
-/// Creates a pass to fuse Linalg operations on tensors.
+// Creates a pass to fuse Linalg operations on tensors.
 std::unique_ptr<Pass> createFusionOfTensorOpsPass();
 
-/// Infers and inserts util.numeric.optional_narrow ops at points that may be
-/// beneficial.
+// Infers and inserts util.numeric.optional_narrow ops at points that may be
+// beneficial.
 std::unique_ptr<Pass> createInferNumericNarrowingPass();
 
-/// Create a pass to interchange generic ops to force the reduction loop to be
-/// the most inner loops.
+// Create a pass to interchange generic ops to force the reduction loop to be
+// the most inner loops.
 std::unique_ptr<Pass> createInterchangeGenericOpsPass();
 
 // Convert operations to equivalent flow ops before dispatch region creation.
@@ -108,18 +108,21 @@ std::unique_ptr<OperationPass<mlir::FuncOp>> createPromoteI1ToI8Pass();
 // Strips the signed/unsigned portion off of tensors.
 std::unique_ptr<OperationPass<mlir::FuncOp>> createStripSignednessPass();
 
-/// Verifies that the input to the Flow transformation pipeline is legal.
-/// This includes checking for operations from dialects that are expected
-/// to be legalized before this pass.
+// Verifies that the input to the Flow transformation pipeline is legal.
+// This includes checking for operations from dialects that are expected
+// to be legalized before this pass.
 std::unique_ptr<Pass> createVerifyInputLegalityPass();
 
 //===----------------------------------------------------------------------===//
 // Dispatches (flow.dispatch.workgroups)
 //===----------------------------------------------------------------------===//
 
-/// Pass to perform dispatch of Linalg on tensor ops by tiling and distribution.
-/// A dispatch region is created for each tiled loop nest.
+// Pass to perform dispatch of Linalg on tensor ops by tiling and distribution.
+// A dispatch region is created for each tiled loop nest.
 std::unique_ptr<Pass> createDispatchLinalgOnTensorsPass();
+
+// Captures dynamic shape dimensions required by dispatch operands.
+std::unique_ptr<Pass> createCaptureDispatchDynamicDimsPass();
 
 // Outlines dispatch regions into executables.
 std::unique_ptr<OperationPass<mlir::ModuleOp>>
@@ -135,7 +138,7 @@ std::unique_ptr<OperationPass<mlir::ModuleOp>> createExportBenchmarkFuncsPass();
 // Linalg transforms
 //===----------------------------------------------------------------------===//
 
-/// A pass to pad linalg ops to the next integer multiple of `paddingSize`.
+// A pass to pad linalg ops to the next integer multiple of `paddingSize`.
 std::unique_ptr<Pass> createPadLinalgOpsToIntegerMultiplePass(
     int paddingSize = 4);
 

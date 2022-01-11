@@ -14,6 +14,7 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
+    "capture_dispatch_dynamic_dims.mlir"
     "cleanup_numeric_narrowing.mlir"
     "conv1x1_to_matmul.mlir"
     "conv2d_to_img2col.mlir"
