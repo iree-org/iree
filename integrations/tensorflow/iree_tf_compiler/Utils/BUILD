@@ -22,12 +22,8 @@ cc_library(
     ],
     deps = [
         "@llvm-project//llvm:Support",
-        # "@llvm-project//mlir:ArithmeticDialect",
         "@llvm-project//mlir:IR",
-        # "@llvm-project//mlir:Pass",
-        # "@llvm-project//mlir:StandardOps",
         "@llvm-project//mlir:Support",
         "@llvm-project//mlir:TransformUtils",
-        # "@llvm-project//mlir:Transforms",
     ],
 )
