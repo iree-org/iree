@@ -160,6 +160,7 @@ cc_library(
         "@llvm-project//mlir:SPIRVDialect",
         "@llvm-project//mlir:SPIRVTransforms",
         "@llvm-project//mlir:Shape",
+        "@llvm-project//mlir:SparseTensor",
         "@llvm-project//mlir:StandardOps",
         "@llvm-project//mlir:StandardToSPIRV",
         "@llvm-project//mlir:TensorInferTypeOpInterfaceImpl",

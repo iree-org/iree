@@ -18,6 +18,8 @@ def CPU_TensorToVectors
     : StrEnumAttrCase<"CPUTensorToVectors">;
 def CPU_TileFuseAndVectorize
     : StrEnumAttrCase<"CPUTileFuseAndVectorize">;
+def CPU_Sparse
+    : StrEnumAttrCase<"CPUSparse">;
 
 def LLVMGPU_SimpleDistribute
     : StrEnumAttrCase<"LLVMGPUDistribute">;
@@ -46,10 +48,10 @@ def DispatchLoweringPassPipelineEnum : StrEnumAttr<
     "DispatchLoweringPassPipeline",
     "identifier for pass pipeline use to lower dispatch region",
     [CPU_Default, CPU_SingleTilingExpert, CPU_TensorToVectors,
-     CPU_TileFuseAndVectorize, LLVMGPU_SimpleDistribute, LLVMGPU_Vectorize,
-     LLVMGPU_MatmulSimt, LLVMGPU_MatmulTensorCore, SPIRV_Distribute,
-     SPIRV_DistributeCopy, SPIRV_Vectorize, SPIRV_VectorizeToCooperativeOps,
-     None]> {
+     CPU_TileFuseAndVectorize, CPU_Sparse, LLVMGPU_SimpleDistribute,
+     LLVMGPU_Vectorize, LLVMGPU_MatmulSimt, LLVMGPU_MatmulTensorCore,
+     SPIRV_Distribute, SPIRV_DistributeCopy, SPIRV_Vectorize,
+     SPIRV_VectorizeToCooperativeOps, None]> {
   let cppNamespace = "::mlir::iree_compiler::IREE::Codegen";
 }
 

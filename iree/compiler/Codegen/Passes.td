@@ -108,6 +108,13 @@ def LinalgToVectorVectorizeMMT4d :
   let constructor =
       "mlir::iree_compiler::createLinalgToVectorVectorizeMMT4dPass()";
 }
+
+def SparsePreBufferization :
+    Pass<"iree-codegen-pre-bufferize-sparse", "ModuleOp"> {
+  let summary = "Does pre-bufferization for some sparse ops";
+  let constructor =
+      "mlir::iree_compiler::createSparsePreBufferize()";
+}
 //------------------------------------------------------------------------------
 // LLVMCPU
 //------------------------------------------------------------------------------

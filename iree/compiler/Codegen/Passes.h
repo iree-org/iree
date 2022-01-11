@@ -107,6 +107,9 @@ std::unique_ptr<OperationPass<FuncOp>> createLinalgToVectorVectorizeConvPass();
 /// Creates a pass to vectorize a very specific form of linalg.conv ops.
 std::unique_ptr<OperationPass<FuncOp>> createLinalgToVectorVectorizeMMT4dPass();
 
+/// Create a pass that pre convert some tensor to memref for sparse related ops.
+std::unique_ptr<OperationPass<ModuleOp>> createSparsePreBufferize();
+
 /// Pass to optimize vector transfer_read and transfer_write.
 std::unique_ptr<OperationPass<FuncOp>> createOptimizeVectorTransferPass();
 
@@ -213,6 +216,9 @@ void addSingleTilingExpertPassPipeline(OpPassManager &passManager);
 /// of linalg ops on tensors to vectors operations.
 void addTileFuseAndVectorizePassPipeline(OpPassManager &passManager,
                                          bool lowerToVectors = true);
+
+/// Populates the passes needed to lower ops handling sparse tensor type.
+void addCPUSparsePassPipeline(OpPassManager &passManager);
 
 //----------------------------------------------------------------------------//
 // LLVMCPU Pass Pipelines for lowering to LLVM dialect.

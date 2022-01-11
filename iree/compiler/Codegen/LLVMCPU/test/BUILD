@@ -26,6 +26,7 @@ iree_lit_test_suite(
             "illegal_configuration.mlir",
             "materialize_launch_configuration.mlir",
             "synchronize_symbol_visibility.mlir",
+            "sparse_pipeline.mlir",
             "test_config_mmt4d.mlir",
             "tile_and_vectorize.mlir",
             "tile_fuse_and_vectorize.mlir",

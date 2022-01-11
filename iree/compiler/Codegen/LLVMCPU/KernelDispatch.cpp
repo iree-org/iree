@@ -19,6 +19,7 @@
 #include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
+#include "mlir/Dialect/SparseTensor/IR/SparseTensor.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/IR/Matchers.h"
@@ -394,6 +395,25 @@ static LogicalResult setRootConfig(
                           vectorSize);
 }
 
+/// Sets the lowering configuration for dispatch region with root op being a
+/// generic op.
+static LogicalResult setSparseRootConfig(FuncOp entryPointFn, Operation *op) {
+  if (getLoweringConfig(op)) return success();
+  return setOpConfigAndEntryPointFnTranslation(
+      entryPointFn, op, {}, /*nativeVectorSize=*/ArrayRef<int64_t>{},
+      DispatchLoweringPassPipeline::CPUSparse);
+}
+
+static bool isSparseOp(Operation *op) {
+  return llvm::any_of(op->getOperandTypes(), [](Type type) {
+    auto tensorType = type.dyn_cast<RankedTensorType>();
+    if (!tensorType) return false;
+    if (!tensorType.getEncoding()) return false;
+    return tensorType.getEncoding()
+        .isa<sparse_tensor::SparseTensorEncodingAttr>();
+  });
+}
+
 /// Sets the lowering configuration for dispatch region for linalg.mmt4d root
 /// op
 static LogicalResult setRootConfig(
@@ -567,6 +587,7 @@ static LogicalResult setRootConfig(
   Operation *rootOp = nullptr;
   for (auto computeOp : computeOps) {
     auto setRootConfigFn = [&](Operation *op) -> LogicalResult {
+      if (isSparseOp(op)) return setSparseRootConfig(entryPointFn, op);
       return TypeSwitch<Operation *, LogicalResult>(op)
           .Case<linalg::Mmt4DOp, linalg::ContractionOpInterface,
                 IREE::LinalgExt::FftOp>([&](auto op) {

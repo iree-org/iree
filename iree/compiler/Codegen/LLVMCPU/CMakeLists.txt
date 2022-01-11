@@ -50,6 +50,8 @@ iree_cc_library(
     MLIRReconcileUnrealizedCasts
     MLIRSCF
     MLIRSCFToStandard
+    MLIRSparseTensor
+    MLIRSparseTensorTransforms
     MLIRStandard
     MLIRStandardOpsTransforms
     MLIRStandardToLLVM

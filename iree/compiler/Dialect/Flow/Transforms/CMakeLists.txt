@@ -66,6 +66,7 @@ iree_cc_library(
     MLIRMemRefTransforms
     MLIRPass
     MLIRSCF
+    MLIRSparseTensor
     MLIRStandard
     MLIRSupport
     MLIRTensor

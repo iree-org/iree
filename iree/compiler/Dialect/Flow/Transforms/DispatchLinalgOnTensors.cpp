@@ -19,6 +19,7 @@
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
 #include "mlir/Dialect/SCF/SCF.h"
+#include "mlir/Dialect/SparseTensor/IR/SparseTensor.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/Block.h"
@@ -272,7 +273,7 @@ buildOperandLessFlowDispatchWorkgroupOp(PatternRewriter &rewriter, Location loc,
 // necessary across the boundary of regions without captures.
 static void pullInProducersInSameGroup(
     PatternRewriter &rewriter, IREE::Flow::DispatchWorkgroupsOp dispatchOp,
-    linalg::LinalgOp tiledOp, ValueRange untiledOpOperands,
+    Operation *tiledOp, ValueRange untiledOpOperands,
     ArrayRef<Operation *> tiledLoops, int64_t groupNum) {
   LLVM_DEBUG(llvm::dbgs() << "pull in producers for tiled op: " << tiledOp
                           << "\n");
@@ -281,7 +282,7 @@ static void pullInProducersInSameGroup(
   OpBuilder::InsertionGuard g(rewriter);
   rewriter.setInsertionPointToStart(&dispatchOp.getRegion().front());
   for (auto en : llvm::enumerate(untiledOpOperands)) {
-    if (auto producer = en.value().getDefiningOp<linalg::LinalgOp>()) {
+    if (auto producer = en.value().getDefiningOp()) {
       if (!isInFusionGroup(producer, groupNum)) continue;
       DEBUG_WITH_TYPE(DEBUG_TYPE,
                       llvm::dbgs() << "current producer: " << producer << "\n");
@@ -290,12 +291,12 @@ static void pullInProducersInSameGroup(
       rewriter.replaceOpWithinBlock(producer, clonedOrigProducer->getResults(),
                                     &dispatchOp.getRegion().front());
 
-      linalg::LinalgOp fusedProducer;
+      Operation *fusedProducer = nullptr;
       if (tiledLoops.empty()) {
         LLVM_DEBUG(llvm::dbgs() << "no loops; just copy over the op\n");
         // The root op wasn't tiled. We are done then.
         removeFusionGroupsAttribute(clonedOrigProducer);
-        fusedProducer = cast<linalg::LinalgOp>(clonedOrigProducer);
+        fusedProducer = clonedOrigProducer;
       } else {
         // TODO: this is incorrect on general pattern failures, try pattern
         // within pattern.
@@ -317,12 +318,14 @@ static void pullInProducersInSameGroup(
       // producer's operands and pull them in if they are marked to be fused
       // into the current group.
       if (fusedProducer) {
-        SmallVector<Value> origProducerOpOperands =
-            cast<linalg::LinalgOp>(clonedOrigProducer)
-                .getInputAndOutputOperands();
-        pullInProducersInSameGroup(rewriter, dispatchOp, fusedProducer,
-                                   origProducerOpOperands, tiledLoops,
-                                   groupNum);
+        auto linalgProducer = dyn_cast<linalg::LinalgOp>(clonedOrigProducer);
+        if (linalgProducer) {
+          SmallVector<Value> origProducerOpOperands =
+              linalgProducer.getInputAndOutputOperands();
+          pullInProducersInSameGroup(rewriter, dispatchOp, fusedProducer,
+                                     origProducerOpOperands, tiledLoops,
+                                     groupNum);
+        }
       }
     }
   }
@@ -737,6 +740,17 @@ static void appendDynamicDims(OpBuilder &builder, Location loc, Value v,
   }
 }
 
+/// Return true if the operations has any sparse operand types.
+static bool isSparseOp(Operation *op) {
+  return llvm::any_of(op->getOperandTypes(), [](Type type) {
+    auto tensorType = type.dyn_cast<RankedTensorType>();
+    if (!tensorType) return false;
+    if (!tensorType.getEncoding()) return false;
+    return tensorType.getEncoding()
+        .isa<sparse_tensor::SparseTensorEncodingAttr>();
+  });
+}
+
 //===----------------------------------------------------------------------===//
 // Patterns that create the dispatch region.
 //===----------------------------------------------------------------------===//
@@ -799,7 +813,8 @@ struct TileAndDistributeLinalgOpsPattern : public linalg::LinalgTilingPattern {
     rewriter.setInsertionPoint(clonedLinalgOp);
 
     auto nLoops = linalgOp.getNumParallelLoops();
-    if (nLoops) {
+    // Currently sparse ops cannot be tiled.
+    if (nLoops && !isSparseOp(linalgOp)) {
       SmallVector<Value> clonedOpOperands =
           clonedLinalgOp.getInputAndOutputOperands();
       FailureOr<linalg::TiledLinalgOp> tiledLinalgOpOr =
@@ -942,6 +957,17 @@ static unsigned decideFusableLinalgOps(Operation *funcOp) {
         if (!producer) continue;
         if (producer.getNumLoops() != producer.getNumParallelLoops()) continue;
         appendToFusionGroup(producer, newGroup);
+      }
+      // Workaround for sparse ops, force ConvertOp operand to be fused as
+      // sparse types are not supported at the kernel/runtime interface.
+      if (isSparseOp(&op)) {
+        for (OpOperand *operand :
+             cast<linalg::LinalgOp>(op).getInputTensorOperands()) {
+          auto producer =
+              operand->get().getDefiningOp<sparse_tensor::ConvertOp>();
+          if (!producer) continue;
+          appendToFusionGroup(producer, newGroup);
+        }
       }
     }
 

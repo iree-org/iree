@@ -188,6 +188,9 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
               CPUTileFuseAndVectorize:
             addTileFuseAndVectorizePassPipeline(nestedModulePM, lowerToVectors);
             break;
+          case IREE::Codegen::DispatchLoweringPassPipeline::CPUSparse:
+            addCPUSparsePassPipeline(nestedModulePM);
+            break;
           default:
             llvm_unreachable("Unsupported pipeline on CPU target.");
         }

@@ -16,6 +16,7 @@
 #include "mlir/Conversion/SCFToStandard/SCFToStandard.h"
 #include "mlir/Dialect/Arithmetic/Transforms/Passes.h"
 #include "mlir/Dialect/Linalg/Passes.h"
+#include "mlir/Dialect/SparseTensor/Transforms/Passes.h"
 #include "mlir/Dialect/StandardOps/Transforms/Passes.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Transforms/Passes.h"
@@ -226,6 +227,16 @@ void addTileFuseAndVectorizePassPipeline(OpPassManager &passManager,
 
   passManager.addNestedPass<FuncOp>(createForOpCanonicalizationPass());
   passManager.addNestedPass<FuncOp>(createOptimizeVectorTransferPass());
+}
+
+void addCPUSparsePassPipeline(OpPassManager &passManager) {
+  passManager.addPass(createCanonicalizerPass());
+  passManager.addPass(createSparsificationPass());
+  passManager.addPass(createSparseTensorConversionPass());
+
+  passManager.addPass(createSparsePreBufferize());
+  addLinalgBufferizePasses(passManager, cpuAllocationFunction);
+  passManager.addPass(createFuncBufferizePass());
 }
 
 void addCPUDefaultPassPipeline(OpPassManager &passManager) {

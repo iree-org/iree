@@ -751,6 +751,12 @@ void ConvertToLLVMPass::runOnOperation() {
   // Don't apply patterns to private function (e.g num_workgroups func).
   target.addDynamicallyLegalOp<FuncOp>([&](FuncOp funcOp) {
     if (isEntryPoint(funcOp)) return false;
+    for (Type type : funcOp.getType().getInputs()) {
+      if (type.isa<MemRefType>()) return false;
+    }
+    for (Type type : funcOp.getType().getResults()) {
+      if (type.isa<MemRefType>()) return false;
+    }
     return true;
   });
   target.addDynamicallyLegalDialect<StandardOpsDialect, mlir::math::MathDialect,

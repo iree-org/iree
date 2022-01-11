@@ -868,6 +868,7 @@ static LogicalResult convertScfForOp(OpBuilder &b, scf::ForOp forOp,
 static LogicalResult convertScfIfOp(OpBuilder &b, scf::IfOp ifOp,
                                     BlockAndValueMapping &bvm,
                                     BufferizationPlan &plan) {
+  if (ifOp.getResults().empty()) return success();
   auto thenYieldOp = ifOp.thenYield();
   auto elseYieldOp = ifOp.elseYield();
   for (auto result : llvm::enumerate(ifOp.getResults())) {
@@ -1018,6 +1019,10 @@ void LinalgBufferizePass::runOnOperation() {
         .Case<arith::ConstantOp>([&](arith::ConstantOp constantOp) {
           return convertConstantOp(b, constantOp, bvm);
         })
+        .Case<bufferization::ToTensorOp>([&](bufferization::ToTensorOp loadOp) {
+          bvm.map(loadOp.getResult(), loadOp.memref());
+          return success();
+        })
         .Case<IREE::Flow::DispatchTensorStoreOp>(
             [&](IREE::Flow::DispatchTensorStoreOp storeOp) {
               return convertInterfaceStoreTensorOp(b, storeOp, bvm, plan);
@@ -1088,6 +1093,12 @@ void LinalgBufferizePass::runOnOperation() {
               }
               return convertVectorTransferWriteOp(b, transferWriteOp, bvm,
                                                   plan);
+            })
+        .Case<bufferization::ToMemrefOp>(
+            [&](bufferization::ToMemrefOp bufferCastOp) {
+              Value memref = bvm.lookupOrNull(bufferCastOp.tensor());
+              if (memref) bufferCastOp.replaceAllUsesWith(memref);
+              return success();
             })
         .Default([&](Operation *op) { return success(); });
   };

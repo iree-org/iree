@@ -38,6 +38,7 @@ iree_cc_library(
     "OptimizeVectorTransferPass.cpp"
     "RemoveTrivialLoops.cpp"
     "SetNumWorkgroupsPass.cpp"
+    "SparsePreBufferization.cpp"
     "VectorizeConv.cpp"
     "VectorizeMMT4d.cpp"
   DEPS

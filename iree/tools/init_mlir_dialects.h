@@ -23,6 +23,7 @@
 #include "mlir/Dialect/SCF/SCF.h"
 #include "mlir/Dialect/SPIRV/IR/SPIRVDialect.h"
 #include "mlir/Dialect/Shape/IR/Shape.h"
+#include "mlir/Dialect/SparseTensor/IR/SparseTensor.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Tensor/IR/TensorInferTypeOpInterfaceImpl.h"
@@ -54,7 +55,8 @@ inline void registerMlirDialects(DialectRegistry &registry) {
                   vector::VectorDialect,
                   tensor::TensorDialect,
                   tosa::TosaDialect,
-                  shape::ShapeDialect>();
+                  shape::ShapeDialect,
+                  sparse_tensor::SparseTensorDialect>();
   // clang-format on
   tensor::registerInferTypeOpInterfaceExternalModels(registry);
 

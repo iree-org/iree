@@ -19,6 +19,7 @@
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "mlir/Analysis/SliceAnalysis.h"
+#include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
@@ -149,6 +150,9 @@ static bool canSetStoreValueAndTargetAsEquivalent(
   assert(targetInterfaceOp);
   if (auto valueConstantOp =
           getEquivalentOpOfType<arith::ConstantOp>(value, plan)) {
+    return false;
+  }
+  if (getEquivalentOpOfType<memref::AllocOp>(value, plan)) {
     return false;
   }
   if (auto valueInterfaceOp =
@@ -534,6 +538,10 @@ LogicalResult createTensorEquivalenceClasses(FuncOp funcOp,
             [&](scf::IfOp ifOp) { return analyseScfIfOp(ifOp, plan); })
         .Case<scf::ForOp>(
             [&](scf::ForOp forOp) { return analyseScfForOp(forOp, plan); })
+        .Case<bufferization::ToTensorOp>([&](bufferization::ToTensorOp loadOp) {
+          plan.unionSets(loadOp.result(), loadOp.memref());
+          return success();
+        })
         .Default([&](Operation *op) { return success(); });
   };
   if (funcOp.walk<WalkOrder::PreOrder>(bufferMappingFn).wasInterrupted()) {
