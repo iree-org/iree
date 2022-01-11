@@ -1215,8 +1215,7 @@ func @scan_1d(%0: tensor<128xi32>) -> tensor<128xi32> {
   %2 = iree_linalg_ext.scan
     dimension(0) inclusive(true)
     {__internal_linalg_transform__ = "outer_reduce_input"}
-    identity(%c0 : i32)
-    ins(%0 : tensor<128xi32>) outs(%1 : tensor<128xi32>) {
+    ins(%0, %c0 : tensor<128xi32>, i32) outs(%1 : tensor<128xi32>) {
     ^bb0(%arg0 : i32, %arg1 : i32):
       %sum = arith.addi %arg0, %arg1 : i32
       iree_linalg_ext.yield %sum : i32
@@ -1229,8 +1228,7 @@ func @scan_1d(%0: tensor<128xi32>) -> tensor<128xi32> {
 //      CHECK:   %[[OUTPUT:.+]] = linalg.init_tensor [128] : tensor<128xi32>
 //      CHECK:   %[[RESULT:.+]] = iree_linalg_ext.scan
 // CHECK-SAME:           __internal_linalg_transform__ = "outer_reduce_output"
-// CHECK-SAME:       identity(%[[IDENTITY]] :
-// CHECK-SAME:       ins(%[[OPERAND]] :
+// CHECK-SAME:       ins(%[[OPERAND]], %[[IDENTITY]] :
 // CHECK-SAME:       outs(%[[OUTPUT]] :
 //      CHECK:   return %[[RESULT]]
 
@@ -1242,8 +1240,7 @@ func @scan_2d(%0: tensor<16x32xi32>) -> tensor<16x32xi32> {
   %2 = iree_linalg_ext.scan
     dimension(0) inclusive(true)
     {__internal_linalg_transform__ = "outer_reduce_input"}
-    identity(%c0 : i32)
-    ins(%0 : tensor<16x32xi32>) outs(%1 : tensor<16x32xi32>) {
+    ins(%0, %c0 : tensor<16x32xi32>, i32) outs(%1 : tensor<16x32xi32>) {
     ^bb0(%arg0 : i32, %arg1 : i32):
       %sum = arith.addi %arg0, %arg1 : i32
       iree_linalg_ext.yield %sum : i32
@@ -1281,8 +1278,7 @@ func @scan_2d_memref(%0: memref<16x32xi32>, %1: memref<16x32xi32>) {
   iree_linalg_ext.scan
     dimension(0) inclusive(true)
     {__internal_linalg_transform__ = "outer_reduce_input"}
-    identity(%c0 : i32)
-    ins(%0 : memref<16x32xi32>) outs(%1 : memref<16x32xi32>) {
+    ins(%0, %c0 : memref<16x32xi32>, i32) outs(%1 : memref<16x32xi32>) {
     ^bb0(%arg0 : i32, %arg1 : i32):
       %sum = arith.addi %arg0, %arg1 : i32
       iree_linalg_ext.yield %sum : i32

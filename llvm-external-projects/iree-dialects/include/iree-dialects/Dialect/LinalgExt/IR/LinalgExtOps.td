@@ -256,17 +256,15 @@ def IREELinalgExt_ScanOp : IREELinalgExt_Op<"scan",
     Computes the inclusive/exclusive scan along a given dimension.
   }];
 
-  let arguments = (ins Variadic<AnyShaped>:$inputs,
+  let arguments = (ins Variadic<AnyType>:$inputs,
                        Variadic<AnyShaped>:$outputs,
-                       AnyType:$identity,
                        I64Attr:$dimension,
                        BoolAttr:$inclusive
   );
 
   let builders = [
     OpBuilder<(ins "ValueRange":$inputs, "ValueRange":$outputs,
-      "Value":$identity, CArg<"int64_t", "0">:$dimension,
-      CArg<"bool", "true">:$inclusive)>
+      CArg<"int64_t", "0">:$dimension, CArg<"bool", "true">:$inclusive)>
   ];
 
   let results = (outs Variadic<AnyRankedTensor>:$results);
@@ -275,7 +273,6 @@ def IREELinalgExt_ScanOp : IREELinalgExt_Op<"scan",
     `dimension` `(` $dimension `)`
     `inclusive` `(` $inclusive `)`
     attr-dict
-    `identity` `(` $identity `:` type($identity) `)`
     `ins` `(` $inputs `:` type($inputs) `)`
     (`outs` `(` $outputs^ `:` type($outputs) `)`)?
     $region (`->` type($results)^)?
@@ -284,6 +281,9 @@ def IREELinalgExt_ScanOp : IREELinalgExt_Op<"scan",
   let extraClassDeclaration = extraLinalgExtOpClassDeclaration # [{
     Value input() {
       return getInputOperand(0)->get();
+    }
+    Value identity() {
+      return getInputOperand(1)->get();
     }
     Value output() {
       return getOutputOperand(0)->get();
