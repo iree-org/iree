@@ -192,7 +192,7 @@ static iree_status_t iree_replay_benchmark_run_file(
     const iree_benchmark_def_t* benchmark_def,
     iree_benchmark_state_t* benchmark_state) {
   const iree_replay_benchmark_registration_t* registration =
-      (const iree_replay_benchmark_registration_t*)benchmark_def;
+      (const iree_replay_benchmark_registration_t*)benchmark_def->user_data;
 
   // Setup replay state used for this benchmark.
   iree_trace_replay_t replay;
@@ -248,6 +248,7 @@ static void iree_replay_benchmark_register_trace_files(
         .minimum_duration_ns = 0,
         .iteration_count = 0,
         .run = iree_replay_benchmark_run_file,
+        .user_data = &registrations[i],
     };
     iree_benchmark_register(iree_file_path_stem(file_path),
                             &registrations[i].benchmark_def);
