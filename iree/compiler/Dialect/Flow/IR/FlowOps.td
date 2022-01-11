@@ -287,6 +287,8 @@ def FLOW_DispatchTieShapeOp : FLOW_PureOp<"dispatch.tie_shape", [
     ValueRange getResultDynamicDims(unsigned idx) { return dynamic_dims(); }
   }];
 
+  let verifier = [{ return verifyDispatchTieShapeOp(*this); }];
+
   let hasFolder = 1;
 }
 
@@ -380,6 +382,8 @@ def FLOW_DispatchTensorLoadOp : FLOW_PureOp<"dispatch.tensor.load", [
     ValueRange getResultDynamicDims(unsigned idx) { return sizes(); }
   }];
 
+  let verifier = [{ return verifyDispatchTensorLoadOp(*this); }];
+
   let hasCanonicalizer = 1;
   let hasFolder = 1;
 }
@@ -455,6 +459,8 @@ def FLOW_DispatchTensorStoreOp : FLOW_Op<"dispatch.tensor.store", [
     }
     ValueRange getResultDynamicDims(unsigned idx) { return {}; }
   }];
+
+  let verifier = [{ return verifyDispatchTensorStoreOp(*this); }];
 
   let hasCanonicalizer = 1;
 }
