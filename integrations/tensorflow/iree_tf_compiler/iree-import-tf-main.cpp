@@ -235,16 +235,6 @@ int main(int argc, char **argv) {
       if (failed(saveToFile(saveTempMidLevelImport))) return 10;
     }
   }
-  {
-    PassManager pm(&context, PassManager::Nesting::Implicit);
-    applyPassManagerCLOptions(pm);
-    iree_integrations::MHLO::buildMHLOImportPassPipeline(pm);
-    if (failed(pm.run(*module))) {
-      llvm::errs() << "Running iree-import-tf MHLO Import pass pipeline failed "
-                      "(see diagnostics)\n";
-      return 2;
-    }
-  }
 
   // Save temp output.
   if (!saveTempIreeImport.empty()) {

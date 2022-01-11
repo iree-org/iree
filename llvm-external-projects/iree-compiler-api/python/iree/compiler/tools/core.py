@@ -42,6 +42,7 @@ class InputType(Enum):
   NONE = "none"
   MHLO = "mhlo"
   TOSA = "tosa"
+  XLA = "xla"
 
   @staticmethod
   def parse(spec: Union[str, "InputType"]) -> "InputType":
