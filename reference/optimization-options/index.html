@@ -796,6 +796,13 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#strip-debug-assertions-iree-opt-strip-assertions-off" class="md-nav__link">
+    Strip Debug Assertions (--iree-opt-strip-assertions (off))
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -1015,6 +1022,13 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#strip-debug-assertions-iree-opt-strip-assertions-off" class="md-nav__link">
+    Strip Debug Assertions (--iree-opt-strip-assertions (off))
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -1076,6 +1090,13 @@ programs where large amounts (up to the whole) have had their numeric operations
 and constant data rewritten to lower precision types.</p>
 <p>This feature is actively evolving and will be the subject of dedicated
 documentation when ready.</p>
+<h3 id="strip-debug-assertions-iree-opt-strip-assertions-off">Strip Debug Assertions (<code>--iree-opt-strip-assertions</code> (off))<a class="headerlink" href="#strip-debug-assertions-iree-opt-strip-assertions-off" title="Permanent link">&para;</a></h3>
+<p>Strips all <code>std.assert</code> ops in the input program after useful information for
+optimization analysis has been extracted. Assertions provide useful user-visible
+error messages but can prevent critical optimizations. Assertions are not,
+however, a substitution for control flow and frontends that want to check errors
+in optimized release builds should do so via actual code - similar to when one
+would <code>if (foo) return false;</code> vs. <code>assert(foo);</code> in a normal program.</p>
 
               
             </article>
