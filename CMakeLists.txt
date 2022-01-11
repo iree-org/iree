@@ -75,7 +75,9 @@ option(IREE_BUILD_PYTHON_BINDINGS "Builds the IREE python bindings" "${IREE_ENAB
 
 option(IREE_BUILD_EXPERIMENTAL_REMOTING "Builds experimental remoting support." OFF)
 option(IREE_BUILD_EXPERIMENTAL_ROCM "Builds the experimental ROCm Backend." OFF)
-option(IREE_ENABLE_NEW_INTEGRATION_TESTS "Enables new integration tests and disables old." OFF)
+option(IREE_ENABLE_OLD_INTEGRATION_TESTS "Enables old integration tests." OFF)
+option(IREE_ENABLE_NEW_INTEGRATION_TESTS "Enables new integration tests." OFF)
+option(IREE_ENABLE_TFLITE_INTEGRATION_TESTS "Enables tflite integration tests." OFF)
 
 #-------------------------------------------------------------------------------
 # Derived flags based on primary options

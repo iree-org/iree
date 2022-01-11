@@ -5,10 +5,23 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 
-if(${IREE_ENABLE_NEW_INTEGRATION_TESTS})
-  add_subdirectory(tf_integration)
-endif()
+iree_py_library(
+  NAME
+    test_util
+  SRCS
+    "test_util.py"
+)
 
-if(${IREE_ENABLE_TFLITE_INTEGRATION_TESTS})
-  add_subdirectory(tflite_integration)
-endif()
+iree_py_test(
+  NAME
+    mobilenet_v1
+  SRCS
+    "mobilenet_v1_test.py"
+)
+
+iree_py_test(
+  NAME
+    posenet_i8
+  SRCS
+    "posenet_i8_test.py"
+)
