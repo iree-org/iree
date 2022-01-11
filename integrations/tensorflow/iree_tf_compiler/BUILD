@@ -31,9 +31,9 @@ cc_binary(
     name = "iree-tf-opt",
     srcs = ["iree-tf-opt-main.cpp"],
     deps = [
+        "//iree-dialects:IREEInputDialect",
         "//iree_tf_compiler/MHLO",
         "//iree_tf_compiler/TF",
-        "//iree-dialects:IREEInputDialect",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:MlirOptLib",

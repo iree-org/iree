@@ -27,8 +27,8 @@ iree_lit_test_suite(
         include = ["*.mlir"],
     ),
     data = [
-        "//iree_tf_compiler:iree-opt-tflite",
         "//build_tools/bazel:IreeFileCheck",
+        "//iree_tf_compiler:iree-opt-tflite",
     ],
     driver = "//build_tools/bazel:run_lit.sh",
 )
