@@ -8,29 +8,30 @@
 
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree-dialects/Dialect/LinalgExt/IR/TiledOpInterface.h"
-#include "llvm/ADT/SmallVector.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/Support/LLVM.h"
 
-using namespace llvm;
-
+// clang-format off
 #include "iree/compiler/Dialect/Flow/IR/PartitionableLoopsInterface.cpp.inc"  // IWYU pragma: export
+// clang-format on
 
 /// Filters out dimensions in `parallelLoops` that have unit range in
 /// `loopRanges`.
-static SmallVector<unsigned> pruneUnitTripParallelLoops(
-    ArrayRef<unsigned> parallelLoops, ArrayRef<int64_t> loopRanges) {
+static llvm::SmallVector<unsigned> pruneUnitTripParallelLoops(
+    llvm::ArrayRef<unsigned> parallelLoops,
+    llvm::ArrayRef<int64_t> loopRanges) {
   return llvm::to_vector(llvm::make_filter_range(
       parallelLoops,
       [&loopRanges](unsigned loopDim) { return loopRanges[loopDim] != 1; }));
 }
 
 /// Returns the partitionable loops for all Linalg ops.
-SmallVector<unsigned> getPartitionableLoopsImpl(
+llvm::SmallVector<unsigned> getPartitionableLoopsImpl(
     mlir::linalg::LinalgOp linalgOp, unsigned maxNumPartitionedLoops) {
-  SmallVector<unsigned> parallelLoops;
+  llvm::SmallVector<unsigned> parallelLoops;
   linalgOp.getParallelDims(parallelLoops);
   // Get the static loop ranges.
-  Optional<SmallVector<int64_t, 4>> staticLoopRanges =
+  llvm::Optional<llvm::SmallVector<int64_t, 4>> staticLoopRanges =
       linalgOp.getStaticLoopRanges();
   if (staticLoopRanges) {
     parallelLoops =
@@ -39,8 +40,8 @@ SmallVector<unsigned> getPartitionableLoopsImpl(
   // TODO(ravishankarm): For now the outer parallel loops are dropped. This is
   // a pragmatic choice for now but might need to be revisited.
   if (parallelLoops.size() > maxNumPartitionedLoops) {
-    parallelLoops = llvm::to_vector(
-        ArrayRef<unsigned>(parallelLoops).take_back(maxNumPartitionedLoops));
+    parallelLoops = llvm::to_vector(llvm::ArrayRef<unsigned>(parallelLoops)
+                                        .take_back(maxNumPartitionedLoops));
   }
   return parallelLoops;
 }
@@ -59,14 +60,14 @@ struct LinalgOpPartitionableLoops
     return linalgOp.getNumLoops();
   }
 
-  SmallVector<unsigned> getPartitionableLoops(
+  llvm::SmallVector<unsigned> getPartitionableLoops(
       Operation *op, unsigned maxNumPartitionedLoops) const {
     auto linalgOp = cast<linalg::LinalgOp>(op);
     return getPartitionableLoopsImpl(linalgOp, maxNumPartitionedLoops);
   }
 };
 
-/// External model implementation for linalg::Mmt4DOp;
+/// External model implementation for linalg::Mmt4DOp.
 struct Mmt4DOpPartitionableLoops
     : public PartitionableLoopsInterface::ExternalModel<
           Mmt4DOpPartitionableLoops, linalg::Mmt4DOp> {
@@ -75,9 +76,13 @@ struct Mmt4DOpPartitionableLoops
     return linalgOp.getNumLoops();
   }
 
-  SmallVector<unsigned> getPartitionableLoops(
+  llvm::SmallVector<unsigned> getPartitionableLoops(
       Operation *op, unsigned maxNumPartitionedLoops) const {
-    return {0, 1};
+    llvm::SmallVector<unsigned> partitionableLoops = {0, 1};
+    if (partitionableLoops.size() > maxNumPartitionedLoops) {
+      partitionableLoops.resize(maxNumPartitionedLoops);
+    }
+    return partitionableLoops;
   }
 };
 
@@ -91,7 +96,7 @@ struct TiledOpInterfacePartitionableLoops
     return tiledOp.getLoopIteratorTypes().size();
   }
 
-  SmallVector<unsigned> getPartitionableLoops(
+  llvm::SmallVector<unsigned> getPartitionableLoops(
       Operation *op, unsigned maxNumPartitionedLoops) const {
     // For now just return the loops that are returned by the
     // `TiledOpInterface`. This needs to be further pruned to remove unit-dim
@@ -142,7 +147,8 @@ void registerPartitionableLoopsInterfaceModels(DialectRegistry &registry) {
   registerInterfaceForLinalgOps<
   
   // This is copy-pasted from LinalgStructuredOps.cpp.inc. In theory you could
-  // just include that generated file here, but that cause some linking errors.
+  // just include that generated file here, but that cause errors with bazel. 
+  // The required generated header is not exposed correctly.
   // Copy paste is fine for now.
 
   ::mlir::linalg::BatchMatmulOp,

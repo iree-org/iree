@@ -13,7 +13,7 @@ def FLOW_PartitionableLoopsInterface : OpInterface<"PartitionableLoopsInterface"
   let cppNamespace = "::mlir::iree_compiler::IREE::Flow";
 
   let description = [{
-    An interface for ops to publish the loops that can be partitioned.
+    An interface for ops to indicate which implicit loops that can be partitioned.
 
     Using this interface allows for consistent specification of which loops of
     an operation are partitioned.
@@ -34,7 +34,7 @@ def FLOW_PartitionableLoopsInterface : OpInterface<"PartitionableLoopsInterface"
         The size of the vector returned is always lesser than
         `maxNumPartitionedLoops`.
       }],
-      /*retTy=*/"SmallVector<unsigned>",
+      /*retTy=*/"llvm::SmallVector<unsigned>",
       /*methodName=*/"getPartitionableLoops",
       /*args=*/(ins "unsigned":$maxNumPartitionedLoops)
     >
