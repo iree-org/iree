@@ -257,6 +257,39 @@ def FLOW_DispatchWorkgroupSizeOp : FLOW_PureOp<"dispatch.workgroup.size", [
   let verifier = [{ return verifyDispatchWorkgroupInfoOp(*this); }];
 }
 
+def FLOW_DispatchTieShapeOp : FLOW_PureOp<"dispatch.tie_shape", [
+  AllTypesMatch<["operand", "result"]>,
+  DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>,
+  Util_ShapeAwareOp,
+]> {
+  let summary = [{ties a runtime shape to a dispatch I/O argument}];
+  let description = [{
+    Metadata op used to tie a runtime-computed shape with dynamic dimensions to
+    a dispatch input/output argument. All uses of the argument should use the
+    pass-through result of this op to allow for SSA-based shape resolution.
+  }];
+
+  let arguments = (ins
+    FLOW_DispatchTensor:$operand,
+    FLOW_ShapeDynamicDims:$dynamic_dims
+  );
+  let results = (outs
+    FLOW_DispatchTensor:$result
+  );
+
+  let assemblyFormat = [{
+    $operand attr-dict
+    `:` type($result) (`{` $dynamic_dims^ `}`)?
+  }];
+
+  let extraClassDeclaration = [{
+    ValueRange getOperandDynamicDims(unsigned idx) { return dynamic_dims(); }
+    ValueRange getResultDynamicDims(unsigned idx) { return dynamic_dims(); }
+  }];
+
+  let hasFolder = 1;
+}
+
 def FLOW_DispatchTensorLoadOp : FLOW_PureOp<"dispatch.tensor.load", [
   AttrSizedOperandSegments,
   OffsetSizeAndStrideOpInterface,

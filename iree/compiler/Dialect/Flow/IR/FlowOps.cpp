@@ -56,6 +56,26 @@ static LogicalResult verifyOpDynamicDims(Operation *op, ValueRange values,
 }
 
 //===----------------------------------------------------------------------===//
+// flow.dispatch.tie_shape
+//===----------------------------------------------------------------------===//
+
+LogicalResult DispatchTieShapeOp::reifyResultShapes(
+    OpBuilder &b, ReifiedRankedShapedTypeDims &reifiedReturnShapes) {
+  SmallVector<Value> shape;
+  unsigned dynamicIdx = 0;
+  auto tensorType = result().getType().cast<IREE::Flow::DispatchTensorType>();
+  for (int64_t dim : tensorType.getShape()) {
+    if (dim == ShapedType::kDynamicSize) {
+      shape.push_back(dynamic_dims()[dynamicIdx++]);
+    } else {
+      shape.push_back(b.create<arith::ConstantIndexOp>(getLoc(), dim));
+    }
+  }
+  reifiedReturnShapes.push_back(shape);
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
 // flow.dispatch.tensor.load
 //===----------------------------------------------------------------------===//
 
