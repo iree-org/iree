@@ -9,6 +9,7 @@
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
+#include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "llvm/ADT/Triple.h"
 #include "llvm/ADT/TypeSwitch.h"
@@ -63,6 +64,13 @@ static llvm::cl::opt<int> defaultWorkgroupTileSize(
     llvm::cl::init(64));
 
 using IREE::Codegen::DispatchLoweringPassPipeline;
+
+static bool isVMVX(FuncOp entryPointFn) {
+  auto variantOp =
+      entryPointFn->getParentOfType<IREE::HAL::ExecutableVariantOp>();
+  IREE::HAL::ExecutableTargetAttr targetAttr = variantOp.target();
+  return targetAttr && targetAttr.getBackend().getValue() == "vmvx";
+}
 
 static Optional<llvm::Triple> getTargetTriple(FuncOp entryPointFn) {
   auto variantOp =
@@ -475,7 +483,83 @@ static LogicalResult setRootConfig(
       getDispatchLoweringPassPipeline(entryPointFn, fftOp));
 }
 
-/// Finds the root operation in the given list of linalg operations and sets
+/// Sets the lowering configuration for a generic op to use SingleTilingExpert.
+static LogicalResult setRootConfig(
+    FuncOp entryPointFn, linalg::GenericOp genericOp,
+    ArrayRef<LoopTilingAndDistributionInfo> tiledLoops) {
+  // If there is already a set configuration, do nothing.
+  if (getLoweringConfig(genericOp)) return success();
+
+  // For VMVX, do not use vectorization. Just lower as default.
+  if (isVMVXBackend(entryPointFn)) return success();
+
+  // If there are no loops, there is nothing to do.
+  unsigned numLoops = genericOp.getNumLoops();
+  if (numLoops == 0) return success();
+
+  Optional<int64_t> nativeVectorSizeInBytes =
+      getNativeVectorSizeInBytes(entryPointFn);
+  if (!nativeVectorSizeInBytes) {
+    // For now if there is nothing specified in the `hal.executable.variant`,
+    // just use a default.
+    nativeVectorSizeInBytes = clNativeVectorSizeInBytes;
+  }
+  SmallVector<int64_t> nativeVectorSize(numLoops, 1);
+  auto inputOutputOpOperands = genericOp.getInputAndOutputOperands();
+  for (auto map : llvm::enumerate(genericOp.getIndexingMaps())) {
+    // Check the fastest varying dimension of the operand. Set the vector size
+    // of the corresponding loop to the vector size.
+    if (map.value().getNumResults() == 0) continue;
+    auto fastestVaryingDimExpr =
+        map.value().getResults().back().dyn_cast<AffineDimExpr>();
+    if (!fastestVaryingDimExpr) continue;
+    unsigned fastestVaryingDim = fastestVaryingDimExpr.getPosition();
+
+    // If the indexing map has result it has to be a shaped type.
+    auto operandType =
+        inputOutputOpOperands[map.index()]->get().getType().cast<ShapedType>();
+    Type elemType = operandType.getElementType();
+    if (!elemType.isIntOrFloat()) continue;
+
+    unsigned byteWidth =
+        std::max<unsigned>(elemType.getIntOrFloatBitWidth() / 8, 1);
+    unsigned currVectorSize = nativeVectorSizeInBytes.getValue() / byteWidth;
+    nativeVectorSize[fastestVaryingDim] =
+        std::max<int64_t>(nativeVectorSize[fastestVaryingDim], currVectorSize);
+  }
+  if (llvm::all_of(nativeVectorSize, [](int64_t vs) { return vs == 1; })) {
+    // Nothing to vectorize just lower to loops.
+    return success();
+  }
+
+  // Set the flow level tiling to the default.
+  SmallVector<int64_t> prunedNativeVectorSize(tiledLoops.size(), 1);
+  if (!tiledLoops.empty()) {
+    SmallVector<unsigned> partitionedLoops = getPartitionedLoops(genericOp);
+    for (auto loopDim : llvm::enumerate(partitionedLoops)) {
+      prunedNativeVectorSize[loopDim.index()] =
+          nativeVectorSize[loopDim.value()];
+    }
+  }
+  SmallVector<int64_t> workloadPerWorkgroup =
+      getDefaultWorkloadPerWorkgroup(tiledLoops, prunedNativeVectorSize);
+  setTranslationInfo(entryPointFn,
+                     DispatchLoweringPassPipeline::CPUSingleTilingExpert,
+                     workloadPerWorkgroup,
+                     /*workgroupSize=*/ArrayRef<int64_t>{});
+
+  SmallVector<int64_t> l1TileSizes = nativeVectorSize;
+  TileSizesListType tileSizes;
+  tileSizes.push_back({});  // Empty since nothing to do for first level tiling.
+  tileSizes.push_back(l1TileSizes);
+  auto config = IREE::Codegen::LoweringConfigAttr::get(
+      entryPointFn.getContext(), tileSizes, nativeVectorSize);
+  setLoweringConfig(genericOp, config);
+
+  return success();
+}
+
+/// Finds the root operation in the given list of Linalg operations and sets
 /// its configuration. Returns error for multiple root operations.
 static LogicalResult setRootConfig(
     FuncOp entryPointFn, ArrayRef<Operation *> computeOps,
@@ -488,6 +572,15 @@ static LogicalResult setRootConfig(
                 IREE::LinalgExt::FftOp>([&](auto op) {
             return setRootConfig(entryPointFn, op, tiledLoops);
           })
+          .Case<linalg::GenericOp>([&](auto genericOp) {
+            if (genericOp.getNumLoops() == genericOp.getNumParallelLoops()) {
+              // Ignore parallel elementwise operations now. They will be set as
+              // roots ops if there are no other ops that can be treated as a
+              // root op.
+              return success();
+            }
+            return setRootConfig(entryPointFn, genericOp, tiledLoops);
+          })
           .Default([&](Operation *op) { return success(); });
     };
     if (failed(setRootConfigFn(computeOp))) {
@@ -495,10 +588,36 @@ static LogicalResult setRootConfig(
     }
     if (getLoweringConfig(computeOp)) {
       if (rootOp) {
-        return computeOp->emitError(
+        return computeOp->emitOpError(
             "unhandled multiple roots in dispatch region");
       }
       rootOp = computeOp;
+    }
+  }
+  if (rootOp) return success();
+
+  // If there are any other ops other than `linalg.generic`, `linalg.copy` or
+  // `linalg.fill` then just use the default.
+  for (auto computeOp : computeOps) {
+    if (!isa<linalg::GenericOp, linalg::CopyOp, linalg::FillOp>(computeOp)) {
+      return success();
+    }
+  }
+
+  // If there are no root ops, then check for a single `linalg.generic` op. Make
+  // this the root, and vectorize the operation.
+  for (auto computeOp : computeOps) {
+    if (auto genericOp = dyn_cast<linalg::GenericOp>(computeOp)) {
+      if (failed(setRootConfig(entryPointFn, genericOp, tiledLoops))) {
+        return failure();
+      }
+      if (getLoweringConfig(computeOp)) {
+        if (rootOp) {
+          return computeOp->emitOpError(
+              "unhanlded multiple parallel generic ops within a dispatch");
+        }
+        rootOp = computeOp;
+      }
     }
   }
   return success();

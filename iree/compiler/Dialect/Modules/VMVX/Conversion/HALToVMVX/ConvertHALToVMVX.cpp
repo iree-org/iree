@@ -192,8 +192,8 @@ class ConvertHALInterfaceConstantLoadOp
         op.getLoc(), op.index().getZExtValue());
     auto loadedValue = rewriter.createOrFold<memref::LoadOp>(
         op.getLoc(), constantType, constantsArg, ValueRange{constantIndex});
-    rewriter.replaceOpWithNewOp<arith::IndexCastOp>(op, loadedValue,
-                                                    resultType);
+    rewriter.replaceOpWithNewOp<mlir::UnrealizedConversionCastOp>(
+        op, resultType, loadedValue);
     return success();
   }
 };

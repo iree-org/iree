@@ -51,6 +51,83 @@ func @TensorConstantToSplat() -> !stream.resource<constant> {
 
 // -----
 
+// CHECK-LABEL: @NarrowSplatPatternI32ToI8
+func @NarrowSplatPatternI32ToI8() -> !stream.resource<*> {
+  %c100 = arith.constant 100 : index
+  %pattern = arith.constant 0xAAAAAAAA : i32
+  // CHECK: stream.tensor.splat %c-86_i8 : i8
+  %0 = stream.tensor.splat %pattern : i32 -> tensor<2x2xf32> in !stream.resource<*>{%c100}
+  return %0 : !stream.resource<*>
+}
+
+// -----
+
+// CHECK-LABEL: @NarrowSplatPatternI32ToI16
+func @NarrowSplatPatternI32ToI16() -> !stream.resource<*> {
+  %c100 = arith.constant 100 : index
+  %pattern = arith.constant 0xAABBAABB : i32
+  // CHECK: stream.tensor.splat %c-21829_i16 : i16
+  %0 = stream.tensor.splat %pattern : i32 -> tensor<2x2xf32> in !stream.resource<*>{%c100}
+  return %0 : !stream.resource<*>
+}
+
+// -----
+
+// CHECK-LABEL: @NarrowSplatPatternI64ToI8
+func @NarrowSplatPatternI64ToI8() -> !stream.resource<*> {
+  %c100 = arith.constant 100 : index
+  %pattern = arith.constant 0 : i64
+  // CHECK: stream.tensor.splat %c0_i8 : i8
+  %0 = stream.tensor.splat %pattern : i64 -> tensor<2x2xf32> in !stream.resource<*>{%c100}
+  return %0 : !stream.resource<*>
+}
+
+// -----
+
+// CHECK-LABEL: @NarrowSplatPatternI64ToI16
+func @NarrowSplatPatternI64ToI16() -> !stream.resource<*> {
+  %c100 = arith.constant 100 : index
+  %pattern = arith.constant 0xAABBAABBAABBAABB : i64
+  // CHECK: stream.tensor.splat %c-21829_i16 : i16
+  %0 = stream.tensor.splat %pattern : i64 -> tensor<2x2xf32> in !stream.resource<*>{%c100}
+  return %0 : !stream.resource<*>
+}
+
+// -----
+
+// CHECK-LABEL: @NarrowSplatPatternI64ToI32
+func @NarrowSplatPatternI64ToI32() -> !stream.resource<*> {
+  %c100 = arith.constant 100 : index
+  %pattern = arith.constant 0xAABBCCDDAABBCCDD : i64
+  // CHECK: stream.tensor.splat %c12307677_i32
+  %0 = stream.tensor.splat %pattern : i64 -> tensor<2x2xf32> in !stream.resource<*>{%c100}
+  return %0 : !stream.resource<*>
+}
+
+// -----
+
+// CHECK-LABEL: @NarrowSplatPatternBF16
+func @NarrowSplatPatternBF16() -> !stream.resource<*> {
+  %c100 = arith.constant 100 : index
+  %pattern = arith.constant 0.0 : bf16
+  // CHECK: stream.tensor.splat %c0_i8 : i8
+  %0 = stream.tensor.splat %pattern : bf16 -> tensor<2x2xf32> in !stream.resource<*>{%c100}
+  return %0 : !stream.resource<*>
+}
+
+// -----
+
+// CHECK-LABEL: @NarrowSplatPatternF32
+func @NarrowSplatPatternF32() -> !stream.resource<*> {
+  %c100 = arith.constant 100 : index
+  %pattern = arith.constant 0.0 : f32
+  // CHECK: stream.tensor.splat %c0_i8 : i8
+  %0 = stream.tensor.splat %pattern : f32 -> tensor<2x2xf32> in !stream.resource<*>{%c100}
+  return %0 : !stream.resource<*>
+}
+
+// -----
+
 // CHECK-LABEL: @FoldTensorCloneOp
 func @FoldTensorCloneOp(%arg0: !stream.resource<*>, %arg1: index) -> !stream.resource<*> {
   // CHECK-NOT: stream.tensor.clone

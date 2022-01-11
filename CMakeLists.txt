@@ -48,7 +48,7 @@ option(IREE_BUILD_TFLITE_COMPILER "Builds the TFLite compiler frontend." "${IREE
 option(IREE_BUILD_XLA_COMPILER "Builds TensorFlow XLA compiler frontend." "${IREE_BUILD_TENSORFLOW_ALL}")
 
 # Properties controlling version and naming of release artifacts.
-set(IREE_RELEASE_PACKAGE_SUFFIX "-dev" CACHE STRING "Suffix to append to distributed package names")
+set(IREE_RELEASE_PACKAGE_SUFFIX "" CACHE STRING "Suffix to append to distributed package names")
 set(IREE_RELEASE_VERSION "0.1a1" CACHE STRING "Version to embed in distributed packages")
 set(IREE_RELEASE_REVISION "HEAD" CACHE STRING "Version control revision information to embed in distributed packages")
 

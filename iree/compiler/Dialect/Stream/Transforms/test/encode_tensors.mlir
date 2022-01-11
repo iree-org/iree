@@ -23,10 +23,53 @@ func @denseTensorConstant(%arg0: index) -> !stream.resource<constant> {
 
 // -----
 
-// CHECK-LABEL: @denseTensorSplat
-func @denseTensorSplat(%arg0: f32, %arg1: index, %arg2: index) -> !stream.resource<*> {
-  // CHECK: %[[RET:.+]] = stream.async.splat %arg0 : f32 -> !stream.resource<*>{%arg2}
+// CHECK-LABEL: @denseTensorSplatI32
+func @denseTensorSplatI32(%arg0: i32, %arg1: index, %arg2: index) -> !stream.resource<*> {
+  // CHECK: %[[RET:.+]] = stream.async.splat %arg0 : i32 -> !stream.resource<*>{%arg2}
+  %0 = stream.tensor.splat %arg0 : i32 -> tensor<?x1x10xi32>{%arg1} in !stream.resource<*>{%arg2}
+  // CHECK: return %[[RET]]
+  return %0 : !stream.resource<*>
+}
+
+// -----
+
+// CHECK-LABEL: @denseTensorSplatI1
+func @denseTensorSplatI1(%arg0: i1, %arg1: index, %arg2: index) -> !stream.resource<*> {
+  // CHECK: %[[PATTERN:.+]] = arith.extui %arg0 : i1 to i8
+  // CHECK: %[[RET:.+]] = stream.async.splat %[[PATTERN]] : i8 -> !stream.resource<*>{%arg2}
+  %0 = stream.tensor.splat %arg0 : i1 -> tensor<?x1x10xi1>{%arg1} in !stream.resource<*>{%arg2}
+  // CHECK: return %[[RET]]
+  return %0 : !stream.resource<*>
+}
+
+// -----
+
+// CHECK-LABEL: @denseTensorSplatBF16
+func @denseTensorSplatBF16(%arg0: bf16, %arg1: index, %arg2: index) -> !stream.resource<*> {
+  // CHECK: %[[PATTERN:.+]] = arith.bitcast %arg0 : bf16 to i16
+  // CHECK: %[[RET:.+]] = stream.async.splat %[[PATTERN]] : i16 -> !stream.resource<*>{%arg2}
+  %0 = stream.tensor.splat %arg0 : bf16 -> tensor<?x1x10xbf16>{%arg1} in !stream.resource<*>{%arg2}
+  // CHECK: return %[[RET]]
+  return %0 : !stream.resource<*>
+}
+
+// -----
+
+// CHECK-LABEL: @denseTensorSplatF32
+func @denseTensorSplatF32(%arg0: f32, %arg1: index, %arg2: index) -> !stream.resource<*> {
+  // CHECK: %[[PATTERN:.+]] = arith.bitcast %arg0 : f32 to i32
+  // CHECK: %[[RET:.+]] = stream.async.splat %[[PATTERN]] : i32 -> !stream.resource<*>{%arg2}
   %0 = stream.tensor.splat %arg0 : f32 -> tensor<?x1x10xf32>{%arg1} in !stream.resource<*>{%arg2}
+  // CHECK: return %[[RET]]
+  return %0 : !stream.resource<*>
+}
+
+// -----
+
+// CHECK-LABEL: @denseTensorSplatI64
+func @denseTensorSplatI64(%arg0: i64, %arg1: index, %arg2: index) -> !stream.resource<*> {
+  // CHECK: %[[RET:.+]] = stream.builtin.splat.i64 %arg0 : i64 -> !stream.resource<*>{%arg2}
+  %0 = stream.tensor.splat %arg0 : i64 -> tensor<?x1x10xi64>{%arg1} in !stream.resource<*>{%arg2}
   // CHECK: return %[[RET]]
   return %0 : !stream.resource<*>
 }
@@ -61,14 +104,44 @@ func @denseTensorSlice(%arg0: !stream.resource<*>, %arg1: index, %arg2: index, %
 
 // -----
 
-// CHECK-LABEL: @denseTensorFill
-func @denseTensorFill(%arg0: f32, %arg1: !stream.resource<*>, %arg2: index, %arg3: index) -> !stream.resource<*> {
+// CHECK-LABEL: @denseTensorFillF32
+func @denseTensorFillF32(%arg0: f32, %arg1: !stream.resource<*>, %arg2: index, %arg3: index) -> !stream.resource<*> {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
-  // CHECK: %[[OFFSET:.+]] = arith.constant 0 : index
-  // CHECK: %[[LENGTH:.+]] = arith.constant 20 : index
-  // CHECK: %[[RET:.+]] = stream.async.fill %arg0, %arg1[%[[OFFSET]] to %[[LENGTH]] for %[[LENGTH]]] : f32 -> %arg1 as !stream.resource<*>{%arg3}
+  // CHECK-DAG: %[[OFFSET:.+]] = arith.constant 0 : index
+  // CHECK-DAG: %[[LENGTH:.+]] = arith.constant 20 : index
+  // CHECK-DAG: %[[PATTERN:.+]] = arith.bitcast %arg0 : f32 to i32
+  // CHECK: %[[RET:.+]] = stream.async.fill %[[PATTERN]], %arg1[%[[OFFSET]] to %[[LENGTH]] for %[[LENGTH]]] : i32 -> %arg1 as !stream.resource<*>{%arg3}
   %0 = stream.tensor.fill %arg0, %arg1[%c0, %c0 for %c1, %c1] : f32 -> tensor<?x4xf32>{%arg2} in %arg1 as !stream.resource<*>{%arg3}
+  // CHECK: return %[[RET]]
+  return %0 : !stream.resource<*>
+}
+
+// -----
+
+// CHECK-LABEL: @denseTensorFillI64
+func @denseTensorFillI64(%arg0: i64, %arg1: !stream.resource<*>, %arg2: index, %arg3: index) -> !stream.resource<*> {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  // CHECK-DAG: %[[OFFSET:.+]] = arith.constant 0 : index
+  // CHECK-DAG: %[[LENGTH:.+]] = arith.constant 40 : index
+  // CHECK: %[[RET:.+]] = stream.builtin.fill.i64 %arg0, %arg1[%[[OFFSET]] to %[[LENGTH]] for %[[LENGTH]]] : i64 -> %arg1 as !stream.resource<*>{%arg3}
+  %0 = stream.tensor.fill %arg0, %arg1[%c0, %c0 for %c1, %c1] : i64 -> tensor<?x4xi64>{%arg2} in %arg1 as !stream.resource<*>{%arg3}
+  // CHECK: return %[[RET]]
+  return %0 : !stream.resource<*>
+}
+
+// -----
+
+// CHECK-LABEL: @denseTensorFillF64
+func @denseTensorFillF64(%arg0: f64, %arg1: !stream.resource<*>, %arg2: index, %arg3: index) -> !stream.resource<*> {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  // CHECK-DAG: %[[OFFSET:.+]] = arith.constant 0 : index
+  // CHECK-DAG: %[[LENGTH:.+]] = arith.constant 40 : index
+  // CHECK-DAG: %[[PATTERN:.+]] = arith.bitcast %arg0 : f64 to i64
+  // CHECK: %[[RET:.+]] = stream.builtin.fill.i64 %[[PATTERN]], %arg1[%[[OFFSET]] to %[[LENGTH]] for %[[LENGTH]]] : i64 -> %arg1 as !stream.resource<*>{%arg3}
+  %0 = stream.tensor.fill %arg0, %arg1[%c0, %c0 for %c1, %c1] : f64 -> tensor<?x4xi64>{%arg2} in %arg1 as !stream.resource<*>{%arg3}
   // CHECK: return %[[RET]]
   return %0 : !stream.resource<*>
 }

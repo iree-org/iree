@@ -247,6 +247,56 @@ def IREELinalgExt_FftOp : IREELinalgExt_Op<"fft", [
   }];
 }
 
+def IREELinalgExt_ScanOp : IREELinalgExt_Op<"scan",
+    [DeclareOpInterfaceMethods<TiledOpInterface,
+      ["getPartitionableLoops", "generateScalarImplementation",
+       "getTiledImplementation"]>]> {
+  let summary = "Scan operator";
+  let description = [{
+    Computes the inclusive/exclusive scan along a given dimension.
+  }];
+
+  let arguments = (ins Variadic<AnyShaped>:$inputs,
+                       Variadic<AnyShaped>:$outputs,
+                       AnyType:$identity,
+                       I64Attr:$dimension,
+                       BoolAttr:$inclusive
+  );
+
+  let builders = [
+    OpBuilder<(ins "ValueRange":$inputs, "ValueRange":$outputs,
+      "Value":$identity, CArg<"int64_t", "0">:$dimension,
+      CArg<"bool", "true">:$inclusive)>
+  ];
+
+  let results = (outs Variadic<AnyRankedTensor>:$results);
+  let regions = (region AnyRegion:$region);
+  let assemblyFormat = [{
+    `dimension` `(` $dimension `)`
+    `inclusive` `(` $inclusive `)`
+    attr-dict
+    `identity` `(` $identity `:` type($identity) `)`
+    `ins` `(` $inputs `:` type($inputs) `)`
+    (`outs` `(` $outputs^ `:` type($outputs) `)`)?
+    $region (`->` type($results)^)?
+  }];
+
+  let extraClassDeclaration = extraLinalgExtOpClassDeclaration # [{
+    Value input() {
+      return getInputOperand(0)->get();
+    }
+    Value output() {
+      return getOutputOperand(0)->get();
+    }
+    ShapedType getOperandType() {
+      return input().getType().cast<ShapedType>();
+    }
+    int64_t getOperandRank() {
+      return getOperandType().getRank();
+    }
+  }];
+}
+
 def IREELinalgExt_ReverseOp : IREELinalgExt_Op<"reverse", [
   DeclareOpInterfaceMethods<
       TiledOpInterface,

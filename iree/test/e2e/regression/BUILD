@@ -36,6 +36,7 @@ iree_lit_test_suite(
     name = "lit",
     srcs = enforce_glob(
         [
+            "fill_i64.mlir",
             "globals.mlir",
             "libm_linking.mlir",
             "scalar.mlir",

@@ -18,7 +18,13 @@
 
 // Force using CUDA streams until we support command buffer caching to avoid the
 // overhead of graph creation.
-IREE_FLAG(bool, cuda_use_streams, true, "Force to use cuda streams");
+IREE_FLAG(
+    bool, cuda_use_streams, true,
+    "Use CUDA streams for executing command buffers (instead of graphs).");
+
+IREE_FLAG(bool, cuda_allow_inline_execution, false,
+          "Allow command buffers to execute inline against CUDA streams when "
+          "possible.");
 
 static iree_status_t iree_hal_cuda_driver_factory_enumerate(
     void* self, const iree_hal_driver_info_t** out_driver_infos,
@@ -53,6 +59,7 @@ static iree_status_t iree_hal_cuda_driver_factory_try_create(
     default_params.command_buffer_mode =
         IREE_HAL_CUDA_COMMAND_BUFFER_MODE_STREAM;
   }
+  default_params.allow_inline_execution = FLAG_cuda_allow_inline_execution;
 
   iree_hal_cuda_driver_options_t driver_options;
   iree_hal_cuda_driver_options_initialize(&driver_options);

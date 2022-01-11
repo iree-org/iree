@@ -349,6 +349,7 @@ def HAL_HostSizeAttr : Util_IndexAttrBase<"size_t">;
 def HAL_TimelineValue : TypeAlias<Index>;
 
 def HAL_PrimitiveType : AnyTypeOf<[Index, AnySignlessInteger, AnyFloat]>;
+def HAL_FillPatternType : AnyTypeOf<[I8, I16, I32]>;
 
 def HAL_GlobalRefAttr : AliasedSymbolRefAttr;
 def HAL_GlobalType : AnyTypeOf<[HAL_PrimitiveType, AnyVector, HAL_ObjectType]>;

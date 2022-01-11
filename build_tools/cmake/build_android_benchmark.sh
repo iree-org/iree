@@ -39,7 +39,7 @@ BAZEL_CMD=(bazel --noworkspace_rc --bazelrc=build_tools/bazel/iree-tf.bazelrc)
 BAZEL_BINDIR="$(${BAZEL_CMD[@]} info bazel-bin)"
 "${BAZEL_CMD[@]}" build //iree_tf_compiler:iree-import-tflite \
       --config=generic_clang \
-      --config=remote_cache_tf_integrations
+      --config=remote_cache_bazel_ci
 
 # --------------------------------------------------------------------------- #
 # Build for the host.

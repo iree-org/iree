@@ -32,7 +32,14 @@ llvm::StringMap<IREE::HAL::ExecutableEntryPointOp> getAllEntryPoints(
 /// Returns the entry point op for the `funcOp`. Returns `nullptr` on failure.
 IREE::HAL::ExecutableEntryPointOp getEntryPoint(FuncOp funcOp);
 
-bool isVMVXBackend(IREE::HAL::ExecutableVariantOp variantOp);
+inline bool isVMVXBackend(IREE::HAL::ExecutableVariantOp variantOp) {
+  return variantOp.target().getBackend().getValue() == "vmvx";
+}
+inline bool isVMVXBackend(FuncOp entryPointFn) {
+  auto variantOp =
+      entryPointFn->getParentOfType<IREE::HAL::ExecutableVariantOp>();
+  return isVMVXBackend(variantOp);
+}
 
 //===----------------------------------------------------------------------===//
 // Utility functions to get untiled op shapes

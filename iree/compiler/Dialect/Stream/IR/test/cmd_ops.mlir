@@ -21,10 +21,10 @@ func @cmdMemoryControl(%arg0: !stream.resource<transient>, %arg1: index) -> !str
 func @cmdFill(%arg0: !stream.resource<transient>, %arg1: index) -> !stream.timepoint {
   %c0 = arith.constant 0 : index
   %c128 = arith.constant 128 : index
-  %cst = arith.constant 4.2 : f32
+  %c255_i32 = arith.constant 255 : i32
   %0 = stream.cmd.execute with(%arg0 as %arg2: !stream.resource<transient>{%arg1}) {
-    // CHECK: stream.cmd.fill %cst, %arg2[%c0 for %c128] : f32 -> !stream.resource<transient>{%arg1}
-    stream.cmd.fill %cst, %arg2[%c0 for %c128] : f32 -> !stream.resource<transient>{%arg1}
+    // CHECK: stream.cmd.fill %c255_i32, %arg2[%c0 for %c128] : i32 -> !stream.resource<transient>{%arg1}
+    stream.cmd.fill %c255_i32, %arg2[%c0 for %c128] : i32 -> !stream.resource<transient>{%arg1}
   } => !stream.timepoint
   return %0 : !stream.timepoint
 }

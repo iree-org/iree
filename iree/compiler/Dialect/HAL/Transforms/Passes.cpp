@@ -55,17 +55,17 @@ static void addCleanupPatterns(OpPassManager &passManager) {
   passManager.addPass(mlir::createCanonicalizerPass());
   passManager.addPass(mlir::createCSEPass());
 
-  // Cleanup and canonicalization of util.global (and other util ops).
-  passManager.addPass(IREE::Util::createApplyPatternsPass());
-  passManager.addPass(IREE::Util::createFoldGlobalsPass());
-  passManager.addPass(IREE::Util::createFuseGlobalsPass());
-
   // Simplify util.global accesses; this can help with data flow tracking as
   // redundant store-loads are removed.
   passManager.addNestedPass<IREE::Util::InitializerOp>(
       IREE::Util::createSimplifyGlobalAccessesPass());
   passManager.addNestedPass<mlir::FuncOp>(
       IREE::Util::createSimplifyGlobalAccessesPass());
+
+  // Cleanup and canonicalization of util.global (and other util ops).
+  passManager.addPass(IREE::Util::createApplyPatternsPass());
+  passManager.addPass(IREE::Util::createFoldGlobalsPass());
+  passManager.addPass(IREE::Util::createFuseGlobalsPass());
 }
 
 void buildHALTransformPassPipeline(OpPassManager &passManager,
@@ -94,6 +94,20 @@ void buildHALTransformPassPipeline(OpPassManager &passManager,
     passManager.addPass(createAssignTargetDevicesPass(targetOptions.targets));
   }
   passManager.addPass(createVerifyTargetEnvironmentPass());
+
+  // Pack dispatch operands on stream.executable into i32 values.
+  // We do this prior to materializing interfaces so we can easily add/remove
+  // operands. By not doing this afterward on hal ops we can have stronger
+  // type verification. Though we're manipulating stream ops we need to use our
+  // target information we only have after device assignment to know what data
+  // types are supported and how many push constants we can use.
+  //
+  // TODO(benvanik): re-evaluate moving this up in to streams and making the
+  // requirements universal. It's a leak of HAL behavior (i32 push constants)
+  // but would fit better up in there. We need to re-evaluate once there are
+  // multiple devices with different data type support or host/device index
+  // width mismatches.
+  passManager.addPass(createPackDispatchOperandsPass());
 
   // TODO(benvanik): when we spill push constants spill to staging buffers. But
   // maybe up in stream first? Need to know push constant limit but that could

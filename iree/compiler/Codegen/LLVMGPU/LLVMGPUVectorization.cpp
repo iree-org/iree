@@ -27,12 +27,14 @@ namespace iree_compiler {
 //====---------------------------------------------------------------------===//
 
 static void populateVectorizationPatterns(RewritePatternSet &patterns) {
-  linalg::insertVectorizationPatterns<linalg::FillOp, linalg::CopyOp,
-                                      linalg::GenericOp,
-                                      linalg::ContractionOpInterface>(
-      patterns, linalg::LinalgVectorizationOptions(),
-      linalg::LinalgTransformationFilter(
-          Identifier::get(getVectorizeMarker(), patterns.getContext())));
+  MLIRContext *ctx = patterns.getContext();
+  linalg::LinalgVectorizationOptions opt;
+  linalg::LinalgTransformationFilter f(
+      Identifier::get(getVectorizeMarker(), ctx));
+  linalg::VectorizationPatterns<linalg::FillOp, linalg::CopyOp,
+                                linalg::GenericOp>::insert(patterns, opt, f);
+  patterns.add<linalg::LinalgVectorizationPattern>(
+      ctx, f.addOpFilter<linalg::ContractionOpInterface>(), opt);
   vector::populateVectorTransferPermutationMapLoweringPatterns(patterns);
   vector::populateVectorReductionToContractPatterns(patterns);
 }

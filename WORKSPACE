@@ -59,28 +59,3 @@ maybe(
 load("//build_tools/bazel:workspace.bzl", "configure_iree_submodule_deps")
 
 configure_iree_submodule_deps()
-
-###############################################################################
-# bazel toolchains rules for remote execution (https://releases.bazel.build/bazel-toolchains.html).
-http_archive(
-    name = "bazel_toolchains",
-    sha256 = "8c9728dc1bb3e8356b344088dfd10038984be74e1c8d6e92dbb05f21cabbb8e4",
-    strip_prefix = "bazel-toolchains-3.7.1",
-    urls = [
-        "https://github.com/bazelbuild/bazel-toolchains/releases/download/3.7.1/bazel-toolchains-3.7.1.tar.gz",
-        "https://mirror.bazel.build/github.com/bazelbuild/bazel-toolchains/releases/download/3.7.1/bazel-toolchains-3.7.1.tar.gz",
-    ],
-)
-
-load("@bazel_toolchains//rules:rbe_repo.bzl", "rbe_autoconfig")
-
-rbe_autoconfig(
-    name = "rbe_default",
-    base_container_digest = "sha256:1a8ed713f40267bb51fe17de012fa631a20c52df818ccb317aaed2ee068dfc61",
-    digest = "sha256:8978b32e52cfb9decba4ca41469728776d344d44904abd17950a90cac3f7bcde",
-    registry = "gcr.io",
-    repository = "iree-oss/rbe-toolchain",
-    use_checked_in_confs = "Force",
-)
-
-###############################################################################

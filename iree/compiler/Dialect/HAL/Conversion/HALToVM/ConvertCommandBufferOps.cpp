@@ -50,10 +50,6 @@ class CommandBufferFillBufferOpConversion
     auto patternLengthConst = rewriter.createOrFold<mlir::arith::ConstantIntOp>(
         op.getLoc(), patternLengthBytes, 32);
     Value pattern = op.pattern();
-    if (originalPatternType.isa<FloatType>()) {
-      pattern = rewriter.createOrFold<arith::BitcastOp>(
-          op.getLoc(), rewriter.getIntegerType(patternBitWidth), pattern);
-    }
     if (patternBitWidth < 32) {
       pattern = rewriter.createOrFold<arith::ExtUIOp>(
           op.getLoc(), pattern, rewriter.getIntegerType(32));

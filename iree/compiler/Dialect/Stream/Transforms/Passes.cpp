@@ -27,17 +27,17 @@ static void addCleanupPatterns(OpPassManager &passManager) {
   passManager.addPass(mlir::createCanonicalizerPass());
   passManager.addPass(mlir::createCSEPass());
 
-  // Cleanup and canonicalization of util.global (and other util ops).
-  passManager.addPass(IREE::Util::createApplyPatternsPass());
-  passManager.addPass(IREE::Util::createFoldGlobalsPass());
-  passManager.addPass(IREE::Util::createFuseGlobalsPass());
-
   // Simplify util.global accesses; this can help with data flow tracking as
   // redundant store-loads are removed.
   passManager.addNestedPass<IREE::Util::InitializerOp>(
       IREE::Util::createSimplifyGlobalAccessesPass());
   passManager.addNestedPass<mlir::FuncOp>(
       IREE::Util::createSimplifyGlobalAccessesPass());
+
+  // Cleanup and canonicalization of util.global (and other util ops).
+  passManager.addPass(IREE::Util::createApplyPatternsPass());
+  passManager.addPass(IREE::Util::createFoldGlobalsPass());
+  passManager.addPass(IREE::Util::createFuseGlobalsPass());
 }
 
 //===----------------------------------------------------------------------===//
@@ -111,6 +111,10 @@ void buildStreamAsyncPassPipeline(OpPassManager &passManager,
       IREE::Stream::createEncodeTensorsPass());
   passManager.addNestedPass<mlir::FuncOp>(
       IREE::Stream::createEncodeTensorsPass());
+
+  // Expand builtins to dispatches. This may introduce new executables.
+  passManager.addPass(IREE::Stream::createMaterializeBuiltinsPass());
+
   addCleanupPatterns(passManager);
 
   // Materialize copy-on-write behavior with explicit stream.async.* ops.

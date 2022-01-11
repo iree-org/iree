@@ -8,6 +8,7 @@
 #include "iree/compiler/Codegen/Sandbox/PassDetail.h"
 #include "iree/compiler/Codegen/Sandbox/Passes.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
+#include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Passes.h"
@@ -21,6 +22,8 @@
 
 using namespace mlir;
 using namespace mlir::linalg;
+
+#define DEBUG_TYPE "iree-linalg-tensor-codegen-driver"
 
 //===----------------------------------------------------------------------===//
 // IREE specific functions
@@ -232,6 +235,7 @@ void LinalgSingleTilingExpertPass::runOnOperation() {
 }
 
 void LinalgVectorLoweringPass::runOnOperation() {
+  LLVM_DEBUG(llvm::dbgs() << "\n ---- Stage : " << vectorLoweringStage;);
   vector::VectorTransposeLowering vectorTransposeLowering =
       llvm::StringSwitch<vector::VectorTransposeLowering>(
           lowerVectorTransposeTo.getValue())

@@ -69,8 +69,8 @@ static void populateTilingCopyToWorkgroupMemPatterns(
           .setLoopType(linalg::LinalgTilingLoopType::Loops)
           .setTileSizeComputationFunction(wgCopyTileSizeFn)
           .setDistributionOptions(copyInvocationDistributionOptions);
-  patterns.insert<linalg::LinalgTilingPattern<linalg::CopyOp>>(
-      patterns.getContext(), tilingOptions,
+  patterns.insert<linalg::LinalgTilingPattern>(
+      linalg::CopyOp::getOperationName(), patterns.getContext(), tilingOptions,
       linalg::LinalgTransformationFilter(
           {Identifier::get(getCopyToWorkgroupMemoryMarker(),
                            patterns.getContext())},
@@ -78,7 +78,7 @@ static void populateTilingCopyToWorkgroupMemPatterns(
 }
 
 static void populateVectorizationPatterns(RewritePatternSet &patterns) {
-  linalg::insertVectorizationPatterns<linalg::CopyOp>(
+  linalg::VectorizationPatterns<linalg::CopyOp>::insert(
       patterns, linalg::LinalgVectorizationOptions(),
       linalg::LinalgTransformationFilter(Identifier::get(
           getCopyToWorkgroupMemoryMarker(), patterns.getContext())));

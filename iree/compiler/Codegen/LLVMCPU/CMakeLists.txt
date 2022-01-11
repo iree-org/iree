@@ -63,6 +63,7 @@ iree_cc_library(
     iree::compiler::Codegen::Common
     iree::compiler::Codegen::Dialect::IREECodegenDialect
     iree::compiler::Codegen::PassHeaders
+    iree::compiler::Codegen::Sandbox
     iree::compiler::Codegen::Transforms
     iree::compiler::Codegen::Utils
     iree::compiler::Dialect::Flow::IR

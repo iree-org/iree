@@ -134,11 +134,9 @@ static void populateTilingToSubgroupPatterns(ArrayRef<int64_t> subgroupCounts,
 
   auto filter = linalg::LinalgTransformationFilter(
       ArrayRef<Identifier>{}, Identifier::get(getVectorizeMarker(), context));
-
-  patterns.insert<linalg::LinalgTilingPattern<linalg::FillOp>,
-                  linalg::LinalgTilingPattern<linalg::MatmulOp>,
-                  linalg::LinalgTilingPattern<linalg::GenericOp>>(
-      context, tilingOptions, filter);
+  linalg::TilingPatterns<linalg::FillOp, linalg::MatmulOp,
+                         linalg::GenericOp>::insert(patterns, tilingOptions,
+                                                    filter);
 }
 
 //===----------------------------------------------------------------------===//
@@ -148,11 +146,13 @@ static void populateTilingToSubgroupPatterns(ArrayRef<int64_t> subgroupCounts,
 /// Adds patterns to vectorize Linalg ops with vectorization markers.
 void populateVectorizationPatterns(MLIRContext *context,
                                    RewritePatternSet &patterns) {
-  linalg::insertVectorizationPatterns<linalg::ContractionOpInterface,
-                                      linalg::FillOp, linalg::GenericOp>(
-      patterns, linalg::LinalgVectorizationOptions(),
-      linalg::LinalgTransformationFilter(
-          Identifier::get(getVectorizeMarker(), context)));
+  linalg::LinalgVectorizationOptions opt;
+  linalg::LinalgTransformationFilter f(
+      Identifier::get(getVectorizeMarker(), context));
+  linalg::VectorizationPatterns<linalg::FillOp, linalg::GenericOp>::insert(
+      patterns, opt, f);
+  patterns.add<linalg::LinalgVectorizationPattern>(
+      context, f.addOpFilter<linalg::ContractionOpInterface>(), opt);
   vector::populateVectorTransferPermutationMapLoweringPatterns(patterns);
   vector::populateVectorReductionToContractPatterns(patterns);
 }

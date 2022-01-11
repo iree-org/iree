@@ -297,7 +297,7 @@ void SPIRVCopyToWorkgroupMemoryPass::tileAndVectorizeLinalgCopy(
 
   // 3. Vectorize the tiled linalg to be able to map it to load/store vector.
   OwningRewritePatternList vectorizationPatterns(&getContext());
-  linalg::insertVectorizationPatterns<linalg::CopyOp>(
+  linalg::VectorizationPatterns<linalg::CopyOp>::insert(
       vectorizationPatterns, linalg::LinalgVectorizationOptions(),
       linalg::LinalgTransformationFilter(
           Identifier::get(getVectorizeMarker(), context), {}));

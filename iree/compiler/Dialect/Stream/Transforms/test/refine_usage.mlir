@@ -35,10 +35,10 @@ func @propagateFuncCaller(%size: index) -> !stream.resource<*> {
 
 // CHECK-LABEL: @transitionTypesAcrossTies
 func @transitionTypesAcrossTies() -> !hal.buffer_view {
-  %cst = arith.constant 1.0 : f32
   %c4 = arith.constant 4 : index
+  %c255_i32 = arith.constant 255 : i32
   // CHECK: %[[SPLAT:.+]] = stream.async.splat {{.+}} -> !stream.resource<external>
-  %0 = stream.async.splat %cst : f32 -> !stream.resource<*>{%c4}
+  %0 = stream.async.splat %c255_i32 : i32 -> !stream.resource<*>{%c4}
   // CHECK-NOT: stream.async.transfer
   %1 = stream.async.transfer %0 : !stream.resource<*>{%c4} -> !stream.resource<external>{%c4}
   // CHECK: stream.tensor.export %[[SPLAT]] : tensor<f32> in !stream.resource<external>{%c4} -> !hal.buffer_view

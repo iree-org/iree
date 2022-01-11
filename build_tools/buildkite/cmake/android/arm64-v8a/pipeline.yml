@@ -8,7 +8,7 @@ steps:
   - label: "build"
     commands:
       - "./scripts/git/submodule_versions.py init"
-      - "docker run --user=$(id -u):$(id -g) --volume=\\$PWD:\\$IREE_DOCKER_WORKDIR --workdir=\\$IREE_DOCKER_WORKDIR --rm gcr.io/iree-oss/android@sha256:58adb4131cfc7b08cd5767c577420f3479ca2f46bb67d9fac6c0797984627758 build_tools/cmake/build_android.sh arm64-v8a"
+      - "docker run --user=$(id -u):$(id -g) --volume=\\$PWD:\\$IREE_DOCKER_WORKDIR --workdir=\\$IREE_DOCKER_WORKDIR --rm gcr.io/iree-oss/android@sha256:112598cea3ff71c33f131772edea78eee5aceff5914874142229859017fd4869 build_tools/cmake/build_android.sh arm64-v8a"
       - "tar --exclude='*.o' --exclude='*.a' -czvf build-artifacts.tgz build-android"
     agents:
       - "queue=build"
@@ -18,15 +18,16 @@ steps:
 
   - wait
 
-  - label: "test on Galaxy S20 (exynos-990, mali-g77)"
+  - label: "test on Pixel 6 (google-tensor, mali-g78)"
     commands:
+      - "git clean -fdx"
       - "buildkite-agent artifact download --step build build-artifacts.tgz ./"
       - "tar xzf build-artifacts.tgz"
       - "find build-android/ -name '*.cmake' -exec sed -i \"s!\\$IREE_DOCKER_WORKDIR/!\\$PWD/!g\" {} \\;"
       - "cd build-android/"
       - "ctest --timeout 900 --output-on-failure"
     agents:
-      - "android-soc=exynos-990"
+      - "android-soc=google-tensor"
       - "queue=test-android"
     env:
       IREE_DOCKER_WORKDIR: "/usr/src/github/iree"
@@ -34,6 +35,7 @@ steps:
 
   - label: "test on Galaxy S10 (exynos-9820, mali-g76)"
     commands:
+      - "git clean -fdx"
       - "buildkite-agent artifact download --step build build-artifacts.tgz ./"
       - "tar xzf build-artifacts.tgz"
       - "find build-android/ -name '*.cmake' -exec sed -i \"s!\\$IREE_DOCKER_WORKDIR/!\\$PWD/!g\" {} \\;"
@@ -48,6 +50,7 @@ steps:
 
   - label: "test on Pixel 4 (snapdragon-855, adreno-640)"
     commands:
+      - "git clean -fdx"
       - "buildkite-agent artifact download --step build build-artifacts.tgz ./"
       - "tar xzf build-artifacts.tgz"
       - "find build-android/ -name '*.cmake' -exec sed -i \"s!\\$IREE_DOCKER_WORKDIR/!\\$PWD/!g\" {} \\;"

@@ -589,7 +589,7 @@ static Attribute constFoldBinaryOp(ArrayRef<Attribute> operands,
   assert(operands.size() == 2 && "binary op takes two operands");
   if (auto lhs = operands[0].dyn_cast_or_null<AttrElementT>()) {
     auto rhs = operands[1].dyn_cast_or_null<AttrElementT>();
-    if (!rhs || lhs.getType() != rhs.getType()) return {};
+    if (!rhs) return {};
     return AttrElementT::get(lhs.getType(),
                              calculate(lhs.getValue(), rhs.getValue()));
   } else if (auto lhs = operands[0].dyn_cast_or_null<SplatElementsAttr>()) {

@@ -18,6 +18,7 @@ iree_cc_library(
     "FlatbufferUtils.h"
     "GraphUtils.h"
     "IndexSet.h"
+    "ModuleUtils.h"
     "OptionUtils.h"
     "PassUtils.h"
     "PatternUtils.h"
@@ -26,6 +27,7 @@ iree_cc_library(
     "ConversionUtils.cpp"
     "FlatbufferUtils.cpp"
     "GraphUtils.cpp"
+    "ModuleUtils.cpp"
     "OptionUtils.cpp"
     "PassUtils.cpp"
     "TracingUtils.cpp"
@@ -33,6 +35,7 @@ iree_cc_library(
     LLVMSupport
     MLIRArithmetic
     MLIRIR
+    MLIRParser
     MLIRPass
     MLIRStandard
     MLIRSupport

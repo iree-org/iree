@@ -12,7 +12,7 @@ func @partitioningForMinPeakMemory(%arg0: !stream.resource<external>, %arg1: !st
   %c20 = arith.constant 20 : index
   %c80 = arith.constant 80 : index
   %c1280 = arith.constant 1280 : index
-  %cst = arith.constant 0x7F800000 : f32
+  %c255_i32 = arith.constant 255 : i32
   // CHECK: stream.async.execute
   %results, %result_timepoint = stream.async.execute
       // CHECK-SAME: with(%[[ARG1]] as %[[ARG1_CAPTURE:.+]]: !stream.resource<external>{%c80},
@@ -21,8 +21,8 @@ func @partitioningForMinPeakMemory(%arg0: !stream.resource<external>, %arg1: !st
            %arg0 as %arg3: !stream.resource<external>{%c20})
       -> !stream.resource<external>{%c20} {
 
-    // CHECK: %[[SPLAT0:.+]] = stream.async.splat %cst : f32 -> !stream.resource<transient>{%c1280}
-    %1 = stream.async.splat %cst : f32 -> !stream.resource<transient>{%c1280}
+    // CHECK: %[[SPLAT0:.+]] = stream.async.splat %c255_i32 : i32 -> !stream.resource<transient>{%c1280}
+    %1 = stream.async.splat %c255_i32 : i32 -> !stream.resource<transient>{%c1280}
 
     // CHECK: %[[CON0:.+]]:2 = stream.async.concurrent
     // CHECK-SAME: with(%[[SPLAT0]] as %[[SPLAT0_CAPTURE:.+]]: !stream.resource<transient>{%c1280},
@@ -30,8 +30,8 @@ func @partitioningForMinPeakMemory(%arg0: !stream.resource<external>, %arg1: !st
     // CHECK-SAME: -> (!stream.resource<transient>{%c1280}, !stream.resource<transient>{%c20}) {
     // CHECK-NEXT: %[[DISPATCH0:.+]] = stream.async.dispatch @ex::@dispatch_0[%c1, %c1, %c1](%[[SPLAT0_CAPTURE]], %[[ARG1_CON0_CAPTURE]])
     %2 = stream.async.dispatch @ex::@dispatch_0[%c1, %c1, %c1](%1, %arg2) : (!stream.resource<transient>{%c1280}, !stream.resource<external>{%c80}) -> %1{%c1280}
-    // CHECK-NEXT: %[[SPLAT1:.+]] = stream.async.splat %cst : f32 -> !stream.resource<transient>{%c20}
-    %3 = stream.async.splat %cst : f32 -> !stream.resource<transient>{%c20}
+    // CHECK-NEXT: %[[SPLAT1:.+]] = stream.async.splat %c255_i32 : i32 -> !stream.resource<transient>{%c20}
+    %3 = stream.async.splat %c255_i32 : i32 -> !stream.resource<transient>{%c20}
     // CHECK-NEXT: stream.yield %[[DISPATCH0]], %[[SPLAT1]] : !stream.resource<transient>{%c1280}, !stream.resource<transient>{%c20}
 
     // CHECK: %[[DISPATCH1:.+]] = stream.async.dispatch @ex::@dispatch_1[%c1, %c1, %c1](%[[ARG0_CAPTURE]], %[[CON0]]#1)
@@ -60,7 +60,7 @@ func @partitioningForMaxConcurrency(%arg0: !stream.resource<external>, %arg1: !s
   %c20 = arith.constant 20 : index
   %c80 = arith.constant 80 : index
   %c1280 = arith.constant 1280 : index
-  %cst = arith.constant 0x7F800000 : f32
+  %c255_i32 = arith.constant 255 : i32
   // CHECK: stream.async.execute
   %results, %result_timepoint = stream.async.execute
       // CHECK-SAME: with(%[[ARG1]] as %[[ARG1_CAPTURE:.+]]: !stream.resource<external>{%c80},
@@ -71,8 +71,8 @@ func @partitioningForMaxConcurrency(%arg0: !stream.resource<external>, %arg1: !s
 
     // CHECK: %[[CON0:.+]]:2 = stream.async.concurrent with()
     // CHECK-SAME: -> (!stream.resource<transient>{%c1280}, !stream.resource<transient>{%c20}) {
-    // CHECK-NEXT: %[[SPLAT0:.+]] = stream.async.splat %cst : f32 -> !stream.resource<transient>{%c1280}
-    // CHECK-NEXT: %[[SPLAT1:.+]] = stream.async.splat %cst : f32 -> !stream.resource<transient>{%c20}
+    // CHECK-NEXT: %[[SPLAT0:.+]] = stream.async.splat %c255_i32 : i32 -> !stream.resource<transient>{%c1280}
+    // CHECK-NEXT: %[[SPLAT1:.+]] = stream.async.splat %c255_i32 : i32 -> !stream.resource<transient>{%c20}
     // CHECK-NEXT: stream.yield %[[SPLAT0]], %[[SPLAT1]] : !stream.resource<transient>{%c1280}, !stream.resource<transient>{%c20}
 
     // CHECK: %[[CON1:.+]]:2 = stream.async.concurrent
@@ -88,9 +88,9 @@ func @partitioningForMaxConcurrency(%arg0: !stream.resource<external>, %arg1: !s
     // CHECK: %[[DISPATCH2:.+]] = stream.async.dispatch @ex::@dispatch_2[%c1, %c1, %c1](%[[CON1]]#0, %[[CON1]]#1)
     // CHECK-NEXT: stream.yield %[[DISPATCH2]]
 
-    %1 = stream.async.splat %cst : f32 -> !stream.resource<transient>{%c1280}
+    %1 = stream.async.splat %c255_i32 : i32 -> !stream.resource<transient>{%c1280}
     %2 = stream.async.dispatch @ex::@dispatch_0[%c1, %c1, %c1](%1, %arg2) : (!stream.resource<transient>{%c1280}, !stream.resource<external>{%c80}) -> %1{%c1280}
-    %3 = stream.async.splat %cst : f32 -> !stream.resource<transient>{%c20}
+    %3 = stream.async.splat %c255_i32 : i32 -> !stream.resource<transient>{%c20}
     %4 = stream.async.dispatch @ex::@dispatch_1[%c1, %c1, %c1](%arg3, %3) : (!stream.resource<external>{%c20}, !stream.resource<transient>{%c20}) -> %3{%c20}
     %5 = stream.async.dispatch @ex::@dispatch_2[%c1, %c1, %c1](%2, %4) : (!stream.resource<transient>{%c1280}, !stream.resource<transient>{%c20}) -> !stream.resource<external>{%c20}
     stream.yield %5 : !stream.resource<external>{%c20}

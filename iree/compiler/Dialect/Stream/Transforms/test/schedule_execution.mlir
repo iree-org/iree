@@ -9,17 +9,17 @@ func @partitioning(%arg0: !stream.resource<external>, %arg1: !stream.resource<ex
   %c20 = arith.constant 20 : index
   %c80 = arith.constant 80 : index
   %c1280 = arith.constant 1280 : index
-  %cst = arith.constant 0x7F800000 : f32
+  %c255_i32 = arith.constant 255 : i32
   // CHECK: %[[RESULT:.+]], %[[TIMEPOINT:.+]] = stream.async.execute
   // CHECK-SAME: with(%[[ARG1]] as %[[ARG1_CAPTURE:.+]]: !stream.resource<external>{%c80},
   // CHECK-SAME:      %[[ARG0]] as %[[ARG0_CAPTURE:.+]]: !stream.resource<external>{%c20})
   // CHECK-SAME: -> !stream.resource<external>{%c20} {
   // CHECK-NEXT: %[[SPLAT0:.+]] = stream.async.splat
-  %2 = stream.async.splat %cst : f32 -> !stream.resource<transient>{%c1280}
+  %2 = stream.async.splat %c255_i32 : i32 -> !stream.resource<transient>{%c1280}
   // CHECK-NEXT: %[[DISPATCH0:.+]] = stream.async.dispatch @ex::@dispatch_0[%c1, %c1, %c1](%[[SPLAT0]], %[[ARG1_CAPTURE]]) : (!stream.resource<transient>{%c1280}, !stream.resource<external>{%c80}) -> %[[SPLAT0]]{%c1280}
   %3 = stream.async.dispatch @ex::@dispatch_0[%c1, %c1, %c1](%2, %arg1) : (!stream.resource<transient>{%c1280}, !stream.resource<external>{%c80}) -> %2{%c1280}
   // CHECK-NEXT: %[[SPLAT1:.+]] = stream.async.splat
-  %4 = stream.async.splat %cst : f32 -> !stream.resource<transient>{%c20}
+  %4 = stream.async.splat %c255_i32 : i32 -> !stream.resource<transient>{%c20}
   // CHECK-NEXT: %[[DISPATCH1:.+]] = stream.async.dispatch @ex::@dispatch_1[%c1, %c1, %c1](%[[ARG0_CAPTURE]], %[[SPLAT1]]) : (!stream.resource<external>{%c20}, !stream.resource<transient>{%c20}) -> %[[SPLAT1]]{%c20}
   %5 = stream.async.dispatch @ex::@dispatch_1[%c1, %c1, %c1](%arg0, %4) : (!stream.resource<external>{%c20}, !stream.resource<transient>{%c20}) -> %4{%c20}
   // CHECK-NEXT: %[[DISPATCH2:.+]] = stream.async.dispatch @ex::@dispatch_2[%c1, %c1, %c1](%[[DISPATCH0]], %[[DISPATCH1]]) : (!stream.resource<transient>{%c1280}, !stream.resource<transient>{%c20}) -> !stream.resource<external>{%c20}
@@ -41,10 +41,10 @@ func @partitioning(%arg0: !stream.resource<external>, %arg1: !stream.resource<ex
 func @partitionWithinBlocks(%cond: i1) -> !stream.resource<transient> {
   %c1 = arith.constant 1 : index
   %c1280 = arith.constant 1280 : index
-  %cst = arith.constant 0x7F800000 : f32
+  %c255_i32 = arith.constant 255 : i32
   // CHECK: %[[SPLAT:.+]], %[[SPLAT_TIMEPOINT:.+]] = stream.async.execute
   // CHECK: stream.async.splat
-  %splat = stream.async.splat %cst : f32 -> !stream.resource<transient>{%c1280}
+  %splat = stream.async.splat %c255_i32 : i32 -> !stream.resource<transient>{%c1280}
   // CHECK: cond_br
   cond_br %cond, ^bb1, ^bb2
 ^bb1:
@@ -113,13 +113,13 @@ func @dontHoistPastAsserts(%arg0: !stream.resource<external>, %arg1: !stream.res
   %c20 = arith.constant 20 : index
   %c80 = arith.constant 80 : index
   %c1280 = arith.constant 1280 : index
-  %cst = arith.constant 0x7F800000 : f32
+  %c255_i32 = arith.constant 255 : i32
   %cond_a = arith.constant 0 : i1
   %cond_b = arith.constant 0 : i1
 
   // CHECK: stream.async.execute
   // CHECK-NEXT: stream.async.splat
-  %2 = stream.async.splat %cst : f32 -> !stream.resource<transient>{%c1280}
+  %2 = stream.async.splat %c255_i32 : i32 -> !stream.resource<transient>{%c1280}
   // CHECK-NEXT: stream.async.dispatch @ex::@dispatch_0
   %3 = stream.async.dispatch @ex::@dispatch_0[%c1, %c1, %c1](%2, %arg1) : (!stream.resource<transient>{%c1280}, !stream.resource<external>{%c80}) -> %2{%c1280}
 
@@ -128,7 +128,7 @@ func @dontHoistPastAsserts(%arg0: !stream.resource<external>, %arg1: !stream.res
 
   // CHECK: stream.async.execute
   // CHECK-NEXT: stream.async.splat
-  %4 = stream.async.splat %cst : f32 -> !stream.resource<transient>{%c20}
+  %4 = stream.async.splat %c255_i32 : i32 -> !stream.resource<transient>{%c20}
   // CHECK-NEXT: stream.async.dispatch @ex::@dispatch_1
   %5 = stream.async.dispatch @ex::@dispatch_1[%c1, %c1, %c1](%arg0, %4) : (!stream.resource<external>{%c20}, !stream.resource<transient>{%c20}) -> %4{%c20}
 
@@ -191,11 +191,11 @@ func @cloneAcrossPartitions(%cond: i1) -> (!stream.resource<external>) {
 func @deviceHostDeviceCrossing(%arg0: i1) -> !stream.resource<transient> {
   %c1 = arith.constant 1 : index
   %c128 = arith.constant 128 : index
-  %cst = arith.constant 0xFF800000 : f32
+  %c255_i32 = arith.constant 255 : i32
 
   // CHECK: stream.async.execute
   // CHECK-NEXT: stream.async.splat
-  %0 = stream.async.splat %cst : f32 -> !stream.resource<transient>{%c128}
+  %0 = stream.async.splat %c255_i32 : i32 -> !stream.resource<transient>{%c128}
   // CHECK-NEXT: stream.async.dispatch @ex::@dispatch0
   %1 = stream.async.dispatch @ex::@dispatch0[%c1, %c1, %c1](%0) : (!stream.resource<transient>{%c128}) -> !stream.resource<transient>{%c128}
   // CHECK-NEXT: stream.async.dispatch @ex::@dispatch1

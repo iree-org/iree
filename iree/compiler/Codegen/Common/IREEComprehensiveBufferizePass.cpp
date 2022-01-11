@@ -114,9 +114,9 @@ void IREEComprehensiveBufferizePass::runOnOperation() {
 }
 
 // Default allocation functions.
-static Optional<Value> defaultAllocationFn(OpBuilder &builder, Location loc,
-                                           MemRefType allocationType,
-                                           ArrayRef<Value> dynamicSizes) {
+static FailureOr<Value> defaultAllocationFn(OpBuilder &builder, Location loc,
+                                            MemRefType allocationType,
+                                            ArrayRef<Value> dynamicSizes) {
   return builder.create<memref::AllocOp>(loc, allocationType, dynamicSizes)
       .getResult();
 }
@@ -145,8 +145,6 @@ void addIREEComprehensiveBufferizePasses(
     OpPassManager &passManager,
     std::unique_ptr<linalg::comprehensive_bufferize::AllocationCallbacks>
         allocationFns) {
-  passManager.addNestedPass<FuncOp>(
-      createConvertToDestinationPassingStylePass());
   passManager.addPass(
       createIREEComprehensiveBufferizePass(std::move(allocationFns)));
   passManager.addPass(memref::createResolveShapedTypeResultDimsPass());

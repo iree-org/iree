@@ -732,19 +732,10 @@ struct CmdDispatchOpPattern
       int pushConstantBase = 0;  // always 0 today
       SmallVector<Value> pushConstants;
       for (auto operand : adaptor.operands()) {
-        // Need an explicit index cast to i32 since the
-        // CommandBufferPushConstantsOp is intrinsically i32 based.
-        // TODO(benvanik): don't force conversion yet - or do so
-        // target-dependently.
-        if (operand.getType().isa<IndexType>()) {
-          pushConstants.push_back(builder.create<arith::IndexCastOp>(
-              dispatchOp.getLoc(), builder.getIntegerType(32), operand));
-        } else {
-          assert(
-              (operand.getType().isInteger(32) || operand.getType().isF32()) &&
-              "expected a 32-bit value");
-          pushConstants.push_back(operand);
-        }
+        assert(
+            operand.getType().isInteger(32) &&
+            "expected only i32 values after iree-hal-pack-dispatch-operands");
+        pushConstants.push_back(operand);
       }
       builder.create<IREE::HAL::CommandBufferPushConstantsOp>(
           loc, commandBuffer, executableLayout,

@@ -18,6 +18,10 @@
 namespace mlir {
 namespace iree_compiler {
 
+// TODO(benvanik): replace with iree/compiler/Utils/ModuleUtils.h.
+// There may be some special insertion order arrangement required based on the
+// nested vm.module here.
+
 LogicalResult appendImportModule(IREE::VM::ModuleOp importModuleOp,
                                  ModuleOp targetModuleOp) {
   SymbolTable symbolTable(targetModuleOp);

@@ -12,8 +12,8 @@ on:
     inputs:
       package_suffix:
         description: 'Suffix to append to package names'
-        required: true
-        default: '-cidev'
+        required: false
+        default: ''
       package_version:
         description: 'Version of the package'
         required: true
@@ -52,10 +52,6 @@ jobs:
             experimental: false
           - os: ubuntu-18.04
             build_package: py-tf-compiler-tools-pkg
-            experimental: false
-          # Only needs to be built on Linux because platform independent.
-          - os: ubuntu-18.04
-            build_package: py-pure-pkgs
             experimental: false
 
           # Windows packages.
