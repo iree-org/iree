@@ -84,6 +84,7 @@ echo "***** Running TensorFlow integration tests *****"
 cd "$IREE_SRC_DIR"
 LIT_SCRIPT="$IREE_SRC_DIR/third_party/llvm-project/llvm/utils/lit/lit.py"
 if ! python3 "$LIT_SCRIPT" integrations/tensorflow/test \
+   --timeout 900 \
    -D FEATURES=vulkan
 then
    tests_passed=false
