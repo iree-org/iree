@@ -134,7 +134,8 @@ Status ParseToVariantList(iree_hal_allocator_t* allocator,
   return OkStatus();
 }
 
-Status PrintVariantList(iree_vm_list_t* variant_list, std::ostream* os) {
+Status PrintVariantList(iree_vm_list_t* variant_list, size_t max_element_count,
+                        std::ostream* os) {
   for (iree_host_size_t i = 0; i < iree_vm_list_size(variant_list); ++i) {
     iree_vm_variant_t variant = iree_vm_variant_empty();
     IREE_RETURN_IF_ERROR(iree_vm_list_get_variant(variant_list, i, &variant),
@@ -175,9 +176,9 @@ Status PrintVariantList(iree_vm_list_t* variant_list, std::ostream* os) {
         iree_status_t status;
         do {
           iree_host_size_t actual_length = 0;
-          status = iree_hal_buffer_view_format(
-              buffer_view, /*max_element_count=*/1024, result_str.size() + 1,
-              &result_str[0], &actual_length);
+          status = iree_hal_buffer_view_format(buffer_view, max_element_count,
+                                               result_str.size() + 1,
+                                               &result_str[0], &actual_length);
           result_str.resize(actual_length);
         } while (iree_status_is_out_of_range(status));
         IREE_RETURN_IF_ERROR(status);
