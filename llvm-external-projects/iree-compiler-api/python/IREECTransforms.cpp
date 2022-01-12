@@ -60,7 +60,10 @@ void setOptionsFromArgs(IreeCompilerOptions &options, py::args &args) {
   std::vector<const char *> cArgs;
   for (auto &argObject : args) {
     allocedArgs.push_back(py::cast<std::string>(argObject));
-    cArgs.push_back(allocedArgs.back().c_str());
+  }
+  // Can only get c_str() after finished mutating the vector.
+  for (auto &argStr : allocedArgs) {
+    cArgs.push_back(argStr.c_str());
   }
 
   std::string errorMessage;
