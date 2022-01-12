@@ -6,6 +6,7 @@
 
 import os
 import sys
+import tempfile
 
 import lit.formats
 import lit.util
@@ -18,6 +19,9 @@ from lit.llvm import llvm_config
 
 llvm_config.with_system_environment("PYTHONPATH")
 llvm_config.with_system_environment("VK_ICD_FILENAMES")
+
+# Put execution artifacts in the temp dir.
+config.test_exec_root = os.path.join(tempfile.gettempdir(), "lit")
 
 # name: The name of this test suite.
 config.name = 'TENSORFLOW_TESTS'
