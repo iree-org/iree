@@ -10,6 +10,7 @@
 # Built artifacts are per-platform and build out of the build tree.
 
 from distutils.command.install import install
+import json
 import os
 import platform
 from setuptools import setup, find_namespace_packages
@@ -25,6 +26,26 @@ if not os.access(import_xla_path, os.X_OK):
   raise RuntimeError(
       f"Tool not found ({import_xla_path}). Be sure to build "
       f"//iree_tf_compiler:iree-import-xla and run ./symlink_binaries.sh")
+
+# Setup and get version information.
+THIS_DIR = os.path.realpath(os.path.dirname(__file__))
+IREESRC_DIR = os.path.join(THIS_DIR, "..", "..", "..", "..")
+VERSION_INFO_FILE = os.path.join(IREESRC_DIR, "version_info.json")
+
+
+def load_version_info():
+  with open(VERSION_INFO_FILE, "rt") as f:
+    return json.load(f)
+
+
+try:
+  version_info = load_version_info()
+except FileNotFoundError:
+  print("version_info.json not found. Using defaults")
+  version_info = {}
+
+PACKAGE_SUFFIX = version_info.get("package-suffix") or ""
+PACKAGE_VERSION = version_info.get("package-version") or "0.1dev1"
 
 # Force platform specific wheel.
 # https://stackoverflow.com/questions/45150304
@@ -60,8 +81,8 @@ class platlib_install(install):
 
 
 setup(
-    name="iree-tools-xla",
-    version="0.1",
+    name=f"iree-tools-xla{PACKAGE_SUFFIX}",
+    version=f"{PACKAGE_VERSION}",
     author="The IREE Team",
     author_email="iree-discuss@googlegroups.com",
     license="Apache",
