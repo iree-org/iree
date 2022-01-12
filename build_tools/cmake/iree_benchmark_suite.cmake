@@ -145,11 +145,10 @@ function(iree_benchmark_suite)
         add_custom_command(
           OUTPUT "${_MODULE_SOURCE}"
           COMMAND
-            "$<TARGET_FILE:integrations::tensorflow::iree_tf_compiler::iree-import-tflite>"
+            "${IREE_IMPORT_TFLITE_PATH}"
             "${_TFLITE_FILE}"
             "-o=${_MODULE_SOURCE}"
           DEPENDS
-            integrations::tensorflow::iree_tf_compiler::iree-import-tflite
             "${_TFLITE_FILE}"
           COMMENT "Importing TFLite file ${_TFLITE_FILE_BASENAME}"
         )

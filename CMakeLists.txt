@@ -483,6 +483,7 @@ add_subdirectory(iree/test)
 add_subdirectory(iree/vm)
 
 if(${IREE_BUILD_BENCHMARKS})
+  find_program(IREE_IMPORT_TFLITE_PATH iree-import-tflite REQUIRED)
   add_subdirectory(benchmarks)
 endif()
 

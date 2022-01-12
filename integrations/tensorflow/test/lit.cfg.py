@@ -25,7 +25,7 @@ config.name = 'TENSORFLOW_TESTS'
 config.test_format = lit.formats.ShTest()
 
 # suffixes: A list of file extensions to treat as test files.
-config.suffixes = ['.py', '.run']
+config.suffixes = ['.run']
 
 # test_source_root: The root path where tests are located.
 config.test_source_root = os.path.dirname(__file__)
