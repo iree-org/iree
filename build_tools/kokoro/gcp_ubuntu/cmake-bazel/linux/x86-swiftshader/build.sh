@@ -32,6 +32,7 @@ echo "Initializing submodules"
 ./scripts/git/submodule_versions.py init
 
 # BUILD the integrations binaries with Bazel and run any lit tests
+IREE_SRC_DIR="$PWD"
 pushd integrations/tensorflow
 BAZEL_CMD=(bazel --noworkspace_rc --bazelrc=build_tools/bazel/iree-tf.bazelrc)
 BAZEL_BINDIR="$(${BAZEL_CMD[@]?} info bazel-bin)"
@@ -45,6 +46,7 @@ BAZEL_BINDIR="$(${BAZEL_CMD[@]?} info bazel-bin)"
       --config=generic_clang \
       --test_tag_filters="-nokokoro" \
       --build_tag_filters="-nokokoro"
+bash ./symlink_binaries.sh
 popd
 
 CMAKE_BUILD_DIR="$HOME/iree/build/tf"
@@ -59,11 +61,7 @@ echo "Configuring CMake"
    -DIREE_BUILD_COMPILER=ON \
    -DIREE_BUILD_TESTS=ON \
    -DIREE_BUILD_SAMPLES=OFF \
-   -DIREE_BUILD_XLA_COMPILER=ON \
-   -DIREE_BUILD_TFLITE_COMPILER=ON \
-   -DIREE_BUILD_TENSORFLOW_COMPILER=ON \
-   -DIREE_ENABLE_OLD_INTEGRATION_TESTS=ON \
-   -DIREE_ENABLE_TFLITE_INTEGRATION_TESTS=ON \
+   -DIREE_BUILD_PYTHON_BINDINGS=ON \
    .
 
 echo "Building with Ninja"
@@ -72,7 +70,30 @@ ninja
 
 export CTEST_PARALLEL_LEVEL=${CTEST_PARALLEL_LEVEL:-$(nproc)}
 
-echo "Testing with CTest"
-ctest --timeout 900 --output-on-failure \
+tests_passed=true
+
+echo "***** Testing with CTest *****"
+if ! ctest --timeout 900 --output-on-failure \
    --tests-regex "^integrations/tensorflow/|^bindings/python/" \
    --label-exclude "^nokokoro$|^vulkan_uses_vk_khr_shader_float16_int8$"
+then
+   tests_passed=false
+fi
+
+echo "***** Running TensorFlow integration tests *****"
+# TODO: Use "--timeout 900" instead of --max-time below. Requires that
+# `psutil` python package be installed in the VM for per test timeout.
+cd "$IREE_SRC_DIR"
+source "${CMAKE_BUILD_DIR?}/.env" && export PYTHONPATH
+LIT_SCRIPT="$IREE_SRC_DIR/third_party/llvm-project/llvm/utils/lit/lit.py"
+if ! python3 "$LIT_SCRIPT" -v integrations/tensorflow/test \
+   --max-time 1800 \
+   -D FEATURES=vulkan
+then
+   tests_passed=false
+fi
+
+if ! $tests_passed; then
+   echo "Some tests failed!!!"
+   exit 1
+fi
