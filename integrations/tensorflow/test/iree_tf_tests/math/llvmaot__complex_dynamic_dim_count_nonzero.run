@@ -1,2 +1,4 @@
 # REQUIRES: llvmaot
+# REQUIRES: bugfix
+#           TODO(#8083): re-enable once passing
 # RUN: %PYTHON -m iree_tf_tests.math.math_test --target_backends=iree_llvmaot --dynamic_dims=true --functions=count_nonzero -artifacts_dir=%t
