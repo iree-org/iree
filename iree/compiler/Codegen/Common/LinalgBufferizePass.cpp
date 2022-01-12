@@ -168,7 +168,7 @@ static bool generatesNoOpSubView(Value src, ArrayRef<OpFoldResult> offsets,
       })) {
     return false;
   }
-  /// Check strides are 0.
+  /// Check strides are 1.
   if (llvm::any_of(strides, [](OpFoldResult ofr) {
         Optional<int64_t> intValue = getConstantIntValue(ofr);
         return !intValue || intValue.getValue() != 1;
@@ -185,6 +185,9 @@ static bool generatesNoOpSubView(Value src, ArrayRef<OpFoldResult> offsets,
         return false;
       }
       continue;
+    }
+    if (dynamicDimsPos >= dynamicDims.size()) {
+      return false;
     }
     if (size.value().get<Value>() == dynamicDims[dynamicDimsPos]) {
       dynamicDimsPos++;

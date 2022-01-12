@@ -2536,3 +2536,54 @@ func @two_level_tile_and_fuse() {
 //       CHECK:           linalg.generic
 //  CHECK-SAME:               ins(%[[RESULT_TILE_2]], %[[BIAS_TILE_2]]
 //  CHECK-SAME:               outs(%[[RESULT_TILE_2]]
+
+// -----
+
+// This test is a repro from a failure. No checking needed.
+func @forward_dispatch_3() {
+  %c384 = arith.constant 384 : index
+  %c512_i64 = arith.constant 512 : i64
+  %c0_i64 = arith.constant 0 : i64
+  %c0 = arith.constant 0 : index
+  %c592896 = arith.constant 592896 : index
+  %c47481856 = arith.constant 47481856 : index
+  %c64 = arith.constant 64 : index
+  %0 = hal.interface.constant.load[0] : i32
+  %1 = arith.index_cast %0 : i32 to index
+  %2 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c592896) alignment(32) : !flow.dispatch.tensor<readonly:1x512xi64>
+  %3 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c47481856) alignment(32) : !flow.dispatch.tensor<readonly:512x384xf32>
+  %4 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) offset(%c0) alignment(32) : !flow.dispatch.tensor<writeonly:?x384xf32>{%1}
+  %5 = flow.dispatch.tensor.load %2, offsets = [0, 0], sizes = [1, 512], strides = [1, 1] : !flow.dispatch.tensor<readonly:1x512xi64> -> tensor<1x512xi64>
+  %6 = flow.dispatch.tensor.load %3, offsets = [0, 0], sizes = [512, 384], strides = [1, 1] : !flow.dispatch.tensor<readonly:512x384xf32> -> tensor<512x384xf32>
+  %7 = tensor.extract_slice %5[0, 0] [1, %1] [1, 1] : tensor<1x512xi64> to tensor<?xi64>
+  %workgroup_id_x = hal.interface.workgroup.id[0] : index
+  %workgroup_count_x = hal.interface.workgroup.count[0] : index
+  %workgroup_id_y = hal.interface.workgroup.id[1] : index
+  %workgroup_count_y = hal.interface.workgroup.count[1] : index
+  %8 = affine.apply affine_map<()[s0] -> (s0 * 64)>()[%workgroup_id_y]
+  %9 = affine.apply affine_map<()[s0] -> (s0 * 64)>()[%workgroup_count_y]
+  scf.for %arg0 = %8 to %1 step %9 {
+    %10 = affine.apply affine_map<()[s0] -> (s0 * 64)>()[%workgroup_id_x]
+    %11 = affine.apply affine_map<()[s0] -> (s0 * 64)>()[%workgroup_count_x]
+    scf.for %arg1 = %10 to %c384 step %11 {
+      %12 = affine.min affine_map<(d0)[s0] -> (64, -d0 + s0)>(%arg0)[%1]
+      %13 = tensor.extract_slice %7[%arg0] [%12] [1] : tensor<?xi64> to tensor<?xi64>
+      %14 = linalg.init_tensor [%12, 64] : tensor<?x64xf32>
+      %15 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]} ins(%13 : tensor<?xi64>) outs(%14 : tensor<?x64xf32>) {
+      ^bb0(%arg2: i64, %arg3: f32):  // no predecessors
+        %16 = arith.index_cast %arg2 : i64 to index
+        %17 = linalg.index 1 : index
+        %18 = affine.apply affine_map<(d0, d1) -> (d0 + d1)>(%17, %arg1)
+        %19 = arith.cmpi slt, %arg2, %c512_i64 : i64
+        assert %19, "index must be smaller than dim size"
+        %20 = arith.cmpi sge, %arg2, %c0_i64 : i64
+        assert %20, "index must be larger or equal to 0"
+        %21 = tensor.extract %6[%16, %18] : tensor<512x384xf32>
+        linalg.yield %21 : f32
+      } -> tensor<?x64xf32>
+      flow.dispatch.tensor.store %15, %4, offsets = [%arg0, %arg1], sizes = [%12, %c64], strides = [1, 1] : tensor<?x64xf32> -> !flow.dispatch.tensor<writeonly:?x384xf32>{%1}
+    }
+  }
+  return
+}
+// CHECK: func @forward_dispatch_3()
