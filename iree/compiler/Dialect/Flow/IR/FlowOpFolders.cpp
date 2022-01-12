@@ -119,7 +119,8 @@ static bool updateTensorOpDims(Operation *op, Value tensorValue,
   if (!dynamicDimsOr.hasValue()) return false;
   auto dynamicDims = dynamicDimsOr.getValue();
   bool anyChanged = false;
-  auto oldValues = llvm::to_vector<4>(OperandRange(mutableDimValues));
+  OperandRange oldValueRange = mutableDimValues;
+  auto oldValues = llvm::to_vector<4>(oldValueRange);
   for (unsigned i = 0; i < dynamicDims.size(); ++i) {
     if (oldValues[i] != dynamicDims[i]) {
       mutableDimValues.slice(i, 1).assign(dynamicDims[i]);
