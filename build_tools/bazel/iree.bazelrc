@@ -50,6 +50,8 @@ build:generic_gcc --copt=-UNDEBUG
 build:generic_gcc --copt=-Wno-unused-but-set-parameter
 build:generic_gcc --copt=-Wno-comment
 build:generic_gcc --copt=-Wno-attributes
+# NOTE: from a TF dep: external/upb/upb/upb.c and fails on GCC 10.
+build:generic_gcc --copt=-Wno-stringop-truncation
 
 ###############################################################################
 # Options for "generic_clang" builds: these options should generally apply to
