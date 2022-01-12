@@ -13,7 +13,12 @@ import logging
 import tempfile
 from typing import List, Optional, Sequence, Set, Union
 
-from .core import CompilerOptions, DEFAULT_TESTING_BACKENDS, build_compile_command_line
+from .core import (
+    CompilerOptions,
+    DEFAULT_TESTING_BACKENDS,
+    InputType,
+    build_compile_command_line,
+)
 from .debugging import TempFileSaver
 from .binaries import find_tool, invoke_immediate, invoke_pipeline
 
@@ -78,6 +83,7 @@ class ImportOptions(CompilerOptions):
                exported_names: Sequence[str] = (),
                import_only: bool = False,
                import_type: Union[ImportType, str] = ImportType.OBJECT_GRAPH,
+               input_type: Union[InputType, str] = InputType.XLA,
                saved_model_tags: Set[str] = set(),
                import_extra_args: Sequence[str] = (),
                save_temp_tf_input: Optional[str] = None,
@@ -107,7 +113,7 @@ class ImportOptions(CompilerOptions):
       save_temp_iree_input: Optionally save the IR that is the result of the
         import (ready to be passed to IREE).
     """
-    super().__init__(**kwargs)
+    super().__init__(input_type=input_type, **kwargs)
     self.exported_names = exported_names
     self.import_only = import_only
     self.import_type = ImportType.parse(import_type)

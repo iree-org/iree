@@ -33,6 +33,7 @@ namespace {
 
 // Allowlist of function attributes to retain when importing funcs.
 constexpr const char *kRetainedAttributes[] = {
+    "iree.abi",
     "iree.reflection",
     "sym_visibility",
     "noinline",
@@ -90,11 +91,22 @@ class BufferViewToTensorPattern
   LogicalResult matchAndRewrite(
       IREE::Input::BufferViewToTensorOp srcOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    Type resultType = typeConverter->convertType(srcOp.target().getType());
+    TensorType resultType = typeConverter->convertType(srcOp.target().getType())
+                                .dyn_cast_or_null<TensorType>();
     if (!resultType) return failure();
-    rewriter.replaceOpWithNewOp<IREE::HAL::TensorImportOp>(
-        srcOp, resultType, adaptor.source(), TypeAttr::get(resultType),
-        adaptor.target_dims());
+    if (adaptor.target_dims().empty() && !resultType.hasStaticShape()) {
+      // For the input dialect, we allow ops that don't have their dims
+      // specified and we reify them here with the specific builder that does
+      // the work.
+      rewriter.replaceOpWithNewOp<IREE::HAL::TensorImportOp>(srcOp, resultType,
+                                                             adaptor.source());
+    } else {
+      // Dynamic dims explicitly provided (or wrong, in which case the verifier
+      // will get it).
+      rewriter.replaceOpWithNewOp<IREE::HAL::TensorImportOp>(
+          srcOp, resultType, adaptor.source(), TypeAttr::get(resultType),
+          adaptor.target_dims());
+    }
     return success();
   }
 };
@@ -107,11 +119,22 @@ class TensorToBufferViewPattern
       IREE::Input::TensorToBufferViewOp srcOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     Type resultType = typeConverter->convertType(srcOp.target().getType());
-    if (!resultType) return failure();
-    rewriter.replaceOpWithNewOp<IREE::HAL::TensorExportOp>(
-        srcOp, resultType, adaptor.source(),
-        TypeAttr::get(adaptor.source().getType()), adaptor.source_dims(),
-        /*target_storage=*/nullptr);
+    TensorType sourceType = adaptor.source().getType().dyn_cast<TensorType>();
+    if (!resultType || !sourceType) return failure();
+    if (adaptor.source_dims().empty() && !sourceType.hasStaticShape()) {
+      // For the input dialect, we allow ops that don't have their dims
+      // specified and we reify them here with the specific builder that does
+      // the work.
+      rewriter.replaceOpWithNewOp<IREE::HAL::TensorExportOp>(srcOp, resultType,
+                                                             adaptor.source());
+    } else {
+      // Dynamic dims explicitly provided (or wrong, in which case the verifier
+      // will get it).
+      rewriter.replaceOpWithNewOp<IREE::HAL::TensorExportOp>(
+          srcOp, resultType, adaptor.source(),
+          TypeAttr::get(adaptor.source().getType()), adaptor.source_dims(),
+          /*target_storage=*/nullptr);
+    }
     return success();
   }
 };

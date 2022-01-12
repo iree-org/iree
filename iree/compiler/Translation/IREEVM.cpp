@@ -17,6 +17,7 @@
 #include "iree/compiler/InputConversion/Common/Passes.h"
 #include "iree/compiler/InputConversion/MHLO/Passes.h"
 #include "iree/compiler/InputConversion/TOSA/Passes.h"
+#include "iree/compiler/Utils/PassUtils.h"
 #include "iree/compiler/Utils/TracingUtils.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/Pass/PassManager.h"
@@ -84,6 +85,10 @@ void HighLevelOptimizationOptions::bindOptions(OptionsBinder &binder) {
       llvm::cl::desc(
           "Reduces numeric precision to lower bit depths where possible"),
       llvm::cl::cat(category));
+  binder.opt<bool>("iree-opt-strip-assertions", stripAssertions,
+                   llvm::cl::desc("Strips debug assertions after any useful "
+                                  "information has been extracted."),
+                   llvm::cl::cat(category));
 }
 
 void buildIREEVMTransformPassPipeline(
@@ -129,6 +134,12 @@ void buildIREEVMTransformPassPipeline(
   }
   flowOptions.numericPrecisionReduction =
       highLevelOptimizationOptions.numericPrecisionReduction;
+
+  if (highLevelOptimizationOptions.stripAssertions) {
+    // Strip std.assert & co after we perform optimizations; prior to this we
+    // may use the assertions to derive information during analysis.
+    passManager.addPass(IREE::Util::createStripDebugOpsPass());
+  }
 
   IREE::Flow::buildFlowTransformPassPipeline(passManager, flowOptions);
   IREE::Stream::TransformOptions streamOptions;

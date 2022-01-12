@@ -23,11 +23,6 @@ cc_library(
         "IREE_COMPILER_TENSORFLOW_ENABLED",
     ],
     deps = [
-        "@iree//iree/compiler/Codegen:PassHeaders",
-        "@iree//iree/compiler/Dialect/Flow/IR",
-        "@iree//iree/compiler/Dialect/Flow/Transforms",
-        "@iree//iree/compiler/Dialect/Util/IR",
-        "@iree//iree/compiler/InputConversion/MHLO",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:Pass",

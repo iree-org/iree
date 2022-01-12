@@ -84,10 +84,10 @@ func @inplaceDispatch(
   // CHECK-NEXT: (%[[INNER_ARG0:.+]]: !flow.dispatch.tensor<readwrite:?x4xf32>
   // CHECK-SAME:  %[[INNER_ARG1:.+]]: index) {
   (%arg0_capture: !flow.dispatch.tensor<readwrite:?x4xf32>, %arg1_capture: index) {
-    // CHECK: %[[VALUE:.+]] = flow.dispatch.tensor.load %[[INNER_ARG0]], {{.*}} : !flow.dispatch.tensor<readwrite:?x4xf32> -> tensor<?x4xf32>
-    %t = flow.dispatch.tensor.load %arg0_capture, offsets=[0, 0], sizes=[%arg1_capture, 4], strides=[1, 1] : !flow.dispatch.tensor<readwrite:?x4xf32> -> tensor<?x4xf32>
-    // CHECK: flow.dispatch.tensor.store %[[VALUE]], %[[INNER_ARG0]], {{.*}}: tensor<?x4xf32> -> !flow.dispatch.tensor<readwrite:?x4xf32>
-    flow.dispatch.tensor.store %t, %arg0_capture, offsets=[0, 0], sizes=[%arg1_capture, 4], strides=[1, 1] : tensor<?x4xf32> -> !flow.dispatch.tensor<readwrite:?x4xf32>
+    // CHECK: %[[VALUE:.+]] = flow.dispatch.tensor.load %[[INNER_ARG0]], {{.*}} : !flow.dispatch.tensor<readwrite:?x4xf32>{%[[INNER_ARG1]]} -> tensor<?x4xf32>
+    %t = flow.dispatch.tensor.load %arg0_capture, offsets=[0, 0], sizes=[%arg1_capture, 4], strides=[1, 1] : !flow.dispatch.tensor<readwrite:?x4xf32>{%arg1_capture} -> tensor<?x4xf32>
+    // CHECK: flow.dispatch.tensor.store %[[VALUE]], %[[INNER_ARG0]], {{.*}}: tensor<?x4xf32> -> !flow.dispatch.tensor<readwrite:?x4xf32>{%[[INNER_ARG1]]}
+    flow.dispatch.tensor.store %t, %arg0_capture, offsets=[0, 0], sizes=[%arg1_capture, 4], strides=[1, 1] : tensor<?x4xf32> -> !flow.dispatch.tensor<readwrite:?x4xf32>{%arg1_capture}
     // CHECK-NEXT: flow.return
     flow.return
   }

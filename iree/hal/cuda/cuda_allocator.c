@@ -147,6 +147,7 @@ iree_hal_cuda_allocator_query_buffer_compatibility(
 static void iree_hal_cuda_buffer_free(iree_hal_cuda_context_wrapper_t* context,
                                       iree_hal_memory_type_t memory_type,
                                       CUdeviceptr device_ptr, void* host_ptr) {
+  IREE_TRACE_ZONE_BEGIN(z0);
   if (iree_all_bits_set(memory_type, IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL)) {
     // Device local.
     CUDA_IGNORE_ERROR(context->syms, cuMemFree(device_ptr));
@@ -154,6 +155,7 @@ static void iree_hal_cuda_buffer_free(iree_hal_cuda_context_wrapper_t* context,
     // Host local.
     CUDA_IGNORE_ERROR(context->syms, cuMemFreeHost(host_ptr));
   }
+  IREE_TRACE_ZONE_END(z0);
 }
 
 static iree_status_t iree_hal_cuda_allocator_allocate_buffer(
@@ -181,9 +183,10 @@ static iree_status_t iree_hal_cuda_allocator_allocate_buffer(
         IREE_HAL_MEMORY_TYPE_HOST_LOCAL | IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE;
   }
 
-  iree_status_t status;
+  iree_status_t status = iree_ok_status();
   void* host_ptr = NULL;
   CUdeviceptr device_ptr = 0;
+  IREE_TRACE_ZONE_BEGIN_NAMED(z0, "iree_hal_cuda_buffer_allocate");
   if (iree_all_bits_set(memory_type, IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL)) {
     // Device local case.
     if (iree_all_bits_set(memory_type, IREE_HAL_MEMORY_TYPE_HOST_VISIBLE)) {
@@ -218,6 +221,7 @@ static iree_status_t iree_hal_cuda_allocator_allocate_buffer(
           cuMemHostGetDevicePointer(&device_ptr, host_ptr, /*flags=*/0));
     }
   }
+  IREE_TRACE_ZONE_END(z0);
 
   iree_hal_buffer_t* buffer = NULL;
   if (iree_status_is_ok(status)) {

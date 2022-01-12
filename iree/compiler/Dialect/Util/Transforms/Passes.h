@@ -18,12 +18,13 @@ namespace Util {
 std::unique_ptr<OperationPass<void>> createApplyPatternsPass();
 std::unique_ptr<OperationPass<mlir::ModuleOp>> createCombineInitializersPass();
 std::unique_ptr<OperationPass<void>> createDropCompilerHintsPass();
+std::unique_ptr<OperationPass<void>> createFixedPointIteratorPass(
+    OpPassManager pipeline);
 std::unique_ptr<OperationPass<mlir::ModuleOp>> createFoldGlobalsPass();
 std::unique_ptr<OperationPass<mlir::ModuleOp>> createFuseGlobalsPass();
 std::unique_ptr<OperationPass<mlir::ModuleOp>> createHoistIntoGlobalsPass();
 std::unique_ptr<OperationPass<void>> createSimplifyGlobalAccessesPass();
-std::unique_ptr<OperationPass<void>> createFixedPointIteratorPass(
-    OpPassManager pipeline);
+std::unique_ptr<OperationPass<void>> createStripDebugOpsPass();
 
 // Test passes.
 std::unique_ptr<OperationPass<void>> createTestFloatRangeAnalysis();
@@ -34,11 +35,12 @@ inline void registerTransformPasses() {
   createApplyPatternsPass();
   createCombineInitializersPass();
   createDropCompilerHintsPass();
+  createFixedPointIteratorPass(OpPassManager("dummy_op"));
   createFoldGlobalsPass();
   createFuseGlobalsPass();
   createHoistIntoGlobalsPass();
   createSimplifyGlobalAccessesPass();
-  createFixedPointIteratorPass(OpPassManager("dummy_op"));
+  createStripDebugOpsPass();
   createTestFloatRangeAnalysis();
 }
 

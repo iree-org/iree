@@ -6,9 +6,6 @@
 
 #include "iree_tf_compiler/MHLO/Passes.h"
 
-#include "iree/compiler/Codegen/Passes.h"
-#include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
-#include "iree/compiler/InputConversion/MHLO/Passes.h"
 #include "mlir-hlo/Dialect/mhlo/transforms/passes.h"
 #include "mlir/Conversion/SCFToStandard/SCFToStandard.h"
 #include "mlir/Dialect/SCF/Passes.h"
@@ -26,13 +23,6 @@ void buildMHLOImportPassPipeline(OpPassManager &pm) {
   // but this entire pipeline will soon be deleted and it isn't worth
   // removing now.
   pm.addPass(mlir::createInlinerPass());
-
-  // Drop to CFG and eliminate tuples.
-  mlir::iree_compiler::MHLO::buildXLACleanupPassPipeline(pm);
-
-  // Mostly delegate to the IREE side MHLO legalization pipeline, now that we
-  // have handled the weird that comes from legacy HLO clients.
-  mlir::iree_compiler::MHLO::buildMHLOInputConversionPassPipeline(pm);
 
   // Import pipelines should end with canonicalization because they may have
   // access to dialects and patterns that the core compiler does not.

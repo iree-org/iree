@@ -508,8 +508,8 @@ func @reverse_dim_0(%arg0: memref<?x?xi32>, %arg1: memref<?x?xi32>) {
 
 func @scan_1d_inclusive(%0: memref<128xi32>, %1: memref<128xi32>) {
   %c0 = arith.constant 0 : i32
-  iree_linalg_ext.scan dimension(0) inclusive(true) identity(%c0 : i32)
-    ins(%0 : memref<128xi32>) outs(%1 : memref<128xi32>) {
+  iree_linalg_ext.scan dimension(0) inclusive(true)
+    ins(%0, %c0 : memref<128xi32>, i32) outs(%1 : memref<128xi32>) {
     ^bb0(%arg0 : i32, %arg1 : i32):
       %sum = arith.addi %arg0, %arg1 : i32
       iree_linalg_ext.yield %sum : i32
@@ -539,8 +539,8 @@ func @scan_1d_inclusive(%0: memref<128xi32>, %1: memref<128xi32>) {
 
 func @scan_1d_exclusive(%0: memref<128xi32>, %1: memref<128xi32>) {
   %c0 = arith.constant 0 : i32
-  iree_linalg_ext.scan dimension(0) inclusive(false) identity(%c0 : i32)
-    ins(%0 : memref<128xi32>) outs(%1 : memref<128xi32>) {
+  iree_linalg_ext.scan dimension(0) inclusive(false)
+    ins(%0, %c0 : memref<128xi32>, i32) outs(%1 : memref<128xi32>) {
     ^bb0(%arg0 : i32, %arg1 : i32):
       %sum = arith.addi %arg0, %arg1 : i32
       iree_linalg_ext.yield %sum : i32
@@ -570,8 +570,8 @@ func @scan_1d_exclusive(%0: memref<128xi32>, %1: memref<128xi32>) {
 
 func @scan_2d(%0: memref<16x32xi32>, %1: memref<16x32xi32>) {
   %c0 = arith.constant 0 : i32
-  iree_linalg_ext.scan dimension(0) inclusive(true) identity(%c0 : i32)
-    ins(%0 : memref<16x32xi32>) outs(%1 : memref<16x32xi32>) {
+  iree_linalg_ext.scan dimension(0) inclusive(true)
+    ins(%0, %c0 : memref<16x32xi32>, i32) outs(%1 : memref<16x32xi32>) {
     ^bb0(%arg0 : i32, %arg1 : i32):
       %sum = arith.addi %arg0, %arg1 : i32
       iree_linalg_ext.yield %sum : i32

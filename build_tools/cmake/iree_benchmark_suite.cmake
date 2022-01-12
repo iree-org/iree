@@ -133,9 +133,10 @@ function(iree_benchmark_suite)
 
     # If the source is a TFLite file, import it.
     if("${_MODULE_SOURCE}" MATCHES "\.tflite$")
-      if (NOT IREE_BUILD_TFLITE_COMPILER)
+      if (NOT IREE_IMPORT_TFLITE_PATH)
         message(SEND_ERROR "Benchmarks of ${_MODULE_SOURCE} require"
-                          " IREE_BUILD_TFLITE_COMPILER to be ON")
+                          " that iree-import-tflite be available "
+                          " (either on PATH or via IREE_IMPORT_TFLITE_PATH)")
       endif()
       set(_TFLITE_FILE "${_MODULE_SOURCE}")
       set(_MODULE_SOURCE "${_TFLITE_FILE}.mlir")
@@ -145,11 +146,10 @@ function(iree_benchmark_suite)
         add_custom_command(
           OUTPUT "${_MODULE_SOURCE}"
           COMMAND
-            "$<TARGET_FILE:integrations::tensorflow::iree_tf_compiler::iree-import-tflite>"
+            "${IREE_IMPORT_TFLITE_PATH}"
             "${_TFLITE_FILE}"
             "-o=${_MODULE_SOURCE}"
           DEPENDS
-            integrations::tensorflow::iree_tf_compiler::iree-import-tflite
             "${_TFLITE_FILE}"
           COMMENT "Importing TFLite file ${_TFLITE_FILE_BASENAME}"
         )

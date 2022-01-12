@@ -18,6 +18,7 @@ declare -a excluded_files_patterns=(
   "/third_party/"
   "^third_party/"
   "*Makefile*"
+  "^integrations/tensorflow/iree-dialects$"
 )
 
 # Join on |

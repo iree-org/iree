@@ -92,10 +92,53 @@ void DispatchWorkgroupsOp::getCanonicalizationPatterns(
 }
 
 //===----------------------------------------------------------------------===//
+// flow.dispatch.tie_shape
+//===----------------------------------------------------------------------===//
+
+OpFoldResult DispatchTieShapeOp::fold(ArrayRef<Attribute> operands) {
+  if (dynamic_dims().empty()) {
+    return operand();
+  }
+  return {};
+}
+
+//===----------------------------------------------------------------------===//
 // flow.dispatch.tensor.load
 //===----------------------------------------------------------------------===//
 
 namespace {
+
+// Updates the |dimValues| of |tensorValue| with dimensions inferred from IR.
+// The dimension values may be derived values that are redundant with captured
+// dimensions and by redirecting to the captured values we can simplify things.
+// Returns true if the dims were changed.
+static bool updateTensorOpDims(Operation *op, Value tensorValue,
+                               MutableOperandRange mutableDimValues) {
+  auto dynamicDimsOr = IREE::Util::findDynamicDims(tensorValue, op->getBlock(),
+                                                   Block::iterator(op));
+  if (!dynamicDimsOr.hasValue()) return false;
+  auto dynamicDims = dynamicDimsOr.getValue();
+  bool anyChanged = false;
+  OperandRange oldValueRange = mutableDimValues;
+  auto oldValues = llvm::to_vector<4>(oldValueRange);
+  for (unsigned i = 0; i < dynamicDims.size(); ++i) {
+    if (oldValues[i] != dynamicDims[i]) {
+      mutableDimValues.slice(i, 1).assign(dynamicDims[i]);
+      anyChanged = true;
+    }
+  }
+  return anyChanged;
+}
+
+struct ReuseDispatchTensorLoadShapeDims
+    : public OpRewritePattern<DispatchTensorLoadOp> {
+  using OpRewritePattern::OpRewritePattern;
+  LogicalResult matchAndRewrite(DispatchTensorLoadOp loadOp,
+                                PatternRewriter &rewriter) const override {
+    return success(updateTensorOpDims(loadOp, loadOp.source(),
+                                      loadOp.source_dimsMutable()));
+  }
+};
 
 // Inlining producers of an input to the dispatch region results in the
 // `flow.dispatch.input.load` having a `tensor` type as input. This fails
@@ -111,7 +154,6 @@ namespace {
 struct ConvertDispatchInputLoadOfTensorToSubTensor
     : public OpRewritePattern<DispatchTensorLoadOp> {
   using OpRewritePattern::OpRewritePattern;
-
   LogicalResult matchAndRewrite(DispatchTensorLoadOp loadOp,
                                 PatternRewriter &rewriter) const override {
     if (!loadOp.source().getType().isa<RankedTensorType>()) {
@@ -130,7 +172,7 @@ struct ConvertDispatchInputLoadOfTensorToSubTensor
 };
 
 /// Pattern to rewrite a subview op with constant arguments.
-class DispatchTensorLoadOpWithOffsetSizesAndStridesConstantArgumentFolder final
+struct DispatchTensorLoadOpWithOffsetSizesAndStridesConstantArgumentFolder final
     : public OpRewritePattern<DispatchTensorLoadOp> {
   using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(DispatchTensorLoadOp op,
@@ -138,8 +180,9 @@ class DispatchTensorLoadOpWithOffsetSizesAndStridesConstantArgumentFolder final
     // No constant operand, just return;
     if (llvm::none_of(op.getOperands(), [](Value operand) {
           return matchPattern(operand, matchConstantIndex());
-        }))
+        })) {
       return failure();
+    }
 
     // At least one of offsets/sizes/strides is a new constant.
     // Form the new list of operands and constant attributes from the existing.
@@ -167,8 +210,9 @@ class DispatchTensorLoadOpWithOffsetSizesAndStridesConstantArgumentFolder final
 
 void DispatchTensorLoadOp::getCanonicalizationPatterns(
     OwningRewritePatternList &results, MLIRContext *context) {
+  results.insert<ReuseDispatchTensorLoadShapeDims>(context);
+  results.insert<ConvertDispatchInputLoadOfTensorToSubTensor>(context);
   results.insert<
-      ConvertDispatchInputLoadOfTensorToSubTensor,
       DispatchTensorLoadOpWithOffsetSizesAndStridesConstantArgumentFolder>(
       context);
 }
@@ -191,10 +235,20 @@ OpFoldResult DispatchTensorLoadOp::fold(ArrayRef<Attribute> operands) {
 //===----------------------------------------------------------------------===//
 
 namespace {
+
+struct ReuseDispatchTensorStoreShapeDims
+    : public OpRewritePattern<DispatchTensorStoreOp> {
+  using OpRewritePattern::OpRewritePattern;
+  LogicalResult matchAndRewrite(DispatchTensorStoreOp storeOp,
+                                PatternRewriter &rewriter) const override {
+    return success(updateTensorOpDims(storeOp, storeOp.target(),
+                                      storeOp.target_dimsMutable()));
+  }
+};
+
 struct FoldCastOpIntoDispatchStoreOp
     : public OpRewritePattern<DispatchTensorStoreOp> {
   using OpRewritePattern::OpRewritePattern;
-
   LogicalResult matchAndRewrite(DispatchTensorStoreOp storeOp,
                                 PatternRewriter &rewriter) const override {
     if (!storeOp.value().getDefiningOp<tensor::CastOp>()) return failure();
@@ -207,10 +261,12 @@ struct FoldCastOpIntoDispatchStoreOp
     return success();
   }
 };
+
 }  // namespace
 
 void DispatchTensorStoreOp::getCanonicalizationPatterns(
     OwningRewritePatternList &results, MLIRContext *context) {
+  results.insert<ReuseDispatchTensorStoreShapeDims>(context);
   results.insert<FoldCastOpIntoDispatchStoreOp>(context);
 }
 

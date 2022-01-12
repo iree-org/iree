@@ -31,6 +31,7 @@ gentbl_cc_library(
 cc_library(
     name = "Transforms",
     srcs = [
+        "CaptureDispatchDynamicDims.cpp",
         "CleanupNumericNarrowing.cpp",
         "ConvertConv2D1x1ToMatmulPass.cpp",
         "ConvertConv2DToImg2ColPass.cpp",
@@ -53,6 +54,7 @@ cc_library(
         "PromoteI1ToI8Pass.cpp",
         "StripAndSplatConstantVariables.cpp",
         "StripSignednessPass.cpp",
+        "TestPartitionableLoopsInterface.cpp",
         "TypeConverter.cpp",
         "VerifyInputLegality.cpp",
     ],
@@ -66,6 +68,7 @@ cc_library(
         ":PassesIncGen",
         "//iree/compiler/Dialect/Flow/Conversion/TensorToFlow",
         "//iree/compiler/Dialect/Flow/IR",
+        "//iree/compiler/Dialect/Flow/IR:PartitionableLoopsInterface",
         "//iree/compiler/Dialect/HAL/IR",
         "//iree/compiler/Dialect/Util/Analysis",
         "//iree/compiler/Dialect/Util/Analysis/Attributes",

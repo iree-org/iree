@@ -772,13 +772,21 @@ Operation *FftOp::getTiledImplementation(OpBuilder &builder, ValueRange outputs,
 //===----------------------------------------------------------------------===//
 
 static LogicalResult verifyScanOp(ScanOp op) {
-  if (op.getNumInputs() != 1) {
-    return op.emitOpError("expected one input operands");
+  if (op.getNumInputs() != 2) {
+    return op.emitOpError("expected two input operands");
   }
   if (op.getNumOutputs() != 1) {
     return op.emitOpError("expected one output operand");
   }
+  if (!op.input().getType().isa<ShapedType>()) {
+    return op.emitOpError("expected first input element type to be shaped");
+  }
   auto identityElementType = op.identity().getType();
+  if (!(identityElementType.isa<FloatType>() ||
+        identityElementType.isa<IntegerType>())) {
+    return op.emitOpError(
+        "expected second input element type to be float or integer");
+  }
   auto inputType = op.input().getType().cast<ShapedType>();
   auto outputType = op.output().getType().cast<ShapedType>();
   if (identityElementType != inputType.getElementType()) {
@@ -914,13 +922,13 @@ Operation *ScanOp::getTiledImplementation(OpBuilder &builder,
   SmallVector<Value> tiledOperands;
   tiledOperands.emplace_back(
       getSlice(builder, getLoc(), input(), offsets, sizes, strides));
+  tiledOperands.emplace_back(identity());
   tiledOperands.emplace_back(
       getSlice(builder, getLoc(), output(), offsets, sizes, strides));
-  tiledOperands.emplace_back(identity());
 
   SmallVector<Type, 4> resultTypes;
   if (hasTensorSemantics()) {
-    resultTypes.push_back(tiledOperands[1].getType());
+    resultTypes.push_back(tiledOperands[2].getType());
   }
 
   Operation *tiledScanOp = cast<LinalgExtOp>(getOperation())

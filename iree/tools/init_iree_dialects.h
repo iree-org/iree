@@ -46,6 +46,7 @@ inline void registerIreeDialects(DialectRegistry &registry) {
                   IREE::PYDM::IREEPyDMDialect>();
   // clang-format on
 
+  IREE::Flow::registerPartitionableLoopsInterfaceModels(registry);
   IREE::LinalgExt::registerTiledOpInterfaceExternalModels(registry);
   IREE::Util::registerUtilExternalModels(registry);
   registerCodegenInterfaces(registry);

@@ -23,6 +23,9 @@
 
 IREE_FLAG(string, driver, "vmvx", "Backend driver to use.");
 
+IREE_FLAG(bool, print_statistics, false,
+          "Prints runtime statistics to stderr on exit.");
+
 IREE_FLAG(int32_t, call_iterations, 1,
           "Number of times to invoke each call in the trace. May break usage "
           "with stateful models.");
@@ -224,7 +227,10 @@ static iree_status_t iree_replay_benchmark_run_file(
   }
 
   iree_replay_benchmark_call_list_deinitialize(&call_list);
-  iree_trace_replay_deinitialize(&replay);
+  iree_trace_replay_deinitialize(
+      &replay, FLAG_print_statistics
+                   ? IREE_TRACE_REPLAY_SHUTDOWN_PRINT_STATISTICS
+                   : IREE_TRACE_REPLAY_SHUTDOWN_QUIET);
   return iree_ok_status();
 }
 

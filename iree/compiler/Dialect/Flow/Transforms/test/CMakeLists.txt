@@ -14,6 +14,7 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
+    "capture_dispatch_dynamic_dims.mlir"
     "cleanup_numeric_narrowing.mlir"
     "conv1x1_to_matmul.mlir"
     "conv2d_to_img2col.mlir"
@@ -35,6 +36,7 @@ iree_lit_test_suite(
     "promote_i1_to_i8.mlir"
     "strip_and_splat_constant_variables.mlir"
     "strip_signedness.mlir"
+    "test_partitionable_loops_interface.mlir"
     "transformation.mlir"
     "verify_input_ir.mlir"
   DATA

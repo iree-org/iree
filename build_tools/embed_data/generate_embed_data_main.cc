@@ -169,7 +169,7 @@ static bool GenerateImpl(const std::string& identifier,
   for (size_t i = 0, e = input_files.size(); i < e; ++i) {
     f << "  {\n";
     f << "    \"" << CEscape(toc_files[i]) << "\",\n";
-    f << "    file_" << i << ",\n";
+    f << "    (const char*)file_" << i << ",\n";
     f << "    sizeof(file_" << i << ") - 1\n";
     f << "  },\n";
   }
