@@ -27,6 +27,10 @@ Symlink binaries into python packages (only needs to be done once):
 Pip install editable (recommend to do this in a virtual environment):
 
 ```
+# All at once:
+pip install -e python_projects/*
+
+# Or one at a time:
 pip install -e python_projects/iree_tflite
 pip install -e python_projects/iree_xla
 pip install -e python_projects/iree_tf
@@ -53,8 +57,17 @@ source ~/path/to/iree-build/.env && export PYTHONPATH
 Run the test suite with:
 
 ```
-lit -v test/
-```
+pip install lit
 
-Note that you can specify arbitrary sub-directories or individual files/globs
-as needed.
+# Just runs the LLVM AOT tests by default:
+lit -v test/
+
+# Can also run vulkan tests with:
+lit -v -D FEATURES=vulkan test/
+
+# Can disable the default LLVM AOT tests:
+lit -v -D DISABLE_FEATURES=llvmaot -D FEATURES=vulkan test/
+
+# Individual test directories, files or globs can be run individually.
+lit -v $(find test -name '*softplus*')
+```
