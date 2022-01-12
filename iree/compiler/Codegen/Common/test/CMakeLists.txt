@@ -31,7 +31,7 @@ iree_lit_test_suite(
     "vectorize_linalg_conv.mlir"
     "vectorize_linalg_mmt4d.mlir"
   DATA
-    iree::tools::IreeFileCheck
+    FileCheck
     iree::tools::iree-opt
 )
 

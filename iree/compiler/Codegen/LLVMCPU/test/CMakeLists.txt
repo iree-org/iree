@@ -27,7 +27,7 @@ iree_lit_test_suite(
     "unfused_fma.mlir"
     "vector_contract_to_aarch64_asm.mlir"
   DATA
-    iree::tools::IreeFileCheck
+    FileCheck
     iree::tools::iree-opt
 )
 

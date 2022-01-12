@@ -1,4 +1,4 @@
-// RUN: iree-tf-opt %s -tf-saved-model-to-iree-abi -split-input-file -verify-diagnostics | IreeFileCheck %s
+// RUN: iree-tf-opt %s -tf-saved-model-to-iree-abi -split-input-file -verify-diagnostics | FileCheck %s
 
 // CHECK-LABEL: module @binary_func
 // Should just be a pass through.

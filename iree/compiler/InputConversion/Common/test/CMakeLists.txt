@@ -17,7 +17,7 @@ iree_lit_test_suite(
     "iree_import_public.mlir"
     "top_level_scf_to_cfg.mlir"
   DATA
-    iree::tools::IreeFileCheck
+    FileCheck
     iree::tools::iree-opt
 )
 

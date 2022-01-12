@@ -1,4 +1,4 @@
-// RUN: iree-opt -allow-unregistered-dialect -split-input-file -canonicalize %s | iree-opt -allow-unregistered-dialect -split-input-file | IreeFileCheck %s
+// RUN: iree-opt -allow-unregistered-dialect -split-input-file -canonicalize %s | iree-opt -allow-unregistered-dialect -split-input-file | FileCheck %s
 
 // CHECK-LABEL: @workgroupRankFolding
 func @workgroupRankFolding(%arg0 : tensor<?x4xf32>) -> tensor<4x?xf32> {
@@ -169,4 +169,3 @@ func @keep_used_read_write_result(%arg0 : tensor<9xi32>, %arg1 : tensor<9xi32>) 
   }
   return %0#0 : tensor<i32>
 }
-

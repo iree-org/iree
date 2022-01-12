@@ -1,4 +1,4 @@
-// RUN: iree-opt %s -iree-llvmcpu-tile-fuse-and-vectorize -cse -canonicalize -split-input-file | IreeFileCheck %s
+// RUN: iree-opt %s -iree-llvmcpu-tile-fuse-and-vectorize -cse -canonicalize -split-input-file | FileCheck %s
 
 #config = #iree_codegen.lowering.config<tile_sizes = [[], [16, 16, 32], [16, 16, 16]], native_vector_size = [16, 16, 16]>
 #map0 = affine_map<()[s0] -> (s0 * 64)>

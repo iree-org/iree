@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -iree-hal-materialize-resource-caches %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -iree-hal-materialize-resource-caches %s | FileCheck %s
 
 //      CHECK: util.global private @_descriptor_set_layout_0 : !hal.descriptor_set_layout
 // CHECK-NEXT: util.initializer {

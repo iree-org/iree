@@ -29,6 +29,6 @@ iree_lit_test_suite(
     "shift_ops_i64.mlir"
     "type_conversion.mlir"
   DATA
-    iree::tools::IreeFileCheck
+    FileCheck
     iree::tools::iree-opt
 )

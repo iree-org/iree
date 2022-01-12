@@ -26,7 +26,7 @@ iree_lit_test_suite(
         "tensor_cast.mlir",
     ],
     data = [
-        "//iree/tools:IreeFileCheck",
+        "@llvm-project//llvm:FileCheck",
         "//iree/tools:iree-benchmark-module",
         "//iree/tools:iree-run-mlir",
         "//iree/tools:iree-translate",

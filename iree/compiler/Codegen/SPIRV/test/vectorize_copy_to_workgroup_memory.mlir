@@ -1,7 +1,7 @@
 // RUN: iree-opt -split-input-file -iree-spirv-copy-to-workgroup-memory %s
 // TODO(antiagainst): Re-enable vectorizing workgroup memory copy once the
 // whole pipeline is in a better state.
-// | IreeFileCheck %s
+// | FileCheck %s
 
 #map0 = affine_map<(d0, d1)[s0] -> (d0 * 4096 + s0 + d1)>
 

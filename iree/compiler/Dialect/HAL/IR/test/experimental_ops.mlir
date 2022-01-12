@@ -1,4 +1,4 @@
-// RUN: iree-opt -allow-unregistered-dialect -split-input-file %s | iree-opt -allow-unregistered-dialect -split-input-file | IreeFileCheck %s
+// RUN: iree-opt -allow-unregistered-dialect -split-input-file %s | iree-opt -allow-unregistered-dialect -split-input-file | FileCheck %s
 
 // CHECK-LABEL: @shared_device
 func @shared_device() -> !hal.device {

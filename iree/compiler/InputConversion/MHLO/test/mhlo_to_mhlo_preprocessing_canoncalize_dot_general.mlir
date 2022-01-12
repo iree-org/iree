@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -verify-diagnostics -iree-mhlo-to-mhlo-preprocessing %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -verify-diagnostics -iree-mhlo-to-mhlo-preprocessing %s | FileCheck %s
 
 func @dot_general_to_dot(%arg0: tensor<1x32x128x4xf32>, %arg1: tensor<128x4x8x64xf32>) -> tensor<1x32x8x64xf32> {
   %0 = "mhlo.dot_general"(%arg0, %arg1) {
@@ -152,8 +152,8 @@ func @dot_general_1d_batching_1d_contracting(%arg0: tensor<64x155x4x36xf32>, %ar
 // CHECK-LABEL: func @dot_general_1d_batching_1d_contracting
 // CHECK-SAME: %[[ARG0:[a-zA-Z0-9_]+]]
 // CHECK-SAME: %[[ARG1:[a-zA-Z0-9_]+]]
-// CHECK: %[[ARG0_RESHAPED_TR:.+]] = "mhlo.transpose"(%[[ARG0]]) 
-// CHECK-SAME: {permutation = dense<[2, 0, 1, 3]> : tensor<4xi64>} 
+// CHECK: %[[ARG0_RESHAPED_TR:.+]] = "mhlo.transpose"(%[[ARG0]])
+// CHECK-SAME: {permutation = dense<[2, 0, 1, 3]> : tensor<4xi64>}
 // CHECK-SAME: (tensor<64x155x4x36xf32>) -> tensor<4x64x155x36xf32>
 // CHECK: %[[ARG1_RESHAPED_TR:.+]] = "mhlo.transpose"(%[[ARG1]])
 // CHECK-SAME: {permutation = dense<[1, 2, 0]> : tensor<3xi64>}

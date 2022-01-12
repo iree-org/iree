@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -iree-convert-hal-to-vm %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -iree-convert-hal-to-vm %s | FileCheck %s
 
 // CHECK-LABEL: vm.func private @buffer_view_dims
 // CHECK-SAME: %[[VIEW:.+]]: !vm.ref<!hal.buffer_view>

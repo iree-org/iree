@@ -17,7 +17,7 @@ iree_lit_test_suite(
     "dispatch_ops.mlir"
     "tensor_ops.mlir"
   DATA
-    iree::tools::IreeFileCheck
+    FileCheck
     iree::tools::iree-opt
 )
 

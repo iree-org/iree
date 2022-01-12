@@ -23,7 +23,7 @@ iree_lit_test_suite(
     "tensor_ops.mlir"
     "types.mlir"
   DATA
-    iree::tools::IreeFileCheck
+    FileCheck
     iree::tools::iree-opt
 )
 

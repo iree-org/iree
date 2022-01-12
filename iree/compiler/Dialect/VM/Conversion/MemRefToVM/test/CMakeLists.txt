@@ -16,7 +16,7 @@ iree_lit_test_suite(
   SRCS
     "load_store_ops.mlir"
   DATA
-    iree::tools::IreeFileCheck
+    FileCheck
     iree::tools::iree-opt
 )
 

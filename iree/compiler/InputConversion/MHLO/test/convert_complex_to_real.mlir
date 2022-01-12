@@ -1,4 +1,4 @@
-// RUN: iree-opt -iree-test-mhlo-convert-complex-to-real %s | IreeFileCheck %s
+// RUN: iree-opt -iree-test-mhlo-convert-complex-to-real %s | FileCheck %s
 
 // CHECK-LABEL: @add
 func @add(%arg0 : tensor<2xf32>, %arg1 : tensor<2xf32>, %arg2 : tensor<2xf32>, %arg3 : tensor<2xf32>) -> (tensor<2xf32>, tensor<2xf32>) {

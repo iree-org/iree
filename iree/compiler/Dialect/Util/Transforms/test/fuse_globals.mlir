@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -iree-util-fuse-globals -allow-unregistered-dialect %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -iree-util-fuse-globals -allow-unregistered-dialect %s | FileCheck %s
 
 // CHECK: util.global private mutable @fusable0 : index
 util.global private mutable @fusable0 : index

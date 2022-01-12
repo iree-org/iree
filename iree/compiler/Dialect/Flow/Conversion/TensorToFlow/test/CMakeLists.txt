@@ -20,7 +20,7 @@ iree_lit_test_suite(
     "from_elements.mlir"
     "insert_slice.mlir"
   DATA
-    iree::tools::IreeFileCheck
+    FileCheck
     iree::tools::iree-opt
 )
 

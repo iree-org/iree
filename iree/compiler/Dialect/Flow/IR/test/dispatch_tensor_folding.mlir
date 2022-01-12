@@ -1,4 +1,4 @@
-// RUN: iree-opt -allow-unregistered-dialect -split-input-file -canonicalize %s | IreeFileCheck %s
+// RUN: iree-opt -allow-unregistered-dialect -split-input-file -canonicalize %s | FileCheck %s
 
 // CHECK-LABEL: @ReuseDispatchTensorLoadShapeDims
 func @ReuseDispatchTensorLoadShapeDims(%arg0: !flow.dispatch.tensor<readonly:?x?xf32>, %arg1: index, %arg2: index, %arg3: index, %arg4: index) {

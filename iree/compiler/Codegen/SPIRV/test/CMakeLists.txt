@@ -40,7 +40,7 @@ iree_lit_test_suite(
     "vectorize_load_store.mlir"
     "vectorize_matmul.mlir"
   DATA
-    iree::tools::IreeFileCheck
+    FileCheck
     iree::tools::iree-opt
 )
 

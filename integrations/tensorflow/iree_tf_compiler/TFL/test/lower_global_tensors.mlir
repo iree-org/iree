@@ -1,4 +1,4 @@
-// RUN: iree-opt-tflite -split-input-file -allow-unregistered-dialect -pass-pipeline='iree-tflite-lower-global-tensors' %s | IreeFileCheck %s
+// RUN: iree-opt-tflite -split-input-file -allow-unregistered-dialect -pass-pipeline='iree-tflite-lower-global-tensors' %s | FileCheck %s
 
 module {
   // CHECK: iree_input.global private mutable @__iree_flow_Variable = dense<1.000000e+00> : tensor<16x16xf32>

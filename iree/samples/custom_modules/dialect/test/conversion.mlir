@@ -8,7 +8,7 @@
 // Depending on whether any manual conversion is performed this may get complex,
 // such as when versioning imports or performing optimizations.
 
-// RUN: custom-opt %s -iree-hal-conversion -iree-vm-conversion -split-input-file | IreeFileCheck %s
+// RUN: custom-opt %s -iree-hal-conversion -iree-vm-conversion -split-input-file | FileCheck %s
 
 // CHECK-LABEL: @tensorToMessage
 func @tensorToMessage(%tensor : tensor<2x4xf32>) {
@@ -113,4 +113,3 @@ func @getUniqueMessageOp() -> !custom.message {
   %0 = "custom.get_unique_message"() : () -> !custom.message
   return %0 : !custom.message
 }
-

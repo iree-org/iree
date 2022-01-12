@@ -1,4 +1,4 @@
-// RUN: iree-translate -split-input-file -iree-vm-ir-to-c-module -iree-vm-c-module-optimize=false %s | IreeFileCheck %s
+// RUN: iree-translate -split-input-file -iree-vm-ir-to-c-module -iree-vm-c-module-optimize=false %s | FileCheck %s
 
 vm.module @rodata_ops {
   // Check the generated arrays
@@ -23,7 +23,7 @@ vm.module @rodata_ops {
   // check state initialization inside the alloc_state function
   // CHECK-LABEL: static iree_status_t rodata_ops_alloc_state(
   // CHECK: [[STATE:[^ ]*]] = NULL;
-  
+
   // CHECK: [[VOID_PTR_1:[^ ]*]] = EMITC_CAST(rodata_ops_buffer_1, void*);
   // CHECK-NEXT: [[SIZE_1:[^ ]*]] = sizeof(rodata_ops_buffer_1);
   // CHECK-NEXT: [[BYTE_SPAN_1:[^ ]*]] = iree_make_byte_span([[VOID_PTR_1]], [[SIZE_1]]);
