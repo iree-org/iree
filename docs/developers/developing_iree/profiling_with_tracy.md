@@ -81,7 +81,7 @@ The built command line tool will be found at `./build/tracy/iree-tracy-capture`
 
 ## Building the Tracy UI (the "server")
 
-This is explained in section 2.3 of the [manual](#the-tracy-manual) for Windows
+This is explained in "Building the server" section 2.3 of the [manual](#the-tracy-manual) for Windows
 and Linux. Here we give some more detailed instructions for some systems.
 
 This is built as part of the IREE build above if you have installed the dependencies.
@@ -106,9 +106,9 @@ make -C third_party/tracy/profiler/build/unix -j12 release
 
 ## Running the profiled program
 
-Tracing doesn't work properly on VMs (see section 2.1.6.4 of the
-[manual](#the-tracy-manual)). To get sampling, you should run the profiled
-program on bare metal.
+Tracing doesn't work properly on VMs (see "Problematic Platforms / Virtual Machines" 
+section 2.1.6.4 of the [manual](#the-tracy-manual)). To get sampling, you should 
+run the profiled program on bare metal.
 
 Run your IREE workload as you normally would: now that it's been built with
 Tracy instrumentation enabled, it should do all the right things automatically.
