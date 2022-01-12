@@ -41,8 +41,8 @@ class BenchmarkThreshold:
 # match is used.
 BENCHMARK_THRESHOLDS = [
     # Fluctuating benchmarks on CPUs.
-    BenchmarkThreshold(re.compile(r"^DeepLabV3.*big-core.*Dylib-Sync @ Pixel"),
-                       20, ThresholdUnit.PERCENTAGE),
+    BenchmarkThreshold(re.compile(r"^DeepLabV3.*big-core.*Dylib.* @ Pixel"), 20,
+                       ThresholdUnit.PERCENTAGE),
     BenchmarkThreshold(
         re.compile(r"^MobileBertSquad.*big-core.*Dylib-Sync @ Pixel-4"), 50,
         ThresholdUnit.PERCENTAGE),
