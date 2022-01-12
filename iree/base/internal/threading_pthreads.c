@@ -26,6 +26,10 @@
 #include "iree/base/internal/threading.h"
 #include "iree/base/tracing.h"
 
+#if defined(IREE_PLATFORM_EMSCRIPTEN)
+#include <emscripten/threading.h>
+#endif  // IREE_PLATFORM_EMSCRIPTEN
+
 // Older glibc doesn't have a gettid wrapper:
 // https://stackoverflow.com/a/63494768
 #if __GLIBC__ == 2 && __GLIBC_MINOR__ < 30
@@ -58,6 +62,15 @@ static bool iree_thread_resumed_predicate(void* arg) {
                                 iree_memory_order_seq_cst) == 0;
 }
 
+#if defined(IREE_PLATFORM_EMSCRIPTEN)
+
+static int iree_thread_set_name(pthread_t handle, const char* name) {
+  emscripten_set_thread_name(handle, name);
+  return 0;
+}
+
+#else
+
 typedef int (*pthread_setname_np_fn_t)(pthread_t thread, const char* name);
 
 static pthread_setname_np_fn_t iree_pthread_setname_np_fn = NULL;
@@ -79,6 +92,8 @@ static int iree_thread_set_name(pthread_t handle, const char* name) {
   IREE_TRACE_ZONE_END(z0);
   return rc;
 }
+
+#endif  // IREE_PLATFORM_EMSCRIPTEN
 
 static void* iree_thread_start_routine(void* param) {
   // NOTE: we own a reference to the thread handle so that the creation
@@ -266,8 +281,9 @@ static void iree_thread_set_priority_class(
     iree_thread_t* thread, iree_thread_priority_class_t priority_class) {
   IREE_TRACE_ZONE_BEGIN(z0);
 
-#if defined(IREE_PLATFORM_ANDROID)
+#if defined(IREE_PLATFORM_ANDROID) || defined(IREE_PLATFORM_EMSCRIPTEN)
   // TODO(benvanik): Some sort of solution on Android, if possible (see above)
+  // TODO(benvanik): Some sort of solution on Emscripten, if possible
 #else
   int policy = 0;
   struct sched_param param;
@@ -315,10 +331,12 @@ void iree_thread_request_affinity(iree_thread_t* thread,
   // implemented as this sequence anyway:
   pid_t tid = pthread_gettid_np(thread->handle);
   sched_setaffinity(tid, sizeof(cpu_set), &cpu_set);
-#endif
+#endif  // __ANDROID_API__ >= 21
+#elif defined(IREE_PLATFORM_EMSCRIPTEN)
+  // TODO(benvanik): Some sort of solution on Emscripten, if possible
 #else
   pthread_setaffinity_np(thread->handle, sizeof(cpu_set), &cpu_set);
-#endif  // IREE_PLATFORM_ANDROID
+#endif  // IREE_PLATFORM_*
 
   IREE_TRACE_ZONE_END(z0);
 }
