@@ -70,6 +70,7 @@ iree_cc_library(
   HDRS
     "dynamic_symbols.h"
   TEXTUAL_HDRS
+    "dynamic_cupti_tables.h"
     "dynamic_symbol_tables.h"
   SRCS
     "cuda_headers.h"
@@ -80,6 +81,20 @@ iree_cc_library(
     iree::base::internal::dynamic_library
     iree::base::tracing
   PUBLIC
+)
+
+iree_cc_test(
+  NAME
+    dynamic_cupti_test
+  SRCS
+    "dynamic_cupti_test.cc"
+  DEPS
+    ::dynamic_symbols
+    iree::base
+    iree::testing::gtest
+    iree::testing::gtest_main
+  LABELS
+    "driver=cuda"
 )
 
 iree_cc_test(

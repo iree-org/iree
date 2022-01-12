@@ -15,7 +15,7 @@ external_cc_library(
     ${CUDA_HEADERS_API_ROOT}
   HDRS
     "cuda.h"
+    "cupti/cupti.h"
   INCLUDES
     ${CUDA_HEADERS_API_ROOT}
 )
-

@@ -8,5 +8,6 @@
 #define IREE_HAL_CUDA_CUDA_HEADERS_H_
 
 #include "cuda.h"  // IWYU pragma: export
+#include "cupti.h" // IWYU pragma: export
 
 #endif  // IREE_HAL_CUDA_CUDA_HEADERS_H_

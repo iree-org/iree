@@ -21,12 +21,20 @@ extern "C" {
 // the declarations in `cuda.h`.
 typedef struct iree_hal_cuda_dynamic_symbols_t {
   iree_dynamic_library_t* loader_library;
+  iree_dynamic_library_t* cupti_library;
 
 #define CU_PFN_DECL(cudaSymbolName, ...) \
   CUresult (*cudaSymbolName)(__VA_ARGS__);
 #include "iree/hal/cuda/dynamic_symbol_tables.h"  // IWYU pragma: export
 #undef CU_PFN_DECL
+
+#define CUPTI_PFN_DECL(cuptiSymbolName, ...) \
+  CUptiResult (*cuptiSymbolName)(__VA_ARGS__);
+#include "iree/hal/cuda/dynamic_cupti_tables.h"  // IWYU pragma: export
+#undef CUPTI_PFN_DECL
+
 } iree_hal_cuda_dynamic_symbols_t;
+
 
 // Initializes |out_syms| in-place with dynamically loaded CUDA symbols.
 // iree_hal_cuda_dynamic_symbols_deinitialize must be used to release the

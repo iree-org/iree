@@ -82,6 +82,7 @@ cc_library(
         "dynamic_symbols.h",
     ],
     textual_hdrs = [
+        "dynamic_cupti_tables.h",
         "dynamic_symbol_tables.h",
     ],
     deps = [
@@ -89,6 +90,18 @@ cc_library(
         "//iree/base:tracing",
         "//iree/base/internal:dynamic_library",
         "@cuda//:cuda_headers",
+    ],
+)
+
+cc_test(
+    name = "dynamic_cupti_test",
+    srcs = ["dynamic_cupti_test.cc"],
+    tags = ["driver=cuda"],
+    deps = [
+        ":dynamic_symbols",
+        "//iree/base",
+        "//iree/testing:gtest",
+        "//iree/testing:gtest_main",
     ],
 )
 
