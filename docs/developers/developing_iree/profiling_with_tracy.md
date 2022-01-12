@@ -21,41 +21,22 @@ a PDF manual that's part of each numbered release. You can
 or
 [preview it](https://docs.google.com/viewer?url=https://github.com/wolfpld/tracy/releases/latest/download/tracy.pdf).
 
-## Building the Tracy UI (the "server")
-
-This is explained in section 2.3 of the [manual](#the-tracy-manual) for Windows
-and Linux. Here we give some more detailed instructions for some systems.
-
-The IREE repository contains its own clone of the Tracy repository in
-`third_party/tracy`, so there is no need to make a separate clone of it. You can
-use one if you want, but be aware that the Tracy client/server protocol gets
-updated sometimes. Building both sides from the same `iree/third_party/tracy`
-lowers the risk of running into a protocol version mismatch.
-
+## Install dependencies
 ### Linux
 
 Install dependencies (Debian-based distributions):
-```
+```shell
 sudo apt install libcapstone-dev libtbb-dev libglfw3-dev libfreetype6-dev libgtk-3-dev
 ```
 
-Build (from your `iree/` clone root directory):
-```
-make -C third_party/tracy/profiler/build/unix -j12 release
+If you only build the command line tool you can install:
+```shell
+sudo apt install libcapstone-dev libtbb-dev libzstd-dev
 ```
 
 ### Mac
-
-TODO write this (Kojo?)
-
-
-## Building the Tracy Command Line Capture (the alternative "server")
-
-Build and run the command line capture when you don't have a UI or can't SSH in to
-setup a tunnel (GCP IAP etc).
-
-```
-make -C third_party/tracy/profiler/build/unix -j12 release
+```shell
+brew install capstone glfw freetype
 ```
 
 
@@ -82,6 +63,45 @@ $ cmake \
 For tracing the compiler, additionally set `IREE_ENABLE_COMPILER_TRACING` to
 `ON`. Compiler tracing is less stable, particularly on Linux with MLIR
 threading enabled (https://github.com/google/iree/issues/6404).
+
+
+## Building the Tracy Command Line Capture (the alternative "server")
+
+Optionally build the command capture tool with `-DIREE_BUILD_TRACY=ON `
+
+```shell
+$ cmake \
+  -DIREE_BUILD_TRACY=ON \
+  -DIREE_ENABLE_RUNTIME_TRACING=ON \
+  -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+  ... # other cmake arguments as usual
+```
+
+The built command line tool will be found at `./build/tracy/iree-tracy-capture`
+
+## Building the Tracy UI (the "server")
+
+This is explained in section 2.3 of the [manual](#the-tracy-manual) for Windows
+and Linux. Here we give some more detailed instructions for some systems.
+
+This is built as part of the IREE build above if you have installed the dependencies.
+The tool would be located at `./build/tracy/iree-tracy-profiler`
+
+If you would like to build the "server" for your desktop to connect remotely follow along.
+
+The IREE repository contains its own clone of the Tracy repository in
+`third_party/tracy`, so there is no need to make a separate clone of it. You can
+use one if you want, but be aware that the Tracy client/server protocol gets
+updated sometimes. Building both sides from the same `iree/third_party/tracy`
+lowers the risk of running into a protocol version mismatch.
+
+
+### Build on Mac and Linux
+
+Build (from your `iree/` clone root directory):
+```
+make -C third_party/tracy/profiler/build/unix -j12 release
+```
 
 
 ## Running the profiled program
@@ -120,7 +140,7 @@ While the program that you want to profile is still running (thanks to
 `TRACY_NO_EXIT=1`), start the Tracy capture tool in another terminal / ttyl.
 From the IREE root directory:
 ```shell
-./third_party/tracy/capture/build/unix/capture-release -o myprofile.tracy
+./build/tracy/iree-tracy-capture -o myprofile.tracy
 Connecting to 127.0.0.1:8086...
 ```
 
@@ -134,6 +154,13 @@ make sure you don't miss any capture events.
 While the program that you want to profile is still running (possibly thanks to
 `TRACY_NO_EXIT=1`), start the Tracy profiler UI which we had built above. From
 the IREE root directory:
+
+If you built it part of IREE:
+```shell
+./build/tracy/iree-tracy-profiler
+```
+
+If you built the standalone "server" on MAC or Linux:
 ```shell
 ./third_party/tracy/profiler/build/unix/Tracy-release
 ```
@@ -273,7 +300,11 @@ adb forward tcp:8086 tcp:8086
 
 ### Between two computers over the network
 
-TODO write this (`ssh` stuff...)
+Setup you [ssh tunnel](https://linuxize.com/post/how-to-setup-ssh-tunneling/)
+Make sure you can telnet to your local port and you can hit the remote server
+port 8086. Once that is done supply the port address for the caputre tool
+to connect to.
+
 
 ## Configuring Tracy instrumentation
 
