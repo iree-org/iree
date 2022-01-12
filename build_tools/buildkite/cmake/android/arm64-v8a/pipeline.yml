@@ -8,7 +8,7 @@ steps:
   - label: "build"
     commands:
       - "./scripts/git/submodule_versions.py init"
-      - "docker run --user=$(id -u):$(id -g) --volume=\\$PWD:\\$IREE_DOCKER_WORKDIR --workdir=\\$IREE_DOCKER_WORKDIR --rm gcr.io/iree-oss/android@sha256:112598cea3ff71c33f131772edea78eee5aceff5914874142229859017fd4869 build_tools/cmake/build_android.sh arm64-v8a"
+      - "docker run --user=$(id -u):$(id -g) --volume=\\$PWD:\\$IREE_DOCKER_WORKDIR --workdir=\\$IREE_DOCKER_WORKDIR --rm gcr.io/iree-oss/android@sha256:ffb02ab2a7c5ee7bb1bcae9fb08d0de70cdb3c42466a4951e48d9142cc9b8ca2 build_tools/cmake/build_android.sh arm64-v8a"
       - "tar --exclude='*.o' --exclude='*.a' -czvf build-artifacts.tgz build-android"
     agents:
       - "queue=build"

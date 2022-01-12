@@ -5,7 +5,7 @@
 ### Build in the same Linux container as the release
 
 ```
-docker run --rm -it -v $(pwd):/work stellaraccident/manylinux2014_x86_64-bazel-3.7.2:latest /bin/bash
+docker run --rm -it -v $(pwd):/work stellaraccident/manylinux2014_x86_64-bazel-4.2.2:latest /bin/bash
 
 # From within docker.
 export PATH=/opt/python/cp38-cp38/bin:$PATH

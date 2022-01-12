@@ -82,7 +82,7 @@ jobs:
 
       # Needs the bazel manylinux image.
       # TODO: Move this to our repo and pin.
-      CIBW_MANYLINUX_X86_64_IMAGE: stellaraccident/manylinux2014_x86_64-bazel-3.7.2:latest
+      CIBW_MANYLINUX_X86_64_IMAGE: stellaraccident/manylinux2014_x86_64-bazel-4.2.2:latest
       # CIBW_MANYLINUX_X86_64_IMAGE: manylinux2014
 
       CIBW_BUILD: "cp37-* cp38-* cp39-*"

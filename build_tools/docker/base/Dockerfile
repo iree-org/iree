@@ -65,7 +65,7 @@ RUN wget "https://github.com/Kitware/CMake/releases/download/v${CMAKE_VERSION?}/
 
 ######## Bazel ########
 WORKDIR /install-bazel
-ARG BAZEL_VERSION=3.7.1
+ARG BAZEL_VERSION=4.2.2
 
 # https://docs.bazel.build/versions/master/install-ubuntu.html
 RUN wget -qO - https://bazel.build/bazel-release.pub.gpg | apt-key add - \
