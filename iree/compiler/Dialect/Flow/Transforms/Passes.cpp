@@ -170,6 +170,12 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
   // wrapped in executables.
   passManager.addPass(createOutlineDispatchRegionsPass());
 
+  // Strip assertions from executables. We could support them with a bunch of
+  // work but our generated executables are designed to be safe in the face of
+  // invalid values and it'd only be useful for debugging.
+  passManager.addNestedPass<IREE::Flow::ExecutableOp>(
+      IREE::Util::createStripDebugOpsPass());
+
   // Cleanup identity ops that clutter up the IR and canonicalize.
   FunctionLikeNest(passManager).addPass(mlir::createCanonicalizerPass);
 
