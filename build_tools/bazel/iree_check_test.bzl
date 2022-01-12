@@ -6,7 +6,7 @@
 
 """Macros for defining tests that run a module using iree-check-module."""
 
-load("//iree/tools:compilation.bzl", "iree_bytecode_module")
+load("//build_tools/bazel:iree_bytecode_module.bzl", "iree_bytecode_module")
 load("//build_tools/bazel:run_binary_test.bzl", "run_binary_test")
 
 ALL_TARGET_BACKENDS_AND_DRIVERS = [
