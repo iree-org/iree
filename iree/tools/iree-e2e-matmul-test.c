@@ -624,7 +624,7 @@ static iree_status_t run_trace_file(iree_string_view_t root_path, FILE* file,
 
   yaml_parser_t parser;
   if (!yaml_parser_initialize(&parser)) {
-    iree_trace_replay_deinitialize(&replay);
+    iree_trace_replay_deinitialize(&replay, IREE_TRACE_REPLAY_SHUTDOWN_QUIET);
     return iree_make_status(IREE_STATUS_INTERNAL,
                             "yaml_parser_initialize failed");
   }
@@ -649,7 +649,7 @@ static iree_status_t run_trace_file(iree_string_view_t root_path, FILE* file,
   }
 
   yaml_parser_delete(&parser);
-  iree_trace_replay_deinitialize(&replay);
+  iree_trace_replay_deinitialize(&replay, IREE_TRACE_REPLAY_SHUTDOWN_QUIET);
   return status;
 }
 
