@@ -40,6 +40,8 @@ BAZEL_BINDIR="$(${BAZEL_CMD[@]} info bazel-bin)"
 "${BAZEL_CMD[@]}" build //iree_tf_compiler:iree-import-tflite \
       --config=generic_clang \
       --config=remote_cache_bazel_ci
+# So the benchmark build below can find the importer binaries that were built.
+export PATH="$PWD/bazel-bin/iree_tf_compiler:$PATH"
 
 # --------------------------------------------------------------------------- #
 # Build for the host.
@@ -61,8 +63,8 @@ cd build-host
   -DIREE_BUILD_COMPILER=ON \
   -DIREE_BUILD_TESTS=OFF \
   -DIREE_BUILD_BENCHMARKS=ON \
-  -DIREE_BUILD_TFLITE_COMPILER=ON \
   -DIREE_BUILD_SAMPLES=OFF
+
 "${CMAKE_BIN}" --build . --target install
 # Also generate artifacts for benchmarking on Android.
 "${CMAKE_BIN}" --build . --target iree-benchmark-suites
