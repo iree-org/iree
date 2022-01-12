@@ -11,8 +11,8 @@ TENSORFLOW_COMMIT = "baa6d31a0af6adb7058e229001931a1fdd6f81bb"
 
 git_repository(
     name = "org_tensorflow",
-    remote = "https://github.com/tensorflow/tensorflow.git",
     commit = TENSORFLOW_COMMIT,
+    remote = "https://github.com/tensorflow/tensorflow.git",
 )
 
 # Import all of the tensorflow dependencies.
