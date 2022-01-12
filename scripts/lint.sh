@@ -105,9 +105,6 @@ else
   echo "'git-clang-format' not found. Skipping check"
 fi
 
-echo "***** submodules *****"
-./scripts/git/submodule_versions.py check
-
 echo "***** tabs *****"
 ./scripts/check_tabs.sh
 

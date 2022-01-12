@@ -26,9 +26,6 @@ python3 --version
 # Print SwiftShader git commit
 cat /swiftshader/git-commit
 
-echo "Initializing submodules"
-./scripts/git/submodule_versions.py init
-
 # TODO(gcmn): It would be nice to be able to build and test as much as possible,
 # so a build failure only prevents building/testing things that depend on it and
 # we can still run the other tests.

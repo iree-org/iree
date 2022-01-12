@@ -29,9 +29,6 @@ nvidia-smi || true
 
 ./build_tools/kokoro/gcp_ubuntu/check_vulkan.sh
 
-echo "Initializing submodules"
-./scripts/git/submodule_versions.py init
-
 # BUILD the integrations binaries with Bazel
 IREE_SRC_DIR="$PWD"
 pushd integrations/tensorflow

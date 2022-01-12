@@ -110,14 +110,6 @@ jobs:
           /tmp/git-clang-format "${GITHUB_BASE_REF?}" --binary=clang-format-9 --style=file
           git diff --exit-code
 
-  submodules:
-    runs-on: ubuntu-18.04
-    steps:
-      - name: Checking out repository
-        uses: actions/checkout@v2
-      - name: Checking submodules
-        run: ./scripts/git/submodule_versions.py check
-
   tabs:
     runs-on: ubuntu-18.04
     steps:

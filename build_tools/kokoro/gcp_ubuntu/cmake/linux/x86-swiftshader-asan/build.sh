@@ -26,9 +26,6 @@ python3 --version
 # Print SwiftShader git commit
 cat /swiftshader/git-commit
 
-echo "Initializing submodules"
-./scripts/git/submodule_versions.py init
-
 CMAKE_BUILD_DIR="${CMAKE_BUILD_DIR:-$HOME/build}"
 
 CMAKE_ARGS=(

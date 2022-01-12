@@ -28,9 +28,6 @@ python3 -c 'import jax; print(jax.__version__)'
 # Print SwiftShader git commit
 cat /swiftshader/git-commit
 
-echo "Initializing submodules"
-./scripts/git/submodule_versions.py init
-
 # BUILD the integrations binaries with Bazel and run any lit tests
 IREE_SRC_DIR="$PWD"
 pushd integrations/tensorflow

@@ -21,8 +21,5 @@ bazel --version
 "${CXX?}" --version
 "${CC?}" --version
 
-echo "Initializing submodules"
-./scripts/git/submodule_versions.py init
-
 echo "Building and testing with bazel"
 ./build_tools/bazel/build_core.sh

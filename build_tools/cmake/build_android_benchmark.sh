@@ -29,9 +29,6 @@ echo "Android NDK path: ${ANDROID_NDK}"
 ROOT_DIR=$(git rev-parse --show-toplevel)
 cd "${ROOT_DIR}"
 
-echo "Initializing submodules"
-./scripts/git/submodule_versions.py init
-
 # BUILD the iree-import-tflite binary for importing models to benchmark from
 # TFLite flatbuffers.
 cd "${ROOT_DIR}/integrations/tensorflow"

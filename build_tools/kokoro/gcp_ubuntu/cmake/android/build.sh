@@ -35,9 +35,6 @@ python3 --version
 ninja --version
 echo "Android NDK path: $ANDROID_NDK"
 
-echo "Initializing submodules"
-./scripts/git/submodule_versions.py init
-
 cd "${ROOT_DIR}"
 
 # BUILD the iree-import-tflite binary for importing models to benchmark from
