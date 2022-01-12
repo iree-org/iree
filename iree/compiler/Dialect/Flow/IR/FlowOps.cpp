@@ -44,6 +44,9 @@ static LogicalResult verifyOpDynamicDims(Operation *op, ValueRange values,
   for (auto value : values) {
     if (auto shapedType = value.getType().dyn_cast<ShapedType>()) {
       requiredCount += shapedType.getNumDynamicDims();
+    } else if (auto tensorType =
+                   value.getType().dyn_cast<DispatchTensorType>()) {
+      requiredCount += tensorType.getNumDynamicDims();
     }
   }
   if (dynamicDims.size() != requiredCount) {
@@ -56,8 +59,42 @@ static LogicalResult verifyOpDynamicDims(Operation *op, ValueRange values,
 }
 
 //===----------------------------------------------------------------------===//
+// flow.dispatch.tie_shape
+//===----------------------------------------------------------------------===//
+
+static LogicalResult verifyDispatchTieShapeOp(DispatchTieShapeOp op) {
+  if (failed(verifyOpDynamicDims(op, {op.operand()}, op.dynamic_dims()))) {
+    return failure();
+  }
+  return success();
+}
+
+LogicalResult DispatchTieShapeOp::reifyResultShapes(
+    OpBuilder &b, ReifiedRankedShapedTypeDims &reifiedReturnShapes) {
+  SmallVector<Value> shape;
+  unsigned dynamicIdx = 0;
+  auto tensorType = result().getType().cast<IREE::Flow::DispatchTensorType>();
+  for (int64_t dim : tensorType.getShape()) {
+    if (dim == ShapedType::kDynamicSize) {
+      shape.push_back(dynamic_dims()[dynamicIdx++]);
+    } else {
+      shape.push_back(b.create<arith::ConstantIndexOp>(getLoc(), dim));
+    }
+  }
+  reifiedReturnShapes.push_back(shape);
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
 // flow.dispatch.tensor.load
 //===----------------------------------------------------------------------===//
+
+static LogicalResult verifyDispatchTensorLoadOp(DispatchTensorLoadOp op) {
+  if (failed(verifyOpDynamicDims(op, {op.source()}, op.source_dims()))) {
+    return failure();
+  }
+  return success();
+}
 
 /// Extracts static and dynamic values from list of `OpFoldResult`.
 static void processMixedOperands(ArrayRef<OpFoldResult> valueOrAttrs,
@@ -231,6 +268,13 @@ LogicalResult DispatchTensorLoadOp::reifyResultShapes(
 //===----------------------------------------------------------------------===//
 // flow.dispatch.tensor.store
 //===----------------------------------------------------------------------===//
+
+static LogicalResult verifyDispatchTensorStoreOp(DispatchTensorStoreOp op) {
+  if (failed(verifyOpDynamicDims(op, {op.target()}, op.target_dims()))) {
+    return failure();
+  }
+  return success();
+}
 
 void DispatchTensorStoreOp::build(OpBuilder &builder, OperationState &state,
                                   Value value, Value target,

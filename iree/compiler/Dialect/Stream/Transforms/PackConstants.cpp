@@ -44,6 +44,23 @@ struct ConstantSlice {
   Value resultSize;
   // Constant value being encoded.
   Attribute value;
+
+  // Returns the length, in bytes, of the constant value prior to alignment or
+  // padding.
+  uint64_t getRawLength() const {
+    if (auto denseAttr = value.dyn_cast<DenseElementsAttr>()) {
+      return denseAttr.getRawData().size();
+    } else if (auto opaqueAttr = value.dyn_cast<OpaqueElementsAttr>()) {
+      // Later on in the pipeline opaque attrs will cause the compiler to fail
+      // (as at some point we need to get the data) but this allows us to run
+      // the stream transforms on IR that has had its large constants elided.
+      return opaqueAttr.getNumElements() *
+             opaqueAttr.getElementType().getIntOrFloatBitWidth();
+    } else {
+      llvm_unreachable("invalid constant attr type");
+      return 0;
+    }
+  }
 };
 
 struct PackedSpan {
@@ -81,8 +98,7 @@ static SmallVector<StorageResource, 8> bucketValuesIntoStorageResources(
   for (auto slice : slices) {
     uint64_t offset = IREE::Util::align(
         currentBuffer->totalSize, resourceConfig.getMinBufferOffsetAlignment());
-    uint64_t unpaddedLength =
-        slice.value.cast<DenseElementsAttr>().getRawData().size();
+    uint64_t unpaddedLength = slice.getRawLength();
     uint64_t paddedLength = IREE::Util::align(
         unpaddedLength, resourceConfig.getMinBufferRangeAlignment());
     if (offset + unpaddedLength > resourceConfig.getMaxAllocationSize()) {
@@ -165,6 +181,7 @@ static void packStorageResourceData(StorageResource &storageBuffer,
   }
 
   storageBuffer.data = IREE::Util::CompositeAttr::get(context, values);
+  assert(storageBuffer.data && "unable to build composite attr");
 }
 
 // Returns zero or more storage resources and the spans values map into.

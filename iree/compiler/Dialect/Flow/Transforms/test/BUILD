@@ -17,6 +17,7 @@ iree_lit_test_suite(
     name = "lit",
     srcs = enforce_glob(
         [
+            "capture_dispatch_dynamic_dims.mlir",
             "cleanup_numeric_narrowing.mlir",
             "conv1x1_to_matmul.mlir",
             "conv2d_to_img2col.mlir",

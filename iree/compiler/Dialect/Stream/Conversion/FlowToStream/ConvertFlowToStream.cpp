@@ -365,6 +365,11 @@ struct ConvertExecutableOp
         }
       }
 
+      // Strip any shape ties now that we've extracted the information.
+      funcOp.walk([&](IREE::Flow::DispatchTieShapeOp tieOp) {
+        rewriter.replaceOp(tieOp, tieOp.operand());
+      });
+
       funcOp.setType(rewriter.getFunctionType(newTypes, {}));
     }
 
