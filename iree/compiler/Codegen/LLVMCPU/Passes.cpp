@@ -180,8 +180,11 @@ void addTensorToVectorsPassPipeline(OpPassManager &passManager,
 void addSingleTilingExpertPassPipeline(OpPassManager &passManager) {
   passManager.addPass(createCanonicalizerPass());
   // Add the sandbox single tiling expert to tile and vectorize.
-  passManager.addNestedPass<FuncOp>(createLinalgSingleTilingExpertPass(
-      static_cast<int64_t>(TilingLevel::L1Tiles), true));
+  LinalgSingleTilingExpertPassOptions options;
+  options.vectorize = true;
+  options.tilingLevel = static_cast<int64_t>(TilingLevel::L1Tiles);
+  passManager.addNestedPass<FuncOp>(
+      createLinalgSingleTilingExpertPass(options));
 
   // TODO(ravishankarm): This is commented cause this is WIP, to be enabled
   // soon.

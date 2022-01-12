@@ -14,8 +14,29 @@ namespace mlir {
 /// Creates a pass to drive tile + fuse transformations of `LinalgOp`s.
 std::unique_ptr<OperationPass<FuncOp>> createLinalgFusePass();
 
+/// Struct to control pass options for `LinalgSingleTilingExpert` pass.
+struct LinalgSingleTilingExpertPassOptions {
+  std::string anchorFuncOpName = "";
+  std::string anchorOpName = "";
+  SmallVector<int64_t> tileSizes = {};
+  SmallVector<int64_t> tileInterchange = {};
+  SmallVector<int64_t> peeledLoops = {};
+  bool pad = false;
+  SmallVector<int64_t> packPaddings = {};
+  SmallVector<int64_t> hoistPaddings = {};
+  bool scalarizeDynamicDims = false;
+  bool generalize = false;
+  SmallVector<int64_t> iteratorInterchange = {};
+  bool decomposeToLowerDimOp = false;
+  bool vectorize = false;
+  bool vectorizePadding = false;
+  int64_t tilingLevel = -1;
+};
+
 /// Creates a pass to drive one level tiling + vectorization of `LinalgOp`s.
 std::unique_ptr<OperationPass<FuncOp>> createLinalgSingleTilingExpertPass();
+std::unique_ptr<OperationPass<FuncOp>> createLinalgSingleTilingExpertPass(
+    const LinalgSingleTilingExpertPassOptions &passOptions);
 
 /// Creates a pass to drive the lowering of vector operations in a staged
 /// manner.
