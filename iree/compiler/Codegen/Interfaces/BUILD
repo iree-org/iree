@@ -62,6 +62,7 @@ cc_library(
         "@llvm-project//mlir:LinalgBufferizableOpInterfaceImpl",
         "@llvm-project//mlir:MemRefDialect",
         "@llvm-project//mlir:SCFBufferizableOpInterfaceImpl",
+        "@llvm-project//mlir:StdBufferizableOpInterfaceImpl",
         "@llvm-project//mlir:Support",
         "@llvm-project//mlir:TensorBufferizableOpInterfaceImpl",
         "@llvm-project//mlir:VectorBufferizableOpInterfaceImpl",

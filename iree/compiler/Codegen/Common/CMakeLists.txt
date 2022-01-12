@@ -66,6 +66,7 @@ iree_cc_library(
     MLIRSCF
     MLIRSCFBufferizableOpInterfaceImpl
     MLIRSCFToStandard
+    MLIRStdBufferizableOpInterfaceImpl
     MLIRSideEffectInterfaces
     MLIRStandard
     MLIRSupport
