@@ -48,6 +48,17 @@ make -C third_party/tracy/profiler/build/unix -j12 release
 
 TODO write this (Kojo?)
 
+
+## Building the Tracy Command Line Capture (the alternative "server")
+
+Build and run the command line capture when you don't have a UI or can't SSH in to
+setup a tunnel (GCP IAP etc).
+
+```
+make -C third_party/tracy/profiler/build/unix -j12 release
+```
+
+
 ## Building IREE with Tracy instrumentation (the "client")
 
 IREE needs to be build with Tracy instrumentation enabled. This enables both the
@@ -72,58 +83,6 @@ For tracing the compiler, additionally set `IREE_ENABLE_COMPILER_TRACING` to
 `ON`. Compiler tracing is less stable, particularly on Linux with MLIR
 threading enabled (https://github.com/google/iree/issues/6404).
 
-## Permissions issues
-
-The profiled application (i.e. the Tracy client) needs to have appropriate
-permissions so perform the special I/O required to collect the profile
-information. This is OS-specific.
-
-### Desktop Linux
-
-On desktop Linux, the profiled application must be run as root, e.g. with
-`sudo`. Otherwise, profile data will lack important components.
-
-### Android
-
-On Android it is not necessary to run as root and in fact, Android graphical
-applications never run as root, so it's advisable to run all programs as
-non-root for consistency.
-
-The Android device must be prepared as follows to enable Tracy profiling.
-* The device must be rooted.
-  * That means that in `adb shell`, the command `su` must succeed.
-  * That does NOT mean doing `adb root`. The effect of `adb root` is to have the
-    `adbd` daemon itself run as root, which causes `adb shell` to give you a
-    root shell by default. If you are in that case, consider doing `adb unroot`
-    to restart the `adbd` server as non-root. Not mandatory, but again, running
-    anything as root on Android is a deviation from normal user conditions.
-* Execute the following commands in a root shell on the device (i.e. `adb
-  shell`, then `su`, then the following commands). These are from the
-  [manual](#the-tracy-manual), but hard to find there, and copy-pasting from PDF
-  introduces unwanted whitespace. These settings normally persist until the next
-  reboot of the device.
-  * `setenforce 0`
-  * `mount -o remount,hidepid=0 /proc`
-  * `echo 0 > /proc/sys/kernel/perf_event_paranoid`
-
-## Port forwarding
-
-The Tracy client and server communicate by default over port `8086`. When they
-run on different machines, e.g. with embedded/Android profiling or remote
-profiling, port forwarding must be set up.
-
-### Between a computer and a local Android device connected to it by USB
-
-Run this command. You might need to run it again more a little frequently than
-you reboot the device. When experiencing connection issues, try that first.
-
-```shell
-adb forward tcp:8086 tcp:8086
-```
-
-### Between two computers over the network
-
-TODO write this (`ssh` stuff...)
 
 ## Running the profiled program
 
@@ -153,6 +112,22 @@ TRACY_NO_EXIT=1 /data/local/tmp/iree-benchmark-module \
   --function_input=1x384xi32 \
   --function_input=1x384xi32
 ```
+
+
+## Running the Tracy Capture CLI, connecting and saving profiles
+
+While the program that you want to profile is still running (thanks to
+`TRACY_NO_EXIT=1`), start the Tracy capture tool in another terminal / ttyl.
+From the IREE root directory:
+```shell
+./third_party/tracy/capture/build/unix/capture-release -o myprofile.tracy
+Connecting to 127.0.0.1:8086...
+```
+
+It should connect to the IREE client and save the output to myprofile.tracy that
+can be visualized by the client below. You can start the capture tool first to
+make sure you don't miss any capture events.
+
 
 ## Running the Tracy profiler UI, connecting and visualizing
 
@@ -246,6 +221,59 @@ This still has a 'Source' button but that only shows the last C++ caller that
 had explicit Tracy information, so here we see a file under `iree/hal` whereas
 the Ghost zone saw into the IREE compiled module that that calls into, with the
 source view pointing to the `.mlir` file.
+
+## Permissions issues
+
+The profiled application (i.e. the Tracy client) needs to have appropriate
+permissions so perform the special I/O required to collect the profile
+information. This is OS-specific.
+
+### Desktop Linux
+
+On desktop Linux, the profiled application must be run as root, e.g. with
+`sudo`. Otherwise, profile data will lack important components.
+
+### Android
+
+On Android it is not necessary to run as root and in fact, Android graphical
+applications never run as root, so it's advisable to run all programs as
+non-root for consistency.
+
+The Android device must be prepared as follows to enable Tracy profiling.
+* The device must be rooted.
+  * That means that in `adb shell`, the command `su` must succeed.
+  * That does NOT mean doing `adb root`. The effect of `adb root` is to have the
+    `adbd` daemon itself run as root, which causes `adb shell` to give you a
+    root shell by default. If you are in that case, consider doing `adb unroot`
+    to restart the `adbd` server as non-root. Not mandatory, but again, running
+    anything as root on Android is a deviation from normal user conditions.
+* Execute the following commands in a root shell on the device (i.e. `adb
+  shell`, then `su`, then the following commands). These are from the
+  [manual](#the-tracy-manual), but hard to find there, and copy-pasting from PDF
+  introduces unwanted whitespace. These settings normally persist until the next
+  reboot of the device.
+  * `setenforce 0`
+  * `mount -o remount,hidepid=0 /proc`
+  * `echo 0 > /proc/sys/kernel/perf_event_paranoid`
+
+## Port forwarding
+
+The Tracy client and server communicate by default over port `8086`. When they
+run on different machines, e.g. with embedded/Android profiling or remote
+profiling, port forwarding must be set up.
+
+### Between a computer and a local Android device connected to it by USB
+
+Run this command. You might need to run it again more a little frequently than
+you reboot the device. When experiencing connection issues, try that first.
+
+```shell
+adb forward tcp:8086 tcp:8086
+```
+
+### Between two computers over the network
+
+TODO write this (`ssh` stuff...)
 
 ## Configuring Tracy instrumentation
 
