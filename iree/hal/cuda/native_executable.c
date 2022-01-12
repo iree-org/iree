@@ -90,6 +90,7 @@ iree_status_t iree_hal_cuda_native_executable_create(
         "cuModuleLoadDataEx");
   }
 
+  executable->entry_count = entry_count;
   for (iree_host_size_t i = 0; i < entry_count; i++) {
     if (iree_status_is_ok(status)) {
       CUfunction function = NULL;
@@ -117,6 +118,21 @@ iree_status_t iree_hal_cuda_native_executable_create(
   return status;
 }
 
+static void iree_hal_cuda_native_executable_destroy(
+    iree_hal_executable_t* base_executable) {
+  iree_hal_cuda_native_executable_t* executable =
+      iree_hal_cuda_native_executable_cast(base_executable);
+  iree_allocator_t host_allocator = executable->context->host_allocator;
+  IREE_TRACE_ZONE_BEGIN(z0);
+
+  for (iree_host_size_t i = 0; i < executable->entry_count; ++i) {
+    iree_hal_executable_layout_release(executable->executable_layouts[i]);
+  }
+  iree_allocator_free(host_allocator, executable);
+
+  IREE_TRACE_ZONE_END(z0);
+}
+
 CUfunction iree_hal_cuda_native_executable_for_entry_point(
     iree_hal_executable_t* base_executable, int32_t entry_point) {
   iree_hal_cuda_native_executable_t* executable =
@@ -140,21 +156,6 @@ iree_hal_executable_layout_t* iree_hal_cuda_executable_get_layout(
   iree_hal_cuda_native_executable_t* executable =
       iree_hal_cuda_native_executable_cast(base_executable);
   return executable->executable_layouts[entry_point];
-}
-
-static void iree_hal_cuda_native_executable_destroy(
-    iree_hal_executable_t* base_executable) {
-  iree_hal_cuda_native_executable_t* executable =
-      iree_hal_cuda_native_executable_cast(base_executable);
-  iree_allocator_t host_allocator = executable->context->host_allocator;
-  IREE_TRACE_ZONE_BEGIN(z0);
-
-  for (iree_host_size_t i = 0; i < executable->entry_count; ++i) {
-    iree_hal_executable_layout_release(executable->executable_layouts[i]);
-  }
-  iree_allocator_free(host_allocator, executable);
-
-  IREE_TRACE_ZONE_END(z0);
 }
 
 static const iree_hal_executable_vtable_t

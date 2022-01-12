@@ -537,6 +537,8 @@ IREE_API_EXPORT iree_status_t iree_hal_heap_buffer_wrap(
 //===----------------------------------------------------------------------===//
 
 typedef struct iree_hal_buffer_vtable_t {
+  // Must be iree_hal_buffer_recycle.
+  void(IREE_API_PTR* recycle)(iree_hal_buffer_t* buffer);
   void(IREE_API_PTR* destroy)(iree_hal_buffer_t* buffer);
 
   iree_status_t(IREE_API_PTR* map_range)(iree_hal_buffer_t* buffer,
@@ -559,7 +561,9 @@ typedef struct iree_hal_buffer_vtable_t {
       iree_hal_buffer_t* buffer, iree_device_size_t local_byte_offset,
       iree_device_size_t local_byte_length);
 } iree_hal_buffer_vtable_t;
-IREE_HAL_ASSERT_VTABLE_LAYOUT(iree_hal_buffer_vtable_t);
+static_assert(offsetof(iree_hal_buffer_vtable_t, recycle) == 0,
+              "iree_hal_resource_vtable_t expects destroy at offset 0, we want "
+              "to recycle instead");
 
 struct iree_hal_buffer_t {
   iree_hal_resource_t resource;
@@ -585,6 +589,13 @@ IREE_API_EXPORT void iree_hal_buffer_initialize(
     iree_hal_buffer_usage_t allowed_usage,
     const iree_hal_buffer_vtable_t* vtable, iree_hal_buffer_t* buffer);
 
+// Recycles |buffer| by returning it to its allocator (or destroying it).
+// The |buffer| pointer may remain valid if it is returned to a pool but callers
+// must assume its contents are undefined.
+IREE_API_EXPORT void iree_hal_buffer_recycle(iree_hal_buffer_t* buffer);
+
+// Destroys |buffer| and frees its memory.
+// Implementations should use iree_hal_buffer_recycle in their vtables.
 IREE_API_EXPORT void iree_hal_buffer_destroy(iree_hal_buffer_t* buffer);
 
 #ifdef __cplusplus

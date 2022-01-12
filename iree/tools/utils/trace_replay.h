@@ -16,6 +16,12 @@
 extern "C" {
 #endif  // __cplusplus
 
+enum iree_trace_replay_shutdown_flag_bits_e {
+  IREE_TRACE_REPLAY_SHUTDOWN_QUIET = 0u,
+  IREE_TRACE_REPLAY_SHUTDOWN_PRINT_STATISTICS = 1 << 0u,
+};
+typedef uint32_t iree_trace_replay_shutdown_flags_t;
+
 typedef struct iree_trace_replay_t {
   iree_allocator_t host_allocator;
   iree_string_view_t root_path;
@@ -36,7 +42,8 @@ iree_status_t iree_trace_replay_initialize(
     iree_trace_replay_t* out_replay);
 
 // Deinitializes a trace replay context and releases all resources.
-void iree_trace_replay_deinitialize(iree_trace_replay_t* replay);
+void iree_trace_replay_deinitialize(iree_trace_replay_t* replay,
+                                    iree_trace_replay_shutdown_flags_t flags);
 
 // Overrides the HAL driver used in the trace with the given |driver|.
 void iree_trace_replay_set_hal_driver_override(iree_trace_replay_t* replay,

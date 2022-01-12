@@ -54,7 +54,7 @@ IREE_API_EXPORT iree_status_t iree_hal_module_register_types(void) {
                               iree_hal_allocator_destroy,
                               iree_hal_allocator_descriptor);
   IREE_VM_REGISTER_HAL_C_TYPE(iree_hal_buffer_t, "hal.buffer",
-                              iree_hal_buffer_destroy,
+                              iree_hal_buffer_recycle,
                               iree_hal_buffer_descriptor);
   IREE_VM_REGISTER_HAL_C_TYPE(iree_hal_buffer_view_t, "hal.buffer_view",
                               iree_hal_buffer_view_destroy,
