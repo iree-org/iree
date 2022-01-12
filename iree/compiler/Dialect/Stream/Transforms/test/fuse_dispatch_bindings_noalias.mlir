@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -pass-pipeline='iree-stream-fuse-dispatch-bindings{alias-mutable-bindings=false}' %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -pass-pipeline='iree-stream-fuse-dispatch-bindings{alias-mutable-bindings=false}' %s | FileCheck %s
 
 // TODO(benvanik): remove this file when aliasing mutable bindings is fixed.
 

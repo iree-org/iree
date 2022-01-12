@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file --iree-mhlo-to-linalg-ext %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file --iree-mhlo-to-linalg-ext %s | FileCheck %s
 // Also ensure that full lowering to linalg doesn't error.
 // RUN: iree-opt -split-input-file --iree-mhlo-to-linalg-ext --iree-mhlo-to-linalg-on-tensors --reconcile-unrealized-casts %s
 

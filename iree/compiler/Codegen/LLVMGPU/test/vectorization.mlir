@@ -1,4 +1,4 @@
-// RUN: iree-opt -iree-llvmgpu-vectorization %s | IreeFileCheck %s
+// RUN: iree-opt -iree-llvmgpu-vectorization %s | FileCheck %s
 
 func @add_dispatch_0(%arg0: memref<1x8x4xf32>, %arg1: memref<1x4x8xf32>, %arg2: memref<1x4x8xf32>)  {
   linalg.generic {indexing_maps =

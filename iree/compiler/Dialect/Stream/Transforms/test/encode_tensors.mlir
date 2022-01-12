@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -iree-stream-encode-tensors %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -iree-stream-encode-tensors %s | FileCheck %s
 
 // CHECK-LABEL: @denseTensorSizeOf
 func @denseTensorSizeOf(%arg0: index) -> index {

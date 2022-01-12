@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -iree-stream-annotate-dispatch-arguments %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -iree-stream-annotate-dispatch-arguments %s | FileCheck %s
 
 // Tests that operands are annotated with their potential values.
 // %arg0: cannot be annotated because it comes from outside the program.

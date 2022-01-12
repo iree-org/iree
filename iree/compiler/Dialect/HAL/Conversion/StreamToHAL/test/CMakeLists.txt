@@ -19,7 +19,7 @@ iree_lit_test_suite(
     "timepoint_ops.mlir"
     "transfer_ops.mlir"
   DATA
-    iree::tools::IreeFileCheck
+    FileCheck
     iree::tools::iree-opt
 )
 

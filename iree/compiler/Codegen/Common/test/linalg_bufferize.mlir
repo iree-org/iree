@@ -1,4 +1,4 @@
-// RUN: iree-opt %s --iree-codegen-linalg-bufferize -canonicalize -cse -split-input-file | IreeFileCheck %s
+// RUN: iree-opt %s --iree-codegen-linalg-bufferize -canonicalize -cse -split-input-file | FileCheck %s
 
 func @tile_from_tensor_load() {
   %c0 = arith.constant 0 : index

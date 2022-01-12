@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -iree-vmvx-conversion -canonicalize %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -iree-vmvx-conversion -canonicalize %s | FileCheck %s
 
 // CHECK: memref.global "private" constant @__constant_5xi32 : memref<5xi32> = dense<[1, 2, 3, 4, 5]>
 memref.global "private" constant @__constant_5xi32 : memref<5xi32> = dense<[1, 2, 3, 4, 5]>

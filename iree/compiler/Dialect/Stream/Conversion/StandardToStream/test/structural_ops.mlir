@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -iree-stream-conversion %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -iree-stream-conversion %s | FileCheck %s
 
 // CHECK-LABEL: @functionExpansion
 //  CHECK-SAME: (%[[ARG0:.+]]: !stream.resource<*>, %[[ARG0_SIZE:.+]]: index,

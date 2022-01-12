@@ -1,4 +1,4 @@
-// RUN: iree-opt -iree-llvmgpu-tensorcore-vectorization %s | IreeFileCheck %s
+// RUN: iree-opt -iree-llvmgpu-tensorcore-vectorization %s | FileCheck %s
 
 func @dot() {
   %c16 = arith.constant 16 : index

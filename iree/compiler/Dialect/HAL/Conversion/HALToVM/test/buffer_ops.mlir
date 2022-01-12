@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -iree-convert-hal-to-vm %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -iree-convert-hal-to-vm %s | FileCheck %s
 
 // CHECK-LABEL: @buffer_subspan
 func @buffer_subspan(%arg0 : !hal.buffer) -> !hal.buffer {

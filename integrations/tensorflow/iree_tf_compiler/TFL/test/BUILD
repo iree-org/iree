@@ -28,7 +28,7 @@ iree_lit_test_suite(
     ),
     data = [
         "//iree_tf_compiler:iree-opt-tflite",
-        "@iree//iree/tools:IreeFileCheck",
+        "@llvm-project//llvm:FileCheck",
     ],
     driver = "@iree//iree/tools:run_lit.sh",
 )

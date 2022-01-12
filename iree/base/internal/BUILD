@@ -193,7 +193,7 @@ iree_lit_test_suite(
     srcs = ["flags_test.txt"],
     data = [
         ":flags_demo",
-        "//iree/tools:IreeFileCheck",
+        "@llvm-project//llvm:FileCheck",
     ],
     tags = ["hostonly"],
 )

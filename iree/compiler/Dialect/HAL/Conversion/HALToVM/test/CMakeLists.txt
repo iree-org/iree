@@ -21,7 +21,7 @@ iree_lit_test_suite(
     "device_ops.mlir"
     "executable_ops.mlir"
   DATA
-    iree::tools::IreeFileCheck
+    FileCheck
     iree::tools::iree-opt
 )
 

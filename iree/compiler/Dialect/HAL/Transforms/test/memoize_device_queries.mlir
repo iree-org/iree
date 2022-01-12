@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -iree-hal-memoize-device-queries -canonicalize %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -iree-hal-memoize-device-queries -canonicalize %s | FileCheck %s
 
 //      CHECK: util.global private @_device_query_0 : i1
 // CHECK-NEXT: util.global private @_device_query_0_ok : i1

@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file %s | FileCheck %s
 
 // Common operations that don't care what the type of the list is.
 vm.module @module {

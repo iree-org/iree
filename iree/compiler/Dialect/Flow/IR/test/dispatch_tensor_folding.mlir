@@ -1,4 +1,4 @@
-// RUN: iree-opt -allow-unregistered-dialect -split-input-file -canonicalize %s | IreeFileCheck %s
+// RUN: iree-opt -allow-unregistered-dialect -split-input-file -canonicalize %s | FileCheck %s
 
 func @canonicalizeStaticOperands(%arg0: !flow.dispatch.tensor<readonly:4x4xf32>) {
     %c0 = arith.constant 0 : index

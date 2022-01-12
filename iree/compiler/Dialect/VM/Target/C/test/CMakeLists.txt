@@ -13,6 +13,6 @@ iree_lit_test_suite(
   SRCS
     "${_GLOB_X_MLIR}"
   DATA
-    iree::tools::IreeFileCheck
+    FileCheck
     iree::tools::iree-translate
 )

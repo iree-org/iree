@@ -1,4 +1,4 @@
-// RUN: iree-opt -allow-unregistered-dialect -split-input-file -iree-flow-convert-to-flow-before-dispatch-formation %s | IreeFileCheck %s
+// RUN: iree-opt -allow-unregistered-dialect -split-input-file -iree-flow-convert-to-flow-before-dispatch-formation %s | FileCheck %s
 
 func @extract_slice1(%arg0 : tensor<5x24x48xf32>) -> tensor<4xf32> {
   %0 = tensor.extract_slice %arg0[2, 3, 4] [1, 1, 4] [1, 1, 1]

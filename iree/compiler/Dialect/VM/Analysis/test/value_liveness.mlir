@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -pass-pipeline='vm.module(vm.func(test-iree-vm-value-liveness))' %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -pass-pipeline='vm.module(vm.func(test-iree-vm-value-liveness))' %s | FileCheck %s
 
 // CHECK-LABEL: @module
 vm.module @module {

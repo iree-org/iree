@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -pass-pipeline='vm.module(vm.func(test-iree-vm-register-allocation))' %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -pass-pipeline='vm.module(vm.func(test-iree-vm-register-allocation))' %s | FileCheck %s
 
 // CHECK-LABEL: @module
 vm.module @module {

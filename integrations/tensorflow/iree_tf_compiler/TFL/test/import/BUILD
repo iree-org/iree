@@ -24,7 +24,7 @@ iree_lit_test_suite(
     ),
     data = glob(["*.tflite"]) + [
         "//iree_tf_compiler:iree-import-tflite",
-        "@iree//iree/tools:IreeFileCheck",
+        "@llvm-project//llvm:FileCheck",
     ],
     driver = "@iree//iree/tools:run_lit.sh",
     # TODO: These tests have never passed

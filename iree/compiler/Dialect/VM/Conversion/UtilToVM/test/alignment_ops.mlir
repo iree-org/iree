@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -iree-vm-conversion -cse -iree-vm-target-extension-i64 %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -iree-vm-conversion -cse -iree-vm-target-extension-i64 %s | FileCheck %s
 
 // CHECK-LABEL: @utilAlign
 func @utilAlign(%arg0 : index, %arg1: index) ->  (index) {

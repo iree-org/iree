@@ -41,6 +41,7 @@ def iree_lit_test(
         srcs = [driver],
         size = size,
         data = data,
+        env = {"FILECHECK_OPTS": "--enable-var-scope"},
         args = ["$(location {})".format(file) for file in data],
         **kwargs
     )

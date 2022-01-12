@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -pass-pipeline='iree-stream-fuse-dispatch-bindings{alias-mutable-bindings=true}' %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -pass-pipeline='iree-stream-fuse-dispatch-bindings{alias-mutable-bindings=true}' %s | FileCheck %s
 
 // Test that bindings that are unique are rebased to the widest possible access
 // and to have a 0 offset by passing in the actual offset as operands. The

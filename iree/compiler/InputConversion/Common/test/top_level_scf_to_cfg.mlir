@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -iree-top-level-scf-to-cfg %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -iree-top-level-scf-to-cfg %s | FileCheck %s
 
 // CHECK-LABEL: @generic_nested_for
 // While not super recommended, we do have cases of SCF constructs embedded

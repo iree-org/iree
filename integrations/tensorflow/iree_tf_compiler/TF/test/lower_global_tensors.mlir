@@ -1,4 +1,4 @@
-// RUN: iree-tf-opt -iree-tf-saved-model-lower-global-tensors -split-input-file %s | IreeFileCheck %s
+// RUN: iree-tf-opt -iree-tf-saved-model-lower-global-tensors -split-input-file %s | FileCheck %s
 
 // CHECK-LABEL: module attributes {tf_saved_model.semantics}
 module attributes {tf_saved_model.semantics} {

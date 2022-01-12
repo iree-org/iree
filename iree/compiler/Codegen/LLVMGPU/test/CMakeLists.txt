@@ -25,7 +25,7 @@ iree_lit_test_suite(
     "tensorcore_vectorization.mlir"
     "vectorization.mlir"
   DATA
-    iree::tools::IreeFileCheck
+    FileCheck
     iree::tools::iree-opt
 )
 
