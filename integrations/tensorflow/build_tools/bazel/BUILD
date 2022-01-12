@@ -11,11 +11,3 @@ package(
 )
 
 exports_files(["run_lit.sh"])
-
-sh_binary(
-    name = "IreeFileCheck",
-    testonly = True,
-    srcs = ["IreeFileCheck.sh"],
-    data = ["@llvm-project//llvm:FileCheck"],
-    tags = ["hostonly"],
-)
