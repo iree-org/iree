@@ -41,7 +41,11 @@ class MobileBertSquadTest(tf_test_utils.TracedModuleTestCase):
 
     # Get_file will download the model weights from a publicly available folder,
     # save them to cache_dir=~/.keras/datasets/ and return a path to them.
-    model_path = tf.keras.utils.get_file(FILE_NAME, MODEL_URL, untar=True)
+    model_path = tf.keras.utils.get_file(
+        FILE_NAME,
+        MODEL_URL,
+        untar=True,
+        cache_dir=tf_test_utils._setup_artifacts_dir("download"))
     model_dir = os.path.dirname(model_path)
     extracted_name = FILE_NAME.split('.')[0]
     model_path = os.path.join(model_dir, extracted_name, model_type)
