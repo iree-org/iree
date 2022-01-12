@@ -46,15 +46,15 @@ BENCHMARK_THRESHOLDS = [
     BenchmarkThreshold(
         re.compile(r"^MobileBertSquad.*big-core.*Dylib-Sync @ Pixel-4"), 50,
         ThresholdUnit.PERCENTAGE),
-    BenchmarkThreshold(re.compile(r"^MobileNetV3Small.*Dylib-Sync @ Pixel-6"),
-                       20, ThresholdUnit.PERCENTAGE),
     BenchmarkThreshold(re.compile(r"^MobileNetV2.*Dylib @ Pixel"), 15,
                        ThresholdUnit.PERCENTAGE),
-    BenchmarkThreshold(
-        re.compile(r"^MobileNetV3Small.*little-core.*Dylib @ Pixel"), 20,
-        ThresholdUnit.PERCENTAGE),
+    BenchmarkThreshold(re.compile(r"^MobileNetV3Small.*Dylib-Sync @ Pixel-6"),
+                       20, ThresholdUnit.PERCENTAGE),
     BenchmarkThreshold(
         re.compile(r"^MobileNetV3Small.*big-core.*Dylib @ Pixel-6"), 20,
+        ThresholdUnit.PERCENTAGE),
+    BenchmarkThreshold(
+        re.compile(r"^MobileNetV3Small.*little-core.*Dylib @ Pixel"), 20,
         ThresholdUnit.PERCENTAGE),
     BenchmarkThreshold(
         re.compile(r"^MobileSSD.*little-core.*Dylib.* @ Pixel-6"), 20,
