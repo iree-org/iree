@@ -6,7 +6,7 @@
 
 """Macros for defining tests that use a trace-runner."""
 
-load("//iree/tools:compilation.bzl", "iree_bytecode_module")
+load("//build_tools/bazel:iree_bytecode_module.bzl", "iree_bytecode_module")
 load("//build_tools/bazel:run_binary_test.bzl", "run_binary_test")
 
 def iree_trace_runner_test(
