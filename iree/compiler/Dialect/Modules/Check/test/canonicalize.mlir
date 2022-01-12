@@ -1,6 +1,6 @@
 // Tests the canonicalization/folding of the Check dialect ops.
 
-// RUN: iree-opt -canonicalize -split-input-file %s | IreeFileCheck %s
+// RUN: iree-opt -canonicalize -split-input-file %s | FileCheck %s
 
 // CHECK-LABEL: @expect_eq_const
 // CHECK-SAME: %[[LHS:[a-zA-Z0-9$._-]+]]

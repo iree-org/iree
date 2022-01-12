@@ -1,4 +1,4 @@
-// RUN: iree-opt -iree-llvmcpu-vector-to-aarch64-inline-asm %s | IreeFileCheck %s
+// RUN: iree-opt -iree-llvmcpu-vector-to-aarch64-inline-asm %s | FileCheck %s
 
 // CHECK-LABEL: @vector_i8i8i32matmul_to_aarch64_asm_vec_dot(
 func @vector_i8i8i32matmul_to_aarch64_asm_vec_dot(

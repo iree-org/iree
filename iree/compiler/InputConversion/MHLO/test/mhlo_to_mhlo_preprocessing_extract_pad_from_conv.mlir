@@ -1,4 +1,4 @@
-// RUN: iree-opt -iree-mhlo-to-mhlo-preprocessing %s | IreeFileCheck %s
+// RUN: iree-opt -iree-mhlo-to-mhlo-preprocessing %s | FileCheck %s
 
 // CHECK-LABEL: @conv
 //       CHECK: mhlo.pad

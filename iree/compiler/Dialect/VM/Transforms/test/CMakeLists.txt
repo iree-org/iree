@@ -20,7 +20,7 @@ iree_lit_test_suite(
     "ordinal_allocation.mlir"
     "sink_defining_ops.mlir"
   DATA
-    iree::tools::IreeFileCheck
+    FileCheck
     iree::tools::iree-opt
 )
 

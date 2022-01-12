@@ -1,4 +1,4 @@
-// RUN: iree-opt %s -iree-codegen-convert-to-destination-passing-style -canonicalize -cse -split-input-file | IreeFileCheck %s
+// RUN: iree-opt %s -iree-codegen-convert-to-destination-passing-style -canonicalize -cse -split-input-file | FileCheck %s
 
 func @matmul() {
   %m = hal.interface.constant.load[0] : index

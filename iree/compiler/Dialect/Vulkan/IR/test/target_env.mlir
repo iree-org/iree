@@ -1,6 +1,6 @@
 // Test parsing and printing Vulkan target environment attribute.
 
-// RUN: iree-opt -allow-unregistered-dialect -split-input-file -verify-diagnostics %s | IreeFileCheck %s
+// RUN: iree-opt -allow-unregistered-dialect -split-input-file -verify-diagnostics %s | FileCheck %s
 
 "vk_configure_op"() {
   // CHECK:      #vk.target_env<v1.1, r(120), [VK_KHR_spirv_1_4, VK_KHR_storage_buffer_storage_class], AMD:DiscreteGPU, {

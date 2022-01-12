@@ -1,8 +1,8 @@
-// RUN: iree-opt -pass-pipeline='iree-hal-transformation-pipeline{serialize-executables=false}' -iree-hal-target-backends=vulkan-spirv %s | IreeFileCheck %s -check-prefix=DEFAULT
-// RUN: iree-opt -pass-pipeline='iree-hal-transformation-pipeline{serialize-executables=false}' -iree-hal-target-backends=vulkan-spirv -iree-vulkan-target-triple=adreno-a650-android11 %s | IreeFileCheck %s -check-prefix=ADRENO
-// RUN: iree-opt -pass-pipeline='iree-hal-transformation-pipeline{serialize-executables=false}' -iree-hal-target-backends=vulkan-spirv -iree-vulkan-target-triple=valhall-unknown-android11 %s | IreeFileCheck %s -check-prefix=MALI
-// RUN: iree-opt -pass-pipeline='iree-hal-transformation-pipeline{serialize-executables=false}' -iree-hal-target-backends=vulkan-spirv -iree-vulkan-target-triple=turing-t4-linux %s | IreeFileCheck %s -check-prefix=TURINGT4
-// RUN: iree-opt -pass-pipeline='iree-hal-transformation-pipeline{serialize-executables=false}' -iree-hal-target-backends=vulkan-spirv -iree-vulkan-target-triple=rdna1-5700xt-windows %s | IreeFileCheck %s -check-prefix=AMD5700XT
+// RUN: iree-opt -pass-pipeline='iree-hal-transformation-pipeline{serialize-executables=false}' -iree-hal-target-backends=vulkan-spirv %s | FileCheck %s -check-prefix=DEFAULT
+// RUN: iree-opt -pass-pipeline='iree-hal-transformation-pipeline{serialize-executables=false}' -iree-hal-target-backends=vulkan-spirv -iree-vulkan-target-triple=adreno-a650-android11 %s | FileCheck %s -check-prefix=ADRENO
+// RUN: iree-opt -pass-pipeline='iree-hal-transformation-pipeline{serialize-executables=false}' -iree-hal-target-backends=vulkan-spirv -iree-vulkan-target-triple=valhall-unknown-android11 %s | FileCheck %s -check-prefix=MALI
+// RUN: iree-opt -pass-pipeline='iree-hal-transformation-pipeline{serialize-executables=false}' -iree-hal-target-backends=vulkan-spirv -iree-vulkan-target-triple=turing-t4-linux %s | FileCheck %s -check-prefix=TURINGT4
+// RUN: iree-opt -pass-pipeline='iree-hal-transformation-pipeline{serialize-executables=false}' -iree-hal-target-backends=vulkan-spirv -iree-vulkan-target-triple=rdna1-5700xt-windows %s | FileCheck %s -check-prefix=AMD5700XT
 
 // TODO(antiagainst): Passing in lenghty strings as command-line options is not
 // optimal. We should consider creating a dedicated test pass to pick up

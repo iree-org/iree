@@ -1,4 +1,4 @@
-// RUN: iree-tf-opt -iree-tf-saved-model-lower-global-tensors -verify-diagnostics -split-input-file %s | IreeFileCheck %s
+// RUN: iree-tf-opt -iree-tf-saved-model-lower-global-tensors -verify-diagnostics -split-input-file %s | FileCheck %s
 
 // TODO(silvasean): Make this interprocedural.
 

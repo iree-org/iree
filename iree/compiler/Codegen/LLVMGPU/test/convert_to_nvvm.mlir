@@ -1,4 +1,4 @@
-// RUN: iree-opt -iree-convert-to-nvvm -split-input-file %s | IreeFileCheck %s
+// RUN: iree-opt -iree-convert-to-nvvm -split-input-file %s | FileCheck %s
 
 // Test that that standard and GPU ops are converted to LLVM and NVVM.
 func @abs_ex_dispatch_0() {

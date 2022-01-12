@@ -24,6 +24,6 @@ iree_lit_test_suite(
     ),
     data = [
         "//iree/samples/custom_modules/dialect:custom-opt",
-        "//iree/tools:IreeFileCheck",
+        "@llvm-project//llvm:FileCheck",
     ],
 )

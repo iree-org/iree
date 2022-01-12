@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -iree-util-fold-globals %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -iree-util-fold-globals %s | FileCheck %s
 
 // NOTE: this file is only testing that the iree-util-fold-globals pass works
 // with stream types - the rest of the testing for that pass lives in

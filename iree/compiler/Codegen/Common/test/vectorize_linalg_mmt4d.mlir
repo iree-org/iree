@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -iree-codegen-vectorize-linalg-mmt4d -canonicalize -cse %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -iree-codegen-vectorize-linalg-mmt4d -canonicalize -cse %s | FileCheck %s
 
 func @tiled_mmt4d_4x4x4_f32(%lhs: tensor<1x1x4x4xf32>, %rhs: tensor<1x1x4x4xf32>, %dst: tensor<1x1x4x4xf32>) -> tensor<1x1x4x4xf32> {
     %0 = linalg.mmt4d ins(%lhs, %rhs: tensor<1x1x4x4xf32>, tensor<1x1x4x4xf32>) outs(%dst: tensor<1x1x4x4xf32>) -> tensor<1x1x4x4xf32>

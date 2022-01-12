@@ -1,4 +1,4 @@
-// RUN: iree-opt %s -cse -iree-llvmcpu-tile-and-vectorize -cse -canonicalize -split-input-file | IreeFileCheck %s
+// RUN: iree-opt %s -cse -iree-llvmcpu-tile-and-vectorize -cse -canonicalize -split-input-file | FileCheck %s
 
 #config0 = #iree_codegen.lowering.config<tile_sizes = [[64, 64]], native_vector_size = []>
 #config1 = #iree_codegen.lowering.config<tile_sizes = [[64, 64], [32, 32, 32], [4, 4, 4]], native_vector_size = [4, 4, 4]>

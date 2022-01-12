@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file %s | iree-opt -split-input-file | IreeFileCheck %s
+// RUN: iree-opt -split-input-file %s | iree-opt -split-input-file | FileCheck %s
 
 // CHECK-LABEL: @list_init_ops
 func @list_init_ops() {
@@ -82,4 +82,3 @@ func @list_access_variant(%list: !util.list<?>) {
 
   return
 }
-

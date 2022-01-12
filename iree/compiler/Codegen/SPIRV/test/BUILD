@@ -52,7 +52,7 @@ iree_lit_test_suite(
         ],
     ),
     data = [
-        "//iree/tools:IreeFileCheck",
         "//iree/tools:iree-opt",
+        "@llvm-project//llvm:FileCheck",
     ],
 )

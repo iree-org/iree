@@ -411,11 +411,3 @@ cc_binary(
         ":iree_translate_lib",
     ],
 )
-
-sh_binary(
-    name = "IreeFileCheck",
-    testonly = True,
-    srcs = ["IreeFileCheck.sh"],
-    data = ["@llvm-project//llvm:FileCheck"],
-    tags = ["hostonly"],
-)

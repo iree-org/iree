@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file %s | iree-opt -split-input-file | IreeFileCheck %s
+// RUN: iree-opt -split-input-file %s | iree-opt -split-input-file | FileCheck %s
 
 // CHECK-LABEL: @tensorImport
 func @tensorImport(%arg0: !hal.buffer_view, %arg1: index) -> !stream.resource<external> {

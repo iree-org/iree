@@ -1,6 +1,6 @@
 // Tests the printing/parsing of the Check dialect ops.
 
-// RUN: iree-opt -split-input-file %s | iree-opt -split-input-file | IreeFileCheck %s
+// RUN: iree-opt -split-input-file %s | iree-opt -split-input-file | FileCheck %s
 
 // CHECK-LABEL: @expect_true
 // CHECK-SAME: %[[ARG:[a-zA-Z0-9$._-]+]]
@@ -107,4 +107,3 @@ func @expect_almost_eq_const(%lhs : tensor<2x2xf32>) {
   check.expect_almost_eq_const(%lhs, dense<1.0> : tensor<2x2xf32>) : tensor<2x2xf32>
   return
 }
-

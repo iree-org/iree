@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file %s | FileCheck %s
 
 module attributes {
   translation.info = #iree_codegen.translation.info<"CPUDefault", workload_per_wg = [32, 42]>

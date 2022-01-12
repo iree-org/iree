@@ -1,5 +1,5 @@
-// RUN: [[ $IREE_LLVMAOT_DISABLE == 1 ]] || (iree-run-mlir --iree-input-type=mhlo %s -iree-hal-target-backends=dylib-llvm-aot -function-input="1x5xf32=1,-2,-3,4,-5" -function-input="1x5x3x1xf32=15,14,13,12,11,10,9,8,7,6,5,4,3,2,1" | IreeFileCheck %s)
-// RUN: [[ $IREE_VULKAN_DISABLE == 1 ]] || (iree-run-mlir --iree-input-type=mhlo %s -iree-hal-target-backends=vulkan-spirv -function-input="1x5xf32=1,-2,-3,4,-5" -function-input="1x5x3x1xf32=15,14,13,12,11,10,9,8,7,6,5,4,3,2,1" | IreeFileCheck %s)
+// RUN: [[ $IREE_LLVMAOT_DISABLE == 1 ]] || (iree-run-mlir --iree-input-type=mhlo %s -iree-hal-target-backends=dylib-llvm-aot -function-input="1x5xf32=1,-2,-3,4,-5" -function-input="1x5x3x1xf32=15,14,13,12,11,10,9,8,7,6,5,4,3,2,1" | FileCheck %s)
+// RUN: [[ $IREE_VULKAN_DISABLE == 1 ]] || (iree-run-mlir --iree-input-type=mhlo %s -iree-hal-target-backends=vulkan-spirv -function-input="1x5xf32=1,-2,-3,4,-5" -function-input="1x5x3x1xf32=15,14,13,12,11,10,9,8,7,6,5,4,3,2,1" | FileCheck %s)
 
 // CHECK-LABEL: EXEC @main
 func @main(%arg0: tensor<1x5xf32>, %arg1: tensor<1x5x3x1xf32>) -> tensor<5x1x5xf32> {
@@ -79,7 +79,7 @@ func @main(%arg0: tensor<1x5xf32>, %arg1: tensor<1x5x3x1xf32>) -> tensor<5x1x5xf
   return %54 : tensor<5x1x5xf32>
 }
 
-// On separate lines to avoid "[[" which IreeFileCheck interprets as substitutions
+// On separate lines to avoid "[[" which FileCheck interprets as substitutions
 // CHECK: 5x1x5xf32=[
 // CHECK-SAME:   [0 0 0 0 0]
 // CHECK-SAME: ][

@@ -89,7 +89,7 @@ iree_lit_test(
     "static_library_demo_test.txt"
   DATA
     ::static_library_demo
-    iree::tools::IreeFileCheck
+    FileCheck
   LABELS
     "hostonly"
 )
@@ -163,7 +163,7 @@ iree_lit_test(
     "static_library_demo_c_test.txt"
   DATA
     ::static_library_demo_c
-    iree::tools::IreeFileCheck
+    FileCheck
   LABELS
     "hostonly"
 )

@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -iree-util-fold-globals %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -iree-util-fold-globals %s | FileCheck %s
 
 // CHECK: util.global public mutable @uniformConstants = 5 : index
 util.global public mutable @uniformConstants : index

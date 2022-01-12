@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file %s | FileCheck %s
 
 vm.module @my_module {
   // CHECK-LABEL: @const_i32_zero

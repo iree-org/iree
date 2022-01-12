@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -iree-stream-propagate-subviews %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -iree-stream-propagate-subviews %s | FileCheck %s
 
 // Tests that resource global loads also load all the subview params.
 //

@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -iree-convert-hal-to-vm -canonicalize %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -iree-convert-hal-to-vm -canonicalize %s | FileCheck %s
 
 // CHECK-LABEL: @command_buffer_create
 func @command_buffer_create(%arg0: !hal.device) {

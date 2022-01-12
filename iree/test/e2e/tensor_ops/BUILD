@@ -26,10 +26,10 @@ iree_lit_test_suite(
         "tensor_cast.mlir",
     ],
     data = [
-        "//iree/tools:IreeFileCheck",
         "//iree/tools:iree-benchmark-module",
         "//iree/tools:iree-run-mlir",
         "//iree/tools:iree-translate",
+        "@llvm-project//llvm:FileCheck",
     ],
     tags = ["hostonly"],
 )

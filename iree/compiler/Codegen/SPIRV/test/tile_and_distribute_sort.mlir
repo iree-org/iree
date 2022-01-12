@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -pass-pipeline='hal.executable(hal.executable.variant(builtin.module(builtin.func(iree-spirv-tile-and-distribute, cse))))' %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -pass-pipeline='hal.executable(hal.executable.variant(builtin.module(builtin.func(iree-spirv-tile-and-distribute, cse))))' %s | FileCheck %s
 
 #config = #iree_codegen.lowering.config<tile_sizes = [[1, 0, 16], [1, 0, 1]], native_vector_size = []>
 #translation = #iree_codegen.translation.info<"SPIRVDistribute", workload_per_wg = [16, 1]>

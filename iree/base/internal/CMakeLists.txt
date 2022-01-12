@@ -195,7 +195,7 @@ iree_lit_test_suite(
     "flags_test.txt"
   DATA
     ::flags_demo
-    iree::tools::IreeFileCheck
+    FileCheck
   LABELS
     "hostonly"
 )

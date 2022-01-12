@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -pass-pipeline='test-iree-convert-std-to-vm' %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -pass-pipeline='test-iree-convert-std-to-vm' %s | FileCheck %s
 
 // -----
 // CHECK-LABEL: @t001_addi

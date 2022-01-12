@@ -26,7 +26,7 @@ iree_lit_test_suite(
     "resolve_entry_point_ordinals.mlir"
     "verify_target_environment.mlir"
   DATA
-    iree::tools::IreeFileCheck
+    FileCheck
     iree::tools::iree-opt
 )
 

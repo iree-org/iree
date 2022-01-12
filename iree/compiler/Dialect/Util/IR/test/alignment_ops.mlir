@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file %s | FileCheck %s
 
 // CHECK-LABEL: @utilAlign
 func @utilAlign(%arg0 : index, %arg1: index) {
