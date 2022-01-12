@@ -92,6 +92,10 @@ class DecomposeLog1PPattern : public OpRewritePattern<mhlo::Log1pOp> {
                                 PatternRewriter &rewriter) const override {
     Location loc = op.getLoc();
     auto type = op.operand().getType().cast<TensorType>();
+    // https://github.com/google/iree/issues/8083
+    if (!type.hasStaticShape()) {
+      return rewriter.notifyMatchFailure(op, "TODO: Support dynamic shape");
+    }
     DenseElementsAttr attr =
         DenseElementsAttr::get(type, rewriter.getF32FloatAttr(1.0));
     auto one = rewriter.create<arith::ConstantOp>(loc, attr);
@@ -109,6 +113,10 @@ class DecomposeExpM1Pattern : public OpRewritePattern<mhlo::Expm1Op> {
                                 PatternRewriter &rewriter) const override {
     Location loc = op.getLoc();
     auto type = op.operand().getType().cast<TensorType>();
+    // https://github.com/google/iree/issues/8083
+    if (!type.hasStaticShape()) {
+      return rewriter.notifyMatchFailure(op, "TODO: Support dynamic shape");
+    }
     DenseElementsAttr attr =
         DenseElementsAttr::get(type, rewriter.getF32FloatAttr(1.0));
     auto one = rewriter.create<arith::ConstantOp>(loc, attr);

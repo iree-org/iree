@@ -197,25 +197,28 @@ BACKENDS = [
 for variant, flags in BACKENDS:
   for math_fn in TF_MATH_FUNCTIONS:
     generate_runner.main([
-        variant, f"{flags} --dynamic_dims=false --functions={math_fn} --artifacts_dir=%t",
+        variant,
+        f"{flags} --dynamic_dims=false --functions={math_fn} --artifacts_dir=%t",
         f"iree_tf_tests/math/math_test.py:{math_fn}"
     ])
   for math_fn in COMPLEX_FUNCTIONS:
     generate_runner.main([
-        variant, f"{flags} --dynamic_dims=false --functions={math_fn} --artifacts_dir=%t",
+        variant,
+        f"{flags} --dynamic_dims=false --functions={math_fn} --artifacts_dir=%t",
         f"iree_tf_tests/math/math_test.py:complex_{math_fn}"
     ])
-
 
 # Dynamic dim tests.
 for variant, flags in BACKENDS:
   for math_fn in TF_MATH_FUNCTIONS:
     generate_runner.main([
-        variant, f"{flags} --dynamic_dims=true --functions={math_fn} --artifacts_dir=%t",
+        variant,
+        f"{flags} --dynamic_dims=true --functions={math_fn} --artifacts_dir=%t",
         f"iree_tf_tests/math/math_test.py:dynamic_dim_{math_fn}"
     ])
   for math_fn in COMPLEX_FUNCTIONS:
     generate_runner.main([
-        variant, f"{flags} --dynamic_dims=true --functions={math_fn} --artifacts_dir=%t",
+        variant,
+        f"{flags} --dynamic_dims=true --functions={math_fn} --artifacts_dir=%t",
         f"iree_tf_tests/math/math_test.py:complex_dynamic_dim_{math_fn}"
     ])

@@ -172,8 +172,8 @@ for variant, flags in BACKENDS:
     generate_runner.main([
         variant,
         (f"{flags} --dynamic_dims=false --training=false "
-         f"--test_default_kwargs_only=false --layer={layer} --artifacts_dir=%t"),
-        f"iree_tf_tests/layers/layers_test.py:full_api_{layer}"
+         f"--test_default_kwargs_only=false --layer={layer} --artifacts_dir=%t"
+        ), f"iree_tf_tests/layers/layers_test.py:full_api_{layer}"
     ])
 
   # Test with training flags.
