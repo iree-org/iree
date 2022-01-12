@@ -483,7 +483,10 @@ add_subdirectory(iree/test)
 add_subdirectory(iree/vm)
 
 if(${IREE_BUILD_BENCHMARKS})
-  find_program(IREE_IMPORT_TFLITE_PATH iree-import-tflite REQUIRED)
+  find_program(IREE_IMPORT_TFLITE_PATH iree-import-tflite)
+  if(IREE_IMPORT_TFLITE_PATH)
+    message(STATUS "Will use ${IREE_IMPORT_TFLITE_PATH} to generate benchmark artifacts")
+  endif()
   add_subdirectory(benchmarks)
 endif()
 

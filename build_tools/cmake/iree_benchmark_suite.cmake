@@ -133,9 +133,10 @@ function(iree_benchmark_suite)
 
     # If the source is a TFLite file, import it.
     if("${_MODULE_SOURCE}" MATCHES "\.tflite$")
-      if (NOT IREE_BUILD_TFLITE_COMPILER)
+      if (NOT IREE_IMPORT_TFLITE_PATH)
         message(SEND_ERROR "Benchmarks of ${_MODULE_SOURCE} require"
-                          " IREE_BUILD_TFLITE_COMPILER to be ON")
+                          " that iree-import-tflite be available "
+                          " (either on PATH or via IREE_IMPORT_TFLITE_PATH)")
       endif()
       set(_TFLITE_FILE "${_MODULE_SOURCE}")
       set(_MODULE_SOURCE "${_TFLITE_FILE}.mlir")
