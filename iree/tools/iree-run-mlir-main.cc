@@ -16,7 +16,7 @@
 // executed functions will be printed to stdout for checking.
 //
 // Example input:
-// // RUN: iree-run-mlir %s | IreeFileCheck %s
+// // RUN: iree-run-mlir %s | FileCheck %s
 // // CHECK-LABEL: @foo
 // // CHECK: 1xf32: 2
 // func @foo() -> tensor<f32> {

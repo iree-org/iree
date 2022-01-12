@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -iree-hal-link-executables %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -iree-hal-link-executables %s | FileCheck %s
 
 #vmvx_target = #hal.executable.target<"vmvx", "vmvx-bytecode-fb">
 #executable_layout = #hal.executable.layout<push_constants = 1, sets = [

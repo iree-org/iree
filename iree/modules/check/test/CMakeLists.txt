@@ -17,7 +17,7 @@ iree_lit_test_suite(
     "failure.mlir"
     "success.mlir"
   DATA
-    iree::tools::IreeFileCheck
+    FileCheck
     iree::tools::iree-check-module
     iree::tools::iree-translate
   LABELS

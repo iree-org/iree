@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -pass-pipeline='iree-hal-transformation-pipeline{serialize-executables=false},canonicalize' -mlir-print-local-scope %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -pass-pipeline='iree-hal-transformation-pipeline{serialize-executables=false},canonicalize' -mlir-print-local-scope %s | FileCheck %s
 
 module attributes {
   hal.device.targets = [

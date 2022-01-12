@@ -17,7 +17,7 @@ iree_lit_test_suite(
     "register_allocation.mlir"
     "value_liveness.mlir"
   DATA
-    iree::tools::IreeFileCheck
+    FileCheck
     iree::tools::iree-opt
 )
 

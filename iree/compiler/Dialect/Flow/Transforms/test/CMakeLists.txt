@@ -40,7 +40,7 @@ iree_lit_test_suite(
     "transformation.mlir"
     "verify_input_ir.mlir"
   DATA
-    iree::tools::IreeFileCheck
+    FileCheck
     iree::tools::iree-opt
 )
 

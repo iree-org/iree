@@ -17,7 +17,7 @@ iree_lit_test_suite(
     "canonicalize.mlir"
     "ops.mlir"
   DATA
-    iree::tools::IreeFileCheck
+    FileCheck
     iree::tools::iree-opt
 )
 

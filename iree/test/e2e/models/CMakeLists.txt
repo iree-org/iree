@@ -22,7 +22,7 @@ iree_lit_test_suite(
     "resnet50_fake_weights.mlir"
     "unidirectional_lstm.mlir"
   DATA
-    iree::tools::IreeFileCheck
+    FileCheck
     iree::tools::iree-run-mlir
     lld
   LABELS

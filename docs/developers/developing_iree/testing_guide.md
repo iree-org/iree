@@ -133,11 +133,7 @@ For advice on writing MLIR compiler tests, see the
 [MLIR testing guide](https://mlir.llvm.org/getting_started/TestingGuide/). Tests
 should be `.mlir` files in `test` directory adjacent to the functionality they
 are testing. Instead of `mlir-opt`, use `iree-opt`, which registers IREE
-dialects and passes and doesn't register some unnecessary core ones. Instead of
-`FileCheck`, use
-[`IreeFileCheck`](https://github.com/google/iree/tree/main/iree/tools/IreeFileCheck.sh),
-a shell-script wrapper around FileCheck that passes it a few
-`--do-the-right-thing` flags.
+dialects and passes and doesn't register some unnecessary core ones.
 
 As with most parts of the IREE compiler, these should not have a dependency on
 the runtime.
@@ -155,7 +151,7 @@ iree_lit_test_suite(
     name = "lit",
     srcs = glob(["*.mlir"]),
     data = [
-        "//iree/tools:IreeFileCheck",
+        "@llvm-project//llvm:FileCheck",
         "//iree/tools:iree-opt",
     ],
 )
@@ -172,7 +168,7 @@ iree_lit_test_suite(
   SRCS
     "${_GLOB_X_MLIR}"
   DATA
-    iree::tools::IreeFileCheck
+    FileCheck
     iree::tools::iree-opt
 )
 ```

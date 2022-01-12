@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -canonicalize %s | iree-opt -split-input-file | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -canonicalize %s | iree-opt -split-input-file | FileCheck %s
 
 // NOTE: util.range.min and util.range.max share their code so we just test min.
 

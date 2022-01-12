@@ -16,7 +16,7 @@ iree_lit_test_suite(
   SRCS
     "jit_globals.mlir"
   DATA
-    iree::tools::IreeFileCheck
+    FileCheck
     iree::tools::iree-opt
 )
 

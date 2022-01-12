@@ -36,7 +36,7 @@ iree_lit_test_suite(
     "schedule_execution.mlir"
     "specialize_dispatches.mlir"
   DATA
-    iree::tools::IreeFileCheck
+    FileCheck
     iree::tools::iree-opt
 )
 

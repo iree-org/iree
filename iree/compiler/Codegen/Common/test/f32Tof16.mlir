@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -iree-convert-f32-to-f16 %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -iree-convert-f32-to-f16 %s | FileCheck %s
 
 //       CHECK: util.global {{.*}} : tensor<4xf16>
 // CHECK-LABEL: func @simple_f32() -> tensor<4xf16>

@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -verify-diagnostics -pass-pipeline="builtin.func(iree-flow-dispatch-linalg-on-tensors-pass)" -canonicalize -cse %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -verify-diagnostics -pass-pipeline="builtin.func(iree-flow-dispatch-linalg-on-tensors-pass)" -canonicalize -cse %s | FileCheck %s
 
 func @fuse_conv2d_elementwise(%input: tensor<1x225x225x16xf32>, %filter: tensor<3x3x16x32xf32>, %offset: tensor<32xf32>) -> tensor<1x112x112x32xf32> {
   %cst = arith.constant 0.000000e+00 : f32

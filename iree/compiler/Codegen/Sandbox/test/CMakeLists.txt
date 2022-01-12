@@ -17,7 +17,7 @@ iree_lit_test_suite(
     "fusion_expert.mlir"
     "single_tiling_expert.mlir"
   DATA
-    iree::tools::IreeFileCheck
+    FileCheck
     iree::tools::iree-opt
 )
 

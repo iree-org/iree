@@ -1,4 +1,4 @@
-// RUN: iree-opt -iree-llvmcpu-unfuse-fma-pass %s | IreeFileCheck %s
+// RUN: iree-opt -iree-llvmcpu-unfuse-fma-pass %s | FileCheck %s
 
 func @fma_unfused(%a : f32, %b: f32, %c: f32) -> f32 {
     %0 = "llvm.intr.fma"(%a, %b, %c) : (f32, f32, f32) -> f32

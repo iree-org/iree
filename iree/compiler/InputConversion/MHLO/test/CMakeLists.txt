@@ -28,7 +28,7 @@ iree_lit_test_suite(
     "missing_legalizations.mlir"
     "verify_compiler_mhlo_input_legality.mlir"
   DATA
-    iree::tools::IreeFileCheck
+    FileCheck
     iree::tools::iree-opt
 )
 

@@ -22,7 +22,7 @@ iree_lit_test_suite(
     "repeated_return.mlir"
     "scalars.mlir"
   DATA
-    iree::tools::IreeFileCheck
+    FileCheck
     iree::tools::iree-benchmark-module
     iree::tools::iree-run-mlir
     iree::tools::iree-run-module
@@ -38,7 +38,7 @@ iree_lit_test_suite(
   SRCS
     "benchmark_flags.txt"
   DATA
-    iree::tools::IreeFileCheck
+    FileCheck
     iree::tools::iree-benchmark-module
     iree::tools::iree-translate
   LABELS

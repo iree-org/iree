@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -pass-pipeline='hal.executable(hal.executable.variant(builtin.module(builtin.func(iree-codegen-remove-single-iteration-loop))))' %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -pass-pipeline='hal.executable(hal.executable.variant(builtin.module(builtin.func(iree-codegen-remove-single-iteration-loop))))' %s | FileCheck %s
 
 #executable_layout = #hal.executable.layout<push_constants = 1, sets = [
   #hal.descriptor_set.layout<0, bindings = [

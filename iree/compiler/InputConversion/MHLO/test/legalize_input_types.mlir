@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -verify-diagnostics -iree-mhlo-legalize-input-types %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -verify-diagnostics -iree-mhlo-legalize-input-types %s | FileCheck %s
 
 // CHECK-LABEL: func @constantI64
 // CHECK-SAME: () -> i32

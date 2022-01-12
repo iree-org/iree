@@ -17,7 +17,7 @@ iree_lit_test_suite(
     "constant_ops.mlir"
     "structural_ops.mlir"
   DATA
-    iree::tools::IreeFileCheck
+    FileCheck
     iree::tools::iree-opt
 )
 

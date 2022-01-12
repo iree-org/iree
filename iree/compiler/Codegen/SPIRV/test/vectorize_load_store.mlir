@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -iree-spirv-vectorize-load-store -canonicalize -cse -mlir-print-local-scope %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -iree-spirv-vectorize-load-store -canonicalize -cse -mlir-print-local-scope %s | FileCheck %s
 
 // CHECK-LABEL: func @alloc_copy
 //  CHECK-SAME: (%[[ARG0:.+]]: memref<4096x1024xvector<4xf32>>, %[[X:.+]]: index, %[[Y:.+]]: index)

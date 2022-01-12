@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -canonicalize %s | iree-opt -split-input-file | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -canonicalize %s | iree-opt -split-input-file | FileCheck %s
 
 // CHECK-LABEL: @FoldResourceSizeOp
 func @FoldResourceSizeOp(%arg0: !stream.resource<staging>, %arg1: index) -> (index, i32) {

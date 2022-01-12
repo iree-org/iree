@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -iree-stream-fold-uniform-operands %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -iree-stream-fold-uniform-operands %s | FileCheck %s
 
 // Tests that duplicate primitive operands are folded if they are uniform at all
 // dispatch sites.

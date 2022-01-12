@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -iree-import-public %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -iree-import-public %s | FileCheck %s
 
 // CHECK-LABEL: func @bv_func
 // CHECK-SAME: (%arg0: !hal.buffer_view, %arg1: !hal.buffer_view) -> (!hal.buffer_view, !hal.buffer_view)

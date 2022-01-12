@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -iree-stream-specialize-dispatches %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -iree-stream-specialize-dispatches %s | FileCheck %s
 
 // Tests that operands of different types are placed into lookup tables of the
 // appropriate type within the dispatch region and extracted based on a unique

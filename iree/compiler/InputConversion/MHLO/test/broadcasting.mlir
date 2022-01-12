@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -iree-mhlo-to-linalg-on-tensors %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -iree-mhlo-to-linalg-on-tensors %s | FileCheck %s
 
 // Check the non-broadcast case for each registered op, then just check a
 // representative op for detailed broadcast semantics. Since the broadcasting

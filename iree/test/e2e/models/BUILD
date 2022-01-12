@@ -39,9 +39,9 @@ iree_lit_test_suite(
         exclude = CHECK_FRAMEWORK_TESTS,
     ),
     data = [
-        "//iree/tools:IreeFileCheck",
         "//iree/tools:iree-run-mlir",
         "@llvm-project//lld",
+        "@llvm-project//llvm:FileCheck",
     ],
     tags = [
         "hostonly",

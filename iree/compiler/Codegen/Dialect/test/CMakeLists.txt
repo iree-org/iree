@@ -16,7 +16,7 @@ iree_lit_test_suite(
   SRCS
     "lowering_config_attr.mlir"
   DATA
-    iree::tools::IreeFileCheck
+    FileCheck
     iree::tools::iree-opt
 )
 

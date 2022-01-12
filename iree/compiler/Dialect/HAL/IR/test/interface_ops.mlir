@@ -1,4 +1,4 @@
-// RUN: iree-opt -allow-unregistered-dialect -split-input-file -verify-diagnostics %s | IreeFileCheck %s
+// RUN: iree-opt -allow-unregistered-dialect -split-input-file -verify-diagnostics %s | FileCheck %s
 
 // CHECK-LABEL: @interface_workgroup_info
 func @interface_workgroup_info() {

@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file --iree-mhlo-to-linalg-on-tensors %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file --iree-mhlo-to-linalg-on-tensors %s | FileCheck %s
 
 // CHECK-LABEL: @func_cfg_conversion
 module @func_cfg_conversion {

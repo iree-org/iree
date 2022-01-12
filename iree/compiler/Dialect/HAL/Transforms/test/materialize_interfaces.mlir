@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -iree-hal-materialize-interfaces %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -iree-hal-materialize-interfaces %s | FileCheck %s
 
 // Tests an already-specified executable source op is expanded into the variants
 // specified by the target configuration. These source executables may come from

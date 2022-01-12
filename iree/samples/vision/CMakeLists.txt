@@ -45,7 +45,7 @@ iree_lit_test(
     "mnist_test.txt"
   DATA
     ::iree-run-mnist-module
-    iree::tools::IreeFileCheck
+    FileCheck
   LABELS
     "hostonly"
 )

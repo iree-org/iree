@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -iree-stream-propagate-timepoints %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -iree-stream-propagate-timepoints %s | FileCheck %s
 
 // Tests that resource global loads pull an unready resource and provide an
 // await with the associated timepoint.

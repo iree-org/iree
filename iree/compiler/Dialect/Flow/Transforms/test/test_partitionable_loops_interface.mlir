@@ -1,4 +1,4 @@
-// RUN: iree-opt -iree-flow-test-partitionable-loops-interface -split-input-file %s | IreeFileCheck %s
+// RUN: iree-opt -iree-flow-test-partitionable-loops-interface -split-input-file %s | FileCheck %s
 
 #map1 = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
 #map2 = affine_map<(d0, d1, d2) -> (d0, d2)>
@@ -63,7 +63,7 @@ func @generic_4D(%arg0: tensor<?x?x?x?xf32>) -> tensor<?x?x?x?xf32> {
       ^bb0(%arg1 : f32, %arg2 : f32):
         linalg.yield %arg1 : f32
     } -> tensor<?x?x?x?xf32>
-  return %0 : tensor<?x?x?x?xf32> 
+  return %0 : tensor<?x?x?x?xf32>
 }
 // CHECK-LABEL: func @generic_4D(
 //       CHECK:   util.unfoldable_constant dense<[0, 1, 1, 1]> : tensor<4xindex>
@@ -87,7 +87,7 @@ func @generic_4D_unit_dim(%arg0: tensor<?x?x1x?xf32>) -> tensor<?x?x1x?xf32> {
       ^bb0(%arg1 : f32, %arg2 : f32):
         linalg.yield %arg1 : f32
     } -> tensor<?x?x1x?xf32>
-  return %0 : tensor<?x?x1x?xf32> 
+  return %0 : tensor<?x?x1x?xf32>
 }
 // CHECK-LABEL: func @generic_4D_unit_dim(
 //       CHECK:   util.unfoldable_constant dense<[1, 1, 0, 1]> : tensor<4xindex>

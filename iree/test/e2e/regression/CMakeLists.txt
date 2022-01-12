@@ -21,7 +21,7 @@ iree_lit_test_suite(
     "trace_dispatch_tensors.mlir"
     "unused_args.mlir"
   DATA
-    iree::tools::IreeFileCheck
+    FileCheck
     iree::tools::iree-opt
     iree::tools::iree-run-mlir
     lld
