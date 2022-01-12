@@ -18,6 +18,7 @@
 #include "mlir/Dialect/Linalg/ComprehensiveBufferize/LinalgInterfaceImpl.h"
 #include "mlir/Dialect/Linalg/ComprehensiveBufferize/ModuleBufferization.h"
 #include "mlir/Dialect/Linalg/ComprehensiveBufferize/SCFInterfaceImpl.h"
+#include "mlir/Dialect/Linalg/ComprehensiveBufferize/StdInterfaceImpl.h"
 #include "mlir/Dialect/Linalg/ComprehensiveBufferize/TensorInterfaceImpl.h"
 #include "mlir/Dialect/Linalg/ComprehensiveBufferize/VectorInterfaceImpl.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
@@ -282,6 +283,8 @@ void registerBufferizationInterfaces(DialectRegistry &registry) {
       registerBufferizableOpInterfaceExternalModels(registry);
   linalg::comprehensive_bufferize::scf_ext::
       registerBufferizableOpInterfaceExternalModels(registry);
+  linalg::comprehensive_bufferize::std_ext::
+      registerModuleBufferizationExternalModels(registry);
   linalg::comprehensive_bufferize::std_ext::
       registerBufferizableOpInterfaceExternalModels(registry);
   linalg::comprehensive_bufferize::tensor_ext::
