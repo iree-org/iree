@@ -260,8 +260,12 @@ static LogicalResult verifyTypeStorageCompatibility(Operation *op,
 }
 
 static LogicalResult verifyTensorImportOp(TensorImportOp op) {
-  return verifyTypeStorageCompatibility(op, op.target_encoding(),
-                                        op.target().getType());
+  auto targetType = op.target().getType().cast<TensorType>();
+  if (targetType.getNumDynamicDims() != op.target_dims().size()) {
+    return op->emitOpError() << "number of target_dims must match number of "
+                                "dynamic dims in target type";
+  }
+  return verifyTypeStorageCompatibility(op, op.target_encoding(), targetType);
 }
 
 void TensorExportOp::build(OpBuilder &builder, OperationState &result,
@@ -286,6 +290,11 @@ SmallVector<int64_t, 4> TensorExportOp::getTiedResultOperandIndices() {
 }
 
 static LogicalResult verifyTensorExportOp(TensorExportOp op) {
+  auto sourceType = op.source().getType().cast<TensorType>();
+  if (sourceType.getNumDynamicDims() != op.source_dims().size()) {
+    return op->emitOpError() << "number of source_dims must match number of "
+                                "dynamic dims in source type";
+  }
   return verifyTypeStorageCompatibility(op, op.source_encoding(),
                                         op.source().getType());
 }
