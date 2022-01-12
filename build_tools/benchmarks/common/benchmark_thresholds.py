@@ -59,8 +59,8 @@ BENCHMARK_THRESHOLDS = [
     BenchmarkThreshold(
         re.compile(r"^MobileSSD.*little-core.*Dylib.* @ Pixel-6"), 20,
         ThresholdUnit.PERCENTAGE),
-    BenchmarkThreshold(re.compile(r"^PoseNet.*big-core.*Dylib-Sync @ Pixel-6"),
-                       20, ThresholdUnit.PERCENTAGE),
+    BenchmarkThreshold(re.compile(r"^PoseNet.*big-core.*Dylib.* @ Pixel-6"), 20,
+                       ThresholdUnit.PERCENTAGE),
 
     # Benchmarks that complete around 10ms on GPUs; using percentage is not
     # suitable anymore.
