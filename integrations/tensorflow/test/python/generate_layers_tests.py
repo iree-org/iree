@@ -156,14 +156,14 @@ for variant, flags in BACKENDS:
     generate_runner.main([
         variant,
         (f"{flags} --dynamic_dims=false --training=false "
-         f"--test_default_kwargs_only=true --layer={layer}"),
+         f"--test_default_kwargs_only=true --layer={layer} --artifacts_dir=%t"),
         f"iree_tf_tests/layers/layers_test.py:{layer}"
     ])
     # Dynamic.
     generate_runner.main([
         variant,
         (f"{flags} --dynamic_dims=true --training=false "
-         f"--test_default_kwargs_only=true --layer={layer}"),
+         f"--test_default_kwargs_only=true --layer={layer} --artifacts_dir=%t"),
         f"iree_tf_tests/layers/layers_test.py:dynamic_dims_{layer}"
     ])
 
@@ -172,7 +172,7 @@ for variant, flags in BACKENDS:
     generate_runner.main([
         variant,
         (f"{flags} --dynamic_dims=false --training=false "
-         f"--test_default_kwargs_only=false --layer={layer}"),
+         f"--test_default_kwargs_only=false --layer={layer} --artifacts_dir=%t"),
         f"iree_tf_tests/layers/layers_test.py:full_api_{layer}"
     ])
 
@@ -181,6 +181,6 @@ for variant, flags in BACKENDS:
     generate_runner.main([
         variant,
         (f"{flags} --dynamic_dims=false --training=true "
-         f"--test_default_kwargs_only=true --layer={layer}"),
+         f"--test_default_kwargs_only=true --layer={layer} --artifacts_dir=%t"),
         f"iree_tf_tests/layers/layers_test.py:training_{layer}"
     ])
