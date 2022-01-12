@@ -81,10 +81,12 @@ then
 fi
 
 echo "***** Running TensorFlow integration tests *****"
+# TODO: Use "--timeout 900" instead of --max-time below. Requires that
+# `psutil` python package be installed in the VM for per test timeout.
 cd "$IREE_SRC_DIR"
 LIT_SCRIPT="$IREE_SRC_DIR/third_party/llvm-project/llvm/utils/lit/lit.py"
 if ! python3 "$LIT_SCRIPT" integrations/tensorflow/test \
-   --timeout 900 \
+   --max-time 1800 \
    -D FEATURES=vulkan
 then
    tests_passed=false
