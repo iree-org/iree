@@ -2,7 +2,7 @@ name: Schedule candidate release
 
 on:
   schedule:
-    - cron: '0 18 * * *'
+    - cron: '0 13 * * *'
 
   workflow_dispatch:
 

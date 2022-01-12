@@ -229,8 +229,7 @@ def bazel_build_tf_binary(target):
   # See https://github.com/bazelbuild/bazel/issues/8739
   cmd = [
       "bazel",
-      "run",
-      "--run_under=echo",
+      "build",
       "--config=release",
       "--keep_going",
       target,
