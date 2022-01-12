@@ -27,9 +27,7 @@
 #include "iree/base/tracing.h"
 
 #if defined(IREE_PLATFORM_EMSCRIPTEN)
-
 #include <emscripten/threading.h>
-
 #endif  // IREE_PLATFORM_EMSCRIPTEN
 
 // Older glibc doesn't have a gettid wrapper:
