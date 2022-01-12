@@ -5,9 +5,14 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 """Adds a local dependency on tensorflow."""
 
-local_repository(
+load("@bazel_tools//tools/build_defs/repo:git.bzl", "git_repository")
+
+TENSORFLOW_COMMIT = "baa6d31a0af6adb7058e229001931a1fdd6f81bb"
+
+git_repository(
     name = "org_tensorflow",
-    path = "../../third_party/tensorflow",
+    commit = TENSORFLOW_COMMIT,
+    remote = "https://github.com/tensorflow/tensorflow.git",
 )
 
 # Import all of the tensorflow dependencies.
