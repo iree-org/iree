@@ -68,8 +68,8 @@ python -m pip install numpy absl-py
 
 ### Prebuilt packages
 
-For now, packages can be installed from our
-[GitHub releases](https://github.com/google/iree/releases):
+Stable release packages are published to
+[PyPI](https://pypi.org/user/google-iree-pypi-deploy/).
 
 === "Minimal"
 
@@ -78,8 +78,7 @@ For now, packages can be installed from our
     ``` shell
     python -m pip install \
       iree-compiler \
-      iree-runtime \
-      --find-links https://github.com/google/iree/releases
+      iree-runtime
     ```
 
 === "All packages"
@@ -92,13 +91,18 @@ For now, packages can be installed from our
       iree-runtime \
       iree-tools-tf \
       iree-tools-tflite \
-      iree-tools-xla \
-      --find-links https://github.com/google/iree/releases
+      iree-tools-xla
     ```
 
-!!! info
-    We plan to publish packages on [PyPI](https://pypi.org/) as they become
-    more stable.
+!!! Tip
+
+    Nightly packages are also published on
+    [GitHub releases](https://github.com/google/iree/releases). To use these,
+    run `pip install` with this extra option:
+
+    ```
+    --find-links https://github.com/google/iree/releases
+    ```
 
 ### Building from source
 
@@ -115,6 +119,6 @@ Check out the samples in IREE's
 [iree-samples repository](https://github.com/google/iree-samples) for examples
 using the Python APIs.
 
-## Troubleshooting
+<!-- ## Troubleshooting -->
 
 <!-- TODO(scotttodd): update python, update pip, search GitHub issues -->

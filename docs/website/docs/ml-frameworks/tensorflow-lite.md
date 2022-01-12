@@ -19,8 +19,7 @@ Install IREE pip packages, either from pip or by
 python -m pip install \
   iree-compiler \
   iree-runtime \
-  iree-tools-tflite \
-  -f https://github.com/google/iree/releases
+  iree-tools-tflite
 ```
 
 !!! warning

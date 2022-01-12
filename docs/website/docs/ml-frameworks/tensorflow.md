@@ -23,8 +23,7 @@ Install IREE pip packages, either from pip or by
 python -m pip install \
   iree-compiler \
   iree-runtime \
-  iree-tools-tf \
-  -f https://github.com/google/iree/releases
+  iree-tools-tf
 ```
 
 !!! warning
