@@ -13,112 +13,9 @@
 #include "iree/base/api.h"
 #include "iree/base/target_platform.h"
 
-#if defined(IREE_PLATFORM_WINDOWS)
-// Though Windows can support pipes no one uses them so for simplicity we only
-// exposes HANDLEs.
-#define IREE_HAVE_WAIT_TYPE_WIN32_HANDLE 1
-#elif defined(IREE_PLATFORM_ANDROID) || defined(IREE_PLATFORM_LINUX)
-// Treat Android and modern linux as (mostly) the same.
-#define IREE_HAVE_WAIT_TYPE_EVENTFD 1
-#define IREE_HAVE_WAIT_TYPE_PIPE 1
-#else
-// BSD/Darwin/etc all have pipe.
-#define IREE_HAVE_WAIT_TYPE_PIPE 1
-#endif  // IREE_PLATFORM_*
-
-// TODO(benvanik): see if we can get sync file on linux too:
-#if defined(IREE_PLATFORM_ANDROID)
-#define IREE_HAVE_WAIT_TYPE_SYNC_FILE 1
-#endif  // IREE_PLATFORM_ANDROID
-
 #ifdef __cplusplus
 extern "C" {
 #endif  // __cplusplus
-
-//===----------------------------------------------------------------------===//
-// iree_wait_primitive_*
-//===----------------------------------------------------------------------===//
-
-// TODO(benvanik): conditionally compile out enum values unavailable (to avoid
-// runtime surprises).
-
-// Specifies the type of a wait handle.
-enum iree_wait_primitive_type_bits_t {
-  // Android/Linux eventfd handle.
-  // These are akin to pipe() but require only a single handle and have
-  // significantly lower overhead (equivalent if not slightly better than
-  // pthreads condvars).
-  //
-  // eventfds support acting as both semaphores and auto reset events.
-  //
-  // More information:
-  // http://man7.org/linux/man-pages/man2/eventfd.2.html
-  IREE_WAIT_PRIMITIVE_TYPE_EVENT_FD = 1u,
-
-  // Android/Linux sync_file handle (aka 'sync fence').
-  // The handle is allocated indirectly by the device driver via the
-  // <linux/sync_file.h> API. It may be waited upon with poll(), select(), or
-  // epoll() and must be closed with close() when no longer required. If
-  // waiting on multiple sync_files the caller should first merge them
-  // together.
-  //
-  // A sync_file must only be used as fences (one-shot manual reset events).
-  //
-  // More information:
-  // https://www.kernel.org/doc/Documentation/sync_file.txt
-  // https://lwn.net/Articles/702339/
-  // https://source.android.com/devices/graphics/implement-vsync#explicit_synchronization
-  // https://developer.android.com/ndk/reference/group/sync
-  IREE_WAIT_PRIMITIVE_TYPE_SYNC_FILE = 2u,
-
-  // Android/Linux/iOS-compatible POSIX pipe handle.
-  // Two handles are generated: one for transmitting and one for receiving.
-  //
-  // More information:
-  // http://man7.org/linux/man-pages/man2/pipe.2.html
-  IREE_WAIT_PRIMITIVE_TYPE_PIPE = 3u,
-
-  // Windows HANDLE type.
-  // The HANDLE may represent a thread, event, semaphore, timer, etc.
-  //
-  // More information:
-  // https://docs.microsoft.com/en-us/windows/win32/sysinfo/object-categories
-  // https://docs.microsoft.com/en-us/windows/win32/sync/using-event-objects
-  IREE_WAIT_PRIMITIVE_TYPE_WIN32_HANDLE = 4u,
-};
-typedef uint8_t iree_wait_primitive_type_t;
-
-// A handle value whose behavior is defined by the iree_wait_primitive_type_t.
-typedef union {
-#if defined(IREE_HAVE_WAIT_TYPE_EVENTFD)
-  // IREE_WAIT_PRIMITIVE_TYPE_EVENT_FD
-  struct {
-    int fd;
-  } event;
-#endif  // IREE_HAVE_WAIT_TYPE_EVENTFD
-#if defined(IREE_HAVE_WAIT_TYPE_SYNC_FILE)
-  // IREE_WAIT_PRIMITIVE_TYPE_SYNC_FILE
-  struct {
-    int fd;
-  } sync_file;
-#endif  // IREE_HAVE_WAIT_TYPE_SYNC_FILE
-#if defined(IREE_HAVE_WAIT_TYPE_PIPE)
-  // IREE_WAIT_PRIMITIVE_TYPE_PIPE
-  union {
-    struct {
-      int read_fd;
-      int write_fd;
-    };
-    int fds[2];
-  } pipe;
-#endif  // IREE_HAVE_WAIT_TYPE_PIPE
-#if defined(IREE_HAVE_WAIT_TYPE_WIN32_HANDLE)
-  // IREE_WAIT_PRIMITIVE_TYPE_WIN32_HANDLE
-  struct {
-    uintptr_t handle;
-  } win32;
-#endif  // IREE_HAVE_WAIT_TYPE_WIN32_HANDLE
-} iree_wait_primitive_value_t;
 
 //===----------------------------------------------------------------------===//
 // iree_wait_handle_t
@@ -127,7 +24,6 @@ typedef union {
 // Non-owning handle reference to a waitable object.
 // TODO(benvanik): packing to ensure we are getting the expected alignments.
 typedef struct iree_wait_handle_t {
-  iree_wait_primitive_type_t type;  // uint8_t
   union {
     // Used by iree_wait_set_t storage to track the number of duplicate
     // instances of a particular handle within the set to avoid needing to store
@@ -140,8 +36,18 @@ typedef struct iree_wait_handle_t {
     // (3 bytes total available)
     uint8_t storage[3];
   } set_internal;
+  // Inlined iree_wait_primitive_t to get better packing:
+  iree_wait_primitive_type_t type;  // uint8_t
   iree_wait_primitive_value_t value;
 } iree_wait_handle_t;
+static_assert(sizeof(iree_wait_handle_t) <= sizeof(uint64_t) * 2,
+              "iree_wait_handle_t must fit in 16-bytes so it can be stored in "
+              "other data structures");
+
+// Returns true if the wait |handle| is resolved immediately (empty).
+static inline bool iree_wait_handle_is_immediate(iree_wait_handle_t handle) {
+  return handle.type == IREE_WAIT_PRIMITIVE_TYPE_NONE;
+}
 
 // Initializes a wait handle with the given primitive type and value.
 // Wait handles do not retain the provided primitives and they must be kept
@@ -155,6 +61,14 @@ iree_status_t iree_wait_handle_wrap_primitive(
 // Note that wait handles do not retain the underlying wait primitive and
 // deinitializing a handle will not close the resource.
 void iree_wait_handle_deinitialize(iree_wait_handle_t* handle);
+
+// Closes a wait handle and resets |handle|.
+void iree_wait_handle_close(iree_wait_handle_t* handle);
+
+// iree_wait_source_t control function.
+iree_status_t iree_wait_handle_ctl(iree_wait_source_t wait_source,
+                                   iree_wait_source_command_t command,
+                                   const void* params, void** inout_ptr);
 
 //===----------------------------------------------------------------------===//
 // iree_wait_set_t
@@ -197,7 +111,7 @@ iree_status_t iree_wait_set_insert(iree_wait_set_t* set,
 
 // Erases a single instance of a wait handle from the set.
 // Decrements the reference count; if the same handle was inserted multiple
-// times then the it may still remain in the set after an erase!
+// times then it may still remain in the set after the call returns.
 void iree_wait_set_erase(iree_wait_set_t* set, iree_wait_handle_t handle);
 
 // Clears all handles from the wait set.
@@ -298,6 +212,10 @@ void iree_event_set(iree_event_t* event);
 // Resets the event object to the unsignaled state.
 // Resetting an event that is already reset has no effect.
 void iree_event_reset(iree_event_t* event);
+
+// Returns a wait_source reference to |event|.
+// The event must be kept live for as long as the reference is live.
+iree_wait_source_t iree_event_await(iree_event_t* event);
 
 #ifdef __cplusplus
 }  // extern "C"

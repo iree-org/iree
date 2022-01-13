@@ -33,6 +33,8 @@ cc_library(
         "string_view.h",
         "time.c",
         "time.h",
+        "wait_source.c",
+        "wait_source.h",
     ],
     hdrs = ["api.h"],
     visibility = ["//visibility:public"],
