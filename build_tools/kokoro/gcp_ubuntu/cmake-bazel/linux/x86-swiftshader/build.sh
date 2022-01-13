@@ -24,7 +24,7 @@ python3 -c 'import tensorflow as tf; print(tf.__version__)'
 python3 -c 'import jax; print(jax.__version__)'
 
 echo "Initializing submodules"
-git submodule update --init
+git submodule update --init --jobs 8 --depth 1
 
 ./build_tools/kokoro/gcp_ubuntu/check_vulkan.sh
 

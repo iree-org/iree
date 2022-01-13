@@ -23,7 +23,7 @@ ANDROID_ABI="$1"
 export PS4='[$(date -u "+%T %Z")] '
 
 echo "Initializing submodules"
-git submodule update --init
+git submodule update --init --jobs 8 --depth 1
 
 ROOT_DIR="$(git rev-parse --show-toplevel)"
 

@@ -22,7 +22,7 @@ export CMAKE_BIN="$(which cmake)"
 python3 --version
 
 echo "Initializing submodules"
-git submodule update --init
+git submodule update --init --jobs 8 --depth 1
 
 ./build_tools/kokoro/gcp_ubuntu/check_vulkan.sh
 
