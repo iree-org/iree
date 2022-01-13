@@ -26,11 +26,11 @@ ninja --version
 python3 --version
 echo "Android NDK path: ${ANDROID_NDK}"
 
+echo "Initializing submodules"
+git submodule update --init --jobs 8 --depth 1
+
 ROOT_DIR=$(git rev-parse --show-toplevel)
 cd "${ROOT_DIR}"
-
-echo "Initializing submodules"
-./scripts/git/submodule_versions.py init
 
 # BUILD the iree-import-tflite binary for importing models to benchmark from
 # TFLite flatbuffers.

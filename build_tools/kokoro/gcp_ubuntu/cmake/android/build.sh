@@ -22,6 +22,9 @@ ANDROID_ABI="$1"
 # Print the UTC time when set -x is on
 export PS4='[$(date -u "+%T %Z")] '
 
+echo "Initializing submodules"
+git submodule update --init --jobs 8 --depth 1
+
 ROOT_DIR="$(git rev-parse --show-toplevel)"
 
 CMAKE_BIN="${CMAKE_BIN:-$(which cmake)}"
@@ -34,9 +37,6 @@ bazel --version
 python3 --version
 ninja --version
 echo "Android NDK path: $ANDROID_NDK"
-
-echo "Initializing submodules"
-./scripts/git/submodule_versions.py init
 
 cd "${ROOT_DIR}"
 

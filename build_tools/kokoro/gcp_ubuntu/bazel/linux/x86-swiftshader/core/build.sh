@@ -22,7 +22,7 @@ bazel --version
 "${CC?}" --version
 
 echo "Initializing submodules"
-./scripts/git/submodule_versions.py init
+git submodule update --init --jobs 8 --depth 1
 
 echo "Building and testing with bazel"
 ./build_tools/bazel/build_core.sh

@@ -22,7 +22,7 @@ export CMAKE_BIN="$(which cmake)"
 python3 --version
 
 echo "Initializing submodules"
-./scripts/git/submodule_versions.py init
+git submodule update --init --jobs 8 --depth 1
 
 export ROOT_DIR="$(git rev-parse --show-toplevel)"
 export BUILD_HOST_DIR="${ROOT_DIR?}/build-host"

@@ -23,13 +23,13 @@ python3 --version
 python3 -c 'import tensorflow as tf; print(tf.__version__)'
 python3 -c 'import jax; print(jax.__version__)'
 
+echo "Initializing submodules"
+git submodule update --init --jobs 8 --depth 1
+
 ./build_tools/kokoro/gcp_ubuntu/check_vulkan.sh
 
 # Print SwiftShader git commit
 cat /swiftshader/git-commit
-
-echo "Initializing submodules"
-./scripts/git/submodule_versions.py init
 
 # BUILD the integrations binaries with Bazel and run any lit tests
 IREE_SRC_DIR="$PWD"
