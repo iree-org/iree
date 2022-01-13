@@ -37,11 +37,8 @@ llvm::SmallVector<unsigned> getPartitionableLoopsImpl(
     parallelLoops =
         pruneUnitTripParallelLoops(parallelLoops, *staticLoopRanges);
   }
-  // TODO(ravishankarm): For now the outer parallel loops are dropped. This is
-  // a pragmatic choice for now but might need to be revisited.
   if (parallelLoops.size() > maxNumPartitionedLoops) {
-    parallelLoops = llvm::to_vector(llvm::ArrayRef<unsigned>(parallelLoops)
-                                        .take_back(maxNumPartitionedLoops));
+    parallelLoops.resize(maxNumPartitionedLoops);
   }
   return parallelLoops;
 }
@@ -78,11 +75,7 @@ struct Mmt4DOpPartitionableLoops
 
   llvm::SmallVector<unsigned> getPartitionableLoops(
       Operation *op, unsigned maxNumPartitionedLoops) const {
-    llvm::SmallVector<unsigned> partitionableLoops = {0, 1};
-    if (partitionableLoops.size() > maxNumPartitionedLoops) {
-      partitionableLoops.resize(maxNumPartitionedLoops);
-    }
-    return partitionableLoops;
+    return {0, 1};
   }
 };
 
@@ -192,9 +185,9 @@ void registerPartitionableLoopsInterfaceModels(DialectRegistry &registry) {
   // clang-format on
 
   registerInterfaceForTiledOpInterfaceOps<
-      LinalgExt::FftOp, LinalgExt::ReverseOp, LinalgExt::ScatterOp,
-      LinalgExt::SortOp, tensor::ExtractSliceOp, tensor::InsertSliceOp>(
-      registry);
+      linalg::PadTensorOp, LinalgExt::FftOp, LinalgExt::ReverseOp,
+      LinalgExt::ScanOp, LinalgExt::ScatterOp, LinalgExt::SortOp,
+      tensor::ExtractSliceOp, tensor::InsertSliceOp>(registry);
 }
 
 }  // namespace Flow

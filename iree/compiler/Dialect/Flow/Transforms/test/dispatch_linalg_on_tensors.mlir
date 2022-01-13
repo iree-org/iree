@@ -253,7 +253,7 @@ func @tile_4d_generic_op_alone
 //  CHECK-DAG:   %[[D3:.+]] = tensor.dim %[[ARG0]], %[[C3]]
 //  CHECK-DAG:   %[[WG_SISE_2:.+]] = flow.dispatch.workgroup.size[2] : index
 //  CHECK-DAG:   %[[WG_ID_2:.+]] = flow.dispatch.workgroup.id[2] : index
-//  CHECK-DAG:   flow.dispatch.workgroups[%[[D3]], %[[D2]], %[[D1]]]
+//  CHECK-DAG:   flow.dispatch.workgroups[%[[D2]], %[[D1]], %[[D0]]]
 //  CHECK-DAG:   %[[D4:.+]] = affine.apply #[[MAP0]]()[%[[WG_ID_2]], %[[WG_SISE_2]]]
 
 // -----
@@ -1068,11 +1068,9 @@ func @pooling_nwhc_sum_static(%input: tensor<1x33x33x160xf32>) -> tensor<1x1x1x1
 // CHECK-LABEL: func @pooling_nwhc_sum_static
 //       CHECK:   flow.dispatch.workgroups
 //  CHECK-NEXT:   (%{{.+}}: !flow.dispatch.tensor<readonly:1x33x33x160xf32>, %[[OUTPUT:.+]]: !flow.dispatch.tensor<writeonly:1x1x1x160xf32>)
-//       CHECK:     scf.for %[[Z:.+]] =
-//       CHECK:       scf.for %[[Y:.+]] =
-//       CHECK:         scf.for %[[X:.+]] =
-//       CHECK:           %[[POOL:.+]] = linalg.pooling_nhwc_sum
-//       CHECK:           flow.dispatch.tensor.store %[[POOL]], %[[OUTPUT]], offsets = [0, %[[Z]], %[[Y]], %[[X]]], sizes = [1, %{{.+}}, %{{.+}}, %{{.+}}]
+//       CHECK:     scf.for %[[X:.+]] =
+//       CHECK:       %[[POOL:.+]] = linalg.pooling_nhwc_sum
+//       CHECK:       flow.dispatch.tensor.store %[[POOL]], %[[OUTPUT]], offsets = [0, 0, 0, %[[X]]], sizes = [1, 1, 1, %{{.+}}]
 
 // -----
 
@@ -1197,3 +1195,118 @@ func @inline_cst2(%arg0 : tensor<4x2xi32>) -> tensor<2xi32> {
 //      CHECK:   flow.dispatch.workgroups
 // CHECK-SAME:     (%[[ARG0]])
 //      CHECK:     %[[CST:.+]] = arith.constant dense<[21, 42]> : tensor<2xi32>
+
+// -----
+
+func @gemm_unitN(%arg0 : tensor<?x?xf32>, %arg1 : tensor<?x1xf32>,
+    %arg2 : tensor<?x1xf32>) -> tensor<?x1xf32> {
+  %0 = linalg.matmul
+      ins(%arg0, %arg1 : tensor<?x?xf32>, tensor<?x1xf32>)
+      outs(%arg2 : tensor<?x1xf32>) -> tensor<?x1xf32>
+  return %0 : tensor<?x1xf32>
+}
+//      CHECK: func @gemm_unitN(
+// CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: tensor<?x?xf32>,
+// CHECK-SAME:     %[[ARG1:[a-zA-Z0-9]+]]: tensor<?x1xf32>,
+// CHECK-SAME:     %[[ARG2:[a-zA-Z0-9]+]]: tensor<?x1xf32>)
+//  CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
+//  CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
+//  CHECK-DAG:   %[[M:.+]] = tensor.dim %[[ARG0:.+]], %[[C0]]
+//      CHECK:   flow.dispatch.workgroups[%[[M]], %[[C1]], %[[C1]]]
+//      CHECK:     scf.for
+//  CHECK-NOT:       scf.for
+//      CHECK:       linalg.matmul
+
+// -----
+
+func @gemm_unitM_unitN(%arg0 : tensor<1x1xf32>, %arg1 : tensor<1x1xf32>,
+    %arg2 : tensor<1x1xf32>) -> tensor<1x1xf32> {
+  %0 = linalg.matmul
+      ins(%arg0, %arg1 : tensor<1x1xf32>, tensor<1x1xf32>)
+      outs(%arg2 : tensor<1x1xf32>) -> tensor<1x1xf32>
+  return %0 : tensor<1x1xf32>
+}
+//     CHECK: func @gemm_unitM_unitN(
+//     CHECK:   %[[C1:.+]] = arith.constant 1 : index
+//     CHECK:   flow.dispatch.workgroups[%[[C1]], %[[C1]], %[[C1]]]
+// CHECK-NOT:     scf.for
+//     CHECK:     linalg.matmul
+
+// -----
+
+func @gemm_unitM(%arg0 : tensor<1x?xf32>, %arg1 : tensor<?x?xf32>,
+    %arg2 : tensor<1x?xf32>) -> tensor<1x?xf32> {
+  %0 = linalg.matmul
+      ins(%arg0, %arg1 : tensor<1x?xf32>, tensor<?x?xf32>)
+      outs(%arg2 : tensor<1x?xf32>) -> tensor<1x?xf32>
+  return %0 : tensor<1x?xf32>
+}
+//     CHECK: func @gemm_unitM(
+// CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: tensor<1x?xf32>,
+// CHECK-SAME:     %[[ARG1:[a-zA-Z0-9]+]]: tensor<?x?xf32>,
+// CHECK-SAME:     %[[ARG2:[a-zA-Z0-9]+]]: tensor<1x?xf32>)
+//  CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
+//  CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
+//  CHECK-DAG:   %[[N:.+]] = tensor.dim %[[ARG1:.+]], %[[C1]]
+//      CHECK:   flow.dispatch.workgroups[%[[N]], %[[C1]], %[[C1]]]
+//      CHECK:     scf.for
+//  CHECK-NOT:       scf.for
+//      CHECK:       linalg.matmul
+
+// -----
+
+#map = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1, d2, d3, d4, d5, d6, d7)>
+func @unit_dim_generic(%arg0 : tensor<1x?x1x1x?x?x1x?xf32>,
+    %arg1 : tensor<1x?x1x1x?x?x1x?xf32>) -> tensor<1x?x1x1x?x?x1x?xf32> {
+  %0 = linalg.generic {
+      indexing_maps = [#map, #map, #map],
+      iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel", "parallel", "parallel", "parallel"]}
+      ins(%arg0, %arg1 : tensor<1x?x1x1x?x?x1x?xf32>, tensor<1x?x1x1x?x?x1x?xf32>)
+      outs(%arg0 : tensor<1x?x1x1x?x?x1x?xf32>) {
+      ^bb0(%arg2 : f32, %arg3 : f32, %arg4 : f32):
+        %1 = arith.addf %arg2, %arg3 : f32
+        linalg.yield %1 : f32
+      } -> tensor<1x?x1x1x?x?x1x?xf32>
+  return %0 : tensor<1x?x1x1x?x?x1x?xf32>
+}
+//  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0, s1] -> (s0 * s1)>
+//  CHECK-DAG: #[[MAP1:.+]] = affine_map<(d0, d1)[s0] -> (d0, -d1 + s0)>
+//      CHECK: func @unit_dim_generic(
+// CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: tensor<1x?x1x1x?x?x1x?xf32>
+// CHECK-SAME:     %[[ARG1:[a-zA-Z0-9]+]]: tensor<1x?x1x1x?x?x1x?xf32>)
+//  CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
+//  CHECK-DAG:   %[[C4:.+]] = arith.constant 4 : index
+//  CHECK-DAG:   %[[C5:.+]] = arith.constant 5 : index
+//  CHECK-DAG:   %[[D1:.+]] = tensor.dim %[[ARG0]], %[[C1]]
+//  CHECK-DAG:   %[[D4:.+]] = tensor.dim %[[ARG0]], %[[C4]]
+//  CHECK-DAG:   %[[D5:.+]] = tensor.dim %[[ARG0]], %[[C5]]
+//      CHECK:   flow.dispatch.workgroups[%[[D5]], %[[D4]], %[[D1]]]
+// CHECK-SAME:       (%[[ARG0]], %[[D1]], %[[D4]], %[[D5]]
+// CHECK-NEXT:      %[[ARG2:[a-zA-Z0-9]+]]: !flow.dispatch.tensor<readwrite:1x?x1x1x?x?x1x?xf32>
+// CHECK-SAME:      %[[ARG3:[a-zA-Z0-9]+]]: index
+// CHECK-SAME:      %[[ARG4:[a-zA-Z0-9]+]]: index
+// CHECK-SAME:      %[[ARG5:[a-zA-Z0-9]+]]: index
+//  CHECK-DAG:     %[[WG_SIZE_X:.+]] = flow.dispatch.workgroup.size[0] : index
+//  CHECK-DAG:     %[[WG_SIZE_Y:.+]] = flow.dispatch.workgroup.size[1] : index
+//  CHECK-DAG:     %[[WG_SIZE_Z:.+]] = flow.dispatch.workgroup.size[2] : index
+//  CHECK-DAG:     %[[WG_ID_X:.+]] = flow.dispatch.workgroup.id[0] : index
+//  CHECK-DAG:     %[[WG_COUNT_X:.+]] = flow.dispatch.workgroup.count[0] : index
+//  CHECK-DAG:     %[[WG_ID_Y:.+]] = flow.dispatch.workgroup.id[1] : index
+//  CHECK-DAG:     %[[WG_COUNT_Y:.+]] = flow.dispatch.workgroup.count[1] : index
+//  CHECK-DAG:     %[[WG_ID_Z:.+]] = flow.dispatch.workgroup.id[2] : index
+//  CHECK-DAG:     %[[WG_COUNT_Z:.+]] = flow.dispatch.workgroup.count[2] : index
+//  CHECK-DAG:     %[[LB_Z:.+]] = affine.apply #[[MAP0]]()[%[[WG_ID_Z]], %[[WG_SIZE_Z]]]
+//  CHECK-DAG:     %[[STEP_Z:.+]] = affine.apply #[[MAP0]]()[%[[WG_COUNT_Z]], %[[WG_SIZE_Z]]]
+//      CHECK:     scf.for %[[IV0:.+]] = %[[LB_Z]] to %[[ARG3]] step %[[STEP_Z]]
+//  CHECK-DAG:       %[[LB_Y:.+]] = affine.apply #[[MAP0]]()[%[[WG_ID_Y]], %[[WG_SIZE_Y]]]
+//  CHECK-DAG:       %[[STEP_Y:.+]] = affine.apply #[[MAP0]]()[%[[WG_COUNT_Y]], %[[WG_SIZE_Y]]]
+//      CHECK:       scf.for %[[IV1:.+]] = %[[LB_Y]] to %[[ARG4]] step %[[STEP_Y]]
+//  CHECK-DAG:         %[[LB_X:.+]] = affine.apply #[[MAP0]]()[%[[WG_ID_X]], %[[WG_SIZE_X]]]
+//  CHECK-DAG:         %[[STEP_X:.+]] = affine.apply #[[MAP0]]()[%[[WG_COUNT_X]], %[[WG_SIZE_X]]]
+//      CHECK:         scf.for %[[IV2:.+]] = %[[LB_X]] to %[[ARG5]] step %[[STEP_X]]
+//  CHECK-DAG:           %[[TILE_Z:.+]] = affine.min #[[MAP1]](%[[WG_SIZE_Z]], %[[IV0]])[%[[ARG3]]]
+//  CHECK-DAG:           %[[TILE_Y:.+]] = affine.min #[[MAP1]](%[[WG_SIZE_Y]], %[[IV1]])[%[[ARG4]]]
+//  CHECK-DAG:           %[[TILE_X:.+]] = affine.min #[[MAP1]](%[[WG_SIZE_X]], %[[IV2]])[%[[ARG5]]]
+//      CHECK:           flow.dispatch.tensor.load %[[ARG2]]
+// CHECK-SAME:               offsets = [0, %[[IV0]], 0, 0, %[[IV1]], %[[IV2]], 0, 0]
+// CHECK-SAME:               sizes = [1, %[[TILE_Z]], 1, 1, %[[TILE_Y]], %[[TILE_X]], 1, %{{.+}}]

@@ -12,6 +12,7 @@
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Sandbox/Passes.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
+#include "iree/compiler/Dialect/Flow/IR/PartitionableLoopsInterface.h"
 #include "llvm/Support/CommandLine.h"
 #include "mlir/Conversion/ReconcileUnrealizedCasts/ReconcileUnrealizedCasts.h"
 #include "mlir/Conversion/SCFToStandard/SCFToStandard.h"
@@ -94,15 +95,7 @@ LogicalResult verifyDoubleTilingExpertPassPipelineConfig(
     return op->emitOpError("workload_per_wg size should be less than ")
            << kNumMaxParallelDims;
   }
-  if (isa<linalg::LinalgOp, IREE::LinalgExt::TiledOpInterface>(op)) {
-    SmallVector<unsigned> partitionedLoops = getPartitionedLoops(op);
-    if (workloadPerWorkgroup.size() != partitionedLoops.size()) {
-      return op->emitOpError("expected ")
-             << partitionedLoops.size()
-             << " entries for workload_per_wg, but got "
-             << workloadPerWorkgroup.size();
-    }
-  }
+
   if (llvm::any_of(workloadPerWorkgroup,
                    [](int64_t val) { return val == 0; })) {
     return op->emitOpError("invalid to use 0 in workload_per_wg");
@@ -112,12 +105,14 @@ LogicalResult verifyDoubleTilingExpertPassPipelineConfig(
     return op->emitOpError("expected two levels of tile sizes for ")
            << pipelineName << ", got " << loweringConfig.getTileSizes().size();
   }
-  SmallVector<int64_t> firstLevelTileSizes = loweringConfig.getTileSizeVals(
-      static_cast<unsigned>(TilingLevel::WorkGroupTiles));
-  if (!firstLevelTileSizes.empty()) {
+    SmallVector<int64_t> firstLevelTileSizes = loweringConfig.getTileSizeVals(static_cast<unsigned>(TilingLevel::WorkGroupTiles));
+  IREE::Flow::PartitionableLoopsInterface interfaceOp =
+      dyn_cast_or_null<IREE::Flow::PartitionableLoopsInterface>(op);
+  if (interfaceOp && !firstLevelTileSizes.empty()) {
     // Verify that if the first-level tile sizes are set, they are the same as
     // workload_per_wg for the partitioned loops.
-    SmallVector<unsigned> partitionedLoops = getPartitionedLoops(op);
+    SmallVector<unsigned> partitionedLoops =
+        interfaceOp.getPartitionableLoops(kNumMaxParallelDims);
     size_t minElements =
         (partitionedLoops.empty() ? 0 : partitionedLoops.back() + 1);
     if (firstLevelTileSizes.size() < minElements) {

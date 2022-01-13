@@ -7,6 +7,7 @@
 #ifndef IREE_COMPILER_CODEGEN_UTILS_UTILS_H_
 #define IREE_COMPILER_CODEGEN_UTILS_UTILS_H_
 
+#include "iree/compiler/Dialect/Flow/IR/PartitionableLoopsInterface.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "llvm/ADT/StringMap.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
@@ -63,7 +64,16 @@ SmallVector<int64_t> getUntiledResultShape(linalg::LinalgOp linalgOp,
 /// order, i.e. starting from the outer-most to innermost.
 /// Note that this is the same method that is used at the Flow dispatch region
 /// formation to tile and distribute the ops.
+// TODO: This method is to be deprecated.
 SmallVector<unsigned> getPartitionedLoops(Operation *op);
+
+/// Return the tile sizes to use for the Flow partitioned loops given the
+/// workload per workgroup. The tile sizes for the partitioned loops are
+/// obtained from the workload per workgroup. The other loops are returned as
+/// zero.
+SmallVector<int64_t> getDistributedTileSizes(
+    IREE::Flow::PartitionableLoopsInterface interfaceOp,
+    ArrayRef<int64_t> workloadPerWorkgroup);
 
 /// Information about a tiled and distributed loop.
 ///

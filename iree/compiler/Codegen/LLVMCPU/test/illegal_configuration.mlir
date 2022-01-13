@@ -20,7 +20,7 @@ hal.executable private @matmul_tensors {
         %lhs = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<4x8xf32>
         %rhs = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<8x16xf32>
         %result = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : memref<4x16xf32>
-        // expected-error @+1 {{expected 2 entries for workload_per_wg, but got 0}}
+        // expected-error @+1 {{expected three levels of tile sizes for CPUTensorToVectors, got 0}}
         linalg.matmul {lowering.config = #config} ins(%lhs, %rhs : memref<4x8xf32>, memref<8x16xf32>)
           outs(%result: memref<4x16xf32>)
         return
