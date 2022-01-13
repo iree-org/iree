@@ -40,6 +40,28 @@ class BenchmarkThreshold:
 # Order matters here: if multiple regexes match a single benchmark, the first
 # match is used.
 BENCHMARK_THRESHOLDS = [
+    # Fluctuating benchmarks on CPUs.
+    BenchmarkThreshold(re.compile(r"^DeepLabV3.*big-core.*Dylib.* @ Pixel"), 20,
+                       ThresholdUnit.PERCENTAGE),
+    BenchmarkThreshold(
+        re.compile(r"^MobileBertSquad.*big-core.*Dylib-Sync @ Pixel-4"), 50,
+        ThresholdUnit.PERCENTAGE),
+    BenchmarkThreshold(re.compile(r"^MobileNetV2.*Dylib @ Pixel"), 15,
+                       ThresholdUnit.PERCENTAGE),
+    BenchmarkThreshold(re.compile(r"^MobileNetV3Small.*Dylib-Sync @ Pixel-6"),
+                       20, ThresholdUnit.PERCENTAGE),
+    BenchmarkThreshold(
+        re.compile(r"^MobileNetV3Small.*big-core.*Dylib @ Pixel-6"), 20,
+        ThresholdUnit.PERCENTAGE),
+    BenchmarkThreshold(
+        re.compile(r"^MobileNetV3Small.*little-core.*Dylib @ Pixel"), 20,
+        ThresholdUnit.PERCENTAGE),
+    BenchmarkThreshold(
+        re.compile(r"^MobileSSD.*little-core.*Dylib.* @ Pixel-6"), 20,
+        ThresholdUnit.PERCENTAGE),
+    BenchmarkThreshold(re.compile(r"^PoseNet.*big-core.*Dylib.* @ Pixel-6"), 20,
+                       ThresholdUnit.PERCENTAGE),
+
     # Benchmarks that complete around 10ms on GPUs; using percentage is not
     # suitable anymore.
     BenchmarkThreshold(re.compile(r"^DeepLabV3.*GPU-Mali"), 1,
