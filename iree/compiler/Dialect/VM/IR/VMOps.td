@@ -3739,21 +3739,57 @@ def VM_CheckNZOp : VM_UnaryCheckOp<"check.nz"> {
 //   await_any
 
 def VM_YieldOp : VM_Op<"yield", [
+    DeclareOpInterfaceMethods<BranchOpInterface>,
     DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
     HasParent<"IREE::VM::FuncOp">,
+    Terminator,
     YieldPoint,
   ]> {
   let summary = [{unconditional fiber yield operation}];
   let description = [{
     Yields the fiber for some (likely short) amount of time. This can be used to
-    perform cooperative scheduling and ensure fair (enough) execution.
+    perform cooperative scheduling and ensure fair (enough) execution. Execution
+    resumes at the specified target branch.
+
+    ```
+    ^bb0:
+      vm.yield ^on_resume
+    ^on_resume:
+      ...
+   ```
   }];
 
-  let assemblyFormat = "attr-dict";
+  let arguments = (ins
+    Variadic<VM_AnyType>:$destOperands
+  );
+
+  let successors = (successor
+    AnySuccessor:$dest
+  );
+
+  let assemblyFormat = [{
+    $dest (`(` $destOperands^ `:` type($destOperands) `)`)? attr-dict
+  }];
 
   let encoding = [
     VM_EncOpcode<VM_OPC_Yield>,
+    VM_EncBranch<"dest", "getOperands", 0>,
   ];
+
+  let builders = [
+    OpBuilder<(ins "Block *":$dest, CArg<"ValueRange", "{}">:$destOperands), [{
+      $_state.addSuccessors(dest);
+      $_state.addOperands(destOperands);
+    }]>,
+  ];
+
+  let extraClassDeclaration = [{
+    Block *getDest();
+    void setDest(Block *block);
+
+    /// Erase the operand at 'index' from the operand list.
+    void eraseOperand(unsigned index);
+  }];
 }
 
 //===----------------------------------------------------------------------===//
@@ -3851,11 +3887,11 @@ def VM_BreakOp : VM_Op<"break", [
   ];
 
   let builders = [
-    OpBuilder<(ins "Block *":$dest, CArg<"ValueRange", "{}">:$destOperands),
-    [{
+    OpBuilder<(ins "Block *":$dest, CArg<"ValueRange", "{}">:$destOperands), [{
       $_state.addSuccessors(dest);
       $_state.addOperands(destOperands);
-  }]>];
+    }]>,
+  ];
 
   let extraClassDeclaration = [{
     Block *getDest();

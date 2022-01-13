@@ -1363,8 +1363,13 @@ iree_status_t iree_vm_bytecode_disasm_op(
     //===------------------------------------------------------------------===//
 
     DISASM_OP(CORE, Yield) {
+      int32_t block_pc = VM_DecBranchTarget("dest");
+      const iree_vm_register_remap_list_t* remap_list =
+          VM_ParseBranchOperands("operands");
       IREE_RETURN_IF_ERROR(
-          iree_string_builder_append_cstring(b, "vm.yield (TBD)"));
+          iree_string_builder_append_format(b, "vm.yield ^%08X(", block_pc));
+      EMIT_REMAP_LIST(remap_list);
+      IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ")"));
       break;
     }
 
