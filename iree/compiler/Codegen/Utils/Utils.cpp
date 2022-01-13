@@ -78,6 +78,21 @@ SmallVector<unsigned> getPartitionedLoops(Operation *op) {
   return {};
 }
 
+SmallVector<int64_t> getDistributedTileSizes(
+    IREE::Flow::PartitionableLoopsInterface interfaceOp,
+    ArrayRef<int64_t> workloadPerWorkgroup) {
+  SmallVector<int64_t> tileSizes(interfaceOp.getNumLoops(), 0);
+  SmallVector<unsigned> partitionableLoops =
+      interfaceOp.getPartitionableLoops(kNumMaxParallelDims);
+  assert(partitionableLoops.size() == workloadPerWorkgroup.size() &&
+         "mismatch in parallelization");
+  for (auto it :
+       llvm::zip(workloadPerWorkgroup, llvm::reverse(partitionableLoops))) {
+    tileSizes[std::get<1>(it)] = std::get<0>(it);
+  }
+  return tileSizes;
+}
+
 /// Walk up the defs of the view, to get the untiled value. Either walks up
 /// `ViewOpInterface` op-chains or the `subtensor` op-chains.
 static Value getViewSource(Value view) {

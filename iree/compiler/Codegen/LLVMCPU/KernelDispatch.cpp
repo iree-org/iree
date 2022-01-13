@@ -244,6 +244,61 @@ static SmallVector<int64_t> getDefaultWorkloadPerWorkgroup(
   return workloadPerWorkgroup;
 }
 
+/// Adjusts the workload per workgroup to be a multiple of vector size to ensure
+/// that the op vectorizes.
+static int64_t getMaxTileSize(int64_t lb, int64_t ub, int64_t maxSize,
+                              int64_t vectorSizeVal) {
+  if (ub == ShapedType::kDynamicSize || lb == ShapedType::kDynamicSize) {
+    return maxSize;
+  }
+  int64_t dim = ub - lb;
+  if (dim < vectorSizeVal) return 0;
+  for (int64_t i = std::min(maxSize, dim); i > 0; --i) {
+    if (dim % i == 0 && i % vectorSizeVal == 0) {
+      return i;
+    }
+  }
+  return maxSize;
+}
+
+/// Compute the workload per workgroup. The `vectorSize` is expected to contain
+/// the vector size to use along each loop of the `interfaceOp`.
+static SmallVector<int64_t> getDefaultWorkloadPerWorkgroup(
+    ArrayRef<LoopTilingAndDistributionInfo> tiledLoops,
+    ArrayRef<unsigned> partitionedLoops, ArrayRef<int64_t> vectorSize) {
+  if (tiledLoops.empty()) {
+    // Nothing to do.
+    return {};
+  }
+
+  assert(partitionedLoops.size() == tiledLoops.size() &&
+         "mismatch in expected parallelization");
+  SmallVector<int64_t> partitionedLoopsVectorSize(tiledLoops.size(), 1);
+  for (auto loopDim : llvm::enumerate(partitionedLoops)) {
+    partitionedLoopsVectorSize[loopDim.index()] = vectorSize[loopDim.value()];
+  }
+
+  SmallVector<int64_t> workLoadPerWorkgroup =
+      getDefaultWorkloadPerWorkgroup(tiledLoops, partitionedLoopsVectorSize);
+  for (auto tiledLoop : llvm::enumerate(tiledLoops)) {
+    Optional<int64_t> lb =
+        getConstantIntValue(tiledLoop.value().untiledLowerBound);
+    Optional<int64_t> ub =
+        getConstantIntValue(tiledLoop.value().untiledUpperBound);
+    if (!lb || !ub) continue;
+    unsigned workloadIndex = tiledLoops.size() - 1 - tiledLoop.index();
+    workLoadPerWorkgroup[workloadIndex] = getMaxTileSize(
+        lb.getValue(), ub.getValue(), workLoadPerWorkgroup[workloadIndex],
+        partitionedLoopsVectorSize[tiledLoop.index()]);
+    if (workLoadPerWorkgroup[workloadIndex] == 0) {
+      // If the tile size chosen is 0 set the workLoadPerWorkgroup to problem
+      // size.
+      workLoadPerWorkgroup[workloadIndex] = ub.getValue() - lb.getValue();
+    }
+  }
+  return workLoadPerWorkgroup;
+}
+
 /// Sets the default launch configuration to use for a tiled + distributed
 /// dispatch region based on the `tiledLoops` found.
 static LogicalResult setDefaultLaunchConfig(
@@ -264,32 +319,10 @@ static LogicalResult setDefaultLaunchConfig(
   return success();
 }
 
-/// Adjusts the workload per workgroup to be a multiple of vector size to ensure
-/// that the op vectorizes.
-static int64_t getMaxTileSize(int64_t lb, int64_t ub, int64_t maxSize,
-                              int64_t vectorSizeVal) {
-  if (ub == ShapedType::kDynamicSize || lb == ShapedType::kDynamicSize) {
-    return maxSize;
-  }
-  int64_t dim = ub - lb;
-  if (dim < vectorSizeVal) return vectorSizeVal;
-  for (int64_t i = std::min(maxSize, dim); i > 0; --i) {
-    if (dim % i == 0 && i % vectorSizeVal == 0) {
-      return i;
-    }
-  }
-  return maxSize;
-}
-
 static LogicalResult setX86RootConfig(FuncOp entryPointFn,
                                       linalg::ContractionOpInterface op,
-                                      SmallVector<int64_t> workloadPerWorkgroup,
+                                      SmallVector<int64_t> flowTileSizes,
                                       int vectorSize) {
-  setTranslationInfo(entryPointFn,
-                     getDispatchLoweringPassPipeline(entryPointFn, op),
-                     workloadPerWorkgroup,
-                     /*workgroupSize=*/ArrayRef<int64_t>{});
-
   // Hardcoded tile sizes, where v is the native vector size.
   // L1 tile sizes are {1, 1, ..., 8, 2v, 2v}.
   // Vector tile sizes are {1, ..., 1, v, v}
@@ -297,9 +330,9 @@ static LogicalResult setX86RootConfig(FuncOp entryPointFn,
   int64_t nLoops = cast<linalg::LinalgOp>(op.getOperation()).getNumLoops();
   l1TileSizes.append(nLoops - 3, 1);
   l1TileSizes.push_back(
-      getMaxTileSize(0, workloadPerWorkgroup[1], 8, vectorSize));
+      getMaxTileSize(0, flowTileSizes[nLoops - 3], 8, vectorSize));
   l1TileSizes.push_back(
-      getMaxTileSize(0, workloadPerWorkgroup[0], 2 * vectorSize, vectorSize));
+      getMaxTileSize(0, flowTileSizes[nLoops - 2], 2 * vectorSize, vectorSize));
   vectorTileSizes.append(nLoops - 2, 1);
   vectorTileSizes.push_back(vectorSize);
 
@@ -323,11 +356,6 @@ static LogicalResult setX86RootConfig(FuncOp entryPointFn,
 static LogicalResult setX86SandboxRootConfig(
     FuncOp entryPointFn, linalg::ContractionOpInterface op,
     SmallVector<int64_t> workloadPerWorkgroup, int vectorSize) {
-  setTranslationInfo(entryPointFn,
-                     DispatchLoweringPassPipeline::CPUDoubleTilingExpert,
-                     workloadPerWorkgroup,
-                     /*workgroupSize=*/ArrayRef<int64_t>{});
-
   // Hardcoded tile sizes. The configuration is derived from iree-llvm-sandbox.
   // L1 tile sizes are {1, 1, ..., 288, 128, 512}.
   // Vector tile sizes are {1, ..., 9, 32, 16}
@@ -355,13 +383,8 @@ static LogicalResult setX86SandboxRootConfig(
 
 static LogicalResult setARMRootConfig(FuncOp entryPointFn,
                                       linalg::ContractionOpInterface op,
-                                      SmallVector<int64_t> workloadPerWorkgroup,
+                                      SmallVector<int64_t> flowTileSizes,
                                       int vectorSize) {
-  setTranslationInfo(entryPointFn,
-                     getDispatchLoweringPassPipeline(entryPointFn, op),
-                     workloadPerWorkgroup,
-                     /*workgroupSize=*/ArrayRef<int64_t>{});
-
   // Hardcoded tile sizes, where v is the native vector size.
   // L1 tile sizes are {1, ..., 5v, v, 16v}.
   // Vector tile sizes are {1, ..., v, v, v}
@@ -369,9 +392,9 @@ static LogicalResult setARMRootConfig(FuncOp entryPointFn,
   int64_t nLoops = cast<linalg::LinalgOp>(op.getOperation()).getNumLoops();
   l1TileSizes.append(nLoops - 3, 1);
   l1TileSizes.push_back(
-      getMaxTileSize(0, workloadPerWorkgroup[1], 5 * vectorSize, vectorSize));
+      getMaxTileSize(0, flowTileSizes[nLoops - 3], 5 * vectorSize, vectorSize));
   l1TileSizes.push_back(
-      getMaxTileSize(0, workloadPerWorkgroup[0], vectorSize, vectorSize));
+      getMaxTileSize(0, flowTileSizes[nLoops - 2], vectorSize, vectorSize));
   vectorTileSizes.append(nLoops - 3, 1);
   vectorTileSizes.push_back(vectorSize);
   vectorTileSizes.push_back(vectorSize);
@@ -400,33 +423,40 @@ static LogicalResult setRootConfig(
     ArrayRef<LoopTilingAndDistributionInfo> tiledLoops) {
   auto lhsShapedType = contractionOp.lhs().getType().cast<ShapedType>();
   // Use the default distribution for the matmul loops.
-  int numBatchDims =
-      cast<linalg::LinalgOp>(contractionOp.getOperation()).getNumLoops() - 3;
+  unsigned numBatchDims = 0;
+  auto interfaceOp = cast<IREE::Flow::PartitionableLoopsInterface>(
+      contractionOp.getOperation());
+  unsigned numLoops = interfaceOp.getNumLoops();
+  SmallVector<unsigned> partitionedLoops =
+      interfaceOp.getPartitionableLoops(kNumMaxParallelDims);
+  // The batch dim is distributed if numLoops > 3 and partitionedLoops.begin()
+  // == 0.
+  if (numLoops > 3 && !partitionedLoops.empty() && partitionedLoops[0] == 0) {
+    numBatchDims = 1;
+  }
 
   int64_t vectorSize = getVectorSize(entryPointFn, lhsShapedType);
-  SmallVector<int64_t> vectorSizeVals(tiledLoops.size(), 1);
+  SmallVector<int64_t> vectorSizeVals(numLoops, 1);
   vectorSizeVals.back() = vectorSize;
   vectorSizeVals[vectorSizeVals.size() - 2] = vectorSize;
+  vectorSizeVals[vectorSizeVals.size() - 3] = vectorSize;
 
   SmallVector<int64_t> workloadPerWorkgroup = getDefaultWorkloadPerWorkgroup(
       tiledLoops.drop_front(numBatchDims),
+      ArrayRef<unsigned>(partitionedLoops).drop_front(numBatchDims),
       ArrayRef<int64_t>(vectorSizeVals).drop_front(numBatchDims));
-
-  for (unsigned i = tiledLoops.size() - 2; i < tiledLoops.size(); ++i) {
-    if (!tiledLoops[i].untiledLowerBound.is<Attribute>() ||
-        !tiledLoops[i].untiledUpperBound.is<Attribute>()) {
-      continue;
-    }
-    auto lb =
-        tiledLoops[i].untiledLowerBound.get<Attribute>().cast<IntegerAttr>();
-    auto ub =
-        tiledLoops[i].untiledUpperBound.get<Attribute>().cast<IntegerAttr>();
-    workloadPerWorkgroup[tiledLoops.size() - 1 - i] = getMaxTileSize(
-        lb.getInt(), ub.getInt(),
-        workloadPerWorkgroup[tiledLoops.size() - 1 - i], vectorSizeVals[i]);
+  if (numBatchDims) {
+    workloadPerWorkgroup.push_back(1);
   }
-  workloadPerWorkgroup.append(numBatchDims, 1);
 
+  setTranslationInfo(
+      entryPointFn,
+      getDispatchLoweringPassPipeline(entryPointFn, contractionOp),
+      workloadPerWorkgroup,
+      /*workgroupSize=*/ArrayRef<int64_t>{});
+
+  SmallVector<int64_t> flowTileSizes =
+      getDistributedTileSizes(interfaceOp, workloadPerWorkgroup);
   Optional<llvm::Triple> triple = getTargetTriple(entryPointFn);
   if (triple && triple.getValue().isX86()) {
     // For DoubleTilingExpert, we will use LinalgSingleTilingExpertPassOptions
@@ -435,15 +465,15 @@ static LogicalResult setRootConfig(
     // pass to pass manager. Thus, we don't use double tiling expert for batch
     // gemms for now.
     if (!numBatchDims && useDoubleTilingExpert) {
-      return setX86SandboxRootConfig(entryPointFn, contractionOp,
-                                     workloadPerWorkgroup, vectorSize);
+      return setX86SandboxRootConfig(entryPointFn, contractionOp, flowTileSizes,
+                                     vectorSize);
     } else {
-      return setX86RootConfig(entryPointFn, contractionOp, workloadPerWorkgroup,
+      return setX86RootConfig(entryPointFn, contractionOp, flowTileSizes,
                               vectorSize);
     }
   }
   // Fall back to ARM configurations.
-  return setARMRootConfig(entryPointFn, contractionOp, workloadPerWorkgroup,
+  return setARMRootConfig(entryPointFn, contractionOp, flowTileSizes,
                           vectorSize);
 }
 
@@ -568,16 +598,11 @@ static LogicalResult setRootConfig(
   }
 
   // Set the flow level tiling to the default.
-  SmallVector<int64_t> prunedNativeVectorSize(tiledLoops.size(), 1);
-  if (!tiledLoops.empty()) {
-    SmallVector<unsigned> partitionedLoops = getPartitionedLoops(genericOp);
-    for (auto loopDim : llvm::enumerate(partitionedLoops)) {
-      prunedNativeVectorSize[loopDim.index()] =
-          nativeVectorSize[loopDim.value()];
-    }
-  }
-  SmallVector<int64_t> workloadPerWorkgroup =
-      getDefaultWorkloadPerWorkgroup(tiledLoops, prunedNativeVectorSize);
+  SmallVector<unsigned> partitionedLoops =
+      cast<IREE::Flow::PartitionableLoopsInterface>(genericOp.getOperation())
+          .getPartitionableLoops(kNumMaxParallelDims);
+  SmallVector<int64_t> workloadPerWorkgroup = getDefaultWorkloadPerWorkgroup(
+      tiledLoops, partitionedLoops, nativeVectorSize);
   setTranslationInfo(entryPointFn,
                      DispatchLoweringPassPipeline::CPUSingleTilingExpert,
                      workloadPerWorkgroup,

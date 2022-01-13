@@ -9,6 +9,7 @@
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowTypes.h"
+#include "iree/compiler/Dialect/Flow/IR/PartitionableLoopsInterface.h"
 #include "iree/compiler/Dialect/Flow/Transforms/DestructiveUpdateUtils.h"
 #include "iree/compiler/Dialect/Flow/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
@@ -693,31 +694,6 @@ static LogicalResult legalizeDispatchWorkgroupOperands(
   return success();
 }
 
-/// Returns the loops that are partitioned during dispatch region formations, in
-/// order, i.e. starting from the outer-most to innermost.
-static SmallVector<unsigned> getPartitionedLoops(Operation *op) {
-  if (auto mmt4dOp = dyn_cast<linalg::Mmt4DOp>(op)) {
-    return {0, 1};
-  }
-  if (auto linalgOp = dyn_cast<linalg::LinalgOp>(op)) {
-    SmallVector<unsigned> partitionedLoops;
-    for (auto indexedIterator : llvm::enumerate(linalgOp.iterator_types())) {
-      if (isParallelIterator(indexedIterator.value())) {
-        partitionedLoops.push_back(indexedIterator.index());
-      }
-    }
-    // Only keep the last kNumMaxParallelDims if we have more than that.
-    while (partitionedLoops.size() > kNumMaxParallelDims) {
-      partitionedLoops.erase(partitionedLoops.begin());
-    }
-    return partitionedLoops;
-  }
-  if (auto tilableOp = dyn_cast<IREE::LinalgExt::TiledOpInterface>(op)) {
-    return tilableOp.getPartitionableLoops(kNumMaxParallelDims);
-  }
-  return {};
-}
-
 static bool hasOnlyDimUses(Operation *op) {
   return llvm::all_of(op->getUsers(), [&](Operation *user) {
     return isa<tensor::DimOp>(user);
@@ -768,7 +744,9 @@ struct TileAndDistributeLinalgOpsPattern : public linalg::LinalgTilingPattern {
     // of the outermost parallel loops that can be distributed.
     Location loc = linalgOp->getLoc();
     SmallVector<Range> loopRanges = linalgOp.createLoopRanges(rewriter, loc);
-    SmallVector<unsigned> partitionedLoops = getPartitionedLoops(linalgOp);
+    SmallVector<unsigned> partitionedLoops =
+        cast<PartitionableLoopsInterface>(linalgOp.getOperation())
+            .getPartitionableLoops(kNumMaxParallelDims);
     SmallVector<Value> count;
     for (auto dim : partitionedLoops) {
       count.push_back(loopRanges[dim].size);
@@ -847,7 +825,9 @@ struct TiledOpInterfacePattern
 
     SmallVector<StringRef> iteratorTypes = tilableOp.getLoopIteratorTypes();
     SmallVector<Range> loopRanges = tilableOp.getIterationDomain(rewriter);
-    SmallVector<unsigned> partitionedLoops = getPartitionedLoops(tilableOp);
+    SmallVector<unsigned> partitionedLoops =
+        cast<PartitionableLoopsInterface>(tilableOp.getOperation())
+            .getPartitionableLoops(kNumMaxParallelDims);
     SmallVector<Value> count;
     for (auto dim : partitionedLoops) {
       count.push_back(loopRanges[dim].size);
@@ -1039,7 +1019,11 @@ LogicalResult createDispatchRegionsFromRootOps(mlir::Operation *funcOp) {
   // workgroup size specified by the backend.
   auto tileSizeFn = [&](OpBuilder &builder,
                         Operation *op) -> SmallVector<Value, 4> {
-    SmallVector<unsigned> partitionedLoops = getPartitionedLoops(op);
+    PartitionableLoopsInterface interfaceOp =
+        dyn_cast<PartitionableLoopsInterface>(op);
+    if (!interfaceOp) return {};
+    SmallVector<unsigned> partitionedLoops =
+        interfaceOp.getPartitionableLoops(kNumMaxParallelDims);
     if (partitionedLoops.empty()) return {};
     unsigned maxDepth = partitionedLoops.back() + 1;
 

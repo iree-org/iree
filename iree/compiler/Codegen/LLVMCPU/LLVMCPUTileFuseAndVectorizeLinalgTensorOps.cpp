@@ -120,16 +120,22 @@ void LLVMCPUTileFuseAndVectorizePass::runOnOperation() {
       }
     }
     assert(consumerOp && "can't find consumerOp");
-    SmallVector<int64_t> consumerTileSize(
+    // Only the parallel loops of the consumer can be tiled for fusion.
+    SmallVector<int64_t> consumerTileSizes(
         tileSizes.begin(),
         tileSizes.begin() + consumerOp.getNumParallelLoops());
-    auto identityIndicesOrder =
-        llvm::to_vector<4>(llvm::seq<int64_t>(0, consumerTileSize.size()));
-    FailureOr<linalg::TileLoopNest> tileLoopNest =
-        linalg::tileConsumerAndFuseProducers(
-            builder, consumerOp, consumerTileSize, identityIndicesOrder);
-    if (failed(tileLoopNest)) return signalPassFailure();
-    consumerOp->replaceAllUsesWith(tileLoopNest->getRootOpReplacementResults());
+    // TODO: The fusion method failes to handle the corner case when no tiling
+    // is needed and segfaults/asserts. So guard it for now.
+    if (llvm::any_of(consumerTileSizes, [](int64_t v) { return v; })) {
+      auto identityIndicesOrder =
+          llvm::to_vector<4>(llvm::seq<int64_t>(0, consumerTileSizes.size()));
+      FailureOr<linalg::TileLoopNest> tileLoopNest =
+          linalg::tileConsumerAndFuseProducers(
+              builder, consumerOp, consumerTileSizes, identityIndicesOrder);
+      if (failed(tileLoopNest)) return signalPassFailure();
+      consumerOp->replaceAllUsesWith(
+          tileLoopNest->getRootOpReplacementResults());
+    }
 
     // Apply canoncalization
     if (failed(applyTileAndFuseCanonicalizationPatterns(funcOp))) {
