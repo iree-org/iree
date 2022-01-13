@@ -1151,6 +1151,22 @@ static void printCondFailOp(OpAsmPrinter &p, CondFailOp op) {
 // Async/fiber ops
 //===----------------------------------------------------------------------===//
 
+Block *YieldOp::getDest() { return getOperation()->getSuccessor(0); }
+
+void YieldOp::setDest(Block *block) {
+  return getOperation()->setSuccessor(block, 0);
+}
+
+void YieldOp::eraseOperand(unsigned index) {
+  getOperation()->eraseOperand(index);
+}
+
+Optional<MutableOperandRange> YieldOp::getMutableSuccessorOperands(
+    unsigned index) {
+  assert(index == 0 && "invalid successor index");
+  return destOperandsMutable();
+}
+
 //===----------------------------------------------------------------------===//
 // Debugging
 //===----------------------------------------------------------------------===//

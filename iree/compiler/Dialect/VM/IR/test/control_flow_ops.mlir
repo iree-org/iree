@@ -217,8 +217,9 @@ vm.module @my_module {
 // CHECK-LABEL: @yield
 vm.module @my_module {
   vm.func @yield() {
-    // CHECK: vm.yield
-    vm.yield
+    // CHECK: vm.yield ^bb1
+    vm.yield ^bb1
+  ^bb1:
     vm.return
   }
 }
