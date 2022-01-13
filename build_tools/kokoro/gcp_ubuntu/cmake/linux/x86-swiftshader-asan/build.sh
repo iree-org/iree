@@ -21,6 +21,9 @@ export CMAKE_BIN="$(which cmake)"
 "${CXX?}" --version
 python3 --version
 
+echo "Initializing submodules"
+git submodule update --init
+
 ./build_tools/kokoro/gcp_ubuntu/check_vulkan.sh
 
 # Print SwiftShader git commit

@@ -23,6 +23,9 @@ python3 --version
 python3 -c 'import tensorflow as tf; print(tf.__version__)'
 python3 -c 'import jax; print(jax.__version__)'
 
+echo "Initializing submodules"
+git submodule update --init
+
 ./build_tools/kokoro/gcp_ubuntu/check_vulkan.sh
 
 # Print SwiftShader git commit

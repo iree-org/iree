@@ -26,6 +26,9 @@ ninja --version
 python3 --version
 echo "Android NDK path: ${ANDROID_NDK}"
 
+echo "Initializing submodules"
+git submodule update --init
+
 ROOT_DIR=$(git rev-parse --show-toplevel)
 cd "${ROOT_DIR}"
 

@@ -22,6 +22,9 @@ ANDROID_ABI="$1"
 # Print the UTC time when set -x is on
 export PS4='[$(date -u "+%T %Z")] '
 
+echo "Initializing submodules"
+git submodule update --init
+
 ROOT_DIR="$(git rev-parse --show-toplevel)"
 
 CMAKE_BIN="${CMAKE_BIN:-$(which cmake)}"

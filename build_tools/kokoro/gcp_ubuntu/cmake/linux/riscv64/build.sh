@@ -21,6 +21,9 @@ export CMAKE_BIN="$(which cmake)"
 "${CXX?}" --version
 python3 --version
 
+echo "Initializing submodules"
+git submodule update --init
+
 export ROOT_DIR="$(git rev-parse --show-toplevel)"
 export BUILD_HOST_DIR="${ROOT_DIR?}/build-host"
 export BUILD_RISCV_DIR="${ROOT_DIR?}/build-riscv"

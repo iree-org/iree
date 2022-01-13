@@ -21,6 +21,9 @@ export CMAKE_BIN="$(which cmake)"
 "${CXX?}" --version
 python3 --version
 
+echo "Initializing submodules"
+git submodule update --init
+
 # Print NVIDIA GPU information inside the docker
 dpkg -l | grep nvidia
 nvidia-smi || true
