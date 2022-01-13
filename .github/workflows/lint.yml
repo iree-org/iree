@@ -91,7 +91,6 @@ jobs:
         run: ./build_tools/pytype/check_diff.sh "${GITHUB_BASE_REF?}"
 
   clang-format:
-    if: ${{ false }}  # Disable until GitHub actions stop being broken: https://github.com/google/iree/runs/4794478921?check_suite_focus=true
     runs-on: ubuntu-18.04
     steps:
       - name: Installing dependencies
