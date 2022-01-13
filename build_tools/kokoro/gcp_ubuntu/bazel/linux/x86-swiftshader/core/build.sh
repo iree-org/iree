@@ -21,5 +21,8 @@ bazel --version
 "${CXX?}" --version
 "${CC?}" --version
 
+echo "Initializing submodules"
+git submodule update --init
+
 echo "Building and testing with bazel"
 ./build_tools/bazel/build_core.sh
