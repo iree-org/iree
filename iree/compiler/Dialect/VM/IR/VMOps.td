@@ -2302,6 +2302,13 @@ def VM_TanhF64Op : VM_UnaryArithmeticOp<F64, "tanh.f64", VM_OPC_TanhF64, [VM_Ext
   let summary = [{hyperbolic tangent of the specified value}];
 }
 
+def VM_ErfF32Op : VM_UnaryArithmeticOp<F32, "erf.f32", VM_OPC_ErfF32, [VM_ExtF32]> {
+  let summary = [{computes the error function of the specified value}];
+}
+def VM_ErfF64Op : VM_UnaryArithmeticOp<F64, "erf.f64", VM_OPC_ErfF64, [VM_ExtF64]> {
+  let summary = [{computes the error function of the specified value}];
+}
+
 //===----------------------------------------------------------------------===//
 // Integer bit manipulation
 //===----------------------------------------------------------------------===//

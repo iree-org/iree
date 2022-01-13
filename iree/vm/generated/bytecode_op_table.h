@@ -603,7 +603,7 @@ typedef enum {
   IREE_VM_OP_EXT_F32_RsqrtF32 = 0x4C,
   IREE_VM_OP_EXT_F32_SqrtF32 = 0x4D,
   IREE_VM_OP_EXT_F32_TanhF32 = 0x4E,
-  IREE_VM_OP_EXT_F32_RSV_0x4F,
+  IREE_VM_OP_EXT_F32_ErfF32 = 0x4F,
   IREE_VM_OP_EXT_F32_RSV_0x50,
   IREE_VM_OP_EXT_F32_RSV_0x51,
   IREE_VM_OP_EXT_F32_RSV_0x52,
@@ -862,7 +862,7 @@ typedef enum {
     OPC(0x4C, RsqrtF32) \
     OPC(0x4D, SqrtF32) \
     OPC(0x4E, TanhF32) \
-    RSV(0x4F) \
+    OPC(0x4F, ErfF32) \
     RSV(0x50) \
     RSV(0x51) \
     RSV(0x52) \
@@ -1120,7 +1120,7 @@ typedef enum {
   IREE_VM_OP_EXT_F64_RsqrtF64 = 0x4C,
   IREE_VM_OP_EXT_F64_SqrtF64 = 0x4D,
   IREE_VM_OP_EXT_F64_TanhF64 = 0x4E,
-  IREE_VM_OP_EXT_F64_RSV_0x4F,
+  IREE_VM_OP_EXT_F64_ErfF64 = 0x4F,
   IREE_VM_OP_EXT_F64_RSV_0x50,
   IREE_VM_OP_EXT_F64_RSV_0x51,
   IREE_VM_OP_EXT_F64_RSV_0x52,
@@ -1379,7 +1379,7 @@ typedef enum {
     OPC(0x4C, RsqrtF64) \
     OPC(0x4D, SqrtF64) \
     OPC(0x4E, TanhF64) \
-    RSV(0x4F) \
+    OPC(0x4F, ErfF64) \
     RSV(0x50) \
     RSV(0x51) \
     RSV(0x52) \

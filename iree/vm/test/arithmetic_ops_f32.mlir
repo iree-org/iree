@@ -267,4 +267,15 @@ vm.module @arithmetic_ops_f32 {
     vm.check.eq %v, %c2, "tanh(0.5)=0.46211715726000974" : f32
     vm.return
   }
+
+  // TODO(#5854): vm.check.nearly_eq; this can differ across libm impls.
+  // vm.export @test_erf_f32
+  // vm.func @test_erf_f32() {
+  //   %c1 = vm.const.f32 0.5 : f32
+  //   %c1dno = util.do_not_optimize(%c1) : f32
+  //   %v = vm.erf.f32 %c1dno : f32
+  //   %c2 = vm.const.f32 0.520499945 : f32
+  //   vm.check.eq %v, %c2, "erf(0.5)=0.520499945" : f32
+  //   vm.return
+  // }
 }
