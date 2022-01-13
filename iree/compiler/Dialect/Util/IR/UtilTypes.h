@@ -59,6 +59,7 @@ enum class StatusCode : int32_t {
   Unavailable = 14,
   DataLoss = 15,
   Unauthenticated = 16,
+  Deferred = 17,
   DoNotUseReservedForFutureExpansionUseDefaultInSwitchInstead_ = 20
 };
 
