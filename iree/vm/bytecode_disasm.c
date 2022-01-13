@@ -1955,6 +1955,7 @@ iree_status_t iree_vm_bytecode_disasm_op(
     DISASM_OP_EXT_F32_UNARY_F32(RsqrtF32, "vm.rsqrt.f32");
     DISASM_OP_EXT_F32_UNARY_F32(SqrtF32, "vm.sqrt.f32");
     DISASM_OP_EXT_F32_UNARY_F32(TanhF32, "vm.tanh.f32");
+    DISASM_OP_EXT_F32_UNARY_F32(ErfF32, "vm.erf.f32");
 
     //===----------------------------------------------------------------===//
     // ExtF32: Casting and type conversion/emulation

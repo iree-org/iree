@@ -49,6 +49,9 @@ module {
     // CHECK: vm.tanh.f32
     %14 = math.tanh %13 : f32
 
-    return %14 : f32
+    // CHECK: vm.erf.f32
+    %15 = math.erf %14 : f32
+
+    return %15 : f32
   }
 }
