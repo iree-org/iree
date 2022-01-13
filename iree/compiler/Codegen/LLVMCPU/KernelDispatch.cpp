@@ -115,6 +115,24 @@ static Optional<int64_t> getNativeVectorSizeInBytes(FuncOp entryPointFn) {
   return nativeVectorSizeVal;
 }
 
+/// For a given `shapedType` or (`byteWidth` of element type) return the number
+/// of elements that correspond to the native vector size. Returns 1 as the
+/// fallback.
+static int64_t getVectorSize(FuncOp entryPointFn, unsigned byteWidth) {
+  if (Optional<int64_t> nativeVectorSize =
+          getNativeVectorSizeInBytes(entryPointFn)) {
+    return nativeVectorSize.getValue() / byteWidth;
+  }
+  return clNativeVectorSizeInBytes / byteWidth;
+}
+static int64_t getVectorSize(FuncOp entryPointFn, ShapedType shapedType) {
+  Type elementType = shapedType.getElementType();
+  if (!elementType.isIntOrFloat()) return 1;
+  unsigned byteWidth =
+      std::max<unsigned>(1, elementType.getIntOrFloatBitWidth() / 8);
+  return getVectorSize(entryPointFn, byteWidth);
+}
+
 /// Returns the type length in bytes. Looks through all the interface binding
 /// ops to see the ABI types and guess-timates the type size to use. This is
 /// used to convert the vector size in bytes to vector size in number of
@@ -223,15 +241,11 @@ static SmallVector<int64_t> getDefaultWorkloadPerWorkgroup(
 /// dispatch region based on the `tiledLoops` found.
 static LogicalResult setDefaultLaunchConfig(
     FuncOp entryPointFn, ArrayRef<LoopTilingAndDistributionInfo> tiledLoops) {
-  unsigned typeWidthInBytes = getReferenceTypeLengthInBytes(entryPointFn);
   SmallVector<int64_t> nativeVectorSizeInElements(tiledLoops.size(), 1);
   if (!tiledLoops.empty()) {
-    int64_t nativeVectorSizeInBytes = clNativeVectorSizeInBytes;
-    if (auto fromConfig = getNativeVectorSizeInBytes(entryPointFn)) {
-      nativeVectorSizeInBytes = fromConfig.getValue();
-    }
+    unsigned typeWidthInBytes = getReferenceTypeLengthInBytes(entryPointFn);
     nativeVectorSizeInElements.back() =
-        nativeVectorSizeInBytes / typeWidthInBytes;
+        getVectorSize(entryPointFn, typeWidthInBytes);
   }
 
   SmallVector<int64_t> workloadPerWorkgroup =
@@ -344,23 +358,12 @@ static LogicalResult setARMRootConfig(FuncOp entryPointFn,
 static LogicalResult setRootConfig(
     FuncOp entryPointFn, linalg::ContractionOpInterface contractionOp,
     ArrayRef<LoopTilingAndDistributionInfo> tiledLoops) {
-  if (getLoweringConfig(contractionOp)) return success();
-
   auto lhsShapedType = contractionOp.lhs().getType().cast<ShapedType>();
   // Use the default distribution for the matmul loops.
   int numBatchDims =
       cast<linalg::LinalgOp>(contractionOp.getOperation()).getNumLoops() - 3;
 
-  Type elementType = lhsShapedType.getElementType();
-  if (!elementType.isIntOrFloat()) return success();
-  unsigned byteWidth = elementType.getIntOrFloatBitWidth() / 8;
-  int64_t vectorSize;
-  if (Optional<int64_t> nativeVectorSizeVal =
-          getNativeVectorSizeInBytes(entryPointFn)) {
-    vectorSize = nativeVectorSizeVal.getValue() / byteWidth;
-  } else {
-    vectorSize = clNativeVectorSizeInBytes;
-  }
+  int64_t vectorSize = getVectorSize(entryPointFn, lhsShapedType);
   SmallVector<int64_t> vectorSizeVals(tiledLoops.size(), 1);
   vectorSizeVals.back() = vectorSize;
   vectorSizeVals[vectorSizeVals.size() - 2] = vectorSize;
@@ -487,23 +490,10 @@ static LogicalResult setRootConfig(
 static LogicalResult setRootConfig(
     FuncOp entryPointFn, linalg::GenericOp genericOp,
     ArrayRef<LoopTilingAndDistributionInfo> tiledLoops) {
-  // If there is already a set configuration, do nothing.
-  if (getLoweringConfig(genericOp)) return success();
-
-  // For VMVX, do not use vectorization. Just lower as default.
-  if (isVMVXBackend(entryPointFn)) return success();
-
   // If there are no loops, there is nothing to do.
   unsigned numLoops = genericOp.getNumLoops();
   if (numLoops == 0) return success();
 
-  Optional<int64_t> nativeVectorSizeInBytes =
-      getNativeVectorSizeInBytes(entryPointFn);
-  if (!nativeVectorSizeInBytes) {
-    // For now if there is nothing specified in the `hal.executable.variant`,
-    // just use a default.
-    nativeVectorSizeInBytes = clNativeVectorSizeInBytes;
-  }
   SmallVector<int64_t> nativeVectorSize(numLoops, 1);
   auto inputOutputOpOperands = genericOp.getInputAndOutputOperands();
   for (auto map : llvm::enumerate(genericOp.getIndexingMaps())) {
@@ -518,14 +508,9 @@ static LogicalResult setRootConfig(
     // If the indexing map has result it has to be a shaped type.
     auto operandType =
         inputOutputOpOperands[map.index()]->get().getType().cast<ShapedType>();
-    Type elemType = operandType.getElementType();
-    if (!elemType.isIntOrFloat()) continue;
-
-    unsigned byteWidth =
-        std::max<unsigned>(elemType.getIntOrFloatBitWidth() / 8, 1);
-    unsigned currVectorSize = nativeVectorSizeInBytes.getValue() / byteWidth;
     nativeVectorSize[fastestVaryingDim] =
-        std::max<int64_t>(nativeVectorSize[fastestVaryingDim], currVectorSize);
+        std::max<int64_t>(nativeVectorSize[fastestVaryingDim],
+                          getVectorSize(entryPointFn, operandType));
   }
   if (llvm::all_of(nativeVectorSize, [](int64_t vs) { return vs == 1; })) {
     // Nothing to vectorize just lower to loops.
@@ -559,6 +544,33 @@ static LogicalResult setRootConfig(
   return success();
 }
 
+static LogicalResult setRootConfigImpl(
+    FuncOp entryPointFn, Operation *op,
+    ArrayRef<LoopTilingAndDistributionInfo> tiledLoops) {
+  // Do not overwrite default configuration.
+  if (getLoweringConfig(op)) return success();
+
+  // Redirect to individual operations.
+  auto setRootConfigFn = [&](Operation *op) -> LogicalResult {
+    return TypeSwitch<Operation *, LogicalResult>(op)
+        .Case<linalg::Mmt4DOp, linalg::ContractionOpInterface,
+              IREE::LinalgExt::FftOp>([&](auto op) {
+          return setRootConfig(entryPointFn, op, tiledLoops);
+        })
+        .Case<linalg::GenericOp>([&](auto genericOp) {
+          if (genericOp.getNumLoops() == genericOp.getNumParallelLoops()) {
+            // Ignore parallel elementwise operations now. They will be set as
+            // roots ops if there are no other ops that can be treated as a
+            // root op.
+            return success();
+          }
+          return setRootConfig(entryPointFn, genericOp, tiledLoops);
+        })
+        .Default([&](Operation *op) { return success(); });
+  };
+  return setRootConfigFn(op);
+}
+
 /// Finds the root operation in the given list of Linalg operations and sets
 /// its configuration. Returns error for multiple root operations.
 static LogicalResult setRootConfig(
@@ -566,24 +578,7 @@ static LogicalResult setRootConfig(
     ArrayRef<LoopTilingAndDistributionInfo> tiledLoops) {
   Operation *rootOp = nullptr;
   for (auto computeOp : computeOps) {
-    auto setRootConfigFn = [&](Operation *op) -> LogicalResult {
-      return TypeSwitch<Operation *, LogicalResult>(op)
-          .Case<linalg::Mmt4DOp, linalg::ContractionOpInterface,
-                IREE::LinalgExt::FftOp>([&](auto op) {
-            return setRootConfig(entryPointFn, op, tiledLoops);
-          })
-          .Case<linalg::GenericOp>([&](auto genericOp) {
-            if (genericOp.getNumLoops() == genericOp.getNumParallelLoops()) {
-              // Ignore parallel elementwise operations now. They will be set as
-              // roots ops if there are no other ops that can be treated as a
-              // root op.
-              return success();
-            }
-            return setRootConfig(entryPointFn, genericOp, tiledLoops);
-          })
-          .Default([&](Operation *op) { return success(); });
-    };
-    if (failed(setRootConfigFn(computeOp))) {
+    if (failed(setRootConfigImpl(entryPointFn, computeOp, tiledLoops))) {
       return failure();
     }
     if (getLoweringConfig(computeOp)) {
@@ -648,8 +643,11 @@ static LogicalResult setTranslationInfoAndRootConfig(
   }
 
   // Next set the configuration of the operations.
-  if (failed(setRootConfig(entryPointFn, computeOps, tiledLoops))) {
-    return failure();
+  // For VMVX, do not use vectorization. Just lower as default.
+  if (!isVMVXBackend(entryPointFn)) {
+    if (failed(setRootConfig(entryPointFn, computeOps, tiledLoops))) {
+      return failure();
+    }
   }
 
   // Check if the translation info for the entry point is already set.
