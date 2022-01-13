@@ -219,37 +219,6 @@ def build_py_runtime_pkg(instrumented: bool = False):
                  check=True)
 
 
-def bazel_build_tf_binary(target):
-  """Builds a binary in the IREE-TF Workspace and returns the filepath."""
-  install_python_requirements()
-  configure_bazel()
-
-  # Builds a runnable target and returns the path to the executable. Yes this is
-  # really the best Bazel gives us.
-  # See https://github.com/bazelbuild/bazel/issues/8739
-  cmd = [
-      "bazel",
-      "build",
-      "--config=release",
-      "--keep_going",
-      target,
-  ]
-  process = subprocess.run(cmd,
-                           cwd=TF_INTEGRATIONS_DIR,
-                           check=True,
-                           stdout=subprocess.PIPE,
-                           universal_newlines=True)
-
-  if len(process.stdout.splitlines()) != 1:
-    raise RuntimeError(
-        f"Unexpected output from `{' '.join(cmd)}`:\n{process.stdout}")
-  bin_path = process.stdout.strip()
-  if not os.path.isfile(bin_path):
-    raise RuntimeError("{bin_path} is not a file.")
-
-  return bin_path
-
-
 def build_py_tf_compiler_tools_pkg():
   """Builds the iree-install/python_packages/iree_tools_tf package."""
   install_python_requirements()
@@ -260,7 +229,14 @@ def build_py_tf_compiler_tools_pkg():
   remove_cmake_cache()
 
   print("*** Building TF import tool with Bazel ***")
-  binpath = bazel_build_tf_binary("//iree_tf_compiler:importer-binaries")
+  cmd = [
+      "bazel",
+      "build",
+      "--config=release",
+      "--keep_going",
+      "//iree_tf_compiler:importer-binaries",
+  ]
+  process = subprocess.run(cmd, cwd=TF_INTEGRATIONS_DIR, check=True)
 
   print("*** Symlinking built binaries ***")
   subprocess.run(["bash", "symlink_binaries.sh"],
