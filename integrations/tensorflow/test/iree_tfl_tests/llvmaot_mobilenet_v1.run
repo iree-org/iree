@@ -1,0 +1,2 @@
+# REQUIRES: llvmaot
+# RUN: %PYTHON -m iree_tfl_tests.mobilenet_v1_test --target_backend=llvmaot -artifacts_dir=%t

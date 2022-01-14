@@ -1,0 +1,2 @@
+# REQUIRES: vulkan
+# RUN: %PYTHON -m iree_tfl_tests.posenet_i8_test --target_backend=vulkan -artifacts_dir=%t
