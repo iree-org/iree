@@ -425,15 +425,19 @@ static LogicalResult setDefaultOpConfig(spirv::ResourceLimitsAttr limits,
 
     // Scan from the innermost shape dimension and try to deduce the
     // configuration for the corresponding GPU workgroup dimension.
-    for (int shapeDim = loopDepth - 1, wgDim = 0; shapeDim >= 0; --shapeDim) {
+    for (auto p : llvm::zip(llvm::reverse(partitionedLoops), tiledLoopInfo)) {
+      int shapeDim = std::get<0>(p);
+      int wgDim = std::get<1>(p).processorDistributionDim;
       LLVM_DEBUG({
         llvm::dbgs() << "Remaining threads: " << numThreads << "\n";
         llvm::dbgs() << "Shape dim #" << shapeDim << "=";
         llvm::dbgs() << loopBounds[shapeDim] << "\n"
                      << "Workgroup dim #" << wgDim << "\n";
       });
-      // Skip dynamic/untiled/size-1 dimensions.
-      if (loopBounds[shapeDim] <= 1) continue;
+
+      // Skip untiled or dynamic dimensions.
+      // TODO: Skip size-1 dimensions in Flow level tiling and distribution.
+      if (loopBounds[shapeDim] <= 0) continue;
 
       // Try to find some power of two that can devide the current shape dim
       // size. This vector keeps the candidate tile sizes.
@@ -441,7 +445,9 @@ static LogicalResult setDefaultOpConfig(spirv::ResourceLimitsAttr limits,
 
       // For the inner most workgroup dim, try to see if we can have 4
       // elements per thread. This enables vectorization.
-      if (vectorizable && wgDim == 0) candidates.push_back(4 * numThreads);
+      if (vectorizable && wgDim == 0 && !lossFactor) {
+        candidates.push_back(4 * numThreads);
+      }
       // Try all power of two numbers upto the subgroup size.
       for (unsigned i = numThreads; i >= 1; i >>= 1) {
         candidates.push_back(i);
@@ -464,7 +470,7 @@ static LogicalResult setDefaultOpConfig(spirv::ResourceLimitsAttr limits,
         // Found a suitable candidate. Try to let each thread handle 4
         // elements if this is the workgroup x dimension.
         workgroupTileSizes[shapeDim] = candidate;
-        if (vectorizable && wgDim == 0 && candidate % 4 == 0) {
+        if (vectorizable && wgDim == 0 && !lossFactor && candidate % 4 == 0) {
           threadTileSizes[shapeDim] = 4;
           workgroupSize[wgDim++] = candidate / 4;
           assert(numThreads % (candidate / 4) == 0);
@@ -480,9 +486,8 @@ static LogicalResult setDefaultOpConfig(spirv::ResourceLimitsAttr limits,
         break;
       }
 
-      // Check if we have distributed all threads in this subgroup all used
-      // up all distribution dims.
-      if (numThreads == 1 || wgDim > 3) break;
+      // Stop if we have distributed all threads.
+      if (numThreads == 1) break;
     }
     return numThreads;
   };
