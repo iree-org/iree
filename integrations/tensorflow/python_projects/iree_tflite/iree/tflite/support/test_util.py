@@ -35,6 +35,7 @@ absl.flags.DEFINE_string(
     "Specifies a directory to dump compilation artifacts and traces to. "
     "Defaults to the OS's tempdir.")
 
+
 def _setup_artifacts_dir(relative_artifacts_dir: str) -> str:
   parent_dirs = [
       FLAGS.artifacts_dir,
@@ -46,7 +47,8 @@ def _setup_artifacts_dir(relative_artifacts_dir: str) -> str:
   parent_dir = next(parent for parent in parent_dirs if parent is not None)
 
   artifacts_dir = os.path.join(parent_dir, relative_artifacts_dir)
-  absl.logging.info("Saving compilation artifacts and traces to '%s'", artifacts_dir)
+  absl.logging.info("Saving compilation artifacts and traces to '%s'",
+                    artifacts_dir)
   os.makedirs(artifacts_dir, exist_ok=True)
   return artifacts_dir
 
