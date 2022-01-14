@@ -242,6 +242,7 @@ def build_py_tf_compiler_tools_pkg():
   subprocess.run(["bash", "symlink_binaries.sh"],
                  cwd=TF_INTEGRATIONS_DIR,
                  check=True)
+  os.makedirs(BINDIST_DIR, exist_ok=True)
 
   for project in ["iree_tflite", "iree_tf", "iree_xla"]:
     print(f"*** Building wheel for {project} ***")
