@@ -19,6 +19,7 @@
 #include "mlir/Dialect/Vector/VectorTransforms.h"
 #include "mlir/Dialect/X86Vector/Transforms.h"
 #include "mlir/Pass/PassManager.h"
+#include "mlir/Transforms/Passes.h"
 
 using namespace mlir;
 using namespace mlir::linalg;
@@ -121,6 +122,16 @@ struct LinalgVectorLoweringPass
     this->vectorLoweringStage.setValue(vectorLoweringStage);
   }
   LinalgVectorLoweringPass(const LinalgVectorLoweringPass &pass) {}
+  LinalgVectorLoweringPass(const LinalgVectorLoweringPassOptions &options) {
+    this->vectorLoweringStage = options.vectorLoweringStage;
+    this->splitVectorTransfersTo = options.splitVectorTransfersTo;
+    this->lowerVectorTransposeTo = options.lowerVectorTransposeTo;
+    this->lowerVectorTransposeToAVX2 = options.lowerVectorTransposeToAVX2;
+    this->lowerVectorMultiReductionTo = options.lowerVectorMultiReductionTo;
+    this->lowerVectorContractionTo = options.lowerVectorContractionTo;
+    this->unrollVectorTransfers = options.unrollVectorTransfers;
+    this->maxTransferRank = options.maxTransferRank;
+  }
 
   void runOnOperation() override;
 };
@@ -346,19 +357,23 @@ std::unique_ptr<OperationPass<FuncOp>> mlir::createLinalgVectorLoweringPass(
     int64_t vectorLoweringStage) {
   return std::make_unique<LinalgVectorLoweringPass>(vectorLoweringStage);
 }
+std::unique_ptr<OperationPass<FuncOp>> mlir::createLinalgVectorLoweringPass(
+    const LinalgVectorLoweringPassOptions &options) {
+  return std::make_unique<LinalgVectorLoweringPass>(options);
+}
 
 //===----------------------------------------------------------------------===//
 // Transforms
 //===----------------------------------------------------------------------===//
 
-void mlir::addLowerToVectorTransforms(OpPassManager &passManager) {
-  passManager.addPass(createLinalgVectorLoweringPass(0));
-  passManager.addPass(createLinalgVectorLoweringPass(1));
-  passManager.addPass(createLinalgVectorLoweringPass(2));
-  passManager.addPass(createLinalgVectorLoweringPass(3));
-  passManager.addPass(createLinalgVectorLoweringPass(4));
-  passManager.addPass(createLinalgVectorLoweringPass(5));
-  passManager.addPass(createLinalgVectorLoweringPass(6));
+void mlir::addLowerToVectorTransforms(OpPassManager &passManager,
+                                      LinalgVectorLoweringPassOptions options) {
+  for (int i = 0; i < 7; ++i) {
+    options.vectorLoweringStage = i;
+    passManager.addPass(createLinalgVectorLoweringPass(options));
+    passManager.addPass(createCanonicalizerPass());
+    passManager.addPass(createCSEPass());
+  }
 }
 
 //===----------------------------------------------------------------------===//

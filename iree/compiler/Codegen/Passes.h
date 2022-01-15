@@ -209,6 +209,10 @@ void addTensorToVectorsPassPipeline(OpPassManager &passManager,
 /// using the Codegen drivers from sandbox.
 void addSingleTilingExpertPassPipeline(OpPassManager &passManager);
 
+/// Populates the passes needed to do two-level tile + vectorize of linalg ops
+/// using the Codegen drivers from sandbox.
+void addDoubleTilingExpertPassPipeline(OpPassManager &passManager);
+
 /// Populates the passes needed to multi level tile, fuse and vectorize lowering
 /// of linalg ops on tensors to vectors operations.
 void addTileFuseAndVectorizePassPipeline(OpPassManager &passManager,

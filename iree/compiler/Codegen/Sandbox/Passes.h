@@ -38,10 +38,24 @@ std::unique_ptr<OperationPass<FuncOp>> createLinalgSingleTilingExpertPass();
 std::unique_ptr<OperationPass<FuncOp>> createLinalgSingleTilingExpertPass(
     const LinalgSingleTilingExpertPassOptions &passOptions);
 
+/// Struct to control pass options for `LinalgVectorLoweringPass` pass.
+struct LinalgVectorLoweringPassOptions {
+  int vectorLoweringStage = 0;
+  std::string splitVectorTransfersTo = "";
+  std::string lowerVectorTransposeTo = "eltwise";
+  bool lowerVectorTransposeToAVX2 = false;
+  std::string lowerVectorMultiReductionTo = "innerparallel";
+  std::string lowerVectorContractionTo = "outerproduct";
+  bool unrollVectorTransfers = true;
+  int maxTransferRank = 1;
+};
+
 /// Creates a pass to drive the lowering of vector operations in a staged
 /// manner.
 std::unique_ptr<OperationPass<FuncOp>> createLinalgVectorLoweringPass(
     int64_t vectorLoweringStage = 0);
+std::unique_ptr<OperationPass<FuncOp>> createLinalgVectorLoweringPass(
+    const LinalgVectorLoweringPassOptions &options);
 
 //===----------------------------------------------------------------------===//
 // Transforms that tie together individual drivers.
@@ -49,7 +63,8 @@ std::unique_ptr<OperationPass<FuncOp>> createLinalgVectorLoweringPass(
 
 /// Add staged lowering of vector ops. `passManager` is expected to be a
 /// `builtin.func` op pass manager.
-void addLowerToVectorTransforms(OpPassManager &passManager);
+void addLowerToVectorTransforms(OpPassManager &passManager,
+                                LinalgVectorLoweringPassOptions options);
 
 //===----------------------------------------------------------------------===//
 // IREE specific pass creation methods to allow invocation from within IREEs

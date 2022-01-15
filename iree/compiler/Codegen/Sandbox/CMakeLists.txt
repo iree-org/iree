@@ -53,6 +53,7 @@ iree_cc_library(
     MLIRPass
     MLIRSCF
     MLIRTensor
+    MLIRTransforms
     MLIRVector
     MLIRX86VectorTransforms
     iree::compiler::Codegen::Dialect::IREECodegenDialect

@@ -180,11 +180,13 @@ void addTensorToVectorsPassPipeline(OpPassManager &passManager,
 void addSingleTilingExpertPassPipeline(OpPassManager &passManager) {
   passManager.addPass(createCanonicalizerPass());
   // Add the sandbox single tiling expert to tile and vectorize.
-  LinalgSingleTilingExpertPassOptions options;
-  options.vectorize = true;
-  options.tilingLevel = static_cast<int64_t>(TilingLevel::L1Tiles);
-  passManager.addNestedPass<FuncOp>(
-      createLinalgSingleTilingExpertPass(options));
+  {
+    LinalgSingleTilingExpertPassOptions options;
+    options.vectorize = true;
+    options.tilingLevel = static_cast<int64_t>(TilingLevel::L1Tiles);
+    passManager.addNestedPass<FuncOp>(
+        createLinalgSingleTilingExpertPass(options));
+  }
 
   // TODO(ravishankarm): This is commented cause this is WIP, to be enabled
   // soon.
@@ -197,8 +199,60 @@ void addSingleTilingExpertPassPipeline(OpPassManager &passManager) {
   addLinalgBufferizePasses(passManager, cpuAllocationFunction);
 
   // Add the vector lowering expert.
-  OpPassManager &nestedFuncPassManager = passManager.nest<FuncOp>();
-  addLowerToVectorTransforms(nestedFuncPassManager);
+  {
+    OpPassManager &nestedFuncPassManager = passManager.nest<FuncOp>();
+    LinalgVectorLoweringPassOptions options;
+    addLowerToVectorTransforms(nestedFuncPassManager, options);
+  }
+}
+
+void addDoubleTilingExpertPassPipeline(OpPassManager &passManager) {
+  passManager.addPass(createCanonicalizerPass());
+  {
+    passManager.addNestedPass<FuncOp>(createRemoveSingleIterationLoopPass());
+    LinalgSingleTilingExpertPassOptions options;
+    options.tilingLevel = static_cast<int64_t>(TilingLevel::L1Tiles);
+    options.tileInterchange = {0, 2, 1};
+    passManager.addNestedPass<FuncOp>(
+        createLinalgSingleTilingExpertPass(options));
+    passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
+    passManager.addNestedPass<FuncOp>(createCSEPass());
+  }
+
+  // Add the sandbox single tiling expert to tile and vectorize.
+  {
+    // The options are derived from sandbox codegen driver. hoistPadding options
+    // does not work in IREE cases. It's fine to not have it, since it's already
+    // generating the IR as same as sandbox.
+    LinalgSingleTilingExpertPassOptions options;
+    options.vectorize = true;
+    options.vectorizePadding = true;
+    options.pad = true;
+    options.packPaddings = {1, 1, 0};
+    // options.hoistPaddings = {5, 6, 0};
+    options.tilingLevel = static_cast<int64_t>(TilingLevel::VectorTiles);
+    options.tileInterchange = {0, 1, 2};
+    passManager.addNestedPass<FuncOp>(
+        createLinalgSingleTilingExpertPass(options));
+  }
+
+  // TODO(ravishankarm): This is commented cause this is WIP, to be enabled
+  // soon.
+  // auto callbacks =
+  //     std::make_unique<linalg::comprehensive_bufferize::AllocationCallbacks>(
+  //         cpuComprehensiveBufferizeAllocationFn,
+  //         cpuComprehensiveBufferizeDeallocationFn,
+  //         cpuComprehensiveBufferizeCopyFn);
+  // addIREEComprehensiveBufferizePasses(passManager, std::move(callbacks));
+  addLinalgBufferizePasses(passManager, cpuAllocationFunction);
+
+  // Add the vector lowering expert.
+  {
+    OpPassManager &nestedFuncPassManager = passManager.nest<FuncOp>();
+    LinalgVectorLoweringPassOptions options;
+    options.splitVectorTransfersTo = "linalg-copy";
+    addLowerToVectorTransforms(nestedFuncPassManager, options);
+  }
 }
 
 void addTileFuseAndVectorizePassPipeline(OpPassManager &passManager,
