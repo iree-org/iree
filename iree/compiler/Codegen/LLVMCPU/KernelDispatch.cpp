@@ -68,7 +68,7 @@ static llvm::cl::opt<int> defaultWorkgroupTileSize(
 static llvm::cl::opt<bool> useDoubleTilingExpert(
     "iree-codegen-use-double-tiling-expert",
     llvm::cl::desc("DEVELOPMENT ONLY, DO NOT USE THE FLAG."),
-    llvm::cl::init(true));
+    llvm::cl::init(false));
 
 using IREE::Codegen::DispatchLoweringPassPipeline;
 
