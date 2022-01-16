@@ -60,12 +60,10 @@ import sys
 
 from typing import Any, Dict, List, Optional, Sequence, Tuple, TextIO, Set
 
-from common.benchmark_definition import (AndroidDeviceInfo, BenchmarkInfo,
-                                         BenchmarkResults, BenchmarkRun,
-                                         execute_cmd,
-                                         execute_cmd_and_get_output,
-                                         get_android_device_model,
-                                         IREE_PRETTY_NAMES_TO_DRIVERS)
+from common.benchmark_definition import (
+    AndroidDeviceInfo, BenchmarkInfo, BenchmarkResults, BenchmarkRun,
+    execute_cmd, execute_cmd_and_get_output, get_android_device_model,
+    get_android_gpu_name, IREE_PRETTY_NAMES_TO_DRIVERS)
 
 # All benchmarks' relative path against root build directory.
 BENCHMARK_SUITE_REL_PATH = "benchmark_suites"
@@ -88,6 +86,7 @@ GPU_NAME_TO_TARGET_ARCH_MAP = {
     "adreno-640": "gpu-adreno",
     "adreno-650": "gpu-adreno",
     "adreno-660": "gpu-adreno",
+    "adreno-730": "gpu-adreno",
     "mali-g77": "gpu-mali-valhall",
     "mali-g78": "gpu-mali-valhall",
 }
@@ -550,23 +549,27 @@ def filter_and_run_benchmarks(
 
 def set_cpu_frequency_scaling_governor(governor: str):
   git_root = execute_cmd_and_get_output(["git", "rev-parse", "--show-toplevel"])
-  cpu_script = os.path.join(
-      git_root, "build_tools/benchmarks/set_android_scaling_governor.sh")
+  cpu_script = os.path.join(git_root, "build_tools", "benchmarks",
+                            "set_android_scaling_governor.sh")
   android_path = adb_push_to_tmp_dir(cpu_script)
-  adb_execute(["su", "root", android_path, governor])
+  adb_execute(["su", "-c", android_path, governor])
 
 
 def set_gpu_frequency_scaling_policy(policy: str):
   git_root = execute_cmd_and_get_output(["git", "rev-parse", "--show-toplevel"])
   device_model = get_android_device_model()
+  gpu_name = get_android_gpu_name()
   if device_model == "Pixel-6" or device_model == "Pixel-6-Pro":
-    gpu_script = os.path.join(
-        git_root, "build_tools/benchmarks/set_pixel6_gpu_scaling_policy.sh")
+    gpu_script = os.path.join(git_root, "build_tools", "benchmarks",
+                              "set_pixel6_gpu_scaling_policy.sh")
+  elif gpu_name.lower().startswith("adreno"):
+    gpu_script = os.path.join(git_root, "build_tools", "benchmarks",
+                              "set_adreno_gpu_scaling_policy.sh")
   else:
     raise RuntimeError(
         f"Unsupported device '{device_model}' for setting GPU scaling policy")
   android_path = adb_push_to_tmp_dir(gpu_script)
-  adb_execute(["su", "root", android_path, policy])
+  adb_execute(["su", "-c", android_path, policy])
 
 
 def parse_arguments():
@@ -679,8 +682,8 @@ def main(args):
     set_cpu_frequency_scaling_governor("performance")
     atexit.register(set_cpu_frequency_scaling_governor, "schedutil")
   if args.pin_gpu_freq:
-    set_gpu_frequency_scaling_policy("always_on")
-    atexit.register(set_gpu_frequency_scaling_policy, "coarse_demand")
+    set_gpu_frequency_scaling_policy("performance")
+    atexit.register(set_gpu_frequency_scaling_policy, "ondemand")
 
   previous_benchmarks = None
   previous_captures = None

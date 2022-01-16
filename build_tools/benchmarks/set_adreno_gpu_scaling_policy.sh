@@ -1,0 +1,80 @@
+#!/bin/sh
+
+# Copyright 2022 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+# Runs on a phone with Adreno GPU to set the GPU frequency scaling policy.
+
+################################### WARNING ####################################
+# This will overheat the phone if it's not on a cooling plate, resulting in    #
+# thermal throttling. To prevent anything catching on fire, the actual GPU     #
+# frequencies will be throttled to below the maximum, skewing your results.    #
+################################################################################
+
+set -euo pipefail
+
+POLICY="${1:-performance}"
+
+readonly ADRENO_GPU_PATH="/sys/class/kgsl/kgsl-3d0"
+
+# Available frequencies are ordered from highest to lowest.
+readonly ADRENO_MAX_FREQ=$(cat "${ADRENO_GPU_PATH}/devfreq/available_frequencies" | tr " " "\n" | head -1)
+readonly ADRENO_MIN_FREQ=$(cat "${ADRENO_GPU_PATH}/devfreq/available_frequencies" | tr " " "\n" | tail -1)
+
+# Power levels match available freqencies.
+readonly ADRENO_MAX_PWRLEVEL=0
+readonly ADRENO_MIN_PWRLEVEL=$(expr $(cat "${ADRENO_GPU_PATH}/num_pwrlevels") - 1)
+
+echo "GPU info (before changing power policy):"
+echo 'model\t\tcur\t\tmin\t\tmax'
+echo "---------------------------------------------------------"
+paste \
+  "${ADRENO_GPU_PATH}/gpu_model" \
+  "${ADRENO_GPU_PATH}/devfreq/cur_freq" \
+  "${ADRENO_GPU_PATH}/devfreq/min_freq" \
+  "${ADRENO_GPU_PATH}/devfreq/max_freq"
+
+echo "Setting GPU power policy to ${POLICY}"
+
+if [[ "$POLICY" == "performance" ]]; then
+  echo 1 > "${ADRENO_GPU_PATH}/force_clk_on"
+  echo 3600000 > "${ADRENO_GPU_PATH}/idle_timer"
+
+  # Some devices only expose the msm-adreno-tz governor, so allow the
+  # following to fail.
+  echo performance > "${ADRENO_GPU_PATH}/devfreq/governor" || true
+
+  echo ${ADRENO_MAX_FREQ} > "${ADRENO_GPU_PATH}/gpuclk"
+  echo ${ADRENO_MAX_FREQ} > "${ADRENO_GPU_PATH}/devfreq/max_freq"
+  echo ${ADRENO_MAX_FREQ} > "${ADRENO_GPU_PATH}/devfreq/min_freq"
+
+  echo ${ADRENO_MAX_PWRLEVEL} > "${ADRENO_GPU_PATH}/max_pwrlevel"
+  echo ${ADRENO_MAX_PWRLEVEL} > "${ADRENO_GPU_PATH}/min_pwrlevel"
+elif [[ "$POLICY" == "ondemand" ]]; then
+  echo 0 > "${ADRENO_GPU_PATH}/force_clk_on"
+  # 80ms is the default idle timer.
+  echo 80 > "${ADRENO_GPU_PATH}/idle_timer"
+
+  echo msm-adreno-tz > "${ADRENO_GPU_PATH}/devfreq/governor"
+
+  echo ${ADRENO_MAX_FREQ} > "${ADRENO_GPU_PATH}/devfreq/max_freq"
+  echo ${ADRENO_MIN_FREQ} > "${ADRENO_GPU_PATH}/devfreq/min_freq"
+
+  echo ${ADRENO_MAX_PWRLEVEL} > "${ADRENO_GPU_PATH}/max_pwrlevel"
+  echo ${ADRENO_MIN_PWRLEVEL} > "${ADRENO_GPU_PATH}/min_pwrlevel"
+else
+  echo "Unknown power policy: ${POLICY}"
+  exit 1
+fi
+
+echo "GPU info (after changing power policy):"
+echo 'model\t\tcur\t\tmin\t\tmax'
+echo "---------------------------------------------------------"
+paste \
+  "${ADRENO_GPU_PATH}/gpu_model" \
+  "${ADRENO_GPU_PATH}/devfreq/cur_freq" \
+  "${ADRENO_GPU_PATH}/devfreq/min_freq" \
+  "${ADRENO_GPU_PATH}/devfreq/max_freq"

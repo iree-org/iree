@@ -16,7 +16,7 @@
 
 set -euo pipefail
 
-POLICY="${1:-always_on}"
+POLICY="${1:-performance}"
 
 readonly MALI_GPU_PATH="/sys/devices/platform/1c500000.mali"
 
@@ -31,11 +31,11 @@ paste \
 
 echo "Setting GPU power policy to ${POLICY}"
 
-if [[ "$POLICY" == "always_on" ]]; then
+if [[ "$POLICY" == "performance" ]]; then
   echo "always_on" > "${MALI_GPU_PATH}/power_policy"
   cat "${MALI_GPU_PATH}/max_freq" > "${MALI_GPU_PATH}/scaling_max_freq"
   cat "${MALI_GPU_PATH}/max_freq" > "${MALI_GPU_PATH}/scaling_min_freq"
-elif [[ "$POLICY" == "coarse_demand" ]]; then
+elif [[ "$POLICY" == "ondemand" ]]; then
   echo "coarse_demand" > "${MALI_GPU_PATH}/power_policy"
   cat "${MALI_GPU_PATH}/max_freq" > "${MALI_GPU_PATH}/scaling_max_freq"
   cat "${MALI_GPU_PATH}/min_freq" > "${MALI_GPU_PATH}/scaling_min_freq"
