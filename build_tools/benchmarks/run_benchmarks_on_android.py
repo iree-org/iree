@@ -547,12 +547,20 @@ def filter_and_run_benchmarks(
   return (benchmark_files, captures, errors)
 
 
+def is_magisk_su():
+  """Returns true if the Android device has a Magisk SU binary."""
+  return "MagiskSU" in adb_execute_and_get_output(["su", "--help"])
+
+
 def set_cpu_frequency_scaling_governor(governor: str):
   git_root = execute_cmd_and_get_output(["git", "rev-parse", "--show-toplevel"])
   cpu_script = os.path.join(git_root, "build_tools", "benchmarks",
                             "set_android_scaling_governor.sh")
   android_path = adb_push_to_tmp_dir(cpu_script)
-  adb_execute(["su", "root", "-c", android_path, governor])
+  if is_magisk_su():
+    adb_execute(["su", "-c", android_path, governor])
+  else:
+    adb_execute(["su", "root", android_path, governor])
 
 
 def set_gpu_frequency_scaling_policy(policy: str):
@@ -569,7 +577,10 @@ def set_gpu_frequency_scaling_policy(policy: str):
     raise RuntimeError(
         f"Unsupported device '{device_model}' for setting GPU scaling policy")
   android_path = adb_push_to_tmp_dir(gpu_script)
-  adb_execute(["su", "root", "-c", android_path, policy])
+  if is_magisk_su():
+    adb_execute(["su", "-c", android_path, policy])
+  else:
+    adb_execute(["su", "root", android_path, policy])
 
 
 def parse_arguments():
