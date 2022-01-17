@@ -552,7 +552,7 @@ def set_cpu_frequency_scaling_governor(governor: str):
   cpu_script = os.path.join(git_root, "build_tools", "benchmarks",
                             "set_android_scaling_governor.sh")
   android_path = adb_push_to_tmp_dir(cpu_script)
-  adb_execute(["su", "-c", android_path, governor])
+  adb_execute(["su", "root", "-c", android_path, governor])
 
 
 def set_gpu_frequency_scaling_policy(policy: str):
@@ -569,7 +569,7 @@ def set_gpu_frequency_scaling_policy(policy: str):
     raise RuntimeError(
         f"Unsupported device '{device_model}' for setting GPU scaling policy")
   android_path = adb_push_to_tmp_dir(gpu_script)
-  adb_execute(["su", "-c", android_path, policy])
+  adb_execute(["su", "root", "-c", android_path, policy])
 
 
 def parse_arguments():
