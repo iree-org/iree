@@ -66,7 +66,7 @@ func @generic_4D(%arg0: tensor<?x?x?x?xf32>) -> tensor<?x?x?x?xf32> {
   return %0 : tensor<?x?x?x?xf32>
 }
 // CHECK-LABEL: func @generic_4D(
-//       CHECK:   util.unfoldable_constant dense<[1, 1, 1, 0]> : tensor<4xindex>
+//       CHECK:   util.unfoldable_constant dense<[0, 1, 1, 1]> : tensor<4xindex>
 
 // -----
 

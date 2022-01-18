@@ -55,29 +55,6 @@ llvm::StringMap<IREE::HAL::ExecutableEntryPointOp> getAllEntryPoints(
 // Utility functions to get untiled op shapes
 //===----------------------------------------------------------------------===//
 
-SmallVector<unsigned> getPartitionedLoops(Operation *op) {
-  if (auto mmt4dOp = dyn_cast<linalg::Mmt4DOp>(op)) {
-    return {0, 1};
-  }
-  if (auto linalgOp = dyn_cast<linalg::LinalgOp>(op)) {
-    SmallVector<unsigned> partitionedLoops;
-    for (auto indexedIterator : llvm::enumerate(linalgOp.iterator_types())) {
-      if (isParallelIterator(indexedIterator.value())) {
-        partitionedLoops.push_back(indexedIterator.index());
-      }
-    }
-    // Only keep the last kNumMaxParallelDims if we have more than that.
-    while (partitionedLoops.size() > kNumMaxParallelDims) {
-      partitionedLoops.erase(partitionedLoops.begin());
-    }
-    return partitionedLoops;
-  }
-  if (auto tilableOp = dyn_cast<IREE::LinalgExt::TiledOpInterface>(op)) {
-    return tilableOp.getPartitionableLoops(kNumMaxParallelDims);
-  }
-  return {};
-}
-
 SmallVector<int64_t> getDistributedTileSizes(
     IREE::Flow::PartitionableLoopsInterface interfaceOp,
     ArrayRef<int64_t> workloadPerWorkgroup) {
@@ -146,7 +123,9 @@ SmallVector<int64_t> getUntiledResultShape(linalg::LinalgOp linalgOp,
   // should be tiled and the materialized loop nest. The materialized loops'
   // upper bounds should be the original dimension size for the corresponding
   // tiled op shape dimension.
-  auto partitionedLoops = getPartitionedLoops(linalgOp);
+  auto interfaceOp = cast<IREE::Flow::PartitionableLoopsInterface>(*linalgOp);
+  auto partitionedLoops =
+      interfaceOp.getPartitionableLoops(kNumMaxParallelDims);
   SmallVector<LoopTilingAndDistributionInfo> loopInfo =
       getTiledAndDistributedLoopInfo(linalgOp->getParentOfType<FuncOp>());
   // The number of linalg implicit loops to partition and tiled loops

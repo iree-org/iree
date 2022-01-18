@@ -269,7 +269,10 @@ static LogicalResult setFftOpConfig(spirv::ResourceLimitsAttr limits,
 
   std::array<int64_t, 3> workgroupSize = {subgroupSize, 1, 1};
 
-  auto partitionedLoops = getPartitionedLoops(op);
+  auto interfaceOp = cast<IREE::Flow::PartitionableLoopsInterface>(*op);
+  auto partitionedLoops =
+      interfaceOp.getPartitionableLoops(kNumMaxParallelDims);
+
   unsigned loopDepth = partitionedLoops.back() + 1;
   SmallVector<int64_t> workgroupTileSize(loopDepth, 0);
 
@@ -301,7 +304,9 @@ static LogicalResult setDefaultOpConfig(spirv::ResourceLimitsAttr limits,
                                         Operation *op) {
   LLVM_DEBUG(llvm::dbgs() << "Using default config for op: " << *op << "\n");
   FuncOp funcOp = op->getParentOfType<FuncOp>();
-  auto partitionedLoops = getPartitionedLoops(op);
+  auto interfaceOp = cast<IREE::Flow::PartitionableLoopsInterface>(*op);
+  auto partitionedLoops =
+      interfaceOp.getPartitionableLoops(kNumMaxParallelDims);
 
   // Special case for not tiled ops.
   if (partitionedLoops.empty()) {

@@ -534,7 +534,9 @@ static LogicalResult setRootConfig(
 static LogicalResult setRootConfig(
     FuncOp entryPointFn, IREE::LinalgExt::FftOp fftOp,
     ArrayRef<LoopTilingAndDistributionInfo> tiledLoops) {
-  auto partitionedLoops = getPartitionedLoops(fftOp);
+  auto interfaceOp = cast<IREE::Flow::PartitionableLoopsInterface>(*fftOp);
+  auto partitionedLoops =
+      interfaceOp.getPartitionableLoops(kNumMaxParallelDims);
   unsigned maxDepth = partitionedLoops.back() + 1;
   SmallVector<int64_t> workgroupTileSizes(maxDepth, defaultWorkgroupTileSize);
   llvm::DenseSet<unsigned> partitionedLoopsSet(partitionedLoops.begin(),
