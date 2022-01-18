@@ -13,23 +13,44 @@ import iree.compiler.tflite as iree_tflite_compile
 import iree.runtime as iree_rt
 import numpy as np
 import os
-import sys
 import tempfile
 import tensorflow.compat.v2 as tf
 import time
 import urllib.request
 
 targets = {
-    'dylib': 'dylib-llvm-aot',
+    'llvmaot': 'dylib-llvm-aot',
     'vulkan': 'vulkan-spirv',
 }
 
 configs = {
-    'dylib': 'dylib',
+    'llvmaot': 'dylib',
     'vulkan': 'vulkan',
 }
 
-absl.flags.DEFINE_string('config', 'dylib', 'model path to execute')
+absl.flags.DEFINE_string('target_backend', 'llvmaot', 'model path to execute')
+
+absl.flags.DEFINE_string(
+    "artifacts_dir", None,
+    "Specifies a directory to dump compilation artifacts and traces to. "
+    "Defaults to the OS's tempdir.")
+
+
+def _setup_artifacts_dir(relative_artifacts_dir: str) -> str:
+  parent_dirs = [
+      FLAGS.artifacts_dir,
+      os.environ.get('TEST_UNDECLARED_OUTPUTS_DIR'),
+      os.environ.get('TEST_TMPDIR'),
+      os.path.join(tempfile.gettempdir(), "iree", "modules"),
+  ]
+  # Use the most preferred path in parent_dirs that isn't None.
+  parent_dir = next(parent for parent in parent_dirs if parent is not None)
+
+  artifacts_dir = os.path.join(parent_dir, relative_artifacts_dir)
+  absl.logging.info("Saving compilation artifacts and traces to '%s'",
+                    artifacts_dir)
+  os.makedirs(artifacts_dir, exist_ok=True)
+  return artifacts_dir
 
 
 class TFLiteModelTest(testing.absltest.TestCase):
@@ -41,8 +62,7 @@ class TFLiteModelTest(testing.absltest.TestCase):
   def setUp(self):
     if self.model_path is None:
       return
-    exe_basename = os.path.basename(sys.argv[0])
-    self.workdir = tempfile.mkdtemp(dir=testing.absltest.TEST_TMPDIR.value)
+    self.workdir = _setup_artifacts_dir("download")
     print(f"TMP_DIR = {self.workdir}")
     self.tflite_file = '/'.join([self.workdir, 'model.tflite'])
     self.tflite_ir = '/'.join([self.workdir, 'tflite.mlir'])
@@ -84,7 +104,7 @@ class TFLiteModelTest(testing.absltest.TestCase):
   def setup_iree(self):
     absl.logging.info("Setting up iree runtime")
     with open(self.binary, 'rb') as f:
-      config = iree_rt.Config(configs[absl.flags.FLAGS.config])
+      config = iree_rt.Config(configs[absl.flags.FLAGS.target_backend])
       self.iree_context = iree_rt.SystemContext(config=config)
       vm_module = iree_rt.VmModule.from_flatbuffer(f.read())
       self.iree_context.add_vm_module(vm_module)
@@ -126,7 +146,7 @@ class TFLiteModelTest(testing.absltest.TestCase):
         output_file=self.binary,
         save_temp_tfl_input=self.tflite_ir,
         save_temp_iree_input=self.iree_ir,
-        target_backends=[targets[absl.flags.FLAGS.config]],
+        target_backends=[targets[absl.flags.FLAGS.target_backend]],
         import_only=False)
 
     self.setup_tflite()
