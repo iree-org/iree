@@ -62,6 +62,11 @@ BENCHMARK_THRESHOLDS = [
     BenchmarkThreshold(re.compile(r"^PoseNet.*big-core.*Dylib.* @ Pixel-6"), 20,
                        ThresholdUnit.PERCENTAGE),
 
+    # Fluctuating benchmarks on GPUs.
+    BenchmarkThreshold(
+        re.compile(r"^MobileNetV3Small.*full-inference.*GPU-Mali"), 2,
+        ThresholdUnit.VALUE_MS),
+
     # Benchmarks that complete around 10ms on GPUs; using percentage is not
     # suitable anymore.
     BenchmarkThreshold(re.compile(r"^DeepLabV3.*GPU-Mali"), 1,
