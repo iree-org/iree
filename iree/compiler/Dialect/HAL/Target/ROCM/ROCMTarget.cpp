@@ -26,34 +26,23 @@
 #include "mlir/Target/LLVMIR/Dialect/ROCDL/ROCDLToLLVMIRTranslation.h"
 #include "mlir/Target/LLVMIR/Export.h"
 
+static llvm::cl::opt<std::string> clROCMTargetChip(
+    "iree-rocm-target-chip", llvm::cl::desc("ROCm target Chip"),
+    llvm::cl::init("gfx908"));
+
+static llvm::cl::opt<bool> clROCMLinkBC(
+    "iree-rocm-link-bc",
+    llvm::cl::desc("Whether to try Linking to AMD Bitcodes"),
+    llvm::cl::init(false));
+
+static llvm::cl::opt<std::string> clROCMBitcodeDir(
+    "iree-rocm-bc-dir", llvm::cl::desc("Directory of ROCM Bitcode"),
+    llvm::cl::init("/opt/rocm/amdgcn/bitcode"));
+
 namespace mlir {
 namespace iree_compiler {
 namespace IREE {
 namespace HAL {
-
-ROCMTargetOptions getROCMTargetOptionsFromFlags() {
-  static ROCMTargetOptions targetOptions;
-  static std::once_flag onceFlag;
-  std::call_once(onceFlag, [&]() {
-    static llvm::cl::opt<std::string> clROCMTargetChip(
-        "iree-rocm-target-chip", llvm::cl::desc("ROCm target Chip"),
-        llvm::cl::init("gfx908"));
-
-    static llvm::cl::opt<bool> clROCMLinkBC(
-        "iree-rocm-link-bc",
-        llvm::cl::desc("Whether to try Linking to AMD Bitcodes"),
-        llvm::cl::init(false));
-
-    static llvm::cl::opt<std::string> clROCMBitcodeDir(
-        "iree-rocm-bc-dir", llvm::cl::desc("Directory of ROCM Bitcode"),
-        llvm::cl::init("/opt/rocm/amdgcn/bitcode"));
-
-    targetOptions.ROCMTargetChip = clROCMTargetChip;
-    targetOptions.ROCMLinkBC = clROCMLinkBC;
-    targetOptions.ROCMBitcodeDir = clROCMBitcodeDir;
-  });
-  return targetOptions;
-}
 
 static std::string translateModuleToISA(llvm::Module &module,
                                         llvm::TargetMachine &targetMachine) {
@@ -71,8 +60,6 @@ static std::string translateModuleToISA(llvm::Module &module,
 
 class ROCMTargetBackend final : public TargetBackend {
  public:
-  ROCMTargetBackend(ROCMTargetOptions options) : options_(std::move(options)) {}
-
   std::string name() const override { return "rocm"; }
 
   void getDependentDialects(DialectRegistry &registry) const override {
@@ -136,6 +123,7 @@ class ROCMTargetBackend final : public TargetBackend {
     }
     std::vector<std::array<int32_t, 3>> workgroupSizes;
     for (auto func : innerModuleOp.getOps<LLVM::LLVMFuncOp>()) {
+      int32_t flatWgSize = 1;
       auto *llvmFunc = llvmModule->getFunction(func.getName());
       if (llvmFunc->isDeclaration()) continue;
       std::array<int32_t, 3> workgroup_size;
@@ -144,19 +132,26 @@ class ROCMTargetBackend final : public TargetBackend {
               entryPointOp.workgroup_size()) {
         for (auto it : llvm::enumerate(workgroupSizeAttr.getValue())) {
           workgroup_size[it.index()] = it.value().cast<IntegerAttr>().getInt();
+          flatWgSize *= it.value().cast<IntegerAttr>().getInt();
         }
       } else {
         workgroup_size = {1, 1, 1};
       }
       workgroupSizes.push_back(workgroup_size);
+      // For GPU kernels,
+      // 1. Insert AMDGPU_KERNEL calling convention.
+      // 2. Insert amdgpu-flat-workgroup-size(1, 256) attribute.
+      // 3. Insert amdgpu-implicitarg-num-bytes=56 (which must be set on OpenCL
+      // and HIP kernels per Clang)
       llvmFunc->setCallingConv(llvm::CallingConv::AMDGPU_KERNEL);
-      llvmFunc->addFnAttr("amdgpu-flat-work-group-size", "1, 1024");
+      std::string wgSizeRange = std::string("1, ") + std::to_string(flatWgSize);
+      llvmFunc->addFnAttr("amdgpu-flat-work-group-size", wgSizeRange);
     }
 
     std::unique_ptr<llvm::TargetMachine> targetMachine;
     {
       llvm::Triple triple("amdgcn--amdhsa-amdgiz");
-      std::string targetChip = options_.ROCMTargetChip;
+      std::string targetChip = clROCMTargetChip;
       std::string error;
       const llvm::Target *target =
           llvm::TargetRegistry::lookupTarget("", triple, error);
@@ -176,9 +171,9 @@ class ROCMTargetBackend final : public TargetBackend {
     iree_ROCMExecutableDef_start_as_root(builder);
 
     // Link module to Device Library
-    if (options_.ROCMLinkBC) {
-      LinkROCDLIfNecessary(llvmModule.get(), options_.ROCMTargetChip,
-                           options_.ROCMBitcodeDir);
+    if (clROCMLinkBC) {
+      LinkROCDLIfNecessary(llvmModule.get(), clROCMTargetChip,
+                           clROCMBitcodeDir);
     }
 
     // Serialize hsaco kernel into the binary that we will embed in the
@@ -238,12 +233,9 @@ class ROCMTargetBackend final : public TargetBackend {
         configAttr);
   }
 
-  ROCMTargetOptions options_;
 };
 
-void registerROCMTargetBackends(
-    std::function<ROCMTargetOptions()> queryOptions) {
-  getROCMTargetOptionsFromFlags();
+void registerROCMTargetBackends() {
   // #hal.device.target<"rocm", ...
   // #hal.executable.target<"rocm", ...
   static iree_compiler::IREE::HAL::TargetBackendRegistration registration(
@@ -252,7 +244,7 @@ void registerROCMTargetBackends(
         LLVMInitializeAMDGPUTargetMC();
         LLVMInitializeAMDGPUTargetInfo();
         LLVMInitializeAMDGPUAsmPrinter();
-        return std::make_shared<ROCMTargetBackend>(queryOptions());
+        return std::make_shared<ROCMTargetBackend>();
       });
 }
 
