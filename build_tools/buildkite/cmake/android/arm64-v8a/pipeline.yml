@@ -33,21 +33,6 @@ steps:
       IREE_DOCKER_WORKDIR: "/usr/src/github/iree"
     timeout_in_minutes: "15"
 
-  - label: "test on Galaxy S10 (exynos-9820, mali-g76)"
-    commands:
-      - "git clean -fdx"
-      - "buildkite-agent artifact download --step build build-artifacts.tgz ./"
-      - "tar xzf build-artifacts.tgz"
-      - "find build-android/ -name '*.cmake' -exec sed -i \"s!\\$IREE_DOCKER_WORKDIR/!\\$PWD/!g\" {} \\;"
-      - "cd build-android/"
-      - "ctest --timeout 900 --output-on-failure"
-    agents:
-      - "android-soc=exynos-9820"
-      - "queue=test-android"
-    env:
-      IREE_DOCKER_WORKDIR: "/usr/src/github/iree"
-    timeout_in_minutes: "15"
-
   - label: "test on Pixel 4 (snapdragon-855, adreno-640)"
     commands:
       - "git clean -fdx"
