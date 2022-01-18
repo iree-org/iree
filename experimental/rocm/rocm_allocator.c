@@ -43,6 +43,7 @@ iree_status_t iree_hal_rocm_allocator_create(
     iree_hal_resource_initialize(&iree_hal_rocm_allocator_vtable,
                                  &allocator->resource);
     allocator->context = context;
+    allocator->base_device = base_device;
     *out_allocator = (iree_hal_allocator_t*)allocator;
   }
 
@@ -173,7 +174,7 @@ static iree_status_t iree_hal_rocm_allocator_allocate_buffer(
         (iree_hal_allocator_t*)allocator, memory_type,
         IREE_HAL_MEMORY_ACCESS_ALL, allowed_usage, allocation_size,
         /*byte_offset=*/0,
-        /*byte_length=*/allocation_size, device_ptr, host_ptr, out_buffer);
+        /*byte_length=*/allocation_size, device_ptr, host_ptr, &buffer);
   }
 
   // Copy the initial contents into the buffer. This may require staging.

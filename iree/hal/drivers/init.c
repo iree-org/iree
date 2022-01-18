@@ -32,9 +32,9 @@
 #include "iree/hal/vulkan/registration/driver_module.h"
 #endif  // IREE_HAL_HAVE_VULKAN_DRIVER_MODULE
 
-#if defined(IREE_BUILD_EXPERIMENTAL_ROCM)
+#if defined(IREE_HAL_HAVE_EXPERIMENTAL_ROCM_DRIVER_MODULE)
 #include "experimental/rocm/registration/driver_module.h"
-#endif  // IREE_BUILD_EXPERIMENTAL_ROCM
+#endif  // IREE_HAL_HAVE_EXPERIMENTAL_ROCM_DRIVER_MODULE
 
 IREE_API_EXPORT iree_status_t
 iree_hal_register_all_available_drivers(iree_hal_driver_registry_t* registry) {
@@ -70,10 +70,10 @@ iree_hal_register_all_available_drivers(iree_hal_driver_registry_t* registry) {
       z0, iree_hal_vulkan_driver_module_register(registry));
 #endif  // IREE_HAL_HAVE_VULKAN_DRIVER_MODULE
 
-#if defined(IREE_BUILD_EXPERIMENTAL_ROCM)
+#if defined(IREE_HAL_HAVE_EXPERIMENTAL_ROCM_DRIVER_MODULE)
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0, iree_hal_rocm_driver_module_register(registry));
-#endif  // IREE_HAL_HAVE_ROCM_DRIVER_MODULE
+#endif  // IREE_HAL_HAVE_EXPERIMENTAL_ROCM_DRIVER_MODULE
 
   IREE_TRACE_ZONE_END(z0);
   return iree_ok_status();
