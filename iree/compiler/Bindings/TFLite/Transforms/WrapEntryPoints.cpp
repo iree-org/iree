@@ -641,7 +641,7 @@ class WrapEntryPointsPass
       }
     }
     return NamedAttribute{
-        Identifier::get("tfl.io.names", &getContext()),
+        StringAttr::get(&getContext(), "tfl.io.names"),
         StringAttr::get(&getContext(), llvm::join(pieces, ";"))};
   }
 };

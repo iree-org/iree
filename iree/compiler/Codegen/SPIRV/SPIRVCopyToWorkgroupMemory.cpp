@@ -300,7 +300,7 @@ void SPIRVCopyToWorkgroupMemoryPass::tileAndVectorizeLinalgCopy(
   linalg::VectorizationPatterns<linalg::CopyOp>::insert(
       vectorizationPatterns, linalg::LinalgVectorizationOptions(),
       linalg::LinalgTransformationFilter(
-          Identifier::get(getVectorizeMarker(), context), {}));
+          StringAttr::get(context, getVectorizeMarker()), {}));
   if (failed(applyPatternsAndFoldGreedily(funcOp,
                                           std::move(vectorizationPatterns)))) {
     return signalPassFailure();

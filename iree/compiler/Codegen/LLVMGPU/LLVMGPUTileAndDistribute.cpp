@@ -53,8 +53,8 @@ static void populateTilingReductionPatterns(
   MLIRContext *context = patterns.getContext();
 
   linalg::LinalgTransformationFilter filter(
-      ArrayRef<Identifier>{},
-      Identifier::get(getWorkgroupKTiledMarker(), context));
+      ArrayRef<StringAttr>{},
+      StringAttr::get(context, getWorkgroupKTiledMarker()));
   linalg::TilingPatterns<linalg::MatmulOp, linalg::BatchMatmulOp,
                          linalg::GenericOp>::insert(patterns, tilingOptions,
                                                     filter);
@@ -109,9 +109,9 @@ static void populateTilingToWarpPatterns(
                            .setDistributionOptions(warpDistributionOptions);
   MLIRContext *context = patterns.getContext();
   linalg::LinalgTransformationFilter filter(
-      {Identifier::get(getWorkgroupKTiledMarker(), context),
-       Identifier::get(getWorkgroupMemoryMarker(), context)},
-      Identifier::get(getVectorizeMarker(), context));
+      {StringAttr::get(context, getWorkgroupKTiledMarker()),
+       StringAttr::get(context, getWorkgroupMemoryMarker())},
+      StringAttr::get(context, getVectorizeMarker()));
   filter.setMatchByDefault();
   linalg::TilingPatterns<linalg::MatmulOp, linalg::FillOp, linalg::CopyOp,
                          linalg::BatchMatmulOp,
@@ -167,9 +167,9 @@ static void populateTilingToInvocationPatterns(
 
   MLIRContext *context = patterns.getContext();
   linalg::LinalgTransformationFilter f(
-      {Identifier::get(getWorkgroupKTiledMarker(), context),
-       Identifier::get(getWorkgroupMemoryMarker(), context)},
-      Identifier::get(getVectorizeMarker(), context));
+      {StringAttr::get(context, getWorkgroupKTiledMarker()),
+       StringAttr::get(context, getWorkgroupMemoryMarker())},
+      StringAttr::get(context, getVectorizeMarker()));
   f.addFilter([](Operation *op) {
      // FFT doesn't support second level of tiling yet.
      return success(!isa<IREE::LinalgExt::FftOp>(op));
@@ -249,8 +249,8 @@ static void populatePromotionPatterns(MLIRContext *context,
           .setOperandsToPromote({0, 1})
           .setUseFullTileBuffers({false, false}),
       linalg::LinalgTransformationFilter(
-          {Identifier::get(getWorkgroupKTiledMarker(), context)},
-          Identifier::get(getWorkgroupMemoryMarker(), context)));
+          {StringAttr::get(context, getWorkgroupKTiledMarker())},
+          StringAttr::get(context, getWorkgroupMemoryMarker())));
 }
 
 namespace {

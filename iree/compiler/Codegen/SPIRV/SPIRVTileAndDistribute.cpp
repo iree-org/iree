@@ -53,14 +53,14 @@ namespace iree_compiler {
 static linalg::LinalgTransformationFilter getLinalgMatchAndReplaceMarker(
     ArrayRef<StringRef> matchMarkers, Optional<StringRef> replaceMarker,
     MLIRContext *context) {
-  SmallVector<Identifier, 2> matchIds;
+  SmallVector<StringAttr, 2> matchIds;
   matchIds.reserve(matchMarkers.size());
   for (StringRef marker : matchMarkers) {
-    matchIds.emplace_back(Identifier::get(marker, context));
+    matchIds.emplace_back(StringAttr::get(context, marker));
   }
 
-  Optional<Identifier> replaceId;
-  if (replaceMarker) replaceId = Identifier::get(*replaceMarker, context);
+  Optional<StringAttr> replaceId;
+  if (replaceMarker) replaceId = StringAttr::get(context, *replaceMarker);
 
   return linalg::LinalgTransformationFilter(matchIds, replaceId);
 }

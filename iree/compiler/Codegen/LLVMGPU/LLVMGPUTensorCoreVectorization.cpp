@@ -24,7 +24,7 @@ namespace iree_compiler {
 static void populateVectorizationPatterns(RewritePatternSet &patterns) {
   linalg::LinalgVectorizationOptions opt;
   linalg::LinalgTransformationFilter f(
-      Identifier::get(getVectorizeMarker(), patterns.getContext()));
+      StringAttr::get(patterns.getContext(), getVectorizeMarker()));
   linalg::VectorizationPatterns<linalg::FillOp, linalg::CopyOp,
                                 linalg::GenericOp>::insert(patterns, opt, f);
   patterns.add<linalg::LinalgVectorizationPattern>(

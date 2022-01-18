@@ -57,7 +57,7 @@ class TestFloatRangeAnalysisPass
     // Update.
     for (auto &it : queryOps) {
       it.first->setAttr("analysis",
-                        StringAttr::get(it.second->getAsStr(), &getContext()));
+                        StringAttr::get(&getContext(), it.second->getAsStr()));
     }
   }
 };
