@@ -177,14 +177,10 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
             break;
           case IREE::Codegen::DispatchLoweringPassPipeline::
               CPUSingleTilingExpert:
-            nestedModulePM.addNestedPass<FuncOp>(
-                createConvertToDestinationPassingStylePass());
             addSingleTilingExpertPassPipeline(nestedModulePM);
             break;
           case IREE::Codegen::DispatchLoweringPassPipeline::
               CPUDoubleTilingExpert:
-            nestedModulePM.addNestedPass<FuncOp>(
-                createConvertToDestinationPassingStylePass());
             addDoubleTilingExpertPassPipeline(nestedModulePM);
             break;
           case IREE::Codegen::DispatchLoweringPassPipeline::CPUTensorToVectors:
