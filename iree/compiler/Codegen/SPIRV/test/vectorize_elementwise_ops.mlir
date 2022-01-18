@@ -66,15 +66,11 @@ func @transpose_add(%lhs: tensor<4x2xf32>, %rhs: tensor<2xf32>) -> tensor<2x4xf3
 //       CHECK:   %[[INSERT2:.+]] = vector.insert %[[READ]], %[[INSERT1]] [2] : vector<2xf32> into vector<4x2xf32>
 //       CHECK:   %[[INSERT3:.+]] = vector.insert %[[READ]], %[[INSERT2]] [3] : vector<2xf32> into vector<4x2xf32>
 //       CHECK:   %[[RT:.+]] = vector.transpose %[[INSERT3]], [1, 0] : vector<4x2xf32> to vector<2x4xf32>
-//       CHECK:   %[[SLICE0:.+]] = vector.extract_strided_slice %[[LT]] {offsets = [0, 0]
-//       CHECK:   %[[SLICE1:.+]] = vector.extract_strided_slice %[[RT]] {offsets = [0, 0]
-//       CHECK:   %[[EXTRACT0:.+]] = vector.extract %[[SLICE0]][0]
-//       CHECK:   %[[EXTRACT1:.+]] = vector.extract %[[SLICE1]][0]
+//       CHECK:   %[[EXTRACT0:.+]] = vector.extract %[[LT]][0]
+//       CHECK:   %[[EXTRACT1:.+]] = vector.extract %[[RT]][0]
 //       CHECK:   %[[ADD0:.+]] = arith.addf %[[EXTRACT0]], %[[EXTRACT1]] : vector<4xf32>
-//       CHECK:   %[[SLICE0:.+]] = vector.extract_strided_slice %[[LT]] {offsets = [1, 0]
-//       CHECK:   %[[SLICE1:.+]] = vector.extract_strided_slice %[[RT]] {offsets = [1, 0]
-//       CHECK:   %[[EXTRACT0:.+]] = vector.extract %[[SLICE0]][0]
-//       CHECK:   %[[EXTRACT1:.+]] = vector.extract %[[SLICE1]][0]
+//       CHECK:   %[[EXTRACT0:.+]] = vector.extract %[[LT]][1]
+//       CHECK:   %[[EXTRACT1:.+]] = vector.extract %[[RT]][1]
 //       CHECK:   %[[ADD1:.+]] = arith.addf %[[EXTRACT0]], %[[EXTRACT1]] : vector<4xf32>
 //       CHECK:   %[[WRITE0:.+]] = vector.transfer_write %[[ADD0]], %[[OINIT]][%[[C0]], %[[C0]]]
 //       CHECK:   %[[WRITE1:.+]] = vector.transfer_write %[[ADD1]], %[[WRITE0]][%[[C1]], %[[C0]]]
