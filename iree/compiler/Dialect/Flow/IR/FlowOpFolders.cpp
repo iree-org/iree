@@ -177,8 +177,17 @@ struct DispatchTensorLoadOpWithOffsetSizesAndStridesConstantArgumentFolder final
   using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(DispatchTensorLoadOp op,
                                 PatternRewriter &rewriter) const override {
-    // No constant operand, just return;
-    if (llvm::none_of(op.getOperands(), [](Value operand) {
+    // If there are no constant operands then we return early before the more
+    // expensive work below.
+    if (llvm::none_of(op.offsets(),
+                      [](Value operand) {
+                        return matchPattern(operand, matchConstantIndex());
+                      }) &&
+        llvm::none_of(op.sizes(),
+                      [](Value operand) {
+                        return matchPattern(operand, matchConstantIndex());
+                      }) &&
+        llvm::none_of(op.strides(), [](Value operand) {
           return matchPattern(operand, matchConstantIndex());
         })) {
       return failure();
