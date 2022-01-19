@@ -44,15 +44,12 @@ for the target.
 
 #### Download as Python package
 
-Python packages for various IREE functionalities are regularly published on
-IREE's [GitHub Releases][iree-releases] page.  Right now these are just
-snapshots of the `main` development branch.
-
-You can install the Python package containing the LLVM-based dylib compiler by
+Python packages for various IREE functionalities are regularly published
+to [PyPI][pypi]. See the [Python Bindings][python-bindings] page for more
+details. The core `iree-compiler` package includes the LLVM-based CPU compiler:
 
 ``` shell
-python -m pip install iree-compiler \
-    -f https://github.com/google/iree/releases
+python -m pip install iree-compiler
 ```
 
 !!! tip
@@ -133,9 +130,10 @@ concrete values.
 
 [android-cc]: ../building-from-source/android.md
 [get-started]: ../building-from-source/getting-started.md
-[iree-releases]: https://github.com/google/iree/releases/
 [llvm]: https://llvm.org/
 [mlir]: https://mlir.llvm.org/
+[pypi]: https://pypi.org/user/google-iree-pypi-deploy/
+[python-bindings]: ../bindings/python.md
 [tf-hub-mobilenetv2]: https://tfhub.dev/google/tf2-preview/mobilenet_v2/classification
 [tf-import]: ../ml-frameworks/tensorflow.md
 [tflite-import]: ../ml-frameworks/tensorflow-lite.md

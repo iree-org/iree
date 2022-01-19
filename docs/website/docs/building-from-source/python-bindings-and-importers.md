@@ -79,9 +79,18 @@ package manager ([about](https://docs.python.org/3/library/venv.html),
 === "Windows"
 
     ``` powershell
+    # Create a persistent virtual environment (first time only).
     python -m venv .venv
+
+    # Activate the virtual environment (per shell).
+    # Now the `python` command will resolve to your virtual environment
+    # (even on systems where you typically use `python3`).
     .venv\Scripts\activate.bat
+
+    # Upgrade PIP.
     python -m pip install --upgrade pip
+
+    # Install IREE build pre-requisites.
     python -m pip install -r bindings\python\build_requirements.txt
     ```
 
@@ -147,84 +156,13 @@ These tools packages are needed in order for the frontend specific, high-level
 APIs under `import iree.compiler.tf`, `import iree.compiler.tflite`,
 `import iree.compiler.xla`, and `import iree.jax` to be fully functional.
 
-### Environment setup
+!!! Warning
 
-The
-[build_requirements.txt](https://github.com/google/iree/blob/main/integrations/tensorflow/bindings/python/build_requirements.txt)
-file lists prerequisites, such as a recent version of `tf-nightly`:
-
-```shell
-python -m pip install -r \
-    ./integrations/tensorflow/bindings/python/build_requirements.txt
-```
-
-### Building TensorFlow components with Bazel
-
-TensorFlow frontends can only be built with [Bazel](https://bazel.build/),
-and this must be done as a manual step (we used to have automation for this,
-but Bazel integrates poorly with automation and it made diagnosis and cross
-platform usage unreliable). The recommended version of Bazel (used by CI
-systems) can be found in the
-[.bazelversion](https://github.com/google/iree/blob/main/.bazelversion)
-file. In addition, Bazel is hard to use out of tree, so these steps will
-involve working from the source tree (instead of the build tree).
+    This section is under construction. Refer to the
+    [source documentation](https://github.com/google/iree/tree/main/integrations/tensorflow#readme)
+    for the latest building from source instructions.
 
 ???+ Note
     Due to the difficulties using Bazel and compiling TensorFlow, only
     compilation on Linux with clang is supported. Other OS's and compilers are
     "best effort" with patches to improve support welcome.
-
-=== "Linux and MacOS"
-
-    ``` shell
-    # From the iree source directory.
-    cd integrations/tensorflow
-    CC=clang CXX=clang python ../../configure_bazel.py
-    bazel build iree_tf_compiler:importer-binaries
-    ```
-
-=== "Windows"
-
-    ``` powershell
-    # From the iree source directory.
-    cd integrations\tensorflow
-    python ..\..\configure_bazel.py
-    bazel build iree_tf_compiler:importer-binaries
-    ```
-
-Importer binaries can be found under `bazel-bin/iree_tf_compiler` and can
-be used from the command line if desired.
-
-
-???+ Note
-    Bazel's default configuration tends to build almost everything twice,
-    for reasons that can only be surmised to be based in some technically
-    correct but practically challenged viewpoint. It is also incompatible with
-    ccache and other mechanisms for performing less incremental work. It is
-    recommended to address both of these with a `.bazelrc` file in your
-    home directory:
-
-    ```
-    build --disk_cache=/path/to/home/.bazelcache
-    build --nodistinct_host_configuration
-    ```
-
-    We can't set these for you because of other inscrutable reasons.
-
-### Building IREE components with CMake
-
-The main IREE build will embed binaries built above and enable additional
-Python APIs. Within the build, the binaries are symlinked, so can be
-rebuilt per above without re-running these steps for edit-and-continue
-style work.
-
-``` shell
-# From the iree-build/ directory.
-cmake -DIREE_BUILD_TENSORFLOW_ALL=ON .
-cmake --build .
-
-# Validate.
-python -c "import iree.tools.tf as _; print(_.get_tool('iree-import-tf'))"
-python -c "import iree.tools.tflite as _; print(_.get_tool('iree-import-tflite'))"
-python -c "import iree.tools.xla as _; print(_.get_tool('iree-import-xla'))"
-```
