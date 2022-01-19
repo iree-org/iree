@@ -202,13 +202,13 @@ func @other_targets() -> () {
 //
 // CHECK:       func @other_targets() {
 // CHECK:         hal.device.switch<%device : !hal.device>
-// CHECK-NEXT:    #hal.device.match.executable.format<"vmvx-bytecode-fb"> {
+// CHECK-NEXT:    #hal.device.match.executable.format<"vmvx-bytecode-fb">{
 // CHECK-NEXT:      %c1 = arith.constant 1 : index
 // CHECK-NEXT:      hal.command_buffer.dispatch.symbol<%cmd : !hal.command_buffer> target(@vmvx_linked::@vmvx_bytecode_fb::@dispatch_0) workgroups([%c1, %c1, %c1])
 // CHECK-NEXT:      hal.command_buffer.dispatch.symbol<%cmd : !hal.command_buffer> target(@vmvx_linked::@vmvx_bytecode_fb::@dispatch_1) workgroups([%c1, %c1, %c1])
 // CHECK-NEXT:      hal.return
 // CHECK-NEXT:    },
-// CHECK-NEXT:    #hal.device.match.executable.format<"cuda-nvptx-fb"> {
+// CHECK-NEXT:    #hal.device.match.executable.format<"cuda-nvptx-fb">{
 // CHECK-NEXT:      %c1 = arith.constant 1 : index
 // CHECK-NEXT:      hal.command_buffer.dispatch.symbol<%cmd : !hal.command_buffer> target(@dispatch_0::@otherdispatch::@dispatch_0) workgroups([%c1, %c1, %c1])
 // CHECK-NEXT:      hal.command_buffer.dispatch.symbol<%cmd : !hal.command_buffer> target(@dispatch_1::@otherdispatch::@dispatch_1) workgroups([%c1, %c1, %c1])
@@ -282,7 +282,7 @@ hal.executable private @dispatch_1 {
 // CHECK-NOT: hal.executable private @dispatch_0
 // CHECK-NOT: hal.executable private @dispatch_1
 // CHECK:       hal.executable private @vmvx_linked {
-// CHECK:       hal.executable.variant public @vmvx_bytecode_fb, target = #executable_target_vmvx_bytecode_fb {
+// CHECK:       hal.executable.variant public @vmvx_bytecode_fb, target = #executable_target_vmvx_bytecode_fb{
 // CHECK:           module {
 // CHECK-NEXT:        vm.module public @linked_module {
 // CHECK-NEXT:          vm.rodata public @rodata_a dense<0> : tensor<1xi32>
