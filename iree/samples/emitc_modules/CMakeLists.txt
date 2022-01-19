@@ -62,7 +62,7 @@ if(${IREE_ENABLE_EMITC})
 
   iree_c_module(
     NAME
-    import_module_b
+      import_module_b
     SRC
       "import_module_b.mlir"
     H_FILE_OUTPUT

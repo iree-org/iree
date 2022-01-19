@@ -41,7 +41,7 @@ function(iree_c_module)
 
   # Prefix the library with the package name, so we get: iree_package_name.
   iree_package_name(_PACKAGE_NAME)
-  set(_NAME "${_PACKAGE_NAME}_${_RULE_NAME}")
+  set(_NAME "${_PACKAGE_NAME}_${_RULE_NAME}_hdrs")
 
   # Set defaults for TRANSLATE_TOOL.
   if(DEFINED _RULE_TRANSLATE_TOOL)
@@ -65,6 +65,15 @@ function(iree_c_module)
     DEPENDS ${_TRANSLATE_TOOL_EXECUTABLE} ${_RULE_SRC}
   )
 
+  iree_cc_library(
+    NAME ${_RULE_NAME}
+    HDRS "${_RULE_H_FILE_OUTPUT}"
+    SRCS "${IREE_SOURCE_DIR}/iree/vm/module_impl_emitc.c"
+    INCLUDES "${CMAKE_CURRENT_BINARY_DIR}"
+    COPTS "-DEMITC_IMPLEMENTATION=\"${_RULE_H_FILE_OUTPUT}\""
+    "${_TESTONLY_ARG}"
+  )
+
   set(_GEN_TARGET "${_NAME}_gen")
   add_custom_target(
     ${_GEN_TARGET}
@@ -84,9 +93,9 @@ function(iree_c_module)
   # Alias the iree_package_name library to iree::package::name.
   # This lets us more clearly map to Bazel and makes it possible to
   # disambiguate the underscores in paths vs. the separators.
-  add_library(${_PACKAGE_NS}::${_RULE_NAME} ALIAS ${_NAME})
+  add_library(${_PACKAGE_NS}::${_RULE_NAME}_hdrs ALIAS ${_NAME})
   iree_package_dir(_PACKAGE_DIR)
-  if(${_RULE_NAME} STREQUAL ${_PACKAGE_DIR})
+  if(${_RULE_NAME}_hdrs STREQUAL ${_PACKAGE_DIR})
     # If the library name matches the package then treat it as a default.
     # For example, foo/bar/ library 'bar' would end up as 'foo::bar'.
     add_library(${_PACKAGE_NS} ALIAS ${_NAME})
