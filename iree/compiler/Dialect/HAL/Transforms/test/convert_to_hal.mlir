@@ -82,7 +82,7 @@ module attributes {hal.device.targets = [#device_target_cpu]}  {
              %result_resource as %result_capture: !stream.resource<external>{%c16}) {
 
       // CHECK: hal.device.switch<%[[DEVICE]] : !hal.device>
-      // CHECK: #hal.device.match.executable.format<"embedded-elf-x86_64"> {
+      // CHECK: #hal.device.match.executable.format<"embedded-elf-x86_64">{
       // CHECK:   %[[EXECUTABLE_LAYOUT:.+]] = hal.executable_layout.lookup
       // CHECK-SAME: device(%[[DEVICE]] : !hal.device)
       // CHECK-SAME: layout(#executable_layout) : !hal.executable_layout

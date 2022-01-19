@@ -1485,7 +1485,6 @@ def HAL_ExecutableOp : HAL_Op<"executable", [
     custom<SymbolVisibility>($sym_visibility)
     $sym_name
     attr-dict-with-keyword
-    ``
     regions
   }];
 

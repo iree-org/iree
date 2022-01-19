@@ -72,7 +72,7 @@ util.initializer {
 // CHECK-NOT: hal.executable private @dispatch_1
 // CHECK-NOT: hal.executable private @dispatch_2
 // CHECK:       hal.executable private @vmvx_linked {
-// CHECK-NEXT:    hal.executable.variant public @vmvx_bytecode_fb, target = #executable_target_vmvx_bytecode_fb {
+// CHECK-NEXT:    hal.executable.variant public @vmvx_bytecode_fb, target = #executable_target_vmvx_bytecode_fb{
 // CHECK-NEXT:      hal.executable.entry_point public @dispatch_0 ordinal(0)
 // CHECK-NEXT:      hal.executable.entry_point public @dispatch_1 ordinal(1)
 // CHECK-NEXT:      hal.executable.entry_point public @dispatch_2 ordinal(2)
@@ -102,7 +102,7 @@ util.initializer {
 // CHECK-NEXT:    return
 // CHECK-NEXT:  }
 //
-// CHECK:       util.initializer {
+// CHECK:       util.initializer{
 // CHECK:         hal.command_buffer.dispatch.symbol<%cmd : !hal.command_buffer> target(@vmvx_linked::@vmvx_bytecode_fb::@dispatch_0) workgroups([%c1, %c1, %c1])
 // CHECK-NEXT:    hal.command_buffer.dispatch.symbol<%cmd : !hal.command_buffer> target(@vmvx_linked::@vmvx_bytecode_fb::@dispatch_1) workgroups([%c1, %c1, %c1])
 // CHECK-NEXT:    hal.command_buffer.dispatch.symbol<%cmd : !hal.command_buffer> target(@vmvx_linked::@vmvx_bytecode_fb::@dispatch_2) workgroups([%c1, %c1, %c1])
@@ -176,7 +176,7 @@ func @other_targets() -> () {
 // VMVX target should be pulled out from both executables leaving the originals
 // untouched.
 // CHECK:       hal.executable private @vmvx_linked {
-// CHECK-NEXT:    hal.executable.variant public @vmvx_bytecode_fb, target = #executable_target_vmvx_bytecode_fb {
+// CHECK-NEXT:    hal.executable.variant public @vmvx_bytecode_fb, target = #executable_target_vmvx_bytecode_fb{
 // CHECK-NEXT:      hal.executable.entry_point public @dispatch_0 ordinal(0)
 // CHECK-NEXT:      hal.executable.entry_point public @dispatch_1 ordinal(1)
 // CHECK-NEXT:      module {

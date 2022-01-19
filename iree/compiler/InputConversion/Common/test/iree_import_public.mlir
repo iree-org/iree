@@ -234,7 +234,7 @@ builtin.module @globals {
 
   // CHECK: util.global public @global5 : tensor<4xi32>
   iree_input.global @global5 initializer(@initializer) : tensor<4xi32>
-  // CHECK-NEXT: util.initializer {
+  // CHECK-NEXT: util.initializer{
   // CHECK-NEXT:   %[[VALUE:.+]] = call @initializer() : () -> tensor<4xi32>
   // CHECK-NEXT:   util.global.store %[[VALUE]], @global5 : tensor<4xi32>
   // CHECK-NEXT:   util.initializer.return

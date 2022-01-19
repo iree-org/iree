@@ -13,7 +13,7 @@ func @partitioning(%arg0: !stream.resource<external>, %arg1: !stream.resource<ex
   // CHECK: %[[RESULT:.+]], %[[TIMEPOINT:.+]] = stream.async.execute
   // CHECK-SAME: with(%[[ARG1]] as %[[ARG1_CAPTURE:.+]]: !stream.resource<external>{%c80},
   // CHECK-SAME:      %[[ARG0]] as %[[ARG0_CAPTURE:.+]]: !stream.resource<external>{%c20})
-  // CHECK-SAME: -> !stream.resource<external>{%c20} {
+  // CHECK-SAME: -> !stream.resource<external>{%c20}{
   // CHECK-NEXT: %[[SPLAT0:.+]] = stream.async.splat
   %2 = stream.async.splat %c255_i32 : i32 -> !stream.resource<transient>{%c1280}
   // CHECK-NEXT: %[[DISPATCH0:.+]] = stream.async.dispatch @ex::@dispatch_0[%c1, %c1, %c1](%[[SPLAT0]], %[[ARG1_CAPTURE]]) : (!stream.resource<transient>{%c1280}, !stream.resource<external>{%c80}) -> %[[SPLAT0]]{%c1280}
