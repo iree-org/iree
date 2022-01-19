@@ -27,10 +27,6 @@ static void printCompilerConfigurationBlock(llvm::raw_ostream &output) {
   output << "//" << std::string(77, '=') << "\n"
          << "// compiler configuration\n"
          << "//" << std::string(77, '=') << "\n\n";
-
-  output << "#if defined(IREE_COMPILER_MSVC)\n";
-  output << "#pragma warning(disable:4102)\n";
-  output << "#endif  // IREE_COMPILER_MSVC\n";
 }
 
 static void printModuleComment(IREE::VM::ModuleOp &moduleOp,
