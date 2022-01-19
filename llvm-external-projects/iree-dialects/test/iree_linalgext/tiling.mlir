@@ -1210,75 +1210,78 @@ func @pad_tensor(%arg0 : tensor<?x?xf32>, %arg1 : index, %arg2 : index,
 // -----
 
 func @scan_1d(%0: tensor<128xi32>) -> tensor<128xi32> {
-  %c0 = arith.constant 0 : i32
+  %c0 = linalg.init_tensor [] : tensor<i32>
   %1 = linalg.init_tensor [128] : tensor<128xi32>
-  %2 = iree_linalg_ext.scan
+  %2:2 = iree_linalg_ext.scan
     dimension(0) inclusive(true)
     {__internal_linalg_transform__ = "outer_reduce_input"}
-    ins(%0, %c0 : tensor<128xi32>, i32) outs(%1 : tensor<128xi32>) {
+    ins(%0 : tensor<128xi32>) outs(%1, %c0 : tensor<128xi32>, tensor<i32>) {
     ^bb0(%arg0 : i32, %arg1 : i32):
       %sum = arith.addi %arg0, %arg1 : i32
       iree_linalg_ext.yield %sum : i32
-  } -> tensor<128xi32>
-  return %2 : tensor<128xi32>
+  } -> tensor<128xi32>, tensor<i32>
+  return %2#0 : tensor<128xi32>
 }
 //      CHECK: func @scan_1d(
 // CHECK-SAME:   %[[OPERAND:.+]]: tensor<128xi32>
-//      CHECK:   %[[IDENTITY:.+]] = arith.constant 0 : i32
+//      CHECK:   %[[ACC:.+]] = linalg.init_tensor [] : tensor<i32>
 //      CHECK:   %[[OUTPUT:.+]] = linalg.init_tensor [128] : tensor<128xi32>
-//      CHECK:   %[[RESULT:.+]] = iree_linalg_ext.scan
+//      CHECK:   %[[RESULT:.+]]:2 = iree_linalg_ext.scan
 // CHECK-SAME:           __internal_linalg_transform__ = "outer_reduce_output"
-// CHECK-SAME:       ins(%[[OPERAND]], %[[IDENTITY]] :
-// CHECK-SAME:       outs(%[[OUTPUT]] :
+// CHECK-SAME:       ins(%[[OPERAND]] :
+// CHECK-SAME:       outs(%[[OUTPUT]], %[[ACC]] :
 //      CHECK:   return %[[RESULT]]
 
 // -----
 
 func @scan_2d(%0: tensor<16x32xi32>) -> tensor<16x32xi32> {
-  %c0 = arith.constant 0 : i32
+  %c0 = linalg.init_tensor [32] : tensor<32xi32>
   %1 = linalg.init_tensor [16, 32] : tensor<16x32xi32>
-  %2 = iree_linalg_ext.scan
+  %2:2 = iree_linalg_ext.scan
     dimension(0) inclusive(true)
     {__internal_linalg_transform__ = "outer_reduce_input"}
-    ins(%0, %c0 : tensor<16x32xi32>, i32) outs(%1 : tensor<16x32xi32>) {
+    ins(%0 : tensor<16x32xi32>) outs(%1, %c0 : tensor<16x32xi32>, tensor<32xi32>) {
     ^bb0(%arg0 : i32, %arg1 : i32):
       %sum = arith.addi %arg0, %arg1 : i32
       iree_linalg_ext.yield %sum : i32
-  } -> tensor<16x32xi32>
-  return %2 : tensor<16x32xi32>
+  } -> tensor<16x32xi32>, tensor<32xi32>
+  return %2#0 : tensor<16x32xi32>
 }
 //  CHECK-DAG:  #[[MAP0:.+]] = affine_map<(d0)[s0, s1] -> (20, -d0 + s1)>
 //      CHECK:  func @scan_2d(
 // CHECK-SAME:    %[[ARG0:[a-zA-Z0-9_]+]]
-//  CHECK-DAG:    %[[IDENTITY:.+]] = arith.constant 0 : i32
 //      CHECK:    %[[C0:.+]] = arith.constant 0 : index
 //      CHECK:    %[[C16:.+]] = arith.constant 16 : index
 //      CHECK:    %[[C32:.+]] = arith.constant 32 : index
 //      CHECK:    %[[C20:.+]] = arith.constant 20 : index
+//      CHECK:    %[[ACC:.+]] = linalg.init_tensor [32] : tensor<32xi32>
 //      CHECK:    %[[OUTPUT:.+]] = linalg.init_tensor [16, 32] : tensor<16x32xi32>
-//      CHECK:    %[[RESULT:.+]] = scf.for %[[I:.+]] = %[[C0]] to %[[C32]] step %[[C20]] 
-// CHECK-SAME:      iter_args(%[[ARG2:.+]] = %[[OUTPUT]])
+//      CHECK:    %[[RESULT:.+]]:2 = scf.for %[[I:.+]] = %[[C0]] to %[[C32]] step %[[C20]] 
+// CHECK-SAME:      iter_args(%[[ARG2:.+]] = %[[OUTPUT]], %[[ARG3:.+]] = %[[ACC]])
 //      CHECK:      %[[SIZE:.+]] = affine.min #[[MAP0]](%[[I]])[%[[C20]], %[[C32]]]
 //      CHECK:      %[[UPDATE_SLICE_IN:.+]] = tensor.extract_slice %[[ARG0]][0, %[[I]]] [%[[C16]], %[[SIZE]]]
-//      CHECK:      %[[UPDATE_SLICE_OUT:.+]] = tensor.extract_slice %[[OUTPUT]][0, %[[I]]] [%[[C16]], %[[SIZE]]]
-//      CHECK:      %[[SCAN_TILE:.+]] = iree_linalg_ext.scan
+//      CHECK:      %[[UPDATE_SLICE_OUT:.+]] = tensor.extract_slice %[[ARG2]][0, %[[I]]] [%[[C16]], %[[SIZE]]]
+//      CHECK:      %[[UPDATE_SLICE_ACC:.+]] = tensor.extract_slice %[[ARG3]][%[[I]]] [%[[SIZE]]]
+//      CHECK:      %[[SCAN_TILE:.+]]:2 = iree_linalg_ext.scan
 // CHECK-SAME:       dimension(0) inclusive(true)
 // CHECK-SAME:       {__internal_linalg_transform__ = "outer_reduce_output"}
 // CHECK-SAME:       ins(%[[UPDATE_SLICE_IN]]
-// CHECK-SAME:       outs(%[[UPDATE_SLICE_OUT]]
-//      CHECK:       %[[YIELD:.+]] = tensor.insert_slice %[[SCAN_TILE]] into %[[ARG2]][0, %[[I]]]
+// CHECK-SAME:       outs(%[[UPDATE_SLICE_OUT]], %[[UPDATE_SLICE_ACC]]
+//      CHECK:       %[[YIELD:.+]] = tensor.insert_slice %[[SCAN_TILE]]#0 into %[[ARG2]][0, %[[I]]]
 // CHECK-SAME:           [%[[C16]], %[[SIZE]]]
-//      CHECK:       scf.yield %[[YIELD]]
-//      CHECK:   return %[[RESULT]]
+//      CHECK:       %[[ACC_YIELD:.+]] = tensor.insert_slice %[[SCAN_TILE]]#1 into %[[ARG3]][%[[I]]]
+// CHECK-SAME:           [%[[SIZE]]]
+//      CHECK:       scf.yield %[[YIELD]], %[[ACC_YIELD]] : tensor<16x32xi32>, tensor<32xi32>
+//      CHECK:   return %[[RESULT]]#0
 
 // -----
 
 func @scan_2d_memref(%0: memref<16x32xi32>, %1: memref<16x32xi32>) {
-  %c0 = arith.constant 0 : i32
+  %c0 = memref.alloc() : memref<32xi32>
   iree_linalg_ext.scan
     dimension(0) inclusive(true)
     {__internal_linalg_transform__ = "outer_reduce_input"}
-    ins(%0, %c0 : memref<16x32xi32>, i32) outs(%1 : memref<16x32xi32>) {
+    ins(%0 : memref<16x32xi32>) outs(%1, %c0 : memref<16x32xi32>, memref<32xi32>) {
     ^bb0(%arg0 : i32, %arg1 : i32):
       %sum = arith.addi %arg0, %arg1 : i32
       iree_linalg_ext.yield %sum : i32
@@ -1290,18 +1293,19 @@ func @scan_2d_memref(%0: memref<16x32xi32>, %1: memref<16x32xi32>) {
 //      CHECK:  func @scan_2d_memref(
 // CHECK-SAME:    %[[ARG0:[a-zA-Z0-9_]+]]
 // CHECK-SAME:    %[[ARG1:[a-zA-Z0-9_]+]]
-//  CHECK-DAG:    %[[IDENTITY:.+]] = arith.constant 0 : i32
 //      CHECK:    %[[C0:.+]] = arith.constant 0 : index
 //      CHECK:    %[[C16:.+]] = arith.constant 16 : index
 //      CHECK:    %[[C32:.+]] = arith.constant 32 : index
 //      CHECK:    %[[C20:.+]] = arith.constant 20 : index
+//      CHECK:    %[[ACC:.+]] = memref.alloc() : memref<32xi32>
 //      CHECK:    scf.for %[[I:.+]] = %[[C0]] to %[[C32]] step %[[C20]]
 //      CHECK:      %[[SIZE:.+]] = affine.min #[[MAP0]](%[[I]])[%[[C20]], %[[C32]]]
 //      CHECK:      %[[UPDATE_SLICE_IN:.+]] = memref.subview %[[ARG0]][0, %[[I]]] [%[[C16]], %[[SIZE]]]
 //      CHECK:      %[[UPDATE_SLICE_OUT:.+]] = memref.subview %[[ARG1]][0, %[[I]]] [%[[C16]], %[[SIZE]]]
+//      CHECK:      %[[UPDATE_SLICE_ACC:.+]] = memref.subview %[[ACC]][%[[I]]] [%[[SIZE]]]
 //      CHECK:      iree_linalg_ext.scan
 // CHECK-SAME:       dimension(0) inclusive(true)
 // CHECK-SAME:       {__internal_linalg_transform__ = "outer_reduce_output"}
 // CHECK-SAME:       ins(%[[UPDATE_SLICE_IN]]
-// CHECK-SAME:       outs(%[[UPDATE_SLICE_OUT]]
+// CHECK-SAME:       outs(%[[UPDATE_SLICE_OUT]], %[[UPDATE_SLICE_ACC]]
 //      CHECK:   return
