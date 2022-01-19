@@ -282,24 +282,24 @@ void TiledOpInterfaceTilingPass::runOnOperation() {
   patterns.add<TiledOpInterfaceTilingPattern>(
       context, linalg::LinalgTilingOptions().setTileSizes({10, 20}),
       linalg::LinalgTransformationFilter(
-          Identifier::get("tiling_input", context),
-          Identifier::get("tiling_output", context)));
+          StringAttr::get(context, "tiling_input"),
+          StringAttr::get(context, "tiling_output")));
   patterns.add<TiledOpInterfaceTilingPattern>(
       context, linalg::LinalgTilingOptions().setTileSizes(ArrayRef<int64_t>{0}),
       linalg::LinalgTransformationFilter(
-          Identifier::get("no_tiling_input", context),
-          Identifier::get("no_tiling_output", context)));
+          StringAttr::get(context, "no_tiling_input"),
+          StringAttr::get(context, "no_tiling_output")));
 
   patterns.add<TiledOpInterfaceTilingPattern>(
       context, linalg::LinalgTilingOptions().setTileSizes({0, 20}),
       linalg::LinalgTransformationFilter(
-          Identifier::get("outer_reduce_input", context),
-          Identifier::get("outer_reduce_output", context)));
+          StringAttr::get(context, "outer_reduce_input"),
+          StringAttr::get(context, "outer_reduce_output")));
   patterns.add<TiledOpInterfaceTilingPattern>(
       context, linalg::LinalgTilingOptions().setTileSizes({10, 0, 0}),
       linalg::LinalgTransformationFilter(
-          Identifier::get("inner_reduce_input", context),
-          Identifier::get("inner_reduce_output", context)));
+          StringAttr::get(context, "inner_reduce_input"),
+          StringAttr::get(context, "inner_reduce_output")));
 
   static linalg::LinalgLoopDistributionOptions workgroupDistributionOptions = {
       [](OpBuilder &builder, Location loc, ArrayRef<Range> parallelLoopRanges) {
@@ -326,22 +326,22 @@ void TiledOpInterfaceTilingPass::runOnOperation() {
           .setTileSizes(ArrayRef<int64_t>{10, 0, 30})
           .setDistributionOptions(workgroupDistributionOptions),
       linalg::LinalgTransformationFilter(
-          Identifier::get("distribute_input", context),
-          Identifier::get("distribute_output", context)));
+          StringAttr::get(context, "distribute_input"),
+          StringAttr::get(context, "distribute_output")));
 
   patterns.add<TiledOpInterfaceTilingPattern>(
       context,
       linalg::LinalgTilingOptions().setTileSizes(ArrayRef<int64_t>{32}),
       linalg::LinalgTransformationFilter(
-          Identifier::get("tiling_1d_stage5_fft_input", context),
-          Identifier::get("tiling_1d_stage5_fft_output", context)));
+          StringAttr::get(context, "tiling_1d_stage5_fft_input"),
+          StringAttr::get(context, "tiling_1d_stage5_fft_output")));
 
   patterns.add<TiledOpInterfaceTilingPattern>(
       context,
       linalg::LinalgTilingOptions().setTileSizes(ArrayRef<int64_t>{10, 32}),
       linalg::LinalgTransformationFilter(
-          Identifier::get("tiling_2d_stage5_fft_input", context),
-          Identifier::get("tiling_2d_stage5_fft_output", context)));
+          StringAttr::get(context, "tiling_2d_stage5_fft_input"),
+          StringAttr::get(context, "tiling_2d_stage5_fft_output")));
 
   if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
     return signalPassFailure();

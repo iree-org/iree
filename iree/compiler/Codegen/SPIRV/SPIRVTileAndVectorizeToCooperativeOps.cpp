@@ -133,7 +133,7 @@ static void populateTilingToSubgroupPatterns(ArrayRef<int64_t> subgroupCounts,
           .setDistributionOptions(distributionOptions);
 
   auto filter = linalg::LinalgTransformationFilter(
-      ArrayRef<Identifier>{}, Identifier::get(getVectorizeMarker(), context));
+      ArrayRef<StringAttr>{}, StringAttr::get(context, getVectorizeMarker()));
   linalg::TilingPatterns<linalg::FillOp, linalg::MatmulOp,
                          linalg::GenericOp>::insert(patterns, tilingOptions,
                                                     filter);
@@ -148,7 +148,7 @@ void populateVectorizationPatterns(MLIRContext *context,
                                    RewritePatternSet &patterns) {
   linalg::LinalgVectorizationOptions opt;
   linalg::LinalgTransformationFilter f(
-      Identifier::get(getVectorizeMarker(), context));
+      StringAttr::get(context, getVectorizeMarker()));
   linalg::VectorizationPatterns<linalg::FillOp, linalg::GenericOp>::insert(
       patterns, opt, f);
   patterns.add<linalg::LinalgVectorizationPattern>(

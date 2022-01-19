@@ -189,8 +189,8 @@ void LLVMCPUTileFuseAndVectorizePass::runOnOperation() {
                 return std::move(reductionTiles);
               }),
           linalg::LinalgTransformationFilter(
-              ArrayRef<Identifier>{},
-              Identifier::get(getVectorizeMarker(), context)));
+              ArrayRef<StringAttr>{},
+              StringAttr::get(context, getVectorizeMarker())));
 
       if (failed(applyPatternsAndFoldGreedily(
               funcOp, std::move(tileReductionPatterns)))) {
@@ -231,8 +231,8 @@ void LLVMCPUTileFuseAndVectorizePass::runOnOperation() {
                     static_cast<unsigned>(TilingLevel::VectorTiles));
               }),
           linalg::LinalgTransformationFilter(
-              Identifier::get(getWorkgroupL1TileMarker(), context),
-              Identifier::get(getVectorizeMarker(), context)));
+              StringAttr::get(context, getWorkgroupL1TileMarker()),
+              StringAttr::get(context, getVectorizeMarker())));
 
       if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(l2patterns)))) {
         return signalPassFailure();
@@ -259,7 +259,7 @@ void LLVMCPUTileFuseAndVectorizePass::runOnOperation() {
     OwningRewritePatternList vectorizationPatterns(&getContext());
     linalg::LinalgVectorizationOptions opt;
     linalg::LinalgTransformationFilter f(
-        Identifier::get(getVectorizeMarker(), context));
+        StringAttr::get(context, getVectorizeMarker()));
     linalg::VectorizationPatterns<linalg::GenericOp, linalg::CopyOp,
                                   linalg::FillOp>::insert(vectorizationPatterns,
                                                           opt, f);

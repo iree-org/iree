@@ -63,21 +63,17 @@ func @matmul_2x128x4() {
 //       CHECK:       %[[RHS_1_VECTOR:.+]] = vector.transfer_read %[[RHS_TILE]][%[[C1]], %[[C0]]], %[[PAD]]
 //       CHECK:       %[[RHS_2_VECTOR:.+]] = vector.transfer_read %[[RHS_TILE]][%[[C2]], %[[C0]]], %[[PAD]]
 //       CHECK:       %[[RHS_3_VECTOR:.+]] = vector.transfer_read %[[RHS_TILE]][%[[C3]], %[[C0]]], %[[PAD]]
-//       CHECK:       %[[LHS_0:.+]] = vector.extract_strided_slice %[[LHS_VECTOR]] {offsets = [0], sizes = [1], strides = [1]}
-//       CHECK:       %[[LHS_0_SCALAR:.+]] = vector.extract %[[LHS_0]][0] : vector<1xf32>
+//       CHECK:       %[[LHS_0_SCALAR:.+]] = vector.extract %[[LHS_VECTOR]][0]
 //       CHECK:       %[[LHS_0_VECTOR:.+]] = splat %[[LHS_0_SCALAR]] : vector<4xf32>
 //       CHECK:       %[[ACC_0_VECTOR:.+]] = vector.extract %[[ZERO]][0] : vector<1x4xf32>
 //       CHECK:       %[[FMA_0:.+]] = vector.fma %[[LHS_0_VECTOR]], %[[RHS_0_VECTOR]], %[[ACC_0_VECTOR]] : vector<4xf32>
-//       CHECK:       %[[LHS_1:.+]] = vector.extract_strided_slice %[[LHS_VECTOR]] {offsets = [1], sizes = [1], strides = [1]}
-//       CHECK:       %[[LHS_1_SCALAR:.+]] = vector.extract %[[LHS_1]][0] : vector<1xf32>
+//       CHECK:       %[[LHS_1_SCALAR:.+]] = vector.extract %[[LHS_VECTOR]][1]
 //       CHECK:       %[[LHS_1_VECTOR:.+]] = splat %[[LHS_1_SCALAR]] : vector<4xf32>
 //       CHECK:       %[[FMA_1:.+]] = vector.fma %[[LHS_1_VECTOR]], %[[RHS_1_VECTOR]], %[[FMA_0]] : vector<4xf32>
-//       CHECK:       %[[LHS_2:.+]] = vector.extract_strided_slice %[[LHS_VECTOR]] {offsets = [2], sizes = [1], strides = [1]}
-//       CHECK:       %[[LHS_2_SCALAR:.+]] = vector.extract %[[LHS_2]][0] : vector<1xf32>
+//       CHECK:       %[[LHS_2_SCALAR:.+]] = vector.extract %[[LHS_VECTOR]][2]
 //       CHECK:       %[[LHS_2_VECTOR:.+]] = splat %[[LHS_2_SCALAR]] : vector<4xf32>
 //       CHECK:       %[[FMA_2:.+]] = vector.fma %[[LHS_2_VECTOR]], %[[RHS_2_VECTOR]], %[[FMA_1]] : vector<4xf32>
-//       CHECK:       %[[LHS_3:.+]] = vector.extract_strided_slice %[[LHS_VECTOR]] {offsets = [3], sizes = [1], strides = [1]}
-//       CHECK:       %[[LHS_3_SCALAR:.+]] = vector.extract %[[LHS_3]][0] : vector<1xf32>
+//       CHECK:       %[[LHS_3_SCALAR:.+]] = vector.extract %[[LHS_VECTOR]][3]
 //       CHECK:       %[[LHS_3_VECTOR:.+]] = splat %[[LHS_3_SCALAR]] : vector<4xf32>
 //       CHECK:       %[[FMA_3:.+]] = vector.fma %[[LHS_3_VECTOR]], %[[RHS_3_VECTOR]], %[[FMA_2]] : vector<4xf32>
 //       CHECK:       vector.transfer_write %[[FMA_3]], %[[ACC_TILE]][%[[IV_Y]], %[[IV_X]]]

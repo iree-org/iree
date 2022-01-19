@@ -115,7 +115,7 @@ void StripSignednessPass::runOnOperation() {
 
   RewritePatternSet patterns(&getContext());
   patterns.insert<GenericTypeConvert>(ctx, converter);
-  populateFuncOpTypeConversionPattern(patterns, converter);
+  populateFunctionLikeTypeConversionPattern<FuncOp>(patterns, converter);
 
   if (failed(applyFullConversion(func, target, std::move(patterns)))) {
     signalPassFailure();

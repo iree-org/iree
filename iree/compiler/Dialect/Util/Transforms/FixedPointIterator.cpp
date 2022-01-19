@@ -87,9 +87,9 @@ void FixedPointIteratorPass::getDependentDialects(
 
 void FixedPointIteratorPass::runOnOperation() {
   MLIRContext *context = &getContext();
-  StringAttr markerName = StringAttr::get("iree.fixedpoint.iteration", context);
+  StringAttr markerName = StringAttr::get(context, "iree.fixedpoint.iteration");
   StringAttr modifiedName =
-      StringAttr::get("iree.fixedpoint.modified", context);
+      StringAttr::get(context, "iree.fixedpoint.modified");
 
   if (getOperation()->hasAttr(markerName)) {
     emitError(getOperation()->getLoc())

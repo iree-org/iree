@@ -72,16 +72,16 @@ static void populateTilingCopyToWorkgroupMemPatterns(
   patterns.insert<linalg::LinalgTilingPattern>(
       linalg::CopyOp::getOperationName(), patterns.getContext(), tilingOptions,
       linalg::LinalgTransformationFilter(
-          {Identifier::get(getCopyToWorkgroupMemoryMarker(),
-                           patterns.getContext())},
-          Identifier::get(getVectorizeMarker(), patterns.getContext())));
+          {StringAttr::get(patterns.getContext(),
+                           getCopyToWorkgroupMemoryMarker())},
+          StringAttr::get(patterns.getContext(), getVectorizeMarker())));
 }
 
 static void populateVectorizationPatterns(RewritePatternSet &patterns) {
   linalg::VectorizationPatterns<linalg::CopyOp>::insert(
       patterns, linalg::LinalgVectorizationOptions(),
-      linalg::LinalgTransformationFilter(Identifier::get(
-          getCopyToWorkgroupMemoryMarker(), patterns.getContext())));
+      linalg::LinalgTransformationFilter(StringAttr::get(
+          patterns.getContext(), getCopyToWorkgroupMemoryMarker())));
 }
 
 // TODO(thomasraoux): Extend this to support smaller vector size as well.

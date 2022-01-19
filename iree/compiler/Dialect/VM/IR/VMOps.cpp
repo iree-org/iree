@@ -109,7 +109,7 @@ void FuncOp::setReflectionAttr(StringRef name, Attribute value) {
     }
   }
   if (!didFind) {
-    attrs.push_back(NamedAttribute(Identifier::get(name, getContext()), value));
+    attrs.push_back(NamedAttribute(StringAttr::get(getContext(), name), value));
     DictionaryAttr::sortInPlace(attrs);
   }
   getOperation()->setAttr("iree.reflection",

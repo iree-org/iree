@@ -30,7 +30,7 @@ static void populateVectorizationPatterns(RewritePatternSet &patterns) {
   MLIRContext *ctx = patterns.getContext();
   linalg::LinalgVectorizationOptions opt;
   linalg::LinalgTransformationFilter f(
-      Identifier::get(getVectorizeMarker(), ctx));
+      StringAttr::get(ctx, getVectorizeMarker()));
   linalg::VectorizationPatterns<linalg::FillOp, linalg::CopyOp,
                                 linalg::GenericOp>::insert(patterns, opt, f);
   patterns.add<linalg::LinalgVectorizationPattern>(
