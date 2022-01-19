@@ -99,8 +99,8 @@ static bool isaTensor(Type t) { return t.isa<TensorType>(); };
 /// Run comprehensive bufferize.
 void IREEComprehensiveBufferizePass::runOnOperation() {
   ModuleOp moduleOp = getOperation();
-  auto options =
-      std::make_unique<linalg::comprehensive_bufferize::BufferizationOptions>();
+  auto options = std::make_unique<
+      linalg::comprehensive_bufferize::AnalysisBufferizationOptions>();
   options->allocationFns =
       std::make_unique<linalg::comprehensive_bufferize::AllocationCallbacks>(
           allocationFn->allocationFn, allocationFn->deallocationFn,

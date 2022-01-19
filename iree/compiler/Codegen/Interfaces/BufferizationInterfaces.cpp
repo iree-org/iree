@@ -24,6 +24,8 @@
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Support/LLVM.h"
 
+using mlir::linalg::comprehensive_bufferize::AnalysisBufferizationOptions;
+using mlir::linalg::comprehensive_bufferize::AnalysisBufferizationState;
 using mlir::linalg::comprehensive_bufferize::BufferizableOpInterface;
 using mlir::linalg::comprehensive_bufferize::BufferizationAliasInfo;
 using mlir::linalg::comprehensive_bufferize::BufferizationState;
@@ -299,8 +301,7 @@ void registerBufferizationInterfaces(DialectRegistry &registry) {
                           DispatchTensorStoreOpInterface>();
 }
 
-void addPostAnalysisTransformations(
-    linalg::comprehensive_bufferize::BufferizationOptions &options) {
+void addPostAnalysisTransformations(AnalysisBufferizationOptions &options) {
   options.addPostAnalysisStep<CreateSubSpanBuffers>();
   options.addPostAnalysisStep<StoreTensorOpAnchoredInitTensorEliminationStep>();
   options.addPostAnalysisStep<InplaceTensorStoreOpAnalysis>();

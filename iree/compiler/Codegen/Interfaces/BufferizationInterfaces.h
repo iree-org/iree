@@ -18,7 +18,7 @@ void registerBufferizationInterfaces(DialectRegistry &registry);
 
 // Method to add all the analysis passes for bufferization.
 void addPostAnalysisTransformations(
-    linalg::comprehensive_bufferize::BufferizationOptions &options);
+    linalg::comprehensive_bufferize::AnalysisBufferizationOptions &options);
 
 }  // namespace iree_compiler
 }  // namespace mlir
