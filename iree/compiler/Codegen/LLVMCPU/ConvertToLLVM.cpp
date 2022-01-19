@@ -688,16 +688,6 @@ void ConvertToLLVMPass::runOnOperation() {
     }
   }
 
-  // math dialect elementry functions -> polynomial form.
-  {
-    OwningRewritePatternList mathPatterns(&getContext());
-    populateMathPolynomialApproximationPatterns(mathPatterns);
-    if (failed(applyPatternsAndFoldGreedily(getOperation(),
-                                            std::move(mathPatterns)))) {
-      return signalPassFailure();
-    }
-  }
-
   const auto &dataLayoutAnalysis = getAnalysis<DataLayoutAnalysis>();
   LowerToLLVMOptions options(&getContext(),
                              dataLayoutAnalysis.getAtOrAbove(module));
