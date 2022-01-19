@@ -35,7 +35,7 @@ if [[ "$POLICY" == "performance" ]]; then
   echo "always_on" > "${MALI_GPU_PATH}/power_policy"
   cat "${MALI_GPU_PATH}/max_freq" > "${MALI_GPU_PATH}/scaling_max_freq"
   cat "${MALI_GPU_PATH}/max_freq" > "${MALI_GPU_PATH}/scaling_min_freq"
-elif [[ "$POLICY" == "ondemand" ]]; then
+elif [[ "$POLICY" == "default" ]]; then
   echo "coarse_demand" > "${MALI_GPU_PATH}/power_policy"
   cat "${MALI_GPU_PATH}/max_freq" > "${MALI_GPU_PATH}/scaling_max_freq"
   cat "${MALI_GPU_PATH}/min_freq" > "${MALI_GPU_PATH}/scaling_min_freq"

@@ -175,6 +175,19 @@ def adb_execute(cmd_args: Sequence[str],
   return execute_cmd(cmd, verbose=verbose)
 
 
+def is_magisk_su():
+  """Returns true if the Android device has a Magisk SU binary."""
+  return "MagiskSU" in adb_execute_and_get_output(["su", "--help"])
+
+
+def adb_execute_as_root(cmd_args: Sequence[str]) -> subprocess.CompletedProcess:
+  """Executes the given command as root."""
+  if is_magisk_su():
+    adb_execute(["su", "-c", android_path, governor])
+  else:
+    adb_execute(["su", "root", android_path, governor])
+
+
 def adb_start_cmd(cmd_args: Sequence[str],
                   relative_dir: str,
                   verbose: bool = False) -> subprocess.Popen:
@@ -547,20 +560,12 @@ def filter_and_run_benchmarks(
   return (benchmark_files, captures, errors)
 
 
-def is_magisk_su():
-  """Returns true if the Android device has a Magisk SU binary."""
-  return "MagiskSU" in adb_execute_and_get_output(["su", "--help"])
-
-
 def set_cpu_frequency_scaling_governor(governor: str):
   git_root = execute_cmd_and_get_output(["git", "rev-parse", "--show-toplevel"])
   cpu_script = os.path.join(git_root, "build_tools", "benchmarks",
                             "set_android_scaling_governor.sh")
   android_path = adb_push_to_tmp_dir(cpu_script)
-  if is_magisk_su():
-    adb_execute(["su", "-c", android_path, governor])
-  else:
-    adb_execute(["su", "root", android_path, governor])
+  adb_execute_as_root([android_path, governor])
 
 
 def set_gpu_frequency_scaling_policy(policy: str):
@@ -577,10 +582,7 @@ def set_gpu_frequency_scaling_policy(policy: str):
     raise RuntimeError(
         f"Unsupported device '{device_model}' for setting GPU scaling policy")
   android_path = adb_push_to_tmp_dir(gpu_script)
-  if is_magisk_su():
-    adb_execute(["su", "-c", android_path, policy])
-  else:
-    adb_execute(["su", "root", android_path, policy])
+  adb_execute_as_root([android_path, policy])
 
 
 def parse_arguments():
@@ -694,7 +696,7 @@ def main(args):
     atexit.register(set_cpu_frequency_scaling_governor, "schedutil")
   if args.pin_gpu_freq:
     set_gpu_frequency_scaling_policy("performance")
-    atexit.register(set_gpu_frequency_scaling_policy, "ondemand")
+    atexit.register(set_gpu_frequency_scaling_policy, "default")
 
   previous_benchmarks = None
   previous_captures = None

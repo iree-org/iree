@@ -26,9 +26,13 @@ readonly ADRENO_MIN_FREQ=$(cat "${ADRENO_GPU_PATH}/devfreq/available_frequencies
 
 # Power levels match available freqencies.
 readonly ADRENO_MAX_PWRLEVEL=0
-readonly ADRENO_MIN_PWRLEVEL=$(expr $(cat "${ADRENO_GPU_PATH}/num_pwrlevels") - 1)
+(( ADRENO_MIN_PWRLEVEL = $(expr $(cat "${ADRENO_GPU_PATH}/num_pwrlevels") - 1 ))
 
-echo "GPU info (before changing power policy):"
+# Idle timers affect governor change and frequncy reset.
+readonly ADRENO_DEFAULT_IDLE_TIMER=80    # ms
+readonly ADRENO_1HOUR_IDLE_TIMER=3600000 # ms
+
+echo "GPU info (before changing frequency scaling policy):"
 echo 'model\t\tcur\t\tmin\t\tmax'
 echo "---------------------------------------------------------"
 paste \
@@ -37,11 +41,11 @@ paste \
   "${ADRENO_GPU_PATH}/devfreq/min_freq" \
   "${ADRENO_GPU_PATH}/devfreq/max_freq"
 
-echo "Setting GPU power policy to ${POLICY}"
+echo "Setting GPU frequency scaling policy to ${POLICY}"
 
 if [[ "$POLICY" == "performance" ]]; then
   echo 1 > "${ADRENO_GPU_PATH}/force_clk_on"
-  echo 3600000 > "${ADRENO_GPU_PATH}/idle_timer"
+  echo ${ADRENO_1HOUR_IDLE_TIMER} > "${ADRENO_GPU_PATH}/idle_timer"
 
   # Some devices only expose the msm-adreno-tz governor, so allow the
   # following to fail.
@@ -53,11 +57,11 @@ if [[ "$POLICY" == "performance" ]]; then
 
   echo ${ADRENO_MAX_PWRLEVEL} > "${ADRENO_GPU_PATH}/max_pwrlevel"
   echo ${ADRENO_MAX_PWRLEVEL} > "${ADRENO_GPU_PATH}/min_pwrlevel"
-elif [[ "$POLICY" == "ondemand" ]]; then
+elif [[ "$POLICY" == "default" ]]; then
   echo 0 > "${ADRENO_GPU_PATH}/force_clk_on"
-  # 80ms is the default idle timer.
-  echo 80 > "${ADRENO_GPU_PATH}/idle_timer"
+  echo ${ADRENO_DEFAULT_IDLE_TIMER} > "${ADRENO_GPU_PATH}/idle_timer"
 
+  # msm-adreno-tz is the default governor for Adreno GPUs.
   echo msm-adreno-tz > "${ADRENO_GPU_PATH}/devfreq/governor"
 
   echo ${ADRENO_MAX_FREQ} > "${ADRENO_GPU_PATH}/devfreq/max_freq"
@@ -66,11 +70,11 @@ elif [[ "$POLICY" == "ondemand" ]]; then
   echo ${ADRENO_MAX_PWRLEVEL} > "${ADRENO_GPU_PATH}/max_pwrlevel"
   echo ${ADRENO_MIN_PWRLEVEL} > "${ADRENO_GPU_PATH}/min_pwrlevel"
 else
-  echo "Unknown power policy: ${POLICY}"
+  echo "Unknown frequency scaling policy: ${POLICY}"
   exit 1
 fi
 
-echo "GPU info (after changing power policy):"
+echo "GPU info (after changing frequency scaling policy):"
 echo 'model\t\tcur\t\tmin\t\tmax'
 echo "---------------------------------------------------------"
 paste \
