@@ -110,11 +110,11 @@ static linalg::ProcInfo getGPUProcessorIdAndCountImpl(OpBuilder &builder,
                                                       unsigned dim) {
   assert(dim < kNumGPUDims && "processor index out of range!");
 
-  std::array<const char *, kNumGPUDims> dimAttr{"x", "y", "z"};
-  StringAttr attr = builder.getStringAttr(dimAttr[dim]);
+  std::array<gpu::Dimension, kNumGPUDims> dimAttr{
+      gpu::Dimension::x, gpu::Dimension::y, gpu::Dimension::z};
   Type indexType = builder.getIndexType();
-  return {builder.create<GPUIdOp>(loc, indexType, attr),
-          builder.create<GPUCountOp>(loc, indexType, attr)};
+  return {builder.create<GPUIdOp>(loc, indexType, dimAttr[dim]),
+          builder.create<GPUCountOp>(loc, indexType, dimAttr[dim])};
 }
 
 template <>
@@ -122,13 +122,15 @@ linalg::ProcInfo getGPUProcessorIdAndCountImpl<GPUGlobalId, GPUGlobalCount>(
     OpBuilder &builder, Location loc, unsigned dim) {
   assert(dim < kNumGPUDims && "processor index out of range!");
 
-  std::array<const char *, kNumGPUDims> dimAttr{"x", "y", "z"};
-  StringAttr attr = builder.getStringAttr(dimAttr[dim]);
+  std::array<gpu::Dimension, kNumGPUDims> dimAttr{
+      gpu::Dimension::x, gpu::Dimension::y, gpu::Dimension::z};
   Type indexType = builder.getIndexType();
-  Value gridDim = builder.create<gpu::GridDimOp>(loc, indexType, attr);
-  Value blockId = builder.create<gpu::BlockIdOp>(loc, indexType, attr);
-  Value blockDim = builder.create<gpu::BlockDimOp>(loc, indexType, attr);
-  Value threadId = builder.create<gpu::ThreadIdOp>(loc, indexType, attr);
+  Value gridDim = builder.create<gpu::GridDimOp>(loc, indexType, dimAttr[dim]);
+  Value blockId = builder.create<gpu::BlockIdOp>(loc, indexType, dimAttr[dim]);
+  Value blockDim =
+      builder.create<gpu::BlockDimOp>(loc, indexType, dimAttr[dim]);
+  Value threadId =
+      builder.create<gpu::ThreadIdOp>(loc, indexType, dimAttr[dim]);
   // TODO(ravishankarm): Using affine_maps here would be beneficial, and we can
   // do this because the blockDim is constant. But this would lead to an
   // ordering issue cause it assumes that the workgroup size has already been

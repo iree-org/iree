@@ -130,12 +130,12 @@ static Value createFlatId(FuncOp funcOp, ArrayRef<int64_t> workgroupSize) {
   AffineExpr d0 = getAffineDimExpr(0, b.getContext());
   AffineExpr d1 = getAffineDimExpr(1, b.getContext());
   AffineExpr d2 = getAffineDimExpr(2, b.getContext());
-  Value threadX = b.create<gpu::ThreadIdOp>(funcOp.getLoc(), indexType,
-                                            b.getStringAttr("x"));
-  Value threadY = b.create<gpu::ThreadIdOp>(funcOp.getLoc(), indexType,
-                                            b.getStringAttr("y"));
-  Value threadZ = b.create<gpu::ThreadIdOp>(funcOp.getLoc(), indexType,
-                                            b.getStringAttr("z"));
+  Value threadX =
+      b.create<gpu::ThreadIdOp>(funcOp.getLoc(), indexType, gpu::Dimension::x);
+  Value threadY =
+      b.create<gpu::ThreadIdOp>(funcOp.getLoc(), indexType, gpu::Dimension::y);
+  Value threadZ =
+      b.create<gpu::ThreadIdOp>(funcOp.getLoc(), indexType, gpu::Dimension::z);
   Value flatThreadId = makeComposedAffineApply(
       b, funcOp.getLoc(),
       d0 + workgroupSize[0] * d1 + (workgroupSize[0] * workgroupSize[1]) * d2,

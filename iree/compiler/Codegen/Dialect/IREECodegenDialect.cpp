@@ -37,25 +37,6 @@ void IREECodegenDialect::initialize() {
   addInterfaces<IREECodegenDialectOpAsmInterface>();
 }
 
-Attribute IREECodegenDialect::parseAttribute(DialectAsmParser &parser,
-                                             Type type) const {
-  StringRef mnemonic;
-  if (failed(parser.parseKeyword(&mnemonic))) return {};
-  Attribute genAttr;
-  OptionalParseResult parseResult =
-      parseCodegenAttrs(parser, mnemonic, type, genAttr);
-  if (parseResult.hasValue()) return genAttr;
-  parser.emitError(parser.getNameLoc(), "unknown iree_codegen attribute");
-  return Attribute();
-}
-
-void IREECodegenDialect::printAttribute(Attribute attr,
-                                        DialectAsmPrinter &p) const {
-  if (failed(printCodegenAttrs(attr, p))) {
-    llvm_unreachable("unhandled iree_codegen attribute");
-  }
-}
-
 }  // namespace Codegen
 }  // namespace IREE
 }  // namespace iree_compiler
