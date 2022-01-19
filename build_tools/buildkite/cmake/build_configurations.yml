@@ -7,15 +7,11 @@
 steps:
   - label: ":zap: Build with tracing enabled"
     commands: |
-      cd ${BUILDKITE_BUILD_CHECKOUT_PATH}
-      git clone https://github.com/google/iree .
-      git submodule sync && git submodule update --init --jobs 8 --depth 1
       docker run --user=$(id -u):$(id -g) --volume=\$PWD:\$IREE_DOCKER_WORKDIR --workdir=\$IREE_DOCKER_WORKDIR --rm gcr.io/iree-oss/base@sha256:61f948eb15c90596b9faabbca168de2c7d5008e5d2c0b9c5c26a0efe572198d6 ./build_tools/cmake/build_tracing.sh
     env:
       IREE_DOCKER_WORKDIR: "/usr/src/github/iree"
-      BUILDKITE_REPO: ""
     agents:
-      - "queue=build"
+      - "queue=build-gcmn-test"
 
   - label: ":hammer_and_wrench: Build the runtime only"
     commands:
