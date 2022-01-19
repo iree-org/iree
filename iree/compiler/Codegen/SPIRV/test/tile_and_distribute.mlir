@@ -35,8 +35,8 @@ hal.executable private @matmul {
         %c4 = arith.constant 4 : index
         %c1 = arith.constant 1 : index
         %0 = memref.dim %arg0, %c1 : memref<?x?xf32>
-        %1 = "gpu.block_id"() {dimension = "x"} : () -> index
-        %2 = "gpu.block_id"() {dimension = "y"} : () -> index
+        %1 = gpu.block_id x
+        %2 = gpu.block_id y
         scf.for %arg3 = %c0 to %0 step %c4 {
           %3 = affine.apply #map0()[%2]
           %4 = memref.dim %arg0, %c0 : memref<?x?xf32>
@@ -67,10 +67,10 @@ hal.executable private @matmul {
 // CHECK-LABEL: func @matmul
 //   CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
 //   CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
-//   CHECK-DAG:   %[[TIDX:.+]] = "gpu.thread_id"() {dimension = "x"}
-//   CHECK-DAG:   %[[TIDY:.+]] = "gpu.thread_id"() {dimension = "y"}
-//   CHECK-DAG:   %[[BDIMX:.+]] = "gpu.block_dim"() {dimension = "x"}
-//   CHECK-DAG:   %[[BDIMY:.+]] = "gpu.block_dim"() {dimension = "y"}
+//   CHECK-DAG:   %[[TIDX:.+]] = gpu.thread_id x
+//   CHECK-DAG:   %[[TIDY:.+]] = gpu.thread_id y
+//   CHECK-DAG:   %[[BDIMX:.+]] = gpu.block_dim x
+//   CHECK-DAG:   %[[BDIMY:.+]] = gpu.block_dim y
 //       CHECK:     scf.for %{{.+}} = %[[TIDY]] to %{{.*}} step %[[BDIMY]]
 //       CHECK:       scf.for %{{.+}} = %[[TIDX]] to %{{.*}} step %[[BDIMX]]
 //       CHECK:         scf.for %{{.+}} = %[[C0]] to %{{.*}} step %[[C1]]
@@ -100,9 +100,9 @@ hal.executable private @conv_1d {
         %0 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : memref<3x6x1xf32>
         %1 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<3x8x1xf32>
         %2 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<3x1x1xf32>
-        %3 = "gpu.block_id"() {dimension = "x"} : () -> index
-        %4 = "gpu.block_id"() {dimension = "y"} : () -> index
-        %5 = "gpu.block_id"() {dimension = "z"} : () -> index
+        %3 = gpu.block_id x
+        %4 = gpu.block_id y
+        %5 = gpu.block_id z 
         %6 = affine.apply affine_map<()[s0] -> (s0 * 4)>()[%4]
         %7 = affine.min affine_map<()[s0] -> (6, s0 * -4 + 8)>()[%4]
         %8 = memref.subview %1[%5, %6, 0] [1, %7, 1] [1, 1, 1] : memref<3x8x1xf32> to memref<1x?x1xf32, affine_map<(d0, d1, d2)[s0] -> (d0 * 8 + s0 + d1 + d2)>>
@@ -131,12 +131,12 @@ hal.executable private @conv_1d {
 //       CHECK-DAG: %[[ARG0SV1:.+]] = memref.subview %[[ARG0]]
 //       CHECK-DAG: %[[ARG1SV1:.+]] = memref.subview %[[ARG1]]
 //       CHECK-DAG: %[[RETSV1:.+]] = memref.subview %[[RET]]
-//       CHECK: %[[TIDX:.+]] = "gpu.thread_id"() {dimension = "x"}
-//       CHECK: %[[BDIMX:.+]] = "gpu.block_dim"() {dimension = "x"}
-//       CHECK: %[[TIDY:.+]] = "gpu.thread_id"() {dimension = "y"}
-//       CHECK: %[[BDIMY:.+]] = "gpu.block_dim"() {dimension = "y"}
-//       CHECK: %[[TIDZ:.+]] = "gpu.thread_id"() {dimension = "z"}
-//       CHECK: %[[BDIMZ:.+]] = "gpu.block_dim"() {dimension = "z"}
+//       CHECK: %[[TIDX:.+]] = gpu.thread_id x
+//       CHECK: %[[BDIMX:.+]] = gpu.block_dim x
+//       CHECK: %[[TIDY:.+]] = gpu.thread_id y
+//       CHECK: %[[BDIMY:.+]] = gpu.block_dim y
+//       CHECK: %[[TIDZ:.+]] = gpu.thread_id z
+//       CHECK: %[[BDIMZ:.+]] = gpu.block_dim z
 //       CHECK: scf.for %[[IV_Z:.+]] = %[[TIDZ]] to %{{.*}} step %[[BDIMZ]]
 //       CHECK:   scf.for %[[IV_Y:.+]] = %[[TIDY]] to %{{.*}} step %[[BDIMY]]
 //       CHECK:     scf.for %[[IV_X:.+]] = %[[TIDX]] to %{{.*}} step %[[BDIMX]]
@@ -196,12 +196,12 @@ hal.executable private @conv_2d {
         %2 = memref.dim %arg1, %c0 : memref<?x?x?x?xf32>
         %3 = memref.dim %arg2, %c1 : memref<?x?x?x?xf32>
         %4 = memref.dim %arg2, %c2 : memref<?x?x?x?xf32>
-        %5 = "gpu.block_id"() {dimension = "x"} : () -> index
-        %6 = "gpu.grid_dim"() {dimension = "x"} : () -> index
-        %7 = "gpu.block_id"() {dimension = "y"} : () -> index
-        %8 = "gpu.grid_dim"() {dimension = "y"} : () -> index
-        %9 = "gpu.block_id"() {dimension = "z"} : () -> index
-        %10 = "gpu.grid_dim"() {dimension = "z"} : () -> index
+        %5 = gpu.block_id x
+        %6 = gpu.grid_dim x
+        %7 = gpu.block_id y
+        %8 = gpu.grid_dim y
+        %9 = gpu.block_id z 
+        %10 = gpu.grid_dim z
         %11 = affine.apply #map0()[%7]
         %12 = affine.apply #map0()[%8]
         %13 = affine.apply #map1()[%5]
@@ -250,12 +250,12 @@ hal.executable private @conv_2d {
 //     CHECK-DAG:   %[[C4:.+]] = arith.constant 4
 //         CHECK:   %[[INPUT_BLOCK:.+]] = memref.subview %[[ARG1]]
 //         CHECK:   %[[OUTPUT_BLOCK:.+]] = memref.subview %[[RET0]]
-//     CHECK-DAG:   %[[TIDX:.+]] = "gpu.thread_id"() {dimension = "x"}
-//     CHECK-DAG:   %[[TIDY:.+]] = "gpu.thread_id"() {dimension = "y"}
-//     CHECK-DAG:   %[[TIDZ:.+]] = "gpu.thread_id"() {dimension = "z"}
-//     CHECK-DAG:   %[[BDIMX:.+]] = "gpu.block_dim"() {dimension = "x"}
-//     CHECK-DAG:   %[[BDIMY:.+]] = "gpu.block_dim"() {dimension = "y"}
-//     CHECK-DAG:   %[[BDIMZ:.+]] = "gpu.block_dim"() {dimension = "z"}
+//     CHECK-DAG:   %[[TIDX:.+]] = gpu.thread_id x
+//     CHECK-DAG:   %[[TIDY:.+]] = gpu.thread_id y
+//     CHECK-DAG:   %[[TIDZ:.+]] = gpu.thread_id z
+//     CHECK-DAG:   %[[BDIMX:.+]] = gpu.block_dim x
+//     CHECK-DAG:   %[[BDIMY:.+]] = gpu.block_dim y
+//     CHECK-DAG:   %[[BDIMZ:.+]] = gpu.block_dim z
 //         CHECK:   scf.for %[[IV_Z:.+]] = %[[TIDZ]] to %{{.*}} step %[[BDIMZ]]
 //         CHECK:     scf.for %[[IV_Y:.+]] = %[[TIDY]] to %{{.*}} step %[[BDIMY]]
 //         CHECK:       scf.for %[[IV_X:.+]] = %[[TIDX]] to %{{.*}} step %[[BDIMX]]
@@ -295,9 +295,9 @@ hal.executable private @conv_3d {
         %0 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : memref<2x7x7x7x2xf32>
         %1 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<2x8x8x8x3xf32>
         %2 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<2x2x2x3x2xf32>
-        %3 = "gpu.block_id"() {dimension = "x"} : () -> index
-        %4 = "gpu.block_id"() {dimension = "y"} : () -> index
-        %5 = "gpu.block_id"() {dimension = "z"} : () -> index
+        %3 = gpu.block_id x
+        %4 = gpu.block_id y
+        %5 = gpu.block_id z 
         %6 = affine.apply affine_map<()[s0] -> (s0 * 4)>()[%4]
         %7 = affine.min affine_map<()[s0] -> (5, s0 * -4 + 8)>()[%4]
         %8 = affine.apply affine_map<()[s0] -> (s0 * 32)>()[%3]
@@ -319,12 +319,12 @@ hal.executable private @conv_3d {
 }
 
 //   CHECK-LABEL: func @conv_3d
-//     CHECK-DAG:   %[[TIDX:.+]] = "gpu.thread_id"() {dimension = "x"}
-//     CHECK-DAG:   %[[TIDY:.+]] = "gpu.thread_id"() {dimension = "y"}
-//     CHECK-DAG:   %[[TIDZ:.+]] = "gpu.thread_id"() {dimension = "z"}
-//     CHECK-DAG:   %[[BDIMX:.+]] = "gpu.block_dim"() {dimension = "x"}
-//     CHECK-DAG:   %[[BDIMY:.+]] = "gpu.block_dim"() {dimension = "y"}
-//     CHECK-DAG:   %[[BDIMZ:.+]] = "gpu.block_dim"() {dimension = "z"}
+//     CHECK-DAG:   %[[TIDX:.+]] = gpu.thread_id x
+//     CHECK-DAG:   %[[TIDY:.+]] = gpu.thread_id y
+//     CHECK-DAG:   %[[TIDZ:.+]] = gpu.thread_id z
+//     CHECK-DAG:   %[[BDIMX:.+]] = gpu.block_dim x
+//     CHECK-DAG:   %[[BDIMY:.+]] = gpu.block_dim y
+//     CHECK-DAG:   %[[BDIMZ:.+]] = gpu.block_dim z
 //         CHECK:   scf.for %[[IV0:.+]] = %[[TIDZ]] to %{{.*}} step %[[BDIMZ]]
 //         CHECK:     scf.for %[[IV1:.+]] = %[[TIDY]] to %{{.*}} step %[[BDIMY]]
 //         CHECK:       scf.for %[[IV2:.+]] = %[[TIDX]] to %{{.*}} step %[[BDIMX]]
@@ -365,8 +365,8 @@ module  {
           %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<2x16x16x6xf32>
           %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<3x4xf32>
           %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : memref<2x14x13x6xf32>
-          %3 = "gpu.block_id"() {dimension = "x"} : () -> index
-          %4 = "gpu.block_id"() {dimension = "y"} : () -> index
+          %3 = gpu.block_id x
+          %4 = gpu.block_id y
           %5 = affine.apply #map0()[%4]
           %6 = affine.min #map1()[%4]
           %7 = affine.apply #map2()[%3]
@@ -393,12 +393,12 @@ module  {
 //     CHECK-DAG:   %[[RET0:.+]] = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer)
 //         CHECK:   %[[SV1:.+]] = memref.subview %[[ARG0]]
 //         CHECK:   %[[SV2:.+]] = memref.subview %[[RET0]]
-//     CHECK-DAG:   %[[TIDX:.+]] = "gpu.thread_id"() {dimension = "x"}
-//     CHECK-DAG:   %[[TIDY:.+]] = "gpu.thread_id"() {dimension = "y"}
-//     CHECK-DAG:   %[[TIDZ:.+]] = "gpu.thread_id"() {dimension = "z"}
-//     CHECK-DAG:   %[[BDIMX:.+]] = "gpu.block_dim"() {dimension = "x"}
-//     CHECK-DAG:   %[[BDIMY:.+]] = "gpu.block_dim"() {dimension = "y"}
-//     CHECK-DAG:   %[[BDIMZ:.+]] = "gpu.block_dim"() {dimension = "z"}
+//     CHECK-DAG:   %[[TIDX:.+]] = gpu.thread_id x
+//     CHECK-DAG:   %[[TIDY:.+]] = gpu.thread_id y
+//     CHECK-DAG:   %[[TIDZ:.+]] = gpu.thread_id z
+//     CHECK-DAG:   %[[BDIMX:.+]] = gpu.block_dim x
+//     CHECK-DAG:   %[[BDIMY:.+]] = gpu.block_dim y
+//     CHECK-DAG:   %[[BDIMZ:.+]] = gpu.block_dim z
 //         CHECK:   scf.for %[[IV0:.+]] = %[[TIDZ]] to %{{.*}} step %[[BDIMZ]]
 //         CHECK:     scf.for %[[IV1:.+]] = %[[TIDY]] to %{{.*}} step %[[BDIMY]]
 //         CHECK:       scf.for %[[IV2:.+]] = %[[TIDX]] to %{{.*}} step %[[BDIMX]]

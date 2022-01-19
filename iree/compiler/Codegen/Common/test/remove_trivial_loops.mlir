@@ -19,8 +19,8 @@ hal.executable private @dispatch_0  {
         %c256 = arith.constant 256 : index
         //     CHECK: %[[C250:.+]] = arith.constant 250 : index
         %c250 = arith.constant 250 : index
-        %tidx = "gpu.thread_id"() {dimension = "x"} : () -> index
-        %tidy = "gpu.thread_id"() {dimension = "y"} : () -> index
+        %tidx = gpu.thread_id x
+        %tidy = gpu.thread_id y
         // CHECK-NOT: scf.for
         //     CHECK: gpu.barrier
         scf.for %arg3 = %tidy to %c2 step %c2 {
@@ -151,13 +151,13 @@ hal.executable private @both_workgroup_and_workitem  {
             scf.for %arg2 = %6 to %c32 step %7 {
 
               // Additional loops distributed to workitems.
-              %18 = "gpu.thread_id"() {dimension = "y"} : () -> index
-              %19 = "gpu.block_dim"() {dimension = "y"} : () -> index
+              %18 = gpu.thread_id y
+              %19 = gpu.block_dim y
               %20 = affine.apply affine_map<()[s0] -> (s0 * 4)>()[%18]
               %21 = affine.apply affine_map<()[s0] -> (s0 * 4)>()[%19]
               scf.for %arg3 = %20 to %c8 step %21 {
-                %22 = "gpu.thread_id"() {dimension = "x"} : () -> index
-                %23 = "gpu.block_dim"() {dimension = "x"} : () -> index
+                %22 = gpu.thread_id x
+                %23 = gpu.block_dim x
                 %24 = affine.apply affine_map<()[s0] -> (s0 * 4)>()[%22]
                 %25 = affine.apply affine_map<()[s0] -> (s0 * 4)>()[%23]
                 scf.for %arg4 = %24 to %c32 step %25 {

@@ -20,12 +20,12 @@ module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.0, [Shader], [SP
     // CHECK-DAG: %[[C0:.+]] = arith.constant 0 : index
     // CHECK: %[[ALLOC:.+]] = memref.alloc() : memref<128x32xf32, 3>
     // CHECK: %[[DST:.+]]  = memref.subview %{{.+}}[0, 0] [128, 32] [1, 1]  : memref<4096x4096xf32> to memref<128x32xf32, #map0>
-    // CHECK: %[[TIDx:.+]] = "gpu.thread_id"() {dimension = "x"} : () -> index
-    // CHECK: %[[DIMx:.+]] = "gpu.block_dim"() {dimension = "x"} : () -> index
-    // CHECK: %[[TIDy:.+]] = "gpu.thread_id"() {dimension = "y"} : () -> index
-    // CHECK: %[[DIMy:.+]] = "gpu.block_dim"() {dimension = "y"} : () -> index
-    // CHECK: %[[TIDz:.+]] = "gpu.thread_id"() {dimension = "z"} : () -> index
-    // CHECK: %[[DIMz:.+]] = "gpu.block_dim"() {dimension = "z"} : () -> index
+    // CHECK: %[[TIDx:.+]] = gpu.thread_id x
+    // CHECK: %[[DIMx:.+]] = gpu.block_dim x
+    // CHECK: %[[TIDy:.+]] = gpu.thread_id y
+    // CHECK: %[[DIMy:.+]] = gpu.block_dim y
+    // CHECK: %[[TIDz:.+]] = gpu.thread_id z
+    // CHECK: %[[DIMz:.+]] = gpu.block_dim z
     // CHECK: %[[LIDz:.+]] = arith.muli %[[TIDz]], %[[DIMy]] : index
     // CHECK: %[[LIDzy:.+]] = arith.addi %[[LIDz]], %[[TIDy]] : index
     // CHECK: %[[DIMzy:.+]] = arith.muli %[[DIMz]], %[[DIMy]] : index

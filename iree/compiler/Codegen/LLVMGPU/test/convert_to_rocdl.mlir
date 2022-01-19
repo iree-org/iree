@@ -6,9 +6,9 @@ func @abs_ex_dispatch_0() {
   %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<16xf32>
   %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<16xf32>
   %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : memref<16xf32>
-  %3 = "gpu.block_id"() {dimension = "x"} : () -> index
-  %4 = "gpu.block_dim"() {dimension = "x"} : () -> index
-  %5 = "gpu.thread_id"() {dimension = "x"} : () -> index
+  %3 = gpu.block_id x
+  %4 = gpu.block_dim x
+  %5 = gpu.thread_id x
   %6 = arith.muli %3, %4 : index
   %7 = arith.addi %6, %5 : index
   %9 = memref.load %1[%7] : memref<16xf32>

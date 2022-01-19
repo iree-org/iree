@@ -32,9 +32,9 @@ hal.executable private @shared_mem_cpy  {
     // CHECK-DAG: %[[C2:.*]] = arith.constant 2 : index
     // CHECK-DAG: %[[C1:.*]] = arith.constant 1 : index
     // CHECK-DAG: %[[C0:.*]] = arith.constant 0 : index
-    // CHECK-DAG: %[[TX:.*]] = "gpu.thread_id"() {dimension = "x"} : () -> index
-    // CHECK-DAG: %[[TY:.*]] = "gpu.thread_id"() {dimension = "y"} : () -> index
-    // CHECK-DAG: %[[TZ:.*]] = "gpu.thread_id"() {dimension = "z"} : () -> index
+    // CHECK-DAG: %[[TX:.*]] = gpu.thread_id x
+    // CHECK-DAG: %[[TY:.*]] = gpu.thread_id y
+    // CHECK-DAG: %[[TZ:.*]] = gpu.thread_id z
 
     // CHECK-DAG: %[[Y0:.*]] = affine.apply #[[$MAP0]]()[%[[TX]], %[[TY]], %[[TZ]]]
     // CHECK-DAG: %[[X0:.*]] = affine.apply #[[$MAP1]]()[%[[TX]]]

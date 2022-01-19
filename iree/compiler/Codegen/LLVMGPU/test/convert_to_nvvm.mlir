@@ -7,9 +7,9 @@ func @abs_ex_dispatch_0() {
   %0 = hal.interface.binding.subspan set(0) binding(4) type(storage_buffer) offset(%c128) : memref<16xf32>
   %1 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<16xi32>
   %2 = hal.interface.binding.subspan set(1) binding(2) type(storage_buffer) : memref<16xf32>
-  %3 = "gpu.block_id"() {dimension = "x"} : () -> index
-  %4 = "gpu.block_dim"() {dimension = "x"} : () -> index
-  %5 = "gpu.thread_id"() {dimension = "x"} : () -> index
+  %3 = gpu.block_id x
+  %4 = gpu.block_dim x
+  %5 = gpu.thread_id x
   %6 = arith.muli %3, %4 : index
   %7 = arith.addi %6, %5 : index
   %9 = memref.load %0[%7] : memref<16xf32>
@@ -42,9 +42,9 @@ func @abs_dynamic() {
   %0 = hal.interface.binding.subspan set(0) binding(4) type(storage_buffer) offset(%c128) : memref<?xf32>{%s}
   %1 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<16xi32>
   %2 = hal.interface.binding.subspan set(1) binding(2) type(storage_buffer) : memref<16xf32>
-  %3 = "gpu.block_id"() {dimension = "x"} : () -> index
-  %4 = "gpu.block_dim"() {dimension = "x"} : () -> index
-  %5 = "gpu.thread_id"() {dimension = "x"} : () -> index
+  %3 = gpu.block_id x
+  %4 = gpu.block_dim x
+  %5 = gpu.thread_id x
   %6 = arith.muli %3, %4 : index
   %7 = arith.addi %6, %5 : index
   %9 = memref.load %0[%7] : memref<?xf32>
@@ -78,9 +78,9 @@ func @dead_symbol() {
   %c128 = arith.constant 128 : index
   %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<16xi32>
   %2 = hal.interface.binding.subspan set(1) binding(2) type(storage_buffer) : memref<16xf32>
-  %3 = "gpu.block_id"() {dimension = "x"} : () -> index
-  %4 = "gpu.block_dim"() {dimension = "x"} : () -> index
-  %5 = "gpu.thread_id"() {dimension = "x"} : () -> index
+  %3 = gpu.block_id x
+  %4 = gpu.block_dim x
+  %5 = gpu.thread_id x
   %6 = arith.muli %3, %4 : index
   %7 = arith.addi %6, %5 : index
   %10 = memref.load %1[%7] : memref<16xi32>
@@ -105,9 +105,9 @@ func @mixed_type() {
   %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c128) : memref<16xf32>
   %1 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) : memref<16xi32>
   %2 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<16xf32>
-  %3 = "gpu.block_id"() {dimension = "x"} : () -> index
-  %4 = "gpu.block_dim"() {dimension = "x"} : () -> index
-  %5 = "gpu.thread_id"() {dimension = "x"} : () -> index
+  %3 = gpu.block_id x
+  %4 = gpu.block_dim x
+  %5 = gpu.thread_id x
   %6 = arith.muli %3, %4 : index
   %7 = arith.addi %6, %5 : index
   %9 = memref.load %0[%7] : memref<16xf32>

@@ -15,8 +15,8 @@ func @dot() {
   %5 = memref.subview %0[%3, 0] [64, 1024] [1, 1] : memref<2048x1024xf32> to memref<64x1024xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
   %6 = memref.subview %1[0, %4] [1024, 64] [1, 1] : memref<1024x512xf32> to memref<1024x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 512 + s0 + d1)>>
   %7 = memref.subview %2[%3, %4] [64, 64] [1, 1] : memref<2048x512xf32> to memref<64x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 512 + s0 + d1)>>
-  %8 = "gpu.thread_id"() {dimension = "x"} : () -> index
-  %9 = "gpu.thread_id"() {dimension = "y"} : () -> index
+  %8 = gpu.thread_id x
+  %9 = gpu.thread_id y
   %10 = affine.apply affine_map<()[s0] -> (s0 * 32)>()[%9]
   %11 = affine.apply affine_map<(d0) -> ((d0 floordiv 32) * 32)>(%8)
   %12 = memref.subview %7[%10, %11] [32, 32] [1, 1] : memref<64x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 512 + s0 + d1)>> to memref<32x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 512 + s0 + d1)>>

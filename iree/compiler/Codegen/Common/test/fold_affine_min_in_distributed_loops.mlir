@@ -72,8 +72,8 @@ func @loop_distributed_to_workitem_x() -> index {
   // CHECK: %[[C32:.+]] = arith.constant 32 : index
   %c32 = arith.constant 32 : index
 
-  %workitem_id_x = "gpu.thread_id"() {dimension = "x"} : () -> index
-  %workitem_count_x = "gpu.block_dim"() {dimension = "x"} : () -> index
+  %workitem_id_x = gpu.thread_id x
+  %workitem_count_x = gpu.block_dim x
 
   %0 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workitem_id_x, %c32]
   %1 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workitem_count_x, %c32]
@@ -94,8 +94,8 @@ func @loop_distributed_to_workitem_y() -> index {
   // CHECK: %[[C32:.+]] = arith.constant 32 : index
   %c32 = arith.constant 32 : index
 
-  %workitem_id_y = "gpu.thread_id"() {dimension = "y"} : () -> index
-  %workitem_count_y = "gpu.block_dim"() {dimension = "y"} : () -> index
+  %workitem_id_y = gpu.thread_id y
+  %workitem_count_y = gpu.block_dim y
 
   %0 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workitem_id_y, %c32]
   %1 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workitem_count_y, %c32]
@@ -116,8 +116,8 @@ func @loop_distributed_to_workitem_z() -> index {
   // CHECK: %[[C32:.+]] = arith.constant 32 : index
   %c32 = arith.constant 32 : index
 
-  %workitem_id_z = "gpu.thread_id"() {dimension = "z"} : () -> index
-  %workitem_count_z = "gpu.block_dim"() {dimension = "z"} : () -> index
+  %workitem_id_z = gpu.thread_id z
+  %workitem_count_z = gpu.block_dim z
 
   %0 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workitem_id_z, %c32]
   %1 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workitem_count_z, %c32]
