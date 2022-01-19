@@ -253,7 +253,7 @@ func @tile_4d_generic_op_alone
 //  CHECK-DAG:   %[[D3:.+]] = tensor.dim %[[ARG0]], %[[C3]]
 //  CHECK-DAG:   %[[WG_SISE_2:.+]] = flow.dispatch.workgroup.size[2] : index
 //  CHECK-DAG:   %[[WG_ID_2:.+]] = flow.dispatch.workgroup.id[2] : index
-//  CHECK-DAG:   flow.dispatch.workgroups[%[[D2]], %[[D1]], %[[D0]]]
+//  CHECK-DAG:   flow.dispatch.workgroups[%[[D3]], %[[D2]], %[[D1]]]
 //  CHECK-DAG:   %[[D4:.+]] = affine.apply #[[MAP0]]()[%[[WG_ID_2]], %[[WG_SISE_2]]]
 
 // -----
@@ -1056,21 +1056,23 @@ func @scatter_static(%arg0 : tensor<4xi32>, %arg1 : tensor<4x1xi32>, %arg2 : ten
 
 // Check that we are distributing along the last three dimensions for NHWC-output pooling op.
 
-func @pooling_nwhc_sum_static(%input: tensor<1x33x33x160xf32>) -> tensor<1x1x1x160xf32> {
+func @pooling_nwhc_sum_static(%input: tensor<1x33x33x160xf32>) -> tensor<1x3x3x160xf32> {
   %cst = arith.constant 0.0 : f32
-  %1 = linalg.init_tensor [1, 1, 1, 160] : tensor<1x1x1x160xf32>
-  %2 = linalg.fill(%cst, %1) : f32, tensor<1x1x1x160xf32> -> tensor<1x1x1x160xf32>
-  %3 = linalg.init_tensor [33, 33] : tensor<33x33xf32>
-  %4 = linalg.pooling_nhwc_sum {dilations = dense<1> : vector<2xi64>, strides = dense<33> : vector<2xi64>} ins(%input, %3 : tensor<1x33x33x160xf32>, tensor<33x33xf32>) outs(%2 : tensor<1x1x1x160xf32>) -> tensor<1x1x1x160xf32>
-  return %4 : tensor<1x1x1x160xf32>
+  %1 = linalg.init_tensor [1, 3, 3, 160] : tensor<1x3x3x160xf32>
+  %2 = linalg.fill(%cst, %1) : f32, tensor<1x3x3x160xf32> -> tensor<1x3x3x160xf32>
+  %3 = linalg.init_tensor [11, 11] : tensor<11x11xf32>
+  %4 = linalg.pooling_nhwc_sum {dilations = dense<1> : vector<2xi64>, strides = dense<11> : vector<2xi64>} ins(%input, %3 : tensor<1x33x33x160xf32>, tensor<11x11xf32>) outs(%2 : tensor<1x3x3x160xf32>) -> tensor<1x3x3x160xf32>
+  return %4 : tensor<1x3x3x160xf32>
 }
 
 // CHECK-LABEL: func @pooling_nwhc_sum_static
 //       CHECK:   flow.dispatch.workgroups
-//  CHECK-NEXT:   (%{{.+}}: !flow.dispatch.tensor<readonly:1x33x33x160xf32>, %[[OUTPUT:.+]]: !flow.dispatch.tensor<writeonly:1x1x1x160xf32>)
-//       CHECK:     scf.for %[[X:.+]] =
-//       CHECK:       %[[POOL:.+]] = linalg.pooling_nhwc_sum
-//       CHECK:       flow.dispatch.tensor.store %[[POOL]], %[[OUTPUT]], offsets = [0, 0, 0, %[[X]]], sizes = [1, 1, 1, %{{.+}}]
+//  CHECK-NEXT:   (%{{.+}}: !flow.dispatch.tensor<readonly:1x33x33x160xf32>, %[[OUTPUT:.+]]: !flow.dispatch.tensor<writeonly:1x3x3x160xf32>)
+//       CHECK:     scf.for %[[Z:.+]] =
+//       CHECK:       scf.for %[[Y:.+]] =
+//       CHECK:         scf.for %[[X:.+]] =
+//       CHECK:           %[[POOL:.+]] = linalg.pooling_nhwc_sum
+//       CHECK:           flow.dispatch.tensor.store %[[POOL]], %[[OUTPUT]], offsets = [0, %[[Z]], %[[Y]], %[[X]]], sizes = [1, %{{.+}}, %{{.+}}, %{{.+}}]
 
 // -----
 
@@ -1277,15 +1279,18 @@ func @unit_dim_generic(%arg0 : tensor<1x?x1x1x?x?x1x?xf32>,
 //  CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
 //  CHECK-DAG:   %[[C4:.+]] = arith.constant 4 : index
 //  CHECK-DAG:   %[[C5:.+]] = arith.constant 5 : index
+//  CHECK-DAG:   %[[C7:.+]] = arith.constant 7 : index
 //  CHECK-DAG:   %[[D1:.+]] = tensor.dim %[[ARG0]], %[[C1]]
 //  CHECK-DAG:   %[[D4:.+]] = tensor.dim %[[ARG0]], %[[C4]]
 //  CHECK-DAG:   %[[D5:.+]] = tensor.dim %[[ARG0]], %[[C5]]
-//      CHECK:   flow.dispatch.workgroups[%[[D5]], %[[D4]], %[[D1]]]
-// CHECK-SAME:       (%[[ARG0]], %[[D1]], %[[D4]], %[[D5]]
+//  CHECK-DAG:   %[[D7:.+]] = tensor.dim %[[ARG0]], %[[C7]]
+//      CHECK:   flow.dispatch.workgroups[%[[D7]], %[[D5]], %[[D4]]]
+// CHECK-SAME:       (%[[ARG0]], %[[D1]], %[[D4]], %[[D5]], %[[D7]]
 // CHECK-NEXT:      %[[ARG2:[a-zA-Z0-9]+]]: !flow.dispatch.tensor<readwrite:1x?x1x1x?x?x1x?xf32>
 // CHECK-SAME:      %[[ARG3:[a-zA-Z0-9]+]]: index
 // CHECK-SAME:      %[[ARG4:[a-zA-Z0-9]+]]: index
 // CHECK-SAME:      %[[ARG5:[a-zA-Z0-9]+]]: index
+// CHECK-SAME:      %[[ARG6:[a-zA-Z0-9]+]]: index
 //  CHECK-DAG:     %[[WG_SIZE_X:.+]] = flow.dispatch.workgroup.size[0] : index
 //  CHECK-DAG:     %[[WG_SIZE_Y:.+]] = flow.dispatch.workgroup.size[1] : index
 //  CHECK-DAG:     %[[WG_SIZE_Z:.+]] = flow.dispatch.workgroup.size[2] : index
@@ -1297,16 +1302,16 @@ func @unit_dim_generic(%arg0 : tensor<1x?x1x1x?x?x1x?xf32>,
 //  CHECK-DAG:     %[[WG_COUNT_Z:.+]] = flow.dispatch.workgroup.count[2] : index
 //  CHECK-DAG:     %[[LB_Z:.+]] = affine.apply #[[MAP0]]()[%[[WG_ID_Z]], %[[WG_SIZE_Z]]]
 //  CHECK-DAG:     %[[STEP_Z:.+]] = affine.apply #[[MAP0]]()[%[[WG_COUNT_Z]], %[[WG_SIZE_Z]]]
-//      CHECK:     scf.for %[[IV0:.+]] = %[[LB_Z]] to %[[ARG3]] step %[[STEP_Z]]
+//      CHECK:     scf.for %[[IV0:.+]] = %[[LB_Z]] to %[[ARG4]] step %[[STEP_Z]]
 //  CHECK-DAG:       %[[LB_Y:.+]] = affine.apply #[[MAP0]]()[%[[WG_ID_Y]], %[[WG_SIZE_Y]]]
 //  CHECK-DAG:       %[[STEP_Y:.+]] = affine.apply #[[MAP0]]()[%[[WG_COUNT_Y]], %[[WG_SIZE_Y]]]
-//      CHECK:       scf.for %[[IV1:.+]] = %[[LB_Y]] to %[[ARG4]] step %[[STEP_Y]]
+//      CHECK:       scf.for %[[IV1:.+]] = %[[LB_Y]] to %[[ARG5]] step %[[STEP_Y]]
 //  CHECK-DAG:         %[[LB_X:.+]] = affine.apply #[[MAP0]]()[%[[WG_ID_X]], %[[WG_SIZE_X]]]
 //  CHECK-DAG:         %[[STEP_X:.+]] = affine.apply #[[MAP0]]()[%[[WG_COUNT_X]], %[[WG_SIZE_X]]]
-//      CHECK:         scf.for %[[IV2:.+]] = %[[LB_X]] to %[[ARG5]] step %[[STEP_X]]
-//  CHECK-DAG:           %[[TILE_Z:.+]] = affine.min #[[MAP1]](%[[WG_SIZE_Z]], %[[IV0]])[%[[ARG3]]]
-//  CHECK-DAG:           %[[TILE_Y:.+]] = affine.min #[[MAP1]](%[[WG_SIZE_Y]], %[[IV1]])[%[[ARG4]]]
-//  CHECK-DAG:           %[[TILE_X:.+]] = affine.min #[[MAP1]](%[[WG_SIZE_X]], %[[IV2]])[%[[ARG5]]]
+//      CHECK:         scf.for %[[IV2:.+]] = %[[LB_X]] to %[[ARG6]] step %[[STEP_X]]
+//  CHECK-DAG:           %[[TILE_Z:.+]] = affine.min #[[MAP1]](%[[WG_SIZE_Z]], %[[IV0]])[%[[ARG4]]]
+//  CHECK-DAG:           %[[TILE_Y:.+]] = affine.min #[[MAP1]](%[[WG_SIZE_Y]], %[[IV1]])[%[[ARG5]]]
+//  CHECK-DAG:           %[[TILE_X:.+]] = affine.min #[[MAP1]](%[[WG_SIZE_X]], %[[IV2]])[%[[ARG6]]]
 //      CHECK:           flow.dispatch.tensor.load %[[ARG2]]
-// CHECK-SAME:               offsets = [0, %[[IV0]], 0, 0, %[[IV1]], %[[IV2]], 0, 0]
-// CHECK-SAME:               sizes = [1, %[[TILE_Z]], 1, 1, %[[TILE_Y]], %[[TILE_X]], 1, %{{.+}}]
+// CHECK-SAME:               offsets = [0, 0, 0, 0, %[[IV0]], %[[IV1]], 0, %[[IV2]]]
+// CHECK-SAME:               sizes = [1, %[[ARG3]], 1, 1, %[[TILE_Z]], %[[TILE_Y]], 1, %[[TILE_X]]]

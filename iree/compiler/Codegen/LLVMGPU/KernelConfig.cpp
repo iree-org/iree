@@ -196,7 +196,9 @@ static LogicalResult setContractConfig(FuncOp entryPoint, linalg::LinalgOp op) {
 
 static LogicalResult setFftConfig(FuncOp entryPoint,
                                   IREE::LinalgExt::FftOp op) {
-  auto partitionedLoops = getPartitionedLoops(op);
+  auto interfaceOp = cast<IREE::Flow::PartitionableLoopsInterface>(*op);
+  auto partitionedLoops =
+      interfaceOp.getPartitionableLoops(kNumMaxParallelDims);
   unsigned loopDepth = partitionedLoops.back() + 1;
   SmallVector<int64_t> workgroupTileSize(loopDepth, 0);
   SmallVector<int64_t, 3> workgroupSize = {cudaWarpSize, 1, 1};
@@ -224,7 +226,9 @@ static LogicalResult setFftConfig(FuncOp entryPoint,
 
 static LogicalResult setSortConfig(FuncOp entryPoint, Operation *op) {
   TileSizesListType tileSizes;
-  SmallVector<unsigned> partitionedLoops = getPartitionedLoops(op);
+  auto interfaceOp = cast<IREE::Flow::PartitionableLoopsInterface>(*op);
+  auto partitionedLoops =
+      interfaceOp.getPartitionableLoops(kNumMaxParallelDims);
   if (partitionedLoops.empty()) {
     tileSizes.push_back({});
     return setOpConfigAndEntryPointFnTranslation(
@@ -264,7 +268,9 @@ static LogicalResult setRootDefaultConfig(FuncOp entryPoint, Operation *op) {
   IREE::Codegen::DispatchLoweringPassPipeline passPipeline =
       IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUDistribute;
   TileSizesListType tileSizes;
-  SmallVector<unsigned> partitionedLoops = getPartitionedLoops(op);
+  auto interfaceOp = cast<IREE::Flow::PartitionableLoopsInterface>(*op);
+  auto partitionedLoops =
+      interfaceOp.getPartitionableLoops(kNumMaxParallelDims);
   if (partitionedLoops.empty()) {
     tileSizes.push_back({});
     return setOpConfigAndEntryPointFnTranslation(

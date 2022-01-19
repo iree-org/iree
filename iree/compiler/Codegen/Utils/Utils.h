@@ -60,13 +60,6 @@ SmallVector<int64_t> getUntiledResultShape(linalg::LinalgOp linalgOp,
 // Utility functions to set configurations
 //===----------------------------------------------------------------------===//
 
-/// Returns the loops that are partitioned during dispatch region formations, in
-/// order, i.e. starting from the outer-most to innermost.
-/// Note that this is the same method that is used at the Flow dispatch region
-/// formation to tile and distribute the ops.
-// TODO: This method is to be deprecated.
-SmallVector<unsigned> getPartitionedLoops(Operation *op);
-
 /// Return the tile sizes to use for the Flow partitioned loops given the
 /// workload per workgroup. The tile sizes for the partitioned loops are
 /// obtained from the workload per workgroup. The other loops are returned as

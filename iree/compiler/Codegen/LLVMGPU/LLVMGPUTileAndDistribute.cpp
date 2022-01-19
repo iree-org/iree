@@ -35,7 +35,9 @@ namespace iree_compiler {
 static void populateTilingReductionPatterns(RewritePatternSet &patterns) {
   auto tileSizesFn = [&](OpBuilder &builder,
                          Operation *op) -> SmallVector<Value, 4> {
-    SmallVector<unsigned> partitionedLoops = getPartitionedLoops(op);
+    auto interfaceOp = cast<IREE::Flow::PartitionableLoopsInterface>(*op);
+    auto partitionedLoops =
+        interfaceOp.getPartitionableLoops(kNumMaxParallelDims);
     SmallVector<Value, 4> tileSizes = getTileSizes(builder, op, 0);
     auto zero = builder.create<arith::ConstantIndexOp>(op->getLoc(), 0);
     for (unsigned depth : partitionedLoops) {
@@ -77,7 +79,10 @@ static void populateTilingToWarpPatterns(
         }
         std::reverse(tileSizes.begin(), tileSizes.end());
         if (tileSizes.empty()) return SmallVector<Value, 4>();
-        SmallVector<unsigned> partitionedLoops = getPartitionedLoops(operation);
+        auto interfaceOp =
+            cast<IREE::Flow::PartitionableLoopsInterface>(*operation);
+        auto partitionedLoops =
+            interfaceOp.getPartitionableLoops(kNumMaxParallelDims);
         unsigned maxDepth = partitionedLoops.back() + 1;
         auto zero =
             builder.create<arith::ConstantIndexOp>(operation->getLoc(), 0);
@@ -132,7 +137,10 @@ static void populateTilingToInvocationPatterns(
         }
         std::reverse(tileSizes.begin(), tileSizes.end());
         if (tileSizes.empty()) return SmallVector<Value, 4>();
-        SmallVector<unsigned> partitionedLoops = getPartitionedLoops(operation);
+        auto interfaceOp =
+            cast<IREE::Flow::PartitionableLoopsInterface>(*operation);
+        auto partitionedLoops =
+            interfaceOp.getPartitionableLoops(kNumMaxParallelDims);
         unsigned maxDepth = partitionedLoops.back() + 1;
         auto zero =
             builder.create<arith::ConstantIndexOp>(operation->getLoc(), 0);

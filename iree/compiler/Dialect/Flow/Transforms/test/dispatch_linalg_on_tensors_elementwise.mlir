@@ -96,7 +96,8 @@ func @tile_4d_generic_op_alone
 //  CHECK-DAG:   %[[D0:.+]] = tensor.dim %[[ARG0]], %[[C0]]
 //  CHECK-DAG:   %[[D1:.+]] = tensor.dim %[[ARG0]], %[[C1]]
 //  CHECK-DAG:   %[[D2:.+]] = tensor.dim %[[ARG0]], %[[C2]]
-//      CHECK:   flow.dispatch.workgroups[%[[D2]], %[[D1]], %[[D0]]]
+//  CHECK-DAG:   %[[D3:.+]] = tensor.dim %[[ARG0]], %[[C3]]
+//      CHECK:   flow.dispatch.workgroups[%[[D3]], %[[D2]], %[[D1]]]
 
 // -----
 

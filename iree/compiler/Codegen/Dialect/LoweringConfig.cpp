@@ -334,7 +334,9 @@ LogicalResult setOpConfigAndEntryPointFnTranslation(
     IREE::Codegen::LoweringConfigAttr config,
     IREE::Codegen::DispatchLoweringPassPipeline passPipeline,
     ArrayRef<int64_t> workgroupSize) {
-  auto partitionedLoops = getPartitionedLoops(op);
+  auto interfaceOp = cast<IREE::Flow::PartitionableLoopsInterface>(*op);
+  auto partitionedLoops =
+      interfaceOp.getPartitionableLoops(kNumMaxParallelDims);
   SmallVector<int64_t, 3> workloadPerWorkgroup;
   auto tileSizes = config.getTileSizeVals(0);
   if (!tileSizes.empty() && !partitionedLoops.empty()) {

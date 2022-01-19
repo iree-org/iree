@@ -37,8 +37,11 @@ llvm::SmallVector<unsigned> getPartitionableLoopsImpl(
     parallelLoops =
         pruneUnitTripParallelLoops(parallelLoops, *staticLoopRanges);
   }
+  // TODO(ravishankarm): For now the outer parallel loops are dropped. This is
+  // a pragmatic choice for now but might need to be revisited.
   if (parallelLoops.size() > maxNumPartitionedLoops) {
-    parallelLoops.resize(maxNumPartitionedLoops);
+    parallelLoops = llvm::to_vector(llvm::ArrayRef<unsigned>(parallelLoops)
+                                        .take_back(maxNumPartitionedLoops));
   }
   return parallelLoops;
 }
