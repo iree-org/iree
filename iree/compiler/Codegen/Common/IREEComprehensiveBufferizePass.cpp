@@ -55,10 +55,6 @@
 namespace mlir {
 namespace iree_compiler {
 
-using linalg::comprehensive_bufferize::BufferizableOpInterface;
-using linalg::comprehensive_bufferize::BufferizationAliasInfo;
-using linalg::comprehensive_bufferize::BufferizationState;
-
 namespace {
 
 /// Pass to convert from tensor based ops to memref based ops.
@@ -66,16 +62,12 @@ class IREEComprehensiveBufferizePass
     : public IREEComprehensiveBufferizeBase<IREEComprehensiveBufferizePass> {
  public:
   explicit IREEComprehensiveBufferizePass(
-      std::unique_ptr<linalg::comprehensive_bufferize::AllocationCallbacks>
-          allocationFn)
-      : allocationFn(std::move(allocationFn)) {}
-
-  IREEComprehensiveBufferizePass(const IREEComprehensiveBufferizePass &other) {
-    allocationFn =
-        std::make_unique<linalg::comprehensive_bufferize::AllocationCallbacks>(
-            other.allocationFn->allocationFn,
-            other.allocationFn->deallocationFn, other.allocationFn->memCpyFn);
-  }
+      Optional<BufferizationOptions::AllocationFn> allocationFn = None,
+      Optional<BufferizationOptions::DeallocationFn> deallocationFn = None,
+      Optional<BufferizationOptions::MemCpyFn> memCpyFn = None)
+      : allocationFn(allocationFn),
+        deallocationFn(deallocationFn),
+        memCpyFn(memCpyFn) {}
 
   void getDependentDialects(DialectRegistry &registry) const override {
     registry
@@ -89,8 +81,9 @@ class IREEComprehensiveBufferizePass
   void runOnOperation() override;
 
  private:
-  std::unique_ptr<linalg::comprehensive_bufferize::AllocationCallbacks>
-      allocationFn;
+  const Optional<BufferizationOptions::AllocationFn> allocationFn;
+  const Optional<BufferizationOptions::DeallocationFn> deallocationFn;
+  const Optional<BufferizationOptions::MemCpyFn> memCpyFn;
 };
 }  // namespace
 
@@ -101,10 +94,9 @@ void IREEComprehensiveBufferizePass::runOnOperation() {
   ModuleOp moduleOp = getOperation();
   auto options =
       std::make_unique<linalg::comprehensive_bufferize::BufferizationOptions>();
-  options->allocationFns =
-      std::make_unique<linalg::comprehensive_bufferize::AllocationCallbacks>(
-          allocationFn->allocationFn, allocationFn->deallocationFn,
-          allocationFn->memCpyFn);
+  options->allocationFn = allocationFn;
+  options->deallocationFn = deallocationFn;
+  options->memCpyFn = memCpyFn;
   options->testAnalysisOnly = false;
   addPostAnalysisTransformations(*options);
 
@@ -120,33 +112,38 @@ static FailureOr<Value> defaultAllocationFn(OpBuilder &builder, Location loc,
   return builder.create<memref::AllocOp>(loc, allocationType, dynamicSizes)
       .getResult();
 }
-static void defaultDeallocationFn(OpBuilder &builder, Location loc,
-                                  Value allocation) {
+static LogicalResult defaultDeallocationFn(OpBuilder &builder, Location loc,
+                                           Value allocation) {
   builder.create<memref::DeallocOp>(loc, allocation);
+  return success();
 }
-static void defaultMemCpyFn(OpBuilder &builder, Location loc, Value from,
-                            Value to) {
+static LogicalResult defaultMemCpyFn(OpBuilder &builder, Location loc,
+                                     Value from, Value to) {
   builder.create<linalg::CopyOp>(loc, from, to);
+  return success();
 }
 
 std::unique_ptr<OperationPass<ModuleOp>> createIREEComprehensiveBufferizePass(
-    std::unique_ptr<linalg::comprehensive_bufferize::AllocationCallbacks>
-        allocationFns) {
-  if (!allocationFns) {
-    allocationFns =
-        std::make_unique<linalg::comprehensive_bufferize::AllocationCallbacks>(
-            defaultAllocationFn, defaultDeallocationFn, defaultMemCpyFn);
-  }
+    Optional<BufferizationOptions::AllocationFn> allocationFn,
+    Optional<BufferizationOptions::DeallocationFn> deallocationFn,
+    Optional<BufferizationOptions::MemCpyFn> memCpyFn) {
+  if (!allocationFn) allocationFn = defaultAllocationFn;
+  if (!deallocationFn) deallocationFn = defaultDeallocationFn;
+  if (!memCpyFn) memCpyFn = defaultMemCpyFn;
+
   return std::make_unique<IREEComprehensiveBufferizePass>(
-      std::move(allocationFns));
+      allocationFn, deallocationFn, memCpyFn);
 }
 
 void addIREEComprehensiveBufferizePasses(
     OpPassManager &passManager,
-    std::unique_ptr<linalg::comprehensive_bufferize::AllocationCallbacks>
-        allocationFns) {
-  passManager.addPass(
-      createIREEComprehensiveBufferizePass(std::move(allocationFns)));
+    Optional<BufferizationOptions::AllocationFn> allocationFn,
+    Optional<BufferizationOptions::DeallocationFn> deallocationFn,
+    Optional<BufferizationOptions::MemCpyFn> memCpyFn) {
+  passManager.addNestedPass<FuncOp>(
+      createConvertToDestinationPassingStylePass());
+  passManager.addPass(createIREEComprehensiveBufferizePass(
+      allocationFn, deallocationFn, memCpyFn));
   passManager.addPass(memref::createResolveShapedTypeResultDimsPass());
   passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
   passManager.addNestedPass<FuncOp>(createCSEPass());

@@ -27,6 +27,7 @@
 using mlir::linalg::comprehensive_bufferize::BufferizableOpInterface;
 using mlir::linalg::comprehensive_bufferize::BufferizationAliasInfo;
 using mlir::linalg::comprehensive_bufferize::BufferizationState;
+using mlir::linalg::comprehensive_bufferize::createMemCpy;
 using mlir::linalg::comprehensive_bufferize::DialectBufferizationState;
 using mlir::linalg::comprehensive_bufferize::PostAnalysisStep;
 using mlir::linalg::comprehensive_bufferize::linalg_ext::
@@ -180,7 +181,9 @@ struct DispatchTensorStoreOpInterface
 
     // If everything bufferized inplace, no copy is needed. We wrote to the
     // target buffer already. The copy folds away in that case.
-    state.createMemCpy(rewriter, storeOp->getLoc(), srcMemref, subView);
+    if (failed(createMemCpy(rewriter, storeOp->getLoc(), srcMemref, subView,
+                            state.getOptions())))
+      return failure();
 
     rewriter.eraseOp(storeOp);
     return success();

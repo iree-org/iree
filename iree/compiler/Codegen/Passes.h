@@ -47,10 +47,13 @@ using WorkgroupMemoryAllocationFn = std::function<Value(
 void addLinalgBufferizePasses(
     OpPassManager &passManager,
     WorkgroupMemoryAllocationFn allocationFn = nullptr);
+
+using linalg::comprehensive_bufferize::BufferizationOptions;
 void addIREEComprehensiveBufferizePasses(
     OpPassManager &passManager,
-    std::unique_ptr<linalg::comprehensive_bufferize::AllocationCallbacks>
-        allocationFn = nullptr);
+    Optional<BufferizationOptions::AllocationFn> allocationFn = None,
+    Optional<BufferizationOptions::DeallocationFn> deallocationFn = None,
+    Optional<BufferizationOptions::MemCpyFn> memCpyFn = None);
 
 /// Pass to perform canonicalizations/cleanups related to HAL interface/buffer
 /// allocations and view operations.
@@ -89,8 +92,9 @@ std::unique_ptr<OperationPass<FuncOp>> createForOpCanonicalizationPass();
 std::unique_ptr<OperationPass<FuncOp>> createLinalgBufferizePass(
     WorkgroupMemoryAllocationFn allocationFn = nullptr);
 std::unique_ptr<OperationPass<ModuleOp>> createIREEComprehensiveBufferizePass(
-    std::unique_ptr<linalg::comprehensive_bufferize::AllocationCallbacks> =
-        nullptr);
+    Optional<BufferizationOptions::AllocationFn> allocationFn = None,
+    Optional<BufferizationOptions::DeallocationFn> deallocationFn = None,
+    Optional<BufferizationOptions::MemCpyFn> memCpyFn = None);
 
 /// Creates a pass to remove single iteration distributed loops.
 std::unique_ptr<OperationPass<FuncOp>> createRemoveSingleIterationLoopPass();
