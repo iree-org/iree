@@ -9,6 +9,7 @@ steps:
     plugins:
         - cultureamp/skip-checkout#v1.0.0: ~
     commands: |
+      mkdir -p ${BUILDKITE_BUILD_CHECKOUT_PATH}
       cd ${BUILDKITE_BUILD_CHECKOUT_PATH}
       git clone https://github.com/google/iree.git .
       git submodule sync
