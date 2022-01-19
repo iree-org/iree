@@ -543,29 +543,6 @@ void UtilDialect::registerAttributes() {
       *getContext());
 }
 
-//===----------------------------------------------------------------------===//
-// Attribute printing and parsing
-//===----------------------------------------------------------------------===//
-
-Attribute UtilDialect::parseAttribute(DialectAsmParser &parser,
-                                      Type type) const {
-  StringRef mnemonic;
-  if (failed(parser.parseKeyword(&mnemonic))) return {};
-  Attribute genAttr;
-  OptionalParseResult parseResult =
-      generatedAttributeParser(parser, mnemonic, type, genAttr);
-  if (parseResult.hasValue()) return genAttr;
-  parser.emitError(parser.getNameLoc())
-      << "unknown util attribute: " << mnemonic;
-  return {};
-}
-
-void UtilDialect::printAttribute(Attribute attr, DialectAsmPrinter &p) const {
-  if (failed(generatedAttributePrinter(attr, p))) {
-    llvm_unreachable("unhandled util attribute kind");
-  }
-}
-
 }  // namespace Util
 }  // namespace IREE
 }  // namespace iree_compiler

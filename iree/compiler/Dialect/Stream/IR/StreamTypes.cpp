@@ -325,45 +325,6 @@ void StreamDialect::registerTypes() {
       >();
 }
 
-//===----------------------------------------------------------------------===//
-// Type printing and parsing
-//===----------------------------------------------------------------------===//
-
-Attribute StreamDialect::parseAttribute(DialectAsmParser &parser,
-                                        Type type) const {
-  StringRef mnemonic;
-  if (failed(parser.parseKeyword(&mnemonic))) return {};
-  Attribute attr;
-  auto parseResult = generatedAttributeParser(parser, mnemonic, type, attr);
-  if (parseResult.hasValue()) return attr;
-  parser.emitError(parser.getCurrentLocation())
-      << "unknown Stream attribute: " << mnemonic;
-  return {};
-}
-
-void StreamDialect::printAttribute(Attribute attr, DialectAsmPrinter &p) const {
-  if (failed(generatedAttributePrinter(attr, p))) {
-    llvm_unreachable("unknown Stream attribute");
-  }
-}
-
-Type StreamDialect::parseType(DialectAsmParser &parser) const {
-  StringRef mnemonic;
-  if (failed(parser.parseKeyword(&mnemonic))) return {};
-  Type type;
-  OptionalParseResult parseResult = generatedTypeParser(parser, mnemonic, type);
-  if (parseResult.hasValue()) return type;
-  parser.emitError(parser.getCurrentLocation())
-      << "unknown Stream type: " << mnemonic;
-  return {};
-}
-
-void StreamDialect::printType(Type type, DialectAsmPrinter &p) const {
-  if (failed(generatedTypePrinter(type, p))) {
-    llvm_unreachable("unknown Stream type");
-  }
-}
-
 }  // namespace Stream
 }  // namespace IREE
 }  // namespace iree_compiler
