@@ -10,15 +10,19 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Codegen/Dialect/LoweringConfig.h"
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Codegen/SPIRV/Utils.h"
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
+#include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/SCF/SCF.h"
 #include "mlir/Dialect/SCF/Transforms.h"
+#include "mlir/Dialect/Tensor/Transforms/Transforms.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #define DEBUG_TYPE "iree-spirv-tile"
@@ -64,14 +68,54 @@ class SPIRVTilePass final : public SPIRVTileBase<SPIRVTilePass> {
     MLIRContext *context = &getContext();
     FuncOp funcOp = getOperation();
 
-    SmallVector<Operation *> computeOps;
-    SmallVector<LoopTilingAndDistributionInfo> loopInfos;
-    if (failed(getComputeOps(funcOp, computeOps, loopInfos))) {
-      return signalPassFailure();
+    {
+      RewritePatternSet patterns(context);
+      tensor::populateSplitPaddingPatterns(patterns);
+      scf::populateIfRegionExpansionPatterns(patterns);
+      linalg::populateConcretizePadResultShapePatterns(patterns);
+      (void)applyPatternsAndFoldGreedily(funcOp, std::move(patterns));
+
+      LLVM_DEBUG({
+        llvm::dbgs() << "--- After splitting padding cases ---\n";
+        funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
+        llvm::dbgs() << "\n\n";
+      });
     }
 
-    {  // Tile to invocations.
-      auto consumerOp = dyn_cast<linalg::LinalgOp>(computeOps.back());
+    SmallVector<Operation *> computeOps;
+    SmallVector<scf::IfOp, 1> ifOps;
+    funcOp.walk([&ifOps](scf::IfOp ifOp) { ifOps.push_back(ifOp); });
+    if (ifOps.empty()) {
+      SmallVector<LoopTilingAndDistributionInfo> loopInfos;
+      if (failed(getComputeOps(funcOp, computeOps, loopInfos))) {
+        return signalPassFailure();
+      }
+      while (computeOps.size() > 1) computeOps.erase(computeOps.begin());
+    } else {
+      if (ifOps.size() > 1) {
+        funcOp.emitError("expected to contain no more than one scf.if ops");
+        return signalPassFailure();
+      }
+
+      for (Operation &op : llvm::reverse(*ifOps.front().thenBlock())) {
+        if (isa<linalg::LinalgOp, IREE::LinalgExt::TiledOpInterface>(op)) {
+          computeOps.push_back(&op);
+          break;
+        }
+      }
+      if (Block *elseBlock = ifOps.front().elseBlock()) {
+        for (Operation &op : llvm::reverse(*elseBlock)) {
+          if (isa<linalg::LinalgOp, IREE::LinalgExt::TiledOpInterface>(op)) {
+            computeOps.push_back(&op);
+            break;
+          }
+        }
+      }
+    }
+    assert(computeOps.size() <= 2);
+
+    for (Operation *computeOp : computeOps) {  // Tile to invocations.
+      auto consumerOp = dyn_cast<linalg::LinalgOp>(computeOp);
 
       OpBuilder builder(context);
       SmallVector<int64_t> tileSizes = getTileSizes(consumerOp, 1);
@@ -94,9 +138,22 @@ class SPIRVTilePass final : public SPIRVTileBase<SPIRVTilePass> {
       for (int i = loops.size() - 1, dim = 0; i >= 0; --i) {
         loops[i]->setAttr(attrName, builder.getIndexAttr(dim++));
       }
+    }
+
+    LLVM_DEBUG({
+      llvm::dbgs() << "--- After tiling to invocations ---\n";
+      funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
+      llvm::dbgs() << "\n\n";
+    });
+
+    {
+      RewritePatternSet patterns(context);
+      patterns.insert<linalg::ExtractSliceOfPadTensorSwapPattern>(
+          context, [](tensor::ExtractSliceOp) { return false; });
+      (void)applyPatternsAndFoldGreedily(funcOp, std::move(patterns));
 
       LLVM_DEBUG({
-        llvm::dbgs() << "--- After tiling to invocations ---\n";
+        llvm::dbgs() << "--- After fusing padding into consumers ---\n";
         funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
         llvm::dbgs() << "\n\n";
       });
@@ -111,6 +168,11 @@ class SPIRVTilePass final : public SPIRVTileBase<SPIRVTilePass> {
       // Pulling in IREE scf.for and affine.min canonicalization patterns.
       // They work on tiled and distributed loops.
       populateFoldAffineMinInDistributedLoopsPatterns(patterns);
+      // Pulling in flow.dispatch.tensor.load/store op canonicalization
+      // patterns. Tiling can generate dim ops taking them as operands.
+      IREE::Flow::populateFlowDispatchCanonicalizationPatterns(patterns,
+                                                               context);
+      linalg::populateConcretizePadResultShapePatterns(patterns);
       (void)applyPatternsAndFoldGreedily(funcOp, std::move(patterns));
 
       LLVM_DEBUG({
@@ -148,15 +210,31 @@ class SPIRVTilePass final : public SPIRVTileBase<SPIRVTilePass> {
     }
 
     {
+      RewritePatternSet patterns(context);
+      patterns.insert<linalg::ExtractSliceOfPadTensorSwapPattern>(
+          context, [](tensor::ExtractSliceOp) { return false; });
+      (void)applyPatternsAndFoldGreedily(funcOp, std::move(patterns));
+
+      LLVM_DEBUG({
+        llvm::dbgs() << "--- After fusing padding into consumers ---\n";
+        funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
+        llvm::dbgs() << "\n\n";
+      });
+    }
+
+    {
       RewritePatternSet patterns =
           linalg::getLinalgTilingCanonicalizationPatterns(context);
       // Pulling in upstream scf.for and affine.min canonicalization patterns.
       // They work on tiled (but not distributed) loops. We only tiled reduction
       // loops previously so this should be fine.
       scf::populateSCFForLoopCanonicalizationPatterns(patterns);
-      if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
-        return signalPassFailure();
-      }
+      // Pulling in flow.dispatch.tensor.load/store op canonicalization
+      // patterns. Tiling can generate dim ops taking them as operands.
+      IREE::Flow::populateFlowDispatchCanonicalizationPatterns(patterns,
+                                                               context);
+      linalg::populateConcretizePadResultShapePatterns(patterns);
+      (void)applyPatternsAndFoldGreedily(funcOp, std::move(patterns));
 
       LLVM_DEBUG({
         llvm::dbgs() << "--- After tiling canonicalization  ---\n";

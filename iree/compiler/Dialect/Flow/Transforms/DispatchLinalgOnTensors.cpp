@@ -1069,6 +1069,8 @@ LogicalResult createDispatchRegionsFromRootOps(mlir::Operation *funcOp) {
 
     patterns.insert<TileAndDistributeLinalgOpsPattern, TiledOpInterfacePattern>(
         context, linalgTilingOptions, linalg::LinalgTransformationFilter());
+    patterns.insert<linalg::ExtractSliceOfPadTensorSwapPattern>(
+        context, [](tensor::ExtractSliceOp) { return false; });
     if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
       return failure();
     }
