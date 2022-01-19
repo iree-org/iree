@@ -20,9 +20,14 @@ POLICY="${1:-performance}"
 
 readonly ADRENO_GPU_PATH="/sys/class/kgsl/kgsl-3d0"
 
-# Available frequencies are ordered from highest to lowest.
-readonly ADRENO_MAX_FREQ=$(cat "${ADRENO_GPU_PATH}/devfreq/available_frequencies" | tr " " "\n" | head -1)
-readonly ADRENO_MIN_FREQ=$(cat "${ADRENO_GPU_PATH}/devfreq/available_frequencies" | tr " " "\n" | tail -1)
+# Available frequencies are sorted, either in ascending or descending order.
+ADRENO_MAX_FREQ=$(cat "${ADRENO_GPU_PATH}/devfreq/available_frequencies" | tr " " "\n" | head -1)
+ADRENO_MIN_FREQ=$(cat "${ADRENO_GPU_PATH}/devfreq/available_frequencies" | tr " " "\n" | tail -1)
+if (( ${ADRENO_MAX_FREQ} < ${ADRENO_MIN_FREQ} )); then
+  TMP=${ADRENO_MAX_FREQ}
+  ADRENO_MAX_FREQ=${ADRENO_MIN_FREQ}
+  ADRENO_MIN_FREQ=${TMP}
+fi
 
 # Power levels match available freqencies.
 readonly ADRENO_MAX_PWRLEVEL=0
