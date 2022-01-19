@@ -183,9 +183,9 @@ def is_magisk_su():
 def adb_execute_as_root(cmd_args: Sequence[str]) -> subprocess.CompletedProcess:
   """Executes the given command as root."""
   if is_magisk_su():
-    adb_execute(["su", "-c", android_path, governor])
+    return adb_execute(["su", "-c", android_path, governor])
   else:
-    adb_execute(["su", "root", android_path, governor])
+    return adb_execute(["su", "root", android_path, governor])
 
 
 def adb_start_cmd(cmd_args: Sequence[str],
