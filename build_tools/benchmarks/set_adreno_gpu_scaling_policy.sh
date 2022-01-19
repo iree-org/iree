@@ -26,7 +26,7 @@ readonly ADRENO_MIN_FREQ=$(cat "${ADRENO_GPU_PATH}/devfreq/available_frequencies
 
 # Power levels match available freqencies.
 readonly ADRENO_MAX_PWRLEVEL=0
-(( ADRENO_MIN_PWRLEVEL = $(expr $(cat "${ADRENO_GPU_PATH}/num_pwrlevels") - 1 ))
+(( ADRENO_MIN_PWRLEVEL = $(cat "${ADRENO_GPU_PATH}/num_pwrlevels") - 1 ))
 
 # Idle timers affect governor change and frequncy reset.
 readonly ADRENO_DEFAULT_IDLE_TIMER=80    # ms
