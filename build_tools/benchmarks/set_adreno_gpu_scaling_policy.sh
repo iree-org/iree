@@ -21,17 +21,13 @@ POLICY="${1:-performance}"
 readonly ADRENO_GPU_PATH="/sys/class/kgsl/kgsl-3d0"
 
 # Available frequencies are sorted, either in ascending or descending order.
-ADRENO_MAX_FREQ=$(cat "${ADRENO_GPU_PATH}/devfreq/available_frequencies" | tr " " "\n" | head -1)
-ADRENO_MIN_FREQ=$(cat "${ADRENO_GPU_PATH}/devfreq/available_frequencies" | tr " " "\n" | tail -1)
-if (( ${ADRENO_MAX_FREQ} < ${ADRENO_MIN_FREQ} )); then
-  TMP=${ADRENO_MAX_FREQ}
-  ADRENO_MAX_FREQ=${ADRENO_MIN_FREQ}
-  ADRENO_MIN_FREQ=${TMP}
-fi
+readonly ADRENO_MIN_FREQ=$(cat "${ADRENO_GPU_PATH}/devfreq/available_frequencies" | tr " " "\n" | sort -u -n | head -1)
+readonly ADRENO_MAX_FREQ=$(cat "${ADRENO_GPU_PATH}/devfreq/available_frequencies" | tr " " "\n" | sort -u -n | tail -1)
 
 # Power levels match available freqencies.
 readonly ADRENO_MAX_PWRLEVEL=0
 (( ADRENO_MIN_PWRLEVEL = $(cat "${ADRENO_GPU_PATH}/num_pwrlevels") - 1 ))
+readonly ADRENO_MIN_PWRLEVEL
 
 # Idle timers affect governor change and frequncy reset.
 readonly ADRENO_DEFAULT_IDLE_TIMER=80    # ms
