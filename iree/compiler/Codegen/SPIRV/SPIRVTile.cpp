@@ -10,15 +10,20 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Codegen/Dialect/LoweringConfig.h"
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Codegen/SPIRV/Utils.h"
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
+#include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/SCF/SCF.h"
 #include "mlir/Dialect/SCF/Transforms.h"
+#include "mlir/Dialect/Tensor/Transforms/Transforms.h"
+#include "mlir/IR/Matchers.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #define DEBUG_TYPE "iree-spirv-tile"
@@ -49,6 +54,106 @@ static void populateTilingReductionPatterns(RewritePatternSet &patterns) {
                                                    filter);
 }
 
+/// Gets the given `attrOrValue` as an index value by creating constant ops
+/// for attributes.
+static Value getAsIndexValue(OpFoldResult attrOrValue, OpBuilder &builder,
+                             Location loc) {
+  IntegerAttr attr;
+  if (Value val = attrOrValue.dyn_cast<Value>()) {
+    if (val.getType().isIndex()) return val;
+    matchPattern(val, m_Constant(&attr));
+  } else {
+    attr = attrOrValue.get<Attribute>().cast<IntegerAttr>();
+  }
+  return builder.createOrFold<arith::ConstantIndexOp>(
+      loc, attr.getValue().getSExtValue());
+}
+
+namespace {
+
+/// Concretizes tensor.pad op's result shape if its source op implements
+/// OffsetSizeAndStrideOpInterface. For example, pad(extract_slice).
+struct ConcretizePadResultShape final : public OpRewritePattern<tensor::PadOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(tensor::PadOp padOp,
+                                PatternRewriter &rewriter) const override {
+    // If the result shape is already static, then nothing to do.
+    if (padOp.getResultType().hasStaticShape()) return failure();
+
+    int rank = padOp.getResultType().getRank();
+    SmallVector<int64_t> staticShape;
+    staticShape.reserve(rank);
+
+    auto sourceIfxOp = dyn_cast_or_null<OffsetSizeAndStrideOpInterface>(
+        padOp.source().getDefiningOp());
+    if (!sourceIfxOp) return failure();
+
+    SmallVector<OpFoldResult> lowPad = padOp.getMixedLowPad();
+    SmallVector<OpFoldResult> source = sourceIfxOp.getMixedSizes();
+    SmallVector<OpFoldResult> highPad = padOp.getMixedHighPad();
+
+    MLIRContext *context = padOp.getContext();
+    Location loc = padOp.getLoc();
+
+    AffineExpr sym0, sym1, sym2;
+    bindSymbols(context, sym0, sym1, sym2);
+    auto addMap = AffineMap::get(0, 3, {sym0 + sym1 + sym2}, context);
+
+    SmallVector<Value, 3> valueSizes;
+    for (int dimIndex = 0; dimIndex < rank; ++dimIndex) {
+      valueSizes.clear();
+      valueSizes.push_back(getAsIndexValue(lowPad[dimIndex], rewriter, loc));
+      valueSizes.push_back(getAsIndexValue(source[dimIndex], rewriter, loc));
+      valueSizes.push_back(getAsIndexValue(highPad[dimIndex], rewriter, loc));
+
+      // The pad op's result shape is low padding + source size + high padding.
+      // Try to see if we can get a constant number by composing and
+      // canonicalizing the result. We use affine mechanisms here because
+      // generating arithmetic add ops over dim ops won't work, given they are
+      // SSA values that would need invoking other patterns to simplify. We
+      // cannot invoke patterns in patterns.
+      AffineMap map = addMap;
+      fullyComposeAffineMapAndOperands(&map, &valueSizes);
+      canonicalizeMapAndOperands(&map, &valueSizes);
+
+      auto cstExpr = map.getResult(0).dyn_cast<AffineConstantExpr>();
+      // Specially handle the case where we have both dimensions and symbols and
+      // they map to the same value, e.g.:
+      //   affine_map<(d0, s0) -> (d0 - s0 + 4)>(%v, %v).
+      // Due to the restrictions over dimensions and symbols, the above won't
+      // simplify. Try to change dimensions for symbols for such cases.
+      if (!cstExpr && llvm::is_splat(valueSizes)) {
+        int numDims = map.getNumDims();
+        int numSyms = map.getNumSymbols();
+        DenseMap<AffineExpr, AffineExpr> dimToSymMap;
+        for (int i = 0; i < numDims; ++i) {
+          dimToSymMap[rewriter.getAffineDimExpr(i)] =
+              rewriter.getAffineSymbolExpr(numSyms + i);
+        }
+        map = map.replace(dimToSymMap, /*numResultDims=*/0,
+                          /*numResultSyms=*/numDims + numSyms);
+
+        canonicalizeMapAndOperands(&map, &valueSizes);
+        cstExpr = map.getResult(0).dyn_cast<AffineConstantExpr>();
+      }
+      if (!cstExpr) return failure();
+
+      staticShape.push_back(cstExpr.getValue());
+    }
+
+    auto resultType = RankedTensorType::get(
+        staticShape, padOp.getResultType().getElementType(),
+        padOp.getResultType().getEncoding());
+
+    rewriter.updateRootInPlace(padOp,
+                               [&]() { padOp.result().setType(resultType); });
+    return success();
+  }
+};
+
+}  // namespace
+
 //===----------------------------------------------------------------------===//
 // Main pass
 //===----------------------------------------------------------------------===//
@@ -64,14 +169,76 @@ class SPIRVTilePass final : public SPIRVTileBase<SPIRVTilePass> {
     MLIRContext *context = &getContext();
     FuncOp funcOp = getOperation();
 
-    SmallVector<Operation *> computeOps;
-    SmallVector<LoopTilingAndDistributionInfo> loopInfos;
-    if (failed(getComputeOps(funcOp, computeOps, loopInfos))) {
-      return signalPassFailure();
+    {
+      RewritePatternSet patterns(context);
+      tensor::populateSplitPaddingPatterns(patterns);
+      (void)applyPatternsAndFoldGreedily(funcOp, std::move(patterns));
+
+      LLVM_DEBUG({
+        llvm::dbgs() << "--- After splitting padding cases ---\n";
+        funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
+        llvm::dbgs() << "\n\n";
+      });
     }
 
-    {  // Tile to invocations.
-      auto consumerOp = dyn_cast<linalg::LinalgOp>(computeOps.back());
+    {
+      SmallVector<scf::IfOp> ifOps;
+      funcOp.walk([&](scf::IfOp ifOp) { ifOps.push_back(ifOp); });
+      if (ifOps.size() > 1) {
+        funcOp.emitError("expected to contain no more than one scf.if ops");
+        return signalPassFailure();
+      }
+      if (ifOps.size() == 1) {
+        RewritePatternSet patterns(funcOp.getContext());
+        populateSPIRVExpandIfRegionPatterns(
+            patterns, /*canMoveToRegion=*/[](Operation *op) { return true; });
+        FrozenRewritePatternSet frozenPatterns(std::move(patterns));
+        // Apply transforms per op to avoid recursive behavior.
+        (void)applyOpPatternsAndFold(ifOps.front(), frozenPatterns,
+                                     /*erased=*/nullptr);
+      }
+
+      LLVM_DEBUG({
+        llvm::dbgs() << "--- After expand scf.if regions ---\n";
+        funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
+        llvm::dbgs() << "\n\n";
+      });
+    }
+
+    SmallVector<Operation *> computeOps;
+    SmallVector<scf::IfOp, 1> ifOps;
+    funcOp.walk([&ifOps](scf::IfOp ifOp) { ifOps.push_back(ifOp); });
+    if (ifOps.empty()) {
+      SmallVector<LoopTilingAndDistributionInfo> loopInfos;
+      if (failed(getComputeOps(funcOp, computeOps, loopInfos))) {
+        return signalPassFailure();
+      }
+      while (computeOps.size() > 1) computeOps.erase(computeOps.begin());
+    } else {
+      if (ifOps.size() > 1) {
+        funcOp.emitError("expected to contain no more than one scf.if ops");
+        return signalPassFailure();
+      }
+
+      for (Operation &op : llvm::reverse(*ifOps.front().thenBlock())) {
+        if (isa<linalg::LinalgOp, IREE::LinalgExt::TiledOpInterface>(op)) {
+          computeOps.push_back(&op);
+          break;
+        }
+      }
+      if (Block *elseBlock = ifOps.front().elseBlock()) {
+        for (Operation &op : llvm::reverse(*elseBlock)) {
+          if (isa<linalg::LinalgOp, IREE::LinalgExt::TiledOpInterface>(op)) {
+            computeOps.push_back(&op);
+            break;
+          }
+        }
+      }
+    }
+    assert(computeOps.size() <= 2);
+
+    for (Operation *computeOp : computeOps) {  // Tile to invocations.
+      auto consumerOp = dyn_cast<linalg::LinalgOp>(computeOp);
 
       OpBuilder builder(context);
       SmallVector<int64_t> tileSizes = getTileSizes(consumerOp, 1);
@@ -94,9 +261,22 @@ class SPIRVTilePass final : public SPIRVTileBase<SPIRVTilePass> {
       for (int i = loops.size() - 1, dim = 0; i >= 0; --i) {
         loops[i]->setAttr(attrName, builder.getIndexAttr(dim++));
       }
+    }
+
+    LLVM_DEBUG({
+      llvm::dbgs() << "--- After tiling to invocations ---\n";
+      funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
+      llvm::dbgs() << "\n\n";
+    });
+
+    {
+      RewritePatternSet patterns(context);
+      patterns.insert<linalg::ExtractSliceOfPadTensorSwapPattern>(
+          context, [](tensor::ExtractSliceOp) { return false; });
+      (void)applyPatternsAndFoldGreedily(funcOp, std::move(patterns));
 
       LLVM_DEBUG({
-        llvm::dbgs() << "--- After tiling to invocations ---\n";
+        llvm::dbgs() << "--- After fusing padding into consumers ---\n";
         funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
         llvm::dbgs() << "\n\n";
       });
@@ -111,6 +291,11 @@ class SPIRVTilePass final : public SPIRVTileBase<SPIRVTilePass> {
       // Pulling in IREE scf.for and affine.min canonicalization patterns.
       // They work on tiled and distributed loops.
       populateFoldAffineMinInDistributedLoopsPatterns(patterns);
+      // Pulling in flow.dispatch.tensor.load/store op canonicalization
+      // patterns. Tiling can generate dim ops taking them as operands.
+      IREE::Flow::populateFlowDispatchCanonicalizationPatterns(patterns,
+                                                               context);
+      patterns.add<ConcretizePadResultShape>(context);
       (void)applyPatternsAndFoldGreedily(funcOp, std::move(patterns));
 
       LLVM_DEBUG({
@@ -148,15 +333,31 @@ class SPIRVTilePass final : public SPIRVTileBase<SPIRVTilePass> {
     }
 
     {
+      RewritePatternSet patterns(context);
+      patterns.insert<linalg::ExtractSliceOfPadTensorSwapPattern>(
+          context, [](tensor::ExtractSliceOp) { return false; });
+      (void)applyPatternsAndFoldGreedily(funcOp, std::move(patterns));
+
+      LLVM_DEBUG({
+        llvm::dbgs() << "--- After fusing padding into consumers ---\n";
+        funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
+        llvm::dbgs() << "\n\n";
+      });
+    }
+
+    {
       RewritePatternSet patterns =
           linalg::getLinalgTilingCanonicalizationPatterns(context);
       // Pulling in upstream scf.for and affine.min canonicalization patterns.
       // They work on tiled (but not distributed) loops. We only tiled reduction
       // loops previously so this should be fine.
       scf::populateSCFForLoopCanonicalizationPatterns(patterns);
-      if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
-        return signalPassFailure();
-      }
+      // Pulling in flow.dispatch.tensor.load/store op canonicalization
+      // patterns. Tiling can generate dim ops taking them as operands.
+      IREE::Flow::populateFlowDispatchCanonicalizationPatterns(patterns,
+                                                               context);
+      patterns.add<ConcretizePadResultShape>(context);
+      (void)applyPatternsAndFoldGreedily(funcOp, std::move(patterns));
 
       LLVM_DEBUG({
         llvm::dbgs() << "--- After tiling canonicalization  ---\n";

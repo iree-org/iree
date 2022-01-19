@@ -117,6 +117,8 @@ static void addSPIRVLoweringPasses(OpPassManager &pm) {
   pm.addPass(createCSEPass());
 
   pm.addPass(createLowerAffinePass());
+  pm.addPass(createCanonicalizerPass());
+  pm.addPass(createCSEPass());
 
   pm.addPass(createConvertToSPIRVPass());
 
@@ -138,7 +140,10 @@ void addSPIRVTileAndVectorizePassPipeline(OpPassManager &pm) {
 
   // Tile to GPU invocations and vectorize.
   pm.addNestedPass<FuncOp>(createSPIRVTilePass());
+  pm.addPass(createCanonicalizerPass());
+  pm.addPass(createCSEPass());
   pm.addNestedPass<FuncOp>(createSPIRVVectorizePass());
+  pm.addNestedPass<FuncOp>(createForOpCanonicalizationPass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
@@ -235,6 +240,7 @@ void buildSPIRVCodegenPassPipeline(OpPassManager &pm) {
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
   pm.addPass(createSPIRVLowerExecutableTargetPass());
+
   addMemRefLoweringPasses(pm.nest<ModuleOp>());
   addSPIRVLoweringPasses(pm.nest<ModuleOp>());
 

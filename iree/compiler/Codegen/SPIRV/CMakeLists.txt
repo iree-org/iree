@@ -75,6 +75,7 @@ iree_cc_library(
     MLIRSideEffectInterfaces
     MLIRSupport
     MLIRTensorToSPIRV
+    MLIRTensorTransforms
     MLIRTosa
     MLIRTosaToStandard
     MLIRTransforms

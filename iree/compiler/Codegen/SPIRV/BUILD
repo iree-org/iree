@@ -86,6 +86,7 @@ cc_library(
         "@llvm-project//mlir:SideEffectInterfaces",
         "@llvm-project//mlir:Support",
         "@llvm-project//mlir:TensorToSPIRV",
+        "@llvm-project//mlir:TensorTransforms",
         "@llvm-project//mlir:TosaDialect",
         "@llvm-project//mlir:TosaToStandard",
         "@llvm-project//mlir:Transforms",
