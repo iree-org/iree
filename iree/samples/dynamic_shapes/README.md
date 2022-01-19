@@ -84,6 +84,7 @@ them.
     ../iree-build/iree/tools/iree-translate \
         -iree-mlir-to-vm-bytecode-module \
         -iree-hal-target-backends=dylib-llvm-aot \
+        -iree-input-type=mhlo \
         dynamic_shapes.mlir -o dynamic_shapes_dylib.vmfb
     ```
 
