@@ -14,7 +14,13 @@ from absl.testing import absltest
 
 NOTEBOOKS_TO_SKIP = []
 
-NOTEBOOKS_EXPECTED_TO_FAIL = []
+NOTEBOOKS_EXPECTED_TO_FAIL = [
+    # Logs: https://buildkite.com/iree/iree-samples/builds/212#2d108f5a-b7d1-46de-93d3-85ce60250514
+    # error: 'util.global.store' op global type mismatch;
+    #        global __iree_flow___sm_node14__optimizer.iter is 'tensor<i64>' but
+    #        store is 'tensor<i32>'
+    "mnist_training.ipynb",
+]
 
 
 class ColabNotebookTests(absltest.TestCase):
