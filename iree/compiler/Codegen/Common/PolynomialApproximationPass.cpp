@@ -28,10 +28,10 @@ class PolynomialApproximationPass
     : public PolynomialApproximationPassBase<PolynomialApproximationPass> {
   void runOnOperation() override {
     OwningRewritePatternList mathPatterns(&getContext());
-    if (!clNativeMathPrecision) {
-      populateMathPolynomialApproximationPatterns(mathPatterns);
-    } else {
+    if (clNativeMathPrecision) {
       mathPatterns.add<math::ErfPolynomialApproximation>(&getContext());
+    } else {
+      populateMathPolynomialApproximationPatterns(mathPatterns);
     }
     if (failed(applyPatternsAndFoldGreedily(getOperation(),
                                             std::move(mathPatterns)))) {
