@@ -11,7 +11,7 @@
         <link rel="canonical" href="https://google.github.io/iree/bindings/python/">
       
       <link rel="icon" href="../../ghost.svg">
-      <meta name="generator" content="mkdocs-1.2.3, mkdocs-material-8.1.6">
+      <meta name="generator" content="mkdocs-1.2.3, mkdocs-material-8.1.7">
     
     
       
@@ -701,13 +701,6 @@
   
 </li>
       
-        <li class="md-nav__item">
-  <a href="#troubleshooting" class="md-nav__link">
-    Troubleshooting
-  </a>
-  
-</li>
-      
     </ul>
   
 </nav>
@@ -1055,13 +1048,6 @@
   
 </li>
       
-        <li class="md-nav__item">
-  <a href="#troubleshooting" class="md-nav__link">
-    Troubleshooting
-  </a>
-  
-</li>
-      
     </ul>
   
 </nav>
@@ -1160,16 +1146,15 @@ python -m pip install numpy absl-py
 </code></pre></div>
 <h2 id="installing-iree-packages">Installing IREE packages<a class="headerlink" href="#installing-iree-packages" title="Permanent link">&para;</a></h2>
 <h3 id="prebuilt-packages">Prebuilt packages<a class="headerlink" href="#prebuilt-packages" title="Permanent link">&para;</a></h3>
-<p>For now, packages can be installed from our
-<a href="https://github.com/google/iree/releases">GitHub releases</a>:</p>
+<p>Stable release packages are published to
+<a href="https://pypi.org/user/google-iree-pypi-deploy/">PyPI</a>.</p>
 <div class="tabbed-set tabbed-alternate" data-tabs="2:2"><input checked="checked" id="__tabbed_2_1" name="__tabbed_2" type="radio" /><input id="__tabbed_2_2" name="__tabbed_2" type="radio" /><div class="tabbed-labels"><label for="__tabbed_2_1">Minimal</label><label for="__tabbed_2_2">All packages</label></div>
 <div class="tabbed-content">
 <div class="tabbed-block">
 <p>To install just the core IREE packages:</p>
 <div class="highlight"><pre><span></span><code>python -m pip install <span class="se">\</span>
   iree-compiler <span class="se">\</span>
-  iree-runtime <span class="se">\</span>
-  --find-links https://github.com/google/iree/releases
+  iree-runtime
 </code></pre></div>
 </div>
 <div class="tabbed-block">
@@ -1179,16 +1164,18 @@ python -m pip install numpy absl-py
   iree-runtime <span class="se">\</span>
   iree-tools-tf <span class="se">\</span>
   iree-tools-tflite <span class="se">\</span>
-  iree-tools-xla <span class="se">\</span>
-  --find-links https://github.com/google/iree/releases
+  iree-tools-xla
 </code></pre></div>
 </div>
 </div>
 </div>
-<div class="admonition info">
-<p class="admonition-title">Info</p>
-<p>We plan to publish packages on <a href="https://pypi.org/">PyPI</a> as they become
-more stable.</p>
+<div class="admonition tip">
+<p class="admonition-title">Tip</p>
+<p>Nightly packages are also published on
+<a href="https://github.com/google/iree/releases">GitHub releases</a>. To use these,
+run <code>pip install</code> with this extra option:</p>
+<div class="highlight"><pre><span></span><code>--find-links https://github.com/google/iree/releases
+</code></pre></div>
 </div>
 <h3 id="building-from-source">Building from source<a class="headerlink" href="#building-from-source" title="Permanent link">&para;</a></h3>
 <p>See <a href="../../building-from-source/python-bindings-and-importers/#building-python-bindings">Building Python bindings</a>
@@ -1200,7 +1187,8 @@ page for instructions for building from source.</p>
 <a href="https://github.com/google/iree/tree/main/colab">colab/ directory</a> and the
 <a href="https://github.com/google/iree-samples">iree-samples repository</a> for examples
 using the Python APIs.</p>
-<h2 id="troubleshooting">Troubleshooting<a class="headerlink" href="#troubleshooting" title="Permanent link">&para;</a></h2>
+<!-- ## Troubleshooting -->
+
 <!-- TODO(scotttodd): update python, update pip, search GitHub issues -->
 
               
@@ -1273,7 +1261,7 @@ using the Python APIs.</p>
     <script id="__config" type="application/json">{"base": "../..", "features": ["navigation.instant", "navigation.tracking", "navigation.sections", "navigation.top", "navigation.indexes"], "translations": {"clipboard.copy": "Copy to clipboard", "clipboard.copied": "Copied to clipboard", "search.config.lang": "en", "search.config.pipeline": "trimmer, stopWordFilter", "search.config.separator": "[\\s\\-]+", "search.placeholder": "Search", "search.result.placeholder": "Type to start searching", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.term.missing": "Missing", "select.version.title": "Select version"}, "search": "../../assets/javascripts/workers/search.22074ed6.min.js"}</script>
     
     
-      <script src="../../assets/javascripts/bundle.1514a9a0.min.js"></script>
+      <script src="../../assets/javascripts/bundle.01de222e.min.js"></script>
       
     
   </body>
