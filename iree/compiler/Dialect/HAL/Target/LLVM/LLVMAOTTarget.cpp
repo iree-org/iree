@@ -30,6 +30,10 @@
 
 #define DEBUG_TYPE "iree-llvmaot-target"
 
+static llvm::cl::opt<bool> dumpLLVMIR("iree-llvm-dump-llvmir",
+                                      llvm::cl::init(false),
+                                      llvm::cl::desc("Dump LLVM IR"));
+
 namespace mlir {
 namespace iree_compiler {
 namespace IREE {
@@ -383,6 +387,10 @@ class LLVMAOTTargetBackend final : public TargetBackend {
       }
       func.setDSOLocal(true);
       func.setLinkage(llvm::GlobalValue::LinkageTypes::PrivateLinkage);
+    }
+
+    if (dumpLLVMIR) {
+      llvmModule->dump();
     }
 
     SmallVector<Artifact> objectFiles;
