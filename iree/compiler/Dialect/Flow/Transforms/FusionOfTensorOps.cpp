@@ -120,23 +120,9 @@ struct FusionOfTensorOpsPass
     // If the source of the reshape is a linalg op fold to potentially allow the
     // two linalg ops to be fused. Otherwise leave it to avoid adding dimensions
     // to the consumer linalg op.
-    linalg::ControlElementwiseOpsFusionFn foldReshapeBetweenLinalgFn =
-        [](const OpResult &producer, const OpOperand &consumer) {
-          auto collapseOp = producer.getDefiningOp<tensor::CollapseShapeOp>();
-          if (collapseOp) {
-            return collapseOp.src().getDefiningOp<LinalgOp>() != nullptr;
-          }
-          auto expandOp = producer.getDefiningOp<tensor::ExpandShapeOp>();
-          if (expandOp) {
-            return expandOp.src().getDefiningOp<LinalgOp>() != nullptr;
-          }
-          return false;
-        };
     linalg::populateElementwiseOpsFusionPatterns(
-        fusionPatterns,
-        linalg::LinalgElementwiseFusionOptions()
-            .setControlFoldingReshapes(foldReshapeBetweenLinalgFn)
-            .setControlElementwiseOpsFusionFn(controlFn));
+        fusionPatterns, linalg::LinalgElementwiseFusionOptions()
+                            .setControlElementwiseOpsFusionFn(controlFn));
 
     if (failed(applyPatternsAndFoldGreedily(op->getRegions(),
                                             std::move(fusionPatterns)))) {
