@@ -37,7 +37,8 @@ struct CompilerOptions {
   BindingOptions bindingOptions;
   InputDialectOptions inputDialectOptions;
   HighLevelOptimizationOptions highLevelOptimizationOptions;
-  HALTargetOptions executableOptions;
+  SchedulingOptions schedulingOptions;
+  HALTargetOptions halTargetOptions;
   VMTargetOptions vmTargetOptions;
   VMBytecodeTargetOptions vmBytecodeTargetOptions;
 
@@ -47,7 +48,8 @@ struct CompilerOptions {
     bindingOptions.bindOptions(binder);
     inputDialectOptions.bindOptions(binder);
     highLevelOptimizationOptions.bindOptions(binder);
-    executableOptions.bindOptions(binder);
+    schedulingOptions.bindOptions(binder);
+    halTargetOptions.bindOptions(binder);
     vmTargetOptions.bindOptions(binder);
     vmBytecodeTargetOptions.bindOptions(binder);
   }
@@ -96,7 +98,7 @@ void ireeCompilerOptionsDestroy(IreeCompilerOptions options) {
 
 void ireeCompilerOptionsAddTargetBackend(IreeCompilerOptions options,
                                          const char *targetBackend) {
-  unwrap(options)->executableOptions.targets.push_back(
+  unwrap(options)->halTargetOptions.targets.push_back(
       std::string(targetBackend));
 }
 
@@ -133,8 +135,9 @@ void ireeCompilerBuildIREEVMPassPipeline(IreeCompilerOptions options,
   auto *passManagerCpp = unwrap(passManager);
   buildIREEVMTransformPassPipeline(
       optionsCpp->bindingOptions, optionsCpp->inputDialectOptions,
-      optionsCpp->highLevelOptimizationOptions, optionsCpp->executableOptions,
-      optionsCpp->vmTargetOptions, *passManagerCpp);
+      optionsCpp->highLevelOptimizationOptions, optionsCpp->schedulingOptions,
+      optionsCpp->halTargetOptions, optionsCpp->vmTargetOptions,
+      *passManagerCpp);
 }
 
 // Translates a module op derived from the ireeCompilerBuildIREEVMPassPipeline

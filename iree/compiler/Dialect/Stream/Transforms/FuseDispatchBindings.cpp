@@ -387,8 +387,7 @@ static void fuseDispatchBindings(
   // can do it for everything.
 
   // Update the executable function to use the new bindings.
-  auto funcOp = executableOp.getInnerModule().lookupSymbol<mlir::FuncOp>(
-      exportOp.function_refAttr());
+  auto funcOp = exportOp.getFunctionRef();
   assert(funcOp && "entry func not found");
   updateExecutableSignature(executableOp, exportOp, funcOp, bindings);
 

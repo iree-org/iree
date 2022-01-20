@@ -282,8 +282,7 @@ class FoldUniformOperandsPass
         auto &dispatchOps = entryDispatchMap[exportOp];
         if (dispatchOps.empty()) continue;  // no-op if no dispatches
 
-        auto funcOp = dyn_cast<mlir::FuncOp>(SymbolTable::lookupSymbolIn(
-            executableOp.getInnerModule(), exportOp.function_refAttr()));
+        auto funcOp = exportOp.getFunctionRef();
 
         // Deduplicate operands that are correlated at all dispatch sites.
         // We do this first so that we know all constants passed in are unique
