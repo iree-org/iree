@@ -321,6 +321,14 @@ def SPIRVVectorizeLoadStore :
   let constructor = "mlir::iree_compiler::createSPIRVVectorizeLoadStore()";
 }
 
+def SPIRVHoistIfRegionOps :
+    Pass<"iree-spirv-hoist-if-region-ops", "FuncOp"> {
+  let summary = "Hoist no-side-effecting ops in scf.if regions ahead of "
+                "the scf.if op";
+  let constructor =
+      "mlir::iree_compiler::createSPIRVHoistIfRegionOpsPass()";
+}
+
 //------------------------------------------------------------------------------
 // Test passes
 //------------------------------------------------------------------------------

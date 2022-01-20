@@ -20,6 +20,7 @@ cc_library(
         "NVIDIAConfig.cpp",
         "Passes.cpp",
         "SPIRVDistribute.cpp",
+        "SPIRVHoistIfRegionOps.cpp",
         "SPIRVInitConfigPass.cpp",
         "SPIRVLowerExecutableTargetPass.cpp",
         "SPIRVTile.cpp",

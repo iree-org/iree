@@ -22,6 +22,7 @@
 #include "mlir/Dialect/Arithmetic/Transforms/Passes.h"
 #include "mlir/Dialect/Linalg/Passes.h"
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
+#include "mlir/Dialect/SCF/Passes.h"
 #include "mlir/Dialect/SPIRV/IR/SPIRVOps.h"
 #include "mlir/Dialect/SPIRV/Transforms/Passes.h"
 #include "mlir/Dialect/StandardOps/Transforms/Passes.h"
@@ -117,6 +118,12 @@ static void addSPIRVLoweringPasses(OpPassManager &pm) {
   pm.addPass(createCSEPass());
 
   pm.addPass(createLowerAffinePass());
+
+  // Hoist index calculation logic outside of SCF regions so that we can CSE
+  // them to save cost.
+  pm.addNestedPass<FuncOp>(createSPIRVHoistIfRegionOpsPass());
+  pm.addNestedPass<FuncOp>(createLoopInvariantCodeMotionPass());
+
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 

@@ -364,6 +364,9 @@ std::unique_ptr<OperationPass<FuncOp>> createSPIRVVectorizePass();
 /// having pointer bitcast.
 std::unique_ptr<OperationPass<ModuleOp>> createSPIRVVectorizeLoadStore();
 
+/// Hoists non-side-effecting ops in scf.if regions ahead of the scf.if op.
+std::unique_ptr<OperationPass<FuncOp>> createSPIRVHoistIfRegionOpsPass();
+
 //----------------------------------------------------------------------------//
 // SPIRV Codegen Pass Pipelines.
 //----------------------------------------------------------------------------//
