@@ -141,19 +141,28 @@ SET_TARGET_PROPERTIES(
 )
 
 # TODO(marbre): Cleanup SRCS and DEPS.
+iree_cc_library(
+  NAME
+    simple_mul_emitc
+  HDRS
+    "simple_mul_emitc.h"
+  DEFINES
+    "EMITC_IMPLEMENTATION"
+)
+
 iree_cc_binary(
-NAME
-  static_library_demo_c
-SRCS
-  "create_c_module.c"
-  "static_library_demo.c"
-  "simple_mul_emitc.h"
-DEPS
-  iree::runtime
-  iree::hal::local::loaders::static_library_loader
-  iree::hal::local::sync_driver
-  iree::vm::shims_emitc
-  simple_mul_c_module
+  NAME
+    static_library_demo_c
+  SRCS
+    "create_c_module.c"
+    "static_library_demo.c"
+  DEPS
+    ::simple_mul_emitc
+    iree::runtime
+    iree::hal::local::loaders::static_library_loader
+    iree::hal::local::sync_driver
+    iree::vm::shims_emitc
+    simple_mul_c_module
 )
 
 iree_lit_test(

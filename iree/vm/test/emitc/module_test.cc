@@ -15,6 +15,7 @@ using namespace std;
 #include "iree/base/status_cc.h"
 #include "iree/testing/gtest.h"
 #include "iree/vm/api.h"
+#define EMITC_IMPLEMENTATION
 #include "iree/vm/test/emitc/arithmetic_ops.h"
 #include "iree/vm/test/emitc/arithmetic_ops_f32.h"
 #include "iree/vm/test/emitc/arithmetic_ops_i64.h"

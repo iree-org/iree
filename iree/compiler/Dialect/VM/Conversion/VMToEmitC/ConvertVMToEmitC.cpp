@@ -1195,12 +1195,14 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
     typeConverter.analysisCache.insert(
         std::make_pair(funcOp.getOperation(), VMAnalysis()));
 
-    funcOp.getOperation()->setAttr("emitc.static", UnitAttr::get(ctx));
-
     // This function needs an iree_vm_native_module_descriptor_t that is emitted
     // by the CModuleTarget at the moment. So we add a marker to this function
     // and delay the printing of it.
     funcOp.getOperation()->setAttr("vm.emit_at_end", UnitAttr::get(ctx));
+
+    // This functions is the only one users need and it is therefore declared
+    // separatly from all other functions.
+    funcOp.getOperation()->setAttr("vm.module.constructor", UnitAttr::get(ctx));
 
     Block *entryBlock = funcOp.addEntryBlock();
 
