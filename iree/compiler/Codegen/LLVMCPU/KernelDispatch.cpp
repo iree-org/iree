@@ -338,7 +338,7 @@ static LogicalResult setX86SandboxRootConfig(
   l1TileSizes.push_back(128);
   l1TileSizes.push_back(512);
   vectorTileSizes.append(nLoops - 3, 1);
-  vectorTileSizes.push_back(9);
+  vectorTileSizes.push_back(8);
   vectorTileSizes.push_back(32);
   vectorTileSizes.push_back(16);
 

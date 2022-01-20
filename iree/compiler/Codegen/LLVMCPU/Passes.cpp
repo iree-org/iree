@@ -208,7 +208,8 @@ void addSingleTilingExpertPassPipeline(OpPassManager &passManager) {
 
 void addDoubleTilingExpertPassPipeline(OpPassManager &passManager) {
   passManager.addPass(createCanonicalizerPass());
-  {
+  //passManager.addNestedPass<FuncOp>(createRemoveSingleIterationLoopPass());
+  if (0) {
     passManager.addNestedPass<FuncOp>(createRemoveSingleIterationLoopPass());
     LinalgSingleTilingExpertPassOptions options;
     options.tilingLevel = static_cast<int64_t>(TilingLevel::L1Tiles);
