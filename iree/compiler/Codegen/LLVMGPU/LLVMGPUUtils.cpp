@@ -16,12 +16,12 @@ llvm::SmallVector<mlir::linalg::ProcInfo, 2> getGPUThreadIdsAndCounts(
     llvm::ArrayRef<int64_t> workgroupSize) {
   assert(numDims <= kNumGPUDims);
   llvm::SmallVector<mlir::linalg::ProcInfo, 2> procInfo(numDims);
-  std::array<llvm::StringRef, kNumGPUDims> dimAttr{"x", "y", "z"};
+  std::array<gpu::Dimension, kNumGPUDims> dimAttr{
+      gpu::Dimension::x, gpu::Dimension::y, gpu::Dimension::z};
   mlir::Type indexType = builder.getIndexType();
   for (unsigned i = 0; i < numDims; ++i) {
-    mlir::StringAttr attr = builder.getStringAttr(dimAttr[i]);
     procInfo[numDims - 1 - i] = {
-        builder.create<mlir::gpu::ThreadIdOp>(loc, indexType, attr),
+        builder.create<mlir::gpu::ThreadIdOp>(loc, indexType, dimAttr[i]),
         builder.create<mlir::arith::ConstantOp>(
             loc, builder.getIndexAttr(workgroupSize[i]))};
   }
@@ -33,12 +33,12 @@ llvm::SmallVector<mlir::linalg::ProcInfo, 2> getSubgroupIdsAndCounts(
     llvm::ArrayRef<int64_t> numSubgroups) {
   assert(numDims <= kNumGPUDims);
   llvm::SmallVector<mlir::linalg::ProcInfo, 2> procInfo(numDims);
-  std::array<llvm::StringRef, kNumGPUDims> dimAttr{"x", "y", "z"};
+  std::array<gpu::Dimension, kNumGPUDims> dimAttr{
+      gpu::Dimension::x, gpu::Dimension::y, gpu::Dimension::z};
   mlir::Type indexType = builder.getIndexType();
   for (unsigned i = 0; i < numDims; ++i) {
-    mlir::StringAttr attr = builder.getStringAttr(dimAttr[i]);
     mlir::Value subgroupId =
-        builder.create<mlir::gpu::ThreadIdOp>(loc, indexType, attr);
+        builder.create<mlir::gpu::ThreadIdOp>(loc, indexType, dimAttr[i]);
     if (i == 0) {
       mlir::AffineExpr d0 = builder.getAffineDimExpr(0);
       subgroupId = mlir::makeComposedAffineApply(

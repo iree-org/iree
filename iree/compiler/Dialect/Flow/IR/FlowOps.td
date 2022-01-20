@@ -514,7 +514,6 @@ def FLOW_ExecutableOp : FLOW_Op<"executable", [
     custom<SymbolVisibility>($sym_visibility)
     $sym_name
     attr-dict-with-keyword
-    ``
     regions
   }];
 

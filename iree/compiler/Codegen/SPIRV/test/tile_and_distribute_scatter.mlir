@@ -58,10 +58,10 @@ hal.executable private @static_scatter_update_slice  {
 //       CHECK:     %[[WG_UPDATE:.+]] = memref.subview %[[ARG0]]
 //       CHECK:     %[[WG_INDEX:.+]] = memref.subview %[[ARG1]]
 //       CHECK:     %[[WG_TARGET:.+]] = memref.subview %[[ARG2]]
-//       CHECK:     %[[TID_X:.+]] = "gpu.thread_id"() {dimension = "x"}
-//       CHECK:     %[[DIM_X:.+]] = "gpu.block_dim"() {dimension = "x"}
-//       CHECK:     %[[TID_Y:.+]] = "gpu.thread_id"() {dimension = "y"}
-//       CHECK:     %[[DIM_Y:.+]] = "gpu.block_dim"() {dimension = "y"}
+//       CHECK:     %[[TID_X:.+]] = gpu.thread_id x
+//       CHECK:     %[[DIM_X:.+]] = gpu.block_dim x
+//       CHECK:     %[[TID_Y:.+]] = gpu.thread_id y
+//       CHECK:     %[[DIM_Y:.+]] = gpu.block_dim y
 //       CHECK:     scf.for %[[IV_Y:.+]] = %[[TID_Y]] to %{{.+}} step %[[DIM_Y]]
 //       CHECK:       scf.for %[[IV_X:.+]] = %[[TID_X]] to %{{.+}} step %[[DIM_X]]
 //       CHECK:         %[[T_UPDATE:.+]] = memref.subview %[[WG_UPDATE]][%[[IV_Y]], %[[IV_X]]] [1, 1] [1, 1]

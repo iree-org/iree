@@ -15,8 +15,15 @@
 namespace mlir {
 namespace iree_compiler {
 
-static unsigned dimToIndex(StringRef dim) {
-  return StringSwitch<unsigned>(dim).Case("x", 0).Case("y", 1).Case("z", 2);
+static unsigned dimToIndex(gpu::Dimension dim) {
+  switch (dim) {
+    case gpu::Dimension::x:
+      return 0;
+    case gpu::Dimension::y:
+      return 1;
+    case gpu::Dimension::z:
+      return 2;
+  }
 }
 
 struct ThreadIdOpInterface

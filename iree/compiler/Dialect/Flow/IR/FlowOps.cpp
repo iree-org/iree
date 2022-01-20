@@ -417,7 +417,7 @@ static void printDispatchWorkgroupBody(OpAsmPrinter &p, Operation *op,
     p << ": ";
     p << arg.getType();
   });
-  p << ")";
+  p << ") ";
   p.printRegion(body, /*printEntryBlockArgs=*/false,
                 /*printBlockTerminators=*/true);
 }

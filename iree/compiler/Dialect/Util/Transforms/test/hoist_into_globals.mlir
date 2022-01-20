@@ -14,7 +14,7 @@ module @hoist_simple_const_expr {
     %2 = "iree_unregistered.const_expr"(%0, %1) : (i32, i32) -> i32
     return %2 : i32
   }
-  // CHECK: util.initializer {
+  // CHECK: util.initializer{
   // CHECK:   %[[C0:.*]] = arith.constant 0 : i32
   // CHECK:   %[[C1:.*]] = arith.constant 1 : i32
   // CHECK:   %[[CE0:.*]] = "iree_unregistered.const_expr"(%[[C0]], %[[C1]])
@@ -126,14 +126,14 @@ module @hoist_tree_const_expr {
     %5 = "iree_unregistered.var_expr"(%4) : (i32) -> i32
     return %2, %4, %5 : i32, i32, i32
   }
-  // CHECK: util.initializer {
+  // CHECK: util.initializer{
   // CHECK:   %[[C0:.*]] = arith.constant 0 : i32
   // CHECK:   %[[C1:.*]] = arith.constant 1 : i32
   // CHECK:   %[[CE0:.*]] = "iree_unregistered.const_expr"(%[[C0]], %[[C1]])
   // CHECK:   util.global.store %[[CE0]], @[[HOISTED_0]] : i32
   // CHECK:   util.initializer.return
   // CHECK: }
-  // CHECK: util.initializer {
+  // CHECK: util.initializer{
   // CHECK:   %[[LOAD_HOISTED_0:.*]] = util.global.load @[[HOISTED_0]] : i32
   // CHECK:   %[[LOAD_LATENT_GLOBAL:.*]] = util.global.load @latent_global : i32
   // CHECK:   %[[CE1:.*]] = "iree_unregistered.const_expr"(%[[LOAD_HOISTED_0]], %[[LOAD_LATENT_GLOBAL]])
@@ -161,7 +161,7 @@ module @hoist_non_leaf_const_expr {
     %4 = "iree_unregistered.non_leaf_const_expr"(%3) : (i32) -> i32
     return %4 : i32
   }
-  // CHECK: util.initializer {
+  // CHECK: util.initializer{
   // CHECK:   %[[C0:.*]] = arith.constant 0 : i32
   // CHECK:   %[[C1:.*]] = arith.constant 1 : i32
   // CHECK:   %[[CE0:.*]] = "iree_unregistered.non_leaf_const_expr"(%[[C0]], %[[C1]])
@@ -192,7 +192,7 @@ module @hoist_implicit_capture {
   }
   // Key checks: arith.constant 1 gets pulled in to the initializer
   // and the reference is updated correctly in the custom op region.
-  // CHECK: util.initializer {
+  // CHECK: util.initializer{
   // CHECK-DAG:   %[[C0:.*]] = arith.constant 0 : i32
   // CHECK-DAG:   %[[C1:.*]] = arith.constant 1 : i32
   // CHECK:       %[[CE0:.*]] = "iree_unregistered.const_expr"(%[[C0]])

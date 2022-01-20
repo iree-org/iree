@@ -383,7 +383,7 @@ static void printExplicitResourceRegion(OpAsmPrinter &p, Operation *op,
           operandSizes = operandSizes.drop_front(1);
         }
       });
-  p << ")";
+  p << ") ";
   p.printRegion(body, /*printEntryBlockArgs=*/false,
                 /*printBlockTerminators=*/false);
 }

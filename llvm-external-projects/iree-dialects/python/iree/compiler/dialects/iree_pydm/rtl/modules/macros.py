@@ -45,7 +45,6 @@ def _unbox_i32(stage: ImportStage, value: ir.Value) -> ir.Value:
 def unbox_i32(stage: ImportStage, value: ir.Value) -> ir.Value:
   return _unbox_i32(stage, value)
 
-
 def _unbox_i64(stage: ImportStage, value: ir.Value) -> ir.Value:
   i64_type = d.IntegerType.get_explicit(64)
   if d.ObjectType.isinstance(value.type):

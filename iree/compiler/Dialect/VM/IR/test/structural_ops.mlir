@@ -70,21 +70,21 @@ vm.module @import_funcs {
 
 // CHECK-LABEL: @initializers
 vm.module @initializers {
-  // CHECK-NEXT: vm.initializer {
+  // CHECK-NEXT: vm.initializer{
   // CHECK-NEXT:   vm.return
   // CHECK-NEXT: }
   vm.initializer {
     vm.return
   }
 
-  // CHECK-NEXT: vm.initializer attributes {foo} {
+  // CHECK-NEXT: vm.initializer attributes {foo}{
   // CHECK-NEXT:   vm.return
   // CHECK-NEXT: }
   vm.initializer attributes {foo} {
     vm.return
   }
 
-  // CHECK-NEXT: vm.initializer {
+  // CHECK-NEXT: vm.initializer{
   vm.initializer {
     // CHECK-NEXT: %zero = vm.const.i32 0 : i32
     %zero = vm.const.i32 0 : i32

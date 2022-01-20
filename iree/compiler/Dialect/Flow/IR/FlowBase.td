@@ -14,7 +14,7 @@ include "iree/compiler/Dialect/Util/IR/UtilBase.td"
 // IREE execution flow dialect
 //===----------------------------------------------------------------------===//
 
-def FLOW_Dialect : Dialect {
+def Flow_Dialect : Dialect {
   let name = "flow";
   let cppNamespace = "::mlir::iree_compiler::IREE::Flow";
 
@@ -59,6 +59,7 @@ def FLOW_Dialect : Dialect {
     to communicate statically available information such as the expected
     workload size, shapes of inputs and outputs, etc.
   }];
+  let useDefaultTypePrinterParser = 0;
 }
 
 //===----------------------------------------------------------------------===//
@@ -66,7 +67,7 @@ def FLOW_Dialect : Dialect {
 //===----------------------------------------------------------------------===//
 
 class FLOW_Op<string mnemonic, list<OpTrait> traits = []> :
-    Op<FLOW_Dialect, mnemonic, traits> {
+    Op<Flow_Dialect, mnemonic, traits> {
   let parser = [{ return parse$cppClass(parser, &result); }];
   let printer = [{ return print$cppClass(p, *this); }];
 }
@@ -105,7 +106,7 @@ def FLOW_TensorAccessCanWritePred : CPred<[{
 }]>;
 
 def FLOW_DispatchTensor : DialectType<
-    FLOW_Dialect,
+    Flow_Dialect,
     CPred<"$_self.isa<IREE::Flow::DispatchTensorType>()">,
     "dispatch.tensor"> {
   let description = [{
@@ -116,7 +117,7 @@ def FLOW_DispatchTensor : DialectType<
 }
 
 def FLOW_ReadableDispatchTensor : DialectType<
-    FLOW_Dialect,
+    Flow_Dialect,
     And<[
       CPred<"$_self.isa<IREE::Flow::DispatchTensorType>()">,
       FLOW_TensorAccessCanReadPred,
@@ -130,7 +131,7 @@ def FLOW_ReadableDispatchTensor : DialectType<
 }
 
 def FLOW_WritableDispatchTensor : DialectType<
-    FLOW_Dialect,
+    Flow_Dialect,
     And<[
       CPred<"$_self.isa<IREE::Flow::DispatchTensorType>()">,
       FLOW_TensorAccessCanWritePred,
@@ -144,10 +145,10 @@ def FLOW_WritableDispatchTensor : DialectType<
 }
 
 // TODO(benvanik): remove when we have real types using this.
-def FLOW_Dummy0 : TypeDef<FLOW_Dialect, "Dummy", []> {
+def FLOW_Dummy0 : TypeDef<Flow_Dialect, "Dummy", []> {
   let mnemonic = "dummy";
 }
-def FLOW_Dummy1 : AttrDef<FLOW_Dialect, "Dummy", []> {
+def FLOW_Dummy1 : AttrDef<Flow_Dialect, "Dummy", []> {
   let mnemonic = "dummy";
 }
 

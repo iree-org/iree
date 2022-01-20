@@ -44,7 +44,6 @@ def VM_ModuleOp : VM_Op<"module", [
     custom<SymbolVisibility>($sym_visibility)
     $sym_name
     attr-dict-with-keyword
-    ``
     regions
   }];
 

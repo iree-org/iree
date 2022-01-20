@@ -27,7 +27,7 @@ func @partitioningForMinPeakMemory(%arg0: !stream.resource<external>, %arg1: !st
     // CHECK: %[[CON0:.+]]:2 = stream.async.concurrent
     // CHECK-SAME: with(%[[SPLAT0]] as %[[SPLAT0_CAPTURE:.+]]: !stream.resource<transient>{%c1280},
     // CHECK-SAME:      %[[ARG1_CAPTURE]] as %[[ARG1_CON0_CAPTURE:.+]]: !stream.resource<external>{%c80})
-    // CHECK-SAME: -> (!stream.resource<transient>{%c1280}, !stream.resource<transient>{%c20}) {
+    // CHECK-SAME: -> (!stream.resource<transient>{%c1280}, !stream.resource<transient>{%c20}){
     // CHECK-NEXT: %[[DISPATCH0:.+]] = stream.async.dispatch @ex::@dispatch_0[%c1, %c1, %c1](%[[SPLAT0_CAPTURE]], %[[ARG1_CON0_CAPTURE]])
     %2 = stream.async.dispatch @ex::@dispatch_0[%c1, %c1, %c1](%1, %arg2) : (!stream.resource<transient>{%c1280}, !stream.resource<external>{%c80}) -> %1{%c1280}
     // CHECK-NEXT: %[[SPLAT1:.+]] = stream.async.splat %c255_i32 : i32 -> !stream.resource<transient>{%c20}
@@ -70,7 +70,7 @@ func @partitioningForMaxConcurrency(%arg0: !stream.resource<external>, %arg1: !s
       -> !stream.resource<external>{%c20} {
 
     // CHECK: %[[CON0:.+]]:2 = stream.async.concurrent with()
-    // CHECK-SAME: -> (!stream.resource<transient>{%c1280}, !stream.resource<transient>{%c20}) {
+    // CHECK-SAME: -> (!stream.resource<transient>{%c1280}, !stream.resource<transient>{%c20}){
     // CHECK-NEXT: %[[SPLAT0:.+]] = stream.async.splat %c255_i32 : i32 -> !stream.resource<transient>{%c1280}
     // CHECK-NEXT: %[[SPLAT1:.+]] = stream.async.splat %c255_i32 : i32 -> !stream.resource<transient>{%c20}
     // CHECK-NEXT: stream.yield %[[SPLAT0]], %[[SPLAT1]] : !stream.resource<transient>{%c1280}, !stream.resource<transient>{%c20}
@@ -80,7 +80,7 @@ func @partitioningForMaxConcurrency(%arg0: !stream.resource<external>, %arg1: !s
     // CHECK-SAME:      %[[ARG1_CAPTURE]] as %[[ARG1_CON1_CAPTURE:.+]]: !stream.resource<external>{%c80},
     // CHECK-SAME:      %[[ARG0_CAPTURE]] as %[[ARG0_CON1_CAPTURE:.+]]: !stream.resource<external>{%c20},
     // CHECK-SAME:      %[[CON0]]#1 as %[[CON0_1_CAPTURE:.+]]: !stream.resource<transient>{%c20})
-    // CHECK-SAME: -> (!stream.resource<transient>{%c1280}, !stream.resource<transient>{%c20}) {
+    // CHECK-SAME: -> (!stream.resource<transient>{%c1280}, !stream.resource<transient>{%c20}){
     // CHECK-NEXT: %[[DISPATCH0:.+]] = stream.async.dispatch @ex::@dispatch_0[%c1, %c1, %c1](%[[CON0_0_CAPTURE]], %[[ARG1_CON1_CAPTURE]])
     // CHECK-NEXT: %[[DISPATCH1:.+]] = stream.async.dispatch @ex::@dispatch_1[%c1, %c1, %c1](%[[ARG0_CON1_CAPTURE]], %[[CON0_1_CAPTURE]])
     // CHECK-NEXT: stream.yield %[[DISPATCH0]], %[[DISPATCH1]]

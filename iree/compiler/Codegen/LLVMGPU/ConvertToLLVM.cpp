@@ -339,7 +339,8 @@ struct HALInterfaceWorkgroupOpsConverter final
       InterfaceOpTy op, typename InterfaceOpTy::Adaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     int32_t index = static_cast<int32_t>(op.dimension().getSExtValue());
-    std::array<const char *, 3> dimAttr{"x", "y", "z"};
+    std::array<gpu::Dimension, 3> dimAttr{gpu::Dimension::x, gpu::Dimension::y,
+                                          gpu::Dimension::z};
     rewriter.replaceOpWithNewOp<NewOpTy>(op, op.getType(), dimAttr[index]);
     return success();
   }

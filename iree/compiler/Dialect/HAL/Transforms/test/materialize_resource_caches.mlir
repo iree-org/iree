@@ -1,7 +1,7 @@
 // RUN: iree-opt -split-input-file -iree-hal-materialize-resource-caches %s | FileCheck %s
 
 //      CHECK: util.global private @_descriptor_set_layout_0 : !hal.descriptor_set_layout
-// CHECK-NEXT: util.initializer {
+// CHECK-NEXT: util.initializer{
 // CHECK-NEXT:   %device = hal.ex.shared_device : !hal.device
 // CHECK-NEXT:   %descriptor_set_layout = hal.descriptor_set_layout.create
 // CHECK-SAME:     device(%device : !hal.device)
@@ -30,7 +30,7 @@ func @descriptorSetLayoutLookup(%device : !hal.device) -> !hal.descriptor_set_la
 // CHECK: util.global private @_descriptor_set_layout_0 : !hal.descriptor_set_layout
 
 //      CHECK: util.global private @_executable_layout_0 : !hal.executable_layout
-// CHECK-NEXT: util.initializer {
+// CHECK-NEXT: util.initializer{
 // CHECK-NEXT:   %[[SET0:.+]] = util.global.load @_descriptor_set_layout_0 : !hal.descriptor_set_layout
 // CHECK-NEXT:   %device = hal.ex.shared_device : !hal.device
 // CHECK-NEXT:   %executable_layout = hal.executable_layout.create
@@ -59,7 +59,7 @@ func @exeLayoutLookup(%device : !hal.device) -> !hal.executable_layout {
 // CHECK: util.global private @_descriptor_set_layout_1
 
 //      CHECK: util.global private @_executable_layout_0 : !hal.executable_layout
-// CHECK-NEXT: util.initializer {
+// CHECK-NEXT: util.initializer{
 // CHECK-NEXT:   %[[SET0:.+]] = util.global.load @_descriptor_set_layout_0 : !hal.descriptor_set_layout
 // CHECK-NEXT:   %[[SET1:.+]] = util.global.load @_descriptor_set_layout_1 : !hal.descriptor_set_layout
 // CHECK-NEXT:   %device = hal.ex.shared_device : !hal.device
@@ -140,10 +140,10 @@ hal.executable @exe {
 // CHECK-DAG: util.global private @_executable_layout_1
 
 // CHECK: util.global private @_executable_exe : !hal.executable
-// CHECK-NEXT: util.initializer {
+// CHECK-NEXT: util.initializer{
 // CHECK:   %[[DEV:.+]] = hal.ex.shared_device : !hal.device
 // CHECK:   %[[RET:.+]] = hal.device.switch<%[[DEV]] : !hal.device> -> !hal.executable
-// CHECK:   #hal.device.match.executable.format<"vmvx-bytecode-fb"> {
+// CHECK:   #hal.device.match.executable.format<"vmvx-bytecode-fb">{
 // CHECK:     %[[LAYOUT0:.+]] = util.global.load @_executable_layout_0 : !hal.executable_layout
 // CHECK:     %[[LAYOUT0_2:.+]] = util.global.load @_executable_layout_0 : !hal.executable_layout
 // CHECK:     %[[LAYOUT1:.+]] = util.global.load @_executable_layout_1 : !hal.executable_layout
@@ -154,7 +154,7 @@ hal.executable @exe {
 // CHECK-SAME:  : !hal.executable
 // CHECK:     hal.return %[[EXE]] : !hal.executable
 // CHECK:   },
-// CHECK:   #hal.match.always {
+// CHECK:   #hal.match.always{
 // CHECK:     %[[NULL:.+]] = util.null : !hal.executable
 // CHECK:     hal.return %[[NULL]] : !hal.executable
 // CHECK:   }

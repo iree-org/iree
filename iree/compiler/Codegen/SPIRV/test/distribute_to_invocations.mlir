@@ -16,8 +16,8 @@ func @distribute_to_x(%lb : index, %ub : index, %step: index, %output: memref<?x
 
 // CHECK-LABEL: func @distribute_to_x
 //  CHECK-SAME: %[[LB:.+]]: index, %[[UB:.+]]: index, %[[STEP:.+]]: index
-//       CHECK:   %[[ID:.+]] = "gpu.thread_id"() {dimension = "x"}
-//       CHECK:   %[[DIM:.+]] = "gpu.block_dim"() {dimension = "x"}
+//       CHECK:   %[[ID:.+]] = gpu.thread_id x
+//       CHECK:   %[[DIM:.+]] = gpu.block_dim x
 //       CHECK:   %[[XLB:.+]] = affine.apply affine_map<()[s0, s1, s2] -> (s0 * s1 + s2)>()[%[[ID]], %[[STEP]], %[[LB]]]
 //       CHECK:   %[[XSTEP:.+]] = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%[[DIM]], %[[STEP]]]
 //       CHECK:   scf.for %[[IV:.+]] = %[[XLB]] to %[[UB]] step %[[XSTEP]] {
@@ -41,8 +41,8 @@ func @distribute_to_y(%lb : index, %ub : index, %step: index, %output: memref<?x
 
 // CHECK-LABEL: func @distribute_to_y
 //  CHECK-SAME: %[[LB:.+]]: index, %[[UB:.+]]: index, %[[STEP:.+]]: index
-//       CHECK:   %[[ID:.+]] = "gpu.thread_id"() {dimension = "y"}
-//       CHECK:   %[[DIM:.+]] = "gpu.block_dim"() {dimension = "y"}
+//       CHECK:   %[[ID:.+]] = gpu.thread_id y
+//       CHECK:   %[[DIM:.+]] = gpu.block_dim y
 //       CHECK:   %[[YLB:.+]] = affine.apply affine_map<()[s0, s1, s2] -> (s0 * s1 + s2)>()[%[[ID]], %[[STEP]], %[[LB]]]
 //       CHECK:   %[[YSTEP:.+]] = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%[[DIM]], %[[STEP]]]
 //       CHECK:   scf.for %[[IV:.+]] = %[[YLB]] to %[[UB]] step %[[YSTEP]] {
@@ -66,8 +66,8 @@ func @distribute_to_z(%lb : index, %ub : index, %step: index, %output: memref<?x
 
 // CHECK-LABEL: func @distribute_to_z
 //  CHECK-SAME: %[[LB:.+]]: index, %[[UB:.+]]: index, %[[STEP:.+]]: index
-//       CHECK:   %[[ID:.+]] = "gpu.thread_id"() {dimension = "z"}
-//       CHECK:   %[[DIM:.+]] = "gpu.block_dim"() {dimension = "z"}
+//       CHECK:   %[[ID:.+]] = gpu.thread_id z
+//       CHECK:   %[[DIM:.+]] = gpu.block_dim z
 //       CHECK:   %[[ZLB:.+]] = affine.apply affine_map<()[s0, s1, s2] -> (s0 * s1 + s2)>()[%[[ID]], %[[STEP]], %[[LB]]]
 //       CHECK:   %[[ZSTEP:.+]] = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%[[DIM]], %[[STEP]]]
 //       CHECK:   scf.for %[[IV:.+]] = %[[ZLB]] to %[[UB]] step %[[ZSTEP]] {
