@@ -22,6 +22,7 @@ cc_library(
         "SPIRVCreateFastSlowPath.cpp",
         "SPIRVDistribute.cpp",
         "SPIRVFuseTensorPadWithConsumer.cpp",
+        "SPIRVHoistIfRegionOps.cpp",
         "SPIRVInitConfigPass.cpp",
         "SPIRVLowerExecutableTargetPass.cpp",
         "SPIRVTile.cpp",

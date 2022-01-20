@@ -412,6 +412,9 @@ createSPIRVFuseTensorPadWithConsumerPass();
 // padding, while the slow path is for boundary tiles where we do need padding.
 std::unique_ptr<OperationPass<FuncOp>> createSPIRVCreateFastSlowPathPass();
 
+/// Hoists non-side-effecting ops in scf.if regions ahead of the scf.if op.
+std::unique_ptr<OperationPass<FuncOp>> createSPIRVHoistIfRegionOpsPass();
+
 //----------------------------------------------------------------------------//
 // SPIRV Codegen Pass Pipelines.
 //----------------------------------------------------------------------------//
