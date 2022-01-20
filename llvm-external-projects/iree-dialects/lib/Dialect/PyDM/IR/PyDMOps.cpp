@@ -488,6 +488,7 @@ static void print(OpAsmPrinter &p, FunctionalIfOp op) {
     // Print yield explicitly if the op defines values.
     printBlockTerminators = true;
   }
+  p << " ";
   p.printRegion(op.thenRegion(),
                 /*printEntryBlockArgs=*/false,
                 /*printBlockTerminators=*/printBlockTerminators);
@@ -495,7 +496,7 @@ static void print(OpAsmPrinter &p, FunctionalIfOp op) {
   // Print the 'else' regions if it exists and has a block.
   auto &elseRegion = op.elseRegion();
   if (!elseRegion.empty()) {
-    p << " else";
+    p << " else ";
     p.printRegion(elseRegion,
                   /*printEntryBlockArgs=*/false,
                   /*printBlockTerminators=*/printBlockTerminators);
