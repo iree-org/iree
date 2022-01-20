@@ -157,7 +157,7 @@ static LogicalResult buildModuleDescriptors(IREE::VM::ModuleOp &moduleOp,
          << "[] = {\n";
   if (exportOps.empty()) {
     // Empty list placeholder.
-    output << "    {0},\n";
+    output << "    {{0}},\n";
   } else {
     // sort export ops
     llvm::sort(exportOps, [](auto &lhs, auto &rhs) {
