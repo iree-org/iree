@@ -1757,7 +1757,7 @@ class ExportOpConversion : public OpConversionPattern<IREE::VM::ExportOp> {
     auto ctx = exportOp.getContext();
     auto loc = exportOp.getLoc();
 
-    // const args_t* args = (const args_t*)call->arguments.data;
+    // args_t* args = (args_t*)call->arguments.data;
     // call->arguments
     auto callArguments = rewriter.create<emitc::CallOp>(
         /*location=*/loc,
@@ -1781,7 +1781,7 @@ class ExportOpConversion : public OpConversionPattern<IREE::VM::ExportOp> {
         /*operands=*/ArrayRef<Value>{callArguments.getResult(0)});
 
     // cast
-    std::string argumentsType = "const " + argumentStructName + "*";
+    std::string argumentsType = argumentStructName + "*";
     auto arguments = rewriter.create<emitc::CallOp>(
         /*location=*/loc,
         /*type=*/emitc::OpaqueType::get(ctx, argumentsType),
