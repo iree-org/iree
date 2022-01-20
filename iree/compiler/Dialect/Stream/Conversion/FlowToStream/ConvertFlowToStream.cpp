@@ -286,26 +286,64 @@ struct ConvertDispatchOp : public OpConversionPattern<IREE::Flow::DispatchOp> {
   }
 };
 
-static SmallVector<Value> makeBindingDynamicDims(
-    Location loc, IREE::Flow::DispatchTensorType tensorType, BlockArgument arg,
-    OpBuilder &builder) {
-  assert(!arg.use_empty() && "must have uses to query dims");
-  if (tensorType.hasStaticShape()) return {};
+// Inserts a stream.binding.subspan op for |arg|.
+// If the tensor result is statically shaped then the binding is inserted at the
+// current |builder| location. If the result is dynamically shaped then the
+// insertion point is set to the first use of the |arg| where all required
+// dynamic dimension SSA values are present.
+static bool insertBindingOp(BlockArgument arg,
+                            IREE::Flow::DispatchTensorType tensorType,
+                            Value zero, OpBuilder &builder) {
+  // No uses: don't need a binding op.
+  if (arg.use_empty()) return true;
 
-  // 95% of the time the dims come right from the arguments so look there first.
-  auto foundDims = IREE::Util::findDynamicDims(arg, builder.getInsertionBlock(),
-                                               builder.getInsertionPoint());
-  if (foundDims.hasValue()) return llvm::to_vector<4>(foundDims.getValue());
+  // Find the dynamic dimension SSA values of the argument within the region.
+  // If the flow dialect properly modeled dimension associations we wouldn't
+  // need this.
+  SmallVector<Value> dynamicDims;
+  OpBuilder::InsertPoint ip;
+  if (!tensorType.hasStaticShape()) {
+    // Try first to find a flow.dispatch.tie_shape op. All args with dynamic
+    // shapes should have one. We don't need to perform any analysis and don't
+    // need to worry about insertion order if we do our work next to it as it
+    // already carries all the SSA values we need.
+    IREE::Flow::DispatchTieShapeOp tieShapeOp;
+    for (auto user : arg.getUsers()) {
+      tieShapeOp = dyn_cast<IREE::Flow::DispatchTieShapeOp>(user);
+      if (tieShapeOp) break;
+    }
+    if (tieShapeOp) {
+      // Found a tie shape op - we'll insert ourselves there.
+      ip = builder.saveInsertionPoint();
+      builder.setInsertionPoint(tieShapeOp);
+      dynamicDims = tieShapeOp.dynamic_dims();
+    } else {
+      // The issue here is that at this point we no longer have the information
+      // we need to reconstitute the dimensions. We expect that whoever created
+      // the executable captured the shape dimensions they needed and we can
+      // find them with the simple logic above. If we do hit this case we'll
+      // need to add a new dispatch argument for the dimension and then go to
+      // each dispatch site and insert the dimension query - if that feels like
+      // a nasty hack it's because it is and it'd be better if we could avoid
+      // needing it.
+      mlir::emitError(arg.getLoc())
+          << "dynamic dispatch dimensions not properly captured; the must be "
+             "associated with a flow.dispatch.tie_shape op";
+      return false;
+    }
+  }
 
-  // The issue here is that at this point we no longer have the information we
-  // need to reconstitute the dimensions. We expect that whoever created the
-  // executable captured the shape dimensions they needed and we can find them
-  // with the simple logic above. If we do hit this case we'll need to add a new
-  // dispatch argument for the dimension and then go to each dispatch site and
-  // insert the dimension query - if that feels like a nasty hack it's because
-  // it is and it'd be better if we could avoid needing it.
-  llvm_unreachable("TODO: synthesize dynamic dimensions/hoist logic");
-  return {};
+  auto subspanOp = builder.create<IREE::Stream::BindingSubspanOp>(
+      arg.getLoc(), tensorType, arg, zero, dynamicDims);
+  arg.replaceAllUsesExcept(subspanOp.result(), subspanOp);
+
+  // If we needed to insert at a special point restore back to the original
+  // insertion point to keep the ops ordered with arguments.
+  if (ip.isSet()) {
+    builder.restoreInsertionPoint(ip);
+  }
+
+  return true;
 }
 
 struct ConvertExecutableOp
@@ -348,15 +386,12 @@ struct ConvertExecutableOp
         auto oldType = arg.getType();
         if (auto tensorType =
                 oldType.dyn_cast<IREE::Flow::DispatchTensorType>()) {
-          // Now a binding.
+          // Now a binding - insert the stream.binding.subspan op to slice it.
           auto newType = rewriter.getType<IREE::Stream::BindingType>();
           newTypes.push_back(newType);
-          if (!arg.use_empty()) {
-            auto dynamicDims =
-                makeBindingDynamicDims(arg.getLoc(), tensorType, arg, rewriter);
-            auto subspanOp = rewriter.create<IREE::Stream::BindingSubspanOp>(
-                arg.getLoc(), tensorType, arg, zero, dynamicDims);
-            arg.replaceAllUsesExcept(subspanOp.result(), subspanOp);
+          if (!insertBindingOp(arg, tensorType, zero, rewriter)) {
+            return rewriter.notifyMatchFailure(
+                flowOp, "failed to query dynamic dimensions");
           }
           arg.setType(newType);
         } else {
