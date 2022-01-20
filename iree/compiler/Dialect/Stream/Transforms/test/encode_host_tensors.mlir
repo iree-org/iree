@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -iree-stream-encode-tensors %s | FileCheck %s
+// RUN: iree-opt -split-input-file -iree-stream-encode-host-tensors %s | FileCheck %s
 
 // CHECK-LABEL: @denseTensorSizeOf
 func @denseTensorSizeOf(%arg0: index) -> index {
@@ -17,6 +17,19 @@ func @denseTensorConstant(%arg0: index) -> !stream.resource<constant> {
   // CHECK: %[[DYNAMIC_SIZE:.+]] = arith.muli %arg0, %[[STATIC_SIZE]] : index
   // CHECK: %[[RET:.+]] = stream.async.constant : !stream.resource<constant>{%[[DYNAMIC_SIZE]]} = dense<0.000000e+00> : tensor<1x5x64xf32>
   %0 = stream.tensor.constant : tensor<?x5x64xf32>{%arg0} in !stream.resource<constant> = dense<0.000000e+00> : tensor<1x5x64xf32>
+  // CHECK: return %[[RET]]
+  return %0 : !stream.resource<constant>
+}
+
+// -----
+
+// Tests that sub-byte element width constants get extended to byte alignment.
+
+// CHECK-LABEL: @denseTensorConstantI1
+func @denseTensorConstantI1() -> !stream.resource<constant> {
+  // CHECK: %[[STATIC_SIZE:.+]] = arith.constant 4 : index
+  // CHECK: %[[RET:.+]] = stream.async.constant : !stream.resource<constant>{%[[STATIC_SIZE]]} = dense<[1, 1, 0, 1]> : tensor<4xi8>
+  %0 = stream.tensor.constant : tensor<4xi1> in !stream.resource<constant> = dense<[true, true, false, true]> : tensor<4xi1>
   // CHECK: return %[[RET]]
   return %0 : !stream.resource<constant>
 }
