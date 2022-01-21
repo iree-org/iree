@@ -111,8 +111,9 @@ void buildStreamAsyncPassPipeline(OpPassManager &passManager,
       IREE::Stream::createEncodeHostTensorsPass());
   passManager.addNestedPass<mlir::FuncOp>(
       IREE::Stream::createEncodeHostTensorsPass());
-  passManager.addNestedPass<IREE::Stream::ExecutableOp>(
-      IREE::Stream::createEncodeDeviceTensorsPass());
+  // TODO(ravishankarm): enable when codegen can handle extui/trunc ops.
+  // passManager.addNestedPass<IREE::Stream::ExecutableOp>(
+  //     IREE::Stream::createEncodeDeviceTensorsPass());
 
   // Expand builtins to dispatches. This may introduce new executables.
   passManager.addPass(IREE::Stream::createMaterializeBuiltinsPass());
