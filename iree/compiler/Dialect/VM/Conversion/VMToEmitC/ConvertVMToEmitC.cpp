@@ -1049,34 +1049,36 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
     }
     const int numGlobalRefs = ordinal_counts.getValue().global_refs();
 
-    auto refs = builder.create<emitc::CallOp>(
-        /*location=*/loc,
-        /*type=*/emitc::OpaqueType::get(ctx, "iree_vm_ref_t*"),
-        /*callee=*/StringAttr::get(ctx, "EMITC_STRUCT_PTR_MEMBER"),
-        /*args=*/
-        ArrayAttr::get(ctx, {builder.getIndexAttr(0),
-                             emitc::OpaqueAttr::get(ctx, "refs")}),
-        /*templateArgs=*/ArrayAttr{},
-        /*operands=*/ArrayRef<Value>{stateOp.getResult(0)});
-
-    for (int i = 0; i < numGlobalRefs; i++) {
-      auto refPtrOp = builder.create<emitc::CallOp>(
+    if (numGlobalRefs > 0) {
+      auto refs = builder.create<emitc::CallOp>(
           /*location=*/loc,
           /*type=*/emitc::OpaqueType::get(ctx, "iree_vm_ref_t*"),
-          /*callee=*/StringAttr::get(ctx, "EMITC_ARRAY_ELEMENT_ADDRESS"),
+          /*callee=*/StringAttr::get(ctx, "EMITC_STRUCT_PTR_MEMBER"),
           /*args=*/
-          ArrayAttr::get(
-              ctx, {builder.getIndexAttr(0), builder.getUI32IntegerAttr(i)}),
+          ArrayAttr::get(ctx, {builder.getIndexAttr(0),
+                               emitc::OpaqueAttr::get(ctx, "refs")}),
           /*templateArgs=*/ArrayAttr{},
-          /*operands=*/ArrayRef<Value>{refs.getResult(0)});
+          /*operands=*/ArrayRef<Value>{stateOp.getResult(0)});
 
-      builder.create<emitc::CallOp>(
-          /*location=*/loc,
-          /*type=*/TypeRange{},
-          /*callee=*/StringAttr::get(ctx, "iree_vm_ref_release"),
-          /*args=*/ArrayAttr{},
-          /*templateArgs=*/ArrayAttr{},
-          /*operands=*/ArrayRef<Value>{refPtrOp.getResult(0)});
+      for (int i = 0; i < numGlobalRefs; i++) {
+        auto refPtrOp = builder.create<emitc::CallOp>(
+            /*location=*/loc,
+            /*type=*/emitc::OpaqueType::get(ctx, "iree_vm_ref_t*"),
+            /*callee=*/StringAttr::get(ctx, "EMITC_ARRAY_ELEMENT_ADDRESS"),
+            /*args=*/
+            ArrayAttr::get(
+                ctx, {builder.getIndexAttr(0), builder.getUI32IntegerAttr(i)}),
+            /*templateArgs=*/ArrayAttr{},
+            /*operands=*/ArrayRef<Value>{refs.getResult(0)});
+
+        builder.create<emitc::CallOp>(
+            /*location=*/loc,
+            /*type=*/TypeRange{},
+            /*callee=*/StringAttr::get(ctx, "iree_vm_ref_release"),
+            /*args=*/ArrayAttr{},
+            /*templateArgs=*/ArrayAttr{},
+            /*operands=*/ArrayRef<Value>{refPtrOp.getResult(0)});
+      }
     }
 
     auto allocatorOp = builder.create<emitc::CallOp>(
