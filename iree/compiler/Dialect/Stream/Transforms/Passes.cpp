@@ -223,13 +223,15 @@ void buildStreamCmdPassPipeline(OpPassManager &passManager,
 
 void buildStreamOptimizationPassPipeline(
     OpPassManager &passManager, const TransformOptions &transformOptions) {
+  // Forming streams involves a fair amount of subgraph stitching, which can
+  // cause duplication. Run CSE to collapse.
+  addCleanupPatterns(passManager);
+
   //----------------------------------------------------------------------------
   // Binding optimization
   //----------------------------------------------------------------------------
 
   if (transformOptions.optimizeBindings) {
-    // Canonicalizer needs to run so that we have predictable inputs for fusion.
-    passManager.addPass(mlir::createCanonicalizerPass());
     passManager.addPass(IREE::Stream::createFuseDispatchBindingsPass());
 
     // Folding operands requires that CSE folds the inputs that we check for.
@@ -284,8 +286,7 @@ void buildStreamTransformPassPipeline(
   // Post-pipeline cleanup
   //----------------------------------------------------------------------------
 
-  // Forming streams involves a fair amount of subgraph stitching, which can
-  // cause duplication. Run CSE to collapse.
+  // Final cleanup after we optimize dispatches and fuse operands and bindings.
   addCleanupPatterns(passManager);
 
   // Symbol DCE any remaining variables/functions that are now no longer
