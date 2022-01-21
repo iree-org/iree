@@ -17,6 +17,7 @@
 #include "iree/compiler/Codegen/SPIRV/Utils.h"
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
@@ -155,6 +156,30 @@ struct ConcretizePadResultShape final : public OpRewritePattern<tensor::PadOp> {
 }  // namespace
 
 //===----------------------------------------------------------------------===//
+// Tiling configuration
+//===----------------------------------------------------------------------===//
+
+/// Returns a tile size configuration to split the given original tile `sizes`
+/// into two even halves.
+static SmallVector<int64_t> halveTileSizes(ArrayRef<int64_t> sizes) {
+  SmallVector<int64_t> halfSizes(sizes.size(), 0);
+
+  // Drop all non tiled dimensions at the end.
+  while (!sizes.empty() && sizes.back() == 0) sizes = sizes.drop_back();
+
+  // Find the first dimension that can be halved. If it is not the last tiled
+  // dimension, we can just use it. Otherwise, only halve if we can still
+  // maintain at least 4 elements per tile for vectorization.
+  for (int i = 0; i < sizes.size(); ++i) {
+    if (sizes[i] == 0 || sizes[i] % 2 != 0) continue;
+    if (i != sizes.size() - 1 || sizes[i] >= 8) halfSizes[i] = sizes[i] / 2;
+    break;
+  }
+
+  return halfSizes;
+}
+
+//===----------------------------------------------------------------------===//
 // Main pass
 //===----------------------------------------------------------------------===//
 
@@ -207,8 +232,8 @@ class SPIRVTilePass final : public SPIRVTileBase<SPIRVTilePass> {
 
     // Now tile the last computation op to invocations and fuse all operand
     // computation ops into the materialized loop nest.
-    for (Operation *computeOp : computeOps) {
-      auto consumerOp = dyn_cast<linalg::LinalgOp>(computeOp);
+    for (int i = 0; i < computeOps.size(); ++i) {
+      auto consumerOp = dyn_cast<linalg::LinalgOp>(computeOps[i]);
 
       OpBuilder builder(context);
       SmallVector<int64_t> tileSizes = getTileSizes(consumerOp, 1);
@@ -221,6 +246,7 @@ class SPIRVTilePass final : public SPIRVTileBase<SPIRVTilePass> {
       if (failed(loopNest)) return signalPassFailure();
 
       consumerOp->replaceAllUsesWith(loopNest->getRootOpReplacementResults());
+      computeOps[i] = loopNest->getRootOp();
 
       // We don't distribute here; instead, it will be done in a later step
       // after bufferization. So add attributes to the tiled loop nest to
@@ -235,6 +261,37 @@ class SPIRVTilePass final : public SPIRVTileBase<SPIRVTilePass> {
 
     LLVM_DEBUG({
       llvm::dbgs() << "--- After tiling to invocations ---\n";
+      funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
+      llvm::dbgs() << "\n\n";
+    });
+
+    if (!ifOps.empty()) {  // Tile padded case again to save registers
+      auto consumerOp = dyn_cast<linalg::LinalgOp>(computeOps.back());
+
+      SmallVector<int64_t> tileSizes =
+          halveTileSizes(getTileSizes(consumerOp, 1));
+      LLVM_DEBUG({
+        llvm::dbgs() << "Tiling padded case again using tile size: [";
+        llvm::interleaveComma(tileSizes, llvm::dbgs());
+        llvm::dbgs() << "]\n";
+      });
+
+      if (llvm::any_of(tileSizes, [](int64_t size) { return size != 0; })) {
+        OpBuilder builder(context);
+        auto identityLoopOrder =
+            llvm::to_vector<4>(llvm::seq<int64_t>(0, tileSizes.size()));
+        FailureOr<linalg::TileLoopNest> loopNest =
+            linalg::tileConsumerAndFuseProducers(builder, consumerOp, tileSizes,
+                                                 identityLoopOrder, llvm::None);
+
+        if (failed(loopNest)) return signalPassFailure();
+
+        consumerOp->replaceAllUsesWith(loopNest->getRootOpReplacementResults());
+      }
+    }
+
+    LLVM_DEBUG({
+      llvm::dbgs() << "--- After tiling padded case ---\n";
       funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
       llvm::dbgs() << "\n\n";
     });
