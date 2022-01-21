@@ -256,7 +256,7 @@ def IREELinalgExt_ScanOp : IREELinalgExt_Op<"scan",
     Computes the inclusive/exclusive scan along a given dimension.
   }];
 
-  let arguments = (ins Variadic<AnyType>:$inputs,
+  let arguments = (ins Variadic<AnyShaped>:$inputs,
                        Variadic<AnyShaped>:$outputs,
                        I64Attr:$dimension,
                        BoolAttr:$inclusive
@@ -269,12 +269,13 @@ def IREELinalgExt_ScanOp : IREELinalgExt_Op<"scan",
 
   let results = (outs Variadic<AnyRankedTensor>:$results);
   let regions = (region AnyRegion:$region);
+  let hasFolder = 1;
   let assemblyFormat = [{
     `dimension` `(` $dimension `)`
     `inclusive` `(` $inclusive `)`
     attr-dict
     `ins` `(` $inputs `:` type($inputs) `)`
-    (`outs` `(` $outputs^ `:` type($outputs) `)`)?
+    `outs` `(` $outputs `:` type($outputs) `)`
     $region (`->` type($results)^)?
   }];
 
@@ -282,8 +283,8 @@ def IREELinalgExt_ScanOp : IREELinalgExt_Op<"scan",
     Value input() {
       return getInputOperand(0)->get();
     }
-    Value identity() {
-      return getInputOperand(1)->get();
+    Value accumulator() {
+      return getOutputOperand(1)->get();
     }
     Value output() {
       return getOutputOperand(0)->get();
