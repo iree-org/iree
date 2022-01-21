@@ -35,7 +35,6 @@ typedef struct iree_hal_cuda_dynamic_symbols_t {
 
 } iree_hal_cuda_dynamic_symbols_t;
 
-
 // Initializes |out_syms| in-place with dynamically loaded CUDA symbols.
 // iree_hal_cuda_dynamic_symbols_deinitialize must be used to release the
 // library resources.
