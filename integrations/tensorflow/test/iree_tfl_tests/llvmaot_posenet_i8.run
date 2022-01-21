@@ -1,2 +1,3 @@
 # REQUIRES: llvmaot
 # RUN: %PYTHON -m iree_tfl_tests.posenet_i8_test --target_backend=llvmaot -artifacts_dir=%t
+# XFAIL: *
