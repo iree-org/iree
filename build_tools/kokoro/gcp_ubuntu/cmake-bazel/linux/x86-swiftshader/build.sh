@@ -62,6 +62,7 @@ echo "Configuring CMake"
    -DIREE_BUILD_TESTS=ON \
    -DIREE_BUILD_SAMPLES=OFF \
    -DIREE_BUILD_PYTHON_BINDINGS=ON \
+   -DIREE_HAL_DRIVER_CUDA=OFF \
    .
 
 echo "Building with Ninja"

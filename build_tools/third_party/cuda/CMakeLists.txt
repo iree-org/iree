@@ -8,6 +8,8 @@
 unset(CUDA_INCLUD_DIR CACHE)
 unset(CUPTI_INCLUDE_DIR CACHE)
 
+message("third_paryt/cuda/CMakeLists.txt: IREE_HAL_DRIVER_CUDA - ${IREE_HAL_DRIVER_CUDA}")
+
 if(IREE_HAL_DRIVER_CUDA)
   include(CheckLanguage)
   check_language(CUDA)

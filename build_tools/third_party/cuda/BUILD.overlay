@@ -8,7 +8,7 @@ package(default_visibility = ["//visibility:public"])
 
 cc_library(
     name = "cuda_headers",
-    hdrs = ["include/cuda.h", "include/cupti.h"],
+    hdrs = ["include/cuda.h"],
     includes = ["include"],
 )
 

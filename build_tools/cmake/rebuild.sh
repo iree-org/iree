@@ -48,6 +48,10 @@ CMAKE_ARGS=(
   # get a reasonable mix of {builds with asserts, builds with other features
   # such as ASan but without asserts}.
   "-DIREE_ENABLE_ASSERTIONS=ON"
+
+  # Cuda builds are only viable on Tesla machines. For general builds without
+  # Nvidia GPUs, this will fai.
+  "-DIREE_HAL_DRIVER_CUDA=OFF"
 )
 
 "$CMAKE_BIN" "${CMAKE_ARGS[@]?}" ..

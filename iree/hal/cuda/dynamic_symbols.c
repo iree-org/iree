@@ -49,6 +49,8 @@ static iree_status_t iree_hal_cuda_dynamic_symbols_resolve_all(
 #include "iree/hal/cuda/dynamic_symbol_tables.h"  // IWYU pragma: keep
 #undef CU_PFN_DECL
 
+#if IREE_TRACING_FEATURES  // CUPTI is only used for tracing.
+
 #define CUPTI_PFN_DECL(cuptiSymbolName, ...)                                  \
   {                                                                           \
     static const char* kName = #cuptiSymbolName;                              \
@@ -61,6 +63,9 @@ static iree_status_t iree_hal_cuda_dynamic_symbols_resolve_all(
   }
 #include "iree/hal/cuda/dynamic_cupti_tables.h"  // IWYU pragma: keep
 #undef CUPTI_PFN_DECL
+
+#endif  // IREE_TRACING_FEATURES
+
   return iree_ok_status();
 }
 

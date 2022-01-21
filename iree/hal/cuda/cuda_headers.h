@@ -7,7 +7,9 @@
 #ifndef IREE_HAL_CUDA_CUDA_HEADERS_H_
 #define IREE_HAL_CUDA_CUDA_HEADERS_H_
 
-#include "cuda.h"  // IWYU pragma: export
-#include "cupti.h"  // IWYU pragma: export
+#include "cuda.h"          // IWYU pragma: export
+// #if IREE_TRACING_FEATURES  // CUPTI is only used for tracing.
+#include "cupti.h"         // IWYU pragma: export
+// #endif                     // IREE_TRACING_FEATURES
 
 #endif  // IREE_HAL_CUDA_CUDA_HEADERS_H_
