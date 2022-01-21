@@ -94,6 +94,8 @@ struct OptimizeVectorTransferPass
     // ops. This increases the chance that we can forward more transfer writes
     // to transfer reads.
     OwningRewritePatternList patterns(&getContext());
+    mlir::vector::populateVectorTransferDropUnitDimsPatterns(patterns);
+    mlir::vector::populateFlattenVectorTransferPatterns(patterns);
     mlir::vector::populateCastAwayVectorLeadingOneDimPatterns(patterns);
     patterns.add<TransposeUnitDimToShapeCast>(&getContext());
     mlir::vector::populateVectorTransferCollapseInnerMostContiguousDimsPatterns(
