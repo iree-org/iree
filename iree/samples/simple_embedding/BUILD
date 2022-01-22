@@ -320,7 +320,7 @@ iree_native_test(
     "simple_embedding_cuda_test"
   LABELS
     "driver=cuda"
-  TEST_BINARY
+  SRC
     ::simple_embedding_cuda
 )
 
