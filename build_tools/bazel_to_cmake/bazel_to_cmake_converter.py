@@ -721,8 +721,7 @@ class BuildFileFunctions(object):
 
   def native_test(self, name, src, args=None, data=None, tags=None):
     if data is not None:
-      self._convert_unimplemented_function("native_test",
-                                           name + " has data")
+      self._convert_unimplemented_function("native_test", name + " has data")
 
     name_block = _convert_string_arg_block("NAME", name)
     test_binary_block = _convert_single_target_block("SRC", src)
