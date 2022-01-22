@@ -268,8 +268,8 @@ cc_binary(
 
 native_test(
     name = "bytecode_module_benchmark_test",
-    args = ["--benchmark_min_time=0"],
     src = ":bytecode_module_benchmark",
+    args = ["--benchmark_min_time=0"],
 )
 
 iree_bytecode_module(

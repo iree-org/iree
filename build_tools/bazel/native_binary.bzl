@@ -23,7 +23,7 @@ don't depend on Bash and work with --shell_exectuable="".
 def _shared_impl(ctx):
     out = ctx.attr.out
     if not out:
-      out = ctx.attr.name
+        out = ctx.attr.name
     output = ctx.actions.declare_file(out)
     ctx.actions.symlink(
         target_file = ctx.executable.src,
