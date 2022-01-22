@@ -43,7 +43,7 @@ iree_lit_test(
     iree_run_mnist_module_test
   TEST_FILE
     "mnist_test.txt"
-  DATA
+  TOOLS
     ::iree-run-mnist-module
     FileCheck
   LABELS
