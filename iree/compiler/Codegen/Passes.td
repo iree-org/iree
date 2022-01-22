@@ -159,10 +159,18 @@ def LLVMCPUUnfuseFMAOps :
   let constructor = "mlir::iree_compiler::createLLVMCPUUnfuseFMAOpsPass()";
 }
 
-def VectorToAArch64InlineAsm :
-    Pass<"iree-llvmcpu-vector-to-aarch64-inline-asm", "FuncOp"> {
-  let summary = "Convert vector operations to aarch64 inline asm LLVMIR dialect";
-  let constructor = "mlir::iree_compiler::createVectorToAArch64InlineAssemblyPass()";
+def VectorContractCustomKernels :
+    Pass<"iree-llvmcpu-vector-contract-custom-kernels", "FuncOp"> {
+  let summary = "Enable custom kernels (inline assembly or intrinsics) for some vector.contract ops";
+  let constructor = "mlir::iree_compiler::createVectorContractCustomKernelsPass()";
+  let options = [
+    Option<"aarch64", "aarch64", "bool",
+            /*default=*/"false",
+           "Enable aarch64 kernels">,
+    Option<"dotprod", "dotprod", "bool",
+            /*default=*/"false",
+           "Under aarch64, enable kernels that use dotprod instructions">,
+  ];
 }
 
 //------------------------------------------------------------------------------

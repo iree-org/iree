@@ -660,6 +660,10 @@ class LLVMAOTTargetBackend final : public TargetBackend {
     addConfig("native_vector_size",
               IntegerAttr::get(IndexType::get(context), config_.vectorSize));
 
+    // Set target CPU features.
+    addConfig("cpu_features",
+              StringAttr::get(context, options_.targetCPUFeatures));
+
     return IREE::HAL::ExecutableTargetAttr::get(
         context, StringAttr::get(context, "llvm"),
         StringAttr::get(context, format), DictionaryAttr::get(context, config));
@@ -700,9 +704,9 @@ class LLVMAOTTargetBackend final : public TargetBackend {
 
   LLVMTargetOptions options_;
 
-  // Configuration to be set on each `hal.executable.variant` that only depend
-  // on the `options_`.
-  struct ConfigurationValues {
+  // Additional target information besides that is contained in
+  // LLVMTargetOptions options_.
+  struct AdditionalConfigurationValues {
     std::string dataLayoutStr;
     int64_t vectorSize;
   } config_;

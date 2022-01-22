@@ -94,11 +94,8 @@ static Optional<llvm::Triple> getTargetTriple(FuncOp entryPointFn) {
 static DispatchLoweringPassPipeline getDispatchLoweringPassPipeline(
     FuncOp entryPointFn, Operation *op) {
   return TypeSwitch<Operation *, DispatchLoweringPassPipeline>(op)
-      .Case<linalg::ContractionOpInterface>([&](auto op) {
+      .Case<linalg::ContractionOpInterface, linalg::Mmt4DOp>([&](auto op) {
         return DispatchLoweringPassPipeline::CPUTileFuseAndVectorize;
-      })
-      .Case<linalg::Mmt4DOp>([&](auto op) {
-        return DispatchLoweringPassPipeline::CPUTensorToVectors;
       })
       .Default([&](Operation *op) {
         return DispatchLoweringPassPipeline::CPUDefault;

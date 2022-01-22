@@ -25,7 +25,7 @@ iree_cc_library(
     "LLVMCPUTileFuseAndVectorizeLinalgTensorOps.cpp"
     "LLVMCPUUnfuseFMAOps.cpp"
     "Passes.cpp"
-    "VectorContractToAArch64InlineAsmOp.cpp"
+    "VectorContractCustomKernels.cpp"
   DEPS
     IREELinalgExtDialect
     IREELinalgExtPasses
