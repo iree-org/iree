@@ -15,13 +15,11 @@ include(CMakeParseArguments)
 # Parameters:
 # NAME: Name of the target
 # TEST_FILE: Test file to run with the lit runner.
+# TOOLS: Tools that should be included on the PATH
 # DATA: Additional data dependencies invoked by the test (e.g. binaries
 #   called in the RUN line)
 # LABELS: Additional labels to apply to the test. The package path is added
 #     automatically.
-#
-# TODO(gcmn): allow using alternative driver
-# A driver other than the default iree/tools/run_lit.sh is not currently supported.
 function(iree_lit_test)
   if(NOT IREE_BUILD_TESTS)
     return()
@@ -102,13 +100,10 @@ endfunction()
 # Parameters:
 # NAME: Name of the target
 # SRCS: List of test files to run with the lit runner. Creates one test per source.
-# DATA: Additional data dependencies invoked by the test (e.g. binaries
-#   called in the RUN line)
+# TOOLS: Tools that should be included on the PATH
+# DATA: Additional data dependencies used by the test
 # LABELS: Additional labels to apply to the generated tests. The package path is
 #     added automatically.
-#
-# TODO(gcmn): allow using alternative driver
-# A driver other than the default iree/tools/run_lit.sh is not currently supported.
 function(iree_lit_test_suite)
   if(NOT IREE_BUILD_TESTS)
     return()
