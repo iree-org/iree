@@ -733,8 +733,17 @@ struct ConvertDynamicReshapeOp
       }
     }
 
-    rewriter.replaceOpWithNewOp<IREE::Flow::TensorReshapeOp>(op, resultType,
-                                                             input, targetDims);
+    SmallVector<Value> castedTargetDims;
+    for (Value dim : targetDims) {
+      if (dim.getType().isa<IntegerType>()) {
+        dim = rewriter.create<arith::IndexCastOp>(loc, rewriter.getIndexType(),
+                                                  dim);
+      }
+      castedTargetDims.push_back(dim);
+    }
+
+    rewriter.replaceOpWithNewOp<IREE::Flow::TensorReshapeOp>(
+        op, resultType, input, castedTargetDims);
     return success();
   }
 };

@@ -426,3 +426,25 @@ func @fallbackDynamicReshape(%arg0 : tensor<4x?x3x?xui32>, %arg1 : tensor<5xinde
   // CHECK: return %[[RESULT]]
   return %0 : tensor<12x?x?x1x?xui32>
 }
+
+// -----
+// CHECK-LABEL: @fallbackDynamicReshapeInt
+func @fallbackDynamicReshapeInt(%arg0 : tensor<4x?x3x?xui32>, %arg1 : tensor<5xi32>) -> tensor<12x?x?x1x?xui32> {
+  // CHECK-DAG: %[[C1:.*]] = arith.constant 1 : index
+  // CHECK-DAG: %[[C2:.*]] = arith.constant 2 : index
+  // CHECK-DAG: %[[C4:.*]] = arith.constant 4 : index
+  // CHECK-DAG: %[[D1:.*]] = tensor.extract %arg1[%[[C1]]] : tensor<5xi32>
+  // CHECK-DAG: %[[D2:.*]] = tensor.extract %arg1[%[[C2]]] : tensor<5xi32>
+  // CHECK-DAG: %[[D4:.*]] = tensor.extract %arg1[%[[C4]]] : tensor<5xi32>
+  // CHECK-DAG: %[[RESULT_D1:.*]] = arith.index_cast %0 : i32 to index
+  // CHECK-DAG: %[[RESULT_D2:.*]] = arith.index_cast %1 : i32 to index
+  // CHECK-DAG: %[[RESULT_D4:.*]] = arith.index_cast %2 : i32 to index
+  // CHECK-DAG: %[[INDEX1:.*]] = arith.constant 1 : index
+  // CHECK-DAG: %[[ARG_D1:.*]] = tensor.dim %arg0, %[[INDEX1]] : tensor<4x?x3x?xi32>
+  // CHECK-DAG: %[[INDEX3:.*]] = arith.constant 3 : index
+  // CHECK-DAG: %[[ARG_D3:.*]] = tensor.dim %arg0, %[[INDEX3]] : tensor<4x?x3x?xi32>
+  // CHECK-DAG: %[[RESULT:.*]] = flow.tensor.reshape %arg0 : tensor<4x?x3x?xi32>{%[[ARG_D1]], %[[ARG_D3]]} -> tensor<12x?x?x1x?xi32>{%[[RESULT_D1]], %[[RESULT_D2]], %[[RESULT_D4]]}
+  %0 = "mhlo.dynamic_reshape"(%arg0, %arg1) : (tensor<4x?x3x?xui32>, tensor<5xi32>) -> tensor<12x?x?x1x?xui32>
+  // CHECK: return %[[RESULT]]
+  return %0 : tensor<12x?x?x1x?xui32>
+}
