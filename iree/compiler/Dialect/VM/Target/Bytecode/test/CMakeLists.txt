@@ -17,7 +17,7 @@ iree_lit_test_suite(
     "constant_encoding.mlir"
     "module_encoding_smoke.mlir"
     "reflection_attrs.mlir"
-  DATA
+  TOOLS
     FileCheck
     iree::tools::iree-translate
 )

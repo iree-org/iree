@@ -23,7 +23,7 @@ iree_lit_test_suite(
     "func_attrs.mlir"
     "nesting.mlir"
     "structural_ops.mlir"
-  DATA
+  TOOLS
     FileCheck
     iree::tools::iree-opt
 )

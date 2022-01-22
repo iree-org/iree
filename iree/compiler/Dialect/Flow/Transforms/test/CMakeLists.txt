@@ -39,7 +39,7 @@ iree_lit_test_suite(
     "test_partitionable_loops_interface.mlir"
     "transformation.mlir"
     "verify_input_ir.mlir"
-  DATA
+  TOOLS
     FileCheck
     iree::tools::iree-opt
 )

@@ -16,7 +16,7 @@ iree_lit_test_suite(
   SRCS
     "conversion.mlir"
     "custom_ops.mlir"
-  DATA
+  TOOLS
     FileCheck
     iree::samples::custom_modules::dialect::custom-opt
 )

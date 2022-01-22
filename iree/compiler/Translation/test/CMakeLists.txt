@@ -16,7 +16,7 @@ iree_lit_test_suite(
   SRCS
     "hal_executable.mlir"
     "smoketest.mlir"
-  DATA
+  TOOLS
     FileCheck
     iree::tools::iree-translate
 )

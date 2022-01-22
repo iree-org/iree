@@ -193,7 +193,7 @@ iree_lit_test_suite(
     flags_test
   SRCS
     "flags_test.txt"
-  DATA
+  TOOLS
     ::flags_demo
     FileCheck
   LABELS
