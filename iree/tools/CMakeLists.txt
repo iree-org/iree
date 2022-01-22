@@ -471,16 +471,6 @@ if(${IREE_BUILD_COMPILER})
     RUNTIME DESTINATION bin
   )
 
-  # General test dependency binary/scripts installed.
-  install(
-    PROGRAMS
-      run_lit.bat
-      run_lit.ps1
-      run_lit.sh
-    DESTINATION "tests/bin"
-    COMPONENT Tests
-  )
-
   # Bundle the FileCheck binary from LLVM into our tests/bin directory so
   # installed FileCheck tests are hermetic.
   install(
