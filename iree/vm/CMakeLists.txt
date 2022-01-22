@@ -226,12 +226,12 @@ iree_cc_binary(
   TESTONLY
 )
 
-iree_run_binary_test(
+iree_native_test(
   NAME
     "bytecode_module_benchmark_test"
   ARGS
     "--benchmark_min_time=0"
-  TEST_BINARY
+  SRC
     ::bytecode_module_benchmark
 )
 
