@@ -22,15 +22,15 @@ iree_lit_test_suite(
         ],
         include = ["*.mlir"],
     ),
-    data = glob(["*.tflite"]) + [
-        "//iree_tf_compiler:iree-import-tflite",
-        "@llvm-project//llvm:FileCheck",
-    ],
-    driver = "//build_tools/bazel:run_lit.sh",
     # TODO: These tests have never passed
     tags = [
         "manual",
         "nokokoro",
         "notap",
+    ],
+    data = glob(["*.tflite"]),
+    tools = [
+        "//iree_tf_compiler:iree-import-tflite",
+        "@llvm-project//llvm:FileCheck",
     ],
 )

@@ -191,11 +191,11 @@ cc_binary(
 iree_lit_test_suite(
     name = "flags_test",
     srcs = ["flags_test.txt"],
-    data = [
+    tags = ["hostonly"],
+    tools = [
         ":flags_demo",
         "@llvm-project//llvm:FileCheck",
     ],
-    tags = ["hostonly"],
 )
 
 cc_library(
@@ -296,8 +296,8 @@ cc_binary(
 
 native_test(
     name = "synchronization_benchmark_test",
-    args = ["--benchmark_min_time=0"],
     src = ":synchronization_benchmark",
+    args = ["--benchmark_min_time=0"],
 )
 
 cc_test(

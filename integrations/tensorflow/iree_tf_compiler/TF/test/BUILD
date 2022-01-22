@@ -30,9 +30,8 @@ iree_lit_test_suite(
         ],
         include = ["*.mlir"],
     ),
-    data = [
+    tools = [
         "//iree_tf_compiler:iree-tf-opt",
         "@llvm-project//llvm:FileCheck",
     ],
-    driver = "//build_tools/bazel:run_lit.sh",
 )

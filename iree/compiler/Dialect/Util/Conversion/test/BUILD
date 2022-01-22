@@ -19,7 +19,7 @@ iree_lit_test_suite(
         ["hint_ops.mlir"],
         include = ["*.mlir"],
     ),
-    data = [
+    tools = [
         "//iree/tools:iree-opt",
         "@llvm-project//llvm:FileCheck",
     ],

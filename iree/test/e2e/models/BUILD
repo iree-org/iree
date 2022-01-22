@@ -38,14 +38,14 @@ iree_lit_test_suite(
             ["*.mlir"],
         exclude = CHECK_FRAMEWORK_TESTS,
     ),
-    data = [
-        "//iree/tools:iree-run-mlir",
-        "@llvm-project//lld",
-        "@llvm-project//llvm:FileCheck",
-    ],
     tags = [
         "hostonly",
         "optonly",  # swiftshader is too slow in dbg
+    ],
+    tools = [
+        "//iree/tools:iree-run-mlir",
+        "@llvm-project//lld",
+        "@llvm-project//llvm:FileCheck",
     ],
 )
 

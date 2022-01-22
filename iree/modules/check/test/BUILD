@@ -23,12 +23,12 @@ iree_lit_test_suite(
         ],
         include = ["*.mlir"],
     ),
-    data = [
+    tags = ["hostonly"],
+    tools = [
         "//iree/tools:iree-check-module",
         "//iree/tools:iree-translate",
         "@llvm-project//llvm:FileCheck",
     ],
-    tags = ["hostonly"],
 )
 
 iree_check_test_suite(

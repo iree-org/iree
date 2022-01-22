@@ -6,7 +6,7 @@
 
 """Rules for running lit tests with the upstream lit binary."""
 
-# This exists as a separate file from iree_iree_lit_test.bzl because we anticipate
+# This exists as a separate file from iree_lit_test.bzl because we anticipate
 # upstreaming it soon.
 
 load("@bazel_skylib//lib:paths.bzl", "paths")
@@ -110,6 +110,7 @@ def lit_test(
     native_test(
         name = name,
         src = "@llvm-project//llvm:lit",
+        # out = name,
         args = [
             "-v",
             "--path",

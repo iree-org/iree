@@ -56,13 +56,13 @@ iree_lit_test_suite(
             "lowering_config.mlir",
         ] + BACKEND_TESTS,
     ),
-    data = [
+    tags = ["hostonly"],
+    tools = [
         "//iree/tools:iree-opt",
         "//iree/tools:iree-run-mlir",
         "@llvm-project//lld",
         "@llvm-project//llvm:FileCheck",
     ],
-    tags = ["hostonly"],
 )
 
 iree_check_single_backend_test_suite(
