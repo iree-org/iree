@@ -64,3 +64,23 @@ stream.executable private @convert_multi_i1 {
     }
   }
 }
+
+// -----
+
+// CHECK-LABEL: @convert_load_i33
+stream.executable private @convert_load_i33 {
+  stream.executable.export public @dispatch
+  builtin.module {
+    func @dispatch(%arg0: !stream.binding) {
+      %c0 = arith.constant 0 : index
+      // CHECK: %[[BINDING:.+]] = stream.binding.subspan {{.+}} -> !flow.dispatch.tensor<readonly:4xi64>
+      %binding = stream.binding.subspan %arg0[%c0] : !stream.binding -> !flow.dispatch.tensor<readonly:4xi33>
+      // CHECK: %[[TILE_I8:.+]] = flow.dispatch.tensor.load %[[BINDING]], {{.+}} : !flow.dispatch.tensor<readonly:4xi64> -> tensor<?xi64>
+      // CHECK: %[[TILE_I1:.+]] = arith.trunci %[[TILE_I8]] : tensor<?xi64> to tensor<?xi33>
+      %tile = flow.dispatch.tensor.load %binding, offsets = [0], sizes = [4], strides = [1] : !flow.dispatch.tensor<readonly:4xi33> -> tensor<?xi33>
+      // CHECK: do_not_optimize(%[[TILE_I1]])
+      util.do_not_optimize(%tile) : tensor<?xi33>
+      return
+    }
+  }
+}

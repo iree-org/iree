@@ -47,6 +47,7 @@ cc_library(
         "OptimizeVectorTransferPass.cpp",
         "RemoveTrivialLoops.cpp",
         "SetNumWorkgroupsPass.cpp",
+        "TypePropagationPass.cpp",
         "VectorizeConv.cpp",
         "VectorizeMMT4d.cpp",
     ],

@@ -114,6 +114,9 @@ std::unique_ptr<OperationPass<FuncOp>> createLinalgToVectorVectorizeMMT4dPass();
 /// Pass to optimize vector transfer_read and transfer_write.
 std::unique_ptr<OperationPass<FuncOp>> createOptimizeVectorTransferPass();
 
+/// Pass to propagate type to avoid generating load/stores of illegal types.
+std::unique_ptr<OperationPass<FuncOp>> createTypePropagationPass();
+
 /// Sets the number of workgroups to use for each entry point in the dispatch
 /// region.
 std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>

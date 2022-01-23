@@ -224,6 +224,7 @@ void addSPIRVTileAndDistributeCopyPassPipeline(OpPassManager &pm) {
 //===----------------------------------------------------------------------===//
 
 void buildSPIRVCodegenPassPipeline(OpPassManager &pm) {
+  pm.nest<ModuleOp>().nest<FuncOp>().addPass(createTypePropagationPass());
   pm.addPass(createSPIRVLowerExecutableTargetPass());
   addMemRefLoweringPasses(pm.nest<ModuleOp>());
   addSPIRVLoweringPasses(pm.nest<ModuleOp>());

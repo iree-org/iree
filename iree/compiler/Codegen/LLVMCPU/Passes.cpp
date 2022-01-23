@@ -337,6 +337,8 @@ static void addLowerToLLVMPasses(OpPassManager &passManager) {
 }
 
 void buildLLVMCPUCodegenPassPipeline(OpPassManager &passManager) {
+  passManager.nest<ModuleOp>().nest<FuncOp>().addPass(
+      createTypePropagationPass());
   passManager.addPass(createLLVMCPULowerExecutableTargetPass());
   OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
   addLowerToLLVMPasses(nestedModulePM);
