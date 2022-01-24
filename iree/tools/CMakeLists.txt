@@ -459,11 +459,6 @@ if(${IREE_BUILD_COMPILER})
     HOSTONLY
   )
 
-  add_custom_target(BundledLLVMFileCheck ALL
-    COMMAND ${CMAKE_COMMAND} -E create_symlink $<TARGET_FILE:FileCheck> FileCheck
-    DEPENDS FileCheck
-  )
-
   # lld install - required by the compiler to link codegen executables.
   install(
     TARGETS lld
