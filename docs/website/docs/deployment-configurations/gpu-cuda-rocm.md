@@ -1,10 +1,10 @@
 # CUDA and ROCM GPU HAL Driver
 
-A lot of AI/ML workload uses GPU to accelerate execution. IREE can accelerate model execution on GPUs through CUDA for NVIDIA hardwares, and ROCm for AMD hardwares. Due to the similarity of CUDA and ROCM APIs and infrastructure, CUDA and ROCM backend shares many features and implementation in IREE. In IREE compiler level, CUDA and ROCM bothg go through LLVMGPU pipeline, but CUDA generate ptx, while ROCM generate hsaco. In the IREE runtime level, the HAL layer for ROCM mirrors the one on CUDA, except for the command graph. Where CUDA has direct, stream, and graph command buffer, and ROCM has only direct command buffer.
+IREE can accelerate model execution on NVIDIA GPUs using CUDA and on AMD GPUs using ROCm. Due to the similarity of CUDA and ROCm APIs and infrastructure, the CUDA and ROCm backends share much of their implementation in IREE. The IREE compiler uses a similar GPU code generation pipeline for each, but generates PTX for CUDA and hsaco for ROCm. The IREE runtime HAL driver for ROCm mirrors the one for CUDA, except for the command graph - where CUDA has "direct", "stream", and "graph" command buffers, and ROCM has only "direct" command buffers.
 
 ## Prerequisites
 
-In order to use CUDA or ROCM to drive the GPU, you need to have a functional CUDA or ROCM
+In order to use CUDA or ROCm to drive the GPU, you need to have a functional CUDA or ROCm
 environment. It can be verified by the following steps:
 
 === "Nvidia/CUDA"
@@ -115,7 +115,7 @@ IREE's TensorFlow importer. We can now compile them for each GPU by running the 
 
 === "Nvidia/CUDA"
 
-``` shell hl_lines="3 4"
+``` shell hl_lines="3 5"
 iree/tools/iree-translate \
     -iree-mlir-to-vm-bytecode-module \
     -iree-hal-target-backends=cuda \
@@ -138,7 +138,7 @@ Nvidia A100 | `sm_80`
 
 === "AMD/ROCM"
 
-``` shell hl_lines="3 4"
+``` shell hl_lines="3 6"
 iree/tools/iree-translate \
     -iree-mlir-to-vm-bytecode-module \
     -iree-hal-target-backends=rocm \
@@ -148,7 +148,7 @@ iree/tools/iree-translate \
     iree_input.mlir -o mobilenet-rocm.vmfb
 ```
 
-Note ROCM Bitcode Dir(`iree-rocm-bc-dir`) path is required. If the system you are compiling IREE in has ROCM installed, then the default value of `/opt/rocm/amdgcn/bitcode` will usually suffice. If you intend on building ROCM compiler in a non-ROCM capable system, please set `iree-rocm-bc-dir` to the absolute path where you might have saved the amdgcn bitcode.
+Note ROCm Bitcode Dir(`iree-rocm-bc-dir`) path is required. If the system you are compiling IREE in has ROCm installed, then the default value of `/opt/rocm/amdgcn/bitcode` will usually suffice. If you intend on building ROCm compiler in a non-ROCm capable system, please set `iree-rocm-bc-dir` to the absolute path where you might have saved the amdgcn bitcode.
 
 Note that a rocm target chip(`iree-rocm-target-chip`) of the form `gfx<arch_number>` is needed
 to compile towards each GPU architecture. If no architecture is specified then we will default to `gfx908`
@@ -181,7 +181,7 @@ iree/tools/iree-run-module \
 
 ``` shell hl_lines="2"
 iree/tools/iree-run-module \
-    --driver=cuda \
+    --driver=rocm \
     --module_file=mobilenet-rocm.vmfb \
     --entry_function=predict \
     --function_input="1x224x224x3xf32=0"
