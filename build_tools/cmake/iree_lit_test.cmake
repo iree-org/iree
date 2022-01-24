@@ -57,7 +57,6 @@ function(iree_lit_test)
   endforeach()
 
   set(_LIT_PATH_ARGS)
-  # TODO: only tools
   foreach(_TOOL IN LISTS _RULE_TOOLS)
     list(APPEND _LIT_PATH_ARGS "--path" "$<TARGET_FILE_DIR:${_TOOL}>")
   endforeach()
