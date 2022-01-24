@@ -33,11 +33,19 @@ def ConvertToStream :
   }];
 }
 
-def EncodeTensors :
-    Pass<"iree-stream-encode-tensors", ""> {
+def EncodeHostTensors :
+    Pass<"iree-stream-encode-host-tensors", ""> {
   let summary = "Encodes tensors into binary formats based on affinity and target support.";
   let constructor = [{
-    mlir::iree_compiler::IREE::Stream::createEncodeTensorsPass()
+    mlir::iree_compiler::IREE::Stream::createEncodeHostTensorsPass()
+  }];
+}
+
+def EncodeDeviceTensors :
+    Pass<"iree-stream-encode-device-tensors", ""> {
+  let summary = "Encodes tensors into binary formats based on affinity and target support.";
+  let constructor = [{
+    mlir::iree_compiler::IREE::Stream::createEncodeDeviceTensorsPass()
   }];
 }
 

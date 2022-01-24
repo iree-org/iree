@@ -4,6 +4,9 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+// TODO(benvanik): have a stream/upstream equivalent of the flow.dispatch.* ops.
+#include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
+#include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamDialect.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamOps.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamTypes.h"
@@ -51,6 +54,37 @@ static int64_t getElementByteSize(Type elementType) {
   int64_t bitCount = elementType.getIntOrFloatBitWidth();
   int64_t byteCount = (bitCount + 8 - 1) / 8;
   return byteCount;
+}
+
+// Aligns an element type to a byte-aligned power of 2 bit width.
+//
+// Examples:
+//   i1  -> i8
+//   i4  -> i8
+//   i11 -> i16
+//   i33 -> i64
+static Type alignElementType(Type originalType) {
+  // Only handle integers; floats (today) in MLIR all have aligned widths.
+  auto elementType = originalType.dyn_cast<IntegerType>();
+  if (!elementType) return originalType;
+
+  // Align the element type to a power of two byte size.
+  auto alignedBitWidth = getElementByteSize(elementType) * 8;
+  if (elementType.getIntOrFloatBitWidth() == alignedBitWidth) {
+    // Already aligned.
+    return originalType;
+  }
+  return IntegerType::get(elementType.getContext(), alignedBitWidth,
+                          elementType.getSignedness());
+}
+
+// Aligns the element type of a tensor<> to a byte-aligned power of 2 bit width.
+static RankedTensorType alignTensorType(RankedTensorType originalType) {
+  auto elementType = originalType.getElementType();
+  auto alignedType = alignElementType(elementType);
+  if (alignedType == elementType) return originalType;
+  return RankedTensorType::get(originalType.getShape(), alignedType,
+                               originalType.getEncoding());
 }
 
 // Returns the element count of a tensor with optional dynamic dimensions.
@@ -210,15 +244,43 @@ struct EncodeTensorConstantOp
       return failure();
     }
 
-    // NOTE: we could compute size based on the contents of the elements and
-    // perform arbitrary unpacking logic here.
+    // TODO(benvanik): compute the size based on the contents of the elements
+    // and perform arbitrary unpacking logic here, such as doing partial splats/
+    // scatters/etc ala run-length-encoding. Lots of models have constants that
+    // are very low entropy and instead of a compression algorithm a simple RLE
+    // may be enough - even if just for the suffix.
+
+    // TODO(benvanik): bit pack and emit a __builtin_zext_i1_i8 builtin.
+    // Really we should be doing bitpacking at the flow/linalg level - doing it
+    // here only saves us file size as we'd have to allocate the extended memory
+    // and keep it around. If we see models with large unaligned constants we
+    // can make the tradeoff for minimizing file size vs minimizing startup
+    // cost.
+
+    // Sub-byte aligned constants need to be expanded to a power of 2
+    // byte-aligned width. This is unfortunate: it's wasted bits in the final
+    // binary that we could otherwise use productively.
+    auto alignedType = alignTensorType(resultType);
+    ElementsAttr encodedAttr = op.value();
+    if (alignedType != resultType) {
+      if (auto sourceAttr = encodedAttr.dyn_cast<DenseIntElementsAttr>()) {
+        auto alignedBitWidth = alignedType.getElementTypeBitWidth();
+        encodedAttr = sourceAttr.mapValues(
+            alignedType.getElementType(), [=](APInt sourceValue) {
+              // NOTE: this is super slow! We should be doing a conversion in
+              // a loop ourselves - don't want to be mapping for millions of
+              // elements.
+              return sourceValue.zext(alignedBitWidth);
+            });
+      }
+    }
 
     // Dense:
     auto resultSize = calculateElementCount(
-        op.getLoc(), resultType, resultDims,
-        getElementByteSize(resultType.getElementType()), rewriter);
+        op.getLoc(), alignedType, resultDims,
+        getElementByteSize(alignedType.getElementType()), rewriter);
     rewriter.replaceOpWithNewOp<IREE::Stream::AsyncConstantOp>(
-        op, op.result().getType(), op.value(), resultSize, op.affinityAttr());
+        op, op.result().getType(), encodedAttr, resultSize, op.affinityAttr());
 
     return success();
   }
@@ -491,10 +553,11 @@ struct EncodeTensorStoreOp
 };
 
 //===----------------------------------------------------------------------===//
-// -iree-stream-encode-tensors
+// -iree-stream-encode-host-tensors
 //===----------------------------------------------------------------------===//
 
-class EncodeTensorsPass : public EncodeTensorsBase<EncodeTensorsPass> {
+class EncodeHostTensorsPass
+    : public EncodeHostTensorsBase<EncodeHostTensorsPass> {
  public:
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<mlir::StandardOpsDialect>();
@@ -517,10 +580,147 @@ class EncodeTensorsPass : public EncodeTensorsBase<EncodeTensorsPass> {
   }
 };
 
+//===----------------------------------------------------------------------===//
+// stream.binding.subspan
+//===----------------------------------------------------------------------===//
+
+// Aligns the element type of a !flow.dispatch.tensor<> to a byte-aligned power
+// of 2 bit width.
+static IREE::Flow::DispatchTensorType alignDispatchTensorType(
+    IREE::Flow::DispatchTensorType originalType) {
+  auto elementType = originalType.getElementType();
+  auto alignedType = alignElementType(elementType);
+  if (alignedType == elementType) return originalType;
+  return IREE::Flow::DispatchTensorType::get(
+      originalType.getAccess(), originalType.getShape(), alignedType);
+}
+
+// Aligns binding element types to power-of-two byte boundaries.
+// The loads and stores to the binding will need to be updated to perform the
+// truncation and extension as required.
+//
+// We could do more handling here; today we are just doing sub-byte alignment
+// conversion to ensure both host and device agree upon the number of bytes in
+// a resource.
+struct EncodeBindingSubspanOp
+    : public OpRewritePattern<IREE::Stream::BindingSubspanOp> {
+  using OpRewritePattern::OpRewritePattern;
+  LogicalResult matchAndRewrite(IREE::Stream::BindingSubspanOp op,
+                                PatternRewriter &rewriter) const override {
+    auto originalType =
+        op.result().getType().dyn_cast<IREE::Flow::DispatchTensorType>();
+    if (!originalType) {
+      return rewriter.notifyMatchFailure(op, "binding type not supported");
+    }
+
+    // Align the element type, if needed.
+    auto alignedType = alignDispatchTensorType(originalType);
+    if (originalType == alignedType) return failure();  // already aligned.
+
+    // Directly swap the type with the one, changing all uses in the IR.
+    // This works because
+    rewriter.updateRootInPlace(op, [&]() { op.result().setType(alignedType); });
+
+    return success();
+  }
+};
+
+//===----------------------------------------------------------------------===//
+// flow.dispatch.tensor.load
+//===----------------------------------------------------------------------===//
+
+struct EncodeDispatchTensorLoadOp
+    : public OpRewritePattern<IREE::Flow::DispatchTensorLoadOp> {
+  using OpRewritePattern::OpRewritePattern;
+  LogicalResult matchAndRewrite(IREE::Flow::DispatchTensorLoadOp op,
+                                PatternRewriter &rewriter) const override {
+    auto targetType = op.result().getType().cast<RankedTensorType>();
+
+    // Align the element type, if needed.
+    auto alignedType = alignTensorType(targetType);
+    if (targetType == alignedType) return failure();  // already aligned.
+
+    // Loads always truncate from an byte aligned type to a sub-byte one.
+    assert(targetType.getElementTypeBitWidth() <
+               alignedType.getElementTypeBitWidth() &&
+           "loads must truncate");
+
+    // Truncate the byte -> sub-byte type; e.g. i8 -> i1.
+    auto loadedValue = op.getResult();
+    rewriter.setInsertionPointAfterValue(loadedValue);
+    auto truncOp =
+        rewriter.create<arith::TruncIOp>(op.getLoc(), targetType, loadedValue);
+    rewriter.updateRootInPlace(op, [&]() {
+      loadedValue.replaceAllUsesExcept(truncOp, truncOp);
+      loadedValue.setType(alignedType);
+    });
+    return success();
+  }
+};
+
+//===----------------------------------------------------------------------===//
+// flow.dispatch.tensor.store
+//===----------------------------------------------------------------------===//
+
+struct EncodeDispatchTensorStoreOp
+    : public OpRewritePattern<IREE::Flow::DispatchTensorStoreOp> {
+  using OpRewritePattern::OpRewritePattern;
+  LogicalResult matchAndRewrite(IREE::Flow::DispatchTensorStoreOp op,
+                                PatternRewriter &rewriter) const override {
+    auto sourceType = op.value().getType().cast<RankedTensorType>();
+
+    // Align the element type, if needed.
+    auto alignedType = alignTensorType(sourceType);
+    if (sourceType == alignedType) return failure();  // already aligned.
+
+    // Stores always extend from a sub-byte aligned type to a byte aligned one.
+    assert(sourceType.getElementTypeBitWidth() <
+               alignedType.getElementTypeBitWidth() &&
+           "stores must extend");
+
+    // Extend the sub-byte -> byte type; e.g. i1 -> i8.
+    auto extOp =
+        rewriter.create<arith::ExtUIOp>(op.getLoc(), alignedType, op.value());
+    rewriter.updateRootInPlace(
+        op, [&]() { op.valueMutable().assign(extOp.getResult()); });
+    return success();
+  }
+};
+
+//===----------------------------------------------------------------------===//
+// -iree-stream-encode-device-tensors
+//===----------------------------------------------------------------------===//
+
+class EncodeDeviceTensorsPass
+    : public EncodeDeviceTensorsBase<EncodeDeviceTensorsPass> {
+ public:
+  void getDependentDialects(DialectRegistry &registry) const override {
+    registry.insert<mlir::StandardOpsDialect>();
+    registry.insert<mlir::arith::ArithmeticDialect>();
+    registry.insert<IREE::Flow::FlowDialect>();
+    registry.insert<IREE::Stream::StreamDialect>();
+    registry.insert<IREE::Util::UtilDialect>();
+  }
+
+  void runOnOperation() override {
+    OwningRewritePatternList patterns(&getContext());
+    patterns.insert<EncodeBindingSubspanOp, EncodeDispatchTensorLoadOp,
+                    EncodeDispatchTensorStoreOp>(&getContext());
+    FrozenRewritePatternSet frozenPatterns(std::move(patterns));
+    if (failed(applyPatternsAndFoldGreedily(getOperation(), frozenPatterns))) {
+      return signalPassFailure();
+    }
+  }
+};
+
 }  // namespace
 
-std::unique_ptr<OperationPass<>> createEncodeTensorsPass() {
-  return std::make_unique<EncodeTensorsPass>();
+std::unique_ptr<OperationPass<>> createEncodeHostTensorsPass() {
+  return std::make_unique<EncodeHostTensorsPass>();
+}
+
+std::unique_ptr<OperationPass<>> createEncodeDeviceTensorsPass() {
+  return std::make_unique<EncodeDeviceTensorsPass>();
 }
 
 }  // namespace Stream

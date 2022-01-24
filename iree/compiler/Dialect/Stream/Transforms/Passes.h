@@ -83,7 +83,8 @@ std::unique_ptr<OperationPass<mlir::ModuleOp>> createConvertToStreamPass();
 // Tensor lowering and resource management
 //===----------------------------------------------------------------------===//
 
-std::unique_ptr<OperationPass<>> createEncodeTensorsPass();
+std::unique_ptr<OperationPass<>> createEncodeHostTensorsPass();
+std::unique_ptr<OperationPass<>> createEncodeDeviceTensorsPass();
 std::unique_ptr<OperationPass<mlir::ModuleOp>> createMaterializeBuiltinsPass();
 std::unique_ptr<OperationPass<>> createMaterializeCopyOnWritePass();
 std::unique_ptr<OperationPass<mlir::ModuleOp>> createElideAsyncCopiesPass();

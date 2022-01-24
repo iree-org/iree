@@ -108,9 +108,12 @@ void buildStreamAsyncPassPipeline(OpPassManager &passManager,
   // Lower stream.tensor.* ops to stream.async.* ops based on
   // affinity/configuration assigned during placement.
   passManager.addNestedPass<IREE::Util::InitializerOp>(
-      IREE::Stream::createEncodeTensorsPass());
+      IREE::Stream::createEncodeHostTensorsPass());
   passManager.addNestedPass<mlir::FuncOp>(
-      IREE::Stream::createEncodeTensorsPass());
+      IREE::Stream::createEncodeHostTensorsPass());
+  // TODO(ravishankarm): enable when codegen can handle extui/trunc ops.
+  // passManager.addNestedPass<IREE::Stream::ExecutableOp>(
+  //     IREE::Stream::createEncodeDeviceTensorsPass());
 
   // Expand builtins to dispatches. This may introduce new executables.
   passManager.addPass(IREE::Stream::createMaterializeBuiltinsPass());
