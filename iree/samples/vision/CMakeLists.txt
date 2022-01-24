@@ -46,6 +46,8 @@ iree_lit_test(
   TOOLS
     ::iree-run-mnist-module
     FileCheck
+  DATA
+    "mnist_test.png"
   LABELS
     "hostonly"
 )
