@@ -32,7 +32,7 @@ def iree_lit_test(
     tools = tools or []
     env = env or {}
 
-    # Always include llvm-sybmolizer so we get useful stack traces. Maybe it
+    # Always include llvm-symbolizer so we get useful stack traces. Maybe it
     # would be better to force everyone to do this explicitly, but since
     # forgetting wouldn't cause the test to fail, only make debugging harder
     # when it does, I think better to hardcode it here.
@@ -76,7 +76,7 @@ def iree_lit_test_suite(
     tools = tools or []
     env = env or {}
 
-    # Always include llvm-sybmolizer so we get useful stack traces. Maybe it
+    # Always include llvm-symbolizer so we get useful stack traces. Maybe it
     # would be better to force everyone to do this explicitly, but since
     # forgetting wouldn't cause the test to fail, only make debugging harder
     # when it does, I think better to hardcode it here.
