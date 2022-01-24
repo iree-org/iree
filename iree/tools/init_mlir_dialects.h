@@ -13,6 +13,7 @@
 #define IREE_TOOLS_INIT_MLIR_DIALECTS_H_
 
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
+#include "mlir/Dialect/ArmNeon/ArmNeonDialect.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/GPU/GPUDialect.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
@@ -49,6 +50,7 @@ inline void registerMlirDialects(DialectRegistry &registry) {
                   scf::SCFDialect,
                   quant::QuantizationDialect,
                   spirv::SPIRVDialect,
+                  arm_neon::ArmNeonDialect,
                   StandardOpsDialect,
                   mlir::arith::ArithmeticDialect,
                   vector::VectorDialect,

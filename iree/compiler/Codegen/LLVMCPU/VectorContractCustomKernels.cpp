@@ -11,6 +11,7 @@
 #include "llvm/ADT/Triple.h"
 #include "mlir/Conversion/StandardToLLVM/ConvertStandardToLLVM.h"
 #include "mlir/Conversion/VectorToLLVM/ConvertVectorToLLVM.h"
+#include "mlir/Dialect/ArmNeon/ArmNeonDialect.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/LLVMIR/LLVMTypes.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
@@ -321,11 +322,150 @@ struct MMT_8x4x8_i8i8i32_Aarch64Dotprod_InlineAsm
   }
 };
 
+static Value getExtInput(Type extSrcType, Type extDstType, Value extResult) {
+  if (extResult.getType().cast<VectorType>().getElementType() != extDstType) {
+    return nullptr;
+  }
+  // TODO: Can we do better than only looking one op up? Maybe not, in which
+  // case there should maybe be patterns to sink widening casts past other ops.
+  auto extSIOp = extResult.getDefiningOp<arith::ExtSIOp>();
+  if (!extSIOp) {
+    return nullptr;
+  }
+  Value extInput = extSIOp.getIn();
+  if (extInput.getType().cast<VectorType>().getElementType() != extSrcType) {
+    return nullptr;
+  }
+  return extInput;
+}
+
+/// Converts a vector.contract computing A*B^T where A and B are 8x4 matrices
+/// of int32's that are themselves the result of an arith.extsi promoting from
+/// i8, into an ARM NEON Op corresponding to a dotprod intrinsic.
+struct MMT_8x4x8_i8i8i32_Aarch64Dotprod_Intrinsics
+    : public OpRewritePattern<vector::ContractionOp> {
+ public:
+  using OpRewritePattern<vector::ContractionOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(vector::ContractionOp contractionOp,
+                                PatternRewriter &rewriter) const override {
+    auto lhsType = contractionOp.lhs().getType().cast<VectorType>();
+    auto rhsType = contractionOp.rhs().getType().cast<VectorType>();
+    auto accType = contractionOp.acc().getType().cast<VectorType>();
+    auto lhsShape = lhsType.getShape();
+    auto rhsShape = rhsType.getShape();
+
+    if (lhsShape[0] != 8 || lhsShape[1] != 4 || rhsShape[0] != 8 ||
+        rhsShape[1] != 4) {
+      return failure();
+    }
+    if (!isMatrixTimesMatrixTransposedOfGivenShape(contractionOp, 8, 4, 8)) {
+      return failure();
+    }
+
+    Type I8Type = rewriter.getIntegerType(8);
+    Type I32Type = rewriter.getIntegerType(32);
+
+    if (accType.getElementType() != I32Type) {
+      return failure();
+    }
+
+    Value inLhs = getExtInput(I8Type, I32Type, contractionOp.lhs());
+    Value inRhs = getExtInput(I8Type, I32Type, contractionOp.rhs());
+
+    if (!inLhs || !inRhs) return failure();
+
+    auto loc = contractionOp.getLoc();
+
+    auto int32x4VType = VectorType::get({4}, I32Type);
+
+    auto acc = contractionOp.acc();
+    SmallVector<Value> accChunks;
+    for (int row = 0; row < 8; ++row) {
+      auto accRow =
+          rewriter.create<vector::ExtractOp>(loc, acc, ArrayRef<int64_t>{row});
+      for (int chunk = 0; chunk < 2; ++chunk) {
+        auto accChunk = rewriter.create<vector::ExtractStridedSliceOp>(
+            loc, accRow, ArrayRef<int64_t>{chunk * 4}, ArrayRef<int64_t>{4},
+            ArrayRef<int64_t>{1});
+        assert(accChunk.getType() == int32x4VType);
+        accChunks.push_back(accChunk);
+      }
+    }
+
+    auto lhs0 = rewriter.create<vector::ExtractStridedSliceOp>(
+        loc, inLhs, ArrayRef<int64_t>{0, 0}, ArrayRef<int64_t>{4, 4},
+        ArrayRef<int64_t>{1, 1});
+    auto lhs1 = rewriter.create<vector::ExtractStridedSliceOp>(
+        loc, inLhs, ArrayRef<int64_t>{4, 0}, ArrayRef<int64_t>{4, 4},
+        ArrayRef<int64_t>{1, 1});
+
+    auto rhs0 = rewriter.create<vector::ExtractStridedSliceOp>(
+        loc, inRhs, ArrayRef<int64_t>{0, 0}, ArrayRef<int64_t>{4, 4},
+        ArrayRef<int64_t>{1, 1});
+    auto rhs1 = rewriter.create<vector::ExtractStridedSliceOp>(
+        loc, inRhs, ArrayRef<int64_t>{4, 0}, ArrayRef<int64_t>{4, 4},
+        ArrayRef<int64_t>{1, 1});
+
+    auto int8x4x4VType = VectorType::get({4, 4}, rewriter.getIntegerType(8));
+    auto int8Zero4x4 = rewriter.create<arith::ConstantOp>(
+        loc, rewriter.getZeroAttr(int8x4x4VType));
+
+    assert(lhs0.getType() == int8x4x4VType);
+    assert(lhs1.getType() == int8x4x4VType);
+    assert(rhs0.getType() == int8x4x4VType);
+    assert(rhs1.getType() == int8x4x4VType);
+
+    auto sdot = [&](Value acc, Value lhs, Value rhs, int64_t lane) -> Value {
+      auto rhsReplicatedLane = rewriter.create<vector::ShuffleOp>(
+          loc, rhs, int8Zero4x4, ArrayRef<int64_t>{lane, lane, lane, lane});
+
+      return rewriter.create<arm_neon::Sdot2dOp>(loc, int32x4VType, acc, lhs,
+                                                 rhsReplicatedLane);
+    };
+
+    SmallVector<Value> dstChunks;
+    // Note lhs and rhs are deliberately swapped here
+    dstChunks.push_back(sdot(accChunks[0], rhs0, lhs0, 0));
+    dstChunks.push_back(sdot(accChunks[1], rhs1, lhs0, 0));
+    dstChunks.push_back(sdot(accChunks[2], rhs0, lhs0, 1));
+    dstChunks.push_back(sdot(accChunks[3], rhs1, lhs0, 1));
+    dstChunks.push_back(sdot(accChunks[4], rhs0, lhs0, 2));
+    dstChunks.push_back(sdot(accChunks[5], rhs1, lhs0, 2));
+    dstChunks.push_back(sdot(accChunks[6], rhs0, lhs0, 3));
+    dstChunks.push_back(sdot(accChunks[7], rhs1, lhs0, 3));
+    dstChunks.push_back(sdot(accChunks[8], rhs0, lhs1, 0));
+    dstChunks.push_back(sdot(accChunks[9], rhs1, lhs1, 0));
+    dstChunks.push_back(sdot(accChunks[10], rhs0, lhs1, 1));
+    dstChunks.push_back(sdot(accChunks[11], rhs1, lhs1, 1));
+    dstChunks.push_back(sdot(accChunks[12], rhs0, lhs1, 2));
+    dstChunks.push_back(sdot(accChunks[13], rhs1, lhs1, 2));
+    dstChunks.push_back(sdot(accChunks[14], rhs0, lhs1, 3));
+    dstChunks.push_back(sdot(accChunks[15], rhs1, lhs1, 3));
+    assert(dstChunks.size() == 16 && "16 chunks");
+    auto int32x8x8xVType = VectorType::get({8, 8}, I32Type);
+
+    Value result;
+    result = rewriter.create<arith::ConstantOp>(
+        loc, rewriter.getZeroAttr(int32x8x8xVType));
+    for (int row = 0; row < 8; ++row) {
+      for (int chunk = 0; chunk < 2; ++chunk) {
+        result = rewriter.create<vector::InsertStridedSliceOp>(
+            loc, dstChunks[row * 2 + chunk], result,
+            ArrayRef<int64_t>{row, chunk * 4}, ArrayRef<int64_t>{1});
+      }
+    }
+    rewriter.replaceOp(contractionOp, {result});
+    return success();
+  }
+};
+
 class VectorContractCustomKernelsPass
     : public VectorContractCustomKernelsBase<VectorContractCustomKernelsPass> {
  public:
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<vector::VectorDialect, LLVM::LLVMDialect>();
+    registry.insert<vector::VectorDialect, LLVM::LLVMDialect,
+                    arm_neon::ArmNeonDialect>();
   }
   LogicalResult initializeOptions(StringRef options) override {
     if (failed(Pass::initializeOptions(options))) {
@@ -333,6 +473,7 @@ class VectorContractCustomKernelsPass
     }
     target_info.aarch64 = aarch64;
     target_info.dotprod = dotprod;
+    target_info.intrinsics = intrinsics;
     return success();
   }
   void runOnOperation() override {
@@ -356,7 +497,11 @@ void populateVectorContractCustomKernelsPatterns(
     OwningRewritePatternList &patterns) {
   MLIRContext *context = patterns.getContext();
   if (target_info.aarch64 && target_info.dotprod) {
-    patterns.insert<MMT_8x4x8_i8i8i32_Aarch64Dotprod_InlineAsm>(context);
+    if (target_info.intrinsics) {
+      patterns.insert<MMT_8x4x8_i8i8i32_Aarch64Dotprod_Intrinsics>(context);
+    } else {
+      patterns.insert<MMT_8x4x8_i8i8i32_Aarch64Dotprod_InlineAsm>(context);
+    }
   }
 }
 
