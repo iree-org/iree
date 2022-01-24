@@ -382,14 +382,6 @@ else()
   _hack_llvm_include_paths()
 endif()
 
-if(IREE_BUILD_TESTS AND IREE_BUILD_COMPILER)
-  # Ensure FileCheck gets built. Tests don't have dependencies in CMake
-  # because they aren't targets. So until we fix that, we just force this to
-  # get built.
-  set_target_properties(FileCheck PROPERTIES EXCLUDE_FROM_ALL OFF)
-endif()
-
-
 #-------------------------------------------------------------------------------
 # Other dependencies
 #-------------------------------------------------------------------------------
