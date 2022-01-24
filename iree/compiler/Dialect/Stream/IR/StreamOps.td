@@ -2424,7 +2424,7 @@ def Stream_CmdSerialOp : Stream_Op<"cmd.serial", [
   let regions = (region AnyRegion:$body);
 
   let assemblyFormat = [{
-    `` $body
+    $body
     attr-dict-with-keyword
   }];
 
@@ -2486,7 +2486,7 @@ def Stream_CmdConcurrentOp : Stream_Op<"cmd.concurrent", [
   let regions = (region AnyRegion:$body);
 
   let assemblyFormat = [{
-    `` $body
+    $body
     attr-dict-with-keyword
   }];
 

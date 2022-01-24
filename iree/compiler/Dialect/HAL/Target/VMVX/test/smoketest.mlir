@@ -35,7 +35,7 @@ stream.executable public @add_dispatch_0 {
 }
 
 // CHECK-LABEL: hal.executable public @add_dispatch_0
-//  CHECK-NEXT:   hal.executable.variant public @vmvx_bytecode_fb, target = <"vmvx", "vmvx-bytecode-fb">{
+//  CHECK-NEXT:   hal.executable.variant public @vmvx_bytecode_fb, target = <"vmvx", "vmvx-bytecode-fb"> {
 //  CHECK-NEXT:     hal.executable.entry_point public @add_dispatch_0 ordinal(0)
 //  CHECK-SAME:       layout(#hal.executable.layout<push_constants = 0, sets = [
 //  CHECK-SAME:         #hal.descriptor_set.layout<0, bindings = [

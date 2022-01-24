@@ -645,6 +645,7 @@ static void printDeviceSwitchOp(OpAsmPrinter &p, DeviceSwitchOp op) {
         auto &conditionAttr = std::get<0>(it);
         auto &conditionRegion = std::get<1>(it);
         p.printAttribute(conditionAttr);
+        p << " ";
         p.printRegion(conditionRegion,
                       /*printEntryBlockArgs=*/false,
                       /*printBlockTerminators=*/true);
@@ -762,6 +763,7 @@ static void printExecutableEntryPointOp(OpAsmPrinter &p,
   p.printOptionalAttrDict(op->getAttrs(),
                           /*elidedAttrs=*/{"sym_name", "layout", "ordinal"});
   if (op.workgroup_count_region().empty()) return;
+  p << " ";
   p.printRegion(op.workgroup_count_region().front());
 }
 

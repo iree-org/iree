@@ -124,9 +124,9 @@ func @asyncDispatch(%arg0: !stream.resource<*>, %arg1: index) -> !stream.resourc
 
 // CHECK-LABEL: @asyncExecute
 func @asyncExecute(%arg0: !stream.resource<*>, %arg1: index, %arg2: !stream.timepoint) -> (!stream.resource<*>, !stream.timepoint) {
-  // CHECK: = stream.async.execute await(%arg2) => with(%arg0 as %arg3: !stream.resource<*>{%arg1}) -> %arg0{%arg1}{
+  // CHECK: = stream.async.execute await(%arg2) => with(%arg0 as %arg3: !stream.resource<*>{%arg1}) -> %arg0{%arg1} {
   %0:2 = stream.async.execute await(%arg2) => with(%arg0 as %arg3: !stream.resource<*>{%arg1}) -> %arg0 as !stream.resource<*>{%arg1} {
-    // CHECK: %[[W:.+]] = stream.async.concurrent with(%arg3 as %arg4: !stream.resource<*>{%arg1}) -> %arg3{%arg1}{
+    // CHECK: %[[W:.+]] = stream.async.concurrent with(%arg3 as %arg4: !stream.resource<*>{%arg1}) -> %arg3{%arg1} {
     %1 = stream.async.concurrent with(%arg3 as %arg4: !stream.resource<*>{%arg1}) -> %arg3 as !stream.resource<*>{%arg1} {
       // CHECK: stream.yield %arg4 : !stream.resource<*>{%arg1}
       stream.yield %arg4 : !stream.resource<*>{%arg1}
@@ -141,7 +141,7 @@ func @asyncExecute(%arg0: !stream.resource<*>, %arg1: index, %arg2: !stream.time
 
 // CHECK-LABEL: @asyncExecuteNoCaptures
 func @asyncExecuteNoCaptures(%arg0: index, %arg1: i32) -> (!stream.resource<*>, !stream.timepoint) {
-  // CHECK: = stream.async.execute with() -> !stream.resource<*>{%arg0}{
+  // CHECK: = stream.async.execute with() -> !stream.resource<*>{%arg0} {
   %0:2 = stream.async.execute with() -> !stream.resource<*>{%arg0} {
     // CHECK: %[[T:.+]] = stream.async.splat
     %1 = stream.async.splat %arg1 : i32 -> !stream.resource<*>{%arg0}
@@ -155,7 +155,7 @@ func @asyncExecuteNoCaptures(%arg0: index, %arg1: i32) -> (!stream.resource<*>, 
 
 // CHECK-LABEL: @asyncExecuteNoResults
 func @asyncExecuteNoResults(%arg0: !stream.resource<*>, %arg1: index, %arg2: !stream.timepoint) -> (!stream.timepoint) {
-  // CHECK: = stream.async.execute await(%arg2) => with(%arg0 as %arg3: !stream.resource<*>{%arg1}){
+  // CHECK: = stream.async.execute await(%arg2) => with(%arg0 as %arg3: !stream.resource<*>{%arg1}) {
   %0:1 = stream.async.execute await(%arg2) => with(%arg0 as %arg3: !stream.resource<*>{%arg1}) {
     // CHECK: stream.yield
     stream.yield

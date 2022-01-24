@@ -315,6 +315,7 @@ static void printResourceRegion(OpAsmPrinter &p, Operation *op,
                           resultTypes, resultSizes, tiedOperands);
     if (resultTypes.size() != 1) p << ")";
   }
+  p << " ";
   p.printRegion(body, /*printEntryBlockArgs=*/false,
                 /*printBlockTerminators=*/true);
 }
