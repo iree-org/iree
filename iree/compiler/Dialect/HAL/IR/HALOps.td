@@ -1609,7 +1609,6 @@ def HAL_ExecutableVariantOp : HAL_Op<"executable.variant", [
     $sym_name
     `,` `target` `=` $target
     attr-dict-with-keyword
-    ``
     regions
   }];
 

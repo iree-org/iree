@@ -22,7 +22,7 @@ util.initializer {
   util.global.store %value2, @global2 : index
   util.initializer.return
 }
-// CHECK-NEXT: util.initializer{
+// CHECK-NEXT: util.initializer {
 // CHECK-NEXT: %[[VALUE0:.+]] = call @extern()
 // CHECK-NEXT: util.global.store %[[VALUE0]], @global0
 // CHECK-NEXT: %[[VALUE1:.+]] = call @extern()
@@ -68,7 +68,7 @@ util.initializer {
   util.global.store %c300, @globalB : index
   util.initializer.return
 }
-// CHECK: util.initializer{
+// CHECK: util.initializer {
 // CHECK: ^bb1:
 // CHECK:   br ^bb3
 // CHECK: ^bb2:

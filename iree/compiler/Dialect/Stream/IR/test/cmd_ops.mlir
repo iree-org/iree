@@ -74,13 +74,13 @@ func @cmdExecute(%arg0: !stream.resource<transient>, %arg1: index, %arg2: !strea
   %c128 = arith.constant 128 : index
   // CHECK: = stream.cmd.execute await(%arg4) => with(%arg0 as %arg5: !stream.resource<transient>{%arg1}, %arg2 as %arg6: !stream.resource<staging>{%arg3}) {
   %0 = stream.cmd.execute await(%arg4) => with(%arg0 as %arg5: !stream.resource<transient>{%arg1}, %arg2 as %arg6: !stream.resource<staging>{%arg3}) {
-    // CHECK: stream.cmd.concurrent{
+    // CHECK: stream.cmd.concurrent {
     stream.cmd.concurrent {
       // CHECK-NEXT: stream.cmd.copy
       stream.cmd.copy %arg5[%c0], %arg6[%c0], %c128 : !stream.resource<transient>{%arg1} -> !stream.resource<staging>{%arg3}
       // CHECK-NEXT: stream.cmd.copy
       stream.cmd.copy %arg5[%c0], %arg6[%c0], %c128 : !stream.resource<transient>{%arg1} -> !stream.resource<staging>{%arg3}
-      // CHECK: stream.cmd.serial{
+      // CHECK: stream.cmd.serial {
       stream.cmd.serial {
         // CHECK-NEXT: stream.cmd.copy
         stream.cmd.copy %arg5[%c0], %arg6[%c0], %c128 : !stream.resource<transient>{%arg1} -> !stream.resource<staging>{%arg3}

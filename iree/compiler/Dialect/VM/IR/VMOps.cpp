@@ -305,6 +305,7 @@ static ParseResult parseInitializerOp(OpAsmParser &parser,
 
 static void printInitializerOp(OpAsmPrinter &p, InitializerOp &op) {
   p.printOptionalAttrDictWithKeyword(op->getAttrs(), /*elidedAttrs=*/{"type"});
+  p << " ";
   p.printRegion(op.body());
 }
 

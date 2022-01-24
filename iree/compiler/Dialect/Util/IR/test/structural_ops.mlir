@@ -1,6 +1,6 @@
 // RUN: iree-opt -split-input-file %s | iree-opt -split-input-file | FileCheck %s
 
-//      CHECK: util.initializer{
+//      CHECK: util.initializer {
 // CHECK-NEXT:   util.initializer.return
 // CHECK-NEXT: }
 util.initializer {
@@ -9,7 +9,7 @@ util.initializer {
 
 // -----
 
-//      CHECK: util.initializer attributes {foo}{
+//      CHECK: util.initializer attributes {foo} {
 // CHECK-NEXT:   util.initializer.return
 // CHECK-NEXT: }
 util.initializer attributes {foo} {
@@ -18,7 +18,7 @@ util.initializer attributes {foo} {
 
 // -----
 
-// CHECK: util.initializer{
+// CHECK: util.initializer {
 util.initializer {
   // CHECK-NEXT: %[[ZERO:.+]] = arith.constant 0 : i32
   %zero = arith.constant 0 : i32

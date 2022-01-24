@@ -21,19 +21,19 @@ func @device_switch(%device: !hal.device) -> i32 {
   %c2 = arith.constant 2 : i32
   // CHECK: = hal.device.switch<%[[DEVICE]] : !hal.device> -> i32
   %0 = hal.device.switch<%device : !hal.device> -> i32
-    // CHECK-NEXT: #hal.device.match.id<"vulkan-v1.?-*">{
+    // CHECK-NEXT: #hal.device.match.id<"vulkan-v1.?-*"> {
     #hal.device.match.id<"vulkan-v1.?-*"> {
       // CHECK-NEXT: hal.return %[[C1]] : i32
       hal.return %c1 : i32
       // CHECK-NEXT: },
     },
-    // CHECK-NEXT: #hal.match.any<[#hal.device.match.id<"vmvx">, #hal.device.match.id<"vulkan-*">]>{
+    // CHECK-NEXT: #hal.match.any<[#hal.device.match.id<"vmvx">, #hal.device.match.id<"vulkan-*">]> {
     #hal.match.any<[#hal.device.match.id<"vmvx">, #hal.device.match.id<"vulkan-*">]> {
       // CHECK-NEXT: hal.return %[[C2]] : i32
       hal.return %c2 : i32
       // CHECK-NEXT: },
     },
-    // CHECK-NEXT: #hal.match.always{
+    // CHECK-NEXT: #hal.match.always {
     #hal.match.always {
       // CHECK-NEXT: hal.return %[[C0]] : i32
       hal.return %c0 : i32

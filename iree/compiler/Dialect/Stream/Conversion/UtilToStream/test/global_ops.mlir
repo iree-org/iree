@@ -31,7 +31,7 @@ func @mutableGlobal() {
 
 //  CHECK-DAG: util.global public mutable @var_with_tensor_initializer : !stream.resource<variable>
 //  CHECK-DAG: util.global public mutable @var_with_tensor_initializer__size : index
-// CHECK-NEXT: util.initializer{
+// CHECK-NEXT: util.initializer {
 // CHECK-NEXT:   %[[CST:.+]] = stream.tensor.constant : tensor<f32> in !stream.resource<variable> = dense<0.000000e+00> : tensor<f32>
 // CHECK-NEXT:   %[[SIZE:.+]] = stream.resource.size %[[CST]] : !stream.resource<variable>
 //  CHECK-DAG:   util.global.store %[[CST]], @var_with_tensor_initializer : !stream.resource<variable>
