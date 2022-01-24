@@ -40,6 +40,62 @@ namespace {
 // TODO(benvanik): move to Util/Analysis/ as this would be useful in other
 // passes as well and only depends on util.align and upstream ops.
 
+static std::string getPVSAsStr(
+    const DFX::PotentialConstantIntValuesState &pvs) {
+  std::string str;
+  llvm::raw_string_ostream sstream(str);
+  sstream << "pvs: ";
+  if (pvs.isValidState()) {
+    sstream << "[";
+    if (pvs.isUndefContained()) {
+      sstream << "undef, ";
+    }
+    llvm::interleaveComma(pvs.getAssumedSet(), sstream,
+                          [&](APInt value) { value.print(sstream, false); });
+    sstream << "]";
+  } else {
+    sstream << "(invalid)";
+  }
+  sstream.flush();
+  return str;
+}
+
+class GlobalPVS : public DFX::StateWrapper<
+                      DFX::PotentialConstantIntValuesState,
+                      DFX::TypedOperationElement<IREE::Util::GlobalOp>> {
+ public:
+  using BaseType =
+      DFX::StateWrapper<DFX::PotentialConstantIntValuesState,
+                        DFX::TypedOperationElement<IREE::Util::GlobalOp>>;
+
+  static GlobalPVS &createForPosition(const Position &pos,
+                                      DFX::Solver &solver) {
+    return *(new (solver.getAllocator()) GlobalPVS(pos));
+  }
+
+  const std::string getName() const override { return "GlobalPVS"; }
+  const void *getID() const override { return &ID; }
+  static bool classof(const DFX::AbstractElement *element) {
+    return (element->getID() == &ID);
+  }
+  static const char ID;
+
+  const std::string getAsStr() const override {
+    return getPVSAsStr(getState());
+  }
+
+ private:
+  explicit GlobalPVS(const Position &pos) : BaseType(pos) {}
+
+  void initializeOperation(IREE::Util::GlobalOp globalOp,
+                           DFX::Solver &solver) override;
+  ChangeStatus updateOperation(IREE::Util::GlobalOp globalOp,
+                               DFX::Solver &solver) override;
+
+  friend class DFX::Solver;
+};
+const char GlobalPVS::ID = 0;
+
 class ValuePVS : public DFX::StateWrapper<DFX::PotentialConstantIntValuesState,
                                           DFX::ValueElement> {
  public:
@@ -58,22 +114,7 @@ class ValuePVS : public DFX::StateWrapper<DFX::PotentialConstantIntValuesState,
   static const char ID;
 
   const std::string getAsStr() const override {
-    std::string str;
-    llvm::raw_string_ostream sstream(str);
-    sstream << "pvs: ";
-    if (isValidState()) {
-      sstream << "[";
-      if (isUndefContained()) {
-        sstream << "undef, ";
-      }
-      llvm::interleaveComma(getAssumedSet(), sstream,
-                            [&](APInt value) { value.print(sstream, false); });
-      sstream << "]";
-    } else {
-      sstream << "(invalid)";
-    }
-    sstream.flush();
-    return str;
+    return getPVSAsStr(getState());
   }
 
  private:
@@ -94,6 +135,19 @@ class ValuePVS : public DFX::StateWrapper<DFX::PotentialConstantIntValuesState,
           if (matchPattern(result, m_ConstantInt(&staticValue))) {
             newState.unionAssumed(staticValue);
             return WalkResult::advance();
+          }
+
+          if (auto loadOp =
+                  dyn_cast<IREE::Util::GlobalLoadOp>(result.getDefiningOp())) {
+            auto *globalInfo = solver.getExplorer().queryGlobalInfoFrom(
+                loadOp.global(), loadOp);
+            auto global = solver.getElementFor<GlobalPVS>(
+                *this, Position::forOperation(globalInfo->op),
+                DFX::Resolution::REQUIRED);
+            if (global.isValidState()) {
+              newState.unionAssumed(global);
+              return WalkResult::advance();
+            }
           }
 
           // TODO(benvanik): more ops supported for joining. We could for
@@ -133,6 +187,41 @@ class ValuePVS : public DFX::StateWrapper<DFX::PotentialConstantIntValuesState,
   friend class DFX::Solver;
 };
 const char ValuePVS::ID = 0;
+
+void GlobalPVS::initializeOperation(IREE::Util::GlobalOp globalOp,
+                                    DFX::Solver &solver) {
+  auto *globalInfo = solver.getExplorer().getGlobalInfo(globalOp);
+  if (!globalInfo || globalInfo->isIndirect) {
+    // Cannot perform analysis.
+    indicatePessimisticFixpoint();
+  } else if (globalInfo) {
+    if (auto initialValue =
+            globalOp.initial_valueAttr().dyn_cast_or_null<IntegerAttr>()) {
+      // Initial value is available for use; stored values from the rest of the
+      // program will come during iteration.
+      unionAssumed(initialValue.getValue());
+    }
+  }
+}
+
+ChangeStatus GlobalPVS::updateOperation(IREE::Util::GlobalOp globalOp,
+                                        DFX::Solver &solver) {
+  StateType newState;
+  auto *globalInfo = solver.getExplorer().getGlobalInfo(globalOp);
+  for (auto use : globalInfo->uses) {
+    auto storeOp = dyn_cast<IREE::Util::GlobalStoreOp>(use);
+    if (!storeOp) continue;
+    auto value = solver.getElementFor<ValuePVS>(
+        *this, Position::forValue(storeOp.value()), DFX::Resolution::REQUIRED);
+    if (value.isValidState()) {
+      newState.unionAssumed(value);
+    } else {
+      newState.unionAssumedWithUndef();
+      newState.indicatePessimisticFixpoint();
+    }
+  }
+  return DFX::clampStateAndIndicateChange(getState(), newState);
+}
 
 static constexpr uint64_t kMaximumAlignment = 1ull << 32;
 
@@ -397,6 +486,12 @@ static void annotateExport(IREE::Stream::ExecutableOp executableOp,
       for (auto value : pvs.getAssumedSet()) {
         potentialValues.push_back(IntegerAttr::get(argType, value));
       }
+      llvm::sort(potentialValues, [](Attribute lhs, Attribute rhs) {
+        auto lhsInt = lhs.dyn_cast<IntegerAttr>();
+        auto rhsInt = rhs.dyn_cast<IntegerAttr>();
+        if (!lhsInt || !rhsInt) return false;
+        return lhsInt.getValue().ult(rhsInt.getValue());
+      });
       auto potentialValuesAttr = ArrayAttr::get(context, potentialValues);
       funcOp.setArgAttr(argIdx, "stream.values", potentialValuesAttr);
     }

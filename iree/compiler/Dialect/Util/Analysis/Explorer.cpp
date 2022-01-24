@@ -122,6 +122,13 @@ void Explorer::initializeInverseCallGraph() {
   });
 }
 
+const Explorer::GlobalInfo *Explorer::getGlobalInfo(
+    IREE::Util::GlobalOp globalOp) {
+  auto it = globalInfos.find(globalOp);
+  if (it == globalInfos.end()) return nullptr;
+  return &it->second;
+}
+
 const Explorer::GlobalInfo *Explorer::queryGlobalInfoFrom(StringRef globalName,
                                                           Operation *from) {
   auto *symbolTableOp = SymbolTable::getNearestSymbolTable(from);

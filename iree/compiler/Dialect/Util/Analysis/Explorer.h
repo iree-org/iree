@@ -135,6 +135,9 @@ class Explorer {
     SmallVector<Operation *> uses;
   };
 
+  // Gets analyzed global information for the given global operation.
+  const GlobalInfo *getGlobalInfo(IREE::Util::GlobalOp globalOp);
+
   // Queries memoized information about a global variable, returning nullptr if
   // not found.
   const GlobalInfo *queryGlobalInfoFrom(StringRef globalName, Operation *from);

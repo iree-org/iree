@@ -2705,7 +2705,6 @@ def Stream_ExecutableOp : Stream_Op<"executable", [
     custom<SymbolVisibility>($sym_visibility)
     $sym_name
     attr-dict-with-keyword
-    ``
     regions
   }];
 
