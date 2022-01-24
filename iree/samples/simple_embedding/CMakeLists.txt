@@ -45,10 +45,10 @@ iree_bytecode_module(
   PUBLIC
 )
 
-iree_run_binary_test(
+iree_native_test(
   NAME
     "simple_embedding_vmvx_sync_test"
-  TEST_BINARY
+  SRC
     ::simple_embedding_vmvx_sync
 )
 
@@ -176,10 +176,10 @@ iree_bytecode_module(
   PUBLIC
 )
 
-iree_run_binary_test(
+iree_native_test(
   NAME
     "simple_embedding_embedded_sync_test"
-  TEST_BINARY
+  SRC
     ::simple_embedding_embedded_sync
 )
 
@@ -206,10 +206,10 @@ iree_cc_binary(
     iree::vm::bytecode_module
 )
 
-iree_run_binary_test(
+iree_native_test(
   NAME
     "simple_embedding_dylib_test"
-  TEST_BINARY
+  SRC
     ::simple_embedding_dylib
 )
 
@@ -250,10 +250,10 @@ iree_bytecode_module(
   PUBLIC
 )
 
-iree_run_binary_test(
+iree_native_test(
   NAME
     "simple_embedding_vulkan_test"
-  TEST_BINARY
+  SRC
     ::simple_embedding_vulkan
 )
 
@@ -292,12 +292,12 @@ iree_bytecode_module(
   PUBLIC
 )
 
-iree_run_binary_test(
+iree_native_test(
   NAME
     "simple_embedding_cuda_test"
   LABELS
     "driver=cuda"
-  TEST_BINARY
+  SRC
     ::simple_embedding_cuda
 )
 

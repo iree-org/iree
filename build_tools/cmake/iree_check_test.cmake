@@ -178,12 +178,12 @@ function(iree_check_test)
     "${_RUNNER_TARGET}"
   )
 
-  iree_run_binary_test(
+  iree_native_test(
     NAME
       "${_RULE_NAME}"
     DRIVER
       "${_RULE_DRIVER}"
-    TEST_BINARY
+    SRC
       "${_RUNNER_TARGET}"
     TEST_INPUT_FILE_ARG
       "${_MODULE_FILE_NAME}"

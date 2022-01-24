@@ -459,26 +459,17 @@ if(${IREE_BUILD_COMPILER})
     HOSTONLY
   )
 
-  add_custom_target(BundledLLVMFileCheck ALL
-    COMMAND ${CMAKE_COMMAND} -E create_symlink $<TARGET_FILE:FileCheck> FileCheck
-    DEPENDS FileCheck
-  )
+  # Ensure FileCheck gets built. Tests don't have dependencies in CMake because
+  # they aren't targets. So until we fix that, we just force this to get built.
+  # Limiting this to when IREE_BUILD_TESTS is set prevents the installation
+  # below, which we use for cross-platform testing.
+  set_target_properties(FileCheck PROPERTIES EXCLUDE_FROM_ALL OFF)
 
   # lld install - required by the compiler to link codegen executables.
   install(
     TARGETS lld
     COMPONENT Compiler
     RUNTIME DESTINATION bin
-  )
-
-  # General test dependency binary/scripts installed.
-  install(
-    PROGRAMS
-      run_lit.bat
-      run_lit.ps1
-      run_lit.sh
-    DESTINATION "tests/bin"
-    COMPONENT Tests
   )
 
   # Bundle the FileCheck binary from LLVM into our tests/bin directory so

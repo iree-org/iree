@@ -6,7 +6,7 @@
 
 load("//iree:build_defs.oss.bzl", "iree_cmake_extra_content")
 load("//build_tools/bazel:iree_bytecode_module.bzl", "iree_bytecode_module")
-load("//build_tools/bazel:run_binary_test.bzl", "run_binary_test")
+load("//build_tools/bazel:native_binary.bzl", "native_test")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -52,9 +52,9 @@ iree_bytecode_module(
     ],
 )
 
-run_binary_test(
+native_test(
     name = "simple_embedding_vmvx_sync_test",
-    test_binary = ":simple_embedding_vmvx_sync",
+    src = ":simple_embedding_vmvx_sync",
 )
 
 iree_cmake_extra_content(
@@ -177,9 +177,9 @@ iree_bytecode_module(
     ],
 )
 
-run_binary_test(
+native_test(
     name = "simple_embedding_embedded_sync_test",
-    test_binary = ":simple_embedding_embedded_sync",
+    src = ":simple_embedding_embedded_sync",
 )
 
 iree_cmake_extra_content(
@@ -211,9 +211,9 @@ cc_binary(
     ],
 )
 
-run_binary_test(
+native_test(
     name = "simple_embedding_dylib_test",
-    test_binary = ":simple_embedding_dylib",
+    src = ":simple_embedding_dylib",
 )
 
 iree_cmake_extra_content(
@@ -261,9 +261,9 @@ iree_bytecode_module(
     ],
 )
 
-run_binary_test(
+native_test(
     name = "simple_embedding_vulkan_test",
-    test_binary = ":simple_embedding_vulkan",
+    src = ":simple_embedding_vulkan",
 )
 
 iree_cmake_extra_content(
@@ -305,22 +305,22 @@ iree_bytecode_module(
 )
 
 # Simple embedding is failing in the CI.
-# run_binary_test(
+# native_test(
 #     name = "simple_embedding_cuda_test",
 #     tags = [
 #         "driver=cuda",
 #     ],
-#     test_binary = ":simple_embedding_cuda",
+#     src = ":simple_embedding_cuda",
 # )
 
 iree_cmake_extra_content(
     content = """
-iree_run_binary_test(
+iree_native_test(
   NAME
     "simple_embedding_cuda_test"
   LABELS
     "driver=cuda"
-  TEST_BINARY
+  SRC
     ::simple_embedding_cuda
 )
 

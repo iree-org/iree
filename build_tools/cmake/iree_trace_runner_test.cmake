@@ -96,12 +96,12 @@ function(iree_trace_runner_test)
     "${_RULE_TRACE_RUNNER}"
   )
 
-  iree_run_binary_test(
+  iree_native_test(
     NAME
       "${_RULE_NAME}"
     DRIVER
       "${_RULE_DRIVER}"
-    TEST_BINARY
+    SRC
       "${_RULE_TRACE_RUNNER}"
     TEST_INPUT_FILE_ARG
       ${_RULE_TRACE}

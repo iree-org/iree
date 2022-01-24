@@ -40,10 +40,10 @@ iree_cc_binary(
     iree::hal::local::executable_library
 )
 
-iree_run_binary_test(
+iree_native_test(
   NAME
     "elf_module_test"
-  TEST_BINARY
+  SRC
     ::elf_module_test_binary
 )
 

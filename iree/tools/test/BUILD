@@ -6,7 +6,7 @@
 
 # Smoke tests for the execution of tool binaries.
 
-load("//iree:lit_test.bzl", "iree_lit_test_suite")
+load("//build_tools/bazel:iree_lit_test.bzl", "iree_lit_test_suite")
 load("//build_tools/bazel:enforce_glob.bzl", "enforce_glob")
 
 package(
@@ -29,7 +29,10 @@ iree_lit_test_suite(
         ],
         include = ["*.mlir"],
     ),
-    data = [
+    tags = [
+        "hostonly",
+    ],
+    tools = [
         "//iree/tools:iree-benchmark-module",
         "//iree/tools:iree-run-mlir",
         "//iree/tools:iree-run-module",
@@ -37,20 +40,17 @@ iree_lit_test_suite(
         "@llvm-project//lld",
         "@llvm-project//llvm:FileCheck",
     ],
-    tags = [
-        "hostonly",
-    ],
 )
 
 iree_lit_test_suite(
     name = "benchmark_flags",
     srcs = ["benchmark_flags.txt"],
-    data = [
+    tags = [
+        "hostonly",
+    ],
+    tools = [
         "//iree/tools:iree-benchmark-module",
         "//iree/tools:iree-translate",
         "@llvm-project//llvm:FileCheck",
-    ],
-    tags = [
-        "hostonly",
     ],
 )

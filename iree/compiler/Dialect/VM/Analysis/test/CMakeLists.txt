@@ -16,7 +16,7 @@ iree_lit_test_suite(
   SRCS
     "register_allocation.mlir"
     "value_liveness.mlir"
-  DATA
+  TOOLS
     FileCheck
     iree::tools::iree-opt
 )

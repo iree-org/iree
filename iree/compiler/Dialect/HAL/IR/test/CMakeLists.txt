@@ -31,7 +31,7 @@ iree_lit_test_suite(
     "semaphore_ops.mlir"
     "tensor_op_folding.mlir"
     "tensor_ops.mlir"
-  DATA
+  TOOLS
     FileCheck
     iree::tools::iree-opt
 )

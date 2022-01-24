@@ -6,7 +6,7 @@
 
 include(CMakeParseArguments)
 
-# iree_run_binary_test()
+# iree_native_test()
 #
 # Creates a test that runs the specified binary with the specified arguments.
 #
@@ -17,15 +17,15 @@ include(CMakeParseArguments)
 # DRIVER: If specified, will pass --driver=DRIVER to the test binary and adds
 #     a driver label to the test.
 # TEST_INPUT_FILE_ARG: If specified, the input file will be added to DATA and
-#     its device path appended to ARGS. Note that the device path may be different
-#     from the host path, so this parameter should be used to portably pass file arguments
-#     to tests.
-# DATA: Additional input files needed by the test binary. When running tests on a
-#     separate device (e.g. Android), these files will be pushed to the device.
-#     TEST_INPUT_FILE_ARG is automatically added if specified.
+#     its device path appended to ARGS. Note that the device path may be
+#     different from the host path, so this parameter should be used to portably
+#     pass file arguments to tests.
+# DATA: Additional input files needed by the test binary. When running tests on
+#     a separate device (e.g. Android), these files will be pushed to the
+#     device. TEST_INPUT_FILE_ARG is automatically added if specified.
 # ARGS: additional arguments passed to the test binary. TEST_INPUT_FILE_ARG and
 #     --driver=DRIVER are automatically added if specified.
-# TEST_BINARY: binary target to run as the test.
+# SRC: binary target to run as the test.
 # LABELS: Additional labels to apply to the test. The package path is added
 #     automatically.
 #
@@ -38,16 +38,16 @@ include(CMakeParseArguments)
 #     requires_args_to_run
 #   ...
 # )
-# iree_run_binary_test(
+# iree_native_test(
 #   NAME
 #     requires_args_to_run_test
 #   ARGS
 #    --do-the-right-thing
-#   TEST_BINARY
+#   SRC
 #     ::requires_args_to_run
 # )
 
-function(iree_run_binary_test)
+function(iree_native_test)
   if(NOT IREE_BUILD_TESTS)
     return()
   endif()
@@ -55,7 +55,7 @@ function(iree_run_binary_test)
   cmake_parse_arguments(
     _RULE
     ""
-    "NAME;TEST_BINARY;DRIVER;TEST_INPUT_FILE_ARG"
+    "NAME;SRC;DRIVER;TEST_INPUT_FILE_ARG"
     "ARGS;LABELS;DATA"
     ${ARGN}
   )
@@ -88,7 +88,7 @@ function(iree_run_binary_test)
   endif()
 
   # Replace binary passed by relative ::name with iree::package::name
-  string(REGEX REPLACE "^::" "${_PACKAGE_NS}::" _TEST_BINARY_TARGET ${_RULE_TEST_BINARY})
+  string(REGEX REPLACE "^::" "${_PACKAGE_NS}::" _SRC_TARGET ${_RULE_SRC})
 
   if(ANDROID)
     # Define a custom target for pushing and running the test on Android device.
@@ -98,7 +98,7 @@ function(iree_run_binary_test)
         ${_TEST_NAME}
       COMMAND
         "${CMAKE_SOURCE_DIR}/build_tools/cmake/run_android_test.${IREE_HOST_SCRIPT_EXT}"
-        "${_ANDROID_ABS_DIR}/$<TARGET_FILE_NAME:${_TEST_BINARY_TARGET}>"
+        "${_ANDROID_ABS_DIR}/$<TARGET_FILE_NAME:${_SRC_TARGET}>"
         ${_RULE_ARGS}
     )
     # Use environment variables to instruct the script to push artifacts
@@ -108,7 +108,7 @@ function(iree_run_binary_test)
     set(
       _ENVIRONMENT_VARS
         "TEST_ANDROID_ABS_DIR=${_ANDROID_ABS_DIR}"
-        "TEST_EXECUTABLE=$<TARGET_FILE:${_TEST_BINARY_TARGET}>"
+        "TEST_EXECUTABLE=$<TARGET_FILE:${_SRC_TARGET}>"
         "TEST_DATA=${_DATA_SPACE_SEPARATED}"
         "TEST_TMPDIR=${_ANDROID_ABS_DIR}/test_tmpdir"
     )
@@ -119,7 +119,7 @@ function(iree_run_binary_test)
         ${_TEST_NAME}
       COMMAND
         "${CMAKE_SOURCE_DIR}/build_tools/cmake/run_test.${IREE_HOST_SCRIPT_EXT}"
-        "$<TARGET_FILE:${_TEST_BINARY_TARGET}>"
+        "$<TARGET_FILE:${_SRC_TARGET}>"
         ${_RULE_ARGS}
     )
     set_property(TEST ${_TEST_NAME} PROPERTY ENVIRONMENT "TEST_TMPDIR=${CMAKE_BINARY_DIR}/${_NAME}_test_tmpdir")

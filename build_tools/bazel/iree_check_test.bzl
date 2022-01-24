@@ -7,7 +7,7 @@
 """Macros for defining tests that run a module using iree-check-module."""
 
 load("//build_tools/bazel:iree_bytecode_module.bzl", "iree_bytecode_module")
-load("//build_tools/bazel:run_binary_test.bzl", "run_binary_test")
+load("//build_tools/bazel:native_binary.bzl", "native_test")
 
 ALL_TARGET_BACKENDS_AND_DRIVERS = [
     ("vmvx", "vmvx"),
@@ -47,7 +47,7 @@ def iree_check_test(
           automatically.
       target_cpu_features: currently unimplemented (must be empty), will eventually allow specifying target CPU features.
       timeout: timeout for the generated tests.
-      **kwargs: any additional attributes to pass to the underlying run_binary_test.
+      **kwargs: any additional attributes to pass to the underlying native_test.
     """
 
     if target_cpu_features:
@@ -67,14 +67,14 @@ def iree_check_test(
         visibility = ["//visibility:private"],
     )
 
-    run_binary_test(
+    native_test(
         name = name,
         args = [
             "--driver=%s" % driver,
             "$(location :%s)" % bytecode_module_name,
         ] + runner_args,
         data = [":%s" % bytecode_module_name],
-        test_binary = "//iree/tools:iree-check-module",
+        src = "//iree/tools:iree-check-module",
         tags = tags + ["driver=%s" % driver],
         timeout = timeout,
         **kwargs

@@ -22,7 +22,7 @@ iree_lit_test_suite(
     "tensor_folding.mlir"
     "tensor_ops.mlir"
     "types.mlir"
-  DATA
+  TOOLS
     FileCheck
     iree::tools::iree-opt
 )

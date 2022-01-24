@@ -19,7 +19,7 @@ iree_lit_test_suite(
     "extract_slice.mlir"
     "from_elements.mlir"
     "insert_slice.mlir"
-  DATA
+  TOOLS
     FileCheck
     iree::tools::iree-opt
 )

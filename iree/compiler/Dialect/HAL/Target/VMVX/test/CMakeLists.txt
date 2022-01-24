@@ -16,7 +16,7 @@ iree_lit_test_suite(
   SRCS
     "linking.mlir"
     "smoketest.mlir"
-  DATA
+  TOOLS
     FileCheck
     iree::tools::iree-opt
 )

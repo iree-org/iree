@@ -145,12 +145,12 @@ a single suite that globs all `.mlir` files in the directory and is called
 "lit".
 
 ```bzl
-load("//iree:lit_test.bzl", "iree_lit_test_suite")
+load("//iree/build_tools/bazel:iree_lit_test.bzl", "iree_lit_test_suite")
 
 iree_lit_test_suite(
     name = "lit",
     srcs = glob(["*.mlir"]),
-    data = [
+    tools = [
         "@llvm-project//llvm:FileCheck",
         "//iree/tools:iree-opt",
     ],

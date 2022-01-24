@@ -15,13 +15,11 @@ include(CMakeParseArguments)
 # Parameters:
 # NAME: Name of the target
 # TEST_FILE: Test file to run with the lit runner.
+# TOOLS: Tools that should be included on the PATH
 # DATA: Additional data dependencies invoked by the test (e.g. binaries
 #   called in the RUN line)
 # LABELS: Additional labels to apply to the test. The package path is added
 #     automatically.
-#
-# TODO(gcmn): allow using alternative driver
-# A driver other than the default iree/tools/run_lit.sh is not currently supported.
 function(iree_lit_test)
   if(NOT IREE_BUILD_TESTS)
     return()
@@ -37,7 +35,7 @@ function(iree_lit_test)
     _RULE
     ""
     "NAME;TEST_FILE"
-    "DATA;LABELS"
+    "DATA;TOOLS;LABELS"
     ${ARGN}
   )
 
@@ -52,10 +50,16 @@ function(iree_lit_test)
   get_filename_component(_TEST_FILE_PATH ${_RULE_TEST_FILE} ABSOLUTE)
 
   list(TRANSFORM _RULE_DATA REPLACE "^::" "${_PACKAGE_NS}::")
+  list(TRANSFORM _RULE_TOOLS REPLACE "^::" "${_PACKAGE_NS}::")
   set(_DATA_DEP_PATHS)
-  foreach(_DATA_DEP ${_RULE_DATA})
+  foreach(_DATA_DEP IN LISTS _RULE_DATA _RULE_TOOLS)
     list(APPEND _DATA_DEP_PATHS $<TARGET_FILE:${_DATA_DEP}>)
-  endforeach(_DATA_DEP)
+  endforeach()
+
+  set(_LIT_PATH_ARGS)
+  foreach(_TOOL IN LISTS _RULE_TOOLS)
+    list(APPEND _LIT_PATH_ARGS "--path" "$<TARGET_FILE_DIR:${_TOOL}>")
+  endforeach()
 
   iree_package_ns(_PACKAGE_NS)
   string(REPLACE "::" "/" _PACKAGE_PATH ${_PACKAGE_NS})
@@ -67,9 +71,11 @@ function(iree_lit_test)
       # We run all our tests through a custom test runner to allow setup
       # and teardown.
       "${CMAKE_SOURCE_DIR}/build_tools/cmake/run_test.${IREE_HOST_SCRIPT_EXT}"
-      "${CMAKE_SOURCE_DIR}/iree/tools/run_lit.${IREE_HOST_SCRIPT_EXT}"
+      "${Python3_EXECUTABLE}"
+      "${LLVM_SOURCE_DIR}/utils/lit/lit.py"
+      "-v"
+      ${_LIT_PATH_ARGS}
       ${_TEST_FILE_PATH}
-      ${_DATA_DEP_PATHS}
   )
 
   list(APPEND _RULE_LABELS "${_PACKAGE_PATH}")
@@ -93,13 +99,10 @@ endfunction()
 # Parameters:
 # NAME: Name of the target
 # SRCS: List of test files to run with the lit runner. Creates one test per source.
-# DATA: Additional data dependencies invoked by the test (e.g. binaries
-#   called in the RUN line)
+# TOOLS: Tools that should be included on the PATH
+# DATA: Additional data dependencies used by the test
 # LABELS: Additional labels to apply to the generated tests. The package path is
 #     added automatically.
-#
-# TODO(gcmn): allow using alternative driver
-# A driver other than the default iree/tools/run_lit.sh is not currently supported.
 function(iree_lit_test_suite)
   if(NOT IREE_BUILD_TESTS)
     return()
@@ -113,7 +116,7 @@ function(iree_lit_test_suite)
     _RULE
     ""
     "NAME"
-    "SRCS;DATA;LABELS"
+    "SRCS;DATA;TOOLS;LABELS"
     ${ARGN}
   )
 
@@ -126,6 +129,8 @@ function(iree_lit_test_suite)
         "${_TEST_FILE}"
       DATA
         "${_RULE_DATA}"
+      TOOLS
+        "${_RULE_TOOLS}"
       LABELS
         "${_RULE_LABELS}"
     )

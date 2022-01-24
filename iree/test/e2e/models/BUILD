@@ -7,7 +7,7 @@
 # Tests for end-to-end IREE support of entire models or their close derivatives.
 
 load("//build_tools/bazel:enforce_glob.bzl", "enforce_glob")
-load("//iree:lit_test.bzl", "iree_lit_test_suite")
+load("//build_tools/bazel:iree_lit_test.bzl", "iree_lit_test_suite")
 load("//build_tools/bazel:iree_check_test.bzl", "iree_check_single_backend_test_suite")
 
 package(
@@ -38,14 +38,14 @@ iree_lit_test_suite(
             ["*.mlir"],
         exclude = CHECK_FRAMEWORK_TESTS,
     ),
-    data = [
-        "//iree/tools:iree-run-mlir",
-        "@llvm-project//lld",
-        "@llvm-project//llvm:FileCheck",
-    ],
     tags = [
         "hostonly",
         "optonly",  # swiftshader is too slow in dbg
+    ],
+    tools = [
+        "//iree/tools:iree-run-mlir",
+        "@llvm-project//lld",
+        "@llvm-project//llvm:FileCheck",
     ],
 )
 

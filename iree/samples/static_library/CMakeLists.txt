@@ -87,7 +87,7 @@ iree_lit_test(
     static_library_demo_test
   TEST_FILE
     "static_library_demo_test.txt"
-  DATA
+  TOOLS
     ::static_library_demo
     FileCheck
   LABELS
@@ -170,7 +170,7 @@ iree_lit_test(
     static_library_demo_c_test
   TEST_FILE
     "static_library_demo_c_test.txt"
-  DATA
+  TOOLS
     ::static_library_demo_c
     FileCheck
   LABELS

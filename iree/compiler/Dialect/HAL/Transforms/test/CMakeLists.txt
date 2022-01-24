@@ -25,7 +25,7 @@ iree_lit_test_suite(
     "pack_dispatch_operands.mlir"
     "resolve_entry_point_ordinals.mlir"
     "verify_target_environment.mlir"
-  DATA
+  TOOLS
     FileCheck
     iree::tools::iree-opt
 )

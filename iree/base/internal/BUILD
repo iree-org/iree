@@ -8,9 +8,9 @@
 # These are not part of the IREE API. Though they may be used by external
 # projects their API may change at any time.
 
-load("//build_tools/bazel:run_binary_test.bzl", "run_binary_test")
+load("//build_tools/bazel:native_binary.bzl", "native_test")
 load("//iree:build_defs.oss.bzl", "iree_cmake_extra_content")
-load("//iree:lit_test.bzl", "iree_lit_test_suite")
+load("//build_tools/bazel:iree_lit_test.bzl", "iree_lit_test_suite")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -191,11 +191,11 @@ cc_binary(
 iree_lit_test_suite(
     name = "flags_test",
     srcs = ["flags_test.txt"],
-    data = [
+    tags = ["hostonly"],
+    tools = [
         ":flags_demo",
         "@llvm-project//llvm:FileCheck",
     ],
-    tags = ["hostonly"],
 )
 
 cc_library(
@@ -294,10 +294,10 @@ cc_binary(
     ],
 )
 
-run_binary_test(
+native_test(
     name = "synchronization_benchmark_test",
+    src = ":synchronization_benchmark",
     args = ["--benchmark_min_time=0"],
-    test_binary = ":synchronization_benchmark",
 )
 
 cc_test(

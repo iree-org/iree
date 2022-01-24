@@ -9,7 +9,7 @@
 # those tests in iree/tools/test/
 
 load("//build_tools/bazel:enforce_glob.bzl", "enforce_glob")
-load("//iree:lit_test.bzl", "iree_lit_test_suite")
+load("//build_tools/bazel:iree_lit_test.bzl", "iree_lit_test_suite")
 load("//build_tools/bazel:iree_check_test.bzl", "iree_check_single_backend_test_suite")
 load("//build_tools/bazel:iree_trace_runner_test.bzl", "iree_generated_trace_runner_test")
 
@@ -56,13 +56,13 @@ iree_lit_test_suite(
             "lowering_config.mlir",
         ] + BACKEND_TESTS,
     ),
-    data = [
+    tags = ["hostonly"],
+    tools = [
         "//iree/tools:iree-opt",
         "//iree/tools:iree-run-mlir",
         "@llvm-project//lld",
         "@llvm-project//llvm:FileCheck",
     ],
-    tags = ["hostonly"],
 )
 
 iree_check_single_backend_test_suite(

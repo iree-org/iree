@@ -508,15 +508,23 @@ class BuildFileFunctions(object):
                             f"{tblgen_block}"
                             f")\n\n")
 
-  def iree_lit_test_suite(self, name, srcs, data, tags=None, **kwargs):
+  def iree_lit_test_suite(self,
+                          name,
+                          srcs,
+                          tools=None,
+                          data=None,
+                          tags=None,
+                          **kwargs):
     name_block = _convert_string_arg_block("NAME", name, quote=False)
     srcs_block = _convert_srcs_block(srcs)
+    tools_block = _convert_target_list_block("TOOLS", tools)
     data_block = _convert_target_list_block("DATA", data)
     labels_block = _convert_string_list_block("LABELS", tags)
 
     self.converter.body += (f"iree_lit_test_suite(\n"
                             f"{name_block}"
                             f"{srcs_block}"
+                            f"{tools_block}"
                             f"{data_block}"
                             f"{labels_block}"
                             f")\n\n")
@@ -711,17 +719,16 @@ class BuildFileFunctions(object):
                             f"{labels_block}"
                             f")\n\n")
 
-  def run_binary_test(self, name, test_binary, args=None, data=None, tags=None):
+  def native_test(self, name, src, args=None, data=None, tags=None):
     if data is not None:
-      self._convert_unimplemented_function("iree_run_binary_test",
-                                           name + " has data")
+      self._convert_unimplemented_function("native_test", name + " has data")
 
     name_block = _convert_string_arg_block("NAME", name)
-    test_binary_block = _convert_single_target_block("TEST_BINARY", test_binary)
+    test_binary_block = _convert_single_target_block("SRC", src)
     args_block = _convert_string_list_block("ARGS", args)
     labels_block = _convert_string_list_block("LABELS", tags)
 
-    self.converter.body += (f"iree_run_binary_test(\n"
+    self.converter.body += (f"iree_native_test(\n"
                             f"{name_block}"
                             f"{args_block}"
                             f"{test_binary_block}"

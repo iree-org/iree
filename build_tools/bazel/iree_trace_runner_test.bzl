@@ -7,7 +7,7 @@
 """Macros for defining tests that use a trace-runner."""
 
 load("//build_tools/bazel:iree_bytecode_module.bzl", "iree_bytecode_module")
-load("//build_tools/bazel:run_binary_test.bzl", "run_binary_test")
+load("//build_tools/bazel:native_binary.bzl", "native_test")
 
 def iree_trace_runner_test(
         name,
@@ -70,7 +70,7 @@ def iree_trace_runner_test(
         **kwargs
     )
 
-    run_binary_test(
+    native_test(
         name = name,
         args = [
             "--driver=%s" % driver,
@@ -80,7 +80,7 @@ def iree_trace_runner_test(
             ":%s" % bytecode_module_name,
             ":%s" % trace,
         ],
-        test_binary = trace_runner,
+        src = trace_runner,
         tags = tags + ["driver=%s" % driver],
         timeout = timeout,
         **kwargs

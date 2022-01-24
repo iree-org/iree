@@ -21,7 +21,7 @@ iree_lit_test_suite(
     "mnist_fake_weights.mlir"
     "resnet50_fake_weights.mlir"
     "unidirectional_lstm.mlir"
-  DATA
+  TOOLS
     FileCheck
     iree::tools::iree-run-mlir
     lld

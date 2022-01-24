@@ -15,7 +15,7 @@ iree_lit_test_suite(
     lit
   SRCS
     "target_env.mlir"
-  DATA
+  TOOLS
     FileCheck
     iree::tools::iree-opt
 )

@@ -25,7 +25,7 @@ iree_lit_test_suite(
     "strip_debug_ops.mlir"
     "test_float_range_analysis.mlir"
     "test_float_range_analysis_linalg.mlir"
-  DATA
+  TOOLS
     FileCheck
     iree::tools::iree-opt
 )
