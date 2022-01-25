@@ -29,9 +29,9 @@ using mlir::bufferization::AnalysisBufferizationState;
 using mlir::bufferization::BufferizableOpInterface;
 using mlir::bufferization::BufferizationAliasInfo;
 using mlir::bufferization::BufferizationState;
+using mlir::bufferization::createMemCpy;
 using mlir::bufferization::DialectBufferizationState;
 using mlir::bufferization::PostAnalysisStep;
-using mlir::bufferization::createMemCpy;
 using mlir::bufferization::replaceOpWithNewBufferizedOp;
 using mlir::linalg::comprehensive_bufferize::linalg_ext::
     InitTensorEliminationStep;

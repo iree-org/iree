@@ -104,7 +104,7 @@ void IREEComprehensiveBufferizePass::runOnOperation() {
   addPostAnalysisTransformations(*options);
 
   if (failed(
-      bufferization::runOneShotBufferize(moduleOp, std::move(options)))) {
+          bufferization::runOneShotBufferize(moduleOp, std::move(options)))) {
     return signalPassFailure();
   }
 }
