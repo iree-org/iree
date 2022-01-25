@@ -8,7 +8,7 @@
 
 It's good to test that benchmarks run, but it's really annoying to run a billion
 iterations of them every time you try to run tests. So we create these as
-binaries and then invoke them as tests with `--min_benchmark_time=0`.
+binaries and then invoke them as tests with `--benchmark_min_time=0`.
 """
 
 load(":native_binary.bzl", "native_test")

@@ -12,7 +12,7 @@ include(CMakeParseArguments)
 #
 # It's good to test that benchmarks run, but it's really annoying to run a
 # billion iterations of them every time you try to run tests. So we create these
-# as binaries and then invoke them as tests with `--min_benchmark_time=0`.
+# as binaries and then invoke them as tests with `--benchmark_min_time=0`.
 #
 # Mirrors the bzl function of the same name. See iree_cc_binary and iree_cc_test
 # for more details on those rules
