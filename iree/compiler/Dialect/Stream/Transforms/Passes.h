@@ -8,6 +8,7 @@
 #define IREE_COMPILER_DIALECT_STREAM_TRANSFORMS_PASSES_H_
 
 #include "iree/compiler/Dialect/Stream/IR/StreamOps.h"
+#include "iree/compiler/Dialect/Stream/Transforms/PassDetail.h"
 #include "llvm/ADT/StringMap.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/Pass/Pass.h"
@@ -27,10 +28,33 @@ struct TransformOptions : public PassPipelineOptions<TransformOptions> {
   // TODO(benvanik): options for async/sync overrides.
 
   Option<bool> optimizeBindings{
-      *this, "optimize-bindings",
+      *this,
+      "optimize-bindings",
       llvm::cl::desc(
           "Enables binding fusion and dispatch site specialization."),
-      llvm::cl::init(true)};
+      llvm::cl::init(true),
+  };
+
+  Option<DumpOutputFormat> dumpStatisticsFormat{
+      *this,
+      "dump-statistics-format",
+      llvm::cl::desc("Dumps statistics in the specified output format."),
+      llvm::cl::init(DumpOutputFormat::None),
+      llvm::cl::values(
+          clEnumValN(IREE::Stream::DumpOutputFormat::Pretty, "pretty",
+                     "Human-readable pretty printed output."),
+          clEnumValN(IREE::Stream::DumpOutputFormat::Verbose, "verbose",
+                     "Pretty printed output with additional IR."),
+          clEnumValN(IREE::Stream::DumpOutputFormat::CSV, "csv",
+                     "Comma separated values.")),
+  };
+  Option<std::string> dumpStatisticsFile{
+      *this,
+      "dump-statistics-file",
+      llvm::cl::desc(
+          "File path to write to; or `` for stderr or `-` for stdout."),
+      llvm::cl::init(""),
+  };
 };
 
 // Adds a set of passes to the given pass manager that run the required flow
@@ -132,6 +156,10 @@ createAnnotateDispatchArgumentsPass();
 //===----------------------------------------------------------------------===//
 // Diagnostics
 //===----------------------------------------------------------------------===//
+
+std::unique_ptr<OperationPass<mlir::ModuleOp>> createDumpStatisticsPass(
+    DumpOutputFormat outputFormat = DumpOutputFormat::Pretty,
+    std::string outputFile = "");
 
 std::unique_ptr<OperationPass<mlir::ModuleOp>> createVerifyInputPass();
 std::unique_ptr<OperationPass<mlir::ModuleOp>>

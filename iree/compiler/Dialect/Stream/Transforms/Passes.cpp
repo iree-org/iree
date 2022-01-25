@@ -279,6 +279,15 @@ void buildStreamTransformPassPipeline(
   buildStreamAsyncPassPipeline(passManager, transformOptions);
   buildStreamCmdPassPipeline(passManager, transformOptions);
 
+  // Dump statistics before the deeper optimizations happen.
+  // Optimizations such as dispatch operand fusion remove information we can use
+  // to determine memory usage by dispatches.
+  if (transformOptions.dumpStatisticsFormat != DumpOutputFormat::None) {
+    passManager.addPass(IREE::Stream::createDumpStatisticsPass(
+        transformOptions.dumpStatisticsFormat,
+        transformOptions.dumpStatisticsFile));
+  }
+
   //----------------------------------------------------------------------------
   // Optimizations (may be required by some targets)
   //----------------------------------------------------------------------------

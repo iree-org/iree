@@ -2759,6 +2759,10 @@ def Stream_ExecutableExportOp : Stream_Op<"executable.export", [
       "FlatSymbolRefAttr":$function_ref
     )>,
   ];
+
+  let extraClassDeclaration = [{
+    ::mlir::FuncOp getFunctionRef();
+  }];
 }
 
 def Stream_BindingSubspanOp : Stream_PureOp<"binding.subspan", [

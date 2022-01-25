@@ -290,8 +290,7 @@ static void specializeDispatches(
     MemoizedCmdConstants &memoizedConstants) {
   if (dispatchOps.empty()) return;  // no-op if no dispatches
 
-  auto funcOp = executableOp.getInnerModule().lookupSymbol<mlir::FuncOp>(
-      exportOp.function_refAttr());
+  auto funcOp = exportOp.getFunctionRef();
 
   // Build a constant table for unique per-dispatch constant values.
   auto constantTable = buildConstantTable(funcOp, dispatchOps);

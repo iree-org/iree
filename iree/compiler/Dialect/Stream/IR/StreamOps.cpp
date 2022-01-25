@@ -1963,6 +1963,14 @@ void ExecutableExportOp::build(OpBuilder &builder, OperationState &state,
         builder.getStringAttr(sym_name), function_ref);
 }
 
+::mlir::FuncOp ExecutableExportOp::getFunctionRef() {
+  auto executableOp =
+      this->getOperation()->getParentOfType<IREE::Stream::ExecutableOp>();
+  if (!executableOp) return {};
+  return executableOp.getInnerModule().lookupSymbol<::mlir::FuncOp>(
+      function_ref());
+}
+
 //===----------------------------------------------------------------------===//
 // stream.binding.subspan
 //===----------------------------------------------------------------------===//

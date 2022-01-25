@@ -57,10 +57,7 @@ static BindingLayoutAnalysis::ExportDispatchMap findAllDispatchSites(
 static ExecutableLayout deriveExportLayout(
     IREE::Stream::ExecutableExportOp exportOp,
     SmallVector<IREE::Stream::CmdDispatchOp> &dispatchOps) {
-  auto executableOp = exportOp->getParentOfType<IREE::Stream::ExecutableOp>();
-  assert(executableOp && "unnested export");
-  auto funcOp = executableOp.getInnerModule().lookupSymbol<mlir::FuncOp>(
-      exportOp.function_ref());
+  auto funcOp = exportOp.getFunctionRef();
   assert(funcOp && "export target not found");
 
   // TODO(#3502): a real derivation based on dispatch sites.
@@ -130,6 +127,7 @@ static ExecutableLayout deriveExportLayout(
   executableLayout.setLayouts.push_back(setLayout);
 
   LLVM_DEBUG({
+    auto executableOp = exportOp->getParentOfType<IREE::Stream::ExecutableOp>();
     llvm::dbgs() << "deriveExportLayout(@" << executableOp.sym_name() << "::@"
                  << exportOp.sym_name() << "):\n";
     executableLayout.print(llvm::dbgs());

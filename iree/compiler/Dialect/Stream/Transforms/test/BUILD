@@ -19,6 +19,7 @@ iree_lit_test_suite(
         [
             "annotate_dispatch_arguments.mlir",
             "convert_to_stream.mlir",
+            "dump_statistics.mlir",
             "elide_async_copies.mlir",
             "encode_device_tensors.mlir",
             "encode_host_tensors.mlir",
