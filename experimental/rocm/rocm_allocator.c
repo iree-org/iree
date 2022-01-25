@@ -204,15 +204,6 @@ static iree_status_t iree_hal_rocm_allocator_allocate_buffer(
   return status;
 }
 
-static iree_status_t iree_hal_rocm_allocator_wrap_buffer(
-    iree_hal_allocator_t* base_allocator, iree_hal_memory_type_t memory_type,
-    iree_hal_memory_access_t allowed_access,
-    iree_hal_buffer_usage_t allowed_usage, iree_byte_span_t data,
-    iree_allocator_t data_allocator, iree_hal_buffer_t** out_buffer) {
-  return iree_make_status(IREE_STATUS_UNAVAILABLE,
-                          "wrapping of external buffers not supported");
-}
-
 static void iree_hal_rocm_allocator_deallocate_buffer(
     iree_hal_allocator_t* base_allocator, iree_hal_buffer_t* base_buffer) {
   iree_hal_rocm_allocator_t* allocator =
@@ -230,6 +221,34 @@ static void iree_hal_rocm_allocator_deallocate_buffer(
   iree_hal_buffer_destroy(base_buffer);
 }
 
+static iree_status_t iree_hal_rocm_allocator_wrap_buffer(
+    iree_hal_allocator_t* base_allocator, iree_hal_memory_type_t memory_type,
+    iree_hal_memory_access_t allowed_access,
+    iree_hal_buffer_usage_t allowed_usage, iree_byte_span_t data,
+    iree_allocator_t data_allocator, iree_hal_buffer_t** out_buffer) {
+  return iree_make_status(IREE_STATUS_UNAVAILABLE,
+                          "wrapping of external buffers not supported");
+}
+
+static iree_status_t iree_hal_rocm_allocator_import_buffer(
+    iree_hal_allocator_t* base_allocator, iree_hal_memory_type_t memory_type,
+    iree_hal_memory_access_t allowed_access,
+    iree_hal_buffer_usage_t allowed_usage,
+    iree_hal_external_buffer_t* external_buffer,
+    iree_hal_buffer_t** out_buffer) {
+  return iree_make_status(IREE_STATUS_UNAVAILABLE,
+                          "importing from external buffers not supported");
+}
+
+static iree_status_t iree_hal_rocm_allocator_export_buffer(
+    iree_hal_allocator_t* base_allocator, iree_hal_buffer_t* buffer,
+    iree_hal_external_buffer_type_t requested_type,
+    iree_hal_external_buffer_flags_t requested_flags,
+    iree_hal_external_buffer_t* out_external_buffer) {
+  return iree_make_status(IREE_STATUS_UNAVAILABLE,
+                          "exporting to external buffers not supported");
+}
+
 static const iree_hal_allocator_vtable_t iree_hal_rocm_allocator_vtable = {
     .destroy = iree_hal_rocm_allocator_destroy,
     .host_allocator = iree_hal_rocm_allocator_host_allocator,
@@ -238,6 +257,8 @@ static const iree_hal_allocator_vtable_t iree_hal_rocm_allocator_vtable = {
     .query_buffer_compatibility =
         iree_hal_rocm_allocator_query_buffer_compatibility,
     .allocate_buffer = iree_hal_rocm_allocator_allocate_buffer,
-    .wrap_buffer = iree_hal_rocm_allocator_wrap_buffer,
     .deallocate_buffer = iree_hal_rocm_allocator_deallocate_buffer,
+    .wrap_buffer = iree_hal_rocm_allocator_wrap_buffer,
+    .import_buffer = iree_hal_rocm_allocator_import_buffer,
+    .export_buffer = iree_hal_rocm_allocator_export_buffer,
 };

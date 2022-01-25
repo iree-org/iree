@@ -383,6 +383,12 @@ static iree_status_t iree_hal_vulkan_vma_allocator_allocate_buffer(
       /*flags=*/0, out_buffer);
 }
 
+static void iree_hal_vulkan_vma_allocator_deallocate_buffer(
+    iree_hal_allocator_t* base_allocator, iree_hal_buffer_t* base_buffer) {
+  // VMA does the pooling for us so we don't need anything special.
+  iree_hal_buffer_destroy(base_buffer);
+}
+
 static iree_status_t iree_hal_vulkan_vma_allocator_wrap_buffer(
     iree_hal_allocator_t* base_allocator, iree_hal_memory_type_t memory_type,
     iree_hal_memory_access_t allowed_access,
@@ -393,10 +399,23 @@ static iree_status_t iree_hal_vulkan_vma_allocator_wrap_buffer(
                           "wrapping of external buffers not supported");
 }
 
-static void iree_hal_vulkan_vma_allocator_deallocate_buffer(
-    iree_hal_allocator_t* base_allocator, iree_hal_buffer_t* base_buffer) {
-  // VMA does the pooling for us so we don't need anything special.
-  iree_hal_buffer_destroy(base_buffer);
+static iree_status_t iree_hal_vulkan_vma_allocator_import_buffer(
+    iree_hal_allocator_t* base_allocator, iree_hal_memory_type_t memory_type,
+    iree_hal_memory_access_t allowed_access,
+    iree_hal_buffer_usage_t allowed_usage,
+    iree_hal_external_buffer_t* external_buffer,
+    iree_hal_buffer_t** out_buffer) {
+  return iree_make_status(IREE_STATUS_UNAVAILABLE,
+                          "importing from external buffers not supported");
+}
+
+static iree_status_t iree_hal_vulkan_vma_allocator_export_buffer(
+    iree_hal_allocator_t* base_allocator, iree_hal_buffer_t* buffer,
+    iree_hal_external_buffer_type_t requested_type,
+    iree_hal_external_buffer_flags_t requested_flags,
+    iree_hal_external_buffer_t* out_external_buffer) {
+  return iree_make_status(IREE_STATUS_UNAVAILABLE,
+                          "exporting to external buffers not supported");
 }
 
 namespace {
@@ -408,7 +427,9 @@ const iree_hal_allocator_vtable_t iree_hal_vulkan_vma_allocator_vtable = {
     /*.query_buffer_compatibility=*/
     iree_hal_vulkan_vma_allocator_query_buffer_compatibility,
     /*.allocate_buffer=*/iree_hal_vulkan_vma_allocator_allocate_buffer,
-    /*.wrap_buffer=*/iree_hal_vulkan_vma_allocator_wrap_buffer,
     /*.deallocate_buffer=*/iree_hal_vulkan_vma_allocator_deallocate_buffer,
+    /*.wrap_buffer=*/iree_hal_vulkan_vma_allocator_wrap_buffer,
+    /*.import_buffer=*/iree_hal_vulkan_vma_allocator_import_buffer,
+    /*.export_buffer=*/iree_hal_vulkan_vma_allocator_export_buffer,
 };
 }  // namespace
