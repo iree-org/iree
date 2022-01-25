@@ -63,13 +63,6 @@ static llvm::cl::opt<int> defaultWorkgroupTileSize(
         "linalg.generic and linalg.indexed_generic workgroup tile size"),
     llvm::cl::init(64));
 
-// TODO(hanchung): Enable the flag by default after addressing perf
-// regresssions.
-static llvm::cl::opt<bool> useDoubleTilingExpert(
-    "iree-codegen-use-double-tiling-expert",
-    llvm::cl::desc("DEVELOPMENT ONLY, DO NOT USE THE FLAG."),
-    llvm::cl::init(false));
-
 using IREE::Codegen::DispatchLoweringPassPipeline;
 
 static bool isVMVX(FuncOp entryPointFn) {
@@ -329,8 +322,9 @@ static LogicalResult setX86SandboxRootConfig(
                      /*workgroupSize=*/ArrayRef<int64_t>{});
 
   // Hardcoded tile sizes. The configuration is derived from iree-llvm-sandbox.
-  // L1 tile sizes are {1, 1, ..., 288, 128, 512}.
-  // Vector tile sizes are {1, ..., 9, 32, 16}
+  // L1 tile sizes are {1, 1, ..., 288, 128, 512}. Note that L1 tiling sizes is
+  // unused at this moment.
+  // Vector tile sizes are {1, ..., 8, 32, 16}
   SmallVector<int64_t> l1TileSizes, vectorTileSizes;
   int64_t nLoops = cast<linalg::LinalgOp>(op.getOperation()).getNumLoops();
   l1TileSizes.append(nLoops - 3, 1);
@@ -434,7 +428,9 @@ static LogicalResult setRootConfig(
     // configured. However, we don't know the number of loops when adding the
     // pass to pass manager. Thus, we don't use double tiling expert for batch
     // gemms for now.
-    if (!numBatchDims && useDoubleTilingExpert) {
+    // TODO(hanchung): Embed options into attributes, so we can control options
+    // more heuristically.
+    if (!numBatchDims) {
       return setX86SandboxRootConfig(entryPointFn, contractionOp,
                                      workloadPerWorkgroup, vectorSize);
     } else {
