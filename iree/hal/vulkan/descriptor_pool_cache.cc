@@ -60,13 +60,12 @@ iree_status_t DescriptorPoolCache::AcquireDescriptorPool(
   create_info.maxSets = kMaxDescriptorSets;
   std::array<VkDescriptorPoolSize, 1> pool_sizes;
   pool_sizes[0].type = descriptor_type;
-  pool_sizes[0].descriptorCount = max_descriptor_count;
+  pool_sizes[0].descriptorCount = max_descriptor_count * create_info.maxSets;
   create_info.poolSizeCount = static_cast<uint32_t>(pool_sizes.size());
   create_info.pPoolSizes = pool_sizes.data();
 
   DescriptorPool descriptor_pool;
   descriptor_pool.descriptor_type = descriptor_type;
-  descriptor_pool.max_descriptor_count = max_descriptor_count;
   descriptor_pool.handle = VK_NULL_HANDLE;
 
   VK_RETURN_IF_ERROR(syms().vkCreateDescriptorPool(

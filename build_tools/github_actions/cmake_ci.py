@@ -152,7 +152,7 @@ def invoke_generate():
       f'-DPYTHON_EXECUTABLE:FILEPATH={sys.executable}',
       f'-DPython3_INCLUDE_DIR:PATH={sysconfig.get_path("include")}',
       f'-DPYTHON_INCLUDE_DIR:PATH={sysconfig.get_path("include")}',
-      f'-DIREE_RELEASE_PACKAGE_SUFFIX:STRING={version_info.get("package-suffix") or "-dev"}',
+      f'-DIREE_RELEASE_PACKAGE_SUFFIX:STRING={version_info.get("package-suffix") or ""}',
       f'-DIREE_RELEASE_VERSION:STRING={version_info.get("package-version") or "0.0.1a1"}',
       f'-DIREE_RELEASE_REVISION:STRING={version_info.get("iree-revision") or "HEAD"}',
   ]

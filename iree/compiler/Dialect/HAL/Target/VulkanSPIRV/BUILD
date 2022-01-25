@@ -14,7 +14,7 @@ package(
 
 iree_cmake_extra_content(
     content = """
-if(NOT "${IREE_TARGET_BACKEND_VULKAN-SPIRV}")
+if(NOT "${IREE_TARGET_BACKEND_VULKAN_SPIRV}")
   return()
 endif()
 """,
@@ -31,24 +31,21 @@ cc_library(
     deps = [
         "//iree/compiler/Codegen:PassHeaders",
         "//iree/compiler/Codegen/Common",
+        "//iree/compiler/Codegen/Dialect:IREECodegenDialect",
         "//iree/compiler/Codegen/SPIRV",
         "//iree/compiler/Codegen/Utils",
-        "//iree/compiler/Dialect/Flow/IR",
         "//iree/compiler/Dialect/HAL/Target",
         "//iree/compiler/Dialect/Vulkan/IR",
         "//iree/compiler/Dialect/Vulkan/Utils",
         "//iree/compiler/Utils",
         "//iree/schemas:spirv_executable_def_c_fbs",
         "@llvm-project//llvm:Support",
-        "@llvm-project//mlir:Affine",
         "@llvm-project//mlir:GPUDialect",
         "@llvm-project//mlir:IR",
-        "@llvm-project//mlir:LinalgOps",
         "@llvm-project//mlir:Parser",
         "@llvm-project//mlir:SPIRVDialect",
         "@llvm-project//mlir:SPIRVModuleCombiner",
         "@llvm-project//mlir:SPIRVSerialization",
         "@llvm-project//mlir:Support",
-        "@llvm-project//mlir:VectorOps",
     ],
 )

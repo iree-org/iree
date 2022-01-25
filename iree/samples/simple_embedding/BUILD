@@ -5,8 +5,8 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 load("//iree:build_defs.oss.bzl", "iree_cmake_extra_content")
-load("//iree/tools:compilation.bzl", "iree_bytecode_module")
-load("//build_tools/bazel:run_binary_test.bzl", "run_binary_test")
+load("//build_tools/bazel:iree_bytecode_module.bzl", "iree_bytecode_module")
+load("//build_tools/bazel:native_binary.bzl", "native_test")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -52,9 +52,9 @@ iree_bytecode_module(
     ],
 )
 
-run_binary_test(
+native_test(
     name = "simple_embedding_vmvx_sync_test",
-    test_binary = ":simple_embedding_vmvx_sync",
+    src = ":simple_embedding_vmvx_sync",
 )
 
 iree_cmake_extra_content(
@@ -67,7 +67,7 @@ endif()
 iree_cmake_extra_content(
     content = """
 if((${IREE_HAL_DRIVER_DYLIB} OR ${IREE_HAL_DRIVER_DYLIB_SYNC})
-   AND (${IREE_TARGET_BACKEND_DYLIB-LLVM-AOT} OR DEFINED IREE_HOST_BINARY_ROOT))
+   AND (${IREE_TARGET_BACKEND_DYLIB_LLVM_AOT} OR DEFINED IREE_HOST_BINARY_ROOT))
 """,
     inline = True,
 )
@@ -104,7 +104,6 @@ iree_bytecode_module(
         "-iree-mlir-to-vm-bytecode-module",
         "-iree-hal-target-backends=dylib-llvm-aot",
         "-iree-llvm-target-triple=x86_64-pc-linux-elf",
-        "-iree-llvm-link-embedded=true",
         "-iree-llvm-debug-symbols=false",
         "-iree-vm-bytecode-module-strip-source-map=true",
         "-iree-vm-emit-polyglot-zip=false",
@@ -123,7 +122,6 @@ iree_bytecode_module(
         "-iree-llvm-target-cpu=generic-rv32",
         "-iree-llvm-target-cpu-features=+m,+f",
         "-iree-llvm-target-abi=ilp32",
-        "-iree-llvm-link-embedded=true",
         "-iree-llvm-debug-symbols=false",
         "-iree-vm-bytecode-module-strip-source-map=true",
         "-iree-vm-emit-polyglot-zip=false",
@@ -142,7 +140,6 @@ iree_bytecode_module(
         "-iree-llvm-target-cpu=generic-rv64",
         "-iree-llvm-target-cpu-features=+m,+a,+f,+d,+c",
         "-iree-llvm-target-abi=lp64d",
-        "-iree-llvm-link-embedded=true",
         "-iree-llvm-debug-symbols=false",
         "-iree-vm-bytecode-module-strip-source-map=true",
         "-iree-vm-emit-polyglot-zip=false",
@@ -159,7 +156,6 @@ iree_bytecode_module(
         "-iree-hal-target-backends=dylib-llvm-aot",
         "-iree-llvm-target-triple=armv7a-pc-linux-elf",
         "-iree-llvm-target-float-abi=hard",
-        "-iree-llvm-link-embedded=true",
         "-iree-llvm-debug-symbols=false",
         "-iree-vm-bytecode-module-strip-source-map=true",
         "-iree-vm-emit-polyglot-zip=false",
@@ -175,16 +171,15 @@ iree_bytecode_module(
         "-iree-mlir-to-vm-bytecode-module",
         "-iree-hal-target-backends=dylib-llvm-aot",
         "-iree-llvm-target-triple=aarch64-pc-linux-elf",
-        "-iree-llvm-link-embedded=true",
         "-iree-llvm-debug-symbols=false",
         "-iree-vm-bytecode-module-strip-source-map=true",
         "-iree-vm-emit-polyglot-zip=false",
     ],
 )
 
-run_binary_test(
+native_test(
     name = "simple_embedding_embedded_sync_test",
-    test_binary = ":simple_embedding_embedded_sync",
+    src = ":simple_embedding_embedded_sync",
 )
 
 iree_cmake_extra_content(
@@ -216,9 +211,9 @@ cc_binary(
     ],
 )
 
-run_binary_test(
+native_test(
     name = "simple_embedding_dylib_test",
-    test_binary = ":simple_embedding_dylib",
+    src = ":simple_embedding_dylib",
 )
 
 iree_cmake_extra_content(
@@ -232,7 +227,7 @@ iree_cmake_extra_content(
     content = """
 endif()
 
-if(${IREE_HAL_DRIVER_VULKAN} AND (${IREE_TARGET_BACKEND_VULKAN-SPIRV} OR DEFINED IREE_HOST_BINARY_ROOT))
+if(${IREE_HAL_DRIVER_VULKAN} AND (${IREE_TARGET_BACKEND_VULKAN_SPIRV} OR DEFINED IREE_HOST_BINARY_ROOT))
 """,
     inline = True,
 )
@@ -266,9 +261,9 @@ iree_bytecode_module(
     ],
 )
 
-run_binary_test(
+native_test(
     name = "simple_embedding_vulkan_test",
-    test_binary = ":simple_embedding_vulkan",
+    src = ":simple_embedding_vulkan",
 )
 
 iree_cmake_extra_content(
@@ -310,22 +305,22 @@ iree_bytecode_module(
 )
 
 # Simple embedding is failing in the CI.
-# run_binary_test(
+# native_test(
 #     name = "simple_embedding_cuda_test",
 #     tags = [
 #         "driver=cuda",
 #     ],
-#     test_binary = ":simple_embedding_cuda",
+#     src = ":simple_embedding_cuda",
 # )
 
 iree_cmake_extra_content(
     content = """
-iree_run_binary_test(
+iree_native_test(
   NAME
     "simple_embedding_cuda_test"
   LABELS
     "driver=cuda"
-  TEST_BINARY
+  SRC
     ::simple_embedding_cuda
 )
 

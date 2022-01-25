@@ -80,8 +80,9 @@ static void loopInvariantCodeMotion(FuncOp funcOp) {
   // way, we first LICM from the inner loop, and place the ops in
   // the outer loop, which in turn can be further LICM'ed.
   funcOp.walk([&](LoopLikeOpInterface loopLike) {
-    if (failed(moveLoopInvariantCode(loopLike)))
+    if (failed(moveLoopInvariantCode(loopLike))) {
       llvm_unreachable("Unexpected failure to move invariant code out of loop");
+    }
   });
 }
 
@@ -93,9 +94,15 @@ struct OptimizeVectorTransferPass
     // ops. This increases the chance that we can forward more transfer writes
     // to transfer reads.
     OwningRewritePatternList patterns(&getContext());
+    mlir::vector::populateVectorTransferDropUnitDimsPatterns(patterns);
+    mlir::vector::populateFlattenVectorTransferPatterns(patterns);
     mlir::vector::populateCastAwayVectorLeadingOneDimPatterns(patterns);
     patterns.add<TransposeUnitDimToShapeCast>(&getContext());
-    (void)applyPatternsAndFoldGreedily(funcOp, std::move(patterns));
+    mlir::vector::populateVectorTransferCollapseInnerMostContiguousDimsPatterns(
+        patterns);
+    if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
+      return signalPassFailure();
+    }
     // Workaround, run loop invariant code motion before hoist redudant vector
     // transfer to workaround a bug upstream.
     // TODO(thomasraoux): Remove it once the fix is merged.

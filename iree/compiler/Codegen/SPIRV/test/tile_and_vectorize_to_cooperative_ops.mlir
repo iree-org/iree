@@ -1,14 +1,18 @@
-// RUN: iree-opt -split-input-file -pass-pipeline='hal.executable(hal.executable.variant(builtin.module(builtin.func(iree-spirv-tile-and-vectorize-to-cooperative-ops))))' %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -pass-pipeline='hal.executable(hal.executable.variant(builtin.module(builtin.func(iree-spirv-tile-and-vectorize-to-cooperative-ops))))' %s | FileCheck %s
 
+#config = #iree_codegen.lowering.config<tile_sizes = [[16, 16, 16], [16, 16, 16]], native_vector_size = []>
+#translation = #iree_codegen.translation.info<"SPIRVVectorizeToCooperativeOps", workload_per_wg = [16, 16]>
+#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>,
+    #hal.descriptor_set.binding<2, storage_buffer>,
+    #hal.descriptor_set.binding<3, storage_buffer>,
+    #hal.descriptor_set.binding<4, storage_buffer>
+  ]>
+]>
 hal.executable public @matmul_256x1024x128_div_sub {
-  hal.interface public @io {
-    hal.interface.binding public @s0b0_ro_external, set=0, binding=0, type="StorageBuffer", access="Read"
-    hal.interface.binding public @s0b1_ro_external, set=0, binding=1, type="StorageBuffer", access="Read"
-    hal.interface.binding public @s0b2_ro_external, set=0, binding=2, type="StorageBuffer", access="Read"
-    hal.interface.binding public @s0b3_ro_external, set=0, binding=3, type="StorageBuffer", access="Read"
-    hal.interface.binding public @s0b4_xw_external, set=0, binding=4, type="StorageBuffer", access="Write|Discard"
-  }
-  hal.executable.variant @vulkan, target = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
+  hal.executable.variant @vulkan, target = <"vulkan-spirv", "vulkan-spirv-fb", {
       spv.target_env =
         #spv.target_env<#spv.vce<v1.5,
           [Shader, Float16, StorageBuffer16BitAccess, StorageUniform16, CooperativeMatrixNV],
@@ -26,9 +30,8 @@ hal.executable public @matmul_256x1024x128_div_sub {
            max_compute_workgroup_invocations = 1024 : i32,
            max_compute_workgroup_size = dense<[2147483647, 65535, 65535]> : vector<3xi32>,
            subgroup_size = 32 : i32}>}> {
-    hal.executable.entry_point public @matmul_256x1024x128_div_sub attributes {
-      interface = @io, ordinal = 0 : index,
-      translation.info = {passPipeline = "SPIRVVectorizeToCooperativeOps", workloadPerWorkgroup = [16, 16]},
+    hal.executable.entry_point public @matmul_256x1024x128_div_sub layout(#executable_layout) attributes {
+      translation.info = #translation,
       workgroup_size = [32 : index, 1 : index, 1 : index]
     } {
     ^bb0(%arg0: index, %arg1: index, %arg2: index):  // no predecessors
@@ -43,11 +46,11 @@ hal.executable public @matmul_256x1024x128_div_sub {
         %c1024 = arith.constant 1024 : index
         %c256 = arith.constant 256 : index
         %cst = arith.constant 0.000000e+00 : f16
-        %0 = hal.interface.binding.subspan @io::@s0b0_ro_external[%c0] : memref<256x1024xf16>
-        %1 = hal.interface.binding.subspan @io::@s0b1_ro_external[%c0] : memref<256x1024xf16>
-        %2 = hal.interface.binding.subspan @io::@s0b2_ro_external[%c0] : memref<256x128xf16>
-        %3 = hal.interface.binding.subspan @io::@s0b3_ro_external[%c0] : memref<128x1024xf16>
-        %4 = hal.interface.binding.subspan @io::@s0b4_xw_external[%c0] : memref<256x1024xf16>
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<256x1024xf16>
+        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<256x1024xf16>
+        %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : memref<256x128xf16>
+        %3 = hal.interface.binding.subspan set(0) binding(3) type(storage_buffer) : memref<128x1024xf16>
+        %4 = hal.interface.binding.subspan set(0) binding(4) type(storage_buffer) : memref<256x1024xf16>
         %workgroup_id_x = hal.interface.workgroup.id[0] : index
         %workgroup_count_x = hal.interface.workgroup.count[0] : index
         %workgroup_id_y = hal.interface.workgroup.id[1] : index
@@ -63,14 +66,14 @@ hal.executable public @matmul_256x1024x128_div_sub {
             %11 = memref.subview %2[%arg0, 0] [16, 128] [1, 1] : memref<256x128xf16> to memref<16x128xf16, affine_map<(d0, d1)[s0] -> (d0 * 128 + s0 + d1)>>
             %12 = memref.subview %3[0, %arg1] [128, 16] [1, 1] : memref<128x1024xf16> to memref<128x16xf16, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
             %13 = memref.subview %4[%arg0, %arg1] [16, 16] [1, 1] : memref<256x1024xf16> to memref<16x16xf16, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
-            linalg.fill(%cst, %13) {__internal_linalg_transform__ = "workgroup", lowering.config = {tileSizes = [[16, 16, 16], [16, 16, 16]]}} : f16, memref<16x16xf16, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
-            linalg.matmul {__internal_linalg_transform__ = "workgroup", lowering.config = {tileSizes = [[16, 16, 16], [16, 16, 16]]}}
+            linalg.fill(%cst, %13) {lowering.config = #config} : f16, memref<16x16xf16, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
+            linalg.matmul {lowering.config = #config}
               ins(%11, %12 : memref<16x128xf16, affine_map<(d0, d1)[s0] -> (d0 * 128 + s0 + d1)>>, memref<128x16xf16, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>)
               outs(%13 : memref<16x16xf16, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>)
             linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]}
               ins(%13, %9, %10 : memref<16x16xf16, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>, memref<16x16xf16, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>, memref<16x16xf16, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>)
               outs(%13 : memref<16x16xf16, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>)
-              attrs =  {__internal_linalg_transform__ = "workgroup", lowering.config = {tileSizes = [[16, 16, 16], [16, 16, 16]]}} {
+              attrs =  {lowering.config = #config} {
             ^bb0(%arg2: f16, %arg3: f16, %arg4: f16, %arg5: f16):  // no predecessors
               %14 = arith.divf %arg2, %arg3 : f16
               %15 = arith.subf %14, %arg4 : f16
@@ -101,11 +104,11 @@ hal.executable public @matmul_256x1024x128_div_sub {
 // CHECK-DAG: %[[C96:.+]] = arith.constant 96 : index
 // CHECK-DAG: %[[C112:.+]] = arith.constant 112 : index
 
-// CHECK: %[[DIV_BUFFER:.+]] = hal.interface.binding.subspan @io::@s0b0_ro_external[%[[C0]]] : memref<256x1024xf16>
-// CHECK: %[[SUB_BUFFER:.+]] = hal.interface.binding.subspan @io::@s0b1_ro_external[%[[C0]]] : memref<256x1024xf16>
-// CHECK: %[[LHS_BUFFER:.+]] = hal.interface.binding.subspan @io::@s0b2_ro_external[%[[C0]]] : memref<256x128xf16>
-// CHECK: %[[RHS_BUFFER:.+]] = hal.interface.binding.subspan @io::@s0b3_ro_external[%[[C0]]] : memref<128x1024xf16>
-// CHECK: %[[ACC_BUFFER:.+]] = hal.interface.binding.subspan @io::@s0b4_xw_external[%[[C0]]] : memref<256x1024xf16>
+// CHECK: %[[DIV_BUFFER:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<256x1024xf16>
+// CHECK: %[[SUB_BUFFER:.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<256x1024xf16>
+// CHECK: %[[LHS_BUFFER:.+]] = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : memref<256x128xf16>
+// CHECK: %[[RHS_BUFFER:.+]] = hal.interface.binding.subspan set(0) binding(3) type(storage_buffer) : memref<128x1024xf16>
+// CHECK: %[[ACC_BUFFER:.+]] = hal.interface.binding.subspan set(0) binding(4) type(storage_buffer) : memref<256x1024xf16>
 
 // CHECK: scf.for %[[IV_Y:.+]] =
 // CHECK:   %[[LHS_TILE:.+]] = memref.subview %[[LHS_BUFFER]][%[[IV_Y]], 0] [16, 128] [1, 1]

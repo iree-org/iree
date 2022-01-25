@@ -193,9 +193,9 @@ iree_lit_test_suite(
     flags_test
   SRCS
     "flags_test.txt"
-  DATA
+  TOOLS
     ::flags_demo
-    iree::tools::IreeFileCheck
+    FileCheck
   LABELS
     "hostonly"
 )
@@ -308,12 +308,12 @@ iree_cc_binary(
   TESTONLY
 )
 
-iree_run_binary_test(
+iree_native_test(
   NAME
     "synchronization_benchmark_test"
   ARGS
     "--benchmark_min_time=0"
-  TEST_BINARY
+  SRC
     ::synchronization_benchmark
 )
 

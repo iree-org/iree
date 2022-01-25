@@ -23,16 +23,10 @@ iree_status_t counter_get_value(iree_runtime_session_t* session,
     status =
         iree_runtime_call_outputs_pop_front_buffer_view(&call, &buffer_view);
   }
-  iree_hal_buffer_mapping_t buffer_mapping;
   if (iree_status_is_ok(status)) {
-    status = iree_hal_buffer_map_range(iree_hal_buffer_view_buffer(buffer_view),
-                                       IREE_HAL_MEMORY_ACCESS_READ, 0,
-                                       IREE_WHOLE_BUFFER, &buffer_mapping);
+    status = iree_hal_buffer_read_data(iree_hal_buffer_view_buffer(buffer_view),
+                                       0, out_value, sizeof(*out_value));
   }
-  if (iree_status_is_ok(status)) {
-    *out_value = *buffer_mapping.contents.data;
-  }
-  iree_hal_buffer_unmap_range(&buffer_mapping);
   iree_hal_buffer_view_release(buffer_view);
 
   iree_runtime_call_deinitialize(&call);
@@ -46,16 +40,15 @@ iree_status_t counter_set_value(iree_runtime_session_t* session,
       session, iree_make_cstring_view("module.set_value"), &call));
 
   iree_hal_buffer_view_t* arg0 = NULL;
-  static const iree_hal_dim_t arg0_shape[1] = {1};
   int arg0_data[1] = {new_value};
 
   // TODO(scotttodd): use iree_hal_buffer_view_wrap_or_clone_heap_buffer
   //   * debugging some apparent memory corruption with the stack-local value
   iree_status_t status = iree_ok_status();
   if (iree_status_is_ok(status)) {
-    status = iree_hal_buffer_view_clone_heap_buffer(
-        iree_runtime_session_device_allocator(session), arg0_shape,
-        IREE_ARRAYSIZE(arg0_shape), IREE_HAL_ELEMENT_TYPE_SINT_32,
+    status = iree_hal_buffer_view_allocate_buffer(
+        iree_runtime_session_device_allocator(session), /*shape=*/NULL,
+        /*shape_rank=*/0, IREE_HAL_ELEMENT_TYPE_SINT_32,
         IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR,
         IREE_HAL_MEMORY_TYPE_HOST_LOCAL | IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE,
         IREE_HAL_BUFFER_USAGE_ALL,
@@ -79,16 +72,15 @@ iree_status_t counter_add_to_value(iree_runtime_session_t* session, int x) {
       session, iree_make_cstring_view("module.add_to_value"), &call));
 
   iree_hal_buffer_view_t* arg0 = NULL;
-  static const iree_hal_dim_t arg0_shape[1] = {1};
   int arg0_data[1] = {x};
 
   // TODO(scotttodd): use iree_hal_buffer_view_wrap_or_clone_heap_buffer
   //   * debugging some apparent memory corruption with the stack-local value
   iree_status_t status = iree_ok_status();
   if (iree_status_is_ok(status)) {
-    status = iree_hal_buffer_view_clone_heap_buffer(
-        iree_runtime_session_device_allocator(session), arg0_shape,
-        IREE_ARRAYSIZE(arg0_shape), IREE_HAL_ELEMENT_TYPE_SINT_32,
+    status = iree_hal_buffer_view_allocate_buffer(
+        iree_runtime_session_device_allocator(session), /*shape=*/NULL,
+        /*shape_rank=*/0, IREE_HAL_ELEMENT_TYPE_SINT_32,
         IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR,
         IREE_HAL_MEMORY_TYPE_HOST_LOCAL | IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE,
         IREE_HAL_BUFFER_USAGE_ALL,

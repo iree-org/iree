@@ -29,13 +29,15 @@ struct LLVMGPUVectorLoweringPass
     FuncOp funcOp = getOperation();
     RewritePatternSet vectorToLoopsPatterns(&getContext());
     VectorTransferToSCFOptions vectorToSCFOptions;
-    vectorToSCFOptions.setUnroll(true);
+    vectorToSCFOptions.enableFullUnroll();
     populateVectorToSCFConversionPatterns(vectorToLoopsPatterns,
                                           vectorToSCFOptions);
     memref::populateFoldSubViewOpPatterns(vectorToLoopsPatterns);
     vector::populateVectorTransferLoweringPatterns(vectorToLoopsPatterns);
-    (void)applyPatternsAndFoldGreedily(funcOp,
-                                       std::move(vectorToLoopsPatterns));
+    if (failed(applyPatternsAndFoldGreedily(
+            funcOp, std::move(vectorToLoopsPatterns)))) {
+      return signalPassFailure();
+    }
   }
 };
 }  // namespace

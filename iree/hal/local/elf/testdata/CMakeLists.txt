@@ -10,16 +10,16 @@
 
 iree_add_all_subdirs()
 
-file(GLOB _GLOB_SIMPLE_MUL_DISPATCH_X_SO LIST_DIRECTORIES false RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} CONFIGURE_DEPENDS simple_mul_dispatch_*.so)
+file(GLOB _GLOB_ELEMENTWISE_MUL_X_SO LIST_DIRECTORIES false RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} CONFIGURE_DEPENDS elementwise_mul_*.so)
 iree_c_embed_data(
   NAME
-    simple_mul_dispatch
+    elementwise_mul
   SRCS
-    "${_GLOB_SIMPLE_MUL_DISPATCH_X_SO}"
+    "${_GLOB_ELEMENTWISE_MUL_X_SO}"
   C_FILE_OUTPUT
-    "simple_mul_dispatch.c"
+    "elementwise_mul.c"
   H_FILE_OUTPUT
-    "simple_mul_dispatch.h"
+    "elementwise_mul.h"
   FLATTEN
   PUBLIC
 )

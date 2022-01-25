@@ -18,6 +18,7 @@
 #include "iree/hal/local/local_executable_layout.h"
 #include "iree/hal/local/sync_event.h"
 #include "iree/hal/local/sync_semaphore.h"
+#include "iree/hal/utils/buffer_transfer.h"
 
 typedef struct iree_hal_sync_device_t {
   iree_hal_resource_t resource;
@@ -53,9 +54,11 @@ static iree_status_t iree_hal_sync_device_check_params(
 iree_status_t iree_hal_sync_device_create(
     iree_string_view_t identifier, const iree_hal_sync_device_params_t* params,
     iree_host_size_t loader_count, iree_hal_executable_loader_t** loaders,
-    iree_allocator_t host_allocator, iree_hal_device_t** out_device) {
+    iree_hal_allocator_t* device_allocator, iree_allocator_t host_allocator,
+    iree_hal_device_t** out_device) {
   IREE_ASSERT_ARGUMENT(params);
   IREE_ASSERT_ARGUMENT(!loader_count || loaders);
+  IREE_ASSERT_ARGUMENT(device_allocator);
   IREE_ASSERT_ARGUMENT(out_device);
   *out_device = NULL;
   IREE_TRACE_ZONE_BEGIN(z0);
@@ -76,6 +79,8 @@ iree_status_t iree_hal_sync_device_create(
     iree_string_view_append_to_buffer(identifier, &device->identifier,
                                       (char*)device + struct_size);
     device->host_allocator = host_allocator;
+    device->device_allocator = device_allocator;
+    iree_hal_allocator_retain(device_allocator);
 
     device->loader_count = loader_count;
     for (iree_host_size_t i = 0; i < device->loader_count; ++i) {
@@ -84,11 +89,6 @@ iree_status_t iree_hal_sync_device_create(
     }
 
     iree_hal_sync_semaphore_state_initialize(&device->semaphore_state);
-  }
-
-  if (iree_status_is_ok(status)) {
-    status = iree_hal_allocator_create_heap(identifier, host_allocator,
-                                            &device->device_allocator);
   }
 
   if (iree_status_is_ok(status)) {
@@ -134,6 +134,11 @@ static iree_hal_allocator_t* iree_hal_sync_device_allocator(
   return device->device_allocator;
 }
 
+static iree_status_t iree_hal_sync_device_trim(iree_hal_device_t* base_device) {
+  iree_hal_sync_device_t* device = iree_hal_sync_device_cast(base_device);
+  return iree_hal_allocator_trim(device->device_allocator);
+}
+
 static iree_status_t iree_hal_sync_device_query_i32(
     iree_hal_device_t* base_device, iree_string_view_t category,
     iree_string_view_t key, int32_t* out_value) {
@@ -164,7 +169,7 @@ static iree_status_t iree_hal_sync_device_create_command_buffer(
   // TODO(#4680): implement a non-inline command buffer that stores its commands
   // and can be submitted later on/multiple-times.
   return iree_hal_inline_command_buffer_create(
-      mode, command_categories, queue_affinity,
+      base_device, mode, command_categories, queue_affinity,
       iree_hal_device_host_allocator(base_device), out_command_buffer);
 }
 
@@ -289,6 +294,7 @@ static const iree_hal_device_vtable_t iree_hal_sync_device_vtable = {
     .id = iree_hal_sync_device_id,
     .host_allocator = iree_hal_sync_device_host_allocator,
     .device_allocator = iree_hal_sync_device_allocator,
+    .trim = iree_hal_sync_device_trim,
     .query_i32 = iree_hal_sync_device_query_i32,
     .create_command_buffer = iree_hal_sync_device_create_command_buffer,
     .create_descriptor_set = iree_hal_sync_device_create_descriptor_set,
@@ -298,6 +304,7 @@ static const iree_hal_device_vtable_t iree_hal_sync_device_vtable = {
     .create_executable_cache = iree_hal_sync_device_create_executable_cache,
     .create_executable_layout = iree_hal_sync_device_create_executable_layout,
     .create_semaphore = iree_hal_sync_device_create_semaphore,
+    .transfer_range = iree_hal_device_transfer_mappable_range,
     .queue_submit = iree_hal_sync_device_queue_submit,
     .submit_and_wait = iree_hal_sync_device_submit_and_wait,
     .wait_semaphores = iree_hal_sync_device_wait_semaphores,

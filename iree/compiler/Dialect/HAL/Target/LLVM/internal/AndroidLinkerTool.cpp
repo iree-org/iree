@@ -24,7 +24,7 @@ using llvm::Triple;
 //   https://developer.android.com/ndk/guides/other_build_systems
 //
 // If we want to support self-built variants we'll need an env var (or just make
-// the user set IREE_LLVMAOT_LINKER_PATH).
+// the user set IREE_LLVMAOT_SYSTEM_LINKER_PATH).
 static const char *getNDKHostPlatform() {
   auto hostTriple = Triple(llvm::sys::getProcessTriple());
   if (hostTriple.isOSLinux() && hostTriple.getArch() == Triple::x86_64) {
@@ -68,8 +68,8 @@ class AndroidLinkerTool : public LinkerTool {
  public:
   using LinkerTool::LinkerTool;
 
-  std::string getToolPath() const override {
-    auto toolPath = LinkerTool::getToolPath();
+  std::string getSystemToolPath() const override {
+    auto toolPath = LinkerTool::getSystemToolPath();
     if (!toolPath.empty()) return toolPath;
 
     // ANDROID_NDK must be set for us to infer the tool path.
@@ -80,10 +80,8 @@ class AndroidLinkerTool : public LinkerTool {
     }
 
     // Extract the Android version from the `android30` like triple piece.
-    unsigned androidEnv[3];
-    targetTriple.getEnvironmentVersion(androidEnv[0], androidEnv[1],
-                                       androidEnv[2]);
-    unsigned androidVersion = androidEnv[0];  // like '30'
+    llvm::VersionTuple androidEnv = targetTriple.getEnvironmentVersion();
+    unsigned androidVersion = androidEnv.getMajor();  // like '30'
 
     // Select prebuilt toolchain based on both host and target
     // architecture/platform:
@@ -114,7 +112,7 @@ class AndroidLinkerTool : public LinkerTool {
     artifacts.libraryFile.close();
 
     SmallVector<std::string, 8> flags = {
-        getToolPath(),
+        getSystemToolPath(),
 
         // Avoids including any libc/startup files that initialize the CRT as
         // we don't use any of that. Our shared libraries must be freestanding.
@@ -122,17 +120,7 @@ class AndroidLinkerTool : public LinkerTool {
 
         // Statically link all dependencies so we don't have any runtime deps.
         // We cannot have any imports in the module we produce.
-        // "-static",
-
-        // HACK: we insert mallocs and junk. This is *not good*.
-        // We should be statically linking and not require anything from libc.
-        "-shared",
-        "-lc",
-
-        // Currently we are emitting calls to libm (expf, cosf, etc). We ideally
-        // should not be doing this - those functions are all generally terrible
-        // and indicate some extremely non-optimal code paths.
-        "-lm",
+        "-static",
 
         "-o " + artifacts.libraryFile.path,
     };

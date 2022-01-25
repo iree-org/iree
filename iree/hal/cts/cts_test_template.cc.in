@@ -1,0 +1,63 @@
+// Copyright 2021 The IREE Authors
+//
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+// clang-format off
+#cmakedefine IREE_CTS_TEST_FILE_PATH "@IREE_CTS_TEST_FILE_PATH@"
+#cmakedefine IREE_CTS_DRIVER_REGISTRATION_HDR "@IREE_CTS_DRIVER_REGISTRATION_HDR@"
+#cmakedefine IREE_CTS_DRIVER_REGISTRATION_FN @IREE_CTS_DRIVER_REGISTRATION_FN@
+#cmakedefine IREE_CTS_TEST_CLASS_NAME @IREE_CTS_TEST_CLASS_NAME@
+#cmakedefine IREE_CTS_DRIVER_NAME "@IREE_CTS_DRIVER_NAME@"
+#cmakedefine IREE_CTS_EXECUTABLE_FORMAT @IREE_CTS_EXECUTABLE_FORMAT@
+#cmakedefine IREE_CTS_EXECUTABLES_TESTDATA_HDR "@IREE_CTS_EXECUTABLES_TESTDATA_HDR@"
+// clang-format on
+
+#include IREE_CTS_TEST_FILE_PATH
+
+#include IREE_CTS_DRIVER_REGISTRATION_HDR
+#include "iree/hal/cts/cts_test_base.h"
+#include "iree/testing/gtest.h"
+
+#ifdef IREE_CTS_EXECUTABLES_TESTDATA_HDR
+#include IREE_CTS_EXECUTABLES_TESTDATA_HDR
+#endif
+
+namespace iree {
+namespace hal {
+namespace cts {
+
+iree_status_t register_test_driver(iree_hal_driver_registry_t* registry) {
+  return IREE_CTS_DRIVER_REGISTRATION_FN(registry);
+}
+
+const char* get_test_executable_format() {
+#ifdef IREE_CTS_EXECUTABLE_FORMAT
+  return IREE_CTS_EXECUTABLE_FORMAT;
+#else
+  return "UNDEFINED";
+#endif
+}
+
+iree_const_byte_span_t get_test_executable_data(iree_string_view_t file_name) {
+#ifdef IREE_CTS_EXECUTABLES_TESTDATA_HDR
+  const struct iree_file_toc_t* toc = iree_cts_testdata_executables_create();
+  for (size_t i = 0; i < iree_cts_testdata_executables_size(); ++i) {
+    const auto& file = toc[i];
+    if (iree_string_view_equal(file_name, iree_make_cstring_view(file.name))) {
+      return iree_make_const_byte_span(file.data, file.size);
+    }
+  }
+  // TODO(scotttodd): error handling / reporting? This a sharp edge.
+#endif
+  return iree_const_byte_span_empty();
+}
+
+INSTANTIATE_TEST_SUITE_P(CTS, IREE_CTS_TEST_CLASS_NAME,
+                         ::testing::Values(IREE_CTS_DRIVER_NAME),
+                         GenerateTestName());
+
+}  // namespace cts
+}  // namespace hal
+}  // namespace iree

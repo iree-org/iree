@@ -23,6 +23,7 @@
 #include "iree/hal/cuda/nop_executable_cache.h"
 #include "iree/hal/cuda/status_util.h"
 #include "iree/hal/cuda/stream_command_buffer.h"
+#include "iree/hal/utils/buffer_transfer.h"
 #include "iree/hal/utils/deferred_command_buffer.h"
 
 //===----------------------------------------------------------------------===//
@@ -41,6 +42,9 @@ typedef struct iree_hal_cuda_device_t {
   // to ensure the symbols remains valid.
   iree_hal_driver_t* driver;
 
+  // Parameters used to control device behavior.
+  iree_hal_cuda_device_params_t params;
+
   CUdevice device;
 
   // TODO: support multiple streams.
@@ -48,11 +52,12 @@ typedef struct iree_hal_cuda_device_t {
   iree_hal_cuda_context_wrapper_t context_wrapper;
   iree_hal_allocator_t* device_allocator;
 
-  // Switch for using deferred command buffer or default graph command buffer
-  bool use_deferred_submission;
+  // Cache of the direct stream command buffer initialized when in stream mode.
+  // TODO: have one cached per stream once there are multiple streams.
+  iree_hal_command_buffer_t* stream_command_buffer;
 } iree_hal_cuda_device_t;
 
-extern const iree_hal_device_vtable_t iree_hal_cuda_device_vtable;
+static const iree_hal_device_vtable_t iree_hal_cuda_device_vtable;
 
 static iree_hal_cuda_device_t* iree_hal_cuda_device_cast(
     iree_hal_device_t* base_value) {
@@ -64,7 +69,8 @@ void iree_hal_cuda_device_params_initialize(
     iree_hal_cuda_device_params_t* out_params) {
   out_params->arena_block_size = 32 * 1024;
   out_params->queue_count = 8;
-  out_params->use_deferred_submission = false;
+  out_params->command_buffer_mode = IREE_HAL_CUDA_COMMAND_BUFFER_MODE_GRAPH;
+  out_params->allow_inline_execution = false;
 }
 
 static iree_status_t iree_hal_cuda_device_check_params(
@@ -78,25 +84,6 @@ static iree_status_t iree_hal_cuda_device_check_params(
                             "at least one queue is required");
   }
   return iree_ok_status();
-}
-
-static void iree_hal_cuda_device_destroy(iree_hal_device_t* base_device) {
-  iree_hal_cuda_device_t* device = iree_hal_cuda_device_cast(base_device);
-  iree_allocator_t host_allocator = iree_hal_device_host_allocator(base_device);
-  IREE_TRACE_ZONE_BEGIN(z0);
-
-  // There should be no more buffers live that use the allocator.
-  iree_hal_allocator_release(device->device_allocator);
-  CUDA_IGNORE_ERROR(device->context_wrapper.syms,
-                    cuStreamDestroy(device->stream));
-
-  iree_arena_block_pool_deinitialize(&device->block_pool);
-  // Finally, destroy the device.
-  iree_hal_driver_release(device->driver);
-
-  iree_allocator_free(host_allocator, device);
-
-  IREE_TRACE_ZONE_END(z0);
 }
 
 static iree_status_t iree_hal_cuda_device_create_internal(
@@ -115,6 +102,7 @@ static iree_status_t iree_hal_cuda_device_create_internal(
   iree_string_view_append_to_buffer(
       identifier, &device->identifier,
       (char*)device + iree_sizeof_struct(*device));
+  device->params = *params;
   device->device = cu_device;
   device->stream = stream;
   device->context_wrapper.cu_context = context;
@@ -122,9 +110,20 @@ static iree_status_t iree_hal_cuda_device_create_internal(
   iree_arena_block_pool_initialize(params->arena_block_size, host_allocator,
                                    &device->block_pool);
   device->context_wrapper.syms = syms;
-  device->use_deferred_submission = params->use_deferred_submission;
+
   iree_status_t status = iree_hal_cuda_allocator_create(
-      &device->context_wrapper, cu_device, stream, &device->device_allocator);
+      (iree_hal_device_t*)device, &device->context_wrapper, cu_device, stream,
+      &device->device_allocator);
+
+  if (iree_status_is_ok(status) &&
+      params->command_buffer_mode == IREE_HAL_CUDA_COMMAND_BUFFER_MODE_STREAM) {
+    status = iree_hal_cuda_stream_command_buffer_create(
+        (iree_hal_device_t*)device, &device->context_wrapper,
+        IREE_HAL_COMMAND_BUFFER_MODE_ALLOW_INLINE_EXECUTION,
+        IREE_HAL_COMMAND_CATEGORY_ANY, device->stream,
+        &device->stream_command_buffer);
+  }
+
   if (iree_status_is_ok(status)) {
     *out_device = (iree_hal_device_t*)device;
   } else {
@@ -164,6 +163,27 @@ iree_status_t iree_hal_cuda_device_create(
   return status;
 }
 
+static void iree_hal_cuda_device_destroy(iree_hal_device_t* base_device) {
+  iree_hal_cuda_device_t* device = iree_hal_cuda_device_cast(base_device);
+  iree_allocator_t host_allocator = iree_hal_device_host_allocator(base_device);
+  IREE_TRACE_ZONE_BEGIN(z0);
+
+  // There should be no more buffers live that use the allocator.
+  iree_hal_command_buffer_release(device->stream_command_buffer);
+  iree_hal_allocator_release(device->device_allocator);
+  CUDA_IGNORE_ERROR(device->context_wrapper.syms,
+                    cuStreamDestroy(device->stream));
+
+  iree_arena_block_pool_deinitialize(&device->block_pool);
+
+  // Finally, destroy the device.
+  iree_hal_driver_release(device->driver);
+
+  iree_allocator_free(host_allocator, device);
+
+  IREE_TRACE_ZONE_END(z0);
+}
+
 static iree_string_view_t iree_hal_cuda_device_id(
     iree_hal_device_t* base_device) {
   iree_hal_cuda_device_t* device = iree_hal_cuda_device_cast(base_device);
@@ -180,6 +200,12 @@ static iree_hal_allocator_t* iree_hal_cuda_device_allocator(
     iree_hal_device_t* base_device) {
   iree_hal_cuda_device_t* device = iree_hal_cuda_device_cast(base_device);
   return device->device_allocator;
+}
+
+static iree_status_t iree_hal_cuda_device_trim(iree_hal_device_t* base_device) {
+  iree_hal_cuda_device_t* device = iree_hal_cuda_device_cast(base_device);
+  iree_arena_block_pool_trim(&device->block_pool);
+  return iree_hal_allocator_trim(device->device_allocator);
 }
 
 static iree_status_t iree_hal_cuda_device_query_i32(
@@ -209,14 +235,30 @@ static iree_status_t iree_hal_cuda_device_create_command_buffer(
     iree_hal_queue_affinity_t queue_affinity,
     iree_hal_command_buffer_t** out_command_buffer) {
   iree_hal_cuda_device_t* device = iree_hal_cuda_device_cast(base_device);
-  if (device->use_deferred_submission) {
-    return iree_hal_deferred_command_buffer_create(
-        mode, command_categories, &device->block_pool,
-        iree_hal_device_host_allocator(base_device), out_command_buffer);
+  if (device->params.allow_inline_execution &&
+      iree_all_bits_set(mode,
+                        IREE_HAL_COMMAND_BUFFER_MODE_ALLOW_INLINE_EXECUTION)) {
+    // The caller has indicated the command buffer can be executed as it is
+    // recorded, implying that the command buffer cannot be reused and doesn't
+    // need to be persisted. This lets us lower the execution delay as we can
+    // directly route commands to a CUDA stream and let it eagerly flush.
+    return iree_hal_cuda_stream_command_buffer_create(
+        base_device, &device->context_wrapper, mode, command_categories,
+        device->stream, out_command_buffer);
   }
-  return iree_hal_cuda_graph_command_buffer_create(
-      &device->context_wrapper, mode, command_categories, queue_affinity,
-      out_command_buffer);
+  switch (device->params.command_buffer_mode) {
+    case IREE_HAL_CUDA_COMMAND_BUFFER_MODE_GRAPH:
+      return iree_hal_cuda_graph_command_buffer_create(
+          base_device, &device->context_wrapper, mode, command_categories,
+          queue_affinity, &device->block_pool, out_command_buffer);
+    case IREE_HAL_CUDA_COMMAND_BUFFER_MODE_STREAM:
+      return iree_hal_deferred_command_buffer_create(
+          base_device, mode, command_categories, &device->block_pool,
+          iree_hal_device_host_allocator(base_device), out_command_buffer);
+    default:
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                              "invalid command buffer mode");
+  }
 }
 
 static iree_status_t iree_hal_cuda_device_create_descriptor_set(
@@ -280,34 +322,28 @@ static iree_status_t iree_hal_cuda_device_queue_submit(
     iree_hal_queue_affinity_t queue_affinity, iree_host_size_t batch_count,
     const iree_hal_submission_batch_t* batches) {
   iree_hal_cuda_device_t* device = iree_hal_cuda_device_cast(base_device);
-  if (device->use_deferred_submission) {
-    iree_hal_command_buffer_t* stream_command_buffer;
-    iree_status_t status = iree_hal_cuda_stream_command_buffer_create(
-        &device->context_wrapper,
-        IREE_HAL_COMMAND_BUFFER_MODE_ALLOW_INLINE_EXECUTION, command_categories,
-        device->stream, &stream_command_buffer);
-    if (iree_status_is_ok(status)) {
-      for (int i = 0; i < batch_count; i++) {
-        for (int j = 0; j < batches[i].command_buffer_count; j++) {
-          iree_hal_deferred_command_buffer_apply(batches[i].command_buffers[j],
-                                                 stream_command_buffer);
-        }
-      }
-    }
-    iree_hal_command_buffer_release(stream_command_buffer);
-  } else {
-    for (int i = 0; i < batch_count; i++) {
-      for (int j = 0; j < batches[i].command_buffer_count; j++) {
+  for (int i = 0; i < batch_count; i++) {
+    for (int j = 0; j < batches[i].command_buffer_count; j++) {
+      iree_hal_command_buffer_t* command_buffer = batches[i].command_buffers[j];
+      if (iree_hal_cuda_stream_command_buffer_isa(command_buffer)) {
+        // Nothing to do for an inline command buffer; all the work has already
+        // been submitted. When we support semaphores we'll still need to signal
+        // their completion but do not have to worry about any waits: if there
+        // were waits we wouldn't have been able to execute inline!
+      } else if (iree_hal_cuda_graph_command_buffer_isa(command_buffer)) {
         CUgraphExec exec = iree_hal_cuda_graph_command_buffer_exec(
             batches[i].command_buffers[j]);
         CUDA_RETURN_IF_ERROR(device->context_wrapper.syms,
                              cuGraphLaunch(exec, device->stream),
                              "cuGraphLaunch");
+      } else {
+        IREE_RETURN_IF_ERROR(iree_hal_deferred_command_buffer_apply(
+            batches[i].command_buffers[j], device->stream_command_buffer));
       }
     }
   }
-  // TODO(thomasraoux): Conservatively syncronize after every submit until we
-  // support semaphores.
+  // TODO(thomasraoux): implement semaphores - for now this conservatively
+  // synchronizes after every submit.
   CUDA_RETURN_IF_ERROR(device->context_wrapper.syms,
                        cuStreamSynchronize(device->stream),
                        "cuStreamSynchronize");
@@ -348,11 +384,12 @@ static iree_status_t iree_hal_cuda_device_wait_idle(
   return iree_ok_status();
 }
 
-const iree_hal_device_vtable_t iree_hal_cuda_device_vtable = {
+static const iree_hal_device_vtable_t iree_hal_cuda_device_vtable = {
     .destroy = iree_hal_cuda_device_destroy,
     .id = iree_hal_cuda_device_id,
     .host_allocator = iree_hal_cuda_device_host_allocator,
     .device_allocator = iree_hal_cuda_device_allocator,
+    .trim = iree_hal_cuda_device_trim,
     .query_i32 = iree_hal_cuda_device_query_i32,
     .create_command_buffer = iree_hal_cuda_device_create_command_buffer,
     .create_descriptor_set = iree_hal_cuda_device_create_descriptor_set,
@@ -362,6 +399,7 @@ const iree_hal_device_vtable_t iree_hal_cuda_device_vtable = {
     .create_executable_cache = iree_hal_cuda_device_create_executable_cache,
     .create_executable_layout = iree_hal_cuda_device_create_executable_layout,
     .create_semaphore = iree_hal_cuda_device_create_semaphore,
+    .transfer_range = iree_hal_device_submit_transfer_range_and_wait,
     .queue_submit = iree_hal_cuda_device_queue_submit,
     .submit_and_wait = iree_hal_cuda_device_submit_and_wait,
     .wait_semaphores = iree_hal_cuda_device_wait_semaphores,

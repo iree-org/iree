@@ -1,6 +1,4 @@
-// Tests printing and parsing of tensor ops.
-
-// RUN: iree-opt -split-input-file %s | iree-opt -split-input-file | IreeFileCheck %s
+// RUN: iree-opt -split-input-file %s | iree-opt -split-input-file | FileCheck %s
 
 // CHECK-LABEL: @tensorReshape
 func @tensorReshape(%arg0 : tensor<4x4xf32>) -> tensor<16xf32> {

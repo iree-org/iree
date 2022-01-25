@@ -6,7 +6,6 @@
 
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 
-#include "iree/compiler/Dialect/Shape/IR/Builders.h"
 #include "iree/compiler/Dialect/Util/IR/ClosureOpUtils.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
@@ -28,12 +27,6 @@
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/RegionUtils.h"
 
-static llvm::cl::opt<int> clInlineConstantByteLength(
-    "iree-flow-inline-constants-max-byte-length",
-    llvm::cl::desc("Maximum byte-length of constant that can be inlined into a "
-                   "dispatch region"),
-    llvm::cl::init(256));
-
 namespace mlir {
 namespace iree_compiler {
 namespace IREE {
@@ -51,6 +44,9 @@ static LogicalResult verifyOpDynamicDims(Operation *op, ValueRange values,
   for (auto value : values) {
     if (auto shapedType = value.getType().dyn_cast<ShapedType>()) {
       requiredCount += shapedType.getNumDynamicDims();
+    } else if (auto tensorType =
+                   value.getType().dyn_cast<DispatchTensorType>()) {
+      requiredCount += tensorType.getNumDynamicDims();
     }
   }
   if (dynamicDims.size() != requiredCount) {
@@ -63,8 +59,42 @@ static LogicalResult verifyOpDynamicDims(Operation *op, ValueRange values,
 }
 
 //===----------------------------------------------------------------------===//
+// flow.dispatch.tie_shape
+//===----------------------------------------------------------------------===//
+
+static LogicalResult verifyDispatchTieShapeOp(DispatchTieShapeOp op) {
+  if (failed(verifyOpDynamicDims(op, {op.operand()}, op.dynamic_dims()))) {
+    return failure();
+  }
+  return success();
+}
+
+LogicalResult DispatchTieShapeOp::reifyResultShapes(
+    OpBuilder &b, ReifiedRankedShapedTypeDims &reifiedReturnShapes) {
+  SmallVector<Value> shape;
+  unsigned dynamicIdx = 0;
+  auto tensorType = result().getType().cast<IREE::Flow::DispatchTensorType>();
+  for (int64_t dim : tensorType.getShape()) {
+    if (dim == ShapedType::kDynamicSize) {
+      shape.push_back(dynamic_dims()[dynamicIdx++]);
+    } else {
+      shape.push_back(b.create<arith::ConstantIndexOp>(getLoc(), dim));
+    }
+  }
+  reifiedReturnShapes.push_back(shape);
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
 // flow.dispatch.tensor.load
 //===----------------------------------------------------------------------===//
+
+static LogicalResult verifyDispatchTensorLoadOp(DispatchTensorLoadOp op) {
+  if (failed(verifyOpDynamicDims(op, {op.source()}, op.source_dims()))) {
+    return failure();
+  }
+  return success();
+}
 
 /// Extracts static and dynamic values from list of `OpFoldResult`.
 static void processMixedOperands(ArrayRef<OpFoldResult> valueOrAttrs,
@@ -81,6 +111,33 @@ static void processMixedOperands(ArrayRef<OpFoldResult> valueOrAttrs,
       staticValues.push_back(operandValue);
     }
   }
+}
+
+/// Implements default offset, sizes and strides, for
+/// `flow.dispatch.tensor.load/store` ops. When no offsets, sizes and strides
+/// are specified, the offsets are all zeros, sizes are same as the dispatch
+/// tensor and strides are all 1.
+static void getDefaultOffsetSizeAndStrides(
+    OpBuilder &builder, IREE::Flow::DispatchTensorType dispatchTensorType,
+    ValueRange dynamicDims, SmallVectorImpl<OpFoldResult> &offsets,
+    SmallVectorImpl<OpFoldResult> &sizes,
+    SmallVectorImpl<OpFoldResult> &strides) {
+  auto zeroAttr = builder.getI64IntegerAttr(0);
+  auto oneAttr = builder.getI64IntegerAttr(1);
+  int64_t dispatchTensorRank = dispatchTensorType.getRank();
+  offsets.assign(dispatchTensorRank, zeroAttr);
+  strides.assign(dispatchTensorRank, oneAttr);
+  sizes.resize(dispatchTensorRank);
+  unsigned pos = 0;
+  for (auto dim : llvm::enumerate(dispatchTensorType.getShape())) {
+    if (ShapedType::isDynamic(dim.value())) {
+      assert(pos < dynamicDims.size() && "missing dynamic dims specifications");
+      sizes[dim.index()] = dynamicDims[pos++];
+      continue;
+    }
+    sizes[dim.index()] = builder.getI64IntegerAttr(dim.value());
+  }
+  return;
 }
 
 RankedTensorType DispatchTensorLoadOp::inferRankReducedResultType(
@@ -128,14 +185,19 @@ RankedTensorType DispatchTensorLoadOp::inferResultType(
 
 void DispatchTensorLoadOp::build(OpBuilder &builder, OperationState &state,
                                  RankedTensorType returnType, Value source,
+                                 ValueRange sourceDynamicDims,
                                  ArrayRef<NamedAttribute> attributes) {
-  build(builder, state, returnType, source, ArrayRef<Value>(),
-        ArrayRef<Value>(), ArrayRef<Value>(), builder.getI64ArrayAttr({}),
-        builder.getI64ArrayAttr({}), builder.getI64ArrayAttr({}));
+  SmallVector<OpFoldResult> offsets, strides, sizes;
+  getDefaultOffsetSizeAndStrides(
+      builder, source.getType().cast<IREE::Flow::DispatchTensorType>(),
+      sourceDynamicDims, offsets, sizes, strides);
+  build(builder, state, returnType, source, sourceDynamicDims, offsets, sizes,
+        strides, attributes);
 }
 
 void DispatchTensorLoadOp::build(OpBuilder &builder, OperationState &state,
                                  RankedTensorType returnType, Value source,
+                                 ValueRange sourceDynamicDims,
                                  ArrayRef<OpFoldResult> mixedOffsets,
                                  ArrayRef<OpFoldResult> mixedSizes,
                                  ArrayRef<OpFoldResult> mixedStrides,
@@ -154,34 +216,99 @@ void DispatchTensorLoadOp::build(OpBuilder &builder, OperationState &state,
   processMixedOperands(mixedStrides, strides, staticStrides,
                        ShapedType::kDynamicStrideOrOffset);
 
-  build(builder, state, returnType, source, offsets, sizes, strides,
-        builder.getI64ArrayAttr(staticOffsets),
+  build(builder, state, returnType, source, sourceDynamicDims, offsets, sizes,
+        strides, builder.getI64ArrayAttr(staticOffsets),
         builder.getI64ArrayAttr(staticSizes),
         builder.getI64ArrayAttr(staticStrides));
+  state.addAttributes(attributes);
 }
 
 void DispatchTensorLoadOp::build(OpBuilder &builder, OperationState &state,
-                                 Value source,
+                                 Value source, ValueRange sourceDynamicDims,
                                  ArrayRef<OpFoldResult> mixedOffsets,
                                  ArrayRef<OpFoldResult> mixedSizes,
                                  ArrayRef<OpFoldResult> mixedStrides,
                                  ArrayRef<NamedAttribute> attributes) {
   auto returnType =
       inferResultType(source.getType().cast<DispatchTensorType>(), mixedSizes);
-  build(builder, state, returnType, source, mixedOffsets, mixedSizes,
-        mixedStrides);
+  build(builder, state, returnType, source, sourceDynamicDims, mixedOffsets,
+        mixedSizes, mixedStrides);
+}
+
+LogicalResult DispatchTensorLoadOp::reifyResultShapes(
+    OpBuilder &b, ReifiedRankedShapedTypeDims &reifiedReturnShapes) {
+  auto mixedSizes = getMixedSizes();
+  SmallVector<Value> shape;
+  if (!mixedSizes.empty()) {
+    // Slicing out a tile; return the size sliced.
+    shape = llvm::to_vector<6>(llvm::map_range(
+        getMixedSizes(), [&](OpFoldResult valueOrAttr) -> Value {
+          if (auto attr = valueOrAttr.dyn_cast<Attribute>()) {
+            return b.create<arith::ConstantIndexOp>(
+                getLoc(), attr.cast<IntegerAttr>().getInt());
+          } else {
+            return valueOrAttr.dyn_cast<Value>();
+          }
+        }));
+  } else {
+    // Result size matches the source size (no slicing).
+    unsigned dynamicIdx = 0;
+    for (int64_t dim : getType().getShape()) {
+      if (dim == ShapedType::kDynamicSize) {
+        shape.push_back(source_dims()[dynamicIdx++]);
+      } else {
+        shape.push_back(b.create<arith::ConstantIndexOp>(getLoc(), dim));
+      }
+    }
+  }
+  reifiedReturnShapes.push_back(shape);
+  return success();
 }
 
 //===----------------------------------------------------------------------===//
 // flow.dispatch.tensor.store
 //===----------------------------------------------------------------------===//
 
+static LogicalResult verifyDispatchTensorStoreOp(DispatchTensorStoreOp op) {
+  if (failed(verifyOpDynamicDims(op, {op.target()}, op.target_dims()))) {
+    return failure();
+  }
+  return success();
+}
+
 void DispatchTensorStoreOp::build(OpBuilder &builder, OperationState &state,
                                   Value value, Value target,
+                                  ValueRange targetDynamicDims,
                                   ArrayRef<NamedAttribute> attributes) {
-  build(builder, state, ArrayRef<Type>(), value, target, ArrayRef<Value>(),
-        ArrayRef<Value>(), ArrayRef<Value>(), builder.getI64ArrayAttr({}),
-        builder.getI64ArrayAttr({}), builder.getI64ArrayAttr({}));
+  SmallVector<OpFoldResult> offsets, sizes, strides;
+  getDefaultOffsetSizeAndStrides(
+      builder, target.getType().cast<IREE::Flow::DispatchTensorType>(),
+      targetDynamicDims, offsets, sizes, strides);
+  build(builder, state, value, target, targetDynamicDims, offsets, sizes,
+        strides, attributes);
+}
+
+void DispatchTensorStoreOp::build(OpBuilder &builder, OperationState &state,
+                                  Value value, Value target,
+                                  ValueRange targetDynamicDims,
+                                  ArrayRef<OpFoldResult> mixedOffsets,
+                                  ArrayRef<OpFoldResult> mixedSizes,
+                                  ArrayRef<OpFoldResult> mixedStrides,
+                                  ArrayRef<NamedAttribute> attributes) {
+  SmallVector<Value> offsets, sizes, strides;
+  SmallVector<int64_t> staticOffsets, staticSizes, staticStrides;
+  processMixedOperands(mixedOffsets, offsets, staticOffsets,
+                       ShapedType::kDynamicStrideOrOffset);
+  processMixedOperands(mixedSizes, sizes, staticSizes,
+                       ShapedType::kDynamicSize);
+  processMixedOperands(mixedStrides, strides, staticStrides,
+                       ShapedType::kDynamicStrideOrOffset);
+
+  build(builder, state, ArrayRef<Type>(), value, target, targetDynamicDims,
+        offsets, sizes, strides, builder.getI64ArrayAttr(staticOffsets),
+        builder.getI64ArrayAttr(staticSizes),
+        builder.getI64ArrayAttr(staticStrides));
+  state.addAttributes(attributes);
 }
 
 //===----------------------------------------------------------------------===//
@@ -290,7 +417,7 @@ static void printDispatchWorkgroupBody(OpAsmPrinter &p, Operation *op,
     p << ": ";
     p << arg.getType();
   });
-  p << ")";
+  p << ") ";
   p.printRegion(body, /*printEntryBlockArgs=*/false,
                 /*printBlockTerminators=*/true);
 }
@@ -299,23 +426,30 @@ static LogicalResult verifyDispatchWorkgroupsOp(DispatchWorkgroupsOp op) {
   if (op.workgroup_count().empty()) {
     return op.emitOpError() << "at least one workgroup dimension is required";
   }
+
   if (failed(verifyOpDynamicDims(op, op.operands(), op.operand_dims())) ||
       failed(verifyOpDynamicDims(op, op.results(), op.result_dims()))) {
     return failure();
   }
+
+  auto verifyIOType = [&](Type type) -> LogicalResult {
+    if (auto shapedType = type.dyn_cast<ShapedType>()) {
+      if (shapedType.getElementType().isIndex()) {
+        return op.emitOpError() << "I/O type " << type
+                                << " is invalid: index types must not cross "
+                                   "the dispatch boundary";
+      }
+    }
+    return success();
+  };
+  for (auto type : op.getOperandTypes()) {
+    if (failed(verifyIOType(type))) return failure();
+  }
+  for (auto type : op.getResultTypes()) {
+    if (failed(verifyIOType(type))) return failure();
+  }
+
   return success();
-}
-
-Value DispatchWorkgroupsOp::buildOperandRankedShape(unsigned idx,
-                                                    OpBuilder &builder) {
-  return Shape::buildRankedShapeForValueInList(getLoc(), idx, getOperands(),
-                                               operand_dims(), builder);
-}
-
-Value DispatchWorkgroupsOp::buildResultRankedShape(unsigned idx,
-                                                   OpBuilder &builder) {
-  return Shape::buildRankedShapeForValueInList(getLoc(), idx, getResults(),
-                                               result_dims(), builder);
 }
 
 Operation::operand_range DispatchWorkgroupsOp::getClosureOperands() {
@@ -330,21 +464,8 @@ Operation::result_range DispatchWorkgroupsOp::getClosureResults() {
 static bool canDispatchRegionContainOp(Operation *op) {
   // Inline constant operations that are splat or small constants.
   if (auto constantOp = dyn_cast<arith::ConstantOp>(op)) {
-    auto constantValueAttr = constantOp.value();
     auto constantType = constantOp.getType();
-    if (constantValueAttr.isa<SplatElementsAttr>()) {
-      return true;
-    } else if (auto denseAttr =
-                   constantValueAttr.dyn_cast<DenseElementsAttr>()) {
-      // TODO(GH-4897): Non-splat constants seems to have an issue on the LLVM
-      // side. Uncomment after that is fixed.
-      auto shapedType = constantOp.getType().cast<ShapedType>();
-      uint64_t estimatedByteLength =
-          (shapedType.getNumElements() * shapedType.getElementTypeBitWidth()) /
-          8;
-      return denseAttr.isSplat() ||
-             estimatedByteLength <= clInlineConstantByteLength;
-    } else if (constantType.isIntOrIndexOrFloat()) {
+    if (constantType.isIntOrIndexOrFloat()) {
       return true;
     }
   }
@@ -531,28 +652,6 @@ static LogicalResult verifyDispatchWorkgroupInfoOp(T op) {
 }
 
 //===----------------------------------------------------------------------===//
-// flow.dispatch.shape
-//===----------------------------------------------------------------------===//
-
-void DispatchShapeOp::getAsmResultNames(
-    function_ref<void(Value, StringRef)> setNameFn) {
-  // TODO(benvanik): since we know these are arguments, we could map them based
-  // on index (so we get arg0_shape, ret0_shape, etc).
-  setNameFn(result(), "shape");
-}
-
-LogicalResult DispatchShapeOp::inferReturnTypes(
-    MLIRContext *context, Optional<Location> location, ValueRange operands,
-    DictionaryAttr attributes, RegionRange regions,
-    SmallVectorImpl<Type> &inferredReturnTypes) {
-  auto dispatchTensorType = operands[0].getType().cast<DispatchTensorType>();
-  auto shape = dispatchTensorType.getShape();
-  auto rankedShapeType = Shape::RankedShapeType::get(shape, context);
-  inferredReturnTypes.assign({rankedShapeType});
-  return success();
-}
-
-//===----------------------------------------------------------------------===//
 // flow.executable
 //===----------------------------------------------------------------------===//
 
@@ -680,16 +779,6 @@ static LogicalResult verifyDispatchOp(DispatchOp op) {
   return success();
 }
 
-Value DispatchOp::buildOperandRankedShape(unsigned idx, OpBuilder &builder) {
-  return Shape::buildRankedShapeForValueInList(getLoc(), idx, getOperands(),
-                                               operand_dims(), builder);
-}
-
-Value DispatchOp::buildResultRankedShape(unsigned idx, OpBuilder &builder) {
-  return Shape::buildRankedShapeForValueInList(getLoc(), idx, getResults(),
-                                               result_dims(), builder);
-}
-
 std::pair<unsigned, unsigned> DispatchOp::getTiedOperandsIndexAndLength() {
   return getODSOperandIndexAndLength(1);  // $operands
 }
@@ -697,18 +786,6 @@ std::pair<unsigned, unsigned> DispatchOp::getTiedOperandsIndexAndLength() {
 //===----------------------------------------------------------------------===//
 // flow.tensor.reshape
 //===----------------------------------------------------------------------===//
-
-Value TensorReshapeOp::buildOperandRankedShape(unsigned idx,
-                                               OpBuilder &builder) {
-  return Shape::buildRankedShapeForValue(getLoc(), source(), source_dims(),
-                                         builder);
-}
-
-Value TensorReshapeOp::buildResultRankedShape(unsigned idx,
-                                              OpBuilder &builder) {
-  return Shape::buildRankedShapeForValue(getLoc(), result(), result_dims(),
-                                         builder);
-}
 
 Value TensorReshapeOp::getTiedResult(unsigned resultIndex) {
   return IREE::Util::TiedOpInterface::findTiedBaseValue(source());
@@ -724,58 +801,6 @@ SmallVector<int64_t, 4> TensorReshapeOp::getTiedResultOperandIndices() {
 }
 
 //===----------------------------------------------------------------------===//
-// flow.tensor.*
-//===----------------------------------------------------------------------===//
-
-Value TensorLoadOp::buildOperandRankedShape(unsigned idx, OpBuilder &builder) {
-  return Shape::buildRankedShapeForValue(getLoc(), source(), source_dims(),
-                                         builder);
-}
-
-Value TensorLoadOp::buildResultRankedShape(unsigned idx, OpBuilder &builder) {
-  return {};
-}
-
-Value TensorStoreOp::buildOperandRankedShape(unsigned idx, OpBuilder &builder) {
-  return Shape::buildRankedShapeForValue(getLoc(), target(), target_dims(),
-                                         builder);
-}
-
-Value TensorStoreOp::buildResultRankedShape(unsigned idx, OpBuilder &builder) {
-  return Shape::buildRankedShapeForValue(getLoc(), result(), target_dims(),
-                                         builder);
-}
-
-Value TensorSplatOp::buildOperandRankedShape(unsigned idx, OpBuilder &builder) {
-  return {};
-}
-
-Value TensorSplatOp::buildResultRankedShape(unsigned idx, OpBuilder &builder) {
-  return Shape::buildRankedShapeForValue(getLoc(), result(), result_dims(),
-                                         builder);
-}
-
-Value TensorCloneOp::buildOperandRankedShape(unsigned idx, OpBuilder &builder) {
-  return Shape::buildRankedShapeForValue(getLoc(), operand(), operand_dims(),
-                                         builder);
-}
-
-Value TensorCloneOp::buildResultRankedShape(unsigned idx, OpBuilder &builder) {
-  return Shape::buildRankedShapeForValue(getLoc(), result(), operand_dims(),
-                                         builder);
-}
-
-Value TensorSliceOp::buildOperandRankedShape(unsigned idx, OpBuilder &builder) {
-  return Shape::buildRankedShapeForValue(getLoc(), source(), source_dims(),
-                                         builder);
-}
-
-Value TensorSliceOp::buildResultRankedShape(unsigned idx, OpBuilder &builder) {
-  return Shape::buildRankedShapeForValue(getLoc(), result(), result_dims(),
-                                         builder);
-}
-
-//===----------------------------------------------------------------------===//
 // flow.tensor.update
 //===----------------------------------------------------------------------===//
 
@@ -783,9 +808,9 @@ void TensorUpdateOp::build(OpBuilder &builder, OperationState &state,
                            Value target, ValueRange startIndices,
                            Value update) {
   auto targetDims =
-      Shape::buildOrFindDynamicDimsForValue(state.location, target, builder);
+      IREE::Util::buildDynamicDimsForValue(state.location, target, builder);
   auto updateDims =
-      Shape::buildOrFindDynamicDimsForValue(state.location, update, builder);
+      IREE::Util::buildDynamicDimsForValue(state.location, update, builder);
   build(builder, state, target.getType(), target, targetDims, startIndices,
         update, updateDims, builder.getIndexArrayAttr({0}));
 }
@@ -796,22 +821,6 @@ static LogicalResult verifyTensorUpdateOp(TensorUpdateOp op) {
     return failure();
   }
   return success();
-}
-
-Value TensorUpdateOp::buildOperandRankedShape(unsigned idx,
-                                              OpBuilder &builder) {
-  if (idx == 0) {
-    return Shape::buildRankedShapeForValueInList(getLoc(), idx, getOperands(),
-                                                 target_dims(), builder);
-  } else {
-    return Shape::buildRankedShapeForValueInList(getLoc(), idx, getOperands(),
-                                                 update_dims(), builder);
-  }
-}
-
-Value TensorUpdateOp::buildResultRankedShape(unsigned idx, OpBuilder &builder) {
-  return Shape::buildRankedShapeForValue(getLoc(), target(), target_dims(),
-                                         builder);
 }
 
 Value TensorUpdateOp::getTiedResult(unsigned resultIndex) {
@@ -825,184 +834,6 @@ Value TensorUpdateOp::getTiedResult(unsigned resultIndex) {
 
 SmallVector<int64_t, 4> TensorUpdateOp::getTiedResultOperandIndices() {
   return {0};  // target
-}
-
-//===----------------------------------------------------------------------===//
-// flow.ex.stream.fragment
-//===----------------------------------------------------------------------===//
-
-void ExStreamFragmentOp::build(OpBuilder &builder, OperationState &state,
-                               TypeRange resultTypes, ValueRange resultDims,
-                               ValueRange operands, ValueRange operandDims,
-                               ArrayRef<int64_t> tiedOperands,
-                               ArrayRef<NamedAttribute> attributes) {
-  state.addTypes(resultTypes);
-  state.addOperands(operands);
-  state.addOperands(operandDims);
-  state.addOperands(resultDims);
-  state.addAttributes(attributes);
-  state.attributes.erase(IREE::Util::TiedOpInterface::getStorageAttrName());
-  state.addAttribute(IREE::Util::TiedOpInterface::getStorageAttrName(),
-                     builder.getIndexArrayAttr(tiedOperands));
-  state.attributes.erase("operand_segment_sizes");
-  state.addAttribute("operand_segment_sizes",
-                     builder.getI32VectorAttr({
-                         static_cast<int32_t>(operands.size()),
-                         static_cast<int32_t>(operandDims.size()),
-                         static_cast<int32_t>(resultDims.size()),
-                     }));
-  state.addRegion();
-}
-
-static LogicalResult verifyExStreamFragmentOp(ExStreamFragmentOp op) {
-  if (failed(verifyOpDynamicDims(op, op.operands(), op.operand_dims())) ||
-      failed(verifyOpDynamicDims(op, op.results(), op.result_dims()))) {
-    return failure();
-  }
-  return success();
-}
-
-static ParseResult parseStreamFragmentBody(OpAsmParser &parser,
-                                           TypeRange operandTypes,
-                                           TypeRange resultTypes,
-                                           ArrayAttr tiedOperands,
-                                           Region &body) {
-  auto loc = parser.getCurrentLocation();
-
-  SmallVector<OpAsmParser::OperandType, 16> regionArgs;
-  SmallVector<Type, 16> regionArgTypes;
-  if (failed(parser.parseLParen())) {
-    return failure();
-  }
-  if (failed(parser.parseOptionalRParen())) {
-    do {
-      // Reserve entries in the lists.
-      regionArgs.emplace_back();
-      regionArgTypes.emplace_back();
-      if (failed(parser.parseRegionArgument(regionArgs.back())) ||
-          failed(parser.parseColonType(regionArgTypes.back()))) {
-        return failure();
-      }
-    } while (succeeded(parser.parseOptionalComma()));
-    if (failed(parser.parseRParen())) {
-      return failure();
-    }
-  }
-
-  SmallVector<Type, 4> regionResultTypes;
-  if (failed(parser.parseArrowTypeList(regionResultTypes))) return failure();
-
-  if (regionArgs.size() != operandTypes.size()) {
-    return parser.emitError(loc, "region operand list mismatch");
-  }
-  if (regionResultTypes.size() != resultTypes.size()) {
-    return parser.emitError(loc, "region result list mismatch");
-  }
-
-  return parser.parseRegion(body, regionArgs, regionArgTypes,
-                            /*enableNameShadowing=*/true);
-}
-
-static void printStreamFragmentBody(OpAsmPrinter &p, Operation *op,
-                                    TypeRange operandTypes,
-                                    TypeRange resultTypes,
-                                    ArrayAttr tiedOperands, Region &body) {
-  p << "(";
-  llvm::interleaveComma(body.getArguments(), p, [&](BlockArgument arg) {
-    p << arg;
-    p << ": ";
-    p << arg.getType();
-  });
-  p << ") -> ";
-  if (resultTypes.size() != 1) p << "(";
-  for (unsigned i = 0; i < resultTypes.size(); ++i) {
-    p.printType(resultTypes[i]);
-    if (i < resultTypes.size() - 1) p << ", ";
-  }
-  if (resultTypes.size() != 1) p << ")";
-  p.printRegion(body, /*printEntryBlockArgs=*/false,
-                /*printBlockTerminators=*/true);
-}
-
-Value ExStreamFragmentOp::buildOperandRankedShape(unsigned idx,
-                                                  OpBuilder &builder) {
-  return Shape::buildRankedShapeForValueInList(getLoc(), idx, getOperands(),
-                                               operand_dims(), builder);
-}
-
-Value ExStreamFragmentOp::buildResultRankedShape(unsigned idx,
-                                                 OpBuilder &builder) {
-  return Shape::buildRankedShapeForValueInList(getLoc(), idx, getResults(),
-                                               result_dims(), builder);
-}
-
-Operation::operand_range ExStreamFragmentOp::getClosureOperands() {
-  return operands();
-}
-
-Operation::result_range ExStreamFragmentOp::getClosureResults() {
-  return results();
-}
-
-bool ExStreamFragmentOp::canClosureContainOp(Operation *op) {
-  // NOTE: we widen support on new stream ops only - the legacy path isn't worth
-  // upgrading to support more.
-  if (auto constantOp = dyn_cast<arith::ConstantOp>(op)) {
-    return constantOp.getType().isIntOrIndexOrFloat();
-  }
-  if (auto loadOp = dyn_cast<IREE::Util::GlobalLoadOp>(op)) {
-    // Only allow loads of immutable variables to move into the stream.
-    // As they are immutable it's always safe to do so as no synchronization at
-    // the stream entry/exit boundary is required.
-    //
-    // Loads of mutable variables may sometimes be safe to move in as well
-    // however that is best done when we have better cross-stream
-    // synchronization support and can make those guarantees structurally.
-    return loadOp.isGlobalImmutable();
-  }
-  return false;
-}
-
-IREE::Util::ValueAccess ExStreamFragmentOp::getOperandAccess(
-    unsigned operandIndex) {
-  return !isOperandTied(operandIndex) ? IREE::Util::ValueAccess::ReadOnly()
-                                      : IREE::Util::ValueAccess::ReadWrite();
-}
-
-IREE::Util::ValueAccess ExStreamFragmentOp::getResultAccess(
-    unsigned resultIndex) {
-  return getTiedResultOperandIndex(resultIndex).hasValue()
-             ? IREE::Util::ValueAccess::ReadWrite()
-             : IREE::Util::ValueAccess::DiscardWrite();
-}
-
-IREE::Util::ClosureOpInterface
-ExStreamFragmentOp::cloneReplacementExcludingOperandsAndResults(
-    ArrayRef<unsigned> excludedOperandIndices,
-    ArrayRef<unsigned> excludedResultIndices, PatternRewriter &rewriter) {
-  SmallVector<Type, 4> newResultTypes = llvm::to_vector<4>(getResultTypes());
-  SmallVector<Value, 4> newResultDims = llvm::to_vector<4>(result_dims());
-  SmallVector<Value, 4> newOperandsValues = llvm::to_vector<4>(operands());
-  SmallVector<Value, 4> newOperandDims = llvm::to_vector<4>(operand_dims());
-  IREE::Util::excludeClosureOperandsAndResults(
-      newOperandsValues, newOperandDims, excludedOperandIndices, newResultTypes,
-      newResultDims, excludedResultIndices);
-
-  auto newTiedOperandIndices =
-      llvm::to_vector<4>(getTiedResultOperandIndices());
-  IREE::Util::excludeTiedOperandAndResultIndices(
-      excludedOperandIndices, excludedResultIndices, newTiedOperandIndices);
-  assert(getTiedOperandsIndexAndLength().first == 0 &&
-         "operands must be the first ODS group");
-
-  auto newOp = rewriter.create<ExStreamFragmentOp>(
-      getLoc(), newResultTypes, newResultDims, newOperandsValues,
-      newOperandDims, newTiedOperandIndices, getOperation()->getAttrs());
-  auto &newBody = newOp.getClosureBodyRegion();
-  newBody.takeBody(getClosureBodyRegion());
-  IREE::Util::eraseRegionResults(newBody, excludedResultIndices);
-  newBody.front().eraseArguments(excludedOperandIndices);
-  return newOp;
 }
 
 //===----------------------------------------------------------------------===//

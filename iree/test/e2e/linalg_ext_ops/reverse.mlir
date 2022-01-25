@@ -3,7 +3,7 @@ func @reverse_dim0() {
                                            [4.0, 5.0, 6.0]]> : tensor<2x3xf32>
 
   %init = linalg.init_tensor [2, 3] : tensor<2x3xf32>
-  %0 = linalg_ext.reverse
+  %0 = iree_linalg_ext.reverse
          dimensions(dense<0> : tensor<1xi64>)
          ins(%input : tensor<2x3xf32>)
          outs(%init : tensor<2x3xf32>) : tensor<2x3xf32>
@@ -21,7 +21,7 @@ func @reverse_dim1() {
                                            [4, 5, 6]]> : tensor<2x3xi32>
 
   %init = linalg.init_tensor [2, 3] : tensor<2x3xi32>
-  %0 = linalg_ext.reverse
+  %0 = iree_linalg_ext.reverse
          dimensions(dense<1> : tensor<1xi64>)
          ins(%input : tensor<2x3xi32>)
          outs(%init : tensor<2x3xi32>) : tensor<2x3xi32>
@@ -39,7 +39,7 @@ func @reverse_multi_dims() {
                                            [4, 5, 6]]> : tensor<2x3xi32>
 
   %init = linalg.init_tensor [2, 3] : tensor<2x3xi32>
-  %0 = linalg_ext.reverse
+  %0 = iree_linalg_ext.reverse
          dimensions(dense<[0, 1]> : tensor<2xi64>)
          ins(%input : tensor<2x3xi32>)
          outs(%init : tensor<2x3xi32>) : tensor<2x3xi32>

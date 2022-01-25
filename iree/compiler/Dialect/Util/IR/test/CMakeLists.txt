@@ -14,6 +14,8 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
+    "alignment_folding.mlir"
+    "alignment_ops.mlir"
     "attributes.mlir"
     "byte_buffer_ops.mlir"
     "global_folding.mlir"
@@ -21,12 +23,13 @@ iree_lit_test_suite(
     "hint_folding.mlir"
     "hint_ops.mlir"
     "list_ops.mlir"
+    "numeric_ops.mlir"
     "range_folding.mlir"
     "range_ops.mlir"
     "structural_folding.mlir"
     "structural_ops.mlir"
-  DATA
-    iree::tools::IreeFileCheck
+  TOOLS
+    FileCheck
     iree::tools::iree-opt
 )
 

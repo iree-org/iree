@@ -58,10 +58,14 @@ vm.import @allocator.wrap.byte_buffer(
 //===----------------------------------------------------------------------===//
 
 // Returns the allocator the buffer was allocated with.
-vm.import @buffer.allocator(
-  %buffer : !vm.ref<!hal.buffer>
-) -> !vm.ref<!hal.allocator>
-attributes {nosideeffects}
+vm.import @buffer.assert(
+  %buffer : !vm.ref<!hal.buffer>,
+  %message : !vm.buffer,
+  %allocator : !vm.ref<!hal.allocator>,
+  %minimum_length : i32,
+  %memory_types : i32,
+  %buffer_usage : i32
+)
 
 // Returns a reference to a subspan of the buffer.
 vm.import @buffer.subspan(
@@ -104,6 +108,15 @@ vm.import @buffer_view.create(
   %shape : i32 ...
 ) -> !vm.ref<!hal.buffer_view>
 attributes {nosideeffects}
+
+// Asserts a buffer view matches the given tensor encoding and shape.
+vm.import @buffer_view.assert(
+  %buffer_view : !vm.ref<!hal.buffer_view>,
+  %message : !vm.buffer,
+  %element_type : i32,
+  %encoding_type : i32,
+  %shape : i32 ...
+)
 
 // Returns the backing buffer of the buffer view.
 vm.import @buffer_view.buffer(
@@ -197,7 +210,8 @@ vm.import @command_buffer.fill_buffer(
   %target_buffer : !vm.ref<!hal.buffer>,
   %target_offset : i32,
   %length : i32,
-  %pattern : i32
+  %pattern : i32,
+  %pattern_length: i32
 )
 
 // Copies a range of one buffer to another.
@@ -276,8 +290,8 @@ vm.import @descriptor_set.create(
 vm.import @descriptor_set_layout.create(
   %device : !vm.ref<!hal.device>,
   %usage_type : i32,
-  // <binding, type, access>
-  %bindings : tuple<i32, i32, i32>...
+  // <binding, type>
+  %bindings : tuple<i32, i32>...
 ) -> !vm.ref<!hal.descriptor_set_layout>
 attributes {nosideeffects}
 

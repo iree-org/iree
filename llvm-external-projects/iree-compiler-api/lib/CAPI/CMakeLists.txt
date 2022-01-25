@@ -8,6 +8,8 @@ add_mlir_public_c_api_library(IREECompilerAPICompilerCAPI
     Support
   LINK_LIBS PUBLIC
     MLIRIR
+    iree::compiler::InputConversion::MHLO::MHLO
+    iree::compiler::InputConversion::TOSA::TOSA
     iree::compiler::Dialect::VM::IR::IR
     iree::compiler::Dialect::VM::Target::Bytecode::Bytecode
     iree::compiler::Translation::IREEVM
@@ -21,7 +23,6 @@ add_mlir_public_c_api_library(IREECompilerAPICompilerCAPI
     # LLD.
     lldCommon
     lldCOFF
-    lldDriver
     lldELF
     lldMachO
     lldMinGW

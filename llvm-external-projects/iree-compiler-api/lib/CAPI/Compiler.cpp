@@ -8,7 +8,10 @@
 
 #include "iree/compiler/Dialect/VM/IR/VMOps.h"
 #include "iree/compiler/Dialect/VM/Target/Bytecode/BytecodeModuleTarget.h"
+#include "iree/compiler/InputConversion/MHLO/Passes.h"
+#include "iree/compiler/InputConversion/TOSA/Passes.h"
 #include "iree/compiler/Translation/IREEVM.h"
+#include "iree/compiler/Utils/OptionUtils.h"
 #include "iree/tools/init_targets.h"
 #include "mlir/CAPI/IR.h"
 #include "mlir/CAPI/Pass.h"
@@ -33,9 +36,23 @@ namespace {
 struct CompilerOptions {
   BindingOptions bindingOptions;
   InputDialectOptions inputDialectOptions;
-  HALTargetOptions executableOptions;
+  HighLevelOptimizationOptions highLevelOptimizationOptions;
+  SchedulingOptions schedulingOptions;
+  HALTargetOptions halTargetOptions;
   VMTargetOptions vmTargetOptions;
   VMBytecodeTargetOptions vmBytecodeTargetOptions;
+
+  OptionsBinder binder;
+
+  CompilerOptions() : binder(OptionsBinder::local()) {
+    bindingOptions.bindOptions(binder);
+    inputDialectOptions.bindOptions(binder);
+    highLevelOptimizationOptions.bindOptions(binder);
+    schedulingOptions.bindOptions(binder);
+    halTargetOptions.bindOptions(binder);
+    vmTargetOptions.bindOptions(binder);
+    vmBytecodeTargetOptions.bindOptions(binder);
+  }
 };
 }  // namespace
 
@@ -50,13 +67,38 @@ IreeCompilerOptions ireeCompilerOptionsCreate() {
   return wrap(options);
 }
 
+MlirLogicalResult ireeCompilerOptionsSetFlags(
+    IreeCompilerOptions options, int argc, const char *const *argv,
+    void (*onError)(MlirStringRef, void *), void *userData) {
+  CompilerOptions *optionsCpp = unwrap(options);
+  auto callback = [&](llvm::StringRef message) {
+    if (onError) {
+      onError(wrap(message), userData);
+    }
+  };
+  if (failed(optionsCpp->binder.parseArguments(argc, argv, callback))) {
+    return mlirLogicalResultFailure();
+  }
+  return mlirLogicalResultSuccess();
+}
+
+void ireeCompilerOptionsGetFlags(IreeCompilerOptions options,
+                                 bool nonDefaultOnly,
+                                 void (*onFlag)(MlirStringRef, void *),
+                                 void *userData) {
+  auto flagVector = unwrap(options)->binder.printArguments(nonDefaultOnly);
+  for (std::string &value : flagVector) {
+    onFlag(wrap(llvm::StringRef(value)), userData);
+  }
+}
+
 void ireeCompilerOptionsDestroy(IreeCompilerOptions options) {
   delete unwrap(options);
 }
 
 void ireeCompilerOptionsAddTargetBackend(IreeCompilerOptions options,
                                          const char *targetBackend) {
-  unwrap(options)->executableOptions.targets.push_back(
+  unwrap(options)->halTargetOptions.targets.push_back(
       std::string(targetBackend));
 }
 
@@ -68,13 +110,33 @@ void ireeCompilerOptionsSetInputDialectTOSA(IreeCompilerOptions options) {
   unwrap(options)->inputDialectOptions.type = InputDialectOptions::Type::tosa;
 }
 
+void ireeCompilerOptionsSetInputDialectXLA(IreeCompilerOptions options) {
+  unwrap(options)->inputDialectOptions.type = InputDialectOptions::Type::xla;
+}
+
+void ireeCompilerBuildXLACleanupPassPipeline(MlirOpPassManager passManager) {
+  auto *passManagerCpp = unwrap(passManager);
+  MHLO::buildXLACleanupPassPipeline(*passManagerCpp);
+}
+
+void ireeCompilerBuildMHLOImportPassPipeline(MlirOpPassManager passManager) {
+  auto *passManagerCpp = unwrap(passManager);
+  MHLO::buildMHLOInputConversionPassPipeline(*passManagerCpp);
+}
+
+void ireeCompilerBuildTOSAImportPassPipeline(MlirOpPassManager passManager) {
+  auto *passManagerCpp = unwrap(passManager);
+  buildTOSAInputConversionPassPipeline(*passManagerCpp);
+}
+
 void ireeCompilerBuildIREEVMPassPipeline(IreeCompilerOptions options,
                                          MlirOpPassManager passManager) {
   auto *optionsCpp = unwrap(options);
   auto *passManagerCpp = unwrap(passManager);
   buildIREEVMTransformPassPipeline(
       optionsCpp->bindingOptions, optionsCpp->inputDialectOptions,
-      optionsCpp->executableOptions, optionsCpp->vmTargetOptions,
+      optionsCpp->highLevelOptimizationOptions, optionsCpp->schedulingOptions,
+      optionsCpp->halTargetOptions, optionsCpp->vmTargetOptions,
       *passManagerCpp);
 }
 

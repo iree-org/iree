@@ -19,11 +19,11 @@ add_subdirectory(utils)
 # Enable compiler targets based on options.
 set(IREE_COMPILER_TARGETS "")
 set(IREE_COMPILER_TARGET_COPTS "")
-if("${IREE_TARGET_BACKEND_DYLIB-LLVM-AOT}" OR "${IREE_TARGET_BACKEND_WASM-LLVM-AOT}")
+if("${IREE_TARGET_BACKEND_DYLIB_LLVM_AOT}" OR "${IREE_TARGET_BACKEND_WASM_LLVM_AOT}")
   list(APPEND IREE_COMPILER_TARGETS iree::compiler::Dialect::HAL::Target::LLVM)
   list(APPEND IREE_COMPILER_TARGET_COPTS "-DIREE_HAVE_LLVMAOT_TARGET")
 endif()
-if("${IREE_TARGET_BACKEND_METAL-SPIRV}")
+if("${IREE_TARGET_BACKEND_METAL_SPIRV}")
   list(APPEND IREE_COMPILER_TARGETS iree::compiler::Dialect::HAL::Target::MetalSPIRV)
   list(APPEND IREE_COMPILER_TARGET_COPTS "-DIREE_HAVE_METALSPIRV_TARGET")
 endif()
@@ -31,9 +31,13 @@ if("${IREE_TARGET_BACKEND_VMVX}")
   list(APPEND IREE_COMPILER_TARGETS iree::compiler::Dialect::HAL::Target::VMVX)
   list(APPEND IREE_COMPILER_TARGET_COPTS "-DIREE_HAVE_VMVX_TARGET")
 endif()
-if("${IREE_TARGET_BACKEND_VULKAN-SPIRV}")
+if("${IREE_TARGET_BACKEND_VULKAN_SPIRV}")
   list(APPEND IREE_COMPILER_TARGETS iree::compiler::Dialect::HAL::Target::VulkanSPIRV)
   list(APPEND IREE_COMPILER_TARGET_COPTS "-DIREE_HAVE_VULKANSPIRV_TARGET")
+endif()
+if("${IREE_TARGET_BACKEND_WEBGPU}")
+  list(APPEND IREE_COMPILER_TARGETS iree::compiler::Dialect::HAL::Target::WebGPU)
+  list(APPEND IREE_COMPILER_TARGET_COPTS "-DIREE_HAVE_WEBGPU_TARGET")
 endif()
 if("${IREE_TARGET_BACKEND_CUDA}")
   list(APPEND IREE_COMPILER_TARGETS iree::compiler::Dialect::HAL::Target::CUDA)
@@ -211,23 +215,21 @@ if(${IREE_BUILD_COMPILER})
       "init_iree_dialects.h"
       "init_iree_passes.h"
     DEPS
-      IREEDialectsIREEPyDMDialect
-      IREEDialectsIREEDialect
+      IREEInputDialect
+      IREEPyDMDialect
       MLIRIR
       iree::compiler::Bindings::Native::Transforms
       iree::compiler::Bindings::TFLite::Transforms
+      iree::compiler::Codegen::Dialect::IREECodegenDialect
+      iree::compiler::Codegen::Interfaces::Interfaces
       iree::compiler::Dialect::Flow::IR
       iree::compiler::Dialect::Flow::Transforms
       iree::compiler::Dialect::HAL::IR::HALDialect
       iree::compiler::Dialect::HAL::Transforms
-      iree::compiler::Dialect::LinalgExt::IR
-      iree::compiler::Dialect::LinalgExt::IR::TiledOpInterface
-      iree::compiler::Dialect::LinalgExt::Transforms
       iree::compiler::Dialect::Modules::VMVX::IR::VMVXDialect
       iree::compiler::Dialect::Modules::VMVX::Transforms
-      iree::compiler::Dialect::Shape::IR
-      iree::compiler::Dialect::Shape::Transforms
       iree::compiler::Dialect::Stream::IR
+      iree::compiler::Dialect::Stream::Transforms
       iree::compiler::Dialect::Util::IR
       iree::compiler::Dialect::Util::Transforms
       iree::compiler::Dialect::VM::Analysis
@@ -237,6 +239,8 @@ if(${IREE_BUILD_COMPILER})
       iree::compiler::InputConversion::Common
       iree::compiler::InputConversion::MHLO
       iree::compiler::InputConversion::TOSA
+      iree::compiler::ConstEval
+      iree::compiler::Translation::HALExecutable
       iree::compiler::Translation::IREEVM
     PUBLIC
   )
@@ -267,6 +271,7 @@ if(${IREE_BUILD_COMPILER})
       MLIRShape
       MLIRStandard
       MLIRStandardToSPIRV
+      MLIRTensorInferTypeOpInterfaceImpl
       MLIRTosa
       MLIRTosaTransforms
       MLIRTransforms
@@ -319,7 +324,9 @@ if(${IREE_BUILD_COMPILER})
     HDRS
       "init_xla_dialects.h"
     DEPS
-      tensorflow::mlir_hlo
+      tensorflow::external_mhlo_includes
+      ChloDialect
+      MhloDialect
     PUBLIC
   )
 
@@ -329,6 +336,7 @@ if(${IREE_BUILD_COMPILER})
     HDRS
       "init_translations.h"
     DEPS
+      iree::compiler::Translation::HALExecutable
       iree::compiler::Translation::IREEVM
       MLIRSPIRVTranslateRegistration
   )
@@ -374,6 +382,7 @@ if(${IREE_BUILD_COMPILER})
       iree::compiler::Codegen::Codegen
       iree::compiler::Dialect::VM::Target::Bytecode
       iree::compiler::Dialect::VM::Target::init_targets
+      iree::compiler::Translation::HALExecutable
       iree::compiler::Translation::IREEVM
       ${IREE_EMITC_CONDITIONAL_DEP}
     PUBLIC
@@ -450,72 +459,17 @@ if(${IREE_BUILD_COMPILER})
     HOSTONLY
   )
 
-  # IreeFileCheck
-  # We could encapsulate this in iree_sh_binary, but we only have one use of it
-  # in the project and this file is already not covered by Bazel->CMake
-
-  # Symlink the shell script into the build tree as the expected executable name
-  add_custom_command(
-    OUTPUT
-      IreeFileCheck
-    COMMAND
-      ${CMAKE_COMMAND} -E create_symlink
-      ${CMAKE_CURRENT_SOURCE_DIR}/IreeFileCheck.sh
-      IreeFileCheck
-  )
-
-  # CMake always needs to custom targets to drive custom commands. We have to
-  # give it a different name.
-  add_custom_target(iree_tools_IreeFileCheck_Driver ALL DEPENDS IreeFileCheck)
-
-  # But custom target doesn't have the TARGET_FILE property, which we need, so
-  # wrap it yet again in an executable. This is marked as an imported executable
-  # because otherwise CMake would try to compile it as C++.
-  add_executable(iree_tools_IreeFileCheck IMPORTED GLOBAL)
-  set_property(
-    TARGET
-    iree_tools_IreeFileCheck
-    PROPERTY IMPORTED_LOCATION
-    "${CMAKE_CURRENT_BINARY_DIR}/IreeFileCheck"
-  )
-  add_dependencies(iree_tools_IreeFileCheck iree_tools_IreeFileCheck_Driver)
-  # Finally do our normal aliasing tricks to make this accessible as a qualified
-  # target name throughout the project. Accessing this as an unqualified target
-  # is not supported as the name would conflict with the file name, which CMake
-  # does not support (https://gitlab.kitware.com/cmake/cmake/-/issues/18627).
-  add_executable(iree::tools::IreeFileCheck ALIAS iree_tools_IreeFileCheck)
-
-  add_custom_target(BundledLLVMFileCheck ALL
-    COMMAND ${CMAKE_COMMAND} -E create_symlink $<TARGET_FILE:FileCheck> FileCheck
-    DEPENDS FileCheck
-  )
+  # Ensure FileCheck gets built. Tests don't have dependencies in CMake because
+  # they aren't targets. So until we fix that, we just force this to get built.
+  # Limiting this to when IREE_BUILD_TESTS is set prevents the installation
+  # below, which we use for cross-platform testing.
+  set_target_properties(FileCheck PROPERTIES EXCLUDE_FROM_ALL OFF)
 
   # lld install - required by the compiler to link codegen executables.
   install(
     TARGETS lld
     COMPONENT Compiler
     RUNTIME DESTINATION bin
-  )
-
-  # General test dependency binary/scripts installed.
-  install(
-    PROGRAMS
-      IreeFileCheck.bat
-      run_lit.bat
-      run_lit.ps1
-      run_lit.sh
-    DESTINATION "tests/bin"
-    COMPONENT Tests
-  )
-
-  # Rename IreeFileCheck.sh -> IreeFileCheck in lieu of symlink (as is used in
-  # the build tree).
-  install(
-    PROGRAMS
-      IreeFileCheck.sh
-    DESTINATION "tests/bin"
-    RENAME "IreeFileCheck"
-    COMPONENT Tests
   )
 
   # Bundle the FileCheck binary from LLVM into our tests/bin directory so

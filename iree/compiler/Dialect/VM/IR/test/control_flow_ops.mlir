@@ -1,6 +1,4 @@
-// Tests printing and parsing of control flow ops.
-
-// RUN: iree-opt -split-input-file %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file %s | FileCheck %s
 
 // CHECK-LABEL: @branch_empty
 vm.module @my_module {
@@ -219,8 +217,9 @@ vm.module @my_module {
 // CHECK-LABEL: @yield
 vm.module @my_module {
   vm.func @yield() {
-    // CHECK: vm.yield
-    vm.yield
+    // CHECK: vm.yield ^bb1
+    vm.yield ^bb1
+  ^bb1:
     vm.return
   }
 }

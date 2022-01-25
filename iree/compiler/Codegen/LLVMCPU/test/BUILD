@@ -6,7 +6,7 @@
 
 # Tests for common transforms.
 
-load("//iree:lit_test.bzl", "iree_lit_test_suite")
+load("//build_tools/bazel:iree_lit_test.bzl", "iree_lit_test_suite")
 load("//build_tools/bazel:enforce_glob.bzl", "enforce_glob")
 
 package(
@@ -19,20 +19,24 @@ iree_lit_test_suite(
     name = "lit",
     srcs = enforce_glob(
         [
+            "check_ir_before_llvm_conversion.mlir",
             "hal_interface_bindings.mlir",
             "hal_interface_constants.mlir",
             "hal_interface_workgroup_info.mlir",
+            "illegal_configuration.mlir",
+            "materialize_double_tiling_expert_configuration.mlir",
             "materialize_launch_configuration.mlir",
-            "matmul_vectorization.mlir",
             "synchronize_symbol_visibility.mlir",
+            "test_config_mmt4d.mlir",
             "tile_and_vectorize.mlir",
+            "tile_fuse_and_vectorize.mlir",
             "unfused_fma.mlir",
-            "vector_contract_to_aarch64_asm.mlir",
+            "vector_contract_custom_kernels.mlir",
         ],
         include = ["*.mlir"],
     ),
-    data = [
-        "//iree/tools:IreeFileCheck",
+    tools = [
         "//iree/tools:iree-opt",
+        "@llvm-project//llvm:FileCheck",
     ],
 )

@@ -18,11 +18,10 @@ iree_lit_test_suite(
     "buffer_ops.mlir"
     "buffer_view_ops.mlir"
     "command_buffer_ops.mlir"
-    "constant_ops.mlir"
     "device_ops.mlir"
     "executable_ops.mlir"
-  DATA
-    iree::tools::IreeFileCheck
+  TOOLS
+    FileCheck
     iree::tools::iree-opt
 )
 

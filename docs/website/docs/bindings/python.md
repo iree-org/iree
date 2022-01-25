@@ -1,16 +1,23 @@
 # Python bindings
 
+!!! info
+
+    API reference pages for IREE's runtime and compiler Python APIs are hosted on
+    [readthedocs](https://iree-python-api.readthedocs.io/en/latest/).
+
+## Overview
+
 IREE offers Python bindings split into several packages, covering different
 components:
 
 | PIP package name             | Description                                                                 |
 |------------------------------|-----------------------------------------------------------------------------|
-| `iree-compiler-snapshot`     | IREE's generic compiler tools and helpers                                   |
-| `iree-runtime-snapshot`      | IREE's runtime, including CPU and GPU backends                              |
-| `iree-tools-tf-snapshot`     | Tools for importing from [TensorFlow](https://www.tensorflow.org/)          |
-| `iree-tools-tflite-snapshot` | Tools for importing from [TensorFlow Lite](https://www.tensorflow.org/lite) |
-| `iree-tools-xla-snapshot`    | Tools for importing from [XLA](https://www.tensorflow.org/xla)              |
-| `iree-jax-snapshot`          | Tools for importing from [JAX](https://github.com/google/jax)               |
+| `iree-compiler`     | IREE's generic compiler tools and helpers                                   |
+| `iree-runtime`      | IREE's runtime, including CPU and GPU backends                              |
+| `iree-tools-tf`     | Tools for importing from [TensorFlow](https://www.tensorflow.org/)          |
+| `iree-tools-tflite` | Tools for importing from [TensorFlow Lite](https://www.tensorflow.org/lite) |
+| `iree-tools-xla`    | Tools for importing from [XLA](https://www.tensorflow.org/xla)              |
+| `iree-jax`          | Tools for importing from [JAX](https://github.com/google/jax)               |
 
 Collectively, these packages allow for importing from frontends, compiling
 towards various targets, and executing compiled code on IREE's backends.
@@ -19,10 +26,6 @@ towards various targets, and executing compiled code on IREE's backends.
     The TensorFlow, TensorFlow Lite, and XLA packages are currently only
     available on Linux and macOS. They are not available on Windows yet (see
     [this issue](https://github.com/google/iree/issues/6417)).
-
-<!-- TODO(??): API references for packages/modules -->
-<!-- TODO(??): at least link to source code and sample Colab notebooks for now -->
-<!-- TODO(??): link to frontend docs -->
 
 ## Prerequisites
 
@@ -65,8 +68,8 @@ python -m pip install numpy absl-py
 
 ### Prebuilt packages
 
-For now, packages can be installed from our
-[GitHub releases](https://github.com/google/iree/releases):
+Stable release packages are published to
+[PyPI](https://pypi.org/user/google-iree-pypi-deploy/).
 
 === "Minimal"
 
@@ -74,9 +77,8 @@ For now, packages can be installed from our
 
     ``` shell
     python -m pip install \
-      iree-compiler-snapshot \
-      iree-runtime-snapshot \
-      --find-links https://github.com/google/iree/releases
+      iree-compiler \
+      iree-runtime
     ```
 
 === "All packages"
@@ -85,30 +87,38 @@ For now, packages can be installed from our
 
     ``` shell
     python -m pip install \
-      iree-compiler-snapshot \
-      iree-runtime-snapshot \
-      iree-tools-tf-snapshot \
-      iree-tools-tflite-snapshot \
-      iree-tools-xla-snapshot \
-      --find-links https://github.com/google/iree/releases
+      iree-compiler \
+      iree-runtime \
+      iree-tools-tf \
+      iree-tools-tflite \
+      iree-tools-xla
     ```
 
-!!! info
-    We plan to publish packages on [PyPI](https://pypi.org/) as they become
-    more stable.
+!!! Tip
+
+    Nightly packages are also published on
+    [GitHub releases](https://github.com/google/iree/releases). To use these,
+    run `pip install` with this extra option:
+
+    ```
+    --find-links https://github.com/google/iree/releases
+    ```
 
 ### Building from source
 
-See [Building Python bindings](../../building-from-source/optional-features/#building-python-bindings)
+See [Building Python bindings](../../building-from-source/python-bindings-and-importers/#building-python-bindings)
 page for instructions for building from source.
 
 ## Using the Python bindings
 
-<!-- TODO(??): general flow: import, compile, run -->
-<!-- TODO(??): high level API vs low level API -->
-<!-- TODO(??): examples split by TF/TFLite/XLA/JAX (and link to frontend docs) -->
+API reference pages for IREE's runtime and compiler Python APIs are hosted on
+[readthedocs](https://iree-python-api.readthedocs.io/en/latest/).
 
-## Troubleshooting
+Check out the samples in IREE's
+[colab/ directory](https://github.com/google/iree/tree/main/colab) and the
+[iree-samples repository](https://github.com/google/iree-samples) for examples
+using the Python APIs.
+
+<!-- ## Troubleshooting -->
 
 <!-- TODO(scotttodd): update python, update pip, search GitHub issues -->
-<!-- TODO(scotttodd): add note about frontend tools not being published for Windows -->

@@ -37,11 +37,6 @@ extern "C" {
 #define iree_min(lhs, rhs) ((lhs) <= (rhs) ? (lhs) : (rhs))
 #define iree_max(lhs, rhs) ((lhs) <= (rhs) ? (rhs) : (lhs))
 
-// Returns true if any bit from |rhs| is set in |lhs|.
-#define iree_any_bit_set(lhs, rhs) (((lhs) & (rhs)) != 0)
-// Returns true iff all bits from |rhs| are set in |lhs|.
-#define iree_all_bits_set(lhs, rhs) (((lhs) & (rhs)) == (rhs))
-
 #if IREE_STATISTICS_ENABLE
 // Evalutes the expression code only if statistics are enabled.
 //
@@ -74,6 +69,15 @@ static inline iree_byte_span_t iree_make_byte_span(
   return v;
 }
 
+static inline iree_byte_span_t iree_byte_span_empty() {
+  iree_byte_span_t v = {NULL, 0};
+  return v;
+}
+
+static bool iree_byte_span_is_empty(iree_byte_span_t span) {
+  return span.data == NULL || span.data_length == 0;
+}
+
 // A span of constant bytes (ala std::span of const uint8_t).
 typedef struct iree_const_byte_span_t {
   const uint8_t* data;
@@ -84,6 +88,15 @@ static inline iree_const_byte_span_t iree_make_const_byte_span(
     const void* data, iree_host_size_t data_length) {
   iree_const_byte_span_t v = {(const uint8_t*)data, data_length};
   return v;
+}
+
+static inline iree_const_byte_span_t iree_const_byte_span_empty() {
+  iree_const_byte_span_t v = {NULL, 0};
+  return v;
+}
+
+static bool iree_const_byte_span_is_empty(iree_const_byte_span_t span) {
+  return span.data == NULL || span.data_length == 0;
 }
 
 //===----------------------------------------------------------------------===//

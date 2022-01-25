@@ -68,6 +68,7 @@ def VM_OPC_PowF64                : VM_OPC<0x4B, "PowF64">;
 def VM_OPC_RsqrtF64              : VM_OPC<0x4C, "RsqrtF64">;
 def VM_OPC_SqrtF64               : VM_OPC<0x4D, "SqrtF64">;
 def VM_OPC_TanhF64               : VM_OPC<0x4E, "TanhF64">;
+def VM_OPC_ErfF64                : VM_OPC<0x4F, "ErfF64">;
 
 def VM_OPC_CmpEQF64O             : VM_OPC<0x60, "CmpEQF64O">;
 def VM_OPC_CmpEQF64U             : VM_OPC<0x61, "CmpEQF64U">;

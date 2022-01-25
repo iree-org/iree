@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file %s | iree-opt -split-input-file | IreeFileCheck %s
+// RUN: iree-opt -split-input-file %s | iree-opt -split-input-file | FileCheck %s
 
 //      CHECK: util.initializer {
 // CHECK-NEXT:   util.initializer.return

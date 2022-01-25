@@ -1,4 +1,27 @@
-// RUN: iree-opt -split-input-file -canonicalize %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -canonicalize %s | FileCheck %s
+
+// CHECK-LABEL: @FoldTimepointExport
+func @FoldTimepointExport(%arg0: !hal.semaphore, %arg1: index) -> (!hal.semaphore, index) {
+  // CHECK-NOT: stream.timepoint.import
+  %0 = stream.timepoint.import %arg0, %arg1 : (!hal.semaphore, index) => !stream.timepoint
+  // CHECK-NOT: stream.timepoint.export
+  %1:2 = stream.timepoint.export %0 => (!hal.semaphore, index)
+  // CHECK: return %arg0, %arg1
+  return %1#0, %1#1 : !hal.semaphore, index
+}
+
+// -----
+
+// CHECK-LABEL: @DontFoldTimepointExportMismatch
+func @DontFoldTimepointExportMismatch(%arg0: !hal.semaphore, %arg1: index) -> (!hal.semaphore, i32) {
+  // CHECK: stream.timepoint.import
+  %0 = stream.timepoint.import %arg0, %arg1 : (!hal.semaphore, index) => !stream.timepoint
+  // CHECK-NEXT: stream.timepoint.export
+  %1:2 = stream.timepoint.export %0 => (!hal.semaphore, i32)
+  return %1#0, %1#1 : !hal.semaphore, i32
+}
+
+// -----
 
 // CHECK-LABEL: @FoldTimepointJoinOp
 func @FoldTimepointJoinOp(%arg0: !stream.timepoint) -> !stream.timepoint {
@@ -39,6 +62,17 @@ func @FoldDuplicateTimepointJoinOperands(%arg0: !stream.timepoint, %arg1: !strea
   // CHECK: = stream.timepoint.join max(%arg0, %arg1)
   %0 = stream.timepoint.join max(%arg0, %arg1, %arg0, %arg1) => !stream.timepoint
   return %0 : !stream.timepoint
+}
+
+// -----
+
+// CHECK-LABEL: @ExpandTimepointJoinOperands
+func @ExpandTimepointJoinOperands(%arg0: !stream.timepoint, %arg1: !stream.timepoint, %arg2: !stream.timepoint, %arg3: !stream.timepoint) -> !stream.timepoint {
+  %join0 = stream.timepoint.join max(%arg0, %arg1) => !stream.timepoint
+  // CHECK: %[[JOIN:.+]] = stream.timepoint.join max(%arg2, %arg0, %arg1, %arg3)
+  %join1 = stream.timepoint.join max(%arg2, %join0, %arg3) => !stream.timepoint
+  // CHECK: return %[[JOIN]]
+  return %join1 : !stream.timepoint
 }
 
 // -----

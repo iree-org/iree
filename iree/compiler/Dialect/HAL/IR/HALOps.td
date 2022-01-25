@@ -11,7 +11,6 @@ include "iree/compiler/Dialect/HAL/IR/HALBase.td"
 include "iree/compiler/Dialect/HAL/IR/HALInterfaces.td"
 include "iree/compiler/Dialect/Util/IR/UtilAttrs.td"
 include "iree/compiler/Dialect/Util/IR/UtilInterfaces.td"
-include "iree/compiler/Dialect/Shape/IR/ShapeInterfaces.td"
 include "mlir/IR/OpAsmInterface.td"
 include "mlir/IR/SymbolInterfaces.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
@@ -59,57 +58,124 @@ def HAL_ExSubmitAndWaitOp : HAL_Op<"ex.submit_and_wait", [YieldPoint]> {
 // Pseudo ops for conversion support
 //===----------------------------------------------------------------------===//
 
-def HAL_TensorCastOp : HAL_PureOp<"tensor.cast", [
-    AttrSizedOperandSegments,
-    DeclareOpInterfaceMethods<Util_TiedOpInterface, [
-        "getTiedResult",
-        "getTiedResultOperandIndex",
-        "getTiedResultOperandIndices",
-    ]>,
-    DeclareOpInterfaceMethods<Shape_ShapeCarryingOpInterface>,
-    Util_ShapeAwareOp,
-  ]> {
-  let summary = [{conversion placeholder for HAL<->tensor type conversion}];
+def HAL_TensorImportOp : HAL_PureOp<"tensor.import", [
+  DeclareOpInterfaceMethods<Util_TiedOpInterface, [
+    "getTiedResult",
+    "getTiedResultOperandIndex",
+    "getTiedResultOperandIndices",
+  ]>,
+  Util_ShapeAwareOp,
+]> {
+  let summary = [{imports a tensor from a HAL buffer view}];
   let description = [{
-    Defines a conversion from a higher-level dialect type such as `tensor` that
-    is resolved during lowering into the HAL. This can be used to interoperate
-    between levels of the stack that require specifying HAL types and those that
-    prior to lowering do not handle them.
+    Defines an import of an external HAL buffer view into a SSA-form tensor.
+    An optional semaphore timepoint can be specified indicating when the
+    buffer view is available for use. If no semaphore timepoint is provided it
+    is assumed the buffer view is immediately available.
+
+    The provided `target_encoding`, if different from the `target` type,
+    indicates that the ABI-facing type may differ from the internal
+    representation. The types must be bitcastable (same storage size) and
+    dynamically shaped values must have the same number of dynamic dimensions.
+    This allows for casting between rank-0 and rank-N types, different element
+    types, etc.
   }];
 
   let arguments = (ins
-    AnyType:$source,
-    HAL_ShapeDynamicDims:$source_dims,
+    AnyTypeOf<[HAL_Buffer, HAL_BufferView]>:$source,
+    TypeAttr:$target_encoding,
     HAL_ShapeDynamicDims:$target_dims
   );
   let results = (outs
-    AnyType:$target
+    AnyTensor:$target
   );
 
   let assemblyFormat = [{
-    $source `:`
-    type($source) (`{` $source_dims^ `}`)? `->`
-    type($target) (`{` $target_dims^ `}`)?
+    $source `:` type($source)
+    `->`
+    custom<TypeAlias>($target_encoding, type($target)) (`{` $target_dims^ `}`)?
     attr-dict-with-keyword
   }];
 
-  let skipDefaultBuilders = 1;
   let builders = [
     OpBuilder<(ins
       "Type":$resultType,
-      "Value":$source,
-      CArg<"ArrayRef<NamedAttribute>", "{}">:$attributes)>,
+      "Value":$source
+    )>,
+  ];
+
+  let extraClassDeclaration = [{
+    ValueRange getOperandDynamicDims(unsigned idx) { return {}; }
+    ValueRange getResultDynamicDims(unsigned idx) { return target_dims(); }
+  }];
+
+  let verifier = [{ return verifyTensorImportOp(*this); }];
+
+  let hasFolder = 1;
+}
+
+def HAL_TensorExportOp : HAL_PureOp<"tensor.export", [
+  AttrSizedOperandSegments,
+  DeclareOpInterfaceMethods<Util_TiedOpInterface, [
+    "getTiedResult",
+    "getTiedResultOperandIndex",
+    "getTiedResultOperandIndices",
+  ]>,
+  Util_ShapeAwareOp,
+]> {
+  let summary = [{exports a tensor to a HAL buffer view}];
+  let description = [{
+    Defines an export of an SSA-form tensor to an external HAL buffer view.
+    An optional semaphore timepoint can be specified indicating when the
+    buffer view is available for use. If no semaphore timepoint is requested it
+    is assumed execution blocks until the buffer view is available.
+
+    The provided `source_encoding`, if different from the `source` type,
+    indicates that the ABI-facing type may differ from the internal
+    representation. The types must be bitcastable (same storage size) and
+    dynamically shaped values must have the same number of dynamic dimensions.
+    This allows for casting between rank-0 and rank-N types, different element
+    types, etc.
+
+    An optional `target_storage` buffer can be provided to hold the exported
+    result. The export will fail at runtime if the storage is null or if it has
+    insufficient capacity to store the output. The storage must be
+    device-visible and defined for transfer-target and dispatch usage.
+  }];
+
+  let arguments = (ins
+    AnyTensor:$source,
+    TypeAttr:$source_encoding,
+    HAL_ShapeDynamicDims:$source_dims,
+    Optional<HAL_Buffer>:$target_storage
+  );
+  let results = (outs
+    AnyTypeOf<[HAL_Buffer, HAL_BufferView]>:$target
+  );
+
+  let assemblyFormat = [{
+    $source
+    (`into` $target_storage^)?
+    `:`
+    custom<TypeAlias>($source_encoding, type($source)) (`{` $source_dims^ `}`)?
+    `->`
+    type($target)
+    attr-dict-with-keyword
+  }];
+
+  let builders = [
     OpBuilder<(ins
       "Type":$resultType,
-      "Value":$source,
-      "ValueRange":$dynamicDims,
-      CArg<"ArrayRef<NamedAttribute>", "{}">:$attributes)>,
+      "Value":$source
+    )>,
   ];
 
   let extraClassDeclaration = [{
     ValueRange getOperandDynamicDims(unsigned idx) { return source_dims(); }
-    ValueRange getResultDynamicDims(unsigned idx) { return target_dims(); }
+    ValueRange getResultDynamicDims(unsigned idx) { return {}; }
   }];
+
+  let verifier = [{ return verifyTensorExportOp(*this); }];
 
   let hasFolder = 1;
 }
@@ -117,163 +183,6 @@ def HAL_TensorCastOp : HAL_PureOp<"tensor.cast", [
 //===----------------------------------------------------------------------===//
 // !hal.allocator / iree_hal_allocator_t
 //===----------------------------------------------------------------------===//
-
-// TODO(#7277): remove when switched to streams (happens there now).
-def HAL_AllocatorComputeSizeOp : HAL_PureOp<"allocator.compute_size", [
-    DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
-  ]> {
-  let summary = [{buffer allocation size computation operation}];
-  let description = [{
-    Computes the byte size required for a buffer of the given shape and type.
-    The returned size may be larger than the logical size of the tensor type
-    stored within the buffer based on alignment requirements of the allocator.
-  }];
-
-  let arguments = (ins
-    HAL_Allocator:$allocator,
-    HAL_Shape:$shape,
-    HAL_ElementType:$element_type,
-    HAL_EncodingType:$encoding_type
-  );
-  let results = (outs
-    HAL_DeviceSize:$result
-  );
-
-  let assemblyFormat = [{
-    `<` $allocator `:` type($allocator) `>`
-    `shape` `(` `[` $shape `]` `)`
-    `type` `(` $element_type `)`
-    `encoding` `(` $encoding_type `)`
-    `:` type($result)
-    attr-dict-with-keyword
-  }];
-
-  let builders = [
-    OpBuilder<(ins
-      "Value":$allocator,
-      "ValueRange":$shape,
-      "int32_t":$elementType,
-      "int32_t":$encodingType
-    )>,
-    OpBuilder<(ins
-      "Value":$allocator,
-      "ValueRange":$shape,
-      "Value":$elementType,
-      "Value":$encodingType
-    )>,
-  ];
-
-  let hasCanonicalizer = 1;
-}
-
-// TODO(#7277): remove when switched to streams (happens there now).
-def HAL_AllocatorComputeOffsetOp : HAL_PureOp<"allocator.compute_offset", [
-    DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
-    SameVariadicOperandSize,
-  ]> {
-  let summary = [{buffer view indices to byte offset computation operation}];
-  let description = [{
-    Computes an element byte offset within a buffer produced by the allocator.
-  }];
-
-  let arguments = (ins
-    HAL_Allocator:$allocator,
-    HAL_Shape:$shape,
-    HAL_ElementType:$element_type,
-    HAL_EncodingType:$encoding_type,
-    HAL_Dims:$indices
-  );
-
-  let results = (outs
-    HAL_DeviceSize:$offset
-  );
-
-  let assemblyFormat = [{
-    `<` $allocator `:` type($allocator) `>`
-    `indices` `(` `[` $indices `]` `)`
-    `shape` `(` `[` $shape `]` `)`
-    `type` `(` $element_type `)`
-    `encoding` `(` $encoding_type `)`
-    `:` type($offset)
-    attr-dict-with-keyword
-  }];
-
-  let builders = [
-    OpBuilder<(ins
-      "Value":$allocator,
-      "ValueRange":$shape,
-      "int32_t":$elementType,
-      "int32_t":$encodingType,
-      "ValueRange":$indices
-    )>,
-    OpBuilder<(ins
-      "Value":$allocator,
-      "ValueRange":$shape,
-      "Value":$elementType,
-      "Value":$encodingType,
-      "ValueRange":$indices
-    )>,
-  ];
-
-  let hasCanonicalizer = 1;
-}
-
-// TODO(#7277): remove when switched to streams (happens there now).
-def HAL_AllocatorComputeRangeOp : HAL_PureOp<"allocator.compute_range", [
-    DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
-    SameVariadicOperandSize,
-  ]> {
-  let summary = [{buffer view byte range computation operation}];
-  let description = [{
-    Computes a byte range within a buffer for one or more elements.
-  }];
-
-  let arguments = (ins
-    HAL_Allocator:$allocator,
-    HAL_Shape:$shape,
-    HAL_ElementType:$element_type,
-    HAL_EncodingType:$encoding_type,
-    HAL_Dims:$indices,
-    HAL_Dims:$lengths
-  );
-  let results = (outs
-    // TODO(benvanik): return a strides tuple instead, or one per dim.
-    HAL_DeviceSize:$offset,
-    HAL_DeviceSize:$length
-  );
-
-  let assemblyFormat = [{
-    `<` $allocator `:` type($allocator) `>`
-    `indices` `(` `[` $indices `]` `)`
-    `lengths` `(` `[` $lengths `]` `)`
-    `shape` `(` `[` $shape `]` `)`
-    `type` `(` $element_type `)`
-    `encoding` `(` $encoding_type `)`
-    `:` type($offset) `,` type($length)
-    attr-dict-with-keyword
-  }];
-
-  let builders = [
-    OpBuilder<(ins
-      "Value":$allocator,
-      "ValueRange":$shape,
-      "int32_t":$elementType,
-      "int32_t":$encodingType,
-      "ValueRange":$indices,
-      "ValueRange":$lengths
-    )>,
-    OpBuilder<(ins
-      "Value":$allocator,
-      "ValueRange":$shape,
-      "Value":$elementType,
-      "Value":$encodingType,
-      "ValueRange":$indices,
-      "ValueRange":$lengths
-    )>,
-  ];
-
-  let hasCanonicalizer = 1;
-}
 
 def HAL_AllocatorAllocateOp : HAL_Op<"allocator.allocate", [
     DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
@@ -304,40 +213,6 @@ def HAL_AllocatorAllocateOp : HAL_Op<"allocator.allocate", [
     `:` custom<SizeAwareType>(type($result), $result_size)
     attr-dict-with-keyword
   }];
-}
-
-// TODO(#7277): remove when switched to streams (happens there now).
-def HAL_AllocatorConstantOp : HAL_Op<"allocator.constant", [
-    DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
-  ]> {
-  let summary = [{constant buffer allocation operation}];
-  let description = [{
-    Allocates a buffer from the allocator with the given constant contents.
-    The buffer contents cannot change after the the point of allocation and in
-    most cases should be cached so that the buffer is not reallocated
-    repeatedly.
-  }];
-
-  let arguments = (ins
-    HAL_Allocator:$allocator,
-    HAL_MemoryTypeBitfieldAttr:$memory_types,
-    HAL_BufferUsageBitfieldAttr:$buffer_usage,
-    ElementsAttr:$value
-  );
-  let results = (outs
-    AnyTypeOf<[HAL_Buffer, HAL_BufferView]>:$result
-  );
-
-  // TODO(benvanik): change type/usage to ref params.
-  let assemblyFormat = [{
-    `<` $allocator `:` type($allocator) `>`
-    `type` `(` $memory_types `)`
-    `usage` `(` $buffer_usage `)`
-    `:` type($result) `=` $value
-    attr-dict-with-keyword
-  }];
-
-  let hasCanonicalizer = 1;
 }
 
 def HAL_AllocatorMapOp : HAL_Op<"allocator.map", [
@@ -413,137 +288,46 @@ def HAL_AllocatorTryMapOp : HAL_Op<"allocator.try_map", [
   }];
 }
 
-// TODO(#7277): remove when switched to streams (happens there now).
-def HAL_AllocatorPackOp : HAL_PureOp<"allocator.pack", [
-    DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
-    AttrSizedOperandSegments,
-  ]> {
-  let summary = [{packs variable-sized slices into a single slab}];
-  let description = [{
-    Performs a greedy packing of one or more sized slices with specified
-    lifetimes and returns their relative offsets in an aliased linear space.
-
-    Slices are `[start, end] = %slice_byte_size`, where the start and end values
-    define an inclusive lifetime range and the size is the total number of bytes
-    required to be live for that range.
-
-    ```mlir
-    // Computes thte total length required for the packed values and the offsets
-    // of the 3 slices requested relative to the base of the packed memory:
-    %total_length, %offset_0, %offset_1, %offset_2 =
-        hal.allocator.pack<%allocator : !hal.allocator>
-            // Each slice gets one result offset:
-            slices([
-              // 3 slices where A and B overlap and will get unique offsets
-              // while B and C do not overlap and are allowed to alias.
-              [0, 10] = %size_0,  // A => %offset_0
-              [3,  8] = %size_1,  // B => %offset_1
-              [9, 10] = %size_2,  // C => %offset_2
-              ...
-            ]) : index
-    ```
-
-    The lifetime start and end points (inclusive) are only used for relative
-    comparisons and may originate with any meaning (op order in block, epoch,
-    phase of the moon, etc). The packing algorithm uses the intervals to
-    determine slice liveness and when aliasing is safe.
-
-    The size of each slice may either be a constant or runtime-computed dynamic
-    value. Constant slices can achieve more dense packing than the dynamic
-    values and CSE/canonicalization should be applied to ensure that as many of
-    the dynamic values are equivalent if possible.
-
-    The total length required to pack all slices is returned and can be used to
-    acquire storage. The individual slice offsets are 0-based and as such if are
-    directly used as buffer offsets may need additional offseting. This can
-    either be applied via the optional `offset` operand or slicing of the
-    underlying allocation buffer.
-  }];
-
-  let arguments = (ins
-    HAL_Allocator:$allocator,
-    Optional<HAL_DeviceSize>:$offset,
-    HAL_IndexArrayAttr:$lifetime_intervals,
-    Variadic<HAL_DeviceSize>:$dynamic_slice_sizes
-  );
-  let results = (outs
-    HAL_DeviceSize:$total_length,
-    Variadic<HAL_DeviceSize>:$packed_offsets
-  );
-
-  let assemblyFormat = [{
-    `<` $allocator `:` type($allocator) `>`
-    (`offset` `(` $offset^ `)`)?
-    `slices` `(` `{`
-    custom<PackSliceRanges>($lifetime_intervals,
-                            $dynamic_slice_sizes,
-                            type($packed_offsets))
-    `}` `)`
-    `:` type($total_length)
-    attr-dict-with-keyword
-  }];
-
-  let verifier = [{ return verifyAllocatorPackOp(*this); }];
-
-  let extraClassDeclaration = [{
-    struct Slice {
-      int64_t lifetimeStart;
-      int64_t lifetimeEnd;
-      Value dynamicSize;
-      Value packedOffset;
-
-      bool operator==(const Slice &rhs) const {
-        return lifetimeStart == rhs.lifetimeStart &&
-               lifetimeEnd == rhs.lifetimeEnd;
-      }
-      bool operator!=(const Slice &rhs) const {
-        return !(*this == rhs);
-      }
-      bool operator<(const Slice &rhs) const {
-        return std::make_pair(lifetimeStart, lifetimeEnd) <
-               std::make_pair(rhs.lifetimeStart, rhs.lifetimeEnd);
-      }
-      bool intersects(const Slice &rhs) const {
-        return lifetimeEnd >= rhs.lifetimeStart &&
-               rhs.lifetimeEnd >= lifetimeStart;
-      }
-    };
-
-    /// Returns all of the slices to be packed.
-    /// Order is ascending by lifetime interval (post-canonicalization).
-    SmallVector<Slice> getSlices();
-  }];
-
-  let hasCanonicalizer = 1;
-  let hasFolder = 1;
-}
-
 //===----------------------------------------------------------------------===//
 // !hal.buffer / iree_hal_buffer_t
 //===----------------------------------------------------------------------===//
 
-def HAL_BufferAllocatorOp : HAL_PureOp<"buffer.allocator", [
-    DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
-  ]> {
-  let summary = [{buffer allocator accessor operation}];
+def HAL_BufferAssertOp : HAL_Op<"buffer.assert", []> {
+  let summary = [{buffer compatibility assertion}];
   let description = [{
-    Returns the allocator this buffer was allocated from.
+    Asserts that the buffer is compatible with the given allocator and usage.
+    Program execution will abort as if `std.assert` had been used.
+
+    This only checks that the buffer can be used and not that it matches the
+    given parameters exactly. Buffers may be from other allocators so long as
+    the allocators are compatible (devices can address each other's memory),
+    the type and usage contain all the requested bits (having more bits is ok),
+    and the length is at least the requested minimum (as padding may be
+    ignored).
   }];
 
   let arguments = (ins
-    HAL_BufferType:$buffer
+    HAL_Buffer:$buffer,
+    StrAttr:$message,
+    HAL_Allocator:$allocator,
+    HAL_DeviceSize:$minimum_length,
+    HAL_MemoryTypeBitfieldAttr:$memory_types,
+    HAL_BufferUsageBitfieldAttr:$buffer_usage
   );
-  let results = (outs
-    HAL_Allocator:$result
-  );
+  let results = (outs);
 
   let assemblyFormat = [{
     `<` $buffer `:` type($buffer) `>`
-    `:` type($result)
+    `message` `(` $message `)`
+    `allocator` `(` $allocator `:` type($allocator) `)`
+    `minimum_length` `(` $minimum_length `)`
+    `type` `(` $memory_types `)`
+    `usage` `(` $buffer_usage `)`
     attr-dict-with-keyword
   }];
 
-  let hasCanonicalizer = 1;
+  // TODO(benvanik): fold away when we know some properties of the buffer
+  // (such as when we create it ourselves earlier on) or we've already asserted.
 }
 
 def HAL_BufferSubspanOp : HAL_PureOp<"buffer.subspan", [
@@ -687,6 +471,36 @@ def HAL_BufferViewCreateOp : HAL_PureOp<"buffer_view.create", [
       "ValueRange":$shape
     )>,
   ];
+}
+
+def HAL_BufferViewAssertOp : HAL_Op<"buffer_view.assert", []> {
+  let summary = [{buffer view contents assertion}];
+  let description = [{
+    Asserts that the buffer view contains a data compatible tensor with the
+    given encoding. Program execution will abort as if `std.assert` had been
+    used.
+  }];
+
+  let arguments = (ins
+    HAL_BufferView:$buffer_view,
+    StrAttr:$message,
+    HAL_ElementType:$element_type,
+    HAL_EncodingType:$encoding_type,
+    HAL_Shape:$shape
+  );
+  let results = (outs);
+
+  let assemblyFormat = [{
+    `<` $buffer_view `:` type($buffer_view) `>`
+    `message` `(` $message `)`
+    `shape` `(` `[` $shape `]` `)`
+    `type` `(` $element_type `)`
+    `encoding` `(` $encoding_type `)`
+    attr-dict-with-keyword
+  }];
+
+  // TODO(benvanik): fold away when we know some properties of the buffer view
+  // (such as when we create it ourselves earlier on) or we've already asserted.
 }
 
 def HAL_BufferViewBufferOp : HAL_PureOp<"buffer_view.buffer", [
@@ -1025,7 +839,7 @@ def HAL_CommandBufferFillBufferOp : HAL_Op<"command_buffer.fill_buffer"> {
     HAL_BufferType:$target_buffer,
     HAL_DeviceSize:$target_offset,
     HAL_DeviceSize:$length,
-    I32:$pattern
+    HAL_FillPatternType:$pattern
   );
 
   let assemblyFormat = [{
@@ -1274,209 +1088,6 @@ def HAL_CommandBufferDispatchIndirectOp : HAL_Op<"command_buffer.dispatch.indire
   }];
 }
 
-//===----------------------------------------------------------------------===//
-// Constant pooling
-//===----------------------------------------------------------------------===//
-
-// TODO(#7277): remove when switched to streams (happens there now).
-
-def HAL_ConstantPoolOp : HAL_Op<"constant_pool", [
-    IsolatedFromAbove,
-    SingleBlockImplicitTerminator<"IREE::HAL::ConstantPoolEndOp">,
-    Symbol,
-    SymbolTable,
-  ]> {
-  let summary = [{pool of constants with similar lifetimes}];
-  let description = [{
-    A pool of constants that share a similar lifetime and that should be stored
-    together both in the source files and at runtime. By logically grouping
-    constants by their frequency and locality of access we can reduce the number
-    of bindings required on hal.interface by sourcing constants from the same
-    buffer. We can also optimize module loading by mapping or DMA transferring
-    constant data (based on device).
-  }];
-
-  let arguments = (ins
-    OptionalAttr<StrAttr>:$sym_visibility,
-    SymbolNameAttr:$sym_name,
-    HAL_BufferConstraintsAttr:$buffer_constraints
-  );
-
-  let regions = (region SizedRegion<1>:$body);
-
-  let assemblyFormat = [{
-    custom<SymbolVisibility>($sym_visibility)
-    $sym_name
-    attr-dict-with-keyword
-    ``
-    regions
-  }];
-
-  let skipDefaultBuilders = 1;
-  let builders = [
-    OpBuilder<(ins
-      "StringRef":$name,
-      "BufferConstraintsAttr":$bufferConstraints
-    )>,
-  ];
-
-  let extraClassDeclaration = [{
-    Block& getBlock() { return body().front(); }
-  }];
-}
-
-def HAL_ConstantPoolEndOp : HAL_Op<"constant_pool_end", [
-    HasParent<"IREE::HAL::ConstantPoolOp">,
-    Terminator,
-  ]> {
-  let summary = [{terminator pseudo-op for the constant pool op}];
-  let assemblyFormat = "attr-dict-with-keyword";
-}
-
-def HAL_ConstantPoolValueOp : HAL_Op<"constant_pool.value", [
-    Symbol,
-    HasParent<"IREE::HAL::ConstantPoolOp">,
-  ]> {
-  let summary = [{constant value within a parent constant pool}];
-  let description = [{
-    Represents a constant value as part of a constant pool containing constants
-    with a similar lifetime.
-  }];
-
-  let arguments = (ins
-    OptionalAttr<StrAttr>:$sym_visibility,
-    SymbolNameAttr:$sym_name,
-    Util_AnySerializableAttr:$value
-  );
-
-  let assemblyFormat = [{
-    custom<SymbolVisibility>($sym_visibility)
-    $sym_name `=` $value attr-dict-with-keyword
-  }];
-
-  let builders = [
-    OpBuilder<(ins
-      "StringRef":$sym_name,
-      "::mlir::Attribute":$value
-    ), [{
-      build($_builder, $_state, nullptr, sym_name, value);
-    }]>
-  ];
-}
-
-def HAL_ConstantPoolSpanOp : HAL_Op<"constant_pool.span", [
-    Symbol,
-    HasParent<"IREE::HAL::ConstantPoolOp">,
-  ]> {
-  let summary = [{constant span within a parent storage block}];
-  let description = [{
-    Represents a constant stored within a hal.constant_pool. Provides a
-    symbol that can be used to reference the constant data as a stored range
-    within the module file.
-  }];
-
-  let arguments = (ins
-    OptionalAttr<StrAttr>:$sym_visibility,
-    SymbolNameAttr:$sym_name,
-    TypeAttr:$tensor_type,
-    SymbolRefAttr:$storage_buffer,
-    Util_ByteRangeAttr:$storage_range,
-    OptionalAttr<SymbolRefAttr>:$runtime_buffer,
-    OptionalAttr<Util_ByteRangeAttr>:$runtime_range
-  );
-
-  let assemblyFormat = [{
-    custom<SymbolVisibility>($sym_visibility)
-    $sym_name `:` $tensor_type
-    `=` $storage_buffer `[` $storage_range `]`
-    (`->` $runtime_buffer^ `[` $runtime_range `]`)?
-    attr-dict-with-keyword
-  }];
-
-  let builders = [
-    OpBuilder<(ins
-      "StringRef":$sym_name,
-      "::mlir::Type":$tensor_type,
-      "::mlir::FlatSymbolRefAttr":$storage_buffer,
-      "::mlir::iree_compiler::IREE::Util::ByteRangeAttr":$storage_range,
-      "::mlir::SymbolRefAttr":$runtime_buffer,
-      "::mlir::iree_compiler::IREE::Util::ByteRangeAttr":$runtime_range
-    ), [{
-      build($_builder, $_state, nullptr, sym_name, tensor_type, storage_buffer,
-            storage_range, runtime_buffer, runtime_range);
-    }]>
-  ];
-}
-
-def HAL_ConstantPoolSplatOp : HAL_Op<"constant_pool.splat", [
-    Symbol,
-    HasParent<"IREE::HAL::ConstantPoolOp">,
-  ]> {
-  let summary = [{constant splat within a parent storage block}];
-  let description = [{
-    Represents a splatted constant that has no representation in the storage
-    but must be represented at runtime as splatted 4-byte value.
-  }];
-
-  let arguments = (ins
-    OptionalAttr<StrAttr>:$sym_visibility,
-    SymbolNameAttr:$sym_name,
-    ElementsAttr:$value,
-    OptionalAttr<SymbolRefAttr>:$runtime_buffer,
-    OptionalAttr<Util_ByteRangeAttr>:$runtime_range
-  );
-
-  let assemblyFormat = [{
-    custom<SymbolVisibility>($sym_visibility)
-    $sym_name `=` $value
-    (`->` $runtime_buffer^ `[` $runtime_range `]`)?
-    attr-dict-with-keyword
-  }];
-
-  let builders = [
-    OpBuilder<(ins
-      "StringRef":$sym_name,
-      "::mlir::ElementsAttr":$value
-    ), [{
-      build($_builder, $_state, nullptr, sym_name, value, SymbolRefAttr{},
-            IREE::Util::ByteRangeAttr{});
-    }]>
-  ];
-}
-
-def HAL_ConstantPoolLoadOp : HAL_PureOp<"constant_pool.load", [
-    DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
-  ]> {
-  let summary = [{constant pool tensor load pseudo-op}];
-  let description = [{
-    Used during conversion to provide a placeholder for a globally cached and
-    possibly lazy-initialized compile-time constants. Will be replaced with a
-    direct variable access during transformation.
-  }];
-
-  let arguments = (ins
-    SymbolRefAttr:$constant
-  );
-  let results = (outs
-    TypeAlias<AnyRankedTensor>:$result
-  );
-
-  let assemblyFormat = [{
-    $constant `:` type($result) attr-dict-with-keyword
-  }];
-
-  let skipDefaultBuilders = 1;
-  let builders = [
-    OpBuilder<(ins "Type":$resultType, "SymbolRefAttr":$constant),
-    [{
-      $_state.addTypes({resultType});
-      $_state.addAttribute("constant", constant);
-    }]>,
-  ];
-
-  let hasCanonicalizer = 1;
-}
-
 def HAL_ConstantStorageOp : HAL_Op<"constant_storage", [
     Symbol,
   ]> {
@@ -1505,50 +1116,6 @@ def HAL_ConstantStorageOp : HAL_Op<"constant_storage", [
       build($_builder, $_state, nullptr, sym_name, value);
     }]>
   ];
-}
-
-def HAL_ConstantStorageLookupOp :
-    HAL_PureOp<"constant_storage.lookup", [
-      DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
-    ]> {
-  let summary = [{constant storage byte buffer accessor}];
-  let description = [{
-    Returns the read-only host byte buffer storing the constant data.
-  }];
-
-  let arguments = (ins
-    SymbolRefAttr:$constant
-  );
-  let results = (outs
-    ByteBufferType:$result
-  );
-
-  let assemblyFormat = [{
-    $constant `:` type($result) attr-dict-with-keyword
-  }];
-}
-
-def HAL_ConstantSubspanOp : HAL_PureOp<"constant.subspan", [
-    DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
-  ]> {
-  let summary = [{runtime constant buffer lookup pseudo-op}];
-  let description = [{
-    Used during conversion to resolve a runtime representation of a constant as
-    a tensor backed by a buffer range.
-  }];
-
-  let arguments = (ins
-    SymbolRefAttr:$runtime_buffer,
-    Util_ByteRangeAttr:$runtime_range
-  );
-  let results = (outs
-    AnyRankedTensor:$result
-  );
-
-  let assemblyFormat = [{
-    $runtime_buffer `[` $runtime_range `]` `:` type($result)
-    attr-dict-with-keyword
-  }];
 }
 
 //===----------------------------------------------------------------------===//
@@ -1847,6 +1414,53 @@ def HAL_DeviceQueryOp :
 // !hal.executable / iree_hal_executable_t
 //===----------------------------------------------------------------------===//
 
+def HAL_ExecutableSourceOp : HAL_Op<"executable.source", [
+    IsolatedFromAbove,
+    SingleBlockImplicitTerminator<"IREE::HAL::ExecutableSourceEndOp">,
+    Symbol,
+    SymbolTable,
+  ]> {
+  let summary = [{generic source contents of an executable op}];
+  let description = [{
+    This is an unspecialized source representation of an executable
+    module without an assigned target. This is useful for hand-authoring
+    executables prior to device specification.
+  }];
+
+  let arguments = (ins
+    OptionalAttr<StrAttr>:$sym_visibility,
+    SymbolNameAttr:$sym_name
+  );
+
+  let regions = (region SizedRegion<1>:$body);
+
+  let assemblyFormat = [{
+    custom<SymbolVisibility>($sym_visibility)
+    $sym_name
+    attr-dict-with-keyword
+    ``
+    regions
+  }];
+
+  let extraClassDeclaration = [{
+    Block& getBlock() { return body().front(); }
+
+    ::mlir::ModuleOp getInnerModule() {
+      auto moduleOps = getBlock().getOps<::mlir::ModuleOp>();
+      assert(!moduleOps.empty() && "source ops need inner modules");
+      return *moduleOps.begin();
+    }
+  }];
+}
+
+def HAL_ExecutableSourceEndOp : HAL_Op<"executable.source_end", [
+    HasParent<"IREE::HAL::ExecutableSourceOp">,
+    Terminator,
+  ]> {
+  let summary = [{terminator pseudo-op for the executable source op}];
+  let assemblyFormat = "attr-dict";
+}
+
 def HAL_ExecutableOp : HAL_Op<"executable", [
     IsolatedFromAbove,
     SingleBlockImplicitTerminator<"IREE::HAL::ExecutableEndOp">,
@@ -1871,7 +1485,6 @@ def HAL_ExecutableOp : HAL_Op<"executable", [
     custom<SymbolVisibility>($sym_visibility)
     $sym_name
     attr-dict-with-keyword
-    ``
     regions
   }];
 
@@ -1897,8 +1510,11 @@ def HAL_ExecutableEndOp : HAL_Op<"executable_end", [
 
 def HAL_ExecutableEntryPointOp : HAL_Op<"executable.entry_point", [
     Symbol,
-    HasParent<"IREE::HAL::ExecutableVariantOp">,
-    IsolatedFromAbove
+    ParentOneOf<[
+      "IREE::HAL::ExecutableSourceOp",
+      "IREE::HAL::ExecutableVariantOp",
+    ]>,
+    IsolatedFromAbove,
   ]> {
   let summary = [{executable entry point declaration}];
   let description = [{
@@ -1920,8 +1536,8 @@ def HAL_ExecutableEntryPointOp : HAL_Op<"executable.entry_point", [
   let arguments = (ins
     OptionalAttr<StrAttr>:$sym_visibility,
     SymbolNameAttr:$sym_name,
-    HAL_OrdinalAttr:$ordinal,
-    FlatSymbolRefAttr:$interface,
+    OptionalAttr<HAL_OrdinalAttr>:$ordinal,
+    HAL_ExecutableLayoutAttr:$layout,
     OptionalAttr<HAL_WorkgroupSizeAttr>:$workgroup_size,
     OptionalAttr<IndexAttr>:$workgroup_local_memory
   );
@@ -1930,34 +1546,24 @@ def HAL_ExecutableEntryPointOp : HAL_Op<"executable.entry_point", [
 
   let builders = [
     OpBuilder<(ins
-      "::llvm::StringRef":$sym_name,
-      "::llvm::APInt":$ordinal,
-      "::llvm::StringRef":$interface,
+      "::mlir::StringAttr":$sym_name,
+      "::mlir::IntegerAttr":$ordinal,
+      "IREE::HAL::ExecutableLayoutAttr":$layout,
       "::mlir::ArrayAttr":$workgroup_size,
       "::mlir::IntegerAttr":$workgroup_local_memory
     ), [{
-      build($_builder, $_state, nullptr, sym_name, ordinal, interface,
+      build($_builder, $_state, nullptr, sym_name, ordinal, layout,
             workgroup_size, workgroup_local_memory, 0);
     }]>,
     OpBuilder<(ins
       "::mlir::StringAttr":$sym_name,
       "::mlir::IntegerAttr":$ordinal,
-      "::mlir::FlatSymbolRefAttr":$interface,
-      "::mlir::ArrayAttr":$workgroup_size,
-      "::mlir::IntegerAttr":$workgroup_local_memory
-    ), [{
-      build($_builder, $_state, nullptr, sym_name, ordinal, interface,
-            workgroup_size, workgroup_local_memory, 0);
-    }]>,
-    OpBuilder<(ins
-      "::mlir::StringAttr":$sym_name,
-      "::mlir::IntegerAttr":$ordinal,
-      "::mlir::FlatSymbolRefAttr":$interface,
+      "IREE::HAL::ExecutableLayoutAttr":$layout,
       "::mlir::ArrayAttr":$workgroup_size,
       "::mlir::IntegerAttr":$workgroup_local_memory,
       "int":$workgroup_count_regionCount
     ), [{
-      build($_builder, $_state, nullptr, sym_name, ordinal, interface,
+      build($_builder, $_state, nullptr, sym_name, ordinal, layout,
             workgroup_size, workgroup_local_memory, workgroup_count_regionCount);
     }]>
   ];
@@ -2003,7 +1609,6 @@ def HAL_ExecutableVariantOp : HAL_Op<"executable.variant", [
     $sym_name
     `,` `target` `=` $target
     attr-dict-with-keyword
-    ``
     regions
   }];
 
@@ -2143,145 +1748,6 @@ def HAL_ExecutableLookupOp : HAL_PureOp<"executable.lookup", [
 // hal.interface
 //===----------------------------------------------------------------------===//
 
-def HAL_InterfaceOp : HAL_Op<"interface", [
-    IsolatedFromAbove,
-    // HasParent<"IREE::HAL::ExecutableOp">,
-    SingleBlockImplicitTerminator<"IREE::HAL::InterfaceEndOp">,
-    Symbol,
-    SymbolTable,
-  ]> {
-  let summary = [{executable IO interface description}];
-  let description = [{
-    Defines a set of IO bindings and associated information required for the
-    scheduler to correctly dispatch the executable. Multiple executable binaries
-    can share the same interface to reduce the amount of scheduling code
-    generated, or a single executable binary can expose entry points with
-    multiple different interfaces to allow for runtime selection based on
-    supported device capabilities.
-
-    The design is modeled on the Vulkan binding model, which uses one or more
-    descriptor sets containing one or more bindings as part of its API. By using
-    the same representation here we can get toll-free lowering on the Vulkan and
-    SPIR-V side, and for other backends that may have simpler models the cost is
-    negligable (just an extra indirection during dispatch). For more information
-    on the Vulkan binding model see the documentation (which contains GLSL,
-    SPIR-V, and Vulkan API examples that directly map to our use here):
-    https://vulkan.lunarg.com/doc/view/1.0.33.0/linux/vkspec.chunked/ch13s02.html
-
-    For background as to how multiple descriptor sets are used by the scheduler
-    see: https://developer.nvidia.com/vulkan-shader-resource-binding
-  }];
-
-  let arguments = (ins
-    OptionalAttr<StrAttr>:$sym_visibility,
-    SymbolNameAttr:$sym_name,
-    OptionalAttr<IndexAttr>:$push_constants
-  );
-
-  let regions = (region SizedRegion<1>:$body);
-
-  let assemblyFormat = [{
-    custom<SymbolVisibility>($sym_visibility)
-    $sym_name
-    attr-dict-with-keyword
-    ``
-    regions
-  }];
-
-  let skipDefaultBuilders = 1;
-  let builders = [
-    OpBuilder<(ins
-      "StringRef":$name,
-      CArg<"IntegerAttr", "{}">:$pushConstants
-    )>,
-  ];
-
-  let extraClassDeclaration = [{
-    Block& getBlock() { return body().front(); }
-
-    // TODO(benvanik): replace with a nested typed attr that works.
-    // Array of HAL_DescriptorSetLayoutBindingArrayAttr.
-    ArrayAttr getExecutableSetLayoutsAttr();
-
-    // Returns true if the all bindings in the interface match exactly those
-    // in |other| (including order).
-    bool isEquivalentTo(IREE::HAL::InterfaceOp other);
-
-    // Returns a hash for the interface, considering the push constant and
-    // all bindings.
-    llvm::hash_code getInterfaceHash();
-  }];
-}
-
-def HAL_InterfaceEndOp : HAL_Op<"interface_end", [
-    HasParent<"IREE::HAL::InterfaceOp">,
-    Terminator,
-  ]> {
-  let summary = [{terminator pseudo-op for the executable interface op}];
-  let assemblyFormat = "attr-dict";
-}
-
-def HAL_InterfaceBindingOp : HAL_Op<"interface.binding", [
-    HasParent<"IREE::HAL::InterfaceOp">,
-    Symbol,
-  ]> {
-  let summary = [{executable IO binding description}];
-  let description = [{
-    Defines an IO binding used to pass buffers into the executable for loads and
-    stores. These bindings will be mapped into descriptor sets by the scheduler
-    based on device support and usage within the command buffer.
-
-    Bindings are typeless and only indicate a resource that is made available to
-    executables. The types that can be loaded-from and stored-into the binding
-    buffers are provided to backends by way of the `hal.interface.load.*` and
-    `hal.interface.store.*` ops.
-
-    Bindings do not need to correlate 1:1 with entry point arguments/results and
-    in many cases will not. For example, the same binding may be used with
-    different offsets if the arguments were packed into a ringbuffer/arena by
-    the scheduler.
-  }];
-
-  let arguments = (ins
-    OptionalAttr<StrAttr>:$sym_visibility,
-    SymbolNameAttr:$sym_name,
-    IndexAttr:$set,
-    IndexAttr:$binding,
-    HAL_DescriptorTypeAttr:$type,
-    HAL_MemoryAccessBitfieldAttr:$access
-  );
-
-  // TODO(scotttodd): enable assemblyFormat after figuring out how to keep
-  //   quotes around "type" and "access". The custom printer uses stringify*
-  // let assemblyFormat = [{
-  //   custom<SymbolVisibility>($sym_visibility)
-  //   $sym_name
-  //   `,` `set` `` `=` `` $set
-  //   `,` `binding` `` `=` `` $binding
-  //   `,` `type` `` `=` `` $type
-  //   `,` `access` `` `=` `` $access
-  //   attr-dict-with-keyword
-  // }];
-
-  let builders = [
-    OpBuilder<(ins
-      "StringRef":$sym_name,
-      "::llvm::APInt":$set,
-      "::llvm::APInt":$binding,
-      "IREE::HAL::DescriptorType":$type,
-      "IREE::HAL::MemoryAccessBitfield":$access
-    ), [{
-      build($_builder, $_state, nullptr, sym_name, set, binding, type, access);
-    }]>
-  ];
-
-  let extraClassDeclaration = [{
-    /// Returns a hash for the descriptor, considering the set, binding,
-    /// type, and access.
-    llvm::hash_code getDescriptorHash();
-  }];
-}
-
 def HAL_InterfaceWorkgroupIDOp : HAL_PureOp<"interface.workgroup.id", [
     DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
   ]> {
@@ -2362,48 +1828,76 @@ def HAL_InterfaceWorkgroupSizeOp : HAL_PureOp<"interface.workgroup.size", [
   }];
 }
 
-def HAL_InterfaceLoadConstantOp : HAL_PureOp<"interface.load.constant"> {
+def HAL_InterfaceConstantLoadOp : HAL_PureOp<"interface.constant.load"> {
   let summary = [{loads a constant value from the interface constant block}];
   let description = [{
     Loads a scalar constant value from an executable IO push constant block.
     The value will be loaded from the given constant offset and will be
     bitcast (possibly with truncation or zero-extension) to the result type.
+
+    An optional alignment indicates the byte alignment of potential values for
+    the constant when it could be determined from analysis. If omitted the value
+    may be anything and its interpretation is up to the usage. This is intended
+    to provide pointer alignment-like semantics to constants that are used to
+    index into binding resources.
+
+    An optional set of values indicates all possible values that can be passed
+    to the constant from all dispatch sites in the program. If omitted the value
+    may be from an unanalyzable source (outside of the program, indirect, etc)
+    and must be assumed to have any value.
   }];
 
   let arguments = (ins
-    HAL_HostSizeAttr:$offset
+    HAL_HostSizeAttr:$index,
+    OptionalAttr<IndexAttr>:$alignment,
+    OptionalAttr<ArrayAttr>:$values
   );
   let results = (outs
     HAL_PrimitiveType:$result
   );
 
   let assemblyFormat = [{
-    `offset` `=` $offset attr-dict `:` type($result)
+    `` `[` $index `]`
+    (`alignment` `(` $alignment^ `)`)?
+    (`values` `(` $values^ `)`)?
+    attr-dict `:` type($result)
   }];
 }
 
 def HAL_InterfaceBindingSubspanOp : HAL_Op<"interface.binding.subspan", [
-    AttrSizedOperandSegments, MemoryEffects<[MemAlloc]>,
-    DeclareOpInterfaceMethods<Shape_ShapeCarryingOpInterface>,
+    AttrSizedOperandSegments,
+    MemoryEffects<[MemAlloc]>,
     Util_ShapeAwareOp,
   ]> {
   let summary = [{returns an alias to a subspan of interface binding data}];
   let description = [{
-    // TODO(benvanik): add description
+    Returns a subspan of an interface binding storage buffer in a generic type.
+    The exact shape, type, and alignment of the returned type are defined by
+    the result type (tensor, memref, etc).
+
+    An optional alignment indicates the byte alignment of the base binding
+    resource. Note that the byte offset is added to the base and the alignment
+    will be the minimum of the two.
   }];
 
   let arguments = (ins
-    SymbolRefAttr:$binding,
-    HAL_DeviceSize:$byte_offset,
-    Optional<HAL_DeviceSize>:$byte_length,
-    HAL_ShapeDynamicDims:$dynamic_dims
+    IndexAttr:$set,
+    IndexAttr:$binding,
+    HAL_DescriptorTypeAttr:$type,
+    Optional<HAL_DeviceSize>:$byte_offset,
+    HAL_ShapeDynamicDims:$dynamic_dims,
+    OptionalAttr<IndexAttr>:$alignment
   );
   let results = (outs
     Res<AnyType, "", [MemAlloc]>:$result
   );
 
   let assemblyFormat = [{
-    $binding `[` $byte_offset ( `,` $byte_length^ )? `]`
+    `set` `(` $set `)`
+    `binding` `(` $binding `)`
+    `type` `(` $type `)`
+    (`offset` `(` $byte_offset^ `)`)?
+    (`alignment` `(` $alignment^ `)`)?
     attr-dict `:` type($result) (`{` $dynamic_dims^ `}`)?
   }];
 
@@ -2413,9 +1907,11 @@ def HAL_InterfaceBindingSubspanOp : HAL_Op<"interface.binding.subspan", [
     ValueRange getOperandDynamicDims(unsigned idx) { return ValueRange{}; }
     ValueRange getResultDynamicDims(unsigned idx) { return dynamic_dims(); }
 
-    /// Returns the hal.interface.binding op associated with this op.
-    /// Returns null op if not found.
-    IREE::HAL::InterfaceBindingOp queryBindingOp();
+    // Attempts to calculate an alignment of the final subspan offset in the
+    // parent storage buffer. This is a combination of both the binding
+    // alignment and the byte offset and may be as small as the natural
+    // alignment of the element type being accessed.
+    llvm::Align calculateAlignment();
   }];
 }
 
@@ -2467,10 +1963,7 @@ def HAL_ExecutableLayoutLookupOp : HAL_PureOp<"executable_layout.lookup", [
 
   let arguments = (ins
     HAL_Device:$device,
-    OptionalAttr<IndexAttr>:$push_constants,
-    // TODO(benvanik): replace with a nested typed attr that works.
-    // Array of HAL_DescriptorSetLayoutBindingArrayAttr.
-    ArrayAttr:$set_layouts
+    HAL_ExecutableLayoutAttr:$layout
   );
   let results = (outs
     HAL_ExecutableLayout:$result
@@ -2478,8 +1971,7 @@ def HAL_ExecutableLayoutLookupOp : HAL_PureOp<"executable_layout.lookup", [
 
   let assemblyFormat = [{
     `device` `(` $device `:` type($device) `)`
-    (`push_constants` `(` $push_constants^ `)`)?
-    `layouts` `(` $set_layouts `)`
+    `layout` `(` $layout `)`
     `:` type($result)
     attr-dict-with-keyword
   }];
@@ -2577,8 +2069,6 @@ def HAL_SemaphoreFailOp : HAL_Op<"semaphore.fail"> {
   }];
 }
 
-// TODO(benvanik): rework this to make it a terminator with branch targets
-// for ^success and ^fail(status).
 def HAL_SemaphoreAwaitOp : HAL_Op<"semaphore.await", [YieldPoint]> {
   let summary = [{asynchronous semaphore wait operation}];
   let description = [{

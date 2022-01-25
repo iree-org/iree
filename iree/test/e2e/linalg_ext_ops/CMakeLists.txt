@@ -15,6 +15,7 @@ iree_check_single_backend_test_suite(
     check_cuda
   SRCS
     "reverse.mlir"
+    "scan.mlir"
   TARGET_BACKEND
     "cuda"
   DRIVER
@@ -29,22 +30,10 @@ iree_check_single_backend_test_suite(
 
 iree_check_single_backend_test_suite(
   NAME
-    check_dylib_embedded-llvm-aot_dylib
-  SRCS
-    "reverse.mlir"
-  TARGET_BACKEND
-    "dylib-llvm-aot"
-  DRIVER
-    "dylib"
-  COMPILER_FLAGS
-    "-iree-llvm-link-embedded=true"
-)
-
-iree_check_single_backend_test_suite(
-  NAME
     check_dylib-llvm-aot_dylib
   SRCS
     "reverse.mlir"
+    "scan.mlir"
   TARGET_BACKEND
     "dylib-llvm-aot"
   DRIVER
@@ -56,6 +45,7 @@ iree_check_single_backend_test_suite(
     check_vmvx_vmvx
   SRCS
     "reverse.mlir"
+    "scan.mlir"
   TARGET_BACKEND
     "vmvx"
   DRIVER

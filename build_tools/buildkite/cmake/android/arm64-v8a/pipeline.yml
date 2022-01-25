@@ -7,7 +7,8 @@
 steps:
   - label: "build"
     commands:
-      - "docker run --user=$(id -u):$(id -g) --volume=\\$PWD:\\$IREE_DOCKER_WORKDIR --workdir=\\$IREE_DOCKER_WORKDIR --rm gcr.io/iree-oss/cmake-android@sha256:0981a75325547d1bd5771290287cb8ef09181c4c127972d17132405394478ffb build_tools/kokoro/gcp_ubuntu/cmake/android/build.sh arm64-v8a"
+      - "git submodule sync && git submodule update --init --jobs 8 --depth 1"
+      - "docker run --user=$(id -u):$(id -g) --volume=\\$PWD:\\$IREE_DOCKER_WORKDIR --workdir=\\$IREE_DOCKER_WORKDIR --rm gcr.io/iree-oss/android@sha256:ffb02ab2a7c5ee7bb1bcae9fb08d0de70cdb3c42466a4951e48d9142cc9b8ca2 build_tools/cmake/build_android.sh arm64-v8a"
       - "tar --exclude='*.o' --exclude='*.a' -czvf build-artifacts.tgz build-android"
     agents:
       - "queue=build"
@@ -17,29 +18,16 @@ steps:
 
   - wait
 
-  - label: "test on Galaxy S20 (exynos-990, mali-g77)"
+  - label: "test on Pixel 6 (google-tensor, mali-g78)"
     commands:
+      - "git clean -fdx"
       - "buildkite-agent artifact download --step build build-artifacts.tgz ./"
       - "tar xzf build-artifacts.tgz"
       - "find build-android/ -name '*.cmake' -exec sed -i \"s!\\$IREE_DOCKER_WORKDIR/!\\$PWD/!g\" {} \\;"
       - "cd build-android/"
       - "ctest --timeout 900 --output-on-failure"
     agents:
-      - "android-soc=exynos-990"
-      - "queue=test-android"
-    env:
-      IREE_DOCKER_WORKDIR: "/usr/src/github/iree"
-    timeout_in_minutes: "15"
-
-  - label: "test on Galaxy S10 (exynos-9820, mali-g76)"
-    commands:
-      - "buildkite-agent artifact download --step build build-artifacts.tgz ./"
-      - "tar xzf build-artifacts.tgz"
-      - "find build-android/ -name '*.cmake' -exec sed -i \"s!\\$IREE_DOCKER_WORKDIR/!\\$PWD/!g\" {} \\;"
-      - "cd build-android/"
-      - "ctest --timeout 900 --output-on-failure"
-    agents:
-      - "android-soc=exynos-9820"
+      - "android-soc=google-tensor"
       - "queue=test-android"
     env:
       IREE_DOCKER_WORKDIR: "/usr/src/github/iree"
@@ -47,6 +35,7 @@ steps:
 
   - label: "test on Pixel 4 (snapdragon-855, adreno-640)"
     commands:
+      - "git clean -fdx"
       - "buildkite-agent artifact download --step build build-artifacts.tgz ./"
       - "tar xzf build-artifacts.tgz"
       - "find build-android/ -name '*.cmake' -exec sed -i \"s!\\$IREE_DOCKER_WORKDIR/!\\$PWD/!g\" {} \\;"

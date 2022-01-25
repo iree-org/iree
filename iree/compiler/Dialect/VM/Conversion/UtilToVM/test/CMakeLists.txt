@@ -14,13 +14,14 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
+    "alignment_ops.mlir"
     "byte_buffer_ops.mlir"
     "global_ops.mlir"
     "hint_ops.mlir"
     "list_ops.mlir"
     "status_ops.mlir"
-  DATA
-    iree::tools::IreeFileCheck
+  TOOLS
+    FileCheck
     iree::tools::iree-opt
 )
 

@@ -6,7 +6,7 @@
 
 #include "iree/compiler/Dialect/Flow/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
-#include "mlir/Dialect/Linalg/IR/LinalgOps.h"
+#include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/PatternMatch.h"
@@ -40,7 +40,7 @@ class ConvertBoolConstantPattern
     // Constant is never used, ignore.
     if (op.getResult().use_empty()) return failure();
 
-    DenseIntElementsAttr attr = op.value().dyn_cast<DenseIntElementsAttr>();
+    DenseIntElementsAttr attr = op.getValue().dyn_cast<DenseIntElementsAttr>();
     if (!attr) return failure();
 
     // Create a new ConstantOp that contains the same values as an int8.
@@ -103,7 +103,10 @@ class PromoteI1ToI8Pass : public PromoteI1ToI8Base<PromoteI1ToI8Pass> {
   void runOnOperation() override {
     OwningRewritePatternList patterns(&getContext());
     patterns.insert<ConvertBoolConstantPattern>(&getContext());
-    (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
+    if (failed(applyPatternsAndFoldGreedily(getOperation(),
+                                            std::move(patterns)))) {
+      return signalPassFailure();
+    }
   }
 };
 

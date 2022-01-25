@@ -5,7 +5,7 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 load("//iree:build_defs.oss.bzl", "iree_cmake_extra_content")
-load("//iree:lit_test.bzl", "iree_lit_test_suite")
+load("//build_tools/bazel:iree_lit_test.bzl", "iree_lit_test_suite")
 load("//build_tools/bazel:enforce_glob.bzl", "enforce_glob")
 
 package(
@@ -16,7 +16,7 @@ package(
 
 iree_cmake_extra_content(
     content = """
-if(NOT "${IREE_TARGET_BACKEND_VULKAN-SPIRV}")
+if(NOT "${IREE_TARGET_BACKEND_VULKAN_SPIRV}")
   return()
 endif()
 """,
@@ -30,8 +30,8 @@ iree_lit_test_suite(
         ],
         include = ["*.mlir"],
     ),
-    data = [
-        "//iree/tools:IreeFileCheck",
+    tools = [
         "//iree/tools:iree-opt",
+        "@llvm-project//llvm:FileCheck",
     ],
 )

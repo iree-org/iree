@@ -12,7 +12,7 @@ iree_add_all_subdirs()
 
 iree_check_single_backend_test_suite(
   NAME
-    check_cuda
+    check_cuda_graph
   SRCS
     "abs.mlir"
     "add.mlir"
@@ -34,6 +34,7 @@ iree_check_single_backend_test_suite(
     "dynamic_slice.mlir"
     "dynamic_update_slice.mlir"
     "exponential.mlir"
+    "exponential_fp16.mlir"
     "exponential_minus_one.mlir"
     "fft.mlir"
     "finite.mlir"
@@ -74,6 +75,8 @@ iree_check_single_backend_test_suite(
     "cuda"
   COMPILER_FLAGS
     "-iree-input-type=mhlo"
+  RUNNER_ARGS
+    "--cuda_use_streams=false"
   LABELS
     "noasan"
     "nomsan"
@@ -84,7 +87,7 @@ iree_check_single_backend_test_suite(
 
 iree_check_single_backend_test_suite(
   NAME
-    check_dylib_embedded-llvm-aot_dylib
+    check_cuda_streams
   SRCS
     "abs.mlir"
     "add.mlir"
@@ -106,6 +109,7 @@ iree_check_single_backend_test_suite(
     "dynamic_slice.mlir"
     "dynamic_update_slice.mlir"
     "exponential.mlir"
+    "exponential_fp16.mlir"
     "exponential_minus_one.mlir"
     "fft.mlir"
     "finite.mlir"
@@ -119,6 +123,7 @@ iree_check_single_backend_test_suite(
     "multiply.mlir"
     "negate.mlir"
     "pad.mlir"
+    "pow.mlir"
     "reduce.mlir"
     "reduce_window.mlir"
     "remainder.mlir"
@@ -140,12 +145,19 @@ iree_check_single_backend_test_suite(
     "transpose.mlir"
     "while.mlir"
   TARGET_BACKEND
-    "dylib-llvm-aot"
+    "cuda"
   DRIVER
-    "dylib"
+    "cuda"
   COMPILER_FLAGS
     "-iree-input-type=mhlo"
-    "-iree-llvm-link-embedded=true"
+  RUNNER_ARGS
+    "--cuda_use_streams=true"
+  LABELS
+    "noasan"
+    "nomsan"
+    "notsan"
+    "noubsan"
+    "requires-gpu-nvidia"
 )
 
 iree_check_single_backend_test_suite(
@@ -172,6 +184,7 @@ iree_check_single_backend_test_suite(
     "dynamic_slice.mlir"
     "dynamic_update_slice.mlir"
     "exponential.mlir"
+    "exponential_fp16.mlir"
     "exponential_minus_one.mlir"
     "fft.mlir"
     "finite.mlir"
@@ -257,9 +270,12 @@ iree_check_single_backend_test_suite(
     "reshape.mlir"
     "reverse.mlir"
     "rsqrt.mlir"
+    "scatter.mlir"
+    "scatter_dynamic.mlir"
     "select.mlir"
     "sine.mlir"
     "slice.mlir"
+    "sort.mlir"
     "sqrt.mlir"
     "subtract.mlir"
     "tanh.mlir"

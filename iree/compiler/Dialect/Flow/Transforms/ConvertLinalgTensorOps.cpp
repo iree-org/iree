@@ -9,10 +9,11 @@
 #include "iree/compiler/Dialect/Flow/IR/FlowTypes.h"
 #include "iree/compiler/Dialect/Flow/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
-#include "mlir/Dialect/Linalg/IR/LinalgOps.h"
+#include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/PatternMatch.h"
+#include "mlir/Interfaces/InferTypeOpInterface.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Support/LLVM.h"
@@ -51,7 +52,10 @@ struct LinalgTensorReshapeToFlowTensorReshape
       return failure();
     }
     SmallVector<SmallVector<Value>> outputShape;
-    if (failed(reshapeOp.reifyResultShapes(rewriter, outputShape))) {
+    ReifyRankedShapedTypeOpInterface reifyShapedTypeInterface =
+        cast<ReifyRankedShapedTypeOpInterface>(reshapeOp.getOperation());
+    if (failed(reifyShapedTypeInterface.reifyResultShapes(rewriter,
+                                                          outputShape))) {
       return failure();
     }
     SmallVector<Value> outputDynamicShapes;
@@ -102,7 +106,8 @@ struct ConvertSplatConstantOp : public OpRewritePattern<mlir::ConstantOp> {
     }
     auto tensorType = op.getType().cast<TensorType>();
     auto elementValue = rewriter.createOrFold<mlir::ConstantOp>(
-        op.getLoc(), tensorType.getElementType(), splatAttr.getSplatValue());
+        op.getLoc(), tensorType.getElementType(),
+        splatAttr.getSplatValue<Attribute>());
     rewriter.replaceOpWithNewOp<IREE::Flow::TensorSplatOp>(
         op, tensorType, elementValue, ValueRange{});
     return success();

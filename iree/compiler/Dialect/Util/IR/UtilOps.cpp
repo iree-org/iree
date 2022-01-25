@@ -6,7 +6,6 @@
 
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 
-#include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/SMLoc.h"
@@ -117,6 +116,33 @@ void printTypeOrAttr(OpAsmPrinter &p, Operation *op, TypeAttr type,
     p << "= ";
     p.printAttribute(attr);
   }
+}
+
+//===----------------------------------------------------------------------===//
+// custom<TypeAlias>($encoding_type, $storage_type)
+//===----------------------------------------------------------------------===//
+// tensor<4xf32>
+// tensor<4xf32> as tensor<2xf64>
+
+ParseResult parseTypeAlias(OpAsmParser &parser, TypeAttr &encodingTypeAttr,
+                           Type &storageType) {
+  Type encodingType;
+  if (failed(parser.parseType(encodingType))) return failure();
+  storageType = encodingType;
+  if (succeeded(parser.parseOptionalKeyword("as"))) {
+    if (failed(parser.parseType(storageType))) return failure();
+  }
+  encodingTypeAttr = TypeAttr::get(encodingType);
+  return success();
+}
+
+void printTypeAlias(OpAsmPrinter &p, Operation *op, TypeAttr encodingTypeAttr,
+                    Type storageType) {
+  if (encodingTypeAttr.getValue() != storageType) {
+    p.printType(encodingTypeAttr.getValue());
+    p << " as ";
+  }
+  p.printType(storageType);
 }
 
 //===----------------------------------------------------------------------===//
@@ -234,6 +260,13 @@ void printSizeAwareTypeList(OpAsmPrinter &p, Operation *op, TypeRange types0,
 
 ParseResult parseShapedTiedResult(
     OpAsmParser &parser, Type &resultType,
+    SmallVectorImpl<OpAsmParser::OperandType> &resultDims) {
+  ArrayAttr tiedOperands;
+  return parseShapedTiedResult(parser, resultType, resultDims, tiedOperands);
+}
+
+ParseResult parseShapedTiedResult(
+    OpAsmParser &parser, Type &resultType,
     SmallVectorImpl<OpAsmParser::OperandType> &resultDims,
     ArrayAttr &tiedOperands) {
   OpAsmParser::OperandType tiedResult;
@@ -270,7 +303,7 @@ ParseResult parseShapedTiedResult(
 }
 
 void printShapedTiedResult(OpAsmPrinter &p, Operation *op, Type resultType,
-                           ValueRange resultDims, ArrayAttr tiedOperands) {
+                           ValueRange resultDims) {
   auto tiedOp = cast<IREE::Util::TiedOpInterface>(op);
   auto tiedOperandIndex = tiedOp.getTiedResultOperandIndex(0);
   if (tiedOperandIndex.hasValue()) {
@@ -299,6 +332,11 @@ void printShapedTiedResult(OpAsmPrinter &p, Operation *op, Type resultType,
     p << "}";
     resultDims = resultDims.drop_front(1);
   }
+}
+
+void printShapedTiedResult(OpAsmPrinter &p, Operation *op, Type resultType,
+                           ValueRange resultDims, ArrayAttr tiedOperands) {
+  printShapedTiedResult(p, op, resultType, resultDims);
 }
 
 //===----------------------------------------------------------------------===//
@@ -625,6 +663,24 @@ void printUnfoldableConstantOp(OpAsmPrinter &p, Operation *op) {
 }
 
 //===----------------------------------------------------------------------===//
+// Numeric ops
+//===----------------------------------------------------------------------===//
+
+Optional<std::pair<int64_t, int64_t>>
+NumericOptionalNarrowOp::getIntegerRange() {
+  if (!min_value() || !max_value()) return {};
+  bool signExtend = isSigned();
+  // Note: Cannot sign extend 0 bit values.
+  int64_t minValue = signExtend && min_value()->getBitWidth() > 0
+                         ? min_value()->getSExtValue()
+                         : min_value()->getZExtValue();
+  int64_t maxValue = signExtend && max_value()->getBitWidth() > 0
+                         ? max_value()->getSExtValue()
+                         : max_value()->getZExtValue();
+  return std::make_pair(minValue, maxValue);
+}
+
+//===----------------------------------------------------------------------===//
 // Structural ops
 //===----------------------------------------------------------------------===//
 
@@ -652,6 +708,7 @@ static ParseResult parseInitializerOp(OpAsmParser &parser,
 
 static void printInitializerOp(OpAsmPrinter &p, InitializerOp &op) {
   p.printOptionalAttrDictWithKeyword(op->getAttrs(), /*elidedAttrs=*/{"type"});
+  p << " ";
   p.printRegion(op.body());
 }
 
@@ -730,6 +787,8 @@ IREE::Util::GlobalOp GlobalAddressOp::getGlobalOp() {
       getOperation()->getParentOp(), globalAttr());
 }
 
+FlatSymbolRefAttr GlobalAddressOp::getGlobalRefAttr() { return globalAttr(); }
+
 void GlobalAddressOp::getAsmResultNames(
     function_ref<void(Value, StringRef)> setNameFn) {
   setNameFn(result(), Twine("ptr_" + global()).str());
@@ -754,6 +813,8 @@ IREE::Util::GlobalOp GlobalLoadOp::getGlobalOp() {
   return SymbolTable::lookupNearestSymbolFrom<IREE::Util::GlobalOp>(
       getOperation()->getParentOp(), globalAttr());
 }
+
+FlatSymbolRefAttr GlobalLoadOp::getGlobalRefAttr() { return globalAttr(); }
 
 bool GlobalLoadOp::isGlobalImmutable() { return !getGlobalOp().is_mutable(); }
 
@@ -803,6 +864,8 @@ IREE::Util::GlobalOp GlobalStoreOp::getGlobalOp() {
   return SymbolTable::lookupNearestSymbolFrom<IREE::Util::GlobalOp>(
       getOperation()->getParentOp(), globalAttr());
 }
+
+FlatSymbolRefAttr GlobalStoreOp::getGlobalRefAttr() { return globalAttr(); }
 
 static LogicalResult verifyGlobalStoreOp(GlobalStoreOp op) {
   auto globalOp = op.getGlobalOp();

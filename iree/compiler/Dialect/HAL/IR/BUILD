@@ -27,12 +27,10 @@ td_library(
             "HALDialect.td",
             "HALInterfaces.td",
             "HALOps.td",
-            "LoweringConfig.td",
         ],
         include = ["*.td"],
     ),
     deps = [
-        "//iree/compiler/Dialect/Shape/IR:td_files",
         "//iree/compiler/Dialect/Util/IR:td_files",
         "@llvm-project//mlir:OpBaseTdFiles",
         "@llvm-project//mlir:StdOpsTdFiles",
@@ -46,14 +44,12 @@ cc_library(
         "HALOpFolders.cpp",
         "HALOps.cpp",
         "HALTypes.cpp",
-        "LoweringConfig.cpp",
     ],
     hdrs = [
         "HALDialect.h",
         "HALOps.h",
         "HALTraits.h",
         "HALTypes.h",
-        "LoweringConfig.h",
     ],
     textual_hdrs = [
         "HALAttrs.cpp.inc",
@@ -70,19 +66,12 @@ cc_library(
         "HALStructs.h.inc",
         "HALTypeInterfaces.cpp.inc",
         "HALTypeInterfaces.h.inc",
-        "LoweringConfig.h.inc",
-        "LoweringConfig.cpp.inc",
-        "LoweringConfigEnums.h.inc",
-        "LoweringConfigEnums.cpp.inc",
     ],
     deps = [
         ":HALInterfacesGen",
         ":HALOpsGen",
         ":HALStructsGen",
         ":HALTypesGen",
-        ":LoweringConfigEnumGen",
-        ":LoweringConfigGen",
-        "//iree/compiler/Dialect/Shape/IR",
         "//iree/compiler/Dialect/Util/IR",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:IR",
@@ -103,9 +92,7 @@ cc_library(
     deps = [
         ":IR",
         "//iree/compiler/Dialect/HAL:hal_imports",
-        "//iree/compiler/Dialect/HAL/Conversion/HALToHAL",
         "//iree/compiler/Dialect/HAL/Conversion/HALToVM",
-        "//iree/compiler/Dialect/Shape/IR",
         "//iree/compiler/Dialect/Util/IR",
         "//iree/compiler/Dialect/VM/Conversion",
         "@llvm-project//llvm:Support",
@@ -219,39 +206,5 @@ iree_tablegen_doc(
     ],
     tblgen = "@llvm-project//mlir:mlir-tblgen",
     td_file = "HALOps.td",
-    deps = [":td_files"],
-)
-
-gentbl_cc_library(
-    name = "LoweringConfigGen",
-    tbl_outs = [
-        (
-            ["-gen-struct-attr-decls"],
-            "LoweringConfig.h.inc",
-        ),
-        (
-            ["-gen-struct-attr-defs"],
-            "LoweringConfig.cpp.inc",
-        ),
-    ],
-    tblgen = "@llvm-project//mlir:mlir-tblgen",
-    td_file = "LoweringConfig.td",
-    deps = [":td_files"],
-)
-
-gentbl_cc_library(
-    name = "LoweringConfigEnumGen",
-    tbl_outs = [
-        (
-            ["-gen-enum-decls"],
-            "LoweringConfigEnums.h.inc",
-        ),
-        (
-            ["-gen-enum-defs"],
-            "LoweringConfigEnums.cpp.inc",
-        ),
-    ],
-    tblgen = "@llvm-project//mlir:mlir-tblgen",
-    td_file = "LoweringConfig.td",
     deps = [":td_files"],
 )

@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -pass-pipeline='test-iree-convert-std-to-vm' %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -pass-pipeline='test-iree-convert-std-to-vm' %s | FileCheck %s
 
 // -----
 // Checks literal specifics of structural transforms (more verbose checks
@@ -39,23 +39,4 @@ module @t003_unnamed_module {
 module {
 }
 
-}
-
-// -----
-
-// CHECK: module
-module {
-  // CHECK: module
-  module {
-    // CHECK: module
-    module {
-      // CHECK-LABEL: vm.module public @deeplyNested
-      module @deeplyNested {
-        // CHECK: vm.func private @foo
-        func @foo() {
-          return
-        }
-      }
-    }
-  }
 }

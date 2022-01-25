@@ -27,37 +27,81 @@ typedef struct iree_hal_heap_buffer_t {
 
 static const iree_hal_buffer_vtable_t iree_hal_heap_buffer_vtable;
 
-iree_status_t iree_hal_heap_buffer_create(
-    iree_hal_allocator_t* allocator,
-    iree_hal_heap_allocator_statistics_t* statistics,
-    iree_hal_memory_type_t memory_type, iree_hal_memory_access_t allowed_access,
-    iree_hal_buffer_usage_t allowed_usage, iree_device_size_t allocation_size,
-    iree_allocator_t host_allocator, iree_hal_buffer_t** out_buffer) {
-  IREE_ASSERT_ARGUMENT(allocator);
-  IREE_ASSERT_ARGUMENT(out_buffer);
-  IREE_TRACE_ZONE_BEGIN(z0);
+// Allocates a buffer with the metadata and storage split.
+// This results in an additional host allocation but allows for user-overridden
+// data storage allocations.
+static iree_status_t iree_hal_heap_buffer_allocate_split(
+    iree_device_size_t allocation_size, iree_allocator_t data_allocator,
+    iree_allocator_t host_allocator, iree_hal_heap_buffer_t** out_buffer,
+    iree_byte_span_t* out_data) {
+  // Try allocating the storage first as it's the most likely to fail if OOM.
+  out_data->data_length = allocation_size;
+  IREE_RETURN_IF_ERROR(iree_allocator_malloc(data_allocator, allocation_size,
+                                             (void**)&out_data->data));
 
+  // Allocate the host metadata wrapper.
+  iree_status_t status = iree_allocator_malloc(
+      host_allocator, sizeof(**out_buffer), (void**)out_buffer);
+  if (!iree_status_is_ok(status)) {
+    // Need to free the storage we just allocated.
+    iree_allocator_free(data_allocator, out_data->data);
+  }
+  return status;
+}
+
+// Allocates a buffer with the metadata as a prefix to the storage.
+// This results in a single allocation per buffer but requires that both the
+// metadata and storage live together.
+static iree_status_t iree_hal_heap_buffer_allocate_slab(
+    iree_device_size_t allocation_size, iree_allocator_t host_allocator,
+    iree_hal_heap_buffer_t** out_buffer, iree_byte_span_t* out_data) {
   // NOTE: we want the buffer data to always be 16-byte aligned.
   iree_hal_heap_buffer_t* buffer = NULL;
   iree_host_size_t header_size =
       iree_host_align(iree_sizeof_struct(*buffer), 16);
   iree_host_size_t total_size = header_size + allocation_size;
+  IREE_RETURN_IF_ERROR(
+      iree_allocator_malloc(host_allocator, total_size, (void**)&buffer));
+  *out_buffer = buffer;
+  *out_data =
+      iree_make_byte_span((uint8_t*)buffer + header_size, allocation_size);
+  return iree_ok_status();
+}
+
+iree_status_t iree_hal_heap_buffer_create(
+    iree_hal_allocator_t* allocator,
+    iree_hal_heap_allocator_statistics_t* statistics,
+    iree_hal_memory_type_t memory_type, iree_hal_memory_access_t allowed_access,
+    iree_hal_buffer_usage_t allowed_usage, iree_device_size_t allocation_size,
+    iree_allocator_t data_allocator, iree_allocator_t host_allocator,
+    iree_hal_buffer_t** out_buffer) {
+  IREE_ASSERT_ARGUMENT(allocator);
+  IREE_ASSERT_ARGUMENT(out_buffer);
+  IREE_TRACE_ZONE_BEGIN(z0);
+
+  // If the data and host allocators are the same we can allocate more
+  // efficiently as a large slab. Otherwise we need to allocate both the
+  // metadata and the storage independently.
+  bool same_allocator =
+      memcmp(&data_allocator, &host_allocator, sizeof(data_allocator)) == 0;
+
+  iree_hal_heap_buffer_t* buffer = NULL;
+  iree_byte_span_t data = iree_make_byte_span(NULL, 0);
   iree_status_t status =
-      iree_allocator_malloc(host_allocator, total_size, (void**)&buffer);
+      same_allocator
+          ? iree_hal_heap_buffer_allocate_slab(allocation_size, host_allocator,
+                                               &buffer, &data)
+          : iree_hal_heap_buffer_allocate_split(allocation_size, data_allocator,
+                                                host_allocator, &buffer, &data);
+
   if (iree_status_is_ok(status)) {
-    iree_hal_resource_initialize(&iree_hal_heap_buffer_vtable,
-                                 &buffer->base.resource);
-    buffer->base.allocator = allocator;
-    buffer->base.allocated_buffer = &buffer->base;
-    buffer->base.allocation_size = allocation_size;
-    buffer->base.byte_offset = 0;
-    buffer->base.byte_length = allocation_size;
-    buffer->base.memory_type = memory_type;
-    buffer->base.allowed_access = allowed_access;
-    buffer->base.allowed_usage = allowed_usage;
-    buffer->data =
-        iree_make_byte_span((uint8_t*)buffer + header_size, allocation_size);
-    buffer->data_allocator = iree_allocator_null();  // freed with the buffer
+    iree_hal_buffer_initialize(host_allocator, allocator, &buffer->base,
+                               allocation_size, 0, allocation_size, memory_type,
+                               allowed_access, allowed_usage,
+                               &iree_hal_heap_buffer_vtable, &buffer->base);
+    buffer->data = data;
+    buffer->data_allocator =
+        same_allocator ? iree_allocator_null() : data_allocator;
 
     IREE_STATISTICS({
       if (statistics != NULL) {
@@ -86,21 +130,16 @@ IREE_API_EXPORT iree_status_t iree_hal_heap_buffer_wrap(
   IREE_ASSERT_ARGUMENT(out_buffer);
   IREE_TRACE_ZONE_BEGIN(z0);
 
+  iree_allocator_t host_allocator =
+      iree_hal_allocator_host_allocator(allocator);
   iree_hal_heap_buffer_t* buffer = NULL;
   iree_status_t status =
-      iree_allocator_malloc(iree_hal_allocator_host_allocator(allocator),
-                            sizeof(*buffer), (void**)&buffer);
+      iree_allocator_malloc(host_allocator, sizeof(*buffer), (void**)&buffer);
   if (iree_status_is_ok(status)) {
-    iree_hal_resource_initialize(&iree_hal_heap_buffer_vtable,
-                                 &buffer->base.resource);
-    buffer->base.allocator = allocator;
-    buffer->base.allocated_buffer = &buffer->base;
-    buffer->base.allocation_size = allocation_size;
-    buffer->base.byte_offset = 0;
-    buffer->base.byte_length = data.data_length;
-    buffer->base.memory_type = memory_type;
-    buffer->base.allowed_access = allowed_access;
-    buffer->base.allowed_usage = allowed_usage;
+    iree_hal_buffer_initialize(host_allocator, allocator, &buffer->base,
+                               allocation_size, 0, data.data_length,
+                               memory_type, allowed_access, allowed_usage,
+                               &iree_hal_heap_buffer_vtable, &buffer->base);
     buffer->data = data;
     buffer->data_allocator = data_allocator;
     *out_buffer = &buffer->base;
@@ -112,8 +151,7 @@ IREE_API_EXPORT iree_status_t iree_hal_heap_buffer_wrap(
 
 static void iree_hal_heap_buffer_destroy(iree_hal_buffer_t* base_buffer) {
   iree_hal_heap_buffer_t* buffer = (iree_hal_heap_buffer_t*)base_buffer;
-  iree_allocator_t host_allocator =
-      iree_hal_allocator_host_allocator(iree_hal_buffer_allocator(base_buffer));
+  iree_allocator_t host_allocator = base_buffer->host_allocator;
   IREE_TRACE_ZONE_BEGIN(z0);
 
   IREE_STATISTICS({
@@ -136,9 +174,10 @@ static iree_status_t iree_hal_heap_buffer_map_range(
     iree_hal_buffer_t* base_buffer, iree_hal_mapping_mode_t mapping_mode,
     iree_hal_memory_access_t memory_access,
     iree_device_size_t local_byte_offset, iree_device_size_t local_byte_length,
-    void** out_data_ptr) {
+    iree_hal_buffer_mapping_t* mapping) {
   iree_hal_heap_buffer_t* buffer = (iree_hal_heap_buffer_t*)base_buffer;
-  *out_data_ptr = buffer->data.data + local_byte_offset;
+  mapping->contents = iree_make_byte_span(buffer->data.data + local_byte_offset,
+                                          local_byte_length);
 
   // If we mapped for discard scribble over the bytes. This is not a mandated
   // behavior but it will make debugging issues easier. Alternatively for
@@ -146,17 +185,18 @@ static iree_status_t iree_hal_heap_buffer_map_range(
   // would only work if the entire buffer was discarded.
 #ifndef NDEBUG
   if (iree_any_bit_set(memory_access, IREE_HAL_MEMORY_ACCESS_DISCARD)) {
-    memset(*out_data_ptr, 0xCD, local_byte_length);
+    memset(mapping->contents.data, 0xCD, local_byte_length);
   }
 #endif  // !NDEBUG
 
   return iree_ok_status();
 }
 
-static void iree_hal_heap_buffer_unmap_range(
+static iree_status_t iree_hal_heap_buffer_unmap_range(
     iree_hal_buffer_t* base_buffer, iree_device_size_t local_byte_offset,
-    iree_device_size_t local_byte_length, void* data_ptr) {
+    iree_device_size_t local_byte_length, iree_hal_buffer_mapping_t* mapping) {
   // No-op here as we always have the pointer.
+  return iree_ok_status();
 }
 
 static iree_status_t iree_hal_heap_buffer_invalidate_range(
@@ -174,6 +214,7 @@ static iree_status_t iree_hal_heap_buffer_flush_range(
 }
 
 static const iree_hal_buffer_vtable_t iree_hal_heap_buffer_vtable = {
+    .recycle = iree_hal_buffer_recycle,
     .destroy = iree_hal_heap_buffer_destroy,
     .map_range = iree_hal_heap_buffer_map_range,
     .unmap_range = iree_hal_heap_buffer_unmap_range,

@@ -34,6 +34,7 @@ cc_library(
     ],
     deps = [
         ":PassesIncGen",
+        "//iree/compiler/Codegen/Dialect:IREECodegenDialect",
         "//iree/compiler/Dialect/HAL/IR",
         "@llvm-project//mlir:LinalgTransforms",
         "@llvm-project//mlir:Pass",
@@ -50,8 +51,10 @@ cc_library(
         ":PassHeaders",
         ":PassesIncGen",
         "//iree/compiler/Codegen/Common",
+        "//iree/compiler/Codegen/Dialect:IREECodegenDialect",
         "//iree/compiler/Codegen/LLVMCPU",
         "//iree/compiler/Codegen/LLVMGPU",
         "//iree/compiler/Codegen/SPIRV",
+        "//iree/compiler/Codegen/Sandbox",
     ],
 )

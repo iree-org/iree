@@ -1,4 +1,4 @@
-// RUN: iree-opt -pass-pipeline='hal.executable(hal.executable.variant(builtin.module(builtin.func(iree-llvmgpu-distribute-shared-memory-copy))))' -cse %s | IreeFileCheck %s
+// RUN: iree-opt -pass-pipeline='hal.executable(hal.executable.variant(builtin.module(builtin.func(iree-llvmgpu-distribute-shared-memory-copy))))' -cse %s | FileCheck %s
 
 // CHECK-DAG: #[[$MAP0:.*]] = affine_map<()[s0, s1, s2] -> (s1 * 8 + s2 * 32 + s0 floordiv 4)>
 // CHECK-DAG: #[[$MAP1:.*]] = affine_map<()[s0] -> (s0 * 4 - (s0 floordiv 4) * 16)>
@@ -7,13 +7,18 @@
 // CHECK-DAG: #[[$MAP4:.*]] = affine_map<()[s0, s1, s2] -> (s0 + s1 * 32 + s2 * 128 + 128)>
 // CHECK-DAG: #[[$MAP5:.*]] = affine_map<()[s0, s1, s2] -> (s0 * 4 + s1 * 128 + s2 * 512)>
 
+#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>
+  ]>
+]>
 hal.executable private @shared_mem_cpy  {
-  hal.executable.variant @cuda, target = #hal.executable.target<"cuda", "cuda-nvptx-fb"> {
-    hal.executable.entry_point @shared_mem_cpy attributes {
-      interface = @io,
-      ordinal = 0 : index,
-      workgroup_size = [32: index, 4: index, 1:index]}
-    builtin.module  {
+  hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
+    hal.executable.entry_point @shared_mem_cpy layout(#executable_layout) attributes {
+      workgroup_size = [32: index, 4: index, 1:index]
+    }
+    builtin.module {
       memref.global "private" @__shared_memory___1 : memref<3x512xf32, 3>
       memref.global "private" @__shared_memory___0 : memref<256x4xf32, 3>
       memref.global "private" @__shared_memory__ : memref<64x16xf32, 3>
@@ -27,9 +32,9 @@ hal.executable private @shared_mem_cpy  {
     // CHECK-DAG: %[[C2:.*]] = arith.constant 2 : index
     // CHECK-DAG: %[[C1:.*]] = arith.constant 1 : index
     // CHECK-DAG: %[[C0:.*]] = arith.constant 0 : index
-    // CHECK-DAG: %[[TX:.*]] = "gpu.thread_id"() {dimension = "x"} : () -> index
-    // CHECK-DAG: %[[TY:.*]] = "gpu.thread_id"() {dimension = "y"} : () -> index
-    // CHECK-DAG: %[[TZ:.*]] = "gpu.thread_id"() {dimension = "z"} : () -> index
+    // CHECK-DAG: %[[TX:.*]] = gpu.thread_id x
+    // CHECK-DAG: %[[TY:.*]] = gpu.thread_id y
+    // CHECK-DAG: %[[TZ:.*]] = gpu.thread_id z
 
     // CHECK-DAG: %[[Y0:.*]] = affine.apply #[[$MAP0]]()[%[[TX]], %[[TY]], %[[TZ]]]
     // CHECK-DAG: %[[X0:.*]] = affine.apply #[[$MAP1]]()[%[[TX]]]

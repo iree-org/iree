@@ -7,5 +7,5 @@ sphinx_toolbox==2.15.0
 
 # IREE Python API
 -f https://github.com/google/iree/releases
-iree-compiler-snapshot
-iree-runtime-snapshot
+iree-compiler
+iree-runtime

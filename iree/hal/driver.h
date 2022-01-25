@@ -94,9 +94,6 @@ IREE_API_EXPORT iree_status_t iree_hal_driver_create_default_device(
 //===----------------------------------------------------------------------===//
 
 typedef struct iree_hal_driver_vtable_t {
-  // << HAL C porting in progress >>
-  IREE_API_UNSTABLE
-
   void(IREE_API_PTR* destroy)(iree_hal_driver_t* driver);
 
   iree_status_t(IREE_API_PTR* query_available_devices)(
@@ -109,6 +106,7 @@ typedef struct iree_hal_driver_vtable_t {
                                              iree_allocator_t allocator,
                                              iree_hal_device_t** out_device);
 } iree_hal_driver_vtable_t;
+IREE_HAL_ASSERT_VTABLE_LAYOUT(iree_hal_driver_vtable_t);
 
 IREE_API_EXPORT void iree_hal_driver_destroy(iree_hal_driver_t* driver);
 

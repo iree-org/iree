@@ -13,6 +13,7 @@ package(
 cc_library(
     name = "UtilToVM",
     srcs = [
+        "ConvertAlignmentOps.cpp",
         "ConvertGlobalOps.cpp",
         "ConvertListOps.cpp",
         "ConvertStatusOps.cpp",

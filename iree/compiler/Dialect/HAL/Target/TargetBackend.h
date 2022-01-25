@@ -14,7 +14,7 @@
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/HAL/Utils/DeviceSwitchBuilder.h"
-#include "iree/compiler/Dialect/HAL/Utils/TypeUtils.h"
+#include "iree/compiler/Utils/OptionUtils.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/StringRef.h"
 #include "mlir/IR/Dialect.h"
@@ -36,11 +36,9 @@ struct TargetOptions {
   // the best we can do is a coarse flag as to whether source maps should be
   // embedded, however we could be much better here on the TargetBackend
   // interface.
+  void bindOptions(OptionsBinder &binder);
+  using FromFlags = OptionsFromFlags<TargetOptions>;
 };
-
-// Returns a TargetOptions struct initialized with the
-// --iree-hal-target-* flags.
-TargetOptions getTargetOptionsFromFlags();
 
 // HAL executable target backend interface.
 // Multiple backends can be registered and targeted during a single compilation.
@@ -137,8 +135,7 @@ class TargetBackend {
   //       hal.interface.binding @arg1, set=0, binding=1, ...
   //     }
   //     hal.executable.variant @target, target="target-backend" {
-  //       hal.executable.entry_point @main attributes {
-  //         interface = @main_io,
+  //       hal.executable.entry_point @main interface(@main_io) {
   //         ordinal = 0 : index
   //       }
   //       module { ... }

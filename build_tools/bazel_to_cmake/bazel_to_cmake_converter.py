@@ -15,7 +15,7 @@ See bazel_to_cmake.py for usage.
 # pylint: disable=exec-used
 
 import itertools
-import textwrap
+import re
 
 import bazel_to_cmake_targets
 
@@ -237,7 +237,6 @@ class BuildFileFunctions(object):
     # Cross-package dependencies and complicated globs could be hard to handle.
 
     self._convert_unimplemented_function("filegroup", name)
-
 
   def sh_binary(self, name, **kwargs):
     self._convert_unimplemented_function("sh_binary", name)
@@ -509,15 +508,23 @@ class BuildFileFunctions(object):
                             f"{tblgen_block}"
                             f")\n\n")
 
-  def iree_lit_test_suite(self, name, srcs, data, tags=None, **kwargs):
+  def iree_lit_test_suite(self,
+                          name,
+                          srcs,
+                          tools=None,
+                          data=None,
+                          tags=None,
+                          **kwargs):
     name_block = _convert_string_arg_block("NAME", name, quote=False)
     srcs_block = _convert_srcs_block(srcs)
+    tools_block = _convert_target_list_block("TOOLS", tools)
     data_block = _convert_target_list_block("DATA", data)
     labels_block = _convert_string_list_block("LABELS", tags)
 
     self.converter.body += (f"iree_lit_test_suite(\n"
                             f"{name_block}"
                             f"{srcs_block}"
+                            f"{tools_block}"
                             f"{data_block}"
                             f"{labels_block}"
                             f")\n\n")
@@ -532,6 +539,7 @@ class BuildFileFunctions(object):
                                            runner_args=None,
                                            tags=None,
                                            opt_flags=None,
+                                           target_cpu_features=None,
                                            **kwargs):
     name_block = _convert_string_arg_block("NAME", name, quote=False)
     srcs_block = _convert_srcs_block(srcs)
@@ -543,6 +551,8 @@ class BuildFileFunctions(object):
     runner_args_block = _convert_string_list_block("RUNNER_ARGS", runner_args)
     labels_block = _convert_string_list_block("LABELS", tags)
     opt_flags_block = _convert_string_list_block("OPT_FLAGS", opt_flags)
+    target_cpu_features_block = _convert_string_arg_block(
+        "TARGET_CPU_FEATURES", target_cpu_features)
 
     self.converter.body += (f"iree_check_single_backend_test_suite(\n"
                             f"{name_block}"
@@ -553,6 +563,7 @@ class BuildFileFunctions(object):
                             f"{runner_args_block}"
                             f"{labels_block}"
                             f"{opt_flags_block}"
+                            f"{target_cpu_features_block}"
                             f")\n\n")
 
   def iree_check_test_suite(self,
@@ -563,6 +574,7 @@ class BuildFileFunctions(object):
                             runner_args=None,
                             tags=None,
                             opt_flags=None,
+                            target_cpu_features_variants=None,
                             **kwargs):
     target_backends = None
     drivers = None
@@ -580,6 +592,8 @@ class BuildFileFunctions(object):
     runner_args_block = _convert_string_list_block("RUNNER_ARGS", runner_args)
     labels_block = _convert_string_list_block("LABELS", tags)
     opt_flags_block = _convert_string_list_block("OPT_FLAGS", opt_flags)
+    target_cpu_features_variants_block = _convert_string_list_block(
+        "TARGET_CPU_FEATURES_VARIANTS", target_cpu_features_variants)
 
     self.converter.body += (f"iree_check_test_suite(\n"
                             f"{name_block}"
@@ -590,6 +604,7 @@ class BuildFileFunctions(object):
                             f"{runner_args_block}"
                             f"{labels_block}"
                             f"{opt_flags_block}"
+                            f"{target_cpu_features_variants_block}"
                             f")\n\n")
 
   def iree_generated_trace_runner_test(self,
@@ -603,6 +618,7 @@ class BuildFileFunctions(object):
                                        tags=None,
                                        opt_tool=None,
                                        opt_flags=None,
+                                       target_cpu_features_variants=None,
                                        **kwargs):
     target_backends = None
     drivers = None
@@ -611,8 +627,11 @@ class BuildFileFunctions(object):
       drivers = [it[1] for it in target_backends_and_drivers]
 
     name_block = _convert_string_arg_block("NAME", name, quote=False)
+    # For now we assume that the generator target is a py_binary with a single
+    # source .py file named like it.
+    generator_py = f"{generator.split(':')[-1]}.py"
     generator_block = _convert_string_arg_block("GENERATOR",
-                                                generator,
+                                                generator_py,
                                                 quote=True)
     generator_args_block = _convert_string_list_block("GENERATOR_ARGS",
                                                       generator_args)
@@ -625,6 +644,8 @@ class BuildFileFunctions(object):
     runner_args_block = _convert_string_list_block("RUNNER_ARGS", runner_args)
     labels_block = _convert_string_list_block("LABELS", tags)
     opt_flags_block = _convert_string_list_block("OPT_FLAGS", opt_flags)
+    target_cpu_features_variants_block = _convert_string_list_block(
+        "TARGET_CPU_FEATURES_VARIANTS", target_cpu_features_variants)
 
     self.converter.body += (f"iree_generated_trace_runner_test(\n"
                             f"{name_block}"
@@ -637,6 +658,7 @@ class BuildFileFunctions(object):
                             f"{runner_args_block}"
                             f"{labels_block}"
                             f"{opt_flags_block}"
+                            f"{target_cpu_features_variants_block}"
                             f")\n\n")
 
   def iree_e2e_cartesian_product_test_suite(self,
@@ -697,17 +719,16 @@ class BuildFileFunctions(object):
                             f"{labels_block}"
                             f")\n\n")
 
-  def run_binary_test(self, name, test_binary, args=None, data=None, tags=None):
+  def native_test(self, name, src, args=None, data=None, tags=None):
     if data is not None:
-      self._convert_unimplemented_function("iree_run_binary_test",
-                                           name + " has data")
+      self._convert_unimplemented_function("native_test", name + " has data")
 
     name_block = _convert_string_arg_block("NAME", name)
-    test_binary_block = _convert_single_target_block("TEST_BINARY", test_binary)
+    test_binary_block = _convert_single_target_block("SRC", src)
     args_block = _convert_string_list_block("ARGS", args)
     labels_block = _convert_string_list_block("LABELS", tags)
 
-    self.converter.body += (f"iree_run_binary_test(\n"
+    self.converter.body += (f"iree_native_test(\n"
                             f"{name_block}"
                             f"{args_block}"
                             f"{test_binary_block}"

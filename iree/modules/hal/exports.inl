@@ -28,12 +28,13 @@ EXPORT_FN("allocator.allocate", iree_hal_module_allocator_allocate, riii, r)
 EXPORT_FN("allocator.map.byte_buffer", iree_hal_module_allocator_map_byte_buffer, riiirii, r)
 EXPORT_FN("allocator.wrap.byte_buffer", iree_hal_module_allocator_wrap_byte_buffer, riirii, r)
 
-EXPORT_FN("buffer.allocator", iree_hal_module_buffer_allocator, r, r)
+EXPORT_FN("buffer.assert", iree_hal_module_buffer_assert, rrriii, v)
 EXPORT_FN("buffer.length", iree_hal_module_buffer_length, r, i)
 EXPORT_FN("buffer.load", iree_hal_module_buffer_load, rii, i)
 EXPORT_FN("buffer.store", iree_hal_module_buffer_store, irii, v)
 EXPORT_FN("buffer.subspan", iree_hal_module_buffer_subspan, rii, r)
 
+EXPORT_FN("buffer_view.assert", iree_hal_module_buffer_view_assert, rriiCiD, v)
 EXPORT_FN("buffer_view.buffer", iree_hal_module_buffer_view_buffer, r, r)
 EXPORT_FN("buffer_view.byte_length", iree_hal_module_buffer_view_byte_length, r, i)
 EXPORT_FN("buffer_view.create", iree_hal_module_buffer_view_create, riiCiD, r)
@@ -53,13 +54,13 @@ EXPORT_FN("command_buffer.dispatch.indirect", iree_hal_module_command_buffer_dis
 EXPORT_FN("command_buffer.end", iree_hal_module_command_buffer_end, r, v)
 EXPORT_FN("command_buffer.end_debug_group", iree_hal_module_command_buffer_end_debug_group, r, v)
 EXPORT_FN("command_buffer.execution_barrier", iree_hal_module_command_buffer_execution_barrier, riii, v)
-EXPORT_FN("command_buffer.fill_buffer", iree_hal_module_command_buffer_fill_buffer, rriii, v)
+EXPORT_FN("command_buffer.fill_buffer", iree_hal_module_command_buffer_fill_buffer, rriiii, v)
 EXPORT_FN("command_buffer.push_constants", iree_hal_module_command_buffer_push_constants, rriCiD, v)
 EXPORT_FN("command_buffer.push_descriptor_set", iree_hal_module_command_buffer_push_descriptor_set, rriCiriiD, v)
 
 EXPORT_FN("descriptor_set.create", iree_hal_module_descriptor_set_create, rrCiriiD, r)
 
-EXPORT_FN("descriptor_set_layout.create", iree_hal_module_descriptor_set_layout_create, riCiiiD, r)
+EXPORT_FN("descriptor_set_layout.create", iree_hal_module_descriptor_set_layout_create, riCiiD, r)
 
 EXPORT_FN("device.allocator", iree_hal_module_device_allocator, r, r)
 EXPORT_FN("device.query.i32", iree_hal_module_device_query_i32, rrr, ii)

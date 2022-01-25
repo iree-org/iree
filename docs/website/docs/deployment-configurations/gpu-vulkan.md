@@ -84,9 +84,8 @@ platforms.
 
 <!-- TODO(??): a way to verify Vulkan is compiled in and supported -->
 
-If you want to explicitly specify HAL drivers to support, you will need to add
-`Vulkan` to the `IREE_HAL_DRIVERS_TO_BUILD` CMake list variable when
-configuring (for target).
+Ensure that the `IREE_HAL_DRIVER_VULKAN` CMake option is `ON` when configuring
+for the target.
 
 ### Get compiler for SPIR-V exchange format
 
@@ -97,15 +96,12 @@ binary exchange format, which the model must be compiled into.
 
 #### Download as Python package
 
-Python packages for various IREE functionalities are regularly published on
-IREE's [GitHub Releases][iree-releases] page.  Right now these are just
-snapshots of the `main` development branch.
-
-You can install the Python package containing the SPIR-V compiler by
+Python packages for various IREE functionalities are regularly published
+to [PyPI][pypi]. See the [Python Bindings][python-bindings] page for more
+details. The core `iree-compiler` package includes the SPIR-V compiler:
 
 ``` shell
-python -m pip install iree-compiler-snapshot \
-    -f https://github.com/google/iree/releases
+python -m pip install iree-compiler
 ```
 
 !!! tip
@@ -120,9 +116,8 @@ to build IREE for Linux/Windows and the [Android cross-compilation][android-cc]
 page for Android. The SPIR-V compiler backend is compiled in by default on all
 platforms.
 
-If you want to explicitly specify HAL drivers to support, you will need to add
-`Vulkan-SPIRV` to the `IREE_TARGET_BACKENDS_TO_BUILD` CMake list variable when
-configuring (for host).
+Ensure that the `IREE_TARGET_BACKEND_VULKAN_SPIRV` CMake option is `ON` when
+configuring for the host.
 
 ## Compile and run the model
 
@@ -203,8 +198,9 @@ limits, etc. So the target triple is just an approximation for usage.
 
 [android-cc]: ../building-from-source/android.md
 [get-started]: ../building-from-source/getting-started.md
-[iree-releases]: https://github.com/google/iree/releases/
 [mlir]: https://mlir.llvm.org/
+[pypi]: https://pypi.org/user/google-iree-pypi-deploy/
+[python-bindings]: ../bindings/python.md
 [spirv]: https://www.khronos.org/registry/spir-v/
 [tf-hub-mobilenetv2]: https://tfhub.dev/google/tf2-preview/mobilenet_v2/classification
 [tf-import]: ../ml-frameworks/tensorflow.md

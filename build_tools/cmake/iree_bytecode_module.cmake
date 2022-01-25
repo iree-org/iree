@@ -25,8 +25,8 @@ include(CMakeParseArguments)
 #    -DIREE_BUILD_TESTS=ON to CMake.
 #
 # Note:
-# By default, iree_bytecode_module will create a library named ${NAME}_cc,
-# and alias target iree::${NAME}_cc. The iree:: form should always be used.
+# By default, iree_bytecode_module will create a library named ${NAME}_c,
+# and alias target iree::${NAME}_c. The iree:: form should always be used.
 # This is to reduce namespace pollution.
 function(iree_bytecode_module)
   cmake_parse_arguments(

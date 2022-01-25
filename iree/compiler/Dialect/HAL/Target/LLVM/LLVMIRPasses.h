@@ -30,7 +30,9 @@ LogicalResult runLLVMIRPasses(const LLVMTargetOptions &options,
 
 // Emits compiled module obj for the target machine.
 LogicalResult runEmitObjFilePasses(llvm::TargetMachine *machine,
-                                   llvm::Module *module, std::string *objData);
+                                   llvm::Module *module,
+                                   llvm::CodeGenFileType fileType,
+                                   std::string *objData);
 
 }  // namespace HAL
 }  // namespace IREE

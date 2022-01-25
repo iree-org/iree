@@ -13,18 +13,17 @@
 
 #include <algorithm>
 
+#include "iree/compiler/Codegen/Dialect/LoweringConfig.h"
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Codegen/SPIRV/KernelConfig.h"
 #include "iree/compiler/Codegen/SPIRV/Utils.h"
-#include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
-#include "iree/compiler/Dialect/HAL/IR/LoweringConfig.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
 #include "mlir/Dialect/GPU/GPUDialect.h"
-#include "mlir/Dialect/Linalg/IR/LinalgOps.h"
+#include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/Hoisting.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/SPIRV/IR/TargetAndABI.h"
@@ -134,13 +133,10 @@ static void populateTilingToSubgroupPatterns(ArrayRef<int64_t> subgroupCounts,
           .setDistributionOptions(distributionOptions);
 
   auto filter = linalg::LinalgTransformationFilter(
-      {Identifier::get(getWorkgroupMarker(), context)},
-      Identifier::get(getVectorizeMarker(), context));
-
-  patterns.insert<linalg::LinalgTilingPattern<linalg::FillOp>,
-                  linalg::LinalgTilingPattern<linalg::MatmulOp>,
-                  linalg::LinalgTilingPattern<linalg::GenericOp>>(
-      context, tilingOptions, filter);
+      ArrayRef<StringAttr>{}, StringAttr::get(context, getVectorizeMarker()));
+  linalg::TilingPatterns<linalg::FillOp, linalg::MatmulOp,
+                         linalg::GenericOp>::insert(patterns, tilingOptions,
+                                                    filter);
 }
 
 //===----------------------------------------------------------------------===//
@@ -150,11 +146,15 @@ static void populateTilingToSubgroupPatterns(ArrayRef<int64_t> subgroupCounts,
 /// Adds patterns to vectorize Linalg ops with vectorization markers.
 void populateVectorizationPatterns(MLIRContext *context,
                                    RewritePatternSet &patterns) {
-  linalg::insertVectorizationPatterns<linalg::ContractionOpInterface,
-                                      linalg::FillOp, linalg::GenericOp>(
-      patterns, linalg::LinalgVectorizationOptions(),
-      linalg::LinalgTransformationFilter(
-          Identifier::get(getVectorizeMarker(), context)));
+  linalg::LinalgVectorizationOptions opt;
+  linalg::LinalgTransformationFilter f(
+      StringAttr::get(context, getVectorizeMarker()));
+  linalg::VectorizationPatterns<linalg::FillOp, linalg::GenericOp>::insert(
+      patterns, opt, f);
+  patterns.add<linalg::LinalgVectorizationPattern>(
+      context, f.addOpFilter<linalg::ContractionOpInterface>(), opt);
+  vector::populateVectorTransferPermutationMapLoweringPatterns(patterns);
+  vector::populateVectorReductionToContractPatterns(patterns);
 }
 
 /// Returns vector shape matching native cooperative op sizes for unrolling
@@ -306,14 +306,18 @@ class SPIRVTileAndVectorizeToCooperativeOpsPass final
     {
       RewritePatternSet subgroupTilingPatterns(context);
       populateTilingToSubgroupPatterns(subgroupCounts, subgroupTilingPatterns);
-      (void)applyPatternsAndFoldGreedily(funcOp,
-                                         std::move(subgroupTilingPatterns));
+      if (failed(applyPatternsAndFoldGreedily(
+              funcOp, std::move(subgroupTilingPatterns)))) {
+        return signalPassFailure();
+      }
 
       RewritePatternSet canonicalizationPatterns =
           linalg::getLinalgTilingCanonicalizationPatterns(context);
-      populateAffineMinCanonicalizationPattern(canonicalizationPatterns);
-      (void)applyPatternsAndFoldGreedily(funcOp,
-                                         std::move(canonicalizationPatterns));
+      populateFoldAffineMinInDistributedLoopsPatterns(canonicalizationPatterns);
+      if (failed(applyPatternsAndFoldGreedily(
+              funcOp, std::move(canonicalizationPatterns)))) {
+        return signalPassFailure();
+      }
     }
 
     LLVM_DEBUG({
@@ -327,14 +331,18 @@ class SPIRVTileAndVectorizeToCooperativeOpsPass final
     {
       RewritePatternSet vectorizationPatterns(context);
       populateVectorizationPatterns(context, vectorizationPatterns);
-      (void)applyPatternsAndFoldGreedily(funcOp,
-                                         std::move(vectorizationPatterns));
+      if (failed(applyPatternsAndFoldGreedily(
+              funcOp, std::move(vectorizationPatterns)))) {
+        return signalPassFailure();
+      }
 
       RewritePatternSet canonicalizationPatterns(context);
       vector::ContractionOp::getCanonicalizationPatterns(
           canonicalizationPatterns, context);
-      (void)applyPatternsAndFoldGreedily(funcOp,
-                                         std::move(canonicalizationPatterns));
+      if (failed(applyPatternsAndFoldGreedily(
+              funcOp, std::move(canonicalizationPatterns)))) {
+        return signalPassFailure();
+      }
     }
 
     LLVM_DEBUG({
@@ -346,8 +354,10 @@ class SPIRVTileAndVectorizeToCooperativeOpsPass final
     {
       RewritePatternSet vectorUnrollPatterns(context);
       populateVectorUnrollPatterns(cooperativeOpSize, vectorUnrollPatterns);
-      (void)applyPatternsAndFoldGreedily(funcOp,
-                                         std::move(vectorUnrollPatterns));
+      if (failed(applyPatternsAndFoldGreedily(
+              funcOp, std::move(vectorUnrollPatterns)))) {
+        return signalPassFailure();
+      }
     }
 
     LLVM_DEBUG({
@@ -370,8 +380,10 @@ class SPIRVTileAndVectorizeToCooperativeOpsPass final
       RewritePatternSet canonicalizationPatterns(context);
       vector::populateVectorTransferPermutationMapLoweringPatterns(
           canonicalizationPatterns);
-      (void)applyPatternsAndFoldGreedily(funcOp,
-                                         std::move(canonicalizationPatterns));
+      if (failed(applyPatternsAndFoldGreedily(
+              funcOp, std::move(canonicalizationPatterns)))) {
+        return signalPassFailure();
+      }
     }
 
     LLVM_DEBUG({
@@ -385,8 +397,10 @@ class SPIRVTileAndVectorizeToCooperativeOpsPass final
     // converted to cooperative matrix matmul op.
     RewritePatternSet combineTransposePatterns(context);
     combineTransposePatterns.add<CombineContractTranspose>(context);
-    (void)applyPatternsAndFoldGreedily(funcOp,
-                                       std::move(combineTransposePatterns));
+    if (failed(applyPatternsAndFoldGreedily(
+            funcOp, std::move(combineTransposePatterns)))) {
+      return signalPassFailure();
+    }
 
     LLVM_DEBUG({
       llvm::dbgs() << "--- After handling transposes ---\n";

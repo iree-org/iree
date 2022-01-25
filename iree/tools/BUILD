@@ -13,10 +13,6 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
-exports_files([
-    "run_lit.sh",
-])
-
 cc_binary(
     name = "iree-benchmark-module",
     srcs = ["iree-benchmark-module-main.cc"],
@@ -100,18 +96,17 @@ cc_library(
     deps = [
         "//iree/compiler/Bindings/Native/Transforms",
         "//iree/compiler/Bindings/TFLite/Transforms",
+        "//iree/compiler/Codegen/Dialect:IREECodegenDialect",
+        "//iree/compiler/Codegen/Interfaces",
+        "//iree/compiler/ConstEval",
         "//iree/compiler/Dialect/Flow/IR",
         "//iree/compiler/Dialect/Flow/Transforms",
         "//iree/compiler/Dialect/HAL/IR:HALDialect",
         "//iree/compiler/Dialect/HAL/Transforms",
-        "//iree/compiler/Dialect/LinalgExt/IR",
-        "//iree/compiler/Dialect/LinalgExt/IR:TiledOpInterface",
-        "//iree/compiler/Dialect/LinalgExt/Transforms",
         "//iree/compiler/Dialect/Modules/VMVX/IR:VMVXDialect",
         "//iree/compiler/Dialect/Modules/VMVX/Transforms",
-        "//iree/compiler/Dialect/Shape/IR",
-        "//iree/compiler/Dialect/Shape/Transforms",
         "//iree/compiler/Dialect/Stream/IR",
+        "//iree/compiler/Dialect/Stream/Transforms",
         "//iree/compiler/Dialect/Util/IR",
         "//iree/compiler/Dialect/Util/Transforms",
         "//iree/compiler/Dialect/VM/Analysis",
@@ -121,8 +116,11 @@ cc_library(
         "//iree/compiler/InputConversion/Common",
         "//iree/compiler/InputConversion/MHLO",
         "//iree/compiler/InputConversion/TOSA",
+        "//iree/compiler/Translation:HALExecutable",
         "//iree/compiler/Translation:IREEVM",
-        "//llvm-external-projects/iree-dialects:IREEDialect",
+        "//llvm-external-projects/iree-dialects:IREEInputDialect",
+        "//llvm-external-projects/iree-dialects:IREELinalgExtDialect",
+        "//llvm-external-projects/iree-dialects:IREELinalgExtTransforms",
         "//llvm-external-projects/iree-dialects:IREEPyDMDialect",
         "@llvm-project//mlir:IR",
     ],
@@ -137,6 +135,7 @@ cc_library(
     deps = [
         "@llvm-project//mlir:Affine",
         "@llvm-project//mlir:AffineTransforms",
+        "@llvm-project//mlir:BufferizationDialect",
         "@llvm-project//mlir:ConversionPasses",
         "@llvm-project//mlir:GPUDialect",
         "@llvm-project//mlir:GPUToSPIRV",
@@ -159,6 +158,7 @@ cc_library(
         "@llvm-project//mlir:Shape",
         "@llvm-project//mlir:StandardOps",
         "@llvm-project//mlir:StandardToSPIRV",
+        "@llvm-project//mlir:TensorInferTypeOpInterfaceImpl",
         "@llvm-project//mlir:Transforms",
         "@llvm-project//mlir:VectorOps",
     ],
@@ -216,6 +216,7 @@ cc_library(
         "init_translations.h",
     ],
     deps = [
+        "//iree/compiler/Translation:HALExecutable",
         "//iree/compiler/Translation:IREEVM",
         "@llvm-project//mlir:SPIRVTranslateRegistration",
     ],
@@ -335,6 +336,25 @@ cc_binary(
 )
 
 cc_binary(
+    name = "iree-e2e-matmul-test",
+    srcs = ["iree-e2e-matmul-test.c"],
+    deps = [
+        "//iree/base",
+        "//iree/base:core_headers",
+        "//iree/base:tracing",
+        "//iree/base/internal:file_path",
+        "//iree/base/internal:flags",
+        "//iree/hal",
+        "//iree/hal/drivers",
+        "//iree/modules/hal",
+        "//iree/tools/utils:trace_replay",
+        "//iree/tools/utils:yaml_util",
+        "//iree/vm",
+        "@com_github_yaml_libyaml//:yaml",
+    ],
+)
+
+cc_binary(
     name = "iree-tblgen",
     srcs = [
         "//iree/compiler/Dialect/Util/Tools:GenSrcs",
@@ -366,6 +386,7 @@ cc_library(
         "//iree/compiler/Codegen",
         "//iree/compiler/Dialect/VM/Target:init_targets",
         "//iree/compiler/Dialect/VM/Target/Bytecode",
+        "//iree/compiler/Translation:HALExecutable",
         "//iree/compiler/Translation:IREEVM",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:IR",
@@ -385,12 +406,4 @@ cc_binary(
     deps = [
         ":iree_translate_lib",
     ],
-)
-
-sh_binary(
-    name = "IreeFileCheck",
-    testonly = True,
-    srcs = ["IreeFileCheck.sh"],
-    data = ["@llvm-project//llvm:FileCheck"],
-    tags = ["hostonly"],
 )

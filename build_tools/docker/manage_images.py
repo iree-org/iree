@@ -43,27 +43,16 @@ DOCKER_DIR = 'build_tools/docker/'.replace('/', os.sep)
 # Map from image names to images that they depend on.
 IMAGES_TO_DEPENDENCIES = {
     'base': [],
-    'bazel': ['base', 'util'],
-    'cmake': ['base', 'util'],
-    'cmake-android': ['cmake', 'util'],
-    'cmake-emscripten': ['cmake'],
-    'cmake-gcc': ['cmake'],
-    'cmake-vulkan': ['cmake', 'vulkan'],
-    'cmake-swiftshader': ['cmake-vulkan', 'swiftshader'],
-    'cmake-nvidia': ['cmake-vulkan', 'util'],
-    'cmake-riscv': ['cmake', 'util'],
-    'cmake-bazel-frontends': ['cmake', 'bazel'],
-    'cmake-bazel-frontends-vulkan': ['cmake-bazel-frontends', 'vulkan'],
-    'cmake-bazel-frontends-swiftshader': [
-        'cmake-bazel-frontends-vulkan', 'swiftshader'
-    ],
-    'cmake-bazel-frontends-nvidia': ['cmake-bazel-frontends-vulkan'],
-    'gradle-android': ['cmake'],
-    'rbe-toolchain': ['vulkan'],
-    'samples': ['cmake-swiftshader'],
-    'swiftshader': ['cmake'],
-    'util': [],
-    'vulkan': ['util'],
+    'android': ['base'],
+    'emscripten': ['base'],
+    'nvidia': ['base'],
+    'riscv': ['base'],
+    'gradle-android': ['base'],
+    'frontends': ['android'],
+    'swiftshader': ['base'],
+    'samples': ['swiftshader'],
+    'frontends-swiftshader': ['frontends', 'swiftshader'],
+    'frontends-nvidia': ['frontends'],
 }
 
 IMAGES_TO_DEPENDENT_IMAGES = {k: [] for k in IMAGES_TO_DEPENDENCIES}
@@ -157,26 +146,6 @@ def get_repo_digest(tagged_image_url: str, dry_run: bool = False) -> str:
   return repo_digest
 
 
-def update_rbe_reference(digest: str, dry_run: bool = False):
-  print('Updating WORKSPACE file for rbe-toolchain')
-  digest_updates = 0
-  for line in fileinput.input(files=['WORKSPACE'], inplace=True):
-    if line.strip().startswith('digest ='):
-      digest_updates += 1
-      if dry_run:
-        print(line, end='')
-      else:
-        print(re.sub(DIGEST_REGEX, digest, line), end='')
-    else:
-      print(line, end='')
-
-  if digest_updates > 1:
-    raise RuntimeError(
-        "There is more than one instance of 'digest =' in the WORKSPACE file. "
-        "This means that more than just the 'rbe_toolchain' digest was "
-        "overwritten, and the file should be restored.")
-
-
 def update_references(image_url: str, digest: str, dry_run: bool = False):
   """Updates all references to 'image_url' with a sha256 digest."""
   print(f'Updating references to {image_url}')
@@ -257,7 +226,4 @@ if __name__ == '__main__':
         with open(utils.PROD_DIGESTS_PATH, 'a') as f:
           f.write(f'{image_with_digest}\n')
 
-    # Just hardcode this oddity
-    if image == 'rbe-toolchain':
-      update_rbe_reference(digest, dry_run=args.dry_run)
     update_references(image_url, digest, dry_run=args.dry_run)

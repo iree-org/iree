@@ -8,6 +8,7 @@
 #define IREE_COMPILER_DIALECT_VM_TARGET_BYTECODE_BYTECODEMODULETARGET_H_
 
 #include "iree/compiler/Dialect/VM/IR/VMOps.h"
+#include "iree/compiler/Utils/OptionUtils.h"
 #include "llvm/Support/raw_ostream.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/Support/LogicalResult.h"
@@ -52,6 +53,9 @@ struct BytecodeTargetOptions {
   // Enables the output .vmfb to be inspected as a ZIP file.
   // This is only useful for debugging and should be disabled otherwise.
   bool emitPolyglotZip = false;
+
+  void bindOptions(OptionsBinder &binder);
+  using FromFlags = OptionsFromFlags<BytecodeTargetOptions>;
 };
 
 // Translates a vm.module to a bytecode module flatbuffer.

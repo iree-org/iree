@@ -102,14 +102,14 @@ void FuncOp::setReflectionAttr(StringRef name, Attribute value) {
   SmallVector<NamedAttribute> attrs(existingAttr.begin(), existingAttr.end());
   bool didFind = false;
   for (size_t i = 0; i < attrs.size(); ++i) {
-    if (attrs[i].first == name) {
-      attrs[i].second = value;
+    if (attrs[i].getName() == name) {
+      attrs[i].setValue(value);
       didFind = true;
       break;
     }
   }
   if (!didFind) {
-    attrs.push_back(NamedAttribute(Identifier::get(name, getContext()), value));
+    attrs.push_back(NamedAttribute(StringAttr::get(getContext(), name), value));
     DictionaryAttr::sortInPlace(attrs);
   }
   getOperation()->setAttr("iree.reflection",
@@ -305,6 +305,7 @@ static ParseResult parseInitializerOp(OpAsmParser &parser,
 
 static void printInitializerOp(OpAsmPrinter &p, InitializerOp &op) {
   p.printOptionalAttrDictWithKeyword(op->getAttrs(), /*elidedAttrs=*/{"type"});
+  p << " ";
   p.printRegion(op.body());
 }
 
@@ -541,7 +542,8 @@ static Attribute convertConstIntegerValue(Attribute value) {
     dims = v.getNumElements();
     ShapedType adjustedType = VectorType::get({dims}, integerType);
     if (auto elements = v.dyn_cast<SplatElementsAttr>()) {
-      return SplatElementsAttr::get(adjustedType, elements.getSplatValue());
+      return SplatElementsAttr::get(adjustedType,
+                                    elements.getSplatValue<Attribute>());
     } else {
       return DenseElementsAttr::get(
           adjustedType, llvm::to_vector<4>(v.getValues<Attribute>()));
@@ -577,7 +579,8 @@ static Attribute convertConstFloatValue(Attribute value) {
     dims = v.getNumElements();
     ShapedType adjustedType = VectorType::get({dims}, floatType);
     if (auto elements = v.dyn_cast<SplatElementsAttr>()) {
-      return SplatElementsAttr::get(adjustedType, elements.getSplatValue());
+      return SplatElementsAttr::get(adjustedType,
+                                    elements.getSplatValue<Attribute>());
     } else {
       return DenseElementsAttr::get(
           adjustedType, llvm::to_vector<4>(v.getValues<Attribute>()));
@@ -1148,6 +1151,22 @@ static void printCondFailOp(OpAsmPrinter &p, CondFailOp op) {
 //===----------------------------------------------------------------------===//
 // Async/fiber ops
 //===----------------------------------------------------------------------===//
+
+Block *YieldOp::getDest() { return getOperation()->getSuccessor(0); }
+
+void YieldOp::setDest(Block *block) {
+  return getOperation()->setSuccessor(block, 0);
+}
+
+void YieldOp::eraseOperand(unsigned index) {
+  getOperation()->eraseOperand(index);
+}
+
+Optional<MutableOperandRange> YieldOp::getMutableSuccessorOperands(
+    unsigned index) {
+  assert(index == 0 && "invalid successor index");
+  return destOperandsMutable();
+}
 
 //===----------------------------------------------------------------------===//
 // Debugging

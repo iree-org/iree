@@ -13,7 +13,9 @@
 #include <array>
 
 #include "iree/compiler/Codegen/SPIRV/KernelConfig.h"
-#include "mlir/Dialect/Linalg/IR/LinalgOps.h"
+#include "llvm/ADT/TypeSwitch.h"
+#include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/IR/BuiltinOps.h"
 
 namespace mlir {
 namespace iree_compiler {
@@ -42,7 +44,7 @@ LogicalResult setMaliCodeGenConfig(const spirv::TargetEnv &targetEnv,
         return setConvOpConfig(op, subgroupSize,
                                /*bestTilingFactor=*/16);
       })
-      .Case<linalg::DepthwiseConv2DNhwOp>([subgroupSize](auto op) {
+      .Case<linalg::DepthwiseConv2DNhwcHwcOp>([subgroupSize](auto op) {
         return setConvOpConfig(op, subgroupSize,
                                /*bestTilingFactor=*/16);
       })

@@ -17,7 +17,7 @@ typedef struct iree_hal_cuda_semaphore_t {
   uint64_t initial_value;
 } iree_hal_cuda_semaphore_t;
 
-extern const iree_hal_semaphore_vtable_t iree_hal_cuda_semaphore_vtable;
+static const iree_hal_semaphore_vtable_t iree_hal_cuda_semaphore_vtable;
 
 static iree_hal_cuda_semaphore_t* iree_hal_cuda_semaphore_cast(
     iree_hal_semaphore_t* base_value) {
@@ -84,7 +84,7 @@ static iree_status_t iree_hal_cuda_semaphore_wait(
   return iree_ok_status();
 }
 
-const iree_hal_semaphore_vtable_t iree_hal_cuda_semaphore_vtable = {
+static const iree_hal_semaphore_vtable_t iree_hal_cuda_semaphore_vtable = {
     .destroy = iree_hal_cuda_semaphore_destroy,
     .query = iree_hal_cuda_semaphore_query,
     .signal = iree_hal_cuda_semaphore_signal,

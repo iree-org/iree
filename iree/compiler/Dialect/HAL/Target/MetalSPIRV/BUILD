@@ -14,7 +14,7 @@ package(
 
 iree_cmake_extra_content(
     content = """
-if(NOT "${IREE_TARGET_BACKEND_METAL-SPIRV}")
+if(NOT "${IREE_TARGET_BACKEND_METAL_SPIRV}")
   return()
 endif()
 """,
@@ -28,6 +28,7 @@ cc_library(
         ":SPIRVToMSL",
         "//iree/compiler/Codegen:PassHeaders",
         "//iree/compiler/Codegen/Common",
+        "//iree/compiler/Codegen/Dialect:IREECodegenDialect",
         "//iree/compiler/Codegen/SPIRV",
         "//iree/compiler/Codegen/Utils",
         "//iree/compiler/Dialect/HAL/Target",

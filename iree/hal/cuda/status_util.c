@@ -26,7 +26,7 @@ iree_status_t iree_hal_cuda_result_to_status(
   if (syms->cuGetErrorString(result, &error_string) != CUDA_SUCCESS) {
     error_string = "Unknown error.";
   }
-  return iree_make_status(IREE_STATUS_INTERNAL,
-                          "CUDA driver error '%s' (%d): %s", error_name, result,
-                          error_string);
+  return iree_make_status_with_location(file, line, IREE_STATUS_INTERNAL,
+                                        "CUDA driver error '%s' (%d): %s",
+                                        error_name, result, error_string);
 }

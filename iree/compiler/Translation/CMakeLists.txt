@@ -12,6 +12,26 @@ if(IREE_ENABLE_EMITC)
   )
 endif()
 
+
+iree_cc_library(
+  NAME
+    HALExecutable
+  HDRS
+    "HALExecutable.h"
+  SRCS
+    "HALExecutable.cpp"
+  DEPS
+    LLVMSupport
+    MLIRIR
+    MLIRPass
+    MLIRSupport
+    MLIRTranslation
+    iree::compiler::Dialect::HAL::Target
+    iree::compiler::Dialect::HAL::Transforms
+    iree::compiler::Utils
+  PUBLIC
+)
+
 iree_cc_library(
   NAME
     IREEVM
@@ -27,11 +47,13 @@ iree_cc_library(
     MLIRTranslation
     iree::compiler::Bindings::Native::Transforms
     iree::compiler::Bindings::TFLite::Transforms
+    iree::compiler::ConstEval
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::Flow::Transforms
     iree::compiler::Dialect::HAL::Conversion::HALToVM
     iree::compiler::Dialect::HAL::Target
     iree::compiler::Dialect::HAL::Transforms
+    iree::compiler::Dialect::Stream::Transforms
     iree::compiler::Dialect::Util::Transforms
     iree::compiler::Dialect::VM::Conversion
     iree::compiler::Dialect::VM::Conversion::StandardToVM

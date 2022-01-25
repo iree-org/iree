@@ -4,13 +4,7 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-cmake_minimum_required(VERSION 3.16.3)
-
-# Do not set MSVC warning flags like /W3 by default (since 3.15):
-#   https://cmake.org/cmake/help/v3.15/policy/CMP0092.html
-if(POLICY CMP0092)
-  cmake_policy(SET CMP0092 NEW)
-endif()
+cmake_minimum_required(VERSION 3.16.3...3.21)
 
 # LLVM requires CMP0116 for tblgen: https://reviews.llvm.org/D101083
 # CMP0116: Ninja generators transform `DEPFILE`s from `add_custom_command()`
@@ -31,12 +25,15 @@ else()
   enable_language(ASM)
 endif()
 
+include(CMakeDependentOption)
+
 #-------------------------------------------------------------------------------
 # Project component configuration
 #-------------------------------------------------------------------------------
 
 option(IREE_ENABLE_RUNTIME_TRACING "Enables instrumented runtime tracing." OFF)
 option(IREE_ENABLE_COMPILER_TRACING "Enables instrumented compiler tracing." OFF)
+option(IREE_ENABLE_THREADING "Builds IREE in with thread library support." ON)
 
 option(IREE_BUILD_COMPILER "Builds the IREE compiler." ON)
 option(IREE_BUILD_TESTS "Builds IREE unit tests." ON)
@@ -45,137 +42,84 @@ option(IREE_BUILD_DOCS "Builds IREE docs." OFF)
 option(IREE_BUILD_SAMPLES "Builds IREE sample projects." ON)
 option(IREE_BUILD_TRACY "Builds tracy server tools." OFF)
 
-option(IREE_BUILD_TENSORFLOW_ALL "Builds all TensorFlow compiler frontends." OFF)
-option(IREE_BUILD_TENSORFLOW_COMPILER "Builds TensorFlow compiler frontend." OFF)
-option(IREE_BUILD_TFLITE_COMPILER "Builds the TFLite compiler frontend." OFF)
-option(IREE_BUILD_XLA_COMPILER "Builds TensorFlow XLA compiler frontend." OFF)
-option(IREE_ENABLE_THREADING "Builds IREE in with thread library support." ON)
-
-set(IREE_HAL_DRIVERS_TO_BUILD "all"
-  CACHE STRING "Semicolon-separated list of HAL drivers to build, or \"all\".")
-set(IREE_TARGET_BACKENDS_TO_BUILD "all"
-  CACHE STRING "Semicolon-separated list of target backends to build, or \"all\".")
-
 # Properties controlling version and naming of release artifacts.
-set(IREE_RELEASE_PACKAGE_SUFFIX "-dev" CACHE STRING "Suffix to append to distributed package names")
+set(IREE_RELEASE_PACKAGE_SUFFIX "" CACHE STRING "Suffix to append to distributed package names")
 set(IREE_RELEASE_VERSION "0.1a1" CACHE STRING "Version to embed in distributed packages")
 set(IREE_RELEASE_REVISION "HEAD" CACHE STRING "Version control revision information to embed in distributed packages")
-
-# Master enable for tensorflow build support.
-# Note that this is a normal CMake variable used to gate build features (not
-# a cache variable that is user-settable).
-set(IREE_ENABLE_TENSORFLOW OFF)
-if(${IREE_BUILD_TENSORFLOW_ALL} OR
-   ${IREE_BUILD_TENSORFLOW_COMPILER} OR
-   ${IREE_BUILD_TFLITE_COMPILER} OR
-   ${IREE_BUILD_XLA_COMPILER})
-  set(IREE_ENABLE_TENSORFLOW ON)
-endif()
 
 option(IREE_BUILD_BINDINGS_TFLITE "Builds the IREE TFLite C API compatibility shim" ON)
 option(IREE_BUILD_BINDINGS_TFLITE_JAVA "Builds the IREE TFLite Java bindings with the C API compatibility shim" ON)
 
 # Default python bindings to enabled for some features.
-if(${IREE_ENABLE_TENSORFLOW})
-  option(IREE_BUILD_PYTHON_BINDINGS "Builds the IREE python bindings" ON)
-else()
-  option(IREE_BUILD_PYTHON_BINDINGS "Builds the IREE python bindings" OFF)
-endif()
+option(IREE_BUILD_PYTHON_BINDINGS "Builds the IREE python bindings" OFF)
 
 #-------------------------------------------------------------------------------
 # Experimental project flags
 #-------------------------------------------------------------------------------
 
 option(IREE_BUILD_EXPERIMENTAL_REMOTING "Builds experimental remoting support." OFF)
-option(IREE_BUILD_EXPERIMENTAL_JAVA_BINDINGS "Builds the experimental java bindings." OFF)
-option(IREE_BUILD_EXPERIMENTAL_ROCM "Builds the experimental ROCM Backend." OFF)
-option(IREE_ENABLE_NEW_INTEGRATION_TESTS "Enables new integration tests and disables old." OFF)
+option(IREE_HAL_DRIVER_EXPERIMENTAL_ROCM "Builds the experimental ROCm Backend." OFF)
 
 #-------------------------------------------------------------------------------
 # Derived flags based on primary options
 #-------------------------------------------------------------------------------
 
-option(IREE_ENABLE_EMITC "Enables MLIR EmitC dependencies." ${IREE_BUILD_COMPILER})
+cmake_dependent_option(IREE_ENABLE_EMITC "Enables MLIR EmitC dependencies." ON ${IREE_BUILD_COMPILER} OFF)
 
 #-------------------------------------------------------------------------------
 # Target and backend configuration
 #-------------------------------------------------------------------------------
 
-# List of all HAL drivers to be built by default:
-set(IREE_ALL_HAL_DRIVERS
-  Cuda
-  DyLib
-  Dylib_Sync
-  VMVX
-  VMVX_Sync
-  Vulkan
-)
+option(IREE_HAL_DRIVER_DEFAULTS "Sets the default value for all runtime HAL drivers" ON)
+option(IREE_TARGET_BACKEND_DEFAULTS "Sets the default value for all compiler target backends" ${IREE_BUILD_COMPILER})
 
-if(IREE_HAL_DRIVERS_TO_BUILD STREQUAL "all")
-  set(IREE_HAL_DRIVERS_TO_BUILD ${IREE_ALL_HAL_DRIVERS})
-
-  # For Apple platforms we need to use Metal instead of Vulkan.
-  if(APPLE)
-    list(REMOVE_ITEM IREE_HAL_DRIVERS_TO_BUILD Vulkan)
-  endif()
-  # Remove Cuda from Android and Apple platforms.
-  if(ANDROID OR APPLE)
-    list(REMOVE_ITEM IREE_HAL_DRIVERS_TO_BUILD Cuda)
-  endif()
-endif()
-message(STATUS "Building HAL drivers: ${IREE_HAL_DRIVERS_TO_BUILD}")
-
-# Default every IREE_HAL_DRIVER_* to OFF
-foreach(_backend ${IREE_ALL_HAL_DRIVERS})
-  string(TOUPPER "${_backend}" uppercase_backend)
-  set(IREE_HAL_DRIVER_${uppercase_backend} OFF CACHE BOOL "" FORCE)
-endforeach()
-
-# Set IREE_HAL_DRIVER_* based on configuration
-foreach(_backend ${IREE_HAL_DRIVERS_TO_BUILD})
-  string(TOUPPER "${_backend}" uppercase_backend)
-  string(REPLACE "\"" "" uppercase_backend ${uppercase_backend})
-  set(IREE_HAL_DRIVER_${uppercase_backend} ON CACHE BOOL "" FORCE)
-endforeach()
-
-# List of all target backends to be built by default:
-set(IREE_ALL_TARGET_BACKENDS
-  CUDA
-  DYLIB-LLVM-AOT
-  WASM-LLVM-AOT
-  Metal-SPIRV
-  ROCM
-  Vulkan-SPIRV
-  VMVX
-)
-
-if(${IREE_BUILD_COMPILER})
-  if(IREE_TARGET_BACKENDS_TO_BUILD STREQUAL "all")
-    set(IREE_TARGET_BACKENDS_TO_BUILD ${IREE_ALL_TARGET_BACKENDS})
-  endif()
-  message(STATUS "Building target backends: ${IREE_TARGET_BACKENDS_TO_BUILD}")
+# CUDA is not natively supported on Android or Apple platforms.
+if(ANDROID OR APPLE)
+  set(IREE_HAL_DRIVER_CUDA_DEFAULT OFF)
 else()
-  set(IREE_TARGET_BACKENDS_TO_BUILD "" CACHE STRING "" FORCE)
-  message(STATUS "Compiler is disabled, building no target backends")
+  set(IREE_HAL_DRIVER_CUDA_DEFAULT ${IREE_HAL_DRIVER_DEFAULTS})
 endif()
 
-# Default every IREE_TARGET_BACKEND_* to OFF
-foreach(_backend ${IREE_ALL_TARGET_BACKENDS})
-  string(TOUPPER "${_backend}" uppercase_backend)
-  set(IREE_TARGET_BACKEND_${uppercase_backend} OFF CACHE BOOL "" FORCE)
-endforeach()
+# Vulkan is not natively supported on Apple platforms.
+# Metal should generally be used instead, though MoltenVK may also work.
+if (APPLE)
+  set(IREE_HAL_DRIVER_VULKAN_DEFAULT OFF)
+else()
+  set(IREE_HAL_DRIVER_VULKAN_DEFAULT ${IREE_HAL_DRIVER_DEFAULTS})
+endif()
 
-# Set IREE_TARGET_BACKEND_* based on configuration
-foreach(_backend ${IREE_TARGET_BACKENDS_TO_BUILD})
-  string(TOUPPER "${_backend}" uppercase_backend)
-  string(REPLACE "\"" "" uppercase_backend ${uppercase_backend})
-  set(IREE_TARGET_BACKEND_${uppercase_backend} ON CACHE BOOL "" FORCE)
-endforeach()
+option(IREE_HAL_DRIVER_CUDA "Enables the 'cuda' runtime HAL driver" ${IREE_HAL_DRIVER_CUDA_DEFAULT})
+option(IREE_HAL_DRIVER_DYLIB "Enables the 'dylib' runtime HAL driver" ${IREE_HAL_DRIVER_DEFAULTS})
+option(IREE_HAL_DRIVER_DYLIB_SYNC "Enables the 'dylib-sync' runtime HAL driver" ${IREE_HAL_DRIVER_DEFAULTS})
+option(IREE_HAL_DRIVER_VMVX "Enables the 'vmvx' runtime HAL driver" ${IREE_HAL_DRIVER_DEFAULTS})
+option(IREE_HAL_DRIVER_VMVX_SYNC "Enables the 'vmvx-sync' runtime HAL driver" ${IREE_HAL_DRIVER_DEFAULTS})
+option(IREE_HAL_DRIVER_VULKAN "Enables the 'vulkan' runtime HAL driver" ${IREE_HAL_DRIVER_VULKAN_DEFAULT})
 
-list(APPEND CMAKE_MODULE_PATH
-  ${CMAKE_CURRENT_LIST_DIR}/build_tools/cmake/
-  ${CMAKE_CURRENT_LIST_DIR}/bindings/python/build_tools/cmake/
-)
+cmake_dependent_option(IREE_TARGET_BACKEND_CUDA "Enables the 'cuda' compiler target backend" ON ${IREE_BUILD_COMPILER} OFF)
+cmake_dependent_option(IREE_TARGET_BACKEND_DYLIB_LLVM_AOT "Enables the 'dylib-llvm-aot' compiler target backend" ON ${IREE_BUILD_COMPILER} OFF)
+cmake_dependent_option(IREE_TARGET_BACKEND_METAL_SPIRV "Enables the 'metal-spirv' compiler target backend" ON ${IREE_BUILD_COMPILER} OFF)
+cmake_dependent_option(IREE_TARGET_BACKEND_ROCM "Enables the 'rocm' compiler target backend" ON ${IREE_BUILD_COMPILER} OFF)
+cmake_dependent_option(IREE_TARGET_BACKEND_VMVX "Enables the 'vmvx' compiler target backend" ON ${IREE_BUILD_COMPILER} OFF)
+cmake_dependent_option(IREE_TARGET_BACKEND_VULKAN_SPIRV "Enables the 'vulkan-spirv' compiler target backend" ON ${IREE_BUILD_COMPILER} OFF)
+cmake_dependent_option(IREE_TARGET_BACKEND_WASM_LLVM_AOT "Enables the 'wasm-llvm-aot' compiler target backend" ON ${IREE_BUILD_COMPILER} OFF)
+# Disable WebGPU by default - it has complex deps and is under development.
+cmake_dependent_option(IREE_TARGET_BACKEND_WEBGPU "Enables the 'webgpu' compiler target backend" OFF ${IREE_BUILD_COMPILER} OFF)
+
+message(VERBOSE "IREE build runtime HAL driver 'cuda': ${IREE_HAL_DRIVER_CUDA}")
+message(VERBOSE "IREE build runtime HAL driver 'dylib': ${IREE_HAL_DRIVER_DYLIB}")
+message(VERBOSE "IREE build runtime HAL driver 'dylib-sync': ${IREE_HAL_DRIVER_DYLIB_SYNC}")
+message(VERBOSE "IREE build runtime HAL driver 'vmvx': ${IREE_HAL_DRIVER_VMVX}")
+message(VERBOSE "IREE build runtime HAL driver 'vmvx-sync': ${IREE_HAL_DRIVER_VMVX_SYNC}")
+message(VERBOSE "IREE build runtime HAL driver 'vulkan': ${IREE_HAL_DRIVER_VULKAN}")
+
+message(VERBOSE "IREE build compiler target backend 'cuda': ${IREE_TARGET_BACKEND_CUDA}")
+message(VERBOSE "IREE build compiler target backend 'dylib-llvm-aot': ${IREE_TARGET_BACKEND_DYLIB_LLVM_AOT}")
+message(VERBOSE "IREE build compiler target backend 'wasm-llvm-aot': ${IREE_TARGET_BACKEND_WASM_LLVM_AOT}")
+message(VERBOSE "IREE build compiler target backend 'metal-spirv': ${IREE_TARGET_BACKEND_METAL_SPIRV}")
+message(VERBOSE "IREE build compiler target backend 'rocm': ${IREE_TARGET_BACKEND_ROCM}")
+message(VERBOSE "IREE build compiler target backend 'vulkan-spirv': ${IREE_TARGET_BACKEND_VULKAN_SPIRV}")
+message(VERBOSE "IREE build compiler target backend 'vmvx': ${IREE_TARGET_BACKEND_VMVX}")
+message(VERBOSE "IREE build compiler target backend 'webgpu': ${IREE_TARGET_BACKEND_WEBGPU}")
 
 #-------------------------------------------------------------------------------
 # IREE compilation toolchain configuration
@@ -250,6 +194,11 @@ iree_fix_ndebug()
 # IREE utility definitions
 #-------------------------------------------------------------------------------
 
+list(APPEND CMAKE_MODULE_PATH
+  ${CMAKE_CURRENT_LIST_DIR}/build_tools/cmake/
+  ${CMAKE_CURRENT_LIST_DIR}/bindings/python/build_tools/cmake/
+)
+
 include(iree_macros)
 include(iree_copts)
 include(sanitizers)
@@ -267,8 +216,9 @@ include(iree_lit_test)
 include(iree_add_all_subdirs)
 include(iree_check_test)
 include(iree_trace_runner_test)
-include(iree_run_binary_test)
-include(iree_mlir_benchmark_suite)
+include(iree_native_test)
+include(iree_benchmark_suite)
+include(iree_hal_cts_test_suite)
 
 set(DEFAULT_CMAKE_BUILD_TYPE "Release")
 if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
@@ -340,15 +290,29 @@ endif()
 # This will only run if python3 is available.
 #-------------------------------------------------------------------------------
 
+option(IREE_ERROR_ON_MISSING_SUBMODULES "Error if submodules have not been initialized." ON)
+
 find_package(Python3 COMPONENTS Interpreter QUIET)
-if(Python3_FOUND)
+find_package(Git)
+if(IREE_ERROR_ON_MISSING_SUBMODULES AND Python3_FOUND AND Git_FOUND)
+  # Only check submodule status when the git commit changes.
   execute_process(
-    COMMAND ${Python3_EXECUTABLE} scripts/git/check_submodule_init.py
+    COMMAND git rev-parse --short HEAD
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-    RESULT_VARIABLE ret
-  )
-  if(NOT ret EQUAL "0")
-    message(FATAL_ERROR "check_submodule_init.py failed, see the logs above")
+    RESULT_VARIABLE SHORT_HASH_RESULT
+    OUTPUT_VARIABLE SHORT_HASH)
+  string(REGEX REPLACE "\n$" "" SHORT_HASH "${SHORT_HASH}")
+  if(SHORT_HASH_RESULT EQUAL "0" AND NOT "${IREE_GIT_SHORT_HASH}" STREQUAL "${SHORT_HASH}")
+    execute_process(
+      COMMAND ${Python3_EXECUTABLE} scripts/git/check_submodule_init.py
+      WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+      RESULT_VARIABLE SUBMODULE_INIT_RESULT
+    )
+    if(NOT SUBMODULE_INIT_RESULT EQUAL "0")
+      message(FATAL_ERROR "check_submodule_init.py failed, see the logs above")
+    else()
+      set(IREE_GIT_SHORT_HASH "${SHORT_HASH}" CACHE STRING "" FORCE)
+    endif()
   endif()
 endif()
 
@@ -419,7 +383,7 @@ else()
 endif()
 
 #-------------------------------------------------------------------------------
-# Other dependencies.
+# Other dependencies
 #-------------------------------------------------------------------------------
 
 include(external_cc_library)
@@ -440,17 +404,17 @@ if(IREE_ENABLE_THREADING)
   add_subdirectory(third_party/cpuinfo EXCLUDE_FROM_ALL)
 endif()
 
-iree_set_flatcc_cmake_options()
 add_subdirectory(build_tools/third_party/flatcc EXCLUDE_FROM_ALL)
-add_subdirectory(third_party/flatcc EXCLUDE_FROM_ALL)
 
 add_subdirectory(third_party/vulkan_headers EXCLUDE_FROM_ALL)
 
 # TODO(scotttodd): Iterate some more and find a better place for this.
 if (NOT CMAKE_CROSSCOMPILING)
-  install(TARGETS iree-flatcc-cli
-          COMPONENT iree-flatcc-cli
-          RUNTIME DESTINATION bin)
+  install(
+    TARGETS iree-flatcc-cli
+    COMPONENT iree-flatcc-cli
+    RUNTIME DESTINATION bin
+  )
 endif()
 
 if(IREE_BUILD_COMPILER)
@@ -470,10 +434,19 @@ if(IREE_BUILD_PYTHON_BINDINGS)
   endif()
 endif()
 
-if(IREE_TARGET_BACKEND_METAL-SPIRV)
+if(IREE_TARGET_BACKEND_METAL_SPIRV)
   iree_set_spirv_cross_cmake_options()
   # SPIRV-Cross is needed to cross compile SPIR-V into MSL source code.
   add_subdirectory(third_party/spirv_cross EXCLUDE_FROM_ALL)
+endif()
+
+if(IREE_TARGET_BACKEND_WEBGPU)
+  # Tint is needed to compile SPIR-V into WGSL source code.
+  # Tint also requires SPIRV-Tools, which requires SPIRV-Headers.
+  iree_set_spirv_headers_cmake_options()
+  add_subdirectory(third_party/spirv_headers EXCLUDE_FROM_ALL)
+  add_subdirectory(build_tools/third_party/spirv-tools EXCLUDE_FROM_ALL)
+  add_subdirectory(build_tools/third_party/tint EXCLUDE_FROM_ALL)
 endif()
 
 #-------------------------------------------------------------------------------
@@ -499,6 +472,7 @@ endif()
 add_subdirectory(build_tools/embed_data/)
 
 add_subdirectory(iree/base)
+add_subdirectory(iree/builtins)
 add_subdirectory(iree/hal)
 add_subdirectory(iree/modules)
 add_subdirectory(iree/runtime)
@@ -509,10 +483,16 @@ add_subdirectory(iree/test)
 add_subdirectory(iree/vm)
 
 if(${IREE_BUILD_BENCHMARKS})
+  find_program(IREE_IMPORT_TFLITE_PATH iree-import-tflite)
+  if(IREE_IMPORT_TFLITE_PATH)
+    message(STATUS "Found ${IREE_IMPORT_TFLITE_PATH} to generate benchmark artifacts")
+  else()
+    message(STATUS "iree-import-tflite not found. Some benchmarks may not configure")
+  endif()
   add_subdirectory(benchmarks)
 endif()
 
-if(${IREE_BUILD_EXPERIMENTAL_ROCM})
+if(${IREE_HAL_DRIVER_EXPERIMENTAL_ROCM})
   add_subdirectory(build_tools/third_party/rocm EXCLUDE_FROM_ALL)
   add_subdirectory(experimental/rocm)
 endif()
@@ -556,14 +536,6 @@ if(${IREE_BUILD_EXPERIMENTAL_REMOTING})
     add_subdirectory(build_tools/third_party/liburing EXCLUDE_FROM_ALL)
   endif()
   add_subdirectory(experimental/remoting)
-endif()
-
-if(${IREE_BUILD_EXPERIMENTAL_JAVA_BINDINGS})
-  add_subdirectory(experimental/bindings/java)
-endif()
-
-if(${IREE_ENABLE_TENSORFLOW})
-  add_subdirectory(integrations/tensorflow)
 endif()
 
 set(IREE_PUBLIC_INCLUDE_DIRS "${IREE_COMMON_INCLUDE_DIRS}"

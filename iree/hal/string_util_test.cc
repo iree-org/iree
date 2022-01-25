@@ -386,9 +386,9 @@ struct Allocator final
   // used.
   static StatusOr<Allocator> CreateHostLocal() {
     Allocator allocator;
-    iree_status_t status =
-        iree_hal_allocator_create_heap(iree_make_cstring_view("host_local"),
-                                       iree_allocator_system(), &allocator);
+    iree_status_t status = iree_hal_allocator_create_heap(
+        iree_make_cstring_view("host_local"), iree_allocator_system(),
+        iree_allocator_system(), &allocator);
     IREE_RETURN_IF_ERROR(std::move(status));
     return std::move(allocator);
   }
@@ -430,9 +430,9 @@ struct BufferView final
     iree_hal_encoding_type_t encoding_type =
         IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR;
     BufferView buffer_view;
-    iree_status_t status =
-        iree_hal_buffer_view_create(buffer, shape.data(), shape.size(),
-                                    element_type, encoding_type, &buffer_view);
+    iree_status_t status = iree_hal_buffer_view_create(
+        buffer, shape.data(), shape.size(), element_type, encoding_type,
+        iree_allocator_system(), &buffer_view);
     IREE_RETURN_IF_ERROR(std::move(status));
     return std::move(buffer_view);
   }
@@ -548,13 +548,17 @@ TEST(ShapeStringUtilTest, FormatShape) {
 
 TEST(ElementTypeStringUtilTest, ParseElementType) {
   EXPECT_THAT(ParseElementType("i8"),
+              IsOkAndHolds(Eq(IREE_HAL_ELEMENT_TYPE_INT_8)));
+  EXPECT_THAT(ParseElementType("si8"),
               IsOkAndHolds(Eq(IREE_HAL_ELEMENT_TYPE_SINT_8)));
-  EXPECT_THAT(ParseElementType("u16"),
+  EXPECT_THAT(ParseElementType("ui16"),
               IsOkAndHolds(Eq(IREE_HAL_ELEMENT_TYPE_UINT_16)));
   EXPECT_THAT(ParseElementType("f32"),
               IsOkAndHolds(Eq(IREE_HAL_ELEMENT_TYPE_FLOAT_32)));
   EXPECT_THAT(ParseElementType("f16"),
               IsOkAndHolds(Eq(IREE_HAL_ELEMENT_TYPE_FLOAT_16)));
+  EXPECT_THAT(ParseElementType("bf16"),
+              IsOkAndHolds(Eq(IREE_HAL_ELEMENT_TYPE_BFLOAT_16)));
   EXPECT_THAT(ParseElementType("x64"),
               IsOkAndHolds(Eq(IREE_HAL_ELEMENT_TYPE_OPAQUE_64)));
   EXPECT_THAT(ParseElementType("*64"),
@@ -572,12 +576,16 @@ TEST(ElementTypeStringUtilTest, ParseElementTypeInvalid) {
 }
 
 TEST(ElementTypeStringUtilTest, FormatElementType) {
-  EXPECT_THAT(FormatElementType(IREE_HAL_ELEMENT_TYPE_SINT_8),
+  EXPECT_THAT(FormatElementType(IREE_HAL_ELEMENT_TYPE_INT_8),
               IsOkAndHolds(Eq("i8")));
+  EXPECT_THAT(FormatElementType(IREE_HAL_ELEMENT_TYPE_SINT_8),
+              IsOkAndHolds(Eq("si8")));
   EXPECT_THAT(FormatElementType(IREE_HAL_ELEMENT_TYPE_UINT_16),
-              IsOkAndHolds(Eq("u16")));
+              IsOkAndHolds(Eq("ui16")));
   EXPECT_THAT(FormatElementType(IREE_HAL_ELEMENT_TYPE_FLOAT_32),
               IsOkAndHolds(Eq("f32")));
+  EXPECT_THAT(FormatElementType(IREE_HAL_ELEMENT_TYPE_BFLOAT_16),
+              IsOkAndHolds(Eq("bf16")));
   EXPECT_THAT(FormatElementType(IREE_HAL_ELEMENT_TYPE_OPAQUE_64),
               IsOkAndHolds(Eq("*64")));
   EXPECT_THAT(FormatElementType(iree_hal_make_element_type(
@@ -1001,10 +1009,12 @@ TEST(BufferViewStringUtilTest, RoundTrip) {
   };
 
   expect_round_trip("i8=-8");
-  expect_round_trip("u8=239");
+  expect_round_trip("si8=-8");
+  expect_round_trip("ui8=239");
   expect_round_trip("4xi8=0 -1 2 3");
+  expect_round_trip("4xsi8=0 -1 2 3");
   expect_round_trip("4xi16=0 -1 2 3");
-  expect_round_trip("4xu16=0 1 2 3");
+  expect_round_trip("4xui16=0 1 2 3");
   expect_round_trip("2x2xi32=[0 1][2 3]");
   expect_round_trip("4xf16=0 0.5 2 3");
   expect_round_trip("4xf32=0 1.1 2 3");

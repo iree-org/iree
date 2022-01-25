@@ -60,6 +60,12 @@ enum iree_hal_command_buffer_mode_bits_t {
   // IREE_HAL_COMMAND_BUFFER_MODE_PRIMARY. Compatible with
   // IREE_HAL_COMMAND_BUFFER_MODE_REUSABLE.
   IREE_HAL_COMMAND_BUFFER_MODE_ALLOW_INLINE_EXECUTION = 1u << 4,
+
+  // Disables additional command buffer validation (if present).
+  // By default all command buffers will be validated if
+  // `IREE_HAL_COMMAND_BUFFER_VALIDATION_ENABLE=1` - if shimming command buffers
+  // or performing replay this validation can be disabled per-command buffer.
+  IREE_HAL_COMMAND_BUFFER_MODE_UNVALIDATED = 1u << 5,
 };
 typedef uint32_t iree_hal_command_buffer_mode_t;
 
@@ -202,12 +208,32 @@ static inline iree_hal_label_color_t iree_hal_label_color_unspecified() {
   return color;
 }
 
-// TODO(benvanik): replace with tables for iree_string_builder_*.
-#define iree_hal_command_buffer_mode_string(...) "TODO"
-//    {IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT, "ONE_SHOT"},
-#define iree_hal_command_category_string(...) "TODO"
-//    {IREE_HAL_COMMAND_CATEGORY_TRANSFER, "TRANSFER"},
-//    {IREE_HAL_COMMAND_CATEGORY_DISPATCH, "DISPATCH"},
+// Formats a command buffer mode bitfield as a string.
+// See iree_bitfield_format for usage.
+IREE_API_EXPORT iree_string_view_t
+iree_hal_command_buffer_mode_format(iree_hal_command_buffer_mode_t value,
+                                    iree_bitfield_string_temp_t* out_temp);
+
+// Formats a command category bitfield as a string.
+// See iree_bitfield_format for usage.
+IREE_API_EXPORT iree_string_view_t iree_hal_command_category_format(
+    iree_hal_command_category_t value, iree_bitfield_string_temp_t* out_temp);
+
+// Storage for command buffer validation state.
+// Designed to be embedded in concrete implementations that want validation.
+typedef struct iree_hal_command_buffer_validation_state_t {
+  iree_hal_device_t* device;
+  bool is_recording;
+  int32_t debug_group_depth;
+  // TODO(benvanik): current executable layout/descriptor set layout info.
+  // TODO(benvanik): valid push constant bit ranges.
+} iree_hal_command_buffer_validation_state_t;
+
+// Maximum size of any update in iree_hal_command_buffer_update_buffer.
+// 64KB is the limit on Vulkan and we uniformly use that today across all
+// targets as to not need too much command buffer memory.
+#define IREE_HAL_COMMAND_BUFFER_MAX_UPDATE_SIZE \
+  ((iree_device_size_t)(64 * 1024))
 
 //===----------------------------------------------------------------------===//
 // iree_hal_command_buffer_t
@@ -217,11 +243,13 @@ static inline iree_hal_label_color_t iree_hal_label_color_unspecified() {
 // Commands are recorded by the implementation for later submission to command
 // queues.
 //
-// Buffers and synchronization objects referenced must remain valid and not be
+// Buffers, events, and programs referenced must remain valid and not be
 // modified or read while there are commands in-flight. The usual flow is to
-// populate input buffers, Dispatch using those buffers, wait on a Semaphore
-// until the buffers are guaranteed to no longer be in use, and then reuse or
-// release the buffers.
+// populate input buffers, dispatch using those buffers, wait on a semaphore
+// until the buffers are guaranteed to no longer be in use, and then reuse the
+// buffers. Lifetimes are managed by the command buffer and all used resources
+// will be retained for as long as the command buffer is live or until it is
+// reset.
 //
 // Errors that can be recognized when operations are enqueued will be returned
 // immediately, such as invalid argument errors. Errors that can only be
@@ -260,6 +288,9 @@ IREE_API_EXPORT void iree_hal_command_buffer_retain(
 // Releases the given |command_buffer| from the caller.
 IREE_API_EXPORT void iree_hal_command_buffer_release(
     iree_hal_command_buffer_t* command_buffer);
+
+IREE_API_EXPORT void* iree_hal_command_buffer_dyn_cast(
+    iree_hal_command_buffer_t* command_buffer, const void* vtable);
 
 // Returns a bitmask indicating the behavior of the command buffer.
 IREE_API_EXPORT iree_hal_command_buffer_mode_t
@@ -470,6 +501,68 @@ IREE_API_EXPORT iree_status_t iree_hal_command_buffer_dispatch_indirect(
     iree_hal_buffer_t* workgroups_buffer, iree_device_size_t workgroups_offset);
 
 //===----------------------------------------------------------------------===//
+// Utilities for command buffer creation
+//===----------------------------------------------------------------------===//
+
+// Defines a transfer command operation.
+typedef enum iree_hal_transfer_command_type_t {
+  // iree_hal_command_buffer_fill_buffer
+  IREE_HAL_TRANSFER_COMMAND_TYPE_FILL = 0u,
+  // iree_hal_command_buffer_copy_buffer
+  IREE_HAL_TRANSFER_COMMAND_TYPE_COPY = 1u,
+  // iree_hal_command_buffer_update_buffer
+  IREE_HAL_TRANSFER_COMMAND_TYPE_UPDATE = 2u,
+} iree_hal_transfer_command_type_t;
+
+// Represents a single transfer command within a batch of commands.
+typedef struct iree_hal_transfer_command_t {
+  // The type of the command selecting which of the payload data is used.
+  iree_hal_transfer_command_type_t type;
+  union {
+    // IREE_HAL_TRANSFER_COMMAND_TYPE_FILL
+    struct {
+      iree_hal_buffer_t* target_buffer;
+      iree_device_size_t target_offset;
+      iree_device_size_t length;
+      const void* pattern;
+      iree_host_size_t pattern_length;
+    } fill;
+    // IREE_HAL_TRANSFER_COMMAND_TYPE_COPY
+    struct {
+      iree_hal_buffer_t* source_buffer;
+      iree_device_size_t source_offset;
+      iree_hal_buffer_t* target_buffer;
+      iree_device_size_t target_offset;
+      iree_device_size_t length;
+    } copy;
+    // IREE_HAL_TRANSFER_COMMAND_TYPE_UPDATE
+    struct {
+      const void* source_buffer;
+      iree_host_size_t source_offset;
+      iree_hal_buffer_t* target_buffer;
+      iree_device_size_t target_offset;
+      iree_device_size_t length;
+    } update;
+  };
+} iree_hal_transfer_command_t;
+
+// Builds a command buffer containing a recording of all |transfer_commands|.
+// All buffers must be compatible with |device| and ranges must not overlap
+// (same as with memcpy). All commands are executed concurrently with no
+// barriers. The provided commands and any referenced data needs only remain
+// live during recording, while all referenced buffers must be kept live by
+// the caller until the command buffer has completed execution.
+//
+// This is just a utility to make it easier to quickly construct batches of
+// transfer operations. If more control is required then record the command
+// buffer as normal.
+IREE_API_EXPORT iree_status_t iree_hal_create_transfer_command_buffer(
+    iree_hal_device_t* device, iree_hal_command_buffer_mode_t mode,
+    iree_hal_queue_affinity_t queue_affinity, iree_host_size_t transfer_count,
+    const iree_hal_transfer_command_t* transfer_commands,
+    iree_hal_command_buffer_t** out_command_buffer);
+
+//===----------------------------------------------------------------------===//
 // iree_hal_command_buffer_t validation wrapper
 //===----------------------------------------------------------------------===//
 
@@ -494,15 +587,10 @@ IREE_API_EXPORT iree_status_t iree_hal_command_buffer_wrap_validation(
 //===----------------------------------------------------------------------===//
 
 typedef struct iree_hal_command_buffer_vtable_t {
-  // << HAL C porting in progress >>
-  IREE_API_UNSTABLE
-
   void(IREE_API_PTR* destroy)(iree_hal_command_buffer_t* command_buffer);
 
-  iree_hal_command_buffer_mode_t(IREE_API_PTR* mode)(
-      const iree_hal_command_buffer_t* command_buffer);
-  iree_hal_command_category_t(IREE_API_PTR* allowed_categories)(
-      const iree_hal_command_buffer_t* command_buffer);
+  void*(IREE_API_PTR* dyn_cast)(iree_hal_command_buffer_t* command_buffer,
+                                const void* vtable);
 
   iree_status_t(IREE_API_PTR* begin)(iree_hal_command_buffer_t* command_buffer);
   iree_status_t(IREE_API_PTR* end)(iree_hal_command_buffer_t* command_buffer);
@@ -591,6 +679,25 @@ typedef struct iree_hal_command_buffer_vtable_t {
       iree_hal_buffer_t* workgroups_buffer,
       iree_device_size_t workgroups_offset);
 } iree_hal_command_buffer_vtable_t;
+IREE_HAL_ASSERT_VTABLE_LAYOUT(iree_hal_command_buffer_vtable_t);
+
+struct iree_hal_command_buffer_t {
+  iree_hal_resource_t resource;
+  iree_hal_command_buffer_mode_t mode;
+  iree_hal_command_category_t allowed_categories;
+  iree_hal_queue_affinity_t queue_affinity;
+
+#if IREE_HAL_COMMAND_BUFFER_VALIDATION_ENABLE
+  iree_hal_command_buffer_validation_state_t validation;
+#endif  // IREE_HAL_COMMAND_BUFFER_VALIDATION_ENABLE
+};
+
+IREE_API_EXPORT void iree_hal_command_buffer_initialize(
+    iree_hal_device_t* device, iree_hal_command_buffer_mode_t mode,
+    iree_hal_command_category_t command_categories,
+    iree_hal_queue_affinity_t queue_affinity,
+    const iree_hal_command_buffer_vtable_t* vtable,
+    iree_hal_command_buffer_t* command_buffer);
 
 IREE_API_EXPORT void iree_hal_command_buffer_destroy(
     iree_hal_command_buffer_t* command_buffer);

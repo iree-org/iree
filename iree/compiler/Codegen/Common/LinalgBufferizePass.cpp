@@ -4,7 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-//===- LinalgBufferizePass.cpp.cpp - Pass to bufferize Linalg on tensors --===//
+//===- LinalgBufferizePass.cpp - Pass to bufferize Linalg on tensors ------===//
 //
 // The overall bufferizarion algorithm is summarized here. Each of the
 // individual steps are explained in detail later.
@@ -36,7 +36,8 @@
 //     involved and explained below.
 //
 //===----------------------------------------------------------------------===//
-
+#include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
+#include "iree/compiler/Codegen/Common/BufferizationAnalysis.h"
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
@@ -44,15 +45,14 @@
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowTypes.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
-#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
-#include "iree/compiler/Dialect/Shape/IR/ShapeOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "llvm/ADT/EquivalenceClasses.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "mlir/Analysis/SliceAnalysis.h"
-#include "mlir/Dialect/Linalg/IR/LinalgOps.h"
+#include "mlir/Dialect/Bufferization/IR/Bufferization.h"
+#include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
 #include "mlir/Dialect/SCF/SCF.h"
@@ -69,635 +69,6 @@
 
 namespace mlir {
 namespace iree_compiler {
-
-//===----------------------------------------------------------------------===//
-// Analysis to compute equivalence sets.
-//
-// These functions compute the equivalence relationships between all tensors in
-// the program. Two tensors are equivalent if they are to be mapped to the same
-// buffer. For every operation, based on the operation semantics the result of
-// the operation can reuse the buffer for an operand of the operation. This
-// information is captured by adding these two tensors to the same equivalence
-// class. Eventually the result of the dispatch tensor is added to some
-// equivalence set. All tensors in that equivalence set can reuse the result
-// buffer and compute the values in place. You can add tensors to equivalence
-// set only if
-// - They have a single use
-// - They are derived from a read-only buffer.
-//
-//===----------------------------------------------------------------------===//
-
-/// Check if all users of an op that lowers to a subview eventually can use the
-/// subview when converted to buffers. For example `linalg.reshape` (which is
-/// the buffer version of `linalg.tensor_reshape`) cannot handle subviews.
-static bool canUsersHandleSubviews(Operation *op) {
-  // TODO(ravishankarm): Maybe this is too aggressive, might have to switch this
-  // to have a white-list instead of blacklist.
-  for (Operation *user : op->getUsers()) {
-    if (isa<IREE::Flow::DispatchTensorStoreOp, linalg::TensorCollapseShapeOp,
-            linalg::TensorExpandShapeOp>(user)) {
-      return false;
-    }
-  }
-  return true;
-}
-
-/// Class that tracks the equivalence relationship between tensors. Its a
-/// light-weight wrapper around `llvm::EquivalenceClasses` to account for
-/// `Value` not directly supported as a value type by this class.
-class BufferizationPlan {
- public:
-  llvm::EquivalenceClasses<void *>::iterator findValue(Value v) const {
-    return mappedTensors.findValue(getPointer(v));
-  }
-
-  llvm::EquivalenceClasses<void *>::iterator end() const {
-    return mappedTensors.end();
-  }
-
-  SmallVector<Value> getTensorsMappedToSameSet(Value v) const {
-    SmallVector<Value> tensors;
-    for (auto it = mappedTensors.findLeader(getPointer(v)),
-              ie = mappedTensors.member_end();
-         it != ie; ++it) {
-      tensors.push_back(getValue(*it));
-    }
-    return tensors;
-  }
-
-  bool isEquivalent(Value v1, Value v2) const {
-    return mappedTensors.isEquivalent(getPointer(v1), getPointer(v2));
-  }
-
-  void insert(Value v) { mappedTensors.insert(getPointer(v)); }
-
-  void unionSets(Value v1, Value v2) {
-    mappedTensors.unionSets(getPointer(v1), getPointer(v2));
-  }
-
-  /// Sets the equivalance class that contains `v` as the set that contains the
-  /// result tensor of the dispatch region (i.e. a tensor that is the `value`
-  /// operand of a flow.dispatch.tensor.store` op). All operations in this
-  /// equivalence class can use the result buffer of the dispatch region to
-  /// compute their values in place.
-  void storeSet(Value v) { storeLeaders.insert(getLeaderValue(v)); }
-
-  /// Queries if the value `v` is in the same equivalence class as the result of
-  /// the dispatch region.
-  bool isInStoreSet(Value v) { return storeLeaders.count(getLeaderValue(v)); }
-
-  void dump() {
-    llvm::dbgs() << "BufferMappings : \n";
-    unsigned numSets = 0;
-    for (auto it = mappedTensors.begin(), ie = mappedTensors.end(); it != ie;
-         ++it) {
-      if (!it->isLeader()) continue;
-      llvm::dbgs() << "\tSet " << numSets << ":\n";
-      for (auto member : llvm::make_range(mappedTensors.member_begin(it),
-                                          mappedTensors.member_end())) {
-        llvm::dbgs() << "\t\t";
-        getValue(member).print(llvm::dbgs());
-        llvm::dbgs() << "\n";
-      }
-      numSets++;
-    }
-  }
-
- private:
-  Value getLeaderValue(Value v1) const {
-    return getValue(mappedTensors.getLeaderValue(getPointer(v1)));
-  }
-
-  void *getPointer(Value v) const { return v.getAsOpaquePointer(); }
-
-  Value getValue(void *v) const { return Value::getFromOpaquePointer(v); }
-
-  llvm::EquivalenceClasses<void *> mappedTensors;
-
-  /// Leaders of the sets that contain the result tensor of the dispatch
-  /// region, i.e. a tensor that is the `value` operand of a
-  /// flow.dispatch.tensor.store` op
-  llvm::DenseSet<Value> storeLeaders;
-};
-
-/// Walks the use-def chain and see if this value comes from a read-only tensor.
-static bool isFromReadOnlyTensor(Value v, const BufferizationPlan &plan) {
-  auto definingOp = v.getDefiningOp();
-  if (!definingOp) {
-    auto arg = v.cast<BlockArgument>();
-    return TypeSwitch<Operation *, bool>(arg.getOwner()->getParentOp())
-        .Case<scf::ForOp>([&](scf::ForOp forOp) {
-          Value initOperand = forOp.getOpOperandForRegionIterArg(arg).get();
-          if (plan.isEquivalent(arg, initOperand)) {
-            return isFromReadOnlyTensor(initOperand, plan);
-          }
-          return false;
-        })
-        .Default([&](Operation *op) { return false; });
-  }
-  return TypeSwitch<Operation *, bool>(definingOp)
-      .Case<arith::ConstantOp>(
-          [&](arith::ConstantOp constantOp) { return true; })
-      .Case<linalg::TensorCollapseShapeOp, linalg::TensorExpandShapeOp>(
-          [&](auto op) { return isFromReadOnlyTensor(op.src(), plan); })
-      .Case<tensor::ExtractSliceOp>([&](tensor::ExtractSliceOp sliceOp) {
-        return isFromReadOnlyTensor(sliceOp.source(), plan);
-      })
-      .Case<IREE::Flow::DispatchTensorLoadOp>(
-          [&](IREE::Flow::DispatchTensorLoadOp loadOp) {
-            return loadOp.source()
-                       .getType()
-                       .cast<IREE::Flow::DispatchTensorType>()
-                       .getAccess() == IREE::Flow::TensorAccess::ReadOnly;
-          })
-      .Default([&](Operation *op) { return false; });
-}
-
-/// Adds the result of `std.constant` to its set (there is nothing to tie to
-/// here).
-static LogicalResult analyseConstantOp(arith::ConstantOp constantOp,
-                                       BufferizationPlan &plan) {
-  if (!constantOp.getResult().getType().isa<ShapedType>()) return success();
-  plan.insert(constantOp.getResult());
-  return success();
-}
-
-/// Adds the result of the `flow.dispatch.tensor.load` op to the same
-/// equivalence class as the source.
-static LogicalResult analyseInterfaceLoadTensorOp(
-    IREE::Flow::DispatchTensorLoadOp loadOp, BufferizationPlan &plan) {
-  if (!(loadOp.getMixedOffsets().empty() && loadOp.getMixedSizes().empty() &&
-        loadOp.getMixedStrides().empty()) &&
-      !canUsersHandleSubviews(loadOp)) {
-    plan.insert(loadOp.source());
-    plan.insert(loadOp.result());
-    return success();
-  }
-  plan.unionSets(loadOp.result(), loadOp.source());
-  return success();
-}
-
-/// Helper method to returns an operation of type `OpType` whose result is in
-/// the same equivalence set as `value`. Returns an operation if there is only
-/// one such op in the equivalence set or nullptr in all other cases.
-template <typename OpType>
-static OpType getEquivalentOpOfType(Value value, BufferizationPlan &plan) {
-  OpType equivalentOp;
-  SmallVector<Value> mappedTensors = plan.getTensorsMappedToSameSet(value);
-  for (auto v : mappedTensors) {
-    auto definingOp = v.getDefiningOp<OpType>();
-    if (!definingOp) continue;
-    assert((!equivalentOp || equivalentOp == definingOp) &&
-           "found two interface binding ops marked as equivalent");
-    if (!equivalentOp) equivalentOp = definingOp;
-  }
-  return equivalentOp;
-}
-
-/// Returns true if the value and target of a `flow.dispatch.tensor.store`
-/// operation can be added to the same equivalence set. This can be done only if
-/// - The `value` is not from a equivalence set that contains a read-only
-///   tensor.
-/// - All `hal.interface.binding.subspan` operations in the equivalence class of
-///   `value` and `target` have the same binding and offset. For now, it is
-///   assumed that the equivalence classes contain only 1 such instruction.
-/// This method asserts that the `target` equivalence class already contains a
-/// `hal.interface.binding.subspan` op.'
-static bool canSetStoreValueAndTargetAsEquivalent(
-    IREE::Flow::DispatchTensorStoreOp storeOp, BufferizationPlan &plan) {
-  Value value = storeOp.value();
-  if (!(storeOp.getMixedOffsets().empty() && storeOp.getMixedSizes().empty() &&
-        storeOp.getMixedStrides().empty())) {
-    SmallVector<Value> mappedTensors = plan.getTensorsMappedToSameSet(value);
-    for (auto v : mappedTensors) {
-      // TODO(ravishankarm): At this point it is not clear why the following
-      // restriction exists. It might have something to do with subviews and
-      // reshapes not working well together, but there is no comment about why
-      // this was added with the change that added this.
-      Operation *op = v.getDefiningOp();
-      if (op && isa<linalg::TensorCollapseShapeOp, linalg::TensorExpandShapeOp>(
-                    v.getDefiningOp())) {
-        return false;
-      }
-    }
-  }
-
-  Value target = storeOp.target();
-  auto targetInterfaceOp =
-      getEquivalentOpOfType<IREE::HAL::InterfaceBindingSubspanOp>(target, plan);
-  assert(targetInterfaceOp);
-  if (auto valueConstantOp =
-          getEquivalentOpOfType<arith::ConstantOp>(value, plan)) {
-    return false;
-  }
-  if (auto valueInterfaceOp =
-          getEquivalentOpOfType<IREE::HAL::InterfaceBindingSubspanOp>(value,
-                                                                      plan)) {
-    if (targetInterfaceOp.binding() != valueInterfaceOp.binding() ||
-        targetInterfaceOp.byte_offset() != valueInterfaceOp.byte_offset()) {
-      // If the binding and offsets are different, map these to different
-      // memrefs.
-      return false;
-    }
-    // If the binding and offsets are the same, make sure that the
-    // !flow.dispatch.tensor is read-write.
-    auto sourceType =
-        valueInterfaceOp.getType().dyn_cast<IREE::Flow::DispatchTensorType>();
-    return sourceType &&
-           sourceType.getAccess() == IREE::Flow::TensorAccess::ReadWrite;
-  }
-  return true;
-}
-
-/// Tries to add the `value` and `target` to the same equivalence class.
-static LogicalResult analyseInterfaceStoreTensorOp(
-    IREE::Flow::DispatchTensorStoreOp storeOp, BufferizationPlan &plan) {
-  // The value and target can be union-ed if the set the value is part of does
-  // not contain any hal.interface.binding.subspan from a different binding.
-  Value value = storeOp.value();
-  Value target = storeOp.target();
-  if (!getEquivalentOpOfType<IREE::HAL::InterfaceBindingSubspanOp>(target,
-                                                                   plan)) {
-    return storeOp.emitError(
-        "expected target of store op to already be added to an equivalence "
-        "set");
-  }
-  if (canSetStoreValueAndTargetAsEquivalent(storeOp, plan)) {
-    plan.unionSets(value, target);
-  } else {
-    plan.insert(value);
-  }
-  plan.storeSet(target);
-  return success();
-}
-
-static LogicalResult analyseInterfaceBindingSubspanOp(
-    IREE::HAL::InterfaceBindingSubspanOp subspanOp, BufferizationPlan &plan) {
-  plan.insert(subspanOp.getResult());
-  return success();
-}
-
-static LogicalResult analysePadTensorOp(linalg::PadTensorOp padTensorOp,
-                                        BufferizationPlan &plan) {
-  plan.insert(padTensorOp.source());
-  plan.insert(padTensorOp.result());
-  return success();
-}
-
-/// For every result of the LinalgOp, gets the operands (`ins` or `outs`) whose
-/// buffer can be reused for the result.
-static SmallVector<Value> getTiedOperandsForLinalgOps(
-    linalg::LinalgOp linalgOp, const BufferizationPlan &plan) {
-  SmallVector<Value> tiedOperands(linalgOp.getOperation()->getNumResults());
-  auto outputOperands = linalgOp.getOutputOperands();
-  for (auto outTensor : llvm::enumerate(outputOperands)) {
-    if (linalgOp.payloadUsesValueFromOperand(outTensor.value())) {
-      // If the `outs` tensor has a single use (this op) and is not from a
-      // read-only buffer, the `outs` tensor can be tied to the result.
-      if (outTensor.value()->get().hasOneUse() &&
-          !isFromReadOnlyTensor(outTensor.value()->get(), plan)) {
-        tiedOperands[outTensor.index()] = outTensor.value()->get();
-      }
-    }
-  }
-  return tiedOperands;
-}
-
-static LogicalResult analyseLinalgExtOps(linalg_ext::LinalgExtOp op,
-                                         BufferizationPlan &plan) {
-  if (!op.hasTensorSemantics()) return success();
-  // TODO(hanchung): Revisit if we can tie together op.getOutputOperands() with
-  // the corresponding op.getInputOperands(). For now we have limit LinalgExt
-  // ops, and there is no use case. So we ignore it.
-  // Note: this is what should be done for LinalgOps, except for a what is done
-  // for operand fusion today.
-  for (auto input : op.getInputOperands()) {
-    plan.insert(input->get());
-  }
-  for (auto output : op.getOutputOperands()) {
-    plan.insert(output->get());
-  }
-  for (auto result : op->getResults()) {
-    plan.insert(result);
-  }
-  return success();
-}
-
-/// Adds the corresponding `outs` and result tensors of the linalg op into the
-/// same equivalence class.
-static LogicalResult analyseLinalgOps(linalg::LinalgOp linalgOp,
-                                      BufferizationPlan &plan) {
-  if (!linalgOp.hasTensorSemantics()) return success();
-  auto results = linalgOp->getResults();
-  auto tiedOperands = getTiedOperandsForLinalgOps(linalgOp, plan);
-  for (auto it : llvm::enumerate(llvm::zip(results, tiedOperands))) {
-    Value resultTensor = std::get<0>(it.value());
-    Value tiedOperand = std::get<1>(it.value());
-    if (tiedOperand) {
-      plan.unionSets(resultTensor, tiedOperand);
-    }
-    plan.insert(linalgOp.getOutputOperand(it.index())->get());
-    plan.insert(resultTensor);
-  }
-  return success();
-}
-
-/// Returns true if there is a single use of the `value` that is "real",
-/// i.e. where the value itself is used, and not the type of the value. For
-/// example, a use in a `memref.dim` is only looking at the type and not the
-/// value.
-static bool hasSingleRealUse(Value value) {
-  int numUsers = 0;
-  for (OpOperand &use : value.getUses()) {
-    if (!isa<memref::DimOp, tensor::DimOp>(use.getOwner())) {
-      numUsers++;
-    }
-  }
-  return numUsers == 1;
-}
-
-/// For operations that have a single operand and result, adds both to the same
-/// equivalence class.
-static LogicalResult analyseSingleOperandResultOp(Value source, Value result,
-                                                  BufferizationPlan &plan) {
-  if (hasSingleRealUse(source) || isFromReadOnlyTensor(source, plan)) {
-    plan.unionSets(source, result);
-    return success();
-  }
-  plan.insert(source);
-  plan.insert(result);
-  return success();
-}
-
-static LogicalResult analyseSubTensorOp(tensor::ExtractSliceOp subTensorOp,
-                                        BufferizationPlan &plan) {
-  if (!canUsersHandleSubviews(subTensorOp)) {
-    plan.insert(subTensorOp.source());
-    plan.insert(subTensorOp.result());
-    return success();
-  }
-  return analyseSingleOperandResultOp(subTensorOp.source(),
-                                      subTensorOp.result(), plan);
-}
-
-/// Adds the `dest` and `result` tensor of a subtensor insert operation into the
-/// same equivalence class. If `source` is not null also checks that the
-/// `source` and `dest` are not equivalent.
-static LogicalResult analyseDestructiveUpdateOp(Operation *op, Value source,
-                                                Value dest, Value result,
-                                                BufferizationPlan &plan) {
-  if (hasSingleRealUse(dest) && !isFromReadOnlyTensor(dest, plan)) {
-    plan.unionSets(dest, result);
-  } else if (source && plan.isEquivalent(source, dest)) {
-    // The destructive update pattern can put the source and dest in the same
-    // equivalence class, but that is checked explicitly later on. So at this
-    // stage this shouldnt happen.
-    return op->emitError(
-        "unexpected source and dest being equivalent in destructive update op");
-  }
-  plan.insert(dest);
-  plan.insert(result);
-  return success();
-}
-
-static LogicalResult analyseScfIfOp(scf::IfOp ifOp, BufferizationPlan &plan) {
-  if (!ifOp.getNumResults()) return success();
-  for (auto it : llvm::zip(ifOp.getResults(), ifOp.thenYield().getOperands(),
-                           ifOp.elseYield().getOperands())) {
-    Value result = std::get<0>(it);
-    if (!result.getType().isa<RankedTensorType>()) continue;
-    // All results and yields of the if-then-else are tied together.
-    plan.unionSets(result, std::get<1>(it));
-    plan.unionSets(result, std::get<2>(it));
-  }
-  return success();
-}
-
-static LogicalResult analyseScfForOp(scf::ForOp forOp,
-                                     BufferizationPlan &plan) {
-  if (forOp.results().empty()) return success();
-  if (!llvm::all_of(forOp->getResultTypes(), [](Type resultType) {
-        return resultType.isa<RankedTensorType>();
-      })) {
-    return success();
-  }
-
-  auto yeildOp = cast<scf::YieldOp>(forOp.getBody()->getTerminator());
-  auto regionArgs = forOp.getRegionIterArgs();
-  auto initArgs = forOp.initArgs();
-  for (int i = 0; i < yeildOp.results().size(); ++i) {
-    Value yieldTensor = yeildOp.results()[i];
-    Value resultTensor = forOp.results()[i];
-    Value initArg = initArgs[i];
-    Value arg = regionArgs[i];
-    // Always tie the yield, the result tensor, and the region arg
-    plan.unionSets(yieldTensor, resultTensor);
-    plan.unionSets(yieldTensor, arg);
-
-    // If the init value is not read-only and has single use, the tie the init
-    // and result (and by extension all 4 tensors here).
-    if (hasSingleRealUse(initArg) && !isFromReadOnlyTensor(initArg, plan)) {
-      plan.unionSets(initArg, resultTensor);
-    }
-  }
-  return success();
-}
-
-/// Look for destructive update loop pattern.
-///
-/// ```mlir
-///   %result = scf.for %arg0 = ... iter_args(%arg1 = %init) {
-///     %st = subtensor %arg1[...]
-///
-///     %yieldVal = tensor.insert_slice %val, %arg1[...]
-///     scf.yield %yieldVal
-///   }
-///
-/// `%result`, `%arg1` and `%yieldVal` are all already in the same equivalence
-/// class. `%st` and `%arg` can be added to the same equivalence class even
-/// though `%arg1` has multiple uses. Same is true for `%yieldVal` and
-/// `%arg1`. Here we also verify there are no other "value" uses of
-/// `%arg1`. This might be overly constraining, but we can relax gradually.
-static LogicalResult hasDestructiveUpdateLoopPattern(scf::ForOp forOp,
-                                                     BufferizationPlan &plan) {
-  for (BlockArgument arg : forOp.getRegionIterArgs()) {
-    auto isDestructiveUpdateUses = [&](OpOperand &use) -> bool {
-      Operation *user = use.getOwner();
-      return TypeSwitch<Operation *, bool>(user)
-          .Case<tensor::ExtractSliceOp>([&](tensor::ExtractSliceOp sliceOp) {
-            return sliceOp.source() == arg;
-          })
-          .Case<tensor::InsertSliceOp>(
-              [&](tensor::InsertSliceOp subTensorInsertOp) {
-                return subTensorInsertOp.dest() == arg;
-              })
-          .Case<memref::DimOp, scf::YieldOp, tensor::DimOp>(
-              [&](auto op) { return true; })
-          .Default([&](Operation *op) { return false; });
-    };
-    if (llvm::all_of(arg.getUses(), isDestructiveUpdateUses)) {
-      for (Operation *user : arg.getUsers()) {
-        TypeSwitch<Operation *>(user)
-            .Case<tensor::ExtractSliceOp>([&](tensor::ExtractSliceOp sliceOp) {
-              plan.unionSets(sliceOp.source(), sliceOp.result());
-            })
-            .Case<tensor::InsertSliceOp>(
-                [&](tensor::InsertSliceOp subTensorInsertOp) {
-                  if (!isFromReadOnlyTensor(subTensorInsertOp.source(), plan)) {
-                    plan.unionSets(subTensorInsertOp.source(),
-                                   subTensorInsertOp.dest());
-                  }
-                })
-            .Default([&](Operation *) {});
-      }
-    }
-  }
-  return success();
-}
-
-/// Ties together operands for operand fusion as exists today by reusing buffer
-/// for the result for one of the inputs to do in-place update. Ideally we dont
-/// need to do this if the fusion just happens at vector level. To be removed
-/// when that is worked out and can be load-bearing. Conditions checked here are
-/// 1) the result does not use the value of the `outs` buffer.
-/// 2) the input has a single use (this op) and has the same indexing map as the
-///    result.
-/// 3) the input equivalence set does not have an interface binding, i.e. it is
-///    not using a buffer from the dispatch ABI.
-static void tieOperandsForOperandFusion(linalg::LinalgOp linalgOp,
-                                        BufferizationPlan &plan) {
-  for (auto result : enumerate(linalgOp.getOutputOperands())) {
-    if (linalgOp.payloadUsesValueFromOperand(result.value())) {
-      continue;
-    }
-    for (OpOperand *input : linalgOp.getInputTensorOperands()) {
-      Type inputElementType =
-          input->get().getType().cast<RankedTensorType>().getElementType();
-      Type resultElementType = result.value()
-                                   ->get()
-                                   .getType()
-                                   .cast<RankedTensorType>()
-                                   .getElementType();
-      if (input->get().hasOneUse() && (inputElementType == resultElementType) &&
-          linalgOp.getTiedIndexingMap(input) ==
-              linalgOp.getTiedIndexingMap(result.value()) &&
-          !getEquivalentOpOfType<IREE::HAL::InterfaceBindingSubspanOp>(
-              input->get(), plan) &&
-          !isFromReadOnlyTensor(input->get(), plan)) {
-        plan.unionSets(linalgOp->getResult(result.index()), input->get());
-        break;
-      }
-    }
-  }
-}
-
-static LogicalResult analyseOperations(FuncOp funcOp, BufferizationPlan &plan) {
-  auto bufferMappingFn = [&](Operation *op) -> WalkResult {
-    return TypeSwitch<Operation *, LogicalResult>(op)
-        .Case<arith::ConstantOp>([&](arith::ConstantOp constantOp) {
-          return analyseConstantOp(constantOp, plan);
-        })
-        .Case<IREE::Flow::DispatchTensorLoadOp>(
-            [&](IREE::Flow::DispatchTensorLoadOp loadOp) {
-              return analyseInterfaceLoadTensorOp(loadOp, plan);
-            })
-        .Case<IREE::Flow::DispatchTensorStoreOp>(
-            [&](IREE::Flow::DispatchTensorStoreOp storeOp) {
-              return analyseInterfaceStoreTensorOp(storeOp, plan);
-            })
-        .Case<IREE::Flow::DispatchTieShapeOp>(
-            [&](IREE::Flow::DispatchTieShapeOp tieShapeOp) {
-              return analyseSingleOperandResultOp(tieShapeOp.operand(),
-                                                  tieShapeOp.result(), plan);
-            })
-        .Case<IREE::HAL::InterfaceBindingSubspanOp>(
-            [&](IREE::HAL::InterfaceBindingSubspanOp subspanOp) {
-              return analyseInterfaceBindingSubspanOp(subspanOp, plan);
-            })
-        .Case<linalg::PadTensorOp>([&](linalg::PadTensorOp padTensorOp) {
-          return analysePadTensorOp(padTensorOp, plan);
-        })
-        .Case<linalg::LinalgOp>([&](linalg::LinalgOp linalgOp) {
-          return analyseLinalgOps(linalgOp, plan);
-        })
-        .Case<linalg_ext::LinalgExtOp>(
-            [&](linalg_ext::LinalgExtOp linalgExtOp) {
-              return analyseLinalgExtOps(linalgExtOp, plan);
-            })
-        .Case<linalg::TensorCollapseShapeOp, linalg::TensorExpandShapeOp>(
-            [&](auto reshapeOp) {
-              return analyseSingleOperandResultOp(reshapeOp.src(),
-                                                  reshapeOp.result(), plan);
-            })
-        .Case<tensor::ExtractSliceOp>([&](tensor::ExtractSliceOp sliceOp) {
-          return analyseSubTensorOp(sliceOp, plan);
-        })
-        .Case<tensor::InsertSliceOp>(
-            [&](tensor::InsertSliceOp subTensorInsertOp) {
-              return analyseDestructiveUpdateOp(
-                  subTensorInsertOp, subTensorInsertOp.source(),
-                  subTensorInsertOp.dest(), subTensorInsertOp.result(), plan);
-            })
-        .Case<tensor::CastOp>([&](tensor::CastOp castOp) {
-          return analyseSingleOperandResultOp(castOp.source(), castOp.dest(),
-                                              plan);
-        })
-        .Case<tensor::InsertOp>([&](tensor::InsertOp insertOp) {
-          return analyseDestructiveUpdateOp(insertOp, /*source =*/nullptr,
-                                            insertOp.dest(), insertOp.result(),
-                                            plan);
-        })
-        .Case<vector::TransferReadOp>(
-            [&](vector::TransferReadOp transferReadOp) {
-              plan.insert(transferReadOp.source());
-              return success();
-            })
-        .Case<vector::TransferWriteOp>(
-            [&](vector::TransferWriteOp transferWriteOp) {
-              return analyseDestructiveUpdateOp(transferWriteOp, nullptr,
-                                                transferWriteOp.source(),
-                                                transferWriteOp.result(), plan);
-            })
-        .Case<scf::IfOp>(
-            [&](scf::IfOp ifOp) { return analyseScfIfOp(ifOp, plan); })
-        .Case<scf::ForOp>(
-            [&](scf::ForOp forOp) { return analyseScfForOp(forOp, plan); })
-        .Default([&](Operation *op) { return success(); });
-  };
-  if (funcOp.walk<WalkOrder::PreOrder>(bufferMappingFn).wasInterrupted()) {
-    return failure();
-  }
-  DEBUG_WITH_TYPE(DEBUG_TYPE, {
-    llvm::dbgs() << "After First walk ";
-    plan.dump();
-  });
-
-  if (funcOp
-          .walk([&](scf::ForOp forOp) -> WalkResult {
-            return hasDestructiveUpdateLoopPattern(forOp, plan);
-          })
-          .wasInterrupted()) {
-    return failure();
-  }
-  DEBUG_WITH_TYPE(DEBUG_TYPE, {
-    llvm::dbgs() << "After Destructive update walk ";
-    plan.dump();
-  });
-
-  // Tie operands to allow for operand fusion support. To be dropped once the
-  // operand fusion is generalized in IREE.
-  funcOp.walk([&](linalg::LinalgOp linalgOp) {
-    return tieOperandsForOperandFusion(linalgOp, plan);
-  });
-  DEBUG_WITH_TYPE(DEBUG_TYPE, {
-    llvm::dbgs() << "After union for supporting operand fusion";
-    plan.dump();
-  });
-
-  // Finally to support operand fusion as it exists today, reuse buffer that is
-  // used by one of the
-  return success();
-}
 
 //===----------------------------------------------------------------------===//
 // Bufferization helper functions using BlockAndValueMapping.
@@ -773,6 +144,71 @@ static MemRefType getMemrefTypeForTensor(TensorType tensorType,
                          layout, memorySpace);
 }
 
+/// Checks if the offsets, sizes and strides with src, form a no-op
+/// subview. This is true if
+/// 1) The offsets are 0
+/// 2) The strides are 1
+/// 3) The sizes are same as that of the src.
+/// For (3) when the shape is dynamic if the `src` is defined using an operation
+/// that implements the `ShapeAwareOpInterface` (like
+/// `hal.interface.binding.subspan`) then we can use that to check dynamic
+/// equality.
+static bool generatesNoOpSubView(Value src, ArrayRef<OpFoldResult> offsets,
+                                 ArrayRef<OpFoldResult> sizes,
+                                 ArrayRef<OpFoldResult> strides) {
+  auto interfaceOp =
+      dyn_cast_or_null<IREE::Util::ShapeAwareOpInterface>(src.getDefiningOp());
+  if (!interfaceOp) {
+    return false;
+  }
+  /// Check offsets are 0.
+  if (llvm::any_of(offsets, [](OpFoldResult ofr) {
+        Optional<int64_t> intValue = getConstantIntValue(ofr);
+        return !intValue || intValue.getValue() != 0;
+      })) {
+    return false;
+  }
+  /// Check strides are 1.
+  if (llvm::any_of(strides, [](OpFoldResult ofr) {
+        Optional<int64_t> intValue = getConstantIntValue(ofr);
+        return !intValue || intValue.getValue() != 1;
+      })) {
+    return false;
+  }
+  /// Check sizes are same as the source.
+  auto dynamicDims = interfaceOp.getResultDynamicDims(0);
+  unsigned dynamicDimsPos = 0;
+  ArrayRef<int64_t> srcShape = src.getType().cast<MemRefType>().getShape();
+  for (auto size : enumerate(sizes)) {
+    if (Optional<int64_t> intValue = getConstantIntValue(size.value())) {
+      if (intValue != srcShape[size.index()]) {
+        return false;
+      }
+      continue;
+    }
+    if (dynamicDimsPos >= dynamicDims.size()) {
+      return false;
+    }
+    if (size.value().get<Value>() == dynamicDims[dynamicDimsPos]) {
+      dynamicDimsPos++;
+      continue;
+    }
+    auto loadConstOp1 =
+        size.value()
+            .get<Value>()
+            .getDefiningOp<IREE::HAL::InterfaceConstantLoadOp>();
+    auto loadConstOp2 =
+        dynamicDims[dynamicDimsPos]
+            .getDefiningOp<IREE::HAL::InterfaceConstantLoadOp>();
+    if (!loadConstOp1 || !loadConstOp2 ||
+        loadConstOp1.index() != loadConstOp2.index()) {
+      return false;
+    }
+    dynamicDimsPos++;
+  }
+  return true;
+}
+
 /// Creates a subview operation given the `src`, `offsets`, `sizes` and
 /// `strides`. Handles the corner case where the `offsets`, `sizes` and
 /// `strides` are empty in which case just forward the `src` value.  If the
@@ -781,7 +217,9 @@ static Value createSubviewOp(OpBuilder &b, Location loc, unsigned resultRank,
                              Value src, ArrayRef<OpFoldResult> offsets,
                              ArrayRef<OpFoldResult> sizes,
                              ArrayRef<OpFoldResult> strides) {
-  if (offsets.empty() && sizes.empty() && strides.empty()) return src;
+  if (generatesNoOpSubView(src, offsets, sizes, strides)) {
+    return src;
+  }
   MemRefType resultType;
   MemRefType srcType = src.getType().cast<MemRefType>();
   if (srcType.getRank() != resultRank) {
@@ -807,7 +245,7 @@ static Value createSubviewOp(OpBuilder &b, Location loc, unsigned resultRank,
 //   %buffer = hal.interface.binding.subspan .. : tensor<?xf32>
 //   %result = linalg.matmul ins(%lhs, %rhs : tensor<?x?xf32>, tensor<?x?xf32>)
 //       outs(%init : tensor<?x?xf32>) -> tensor<?x?xf32>
-//   %value = linalg.tensor_reshape %result [affine_map<(d0, d1) -> (d0, d1)]
+//   %value = tensor.collapse_shape %result [[0, 1]]
 //       : tensor<?x?xf32> into tensor<?xf32>
 //   flow.dispatch.tensor.store %value, %buffer[..] [..] [..]
 // ```
@@ -898,21 +336,25 @@ static Value getSubviewOpForTensorStoreOp(OpBuilder &b, Operation *storeOp,
   return subview;
 }
 
-/// Gets the reverse of a
-/// `linalg.tensor_expand_shape`/`linalg.tensor_collapse_shape` op to get a
-/// memref type that can be used for in-place computation of the result of a
-/// dispatch region.
-template <typename TensorReshapeOpTy>
-static Value getReverseOfReshapeOp(OpBuilder &b, TensorReshapeOpTy reshapeOp,
+/// Gets the reverse of a `tensor.collapse_shape` op to get a memref type that
+/// can be used for in-place computation of the result of a dispatch region.
+static Value getReverseOfReshapeOp(OpBuilder &b,
+                                   tensor::CollapseShapeOp reshapeOp,
                                    Value resultBuffer) {
   auto memrefType = getMemrefTypeForTensor(
       reshapeOp.getSrcType(), {},
       resultBuffer.getType().cast<MemRefType>().getMemorySpace());
-  using ReverseReshapeOpTy = typename std::conditional<
-      std::is_same<TensorReshapeOpTy, linalg::TensorCollapseShapeOp>::value,
-      memref::ExpandShapeOp, memref::CollapseShapeOp>::type;
-  return b.create<ReverseReshapeOpTy>(reshapeOp.getLoc(), memrefType,
-                                      resultBuffer, reshapeOp.reassociation());
+  return b.create<memref::ExpandShapeOp>(
+      reshapeOp.getLoc(), memrefType, resultBuffer, reshapeOp.reassociation());
+}
+
+/// Gets the reverse of a `tensor.expand_shape` op to get a memref type that can
+/// be used for in-place computation of the result of a dispatch region.
+static Value getReverseOfReshapeOp(OpBuilder &b,
+                                   tensor::ExpandShapeOp reshapeOp,
+                                   Value resultBuffer) {
+  return b.create<memref::CollapseShapeOp>(reshapeOp.getLoc(), resultBuffer,
+                                           reshapeOp.getReassociationIndices());
 }
 
 /// Gets the reverse of a `tensor.cast` op to get a memref type that
@@ -947,16 +389,28 @@ static Value walkUseToGetResultBuffer(
     OpBuilder &b, Value value, const BufferizationPlan &plan,
     const BlockAndValueMapping &bvm,
     SmallVectorImpl<std::pair<OpOperand *, Value>> &traversedUses) {
-  Operation *user = nullptr;
+  Operation *op = value.getDefiningOp();
+  if (!op) return nullptr;
+  Operation *opParent = op->getParentOp();
+  if (!opParent) return nullptr;
   while (value.hasOneUse()) {
     OpOperand &use = *value.use_begin();
-    user = use.getOwner();
-    if (isa<IREE::Flow::DispatchTensorStoreOp>(user)) {
+    Operation *user = use.getOwner();
+    bool isUserInSameScope = user->getParentOp() == opParent;
+    if (isUserInSameScope &&
+        isa<IREE::Flow::DispatchTensorStoreOp, tensor::InsertSliceOp>(user)) {
       return getSubviewOpForTensorStoreOp(b, user, bvm);
     }
-    value = getTiedResultForOperand(use, plan);
+    if (!isUserInSameScope && isa<scf::YieldOp>(user)) {
+      value = cast<scf::ForOp>(user->getParentOp())
+                  .getResult(use.getOperandNumber());
+    } else {
+      value = getTiedResultForOperand(use, plan);
+    }
     if (!value) return nullptr;
-    traversedUses.push_back(std::make_pair(&use, value));
+    if (isUserInSameScope) {
+      traversedUses.push_back(std::make_pair(&use, value));
+    }
     if (auto resultBuffer = bvm.lookupOrNull(value)) return resultBuffer;
   }
   return nullptr;
@@ -991,10 +445,10 @@ static Value getInplaceResultBuffer(OpBuilder &b, OpResult resultValue,
     resultBuffer =
         TypeSwitch<Operation *, Value>(op)
             .Case<scf::IfOp, scf::ForOp, linalg::LinalgOp,
-                  linalg_ext::LinalgExtOp, tensor::InsertSliceOp,
+                  IREE::LinalgExt::LinalgExtOp, tensor::InsertSliceOp,
                   vector::TransferWriteOp>(
                 [&](auto op) { return resultBuffer; })
-            .Case<linalg::TensorCollapseShapeOp, linalg::TensorExpandShapeOp>(
+            .Case<tensor::CollapseShapeOp, tensor::ExpandShapeOp>(
                 [&](auto reshapeOp) {
                   return getReverseOfReshapeOp(b, reshapeOp, resultBuffer);
                 })
@@ -1043,12 +497,26 @@ static Value getAliasingBufferForResult(OpBuilder &b,
                          loadOp.getMixedSizes(), loadOp.getMixedStrides());
 }
 
-/// Converts a `linalg.tensor_collapse/expand_shape` operation to a
-/// `linalg.collapse/expand_shape` operation with the result aliasing the buffer
-/// for the operand.
-template <typename TensorReshapeOpTy>
+/// Converts a `tensor.collapse_shape` operation to a `memref.collapse_shape`
+/// operation with the result aliasing the buffer for the operand.
 static Value getAliasingBufferForReshapeResult(OpBuilder &b,
-                                               TensorReshapeOpTy op,
+                                               tensor::CollapseShapeOp op,
+                                               BlockAndValueMapping &bvm) {
+  Location loc = op.getLoc();
+  Value srcTensor = op.src();
+  Value inputBuffer = bvm.lookup(srcTensor);
+
+  // Create the reshape op.
+  Value bufferReshape = b.create<memref::CollapseShapeOp>(
+      loc, inputBuffer, op.getReassociationIndices());
+  return bufferReshape;
+}
+
+/// Converts a `tensor.expand_shape` operation to a
+/// `memref.expand_shape` operation with the result aliasing the buffer
+/// for the operand.
+static Value getAliasingBufferForReshapeResult(OpBuilder &b,
+                                               tensor::ExpandShapeOp op,
                                                BlockAndValueMapping &bvm) {
   Location loc = op.getLoc();
   Value srcTensor = op.src();
@@ -1059,11 +527,8 @@ static Value getAliasingBufferForReshapeResult(OpBuilder &b,
   MemRefType inputBufferType = inputBuffer.getType().cast<MemRefType>();
   auto reshapeResultType = getMemrefTypeForTensor(
       resultTensorType, {}, inputBufferType.getMemorySpace());
-  using ReshapeOpTy = typename std::conditional<
-      std::is_same<TensorReshapeOpTy, linalg::TensorCollapseShapeOp>::value,
-      memref::CollapseShapeOp, memref::ExpandShapeOp>::type;
-  Value bufferReshape = b.create<ReshapeOpTy>(loc, reshapeResultType,
-                                              inputBuffer, op.reassociation());
+  Value bufferReshape = b.create<memref::ExpandShapeOp>(
+      loc, reshapeResultType, inputBuffer, op.reassociation());
   return bufferReshape;
 }
 
@@ -1082,9 +547,9 @@ static Value getAliasingBufferForResult(OpBuilder &b, tensor::ExtractSliceOp op,
 /// Returns output buffers that aliases inputs.
 static SmallVector<Value> getAliasingBuffersForResult(
     scf::ForOp scfFor, BlockAndValueMapping &bvm) {
-  SmallVector<Value> aliasedBuffers(scfFor.results().size(), nullptr);
-  for (int i = 0; i < scfFor.results().size(); ++i) {
-    Value inputTensor = scfFor.initArgs()[i];
+  SmallVector<Value> aliasedBuffers(scfFor.getResults().size(), nullptr);
+  for (int i = 0; i < scfFor.getResults().size(); ++i) {
+    Value inputTensor = scfFor.getInitArgs()[i];
     if (!inputTensor.getType().isa<RankedTensorType>()) continue;
     Value inputBuffer = bvm.lookup(inputTensor);
     aliasedBuffers[i] = inputBuffer;
@@ -1101,7 +566,7 @@ static SmallVector<Value, 4> getAliasingBuffersForResults(
             tensor::CastOp>([&](auto singleResultOp) -> SmallVector<Value, 4> {
         return {getAliasingBufferForResult(b, singleResultOp, bvm)};
       })
-      .Case<linalg::TensorCollapseShapeOp, linalg::TensorExpandShapeOp>(
+      .Case<tensor::CollapseShapeOp, tensor::ExpandShapeOp>(
           [&](auto reshapeOp) -> SmallVector<Value, 4> {
             return {getAliasingBufferForReshapeResult(b, reshapeOp, bvm)};
           })
@@ -1261,20 +726,9 @@ static LogicalResult convertConstantOp(OpBuilder &b,
   OpBuilder::InsertionGuard g(b);
   b.setInsertionPointAfter(constantOp);
   auto memrefType = getMemrefTypeForTensor(tensorType);
-  Value memref =
-      b.create<memref::BufferCastOp>(constantOp.getLoc(), memrefType, result);
+  Value memref = b.create<bufferization::ToMemrefOp>(constantOp.getLoc(),
+                                                     memrefType, result);
   bvm.map(result, memref);
-  return success();
-}
-
-static LogicalResult convertDispatchTieShapeOp(
-    OpBuilder &b, IREE::Flow::DispatchTieShapeOp shapeOp,
-    BlockAndValueMapping &bvm) {
-  if (Value v = bvm.lookupOrNull(shapeOp.operand())) {
-    auto tieShapeOp = b.create<Shape::TieShapeOp>(shapeOp.getLoc(), v.getType(),
-                                                  v, shapeOp.shape());
-    bvm.map(shapeOp.getResult(), tieShapeOp.getResult());
-  }
   return success();
 }
 
@@ -1378,15 +832,18 @@ static LogicalResult convertVectorTransferWriteOp(OpBuilder &b,
   if (!resultType) return success();
   Value resultBuffer = bvm.lookup(result);
 
-  if (!plan.isEquivalent(op.source(), result)) {
+  if (!plan.isEquivalent(op.source(), result) &&
+      // If the source is linalg.init_tensor, then we don't care about the
+      // initial value and can avoid the copy.
+      !op.source().getDefiningOp<linalg::InitTensorOp>()) {
     Value destBuffer = bvm.lookup(op.source());
     b.create<linalg::CopyOp>(loc, destBuffer, resultBuffer);
   }
 
   // Create a new vector.transfer_write operation without a result value.
-  b.create<vector::TransferWriteOp>(
-      loc, op.vector(), resultBuffer, op.indices(), op.permutation_map(),
-      op.mask(), op.in_bounds() ? *op.in_bounds() : ArrayAttr());
+  b.create<vector::TransferWriteOp>(loc, op.vector(), resultBuffer,
+                                    op.indices(), op.permutation_mapAttr(),
+                                    op.mask(), op.in_boundsAttr());
   return success();
 }
 
@@ -1480,7 +937,7 @@ static LogicalResult convertPadTensorOp(OpBuilder &b,
     return padTensorOp.emitError(
         "Converting linalg.pad_tensor with non-constant padding value");
   }
-  if (constOp.value().isa<DenseElementsAttr>()) {
+  if (constOp.getValue().isa<DenseElementsAttr>()) {
     return padTensorOp.emitError(
         "Converting linalg.pad_tensor with non-scalar constant padding "
         "value");
@@ -1509,7 +966,8 @@ class LinalgBufferizePass : public LinalgBufferizeBase<LinalgBufferizePass> {
  public:
   LinalgBufferizePass(WorkgroupMemoryAllocationFn fn) : allocationFn(fn) {}
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<IREE::Util::UtilDialect, linalg::LinalgDialect,
+    registry.insert<mlir::bufferization::BufferizationDialect,
+                    IREE::Util::UtilDialect, linalg::LinalgDialect,
                     memref::MemRefDialect, scf::SCFDialect, StandardOpsDialect,
                     mlir::math::MathDialect, mlir::arith::ArithmeticDialect>();
   }
@@ -1523,14 +981,7 @@ class LinalgBufferizePass : public LinalgBufferizeBase<LinalgBufferizePass> {
 void LinalgBufferizePass::runOnOperation() {
   BufferizationPlan plan;
   FuncOp funcOp = getOperation();
-  if (failed(analyseOperations(funcOp, plan))) {
-    return signalPassFailure();
-  }
-  if (funcOp
-          .walk([&](IREE::Flow::DispatchTensorStoreOp storeOp) -> WalkResult {
-            return analyseInterfaceStoreTensorOp(storeOp, plan);
-          })
-          .wasInterrupted()) {
+  if (failed(createTensorEquivalenceClasses(funcOp, plan))) {
     return signalPassFailure();
   }
 
@@ -1541,21 +992,26 @@ void LinalgBufferizePass::runOnOperation() {
 
   // First go over all hal.interface.binding.subspan ops and create counterparts
   // working with memrefs.
-  funcOp.walk([&](IREE::HAL::InterfaceBindingSubspanOp op) {
-    auto shapedType =
-        op.getResult().getType().dyn_cast<IREE::Flow::DispatchTensorType>();
+  funcOp.walk([&](IREE::HAL::InterfaceBindingSubspanOp subspanOp) {
+    auto shapedType = subspanOp.getResult()
+                          .getType()
+                          .dyn_cast<IREE::Flow::DispatchTensorType>();
     if (!shapedType || !shapedType.hasRank()) return;
     OpBuilder::InsertionGuard g(b);
-    b.setInsertionPoint(op);
+    b.setInsertionPoint(subspanOp);
     // Just change the result type of the InterfaceBindingSubspanOp to form
     // the base buffer.
     auto tensorType =
-        op.result().getType().cast<IREE::Flow::DispatchTensorType>();
+        subspanOp.result().getType().cast<IREE::Flow::DispatchTensorType>();
     auto memRefType = getMemrefTypeForTensor(tensorType);
     auto baseBuffer = b.create<IREE::HAL::InterfaceBindingSubspanOp>(
-        op->getLoc(), memRefType, op.binding(), op.byte_offset(),
-        op.byte_length(), op.dynamic_dims());
-    bvm.map(op, baseBuffer);
+        subspanOp->getLoc(), memRefType, subspanOp.set(), subspanOp.binding(),
+        subspanOp.type(), subspanOp.byte_offset(), subspanOp.dynamic_dims(),
+        subspanOp.alignmentAttr());
+    auto alignment = baseBuffer.calculateAlignment();
+    b.create<memref::AssumeAlignmentOp>(subspanOp->getLoc(), baseBuffer,
+                                        alignment.value());
+    bvm.map(subspanOp, baseBuffer);
   });
 
   // Visit all the operations that return `tensor`s and convert them to using
@@ -1568,10 +1024,6 @@ void LinalgBufferizePass::runOnOperation() {
         .Case<IREE::Flow::DispatchTensorStoreOp>(
             [&](IREE::Flow::DispatchTensorStoreOp storeOp) {
               return convertInterfaceStoreTensorOp(b, storeOp, bvm, plan);
-            })
-        .Case<IREE::Flow::DispatchTieShapeOp>(
-            [&](IREE::Flow::DispatchTieShapeOp shapeOp) {
-              return convertDispatchTieShapeOp(b, shapeOp, bvm);
             })
         .Case<scf::ForOp>([&](scf::ForOp forOp) {
           if (failed(getOrAllocateResultBuffers(b, forOp, bvm, plan,
@@ -1587,20 +1039,21 @@ void LinalgBufferizePass::runOnOperation() {
           }
           return convertScfIfOp(b, ifOp, bvm, plan);
         })
-        .Case<IREE::Flow::DispatchTensorLoadOp, linalg::TensorCollapseShapeOp,
-              linalg::TensorExpandShapeOp, tensor::ExtractSliceOp,
-              tensor::CastOp>([&](auto aliasingOp) {
-          auto aliasingBuffers =
-              getAliasingBuffersForResults(b, aliasingOp, bvm);
-          if (failed(getOrAllocateResultBuffers(b, aliasingOp, aliasingBuffers,
-                                                bvm, plan, allocationFn))) {
-            return failure();
-          }
-          copyFromAliasingBufferToResultBuffer(
-              b, aliasingOp->getLoc(), aliasingOp->getOperand(0),
-              aliasingOp->getResult(0), aliasingBuffers, bvm, plan);
-          return success();
-        })
+        .Case<IREE::Flow::DispatchTensorLoadOp, tensor::CollapseShapeOp,
+              tensor::ExpandShapeOp, tensor::ExtractSliceOp, tensor::CastOp>(
+            [&](auto aliasingOp) {
+              auto aliasingBuffers =
+                  getAliasingBuffersForResults(b, aliasingOp, bvm);
+              if (failed(getOrAllocateResultBuffers(b, aliasingOp,
+                                                    aliasingBuffers, bvm, plan,
+                                                    allocationFn))) {
+                return failure();
+              }
+              copyFromAliasingBufferToResultBuffer(
+                  b, aliasingOp->getLoc(), aliasingOp->getOperand(0),
+                  aliasingOp->getResult(0), aliasingBuffers, bvm, plan);
+              return success();
+            })
         .Case<linalg::PadTensorOp>([&](linalg::PadTensorOp padTensorOp) {
           if (failed(getOrAllocateResultBuffers(b, padTensorOp, bvm, plan,
                                                 allocationFn))) {
@@ -1608,7 +1061,7 @@ void LinalgBufferizePass::runOnOperation() {
           }
           return convertPadTensorOp(b, padTensorOp, bvm);
         })
-        .Case<linalg::LinalgOp, linalg_ext::LinalgExtOp>([&](auto op) {
+        .Case<linalg::LinalgOp, IREE::LinalgExt::LinalgExtOp>([&](auto op) {
           if (failed(
                   getOrAllocateResultBuffers(b, op, bvm, plan, allocationFn))) {
             return failure();

@@ -7,8 +7,8 @@
 steps:
   - label: ":zap: Build with tracing enabled"
     commands:
-      - "./scripts/git/submodule_versions.py init"
-      - "docker run --user=$(id -u):$(id -g) --volume=\\$PWD:\\$IREE_DOCKER_WORKDIR --workdir=\\$IREE_DOCKER_WORKDIR --rm gcr.io/iree-oss/cmake@sha256:37ddc553262f28a4c290eb3ccda5e50ef1115209fbb62a44a85165e7b6f7d514 ./build_tools/cmake/build_tracing.sh"
+      - "git submodule sync && git submodule update --init --jobs 8 --depth 1"
+      - "docker run --user=$(id -u):$(id -g) --volume=\\$PWD:\\$IREE_DOCKER_WORKDIR --workdir=\\$IREE_DOCKER_WORKDIR --rm gcr.io/iree-oss/base@sha256:61f948eb15c90596b9faabbca168de2c7d5008e5d2c0b9c5c26a0efe572198d6 ./build_tools/cmake/build_tracing.sh"
     env:
       IREE_DOCKER_WORKDIR: "/usr/src/github/iree"
     agents:
@@ -16,8 +16,17 @@ steps:
 
   - label: ":hammer_and_wrench: Build the runtime only"
     commands:
-      - "./scripts/git/submodule_versions.py init"
-      - "docker run --user=$(id -u):$(id -g) --volume=\\$PWD:\\$IREE_DOCKER_WORKDIR --workdir=\\$IREE_DOCKER_WORKDIR --rm gcr.io/iree-oss/cmake@sha256:37ddc553262f28a4c290eb3ccda5e50ef1115209fbb62a44a85165e7b6f7d514 ./build_tools/cmake/build_runtime.sh"
+      - "git submodule sync && git submodule update --init --jobs 8 --depth 1"
+      - "docker run --user=$(id -u):$(id -g) --volume=\\$PWD:\\$IREE_DOCKER_WORKDIR --workdir=\\$IREE_DOCKER_WORKDIR --rm gcr.io/iree-oss/base@sha256:61f948eb15c90596b9faabbca168de2c7d5008e5d2c0b9c5c26a0efe572198d6 ./build_tools/cmake/build_runtime.sh"
+    env:
+      IREE_DOCKER_WORKDIR: "/usr/src/github/iree"
+    agents:
+      - "queue=build"
+
+  - label: ":pinching_hand: Build the size-optimized runtime only"
+    commands:
+      - "git submodule sync && git submodule update --init --jobs 8 --depth 1"
+      - "docker run --user=$(id -u):$(id -g) --volume=\\$PWD:\\$IREE_DOCKER_WORKDIR --workdir=\\$IREE_DOCKER_WORKDIR --rm gcr.io/iree-oss/base@sha256:61f948eb15c90596b9faabbca168de2c7d5008e5d2c0b9c5c26a0efe572198d6 ./build_tools/cmake/build_runtime_small.sh"
     env:
       IREE_DOCKER_WORKDIR: "/usr/src/github/iree"
     agents:
@@ -26,8 +35,8 @@ steps:
   - label: ":gnu: Build with GCC"
     key: "build-gcc"
     commands:
-      - "./scripts/git/submodule_versions.py init"
-      - "docker run --user=$(id -u):$(id -g) --volume=\\$PWD:\\$IREE_DOCKER_WORKDIR --workdir=\\$IREE_DOCKER_WORKDIR --rm gcr.io/iree-oss/cmake-gcc@sha256:59ce6bc769906d82dc03712ded5334aea4722adffdd131d684b689dbfd3e1009 ./build_tools/cmake/clean_build.sh"
+      - "git submodule sync && git submodule update --init --jobs 8 --depth 1"
+      - "docker run --env CC=/usr/bin/gcc-9 --env CXX=/usr/bin/g++-9 --user=$(id -u):$(id -g) --volume=\\$PWD:\\$IREE_DOCKER_WORKDIR --workdir=\\$IREE_DOCKER_WORKDIR --rm gcr.io/iree-oss/base@sha256:61f948eb15c90596b9faabbca168de2c7d5008e5d2c0b9c5c26a0efe572198d6 ./build_tools/cmake/clean_build.sh"
     env:
       IREE_DOCKER_WORKDIR: "/usr/src/github/iree"
     agents:
@@ -36,8 +45,8 @@ steps:
   - label: ":linux: Build host install"
     key: "build-host-install"
     commands:
-      - "./scripts/git/submodule_versions.py init"
-      - "docker run --user=$(id -u):$(id -g) --volume=\\$PWD:\\$IREE_DOCKER_WORKDIR --workdir=\\$IREE_DOCKER_WORKDIR --rm gcr.io/iree-oss/cmake@sha256:37ddc553262f28a4c290eb3ccda5e50ef1115209fbb62a44a85165e7b6f7d514 ./build_tools/cmake/build_host_install.sh"
+      - "git submodule sync && git submodule update --init --jobs 8 --depth 1"
+      - "docker run --user=$(id -u):$(id -g) --volume=\\$PWD:\\$IREE_DOCKER_WORKDIR --workdir=\\$IREE_DOCKER_WORKDIR --rm gcr.io/iree-oss/base@sha256:61f948eb15c90596b9faabbca168de2c7d5008e5d2c0b9c5c26a0efe572198d6 ./build_tools/cmake/build_host_install.sh"
       - "tar -czvf build-artifacts.tgz build-host/install"
     artifact_paths: "build-artifacts.tgz"
     env:
@@ -50,8 +59,8 @@ steps:
     commands:
       - "buildkite-agent artifact download --step build-host-install build-artifacts.tgz ./"
       - "tar xzf build-artifacts.tgz"
-      - "./scripts/git/submodule_versions.py init"
-      - "docker run --user=$(id -u):$(id -g) --volume=\\$PWD:\\$IREE_DOCKER_WORKDIR --workdir=\\$IREE_DOCKER_WORKDIR --rm gcr.io/iree-oss/cmake-emscripten@sha256:62dbe3f635e0f2686d899fd495fc61361c2ab93076528de54cadec7fc63b90c3 ./build_tools/cmake/build_runtime_emscripten.sh"
+      - "git submodule update --init --jobs 8 --depth 1"
+      - "docker run --user=$(id -u):$(id -g) --volume=\\$PWD:\\$IREE_DOCKER_WORKDIR --workdir=\\$IREE_DOCKER_WORKDIR --rm gcr.io/iree-oss/emscripten@sha256:41d1eb2045e1e379f03f30b6987e2adf671399da87cc8c54693f7a7b820859fb ./build_tools/cmake/build_runtime_emscripten.sh"
     env:
       IREE_DOCKER_WORKDIR: "/usr/src/github/iree"
     agents:

@@ -7,6 +7,7 @@
 #ifndef IREE_COMPILER_DIALECT_VM_CONVERSION_VMTOEMITC_EMITCTYPECONVERTER_H_
 #define IREE_COMPILER_DIALECT_VM_CONVERSION_VMTOEMITC_EMITCTYPECONVERTER_H_
 
+#include "iree/compiler/Dialect/VM/Conversion/VMToEmitC/VMAnalysis.h"
 #include "iree/compiler/Dialect/VM/IR/VMTypes.h"
 #include "mlir/Dialect/EmitC/IR/EmitC.h"
 #include "mlir/Transforms/DialectConversion.h"
@@ -18,16 +19,22 @@ namespace VM {
 
 class EmitCTypeConverter : public mlir::TypeConverter {
  public:
-  EmitCTypeConverter() {
-    // Return the incoming type in the default case.
-    addConversion([](Type type) { return type; });
-
-    addConversion([](emitc::OpaqueType type) { return type; });
-
-    addConversion([](IREE::VM::RefType type) {
-      return emitc::OpaqueType::get(type.getContext(), "iree_vm_ref_t*");
-    });
+  EmitCTypeConverter();
+  FailureOr<std::reference_wrapper<VMAnalysis>> lookupAnalysis(
+      mlir::FuncOp &funcOp) {
+    return lookupAnalysis(funcOp.getOperation());
   }
+  FailureOr<std::reference_wrapper<VMAnalysis>> lookupAnalysis(
+      IREE::VM::FuncOp &funcOp) {
+    return lookupAnalysis(funcOp.getOperation());
+  }
+  Optional<Value> materializeRef(Value ref);
+
+  SetVector<Operation *> sourceMaterializations;
+  VMAnalysisCache analysisCache;
+
+ private:
+  FailureOr<std::reference_wrapper<VMAnalysis>> lookupAnalysis(Operation *op);
 };
 
 }  // namespace VM

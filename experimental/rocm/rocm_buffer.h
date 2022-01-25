@@ -15,7 +15,7 @@
 extern "C" {
 #endif  // __cplusplus
 
-// Wraps a rocm allocation in an iree_hal_buffer_t.
+// Wraps a ROCm allocation in an iree_hal_buffer_t.
 iree_status_t iree_hal_rocm_buffer_wrap(
     iree_hal_allocator_t* allocator, iree_hal_memory_type_t memory_type,
     iree_hal_memory_access_t allowed_access,
@@ -23,10 +23,13 @@ iree_status_t iree_hal_rocm_buffer_wrap(
     iree_device_size_t byte_offset, iree_device_size_t byte_length,
     hipDeviceptr_t device_ptr, void* host_ptr, iree_hal_buffer_t** out_buffer);
 
-// Returns the rocm base pointer for the given |buffer|.
+// Returns the ROCm base pointer for the given |buffer|.
 // This is the entire allocated_buffer and must be offset by the buffer
 // byte_offset and byte_length when used.
 hipDeviceptr_t iree_hal_rocm_buffer_device_pointer(iree_hal_buffer_t* buffer);
+
+// Returns the ROCm host pointer for the given |buffer|, if available.
+void* iree_hal_rocm_buffer_host_pointer(iree_hal_buffer_t* buffer);
 
 #ifdef __cplusplus
 }  // extern "C"

@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file %s | iree-opt -split-input-file | IreeFileCheck %s
+// RUN: iree-opt -split-input-file %s | iree-opt -split-input-file | FileCheck %s
 
 // CHECK-LABEL: @asyncAlloca
 func @asyncAlloca(%arg0: index) -> !stream.resource<transient> {
@@ -19,9 +19,9 @@ func @asyncConstant(%arg0: index) -> !stream.resource<transient> {
 // -----
 
 // CHECK-LABEL: @asyncSplat
-func @asyncSplat(%arg0: index, %arg1: f32) -> !stream.resource<*> {
-  // CHECK: = stream.async.splat %arg1 : f32 -> !stream.resource<*>{%arg0}
-  %0 = stream.async.splat %arg1 : f32 -> !stream.resource<*>{%arg0}
+func @asyncSplat(%arg0: index, %arg1: i32) -> !stream.resource<*> {
+  // CHECK: = stream.async.splat %arg1 : i32 -> !stream.resource<*>{%arg0}
+  %0 = stream.async.splat %arg1 : i32 -> !stream.resource<*>{%arg0}
   return %0 : !stream.resource<*>
 }
 
@@ -48,11 +48,11 @@ func @asyncSlice(%arg0: !stream.resource<*>, %arg1: index) -> !stream.resource<*
 // -----
 
 // CHECK-LABEL: @asyncFill
-func @asyncFill(%arg0: !stream.resource<*>, %arg1: index, %arg2: f32) -> !stream.resource<*> {
+func @asyncFill(%arg0: !stream.resource<*>, %arg1: index, %arg2: i32) -> !stream.resource<*> {
   %c0 = arith.constant 0 : index
   %c128 = arith.constant 128 : index
-  // CHECK: = stream.async.fill %arg2, %arg0[%c0 to %c128 for %c128] : f32 -> %arg0 as !stream.resource<*>{%arg1}
-  %0 = stream.async.fill %arg2, %arg0[%c0 to %c128 for %c128] : f32 -> %arg0 as !stream.resource<*>{%arg1}
+  // CHECK: = stream.async.fill %arg2, %arg0[%c0 to %c128 for %c128] : i32 -> %arg0 as !stream.resource<*>{%arg1}
+  %0 = stream.async.fill %arg2, %arg0[%c0 to %c128 for %c128] : i32 -> %arg0 as !stream.resource<*>{%arg1}
   return %0 : !stream.resource<*>
 }
 
@@ -89,6 +89,26 @@ func @asyncTransfer(%arg0: !stream.resource<constant>, %arg1: index) -> !stream.
 
 // -----
 
+// CHECK-LABEL: @asyncLoad
+func @asyncLoad(%arg0: !stream.resource<staging>, %arg1: index) -> f32 {
+  %c0 = arith.constant 0 : index
+  // CHECK: = stream.async.load %arg0[%c0] : !stream.resource<staging>{%arg1} -> f32
+  %0 = stream.async.load %arg0[%c0] : !stream.resource<staging>{%arg1} -> f32
+  return %0 : f32
+}
+
+// -----
+
+// CHECK-LABEL: @asyncStore
+func @asyncStore(%arg0: !stream.resource<staging>, %arg1: index, %arg2: f32) -> !stream.resource<staging> {
+  %c0 = arith.constant 0 : index
+  // CHECK: = stream.async.store %arg2, %arg0[%c0] : f32 -> %arg0 as !stream.resource<staging>{%arg1}
+  %0 = stream.async.store %arg2, %arg0[%c0] : f32 -> %arg0 as !stream.resource<staging>{%arg1}
+  return %0 : !stream.resource<staging>
+}
+
+// -----
+
 // CHECK-LABEL: @asyncDispatch
 func @asyncDispatch(%arg0: !stream.resource<*>, %arg1: index) -> !stream.resource<*> {
   %c1 = arith.constant 1 : index
@@ -120,13 +140,25 @@ func @asyncExecute(%arg0: !stream.resource<*>, %arg1: index, %arg2: !stream.time
 // -----
 
 // CHECK-LABEL: @asyncExecuteNoCaptures
-func @asyncExecuteNoCaptures(%arg0: index, %arg1: f32) -> (!stream.resource<*>, !stream.timepoint) {
+func @asyncExecuteNoCaptures(%arg0: index, %arg1: i32) -> (!stream.resource<*>, !stream.timepoint) {
   // CHECK: = stream.async.execute with() -> !stream.resource<*>{%arg0} {
   %0:2 = stream.async.execute with() -> !stream.resource<*>{%arg0} {
     // CHECK: %[[T:.+]] = stream.async.splat
-    %1 = stream.async.splat %arg1 : f32 -> !stream.resource<*>{%arg0}
+    %1 = stream.async.splat %arg1 : i32 -> !stream.resource<*>{%arg0}
     // CHECK: stream.yield %[[T]] : !stream.resource<*>{%arg0}
     stream.yield %1 : !stream.resource<*>{%arg0}
   } => !stream.timepoint
   return %0#0, %0#1 : !stream.resource<*>, !stream.timepoint
+}
+
+// -----
+
+// CHECK-LABEL: @asyncExecuteNoResults
+func @asyncExecuteNoResults(%arg0: !stream.resource<*>, %arg1: index, %arg2: !stream.timepoint) -> (!stream.timepoint) {
+  // CHECK: = stream.async.execute await(%arg2) => with(%arg0 as %arg3: !stream.resource<*>{%arg1}) {
+  %0:1 = stream.async.execute await(%arg2) => with(%arg0 as %arg3: !stream.resource<*>{%arg1}) {
+    // CHECK: stream.yield
+    stream.yield
+  } => !stream.timepoint
+  return %0#0 : !stream.timepoint
 }

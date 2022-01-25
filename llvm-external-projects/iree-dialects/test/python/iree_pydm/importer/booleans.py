@@ -7,7 +7,7 @@ from iree.compiler.dialects.iree_pydm.importer.test_util import *
 # CHECK-LABEL: @logical_and
 # CHECK: %[[XVAL:.*]] = load_var %x
 # CHECK: %[[XBOOL:.*]] = as_bool %[[XVAL]]
-# CHECK: %[[R1:.*]] = functional_if %[[XBOOL]] {{.*}} {
+# CHECK: %[[R1:.*]] = functional_if %[[XBOOL]] {{.*}}{
 # CHECK:   %[[YVAL:.*]] = load_var %y
 # CHECK:   %[[YBOOL:.*]] = as_bool %[[YVAL]]
 # CHECK:   %[[R2:.*]] = functional_if %[[YBOOL]] {{.*}} {
@@ -31,7 +31,7 @@ def logical_and():
 # # CHECK-LABEL: @logical_or
 # CHECK: %[[XVAL:.*]] = load_var %x
 # CHECK: %[[XBOOL:.*]] = as_bool %[[XVAL]]
-# CHECK: %[[R1:.*]] = functional_if %[[XBOOL]] {{.*}} {
+# CHECK: %[[R1:.*]] = functional_if %[[XBOOL]] {{.*}}{
 # CHECK:   yield %[[XVAL]]
 # CHECK: } else {
 # CHECK:   %[[YVAL:.*]] = load_var %y
@@ -55,8 +55,8 @@ def logical_or():
 # CHECK-LABEL: func @logical_not
 # CHECK: %[[XVAL:.*]] = load_var %x
 # CHECK: %[[XBOOL:.*]] = as_bool %[[XVAL]]
-# CHECK: %[[T:.*]] = arith.constant true
-# CHECK: %[[F:.*]] = arith.constant false
+# CHECK: %[[T:.*]] = constant true
+# CHECK: %[[F:.*]] = constant false
 # CHECK: %[[R:.*]] = select %[[XBOOL]], %[[F]], %[[T]]
 @test_import_global
 def logical_not():
@@ -67,13 +67,13 @@ def logical_not():
 # CHECK-LABEL: func @conditional
 # CHECK: %[[XVAL:.*]] = load_var %x
 # CHECK: %[[XBOOL:.*]] = as_bool %[[XVAL]]
-# CHECK: %[[R1:.*]] = functional_if %[[XBOOL]] {{.*}} {
-# CHECK:   %[[TWOVAL:.*]] = arith.constant 2
-# CHECK:   %[[TWOBOXED:.*]] = box %[[TWOVAL]] : !iree_pydm.integer -> !iree_pydm.object
+# CHECK: %[[R1:.*]] = functional_if %[[XBOOL]] {{.*}}{
+# CHECK:   %[[TWOVAL:.*]] = constant 2
+# CHECK:   %[[TWOBOXED:.*]] = box %[[TWOVAL]] : !iree_pydm.integer ->
 # CHECK:   yield %[[TWOBOXED]]
 # CHECK: } else {
-# CHECK:   %[[THREEVAL:.*]] = arith.constant 3
-# CHECK:   %[[THREEBOXED:.*]] = box %[[THREEVAL]] : !iree_pydm.integer -> !iree_pydm.object
+# CHECK:   %[[THREEVAL:.*]] = constant 3
+# CHECK:   %[[THREEBOXED:.*]] = box %[[THREEVAL]] : !iree_pydm.integer ->
 # CHECK:   yield %[[THREEBOXED]]
 # CHECK: }
 @test_import_global

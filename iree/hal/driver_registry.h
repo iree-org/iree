@@ -85,14 +85,21 @@ typedef struct iree_hal_driver_registry_t iree_hal_driver_registry_t;
 // over the visibility of drivers to certain callers such as when dealing with
 // requests from multiple users may choose to allocate their own registries and
 // manage their lifetime as desired.
-//
-// TODO(benvanik): remove global registry and make callers manage always. We can
-// provide helpers to make that easier to do, but there's really no benefit to
-// having this be global like it is. Alternatively, this can be opt-in thanks to
-// LTO: if a user doesn't call this then the default registry is never
-// allocated.
 IREE_API_EXPORT iree_hal_driver_registry_t* iree_hal_driver_registry_default(
     void);
+
+// Allocates a driver registry that can be used to register and enumerate
+// HAL drivers.
+//
+// Callers must free the registry with iree_hal_driver_registry_free when it is
+// no longer needed.
+IREE_API_EXPORT iree_status_t iree_hal_driver_registry_allocate(
+    iree_allocator_t host_allocator, iree_hal_driver_registry_t** out_registry);
+
+// Frees a driver registry.
+// All factories will be implicitly unregistered.
+IREE_API_EXPORT void iree_hal_driver_registry_free(
+    iree_hal_driver_registry_t* registry);
 
 // Registers a driver factory to serve future queries/requests for drivers.
 // See iree_hal_driver_registry_t for more information.

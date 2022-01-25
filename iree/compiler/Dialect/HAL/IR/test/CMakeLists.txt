@@ -14,17 +14,13 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
-    "allocator_op_folding.mlir"
     "allocator_ops.mlir"
     "attributes.mlir"
-    "buffer_folding.mlir"
     "buffer_ops.mlir"
     "buffer_view_folding.mlir"
     "buffer_view_ops.mlir"
     "command_buffer_folding.mlir"
     "command_buffer_ops.mlir"
-    "constant_folding.mlir"
-    "constant_ops.mlir"
     "descriptor_set_ops.mlir"
     "device_ops.mlir"
     "executable_ops.mlir"
@@ -33,8 +29,10 @@ iree_lit_test_suite(
     "interface_ops.mlir"
     "invalid.mlir"
     "semaphore_ops.mlir"
-  DATA
-    iree::tools::IreeFileCheck
+    "tensor_op_folding.mlir"
+    "tensor_ops.mlir"
+  TOOLS
+    FileCheck
     iree::tools::iree-opt
 )
 

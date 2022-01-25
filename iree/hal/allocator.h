@@ -95,6 +95,10 @@ IREE_API_EXPORT void iree_hal_allocator_release(
 IREE_API_EXPORT iree_allocator_t
 iree_hal_allocator_host_allocator(const iree_hal_allocator_t* allocator);
 
+// Trims cached/unused pooled buffers, if any.
+IREE_API_EXPORT
+iree_status_t iree_hal_allocator_trim(iree_hal_allocator_t* allocator);
+
 // Queries the aggregate statistics from the allocator since creation.
 // Thread-safe; statistics are captured at the time the call is made.
 //
@@ -121,6 +125,9 @@ iree_hal_allocator_query_buffer_compatibility(
     iree_hal_buffer_usage_t intended_usage, iree_device_size_t allocation_size);
 
 // Allocates a buffer from the allocator.
+// If |initial_data| is provided then the bytes will be copied into the device
+// buffer. To avoid the copy when constant data is used prefer
+// iree_hal_allocator_wrap_buffer when available.
 // Fails if the memory type requested for the given usage cannot be serviced.
 // Callers can use iree_hal_allocator_can_allocate to decide their memory use
 // strategy.
@@ -138,7 +145,7 @@ iree_hal_allocator_query_buffer_compatibility(
 IREE_API_EXPORT iree_status_t iree_hal_allocator_allocate_buffer(
     iree_hal_allocator_t* allocator, iree_hal_memory_type_t memory_type,
     iree_hal_buffer_usage_t allowed_usage, iree_host_size_t allocation_size,
-    iree_hal_buffer_t** out_buffer);
+    iree_const_byte_span_t initial_data, iree_hal_buffer_t** out_buffer);
 
 // Wraps an existing host allocation in a buffer.
 //
@@ -174,22 +181,25 @@ IREE_API_EXPORT iree_status_t iree_hal_allocator_statistics_fprint(
 // used in file IO or tests). Buffers allocated with this will not be compatible
 // with real device allocators and will likely incur a copy (or failure) if
 // used.
+//
+// The buffers created from the allocator will use |host_allocator| for their
+// metadata and |data_allocator| for their device storage allocations. If the
+// two are the same the buffers will be allocated in a single flat slab.
 IREE_API_EXPORT iree_status_t iree_hal_allocator_create_heap(
-    iree_string_view_t identifier, iree_allocator_t host_allocator,
-    iree_hal_allocator_t** out_allocator);
+    iree_string_view_t identifier, iree_allocator_t data_allocator,
+    iree_allocator_t host_allocator, iree_hal_allocator_t** out_allocator);
 
 //===----------------------------------------------------------------------===//
 // iree_hal_allocator_t implementation details
 //===----------------------------------------------------------------------===//
 
 typedef struct iree_hal_allocator_vtable_t {
-  // << HAL C porting in progress >>
-  IREE_API_UNSTABLE
-
   void(IREE_API_PTR* destroy)(iree_hal_allocator_t* allocator);
 
   iree_allocator_t(IREE_API_PTR* host_allocator)(
       const iree_hal_allocator_t* allocator);
+
+  iree_status_t(IREE_API_PTR* trim)(iree_hal_allocator_t* allocator);
 
   void(IREE_API_PTR* query_statistics)(
       iree_hal_allocator_t* allocator,
@@ -204,17 +214,24 @@ typedef struct iree_hal_allocator_vtable_t {
   iree_status_t(IREE_API_PTR* allocate_buffer)(
       iree_hal_allocator_t* allocator, iree_hal_memory_type_t memory_type,
       iree_hal_buffer_usage_t allowed_usage, iree_host_size_t allocation_size,
-      iree_hal_buffer_t** out_buffer);
+      iree_const_byte_span_t initial_data, iree_hal_buffer_t** out_buffer);
 
   iree_status_t(IREE_API_PTR* wrap_buffer)(
       iree_hal_allocator_t* allocator, iree_hal_memory_type_t memory_type,
       iree_hal_memory_access_t allowed_access,
       iree_hal_buffer_usage_t allowed_usage, iree_byte_span_t data,
       iree_allocator_t data_allocator, iree_hal_buffer_t** out_buffer);
+
+  void(IREE_API_PTR* deallocate_buffer)(iree_hal_allocator_t* allocator,
+                                        iree_hal_buffer_t* buffer);
 } iree_hal_allocator_vtable_t;
+IREE_HAL_ASSERT_VTABLE_LAYOUT(iree_hal_allocator_vtable_t);
 
 IREE_API_EXPORT void iree_hal_allocator_destroy(
     iree_hal_allocator_t* allocator);
+
+IREE_API_EXPORT void iree_hal_allocator_deallocate_buffer(
+    iree_hal_allocator_t* allocator, iree_hal_buffer_t* buffer);
 
 #if IREE_STATISTICS_ENABLE
 

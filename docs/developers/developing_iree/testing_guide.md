@@ -105,6 +105,11 @@ iree_cc_test(
 Tests for the IREE compilation pipeline are written as lit tests in the same
 style as MLIR.
 
+By convention, IREE includes tests for printing and parsing of MLIR ops in
+`.../IR/test/{OP_CATEGORY}_ops.mlir` files, tests for folding and
+canonicalization in `.../IR/test/{OP_CATEGORY}_folding.mlir` files, and tests
+for compiler passes and pipelines in other `.../test/*.mlir` files.
+
 ### Running a Test
 
 For the test
@@ -128,13 +133,9 @@ For advice on writing MLIR compiler tests, see the
 [MLIR testing guide](https://mlir.llvm.org/getting_started/TestingGuide/). Tests
 should be `.mlir` files in `test` directory adjacent to the functionality they
 are testing. Instead of `mlir-opt`, use `iree-opt`, which registers IREE
-dialects and passes and doesn't register some unnecessary core ones. Instead of
-`FileCheck`, use
-[`IreeFileCheck`](https://github.com/google/iree/tree/main/iree/tools/IreeFileCheck.sh),
-a shell-script wrapper around FileCheck that passes it a few
-`--do-the-right-thing` flags.
+dialects and passes and doesn't register some unnecessary core ones.
 
-As with all parts of the IREE compiler, these should not have a dependency on
+As with most parts of the IREE compiler, these should not have a dependency on
 the runtime.
 
 ### Configuring the Build System
@@ -144,13 +145,13 @@ a single suite that globs all `.mlir` files in the directory and is called
 "lit".
 
 ```bzl
-load("//iree:lit_test.bzl", "iree_lit_test_suite")
+load("//iree/build_tools/bazel:iree_lit_test.bzl", "iree_lit_test_suite")
 
 iree_lit_test_suite(
     name = "lit",
     srcs = glob(["*.mlir"]),
-    data = [
-        "//iree/tools:IreeFileCheck",
+    tools = [
+        "@llvm-project//llvm:FileCheck",
         "//iree/tools:iree-opt",
     ],
 )
@@ -167,7 +168,7 @@ iree_lit_test_suite(
   SRCS
     "${_GLOB_X_MLIR}"
   DATA
-    iree::tools::IreeFileCheck
+    FileCheck
     iree::tools::iree-opt
 )
 ```

@@ -10,7 +10,6 @@
 include "iree/compiler/Dialect/Stream/IR/StreamInterfaces.td"
 include "iree/compiler/Dialect/Util/IR/UtilBase.td"
 include "iree/compiler/Dialect/Util/IR/UtilInterfaces.td"
-include "iree/compiler/Dialect/Shape/IR/ShapeBase.td"
 include "mlir/IR/SubElementInterfaces.td"
 
 //===----------------------------------------------------------------------===//
@@ -119,6 +118,8 @@ class Stream_Op<string mnemonic, list<OpTrait> traits = []> :
 //===----------------------------------------------------------------------===//
 
 def Stream_PrimitiveType : AnyTypeOf<[Index, AnyInteger, AnyFloat]>;
+def Stream_FillPatternType : AnyTypeOf<[I8, I16, I32]>;
+
 def Stream_Offset : TypeAlias<Index>;
 def Stream_Size : TypeAlias<Index>;
 
@@ -173,13 +174,13 @@ def Stream_AffinityAttr : AttrDef<Stream_Dialect, "Affinity", []> {
 }
 
 def Stream_Favor_Debug : I32EnumAttrCase<"Debug", 0, "debug">;
-def Stream_Favor_Concurrency : I32EnumAttrCase<"Concurrency", 1, "concurrency">;
-def Stream_Favor_MinPeakMemory : I32EnumAttrCase<"MinPeakMemory", 2, "min-peak-memory">;
+def Stream_Favor_MinPeakMemory : I32EnumAttrCase<"MinPeakMemory", 1, "min-peak-memory">;
+def Stream_Favor_MaxConcurrency : I32EnumAttrCase<"MaxConcurrency", 2, "max-concurrency">;
 def Stream_FavorAttr :
     I32EnumAttr<"Favor", "IREE partitioning bias", [
       Stream_Favor_Debug,
-      Stream_Favor_Concurrency,
       Stream_Favor_MinPeakMemory,
+      Stream_Favor_MaxConcurrency,
     ]> {
   let cppNamespace = "::mlir::iree_compiler::IREE::Stream";
 }
@@ -313,11 +314,10 @@ def Stream_TimepointAttr : AttrDef<Stream_Dialect, "Timepoint", []> {
   let description = [{}];
   let parameters = (ins AttributeSelfTypeParameter<"">:$type);
   let valueType = Stream_Timepoint;
-  let typeBuilder = "IREE::Stream::TimepointType::get($_value.getContext())";
   let constBuilderCall = [{
     IREE::Stream::TimepointAttr::get(
         $_builder.getContext(),
-        IREE::Stream::TimepointType::get($_value.getContext()));
+        IREE::Stream::TimepointType::get($_builder.getContext()));
   }];
 }
 

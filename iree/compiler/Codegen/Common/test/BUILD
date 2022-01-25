@@ -6,7 +6,7 @@
 
 # Tests for common transforms.
 
-load("//iree:lit_test.bzl", "iree_lit_test_suite")
+load("//build_tools/bazel:iree_lit_test.bzl", "iree_lit_test_suite")
 load("//build_tools/bazel:enforce_glob.bzl", "enforce_glob")
 
 package(
@@ -21,21 +21,25 @@ iree_lit_test_suite(
         [
             "affinemin_canonicalization.mlir",
             "canonicalize_interface_load_store.mlir",
+            "convert_to_destination_passing_style.mlir",
             "dead_alloc.mlir",
             "f32Tof16.mlir",
             "flatten_memref_subspan.mlir",
+            "fold_affine_min_in_distributed_loops.mlir",
             "fold_tensor_extract_op.mlir",
             "forop_canonicalization.mlir",
+            "iree_comprehensive_bufferize.mlir",
             "linalg_bufferize.mlir",
             "remove_dead_allocs.mlir",
+            "remove_trivial_loops.mlir",
             "transpose_canonicalization.mlir",
             "vectorize_linalg_conv.mlir",
             "vectorize_linalg_mmt4d.mlir",
         ],
         include = ["*.mlir"],
     ),
-    data = [
-        "//iree/tools:IreeFileCheck",
+    tools = [
         "//iree/tools:iree-opt",
+        "@llvm-project//llvm:FileCheck",
     ],
 )

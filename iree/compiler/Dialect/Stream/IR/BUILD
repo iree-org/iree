@@ -25,7 +25,6 @@ td_library(
         include = ["*.td"],
     ),
     deps = [
-        "//iree/compiler/Dialect/Shape/IR:td_files",
         "//iree/compiler/Dialect/Util/IR:td_files",
         "@llvm-project//mlir:InferTypeOpInterfaceTdFiles",
         "@llvm-project//mlir:OpBaseTdFiles",
@@ -65,8 +64,9 @@ cc_library(
         ":StreamInterfacesGen",
         ":StreamOpsGen",
         ":StreamTypesGen",
-        "//iree/compiler/Dialect/Shape/IR",
+        "//iree/compiler/Dialect/Stream/Builtins",
         "//iree/compiler/Dialect/Util/IR",
+        "//iree/compiler/Utils",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:ArithmeticDialect",
         "@llvm-project//mlir:IR",

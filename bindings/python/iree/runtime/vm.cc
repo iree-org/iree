@@ -218,16 +218,15 @@ void VmVariantList::PushBufferView(HalDevice& device,
   // TODO(laurenzo): Expand to other layouts as needed.
   // TODO(laurenzo): Wrap and retain original buffer (depends_on_pyobject=true).
   iree_hal_buffer_t* raw_buffer;
-  CheckApiStatus(iree_hal_allocator_allocate_buffer(
-                     device.allocator(),
-                     static_cast<iree_hal_memory_type_t>(
-                         IREE_HAL_MEMORY_TYPE_HOST_LOCAL |
-                         IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE),
-                     IREE_HAL_BUFFER_USAGE_ALL, py_view.len, &raw_buffer),
-                 "Failed to allocate device visible buffer");
   CheckApiStatus(
-      iree_hal_buffer_write_data(raw_buffer, 0, py_view.buf, py_view.len),
-      "Error writing to input buffer");
+      iree_hal_allocator_allocate_buffer(
+          device.allocator(),
+          static_cast<iree_hal_memory_type_t>(
+              IREE_HAL_MEMORY_TYPE_HOST_LOCAL |
+              IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE),
+          IREE_HAL_BUFFER_USAGE_ALL, py_view.len,
+          iree_make_const_byte_span(py_view.buf, py_view.len), &raw_buffer),
+      "Failed to allocate device visible buffer");
 
   // Only capture the reference to the exporting object (incrementing it)
   // once guaranteed successful.
@@ -247,10 +246,10 @@ void VmVariantList::PushBufferView(HalDevice& device,
   std::vector<int> dims(py_view.ndim);
   std::copy(py_view.shape, py_view.shape + py_view.ndim, dims.begin());
   iree_hal_buffer_view_t* buffer_view;
-  CheckApiStatus(
-      iree_hal_buffer_view_create(raw_buffer, dims.data(), dims.size(),
-                                  element_type, encoding_type, &buffer_view),
-      "Error allocating buffer_view");
+  CheckApiStatus(iree_hal_buffer_view_create(
+                     raw_buffer, dims.data(), dims.size(), element_type,
+                     encoding_type, iree_allocator_system(), &buffer_view),
+                 "Error allocating buffer_view");
   iree_hal_buffer_release(raw_buffer);
   iree_vm_ref_t buffer_view_ref = iree_hal_buffer_view_move_ref(buffer_view);
   CheckApiStatus(iree_vm_list_push_ref_move(raw_ptr(), &buffer_view_ref),
@@ -390,10 +389,11 @@ py::object VmVariantList::GetAsSerializedTraceValue(int index) {
 
       // Map memory.
       iree_device_size_t byte_length = iree_hal_buffer_byte_length(raw_buffer);
-      iree_hal_buffer_mapping_t mapped_memory;
+      iree_hal_buffer_mapping_t mapped_memory = {{0}};
       CheckApiStatus(iree_hal_buffer_map_range(
-                         raw_buffer, IREE_HAL_MEMORY_ACCESS_READ,
-                         0 /* element_offset */, byte_length, &mapped_memory),
+                         raw_buffer, IREE_HAL_MAPPING_MODE_SCOPED,
+                         IREE_HAL_MEMORY_ACCESS_READ, 0 /* element_offset */,
+                         byte_length, &mapped_memory),
                      "Could not map memory");
       record["contents"] =
           py::bytes(reinterpret_cast<const char*>(mapped_memory.contents.data),
@@ -441,24 +441,28 @@ py::object VmVariantList::GetAsNdarray(int index) {
   // TODO: Handle dtypes that do not map to a code (i.e. fp16).
   const char* dtype_code;
   switch (element_type) {
+    case IREE_HAL_ELEMENT_TYPE_INT_8:
     case IREE_HAL_ELEMENT_TYPE_SINT_8:
       dtype_code = "b";
       break;
     case IREE_HAL_ELEMENT_TYPE_UINT_8:
       dtype_code = "B";
       break;
+    case IREE_HAL_ELEMENT_TYPE_INT_16:
     case IREE_HAL_ELEMENT_TYPE_SINT_16:
       dtype_code = "h";
       break;
     case IREE_HAL_ELEMENT_TYPE_UINT_16:
       dtype_code = "H";
       break;
+    case IREE_HAL_ELEMENT_TYPE_INT_32:
     case IREE_HAL_ELEMENT_TYPE_SINT_32:
       dtype_code = "i";
       break;
     case IREE_HAL_ELEMENT_TYPE_UINT_32:
       dtype_code = "I";
       break;
+    case IREE_HAL_ELEMENT_TYPE_INT_64:
     case IREE_HAL_ELEMENT_TYPE_SINT_64:
       dtype_code = "l";
       break;
@@ -471,7 +475,7 @@ py::object VmVariantList::GetAsNdarray(int index) {
     case IREE_HAL_ELEMENT_TYPE_FLOAT_64:
       dtype_code = "d";
       break;
-    case IREE_HAL_ELEMENT_TYPE_VALUE(IREE_HAL_NUMERICAL_TYPE_INTEGER_SIGNED, 1):
+    case IREE_HAL_ELEMENT_TYPE_VALUE(IREE_HAL_NUMERICAL_TYPE_INTEGER, 1):
       // Due to layering issues it is not uncommon to get i1 buffer views
       // and we just silently promote them to i8 since that is what they are.
       // Really i1 should not exist at this boundary.
@@ -485,10 +489,11 @@ py::object VmVariantList::GetAsNdarray(int index) {
   // Map memory.
   iree_device_size_t byte_length =
       iree_hal_buffer_byte_length(buffer.raw_ptr());
-  iree_hal_buffer_mapping_t mapped_memory;
+  iree_hal_buffer_mapping_t mapped_memory = {{0}};
   CheckApiStatus(iree_hal_buffer_map_range(
-                     buffer.raw_ptr(), IREE_HAL_MEMORY_ACCESS_READ,
-                     0 /* element_offset */, byte_length, &mapped_memory),
+                     buffer.raw_ptr(), IREE_HAL_MAPPING_MODE_SCOPED,
+                     IREE_HAL_MEMORY_ACCESS_READ, 0 /* element_offset */,
+                     byte_length, &mapped_memory),
                  "Could not map memory");
 
   // Turn the mapping into a python object that retains until the array is

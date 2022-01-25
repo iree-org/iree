@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
+#include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "iree/compiler/Dialect/VM/Conversion/ImportUtils.h"
 #include "iree/compiler/Dialect/VM/IR/VMOps.h"
 #include "mlir/Transforms/DialectConversion.h"
@@ -12,6 +13,61 @@
 namespace mlir {
 namespace iree_compiler {
 namespace {
+
+class CommandBufferFillBufferOpConversion
+    : public OpConversionPattern<IREE::HAL::CommandBufferFillBufferOp> {
+ public:
+  CommandBufferFillBufferOpConversion(MLIRContext *context,
+                                      SymbolTable &importSymbols,
+                                      TypeConverter &typeConverter,
+                                      StringRef importName)
+      : OpConversionPattern(typeConverter, context) {
+    importOp = importSymbols.lookup<IREE::VM::ImportOp>(importName);
+    assert(importOp);
+  }
+
+  LogicalResult matchAndRewrite(
+      IREE::HAL::CommandBufferFillBufferOp op, OpAdaptor adaptor,
+      ConversionPatternRewriter &rewriter) const override {
+    auto importType = importOp.getType();
+
+    SmallVector<Value, 8> callOperands = {
+        adaptor.command_buffer(),
+        adaptor.target_buffer(),
+        adaptor.target_offset(),
+        adaptor.length(),
+    };
+
+    // Record the original pattern length then extend it to a 32 bit integer.
+    auto originalPatternType = op.pattern().getType();
+    auto patternBitWidth = originalPatternType.getIntOrFloatBitWidth();
+    // The pattern length (in bytes) will be used at runtime to issue the fill
+    // command. While the pattern itself will be stored in a 32 bit integer,
+    // the fill operation will use this length to slice a potentially smaller
+    // range of bits from the full pattern.
+    auto patternLengthBytes =
+        IREE::Util::getRoundedElementByteWidth(originalPatternType);
+    auto patternLengthConst = rewriter.createOrFold<mlir::arith::ConstantIntOp>(
+        op.getLoc(), patternLengthBytes, 32);
+    Value pattern = op.pattern();
+    if (patternBitWidth < 32) {
+      pattern = rewriter.createOrFold<arith::ExtUIOp>(
+          op.getLoc(), pattern, rewriter.getIntegerType(32));
+    }
+    callOperands.push_back(pattern);
+    callOperands.push_back(patternLengthConst);
+
+    auto callOp = rewriter.replaceOpWithNewOp<IREE::VM::CallOp>(
+        op, SymbolRefAttr::get(importOp), importType.getResults(),
+        callOperands);
+
+    copyImportAttrs(importOp, callOp);
+    return success();
+  }
+
+ private:
+  mutable IREE::VM::ImportOp importOp;
+};
 
 class CommandBufferPushDescriptorSetOpConversion
     : public OpConversionPattern<IREE::HAL::CommandBufferPushDescriptorSetOp> {
@@ -26,29 +82,27 @@ class CommandBufferPushDescriptorSetOpConversion
   }
 
   LogicalResult matchAndRewrite(
-      IREE::HAL::CommandBufferPushDescriptorSetOp op,
-      llvm::ArrayRef<Value> operands,
+      IREE::HAL::CommandBufferPushDescriptorSetOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     auto importType = importOp.getType();
-    IREE::HAL::CommandBufferPushDescriptorSetOp::Adaptor newOperands(operands);
 
     SmallVector<Value, 8> callOperands = {
-        newOperands.command_buffer(),
-        newOperands.executable_layout(),
-        newOperands.set(),
+        adaptor.command_buffer(),
+        adaptor.executable_layout(),
+        adaptor.set(),
     };
     SmallVector<int16_t, 5> segmentSizes = {
         /*command_buffer=*/-1,
         /*executable_layout=*/-1,
         /*set=*/-1,
         /*bindings=*/
-        static_cast<int16_t>(newOperands.binding_ordinals().size()),
+        static_cast<int16_t>(adaptor.binding_ordinals().size()),
     };
-    for (size_t i = 0; i < newOperands.binding_ordinals().size(); ++i) {
-      callOperands.push_back(newOperands.binding_ordinals()[i]);
-      callOperands.push_back(newOperands.binding_buffers()[i]);
-      callOperands.push_back(newOperands.binding_offsets()[i]);
-      callOperands.push_back(newOperands.binding_lengths()[i]);
+    for (size_t i = 0; i < adaptor.binding_ordinals().size(); ++i) {
+      callOperands.push_back(adaptor.binding_ordinals()[i]);
+      callOperands.push_back(adaptor.binding_buffers()[i]);
+      callOperands.push_back(adaptor.binding_offsets()[i]);
+      callOperands.push_back(adaptor.binding_lengths()[i]);
     }
 
     auto callOp = rewriter.replaceOpWithNewOp<IREE::VM::CallVariadicOp>(
@@ -86,7 +140,7 @@ void populateHALCommandBufferToVMPatterns(MLIRContext *context,
       .insert<VMImportOpConversion<IREE::HAL::CommandBufferExecutionBarrierOp>>(
           context, importSymbols, typeConverter,
           "hal.command_buffer.execution_barrier");
-  patterns.insert<VMImportOpConversion<IREE::HAL::CommandBufferFillBufferOp>>(
+  patterns.insert<CommandBufferFillBufferOpConversion>(
       context, importSymbols, typeConverter, "hal.command_buffer.fill_buffer");
   patterns.insert<VMImportOpConversion<IREE::HAL::CommandBufferCopyBufferOp>>(
       context, importSymbols, typeConverter, "hal.command_buffer.copy_buffer");

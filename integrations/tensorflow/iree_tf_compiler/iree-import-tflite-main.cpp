@@ -21,6 +21,7 @@
 #include "mlir/Support/FileUtilities.h"
 #include "tensorflow/compiler/mlir/lite/flatbuffer_import.h"
 #include "tensorflow/compiler/mlir/lite/ir/tfl_ops.h"
+#include "tensorflow/compiler/mlir/tensorflow/dialect_registration.h"
 
 using namespace llvm;
 using namespace mlir;
@@ -65,6 +66,8 @@ int main(int argc, char **argv) {
   registry.insert<mlir::tosa::TosaDialect>();
   registry.insert<quant::QuantizationDialect>();
   registry.insert<StandardOpsDialect, mlir::arith::ArithmeticDialect>();
+
+  RegisterAllTensorFlowDialects(registry);
 
   // Convert the Module proto into MLIR.
   MLIRContext context(registry);

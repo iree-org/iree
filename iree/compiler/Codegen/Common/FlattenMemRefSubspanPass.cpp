@@ -36,8 +36,6 @@
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
-#include "iree/compiler/Dialect/Shape/IR/ShapeDialect.h"
-#include "iree/compiler/Dialect/Shape/IR/ShapeOps.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
@@ -132,7 +130,7 @@ struct FlattenAlloc final : public OpConversionPattern<AllocOpTy> {
   using OpConversionPattern<AllocOpTy>::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      AllocOpTy allocOp, ArrayRef<Value> operands,
+      AllocOpTy allocOp, typename AllocOpTy::Adaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     auto oldType = allocOp.getType().template dyn_cast<MemRefType>();
     if (!oldType || !oldType.getLayout().isIdentity()) return failure();
@@ -163,7 +161,7 @@ struct FlattenGlobal final : public OpConversionPattern<memref::GlobalOp> {
   }
 
   LogicalResult matchAndRewrite(
-      memref::GlobalOp globalOp, ArrayRef<Value> operands,
+      memref::GlobalOp globalOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     auto oldType = globalOp.type().dyn_cast<MemRefType>();
     if (!oldType || !oldType.getLayout().isIdentity()) return failure();
@@ -189,7 +187,7 @@ struct FlattenGetGlobal final
   using OpConversionPattern::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      memref::GetGlobalOp getOp, ArrayRef<Value> operands,
+      memref::GetGlobalOp getOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     auto oldType = getOp.getType().dyn_cast<MemRefType>();
     if (!oldType || !oldType.getLayout().isIdentity()) return failure();
@@ -213,7 +211,7 @@ struct FlattenBindingSubspan final
   using OpConversionPattern::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      IREE::HAL::InterfaceBindingSubspanOp subspanOp, ArrayRef<Value> operands,
+      IREE::HAL::InterfaceBindingSubspanOp subspanOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     auto oldType = subspanOp.getType().dyn_cast<MemRefType>();
     // IREE subspan ops only use memref types with the default identity
@@ -225,11 +223,16 @@ struct FlattenBindingSubspan final
     Type newType = getTypeConverter()->convertType(oldType);
 
     rewriter.replaceOpWithNewOp<IREE::HAL::InterfaceBindingSubspanOp>(
-        subspanOp, newType, subspanOp.binding(), subspanOp.byte_offset(),
-        subspanOp.byte_length(), dynamicDim);
+        subspanOp, newType, subspanOp.set(), subspanOp.binding(),
+        subspanOp.type(), subspanOp.byte_offset(), dynamicDim,
+        subspanOp.alignmentAttr());
     return success();
   }
 };
+
+//===----------------------------------------------------------------------===//
+// Linearizing Patterns
+//===----------------------------------------------------------------------===//
 
 /// Generates IR to perform index linearization with the given `indices`
 /// indexing into the given memref `sourceValue`.
@@ -262,12 +265,9 @@ static Value linearizeIndices(Value sourceValue, ValueRange indices,
   Operation *sourceOp = sourceValue.getDefiningOp();
   SmallVector<Value, 4> dims;
   dims.reserve(rank);
-  if (auto shapeCarryOp = dyn_cast<ShapeCarryingInterface>(sourceOp)) {
-    Value shapeOp =
-        shapeCarryOp.buildResultValueRankedShape(sourceValue, builder);
-    for (int i = 0; i < rank; ++i) {
-      dims.push_back(builder.create<Shape::RankedDimOp>(loc, shapeOp, i));
-    }
+  if (auto shapeAwareOp =
+          dyn_cast<IREE::Util::ShapeAwareOpInterface>(sourceOp)) {
+    dims = shapeAwareOp.buildResultValueShape(sourceValue, builder);
   } else {
     auto getDimValues = [&](MemRefType type, ValueRange dynamicDims) {
       auto shape = type.getShape();
@@ -312,7 +312,7 @@ struct LinearizeLoadIndices final : public OpConversionPattern<memref::LoadOp> {
       ConversionPatternRewriter &rewriter) const override {
     if (!isRankOneMemRef(adaptor.memref().getType())) {
       return rewriter.notifyMatchFailure(
-          loadOp, "expected converted memref of rank <= 1");
+          loadOp, "expected converted memref of rank == 1");
     }
 
     Value linearIndex = linearizeIndices(loadOp.memref(), loadOp.getIndices(),
@@ -337,7 +337,7 @@ struct LinearizeStoreIndices final
       ConversionPatternRewriter &rewriter) const override {
     if (!isRankOneMemRef(adaptor.memref().getType())) {
       return rewriter.notifyMatchFailure(
-          storeOp, "expected converted memref of rank <= 1");
+          storeOp, "expected converted memref of rank == 1");
     }
 
     Value linearIndex = linearizeIndices(storeOp.memref(), storeOp.getIndices(),
@@ -366,7 +366,7 @@ struct LinearizeTransferReadIndices final
     }
     if (!isRankOneMemRef(adaptor.source().getType())) {
       return rewriter.notifyMatchFailure(
-          transferReadOp, "expected converted memref of rank <= 1");
+          transferReadOp, "expected converted memref of rank == 1");
     }
     Value linearIndex =
         linearizeIndices(transferReadOp.source(), transferReadOp.indices(),
@@ -377,7 +377,8 @@ struct LinearizeTransferReadIndices final
 
     rewriter.replaceOpWithNewOp<vector::TransferReadOp>(
         transferReadOp, transferReadOp.getVectorType(), adaptor.source(),
-        linearIndex, rewriter.getDimIdentityMap(), transferReadOp.padding(),
+        linearIndex, AffineMapAttr::get(rewriter.getDimIdentityMap()),
+        transferReadOp.padding(), /*mask=*/Value(),
         transferReadOp.in_boundsAttr());
     return success();
   }
@@ -397,7 +398,7 @@ struct LinearizeTransferWriteIndices final
     }
     if (!isRankOneMemRef(adaptor.source().getType())) {
       return rewriter.notifyMatchFailure(
-          transferWriteOp, "expected converted memref of rank <= 1");
+          transferWriteOp, "expected converted memref of rank == 1");
     }
     Value linearIndex =
         linearizeIndices(transferWriteOp.source(), transferWriteOp.indices(),
@@ -408,7 +409,8 @@ struct LinearizeTransferWriteIndices final
 
     rewriter.replaceOpWithNewOp<vector::TransferWriteOp>(
         transferWriteOp, adaptor.vector(), adaptor.source(), linearIndex,
-        rewriter.getDimIdentityMap(), transferWriteOp.in_boundsAttr());
+        AffineMapAttr::get(rewriter.getDimIdentityMap()),
+        transferWriteOp.in_boundsAttr());
     return success();
   }
 };
@@ -419,17 +421,17 @@ struct AdjustConversionCast final
   using OpConversionPattern::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      UnrealizedConversionCastOp castOp, ArrayRef<Value> operands,
+      UnrealizedConversionCastOp castOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     if (castOp->getNumOperands() != 1) return failure();
 
-    Value input = operands.front();
+    Value input = adaptor.getOperands().front();
     // We only want to handle cases where the cast op handles memref types.
     if (!input.getType().isa<BaseMemRefType>()) return failure();
 
     if (!isRankOneMemRef(input.getType())) {
       return rewriter.notifyMatchFailure(
-          castOp, "expected converted memref of rank <= 1");
+          castOp, "expected converted memref of rank == 1");
     }
     rewriter.replaceOpWithNewOp<UnrealizedConversionCastOp>(
         castOp, castOp.getResultTypes(), input);
@@ -440,6 +442,24 @@ struct AdjustConversionCast final
 //===----------------------------------------------------------------------===//
 // Folding Patterns
 //===----------------------------------------------------------------------===//
+
+/// Removes MemRef reshape ops given that we'll linearize both the source and
+/// target type to the same one.
+template <typename ReshapeOpTy>
+struct FoldMemRefReshape final : public OpConversionPattern<ReshapeOpTy> {
+  using OpConversionPattern<ReshapeOpTy>::OpConversionPattern;
+
+  LogicalResult matchAndRewrite(
+      ReshapeOpTy op, typename ReshapeOpTy::Adaptor adaptor,
+      ConversionPatternRewriter &rewriter) const override {
+    if (!isRankOneMemRef(adaptor.src().getType())) {
+      return rewriter.notifyMatchFailure(
+          op, "expected converted memref of rank == 1");
+    }
+    rewriter.replaceOp(op, adaptor.src());
+    return success();
+  };
+};
 
 /// Returns the number of bytes of the given `type`. Returns llvm::None if
 /// cannot deduce.
@@ -474,10 +494,9 @@ struct FoldSubspanOffsetIntoLoadStore final : public OpRewritePattern<OpType> {
     if (!subspanOp) return failure();
 
     // If the subspan op has a zero byte offset then we are done.
-    if (matchPattern(subspanOp.byte_offset(), m_Zero())) return failure();
-    // Byte length is unsupported for now.
-    if (subspanOp.byte_length()) {
-      return rewriter.notifyMatchFailure(op, "byte length unsupported");
+    if (!subspanOp.byte_offset() ||
+        matchPattern(subspanOp.byte_offset(), m_Zero())) {
+      return failure();
     }
 
     // Calculate the offset we need to add to the load/store op, in terms of how
@@ -493,8 +512,9 @@ struct FoldSubspanOffsetIntoLoadStore final : public OpRewritePattern<OpType> {
     Value zero =
         rewriter.create<arith::ConstantIndexOp>(op.memref().getLoc(), 0);
     Value newSubspan = rewriter.create<IREE::HAL::InterfaceBindingSubspanOp>(
-        op.memref().getLoc(), subspanOp.getType(), subspanOp.binding(), zero,
-        subspanOp.byte_length(), subspanOp.dynamic_dims());
+        op.memref().getLoc(), subspanOp.getType(), subspanOp.set(),
+        subspanOp.binding(), subspanOp.type(), zero, subspanOp.dynamic_dims(),
+        subspanOp.alignmentAttr());
     rewriter.restoreInsertionPoint(ip);
 
     MLIRContext *context = rewriter.getContext();
@@ -526,6 +546,19 @@ struct FoldSubspanOffsetIntoLoadStore final : public OpRewritePattern<OpType> {
   }
 };
 
+/// Erase alignment hints.
+struct RemoveAssumeAlignOp
+    : public OpRewritePattern<memref::AssumeAlignmentOp> {
+ public:
+  using OpRewritePattern<memref::AssumeAlignmentOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(memref::AssumeAlignmentOp op,
+                                PatternRewriter &rewriter) const override {
+    rewriter.eraseOp(op);
+    return success();
+  }
+};
+
 //===----------------------------------------------------------------------===//
 // Pass
 //===----------------------------------------------------------------------===//
@@ -536,7 +569,7 @@ struct FlattenMemRefSubspanPass
   FlattenMemRefSubspanPass(const FlattenMemRefSubspanPass &pass) {}
 
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<AffineDialect, memref::MemRefDialect, ShapeDialect>();
+    registry.insert<AffineDialect, memref::MemRefDialect>();
   }
 
   void runOnOperation() override {
@@ -544,6 +577,12 @@ struct FlattenMemRefSubspanPass
     // ops. This requires setting up conversion targets with type converter.
 
     MLIRContext &context = getContext();
+
+    // This pass currently doesn't support alignment hints so remove them first.
+    OwningRewritePatternList patterns(&context);
+    patterns.add<RemoveAssumeAlignOp>(&context);
+    (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
+
     FlattenMemRefTypeConverter typeConverter;
     RewritePatternSet flattenPatterns(&context);
     flattenPatterns
@@ -551,15 +590,17 @@ struct FlattenMemRefSubspanPass
              FlattenGlobal, FlattenGetGlobal, FlattenBindingSubspan,
              LinearizeLoadIndices, LinearizeStoreIndices,
              LinearizeTransferReadIndices, LinearizeTransferWriteIndices,
-             AdjustConversionCast>(typeConverter, &context);
+             AdjustConversionCast, FoldMemRefReshape<memref::CollapseShapeOp>,
+             FoldMemRefReshape<memref::ExpandShapeOp>>(typeConverter, &context);
 
     ConversionTarget target(context);
     target.markUnknownOpDynamicallyLegal([](Operation *) { return true; });
-    target.addDynamicallyLegalOp<IREE::HAL::InterfaceBindingSubspanOp,
-                                 memref::AllocaOp, memref::AllocOp,
-                                 memref::GetGlobalOp>([](Operation *op) {
-      return isRankOneMemRef(op->getResultTypes().front());
-    });
+    target.addDynamicallyLegalOp<
+        IREE::HAL::InterfaceBindingSubspanOp, memref::AllocaOp, memref::AllocOp,
+        memref::CollapseShapeOp, memref::ExpandShapeOp, memref::GetGlobalOp>(
+        [](Operation *op) {
+          return isRankOneMemRef(op->getResultTypes().front());
+        });
     target.addDynamicallyLegalOp<memref::GlobalOp>(
         [](memref::GlobalOp op) { return isRankOneMemRef(op.type()); });
     target.addDynamicallyLegalOp<memref::LoadOp>([](memref::LoadOp loadOp) {
@@ -597,7 +638,10 @@ struct FlattenMemRefSubspanPass
     foldPatterns.add<FoldSubspanOffsetIntoLoadStore<memref::LoadOp>,
                      FoldSubspanOffsetIntoLoadStore<memref::StoreOp>>(&context);
 
-    (void)applyPatternsAndFoldGreedily(getOperation(), std::move(foldPatterns));
+    if (failed(applyPatternsAndFoldGreedily(getOperation(),
+                                            std::move(foldPatterns)))) {
+      return signalPassFailure();
+    }
   }
 };
 

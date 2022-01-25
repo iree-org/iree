@@ -1,6 +1,4 @@
-// Tests printing and parsing of arithmetic ops.
-
-// RUN: iree-opt -split-input-file %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file %s | FileCheck %s
 
 // CHECK-LABEL: @add_i32
 vm.module @my_module {

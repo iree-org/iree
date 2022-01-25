@@ -171,6 +171,16 @@ IREE_API_EXPORT iree_hal_allocator_t* iree_runtime_session_device_allocator(
   return iree_hal_device_allocator(device);
 }
 
+IREE_API_EXPORT iree_status_t
+iree_runtime_session_trim(iree_runtime_session_t* session) {
+  IREE_ASSERT_ARGUMENT(session);
+  IREE_TRACE_ZONE_BEGIN(z0);
+  iree_status_t status = iree_vm_context_notify(
+      iree_runtime_session_context(session), IREE_VM_SIGNAL_LOW_MEMORY);
+  IREE_TRACE_ZONE_END(z0);
+  return status;
+}
+
 IREE_API_EXPORT iree_status_t iree_runtime_session_append_module(
     iree_runtime_session_t* session, iree_vm_module_t* module) {
   IREE_ASSERT_ARGUMENT(session);

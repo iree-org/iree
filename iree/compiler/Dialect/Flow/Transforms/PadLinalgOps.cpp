@@ -6,7 +6,7 @@
 
 #include "iree/compiler/Dialect/Flow/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
-#include "mlir/Dialect/Linalg/IR/LinalgOps.h"
+#include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
@@ -54,8 +54,9 @@ class PadMatmulOp : public OpRewritePattern<linalg::MatmulOp> {
     int paddingForN = newNSize - N;
     int paddingForK = newKSize - K;
 
-    if (paddingForM == 0 && paddingForN == 0 && paddingForK == 0)
+    if (paddingForM == 0 && paddingForN == 0 && paddingForK == 0) {
       return failure();
+    }
 
     auto lhsPaddedType =
         RankedTensorType::get({newMSize, newKSize}, lhsType.getElementType());
@@ -139,7 +140,10 @@ class PadLinalgOpsPass : public PadLinalgOpsBase<PadLinalgOpsPass> {
     MLIRContext *context = &getContext();
     OwningRewritePatternList patterns(context);
     patterns.insert<PadMatmulOp>(context, paddingSize);
-    (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
+    if (failed(applyPatternsAndFoldGreedily(getOperation(),
+                                            std::move(patterns)))) {
+      return signalPassFailure();
+    }
   }
 
  private:
@@ -147,8 +151,7 @@ class PadLinalgOpsPass : public PadLinalgOpsBase<PadLinalgOpsPass> {
 };
 }  // namespace
 
-std::unique_ptr<OperationPass<mlir::FuncOp>>
-createPadLinalgOpsToIntegerMultiplePass(int paddingSize) {
+std::unique_ptr<Pass> createPadLinalgOpsToIntegerMultiplePass(int paddingSize) {
   return std::make_unique<PadLinalgOpsPass>(paddingSize);
 }
 

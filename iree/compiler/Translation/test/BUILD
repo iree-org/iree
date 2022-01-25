@@ -6,7 +6,7 @@
 
 # Tests for common transforms.
 
-load("//iree:lit_test.bzl", "iree_lit_test_suite")
+load("//build_tools/bazel:iree_lit_test.bzl", "iree_lit_test_suite")
 load("//build_tools/bazel:enforce_glob.bzl", "enforce_glob")
 
 package(
@@ -19,14 +19,13 @@ iree_lit_test_suite(
     name = "lit",
     srcs = enforce_glob(
         [
-            "do_not_optimize.mlir",
+            "hal_executable.mlir",
             "smoketest.mlir",
         ],
         include = ["*.mlir"],
     ),
-    data = [
-        "//iree/tools:IreeFileCheck",
-        "//iree/tools:iree-opt",
+    tools = [
         "//iree/tools:iree-translate",
+        "@llvm-project//llvm:FileCheck",
     ],
 )

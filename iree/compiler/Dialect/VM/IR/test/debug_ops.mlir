@@ -1,6 +1,4 @@
-// Tests printing and parsing of debug ops.
-
-// RUN: iree-opt -split-input-file %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file %s | FileCheck %s
 
 // CHECK-LABEL: @trace_args
 vm.module @my_module {

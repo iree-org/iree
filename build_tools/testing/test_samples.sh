@@ -11,6 +11,7 @@ set -x
 ROOT_DIR=$(git rev-parse --show-toplevel)
 cd ${ROOT_DIR?}
 
+git submodule sync
 git submodule update --init
 
 ./iree/samples/dynamic_shapes/test.sh

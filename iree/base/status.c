@@ -220,8 +220,6 @@ IREE_API_EXPORT const char* iree_status_code_string(iree_status_code_t code) {
       return "ALREADY_EXISTS";
     case IREE_STATUS_PERMISSION_DENIED:
       return "PERMISSION_DENIED";
-    case IREE_STATUS_UNAUTHENTICATED:
-      return "UNAUTHENTICATED";
     case IREE_STATUS_RESOURCE_EXHAUSTED:
       return "RESOURCE_EXHAUSTED";
     case IREE_STATUS_FAILED_PRECONDITION:
@@ -238,6 +236,10 @@ IREE_API_EXPORT const char* iree_status_code_string(iree_status_code_t code) {
       return "UNAVAILABLE";
     case IREE_STATUS_DATA_LOSS:
       return "DATA_LOSS";
+    case IREE_STATUS_UNAUTHENTICATED:
+      return "UNAUTHENTICATED";
+    case IREE_STATUS_DEFERRED:
+      return "DEFERRED";
     default:
       return "";
   }
@@ -525,11 +527,23 @@ IREE_API_EXPORT iree_status_t iree_status_ignore(iree_status_t status) {
   return iree_ok_status();
 }
 
+IREE_API_EXPORT iree_status_t iree_status_join(iree_status_t base_status,
+                                               iree_status_t new_status) {
+  // TODO(benvanik): annotate |base_status| with |new_status| so we see it?
+  // This is intended for failure handling and usually the first failure is the
+  // root cause and most important to see.
+  if (!iree_status_is_ok(base_status)) {
+    iree_status_ignore(new_status);
+    return base_status;
+  }
+  return new_status;
+}
+
 IREE_API_EXPORT IREE_ATTRIBUTE_NORETURN void iree_status_abort(
     iree_status_t status) {
+  iree_status_fprint(stderr, status);
   IREE_ASSERT(!iree_status_is_ok(status),
               "only valid to call with failing status codes");
-  iree_status_fprint(stderr, status);
   iree_status_free(status);
   abort();
 }
@@ -645,7 +659,8 @@ IREE_API_EXPORT bool iree_status_format(iree_status_t status,
   *out_buffer_length = 0;
 
   // Grab storage which may have a message and zero or more payloads.
-  iree_status_storage_t* storage = iree_status_storage(status);
+  iree_status_storage_t* storage IREE_ATTRIBUTE_UNUSED =
+      iree_status_storage(status);
 
   // Prefix with source location and status code string (may be 'OK').
   iree_host_size_t buffer_length = 0;

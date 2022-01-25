@@ -6,6 +6,9 @@
 
 #include "iree/compiler/Codegen/Passes.h"
 
+#include "iree/compiler/Codegen/Dialect/LoweringConfig.h"
+#include "iree/compiler/Codegen/Sandbox/Passes.h"
+
 namespace mlir {
 namespace iree_compiler {
 
@@ -17,6 +20,7 @@ namespace {
 void registerCodegenPasses() {
   // Generated.
   registerPasses();
+  registerSandboxPasses();
 
   static PassPipelineRegistration<> LinalgLLVMVPipeline(
       "iree-codegen-linalg-to-llvm-pipeline",
@@ -46,6 +50,22 @@ void registerCodegenPasses() {
       [](OpPassManager &passManager) {
         buildSPIRVCodegenPassPipeline(passManager);
       });
+}
+
+/// Hook to verify the lowering configuration and translation info for an
+/// operation.
+LogicalResult verifyLoweringConfiguration(
+    Operation *op, IREE::Codegen::LoweringConfigAttr loweringConfig,
+    IREE::Codegen::TranslationInfoAttr translationInfo,
+    ArrayRef<int64_t> workgroupSize) {
+  switch (translationInfo.getDispatchLoweringPassPipeline()) {
+    case IREE::Codegen::DispatchLoweringPassPipeline::CPUTensorToVectors:
+      return verifyTensorToVectorsPassPipelineConfig(op, loweringConfig,
+                                                     translationInfo);
+    default:
+      break;
+  }
+  return success();
 }
 
 }  // namespace iree_compiler

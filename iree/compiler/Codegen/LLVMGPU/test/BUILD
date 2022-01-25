@@ -6,7 +6,7 @@
 
 # Tests for common transforms.
 
-load("//iree:lit_test.bzl", "iree_lit_test_suite")
+load("//build_tools/bazel:iree_lit_test.bzl", "iree_lit_test_suite")
 load("//build_tools/bazel:enforce_glob.bzl", "enforce_glob")
 
 package(
@@ -25,15 +25,15 @@ iree_lit_test_suite(
             "distribute_wg_copy.mlir",
             "gpu_set_num_workgroups.mlir",
             "nvvm_pipeline_test.mlir",
-            "remove_loops.mlir",
             "rocdl_pipeline_test.mlir",
             "legalize.mlir",
+            "tensorcore_vectorization.mlir",
             "vectorization.mlir",
         ],
         include = ["*.mlir"],
     ),
-    data = [
-        "//iree/tools:IreeFileCheck",
+    tools = [
         "//iree/tools:iree-opt",
+        "@llvm-project//llvm:FileCheck",
     ],
 )

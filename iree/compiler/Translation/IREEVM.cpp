@@ -8,14 +8,16 @@
 
 #include "iree/compiler/Bindings/Native/Transforms/Passes.h"
 #include "iree/compiler/Bindings/TFLite/Transforms/Passes.h"
+#include "iree/compiler/ConstEval/Passes.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "iree/compiler/Dialect/HAL/Transforms/Passes.h"
+#include "iree/compiler/Dialect/Stream/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
-#include "iree/compiler/Dialect/VM/Target/Bytecode/TranslationFlags.h"
 #include "iree/compiler/Dialect/VM/Transforms/Passes.h"
 #include "iree/compiler/InputConversion/Common/Passes.h"
 #include "iree/compiler/InputConversion/MHLO/Passes.h"
 #include "iree/compiler/InputConversion/TOSA/Passes.h"
+#include "iree/compiler/Utils/PassUtils.h"
 #include "iree/compiler/Utils/TracingUtils.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/Pass/PassManager.h"
@@ -29,113 +31,98 @@
 namespace mlir {
 namespace iree_compiler {
 
-static BindingOptions getBindingOptionsFromFlags() {
+void BindingOptions::bindOptions(OptionsBinder &binder) {
   static llvm::cl::OptionCategory bindingOptionsCategory(
-      "IREE translation binding support options");
+      "IREE translation binding support options.");
 
-  static llvm::cl::opt<bool> *bindingsNativeFlag = new llvm::cl::opt<bool>{
-      "iree-native-bindings-support",
+  binder.opt<bool>(
+      "iree-native-bindings-support", native,
       llvm::cl::desc(
-          "Include runtime support for native IREE ABI-compatible bindings"),
-      llvm::cl::init(true), llvm::cl::cat(bindingOptionsCategory)};
-
-  static llvm::cl::opt<bool> *bindingsTFLiteFlag = new llvm::cl::opt<bool>{
-      "iree-tflite-bindings-support",
-      llvm::cl::desc(
-          "Include runtime support for the IREE TFLite compatibility bindings"),
-      llvm::cl::init(false), llvm::cl::cat(bindingOptionsCategory)};
-
-  BindingOptions bindingOptions;
-  bindingOptions.native = *bindingsNativeFlag;
-  bindingOptions.tflite = *bindingsTFLiteFlag;
-  return bindingOptions;
+          "Include runtime support for native IREE ABI-compatible bindings."),
+      llvm::cl::cat(bindingOptionsCategory));
+  binder.opt<bool>("iree-tflite-bindings-support", tflite,
+                   llvm::cl::desc("Include runtime support for the IREE TFLite "
+                                  "compatibility bindings."),
+                   llvm::cl::cat(bindingOptionsCategory));
 }
 
-static InputDialectOptions getInputDialectOptionsFromFlags() {
+void InputDialectOptions::bindOptions(OptionsBinder &binder) {
   static llvm::cl::OptionCategory inputDialectOptions(
-      "IREE options for controlling the input transformations to apply");
+      "IREE options for controlling the input transformations to apply.");
 
-  static llvm::cl::opt<InputDialectOptions::Type> *typeFlag =
-      new llvm::cl::opt<InputDialectOptions::Type>{
-          "iree-input-type", llvm::cl::desc("IREE input type"),
-          llvm::cl::values(clEnumValN(InputDialectOptions::Type::none, "none",
-                                      "No input dialect transformation"),
-                           clEnumValN(InputDialectOptions::Type::tosa, "tosa",
-                                      "Legalize from TOSA ops"),
-                           clEnumValN(InputDialectOptions::Type::mhlo, "mhlo",
-                                      "Legalize from MHLO ops")),
-          llvm::cl::init(InputDialectOptions::Type::none),
-          llvm::cl::cat(inputDialectOptions)};
-
-  InputDialectOptions options;
-  options.type = *typeFlag;
-  return options;
+  binder.opt<InputDialectOptions::Type>(
+      "iree-input-type", type,
+      llvm::cl::desc("Specifies the input program representation."),
+      llvm::cl::values(
+          clEnumValN(InputDialectOptions::Type::none, "none",
+                     "No input dialect transformation."),
+          clEnumValN(InputDialectOptions::Type::tosa, "tosa",
+                     "Legalize from TOSA ops."),
+          clEnumValN(InputDialectOptions::Type::mhlo, "mhlo",
+                     "Legalize from MHLO ops."),
+          clEnumValN(
+              InputDialectOptions::Type::xla, "xla",
+              "Legalize from MHLO ops (with XLA cleanup preprocessing).")),
+      llvm::cl::cat(inputDialectOptions));
 }
 
-// Performs initial dialect conversion to get the canonical input lowered into
-// the IREE execution/dataflow dialect.
-//
-// This will fail if we cannot support the input yet. The hope is that any
-// error that happens after this point is either backend-specific (like
-// unsupported SPIR-V lowering) or a bug.
-static LogicalResult convertToFlowModule(ModuleOp moduleOp) {
-  PassManager passManager(moduleOp.getContext());
-  mlir::applyPassManagerCLOptions(passManager);
-  mlir::applyDefaultTimingPassManagerCLOptions(passManager);
-  passManager.addInstrumentation(std::make_unique<PassTracing>());
-  IREE::Flow::TransformOptions flowOptions;
-  IREE::Flow::buildFlowTransformPassPipeline(passManager, flowOptions);
-  if (failed(passManager.run(moduleOp))) {
-    return moduleOp.emitError()
-           << "failed to run flow transformation pass pipeline";
-  }
-  return success();
+void HighLevelOptimizationOptions::bindOptions(OptionsBinder &binder) {
+  static llvm::cl::OptionCategory category(
+      "IREE options for controlling high level optimizations.");
+
+  binder.opt<bool>(
+      "iree-opt-const-eval", constEval,
+      llvm::cl::desc("Enables eager evaluation of constants using the full "
+                     "compiler and runtime."),
+      llvm::cl::cat(category));
+  binder.opt<bool>(
+      "iree-opt-const-expr-hoisting", constExprHoisting,
+      llvm::cl::desc(
+          "Hoists the results of latent constant expressions into immutable "
+          "global initializers for evaluation at program load."),
+      llvm::cl::cat(category));
+  binder.opt<bool>(
+      "iree-opt-numeric-precision-reduction", numericPrecisionReduction,
+      llvm::cl::desc(
+          "Reduces numeric precision to lower bit depths where possible."),
+      llvm::cl::cat(category));
+  binder.opt<bool>("iree-opt-strip-assertions", stripAssertions,
+                   llvm::cl::desc("Strips debug assertions after any useful "
+                                  "information has been extracted."),
+                   llvm::cl::cat(category));
 }
 
-// Runs the flow->HAL transform pipeline to lower a flow module and compile
-// executables for the specified target backends.
-static LogicalResult convertToHALModule(
-    ModuleOp moduleOp, IREE::HAL::TargetOptions executableOptions) {
-  PassManager passManager(moduleOp.getContext());
-  mlir::applyPassManagerCLOptions(passManager);
-  mlir::applyDefaultTimingPassManagerCLOptions(passManager);
-  passManager.addInstrumentation(std::make_unique<PassTracing>());
-  IREE::HAL::buildHALTransformPassPipeline(passManager, executableOptions);
-  if (failed(passManager.run(moduleOp))) {
-    return moduleOp.emitError()
-           << "failed to run HAL transformation pass pipeline";
-  }
-  return success();
-}
+void SchedulingOptions::bindOptions(OptionsBinder &binder) {
+  static llvm::cl::OptionCategory category(
+      "IREE options for controlling host/device scheduling.");
 
-// Converts the lowered module to a canonical vm.module containing only vm ops.
-// This uses patterns to convert from standard ops and other dialects to their
-// vm ABI form.
-static LogicalResult convertToVMModule(ModuleOp moduleOp,
-                                       IREE::VM::TargetOptions targetOptions) {
-  PassManager passManager(moduleOp.getContext());
-  mlir::applyPassManagerCLOptions(passManager);
-  mlir::applyDefaultTimingPassManagerCLOptions(passManager);
-  passManager.addInstrumentation(std::make_unique<PassTracing>());
-  IREE::VM::buildVMTransformPassPipeline(passManager, targetOptions);
-  if (failed(passManager.run(moduleOp))) {
-    return moduleOp.emitError()
-           << "failed to run VM transformation pass pipeline";
-  }
-  return success();
+  binder.opt<DumpOutputFormat>(
+      "iree-scheduling-dump-statistics-format", dumpStatisticsFormat,
+      llvm::cl::desc("Dumps statistics in the specified output format."),
+      llvm::cl::cat(category),
+      llvm::cl::values(
+          clEnumValN(DumpOutputFormat::Pretty, "pretty",
+                     "Human-readable pretty printed output."),
+          clEnumValN(DumpOutputFormat::Verbose, "verbose",
+                     "Pretty printed output with additional IR."),
+          clEnumValN(DumpOutputFormat::CSV, "csv", "Comma separated values.")));
+  binder.opt<std::string>("iree-scheduling-dump-statistics-file",
+                          dumpStatisticsFile,
+                          llvm::cl::desc("File path to write statistics to; or "
+                                         "`` for stderr or `-` for stdout."),
+                          llvm::cl::cat(category));
 }
 
 void buildIREEVMTransformPassPipeline(
     BindingOptions bindingOptions, InputDialectOptions inputOptions,
+    HighLevelOptimizationOptions highLevelOptimizationOptions,
+    SchedulingOptions schedulingOptions,
     IREE::HAL::TargetOptions executableOptions,
     IREE::VM::TargetOptions targetOptions, OpPassManager &passManager) {
-  if (bindingOptions.native) {
-    IREE::ABI::buildTransformPassPipeline(passManager);
-  }
-  if (bindingOptions.tflite) {
-    IREE::TFLite::buildTransformPassPipeline(passManager);
-  }
-
+  // Input pipelines can result in changes to the exported functions and types
+  // and must run before generating bindings.
+  // After input processing, there should only be IREE legal types in
+  // signatures.
   switch (inputOptions.type) {
     case InputDialectOptions::Type::none:
       break;
@@ -143,14 +130,48 @@ void buildIREEVMTransformPassPipeline(
       buildTOSAInputConversionPassPipeline(passManager);
       break;
     case InputDialectOptions::Type::mhlo:
-      buildMHLOInputConversionPassPipeline(passManager);
+      MHLO::buildMHLOInputConversionPassPipeline(passManager);
       break;
+    case InputDialectOptions::Type::xla:
+      MHLO::buildXLACleanupPassPipeline(passManager);
+      MHLO::buildMHLOInputConversionPassPipeline(passManager);
+      break;
+  }
+  buildCommonInputConversionPassPipeline(passManager);
+
+  // Now that inputs are legalized, generate wrapper for entry functions.
+  if (bindingOptions.native) {
+    IREE::ABI::buildTransformPassPipeline(passManager);
+  }
+  if (bindingOptions.tflite) {
+    IREE::TFLite::buildTransformPassPipeline(passManager);
   }
 
   IREE::Flow::TransformOptions flowOptions;
+  flowOptions.constExprHoisting =
+      highLevelOptimizationOptions.constExprHoisting;
+  if (highLevelOptimizationOptions.constEval) {
+    flowOptions.buildConstEvalPassPipeline = [](OpPassManager &passManager) {
+      passManager.addPass(ConstEval::createJitGlobalsPass());
+    };
+  }
+  flowOptions.numericPrecisionReduction =
+      highLevelOptimizationOptions.numericPrecisionReduction;
 
-  buildCommonInputConversionPassPipeline(passManager);
+  if (highLevelOptimizationOptions.stripAssertions) {
+    // Strip std.assert & co after we perform optimizations; prior to this we
+    // may use the assertions to derive information during analysis.
+    passManager.addPass(IREE::Util::createStripDebugOpsPass());
+  }
+
+  IREE::Stream::TransformOptions streamOptions;
+  // TODO(benvanik): find a way to share the enums w/o circular deps.
+  streamOptions.dumpStatisticsFormat =
+      (IREE::Stream::DumpOutputFormat)schedulingOptions.dumpStatisticsFormat;
+  streamOptions.dumpStatisticsFile = schedulingOptions.dumpStatisticsFile;
+
   IREE::Flow::buildFlowTransformPassPipeline(passManager, flowOptions);
+  IREE::Stream::buildStreamTransformPassPipeline(passManager, streamOptions);
   IREE::HAL::buildHALTransformPassPipeline(passManager, executableOptions);
   IREE::VM::buildVMTransformPassPipeline(passManager, targetOptions);
   passManager.addPass(IREE::Util::createDropCompilerHintsPass());
@@ -158,9 +179,11 @@ void buildIREEVMTransformPassPipeline(
 
 void buildDefaultIREEVMTransformPassPipeline(OpPassManager &passManager) {
   buildIREEVMTransformPassPipeline(
-      getBindingOptionsFromFlags(), getInputDialectOptionsFromFlags(),
-      IREE::HAL::getTargetOptionsFromFlags(),
-      IREE::VM::getTargetOptionsFromFlags(), passManager);
+      BindingOptions::FromFlags::get(), InputDialectOptions::FromFlags::get(),
+      HighLevelOptimizationOptions::FromFlags::get(),
+      SchedulingOptions::FromFlags::get(),
+      IREE::HAL::TargetOptions::FromFlags::get(),
+      IREE::VM::TargetOptions::FromFlags::get(), passManager);
 }
 
 void registerIREEVMTransformPassPipeline() {
@@ -178,15 +201,17 @@ void registerIREEVMTransformPassPipeline() {
 static LogicalResult translateFromMLIRToVM(
     ModuleOp moduleOp, BindingOptions bindingOptions,
     InputDialectOptions inputOptions,
+    HighLevelOptimizationOptions highLevelOptimizationOptions,
+    SchedulingOptions schedulingOptions,
     IREE::HAL::TargetOptions executableOptions,
     IREE::VM::TargetOptions targetOptions) {
   PassManager passManager(moduleOp.getContext());
   mlir::applyPassManagerCLOptions(passManager);
   mlir::applyDefaultTimingPassManagerCLOptions(passManager);
   passManager.addInstrumentation(std::make_unique<PassTracing>());
-  buildIREEVMTransformPassPipeline(bindingOptions, inputOptions,
-                                   executableOptions, targetOptions,
-                                   passManager);
+  buildIREEVMTransformPassPipeline(
+      bindingOptions, inputOptions, highLevelOptimizationOptions,
+      schedulingOptions, executableOptions, targetOptions, passManager);
   if (failed(passManager.run(moduleOp))) {
     return moduleOp.emitError() << "conversion from source -> vm failed";
   }
@@ -203,13 +228,18 @@ static LogicalResult translateFromMLIRToVM(
 static LogicalResult translateFromMLIRToVMBytecodeModuleWithFlags(
     ModuleOp moduleOp, llvm::raw_ostream &output) {
   mlir::registerPassManagerCLOptions();
-  auto bindingOptions = getBindingOptionsFromFlags();
-  auto inputOptions = getInputDialectOptionsFromFlags();
-  auto halTargetOptions = IREE::HAL::getTargetOptionsFromFlags();
-  auto vmTargetOptions = IREE::VM::getTargetOptionsFromFlags();
-  auto bytecodeTargetOptions = IREE::VM::getBytecodeTargetOptionsFromFlags();
-  auto result = translateFromMLIRToVM(moduleOp, bindingOptions, inputOptions,
-                                      halTargetOptions, vmTargetOptions);
+  auto bindingOptions = BindingOptions::FromFlags::get();
+  auto inputOptions = InputDialectOptions::FromFlags::get();
+  auto highLevelOptimizationOptions =
+      HighLevelOptimizationOptions::FromFlags::get();
+  auto schedulingOptions = SchedulingOptions::FromFlags::get();
+  auto halTargetOptions = IREE::HAL::TargetOptions::FromFlags::get();
+  auto vmTargetOptions = IREE::VM::TargetOptions::FromFlags::get();
+  auto bytecodeTargetOptions =
+      IREE::VM::BytecodeTargetOptions::FromFlags::get();
+  auto result = translateFromMLIRToVM(
+      moduleOp, bindingOptions, inputOptions, highLevelOptimizationOptions,
+      schedulingOptions, halTargetOptions, vmTargetOptions);
   if (failed(result)) {
     return result;
   }
@@ -224,13 +254,17 @@ static LogicalResult translateFromMLIRToVMBytecodeModuleWithFlags(
 static LogicalResult translateFromMLIRToVMCModuleWithFlags(
     ModuleOp moduleOp, llvm::raw_ostream &output) {
   mlir::registerPassManagerCLOptions();
-  auto bindingOptions = getBindingOptionsFromFlags();
-  auto inputOptions = getInputDialectOptionsFromFlags();
-  auto halTargetOptions = IREE::HAL::getTargetOptionsFromFlags();
-  auto vmTargetOptions = IREE::VM::getTargetOptionsFromFlags();
+  auto bindingOptions = BindingOptions::FromFlags::get();
+  auto inputOptions = InputDialectOptions::FromFlags::get();
+  auto highLevelOptimizationOptions =
+      HighLevelOptimizationOptions::FromFlags::get();
+  auto schedulingOptions = SchedulingOptions::FromFlags::get();
+  auto halTargetOptions = IREE::HAL::TargetOptions::FromFlags::get();
+  auto vmTargetOptions = IREE::VM::TargetOptions::FromFlags::get();
   auto cTargetOptions = IREE::VM::getCTargetOptionsFromFlags();
-  auto result = translateFromMLIRToVM(moduleOp, bindingOptions, inputOptions,
-                                      halTargetOptions, vmTargetOptions);
+  auto result = translateFromMLIRToVM(
+      moduleOp, bindingOptions, inputOptions, highLevelOptimizationOptions,
+      schedulingOptions, halTargetOptions, vmTargetOptions);
   if (failed(result)) {
     return result;
   }
@@ -241,8 +275,12 @@ static LogicalResult translateFromMLIRToVMCModuleWithFlags(
 #endif  // IREE_HAVE_EMITC_DIALECT
 
 void registerIREEVMTranslationFlags() {
-  getBindingOptionsFromFlags();
-  getInputDialectOptionsFromFlags();
+  BindingOptions::FromFlags::get();
+  InputDialectOptions::FromFlags::get();
+  HighLevelOptimizationOptions::FromFlags::get();
+  IREE::HAL::TargetOptions::FromFlags::get();
+  IREE::VM::TargetOptions::FromFlags::get();
+  IREE::VM::BytecodeTargetOptions::FromFlags::get();
 }
 
 void registerIREEVMTranslation() {

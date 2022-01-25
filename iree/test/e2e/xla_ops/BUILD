@@ -20,7 +20,7 @@ package(
 )
 
 iree_check_single_backend_test_suite(
-    name = "check_cuda",
+    name = "check_cuda_graph",
     srcs = enforce_glob(
         # keep sorted
         [
@@ -44,6 +44,7 @@ iree_check_single_backend_test_suite(
             "dynamic_slice.mlir",
             "dynamic_update_slice.mlir",
             "exponential.mlir",
+            "exponential_fp16.mlir",
             "exponential_minus_one.mlir",
             "fft.mlir",
             "finite.mlir",
@@ -86,6 +87,7 @@ iree_check_single_backend_test_suite(
     ),
     compiler_flags = ["-iree-input-type=mhlo"],
     driver = "cuda",
+    runner_args = ["--cuda_use_streams=false"],
     tags = [
         # CUDA cuInit fails with sanitizer on.
         "noasan",
@@ -97,8 +99,9 @@ iree_check_single_backend_test_suite(
     target_backend = "cuda",
 )
 
+# Run cuda tests using stream command buffer
 iree_check_single_backend_test_suite(
-    name = "check_dylib_embedded-llvm-aot_dylib",
+    name = "check_cuda_streams",
     srcs = enforce_glob(
         # keep sorted
         [
@@ -122,6 +125,7 @@ iree_check_single_backend_test_suite(
             "dynamic_slice.mlir",
             "dynamic_update_slice.mlir",
             "exponential.mlir",
+            "exponential_fp16.mlir",
             "exponential_minus_one.mlir",
             "fft.mlir",
             "finite.mlir",
@@ -135,6 +139,7 @@ iree_check_single_backend_test_suite(
             "multiply.mlir",
             "negate.mlir",
             "pad.mlir",
+            "pow.mlir",
             "reduce.mlir",
             "reduce_window.mlir",
             "remainder.mlir",
@@ -158,18 +163,21 @@ iree_check_single_backend_test_suite(
         ],
         include = ["*.mlir"],
         exclude = [
-            #TODO(GH-7415): Enable this after failures with bazel bot
-            #and cmake-swiftshared bot are addressed
-            "pow.mlir",
             "round.mlir",
         ],
     ),
-    compiler_flags = [
-        "-iree-input-type=mhlo",
-        "-iree-llvm-link-embedded=true",
+    compiler_flags = ["-iree-input-type=mhlo"],
+    driver = "cuda",
+    runner_args = ["--cuda_use_streams=true"],
+    tags = [
+        # CUDA cuInit fails with sanitizer on.
+        "noasan",
+        "nomsan",
+        "notsan",
+        "noubsan",
+        "requires-gpu-nvidia",
     ],
-    driver = "dylib",
-    target_backend = "dylib-llvm-aot",
+    target_backend = "cuda",
 )
 
 iree_check_single_backend_test_suite(
@@ -197,6 +205,7 @@ iree_check_single_backend_test_suite(
             "dynamic_slice.mlir",
             "dynamic_update_slice.mlir",
             "exponential.mlir",
+            "exponential_fp16.mlir",
             "exponential_minus_one.mlir",
             "fft.mlir",
             "finite.mlir",
@@ -234,6 +243,8 @@ iree_check_single_backend_test_suite(
         ],
         include = ["*.mlir"],
         exclude = [
+            #TODO(#7415): Enable this after failures with bazel bot
+            #and cmake-swiftshared bot are addressed
             "round.mlir",
         ],
     ),
@@ -286,9 +297,12 @@ iree_check_single_backend_test_suite(
             "reshape.mlir",
             "reverse.mlir",
             "rsqrt.mlir",
+            "scatter.mlir",
+            "scatter_dynamic.mlir",
             "select.mlir",
             "sine.mlir",
             "slice.mlir",
+            "sort.mlir",
             "sqrt.mlir",
             "subtract.mlir",
             "tanh.mlir",
@@ -298,13 +312,11 @@ iree_check_single_backend_test_suite(
         ],
         include = ["*.mlir"],
         exclude = [
-            "fft.mlir",  # TODO(GH-6601): Eanble the test.
+            "exponential_fp16.mlir",
+            "fft.mlir",  # TODO(#6601): Eanble the test.
             "round.mlir",
-            "scatter.mlir",  # TODO(GH-6601): Enable the test.
-            "scatter_dynamic.mlir",  # TODO(GH-6601): Enable the test.
-            "sort.mlir",
-            "rng_uniform.mlir",  # TODO(GH-6995): Enable the test.
-            "rng_normal.mlir",  # TODO(GH-6995): Enable the test.
+            "rng_uniform.mlir",  # TODO(#6995): Enable the test.
+            "rng_normal.mlir",  # TODO(#6995): Enable the test.
         ],
     ),
     compiler_flags = ["-iree-input-type=mhlo"],
@@ -374,6 +386,7 @@ iree_check_single_backend_test_suite(
         include = ["*.mlir"],
         exclude = [
             "bitcast_convert.mlir",
+            "exponential_fp16.mlir",
             "round.mlir",
         ],
     ),

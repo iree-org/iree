@@ -109,13 +109,6 @@ $ ../iree-build/iree/tools/iree-run-mlir $PWD/iree/samples/models/simple_abs.mli
 
 ### LLVM Ahead-of-Time (AOT) backend
 
-If you want to manually specify the linker used, set the
-`IREE_LLVMAOT_LINKER_PATH` environment variable to the path of the linker:
-
-```shell
-$ export IREE_LLVMAOT_LINKER_PATH=ld.lld-10
-```
-
 Translate a source MLIR into an IREE module:
 
 ```shell

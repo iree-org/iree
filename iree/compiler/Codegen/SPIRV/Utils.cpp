@@ -16,18 +16,19 @@
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "mlir/Dialect/GPU/GPUDialect.h"
-#include "mlir/Dialect/Linalg/IR/LinalgOps.h"
+#include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SPIRV/IR/TargetAndABI.h"
 #include "mlir/IR/BuiltinOps.h"
-#include "mlir/IR/Identifier.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/Region.h"
 #include "mlir/Support/LogicalResult.h"
 
 namespace mlir {
 namespace iree_compiler {
+
+const char *getSPIRVDistributeAttrName() { return "iree.spirv.distribute_dim"; }
 
 spirv::TargetEnvAttr getSPIRVTargetEnvAttr(Operation *op) {
   auto variant = op->getParentOfType<IREE::HAL::ExecutableVariantOp>();
@@ -109,11 +110,11 @@ static linalg::ProcInfo getGPUProcessorIdAndCountImpl(OpBuilder &builder,
                                                       unsigned dim) {
   assert(dim < kNumGPUDims && "processor index out of range!");
 
-  std::array<const char *, kNumGPUDims> dimAttr{"x", "y", "z"};
-  StringAttr attr = builder.getStringAttr(dimAttr[dim]);
+  std::array<gpu::Dimension, kNumGPUDims> dimAttr{
+      gpu::Dimension::x, gpu::Dimension::y, gpu::Dimension::z};
   Type indexType = builder.getIndexType();
-  return {builder.create<GPUIdOp>(loc, indexType, attr),
-          builder.create<GPUCountOp>(loc, indexType, attr)};
+  return {builder.create<GPUIdOp>(loc, indexType, dimAttr[dim]),
+          builder.create<GPUCountOp>(loc, indexType, dimAttr[dim])};
 }
 
 template <>
@@ -121,13 +122,15 @@ linalg::ProcInfo getGPUProcessorIdAndCountImpl<GPUGlobalId, GPUGlobalCount>(
     OpBuilder &builder, Location loc, unsigned dim) {
   assert(dim < kNumGPUDims && "processor index out of range!");
 
-  std::array<const char *, kNumGPUDims> dimAttr{"x", "y", "z"};
-  StringAttr attr = builder.getStringAttr(dimAttr[dim]);
+  std::array<gpu::Dimension, kNumGPUDims> dimAttr{
+      gpu::Dimension::x, gpu::Dimension::y, gpu::Dimension::z};
   Type indexType = builder.getIndexType();
-  Value gridDim = builder.create<gpu::GridDimOp>(loc, indexType, attr);
-  Value blockId = builder.create<gpu::BlockIdOp>(loc, indexType, attr);
-  Value blockDim = builder.create<gpu::BlockDimOp>(loc, indexType, attr);
-  Value threadId = builder.create<gpu::ThreadIdOp>(loc, indexType, attr);
+  Value gridDim = builder.create<gpu::GridDimOp>(loc, indexType, dimAttr[dim]);
+  Value blockId = builder.create<gpu::BlockIdOp>(loc, indexType, dimAttr[dim]);
+  Value blockDim =
+      builder.create<gpu::BlockDimOp>(loc, indexType, dimAttr[dim]);
+  Value threadId =
+      builder.create<gpu::ThreadIdOp>(loc, indexType, dimAttr[dim]);
   // TODO(ravishankarm): Using affine_maps here would be beneficial, and we can
   // do this because the blockDim is constant. But this would lead to an
   // ordering issue cause it assumes that the workgroup size has already been
@@ -186,9 +189,9 @@ scf::ParallelOp collapseParallelLoops(PatternRewriter &rewriter,
   // iterations of the inner loops.
   SmallVector<Value, 2> iterationStride;
   iterationStride.resize(pLoopOp.getNumLoops());
-  auto lbs = pLoopOp.lowerBound();
-  auto ubs = pLoopOp.upperBound();
-  auto steps = pLoopOp.step();
+  auto lbs = pLoopOp.getLowerBound();
+  auto ubs = pLoopOp.getUpperBound();
+  auto steps = pLoopOp.getStep();
   for (int i = numLoops - 1; i >= 0; --i) {
     Value lb = lbs[i], ub = ubs[i], step = steps[i];
     Value iterCount = rewriter.create<arith::DivSIOp>(
@@ -322,8 +325,8 @@ LogicalResult distributeSingleIterationPerProcessor(
   assert(numLoops == procInfo.size() &&
          "expected as many ids as number of loops");
 
-  auto lbs = pLoopOp.lowerBound();
-  auto step = pLoopOp.step();
+  auto lbs = pLoopOp.getLowerBound();
+  auto step = pLoopOp.getStep();
   SmallVector<Value, 2> ivReplacements;
   for (unsigned i : llvm::seq<unsigned>(0, numLoops)) {
     Value iterValue = rewriter.create<arith::AddIOp>(
@@ -336,7 +339,7 @@ LogicalResult distributeSingleIterationPerProcessor(
   if (generateGuard) {
     TypeConverter::SignatureConversion signatureConverter(numLoops);
     Value cond = nullptr;
-    auto ubs = pLoopOp.upperBound();
+    auto ubs = pLoopOp.getUpperBound();
     for (unsigned i : llvm::seq<unsigned>(0, numLoops)) {
       Value cmp = rewriter.create<arith::CmpIOp>(loc, arith::CmpIPredicate::slt,
                                                  ivReplacements[i], ubs[i]);

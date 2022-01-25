@@ -6,7 +6,7 @@
 
 #include "iree/compiler/Dialect/Flow/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
-#include "mlir/Dialect/Linalg/IR/LinalgOps.h"
+#include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -70,18 +70,18 @@ class Convert1x1ConvolutionMatmulOp
     Value output = convOp.getOutputOperand(0)->get();
     auto loc = convOp.getLoc();
 
-    Value reshapedInput = rewriter.create<linalg::TensorCollapseShapeOp>(
+    Value reshapedInput = rewriter.create<tensor::CollapseShapeOp>(
         loc, reshapedInputType, input, reassociationIndices);
-    Value reshapedFilter = rewriter.create<linalg::TensorCollapseShapeOp>(
+    Value reshapedFilter = rewriter.create<tensor::CollapseShapeOp>(
         loc, reshapedFilterType, filter, reassociationIndices);
-    Value reshapedOutput = rewriter.create<linalg::TensorCollapseShapeOp>(
+    Value reshapedOutput = rewriter.create<tensor::CollapseShapeOp>(
         loc, reshapedOutputType, output, reassociationIndices);
 
     auto matmulResult = rewriter.create<linalg::MatmulOp>(
         loc, reshapedOutputType, ArrayRef<Value>{reshapedInput, reshapedFilter},
         ArrayRef<Value>{reshapedOutput});
 
-    auto reshapedResult = rewriter.create<linalg::TensorExpandShapeOp>(
+    auto reshapedResult = rewriter.create<tensor::ExpandShapeOp>(
         loc, outputShapeType, matmulResult.getResults()[0],
         reassociationIndices);
 
@@ -102,13 +102,15 @@ struct ConvertConv2D1x1ConvToMatmulPass
     MLIRContext *context = &getContext();
     OwningRewritePatternList patterns(&getContext());
     patterns.insert<Convert1x1ConvolutionMatmulOp>(context);
-    (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
+    if (failed(applyPatternsAndFoldGreedily(getOperation(),
+                                            std::move(patterns)))) {
+      return signalPassFailure();
+    }
   }
 };
 }  // namespace
 
-std::unique_ptr<OperationPass<mlir::FuncOp>>
-createConvertConv2D1x1ToMatmulPass() {
+std::unique_ptr<Pass> createConvertConv2D1x1ToMatmulPass() {
   return std::make_unique<ConvertConv2D1x1ConvToMatmulPass>();
 }
 

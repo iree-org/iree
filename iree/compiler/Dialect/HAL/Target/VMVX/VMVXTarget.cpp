@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Dialect/HAL/Target/VMVX/VMVXTarget.h"
 
+#include "iree/compiler/Codegen/Dialect/IREECodegenDialect.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
 #include "iree/compiler/Dialect/Modules/VMVX/IR/VMVXDialect.h"
@@ -35,7 +36,8 @@ class VMVXTargetBackend final : public TargetBackend {
   std::string name() const override { return "vmvx"; }
 
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<VM::VMDialect, VMVX::VMVXDialect>();
+    registry.insert<IREE::Codegen::IREECodegenDialect, VM::VMDialect,
+                    VMVX::VMVXDialect>();
   }
 
   IREE::HAL::DeviceTargetAttr getDefaultDeviceTarget(
@@ -43,7 +45,7 @@ class VMVXTargetBackend final : public TargetBackend {
     Builder b(context);
     SmallVector<NamedAttribute> configItems;
 
-    configItems.emplace_back(b.getIdentifier("executable_targets"),
+    configItems.emplace_back(b.getStringAttr("executable_targets"),
                              getExecutableTargets(context));
 
     auto configAttr = b.getDictionaryAttr(configItems);
@@ -57,7 +59,8 @@ class VMVXTargetBackend final : public TargetBackend {
     OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
 
     // TODO(benvanik): derive these from a vm target triple.
-    auto vmOptions = IREE::VM::getTargetOptionsFromFlags();
+    auto vmOptions = IREE::VM::TargetOptions::FromFlags::get();
+    vmOptions.i64Extension = true;
     vmOptions.f32Extension = true;
     vmOptions.optimizeForStackSize = false;
     IREE::VM::buildVMTransformPassPipeline(nestedModulePM, vmOptions);

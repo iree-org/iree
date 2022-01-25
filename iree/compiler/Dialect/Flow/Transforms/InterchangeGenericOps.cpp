@@ -14,7 +14,7 @@
 #include "iree/compiler/Dialect/Flow/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
-#include "mlir/Dialect/Linalg/IR/LinalgOps.h"
+#include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
@@ -43,13 +43,11 @@ struct GenericOpInterchangePattern
     // If all the parallel loops are outter loops skip the pattern.
     if (!needInterchange) return failure();
     for (auto iter : llvm::enumerate(genericOp.iterator_types())) {
-      if (isReductionIterator(iter.value()))
+      if (isReductionIterator(iter.value())) {
         interchange.push_back(iter.index());
+      }
     }
-    rewriter.updateRootInPlace(genericOp, [&]() {
-      interchangeGenericOp(rewriter, genericOp, interchange);
-    });
-    return success();
+    return interchangeGenericOp(rewriter, genericOp, interchange);
   }
 };
 
@@ -62,13 +60,16 @@ struct InterchangeGenericOpsPass
   void runOnOperation() override {
     OwningRewritePatternList patterns(&getContext());
     patterns.add<GenericOpInterchangePattern>(&getContext());
-    (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
+    if (failed(applyPatternsAndFoldGreedily(getOperation(),
+                                            std::move(patterns)))) {
+      return signalPassFailure();
+    }
   }
 };
 
 }  // namespace
 
-std::unique_ptr<OperationPass<mlir::FuncOp>> createInterchangeGenericOpsPass() {
+std::unique_ptr<Pass> createInterchangeGenericOpsPass() {
   return std::make_unique<InterchangeGenericOpsPass>();
 }
 

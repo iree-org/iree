@@ -172,4 +172,23 @@
 #define IREE_ATTRIBUTE_PACKED
 #endif  // IREE_HAVE_ATTRIBUTE(packed)
 
+//===----------------------------------------------------------------------===//
+// IREE_ATTRIBUTE_UNUSED
+//===----------------------------------------------------------------------===//
+
+// Hints that a variable is _maybe_ unused. This is primarily to quiet
+// diagnostic messages about unused variables that crop up around variables
+// passed to assert/logging/etc that gets stripped in certain configurations.
+//
+// Example:
+//   int some_info IREE_ATTRIBUTE_UNUSED = compute_debug_info();
+//   assert(some_info > 0);  // stripped in NDEBUG
+#if IREE_HAVE_ATTRIBUTE(maybe_unused) && defined(__clang__)
+#define IREE_ATTRIBUTE_UNUSED __attribute__((maybe_unused))
+#elif IREE_HAVE_ATTRIBUTE(unused) || (defined(__GNUC__) && !defined(__clang__))
+#define IREE_ATTRIBUTE_UNUSED __attribute__((unused))
+#else
+#define IREE_ATTRIBUTE_UNUSED
+#endif  // IREE_HAVE_ATTRIBUTE(maybe_unused / unused)
+
 #endif  // IREE_BASE_ATTRIBUTES_H_

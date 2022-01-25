@@ -1,6 +1,6 @@
-// RUN: iree-opt -split-input-file -pass-pipeline='iree-hal-assign-target-devices' %s | IreeFileCheck %s --check-prefix=CHECK --check-prefix=TARGET-0
-// RUN: iree-opt -split-input-file -pass-pipeline='iree-hal-assign-target-devices{targets=vulkan-spirv}' %s | IreeFileCheck %s --check-prefix=CHECK --check-prefix=TARGET-1
-// RUN: iree-opt -split-input-file -pass-pipeline='iree-hal-assign-target-devices{targets=vulkan-spirv,vmvx}' %s | IreeFileCheck %s --check-prefix=CHECK --check-prefix=TARGET-2
+// RUN: iree-opt -split-input-file -pass-pipeline='iree-hal-assign-target-devices' %s | FileCheck %s --check-prefix=CHECK --check-prefix=TARGET-0
+// RUN: iree-opt -split-input-file -pass-pipeline='iree-hal-assign-target-devices{targets=vulkan-spirv}' %s | FileCheck %s --check-prefix=CHECK --check-prefix=TARGET-1
+// RUN: iree-opt -split-input-file -pass-pipeline='iree-hal-assign-target-devices{targets=vulkan-spirv,vmvx}' %s | FileCheck %s --check-prefix=CHECK --check-prefix=TARGET-2
 
 // TARGET-1: #device_target_vulkan = #hal.device.target<"vulkan"
 

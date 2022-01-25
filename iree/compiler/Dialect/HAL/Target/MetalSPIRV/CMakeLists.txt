@@ -8,7 +8,7 @@
 # To disable autogeneration for this file entirely, delete this header.        #
 ################################################################################
 
-if(NOT "${IREE_TARGET_BACKEND_METAL-SPIRV}")
+if(NOT "${IREE_TARGET_BACKEND_METAL_SPIRV}")
   return()
 endif()
 
@@ -30,6 +30,7 @@ iree_cc_library(
     MLIRSPIRVSerialization
     MLIRVector
     iree::compiler::Codegen::Common
+    iree::compiler::Codegen::Dialect::IREECodegenDialect
     iree::compiler::Codegen::PassHeaders
     iree::compiler::Codegen::SPIRV
     iree::compiler::Codegen::Utils

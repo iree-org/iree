@@ -48,7 +48,7 @@ func @dot_general_nontrivial_batching_dimension() {
   return
 }
 
-// TODO(GH-6070): Re-enable this after fixing wrong answer on Pixel 4.
+// TODO(#6070): Re-enable this after fixing wrong answer on Pixel 4.
 // func @large_dot_general2() {
 //   %lhs = util.unfoldable_constant dense<1.0> : tensor<4x32x1024xf32>
 //   %rhs = util.unfoldable_constant dense<0.4> : tensor<4x1024x64xf32>

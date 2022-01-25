@@ -16,12 +16,13 @@
 
 typedef struct iree_hal_rocm_allocator_t {
   iree_hal_resource_t resource;
+  iree_hal_device_t* base_device;
   iree_hal_rocm_context_wrapper_t* context;
 
   IREE_STATISTICS(iree_hal_allocator_statistics_t statistics;)
 } iree_hal_rocm_allocator_t;
 
-extern const iree_hal_allocator_vtable_t iree_hal_rocm_allocator_vtable;
+static const iree_hal_allocator_vtable_t iree_hal_rocm_allocator_vtable;
 
 static iree_hal_rocm_allocator_t* iree_hal_rocm_allocator_cast(
     iree_hal_allocator_t* base_value) {
@@ -30,8 +31,9 @@ static iree_hal_rocm_allocator_t* iree_hal_rocm_allocator_cast(
 }
 
 iree_status_t iree_hal_rocm_allocator_create(
-    iree_hal_rocm_context_wrapper_t* context,
+    iree_hal_device_t* base_device, iree_hal_rocm_context_wrapper_t* context,
     iree_hal_allocator_t** out_allocator) {
+  IREE_ASSERT_ARGUMENT(base_device);
   IREE_ASSERT_ARGUMENT(context);
   IREE_TRACE_ZONE_BEGIN(z0);
   iree_hal_rocm_allocator_t* allocator = NULL;
@@ -41,6 +43,7 @@ iree_status_t iree_hal_rocm_allocator_create(
     iree_hal_resource_initialize(&iree_hal_rocm_allocator_vtable,
                                  &allocator->resource);
     allocator->context = context;
+    allocator->base_device = base_device;
     *out_allocator = (iree_hal_allocator_t*)allocator;
   }
 
@@ -65,6 +68,11 @@ static iree_allocator_t iree_hal_rocm_allocator_host_allocator(
   iree_hal_rocm_allocator_t* allocator =
       (iree_hal_rocm_allocator_t*)base_allocator;
   return allocator->context->host_allocator;
+}
+
+static iree_status_t iree_hal_rocm_allocator_trim(
+    iree_hal_allocator_t* base_allocator) {
+  return iree_ok_status();
 }
 
 static void iree_hal_rocm_allocator_query_statistics(
@@ -107,10 +115,23 @@ iree_hal_rocm_allocator_query_buffer_compatibility(
   return compatibility;
 }
 
+static void iree_hal_rocm_buffer_free(iree_hal_rocm_context_wrapper_t* context,
+                                      iree_hal_memory_type_t memory_type,
+                                      hipDeviceptr_t device_ptr,
+                                      void* host_ptr) {
+  if (iree_all_bits_set(memory_type, IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL)) {
+    // Device local.
+    ROCM_IGNORE_ERROR(context->syms, hipFree(device_ptr));
+  } else {
+    // Host local.
+    ROCM_IGNORE_ERROR(context->syms, hipHostFree(host_ptr));
+  }
+}
+
 static iree_status_t iree_hal_rocm_allocator_allocate_buffer(
     iree_hal_allocator_t* base_allocator, iree_hal_memory_type_t memory_type,
     iree_hal_buffer_usage_t allowed_usage, iree_host_size_t allocation_size,
-    iree_hal_buffer_t** out_buffer) {
+    iree_const_byte_span_t initial_data, iree_hal_buffer_t** out_buffer) {
   iree_hal_rocm_allocator_t* allocator =
       iree_hal_rocm_allocator_cast(base_allocator);
   // Guard against the corner case where the requested buffer size is 0. The
@@ -147,36 +168,40 @@ static iree_status_t iree_hal_rocm_allocator_allocate_buffer(
     }
   }
 
+  iree_hal_buffer_t* buffer = NULL;
   if (iree_status_is_ok(status)) {
-    IREE_STATISTICS(iree_hal_allocator_statistics_record_alloc(
-        &allocator->statistics, memory_type, allocation_size));
     status = iree_hal_rocm_buffer_wrap(
         (iree_hal_allocator_t*)allocator, memory_type,
         IREE_HAL_MEMORY_ACCESS_ALL, allowed_usage, allocation_size,
         /*byte_offset=*/0,
-        /*byte_length=*/allocation_size, device_ptr, host_ptr, out_buffer);
+        /*byte_length=*/allocation_size, device_ptr, host_ptr, &buffer);
   }
-  if (!iree_status_is_ok(status)) {
-    iree_hal_rocm_allocator_free(base_allocator, memory_type, device_ptr,
-                                 host_ptr, allocation_size);
+
+  // Copy the initial contents into the buffer. This may require staging.
+  if (iree_status_is_ok(status) &&
+      !iree_const_byte_span_is_empty(initial_data)) {
+    status = iree_hal_device_transfer_range(
+        allocator->base_device,
+        iree_hal_make_host_transfer_buffer_span((void*)initial_data.data,
+                                                initial_data.data_length),
+        0, iree_hal_make_device_transfer_buffer(buffer), 0,
+        initial_data.data_length, IREE_HAL_TRANSFER_BUFFER_FLAG_DEFAULT,
+        iree_infinite_timeout());
+  }
+
+  if (iree_status_is_ok(status)) {
+    IREE_STATISTICS(iree_hal_allocator_statistics_record_alloc(
+        &allocator->statistics, memory_type, allocation_size));
+    *out_buffer = buffer;
+  } else {
+    if (!buffer) {
+      iree_hal_rocm_buffer_free(allocator->context, memory_type, device_ptr,
+                                host_ptr);
+    } else {
+      iree_hal_buffer_release(buffer);
+    }
   }
   return status;
-}
-
-void iree_hal_rocm_allocator_free(iree_hal_allocator_t* base_allocator,
-                                  iree_hal_memory_type_t memory_type,
-                                  hipDeviceptr_t device_ptr, void* host_ptr,
-                                  iree_device_size_t allocation_size) {
-  iree_hal_rocm_allocator_t* allocator =
-      iree_hal_rocm_allocator_cast(base_allocator);
-  if (iree_all_bits_set(memory_type, IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL)) {
-    ROCM_IGNORE_ERROR(allocator->context->syms, hipFree(device_ptr));
-  } else {
-    // Host local.
-    ROCM_IGNORE_ERROR(allocator->context->syms, hipHostFree(host_ptr));
-  }
-  IREE_STATISTICS(iree_hal_allocator_statistics_record_free(
-      &allocator->statistics, memory_type, allocation_size));
 }
 
 static iree_status_t iree_hal_rocm_allocator_wrap_buffer(
@@ -188,12 +213,31 @@ static iree_status_t iree_hal_rocm_allocator_wrap_buffer(
                           "wrapping of external buffers not supported");
 }
 
-const iree_hal_allocator_vtable_t iree_hal_rocm_allocator_vtable = {
+static void iree_hal_rocm_allocator_deallocate_buffer(
+    iree_hal_allocator_t* base_allocator, iree_hal_buffer_t* base_buffer) {
+  iree_hal_rocm_allocator_t* allocator =
+      iree_hal_rocm_allocator_cast(base_allocator);
+
+  iree_hal_memory_type_t memory_type = iree_hal_buffer_memory_type(base_buffer);
+  iree_hal_rocm_buffer_free(allocator->context, memory_type,
+                            iree_hal_rocm_buffer_device_pointer(base_buffer),
+                            iree_hal_rocm_buffer_host_pointer(base_buffer));
+
+  IREE_STATISTICS(iree_hal_allocator_statistics_record_free(
+      &allocator->statistics, memory_type,
+      iree_hal_buffer_allocation_size(base_buffer)));
+
+  iree_hal_buffer_destroy(base_buffer);
+}
+
+static const iree_hal_allocator_vtable_t iree_hal_rocm_allocator_vtable = {
     .destroy = iree_hal_rocm_allocator_destroy,
     .host_allocator = iree_hal_rocm_allocator_host_allocator,
+    .trim = iree_hal_rocm_allocator_trim,
     .query_statistics = iree_hal_rocm_allocator_query_statistics,
     .query_buffer_compatibility =
         iree_hal_rocm_allocator_query_buffer_compatibility,
     .allocate_buffer = iree_hal_rocm_allocator_allocate_buffer,
     .wrap_buffer = iree_hal_rocm_allocator_wrap_buffer,
+    .deallocate_buffer = iree_hal_rocm_allocator_deallocate_buffer,
 };

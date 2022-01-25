@@ -98,54 +98,55 @@ class FunctionInvoker:
     call_trace = None  # type: Optional[tracing.CallTrace]
     if self._tracer:
       call_trace = self._tracer.start_call(self._vm_function)
+    try:
+      # Initialize the capacity to our total number of args, since we should
+      # be below that when doing a flat invocation. May want to be more
+      # conservative here when considering nesting.
+      inv = Invocation(self._device)
+      ret_descs = self._ret_descs
 
-    # Initialize the capacity to our total number of args, since we should
-    # be below that when doing a flat invocation. May want to be more
-    # conservative here when considering nesting.
-    inv = Invocation(self._device)
-    ret_descs = self._ret_descs
+      # Merge keyword args in by name->position mapping.
+      if kwargs:
+        args = list(args)
+        len_delta = self._max_named_arg_index - len(args) + 1
+        if len_delta > 0:
+          # Fill in MissingArgument placeholders before arranging kwarg input.
+          # Any remaining placeholders will fail arity checks later on.
+          args.extend([MissingArgument] * len_delta)
 
-    # Merge keyword args in by name->position mapping.
-    if kwargs:
-      args = list(args)
-      len_delta = self._max_named_arg_index - len(args) + 1
-      if len_delta > 0:
-        args.extend([NotImplemented] * len_delta)
-      for kwarg_key, kwarg_value in kwargs.items():
-        try:
-          kwarg_index = self._named_arg_indices[kwarg_key]
-        except KeyError:
-          raise ArgumentError(f"specified kwarg '{kwarg_key}' is unknown")
-        len_delta = kwarg_index - len(args) + 1
-        if len_delta <= 0:
-          args.extend([NotImplemented] * len_delta)
-        args[kwarg_index] = kwarg_value
+        for kwarg_key, kwarg_value in kwargs.items():
+          try:
+            kwarg_index = self._named_arg_indices[kwarg_key]
+          except KeyError:
+            raise ArgumentError(f"specified kwarg '{kwarg_key}' is unknown")
+          args[kwarg_index] = kwarg_value
 
-    arg_list = VmVariantList(len(args))
-    ret_list = VmVariantList(len(ret_descs) if ret_descs is not None else 1)
-    _merge_python_sequence_to_vm(inv, arg_list, args, self._arg_descs)
-    if call_trace:
-      call_trace.add_vm_list(arg_list, "args")
-    self._vm_context.invoke(self._vm_function, arg_list, ret_list)
-    if call_trace:
-      call_trace.add_vm_list(ret_list, "results")
+      arg_list = VmVariantList(len(args))
+      ret_list = VmVariantList(len(ret_descs) if ret_descs is not None else 1)
+      _merge_python_sequence_to_vm(inv, arg_list, args, self._arg_descs)
+      if call_trace:
+        call_trace.add_vm_list(arg_list, "args")
+      self._vm_context.invoke(self._vm_function, arg_list, ret_list)
+      if call_trace:
+        call_trace.add_vm_list(ret_list, "results")
 
-    # Un-inline the results to align with reflection, as needed.
-    reflection_aligned_ret_list = ret_list
-    if self._has_inlined_results:
-      reflection_aligned_ret_list = VmVariantList(1)
-      reflection_aligned_ret_list.push_list(ret_list)
-    returns = _extract_vm_sequence_to_python(inv, reflection_aligned_ret_list,
-                                             ret_descs)
-    if call_trace:
-      call_trace.end_call()
-    return_arity = len(returns)
-    if return_arity == 1:
-      return returns[0]
-    elif return_arity == 0:
-      return None
-    else:
-      return tuple(returns)
+      # Un-inline the results to align with reflection, as needed.
+      reflection_aligned_ret_list = ret_list
+      if self._has_inlined_results:
+        reflection_aligned_ret_list = VmVariantList(1)
+        reflection_aligned_ret_list.push_list(ret_list)
+      returns = _extract_vm_sequence_to_python(inv, reflection_aligned_ret_list,
+                                               ret_descs)
+      return_arity = len(returns)
+      if return_arity == 1:
+        return returns[0]
+      elif return_arity == 0:
+        return None
+      else:
+        return tuple(returns)
+    finally:
+      if call_trace:
+        call_trace.end_call()
 
   def _parse_abi_dict(self, vm_function: VmFunction):
     reflection = vm_function.reflection
@@ -200,10 +201,6 @@ class FunctionInvoker:
 #   target_list: VmVariantList to append to
 #   python_value: The python value of the given type
 #   desc: The ABI descriptor list (or None if in dynamic mode).
-
-
-def _missing_argument(inv: Invocation, t: VmVariantList, x, desc):
-  _raise_argument_error(inv, f"a required argument was not specified")
 
 
 def _bool_to_vm(inv: Invocation, t: VmVariantList, x, desc):
@@ -307,8 +304,16 @@ def _ndarray_like_to_vm(inv: Invocation, t: VmVariantList, x, desc):
   return _ndarray_to_vm(inv, t, np.asarray(x), desc)
 
 
+class _MissingArgument:
+  """Placeholder for missing kwargs in the function input."""
+
+  def __repr__(self):
+    return "<mising argument>"
+
+
+MissingArgument = _MissingArgument()
+
 PYTHON_TO_VM_CONVERTERS = {
-    NotImplemented.__class__: _missing_argument,
     bool: _bool_to_vm,
     int: _int_to_vm,
     float: _float_to_vm,
@@ -494,10 +499,14 @@ def _merge_python_sequence_to_vm(inv: Invocation, vm_list, py_list, descs):
   # For dynamic mode, just assume we have the right arity.
   if descs is None:
     descs = [None] * len(py_list)
-  elif len(py_list) != len(descs):
-    _raise_argument_error(
-        inv, f"mismatched function call arity: "
-        f"expected={descs}, got={py_list}")
+  else:
+    len_py_list = sum([1 for x in py_list if x is not MissingArgument])
+    if len(py_list) != len_py_list:
+      _raise_argument_error(
+          inv,
+          f"mismatched call arity: expected {len(descs)} arguments but got "
+          f"{len_py_list}. Expected signature=\n{descs}\nfor input=\n{py_list}")
+
   for py_value, desc in zip(py_list, descs):
     inv.current_arg = py_value
     inv.current_desc = desc

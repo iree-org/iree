@@ -12,8 +12,8 @@ on:
     inputs:
       package_suffix:
         description: 'Suffix to append to package names'
-        required: true
-        default: '-cidev'
+        required: false
+        default: ''
       package_version:
         description: 'Version of the package'
         required: true
@@ -45,17 +45,7 @@ jobs:
             build_package: instrumented-py-runtime-pkg
             experimental: true
           - os: ubuntu-18.04
-            build_package: py-xla-compiler-tools-pkg
-            experimental: false
-          - os: ubuntu-18.04
-            build_package: py-tflite-compiler-tools-pkg
-            experimental: false
-          - os: ubuntu-18.04
             build_package: py-tf-compiler-tools-pkg
-            experimental: false
-          # Only needs to be built on Linux because platform independent.
-          - os: ubuntu-18.04
-            build_package: py-pure-pkgs
             experimental: false
 
           # Windows packages.
@@ -86,7 +76,7 @@ jobs:
 
       # Needs the bazel manylinux image.
       # TODO: Move this to our repo and pin.
-      CIBW_MANYLINUX_X86_64_IMAGE: stellaraccident/manylinux2014_x86_64-bazel-3.7.2:latest
+      CIBW_MANYLINUX_X86_64_IMAGE: stellaraccident/manylinux2014_x86_64-bazel-4.2.2:latest
       # CIBW_MANYLINUX_X86_64_IMAGE: manylinux2014
 
       CIBW_BUILD: "cp37-* cp38-* cp39-*"
@@ -211,64 +201,16 @@ jobs:
           export CIBW_BEFORE_BUILD="python -m pip install --upgrade pip==21.3dev0 -f https://github.com/stellaraccident/pip/releases/tag/21.3dev20210925"
           python -m cibuildwheel --output-dir bindist ./main_checkout/llvm-external-projects/iree-compiler-api
 
-      # Pure python packages only need to do a minimal CMake configure and no
-      # actual building, aside from setting up sources. If there are multiples,
-      # it is fairly cheap to build them serially. Using cibuildwheel is a bit
-      # overkill for this, but we keep it the same as the others for maintenance
-      # value.
-      - name: Build pure python wheels
-        if: "matrix.build_package == 'py-pure-pkgs'"
-        shell: bash
-        run: |
-          python ./main_checkout/build_tools/github_actions/build_dist.py py-pure-pkgs
-          python -m pip wheel -w bindist --no-deps ./iree-install/python_packages/iree_jax
-
-      # Compiler tools wheels are not python version specific, so just build
-      # for one examplar python version.
-      - name: Build XLA Compiler Tools wheels
-        if: "matrix.build_package == 'py-xla-compiler-tools-pkg'"
-        shell: bash
-        run: |
-          # Just need to build for one examplar python3 variant.
-          export CIBW_BUILD="cp38-*"
-          package_dir="./iree-install/python_packages/iree_tools_xla"
-          export CIBW_BEFORE_BUILD="python ./main_checkout/build_tools/github_actions/build_dist.py py-xla-compiler-tools-pkg"
-          # TODO: cibuildwheel sanity checks this, but our setup.py is the
-          # *output* of the build :( Make source packages.
-          mkdir -p $package_dir && touch $package_dir/setup.py
-          python -m cibuildwheel --output-dir bindist $package_dir
-
-      # Compiler tools wheels are not python version specific, so just build
-      # for one examplar python version.
-      - name: Build TFLite Compiler Tools wheels
-        if: "matrix.build_package == 'py-tflite-compiler-tools-pkg'"
-        shell: bash
-        run: |
-          # Just need to build for one examplar python3 variant.
-          export CIBW_BUILD="cp38-*"
-
-          package_dir="./iree-install/python_packages/iree_tools_tflite"
-          export CIBW_BEFORE_BUILD="python ./main_checkout/build_tools/github_actions/build_dist.py py-tflite-compiler-tools-pkg"
-          # TODO: cibuildwheel sanity checks this, but our setup.py is the
-          # *output* of the build :( Make source packages.
-          mkdir -p $package_dir && touch $package_dir/setup.py
-          python -m cibuildwheel --output-dir bindist $package_dir
-
       # Compiler tools wheels are not python version specific, so just build
       # for one examplar python version.
       - name: Build TF Compiler Tools wheels
         if: "matrix.build_package == 'py-tf-compiler-tools-pkg'"
         shell: bash
         run: |
-          # Just need to build for one examplar python3 variant.
-          export CIBW_BUILD="cp38-*"
-
-          package_dir="./iree-install/python_packages/iree_tools_tf"
-          export CIBW_BEFORE_BUILD="python ./main_checkout/build_tools/github_actions/build_dist.py py-tf-compiler-tools-pkg"
-          # TODO: cibuildwheel sanity checks this, but our setup.py is the
-          # *output* of the build :( Make source packages.
-          mkdir -p $package_dir && touch $package_dir/setup.py
-          python -m cibuildwheel --output-dir bindist $package_dir
+          docker run --rm -w=/work \
+            -v $PWD:/work \
+            "${CIBW_MANYLINUX_X86_64_IMAGE}" \
+            bash -c 'export PATH=/opt/python/cp39-cp39/bin:$PATH; python ./main_checkout/build_tools/github_actions/build_dist.py py-tf-compiler-tools-pkg'
 
       - uses: actions/upload-artifact@v2
         with:

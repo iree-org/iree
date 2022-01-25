@@ -8,10 +8,12 @@
 #define IREE_DIALECT_UTIL_IR_UTIL_OPS
 
 include "iree/compiler/Dialect/Util/IR/UtilBase.td"
+include "iree/compiler/Dialect/Util/IR/UtilInterfaces.td"
 include "mlir/IR/OpAsmInterface.td"
 include "mlir/IR/SymbolInterfaces.td"
 include "mlir/Interfaces/CallInterfaces.td"
 include "mlir/Interfaces/ControlFlowInterfaces.td"
+include "mlir/Interfaces/InferTypeOpInterface.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 
 //===----------------------------------------------------------------------===//
@@ -90,6 +92,81 @@ def Util_ByteBufferConstantOp : Util_PureOp<"byte_buffer.constant"> {
 
   let assemblyFormat = [{
     attr-dict `:` type($result) `=` $value
+  }];
+}
+
+//===----------------------------------------------------------------------===//
+// Data type conversions
+//===----------------------------------------------------------------------===//
+
+def Util_NumericOptionalNarrowOp : Util_PureOp<"numeric.optional_narrow", [
+  SameOperandsAndResultType
+]> {
+  let summary = "memorializes an optional numeric narrowing that is valid";
+  let description = [{
+    Serves as a placeholder for points in the computation where an optional
+    numeric narrowing can be performed without loss of information. Such ops
+    can guide optimization passes wishing to perform precision reduction.
+
+    In addition to the operand and result type, this op takes an additional
+    `semantic_type` attribute representing the semantic target type which can
+    be:
+      * FloatType
+      * Signed IntegerType
+      * Unsigned IntegerType
+
+    Note that this `semantic_type` must be a sign-carrying integer if using an
+    integer type and cannot be IndexType (i.e. it can be used to indicate a
+    possible narrowing of an IndexType to a specific integer).
+
+    If the operand is a TensorType, then the result must be a TensorType. The
+    `semantic_type` constrains the element type.
+
+    Optionally, the minimum and maximum integer values (for integer semantic
+    types) are tracked if known.
+  }];
+
+  let arguments = (ins
+    AnyTypeOf<[Util_Element, Util_Tensor]>:$operand,
+    TypeAttr:$semantic_type,
+    OptionalAttr<APIntAttr>:$min_value,
+    OptionalAttr<APIntAttr>:$max_value
+  );
+  let results = (outs
+    AnyTypeOf<[Util_Element, Util_Tensor]>:$result
+  );
+
+  let assemblyFormat = [{
+    $operand `:` type($operand) `as` $semantic_type attr-dict
+  }];
+
+  let builders = [
+    OpBuilder<(ins
+      "Value":$operand,
+      "Type":$type,
+      "Optional<std::pair<int64_t, int64_t>>":$integerRange
+    ),
+    [{
+      IntegerAttr minValueAttr;
+      IntegerAttr maxValueAttr;
+      if (integerRange) {
+        minValueAttr = $_builder.getIntegerAttr(type, integerRange->first);
+        maxValueAttr = $_builder.getIntegerAttr(type, integerRange->second);
+      }
+      build($_builder, $_state, operand.getType(), operand, TypeAttr::get(type),
+        minValueAttr, maxValueAttr);
+    }]>,
+  ];
+
+  let extraClassDeclaration = [{
+    bool isSigned() {
+      if (auto integerType = getType().dyn_cast<IntegerType>()) {
+        return !integerType.isUnsigned();
+      }
+      return true;
+    }
+
+    Optional<std::pair<int64_t, int64_t>> getIntegerRange();
   }];
 }
 
@@ -174,6 +251,45 @@ def Util_RangeExtentsOp : Util_PureOp<"range.extents", [
   }];
 
   let hasCanonicalizer = 1;
+}
+
+//===----------------------------------------------------------------------===//
+// Address/offset Arithmetic
+//===----------------------------------------------------------------------===//
+
+def Util_AlignOp : Util_PureOp<"align", [
+  SameOperandsAndResultType
+  ]> {
+  let summary = "Aligns up to a power-of-two alignment if required";
+  let description = [{
+     Aligns |value| up to the given power-of-two |alignment| if required.
+  }];
+
+  let arguments = (ins
+    SignlessIntegerLike:$value,
+    SignlessIntegerLike:$alignment
+  );
+
+  let results = (outs
+    SignlessIntegerLike:$result
+  );
+
+  let assemblyFormat = [{
+    $value `,` $alignment attr-dict `:` type($result)
+  }];
+
+  let builders = [
+    OpBuilder<(ins
+      "Value":$value,
+      "int64_t":$alignment
+    ),
+    [{
+      build($_builder, $_state, value.getType(), value,
+       $_builder.createOrFold<arith::ConstantIndexOp>($_state.location, alignment));
+    }]>,
+  ];
+
+  let hasFolder = 1;
 }
 
 //===----------------------------------------------------------------------===//
@@ -360,8 +476,9 @@ def Util_GlobalOp : Util_Op<"global", [
     bool isMutable() { return is_mutable(); }
     void makeMutable() { (*this)->setAttr("is_mutable", UnitAttr::get(getContext())); }
 
-    Optional<Attribute> getInitialValueAttr() { return initial_valueAttr(); }
+    Attribute getInitialValueAttr() { return initial_valueAttr(); }
     void clearInitialValue() { (*this)->removeAttr("initial_value"); }
+    void setInitialValue(Attribute attr) { (*this)->setAttr("initial_value", attr); }
   }];
 
   let verifier = [{ return verifyGlobalOp(*this); }];
@@ -371,6 +488,7 @@ def Util_GlobalOp : Util_Op<"global", [
 
 def Util_GlobalAddressOp : Util_PureOp<"global.address", [
   DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
+  DeclareOpInterfaceMethods<Util_GlobalAccessorOpInterface>,
 ]> {
   let summary = [{returns an address reference to a global}];
   let description = [{
@@ -398,6 +516,7 @@ def Util_GlobalLoadOp : Util_Op<"global.load", [
   DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
   // HACK: works around the lack of symbol side effects in C++.
   DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
+  DeclareOpInterfaceMethods<Util_GlobalAccessorOpInterface>,
 ]> {
   let summary = [{loads a value from a global variable}];
   let description = [{
@@ -452,7 +571,9 @@ def Util_GlobalLoadIndirectOp : Util_Op<"global.load.indirect"> {
   let hasCanonicalizer = 1;
 }
 
-def Util_GlobalStoreOp : Util_Op<"global.store"> {
+def Util_GlobalStoreOp : Util_Op<"global.store", [
+  DeclareOpInterfaceMethods<Util_GlobalAccessorOpInterface>,
+]> {
   let summary = [{stores a value into a global variable}];
   let description = [{
     Stores a copy of the value into a global variable.

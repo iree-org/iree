@@ -85,7 +85,7 @@ namespace {
 // Example:
 //  %min = util.range.min %0, %1 : index
 // ->
-//  %min = minui %0, %1 : index
+//  %min = arith.minui %0, %1 : index
 template <typename RangeOpT, typename StdOpT>
 struct ExpandSimpleRangeOp : public OpRewritePattern<RangeOpT> {
   using OpRewritePattern<RangeOpT>::OpRewritePattern;
@@ -147,13 +147,13 @@ struct SimplifyUniformRangeOp : public OpRewritePattern<OpT> {
 
 void RangeMinOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
                                              MLIRContext *context) {
-  results.insert<ExpandSimpleRangeOp<RangeMinOp, mlir::MinUIOp>>(context);
+  results.insert<ExpandSimpleRangeOp<RangeMinOp, arith::MinUIOp>>(context);
   results.insert<SimplifyUniformRangeOp<RangeMinOp, INT64_MAX, xmin>>(context);
 }
 
 void RangeMaxOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
                                              MLIRContext *context) {
-  results.insert<ExpandSimpleRangeOp<RangeMaxOp, mlir::MaxUIOp>>(context);
+  results.insert<ExpandSimpleRangeOp<RangeMaxOp, arith::MaxUIOp>>(context);
   results.insert<SimplifyUniformRangeOp<RangeMaxOp, INT64_MIN, xmax>>(context);
 }
 
@@ -227,10 +227,10 @@ struct FoldConstantRanges : public OpRewritePattern<RangeExtentsOp> {
         rewriter.getIntegerAttr(op.max().getType(),
                                 constantMax - constantMin + 1),
         op.max().getType());
-    min = min ? rewriter.create<mlir::MinUIOp>(op.getLoc(), min, constantMinOp)
+    min = min ? rewriter.create<arith::MinUIOp>(op.getLoc(), min, constantMinOp)
                     .getResult()
               : constantMinOp.getResult();
-    max = max ? rewriter.create<mlir::MaxUIOp>(op.getLoc(), max, constantMaxOp)
+    max = max ? rewriter.create<arith::MaxUIOp>(op.getLoc(), max, constantMaxOp)
                     .getResult()
               : constantMaxOp.getResult();
 
@@ -252,8 +252,8 @@ struct ExpandSimpleRangeExtentsOp : public OpRewritePattern<RangeExtentsOp> {
                               rewriter);
     } else if (op.offsets().size() == 2) {
       // Two ranges turn into min/max.
-      minValue = rewriter.create<mlir::MinUIOp>(loc, op.offsets().front(),
-                                                op.offsets().back());
+      minValue = rewriter.create<arith::MinUIOp>(loc, op.offsets().front(),
+                                                 op.offsets().back());
       auto one = rewriter.create<arith::ConstantOp>(
           loc, rewriter.getIntegerAttr(op.min().getType(), 1),
           op.min().getType());
@@ -261,7 +261,7 @@ struct ExpandSimpleRangeExtentsOp : public OpRewritePattern<RangeExtentsOp> {
                                  op.lengths().front(), one, rewriter);
       auto endRhs = makeRangeEnd(loc, op.offsets().back(), op.lengths().back(),
                                  one, rewriter);
-      maxValue = rewriter.create<mlir::MaxUIOp>(loc, endLhs, endRhs);
+      maxValue = rewriter.create<arith::MaxUIOp>(loc, endLhs, endRhs);
     }
     if (!minValue || !maxValue) return failure();
     rewriter.replaceOp(op, {minValue, maxValue});
@@ -306,6 +306,85 @@ void RangeExtentsOp::getCanonicalizationPatterns(
   results.insert<FoldConstantRanges>(context);
   results.insert<ExpandSimpleRangeExtentsOp>(context);
   results.insert<DeduplicateRangeExtentsOp>(context);
+}
+
+//===----------------------------------------------------------------------===//
+// util.align
+//===----------------------------------------------------------------------===//
+
+// TODO(#5405): add canonicalizers that reach further in the IR or a dedicated
+// pass for full potential-value-set analysis.
+
+// Returns true if |value| is definitely aligned to at least |alignment|.
+// Recursively checks up the source of the value to see if we can trivially
+// prove the alignment either directly matches (when dynamic) or is >= the
+// specified |alignment|. This does not walk across blocks or calls but catches
+// a large majority of the cases we generate ourselves from packing/allocation.
+static bool isAlignedTo(Value value, Value alignment) {
+  APInt staticValue;
+  APInt staticAlignment;
+  if (matchPattern(value, m_ConstantInt(&staticValue)) &&
+      matchPattern(alignment, m_ConstantInt(&staticAlignment))) {
+    // If this value is itself a multiple of the alignment then we can fold.
+    if (staticValue.urem(staticAlignment).isZero()) {
+      return true;  // value % alignment == 0
+    }
+  }
+
+  // If the value is produced by an align op we can check that.
+  if (auto sourceAlignOp = value.getDefiningOp<IREE::Util::AlignOp>()) {
+    // Check for same exact alignment - even if dynamic.
+    if (sourceAlignOp.alignment() == alignment) return true;
+
+    // If the alignments are constant we can compare them inline.
+    APInt sourceAlignment;
+    APInt selfAlignment;
+    if (matchPattern(sourceAlignOp.alignment(),
+                     m_ConstantInt(&sourceAlignment)) &&
+        matchPattern(alignment, m_ConstantInt(&selfAlignment))) {
+      if (sourceAlignment.uge(selfAlignment)) {
+        return true;  // source alignment is >= our alignment
+      }
+    }
+
+    // Recurse and check the alignment on the input to the align; if it was
+    // aligned earlier we can rely on that as align will never shrink a value.
+    return isAlignedTo(sourceAlignOp.value(), alignment);
+  }
+
+  // If we are sourced from add/mul we peephole check to see if what is being
+  // added is also aligned. This should be part of a larger pass doing IPO but
+  // as the common case is that we align+add+align this is worth having in a
+  // folder. This single folder can avoid ever even materializing thousands of
+  // ops.
+  if (auto sourceAddOp = value.getDefiningOp<arith::AddIOp>()) {
+    // Two aligned values added together are still aligned.
+    if (isAlignedTo(sourceAddOp.getLhs(), alignment) &&
+        isAlignedTo(sourceAddOp.getRhs(), alignment)) {
+      return true;
+    }
+  } else if (auto sourceSubOp = value.getDefiningOp<arith::SubIOp>()) {
+    // An aligned value subtracted from an aligned value is still aligned.
+    if (isAlignedTo(sourceSubOp.getLhs(), alignment) &&
+        isAlignedTo(sourceSubOp.getRhs(), alignment)) {
+      return true;
+    }
+  } else if (auto sourceMulOp = value.getDefiningOp<arith::MulIOp>()) {
+    // Two aligned values multiplied together are still aligned.
+    if (isAlignedTo(sourceMulOp.getLhs(), alignment) &&
+        isAlignedTo(sourceMulOp.getRhs(), alignment)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+OpFoldResult AlignOp::fold(ArrayRef<Attribute> operands) {
+  // If aligning an already-aligned value then fold if this is provably a
+  // no-op. We can check this for equality even with dynamic alignments.
+  if (isAlignedTo(value(), alignment())) return value();
+  return {};
 }
 
 //===----------------------------------------------------------------------===//

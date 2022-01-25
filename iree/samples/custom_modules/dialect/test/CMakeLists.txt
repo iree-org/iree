@@ -16,9 +16,9 @@ iree_lit_test_suite(
   SRCS
     "conversion.mlir"
     "custom_ops.mlir"
-  DATA
+  TOOLS
+    FileCheck
     iree::samples::custom_modules::dialect::custom-opt
-    iree::tools::IreeFileCheck
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

@@ -68,8 +68,8 @@ IREE_API_EXPORT void iree_runtime_instance_options_initialize(
     iree_runtime_instance_options_t* out_options);
 
 // Sets the instance to use all available drivers registered in the current
-// binary. This allows for control over driver selection from the build system:
-// if you have IREE_HAL_DRIVERS_TO_BUILD=Vulkan then you'll only get Vulkan.
+// binary. This allows for control over driver selection from the build system
+// using the IREE_HAL_DRIVER_* CMake options.
 // Sessions may query for the driver listing and select one(s) that are
 // appropriate.
 IREE_API_EXPORT void iree_runtime_instance_options_use_all_available_drivers(

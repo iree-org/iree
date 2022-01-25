@@ -220,7 +220,10 @@ Attribute VMDialect::parseAttribute(DialectAsmParser &parser, Type type) const {
 
 void VMDialect::printAttribute(Attribute attr, DialectAsmPrinter &p) const {
   TypeSwitch<Attribute>(attr)
-      .Case<OrdinalCountsAttr>([&](auto typedAttr) { typedAttr.print(p); })
+      .Case<OrdinalCountsAttr>([&](auto typedAttr) {
+        p << typedAttr.getKindName();
+        typedAttr.print(p);
+      })
       .Default(
           [](Attribute) { llvm_unreachable("unhandled VM attribute kind"); });
 }

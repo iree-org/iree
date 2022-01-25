@@ -17,14 +17,13 @@ python -m pip install tf-nightly
 ```
 
 Install IREE pip packages, either from pip or by
-[building from source](../building-from-source/optional-features.md#building-python-bindings):
+[building from source](../building-from-source/python-bindings-and-importers.md):
 
 ```shell
 python -m pip install \
-  iree-compiler-snapshot \
-  iree-runtime-snapshot \
-  iree-tools-tf-snapshot \
-  -f https://github.com/google/iree/releases
+  iree-compiler \
+  iree-runtime \
+  iree-tools-tf
 ```
 
 !!! warning

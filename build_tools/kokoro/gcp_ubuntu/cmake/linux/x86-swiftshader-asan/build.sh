@@ -21,13 +21,13 @@ export CMAKE_BIN="$(which cmake)"
 "${CXX?}" --version
 python3 --version
 
+echo "Initializing submodules"
+git submodule update --init --jobs 8 --depth 1
+
 ./build_tools/kokoro/gcp_ubuntu/check_vulkan.sh
 
 # Print SwiftShader git commit
 cat /swiftshader/git-commit
-
-echo "Initializing submodules"
-./scripts/git/submodule_versions.py init
 
 CMAKE_BUILD_DIR="${CMAKE_BUILD_DIR:-$HOME/build}"
 
@@ -100,17 +100,9 @@ label_exclude_regex="($(IFS="|" ; echo "${label_exclude_args[*]?}"))"
 # These tests currently have asan failures
 # TODO(#5715): Fix these
 declare -a excluded_tests=(
-  "iree/hal/cts/allocator_test"
-  "iree/hal/cts/buffer_mapping_test"
-  "iree/hal/cts/command_buffer_test"
-  "iree/hal/cts/descriptor_set_layout_test"
-  "iree/hal/cts/driver_test"
-  "iree/hal/cts/event_test"
-  "iree/hal/cts/executable_layout_test"
-  "iree/hal/cts/semaphore_test"
-  "iree/hal/cts/semaphore_submission_test"
-  "iree/modules/check/check_test"
+  "iree/base/internal/file_io_test"
   "bindings/tflite/smoke_test"
+  "iree/modules/check/check_test"
   "iree/samples/simple_embedding/simple_embedding_vulkan_test"
 )
 

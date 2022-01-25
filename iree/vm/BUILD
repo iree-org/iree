@@ -5,8 +5,8 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 load("//iree:build_defs.oss.bzl", "iree_cmake_extra_content")
-load("//iree/tools:compilation.bzl", "iree_bytecode_module")
-load("//build_tools/bazel:run_binary_test.bzl", "run_binary_test")
+load("//build_tools/bazel:iree_bytecode_module.bzl", "iree_bytecode_module")
+load("//build_tools/bazel:native_binary.bzl", "native_test")
 # load("@llvm-project//mlir:tblgen.bzl", "gentbl_cc_library")
 
 package(
@@ -266,10 +266,10 @@ cc_binary(
     ],
 )
 
-run_binary_test(
+native_test(
     name = "bytecode_module_benchmark_test",
+    src = ":bytecode_module_benchmark",
     args = ["--benchmark_min_time=0"],
-    test_binary = ":bytecode_module_benchmark",
 )
 
 iree_bytecode_module(
@@ -331,5 +331,9 @@ cc_library(
     name = "shims_emitc",
     hdrs = [
         "shims_emitc.h",
+    ],
+    deps = [
+        ":impl",
+        "//iree/base:core_headers",
     ],
 )

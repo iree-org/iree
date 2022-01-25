@@ -15,8 +15,8 @@ iree_lit_test_suite(
     lit
   SRCS
     "verify_compiler_tosa_input_legality.mlir"
-  DATA
-    iree::tools::IreeFileCheck
+  TOOLS
+    FileCheck
     iree::tools::iree-opt
 )
 

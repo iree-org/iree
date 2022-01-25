@@ -25,12 +25,8 @@
 
 // Inline synchronous one-shot command "buffer".
 typedef struct iree_hal_inline_command_buffer_t {
-  iree_hal_resource_t resource;
-
+  iree_hal_command_buffer_t base;
   iree_allocator_t host_allocator;
-  iree_hal_command_buffer_mode_t mode;
-  iree_hal_command_category_t allowed_categories;
-  iree_hal_queue_affinity_t queue_affinity;
 
   struct {
     // A flattened list of all available descriptor set bindings.
@@ -86,7 +82,7 @@ static void iree_hal_inline_command_buffer_reset(
 }
 
 iree_status_t iree_hal_inline_command_buffer_create(
-    iree_hal_command_buffer_mode_t mode,
+    iree_hal_device_t* device, iree_hal_command_buffer_mode_t mode,
     iree_hal_command_category_t command_categories,
     iree_hal_queue_affinity_t queue_affinity, iree_allocator_t host_allocator,
     iree_hal_command_buffer_t** out_command_buffer) {
@@ -109,15 +105,13 @@ iree_status_t iree_hal_inline_command_buffer_create(
   iree_status_t status = iree_allocator_malloc(
       host_allocator, sizeof(*command_buffer), (void**)&command_buffer);
   if (iree_status_is_ok(status)) {
-    iree_hal_resource_initialize(&iree_hal_inline_command_buffer_vtable,
-                                 &command_buffer->resource);
+    iree_hal_command_buffer_initialize(
+        device, mode, command_categories, queue_affinity,
+        &iree_hal_inline_command_buffer_vtable, &command_buffer->base);
     command_buffer->host_allocator = host_allocator;
-    command_buffer->mode = mode;
-    command_buffer->allowed_categories = command_categories;
-    command_buffer->queue_affinity = queue_affinity;
     iree_hal_inline_command_buffer_reset(command_buffer);
 
-    *out_command_buffer = (iree_hal_command_buffer_t*)command_buffer;
+    *out_command_buffer = &command_buffer->base;
   }
 
   IREE_TRACE_ZONE_END(z0);
@@ -137,16 +131,19 @@ static void iree_hal_inline_command_buffer_destroy(
   IREE_TRACE_ZONE_END(z0);
 }
 
-static iree_hal_command_buffer_mode_t iree_hal_inline_command_buffer_mode(
-    const iree_hal_command_buffer_t* base_command_buffer) {
-  return ((const iree_hal_inline_command_buffer_t*)base_command_buffer)->mode;
+bool iree_hal_inline_command_buffer_isa(
+    iree_hal_command_buffer_t* command_buffer) {
+  return iree_hal_command_buffer_dyn_cast(
+      command_buffer, &iree_hal_inline_command_buffer_vtable);
 }
 
-static iree_hal_command_category_t
-iree_hal_inline_command_buffer_allowed_categories(
-    const iree_hal_command_buffer_t* base_command_buffer) {
-  return ((const iree_hal_inline_command_buffer_t*)base_command_buffer)
-      ->allowed_categories;
+static void* iree_hal_inline_command_buffer_dyn_cast(
+    iree_hal_command_buffer_t* command_buffer, const void* vtable) {
+  if (vtable == &iree_hal_inline_command_buffer_vtable) {
+    IREE_HAL_ASSERT_TYPE(command_buffer, vtable);
+    return command_buffer;
+  }
+  return NULL;
 }
 
 //===----------------------------------------------------------------------===//
@@ -337,12 +334,6 @@ static iree_status_t iree_hal_inline_command_buffer_push_descriptor_set(
                             "set %u out of bounds", set);
   }
 
-  iree_hal_local_executable_layout_t* local_executable_layout =
-      iree_hal_local_executable_layout_cast(executable_layout);
-  iree_hal_local_descriptor_set_layout_t* local_set_layout =
-      iree_hal_local_descriptor_set_layout_cast(
-          local_executable_layout->set_layouts[set]);
-
   iree_host_size_t binding_base =
       set * IREE_HAL_LOCAL_MAX_DESCRIPTOR_BINDING_COUNT;
   for (iree_host_size_t i = 0; i < binding_count; ++i) {
@@ -354,10 +345,11 @@ static iree_status_t iree_hal_inline_command_buffer_push_descriptor_set(
     iree_host_size_t binding_ordinal = binding_base + bindings[i].binding;
 
     // TODO(benvanik): track mapping so we can properly map/unmap/flush/etc.
-    iree_hal_buffer_mapping_t buffer_mapping;
+    iree_hal_buffer_mapping_t buffer_mapping = {{0}};
     IREE_RETURN_IF_ERROR(iree_hal_buffer_map_range(
-        bindings[i].buffer, local_set_layout->bindings[binding_ordinal].access,
-        bindings[i].offset, bindings[i].length, &buffer_mapping));
+        bindings[i].buffer, IREE_HAL_MAPPING_MODE_PERSISTENT,
+        IREE_HAL_MEMORY_ACCESS_ANY, bindings[i].offset, bindings[i].length,
+        &buffer_mapping));
     command_buffer->state.full_bindings[binding_ordinal] =
         buffer_mapping.contents.data;
     command_buffer->state.full_binding_lengths[binding_ordinal] =
@@ -484,10 +476,11 @@ static iree_status_t iree_hal_inline_command_buffer_dispatch_indirect(
     iree_hal_buffer_t* workgroups_buffer,
     iree_device_size_t workgroups_offset) {
   // TODO(benvanik): track mapping so we can properly map/unmap/flush/etc.
-  iree_hal_buffer_mapping_t buffer_mapping;
+  iree_hal_buffer_mapping_t buffer_mapping = {{0}};
   IREE_RETURN_IF_ERROR(iree_hal_buffer_map_range(
-      workgroups_buffer, IREE_HAL_MEMORY_ACCESS_READ, workgroups_offset,
-      3 * sizeof(uint32_t), &buffer_mapping));
+      workgroups_buffer, IREE_HAL_MAPPING_MODE_PERSISTENT,
+      IREE_HAL_MEMORY_ACCESS_READ, workgroups_offset, 3 * sizeof(uint32_t),
+      &buffer_mapping));
   iree_hal_vec3_t workgroup_count =
       *(const iree_hal_vec3_t*)buffer_mapping.contents.data;
   return iree_hal_inline_command_buffer_dispatch(
@@ -502,8 +495,7 @@ static iree_status_t iree_hal_inline_command_buffer_dispatch_indirect(
 static const iree_hal_command_buffer_vtable_t
     iree_hal_inline_command_buffer_vtable = {
         .destroy = iree_hal_inline_command_buffer_destroy,
-        .mode = iree_hal_inline_command_buffer_mode,
-        .allowed_categories = iree_hal_inline_command_buffer_allowed_categories,
+        .dyn_cast = iree_hal_inline_command_buffer_dyn_cast,
         .begin = iree_hal_inline_command_buffer_begin,
         .end = iree_hal_inline_command_buffer_end,
         .begin_debug_group = iree_hal_inline_command_buffer_begin_debug_group,

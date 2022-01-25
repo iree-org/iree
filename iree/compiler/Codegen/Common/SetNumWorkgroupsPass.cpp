@@ -4,16 +4,18 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "iree/compiler/Codegen/Dialect/LoweringConfig.h"
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
-#include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
-#include "iree/compiler/Dialect/HAL/IR/LoweringConfig.h"
+#include "llvm/Support/Debug.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+
+#define DEBUG_TYPE "iree-codegen-set-num-workgroups"
 
 static const unsigned kNumMaxParallelDims = 3;
 
@@ -90,14 +92,9 @@ void SetNumWorkgroupsPass::runOnOperation() {
     if (!workloadPerWorkgroup.empty()) {
       currWorkloadPerWorkgroup.assign(workloadPerWorkgroup.begin(),
                                       workloadPerWorkgroup.end());
-    } else if (IREE::HAL::TranslationInfo translationInfo =
+    } else if (IREE::Codegen::TranslationInfoAttr translationInfo =
                    getTranslationInfo(entryPointOp)) {
-      if (ArrayAttr workloadPerWorkgroupAttr =
-              translationInfo.workloadPerWorkgroup()) {
-        currWorkloadPerWorkgroup = llvm::to_vector<4>(llvm::map_range(
-            workloadPerWorkgroupAttr,
-            [](Attribute attr) { return attr.cast<IntegerAttr>().getInt(); }));
-      }
+      currWorkloadPerWorkgroup = translationInfo.getWorkloadPerWorkgroupVals();
     }
 
     if (!currWorkloadPerWorkgroup.empty()) {
@@ -112,7 +109,7 @@ void SetNumWorkgroupsPass::runOnOperation() {
 
     // The workgroup count region might already be set by op-specific
     // configuration logic. If so, just return to avoid overwriting that.
-    if (!entryPointOp.workgroup_count_region().empty()) return;
+    if (!entryPointOp.workgroup_count_region().empty()) continue;
 
     WorkgroupCountRegionBuilder regionBuilder;
     if (currWorkloadPerWorkgroup.empty()) {
@@ -132,7 +129,7 @@ void SetNumWorkgroupsPass::runOnOperation() {
         Value one = b.create<arith::ConstantIndexOp>(loc, 1);
         std::array<Value, 3> returnValues = {one, one, one};
         for (auto ts : llvm::enumerate(currWorkloadPerWorkgroup)) {
-          returnValues[ts.index()] = linalg::applyMapToValues(
+          returnValues[ts.index()] = applyMapToValues(
               b, loc,
               AffineMap::get(0, 1,
                              b.getAffineSymbolExpr(0).ceilDiv(ts.value())),
@@ -153,7 +150,10 @@ void SetNumWorkgroupsPass::runOnOperation() {
   populateAffineMinSCFCanonicalizationPattern(canonicalization);
   IREE::Flow::populateFlowDispatchCanonicalizationPatterns(canonicalization,
                                                            context);
-  (void)applyPatternsAndFoldGreedily(module, std::move(canonicalization));
+  if (failed(
+          applyPatternsAndFoldGreedily(module, std::move(canonicalization)))) {
+    return signalPassFailure();
+  }
 }
 
 std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>

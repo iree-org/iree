@@ -23,8 +23,12 @@ source "${KOKORO_ARTIFACTS_DIR?}/github/iree/build_tools/kokoro/gcp_ubuntu/docke
 # Sets DOCKER_RUN_ARGS
 docker_setup
 
+# This doesn't really need everything in the frontends image, but we want the
+# cache to be shared with the integrations build (no point building LLVM twice)
+# and the cache key is the docker container it's run in (to ensure correct cache
+# hits).
 docker run "${DOCKER_RUN_ARGS[@]?}" \
-  gcr.io/iree-oss/bazel@sha256:31c3acef0aeb2976b63b8cb946bda1de9bc8b5319b7e079e507afad2a62d13e7 \
+  gcr.io/iree-oss/frontends-swiftshader@sha256:f47974b42778bd929021c62be806c614051092b44fa911497ab23df3a5a0b206 \
   build_tools/kokoro/gcp_ubuntu/bazel/linux/x86-swiftshader/core/build.sh
 
 # Kokoro will rsync this entire directory back to the executor orchestrating the

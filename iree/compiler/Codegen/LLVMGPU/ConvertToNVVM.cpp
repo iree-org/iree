@@ -46,6 +46,10 @@ struct ConvertToNVVMPass : public ConvertToNVVMBase<ConvertToNVVMPass> {
     LowerToLLVMOptions options(m.getContext(), DataLayout(m));
     options.overrideIndexBitwidth(64);
     LLVMTypeConverter converter(m.getContext(), options);
+    // Lowering for MMAMatrixType.
+    converter.addConversion([&](gpu::MMAMatrixType type) -> Type {
+      return convertMMAToLLVMType(type);
+    });
     // Apply in-dialect lowering first. In-dialect lowering will replace ops
     // which need to be lowered further, which is not supported by a single
     // conversion pass.
@@ -54,6 +58,7 @@ struct ConvertToNVVMPass : public ConvertToNVVMBase<ConvertToNVVMPass> {
       OwningRewritePatternList patterns(&getContext());
       populateScalarizeMathOps(patterns);
       populateConvertSharedMemoryAllocOps(patterns);
+      populateLowerHALInterfaceOp(patterns);
       vector::populateVectorToVectorCanonicalizationPatterns(patterns);
       vector::populateVectorBroadcastLoweringPatterns(patterns);
       vector::populateVectorContractLoweringPatterns(
@@ -64,17 +69,20 @@ struct ConvertToNVVMPass : public ConvertToNVVMBase<ConvertToNVVMPass> {
       vector::populateVectorShapeCastLoweringPatterns(patterns);
       vector::populateVectorTransposeLoweringPatterns(patterns);
       vector::populateVectorTransferLoweringPatterns(patterns);
-      (void)applyPatternsAndFoldGreedily(m, std::move(patterns));
+      if (failed(applyPatternsAndFoldGreedily(m, std::move(patterns)))) {
+        return signalPassFailure();
+      }
     }
     {
       OwningRewritePatternList patterns(&getContext());
       populateGpuRewritePatterns(patterns);
-      (void)applyPatternsAndFoldGreedily(m, std::move(patterns));
+      if (failed(applyPatternsAndFoldGreedily(m, std::move(patterns)))) {
+        return signalPassFailure();
+      }
     }
     {
       OwningRewritePatternList llvmPatterns(&getContext());
-      populateLLVMConversionPatterns(&getContext(), llvmPatterns, converter,
-                                     false);
+      populateLLVMConversionPatterns(&getContext(), llvmPatterns, converter);
       populateMathToLLVMConversionPatterns(converter, llvmPatterns);
       populateMemRefToLLVMConversionPatterns(converter, llvmPatterns);
       populateStdToLLVMConversionPatterns(converter, llvmPatterns);
@@ -82,6 +90,7 @@ struct ConvertToNVVMPass : public ConvertToNVVMBase<ConvertToNVVMPass> {
                                                         llvmPatterns);
       populateVectorToLLVMConversionPatterns(converter, llvmPatterns);
       populateGpuToNVVMConversionPatterns(converter, llvmPatterns);
+      populateGpuWMMAToNVVMConversionPatterns(converter, llvmPatterns);
       LLVMConversionTarget target(getContext());
       populateStdToLLVMFuncOpConversionPattern(converter, llvmPatterns);
       configureGpuToNVVMConversionLegality(target);
@@ -89,8 +98,9 @@ struct ConvertToNVVMPass : public ConvertToNVVMBase<ConvertToNVVMPass> {
         if (isEntryPoint(funcOp)) return false;
         return true;
       });
-      if (failed(applyPartialConversion(m, target, std::move(llvmPatterns))))
+      if (failed(applyPartialConversion(m, target, std::move(llvmPatterns)))) {
         signalPassFailure();
+      }
     }
   }
 };

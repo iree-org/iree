@@ -5,7 +5,8 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/PassDetail.h"
-#include "mlir/Dialect/Linalg/IR/LinalgOps.h"
+#include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Vector/VectorOps.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
@@ -14,20 +15,38 @@ namespace iree_compiler {
 
 namespace {
 
+Value promoteVector(Location loc, Value inputVector, Type promotedElementType,
+                    PatternRewriter &rewriter) {
+  VectorType inputVectorType = inputVector.getType().cast<VectorType>();
+  if (inputVectorType.getElementType() == promotedElementType) {
+    return inputVector;
+  } else {
+    auto promotedVectorType = inputVectorType.clone(promotedElementType);
+    if (promotedElementType.isIntOrIndex()) {
+      return rewriter.create<arith::ExtSIOp>(loc, inputVector,
+                                             promotedVectorType);
+    } else {
+      return rewriter.create<arith::ExtFOp>(loc, inputVector,
+                                            promotedVectorType);
+    }
+  }
+}
+
 /// Converts linalg.mmt4d into vector.contract.
-/// This converts linalg.mmt4d with operands <1x1xM0xK0>, <1x1xK0xN0>
+/// This converts linalg.mmt4d with operands <1x1xM0xK0>, <1x1xN0xK0>
 /// to vector.contract where K0 is the contraction dimension.
 struct VectorizeMMT4DOp : public OpRewritePattern<linalg::Mmt4DOp> {
   using OpRewritePattern<linalg::Mmt4DOp>::OpRewritePattern;
 
   LogicalResult matchAndRewrite(linalg::Mmt4DOp mmt4DOp,
                                 PatternRewriter &rewriter) const override {
-    auto lhs = mmt4DOp.inputs()[0];
-    auto rhs = mmt4DOp.inputs()[1];
-    auto dst = mmt4DOp.outputs()[0];
+    Value lhs = mmt4DOp.inputs()[0];
+    Value rhs = mmt4DOp.inputs()[1];
+    Value dst = mmt4DOp.outputs()[0];
 
-    auto lhsType = lhs.getType().dyn_cast<ShapedType>();
-    auto rhsType = rhs.getType().dyn_cast<ShapedType>();
+    ShapedType lhsType = lhs.getType().dyn_cast<ShapedType>();
+    ShapedType rhsType = rhs.getType().dyn_cast<ShapedType>();
+    ShapedType dstType = dst.getType().dyn_cast<ShapedType>();
 
     // This pattern expects tensors of static shapes.
     // In practice, dynamic shapes are meant to be handled by other passes,
@@ -38,8 +57,9 @@ struct VectorizeMMT4DOp : public OpRewritePattern<linalg::Mmt4DOp> {
     // to specialized code paths where these inner dimensions become static
     // (M1xK1x?x? --> M1xK1xM0xK0)
     if (!lhsType || !rhsType || !lhsType.hasStaticShape() ||
-        !rhsType.hasStaticShape())
+        !rhsType.hasStaticShape()) {
       return failure();
+    }
 
     // We expect the incoming mmt4d to already have been maximally tiled, so
     // that the outer dimensions are equal to 1.
@@ -55,36 +75,45 @@ struct VectorizeMMT4DOp : public OpRewritePattern<linalg::Mmt4DOp> {
     int N0 = rhsType.getShape()[2];
     int K0 = lhsType.getShape()[3];
 
-    auto loc = mmt4DOp.getLoc();
-    auto c0 = rewriter.create<arith::ConstantIndexOp>(loc, 0);
+    Location loc = mmt4DOp.getLoc();
+    Value c0 = rewriter.create<arith::ConstantIndexOp>(loc, 0);
 
-    auto lhsVecType = VectorType::get({1, 1, M0, K0}, rewriter.getF32Type());
-    auto rhsVecType = VectorType::get({1, 1, N0, K0}, rewriter.getF32Type());
-    auto dstVecType = VectorType::get({1, 1, M0, N0}, rewriter.getF32Type());
+    Type lhsElementType = lhsType.getElementType();
+    Type rhsElementType = rhsType.getElementType();
+    Type dstElementType = dstType.getElementType();
 
-    auto lhsVecType2D = VectorType::get({M0, K0}, rewriter.getF32Type());
-    auto rhsVecType2D = VectorType::get({N0, K0}, rewriter.getF32Type());
-    auto dstVecType2D = VectorType::get({M0, N0}, rewriter.getF32Type());
+    auto lhsVecType2D = VectorType::get({M0, K0}, lhsElementType);
+    auto rhsVecType2D = VectorType::get({N0, K0}, rhsElementType);
+    auto dstVecType2D = VectorType::get({M0, N0}, dstElementType);
 
-    auto identityMap = rewriter.getMultiDimIdentityMap(4);
+    auto lhs2DTensorType = RankedTensorType::get({M0, K0}, lhsElementType);
+    auto rhs2DTensorType = RankedTensorType::get({N0, K0}, rhsElementType);
+    auto dst2DTensorType = RankedTensorType::get({M0, N0}, dstElementType);
 
-    // Read the input tensors into vectors.
-    auto lhsVec = rewriter.create<vector::TransferReadOp>(
-        loc, lhsVecType, lhs, ValueRange{c0, c0, c0, c0}, identityMap);
-    auto rhsVec = rewriter.create<vector::TransferReadOp>(
-        loc, rhsVecType, rhs, ValueRange{c0, c0, c0, c0}, identityMap);
-    auto dstVec = rewriter.create<vector::TransferReadOp>(
-        loc, dstVecType, dst, ValueRange{c0, c0, c0, c0}, identityMap);
+    Value lhs2D = tensor::createCanonicalRankReducingExtractSliceOp(
+        rewriter, loc, lhs, lhs2DTensorType);
+    Value rhs2D = tensor::createCanonicalRankReducingExtractSliceOp(
+        rewriter, loc, rhs, rhs2DTensorType);
+    Value dst2D = tensor::createCanonicalRankReducingExtractSliceOp(
+        rewriter, loc, dst, dst2DTensorType);
 
-    // Convert the input vectors from 4D shapes (1x1xM0xK0) to 2D shapes (M0xK0)
-    Value lhsVec2D =
-        rewriter.create<vector::ShapeCastOp>(loc, lhsVecType2D, lhsVec);
-    Value rhsVec2D =
-        rewriter.create<vector::ShapeCastOp>(loc, rhsVecType2D, rhsVec);
-    Value dstVec2D =
-        rewriter.create<vector::ShapeCastOp>(loc, dstVecType2D, dstVec);
+    auto identityMap2D = rewriter.getMultiDimIdentityMap(2);
 
-    // Generate the vector.contract on 2D vectors replacing the mmt4d op.
+    Value lhsVec2D = rewriter.create<vector::TransferReadOp>(
+        loc, lhsVecType2D, lhs2D, ValueRange{c0, c0}, identityMap2D);
+    Value rhsVec2D = rewriter.create<vector::TransferReadOp>(
+        loc, rhsVecType2D, rhs2D, ValueRange{c0, c0}, identityMap2D);
+    Value dstVec2D = rewriter.create<vector::TransferReadOp>(
+        loc, dstVecType2D, dst2D, ValueRange{c0, c0}, identityMap2D);
+
+    // Promote, if needed, the element type in the lhs and rhs vectors to
+    // match the dst vector, so that the vector.contract below will involve
+    // only one element type. This is in line with planned design, see
+    // the closing comment on https://reviews.llvm.org/D112508 where the
+    // alternative of using mixed types was considered.
+    Value promLhsVec2d = promoteVector(loc, lhsVec2D, dstElementType, rewriter);
+    Value promRhsVec2d = promoteVector(loc, rhsVec2D, dstElementType, rewriter);
+
     auto m = rewriter.getAffineDimExpr(0);
     auto n = rewriter.getAffineDimExpr(1);
     auto k = rewriter.getAffineDimExpr(2);
@@ -96,16 +125,15 @@ struct VectorizeMMT4DOp : public OpRewritePattern<linalg::Mmt4DOp> {
         {getParallelIteratorTypeName(), getParallelIteratorTypeName(),
          getReductionIteratorTypeName()});
     Value contractResult = rewriter.create<vector::ContractionOp>(
-        loc, lhsVec2D, rhsVec2D, dstVec2D, indexingMaps, iterators);
-
-    // Convert the output vector from 2D shape (M0xN0) to 4D shape (1x1xM0xN0)
-    Value contractResult4D =
-        rewriter.create<vector::ShapeCastOp>(loc, dstVecType, contractResult);
-
-    // Replace the mmt4d op by the equivalent graph.
-    rewriter.replaceOpWithNewOp<vector::TransferWriteOp>(
-        mmt4DOp, contractResult4D, dst, ValueRange{c0, c0, c0, c0},
-        identityMap);
+        loc, promLhsVec2d, promRhsVec2d, dstVec2D, indexingMaps, iterators);
+    Value contractResultTensor =
+        rewriter
+            .create<vector::TransferWriteOp>(loc, contractResult, dst2D,
+                                             ValueRange{c0, c0}, identityMap2D)
+            .getResult(0);
+    Value insertSlice = tensor::createCanonicalRankReducingInsertSliceOp(
+        rewriter, loc, contractResultTensor, dst);
+    rewriter.replaceOp(mmt4DOp, insertSlice);
     return success();
   }
 };
@@ -121,7 +149,10 @@ struct LinalgToVectorVectorizeMMT4dPass
     MLIRContext *context = &getContext();
     OwningRewritePatternList patterns(&getContext());
     patterns.insert<VectorizeMMT4DOp>(context);
-    (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
+    if (failed(applyPatternsAndFoldGreedily(getOperation(),
+                                            std::move(patterns)))) {
+      return signalPassFailure();
+    }
   }
 };
 

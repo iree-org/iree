@@ -88,6 +88,7 @@ enum class StatusCode : uint32_t {
   kUnavailable = IREE_STATUS_UNAVAILABLE,
   kDataLoss = IREE_STATUS_DATA_LOSS,
   kUnauthenticated = IREE_STATUS_UNAUTHENTICATED,
+  kDeferred = IREE_STATUS_DEFERRED,
 };
 
 static inline const char* StatusCodeToString(StatusCode code) {

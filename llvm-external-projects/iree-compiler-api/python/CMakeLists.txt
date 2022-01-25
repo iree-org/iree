@@ -11,8 +11,7 @@ add_compile_definitions("MLIR_PYTHON_PACKAGE_PREFIX=iree.compiler.")
 declare_mlir_python_sources(IREECompilerAPIPythonSources
   ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/iree/compiler"
   SOURCES
-    api/driver.py
-    version.py
+    transforms/ireec.py
 )
 declare_mlir_python_sources(IREECompilerAPIPythonExtensions)
 
@@ -31,11 +30,11 @@ declare_mlir_python_sources(IREECompilerAPIPythonTools
 # Extensions
 ################################################################################
 
-declare_mlir_python_extension(IREECompilerAPIPythonExtensions.CompilerDriver
-  MODULE_NAME _ireeCompilerDriver
+declare_mlir_python_extension(IREECompilerAPIPythonExtensions.IREECTransforms
+  MODULE_NAME _ireecTransforms
   ADD_TO_PARENT IREECompilerAPIPythonExtensions
   SOURCES
-    ${CMAKE_CURRENT_SOURCE_DIR}/CompilerModule.cpp
+    IREECTransforms.cpp
   EMBED_CAPI_LINK_LIBS
     IREECompilerAPICompilerCAPI
   PRIVATE_LINK_LIBS

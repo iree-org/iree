@@ -7,7 +7,6 @@
 #ifndef IREE_DIALECT_STREAM_OPS
 #define IREE_DIALECT_STREAM_OPS
 
-include "iree/compiler/Dialect/Shape/IR/ShapeInterfaces.td"
 include "iree/compiler/Dialect/Stream/IR/StreamBase.td"
 include "iree/compiler/Dialect/Stream/IR/StreamInterfaces.td"
 include "iree/compiler/Dialect/Util/IR/UtilInterfaces.td"
@@ -83,6 +82,7 @@ def Stream_ResourceAllocaOp : Stream_PureOp<"resource.alloca", [
     "getAffinity",
     "setAffinity",
   ]>,
+  Stream_TimelineOp,
   Util_SizeAwareOp,
   MemoryEffects<[MemAlloc]>,
 ]> {
@@ -98,6 +98,7 @@ def Stream_ResourceAllocaOp : Stream_PureOp<"resource.alloca", [
 
   let arguments = (ins
     Stream_Size:$storage_size,
+    Optional<Stream_Timepoint>:$await_timepoint,
     OptionalAttr<Stream_AffinityAttr>:$affinity
   );
   let results = (outs
@@ -109,9 +110,10 @@ def Stream_ResourceAllocaOp : Stream_PureOp<"resource.alloca", [
   );
 
   let assemblyFormat = [{
-    (`on` `(` $affinity^ `)`)?
     `uninitialized`
-    attr-dict `:`
+    (`on` `(` $affinity^ `)`)?
+    (`await` `(` $await_timepoint^ `)` `=` `` `>`):(`:`)?
+    attr-dict
     type($result) `{` $storage_size `}`
     `=` `` `>`
     type($result_timepoint)
@@ -130,6 +132,7 @@ def Stream_ResourceDeallocaOp : Stream_Op<"resource.dealloca", [
     "getAffinity",
     "setAffinity",
   ]>,
+  Stream_TimelineOp,
   Util_SizeAwareOp,
   MemoryEffects<[MemFree]>,
 ]> {
@@ -139,7 +142,8 @@ def Stream_ResourceDeallocaOp : Stream_Op<"resource.dealloca", [
     current computation) previously allocated using `stream.resource.alloca`.
 
     The resource is considered live and valid until the provided timepoint is
-    reached and the memory is only made available for future requests afterward.
+    reached and the memory is only made available for future requests after
+    the result timepoint is reached.
   }];
 
   let arguments = (ins
@@ -148,16 +152,18 @@ def Stream_ResourceDeallocaOp : Stream_Op<"resource.dealloca", [
       Stream_TransientResource,
     ]>:$operand,
     Stream_Size:$operand_size,
-    Stream_Timepoint:$timepoint,
+    Optional<Stream_Timepoint>:$await_timepoint,
     OptionalAttr<Stream_AffinityAttr>:$affinity
   );
-  let results = (outs);
+  let results = (outs
+    Stream_Timepoint:$result_timepoint
+  );
 
   let assemblyFormat = [{
     (`on` `(` $affinity^ `)`)?
-    `await` `(` $timepoint `)`
-    `=` `` `>`
+    (`await` `(` $await_timepoint^ `)` `=` `` `>`)?
     $operand `:` type($operand) `{` $operand_size `}`
+    `=` `` `>` type($result_timepoint)
     attr-dict
   }];
 
@@ -200,6 +206,7 @@ def Stream_ResourceSizeOp : Stream_PureOp<"resource.size", [
     Value getResultSize(unsigned idx) { return {}; }
   }];
 
+  let hasCanonicalizer = 1;
   let hasFolder = 1;
 }
 
@@ -470,6 +477,7 @@ def Stream_ResourcePackOp : Stream_PureOp<"resource.pack", [
 def Stream_ResourceConstantsOp : Stream_PureOp<"resource.constants", [
   SameVariadicResultSize,
   Stream_AffinityOp,
+  Stream_TimelineOp,
   Util_SizeAwareOp,
 ]> {
   let summary = [{asynchronously uploads or maps constant values}];
@@ -686,7 +694,7 @@ def Stream_TensorExportOp : Stream_PureOp<"tensor.export", [
 }
 
 //===----------------------------------------------------------------------===//
-// Builtin tensor ops
+// High-level tensor ops
 //===----------------------------------------------------------------------===//
 
 def Stream_TensorSizeOfOp : Stream_PureOp<"tensor.sizeof", [
@@ -949,7 +957,6 @@ def Stream_TensorFillOp : Stream_Op<"tensor.fill", [
     Variadic<Stream_Dim>:$start_indices,
     Variadic<Stream_Dim>:$lengths,
     Stream_PrimitiveType:$value,
-    OptionalAttr<Util_TiedOpStorageAttr>:$tied_operands,
     OptionalAttr<Stream_AffinityAttr>:$affinity
   );
   let results = (outs
@@ -963,7 +970,7 @@ def Stream_TensorFillOp : Stream_Op<"tensor.fill", [
     `->`
     $target_encoding (`` `{` $target_encoding_dims^ `}`)?
     `in`
-    custom<ShapedTiedResult>(type($target), $target_size, $tied_operands)
+    custom<ShapedTiedResult>(type($target), $target_size)
     attr-dict-with-keyword
   }];
 
@@ -1009,7 +1016,6 @@ def Stream_TensorUpdateOp : Stream_Op<"tensor.update", [
     TypeAttr:$update_encoding,
     Stream_ShapeDynamicDims:$update_encoding_dims,
     Stream_Size:$update_size,
-    OptionalAttr<Util_TiedOpStorageAttr>:$tied_operands,
     OptionalAttr<Stream_AffinityAttr>:$affinity
   );
   let results = (outs
@@ -1025,7 +1031,7 @@ def Stream_TensorUpdateOp : Stream_Op<"tensor.update", [
     `->`
     $target_encoding (`` `{` $target_encoding_dims^ `}`)?
     `in`
-    custom<ShapedTiedResult>(type($target), $target_size, $tied_operands)
+    custom<ShapedTiedResult>(type($target), $target_size)
     attr-dict-with-keyword
   }];
 
@@ -1090,7 +1096,7 @@ def Stream_TensorLoadOp : Stream_PureOp<"tensor.load", [
   let hasCanonicalizer = 1;
 }
 
-def Stream_TensorStoreOp : Stream_Op<"tensor.store", [
+def Stream_TensorStoreOp : Stream_PureOp<"tensor.store", [
   AttrSizedOperandSegments,
   AllTypesMatch<["target", "result"]>,
   Stream_TensorPhaseOp,
@@ -1113,8 +1119,7 @@ def Stream_TensorStoreOp : Stream_Op<"tensor.store", [
     Stream_ShapeDynamicDims:$target_encoding_dims,
     Stream_Size:$target_size,
     Variadic<Stream_Dim>:$indices,
-    AnyTypeOf<[Stream_PrimitiveType, AnyVector]>:$value,
-    OptionalAttr<Util_TiedOpStorageAttr>:$tied_operands
+    AnyTypeOf<[Stream_PrimitiveType, AnyVector]>:$value
   );
   let results = (outs
     Stream_StagingResource:$result
@@ -1127,7 +1132,7 @@ def Stream_TensorStoreOp : Stream_Op<"tensor.store", [
     `->`
     $target_encoding (`` `{` $target_encoding_dims^ `}`)?
     `in`
-    custom<ShapedTiedResult>(type($target), $target_size, $tied_operands)
+    custom<ShapedTiedResult>(type($target), $target_size)
     attr-dict-with-keyword
   }];
 
@@ -1141,6 +1146,122 @@ def Stream_TensorStoreOp : Stream_Op<"tensor.store", [
   let verifier = [{ return verifyOp(*this); }];
 
   let hasCanonicalizer = 1;
+}
+
+def Stream_TensorTraceOp : Stream_Op<"tensor.trace", []> {
+  let summary = [{trace value(s) operation}];
+  let description = [{
+    Traces out to a runtime trace sink (console, log file, etc) the given
+    tensors and titles them with the given key. The key is informational only
+    and useful for titling/marking specific sets of tensors for easier
+    searching.
+  }];
+
+  let arguments = (ins
+    StrAttr:$key,
+    Variadic<AnyTensor>:$operands
+  );
+
+  // TODO(benvanik): stream.tensor.trace assembly format (custom).
+  let assemblyFormat = "attr-dict ($operands^ `:` type($operands))?";
+}
+
+//===----------------------------------------------------------------------===//
+// Builtins
+//===----------------------------------------------------------------------===//
+// Builtins are added by frontends or during tensor encoding to handle ops or
+// data types not supported by the lower-level stream ops (stream.async.* and
+// stream.cmd.*).
+
+def Stream_BuiltinSplatI64Op : Stream_Op<"builtin.splat.i64", [
+  Stream_AffinityOp,
+  Stream_AsyncPhaseOp,
+  DeclareOpInterfaceMethods<Stream_BuiltinOp, [
+    "mergeBuiltinModule",
+    "convertBuiltinOp",
+  ]>,
+  Util_SizeAwareOp,
+]> {
+  let summary = [{splats a value into a resource}];
+  let description = [{
+    Generated builtin for emulating 64-bit splats.
+    As with stream.async.splat it returns a new resource with the given
+    value splatted out to fill the entire contents.
+  }];
+
+  let arguments = (ins
+    I64:$value,
+    Stream_Size:$result_size,
+    OptionalAttr<Stream_AffinityAttr>:$affinity
+  );
+  let results = (outs
+    Stream_AnyStreamResource:$result
+  );
+
+  let assemblyFormat = [{
+    (`on` `(` $affinity^ `)`)?
+    $value `:` type($value) `->` type($result) `` `{` $result_size `}`
+    attr-dict-with-keyword
+  }];
+
+  let extraClassDeclaration = [{
+    Value getOperandSize(unsigned idx) { return {}; }
+    Value getResultSize(unsigned idx) { return result_size(); }
+  }];
+
+  let verifier = [{ return verifyOp(*this); }];
+}
+
+def Stream_BuiltinFillI64Op : Stream_Op<"builtin.fill.i64", [
+  AllTypesMatch<["target", "result"]>,
+  Stream_AffinityOp,
+  Stream_AsyncPhaseOp,
+  DeclareOpInterfaceMethods<Stream_BuiltinOp, [
+    "mergeBuiltinModule",
+    "convertBuiltinOp",
+  ]>,
+  Util_SizeAwareOp,
+  DeclareOpInterfaceMethods<Util_TiedOpInterface, [
+    "getTiedResult",
+    "getTiedResultOperandIndex",
+    "getTiedResultOperandIndices",
+  ]>,
+]> {
+  let summary = [{fills a subview of a stream resource with a value}];
+  let description = [{
+    Generated builtin for emulating 64-bit fills.
+    As with stream.async.fill it splats a value into a subview of the given
+    stream resource and returns the resource with the update applied.
+  }];
+
+  let arguments = (ins
+    Stream_AnyStreamResource:$target,
+    Stream_Size:$target_size,
+    Stream_Offset:$target_offset,
+    Stream_Offset:$target_end,
+    Stream_Size:$target_length,
+    I64:$value,
+    OptionalAttr<Stream_AffinityAttr>:$affinity
+  );
+  let results = (outs
+    Stream_AnyStreamResource:$result
+  );
+
+  let assemblyFormat = [{
+    (`on` `(` $affinity^ `)`)?
+    $value `,`
+    $target `[` $target_offset `to` $target_end `for` $target_length `]` `:`
+    type($value) `->`
+    custom<ShapedTiedResult>(type($target), $target_size)
+    attr-dict-with-keyword
+  }];
+
+  let extraClassDeclaration = [{
+    Value getOperandSize(unsigned idx) { return target_size(); }
+    Value getResultSize(unsigned idx) { return target_size(); }
+  }];
+
+  let verifier = [{ return verifyOp(*this); }];
 }
 
 //===----------------------------------------------------------------------===//
@@ -1245,7 +1366,7 @@ def Stream_AsyncSplatOp : Stream_Op<"async.splat", [
   }];
 
   let arguments = (ins
-    Stream_PrimitiveType:$value,
+    Stream_FillPatternType:$value,
     Stream_Size:$result_size,
     OptionalAttr<Stream_AffinityAttr>:$affinity
   );
@@ -1384,8 +1505,7 @@ def Stream_AsyncFillOp : Stream_Op<"async.fill", [
     Stream_Offset:$target_offset,
     Stream_Offset:$target_end,
     Stream_Size:$target_length,
-    Stream_PrimitiveType:$value,
-    OptionalAttr<Util_TiedOpStorageAttr>:$tied_operands,
+    Stream_FillPatternType:$value,
     OptionalAttr<Stream_AffinityAttr>:$affinity
   );
   let results = (outs
@@ -1397,7 +1517,7 @@ def Stream_AsyncFillOp : Stream_Op<"async.fill", [
     $value `,`
     $target `[` $target_offset `to` $target_end `for` $target_length `]` `:`
     type($value) `->`
-    custom<ShapedTiedResult>(type($target), $target_size, $tied_operands)
+    custom<ShapedTiedResult>(type($target), $target_size)
     attr-dict-with-keyword
   }];
 
@@ -1439,7 +1559,6 @@ def Stream_AsyncUpdateOp : Stream_Op<"async.update", [
     Stream_Offset:$target_end,
     Stream_AnyStreamResource:$update,
     Stream_Size:$update_size,
-    OptionalAttr<Util_TiedOpStorageAttr>:$tied_operands,
     OptionalAttr<Stream_AffinityAttr>:$affinity
   );
   let results = (outs
@@ -1451,7 +1570,7 @@ def Stream_AsyncUpdateOp : Stream_Op<"async.update", [
     $update `,`
     $target `[` $target_offset `to` $target_end `]` `:`
     type($update) `` `{` $update_size `}` `->`
-    custom<ShapedTiedResult>(type($target), $target_size, $tied_operands)
+    custom<ShapedTiedResult>(type($target), $target_size)
     attr-dict-with-keyword
   }];
 
@@ -1500,7 +1619,6 @@ def Stream_AsyncCopyOp : Stream_Op<"async.copy", [
     Stream_Offset:$source_offset,
     Stream_Offset:$source_end,
     Stream_Size:$length,
-    OptionalAttr<Util_TiedOpStorageAttr>:$tied_operands,
     OptionalAttr<Stream_AffinityAttr>:$affinity
   );
   let results = (outs
@@ -1513,7 +1631,7 @@ def Stream_AsyncCopyOp : Stream_Op<"async.copy", [
     $target `[` $target_offset `to` $target_end `]` `,`
     $length `:`
     type($source) `` `{` $source_size `}` `->`
-    custom<ShapedTiedResult>(type($target), $target_size, $tied_operands)
+    custom<ShapedTiedResult>(type($target), $target_size)
     attr-dict-with-keyword
   }];
 
@@ -1578,6 +1696,87 @@ def Stream_AsyncTransferOp : Stream_Op<"async.transfer", [
 
   let hasCanonicalizer = 1;
   let hasFolder = 1;
+}
+
+def Stream_AsyncLoadOp : Stream_PureOp<"async.load", [
+  Stream_AsyncPhaseOp,
+  Util_SizeAwareOp,
+]> {
+  let summary = [{loads a value from a resource}];
+  let description = [{
+    Returns the element at the given location from within the resource.
+  }];
+
+  let arguments = (ins
+    Stream_StagingResource:$source,
+    Stream_Size:$source_size,
+    Stream_Offset:$source_offset
+  );
+  let results = (outs
+    AnyTypeOf<[Stream_PrimitiveType, AnyVector]>:$result
+  );
+
+  let assemblyFormat = [{
+    $source `[` $source_offset `]` `:`
+    type($source) `` `{` $source_size `}`
+    `->`
+    type($result)
+    attr-dict-with-keyword
+  }];
+
+  let extraClassDeclaration = [{
+    Value getOperandSize(unsigned idx) { return source_size(); }
+    Value getResultSize(unsigned idx) { return {}; }
+  }];
+
+  let verifier = [{ return verifyOp(*this); }];
+
+  let hasCanonicalizer = 1;
+}
+
+def Stream_AsyncStoreOp : Stream_PureOp<"async.store", [
+  AllTypesMatch<["target", "result"]>,
+  Stream_AsyncPhaseOp,
+  Util_SizeAwareOp,
+  DeclareOpInterfaceMethods<Util_TiedOpInterface, [
+    "getTiedResult",
+    "getTiedResultOperandIndex",
+    "getTiedResultOperandIndices",
+  ]>,
+]> {
+  let summary = [{stores a value into a resource}];
+  let description = [{
+    Returns a resource with the element at the given offset set to the given
+    value.
+  }];
+
+  let arguments = (ins
+    Stream_StagingResource:$target,
+    Stream_Size:$target_size,
+    Stream_Offset:$target_offset,
+    AnyTypeOf<[Stream_PrimitiveType, AnyVector]>:$value
+  );
+  let results = (outs
+    Stream_StagingResource:$result
+  );
+
+  let assemblyFormat = [{
+    $value `,`
+    $target `[` $target_offset `]` `:`
+    type($value)
+    `->`
+    custom<ShapedTiedResult>(type($target), $target_size)
+    attr-dict-with-keyword
+  }];
+
+  let extraClassDeclaration = [{
+    Value getOperandSize(unsigned idx) { return target_size(); }
+    Value getResultSize(unsigned idx) { return target_size(); }
+  }];
+
+  let verifier = [{ return verifyOp(*this); }];
+
+  let hasCanonicalizer = 1;
 }
 
 def Stream_AsyncDispatchOp : Stream_Op<"async.dispatch", [
@@ -1654,6 +1853,7 @@ def Stream_AsyncExecuteOp : Stream_Op<"async.execute", [
   SingleBlockImplicitTerminator<"IREE::Stream::YieldOp">,
   Stream_AffinityOp,
   Stream_AsyncPhaseOp,
+  Stream_TimelineOp,
   Util_SizeAwareOp,
   DeclareOpInterfaceMethods<Util_ClosureOpInterface>,
   DeclareOpInterfaceMethods<Util_TiedOpInterface, [
@@ -1972,7 +2172,7 @@ def Stream_CmdFillOp : Stream_Op<"cmd.fill", [
     Stream_Size:$target_size,
     Stream_Offset:$target_offset,
     Stream_Size:$target_length,
-    Stream_PrimitiveType:$value
+    Stream_FillPatternType:$value
   );
   let results = (outs);
 
@@ -2085,6 +2285,8 @@ def Stream_CmdDispatchOp : Stream_Op<"cmd.dispatch", [
 
     // Builds a map of operand index to argument index.
     static SmallVector<unsigned> makeOperandToArgMap(mlir::FuncOp funcOp);
+    // Builds a map of resource to argument index of the corresponding binding.
+    static SmallVector<unsigned> makeResourceToArgMap(mlir::FuncOp funcOp);
   }];
 
   let verifier = [{ return verifyOp(*this); }];
@@ -2101,6 +2303,7 @@ def Stream_CmdExecuteOp : Stream_Op<"cmd.execute", [
   SingleBlockImplicitTerminator<"IREE::Stream::YieldOp">,
   Stream_AffinityOp,
   Stream_CmdPhaseOp,
+  Stream_TimelineOp,
   Util_SizeAwareOp,
   DeclareOpInterfaceMethods<Util_ClosureOpInterface>,
 ]> {
@@ -2221,7 +2424,7 @@ def Stream_CmdSerialOp : Stream_Op<"cmd.serial", [
   let regions = (region AnyRegion:$body);
 
   let assemblyFormat = [{
-    `` $body
+    $body
     attr-dict-with-keyword
   }];
 
@@ -2283,7 +2486,7 @@ def Stream_CmdConcurrentOp : Stream_Op<"cmd.concurrent", [
   let regions = (region AnyRegion:$body);
 
   let assemblyFormat = [{
-    `` $body
+    $body
     attr-dict-with-keyword
   }];
 
@@ -2298,6 +2501,7 @@ def Stream_CmdConcurrentOp : Stream_Op<"cmd.concurrent", [
 
 def Stream_TimepointImmediateOp : Stream_PureOp<"timepoint.immediate", [
   ConstantLike,
+  Stream_TimelineOp,
 ]> {
   let summary = [{results an immediately-available timepoint}];
   let description = [{
@@ -2309,18 +2513,79 @@ def Stream_TimepointImmediateOp : Stream_PureOp<"timepoint.immediate", [
 
   let arguments = (ins);
   let results = (outs
-    Stream_Timepoint:$timepoint
+    Stream_Timepoint:$result_timepoint
   );
 
   let assemblyFormat = [{
     attr-dict
-    `=` `` `>` type($timepoint)
+    `=` `` `>` type($result_timepoint)
   }];
 
   let hasFolder = 1;
 }
 
-def Stream_TimepointJoinOp : Stream_PureOp<"timepoint.join", []> {
+
+def Stream_TimepointImportOp : Stream_PureOp<"timepoint.import", [
+  Stream_AffinityOp,
+]> {
+  let summary = [{imports a timepoint from an external dialect type}];
+  let description = [{
+    Defines a conversion from an external dialect type such as `hal.semaphore`
+    that is resolved during lowering into the stream dialect. This can be used
+    to interoperate between levels of the stack that require specifying stream
+    types and those that prior to lowering do not handle them.
+  }];
+
+  let arguments = (ins
+    Variadic<AnyType>:$operands,
+    OptionalAttr<Stream_AffinityAttr>:$affinity
+  );
+  let results = (outs
+    Stream_Timepoint:$result_timepoint
+  );
+
+  let assemblyFormat = [{
+    (`on` `(` $affinity^ `)`)?
+    $operands `:` `(` type($operands) `)`
+    `=` `` `>`
+    type($result_timepoint)
+    attr-dict-with-keyword
+  }];
+}
+
+def Stream_TimepointExportOp : Stream_PureOp<"timepoint.export", [
+  Stream_AffinityOp,
+]> {
+  let summary = [{exports a timepoint to an external dialect type}];
+  let description = [{
+    Defines a conversion to an external dialect type such as `hal.semaphore`
+    that is resolved during lowering into the stream dialect. This can be used
+    to interoperate between levels of the stack that require specifying stream
+    types and those that prior to lowering do not handle them.
+  }];
+
+  let arguments = (ins
+    Stream_Timepoint:$await_timepoint,
+    OptionalAttr<Stream_AffinityAttr>:$affinity
+  );
+  let results = (outs
+    Variadic<AnyType>:$results
+  );
+
+  let assemblyFormat = [{
+    (`on` `(` $affinity^ `)`)?
+    $await_timepoint
+    `=` `` `>`
+    `(` type($results) `)`
+    attr-dict-with-keyword
+  }];
+
+  let hasFolder = 1;
+}
+
+def Stream_TimepointJoinOp : Stream_PureOp<"timepoint.join", [
+  Stream_TimelineOp,
+]> {
   let summary = [{joins one or more timepoints into the max of all of them}];
   let description = [{
     Returns a timepoint that indicates that all of the input timepoints have
@@ -2328,14 +2593,14 @@ def Stream_TimepointJoinOp : Stream_PureOp<"timepoint.join", []> {
   }];
 
   let arguments = (ins
-    Variadic<Stream_Timepoint>:$timepoints
+    Variadic<Stream_Timepoint>:$await_timepoints
   );
   let results = (outs
-    Stream_Timepoint:$result
+    Stream_Timepoint:$result_timepoint
   );
 
   let assemblyFormat = [{
-    `max` `(` $timepoints `)` `=` `` `>` type($result)
+    `max` `(` $await_timepoints `)` `=` `` `>` type($result_timepoint)
     attr-dict-with-keyword
   }];
 
@@ -2348,6 +2613,7 @@ def Stream_TimepointJoinOp : Stream_PureOp<"timepoint.join", []> {
 def Stream_TimepointAwaitOp : Stream_PureOp<"timepoint.await", [
   AttrSizedOperandSegments,
   Stream_AffinityOp,
+  Stream_TimelineOp,
   Util_SizeAwareOp,
   DeclareOpInterfaceMethods<Util_TiedOpInterface, [
     "getTiedResultOperandIndex",
@@ -2370,7 +2636,7 @@ def Stream_TimepointAwaitOp : Stream_PureOp<"timepoint.await", [
       Stream_StagingResource,
     ]>>:$operands,
     Variadic<Stream_Size>:$operand_sizes,
-    Stream_Timepoint:$timepoint,
+    Stream_Timepoint:$await_timepoint,
     OptionalAttr<Stream_AffinityAttr>:$affinity
   );
   let results = (outs
@@ -2382,7 +2648,7 @@ def Stream_TimepointAwaitOp : Stream_PureOp<"timepoint.await", [
 
   let assemblyFormat = [{
     (`on` `(` $affinity^ `)`)?
-    $timepoint `=` `` `>`
+    $await_timepoint `=` `` `>`
     $operands `:`
     custom<SizeAwareTypeList>(type($operands), type($results), $operand_sizes)
     attr-dict-with-keyword
@@ -2392,7 +2658,7 @@ def Stream_TimepointAwaitOp : Stream_PureOp<"timepoint.await", [
   let builders = [
     OpBuilder<(ins
       "ValueRange":$operands, "ValueRange":$operandSizes,
-      "Value":$timepoint,
+      "Value":$await_timepoint,
       CArg<"ArrayRef<NamedAttribute>", "{}">:$attributes)>,
   ];
 
@@ -2439,7 +2705,6 @@ def Stream_ExecutableOp : Stream_Op<"executable", [
     custom<SymbolVisibility>($sym_visibility)
     $sym_name
     attr-dict-with-keyword
-    ``
     regions
   }];
 
@@ -2494,10 +2759,13 @@ def Stream_ExecutableExportOp : Stream_Op<"executable.export", [
       "FlatSymbolRefAttr":$function_ref
     )>,
   ];
+
+  let extraClassDeclaration = [{
+    ::mlir::FuncOp getFunctionRef();
+  }];
 }
 
 def Stream_BindingSubspanOp : Stream_PureOp<"binding.subspan", [
-    DeclareOpInterfaceMethods<Shape_ShapeCarryingOpInterface>,
     Util_ShapeAwareOp,
   ]> {
   let summary = [{returns an alias to a subspan of interface binding data}];

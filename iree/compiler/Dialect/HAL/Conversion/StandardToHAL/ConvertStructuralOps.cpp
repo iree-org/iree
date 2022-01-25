@@ -7,7 +7,9 @@
 #include "iree/compiler/Dialect/HAL/Conversion/StandardToHAL/ConvertStandardToHAL.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
+#include "iree/compiler/Dialect/Util/Conversion/ConversionPatterns.h"
 #include "llvm/ADT/DenseMap.h"
+#include "mlir/Dialect/SCF/SCF.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/BlockAndValueMapping.h"
@@ -25,7 +27,7 @@ class FuncOpSignatureConversion : public OpConversionPattern<mlir::FuncOp> {
   using OpConversionPattern::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      mlir::FuncOp funcOp, llvm::ArrayRef<Value> operands,
+      mlir::FuncOp funcOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     auto &typeConverter = *getTypeConverter();
 
@@ -68,15 +70,14 @@ class CallOpConversion : public OpConversionPattern<mlir::CallOp> {
   using OpConversionPattern::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      mlir::CallOp op, llvm::ArrayRef<Value> operands,
+      mlir::CallOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    mlir::CallOpAdaptor adaptor(operands);
     SmallVector<Type, 4> resultTypes;
     if (failed(getTypeConverter()->convertTypes(op.getResultTypes(),
                                                 resultTypes))) {
       return rewriter.notifyMatchFailure(op, "unable to convert result types");
     }
-    rewriter.replaceOpWithNewOp<mlir::CallOp>(op, resultTypes, op.callee(),
+    rewriter.replaceOpWithNewOp<mlir::CallOp>(op, resultTypes, op.getCallee(),
                                               adaptor.operands());
     return success();
   }
@@ -87,11 +88,10 @@ class BranchOpConversion : public OpConversionPattern<mlir::BranchOp> {
   using OpConversionPattern::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      mlir::BranchOp op, llvm::ArrayRef<Value> operands,
+      mlir::BranchOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    mlir::BranchOpAdaptor adaptor(operands);
-    rewriter.replaceOpWithNewOp<mlir::BranchOp>(op, op.dest(),
-                                                adaptor.destOperands());
+    rewriter.replaceOpWithNewOp<mlir::BranchOp>(op, op.getDest(),
+                                                adaptor.getDestOperands());
     return success();
   }
 };
@@ -101,13 +101,12 @@ class CondBranchOpConversion : public OpConversionPattern<mlir::CondBranchOp> {
   using OpConversionPattern::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      mlir::CondBranchOp op, llvm::ArrayRef<Value> operands,
+      mlir::CondBranchOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    mlir::CondBranchOpAdaptor adaptor(operands,
-                                      op.getOperation()->getAttrDictionary());
     rewriter.replaceOpWithNewOp<mlir::CondBranchOp>(
-        op, adaptor.condition(), op.trueDest(), adaptor.trueDestOperands(),
-        op.falseDest(), adaptor.falseDestOperands());
+        op, adaptor.getCondition(), op.getTrueDest(),
+        adaptor.getTrueDestOperands(), op.getFalseDest(),
+        adaptor.getFalseDestOperands());
     return success();
   }
 };
@@ -117,9 +116,9 @@ class ReturnOpConversion : public OpConversionPattern<mlir::ReturnOp> {
   using OpConversionPattern::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      mlir::ReturnOp returnOp, llvm::ArrayRef<Value> operands,
+      mlir::ReturnOp returnOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    rewriter.replaceOpWithNewOp<mlir::ReturnOp>(returnOp, operands);
+    rewriter.replaceOpWithNewOp<mlir::ReturnOp>(returnOp, adaptor.operands());
     return success();
   }
 };
@@ -129,12 +128,45 @@ class SelectOpConversion : public OpConversionPattern<mlir::SelectOp> {
   using OpConversionPattern::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      mlir::SelectOp selectOp, llvm::ArrayRef<Value> operands,
+      mlir::SelectOp selectOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    mlir::SelectOp::Adaptor adaptor(operands);
-    rewriter.replaceOpWithNewOp<mlir::SelectOp>(selectOp, adaptor.condition(),
-                                                adaptor.true_value(),
-                                                adaptor.false_value());
+    rewriter.replaceOpWithNewOp<mlir::SelectOp>(
+        selectOp, adaptor.getCondition(), adaptor.getTrueValue(),
+        adaptor.getFalseValue());
+    return success();
+  }
+};
+
+struct ConvertIfOp : public OpConversionPattern<scf::IfOp> {
+  using OpConversionPattern::OpConversionPattern;
+  LogicalResult matchAndRewrite(
+      scf::IfOp ifOp, OpAdaptor adaptor,
+      ConversionPatternRewriter &rewriter) const override {
+    auto resultTypes = llvm::to_vector<4>(llvm::map_range(
+        ifOp.getResultTypes(),
+        [&](Type type) { return getTypeConverter()->convertType(type); }));
+    auto newOp = rewriter.create<scf::IfOp>(ifOp.getLoc(), resultTypes,
+                                            adaptor.getCondition(),
+                                            ifOp.elseBlock() != nullptr);
+    rewriter.inlineRegionBefore(ifOp.getThenRegion(), newOp.getThenRegion(),
+                                newOp.getThenRegion().end());
+    rewriter.eraseBlock(&newOp.getThenRegion().front());
+    if (ifOp.elseBlock()) {
+      rewriter.inlineRegionBefore(ifOp.getElseRegion(), newOp.getElseRegion(),
+                                  newOp.getElseRegion().end());
+      rewriter.eraseBlock(&newOp.getElseRegion().front());
+    }
+    rewriter.replaceOp(ifOp, newOp.getResults());
+    return success();
+  }
+};
+
+struct ConvertYieldOp : public OpConversionPattern<scf::YieldOp> {
+  using OpConversionPattern::OpConversionPattern;
+  LogicalResult matchAndRewrite(
+      scf::YieldOp yieldOp, OpAdaptor adaptor,
+      ConversionPatternRewriter &rewriter) const override {
+    rewriter.replaceOpWithNewOp<scf::YieldOp>(yieldOp, adaptor.getResults());
     return success();
   }
 };
@@ -142,12 +174,28 @@ class SelectOpConversion : public OpConversionPattern<mlir::SelectOp> {
 }  // namespace
 
 void populateStandardStructuralToHALPatterns(MLIRContext *context,
+                                             ConversionTarget &conversionTarget,
                                              OwningRewritePatternList &patterns,
-                                             TypeConverter &converter) {
+                                             TypeConverter &typeConverter) {
+  conversionTarget.addLegalOp<mlir::ModuleOp>();
+
+  // We need to rewrite certain types on operands/results so use the default
+  // dynamic legality checker to force any ops using such types to run through
+  // our patterns.
+  conversionTarget.addDynamicallyLegalOp<mlir::FuncOp>([&](mlir::FuncOp op) {
+    return typeConverter.isSignatureLegal(op.getType()) &&
+           typeConverter.isLegal(&op.getBody());
+  });
+
   patterns
       .insert<FuncOpSignatureConversion, CallOpConversion, BranchOpConversion,
               CondBranchOpConversion, ReturnOpConversion, SelectOpConversion>(
-          converter, context);
+          typeConverter, context);
+
+  // TODO(benvanik): move to general utils conversion.
+  addGenericLegalOp<scf::IfOp>(conversionTarget, typeConverter);
+  addGenericLegalOp<scf::YieldOp>(conversionTarget, typeConverter);
+  patterns.insert<ConvertIfOp, ConvertYieldOp>(typeConverter, context);
 }
 
 }  // namespace iree_compiler

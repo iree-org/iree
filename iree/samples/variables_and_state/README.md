@@ -94,6 +94,7 @@ and compile the imported `counter.mlir` file using `iree-translate`:
 ../iree-build/iree/tools/iree-translate \
     -iree-mlir-to-vm-bytecode-module \
     -iree-hal-target-backends=dylib-llvm-aot \
+    -iree-input-type=mhlo \
     counter.mlir -o counter_dylib.vmfb
 ```
 

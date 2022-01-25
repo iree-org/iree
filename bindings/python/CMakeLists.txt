@@ -11,4 +11,3 @@ set(PYBIND_EXTENSION_COPTS "-fvisibility=hidden")
 
 # Namespace packages.
 add_subdirectory(iree/runtime)
-add_subdirectory(iree/jax)

@@ -17,7 +17,7 @@
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "llvm/Support/Debug.h"
-#include "mlir/Dialect/Linalg/IR/LinalgOps.h"
+#include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/Hoisting.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/SPIRV/IR/TargetAndABI.h"
@@ -33,21 +33,27 @@ namespace mlir {
 namespace iree_compiler {
 namespace {
 
-Optional<SmallVector<int64_t, 4>> getSPIRVNativeVectorSize(Operation *op) {
+int getNativeVectorSize(int64_t size) {
+  // Try to use 4 first, and then 2, and then 1.
+  return size % 4 == 0 ? 4 : (size % 2 == 0 ? 2 : 1);
+}
+
+Optional<SmallVector<int64_t, 4>> getNativeVectorShape(Operation *op) {
   if (OpTrait::hasElementwiseMappableTraits(op) && op->getNumResults() == 1) {
     if (auto vecType = op->getResultTypes()[0].dyn_cast<VectorType>()) {
-      // Use 4-element vectors for elementwise ops.
       SmallVector<int64_t, 4> nativeSize(vecType.getRank(), 1);
-      nativeSize.back() = 4;
+      nativeSize.back() = getNativeVectorSize(vecType.getShape().back());
       return nativeSize;
     }
   } else if (auto vtOp = dyn_cast<VectorTransferOpInterface>(op)) {
-    auto rank = vtOp.getVectorType().getRank();
-    SmallVector<int64_t, 4> nativeSize(rank, 1);
+    auto vecType = vtOp.getVectorType();
+    SmallVector<int64_t, 4> nativeSize(vecType.getRank(), 1);
     for (auto dim : llvm::enumerate(vtOp.permutation_map().getResults())) {
       if (auto dimExpr = dim.value().dyn_cast<AffineDimExpr>()) {
-        if (dimExpr.getPosition() == vtOp.permutation_map().getNumDims() - 1)
-          nativeSize[dim.index()] = 4;
+        if (dimExpr.getPosition() == vtOp.permutation_map().getNumDims() - 1) {
+          nativeSize[dim.index()] =
+              getNativeVectorSize(vecType.getShape()[dim.index()]);
+        }
       }
     }
     return nativeSize;
@@ -57,29 +63,30 @@ Optional<SmallVector<int64_t, 4>> getSPIRVNativeVectorSize(Operation *op) {
       if (isParallelIterator(it.value())) lastParalleldim = it.index();
     }
     SmallVector<int64_t, 4> nativeSize(contractOp.iterator_types().size(), 1);
-    nativeSize[lastParalleldim] = 4;
-    // Map to vec4 fma operations.
+    nativeSize[lastParalleldim] = 4;  // Map to vec4 fma operations.
     return nativeSize;
   }
   return llvm::None;
 }
 
-/// Add patterns to vectorize Linalg ops with vectorization marker.
-void populateVectorizationPatterns(MLIRContext *context,
-                                   RewritePatternSet &patterns) {
-  linalg::insertVectorizationPatterns<linalg::FillOp, linalg::GenericOp,
-                                      linalg::ContractionOpInterface>(
-      patterns, linalg::LinalgVectorizationOptions(),
-      linalg::LinalgTransformationFilter(
-          Identifier::get(getVectorizeMarker(), context)));
+/// Add patterns to vectorize any supported Linalg ops.
+void populateVectorizationPatterns(RewritePatternSet &patterns) {
+  linalg::LinalgVectorizationOptions opt;
+  linalg::LinalgTransformationFilter f;
+  linalg::VectorizationPatterns<linalg::FillOp, linalg::GenericOp>::insert(
+      patterns, opt, f);
+  patterns.add<linalg::LinalgVectorizationPattern>(
+      patterns.getContext(), f.addOpFilter<linalg::ContractionOpInterface>(),
+      opt);
+  vector::populateVectorTransferPermutationMapLoweringPatterns(patterns);
+  vector::populateVectorReductionToContractPatterns(patterns);
 }
 
 /// Adds patterns to unroll vector ops to SPIR-V native vector size.
-void populateVectorUnrollPatterns(MLIRContext *context,
-                                  RewritePatternSet &patterns) {
-  vector::populateVectorUnrollPatterns(
-      patterns,
-      vector::UnrollVectorOptions().setNativeShapeFn(getSPIRVNativeVectorSize));
+void populateVectorUnrollPatterns(RewritePatternSet &patterns) {
+  auto options =
+      vector::UnrollVectorOptions().setNativeShapeFn(getNativeVectorShape);
+  vector::populateVectorUnrollPatterns(patterns, options);
 }
 
 /// Vectorizes Linalg ops on buffer semantics.
@@ -97,19 +104,20 @@ class SPIRVVectorizePass : public SPIRVVectorizeBase<SPIRVVectorizePass> {
     FuncOp funcOp = getOperation();
 
     {
-      RewritePatternSet vectorizationPatterns(&getContext());
-      populateVectorizationPatterns(context, vectorizationPatterns);
-      populateLinalgToVectorVectorizeConvPatterns(context,
-                                                  vectorizationPatterns);
-      (void)applyPatternsAndFoldGreedily(funcOp,
-                                         std::move(vectorizationPatterns));
+      RewritePatternSet patterns(context);
+      populateVectorizationPatterns(patterns);
+      populateLinalgToVectorVectorizeConvPatterns(context, patterns);
+      if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
+        return signalPassFailure();
+      }
 
+      RewritePatternSet foldPatterns(context);
       // Fold consumer add ops into the contraction op itself.
-      RewritePatternSet canonicalizationPatterns(context);
-      vector::ContractionOp::getCanonicalizationPatterns(
-          canonicalizationPatterns, context);
-      (void)applyPatternsAndFoldGreedily(funcOp,
-                                         std::move(canonicalizationPatterns));
+      vector::ContractionOp::getCanonicalizationPatterns(foldPatterns, context);
+      if (failed(
+              applyPatternsAndFoldGreedily(funcOp, std::move(foldPatterns)))) {
+        return signalPassFailure();
+      }
     }
 
     LLVM_DEBUG({
@@ -119,10 +127,12 @@ class SPIRVVectorizePass : public SPIRVVectorizeBase<SPIRVVectorizePass> {
     });
 
     {
-      RewritePatternSet vectorUnrollPatterns(funcOp.getContext());
-      populateVectorUnrollPatterns(funcOp.getContext(), vectorUnrollPatterns);
-      (void)applyPatternsAndFoldGreedily(funcOp,
-                                         std::move(vectorUnrollPatterns));
+      RewritePatternSet unrollPatterns(context);
+      populateVectorUnrollPatterns(unrollPatterns);
+      if (failed(applyPatternsAndFoldGreedily(funcOp,
+                                              std::move(unrollPatterns)))) {
+        return signalPassFailure();
+      }
     }
 
     LLVM_DEBUG({
@@ -131,7 +141,7 @@ class SPIRVVectorizePass : public SPIRVVectorizeBase<SPIRVVectorizePass> {
       llvm::dbgs() << "\n\n";
     });
 
-    linalg::hoistRedundantVectorTransfers(funcOp);
+    linalg::hoistRedundantVectorTransfersOnTensor(funcOp);
 
     LLVM_DEBUG({
       llvm::dbgs() << "--- After hoisting vector transfers ---\n";
@@ -139,12 +149,14 @@ class SPIRVVectorizePass : public SPIRVVectorizeBase<SPIRVVectorizePass> {
       llvm::dbgs() << "\n\n";
     });
 
-    {
-      RewritePatternSet canonicalizationPatterns(funcOp.getContext());
-      vector::populateVectorTransferPermutationMapLoweringPatterns(
-          canonicalizationPatterns);
-      (void)applyPatternsAndFoldGreedily(funcOp,
-                                         std::move(canonicalizationPatterns));
+    {  // Canonicalization
+      RewritePatternSet patterns(context);
+      vector::ExtractStridedSliceOp::getCanonicalizationPatterns(patterns,
+                                                                 context);
+      vector::populateVectorTransferPermutationMapLoweringPatterns(patterns);
+      if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
+        return signalPassFailure();
+      }
     }
 
     LLVM_DEBUG({
@@ -154,14 +166,16 @@ class SPIRVVectorizePass : public SPIRVVectorizeBase<SPIRVVectorizePass> {
     });
 
     {
-      RewritePatternSet contractLoweringPatterns(funcOp.getContext());
+      RewritePatternSet contractLoweringPatterns(context);
       vector::populateVectorBroadcastLoweringPatterns(contractLoweringPatterns);
       vector::populateVectorContractLoweringPatterns(
           contractLoweringPatterns,
           vector::VectorTransformsOptions().setVectorTransformsOptions(
               vector::VectorContractLowering::OuterProduct));
-      (void)applyPatternsAndFoldGreedily(funcOp,
-                                         std::move(contractLoweringPatterns));
+      if (failed(applyPatternsAndFoldGreedily(
+              funcOp, std::move(contractLoweringPatterns)))) {
+        return signalPassFailure();
+      }
     }
 
     LLVM_DEBUG({
@@ -169,6 +183,18 @@ class SPIRVVectorizePass : public SPIRVVectorizeBase<SPIRVVectorizePass> {
       funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
       llvm::dbgs() << "\n\n";
     });
+
+    {  // Canonicalization
+      RewritePatternSet patterns(context);
+      // We need to pull in casting way leading one dims to allow cancelling
+      // some read/write ops.
+      vector::populateCastAwayVectorLeadingOneDimPatterns(patterns);
+      vector::TransferReadOp::getCanonicalizationPatterns(patterns, context);
+      vector::TransferWriteOp::getCanonicalizationPatterns(patterns, context);
+      if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
+        return signalPassFailure();
+      }
+    }
   }
 };
 

@@ -15,8 +15,8 @@ iree_lit_test_suite(
     lit
   SRCS
     "wrap_entry_points.mlir"
-  DATA
-    iree::tools::IreeFileCheck
+  TOOLS
+    FileCheck
     iree::tools::iree-opt
 )
 

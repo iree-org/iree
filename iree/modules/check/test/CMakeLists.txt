@@ -16,8 +16,8 @@ iree_lit_test_suite(
   SRCS
     "failure.mlir"
     "success.mlir"
-  DATA
-    iree::tools::IreeFileCheck
+  TOOLS
+    FileCheck
     iree::tools::iree-check-module
     iree::tools::iree-translate
   LABELS

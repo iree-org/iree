@@ -14,7 +14,6 @@
 #include "iree/base/internal/flags.h"
 #include "iree/base/target_platform.h"
 #include "iree/hal/api.h"
-#include "iree/hal/buffer_view.h"
 #include "iree/hal/drivers/init.h"
 #include "iree/modules/hal/module.h"
 #include "iree/tools/utils/trace_replay.h"
@@ -24,17 +23,6 @@
 IREE_FLAG(bool, trace_execution, false, "Traces VM execution to stderr.");
 
 IREE_FLAG(string, driver, "vmvx", "Backend driver to use.");
-
-// We rely on environment variables for some internal knobs because they are
-// easier to propagate through ctest to this program than command-line
-// arguments.
-const char* portable_getenv(const char* env_var) {
-#ifdef IREE_PLATFORM_WINDOWS
-  return _getenv(env_var);
-#else
-  return getenv(env_var);
-#endif
-}
 
 // Helper to get a list item as a buffer_view.
 static iree_status_t iree_get_buffer_view_list_item(
@@ -78,9 +66,10 @@ static iree_status_t get_buffer_view_dense_row_major_data(
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                             "buffer_view is not dense row major");
   }
-  iree_hal_buffer_mapping_t mapping;
+  iree_hal_buffer_mapping_t mapping = {{0}};
   IREE_RETURN_IF_ERROR(iree_hal_buffer_map_range(
-      iree_hal_buffer_view_buffer(buffer_view), IREE_HAL_MEMORY_ACCESS_READ, 0,
+      iree_hal_buffer_view_buffer(buffer_view),
+      IREE_HAL_MAPPING_MODE_PERSISTENT, IREE_HAL_MEMORY_ACCESS_READ, 0,
       IREE_WHOLE_BUFFER, &mapping));
   *data = mapping.contents.data;
   return iree_ok_status();
@@ -159,9 +148,9 @@ static void reference_matmul_element(
     reference_matmul_element_f32(m_size, k_size, n_size, lhs_type, rhs_type,
                                  (float*)lhs_data, (float*)rhs_data,
                                  (float*)acc_data, (float*)result_data, m, n);
-  } else if (lhs_type == IREE_HAL_ELEMENT_TYPE_SINT_8 &&
-             rhs_type == IREE_HAL_ELEMENT_TYPE_SINT_8 &&
-             acc_type == IREE_HAL_ELEMENT_TYPE_SINT_32) {
+  } else if (iree_hal_element_type_is_integer(lhs_type, 8) &&
+             iree_hal_element_type_is_integer(rhs_type, 8) &&
+             iree_hal_element_type_is_integer(acc_type, 32)) {
     reference_matmul_element_i8_i8_i32(
         m_size, k_size, n_size, lhs_type, rhs_type, (int8_t*)lhs_data,
         (int8_t*)rhs_data, (int32_t*)acc_data, (int32_t*)result_data, m, n);
@@ -215,18 +204,18 @@ static iree_vm_value_t read_matrix_element(iree_hal_dim_t m_size,
                                            iree_hal_dim_t n) {
   iree_host_size_t index = n + m * n_size;
   (void)m_size;
-  switch (result_type) {
-    case IREE_HAL_ELEMENT_TYPE_FLOAT_32:
-      return iree_vm_value_make_f32(((float*)data)[index]);
-    case IREE_HAL_ELEMENT_TYPE_SINT_32:
-      return iree_vm_value_make_i32(((int32_t*)data)[index]);
-    case IREE_HAL_ELEMENT_TYPE_SINT_8:
-      return iree_vm_value_make_i8(((int8_t*)data)[index]);
-    default:
-      iree_status_abort(iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                                         "unhandled matmul result type"));
-      return iree_vm_value_make_none();
+  if (iree_hal_element_type_is_integer(result_type, 8)) {
+    return iree_vm_value_make_i8(((int8_t*)data)[index]);
+  } else if (iree_hal_element_type_is_integer(result_type, 16)) {
+    return iree_vm_value_make_i16(((int16_t*)data)[index]);
+  } else if (iree_hal_element_type_is_integer(result_type, 32)) {
+    return iree_vm_value_make_i32(((int32_t*)data)[index]);
+  } else if (result_type == IREE_HAL_ELEMENT_TYPE_FLOAT_32) {
+    return iree_vm_value_make_f32(((float*)data)[index]);
   }
+  iree_status_abort(iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                                     "unhandled matmul result type"));
+  return iree_vm_value_make_none();
 }
 
 typedef enum precision_e {
@@ -380,8 +369,8 @@ static iree_status_t iree_check_matmul_failure(
   IREE_RETURN_IF_ERROR(get_matmul_sizes(lhs, rhs, acc, actual_result, &m_size,
                                         &k_size, &n_size));
   iree_hal_dim_t context = 8;
-  const char* context_env = portable_getenv("IREE_MATMUL_TEST_SHOW_CONTEXT");
-  if (getenv("IREE_MATMUL_TEST_SHOW_CONTEXT")) {
+  const char* context_env = getenv("IREE_MATMUL_TEST_SHOW_CONTEXT");
+  if (context_env) {
     if (1 != sscanf(context_env, "%d", &context)) {
       return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                               "Failed to parse IREE_MATMUL_TEST_SHOW_CONTEXT "
@@ -490,21 +479,23 @@ static iree_status_t allocate_buffer_like(iree_hal_allocator_t* hal_allocator,
       iree_hal_buffer_view_element_type(src),
       iree_hal_buffer_view_encoding_type(src),
       IREE_HAL_MEMORY_TYPE_HOST_LOCAL | IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE,
-      IREE_HAL_BUFFER_USAGE_ALL, dst);
+      IREE_HAL_BUFFER_USAGE_ALL, iree_const_byte_span_empty(), dst);
 }
 
 // Performs a deep copy of |src| into |dst|. Takes care of allocating |dst|.
 static iree_status_t copy_buffer(iree_hal_allocator_t* hal_allocator,
                                  iree_hal_buffer_view_t* src,
                                  iree_hal_buffer_view_t** dst) {
-  iree_hal_buffer_mapping_t src_mapping;
+  // TODO(benvanik): change this to use iree_hal_buffer_copy_data. Or something.
+  // I can't understand what all this code is doing.
+  iree_hal_buffer_mapping_t src_mapping = {{0}};
   IREE_RETURN_IF_ERROR(iree_hal_buffer_map_range(
-      iree_hal_buffer_view_buffer(src), IREE_HAL_MEMORY_ACCESS_READ, 0,
-      IREE_WHOLE_BUFFER, &src_mapping));
+      iree_hal_buffer_view_buffer(src), IREE_HAL_MAPPING_MODE_PERSISTENT,
+      IREE_HAL_MEMORY_ACCESS_READ, 0, IREE_WHOLE_BUFFER, &src_mapping));
   iree_const_byte_span_t src_span;
   src_span.data = src_mapping.contents.data;
   src_span.data_length = src_mapping.contents.data_length;
-  return iree_hal_buffer_view_clone_heap_buffer(
+  return iree_hal_buffer_view_allocate_buffer(
       hal_allocator, iree_hal_buffer_view_shape_dims(src),
       iree_hal_buffer_view_shape_rank(src),
       iree_hal_buffer_view_element_type(src),
@@ -549,10 +540,8 @@ static iree_status_t replay_event_call(iree_trace_replay_t* replay,
   fprintf(stderr, "--- CALL[%.*s] ---\n", (int)function_name.size,
           function_name.data);
 
-  iree_hal_allocator_t* heap_hal_allocator;
-  IREE_RETURN_IF_ERROR(iree_hal_allocator_create_heap(
-      iree_make_cstring_view("e2e-matmul-test-heap-allocator"),
-      replay->host_allocator, &heap_hal_allocator));
+  iree_hal_allocator_t* device_allocator =
+      iree_hal_device_allocator(replay->device);
 
   iree_vm_function_t function;
   iree_vm_list_t* input_list = NULL;
@@ -565,8 +554,8 @@ static iree_status_t replay_event_call(iree_trace_replay_t* replay,
   // linalg.matmul. We need to preserve the original test inputs to run the
   // reference matmul on and to use in test failure logs.
   iree_vm_list_t* copy_of_input_list = NULL;
-  copy_list_of_buffer_views(heap_hal_allocator, input_list,
-                            &copy_of_input_list);
+  IREE_CHECK_OK(copy_list_of_buffer_views(device_allocator, input_list,
+                                          &copy_of_input_list));
 
   // Invoke the function to produce the actual result.
   iree_vm_list_t* output_list = NULL;
@@ -584,8 +573,8 @@ static iree_status_t replay_event_call(iree_trace_replay_t* replay,
 
   // Allocate an expected_result buffer, with same shape as actual_result.
   iree_hal_buffer_view_t* expected_result;
-  IREE_RETURN_IF_ERROR(allocate_buffer_like(heap_hal_allocator, actual_result,
-                                            &expected_result));
+  IREE_RETURN_IF_ERROR(
+      allocate_buffer_like(device_allocator, actual_result, &expected_result));
 
   // Use the reference matmul implementation to fill expected_result
   IREE_RETURN_IF_ERROR(reference_matmul(input_list, expected_result));
@@ -598,8 +587,6 @@ static iree_status_t replay_event_call(iree_trace_replay_t* replay,
   iree_vm_list_release(copy_of_input_list);
   iree_vm_list_release(output_list);  // releases actual_result
   iree_hal_buffer_view_release(expected_result);
-
-  iree_hal_allocator_release(heap_hal_allocator);
 
   return iree_ok_status();
 }
@@ -637,7 +624,7 @@ static iree_status_t run_trace_file(iree_string_view_t root_path, FILE* file,
 
   yaml_parser_t parser;
   if (!yaml_parser_initialize(&parser)) {
-    iree_trace_replay_deinitialize(&replay);
+    iree_trace_replay_deinitialize(&replay, IREE_TRACE_REPLAY_SHUTDOWN_QUIET);
     return iree_make_status(IREE_STATUS_INTERNAL,
                             "yaml_parser_initialize failed");
   }
@@ -662,7 +649,7 @@ static iree_status_t run_trace_file(iree_string_view_t root_path, FILE* file,
   }
 
   yaml_parser_delete(&parser);
-  iree_trace_replay_deinitialize(&replay);
+  iree_trace_replay_deinitialize(&replay, IREE_TRACE_REPLAY_SHUTDOWN_QUIET);
   return status;
 }
 

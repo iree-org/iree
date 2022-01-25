@@ -263,7 +263,8 @@ static iree_status_t iree_hal_executable_library_run(
   // memory accessed by the invocation will come from here.
   iree_hal_allocator_t* heap_allocator = NULL;
   IREE_RETURN_IF_ERROR(iree_hal_allocator_create_heap(
-      iree_make_cstring_view("benchmark"), host_allocator, &heap_allocator));
+      iree_make_cstring_view("benchmark"), host_allocator, host_allocator,
+      &heap_allocator));
   iree_hal_buffer_view_t* buffer_views[IREE_HAL_LOCAL_MAX_TOTAL_BINDING_COUNT];
   void* binding_ptrs[IREE_HAL_LOCAL_MAX_TOTAL_BINDING_COUNT];
   size_t binding_lengths[IREE_HAL_LOCAL_MAX_TOTAL_BINDING_COUNT];
@@ -273,9 +274,10 @@ static iree_status_t iree_hal_executable_library_run(
     iree_hal_buffer_t* buffer = iree_hal_buffer_view_buffer(buffer_views[i]);
     iree_device_size_t buffer_length =
         iree_hal_buffer_view_byte_length(buffer_views[i]);
-    iree_hal_buffer_mapping_t buffer_mapping;
+    iree_hal_buffer_mapping_t buffer_mapping = {{0}};
     IREE_RETURN_IF_ERROR(iree_hal_buffer_map_range(
-        buffer, IREE_HAL_MEMORY_ACCESS_READ | IREE_HAL_MEMORY_ACCESS_WRITE, 0,
+        buffer, IREE_HAL_MAPPING_MODE_PERSISTENT,
+        IREE_HAL_MEMORY_ACCESS_READ | IREE_HAL_MEMORY_ACCESS_WRITE, 0,
         buffer_length, &buffer_mapping));
     binding_ptrs[i] = buffer_mapping.contents.data;
     binding_lengths[i] = (size_t)buffer_mapping.contents.data_length;
@@ -355,7 +357,7 @@ int main(int argc, char** argv) {
       "Example --flagfile:\n"
       "  --executable_format=EX_ELF\n"
       "  --executable_file=iree/hal/local/elf/testdata/"
-      "simple_mul_dispatch_x86_64.so\n"
+      "elementwise_mul_x86_64.so\n"
       "  --entry_point=0\n"
       "  --workgroup_count_x=1\n"
       "  --workgroup_count_y=1\n"

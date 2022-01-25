@@ -4,13 +4,15 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "iree/compiler/Codegen/Dialect/LoweringConfig.h"
 #include "iree/compiler/Codegen/LLVMCPU/KernelDispatch.h"
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
+#include "llvm/Support/Debug.h"
 #include "mlir/Conversion/VectorToSCF/VectorToSCF.h"
-#include "mlir/Dialect/Linalg/IR/LinalgOps.h"
+#include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/Hoisting.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
@@ -20,7 +22,7 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
-#define DEBUG_TYPE "iree-linalg-to-llvm-tile-and-pad-workgroups"
+#define DEBUG_TYPE "iree-llvmcpu-tile-and-vectorize"
 
 namespace mlir {
 namespace iree_compiler {
@@ -28,22 +30,16 @@ namespace iree_compiler {
 namespace {
 // Could just be linalg::TilingPattern with a ContractionOpInterface filter, but
 // that is always templated on an op.
-struct TileWorkgroups : public linalg::LinalgBaseTilingPattern {
-  using Base = linalg::LinalgBaseTilingPattern;
+struct TileWorkgroups : public linalg::LinalgTilingPattern {
+  using Base = linalg::LinalgTilingPattern;
   TileWorkgroups(MLIRContext *context, linalg::LinalgTilingOptions options,
                  linalg::LinalgTransformationFilter marker)
-      : LinalgBaseTilingPattern(context, options, marker) {}
-  LogicalResult matchAndRewrite(Operation *op,
+      : LinalgTilingPattern(context, options, marker) {}
+  LogicalResult matchAndRewrite(linalg::LinalgOp linalgOp,
                                 PatternRewriter &rewriter) const override {
-    auto contractionOp = dyn_cast<linalg::ContractionOpInterface>(op);
-    if (!contractionOp) return failure();
-
-    linalg::TiledLinalgOp tiledLinalgOp;
-    if (failed(Base::matchAndRewriteBase(op, rewriter, tiledLinalgOp))) {
+    if (!isa<linalg::ContractionOpInterface>(linalgOp.getOperation()))
       return failure();
-    }
-    rewriter.replaceOp(op, tiledLinalgOp.tensorResults);
-    return success();
+    return Base::returningMatchAndRewrite(linalgOp, rewriter);
   }
 };
 
@@ -72,24 +68,35 @@ void LLVMCPUTileAndVectorizePass::runOnOperation() {
   MLIRContext *context = &getContext();
   auto funcOp = getOperation();
 
-  // First level of tiling patterns {
+  DEBUG_WITH_TYPE(DEBUG_TYPE, {
+    llvm::dbgs() << "\n--- Before LLVMCPUTileAndVectorizePass ---\n";
+    funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
+    llvm::dbgs() << "\n\n";
+  });
+
+  // First level of tiling patterns
   {
     OwningRewritePatternList l1patterns(&getContext());
     l1patterns.insert<TileWorkgroups>(
         context,
         linalg::LinalgTilingOptions().setTileSizeComputationFunction(
-            [](OpBuilder &builder,
-               Operation *operation) -> SmallVector<Value, 4> {
-              return getTileSizes(builder, operation,
+            [](OpBuilder &builder, Operation *op) -> SmallVector<Value, 4> {
+              return getTileSizes(builder, op,
                                   static_cast<unsigned>(TilingLevel::L1Tiles));
             }),
         linalg::LinalgTransformationFilter(
-            Identifier::get(getWorkgroupMarker(), context),
-            Identifier::get(getWorkgroupL1TileMarker(), context)));
+            ArrayRef<StringAttr>{},
+            StringAttr::get(context, getWorkgroupL1TileMarker())));
 
     if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(l1patterns)))) {
       return signalPassFailure();
     }
+
+    DEBUG_WITH_TYPE(DEBUG_TYPE, {
+      llvm::dbgs() << "\n--- After first level of tiling patterns ---\n";
+      funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
+      llvm::dbgs() << "\n\n";
+    });
   }
 
   // Apply canoncalization
@@ -104,6 +111,12 @@ void LLVMCPUTileAndVectorizePass::runOnOperation() {
             funcOp, std::move(canonicalizationPatterns)))) {
       return signalPassFailure();
     }
+
+    DEBUG_WITH_TYPE(DEBUG_TYPE, {
+      llvm::dbgs() << "\n--- After canonicalization ---\n";
+      funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
+      llvm::dbgs() << "\n\n";
+    });
   }
 
   // Second level of tiling patterns{
@@ -112,20 +125,25 @@ void LLVMCPUTileAndVectorizePass::runOnOperation() {
     l2patterns.insert<TileWorkgroups>(
         context,
         linalg::LinalgTilingOptions().setTileSizeComputationFunction(
-            [](OpBuilder &builder,
-               Operation *operation) -> SmallVector<Value, 4> {
+            [](OpBuilder &builder, Operation *op) -> SmallVector<Value, 4> {
               return getTileSizes(
-                  builder, operation,
-                  static_cast<unsigned>(TilingLevel::VectorTiles));
+                  builder, op, static_cast<unsigned>(TilingLevel::VectorTiles));
             }),
         linalg::LinalgTransformationFilter(
-            Identifier::get(getWorkgroupL1TileMarker(), context),
-            Identifier::get(getVectorizeMarker(), context)));
+            StringAttr::get(context, getWorkgroupL1TileMarker()),
+            StringAttr::get(context, getVectorizeMarker())));
 
     if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(l2patterns)))) {
       return signalPassFailure();
     }
+
+    DEBUG_WITH_TYPE(DEBUG_TYPE, {
+      llvm::dbgs() << "\n--- After second level of tiling patterns ---\n";
+      funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
+      llvm::dbgs() << "\n\n";
+    });
   }
+
   // Apply canoncalization
   {
     OwningRewritePatternList canonicalizationPatterns(&getContext());
@@ -138,24 +156,51 @@ void LLVMCPUTileAndVectorizePass::runOnOperation() {
             funcOp, std::move(canonicalizationPatterns)))) {
       return signalPassFailure();
     }
+
+    DEBUG_WITH_TYPE(DEBUG_TYPE, {
+      llvm::dbgs() << "\n--- After canonicalization ---\n";
+      funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
+      llvm::dbgs() << "\n\n";
+    });
   }
 
   if (!lowerToVectors) {
     return;
   }
 
+  // Op specific conversion.
+  {
+    RewritePatternSet vectorizeOpsPattenrs(context);
+    populateLinalgToVectorVectorizeMMT4dPatterns(context, vectorizeOpsPattenrs);
+    if (failed(applyPatternsAndFoldGreedily(funcOp,
+                                            std::move(vectorizeOpsPattenrs)))) {
+      return signalPassFailure();
+    }
+  }
+
   // Apply vectorization patterns.
   {
     OwningRewritePatternList vectorizationPatterns(&getContext());
-    linalg::insertVectorizationPatterns<linalg::ContractionOpInterface,
-                                        linalg::CopyOp, linalg::FillOp>(
-        vectorizationPatterns, linalg::LinalgVectorizationOptions(),
-        linalg::LinalgTransformationFilter(
-            Identifier::get(getVectorizeMarker(), context)));
+    linalg::LinalgVectorizationOptions opt;
+    linalg::LinalgTransformationFilter f(
+        StringAttr::get(context, getVectorizeMarker()));
+    linalg::VectorizationPatterns<linalg::CopyOp, linalg::FillOp>::insert(
+        vectorizationPatterns, opt, f);
+    vectorizationPatterns.add<linalg::LinalgVectorizationPattern>(
+        context, f.addOpFilter<linalg::ContractionOpInterface>(), opt);
+    vector::populateVectorTransferPermutationMapLoweringPatterns(
+        vectorizationPatterns);
+    vector::populateVectorReductionToContractPatterns(vectorizationPatterns);
     if (failed(applyPatternsAndFoldGreedily(
             funcOp, std::move(vectorizationPatterns)))) {
       return signalPassFailure();
     }
+
+    DEBUG_WITH_TYPE(DEBUG_TYPE, {
+      llvm::dbgs() << "\n--- After vectorization ---\n";
+      funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
+      llvm::dbgs() << "\n\n";
+    });
   }
 
   {
@@ -163,8 +208,18 @@ void LLVMCPUTileAndVectorizePass::runOnOperation() {
     RewritePatternSet canonicalizationPatterns(context);
     vector::ContractionOp::getCanonicalizationPatterns(canonicalizationPatterns,
                                                        context);
-    (void)applyPatternsAndFoldGreedily(funcOp,
-                                       std::move(canonicalizationPatterns));
+    if (failed(applyPatternsAndFoldGreedily(
+            funcOp, std::move(canonicalizationPatterns)))) {
+      return signalPassFailure();
+    }
+
+    DEBUG_WITH_TYPE(DEBUG_TYPE, {
+      llvm::dbgs()
+          << "\n--- After folding consumer add ops into contraction op "
+             "iteself ---\n";
+      funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
+      llvm::dbgs() << "\n\n";
+    });
   }
 
   // Apply vector specific operation lowering.
@@ -173,16 +228,22 @@ void LLVMCPUTileAndVectorizePass::runOnOperation() {
         vector::VectorTransformsOptions().setVectorTransformsOptions(
             vector::VectorContractLowering::OuterProduct);
     OwningRewritePatternList vectorContractLoweringPatterns(&getContext());
-    vectorContractLoweringPatterns
-        .insert<ContractionOpToOuterProductOpLowering,
-                ContractionOpToMatmulOpLowering, ContractionOpLowering>(
-            vectorTransformsOptions, context);
+    vectorContractLoweringPatterns.insert<
+        vector::ContractionOpToOuterProductOpLowering,
+        vector::ContractionOpToMatmulOpLowering, vector::ContractionOpLowering>(
+        vectorTransformsOptions, context);
     vector::populateVectorTransferPermutationMapLoweringPatterns(
         vectorContractLoweringPatterns);
     if (failed(applyPatternsAndFoldGreedily(
             funcOp, std::move(vectorContractLoweringPatterns)))) {
       return signalPassFailure();
     }
+
+    DEBUG_WITH_TYPE(DEBUG_TYPE, {
+      llvm::dbgs() << "\n--- After vector specific operatrion lowering ---\n";
+      funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
+      llvm::dbgs() << "\n\n";
+    });
   }
 }
 

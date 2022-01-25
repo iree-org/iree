@@ -147,7 +147,6 @@ def Util_AnyPtr : DialectType<
   let description = [{
     Pointer to a typed value.
   }];
-  let builderCall = "$_builder.getType<IREE::Util::PtrType>()";
 }
 
 class Util_PtrOf<Type type> :
@@ -183,7 +182,10 @@ def Util_GlobalRefAttr : Confined<FlatSymbolRefAttr, [
 
 def Util_AnyGlobalPtr : TypeAlias<Util_AnyPtr>;
 // TODO(benvanik): actually implement Util_GlobalPtrOf.
-class Util_GlobalPtrOf<list<Type> types> : TypeAlias<Util_AnyPtr>;
+class Util_GlobalPtrOf<list<Type> types> : TypeAlias<Util_AnyPtr> {
+  // Suppress unused template argument warning.
+  int unused = !size(types);
+}
 
 //===----------------------------------------------------------------------===//
 // Buffer types
@@ -264,5 +266,9 @@ def YieldPoint : NativeOpTrait<"IREE::Util::YieldPoint">;
 // Untrusted modules containing ops marked as unsafe will fail to verify at
 // runtime if loaded for dynamic execution.
 def Unsafe : NativeOpTrait<"IREE::Util::Unsafe">;
+
+// Denotes that an operation is only valid in debug builds.
+// These ops are removed by the -iree-util-strip-debug-ops pass.
+def Util_DebugOnly : NativeOpTrait<"IREE::Util::DebugOnly">;
 
 #endif  // IREE_DIALECT_UTIL_IR_UTIL_BASE

@@ -1,30 +1,32 @@
-// RUN: iree-opt -split-input-file -mlir-print-local-scope -pass-pipeline='hal.executable(hal.executable.variant(iree-spirv-lower-executable-target-pass{test-lowering-configuration=true}))' %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -pass-pipeline='hal.executable(hal.executable.variant(iree-spirv-lower-executable-target-pass{test-lowering-configuration=true}))' %s | FileCheck %s
 
 // Large matmul that can match the best tiling scheme.
 
+#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>,
+    #hal.descriptor_set.binding<2, storage_buffer>
+  ]>
+]>
 hal.executable @matmul_1024x2048x512 {
-  hal.interface @io {
-    hal.interface.binding @s0b0_ro_external, set=0, binding=0, type="StorageBuffer", access="Read"
-    hal.interface.binding @s0b1_ro_external, set=0, binding=1, type="StorageBuffer", access="Read"
-    hal.interface.binding @s0b2_xw_external, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
-  }
-  hal.executable.variant @vulkan_spirv_fb, target = #hal.executable.target<"vulkan", "vulkan-spirv-fb", {
+  hal.executable.variant @vulkan_spirv_fb, target = <"vulkan", "vulkan-spirv-fb", {
       spv.target_env = #spv.target_env<#spv.vce<v1.4, [Shader], []>, ARM:IntegratedGPU, {
         max_compute_shared_memory_size = 32768 : i32,
         max_compute_workgroup_invocations = 512 : i32,
         max_compute_workgroup_size = dense<512> : vector<3xi32>,
        subgroup_size = 16 : i32}>
     }> {
-    hal.executable.entry_point @matmul_1024x2048x512 attributes {interface = @io, ordinal = 0 : index}
-    builtin.module  {
+    hal.executable.entry_point @matmul_1024x2048x512 layout(#executable_layout)
+    builtin.module {
       func @matmul_1024x2048x512() {
         %c0 = arith.constant 0 : index
         %c2048 = arith.constant 2048 : index
         %c1024 = arith.constant 1024 : index
         %cst = arith.constant 0.000000e+00 : f32
-        %0 = hal.interface.binding.subspan @io::@s0b0_ro_external[%c0] : !flow.dispatch.tensor<readonly:1024x512xf32>
-        %1 = hal.interface.binding.subspan @io::@s0b1_ro_external[%c0] : !flow.dispatch.tensor<readonly:512x2048xf32>
-        %2 = hal.interface.binding.subspan @io::@s0b2_xw_external[%c0] : !flow.dispatch.tensor<writeonly:1024x2048xf32>
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<readonly:1024x512xf32>
+        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : !flow.dispatch.tensor<readonly:512x2048xf32>
+        %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : !flow.dispatch.tensor<writeonly:1024x2048xf32>
         %workgroup_size_x = hal.interface.workgroup.size[0] : index
         %workgroup_size_y = hal.interface.workgroup.size[1] : index
         %workgroup_id_x = hal.interface.workgroup.id[0] : index
@@ -53,55 +55,56 @@ hal.executable @matmul_1024x2048x512 {
         }
         return
       }
-      hal.interface @io attributes {sym_visibility = "private"} {
-        hal.interface.binding @s0b0_ro_external, set=0, binding=0, type="StorageBuffer", access="Read"
-        hal.interface.binding @s0b1_ro_external, set=0, binding=1, type="StorageBuffer", access="Read"
-        hal.interface.binding @s0b2_xw_external, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
-      }
     }
   }
 }
 
-//          CHECK-LABEL: hal.executable.entry_point public @matmul_1024x2048x512
-//           CHECK-SAME:   translation.info = {passPipeline = "SPIRVVectorize", workloadPerWorkgroup = [32, 8]}
-//           CHECK-SAME:   workgroup_size = [8 : index, 2 : index, 1 : index]
-//           CHECK-NEXT: ^{{.+}}(%[[X:.+]]: index, %[[Y:.+]]: index, %{{.+}}: index):
-//           CHECK-NEXT:   %[[ONE:.+]] = arith.constant 1 : index
-//           CHECK-NEXT:   %[[X_COUNT:.+]] = affine.apply affine_map<()[s0] -> (s0 ceildiv 32)>()[%[[X]]]
-//           CHECK-NEXT:   %[[Y_COUNT:.+]] = affine.apply affine_map<()[s0] -> (s0 ceildiv 8)>()[%[[Y]]]
-//           CHECK-NEXT:   hal.return %[[X_COUNT]], %[[Y_COUNT]], %[[ONE]]
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering.config<tile_sizes = {{\[}}[8, 32], [4, 4], [0, 0, 4]{{\]}}, native_vector_size = []>
+//  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 32)>
+//  CHECK-DAG: #[[MAP1:.+]] = affine_map<()[s0] -> (s0 ceildiv 8)>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"SPIRVVectorize", workload_per_wg = [32, 8]>
+//      CHECK: hal.executable.entry_point public @matmul_1024x2048x512
+// CHECK-SAME:   translation.info = #[[TRANSLATION]]
+// CHECK-SAME:   workgroup_size = [8 : index, 2 : index, 1 : index]
+// CHECK-NEXT: ^{{.+}}(%[[X:.+]]: index, %[[Y:.+]]: index, %{{.+}}: index):
+// CHECK-NEXT:   %[[ONE:.+]] = arith.constant 1 : index
+// CHECK-NEXT:   %[[X_COUNT:.+]] = affine.apply #[[MAP0]]()[%[[X]]]
+// CHECK-NEXT:   %[[Y_COUNT:.+]] = affine.apply #[[MAP1]]()[%[[Y]]]
+// CHECK-NEXT:   hal.return %[[X_COUNT]], %[[Y_COUNT]], %[[ONE]]
 
-//                CHECK: func @matmul_1024x2048x512()
-//                CHECK:   linalg.matmul
-//  CHECK-SAME{LITERAL}:     lowering.config = {tileSizes = [[8, 32], [4, 4], [0, 0, 4]]}
+//      CHECK: func @matmul_1024x2048x512()
+//      CHECK:   linalg.matmul
+// CHECK-SAME:     lowering.config = #[[CONFIG]]
 
 // -----
 
 // Small matmul N that can still tile to all threads in a workgroup.
 
+#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>,
+    #hal.descriptor_set.binding<2, storage_buffer>
+  ]>
+]>
 hal.executable @matmul_3136x24x96 {
-  hal.interface @io {
-    hal.interface.binding @s0b0_ro_external, set=0, binding=0, type="StorageBuffer", access="Read"
-    hal.interface.binding @s0b1_ro_external, set=0, binding=1, type="StorageBuffer", access="Read"
-    hal.interface.binding @s0b2_xw_external, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
-  }
-  hal.executable.variant @vulkan_spirv_fb, target = #hal.executable.target<"vulkan", "vulkan-spirv-fb", {
+  hal.executable.variant @vulkan_spirv_fb, target = <"vulkan", "vulkan-spirv-fb", {
       spv.target_env = #spv.target_env<#spv.vce<v1.4, [Shader], []>, ARM:IntegratedGPU, {
         max_compute_shared_memory_size = 32768 : i32,
         max_compute_workgroup_invocations = 512 : i32,
         max_compute_workgroup_size = dense<512> : vector<3xi32>,
        subgroup_size = 16 : i32}>
     }> {
-    hal.executable.entry_point @matmul_3136x24x96 attributes {interface = @io, ordinal = 0 : index}
-    builtin.module  {
+    hal.executable.entry_point @matmul_3136x24x96 layout(#executable_layout)
+    builtin.module {
       func @matmul_3136x24x96() {
         %c0 = arith.constant 0 : index
         %c24 = arith.constant 24 : index
         %c3136 = arith.constant 3136 : index
         %cst = arith.constant 0.000000e+00 : f32
-        %0 = hal.interface.binding.subspan @io::@s0b0_ro_external[%c0] : !flow.dispatch.tensor<readonly:3136x96xf32>
-        %1 = hal.interface.binding.subspan @io::@s0b1_ro_external[%c0] : !flow.dispatch.tensor<readonly:96x24xf32>
-        %2 = hal.interface.binding.subspan @io::@s0b2_xw_external[%c0] : !flow.dispatch.tensor<writeonly:3136x24xf32>
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<readonly:3136x96xf32>
+        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : !flow.dispatch.tensor<readonly:96x24xf32>
+        %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : !flow.dispatch.tensor<writeonly:3136x24xf32>
         %workgroup_size_x = hal.interface.workgroup.size[0] : index
         %workgroup_size_y = hal.interface.workgroup.size[1] : index
         %workgroup_id_x = hal.interface.workgroup.id[0] : index
@@ -130,55 +133,56 @@ hal.executable @matmul_3136x24x96 {
         }
         return
       }
-      hal.interface @io attributes {sym_visibility = "private"} {
-        hal.interface.binding @s0b0_ro_external, set=0, binding=0, type="StorageBuffer", access="Read"
-        hal.interface.binding @s0b1_ro_external, set=0, binding=1, type="StorageBuffer", access="Read"
-        hal.interface.binding @s0b2_xw_external, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
-      }
     }
   }
 }
 
-//          CHECK-LABEL: hal.executable.entry_point public @matmul_3136x24x96
-//           CHECK-SAME:   translation.info = {passPipeline = "SPIRVVectorize", workloadPerWorkgroup = [8, 32]}
-//           CHECK-SAME:   workgroup_size = [2 : index, 8 : index, 1 : index]
-//           CHECK-NEXT: ^{{.+}}(%[[X:.+]]: index, %[[Y:.+]]: index, %{{.+}}: index):
-//           CHECK-NEXT:   %[[ONE:.+]] = arith.constant 1 : index
-//           CHECK-NEXT:   %[[X_COUNT:.+]] = affine.apply affine_map<()[s0] -> (s0 ceildiv 8)>()[%[[X]]]
-//           CHECK-NEXT:   %[[Y_COUNT:.+]] = affine.apply affine_map<()[s0] -> (s0 ceildiv 32)>()[%[[Y]]]
-//           CHECK-NEXT:   hal.return %[[X_COUNT]], %[[Y_COUNT]], %[[ONE]]
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering.config<tile_sizes = {{\[}}[32, 8], [4, 4], [0, 0, 4]{{\]}}, native_vector_size = []>
+//  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 8)>
+//  CHECK-DAG: #[[MAP1:.+]] = affine_map<()[s0] -> (s0 ceildiv 32)>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"SPIRVVectorize", workload_per_wg = [8, 32]>
+//      CHECK: hal.executable.entry_point public @matmul_3136x24x96
+// CHECK-SAME:   translation.info = #[[TRANSLATION]]
+// CHECK-SAME:   workgroup_size = [2 : index, 8 : index, 1 : index]
+// CHECK-NEXT: ^{{.+}}(%[[X:.+]]: index, %[[Y:.+]]: index, %{{.+}}: index):
+// CHECK-NEXT:   %[[ONE:.+]] = arith.constant 1 : index
+// CHECK-NEXT:   %[[X_COUNT:.+]] = affine.apply #[[MAP0]]()[%[[X]]]
+// CHECK-NEXT:   %[[Y_COUNT:.+]] = affine.apply #[[MAP1]]()[%[[Y]]]
+// CHECK-NEXT:   hal.return %[[X_COUNT]], %[[Y_COUNT]], %[[ONE]]
 
-//                CHECK: func @matmul_3136x24x96()
-//                CHECK:   linalg.matmul
-//  CHECK-SAME{LITERAL}:     lowering.config = {tileSizes = [[32, 8], [4, 4], [0, 0, 4]]}
+//      CHECK: func @matmul_3136x24x96()
+//      CHECK:   linalg.matmul
+// CHECK-SAME:     lowering.config = #[[CONFIG]]
 
 // -----
 
 // Small matmul M that can still tile to all threads in a workgroup.
 
+#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>,
+    #hal.descriptor_set.binding<2, storage_buffer>
+  ]>
+]>
 hal.executable @matmul_196x64x192 {
-  hal.interface @io {
-    hal.interface.binding @s0b0_ro_external, set=0, binding=0, type="StorageBuffer", access="Read"
-    hal.interface.binding @s0b1_ro_external, set=0, binding=1, type="StorageBuffer", access="Read"
-    hal.interface.binding @s0b2_xw_external, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
-  }
-  hal.executable.variant @vulkan_spirv_fb, target = #hal.executable.target<"vulkan", "vulkan-spirv-fb", {
+  hal.executable.variant @vulkan_spirv_fb, target = <"vulkan", "vulkan-spirv-fb", {
       spv.target_env = #spv.target_env<#spv.vce<v1.4, [Shader], []>, ARM:IntegratedGPU, {
         max_compute_shared_memory_size = 32768 : i32,
         max_compute_workgroup_invocations = 512 : i32,
         max_compute_workgroup_size = dense<512> : vector<3xi32>,
        subgroup_size = 16 : i32}>
     }> {
-    hal.executable.entry_point @matmul_196x64x192 attributes {interface = @io, ordinal = 0 : index}
-    builtin.module  {
+    hal.executable.entry_point @matmul_196x64x192 layout(#executable_layout)
+    builtin.module {
       func @matmul_196x64x192() {
         %c0 = arith.constant 0 : index
         %c64 = arith.constant 64 : index
         %c196 = arith.constant 196 : index
         %cst = arith.constant 0.000000e+00 : f32
-        %0 = hal.interface.binding.subspan @io::@s0b0_ro_external[%c0] : !flow.dispatch.tensor<readonly:196x192xf32>
-        %1 = hal.interface.binding.subspan @io::@s0b1_ro_external[%c0] : !flow.dispatch.tensor<readonly:192x64xf32>
-        %2 = hal.interface.binding.subspan @io::@s0b2_xw_external[%c0] : !flow.dispatch.tensor<writeonly:196x64xf32>
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<readonly:196x192xf32>
+        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : !flow.dispatch.tensor<readonly:192x64xf32>
+        %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : !flow.dispatch.tensor<writeonly:196x64xf32>
         %workgroup_size_x = hal.interface.workgroup.size[0] : index
         %workgroup_size_y = hal.interface.workgroup.size[1] : index
         %workgroup_id_x = hal.interface.workgroup.id[0] : index
@@ -207,55 +211,56 @@ hal.executable @matmul_196x64x192 {
         }
         return
       }
-      hal.interface @io attributes {sym_visibility = "private"} {
-        hal.interface.binding @s0b0_ro_external, set=0, binding=0, type="StorageBuffer", access="Read"
-        hal.interface.binding @s0b1_ro_external, set=0, binding=1, type="StorageBuffer", access="Read"
-        hal.interface.binding @s0b2_xw_external, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
-      }
     }
   }
 }
 
-//          CHECK-LABEL: hal.executable.entry_point public @matmul_196x64x192
-//           CHECK-SAME:   translation.info = {passPipeline = "SPIRVVectorize", workloadPerWorkgroup = [32, 4]}
-//           CHECK-SAME:   workgroup_size = [8 : index, 2 : index, 1 : index]
-//           CHECK-NEXT: ^{{.+}}(%[[X:.+]]: index, %[[Y:.+]]: index, %{{.+}}: index):
-//           CHECK-NEXT:   %[[ONE:.+]] = arith.constant 1 : index
-//           CHECK-NEXT:   %[[X_COUNT:.+]] = affine.apply affine_map<()[s0] -> (s0 ceildiv 32)>()[%[[X]]]
-//           CHECK-NEXT:   %[[Y_COUNT:.+]] = affine.apply affine_map<()[s0] -> (s0 ceildiv 4)>()[%[[Y]]]
-//           CHECK-NEXT:   hal.return %[[X_COUNT]], %[[Y_COUNT]], %[[ONE]]
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering.config<tile_sizes = {{\[}}[4, 32], [2, 4], [0, 0, 8]{{\]}}, native_vector_size = []>
+//  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 32)>
+//  CHECK-DAG: #[[MAP1:.+]] = affine_map<()[s0] -> (s0 ceildiv 4)>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"SPIRVVectorize", workload_per_wg = [32, 4]>
+//      CHECK: hal.executable.entry_point public @matmul_196x64x192
+// CHECK-SAME:   translation.info = #[[TRANSLATION]]
+// CHECK-SAME:   workgroup_size = [8 : index, 2 : index, 1 : index]
+// CHECK-NEXT: ^{{.+}}(%[[X:.+]]: index, %[[Y:.+]]: index, %{{.+}}: index):
+// CHECK-NEXT:   %[[ONE:.+]] = arith.constant 1 : index
+// CHECK-NEXT:   %[[X_COUNT:.+]] = affine.apply #[[MAP0]]()[%[[X]]]
+// CHECK-NEXT:   %[[Y_COUNT:.+]] = affine.apply #[[MAP1]]()[%[[Y]]]
+// CHECK-NEXT:   hal.return %[[X_COUNT]], %[[Y_COUNT]], %[[ONE]]
 
-//                CHECK: func @matmul_196x64x192()
-//                CHECK:   linalg.matmul
-//  CHECK-SAME{LITERAL}:      lowering.config = {tileSizes = [[4, 32], [2, 4], [0, 0, 8]]}
+//      CHECK: func @matmul_196x64x192()
+//      CHECK:   linalg.matmul
+// CHECK-SAME:      lowering.config = #[[CONFIG]]
 
 // -----
 
 // Small matmul K that can still tile to all threads in a workgroup.
 
+#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>,
+    #hal.descriptor_set.binding<2, storage_buffer>
+  ]>
+]>
 hal.executable @matmul_12544x96x16 {
-  hal.interface @io {
-    hal.interface.binding @s0b0_ro_external, set=0, binding=0, type="StorageBuffer", access="Read"
-    hal.interface.binding @s0b1_ro_external, set=0, binding=1, type="StorageBuffer", access="Read"
-    hal.interface.binding @s0b2_xw_external, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
-  }
-  hal.executable.variant @vulkan_spirv_fb, target = #hal.executable.target<"vulkan", "vulkan-spirv-fb", {
+  hal.executable.variant @vulkan_spirv_fb, target = <"vulkan", "vulkan-spirv-fb", {
       spv.target_env = #spv.target_env<#spv.vce<v1.4, [Shader], []>, ARM:IntegratedGPU, {
         max_compute_shared_memory_size = 32768 : i32,
         max_compute_workgroup_invocations = 512 : i32,
         max_compute_workgroup_size = dense<512> : vector<3xi32>,
        subgroup_size = 16 : i32}>
     }> {
-    hal.executable.entry_point @matmul_12544x96x16 attributes {interface = @io, ordinal = 0 : index}
-    builtin.module  {
+    hal.executable.entry_point @matmul_12544x96x16 layout(#executable_layout)
+    builtin.module {
       func @matmul_12544x96x16() {
         %c0 = arith.constant 0 : index
         %c96 = arith.constant 96 : index
         %c12544 = arith.constant 12544 : index
         %cst = arith.constant 0.000000e+00 : f32
-        %0 = hal.interface.binding.subspan @io::@s0b0_ro_external[%c0] : memref<12544x16xf32>
-        %1 = hal.interface.binding.subspan @io::@s0b1_ro_external[%c0] : memref<16x96xf32>
-        %2 = hal.interface.binding.subspan @io::@s0b2_xw_external[%c0] : memref<12544x96xf32>
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<12544x16xf32>
+        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<16x96xf32>
+        %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : memref<12544x96xf32>
         %workgroup_size_x = hal.interface.workgroup.size[0] : index
         %workgroup_size_y = hal.interface.workgroup.size[1] : index
         %workgroup_id_x = hal.interface.workgroup.id[0] : index
@@ -279,55 +284,56 @@ hal.executable @matmul_12544x96x16 {
         }
         return
       }
-      hal.interface @io attributes {sym_visibility = "private"} {
-        hal.interface.binding @s0b0_ro_external, set=0, binding=0, type="StorageBuffer", access="Read"
-        hal.interface.binding @s0b1_ro_external, set=0, binding=1, type="StorageBuffer", access="Read"
-        hal.interface.binding @s0b2_xw_external, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
-      }
     }
   }
 }
 
-//          CHECK-LABEL: hal.executable.entry_point public @matmul_12544x96x16
-//           CHECK-SAME:   translation.info = {passPipeline = "SPIRVVectorize", workloadPerWorkgroup = [32, 8]}
-//           CHECK-SAME:   workgroup_size = [8 : index, 2 : index, 1 : index]
-//           CHECK-NEXT: ^{{.+}}(%[[X:.+]]: index, %[[Y:.+]]: index, %{{.+}}: index):
-//           CHECK-NEXT:   %[[ONE:.+]] = arith.constant 1 : index
-//           CHECK-NEXT:   %[[X_COUNT:.+]] = affine.apply affine_map<()[s0] -> (s0 ceildiv 32)>()[%[[X]]]
-//           CHECK-NEXT:   %[[Y_COUNT:.+]] = affine.apply affine_map<()[s0] -> (s0 ceildiv 8)>()[%[[Y]]]
-//           CHECK-NEXT:   hal.return %[[X_COUNT]], %[[Y_COUNT]], %[[ONE]]
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering.config<tile_sizes = {{\[}}[8, 32], [4, 4], [0, 0, 4]{{\]}}, native_vector_size = []>
+//  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 32)>
+//  CHECK-DAG: #[[MAP1:.+]] = affine_map<()[s0] -> (s0 ceildiv 8)>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"SPIRVVectorize", workload_per_wg = [32, 8]>
+//      CHECK: hal.executable.entry_point public @matmul_12544x96x16
+// CHECK-SAME:   translation.info = #[[TRANSLATION]]
+// CHECK-SAME:   workgroup_size = [8 : index, 2 : index, 1 : index]
+// CHECK-NEXT: ^{{.+}}(%[[X:.+]]: index, %[[Y:.+]]: index, %{{.+}}: index):
+// CHECK-NEXT:   %[[ONE:.+]] = arith.constant 1 : index
+// CHECK-NEXT:   %[[X_COUNT:.+]] = affine.apply #[[MAP0]]()[%[[X]]]
+// CHECK-NEXT:   %[[Y_COUNT:.+]] = affine.apply #[[MAP1]]()[%[[Y]]]
+// CHECK-NEXT:   hal.return %[[X_COUNT]], %[[Y_COUNT]], %[[ONE]]
 
-//                CHECK: func @matmul_12544x96x16()
-//                CHECK:   linalg.matmul
-//  CHECK-SAME{LITERAL}:     lowering.config =  {tileSizes = [[8, 32], [4, 4], [0, 0, 4]]}
+//      CHECK: func @matmul_12544x96x16()
+//      CHECK:   linalg.matmul
+// CHECK-SAME:     lowering.config = #[[CONFIG]]
 
 // -----
 
 // Odd matmul M and small N that cannot utilize all threads in a workgroup.
 
+#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>,
+    #hal.descriptor_set.binding<2, storage_buffer>
+  ]>
+]>
 hal.executable @matmul_49x160x576 {
-  hal.interface @io {
-    hal.interface.binding @s0b0_ro_external, set=0, binding=0, type="StorageBuffer", access="Read"
-    hal.interface.binding @s0b1_ro_external, set=0, binding=1, type="StorageBuffer", access="Read"
-    hal.interface.binding @s0b2_xw_external, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
-  }
-  hal.executable.variant @vulkan_spirv_fb, target = #hal.executable.target<"vulkan", "vulkan-spirv-fb", {
+  hal.executable.variant @vulkan_spirv_fb, target = <"vulkan", "vulkan-spirv-fb", {
       spv.target_env = #spv.target_env<#spv.vce<v1.4, [Shader], []>, ARM:IntegratedGPU, {
         max_compute_shared_memory_size = 32768 : i32,
         max_compute_workgroup_invocations = 512 : i32,
         max_compute_workgroup_size = dense<512> : vector<3xi32>,
        subgroup_size = 16 : i32}>
     }> {
-    hal.executable.entry_point @matmul_49x160x576 attributes {interface = @io, ordinal = 0 : index}
-    builtin.module  {
+    hal.executable.entry_point @matmul_49x160x576 layout(#executable_layout)
+    builtin.module {
       func @matmul_49x160x576() {
         %c0 = arith.constant 0 : index
         %c160 = arith.constant 160 : index
         %c49 = arith.constant 49 : index
         %cst = arith.constant 0.000000e+00 : f32
-        %0 = hal.interface.binding.subspan @io::@s0b0_ro_external[%c0] : !flow.dispatch.tensor<readonly:49x576xf32>
-        %1 = hal.interface.binding.subspan @io::@s0b1_ro_external[%c0] : !flow.dispatch.tensor<readonly:576x160xf32>
-        %2 = hal.interface.binding.subspan @io::@s0b2_xw_external[%c0] : !flow.dispatch.tensor<writeonly:49x160xf32>
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<readonly:49x576xf32>
+        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : !flow.dispatch.tensor<readonly:576x160xf32>
+        %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : !flow.dispatch.tensor<writeonly:49x160xf32>
         %workgroup_size_x = hal.interface.workgroup.size[0] : index
         %workgroup_size_y = hal.interface.workgroup.size[1] : index
         %workgroup_id_x = hal.interface.workgroup.id[0] : index
@@ -356,54 +362,54 @@ hal.executable @matmul_49x160x576 {
         }
         return
       }
-      hal.interface @io attributes {sym_visibility = "private"} {
-        hal.interface.binding @s0b0_ro_external, set=0, binding=0, type="StorageBuffer", access="Read"
-        hal.interface.binding @s0b1_ro_external, set=0, binding=1, type="StorageBuffer", access="Read"
-        hal.interface.binding @s0b2_xw_external, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
-      }
     }
   }
 }
 
-//          CHECK-LABEL: hal.executable.entry_point public @matmul_49x160x576
-//           CHECK-SAME:   translation.info = {passPipeline = "SPIRVVectorize", workloadPerWorkgroup = [32, 1]}
-//           CHECK-SAME:   workgroup_size = [8 : index, 1 : index, 1 : index]
-//           CHECK-NEXT: ^{{.+}}(%[[X:.+]]: index, %[[Y:.+]]: index, %{{.+}}: index):
-//           CHECK-NEXT:   %[[ONE:.+]] = arith.constant 1 : index
-//           CHECK-NEXT:   %[[X_COUNT:.+]] = affine.apply affine_map<()[s0] -> (s0 ceildiv 32)>()[%[[X]]]
-//           CHECK-NEXT:   hal.return %[[X_COUNT]], %[[Y]], %[[ONE]]
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering.config<tile_sizes = {{\[}}[1, 32], [1, 4], [0, 0, 8]{{\]}}, native_vector_size = []>
+//  CHECK-DAG: #[[MAP:.+]] = affine_map<()[s0] -> (s0 ceildiv 32)>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"SPIRVVectorize", workload_per_wg = [32, 1]>
+//      CHECK: hal.executable.entry_point public @matmul_49x160x576
+// CHECK-SAME:   translation.info = #[[TRANSLATION]]
+// CHECK-SAME:   workgroup_size = [8 : index, 1 : index, 1 : index]
+// CHECK-NEXT: ^{{.+}}(%[[X:.+]]: index, %[[Y:.+]]: index, %{{.+}}: index):
+// CHECK-NEXT:   %[[ONE:.+]] = arith.constant 1 : index
+// CHECK-NEXT:   %[[X_COUNT:.+]] = affine.apply #[[MAP]]()[%[[X]]]
+// CHECK-NEXT:   hal.return %[[X_COUNT]], %[[Y]], %[[ONE]]
 
-//                CHECK: func @matmul_49x160x576()
-//                CHECK:   linalg.matmul
-//  CHECK-SAME{LITERAL}:     lowering.config = {tileSizes = [[1, 32], [1, 4], [0, 0, 8]]}
+//      CHECK: func @matmul_49x160x576()
+//      CHECK:   linalg.matmul
+// CHECK-SAME:     lowering.config = #[[CONFIG]]
 
 // -----
 
 // Large batch matmul.
 
+#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>,
+    #hal.descriptor_set.binding<2, storage_buffer>
+  ]>
+]>
 hal.executable @batch_matmul_4x384x384 {
-  hal.interface @io {
-    hal.interface.binding @s0b0_ro_external, set=0, binding=0, type="StorageBuffer", access="Read"
-    hal.interface.binding @s0b1_ro_external, set=0, binding=1, type="StorageBuffer", access="Read"
-    hal.interface.binding @s0b2_xw_external, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
-  }
-  hal.executable.variant @vulkan_spirv_fb, target = #hal.executable.target<"vulkan", "vulkan-spirv-fb", {
+  hal.executable.variant @vulkan_spirv_fb, target = <"vulkan", "vulkan-spirv-fb", {
       spv.target_env = #spv.target_env<#spv.vce<v1.4, [Shader], []>, ARM:IntegratedGPU, {
         max_compute_shared_memory_size = 32768 : i32,
         max_compute_workgroup_invocations = 512 : i32,
         max_compute_workgroup_size = dense<512> : vector<3xi32>,
        subgroup_size = 16 : i32}>
     }> {
-    hal.executable.entry_point @batch_matmul_4x384x384 attributes {interface = @io, ordinal = 0 : index}
-    builtin.module  {
+    hal.executable.entry_point @batch_matmul_4x384x384 layout(#executable_layout)
+    builtin.module {
       func @batch_matmul_4x384x384() {
         %c0 = arith.constant 0 : index
         %c384 = arith.constant 384 : index
         %c4 = arith.constant 4 : index
         %cst = arith.constant 0.000000e+00 : f32
-        %0 = hal.interface.binding.subspan @io::@s0b0_ro_external[%c0] : !flow.dispatch.tensor<readonly:4x384x32xf32>
-        %1 = hal.interface.binding.subspan @io::@s0b1_ro_external[%c0] : !flow.dispatch.tensor<readonly:4x32x384xf32>
-        %2 = hal.interface.binding.subspan @io::@s0b2_xw_external[%c0] : !flow.dispatch.tensor<writeonly:4x384x384xf32>
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<readonly:4x384x32xf32>
+        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : !flow.dispatch.tensor<readonly:4x32x384xf32>
+        %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : !flow.dispatch.tensor<writeonly:4x384x384xf32>
         %workgroup_size_x = hal.interface.workgroup.size[0] : index
         %workgroup_size_y = hal.interface.workgroup.size[1] : index
         %workgroup_size_z = hal.interface.workgroup.size[2] : index
@@ -443,55 +449,56 @@ hal.executable @batch_matmul_4x384x384 {
         }
         return
       }
-      hal.interface @io attributes {sym_visibility = "private"} {
-        hal.interface.binding @s0b0_ro_external, set=0, binding=0, type="StorageBuffer", access="Read"
-        hal.interface.binding @s0b1_ro_external, set=0, binding=1, type="StorageBuffer", access="Read"
-        hal.interface.binding @s0b2_xw_external, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
-      }
     }
   }
 }
 
-//          CHECK-LABEL: hal.executable.entry_point public @batch_matmul_4x384x384
-//           CHECK-SAME:   translation.info = {passPipeline = "SPIRVVectorize", workloadPerWorkgroup = [32, 12, 1]}
-//           CHECK-SAME:   workgroup_size = [8 : index, 2 : index, 1 : index]
-//           CHECK-NEXT: ^{{.+}}(%[[X:.+]]: index, %[[Y:.+]]: index, %[[Z:.+]]: index):
-//           CHECK-NEXT:   %[[X_COUNT:.+]] = affine.apply affine_map<()[s0] -> (s0 ceildiv 32)>()[%[[X]]]
-//           CHECK-NEXT:   %[[Y_COUNT:.+]] = affine.apply affine_map<()[s0] -> (s0 ceildiv 12)>()[%[[Y]]]
-//           CHECK-NEXT:   hal.return %[[X_COUNT]], %[[Y_COUNT]], %[[Z]]
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering.config<tile_sizes = {{\[}}[1, 12, 32], [1, 6, 4], [0, 0, 0, 4]{{\]}}, native_vector_size = []>
+//  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 32)>
+//  CHECK-DAG: #[[MAP1:.+]] = affine_map<()[s0] -> (s0 ceildiv 12)>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"SPIRVVectorize", workload_per_wg = [32, 12, 1]>
+//      CHECK: hal.executable.entry_point public @batch_matmul_4x384x384
+// CHECK-SAME:   translation.info = #[[TRANSLATION]]
+// CHECK-SAME:   workgroup_size = [8 : index, 2 : index, 1 : index]
+// CHECK-NEXT: ^{{.+}}(%[[X:.+]]: index, %[[Y:.+]]: index, %[[Z:.+]]: index):
+// CHECK-NEXT:   %[[X_COUNT:.+]] = affine.apply #[[MAP0]]()[%[[X]]]
+// CHECK-NEXT:   %[[Y_COUNT:.+]] = affine.apply #[[MAP1]]()[%[[Y]]]
+// CHECK-NEXT:   hal.return %[[X_COUNT]], %[[Y_COUNT]], %[[Z]]
 
-//                CHECK: func @batch_matmul_4x384x384()
-//                CHECK:   linalg.batch_matmul
-//  CHECK-SAME{LITERAL}:     lowering.config = {tileSizes = [[1, 12, 32], [1, 6, 4], [0, 0, 0, 4]]}
+//      CHECK: func @batch_matmul_4x384x384()
+//      CHECK:   linalg.batch_matmul
+// CHECK-SAME:     lowering.config = #[[CONFIG]]
 
 // -----
 
 // Small batch matmul.
 
+#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>,
+    #hal.descriptor_set.binding<2, storage_buffer>
+  ]>
+]>
 hal.executable @batch_matmul_4x2x8 {
-  hal.interface @io {
-    hal.interface.binding @s0b0_ro_external, set=0, binding=0, type="StorageBuffer", access="Read"
-    hal.interface.binding @s0b1_ro_external, set=0, binding=1, type="StorageBuffer", access="Read"
-    hal.interface.binding @s0b2_xw_external, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
-  }
-  hal.executable.variant @vulkan_spirv_fb, target = #hal.executable.target<"vulkan", "vulkan-spirv-fb", {
+  hal.executable.variant @vulkan_spirv_fb, target = <"vulkan", "vulkan-spirv-fb", {
       spv.target_env = #spv.target_env<#spv.vce<v1.4, [Shader], []>, ARM:IntegratedGPU, {
         max_compute_shared_memory_size = 32768 : i32,
         max_compute_workgroup_invocations = 512 : i32,
         max_compute_workgroup_size = dense<512> : vector<3xi32>,
        subgroup_size = 16 : i32}>
     }> {
-    hal.executable.entry_point @batch_matmul_4x2x8 attributes {interface = @io, ordinal = 0 : index}
-    builtin.module  {
+    hal.executable.entry_point @batch_matmul_4x2x8 layout(#executable_layout)
+    builtin.module {
       func @batch_matmul_4x2x8() {
         %c0 = arith.constant 0 : index
         %c8 = arith.constant 8 : index
         %c2 = arith.constant 2 : index
         %c4 = arith.constant 4 : index
         %cst = arith.constant 0.000000e+00 : f32
-        %0 = hal.interface.binding.subspan @io::@s0b0_ro_external[%c0] : !flow.dispatch.tensor<readonly:4x2x32xf32>
-        %1 = hal.interface.binding.subspan @io::@s0b1_ro_external[%c0] : !flow.dispatch.tensor<readonly:4x32x8xf32>
-        %2 = hal.interface.binding.subspan @io::@s0b2_xw_external[%c0] : !flow.dispatch.tensor<writeonly:4x2x8xf32>
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<readonly:4x2x32xf32>
+        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : !flow.dispatch.tensor<readonly:4x32x8xf32>
+        %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : !flow.dispatch.tensor<writeonly:4x2x8xf32>
         %workgroup_size_x = hal.interface.workgroup.size[0] : index
         %workgroup_size_y = hal.interface.workgroup.size[1] : index
         %workgroup_size_z = hal.interface.workgroup.size[2] : index
@@ -531,23 +538,22 @@ hal.executable @batch_matmul_4x2x8 {
         }
         return
       }
-      hal.interface @io attributes {sym_visibility = "private"} {
-        hal.interface.binding @s0b0_ro_external, set=0, binding=0, type="StorageBuffer", access="Read"
-        hal.interface.binding @s0b1_ro_external, set=0, binding=1, type="StorageBuffer", access="Read"
-        hal.interface.binding @s0b2_xw_external, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
-      }
     }
   }
 }
 
-//          CHECK-LABEL: hal.executable.entry_point public @batch_matmul_4x2x8
-//           CHECK-SAME:   translation.info = {passPipeline = "SPIRVVectorize", workloadPerWorkgroup = [8, 2, 1]}
-//           CHECK-SAME:   workgroup_size = [2 : index, 2 : index, 1 : index]
-//           CHECK-NEXT: ^{{.+}}(%[[X:.+]]: index, %[[Y:.+]]: index, %[[Z:.+]]: index):
-//           CHECK-NEXT:   %[[X_COUNT:.+]] = affine.apply affine_map<()[s0] -> (s0 ceildiv 8)>()[%[[X]]]
-//           CHECK-NEXT:   %[[Y_COUNT:.+]] = affine.apply affine_map<()[s0] -> (s0 ceildiv 2)>()[%[[Y]]]
-//           CHECK-NEXT:   hal.return %[[X_COUNT]], %[[Y_COUNT]], %[[Z]]
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering.config<tile_sizes = {{\[}}[1, 2, 8], [1, 1, 4], [0, 0, 0, 8]{{\]}}, native_vector_size = []>
+//  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 8)>
+//  CHECK-DAG: #[[MAP1:.+]] = affine_map<()[s0] -> (s0 ceildiv 2)>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"SPIRVVectorize", workload_per_wg = [8, 2, 1]>
+//      CHECK: hal.executable.entry_point public @batch_matmul_4x2x8
+// CHECK-SAME:   translation.info = #[[TRANSLATION]]
+// CHECK-SAME:   workgroup_size = [2 : index, 2 : index, 1 : index]
+// CHECK-NEXT: ^{{.+}}(%[[X:.+]]: index, %[[Y:.+]]: index, %[[Z:.+]]: index):
+// CHECK-NEXT:   %[[X_COUNT:.+]] = affine.apply #[[MAP0]]()[%[[X]]]
+// CHECK-NEXT:   %[[Y_COUNT:.+]] = affine.apply #[[MAP1]]()[%[[Y]]]
+// CHECK-NEXT:   hal.return %[[X_COUNT]], %[[Y_COUNT]], %[[Z]]
 
-//                CHECK: func @batch_matmul_4x2x8()
-//                CHECK:   linalg.batch_matmul
-//  CHECK-SAME{LITERAL}:     lowering.config = {tileSizes = [[1, 2, 8], [1, 1, 4], [0, 0, 0, 8]]}
+//      CHECK: func @batch_matmul_4x2x8()
+//      CHECK:   linalg.batch_matmul
+// CHECK-SAME:     lowering.config = #[[CONFIG]]

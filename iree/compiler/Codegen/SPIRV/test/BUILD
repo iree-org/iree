@@ -6,7 +6,7 @@
 
 # Tests for common transforms.
 
-load("//iree:lit_test.bzl", "iree_lit_test_suite")
+load("//build_tools/bazel:iree_lit_test.bzl", "iree_lit_test_suite")
 load("//build_tools/bazel:enforce_glob.bzl", "enforce_glob")
 
 package(
@@ -21,21 +21,20 @@ iree_lit_test_suite(
         [
             "config_adreno_conv.mlir",
             "config_adreno_matmul.mlir",
+            "config_default_conv.mlir",
+            "config_default_linalg_ext_ops.mlir",
+            "config_default_linalg_ops.mlir",
             "config_default_matmul.mlir",
-            "config_linalg_ext_ops.mlir",
-            "config_linalg_ops.mlir",
             "config_mali_conv.mlir",
             "config_mali_matmul.mlir",
             "config_nvidia_matmul_cooperative_ops.mlir",
             "convert_to_spirv.mlir",
-            "distribute_to_global_id.mlir",
-            "fold_gpu_procid_uses.mlir",
+            "distribute_to_invocations.mlir",
             "pipeline_matmul_cooperative_ops.mlir",
             "pipeline_matmul_vectorization.mlir",
-            "remove_one_trip_tiled_loop.mlir",
+            "tile_and_distribute.mlir",
             "tile_and_distribute_scatter.mlir",
             "tile_and_distribute_sort.mlir",
-            "tile_and_vectorize.mlir",
             "tile_and_vectorize_batch_matmul.mlir",
             "tile_and_vectorize_conv.mlir",
             "tile_and_vectorize_matmul.mlir",
@@ -52,8 +51,8 @@ iree_lit_test_suite(
             "promote_workgroup_memory.mlir",
         ],
     ),
-    data = [
-        "//iree/tools:IreeFileCheck",
+    tools = [
         "//iree/tools:iree-opt",
+        "@llvm-project//llvm:FileCheck",
     ],
 )

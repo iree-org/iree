@@ -8,7 +8,7 @@
 # To disable autogeneration for this file entirely, delete this header.        #
 ################################################################################
 
-if(NOT "${IREE_TARGET_BACKEND_VULKAN-SPIRV}")
+if(NOT "${IREE_TARGET_BACKEND_VULKAN_SPIRV}")
   return()
 endif()
 
@@ -19,8 +19,8 @@ iree_lit_test_suite(
     lit
   SRCS
     "target_env_conversion.mlir"
-  DATA
-    iree::tools::IreeFileCheck
+  TOOLS
+    FileCheck
     iree::tools::iree-opt
 )
 

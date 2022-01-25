@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -iree-util-fuse-globals -allow-unregistered-dialect %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -iree-util-fuse-globals -allow-unregistered-dialect %s | FileCheck %s
 
 // CHECK: util.global private mutable @fusable0 : index
 util.global private mutable @fusable0 : index
@@ -65,4 +65,20 @@ builtin.func @foo(%arg0: index) -> (index, index) {
   %1 = util.global.load @unfusableInit1 : index
   // CHECK: return %[[VALUE0]], %[[VALUE1]]
   return %0, %1 : index, index
+}
+
+// -----
+
+// CHECK: util.global private mutable @unfusableDivergent0
+util.global private mutable @unfusableDivergent0 : index
+// CHECK: util.global private mutable @unfusableDivergent1
+util.global private mutable @unfusableDivergent1 : index
+builtin.func @fn_a(%arg0: index) {
+  util.global.store %arg0, @unfusableDivergent0 : index
+  util.global.store %arg0, @unfusableDivergent1 : index
+  return
+}
+builtin.func @fn_b(%arg0: index) {
+  util.global.store %arg0, @unfusableDivergent0 : index
+  return
 }

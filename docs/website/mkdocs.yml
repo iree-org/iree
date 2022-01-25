@@ -80,9 +80,9 @@ markdown_extensions:
       options:
         custom_icons:
           - overrides/.icons
-  - pymdownx.tabbed
   - pymdownx.superfences
-  - pymdownx.tabbed
+  - pymdownx.tabbed:
+      alternate_style: true
   - pymdownx.tasklist:
       custom_checkbox: true
   - tables
@@ -107,7 +107,7 @@ nav:
   - 'Building from source':
       - 'building-from-source/index.md'
       - 'building-from-source/getting-started.md'
-      - 'building-from-source/optional-features.md'
+      - 'building-from-source/python-bindings-and-importers.md'
       - 'building-from-source/android.md'
       - 'building-from-source/riscv.md'
   - 'Bindings':
@@ -115,8 +115,12 @@ nav:
       - C API: 'bindings/c-api.md'
       - Python: 'bindings/python.md'
       - TensorFlow Lite: 'bindings/tensorflow-lite.md'
+  - 'Extensions':
+      - 'extensions/index.md'
+  - 'Reference':
+      - Optimization Options: 'reference/optimization-options.md'
   - 'Community':
-      - Projects: 'community/projects.md'
+      - 'community/index.md'
   - 'Blog':
       - 'blog/index.md'
       - CUDA backend: 'blog/2021-10-15-cuda-backend.md'

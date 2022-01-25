@@ -59,7 +59,7 @@ See [our website](https://google.github.io/iree/) for more information.
 
 ## Presentations and Talks
 
-*   2021-06-09: IREE Runtime Design Tech Talk ([recording](https://drive.google.com/file/d/1p0DcysaIg8rC7ErKYEgutQkOJGPFCU3s/view) and [slides](https://drive.google.com/file/d/1CA-FRRjZUbDFS4pGPiLT86lwghNxMN2M/view?usp=sharing))
+*   2021-06-09: IREE Runtime Design Tech Talk ([recording](https://drive.google.com/file/d/1p0DcysaIg8rC7ErKYEgutQkOJGPFCU3s/view) and [slides](https://drive.google.com/file/d/1ikgOdZxnMz1ExqwrAiuTY9exbe3yMWbB/view?usp=sharing))
 *   2020-08-20: IREE CodeGen: MLIR Open Design Meeting Presentation
     ([recording](https://drive.google.com/file/d/1325zKXnNIXGw3cdWrDWJ1-bp952wvC6W/view?usp=sharing)
     and

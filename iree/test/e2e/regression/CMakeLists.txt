@@ -14,15 +14,17 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
+    "fill_i64.mlir"
     "globals.mlir"
+    "libm_linking.mlir"
     "scalar.mlir"
     "trace_dispatch_tensors.mlir"
     "unused_args.mlir"
-  DATA
-    iree::tools::IreeFileCheck
-    iree::tools::iree-benchmark-module
+  TOOLS
+    FileCheck
+    iree::tools::iree-opt
     iree::tools::iree-run-mlir
-    iree::tools::iree-translate
+    lld
   LABELS
     "hostonly"
 )
@@ -176,7 +178,9 @@ iree_generated_trace_runner_test(
     "vmvx"
   OPT_FLAGS
     "--iree-flow-convert-linalg-matmul-to-mmt4d=M0=8 K0=4 N0=8"
-    "--iree-codegen-vectorize-linalg-mmt4d"
+  TARGET_CPU_FEATURES_VARIANTS
+    "default"
+    "aarch64:+dotprod"
 )
 
 iree_generated_trace_runner_test(
@@ -197,7 +201,9 @@ iree_generated_trace_runner_test(
     "vmvx"
   OPT_FLAGS
     "--iree-flow-convert-linalg-matmul-to-mmt4d=M0=8 K0=1 N0=8"
-    "--iree-codegen-vectorize-linalg-mmt4d"
+  TARGET_CPU_FEATURES_VARIANTS
+    "default"
+    "aarch64:+dotprod"
 )
 
 iree_generated_trace_runner_test(
@@ -216,7 +222,9 @@ iree_generated_trace_runner_test(
     "dylib"
   OPT_FLAGS
     "--iree-flow-convert-linalg-matmul-to-mmt4d=M0=8 K0=4 N0=8"
-    "--iree-codegen-vectorize-linalg-mmt4d"
+  TARGET_CPU_FEATURES_VARIANTS
+    "default"
+    "aarch64:+dotprod"
 )
 
 iree_generated_trace_runner_test(
@@ -235,7 +243,9 @@ iree_generated_trace_runner_test(
     "dylib"
   OPT_FLAGS
     "--iree-flow-convert-linalg-matmul-to-mmt4d=M0=8 K0=1 N0=8"
-    "--iree-codegen-vectorize-linalg-mmt4d"
+  TARGET_CPU_FEATURES_VARIANTS
+    "default"
+    "aarch64:+dotprod"
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

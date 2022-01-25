@@ -7,8 +7,8 @@
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "llvm/ADT/STLExtras.h"
-#include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/SymbolTable.h"
@@ -30,11 +30,7 @@ class WrapEntryPointsPass
  public:
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<StandardOpsDialect, mlir::arith::ArithmeticDialect,
-                    IREE::HAL::HALDialect,
-                    // TODO: memref is here because the **tensor** dim op was
-                    // moved there for some reason. When that goes away we can
-                    // drop this dependency.
-                    memref::MemRefDialect>();
+                    mlir::tensor::TensorDialect, IREE::HAL::HALDialect>();
   }
 
   StringRef getArgument() const override {
@@ -71,6 +67,7 @@ class WrapEntryPointsPass
       // Create the wrapper function that conforms to the IREE native ABI and
       // marshals arguments/results to the original function.
       auto wrapperFuncOp = createWrapperFunc(entryFuncOp);
+      if (!wrapperFuncOp) return signalPassFailure();
       wrapperFuncOp.setPublic();
       wrapperFuncOp.setName(
           mlir::StringAttr::get(entryFuncOp.getContext(), publicName));
@@ -131,13 +128,34 @@ class WrapEntryPointsPass
     auto *entryBlock = wrapperFuncOp.addEntryBlock();
     auto entryBuilder = OpBuilder::atBlockBegin(entryBlock);
 
+    // Build a map of result value to the argument that has its backing storage.
+    SmallVector<Value> resultStorages;
+    resultStorages.resize(resultTypes.size());
+    for (unsigned i = 0; i < inputTypes.size(); ++i) {
+      auto outputAttr =
+          entryFuncOp.getArgAttrOfType<IntegerAttr>(i, "iree.abi.output");
+      if (!outputAttr) continue;
+      // Today all outputs need to be a !hal.buffer - we could change this
+      // in the future to be something more generalized.
+      auto storageArg = entryBlock->getArgument(i);
+      if (!storageArg.getType().isa<IREE::HAL::BufferType>()) {
+        entryFuncOp.emitError()
+            << "storage argument " << i << " has an invalid type "
+            << storageArg.getType() << "; must be a !hal.buffer";
+        return {};
+      }
+      resultStorages[outputAttr.getInt()] = storageArg;
+    }
+
     // Marshal arguments.
     SmallVector<Value> arguments;
     for (auto arg : llvm::enumerate(entryBlock->getArguments())) {
       auto oldType = entryFuncType.getInput(arg.index());
-      if (oldType.isa<TensorType>()) {
-        arguments.push_back(entryBuilder.create<IREE::HAL::TensorCastOp>(
-            entryFuncOp.getLoc(), oldType, arg.value()));
+      if (auto tensorType = oldType.dyn_cast<RankedTensorType>()) {
+        auto argLoc = arg.value().getLoc();
+        auto importOp = entryBuilder.create<IREE::HAL::TensorImportOp>(
+            argLoc, oldType, arg.value());
+        arguments.push_back(importOp.target());
       } else {
         arguments.push_back(arg.value());
       }
@@ -153,8 +171,12 @@ class WrapEntryPointsPass
       auto oldType = entryFuncType.getResult(result.index());
       auto newType = wrapperFuncType.getResult(result.index());
       if (oldType.isa<TensorType>()) {
-        results.push_back(entryBuilder.createOrFold<IREE::HAL::TensorCastOp>(
-            entryFuncOp.getLoc(), newType, result.value()));
+        auto dynamicDims = IREE::Util::buildDynamicDimsForValue(
+            entryFuncOp.getLoc(), result.value(), entryBuilder);
+        results.push_back(entryBuilder.create<IREE::HAL::TensorExportOp>(
+            entryFuncOp.getLoc(), newType, result.value(),
+            TypeAttr::get(result.value().getType()), dynamicDims,
+            resultStorages[result.index()]));
       } else {
         results.push_back(result.value());
       }
@@ -169,8 +191,8 @@ class WrapEntryPointsPass
     SmallVector<NamedAttribute, 4> attrs;
     auto abiAttr = entryFuncOp->getAttr("iree.abi");
     if (abiAttr) {
-      attrs.push_back(std::make_pair(
-          Identifier::get("iree.abi", entryFuncOp.getContext()), abiAttr));
+      attrs.emplace_back(StringAttr::get(entryFuncOp.getContext(), "iree.abi"),
+                         abiAttr);
     }
     if (!attrs.empty()) {
       auto reflectionAttr = DictionaryAttr::get(&getContext(), attrs);

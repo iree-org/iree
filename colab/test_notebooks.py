@@ -15,9 +15,11 @@ from absl.testing import absltest
 NOTEBOOKS_TO_SKIP = []
 
 NOTEBOOKS_EXPECTED_TO_FAIL = [
-    # Text classification notebook fails to extract the vocab file on Docker
-    # (needs visibility into the tempdir?)
-    "tflite_text_classification.ipynb",
+    # Logs: https://buildkite.com/iree/iree-samples/builds/212#2d108f5a-b7d1-46de-93d3-85ce60250514
+    # error: 'util.global.store' op global type mismatch;
+    #        global __iree_flow___sm_node14__optimizer.iter is 'tensor<i64>' but
+    #        store is 'tensor<i32>'
+    "mnist_training.ipynb",
 ]
 
 

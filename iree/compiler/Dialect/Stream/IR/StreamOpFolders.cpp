@@ -7,7 +7,6 @@
 #include <algorithm>
 #include <numeric>
 
-#include "iree/compiler/Dialect/Shape/IR/ShapeOps.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamDialect.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamOps.h"
 #include "iree/compiler/Dialect/Util/IR/ClosureOpUtils.h"
@@ -306,7 +305,45 @@ void ResourceDeallocaOp::getCanonicalizationPatterns(
 OpFoldResult ResourceSizeOp::fold(ArrayRef<Attribute> operands) {
   auto sizeAwareType =
       operand().getType().cast<IREE::Util::SizeAwareTypeInterface>();
-  return sizeAwareType.findSizeValue(operand(), *this);
+  Operation *op = this->getOperation();
+  return sizeAwareType.findSizeValue(operand(), op->getBlock(),
+                                     Block::iterator(op));
+}
+
+namespace {
+
+// Propagates resource sizes through select ops by selecting on the sizes of the
+// select operands.
+//
+// Example:
+//  %a = stream... : !stream.resource<*>{%a_sz}
+//  %b = stream... : !stream.resource<*>{%b_sz}
+//  %c = select %cond, %a, %b : !stream.resource<*>
+//  %c_sz = stream.resource.size %c : !stream.resource<*>
+// ->
+//  %c = select %cond, %a, %b : !stream.resource<*>
+//  %c_sz = select %cond, %a_sz, %b_sz : index
+struct SelectResourceSizeOp : public OpRewritePattern<ResourceSizeOp> {
+  using OpRewritePattern::OpRewritePattern;
+  LogicalResult matchAndRewrite(ResourceSizeOp op,
+                                PatternRewriter &rewriter) const override {
+    auto selectOp = op.operand().getDefiningOp<mlir::SelectOp>();
+    if (!selectOp) return failure();
+    auto trueSize = rewriter.createOrFold<IREE::Stream::ResourceSizeOp>(
+        op.getLoc(), selectOp.getTrueValue(), op.affinityAttr());
+    auto falseSize = rewriter.createOrFold<IREE::Stream::ResourceSizeOp>(
+        op.getLoc(), selectOp.getFalseValue(), op.affinityAttr());
+    rewriter.replaceOpWithNewOp<mlir::SelectOp>(op, selectOp.getCondition(),
+                                                trueSize, falseSize);
+    return success();
+  }
+};
+
+}  // namespace
+
+void ResourceSizeOp::getCanonicalizationPatterns(
+    OwningRewritePatternList &results, MLIRContext *context) {
+  results.insert<SelectResourceSizeOp>(context);
 }
 
 //===----------------------------------------------------------------------===//
@@ -466,8 +503,7 @@ struct PropagateResourcePackBaseOffset
 
     // Zero offsets don't do anything and can just be removed so we can avoid
     // inserting a bunch of additional IR.
-    if (auto constantOp = dyn_cast_or_null<arith::ConstantIndexOp>(
-            baseOffset.getDefiningOp())) {
+    if (auto constantOp = baseOffset.getDefiningOp<arith::ConstantIndexOp>()) {
       if (constantOp.value() == 0) {
         return success();
       }
@@ -480,7 +516,7 @@ struct PropagateResourcePackBaseOffset
           rewriter.create<arith::AddIOp>(op.getLoc(), baseOffset, sliceOffset);
       SmallPtrSet<Operation *, 1> exclusions;
       exclusions.insert(addOp);
-      sliceOffset.replaceAllUsesExcept(addOp.result(), exclusions);
+      sliceOffset.replaceAllUsesExcept(addOp.getResult(), exclusions);
     }
 
     return success();
@@ -590,11 +626,47 @@ struct FoldResourceSubviewOps : public OpRewritePattern<ResourceSubviewOp> {
   }
 };
 
+// Turns selects of subviews of a resource into selects of the offset.
+// This only works if the subview sizes match.
+//
+// Example:
+//  %subview0 = stream.resource.subview %src[%offset0]
+//  %subview1 = stream.resource.subview %src[%offset1]
+//  %subview = select %cond, %subview0, %subview1 : !stream.resource<transient>
+// ->
+//  %offset = select %cond, %offset0, %offset1 : index
+//  %subview = stream.resource.subview %src[%offset]
+struct SinkSubviewAcrossSelectOps : public OpRewritePattern<mlir::SelectOp> {
+  using OpRewritePattern::OpRewritePattern;
+  LogicalResult matchAndRewrite(mlir::SelectOp op,
+                                PatternRewriter &rewriter) const override {
+    if (!op.getType().isa<IREE::Stream::ResourceType>()) return failure();
+    auto trueSubview = dyn_cast_or_null<IREE::Stream::ResourceSubviewOp>(
+        op.getTrueValue().getDefiningOp());
+    auto falseSubview = dyn_cast_or_null<IREE::Stream::ResourceSubviewOp>(
+        op.getFalseValue().getDefiningOp());
+    if (!trueSubview || !falseSubview) return failure();
+    if (trueSubview.source() != falseSubview.source() ||
+        trueSubview.result_size() != falseSubview.result_size()) {
+      return failure();
+    }
+    auto offsetSelectOp = rewriter.create<mlir::SelectOp>(
+        op.getLoc(), op.getCondition(), trueSubview.source_offset(),
+        falseSubview.source_offset());
+    rewriter.replaceOpWithNewOp<IREE::Stream::ResourceSubviewOp>(
+        op, op.getResult().getType(), trueSubview.source(),
+        trueSubview.source_size(), offsetSelectOp.getResult(),
+        trueSubview.result_size());
+    return success();
+  }
+};
+
 }  // namespace
 
 void ResourceSubviewOp::getCanonicalizationPatterns(
     OwningRewritePatternList &results, MLIRContext *context) {
   results.insert<FoldResourceSubviewOps>(context);
+  results.insert<SinkSubviewAcrossSelectOps>(context);
 }
 
 //===----------------------------------------------------------------------===//
@@ -602,14 +674,21 @@ void ResourceSubviewOp::getCanonicalizationPatterns(
 //===----------------------------------------------------------------------===//
 
 OpFoldResult TensorImportOp::fold(ArrayRef<Attribute> operands) {
-  // TODO(benvanik): if operand comes from export then fold.
+  // If operand comes from an export with the same affinity and size then fold.
+  // Different affinities may indicate exporting from one device or queue and
+  // importing to a different device or queue.
+  // We assume that differing encodings and shapes are compatible.
+  auto exportOp = source().getDefiningOp<TensorExportOp>();
+  if (exportOp && affinity() == exportOp.affinity() &&
+      result_size() == exportOp.source_size()) {
+    return exportOp.source();
+  }
   return {};
 }
 
 void TensorImportOp::getCanonicalizationPatterns(
     OwningRewritePatternList &results, MLIRContext *context) {
   // TODO(benvanik): check operand and dedupe imports.
-  results.insert<MaterializeCOW<TensorImportOp>>(context);
 }
 
 //===----------------------------------------------------------------------===//
@@ -617,7 +696,15 @@ void TensorImportOp::getCanonicalizationPatterns(
 //===----------------------------------------------------------------------===//
 
 OpFoldResult TensorExportOp::fold(ArrayRef<Attribute> operands) {
-  // TODO(benvanik): if operand comes from import then fold.
+  // If operand comes from import with the same properties then fold.
+  // These checks are conservative, since encoding changes may be meaningful.
+  auto importOp = source().getDefiningOp<TensorImportOp>();
+  if (importOp && source_encoding() == importOp.result_encoding() &&
+      source_encoding_dims() == importOp.result_encoding_dims() &&
+      source_size() == importOp.result_size() &&
+      affinity() == importOp.affinity()) {
+    return importOp.source();
+  }
   return {};
 }
 
@@ -647,7 +734,7 @@ struct TensorConstantToSplat : public OpRewritePattern<TensorConstantOp> {
           "only constant splat attrs can be converted to splat ops");
     }
 
-    auto splatElementAttr = splatAttr.getSplatValue();
+    auto splatElementAttr = splatAttr.getSplatValue<Attribute>();
     auto splatValue = rewriter.create<arith::ConstantOp>(
         constantOp.getLoc(), splatElementAttr.getType(), splatElementAttr);
     auto resultType = IREE::Stream::ResourceType::get(constantOp.getContext());
@@ -680,9 +767,145 @@ void TensorConstantOp::getCanonicalizationPatterns(
 // stream.tensor.splat
 //===----------------------------------------------------------------------===//
 
+namespace {
+
+// Returns an integer with a bit width as small as possible to represent the
+// input |pattern|, aligned to 8-bits.
+//
+// Examples:
+//            0 : i64 ->    0 : i8
+//            1 : i32 ->    1 : i8
+//          123 : i32 ->  123 : i8
+//         1234 : i32 -> 1234 : i16
+//   0xCDCDCDCD : i32 -> 0xCD : i8
+static APInt computeRequiredPatternBits(APInt pattern) {
+  // Special case for well-known constant values.
+  if (pattern.isZero()) return APInt(8, 0u);
+  if (pattern.isAllOnes()) return APInt(8, 0xFF);
+
+  // Extend up to a power of two bit width. This makes the value easier to work
+  // with as we'll be dealing with one of 4 sizes (1/2/4/8b).
+  uint64_t bitWidth = llvm::PowerOf2Ceil(pattern.getBitWidth());
+  if (bitWidth != pattern.getBitWidth()) {
+    // Extending as we operate - that's not good: users should have taken care
+    // of this earier.
+    return pattern;
+  }
+
+  uint64_t byteWidth = bitWidth / 8;
+  uint64_t value = pattern.getZExtValue();
+  switch (byteWidth) {
+    case 1:
+      // Can't go smaller than 1 byte.
+      return pattern;
+    case 2: {
+      uint64_t b0 = value & 0xFF;
+      uint64_t b1 = (value >> 8) & 0xFF;
+      if (b0 == b1) {
+        // 0xAAAA : i16 => 0xAA : i8
+        return APInt(8, value & 0xFF);
+      }
+      return pattern;
+    }
+    case 4: {
+      uint64_t b0 = value & 0xFF;
+      uint64_t b1 = (value >> 8) & 0xFF;
+      uint64_t b2 = (value >> 16) & 0xFF;
+      uint64_t b3 = (value >> 24) & 0xFF;
+      if (b0 == b1 && b0 == b2 && b0 == b3) {
+        // 0xAAAAAAAA : i32 => 0xAA : i8
+        return APInt(8, b0);
+      } else if (b0 == b2 && b1 == b3) {
+        // 0xAABBAABB : i32 => 0xAABB : i16
+        return APInt(16, b0 | (b1 << 8));
+      }
+      return pattern;
+    }
+    case 8: {
+      uint64_t b0 = value & 0xFF;
+      uint64_t b1 = (value >> 8) & 0xFF;
+      uint64_t b2 = (value >> 16) & 0xFF;
+      uint64_t b3 = (value >> 24) & 0xFF;
+      uint64_t b4 = (value >> 32) & 0xFF;
+      uint64_t b5 = (value >> 40) & 0xFF;
+      uint64_t b6 = (value >> 48) & 0xFF;
+      uint64_t b7 = (value >> 56) & 0xFF;
+      if (b0 == b1 && b0 == b2 && b0 == b3 && b0 == b4 && b0 == b5 &&
+          b0 == b6 && b0 == b7) {
+        // 0xAAAAAAAAAAAAAAAA : i64 => 0xAA : i8
+        return APInt(8, b0);
+      } else if ((b0 == b2 && b0 == b4 && b0 == b6) &&
+                 (b1 == b3 && b1 == b5 && b1 == b7)) {
+        // 0xAABBAABBAABBAABB : i64 => 0xAABB : i16
+        return APInt(16, b0 | (b1 << 8));
+      } else if (b0 == b4 && b1 == b5 && b2 == b6 && b3 == b7) {
+        // 0xAABBCCDDAABBCCDD : i64 => 0xAABBCCDD : i32
+        return APInt(32, b0 | (b1 << 8) | (b2 << 16) | (b3 << 32));
+      }
+      return pattern;
+    }
+    default:
+      // Unhandled bit width.
+      return pattern;
+  }
+}
+
+// Narrows the bit width of a splat/fill pattern when known safe to do so.
+// Target HAL implementations don't support 64-bit and a real 64-bit splat needs
+// to be emulated - if we can avoid that here that's a big win. Some HAL
+// implementations (such as Metal) only support 8-bit fills and anything larger
+// needs to be implemented as well.
+static Attribute tryNarrowPatternBits(Attribute patternAttr) {
+  // Get the old pattern bitcast to an APInt. Splats are bitwise operations
+  // and we don't care what the value originally was.
+  APInt oldPattern;
+  if (auto floatAttr = patternAttr.dyn_cast<FloatAttr>()) {
+    oldPattern = floatAttr.getValue().bitcastToAPInt();
+  } else if (auto intAttr = patternAttr.dyn_cast<IntegerAttr>()) {
+    oldPattern = intAttr.getValue();
+  } else {
+    // Can't handle today.
+    return patternAttr;
+  }
+
+  // Try narrowing the pattern.
+  auto newPattern = computeRequiredPatternBits(oldPattern);
+  if (newPattern.getBitWidth() == oldPattern.getBitWidth()) return patternAttr;
+
+  // Wrap the result in an attribute - note that it is always an integer.
+  return IntegerAttr::get(
+      IntegerType::get(patternAttr.getContext(), newPattern.getBitWidth()),
+      newPattern);
+}
+
+// Tries to narrow constant splat patterns to a smaller bit width.
+struct NarrowSplatPattern : public OpRewritePattern<TensorSplatOp> {
+  using OpRewritePattern::OpRewritePattern;
+  LogicalResult matchAndRewrite(TensorSplatOp splatOp,
+                                PatternRewriter &rewriter) const override {
+    // Try narrowing the pattern.
+    Attribute oldPatternAttr;
+    if (!matchPattern(splatOp.value(), m_Constant(&oldPatternAttr))) {
+      return failure();
+    }
+    auto newPatternAttr = tryNarrowPatternBits(oldPatternAttr);
+    if (newPatternAttr == oldPatternAttr) return failure();
+
+    // Replace the pattern on the op with the new one.
+    auto narrowValue =
+        rewriter.create<arith::ConstantOp>(splatOp.getLoc(), newPatternAttr);
+    rewriter.updateRootInPlace(
+        splatOp, [&]() { splatOp.valueMutable().assign(narrowValue); });
+    return success();
+  }
+};
+
+}  // namespace
+
 void TensorSplatOp::getCanonicalizationPatterns(
     OwningRewritePatternList &results, MLIRContext *context) {
   results.insert<ElideUnusedOp<TensorSplatOp>>(context);
+  results.insert<NarrowSplatPattern>(context);
 }
 
 //===----------------------------------------------------------------------===//
@@ -746,9 +969,36 @@ void TensorSliceOp::getCanonicalizationPatterns(
 // stream.tensor.fill
 //===----------------------------------------------------------------------===//
 
+namespace {
+
+// Tries to narrow constant fill patterns to a smaller bit width.
+struct NarrowFillPattern : public OpRewritePattern<TensorFillOp> {
+  using OpRewritePattern::OpRewritePattern;
+  LogicalResult matchAndRewrite(TensorFillOp fillOp,
+                                PatternRewriter &rewriter) const override {
+    // Try narrowing the pattern.
+    Attribute oldPatternAttr;
+    if (!matchPattern(fillOp.value(), m_Constant(&oldPatternAttr))) {
+      return failure();
+    }
+    auto newPatternAttr = tryNarrowPatternBits(oldPatternAttr);
+    if (newPatternAttr == oldPatternAttr) return failure();
+
+    // Replace the pattern on the op with the new one.
+    auto narrowValue =
+        rewriter.create<arith::ConstantOp>(fillOp.getLoc(), newPatternAttr);
+    rewriter.updateRootInPlace(
+        fillOp, [&]() { fillOp.valueMutable().assign(narrowValue); });
+    return success();
+  }
+};
+
+}  // namespace
+
 void TensorFillOp::getCanonicalizationPatterns(
     OwningRewritePatternList &results, MLIRContext *context) {
   // TODO(benvanik): if target_size == sizeof(value) turn into splat.
+  results.insert<NarrowFillPattern>(context);
 }
 
 //===----------------------------------------------------------------------===//
@@ -799,18 +1049,40 @@ void AsyncAllocaOp::getCanonicalizationPatterns(
   // TODO(benvanik): alloca (staging) -> non-staging change to target.
   // TODO(benvanik): alloca (non-staging) -> staging change to target.
   // TODO(benvanik): sink to first user.
-  results.insert<MaterializeCOW<AsyncAllocaOp>>(context);
 }
 
 //===----------------------------------------------------------------------===//
 // stream.async.constant
 //===----------------------------------------------------------------------===//
 
+namespace {
+
+// Converts constants with splat values into splats.
+struct ConvertSplatConstantsIntoSplats
+    : public OpRewritePattern<AsyncConstantOp> {
+  using OpRewritePattern::OpRewritePattern;
+  LogicalResult matchAndRewrite(AsyncConstantOp constantOp,
+                                PatternRewriter &rewriter) const override {
+    auto value = constantOp.value();
+    if (!value.isSplat()) return failure();
+
+    auto splatElementAttr =
+        value.dyn_cast<SplatElementsAttr>().getSplatValue<Attribute>();
+    auto splatValue = rewriter.create<arith::ConstantOp>(
+        constantOp.getLoc(), splatElementAttr.getType(), splatElementAttr);
+    rewriter.replaceOpWithNewOp<IREE::Stream::AsyncSplatOp>(
+        constantOp, constantOp.result().getType(), splatValue,
+        constantOp.result_size(), constantOp.affinityAttr());
+    return success();
+  }
+};
+
+}  // namespace
+
 void AsyncConstantOp::getCanonicalizationPatterns(
     OwningRewritePatternList &results, MLIRContext *context) {
-  // TODO(benvanik): if value is a splat turn into splat.
+  results.insert<ConvertSplatConstantsIntoSplats>(context);
   // TODO(benvanik): if value is _mostly_ a splat, turn into splat + updates.
-  results.insert<MaterializeCOW<AsyncConstantOp>>(context);
 }
 
 //===----------------------------------------------------------------------===//
@@ -886,7 +1158,6 @@ void AsyncSplatOp::getCanonicalizationPatterns(
   // TODO(#6972): clone instead of sinking to common dominator.
   results.insert<SinkSplatsToConsumers>(context);
   results.insert<ElideUnusedOp<AsyncSplatOp>>(context);
-  results.insert<MaterializeCOW<AsyncSplatOp>>(context);
 }
 
 //===----------------------------------------------------------------------===//
@@ -914,8 +1185,8 @@ struct PropagateClonableOps : public OpRewritePattern<AsyncCloneOp> {
   LogicalResult matchAndRewrite(AsyncCloneOp cloneOp,
                                 PatternRewriter &rewriter) const override {
     if (cloneOp.use_empty()) return failure();
-    auto sourceOp = dyn_cast_or_null<IREE::Stream::StreamableOpInterface>(
-        cloneOp.source().getDefiningOp());
+    auto sourceOp =
+        cloneOp.source().getDefiningOp<IREE::Stream::StreamableOpInterface>();
     if (!sourceOp || !sourceOp.preferCloneToConsumers()) return failure();
     for (auto &use : llvm::make_early_inc_range(cloneOp.result().getUses())) {
       rewriter.setInsertionPoint(use.getOwner());
@@ -936,7 +1207,6 @@ void AsyncCloneOp::getCanonicalizationPatterns(
   // TODO(benvanik): some way to reduce deep clone->clone->clone chains.
   results.insert<PropagateClonableOps>(context);
   results.insert<ElideUnusedOp<AsyncCloneOp>>(context);
-  results.insert<MaterializeCOW<AsyncCloneOp>>(context);
 }
 
 //===----------------------------------------------------------------------===//
@@ -966,8 +1236,7 @@ struct PropagateSplatsThroughSlices : public OpRewritePattern<AsyncSliceOp> {
   using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(AsyncSliceOp sliceOp,
                                 PatternRewriter &rewriter) const override {
-    auto splatOp = dyn_cast_or_null<IREE::Stream::AsyncSplatOp>(
-        sliceOp.source().getDefiningOp());
+    auto splatOp = sliceOp.source().getDefiningOp<IREE::Stream::AsyncSplatOp>();
     if (!splatOp) return failure();
     rewriter.replaceOpWithNewOp<IREE::Stream::AsyncSplatOp>(
         sliceOp, sliceOp.result().getType(), splatOp.value(),
@@ -984,7 +1253,6 @@ void AsyncSliceOp::getCanonicalizationPatterns(
   //                 affinity/lifetime differ.
   results.insert<PropagateSplatsThroughSlices>(context);
   results.insert<ElideUnusedOp<AsyncSliceOp>>(context);
-  results.insert<MaterializeCOW<AsyncSliceOp>>(context);
 }
 
 //===----------------------------------------------------------------------===//
@@ -1021,7 +1289,6 @@ void AsyncFillOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
                                               MLIRContext *context) {
   results.insert<FlattenFullFillToSplat>(context);
   results.insert<ElideUnusedOp<AsyncFillOp>>(context);
-  results.insert<MaterializeCOW<AsyncFillOp>>(context);
 }
 
 //===----------------------------------------------------------------------===//
@@ -1051,14 +1318,13 @@ struct CombineSplatUpdateFromToFill : public OpRewritePattern<AsyncUpdateOp> {
   using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(AsyncUpdateOp updateOp,
                                 PatternRewriter &rewriter) const override {
-    auto splatOp = dyn_cast_or_null<IREE::Stream::AsyncSplatOp>(
-        updateOp.update().getDefiningOp());
+    auto splatOp =
+        updateOp.update().getDefiningOp<IREE::Stream::AsyncSplatOp>();
     if (!splatOp) return failure();
     rewriter.replaceOpWithNewOp<IREE::Stream::AsyncFillOp>(
         updateOp, updateOp.result().getType(), updateOp.target(),
         updateOp.target_size(), updateOp.target_offset(), updateOp.target_end(),
-        updateOp.update_size(), splatOp.value(), updateOp.tied_operandsAttr(),
-        updateOp.affinityAttr());
+        updateOp.update_size(), splatOp.value(), updateOp.affinityAttr());
     return success();
   }
 };
@@ -1084,8 +1350,8 @@ struct CombineSliceUpdateFromToCopy : public OpRewritePattern<AsyncUpdateOp> {
   using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(AsyncUpdateOp updateOp,
                                 PatternRewriter &rewriter) const override {
-    auto sliceOp = dyn_cast_or_null<IREE::Stream::AsyncSliceOp>(
-        updateOp.update().getDefiningOp());
+    auto sliceOp =
+        updateOp.update().getDefiningOp<IREE::Stream::AsyncSliceOp>();
     if (!sliceOp || sliceOp->getBlock() != updateOp->getBlock()) {
       // Source is not a slice or a slice from out-of-block. We don't want to
       // grow memory usage by sinking the slice here (we may slice into the
@@ -1096,8 +1362,7 @@ struct CombineSliceUpdateFromToCopy : public OpRewritePattern<AsyncUpdateOp> {
         updateOp, updateOp.result().getType(), updateOp.target(),
         updateOp.target_size(), updateOp.target_offset(), updateOp.target_end(),
         sliceOp.source(), sliceOp.source_size(), sliceOp.source_offset(),
-        sliceOp.source_end(), sliceOp.result_size(),
-        updateOp.tied_operandsAttr(), updateOp.affinityAttr());
+        sliceOp.source_end(), sliceOp.result_size(), updateOp.affinityAttr());
     return success();
   }
 };
@@ -1113,7 +1378,6 @@ void AsyncUpdateOp::getCanonicalizationPatterns(
   results.insert<CombineSplatUpdateFromToFill>(context);
   results.insert<CombineSliceUpdateFromToCopy>(context);
   results.insert<ElideUnusedOp<AsyncUpdateOp>>(context);
-  results.insert<MaterializeCOW<AsyncUpdateOp>>(context);
 }
 
 //===----------------------------------------------------------------------===//
@@ -1134,12 +1398,12 @@ struct AsyncCopyFullSourceToUpdate : public OpRewritePattern<AsyncCopyOp> {
   using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(AsyncCopyOp copyOp,
                                 PatternRewriter &rewriter) const override {
-    if (copyOp.source_end() == copyOp.source_size()) {
+    if (copyOp.source_end() == copyOp.source_size() &&
+        copyOp.length() == copyOp.source_size()) {
       rewriter.replaceOpWithNewOp<IREE::Stream::AsyncUpdateOp>(
           copyOp, copyOp.result().getType(), copyOp.target(),
           copyOp.target_size(), copyOp.target_offset(), copyOp.target_end(),
-          copyOp.source(), copyOp.source_size(), copyOp.tied_operandsAttr(),
-          copyOp.affinityAttr());
+          copyOp.source(), copyOp.source_size(), copyOp.affinityAttr());
       return success();
     }
     return failure();
@@ -1152,7 +1416,6 @@ void AsyncCopyOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
                                               MLIRContext *context) {
   results.insert<AsyncCopyFullSourceToUpdate>(context);
   results.insert<ElideUnusedOp<AsyncCopyOp>>(context);
-  results.insert<MaterializeCOW<AsyncCopyOp>>(context);
 }
 
 //===----------------------------------------------------------------------===//
@@ -1160,8 +1423,7 @@ void AsyncCopyOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
 //===----------------------------------------------------------------------===//
 
 OpFoldResult AsyncTransferOp::fold(ArrayRef<Attribute> operands) {
-  if (auto sourceTransferOp =
-          dyn_cast_or_null<AsyncTransferOp>(source().getDefiningOp())) {
+  if (auto sourceTransferOp = source().getDefiningOp<AsyncTransferOp>()) {
     if (sourceTransferOp.source().getType() == result().getType() &&
         sourceTransferOp.source_affinity() == result_affinity()) {
       return sourceTransferOp.source();
@@ -1195,7 +1457,29 @@ void AsyncTransferOp::getCanonicalizationPatterns(
   // TODO(benvanik): staging propagation (fill of staging -> fill on device).
   results.insert<RedundantTransferElision>(context);
   results.insert<ElideUnusedOp<AsyncTransferOp>>(context);
-  results.insert<MaterializeCOW<AsyncTransferOp>>(context);
+}
+
+//===----------------------------------------------------------------------===//
+// stream.async.load
+//===----------------------------------------------------------------------===//
+
+void AsyncLoadOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
+                                              MLIRContext *context) {
+  // TODO(benvanik): splat + load -> splat value.
+  // TODO(benvanik): clone + ex load -> slice (ranged) + load.
+  // TODO(benvanik): slice + ex load -> slice (ranged) + load.
+  // TODO(benvanik): value->transfer->load -> value->slice->transfer->load?
+  // TODO(benvanik): combine multiple loads from the same target if contiguous.
+}
+
+//===----------------------------------------------------------------------===//
+// stream.async.store
+//===----------------------------------------------------------------------===//
+
+void AsyncStoreOp::getCanonicalizationPatterns(
+    OwningRewritePatternList &results, MLIRContext *context) {
+  // TODO(benvanik): if value is a constant splat then turn into fill.
+  // TODO(benvanik): combine multiple stores to the same target if contiguous.
 }
 
 //===----------------------------------------------------------------------===//
@@ -1206,7 +1490,6 @@ void AsyncDispatchOp::getCanonicalizationPatterns(
     OwningRewritePatternList &results, MLIRContext *context) {
   // TODO(benvanik): nothing? maybe tied type/lifetime updates?
   results.insert<ElideUnusedOp<AsyncDispatchOp>>(context);
-  results.insert<MaterializeCOW<AsyncDispatchOp>>(context);
 }
 
 //===----------------------------------------------------------------------===//
@@ -1280,9 +1563,8 @@ struct ChainAsyncExecuteWaits : public OpRewritePattern<AsyncExecuteOp> {
     SmallVector<Value> newTimepoints;
     SmallVector<std::pair<unsigned, Value>> replacements;
     for (auto operand : llvm::enumerate(op.operands())) {
-      if (auto awaitOp = dyn_cast_or_null<TimepointAwaitOp>(
-              operand.value().getDefiningOp())) {
-        newTimepoints.push_back(awaitOp.timepoint());
+      if (auto awaitOp = operand.value().getDefiningOp<TimepointAwaitOp>()) {
+        newTimepoints.push_back(awaitOp.await_timepoint());
         replacements.push_back(std::make_pair(
             operand.index(), awaitOp.getTiedResultOperand(operand.value())));
       }
@@ -1398,7 +1680,6 @@ void AsyncExecuteOp::getCanonicalizationPatterns(
       context);
   results.insert<TieRegionResults<AsyncExecuteOp>>(context);
   results.insert<ElideUnusedOp<AsyncExecuteOp>>(context);
-  results.insert<MaterializeCOW<AsyncExecuteOp>>(context);
 }
 
 //===----------------------------------------------------------------------===//
@@ -1411,7 +1692,6 @@ void AsyncConcurrentOp::getCanonicalizationPatterns(
       context);
   results.insert<TieRegionResults<AsyncConcurrentOp>>(context);
   results.insert<ElideUnusedOp<AsyncConcurrentOp>>(context);
-  results.insert<MaterializeCOW<AsyncConcurrentOp>>(context);
 }
 
 //===----------------------------------------------------------------------===//
@@ -1736,9 +2016,8 @@ struct ChainCmdExecuteWaits : public OpRewritePattern<CmdExecuteOp> {
     SmallVector<Value> newTimepoints;
     SmallVector<std::pair<unsigned, Value>> replacements;
     for (auto operand : llvm::enumerate(op.operands())) {
-      if (auto awaitOp = dyn_cast_or_null<TimepointAwaitOp>(
-              operand.value().getDefiningOp())) {
-        newTimepoints.push_back(awaitOp.timepoint());
+      if (auto awaitOp = operand.value().getDefiningOp<TimepointAwaitOp>()) {
+        newTimepoints.push_back(awaitOp.await_timepoint());
         replacements.push_back(std::make_pair(
             operand.index(), awaitOp.getTiedResultOperand(operand.value())));
       }
@@ -1896,6 +2175,24 @@ OpFoldResult TimepointImmediateOp::fold(ArrayRef<Attribute> operands) {
 }
 
 //===----------------------------------------------------------------------===//
+// stream.timepoint.export
+//===----------------------------------------------------------------------===//
+
+LogicalResult TimepointExportOp::fold(ArrayRef<Attribute> operands,
+                                      SmallVectorImpl<OpFoldResult> &results) {
+  // If the source timepoint comes from an import op we can fold - but only if
+  // the types match.
+  if (auto importOp = dyn_cast_or_null<TimepointImportOp>(
+          await_timepoint().getDefiningOp())) {
+    if (llvm::equal(importOp.getOperandTypes(), getResultTypes())) {
+      llvm::append_range(results, importOp.operands());
+      return success();
+    }
+  }
+  return failure();
+}
+
+//===----------------------------------------------------------------------===//
 // stream.timepoint.join
 //===----------------------------------------------------------------------===//
 
@@ -1904,9 +2201,9 @@ OpFoldResult TimepointJoinOp::fold(ArrayRef<Attribute> operands) {
     // Immediate wait; fold into immediate.
     return IREE::Stream::TimepointAttr::get(getContext(),
                                             getResult().getType());
-  } else if (timepoints().size() == 1) {
+  } else if (await_timepoints().size() == 1) {
     // Join of a single timepoint => that timepoint.
-    return timepoints().front();
+    return await_timepoints().front();
   }
   return {};
 }
@@ -1919,20 +2216,20 @@ struct ElideImmediateTimepointJoinOperands
   LogicalResult matchAndRewrite(TimepointJoinOp op,
                                 PatternRewriter &rewriter) const override {
     SmallVector<Value> newTimepoints;
-    newTimepoints.reserve(op.timepoints().size());
-    for (auto timepoint : op.timepoints()) {
+    newTimepoints.reserve(op.await_timepoints().size());
+    for (auto timepoint : op.await_timepoints()) {
       if (!isa_and_nonnull<TimepointImmediateOp>(timepoint.getDefiningOp())) {
         newTimepoints.push_back(timepoint);
       }
     }
-    if (newTimepoints.size() == op.timepoints().size()) return failure();
+    if (newTimepoints.size() == op.await_timepoints().size()) return failure();
     if (newTimepoints.empty()) {
       // Fully immediate; replace entire join with immediate.
-      rewriter.replaceOpWithNewOp<TimepointImmediateOp>(op,
-                                                        op.result().getType());
+      rewriter.replaceOpWithNewOp<TimepointImmediateOp>(
+          op, op.result_timepoint().getType());
     } else {
       rewriter.updateRootInPlace(
-          op, [&]() { op.timepointsMutable().assign(newTimepoints); });
+          op, [&]() { op.await_timepointsMutable().assign(newTimepoints); });
     }
     return success();
   }
@@ -1944,10 +2241,41 @@ struct FoldDuplicateTimepointJoinOperands
   LogicalResult matchAndRewrite(TimepointJoinOp op,
                                 PatternRewriter &rewriter) const override {
     SetVector<Value> newTimepoints;
-    newTimepoints.insert(op.timepoints().begin(), op.timepoints().end());
-    if (newTimepoints.size() == op.timepoints().size()) return failure();
+    newTimepoints.insert(op.await_timepoints().begin(),
+                         op.await_timepoints().end());
+    if (newTimepoints.size() == op.await_timepoints().size()) return failure();
     rewriter.updateRootInPlace(op, [&]() {
-      op.timepointsMutable().assign(newTimepoints.takeVector());
+      op.await_timepointsMutable().assign(newTimepoints.takeVector());
+    });
+    return success();
+  }
+};
+
+// Expands await timepoints in join ops that come from join ops.
+// Local transformations will often insert joins that end up back-to-back:
+//   %j0 = stream.timepoint.join max(%tp0, %tp1)
+//   %j1 = stream.timepoint.join max(%tp2, %j0, %tp3)
+// Which we want to fold and expand:
+//   %j1 = stream.timepoint.join max(%tp2, %tp0, %tp1, %tp3)
+struct ExpandTimepointJoinOperands : public OpRewritePattern<TimepointJoinOp> {
+  using OpRewritePattern::OpRewritePattern;
+  LogicalResult matchAndRewrite(TimepointJoinOp op,
+                                PatternRewriter &rewriter) const override {
+    SetVector<Value> newTimepoints;
+    bool didExpand = false;
+    for (auto timepoint : op.await_timepoints()) {
+      if (auto sourceJoinOp =
+              dyn_cast_or_null<TimepointJoinOp>(timepoint.getDefiningOp())) {
+        newTimepoints.insert(sourceJoinOp.await_timepoints().begin(),
+                             sourceJoinOp.await_timepoints().end());
+        didExpand = true;
+      } else {
+        newTimepoints.insert(timepoint);
+      }
+    }
+    if (!didExpand) return failure();
+    rewriter.updateRootInPlace(op, [&]() {
+      op.await_timepointsMutable().assign(newTimepoints.takeVector());
     });
     return success();
   }
@@ -1961,6 +2289,7 @@ void TimepointJoinOp::getCanonicalizationPatterns(
   // TODO(benvanik): sink and pull in other timepoints (join on all needed).
   results.insert<ElideImmediateTimepointJoinOperands>(context);
   results.insert<FoldDuplicateTimepointJoinOperands>(context);
+  results.insert<ExpandTimepointJoinOperands>(context);
 }
 
 //===----------------------------------------------------------------------===//
@@ -1983,7 +2312,8 @@ struct ElideImmediateAwaits : public OpRewritePattern<TimepointAwaitOp> {
   using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(TimepointAwaitOp op,
                                 PatternRewriter &rewriter) const override {
-    if (isa_and_nonnull<TimepointImmediateOp>(op.timepoint().getDefiningOp())) {
+    if (isa_and_nonnull<TimepointImmediateOp>(
+            op.await_timepoint().getDefiningOp())) {
       rewriter.replaceOp(op, op.operands());
       return success();
     }
@@ -2049,8 +2379,8 @@ struct SinkSubviewsAcrossAwaits : public OpRewritePattern<TimepointAwaitOp> {
     rewriter.startRootUpdate(op);
     bool didChange = false;
     for (auto operand : llvm::enumerate(op.operands())) {
-      auto subviewOp = dyn_cast_or_null<IREE::Stream::ResourceSubviewOp>(
-          operand.value().getDefiningOp());
+      auto subviewOp =
+          operand.value().getDefiningOp<IREE::Stream::ResourceSubviewOp>();
       if (!subviewOp) continue;
       didChange = true;
       unsigned operandIdx = static_cast<unsigned>(operand.index());
@@ -2099,7 +2429,7 @@ struct GroupAwaitsByTimepoint : public OpRewritePattern<TimepointAwaitOp> {
   LogicalResult matchAndRewrite(TimepointAwaitOp op,
                                 PatternRewriter &rewriter) const override {
     SmallVector<TimepointAwaitOp> coveredOps;
-    for (auto &use : op.timepoint().getUses()) {
+    for (auto &use : op.await_timepoint().getUses()) {
       // TODO(benvanik): make this handle joins/ties; today we get blocked
       // there. We rely on other canonicalizers to sink things such that
       // (hopefully) we get them directly accessible here.
@@ -2138,7 +2468,7 @@ struct GroupAwaitsByTimepoint : public OpRewritePattern<TimepointAwaitOp> {
       llvm::append_range(newOperandSizes, coveredOp.operand_sizes());
     }
     auto newOp = rewriter.create<TimepointAwaitOp>(
-        op.getLoc(), newOperands, newOperandSizes, op.timepoint());
+        op.getLoc(), newOperands, newOperandSizes, op.await_timepoint());
     if (op.affinity().hasValue()) {
       newOp.affinityAttr(op.affinityAttr());
     }
@@ -2189,7 +2519,7 @@ struct FoldDuplicateAwaitResources : public OpRewritePattern<TimepointAwaitOp> {
 
     // Create replacement op with deduped operands/results.
     auto newOp = rewriter.create<IREE::Stream::TimepointAwaitOp>(
-        op.getLoc(), newOperands, newOperandSizes, op.timepoint());
+        op.getLoc(), newOperands, newOperandSizes, op.await_timepoint());
     if (op.affinity().hasValue()) {
       newOp.affinityAttr(op.affinityAttr());
     }

@@ -28,6 +28,8 @@ iree_cc_library(
     "Passes.h.inc"
     "TypeConverter.h"
   SRCS
+    "CaptureDispatchDynamicDims.cpp"
+    "CleanupNumericNarrowing.cpp"
     "ConvertConv2D1x1ToMatmulPass.cpp"
     "ConvertConv2DToImg2ColPass.cpp"
     "ConvertLinalgMatmulToMmt4D.cpp"
@@ -35,16 +37,13 @@ iree_cc_library(
     "DeduplicateExecutables.cpp"
     "DestructiveUpdateUtils.cpp"
     "DispatchLinalgOnTensors.cpp"
-    "ExpandGlobalDynamicDims.cpp"
     "ExportBenchmarkFuncs.cpp"
-    "FormStreams.cpp"
     "FusionOfTensorOps.cpp"
-    "HoistUnstreamableOps.cpp"
+    "InferNumericNarrowing.cpp"
     "InjectDispatchTracing.cpp"
-    "InsertConstantClones.cpp"
     "InterchangeGenericOps.cpp"
+    "OptimizeNumerics.cpp"
     "OutlineDispatchRegions.cpp"
-    "OutlineLargeConstants.cpp"
     "PadLinalgOps.cpp"
     "PadTensorToSubTensorInsert.cpp"
     "PassDetail.h"
@@ -52,12 +51,16 @@ iree_cc_library(
     "PromoteI1ToI8Pass.cpp"
     "StripAndSplatConstantVariables.cpp"
     "StripSignednessPass.cpp"
+    "TestPartitionableLoopsInterface.cpp"
     "TypeConverter.cpp"
     "VerifyInputLegality.cpp"
   DEPS
     ::PassesIncGen
+    IREELinalgExtDialect
+    IREELinalgExtPasses
     LLVMSupport
     MLIRAffine
+    MLIRArithmetic
     MLIRIR
     MLIRLinalg
     MLIRLinalgTransforms
@@ -73,12 +76,11 @@ iree_cc_library(
     MLIRTransforms
     iree::compiler::Dialect::Flow::Conversion::TensorToFlow
     iree::compiler::Dialect::Flow::IR
+    iree::compiler::Dialect::Flow::IR::PartitionableLoopsInterface
     iree::compiler::Dialect::HAL::IR
-    iree::compiler::Dialect::LinalgExt::IR
-    iree::compiler::Dialect::LinalgExt::Transforms
-    iree::compiler::Dialect::Shape::IR
-    iree::compiler::Dialect::Shape::Transforms
-    iree::compiler::Dialect::Shape::Utils::TypeConversion
+    iree::compiler::Dialect::Util::Analysis
+    iree::compiler::Dialect::Util::Analysis::Attributes
+    iree::compiler::Dialect::Util::Analysis::DFX
     iree::compiler::Dialect::Util::IR
     iree::compiler::Dialect::Util::Transforms
     iree::compiler::Utils

@@ -31,6 +31,8 @@ include(CMakeParseArguments)
 #   MODULE_FILE_NAME: specifies the absolute path to the filename to use for the
 #       generated IREE module (.vmfb). Mandatory, unlike in iree_check_test,
 #       because trace files (.yaml) reference a specific module file path.
+#   TARGET_CPU_FEATURES: If specified, a string passed as argument to
+#       --iree-llvm-target-cpu-features.
 function(iree_trace_runner_test)
   if(NOT IREE_BUILD_TESTS)
     return()
@@ -45,7 +47,7 @@ function(iree_trace_runner_test)
     _RULE
     ""
     "NAME;SRC;TRACE;TARGET_BACKEND;DRIVER;OPT_TOOL;TRACE_RUNNER;MODULE_FILE_NAME"
-    "COMPILER_FLAGS;RUNNER_ARGS;LABELS;OPT_FLAGS"
+    "COMPILER_FLAGS;RUNNER_ARGS;LABELS;OPT_FLAGS;TARGET_CPU_FEATURES"
     ${ARGN}
   )
 
@@ -69,6 +71,8 @@ function(iree_trace_runner_test)
       ${_RULE_OPT_TOOL}
     OPT_FLAGS
       ${_RULE_OPT_FLAGS}
+    TARGET_CPU_FEATURES
+      ${_RULE_TARGET_CPU_FEATURES}
   )
 
   # iree_bytecode_module does not define a target, only a custom command.
@@ -92,12 +96,12 @@ function(iree_trace_runner_test)
     "${_RULE_TRACE_RUNNER}"
   )
 
-  iree_run_binary_test(
+  iree_native_test(
     NAME
       "${_RULE_NAME}"
     DRIVER
       "${_RULE_DRIVER}"
-    TEST_BINARY
+    SRC
       "${_RULE_TRACE_RUNNER}"
     TEST_INPUT_FILE_ARG
       ${_RULE_TRACE}
@@ -107,6 +111,7 @@ function(iree_trace_runner_test)
       ${_RULE_RUNNER_ARGS}
     LABELS
       ${_RULE_LABELS}
+      ${_RULE_TARGET_CPU_FEATURES}
   )
 endfunction()
 
@@ -138,6 +143,8 @@ endfunction()
 #   OPT_FLAGS: If specified, source files are preprocessed with OPT_TOOL with
 #       these flags.
 #   TRACE_RUNNER: trace-runner program to run.
+#   TARGET_CPU_FEATURES: If specified, a string passed as argument to
+#       --iree-llvm-target-cpu-features.
 function(iree_single_backend_generated_trace_runner_test)
   if(NOT IREE_BUILD_TESTS)
     return()
@@ -159,22 +166,24 @@ function(iree_single_backend_generated_trace_runner_test)
     _RULE
     ""
     "NAME;GENERATOR;TARGET_BACKEND;DRIVER;OPT_TOOL;TRACE_RUNNER"
-    "GENERATOR_ARGS;COMPILER_FLAGS;RUNNER_ARGS;LABELS;OPT_FLAGS"
+    "GENERATOR_ARGS;COMPILER_FLAGS;RUNNER_ARGS;LABELS;OPT_FLAGS;TARGET_CPU_FEATURES"
     ${ARGN}
   )
 
   # Omit tests for which the specified driver or target backend is not enabled.
   # This overlaps with directory exclusions and other filtering mechanisms.
   string(TOUPPER ${_RULE_DRIVER} _UPPERCASE_DRIVER)
-  if(NOT DEFINED IREE_HAL_DRIVER_${_UPPERCASE_DRIVER})
-    message(SEND_ERROR "Unknown driver '${_RULE_DRIVER}'. Check IREE_ALL_HAL_DRIVERS.")
+  string(REPLACE "-" "_" _NORMALIZED_DRIVER ${_UPPERCASE_DRIVER})
+  if(NOT DEFINED IREE_HAL_DRIVER_${_NORMALIZED_DRIVER})
+    message(SEND_ERROR "Unknown driver '${_RULE_DRIVER}'. Check IREE_HAL_DRIVER_* options.")
   endif()
-  if(NOT IREE_HAL_DRIVER_${_UPPERCASE_DRIVER})
+  if(NOT IREE_HAL_DRIVER_${_NORMALIZED_DRIVER})
     return()
   endif()
   string(TOUPPER ${_RULE_TARGET_BACKEND} _UPPERCASE_TARGET_BACKEND)
-  if(NOT DEFINED IREE_TARGET_BACKEND_${_UPPERCASE_TARGET_BACKEND})
-    message(SEND_ERROR "Unknown backend '${_RULE_TARGET_BACKEND}'. Check IREE_ALL_TARGET_BACKENDS.")
+  string(REPLACE "-" "_" _NORMALIZED_TARGET_BACKEND ${_UPPERCASE_TARGET_BACKEND})
+  if(NOT DEFINED IREE_TARGET_BACKEND_${_NORMALIZED_TARGET_BACKEND})
+    message(SEND_ERROR "Unknown backend '${_RULE_TARGET_BACKEND}'. Check IREE_TARGET_BACKEND_* options.")
   endif()
   if(DEFINED IREE_HOST_BINARY_ROOT)
     # If we're not building the host tools from source under this configuration,
@@ -183,7 +192,7 @@ function(iree_single_backend_generated_trace_runner_test)
     # rely on the runtime HAL driver check above for filtering.
   else()
     # We are building the host tools, so check enabled compiler target backends.
-    if(NOT IREE_TARGET_BACKEND_${_UPPERCASE_TARGET_BACKEND})
+    if(NOT IREE_TARGET_BACKEND_${_NORMALIZED_TARGET_BACKEND})
       return()
     endif()
   endif()
@@ -244,6 +253,8 @@ function(iree_single_backend_generated_trace_runner_test)
       ${_RULE_OPT_TOOL}
     OPT_FLAGS
       ${_RULE_OPT_FLAGS}
+    TARGET_CPU_FEATURES
+      ${_RULE_TARGET_CPU_FEATURES}
   )
 
   # Note we are relying on the fact that the target created by
@@ -289,6 +300,12 @@ endfunction()
 #   OPT_FLAGS: If specified, source files are preprocessed with OPT_TOOL with
 #       these flags.
 #   TRACE_RUNNER: trace-runner program to run.
+#   TARGET_CPU_FEATURES_VARIANTS: list of target cpu features variants. Only used
+#       for drivers that vary based on the target CPU features. For each list
+#       element, a separate test is created, with the list element passed as
+#       argument to --iree-llvm-target-cpu-features. The special value "default"
+#       is interpreted as no --iree-llvm-target-cpu-features flag to work around
+#       corner cases with empty entries in CMake lists.
 function(iree_generated_trace_runner_test)
   if(NOT IREE_BUILD_TESTS)
     return()
@@ -298,7 +315,7 @@ function(iree_generated_trace_runner_test)
     _RULE
     ""
     "NAME;GENERATOR;OPT_TOOL;TRACE_RUNNER"
-    "TARGET_BACKENDS;DRIVERS;GENERATOR_ARGS;COMPILER_FLAGS;RUNNER_ARGS;LABELS;OPT_FLAGS"
+    "TARGET_BACKENDS;DRIVERS;GENERATOR_ARGS;COMPILER_FLAGS;RUNNER_ARGS;LABELS;OPT_FLAGS;TARGET_CPU_FEATURES_VARIANTS"
     ${ARGN}
   )
 
@@ -319,30 +336,43 @@ function(iree_generated_trace_runner_test)
   foreach(_INDEX RANGE "${_MAX_INDEX}")
     list(GET _RULE_TARGET_BACKENDS ${_INDEX} _TARGET_BACKEND)
     list(GET _RULE_DRIVERS ${_INDEX} _DRIVER)
-    set(_SINGLE_BACKEND_TEST_NAME "${_RULE_NAME}_${_TARGET_BACKEND}_${_DRIVER}")
-    iree_single_backend_generated_trace_runner_test(
-      NAME
-        ${_SINGLE_BACKEND_TEST_NAME}
-      GENERATOR
-        ${_RULE_GENERATOR}
-      GENERATOR_ARGS
-        ${_RULE_GENERATOR_ARGS}
-      TRACE_RUNNER
-        ${_RULE_TRACE_RUNNER}
-      TARGET_BACKEND
-        ${_TARGET_BACKEND}
-      DRIVER
-        ${_DRIVER}
-      COMPILER_FLAGS
-        ${_RULE_COMPILER_FLAGS}
-      RUNNER_ARGS
-        ${_RULE_RUNNER_ARGS}
-      LABELS
-        ${_RULE_LABELS}
-      OPT_TOOL
-        ${_RULE_OPT_TOOL}
-      OPT_FLAGS
-        ${_RULE_OPT_FLAGS}
-    )
+    if (_TARGET_BACKEND STREQUAL "dylib-llvm-aot" AND _RULE_TARGET_CPU_FEATURES_VARIANTS)
+      set(_TARGET_CPU_FEATURES_VARIANTS "${_RULE_TARGET_CPU_FEATURES_VARIANTS}")
+    else()
+      set(_TARGET_CPU_FEATURES_VARIANTS "default")
+    endif()
+    foreach(_TARGET_CPU_FEATURES_LIST_ELEM IN LISTS _TARGET_CPU_FEATURES_VARIANTS)
+      process_target_cpu_features("${_TARGET_CPU_FEATURES_LIST_ELEM}" _ENABLED _TARGET_CPU_FEATURES _TARGET_CPU_FEATURES_SUFFIX)
+      if (NOT _ENABLED)
+        # The current entry is disabled on the target CPU architecture.
+        continue()
+      endif()
+      iree_single_backend_generated_trace_runner_test(
+        NAME
+          "${_RULE_NAME}_${_TARGET_BACKEND}_${_DRIVER}${_TARGET_CPU_FEATURES_SUFFIX}"
+        GENERATOR
+          ${_RULE_GENERATOR}
+        GENERATOR_ARGS
+          ${_RULE_GENERATOR_ARGS}
+        TRACE_RUNNER
+          ${_RULE_TRACE_RUNNER}
+        TARGET_BACKEND
+          ${_TARGET_BACKEND}
+        DRIVER
+          ${_DRIVER}
+        COMPILER_FLAGS
+          ${_RULE_COMPILER_FLAGS}
+        RUNNER_ARGS
+          ${_RULE_RUNNER_ARGS}
+        LABELS
+          ${_RULE_LABELS}
+        OPT_TOOL
+          ${_RULE_OPT_TOOL}
+        OPT_FLAGS
+          ${_RULE_OPT_FLAGS}
+        TARGET_CPU_FEATURES
+          ${_TARGET_CPU_FEATURES}
+      )
+    endforeach()
   endforeach()
 endfunction()

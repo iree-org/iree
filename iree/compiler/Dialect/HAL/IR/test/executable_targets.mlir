@@ -1,4 +1,4 @@
-// RUN: iree-opt -allow-unregistered-dialect -split-input-file %s | iree-opt -allow-unregistered-dialect -split-input-file | IreeFileCheck %s
+// RUN: iree-opt -allow-unregistered-dialect -split-input-file %s | iree-opt -allow-unregistered-dialect -split-input-file | FileCheck %s
 
 //      CHECK: #executable_target_vmvx_bytecode_fb = #hal.executable.target<"vmvx", "vmvx-bytecode-fb">
 //      CHECK: #executable_target_vulkan_spirv_fb0 = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb">

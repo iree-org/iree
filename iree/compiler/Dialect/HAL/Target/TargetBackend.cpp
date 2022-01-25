@@ -17,7 +17,7 @@ namespace iree_compiler {
 namespace IREE {
 namespace HAL {
 
-TargetOptions getTargetOptionsFromFlags() {
+void TargetOptions::bindOptions(OptionsBinder &binder) {
   static llvm::cl::OptionCategory halTargetOptionsCategory(
       "IREE HAL executable target options");
 
@@ -25,15 +25,10 @@ TargetOptions getTargetOptionsFromFlags() {
   // TranslateExecutablesPass. Pass registery is also staticly
   // initialized, so targetBackendsFlags needs to be here to be initialized
   // first.
-  static llvm::cl::list<std::string> *targetBackendsFlag =
-      new llvm::cl::list<std::string>{
-          "iree-hal-target-backends",
-          llvm::cl::desc("Target backends for executable compilation"),
-          llvm::cl::ZeroOrMore, llvm::cl::cat(halTargetOptionsCategory)};
-
-  TargetOptions targetOptions;
-  targetOptions.targets = *targetBackendsFlag;
-  return targetOptions;
+  binder.list<std::string>(
+      "iree-hal-target-backends", targets,
+      llvm::cl::desc("Target backends for executable compilation"),
+      llvm::cl::ZeroOrMore, llvm::cl::cat(halTargetOptionsCategory));
 }
 
 // Renames |op| within |moduleOp| with a new name that is unique within both
@@ -61,6 +56,9 @@ static void renameWithDisambiguatedName(
   symbolUsers.replaceAllUsesWith(op, nameAttr);
   SymbolTable::setSymbolName(op, disambiguatedName);
 }
+
+// TODO(benvanik): replace with iree/compiler/Utils/ModuleUtils.h version.
+// Only difference is one has the symbol map that we don't even need.
 
 // Destructively merges |sourceModuleOp| into |targetModuleOp|.
 // |targetSymbolMap| is updated with the new symbols.
@@ -143,8 +141,9 @@ static LogicalResult mergeModuleInto(
 static void replaceEntryPointUses(
     mlir::ModuleOp moduleOp,
     const DenseMap<Attribute, Attribute> &replacements) {
-  for (auto funcOp : moduleOp.getOps<mlir::FuncOp>()) {
-    funcOp.walk([&](IREE::HAL::CommandBufferDispatchSymbolOp dispatchOp) {
+  for (Operation &funcLikeOp : moduleOp.getOps()) {
+    if (!funcLikeOp.hasTrait<OpTrait::FunctionLike>()) continue;
+    funcLikeOp.walk([&](IREE::HAL::CommandBufferDispatchSymbolOp dispatchOp) {
       auto it = replacements.find(dispatchOp.entry_point());
       if (it != replacements.end()) {
         dispatchOp.entry_pointAttr(it->second.cast<SymbolRefAttr>());
@@ -160,13 +159,10 @@ LogicalResult TargetBackend::linkExecutablesInto(
     IREE::HAL::ExecutableVariantOp linkedTargetOp,
     std::function<Operation *(mlir::ModuleOp moduleOp)> getInnerModuleFn,
     OpBuilder &builder) {
-  llvm::SmallVector<IREE::HAL::InterfaceOp, 4> linkedInterfaceOps;
   int nextEntryPointOrdinal = 0;
   DenseMap<StringRef, Operation *> targetSymbolMap;
   DenseMap<Attribute, Attribute> entryPointRefReplacements;
 
-  auto linkedExecutableBuilder =
-      OpBuilder::atBlockBegin(linkedExecutableOp.getBody());
   auto linkedTargetBuilder = OpBuilder::atBlockBegin(linkedTargetOp.getBody());
   auto linkedModuleOp = getInnerModuleFn(linkedTargetOp.getInnerModule());
 
@@ -182,35 +178,11 @@ LogicalResult TargetBackend::linkExecutablesInto(
       // symbol refs.
       for (auto entryPointOp :
            variantOp.getOps<IREE::HAL::ExecutableEntryPointOp>()) {
-        // Lookup the interface used by this entry point.
-        auto sourceInterfaceOp =
-            SymbolTable::lookupNearestSymbolFrom<IREE::HAL::InterfaceOp>(
-                sourceExecutableOp, entryPointOp.interfaceAttr());
-        assert(sourceInterfaceOp && "cannot find source interface");
-        IREE::HAL::InterfaceOp linkedInterfaceOp;
-        for (auto interfaceOp : linkedInterfaceOps) {
-          if (interfaceOp.isEquivalentTo(sourceInterfaceOp)) {
-            linkedInterfaceOp = interfaceOp;
-            break;
-          }
-        }
-        if (!linkedInterfaceOp) {
-          linkedInterfaceOp = dyn_cast<IREE::HAL::InterfaceOp>(
-              linkedExecutableBuilder.clone(*sourceInterfaceOp));
-          mlir::StringAttr nameAttr = mlir::StringAttr::get(
-              linkedInterfaceOp.getContext(),
-              llvm::formatv("io_{0}", linkedInterfaceOps.size()).str());
-          linkedInterfaceOp.setName(nameAttr);
-          linkedInterfaceOps.push_back(linkedInterfaceOp);
-        }
-
         auto newEntryPointOp =
             linkedTargetBuilder.create<IREE::HAL::ExecutableEntryPointOp>(
                 entryPointOp.getLoc(), entryPointOp.sym_nameAttr(),
                 builder.getIndexAttr(nextEntryPointOrdinal++),
-                SymbolRefAttr::get(builder.getContext(),
-                                   linkedInterfaceOp.getName()),
-                ArrayAttr{}, IntegerAttr{});
+                entryPointOp.layout(), ArrayAttr{}, IntegerAttr{});
 
         // Add to replacement table for fixing up dispatch calls referencing
         // this entry point.

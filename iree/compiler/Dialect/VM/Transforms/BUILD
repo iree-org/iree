@@ -25,7 +25,6 @@ cc_library(
         "Passes.h",
     ],
     deps = [
-        "//iree/compiler/Dialect/Shape/IR",
         "//iree/compiler/Dialect/Util/Conversion",
         "//iree/compiler/Dialect/Util/IR",
         "//iree/compiler/Dialect/VM/Conversion",

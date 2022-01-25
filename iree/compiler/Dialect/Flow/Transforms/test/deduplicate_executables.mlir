@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -iree-flow-deduplicate-executables %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -iree-flow-deduplicate-executables %s | FileCheck %s
 
 // CHECK-LABEL: flow.executable public @single_executable_ex_0
 flow.executable @single_executable_ex_0 {
@@ -128,16 +128,31 @@ flow.executable @multiple_entry_points_ex_1 {
 }
 // CHECK-LABEL: func @multiple_entry_points
 func @multiple_entry_points(%arg0: tensor<4xf32>) -> tensor<4xf32> {
+  // CHECK: %[[C4:.*]] = arith.constant 4
   %c4 = arith.constant 4 : index
-  // CHECK: %0 = flow.dispatch @multiple_entry_points_ex_0::@multiple_entry_points_0_entry_0[%c4](%arg0) : (tensor<4xf32>) -> tensor<4xf32>
+  // CHECK:      {{.*}} = flow.dispatch @multiple_entry_points_ex_0::@multiple_entry_points_0_entry_0[%[[C4]]](%arg0) : (tensor<4xf32>) -> tensor<4xf32>
   %0 = flow.dispatch @multiple_entry_points_ex_0::@multiple_entry_points_0_entry_0[%c4] (%arg0) : (tensor<4xf32>) -> tensor<4xf32>
-  // CHECK: %1 = flow.dispatch @multiple_entry_points_ex_0::@multiple_entry_points_0_entry_1[%c4](%arg0) : (tensor<4xf32>) -> tensor<4xf32>
+  // CHECK-NEXT: {{.*}} = flow.dispatch @multiple_entry_points_ex_0::@multiple_entry_points_0_entry_1[%[[C4]]](%arg0) : (tensor<4xf32>) -> tensor<4xf32>
   %1 = flow.dispatch @multiple_entry_points_ex_0::@multiple_entry_points_0_entry_1[%c4] (%arg0) : (tensor<4xf32>) -> tensor<4xf32>
-  // CHECK: %2 = flow.dispatch @multiple_entry_points_ex_0::@multiple_entry_points_0_entry_0[%c4](%arg0) : (tensor<4xf32>) -> tensor<4xf32>
+  // CHECK-NEXT: {{.*}} = flow.dispatch @multiple_entry_points_ex_0::@multiple_entry_points_0_entry_0[%[[C4]]](%arg0) : (tensor<4xf32>) -> tensor<4xf32>
   %2 = flow.dispatch @multiple_entry_points_ex_1::@multiple_entry_points_1_entry_0[%c4] (%arg0) : (tensor<4xf32>) -> tensor<4xf32>
-  // CHECK: %3 = flow.dispatch @multiple_entry_points_ex_0::@multiple_entry_points_0_entry_1[%c4](%arg0) : (tensor<4xf32>) -> tensor<4xf32>
+  // CHECK-NEXT: {{.*}} = flow.dispatch @multiple_entry_points_ex_0::@multiple_entry_points_0_entry_1[%[[C4]]](%arg0) : (tensor<4xf32>) -> tensor<4xf32>
   %3 = flow.dispatch @multiple_entry_points_ex_1::@multiple_entry_points_1_entry_1[%c4] (%arg0) : (tensor<4xf32>) -> tensor<4xf32>
   return %0 : tensor<4xf32>
+}
+
+// Ensure that symbol renaming is done within initializers.
+util.global private @result : tensor<4xf32>
+// CHECK: util.initializer
+util.initializer {
+  // CHECK: %[[C4:.*]] = arith.constant 4
+  %c4 = arith.constant 4 : index
+  // CHECK: %[[CST:.*]] = arith.constant dense<1.000000e+00>
+  %cst = arith.constant dense<1.000000e+00> : tensor<4xf32>
+  // CHECK: {{.*}} = flow.dispatch @multiple_entry_points_ex_0::@multiple_entry_points_0_entry_1[%[[C4]]](%[[CST]]) : (tensor<4xf32>) -> tensor<4xf32>
+  %0 = flow.dispatch @multiple_entry_points_ex_1::@multiple_entry_points_1_entry_1[%c4] (%cst) : (tensor<4xf32>) -> tensor<4xf32>
+  util.global.store %0, @result : tensor<4xf32>
+  util.initializer.return
 }
 
 // -----
@@ -253,15 +268,15 @@ flow.executable @attributes_ex_0 {
 flow.executable @attributes_ex_1 {
   flow.dispatch.entry @attributes_entry_1
   builtin.module {
-    func @attributes_entry_1(%input: tensor<1x4xi32>) -> tensor<1xi32> {
+    func @attributes_entry_1(%input: tensor<1x4xi32>) -> tensor<4xi32> {
       %0 = arith.constant dense<0> : tensor<i32>
       %1 = "mhlo.reduce"(%input, %0) ( {
       ^bb0(%arg0: tensor<i32>, %arg1: tensor<i32>):   // no predecessors
         %3 = "mhlo.maximum"(%arg0, %arg1) : (tensor<i32>, tensor<i32>) -> tensor<i32>
         "mhlo.return"(%3) : (tensor<i32>) -> ()
         // @attributes_ex_0 but with a different attribute.
-      }) {dimensions = dense<2> : tensor<1xi64>} : (tensor<1x4xi32>, tensor<i32>) -> tensor<1xi32>
-      return %1 : tensor<1xi32>
+      }) {dimensions = dense<0> : tensor<1xi64>} : (tensor<1x4xi32>, tensor<i32>) -> tensor<4xi32>
+      return %1 : tensor<4xi32>
     }
   }
 }

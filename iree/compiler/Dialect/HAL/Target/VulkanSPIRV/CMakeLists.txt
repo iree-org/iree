@@ -8,7 +8,7 @@
 # To disable autogeneration for this file entirely, delete this header.        #
 ################################################################################
 
-if(NOT "${IREE_TARGET_BACKEND_VULKAN-SPIRV}")
+if(NOT "${IREE_TARGET_BACKEND_VULKAN_SPIRV}")
   return()
 endif()
 
@@ -23,21 +23,18 @@ iree_cc_library(
     "VulkanSPIRVTarget.cpp"
   DEPS
     LLVMSupport
-    MLIRAffine
     MLIRGPUOps
     MLIRIR
-    MLIRLinalg
     MLIRParser
     MLIRSPIRV
     MLIRSPIRVModuleCombiner
     MLIRSPIRVSerialization
     MLIRSupport
-    MLIRVector
     iree::compiler::Codegen::Common
+    iree::compiler::Codegen::Dialect::IREECodegenDialect
     iree::compiler::Codegen::PassHeaders
     iree::compiler::Codegen::SPIRV
     iree::compiler::Codegen::Utils
-    iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::HAL::Target
     iree::compiler::Dialect::Vulkan::IR
     iree::compiler::Dialect::Vulkan::Utils

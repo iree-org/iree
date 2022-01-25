@@ -7,11 +7,11 @@
 #ifndef IREE_HAL_CTS_CTS_TEST_BASE_H_
 #define IREE_HAL_CTS_CTS_TEST_BASE_H_
 
-#include <map>
-#include <mutex>
 #include <set>
+#include <string>
 
 #include "iree/base/api.h"
+#include "iree/base/string_view.h"
 #include "iree/hal/api.h"
 #include "iree/testing/gtest.h"
 #include "iree/testing/status_matchers.h"
@@ -20,17 +20,27 @@ namespace iree {
 namespace hal {
 namespace cts {
 
-// Common setup for tests parameterized across all registered drivers.
+// Registers the driver that will be used with INSTANTIATE_TEST_SUITE_P.
+// Leaf test binaries must implement this function.
+iree_status_t register_test_driver(iree_hal_driver_registry_t* registry);
+
+// Returns the executable format for the driver under test.
+// Leaf test binaries must implement this function.
+const char* get_test_executable_format();
+
+// Returns a file's executable data for the driver under test.
+// Leaf test binaries must implement this function.
+iree_const_byte_span_t get_test_executable_data(iree_string_view_t file_name);
+
+// Common setup for tests parameterized on driver names.
 class CtsTestBase : public ::testing::TestWithParam<std::string> {
  protected:
+  static void SetUpTestSuite() {
+    IREE_CHECK_OK(register_test_driver(iree_hal_driver_registry_default()));
+  }
+
   virtual void SetUp() {
     const std::string& driver_name = GetParam();
-    if (driver_block_list_.find(driver_name) != driver_block_list_.end()) {
-      IREE_LOG(WARNING) << "Skipping test as '" << driver_name
-                        << "' driver is explicitly disabled for this test";
-      GTEST_SKIP();
-      return;
-    }
 
     // Get driver with the given name and create its default device.
     // Skip drivers that are (gracefully) unavailable, fail if creation fails.
@@ -38,11 +48,12 @@ class CtsTestBase : public ::testing::TestWithParam<std::string> {
     iree_status_t status = TryGetDriver(driver_name, &driver);
     if (iree_status_is_unavailable(status)) {
       iree_status_free(status);
-      IREE_LOG(WARNING) << "Skipping test as << '" << driver_name
+      IREE_LOG(WARNING) << "Skipping test as '" << driver_name
                         << "' driver is unavailable";
       GTEST_SKIP();
       return;
     }
+    IREE_ASSERT_OK(status);
     driver_ = driver;
 
     iree_hal_device_t* device;
@@ -66,15 +77,15 @@ class CtsTestBase : public ::testing::TestWithParam<std::string> {
   virtual void TearDown() {
     if (device_allocator_) {
       iree_hal_allocator_release(device_allocator_);
-      device_allocator_ = nullptr;
+      device_allocator_ = NULL;
     }
     if (device_) {
       iree_hal_device_release(device_);
-      device_ = nullptr;
+      device_ = NULL;
     }
     if (driver_) {
       iree_hal_driver_release(driver_);
-      driver_ = nullptr;
+      driver_ = NULL;
     }
   }
 
@@ -119,17 +130,9 @@ class CtsTestBase : public ::testing::TestWithParam<std::string> {
     return status;
   }
 
-  iree_hal_driver_t* driver_ = nullptr;
-  iree_hal_device_t* device_ = nullptr;
-  iree_hal_allocator_t* device_allocator_ = nullptr;
-  // Allow skipping tests for driver under development.
-  void declareUnimplementedDriver(const std::string& driver_name) {
-    driver_block_list_.insert(driver_name);
-  }
-  // Allow skipping tests for unsupported features.
-  void SkipUnavailableDriver(const std::string& driver_name) {
-    driver_block_list_.insert(driver_name);
-  }
+  iree_hal_driver_t* driver_ = NULL;
+  iree_hal_device_t* device_ = NULL;
+  iree_hal_allocator_t* device_allocator_ = NULL;
 
  private:
   // Gets a HAL driver with the provided name, if available.
@@ -157,7 +160,6 @@ class CtsTestBase : public ::testing::TestWithParam<std::string> {
     }
     return status;
   }
-  std::set<std::string> driver_block_list_;
 };
 
 struct GenerateTestName {

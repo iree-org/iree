@@ -14,6 +14,8 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
+    "capture_dispatch_dynamic_dims.mlir"
+    "cleanup_numeric_narrowing.mlir"
     "conv1x1_to_matmul.mlir"
     "conv2d_to_img2col.mlir"
     "convert_linalg_tensor_ops_after.mlir"
@@ -22,25 +24,23 @@ iree_lit_test_suite(
     "dispatch_linalg_on_tensors.mlir"
     "dispatch_linalg_on_tensors_elementwise.mlir"
     "dispatch_linalg_on_tensors_fusion.mlir"
-    "expand_global_shape_dims.mlir"
     "export_benchmark_funcs.mlir"
-    "form_streams.mlir"
-    "hoist_unstreamable_ops.mlir"
+    "infer_numeric_narrowing.mlir"
     "inject_dispatch_tracing.mlir"
-    "insert_constant_clones.mlir"
     "interchange_generic_ops.mlir"
     "matmul_to_mmt4d.mlir"
+    "optimize_numerics.mlir"
     "outline_dispatch_regions.mlir"
-    "outline_large_constants.mlir"
     "pad_linalg_ops.mlir"
     "pad_tensor_to_tensor.mlir"
     "promote_i1_to_i8.mlir"
     "strip_and_splat_constant_variables.mlir"
     "strip_signedness.mlir"
+    "test_partitionable_loops_interface.mlir"
     "transformation.mlir"
     "verify_input_ir.mlir"
-  DATA
-    iree::tools::IreeFileCheck
+  TOOLS
+    FileCheck
     iree::tools::iree-opt
 )
 

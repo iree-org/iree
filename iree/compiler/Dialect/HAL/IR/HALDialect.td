@@ -36,6 +36,8 @@ def HAL_Dialect : Dialect {
     resolution) or that certain features are unsafe to expose to user-defined
     input.
   }];
+
+  let useDefaultAttributePrinterParser = 0;
 }
 
 #endif // IREE_DIALECT_HAL_DIALECT

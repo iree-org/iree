@@ -1,6 +1,4 @@
-// Tests printing and parsing of global ops.
-
-// RUN: iree-opt -split-input-file %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file %s | FileCheck %s
 
 // CHECK-LABEL: @global_load_i32
 vm.module @my_module {

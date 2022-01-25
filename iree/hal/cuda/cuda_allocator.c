@@ -16,14 +16,16 @@
 
 typedef struct iree_hal_cuda_allocator_t {
   iree_hal_resource_t resource;
+  iree_hal_device_t* base_device;
   iree_hal_cuda_context_wrapper_t* context;
   CUdevice device;
   CUstream stream;
+  bool supports_concurrent_managed_access;
 
   IREE_STATISTICS(iree_hal_allocator_statistics_t statistics;)
 } iree_hal_cuda_allocator_t;
 
-extern const iree_hal_allocator_vtable_t iree_hal_cuda_allocator_vtable;
+static const iree_hal_allocator_vtable_t iree_hal_cuda_allocator_vtable;
 
 static iree_hal_cuda_allocator_t* iree_hal_cuda_allocator_cast(
     iree_hal_allocator_t* base_value) {
@@ -32,19 +34,45 @@ static iree_hal_cuda_allocator_t* iree_hal_cuda_allocator_cast(
 }
 
 iree_status_t iree_hal_cuda_allocator_create(
-    iree_hal_cuda_context_wrapper_t* context, CUdevice device, CUstream stream,
-    iree_hal_allocator_t** out_allocator) {
+    iree_hal_device_t* base_device, iree_hal_cuda_context_wrapper_t* context,
+    CUdevice device, CUstream stream, iree_hal_allocator_t** out_allocator) {
+  IREE_ASSERT_ARGUMENT(base_device);
   IREE_ASSERT_ARGUMENT(context);
   IREE_TRACE_ZONE_BEGIN(z0);
+
+  // To support device-local + host-visible memory we need concurrent managed
+  // access indicating that the host and devices can concurrently access the
+  // device memory. If we don't have this feature then we fall back to forcing
+  // all device-local + host-visible memory into host-local + device-visible
+  // page-locked memory. The compiler tries to avoid this for high-traffic
+  // buffers except for readback staging buffers.
+  int supports_concurrent_managed_access = 0;
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, CU_RESULT_TO_STATUS(
+              context->syms,
+              cuDeviceGetAttribute(
+                  &supports_concurrent_managed_access,
+                  CU_DEVICE_ATTRIBUTE_CONCURRENT_MANAGED_ACCESS, device),
+              "cuDeviceGetAttribute"));
+
+  IREE_TRACE_ZONE_APPEND_TEXT(
+      z0, supports_concurrent_managed_access
+              ? "has CONCURRENT_MANAGED_ACCESS"
+              : "no CONCURRENT_MANAGED_ACCESS (expect slow accesses on "
+                "device-local + host-visible memory)");
+
   iree_hal_cuda_allocator_t* allocator = NULL;
   iree_status_t status = iree_allocator_malloc(
       context->host_allocator, sizeof(*allocator), (void**)&allocator);
   if (iree_status_is_ok(status)) {
     iree_hal_resource_initialize(&iree_hal_cuda_allocator_vtable,
                                  &allocator->resource);
+    allocator->base_device = base_device;
     allocator->context = context;
     allocator->device = device;
     allocator->stream = stream;
+    allocator->supports_concurrent_managed_access =
+        supports_concurrent_managed_access != 0;
     *out_allocator = (iree_hal_allocator_t*)allocator;
   }
 
@@ -69,6 +97,11 @@ static iree_allocator_t iree_hal_cuda_allocator_host_allocator(
   iree_hal_cuda_allocator_t* allocator =
       (iree_hal_cuda_allocator_t*)base_allocator;
   return allocator->context->host_allocator;
+}
+
+static iree_status_t iree_hal_cuda_allocator_trim(
+    iree_hal_allocator_t* base_allocator) {
+  return iree_ok_status();
 }
 
 static void iree_hal_cuda_allocator_query_statistics(
@@ -111,19 +144,49 @@ iree_hal_cuda_allocator_query_buffer_compatibility(
   return compatibility;
 }
 
+static void iree_hal_cuda_buffer_free(iree_hal_cuda_context_wrapper_t* context,
+                                      iree_hal_memory_type_t memory_type,
+                                      CUdeviceptr device_ptr, void* host_ptr) {
+  IREE_TRACE_ZONE_BEGIN(z0);
+  if (iree_all_bits_set(memory_type, IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL)) {
+    // Device local.
+    CUDA_IGNORE_ERROR(context->syms, cuMemFree(device_ptr));
+  } else {
+    // Host local.
+    CUDA_IGNORE_ERROR(context->syms, cuMemFreeHost(host_ptr));
+  }
+  IREE_TRACE_ZONE_END(z0);
+}
+
 static iree_status_t iree_hal_cuda_allocator_allocate_buffer(
     iree_hal_allocator_t* base_allocator, iree_hal_memory_type_t memory_type,
     iree_hal_buffer_usage_t allowed_usage, iree_host_size_t allocation_size,
-    iree_hal_buffer_t** out_buffer) {
+    iree_const_byte_span_t initial_data, iree_hal_buffer_t** out_buffer) {
   iree_hal_cuda_allocator_t* allocator =
       iree_hal_cuda_allocator_cast(base_allocator);
   // Guard against the corner case where the requested buffer size is 0. The
   // application is unlikely to do anything when requesting a 0-byte buffer; but
   // it can happen in real world use cases. So we should at least not crash.
   if (allocation_size == 0) allocation_size = 4;
-  iree_status_t status;
+
+  // If concurrent managed access is not supported then make device-local +
+  // host-visible allocations fall back to host-local + device-visible
+  // page-locked memory. This will be significantly slower for the device to
+  // access but the compiler only uses this type for readback staging buffers
+  // and it's better to function than function fast.
+  if (!allocator->supports_concurrent_managed_access &&
+      iree_all_bits_set(memory_type, IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL |
+                                         IREE_HAL_MEMORY_TYPE_HOST_VISIBLE)) {
+    memory_type &= ~(IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL |
+                     IREE_HAL_MEMORY_TYPE_HOST_VISIBLE);
+    memory_type |=
+        IREE_HAL_MEMORY_TYPE_HOST_LOCAL | IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE;
+  }
+
+  iree_status_t status = iree_ok_status();
   void* host_ptr = NULL;
   CUdeviceptr device_ptr = 0;
+  IREE_TRACE_ZONE_BEGIN_NAMED(z0, "iree_hal_cuda_buffer_allocate");
   if (iree_all_bits_set(memory_type, IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL)) {
     // Device local case.
     if (iree_all_bits_set(memory_type, IREE_HAL_MEMORY_TYPE_HOST_VISIBLE)) {
@@ -158,36 +221,42 @@ static iree_status_t iree_hal_cuda_allocator_allocate_buffer(
           cuMemHostGetDevicePointer(&device_ptr, host_ptr, /*flags=*/0));
     }
   }
+  IREE_TRACE_ZONE_END(z0);
+
+  iree_hal_buffer_t* buffer = NULL;
   if (iree_status_is_ok(status)) {
-    IREE_STATISTICS(iree_hal_allocator_statistics_record_alloc(
-        &allocator->statistics, memory_type, allocation_size));
     status = iree_hal_cuda_buffer_wrap(
         (iree_hal_allocator_t*)allocator, memory_type,
         IREE_HAL_MEMORY_ACCESS_ALL, allowed_usage, allocation_size,
         /*byte_offset=*/0,
-        /*byte_length=*/allocation_size, device_ptr, host_ptr, out_buffer);
+        /*byte_length=*/allocation_size, device_ptr, host_ptr, &buffer);
   }
-  if (!iree_status_is_ok(status)) {
-    iree_hal_cuda_allocator_free(base_allocator, memory_type, device_ptr,
-                                 host_ptr, allocation_size);
+
+  // Copy the initial contents into the buffer. This may require staging.
+  if (iree_status_is_ok(status) &&
+      !iree_const_byte_span_is_empty(initial_data)) {
+    status = iree_hal_device_transfer_range(
+        allocator->base_device,
+        iree_hal_make_host_transfer_buffer_span((void*)initial_data.data,
+                                                initial_data.data_length),
+        0, iree_hal_make_device_transfer_buffer(buffer), 0,
+        initial_data.data_length, IREE_HAL_TRANSFER_BUFFER_FLAG_DEFAULT,
+        iree_infinite_timeout());
+  }
+
+  if (iree_status_is_ok(status)) {
+    IREE_STATISTICS(iree_hal_allocator_statistics_record_alloc(
+        &allocator->statistics, memory_type, allocation_size));
+    *out_buffer = buffer;
+  } else {
+    if (!buffer) {
+      iree_hal_cuda_buffer_free(allocator->context, memory_type, device_ptr,
+                                host_ptr);
+    } else {
+      iree_hal_buffer_release(buffer);
+    }
   }
   return status;
-}
-
-void iree_hal_cuda_allocator_free(iree_hal_allocator_t* base_allocator,
-                                  iree_hal_memory_type_t memory_type,
-                                  CUdeviceptr device_ptr, void* host_ptr,
-                                  iree_device_size_t allocation_size) {
-  iree_hal_cuda_allocator_t* allocator =
-      iree_hal_cuda_allocator_cast(base_allocator);
-  if (iree_all_bits_set(memory_type, IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL)) {
-    CUDA_IGNORE_ERROR(allocator->context->syms, cuMemFree(device_ptr));
-  } else {
-    // Host local.
-    CUDA_IGNORE_ERROR(allocator->context->syms, cuMemFreeHost(host_ptr));
-  }
-  IREE_STATISTICS(iree_hal_allocator_statistics_record_free(
-      &allocator->statistics, memory_type, allocation_size));
 }
 
 static iree_status_t iree_hal_cuda_allocator_wrap_buffer(
@@ -199,12 +268,30 @@ static iree_status_t iree_hal_cuda_allocator_wrap_buffer(
                           "wrapping of external buffers not supported");
 }
 
-const iree_hal_allocator_vtable_t iree_hal_cuda_allocator_vtable = {
+static void iree_hal_cuda_allocator_deallocate_buffer(
+    iree_hal_allocator_t* base_allocator, iree_hal_buffer_t* base_buffer) {
+  iree_hal_cuda_allocator_t* allocator =
+      iree_hal_cuda_allocator_cast(base_allocator);
+  iree_hal_memory_type_t memory_type = iree_hal_buffer_memory_type(base_buffer);
+  iree_hal_cuda_buffer_free(allocator->context, memory_type,
+                            iree_hal_cuda_buffer_device_pointer(base_buffer),
+                            iree_hal_cuda_buffer_host_pointer(base_buffer));
+
+  IREE_STATISTICS(iree_hal_allocator_statistics_record_free(
+      &allocator->statistics, memory_type,
+      iree_hal_buffer_allocation_size(base_buffer)));
+
+  iree_hal_buffer_destroy(base_buffer);
+}
+
+static const iree_hal_allocator_vtable_t iree_hal_cuda_allocator_vtable = {
     .destroy = iree_hal_cuda_allocator_destroy,
     .host_allocator = iree_hal_cuda_allocator_host_allocator,
+    .trim = iree_hal_cuda_allocator_trim,
     .query_statistics = iree_hal_cuda_allocator_query_statistics,
     .query_buffer_compatibility =
         iree_hal_cuda_allocator_query_buffer_compatibility,
     .allocate_buffer = iree_hal_cuda_allocator_allocate_buffer,
     .wrap_buffer = iree_hal_cuda_allocator_wrap_buffer,
+    .deallocate_buffer = iree_hal_cuda_allocator_deallocate_buffer,
 };

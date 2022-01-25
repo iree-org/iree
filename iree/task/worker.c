@@ -263,6 +263,9 @@ static bool iree_task_worker_pump_once(
   // Since we can host work from multiple scopes and want to ensure an error
   // in one doesn't bring down the whole system we pretend we executed
   // something here by falling through.
+  if (!iree_status_is_ok(status)) {
+    iree_status_fprint(stderr, status);
+  }
   IREE_ASSERT_TRUE(iree_status_is_ok(status));
   iree_status_ignore(status);
 

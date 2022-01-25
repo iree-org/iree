@@ -4,6 +4,8 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+# Keep this in sync with scripts/lint.sh
+
 name: Lint
 
 on: [pull_request]
@@ -106,14 +108,6 @@ jobs:
         run: |
           /tmp/git-clang-format "${GITHUB_BASE_REF?}" --binary=clang-format-9 --style=file
           git diff --exit-code
-
-  submodules:
-    runs-on: ubuntu-18.04
-    steps:
-      - name: Checking out repository
-        uses: actions/checkout@v2
-      - name: Checking submodules
-        run: ./scripts/git/submodule_versions.py check
 
   tabs:
     runs-on: ubuntu-18.04

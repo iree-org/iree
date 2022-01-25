@@ -26,10 +26,10 @@ iree_cc_binary(
     iree::runtime::testdata::simple_mul_module_c
 )
 
-iree_run_binary_test(
+iree_native_test(
   NAME
     "hello_world_embedded_test"
-  TEST_BINARY
+  SRC
     ::hello_world_embedded
 )
 
@@ -54,10 +54,10 @@ iree_cc_binary(
     iree::runtime::testdata::simple_mul_module_c
 )
 
-iree_run_binary_test(
+iree_native_test(
   NAME
     "hello_world_terse_test"
-  TEST_BINARY
+  SRC
     ::hello_world_terse
 )
 

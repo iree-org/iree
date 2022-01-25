@@ -279,7 +279,7 @@ static LogicalResult serializeGenericElementData(
 // Buffer attributes
 //===----------------------------------------------------------------------===//
 
-Attribute ByteRangeAttr::parse(DialectAsmParser &p, Type type) {
+Attribute ByteRangeAttr::parse(AsmParser &p, Type type) {
   if (failed(p.parseLess())) return {};
 
   // TODO(benvanik): support the range syntax; the dialect asm parser fights
@@ -329,9 +329,8 @@ Attribute ByteRangeAttr::parse(DialectAsmParser &p, Type type) {
   return get(p.getContext(), offset, length);
 }
 
-void ByteRangeAttr::print(DialectAsmPrinter &p) const {
+void ByteRangeAttr::print(AsmPrinter &p) const {
   auto &os = p.getStream();
-  os << getMnemonic();
   os << "<";
   os << getOffset();
   os << ", ";
@@ -347,6 +346,13 @@ CompositeAttr CompositeAttr::get(MLIRContext *context,
     if (auto serializableAttr =
             valueAttr.dyn_cast<SerializableAttrInterface>()) {
       calculatedLength += serializableAttr.getStorageSize();
+    } else if (auto opaqueAttr = valueAttr.dyn_cast<OpaqueElementsAttr>()) {
+      // Allow opaque attrs to be placed into composites ease debugging of IR
+      // that has had large attrs elided; these will fail to actually serialize
+      // but being able to run most passes with these unserializable attrs is
+      // useful.
+      calculatedLength += opaqueAttr.getNumElements() *
+                          opaqueAttr.getElementType().getIntOrFloatBitWidth();
     } else {
       return {};
     }
@@ -363,6 +369,9 @@ LogicalResult CompositeAttr::verify(
     if (auto serializableAttr =
             valueAttr.dyn_cast<SerializableAttrInterface>()) {
       calculatedLength += serializableAttr.getStorageSize();
+    } else if (auto opaqueAttr = valueAttr.dyn_cast<OpaqueElementsAttr>()) {
+      calculatedLength += opaqueAttr.getNumElements() *
+                          opaqueAttr.getElementType().getIntOrFloatBitWidth();
     } else {
       return emitError() << "value is not serializable: "
                          << valueAttr.getType();
@@ -376,7 +385,7 @@ LogicalResult CompositeAttr::verify(
   return success();
 }
 
-Attribute CompositeAttr::parse(DialectAsmParser &parser, Type type) {
+Attribute CompositeAttr::parse(AsmParser &parser, Type type) {
   SmallVector<int64_t> dims;
   if (failed(parser.parseLess()) ||
       failed(parser.parseDimensionList(dims, /*allowDynamic=*/false)) ||
@@ -419,9 +428,8 @@ Attribute CompositeAttr::parse(DialectAsmParser &parser, Type type) {
              ArrayAttr::get(parser.getContext(), valueAttrs));
 }
 
-void CompositeAttr::print(DialectAsmPrinter &p) const {
+void CompositeAttr::print(AsmPrinter &p) const {
   auto &os = p.getStream();
-  os << getMnemonic();
   os << "<" << getTotalLength() << "xi8, [";
   if (getTotalLength() > 0) {
     os << "\n";
@@ -496,7 +504,7 @@ struct SerializableDenseElementsAttrModel
     auto elementsAttr = baseAttr.cast<DenseElementsAttr>();
     if (elementsAttr.isSplat()) {
       // Fast-path for splat (no need to convert the value a bunch).
-      return serializeSplatValue(elementsAttr.getSplatValue(),
+      return serializeSplatValue(elementsAttr.getSplatValue<Attribute>(),
                                  elementsAttr.getNumElements(), endian, os);
     }
 
@@ -533,29 +541,6 @@ void UtilDialect::registerAttributes() {
       *getContext());
   DenseFPElementsAttr::attachInterface<SerializableDenseElementsAttrModel>(
       *getContext());
-}
-
-//===----------------------------------------------------------------------===//
-// Attribute printing and parsing
-//===----------------------------------------------------------------------===//
-
-Attribute UtilDialect::parseAttribute(DialectAsmParser &parser,
-                                      Type type) const {
-  StringRef mnemonic;
-  if (failed(parser.parseKeyword(&mnemonic))) return {};
-  Attribute genAttr;
-  OptionalParseResult parseResult =
-      generatedAttributeParser(parser, mnemonic, type, genAttr);
-  if (parseResult.hasValue()) return genAttr;
-  parser.emitError(parser.getNameLoc())
-      << "unknown util attribute: " << mnemonic;
-  return {};
-}
-
-void UtilDialect::printAttribute(Attribute attr, DialectAsmPrinter &p) const {
-  if (failed(generatedAttributePrinter(attr, p))) {
-    llvm_unreachable("unhandled util attribute kind");
-  }
 }
 
 }  // namespace Util

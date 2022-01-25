@@ -13,6 +13,7 @@
 #ifndef IREE_TOOLS_INIT_TRANSLATIONS_H_
 #define IREE_TOOLS_INIT_TRANSLATIONS_H_
 
+#include "iree/compiler/Translation/HALExecutable.h"
 #include "iree/compiler/Translation/IREEVM.h"
 
 namespace mlir {
@@ -37,6 +38,7 @@ namespace iree_compiler {
 // automatically.
 inline void registerIreeTranslations() {
   static bool init_once = []() {
+    registerHALExecutableTranslation();
     registerIREEVMTranslation();
     return true;
   }();

@@ -42,8 +42,9 @@ static void getPipelineStages(
   // Track dependencies of the global memory load.
   llvm::SmallDenseSet<Operation*> loadDep;
   for (Operation& op : forOp.getBody()->getOperations()) {
-    if (op.hasAttr(kPipeliningGlobalLoad))
+    if (op.hasAttr(kPipeliningGlobalLoad)) {
       addDepOps(loadDep, &op, forOp.getBody());
+    }
   }
   // Create a modulo schedule with loads from global memory and the operations
   // it depends on in stage 0. Store to shared memory and computation are in
@@ -85,14 +86,18 @@ struct LLVMGPUPipeliningPass
         copyToWorkgroupMemory = true;
         ld->setAttr(kPipeliningGlobalLoad, builder.getUnitAttr());
       }
-      if (copyToWorkgroupMemory)
+      if (copyToWorkgroupMemory) {
         forOp->setAttr(kPipeliningLoopMarker, builder.getUnitAttr());
+      }
     });
     scf::PipeliningOption options;
     options.getScheduleFn = getPipelineStages;
     RewritePatternSet pipeliningPatterns(context);
     scf::populateSCFLoopPipeliningPatterns(pipeliningPatterns, options);
-    (void)applyPatternsAndFoldGreedily(funcOp, std::move(pipeliningPatterns));
+    if (failed(applyPatternsAndFoldGreedily(funcOp,
+                                            std::move(pipeliningPatterns)))) {
+      return signalPassFailure();
+    }
   }
 };
 }  // namespace

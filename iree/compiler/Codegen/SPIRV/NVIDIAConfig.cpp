@@ -10,10 +10,12 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "iree/compiler/Codegen/Dialect/LoweringConfig.h"
 #include "iree/compiler/Codegen/SPIRV/KernelConfig.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "llvm/Support/Debug.h"
-#include "mlir/Dialect/Linalg/IR/LinalgOps.h"
+#include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/IR/BuiltinOps.h"
 
 #define DEBUG_TYPE "iree-spirv-nvidia-config"
 
@@ -43,8 +45,9 @@ static Optional<CooperativeMatrixSize> getCooperativeMatrixSize(
       int64_t matmulM = property.m_size().getValue().getZExtValue();
       int64_t matmulN = property.n_size().getValue().getZExtValue();
       int64_t matmulK = property.k_size().getValue().getZExtValue();
-      if (m % matmulM == 0 && n % matmulN == 0 && k % matmulK == 0)
+      if (m % matmulM == 0 && n % matmulN == 0 && k % matmulK == 0) {
         return CooperativeMatrixSize{matmulM, matmulN, matmulK};
+      }
     }
   }
   return llvm::None;
@@ -80,8 +83,8 @@ static LogicalResult setOpConfig(const spirv::TargetEnv &targetEnv,
       getElementType(init), lhsShape[0], rhsShape[1], lhsShape[1]);
   if (!coopMatSize) return success();
 
-  auto pipeline =
-      IREE::HAL::DispatchLoweringPassPipeline::SPIRVVectorizeToCooperativeOps;
+  auto pipeline = IREE::Codegen::DispatchLoweringPassPipeline::
+      SPIRVVectorizeToCooperativeOps;
 
   // For now only support one subgroup per workgroup because in the above
   // configuration deduction step we only consider whether the input workload is

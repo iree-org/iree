@@ -24,35 +24,15 @@ typedef struct iree_vm_module_t iree_vm_module_t;
 typedef struct iree_vm_stack_t iree_vm_stack_t;
 typedef struct iree_vm_stack_frame_t iree_vm_stack_frame_t;
 
-// An opaque offset into a source map that a source resolver can calculate.
-// Do not assume that iree_vm_source_offset_t+1 means the next byte offset as
-// backends are free to treat these as everything from pointers to machine code
-// to hash codes.
-typedef int64_t iree_vm_source_offset_t;
+//===----------------------------------------------------------------------===//
+// Module / function reflection
+//===----------------------------------------------------------------------===//
 
 // A key-value pair of module/function reflection information.
 typedef struct iree_vm_reflection_attr_t {
   iree_string_view_t key;
   iree_string_view_t value;
 } iree_vm_reflection_attr_t;
-
-// A variable-length list of registers.
-//
-// This structure is an overlay for the bytecode that is serialized in a
-// matching format, though it can be stack allocated as needed.
-//
-// TODO(benvanik): this should be made private to the bytecode module, but is
-// used for toll-free variadic argument lists here. We could just define an
-// identical structure (and static_assert) to at least rename it to something
-// sensible (iree_vm_segment_size_list_t).
-typedef struct iree_vm_register_list_t {
-  uint16_t size;
-  uint16_t registers[];
-} iree_vm_register_list_t;
-static_assert(iree_alignof(iree_vm_register_list_t) == 2,
-              "expecting byte alignment (to avoid padding)");
-static_assert(offsetof(iree_vm_register_list_t, registers) == 2,
-              "expect no padding in the struct");
 
 // Describes the type of a function reference.
 typedef enum iree_vm_function_linkage_e {
@@ -135,6 +115,28 @@ typedef struct iree_vm_module_signature_t {
 // Thread-compatible; it's expected that only one thread at a time is executing
 // VM functions and accessing this state.
 typedef struct iree_vm_module_state_t iree_vm_module_state_t;
+
+//===----------------------------------------------------------------------===//
+// Function calls and coroutines
+//===----------------------------------------------------------------------===//
+
+// A variable-length list of registers.
+//
+// This structure is an overlay for the bytecode that is serialized in a
+// matching format, though it can be stack allocated as needed.
+//
+// TODO(benvanik): this should be made private to the bytecode module, but is
+// used for toll-free variadic argument lists here. We could just define an
+// identical structure (and static_assert) to at least rename it to something
+// sensible (iree_vm_segment_size_list_t).
+typedef struct iree_vm_register_list_t {
+  uint16_t size;
+  uint16_t registers[];
+} iree_vm_register_list_t;
+static_assert(iree_alignof(iree_vm_register_list_t) == 2,
+              "expecting byte alignment (to avoid padding)");
+static_assert(offsetof(iree_vm_register_list_t, registers) == 2,
+              "expect no padding in the struct");
 
 // Function call data.
 //
@@ -261,6 +263,16 @@ typedef struct iree_vm_execution_result_t {
   int reserved;
 } iree_vm_execution_result_t;
 
+//===----------------------------------------------------------------------===//
+// Source locations
+//===----------------------------------------------------------------------===//
+
+// An opaque offset into a source map that a source resolver can calculate.
+// Do not assume that iree_vm_source_offset_t+1 means the next byte offset as
+// backends are free to treat these as everything from pointers to machine code
+// to hash codes.
+typedef int64_t iree_vm_source_offset_t;
+
 // Controls how source locations are formatted into strings.
 enum iree_vm_source_location_format_flag_bits_e {
   IREE_VM_SOURCE_LOCATION_FORMAT_FLAG_NONE = 0u,
@@ -289,6 +301,34 @@ IREE_API_EXPORT iree_status_t
 iree_vm_source_location_format(iree_vm_source_location_t* source_location,
                                iree_vm_source_location_format_flags_t flags,
                                iree_string_builder_t* builder);
+
+//===----------------------------------------------------------------------===//
+// iree_vm_module_t
+//===----------------------------------------------------------------------===//
+
+// Indicates an event that can be signaled in modules from the hosting program.
+typedef enum iree_vm_signal_e {
+  // Program is resuming from a suspended state.
+  // Modules may reallocate memory for pools and caches.
+  //
+  // Modules are walked in registration order (A->B->C).
+  IREE_VM_SIGNAL_RESUME = 0,
+
+  // Program is entering a suspended state.
+  // Modules should drop any transient memory that is possible to reallocate
+  // upon resume.
+  //
+  // Modules are walked in reverse registration order (C->B->A).
+  IREE_VM_SIGNAL_SUSPEND = 1,
+
+  // Program has received a low memory alert.
+  // Modules must aggressively drop all possible memory even if expensive to
+  // rematerialize it. On some platforms this is sent as a threat that if
+  // sufficient memory is not unwired/freed ASAP the process will be killed.
+  //
+  // Modules are walked in reverse registration order (C->B->A).
+  IREE_VM_SIGNAL_LOW_MEMORY = 2,
+} iree_vm_signal_t;
 
 // Defines an interface that can be used to reflect and execute functions on a
 // module.
@@ -348,6 +388,11 @@ typedef struct iree_vm_module_t {
       void* self, iree_vm_module_state_t* module_state,
       iree_host_size_t ordinal, const iree_vm_function_t* function,
       const iree_vm_function_signature_t* signature);
+
+  // Notifies the module of a system signal.
+  iree_status_t(IREE_API_PTR* notify)(void* self,
+                                      iree_vm_module_state_t* module_state,
+                                      iree_vm_signal_t signal);
 
   // Begins a function call with the given |call| arguments.
   // Execution may yield in the case of asynchronous code and require one or

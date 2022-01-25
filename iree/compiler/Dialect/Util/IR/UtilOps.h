@@ -7,6 +7,7 @@
 #ifndef IREE_COMPILER_DIALECT_UTIL_IR_UTILOPS_H_
 #define IREE_COMPILER_DIALECT_UTIL_IR_UTILOPS_H_
 
+#include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/BuiltinTypes.h"
@@ -15,6 +16,7 @@
 #include "mlir/IR/OpImplementation.h"
 #include "mlir/IR/SymbolTable.h"
 #include "mlir/Interfaces/ControlFlowInterfaces.h"
+#include "mlir/Interfaces/InferTypeOpInterface.h"
 #include "mlir/Interfaces/SideEffectInterfaces.h"
 #include "mlir/Transforms/DialectConversion.h"
 
@@ -59,6 +61,20 @@ void printTypeOrAttr(OpAsmPrinter &p, Operation *op, TypeAttr type,
                      Attribute attr);
 
 //===----------------------------------------------------------------------===//
+// custom<TypeAlias>($encoding_type, $storage_type)
+//===----------------------------------------------------------------------===//
+// some.op custom<TypeAlias>($encoding_type, $storage_type)
+// ->
+// some.op tensor<4xf32>
+// some.op tensor<4xf32> as tensor<2xf64>
+// some.op tensor<4xf32> as tensor<?xf32>{...}
+
+ParseResult parseTypeAlias(OpAsmParser &parser, TypeAttr &encodingTypeAttr,
+                           Type &storageType);
+void printTypeAlias(OpAsmPrinter &p, Operation *op, TypeAttr encodingTypeAttr,
+                    Type storageType);
+
+//===----------------------------------------------------------------------===//
 // custom<SizeAwareType>
 //===----------------------------------------------------------------------===//
 // type{%size}
@@ -92,6 +108,22 @@ void printSizeAwareTypeList(OpAsmPrinter &p, Operation *op, TypeRange types0,
 
 ParseResult parseShapedTiedResult(
     OpAsmParser &parser, Type &resultType,
+    SmallVectorImpl<OpAsmParser::OperandType> &resultDims);
+inline ParseResult parseShapedTiedResult(OpAsmParser &parser, Type &resultType,
+                                         OpAsmParser::OperandType &resultDim) {
+  SmallVector<OpAsmParser::OperandType, 1> resultDims;
+  if (failed(parseShapedTiedResult(parser, resultType, resultDims))) {
+    return failure();
+  }
+  assert(resultDims.size() == 1 && "requires one dim");
+  resultDim = std::move(resultDims.front());
+  return success();
+}
+void printShapedTiedResult(OpAsmPrinter &p, Operation *op, Type resultType,
+                           ValueRange resultDims);
+
+ParseResult parseShapedTiedResult(
+    OpAsmParser &parser, Type &resultType,
     SmallVectorImpl<OpAsmParser::OperandType> &resultDims,
     ArrayAttr &tiedOperands);
 void printShapedTiedResult(OpAsmPrinter &p, Operation *op, Type resultType,
@@ -105,6 +137,7 @@ inline ParseResult parseShapedTiedResult(OpAsmParser &parser, Type &resultType,
                                    tiedOperands))) {
     return failure();
   }
+  assert(resultDims.size() == 1 && "requires one dim");
   resultDim = std::move(resultDims.front());
   return success();
 }

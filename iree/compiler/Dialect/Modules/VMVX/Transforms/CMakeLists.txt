@@ -19,10 +19,12 @@ iree_cc_library(
     "Conversion.cpp"
     "Passes.cpp"
   DEPS
+    IREELinalgExtPasses
     LLVMSupport
     MLIRAffine
     MLIRAffineToStandard
     MLIRAffineTransforms
+    MLIRArithmeticTransforms
     MLIRIR
     MLIRLinalg
     MLIRLinalgTransforms
@@ -46,13 +48,10 @@ iree_cc_library(
     iree::compiler::Codegen::PassHeaders
     iree::compiler::Dialect::HAL::IR::HALDialect
     iree::compiler::Dialect::HAL::Transforms
-    iree::compiler::Dialect::LinalgExt::Transforms
     iree::compiler::Dialect::Modules::VMVX::Conversion::HALToVMVX
     iree::compiler::Dialect::Modules::VMVX::Conversion::StandardToVMVX
     iree::compiler::Dialect::Modules::VMVX::IR
     iree::compiler::Dialect::Modules::VMVX::IR::VMVXDialect
-    iree::compiler::Dialect::Shape::IR
-    iree::compiler::Dialect::Shape::Transforms
     iree::compiler::Dialect::Util::IR
     iree::compiler::Dialect::Util::Transforms
     iree::compiler::Dialect::VM::IR

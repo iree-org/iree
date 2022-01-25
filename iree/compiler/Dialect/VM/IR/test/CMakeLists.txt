@@ -35,8 +35,8 @@ iree_lit_test_suite(
     "shift_ops.mlir"
     "structural_folding.mlir"
     "structural_ops.mlir"
-  DATA
-    iree::tools::IreeFileCheck
+  TOOLS
+    FileCheck
     iree::tools::iree-opt
 )
 

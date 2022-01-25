@@ -1,2 +1,2 @@
-// RUN: (static_library_demo) | IreeFileCheck %s
-// CHECK-LABEL: static_library_run passed
+// RUN: (static_library_demo) | FileCheck %s
+// CHECK-LABEL: static_library_run_bytecode passed

@@ -15,7 +15,7 @@
 #include "iree/compiler/Dialect/Flow/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
-#include "mlir/Dialect/Linalg/IR/LinalgOps.h"
+#include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
@@ -55,10 +55,10 @@ struct FusionOfTensorOpsPass
           Operation *producer = producerResult.getOwner();
           Operation *consumer = consumerOperand.getOwner();
 
-          // TODO(GH-5611): Enable fusion with reduction consumer for all
-          // targets. Currently vectorization doesn't handle generic ops with
-          // reduction iterators we will disable for now to allow vectorizing
-          // producer pointwise ops to avoid performance regressions on CPU.
+          // TODO(#5611): Enable fusion with reduction consumer for all targets.
+          // Currently vectorization doesn't handle generic ops with reduction
+          // iterators we will disable for now to allow vectorizing producer
+          // pointwise ops to avoid performance regressions on CPU.
           if (!clEnableFusionWithReductionOps) {
             if (auto genericOp = dyn_cast<linalg::GenericOp>(consumer)) {
               if (genericOp.getNumReductionLoops()) return false;
@@ -100,8 +100,9 @@ struct FusionOfTensorOpsPass
           // expensive.
           // TODO: Add a cost model to allow ops to be duplicated.
           if (!isBroadcast && !isa<arith::ConstantOp>(producer) &&
-              !llvm::hasSingleElement(producerResult.getUsers()))
+              !llvm::hasSingleElement(producerResult.getUsers())) {
             return false;
+          }
           return llvm::all_of(producerResult.getUsers(), [](Operation *user) {
             return isa<linalg::GenericOp>(user);
           });
@@ -112,13 +113,14 @@ struct FusionOfTensorOpsPass
     // to the consumer linalg op.
     linalg::ControlElementwiseOpsFusionFn foldReshapeBetweenLinalgFn =
         [](const OpResult &producer, const OpOperand &consumer) {
-          auto collapseOp =
-              producer.getDefiningOp<linalg::TensorCollapseShapeOp>();
-          if (collapseOp)
+          auto collapseOp = producer.getDefiningOp<tensor::CollapseShapeOp>();
+          if (collapseOp) {
             return collapseOp.src().getDefiningOp<LinalgOp>() != nullptr;
-          auto expandOp = producer.getDefiningOp<linalg::TensorExpandShapeOp>();
-          if (expandOp)
+          }
+          auto expandOp = producer.getDefiningOp<tensor::ExpandShapeOp>();
+          if (expandOp) {
             return expandOp.src().getDefiningOp<LinalgOp>() != nullptr;
+          }
           return false;
         };
     linalg::populateElementwiseOpsFusionPatterns(
@@ -127,28 +129,41 @@ struct FusionOfTensorOpsPass
             .setControlFoldingReshapes(foldReshapeBetweenLinalgFn)
             .setControlElementwiseOpsFusionFn(controlFn));
 
-    (void)applyPatternsAndFoldGreedily(op->getRegions(),
-                                       std::move(fusionPatterns));
+    if (failed(applyPatternsAndFoldGreedily(op->getRegions(),
+                                            std::move(fusionPatterns)))) {
+      return signalPassFailure();
+    }
 
     OwningRewritePatternList reshapeCanonicalizations(&getContext());
     linalg::populateFoldUnitDimsReshapeOpsByLinearizationPatterns(
         reshapeCanonicalizations);
-    linalg::TensorCollapseShapeOp::getCanonicalizationPatterns(
+    tensor::CollapseShapeOp::getCanonicalizationPatterns(
         reshapeCanonicalizations, context);
-    linalg::TensorExpandShapeOp::getCanonicalizationPatterns(
-        reshapeCanonicalizations, context);
-    (void)applyPatternsAndFoldGreedily(op->getRegions(),
-                                       std::move(reshapeCanonicalizations));
+    tensor::ExpandShapeOp::getCanonicalizationPatterns(reshapeCanonicalizations,
+                                                       context);
+    linalg::InitTensorOp::getCanonicalizationPatterns(reshapeCanonicalizations,
+                                                      context);
+    linalg::FillOp::getCanonicalizationPatterns(reshapeCanonicalizations,
+                                                context);
+    if (failed(applyPatternsAndFoldGreedily(
+            op->getRegions(), std::move(reshapeCanonicalizations)))) {
+      return signalPassFailure();
+    }
 
     // Push the remaining reshapes down the graphs.
     OwningRewritePatternList pushReshapePatterns(&getContext());
     linalg::populatePushReshapeOpsPatterns(pushReshapePatterns);
-    linalg::TensorCollapseShapeOp::getCanonicalizationPatterns(
-        pushReshapePatterns, context);
-    linalg::TensorExpandShapeOp::getCanonicalizationPatterns(
-        pushReshapePatterns, context);
-    (void)applyPatternsAndFoldGreedily(op->getRegions(),
-                                       std::move(pushReshapePatterns));
+    tensor::CollapseShapeOp::getCanonicalizationPatterns(pushReshapePatterns,
+                                                         context);
+    tensor::ExpandShapeOp::getCanonicalizationPatterns(pushReshapePatterns,
+                                                       context);
+    linalg::InitTensorOp::getCanonicalizationPatterns(pushReshapePatterns,
+                                                      context);
+    linalg::FillOp::getCanonicalizationPatterns(pushReshapePatterns, context);
+    if (failed(applyPatternsAndFoldGreedily(op->getRegions(),
+                                            std::move(pushReshapePatterns)))) {
+      return signalPassFailure();
+    }
   }
 };
 

@@ -4,7 +4,7 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-if(NOT ${IREE_BUILD_EXPERIMENTAL_ROCM})
+if(NOT ${IREE_HAL_DRIVER_EXPERIMENTAL_ROCM})
   return()
 endif()
 
@@ -49,10 +49,12 @@ iree_cc_library(
     iree::base
     iree::base::core_headers
     iree::base::internal
+    iree::base::internal::arena
     iree::base::internal::flatcc::parsing
     iree::base::internal::synchronization
     iree::base::tracing
     iree::hal
+    iree::hal::utils::buffer_transfer
     iree::schemas::rocm_executable_def_c_fbs
   PUBLIC
 )

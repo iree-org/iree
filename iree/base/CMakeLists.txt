@@ -16,6 +16,8 @@ iree_cc_library(
     "allocator.h"
     "api.c"
     "assert.h"
+    "bitfield.c"
+    "bitfield.h"
     "status.c"
     "status.h"
     "string_builder.c"
@@ -42,6 +44,17 @@ iree_cc_library(
     ::core_headers
     ::logging
   PUBLIC
+)
+
+iree_cc_test(
+  NAME
+    bitfield_test
+  SRCS
+    "bitfield_test.cc"
+  DEPS
+    ::base
+    iree::testing::gtest
+    iree::testing::gtest_main
 )
 
 iree_cc_test(

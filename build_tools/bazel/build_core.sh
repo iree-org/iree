@@ -22,8 +22,7 @@
 #   See https://docs.bazel.build/versions/master/command-line-reference.html#flag--test_tag_filters)
 #   Default: If IREE_VULKAN_DISABLE=1, "-nokokoro,-driver=vulkan". Else "-nokokoro".
 
-set -e
-set -x
+set -exuo pipefail
 
 # Use user-environment variables if set, otherwise use CI-friendly defaults.
 if ! [[ -v IREE_LLVMAOT_DISABLE ]]; then
@@ -32,11 +31,21 @@ fi
 if ! [[ -v IREE_VULKAN_DISABLE ]]; then
   IREE_VULKAN_DISABLE=0
 fi
+
 declare -a test_env_args=(
-  --test_env=IREE_LLVMAOT_DISABLE=$IREE_LLVMAOT_DISABLE
-  --test_env=IREE_VULKAN_DISABLE=$IREE_VULKAN_DISABLE
-  --action_env=IREE_LLVMAOT_LINKER_PATH=$IREE_LLVMAOT_LINKER_PATH
+  --test_env="LD_PRELOAD=libvulkan.so.1"
+  --test_env="VK_ICD_FILENAMES=${VK_ICD_FILENAMES}"
+  --test_env=IREE_LLVMAOT_DISABLE="${IREE_LLVMAOT_DISABLE}"
+  --test_env=IREE_VULKAN_DISABLE="${IREE_VULKAN_DISABLE}"
 )
+
+if ! [[ -n IREE_LLVMAOT_SYSTEM_LINKER_PATH ]]; then
+  test_env_args+=(--action_env=IREE_LLVMAOT_SYSTEM_LINKER_PATH="${IREE_LLVMAOT_SYSTEM_LINKER_PATH}")
+fi
+
+if ! [[ -n IREE_LLVMAOT_EMBEDDED_LINKER_PATH ]]; then
+  test_env_args+=(--action_env=IREE_LLVMAOT_EMBEDDED_LINKER_PATH="${IREE_LLVMAOT_EMBEDDED_LINKER_PATH}")
+fi
 
 declare -a default_build_tag_filters=("-nokokoro")
 declare -a default_test_tag_filters=("-nokokoro" "-driver=metal")
@@ -74,25 +83,29 @@ fi
 # want them built by CI unless they are excluded with "nokokoro".
 # Explicitly list bazelrc so that builds are reproducible and get cache hits
 # when this script is invoked locally.
+# xargs is set to high arg limits to avoid multiple Bazel invocations and will
+# hard fail if the limits are exceeded.
+# See https://github.com/bazelbuild/bazel/issues/12479
 bazel \
-  --nosystem_rc --nohome_rc --noworkspace_rc \
+  --noworkspace_rc \
   --bazelrc=build_tools/bazel/iree.bazelrc \
   query \
     --config=non_darwin \
     //iree/... + //build_tools/... + \
     //llvm-external-projects/iree-compiler-api/... + \
     //llvm-external-projects/iree-dialects/... | \
-      xargs bazel \
-        --nosystem_rc --nohome_rc --noworkspace_rc \
-        --bazelrc=build_tools/bazel/iree.bazelrc \
-          test \
-            --color=yes \
-            ${test_env_args[@]} \
-            --config=generic_clang \
-            --config=non_darwin \
-            --build_tag_filters="${BUILD_TAG_FILTERS?}" \
-            --test_tag_filters="${TEST_TAG_FILTERS?}" \
-            --keep_going \
-            --test_output=errors \
-            --config=rs \
-            --config=rbe
+      xargs --max-args 1000000 --max-chars 1000000 --exit \
+        bazel \
+          --noworkspace_rc \
+          --bazelrc=build_tools/bazel/iree.bazelrc \
+            test \
+              --color=yes \
+              ${test_env_args[@]} \
+              --config=generic_clang \
+              --config=non_darwin \
+              --build_tag_filters="${BUILD_TAG_FILTERS?}" \
+              --test_tag_filters="${TEST_TAG_FILTERS?}" \
+              --keep_going \
+              --test_output=errors \
+              --config=rs \
+              --config=remote_cache_bazel_ci

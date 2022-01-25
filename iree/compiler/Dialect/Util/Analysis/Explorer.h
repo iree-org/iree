@@ -15,6 +15,7 @@
 #include "mlir/IR/AsmState.h"
 #include "mlir/IR/Operation.h"
 #include "mlir/IR/SymbolTable.h"
+#include "mlir/Pass/AnalysisManager.h"
 #include "mlir/Support/LLVM.h"
 
 namespace mlir {
@@ -119,6 +120,9 @@ class Explorer {
   // been specified.
   void initialize();
 
+  // Returns a cached analysis manager for the root op.
+  AnalysisManager getAnalysisManager() { return analysisManager; }
+
   // Cached information about a global variable.
   struct GlobalInfo {
     // Global variable definition.
@@ -130,6 +134,9 @@ class Explorer {
     // All loads and stores of the global across the program.
     SmallVector<Operation *> uses;
   };
+
+  // Gets analyzed global information for the given global operation.
+  const GlobalInfo *getGlobalInfo(IREE::Util::GlobalOp globalOp);
 
   // Queries memoized information about a global variable, returning nullptr if
   // not found.
@@ -208,6 +215,12 @@ class Explorer {
       std::function<WalkResult(Block *targetBlock,
                                Block::BlockArgListType args)>
           fn);
+
+  // Walks all successors of |branchOp| and provides the successor block
+  // argument corresponding to the given branch |operandIdx|.
+  TraversalResult walkOutgoingBranchOperandArguments(
+      mlir::BranchOpInterface branchOp, unsigned operandIdx,
+      std::function<WalkResult(Block *targetBlock, BlockArgument arg)> fn);
 
   // Walks all potential defining ops of |value|.
   // The defining ops may come from any part of the program. There may be
@@ -288,6 +301,7 @@ class Explorer {
   DenseMap<OperationName, TraversalAction> opActions;
 
   DenseMap<Operation *, GlobalInfo> globalInfos;
+  ModuleAnalysisManager analysisManager;
 };
 
 }  // namespace iree_compiler

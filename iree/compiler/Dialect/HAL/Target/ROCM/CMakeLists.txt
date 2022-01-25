@@ -38,6 +38,7 @@ iree_cc_library(
     MLIRROCDLToLLVMIRTranslation
     MLIRSupport
     MLIRTargetLLVMIRExport
+    iree::compiler::Codegen::Dialect::IREECodegenDialect
     iree::compiler::Codegen::LLVMGPU
     iree::compiler::Codegen::PassHeaders
     iree::compiler::Dialect::HAL::Target

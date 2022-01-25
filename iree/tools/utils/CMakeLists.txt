@@ -53,6 +53,8 @@ iree_cc_library(
   PUBLIC
 )
 
+if(${IREE_HAL_DRIVER_VMVX})
+
 iree_cc_test(
   NAME
     vm_util_test
@@ -69,6 +71,8 @@ iree_cc_test(
     iree::vm
     iree::vm::cc
 )
+
+endif()
 
 iree_cc_library(
   NAME

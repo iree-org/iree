@@ -40,21 +40,38 @@ class BenchmarkThreshold:
 # Order matters here: if multiple regexes match a single benchmark, the first
 # match is used.
 BENCHMARK_THRESHOLDS = [
-    # Unstable and noisy GPU benchmarks.
-    BenchmarkThreshold(re.compile(r"^DeepLabV3.*GPU-Mali"), 20,
+    # Fluctuating benchmarks on CPUs.
+    BenchmarkThreshold(re.compile(r"^DeepLabV3.*big-core.*Dylib.* @ Pixel"), 20,
                        ThresholdUnit.PERCENTAGE),
-    BenchmarkThreshold(re.compile(r"^MobileNetV3Small.*GPU-Mali"), 30,
+    BenchmarkThreshold(
+        re.compile(r"^MobileBertSquad.*big-core.*Dylib-Sync @ Pixel-4"), 50,
+        ThresholdUnit.PERCENTAGE),
+    BenchmarkThreshold(re.compile(r"^MobileNetV2.*Dylib @ Pixel"), 15,
                        ThresholdUnit.PERCENTAGE),
-    BenchmarkThreshold(re.compile(r"^MobileSSD.*GPU-Mali"), 50,
-                       ThresholdUnit.PERCENTAGE),
-    BenchmarkThreshold(re.compile(r"^PoseNet.*GPU-Mali"), 30,
+    BenchmarkThreshold(re.compile(r"^MobileNetV3Small.*Dylib-Sync @ Pixel-6"),
+                       20, ThresholdUnit.PERCENTAGE),
+    BenchmarkThreshold(
+        re.compile(r"^MobileNetV3Small.*big-core.*Dylib @ Pixel-6"), 20,
+        ThresholdUnit.PERCENTAGE),
+    BenchmarkThreshold(
+        re.compile(r"^MobileNetV3Small.*little-core.*Dylib @ Pixel"), 20,
+        ThresholdUnit.PERCENTAGE),
+    BenchmarkThreshold(
+        re.compile(r"^MobileSSD.*little-core.*Dylib.* @ Pixel-6"), 20,
+        ThresholdUnit.PERCENTAGE),
+    BenchmarkThreshold(re.compile(r"^PoseNet.*big-core.*Dylib.* @ Pixel-6"), 20,
                        ThresholdUnit.PERCENTAGE),
 
-    # Fast GPU benchmarks that complete around 10ms; using percentage is
-    # not suitable.
-    BenchmarkThreshold(re.compile(r"^MobileNetV2.*kernel-execution.*GPU-Mali"),
-                       1, ThresholdUnit.VALUE_MS),
-    BenchmarkThreshold(re.compile(r"^MobileNetV3Small.*GPU-Adreno"), 1,
+    # Fluctuating benchmarks on GPUs.
+    BenchmarkThreshold(
+        re.compile(r"^MobileNetV3Small.*full-inference.*GPU-Mali"), 2,
+        ThresholdUnit.VALUE_MS),
+
+    # Benchmarks that complete around 10ms on GPUs; using percentage is not
+    # suitable anymore.
+    BenchmarkThreshold(re.compile(r"^DeepLabV3.*GPU-Mali"), 1,
+                       ThresholdUnit.VALUE_MS),
+    BenchmarkThreshold(re.compile(r"^MobileNet.*GPU"), 1,
                        ThresholdUnit.VALUE_MS),
 
     # Default threshold for all benchmarks: 5%.

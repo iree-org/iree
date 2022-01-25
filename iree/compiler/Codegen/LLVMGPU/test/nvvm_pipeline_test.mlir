@@ -1,36 +1,34 @@
-// RUN: iree-opt -split-input-file -pass-pipeline='hal.executable(hal.executable.variant(iree-codegen-linalg-to-nvvm-pipeline))' %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -pass-pipeline='hal.executable(hal.executable.variant(iree-codegen-linalg-to-nvvm-pipeline))' %s | FileCheck %s
 
 // Verify that a simple element wise op gets lowered succefully all the way to
 // nvvm/llvm dialect.
 
+#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>,
+    #hal.descriptor_set.binding<2, storage_buffer>
+  ]>
+]>
 hal.executable @simpleMath_ex_dispatch_0 {
-  hal.interface @io {
-    hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
-    hal.interface.binding @ret0, set=0, binding=1, type="StorageBuffer", access="Write|Discard"
-  }
-  hal.executable.variant @cuda, target = #hal.executable.target<"cuda", "cuda-nvptx-fb"> {
-  hal.executable.entry_point @add_dispatch_0 attributes {interface = @io, ordinal = 0 : index}
-  builtin.module  {
+  hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
+  hal.executable.entry_point @add_dispatch_0 layout(#executable_layout)
+  builtin.module {
     func @add_dispatch_0() {
       %c0 = arith.constant 0 : index
-      %0 = hal.interface.binding.subspan @io::@arg0[%c0] : !flow.dispatch.tensor<readonly:16xf32>
-      %1 = hal.interface.binding.subspan @io::@arg1[%c0] : !flow.dispatch.tensor<readonly:16xf32>
-      %2 = hal.interface.binding.subspan @io::@ret0[%c0] : !flow.dispatch.tensor<writeonly:16xf32>
+      %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<readonly:16xf32>
+      %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : !flow.dispatch.tensor<readonly:16xf32>
+      %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : !flow.dispatch.tensor<writeonly:16xf32>
       %3 = linalg.init_tensor [16] : tensor<16xf32>
-      %4 = flow.dispatch.tensor.load %0, offsets=[], sizes=[], strides=[] : !flow.dispatch.tensor<readonly:16xf32> -> tensor<16xf32>
-      %5 = flow.dispatch.tensor.load %1, offsets=[], sizes=[], strides=[] : !flow.dispatch.tensor<readonly:16xf32> -> tensor<16xf32>
+      %4 = flow.dispatch.tensor.load %0, offsets=[0], sizes=[16], strides=[1] : !flow.dispatch.tensor<readonly:16xf32> -> tensor<16xf32>
+      %5 = flow.dispatch.tensor.load %1, offsets=[0], sizes=[16], strides=[1] : !flow.dispatch.tensor<readonly:16xf32> -> tensor<16xf32>
       %6 = linalg.generic {indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>], iterator_types = ["parallel"]} ins(%4, %5 : tensor<16xf32>, tensor<16xf32>) outs(%3 : tensor<16xf32>) {
       ^bb0(%arg0: f32, %arg1: f32, %arg2: f32):  // no predecessors
           %7 = arith.addf %arg0, %arg1 : f32
           linalg.yield %7 : f32
         } -> tensor<16xf32>
-        flow.dispatch.tensor.store %6, %2, offsets=[], sizes=[], strides=[] : tensor<16xf32> -> !flow.dispatch.tensor<writeonly:16xf32>
+        flow.dispatch.tensor.store %6, %2, offsets=[0], sizes=[16], strides=[1] : tensor<16xf32> -> !flow.dispatch.tensor<writeonly:16xf32>
         return
-      }
-      hal.interface private @io  {
-        hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
-        hal.interface.binding @arg1, set=0, binding=1, type="StorageBuffer", access="Read"
-        hal.interface.binding @ret0, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
       }
     }
   }
@@ -45,23 +43,25 @@ hal.executable @simpleMath_ex_dispatch_0 {
 #map0 = affine_map<()[s0, s1] -> (s0 * s1)>
 #map1 = affine_map<(d0)[s0] -> (s0, -d0 + 1024)>
 #map2 = affine_map<(d0)[s0] -> (-d0 + 1024, s0)>
+#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>,
+    #hal.descriptor_set.binding<2, storage_buffer>
+  ]>
+]>
 hal.executable @dot_dispatch_0 {
-  hal.interface @io {
-    hal.interface.binding @ro0, set=0, binding=0, type="StorageBuffer", access="Read"
-    hal.interface.binding @ro1, set=0, binding=1, type="StorageBuffer", access="Read"
-    hal.interface.binding @wo2, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
-  }
-  hal.executable.variant @cuda, target = #hal.executable.target<"cuda", "cuda-nvptx-fb"> {
-    hal.executable.entry_point @dot_dispatch_0 attributes {interface = @io, ordinal = 0 : index}
-    builtin.module  {
+  hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
+    hal.executable.entry_point @dot_dispatch_0 layout(#executable_layout)
+    builtin.module {
       func @dot_dispatch_0() {
         %cst = arith.constant 0.000000e+00 : f32
         %c0 = arith.constant 0 : index
         %c1024 = arith.constant 1024 : index
         %c1 = arith.constant 1 : index
-        %0 = hal.interface.binding.subspan @io::@ro0[%c0] : !flow.dispatch.tensor<readonly:1024x1024xf32>
-        %1 = hal.interface.binding.subspan @io::@ro1[%c0] : !flow.dispatch.tensor<readonly:1024x1024xf32>
-        %2 = hal.interface.binding.subspan @io::@wo2[%c0] : !flow.dispatch.tensor<writeonly:1024x1024xf32>
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<readonly:1024x1024xf32>
+        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : !flow.dispatch.tensor<readonly:1024x1024xf32>
+        %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : !flow.dispatch.tensor<writeonly:1024x1024xf32>
         %workgroup_size_x = hal.interface.workgroup.size[0] : index
         %workgroup_size_y = hal.interface.workgroup.size[1] : index
         %workgroup_id_x = hal.interface.workgroup.id[0] : index
@@ -84,16 +84,11 @@ hal.executable @dot_dispatch_0 {
             %14 = affine.min #map2(%arg1)[%workgroup_size_x]
             %15 = linalg.init_tensor [%13, %14] : tensor<?x?xf32>
             %16 = linalg.fill(%cst, %15) : f32, tensor<?x?xf32> -> tensor<?x?xf32>
-            %17 = linalg.matmul {__internal_linalg_transform__ = "workgroup"} ins(%8, %10 : tensor<?x1024xf32>, tensor<1024x?xf32>) outs(%16 : tensor<?x?xf32>) -> tensor<?x?xf32>
+            %17 = linalg.matmul ins(%8, %10 : tensor<?x1024xf32>, tensor<1024x?xf32>) outs(%16 : tensor<?x?xf32>) -> tensor<?x?xf32>
             flow.dispatch.tensor.store %17, %2, offsets = [%arg0, %arg1], sizes = [%11, %12], strides = [%c1, %c1] : tensor<?x?xf32> -> !flow.dispatch.tensor<writeonly:1024x1024xf32>
           }
         }
         return
-      }
-      hal.interface private @io  {
-        hal.interface.binding @ro0, set=0, binding=0, type="StorageBuffer", access="Read"
-        hal.interface.binding @ro1, set=0, binding=1, type="StorageBuffer", access="Read"
-        hal.interface.binding @wo2, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
       }
     }
   }
@@ -121,7 +116,6 @@ hal.executable @dot_dispatch_0 {
 #map0 = affine_map<()[s0, s1] -> (s0 * s1)>
 #map1 = affine_map<(d0)[s0] -> (s0, -d0 + 1024)>
 #map2 = affine_map<(d0)[s0] -> (-d0 + 1024, s0)>
-
 #matmul_trait = {
   args_in = 2,
   args_out = 1,
@@ -132,24 +126,25 @@ hal.executable @dot_dispatch_0 {
   ],
   iterator_types = ["parallel", "parallel", "reduction"]
 }
-
+#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>,
+    #hal.descriptor_set.binding<2, storage_buffer>
+  ]>
+]>
 hal.executable @dot_dispatch_0 {
-  hal.interface @io {
-    hal.interface.binding @ro0, set=0, binding=0, type="StorageBuffer", access="Read"
-    hal.interface.binding @ro1, set=0, binding=1, type="StorageBuffer", access="Read"
-    hal.interface.binding @wo2, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
-  }
-  hal.executable.variant @cuda, target = #hal.executable.target<"cuda", "cuda-nvptx-fb"> {
-    hal.executable.entry_point @dot_dispatch_0 attributes {interface = @io, ordinal = 0 : index}
-    builtin.module  {
+  hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
+    hal.executable.entry_point @dot_dispatch_0 layout(#executable_layout)
+    builtin.module {
       func @dot_dispatch_0() {
         %cst = arith.constant 0.000000e+00 : f32
         %c0 = arith.constant 0 : index
         %c1024 = arith.constant 1024 : index
         %c1 = arith.constant 1 : index
-        %0 = hal.interface.binding.subspan @io::@ro0[%c0] : !flow.dispatch.tensor<readonly:1024x1024xf32>
-        %1 = hal.interface.binding.subspan @io::@ro1[%c0] : !flow.dispatch.tensor<readonly:1024x1024xf32>
-        %2 = hal.interface.binding.subspan @io::@wo2[%c0] : !flow.dispatch.tensor<writeonly:1024x1024xf32>
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<readonly:1024x1024xf32>
+        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : !flow.dispatch.tensor<readonly:1024x1024xf32>
+        %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : !flow.dispatch.tensor<writeonly:1024x1024xf32>
         %workgroup_size_x = hal.interface.workgroup.size[0] : index
         %workgroup_size_y = hal.interface.workgroup.size[1] : index
         %workgroup_id_x = hal.interface.workgroup.id[0] : index
@@ -172,7 +167,7 @@ hal.executable @dot_dispatch_0 {
             %14 = affine.min #map2(%arg1)[%workgroup_size_x]
             %15 = linalg.init_tensor [%13, %14] : tensor<?x?xf32>
             %16 = linalg.fill(%cst, %15) : f32, tensor<?x?xf32> -> tensor<?x?xf32>
-            %17 = linalg.generic #matmul_trait {__internal_linalg_transform__ = "workgroup"} ins(%8, %10 : tensor<?x1024xf32>, tensor<1024x?xf32>) outs(%16 : tensor<?x?xf32>)  {
+            %17 = linalg.generic #matmul_trait ins(%8, %10 : tensor<?x1024xf32>, tensor<1024x?xf32>) outs(%16 : tensor<?x?xf32>)  {
               ^bb(%a: f32, %b: f32, %c: f32) :
               %d = arith.mulf %a, %b: f32
               %e = arith.addf %c, %d: f32
@@ -182,11 +177,6 @@ hal.executable @dot_dispatch_0 {
           }
         }
         return
-      }
-      hal.interface private @io  {
-        hal.interface.binding @ro0, set=0, binding=0, type="StorageBuffer", access="Read"
-        hal.interface.binding @ro1, set=0, binding=1, type="StorageBuffer", access="Read"
-        hal.interface.binding @wo2, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
       }
     }
   }
@@ -201,24 +191,26 @@ hal.executable @dot_dispatch_0 {
 
 // -----
 
+#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>,
+    #hal.descriptor_set.binding<2, storage_buffer>
+  ]>
+]>
 hal.executable @conv2d_dispatch_0 {
-hal.executable.variant @cuda, target = #hal.executable.target<"cuda", "cuda-nvptx-fb"> {
-  hal.interface @io {
-    hal.interface.binding @ro0, set=0, binding=0, type="StorageBuffer", access="Read"
-    hal.interface.binding @ro1, set=0, binding=1, type="StorageBuffer", access="Read"
-    hal.interface.binding @wo2, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
-  }
-  hal.executable.entry_point @conv2d_dispatch_0 attributes {interface = @io, ordinal = 0 : index}
-  builtin.module  {
+hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
+  hal.executable.entry_point @conv2d_dispatch_0 layout(#executable_layout)
+  builtin.module {
     func @conv2d_dispatch_0() {
       %c0 = arith.constant 0 : index
       %cst = arith.constant 0.000000e+00 : f32
       %c2 = arith.constant 2 : index
       %c3 = arith.constant 3 : index
       %c1 = arith.constant 1 : index
-      %0 = hal.interface.binding.subspan @io::@s0b0_ro_external[%c0] : !flow.dispatch.tensor<readonly:1x4x4x2xf32>
-      %1 = hal.interface.binding.subspan @io::@s0b1_ro_external[%c0] : !flow.dispatch.tensor<readonly:3x2x2x1xf32>
-      %2 = hal.interface.binding.subspan @io::@s0b2_xw_external[%c0] : !flow.dispatch.tensor<writeonly:1x2x3x1xf32>
+      %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<readonly:1x4x4x2xf32>
+      %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : !flow.dispatch.tensor<readonly:3x2x2x1xf32>
+      %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : !flow.dispatch.tensor<writeonly:1x2x3x1xf32>
       %workgroup_size_x = hal.interface.workgroup.size[0] : index
       %workgroup_size_y = hal.interface.workgroup.size[1] : index
       %workgroup_size_z = hal.interface.workgroup.size[2] : index
@@ -250,17 +242,12 @@ hal.executable.variant @cuda, target = #hal.executable.target<"cuda", "cuda-nvpt
             %19 = affine.min affine_map<(d0)[s0] -> (-d0 + 1, s0)>(%arg2)[%workgroup_size_x]
             %20 = linalg.init_tensor [1, %17, %18, %19] : tensor<1x?x?x?xf32>
             %21 = linalg.fill(%cst, %20) : f32, tensor<1x?x?x?xf32> -> tensor<1x?x?x?xf32>
-            %22 = linalg.conv_2d_nhwc_hwcf {__internal_linalg_transform__ = "workgroup", dilations = dense<1> : tensor<2xi64>, strides = dense<1> : tensor<2xi64>} ins(%11, %13 : tensor<1x?x?x2xf32>, tensor<3x2x2x?xf32>) outs(%21 : tensor<1x?x?x?xf32>) -> tensor<1x?x?x?xf32>
+            %22 = linalg.conv_2d_nhwc_hwcf {dilations = dense<1> : tensor<2xi64>, strides = dense<1> : tensor<2xi64>} ins(%11, %13 : tensor<1x?x?x2xf32>, tensor<3x2x2x?xf32>) outs(%21 : tensor<1x?x?x?xf32>) -> tensor<1x?x?x?xf32>
             flow.dispatch.tensor.store %22, %2, offsets = [0, %arg0, %arg1, %arg2], sizes = [1, %14, %15, %16], strides = [1, 1, 1, 1] : tensor<1x?x?x?xf32> -> !flow.dispatch.tensor<writeonly:1x2x3x1xf32>
           }
         }
       }
       return
-    }
-    hal.interface private @io  {
-      hal.interface.binding @s0b0_ro_external, set=0, binding=0, type="StorageBuffer", access="Read"
-      hal.interface.binding @s0b1_ro_external, set=0, binding=1, type="StorageBuffer", access="Read"
-      hal.interface.binding @s0b2_xw_external, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
     }
   }
 }
@@ -275,35 +262,33 @@ hal.executable.variant @cuda, target = #hal.executable.target<"cuda", "cuda-nvpt
 
 // -----
 
+#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>
+  ]>
+]>
 hal.executable @simpleMath_ex_dispatch_0 {
-  hal.interface @io {
-    hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
-    hal.interface.binding @ret0, set=0, binding=1, type="StorageBuffer", access="Write|Discard"
-  }
-  hal.executable.variant @cuda, target = #hal.executable.target<"cuda", "cuda-nvptx-fb"> {
-  hal.executable.entry_point @add_dispatch_0 attributes {interface = @io, ordinal = 0 : index}
-  builtin.module  {
+hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
+  hal.executable.entry_point @add_dispatch_0 layout(#executable_layout)
+  builtin.module {
     func @add_dispatch_0() {
       %c0 = arith.constant 0 : index
-      %0 = hal.interface.binding.subspan @io::@arg0[%c0] : !flow.dispatch.tensor<readonly:16xf32>
-      %2 = hal.interface.binding.subspan @io::@ret0[%c0] : !flow.dispatch.tensor<writeonly:16xf32>
+      %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<readonly:16xf32>
+      %2 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : !flow.dispatch.tensor<writeonly:16xf32>
       %3 = linalg.init_tensor [16] : tensor<16xf32>
-      %4 = flow.dispatch.tensor.load %0, offsets=[], sizes=[], strides=[] : !flow.dispatch.tensor<readonly:16xf32> -> tensor<16xf32>
+      %4 = flow.dispatch.tensor.load %0, offsets=[0], sizes=[16], strides=[1] : !flow.dispatch.tensor<readonly:16xf32> -> tensor<16xf32>
       %5 = arith.constant dense<[1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0, 13.0, 14.0, 15.0, 16.0]> : tensor<16xf32>
       %6 = linalg.generic {indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>], iterator_types = ["parallel"]} ins(%4, %5 : tensor<16xf32>, tensor<16xf32>) outs(%3 : tensor<16xf32>) {
       ^bb0(%arg0: f32, %arg1: f32, %arg2: f32):  // no predecessors
           %7 = arith.addf %arg0, %arg1 : f32
           linalg.yield %7 : f32
-        } -> tensor<16xf32>
-        flow.dispatch.tensor.store %6, %2, offsets=[], sizes=[], strides=[] : tensor<16xf32> -> !flow.dispatch.tensor<writeonly:16xf32>
-        return
-      }
-      hal.interface private @io  {
-        hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
-        hal.interface.binding @ret0, set=0, binding=1, type="StorageBuffer", access="Write|Discard"
-      }
+      } -> tensor<16xf32>
+      flow.dispatch.tensor.store %6, %2, offsets=[0], sizes=[16], strides=[1] : tensor<16xf32> -> !flow.dispatch.tensor<writeonly:16xf32>
+      return
     }
   }
+}
 }
 
 // CHECK-LABEL: hal.executable public @simpleMath_ex_dispatch_0
@@ -313,16 +298,22 @@ hal.executable @simpleMath_ex_dispatch_0 {
 
 // -----
 
+#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>
+  ]>
+]>
 hal.executable @reduction_dispatch {
-hal.executable.variant @cuda, target = #hal.executable.target<"cuda", "cuda-nvptx-fb"> {
-  hal.executable.entry_point @reduction attributes {interface = @io, ordinal = 0 : index}
-  builtin.module  {
+hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
+  hal.executable.entry_point @reduction layout(#executable_layout)
+  builtin.module {
     func @reduction() {
       %c0 = arith.constant 0 : index
       %cst = arith.constant 0.000000e+00 : f32
       %c96 = arith.constant 96 : index
-      %0 = hal.interface.binding.subspan @io::@s0b0_ro_external[%c0] : !flow.dispatch.tensor<readonly:14x14x96xf32>
-      %1 = hal.interface.binding.subspan @io::@s0b1_xw_external[%c0] : !flow.dispatch.tensor<writeonly:96xf32>
+      %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<readonly:14x14x96xf32>
+      %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : !flow.dispatch.tensor<writeonly:96xf32>
       %workgroup_size_x = hal.interface.workgroup.size[0] : index
       %workgroup_id_x = hal.interface.workgroup.id[0] : index
       %workgroup_count_x = hal.interface.workgroup.count[0] : index
@@ -335,7 +326,7 @@ hal.executable.variant @cuda, target = #hal.executable.target<"cuda", "cuda-nvpt
         %7 = affine.min affine_map<(d0)[s0] -> (-d0 + 96, s0)>(%arg0)[%workgroup_size_x]
         %8 = linalg.init_tensor [%7] : tensor<?xf32>
         %9 = linalg.fill(%cst, %8) : f32, tensor<?xf32> -> tensor<?xf32>
-        %10 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2) -> (d1, d2, d0)>, affine_map<(d0, d1, d2) -> (d0)>], iterator_types = ["parallel", "reduction", "reduction"]} ins(%5 : tensor<14x14x?xf32>) outs(%9 : tensor<?xf32>) attrs =  {__internal_linalg_transform__ = "workgroup"} {
+        %10 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2) -> (d1, d2, d0)>, affine_map<(d0, d1, d2) -> (d0)>], iterator_types = ["parallel", "reduction", "reduction"]} ins(%5 : tensor<14x14x?xf32>) outs(%9 : tensor<?xf32>) {
         ^bb0(%arg1: f32, %arg2: f32):  // no predecessors
           %11 = arith.addf %arg1, %arg2 : f32
           linalg.yield %11 : f32
@@ -343,10 +334,6 @@ hal.executable.variant @cuda, target = #hal.executable.target<"cuda", "cuda-nvpt
         flow.dispatch.tensor.store %10, %1, offsets = [%arg0], sizes = [%6], strides = [1] : tensor<?xf32> -> !flow.dispatch.tensor<writeonly:96xf32>
       }
       return
-    }
-    hal.interface private @io  {
-      hal.interface.binding @s0b0_ro_external, set=0, binding=0, type="StorageBuffer", access="Read"
-      hal.interface.binding @s0b1_xw_external, set=0, binding=1, type="StorageBuffer", access="Write|Discard"
     }
   }
 }
@@ -358,16 +345,23 @@ hal.executable.variant @cuda, target = #hal.executable.target<"cuda", "cuda-nvpt
 
 // -----
 
+#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>,
+    #hal.descriptor_set.binding<2, storage_buffer>
+  ]>
+]>
 hal.executable @vector_add_dispatch {
-hal.executable.variant @cuda, target = #hal.executable.target<"cuda", "cuda-nvptx-fb"> {
-  hal.executable.entry_point @vector_add_dispatch attributes {interface = @io, ordinal = 0 : index}
-  builtin.module  {
+hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
+  hal.executable.entry_point @vector_add_dispatch layout(#executable_layout)
+  builtin.module {
     builtin.func @vector_add_dispatch() {
       %c0 = arith.constant 0 : index
       %c16384 = arith.constant 16384 : index
-      %0 = hal.interface.binding.subspan @io::@s0b0_ro_external[%c0] : !flow.dispatch.tensor<readonly:16384xf32>
-      %1 = hal.interface.binding.subspan @io::@s0b1_ro_external[%c0] : !flow.dispatch.tensor<readonly:16384xf32>
-      %2 = hal.interface.binding.subspan @io::@s0b2_xw_external[%c0] : !flow.dispatch.tensor<writeonly:16384xf32>
+      %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<readonly:16384xf32>
+      %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : !flow.dispatch.tensor<readonly:16384xf32>
+      %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : !flow.dispatch.tensor<writeonly:16384xf32>
       %workgroup_size_x = hal.interface.workgroup.size[0] : index
       %workgroup_id_x = hal.interface.workgroup.id[0] : index
       %workgroup_count_x = hal.interface.workgroup.count[0] : index
@@ -380,7 +374,7 @@ hal.executable.variant @cuda, target = #hal.executable.target<"cuda", "cuda-nvpt
         %8 = flow.dispatch.tensor.load %1, offsets = [%arg0], sizes = [%7], strides = [1] : !flow.dispatch.tensor<readonly:16384xf32> -> tensor<?xf32>
         %9 = affine.min affine_map<(d0, d1) -> (d1, -d0 + 16384)>(%arg0)[%workgroup_size_x]
         %10 = linalg.init_tensor [%9] : tensor<?xf32>
-        %11 = linalg.generic {indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>], iterator_types = ["parallel"]} ins(%6, %8 : tensor<?xf32>, tensor<?xf32>) outs(%10 : tensor<?xf32>) attrs =  {__internal_linalg_transform__ = "workgroup"} {
+        %11 = linalg.generic {indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>], iterator_types = ["parallel"]} ins(%6, %8 : tensor<?xf32>, tensor<?xf32>) outs(%10 : tensor<?xf32>) {
         ^bb0(%arg1: f32, %arg2: f32, %arg3: f32):  // no predecessors
           %12 = arith.addf %arg1, %arg2 : f32
           linalg.yield %12 : f32
@@ -388,11 +382,6 @@ hal.executable.variant @cuda, target = #hal.executable.target<"cuda", "cuda-nvpt
         flow.dispatch.tensor.store %11, %2, offsets = [%arg0], sizes = [%9], strides = [1] : tensor<?xf32> -> !flow.dispatch.tensor<writeonly:16384xf32>
       }
       return
-    }
-    hal.interface private @io  {
-      hal.interface.binding @s0b0_ro_external, set=0, binding=0, type="StorageBuffer", access="Read"
-      hal.interface.binding @s0b1_ro_external, set=0, binding=1, type="StorageBuffer", access="Read"
-       hal.interface.binding @s0b2_xw_external, set=0, binding=2, type="StorageBuffer", access="Write|Discard"
     }
   }
 }
@@ -410,47 +399,126 @@ hal.executable.variant @cuda, target = #hal.executable.target<"cuda", "cuda-nvpt
 #map2 = affine_map<(d0)[s0] -> (-d0 + 16384, s0)>
 #map3 = affine_map<(d0, d1) -> (d1, d0)>
 #map4 = affine_map<(d0, d1) -> (d0)>
-
+#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>
+  ]>
+]>
 hal.executable @vector_reduction_dispatch {
-hal.executable.variant @cuda, target = #hal.executable.target<"cuda", "cuda-nvptx-fb"> {
-  hal.executable.entry_point @vector_reduction_dispatch attributes {interface = @io, ordinal = 0 : index}
-  builtin.module  {
+hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
+  hal.executable.entry_point @vector_reduction_dispatch layout(#executable_layout)
+  builtin.module {
     builtin.func @vector_reduction_dispatch() {
-          %c0 = arith.constant 0 : index
-          %c16384 = arith.constant 16384 : index
-          %cst = arith.constant 1.000000e+00 : f32
-          %0 = hal.interface.binding.subspan @io::@s0b0_ro_external[%c0] : !flow.dispatch.tensor<readonly:512x16384xf32>
-          %1 = hal.interface.binding.subspan @io::@s0b1_xw_external[%c0] : !flow.dispatch.tensor<writeonly:16384xf32>
-          %workgroup_size_x = hal.interface.workgroup.size[0] : index
-          %workgroup_id_x = hal.interface.workgroup.id[0] : index
-          %workgroup_count_x = hal.interface.workgroup.count[0] : index
-          %2 = affine.apply #map0()[%workgroup_id_x, %workgroup_size_x]
-          %3 = affine.apply #map0()[%workgroup_count_x, %workgroup_size_x]
-          scf.for %arg0 = %2 to %c16384 step %3 {
-            %4 = affine.min #map1(%arg0)[%workgroup_size_x]
-            %5 = flow.dispatch.tensor.load %0, offsets = [0, %arg0], sizes = [512, %4], strides = [1, 1] : !flow.dispatch.tensor<readonly:512x16384xf32> -> tensor<512x?xf32>
-            %6 = affine.min #map1(%arg0)[%workgroup_size_x]
-            %7 = affine.min #map2(%arg0)[%workgroup_size_x]
-            %8 = linalg.init_tensor [%7] : tensor<?xf32>
-            %9 = linalg.fill(%cst, %8) : f32, tensor<?xf32> -> tensor<?xf32>
-            %10 = linalg.generic {indexing_maps = [#map3, #map4], iterator_types = ["parallel", "reduction"]} ins(%5 : tensor<512x?xf32>) outs(%9 : tensor<?xf32>) attrs =  {__internal_linalg_transform__ = "workgroup"} {
-            ^bb0(%arg1: f32, %arg2: f32):  // no predecessors
-              %11 = arith.addf %arg1, %arg2 : f32
-              linalg.yield %11 : f32
-            } -> tensor<?xf32>
-            flow.dispatch.tensor.store %10, %1, offsets = [%arg0], sizes = [%6], strides = [1] : tensor<?xf32> -> !flow.dispatch.tensor<writeonly:16384xf32>
-          }
-          return
-        }
-        hal.interface private @io  {
-          hal.interface.binding @s0b0_ro_external, set=0, binding=0, type="StorageBuffer", access="Read"
-          hal.interface.binding @s0b1_xw_external, set=0, binding=1, type="StorageBuffer", access="Write|Discard"
-        }
+      %c0 = arith.constant 0 : index
+      %c16384 = arith.constant 16384 : index
+      %cst = arith.constant 1.000000e+00 : f32
+      %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<readonly:512x16384xf32>
+      %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : !flow.dispatch.tensor<writeonly:16384xf32>
+      %workgroup_size_x = hal.interface.workgroup.size[0] : index
+      %workgroup_id_x = hal.interface.workgroup.id[0] : index
+      %workgroup_count_x = hal.interface.workgroup.count[0] : index
+      %2 = affine.apply #map0()[%workgroup_id_x, %workgroup_size_x]
+      %3 = affine.apply #map0()[%workgroup_count_x, %workgroup_size_x]
+      scf.for %arg0 = %2 to %c16384 step %3 {
+        %4 = affine.min #map1(%arg0)[%workgroup_size_x]
+        %5 = flow.dispatch.tensor.load %0, offsets = [0, %arg0], sizes = [512, %4], strides = [1, 1] : !flow.dispatch.tensor<readonly:512x16384xf32> -> tensor<512x?xf32>
+        %6 = affine.min #map1(%arg0)[%workgroup_size_x]
+        %7 = affine.min #map2(%arg0)[%workgroup_size_x]
+        %8 = linalg.init_tensor [%7] : tensor<?xf32>
+        %9 = linalg.fill(%cst, %8) : f32, tensor<?xf32> -> tensor<?xf32>
+        %10 = linalg.generic {indexing_maps = [#map3, #map4], iterator_types = ["parallel", "reduction"]} ins(%5 : tensor<512x?xf32>) outs(%9 : tensor<?xf32>) {
+        ^bb0(%arg1: f32, %arg2: f32):  // no predecessors
+          %11 = arith.addf %arg1, %arg2 : f32
+          linalg.yield %11 : f32
+        } -> tensor<?xf32>
+        flow.dispatch.tensor.store %10, %1, offsets = [%arg0], sizes = [%6], strides = [1] : tensor<?xf32> -> !flow.dispatch.tensor<writeonly:16384xf32>
+      }
+      return
     }
   }
+}
 }
 
 //   CHECK-LABEL: hal.executable public @vector_reduction_dispatch
 //         CHECK:   hal.executable.variant public @cuda
 //         CHECK:   llvm.fadd %{{.*}}, %{{.*}} : vector<4xf32>
 //         CHECK:   llvm.store %{{.*}} : !llvm.ptr<vector<4xf32>>
+
+// -----
+
+#map0 = affine_map<()[s0, s1] -> (s0 * s1)>
+#map1 = affine_map<(d0)[s0] -> (s0, -d0 + 1024)>
+#map2 = affine_map<(d0)[s0] -> (-d0 + 1024, s0)>
+#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>,
+    #hal.descriptor_set.binding<2, storage_buffer>
+  ]>
+]>
+hal.executable @mma_fused {
+  hal.executable.variant @cuda, target = #hal.executable.target<"cuda", "cuda-nvptx-fb", {target_arch = "sm_80"}> {
+    hal.executable.entry_point @mma_fused layout(#executable_layout)
+    builtin.module {
+      func @mma_fused() {
+        %cst = arith.constant 0.000000e+00 : f32
+        %c0 = arith.constant 0 : index
+        %c1024 = arith.constant 1024 : index
+        %c1 = arith.constant 1 : index
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<readonly:1024x1024xf32>
+        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : !flow.dispatch.tensor<readonly:1024x1024xf32>
+        %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : !flow.dispatch.tensor<writeonly:1024x1024xf32>
+        %workgroup_size_x = hal.interface.workgroup.size[0] : index
+        %workgroup_size_y = hal.interface.workgroup.size[1] : index
+        %workgroup_id_x = hal.interface.workgroup.id[0] : index
+        %workgroup_count_x = hal.interface.workgroup.count[0] : index
+        %workgroup_id_y = hal.interface.workgroup.id[1] : index
+        %workgroup_count_y = hal.interface.workgroup.count[1] : index
+        %3 = affine.apply #map0()[%workgroup_id_y, %workgroup_size_y]
+        %4 = affine.apply #map0()[%workgroup_count_y, %workgroup_size_y]
+        scf.for %arg0 = %3 to %c1024 step %4 {
+          %5 = affine.apply #map0()[%workgroup_id_x, %workgroup_size_x]
+          %6 = affine.apply #map0()[%workgroup_count_x, %workgroup_size_x]
+          scf.for %arg1 = %5 to %c1024 step %6 {
+            %7 = affine.min #map1(%arg0)[%workgroup_size_y]
+            %8 = flow.dispatch.tensor.load %0, offsets = [%arg0, %c0], sizes = [%7, %c1024], strides = [%c1, %c1] : !flow.dispatch.tensor<readonly:1024x1024xf32> -> tensor<?x1024xf32>
+            %9 = affine.min #map1(%arg1)[%workgroup_size_x]
+            %10 = flow.dispatch.tensor.load %1, offsets = [%c0, %arg1], sizes = [%c1024, %9], strides = [%c1, %c1] : !flow.dispatch.tensor<readonly:1024x1024xf32> -> tensor<1024x?xf32>
+            %11 = affine.min #map1(%arg0)[%workgroup_size_y]
+            %12 = affine.min #map1(%arg1)[%workgroup_size_x]
+            %13 = affine.min #map2(%arg0)[%workgroup_size_y]
+            %14 = affine.min #map2(%arg1)[%workgroup_size_x]
+            %15 = linalg.init_tensor [%13, %14] : tensor<?x?xf32>
+            %16 = linalg.fill(%cst, %15) : f32, tensor<?x?xf32> -> tensor<?x?xf32>
+            %17 = linalg.matmul ins(%8, %10 : tensor<?x1024xf32>, tensor<1024x?xf32>) outs(%16 : tensor<?x?xf32>) -> tensor<?x?xf32>
+            %18 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>],
+              iterator_types = ["parallel", "parallel"]} ins(%17, %17 : tensor<?x?xf32>, tensor<?x?xf32>) outs(%17 : tensor<?x?xf32>) {
+            ^bb0(%arg3: f32, %arg4: f32, %arg5: f32):  // no predecessors
+              %19 = arith.addf %arg3, %arg4 : f32
+             linalg.yield %19 : f32
+            } -> tensor<?x?xf32>
+            flow.dispatch.tensor.store %18, %2, offsets = [%arg0, %arg1], sizes = [%11, %12], strides = [%c1, %c1] : tensor<?x?xf32> -> !flow.dispatch.tensor<writeonly:1024x1024xf32>
+          }
+        }
+        return
+      }
+    }
+  }
+}
+
+//     CHECK-LABEL: hal.executable public @mma_fused
+//           CHECK:   hal.executable.variant public @cuda
+//       CHECK-NOT:   llvm.store
+//   CHECK-COUNT-2:   llvm.load {{.*}} : !llvm.ptr<vector<4xf32>>
+//           CHECK:   llvm.br
+//   CHECK-COUNT-2:   llvm.store {{.*}} : !llvm.ptr<vector<4xf32>, 3>
+//   CHECK-COUNT-4:   nvvm.wmma.load{{.*}} : (!llvm.ptr<f32, 3>) -> !llvm.struct<(i32, i32, i32, i32)
+//   CHECK-COUNT-2:   nvvm.wmma.mma
+//   CHECK-COUNT-2:   llvm.load {{.*}} : !llvm.ptr<vector<4xf32>>
+//           CHECK:   llvm.br
+//   CHECK-COUNT-2:   llvm.store {{.*}} : !llvm.ptr<vector<4xf32>, 3>
+//   CHECK-COUNT-4:   nvvm.wmma.load{{.*}} : (!llvm.ptr<f32, 3>) -> !llvm.struct<(i32, i32, i32, i32)
+//   CHECK-COUNT-2:   nvvm.wmma.mma
+//   CHECK-COUNT-8:   llvm.fadd
+//   CHECK-COUNT-1:   nvvm.wmma.store {{.*}} : !llvm.ptr<f32>, f32, f32, f32, f32, f32, f32, f32, f32

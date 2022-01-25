@@ -109,7 +109,7 @@ class ConvertHALInterfaceWorkgroupIDOp
   using OpConversionPattern::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      IREE::HAL::InterfaceWorkgroupIDOp op, ArrayRef<Value> operands,
+      IREE::HAL::InterfaceWorkgroupIDOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     uint64_t dim = op.dimension().getZExtValue();
     if (dim >= 3) {
@@ -132,7 +132,7 @@ class ConvertHALInterfaceWorkgroupSizeOp
   using OpConversionPattern::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      IREE::HAL::InterfaceWorkgroupSizeOp op, ArrayRef<Value> operands,
+      IREE::HAL::InterfaceWorkgroupSizeOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     uint64_t dim = op.dimension().getZExtValue();
     if (dim >= 3) {
@@ -155,7 +155,7 @@ class ConvertHALInterfaceWorkgroupCountOp
   using OpConversionPattern::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      IREE::HAL::InterfaceWorkgroupCountOp op, ArrayRef<Value> operands,
+      IREE::HAL::InterfaceWorkgroupCountOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     uint64_t dim = op.dimension().getZExtValue();
     if (dim >= 3) {
@@ -170,14 +170,14 @@ class ConvertHALInterfaceWorkgroupCountOp
   }
 };
 
-/// Rewrites hal.interface.load.constant to ops loading from the ABI structs.
-class ConvertHALInterfaceLoadConstantOp
-    : public OpConversionPattern<IREE::HAL::InterfaceLoadConstantOp> {
+/// Rewrites hal.interface.constant.load to ops loading from the ABI structs.
+class ConvertHALInterfaceConstantLoadOp
+    : public OpConversionPattern<IREE::HAL::InterfaceConstantLoadOp> {
  public:
   using OpConversionPattern::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      IREE::HAL::InterfaceLoadConstantOp op, ArrayRef<Value> operands,
+      IREE::HAL::InterfaceConstantLoadOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     // Find the vmvx.interface argument to the function.
     auto constantsArg =
@@ -188,12 +188,12 @@ class ConvertHALInterfaceLoadConstantOp
 
     auto resultType = getTypeConverter()->convertType(op.result().getType());
 
-    auto constantOrdinal = rewriter.createOrFold<arith::ConstantIndexOp>(
-        op.getLoc(), op.offset().getZExtValue());
+    auto constantIndex = rewriter.createOrFold<arith::ConstantIndexOp>(
+        op.getLoc(), op.index().getZExtValue());
     auto loadedValue = rewriter.createOrFold<memref::LoadOp>(
-        op.getLoc(), constantType, constantsArg, ValueRange{constantOrdinal});
-    rewriter.replaceOpWithNewOp<arith::IndexCastOp>(op, loadedValue,
-                                                    resultType);
+        op.getLoc(), constantType, constantsArg, ValueRange{constantIndex});
+    rewriter.replaceOpWithNewOp<mlir::UnrealizedConversionCastOp>(
+        op, resultType, loadedValue);
     return success();
   }
 };
@@ -205,56 +205,53 @@ class ConvertHALInterfaceBindingSubspanOp
   using OpConversionPattern::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      IREE::HAL::InterfaceBindingSubspanOp op, ArrayRef<Value> operands,
+      IREE::HAL::InterfaceBindingSubspanOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    // NOTE: we expect FoldSubViewOps to have run and zeroed out the offset.
-    APInt byteOffset;
-    if (!matchPattern(op.byte_offset(), m_ConstantInt(&byteOffset))) {
-      return op.emitOpError()
-             << "FoldSubViewOps must have ran prior to conversion";
-    }
-
     // Find the vmvx.interface argument to the function.
     auto bindingsArg =
         op->getParentOfType<mlir::FuncOp>().getArgument(kEntryArgBindings);
     assert(bindingsArg && bindingsArg.getType().isa<IREE::Util::ListType>() &&
            "entry point not conforming to requirements");
 
-    // Lookup the source interface binding.
-    auto interfaceBindingOp = op.queryBindingOp();
-
     // TODO(benvanik): compact the indices - the bindings we have on the ABI
     // interface are dense.
-    if (interfaceBindingOp.set().getZExtValue() != 0) {
+    if (op.set().getZExtValue() != 0) {
       return op.emitOpError() << "sparse binding sets not yet implemented";
     }
 
     auto bindingType =
         bindingsArg.getType().cast<IREE::Util::ListType>().getElementType();
-    auto getOp = rewriter.create<IREE::Util::ListGetOp>(
-        op.getLoc(), bindingType, bindingsArg,
-        rewriter.createOrFold<arith::ConstantIndexOp>(
-            op.getLoc(), interfaceBindingOp.binding().getZExtValue()));
+    auto memrefValue = rewriter
+                           .create<IREE::Util::ListGetOp>(
+                               op.getLoc(), bindingType, bindingsArg,
+                               rewriter.createOrFold<arith::ConstantIndexOp>(
+                                   op.getLoc(), op.binding().getZExtValue()))
+                           .result();
+    if (op.byte_offset() && !matchPattern(op.byte_offset(), m_Zero())) {
+      auto memrefType = op.result().getType().cast<MemRefType>();
+      Value elementCount;
+      if (memrefType.isDynamicDim(0)) {
+        elementCount = op.dynamic_dims().front();
+      } else {
+        elementCount = rewriter.createOrFold<arith::ConstantIndexOp>(
+            op.getLoc(), memrefType.getDimSize(0));
+      }
+      auto byteLength = rewriter.createOrFold<arith::MulIOp>(
+          op.getLoc(),
+          rewriter.createOrFold<arith::ConstantIndexOp>(
+              op.getLoc(), memrefType.getElementTypeBitWidth()),
+          elementCount);
+      memrefValue = rewriter.createOrFold<memref::SubViewOp>(
+          op.getLoc(), memrefValue, ArrayRef<OpFoldResult>{op.byte_offset()},
+          ArrayRef<OpFoldResult>{byteLength},
+          ArrayRef<OpFoldResult>{rewriter.getIndexAttr(1)});
+    }
     rewriter.replaceOpWithNewOp<UnrealizedConversionCastOp>(
         op,
         getTypeConverter()
             ->convertType(op.result().getType())
             .cast<MemRefType>(),
-        getOp.result());
-    return success();
-  }
-};
-
-/// Removes the hal.interface from the IR - it's not used after conversion.
-class RemoveHALInterfaceOpPattern
-    : public OpConversionPattern<IREE::HAL::InterfaceOp> {
- public:
-  using OpConversionPattern::OpConversionPattern;
-
-  LogicalResult matchAndRewrite(
-      IREE::HAL::InterfaceOp op, ArrayRef<Value> operands,
-      ConversionPatternRewriter &rewriter) const override {
-    rewriter.eraseOp(op);
+        memrefValue);
     return success();
   }
 };
@@ -267,9 +264,8 @@ void populateHALToVMVXPatterns(MLIRContext *context,
   patterns.insert<ConvertHALInterfaceWorkgroupIDOp>(typeConverter, context);
   patterns.insert<ConvertHALInterfaceWorkgroupSizeOp>(typeConverter, context);
   patterns.insert<ConvertHALInterfaceWorkgroupCountOp>(typeConverter, context);
-  patterns.insert<ConvertHALInterfaceLoadConstantOp>(typeConverter, context);
+  patterns.insert<ConvertHALInterfaceConstantLoadOp>(typeConverter, context);
   patterns.insert<ConvertHALInterfaceBindingSubspanOp>(typeConverter, context);
-  patterns.insert<RemoveHALInterfaceOpPattern>(typeConverter, context);
 }
 
 }  // namespace iree_compiler

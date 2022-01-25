@@ -4,7 +4,7 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-load("//iree/tools:compilation.bzl", "iree_bytecode_module")
+load("//build_tools/bazel:iree_bytecode_module.bzl", "iree_bytecode_module")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -18,7 +18,7 @@ iree_bytecode_module(
     src = "add_dynamic.mlir",
     c_identifier = "iree_tflite_testdata_add_dynamic",
     flags = [
-        "--iree-input-type=mhlo",
+        "-iree-input-type=mhlo",
         "-iree-native-bindings-support=false",
         "-iree-tflite-bindings-support",
         "-iree-mlir-to-vm-bytecode-module",
@@ -32,7 +32,7 @@ iree_bytecode_module(
     src = "add_multi.mlir",
     c_identifier = "iree_tflite_testdata_add_multi",
     flags = [
-        "--iree-input-type=mhlo",
+        "-iree-input-type=mhlo",
         "-iree-native-bindings-support=false",
         "-iree-tflite-bindings-support",
         "-iree-mlir-to-vm-bytecode-module",
@@ -46,7 +46,7 @@ iree_bytecode_module(
     src = "add_static.mlir",
     c_identifier = "iree_tflite_testdata_add_static",
     flags = [
-        "--iree-input-type=mhlo",
+        "-iree-input-type=mhlo",
         "-iree-native-bindings-support=false",
         "-iree-tflite-bindings-support",
         "-iree-mlir-to-vm-bytecode-module",

@@ -7,100 +7,23 @@
 #ifndef IREE_VM_SHIMS_EMITC_H_
 #define IREE_VM_SHIMS_EMITC_H_
 
+#include "iree/base/attributes.h"
 #include "iree/vm/module.h"
 #include "iree/vm/stack.h"
 
-// see Calling convetion in module.h
-// Variadic arguments are not supported
+typedef iree_status_t (*iree_vm_native_function_target_emitc)(
+    iree_vm_stack_t* IREE_RESTRICT stack,
+    iree_vm_function_call_t* IREE_RESTRICT call, void* IREE_RESTRICT module,
+    void* IREE_RESTRICT module_state,
+    iree_vm_execution_result_t* IREE_RESTRICT);
 
-// 0v_v
-typedef iree_status_t (*call_0v_v_t)(iree_vm_stack_t* stack, void* module_ptr,
-                                     void* module_state);
-
-static iree_status_t call_0v_v_shim(iree_vm_stack_t* stack,
-                                    const iree_vm_function_call_t* call,
-                                    call_0v_v_t target_fn, void* module,
-                                    void* module_state,
-                                    iree_vm_execution_result_t* out_result) {
-  return target_fn(stack, module, module_state);
-}
-
-// 0v_i
-typedef iree_status_t (*call_0v_i_t)(iree_vm_stack_t* stack, void* module_ptr,
-                                     void* module_state, int32_t* res0);
-
-static iree_status_t call_0v_i_shim(iree_vm_stack_t* stack,
-                                    const iree_vm_function_call_t* call,
-                                    call_0v_i_t target_fn, void* module,
-                                    void* module_state,
-                                    iree_vm_execution_result_t* out_result) {
-  typedef struct {
-    int32_t ret0;
-  } results_t;
-
-  results_t* results = (results_t*)call->results.data;
-
-  return target_fn(stack, module, module_state, &results->ret0);
-}
-
-// 0i_i
-typedef iree_status_t (*call_0i_i_t)(iree_vm_stack_t* stack, void* module_ptr,
-                                     void* module_state, int32_t arg0,
-                                     int32_t* res0);
-
-static iree_status_t call_0i_i_shim(iree_vm_stack_t* stack,
-                                    const iree_vm_function_call_t* call,
-                                    call_0i_i_t target_fn, void* module,
-                                    void* module_state,
-                                    iree_vm_execution_result_t* out_result) {
-  typedef struct {
-    int32_t arg0;
-  } args_t;
-  typedef struct {
-    int32_t ret0;
-  } results_t;
-
-  const args_t* args = (const args_t*)call->arguments.data;
-  results_t* results = (results_t*)call->results.data;
-
-  return target_fn(stack, module, module_state, args->arg0, &results->ret0);
-}
-
-static iree_status_t call_0i_i_import(iree_vm_stack_t* stack,
-                                      const iree_vm_function_t* import,
-                                      int32_t arg0, int32_t* out_ret0) {
-  iree_vm_function_call_t call;
-  call.function = *import;
-  call.arguments = iree_make_byte_span(&arg0, sizeof(arg0));
-  call.results = iree_make_byte_span(out_ret0, sizeof(*out_ret0));
-
-  iree_vm_execution_result_t result;
-  memset(&result, 0, sizeof(result));
-  return import->module->begin_call(import->module, stack, &call, &result);
-}
-
-// 0ii_i
-typedef iree_status_t (*call_0ii_i_t)(iree_vm_stack_t* stack, void* module_ptr,
-                                      void* module_state, int32_t arg0,
-                                      int32_t arg1, int32_t* res0);
-
-static iree_status_t call_0ii_i_shim(iree_vm_stack_t* stack,
-                                     const iree_vm_function_call_t* call,
-                                     call_0ii_i_t target_fn, void* module,
-                                     void* module_state,
-                                     iree_vm_execution_result_t* out_result) {
-  typedef struct {
-    int32_t arg0;
-    int32_t arg1;
-  } args_t;
-  typedef struct {
-    int32_t ret0;
-  } results_t;
-
-  const args_t* args = (const args_t*)call->arguments.data;
-  results_t* results = (results_t*)call->results.data;
-  return target_fn(stack, module, module_state, args->arg0, args->arg1,
-                   &results->ret0);
+static iree_status_t iree_emitc_shim(
+    iree_vm_stack_t* IREE_RESTRICT stack,
+    /*const*/ iree_vm_function_call_t* IREE_RESTRICT call,
+    iree_vm_native_function_target_emitc target_fn, void* IREE_RESTRICT module,
+    void* IREE_RESTRICT module_state,
+    iree_vm_execution_result_t* IREE_RESTRICT out_result) {
+  return target_fn(stack, call, module, module_state, out_result);
 }
 
 #endif  // IREE_VM_SHIMS_EMITC_H_

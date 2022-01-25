@@ -23,7 +23,9 @@ typedef struct iree_hal_vulkan_vma_buffer_t {
   VmaAllocationInfo allocation_info;
 } iree_hal_vulkan_vma_buffer_t;
 
+namespace {
 extern const iree_hal_buffer_vtable_t iree_hal_vulkan_vma_buffer_vtable;
+}  // namespace
 
 static iree_hal_vulkan_vma_buffer_t* iree_hal_vulkan_vma_buffer_cast(
     iree_hal_buffer_t* base_value) {
@@ -45,21 +47,16 @@ iree_status_t iree_hal_vulkan_vma_buffer_wrap(
   IREE_ASSERT_ARGUMENT(out_buffer);
   IREE_TRACE_ZONE_BEGIN(z0);
 
+  iree_allocator_t host_allocator =
+      iree_hal_allocator_host_allocator(allocator);
   iree_hal_vulkan_vma_buffer_t* buffer = NULL;
   iree_status_t status =
-      iree_allocator_malloc(iree_hal_allocator_host_allocator(allocator),
-                            sizeof(*buffer), (void**)&buffer);
+      iree_allocator_malloc(host_allocator, sizeof(*buffer), (void**)&buffer);
   if (iree_status_is_ok(status)) {
-    iree_hal_resource_initialize(&iree_hal_vulkan_vma_buffer_vtable,
-                                 &buffer->base.resource);
-    buffer->base.allocator = allocator;
-    buffer->base.allocated_buffer = &buffer->base;
-    buffer->base.allocation_size = allocation_size;
-    buffer->base.byte_offset = byte_offset;
-    buffer->base.byte_length = byte_length;
-    buffer->base.memory_type = memory_type;
-    buffer->base.allowed_access = allowed_access;
-    buffer->base.allowed_usage = allowed_usage;
+    iree_hal_buffer_initialize(
+        host_allocator, allocator, &buffer->base, allocation_size, byte_offset,
+        byte_length, memory_type, allowed_access, allowed_usage,
+        &iree_hal_vulkan_vma_buffer_vtable, &buffer->base);
     buffer->vma = vma;
     buffer->handle = handle;
     buffer->allocation = allocation;
@@ -85,8 +82,7 @@ iree_status_t iree_hal_vulkan_vma_buffer_wrap(
 static void iree_hal_vulkan_vma_buffer_destroy(iree_hal_buffer_t* base_buffer) {
   iree_hal_vulkan_vma_buffer_t* buffer =
       iree_hal_vulkan_vma_buffer_cast(base_buffer);
-  iree_allocator_t host_allocator =
-      iree_hal_allocator_host_allocator(iree_hal_buffer_allocator(base_buffer));
+  iree_allocator_t host_allocator = base_buffer->host_allocator;
   IREE_TRACE_ZONE_BEGIN(z0);
 
   // IREE_TRACE_FREE_NAMED("VMA", (void*)buffer->handle);
@@ -107,15 +103,24 @@ static iree_status_t iree_hal_vulkan_vma_buffer_map_range(
     iree_hal_buffer_t* base_buffer, iree_hal_mapping_mode_t mapping_mode,
     iree_hal_memory_access_t memory_access,
     iree_device_size_t local_byte_offset, iree_device_size_t local_byte_length,
-    void** out_data_ptr) {
+    iree_hal_buffer_mapping_t* mapping) {
   iree_hal_vulkan_vma_buffer_t* buffer =
       iree_hal_vulkan_vma_buffer_cast(base_buffer);
+
+  // TODO(benvanik): add upload/download for unmapped buffers.
+  IREE_RETURN_IF_ERROR(iree_hal_buffer_validate_memory_type(
+      iree_hal_buffer_memory_type(base_buffer),
+      IREE_HAL_MEMORY_TYPE_HOST_VISIBLE));
+  IREE_RETURN_IF_ERROR(
+      iree_hal_buffer_validate_usage(iree_hal_buffer_allowed_usage(base_buffer),
+                                     IREE_HAL_BUFFER_USAGE_MAPPING));
 
   uint8_t* data_ptr = nullptr;
   VK_RETURN_IF_ERROR(
       vmaMapMemory(buffer->vma, buffer->allocation, (void**)&data_ptr),
       "vmaMapMemory");
-  *out_data_ptr = data_ptr + local_byte_offset;
+  mapping->contents =
+      iree_make_byte_span(data_ptr + local_byte_offset, local_byte_length);
 
   // If we mapped for discard scribble over the bytes. This is not a mandated
   // behavior but it will make debugging issues easier. Alternatively for
@@ -123,19 +128,20 @@ static iree_status_t iree_hal_vulkan_vma_buffer_map_range(
   // would only work if the entire buffer was discarded.
 #ifndef NDEBUG
   if (iree_any_bit_set(memory_access, IREE_HAL_MEMORY_ACCESS_DISCARD)) {
-    memset(*out_data_ptr, 0xCD, local_byte_length);
+    memset(mapping->contents.data, 0xCD, local_byte_length);
   }
 #endif  // !NDEBUG
 
   return iree_ok_status();
 }
 
-static void iree_hal_vulkan_vma_buffer_unmap_range(
+static iree_status_t iree_hal_vulkan_vma_buffer_unmap_range(
     iree_hal_buffer_t* base_buffer, iree_device_size_t local_byte_offset,
-    iree_device_size_t local_byte_length, void* data_ptr) {
+    iree_device_size_t local_byte_length, iree_hal_buffer_mapping_t* mapping) {
   iree_hal_vulkan_vma_buffer_t* buffer =
       iree_hal_vulkan_vma_buffer_cast(base_buffer);
   vmaUnmapMemory(buffer->vma, buffer->allocation);
+  return iree_ok_status();
 }
 
 static iree_status_t iree_hal_vulkan_vma_buffer_invalidate_range(
@@ -161,10 +167,13 @@ static iree_status_t iree_hal_vulkan_vma_buffer_flush_range(
   return iree_ok_status();
 }
 
+namespace {
 const iree_hal_buffer_vtable_t iree_hal_vulkan_vma_buffer_vtable = {
+    /*.recycle=*/iree_hal_buffer_recycle,
     /*.destroy=*/iree_hal_vulkan_vma_buffer_destroy,
     /*.map_range=*/iree_hal_vulkan_vma_buffer_map_range,
     /*.unmap_range=*/iree_hal_vulkan_vma_buffer_unmap_range,
     /*.invalidate_range=*/iree_hal_vulkan_vma_buffer_invalidate_range,
     /*.flush_range=*/iree_hal_vulkan_vma_buffer_flush_range,
 };
+}  // namespace

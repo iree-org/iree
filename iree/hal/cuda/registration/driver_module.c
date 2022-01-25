@@ -10,10 +10,21 @@
 #include <stddef.h>
 
 #include "iree/base/api.h"
+#include "iree/base/internal/flags.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/cuda/api.h"
 
 #define IREE_HAL_CUDA_DRIVER_ID 0x43554441u  // CUDA
+
+// Force using CUDA streams until we support command buffer caching to avoid the
+// overhead of graph creation.
+IREE_FLAG(
+    bool, cuda_use_streams, true,
+    "Use CUDA streams for executing command buffers (instead of graphs).");
+
+IREE_FLAG(bool, cuda_allow_inline_execution, false,
+          "Allow command buffers to execute inline against CUDA streams when "
+          "possible.");
 
 static iree_status_t iree_hal_cuda_driver_factory_enumerate(
     void* self, const iree_hal_driver_info_t** out_driver_infos,
@@ -41,15 +52,19 @@ static iree_status_t iree_hal_cuda_driver_factory_try_create(
                             driver_id);
   }
   IREE_TRACE_ZONE_BEGIN(z0);
+
   iree_hal_cuda_device_params_t default_params;
   iree_hal_cuda_device_params_initialize(&default_params);
-  // TODO(jinchen62): set up default_params.use_deferred_submission by flag
-  // When we expose more than one driver (different cuda versions, etc) we
-  // can name them here:
-  iree_string_view_t identifier = iree_make_cstring_view("cuda");
+  if (FLAG_cuda_use_streams) {
+    default_params.command_buffer_mode =
+        IREE_HAL_CUDA_COMMAND_BUFFER_MODE_STREAM;
+  }
+  default_params.allow_inline_execution = FLAG_cuda_allow_inline_execution;
 
   iree_hal_cuda_driver_options_t driver_options;
   iree_hal_cuda_driver_options_initialize(&driver_options);
+
+  iree_string_view_t identifier = iree_make_cstring_view("cuda");
   iree_status_t status = iree_hal_cuda_driver_create(
       identifier, &default_params, &driver_options, allocator, out_driver);
   IREE_TRACE_ZONE_END(z0);

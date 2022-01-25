@@ -1,4 +1,4 @@
-// RUN: iree-translate -iree-vm-ir-to-c-module -iree-vm-c-module-optimize=false %s | IreeFileCheck %s
+// RUN: iree-translate -iree-vm-ir-to-c-module -iree-vm-c-module-optimize=false %s | FileCheck %s
 
 vm.module @control_flow_module {
   vm.func @control_flow_test(%a: i32, %cond: i32) -> i32 {
@@ -24,7 +24,6 @@ vm.module @control_flow_module {
   // CHECK-NEXT: int32_t [[C:[^ ]*]];
   // CHECK-NEXT: int32_t [[D:[^ ]*]];
   // CHECK-NEXT: int32_t [[E:[^ ]*]];
-  // CHECK-NEXT: [[BB0:[^ ]*]]:
   // CHECK-NEXT: [[COND_NZ]] = vm_cmp_nz_i32([[COND]]);
   // CHECK-NEXT: [[COND_BOOL]] = EMITC_CAST([[COND_NZ]], bool);
   // CHECK-NEXT: if ([[COND_BOOL]]) {

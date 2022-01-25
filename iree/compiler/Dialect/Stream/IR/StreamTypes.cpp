@@ -8,6 +8,7 @@
 
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/TypeSwitch.h"
+#include "llvm/Support/CommandLine.h"
 #include "mlir/IR/DialectImplementation.h"
 
 // clang-format off: must be included after all LLVM/MLIR headers.
@@ -23,14 +24,27 @@ namespace iree_compiler {
 namespace IREE {
 namespace Stream {
 
+static llvm::cl::opt<Favor> partitioningFavor(
+    "iree-stream-partitioning-favor",
+    llvm::cl::desc("Default stream partitioning favor configuration."),
+    llvm::cl::init(Favor::MaxConcurrency),
+    llvm::cl::values(
+        clEnumValN(Favor::Debug, "debug",
+                   "Force debug partitioning (no concurrency or pipelining)."),
+        clEnumValN(Favor::MinPeakMemory, "min-peak-memory",
+                   "Favor minimizing memory consumption at the cost of "
+                   "additional concurrency."),
+        clEnumValN(Favor::MaxConcurrency, "max-concurrency",
+                   "Favor maximizing concurrency at the cost of additional "
+                   "memory consumption.")));
+
 //===----------------------------------------------------------------------===//
 // #stream.resource_config<...>
 //===----------------------------------------------------------------------===//
 
 // static
-Attribute ResourceConfigAttr::parse(mlir::DialectAsmParser &p,
-                                    mlir::Type type) {
-  if (failed(p.parseLBrace())) return {};
+Attribute ResourceConfigAttr::parse(AsmParser &p, Type type) {
+  if (failed(p.parseLess()) || failed(p.parseLBrace())) return {};
 
   int64_t maxAllocationSize = 0;
   int64_t minBufferOffsetAlignment = 0;
@@ -54,21 +68,22 @@ Attribute ResourceConfigAttr::parse(mlir::DialectAsmParser &p,
     }
     (void)p.parseOptionalComma();
   }
+  if (failed(p.parseGreater())) return {};
 
   return ResourceConfigAttr::get(p.getContext(), maxAllocationSize,
                                  minBufferOffsetAlignment, maxBufferRange,
                                  minBufferRangeAlignment);
 }
 
-void ResourceConfigAttr::print(mlir::DialectAsmPrinter &p) const {
+void ResourceConfigAttr::print(AsmPrinter &p) const {
   auto &os = p.getStream();
-  os << getMnemonic() << "{";
+  os << "<{";
   os << "max_allocation_size = " << getMaxAllocationSize() << ", ";
   os << "min_buffer_offset_alignment = " << getMinBufferOffsetAlignment()
      << ", ";
   os << "max_buffer_range = " << getMaxBufferRange() << ", ";
   os << "min_buffer_range_alignment = " << getMinBufferRangeAlignment();
-  os << "}";
+  os << "}>";
 }
 
 // static
@@ -110,7 +125,7 @@ static ResourceConfigAttr inferResourceConfigFromAffinity(
 // static
 ResourceConfigAttr ResourceConfigAttr::lookup(Operation *op) {
   auto *context = op->getContext();
-  auto attrId = mlir::Identifier::get("stream.resources", context);
+  auto attrId = StringAttr::get(context, "stream.resources");
   while (op) {
     if (auto affinityOp = llvm::dyn_cast<AffinityOpInterface>(op)) {
       auto affinityAttr = affinityOp.getAffinity();
@@ -131,7 +146,7 @@ ResourceConfigAttr ResourceConfigAttr::lookup(Operation *op) {
 // #stream.timepoint<...>
 //===----------------------------------------------------------------------===//
 
-Attribute TimepointAttr::parse(mlir::DialectAsmParser &p, mlir::Type type) {
+Attribute TimepointAttr::parse(AsmParser &p, Type type) {
   StringRef timeStr;
   if (failed(p.parseLess())) return {};
   if (failed(p.parseKeyword(&timeStr))) {
@@ -146,8 +161,8 @@ Attribute TimepointAttr::parse(mlir::DialectAsmParser &p, mlir::Type type) {
   return TimepointAttr::get(p.getContext(), TimepointType::get(p.getContext()));
 }
 
-void TimepointAttr::print(mlir::DialectAsmPrinter &p) const {
-  p << getMnemonic() << "<";
+void TimepointAttr::print(AsmPrinter &p) const {
+  p << "<";
   p << "immediate";
   p << ">";
 }
@@ -157,7 +172,7 @@ void TimepointAttr::print(mlir::DialectAsmPrinter &p) const {
 //===----------------------------------------------------------------------===//
 
 AffinityAttr AffinityAttr::lookup(Operation *op) {
-  auto attrId = mlir::Identifier::get("stream.affinity", op->getContext());
+  auto attrId = StringAttr::get(op->getContext(), "stream.affinity");
   while (op) {
     if (auto affinityOp = llvm::dyn_cast<AffinityOpInterface>(op)) {
       auto affinity = affinityOp.getAffinity();
@@ -187,8 +202,7 @@ void PartitioningConfigAttr::walkImmediateSubElements(
   walkAttrsFn(getFavor());
 }
 
-Attribute PartitioningConfigAttr::parse(mlir::DialectAsmParser &p,
-                                        mlir::Type type) {
+Attribute PartitioningConfigAttr::parse(AsmParser &p, Type type) {
   std::string favorStr;
   if (failed(p.parseLess())) return {};
   if (succeeded(p.parseOptionalStar())) {
@@ -206,21 +220,23 @@ Attribute PartitioningConfigAttr::parse(mlir::DialectAsmParser &p,
       FavorAttr::get(p.getContext(), favor.getValue()));
 }
 
-void PartitioningConfigAttr::print(mlir::DialectAsmPrinter &p) const {
-  p << getMnemonic() << "<";
+void PartitioningConfigAttr::print(AsmPrinter &p) const {
+  p << "<";
   p << "favor-";
   p << stringifyFavor(getFavor().getValue());
   p << ">";
 }
 
 PartitioningConfigAttr PartitioningConfigAttr::lookup(Operation *op) {
-  auto attrId = mlir::Identifier::get("stream.partitioning", op->getContext());
+  auto attrId = StringAttr::get(op->getContext(), "stream.partitioning");
   while (op) {
     auto attr = op->getAttrOfType<PartitioningConfigAttr>(attrId);
     if (attr) return attr;
     op = op->getParentOp();
   }
-  return {};  // No config found; let caller decide what to do.
+  // No config found; use defaults.
+  auto favorAttr = FavorAttr::get(attrId.getContext(), partitioningFavor);
+  return PartitioningConfigAttr::get(favorAttr);
 }
 
 //===----------------------------------------------------------------------===//
@@ -253,7 +269,7 @@ static void printLifetime(Lifetime lifetime, llvm::raw_ostream &os) {
   }
 }
 
-Type ResourceType::parse(mlir::DialectAsmParser &p) {
+Type ResourceType::parse(AsmParser &p) {
   StringRef lifetimeStr;
   if (failed(p.parseLess())) return {};
   if (succeeded(p.parseOptionalStar())) {
@@ -270,8 +286,8 @@ Type ResourceType::parse(mlir::DialectAsmParser &p) {
   return ResourceType::get(p.getContext(), lifetime.getValue());
 }
 
-void ResourceType::print(mlir::DialectAsmPrinter &p) const {
-  p << getMnemonic() << "<";
+void ResourceType::print(AsmPrinter &p) const {
+  p << "<";
   printLifetime(getLifetime(), p.getStream());
   p << ">";
 }
@@ -293,6 +309,9 @@ bool ResourceType::isAccessStorageCompatible(Type accessType) const {
 #include "iree/compiler/Dialect/Stream/IR/StreamTypeInterfaces.cpp.inc"  // IWYU pragma: keep
 
 void StreamDialect::registerAttributes() {
+  // Register command line flags:
+  (void)partitioningFavor;
+
   addAttributes<
 #define GET_ATTRDEF_LIST
 #include "iree/compiler/Dialect/Stream/IR/StreamAttrs.cpp.inc"  // IWYU pragma: keep
@@ -304,45 +323,6 @@ void StreamDialect::registerTypes() {
 #define GET_TYPEDEF_LIST
 #include "iree/compiler/Dialect/Stream/IR/StreamTypes.cpp.inc"  // IWYU pragma: keep
       >();
-}
-
-//===----------------------------------------------------------------------===//
-// Type printing and parsing
-//===----------------------------------------------------------------------===//
-
-Attribute StreamDialect::parseAttribute(DialectAsmParser &parser,
-                                        Type type) const {
-  StringRef mnemonic;
-  if (failed(parser.parseKeyword(&mnemonic))) return {};
-  Attribute attr;
-  auto parseResult = generatedAttributeParser(parser, mnemonic, type, attr);
-  if (parseResult.hasValue()) return attr;
-  parser.emitError(parser.getCurrentLocation())
-      << "unknown Stream attribute: " << mnemonic;
-  return {};
-}
-
-void StreamDialect::printAttribute(Attribute attr, DialectAsmPrinter &p) const {
-  if (failed(generatedAttributePrinter(attr, p))) {
-    llvm_unreachable("unknown Stream attribute");
-  }
-}
-
-Type StreamDialect::parseType(DialectAsmParser &parser) const {
-  StringRef mnemonic;
-  if (failed(parser.parseKeyword(&mnemonic))) return {};
-  Type type;
-  OptionalParseResult parseResult = generatedTypeParser(parser, mnemonic, type);
-  if (parseResult.hasValue()) return type;
-  parser.emitError(parser.getCurrentLocation())
-      << "unknown Stream type: " << mnemonic;
-  return {};
-}
-
-void StreamDialect::printType(Type type, DialectAsmPrinter &p) const {
-  if (failed(generatedTypePrinter(type, p))) {
-    llvm_unreachable("unknown Stream type");
-  }
 }
 
 }  // namespace Stream

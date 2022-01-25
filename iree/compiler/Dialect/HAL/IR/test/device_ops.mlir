@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file %s | iree-opt -split-input-file | IreeFileCheck %s
+// RUN: iree-opt -split-input-file %s | iree-opt -split-input-file | FileCheck %s
 
 // CHECK-LABEL: @device_allocator
 // CHECK-SAME: (%[[DEVICE:.+]]: !hal.device)

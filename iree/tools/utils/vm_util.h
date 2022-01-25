@@ -46,8 +46,15 @@ Status ParseToVariantList(iree_hal_allocator_t* allocator,
 // described in
 // https://github.com/google/iree/tree/main/iree/hal/api.h
 // Uses descriptors in |descs| for type information and validation.
-Status PrintVariantList(iree_vm_list_t* variant_list,
-                        std::ostream* os = &std::cout);
+Status PrintVariantList(iree_vm_list_t* variant_list, size_t max_element_count,
+                        std::ostream* os);
+inline Status PrintVariantList(iree_vm_list_t* variant_list, std::ostream* os) {
+  return PrintVariantList(variant_list, 1024, os);
+}
+inline Status PrintVariantList(iree_vm_list_t* variant_list,
+                               size_t max_element_count = 1024) {
+  return PrintVariantList(variant_list, max_element_count, &std::cout);
+}
 
 // Creates the default device for |driver| in |out_device|.
 // The returned |out_device| must be released by the caller.

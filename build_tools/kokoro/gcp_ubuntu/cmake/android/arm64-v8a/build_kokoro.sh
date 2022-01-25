@@ -7,7 +7,7 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 # Cross-compile the project towards Android arm64-v8a with the
-# gcr.io/iree-oss/cmake-android image using Kokoro.
+# gcr.io/iree-oss/android image using Kokoro.
 # Requires the environment variables KOKORO_ROOT and KOKORO_ARTIFACTS_DIR, which
 # are set by Kokoro.
 
@@ -23,8 +23,10 @@ source "${KOKORO_ARTIFACTS_DIR?}/github/iree/build_tools/kokoro/gcp_ubuntu/docke
 # Sets DOCKER_RUN_ARGS
 docker_setup
 
+# Need to use frontends image (which also has Android toolchain) to build the
+# TFLite compiler for generating benchmarks.
 docker run "${DOCKER_RUN_ARGS[@]?}" \
-  gcr.io/iree-oss/cmake-android@sha256:0981a75325547d1bd5771290287cb8ef09181c4c127972d17132405394478ffb \
+  gcr.io/iree-oss/frontends@sha256:0433f5dfea6f4be6050bb52c3e53c91210aed38244e31e649f65080de2e38fc5 \
   build_tools/kokoro/gcp_ubuntu/cmake/android/build.sh arm64-v8a
 
 # Kokoro will rsync this entire directory back to the executor orchestrating the

@@ -1,0 +1,2 @@
+// RUN: (static_library_demo_c) | FileCheck %s
+// CHECK-LABEL: static_library_run_c passed

@@ -222,6 +222,20 @@ void SetupVulkan(iree_hal_vulkan_features_t vulkan_features,
     create_info.enabledExtensionCount =
         static_cast<uint32_t>(device_extensions.size());
     create_info.ppEnabledExtensionNames = device_extensions.data();
+
+    // Enable timeline semaphores.
+    VkPhysicalDeviceFeatures2 features2;
+    memset(&features2, 0, sizeof(features2));
+    features2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
+    create_info.pNext = &features2;
+    VkPhysicalDeviceTimelineSemaphoreFeatures semaphore_features;
+    memset(&semaphore_features, 0, sizeof(semaphore_features));
+    semaphore_features.sType =
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TIMELINE_SEMAPHORE_FEATURES;
+    semaphore_features.pNext = features2.pNext;
+    features2.pNext = &semaphore_features;
+    semaphore_features.timelineSemaphore = VK_TRUE;
+
     err = vkCreateDevice(*physical_device, &create_info, allocator, device);
     check_vk_result(err);
     vkGetDeviceQueue(*device, *queue_family_index, 0, queue);

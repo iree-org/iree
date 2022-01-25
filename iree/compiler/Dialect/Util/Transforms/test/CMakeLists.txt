@@ -19,9 +19,14 @@ iree_lit_test_suite(
     "drop_compiler_hints.mlir"
     "fold_globals.mlir"
     "fuse_globals.mlir"
+    "hoist_into_globals.mlir"
+    "hoist_into_globals_linalg.mlir"
     "simplify_global_accesses.mlir"
-  DATA
-    iree::tools::IreeFileCheck
+    "strip_debug_ops.mlir"
+    "test_float_range_analysis.mlir"
+    "test_float_range_analysis_linalg.mlir"
+  TOOLS
+    FileCheck
     iree::tools::iree-opt
 )
 

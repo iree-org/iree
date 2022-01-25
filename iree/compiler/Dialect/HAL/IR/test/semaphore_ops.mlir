@@ -1,6 +1,4 @@
-// Tests printing and parsing of hal.semaphore ops.
-
-// RUN: iree-opt -split-input-file %s | iree-opt -split-input-file | IreeFileCheck %s
+// RUN: iree-opt -split-input-file %s | iree-opt -split-input-file | FileCheck %s
 
 // CHECK-LABEL: @semaphore_create
 func @semaphore_create(%arg0 : !hal.device) -> !hal.semaphore {

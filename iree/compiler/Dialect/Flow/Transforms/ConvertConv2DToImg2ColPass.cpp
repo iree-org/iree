@@ -6,7 +6,7 @@
 
 #include "iree/compiler/Dialect/Flow/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
-#include "mlir/Dialect/Linalg/IR/LinalgOps.h"
+#include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Utils/ReshapeOpsUtils.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/Pass/Pass.h"
@@ -98,7 +98,7 @@ class Conv2DImg2ColMatmulConversion
 
     auto s = [&](unsigned i) {
       return rewriter.getAffineConstantExpr(
-          convOp.strides().getValue<int64_t>({i}));
+          convOp.strides().getValues<int64_t>()[i]);
     };
 
     SmallVector<AffineExpr, 4> inputExprs = {n, d(1) * s(0) + k(1),
@@ -139,15 +139,14 @@ class Conv2DImg2ColMatmulConversion
         RankedTensorType::get({outputShape[1] * outputShape[2], outputShape[3]},
                               outputShapeType.getElementType());
 
-    Value reshapedImg2ColTensor =
-        rewriter.create<linalg::TensorCollapseShapeOp>(
-            loc, reshapedImg2ColTensorType, img2ColTensor.getResult(0),
-            img2ColTensorReassociationIndices);
+    Value reshapedImg2ColTensor = rewriter.create<tensor::CollapseShapeOp>(
+        loc, reshapedImg2ColTensorType, img2ColTensor.getResult(0),
+        img2ColTensorReassociationIndices);
 
-    Value reshapedFilter = rewriter.create<linalg::TensorCollapseShapeOp>(
+    Value reshapedFilter = rewriter.create<tensor::CollapseShapeOp>(
         loc, reshapedFilterType, filter, filterAndOutputReassociationIndices);
 
-    Value reshapedOutput = rewriter.create<linalg::TensorCollapseShapeOp>(
+    Value reshapedOutput = rewriter.create<tensor::CollapseShapeOp>(
         loc, reshapedOutputType, output, filterAndOutputReassociationIndices);
 
     auto matmulResult = rewriter.create<linalg::MatmulOp>(
@@ -155,7 +154,7 @@ class Conv2DImg2ColMatmulConversion
         ArrayRef<Value>{reshapedImg2ColTensor, reshapedFilter},
         ArrayRef<Value>{reshapedOutput});
 
-    auto reshapedResult = rewriter.create<linalg::TensorExpandShapeOp>(
+    auto reshapedResult = rewriter.create<tensor::ExpandShapeOp>(
         loc, outputShapeType, matmulResult.getResults()[0],
         filterAndOutputReassociationIndices);
 
@@ -170,11 +169,11 @@ class Conv2DImg2ColMatmulConversion
 // by transposing both input filter so channles are outer most the computation
 // is a batched matrix-vector product.
 class DepthwiseConv2DNHWCHWCImg2ColMatmulConversion
-    : public OpRewritePattern<linalg::DepthwiseConv2DNhwOp> {
+    : public OpRewritePattern<linalg::DepthwiseConv2DNhwcHwcOp> {
  public:
-  using OpRewritePattern<linalg::DepthwiseConv2DNhwOp>::OpRewritePattern;
+  using OpRewritePattern<linalg::DepthwiseConv2DNhwcHwcOp>::OpRewritePattern;
 
-  LogicalResult matchAndRewrite(linalg::DepthwiseConv2DNhwOp convOp,
+  LogicalResult matchAndRewrite(linalg::DepthwiseConv2DNhwcHwcOp convOp,
                                 PatternRewriter &rewriter) const override {
     RankedTensorType inputTensorType =
         convOp.getInputOperand(0)->get().getType().dyn_cast<RankedTensorType>();
@@ -263,7 +262,7 @@ class DepthwiseConv2DNHWCHWCImg2ColMatmulConversion
 
     auto s = [&](unsigned i) {
       return rewriter.getAffineConstantExpr(
-          convOp.strides().getValue<int64_t>({i}));
+          convOp.strides().getValues<int64_t>()[i]);
     };
 
     SmallVector<AffineExpr> inputExprs = {n, ci, d(1) * s(0) + k(1),
@@ -308,14 +307,13 @@ class DepthwiseConv2DNHWCHWCImg2ColMatmulConversion
          transposedOutputTensorShape[2] * transposedOutputTensorShape[3]},
         outputTensorType.getElementType());
 
-    Value reshapedImg2ColTensor =
-        rewriter.create<linalg::TensorCollapseShapeOp>(
-            loc, reshapedImg2ColTensorType, img2ColTensor.getResult(0),
-            img2ColTensorReassociationIndices);
-    Value reshapedFilterTensor = rewriter.create<linalg::TensorCollapseShapeOp>(
+    Value reshapedImg2ColTensor = rewriter.create<tensor::CollapseShapeOp>(
+        loc, reshapedImg2ColTensorType, img2ColTensor.getResult(0),
+        img2ColTensorReassociationIndices);
+    Value reshapedFilterTensor = rewriter.create<tensor::CollapseShapeOp>(
         loc, reshapedFilterTensorType, transposedFilter,
         filterReassociationIndice);
-    Value reshapedoutputTensor = rewriter.create<linalg::TensorCollapseShapeOp>(
+    Value reshapedoutputTensor = rewriter.create<tensor::CollapseShapeOp>(
         loc, reshapedOutputTensorType, transposedOutputTensor,
         outputReassociationIndice);
 
@@ -327,10 +325,9 @@ class DepthwiseConv2DNHWCHWCImg2ColMatmulConversion
     SmallVector<ReassociationIndices> batchMatVecReassociationIndice = {{0, 1},
                                                                         {2, 3}};
 
-    Value batchMatVecResultReshaped =
-        rewriter.create<linalg::TensorExpandShapeOp>(
-            loc, transposedOutputTensor.getType(),
-            batchMatVecResult.getResult(0), batchMatVecReassociationIndice);
+    Value batchMatVecResultReshaped = rewriter.create<tensor::ExpandShapeOp>(
+        loc, transposedOutputTensor.getType(), batchMatVecResult.getResult(0),
+        batchMatVecReassociationIndice);
 
     auto transposedResult =
         transposeOperand(batchMatVecResultReshaped, {0, 2, 3, 1});
@@ -350,14 +347,16 @@ struct ConvertConv2DToImg2ColPass
     OwningRewritePatternList patterns(&getContext());
     patterns.insert<Conv2DImg2ColMatmulConversion,
                     DepthwiseConv2DNHWCHWCImg2ColMatmulConversion>(context);
-    (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
+    if (failed(applyPatternsAndFoldGreedily(getOperation(),
+                                            std::move(patterns)))) {
+      return signalPassFailure();
+    }
   }
 };
 
 }  // namespace
 
-std::unique_ptr<OperationPass<mlir::FuncOp>>
-createConvertConv2DToImg2ColPass() {
+std::unique_ptr<Pass> createConvertConv2DToImg2ColPass() {
   return std::make_unique<ConvertConv2DToImg2ColPass>();
 }
 

@@ -8,8 +8,8 @@
 
 #include <memory>
 
-#include "iree/compiler/Dialect/Shape/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
+#include "iree/compiler/Utils/PassUtils.h"
 #include "mlir/Dialect/Linalg/Passes.h"
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
 #include "mlir/Pass/PassOptions.h"
@@ -66,87 +66,118 @@ namespace iree_compiler {
 namespace IREE {
 namespace Flow {
 
+namespace {
+
+using FunctionLikeNest = MultiOpNest<FuncOp, IREE::Util::InitializerOp>;
+
+// Subset of the overall pass pipeline for optimizing globals and numerics.
+// We may ultimately break this out separately so creating a syntactic
+// distinction to keep that as an option.
+void buildGlobalOptimizationPassPipeline(
+    OpPassManager &mainPassManager, const TransformOptions &transformOptions) {
+  OpPassManager pipeline(ModuleOp::getOperationName());
+
+  FunctionLikeNest(pipeline)
+      // Simplify util.global accesses early on; this can help with dispatch
+      // region formation as redundant store-loads are removed.
+      .addPass(IREE::Util::createSimplifyGlobalAccessesPass);
+
+  // Module level cleanup and canonicalization of util.global (and other util
+  // ops).
+  pipeline.addPass(IREE::Util::createApplyPatternsPass());
+  pipeline.addPass(IREE::Util::createFoldGlobalsPass());
+
+  if (transformOptions.constExprHoisting) {
+    pipeline.addPass(IREE::Util::createHoistIntoGlobalsPass());
+  }
+
+  if (transformOptions.buildConstEvalPassPipeline) {
+    transformOptions.buildConstEvalPassPipeline(pipeline);
+  }
+
+  if (transformOptions.numericPrecisionReduction) {
+    pipeline.addPass(createInferNumericNarrowingPass());
+    pipeline.addPass(createOptimizeNumericsPass());
+    pipeline.addPass(createCleanupNumericNarrowingPass());
+  }
+
+  FunctionLikeNest(pipeline)
+      .addPass(mlir::createCanonicalizerPass)
+      .addPass(mlir::createCSEPass);
+
+  // Add the whole fixed point iterator.
+  mainPassManager.addPass(
+      IREE::Util::createFixedPointIteratorPass(std::move(pipeline)));
+}
+
+}  // namespace
+
 void buildFlowTransformPassPipeline(OpPassManager &passManager,
                                     const TransformOptions &transformOptions) {
   // Special case peephole optimizations.
-  {
-    passManager.addNestedPass<FuncOp>(createConvertConv2D1x1ToMatmulPass());
-    if (clEnableConvToImg2Col) {
-      passManager.addNestedPass<FuncOp>(createConvertConv2DToImg2ColPass());
-    }
-    // Pad linalg op
-    if (clEnablePaddingLinalgOps) {
-      passManager.addNestedPass<FuncOp>(
-          createPadLinalgOpsToIntegerMultiplePass(clLinalgOpsPaddingSize));
-    }
-  }
+  FunctionLikeNest(passManager)
+      .addPass(createConvertConv2D1x1ToMatmulPass)
+      .addPredicatedPass(clEnableConvToImg2Col,
+                         createConvertConv2DToImg2ColPass)
+      // Pad linalg op
+      .addPredicatedPass(clEnablePaddingLinalgOps,
+                         []() {
+                           return createPadLinalgOpsToIntegerMultiplePass(
+                               clLinalgOpsPaddingSize);
+                         })
 
-  passManager.addNestedPass<mlir::FuncOp>(createVerifyInputLegalityPass());
+      // Input should now be legal.
+      .addPass(createVerifyInputLegalityPass);
 
-  // Simplify util.global accesses early on; this can help with dispatch
-  // region formation as redundant store-loads are removed.
-  passManager.addNestedPass<IREE::Util::InitializerOp>(
-      IREE::Util::createSimplifyGlobalAccessesPass());
-  passManager.addNestedPass<mlir::FuncOp>(
-      IREE::Util::createSimplifyGlobalAccessesPass());
+  passManager.addPass(mlir::createLinalgNamedOpConversionPass());
+  buildGlobalOptimizationPassPipeline(passManager, transformOptions);
 
-  // Cleanup and canonicalization of util.global (and other util ops).
-  passManager.addPass(IREE::Util::createApplyPatternsPass());
-  passManager.addPass(IREE::Util::createFoldGlobalsPass());
   // Perform cleanup after variable simplification as more canonicalizers may be
   // able to kick in.
-  passManager.addNestedPass<mlir::FuncOp>(mlir::createCanonicalizerPass());
-  passManager.addNestedPass<mlir::FuncOp>(mlir::createCSEPass());
+  FunctionLikeNest(passManager)
+      // Pad tensors.
+      .addPass(createPadTensorToSubTensorInsertPass)
 
-  // Replaces variables with !shapex.ranked_shape types with individual
-  // variables for each dimension. This allows for constant dimensions to be
-  // DCE'd in following passes.
-  passManager.addPass(createExpandGlobalDynamicDimsPass());
+      // Elementwise, fusion, tiling and distribution.
+      .addPass(mlir::createConvertElementwiseToLinalgPass)
+      .addPass(mlir::createLinalgFoldUnitExtentDimsPass)
+      .addPass(createInterchangeGenericOpsPass)
+      .addPass(mlir::createCanonicalizerPass)
+      .addPass(memref::createResolveShapedTypeResultDimsPass)
 
-  // Materialize dynamic shapes in the IR, also expanding function signatures
-  // such that:
-  //   - Dynamic ranked tensors: (tensor<?x?xf32>) expands to
-  //     (tensor<?x?xf32>, ranked_shape<[?,?]>), and ultimately expands to
-  //     (tensor<?x?xf32>, i32, i32)
-  //   - Unranked tensors: **unsupported**
-  // The generated ABI wrappers assume such an expansion and will generate code
-  // to produce it from the original reflection metadata captured in the
-  // previous pass.
-  passManager.addPass(Shape::createExpandFunctionDynamicDimsPass());
+      // Fusion.
+      .addPass(createFusionOfTensorOpsPass)
+      .addPass(mlir::createCSEPass)
+      .addPredicatedPass(clEnableLinalgDetensorize,
+                         mlir::createLinalgDetensorizePass)
+      // Dispatch region formation.
+      .addPass(createConvertToFlowBeforeDispatchFormation)
+      .addPass(mlir::createCanonicalizerPass)
+      .addPass(createDispatchLinalgOnTensorsPass)
+      .addPass(memref::createResolveShapedTypeResultDimsPass)
+      .addPass(createCaptureDispatchDynamicDimsPass)
+      .addPass(createConvertToFlowAfterDispatchFormation)
+      .addPass(mlir::createCanonicalizerPass)
+      .addPass(memref::createResolveShapedTypeResultDimsPass)
 
-  passManager.addPass(createPadTensorToSubTensorInsertPass());
+      // Cleanup again?
+      .addPass(createConvertToFlowAfterDispatchFormation)
+      // NOTE: required because the current dispatch-linalg-on-tensors pass
+      // creates a lot of dead IR that needs to be cleaned up.
+      .addPass(mlir::createCanonicalizerPass);
 
-  // Elementwise, fusion, tiling and distribution.
-  passManager.addNestedPass<mlir::FuncOp>(
-      mlir::createConvertElementwiseToLinalgPass());
-  passManager.addNestedPass<mlir::FuncOp>(
-      mlir::createLinalgFoldUnitExtentDimsPass());
-  passManager.addNestedPass<mlir::FuncOp>(createInterchangeGenericOpsPass());
-  passManager.addNestedPass<mlir::FuncOp>(mlir::createCanonicalizerPass());
-  passManager.addPass(memref::createResolveShapedTypeResultDimsPass());
-  passManager.addNestedPass<mlir::FuncOp>(createFusionOfTensorOpsPass());
-  passManager.addNestedPass<mlir::FuncOp>(mlir::createCSEPass());
-  if (clEnableLinalgDetensorize) {
-    passManager.addNestedPass<mlir::FuncOp>(
-        mlir::createLinalgDetensorizePass());
-  }
-  passManager.addNestedPass<mlir::FuncOp>(
-      createConvertToFlowBeforeDispatchFormation());
-  passManager.addNestedPass<mlir::FuncOp>(mlir::createCanonicalizerPass());
-  passManager.addNestedPass<mlir::FuncOp>(createDispatchLinalgOnTensorsPass());
-  passManager.addPass(memref::createResolveShapedTypeResultDimsPass());
-  passManager.addNestedPass<mlir::FuncOp>(
-      createConvertToFlowAfterDispatchFormation());
-  // NOTE: required because the current dispatch-linalg-on-tensors pass
-  // creates a lot of dead IR that needs to be cleaned up.
-  passManager.addNestedPass<mlir::FuncOp>(mlir::createCanonicalizerPass());
-
-  // Outline the dispatch regions into their own functions wrapped in
-  // executables.
+  // Module pass to outline the dispatch regions into their own functions
+  // wrapped in executables.
   passManager.addPass(createOutlineDispatchRegionsPass());
 
+  // Strip assertions from executables. We could support them with a bunch of
+  // work but our generated executables are designed to be safe in the face of
+  // invalid values and it'd only be useful for debugging.
+  passManager.addNestedPass<IREE::Flow::ExecutableOp>(
+      IREE::Util::createStripDebugOpsPass());
+
   // Cleanup identity ops that clutter up the IR and canonicalize.
-  passManager.addNestedPass<mlir::FuncOp>(mlir::createCanonicalizerPass());
+  FunctionLikeNest(passManager).addPass(mlir::createCanonicalizerPass);
 
   // Deduplicate executables created from dispatch regions.
   // Note: this only deduplicates equivalent executables. We could in addition
@@ -161,16 +192,15 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
     passManager.addPass(IREE::Flow::createExportBenchmarkFuncsPass());
   }
 
-  // Inject tracing that logs both input and output tensors from all dispatches.
-  // We do this after deduping so that the executable names match later stages.
-  if (clTraceDispatchTensors) {
-    passManager.addNestedPass<mlir::FuncOp>(
-        IREE::Flow::createInjectDispatchTracingPass());
-  }
-
-  // Cleanup the IR after we are done.
-  passManager.addNestedPass<mlir::FuncOp>(mlir::createCanonicalizerPass());
-  passManager.addNestedPass<mlir::FuncOp>(mlir::createCSEPass());
+  FunctionLikeNest(passManager)
+      // Inject tracing that logs both input and output tensors from all
+      // dispatches. We do this after deduping so that the executable names
+      // match later stages.
+      .addPredicatedPass(clTraceDispatchTensors,
+                         IREE::Flow::createInjectDispatchTracingPass)
+      // Cleanup the IR after we are done.
+      .addPass(mlir::createCanonicalizerPass)
+      .addPass(mlir::createCSEPass);
 
   passManager.addNestedPass<IREE::Flow::ExecutableOp>(
       mlir::createCanonicalizerPass());
@@ -179,43 +209,6 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
   // Symbol DCE any remaining variables/functions that are now no longer
   // required.
   passManager.addPass(mlir::createSymbolDCEPass());
-
-  //----------------------------------------------------------------------------
-  // Stream formation.
-  // Pre-conditions:
-  //   - Full formation of dispatch regions
-  //----------------------------------------------------------------------------
-  // TODO(#7277): remove when switched to streams (happens there now).
-  if (transformOptions.streamFormation) {
-    // Cleanup the IR before we try to form streams.
-    passManager.addNestedPass<mlir::FuncOp>(mlir::createCanonicalizerPass());
-    passManager.addNestedPass<mlir::FuncOp>(mlir::createCSEPass());
-
-    // Outline large constants into globals so we can efficiently manage them.
-    passManager.addPass(IREE::Flow::createOutlineLargeConstantsPass());
-
-    // Reorder blocks to increase the grouping of streamable ops.
-    passManager.addNestedPass<mlir::FuncOp>(
-        IREE::Flow::createHoistUnstreamableOpsPass());
-
-    // The hoisting pass does some reordering. Canonicalize to avoid unnecessary
-    // arbitrary ordering.
-    passManager.addNestedPass<mlir::FuncOp>(mlir::createCanonicalizerPass());
-    passManager.addNestedPass<mlir::FuncOp>(mlir::createCSEPass());
-
-    // Clone constants that escape basic blocks until we have better analysis.
-    passManager.addNestedPass<mlir::FuncOp>(
-        IREE::Flow::createInsertConstantClonesPass());
-
-    // Group streamable ops into streams.
-    passManager.addNestedPass<mlir::FuncOp>(
-        IREE::Flow::createFormStreamsPass());
-
-    // Forming streams involves a fair amount of subgraph stitching, which can
-    // cause duplication. Run CSE to collapse.
-    passManager.addNestedPass<mlir::FuncOp>(mlir::createCanonicalizerPass());
-    passManager.addNestedPass<mlir::FuncOp>(mlir::createCSEPass());
-  }
 }
 
 void registerFlowTransformPassPipeline() {
@@ -232,9 +225,21 @@ namespace {
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h.inc"  // IWYU pragma: export
 }  // namespace
 
+/// Test passes.
+std::unique_ptr<OperationPass<void>>
+createTestPartitionableLoopsInterfacePass();
+
+/// Register test passes.
+inline void registerTestPasses() {
+  createTestPartitionableLoopsInterfacePass();
+}
+
 void registerFlowPasses() {
   // Generated.
   registerPasses();
+
+  // Test passes.
+  registerTestPasses();
 
   // Pipelines.
   registerFlowTransformPassPipeline();

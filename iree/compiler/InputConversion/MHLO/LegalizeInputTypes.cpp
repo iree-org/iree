@@ -9,7 +9,7 @@
 #include "iree/compiler/InputConversion/MHLO/PassDetail.h"
 #include "iree/compiler/InputConversion/MHLO/Passes.h"
 #include "mlir-hlo/Dialect/mhlo/IR/hlo_ops.h"
-#include "mlir/Dialect/Linalg/IR/LinalgOps.h"
+#include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/BlockAndValueMapping.h"
 #include "mlir/IR/Builders.h"
@@ -26,6 +26,7 @@
 
 namespace mlir {
 namespace iree_compiler {
+namespace MHLO {
 
 static Attribute convertAttribute(Location loc, Attribute value,
                                   FlowTypeConverter &typeConverter) {
@@ -56,7 +57,7 @@ static Attribute convertAttribute(Location loc, Attribute value,
   } else if (auto attr = value.dyn_cast<SplatElementsAttr>()) {
     return SplatElementsAttr::get(
         newType.cast<ShapedType>(),
-        convertAttribute(loc, attr.getSplatValue(), typeConverter));
+        convertAttribute(loc, attr.getSplatValue<Attribute>(), typeConverter));
   } else if (auto attr = value.dyn_cast<DenseIntElementsAttr>()) {
     auto newElementType = newType.cast<ShapedType>().getElementType();
     auto newElementBitWidth = newElementType.getIntOrFloatBitWidth();
@@ -80,8 +81,8 @@ static LogicalResult convertOperation(Operation *oldOp,
                                       BlockAndValueMapping &mapping,
                                       OpBuilder &builder) {
   if (isa<linalg::LinalgDialect>(oldOp->getDialect()) &&
-      !isa<linalg::TensorCollapseShapeOp>(oldOp) &&
-      !isa<linalg::TensorExpandShapeOp>(oldOp)) {
+      !isa<tensor::CollapseShapeOp>(oldOp) &&
+      !isa<tensor::ExpandShapeOp>(oldOp)) {
     // Currently we assume all Linalg structured ops only contain valid types.
     builder.clone(*oldOp, mapping);
     return success();
@@ -99,12 +100,12 @@ static LogicalResult convertOperation(Operation *oldOp,
       llvm::isa<IREE::Util::GlobalOp>(oldOp)) {
     for (auto attr : oldOp->getAttrs()) {
       auto newAttr =
-          convertAttribute(oldOp->getLoc(), attr.second, typeConverter);
+          convertAttribute(oldOp->getLoc(), attr.getValue(), typeConverter);
       if (!newAttr) {
         return oldOp->emitOpError()
-               << "failed to convert attribute " << attr.first;
+               << "failed to convert attribute " << attr.getName();
       }
-      state.addAttribute(attr.first, newAttr);
+      state.addAttribute(attr.getName(), newAttr);
     }
   } else {
     state.attributes = llvm::to_vector<4>(oldOp->getAttrs());
@@ -253,5 +254,6 @@ std::unique_ptr<OperationPass<ModuleOp>> createLegalizeInputTypesPass() {
   return std::make_unique<LegalizeInputTypesPass>();
 }
 
+}  // namespace MHLO
 }  // namespace iree_compiler
 }  // namespace mlir

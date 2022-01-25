@@ -1,3 +1,0 @@
-tf-nightly>=2.7.0.dev20210802
-tensorflow-model-optimization==0.5.1.dev0
-PyYAML

@@ -6,7 +6,7 @@
 
 #include "iree/compiler/Dialect/Flow/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
-#include "mlir/Dialect/Linalg/IR/LinalgOps.h"
+#include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/PatternMatch.h"
@@ -115,7 +115,7 @@ void StripSignednessPass::runOnOperation() {
 
   RewritePatternSet patterns(&getContext());
   patterns.insert<GenericTypeConvert>(ctx, converter);
-  populateFuncOpTypeConversionPattern(patterns, converter);
+  populateFunctionLikeTypeConversionPattern<FuncOp>(patterns, converter);
 
   if (failed(applyFullConversion(func, target, std::move(patterns)))) {
     signalPassFailure();

@@ -95,6 +95,124 @@ def Util_ClosureOpInterface : OpInterface<"ClosureOpInterface"> {
 }
 
 //===----------------------------------------------------------------------===//
+// IREE::Util::GlobalAccessorOpInterface
+//===----------------------------------------------------------------------===//
+
+def Util_GlobalAccessorOpInterface : OpInterface<"GlobalAccessorOpInterface"> {
+  let cppNamespace = "::mlir::iree_compiler::IREE::Util";
+
+  let description = [{
+    Interface for ops that reference globals (load/store).
+  }];
+
+  let methods = [
+    InterfaceMethod<
+      /*desc=*/[{
+        Returns the body region of the closure (may have multiple blocks).
+      }],
+      /*retTy=*/"FlatSymbolRefAttr",
+      /*methodName=*/"getGlobalRefAttr",
+      /*args=*/(ins)
+    >,
+  ];
+}
+
+//===----------------------------------------------------------------------===//
+// IREE::Util::NumericCastOpInterface
+//===----------------------------------------------------------------------===//
+
+def Util_NumericCastOpInterface : OpInterface<"NumericCastOpInterface"> {
+  let cppNamespace = "::mlir::iree_compiler::IREE::Util";
+
+  let description = [{
+    Applied to numeric casting ops which can convert between different numeric
+    types or shaped-types thereof. Example ops include `fptosi`, `trunci`, etc.
+    Treating these generically allows us to perform various cast movement
+    optimizations.
+
+    Conforming operations must:
+      * Have no attributes.
+      * Have one operand and one result.
+      * Be able to operate on supported scalar types: IntegerType, FloatType,
+        IndexType.
+      * Be able to operate on tensors/vectors of supported scalar types.
+      * Have a builder that takes (Type, Value).
+  }];
+
+  let methods = [
+    InterfaceMethod<
+      /*desc=*/[{
+        Gets the input value.
+      }],
+      /*retTy=*/"Value",
+      /*methodName=*/"getInput",
+      /*args=*/(ins),
+      /*methodBody=*/[{}],
+      /*defaultImplementation=*/[{
+        return $_op->getOperand(0);
+      }]
+    >,
+
+    InterfaceMethod<
+      /*desc=*/[{
+        Gets the input type.
+      }],
+      /*retTy=*/"Type",
+      /*methodName=*/"getInputType",
+      /*args=*/(ins),
+      /*methodBody=*/[{}],
+      /*defaultImplementation=*/[{
+        return $_op->getOperand(0).getType();
+      }]
+    >,
+
+    InterfaceMethod<
+      /*desc=*/[{
+        Gets the result casted value.
+      }],
+      /*retTy=*/"Value",
+      /*methodName=*/"getCasted",
+      /*args=*/(ins),
+      /*methodBody=*/[{}],
+      /*defaultImplementation=*/[{
+        return $_op->getResult(0);
+      }]
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Gets the result casted type.
+      }],
+      /*retTy=*/"Type",
+      /*methodName=*/"getCastedType",
+      /*args=*/(ins),
+      /*methodBody=*/[{}],
+      /*defaultImplementation=*/[{
+        return $_op->getResult(0).getType();
+      }]
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Clones the operation with a new result type and input.
+        Note that it is generally not legal to generically change the scalar
+        type of the input or the result, but it is legal to transform between
+        a scalar type and a tensor/vector with an element type of the original
+        scalar type (and vica-versa).
+      }],
+      /*retTy=*/"NumericCastOpInterface",
+      /*methodName=*/"cloneWithInput",
+      /*args=*/(ins "OpBuilder &":$builder, "Type":$resultType, "Value":$input),
+      /*methodBody=*/[{}],
+      /*defaultImplementation=*/[{
+          return llvm::cast<NumericCastOpInterface>(
+            builder.create<ConcreteOp>($_op->getLoc(), resultType, input)
+              .getOperation());
+      }]
+    >,
+  ];
+}
+
+
+//===----------------------------------------------------------------------===//
 // IREE::Util::TiedOpInterface
 //===----------------------------------------------------------------------===//
 
@@ -309,6 +427,23 @@ def Util_ShapeAwareOp : OpInterface<"ShapeAwareOpInterface"> {
   let description = [{
     An operation that is able to provide dynamic shape dimensions for all
     shaped operands and results.
+
+    This is a more fine-grained version of ReifyRankedShapedTypeOpInterface that
+    allows for querying of individual operand and result dimensions without
+    unconditionally inserting IR. The dynamic dimension queries allow us to find
+    the dynamic shape dimension SSA values in the IR in read-only mode (such as
+    during analysis), and having the queries specific to a particular operand
+    and result allows us to walk through ops along use-def edges. When combined
+    with tied operands the split queries allow for operands and results to have
+    differing dimensions (such as after reshaping/casting).
+
+    `getOperandDynamicDims` and `getResultDynamicDims` are the load-bearing
+    methods and if there was an equivalent set in an upstream dialect we could
+    switch to using that instead as the rest are just utilities built around
+    them.
+
+    `tensor.dim` and `memref.dim` will both resolve shape dimensions through
+    this interface when the dimension index is constant.
   }];
 
   let methods = [
@@ -330,6 +465,35 @@ def Util_ShapeAwareOp : OpInterface<"ShapeAwareOpInterface"> {
           }
         }
         return {};
+      }]
+    >,
+    InterfaceMethod<
+      /*desc=*/[{Returns a full shape for the given shaped operand index.}],
+      /*retTy=*/"SmallVector<Value>",
+      /*methodName=*/"buildOperandShape",
+      /*args=*/(ins "unsigned":$idx, "OpBuilder &":$builder),
+      /*defaultImplementation=*/[{
+        return IREE::Util::buildOperandShape($_self, idx, builder);
+      }]
+    >,
+    InterfaceMethod<
+      /*desc=*/[{Returns a full shape for the given shaped result index.}],
+      /*retTy=*/"SmallVector<Value>",
+      /*methodName=*/"buildResultShape",
+      /*args=*/(ins "unsigned":$idx, "OpBuilder &":$builder),
+      /*defaultImplementation=*/[{
+        return IREE::Util::buildResultShape($_self, idx, builder);
+      }]
+    >,
+    StaticInterfaceMethod<
+      /*desc=*/[{Builds a full shape for the given shaped result value.}],
+      /*retTy=*/"SmallVector<Value>",
+      /*methodName=*/"buildResultValueShape",
+      /*args=*/(ins "Value":$result, "OpBuilder &":$builder),
+      /*methodBody=*/[{
+        auto shapeAwareOp = dyn_cast<IREE::Util::ShapeAwareOpInterface>(result.getDefiningOp());
+        return shapeAwareOp.buildResultShape(
+            result.cast<mlir::OpResult>().getResultNumber(), builder);
       }]
     >,
   ];
@@ -367,8 +531,9 @@ def Util_SizeAwareType : TypeInterface<"SizeAwareTypeInterface"> {
   let extraClassDeclaration = [{
     // Walks the SSA use-def chain to find the size of the type.
     // Returns nullptr if the size cannot be found or if it is defined after
-    // |forOp|.
-    static Value findSizeValue(Value resourceValue, Operation *forOp);
+    // {|block|, |insertionPoint|}.
+    static Value findSizeValue(Value resourceValue, Block *block,
+                               Block::iterator insertionPoint);
 
     // Returns an SSA value representing the byte size of |value| or nullptr
     // if not a sized value.

@@ -4,7 +4,7 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-load("//iree:lit_test.bzl", "iree_lit_test_suite")
+load("//build_tools/bazel:iree_lit_test.bzl", "iree_lit_test_suite")
 load("//build_tools/bazel:enforce_glob.bzl", "enforce_glob")
 
 package(
@@ -17,6 +17,8 @@ iree_lit_test_suite(
     name = "lit",
     srcs = enforce_glob(
         [
+            "alignment_folding.mlir",
+            "alignment_ops.mlir",
             "attributes.mlir",
             "byte_buffer_ops.mlir",
             "global_folding.mlir",
@@ -24,6 +26,7 @@ iree_lit_test_suite(
             "hint_folding.mlir",
             "hint_ops.mlir",
             "list_ops.mlir",
+            "numeric_ops.mlir",
             "range_folding.mlir",
             "range_ops.mlir",
             "structural_folding.mlir",
@@ -31,8 +34,8 @@ iree_lit_test_suite(
         ],
         include = ["*.mlir"],
     ),
-    data = [
-        "//iree/tools:IreeFileCheck",
+    tools = [
         "//iree/tools:iree-opt",
+        "@llvm-project//llvm:FileCheck",
     ],
 )

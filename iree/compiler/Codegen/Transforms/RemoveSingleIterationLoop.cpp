@@ -12,6 +12,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
+#include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Affine/Utils.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/PatternMatch.h"
@@ -118,9 +119,9 @@ static bool alwaysRunsFirstIteration(scf::ForOp op, GetMinMaxExprFn getMinMax) {
   SmallVector<Value, 4> dims;
   SmallVector<Value, 4> symbols;
   AffineExpr lb = getAffineDimExpr(dims.size(), ctx);
-  dims.push_back(op.lowerBound());
+  dims.push_back(op.getLowerBound());
   AffineExpr ub = getAffineDimExpr(dims.size(), ctx);
-  dims.push_back(op.upperBound());
+  dims.push_back(op.getUpperBound());
   AffineExpr iterZero = ub - lb;
   auto map = AffineMap::get(dims.size(), 0, iterZero);
   AffineMap simplifiedMap = substituteMin(map, dims, symbols, getMinMax);
@@ -140,11 +141,11 @@ static bool neverRunsSecondIteration(scf::ForOp op, GetMinMaxExprFn getMinMax) {
   SmallVector<Value, 4> dims;
   SmallVector<Value, 4> symbols;
   AffineExpr lb = getAffineDimExpr(dims.size(), ctx);
-  dims.push_back(op.lowerBound());
+  dims.push_back(op.getLowerBound());
   AffineExpr ub = getAffineDimExpr(dims.size(), ctx);
-  dims.push_back(op.upperBound());
+  dims.push_back(op.getUpperBound());
   AffineExpr step = getAffineDimExpr(dims.size(), ctx);
-  dims.push_back(op.step());
+  dims.push_back(op.getStep());
   AffineExpr iterOne = lb + step - ub;
   auto map = AffineMap::get(dims.size(), 0, iterOne);
 
@@ -168,14 +169,15 @@ struct SimplifyTrivialLoops : public OpRewritePattern<scf::ForOp> {
     // once but the loop may not run at least once by replace the `loop` with an
     // `if`.
     if (!(alwaysRunsFirstIteration(op, getMinMax) &&
-          neverRunsSecondIteration(op, getMinMax)))
+          neverRunsSecondIteration(op, getMinMax))) {
       return failure();
+    }
 
     // The first iteration is always run and the second iteration is never run
     // so the loop always have 1 iteration. Inline its body and remove the loop.
     SmallVector<Value, 4> blockArgs;
     blockArgs.reserve(op.getNumIterOperands() + 1);
-    blockArgs.push_back(op.lowerBound());
+    blockArgs.push_back(op.getLowerBound());
     llvm::append_range(blockArgs, op.getIterOperands());
     replaceOpWithRegion(rewriter, op, op.getLoopBody(), blockArgs);
     return success();

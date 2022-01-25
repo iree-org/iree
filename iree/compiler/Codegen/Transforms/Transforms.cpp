@@ -15,8 +15,8 @@
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
+#include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
-#include "mlir/Dialect/Linalg/IR/LinalgOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/PatternMatch.h"
@@ -44,16 +44,16 @@ LogicalResult defineWorkgroupCountRegion(
 
   auto clonedOp = builder.create<IREE::HAL::ExecutableEntryPointOp>(
       loc, entryPointOp.sym_nameAttr(), entryPointOp.ordinalAttr(),
-      entryPointOp.interfaceAttr(), entryPointOp.workgroup_sizeAttr(),
+      entryPointOp.layoutAttr(), entryPointOp.workgroup_sizeAttr(),
       entryPointOp.workgroup_local_memoryAttr(), 1);
   // Copy over all attributes
   for (auto attr : entryPointOp->getAttrs()) {
-    if (attr.first != entryPointOp.sym_nameAttrName() &&
-        attr.first != entryPointOp.ordinalAttrName() &&
-        attr.first != entryPointOp.interfaceAttrName() &&
-        attr.first != entryPointOp.workgroup_sizeAttrName() &&
-        attr.first != entryPointOp.workgroup_local_memoryAttrName()) {
-      clonedOp->setAttr(attr.first, attr.second);
+    if (attr.getName() != entryPointOp.sym_nameAttrName() &&
+        attr.getName() != entryPointOp.ordinalAttrName() &&
+        attr.getName() != entryPointOp.layoutAttr() &&
+        attr.getName() != entryPointOp.workgroup_sizeAttrName() &&
+        attr.getName() != entryPointOp.workgroup_local_memoryAttrName()) {
+      clonedOp->setAttr(attr.getName(), attr.getValue());
     }
   }
   Region *region = clonedOp.getBody();

@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -pass-pipeline='vm.module(iree-vm-ordinal-allocation),vm.module(iree-convert-vm-to-emitc)' %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -pass-pipeline='vm.module(iree-vm-ordinal-allocation),vm.module(iree-convert-vm-to-emitc)' %s | FileCheck %s
 
 // CHECK-LABEL: @my_module_add_f32
 vm.module @my_module {
@@ -269,6 +269,17 @@ vm.module @my_module {
   vm.func @tanh_f32(%arg0 : f32) -> f32 {
     // CHECK-NEXT: %0 = emitc.call "vm_tanh_f32"(%arg3) : (f32) -> f32
     %0 = vm.tanh.f32 %arg0 : f32
+    vm.return %0 : f32
+  }
+}
+
+// -----
+
+// CHECK-LABEL: @my_module_erf_f32
+vm.module @my_module {
+  vm.func @erf_f32(%arg0 : f32) -> f32 {
+    // CHECK-NEXT: %0 = emitc.call "vm_erf_f32"(%arg3) : (f32) -> f32
+    %0 = vm.erf.f32 %arg0 : f32
     vm.return %0 : f32
   }
 }

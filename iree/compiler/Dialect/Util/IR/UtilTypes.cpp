@@ -9,6 +9,7 @@
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "llvm/ADT/BitVector.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinTypes.h"
@@ -207,7 +208,6 @@ bool TiedOpInterface::hasAnyTiedUses(Value value) {
 bool detail::isOperandTied(Operation *op, unsigned operandIndex) {
   auto tiedOp = dyn_cast<TiedOpInterface>(op);
   if (!tiedOp) return false;
-  SmallVector<Value> results;
   auto tiedIndices = tiedOp.getTiedResultOperandIndices();
   for (unsigned i = 0; i < tiedIndices.size(); ++i) {
     if (tiedIndices[i] == operandIndex) {
@@ -294,34 +294,38 @@ void excludeTiedOperandAndResultIndices(
 // IREE::Util::SizeAwareTypeInterface
 //===----------------------------------------------------------------------===//
 
-static bool isValueUsableForOp(Value value, Operation *forOp) {
-  if (forOp->getBlock() == nullptr) {
+static bool isValueUsableForOp(Value value, Block *block,
+                               Block::iterator insertionPoint) {
+  if (block == nullptr) {
     // Op is not in a block; can't analyze (maybe?).
     return false;
   }
   auto *definingBlock = value.getParentBlock();
-  if (definingBlock == forOp->getBlock()) {
+  if (definingBlock == block) {
     // Defined in the same block; ensure block order.
     if (value.isa<BlockArgument>()) return true;
-    if (value.getDefiningOp()->isBeforeInBlock(forOp)) return true;
+    if (insertionPoint == block->end()) return true;
+    if (value.getDefiningOp()->isBeforeInBlock(&*insertionPoint)) {
+      return true;
+    }
   } else if (definingBlock->isEntryBlock()) {
     // Entry block always dominates - fast path for constants.
     return true;
   } else {
     // See if block the value is defined in dominates the forOp block.
     // TODO(benvanik): optimize this, it's terribly expensive to recompute.
-    DominanceInfo dominanceInfo(forOp->getParentOp());
-    return dominanceInfo.dominates(definingBlock, forOp->getBlock());
+    DominanceInfo dominanceInfo(block->getParentOp());
+    return dominanceInfo.dominates(definingBlock, block);
   }
   return false;
 }
 
 // static
-Value SizeAwareTypeInterface::findSizeValue(Value resourceValue,
-                                            Operation *forOp) {
+Value SizeAwareTypeInterface::findSizeValue(Value resourceValue, Block *block,
+                                            Block::iterator insertionPoint) {
   // See if the value is produced by a size-aware op; we can just ask for the
   // size it has tied. Walking upward is always good as we know any size we find
-  // dominates |forOp|.
+  // dominates {|block|, |insertionPoint|}.
   SmallVector<Value> worklist;
   worklist.push_back(resourceValue);
   while (!worklist.empty()) {
@@ -347,7 +351,8 @@ Value SizeAwareTypeInterface::findSizeValue(Value resourceValue,
               use.getOwner())) {
         auto sizeValue = sizeAwareOp.getOperandSize(use.getOperandNumber());
         if (sizeValue) {
-          if (isValueUsableForOp(sizeValue, forOp)) return sizeValue;
+          if (isValueUsableForOp(sizeValue, block, insertionPoint))
+            return sizeValue;
         }
       }
       if (auto tiedOp =
@@ -369,8 +374,8 @@ Value SizeAwareTypeInterface::queryValueSize(Location loc, Value resourceValue,
     return {};  // Not a sized type.
   }
   if (!builder.getInsertionPoint().getNodePtr()->isKnownSentinel()) {
-    Operation &insertionPt = *builder.getInsertionPoint();
-    auto sizeValue = sizeAwareType.findSizeValue(resourceValue, &insertionPt);
+    auto sizeValue = sizeAwareType.findSizeValue(
+        resourceValue, builder.getBlock(), builder.getInsertionPoint());
     if (sizeValue) {
       return sizeValue;  // Found in IR.
     }
@@ -393,6 +398,51 @@ Value SizeAwareTypeInterface::queryValueSize(Location loc, Value resourceValue,
 // IREE::Util::ShapeAware*
 //===----------------------------------------------------------------------===//
 
+Optional<ValueRange> findDynamicDims(Value shapedValue) {
+  // Look up the use-def chain: always safe, as any value we reach dominates
+  // {|block|, |insertionPoint|} implicitly.
+  SmallVector<Value> worklist;
+  worklist.push_back(shapedValue);
+  while (!worklist.empty()) {
+    auto workValue = worklist.pop_back_val();
+    auto workOp = workValue.getDefiningOp();
+    if (!workOp) continue;
+    if (auto shapeAwareOp = dyn_cast<ShapeAwareOpInterface>(workOp)) {
+      return shapeAwareOp.getResultDynamicDimsFromValue(workValue);
+    } else if (auto tiedOp = dyn_cast<TiedOpInterface>(workOp)) {
+      auto tiedValue = tiedOp.getTiedResultOperand(workValue);
+      if (tiedValue) worklist.push_back(tiedValue);
+    }
+  }
+  return llvm::None;
+}
+
+Optional<ValueRange> findDynamicDims(Value shapedValue, Block *block,
+                                     Block::iterator insertionPoint) {
+  // Look up the use-def chain: always safe, as any value we reach dominates
+  // {|block|, |insertionPoint|} implicitly.
+  auto upwardRange = findDynamicDims(shapedValue);
+  if (upwardRange.hasValue()) return upwardRange.getValue();
+
+  // Look down the use-def chain: not safe at some point because we'll move past
+  // where {|block|, |insertionPoint|} is dominated. This is often fine for a
+  // bit, though, as {|block|, |insertionPoint|} may be a user of |shapedValue|
+  // and be able to provide the shape itself.
+  for (auto &use : shapedValue.getUses()) {
+    if (auto shapeAwareOp = dyn_cast<ShapeAwareOpInterface>(use.getOwner())) {
+      auto dynamicDims =
+          shapeAwareOp.getOperandDynamicDims(use.getOperandNumber());
+      if (llvm::all_of(dynamicDims, [&](Value dim) {
+            return isValueUsableForOp(dim, block, insertionPoint);
+          })) {
+        return dynamicDims;
+      }
+    }
+  }
+
+  return None;
+}
+
 ValueRange findVariadicDynamicDims(unsigned idx, ValueRange values,
                                    ValueRange dynamicDims) {
   auto value = values[idx];
@@ -414,57 +464,84 @@ ValueRange findVariadicDynamicDims(unsigned idx, ValueRange values,
   return dynamicDims.slice(offset, shapedType.getNumDynamicDims());
 }
 
-Optional<ValueRange> findDynamicDims(Value shapedValue, Operation *forOp) {
-  // Look up the use-def chain: always safe, as any value we reach dominates
-  // |forOp| implicitly.
-  SmallVector<Value> worklist;
-  worklist.push_back(shapedValue);
-  while (!worklist.empty()) {
-    auto workValue = worklist.pop_back_val();
-    if (auto shapeAwareOp = dyn_cast_or_null<ShapeAwareOpInterface>(
-            workValue.getDefiningOp())) {
-      return shapeAwareOp.getResultDynamicDimsFromValue(workValue);
-    }
-    if (auto tiedOp =
-            dyn_cast_or_null<TiedOpInterface>(workValue.getDefiningOp())) {
-      auto tiedValue = tiedOp.getTiedResultOperand(workValue);
-      if (tiedValue) worklist.push_back(tiedValue);
-    }
+SmallVector<Value> buildDynamicDimsForValue(Location loc, Value value,
+                                            OpBuilder &builder) {
+  auto valueType = value.getType().dyn_cast<ShapedType>();
+  if (!valueType) {
+    mlir::emitError(loc) << "cannot construct shape for non shaped value: "
+                         << value.getType();
+    return {};
   }
 
-  // Look down the use-def chain: not safe at some point because we'll move
-  // past where |forOp| is dominated. This is often fine for a bit, though, as
-  // |forOp| may be a user of |shapedValue| and be able to provide the shape
-  // itself.
-  for (auto &use : shapedValue.getUses()) {
-    if (auto shapeAwareOp = dyn_cast<ShapeAwareOpInterface>(use.getOwner())) {
-      auto dynamicDims =
-          shapeAwareOp.getOperandDynamicDims(use.getOperandNumber());
-      if (llvm::all_of(dynamicDims, [&](Value dim) {
-            return isValueUsableForOp(dim, forOp);
-          })) {
-        return dynamicDims;
-      }
-    }
+  // Early-exit if all dimensions are static.
+  if (valueType.hasStaticShape()) {
+    return {};
   }
 
-  return None;
+  // Try the fast-path of scanning for the dynamic dims that exist in the IR
+  // already. For shape-aware ops this is free as the dynamic dim SSA values are
+  // always available.
+  auto foundDynamicDims = IREE::Util::findDynamicDims(
+      value, builder.getBlock(), builder.getInsertionPoint());
+  if (foundDynamicDims.hasValue()) {
+    return llvm::to_vector<4>(foundDynamicDims.getValue());
+  }
+
+  // Slower path that materializes the entire shape for a result. Some
+  // implementations may only support this (vs the fast find above).
+  if (auto shapeAwareOp = dyn_cast_or_null<IREE::Util::ShapeAwareOpInterface>(
+          value.getDefiningOp())) {
+    return shapeAwareOp.buildResultValueShape(value, builder);
+  }
+
+  // TODO(benvanik): add support for ReifyRankedShapedTypeOpInterface;
+  // unfortunately it is for all results and all dimensions so a lot of unneeded
+  // IR will be inserted.
+
+  // Fallback to inserting dim ops that can be resolved via normal upstream
+  // mechanisms. Depending on where this is called from within the parent
+  // pipeline these ops may not be desirable, but that's what the
+  // ShapeAwareOpInterface is for.
+  SmallVector<Value> dynamicDims;
+  for (unsigned i = 0; i < valueType.getRank(); ++i) {
+    if (valueType.isDynamicDim(i)) {
+      dynamicDims.push_back(builder.createOrFold<tensor::DimOp>(loc, value, i));
+    }
+  }
+  return dynamicDims;
 }
 
-//===----------------------------------------------------------------------===//
-// Utilities
-//===----------------------------------------------------------------------===//
+static SmallVector<Value> buildShape(Location loc, ShapedType type,
+                                     ValueRange dynamicDims,
+                                     OpBuilder &builder) {
+  SmallVector<Value> dims;
+  dims.reserve(type.getRank());
+  unsigned dynamicIdx = 0;
+  for (unsigned i = 0; i < type.getRank(); ++i) {
+    int64_t dim = type.getDimSize(i);
+    if (dim == ShapedType::kDynamicSize) {
+      dims.push_back(dynamicDims[dynamicIdx++]);
+    } else {
+      dims.push_back(builder.create<arith::ConstantIndexOp>(loc, dim));
+    }
+  }
+  return dims;
+}
 
-// TODO(benvanik): emit a util.align op that we can use to carry the semantics
-// of the alignment and elide redundant aligns.
-Value align(Location loc, Value value, int64_t alignment, OpBuilder &builder) {
-  // (value + (alignment - 1)) & ~(alignment - 1)
-  return builder.createOrFold<arith::AndIOp>(
-      loc,
-      builder.createOrFold<arith::AddIOp>(
-          loc, value,
-          builder.createOrFold<arith::ConstantIndexOp>(loc, alignment - 1)),
-      builder.createOrFold<arith::ConstantIndexOp>(loc, ~(alignment - 1)));
+SmallVector<Value> buildOperandShape(ShapeAwareOpInterface op,
+                                     unsigned operandIdx, OpBuilder &builder) {
+  auto operand = op->getOperand(operandIdx);
+  auto type = operand.getType().cast<ShapedType>();
+  auto dynamicDims = op.getOperandDynamicDims(operandIdx);
+  return buildShape(op.getLoc(), type, dynamicDims, builder);
+}
+
+SmallVector<Value> buildResultShape(ShapeAwareOpInterface op,
+                                    unsigned resultIdx, OpBuilder &builder) {
+  auto result = op->getResult(resultIdx);
+  auto type = result.getType().cast<ShapedType>();
+  auto dynamicDims = op.getResultDynamicDims(resultIdx);
+  return buildShape(op.getLoc(), type, dynamicDims, builder);
 }
 
 //===----------------------------------------------------------------------===//

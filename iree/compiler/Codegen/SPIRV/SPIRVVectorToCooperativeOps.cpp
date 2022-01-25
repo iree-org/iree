@@ -124,8 +124,10 @@ struct ConvertVectorContractOp final
     // Check that this is a matmul operation.
     auto iterators = contractOp.iterator_types().getValue();
     if (iterators.size() != 3 || !isParallelIterator(iterators[0]) ||
-        !isParallelIterator(iterators[1]) || !isReductionIterator(iterators[2]))
+        !isParallelIterator(iterators[1]) ||
+        !isReductionIterator(iterators[2])) {
       return failure();
+    }
     if (contractOp.kind() != vector::CombiningKind::ADD) return failure();
 
     // Column major matmuls should have been lowered to transpose + contract
@@ -152,9 +154,9 @@ struct ConvertConstantMatrix final
     if (!vectorType || vectorType.getRank() != 2) return failure();
 
     // Only convert splat integer/float vectors.
-    auto values = op.value().dyn_cast<DenseIntOrFPElementsAttr>();
+    auto values = op.getValue().dyn_cast<DenseIntOrFPElementsAttr>();
     if (!values || !values.isSplat()) return failure();
-    Attribute value = values.getSplatValue();
+    Attribute value = values.getSplatValue<Attribute>();
 
     auto elementType = values.getType().getElementType();
     Value splatValue = rewriter.create<spirv::ConstantOp>(
@@ -173,10 +175,10 @@ struct ConvertElementwiseOp final : public OpConversionPattern<SrcOpType> {
   using OpConversionPattern<SrcOpType>::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      SrcOpType op, ArrayRef<Value> operands,
+      SrcOpType op, typename SrcOpType::Adaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     // All operands should be of cooperative matrix types.
-    for (Value operand : operands) {
+    for (Value operand : adaptor.getOperands()) {
       if (!operand.getType().isa<spirv::CooperativeMatrixNVType>())
         return failure();
     }
@@ -185,7 +187,7 @@ struct ConvertElementwiseOp final : public OpConversionPattern<SrcOpType> {
     if (op->getNumResults() != 1) return failure();
 
     auto matType = this->typeConverter->convertType(op.getType());
-    rewriter.replaceOpWithNewOp<DstOpType>(op, matType, operands);
+    rewriter.replaceOpWithNewOp<DstOpType>(op, matType, adaptor.getOperands());
     return success();
   }
 };

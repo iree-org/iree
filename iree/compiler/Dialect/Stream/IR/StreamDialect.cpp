@@ -57,6 +57,38 @@ struct StreamFolderInterface : public DialectFoldInterface {
   }
 };
 
+// Tries to fold away unrealized_conversion_cast ops if the downstream consumers
+// don't need the extra information. These are inserted during conversion or
+// transforms that may interop with external dialects.
+//
+// Specifically matches:
+//   %0 = builtin.unrealized_conversion_cast %arg0, %arg1 :
+//        !stream.resource<transient>, index to !stream.resource<transient>
+struct StripResourceConversionCastPattern
+    : public OpRewritePattern<UnrealizedConversionCastOp> {
+  using OpRewritePattern::OpRewritePattern;
+  LogicalResult matchAndRewrite(UnrealizedConversionCastOp castOp,
+                                PatternRewriter &rewriter) const override {
+    auto result = castOp.getResult(0);
+    if (!result.getType().isa<IREE::Stream::ResourceType>()) return failure();
+    assert(castOp.getNumOperands() == 2 &&
+           "expect resource, index -> resource");
+    auto resourceValue = castOp.getOperand(0);
+    auto sizeValue = castOp.getOperand(1);
+    for (auto &use : llvm::make_early_inc_range(result.getUses())) {
+      if (auto sizeOp =
+              dyn_cast<IREE::Stream::ResourceSizeOp>(use.getOwner())) {
+        sizeOp.getResult().replaceAllUsesWith(sizeValue);
+        rewriter.eraseOp(sizeOp);
+      } else {
+        use.set(resourceValue);
+      }
+    }
+    rewriter.eraseOp(castOp);
+    return success();
+  }
+};
+
 }  // namespace
 
 StreamDialect::StreamDialect(MLIRContext *context)
@@ -69,6 +101,11 @@ StreamDialect::StreamDialect(MLIRContext *context)
 #include "iree/compiler/Dialect/Stream/IR/StreamOps.cpp.inc"
       >();
   addInterfaces<StreamInlinerInterface, StreamFolderInterface>();
+}
+
+void StreamDialect::getCanonicalizationPatterns(
+    RewritePatternSet &results) const {
+  results.insert<StripResourceConversionCastPattern>(getContext());
 }
 
 Operation *StreamDialect::materializeConstant(OpBuilder &builder,

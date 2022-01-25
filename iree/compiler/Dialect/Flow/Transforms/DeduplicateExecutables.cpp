@@ -132,8 +132,8 @@ static bool isStructurallyEquivalentTo(Operation &lhs, Operation &rhs,
   if (!compare_ranges(
           lhs.getAttrs(), rhs.getAttrs(),
           [&](const NamedAttribute &lhs, const NamedAttribute &rhs) {
-            if (lhs.first == "function_ref" ||
-                lhs.first == SymbolTable::getSymbolAttrName()) {
+            if (lhs.getName() == "function_ref" ||
+                lhs.getName() == SymbolTable::getSymbolAttrName()) {
               return true;
             }
             return lhs == rhs;
@@ -225,8 +225,9 @@ bool areExecutablesEquivalent(ExecutableOp lhs, ExecutableOp rhs) {
 void replaceEntryPointUses(
     mlir::ModuleOp moduleOp,
     const DenseMap<Attribute, SymbolRefAttr> &replacements) {
-  for (auto funcOp : moduleOp.getOps<mlir::FuncOp>()) {
-    funcOp.walk([&](DispatchOp dispatchOp) {
+  for (Operation &funcLikeOp : moduleOp.getOps()) {
+    if (!funcLikeOp.hasTrait<OpTrait::FunctionLike>()) continue;
+    funcLikeOp.walk([&](DispatchOp dispatchOp) {
       auto it = replacements.find(dispatchOp.entry_point());
       if (it != replacements.end()) {
         dispatchOp.entry_pointAttr(it->second.cast<SymbolRefAttr>());

@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Dialect/HAL/Target/MetalSPIRV/MetalSPIRVTarget.h"
 
+#include "iree/compiler/Codegen/Dialect/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Dialect/HAL/Target/MetalSPIRV/SPIRVToMSL.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
@@ -13,7 +14,7 @@
 #include "iree/schemas/metal_executable_def_builder.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/GPU/GPUDialect.h"
-#include "mlir/Dialect/Linalg/IR/LinalgTypes.h"
+#include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/SPIRV/IR/SPIRVDialect.h"
 #include "mlir/Dialect/SPIRV/IR/SPIRVOps.h"
 #include "mlir/Dialect/SPIRV/IR/TargetAndABI.h"
@@ -44,7 +45,8 @@ class MetalSPIRVTargetBackend : public TargetBackend {
   std::string name() const override { return "metal"; }
 
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<spirv::SPIRVDialect, gpu::GPUDialect>();
+    registry.insert<IREE::Codegen::IREECodegenDialect, spirv::SPIRVDialect,
+                    gpu::GPUDialect>();
   }
 
   IREE::HAL::DeviceTargetAttr getDefaultDeviceTarget(
@@ -52,7 +54,7 @@ class MetalSPIRVTargetBackend : public TargetBackend {
     Builder b(context);
     SmallVector<NamedAttribute> configItems;
 
-    configItems.emplace_back(b.getIdentifier("executable_targets"),
+    configItems.emplace_back(b.getStringAttr("executable_targets"),
                              getExecutableTargets(context));
 
     auto configAttr = b.getDictionaryAttr(configItems);
@@ -152,7 +154,7 @@ class MetalSPIRVTargetBackend : public TargetBackend {
     Builder b(context);
     SmallVector<NamedAttribute> configItems;
 
-    configItems.emplace_back(b.getIdentifier(spirv::getTargetEnvAttrName()),
+    configItems.emplace_back(b.getStringAttr(spirv::getTargetEnvAttrName()),
                              targetEnv);
 
     auto configAttr = b.getDictionaryAttr(configItems);

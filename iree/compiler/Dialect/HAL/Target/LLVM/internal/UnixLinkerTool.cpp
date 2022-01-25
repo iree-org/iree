@@ -22,9 +22,9 @@ class UnixLinkerTool : public LinkerTool {
  public:
   using LinkerTool::LinkerTool;
 
-  std::string getToolPath() const override {
+  std::string getSystemToolPath() const override {
     // First check for setting the linker explicitly.
-    auto toolPath = LinkerTool::getToolPath();
+    auto toolPath = LinkerTool::getSystemToolPath();
     if (!toolPath.empty()) return toolPath;
 
     // No explicit linker specified, search the environment for common tools.
@@ -50,7 +50,7 @@ class UnixLinkerTool : public LinkerTool {
     artifacts.libraryFile.close();
 
     SmallVector<std::string, 8> flags = {
-        getToolPath(),
+        getSystemToolPath(),
         "-o " + artifacts.libraryFile.path,
     };
 
@@ -62,11 +62,9 @@ class UnixLinkerTool : public LinkerTool {
       // Produce a Mach-O dylib file.
       flags.push_back("-dylib");
       flags.push_back("-flat_namespace");
-
-      // HACK: we insert libm calls. This is *not good*.
-      // Until the MLIR LLVM lowering paths no longer introduce these,
-      // we are stuck with this.
-      flags.push_back("-undefined suppress");
+      flags.push_back(
+          "-L /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/lib "
+          "-lSystem");
     } else {
       // Avoids including any libc/startup files that initialize the CRT as
       // we don't use any of that. Our shared libraries must be freestanding.
@@ -74,14 +72,7 @@ class UnixLinkerTool : public LinkerTool {
 
       // Statically link all dependencies so we don't have any runtime deps.
       // We cannot have any imports in the module we produce.
-      // flags.push_back("-static");
-
-      // HACK: we insert mallocs and libm calls. This is *not good*.
-      // We need hermetic binaries that pull in no imports; the MLIR LLVM
-      // lowering paths introduce a bunch, though, so this is what we are
-      // stuck with.
-      flags.push_back("-shared");
-      flags.push_back("-undefined suppress");
+      flags.push_back("-static");
     }
 
     // Strip debug information (only, no relocations) when not requested.

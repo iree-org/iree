@@ -9,11 +9,15 @@
 #   * Vulkan (using SwiftShader)
 #   * Python (including `venv` and common pip packages needed for Colab)
 
-FROM gcr.io/iree-oss/cmake-swiftshader@sha256:031aded9cd66d30fcfa4dabea05a69721f33239516bc2e10ca216afd9ae4c012 AS final
+FROM gcr.io/iree-oss/swiftshader@sha256:5d1bb46b68a664ac9c3669a3b4f129d245e0268332f0cd342de4f5b64b9bd253
 
 # Update setuptools per https://github.com/pypa/setuptools/issues/1694#issuecomment-466010982
-RUN apt-get update && apt-get install -y python3-venv python3.7-venv python-setuptools && \
-    python3 -m pip install --upgrade setuptools
+RUN apt-get update \
+  && apt-get install -y \
+    python3-venv \
+    python3.7-venv \
+    python-setuptools \
+  && python3 -m pip install --upgrade setuptools
 
 # Install additional packages often used in notebooks.
 # Installing these at the system level helps with caching, since venvs can

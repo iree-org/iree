@@ -37,8 +37,9 @@ vm.module @call_ops {
   // of the tests during the lattter. This means we would need to add a pattern
   // that inserts calls to `iree_vm_ref_retain` for operand/result pairs of the
   // do_not_optimize op.
+  // TODO(simon-camp): Enable the test for emitc.
   vm.export @test_call_r_v_preserve_ref attributes {emitc.exclude}
-  vm.func @test_call_r_v_preserve_ref() {
+  vm.func private @test_call_r_v_preserve_ref() {
     %ref = vm.const.ref.zero : !vm.buffer
     %unused = vm.const.ref.rodata @buffer : !vm.buffer
     %unusued_dno_1 = util.do_not_optimize(%unused) : !vm.buffer

@@ -16,7 +16,7 @@
 #include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
-#include "mlir/Dialect/Linalg/IR/LinalgOps.h"
+#include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Matchers.h"
@@ -32,7 +32,7 @@ namespace {
 ///
 /// For example, this matches the following pattern:
 ///
-///   %subspan = hal.interface.binding.subspan @... :
+///   %subspan = hal.interface.binding.subspan ... :
 ///       !flow.dispatch.tensor<readonly:3x3x1x96xf32>
 ///   %tensor = flow.dispatch.tensor.load %subspan :
 ///       !flow.dispatch.tensor<readonly:3x3x1x96xf32> -> tensor<3x3x1x96xf32>
@@ -42,7 +42,7 @@ namespace {
 ///
 /// And turns it into:
 ///
-///   %subspan = hal.interface.binding.subspan @... :
+///   %subspan = hal.interface.binding.subspan ... :
 ///       !flow.dispatch.tensor<readonly:864xf32>
 ///   %0 = flow.dispatch.tensor.load %subspan :
 ///       !flow.dispatch.tensor<readonly:864xf32> -> tensor<864xf32>
@@ -83,12 +83,13 @@ struct FoldReshapeIntoInterfaceTensorLoad : OpRewritePattern<TensorReshapeOp> {
         tensorAccess, reshapeOp.getResultType());
 
     Value newSubspanOp = rewriter.create<IREE::HAL::InterfaceBindingSubspanOp>(
-        subspanOp.getLoc(), newSubspanType, subspanOp.binding(),
-        subspanOp.byte_offset(), subspanOp.byte_length(),
-        subspanOp.dynamic_dims());
+        subspanOp.getLoc(), newSubspanType, subspanOp.set(),
+        subspanOp.binding(), subspanOp.type(), subspanOp.byte_offset(),
+        subspanOp.dynamic_dims(), subspanOp.alignmentAttr());
 
     rewriter.replaceOpWithNewOp<IREE::Flow::DispatchTensorLoadOp>(
-        reshapeOp, reshapeOp.getResultType(), newSubspanOp);
+        reshapeOp, reshapeOp.getResultType(), newSubspanOp,
+        loadOp.source_dims());
 
     return success();
   }
@@ -116,11 +117,13 @@ struct CleanupBufferAllocViewPass
     : public CleanupBufferAllocViewBase<CleanupBufferAllocViewPass> {
   void runOnOperation() override {
     OwningRewritePatternList patterns(&getContext());
-    patterns.insert<
-        FoldReshapeIntoInterfaceTensorLoad<linalg::TensorCollapseShapeOp>,
-        FoldReshapeIntoInterfaceTensorLoad<linalg::TensorExpandShapeOp>,
-        RemoveDeadMemAllocs>(&getContext());
-    (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
+    patterns.insert<FoldReshapeIntoInterfaceTensorLoad<tensor::CollapseShapeOp>,
+                    FoldReshapeIntoInterfaceTensorLoad<tensor::ExpandShapeOp>,
+                    RemoveDeadMemAllocs>(&getContext());
+    if (failed(applyPatternsAndFoldGreedily(getOperation(),
+                                            std::move(patterns)))) {
+      return signalPassFailure();
+    }
   }
 };
 

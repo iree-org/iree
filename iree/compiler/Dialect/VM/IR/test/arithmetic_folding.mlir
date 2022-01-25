@@ -1,6 +1,6 @@
 // Tests folding and canonicalization of arithmetic ops.
 
-// RUN: iree-opt -split-input-file -pass-pipeline='vm.module(canonicalize)' %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -pass-pipeline='vm.module(canonicalize)' %s | FileCheck %s
 
 // CHECK-LABEL: @add_i32_folds
 vm.module @add_i32_folds {
@@ -429,6 +429,39 @@ vm.module @shr_i32_u_folds {
     %c4 = vm.const.i32 4 : i32
     %0 = vm.shr.i32.u %c, %c4 : i32
     vm.return %0 : i32
+  }
+}
+
+// -----
+
+// CHECK-LABEL: @shr_i64_u_folds
+vm.module @shr_i64_u_folds {
+  // CHECK-LABEL: @shr_i64_u_0_by_y
+  vm.func @shr_i64_u_0_by_y() -> i64 {
+    // CHECK: %zero = vm.const.i64.zero : i64
+    // CHECK-NEXT: vm.return %zero : i64
+    %zero = vm.const.i64.zero : i64
+    %c4 = vm.const.i32 4 : i32
+    %0 = vm.shr.i64.u %zero, %c4 : i64
+    vm.return %0 : i64
+  }
+
+  // CHECK-LABEL: @shr_i64_u_x_by_0
+  vm.func @shr_i64_u_x_by_0(%arg0 : i64) -> i64 {
+    // CHECK: vm.return %arg0 : i64
+    %c0 = vm.const.i32 0 : i32
+    %0 = vm.shr.i64.u %arg0, %c0 : i64
+    vm.return %0 : i64
+  }
+
+  // CHECK-LABEL: @shr_i64_u_const
+  vm.func @shr_i64_u_const() -> i64 {
+    // CHECK: %[[C:.+]] = vm.const.i64 576460752303423488 : i64
+    // CHECK-NEXT: vm.return %[[C]]
+    %c = vm.const.i64 0x8000000000000000 : i64
+    %c4 = vm.const.i32 4 : i32
+    %0 = vm.shr.i64.u %c, %c4 : i64
+    vm.return %0 : i64
   }
 }
 

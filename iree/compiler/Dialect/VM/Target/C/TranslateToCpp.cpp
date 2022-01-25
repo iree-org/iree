@@ -73,7 +73,7 @@ static LogicalResult printOperation(CppEmitter &emitter,
 static LogicalResult printOperation(CppEmitter &emitter,
                                     mlir::ConstantOp constantOp) {
   Operation *operation = constantOp.getOperation();
-  Attribute value = constantOp.value();
+  Attribute value = constantOp.getValue();
 
   return printConstantOp(emitter, operation, value);
 }
@@ -255,19 +255,19 @@ static LogicalResult printOperation(CppEmitter &emitter, scf::ForOp forOp) {
   os << " ";
   os << emitter.getOrCreateName(forOp.getInductionVar());
   os << " = ";
-  os << emitter.getOrCreateName(forOp.lowerBound());
+  os << emitter.getOrCreateName(forOp.getLowerBound());
   os << "; ";
   os << emitter.getOrCreateName(forOp.getInductionVar());
   os << " < ";
-  os << emitter.getOrCreateName(forOp.upperBound());
+  os << emitter.getOrCreateName(forOp.getUpperBound());
   os << "; ";
   os << emitter.getOrCreateName(forOp.getInductionVar());
   os << " += ";
-  os << emitter.getOrCreateName(forOp.step());
+  os << emitter.getOrCreateName(forOp.getStep());
   os << ") {\n";
   os.indent();
 
-  Region &forRegion = forOp.region();
+  Region &forRegion = forOp.getRegion();
   auto regionOps = forRegion.getOps();
 
   // We skip the trailing yield op because this updates the result variables
@@ -319,7 +319,7 @@ static LogicalResult printOperation(CppEmitter &emitter, scf::IfOp ifOp) {
   os << ") {\n";
   os.indent();
 
-  Region &thenRegion = ifOp.thenRegion();
+  Region &thenRegion = ifOp.getThenRegion();
   for (Operation &op : thenRegion.getOps()) {
     // Note: This prints a superfluous semicolon if the terminating yield op has
     // zero results.
@@ -329,7 +329,7 @@ static LogicalResult printOperation(CppEmitter &emitter, scf::IfOp ifOp) {
 
   os.unindent() << "}";
 
-  Region &elseRegion = ifOp.elseRegion();
+  Region &elseRegion = ifOp.getElseRegion();
   if (!elseRegion.empty()) {
     os << " else {\n";
     os.indent();
@@ -470,7 +470,7 @@ static LogicalResult printOperation(CppEmitter &emitter, FuncOp functionOp) {
 
   for (Block &block : blocks) {
     // Only print a label if there is more than one block.
-    if (blocks.size() > 1) {
+    if (blocks.size() > 1 && !block.hasNoPredecessors()) {
       if (failed(emitter.emitLabel(block)))
         return failure();
     }
@@ -653,7 +653,7 @@ CppEmitter::emitOperandsAndAttributes(Operation &op,
   // Insert comma in between operands and non-filtered attributes if needed.
   if (op.getNumOperands() > 0) {
     for (NamedAttribute attr : op.getAttrs()) {
-      if (!llvm::is_contained(exclude, attr.first.strref())) {
+      if (!llvm::is_contained(exclude, attr.getName().strref())) {
         os << ", ";
         break;
       }
@@ -661,10 +661,10 @@ CppEmitter::emitOperandsAndAttributes(Operation &op,
   }
   // Emit attributes.
   auto emitNamedAttribute = [&](NamedAttribute attr) -> LogicalResult {
-    if (llvm::is_contained(exclude, attr.first.strref()))
+    if (llvm::is_contained(exclude, attr.getName().strref()))
       return success();
-    os << "/* " << attr.first << " */";
-    if (failed(emitAttribute(op.getLoc(), attr.second)))
+    os << "/* " << attr.getName() << " */";
+    if (failed(emitAttribute(op.getLoc(), attr.getValue())))
       return failure();
     return success();
   };

@@ -21,14 +21,14 @@ export CMAKE_BIN="$(which cmake)"
 "${CXX?}" --version
 python3 --version
 
+echo "Initializing submodules"
+git submodule update --init --jobs 8 --depth 1
+
 # Print NVIDIA GPU information inside the docker
 dpkg -l | grep nvidia
 nvidia-smi || true
 
 ./build_tools/kokoro/gcp_ubuntu/check_vulkan.sh
-
-echo "Initializing submodules"
-./scripts/git/submodule_versions.py init
 
 # TODO(gcmn): It would be nice to be able to build and test as much as possible,
 # so a build failure only prevents building/testing things that depend on it and

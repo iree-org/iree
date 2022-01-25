@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <numeric>
 
+#include "iree/compiler/Codegen/Dialect/LoweringConfig.h"
 #include "iree/compiler/Codegen/LLVMGPU/LLVMGPUUtils.h"
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
@@ -68,19 +69,19 @@ static void populateTilingCopyToWorkgroupMemPatterns(
           .setLoopType(linalg::LinalgTilingLoopType::Loops)
           .setTileSizeComputationFunction(wgCopyTileSizeFn)
           .setDistributionOptions(copyInvocationDistributionOptions);
-  patterns.insert<linalg::LinalgTilingPattern<linalg::CopyOp>>(
-      patterns.getContext(), tilingOptions,
+  patterns.insert<linalg::LinalgTilingPattern>(
+      linalg::CopyOp::getOperationName(), patterns.getContext(), tilingOptions,
       linalg::LinalgTransformationFilter(
-          {Identifier::get(getCopyToWorkgroupMemoryMarker(),
-                           patterns.getContext())},
-          Identifier::get(getVectorizeMarker(), patterns.getContext())));
+          {StringAttr::get(patterns.getContext(),
+                           getCopyToWorkgroupMemoryMarker())},
+          StringAttr::get(patterns.getContext(), getVectorizeMarker())));
 }
 
 static void populateVectorizationPatterns(RewritePatternSet &patterns) {
-  linalg::insertVectorizationPatterns<linalg::CopyOp>(
+  linalg::VectorizationPatterns<linalg::CopyOp>::insert(
       patterns, linalg::LinalgVectorizationOptions(),
-      linalg::LinalgTransformationFilter(Identifier::get(
-          getCopyToWorkgroupMemoryMarker(), patterns.getContext())));
+      linalg::LinalgTransformationFilter(StringAttr::get(
+          patterns.getContext(), getCopyToWorkgroupMemoryMarker())));
 }
 
 // TODO(thomasraoux): Extend this to support smaller vector size as well.
@@ -129,12 +130,12 @@ static Value createFlatId(FuncOp funcOp, ArrayRef<int64_t> workgroupSize) {
   AffineExpr d0 = getAffineDimExpr(0, b.getContext());
   AffineExpr d1 = getAffineDimExpr(1, b.getContext());
   AffineExpr d2 = getAffineDimExpr(2, b.getContext());
-  Value threadX = b.create<gpu::ThreadIdOp>(funcOp.getLoc(), indexType,
-                                            b.getStringAttr("x"));
-  Value threadY = b.create<gpu::ThreadIdOp>(funcOp.getLoc(), indexType,
-                                            b.getStringAttr("y"));
-  Value threadZ = b.create<gpu::ThreadIdOp>(funcOp.getLoc(), indexType,
-                                            b.getStringAttr("z"));
+  Value threadX =
+      b.create<gpu::ThreadIdOp>(funcOp.getLoc(), indexType, gpu::Dimension::x);
+  Value threadY =
+      b.create<gpu::ThreadIdOp>(funcOp.getLoc(), indexType, gpu::Dimension::y);
+  Value threadZ =
+      b.create<gpu::ThreadIdOp>(funcOp.getLoc(), indexType, gpu::Dimension::z);
   Value flatThreadId = makeComposedAffineApply(
       b, funcOp.getLoc(),
       d0 + workgroupSize[0] * d1 + (workgroupSize[0] * workgroupSize[1]) * d2,
@@ -164,9 +165,10 @@ static void distributeTransferRead(FuncOp funcOp, Value flatThreadId,
       multiplier.push_back(threads);
       Value dimId = id;
       assert(numThreads % threads == 0);
-      if (numThreads / threads > 1)
+      if (numThreads / threads > 1) {
         dimId =
             makeComposedAffineApply(b, funcOp.getLoc(), d0 % threads, {dimId});
+      }
       ids.push_back(dimId);
       numThreads = numThreads / threads;
       id = makeComposedAffineApply(b, funcOp.getLoc(), d0.floorDiv(threads),
@@ -231,8 +233,10 @@ class LLVMGPUDistributeSharedMemoryCopyPass
       // Step 1. Vectorize the shared memory copy.
       RewritePatternSet vectorizationPatterns(context);
       populateVectorizationPatterns(vectorizationPatterns);
-      (void)applyPatternsAndFoldGreedily(funcOp,
-                                         std::move(vectorizationPatterns));
+      if (failed(applyPatternsAndFoldGreedily(
+              funcOp, std::move(vectorizationPatterns)))) {
+        return signalPassFailure();
+      }
 
       // Step 2. Unroll transfer_read/transfer_write to a vector with the number
       // of element equal to `targetVectorSize * targetVectorSize`. The.
@@ -240,15 +244,20 @@ class LLVMGPUDistributeSharedMemoryCopyPass
       // size.
       RewritePatternSet vectorUnrollPatterns(context);
       populateVectorUnrollPatterns(vectorUnrollPatterns, flatWorkgroupSize);
-      (void)applyPatternsAndFoldGreedily(funcOp,
-                                         std::move(vectorUnrollPatterns));
+      if (failed(applyPatternsAndFoldGreedily(
+              funcOp, std::move(vectorUnrollPatterns)))) {
+        return signalPassFailure();
+      }
       // Step 3. Distribute the transfer ops onto the flat ids.
       Value flatId = createFlatId(funcOp, workgroupSize);
       distributeTransferRead(funcOp, flatId, flatWorkgroupSize);
       // Propagate vector distribution to the chain of ops.
       RewritePatternSet distributePatterns(context);
       vector::populatePropagateVectorDistributionPatterns(distributePatterns);
-      (void)applyPatternsAndFoldGreedily(funcOp, std::move(distributePatterns));
+      if (failed(applyPatternsAndFoldGreedily(funcOp,
+                                              std::move(distributePatterns)))) {
+        return signalPassFailure();
+      }
     } else {
       // Fall back to basic tiling for cases where workgroup memory size is not
       // well aligned on the number of threads.
@@ -257,15 +266,19 @@ class LLVMGPUDistributeSharedMemoryCopyPass
       OwningRewritePatternList threadLevelTilingPatterns(context);
       populateTilingCopyToWorkgroupMemPatterns(threadLevelTilingPatterns,
                                                workgroupSize);
-      (void)applyPatternsAndFoldGreedily(funcOp,
-                                         std::move(threadLevelTilingPatterns));
+      if (failed(applyPatternsAndFoldGreedily(
+              funcOp, std::move(threadLevelTilingPatterns)))) {
+        return signalPassFailure();
+      }
       // Apply canonicalization patterns.
       RewritePatternSet threadTilingCanonicalizationPatterns =
           linalg::getLinalgTilingCanonicalizationPatterns(context);
       populateAffineMinSCFCanonicalizationPattern(
           threadTilingCanonicalizationPatterns);
-      (void)applyPatternsAndFoldGreedily(
-          funcOp, std::move(threadTilingCanonicalizationPatterns));
+      if (failed(applyPatternsAndFoldGreedily(
+              funcOp, std::move(threadTilingCanonicalizationPatterns)))) {
+        return signalPassFailure();
+      }
     }
   }
 };

@@ -30,14 +30,15 @@ class VerifyInputLegalityPass
     target.addIllegalDialect("mhlo");
     target.addIllegalOp<UnrealizedConversionCastOp>();
 
-    if (failed(
-            iree_compiler::verifyAllOperationsAreLegal(getOperation(), target)))
+    if (failed(iree_compiler::verifyAllOperationsAreLegal(getOperation(),
+                                                          target))) {
       return signalPassFailure();
+    }
   }
 };
 }  // namespace
 
-std::unique_ptr<OperationPass<mlir::FuncOp>> createVerifyInputLegalityPass() {
+std::unique_ptr<Pass> createVerifyInputLegalityPass() {
   return std::make_unique<VerifyInputLegalityPass>();
 }
 

@@ -23,7 +23,7 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/FormatVariadic.h"
 #include "mlir/Dialect/GPU/GPUDialect.h"
-#include "mlir/Dialect/Linalg/IR/LinalgOps.h"
+#include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/CodegenStrategy.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
@@ -88,8 +88,8 @@ LogicalResult distributeCyclicallyToProcessors(
   forBounds.reserve(numLoops);
   permutation.reserve(numLoops);
   Location loc = pLoopOp.getLoc();
-  auto lbs = pLoopOp.lowerBound(), ubs = pLoopOp.upperBound(),
-       steps = pLoopOp.step();
+  auto lbs = pLoopOp.getLowerBound(), ubs = pLoopOp.getUpperBound(),
+       steps = pLoopOp.getStep();
   for (unsigned i : llvm::seq<unsigned>(0, procInfo.size())) {
     Value mappedLb = rewriter.create<arith::AddIOp>(
         loc, lbs[i],
@@ -162,8 +162,7 @@ LogicalResult distributeCopyOp(linalg::CopyOp copyOp, scf::ParallelOp pLoopOp,
 
 // Applies tiling followed to load/store optimized size then distribute on
 // incovations.
-LogicalResult tileAndDistributeCopy(linalg::CopyOp copyOp,
-                                    ArrayRef<Value> operands,
+LogicalResult tileAndDistributeCopy(linalg::CopyOp copyOp, ValueRange operands,
                                     ConversionPatternRewriter &rewriter) {
   linalg::LinalgTilingOptions options;
   // Tile to memory access of 128bits as those tend to be optimal on most GPUs.
@@ -187,12 +186,13 @@ LogicalResult tileAndDistributeCopy(linalg::CopyOp copyOp,
 struct TileAndDistributeCopyOp : public OpConversionPattern<linalg::CopyOp> {
   using OpConversionPattern<linalg::CopyOp>::OpConversionPattern;
   LogicalResult matchAndRewrite(
-      linalg::CopyOp linalgOp, ArrayRef<Value> operands,
+      linalg::CopyOp linalgOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     if (!hasMarker(linalgOp, getCopyToWorkgroupMemoryMarker())) {
       return failure();
     }
-    if (failed(tileAndDistributeCopy(linalgOp, operands, rewriter))) {
+    if (failed(
+            tileAndDistributeCopy(linalgOp, adaptor.getOperands(), rewriter))) {
       return failure();
     }
 
@@ -222,7 +222,7 @@ struct SerializeAndDistributeCopy : public OpConversionPattern<linalg::CopyOp> {
   using OpConversionPattern::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      linalg::CopyOp copyOp, ArrayRef<Value> operands,
+      linalg::CopyOp copyOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     if (!hasMarker(copyOp, {getCopyToWorkgroupMemoryMarker()}))
       return failure();
@@ -290,15 +290,21 @@ void SPIRVCopyToWorkgroupMemoryPass::tileAndVectorizeLinalgCopy(
       linalg::getLinalgTilingCanonicalizationPatterns(context);
   populateAffineMinCanonicalizationPattern(canonicalizePatterns);
   scf::populateSCFForLoopCanonicalizationPatterns(canonicalizePatterns);
-  (void)applyPatternsAndFoldGreedily(funcOp, std::move(canonicalizePatterns));
+  if (failed(applyPatternsAndFoldGreedily(funcOp,
+                                          std::move(canonicalizePatterns)))) {
+    return signalPassFailure();
+  }
 
   // 3. Vectorize the tiled linalg to be able to map it to load/store vector.
   OwningRewritePatternList vectorizationPatterns(&getContext());
-  linalg::insertVectorizationPatterns<linalg::CopyOp>(
+  linalg::VectorizationPatterns<linalg::CopyOp>::insert(
       vectorizationPatterns, linalg::LinalgVectorizationOptions(),
       linalg::LinalgTransformationFilter(
-          Identifier::get(getVectorizeMarker(), context), {}));
-  (void)applyPatternsAndFoldGreedily(funcOp, std::move(vectorizationPatterns));
+          StringAttr::get(context, getVectorizeMarker()), {}));
+  if (failed(applyPatternsAndFoldGreedily(funcOp,
+                                          std::move(vectorizationPatterns)))) {
+    return signalPassFailure();
+  }
 }
 
 void SPIRVCopyToWorkgroupMemoryPass::runOnOperation() {

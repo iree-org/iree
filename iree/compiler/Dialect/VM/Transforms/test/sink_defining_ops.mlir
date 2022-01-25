@@ -1,4 +1,4 @@
-// RUN: iree-opt -allow-unregistered-dialect -split-input-file -iree-vm-sink-defining-ops %s | IreeFileCheck %s
+// RUN: iree-opt -allow-unregistered-dialect -split-input-file -iree-vm-sink-defining-ops %s | FileCheck %s
 
 vm.module @module {
   // CHECK-LABEL: @single_uses

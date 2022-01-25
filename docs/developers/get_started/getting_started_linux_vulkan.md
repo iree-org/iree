@@ -58,16 +58,14 @@ Tests in IREE's HAL "Conformance Test Suite" (CTS) actually exercise the Vulkan
 HAL, which includes checking for supported layers and extensions.
 
 Run the
-[driver test](https://github.com/google/iree/blob/main/iree/hal/cts/driver_test.cc):
+[driver test](https://github.com/google/iree/blob/main/iree/hal/cts/driver_test.h):
 
 ```shell
 # -- CMake --
 $ export VK_LOADER_DEBUG=all
-$ cmake --build ../iree-build/ --target iree_hal_cts_driver_test
-$ ../iree-build/iree/hal/cts/iree_hal_cts_driver_test
-
-# -- Bazel --
-$ bazel test iree/hal/cts:driver_test --test_env=VK_LOADER_DEBUG=all --test_output=all
+$ cmake --build ../iree-build/ --target iree_hal_vulkan_cts_vulkan_driver_test
+$ cd ../iree-build/
+$ ctest -R iree/hal/vulkan/cts/vulkan_driver_test
 ```
 
 If these tests pass, you can skip down to the next section.

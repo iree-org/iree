@@ -18,7 +18,7 @@ typedef struct iree_hal_cuda_nop_executable_cache_t {
   iree_hal_cuda_context_wrapper_t* context;
 } iree_hal_cuda_nop_executable_cache_t;
 
-extern const iree_hal_executable_cache_vtable_t
+static const iree_hal_executable_cache_vtable_t
     iree_hal_cuda_nop_executable_cache_vtable;
 
 static iree_hal_cuda_nop_executable_cache_t*
@@ -80,7 +80,7 @@ static iree_status_t iree_hal_cuda_nop_executable_cache_prepare_executable(
       executable_cache->context, executable_spec, out_executable);
 }
 
-const iree_hal_executable_cache_vtable_t
+static const iree_hal_executable_cache_vtable_t
     iree_hal_cuda_nop_executable_cache_vtable = {
         .destroy = iree_hal_cuda_nop_executable_cache_destroy,
         .can_prepare_format =

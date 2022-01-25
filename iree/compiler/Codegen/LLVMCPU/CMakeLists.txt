@@ -18,18 +18,22 @@ iree_cc_library(
   SRCS
     "ConvertToLLVM.cpp"
     "KernelDispatch.cpp"
+    "LLVMCPUCheckIRBeforeLLVMConversion.cpp"
     "LLVMCPULowerExecutableTarget.cpp"
     "LLVMCPUSynchronizeSymbolVisibility.cpp"
     "LLVMCPUTileAndVectorizeLinalgTensorOps.cpp"
+    "LLVMCPUTileFuseAndVectorizeLinalgTensorOps.cpp"
     "LLVMCPUUnfuseFMAOps.cpp"
-    "LLVMCPUVectorization.cpp"
     "Passes.cpp"
-    "VectorContractToAArch64InlineAsmOp.cpp"
+    "VectorContractCustomKernels.cpp"
   DEPS
+    IREELinalgExtDialect
+    IREELinalgExtPasses
     LLVMSupport
     MLIRAffineToStandard
     MLIRAnalysis
     MLIRArithmeticToLLVM
+    MLIRArithmeticTransforms
     MLIRIR
     MLIRLLVMCommonConversion
     MLIRLLVMIR
@@ -57,16 +61,14 @@ iree_cc_library(
     MLIRVectorToLLVM
     MLIRVectorToSCF
     iree::compiler::Codegen::Common
+    iree::compiler::Codegen::Dialect::IREECodegenDialect
     iree::compiler::Codegen::PassHeaders
+    iree::compiler::Codegen::Sandbox
     iree::compiler::Codegen::Transforms
     iree::compiler::Codegen::Utils
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::HAL::IR::HALDialect
-    iree::compiler::Dialect::LinalgExt::IR
-    iree::compiler::Dialect::LinalgExt::Transforms
-    iree::compiler::Dialect::Shape::IR
-    iree::compiler::Dialect::Shape::Transforms
     iree::compiler::Dialect::Util::IR
   PUBLIC
 )

@@ -17,17 +17,27 @@
 extern "C" {
 #endif  // __cplusplus
 
-// Creates a cuda graph.
+typedef struct iree_arena_block_pool_t iree_arena_block_pool_t;
+
+// Creates a command buffer that records into a CUDA graph.
+//
+// NOTE: the |block_pool| must remain live for the lifetime of the command
+// buffers that use it.
 iree_status_t iree_hal_cuda_graph_command_buffer_create(
-    iree_hal_cuda_context_wrapper_t* context,
+    iree_hal_device_t* device, iree_hal_cuda_context_wrapper_t* context,
     iree_hal_command_buffer_mode_t mode,
     iree_hal_command_category_t command_categories,
     iree_hal_queue_affinity_t queue_affinity,
+    iree_arena_block_pool_t* block_pool,
     iree_hal_command_buffer_t** out_command_buffer);
+
+// Returns true if |command_buffer| is a CUDA graph-based command buffer.
+bool iree_hal_cuda_graph_command_buffer_isa(
+    iree_hal_command_buffer_t* command_buffer);
 
 // Returns the native cuda graph associated to the command buffer.
 CUgraphExec iree_hal_cuda_graph_command_buffer_exec(
-    const iree_hal_command_buffer_t* command_buffer);
+    iree_hal_command_buffer_t* command_buffer);
 
 #ifdef __cplusplus
 }  // extern "C"

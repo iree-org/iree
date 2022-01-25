@@ -58,20 +58,23 @@ struct CanonicalizeForOpInductionVarShape final
                      Operation* ivDef) const {
     if (auto shapeCast = dyn_cast<vector::ShapeCastOp>(ivUser)) {
       if (auto souceOp = dyn_cast<vector::ShapeCastOp>(ivDef)) {
-        if (shapeCast.getType() == souceOp.source().getType())
+        if (shapeCast.getType() == souceOp.source().getType()) {
           return souceOp.source();
+        }
       }
     } else if (auto extractOp = dyn_cast<vector::ExtractOp>(ivUser)) {
       if (auto broadcastOp = dyn_cast<vector::BroadcastOp>(ivDef)) {
-        if (extractOp.getType() == broadcastOp.getSourceType())
+        if (extractOp.getType() == broadcastOp.getSourceType()) {
           return broadcastOp.source();
+        }
       }
     } else if (auto targetOp = dyn_cast<UnrealizedConversionCastOp>(ivUser)) {
       if (auto sourceOp = dyn_cast<UnrealizedConversionCastOp>(ivDef)) {
         if (sourceOp->getNumOperands() == 1 && targetOp->getNumResults() == 1 &&
             sourceOp->getOperandTypes().front() ==
-                targetOp.getResultTypes().front())
+                targetOp.getResultTypes().front()) {
           return sourceOp.inputs().front();
+        }
       }
     }
     return Value();
@@ -97,8 +100,9 @@ struct CanonicalizeForOpInductionVarShape final
       if (!it.value().hasOneUse()) continue;
       Operation* op = it.value().use_begin()->getOwner();
       if (!isa<vector::ShapeCastOp, vector::ExtractOp,
-               UnrealizedConversionCastOp>(op))
+               UnrealizedConversionCastOp>(op)) {
         continue;
+      }
       Operation* returnValDef = returnValues[it.index()].getDefiningOp();
       Value newReturn = FoldCarryDep(forOp, op, returnValDef);
       if (!newReturn) continue;
@@ -111,9 +115,9 @@ struct CanonicalizeForOpInductionVarShape final
       initArgs[it.index()] = rewriter.clone(*op, mapping)->getResult(0);
     }
     if (iteratorFolded.empty()) return failure();
-    auto newLoop =
-        rewriter.create<scf::ForOp>(forOp.getLoc(), forOp.lowerBound(),
-                                    forOp.upperBound(), forOp.step(), initArgs);
+    auto newLoop = rewriter.create<scf::ForOp>(
+        forOp.getLoc(), forOp.getLowerBound(), forOp.getUpperBound(),
+        forOp.getStep(), initArgs);
     transferBody(forOp.getBody(), newLoop.getBody(), returnValues, rewriter);
 
     // Replace the operation by the new one.
@@ -166,8 +170,8 @@ struct PackForOpInductionVarVector final : public OpRewritePattern<scf::ForOp> {
     // Create a new loop with the casted init values. This also creates
     // induction variables with proper type.
     auto newLoop = rewriter.create<scf::ForOp>(
-        forOp.getLoc(), forOp.lowerBound(), forOp.upperBound(), forOp.step(),
-        ivInitValues);
+        forOp.getLoc(), forOp.getLowerBound(), forOp.getUpperBound(),
+        forOp.getStep(), ivInitValues);
 
     // Move all operations to the new for op. This also replaces block
     // arguments. to the new block arguments.
@@ -226,7 +230,9 @@ struct ForOpCanonicalizationPass
     OwningRewritePatternList patterns(&getContext());
     patterns.insert<CanonicalizeForOpInductionVarShape,
                     PackForOpInductionVarVector>(fn.getContext());
-    (void)applyPatternsAndFoldGreedily(fn, std::move(patterns));
+    if (failed(applyPatternsAndFoldGreedily(fn, std::move(patterns)))) {
+      return signalPassFailure();
+    }
   }
 };
 

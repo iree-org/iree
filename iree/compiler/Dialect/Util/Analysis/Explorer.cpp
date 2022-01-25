@@ -24,11 +24,32 @@ static StringRef getRegionName(Region &region) {
   return getOpName(region.getParentOp());
 }
 
+// Returns the remapped successor operand index if the branch operand is
+// passed to a successor (vs being used by the op itself, such as the cond_br
+// condition).
+static llvm::Optional<unsigned> mapSuccessorOperand(BranchOpInterface branchOp,
+                                                    unsigned successorIdx,
+                                                    unsigned operandIdx) {
+  // I don't know if there's a better way to do this - the interface doesn't
+  // help.
+  auto successorOperands = branchOp.getSuccessorOperands(successorIdx);
+  if (!successorOperands.hasValue()) return llvm::None;
+  auto &operandRange = successorOperands.getValue();
+  if (operandRange.empty()) return llvm::None;
+  unsigned beginIdx = operandRange.getBeginOperandIndex();
+  if (operandIdx >= beginIdx && operandIdx < beginIdx + operandRange.size()) {
+    // Covered.
+    return {operandIdx - beginIdx};
+  }
+  return llvm::None;
+}
+
 Explorer::Explorer(Operation *rootOp, TraversalAction defaultAction)
     : rootOp(rootOp),
       asmState(rootOp, OpPrintingFlags().elideLargeElementsAttrs()),
       callGraph(rootOp),
-      defaultAction(defaultAction) {}
+      defaultAction(defaultAction),
+      analysisManager(rootOp, /*passInstrumentor=*/nullptr) {}
 
 Explorer::~Explorer() = default;
 
@@ -70,7 +91,7 @@ void Explorer::initializeGlobalInfos() {
   for (auto use : allUses.getValue()) {
     auto *symbolOp =
         symbolTable.lookupNearestSymbolFrom(use.getUser(), use.getSymbolRef());
-    if (!isa<IREE::Util::GlobalOp>(symbolOp)) continue;
+    if (!isa_and_nonnull<IREE::Util::GlobalOp>(symbolOp)) continue;
     auto &globalInfo = globalInfos[symbolOp];
     globalInfo.op = cast<IREE::Util::GlobalOp>(symbolOp);
     if (isa<IREE::Util::GlobalAddressOp>(use.getUser())) {
@@ -94,9 +115,18 @@ void Explorer::initializeInverseCallGraph() {
       isCallGraphIncomplete = true;
     } else {
       auto *node = callGraph.resolveCallable(callOp, symbolTables);
-      callGraphInv[node->getCallableRegion()].push_back(callOp);
+      if (!node->isExternal()) {
+        callGraphInv[node->getCallableRegion()].push_back(callOp);
+      }
     }
   });
+}
+
+const Explorer::GlobalInfo *Explorer::getGlobalInfo(
+    IREE::Util::GlobalOp globalOp) {
+  auto it = globalInfos.find(globalOp);
+  if (it == globalInfos.end()) return nullptr;
+  return &it->second;
 }
 
 const Explorer::GlobalInfo *Explorer::queryGlobalInfoFrom(StringRef globalName,
@@ -458,7 +488,7 @@ TraversalResult Explorer::walkIncomingBranchOperands(
   // Walk any internal branches to this block.
   for (auto *sourceBlock : targetBlock->getPredecessors()) {
     auto branchOp = cast<BranchOpInterface>(sourceBlock->getTerminator());
-    // I couldn't find a way to get the succesor index from the predecessor,
+    // I couldn't find a way to get the successor index from the predecessor,
     // so here we have to scan the source to see which one we are. This is
     // required to make things like cond_br work where there are multiple
     // successors and one or more may end up in our target block.
@@ -482,6 +512,23 @@ TraversalResult Explorer::walkOutgoingBranchArguments(
         fn) {
   for (auto *targetBlock : sourceBlock->getSuccessors()) {
     if (fn(targetBlock, targetBlock->getArguments()).wasInterrupted()) {
+      break;
+    }
+  }
+  return TraversalResult::COMPLETE;
+}
+
+TraversalResult Explorer::walkOutgoingBranchOperandArguments(
+    mlir::BranchOpInterface branchOp, unsigned operandIdx,
+    std::function<WalkResult(Block *targetBlock, BlockArgument arg)> fn) {
+  for (unsigned successorIdx = 0; successorIdx < branchOp->getNumSuccessors();
+       ++successorIdx) {
+    auto successorOperandIdx =
+        mapSuccessorOperand(branchOp, successorIdx, operandIdx);
+    if (!successorOperandIdx.hasValue()) continue;
+    auto *targetBlock = branchOp->getSuccessor(successorIdx);
+    auto blockArg = targetBlock->getArgument(*successorOperandIdx);
+    if (fn(targetBlock, blockArg).wasInterrupted()) {
       break;
     }
   }
@@ -566,7 +613,7 @@ TraversalResult Explorer::walkDefiningOps(Value value, ResultWalkFn fn) {
       return TraversalResult::COMPLETE;
     }
     LLVM_DEBUG(llvm::dbgs()
-               << "  -> traversing into call target @" << targetSymbol << "\n");
+               << "  -> traversing into call target " << targetSymbol << "\n");
     return walkReturnOperands(targetOp, [&](OperandRange returnOperands) {
       auto returnOperand = returnOperands[idx];
       LLVM_DEBUG({
@@ -771,48 +818,18 @@ TraversalResult Explorer::walkTransitiveUses(Value value, UseWalkFn fn) {
     return TraversalResult::COMPLETE;
   };
 
-  // Returns true if the branch operand is passed to a successor (vs being used
-  // by the op itself, such as the cond_br condition).
-  auto isSuccessorOperand = [&](BranchOpInterface branchOp,
-                                unsigned operandIdx) {
-    // I don't know if there's a better way to do this - the interface doesn't
-    // help.
-    for (unsigned i = 0; i < branchOp->getNumSuccessors(); ++i) {
-      auto successorOperands = branchOp.getSuccessorOperands(i);
-      if (!successorOperands.hasValue()) continue;
-      auto &operandRange = successorOperands.getValue();
-      if (operandRange.empty()) continue;
-      unsigned beginIdx = operandRange.getBeginOperandIndex();
-      if (operandIdx >= beginIdx &&
-          operandIdx < beginIdx + operandRange.size()) {
-        // Covered.
-        return true;
-      }
-    }
-    return false;
-  };
-
   // Move across a branch to all successors.
   auto traverseBranchOp = [&](BranchOpInterface branchOp, unsigned operandIdx) {
-    // First check to see if the operand is for a successor edge. Ops like
-    // cond_br have operands that are not carried along outgoing edges.
-    if (!isSuccessorOperand(branchOp, operandIdx)) {
-      LLVM_DEBUG(llvm::dbgs() << "  -- ignoring non-succesor branch operand "
-                              << operandIdx << "\n");
-      return TraversalResult::COMPLETE;
-    }
-    return walkOutgoingBranchArguments(
-        branchOp->getBlock(),
-        [&](Block *targetBlock, Block::BlockArgListType args) {
-          auto branchArg = args[operandIdx];
+    return walkOutgoingBranchOperandArguments(
+        branchOp, operandIdx, [&](Block *targetBlock, BlockArgument arg) {
           LLVM_DEBUG({
             llvm::dbgs() << "   + queuing ";
             targetBlock->printAsOperand(llvm::dbgs(), asmState);
             llvm::dbgs() << " branch argument ";
-            branchArg.printAsOperand(llvm::dbgs(), asmState);
+            arg.printAsOperand(llvm::dbgs(), asmState);
             llvm::dbgs() << "\n";
           });
-          worklist.insert(branchArg);
+          worklist.insert(arg);
           return WalkResult::advance();
         });
   };

@@ -8,15 +8,13 @@
 
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
-#include "iree/compiler/Dialect/HAL/Utils/TypeUtils.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 
 namespace mlir {
 namespace iree_compiler {
 
 HALTypeConverter::HALTypeConverter(
-    ArrayRef<const HALConversionDialectInterface *> conversionInterfaces,
-    bool supportTensors)
+    ArrayRef<const HALConversionDialectInterface *> conversionInterfaces)
     : conversionInterfaces(conversionInterfaces.vec()) {
   // Custom conversion interfaces for external dialects.
   addConversion([this](Type type, SmallVectorImpl<Type> &results) {
@@ -34,11 +32,8 @@ HALTypeConverter::HALTypeConverter(
   // we need at the HAL level is a blob of bytes.
   addConversion([=](TensorType type) -> Optional<Type> {
     // HAL only should be concerned with numeric values.
-    if (HALTypeConverter::shouldConvertToBuffer(type)) {
-      return supportTensors ? Optional<Type>{IREE::HAL::BufferViewType::get(
-                                  type.getContext())}
-                            : Optional<Type>{IREE::HAL::BufferType::get(
-                                  type.getContext())};
+    if (HALTypeConverter::shouldConvertToBufferView(type)) {
+      return IREE::HAL::BufferViewType::get(type.getContext());
     }
     return llvm::None;
   });
@@ -47,7 +42,7 @@ HALTypeConverter::HALTypeConverter(
                               ValueRange inputs, Location loc) -> Value {
     assert(inputs.size() == 1);
     if (inputs[0].getType().isa<TensorType>()) {
-      return builder.create<IREE::HAL::TensorCastOp>(loc, type, inputs[0]);
+      return builder.create<IREE::HAL::TensorExportOp>(loc, type, inputs[0]);
     } else if (inputs[0].getType().isa<IREE::HAL::BufferViewType>()) {
       return builder.create<IREE::HAL::BufferViewBufferOp>(loc, type,
                                                            inputs[0]);
@@ -64,7 +59,7 @@ HALTypeConverter::HALTypeConverter(
     auto inputValue = inputs[0];
     auto inputType = inputValue.getType();
     if (inputType.isa<TensorType>()) {
-      return builder.create<IREE::HAL::TensorCastOp>(loc, type, inputValue);
+      return builder.create<IREE::HAL::TensorExportOp>(loc, type, inputValue);
     } else if (inputType.isa<IREE::HAL::BufferType>()) {
       // Look for the buffer view this buffer came from, if any.
       // If we don't have the origin buffer view then we can't know the shape

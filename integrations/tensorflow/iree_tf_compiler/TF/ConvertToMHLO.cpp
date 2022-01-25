@@ -8,7 +8,7 @@
 #include "mlir-hlo/Dialect/mhlo/IR/chlo_ops.h"
 #include "mlir-hlo/Dialect/mhlo/IR/hlo_ops.h"
 #include "mlir-hlo/Dialect/mhlo/transforms/rewriters.h"
-#include "mlir/Dialect/Linalg/IR/LinalgOps.h"
+#include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Shape/IR/Shape.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
@@ -62,8 +62,8 @@ class ConvertToMHLOPass : public PassWrapper<ConvertToMHLOPass, FunctionPass> {
     mlir::TF::PopulateTFLoweringBeforeHLOPatterns(context, &lowerTfPatterns);
 
     OwningRewritePatternList canonicalizePatterns(&getContext());
-    for (auto *op : context->getRegisteredOperations()) {
-      op->getCanonicalizationPatterns(canonicalizePatterns, context);
+    for (auto op : context->getRegisteredOperations()) {
+      op.getCanonicalizationPatterns(canonicalizePatterns, context);
     }
 
     OwningRewritePatternList patterns(&getContext());

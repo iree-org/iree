@@ -19,6 +19,9 @@
 
 IREE_FLAG(bool, trace_execution, false, "Traces VM execution to stderr.");
 
+IREE_FLAG(bool, print_statistics, false,
+          "Prints runtime statistics to stderr on exit.");
+
 IREE_FLAG(string, driver, "vmvx", "Backend driver to use.");
 
 // Runs the trace in |file| using |root_path| as the base for any path lookups
@@ -37,7 +40,7 @@ static iree_status_t iree_run_trace_file(iree_string_view_t root_path,
 
   yaml_parser_t parser;
   if (!yaml_parser_initialize(&parser)) {
-    iree_trace_replay_deinitialize(&replay);
+    iree_trace_replay_deinitialize(&replay, IREE_TRACE_REPLAY_SHUTDOWN_QUIET);
     return iree_make_status(IREE_STATUS_INTERNAL,
                             "yaml_parser_initialize failed");
   }
@@ -61,7 +64,10 @@ static iree_status_t iree_run_trace_file(iree_string_view_t root_path,
   }
 
   yaml_parser_delete(&parser);
-  iree_trace_replay_deinitialize(&replay);
+  iree_trace_replay_deinitialize(
+      &replay, FLAG_print_statistics
+                   ? IREE_TRACE_REPLAY_SHUTDOWN_PRINT_STATISTICS
+                   : IREE_TRACE_REPLAY_SHUTDOWN_QUIET);
   return status;
 }
 

@@ -7,7 +7,6 @@
 #include <memory>
 #include <tuple>
 
-#include "iree/compiler/Dialect/Shape/IR/ShapeOps.h"
 #include "iree/compiler/Dialect/Util/Conversion/ConversionPatterns.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
@@ -35,19 +34,6 @@ namespace iree_compiler {
 namespace IREE {
 namespace VM {
 namespace {
-
-// When converting to the VM, it is safe to remove any identity tie_shape
-// ops that remain.
-class ElideTieShapeOp : public OpConversionPattern<Shape::TieShapeOp> {
-  using OpConversionPattern::OpConversionPattern;
-
-  LogicalResult matchAndRewrite(
-      Shape::TieShapeOp op, ArrayRef<Value> operands,
-      ConversionPatternRewriter &rewriter) const override {
-    rewriter.replaceOp(op, operands[0]);
-    return success();
-  }
-};
 
 // Returns a stably sorted list of dialect interfaces of T for all dialects used
 // within the given module.
@@ -139,7 +125,6 @@ class ConversionPass
     populateMemRefToVMPatterns(context, conversionTarget, typeConverter,
                                conversionPatterns);
     populateAffineToStdConversionPatterns(conversionPatterns);
-    conversionPatterns.insert<ElideTieShapeOp>(context);
 
     conversionTarget.addIllegalDialect<StandardOpsDialect,
                                        mlir::arith::ArithmeticDialect>();
@@ -153,7 +138,6 @@ class ConversionPass
       dialectInterface->populateVMConversionPatterns(
           importSymbols, conversionPatterns, typeConverter);
     }
-    Shape::populateFoldConversionPatterns(context, conversionPatterns);
 
     if (failed(applyPartialConversion(outerModuleOp, conversionTarget,
                                       std::move(conversionPatterns)))) {
@@ -174,7 +158,7 @@ std::unique_ptr<OperationPass<mlir::ModuleOp>> createConversionPass(
 static PassRegistration<ConversionPass> pass(
 
     [] {
-      auto options = getTargetOptionsFromFlags();
+      auto options = TargetOptions::FromFlags::get();
       return std::make_unique<ConversionPass>(options);
     });
 

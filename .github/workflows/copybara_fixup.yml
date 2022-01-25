@@ -52,14 +52,6 @@ jobs:
         if: env.commit_amended == 'true'
         run: git push -f origin ${{ github.ref }}
 
-  check_submodules:
-    runs-on: ubuntu-18.04
-    steps:
-      - name: Checking out repository
-        uses: actions/checkout@v2
-      - name: Checking submodules
-        run: ./scripts/git/submodule_versions.py check
-
   check_copybara_tag:
     runs-on: ubuntu-18.04
     steps:

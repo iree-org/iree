@@ -542,8 +542,8 @@ static Attribute constFoldUnaryOp(ArrayRef<Attribute> operands,
   if (auto operand = operands[0].dyn_cast_or_null<AttrElementT>()) {
     return AttrElementT::get(operand.getType(), calculate(operand.getValue()));
   } else if (auto operand = operands[0].dyn_cast_or_null<SplatElementsAttr>()) {
-    auto elementResult =
-        constFoldUnaryOp<AttrElementT>({operand.getSplatValue()}, calculate);
+    auto elementResult = constFoldUnaryOp<AttrElementT>(
+        {operand.getSplatValue<Attribute>()}, calculate);
     if (!elementResult) return {};
     return DenseElementsAttr::get(operand.getType(), elementResult);
   } else if (auto operand = operands[0].dyn_cast_or_null<ElementsAttr>()) {
@@ -565,7 +565,7 @@ static Attribute constFoldFloatUnaryOp(
     return FloatAttr::get(operand.getType(), calculate(operand.getValue()));
   } else if (auto operand = operands[0].dyn_cast_or_null<SplatElementsAttr>()) {
     auto elementResult =
-        constFoldFloatUnaryOp({operand.getSplatValue()}, calculate);
+        constFoldFloatUnaryOp({operand.getSplatValue<Attribute>()}, calculate);
     if (!elementResult) return {};
     return DenseElementsAttr::get(operand.getType(), elementResult);
   } else if (auto operand = operands[0].dyn_cast_or_null<ElementsAttr>()) {
@@ -589,7 +589,7 @@ static Attribute constFoldBinaryOp(ArrayRef<Attribute> operands,
   assert(operands.size() == 2 && "binary op takes two operands");
   if (auto lhs = operands[0].dyn_cast_or_null<AttrElementT>()) {
     auto rhs = operands[1].dyn_cast_or_null<AttrElementT>();
-    if (!rhs || lhs.getType() != rhs.getType()) return {};
+    if (!rhs) return {};
     return AttrElementT::get(lhs.getType(),
                              calculate(lhs.getValue(), rhs.getValue()));
   } else if (auto lhs = operands[0].dyn_cast_or_null<SplatElementsAttr>()) {
@@ -597,7 +597,8 @@ static Attribute constFoldBinaryOp(ArrayRef<Attribute> operands,
     auto rhs = operands[1].dyn_cast_or_null<SplatElementsAttr>();
     if (!rhs || lhs.getType() != rhs.getType()) return {};
     auto elementResult = constFoldBinaryOp<AttrElementT>(
-        {lhs.getSplatValue(), rhs.getSplatValue()}, calculate);
+        {lhs.getSplatValue<Attribute>(), rhs.getSplatValue<Attribute>()},
+        calculate);
     if (!elementResult) return {};
     return DenseElementsAttr::get(lhs.getType(), elementResult);
   } else if (auto lhs = operands[0].dyn_cast_or_null<ElementsAttr>()) {
@@ -643,7 +644,9 @@ static Attribute constFoldTernaryOp(ArrayRef<Attribute> operands,
       return {};
     }
     auto elementResult = constFoldTernaryOp<AttrElementT>(
-        {a.getSplatValue(), b.getSplatValue(), c.getSplatValue()}, calculate);
+        {a.getSplatValue<Attribute>(), b.getSplatValue<Attribute>(),
+         c.getSplatValue<Attribute>()},
+        calculate);
     if (!elementResult) return {};
     return DenseElementsAttr::get(a.getType(), elementResult);
   } else if (auto a = operands[0].dyn_cast_or_null<ElementsAttr>()) {

@@ -1,6 +1,6 @@
 // Tests folding and canonicalization of comparison ops.
 
-// RUN: iree-opt -split-input-file -pass-pipeline='vm.module(canonicalize)' %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -pass-pipeline='vm.module(canonicalize)' %s | FileCheck %s
 
 // CHECK-LABEL: @cmp_eq_i32_folds
 vm.module @cmp_eq_i32_folds {

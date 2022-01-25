@@ -73,23 +73,84 @@ extern "C" {
 // Note that any code within IREE_STATUS_CODE_MASK is valid even if not
 // enumerated here. Always check for unhandled errors/have default conditions.
 typedef enum iree_status_code_e {
+  // Successful operation.
   IREE_STATUS_OK = 0,
+
+  // Operation was cancelled by the caller.
   IREE_STATUS_CANCELLED = 1,
+
+  // Unknown error, or error that could not be mapped to this enum.
   IREE_STATUS_UNKNOWN = 2,
+
+  // The caller provided an invalid argument and that future calls with the same
+  // arguments will fail. If the failure is predicated on system state that may
+  // change prefer IREE_STATUS_OUT_OF_RANGE.
   IREE_STATUS_INVALID_ARGUMENT = 3,
+
+  // A deadline was exceeded before the call could complete.
+  // This can be returned even if the operation would have completed
+  // successfully had the deadline not been met.
   IREE_STATUS_DEADLINE_EXCEEDED = 4,
+
+  // A referenced resource could not be found or was unavailable to all
+  // requesters. IREE_STATUS_PERMISSION_DENIED should be used if only an
+  // individual requester is denied access.
   IREE_STATUS_NOT_FOUND = 5,
+
+  // The resource the caller attempted to create already exists.
   IREE_STATUS_ALREADY_EXISTS = 6,
+
+  // The caller does not have permission to execute the operation or have access
+  // to the requested resources.
   IREE_STATUS_PERMISSION_DENIED = 7,
+
+  // Some resource type has been exhausted and the operation is unable to
+  // reserve what it requires, either by quota or underlying system exhaustion.
   IREE_STATUS_RESOURCE_EXHAUSTED = 8,
+
+  // The operation was rejected because the system is not in a state required
+  // for the operation's execution.
+  //
+  // Use IREE_STATUS_UNAVAILABLE if the caller can retry the operation.
+  // Use IREE_STATUS_ABORTED if the caller should restart their transaction
+  // (the entire sequence of operations is invalid).
+  // Use IREE_STATUS_FAILED_PRECONDITION if the caller should not retry until
+  // the system state has been explicitly fixed.
   IREE_STATUS_FAILED_PRECONDITION = 9,
+
+  // The operation was aborted by the system.
+  // If responding to a caller-requested cancellation use IREE_STATUS_CANCELLED.
   IREE_STATUS_ABORTED = 10,
+
+  // The operation was attempted past the valid range (of a resource, etc).
+  // Indicates the operation can be retried if the system state is fixed.
   IREE_STATUS_OUT_OF_RANGE = 11,
+
+  // Operation has not been implemented or is not supported.
   IREE_STATUS_UNIMPLEMENTED = 12,
+
+  // An internal error has occurred and some invariants expected by an
+  // underlying system have been violated. This error code is reserved for
+  // serious errors.
   IREE_STATUS_INTERNAL = 13,
+
+  // The system used to perform the operation is currently (and transiently)
+  // unavailable. Callers can retry with backoff.
   IREE_STATUS_UNAVAILABLE = 14,
+
+  // An serious unrecoverable data loss or corruption has occurred.
+  // Indicates that an underlying system or resource has failed in such a way
+  // that all related operations may produce incorrect results.
   IREE_STATUS_DATA_LOSS = 15,
+
+  // The requested operation does not have proper authentication.
+  // Callers can correct this and retry.
   IREE_STATUS_UNAUTHENTICATED = 16,
+
+  // The operation has been deferred and must be resumed at a future point.
+  // Used by resumable operations as part of scheduling and execution systems.
+  // Callers that do not handle deferred execution can treat this as a failure.
+  IREE_STATUS_DEFERRED = 17,
 
   IREE_STATUS_CODE_MASK = 0x1Fu,
 } iree_status_code_t;
@@ -151,6 +212,8 @@ typedef struct iree_status_handle_t* iree_status_t;
   (iree_status_code(value) == IREE_STATUS_DATA_LOSS)
 #define iree_status_is_unauthenticated(value) \
   (iree_status_code(value) == IREE_STATUS_UNAUTHENTICATED)
+#define iree_status_is_deferred(value) \
+  (iree_status_code(value) == IREE_STATUS_DEFERRED)
 
 #define IREE_STATUS_IMPL_CONCAT_INNER_(x, y) x##y
 #define IREE_STATUS_IMPL_CONCAT_(x, y) IREE_STATUS_IMPL_CONCAT_INNER_(x, y)
@@ -230,6 +293,8 @@ typedef struct iree_status_handle_t* iree_status_t;
 #if IREE_STATUS_FEATURES == 0
 #define IREE_STATUS_IMPL_MAKE_(code, ...) \
   (iree_status_t)(uintptr_t)((code)&IREE_STATUS_CODE_MASK)
+#define IREE_STATUS_IMPL_MAKE_LOC_(file, line, code, ...) \
+  IREE_STATUS_IMPL_MAKE_(code)
 #undef IREE_STATUS_IMPL_RETURN_IF_API_ERROR_
 #define IREE_STATUS_IMPL_RETURN_IF_API_ERROR_(var, ...)                      \
   iree_status_t var = (IREE_STATUS_IMPL_IDENTITY_(                           \
@@ -254,6 +319,8 @@ typedef struct iree_status_handle_t* iree_status_t;
 #else
 #define IREE_STATUS_IMPL_MAKE_(...) \
   IREE_STATUS_IMPL_MAKE_SWITCH_(__FILE__, __LINE__, __VA_ARGS__)
+#define IREE_STATUS_IMPL_MAKE_LOC_(file, line, ...) \
+  IREE_STATUS_IMPL_MAKE_SWITCH_(file, line, __VA_ARGS__)
 #endif  // !IREE_STATUS_FEATURES
 
 // Returns an IREE_STATUS_OK.
@@ -270,6 +337,15 @@ typedef struct iree_status_handle_t* iree_status_t;
 //  return iree_make_status(IREE_STATUS_CANCELLED, "because reasons");
 //  return iree_make_status(IREE_STATUS_CANCELLED, "because %d > %d", a, b);
 #define iree_make_status IREE_STATUS_IMPL_MAKE_
+
+// Makes an iree_status_t with the given iree_status_code_t code using the given
+// source location. Besides taking the file and line of the source location this
+// is the same as iree_make_status.
+//
+// Examples:
+//  return iree_make_status_with_location(
+//      "file.c", 40, IREE_STATUS_CANCELLED, "because %d > %d", a, b);
+#define iree_make_status_with_location IREE_STATUS_IMPL_MAKE_LOC_
 
 // Propagates the error returned by (expr) by returning from the current
 // function on non-OK status. Optionally annotates the status with additional
@@ -365,6 +441,16 @@ IREE_API_EXPORT void iree_status_free(iree_status_t status);
 // Ignores |status| regardless of its value and frees any associated payloads.
 // Returns an OK status that can be used when chaining.
 IREE_API_EXPORT iree_status_t iree_status_ignore(iree_status_t status);
+
+// Returns a new status that is |base_status| if not OK and otherwise returns
+// |new_status|. This allows for chaining failure handling code that may also
+// return statuses.
+//
+// Example:
+//   iree_status_t status = do_something();
+//   return iree_status_join(status, do_cleanup());
+IREE_API_EXPORT iree_status_t iree_status_join(iree_status_t base_status,
+                                               iree_status_t new_status);
 
 // Aborts the program with a failing |status|.
 // This will trigger a SIGABRT. It's best not to use this at all outside of

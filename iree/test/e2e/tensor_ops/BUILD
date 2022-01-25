@@ -11,7 +11,7 @@
 # See https://github.com/google/iree/blob/main/docs/developers/developing_iree/testing_guide.md#iree-core-end-to-end-tests.
 
 load("//build_tools/bazel:enforce_glob.bzl", "enforce_glob")
-load("//iree:lit_test.bzl", "iree_lit_test_suite")
+load("//build_tools/bazel:iree_lit_test.bzl", "iree_lit_test_suite")
 load("//build_tools/bazel:iree_check_test.bzl", "iree_check_single_backend_test_suite")
 
 package(
@@ -25,17 +25,17 @@ iree_lit_test_suite(
     srcs = [
         "tensor_cast.mlir",
     ],
-    data = [
-        "//iree/tools:IreeFileCheck",
+    tags = ["hostonly"],
+    tools = [
         "//iree/tools:iree-benchmark-module",
         "//iree/tools:iree-run-mlir",
         "//iree/tools:iree-translate",
+        "@llvm-project//llvm:FileCheck",
     ],
-    tags = ["hostonly"],
 )
 
 iree_check_single_backend_test_suite(
-    name = "check_dylib_embedded-llvm-aot_dylib",
+    name = "check_dylib-llvm-aot_dylib",
     srcs = enforce_glob(
         # keep sorted
         [
@@ -47,9 +47,6 @@ iree_check_single_backend_test_suite(
             "tensor_cast.mlir",
         ],
     ),
-    compiler_flags = [
-        "-iree-llvm-link-embedded=true",
-    ],
     driver = "dylib",
     target_backend = "dylib-llvm-aot",
 )
@@ -67,9 +64,6 @@ iree_check_single_backend_test_suite(
             "tensor_cast.mlir",
         ],
     ),
-    compiler_flags = [
-        "-iree-llvm-link-embedded=true",
-    ],
     driver = "cuda",
     tags = [
         "noasan",
@@ -94,9 +88,6 @@ iree_check_single_backend_test_suite(
             "tensor_cast.mlir",
         ],
     ),
-    compiler_flags = [
-        "-iree-llvm-link-embedded=true",
-    ],
     driver = "vulkan",
     target_backend = "vulkan-spirv",
 )
