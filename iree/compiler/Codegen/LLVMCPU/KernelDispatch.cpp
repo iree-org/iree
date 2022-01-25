@@ -274,45 +274,6 @@ static int64_t getMaxTileSize(int64_t lb, int64_t ub, int64_t maxSize,
   return maxSize;
 }
 
-static LogicalResult setX86RootConfig(FuncOp entryPointFn,
-                                      linalg::ContractionOpInterface op,
-                                      SmallVector<int64_t> workloadPerWorkgroup,
-                                      int vectorSize) {
-  setTranslationInfo(entryPointFn,
-                     getDispatchLoweringPassPipeline(entryPointFn, op),
-                     workloadPerWorkgroup,
-                     /*workgroupSize=*/ArrayRef<int64_t>{});
-
-  // Hardcoded tile sizes, where v is the native vector size.
-  // L1 tile sizes are {1, 1, ..., 8, 2v, 2v}.
-  // Vector tile sizes are {1, ..., 1, v, v}
-  SmallVector<int64_t> l1TileSizes, vectorTileSizes;
-  int64_t nLoops = cast<linalg::LinalgOp>(op.getOperation()).getNumLoops();
-  l1TileSizes.append(nLoops - 3, 1);
-  l1TileSizes.push_back(
-      getMaxTileSize(0, workloadPerWorkgroup[1], 8, vectorSize));
-  l1TileSizes.push_back(
-      getMaxTileSize(0, workloadPerWorkgroup[0], 2 * vectorSize, vectorSize));
-  vectorTileSizes.append(nLoops - 2, 1);
-  vectorTileSizes.push_back(vectorSize);
-
-  // L1/vector tile size for k dimensions.
-  auto lhsShapedType = op.lhs().getType().cast<ShapedType>();
-  int64_t K = lhsShapedType.getShape().back();
-  l1TileSizes.push_back(getMaxTileSize(0, K, 2 * vectorSize, vectorSize));
-  vectorTileSizes.push_back(vectorSize);
-  TileSizesListType tileSizes;
-  tileSizes.push_back({});  // Empty here since there is nothing to do in first
-                            // level tiling.
-  tileSizes.push_back(l1TileSizes);
-  tileSizes.push_back(vectorTileSizes);
-  auto config = IREE::Codegen::LoweringConfigAttr::get(
-      entryPointFn.getContext(), tileSizes, vectorTileSizes);
-  setLoweringConfig(op, config);
-
-  return success();
-}
-
 static LogicalResult setX86SandboxRootConfig(
     FuncOp entryPointFn, linalg::ContractionOpInterface op,
     SmallVector<int64_t> workloadPerWorkgroup, int vectorSize) {
