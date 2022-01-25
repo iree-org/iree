@@ -63,11 +63,11 @@ static bool checkAllBlockArgsMapped(Block *block,
 }
 
 Block *PermutedTypePropagator::createBlockPermutation(
-    ParentBlockInfo *parentInfo, TypeRange newArgumentTypes,
+    Location loc, ParentBlockInfo *parentInfo, TypeRange newArgumentTypes,
     BlockPermuteCallback initializeCallback) {
   Block *parentBlock = parentInfo->parentBlock;
   Block *newBlock = new Block();
-  newBlock->addArguments(newArgumentTypes);
+  newBlock->addArguments(newArgumentTypes, loc);
   newBlock->insertBefore(parentBlock);
 
   BlockAndValueMapping mapping;

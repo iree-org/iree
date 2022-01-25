@@ -30,10 +30,10 @@ namespace Flow {
 namespace {
 /// Pattern to convert a linalg.pad_tensor operation into a fill + subtensor
 /// insert. This is needed till pad_tensor op can be fused with its consumers.
-struct PadTensorOpConversion : public OpRewritePattern<linalg::PadTensorOp> {
-  using OpRewritePattern<linalg::PadTensorOp>::OpRewritePattern;
+struct PadTensorOpConversion : public OpRewritePattern<tensor::PadOp> {
+  using OpRewritePattern<tensor::PadOp>::OpRewritePattern;
 
-  LogicalResult matchAndRewrite(linalg::PadTensorOp padTensorOp,
+  LogicalResult matchAndRewrite(tensor::PadOp padTensorOp,
                                 PatternRewriter &rewriter) const override {
     // Check that the region is just a yield operation which is returning a
     // scalar that is not one of the arguments of the linalg operation.

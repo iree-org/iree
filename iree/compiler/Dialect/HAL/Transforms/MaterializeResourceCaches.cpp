@@ -73,8 +73,9 @@ class MaterializeResourceCachesPass
     // Generate cached resource singletons and replace lookup ops with direct
     // loads from variables.
     for (Operation &funcLikeOp : moduleOp.getOps()) {
-      if (!funcLikeOp.hasTrait<OpTrait::FunctionLike>()) continue;
-      for (auto &block : function_like_impl::getFunctionBody(&funcLikeOp)) {
+      auto funcOp = llvm::dyn_cast<FunctionOpInterface>(funcLikeOp);
+      if (!funcOp) continue;
+      for (auto &block : funcOp.getBody()) {
         block.walk([&](Operation *op) {
           if (auto lookupOp = dyn_cast<DescriptorSetLayoutLookupOp>(op)) {
             replaceDescriptorSetLayoutLookupOp(lookupOp);

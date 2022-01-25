@@ -26,6 +26,7 @@ iree_cc_library(
     MLIRLinalg
     MLIRStandard
     MLIRSupport
+    MLIRTensor
     iree::compiler::Dialect::Util::Analysis
     iree::compiler::Dialect::Util::IR
   PUBLIC

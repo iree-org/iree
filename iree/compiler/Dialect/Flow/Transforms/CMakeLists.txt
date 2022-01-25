@@ -71,6 +71,7 @@ iree_cc_library(
     MLIRStandard
     MLIRSupport
     MLIRTensor
+    MLIRTensorUtils
     MLIRTosa
     MLIRTransformUtils
     MLIRTransforms
