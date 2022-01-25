@@ -1200,55 +1200,49 @@
 <h2 id="prerequisites">Prerequisites<a class="headerlink" href="#prerequisites" title="Permanent link">&para;</a></h2>
 <p>In order to use CUDA or ROCm to drive the GPU, you need to have a functional CUDA or ROCm
 environment. It can be verified by the following steps:</p>
-<div class="tabbed-set tabbed-alternate" data-tabs="1:1"><input checked="checked" id="__tabbed_1_1" name="__tabbed_1" type="radio" /><div class="tabbed-labels"><label for="__tabbed_1_1">Nvidia/CUDA</label></div>
+<div class="tabbed-set tabbed-alternate" data-tabs="1:2"><input checked="checked" id="__tabbed_1_1" name="__tabbed_1" type="radio" /><input id="__tabbed_1_2" name="__tabbed_1" type="radio" /><div class="tabbed-labels"><label for="__tabbed_1_1">Nvidia/CUDA</label><label for="__tabbed_1_2">AMD/ROCm</label></div>
 <div class="tabbed-content">
-<div class="tabbed-block"></div>
-</div>
-</div>
+<div class="tabbed-block">
 <p>Run the following command in a shell:</p>
 <div class="highlight"><pre><span></span><code>nvidia-smi <span class="p">|</span> grep CUDA
 </code></pre></div>
-<p>If <code>nvidia-smi</code> does not exist, you will need to <a href="https://developer.nvidia.com/cuda-downloads">install the latest CUDA Toolkit SDK</a>. </p>
-<div class="tabbed-set tabbed-alternate" data-tabs="2:1"><input checked="checked" id="__tabbed_2_1" name="__tabbed_2" type="radio" /><div class="tabbed-labels"><label for="__tabbed_2_1">AMD/ROCm</label></div>
-<div class="tabbed-content">
-<div class="tabbed-block"></div>
+<p>If <code>nvidia-smi</code> does not exist, you will need to <a href="https://developer.nvidia.com/cuda-downloads">install the latest CUDA Toolkit SDK</a>.</p>
 </div>
-</div>
+<div class="tabbed-block">
 <p>Run the following command in a shell:</p>
 <div class="highlight"><pre><span></span><code>rocm-smi <span class="p">|</span> grep rocm
 </code></pre></div>
-<p>If <code>rocm-smi</code> does not exist, you will need to <a href="https://rocmdocs.amd.com/en/latest/Installation_Guide/Installation_new.html">install the latest ROCM Toolkit SDK</a>. </p>
+<p>If <code>rocm-smi</code> does not exist, you will need to <a href="https://rocmdocs.amd.com/en/latest/Installation_Guide/Installation_new.html">install the latest ROCM Toolkit SDK</a>.</p>
+</div>
+</div>
+</div>
 <h2 id="get-runtime-and-compiler">Get runtime and compiler<a class="headerlink" href="#get-runtime-and-compiler" title="Permanent link">&para;</a></h2>
 <h3 id="get-iree-runtime-with-cuda-hal-driver">Get IREE runtime with CUDA HAL driver<a class="headerlink" href="#get-iree-runtime-with-cuda-hal-driver" title="Permanent link">&para;</a></h3>
 <p>Next you will need to get an IREE runtime that supports the CUDA HAL driver
 so it can execute the model on GPU via CUDA for Nvidia. Or the ROCM HAL driver to execute models on AMD hardware</p>
 <h4 id="build-runtime-from-source">Build runtime from source<a class="headerlink" href="#build-runtime-from-source" title="Permanent link">&para;</a></h4>
 <p>Please make sure you have followed the <a href="../../building-from-source/getting-started/">Getting started</a> page
-to build IREE for Linux/Windows. </p>
-<div class="tabbed-set tabbed-alternate" data-tabs="3:1"><input checked="checked" id="__tabbed_3_1" name="__tabbed_3" type="radio" /><div class="tabbed-labels"><label for="__tabbed_3_1">Nvidia/CUDA</label></div>
+to build IREE for Linux/Windows.</p>
+<div class="tabbed-set tabbed-alternate" data-tabs="2:2"><input checked="checked" id="__tabbed_2_1" name="__tabbed_2" type="radio" /><input id="__tabbed_2_2" name="__tabbed_2" type="radio" /><div class="tabbed-labels"><label for="__tabbed_2_1">Nvidia/CUDA</label><label for="__tabbed_2_2">AMD/ROCm</label></div>
 <div class="tabbed-content">
-<div class="tabbed-block"></div>
-</div>
-</div>
+<div class="tabbed-block">
 <p>The CUDA HAL driver is compiled in by default on non-Apple
 platforms.</p>
 <p>Ensure that the <code>IREE_HAL_DRIVER_CUDA</code> CMake option is <code>ON</code> when configuring
 for the target.</p>
-<div class="tabbed-set tabbed-alternate" data-tabs="4:1"><input checked="checked" id="__tabbed_4_1" name="__tabbed_4" type="radio" /><div class="tabbed-labels"><label for="__tabbed_4_1">AMD/ROCm</label></div>
-<div class="tabbed-content">
-<div class="tabbed-block"></div>
 </div>
-</div>
+<div class="tabbed-block">
 <p>Currently our support for ROCm/AMD hardware is still experimental. To enable it add:
 <div class="highlight"><pre><span></span><code>-DIREE_HAL_DRIVER_EXPERIMENTAL_ROCM=ON
 </code></pre></div>
 to the cmake build command.</p>
+</div>
+</div>
+</div>
 <h4 id="download-as-python-package">Download as Python package<a class="headerlink" href="#download-as-python-package" title="Permanent link">&para;</a></h4>
-<div class="tabbed-set tabbed-alternate" data-tabs="5:1"><input checked="checked" id="__tabbed_5_1" name="__tabbed_5" type="radio" /><div class="tabbed-labels"><label for="__tabbed_5_1">Nvidia/CUDA</label></div>
+<div class="tabbed-set tabbed-alternate" data-tabs="3:2"><input checked="checked" id="__tabbed_3_1" name="__tabbed_3" type="radio" /><input id="__tabbed_3_2" name="__tabbed_3" type="radio" /><div class="tabbed-labels"><label for="__tabbed_3_1">Nvidia/CUDA</label><label for="__tabbed_3_2">AMD/ROCm</label></div>
 <div class="tabbed-content">
-<div class="tabbed-block"></div>
-</div>
-</div>
+<div class="tabbed-block">
 <p>Python packages for various IREE functionalities are regularly published
 to <a href="https://pypi.org/user/google-iree-pypi-deploy/">PyPI</a>. See the <a href="../../bindings/python/">Python Bindings</a> page for more
 details. The core <code>iree-compiler</code> package includes the CUDA compiler:</p>
@@ -1260,31 +1254,29 @@ details. The core <code>iree-compiler</code> package includes the CUDA compiler:
 You can find out the full path to the <code>site-packages</code> directory via the
 <code>python -m site</code> command.</p>
 </div>
-<div class="tabbed-set tabbed-alternate" data-tabs="6:1"><input checked="checked" id="__tabbed_6_1" name="__tabbed_6" type="radio" /><div class="tabbed-labels"><label for="__tabbed_6_1">AMD/ROCm</label></div>
-<div class="tabbed-content">
-<div class="tabbed-block"></div>
 </div>
-</div>
+<div class="tabbed-block">
 <p>Currently ROCm is <strong>NOT supported</strong> for the Python interface.</p>
+</div>
+</div>
+</div>
 <h4 id="build-compiler-from-source">Build compiler from source<a class="headerlink" href="#build-compiler-from-source" title="Permanent link">&para;</a></h4>
 <p>Please make sure you have followed the <a href="../../building-from-source/getting-started/">Getting started</a> page
 to build IREE for Linux/Windows and the [Android cross-compilation][android-cc]
 page for Android. The CUDA compiler backend and ROCM compiler backend is compiled in by default on all
 platforms.</p>
-<div class="tabbed-set tabbed-alternate" data-tabs="7:1"><input checked="checked" id="__tabbed_7_1" name="__tabbed_7" type="radio" /><div class="tabbed-labels"><label for="__tabbed_7_1">Nvidia/CUDA</label></div>
+<div class="tabbed-set tabbed-alternate" data-tabs="4:2"><input checked="checked" id="__tabbed_4_1" name="__tabbed_4" type="radio" /><input id="__tabbed_4_2" name="__tabbed_4" type="radio" /><div class="tabbed-labels"><label for="__tabbed_4_1">Nvidia/CUDA</label><label for="__tabbed_4_2">AMD/ROCM</label></div>
 <div class="tabbed-content">
-<div class="tabbed-block"></div>
-</div>
-</div>
+<div class="tabbed-block">
 <p>Ensure that the <code>IREE_TARGET_BACKEND_CUDA</code> CMake option is <code>ON</code> when
 configuring for the host.</p>
-<div class="tabbed-set tabbed-alternate" data-tabs="8:1"><input checked="checked" id="__tabbed_8_1" name="__tabbed_8" type="radio" /><div class="tabbed-labels"><label for="__tabbed_8_1">AMD/ROCM</label></div>
-<div class="tabbed-content">
-<div class="tabbed-block"></div>
 </div>
-</div>
+<div class="tabbed-block">
 <p>Ensure that the <code>IREE_TARGET_BACKEND_ROCM</code> CMake option is <code>ON</code> when
 configuring for the host.</p>
+</div>
+</div>
+</div>
 <h2 id="compile-and-run-the-model">Compile and run the model<a class="headerlink" href="#compile-and-run-the-model" title="Permanent link">&para;</a></h2>
 <p>With the compiler and runtime for CUDA ready, we can now compile a model
 and run it on the GPU.</p>
@@ -1299,16 +1291,14 @@ weights from <a href="https://tfhub.dev/google/tf2-preview/mobilenet_v2/classifi
 <h4 id="compile-using-the-command-line">Compile using the command-line<a class="headerlink" href="#compile-using-the-command-line" title="Permanent link">&para;</a></h4>
 <p>Let <code>iree_input.mlir</code> be the model's initial MLIR representation generated by
 IREE's TensorFlow importer. We can now compile them for each GPU by running the following command:</p>
-<div class="tabbed-set tabbed-alternate" data-tabs="9:1"><input checked="checked" id="__tabbed_9_1" name="__tabbed_9" type="radio" /><div class="tabbed-labels"><label for="__tabbed_9_1">Nvidia/CUDA</label></div>
+<div class="tabbed-set tabbed-alternate" data-tabs="5:2"><input checked="checked" id="__tabbed_5_1" name="__tabbed_5" type="radio" /><input id="__tabbed_5_2" name="__tabbed_5" type="radio" /><div class="tabbed-labels"><label for="__tabbed_5_1">Nvidia/CUDA</label><label for="__tabbed_5_2">AMD/ROCM</label></div>
 <div class="tabbed-content">
-<div class="tabbed-block"></div>
-</div>
-</div>
+<div class="tabbed-block">
 <div class="highlight"><pre><span></span><code>iree/tools/iree-translate <span class="se">\</span>
     -iree-mlir-to-vm-bytecode-module <span class="se">\</span>
 <span class="hll">    -iree-hal-target-backends<span class="o">=</span>cuda <span class="se">\</span>
-</span>    -iree-cuda-llvm-target-arch<span class="o">=</span>&lt;...&gt; <span class="se">\</span>
-<span class="hll">    -iree-hal-cuda-disable-loop-nounroll-wa <span class="se">\</span>
+</span><span class="hll">    -iree-cuda-llvm-target-arch<span class="o">=</span>&lt;...&gt; <span class="se">\</span>
+</span><span class="hll">    -iree-hal-cuda-disable-loop-nounroll-wa <span class="se">\</span>
 </span>    iree_input.mlir -o mobilenet-cuda.vmfb
 </code></pre></div>
 <p>Note that a cuda target architecture(<code>iree-cuda-llvm-target-arch</code>) of the form <code>sm_&lt;arch_number&gt;</code> is needed
@@ -1340,17 +1330,14 @@ Here are a table of commonly used architecture</p>
 </tr>
 </tbody>
 </table>
-<div class="tabbed-set tabbed-alternate" data-tabs="10:1"><input checked="checked" id="__tabbed_10_1" name="__tabbed_10" type="radio" /><div class="tabbed-labels"><label for="__tabbed_10_1">AMD/ROCM</label></div>
-<div class="tabbed-content">
-<div class="tabbed-block"></div>
 </div>
-</div>
+<div class="tabbed-block">
 <div class="highlight"><pre><span></span><code>iree/tools/iree-translate <span class="se">\</span>
     -iree-mlir-to-vm-bytecode-module <span class="se">\</span>
 <span class="hll">    -iree-hal-target-backends<span class="o">=</span>rocm <span class="se">\</span>
-</span>    -iree-rocm-target-chip<span class="o">=</span>&lt;...&gt; <span class="se">\</span>
-    -iree-rocm-link-bc<span class="o">=</span><span class="nb">true</span> <span class="se">\</span>
-<span class="hll">    -iree-rocm-bc-dir<span class="o">=</span>&lt;...&gt; <span class="se">\</span>
+</span><span class="hll">    -iree-rocm-target-chip<span class="o">=</span>&lt;...&gt; <span class="se">\</span>
+</span><span class="hll">    -iree-rocm-link-bc<span class="o">=</span><span class="nb">true</span> <span class="se">\</span>
+</span><span class="hll">    -iree-rocm-bc-dir<span class="o">=</span>&lt;...&gt; <span class="se">\</span>
 </span>    iree_input.mlir -o mobilenet-rocm.vmfb
 </code></pre></div>
 <p>Note ROCm Bitcode Dir(<code>iree-rocm-bc-dir</code>) path is required. If the system you are compiling IREE in has ROCm installed, then the default value of <code>/opt/rocm/amdgcn/bitcode</code> will usually suffice. If you intend on building ROCm compiler in a non-ROCm capable system, please set <code>iree-rocm-bc-dir</code> to the absolute path where you might have saved the amdgcn bitcode.</p>
@@ -1383,31 +1370,32 @@ Here are a table of commonly used architecture</p>
 </tr>
 </tbody>
 </table>
+</div>
+</div>
+</div>
 <h3 id="run-the-model">Run the model<a class="headerlink" href="#run-the-model" title="Permanent link">&para;</a></h3>
 <h4 id="run-using-the-command-line">Run using the command-line<a class="headerlink" href="#run-using-the-command-line" title="Permanent link">&para;</a></h4>
 <p>In the build directory, run the following command:</p>
-<div class="tabbed-set tabbed-alternate" data-tabs="11:1"><input checked="checked" id="__tabbed_11_1" name="__tabbed_11" type="radio" /><div class="tabbed-labels"><label for="__tabbed_11_1">Nvidia/CUDA</label></div>
+<div class="tabbed-set tabbed-alternate" data-tabs="6:2"><input checked="checked" id="__tabbed_6_1" name="__tabbed_6" type="radio" /><input id="__tabbed_6_2" name="__tabbed_6" type="radio" /><div class="tabbed-labels"><label for="__tabbed_6_1">Nvidia/CUDA</label><label for="__tabbed_6_2">AMD/ROCM</label></div>
 <div class="tabbed-content">
-<div class="tabbed-block"></div>
-</div>
-</div>
+<div class="tabbed-block">
 <div class="highlight"><pre><span></span><code>iree/tools/iree-run-module <span class="se">\</span>
 <span class="hll">    --driver<span class="o">=</span>cuda <span class="se">\</span>
 </span>    --module_file<span class="o">=</span>mobilenet-cuda.vmfb <span class="se">\</span>
     --entry_function<span class="o">=</span>predict <span class="se">\</span>
     --function_input<span class="o">=</span><span class="s2">&quot;1x224x224x3xf32=0&quot;</span>
 </code></pre></div>
-<div class="tabbed-set tabbed-alternate" data-tabs="12:1"><input checked="checked" id="__tabbed_12_1" name="__tabbed_12" type="radio" /><div class="tabbed-labels"><label for="__tabbed_12_1">AMD/ROCM</label></div>
-<div class="tabbed-content">
-<div class="tabbed-block"></div>
 </div>
-</div>
+<div class="tabbed-block">
 <div class="highlight"><pre><span></span><code>iree/tools/iree-run-module <span class="se">\</span>
 <span class="hll">    --driver<span class="o">=</span>rocm <span class="se">\</span>
 </span>    --module_file<span class="o">=</span>mobilenet-rocm.vmfb <span class="se">\</span>
     --entry_function<span class="o">=</span>predict <span class="se">\</span>
     --function_input<span class="o">=</span><span class="s2">&quot;1x224x224x3xf32=0&quot;</span>
 </code></pre></div>
+</div>
+</div>
+</div>
 <p>The above assumes the exported function in the model is named as <code>predict</code> and
 it expects one 224x224 RGB image. We are feeding in an image with all 0 values
 here for brevity, see <code>iree-run-module --help</code> for the format to specify
