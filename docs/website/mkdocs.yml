@@ -104,6 +104,7 @@ nav:
       - CPU - Dylib: 'deployment-configurations/cpu-dylib.md'
       - CPU - Bare-Metal: 'deployment-configurations/bare-metal.md'
       - GPU - Vulkan: 'deployment-configurations/gpu-vulkan.md'
+      - GPU - CUDA/ROCm: 'deployment-configurations/gpu-cuda-rocm.md'
   - 'Building from source':
       - 'building-from-source/index.md'
       - 'building-from-source/getting-started.md'
