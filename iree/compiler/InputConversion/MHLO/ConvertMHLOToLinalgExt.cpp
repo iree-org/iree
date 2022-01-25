@@ -176,9 +176,10 @@ struct SortOpConversion : public OpConversionPattern<mhlo::SortOp> {
       if (newType == input.getType()) {
         inputs.push_back(input);
       } else {
-        inputs.push_back(rewriter.create<UnrealizedConversionCastOp>(
-          loc, newType, input).getResult(0));
-      } 
+        inputs.push_back(
+            rewriter.create<UnrealizedConversionCastOp>(loc, newType, input)
+                .getResult(0));
+      }
     }
 
     llvm::SmallVector<Type> resultTypes;
@@ -196,20 +197,21 @@ struct SortOpConversion : public OpConversionPattern<mhlo::SortOp> {
         block.getNumArguments());
     for (auto en : llvm::enumerate(block.getArguments())) {
       signature_converter.addInputs(
-        en.index(), this->typeConverter->convertType(
-          getElementTypeOrSelf(en.value().getType())));
+          en.index(), this->typeConverter->convertType(
+                          getElementTypeOrSelf(en.value().getType())));
     }
     rewriter.applySignatureConversion(&region, signature_converter);
 
     llvm::SmallVector<Value> results;
     for (auto it : llvm::zip(sortOp->getResults(), op.getResultTypes())) {
       Value v = std::get<0>(it);
-      Type t = std::get<1>(it); 
+      Type t = std::get<1>(it);
       if (v.getType() == t) {
         results.push_back(v);
       } else {
-        results.push_back(rewriter.create<UnrealizedConversionCastOp>( 
-          loc, t, v).getResult(0));
+        results.push_back(
+            rewriter.create<UnrealizedConversionCastOp>(loc, t, v).getResult(
+                0));
       }
     }
 
