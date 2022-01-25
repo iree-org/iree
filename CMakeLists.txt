@@ -217,6 +217,7 @@ include(iree_add_all_subdirs)
 include(iree_check_test)
 include(iree_trace_runner_test)
 include(iree_native_test)
+include(iree_cc_binary_benchmark)
 include(iree_benchmark_suite)
 include(iree_hal_cts_test_suite)
 

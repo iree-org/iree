@@ -126,7 +126,7 @@ iree_cc_library(
   PUBLIC
 )
 
-iree_cc_test(
+iree_cc_binary_benchmark(
   NAME
     native_module_benchmark
   SRCS
@@ -138,6 +138,7 @@ iree_cc_test(
     iree::base
     iree::base::logging
     iree::testing::benchmark_main
+  TESTONLY
 )
 
 iree_cc_test(
@@ -210,7 +211,7 @@ iree_cc_test(
     "notap"
 )
 
-iree_cc_binary(
+iree_cc_binary_benchmark(
   NAME
     bytecode_module_benchmark
   SRCS
@@ -226,15 +227,6 @@ iree_cc_binary(
   TESTONLY
 )
 
-iree_native_test(
-  NAME
-    "bytecode_module_benchmark_test"
-  ARGS
-    "--benchmark_min_time=0"
-  SRC
-    ::bytecode_module_benchmark
-)
-
 iree_bytecode_module(
   NAME
     bytecode_module_benchmark_module
@@ -248,7 +240,7 @@ iree_bytecode_module(
   PUBLIC
 )
 
-iree_cc_test(
+iree_cc_binary_benchmark(
   NAME
     bytecode_module_size_benchmark
   SRCS
@@ -258,6 +250,7 @@ iree_cc_test(
     ::bytecode_module_size_benchmark_module_c
     ::vm
     iree::base
+  TESTONLY
 )
 
 iree_bytecode_module(
