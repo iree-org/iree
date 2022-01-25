@@ -60,6 +60,8 @@ LogicalResult InferCustomKernelsTargetInfoFromParent(
   switch (triple.getArch()) {
     case llvm::Triple::ArchType::aarch64:
       target_info.aarch64 = true;
+      // TODO: Add logic for this
+      target_info.intrinsics = true;
       for (auto f : cpuFeatures) {
         target_info.dotprod |= (f == "+dotprod");
       }

@@ -391,6 +391,7 @@ cc_library(
         "//iree/compiler/Translation:HALExecutable",
         "//iree/compiler/Translation:IREEVM",
         "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:ArmNeonToLLVMIRTranslation",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:LLVMToLLVMIRTranslation",
         "@llvm-project//mlir:Pass",
