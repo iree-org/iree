@@ -9,24 +9,24 @@ environment. It can be verified by the following steps:
 
 === "Nvidia/CUDA"
 
-Run the following command in a shell:
+    Run the following command in a shell:
 
-``` shell
-nvidia-smi | grep CUDA
-```
+    ``` shell
+    nvidia-smi | grep CUDA
+    ```
 
-If `nvidia-smi` does not exist, you will need to [install the latest CUDA Toolkit SDK][cuda-toolkit]. 
-    
+    If `nvidia-smi` does not exist, you will need to [install the latest CUDA Toolkit SDK][cuda-toolkit].
+
 === "AMD/ROCm"
 
-Run the following command in a shell:
+    Run the following command in a shell:
 
-``` shell
-rocm-smi | grep rocm
-```
+    ``` shell
+    rocm-smi | grep rocm
+    ```
 
-If `rocm-smi` does not exist, you will need to [install the latest ROCM Toolkit SDK][rocm-toolkit]. 
-    
+    If `rocm-smi` does not exist, you will need to [install the latest ROCM Toolkit SDK][rocm-toolkit].
+
 ## Get runtime and compiler
 
 ### Get IREE runtime with CUDA HAL driver
@@ -36,44 +36,44 @@ so it can execute the model on GPU via CUDA for Nvidia. Or the ROCM HAL driver t
 
 #### Build runtime from source
 Please make sure you have followed the [Getting started][get-started] page
-to build IREE for Linux/Windows. 
+to build IREE for Linux/Windows.
 
 === "Nvidia/CUDA"
 
-The CUDA HAL driver is compiled in by default on non-Apple
-platforms.
+    The CUDA HAL driver is compiled in by default on non-Apple
+    platforms.
 
-Ensure that the `IREE_HAL_DRIVER_CUDA` CMake option is `ON` when configuring
-for the target.
+    Ensure that the `IREE_HAL_DRIVER_CUDA` CMake option is `ON` when configuring
+    for the target.
 
 === "AMD/ROCm"
 
-Currently our support for ROCm/AMD hardware is still experimental. To enable it add:
-```
--DIREE_HAL_DRIVER_EXPERIMENTAL_ROCM=ON
-```
-to the cmake build command.
+    Currently our support for ROCm/AMD hardware is still experimental. To enable it add:
+    ```
+    -DIREE_HAL_DRIVER_EXPERIMENTAL_ROCM=ON
+    ```
+    to the cmake build command.
 
 #### Download as Python package
 
 === "Nvidia/CUDA"
 
-Python packages for various IREE functionalities are regularly published
-to [PyPI][pypi]. See the [Python Bindings][python-bindings] page for more
-details. The core `iree-compiler` package includes the CUDA compiler:
+    Python packages for various IREE functionalities are regularly published
+    to [PyPI][pypi]. See the [Python Bindings][python-bindings] page for more
+    details. The core `iree-compiler` package includes the CUDA compiler:
 
-``` shell
-python -m pip install iree-compiler
-```
+    ``` shell
+    python -m pip install iree-compiler
+    ```
 
-!!! tip
-    `iree-translate` is installed as `/path/to/python/site-packages/iree/tools/core/iree-translate`.
-    You can find out the full path to the `site-packages` directory via the
-    `python -m site` command.
+    !!! tip
+        `iree-translate` is installed as `/path/to/python/site-packages/iree/tools/core/iree-translate`.
+        You can find out the full path to the `site-packages` directory via the
+        `python -m site` command.
 
 === "AMD/ROCm"
 
-Currently ROCm is **NOT supported** for the Python interface.
+    Currently ROCm is **NOT supported** for the Python interface.
 
 #### Build compiler from source
 
@@ -84,13 +84,13 @@ platforms.
 
 === "Nvidia/CUDA"
 
-Ensure that the `IREE_TARGET_BACKEND_CUDA` CMake option is `ON` when
-configuring for the host.
+    Ensure that the `IREE_TARGET_BACKEND_CUDA` CMake option is `ON` when
+    configuring for the host.
 
 === "AMD/ROCM"
 
-Ensure that the `IREE_TARGET_BACKEND_ROCM` CMake option is `ON` when
-configuring for the host.
+    Ensure that the `IREE_TARGET_BACKEND_ROCM` CMake option is `ON` when
+    configuring for the host.
 
 ## Compile and run the model
 
@@ -115,51 +115,50 @@ IREE's TensorFlow importer. We can now compile them for each GPU by running the 
 
 === "Nvidia/CUDA"
 
-``` shell hl_lines="3 5"
-iree/tools/iree-translate \
-    -iree-mlir-to-vm-bytecode-module \
-    -iree-hal-target-backends=cuda \
-    -iree-cuda-llvm-target-arch=<...> \
-    -iree-hal-cuda-disable-loop-nounroll-wa \
-    iree_input.mlir -o mobilenet-cuda.vmfb
-```
+    ``` shell hl_lines="3-5"
+    iree/tools/iree-translate \
+        -iree-mlir-to-vm-bytecode-module \
+        -iree-hal-target-backends=cuda \
+        -iree-cuda-llvm-target-arch=<...> \
+        -iree-hal-cuda-disable-loop-nounroll-wa \
+        iree_input.mlir -o mobilenet-cuda.vmfb
+    ```
 
-Note that a cuda target architecture(`iree-cuda-llvm-target-arch`) of the form `sm_<arch_number>` is needed
-to compile towards each GPU architecture. If no architecture is specified then we will default to `sm_35`
-Here are a table of commonly used architecture
+    Note that a cuda target architecture(`iree-cuda-llvm-target-arch`) of the form `sm_<arch_number>` is needed
+    to compile towards each GPU architecture. If no architecture is specified then we will default to `sm_35`
+    Here are a table of commonly used architecture
 
-CUDA GPU  | Target Architecture
-:--------: | :-----------:
-Nvidia K80 | `sm_35`
-Nvidia P100 | `sm_60`
-Nvidia V100 | `sm_70`
-Nvidia A100 | `sm_80`
-
+    CUDA GPU  | Target Architecture
+    :--------: | :-----------:
+    Nvidia K80 | `sm_35`
+    Nvidia P100 | `sm_60`
+    Nvidia V100 | `sm_70`
+    Nvidia A100 | `sm_80`
 
 === "AMD/ROCM"
 
-``` shell hl_lines="3 6"
-iree/tools/iree-translate \
-    -iree-mlir-to-vm-bytecode-module \
-    -iree-hal-target-backends=rocm \
-    -iree-rocm-target-chip=<...> \
-    -iree-rocm-link-bc=true \
-    -iree-rocm-bc-dir=<...> \
-    iree_input.mlir -o mobilenet-rocm.vmfb
-```
+    ``` shell hl_lines="3-6"
+    iree/tools/iree-translate \
+        -iree-mlir-to-vm-bytecode-module \
+        -iree-hal-target-backends=rocm \
+        -iree-rocm-target-chip=<...> \
+        -iree-rocm-link-bc=true \
+        -iree-rocm-bc-dir=<...> \
+        iree_input.mlir -o mobilenet-rocm.vmfb
+    ```
 
-Note ROCm Bitcode Dir(`iree-rocm-bc-dir`) path is required. If the system you are compiling IREE in has ROCm installed, then the default value of `/opt/rocm/amdgcn/bitcode` will usually suffice. If you intend on building ROCm compiler in a non-ROCm capable system, please set `iree-rocm-bc-dir` to the absolute path where you might have saved the amdgcn bitcode.
+    Note ROCm Bitcode Dir(`iree-rocm-bc-dir`) path is required. If the system you are compiling IREE in has ROCm installed, then the default value of `/opt/rocm/amdgcn/bitcode` will usually suffice. If you intend on building ROCm compiler in a non-ROCm capable system, please set `iree-rocm-bc-dir` to the absolute path where you might have saved the amdgcn bitcode.
 
-Note that a rocm target chip(`iree-rocm-target-chip`) of the form `gfx<arch_number>` is needed
-to compile towards each GPU architecture. If no architecture is specified then we will default to `gfx908`
-Here are a table of commonly used architecture
+    Note that a rocm target chip(`iree-rocm-target-chip`) of the form `gfx<arch_number>` is needed
+    to compile towards each GPU architecture. If no architecture is specified then we will default to `gfx908`
+    Here are a table of commonly used architecture
 
-AMD GPU  | Target Chip
-:--------: | :-----------:
-AMD MI25 | `gfx900`
-AMD MI50 | `gfx906`
-AMD MI60 | `gfx906`
-AMD MI100 | `gfx908`
+    AMD GPU  | Target Chip
+    :--------: | :-----------:
+    AMD MI25 | `gfx900`
+    AMD MI50 | `gfx906`
+    AMD MI60 | `gfx906`
+    AMD MI100 | `gfx908`
 
 ### Run the model
 
@@ -169,23 +168,23 @@ In the build directory, run the following command:
 
 === "Nvidia/CUDA"
 
-``` shell hl_lines="2"
-iree/tools/iree-run-module \
-    --driver=cuda \
-    --module_file=mobilenet-cuda.vmfb \
-    --entry_function=predict \
-    --function_input="1x224x224x3xf32=0"
-```
+    ``` shell hl_lines="2"
+    iree/tools/iree-run-module \
+        --driver=cuda \
+        --module_file=mobilenet-cuda.vmfb \
+        --entry_function=predict \
+        --function_input="1x224x224x3xf32=0"
+    ```
 
 === "AMD/ROCM"
 
-``` shell hl_lines="2"
-iree/tools/iree-run-module \
-    --driver=rocm \
-    --module_file=mobilenet-rocm.vmfb \
-    --entry_function=predict \
-    --function_input="1x224x224x3xf32=0"
-```
+    ``` shell hl_lines="2"
+    iree/tools/iree-run-module \
+        --driver=rocm \
+        --module_file=mobilenet-rocm.vmfb \
+        --entry_function=predict \
+        --function_input="1x224x224x3xf32=0"
+    ```
 
 The above assumes the exported function in the model is named as `predict` and
 it expects one 224x224 RGB image. We are feeding in an image with all 0 values
