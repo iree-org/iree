@@ -153,6 +153,9 @@ static bool isMatrixTimesMatrixTransposedOfGivenShape(
 
 // Checks that the Value `extResult` is defined by an arith::ExtSIOp promoting
 // from `extSrcType` to `extDstType`, and returns the input of the ExtSIOp.
+// Note that this only looks at the immediately defining operation, so we likely
+// want to have earlier passes that sink widening operations as far down as
+// possible, which is probably just good regardless.
 static Value getExtSIInput(Type extSrcType, Type extDstType, Value extResult) {
   auto extSIOp = extResult.getDefiningOp<arith::ExtSIOp>();
   if (!extSIOp) {
@@ -318,26 +321,22 @@ struct MMT_8x4x8_i8i8i32_Aarch64Dotprod_InlineAsm
   }
 };
 
-static Value getExtInput(Type extSrcType, Type extDstType, Value extResult) {
-  if (extResult.getType().cast<VectorType>().getElementType() != extDstType) {
-    return nullptr;
-  }
-  // TODO: Can we do better than only looking one op up? Maybe not, in which
-  // case there should maybe be patterns to sink widening casts past other ops.
-  auto extSIOp = extResult.getDefiningOp<arith::ExtSIOp>();
-  if (!extSIOp) {
-    return nullptr;
-  }
-  Value extInput = extSIOp.getIn();
-  if (extInput.getType().cast<VectorType>().getElementType() != extSrcType) {
-    return nullptr;
-  }
-  return extInput;
-}
-
-/// Converts a vector.contract computing A*B^T where A and B are 8x4 matrices
-/// of int32's that are themselves the result of an arith.extsi promoting from
-/// i8, into ARM NEON Ops corresponding to dotprod intrinsics.
+/// Converts matrix-times-matrix-transposed vector.contracts with
+/// lhs and rhs inputs defined by arith.extsi promoting from i8 to i32,
+///
+///     %lhs_i32 = arith.extsi %lhs_i8 : i8 to i32
+///     %rhs_i32 = arith.extsi %rhs_i8 : i8 to i32
+///     %result = vector.contract [...]
+///                 %lhs_i32 : vector<8x4xi32>,
+///                 %rhs_i32 : vector<8x4xi32>,
+///                 %acc_i32 : vector<8x8xi32>,
+///                 [...]
+///
+/// To vector ops reading directly from the %lhs_i8 and %rhs_i8 values
+/// (bypassing the existing arith.extsi) and passing that to a llvm.inline_asm
+/// block implementing the matrix multiplication arithmetic using Aarch64
+/// dot-product instructions (sdot).
+/// It matches the same patterns as MMT_8x4x8_i8i8i32_Aarch64Dotprod_InlineAsm
 struct MMT_8x4x8_i8i8i32_Aarch64Dotprod_Intrinsics
     : public OpRewritePattern<vector::ContractionOp> {
  public:
@@ -345,6 +344,9 @@ struct MMT_8x4x8_i8i8i32_Aarch64Dotprod_Intrinsics
 
   LogicalResult matchAndRewrite(vector::ContractionOp contractionOp,
                                 PatternRewriter &rewriter) const override {
+    // It would be nice to sharethe matching logic between this and
+    // MMT_8x4x8_i8i8i32_Aarch64Dotprod_InlineAsm, but it defines a bunch of
+    // variables, so doesn't end up being that helpful.
     if (!isMatrixTimesMatrixTransposedOfGivenShape(contractionOp, 8, 4, 8)) {
       return failure();
     }
@@ -359,8 +361,8 @@ struct MMT_8x4x8_i8i8i32_Aarch64Dotprod_Intrinsics
       return failure();
     }
 
-    Value inLhs = getExtInput(I8Type, I32Type, lhs);
-    Value inRhs = getExtInput(I8Type, I32Type, rhs);
+    Value inLhs = getExtSIInput(I8Type, I32Type, lhs);
+    Value inRhs = getExtSIInput(I8Type, I32Type, rhs);
 
     if (!inLhs || !inRhs) return failure();
 
@@ -381,29 +383,22 @@ struct MMT_8x4x8_i8i8i32_Aarch64Dotprod_Intrinsics
       }
     }
 
-    auto lhs0 = rewriter.create<vector::ExtractStridedSliceOp>(
-        loc, inLhs, ArrayRef<int64_t>{0, 0}, ArrayRef<int64_t>{4, 4},
-        ArrayRef<int64_t>{1, 1});
-    auto lhs1 = rewriter.create<vector::ExtractStridedSliceOp>(
-        loc, inLhs, ArrayRef<int64_t>{4, 0}, ArrayRef<int64_t>{4, 4},
-        ArrayRef<int64_t>{1, 1});
-
-    auto rhs0 = rewriter.create<vector::ExtractStridedSliceOp>(
-        loc, inRhs, ArrayRef<int64_t>{0, 0}, ArrayRef<int64_t>{4, 4},
-        ArrayRef<int64_t>{1, 1});
-    auto rhs1 = rewriter.create<vector::ExtractStridedSliceOp>(
-        loc, inRhs, ArrayRef<int64_t>{4, 0}, ArrayRef<int64_t>{4, 4},
-        ArrayRef<int64_t>{1, 1});
-
     auto int8x4x4VType = VectorType::get({4, 4}, rewriter.getIntegerType(8));
+    auto extract4x4 = [&](Value in, int rowOffset, int colOffset) {
+      auto chunk = rewriter.create<vector::ExtractStridedSliceOp>(
+          loc, in, ArrayRef<int64_t>{rowOffset, colOffset},
+          ArrayRef<int64_t>{4, 4}, ArrayRef<int64_t>{1, 1});
+      assert(chunk.getType() == int8x4x4VType);
+      return chunk;
+    };
+
+    auto lhs0 = extract4x4(inLhs, 0, 0);
+    auto lhs1 = extract4x4(inLhs, 4, 0);
+    auto rhs0 = extract4x4(inRhs, 0, 0);
+    auto rhs1 = extract4x4(inRhs, 4, 0);
+
     auto int8Zero4x4 = rewriter.create<arith::ConstantOp>(
         loc, rewriter.getZeroAttr(int8x4x4VType));
-
-    assert(lhs0.getType() == int8x4x4VType);
-    assert(lhs1.getType() == int8x4x4VType);
-    assert(rhs0.getType() == int8x4x4VType);
-    assert(rhs1.getType() == int8x4x4VType);
-
     auto sdot = [&](Value acc, Value lhs, Value rhs, int64_t lane) -> Value {
       auto rhsReplicatedLane = rewriter.create<vector::ShuffleOp>(
           loc, rhs, int8Zero4x4, ArrayRef<int64_t>{lane, lane, lane, lane});
