@@ -18,6 +18,7 @@
 #include "iree/compiler/InputConversion/MHLO/PassDetail.h"
 #include "iree/compiler/InputConversion/MHLO/Passes.h"
 #include "iree/compiler/InputConversion/MHLO/Rewriters.h"
+#include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "mlir-hlo/Dialect/mhlo/IR/chlo_ops.h"
 #include "mlir-hlo/Dialect/mhlo/IR/hlo_ops.h"
 #include "mlir-hlo/Dialect/mhlo/transforms/rewriters.h"
@@ -362,6 +363,7 @@ struct ConvertMHLOToLinalgOnTensorsPass
 
     // Let the rest fall through.
     target.addLegalDialect<BuiltinDialect>();
+    target.addLegalDialect<IREE::LinalgExt::IREELinalgExtDialect>();
     target.markUnknownOpDynamicallyLegal(isLegallyTypedOp);
 
     if (failed(applyPartialConversion(getOperation(), target,

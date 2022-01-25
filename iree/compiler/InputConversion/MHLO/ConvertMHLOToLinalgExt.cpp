@@ -47,6 +47,12 @@ static Optional<Type> convertRank0TensorToScalar(RankedTensorType tensorType) {
   return elementType;
 }
 
+static Type convertShapedToSignless(ShapedType shapedType) {
+  if (auto intType = shapedType.getElementType().dyn_cast<IntegerType>())
+    return shapedType.clone(convertIntegerToSignless(intType));
+  return shapedType;
+}
+
 static Optional<Value> materializeCastToSignless(OpBuilder &builder,
                                                  IntegerType toType,
                                                  ValueRange inputs,
@@ -161,25 +167,53 @@ struct SortOpConversion : public OpConversionPattern<mhlo::SortOp> {
   using OpConversionPattern<mhlo::SortOp>::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      mhlo::SortOp mhloSortOp, OpAdaptor adaptor,
+      mhlo::SortOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const final {
+    Location loc = op.getLoc();
+    llvm::SmallVector<Value> inputs;
+    for (auto input : adaptor.getOperands()) {
+      Type newType = convertShapedToSignless(input.getType());
+      if (newType == input.getType()) {
+        inputs.push_back(input);
+      } else {
+        inputs.push_back(rewriter.create<UnrealizedConversionCastOp>(
+          loc, newType, input).getResult(0));
+      } 
+    }
+
+    llvm::SmallVector<Type> resultTypes;
+    for (auto resultType : op.getResultTypes()) {
+      resultTypes.push_back(convertShapedToSignless(resultType));
+    }
+
     auto sortOp = rewriter.create<IREE::LinalgExt::SortOp>(
-        mhloSortOp.getLoc(), mhloSortOp.getResultTypes(),
-        /*inputs=*/ValueRange{}, adaptor.getOperands(),
-        mhloSortOp.dimensionAttr());
-    rewriter.inlineRegionBefore(mhloSortOp.comparator(), sortOp.region(),
+        loc, resultTypes, /*inputs=*/ValueRange{}, inputs, op.dimensionAttr());
+    rewriter.inlineRegionBefore(op.comparator(), sortOp.region(),
                                 sortOp.region().begin());
     Region &region = sortOp.region();
     Block &block = region.front();
     TypeConverter::SignatureConversion signature_converter(
         block.getNumArguments());
     for (auto en : llvm::enumerate(block.getArguments())) {
-      signature_converter.addInputs(en.index(),
-                                    getElementTypeOrSelf(en.value().getType()));
+      signature_converter.addInputs(
+        en.index(), this->typeConverter->convertType(
+          getElementTypeOrSelf(en.value().getType())));
     }
     rewriter.applySignatureConversion(&region, signature_converter);
 
-    rewriter.replaceOp(mhloSortOp, sortOp->getResults());
+    llvm::SmallVector<Value> results;
+    for (auto it : llvm::zip(sortOp->getResults(), op.getResultTypes())) {
+      Value v = std::get<0>(it);
+      Type t = std::get<1>(it); 
+      if (v.getType() == t) {
+        results.push_back(v);
+      } else {
+        results.push_back(rewriter.create<UnrealizedConversionCastOp>( 
+          loc, t, v).getResult(0));
+      }
+    }
+
+    rewriter.replaceOp(op, results);
     return success();
   }
 };
