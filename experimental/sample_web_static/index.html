@@ -37,12 +37,16 @@ SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
   </div>
 
   <script>
-    let setupSample;
-    let cleanupSample;
-    let runSample;
-    let state;
-    let predictionResultElement;
+    let setupNativeSample;
+    let cleanupNativeSample;
+    let runNativeSample;
+    let nativeState;
+    const predictionResultElement = document.getElementById("predictionResult");
+    const predictButtonElement = document.getElementById("predictButton");
     let initialized = false;
+
+    const imagePixelCount = 28 * 28;
+    let imageBuffer;
 
     var Module = {
       print: function(text) {
@@ -54,33 +58,42 @@ SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
       onRuntimeInitialized: function() {
         console.log("WebAssembly module onRuntimeInitialized()");
 
-        setupSample = Module.cwrap("setup_sample", "number", []);
-        cleanupSample = Module.cwrap("cleanup_sample", null, ["number"]);
-        runSample = Module.cwrap("run_sample", "number", ["number", "number"]);
+        setupNativeSample = Module.cwrap("setup_sample", "number", []);
+        cleanupNativeSample = Module.cwrap("cleanup_sample", null, ["number"]);
+        runNativeSample = Module.cwrap("run_sample", "number", ["number", "number"]);
 
-        state = setupSample();
-
-        predictionResultElement = document.getElementById("predictionResult");
-        document.getElementById("predictButton").disabled = false;
-
-        initialized = true;
+        setupSample();
       },
       // https://emscripten.org/docs/api_reference/module.html#Module.noInitialRun
       noInitialRun: true,
     };
 
+    function setupSample() {
+      nativeState = setupNativeSample();
+      predictButtonElement.disabled = false;
+      imageBuffer = Module._malloc(imagePixelCount * Float32Array.BYTES_PER_ELEMENT);
+      initialized = true;
+    }
+
+    // TODO(scotttodd): call this on page suspend?
+    function cleanupSample() {
+      initialized = false;
+      Module._free(imageDataBuffer);
+      predictButtonElement.disabled = true;
+      cleanupNativeSample();
+      nativeState = null;
+    }
+
     function predictDigit() {
       const rawImageData = getRescaledCanvasData();
-      const imageDataBuffer = preprocessImageData(rawImageData);
+      preprocessImageData(rawImageData);
 
-      result = runSample(state, imageDataBuffer);
+      result = runNativeSample(nativeState, imageBuffer);
       if (result != -1) {
         predictionResultElement.innerHTML = result;
       } else {
         predictionResultElement.innerHTML = "Error";
       }
-
-      Module._free(imageDataBuffer);
     }
 
     // https://becominghuman.ai/passing-and-returning-webassembly-array-parameters-a0f572c65d97
@@ -92,7 +105,6 @@ SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
       // This conversion is terrible, but this is a toy demo with a small image
       // Hopefully there aren't any logic / iteration order issues...
-      const imagePixelCount = 28 * 28;
       const typedArray = new Float32Array(imagePixelCount);
       for (let y = 0; y < 28; ++y) {
         for (let x = 0; x < 28; ++x) {
@@ -102,11 +114,9 @@ SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
         }
       }
 
-      // Copy into WASM heap.
+      // Copy into Wasm heap.
       // Note: we could have done the conversion in-place, but this is demo code
-      const buffer = Module._malloc(imagePixelCount * Float32Array.BYTES_PER_ELEMENT);
-      Module.HEAPF32.set(typedArray, buffer >> 2);
-      return buffer;
+      Module.HEAPF32.set(typedArray, imageBuffer >> 2);
     }
 
   </script>
