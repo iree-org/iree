@@ -13,7 +13,7 @@
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/FunctionImplementation.h"
-#include "mlir/IR/FunctionSupport.h"
+#include "mlir/IR/FunctionInterfaces.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/OpImplementation.h"
@@ -44,18 +44,17 @@ static LogicalResult verifyModuleOp(ModuleOp op) {
 }
 
 static ParseResult parseFuncOp(OpAsmParser &parser, OperationState *result) {
-  auto buildFuncType = [](Builder &builder, ArrayRef<Type> argTypes,
-                          ArrayRef<Type> results,
-                          function_like_impl::VariadicFlag, std::string &) {
-    return builder.getFunctionType(argTypes, results);
-  };
-  return function_like_impl::parseFunctionLikeOp(
+  auto buildFuncType =
+      [](Builder &builder, ArrayRef<Type> argTypes, ArrayRef<Type> results,
+         function_interface_impl::VariadicFlag,
+         std::string &) { return builder.getFunctionType(argTypes, results); };
+  return function_interface_impl::parseFunctionOp(
       parser, *result, /*allowVariadic=*/false, buildFuncType);
 }
 
 static void printFuncOp(OpAsmPrinter &p, FuncOp &op) {
   FunctionType fnType = op.getType();
-  function_like_impl::printFunctionLikeOp(
+  function_interface_impl::printFunctionOp(
       p, op, fnType.getInputs(), /*isVariadic=*/false, fnType.getResults());
 }
 
@@ -73,15 +72,15 @@ void FuncOp::build(OpBuilder &builder, OperationState &result, StringRef name,
 
   assert(type.getNumInputs() == argAttrs.size() &&
          "expected as many argument attribute lists as arguments");
-  function_like_impl::addArgAndResultAttrs(builder, result, argAttrs,
-                                           /*resultAttrs=*/llvm::None);
+  function_interface_impl::addArgAndResultAttrs(builder, result, argAttrs,
+                                                /*resultAttrs=*/llvm::None);
 }
 
 Block *FuncOp::addEntryBlock() {
   assert(empty() && "function already has an entry block");
   auto *entry = new Block();
   push_back(entry);
-  entry->addArguments(getType().getInputs());
+  entry->addArguments(getType().getInputs(), getLoc());
   return entry;
 }
 
@@ -208,15 +207,15 @@ static ParseResult parseImportOp(OpAsmParser &parser, OperationState *result) {
     return parser.emitError(parser.getCurrentLocation())
            << "invalid result type list";
   }
-  function_like_impl::addArgAndResultAttrs(builder, *result, argAttrs,
-                                           /*resultAttrs=*/llvm::None);
+  function_interface_impl::addArgAndResultAttrs(builder, *result, argAttrs,
+                                                /*resultAttrs=*/llvm::None);
   if (failed(parser.parseOptionalAttrDictWithKeyword(result->attributes))) {
     return failure();
   }
 
   auto functionType =
       FunctionType::get(result->getContext(), argTypes, resultTypes);
-  result->addAttribute(mlir::function_like_impl::getTypeAttrName(),
+  result->addAttribute(mlir::function_interface_impl::getTypeAttrName(),
                        TypeAttr::get(functionType));
 
   // No clue why this is required.
@@ -229,7 +228,7 @@ static void printImportOp(OpAsmPrinter &p, ImportOp &op) {
   p << ' ';
   p.printSymbolName(op.getName());
   p << "(";
-  for (int i = 0; i < op.getNumFuncArguments(); ++i) {
+  for (int i = 0; i < op.getArgumentTypes().size(); ++i) {
     if (auto name = op.getArgAttrOfType<StringAttr>(i, "vm.name")) {
       p << '%' << name.getValue() << " : ";
     }
@@ -237,19 +236,19 @@ static void printImportOp(OpAsmPrinter &p, ImportOp &op) {
     if (op.getArgAttrOfType<UnitAttr>(i, "vm.variadic")) {
       p << " ...";
     }
-    if (i < op.getNumFuncArguments() - 1) {
+    if (i < op.getArgumentTypes().size() - 1) {
       p << ", ";
     }
   }
   p << ")";
-  if (op.getNumFuncResults() == 1) {
+  if (op.getResultTypes().size() == 1) {
     p << " -> ";
     p.printType(op.getType().getResult(0));
-  } else if (op.getNumFuncResults() > 1) {
+  } else if (op.getResultTypes().size() > 1) {
     p << " -> (" << op.getType().getResults() << ")";
   }
-  mlir::function_like_impl::printFunctionAttributes(
-      p, op, op.getNumFuncArguments(), op.getNumFuncResults(),
+  mlir::function_interface_impl::printFunctionAttributes(
+      p, op, op.getArgumentTypes().size(), op.getResultTypes().size(),
       /*elided=*/
       {
           "is_variadic",
@@ -269,8 +268,8 @@ void ImportOp::build(OpBuilder &builder, OperationState &result, StringRef name,
 
   assert(type.getNumInputs() == argAttrs.size() &&
          "expected as many argument attribute lists as arguments");
-  function_like_impl::addArgAndResultAttrs(builder, result, argAttrs,
-                                           /*resultAttrs=*/llvm::None);
+  function_interface_impl::addArgAndResultAttrs(builder, result, argAttrs,
+                                                /*resultAttrs=*/llvm::None);
 }
 
 LogicalResult ImportOp::verifyType() {

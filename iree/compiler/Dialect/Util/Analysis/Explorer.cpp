@@ -411,15 +411,17 @@ TraversalResult Explorer::walkReturnOps(Operation *parentOp,
     for (auto &region : regionOp->getRegions()) {
       if (enumerateTerminatorOps(region).wasInterrupted()) break;
     }
-  } else if (parentOp->hasTrait<OpTrait::FunctionLike>()) {
-    if (parentOp->getNumRegions() == 0 || parentOp->getRegion(0).empty()) {
+  } else if (auto parentFuncOp =
+                 llvm::dyn_cast<FunctionOpInterface>(parentOp)) {
+    if (parentFuncOp->getNumRegions() == 0 ||
+        parentFuncOp->getRegion(0).empty()) {
       LLVM_DEBUG(
           llvm::dbgs()
           << "  !! traversal incomplete due to external function-like op @"
           << cast<SymbolOpInterface>(parentOp).getName() << "\n");
       result |= TraversalResult::INCOMPLETE;
     } else {
-      for (auto &region : parentOp->getRegions()) {
+      for (auto &region : parentFuncOp->getRegions()) {
         for (auto &block : region) {
           auto *terminatorOp = block.getTerminator();
           if (terminatorOp->hasTrait<OpTrait::ReturnLike>()) {

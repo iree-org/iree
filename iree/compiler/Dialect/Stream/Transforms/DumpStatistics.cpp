@@ -65,8 +65,7 @@ struct UsageInfo {
     for (auto executableOp : moduleOp.getOps<IREE::Stream::ExecutableOp>()) {
       executableOps[executableOp.getName()] = executableOp;
     }
-    for (auto &funcLikeOp : moduleOp.getOps()) {
-      if (!funcLikeOp.hasTrait<OpTrait::FunctionLike>()) continue;
+    for (auto funcLikeOp : moduleOp.getOps<FunctionOpInterface>()) {
       funcLikeOp.walk([&](Operation *op) {
         TypeSwitch<Operation *>(op)
             .Case<IREE::Stream::ResourceAllocaOp>(
@@ -269,7 +268,7 @@ static void prettyPrintSyncInfo(const UsageInfo &usageInfo, bool verbose,
 static void prettyPrintStreamInfo(const UsageInfo &usageInfo,
                                   IREE::Stream::CmdExecuteOp executeOp,
                                   llvm::raw_fd_ostream &os) {
-  auto parentOp = executeOp->getParentWithTrait<mlir::OpTrait::FunctionLike>();
+  auto parentOp = executeOp->getParentOfType<FunctionOpInterface>();
 
   prettyPrintItemHeader(
       llvm::formatv("stream.cmd.execute", parentOp->getName().getStringRef()),

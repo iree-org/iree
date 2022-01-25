@@ -171,7 +171,7 @@ static void insertConstantTableLookup(mlir::FuncOp funcOp,
   // insertDispatchSiteIdentifiers). This is how we know which dispatch is
   // calling us and which table row we need to select.
   auto builder = OpBuilder::atBlockBegin(&entryBlock);
-  auto siteId = entryBlock.addArgument(builder.getIndexType());
+  auto siteId = entryBlock.addArgument(builder.getIndexType(), funcOp.getLoc());
 
   IndexSet indexSet(funcOp.getLoc(), builder);
 

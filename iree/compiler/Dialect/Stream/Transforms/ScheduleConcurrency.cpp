@@ -108,8 +108,9 @@ struct WavePartitionBuilder {
 
     // Add entry block and arguments.
     auto &entryBlock = concurrentOp.body().emplaceBlock();
-    for (auto args :
-         llvm::zip(operands, entryBlock.addArguments(operandTypes))) {
+    for (auto args : llvm::zip(
+             operands,
+             entryBlock.addArguments(operandTypes, concurrentOp.getLoc()))) {
       mapping.map(std::get<0>(args), std::get<1>(args));
     }
     builder = OpBuilder::atBlockBegin(&entryBlock);

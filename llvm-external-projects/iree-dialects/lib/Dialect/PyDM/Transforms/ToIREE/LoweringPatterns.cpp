@@ -344,11 +344,11 @@ class AssignSubscriptListConversion
         rewriter.getInsertionBlock(), rewriter.getInsertionPoint());
     Block *indexLtZeroBlock = rewriter.createBlock(continuationBlock);
     Block *indexCheckBlock = rewriter.createBlock(continuationBlock);
-    indexCheckBlock->addArgument(indexType);
+    indexCheckBlock->addArgument(indexType, loc);
     Block *setElementBlock = rewriter.createBlock(continuationBlock);
-    setElementBlock->addArgument(indexType);
+    setElementBlock->addArgument(indexType, loc);
     Block *failureBlock = createSlowPathBlock(rewriter);
-    continuationBlock->addArgument(statusType);
+    continuationBlock->addArgument(statusType, loc);
     rewriter.replaceOp(srcOp, continuationBlock->getArguments());
 
     // Comparison index < 0.
@@ -548,8 +548,8 @@ class DynamicUnpackOpConversion
         rewriter.getInsertionBlock(), rewriter.getInsertionPoint());
     Block *arityMatchBlock = rewriter.createBlock(continuationBlock);
     Block *errorBlock = createSlowPathBlock(rewriter);
-    continuationBlock->addArguments(excResultType);
-    continuationBlock->addArguments(slotTypes);
+    continuationBlock->addArguments(excResultType, loc);
+    continuationBlock->addArguments(slotTypes, loc);
     rewriter.replaceOp(srcOp, continuationBlock->getArguments());
 
     // Entry block - check arity.
@@ -930,11 +930,11 @@ class SequenceCloneBuiltinConversion
     Block *continuationBlock = rewriter.splitBlock(
         rewriter.getInsertionBlock(), rewriter.getInsertionPoint());
     Block *outerCond = rewriter.createBlock(continuationBlock);
-    outerCond->addArgument(indexType);
+    outerCond->addArgument(indexType, loc);
     Block *innerCond = rewriter.createBlock(continuationBlock);
-    innerCond->addArguments({indexType, indexType});
+    innerCond->addArguments({indexType, indexType}, loc);
     Block *innerBody = rewriter.createBlock(continuationBlock);
-    innerBody->addArguments({indexType, indexType});
+    innerBody->addArguments({indexType, indexType}, loc);
 
     // Entry block.
     {
@@ -1075,11 +1075,11 @@ class SubscriptOpBuiltinSequenceConversion
         rewriter.getInsertionBlock(), rewriter.getInsertionPoint());
     Block *indexLtZeroBlock = rewriter.createBlock(continuationBlock);
     Block *indexCheckBlock = rewriter.createBlock(continuationBlock);
-    indexCheckBlock->addArgument(indexType);
+    indexCheckBlock->addArgument(indexType, loc);
     Block *getElementBlock = rewriter.createBlock(continuationBlock);
-    getElementBlock->addArgument(indexType);
+    getElementBlock->addArgument(indexType, loc);
     Block *failureBlock = createSlowPathBlock(rewriter);
-    continuationBlock->addArguments({statusType, resultType});
+    continuationBlock->addArguments({statusType, resultType}, loc);
     rewriter.replaceOp(srcOp, continuationBlock->getArguments());
 
     // Comparison index < 0.
@@ -1173,7 +1173,7 @@ class UnboxOpConversion : public OpConversionPattern<PYDM::UnboxOp> {
         rewriter.getInsertionBlock(), rewriter.getInsertionPoint());
     Block *typesMatchBlock = rewriter.createBlock(continuationBlock);
     Block *slowPathMismatchBlock = createSlowPathBlock(rewriter);
-    continuationBlock->addArguments({statusType, targetUnboxedType});
+    continuationBlock->addArguments({statusType, targetUnboxedType}, loc);
     rewriter.replaceOp(srcOp, continuationBlock->getArguments());
 
     // Type code extraction and comparison.

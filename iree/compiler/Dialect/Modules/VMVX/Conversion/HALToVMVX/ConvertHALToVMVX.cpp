@@ -94,7 +94,7 @@ LogicalResult updateHALToVMVXEntryFuncOp(FuncOp funcOp,
                                    {});
 
   funcOp.setType(newType);
-  funcOp.front().addArguments(newType.getInputs());
+  funcOp.front().addArguments(newType.getInputs(), funcOp.getLoc());
 
   return success();
 }

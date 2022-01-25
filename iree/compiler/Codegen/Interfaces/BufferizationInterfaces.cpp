@@ -12,23 +12,21 @@
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "mlir/Dialect/Linalg/ComprehensiveBufferize/AffineInterfaceImpl.h"
 #include "mlir/Dialect/Linalg/ComprehensiveBufferize/ArithInterfaceImpl.h"
-#include "mlir/Dialect/Linalg/ComprehensiveBufferize/BufferizableOpInterface.h"
-#include "mlir/Dialect/Linalg/ComprehensiveBufferize/BufferizationInterfaceImpl.h"
-#include "mlir/Dialect/Linalg/ComprehensiveBufferize/ComprehensiveBufferize.h"
 #include "mlir/Dialect/Linalg/ComprehensiveBufferize/LinalgInterfaceImpl.h"
 #include "mlir/Dialect/Linalg/ComprehensiveBufferize/ModuleBufferization.h"
 #include "mlir/Dialect/Linalg/ComprehensiveBufferize/SCFInterfaceImpl.h"
 #include "mlir/Dialect/Linalg/ComprehensiveBufferize/StdInterfaceImpl.h"
-#include "mlir/Dialect/Linalg/ComprehensiveBufferize/TensorInterfaceImpl.h"
 #include "mlir/Dialect/Linalg/ComprehensiveBufferize/VectorInterfaceImpl.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Support/LLVM.h"
 
-using mlir::linalg::comprehensive_bufferize::BufferizableOpInterface;
-using mlir::linalg::comprehensive_bufferize::BufferizationAliasInfo;
-using mlir::linalg::comprehensive_bufferize::BufferizationState;
-using mlir::linalg::comprehensive_bufferize::DialectBufferizationState;
-using mlir::linalg::comprehensive_bufferize::PostAnalysisStep;
+using mlir::bufferization::AnalysisBufferizationOptions;
+using mlir::bufferization::AnalysisBufferizationState;
+using mlir::bufferization::BufferizableOpInterface;
+using mlir::bufferization::BufferizationAliasInfo;
+using mlir::bufferization::BufferizationState;
+using mlir::bufferization::DialectBufferizationState;
+using mlir::bufferization::PostAnalysisStep;
 using mlir::linalg::comprehensive_bufferize::linalg_ext::
     InitTensorEliminationStep;
 
@@ -106,9 +104,9 @@ struct DispatchTensorLoadOpInterface
     Value source = getSubspanBuffer(loadOp.source(), rewriter, state);
 
     // Bufferize to subview.
-    mlir::linalg::comprehensive_bufferize::replaceOpWithNewBufferizedOp<
-        memref::SubViewOp>(rewriter, op, source, loadOp.getMixedOffsets(),
-                           loadOp.getMixedSizes(), loadOp.getMixedStrides());
+    mlir::bufferization::replaceOpWithNewBufferizedOp<memref::SubViewOp>(
+        rewriter, op, source, loadOp.getMixedOffsets(), loadOp.getMixedSizes(),
+        loadOp.getMixedStrides());
 
     return success();
   }
@@ -180,7 +178,10 @@ struct DispatchTensorStoreOpInterface
 
     // If everything bufferized inplace, no copy is needed. We wrote to the
     // target buffer already. The copy folds away in that case.
-    state.createMemCpy(rewriter, storeOp->getLoc(), srcMemref, subView);
+    if (failed(createMemCpy(rewriter, storeOp->getLoc(), srcMemref, subView,
+                            state.getOptions()))) {
+      return failure();
+    }
 
     rewriter.eraseOp(storeOp);
     return success();
@@ -277,8 +278,9 @@ void registerBufferizationInterfaces(DialectRegistry &registry) {
       registerBufferizableOpInterfaceExternalModels(registry);
   linalg::comprehensive_bufferize::arith_ext::
       registerBufferizableOpInterfaceExternalModels(registry);
-  linalg::comprehensive_bufferize::bufferization_ext::
-      registerBufferizableOpInterfaceExternalModels(registry);
+  // TODO: Appears removed usptream.
+  // linalg::comprehensive_bufferize::bufferization_ext::
+  //     registerBufferizableOpInterfaceExternalModels(registry);
   linalg::comprehensive_bufferize::linalg_ext::
       registerBufferizableOpInterfaceExternalModels(registry);
   linalg::comprehensive_bufferize::scf_ext::
@@ -287,8 +289,9 @@ void registerBufferizationInterfaces(DialectRegistry &registry) {
       registerModuleBufferizationExternalModels(registry);
   linalg::comprehensive_bufferize::std_ext::
       registerBufferizableOpInterfaceExternalModels(registry);
-  linalg::comprehensive_bufferize::tensor_ext::
-      registerBufferizableOpInterfaceExternalModels(registry);
+  // TODO: Seems removed upstream?
+  // linalg::comprehensive_bufferize::tensor_ext::
+  //     registerBufferizableOpInterfaceExternalModels(registry);
   linalg::comprehensive_bufferize::vector_ext::
       registerBufferizableOpInterfaceExternalModels(registry);
 
@@ -299,13 +302,13 @@ void registerBufferizationInterfaces(DialectRegistry &registry) {
                           DispatchTensorStoreOpInterface>();
 }
 
-void addPostAnalysisTransformations(
-    linalg::comprehensive_bufferize::BufferizationOptions &options) {
+void addPostAnalysisTransformations(AnalysisBufferizationOptions &options) {
   options.addPostAnalysisStep<CreateSubSpanBuffers>();
   options.addPostAnalysisStep<StoreTensorOpAnchoredInitTensorEliminationStep>();
   options.addPostAnalysisStep<InplaceTensorStoreOpAnalysis>();
-  options.addPostAnalysisStep<linalg::comprehensive_bufferize::scf_ext::
-                                  AssertDestinationPassingStyle>();
+  // TODO: Appears to have been moved to a private impl upstream.
+  // options.addPostAnalysisStep<linalg::comprehensive_bufferize::scf_ext::
+  //                                 AssertDestinationPassingStyle>();
 }
 
 }  // namespace iree_compiler

@@ -226,7 +226,8 @@ static void expandRegion(Region &region, ExpandedGlobalMap &globalMap,
     for (int i = block.getNumArguments() - 1; i >= 0; --i) {
       auto resourceArg = block.getArgument(i);
       if (!isResourceType(resourceArg.getType())) continue;
-      auto timepointArg = block.insertArgument(i, timepointType);
+      auto timepointArg =
+          block.insertArgument(i, timepointType, resourceArg.getLoc());
       expansions.push_back(std::make_pair(timepointArg, resourceArg));
       resourceTimepointMap.map(resourceArg, timepointArg);
     }

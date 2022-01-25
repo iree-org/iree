@@ -9,6 +9,7 @@
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Interfaces/SideEffectInterfaces.h"
 
 namespace mlir {
@@ -77,7 +78,7 @@ ConstExprOpInfo ConstExprOpInfo::getForOp(Operation *op) {
     // Structured op implementations and a handful of pure ops are included.
     // Notably: IndexOp is not included because it establishes a hidden
     // dependency to the iterator and is non-const.
-    if (llvm::isa<linalg::LinalgOp>(op) || llvm::isa<linalg::PadTensorOp>(op) ||
+    if (llvm::isa<linalg::LinalgOp>(op) || llvm::isa<tensor::PadOp>(op) ||
         llvm::isa<linalg::InitTensorOp>(op)) {
       return getInfoForDefaultConstExprOp(op);
     }

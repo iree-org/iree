@@ -10,6 +10,7 @@
 include "mlir/Interfaces/CallInterfaces.td"
 include "mlir/Interfaces/ControlFlowInterfaces.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
+include "mlir/IR/FunctionInterfaces.td"
 include "mlir/IR/SymbolInterfaces.td"
 include "iree/compiler/Dialect/VM/IR/VMBase.td"
 
@@ -76,7 +77,7 @@ def VM_ModuleTerminatorOp : VM_Op<"module_terminator", [
 def VM_FuncOp : VM_Op<"func", [
     IsolatedFromAbove,
     HasParent<"IREE::VM::ModuleOp">,
-    FunctionLike,
+    FunctionOpInterface,
     CallableOpInterface,
     Symbol,
   ]> {
@@ -118,14 +119,11 @@ def VM_FuncOp : VM_Op<"func", [
           .cast<FunctionType>();
     }
 
-    /// Hook for OpTrait::FunctionLike, returns the number of function
-    /// arguments. Depends on the type attribute being correct as checked by
-    /// verifyType.
-    unsigned getNumFuncArguments() { return getType().getInputs().size(); }
+    /// Returns the argument types of this function.
+    ArrayRef<Type> getArgumentTypes() { return getType().getInputs(); }
 
-    /// Hook for OpTrait::FunctionLike, returns the number of function results.
-    /// Depends on the type attribute being correct as checked by verifyType.
-    unsigned getNumFuncResults() { return getType().getResults().size(); }
+    /// Returns the result types of this function.
+    ArrayRef<Type> getResultTypes() { return getType().getResults(); }
 
     /// Hook for OpTrait::FunctionLike, called after verifying that the 'type'
     /// attribute is present. This can check for preconditions of the
@@ -172,7 +170,7 @@ def VM_ExportOp : VM_Op<"export", [
 
 def VM_ImportOp : VM_Op<"import", [
     Symbol,
-    FunctionLike,
+    FunctionOpInterface,
     CallableOpInterface,
   ]> {
   let summary = [{imports a function from an external module}];
@@ -204,7 +202,7 @@ def VM_ImportOp : VM_Op<"import", [
 
     /// Returns true if the import must be invoked via vm.call.variadic.
     bool isVariadic() {
-      for (int i = 0; i < getNumFuncArguments(); ++i) {
+      for (int i = 0; i < getArgumentTypes().size(); ++i) {
         if (isFuncArgumentVariadic(i)) return true;
       }
       return false;
@@ -220,14 +218,12 @@ def VM_ImportOp : VM_Op<"import", [
       return !!getArgAttrOfType<UnitAttr>(i, "vm.variadic");
     }
 
-    /// Hook for OpTrait::FunctionLike, returns the number of function
-    /// arguments. Depends on the type attribute being correct as checked by
-    /// verifyType.
-    unsigned getNumFuncArguments() { return getType().getInputs().size(); }
+    /// Returns the argument types of this function.
+    ArrayRef<Type> getArgumentTypes() { return getType().getInputs(); }
 
-    /// Hook for OpTrait::FunctionLike, returns the number of function results.
-    /// Depends on the type attribute being correct as checked by verifyType.
-    unsigned getNumFuncResults() { return getType().getResults().size(); }
+    /// Returns the result types of this function.
+    ArrayRef<Type> getResultTypes() { return getType().getResults(); }
+
 
     /// Hook for OpTrait::FunctionLike, called after verifying that the 'type'
     /// attribute is present. This can check for preconditions of the
@@ -244,7 +240,7 @@ def VM_ImportOp : VM_Op<"import", [
 def VM_InitializerOp : VM_Op<"initializer", [
     IsolatedFromAbove,
     HasParent<"IREE::VM::ModuleOp">,
-    FunctionLike,
+    FunctionOpInterface,
     CallableOpInterface,
   ]> {
   let summary = [{global initialization function}];
@@ -273,8 +269,15 @@ def VM_InitializerOp : VM_Op<"initializer", [
     Block *addEntryBlock();
     Block *addBlock();
 
-    unsigned getNumFuncArguments() { return 0; }
-    unsigned getNumFuncResults() { return 0; }
+    FunctionType getType() {
+      return getTypeAttr().getValue().cast<FunctionType>();
+    }
+
+    /// Returns the argument types of this function.
+    ArrayRef<Type> getArgumentTypes() { return {}; }
+
+    /// Returns the result types of this function.
+    ArrayRef<Type> getResultTypes() { return {}; }
 
     LogicalResult verifyType() { return success(); }
 

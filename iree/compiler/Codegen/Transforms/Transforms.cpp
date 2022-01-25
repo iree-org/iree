@@ -60,9 +60,9 @@ LogicalResult defineWorkgroupCountRegion(
   Block *entryBlock = builder.createBlock(region);
   // Add 3 index arguments for the workload.
   auto indexType = builder.getIndexType();
-  std::array<Value, 3> workload = {entryBlock->addArgument(indexType),
-                                   entryBlock->addArgument(indexType),
-                                   entryBlock->addArgument(indexType)};
+  std::array<Value, 3> workload = {entryBlock->addArgument(indexType, loc),
+                                   entryBlock->addArgument(indexType, loc),
+                                   entryBlock->addArgument(indexType, loc)};
   std::array<Value, 3> workgroupCount = regionBuilder(builder, loc, workload);
   builder.create<IREE::HAL::ReturnOp>(loc, workgroupCount);
   entryPointOp.erase();

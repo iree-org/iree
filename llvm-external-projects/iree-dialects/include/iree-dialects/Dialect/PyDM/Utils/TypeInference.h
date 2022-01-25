@@ -76,7 +76,7 @@ class PermutedTypePropagator {
 
   /// Creates a new block permutation. The initialize callback must populate
   /// the mapping for all original arguments.
-  Block *createBlockPermutation(ParentBlockInfo *parentInfo,
+  Block *createBlockPermutation(Location loc, ParentBlockInfo *parentInfo,
                                 TypeRange newArgumentTypes,
                                 BlockPermuteCallback initializeCallback);
 
