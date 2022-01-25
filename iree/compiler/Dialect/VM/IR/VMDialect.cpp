@@ -42,8 +42,7 @@ struct VMOpAsmInterface : public OpAsmDialectInterface {
     }
   }
 
-  void getAsmResultNames(Operation *op,
-                         OpAsmSetValueNameFn setNameFn) const final {
+  void getAsmResultNames(Operation *op, OpAsmSetValueNameFn setNameFn) {
     SmallString<32> osBuffer;
     llvm::raw_svector_ostream os(osBuffer);
 

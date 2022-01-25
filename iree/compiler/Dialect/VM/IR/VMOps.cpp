@@ -80,7 +80,8 @@ Block *FuncOp::addEntryBlock() {
   assert(empty() && "function already has an entry block");
   auto *entry = new Block();
   push_back(entry);
-  entry->addArguments(getType().getInputs(), getLoc());
+  SmallVector<Location> locs(getType().getNumInputs(), getLoc());
+  entry->addArguments(getType().getInputs(), locs);
   return entry;
 }
 
