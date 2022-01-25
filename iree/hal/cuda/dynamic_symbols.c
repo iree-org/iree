@@ -10,7 +10,6 @@
 
 #include "iree/base/internal/dynamic_library.h"
 #include "iree/base/target_platform.h"
-#include "iree/base/tracing.h"
 
 static const char* kCUDALoaderSearchNames[] = {
 #if defined(IREE_PLATFORM_WINDOWS)

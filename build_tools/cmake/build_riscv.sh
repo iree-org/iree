@@ -44,7 +44,6 @@ fi
   -DIREE_BUILD_COMPILER=ON \
   -DIREE_BUILD_TESTS=OFF \
   -DIREE_BUILD_SAMPLES=OFF \
-  -DIREE_HAL_DRIVER_CUDA=OFF \
   "${ROOT_DIR?}"
 "${CMAKE_BIN?}" --build "${BUILD_HOST_DIR?}" --target install
 # --------------------------------------------------------------------------- #
@@ -71,7 +70,6 @@ args=(
   -DIREE_ENABLE_ASSERTIONS=ON
   -DIREE_BUILD_COMPILER=OFF
   -DIREE_BUILD_SAMPLES=ON
-  -DIREE_HAL_DRIVER_CUDA=OFF
 )
 
 if [[ "${RISCV_CONFIG?}" == "rv64" ]]; then

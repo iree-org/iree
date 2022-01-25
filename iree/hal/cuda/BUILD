@@ -94,18 +94,6 @@ cc_library(
 )
 
 cc_test(
-    name = "dynamic_cupti_test",
-    srcs = ["dynamic_cupti_test.cc"],
-    tags = ["driver=cuda"],
-    deps = [
-        ":dynamic_symbols",
-        "//iree/base",
-        "//iree/testing:gtest",
-        "//iree/testing:gtest_main",
-    ],
-)
-
-cc_test(
     name = "dynamic_symbols_test",
     srcs = ["dynamic_symbols_test.cc"],
     tags = ["driver=cuda"],

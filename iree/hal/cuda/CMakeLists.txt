@@ -83,6 +83,7 @@ iree_cc_library(
   PUBLIC
 )
 
+if(IREE_HAL_DRIVER_CUDA AND IREE_ENABLE_RUNTIME_TRACING)
 iree_cc_test(
   NAME
     dynamic_cupti_test
@@ -96,6 +97,7 @@ iree_cc_test(
   LABELS
     "driver=cuda"
 )
+endif() # //IREE_HAL_DRIVER_CUDA AND IREE_ENABLE_RUNTIME_TRACING
 
 iree_cc_test(
   NAME

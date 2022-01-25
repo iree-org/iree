@@ -72,8 +72,7 @@ cd build-host
   -DIREE_BUILD_COMPILER=ON \
   -DIREE_BUILD_TESTS=OFF \
   -DIREE_BUILD_BENCHMARKS=ON \
-  -DIREE_BUILD_SAMPLES=OFF \
-  -DIREE_HAL_DRIVER_CUDA=OFF
+  -DIREE_BUILD_SAMPLES=OFF
 
 "${CMAKE_BIN}" --build . --target install
 # Also make sure that we can generate artifacts for benchmarking on Android.

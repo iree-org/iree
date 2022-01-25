@@ -80,11 +80,6 @@ else()
   set(IREE_HAL_DRIVER_CUDA_DEFAULT ${IREE_HAL_DRIVER_DEFAULTS})
 endif()
 
-message("CMakeLists.txt: ANDROID - ${ANDROID} , APPLE - ${APPLE}")
-message("CMakeLists.txt: IREE_HAL_DRIVER_CUDA_DEFAULT - ${IREE_HAL_DRIVER_CUDA_DEFAULT} ")
-message("CMakeLists.txt: IREE_TARGET_BACKEND_CUDA - ${IREE_TARGET_BACKEND_CUDA} ")
-
-
 # Vulkan is not natively supported on Apple platforms.
 # Metal should generally be used instead, though MoltenVK may also work.
 if (APPLE)

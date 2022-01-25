@@ -16,3 +16,4 @@ filegroup(
     name = "libdevice_root",
     srcs = ["nvvm/libdevice/libdevice.10.bc"],
 )
+

@@ -35,7 +35,6 @@ CMAKE_ARGS=(
   "-G" "Ninja"
   "-DCMAKE_BUILD_TYPE=RelWithDebInfo"
   "-DIREE_ENABLE_ASAN=ON"
-  "-DIREE_HAL_DRIVER_CUDA=OFF"
   "-B" "${CMAKE_BUILD_DIR?}"
 )
 
