@@ -423,20 +423,13 @@ static LogicalResult setRootConfig(
 
   Optional<llvm::Triple> triple = getTargetTriple(entryPointFn);
   if (triple && triple.getValue().isX86()) {
-    // For DoubleTilingExpert, we will use LinalgSingleTilingExpertPassOptions
-    // to control transforms. There is a tileInterchange option that needs to be
-    // configured. However, we don't know the number of loops when adding the
-    // pass to pass manager. Thus, we don't use double tiling expert for batch
-    // gemms for now.
+    // There is a tileInterchange option. If it needs to be configured, we can
+    // only apply the pipeline to linalg.matmul. Because we don't know the
+    // number of loops when adding the pass to pass manager.
     // TODO(hanchung): Embed options into attributes, so we can control options
     // more heuristically.
-    if (!numBatchDims) {
-      return setX86SandboxRootConfig(entryPointFn, contractionOp,
-                                     workloadPerWorkgroup, vectorSize);
-    } else {
-      return setX86RootConfig(entryPointFn, contractionOp, workloadPerWorkgroup,
-                              vectorSize);
-    }
+    return setX86SandboxRootConfig(entryPointFn, contractionOp,
+                                   workloadPerWorkgroup, vectorSize);
   }
   // Fall back to ARM configurations.
   return setARMRootConfig(entryPointFn, contractionOp, workloadPerWorkgroup,
