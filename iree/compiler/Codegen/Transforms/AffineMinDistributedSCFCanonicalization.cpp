@@ -77,19 +77,21 @@ static bool affineMinOpDivisible(AffineMinOp minOp, int64_t dividend) {
   AffineExpr ivDim;
   AffineExpr ubDim;
   for (auto dim : llvm::enumerate(minOp.getDimOperands())) {
-    if (dim.value() == iv)
+    if (dim.value() == iv) {
       ivDim = getAffineDimExpr(dim.index(), minOp.getContext());
-    else if (dim.value() == ub)
+    } else if (dim.value() == ub) {
       ubDim = getAffineDimExpr(dim.index(), minOp.getContext());
-    else
+    } else {
       return false;
+    }
   }
 
   if (!ubDim) {
-    if (auto cstUb = ub.getDefiningOp<arith::ConstantIndexOp>())
+    if (auto cstUb = ub.getDefiningOp<arith::ConstantIndexOp>()) {
       ubDim = getAffineConstantExpr(cstUb.value(), minOp.getContext());
-    else
+    } else {
       return false;
+    }
   }
   AffineExpr diffExp = ubDim - ivDim;
   // Check that all the affine map results are either constant divisible by
