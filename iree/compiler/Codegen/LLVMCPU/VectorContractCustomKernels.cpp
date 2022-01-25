@@ -344,9 +344,6 @@ struct MMT_8x4x8_i8i8i32_Aarch64Dotprod_Intrinsics
 
   LogicalResult matchAndRewrite(vector::ContractionOp contractionOp,
                                 PatternRewriter &rewriter) const override {
-    // It would be nice to sharethe matching logic between this and
-    // MMT_8x4x8_i8i8i32_Aarch64Dotprod_InlineAsm, but it defines a bunch of
-    // variables, so doesn't end up being that helpful.
     if (!isMatrixTimesMatrixTransposedOfGivenShape(contractionOp, 8, 4, 8)) {
       return failure();
     }
@@ -399,12 +396,12 @@ struct MMT_8x4x8_i8i8i32_Aarch64Dotprod_Intrinsics
 
     auto int8Zero4x4 = rewriter.create<arith::ConstantOp>(
         loc, rewriter.getZeroAttr(int8x4x4VType));
-    auto sdot = [&](Value acc, Value lhs, Value rhs, int64_t lane) -> Value {
-      auto rhsReplicatedLane = rewriter.create<vector::ShuffleOp>(
-          loc, rhs, int8Zero4x4, ArrayRef<int64_t>{lane, lane, lane, lane});
+    auto sdot = [&](Value acc, Value a, Value b, int64_t lane) -> Value {
+      auto bReplicatedLane = rewriter.create<vector::ShuffleOp>(
+          loc, b, int8Zero4x4, ArrayRef<int64_t>{lane, lane, lane, lane});
 
-      return rewriter.create<arm_neon::Sdot2dOp>(loc, int32x4VType, acc, lhs,
-                                                 rhsReplicatedLane);
+      return rewriter.create<arm_neon::Sdot2dOp>(loc, int32x4VType, acc, a,
+                                                 bReplicatedLane);
     };
 
     std::array<Value, 16> dstChunks;
