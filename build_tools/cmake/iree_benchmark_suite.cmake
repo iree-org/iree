@@ -244,7 +244,7 @@ function(iree_benchmark_suite)
       add_custom_command(
         OUTPUT "${_FLAG_FILE}"
         COMMAND
-          "${Python3_EXECUTABLE}" "${IREE_ROOT_DIR}/scripts/generate_flagfile.py"
+          "${Python3_EXECUTABLE}" "${IREE_ROOT_DIR}/scripts/generate_runtime_flagfile.py"
             --module_file="${_MODULE_FILE_FLAG}"
             --driver=${_RULE_DRIVER}
             --entry_function=${_MODULE_ENTRY_FUNCTION}
@@ -252,7 +252,7 @@ function(iree_benchmark_suite)
             "${_ADDITIONAL_ARGS_CL}"
             -o "${_FLAG_FILE}"
         DEPENDS
-          "${IREE_ROOT_DIR}/scripts/generate_flagfile.py"
+          "${IREE_ROOT_DIR}/scripts/generate_runtime_flagfile.py"
         WORKING_DIRECTORY "${_RUN_SPEC_DIR}"
         COMMENT "Generating ${_FLAG_FILE}"
       )
@@ -283,10 +283,35 @@ function(iree_benchmark_suite)
         DEPENDS "${_TOOL_FILE}"
       )
 
+      # Create the command and target for the command-line options spec used to
+      # compile the generated artifacts.
+      set(_COMPOPT_FILE "${_RUN_SPEC_DIR}/compilation_flagfile")
+      add_custom_command(
+        OUTPUT "${_COMPOPT_FILE}"
+        COMMAND
+          "${Python3_EXECUTABLE}" "${IREE_ROOT_DIR}/scripts/generate_compilation_flagfile.py"
+            -o "${_COMPOPT_FILE}"
+            --
+            ${_TRANSLATION_ARGS}
+        COMMAND_EXPAND_LISTS
+        DEPENDS
+          "${IREE_ROOT_DIR}/scripts/generate_compilation_flagfile.py"
+        WORKING_DIRECTORY "${_RUN_SPEC_DIR}"
+        COMMENT "Generating ${_COMPOPT_FILE}"
+      )
+
+      set(_COMPFILE_GEN_TARGET_NAME_LIST "iree-generate-benchmark-compilation-flagfile")
+      list(APPEND _COMPFILE_GEN_TARGET_NAME_LIST ${_COMMON_NAME_SEGMENTS})
+      list(JOIN _COMPFILE_GEN_TARGET_NAME_LIST "__" _COMPFILE_GEN_TARGET_NAME)
+      add_custom_target("${_COMPFILE_GEN_TARGET_NAME}"
+        DEPENDS "${_COMPOPT_FILE}"
+      )
+
       # Mark dependency so that we have one target to drive them all.
       add_dependencies(iree-benchmark-suites
         "${_FLAGFILE_GEN_TARGET_NAME}"
         "${_TOOLFILE_GEN_TARGET_NAME}"
+        "${_COMPFILE_GEN_TARGET_NAME}"
       )
     endforeach(_BENCHMARK_MODE IN LISTS _RULE_BENCHMARK_MODES)
 
