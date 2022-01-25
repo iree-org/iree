@@ -251,9 +251,6 @@ struct MMT_8x4x8_i8i8i32_Aarch64Dotprod_InlineAsm
           extract1DSlice(rewriter, loc, int32x4Type, flatAcc, position));
     }
 
-    // Start of the code that's specific to inline assembly. An intrinsics
-    // code path would diverge here.
-
     // Create the inline asm op's operands list.
     SmallVector<Value> asmOperands;
     // First the inputs operands.
@@ -302,9 +299,6 @@ struct MMT_8x4x8_i8i8i32_Aarch64Dotprod_InlineAsm
           loc, int32x4Type, asmOp.getRes(), rewriter.getI64ArrayAttr({i})));
     }
 
-    // End of the code that's specific to inline assembly. An intrinsics code
-    // path would merge here.
-
     // Insert the result vectors of size 4 into the overall result vector of
     // size 64, still 1D.
     VectorType int32x64xType = VectorType::get({64}, I32Type);
@@ -343,7 +337,7 @@ static Value getExtInput(Type extSrcType, Type extDstType, Value extResult) {
 
 /// Converts a vector.contract computing A*B^T where A and B are 8x4 matrices
 /// of int32's that are themselves the result of an arith.extsi promoting from
-/// i8, into an ARM NEON Op corresponding to a dotprod intrinsic.
+/// i8, into ARM NEON Ops corresponding to dotprod intrinsics.
 struct MMT_8x4x8_i8i8i32_Aarch64Dotprod_Intrinsics
     : public OpRewritePattern<vector::ContractionOp> {
  public:
@@ -351,16 +345,6 @@ struct MMT_8x4x8_i8i8i32_Aarch64Dotprod_Intrinsics
 
   LogicalResult matchAndRewrite(vector::ContractionOp contractionOp,
                                 PatternRewriter &rewriter) const override {
-    auto lhsType = contractionOp.lhs().getType().cast<VectorType>();
-    auto rhsType = contractionOp.rhs().getType().cast<VectorType>();
-    auto accType = contractionOp.acc().getType().cast<VectorType>();
-    auto lhsShape = lhsType.getShape();
-    auto rhsShape = rhsType.getShape();
-
-    if (lhsShape[0] != 8 || lhsShape[1] != 4 || rhsShape[0] != 8 ||
-        rhsShape[1] != 4) {
-      return failure();
-    }
     if (!isMatrixTimesMatrixTransposedOfGivenShape(contractionOp, 8, 4, 8)) {
       return failure();
     }
@@ -368,12 +352,15 @@ struct MMT_8x4x8_i8i8i32_Aarch64Dotprod_Intrinsics
     Type I8Type = rewriter.getIntegerType(8);
     Type I32Type = rewriter.getIntegerType(32);
 
-    if (accType.getElementType() != I32Type) {
+    auto acc = contractionOp.acc();
+    auto lhs = contractionOp.lhs();
+    auto rhs = contractionOp.rhs();
+    if (acc.getType().cast<VectorType>().getElementType() != I32Type) {
       return failure();
     }
 
-    Value inLhs = getExtInput(I8Type, I32Type, contractionOp.lhs());
-    Value inRhs = getExtInput(I8Type, I32Type, contractionOp.rhs());
+    Value inLhs = getExtInput(I8Type, I32Type, lhs);
+    Value inRhs = getExtInput(I8Type, I32Type, rhs);
 
     if (!inLhs || !inRhs) return failure();
 
@@ -381,8 +368,7 @@ struct MMT_8x4x8_i8i8i32_Aarch64Dotprod_Intrinsics
 
     auto int32x4VType = VectorType::get({4}, I32Type);
 
-    auto acc = contractionOp.acc();
-    SmallVector<Value> accChunks;
+    std::array<Value, 16> accChunks;
     for (int row = 0; row < 8; ++row) {
       auto accRow =
           rewriter.create<vector::ExtractOp>(loc, acc, ArrayRef<int64_t>{row});
@@ -391,7 +377,7 @@ struct MMT_8x4x8_i8i8i32_Aarch64Dotprod_Intrinsics
             loc, accRow, ArrayRef<int64_t>{chunk * 4}, ArrayRef<int64_t>{4},
             ArrayRef<int64_t>{1});
         assert(accChunk.getType() == int32x4VType);
-        accChunks.push_back(accChunk);
+        accChunks[row * 2 + chunk] = accChunk;
       }
     }
 
@@ -426,38 +412,34 @@ struct MMT_8x4x8_i8i8i32_Aarch64Dotprod_Intrinsics
                                                  rhsReplicatedLane);
     };
 
-    SmallVector<Value> dstChunks;
+    std::array<Value, 16> dstChunks;
     // Note lhs and rhs are deliberately swapped here
-    dstChunks.push_back(sdot(accChunks[0], rhs0, lhs0, 0));
-    dstChunks.push_back(sdot(accChunks[1], rhs1, lhs0, 0));
-    dstChunks.push_back(sdot(accChunks[2], rhs0, lhs0, 1));
-    dstChunks.push_back(sdot(accChunks[3], rhs1, lhs0, 1));
-    dstChunks.push_back(sdot(accChunks[4], rhs0, lhs0, 2));
-    dstChunks.push_back(sdot(accChunks[5], rhs1, lhs0, 2));
-    dstChunks.push_back(sdot(accChunks[6], rhs0, lhs0, 3));
-    dstChunks.push_back(sdot(accChunks[7], rhs1, lhs0, 3));
-    dstChunks.push_back(sdot(accChunks[8], rhs0, lhs1, 0));
-    dstChunks.push_back(sdot(accChunks[9], rhs1, lhs1, 0));
-    dstChunks.push_back(sdot(accChunks[10], rhs0, lhs1, 1));
-    dstChunks.push_back(sdot(accChunks[11], rhs1, lhs1, 1));
-    dstChunks.push_back(sdot(accChunks[12], rhs0, lhs1, 2));
-    dstChunks.push_back(sdot(accChunks[13], rhs1, lhs1, 2));
-    dstChunks.push_back(sdot(accChunks[14], rhs0, lhs1, 3));
-    dstChunks.push_back(sdot(accChunks[15], rhs1, lhs1, 3));
-    assert(dstChunks.size() == 16 && "16 chunks");
-    auto int32x8x8xVType = VectorType::get({8, 8}, I32Type);
+    dstChunks[0] = sdot(accChunks[0], rhs0, lhs0, 0);
+    dstChunks[1] = sdot(accChunks[1], rhs1, lhs0, 0);
+    dstChunks[2] = sdot(accChunks[2], rhs0, lhs0, 1);
+    dstChunks[3] = sdot(accChunks[3], rhs1, lhs0, 1);
+    dstChunks[4] = sdot(accChunks[4], rhs0, lhs0, 2);
+    dstChunks[5] = sdot(accChunks[5], rhs1, lhs0, 2);
+    dstChunks[6] = sdot(accChunks[6], rhs0, lhs0, 3);
+    dstChunks[7] = sdot(accChunks[7], rhs1, lhs0, 3);
+    dstChunks[8] = sdot(accChunks[8], rhs0, lhs1, 0);
+    dstChunks[9] = sdot(accChunks[9], rhs1, lhs1, 0);
+    dstChunks[10] = sdot(accChunks[10], rhs0, lhs1, 1);
+    dstChunks[11] = sdot(accChunks[11], rhs1, lhs1, 1);
+    dstChunks[12] = sdot(accChunks[12], rhs0, lhs1, 2);
+    dstChunks[13] = sdot(accChunks[13], rhs1, lhs1, 2);
+    dstChunks[14] = sdot(accChunks[14], rhs0, lhs1, 3);
+    dstChunks[15] = sdot(accChunks[15], rhs1, lhs1, 3);
 
-    Value result;
-    result = rewriter.create<arith::ConstantOp>(
-        loc, rewriter.getZeroAttr(int32x8x8xVType));
+    // Put the results back in the accumulator
     for (int row = 0; row < 8; ++row) {
       for (int chunk = 0; chunk < 2; ++chunk) {
-        result = rewriter.create<vector::InsertStridedSliceOp>(
-            loc, dstChunks[row * 2 + chunk], result,
+        acc = rewriter.create<vector::InsertStridedSliceOp>(
+            loc, dstChunks[row * 2 + chunk], acc,
             ArrayRef<int64_t>{row, chunk * 4}, ArrayRef<int64_t>{1});
       }
     }
-    rewriter.replaceOp(contractionOp, {result});
+    rewriter.replaceOp(contractionOp, {acc});
     return success();
   }
 };
