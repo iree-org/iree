@@ -40,13 +40,6 @@ typedef struct iree_sample_state_t {
   iree_runtime_call_t call;
 } iree_sample_state_t;
 
-void iree_sample_state_initialize(iree_sample_state_t* out_state) {
-  out_state->instance = NULL;
-  out_state->device = NULL;
-  out_state->module = NULL;
-  out_state->session = NULL;
-}
-
 iree_status_t create_bytecode_module(iree_vm_module_t** out_module) {
   const struct iree_file_toc_t* module_file_toc = iree_static_mnist_create();
   iree_const_byte_span_t module_data =
@@ -57,16 +50,18 @@ iree_status_t create_bytecode_module(iree_vm_module_t** out_module) {
 
 iree_sample_state_t* setup_sample() {
   iree_sample_state_t* state;
-  state = malloc(sizeof(iree_sample_state_t));
-  iree_sample_state_initialize(state);
+  iree_status_t status = iree_allocator_malloc(
+      iree_allocator_system(), sizeof(iree_sample_state_t), (void**)&state);
 
   iree_runtime_instance_options_t instance_options;
   iree_runtime_instance_options_initialize(IREE_API_VERSION_LATEST,
                                            &instance_options);
   // Note: no call to iree_runtime_instance_options_use_all_available_drivers().
 
-  iree_status_t status = iree_runtime_instance_create(
-      &instance_options, iree_allocator_system(), &state->instance);
+  if (iree_status_is_ok(status)) {
+    status = iree_runtime_instance_create(
+        &instance_options, iree_allocator_system(), &state->instance);
+  }
 
   if (iree_status_is_ok(status)) {
     status = create_device_with_static_loader(iree_allocator_system(),
@@ -99,7 +94,7 @@ iree_sample_state_t* setup_sample() {
   if (!iree_status_is_ok(status)) {
     iree_status_fprint(stderr, status);
     iree_status_free(status);
-    free(state);
+    cleanup_sample(state);
     return NULL;
   }
 
@@ -157,31 +152,32 @@ int run_sample(iree_sample_state_t* state, float* image_data) {
   // confidence values for each digit in [0, 9].
   float predictions[1 * 10] = {0.0f};
   if (iree_status_is_ok(status)) {
-    iree_hal_buffer_read_data(iree_hal_buffer_view_buffer(ret_buffer_view), 0,
-                              predictions, sizeof(predictions));
+    status =
+        iree_hal_buffer_read_data(iree_hal_buffer_view_buffer(ret_buffer_view),
+                                  0, predictions, sizeof(predictions));
   }
   iree_hal_buffer_view_release(ret_buffer_view);
 
-  if (iree_status_is_ok(status)) {
-    // Get the highest index from the output.
-    float result_val = FLT_MIN;
-    int result_idx = 0;
-    for (iree_host_size_t i = 0; i < IREE_ARRAYSIZE(predictions); ++i) {
-      if (predictions[i] > result_val) {
-        result_val = predictions[i];
-        result_idx = i;
-      }
-    }
-    fprintf(stdout,
-            "Prediction: %d, confidences: [%.2f, %.2f, %.2f, %.2f, %.2f, %.2f, "
-            "%.2f, %.2f, %.2f, %.2f]\n",
-            result_idx, predictions[0], predictions[1], predictions[2],
-            predictions[3], predictions[4], predictions[5], predictions[6],
-            predictions[7], predictions[8], predictions[9]);
-    return result_idx;
-  } else {
+  if (!iree_status_is_ok(status)) {
     iree_status_fprint(stderr, status);
     iree_status_free(status);
     return -1;
   }
+
+  // Get the highest index from the output.
+  float result_val = FLT_MIN;
+  int result_idx = 0;
+  for (iree_host_size_t i = 0; i < IREE_ARRAYSIZE(predictions); ++i) {
+    if (predictions[i] > result_val) {
+      result_val = predictions[i];
+      result_idx = i;
+    }
+  }
+  fprintf(stdout,
+          "Prediction: %d, confidences: [%.2f, %.2f, %.2f, %.2f, %.2f, %.2f, "
+          "%.2f, %.2f, %.2f, %.2f]\n",
+          result_idx, predictions[0], predictions[1], predictions[2],
+          predictions[3], predictions[4], predictions[5], predictions[6],
+          predictions[7], predictions[8], predictions[9]);
+  return result_idx;
 }
