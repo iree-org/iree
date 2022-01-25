@@ -40,9 +40,8 @@ struct PadTensorOpConversion : public OpRewritePattern<tensor::PadOp> {
     Region &region = padTensorOp.region();
     Block &block = region.front();
     if (!llvm::hasSingleElement(block)) return failure();
-    auto yieldOp = cast<linalg::YieldOp>(block.getTerminator());
-    if (!llvm::hasSingleElement(yieldOp.values())) return failure();
-    Value yieldVal = yieldOp.values().front();
+    auto yieldOp = cast<tensor::YieldOp>(block.getTerminator());
+    Value yieldVal = yieldOp.value();
     if (llvm::any_of(block.getArguments(),
                      [&](Value v) { return v == yieldVal; })) {
       return failure();
