@@ -10,3 +10,6 @@ try-import %workspace%/../../build_tools/bazel/iree.bazelrc
 # Ignore visibility issues in TensorFlow. They are inconsistently applied
 # to the OSS codebase.
 build --nocheck_visibility
+
+# Flags specific for working around tensorflow warnings.
+build:generic_clang --copt=-Wno-inconsistent-missing-override --host_copt=-Wno-inconsistent-missing-override

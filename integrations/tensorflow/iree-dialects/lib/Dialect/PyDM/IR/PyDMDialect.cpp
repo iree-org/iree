@@ -67,27 +67,6 @@ Operation *IREEPyDMDialect::materializeConstant(OpBuilder &builder,
   llvm_unreachable("unhandled iree_pydm constant materialization");
 }
 
-Type IREEPyDMDialect::parseType(DialectAsmParser &parser) const {
-  StringRef typeTag;
-  if (succeeded(parser.parseKeyword(&typeTag))) {
-    Type genType;
-    auto parseResult = generatedTypeParser(parser, typeTag, genType);
-    if (parseResult.hasValue()) {
-      if (*parseResult) {
-        return Type();
-      }
-      return genType;
-    }
-  }
-
-  parser.emitError(parser.getNameLoc(), "unknown dialect type");
-  return Type();
-}
-
-void IREEPyDMDialect::printType(Type type, DialectAsmPrinter &printer) const {
-  (void)generatedTypePrinter(type, printer);
-}
-
 //------------------------------------------------------------------------------
 // Python type implementation
 //------------------------------------------------------------------------------
