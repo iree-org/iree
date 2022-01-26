@@ -1620,13 +1620,13 @@ func @padded_matmul() {
       %8 = flow.dispatch.tensor.load %1, offsets = [0, %arg1], sizes = [27, 16], strides = [1, 1] : !flow.dispatch.tensor<readonly:27x16xf32> -> tensor<27x16xf32>
       %9 = linalg.init_tensor [64, 16] : tensor<64x16xf32>
       %10 = linalg.fill(%cst, %9) {__internal_linalg_transform__ = "workgroup"} : f32, tensor<64x16xf32> -> tensor<64x16xf32>
-      %11 = linalg.pad_tensor %7 low[0, 0] high[0, 5]  {
+      %11 = tensor.pad %7 low[0, 0] high[0, 5]  {
       ^bb0(%arg2: index, %arg3: index):  // no predecessors
-        linalg.yield %cst : f32
+        tensor.yield %cst : f32
       } : tensor<64x27xf32> to tensor<64x32xf32>
-      %12 = linalg.pad_tensor %8 low[0, 0] high[5, 0]  {
+      %12 = tensor.pad %8 low[0, 0] high[5, 0]  {
       ^bb0(%arg2: index, %arg3: index):  // no predecessors
-        linalg.yield %cst : f32
+        tensor.yield %cst : f32
       } : tensor<27x16xf32> to tensor<32x16xf32>
       %13 = linalg.matmul ins(%11, %12 : tensor<64x32xf32>, tensor<32x16xf32>) outs(%10 : tensor<64x16xf32>) -> tensor<64x16xf32>
       %14 = tensor.cast %13 : tensor<64x16xf32> to tensor<?x?xf32>
@@ -1684,13 +1684,13 @@ func @dot_general_padded() {
       %10 = flow.dispatch.tensor.load %1, offsets = [0, %arg1], sizes = [2, %9], strides = [1, 1] : !flow.dispatch.tensor<readonly:?x?xf32>{%k, %n} -> tensor<2x?xf32>
       %11 = affine.min affine_map<(d0)[s0] -> (4, -d0 + s0)>(%arg0)[%m]
       %12 = affine.min affine_map<(d0)[s0] -> (4, -d0 + s0)>(%arg1)[%n]
-      %13 = linalg.pad_tensor %8 low[0, 0] high[1, 2]  {
+      %13 = tensor.pad %8 low[0, 0] high[1, 2]  {
       ^bb0(%arg2: index, %arg3: index):  // no predecessors
-        linalg.yield %cst : f32
+        tensor.yield %cst : f32
       } : tensor<?x2xf32> to tensor<4x4xf32>
-      %14 = linalg.pad_tensor %10 low[0, 0] high[2, 3]  {
+      %14 = tensor.pad %10 low[0, 0] high[2, 3]  {
       ^bb0(%arg2: index, %arg3: index):  // no predecessors
-        linalg.yield %cst : f32
+        tensor.yield %cst : f32
       } : tensor<2x?xf32> to tensor<4x4xf32>
       %15 = linalg.init_tensor [4, 4] : tensor<4x4xf32>
       %16 = linalg.fill(%cst, %15) : f32, tensor<4x4xf32> -> tensor<4x4xf32>

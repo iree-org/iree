@@ -917,28 +917,26 @@ static SmallVector<OpFoldResult> getMemrefSizes(OpBuilder &b, Location loc,
   return sizeMixedValues;
 }
 
-static LogicalResult convertPadTensorOp(OpBuilder &b,
-                                        linalg::PadTensorOp padTensorOp,
+static LogicalResult convertPadTensorOp(OpBuilder &b, tensor::PadOp tensorPadOp,
                                         BlockAndValueMapping &bvm) {
-  auto inputTensor = padTensorOp.source();
+  auto inputTensor = tensorPadOp.source();
   auto inputMemref = bvm.lookup(inputTensor);
 
-  auto loc = padTensorOp.getLoc();
+  auto loc = tensorPadOp.getLoc();
 
-  auto resultPaddedBuffer = bvm.lookup(padTensorOp.result());
+  auto resultPaddedBuffer = bvm.lookup(tensorPadOp.result());
 
   // Get padding value and fill the result buffer.
-  linalg::YieldOp yeildOp =
-      *padTensorOp.region().getOps<linalg::YieldOp>().begin();
-  Value paddingValue = yeildOp.values()[0];
+  auto yeildOp = *tensorPadOp.region().getOps<tensor::YieldOp>().begin();
+  Value paddingValue = yeildOp.value();
 
   auto constOp = paddingValue.getDefiningOp<arith::ConstantOp>();
   if (!constOp) {
-    return padTensorOp.emitError(
+    return tensorPadOp.emitError(
         "Converting linalg.pad_tensor with non-constant padding value");
   }
   if (constOp.getValue().isa<DenseElementsAttr>()) {
-    return padTensorOp.emitError(
+    return tensorPadOp.emitError(
         "Converting linalg.pad_tensor with non-scalar constant padding "
         "value");
   }
@@ -953,7 +951,7 @@ static LogicalResult convertPadTensorOp(OpBuilder &b,
       b.getI64IntegerAttr(1));
 
   auto resultSubView = b.create<memref::SubViewOp>(loc, resultPaddedBuffer,
-                                                   padTensorOp.getMixedLowPad(),
+                                                   tensorPadOp.getMixedLowPad(),
                                                    sizeMixedValues, strides);
   // Copy to the interior region.
   b.create<linalg::CopyOp>(loc, inputMemref, resultSubView);
@@ -1054,12 +1052,12 @@ void LinalgBufferizePass::runOnOperation() {
                   aliasingOp->getResult(0), aliasingBuffers, bvm, plan);
               return success();
             })
-        .Case<linalg::PadTensorOp>([&](linalg::PadTensorOp padTensorOp) {
-          if (failed(getOrAllocateResultBuffers(b, padTensorOp, bvm, plan,
+        .Case<tensor::PadOp>([&](tensor::PadOp tensorPadOp) {
+          if (failed(getOrAllocateResultBuffers(b, tensorPadOp, bvm, plan,
                                                 allocationFn))) {
             return failure();
           }
-          return convertPadTensorOp(b, padTensorOp, bvm);
+          return convertPadTensorOp(b, tensorPadOp, bvm);
         })
         .Case<linalg::LinalgOp, IREE::LinalgExt::LinalgExtOp>([&](auto op) {
           if (failed(

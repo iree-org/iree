@@ -7,6 +7,7 @@
 #include "iree/compiler/Dialect/Flow/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/Dialect/Tensor/Utils/Utils.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
@@ -80,7 +81,7 @@ class PadMatmulOp : public OpRewritePattern<linalg::MatmulOp> {
 
     Value paddedLhs =
         (paddingForM > 0 || paddingForK > 0)
-            ? linalg::PadTensorOp::createPadScalarOp(
+            ? tensor::createPadScalarOp(
                   lhsPaddedType, lhs, lhsPaddingValue, createPadding({0, 0}),
                   createPadding({paddingForM, paddingForK}), /*nofold=*/false,
                   loc, rewriter)
@@ -88,7 +89,7 @@ class PadMatmulOp : public OpRewritePattern<linalg::MatmulOp> {
 
     auto paddedrhs =
         (paddingForK > 0 || paddingForN > 0)
-            ? linalg::PadTensorOp::createPadScalarOp(
+            ? tensor::createPadScalarOp(
                   rhsPaddedType, rhs, rhsPaddingValue, createPadding({0, 0}),
                   createPadding({paddingForK, paddingForN}), /*nofold=*/false,
                   loc, rewriter)
@@ -106,7 +107,7 @@ class PadMatmulOp : public OpRewritePattern<linalg::MatmulOp> {
                                                  resultType.getElementType());
       auto resultPaddingValue = rewriter.create<arith::ConstantOp>(
           loc, rewriter.getZeroAttr(resultType.getElementType()));
-      Value paddedResult = linalg::PadTensorOp::createPadScalarOp(
+      Value paddedResult = tensor::createPadScalarOp(
           newResultType, result, resultPaddingValue, createPadding({0, 0}),
           createPadding({paddingForM, paddingForN}), /*nofold=*/false, loc,
           rewriter);

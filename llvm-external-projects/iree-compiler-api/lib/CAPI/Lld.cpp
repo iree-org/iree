@@ -72,19 +72,21 @@ int ireeCompilerRunLldMain(int argc, char **argv) {
   InitLLVM x(argc, argv);
   sys::Process::UseANSIEscapeCodes(true);
   bool exitEarly = true;
+  bool disableOutput = false;
   llvm::raw_ostream &stdoutOS = llvm::outs();
   llvm::raw_ostream &stderrOS = llvm::errs();
 
   std::vector<const char *> args(argv, argv + argc);
   switch (parseFlavor(args)) {
     case Gnu:
-      return !elf::link(args, exitEarly, stdoutOS, stderrOS);
+      return !elf::link(args, stdoutOS, stderrOS, exitEarly, disableOutput);
     case WinLink:
-      return !coff::link(args, exitEarly, stdoutOS, stderrOS);
+      return !coff::link(args, stdoutOS, stderrOS, exitEarly, disableOutput);
     case Darwin:
-      return !macho::link(args, exitEarly, stdoutOS, stderrOS);
+      return !macho::link(args, stdoutOS, stderrOS, exitEarly, disableOutput);
     case Wasm:
-      return !lld::wasm::link(args, exitEarly, stdoutOS, stderrOS);
+      return !lld::wasm::link(args, stdoutOS, stderrOS, exitEarly,
+                              disableOutput);
     default:
       die("lld is a generic driver.\n"
           "Invoke ld.lld (Unix), ld64.lld (macOS), lld-link (Windows), wasm-ld"

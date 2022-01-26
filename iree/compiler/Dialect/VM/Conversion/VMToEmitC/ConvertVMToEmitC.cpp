@@ -207,11 +207,12 @@ LogicalResult convertFuncOp(IREE::VM::FuncOp funcOp,
            << "branches to the entry block are not supported for now.";
   }
 
-  entryBlock.insertArgument(static_cast<unsigned>(0), stackType);
-  entryBlock.insertArgument(static_cast<unsigned>(1), moduleType);
-  entryBlock.insertArgument(static_cast<unsigned>(2), moduleStateType);
+  entryBlock.insertArgument(static_cast<unsigned>(0), stackType, loc);
+  entryBlock.insertArgument(static_cast<unsigned>(1), moduleType, loc);
+  entryBlock.insertArgument(static_cast<unsigned>(2), moduleStateType, loc);
 
-  entryBlock.addArguments(outputTypes);
+  SmallVector<Location> locs(outputTypes.size(), loc);
+  entryBlock.addArguments(outputTypes, locs);
 
   auto vmAnalysis = typeConverter.lookupAnalysis(funcOp);
   if (failed(vmAnalysis)) {
@@ -1536,11 +1537,11 @@ class ExportOpConversion : public OpConversionPattern<IREE::VM::ExportOp> {
           rewriter.createBlock(&newFuncOp.getBody(), newFuncOp.getBody().end());
 
       // Insert arguments into block.
-      block->addArgument(stackType);
-      block->addArgument(callType);
-      block->addArgument(moduleType);
-      block->addArgument(moduleStateType);
-      block->addArgument(executionResultType);
+      block->addArgument(stackType, loc);
+      block->addArgument(callType, loc);
+      block->addArgument(moduleType, loc);
+      block->addArgument(moduleStateType, loc);
+      block->addArgument(executionResultType, loc);
 
       rewriter.setInsertionPointToStart(block);
 
@@ -2052,7 +2053,7 @@ class ImportOpConversion : public OpConversionPattern<IREE::VM::ImportOp> {
           rewriter.createBlock(&newFuncOp.getBody(), newFuncOp.getBody().end());
 
       for (Type type : newFuncOp.getType().getInputs()) {
-        block->addArgument(type);
+        block->addArgument(type, loc);
       }
 
       rewriter.setInsertionPointToStart(block);
@@ -2814,7 +2815,7 @@ class CallOpConversion : public OpConversionPattern<CallOpTy> {
     }
 
     int64_t firstVariadicOperand = -1;
-    for (int64_t i = 0; i < importOp.getNumFuncArguments(); i++) {
+    for (int64_t i = 0; i < importOp.getArgumentTypes().size(); i++) {
       if (importOp.isFuncArgumentVariadic(i)) {
         firstVariadicOperand = i;
         break;

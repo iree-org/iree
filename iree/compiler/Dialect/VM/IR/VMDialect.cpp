@@ -24,56 +24,27 @@ namespace VM {
 
 #include "iree/compiler/Dialect/VM/IR/VMOpInterface.cpp.inc"  // IWYU pragma: keep
 
-namespace {
+// Fallback asm printer for ops that do not define their own. See op-specific
+// printers in the op implementations.
+struct VMDialect::VMOpAsmInterface
+    : public OpAsmOpInterface::FallbackModel<VMOpAsmInterface> {
+  VMOpAsmInterface() = default;
 
-// Used for custom printing support.
-struct VMOpAsmInterface : public OpAsmDialectInterface {
-  using OpAsmDialectInterface::OpAsmDialectInterface;
+  static bool classof(Operation *op) { return true; }
 
-  void getIntegerName(IntegerAttr value, llvm::raw_svector_ostream &os) const {
-    if (!value) {
-      os << 'c';
+  void getAsmResultNames(Operation *op, OpAsmSetValueNameFn setNameFn) const {
+    if (op->getNumResults() == 0) {
       return;
     }
-    if (value.getValue() == 0) {
-      os << "zero";
-    } else {
-      os << 'c' << value.getValue();
-    }
-  }
 
-  void getAsmResultNames(Operation *op,
-                         OpAsmSetValueNameFn setNameFn) const final {
     SmallString<32> osBuffer;
     llvm::raw_svector_ostream os(osBuffer);
 
-    // TODO(b/143187291): tablegen this by adding a value name prefix field.
     if (op->getResult(0).getType().isa<VectorType>()) {
       os << "v";
     }
-    if (auto globalLoadOp = dyn_cast<GlobalLoadI32Op>(op)) {
-      os << globalLoadOp.global();
-    } else if (auto globalLoadOp = dyn_cast<GlobalLoadI64Op>(op)) {
-      os << globalLoadOp.global();
-    } else if (auto globalLoadOp = dyn_cast<GlobalLoadF32Op>(op)) {
-      os << globalLoadOp.global();
-    } else if (auto globalLoadOp = dyn_cast<GlobalLoadF64Op>(op)) {
-      os << globalLoadOp.global();
-    } else if (auto globalLoadOp = dyn_cast<GlobalLoadRefOp>(op)) {
-      os << globalLoadOp.global();
-    } else if (isa<ConstRefZeroOp>(op)) {
-      os << "null";
-    } else if (isa<ConstI32ZeroOp>(op) || isa<ConstI64ZeroOp>(op) ||
-               isa<ConstF32ZeroOp>(op) || isa<ConstF64ZeroOp>(op)) {
-      os << "zero";
-    } else if (auto constOp = dyn_cast<ConstI32Op>(op)) {
-      getIntegerName(constOp.value().dyn_cast<IntegerAttr>(), os);
-    } else if (auto constOp = dyn_cast<ConstI64Op>(op)) {
-      getIntegerName(constOp.value().dyn_cast<IntegerAttr>(), os);
-    } else if (auto rodataOp = dyn_cast<ConstRefRodataOp>(op)) {
-      os << rodataOp.rodata();
-    } else if (auto refType =
-                   op->getResult(0).getType().dyn_cast<IREE::VM::RefType>()) {
+    if (auto refType =
+            op->getResult(0).getType().dyn_cast<IREE::VM::RefType>()) {
       if (refType.getObjectType().isa<BufferType>()) {
         os << "buffer";
       } else if (refType.getObjectType().isa<ListType>()) {
@@ -81,39 +52,20 @@ struct VMOpAsmInterface : public OpAsmDialectInterface {
       } else {
         os << "ref";
       }
-    } else if (isa<CmpEQI32Op>(op) || isa<CmpEQI64Op>(op)) {
-      os << "eq";
-    } else if (isa<CmpNEI32Op>(op) || isa<CmpNEI64Op>(op)) {
-      os << "ne";
-    } else if (isa<CmpLTI32SOp>(op) || isa<CmpLTI64SOp>(op)) {
-      os << "slt";
-    } else if (isa<CmpLTI32UOp>(op) || isa<CmpLTI64UOp>(op)) {
-      os << "ult";
-    } else if (isa<CmpLTEI32SOp>(op) || isa<CmpLTEI64SOp>(op)) {
-      os << "slte";
-    } else if (isa<CmpLTEI32UOp>(op) || isa<CmpLTEI64UOp>(op)) {
-      os << "ulte";
-    } else if (isa<CmpGTI32SOp>(op) || isa<CmpGTI64SOp>(op)) {
-      os << "sgt";
-    } else if (isa<CmpGTI32UOp>(op) || isa<CmpGTI64UOp>(op)) {
-      os << "ugt";
-    } else if (isa<CmpGTEI32SOp>(op) || isa<CmpGTEI64SOp>(op)) {
-      os << "sgte";
-    } else if (isa<CmpGTEI32UOp>(op) || isa<CmpGTEI64UOp>(op)) {
-      os << "ugte";
-    } else if (isa<CmpNZI32Op>(op) || isa<CmpNZI64Op>(op)) {
-      os << "nz";
-    } else if (isa<CmpEQRefOp>(op)) {
-      os << "req";
-    } else if (isa<CmpNERefOp>(op)) {
-      os << "rne";
-    } else if (isa<CmpNZRefOp>(op)) {
-      os << "rnz";
     }
 
     setNameFn(op->getResult(0), os.str());
   }
+
+  void getAsmBlockArgumentNames(Operation *op, Region &region,
+                                OpAsmSetValueNameFn setNameFn) const {
+    return;
+  }
+
+  static StringRef getDefaultDialect() { return ""; }
 };
+
+namespace {
 
 // Used to control inlining behavior.
 struct VMInlinerInterface : public DialectInlinerInterface {
@@ -193,15 +145,28 @@ struct VMFolderInterface : public DialectFoldInterface {
 }  // namespace
 
 VMDialect::VMDialect(MLIRContext *context)
-    : Dialect(getDialectNamespace(), context, TypeID::get<VMDialect>()) {
+    : Dialect(getDialectNamespace(), context, TypeID::get<VMDialect>()),
+      fallbackOpAsmInterface(new VMOpAsmInterface) {
   registerAttributes();
   registerTypes();
-  addInterfaces<VMInlinerInterface, VMOpAsmInterface, VMFolderInterface>();
+  addInterfaces<VMInlinerInterface, VMFolderInterface>();
 
 #define GET_OP_LIST
   addOperations<
 #include "iree/compiler/Dialect/VM/IR/VMOps.cpp.inc"  // IWYU pragma: keep
       >();
+}
+
+VMDialect::~VMDialect() { delete fallbackOpAsmInterface; }
+
+// Provides a hook for op interface.
+void *VMDialect::getRegisteredInterfaceForOp(mlir::TypeID interface,
+                                             mlir::OperationName opName) {
+  if (interface == TypeID::get<mlir::OpAsmOpInterface>()) {
+    return fallbackOpAsmInterface;
+  }
+
+  return nullptr;
 }
 
 //===----------------------------------------------------------------------===//

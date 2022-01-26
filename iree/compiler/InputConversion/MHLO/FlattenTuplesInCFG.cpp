@@ -37,7 +37,7 @@ void untupleTypes(TypeRange types, llvm::SmallVectorImpl<Type> *newTypes) {
 
 Value processTuple(Type type, Location loc, Block *block, OpBuilder &builder) {
   if (!type.isa<TupleType>()) {
-    return block->addArgument(type);
+    return block->addArgument(type, loc);
   }
 
   auto tupleType = type.dyn_cast<TupleType>();

@@ -11,6 +11,7 @@
 #include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/Dialect/Tensor/Utils/Utils.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -84,7 +85,7 @@ static bool padTensor(Location loc, OpOperand *operand,
   SmallVector<OpFoldResult> zeroStaticLow(shape.size(),
                                           builder.getI64IntegerAttr(0));
   SmallVector<Value> nullLow;
-  Value padded = linalg::PadTensorOp::createPadScalarOp(
+  Value padded = tensor::createPadScalarOp(
       resultType, operand->get(), zeroConstant, zeroStaticLow, newPaddingSizes,
       false, loc, builder);
   operand->set(padded);

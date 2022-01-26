@@ -22,6 +22,7 @@
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/Dominance.h"
+#include "mlir/IR/Location.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
@@ -106,8 +107,9 @@ struct ExecutePartitionBuilder {
 
     // Add entry block and arguments.
     auto &entryBlock = executeOp.body().emplaceBlock();
-    for (auto args :
-         llvm::zip(operands, entryBlock.addArguments(operandTypes))) {
+    SmallVector<Location> operandLocs(operandTypes.size(), executeOp.getLoc());
+    for (auto args : llvm::zip(
+             operands, entryBlock.addArguments(operandTypes, operandLocs))) {
       mapping.map(std::get<0>(args), std::get<1>(args));
     }
     builder = OpBuilder::atBlockBegin(&entryBlock);

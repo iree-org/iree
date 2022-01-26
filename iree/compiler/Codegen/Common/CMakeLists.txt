@@ -50,9 +50,8 @@ iree_cc_library(
     MLIRAnalysis
     MLIRArithBufferizableOpInterfaceImpl
     MLIRArithmetic
-    MLIRBufferizableOpInterface
     MLIRBufferization
-    MLIRComprehensiveBufferize
+    MLIRBufferizationTransforms
     MLIRGPUOps
     MLIRIR
     MLIRLLVMCommonConversion
@@ -62,6 +61,7 @@ iree_cc_library(
     MLIRLinalgTransforms
     MLIRMemRef
     MLIRMemRefTransforms
+    MLIRModuleBufferization
     MLIRPass
     MLIRSCF
     MLIRSCFBufferizableOpInterfaceImpl
@@ -70,7 +70,6 @@ iree_cc_library(
     MLIRStandard
     MLIRSupport
     MLIRTensor
-    MLIRTensorBufferizableOpInterfaceImpl
     MLIRTransforms
     MLIRVector
     MLIRVectorBufferizableOpInterfaceImpl

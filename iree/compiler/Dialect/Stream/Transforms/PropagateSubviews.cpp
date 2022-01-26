@@ -264,9 +264,12 @@ static void expandRegion(Region &region, ExpandedGlobalMap &globalMap,
       if (!isResourceType(arg.getType())) continue;
       Subview subview;
       subview.resource = arg;
-      subview.resourceSize = block.insertArgument(i + 1, indexType);
-      subview.subviewOffset = block.insertArgument(i + 2, indexType);
-      subview.subviewLength = block.insertArgument(i + 3, indexType);
+      subview.resourceSize =
+          block.insertArgument(i + 1, indexType, arg.getLoc());
+      subview.subviewOffset =
+          block.insertArgument(i + 2, indexType, arg.getLoc());
+      subview.subviewLength =
+          block.insertArgument(i + 3, indexType, arg.getLoc());
       expansions.push_back(subview);
       subviewMap[arg] = subview;
     }

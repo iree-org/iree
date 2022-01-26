@@ -2709,7 +2709,8 @@ struct RewriteCondFailToBranchFail : public OpRewritePattern<CondFailOp> {
 
     // Create the block with the vm.fail in it.
     // This is what we will branch to if the condition is true at runtime.
-    auto *failBlock = rewriter.createBlock(block, {op.status().getType()});
+    auto *failBlock =
+        rewriter.createBlock(block, {op.status().getType()}, {op.getLoc()});
     block->moveBefore(failBlock);
     rewriter.setInsertionPointToStart(failBlock);
     rewriter.create<FailOp>(

@@ -9,6 +9,7 @@
 
 include "iree/compiler/Dialect/Util/IR/UtilBase.td"
 include "iree/compiler/Dialect/Util/IR/UtilInterfaces.td"
+include "mlir/IR/FunctionInterfaces.td"
 include "mlir/IR/OpAsmInterface.td"
 include "mlir/IR/SymbolInterfaces.td"
 include "mlir/Interfaces/CallInterfaces.td"
@@ -366,7 +367,7 @@ def Util_UnreachableOp : Util_Op<"unreachable", [NoSideEffect, Terminator]> {
 
 def Util_InitializerOp : Util_Op<"initializer", [
     IsolatedFromAbove,
-    FunctionLike,
+    FunctionOpInterface,
     CallableOpInterface,
   ]> {
   let summary = [{global initialization function}];
@@ -395,8 +396,15 @@ def Util_InitializerOp : Util_Op<"initializer", [
     Block *addEntryBlock();
     Block *addBlock();
 
-    unsigned getNumFuncArguments() { return 0; }
-    unsigned getNumFuncResults() { return 0; }
+    FunctionType getType() {
+      return getTypeAttr().getValue().cast<FunctionType>();
+    }
+
+    /// Returns the argument types of this function.
+    ArrayRef<Type> getArgumentTypes() { return {}; }
+
+    /// Returns the result types of this function.
+    ArrayRef<Type> getResultTypes() { return {}; }
 
     LogicalResult verifyType() { return success(); }
 

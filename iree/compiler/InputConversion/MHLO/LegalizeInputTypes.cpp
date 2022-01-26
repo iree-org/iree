@@ -163,10 +163,12 @@ static LogicalResult convertRegion(Region &oldRegion, Region &newRegion,
       return oldBlock.front().emitError()
              << "unable to legalize block signature";
     }
-    newBlock.addArguments(blockSignature->getConvertedTypes());
-    for (auto oldNewArg :
-         llvm::zip(oldBlock.getArguments(), newBlock.getArguments())) {
-      mapping.map(std::get<0>(oldNewArg), std::get<1>(oldNewArg));
+    for (auto it : llvm::zip(oldBlock.getArguments(),
+                             blockSignature->getConvertedTypes())) {
+      auto oldArg = std::get<0>(it);
+      auto newArgType = std::get<1>(it);
+      auto newArg = newBlock.addArgument(newArgType, oldArg.getLoc());
+      mapping.map(oldArg, newArg);
     }
     mapping.map(&oldBlock, &newBlock);
   }

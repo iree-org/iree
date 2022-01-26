@@ -79,8 +79,9 @@ static void buildConditionDispatchTable(IREE::HAL::DeviceSwitchOp switchOp,
   // the results of the call and use that to replace the switch op.
   auto *beforeBlock = funcBuilder.getBlock();
   auto *afterBlock = beforeBlock->splitBlock(switchOp);
-  auto finalValues =
-      llvm::to_vector<4>(afterBlock->addArguments(switchOp.getResultTypes()));
+  SmallVector<Location> locs(switchOp.getNumResults(), switchOp.getLoc());
+  auto finalValues = llvm::to_vector<4>(
+      afterBlock->addArguments(switchOp.getResultTypes(), locs));
 
   // Create the blocks we'll use for all our conditions so that we can
   // reference them when inserting the branch ops.

@@ -198,7 +198,7 @@ static LogicalResult analyseInterfaceBindingSubspanOp(
   return success();
 }
 
-static LogicalResult analysePadTensorOp(linalg::PadTensorOp padTensorOp,
+static LogicalResult analysePadTensorOp(tensor::PadOp padTensorOp,
                                         BufferizationPlan &plan) {
   plan.insert(padTensorOp.source());
   plan.insert(padTensorOp.result());
@@ -486,7 +486,7 @@ LogicalResult createTensorEquivalenceClasses(FuncOp funcOp,
             [&](IREE::HAL::InterfaceBindingSubspanOp subspanOp) {
               return analyseInterfaceBindingSubspanOp(subspanOp, plan);
             })
-        .Case<linalg::PadTensorOp>([&](linalg::PadTensorOp padTensorOp) {
+        .Case<tensor::PadOp>([&](tensor::PadOp padTensorOp) {
           return analysePadTensorOp(padTensorOp, plan);
         })
         .Case<linalg::LinalgOp>([&](linalg::LinalgOp linalgOp) {

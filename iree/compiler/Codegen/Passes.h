@@ -11,7 +11,7 @@
 
 #include "iree/compiler/Codegen/Dialect/LoweringConfig.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
-#include "mlir/Dialect/Linalg/ComprehensiveBufferize/BufferizableOpInterface.h"
+#include "mlir/Dialect/Bufferization/IR/BufferizableOpInterface.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassOptions.h"
@@ -47,10 +47,13 @@ using WorkgroupMemoryAllocationFn = std::function<Value(
 void addLinalgBufferizePasses(
     OpPassManager &passManager,
     WorkgroupMemoryAllocationFn allocationFn = nullptr);
+
+using bufferization::BufferizationOptions;
 void addIREEComprehensiveBufferizePasses(
     OpPassManager &passManager,
-    std::unique_ptr<linalg::comprehensive_bufferize::AllocationCallbacks>
-        allocationFn = nullptr);
+    Optional<BufferizationOptions::AllocationFn> allocationFn = None,
+    Optional<BufferizationOptions::DeallocationFn> deallocationFn = None,
+    Optional<BufferizationOptions::MemCpyFn> memCpyFn = None);
 
 /// Pass to perform canonicalizations/cleanups related to HAL interface/buffer
 /// allocations and view operations.
@@ -89,8 +92,9 @@ std::unique_ptr<OperationPass<FuncOp>> createForOpCanonicalizationPass();
 std::unique_ptr<OperationPass<FuncOp>> createLinalgBufferizePass(
     WorkgroupMemoryAllocationFn allocationFn = nullptr);
 std::unique_ptr<OperationPass<ModuleOp>> createIREEComprehensiveBufferizePass(
-    std::unique_ptr<linalg::comprehensive_bufferize::AllocationCallbacks> =
-        nullptr);
+    Optional<BufferizationOptions::AllocationFn> allocationFn = None,
+    Optional<BufferizationOptions::DeallocationFn> deallocationFn = None,
+    Optional<BufferizationOptions::MemCpyFn> memCpyFn = None);
 
 /// Creates a pass to remove single iteration distributed loops.
 std::unique_ptr<OperationPass<FuncOp>> createRemoveSingleIterationLoopPass();
