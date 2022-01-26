@@ -8,6 +8,8 @@
 
 #include "iree/compiler/Dialect/Flow/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
+#include "iree/compiler/Utils/CustomKernelsTargetInfo.h"
+#include "llvm/ADT/Optional.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Tensor/Utils/Utils.h"
 #include "mlir/IR/PatternMatch.h"
@@ -215,18 +217,34 @@ static bool haveEqualShapeDim(Value x, Value y, int i) {
          y.getType().cast<ShapedType>().getDimSize(i);
 }
 
+class Mmt4DTileParams {
+ public:
+  Mmt4DTileParams(int64_t M0, int64_t K0, int64_t N0, std::string comment)
+      : M0(M0), K0(K0), N0(N0), comment(comment) {}
+  std::array<int64_t, 2> lhs() const { return {M0, K0}; }
+  std::array<int64_t, 2> rhs() const { return {K0, N0}; }
+  std::array<int64_t, 2> acc() const { return {M0, N0}; }
+  const std::string &getComment() const { return comment; }
+
+ private:
+  const int64_t M0;
+  const int64_t K0;
+  const int64_t N0;
+  const std::string comment;
+};
+
 // Converts linalg.matmul to an equivalent subgraph using linalg.mmt4d.
 // Currently, M0, N0, K0 are compile time constants.
 // TODO(ataei): Move this pattern to linalg transforms upstream.
 class LinalgMatmulOpToLinalgMmt4DOpPattern
     : public OpRewritePattern<linalg::MatmulOp> {
  public:
-  LinalgMatmulOpToLinalgMmt4DOpPattern(MLIRContext *context, int M0, int K0,
-                                       int N0, PatternBenefit benefit = 1)
-      : OpRewritePattern<linalg::MatmulOp>(context, benefit),
-        M0(M0),
-        K0(K0),
-        N0(N0) {}
+  LinalgMatmulOpToLinalgMmt4DOpPattern(
+      MLIRContext *context, const CustomKernelsTargetInfo &target_info,
+      bool enable_generic_slow)
+      : OpRewritePattern<linalg::MatmulOp>(context),
+        target_info(target_info),
+        enable_generic_slow(enable_generic_slow) {}
 
   LogicalResult matchAndRewrite(linalg::MatmulOp matmulOp,
                                 PatternRewriter &rewriter) const override {
@@ -249,23 +267,33 @@ class LinalgMatmulOpToLinalgMmt4DOpPattern
       return failure();
     }
 
-    Value paddedLhs = pad(loc, rewriter, lhs, {M0, K0});
-    Value paddedRhs = pad(loc, rewriter, rhs, {K0, N0});
-    Value paddedAcc = pad(loc, rewriter, acc, {M0, N0});
+    const auto &maybe_tile_params = chooseTileParams(lhs, rhs, acc);
+    if (!maybe_tile_params) {
+      // No good tiling is known for the given problem shape, and the slow
+      // generic fallback (for tests) is not enabled.
+      return failure();
+    }
+    const Mmt4DTileParams &tile_params = maybe_tile_params.getValue();
 
-    Value lhs4D = expandTo4D(loc, rewriter, paddedLhs, {M0, K0});
-    Value rhs4D = expandTo4D(loc, rewriter, paddedRhs, {K0, N0});
-    Value acc4D = expandTo4D(loc, rewriter, paddedAcc, {M0, N0});
+    Value paddedLhs = pad(loc, rewriter, lhs, tile_params.lhs());
+    Value paddedRhs = pad(loc, rewriter, rhs, tile_params.rhs());
+    Value paddedAcc = pad(loc, rewriter, acc, tile_params.acc());
+
+    Value lhs4D = expandTo4D(loc, rewriter, paddedLhs, tile_params.lhs());
+    Value rhs4D = expandTo4D(loc, rewriter, paddedRhs, tile_params.rhs());
+    Value acc4D = expandTo4D(loc, rewriter, paddedAcc, tile_params.acc());
 
     Value lhs4DT = transpose(loc, rewriter, lhs4D, {0, 2, 1, 3});
     Value rhs4DT = transpose(loc, rewriter, rhs4D, {2, 0, 3, 1});
     Value acc4DT = transpose(loc, rewriter, acc4D, {0, 2, 1, 3});
 
-    auto mmt4dResult = rewriter.create<linalg::Mmt4DOp>(
+    auto mmt4d = rewriter.create<linalg::Mmt4DOp>(
         loc, acc4DT.getType(), ValueRange{lhs4DT, rhs4DT}, ValueRange{acc4DT});
+    mmt4d->setAttr(StringAttr::get(getContext(), "comment"),
+                   StringAttr::get(getContext(), tile_params.getComment()));
 
     Value mmt4dResultTransposed =
-        transpose(loc, rewriter, mmt4dResult.getResult(0), {0, 2, 1, 3});
+        transpose(loc, rewriter, mmt4d.getResult(0), {0, 2, 1, 3});
 
     Value paddedResult =
         collapseTo2D(loc, rewriter, mmt4dResultTransposed,
@@ -278,10 +306,31 @@ class LinalgMatmulOpToLinalgMmt4DOpPattern
   }
 
  private:
-  const int M0;
-  const int K0;
-  const int N0;
+  llvm::Optional<Mmt4DTileParams> chooseTileParams(Value lhs, Value rhs,
+                                                   Value acc) const;
+
+  CustomKernelsTargetInfo target_info;
+  bool enable_generic_slow;
 };
+
+llvm::Optional<Mmt4DTileParams>
+LinalgMatmulOpToLinalgMmt4DOpPattern::chooseTileParams(Value lhs, Value rhs,
+                                                       Value acc) const {
+  Type lhsElemType = lhs.getType().cast<ShapedType>().getElementType();
+  Type rhsElemType = rhs.getType().cast<ShapedType>().getElementType();
+  Type accElemType = acc.getType().cast<ShapedType>().getElementType();
+  if (lhsElemType.isSignlessInteger(8) && rhsElemType.isSignlessInteger(8) &&
+      accElemType.isSignlessInteger(32) &&
+      target_info.has(CustomKernelTargetFeature::Aarch64Dotprod)) {
+    return Mmt4DTileParams(8, 4, 8, "i8*i8->i32, aarch64 +dotprod");
+  }
+  if (enable_generic_slow) {
+    return Mmt4DTileParams(8, 2, 4,
+                           "generic tiling parameters, as no known kernel was "
+                           "matched for this matmul and target");
+  }
+  return llvm::None;
+}
 
 /// Canonicalizes [linalg.init_tensor -> linalg.fill -> linalg.generic] ->
 /// [linalg.init_tensor -> linalg.fill] where linalg.generic does only copy e.g
@@ -336,23 +385,7 @@ class ConvertLinalgMatmulToMmt4DPass final
 
   LogicalResult initializeOptions(StringRef options) override {
     if (failed(Pass::initializeOptions(options))) return failure();
-    auto failureWithMessage = [=](const char *msg) {
-      llvm::errs() << "illegal options `" << options << "` for pass `"
-                   << getArgument() << "`: " << msg << "\n";
-      return failure();
-    };
-    if (M0 == mlir::ShapedType::kDynamicSize ||
-        N0 == mlir::ShapedType::kDynamicSize ||
-        K0 == mlir::ShapedType::kDynamicSize) {
-      return failureWithMessage(
-          "currently all three values M0,K0,N0 must be "
-          "specified as a fixed size value, not 'dynamic', as the heuristic to "
-          "choose these values is not yet implemented.");
-    }
-    if (M0 == 0 || N0 == 0 || K0 == 0) {
-      return failureWithMessage("all three values M0,K0,N0 must be nonzero.");
-    }
-    return success();
+    return ParseCustomKernelsTargetInfo(arch, features, target_info);
   }
 
   void runOnOperation() override {
@@ -360,8 +393,8 @@ class ConvertLinalgMatmulToMmt4DPass final
     // Main pattern.
     {
       RewritePatternSet patterns(&getContext());
-      patterns.insert<LinalgMatmulOpToLinalgMmt4DOpPattern>(context, M0, K0,
-                                                            N0);
+      patterns.insert<LinalgMatmulOpToLinalgMmt4DOpPattern>(
+          context, target_info, enable_generic_slow);
       if (failed(applyPatternsAndFoldGreedily(getOperation(),
                                               std::move(patterns)))) {
         return signalPassFailure();
@@ -380,6 +413,9 @@ class ConvertLinalgMatmulToMmt4DPass final
       }
     }
   }
+
+ private:
+  CustomKernelsTargetInfo target_info;
 };
 }  // namespace
 

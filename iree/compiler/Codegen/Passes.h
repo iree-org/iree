@@ -11,6 +11,7 @@
 
 #include "iree/compiler/Codegen/Dialect/LoweringConfig.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
+#include "iree/compiler/Utils/CustomKernelsTargetInfo.h"
 #include "mlir/Dialect/Bufferization/IR/BufferizableOpInterface.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Pass/Pass.h"
@@ -181,32 +182,6 @@ std::unique_ptr<OperationPass<FuncOp>> createVectorContractCustomKernelsPass();
 //------------------------------------------------------------------------------
 // LLVMCPU Codegen specific patterns.
 //------------------------------------------------------------------------------
-
-// Some codegen patterns need to know target CPU information. They can receive
-// such information by means of this struct, which can be populated from either
-// pass options (e.g. in lit tests,
-// -iree-llvmcpu-vector-contract-custom-kernels='aarch64 dotprod')
-// or from global state (see InferCustomKernelsTargetInfoFromGlobals below).
-//
-// It would be interesting to find an opportunity to de-duplicate this with
-// other data structures containing similar information, but a difficulty here
-// is that in the case of lit tests, where we need to populate this from
-// a minimal set of custom boolean options passed to a pass such as
-// -iree-llvmcpu-vector-contract-custom-kernels, we do not have enough
-// information to populate all the other fields of existing, larger data
-// structures. That's the motivation for this custom, minimal struct.
-struct CustomKernelsTargetInfo {
-  // Indicates that the target ISA is Aarch64
-  bool aarch64 = false;
-  // Under aarch64: indicates dot-product extension (SDOT, UDOT)
-  bool dotprod = false;
-  // Indicates that intrinsics should be used rather than inline asm
-  bool intrinsics = false;
-};
-
-// Populate target_info fields from the parent HAL::ExecutableVariantOp.
-LogicalResult InferCustomKernelsTargetInfoFromParent(
-    FuncOp entryPointFn, CustomKernelsTargetInfo &target_info);
 
 /// Populates `patterns` to convert certain vector.contract ops to special
 /// "kernels" written either in SIMD intrinsics or inline assembly.

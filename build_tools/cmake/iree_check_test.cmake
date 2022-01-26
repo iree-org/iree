@@ -294,25 +294,32 @@ endfunction()
 # Helper function parsing a string occurring as an entry in TARGET_CPU_FEATURES_VARIANTS.
 #
 # This function has 3 output-params: variables that it sets with PARENT_SCOPE:
-# _ENABLED, _TARGET_CPU_FEATURES, _TARGET_CPU_FEATURES_SUFFIX.
+# _ENABLED, _TARGET_CPU_FEATURES, _TARGET_CPU_FEATURES_SUFFIX, _TARGET_PASS_OPTIONS.
 #
 # "default" is handled specially. _ENABLED is always set to "TRUE" and
-# _TARGET_CPU_FEATURES and _TARGET_CPU_FEATURES_SUFFIX are both set to the
-# empty string.
+# _TARGET_CPU_FEATURES, _TARGET_CPU_FEATURES_SUFFIX and _TARGET_PASS_OPTIONS are set to
+# the empty string.
 #
 # Other values are parsed as "arch:features", the parsed arch is matched with
 # `CMAKE_SYSTEM_PROCESSOR`, `_ENABLED` is set to "TRUE" if and only if they
-# match, and `_TARGET_CPU_FEATURES_SUFFIX` is set to a string based on the
-# features that is appropriate to include in a CMake target or test name. More
-# than one target cpu feature is currently unsupported.
-# aarch64:+dotprod -> _TARGET_CPU_FEATURES="+dotprod", _TARGET_CPU_FEATURES_SUFFIX="_dotprod"
-# default -> _TARGET_CPU_FEATURES="", _TARGET_CPU_FEATURES_SUFFIX="", ENABLED="TRUE"
+# match, `_TARGET_CPU_FEATURES_SUFFIX` is set to a string based on the
+# features that is appropriate to include in a CMake target or test name, and
+# `_TARGET_PASS_OPTIONS` is formatted to be passed as options to certain passes that
+# expect "arch=<arch> features=<+feature1,...>".
+# More than one target cpu feature is currently unsupported.
+#
+# aarch64:+dotprod ->_ENABLED="TRUE" if the target architecture is aarch64,
+#                    _TARGET_CPU_FEATURES="+dotprod",
+#                    _TARGET_CPU_FEATURES_SUFFIX="_dotprod",
+#                    _TARGET_PASS_OPTIONS="arch=aarch64 features=+dotprod"
+# default -> _ENABLED="TRUE" unconditionally, other output strings are "".
 function(process_target_cpu_features _INPUT_TARGET_CPU_FEATURES _ENABLED
-         _TARGET_CPU_FEATURES _TARGET_CPU_FEATURES_SUFFIX)
+         _TARGET_CPU_FEATURES _TARGET_CPU_FEATURES_SUFFIX _TARGET_PASS_OPTIONS)
+  set(_TARGET_CPU_FEATURES "" PARENT_SCOPE)
+  set(_TARGET_CPU_FEATURES_SUFFIX "" PARENT_SCOPE)
+  set(_TARGET_PASS_OPTIONS "" PARENT_SCOPE)
   if ("${_INPUT_TARGET_CPU_FEATURES}" STREQUAL "default")
     set(_ENABLED "TRUE" PARENT_SCOPE)
-    set(_TARGET_CPU_FEATURES "" PARENT_SCOPE)
-    set(_TARGET_CPU_FEATURES_SUFFIX "" PARENT_SCOPE)
     return()
   endif()
   string(REGEX MATCHALL "[^:]+" _COMPONENTS "${_INPUT_TARGET_CPU_FEATURES}")
@@ -349,8 +356,11 @@ TARGET_CPU_FEATURES should start with a +. Got: ${_TARGET_CPU_FEATURES}.")
 TARGET_CPU_FEATURES should match [a-zA-Z0-9]+ after the initial +. \
 Got: ${_TARGET_CPU_FEATURES}.")
     endif()
+    # Generate the target cpu features suffix string with underscores ('_')
+    # separating the features.
     string(REPLACE "+" "_" _TARGET_CPU_FEATURES_SUFFIX_LOCAL "${_TARGET_CPU_FEATURES}")
     set(_TARGET_CPU_FEATURES_SUFFIX "${_TARGET_CPU_FEATURES_SUFFIX_LOCAL}" PARENT_SCOPE)
+    set(_TARGET_PASS_OPTIONS "arch=${_FILTER_ARCH} features=${_TARGET_CPU_FEATURES}" PARENT_SCOPE)
   else()
     set(_ENABLED "FALSE" PARENT_SCOPE)
   endif()
@@ -425,7 +435,8 @@ function(iree_check_test_suite)
       set(_TARGET_CPU_FEATURES_VARIANTS "default")
     endif()
     foreach(_TARGET_CPU_FEATURES_LIST_ELEM IN LISTS _TARGET_CPU_FEATURES_VARIANTS)
-      process_target_cpu_features("${_TARGET_CPU_FEATURES_LIST_ELEM}" _ENABLED _TARGET_CPU_FEATURES _TARGET_CPU_FEATURES_SUFFIX)
+      process_target_cpu_features("${_TARGET_CPU_FEATURES_LIST_ELEM}" _ENABLED _TARGET_CPU_FEATURES _TARGET_CPU_FEATURES_SUFFIX _TARGET_PASS_OPTIONS)
+      string(REPLACE "#pass_options_variant#" "${_TARGET_PASS_OPTIONS}" _PROCESSED_OPT_FLAGS "${_RULE_OPT_FLAGS}")
       if (NOT _ENABLED)
         # The current entry is disabled on the target CPU architecture.
         continue()

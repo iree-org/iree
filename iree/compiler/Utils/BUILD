@@ -16,6 +16,7 @@ cc_library(
     name = "Utils",
     srcs = [
         "ConversionUtils.cpp",
+        "CustomKernelsTargetInfo.cpp",
         "FlatbufferUtils.cpp",
         "GraphUtils.cpp",
         "ModuleUtils.cpp",
@@ -26,6 +27,7 @@ cc_library(
     ],
     hdrs = [
         "ConversionUtils.h",
+        "CustomKernelsTargetInfo.h",
         "FlatbufferUtils.h",
         "GraphUtils.h",
         "IndexSet.h",
