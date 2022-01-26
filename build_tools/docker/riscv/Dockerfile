@@ -6,7 +6,7 @@
 
 # An image for cross-compiling IREE towards RISCV using CMake.
 
-FROM gcr.io/iree-oss/base@sha256:61f948eb15c90596b9faabbca168de2c7d5008e5d2c0b9c5c26a0efe572198d6 AS install-riscv
+FROM gcr.io/iree-oss/base@sha256:ec10501f22c04c2199c68df5f6782946224fb63568e2a1701ddb3c4928a42bb5 AS install-riscv
 WORKDIR /install-riscv
 RUN wget "https://storage.googleapis.com/iree-shared-files/toolchain_iree_rvv-intrinsic.tar.gz"
 RUN tar -xf "toolchain_iree_rvv-intrinsic.tar.gz" -C /usr/src/
@@ -15,7 +15,7 @@ RUN tar -xf "toolchain_iree_rv32.tar.gz" -C /usr/src/
 RUN wget "https://storage.googleapis.com/iree-shared-files/qemu-riscv.tar.gz"
 RUN tar -xf "qemu-riscv.tar.gz" -C /usr/src/
 
-FROM gcr.io/iree-oss/base@sha256:61f948eb15c90596b9faabbca168de2c7d5008e5d2c0b9c5c26a0efe572198d6 AS final
+FROM gcr.io/iree-oss/base@sha256:ec10501f22c04c2199c68df5f6782946224fb63568e2a1701ddb3c4928a42bb5 AS final
 COPY --from=install-riscv "/usr/src/toolchain_iree" "/usr/src/toolchain_iree"
 COPY --from=install-riscv "/usr/src/toolchain_iree_rv32imf" "/usr/src/toolchain_iree_rv32imf"
 COPY --from=install-riscv "/usr/src/qemu-riscv" "/usr/src/qemu-riscv"
