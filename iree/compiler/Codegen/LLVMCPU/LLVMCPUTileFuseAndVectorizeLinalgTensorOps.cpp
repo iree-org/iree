@@ -33,7 +33,8 @@ namespace iree_compiler {
 static llvm::cl::opt<bool> clUseMmt4dUseIntrinsics(
     "iree-codegen-mmt4d-use-intrinsics",
     llvm::cl::desc("Whether to use instrinsics when lowering vector contracts "
-                   "generated from mmt4d matmuls (as opposed to inline asm)"),
+                   "generated from mmt4d matmuls (as opposed to inline asm). "
+                   "Not for production use."),
     llvm::cl::init(false));
 
 namespace {
