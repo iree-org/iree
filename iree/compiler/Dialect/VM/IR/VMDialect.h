@@ -28,6 +28,7 @@ namespace VM {
 class VMDialect : public Dialect {
  public:
   explicit VMDialect(MLIRContext *context);
+  ~VMDialect() override;
   static StringRef getDialectNamespace() { return "vm"; }
 
   /// Parses an attribute registered to this dialect.
@@ -45,11 +46,18 @@ class VMDialect : public Dialect {
   Operation *materializeConstant(OpBuilder &builder, Attribute value, Type type,
                                  Location loc) override;
 
+  // Provides a hook for op interface.
+  void *getRegisteredInterfaceForOp(mlir::TypeID interface,
+                                    mlir::OperationName opName) override;
+
  private:
   /// Register the attributes of this dialect.
   void registerAttributes();
   /// Register the types of this dialect.
   void registerTypes();
+
+  struct VMOpAsmInterface;
+  VMOpAsmInterface *fallbackOpAsmInterface;
 };
 
 }  // namespace VM
