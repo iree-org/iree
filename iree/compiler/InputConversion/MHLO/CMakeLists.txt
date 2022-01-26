@@ -61,6 +61,7 @@ iree_cc_library(
     LLVMSupport
     LmhloDialect
     MLIRAffine
+    MLIRAffineUtils
     MLIRComplex
     MLIRIR
     MLIRLinalg

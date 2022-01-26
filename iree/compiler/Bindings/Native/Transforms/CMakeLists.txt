@@ -20,6 +20,7 @@ iree_cc_library(
     "WrapEntryPoints.cpp"
   DEPS
     LLVMSupport
+    MLIRAffineUtils
     MLIRIR
     MLIRPass
     MLIRShape

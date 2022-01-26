@@ -27,6 +27,8 @@ iree_cc_library(
     LLVMSupport
     MLIRAffine
     MLIRAffineToStandard
+    MLIRAffineTransforms
+    MLIRAffineUtils
     MLIRIR
     MLIRMath
     MLIRMemRef
