@@ -743,7 +743,7 @@ func @inline_dag_4(%arg0: tensor<4xi32>, %arg1: tensor<i32>) -> tensor<i16> {
 //       CHECK:     %[[RES:.+]] = linalg.generi
 //  CHECK-SAME:       ins(%[[OP7]] : tensor<i32>)
 //  CHECK-SAME:       outs(%[[INIT]] : tensor<i16>) {
-//       CHECK:     ^bb0(%[[ARG5:.+]]: i32, %{{.+}}: i16):  // no predecessors
+//       CHECK:     ^bb0(%[[ARG5:.+]]: i32, %{{.+}}: i16):
 //       CHECK:       %[[TRUNC:.+]] = arith.trunci %[[ARG5]] : i32 to i16
 //       CHECK:       linalg.yield %[[TRUNC]] : i16
 //       CHECK:     } -> tensor<i16>
@@ -1152,9 +1152,9 @@ func @extract_slice(%arg0 : tensor<?x?xf32>, %arg1 : index, %arg2 : index,
 
 func @pad_tensor(%arg0 : tensor<?x?xf32>, %arg1 : index, %arg2 : index,
     %arg3 : index, %arg4 : index, %arg5 : f32) -> tensor<?x?xf32> {
-  %0 = linalg.pad_tensor %arg0 low[%arg1, %arg2] high[%arg3, %arg4] {
+  %0 = tensor.pad %arg0 low[%arg1, %arg2] high[%arg3, %arg4] {
     ^bb0(%arg6 : index, %arg7 : index):
-      linalg.yield %arg5 : f32
+      tensor.yield %arg5 : f32
   } :  tensor<?x?xf32> to tensor<?x?xf32>
   return %0 : tensor<?x?xf32>
 }
