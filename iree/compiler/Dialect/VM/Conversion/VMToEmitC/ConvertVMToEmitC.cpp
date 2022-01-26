@@ -949,15 +949,6 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
           /*templateArgs=*/ArrayAttr{},
           /*operands=*/ArrayRef<Value>{stateOp.getResult()});
 
-      builder.create<emitc::CallOp>(
-          /*location=*/loc,
-          /*type=*/builder.getI32Type(),
-          /*callee=*/StringAttr::get(ctx, "sizeof"),
-          /*args=*/
-          ArrayAttr::get(ctx, {emitc::OpaqueAttr::get(ctx, "iree_vm_ref_t")}),
-          /*templateArgs=*/ArrayAttr{},
-          /*operands=*/ArrayRef<Value>{});
-
       for (int i = 0; i < numGlobalRefs; i++) {
         auto refPtrOp = builder.create<emitc::CallOp>(
             /*location=*/loc,
