@@ -74,7 +74,7 @@ fi
 echo "***** yapf *****"
 # Don't fail script if condition is false
 disable_update_ret
-if exists yapf > /dev/null; then
+if exists yapf; then
   enable_update_ret
   git diff -U0 main | ./third_party/format_diff/format_diff.py yapf -i
 else
@@ -118,7 +118,7 @@ else
   echo "'yamllint' not found. Skipping check"
 fi
 
-if [[ "${FINAL_RET}" -ne 0 ]]; then
+if (( "${FINAL_RET}" != 0 )); then
   echo "Encountered failures. Check error messages and changes to the working" \
        "directory and git index (which may contain fixes) and try again."
 fi
