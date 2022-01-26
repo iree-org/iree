@@ -1695,6 +1695,12 @@ class ExportOpConversion : public OpConversionPattern<IREE::VM::ExportOp> {
       return structBody;
     };
 
+    // TODO(simon-camp): Clean up; We generate calls to a macro that defines
+    // a struct. As we declare all variables at the start of the function,
+    // the macro call cannot be inlined into the function.
+
+    // To prevent scoping issues we prefix the struct name with module and
+    // function name.
     auto typedefStruct = [&rewriter, &newFuncOp, &loc](std::string structName,
                                                        std::string structBody) {
       auto ctx = rewriter.getContext();
