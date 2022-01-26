@@ -3737,8 +3737,19 @@ class FailOpConversion : public OpConversionPattern<IREE::VM::FailOp> {
       rewriter.create<mlir::ReturnOp>(loc, status.getResult(0));
     }
 
-    rewriter.replaceOpWithNewOp<IREE::VM::CondBranchOp>(
-        op, op.status(), failureBlock, passthroughBlock);
+    Type boolType = rewriter.getIntegerType(1);
+    auto condition = rewriter.create<emitc::CallOp>(
+        /*location=*/loc,
+        /*type=*/boolType,
+        /*callee=*/StringAttr::get(ctx, "EMITC_CAST"),
+        /*args=*/
+        ArrayAttr::get(ctx,
+                       {rewriter.getIndexAttr(0), TypeAttr::get(boolType)}),
+        /*templateArgs=*/ArrayAttr{},
+        /*operands=*/ArrayRef<Value>{op.status()});
+
+    rewriter.replaceOpWithNewOp<mlir::CondBranchOp>(
+        op, condition.getResult(0), failureBlock, passthroughBlock);
 
     return success();
   }
