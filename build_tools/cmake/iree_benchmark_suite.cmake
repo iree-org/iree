@@ -244,7 +244,7 @@ function(iree_benchmark_suite)
       add_custom_command(
         OUTPUT "${_FLAG_FILE}"
         COMMAND
-          "${Python3_EXECUTABLE}" "${IREE_ROOT_DIR}/scripts/generate_runtime_flagfile.py"
+          "${Python3_EXECUTABLE}" "${IREE_ROOT_DIR}/scripts/generate_flagfile.py"
             --module_file="${_MODULE_FILE_FLAG}"
             --driver=${_RULE_DRIVER}
             --entry_function=${_MODULE_ENTRY_FUNCTION}
@@ -252,7 +252,7 @@ function(iree_benchmark_suite)
             "${_ADDITIONAL_ARGS_CL}"
             -o "${_FLAG_FILE}"
         DEPENDS
-          "${IREE_ROOT_DIR}/scripts/generate_runtime_flagfile.py"
+          "${IREE_ROOT_DIR}/scripts/generate_flagfile.py"
         WORKING_DIRECTORY "${_RUN_SPEC_DIR}"
         COMMENT "Generating ${_FLAG_FILE}"
       )
