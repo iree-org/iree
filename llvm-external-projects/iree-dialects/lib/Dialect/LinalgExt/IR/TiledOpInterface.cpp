@@ -307,7 +307,7 @@ void IREE::LinalgExt::registerTiledOpInterfaceExternalModels(
   registry
       .addOpInterface<tensor::ExtractSliceOp, ExtractSliceTiledOpInterface>();
   registry.addOpInterface<tensor::InsertSliceOp, InsertSliceTiledOpInterface>();
-  // TODO(mahesh): Needs custom PadTiledOpInterface or equiv.
+  // TODO(ravishankarm): Needs custom PadTiledOpInterface or equiv.
   // registry.addOpInterface<tensor::PadOp,
   //                         ForwardToTilingInterface<tensor::PadOp>>();
 }

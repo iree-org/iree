@@ -927,9 +927,8 @@ static LogicalResult convertPadTensorOp(OpBuilder &b, tensor::PadOp tensorPadOp,
   auto resultPaddedBuffer = bvm.lookup(tensorPadOp.result());
 
   // Get padding value and fill the result buffer.
-  linalg::YieldOp yeildOp =
-      *tensorPadOp.region().getOps<linalg::YieldOp>().begin();
-  Value paddingValue = yeildOp.values()[0];
+  auto yeildOp = *tensorPadOp.region().getOps<tensor::YieldOp>().begin();
+  Value paddingValue = yeildOp.value();
 
   auto constOp = paddingValue.getDefiningOp<arith::ConstantOp>();
   if (!constOp) {
