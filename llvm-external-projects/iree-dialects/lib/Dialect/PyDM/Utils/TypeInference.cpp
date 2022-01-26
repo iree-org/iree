@@ -67,7 +67,9 @@ Block *PermutedTypePropagator::createBlockPermutation(
     BlockPermuteCallback initializeCallback) {
   Block *parentBlock = parentInfo->parentBlock;
   Block *newBlock = new Block();
-  newBlock->addArguments(newArgumentTypes, loc);
+  for (Type newArgumentType : newArgumentTypes) {
+    newBlock->addArgument(newArgumentType, loc);
+  }
   newBlock->insertBefore(parentBlock);
 
   BlockAndValueMapping mapping;
