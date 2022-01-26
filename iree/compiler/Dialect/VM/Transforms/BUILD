@@ -35,6 +35,8 @@ cc_library(
         "//iree/compiler/Dialect/VM/IR",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:Affine",
+        "@llvm-project//mlir:AffineTransforms",
+        "@llvm-project//mlir:AffineUtils",
         "@llvm-project//mlir:AffineToStandardTransforms",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:MathDialect",

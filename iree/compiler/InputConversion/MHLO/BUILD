@@ -71,6 +71,7 @@ cc_library(
         "//llvm-external-projects/iree-dialects:IREELinalgExtTransforms",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:Affine",
+        "@llvm-project//mlir:AffineUtils",
         "@llvm-project//mlir:ComplexDialect",
         "@llvm-project//mlir:DialectUtils",
         "@llvm-project//mlir:IR",
