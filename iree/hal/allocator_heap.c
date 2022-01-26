@@ -111,10 +111,11 @@ iree_hal_heap_allocator_query_buffer_compatibility(
   intended_usage &= allowed_usage;
 
   // All buffers can be allocated on the heap and all heap-accessible buffers
-  // can be imported.
+  // can be imported/exported.
   iree_hal_buffer_compatibility_t compatibility =
       IREE_HAL_BUFFER_COMPATIBILITY_ALLOCATABLE |
-      IREE_HAL_BUFFER_COMPATIBILITY_IMPORTABLE;
+      IREE_HAL_BUFFER_COMPATIBILITY_IMPORTABLE |
+      IREE_HAL_BUFFER_COMPATIBILITY_EXPORTABLE;
 
   // Buffers can only be used on the queue if they are device visible.
   // This is not a strict requirement of heap buffers but matches devices that
@@ -185,6 +186,13 @@ static iree_status_t iree_hal_heap_allocator_allocate_buffer(
   return status;
 }
 
+static void iree_hal_heap_allocator_deallocate_buffer(
+    iree_hal_allocator_t* base_allocator, iree_hal_buffer_t* base_buffer) {
+  // We don't do any pooling yet.
+  // TODO(benvanik): move stats tracking here.
+  iree_hal_buffer_destroy(base_buffer);
+}
+
 static iree_status_t iree_hal_heap_allocator_wrap_buffer(
     iree_hal_allocator_t* base_allocator, iree_hal_memory_type_t memory_type,
     iree_hal_memory_access_t allowed_access,
@@ -193,17 +201,57 @@ static iree_status_t iree_hal_heap_allocator_wrap_buffer(
   // Coerce options into those required for use by heap-based devices.
   IREE_RETURN_IF_ERROR(iree_hal_heap_allocator_make_compatible(
       &memory_type, &allowed_access, &allowed_usage));
-
   return iree_hal_heap_buffer_wrap(base_allocator, memory_type, allowed_access,
                                    allowed_usage, data.data_length, data,
                                    data_allocator, out_buffer);
 }
 
-static void iree_hal_heap_allocator_deallocate_buffer(
-    iree_hal_allocator_t* base_allocator, iree_hal_buffer_t* base_buffer) {
-  // We don't do any pooling yet.
-  // TODO(benvanik): move stats tracking here.
-  iree_hal_buffer_destroy(base_buffer);
+static iree_status_t iree_hal_heap_allocator_import_buffer(
+    iree_hal_allocator_t* base_allocator, iree_hal_memory_type_t memory_type,
+    iree_hal_memory_access_t allowed_access,
+    iree_hal_buffer_usage_t allowed_usage,
+    iree_hal_external_buffer_t* external_buffer,
+    iree_hal_buffer_t** out_buffer) {
+  if (external_buffer->type != IREE_HAL_EXTERNAL_BUFFER_TYPE_HOST_ALLOCATION) {
+    return iree_make_status(IREE_STATUS_UNAVAILABLE,
+                            "external buffer type not supported");
+  }
+
+  // Coerce options into those required for use by heap-based devices.
+  IREE_RETURN_IF_ERROR(iree_hal_heap_allocator_make_compatible(
+      &memory_type, &allowed_access, &allowed_usage));
+
+  // Wrap; note that the host allocation is unowned.
+  return iree_hal_heap_buffer_wrap(
+      base_allocator, memory_type, allowed_access, allowed_usage,
+      external_buffer->size,
+      iree_make_byte_span(external_buffer->handle.host_allocation.ptr,
+                          external_buffer->size),
+      iree_allocator_null(), out_buffer);
+}
+
+static iree_status_t iree_hal_heap_allocator_export_buffer(
+    iree_hal_allocator_t* base_allocator, iree_hal_buffer_t* buffer,
+    iree_hal_external_buffer_type_t requested_type,
+    iree_hal_external_buffer_flags_t requested_flags,
+    iree_hal_external_buffer_t* out_external_buffer) {
+  if (requested_type != IREE_HAL_EXTERNAL_BUFFER_TYPE_HOST_ALLOCATION) {
+    return iree_make_status(IREE_STATUS_UNAVAILABLE,
+                            "external buffer type not supported");
+  }
+
+  // Map the entire buffer persistently, if possible.
+  iree_hal_buffer_mapping_t mapping;
+  IREE_RETURN_IF_ERROR(iree_hal_buffer_map_range(
+      buffer, IREE_HAL_MAPPING_MODE_PERSISTENT,
+      iree_hal_buffer_allowed_access(buffer), 0, IREE_WHOLE_BUFFER, &mapping));
+
+  // Note that the returned pointer is unowned.
+  out_external_buffer->type = requested_type;
+  out_external_buffer->flags = requested_flags;
+  out_external_buffer->size = mapping.contents.data_length;
+  out_external_buffer->handle.host_allocation.ptr = mapping.contents.data;
+  return iree_ok_status();
 }
 
 static const iree_hal_allocator_vtable_t iree_hal_heap_allocator_vtable = {
@@ -214,6 +262,8 @@ static const iree_hal_allocator_vtable_t iree_hal_heap_allocator_vtable = {
     .query_buffer_compatibility =
         iree_hal_heap_allocator_query_buffer_compatibility,
     .allocate_buffer = iree_hal_heap_allocator_allocate_buffer,
-    .wrap_buffer = iree_hal_heap_allocator_wrap_buffer,
     .deallocate_buffer = iree_hal_heap_allocator_deallocate_buffer,
+    .wrap_buffer = iree_hal_heap_allocator_wrap_buffer,
+    .import_buffer = iree_hal_heap_allocator_import_buffer,
+    .export_buffer = iree_hal_heap_allocator_export_buffer,
 };
