@@ -112,7 +112,7 @@ echo "***** yamllint *****"
 disable_update_ret
 if exists yamllint; then
   enable_update_ret
-  ./scripts/yamllint.sh
+  ./scripts/run_yamllint.sh
 else
   enable_update_ret
   echo "'yamllint' not found. Skipping check"

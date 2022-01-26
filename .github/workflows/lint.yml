@@ -126,4 +126,4 @@ jobs:
       - name: Checking out repository
         uses: actions/checkout@v2
       - name: yamllint
-        run: ./scripts/yamllint.sh
+        run: ./scripts/run_yamllint.sh
