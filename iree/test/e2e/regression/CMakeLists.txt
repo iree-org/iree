@@ -160,7 +160,6 @@ iree_generated_trace_runner_test(
     "vmvx"
 )
 
-# Test arm inline asm
 iree_generated_trace_runner_test(
   NAME
     e2e_matmul_mmt4d_i8_small
@@ -249,7 +248,6 @@ iree_generated_trace_runner_test(
     "aarch64:+dotprod"
 )
 
-# Test arm intrinsics
 iree_generated_trace_runner_test(
   NAME
     e2e_matmul_mmt4d_i8_intrinsics_small
@@ -262,10 +260,33 @@ iree_generated_trace_runner_test(
     iree_tools_iree-e2e-matmul-test
   TARGET_BACKENDS
     "dylib-llvm-aot"
-  COMPILER_FLAGS
-    "--iree-codegen-mmt4d-use-intrinsics"
   DRIVERS
     "dylib"
+  COMPILER_FLAGS
+    "--iree-codegen-mmt4d-use-intrinsics"
+  OPT_FLAGS
+    "--iree-flow-convert-linalg-matmul-to-mmt4d=M0=8 K0=4 N0=8"
+  TARGET_CPU_FEATURES_VARIANTS
+    "default"
+    "aarch64:+dotprod"
+)
+
+iree_generated_trace_runner_test(
+  NAME
+    e2e_matmul_mmt4d_i8_intrinsics_large
+  GENERATOR
+    "generate_e2e_matmul_tests.py"
+  GENERATOR_ARGS
+    "--lhs_rhs_type=i8"
+    "--shapes=large"
+  TRACE_RUNNER
+    iree_tools_iree-e2e-matmul-test
+  TARGET_BACKENDS
+    "dylib-llvm-aot"
+  DRIVERS
+    "dylib"
+  COMPILER_FLAGS
+    "--iree-codegen-mmt4d-use-intrinsics"
   OPT_FLAGS
     "--iree-flow-convert-linalg-matmul-to-mmt4d=M0=8 K0=4 N0=8"
   TARGET_CPU_FEATURES_VARIANTS
@@ -285,35 +306,12 @@ iree_generated_trace_runner_test(
     iree_tools_iree-e2e-matmul-test
   TARGET_BACKENDS
     "dylib-llvm-aot"
-  COMPILER_FLAGS
-    "--iree-codegen-mmt4d-use-intrinsics"
   DRIVERS
     "dylib"
+  COMPILER_FLAGS
+    "--iree-codegen-mmt4d-use-intrinsics"
   OPT_FLAGS
     "--iree-flow-convert-linalg-matmul-to-mmt4d=M0=8 K0=1 N0=8"
-  TARGET_CPU_FEATURES_VARIANTS
-    "default"
-    "aarch64:+dotprod"
-)
-
-iree_generated_trace_runner_test(
-  NAME
-    e2e_matmul_mmt4d_i8_intrinsics_large
-  GENERATOR
-    "generate_e2e_matmul_tests.py"
-  GENERATOR_ARGS
-    "--lhs_rhs_type=i8"
-    "--shapes=large"
-  TRACE_RUNNER
-    iree_tools_iree-e2e-matmul-test
-  TARGET_BACKENDS
-    "dylib-llvm-aot"
-  COMPILER_FLAGS
-    "--iree-codegen-mmt4d-use-intrinsics"
-  DRIVERS
-    "dylib"
-  OPT_FLAGS
-    "--iree-flow-convert-linalg-matmul-to-mmt4d=M0=8 K0=4 N0=8"
   TARGET_CPU_FEATURES_VARIANTS
     "default"
     "aarch64:+dotprod"
@@ -331,10 +329,10 @@ iree_generated_trace_runner_test(
     iree_tools_iree-e2e-matmul-test
   TARGET_BACKENDS
     "dylib-llvm-aot"
-  COMPILER_FLAGS
-    "--iree-codegen-mmt4d-use-intrinsics"
   DRIVERS
     "dylib"
+  COMPILER_FLAGS
+    "--iree-codegen-mmt4d-use-intrinsics"
   OPT_FLAGS
     "--iree-flow-convert-linalg-matmul-to-mmt4d=M0=8 K0=1 N0=8"
   TARGET_CPU_FEATURES_VARIANTS
