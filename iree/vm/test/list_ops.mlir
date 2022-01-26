@@ -108,6 +108,8 @@ vm.module @list_ops {
     vm.list.resize %list, %c1 : (!vm.list<i32>, i32)
     %v = vm.list.get.i32 %list, %c1 : (!vm.list<i32>, i32) -> i32
     %v_dno = util.do_not_optimize(%v) : i32
+    // Add a dummy use of %v_dno to please recent versions of clang for the C target
+    vm.list.set.i32 %list, %c1, %v_dno : (!vm.list<i32>, i32, i32)
     vm.return
   }
 
