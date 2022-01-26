@@ -286,16 +286,10 @@ function(iree_benchmark_suite)
       # Create the command and target for the command-line options spec used to
       # compile the generated artifacts.
       set(_COMPOPT_FILE "${_RUN_SPEC_DIR}/compilation_flagfile")
+      string(REPLACE ";" " " _TRANSLATION_ARGS_STR "${_TRANSLATION_ARGS}")
       add_custom_command(
         OUTPUT "${_COMPOPT_FILE}"
-        COMMAND
-          "${Python3_EXECUTABLE}" "${IREE_ROOT_DIR}/scripts/generate_compilation_flagfile.py"
-            -o "${_COMPOPT_FILE}"
-            --
-            ${_TRANSLATION_ARGS}
-        COMMAND_EXPAND_LISTS
-        DEPENDS
-          "${IREE_ROOT_DIR}/scripts/generate_compilation_flagfile.py"
+        COMMAND ${CMAKE_COMMAND} -E echo "${_TRANSLATION_ARGS_STR}" > "${_COMPOPT_FILE}"
         WORKING_DIRECTORY "${_RUN_SPEC_DIR}"
         COMMENT "Generating ${_COMPOPT_FILE}"
       )
