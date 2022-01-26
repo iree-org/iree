@@ -129,13 +129,13 @@ ${QEMU_BIN} \
  toolchain and the emulator, build the tools from the following sources:
 
 * RISC-V toolchain is built from
-[https://github.com/llvm/llvm-project](https://github.com/llvm/llvm-project) (main branch).
+<https://github.com/llvm/llvm-project> (main branch).
     * Currently, the LLVM compiler is built on GNU toolchain, including libgcc,
       GNU linker, and C libraries. You need to build GNU toolchain first.
     * Clone GNU toolchain from:
-      [https://github.com/riscv/riscv-gnu-toolchain](https://github.com/riscv/riscv-gnu-toolchain)
-      (master branch). Switch the "riscv-binutils" submodule to `rvv-1.0.x-zfh`
-      branch manually.
+      <https://github.com/riscv/riscv-gnu-toolchain>
+      (master branch). Switch the "riscv-binutils" submodule to
+      `git://sourceware.org/git/binutils-gdb.git` (master branch) manually.
 * RISC-V QEMU is built from
 [https://github.com/sifive/qemu/tree/v5.2.0-rvv-rvb-zfh](https://github.com/sifive/qemu/tree/v5.2.0-rvv-rvb-zfh).
 
@@ -150,7 +150,7 @@ iree/tools/iree-translate \
   -iree-llvm-target-triple=riscv64 \
   -iree-llvm-target-cpu=generic-rv64 \
   -iree-llvm-target-abi=lp64d \
-  -iree-llvm-target-cpu-features="+m,+a,+f,+d,+experimental-v" \
+  -iree-llvm-target-cpu-features="+m,+a,+f,+d,+v" \
   -riscv-v-vector-bits-min=256 -riscv-v-fixed-length-vector-lmul-max=8 \
   iree_input.mlir -o mobilenet-dylib.vmfb
 ```
