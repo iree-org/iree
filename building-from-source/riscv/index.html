@@ -1288,8 +1288,8 @@ ${HOME}/riscv/qemu/linux/RISCV/bin/qemu-riscv64.</p>
   GNU linker, and C libraries. You need to build GNU toolchain first.</li>
 <li>Clone GNU toolchain from:
   <a href="https://github.com/riscv/riscv-gnu-toolchain">https://github.com/riscv/riscv-gnu-toolchain</a>
-  (master branch). Switch the "riscv-binutils" submodule to <code>rvv-1.0.x-zfh</code>
-  branch manually.</li>
+  (master branch). Switch the "riscv-binutils" submodule to
+  <code>git://sourceware.org/git/binutils-gdb.git</code> (master branch) manually.</li>
 </ul>
 </li>
 <li>RISC-V QEMU is built from
@@ -1304,7 +1304,7 @@ with the additional command-line flags</p>
 </span><span class="hll">  -iree-llvm-target-triple<span class="o">=</span>riscv64 <span class="se">\</span>
 </span><span class="hll">  -iree-llvm-target-cpu<span class="o">=</span>generic-rv64 <span class="se">\</span>
 </span><span class="hll">  -iree-llvm-target-abi<span class="o">=</span>lp64d <span class="se">\</span>
-</span><span class="hll">  -iree-llvm-target-cpu-features<span class="o">=</span><span class="s2">&quot;+m,+a,+f,+d,+experimental-v&quot;</span> <span class="se">\</span>
+</span><span class="hll">  -iree-llvm-target-cpu-features<span class="o">=</span><span class="s2">&quot;+m,+a,+f,+d,+v&quot;</span> <span class="se">\</span>
 </span><span class="hll">  -riscv-v-vector-bits-min<span class="o">=</span><span class="m">256</span> -riscv-v-fixed-length-vector-lmul-max<span class="o">=</span><span class="m">8</span> <span class="se">\</span>
 </span>  iree_input.mlir -o mobilenet-dylib.vmfb
 </code></pre></div>
