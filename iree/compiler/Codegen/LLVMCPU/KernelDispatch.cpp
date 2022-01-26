@@ -283,26 +283,21 @@ static LogicalResult setX86SandboxRootConfig(
                      /*workgroupSize=*/ArrayRef<int64_t>{});
 
   // Hardcoded tile sizes. The configuration is derived from iree-llvm-sandbox.
-  // L1 tile sizes are {1, 1, ..., 288, 128, 512}. Note that L1 tiling sizes is
-  // unused at this moment.
-  // Vector tile sizes are {1, ..., 8, 32, 16}
-  SmallVector<int64_t> l1TileSizes, vectorTileSizes;
+  // L1 tile sizes are {1, ..., 8, 32, 16}
+  SmallVector<int64_t> l1TileSizes, nativeVectorSizes;
   int64_t nLoops = cast<linalg::LinalgOp>(op.getOperation()).getNumLoops();
   l1TileSizes.append(nLoops - 3, 1);
-  l1TileSizes.push_back(288);
-  l1TileSizes.push_back(128);
-  l1TileSizes.push_back(512);
-  vectorTileSizes.append(nLoops - 3, 1);
-  vectorTileSizes.push_back(8);
-  vectorTileSizes.push_back(32);
-  vectorTileSizes.push_back(16);
+  l1TileSizes.push_back(8);
+  l1TileSizes.push_back(32);
+  l1TileSizes.push_back(16);
+  nativeVectorSizes.append(nLoops - 3, 1);
+  nativeVectorSizes.append(3, vectorSize);
 
   TileSizesListType tileSizes;
   tileSizes.push_back({});
   tileSizes.push_back(l1TileSizes);
-  tileSizes.push_back(vectorTileSizes);
   auto config = IREE::Codegen::LoweringConfigAttr::get(
-      entryPointFn.getContext(), tileSizes, vectorTileSizes);
+      entryPointFn.getContext(), tileSizes, nativeVectorSizes);
   setLoweringConfig(op, config);
 
   return success();

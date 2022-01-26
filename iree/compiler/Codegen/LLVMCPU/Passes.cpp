@@ -215,7 +215,7 @@ void addDoubleTilingExpertPassPipeline(OpPassManager &passManager) {
   // along reduction dim again, which needs them to be Linalg ops form.
   {
     LinalgFusePassOptions options;
-    options.tilingLevel = static_cast<int64_t>(TilingLevel::VectorTiles);
+    options.tilingLevel = static_cast<int64_t>(TilingLevel::L1Tiles);
     passManager.addNestedPass<FuncOp>(createLinalgFusePass(options));
     passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
     passManager.addNestedPass<FuncOp>(createCSEPass());
@@ -236,7 +236,7 @@ void addDoubleTilingExpertPassPipeline(OpPassManager &passManager) {
     options.pad = true;
     options.packPaddings = {1, 1, 0};
     // options.hoistPaddings = {5, 6, 0};
-    options.tilingLevel = static_cast<int64_t>(TilingLevel::VectorTiles);
+    options.tilingLevel = static_cast<int64_t>(TilingLevel::L1Tiles);
     passManager.addNestedPass<FuncOp>(
         createLinalgSingleTilingExpertPass(options));
     passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
