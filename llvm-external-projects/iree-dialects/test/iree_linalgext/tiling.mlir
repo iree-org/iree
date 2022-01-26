@@ -1172,9 +1172,9 @@ func @extract_slice_reduced_rank_two_dims_4(%arg0 : tensor<?x?x?x?xf32>, %arg1 :
 
 func @pad_tensor(%arg0 : tensor<?x?xf32>, %arg1 : index, %arg2 : index,
     %arg3 : index, %arg4 : index, %arg5 : f32) -> tensor<?x?xf32> {
-  %0 = linalg.pad_tensor %arg0 low[%arg1, %arg2] high[%arg3, %arg4] {
+  %0 = tensor.pad %arg0 low[%arg1, %arg2] high[%arg3, %arg4] {
     ^bb0(%arg6 : index, %arg7 : index):
-      linalg.yield %arg5 : f32
+      tensor.yield %arg5 : f32
   } {__internal_linalg_transform__ = "tiling_input"}
       :  tensor<?x?xf32> to tensor<?x?xf32>
   return %0 : tensor<?x?xf32>
@@ -1256,7 +1256,7 @@ func @scan_2d(%0: tensor<16x32xi32>) -> tensor<16x32xi32> {
 //      CHECK:    %[[C20:.+]] = arith.constant 20 : index
 //      CHECK:    %[[ACC:.+]] = linalg.init_tensor [32] : tensor<32xi32>
 //      CHECK:    %[[OUTPUT:.+]] = linalg.init_tensor [16, 32] : tensor<16x32xi32>
-//      CHECK:    %[[RESULT:.+]]:2 = scf.for %[[I:.+]] = %[[C0]] to %[[C32]] step %[[C20]] 
+//      CHECK:    %[[RESULT:.+]]:2 = scf.for %[[I:.+]] = %[[C0]] to %[[C32]] step %[[C20]]
 // CHECK-SAME:      iter_args(%[[ARG2:.+]] = %[[OUTPUT]], %[[ARG3:.+]] = %[[ACC]])
 //      CHECK:      %[[SIZE:.+]] = affine.min #[[MAP0]](%[[I]])[%[[C20]], %[[C32]]]
 //      CHECK:      %[[UPDATE_SLICE_IN:.+]] = tensor.extract_slice %[[ARG0]][0, %[[I]]] [%[[C16]], %[[SIZE]]]

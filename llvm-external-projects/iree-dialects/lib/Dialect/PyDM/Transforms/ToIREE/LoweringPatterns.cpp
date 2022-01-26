@@ -548,8 +548,10 @@ class DynamicUnpackOpConversion
         rewriter.getInsertionBlock(), rewriter.getInsertionPoint());
     Block *arityMatchBlock = rewriter.createBlock(continuationBlock);
     Block *errorBlock = createSlowPathBlock(rewriter);
-    continuationBlock->addArguments(excResultType, loc);
-    continuationBlock->addArguments(slotTypes, loc);
+    continuationBlock->addArgument(excResultType, loc);
+    for (auto slotType : slotTypes) {
+      continuationBlock->addArgument(slotType, loc);
+    }
     rewriter.replaceOp(srcOp, continuationBlock->getArguments());
 
     // Entry block - check arity.
@@ -932,9 +934,9 @@ class SequenceCloneBuiltinConversion
     Block *outerCond = rewriter.createBlock(continuationBlock);
     outerCond->addArgument(indexType, loc);
     Block *innerCond = rewriter.createBlock(continuationBlock);
-    innerCond->addArguments({indexType, indexType}, loc);
+    innerCond->addArguments({indexType, indexType}, {loc, loc});
     Block *innerBody = rewriter.createBlock(continuationBlock);
-    innerBody->addArguments({indexType, indexType}, loc);
+    innerBody->addArguments({indexType, indexType}, {loc, loc});
 
     // Entry block.
     {
@@ -1079,7 +1081,7 @@ class SubscriptOpBuiltinSequenceConversion
     Block *getElementBlock = rewriter.createBlock(continuationBlock);
     getElementBlock->addArgument(indexType, loc);
     Block *failureBlock = createSlowPathBlock(rewriter);
-    continuationBlock->addArguments({statusType, resultType}, loc);
+    continuationBlock->addArguments({statusType, resultType}, {loc, loc});
     rewriter.replaceOp(srcOp, continuationBlock->getArguments());
 
     // Comparison index < 0.
@@ -1173,7 +1175,8 @@ class UnboxOpConversion : public OpConversionPattern<PYDM::UnboxOp> {
         rewriter.getInsertionBlock(), rewriter.getInsertionPoint());
     Block *typesMatchBlock = rewriter.createBlock(continuationBlock);
     Block *slowPathMismatchBlock = createSlowPathBlock(rewriter);
-    continuationBlock->addArguments({statusType, targetUnboxedType}, loc);
+    continuationBlock->addArguments({statusType, targetUnboxedType},
+                                    {loc, loc});
     rewriter.replaceOp(srcOp, continuationBlock->getArguments());
 
     // Type code extraction and comparison.
