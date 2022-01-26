@@ -78,6 +78,28 @@ the CI and fix it directly. But if dealing with some large/breaking changes,
 be prepared to settle in for a bit and play a triage role, working to get things
 minimally to a point that you can shard failures to others.
 
+Note that if not bumping mlir-hlo, then it is likely that you will hit a
+compiler error in mlir-hlo at some point and will need to fix it. Advancing
+it to HEAD is always an option, if that contains the fix, but this dependency
+is unstable and should be maintained version locked with the integrations
+directory. It is possible to advance it, but only if integrations tests pass,
+and even then there is the chance for untested compatibility issues.
+
+Typically, for the parts of mlir-hlo that we use, changes can be trivial (a
+few lines, likely that you have already patched something similar in IREE).
+Just make the changes in your submodule, commit them and push to a patch
+branch with:
+
+```
+$SCRIPTS/patch_module.py --module_name=mlir-hlo
+```
+
+You can just do this in your integrate branch and incorporate the changes.
+Typically, you will want to hold off on running `patch_module` until you are
+ready to push the overall integrate branch and have some confidence that your
+local fixes are sound. See the "Cherry-Picking" section below for more
+details.
+
 Good luck!
 
 ### Strategy 2: Sync everything to a Google/TensorFlow commit
