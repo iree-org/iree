@@ -109,7 +109,14 @@ echo "***** tabs *****"
 ./scripts/check_tabs.sh
 
 echo "***** yamllint *****"
-echo "'yamllint' check not yet implemented. Skipping check"
+disable_update_ret
+if exists yamllint; then
+  enable_update_ret
+  ./scripts/yamllint.sh
+else
+  enable_update_ret
+  echo "'yamllint' not found. Skipping check"
+fi
 
 if [[ "${FINAL_RET}" -ne 0 ]]; then
   echo "Encountered failures. Check error messages and changes to the working" \
