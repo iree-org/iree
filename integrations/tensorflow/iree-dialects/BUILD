@@ -279,7 +279,6 @@ cc_library(
         "@llvm-project//mlir:StandardOps",
         "@llvm-project//mlir:Support",
         "@llvm-project//mlir:TensorDialect",
-        "@llvm-project//mlir:TensorUtils",
         "@llvm-project//mlir:ViewLikeInterface",
     ],
 )
@@ -311,7 +310,6 @@ cc_library(
         "@llvm-project//mlir:StandardOps",
         "@llvm-project//mlir:Support",
         "@llvm-project//mlir:TensorDialect",
-        "@llvm-project//mlir:TensorUtils",
         "@llvm-project//mlir:TransformUtils",
         "@llvm-project//mlir:Transforms",
     ],
@@ -356,7 +354,6 @@ gentbl_cc_library(
         ":TdFiles",
         "@llvm-project//mlir:CallInterfacesTdFiles",
         "@llvm-project//mlir:ControlFlowInterfacesTdFiles",
-        "@llvm-project//mlir:FunctionInterfacesTdFiles",
     ],
 )
 
@@ -430,7 +427,6 @@ gentbl_filegroup(
         ":TdFiles",
         "@llvm-project//mlir:CallInterfacesTdFiles",
         "@llvm-project//mlir:ControlFlowInterfacesTdFiles",
-        "@llvm-project//mlir:FunctionInterfacesTdFiles",
     ],
 )
 
