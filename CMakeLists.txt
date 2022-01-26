@@ -384,6 +384,23 @@ else()
 endif()
 
 #-------------------------------------------------------------------------------
+# Check for an installed CUDA library with CUPTI. Enable CUPTI if available.
+#-------------------------------------------------------------------------------
+
+if(IREE_HAL_DRIVER_CUDA AND IREE_ENABLE_RUNTIME_TRACING)
+  include(CheckLanguage)
+  check_language(CUDA)
+  if (CMAKE_CUDA_COMPILER)
+    enable_language(CUDA)
+  else()
+    message(DEBUG
+      "Building the CUDA backend with tracing requires a working CUDA install. Falling back to static libraries")
+  endif()
+
+  find_package(CUDAToolkit) # Defines the CUDAToolkit_LIBRARY_ROOT variable as well as the CUDA::cupti target if they exist.
+endif(IREE_HAL_DRIVER_CUDA AND IREE_ENABLE_RUNTIME_TRACING)
+
+#-------------------------------------------------------------------------------
 # Other dependencies
 #-------------------------------------------------------------------------------
 

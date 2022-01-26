@@ -12,6 +12,22 @@ if(NOT ${IREE_HAL_DRIVER_CUDA})
   return()
 endif()
 
+if (TARGET CUDA::cupti)
+iree_cc_test(
+  NAME
+    dynamic_cupti_test
+  SRCS
+    "dynamic_cupti_test.cc"
+  DEPS
+    ::dynamic_symbols
+    iree::base
+    iree::testing::gtest
+    iree::testing::gtest_main
+  LABELS
+    "driver=cuda"
+)
+endif(TARGET CUDA::cupti)
+
 iree_add_all_subdirs()
 
 iree_cc_library(
@@ -82,22 +98,6 @@ iree_cc_library(
     iree::base::tracing
   PUBLIC
 )
-
-if(IREE_HAL_DRIVER_CUDA AND IREE_ENABLE_RUNTIME_TRACING)
-iree_cc_test(
-  NAME
-    dynamic_cupti_test
-  SRCS
-    "dynamic_cupti_test.cc"
-  DEPS
-    ::dynamic_symbols
-    iree::base
-    iree::testing::gtest
-    iree::testing::gtest_main
-  LABELS
-    "driver=cuda"
-)
-endif() # //IREE_HAL_DRIVER_CUDA AND IREE_ENABLE_RUNTIME_TRACING
 
 iree_cc_test(
   NAME

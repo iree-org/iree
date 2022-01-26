@@ -29,12 +29,13 @@ typedef struct iree_hal_cuda_dynamic_symbols_t {
 #include "iree/hal/cuda/dynamic_symbol_tables.h"  // IWYU pragma: export
 #undef CU_PFN_DECL
 
-#if IREE_TRACING_FEATURES  // CUPTI is only used for tracing.
+#if IREE_TRACING_FEATURES & \
+    IREE_TRACING_FEATURE_INSTRUMENTATION  // CUPTI is only used for tracing.
 #define CUPTI_PFN_DECL(cuptiSymbolName, ...) \
   CUptiResult (*cuptiSymbolName)(__VA_ARGS__);
 #include "iree/hal/cuda/dynamic_cupti_tables.h"  // IWYU pragma: export
 #undef CUPTI_PFN_DECL
-#endif  // IREE_TRACING_FEATURES
+#endif  // IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
 
 } iree_hal_cuda_dynamic_symbols_t;
 

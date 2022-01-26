@@ -93,6 +93,26 @@ cc_library(
     ],
 )
 
+iree_cmake_extra_content(
+    content = """
+if (TARGET CUDA::cupti)
+iree_cc_test(
+  NAME
+    dynamic_cupti_test
+  SRCS
+    "dynamic_cupti_test.cc"
+  DEPS
+    ::dynamic_symbols
+    iree::base
+    iree::testing::gtest
+    iree::testing::gtest_main
+  LABELS
+    "driver=cuda"
+)
+endif(TARGET CUDA::cupti)
+""",
+)
+
 cc_test(
     name = "dynamic_symbols_test",
     srcs = ["dynamic_symbols_test.cc"],

@@ -13,12 +13,6 @@ namespace hal {
 namespace cuda {
 namespace {
 
-#define CUDE_CHECK_ERRORS(expr)           \
-  {                                       \
-    CUresult status = expr;               \
-    IREE_ASSERT_EQ(CUDA_SUCCESS, status); \
-  }
-
 #define CUPTI_CHECK_ERRORS(expr)           \
   {                                        \
     CUptiResult status = expr;             \
@@ -26,11 +20,11 @@ namespace {
   }
 
 // Buffer request callack for CUPTI activity records.
-void bufferRequested(uint8_t **buffer, size_t *size, size_t *maxNumRecords) {}
+void bufferRequested(uint8_t** buffer, size_t* size, size_t* max_num_records) {}
 
 // Buffer completed callack for CUPTI activity records.
-void bufferCompleted(CUcontext ctx, uint32_t streamId, uint8_t *buffer,
-                     size_t size, size_t validSize) {}
+void bufferCompleted(CUcontext ctx, uint32_t stream_id, uint8_t* buffer,
+                     size_t size, size_t valid_size) {}
 
 TEST(DynamicCuptiTest, CreateFromSystemLoader) {
   iree_hal_cuda_dynamic_symbols_t symbols;

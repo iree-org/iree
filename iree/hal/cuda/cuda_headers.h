@@ -21,6 +21,6 @@
 #include <cupti_driver_cbid.h>
 #include <cupti_runtime_cbid.h>
 
-#endif  // IREE_TRACING_FEATURES
+#endif  // IREE_ENABLE_CUPTI
 
 #endif  // IREE_HAL_CUDA_CUDA_HEADERS_H_

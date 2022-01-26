@@ -20,3 +20,7 @@ CUPTI_PFN_DECL(cuptiGetResultString, CUptiResult result, const char** str)
 CUPTI_PFN_DECL(cuptiGetTimestamp, uint64_t*)
 CUPTI_PFN_DECL(cuptiSubscribe, CUpti_SubscriberHandle*, CUpti_CallbackFunc,
                void*)
+CUPTI_PFN_DECL(cuptiActivityPushExternalCorrelationId,
+               CUpti_ExternalCorrelationKind, uint64_t)
+CUPTI_PFN_DECL(cuptiActivityPopExternalCorrelationId,
+               CUpti_ExternalCorrelationKind, uint64_t*)
