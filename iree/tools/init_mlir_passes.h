@@ -62,7 +62,7 @@ inline void registerMlirPasses() {
   // Linalg
   registerLinalgPasses();
 
-  // LLVM - TODO: where is the right placd to put this?
+  // LLVM
   registerConvertArmNeon2dToIntrPass();
 
   // MemRef

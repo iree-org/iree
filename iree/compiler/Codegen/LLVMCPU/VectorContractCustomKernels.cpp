@@ -60,8 +60,6 @@ LogicalResult InferCustomKernelsTargetInfoFromParent(
   switch (triple.getArch()) {
     case llvm::Triple::ArchType::aarch64:
       target_info.aarch64 = true;
-      // TODO: Add logic for this
-      target_info.intrinsics = true;
       for (auto f : cpuFeatures) {
         target_info.dotprod |= (f == "+dotprod");
       }
@@ -440,8 +438,10 @@ class VectorContractCustomKernelsPass
     : public VectorContractCustomKernelsBase<VectorContractCustomKernelsPass> {
  public:
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<vector::VectorDialect, LLVM::LLVMDialect,
-                    arm_neon::ArmNeonDialect>();
+    registry.insert<vector::VectorDialect, LLVM::LLVMDialect>();
+    if (target_info.intrinsics) {
+      registry.insert<arm_neon::ArmNeonDialect>();
+    }
   }
   LogicalResult initializeOptions(StringRef options) override {
     if (failed(Pass::initializeOptions(options))) {

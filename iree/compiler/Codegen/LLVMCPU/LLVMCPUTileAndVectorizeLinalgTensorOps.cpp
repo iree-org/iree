@@ -56,7 +56,7 @@ struct LLVMCPUTileAndVectorizePass
   }
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<linalg::LinalgDialect, memref::MemRefDialect,
-                    arm_neon::ArmNeonDialect, vector::VectorDialect>();
+                    vector::VectorDialect>();
   }
   void runOnOperation() override;
 

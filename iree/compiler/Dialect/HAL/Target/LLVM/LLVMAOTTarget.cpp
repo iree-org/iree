@@ -144,7 +144,6 @@ class LLVMAOTTargetBackend final : public TargetBackend {
 
   void getDependentDialects(DialectRegistry &registry) const override {
     mlir::registerLLVMDialectTranslation(registry);
-    registry.insert<IREE::Codegen::IREECodegenDialect>();
     // TODO: make inclusion of ArmNeon conditional?
     registry
         .insert<IREE::Codegen::IREECodegenDialect, arm_neon::ArmNeonDialect>();
