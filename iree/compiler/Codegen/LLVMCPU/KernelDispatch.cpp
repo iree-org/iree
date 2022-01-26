@@ -84,17 +84,6 @@ static Optional<llvm::Triple> getTargetTriple(FuncOp entryPointFn) {
   return llvm::Triple(triple.getValue().str());
 }
 
-static DispatchLoweringPassPipeline getDispatchLoweringPassPipeline(
-    FuncOp entryPointFn, Operation *op) {
-  return TypeSwitch<Operation *, DispatchLoweringPassPipeline>(op)
-      .Case<linalg::ContractionOpInterface, linalg::Mmt4DOp>([&](auto op) {
-        return DispatchLoweringPassPipeline::CPUTileFuseAndVectorize;
-      })
-      .Default([&](Operation *op) {
-        return DispatchLoweringPassPipeline::CPUDefault;
-      });
-}
-
 /// Looks for the `native_vector_size` attribute in the hal.executable.variant
 /// op.
 static Optional<int64_t> getNativeVectorSizeInBytes(FuncOp entryPointFn) {
@@ -487,11 +476,12 @@ static LogicalResult setRootConfig(
     workloadPerWorkgroup.push_back(1);
   }
 
-  setTranslationInfo(
-      entryPointFn,
-      getDispatchLoweringPassPipeline(entryPointFn, contractionOp),
-      workloadPerWorkgroup,
-      /*workgroupSize=*/ArrayRef<int64_t>{});
+  DispatchLoweringPassPipeline passPipeline =
+      (!numBatchDims && useDoubleTilingExpert)
+          ? DispatchLoweringPassPipeline::CPUDoubleTilingExpert
+          : DispatchLoweringPassPipeline::CPUTileFuseAndVectorize;
+  setTranslationInfo(entryPointFn, passPipeline, workloadPerWorkgroup,
+                     /*workgroupSize=*/ArrayRef<int64_t>{});
 
   SmallVector<int64_t> flowTileSizes =
       getDistributedTileSizes(interfaceOp, workloadPerWorkgroup);
@@ -568,7 +558,7 @@ static LogicalResult setRootConfig(
 
   return setOpConfigAndEntryPointFnTranslation(
       entryPointFn, mmt4dOp, tileSizes, nativeVectorSize,
-      getDispatchLoweringPassPipeline(entryPointFn, mmt4dOp));
+      DispatchLoweringPassPipeline::CPUTileFuseAndVectorize);
 }
 
 /// Sets the lowering configuration for dispatch region for linalg_ext.fft
@@ -607,7 +597,7 @@ static LogicalResult setRootConfig(
   return setOpConfigAndEntryPointFnTranslation(
       entryPointFn, fftOp, tileSizes,
       /*nativeVectorSizes=*/ArrayRef<int64_t>{},
-      getDispatchLoweringPassPipeline(entryPointFn, fftOp));
+      DispatchLoweringPassPipeline::CPUDefault);
 }
 
 /// Sets the lowering configuration for a generic op to use SingleTilingExpert.
