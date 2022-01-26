@@ -2455,15 +2455,18 @@ class ImportOpConversion : public OpConversionPattern<IREE::VM::ImportOp> {
             /*operands=*/ArrayRef<Value>{uint8Ptr, argPtr, size});
       }
 
-      uint8Ptr = rewriter
-                     .create<emitc::CallOp>(
-                         /*location=*/loc,
-                         /*type=*/bytePtrType,
-                         /*callee=*/StringAttr::get(ctx, "EMITC_ADD"),
-                         /*args=*/ArrayAttr{},
-                         /*templateArgs=*/ArrayAttr{},
-                         /*operands=*/ArrayRef<Value>{uint8Ptr, size})
-                     .getResult(0);
+      // Skip the addition in the last iteration.
+      if (i < inputTypes.size() - 1) {
+        uint8Ptr = rewriter
+                       .create<emitc::CallOp>(
+                           /*location=*/loc,
+                           /*type=*/bytePtrType,
+                           /*callee=*/StringAttr::get(ctx, "EMITC_ADD"),
+                           /*args=*/ArrayAttr{},
+                           /*templateArgs=*/ArrayAttr{},
+                           /*operands=*/ArrayRef<Value>{uint8Ptr, size})
+                       .getResult(0);
+      }
     }
     return success();
   }
@@ -2565,15 +2568,18 @@ class ImportOpConversion : public OpConversionPattern<IREE::VM::ImportOp> {
             /*operands=*/ArrayRef<Value>{arg, uint8Ptr, size});
       }
 
-      uint8Ptr = rewriter
-                     .create<emitc::CallOp>(
-                         /*location=*/loc,
-                         /*type=*/bytePtrType,
-                         /*callee=*/StringAttr::get(ctx, "EMITC_ADD"),
-                         /*args=*/ArrayAttr{},
-                         /*templateArgs=*/ArrayAttr{},
-                         /*operands=*/ArrayRef<Value>{uint8Ptr, size})
-                     .getResult(0);
+      // Skip the addition in the last iteration.
+      if (i < resultTypes.size() - 1) {
+        uint8Ptr = rewriter
+                       .create<emitc::CallOp>(
+                           /*location=*/loc,
+                           /*type=*/bytePtrType,
+                           /*callee=*/StringAttr::get(ctx, "EMITC_ADD"),
+                           /*args=*/ArrayAttr{},
+                           /*templateArgs=*/ArrayAttr{},
+                           /*operands=*/ArrayRef<Value>{uint8Ptr, size})
+                       .getResult(0);
+      }
     }
     return success();
   }
