@@ -366,15 +366,18 @@ struct MMT_8x4x8_i8i8i32_Aarch64Dotprod_Intrinsics
     auto int32x4VType = VectorType::get({4}, I32Type);
 
     std::array<Value, 16> accChunks;
-    for (int row = 0; row < 8; ++row) {
-      auto accRow =
-          rewriter.create<vector::ExtractOp>(loc, acc, ArrayRef<int64_t>{row});
-      for (int chunk = 0; chunk < 2; ++chunk) {
-        auto accChunk = rewriter.create<vector::ExtractStridedSliceOp>(
-            loc, accRow, ArrayRef<int64_t>{chunk * 4}, ArrayRef<int64_t>{4},
-            ArrayRef<int64_t>{1});
-        assert(accChunk.getType() == int32x4VType);
-        accChunks[row * 2 + chunk] = accChunk;
+    {
+      int idx = 0;
+      for (int row = 0; row < 8; ++row) {
+        auto accRow = rewriter.create<vector::ExtractOp>(
+            loc, acc, ArrayRef<int64_t>{row});
+        for (int col = 0; col < 8; col += 4) {
+          auto accChunk = rewriter.create<vector::ExtractStridedSliceOp>(
+              loc, accRow, ArrayRef<int64_t>{col}, ArrayRef<int64_t>{4},
+              ArrayRef<int64_t>{1});
+          assert(accChunk.getType() == int32x4VType);
+          accChunks[idx++] = accChunk;
+        }
       }
     }
 
@@ -387,10 +390,10 @@ struct MMT_8x4x8_i8i8i32_Aarch64Dotprod_Intrinsics
       return chunk;
     };
 
-    auto lhs0 = extract4x4(inLhs, 0, 0);
-    auto lhs1 = extract4x4(inLhs, 4, 0);
-    auto rhs0 = extract4x4(inRhs, 0, 0);
-    auto rhs1 = extract4x4(inRhs, 4, 0);
+    std::array<Value, 2> lhsHalves = {extract4x4(inLhs, 0, 0),
+                                      extract4x4(inLhs, 4, 0)};
+    std::array<Value, 2> rhsHalves = {extract4x4(inRhs, 0, 0),
+                                      extract4x4(inRhs, 4, 0)};
 
     auto int8Zero4x4 = rewriter.create<arith::ConstantOp>(
         loc, rewriter.getZeroAttr(int8x4x4VType));
@@ -403,30 +406,27 @@ struct MMT_8x4x8_i8i8i32_Aarch64Dotprod_Intrinsics
     };
 
     std::array<Value, 16> dstChunks;
-    // Note lhs and rhs are deliberately swapped here
-    dstChunks[0] = sdot(accChunks[0], rhs0, lhs0, 0);
-    dstChunks[1] = sdot(accChunks[1], rhs1, lhs0, 0);
-    dstChunks[2] = sdot(accChunks[2], rhs0, lhs0, 1);
-    dstChunks[3] = sdot(accChunks[3], rhs1, lhs0, 1);
-    dstChunks[4] = sdot(accChunks[4], rhs0, lhs0, 2);
-    dstChunks[5] = sdot(accChunks[5], rhs1, lhs0, 2);
-    dstChunks[6] = sdot(accChunks[6], rhs0, lhs0, 3);
-    dstChunks[7] = sdot(accChunks[7], rhs1, lhs0, 3);
-    dstChunks[8] = sdot(accChunks[8], rhs0, lhs1, 0);
-    dstChunks[9] = sdot(accChunks[9], rhs1, lhs1, 0);
-    dstChunks[10] = sdot(accChunks[10], rhs0, lhs1, 1);
-    dstChunks[11] = sdot(accChunks[11], rhs1, lhs1, 1);
-    dstChunks[12] = sdot(accChunks[12], rhs0, lhs1, 2);
-    dstChunks[13] = sdot(accChunks[13], rhs1, lhs1, 2);
-    dstChunks[14] = sdot(accChunks[14], rhs0, lhs1, 3);
-    dstChunks[15] = sdot(accChunks[15], rhs1, lhs1, 3);
+    {
+      int idx = 0;
+      for (Value lhs : lhsHalves) {
+        for (int lane = 0; lane < 4; ++lane) {
+          for (Value rhs : rhsHalves) {
+            dstChunks[idx] = sdot(accChunks[idx], rhs, lhs, lane);
+            ++idx;
+          }
+        }
+      }
+    }
 
     // Put the results back in the accumulator
-    for (int row = 0; row < 8; ++row) {
-      for (int chunk = 0; chunk < 2; ++chunk) {
-        acc = rewriter.create<vector::InsertStridedSliceOp>(
-            loc, dstChunks[row * 2 + chunk], acc,
-            ArrayRef<int64_t>{row, chunk * 4}, ArrayRef<int64_t>{1});
+    {
+      int idx = 0;
+      for (int row = 0; row < 8; ++row) {
+        for (int col = 0; col < 8; col += 4) {
+          acc = rewriter.create<vector::InsertStridedSliceOp>(
+              loc, dstChunks[idx++], acc, ArrayRef<int64_t>{row, col},
+              ArrayRef<int64_t>{1});
+        }
       }
     }
     rewriter.replaceOp(contractionOp, {acc});
