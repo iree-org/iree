@@ -63,13 +63,6 @@ static llvm::cl::opt<int> defaultWorkgroupTileSize(
         "linalg.generic and linalg.indexed_generic workgroup tile size"),
     llvm::cl::init(64));
 
-// TODO(hanchung): Enable the flag by default after addressing perf
-// regresssions.
-static llvm::cl::opt<bool> useDoubleTilingExpert(
-    "iree-codegen-use-double-tiling-expert",
-    llvm::cl::desc("DEVELOPMENT ONLY, DO NOT USE THE FLAG."),
-    llvm::cl::init(false));
-
 using IREE::Codegen::DispatchLoweringPassPipeline;
 
 static bool isVMVX(FuncOp entryPointFn) {
@@ -277,45 +270,6 @@ static int64_t getMaxTileSize(int64_t lb, int64_t ub, int64_t maxSize,
   return maxSize;
 }
 
-static LogicalResult setX86RootConfig(FuncOp entryPointFn,
-                                      linalg::ContractionOpInterface op,
-                                      SmallVector<int64_t> workloadPerWorkgroup,
-                                      int vectorSize) {
-  setTranslationInfo(entryPointFn,
-                     getDispatchLoweringPassPipeline(entryPointFn, op),
-                     workloadPerWorkgroup,
-                     /*workgroupSize=*/ArrayRef<int64_t>{});
-
-  // Hardcoded tile sizes, where v is the native vector size.
-  // L1 tile sizes are {1, 1, ..., 8, 2v, 2v}.
-  // Vector tile sizes are {1, ..., 1, v, v}
-  SmallVector<int64_t> l1TileSizes, vectorTileSizes;
-  int64_t nLoops = cast<linalg::LinalgOp>(op.getOperation()).getNumLoops();
-  l1TileSizes.append(nLoops - 3, 1);
-  l1TileSizes.push_back(
-      getMaxTileSize(0, workloadPerWorkgroup[1], 8, vectorSize));
-  l1TileSizes.push_back(
-      getMaxTileSize(0, workloadPerWorkgroup[0], 2 * vectorSize, vectorSize));
-  vectorTileSizes.append(nLoops - 2, 1);
-  vectorTileSizes.push_back(vectorSize);
-
-  // L1/vector tile size for k dimensions.
-  auto lhsShapedType = op.lhs().getType().cast<ShapedType>();
-  int64_t K = lhsShapedType.getShape().back();
-  l1TileSizes.push_back(getMaxTileSize(0, K, 2 * vectorSize, vectorSize));
-  vectorTileSizes.push_back(vectorSize);
-  TileSizesListType tileSizes;
-  tileSizes.push_back({});  // Empty here since there is nothing to do in first
-                            // level tiling.
-  tileSizes.push_back(l1TileSizes);
-  tileSizes.push_back(vectorTileSizes);
-  auto config = IREE::Codegen::LoweringConfigAttr::get(
-      entryPointFn.getContext(), tileSizes, vectorTileSizes);
-  setLoweringConfig(op, config);
-
-  return success();
-}
-
 static LogicalResult setX86SandboxRootConfig(
     FuncOp entryPointFn, linalg::ContractionOpInterface op,
     SmallVector<int64_t> workloadPerWorkgroup, int vectorSize) {
@@ -325,25 +279,21 @@ static LogicalResult setX86SandboxRootConfig(
                      /*workgroupSize=*/ArrayRef<int64_t>{});
 
   // Hardcoded tile sizes. The configuration is derived from iree-llvm-sandbox.
-  // L1 tile sizes are {1, 1, ..., 288, 128, 512}.
-  // Vector tile sizes are {1, ..., 9, 32, 16}
-  SmallVector<int64_t> l1TileSizes, vectorTileSizes;
+  // L1 tile sizes are {1, ..., 8, 32, 16}
+  SmallVector<int64_t> l1TileSizes, nativeVectorSizes;
   int64_t nLoops = cast<linalg::LinalgOp>(op.getOperation()).getNumLoops();
   l1TileSizes.append(nLoops - 3, 1);
-  l1TileSizes.push_back(288);
-  l1TileSizes.push_back(128);
-  l1TileSizes.push_back(512);
-  vectorTileSizes.append(nLoops - 3, 1);
-  vectorTileSizes.push_back(9);
-  vectorTileSizes.push_back(32);
-  vectorTileSizes.push_back(16);
+  l1TileSizes.push_back(8);
+  l1TileSizes.push_back(32);
+  l1TileSizes.push_back(16);
+  nativeVectorSizes.append(nLoops - 3, 1);
+  nativeVectorSizes.append(3, vectorSize);
 
   TileSizesListType tileSizes;
   tileSizes.push_back({});
   tileSizes.push_back(l1TileSizes);
-  tileSizes.push_back(vectorTileSizes);
   auto config = IREE::Codegen::LoweringConfigAttr::get(
-      entryPointFn.getContext(), tileSizes, vectorTileSizes);
+      entryPointFn.getContext(), tileSizes, nativeVectorSizes);
   setLoweringConfig(op, config);
 
   return success();
@@ -425,18 +375,13 @@ static LogicalResult setRootConfig(
 
   Optional<llvm::Triple> triple = getTargetTriple(entryPointFn);
   if (triple && triple.getValue().isX86()) {
-    // For DoubleTilingExpert, we will use LinalgSingleTilingExpertPassOptions
-    // to control transforms. There is a tileInterchange option that needs to be
-    // configured. However, we don't know the number of loops when adding the
-    // pass to pass manager. Thus, we don't use double tiling expert for batch
-    // gemms for now.
-    if (!numBatchDims && useDoubleTilingExpert) {
-      return setX86SandboxRootConfig(entryPointFn, contractionOp,
-                                     workloadPerWorkgroup, vectorSize);
-    } else {
-      return setX86RootConfig(entryPointFn, contractionOp, workloadPerWorkgroup,
-                              vectorSize);
-    }
+    // There is a tileInterchange option. If it needs to be configured, we can
+    // only apply the pipeline to linalg.matmul. Because we don't know the
+    // number of loops when adding the pass to pass manager.
+    // TODO(hanchung): Embed options into attributes, so we can control options
+    // more heuristically.
+    return setX86SandboxRootConfig(entryPointFn, contractionOp,
+                                   workloadPerWorkgroup, vectorSize);
   }
   // Fall back to ARM configurations.
   return setARMRootConfig(entryPointFn, contractionOp, workloadPerWorkgroup,

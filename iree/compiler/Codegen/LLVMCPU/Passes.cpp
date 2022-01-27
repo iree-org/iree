@@ -208,18 +208,24 @@ void addSingleTilingExpertPassPipeline(OpPassManager &passManager) {
 
 void addDoubleTilingExpertPassPipeline(OpPassManager &passManager) {
   passManager.addPass(createCanonicalizerPass());
+
+  // Run LinalgFusePass firstly in case that we have fill + matmul + generic
+  // ops. At this stage, we do not apply vectorization. The reduction dim won't
+  // get tiled if the case is matmul + generic op. In this case, we have to tile
+  // along reduction dim again, which needs them to be Linalg ops form.
   {
-    passManager.addNestedPass<FuncOp>(createRemoveSingleIterationLoopPass());
-    LinalgSingleTilingExpertPassOptions options;
+    LinalgFusePassOptions options;
     options.tilingLevel = static_cast<int64_t>(TilingLevel::L1Tiles);
-    options.tileInterchange = {0, 2, 1};
-    passManager.addNestedPass<FuncOp>(
-        createLinalgSingleTilingExpertPass(options));
+    passManager.addNestedPass<FuncOp>(createLinalgFusePass(options));
     passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
     passManager.addNestedPass<FuncOp>(createCSEPass());
   }
 
   // Add the sandbox single tiling expert to tile and vectorize.
+  // This might create three addtional one-trip loops if the dim sizes are not
+  // divisible by tiling sizes. It would affect performance for some cases,
+  // e.g., matmul( 1x384, 384x384 ), etc.
+  // TODO(hanchung): Add canonicalization patterns to remove one-trip loops.
   {
     // The options are derived from sandbox codegen driver. hoistPadding options
     // does not work in IREE cases. It's fine to not have it, since it's already
@@ -230,10 +236,11 @@ void addDoubleTilingExpertPassPipeline(OpPassManager &passManager) {
     options.pad = true;
     options.packPaddings = {1, 1, 0};
     // options.hoistPaddings = {5, 6, 0};
-    options.tilingLevel = static_cast<int64_t>(TilingLevel::VectorTiles);
-    options.tileInterchange = {0, 1, 2};
+    options.tilingLevel = static_cast<int64_t>(TilingLevel::L1Tiles);
     passManager.addNestedPass<FuncOp>(
         createLinalgSingleTilingExpertPass(options));
+    passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
+    passManager.addNestedPass<FuncOp>(createCSEPass());
   }
 
   // TODO(ravishankarm): This is commented cause this is WIP, to be enabled
@@ -245,6 +252,9 @@ void addDoubleTilingExpertPassPipeline(OpPassManager &passManager) {
   //         cpuComprehensiveBufferizeCopyFn);
   // addIREEComprehensiveBufferizePasses(passManager, std::move(callbacks));
   addLinalgBufferizePasses(passManager, cpuAllocationFunction);
+
+  // Run IREE specific passes before vector lowering expert.
+  passManager.addNestedPass<FuncOp>(createRemoveSingleIterationLoopPass());
 
   // Add the vector lowering expert.
   {
