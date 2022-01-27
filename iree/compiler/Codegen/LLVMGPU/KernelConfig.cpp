@@ -99,9 +99,41 @@ static LogicalResult setContractConfig(FuncOp entryPoint, linalg::LinalgOp op) {
                          IREE::Codegen::DispatchLoweringPassPipeline pipeline) {
         TileSizesListType tileSizes;
         SmallVector<int64_t> ts;
+        SmallVector<unsigned> partitionedLoops =
+            cast<IREE::Flow::PartitionableLoopsInterface>(op.getOperation())
+                .getPartitionableLoops(kNumMaxParallelDims);
+        unsigned index = 0;
         // Tile all the higher parallel dimension with a size of 1 and the 2
         // most inner dimension with the tileX/tileY size.
-        ts.append(op.getNumParallelLoops() - 2, 1);
+        for (auto loopNum :
+             llvm::seq<unsigned>(0, op.getNumParallelLoops() - 2)) {
+          int64_t tileSize = 0;
+          if (index < partitionedLoops.size() &&
+              partitionedLoops[index] == loopNum) {
+            tileSize = 1;
+            index++;
+          }
+          ts.push_back(tileSize);
+        }
+
+        // Check for M loop being partitioned.
+        if (index < partitionedLoops.size() &&
+            partitionedLoops[index] == op.getNumParallelLoops() - 2) {
+          index++;
+        } else {
+          // M dim isnt partitioned.
+          tileX = 0;
+        }
+
+        // Check for N loop being partitioned.
+        if (index < partitionedLoops.size() &&
+            partitionedLoops[index] == op.getNumParallelLoops() - 1) {
+          index++;
+        } else {
+          // N dim isnt partitioned.
+          tileY = 0;
+        }
+
         ts.append({tileX, tileY});
         // Tile all the reduction dimensions.
         ts.append(op.getNumReductionLoops(), tileK);

@@ -188,9 +188,9 @@ void registerPartitionableLoopsInterfaceModels(DialectRegistry &registry) {
   // clang-format on
 
   registerInterfaceForTiledOpInterfaceOps<
-      linalg::PadTensorOp, LinalgExt::FftOp, LinalgExt::ReverseOp,
-      LinalgExt::ScanOp, LinalgExt::ScatterOp, LinalgExt::SortOp,
-      tensor::ExtractSliceOp, tensor::InsertSliceOp>(registry);
+      LinalgExt::FftOp, LinalgExt::ReverseOp, LinalgExt::ScanOp,
+      LinalgExt::ScatterOp, LinalgExt::SortOp, tensor::ExtractSliceOp,
+      tensor::InsertSliceOp>(registry);
 }
 
 }  // namespace Flow

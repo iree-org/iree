@@ -141,6 +141,9 @@ static void populateTilingToInvocationPatterns(
             cast<IREE::Flow::PartitionableLoopsInterface>(*operation);
         auto partitionedLoops =
             interfaceOp.getPartitionableLoops(kNumMaxParallelDims);
+        if (partitionedLoops.empty()) {
+          return tileSizesVal;
+        }
         unsigned maxDepth = partitionedLoops.back() + 1;
         auto zero =
             builder.create<arith::ConstantIndexOp>(operation->getLoc(), 0);
