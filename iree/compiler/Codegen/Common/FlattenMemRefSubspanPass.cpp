@@ -467,7 +467,7 @@ struct FoldMemRefReshape final : public OpConversionPattern<ReshapeOpTy> {
 /// Note that this should be kept consistent with how the byte offset was
 /// calculated in the subspan ops!
 Optional<int64_t> getNumBytes(Type type) {
-  if (type.isIntOrFloat()) return (type.getIntOrFloatBitWidth() + 7) / 8;
+  if (type.isIntOrFloat()) return IREE::Util::getRoundedElementByteWidth(type);
   if (auto vectorType = type.dyn_cast<VectorType>()) {
     auto elementBytes = getNumBytes(vectorType.getElementType());
     if (!elementBytes) return llvm::None;

@@ -231,9 +231,12 @@ static inline uint64_t align(uint64_t value, const APInt &alignment) {
 //   getRoundedElementByteWidth(i23) = 4
 //   getRoundedElementByteWidth(i32) = 4
 //   getRoundedElementByteWidth(bf16) = 2
+//   getRoundedElementByteWidth(i33) = 8
 static inline int32_t getRoundedElementByteWidth(Type type) {
+  unsigned bitsUnaligned = type.getIntOrFloatBitWidth();
+  assert(bitsUnaligned > 0 && "0-width types unsupported");
   // Round up to 8-bit aligned bytes.
-  unsigned byteAligned = (type.getIntOrFloatBitWidth() + 8 - 1) / 8;
+  unsigned byteAligned = (bitsUnaligned + 8 - 1) / 8;
   // Round up to the next power of two (unless already a power of two).
   return llvm::PowerOf2Ceil(byteAligned);
 }

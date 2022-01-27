@@ -49,7 +49,7 @@ class Register {
     assert(type.getIntOrFloatBitWidth() % 8 == 0 &&
            "require 8-bit aligned value types");
     assert(ordinal < kInt32RegisterCount);
-    size_t byteWidth = type.getIntOrFloatBitWidth() / 8;
+    size_t byteWidth = IREE::Util::getRoundedElementByteWidth(type);
     return {/*isRef=*/false, /*isMove=*/false, byteWidth, ordinal};
   }
 

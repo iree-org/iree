@@ -137,7 +137,8 @@ static bool isConstantSmall(arith::ConstantOp constantOp) {
     // Smallish constants are worth moving inside.
     auto shapedType = constantType.cast<ShapedType>();
     uint64_t estimatedByteLength =
-        (shapedType.getNumElements() * shapedType.getElementTypeBitWidth()) / 8;
+        shapedType.getNumElements() *
+        getRoundedElementByteWidth(shapedType.getElementType());
     return denseAttr.isSplat() ||
            estimatedByteLength <= kMaxInlinedConstantBytes;
   } else if (constantType.isIntOrIndexOrFloat()) {
