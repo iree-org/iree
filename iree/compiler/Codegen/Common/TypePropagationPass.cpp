@@ -53,15 +53,14 @@ static Optional<Type> getLegalizedElementType(Type elementType) {
 static Value convertElementType(OpBuilder &b, Location loc, Type targetType,
                                 Value source) {
   Type sourceType = source.getType();
+  if (sourceType == targetType) return source;
   if (sourceType.isa<IntegerType>() && targetType.isa<IntegerType>()) {
     unsigned sourceBitWidth = sourceType.getIntOrFloatBitWidth();
     unsigned destBitWidth = targetType.getIntOrFloatBitWidth();
     if (sourceBitWidth > destBitWidth) {
       return b.create<arith::TruncIOp>(loc, targetType, source);
-    } else if (sourceBitWidth < destBitWidth) {
-      return b.create<arith::ExtUIOp>(loc, targetType, source);
     } else {
-      return source;
+      return b.create<arith::ExtUIOp>(loc, targetType, source);
     }
   }
   return nullptr;
@@ -225,6 +224,33 @@ struct GenericOpTypePropagation
   }
 };
 
+/// Legalizes `linalg.fill` operation.
+struct LinalgFillTypePropagation
+    : public TypePropagationPattern<linalg::FillOp> {
+  using TypePropagationPattern<linalg::FillOp>::TypePropagationPattern;
+
+  LogicalResult matchAndRewrite(
+      linalg::FillOp fillOp, OpAdaptor adaptor,
+      ConversionPatternRewriter &rewriter) const final {
+    auto outputType = fillOp.output().getType();
+    auto legalizedOutputType = this->typeConverter->convertType(outputType);
+    if (outputType == legalizedOutputType) {
+      return rewriter.notifyMatchFailure(fillOp, "op already legal");
+    }
+    Value value = adaptor.value();
+    Optional<Type> legalizedElementType =
+        getLegalizedElementType(value.getType());
+    if (!legalizedElementType) {
+      return fillOp.emitOpError("failed to get legalized type for value");
+    }
+    Value legalizedValue = convertElementType(
+        rewriter, fillOp->getLoc(), legalizedElementType.getValue(), value);
+    rewriter.replaceOpWithNewOp<linalg::FillOp>(fillOp, legalizedValue,
+                                                adaptor.output());
+    return success();
+  }
+};
+
 /// Simple rewrite pattern that just forwards the source as the result if the
 /// result type is not legal (but source type is)
 template <typename OpTy>
@@ -321,10 +347,11 @@ struct TypePropagationPass : public TypePropagationBase<TypePropagationPass> {
     OwningRewritePatternList patterns(context);
 
     TypePropagationTypeConverter typeConverter;
-    patterns.insert<ForwardSourceType<arith::ExtUIOp>,
-                    ForwardSourceType<arith::TruncIOp>,
-                    GenericOpTypePropagation, LegalizeResultElementType>(
-        typeConverter, context);
+    patterns
+        .insert<ForwardSourceType<arith::ExtUIOp>,
+                ForwardSourceType<arith::TruncIOp>, GenericOpTypePropagation,
+                LinalgFillTypePropagation, LegalizeResultElementType>(
+            typeConverter, context);
 
     ConversionTarget target(*context);
     target.markUnknownOpDynamicallyLegal([&](Operation *op) {

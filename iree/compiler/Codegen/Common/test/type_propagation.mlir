@@ -217,3 +217,23 @@ func @for_loop() {
 //       CHECK:     %[[INSERT:.+]] = tensor.insert_slice %[[SLICE]] into %[[ARG1]]
 //       CHECK:     scf.yield %[[INSERT]]
 //       CHECK:   flow.dispatch.tensor.store %[[FOR]], %[[OUT]]
+
+// -----
+
+func @fill_op() {
+  %d = hal.interface.constant.load[0] : index
+  %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<writeonly:?xi8>{%d}
+  %1 = linalg.init_tensor [%d] : tensor<?xi1>
+  %false = arith.constant false
+  %2 = linalg.fill(%false, %1) : i1, tensor<?xi1> -> tensor<?xi1>
+  %3 = arith.extui %2 : tensor<?xi1> to tensor<?xi8>
+  flow.dispatch.tensor.store %3, %0, offsets=[0], sizes=[%d], strides=[1] : tensor<?xi8> -> !flow.dispatch.tensor<writeonly:?xi8>{%d}
+  return
+}
+// CHECK-LABEL: func @fill_op()
+//   CHECK-DAG:   %[[OUT:.+]] = hal.interface.binding.subspan set(0) binding(0)
+//   CHECK-DAG:   %[[INIT:.+]] = linalg.init_tensor
+//   CHECK-DAG:   %[[FALSE:.+]] = arith.constant false
+//   CHECK-DAG:   %[[EXT_SCALAR:.+]] = arith.extui %[[FALSE]]
+//       CHECK:   %[[FILL:.+]] = linalg.fill(%[[EXT_SCALAR]], %[[INIT]])
+//       CHECK:   flow.dispatch.tensor.store %[[FILL]], %[[OUT]]
