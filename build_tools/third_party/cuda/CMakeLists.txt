@@ -6,13 +6,23 @@
 
 set(CUDA_HEADERS_API_ROOT "${IREE_ROOT_DIR}/third_party/cuda/include")
 
-message("IREE_ENABLE_CUPTI: ${IREE_ENABLE_CUPTI}")
 if (TARGET CUDA::cupti)
- message("cuda target: CUDA::cupti")
-endif()
+  # Locate the CUDA and CUPTI headers.
+  find_path(
+    CUDA_INCLUDE_DIR
+    NAMES
+      "cuda.h"
+    PATHS ${CUDAToolkit_LIBRARY_ROOT}
+    PATH_SUFFIXES include
+  )
+  find_path(
+    CUPTI_INCLUDE_DIR
+    NAMES
+      "cupti.h"
+    PATHS ${CUDAToolkit_LIBRARY_ROOT}
+    PATH_SUFFIXES extras/CUPTI/include
+  )
 
-
-if (TARGET CUDA::cupti)
   external_cc_library(
     PACKAGE
       cuda_headers
@@ -28,6 +38,7 @@ if (TARGET CUDA::cupti)
       ${CUPTI_INCLUDE_DIR}
   )
 else()
+
   external_cc_library(
     PACKAGE
       cuda_headers
@@ -38,4 +49,5 @@ else()
     INCLUDES
       ${CUDA_HEADERS_API_ROOT}
   )
+
 endif(TARGET CUDA::cupti)

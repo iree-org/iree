@@ -394,7 +394,7 @@ if(IREE_HAL_DRIVER_CUDA AND IREE_ENABLE_RUNTIME_TRACING)
     enable_language(CUDA)
   else()
     message(DEBUG
-      "Building the CUDA backend with tracing requires a working CUDA install. Falling back to static libraries")
+      "Using runtime tracing in the CUDA backend requires a working CUDA installation with CUPTI. Download the CUDA Toolkit from https://developer.nvidia.com/cuda-toolkit. Proceeding without CUDA tracing.")
   endif()
 
   find_package(CUDAToolkit) # Defines the CUDAToolkit_LIBRARY_ROOT variable as well as the CUDA::cupti target if they exist.
