@@ -6,7 +6,7 @@
 
 // Tests covering the dispatch logic for individual ops.
 //
-// bytecode_dispatch_test.mlir contains the functions used here for testing. We
+// iree/vm/test/*.mlir contains the functions used here for testing. We
 // avoid defining the IR inline here so that we can run this test on platforms
 // that we can't run the full MLIR compiler stack on.
 
