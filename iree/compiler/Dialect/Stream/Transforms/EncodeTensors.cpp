@@ -49,13 +49,6 @@ static LogicalResult checkEncoding(Operation *op, RankedTensorType encodingType,
   return success();
 }
 
-// Returns an 8-bit aligned element byte count.
-static int64_t getElementByteSize(Type elementType) {
-  int64_t bitCount = elementType.getIntOrFloatBitWidth();
-  int64_t byteCount = (bitCount + 8 - 1) / 8;
-  return byteCount;
-}
-
 // Aligns an element type to a byte-aligned power of 2 bit width.
 //
 // Examples:
@@ -69,7 +62,8 @@ static Type alignElementType(Type originalType) {
   if (!elementType) return originalType;
 
   // Align the element type to a power of two byte size.
-  auto alignedBitWidth = getElementByteSize(elementType) * 8;
+  auto alignedBitWidth =
+      IREE::Util::getRoundedElementByteWidth(elementType) * 8;
   if (elementType.getIntOrFloatBitWidth() == alignedBitWidth) {
     // Already aligned.
     return originalType;
@@ -155,7 +149,8 @@ static Value calculateElementByteOffset(Location loc,
       loc,
       calculateElementOffset(loc, tensorType, dynamicDims, indices, rewriter),
       rewriter.create<arith::ConstantIndexOp>(
-          loc, getElementByteSize(tensorType.getElementType())));
+          loc,
+          IREE::Util::getRoundedElementByteWidth(tensorType.getElementType())));
 }
 
 //===----------------------------------------------------------------------===//
@@ -220,7 +215,8 @@ struct EncodeTensorSizeOfOp
     }
 
     // Dense: element count * element size.
-    auto elementByteSize = getElementByteSize(encodingType.getElementType());
+    auto elementByteSize =
+        IREE::Util::getRoundedElementByteWidth(encodingType.getElementType());
     auto totalSize = calculateElementCount(
         op.getLoc(), encodingType, encodingDims, elementByteSize, rewriter);
     rewriter.replaceOp(op, totalSize);
@@ -278,7 +274,8 @@ struct EncodeTensorConstantOp
     // Dense:
     auto resultSize = calculateElementCount(
         op.getLoc(), alignedType, resultDims,
-        getElementByteSize(alignedType.getElementType()), rewriter);
+        IREE::Util::getRoundedElementByteWidth(alignedType.getElementType()),
+        rewriter);
     rewriter.replaceOpWithNewOp<IREE::Stream::AsyncConstantOp>(
         op, op.result().getType(), encodedAttr, resultSize, op.affinityAttr());
 

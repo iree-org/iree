@@ -7,6 +7,7 @@
 #ifndef IREE_COMPILER_DIALECT_VM_IR_VMDIALECT_H_
 #define IREE_COMPILER_DIALECT_VM_IR_VMDIALECT_H_
 
+#include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "iree/compiler/Dialect/VM/IR/VMFuncEncoder.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/BuiltinAttributes.h"

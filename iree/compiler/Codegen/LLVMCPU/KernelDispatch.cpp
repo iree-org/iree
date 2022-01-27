@@ -132,8 +132,7 @@ static int64_t getVectorSize(FuncOp entryPointFn, unsigned byteWidth) {
 static int64_t getVectorSize(FuncOp entryPointFn, ShapedType shapedType) {
   Type elementType = shapedType.getElementType();
   if (!elementType.isIntOrFloat()) return 1;
-  unsigned byteWidth =
-      std::max<unsigned>(1, elementType.getIntOrFloatBitWidth() / 8);
+  unsigned byteWidth = IREE::Util::getRoundedElementByteWidth(elementType);
   return getVectorSize(entryPointFn, byteWidth);
 }
 
@@ -157,7 +156,7 @@ static unsigned getReferenceTypeLengthInBytes(FuncOp entryPointFn) {
                            .Default([&](Type t) -> Type { return nullptr; });
     if (!elementType || !elementType.isIntOrFloat()) return;
     unsigned typeWidthInBytes =
-        std::max<unsigned>(elementType.getIntOrFloatBitWidth() / 8, 1);
+        IREE::Util::getRoundedElementByteWidth(elementType);
     referenceTypeLengthInBytes =
         std::min<unsigned>(referenceTypeLengthInBytes, typeWidthInBytes);
   });

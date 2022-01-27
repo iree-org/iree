@@ -214,7 +214,7 @@ def VM_GlobalOpInterface : OpInterface<"VMGlobalOp"> {
       auto storageType = $_self.getStorageType();
       assert(storageType.isIntOrFloat());
       assert(storageType.getIntOrFloatBitWidth() % 8 == 0);
-      return storageType.getIntOrFloatBitWidth() / 8;
+      return IREE::Util::getRoundedElementByteWidth(storageType);
     }]>,
     InterfaceMethod<[{}], "StringRef", "getSymbolName", (ins)>,
     InterfaceMethod<[{}], "bool", "isMutable", (ins)>,
