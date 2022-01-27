@@ -39,7 +39,7 @@ class GridCoverage {
     return true;
   }
 
-  static iree_status_t Tile(uintptr_t user_context,
+  static iree_status_t Tile(void* user_context,
                             const iree_task_tile_context_t* tile_context,
                             iree_task_submission_t* pending_submission) {
     GridCoverage* coverage = reinterpret_cast<GridCoverage*>(user_context);
@@ -70,10 +70,10 @@ class TaskDispatchTest : public TaskTest {
                              uint32_t dispatch_flags) {
     GridCoverage coverage(workgroup_count);
     iree_task_dispatch_t task;
-    iree_task_dispatch_initialize(&scope_,
-                                  iree_task_make_dispatch_closure(
-                                      GridCoverage::Tile, (uintptr_t)&coverage),
-                                  workgroup_size, workgroup_count, &task);
+    iree_task_dispatch_initialize(
+        &scope_,
+        iree_task_make_dispatch_closure(GridCoverage::Tile, (void*)&coverage),
+        workgroup_size, workgroup_count, &task);
     task.header.flags |= dispatch_flags;
     IREE_ASSERT_OK(SubmitTasksAndWaitIdle(&task.header, &task.header));
     EXPECT_TRUE(coverage.Verify());
@@ -142,7 +142,7 @@ TEST_F(TaskDispatchTest, IssueIndirect) {
   iree_task_call_initialize(
       &scope_,
       iree_task_make_call_closure(
-          [](uintptr_t user_context, iree_task_t* task,
+          [](void* user_context, iree_task_t* task,
              iree_task_submission_t* pending_submission) {
             uint32_t* indirect_workgroup_count_ptr = (uint32_t*)user_context;
             for (size_t i = 0; i < IREE_ARRAYSIZE(kWorkgroupCount); ++i) {
@@ -150,13 +150,13 @@ TEST_F(TaskDispatchTest, IssueIndirect) {
             }
             return iree_ok_status();
           },
-          (uintptr_t)indirect_workgroup_count),
+          (void*)indirect_workgroup_count),
       &calculate_task);
 
   iree_task_dispatch_t dispatch_task;
   iree_task_dispatch_initialize_indirect(
       &scope_,
-      iree_task_make_dispatch_closure(GridCoverage::Tile, (uintptr_t)&coverage),
+      iree_task_make_dispatch_closure(GridCoverage::Tile, (void*)&coverage),
       kWorkgroupSize, indirect_workgroup_count, &dispatch_task);
   iree_task_set_completion_task(&calculate_task.header, &dispatch_task.header);
 

@@ -58,7 +58,7 @@ static void iree_task_cleanup(iree_task_t* task, iree_status_t status) {
   // NOTE: this may free the memory of the task itself!
   iree_task_pool_t* pool = task->pool;
   if (task->cleanup_fn) {
-    task->cleanup_fn(task, iree_ok_status());
+    task->cleanup_fn(task, status);
   }
 
   // Return the task to the pool it was allocated from.
@@ -96,8 +96,8 @@ void iree_task_discard(iree_task_t* task, iree_task_list_t* discard_worklist) {
       break;
     }
     case IREE_TASK_TYPE_FENCE: {
-      // TODO(benvanik): signal as error.
-      // iree_task_fence_t* fence_task = (iree_task_fence_t*)task;
+      iree_task_scope_fail(task->scope, task,
+                           iree_status_from_code(IREE_STATUS_ABORTED));
       iree_task_scope_end(task->scope);
       break;
     }

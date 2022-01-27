@@ -28,7 +28,7 @@ TEST_F(TaskCallTest, Issue) {
   iree_task_call_t task;
   iree_task_call_initialize(&scope_,
                             iree_task_make_call_closure(
-                                [](uintptr_t user_context, iree_task_t* task,
+                                [](void* user_context, iree_task_t* task,
                                    iree_task_submission_t* pending_submission) {
                                   auto* ctx = (TestCtx*)user_context;
                                   EXPECT_TRUE(NULL != ctx);
@@ -36,7 +36,7 @@ TEST_F(TaskCallTest, Issue) {
                                   ++ctx->did_call;
                                   return iree_ok_status();
                                 },
-                                (uintptr_t)&ctx),
+                                (void*)&ctx),
                             &task);
   IREE_ASSERT_OK(SubmitTasksAndWaitIdle(&task.header, &task.header));
   EXPECT_EQ(1, ctx.did_call);
@@ -63,7 +63,7 @@ TEST_F(TaskCallTest, IssueNested) {
   iree_task_call_initialize(
       &scope_,
       iree_task_make_call_closure(
-          [](uintptr_t user_context, iree_task_t* task,
+          [](void* user_context, iree_task_t* task,
              iree_task_submission_t* pending_submission) {
             auto* ctx = (TestCtx*)user_context;
             EXPECT_TRUE(NULL != ctx);
@@ -75,7 +75,7 @@ TEST_F(TaskCallTest, IssueNested) {
               iree_task_call_initialize(
                   task->scope,
                   iree_task_make_call_closure(
-                      [](uintptr_t user_context, iree_task_t* task,
+                      [](void* user_context, iree_task_t* task,
                          iree_task_submission_t* pending_submission) {
                         auto* ctx = (TestCtx*)user_context;
                         EXPECT_TRUE(NULL != ctx);
@@ -95,7 +95,7 @@ TEST_F(TaskCallTest, IssueNested) {
 
             return iree_ok_status();
           },
-          (uintptr_t)&ctx),
+          (void*)&ctx),
       &task_a);
   IREE_ASSERT_OK(SubmitTasksAndWaitIdle(&task_a.header, &task_a.header));
   EXPECT_EQ(2, ctx.did_call_a);

@@ -51,7 +51,7 @@ typedef struct iree_task_scope_t {
   IREE_TRACE(uint32_t task_trace_color;)
 
   // A permanent status code set when a task within the scope fails. All pending
-  // tasks will be cancelled, though any in-flight tasks may continue executing
+  // tasks will be aborted, though any in-flight tasks may continue executing
   // to completion.
   iree_atomic_intptr_t permanent_status;
 

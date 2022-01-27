@@ -32,14 +32,14 @@ struct TaskCtx {
 
 #define MAKE_CALL_TASK_CLOSURE(task_ctx, task_id)      \
   iree_task_make_call_closure(                         \
-      [](uintptr_t user_context, iree_task_t* task,    \
+      [](void* user_context, iree_task_t* task,        \
          iree_task_submission_t* pending_submission) { \
         auto* ctx = (TaskCtx*)user_context;            \
         EXPECT_EQ(0, (ctx->tasks_called & (task_id))); \
         ctx->tasks_called |= (task_id);                \
         return iree_ok_status();                       \
       },                                               \
-      (uintptr_t)task_ctx)
+      (void*)task_ctx)
 
 // Issues a standalone empty barrier:
 //  { barrier }

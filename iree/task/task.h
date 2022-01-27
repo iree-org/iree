@@ -69,7 +69,7 @@ enum iree_task_type_bits_t {
 
   // Task is a slice of a larger contiguous dispatch tile range. The full
   // dispatch will be sliced into zero or more slices and each slice will be
-  // posted to a particular worker for executiion. If work progresses unevenly
+  // posted to a particular worker for execution. If work progresses unevenly
   // then entire slices will be stolen across workers to balance out the timing.
   // Slices retire once they have completed the tiles assigned to them.
   IREE_TASK_TYPE_DISPATCH_SLICE = 6u,
@@ -128,7 +128,7 @@ typedef void(IREE_API_PTR* iree_task_cleanup_fn_t)(iree_task_t* task,
 // how the executor is to treat the task. Dependency edges can be defined that
 // determine the execution order of tasks within the executors.
 struct iree_alignas(iree_max_align_t) iree_task_t {
-  // Instrusive pointer used to store tasks within iree_task_list_t and
+  // Intrusive pointer used to store tasks within iree_task_list_t and
   // iree_atomic_task_list_t singly-linked lists. This must come first in the
   // structure so that it is at the appropriate alignment.
   iree_task_t* next_task;
@@ -231,7 +231,7 @@ void iree_task_nop_initialize(iree_task_scope_t* scope,
 //==============================================================================
 
 typedef iree_status_t(IREE_API_PTR* iree_task_call_closure_fn_t)(
-    uintptr_t user_context, iree_task_t* task,
+    void* user_context, iree_task_t* task,
     iree_task_submission_t* pending_submission);
 
 // A function closure representing the function to call and its arguments.
@@ -239,12 +239,11 @@ typedef struct iree_task_call_closure_t {
   // Function called per tile invocation.
   iree_task_call_closure_fn_t fn;
 
-  // User-defined argument passed to task functions during invocation.
-  // Opaque pointer-sized values that could point to user data structures or
-  // contain embedded values. No lifetime management is performed by the task
-  // system and it is required that users ensure that the memory referenced is
-  // live until after the task has completed.
-  uintptr_t user_context;
+  // Opaque pointer to a user-provided data structure.
+  // No lifetime management is performed by the task system and it is required
+  // that users ensure that the memory referenced is live until after the task
+  // has completed.
+  void* user_context;
 
   // TODO(benvanik): cleanup function? right now assume arg is never freed.
 } iree_task_call_closure_t;
@@ -253,7 +252,7 @@ typedef struct iree_task_call_closure_t {
 // If the arguments represent pointers they must remain live until the task
 // has completed execution.
 static inline iree_task_call_closure_t iree_task_make_call_closure(
-    iree_task_call_closure_fn_t fn, uintptr_t user_context) {
+    iree_task_call_closure_fn_t fn, void* user_context) {
   iree_task_call_closure_t closure = {fn, user_context};
   return closure;
 }
@@ -358,11 +357,14 @@ typedef struct iree_task_wait_t {
   iree_task_t header;
 
   // The external wait handle that the task is waiting on.
-  // TODO(benvanik): multiple wait handles.
+  // TODO(benvanik): null handle for sleep.
+  // TODO(benvanik): use a wait source with cached wait handle.
+  // TODO(benvanik): multiple wait handles (ptr owned by outer wrapper task).
   iree_wait_handle_t wait_handle;
 
   // TODO(benvanik): deadline_ns.
   // TODO(benvanik): condition (possibly a closure to evaluate) ala condvar.
+  // TODO(benvanik): whether a sleep.
 } iree_task_wait_t;
 
 void iree_task_wait_initialize(iree_task_scope_t* scope,
@@ -460,7 +462,7 @@ typedef iree_alignas(iree_max_align_t) struct {
 //==============================================================================
 
 typedef iree_status_t(IREE_API_PTR* iree_task_dispatch_closure_fn_t)(
-    uintptr_t user_context, const iree_task_tile_context_t* tile_context,
+    void* user_context, const iree_task_tile_context_t* tile_context,
     iree_task_submission_t* pending_submission);
 
 // A function closure representing the function to call and its arguments.
@@ -473,14 +475,14 @@ typedef struct iree_task_dispatch_closure_t {
   // contain embedded values. No lifetime management is performed by the task
   // system and it is required that users ensure that the memory referenced is
   // live until after the task has completed.
-  uintptr_t user_context;
+  void* user_context;
 } iree_task_dispatch_closure_t;
 
 // Binds a function pointer and the arguments it should be called with.
 // If the arguments represent pointers they must remain live until the task
 // has completed execution.
 static inline iree_task_dispatch_closure_t iree_task_make_dispatch_closure(
-    iree_task_dispatch_closure_fn_t fn, uintptr_t user_context) {
+    iree_task_dispatch_closure_fn_t fn, void* user_context) {
   iree_task_dispatch_closure_t closure = {fn, user_context};
   return closure;
 }

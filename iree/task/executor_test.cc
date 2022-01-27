@@ -70,7 +70,7 @@ TEST(ExecutorTest, Any) {
   iree_task_call_t call0;
   iree_task_call_initialize(&scope_a,
                             iree_task_make_call_closure(
-                                [](uintptr_t user_context, iree_task_t* task,
+                                [](void* user_context, iree_task_t* task,
                                    iree_task_submission_t* pending_submission) {
                                   IREE_TRACE_SCOPE0("call0");
                                   EXPECT_EQ(0, user_context);
@@ -85,8 +85,7 @@ TEST(ExecutorTest, Any) {
   iree_task_dispatch_initialize(
       &scope_a,
       iree_task_make_dispatch_closure(
-          [](uintptr_t user_context,
-             const iree_task_tile_context_t* tile_context,
+          [](void* user_context, const iree_task_tile_context_t* tile_context,
              iree_task_submission_t* pending_submission) {
             IREE_TRACE_SCOPE0("tile0");
             EXPECT_EQ(0, user_context);
@@ -105,8 +104,7 @@ TEST(ExecutorTest, Any) {
   iree_task_dispatch_initialize(
       &scope_a,
       iree_task_make_dispatch_closure(
-          [](uintptr_t user_context,
-             const iree_task_tile_context_t* tile_context,
+          [](void* user_context, const iree_task_tile_context_t* tile_context,
              iree_task_submission_t* pending_submission) {
             IREE_TRACE_SCOPE0("tile1");
             EXPECT_EQ(0, user_context);
@@ -123,7 +121,7 @@ TEST(ExecutorTest, Any) {
   iree_task_call_t call1;
   iree_task_call_initialize(&scope_a,
                             iree_task_make_call_closure(
-                                [](uintptr_t user_context, iree_task_t* task,
+                                [](void* user_context, iree_task_t* task,
                                    iree_task_submission_t* pending_submission) {
                                   IREE_TRACE_SCOPE0("call1");
                                   EXPECT_EQ(1, user_context);
