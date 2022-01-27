@@ -11,6 +11,7 @@
 
 #include "iree/base/api.h"
 #include "iree/base/internal/atomics.h"
+#include "iree/base/internal/event_pool.h"
 #include "iree/base/internal/wait_handle.h"
 #include "iree/task/scope.h"
 #include "iree/task/submission.h"
@@ -323,6 +324,13 @@ void iree_task_executor_release(iree_task_executor_t* executor);
 
 // Trims pools and caches used by the executor and its workers.
 void iree_task_executor_trim(iree_task_executor_t* executor);
+
+// Returns an iree_event_t pool managed by the executor.
+// Users of the task system should acquire their transient events from this.
+// Long-lived events should be allocated on their own in order to avoid
+// expending the pool and harming high-frequency event acquisition.
+iree_event_pool_t* iree_task_executor_event_pool(
+    iree_task_executor_t* executor);
 
 // Acquires a fence for the given |scope| from the executor fence pool.
 iree_status_t iree_task_executor_acquire_fence(iree_task_executor_t* executor,

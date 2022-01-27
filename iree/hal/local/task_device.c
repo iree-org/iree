@@ -12,7 +12,6 @@
 
 #include "iree/base/internal/arena.h"
 #include "iree/base/tracing.h"
-#include "iree/hal/local/event_pool.h"
 #include "iree/hal/local/local_descriptor_set.h"
 #include "iree/hal/local/local_descriptor_set_layout.h"
 #include "iree/hal/local/local_executable_cache.h"
@@ -22,8 +21,6 @@
 #include "iree/hal/local/task_queue.h"
 #include "iree/hal/local/task_semaphore.h"
 #include "iree/hal/utils/buffer_transfer.h"
-
-#define IREE_HAL_LOCAL_TASK_EVENT_POOL_CAPACITY 32
 
 typedef struct iree_hal_task_device_t {
   iree_hal_resource_t resource;
@@ -35,9 +32,6 @@ typedef struct iree_hal_task_device_t {
   // Block pool used for command buffers with a larger block size (as command
   // buffers can contain inlined data uploads).
   iree_arena_block_pool_t large_block_pool;
-
-  // iree_event_t pool for semaphore wait operations.
-  iree_hal_local_event_pool_t* event_pool;
 
   iree_task_executor_t* executor;
 
@@ -115,7 +109,6 @@ iree_status_t iree_hal_task_device_create(
                                      &device->small_block_pool);
     iree_arena_block_pool_initialize(params->arena_block_size, host_allocator,
                                      &device->large_block_pool);
-    device->event_pool = NULL;
 
     device->executor = executor;
     iree_task_executor_retain(device->executor);
@@ -140,12 +133,6 @@ iree_status_t iree_hal_task_device_create(
   }
 
   if (iree_status_is_ok(status)) {
-    status = iree_hal_local_event_pool_allocate(
-        IREE_HAL_LOCAL_TASK_EVENT_POOL_CAPACITY, host_allocator,
-        &device->event_pool);
-  }
-
-  if (iree_status_is_ok(status)) {
     *out_device = (iree_hal_device_t*)device;
   } else {
     iree_hal_device_release((iree_hal_device_t*)device);
@@ -166,7 +153,6 @@ static void iree_hal_task_device_destroy(iree_hal_device_t* base_device) {
     iree_hal_executable_loader_release(device->loaders[i]);
   }
   iree_task_executor_release(device->executor);
-  iree_hal_local_event_pool_free(device->event_pool);
   iree_arena_block_pool_deinitialize(&device->large_block_pool);
   iree_arena_block_pool_deinitialize(&device->small_block_pool);
   iree_hal_allocator_release(device->device_allocator);
@@ -301,8 +287,9 @@ static iree_status_t iree_hal_task_device_create_semaphore(
     iree_hal_device_t* base_device, uint64_t initial_value,
     iree_hal_semaphore_t** out_semaphore) {
   iree_hal_task_device_t* device = iree_hal_task_device_cast(base_device);
-  return iree_hal_task_semaphore_create(device->event_pool, initial_value,
-                                        device->host_allocator, out_semaphore);
+  return iree_hal_task_semaphore_create(
+      iree_task_executor_event_pool(device->executor), initial_value,
+      device->host_allocator, out_semaphore);
 }
 
 static iree_status_t iree_hal_task_device_queue_submit(
@@ -336,9 +323,10 @@ static iree_status_t iree_hal_task_device_wait_semaphores(
     iree_hal_device_t* base_device, iree_hal_wait_mode_t wait_mode,
     const iree_hal_semaphore_list_t* semaphore_list, iree_timeout_t timeout) {
   iree_hal_task_device_t* device = iree_hal_task_device_cast(base_device);
-  return iree_hal_task_semaphore_multi_wait(wait_mode, semaphore_list, timeout,
-                                            device->event_pool,
-                                            &device->large_block_pool);
+  return iree_hal_task_semaphore_multi_wait(
+      wait_mode, semaphore_list, timeout,
+      iree_task_executor_event_pool(device->executor),
+      &device->large_block_pool);
 }
 
 static iree_status_t iree_hal_task_device_wait_idle(

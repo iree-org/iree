@@ -65,6 +65,13 @@ struct iree_task_executor_t {
   // really matter here as all tasks will be waited on simultaneously.
   iree_atomic_task_slist_t incoming_waiting_slist;
 
+  // iree_event_t pool used to acquire system wait handles.
+  // Many subsystems interacting with the executor will need events to park
+  // their work in the wait set and sharing the pool across all of them ensures
+  // we limit the number we have outstanding and avoid syscalls to allocate
+  // them.
+  iree_event_pool_t* event_pool;
+
   // Guards coordination logic; only one thread at a time may be acting as the
   // coordinator.
   iree_slim_mutex_t coordinator_mutex;

@@ -115,7 +115,7 @@ typedef struct iree_hal_task_queue_wait_cmd_t {
 
 // Forks out multiple wait tasks prior to issuing the commands.
 static iree_status_t iree_hal_task_queue_wait_cmd(
-    uintptr_t user_context, iree_task_t* task,
+    void* user_context, iree_task_t* task,
     iree_task_submission_t* pending_submission) {
   iree_hal_task_queue_wait_cmd_t* cmd = (iree_hal_task_queue_wait_cmd_t*)task;
   IREE_TRACE_ZONE_BEGIN(z0);
@@ -189,7 +189,7 @@ typedef struct iree_hal_task_queue_issue_cmd_t {
 
 // Issues a set of command buffers without waiting for them to complete.
 static iree_status_t iree_hal_task_queue_issue_cmd(
-    uintptr_t user_context, iree_task_t* task,
+    void* user_context, iree_task_t* task,
     iree_task_submission_t* pending_submission) {
   iree_hal_task_queue_issue_cmd_t* cmd = (iree_hal_task_queue_issue_cmd_t*)task;
   IREE_TRACE_ZONE_BEGIN(z0);
@@ -283,7 +283,7 @@ typedef struct iree_hal_task_queue_retire_cmd_t {
 // Retires a submission by signaling semaphores to their desired value and
 // disposing of the temporary arena memory used for the submission.
 static iree_status_t iree_hal_task_queue_retire_cmd(
-    uintptr_t user_context, iree_task_t* task,
+    void* user_context, iree_task_t* task,
     iree_task_submission_t* pending_submission) {
   iree_hal_task_queue_retire_cmd_t* cmd =
       (iree_hal_task_queue_retire_cmd_t*)task;

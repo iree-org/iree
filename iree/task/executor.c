@@ -89,6 +89,14 @@ iree_status_t iree_task_executor_create(
 
   iree_status_t status = iree_ok_status();
 
+  // Pool used for system events; exposed to users of the task system to ensure
+  // we minimize the number of live events and reduce overheads in
+  // high-frequency transient parking operations.
+  if (iree_status_is_ok(status)) {
+    status = iree_event_pool_allocate(IREE_TASK_EXECUTOR_EVENT_POOL_CAPACITY,
+                                      allocator, &executor->event_pool);
+  }
+
   // Wait set used to batch syscalls for polling/waiting on wait handles.
   // This is currently limited to a relatively small max to make bad behavior
   // clearer with nice RESOURCE_EXHAUSTED errors.
@@ -188,6 +196,7 @@ static void iree_task_executor_destroy(iree_task_executor_t* executor) {
   }
 
   iree_wait_set_free(executor->wait_set);
+  iree_event_pool_free(executor->event_pool);
   iree_slim_mutex_deinitialize(&executor->wait_mutex);
   iree_slim_mutex_deinitialize(&executor->coordinator_mutex);
   iree_atomic_task_slist_deinitialize(&executor->incoming_ready_slist);
@@ -218,6 +227,11 @@ void iree_task_executor_trim(iree_task_executor_t* executor) {
   // on submit - or rework pools to not have this limitation.
   // iree_task_pool_trim(&executor->fence_task_pool);
   // iree_task_pool_trim(&executor->dispatch_task_pool);
+}
+
+iree_event_pool_t* iree_task_executor_event_pool(
+    iree_task_executor_t* executor) {
+  return executor->event_pool;
 }
 
 iree_status_t iree_task_executor_acquire_fence(iree_task_executor_t* executor,
