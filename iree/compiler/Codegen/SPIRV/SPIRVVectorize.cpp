@@ -16,22 +16,141 @@
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/Hoisting.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
+#include "mlir/Dialect/SCF/SCF.h"
 #include "mlir/Dialect/SPIRV/IR/TargetAndABI.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/Dialect/Vector/Transforms/VectorTransforms.h"
+#include "mlir/IR/BlockAndValueMapping.h"
+#include "mlir/IR/PatternMatch.h"
 #include "mlir/Interfaces/VectorInterfaces.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+#include "mlir/Transforms/RegionUtils.h"
 
 #define DEBUG_TYPE "iree-spirv-vectorize"
 
 namespace mlir {
 namespace iree_compiler {
 namespace {
+
+struct SwapYieldedInsertStridedSliceOutOfIfRegion final
+    : public OpRewritePattern<scf::IfOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(scf::IfOp ifOp,
+                                PatternRewriter &rewriter) const override {
+    if (ifOp.getNumResults() == 0) return failure();
+
+    vector::InsertStridedSliceOp insertOp;
+    unsigned yieldIndex;
+    for (auto operand : llvm::enumerate(ifOp.thenYield().getOperands())) {
+      insertOp = operand.value().getDefiningOp<vector::InsertStridedSliceOp>();
+      yieldIndex = operand.index();
+    }
+    if (!insertOp) return failure();
+
+    if (insertOp.getSourceVectorType().getRank() !=
+        insertOp.getDestVectorType().getRank()) {
+      auto srcShape = llvm::reverse(insertOp.getSourceVectorType().getShape());
+      auto dstShape = llvm::reverse(insertOp.getDestVectorType().getShape());
+      for (auto sd : llvm::zip_first(srcShape, dstShape)) {
+        if (std::get<0>(sd) != std::get<1>(sd)) return failure();
+      }
+    }
+
+    bool isDestDefinedAbove = areValuesDefinedAbove(ValueRange{insertOp.dest()},
+                                                    ifOp.getThenRegion());
+    SmallVector<Type, 4> resultTypes =
+        llvm::to_vector<4>(ifOp.getResultTypes());
+    resultTypes.erase(resultTypes.begin() + yieldIndex);
+    resultTypes.push_back(insertOp.getSourceVectorType());
+    if (!isDestDefinedAbove)
+      resultTypes.push_back(insertOp.getDestVectorType());
+
+    auto newIfOp = rewriter.create<scf::IfOp>(
+        ifOp.getLoc(), resultTypes, ifOp.getCondition(), /*else=*/true);
+    rewriter.eraseBlock(&newIfOp.getThenRegion().getBlocks().front());
+    rewriter.eraseBlock(&newIfOp.getElseRegion().getBlocks().front());
+    rewriter.inlineRegionBefore(ifOp.getThenRegion(), newIfOp.getThenRegion(),
+                                newIfOp.getThenRegion().begin());
+    rewriter.inlineRegionBefore(ifOp.getElseRegion(), newIfOp.getElseRegion(),
+                                newIfOp.getElseRegion().begin());
+
+    {
+      auto yieldOp = newIfOp.thenYield();
+      rewriter.setInsertionPoint(yieldOp);
+
+      SmallVector<Value, 4> values = llvm::to_vector<4>(yieldOp.getOperands());
+      values.erase(values.begin() + yieldIndex);
+      values.push_back(insertOp.source());
+      if (!isDestDefinedAbove) values.push_back(insertOp.dest());
+      rewriter.create<scf::YieldOp>(yieldOp.getLoc(), values);
+      rewriter.eraseOp(yieldOp);
+    }
+
+    {
+      auto yieldOp = newIfOp.elseYield();
+      rewriter.setInsertionPoint(yieldOp);
+
+      auto oldValue = yieldOp.getOperand(yieldIndex);
+      Value extractValue;
+      if (insertOp.getSourceVectorType().getRank() ==
+          insertOp.getDestVectorType().getRank()) {
+        extractValue = rewriter.create<vector::ExtractStridedSliceOp>(
+            ifOp.getLoc(), insertOp.getSourceVectorType(), oldValue,
+            insertOp.offsets(),
+            rewriter.getI64ArrayAttr(insertOp.getSourceVectorType().getShape()),
+            insertOp.strides());
+      } else {
+        auto offsets = llvm::to_vector<4>(
+            llvm::map_range(insertOp.offsets(), [](Attribute attr) {
+              return attr.cast<IntegerAttr>().getValue().getSExtValue();
+            }));
+
+        extractValue = rewriter.create<vector::ExtractOp>(
+            ifOp.getLoc(), oldValue,
+            llvm::makeArrayRef(offsets).drop_back(
+                insertOp.getDestVectorType().getRank() -
+                insertOp.getSourceVectorType().getRank()));
+      }
+
+      SmallVector<Value, 4> values = llvm::to_vector<4>(yieldOp.getOperands());
+      values.erase(values.begin() + yieldIndex);
+      values.push_back(extractValue);
+      if (!isDestDefinedAbove) values.push_back(oldValue);
+      rewriter.create<scf::YieldOp>(yieldOp.getLoc(), values);
+      rewriter.eraseOp(yieldOp);
+    }
+
+    rewriter.setInsertionPointAfter(newIfOp);
+    BlockAndValueMapping bvm;
+    if (isDestDefinedAbove) {
+      bvm.map(insertOp.source(),
+              newIfOp.getResult(newIfOp.getNumResults() - 1));
+    } else {
+      bvm.map(insertOp.source(),
+              newIfOp.getResult(newIfOp.getNumResults() - 2));
+      bvm.map(insertOp.dest(), newIfOp.getResult(newIfOp.getNumResults() - 1));
+    }
+    auto newInsertOp = rewriter.clone(*insertOp, bvm);
+
+    SmallVector<Value, 4> replacements;
+    replacements.reserve(newIfOp.getNumResults());
+    for (int i = 0; i < newIfOp.getNumResults(); ++i)
+      replacements.push_back(newIfOp.getResult(i));
+    replacements.pop_back_n(2 - isDestDefinedAbove);
+    replacements.insert(replacements.begin() + yieldIndex,
+                        newInsertOp->getResult(0));
+    rewriter.replaceOp(ifOp, replacements);
+
+    return success();
+  }
+};
 
 int getNativeVectorSize(int64_t size) {
   // Try to use 4 first, and then 2, and then 1.
@@ -193,6 +312,35 @@ class SPIRVVectorizePass : public SPIRVVectorizeBase<SPIRVVectorizePass> {
       vector::populateCastAwayVectorLeadingOneDimPatterns(patterns);
       vector::TransferReadOp::getCanonicalizationPatterns(patterns, context);
       vector::TransferWriteOp::getCanonicalizationPatterns(patterns, context);
+      if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
+        return signalPassFailure();
+      }
+    }
+
+    LLVM_DEBUG({
+      llvm::dbgs() << "--- After remove leading one dims ---\n";
+      funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
+      llvm::dbgs() << "\n\n";
+    });
+
+    {
+      RewritePatternSet hoistPatterns(context);
+      hoistPatterns.add<SwapYieldedInsertStridedSliceOutOfIfRegion>(context);
+      if (failed(
+              applyPatternsAndFoldGreedily(funcOp, std::move(hoistPatterns)))) {
+        return signalPassFailure();
+      }
+    }
+
+    LLVM_DEBUG({
+      llvm::dbgs() << "--- After hoisting inserts ---\n";
+      funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
+      llvm::dbgs() << "\n\n";
+    });
+
+    {  // Canonicalization
+      RewritePatternSet patterns(context);
+      vector::populateVectorInsertExtractStridedSliceTransforms(patterns);
       if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
         return signalPassFailure();
       }

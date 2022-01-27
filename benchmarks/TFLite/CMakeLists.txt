@@ -548,6 +548,7 @@ iree_benchmark_suite(
     "GPU-Adreno"
   TRANSLATION_FLAGS
     ${ANDROID_ADRENO_GPU_TRANSLATION_FLAGS}
+    "--iree-flow-enable-padding-linalg-ops"
     "--iree-flow-enable-fuse-padding-into-consumer-ops"
   BENCHMARK_TOOL
     iree-benchmark-module
@@ -573,6 +574,7 @@ iree_benchmark_suite(
     "GPU-Mali-Valhall"
   TRANSLATION_FLAGS
     ${ANDROID_MALI_GPU_TRANSLATION_FLAGS}
+    "--iree-flow-enable-padding-linalg-ops"
     "--iree-flow-enable-fuse-padding-into-consumer-ops"
   BENCHMARK_TOOL
     iree-benchmark-module
@@ -594,6 +596,7 @@ iree_benchmark_suite(
     "--iree-input-type=tosa"
     "--iree-flow-demote-f32-to-f16"
     "--iree-vulkan-target-triple=valhall-unknown-android11"
+    "--iree-flow-enable-padding-linalg-ops"
     "--iree-flow-enable-fuse-padding-into-consumer-ops"
   BENCHMARK_TOOL
     iree-benchmark-module
@@ -631,6 +634,7 @@ iree_benchmark_suite(
     "GPU-Adreno"
   TRANSLATION_FLAGS
     ${ANDROID_ADRENO_GPU_TRANSLATION_FLAGS}
+    "--iree-flow-enable-padding-linalg-ops"
     "--iree-flow-enable-fuse-padding-into-consumer-ops"
     "--iree-hal-benchmark-dispatch-repeat-count=16"
   BENCHMARK_TOOL
@@ -659,6 +663,7 @@ iree_benchmark_suite(
     "GPU-Mali-Valhall"
   TRANSLATION_FLAGS
     ${ANDROID_MALI_GPU_TRANSLATION_FLAGS}
+    "--iree-flow-enable-padding-linalg-ops"
     "--iree-flow-enable-fuse-padding-into-consumer-ops"
     "--iree-hal-benchmark-dispatch-repeat-count=32"
   BENCHMARK_TOOL
@@ -683,6 +688,7 @@ iree_benchmark_suite(
     "--iree-input-type=tosa"
     "--iree-flow-demote-f32-to-f16"
     "--iree-vulkan-target-triple=valhall-unknown-android11"
+    "--iree-flow-enable-padding-linalg-ops"
     "--iree-flow-enable-fuse-padding-into-consumer-ops"
     "--iree-hal-benchmark-dispatch-repeat-count=32"
   BENCHMARK_TOOL

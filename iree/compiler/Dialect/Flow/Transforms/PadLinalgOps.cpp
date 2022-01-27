@@ -47,13 +47,13 @@ class PadMatmulOp : public OpRewritePattern<linalg::MatmulOp> {
 
     int M = lhsShape[0], K = lhsShape[1], N = rhsShape[1];
 
-    int newMSize = std::ceil(float(M) / paddingSize) * paddingSize;
+    int newMSize = M;
     int newNSize = std::ceil(float(N) / paddingSize) * paddingSize;
-    int newKSize = std::ceil(float(K) / paddingSize) * paddingSize;
+    int newKSize = K;
 
-    int paddingForM = newMSize - M;
+    int paddingForM = 0;
     int paddingForN = newNSize - N;
-    int paddingForK = newKSize - K;
+    int paddingForK = 0;
 
     if (paddingForM == 0 && paddingForN == 0 && paddingForK == 0) {
       return failure();

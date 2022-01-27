@@ -151,6 +151,8 @@ void addSPIRVTileAndVectorizePassPipeline(OpPassManager &pm) {
   pm.addNestedPass<FuncOp>(createSPIRVTilePass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
+  pm.addNestedPass<FuncOp>(createFoldAffineMinInDistributedLoopsPass());
+  pm.addPass(createCanonicalizerPass());
   pm.addNestedPass<FuncOp>(createSPIRVVectorizePass());
   pm.addNestedPass<FuncOp>(createForOpCanonicalizationPass());
   pm.addPass(createCanonicalizerPass());

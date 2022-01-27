@@ -180,14 +180,40 @@ LogicalResult setMatmulOpConfig(linalg::LinalgOp op,
       op.getInputOperand(0)->get().getType().cast<ShapedType>().getShape();
   ArrayRef<int64_t> rhsShape =
       op.getInputOperand(1)->get().getType().cast<ShapedType>().getShape();
-  if (llvm::any_of(lhsShape, ShapedType::isDynamic)) return success();
-  if (llvm::any_of(rhsShape, ShapedType::isDynamic)) return success();
+  ArrayRef<int64_t> outputShape =
+      op.getOutputOperand(0)->get().getType().cast<ShapedType>().getShape();
+
+  LLVM_DEBUG({
+    llvm::dbgs() << "matmul LHS shape: [";
+    llvm::interleaveComma(lhsShape, llvm::dbgs());
+    llvm::dbgs() << "]\n";
+    llvm::dbgs() << "matmul RHS shape: [";
+    llvm::interleaveComma(rhsShape, llvm::dbgs());
+    llvm::dbgs() << "]\n";
+    llvm::dbgs() << "matmul output shape: [";
+    llvm::interleaveComma(outputShape, llvm::dbgs());
+    llvm::dbgs() << "]\n";
+  });
 
   bool isBM = isa<linalg::BatchMatmulOp>(op);
 
-  int64_t dimM = lhsShape[0 + isBM];
-  int64_t dimK = lhsShape[1 + isBM];
-  int64_t dimN = rhsShape[1 + isBM];
+  auto getStaticDimSize = [](int64_t a, int64_t b) {
+    return ShapedType::isDynamic(a) ? b : a;
+  };
+
+  int64_t dimM = getStaticDimSize(lhsShape[0 + isBM], outputShape[0 + isBM]);
+  int64_t dimK = getStaticDimSize(lhsShape[1 + isBM], rhsShape[0 + isBM]);
+  int64_t dimN = getStaticDimSize(rhsShape[1 + isBM], outputShape[1 + isBM]);
+
+  LLVM_DEBUG({
+    llvm::dbgs() << "M: " << dimM << " N: " << dimN << " K: " << dimK << "\n";
+  });
+
+  if (llvm::any_of(ArrayRef<int64_t>{dimM, dimK, dimN},
+                   ShapedType::isDynamic)) {
+    LLVM_DEBUG(llvm::dbgs() << "has dynamic shape\n");
+    return success();
+  }
 
   // The core idea is to distribute the matmul M/N dimension to the workgroup
   // Y/X dimension, with each thread in a workgroup handling multiple vector
@@ -212,7 +238,7 @@ LogicalResult setMatmulOpConfig(linalg::LinalgOp op,
 
   // Deduce the configuration for the N dimension. Start with the best workgroup
   // X size, and reduce by a factor of two each time.
-  for (int64_t x = bestX; x >= 2; x >>= 1) {
+  for (int64_t x = bestX; x >= 1; x >>= 1) {
     // Handle 4 elements per thread for the innermost dimension. We need this
     // for vectorized load.
     int64_t chosenTileSize = bestThreadN;
@@ -226,7 +252,10 @@ LogicalResult setMatmulOpConfig(linalg::LinalgOp op,
       break;
     }
   }
-  if (workgroupTileSizes[1 + isBM] == 0) return success();
+  if (workgroupTileSizes[1 + isBM] == 0) {
+    LLVM_DEBUG(llvm::dbgs() << "failed to deduce config for N\n");
+    return success();
+  }
 
   // Deduce the configuration for the M dimension. Start with the best workgroup
   // Y size, and reduce by a factor of two each time.
@@ -249,7 +278,10 @@ LogicalResult setMatmulOpConfig(linalg::LinalgOp op,
       break;
     }
   }
-  if (workgroupTileSizes[0 + isBM] == 0) return success();
+  if (workgroupTileSizes[0 + isBM] == 0) {
+    LLVM_DEBUG(llvm::dbgs() << "failed to deduce config for M\n");
+    return success();
+  }
 
   // Deduce the configuration for the K dimension. We need some power of two
   // here so that we can do vector load.
@@ -259,7 +291,10 @@ LogicalResult setMatmulOpConfig(linalg::LinalgOp op,
       break;
     }
   }
-  if (reductionTileSizes[2 + isBM] == 0) return success();
+  if (reductionTileSizes[2 + isBM] == 0) {
+    LLVM_DEBUG(llvm::dbgs() << "failed to deduce config for K\n");
+    return success();
+  }
 
   auto pipeline = IREE::Codegen::DispatchLoweringPassPipeline::SPIRVVectorize;
   TileSizesListType tileSizes;

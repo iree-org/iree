@@ -23,6 +23,7 @@
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/GPU/GPUDialect.h"
 #include "mlir/Dialect/SCF/Transforms.h"
+#include "mlir/Dialect/SCF/Utils/AffineCanonicalizationUtils.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinAttributes.h"
@@ -56,6 +57,32 @@ inline raw_ostream &operator<<(raw_ostream &os,
 }
 #endif
 
+/// Matches a distributed loop and updates `lb`, `ub`, `step` with the lower
+/// bound, upper bound, and steps for the loop before distribution,
+static LogicalResult matchDistributedLoop(OpBuilder &builder, Location loc,
+                                          Value iv, Value &lb, Value &ub,
+                                          Value &step) {
+  scf::ForOp forOp = scf::getForInductionVarOwner(iv);
+  if (!forOp) return failure();
+
+  auto loopInfo = isTiledAndDistributedLoop(forOp);
+  if (!loopInfo) return failure();
+  LLVM_DEBUG(llvm::dbgs() << *loopInfo);
+
+  Optional<int64_t> untiledStep = getConstantIntValue(loopInfo->untiledStep);
+  // For IREE right now the original untiled loop should have step 1..
+  if (!untiledStep || *untiledStep != 1) return failure();
+  // ..and we tile according to some static tile sizes for processors.
+  if (!loopInfo->tileSize) return failure();
+
+  lb = getAsValue(loopInfo->untiledLowerBound, builder, loc);
+  ub = getAsValue(loopInfo->untiledUpperBound, builder, loc);
+  // The "step" expected by the upstream utility is really the tiling size.
+  step = builder.create<arith::ConstantIndexOp>(loc,
+                                                loopInfo->tileSize.getValue());
+  return success();
+}
+
 namespace {
 
 /// Folds `affine.min` ops over induction variables of tiled loops that are
@@ -79,34 +106,38 @@ struct FoldAffineMinOverDistributedLoopInductionVariable final
 
   LogicalResult matchAndRewrite(AffineMinOp minOp,
                                 PatternRewriter &rewriter) const override {
-    Location loc = minOp.getLoc();
-
     auto loopMatcher = [&](Value iv, Value &lb, Value &ub, Value &step) {
-      scf::ForOp forOp = scf::getForInductionVarOwner(iv);
-      if (!forOp) return failure();
-
-      auto loopInfo = isTiledAndDistributedLoop(forOp);
-      if (!loopInfo) return failure();
-      LLVM_DEBUG(llvm::dbgs() << *loopInfo);
-
-      Optional<int64_t> untiledStep =
-          getConstantIntValue(loopInfo->untiledStep);
-      // For IREE right now the original untiled loop should have step 1..
-      if (!untiledStep || *untiledStep != 1) return failure();
-      // ..and we tile according to some static tile sizes for processors.
-      if (!loopInfo->tileSize) return failure();
-
-      lb = getAsValue(loopInfo->untiledLowerBound, rewriter, loc);
-      ub = getAsValue(loopInfo->untiledUpperBound, rewriter, loc);
-      // The "step" expected by the upstream utility is really the tiling size.
-      step = rewriter.create<arith::ConstantIndexOp>(
-          loc, loopInfo->tileSize.getValue());
-      return success();
+      return matchDistributedLoop(rewriter, minOp.getLoc(), iv, lb, ub, step);
     };
 
     return scf::canonicalizeMinMaxOpInLoop(
         rewriter, minOp, minOp.getAffineMap(), minOp.operands(), /*isMin=*/true,
         loopMatcher);
+  }
+};
+
+struct FoldAffineMinInIfRegions final : public OpRewritePattern<scf::IfOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(scf::IfOp ifOp,
+                                PatternRewriter &rewriter) const override {
+    auto loopMatcher = [&](Value iv, Value &lb, Value &ub, Value &step) {
+      LLVM_DEBUG(llvm::dbgs() << "entering loopMatcher\n");
+      if (succeeded(
+              matchDistributedLoop(rewriter, ifOp.getLoc(), iv, lb, ub, step)))
+        return success();
+
+      LLVM_DEBUG(llvm::dbgs() << "not distributed loop --- try normal loop\n");
+      if (scf::ForOp forOp = scf::getForInductionVarOwner(iv)) {
+        lb = forOp.getLowerBound();
+        ub = forOp.getUpperBound();
+        step = forOp.getStep();
+        return success();
+      }
+      return failure();
+    };
+
+    return scf::canonicalizeMinMaxOpInInIf(ifOp, loopMatcher, rewriter);
   }
 };
 
@@ -116,6 +147,7 @@ struct FoldAffineMinInDistributedLoopsPass final
   void runOnOperation() override {
     RewritePatternSet patterns(&getContext());
     populateFoldAffineMinInDistributedLoopsPatterns(patterns);
+    populateFoldAffineMinInIfRegionsPatterns(patterns);
     if (failed(applyPatternsAndFoldGreedily(getOperation(),
                                             std::move(patterns)))) {
       // TODO(#4759): This does not converge after the max number of iterations.
@@ -132,6 +164,10 @@ void populateFoldAffineMinInDistributedLoopsPatterns(
     RewritePatternSet &patterns) {
   patterns.add<FoldAffineMinOverDistributedLoopInductionVariable>(
       patterns.getContext());
+}
+
+void populateFoldAffineMinInIfRegionsPatterns(RewritePatternSet &patterns) {
+  patterns.add<FoldAffineMinInIfRegions>(patterns.getContext());
 }
 
 std::unique_ptr<OperationPass<FuncOp>>

@@ -149,6 +149,8 @@ std::unique_ptr<OperationPass<FuncOp>> createMemrefCopyToLinalgPass();
 void populateFoldAffineMinInDistributedLoopsPatterns(
     RewritePatternSet &patterns);
 
+void populateFoldAffineMinInIfRegionsPatterns(RewritePatternSet &patterns);
+
 /// Populates `patterns` with a very specific pattern that vectorizes a
 /// linalg.conv op for a single thread. The linalg.conv should compute on
 /// static-sized subviews. To match, output shape must be 1x1xWoxCo, where Co
