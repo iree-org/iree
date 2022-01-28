@@ -53,40 +53,24 @@ static Type convertShapedToSignless(ShapedType shapedType) {
   return shapedType;
 }
 
-static Optional<Value> materializeCastToSignless(OpBuilder &builder,
-                                                 IntegerType toType,
-                                                 ValueRange inputs,
-                                                 Location loc) {
-  assert(inputs.size() == 1 && "too many inputs to type conversion");
-  Value fromValue = inputs[0];
-  auto fromType = fromValue.getType();
-  if (fromType.isSignlessInteger() || !toType.isSignlessInteger())
-    return llvm::None;
-  // Use unrealized conversion casts to do signful->signless conversion.
-  return builder.create<UnrealizedConversionCastOp>(loc, toType, fromValue)
-      ->getResult(0);
-}
-
-static Optional<Value> materializeCastToScalar(OpBuilder &builder, Type toType,
-                                               ValueRange inputs,
-                                               Location loc) {
+static Optional<Value> materializeCast(OpBuilder &builder, Type toType,
+                                       ValueRange inputs,
+                                       Location loc) {
   assert(inputs.size() == 1 && "too many inputs to type conversion");
   Value fromValue = inputs[0];
   auto fromType = fromValue.getType().dyn_cast<RankedTensorType>();
-  if (!fromType || fromType.getRank() != 0) return llvm::None;
+  if (!fromType) return llvm::None;
 
   if (auto intFromType = fromType.getElementType().dyn_cast<IntegerType>()) {
-    if (!intFromType.isSignlessInteger()) {
-      if (!toType.isSignlessInteger()) return llvm::None;
-      fromType = fromType.clone(toType).cast<RankedTensorType>();
-      fromValue =
-          builder.create<UnrealizedConversionCastOp>(loc, fromType, fromValue)
-              ->getResult(0);
-    }
+    fromValue =
+        builder.create<UnrealizedConversionCastOp>(loc, toType, fromValue)
+            ->getResult(0);
   }
 
-  Type extractType = fromType.getElementType();
-  return builder.createOrFold<tensor::ExtractOp>(loc, extractType, fromValue);
+  if (fromType.getRank() != 0) return fromValue;
+
+    Type extractType = fromType.getElementType();
+    return builder.createOrFold<tensor::ExtractOp>(loc, extractType, fromValue);
 }
 
 /// Note: only designed to work for casts involving rank-0 tensors and scalars
@@ -96,11 +80,13 @@ class MhloToStdTypeConverter : public TypeConverter {
   MhloToStdTypeConverter() {
     addConversion([](Type type) { return type; });
 
+    addConversion(convertShapedToSignless);
     addConversion(convertRank0TensorToScalar);
     addConversion(convertIntegerToSignless);
 
-    addArgumentMaterialization(materializeCastToScalar);
-    addTargetMaterialization(materializeCastToScalar);
+    addArgumentMaterialization(materializeCast);
+    addSourceMaterialization(materializeCast);
+    addTargetMaterialization(materializeCast);
   }
 };
 
@@ -167,29 +153,17 @@ struct SortOpConversion : public OpConversionPattern<mhlo::SortOp> {
   using OpConversionPattern<mhlo::SortOp>::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      mhlo::SortOp op, OpAdaptor adaptor,
+      mhlo::SortOp mhloSortOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const final {
-    Location loc = op.getLoc();
-    llvm::SmallVector<Value> inputs;
-    for (auto input : adaptor.getOperands()) {
-      Type newType = convertShapedToSignless(input.getType());
-      if (newType == input.getType()) {
-        inputs.push_back(input);
-      } else {
-        inputs.push_back(
-            rewriter.create<UnrealizedConversionCastOp>(loc, newType, input)
-                .getResult(0));
-      }
-    }
+    Location loc = mhloSortOp.getLoc();
 
     llvm::SmallVector<Type> resultTypes;
-    for (auto resultType : op.getResultTypes()) {
-      resultTypes.push_back(convertShapedToSignless(resultType));
-    }
-
+    (void)this->typeConverter->convertTypes(mhloSortOp.getResultTypes(), resultTypes);
     auto sortOp = rewriter.create<IREE::LinalgExt::SortOp>(
-        loc, resultTypes, /*inputs=*/ValueRange{}, inputs, op.dimensionAttr());
-    rewriter.inlineRegionBefore(op.comparator(), sortOp.region(),
+        loc, resultTypes,
+        /*inputs=*/ValueRange{}, adaptor.getOperands(),
+        mhloSortOp.dimensionAttr());
+    rewriter.inlineRegionBefore(mhloSortOp.comparator(), sortOp.region(),
                                 sortOp.region().begin());
     Region &region = sortOp.region();
     Block &block = region.front();
@@ -202,20 +176,7 @@ struct SortOpConversion : public OpConversionPattern<mhlo::SortOp> {
     }
     rewriter.applySignatureConversion(&region, signature_converter);
 
-    llvm::SmallVector<Value> results;
-    for (auto it : llvm::zip(sortOp->getResults(), op.getResultTypes())) {
-      Value v = std::get<0>(it);
-      Type t = std::get<1>(it);
-      if (v.getType() == t) {
-        results.push_back(v);
-      } else {
-        results.push_back(
-            rewriter.create<UnrealizedConversionCastOp>(loc, t, v).getResult(
-                0));
-      }
-    }
-
-    rewriter.replaceOp(op, results);
+    rewriter.replaceOp(mhloSortOp, sortOp->getResults());
     return success();
   }
 };
