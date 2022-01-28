@@ -61,14 +61,19 @@ static Optional<Value> materializeCast(OpBuilder &builder, Type toType,
   if (!fromType) return llvm::None;
 
   if (auto intFromType = fromType.getElementType().dyn_cast<IntegerType>()) {
-    fromValue =
-        builder.create<UnrealizedConversionCastOp>(loc, toType, fromValue)
-            ->getResult(0);
+    Type castType = getElementTypeOrSelf(toType);
+    if (auto shapedType = fromType.dyn_cast<ShapedType>())
+      castType = shapedType.clone(castType);
+
+    if (castType != fromType)
+      fromValue =
+          builder.create<UnrealizedConversionCastOp>(loc, castType, fromValue)
+              ->getResult(0);
   }
 
   if (fromType.getRank() != 0) return fromValue;
 
-  Type extractType = fromType.getElementType();
+  Type extractType = getElementTypeOrSelf(toType);
   return builder.createOrFold<tensor::ExtractOp>(loc, extractType, fromValue);
 }
 
