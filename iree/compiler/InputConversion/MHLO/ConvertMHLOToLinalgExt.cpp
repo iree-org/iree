@@ -54,8 +54,7 @@ static Type convertShapedToSignless(ShapedType shapedType) {
 }
 
 static Optional<Value> materializeCast(OpBuilder &builder, Type toType,
-                                       ValueRange inputs,
-                                       Location loc) {
+                                       ValueRange inputs, Location loc) {
   assert(inputs.size() == 1 && "too many inputs to type conversion");
   Value fromValue = inputs[0];
   auto fromType = fromValue.getType().dyn_cast<RankedTensorType>();
@@ -69,8 +68,8 @@ static Optional<Value> materializeCast(OpBuilder &builder, Type toType,
 
   if (fromType.getRank() != 0) return fromValue;
 
-    Type extractType = fromType.getElementType();
-    return builder.createOrFold<tensor::ExtractOp>(loc, extractType, fromValue);
+  Type extractType = fromType.getElementType();
+  return builder.createOrFold<tensor::ExtractOp>(loc, extractType, fromValue);
 }
 
 /// Note: only designed to work for casts involving rank-0 tensors and scalars
@@ -158,7 +157,8 @@ struct SortOpConversion : public OpConversionPattern<mhlo::SortOp> {
     Location loc = mhloSortOp.getLoc();
 
     llvm::SmallVector<Type> resultTypes;
-    (void)this->typeConverter->convertTypes(mhloSortOp.getResultTypes(), resultTypes);
+    (void)this->typeConverter->convertTypes(mhloSortOp.getResultTypes(),
+                                            resultTypes);
     auto sortOp = rewriter.create<IREE::LinalgExt::SortOp>(
         loc, resultTypes,
         /*inputs=*/ValueRange{}, adaptor.getOperands(),
