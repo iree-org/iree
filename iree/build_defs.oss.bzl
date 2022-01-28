@@ -9,7 +9,10 @@
 # Target to the FileCheck binary.
 INTREE_FILECHECK_TARGET = "@llvm-project//llvm:FileCheck"
 
-IREE_CUDA_DEPS = ["//iree/hal/cuda/registration"]
+# Temporarily disabled pending build system changes.
+IREE_CUDA_DEPS = [
+    # "//iree/hal/cuda/registration"
+]
 
 def platform_trampoline_deps(basename, path = "base"):
     """Produce a list of deps for the given `basename` platform target.
