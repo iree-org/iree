@@ -58,6 +58,7 @@ option(IREE_BUILD_PYTHON_BINDINGS "Builds the IREE python bindings" OFF)
 #-------------------------------------------------------------------------------
 
 option(IREE_BUILD_EXPERIMENTAL_REMOTING "Builds experimental remoting support." OFF)
+option(IREE_BUILD_EXPERIMENTAL_WEB_SAMPLES "Builds experimental web samples." OFF)
 option(IREE_HAL_DRIVER_EXPERIMENTAL_ROCM "Builds the experimental ROCm Backend." OFF)
 
 #-------------------------------------------------------------------------------
@@ -537,6 +538,10 @@ if(${IREE_BUILD_EXPERIMENTAL_REMOTING})
     add_subdirectory(build_tools/third_party/liburing EXCLUDE_FROM_ALL)
   endif()
   add_subdirectory(experimental/remoting)
+endif()
+
+if(${IREE_BUILD_EXPERIMENTAL_WEB_SAMPLES})
+  add_subdirectory(experimental/sample_web_static)
 endif()
 
 set(IREE_PUBLIC_INCLUDE_DIRS "${IREE_COMMON_INCLUDE_DIRS}"
