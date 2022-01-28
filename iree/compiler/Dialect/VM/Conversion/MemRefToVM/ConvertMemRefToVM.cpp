@@ -223,7 +223,7 @@ class ConvertMemRefStoreOp : public OpConversionPattern<memref::StoreOp> {
 void populateMemRefToVMPatterns(MLIRContext *context,
                                 ConversionTarget &conversionTarget,
                                 TypeConverter &typeConverter,
-                                OwningRewritePatternList &patterns) {
+                                RewritePatternSet &patterns) {
   conversionTarget.addIllegalDialect<memref::MemRefDialect>();
 
   typeConverter.addConversion([&](MemRefType type) -> llvm::Optional<Type> {

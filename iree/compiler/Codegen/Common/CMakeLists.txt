@@ -50,8 +50,8 @@ iree_cc_library(
     MLIRAffineBufferizableOpInterfaceImpl
     MLIRAffineUtils
     MLIRAnalysis
-    MLIRArithBufferizableOpInterfaceImpl
     MLIRArithmetic
+    MLIRArithmeticTransforms
     MLIRBufferization
     MLIRBufferizationTransforms
     MLIRGPUOps

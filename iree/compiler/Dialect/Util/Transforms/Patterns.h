@@ -17,8 +17,7 @@ namespace Util {
 // Populates |patterns| with some risky/IREE-specific canonicalization patterns.
 // Some of these apply to other dialects (such as std/builtin) and could be
 // upstreamed after some more exhaustive investigation.
-void populateCommonPatterns(MLIRContext *context,
-                            OwningRewritePatternList &patterns);
+void populateCommonPatterns(MLIRContext *context, RewritePatternSet &patterns);
 
 }  // namespace Util
 }  // namespace IREE

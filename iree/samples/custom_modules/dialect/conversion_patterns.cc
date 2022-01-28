@@ -16,7 +16,7 @@ namespace IREE {
 namespace Custom {
 
 void populateCustomToHALPatterns(MLIRContext *context,
-                                 OwningRewritePatternList &patterns,
+                                 RewritePatternSet &patterns,
                                  TypeConverter &typeConverter) {
   // We can use the HAL conversion handler for this tensor->buffer conversion
   // as we just want the simple form. If we wanted to perform additional
@@ -30,7 +30,7 @@ void populateCustomToHALPatterns(MLIRContext *context,
 
 void populateCustomToVMPatterns(MLIRContext *context,
                                 SymbolTable &importSymbols,
-                                OwningRewritePatternList &patterns,
+                                RewritePatternSet &patterns,
                                 TypeConverter &typeConverter) {
   // We can use the VM conversion handler for all of these as they are simple
   // 1:1 mappings. More complex mappings can provide their own conversions

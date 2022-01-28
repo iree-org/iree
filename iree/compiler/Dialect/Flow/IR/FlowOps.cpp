@@ -841,8 +841,8 @@ SmallVector<int64_t, 4> TensorUpdateOp::getTiedResultOperandIndices() {
 // Public methods
 //===----------------------------------------------------------------------===//
 
-void populateFlowDispatchCanonicalizationPatterns(
-    OwningRewritePatternList &results, MLIRContext *context) {
+void populateFlowDispatchCanonicalizationPatterns(RewritePatternSet &results,
+                                                  MLIRContext *context) {
   DispatchTensorLoadOp::getCanonicalizationPatterns(results, context);
 }
 

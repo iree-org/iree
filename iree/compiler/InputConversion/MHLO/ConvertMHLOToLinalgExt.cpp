@@ -487,7 +487,7 @@ struct ConvertMHLOToLinalgExtPass
   }
 
   void runOnOperation() override {
-    OwningRewritePatternList patterns(&getContext());
+    RewritePatternSet patterns(&getContext());
     MLIRContext *context = &getContext();
 
     MhloToStdTypeConverter typeConverter;

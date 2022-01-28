@@ -89,7 +89,7 @@ class AllocatorTryMapOpConversion
 void populateHALAllocatorToVMPatterns(MLIRContext *context,
                                       SymbolTable &importSymbols,
                                       TypeConverter &typeConverter,
-                                      OwningRewritePatternList &patterns) {
+                                      RewritePatternSet &patterns) {
   patterns.insert<VMImportOpConversion<IREE::HAL::AllocatorAllocateOp>>(
       context, importSymbols, typeConverter, "hal.allocator.allocate");
   patterns.insert<AllocatorMapOpConversion>(typeConverter, context,

@@ -111,7 +111,7 @@ class DeviceQueryI32OpConversion
 void populateHALDeviceToVMPatterns(MLIRContext *context,
                                    SymbolTable &importSymbols,
                                    TypeConverter &typeConverter,
-                                   OwningRewritePatternList &patterns) {
+                                   RewritePatternSet &patterns) {
   patterns.insert<VMImportOpConversion<IREE::HAL::DeviceAllocatorOp>>(
       context, importSymbols, typeConverter, "hal.device.allocator");
 

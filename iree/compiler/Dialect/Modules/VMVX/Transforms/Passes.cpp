@@ -54,7 +54,7 @@ static void buildVectorVMVXTransformPassPipeline(OpPassManager &passManager) {
   nestedModulePM.addNestedPass<FuncOp>(createConvertVectorToSCFPass());
   nestedModulePM.addNestedPass<FuncOp>(createCanonicalizerPass());
   nestedModulePM.addNestedPass<FuncOp>(arith::createArithmeticExpandOpsPass());
-  nestedModulePM.addNestedPass<FuncOp>(createStdExpandOpsPass());
+  nestedModulePM.addNestedPass<FuncOp>(memref::createExpandOpsPass());
 
   // Handle tensor-type constants.
   nestedModulePM.addPass(createTensorConstantBufferizePass());

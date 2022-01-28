@@ -13,7 +13,7 @@ namespace mlir {
 namespace iree_compiler {
 
 void populateLLVMConversionPatterns(MLIRContext *context,
-                                    OwningRewritePatternList &patterns,
+                                    RewritePatternSet &patterns,
                                     LLVMTypeConverter &converter);
 
 void populateScalarizeMathOps(RewritePatternSet &patterns);

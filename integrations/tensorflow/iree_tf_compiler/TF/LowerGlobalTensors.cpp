@@ -7,6 +7,7 @@
 #include "iree-dialects/Dialect/Input/InputDialect.h"
 #include "iree-dialects/Dialect/Input/InputOps.h"
 #include "iree_tf_compiler/TF/Passes.h"
+#include "llvm/ADT/BitVector.h"
 #include "llvm/ADT/PostOrderIterator.h"
 #include "llvm/ADT/STLExtras.h"
 #include "mlir/Dialect/Affine/Utils.h"
@@ -85,7 +86,7 @@ static LogicalResult convertTFGlobalTensorsToFlowVariables(ModuleOp module) {
     if (!tf_saved_model::IsExported(func)) {
       continue;
     }
-    SmallVector<unsigned, 4> argsToErase;
+    llvm::BitVector argsToErase(func.getNumArguments());
     OpBuilder builder(func.getBody());
     SmallVector<Value, 8> typeConversionWorklist;
     for (int i = 0, e = func.getNumArguments(); i < e; i++) {
@@ -104,7 +105,7 @@ static LogicalResult convertTFGlobalTensorsToFlowVariables(ModuleOp module) {
                   symNameToFlowSymName[globalTensor.sym_name()]));
       typeConversionWorklist.push_back(variableAddressOp.getResult());
       func.getArgument(i).replaceAllUsesWith(variableAddressOp.getResult());
-      argsToErase.push_back(i);
+      argsToErase.set(i);
     }
     func.eraseArguments(argsToErase);
 

@@ -1075,7 +1075,7 @@ LogicalResult createDispatchRegionsFromRootOps(mlir::Operation *funcOp) {
   // Create the dispatch region, first without the isolate region from above
   // property.
   {
-    OwningRewritePatternList patterns(context);
+    RewritePatternSet patterns(context);
     auto linalgTilingOptions =
         linalg::LinalgTilingOptions()
             .setDistributionOptions(workgroupDistributionOptions)
@@ -1091,7 +1091,7 @@ LogicalResult createDispatchRegionsFromRootOps(mlir::Operation *funcOp) {
 
     // Run canonicalization patterns and pattern to resolve tensor.dim of result
     // values into tensor.dim of its operands..
-    OwningRewritePatternList canonicalizationPatterns(context);
+    RewritePatternSet canonicalizationPatterns(context);
     linalg::populateLinalgTilingCanonicalizationPatterns(
         canonicalizationPatterns);
     if (failed(applyPatternsAndFoldGreedily(
@@ -1108,7 +1108,7 @@ LogicalResult createDispatchRegionsFromRootOps(mlir::Operation *funcOp) {
 
   // Run necessary canonicalization patterns before rewrite destructive updates.
   {
-    OwningRewritePatternList patterns(context);
+    RewritePatternSet patterns(context);
     // Resolve `tensor.dim` of result of operations into operations on its
     // operands using the `ReifyRankedShapedTypeOpInterface`.
     memref::populateResolveRankedShapeTypeResultDimsPatterns(patterns);

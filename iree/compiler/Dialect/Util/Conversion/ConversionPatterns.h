@@ -54,11 +54,11 @@ inline void addGenericLegalOp(ConversionTarget &conversionTarget,
 // |typeConverter|.
 void populateUtilConversionPatterns(MLIRContext *context,
                                     TypeConverter &typeConverter,
-                                    OwningRewritePatternList &patterns);
+                                    RewritePatternSet &patterns);
 void populateUtilConversionPatterns(MLIRContext *context,
                                     ConversionTarget &conversionTarget,
                                     TypeConverter &typeConverter,
-                                    OwningRewritePatternList &patterns);
+                                    RewritePatternSet &patterns);
 
 }  // namespace iree_compiler
 }  // namespace mlir

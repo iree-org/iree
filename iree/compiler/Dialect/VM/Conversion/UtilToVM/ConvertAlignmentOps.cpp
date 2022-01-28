@@ -73,7 +73,7 @@ struct AlignOpConversion : public OpConversionPattern<IREE::Util::AlignOp> {
 void populateUtilAlignmentToVMPatterns(MLIRContext *context,
                                        ConversionTarget &conversionTarget,
                                        TypeConverter &typeConverter,
-                                       OwningRewritePatternList &patterns) {
+                                       RewritePatternSet &patterns) {
   conversionTarget.addIllegalOp<IREE::Util::AlignOp>();
 
   patterns.insert<AlignOpConversion>(typeConverter, context);

@@ -805,7 +805,7 @@ struct MHLOToMHLOPreprocessingPass
   void runOnOperation() override {
     MLIRContext *context = &getContext();
     ConversionTarget conversionTarget(*context);
-    OwningRewritePatternList conversionPatterns(&getContext());
+    RewritePatternSet conversionPatterns(&getContext());
     // Note that various input modalities may do their own legalization of
     // CHLO. Converting here allows IREE to accept CHLO dialect regardless of
     // whether it was legalized away at a higher level.
@@ -820,7 +820,7 @@ struct MHLOToMHLOPreprocessingPass
       return signalPassFailure();
     }
 
-    OwningRewritePatternList patterns(&getContext());
+    RewritePatternSet patterns(&getContext());
     // TODO: Remove once we have a general contraction to matmul pass.
     mhlo::PopulateEinsumToDotGeneralPatterns(context, &patterns);
     mhlo::PopulateUnfuseBatchNormPatterns(context, &patterns);

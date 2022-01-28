@@ -303,7 +303,7 @@ class ScheduleExecutionPass
 
     // Cleanup the dead ops.
     // TODO(benvanik): less work here - maybe no patterns to just force folding?
-    OwningRewritePatternList patterns(context);
+    RewritePatternSet patterns(context);
     for (auto *dialect : context->getLoadedDialects()) {
       dialect->getCanonicalizationPatterns(patterns);
     }

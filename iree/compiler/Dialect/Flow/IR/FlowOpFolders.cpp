@@ -86,7 +86,7 @@ static SmallVector<Value, 4> refreshDimsOnTypeChange(
 //===----------------------------------------------------------------------===//
 
 void DispatchWorkgroupsOp::getCanonicalizationPatterns(
-    OwningRewritePatternList &results, MLIRContext *context) {
+    RewritePatternSet &results, MLIRContext *context) {
   results.insert<IREE::Util::ClosureOptimizationPattern<DispatchWorkgroupsOp>>(
       context);
 }
@@ -218,7 +218,7 @@ struct DispatchTensorLoadOpWithOffsetSizesAndStridesConstantArgumentFolder final
 }  // namespace
 
 void DispatchTensorLoadOp::getCanonicalizationPatterns(
-    OwningRewritePatternList &results, MLIRContext *context) {
+    RewritePatternSet &results, MLIRContext *context) {
   results.insert<ReuseDispatchTensorLoadShapeDims>(context);
   results.insert<ConvertDispatchInputLoadOfTensorToSubTensor>(context);
   results.insert<
@@ -274,7 +274,7 @@ struct FoldCastOpIntoDispatchStoreOp
 }  // namespace
 
 void DispatchTensorStoreOp::getCanonicalizationPatterns(
-    OwningRewritePatternList &results, MLIRContext *context) {
+    RewritePatternSet &results, MLIRContext *context) {
   results.insert<ReuseDispatchTensorStoreShapeDims>(context);
   results.insert<FoldCastOpIntoDispatchStoreOp>(context);
 }
@@ -378,8 +378,8 @@ struct ExpandDynamicShapeConstant : public OpRewritePattern<TensorConstantOp> {
 
 }  // namespace
 
-void TensorConstantOp::getCanonicalizationPatterns(
-    OwningRewritePatternList &results, MLIRContext *context) {
+void TensorConstantOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                                   MLIRContext *context) {
   results.insert<ExpandDynamicShapeConstant>(context);
 }
 
@@ -501,15 +501,15 @@ struct ResolveShapedDim : public OpRewritePattern<tensor::DimOp> {
 
 }  // namespace
 
-void TensorReshapeOp::getCanonicalizationPatterns(
-    OwningRewritePatternList &results, MLIRContext *context) {
+void TensorReshapeOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                                  MLIRContext *context) {
   results.insert<FlattenTensorReshapeChain>(context);
   results.insert<ResolveShapedRank>(context);
   results.insert<ResolveShapedDim>(context);
 }
 
-void TensorLoadOp::getCanonicalizationPatterns(
-    OwningRewritePatternList &results, MLIRContext *context) {
+void TensorLoadOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                               MLIRContext *context) {
   results.insert<FoldSplatLoadIntoPrimitive>(context);
 }
 
@@ -550,8 +550,8 @@ OpFoldResult TensorStoreOp::fold(ArrayRef<Attribute> operands) {
   return {};
 }
 
-void TensorSplatOp::getCanonicalizationPatterns(
-    OwningRewritePatternList &results, MLIRContext *context) {
+void TensorSplatOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                                MLIRContext *context) {
   // TODO(benvanik): canonicalize splat+slice to smaller splat.
   results.insert<FoldSplatReshapeIntoSplat>(context);
 }
@@ -724,8 +724,8 @@ struct FoldTensorUpdateOpWithCasts : public OpRewritePattern<TensorUpdateOp> {
 
 }  // namespace
 
-void TensorUpdateOp::getCanonicalizationPatterns(
-    OwningRewritePatternList &results, MLIRContext *context) {
+void TensorUpdateOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                                 MLIRContext *context) {
   results.insert<FoldTensorUpdateOpWithCasts>(context);
 }
 

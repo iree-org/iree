@@ -824,7 +824,7 @@ class CallOpConversion : public OpConversionPattern<CallOp> {
 
 void populateStandardToVMPatterns(MLIRContext *context,
                                   TypeConverter &typeConverter,
-                                  OwningRewritePatternList &patterns) {
+                                  RewritePatternSet &patterns) {
   patterns.insert<AssertOpConversion, BranchOpConversion, CallOpConversion,
                   CmpI32OpConversion, CmpI64OpConversion, CmpF32OpConversion,
                   CondBranchOpConversion, ModuleOpConversion, FuncOpConversion,

@@ -16,7 +16,7 @@ namespace iree_compiler {
 
 // Populates conversion patterns from the HAL dialect to the VM dialect.
 void populateHALToVMPatterns(MLIRContext *context, SymbolTable &importSymbols,
-                             OwningRewritePatternList &patterns,
+                             RewritePatternSet &patterns,
                              TypeConverter &typeConverter);
 
 }  // namespace iree_compiler

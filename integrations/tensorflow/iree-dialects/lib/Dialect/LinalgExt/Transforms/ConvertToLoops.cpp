@@ -99,7 +99,7 @@ struct LinalgExtToLoopsPass
   void runOnOperation() override {
     MLIRContext *context = &getContext();
 
-    OwningRewritePatternList patterns(context);
+    RewritePatternSet patterns(context);
     patterns.insert<TiledOpInterfaceLowerToLoopsPattern>(context);
     if (failed(applyPatternsAndFoldGreedily(getOperation(),
                                             std::move(patterns)))) {

@@ -40,7 +40,7 @@ void setupDirectMHLOToFlowLegality(MLIRContext *context,
 }
 
 void populateMHLOToFlowPatterns(MLIRContext *context,
-                                OwningRewritePatternList &patterns) {
+                                RewritePatternSet &patterns) {
   patterns.insert<ConstOpLowering>(context);
 }
 

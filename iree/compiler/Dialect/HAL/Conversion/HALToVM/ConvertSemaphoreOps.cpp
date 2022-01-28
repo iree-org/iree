@@ -15,7 +15,7 @@ namespace iree_compiler {
 void populateHALSemaphoreToVMPatterns(MLIRContext *context,
                                       SymbolTable &importSymbols,
                                       TypeConverter &typeConverter,
-                                      OwningRewritePatternList &patterns) {
+                                      RewritePatternSet &patterns) {
   patterns.insert<VMImportOpConversion<IREE::HAL::SemaphoreCreateOp>>(
       context, importSymbols, typeConverter, "hal.semaphore.create");
   patterns.insert<VMImportOpConversion<IREE::HAL::SemaphoreQueryOp>>(

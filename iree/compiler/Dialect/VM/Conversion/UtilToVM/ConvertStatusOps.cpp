@@ -30,7 +30,7 @@ class StatusCheckOkOpConversion
 void populateUtilStatusToVMPatterns(MLIRContext *context,
                                     ConversionTarget &conversionTarget,
                                     TypeConverter &typeConverter,
-                                    OwningRewritePatternList &patterns) {
+                                    RewritePatternSet &patterns) {
   conversionTarget.addIllegalOp<IREE::Util::StatusCheckOkOp>();
   patterns.insert<StatusCheckOkOpConversion>(context, typeConverter);
 }

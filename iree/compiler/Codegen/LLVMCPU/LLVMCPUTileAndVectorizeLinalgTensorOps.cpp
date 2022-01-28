@@ -76,7 +76,7 @@ void LLVMCPUTileAndVectorizePass::runOnOperation() {
 
   // First level of tiling patterns
   {
-    OwningRewritePatternList l1patterns(&getContext());
+    RewritePatternSet l1patterns(&getContext());
     l1patterns.insert<TileWorkgroups>(
         context,
         linalg::LinalgTilingOptions().setTileSizeComputationFunction(
@@ -101,7 +101,7 @@ void LLVMCPUTileAndVectorizePass::runOnOperation() {
 
   // Apply canoncalization
   {
-    OwningRewritePatternList canonicalizationPatterns(&getContext());
+    RewritePatternSet canonicalizationPatterns(&getContext());
     linalg::populateLinalgTilingCanonicalizationPatterns(
         canonicalizationPatterns);
     memref::DimOp::getCanonicalizationPatterns(canonicalizationPatterns,
@@ -121,7 +121,7 @@ void LLVMCPUTileAndVectorizePass::runOnOperation() {
 
   // Second level of tiling patterns{
   {
-    OwningRewritePatternList l2patterns(&getContext());
+    RewritePatternSet l2patterns(&getContext());
     l2patterns.insert<TileWorkgroups>(
         context,
         linalg::LinalgTilingOptions().setTileSizeComputationFunction(
@@ -146,7 +146,7 @@ void LLVMCPUTileAndVectorizePass::runOnOperation() {
 
   // Apply canoncalization
   {
-    OwningRewritePatternList canonicalizationPatterns(&getContext());
+    RewritePatternSet canonicalizationPatterns(&getContext());
     linalg::populateLinalgTilingCanonicalizationPatterns(
         canonicalizationPatterns);
     memref::DimOp::getCanonicalizationPatterns(canonicalizationPatterns,
@@ -180,7 +180,7 @@ void LLVMCPUTileAndVectorizePass::runOnOperation() {
 
   // Apply vectorization patterns.
   {
-    OwningRewritePatternList vectorizationPatterns(&getContext());
+    RewritePatternSet vectorizationPatterns(&getContext());
     linalg::LinalgVectorizationOptions opt;
     linalg::LinalgTransformationFilter f(
         StringAttr::get(context, getVectorizeMarker()));
@@ -227,7 +227,7 @@ void LLVMCPUTileAndVectorizePass::runOnOperation() {
     vector::VectorTransformsOptions vectorTransformsOptions =
         vector::VectorTransformsOptions().setVectorTransformsOptions(
             vector::VectorContractLowering::OuterProduct);
-    OwningRewritePatternList vectorContractLoweringPatterns(&getContext());
+    RewritePatternSet vectorContractLoweringPatterns(&getContext());
     vectorContractLoweringPatterns.insert<
         vector::ContractionOpToOuterProductOpLowering,
         vector::ContractionOpToMatmulOpLowering, vector::ContractionOpLowering>(

@@ -116,7 +116,7 @@ struct RemoveDeadMemAllocs : RewritePattern {
 struct CleanupBufferAllocViewPass
     : public CleanupBufferAllocViewBase<CleanupBufferAllocViewPass> {
   void runOnOperation() override {
-    OwningRewritePatternList patterns(&getContext());
+    RewritePatternSet patterns(&getContext());
     patterns.insert<FoldReshapeIntoInterfaceTensorLoad<tensor::CollapseShapeOp>,
                     FoldReshapeIntoInterfaceTensorLoad<tensor::ExpandShapeOp>,
                     RemoveDeadMemAllocs>(&getContext());

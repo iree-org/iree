@@ -70,7 +70,7 @@ class ConvertToHALPass
     HALTypeConverter typeConverter(conversionInterfaces);
     HALConversionTarget conversionTarget(context, typeConverter);
 
-    OwningRewritePatternList patterns(&getContext());
+    RewritePatternSet patterns(&getContext());
 
     populateUtilToHALPatterns(context, conversionTarget, typeConverter,
                               patterns);

@@ -211,14 +211,12 @@ static void insertConstantTableLookup(mlir::FuncOp funcOp,
   }
 
   // Fixup function signature.
-  SmallVector<unsigned> deadArgs;
   llvm::BitVector deadArgMap(funcOp.getNumArguments() + 1);
   for (auto operandIdx : constantTable.coveredOperands.set_bits()) {
     unsigned argIdx = operandToArgMap[operandIdx];
-    deadArgs.push_back(argIdx);
     deadArgMap.set(argIdx);
   }
-  funcOp.setType(funcOp.getTypeWithoutArgsAndResults(deadArgs, {}));
+  funcOp.setType(funcOp.getTypeWithoutArgsAndResults(deadArgMap, {}));
   funcOp.setType(funcOp.getTypeWithArgsAndResults(
       {funcOp.getNumArguments()}, {builder.getIndexType()}, {}, {}));
   entryBlock.eraseArguments(

@@ -379,7 +379,7 @@ static std::vector<TypeDef> buildTypeTable(IREE::VM::ModuleOp moduleOp) {
 // required transformations (such as debug op stripping).
 static LogicalResult canonicalizeModule(BytecodeTargetOptions targetOptions,
                                         IREE::VM::ModuleOp moduleOp) {
-  OwningRewritePatternList patterns(moduleOp.getContext());
+  RewritePatternSet patterns(moduleOp.getContext());
   ConversionTarget target(*moduleOp.getContext());
   target.addLegalDialect<IREE::VM::VMDialect>();
   target.addLegalOp<IREE::Util::DoNotOptimizeOp>();

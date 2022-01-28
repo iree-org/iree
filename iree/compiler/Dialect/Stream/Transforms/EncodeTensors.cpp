@@ -564,7 +564,7 @@ class EncodeHostTensorsPass
   }
 
   void runOnOperation() override {
-    OwningRewritePatternList patterns(&getContext());
+    RewritePatternSet patterns(&getContext());
     patterns.insert<
         EncodeTensorImportOp, EncodeTensorExportOp, EncodeTensorSizeOfOp,
         EncodeTensorConstantOp, EncodeTensorSplatOp, EncodeTensorCloneOp,
@@ -700,7 +700,7 @@ class EncodeDeviceTensorsPass
   }
 
   void runOnOperation() override {
-    OwningRewritePatternList patterns(&getContext());
+    RewritePatternSet patterns(&getContext());
     patterns.insert<EncodeBindingSubspanOp, EncodeDispatchTensorLoadOp,
                     EncodeDispatchTensorStoreOp>(&getContext());
     FrozenRewritePatternSet frozenPatterns(std::move(patterns));

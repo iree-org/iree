@@ -260,7 +260,7 @@ class ConvertHALInterfaceBindingSubspanOp
 }  // namespace
 
 void populateHALToVMVXPatterns(MLIRContext *context,
-                               OwningRewritePatternList &patterns,
+                               RewritePatternSet &patterns,
                                TypeConverter &typeConverter) {
   patterns.insert<ConvertHALInterfaceWorkgroupIDOp>(typeConverter, context);
   patterns.insert<ConvertHALInterfaceWorkgroupSizeOp>(typeConverter, context);

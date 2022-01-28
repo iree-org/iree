@@ -121,7 +121,7 @@ class CommandBufferPushDescriptorSetOpConversion
 void populateHALCommandBufferToVMPatterns(MLIRContext *context,
                                           SymbolTable &importSymbols,
                                           TypeConverter &typeConverter,
-                                          OwningRewritePatternList &patterns) {
+                                          RewritePatternSet &patterns) {
   patterns.insert<VMImportOpConversion<IREE::HAL::CommandBufferCreateOp>>(
       context, importSymbols, typeConverter, "hal.command_buffer.create");
   patterns.insert<VMImportOpConversion<IREE::HAL::CommandBufferBeginOp>>(

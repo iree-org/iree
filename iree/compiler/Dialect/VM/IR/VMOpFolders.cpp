@@ -119,8 +119,8 @@ struct InlineConstGlobalInitializer : public OpRewritePattern<InitializerOp> {
 
 }  // namespace
 
-void InitializerOp::getCanonicalizationPatterns(
-    OwningRewritePatternList &results, MLIRContext *context) {
+void InitializerOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                                MLIRContext *context) {
   results.insert<DropEmptyInitializerOp, InlineConstGlobalInitializer>(context);
 }
 
@@ -153,27 +153,27 @@ struct DropDefaultConstGlobalOpInitializer : public OpRewritePattern<T> {
 
 }  // namespace
 
-void GlobalI32Op::getCanonicalizationPatterns(OwningRewritePatternList &results,
+void GlobalI32Op::getCanonicalizationPatterns(RewritePatternSet &results,
                                               MLIRContext *context) {
   results.insert<DropDefaultConstGlobalOpInitializer<GlobalI32Op>>(context);
 }
 
-void GlobalI64Op::getCanonicalizationPatterns(OwningRewritePatternList &results,
+void GlobalI64Op::getCanonicalizationPatterns(RewritePatternSet &results,
                                               MLIRContext *context) {
   results.insert<DropDefaultConstGlobalOpInitializer<GlobalI64Op>>(context);
 }
 
-void GlobalF32Op::getCanonicalizationPatterns(OwningRewritePatternList &results,
+void GlobalF32Op::getCanonicalizationPatterns(RewritePatternSet &results,
                                               MLIRContext *context) {
   results.insert<DropDefaultConstGlobalOpInitializer<GlobalF32Op>>(context);
 }
 
-void GlobalF64Op::getCanonicalizationPatterns(OwningRewritePatternList &results,
+void GlobalF64Op::getCanonicalizationPatterns(RewritePatternSet &results,
                                               MLIRContext *context) {
   results.insert<DropDefaultConstGlobalOpInitializer<GlobalF64Op>>(context);
 }
 
-void GlobalRefOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
+void GlobalRefOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                               MLIRContext *context) {}
 
 namespace {
@@ -203,29 +203,29 @@ struct InlineConstGlobalLoadIntegerOp : public OpRewritePattern<LOAD_OP> {
 
 }  // namespace
 
-void GlobalLoadI32Op::getCanonicalizationPatterns(
-    OwningRewritePatternList &results, MLIRContext *context) {
+void GlobalLoadI32Op::getCanonicalizationPatterns(RewritePatternSet &results,
+                                                  MLIRContext *context) {
   results.insert<InlineConstGlobalLoadIntegerOp<GlobalLoadI32Op, GlobalI32Op,
                                                 ConstI32Op, ConstI32ZeroOp>>(
       context);
 }
 
-void GlobalLoadI64Op::getCanonicalizationPatterns(
-    OwningRewritePatternList &results, MLIRContext *context) {
+void GlobalLoadI64Op::getCanonicalizationPatterns(RewritePatternSet &results,
+                                                  MLIRContext *context) {
   results.insert<InlineConstGlobalLoadIntegerOp<GlobalLoadI64Op, GlobalI64Op,
                                                 ConstI64Op, ConstI64ZeroOp>>(
       context);
 }
 
-void GlobalLoadF32Op::getCanonicalizationPatterns(
-    OwningRewritePatternList &results, MLIRContext *context) {
+void GlobalLoadF32Op::getCanonicalizationPatterns(RewritePatternSet &results,
+                                                  MLIRContext *context) {
   results.insert<InlineConstGlobalLoadIntegerOp<GlobalLoadF32Op, GlobalF32Op,
                                                 ConstF32Op, ConstF32ZeroOp>>(
       context);
 }
 
-void GlobalLoadF64Op::getCanonicalizationPatterns(
-    OwningRewritePatternList &results, MLIRContext *context) {
+void GlobalLoadF64Op::getCanonicalizationPatterns(RewritePatternSet &results,
+                                                  MLIRContext *context) {
   results.insert<InlineConstGlobalLoadIntegerOp<GlobalLoadF64Op, GlobalF64Op,
                                                 ConstF64Op, ConstF64ZeroOp>>(
       context);
@@ -251,8 +251,8 @@ struct InlineConstGlobalLoadRefOp : public OpRewritePattern<GlobalLoadRefOp> {
 
 }  // namespace
 
-void GlobalLoadRefOp::getCanonicalizationPatterns(
-    OwningRewritePatternList &results, MLIRContext *context) {
+void GlobalLoadRefOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                                  MLIRContext *context) {
   results.insert<InlineConstGlobalLoadRefOp>(context);
 }
 
@@ -277,35 +277,35 @@ struct PropagateGlobalLoadAddress : public OpRewritePattern<INDIRECT> {
 }  // namespace
 
 void GlobalLoadIndirectI32Op::getCanonicalizationPatterns(
-    OwningRewritePatternList &results, MLIRContext *context) {
+    RewritePatternSet &results, MLIRContext *context) {
   results.insert<
       PropagateGlobalLoadAddress<GlobalLoadIndirectI32Op, GlobalLoadI32Op>>(
       context);
 }
 
 void GlobalLoadIndirectI64Op::getCanonicalizationPatterns(
-    OwningRewritePatternList &results, MLIRContext *context) {
+    RewritePatternSet &results, MLIRContext *context) {
   results.insert<
       PropagateGlobalLoadAddress<GlobalLoadIndirectI64Op, GlobalLoadI64Op>>(
       context);
 }
 
 void GlobalLoadIndirectF32Op::getCanonicalizationPatterns(
-    OwningRewritePatternList &results, MLIRContext *context) {
+    RewritePatternSet &results, MLIRContext *context) {
   results.insert<
       PropagateGlobalLoadAddress<GlobalLoadIndirectF32Op, GlobalLoadF32Op>>(
       context);
 }
 
 void GlobalLoadIndirectF64Op::getCanonicalizationPatterns(
-    OwningRewritePatternList &results, MLIRContext *context) {
+    RewritePatternSet &results, MLIRContext *context) {
   results.insert<
       PropagateGlobalLoadAddress<GlobalLoadIndirectF64Op, GlobalLoadF64Op>>(
       context);
 }
 
 void GlobalLoadIndirectRefOp::getCanonicalizationPatterns(
-    OwningRewritePatternList &results, MLIRContext *context) {
+    RewritePatternSet &results, MLIRContext *context) {
   results.insert<
       PropagateGlobalLoadAddress<GlobalLoadIndirectRefOp, GlobalLoadRefOp>>(
       context);
@@ -331,35 +331,35 @@ struct PropagateGlobalStoreAddress : public OpRewritePattern<INDIRECT> {
 }  // namespace
 
 void GlobalStoreIndirectI32Op::getCanonicalizationPatterns(
-    OwningRewritePatternList &results, MLIRContext *context) {
+    RewritePatternSet &results, MLIRContext *context) {
   results.insert<
       PropagateGlobalStoreAddress<GlobalStoreIndirectI32Op, GlobalStoreI32Op>>(
       context);
 }
 
 void GlobalStoreIndirectI64Op::getCanonicalizationPatterns(
-    OwningRewritePatternList &results, MLIRContext *context) {
+    RewritePatternSet &results, MLIRContext *context) {
   results.insert<
       PropagateGlobalStoreAddress<GlobalStoreIndirectI64Op, GlobalStoreI64Op>>(
       context);
 }
 
 void GlobalStoreIndirectF32Op::getCanonicalizationPatterns(
-    OwningRewritePatternList &results, MLIRContext *context) {
+    RewritePatternSet &results, MLIRContext *context) {
   results.insert<
       PropagateGlobalStoreAddress<GlobalStoreIndirectF32Op, GlobalStoreF32Op>>(
       context);
 }
 
 void GlobalStoreIndirectF64Op::getCanonicalizationPatterns(
-    OwningRewritePatternList &results, MLIRContext *context) {
+    RewritePatternSet &results, MLIRContext *context) {
   results.insert<
       PropagateGlobalStoreAddress<GlobalStoreIndirectF64Op, GlobalStoreF64Op>>(
       context);
 }
 
 void GlobalStoreIndirectRefOp::getCanonicalizationPatterns(
-    OwningRewritePatternList &results, MLIRContext *context) {
+    RewritePatternSet &results, MLIRContext *context) {
   results.insert<
       PropagateGlobalStoreAddress<GlobalStoreIndirectRefOp, GlobalStoreRefOp>>(
       context);
@@ -389,28 +389,28 @@ struct FoldZeroConstPrimitive final : public OpRewritePattern<GeneralOp> {
 
 OpFoldResult ConstI32Op::fold(ArrayRef<Attribute> operands) { return value(); }
 
-void ConstI32Op::getCanonicalizationPatterns(OwningRewritePatternList &results,
+void ConstI32Op::getCanonicalizationPatterns(RewritePatternSet &results,
                                              MLIRContext *context) {
   results.insert<FoldZeroConstPrimitive<ConstI32Op, ConstI32ZeroOp>>(context);
 }
 
 OpFoldResult ConstI64Op::fold(ArrayRef<Attribute> operands) { return value(); }
 
-void ConstI64Op::getCanonicalizationPatterns(OwningRewritePatternList &results,
+void ConstI64Op::getCanonicalizationPatterns(RewritePatternSet &results,
                                              MLIRContext *context) {
   results.insert<FoldZeroConstPrimitive<ConstI64Op, ConstI64ZeroOp>>(context);
 }
 
 OpFoldResult ConstF32Op::fold(ArrayRef<Attribute> operands) { return value(); }
 
-void ConstF32Op::getCanonicalizationPatterns(OwningRewritePatternList &results,
+void ConstF32Op::getCanonicalizationPatterns(RewritePatternSet &results,
                                              MLIRContext *context) {
   results.insert<FoldZeroConstPrimitive<ConstF32Op, ConstF32ZeroOp>>(context);
 }
 
 OpFoldResult ConstF64Op::fold(ArrayRef<Attribute> operands) { return value(); }
 
-void ConstF64Op::getCanonicalizationPatterns(OwningRewritePatternList &results,
+void ConstF64Op::getCanonicalizationPatterns(RewritePatternSet &results,
                                              MLIRContext *context) {
   results.insert<FoldZeroConstPrimitive<ConstF64Op, ConstF64ZeroOp>>(context);
 }
@@ -770,7 +770,7 @@ OpFoldResult MulI32Op::fold(ArrayRef<Attribute> operands) {
   return foldMulOp<IntegerAttr>(*this, operands);
 }
 
-void MulI32Op::getCanonicalizationPatterns(OwningRewritePatternList &results,
+void MulI32Op::getCanonicalizationPatterns(RewritePatternSet &results,
                                            MLIRContext *context) {
   results.insert<FoldConstantMulOperand<IntegerAttr, MulI32Op, ConstI32Op>>(
       context);
@@ -780,7 +780,7 @@ OpFoldResult MulI64Op::fold(ArrayRef<Attribute> operands) {
   return foldMulOp<IntegerAttr>(*this, operands);
 }
 
-void MulI64Op::getCanonicalizationPatterns(OwningRewritePatternList &results,
+void MulI64Op::getCanonicalizationPatterns(RewritePatternSet &results,
                                            MLIRContext *context) {
   results.insert<FoldConstantMulOperand<IntegerAttr, MulI64Op, ConstI64Op>>(
       context);
@@ -932,12 +932,12 @@ OpFoldResult FMAI64Op::fold(ArrayRef<Attribute> operands) {
   return foldFMAOp(*this, operands);
 }
 
-void FMAI32Op::getCanonicalizationPatterns(OwningRewritePatternList &results,
+void FMAI32Op::getCanonicalizationPatterns(RewritePatternSet &results,
                                            MLIRContext *context) {
   results.insert<CanonicalizeFMA<FMAI32Op, MulI32Op, AddI32Op>>(context);
 }
 
-void FMAI64Op::getCanonicalizationPatterns(OwningRewritePatternList &results,
+void FMAI64Op::getCanonicalizationPatterns(RewritePatternSet &results,
                                            MLIRContext *context) {
   results.insert<CanonicalizeFMA<FMAI64Op, MulI64Op, AddI64Op>>(context);
 }
@@ -966,7 +966,7 @@ OpFoldResult MulF32Op::fold(ArrayRef<Attribute> operands) {
   return foldMulOp<FloatAttr>(*this, operands);
 }
 
-void MulF32Op::getCanonicalizationPatterns(OwningRewritePatternList &results,
+void MulF32Op::getCanonicalizationPatterns(RewritePatternSet &results,
                                            MLIRContext *context) {
   results.insert<FoldConstantMulOperand<FloatAttr, MulF32Op, ConstF32Op>>(
       context);
@@ -976,7 +976,7 @@ OpFoldResult MulF64Op::fold(ArrayRef<Attribute> operands) {
   return foldMulOp<FloatAttr>(*this, operands);
 }
 
-void MulF64Op::getCanonicalizationPatterns(OwningRewritePatternList &results,
+void MulF64Op::getCanonicalizationPatterns(RewritePatternSet &results,
                                            MLIRContext *context) {
   results.insert<FoldConstantMulOperand<FloatAttr, MulF64Op, ConstF64Op>>(
       context);
@@ -1061,12 +1061,12 @@ OpFoldResult FMAF64Op::fold(ArrayRef<Attribute> operands) {
   return foldFMAFOp(*this, operands);
 }
 
-void FMAF32Op::getCanonicalizationPatterns(OwningRewritePatternList &results,
+void FMAF32Op::getCanonicalizationPatterns(RewritePatternSet &results,
                                            MLIRContext *context) {
   results.insert<CanonicalizeFMA<FMAF32Op, MulF32Op, AddF32Op>>(context);
 }
 
-void FMAF64Op::getCanonicalizationPatterns(OwningRewritePatternList &results,
+void FMAF64Op::getCanonicalizationPatterns(RewritePatternSet &results,
                                            MLIRContext *context) {
   results.insert<CanonicalizeFMA<FMAF64Op, MulF64Op, AddF64Op>>(context);
 }
@@ -1440,38 +1440,38 @@ struct PseudoIntegerConversionToSplitConversionOp
 
 }  // namespace
 
-void TruncI64I8Op::getCanonicalizationPatterns(
-    OwningRewritePatternList &results, MLIRContext *context) {
+void TruncI64I8Op::getCanonicalizationPatterns(RewritePatternSet &results,
+                                               MLIRContext *context) {
   results.insert<PseudoIntegerConversionToSplitConversionOp<
       TruncI64I8Op, TruncI64I32Op, 32, TruncI32I8Op>>(context);
 }
 
-void TruncI64I16Op::getCanonicalizationPatterns(
-    OwningRewritePatternList &results, MLIRContext *context) {
+void TruncI64I16Op::getCanonicalizationPatterns(RewritePatternSet &results,
+                                                MLIRContext *context) {
   results.insert<PseudoIntegerConversionToSplitConversionOp<
       TruncI64I16Op, TruncI64I32Op, 32, TruncI32I16Op>>(context);
 }
 
-void ExtI8I64SOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
+void ExtI8I64SOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                               MLIRContext *context) {
   results.insert<PseudoIntegerConversionToSplitConversionOp<
       ExtI8I64SOp, ExtI8I32SOp, 32, ExtI32I64SOp>>(context);
 }
 
-void ExtI8I64UOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
+void ExtI8I64UOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                               MLIRContext *context) {
   results.insert<PseudoIntegerConversionToSplitConversionOp<
       ExtI8I64UOp, ExtI8I32UOp, 32, ExtI32I64UOp>>(context);
 }
 
-void ExtI16I64SOp::getCanonicalizationPatterns(
-    OwningRewritePatternList &results, MLIRContext *context) {
+void ExtI16I64SOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                               MLIRContext *context) {
   results.insert<PseudoIntegerConversionToSplitConversionOp<
       ExtI16I64SOp, ExtI16I32SOp, 32, ExtI32I64SOp>>(context);
 }
 
-void ExtI16I64UOp::getCanonicalizationPatterns(
-    OwningRewritePatternList &results, MLIRContext *context) {
+void ExtI16I64UOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                               MLIRContext *context) {
   results.insert<PseudoIntegerConversionToSplitConversionOp<
       ExtI16I64UOp, ExtI16I32UOp, 32, ExtI32I64UOp>>(context);
 }
@@ -1604,7 +1604,7 @@ OpFoldResult CmpEQI32Op::fold(ArrayRef<Attribute> operands) {
   return foldCmpEQOp(*this, operands);
 }
 
-void CmpEQI32Op::getCanonicalizationPatterns(OwningRewritePatternList &results,
+void CmpEQI32Op::getCanonicalizationPatterns(RewritePatternSet &results,
                                              MLIRContext *context) {
   results.insert<SwapInvertedCmpOps<CmpEQI32Op, CmpNEI32Op>>(context);
 }
@@ -1613,7 +1613,7 @@ OpFoldResult CmpEQI64Op::fold(ArrayRef<Attribute> operands) {
   return foldCmpEQOp(*this, operands);
 }
 
-void CmpEQI64Op::getCanonicalizationPatterns(OwningRewritePatternList &results,
+void CmpEQI64Op::getCanonicalizationPatterns(RewritePatternSet &results,
                                              MLIRContext *context) {
   results.insert<SwapInvertedCmpOps<CmpEQI64Op, CmpNEI64Op>>(context);
 }
@@ -1654,13 +1654,13 @@ struct CmpNEZeroToCmpNZ : public OpRewritePattern<NE_OP> {
 
 }  // namespace
 
-void CmpNEI32Op::getCanonicalizationPatterns(OwningRewritePatternList &results,
+void CmpNEI32Op::getCanonicalizationPatterns(RewritePatternSet &results,
                                              MLIRContext *context) {
   results.insert<SwapInvertedCmpOps<CmpNEI32Op, CmpEQI32Op>,
                  CmpNEZeroToCmpNZ<CmpNEI32Op, CmpNZI32Op>>(context);
 }
 
-void CmpNEI64Op::getCanonicalizationPatterns(OwningRewritePatternList &results,
+void CmpNEI64Op::getCanonicalizationPatterns(RewritePatternSet &results,
                                              MLIRContext *context) {
   results.insert<SwapInvertedCmpOps<CmpNEI64Op, CmpEQI64Op>,
                  CmpNEZeroToCmpNZ<CmpNEI64Op, CmpNZI64Op>>(context);
@@ -1684,10 +1684,10 @@ OpFoldResult CmpLTI64SOp::fold(ArrayRef<Attribute> operands) {
   return foldCmpLTSOp(*this, operands);
 }
 
-void CmpLTI32SOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
+void CmpLTI32SOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                               MLIRContext *context) {}
 
-void CmpLTI64SOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
+void CmpLTI64SOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                               MLIRContext *context) {}
 
 template <typename T>
@@ -1708,10 +1708,10 @@ OpFoldResult CmpLTI64UOp::fold(ArrayRef<Attribute> operands) {
   return foldCmpLTUOp(*this, operands);
 }
 
-void CmpLTI32UOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
+void CmpLTI32UOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                               MLIRContext *context) {}
 
-void CmpLTI64UOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
+void CmpLTI64UOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                               MLIRContext *context) {}
 
 namespace {
@@ -1752,14 +1752,14 @@ OpFoldResult CmpLTEI64SOp::fold(ArrayRef<Attribute> operands) {
   return foldCmpLTESOp(*this, operands);
 }
 
-void CmpLTEI32SOp::getCanonicalizationPatterns(
-    OwningRewritePatternList &results, MLIRContext *context) {
+void CmpLTEI32SOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                               MLIRContext *context) {
   results.insert<SwapInvertedCmpOps<CmpLTEI32SOp, CmpGTI32SOp>>(context);
   results.insert<RewritePseudoCmpLTEToLT<CmpLTEI32SOp, CmpLTI32SOp>>(context);
 }
 
-void CmpLTEI64SOp::getCanonicalizationPatterns(
-    OwningRewritePatternList &results, MLIRContext *context) {
+void CmpLTEI64SOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                               MLIRContext *context) {
   results.insert<SwapInvertedCmpOps<CmpLTEI64SOp, CmpGTI64SOp>>(context);
   results.insert<RewritePseudoCmpLTEToLT<CmpLTEI64SOp, CmpLTI64SOp>>(context);
 }
@@ -1782,14 +1782,14 @@ OpFoldResult CmpLTEI64UOp::fold(ArrayRef<Attribute> operands) {
   return foldCmpLTEUOp(*this, operands);
 }
 
-void CmpLTEI32UOp::getCanonicalizationPatterns(
-    OwningRewritePatternList &results, MLIRContext *context) {
+void CmpLTEI32UOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                               MLIRContext *context) {
   results.insert<SwapInvertedCmpOps<CmpLTEI32UOp, CmpGTI32UOp>>(context);
   results.insert<RewritePseudoCmpLTEToLT<CmpLTEI32UOp, CmpLTI32UOp>>(context);
 }
 
-void CmpLTEI64UOp::getCanonicalizationPatterns(
-    OwningRewritePatternList &results, MLIRContext *context) {
+void CmpLTEI64UOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                               MLIRContext *context) {
   results.insert<SwapInvertedCmpOps<CmpLTEI64UOp, CmpGTI64UOp>>(context);
   results.insert<RewritePseudoCmpLTEToLT<CmpLTEI64UOp, CmpLTI64UOp>>(context);
 }
@@ -1828,13 +1828,13 @@ OpFoldResult CmpGTI64SOp::fold(ArrayRef<Attribute> operands) {
   return foldCmpGTSOp(*this, operands);
 }
 
-void CmpGTI32SOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
+void CmpGTI32SOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                               MLIRContext *context) {
   results.insert<SwapInvertedCmpOps<CmpGTI32SOp, CmpLTEI32SOp>>(context);
   results.insert<RewritePseudoCmpGTToLT<CmpGTI32SOp, CmpLTI32SOp>>(context);
 }
 
-void CmpGTI64SOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
+void CmpGTI64SOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                               MLIRContext *context) {
   results.insert<SwapInvertedCmpOps<CmpGTI64SOp, CmpLTEI64SOp>>(context);
   results.insert<RewritePseudoCmpGTToLT<CmpGTI64SOp, CmpLTI64SOp>>(context);
@@ -1858,13 +1858,13 @@ OpFoldResult CmpGTI64UOp::fold(ArrayRef<Attribute> operands) {
   return foldCmpGTUOp(*this, operands);
 }
 
-void CmpGTI32UOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
+void CmpGTI32UOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                               MLIRContext *context) {
   results.insert<SwapInvertedCmpOps<CmpGTI32UOp, CmpLTEI32UOp>>(context);
   results.insert<RewritePseudoCmpGTToLT<CmpGTI32UOp, CmpLTI32UOp>>(context);
 }
 
-void CmpGTI64UOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
+void CmpGTI64UOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                               MLIRContext *context) {
   results.insert<SwapInvertedCmpOps<CmpGTI64UOp, CmpLTEI64UOp>>(context);
   results.insert<RewritePseudoCmpGTToLT<CmpGTI64UOp, CmpLTI64UOp>>(context);
@@ -1908,14 +1908,14 @@ OpFoldResult CmpGTEI64SOp::fold(ArrayRef<Attribute> operands) {
   return foldCmpGTESOp(*this, operands);
 }
 
-void CmpGTEI32SOp::getCanonicalizationPatterns(
-    OwningRewritePatternList &results, MLIRContext *context) {
+void CmpGTEI32SOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                               MLIRContext *context) {
   results.insert<SwapInvertedCmpOps<CmpGTEI32SOp, CmpLTI32SOp>>(context);
   results.insert<RewritePseudoCmpGTEToLT<CmpGTEI32SOp, CmpLTI32SOp>>(context);
 }
 
-void CmpGTEI64SOp::getCanonicalizationPatterns(
-    OwningRewritePatternList &results, MLIRContext *context) {
+void CmpGTEI64SOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                               MLIRContext *context) {
   results.insert<SwapInvertedCmpOps<CmpGTEI64SOp, CmpLTI64SOp>>(context);
   results.insert<RewritePseudoCmpGTEToLT<CmpGTEI64SOp, CmpLTI64SOp>>(context);
 }
@@ -1938,14 +1938,14 @@ OpFoldResult CmpGTEI64UOp::fold(ArrayRef<Attribute> operands) {
   return foldCmpGTEUOp(*this, operands);
 }
 
-void CmpGTEI32UOp::getCanonicalizationPatterns(
-    OwningRewritePatternList &results, MLIRContext *context) {
+void CmpGTEI32UOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                               MLIRContext *context) {
   results.insert<SwapInvertedCmpOps<CmpGTEI32UOp, CmpLTI32UOp>>(context);
   results.insert<RewritePseudoCmpGTEToLT<CmpGTEI32UOp, CmpLTI32UOp>>(context);
 }
 
-void CmpGTEI64UOp::getCanonicalizationPatterns(
-    OwningRewritePatternList &results, MLIRContext *context) {
+void CmpGTEI64UOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                               MLIRContext *context) {
   results.insert<SwapInvertedCmpOps<CmpGTEI64UOp, CmpLTI64UOp>>(context);
   results.insert<RewritePseudoCmpGTEToLT<CmpGTEI64UOp, CmpLTI64UOp>>(context);
 }
@@ -2002,22 +2002,22 @@ OpFoldResult CmpEQF64UOp::fold(ArrayRef<Attribute> operands) {
   return foldCmpEQFOp<UNORDERED>(*this, operands);
 }
 
-void CmpEQF32OOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
+void CmpEQF32OOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                               MLIRContext *context) {
   results.insert<SwapInvertedCmpOps<CmpEQF32OOp, CmpNEF32OOp>>(context);
 }
 
-void CmpEQF64OOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
+void CmpEQF64OOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                               MLIRContext *context) {
   results.insert<SwapInvertedCmpOps<CmpEQF64OOp, CmpNEF64OOp>>(context);
 }
 
-void CmpEQF32UOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
+void CmpEQF32UOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                               MLIRContext *context) {
   results.insert<SwapInvertedCmpOps<CmpEQF32UOp, CmpNEF32UOp>>(context);
 }
 
-void CmpEQF64UOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
+void CmpEQF64UOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                               MLIRContext *context) {
   results.insert<SwapInvertedCmpOps<CmpEQF64UOp, CmpNEF64UOp>>(context);
 }
@@ -2055,22 +2055,22 @@ OpFoldResult CmpNEF64UOp::fold(ArrayRef<Attribute> operands) {
   return foldCmpNEFOp<UNORDERED>(*this, operands);
 }
 
-void CmpNEF32OOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
+void CmpNEF32OOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                               MLIRContext *context) {
   results.insert<SwapInvertedCmpOps<CmpNEF32OOp, CmpEQF32OOp>>(context);
 }
 
-void CmpNEF64OOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
+void CmpNEF64OOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                               MLIRContext *context) {
   results.insert<SwapInvertedCmpOps<CmpNEF64OOp, CmpEQF64OOp>>(context);
 }
 
-void CmpNEF32UOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
+void CmpNEF32UOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                               MLIRContext *context) {
   results.insert<SwapInvertedCmpOps<CmpNEF32UOp, CmpEQF32UOp>>(context);
 }
 
-void CmpNEF64UOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
+void CmpNEF64UOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                               MLIRContext *context) {
   results.insert<SwapInvertedCmpOps<CmpNEF64UOp, CmpEQF64UOp>>(context);
 }
@@ -2108,16 +2108,16 @@ OpFoldResult CmpLTF64UOp::fold(ArrayRef<Attribute> operands) {
   return foldCmpLTFOp<UNORDERED>(*this, operands);
 }
 
-void CmpLTF32OOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
+void CmpLTF32OOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                               MLIRContext *context) {}
 
-void CmpLTF64OOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
+void CmpLTF64OOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                               MLIRContext *context) {}
 
-void CmpLTF32UOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
+void CmpLTF32UOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                               MLIRContext *context) {}
 
-void CmpLTF64UOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
+void CmpLTF64UOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                               MLIRContext *context) {}
 
 template <CmpFOrdering ordering, typename T>
@@ -2188,25 +2188,25 @@ OpFoldResult CmpGTF64UOp::fold(ArrayRef<Attribute> operands) {
   return foldCmpGTFOp<UNORDERED>(*this, operands);
 }
 
-void CmpGTF32OOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
+void CmpGTF32OOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                               MLIRContext *context) {
   results.insert<SwapInvertedCmpOps<CmpGTF32OOp, CmpLTEF32OOp>>(context);
   results.insert<RewritePseudoCmpGTToLT<CmpGTF32OOp, CmpLTF32OOp>>(context);
 }
 
-void CmpGTF64OOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
+void CmpGTF64OOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                               MLIRContext *context) {
   results.insert<SwapInvertedCmpOps<CmpGTF64OOp, CmpLTEF64OOp>>(context);
   results.insert<RewritePseudoCmpGTToLT<CmpGTF64OOp, CmpLTF64OOp>>(context);
 }
 
-void CmpGTF32UOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
+void CmpGTF32UOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                               MLIRContext *context) {
   results.insert<SwapInvertedCmpOps<CmpGTF32UOp, CmpLTEF32UOp>>(context);
   results.insert<RewritePseudoCmpGTToLT<CmpGTF32UOp, CmpLTF32UOp>>(context);
 }
 
-void CmpGTF64UOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
+void CmpGTF64UOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                               MLIRContext *context) {
   results.insert<SwapInvertedCmpOps<CmpGTF64UOp, CmpLTEF64UOp>>(context);
   results.insert<RewritePseudoCmpGTToLT<CmpGTF64UOp, CmpLTF64UOp>>(context);
@@ -2246,26 +2246,26 @@ OpFoldResult CmpGTEF64UOp::fold(ArrayRef<Attribute> operands) {
   return foldCmpGTEFOp<UNORDERED>(*this, operands);
 }
 
-void CmpGTEF32OOp::getCanonicalizationPatterns(
-    OwningRewritePatternList &results, MLIRContext *context) {
+void CmpGTEF32OOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                               MLIRContext *context) {
   results.insert<SwapInvertedCmpOps<CmpGTEF32OOp, CmpLTF32OOp>>(context);
   results.insert<RewritePseudoCmpGTEToLT<CmpGTEF32OOp, CmpLTF32OOp>>(context);
 }
 
-void CmpGTEF64OOp::getCanonicalizationPatterns(
-    OwningRewritePatternList &results, MLIRContext *context) {
+void CmpGTEF64OOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                               MLIRContext *context) {
   results.insert<SwapInvertedCmpOps<CmpGTEF64OOp, CmpLTF64OOp>>(context);
   results.insert<RewritePseudoCmpGTEToLT<CmpGTEF64OOp, CmpLTF64OOp>>(context);
 }
 
-void CmpGTEF32UOp::getCanonicalizationPatterns(
-    OwningRewritePatternList &results, MLIRContext *context) {
+void CmpGTEF32UOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                               MLIRContext *context) {
   results.insert<SwapInvertedCmpOps<CmpGTEF32UOp, CmpLTF32UOp>>(context);
   results.insert<RewritePseudoCmpGTEToLT<CmpGTEF32UOp, CmpLTF32UOp>>(context);
 }
 
-void CmpGTEF64UOp::getCanonicalizationPatterns(
-    OwningRewritePatternList &results, MLIRContext *context) {
+void CmpGTEF64UOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                               MLIRContext *context) {
   results.insert<SwapInvertedCmpOps<CmpGTEF64UOp, CmpLTF64UOp>>(context);
   results.insert<RewritePseudoCmpGTEToLT<CmpGTEF64UOp, CmpLTF64UOp>>(context);
 }
@@ -2308,28 +2308,28 @@ OpFoldResult CmpNZF64UOp::fold(ArrayRef<Attribute> operands) {
   });
 }
 
-void CmpNZF32OOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
+void CmpNZF32OOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                               MLIRContext *context) {
   results
       .insert<RewritePseudoCmpNZToNE<CmpNZF32OOp, CmpNEF32OOp, ConstF32ZeroOp>>(
           context);
 }
 
-void CmpNZF64OOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
+void CmpNZF64OOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                               MLIRContext *context) {
   results
       .insert<RewritePseudoCmpNZToNE<CmpNZF64OOp, CmpNEF64OOp, ConstF64ZeroOp>>(
           context);
 }
 
-void CmpNZF32UOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
+void CmpNZF32UOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                               MLIRContext *context) {
   results
       .insert<RewritePseudoCmpNZToNE<CmpNZF32UOp, CmpNEF32UOp, ConstF32ZeroOp>>(
           context);
 }
 
-void CmpNZF64UOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
+void CmpNZF64UOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                               MLIRContext *context) {
   results
       .insert<RewritePseudoCmpNZToNE<CmpNZF64UOp, CmpNEF64UOp, ConstF64ZeroOp>>(
@@ -2389,7 +2389,7 @@ struct NullCheckCmpEQRefToCmpNZRef : public OpRewritePattern<CmpEQRefOp> {
 
 }  // namespace
 
-void CmpEQRefOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
+void CmpEQRefOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                              MLIRContext *context) {
   results.insert<NullCheckCmpEQRefToCmpNZRef>(context);
 }
@@ -2420,7 +2420,7 @@ struct NullCheckCmpNERefToCmpNZRef : public OpRewritePattern<CmpNERefOp> {
 
 }  // namespace
 
-void CmpNERefOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
+void CmpNERefOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                              MLIRContext *context) {
   results.insert<NullCheckCmpNERefToCmpNZRef>(context);
 }
@@ -2542,7 +2542,7 @@ struct SimplifyPassThroughBr : public OpRewritePattern<BranchOp> {
 
 }  // namespace
 
-void BranchOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
+void BranchOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                            MLIRContext *context) {
   results.insert<SimplifyBrToBlockWithSinglePred, SimplifyPassThroughBr>(
       context);
@@ -2620,8 +2620,8 @@ struct SwapInvertedCondBranchOpTargets : public OpRewritePattern<CondBranchOp> {
 
 }  // namespace
 
-void CondBranchOp::getCanonicalizationPatterns(
-    OwningRewritePatternList &results, MLIRContext *context) {
+void CondBranchOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                               MLIRContext *context) {
   results.insert<SimplifyConstCondBranchPred, SimplifySameTargetCondBranchOp,
                  SwapInvertedCondBranchOpTargets>(context);
 }
@@ -2665,7 +2665,7 @@ struct EraseUnusedCallOp : public OpRewritePattern<T> {
 
 }  // namespace
 
-void CallOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
+void CallOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                          MLIRContext *context) {
   results.insert<EraseUnusedCallOp<CallOp>>(context);
 }
@@ -2692,8 +2692,8 @@ struct ConvertNonVariadicToCallOp : public OpRewritePattern<CallVariadicOp> {
 
 }  // namespace
 
-void CallVariadicOp::getCanonicalizationPatterns(
-    OwningRewritePatternList &results, MLIRContext *context) {
+void CallVariadicOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                                 MLIRContext *context) {
   results.insert<EraseUnusedCallOp<CallVariadicOp>, ConvertNonVariadicToCallOp>(
       context);
 }
@@ -2732,7 +2732,7 @@ struct RewriteCondFailToBranchFail : public OpRewritePattern<CondFailOp> {
 
 }  // namespace
 
-void CondFailOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
+void CondFailOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                              MLIRContext *context) {
   results.insert<RewriteCondFailToBranchFail>(context);
 }
@@ -2785,21 +2785,21 @@ struct RewriteCheckToCondFail : public OpRewritePattern<CheckOp> {
 
 }  // namespace
 
-void CheckEQOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
+void CheckEQOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                             MLIRContext *context) {
   results.insert<RewriteCheckToCondFail<CheckEQOp, CmpEQI32Op, CmpEQI64Op,
                                         CmpEQF32OOp, CmpEQF64OOp, CmpEQRefOp>>(
       context);
 }
 
-void CheckNEOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
+void CheckNEOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                             MLIRContext *context) {
   results.insert<RewriteCheckToCondFail<CheckNEOp, CmpNEI32Op, CmpNEI64Op,
                                         CmpNEF32OOp, CmpNEF64OOp, CmpNERefOp>>(
       context);
 }
 
-void CheckNZOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
+void CheckNZOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                             MLIRContext *context) {
   results.insert<RewriteCheckToCondFail<CheckNZOp, CmpNZI32Op, CmpNZI64Op,
                                         CmpNZF32OOp, CmpNZF64OOp, CmpNZRefOp>>(
@@ -2859,22 +2859,22 @@ struct SimplifyConstCondBreakPred : public OpRewritePattern<CondBreakOp> {
 
 }  // namespace
 
-void TraceOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
+void TraceOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                           MLIRContext *context) {
   results.insert<RemoveDisabledDebugOp<TraceOp>>(context);
 }
 
-void PrintOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
+void PrintOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                           MLIRContext *context) {
   results.insert<RemoveDisabledDebugOp<PrintOp>>(context);
 }
 
-void BreakOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
+void BreakOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                           MLIRContext *context) {
   results.insert<RemoveDisabledDebugAsyncOp<BreakOp>>(context);
 }
 
-void CondBreakOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
+void CondBreakOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                               MLIRContext *context) {
   results.insert<RemoveDisabledDebugAsyncOp<CondBreakOp>,
                  SimplifyConstCondBreakPred>(context);

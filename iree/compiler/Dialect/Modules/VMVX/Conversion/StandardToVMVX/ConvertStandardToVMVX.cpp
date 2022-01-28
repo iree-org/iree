@@ -63,7 +63,7 @@ struct RemoveIdentityConversionCast final
 }  // namespace
 
 void populateStandardToVMVXPatterns(MLIRContext *context,
-                                    OwningRewritePatternList &patterns,
+                                    RewritePatternSet &patterns,
                                     TypeConverter &typeConverter) {
   // We type/shape erase memrefs as we lower so there is no need for reshapes.
   patterns.insert<FoldAsNoOp<memref::CollapseShapeOp>>(typeConverter, context);

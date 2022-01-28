@@ -104,7 +104,7 @@ class TestLLVMGPULegalizeOpPass
     registry.insert<vector::VectorDialect>();
   }
   void runOnOperation() override {
-    OwningRewritePatternList patterns(&getContext());
+    RewritePatternSet patterns(&getContext());
     populateScalarizeMathOps(patterns);
     populateConvertSharedMemoryAllocOps(patterns);
     if (failed(applyPatternsAndFoldGreedily(getOperation(),
@@ -349,7 +349,7 @@ struct HALInterfaceWorkgroupOpsConverter final
 }  // anonymous namespace
 
 void populateLLVMConversionPatterns(MLIRContext *context,
-                                    OwningRewritePatternList &patterns,
+                                    RewritePatternSet &patterns,
                                     LLVMTypeConverter &converter) {
   patterns
       .insert<ConvertFunc, ConvertIREEBindingSubspanOp, ConvertIREEConstantOp>(

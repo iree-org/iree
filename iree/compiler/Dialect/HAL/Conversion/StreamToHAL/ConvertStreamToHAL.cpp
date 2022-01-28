@@ -1122,7 +1122,7 @@ struct GlobalTimepointConversionPattern
 void populateStreamToHALPatterns(MLIRContext *context,
                                  ConversionTarget &conversionTarget,
                                  TypeConverter &typeConverter,
-                                 OwningRewritePatternList &patterns) {
+                                 RewritePatternSet &patterns) {
   conversionTarget.addIllegalDialect<IREE::Stream::StreamDialect>();
 
   typeConverter.addConversion(

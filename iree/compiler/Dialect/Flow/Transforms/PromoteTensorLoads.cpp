@@ -56,8 +56,8 @@ void setupStandardToFlowTensorLoadLegality(MLIRContext *context,
   conversionTarget.addIllegalOp<tensor::ExtractOp>();
 }
 
-void populateStandardToFlowTensorLoadPatterns(
-    MLIRContext *context, OwningRewritePatternList &patterns) {
+void populateStandardToFlowTensorLoadPatterns(MLIRContext *context,
+                                              RewritePatternSet &patterns) {
   patterns.insert<ExtractElementOpLowering>(context);
 }
 
@@ -75,7 +75,7 @@ class PromoteTensorLoadsPass
   void runOnOperation() override {
     auto *context = &getContext();
     ConversionTarget conversionTarget(*context);
-    OwningRewritePatternList conversionPatterns(&getContext());
+    RewritePatternSet conversionPatterns(&getContext());
 
     conversionTarget.addLegalDialect<IREE::Flow::FlowDialect>();
     conversionTarget

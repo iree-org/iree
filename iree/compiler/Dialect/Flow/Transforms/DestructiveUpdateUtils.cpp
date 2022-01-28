@@ -367,7 +367,7 @@ LogicalResult rewriteLinalgDestructiveUpdates(
   // Non-default canonicalization patterns.
   // TODO(nicolasvasilache): add Linalg tiling canonicalization patterns,
   // affineminscf and others as needed.
-  OwningRewritePatternList canonicalizationPatterns(context);
+  RewritePatternSet canonicalizationPatterns(context);
   scf::ForOp::getCanonicalizationPatterns(canonicalizationPatterns, context);
   return applyPatternsAndFoldGreedily(dispatchOp,
                                       std::move(canonicalizationPatterns));

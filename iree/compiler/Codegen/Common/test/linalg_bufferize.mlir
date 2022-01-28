@@ -297,6 +297,7 @@ func @tile_from_pointwise_outs() {
 
 #map = affine_map<(d0, d1) -> (d0, d1)>
 func @tile_from_pointwise_outs_inplace() {
+  %f1 = arith.constant 1.0 : f32
   %c0 = arith.constant 0 : index
   %c2 = arith.constant 2 : index
   %c4 = arith.constant 4 : index
@@ -319,7 +320,8 @@ func @tile_from_pointwise_outs_inplace() {
       %9 = linalg.generic {indexing_maps = [#map, #map], iterator_types = ["parallel", "parallel"]}
         ins(%8 : tensor<1x1xf32>) outs(%shape : tensor<1x1xf32>) {
         ^bb0(%arg2: f32, %s: f32):  // no predecessors
-          linalg.yield %arg2 : f32
+          %add = arith.addf %arg2, %f1 : f32
+          linalg.yield %add : f32
         } -> tensor<1x1xf32>
       %10 = linalg.matmul ins(%6, %7 : tensor<1x3xf32>, tensor<3x1xf32>) outs(%9 : tensor<1x1xf32>)  -> tensor<1x1xf32>
       flow.dispatch.tensor.store %10, %2, offsets = [%arg0, %arg1], sizes = [%c1, %c1], strides = [%c1, %c1] : tensor<1x1xf32> -> !flow.dispatch.tensor<readwrite:?x?xf32>{%M, %N}

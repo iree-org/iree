@@ -16,6 +16,7 @@
 #include "mlir/Conversion/SCFToStandard/SCFToStandard.h"
 #include "mlir/Dialect/Arithmetic/Transforms/Passes.h"
 #include "mlir/Dialect/Linalg/Passes.h"
+#include "mlir/Dialect/MemRef/Transforms/Passes.h"
 #include "mlir/Dialect/StandardOps/Transforms/Passes.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Transforms/Passes.h"
@@ -328,7 +329,7 @@ static void addLowerToLLVMPasses(OpPassManager &passManager) {
 
   // (HAL, IREE, Linalg, STD) -> LLVM
   passManager.addNestedPass<FuncOp>(arith::createArithmeticExpandOpsPass());
-  passManager.addNestedPass<FuncOp>(createStdExpandOpsPass());
+  passManager.addNestedPass<FuncOp>(memref::createExpandOpsPass());
   passManager.addPass(createConvertToLLVMPass());
 
   // We rely on MLIR symbol visibility being correct after this point and need

@@ -42,8 +42,8 @@ struct FusionOfTensorOpsPass
   }
 
   void runOnOperation() override {
-    OwningRewritePatternList fusionPatterns(&getContext());
-    OwningRewritePatternList interfacePatterns(&getContext());
+    RewritePatternSet fusionPatterns(&getContext());
+    RewritePatternSet interfacePatterns(&getContext());
     Operation *op = getOperation();
     MLIRContext *context = op->getContext();
 
@@ -143,7 +143,7 @@ struct FusionOfTensorOpsPass
       return signalPassFailure();
     }
 
-    OwningRewritePatternList reshapeCanonicalizations(&getContext());
+    RewritePatternSet reshapeCanonicalizations(&getContext());
     linalg::populateFoldUnitDimsReshapeOpsByLinearizationPatterns(
         reshapeCanonicalizations);
     tensor::CollapseShapeOp::getCanonicalizationPatterns(
@@ -160,7 +160,7 @@ struct FusionOfTensorOpsPass
     }
 
     // Push the remaining reshapes down the graphs.
-    OwningRewritePatternList pushReshapePatterns(&getContext());
+    RewritePatternSet pushReshapePatterns(&getContext());
     linalg::populatePushReshapeOpsPatterns(pushReshapePatterns);
     tensor::CollapseShapeOp::getCanonicalizationPatterns(pushReshapePatterns,
                                                          context);

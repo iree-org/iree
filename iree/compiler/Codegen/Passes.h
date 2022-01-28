@@ -140,12 +140,12 @@ void populateFoldAffineMinInDistributedLoopsPatterns(
 /// linalg.conv op for a single thread. The linalg.conv should compute on
 /// static-sized subviews. To match, output shape must be 1x1xWoxCo, where Co
 /// Co is a multiple of 4, and filter shape must be 1x1x4xCo.
-void populateLinalgToVectorVectorizeConvPatterns(
-    MLIRContext *context, OwningRewritePatternList &patterns);
+void populateLinalgToVectorVectorizeConvPatterns(MLIRContext *context,
+                                                 RewritePatternSet &patterns);
 
 /// Populates `patterns` to convert linalg.mmt4d to vector.contract.
-void populateLinalgToVectorVectorizeMMT4dPatterns(
-    MLIRContext *context, OwningRewritePatternList &patterns);
+void populateLinalgToVectorVectorizeMMT4dPatterns(MLIRContext *context,
+                                                  RewritePatternSet &patterns);
 
 //------------------------------------------------------------------------------
 // LLVMCPU
@@ -217,11 +217,10 @@ LogicalResult InferCustomKernelsTargetInfoFromParent(
 /// Populates `patterns` to convert certain vector.contract ops to special
 /// "kernels" written either in SIMD intrinsics or inline assembly.
 void populateVectorContractCustomKernelsPatterns(
-    const CustomKernelsTargetInfo &target_info,
-    OwningRewritePatternList &patterns);
+    const CustomKernelsTargetInfo &target_info, RewritePatternSet &patterns);
 
 void populateUnfusedFMAOpsPassPatterns(MLIRContext *context,
-                                       OwningRewritePatternList &patterns);
+                                       RewritePatternSet &patterns);
 
 //----------------------------------------------------------------------------//
 // LLVMCPU backend Pass Pipelines.
