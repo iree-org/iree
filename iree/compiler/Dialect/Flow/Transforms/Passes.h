@@ -102,9 +102,6 @@ std::unique_ptr<Pass> createConvertToFlowAfterDispatchFormation();
 // iree-flow-infer-numeric-narrowing.
 std::unique_ptr<Pass> createOptimizeNumericsPass();
 
-// Promote I1 tensor constants to I8 tensors to match later operations.
-std::unique_ptr<OperationPass<mlir::FuncOp>> createPromoteI1ToI8Pass();
-
 // Strips the signed/unsigned portion off of tensors.
 std::unique_ptr<OperationPass<mlir::FuncOp>> createStripSignednessPass();
 

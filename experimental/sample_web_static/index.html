@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html>
+
+<!--
+Copyright 2022 The IREE Authors
+
+Licensed under the Apache License v2.0 with LLVM Exceptions.
+See https://llvm.org/LICENSE.txt for license information.
+SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+-->
+
+<head>
+  <meta charset="utf-8" />
+  <title>IREE Static Web Sample</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <!-- TODO(scotttodd): use local copy for CORS webserver / SharedArrayBuffer workarounds? -->
+  <script src="https://code.createjs.com/1.0.0/easeljs.min.js"></script>
+</head>
+
+<body style="background-color: #2b2c30; color: #ABB2BF">
+  <h1>IREE Static Web Sample</h1>
+
+  <canvas id="drawingCanvas" width="256" height="256"
+          style="border:2px solid #000000; background-color: #FFFFFF;"
+          oncontextmenu="return false;">
+  </canvas>
+  <canvas id="rescaledCanvas" width="28" height="28"
+          style="border:2px solid #000000; background-color: #FFFFFF;">
+  </canvas>
+
+  <br>
+  <div style="border:2px solid #000000; background-color: #CCCCCC; padding: 8px; color: #111111" width="400px" height="300px">
+    <button id="predictButton" disabled onclick="predictDigit()">Predict handwritten digit</button>
+    <br>
+    Prediction result: <div id="predictionResult"></div>
+  </div>
+
+  <script>
+    let setupNativeSample;
+    let cleanupNativeSample;
+    let runNativeSample;
+    let nativeState;
+    const predictionResultElement = document.getElementById("predictionResult");
+    const predictButtonElement = document.getElementById("predictButton");
+    let initialized = false;
+
+    const imagePixelCount = 28 * 28;
+    let imageBuffer;
+
+    var Module = {
+      print: function(text) {
+        console.log(text);
+      },
+      printErr: function(text) {
+        console.error(text);
+      },
+      onRuntimeInitialized: function() {
+        console.log("WebAssembly module onRuntimeInitialized()");
+
+        setupNativeSample = Module.cwrap("setup_sample", "number", []);
+        cleanupNativeSample = Module.cwrap("cleanup_sample", null, ["number"]);
+        runNativeSample = Module.cwrap("run_sample", "number", ["number", "number"]);
+
+        setupSample();
+      },
+      // https://emscripten.org/docs/api_reference/module.html#Module.noInitialRun
+      noInitialRun: true,
+    };
+
+    function setupSample() {
+      nativeState = setupNativeSample();
+      predictButtonElement.disabled = false;
+      imageBuffer = Module._malloc(imagePixelCount * Float32Array.BYTES_PER_ELEMENT);
+      initialized = true;
+    }
+
+    // TODO(scotttodd): call this on page suspend?
+    function cleanupSample() {
+      initialized = false;
+      Module._free(imageDataBuffer);
+      predictButtonElement.disabled = true;
+      cleanupNativeSample();
+      nativeState = null;
+    }
+
+    function predictDigit() {
+      const rawImageData = getRescaledCanvasData();
+      preprocessImageData(rawImageData);
+
+      result = runNativeSample(nativeState, imageBuffer);
+      if (result != -1) {
+        predictionResultElement.innerHTML = result;
+      } else {
+        predictionResultElement.innerHTML = "Error";
+      }
+    }
+
+    // https://becominghuman.ai/passing-and-returning-webassembly-array-parameters-a0f572c65d97
+    // https://developers.google.com/web/updates/2018/03/emscripting-a-c-library#get_an_image_from_javascript_into_wasm
+    function preprocessImageData(rawImageData) {
+      // * getImageData() returns a Uint8ClampedArray with RGBA image data
+      // * this MNIST model takes tensor<1x28x28x1xf32> with grayscale pixels
+      //   in [0.0, 1.0]
+
+      // This conversion is terrible, but this is a toy demo with a small image
+      // Hopefully there aren't any logic / iteration order issues...
+      const typedArray = new Float32Array(imagePixelCount);
+      for (let y = 0; y < 28; ++y) {
+        for (let x = 0; x < 28; ++x) {
+          const typedIndex = y * 28 + x;
+          const rawIndex = 4 * (y * 28 + x) + 3;  // Assume colorSpace srgb
+          typedArray[typedIndex] = rawImageData.data[rawIndex] / 255.0;
+        }
+      }
+
+      // Copy into Wasm heap.
+      // Note: we could have done the conversion in-place, but this is demo code
+      Module.HEAPF32.set(typedArray, imageBuffer >> 2);
+    }
+
+  </script>
+  <script src="sample-web-static-sync.js"></script>
+  <!-- <script src="sample-web-static-multithreaded.js"></script> -->
+
+
+  <script>
+    // Forked from:
+    //   https://createjs.com/demos/easeljs/curveto
+    //   https://github.com/CreateJS/EaselJS/blob/master/examples/CurveTo.html
+
+    let drawingCanvasElement;
+    let rescaledCanvasElement, rescaledCanvasContext;
+    let stage;
+    let drawingCanvasShape;
+    let oldPt, oldMidPt;
+    let titleText;
+    const primaryColor = "#000000";
+    const eraseColor = "#FFFFFF";
+    const stroke = 32;
+
+    function initDrawing() {
+      drawingCanvasElement = document.getElementById("drawingCanvas");
+
+      rescaledCanvasElement = document.getElementById("rescaledCanvas");
+      rescaledCanvasContext = rescaledCanvasElement.getContext("2d");
+      rescaledCanvasContext.imageSmoothingEnabled = false;
+      rescaledCanvasContext.mozImageSmoothingEnabled = false;
+      rescaledCanvasContext.webkitImageSmoothingEnabled = false;
+      rescaledCanvasContext.msImageSmoothingEnabled = false;
+
+      stage = new createjs.Stage(drawingCanvasElement);
+      stage.autoClear = false;
+      stage.enableDOMEvents(true);
+
+      createjs.Touch.enable(stage);
+      createjs.Ticker.framerate = 24;
+
+      stage.addEventListener("stagemousedown", handleMouseDown);
+      stage.addEventListener("stagemouseup", handleMouseUp);
+
+      drawingCanvasShape = new createjs.Shape();
+      stage.addChild(drawingCanvasShape);
+
+      // Add instruction text.
+      titleText = new createjs.Text("Click and Drag to draw", "18px Arial", "#000000");
+      titleText.x = 30;
+      titleText.y = 100;
+      stage.addChild(titleText);
+
+      stage.update();
+    }
+
+    function handleMouseDown(event) {
+      if (!event.primary && !event.secondary) { return; }
+
+      if (stage.contains(titleText)) {
+        stage.clear();
+        stage.removeChild(titleText);
+      }
+
+      oldPt = new createjs.Point(stage.mouseX, stage.mouseY);
+      oldMidPt = oldPt.clone();
+      stage.addEventListener("stagemousemove", handleMouseMove);
+    }
+
+    function handleMouseMove(event) {
+      if (!event.primary && !event.secondary) { return; }
+
+      const midPt = new createjs.Point(
+        oldPt.x + stage.mouseX >> 1, oldPt.y + stage.mouseY >> 1);
+
+      const color = event.nativeEvent.which == 1 ? primaryColor : eraseColor;
+      drawingCanvasShape.graphics.clear()
+          .setStrokeStyle(stroke, 'round', 'round')
+          .beginStroke(color).moveTo(midPt.x, midPt.y)
+          .curveTo(oldPt.x, oldPt.y, oldMidPt.x, oldMidPt.y);
+
+      oldPt.x = stage.mouseX;
+      oldPt.y = stage.mouseY;
+      oldMidPt.x = midPt.x;
+      oldMidPt.y = midPt.y;
+
+      stage.update();
+      updateRescaledCanvas();
+
+      if (initialized) {
+        // TODO(scotttodd): debounce / rate limit this
+        predictDigit();
+      }
+    }
+
+    function handleMouseUp(event) {
+      if (!event.primary && !event.default) { return; }
+      stage.removeEventListener("stagemousemove", handleMouseMove);
+    }
+
+    function updateRescaledCanvas() {
+      rescaledCanvasContext.drawImage(
+          drawingCanvasElement,
+          /*sx=*/0, /*sy=*/0,
+          /*sWidth=*/256, /*sHeight=*/256,
+          /*dx=*/0, /*dy=*/0,
+          /*dWidth=*/28, /*dHeight=*/28);
+    }
+
+    function getRescaledCanvasData() {
+      return rescaledCanvasContext.getImageData(0, 0, 28, 28);
+    }
+
+    initDrawing();
+  </script>
+</body>
+
+</html>
