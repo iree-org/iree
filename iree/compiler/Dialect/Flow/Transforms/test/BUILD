@@ -36,7 +36,6 @@ iree_lit_test_suite(
             "outline_dispatch_regions.mlir",
             "pad_linalg_ops.mlir",
             "pad_tensor_to_tensor.mlir",
-            "promote_i1_to_i8.mlir",
             "strip_and_splat_constant_variables.mlir",
             "strip_signedness.mlir",
             "test_partitionable_loops_interface.mlir",
