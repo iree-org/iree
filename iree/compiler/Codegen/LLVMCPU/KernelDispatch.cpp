@@ -382,7 +382,6 @@ static LogicalResult setARMRootConfig(FuncOp entryPointFn,
 static LogicalResult setRootConfig(
     FuncOp entryPointFn, linalg::ContractionOpInterface contractionOp,
     ArrayRef<LoopTilingAndDistributionInfo> tiledLoops) {
-  puts("contraction");
   auto lhsShapedType = contractionOp.lhs().getType().cast<ShapedType>();
   // Use the default distribution for the matmul loops.
   int numBatchDims =
