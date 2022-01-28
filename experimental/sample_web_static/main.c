@@ -49,7 +49,7 @@ iree_status_t create_bytecode_module(iree_vm_module_t** out_module) {
 }
 
 iree_sample_state_t* setup_sample() {
-  iree_sample_state_t* state;
+  iree_sample_state_t* state = NULL;
   iree_status_t status = iree_allocator_malloc(
       iree_allocator_system(), sizeof(iree_sample_state_t), (void**)&state);
 
