@@ -26,6 +26,7 @@
 
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
+#include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
@@ -41,10 +42,10 @@ namespace iree_compiler {
 static Optional<Type> getLegalizedElementType(Type elementType) {
   if (auto intType = elementType.dyn_cast<IntegerType>()) {
     unsigned bitWidth = intType.getWidth();
-    unsigned byteAlignedWidth =
-        std::max<unsigned>(8, llvm::PowerOf2Ceil(bitWidth));
-    if (byteAlignedWidth == bitWidth) return elementType;
-    return IntegerType::get(elementType.getContext(), byteAlignedWidth);
+    unsigned byteAlignedBitWidth =
+        IREE::Util::getRoundedElementByteWidth(intType) * 8;
+    if (byteAlignedBitWidth == bitWidth) return elementType;
+    return IntegerType::get(elementType.getContext(), byteAlignedBitWidth);
   }
   return elementType;
 }
