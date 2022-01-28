@@ -51,6 +51,24 @@ llvm::StringMap<IREE::HAL::ExecutableEntryPointOp> getAllEntryPoints(
   return entryPointOps;
 }
 
+/// Returns the LLVM Target triple associated with the `hal.executable.variant`
+/// operation if set.
+static Optional<llvm::Triple> getTargetTriple(
+    IREE::HAL::ExecutableVariantOp variantOp) {
+  IREE::HAL::ExecutableTargetAttr targetAttr = variantOp.target();
+  if (!targetAttr) return llvm::None;
+  auto config = targetAttr.getConfiguration();
+  if (!config) return llvm::None;
+  auto triple = config.getAs<StringAttr>("target_triple");
+  if (!triple) return llvm::None;
+  return llvm::Triple(triple.getValue().str());
+}
+
+bool isX86(IREE::HAL::ExecutableVariantOp variantOp) {
+  Optional<llvm::Triple> triple = getTargetTriple(variantOp);
+  return triple && triple.getValue().isX86();
+}
+
 //===----------------------------------------------------------------------===//
 // Utility functions to get untiled op shapes
 //===----------------------------------------------------------------------===//

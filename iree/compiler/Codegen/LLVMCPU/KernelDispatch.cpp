@@ -11,7 +11,6 @@
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
-#include "llvm/ADT/Triple.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/TargetSelect.h"
@@ -70,18 +69,6 @@ static bool isVMVX(FuncOp entryPointFn) {
       entryPointFn->getParentOfType<IREE::HAL::ExecutableVariantOp>();
   IREE::HAL::ExecutableTargetAttr targetAttr = variantOp.target();
   return targetAttr && targetAttr.getBackend().getValue() == "vmvx";
-}
-
-static Optional<llvm::Triple> getTargetTriple(FuncOp entryPointFn) {
-  auto variantOp =
-      entryPointFn->getParentOfType<IREE::HAL::ExecutableVariantOp>();
-  IREE::HAL::ExecutableTargetAttr targetAttr = variantOp.target();
-  if (!targetAttr) return llvm::None;
-  auto config = targetAttr.getConfiguration();
-  if (!config) return llvm::None;
-  auto triple = config.getAs<StringAttr>("target_triple");
-  if (!triple) return llvm::None;
-  return llvm::Triple(triple.getValue().str());
 }
 
 /// Looks for the `native_vector_size` attribute in the hal.executable.variant
@@ -297,68 +284,22 @@ static LogicalResult setDefaultLaunchConfig(
   return success();
 }
 
-/// Adjusts the workload per workgroup to be a multiple of vector size to ensure
-/// that the op vectorizes.
-static int64_t getMaxTileSize(int64_t lb, int64_t ub, int64_t maxSize,
-                              int64_t vectorSizeVal) {
-  if (ub == ShapedType::kDynamicSize || lb == ShapedType::kDynamicSize) {
-    return maxSize;
-  }
-  int64_t dim = ub - lb;
-  if (dim < vectorSizeVal) return vectorSizeVal;
-  for (int64_t i = std::min(maxSize, dim); i > 0; --i) {
-    if (dim % i == 0 && i % vectorSizeVal == 0) {
-      return i;
-    }
-  }
-  return maxSize;
-}
-
-static LogicalResult setX86RootConfig(FuncOp entryPointFn,
-                                      linalg::ContractionOpInterface op,
-                                      SmallVector<int64_t> flowTileSizes,
-                                      int vectorSize) {
-  // Hardcoded tile sizes, where v is the native vector size.
-  // L1 tile sizes are {1, 1, ..., 8, 2v, 2v}.
-  // Vector tile sizes are {1, ..., 1, v, v}
-  SmallVector<int64_t> l1TileSizes, vectorTileSizes;
-  int64_t nLoops = cast<linalg::LinalgOp>(op.getOperation()).getNumLoops();
-  l1TileSizes.append(nLoops - 3, 1);
-  l1TileSizes.push_back(
-      getMaxTileSize(0, flowTileSizes[nLoops - 3], 8, vectorSize));
-  l1TileSizes.push_back(
-      getMaxTileSize(0, flowTileSizes[nLoops - 2], 2 * vectorSize, vectorSize));
-  vectorTileSizes.append(nLoops - 2, 1);
-  vectorTileSizes.push_back(vectorSize);
-
-  // L1/vector tile size for k dimensions.
-  auto lhsShapedType = op.lhs().getType().cast<ShapedType>();
-  int64_t K = lhsShapedType.getShape().back();
-  l1TileSizes.push_back(getMaxTileSize(0, K, 2 * vectorSize, vectorSize));
-  vectorTileSizes.push_back(vectorSize);
-  TileSizesListType tileSizes;
-  tileSizes.push_back({});  // Empty here since there is nothing to do in first
-                            // level tiling.
-  tileSizes.push_back(l1TileSizes);
-  tileSizes.push_back(vectorTileSizes);
-  auto config = IREE::Codegen::LoweringConfigAttr::get(
-      entryPointFn.getContext(), tileSizes, vectorTileSizes);
-  setLoweringConfig(op, config);
-
-  return success();
-}
-
-static LogicalResult setX86SandboxRootConfig(
-    FuncOp entryPointFn, linalg::ContractionOpInterface op,
-    SmallVector<int64_t> workloadPerWorkgroup, int vectorSize) {
+static LogicalResult setX86SandboxRootConfig(FuncOp entryPointFn,
+                                             linalg::ContractionOpInterface op,
+                                             ArrayRef<int64_t> flowTileSizes,
+                                             int vectorSize) {
   // Hardcoded tile sizes. The configuration is derived from iree-llvm-sandbox.
   // L1 tile sizes are {1, ..., 8, 32, 16}
   SmallVector<int64_t> l1TileSizes;
   int64_t nLoops = cast<linalg::LinalgOp>(op.getOperation()).getNumLoops();
   l1TileSizes.append(nLoops - 3, 1);
-  l1TileSizes.push_back(8);
-  l1TileSizes.push_back(32);
-  l1TileSizes.push_back(16);
+  l1TileSizes.push_back(getMaxTileSize(0, flowTileSizes[nLoops - 3], 8, 8));
+  l1TileSizes.push_back(getMaxTileSize(0, flowTileSizes[nLoops - 2], 32, 32));
+  auto lhsShapedType = op.lhs().getType().cast<ShapedType>();
+  int64_t K = lhsShapedType.getShape().back();
+  l1TileSizes.push_back(getMaxTileSize(0, K, 16, 16));
+  nativeVectorSizes.append(nLoops - 3, 1);
+  nativeVectorSizes.append(3, vectorSize);
 
   TileSizesListType tileSizes;
   tileSizes.push_back({});
@@ -410,7 +351,7 @@ static LogicalResult setX86TileFuseAndVectorizeRootConfig(
 
 static LogicalResult setARMRootConfig(FuncOp entryPointFn,
                                       linalg::ContractionOpInterface op,
-                                      SmallVector<int64_t> flowTileSizes,
+                                      ArrayRef<int64_t> flowTileSizes,
                                       int vectorSize) {
   // Hardcoded tile sizes, where v is the native vector size.
   // L1 tile sizes are {1, ..., 5v, v, 16v}.
@@ -476,17 +417,13 @@ static LogicalResult setRootConfig(
     workloadPerWorkgroup.push_back(1);
   }
 
-  DispatchLoweringPassPipeline passPipeline =
-      (!numBatchDims && useDoubleTilingExpert)
-          ? DispatchLoweringPassPipeline::CPUDoubleTilingExpert
-          : DispatchLoweringPassPipeline::CPUTileFuseAndVectorize;
-  setTranslationInfo(entryPointFn, passPipeline, workloadPerWorkgroup,
-                     /*workgroupSize=*/ArrayRef<int64_t>{});
-
   SmallVector<int64_t> flowTileSizes =
       getDistributedTileSizes(interfaceOp, workloadPerWorkgroup);
-  Optional<llvm::Triple> triple = getTargetTriple(entryPointFn);
-  if (triple && triple.getValue().isX86()) {
+
+  if (isX86(entryPointFn)) {
+    setTranslationInfo(
+        entryPointFn, DispatchLoweringPassPipeline::CPUDoubleTilingExpert,
+        workloadPerWorkgroup, /*workgroupSize=*/ArrayRef<int64_t>{});
     // There is a tileInterchange option. If it needs to be configured, we can
     // only apply the pipeline to linalg.matmul. Because we don't know the
     // number of loops when adding the pass to pass manager.
@@ -498,13 +435,16 @@ static LogicalResult setRootConfig(
         getElementTypeOrSelf(contractionOp->getResult(0).getType());
     if (lhsElemType == rhsElemType && rhsElemType == resElemType) {
       return setX86SandboxRootConfig(entryPointFn, contractionOp,
-                                     workloadPerWorkgroup, vectorSize);
+                                     flowTileSizes, vectorSize);
     } else {
       return setX86TileFuseAndVectorizeRootConfig(
-          entryPointFn, contractionOp, workloadPerWorkgroup, vectorSize);
+          entryPointFn, contractionOp, flowTileSizes, vectorSize);
     }
   }
   // Fall back to ARM configurations.
+  setTranslationInfo(
+      entryPointFn, DispatchLoweringPassPipeline::CPUTileFuseAndVectorize,
+      workloadPerWorkgroup, /*workgroupSize=*/ArrayRef<int64_t>{});
   return setARMRootConfig(entryPointFn, contractionOp, flowTileSizes,
                           vectorSize);
 }
