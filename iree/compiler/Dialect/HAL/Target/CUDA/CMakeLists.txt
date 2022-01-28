@@ -12,22 +12,6 @@ endif()
 
 iree_add_all_subdirs()
 
-# TODO(#5893): iree_c_embed_data requires a relative path and we need it to be
-# here to keep the path consistent with bazel build file. Fix it by making cmake
-# target more flexible.
-iree_c_embed_data(
-  NAME
-    cuda_libdevice
-  SRCS
-    "../../../../../../third_party/cuda/nvvm/libdevice/libdevice.10.bc"
-  C_FILE_OUTPUT
-    "libdevice.c"
-  H_FILE_OUTPUT
-    "libdevice.h"
-  FLATTEN
-  PUBLIC
-)
-
 iree_cc_library(
   NAME
     CUDA
@@ -38,7 +22,6 @@ iree_cc_library(
     "CUDATarget.cpp"
     "NoLoopUnrollPass.cpp"
   DEPS
-    ::cuda_libdevice
     LLVMAnalysis
     LLVMBitReader
     LLVMCore
