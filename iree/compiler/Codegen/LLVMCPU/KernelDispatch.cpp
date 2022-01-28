@@ -299,6 +299,44 @@ static LogicalResult setX86SandboxRootConfig(
   return success();
 }
 
+static LogicalResult setX86TileFuseAndVectorizeRootConfig(
+    FuncOp entryPointFn, linalg::ContractionOpInterface op,
+    SmallVector<int64_t> workloadPerWorkgroup, int vectorSize) {
+  setTranslationInfo(entryPointFn,
+                     DispatchLoweringPassPipeline::CPUTileFuseAndVectorize,
+                     workloadPerWorkgroup,
+                     /*workgroupSize=*/ArrayRef<int64_t>{});
+
+  // Hardcoded tile sizes, where v is the native vector size.
+  // L1 tile sizes are {1, 1, ..., 8, 2v, 2v}.
+  // Vector tile sizes are {1, ..., 1, v, v}
+  SmallVector<int64_t> l1TileSizes, vectorTileSizes;
+  int64_t nLoops = cast<linalg::LinalgOp>(op.getOperation()).getNumLoops();
+  l1TileSizes.append(nLoops - 3, 1);
+  l1TileSizes.push_back(
+      getMaxTileSize(0, workloadPerWorkgroup[1], 8, vectorSize));
+  l1TileSizes.push_back(
+      getMaxTileSize(0, workloadPerWorkgroup[0], 2 * vectorSize, vectorSize));
+  vectorTileSizes.append(nLoops - 2, 1);
+  vectorTileSizes.push_back(vectorSize);
+
+  // L1/vector tile size for k dimensions.
+  auto lhsShapedType = op.lhs().getType().cast<ShapedType>();
+  int64_t K = lhsShapedType.getShape().back();
+  l1TileSizes.push_back(getMaxTileSize(0, K, 2 * vectorSize, vectorSize));
+  vectorTileSizes.push_back(vectorSize);
+  TileSizesListType tileSizes;
+  tileSizes.push_back({});  // Empty here since there is nothing to do in first
+                            // level tiling.
+  tileSizes.push_back(l1TileSizes);
+  tileSizes.push_back(vectorTileSizes);
+  auto config = IREE::Codegen::LoweringConfigAttr::get(
+      entryPointFn.getContext(), tileSizes, vectorTileSizes);
+  setLoweringConfig(op, config);
+
+  return success();
+}
+
 static LogicalResult setARMRootConfig(FuncOp entryPointFn,
                                       linalg::ContractionOpInterface op,
                                       SmallVector<int64_t> workloadPerWorkgroup,
@@ -380,8 +418,17 @@ static LogicalResult setRootConfig(
     // number of loops when adding the pass to pass manager.
     // TODO(hanchung): Embed options into attributes, so we can control options
     // more heuristically.
-    return setX86SandboxRootConfig(entryPointFn, contractionOp,
-                                   workloadPerWorkgroup, vectorSize);
+    Type lhsElemType = getElementTypeOrSelf(contractionOp.lhs().getType());
+    Type rhsElemType = getElementTypeOrSelf(contractionOp.rhs().getType());
+    Type resElemType =
+        getElementTypeOrSelf(contractionOp->getResult(0).getType());
+    if (lhsElemType == rhsElemType && rhsElemType == resElemType) {
+      return setX86SandboxRootConfig(entryPointFn, contractionOp,
+                                     workloadPerWorkgroup, vectorSize);
+    } else {
+      return setX86TileFuseAndVectorizeRootConfig(
+          entryPointFn, contractionOp, workloadPerWorkgroup, vectorSize);
+    }
   }
   // Fall back to ARM configurations.
   return setARMRootConfig(entryPointFn, contractionOp, workloadPerWorkgroup,

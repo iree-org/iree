@@ -1381,3 +1381,70 @@ hal.executable private @matmul_x86  {
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"CPUDoubleTilingExpert", workload_per_wg = [64, 64]>
 //  CHECK-DAG: #[[CONFIG:.+]] =  #iree_codegen.lowering.config<tile_sizes = [{{\[}}], [8, 32, 16]], native_vector_size = [4, 4, 4]>
 //  CHECK:       linalg.matmul {lowering.config = #[[CONFIG]]}
+
+// -----
+
+#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>,
+    #hal.descriptor_set.binding<2, storage_buffer>
+  ]>
+]>
+hal.executable private @matmul_i8_i8_i32  {
+  hal.executable.variant public @embedded_elf_x86_64, target = #hal.executable.target<
+    "llvm",
+    "embedded-elf-x86_64", {
+      data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
+      native_vector_size = 4 : index,
+      target_triple = "x86_64-unknown-unknown-eabi-elf"
+    }> {
+    hal.executable.entry_point public @matmul_i8_i8_i32 layout(#executable_layout)
+    builtin.module {
+      func @matmul_i8_i8_i32() {
+        %c0 = arith.constant 0 : index
+        %0 = hal.interface.constant.load[0] : i32
+        %1 = hal.interface.constant.load[1] : i32
+        %2 = hal.interface.constant.load[2] : i32
+        %3 = hal.interface.constant.load[3] : i32
+        %4 = hal.interface.constant.load[4] : i32
+        %5 = hal.interface.constant.load[5] : i32
+        %6 = arith.index_cast %0 : i32 to index
+        %7 = arith.index_cast %1 : i32 to index
+        %8 = arith.index_cast %2 : i32 to index
+        %9 = arith.index_cast %3 : i32 to index
+        %10 = arith.index_cast %4 : i32 to index
+        %11 = arith.index_cast %5 : i32 to index
+        %12 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(32) : !flow.dispatch.tensor<readonly:?x?xi8>{%6, %7}
+        %13 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(32) : !flow.dispatch.tensor<readonly:?x?xi8>{%8, %9}
+        %14 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) offset(%c0) alignment(32) : !flow.dispatch.tensor<readwrite:?x?xi32>{%10, %11}
+        %workgroup_size_x = hal.interface.workgroup.size[0] : index
+        %workgroup_size_y = hal.interface.workgroup.size[1] : index
+        %workgroup_id_x = hal.interface.workgroup.id[0] : index
+        %workgroup_count_x = hal.interface.workgroup.count[0] : index
+        %workgroup_id_y = hal.interface.workgroup.id[1] : index
+        %workgroup_count_y = hal.interface.workgroup.count[1] : index
+        %15 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_id_y, %workgroup_size_y]
+        %16 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_count_y, %workgroup_size_y]
+        scf.for %arg0 = %15 to %6 step %16 {
+          %17 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_id_x, %workgroup_size_x]
+          %18 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_count_x, %workgroup_size_x]
+          scf.for %arg1 = %17 to %9 step %18 {
+            %19 = affine.min affine_map<(d0)[s0, s1] -> (s1, -d0 + s0)>(%arg0)[%6, %workgroup_size_y]
+            %20 = flow.dispatch.tensor.load %12, offsets = [%arg0, 0], sizes = [%19, %7], strides = [1, 1] : !flow.dispatch.tensor<readonly:?x?xi8>{%6, %7} -> tensor<?x?xi8>
+            %21 = affine.min affine_map<(d0)[s0, s1] -> (s1, -d0 + s0)>(%arg1)[%9, %workgroup_size_x]
+            %22 = flow.dispatch.tensor.load %13, offsets = [0, %arg1], sizes = [%8, %21], strides = [1, 1] : !flow.dispatch.tensor<readonly:?x?xi8>{%8, %9} -> tensor<?x?xi8>
+            %23 = flow.dispatch.tensor.load %14, offsets = [%arg0, %arg1], sizes = [%19, %21], strides = [1, 1] : !flow.dispatch.tensor<readwrite:?x?xi32>{%10, %11} -> tensor<?x?xi32>
+            %24 = linalg.matmul ins(%20, %22 : tensor<?x?xi8>, tensor<?x?xi8>) outs(%23 : tensor<?x?xi32>) -> tensor<?x?xi32>
+            flow.dispatch.tensor.store %24, %14, offsets = [%arg0, %arg1], sizes = [%19, %21], strides = [1, 1] : tensor<?x?xi32> -> !flow.dispatch.tensor<readwrite:?x?xi32>{%10, %11}
+          }
+        }
+        return
+      }
+    }
+  }
+}
+
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering.config<tile_sizes = {{\[}}[], [8, 8, 8], [1, 4, 4]{{\]}}, native_vector_size = [1, 4, 4]>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"CPUTileFuseAndVectorize", workload_per_wg = [64, 64]>
+//  CHECK:       linalg.matmul {lowering.config = #[[CONFIG]]}
