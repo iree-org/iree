@@ -12,38 +12,36 @@ endif()
 
 iree_add_all_subdirs()
 
-iree_cc_library(
-  NAME
-    CUDA
-  HDRS
-    "CUDATarget.h"
-    "LLVMPasses.h"
-  SRCS
-    "CUDATarget.cpp"
-    "NoLoopUnrollPass.cpp"
-  DEPS
-    LLVMAnalysis
-    LLVMBitReader
-    LLVMCore
-    LLVMipo
-    LLVMLinker
-    LLVMNVPTXCodeGen
-    LLVMSupport
-    LLVMTarget
-    MLIRGPUOps
-    MLIRLLVMIR
-    MLIRLLVMToLLVMIRTranslation
-    MLIRNVVMIR
-    MLIRNVVMToLLVMIRTranslation
-    MLIRPass
-    MLIRSupport
-    MLIRTargetLLVMIRExport
-    iree::base::internal::flatcc::building
-    iree::compiler::Codegen::LLVMGPU
-    iree::compiler::Dialect::HAL::Target
-    iree::compiler::Utils
-    iree::schemas::cuda_executable_def_c_fbs
-  PUBLIC
-)
-
-### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
+# iree_cc_library(
+#   NAME
+#     CUDA
+#   HDRS
+#     "CUDATarget.h"
+#     "LLVMPasses.h"
+#   SRCS
+#     "CUDATarget.cpp"
+#     "NoLoopUnrollPass.cpp"
+#   DEPS
+#     LLVMAnalysis
+#     LLVMBitReader
+#     LLVMCore
+#     LLVMipo
+#     LLVMLinker
+#     LLVMNVPTXCodeGen
+#     LLVMSupport
+#     LLVMTarget
+#     MLIRGPUOps
+#     MLIRLLVMIR
+#     MLIRLLVMToLLVMIRTranslation
+#     MLIRNVVMIR
+#     MLIRNVVMToLLVMIRTranslation
+#     MLIRPass
+#     MLIRSupport
+#     MLIRTargetLLVMIRExport
+#     iree::base::internal::flatcc::building
+#     iree::compiler::Codegen::LLVMGPU
+#     iree::compiler::Dialect::HAL::Target
+#     iree::compiler::Utils
+#     iree::schemas::cuda_executable_def_c_fbs
+#   PUBLIC
+# )
