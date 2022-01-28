@@ -149,6 +149,9 @@ static void addLowerToLLVMGPUPasses(OpPassManager &pm, bool useROCM) {
   pm.addNestedPass<FuncOp>(createCanonicalizerPass());
   pm.addNestedPass<FuncOp>(createCSEPass());
 
+  // math dialect elementry functions -> polynomial form.
+  pm.addNestedPass<FuncOp>(createPolynomialApproximationPass());
+
   pm.addNestedPass<FuncOp>(arith::createArithmeticExpandOpsPass());
   pm.addNestedPass<FuncOp>(createStdExpandOpsPass());
   pm.addPass(createLowerAffinePass());
