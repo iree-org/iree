@@ -418,15 +418,11 @@ static LogicalResult setRootConfig(
     // number of loops when adding the pass to pass manager.
     // TODO(hanchung): Embed options into attributes, so we can control options
     // more heuristically.
-    int lhsElemBitwidth = getElementTypeOrSelf(contractionOp.lhs().getType())
-                              .getIntOrFloatBitWidth();
-    int rhsElemBitwidth = getElementTypeOrSelf(contractionOp.rhs().getType())
-                              .getIntOrFloatBitWidth();
-    int resElemBitwidth =
-        getElementTypeOrSelf(contractionOp->getResult(0).getType())
-            .getIntOrFloatBitWidth();
-    if (lhsElemBitwidth == rhsElemBitwidth &&
-        rhsElemBitwidth == resElemBitwidth) {
+    Type lhsElemType = getElementTypeOrSelf(contractionOp.lhs().getType());
+    Type rhsElemType = getElementTypeOrSelf(contractionOp.rhs().getType());
+    Type resElemType =
+        getElementTypeOrSelf(contractionOp->getResult(0).getType());
+    if (lhsElemType == rhsElemType && rhsElemType == resElemType) {
       return setX86SandboxRootConfig(entryPointFn, contractionOp,
                                      workloadPerWorkgroup, vectorSize);
     } else {
