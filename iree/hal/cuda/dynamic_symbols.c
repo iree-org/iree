@@ -10,6 +10,7 @@
 
 #include "iree/base/internal/dynamic_library.h"
 #include "iree/base/target_platform.h"
+#include "iree/base/tracing.h"
 
 static const char* kCUDALoaderSearchNames[] = {
 #if defined(IREE_PLATFORM_WINDOWS)
@@ -19,8 +20,7 @@ static const char* kCUDALoaderSearchNames[] = {
 #endif
 };
 
-#if IREE_TRACING_FEATURES & \
-    IREE_TRACING_FEATURE_INSTRUMENTATION  // CUPTI is only used for tracing.
+#if IREE_ENABLE_CUPTI
 static const char* kCUPTILoaderSearchNames[] = {
 #if defined(IREE_PLATFORM_WINDOWS)
     "cupti64_2021.2.0.dll"
@@ -28,7 +28,7 @@ static const char* kCUPTILoaderSearchNames[] = {
     "libcupti.so"
 #endif
 };
-#endif  // IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
+#endif  // IREE_ENABLE_CUPTI
 
 #define concat(A, B) A B
 
@@ -48,8 +48,7 @@ static iree_status_t iree_hal_cuda_dynamic_symbols_resolve_all(
 #include "iree/hal/cuda/dynamic_symbol_tables.h"  // IWYU pragma: keep
 #undef CU_PFN_DECL
 
-#if IREE_TRACING_FEATURES & \
-    IREE_TRACING_FEATURE_INSTRUMENTATION  // CUPTI is only used for tracing.
+#if IREE_ENABLE_CUPTI
 #define CUPTI_PFN_DECL(cuptiSymbolName, ...)                                  \
   {                                                                           \
     static const char* kName = #cuptiSymbolName;                              \
@@ -62,7 +61,7 @@ static iree_status_t iree_hal_cuda_dynamic_symbols_resolve_all(
   }
 #include "iree/hal/cuda/dynamic_cupti_tables.h"  // IWYU pragma: keep
 #undef CUPTI_PFN_DECL
-#endif  // IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
+#endif  // IREE_ENABLE_CUPTI
 
   return iree_ok_status();
 }
@@ -81,8 +80,7 @@ iree_status_t iree_hal_cuda_dynamic_symbols_initialize(
         "CUDA runtime library not available; ensure installed and on path");
   }
 
-#if IREE_TRACING_FEATURES & \
-    IREE_TRACING_FEATURE_INSTRUMENTATION  // CUPTI is only used for tracing.
+#if IREE_ENABLE_CUPTI
   status = iree_dynamic_library_load_from_files(
       IREE_ARRAYSIZE(kCUPTILoaderSearchNames), kCUPTILoaderSearchNames,
       IREE_DYNAMIC_LIBRARY_FLAG_NONE, allocator, &out_syms->cupti_library);
@@ -92,7 +90,7 @@ iree_status_t iree_hal_cuda_dynamic_symbols_initialize(
         IREE_STATUS_UNAVAILABLE,
         "CUPTI runtime library not available; ensure installed and on path");
   }
-#endif  // IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
+#endif  // IREE_ENABLE_CUPTI
 
   if (iree_status_is_ok(status)) {
     status = iree_hal_cuda_dynamic_symbols_resolve_all(out_syms);

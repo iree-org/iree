@@ -12,21 +12,11 @@ if(NOT ${IREE_HAL_DRIVER_CUDA})
   return()
 endif()
 
-if (TARGET CUDA::cupti)
-iree_cc_test(
-  NAME
-    dynamic_cupti_test
-  SRCS
-    "dynamic_cupti_test.cc"
-  DEPS
-    ::dynamic_symbols
-    iree::base
-    iree::testing::gtest
-    iree::testing::gtest_main
-  LABELS
-    "driver=cuda"
-)
-endif(TARGET CUDA::cupti)
+if(TARGET CUDA::cupti AND IREE_ENABLE_RUNTIME_TRACING)
+  set(_IREE_CUDA_HEADERS_DEFINES "IREE_ENABLE_CUPTI")
+else()
+  set(_IREE_CUDA_HEADERS_DEFINES "")
+endif(TARGET CUDA::cupti AND IREE_ENABLE_RUNTIME_TRACING)
 
 iree_add_all_subdirs()
 
@@ -114,3 +104,25 @@ iree_cc_test(
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
+
+if (TARGET CUDA::cupti AND IREE_ENABLE_RUNTIME_TRACING)
+iree_cc_test(
+  NAME
+    dynamic_cupti_test
+  SRCS
+    "dynamic_cupti_test.cc"
+  DEPS
+    ::dynamic_symbols
+    iree::base
+    iree::testing::gtest
+    iree::testing::gtest_main
+  LABELS
+    "driver=cuda"
+)
+endif(TARGET CUDA::cupti AND IREE_ENABLE_RUNTIME_TRACING)
+
+target_compile_definitions(
+  iree_hal_cuda_dynamic_symbols
+  PUBLIC
+    ${_IREE_CUDA_HEADERS_DEFINES}
+)

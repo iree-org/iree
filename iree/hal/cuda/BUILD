@@ -17,6 +17,12 @@ iree_cmake_extra_content(
 if(NOT ${IREE_HAL_DRIVER_CUDA})
   return()
 endif()
+
+if(TARGET CUDA::cupti AND IREE_ENABLE_RUNTIME_TRACING)
+  set(_IREE_CUDA_HEADERS_DEFINES "IREE_ENABLE_CUPTI")
+else()
+  set(_IREE_CUDA_HEADERS_DEFINES "")
+endif(TARGET CUDA::cupti AND IREE_ENABLE_RUNTIME_TRACING)
 """,
 )
 
@@ -91,26 +97,6 @@ cc_library(
         "//iree/base/internal:dynamic_library",
         "@cuda//:cuda_headers",
     ],
-)
-
-iree_cmake_extra_content(
-    content = """
-if (TARGET CUDA::cupti)
-iree_cc_test(
-  NAME
-    dynamic_cupti_test
-  SRCS
-    "dynamic_cupti_test.cc"
-  DEPS
-    ::dynamic_symbols
-    iree::base
-    iree::testing::gtest
-    iree::testing::gtest_main
-  LABELS
-    "driver=cuda"
-)
-endif(TARGET CUDA::cupti)
-""",
 )
 
 cc_test(

@@ -30,8 +30,6 @@ if (TARGET CUDA::cupti)
       cuda_headers
     ROOT
       ${CUDA_HEADERS_API_ROOT}
-    DEFINES
-      IREE_ENABLE_CUPTI
     INCLUDES
       ${CUDA_HEADERS_API_ROOT}
       ${CUDA_INCLUDE_DIR}
