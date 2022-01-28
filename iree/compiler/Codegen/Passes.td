@@ -114,6 +114,13 @@ def LinalgToVectorVectorizeMMT4d :
   let constructor =
       "mlir::iree_compiler::createLinalgToVectorVectorizeMMT4dPass()";
 }
+
+def PolynomialApproximationPass :
+    Pass<"iree-codegen-polynomial-approximation", ""> {
+  let summary = "Convert math operations to their polynomial approximation";
+  let constructor =
+      "mlir::iree_compiler::createPolynomialApproximationPass()";
+}
 //------------------------------------------------------------------------------
 // LLVMCPU
 //------------------------------------------------------------------------------

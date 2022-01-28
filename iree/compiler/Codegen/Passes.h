@@ -122,6 +122,11 @@ std::unique_ptr<OperationPass<FuncOp>> createTypePropagationPass();
 std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
 createSetNumWorkgroupsPass(ArrayRef<int64_t> workgroupSize = {});
 
+/// Pass to optimize vector transfer_read and transfer_write.
+std::unique_ptr<OperationPass<FuncOp>> createOptimizeVectorTransferPass();
+
+/// Pass to convert math operations to their polynomial approximation.
+std::unique_ptr<OperationPass<>> createPolynomialApproximationPass();
 //----------------------------------------------------------------------------//
 // Common codegen patterns.
 //----------------------------------------------------------------------------//

@@ -324,6 +324,9 @@ static void addLowerToLLVMPasses(OpPassManager &passManager) {
   passManager.addPass(createTensorConstantBufferizePass());
   passManager.addPass(createFoldTensorExtractOpPass());
 
+  // math dialect elementry functions -> polynomial form.
+  passManager.addNestedPass<FuncOp>(createPolynomialApproximationPass());
+
   // (HAL, IREE, Linalg, STD) -> LLVM
   passManager.addNestedPass<FuncOp>(arith::createArithmeticExpandOpsPass());
   passManager.addNestedPass<FuncOp>(memref::createExpandOpsPass());

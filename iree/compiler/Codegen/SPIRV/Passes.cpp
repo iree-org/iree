@@ -84,6 +84,9 @@ static void addMemRefLoweringPasses(OpPassManager &pm) {
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
+  // math dialect elementry functions -> polynomial form.
+  pm.addNestedPass<FuncOp>(createPolynomialApproximationPass());
+
   // Fold load/store from/to subview ops into the original memref when possible.
   // In SPIR-V we don't use memref descriptor so it's not possible to handle
   // subview ops.

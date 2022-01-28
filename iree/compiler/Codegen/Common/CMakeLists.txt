@@ -36,6 +36,7 @@ iree_cc_library(
     "IREEComprehensiveBufferizePass.cpp"
     "LinalgBufferizePass.cpp"
     "OptimizeVectorTransferPass.cpp"
+    "PolynomialApproximationPass.cpp"
     "RemoveTrivialLoops.cpp"
     "SetNumWorkgroupsPass.cpp"
     "TypePropagationPass.cpp"
@@ -60,6 +61,7 @@ iree_cc_library(
     MLIRLinalg
     MLIRLinalgBufferizableOpInterfaceImpl
     MLIRLinalgTransforms
+    MLIRMathTransforms
     MLIRMemRef
     MLIRMemRefTransforms
     MLIRModuleBufferization
