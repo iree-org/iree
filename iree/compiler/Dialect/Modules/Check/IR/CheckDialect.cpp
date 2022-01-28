@@ -32,7 +32,7 @@ class CheckToVmConversionInterface : public VMConversionDialectInterface {
   }
 
   void populateVMConversionPatterns(
-      SymbolTable &importSymbols, OwningRewritePatternList &patterns,
+      SymbolTable &importSymbols, RewritePatternSet &patterns,
       TypeConverter &typeConverter) const override {
     populateCheckToVMPatterns(getDialect()->getContext(), importSymbols,
                               patterns, typeConverter);
@@ -44,7 +44,7 @@ class CheckToHalConversionInterface : public HALConversionDialectInterface {
   using HALConversionDialectInterface::HALConversionDialectInterface;
 
   void setupConversionTarget(ConversionTarget &target,
-                             OwningRewritePatternList &patterns,
+                             RewritePatternSet &patterns,
                              TypeConverter &typeConverter) const override {
     populateCheckToHALPatterns(getDialect()->getContext(), patterns,
                                typeConverter);

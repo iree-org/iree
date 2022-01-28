@@ -72,8 +72,8 @@ struct SkipBufferViewBufferOp : public OpRewritePattern<BufferViewBufferOp> {
 
 }  // namespace
 
-void BufferViewBufferOp::getCanonicalizationPatterns(
-    OwningRewritePatternList &results, MLIRContext *context) {
+void BufferViewBufferOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                                     MLIRContext *context) {
   results.insert<SkipBufferViewBufferOp>(context);
 }
 
@@ -98,8 +98,8 @@ struct ExpandBufferViewDimsOp : public OpRewritePattern<BufferViewDimsOp> {
 
 }  // namespace
 
-void BufferViewDimsOp::getCanonicalizationPatterns(
-    OwningRewritePatternList &results, MLIRContext *context) {
+void BufferViewDimsOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                                   MLIRContext *context) {
   results.insert<ExpandBufferViewDimsOp>(context);
 }
 
@@ -129,7 +129,7 @@ struct SkipCommandBufferDeviceOp
 }  // namespace
 
 void CommandBufferDeviceOp::getCanonicalizationPatterns(
-    OwningRewritePatternList &results, MLIRContext *context) {
+    RewritePatternSet &results, MLIRContext *context) {
   results.insert<SkipCommandBufferDeviceOp>(context);
 }
 
@@ -167,7 +167,7 @@ struct FoldCommandBufferFillBufferSubspans
 }  // namespace
 
 void CommandBufferFillBufferOp::getCanonicalizationPatterns(
-    OwningRewritePatternList &results, MLIRContext *context) {
+    RewritePatternSet &results, MLIRContext *context) {
   results.insert<FoldCommandBufferFillBufferSubspans>(context);
 }
 
@@ -216,7 +216,7 @@ struct FoldCommandBufferCopyBufferSubspans
 }  // namespace
 
 void CommandBufferCopyBufferOp::getCanonicalizationPatterns(
-    OwningRewritePatternList &results, MLIRContext *context) {
+    RewritePatternSet &results, MLIRContext *context) {
   results.insert<FoldCommandBufferCopyBufferSubspans>(context);
 }
 
@@ -262,7 +262,7 @@ struct FoldCommandBufferPushDescriptorSetBufferSubspan
 }  // namespace
 
 void CommandBufferPushDescriptorSetOp::getCanonicalizationPatterns(
-    OwningRewritePatternList &results, MLIRContext *context) {
+    RewritePatternSet &results, MLIRContext *context) {
   results.insert<FoldCommandBufferPushDescriptorSetBufferSubspan>(context);
 }
 

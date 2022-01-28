@@ -33,7 +33,7 @@ namespace iree_compiler {
 /// part of the launch config but needs to be distributed on the workgroup
 /// picked by the root op.
 static void populateTilingCopyToWorkgroupMemPatterns(
-    OwningRewritePatternList &patterns, ArrayRef<int64_t> workgroupSize) {
+    RewritePatternSet &patterns, ArrayRef<int64_t> workgroupSize) {
   // Tile and distribute copy to workgroup memory.
   linalg::TileSizeComputationFunction wgCopyTileSizeFn =
       [](OpBuilder &builder, Operation *operation) {
@@ -263,7 +263,7 @@ class LLVMGPUDistributeSharedMemoryCopyPass
       // well aligned on the number of threads.
       // TODO(thomasraoux): Handle this case with padding instead so that we get
       // good performance for more complex shapes.
-      OwningRewritePatternList threadLevelTilingPatterns(context);
+      RewritePatternSet threadLevelTilingPatterns(context);
       populateTilingCopyToWorkgroupMemPatterns(threadLevelTilingPatterns,
                                                workgroupSize);
       if (failed(applyPatternsAndFoldGreedily(

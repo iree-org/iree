@@ -120,7 +120,7 @@ class VMVXImportOpConversion : public OpConversionPattern<T> {
 void populateVMVXToVMPatterns(MLIRContext *context,
                               TypeConverter &typeConverter,
                               SymbolTable &importSymbols,
-                              OwningRewritePatternList &patterns) {}
+                              RewritePatternSet &patterns) {}
 
 }  // namespace iree_compiler
 }  // namespace mlir

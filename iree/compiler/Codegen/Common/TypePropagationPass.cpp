@@ -345,7 +345,7 @@ struct TypePropagationPass : public TypePropagationBase<TypePropagationPass> {
   }
   void runOnOperation() override {
     MLIRContext *context = &getContext();
-    OwningRewritePatternList patterns(context);
+    RewritePatternSet patterns(context);
 
     TypePropagationTypeConverter typeConverter;
     patterns

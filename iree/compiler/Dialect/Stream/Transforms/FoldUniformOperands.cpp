@@ -127,8 +127,7 @@ static void deduplicateOperands(
   });
 
   // Replace uses of the duplicate arguments with their base arguments.
-  SmallVector<unsigned> deadArgs;
-  llvm::BitVector deadArgMap(funcOp.getNumArguments());
+  llvm::BitVector deadArgs, deadArgMap(funcOp.getNumArguments());
   for (auto replacement : llvm::enumerate(argReplacementMap)) {
     unsigned deadIdx = replacement.index();
     unsigned liveIdx = replacement.value();
@@ -218,8 +217,7 @@ static void inlineUniformConstants(
       IREE::Stream::CmdDispatchOp::makeOperandToArgMap(funcOp);
 
   // Replace uses of the uniform arguments with a constant value.
-  SmallVector<unsigned> deadArgs;
-  llvm::BitVector deadArgMap(funcOp.getNumArguments());
+  llvm::BitVector deadArgs, deadArgMap(funcOp.getNumArguments());
   auto builder = OpBuilder::atBlockBegin(&entryBlock);
   for (auto operandIdx : uniformOperandMap.set_bits()) {
     unsigned argIdx = operandToArgMap[operandIdx];

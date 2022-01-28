@@ -579,7 +579,7 @@ struct FlattenMemRefSubspanPass
     MLIRContext &context = getContext();
 
     // This pass currently doesn't support alignment hints so remove them first.
-    OwningRewritePatternList patterns(&context);
+    RewritePatternSet patterns(&context);
     patterns.add<RemoveAssumeAlignOp>(&context);
     (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
 

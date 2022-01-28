@@ -666,7 +666,7 @@ void ConvertToLLVMPass::runOnOperation() {
 
   // Run Vector -> Vector transformations ahead of conversion to LLVM.
   {
-    OwningRewritePatternList patterns(&getContext());
+    RewritePatternSet patterns(&getContext());
     vector::populateVectorToVectorCanonicalizationPatterns(patterns);
     vector::populateVectorBroadcastLoweringPatterns(patterns);
     vector::populateVectorContractLoweringPatterns(patterns);
@@ -679,7 +679,7 @@ void ConvertToLLVMPass::runOnOperation() {
     }
   }
   {
-    OwningRewritePatternList vectorToLoopsPatterns(&getContext());
+    RewritePatternSet vectorToLoopsPatterns(&getContext());
     populateVectorToSCFConversionPatterns(
         vectorToLoopsPatterns, VectorTransferToSCFOptions().enableFullUnroll());
     if (failed(applyPatternsAndFoldGreedily(
@@ -690,7 +690,7 @@ void ConvertToLLVMPass::runOnOperation() {
 
   // math dialect elementry functions -> polynomial form.
   {
-    OwningRewritePatternList mathPatterns(&getContext());
+    RewritePatternSet mathPatterns(&getContext());
     populateMathPolynomialApproximationPatterns(mathPatterns);
     if (failed(applyPatternsAndFoldGreedily(getOperation(),
                                             std::move(mathPatterns)))) {
@@ -705,7 +705,7 @@ void ConvertToLLVMPass::runOnOperation() {
   options.overrideIndexBitwidth(options.dataLayout.getPointerSizeInBits());
   LLVMTypeConverter converter(&getContext(), options, &dataLayoutAnalysis);
 
-  OwningRewritePatternList patterns(&getContext());
+  RewritePatternSet patterns(&getContext());
 
   // Use the default 64-bit lowering for TOSA's ApplyScale operator:
   //   This lowering widens integer types to 64-bit an performs the non-fused
@@ -771,7 +771,7 @@ void ConvertToLLVMPass::runOnOperation() {
 
   // Post conversion patterns.
   {
-    OwningRewritePatternList postPatterns(&getContext());
+    RewritePatternSet postPatterns(&getContext());
     // TODO(ravishankarm): Move this to a separate pass.
     llvm::Triple triple(targetTripleStr);
     if (triple.isWasm()) {

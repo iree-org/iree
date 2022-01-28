@@ -19,11 +19,11 @@ namespace iree_compiler {
 // |typeConverter|.
 void populateUtilToStreamConversionPatterns(MLIRContext *context,
                                             TypeConverter &typeConverter,
-                                            OwningRewritePatternList &patterns);
+                                            RewritePatternSet &patterns);
 void populateUtilToStreamConversionPatterns(MLIRContext *context,
                                             ConversionTarget &conversionTarget,
                                             TypeConverter &typeConverter,
-                                            OwningRewritePatternList &patterns);
+                                            RewritePatternSet &patterns);
 
 }  // namespace iree_compiler
 }  // namespace mlir

@@ -29,13 +29,13 @@ struct ExpandAttributeToConst : public OpRewritePattern<SrcOp> {
 };
 }  // namespace
 
-void ExpectEqConstOp::getCanonicalizationPatterns(
-    OwningRewritePatternList &results, MLIRContext *context) {
+void ExpectEqConstOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                                  MLIRContext *context) {
   results.insert<ExpandAttributeToConst<ExpectEqConstOp, ExpectEqOp>>(context);
 }
 
 void ExpectAlmostEqConstOp::getCanonicalizationPatterns(
-    OwningRewritePatternList &results, MLIRContext *context) {
+    RewritePatternSet &results, MLIRContext *context) {
   results
       .insert<ExpandAttributeToConst<ExpectAlmostEqConstOp, ExpectAlmostEqOp>>(
           context);

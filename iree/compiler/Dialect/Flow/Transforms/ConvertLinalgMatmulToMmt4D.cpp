@@ -359,7 +359,7 @@ class ConvertLinalgMatmulToMmt4DPass final
     MLIRContext *context = &getContext();
     // Main pattern.
     {
-      OwningRewritePatternList patterns(&getContext());
+      RewritePatternSet patterns(&getContext());
       patterns.insert<LinalgMatmulOpToLinalgMmt4DOpPattern>(context, M0, K0,
                                                             N0);
       if (failed(applyPatternsAndFoldGreedily(getOperation(),
@@ -369,7 +369,7 @@ class ConvertLinalgMatmulToMmt4DPass final
     }
     // Canonicalization.
     {
-      OwningRewritePatternList patterns(&getContext());
+      RewritePatternSet patterns(&getContext());
       tensor::ExpandShapeOp::getCanonicalizationPatterns(patterns, context);
       linalg::InitTensorOp::getCanonicalizationPatterns(patterns, context);
       linalg::FillOp::getCanonicalizationPatterns(patterns, context);

@@ -35,7 +35,7 @@ namespace Flow {
 
 // Populates flow.dispatch.* canonicalization patterns.
 void populateFlowDispatchCanonicalizationPatterns(
-    ::mlir::OwningRewritePatternList &results, ::mlir::MLIRContext *context);
+    ::mlir::RewritePatternSet &results, ::mlir::MLIRContext *context);
 
 }  // namespace Flow
 }  // namespace IREE

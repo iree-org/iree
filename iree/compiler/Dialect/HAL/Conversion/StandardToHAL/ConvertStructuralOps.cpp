@@ -175,7 +175,7 @@ struct ConvertYieldOp : public OpConversionPattern<scf::YieldOp> {
 
 void populateStandardStructuralToHALPatterns(MLIRContext *context,
                                              ConversionTarget &conversionTarget,
-                                             OwningRewritePatternList &patterns,
+                                             RewritePatternSet &patterns,
                                              TypeConverter &typeConverter) {
   conversionTarget.addLegalOp<mlir::ModuleOp>();
 

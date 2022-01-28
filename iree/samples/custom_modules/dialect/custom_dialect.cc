@@ -31,7 +31,7 @@ class CustomToHALConversionInterface : public HALConversionDialectInterface {
   using HALConversionDialectInterface::HALConversionDialectInterface;
 
   void setupConversionTarget(ConversionTarget &target,
-                             OwningRewritePatternList &patterns,
+                             RewritePatternSet &patterns,
                              TypeConverter &typeConverter) const override {
     populateCustomToHALPatterns(getDialect()->getContext(), patterns,
                                 typeConverter);
@@ -52,7 +52,7 @@ class CustomToVMConversionInterface : public VMConversionDialectInterface {
   }
 
   void populateVMConversionPatterns(
-      SymbolTable &importSymbols, OwningRewritePatternList &patterns,
+      SymbolTable &importSymbols, RewritePatternSet &patterns,
       TypeConverter &typeConverter) const override {
     populateCustomToVMPatterns(getDialect()->getContext(), importSymbols,
                                patterns, typeConverter);

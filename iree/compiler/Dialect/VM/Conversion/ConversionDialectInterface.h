@@ -41,7 +41,7 @@ class VMConversionDialectInterface
   // |importSymbols| contains all vm.imports that have been queried from all
   // used dialects, not just this dialect.
   virtual void populateVMConversionPatterns(
-      SymbolTable &importSymbols, OwningRewritePatternList &patterns,
+      SymbolTable &importSymbols, RewritePatternSet &patterns,
       TypeConverter &typeConverter) const = 0;
 
   // Walks all child attributes defined within a custom dialect attribute.

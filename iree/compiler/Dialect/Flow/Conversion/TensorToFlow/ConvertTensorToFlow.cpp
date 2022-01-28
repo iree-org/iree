@@ -322,7 +322,7 @@ struct ConvertTensorFromElementsPattern
 }  // namespace
 
 void populateTensorToFlowPatternsBeforeDispatchFormation(
-    MLIRContext *context, OwningRewritePatternList &patterns) {
+    MLIRContext *context, RewritePatternSet &patterns) {
   patterns
       .insert<ConvertTensorInsertSlicePattern, ConvertTensorExtractSlicePattern,
               ConvertTensorCastPattern, ConvertTensorFromElementsPattern>(
@@ -330,7 +330,7 @@ void populateTensorToFlowPatternsBeforeDispatchFormation(
 }
 
 void populateTensorToFlowPatternsAfterDispatchFormation(
-    MLIRContext *context, OwningRewritePatternList &patterns) {
+    MLIRContext *context, RewritePatternSet &patterns) {
   patterns.insert<ConvertTensorExtractPattern>(context);
 }
 

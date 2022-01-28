@@ -4587,7 +4587,7 @@ class ListSetRefOpConversion
 
 void populateVMToEmitCPatterns(ConversionTarget &conversionTarget,
                                IREE::VM::EmitCTypeConverter &typeConverter,
-                               OwningRewritePatternList &patterns,
+                               RewritePatternSet &patterns,
                                SmallVector<Operation *> &visitedExports,
                                SmallVector<std::string> &importShims) {
   auto context = patterns.getContext();
@@ -4973,7 +4973,7 @@ class ConvertVMToEmitCPass
 
     SmallVector<Operation *> visitedExports;
     SmallVector<std::string> importShims;
-    OwningRewritePatternList patterns(&getContext());
+    RewritePatternSet patterns(&getContext());
     populateVMToEmitCPatterns(target, typeConverter, patterns, visitedExports,
                               importShims);
 

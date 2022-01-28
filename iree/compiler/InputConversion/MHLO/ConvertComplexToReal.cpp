@@ -308,7 +308,7 @@ struct ElideImagPattern : public OpConversionPattern<mhlo::ImagOp> {
 
 void populateMHLOComplexToRealPatterns(MLIRContext *context,
                                        TypeConverter &typeConverter,
-                                       OwningRewritePatternList &patterns) {
+                                       RewritePatternSet &patterns) {
   // Add an subtract patterns.
   patterns.insert<ConvertAddSubOp<mhlo::AddOp>>(typeConverter, context);
   patterns.insert<ConvertAddSubOp<mhlo::SubOp>>(typeConverter, context);
@@ -361,7 +361,7 @@ struct TestMHLOConvertComplexToRealPass
   }
 
   void runOnOperation() override {
-    OwningRewritePatternList patterns(&getContext());
+    RewritePatternSet patterns(&getContext());
     MLIRContext *context = &getContext();
     TypeConverter typeConverter;
     typeConverter.addConversion([](Type t) { return t; });

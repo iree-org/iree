@@ -46,14 +46,14 @@ struct LLVMCPUUnfuseFMAOpsPass
 }  // namespace
 
 void populateUnfusedFMAOpsPassPatterns(MLIRContext *context,
-                                       OwningRewritePatternList &patterns) {
+                                       RewritePatternSet &patterns) {
   patterns.insert<UnfusedFMAOpsPassConversion>(context);
 }
 
 void LLVMCPUUnfuseFMAOpsPass::runOnOperation() {
   auto funcOp = getOperation();
   auto context = funcOp.getContext();
-  OwningRewritePatternList patterns(&getContext());
+  RewritePatternSet patterns(&getContext());
   populateUnfusedFMAOpsPassPatterns(context, patterns);
   if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
     return signalPassFailure();

@@ -23,7 +23,7 @@ void setupDirectMHLOToFlowLegality(MLIRContext *context,
 
 // Appends all patterns for converting MHLO ops to flow ops.
 void populateMHLOToFlowPatterns(MLIRContext *context,
-                                OwningRewritePatternList &patterns);
+                                RewritePatternSet &patterns);
 
 }  // namespace MHLO
 }  // namespace iree_compiler

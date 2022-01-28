@@ -212,7 +212,7 @@ struct SelectOpConversion : public OpConversionPattern<mlir::SelectOp> {
 
 void populateStandardStructuralToStreamPatterns(
     MLIRContext *context, ConversionTarget &conversionTarget,
-    TypeConverter &typeConverter, OwningRewritePatternList &patterns) {
+    TypeConverter &typeConverter, RewritePatternSet &patterns) {
   conversionTarget.addLegalOp<mlir::ModuleOp>();
 
   // We need to rewrite certain types on operands/results so use the default

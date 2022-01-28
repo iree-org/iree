@@ -316,7 +316,7 @@ struct InlineConstantWorkgroupSizePattern
 }  // namespace
 
 static LogicalResult convertFlowInfoOps(IREE::HAL::ExecutableOp executableOp) {
-  OwningRewritePatternList patterns(executableOp.getContext());
+  RewritePatternSet patterns(executableOp.getContext());
   patterns.insert<
       ConvertDispatchWorkgroupInfoPattern<IREE::Flow::DispatchWorkgroupIDOp,
                                           IREE::HAL::InterfaceWorkgroupIDOp>,
