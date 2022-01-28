@@ -28,6 +28,8 @@ namespace IREE {
 namespace VMVX {
 
 static void buildVectorVMVXTransformPassPipeline(OpPassManager &passManager) {
+  passManager.nest<ModuleOp>().nest<FuncOp>().addPass(
+      createTypePropagationPass());
   passManager.addPass(createLLVMCPULowerExecutableTargetPass());
 
   OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();

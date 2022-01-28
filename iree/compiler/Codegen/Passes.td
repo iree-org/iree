@@ -78,6 +78,12 @@ def OptimizeVectorTransfer :
   let constructor = "mlir::iree_compiler::createOptimizeVectorTransferPass()";
 }
 
+def TypePropagation :
+    Pass<"iree-codegen-type-propagation", "FuncOp"> {
+  let summary = "Propogate the type of tensor to avoid load/stores of illegal bit widths";
+  let constructor = "mlir::iree_compiler::createTypePropagationPass()";
+}
+
 def RemoveSingleIterationLoop :
     Pass<"iree-codegen-remove-single-iteration-loop", "FuncOp"> {
   let summary = "Remove distributed loop with single iteration.";
