@@ -203,9 +203,34 @@ LogicalResult verifyDoubleTilingExpertPassPipelineConfig(
   SmallVector<int64_t> firstLevelTileSizes = loweringConfig.getTileSizeVals(
       static_cast<unsigned>(TilingLevel::WorkGroupTiles));
   if (!firstLevelTileSizes.empty()) {
-    return op->emitOpError(
-        "expeted first level of tiling sizes are empty, which is applied at "
-        "flow level");
+    // Verify that if the first-level tile sizes are set, they are the same as
+    // workload_per_wg for the partitioned loops.
+    SmallVector<unsigned> partitionedLoops = getPartitionedLoops(op);
+    size_t minElements =
+        (partitionedLoops.empty() ? 0 : partitionedLoops.back() + 1);
+    if (firstLevelTileSizes.size() < minElements) {
+      return op->emitOpError("expected at least ")
+             << minElements
+             << " size for first level tiling to get the distribution fully "
+                "specified.";
+    }
+    llvm::SmallDenseSet<unsigned> partitionedLoopsSet;
+    partitionedLoopsSet.insert(partitionedLoops.begin(),
+                               partitionedLoops.end());
+    SmallVector<int64_t> partitionedTileSizes;
+    for (auto tileSize : llvm::enumerate(firstLevelTileSizes)) {
+      if (!partitionedLoopsSet.count(tileSize.index())) {
+        continue;
+      }
+      partitionedTileSizes.push_back(tileSize.value());
+    }
+    for (auto val : llvm::enumerate(llvm::reverse(workloadPerWorkgroup))) {
+      if (val.value() != partitionedTileSizes[val.index()]) {
+        return op->emitOpError("mismatch in distributed tile size value ")
+               << partitionedTileSizes[val.index()] << " at position "
+               << val.index() << " and workload_per_wg value " << val.value();
+      }
+    }
   }
 
   // Verify that native vector size is either empty, or if set is same as the
