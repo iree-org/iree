@@ -27,7 +27,7 @@ namespace {
 class PolynomialApproximationPass
     : public PolynomialApproximationPassBase<PolynomialApproximationPass> {
   void runOnOperation() override {
-    OwningRewritePatternList mathPatterns(&getContext());
+    RewritePatternSet mathPatterns(&getContext());
     if (clNativeMathPrecision) {
       mathPatterns.add<math::ErfPolynomialApproximation>(&getContext());
     } else {

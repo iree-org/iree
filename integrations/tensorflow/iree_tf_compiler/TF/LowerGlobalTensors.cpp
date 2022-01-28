@@ -86,7 +86,7 @@ static LogicalResult convertTFGlobalTensorsToFlowVariables(ModuleOp module) {
     if (!tf_saved_model::IsExported(func)) {
       continue;
     }
-    llvm::BitVector argsToErase;
+    llvm::BitVector argsToErase(func.getNumArguments());
     OpBuilder builder(func.getBody());
     SmallVector<Value, 8> typeConversionWorklist;
     for (int i = 0, e = func.getNumArguments(); i < e; i++) {
