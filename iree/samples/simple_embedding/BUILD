@@ -269,40 +269,46 @@ native_test(
 iree_cmake_extra_content(
     content = """
 endif()
-
-if(${IREE_HAL_DRIVER_CUDA} AND (${IREE_TARGET_BACKEND_CUDA} OR DEFINED IREE_HOST_BINARY_ROOT))
 """,
     inline = True,
 )
 
-cc_binary(
-    name = "simple_embedding_cuda",
-    srcs = [
-        "device_cuda.c",
-        "simple_embedding.c",
-    ],
-    deps = [
-        ":simple_embedding_test_bytecode_module_cuda_c",
-        "//iree/base",
-        "//iree/hal",
-        "//iree/hal/cuda/registration",
-        "//iree/modules/hal",
-        "//iree/vm",
-        "//iree/vm:bytecode_module",
-    ],
-)
+# Temporarily disabled pending build system changes.
+# iree_cmake_extra_content(
+#     content = """
+# if(${IREE_HAL_DRIVER_CUDA} AND (${IREE_TARGET_BACKEND_CUDA} OR DEFINED IREE_HOST_BINARY_ROOT))
+# """,
+#     inline = True,
+# )
 
-iree_bytecode_module(
-    name = "simple_embedding_test_bytecode_module_cuda",
-    src = "simple_embedding_test.mlir",
-    c_identifier = "iree_samples_simple_embedding_test_module_cuda",
-    flags = [
-        "-iree-input-type=mhlo",
-        "-iree-mlir-to-vm-bytecode-module",
-        "-iree-hal-target-backends=cuda",
-        "-iree-llvm-debug-symbols=false",
-    ],
-)
+# cc_binary(
+#     name = "simple_embedding_cuda",
+#     srcs = [
+#         "device_cuda.c",
+#         "simple_embedding.c",
+#     ],
+#     deps = [
+#         ":simple_embedding_test_bytecode_module_cuda_c",
+#         "//iree/base",
+#         "//iree/hal",
+#         "//iree/hal/cuda/registration",
+#         "//iree/modules/hal",
+#         "//iree/vm",
+#         "//iree/vm:bytecode_module",
+#     ],
+# )
+
+# iree_bytecode_module(
+#     name = "simple_embedding_test_bytecode_module_cuda",
+#     src = "simple_embedding_test.mlir",
+#     c_identifier = "iree_samples_simple_embedding_test_module_cuda",
+#     flags = [
+#         "-iree-input-type=mhlo",
+#         "-iree-mlir-to-vm-bytecode-module",
+#         "-iree-hal-target-backends=cuda",
+#         "-iree-llvm-debug-symbols=false",
+#     ],
+# )
 
 # Simple embedding is failing in the CI.
 # native_test(
@@ -313,18 +319,18 @@ iree_bytecode_module(
 #     src = ":simple_embedding_cuda",
 # )
 
-iree_cmake_extra_content(
-    content = """
-iree_native_test(
-  NAME
-    "simple_embedding_cuda_test"
-  LABELS
-    "driver=cuda"
-  SRC
-    ::simple_embedding_cuda
-)
+# iree_cmake_extra_content(
+#     content = """
+# iree_native_test(
+#   NAME
+#     "simple_embedding_cuda_test"
+#   LABELS
+#     "driver=cuda"
+#   SRC
+#     ::simple_embedding_cuda
+# )
 
-endif()
-""",
-    inline = True,
-)
+# endif()
+# """,
+#     inline = True,
+# )

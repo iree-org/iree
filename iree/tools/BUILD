@@ -193,7 +193,7 @@ cc_library(
     srcs = ["init_targets.cc"],
     hdrs = ["init_targets.h"],
     local_defines = [
-        "IREE_HAVE_CUDA_TARGET",
+        # "IREE_HAVE_CUDA_TARGET",
         "IREE_HAVE_LLVMAOT_TARGET",
         "IREE_HAVE_METALSPIRV_TARGET",
         "IREE_HAVE_ROCM_TARGET",
@@ -201,7 +201,7 @@ cc_library(
         "IREE_HAVE_VULKANSPIRV_TARGET",
     ],
     deps = [
-        "//iree/compiler/Dialect/HAL/Target/CUDA",
+        # "//iree/compiler/Dialect/HAL/Target/CUDA",
         "//iree/compiler/Dialect/HAL/Target/LLVM",
         "//iree/compiler/Dialect/HAL/Target/MetalSPIRV",
         "//iree/compiler/Dialect/HAL/Target/ROCM",

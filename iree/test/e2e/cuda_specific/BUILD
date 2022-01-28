@@ -7,7 +7,7 @@
 # Tests for end-to-end IREE support specific to the CUDA backend to be able to
 # incrementally enable features.
 
-load("//build_tools/bazel:iree_check_test.bzl", "iree_check_single_backend_test_suite")
+# load("//build_tools/bazel:iree_check_test.bzl", "iree_check_single_backend_test_suite")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -15,20 +15,21 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
-iree_check_single_backend_test_suite(
-    name = "check_cuda",
-    srcs = [
-        "dot.mlir",
-    ],
-    compiler_flags = ["-iree-input-type=mhlo"],
-    driver = "cuda",
-    tags = [
-        # CUDA cuInit fails with sanitizer on.
-        "noasan",
-        "nomsan",
-        "notsan",
-        "noubsan",
-        "requires-gpu-nvidia",
-    ],
-    target_backend = "cuda",
-)
+# Temporarily disabled pending build system changes.
+# iree_check_single_backend_test_suite(
+#     name = "check_cuda",
+#     srcs = [
+#         "dot.mlir",
+#     ],
+#     compiler_flags = ["-iree-input-type=mhlo"],
+#     driver = "cuda",
+#     tags = [
+#         # CUDA cuInit fails with sanitizer on.
+#         "noasan",
+#         "nomsan",
+#         "notsan",
+#         "noubsan",
+#         "requires-gpu-nvidia",
+#     ],
+#     target_backend = "cuda",
+# )
