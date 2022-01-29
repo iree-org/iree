@@ -313,12 +313,7 @@ static LogicalResult setX86SandboxRootConfig(FuncOp entryPointFn,
 
 static LogicalResult setX86TileFuseAndVectorizeRootConfig(
     FuncOp entryPointFn, linalg::ContractionOpInterface op,
-    SmallVector<int64_t> workloadPerWorkgroup, int vectorSize) {
-  setTranslationInfo(entryPointFn,
-                     DispatchLoweringPassPipeline::CPUTileFuseAndVectorize,
-                     workloadPerWorkgroup,
-                     /*workgroupSize=*/ArrayRef<int64_t>{});
-
+    ArrayRef<int64_t> flowTileSizes, int vectorSize) {
   // Hardcoded tile sizes, where v is the native vector size.
   // L1 tile sizes are {1, 1, ..., 8, 2v, 2v}.
   // Vector tile sizes are {1, ..., 1, v, v}
@@ -326,9 +321,9 @@ static LogicalResult setX86TileFuseAndVectorizeRootConfig(
   int64_t nLoops = cast<linalg::LinalgOp>(op.getOperation()).getNumLoops();
   l1TileSizes.append(nLoops - 3, 1);
   l1TileSizes.push_back(
-      getMaxTileSize(0, workloadPerWorkgroup[1], 8, vectorSize));
+      getMaxTileSize(0, flowTileSizes[nLoops - 3], 8, vectorSize));
   l1TileSizes.push_back(
-      getMaxTileSize(0, workloadPerWorkgroup[0], 2 * vectorSize, vectorSize));
+      getMaxTileSize(0, flowTileSizes[nLoops - 2], 2 * vectorSize, vectorSize));
   vectorTileSizes.append(nLoops - 2, 1);
   vectorTileSizes.push_back(vectorSize);
 
@@ -420,6 +415,7 @@ static LogicalResult setRootConfig(
   SmallVector<int64_t> flowTileSizes =
       getDistributedTileSizes(interfaceOp, workloadPerWorkgroup);
 
+  Optional<DispatchLoweringPassPipeline> passPipeline = {};
   if (isX86(entryPointFn)) {
     setTranslationInfo(
         entryPointFn, DispatchLoweringPassPipeline::CPUDoubleTilingExpert,
@@ -434,19 +430,35 @@ static LogicalResult setRootConfig(
     Type resElemType =
         getElementTypeOrSelf(contractionOp->getResult(0).getType());
     if (lhsElemType == rhsElemType && rhsElemType == resElemType) {
-      return setX86SandboxRootConfig(entryPointFn, contractionOp,
-                                     flowTileSizes, vectorSize);
+      passPipeline = DispatchLoweringPassPipeline::CPUDoubleTilingExpert;
+      if (failed(setX86SandboxRootConfig(entryPointFn, contractionOp,
+                                         flowTileSizes, vectorSize))) {
+        return failure();
+      }
     } else {
-      return setX86TileFuseAndVectorizeRootConfig(
-          entryPointFn, contractionOp, flowTileSizes, vectorSize);
+      passPipeline = DispatchLoweringPassPipeline::CPUTileFuseAndVectorize;
+      if (failed(setX86TileFuseAndVectorizeRootConfig(
+              entryPointFn, contractionOp, flowTileSizes, vectorSize))) {
+        return failure();
+      }
+    }
+  } else {
+    // Fall back to ARM configurations.
+    passPipeline = DispatchLoweringPassPipeline::CPUTileFuseAndVectorize;
+    if (failed(setARMRootConfig(entryPointFn, contractionOp, flowTileSizes,
+                                vectorSize))) {
+      return failure();
     }
   }
-  // Fall back to ARM configurations.
-  setTranslationInfo(
-      entryPointFn, DispatchLoweringPassPipeline::CPUTileFuseAndVectorize,
-      workloadPerWorkgroup, /*workgroupSize=*/ArrayRef<int64_t>{});
-  return setARMRootConfig(entryPointFn, contractionOp, flowTileSizes,
-                          vectorSize);
+
+  if (!passPipeline) {
+    // Do nothing.
+    return success();
+  }
+  setTranslationInfo(entryPointFn, passPipeline.getValue(),
+                     workloadPerWorkgroup,
+                     /*workgroupSize=*/ArrayRef<int64_t>{});
+  return success();
 }
 
 /// Sets the lowering configuration for dispatch region for linalg.mmt4d root

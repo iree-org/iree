@@ -1449,6 +1449,8 @@ hal.executable private @matmul_i8_i8_i32  {
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"CPUTileFuseAndVectorize", workload_per_wg = [64, 64]>
 //  CHECK:       linalg.matmul {lowering.config = #[[CONFIG]]}
 
+// -----
+
 #executable_layout = #hal.executable.layout<push_constants = 4, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
