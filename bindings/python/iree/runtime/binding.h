@@ -38,17 +38,17 @@ class ApiRefCounted {
 
   ~ApiRefCounted() { Release(); }
 
-  // Creates an instance of the ref counted wrapper based on an instance
-  // that has already been retained. Ownership is transferred to the
-  // wrapper.
-  static Self CreateRetained(T* retained_inst) {
+  // Steals the reference to the object referenced by the given raw pointer and
+  // returns a wrapper (transfers ownership).
+  static Self StealFromRawPtr(T* retained_inst) {
     auto self = Self();
     self.instance_ = retained_inst;
     return self;
   }
 
-  // Creates a new instance, retaining the underlying object.
-  static Self RetainAndCreate(T* non_retained_inst) {
+  // Retains the object referenced by the given raw pointer and returns
+  // a wrapper.
+  static Self BorrowFromRawPtr(T* non_retained_inst) {
     auto self = Self();
     self.instance_ = non_retained_inst;
     if (non_retained_inst) {

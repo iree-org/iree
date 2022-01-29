@@ -12,7 +12,17 @@ import logging
 
 import numpy as np
 
-from .binding import HalDevice, HalElementType, VmContext, VmFunction, VmVariantList
+from .binding import (
+    BufferUsage,
+    HalBufferView,
+    HalDevice,
+    HalElementType,
+    MemoryType,
+    VmContext,
+    VmFunction,
+    VmVariantList,
+)
+
 from . import tracing
 
 __all__ = [
@@ -297,10 +307,28 @@ def _ndarray_to_vm(inv: Invocation, t: VmVariantList, x, desc):
       break
   else:
     _raise_argument_error(inv, f"unsupported numpy dtype {x.dtype}")
-  t.push_buffer_view(inv.device, x, element_type)
+
+  buffer_view = inv.device.allocator.allocate_buffer_copy(
+      memory_type=IMPLICIT_BUFFER_ARG_MEMORY_TYPE,
+      allowed_usage=IMPLICIT_BUFFER_ARG_USAGE,
+      buffer=x,
+      element_type=element_type)
+  t.push_buffer_view(buffer_view)
 
 
+def _buffer_view_to_vm(inv: Invocation, t: VmVariantList, x, desc):
+  # BufferView is a low-level object and we do no validation here for it.
+  # The assumption is that it is coming from either an advanced use case
+  # or a systematic integration that knows what it is doing. The runtime
+  # will do necessary validation.
+  t.push_buffer_view(x)
+
+
+# Called in reflection mode when we know we want to coerce from something
+# 'ndarray' like (as defined by the reflection metadata).
 def _ndarray_like_to_vm(inv: Invocation, t: VmVariantList, x, desc):
+  if isinstance(x, HalBufferView):
+    return _buffer_view_to_vm(inv, t, x, desc)
   return _ndarray_to_vm(inv, t, np.asarray(x), desc)
 
 
@@ -322,6 +350,7 @@ PYTHON_TO_VM_CONVERTERS = {
     dict: _dict_to_vm,
     str: _str_to_vm,
     np.ndarray: _ndarray_to_vm,
+    HalBufferView: _buffer_view_to_vm,
 }
 
 # VM to Python converters. All take:
@@ -443,6 +472,12 @@ DTYPE_TO_HAL_ELEMENT_TYPE = (
     (np.uint8, HalElementType.UINT_8),
     (np.bool_, HalElementType.BOOL_8),
 )
+
+# When we get an ndarray as an argument and are implicitly mapping it to a
+# buffer view, flags for doing so.
+IMPLICIT_BUFFER_ARG_MEMORY_TYPE = (MemoryType.HOST_LOCAL |
+                                   MemoryType.DEVICE_VISIBLE)
+IMPLICIT_BUFFER_ARG_USAGE = BufferUsage.ALL
 
 
 def _is_ndarray_descriptor(desc):

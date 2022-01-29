@@ -24,7 +24,7 @@ VmModule CreateHalModule(HalDevice* device) {
   CheckApiStatus(iree_hal_module_create(device->raw_ptr(),
                                         iree_allocator_system(), &module),
                  "Error creating hal module");
-  return VmModule::CreateRetained(module);
+  return VmModule::StealFromRawPtr(module);
 }
 
 // RAII wrapper for a Py_buffer which calls PyBuffer_Release when it goes
@@ -66,7 +66,7 @@ VmInstance VmInstance::Create() {
   iree_vm_instance_t* instance;
   auto status = iree_vm_instance_create(iree_allocator_system(), &instance);
   CheckApiStatus(status, "Error creating instance");
-  return VmInstance::CreateRetained(instance);
+  return VmInstance::StealFromRawPtr(instance);
 }
 
 //------------------------------------------------------------------------------
@@ -96,7 +96,7 @@ VmContext VmContext::Create(VmInstance* instance,
   }
 
   IREE_CHECK(context);
-  return VmContext::CreateRetained(context);
+  return VmContext::StealFromRawPtr(context);
 }
 
 void VmContext::RegisterModules(std::vector<VmModule*> modules) {
@@ -148,7 +148,7 @@ VmModule VmModule::FromFlatbufferBlob(py::object flatbuffer_blob_object) {
   }
 
   CheckApiStatus(status, "Error creating vm module from flatbuffer");
-  auto py_module = VmModule::CreateRetained(module);
+  auto py_module = VmModule::StealFromRawPtr(module);
   py_module.stashed_flatbuffer_blob = flatbuffer_blob_object;
   return py_module;
 }
@@ -190,68 +190,9 @@ void VmVariantList::PushList(VmVariantList& other) {
   iree_vm_list_push_ref_move(raw_ptr(), &retained);
 }
 
-void VmVariantList::PushBufferView(HalDevice& device,
-                                   py::object py_buffer_object,
-                                   iree_hal_element_type_t element_type) {
-  // Request a view of the buffer (use the raw python C API to avoid some
-  // allocation and copying at the pybind level).
-  Py_buffer py_view;
-  // Note that only C-Contiguous ND-arrays are presently supported, so
-  // only request that via PyBUF_ND. Long term, we should consult an
-  // "oracle" in the runtime to determine the precise required format and
-  // set flags accordingly (and fallback/copy on failure).
-  int flags = PyBUF_FORMAT | PyBUF_ND;
-
-  // Acquire the backing buffer and setup RAII release.
-  if (PyObject_GetBuffer(py_buffer_object.ptr(), &py_view, flags) != 0) {
-    // The GetBuffer call is required to set an appropriate error.
-    throw py::error_already_set();
-  }
-  PyBufferReleaser py_view_releaser(py_view);
-
-  // Whether the py object needs to be retained with the argument.
-  // Should be set to true if directly mapping, false if copied.
-  bool depends_on_pyobject = false;
-
-  // Allocate a HalBuffer.
-  // This is hard-coded to C-contiguous right now.
-  // TODO(laurenzo): Expand to other layouts as needed.
-  // TODO(laurenzo): Wrap and retain original buffer (depends_on_pyobject=true).
-  iree_hal_buffer_t* raw_buffer;
-  CheckApiStatus(
-      iree_hal_allocator_allocate_buffer(
-          device.allocator(),
-          static_cast<iree_hal_memory_type_t>(
-              IREE_HAL_MEMORY_TYPE_HOST_LOCAL |
-              IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE),
-          IREE_HAL_BUFFER_USAGE_ALL, py_view.len,
-          iree_make_const_byte_span(py_view.buf, py_view.len), &raw_buffer),
-      "Failed to allocate device visible buffer");
-
-  // Only capture the reference to the exporting object (incrementing it)
-  // once guaranteed successful.
-  if (depends_on_pyobject) {
-    // Note for future implementation: there needs to be a place to stash
-    // references to be kept alive which back a buffer. This is likely an
-    // additional bag of refs returned from this function, which can then
-    // be attached to an invocation.
-    throw RaisePyError(PyExc_NotImplementedError,
-                       "Dependent buffer arguments not implemented");
-  }
-
-  iree_hal_encoding_type_t encoding_type =
-      IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR;
-
-  // Create the buffer_view. (note that numpy shape is ssize_t)
-  std::vector<int> dims(py_view.ndim);
-  std::copy(py_view.shape, py_view.shape + py_view.ndim, dims.begin());
-  iree_hal_buffer_view_t* buffer_view;
-  CheckApiStatus(iree_hal_buffer_view_create(
-                     raw_buffer, dims.data(), dims.size(), element_type,
-                     encoding_type, iree_allocator_system(), &buffer_view),
-                 "Error allocating buffer_view");
-  iree_hal_buffer_release(raw_buffer);
-  iree_vm_ref_t buffer_view_ref = iree_hal_buffer_view_move_ref(buffer_view);
+void VmVariantList::PushBufferView(HalBufferView& buffer_view) {
+  iree_vm_ref_t buffer_view_ref =
+      iree_hal_buffer_view_retain_ref(buffer_view.raw_ptr());
   CheckApiStatus(iree_vm_list_push_ref_move(raw_ptr(), &buffer_view_ref),
                  "Error moving buffer view");
 }
@@ -419,7 +360,7 @@ py::object VmVariantList::GetAsNdarray(int index) {
   if (!raw_buffer) {
     throw RaiseValueError("Could not deref result buffer (wrong type?)");
   }
-  HalBuffer buffer = HalBuffer::RetainAndCreate(raw_buffer);
+  HalBuffer buffer = HalBuffer::BorrowFromRawPtr(raw_buffer);
 
   // Extract dims from the buffer view.
   size_t rank = 0;

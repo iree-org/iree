@@ -94,8 +94,7 @@ class VmVariantList {
   void PushFloat(double fvalue);
   void PushInt(int64_t ivalue);
   void PushList(VmVariantList& other);
-  void PushBufferView(HalDevice& device, py::object py_buffer_object,
-                      iree_hal_element_type_t element_type);
+  void PushBufferView(HalBufferView &buffer_view);
   py::object GetAsList(int index);
   py::object GetAsNdarray(int index);
   py::object GetVariant(int index);
