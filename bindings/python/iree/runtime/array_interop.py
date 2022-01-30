@@ -75,8 +75,7 @@ class DeviceArray(numpy.lib.mixins.NDArrayOperatorsMixin):
     self._host_array: Optional[np.ndarray] = None
 
   def __array__(self, dtype=None):
-    if not self._host_array:
-      self._transfer_to_host(True)
+    self._transfer_to_host(True)
     if dtype is None:
       return self._host_array
     else:
@@ -104,7 +103,7 @@ class DeviceArray(numpy.lib.mixins.NDArrayOperatorsMixin):
     return self._host_array
 
   def _transfer_to_host(self, implicit):
-    if self._host_array:
+    if self._host_array is not None:
       return
     if implicit and not self._implicit_host_transfer:
       raise ValueError(
@@ -137,6 +136,12 @@ class DeviceArray(numpy.lib.mixins.NDArrayOperatorsMixin):
   @property
   def shape(self):
     return np.shape(self)
+
+  def astype(self, dtype, casting="unsafe", copy=True):
+    if self.dtype == dtype and not copy:
+      return self
+    host_ary = self.to_host()
+    return host_ary.astype(dtype, casting=casting, copy=copy)
 
   def __reduce__(self):
     # Since this is used for making deep copies and pickling, we map

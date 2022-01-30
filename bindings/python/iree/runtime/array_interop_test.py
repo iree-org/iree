@@ -87,6 +87,26 @@ class DeviceHalTest(unittest.TestCase):
     self.assertIsNot(orig_ary, copy_ary)
     np.testing.assert_array_equal(orig_ary, copy_ary)
 
+  def testAsType(self):
+    init_ary = np.zeros([3, 4], dtype=np.int32) + 2
+    orig_ary = iree.runtime.asdevicearray(self.device,
+                                          init_ary,
+                                          implicit_host_transfer=True)
+    # Same dtype, no copy.
+    i32_nocopy = orig_ary.astype(np.int32, copy=False)
+    self.assertIs(orig_ary, i32_nocopy)
+
+    # Same dtype, copy.
+    i32_nocopy = orig_ary.astype(np.int32)
+    self.assertIsNot(orig_ary, i32_nocopy)
+    np.testing.assert_array_equal(orig_ary, i32_nocopy)
+
+    # Different dtype, copy.
+    f32_copy = orig_ary.astype(np.float32)
+    self.assertIsNot(orig_ary, f32_copy)
+    self.assertEqual(f32_copy.dtype, np.float32)
+    np.testing.assert_array_equal(orig_ary.astype(np.float32), f32_copy)
+
 
 if __name__ == "__main__":
   unittest.main()
