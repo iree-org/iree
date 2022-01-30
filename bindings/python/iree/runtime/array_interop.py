@@ -5,7 +5,7 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 """BufferView and Python Array Protocol interop."""
 
-from typing import Optional
+from typing import Optional, Tuple
 import logging
 import numpy as np
 import numpy.lib.mixins
@@ -110,6 +110,9 @@ class DeviceArray(numpy.lib.mixins.NDArrayOperatorsMixin):
       raise ValueError(
           "DeviceArray cannot be implicitly transferred to the host: "
           "if necessary, do an explicit transfer via .to_host()")
+    self._mapped_memory, self._host_array = self._map_to_host()
+
+  def _map_to_host(self) -> Tuple[MappedMemory, np.ndarray]:
     # TODO: When synchronization is enabled, need to block here.
     raw_dtype = self._get_raw_dtype()
     mapped_memory = self._buffer_view.map()
@@ -120,9 +123,7 @@ class DeviceArray(numpy.lib.mixins.NDArrayOperatorsMixin):
     # this is to support bools.
     if self._override_dtype is not None and self._override_dtype != raw_dtype:
       host_array = host_array.astype(self._override_dtype)
-
-    self._mapped_memory = mapped_memory
-    self._host_array = host_array
+    return mapped_memory, host_array
 
   def _get_raw_dtype(self):
     return HalElementType.map_to_dtype(self._buffer_view.element_type)
@@ -136,6 +137,17 @@ class DeviceArray(numpy.lib.mixins.NDArrayOperatorsMixin):
   @property
   def shape(self):
     return np.shape(self)
+
+  def __reduce__(self):
+    # Since this is used for making deep copies and pickling, we map
+    # separately from any interactive state. We just reduce to the actual
+    # host ndarray, which supports the necessary serialization protocols.
+    _, host_array = self._map_to_host()
+    return _restore_reduced_array, (host_array,)
+
+
+def _restore_reduced_array(ary):
+  return ary
 
 
 # Function implementations with custom behavior.

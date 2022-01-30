@@ -94,11 +94,20 @@ class VmTest(absltest.TestCase):
       # TODO: Unimplemented: (np.float16, ET.FLOAT_16)
       lst = iree.runtime.VmVariantList(5)
       ary1 = np.asarray([1, 2, 3, 4], dtype=dt)
-      lst.push_buffer_view(self.device, ary1, et)
-      ary2 = lst.get_as_ndarray(0)
+      bv1 = self.device.allocator.allocate_buffer_copy(
+          memory_type=iree.runtime.MemoryType.DEVICE_LOCAL |
+          iree.runtime.MemoryType.DEVICE_VISIBLE,
+          allowed_usage=iree.runtime.BufferUsage.ALL,
+          buffer=ary1,
+          element_type=et)
+      lst.push_buffer_view(bv1)
+      ary2 = iree.runtime.DeviceArray(self.device,
+                                      lst.get_as_buffer_view(0),
+                                      override_dtype=dt,
+                                      implicit_host_transfer=True)
       np.testing.assert_array_equal(ary1, ary2)
       with self.assertRaises(IndexError):
-        lst.get_as_ndarray(1)
+        lst.get_as_buffer_view(1)
 
   def test_variant_list_list(self):
     lst1 = iree.runtime.VmVariantList(5)

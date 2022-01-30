@@ -4,9 +4,11 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-import iree.runtime
+import copy
 import numpy as np
 import unittest
+
+import iree.runtime
 
 
 class DeviceHalTest(unittest.TestCase):
@@ -76,6 +78,14 @@ class DeviceHalTest(unittest.TestCase):
     f = np.isfinite(ary)
     self.assertTrue(f.all())
 
+  def testDeepcopy(self):
+    init_ary = np.zeros([3, 4], dtype=np.float32) + 2
+    orig_ary = iree.runtime.asdevicearray(self.device,
+                                          init_ary,
+                                          implicit_host_transfer=True)
+    copy_ary = copy.deepcopy(orig_ary)
+    self.assertIsNot(orig_ary, copy_ary)
+    np.testing.assert_array_equal(orig_ary, copy_ary)
 
 if __name__ == "__main__":
   unittest.main()
