@@ -15,28 +15,28 @@ from . import binding
 # Pull some of the native symbols into the public API.
 # Hal imports
 from .binding import (
-  BufferCompatibility,
-  BufferUsage,
-  HalAllocator,
-  HalBuffer,
-  HalBufferView,
-  HalDevice,
-  HalDriver,
-  HalElementType,
-  MemoryAccess,
-  MemoryType,
-  Shape,
+    BufferCompatibility,
+    BufferUsage,
+    HalAllocator,
+    HalBuffer,
+    HalBufferView,
+    HalDevice,
+    HalDriver,
+    HalElementType,
+    MemoryAccess,
+    MemoryType,
+    Shape,
 )
 
 # Vm imports
 from .binding import (
-  create_hal_module,
-  Linkage,
-  VmVariantList,
-  VmFunction,
-  VmInstance,
-  VmContext,
-  VmModule,
+    create_hal_module,
+    Linkage,
+    VmVariantList,
+    VmFunction,
+    VmInstance,
+    VmContext,
+    VmModule,
 )
 
 from .array_interop import *

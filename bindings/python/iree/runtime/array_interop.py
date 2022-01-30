@@ -80,7 +80,7 @@ class DeviceArray(numpy.lib.mixins.NDArrayOperatorsMixin):
     if dtype is None:
       return self._host_array
     else:
-      return self._host_array.__array__(dtype)
+      return self._host_array.__array__(dtype)  # pytype: disable=attribute-error
 
   def __array_function__(self, func, types, args, kwargs):
     if func in _DEVICE_HANDLED_FUNCTIONS:
@@ -89,7 +89,7 @@ class DeviceArray(numpy.lib.mixins.NDArrayOperatorsMixin):
     # Anything else forces a transfer to host and then delegates to the
     # host array.
     host_array = self.to_host()
-    return host_array.__array_function__(func, types, args, kwargs)
+    return host_array.__array_function__(func, types, args, kwargs)  # pytype: disable=attribute-error
 
   def __repr__(self):
     return f"<IREE DeviceArray: shape={np.shape(self)}, dtype={self.dtype}>"

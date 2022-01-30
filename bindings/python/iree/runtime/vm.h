@@ -94,7 +94,7 @@ class VmVariantList {
   void PushFloat(double fvalue);
   void PushInt(int64_t ivalue);
   void PushList(VmVariantList& other);
-  void PushBufferView(HalBufferView &buffer_view);
+  void PushBufferView(HalBufferView& buffer_view);
   py::object GetAsList(int index);
   py::object GetAsBufferView(int index);
   py::object GetVariant(int index);

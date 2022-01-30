@@ -87,5 +87,6 @@ class DeviceHalTest(unittest.TestCase):
     self.assertIsNot(orig_ary, copy_ary)
     np.testing.assert_array_equal(orig_ary, copy_ary)
 
+
 if __name__ == "__main__":
   unittest.main()
