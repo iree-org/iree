@@ -291,7 +291,13 @@ def _ndarray_to_vm(inv: Invocation, t: VmVariantList, x, desc):
     except KeyError:
       _raise_argument_error(inv, f"unrecognized dtype '{dtype_str}'")
     if dtype != x.dtype:
-      x = x.astype(dtype)
+      # TODO: If we got a DeviceArray in which triggers this implicit
+      # conversion, it will fault back to the host, be converted and
+      # then sent back. This is... not great.
+      # At least warning about it so we know it might be a problem.
+      logging.warn(
+          "Implicit dtype conversion of DeviceArray forces transfer to host")
+      x = np.asarray(x).astype(dtype)
     rank = desc[2]
     shape = desc[3:]
     ndarray_shape = x.shape
@@ -309,11 +315,17 @@ def _ndarray_to_vm(inv: Invocation, t: VmVariantList, x, desc):
   else:
     _raise_argument_error(inv, f"unsupported numpy dtype {x.dtype}")
 
-  buffer_view = inv.device.allocator.allocate_buffer_copy(
-      memory_type=IMPLICIT_BUFFER_ARG_MEMORY_TYPE,
-      allowed_usage=IMPLICIT_BUFFER_ARG_USAGE,
-      buffer=x,
-      element_type=element_type)
+  if isinstance(x, DeviceArray):
+    # Already one of ours and did not get implicitly converted.
+    buffer_view = x._buffer_view
+  else:
+    # Not one of ours. Put it on the device.
+    buffer_view = inv.device.allocator.allocate_buffer_copy(
+        memory_type=IMPLICIT_BUFFER_ARG_MEMORY_TYPE,
+        allowed_usage=IMPLICIT_BUFFER_ARG_USAGE,
+        buffer=np.asarray(x),
+        element_type=element_type)
+
   t.push_buffer_view(buffer_view)
 
 
@@ -352,6 +364,7 @@ PYTHON_TO_VM_CONVERTERS = {
     str: _str_to_vm,
     np.ndarray: _ndarray_to_vm,
     HalBufferView: _buffer_view_to_vm,
+    DeviceArray: _ndarray_to_vm,
 }
 
 # VM to Python converters. All take:
@@ -548,19 +561,14 @@ def _merge_python_sequence_to_vm(inv: Invocation, vm_list, py_list, descs):
   for py_value, desc in zip(py_list, descs):
     inv.current_arg = py_value
     inv.current_desc = desc
-    py_type = py_value.__class__
 
     # For ndarray, we want to be able to handle array-like, so check for that
     # explicitly (duck typed vs static typed).
     if _is_ndarray_descriptor(desc):
       converter = _ndarray_like_to_vm
     else:
-      try:
-        converter = PYTHON_TO_VM_CONVERTERS[py_type]
-      except KeyError:
-        _raise_argument_error(
-            inv, f"cannot map Python type to VM: {py_type}"
-            f" (for desc {desc})")
+      converter = _get_python_to_vm_converter(inv, py_value, desc)
+
     try:
       converter(inv, vm_list, py_value, desc)
     except ArgumentError:
@@ -568,6 +576,22 @@ def _merge_python_sequence_to_vm(inv: Invocation, vm_list, py_list, descs):
     except Exception as e:
       _raise_argument_error(inv, f"exception converting from Python type to VM",
                             e)
+
+
+def _get_python_to_vm_converter(inv: Invocation, py_value, desc):
+  py_type = py_value.__class__
+  converter = PYTHON_TO_VM_CONVERTERS.get(py_type)
+  if converter is not None:
+    return converter
+  # See if it supports the __array__ protocol and if so, pull it to
+  # the host and use the ndarray converter. This will create round-trips
+  # between frameworks but at least enables interop.
+  if hasattr(py_value, "__array__"):
+    return _ndarray_to_vm
+
+  _raise_argument_error(
+      inv, f"cannot map Python type to VM: {py_type}"
+      f" (for desc {desc})")
 
 
 def _extract_vm_sequence_to_python(inv: Invocation, vm_list, descs):
