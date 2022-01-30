@@ -19,25 +19,13 @@ class DeviceHalTest(unittest.TestCase):
 
   def testMetadataAttributes(self):
     init_ary = np.zeros([3, 4], dtype=np.int32) + 2
-    buffer_view = self.allocator.allocate_buffer_copy(
-        memory_type=iree.runtime.MemoryType.DEVICE_LOCAL,
-        allowed_usage=iree.runtime.BufferUsage.CONSTANT,
-        buffer=init_ary,
-        element_type=iree.runtime.HalElementType.SINT_32)
-
-    ary = iree.runtime.DeviceArray(self.device, buffer_view)
+    ary = iree.runtime.asdevicearray(self.device, init_ary)
     self.assertEqual([3, 4], ary.shape)
     self.assertEqual(np.int32, ary.dtype)
 
   def testExplicitHostTransfer(self):
     init_ary = np.zeros([3, 4], dtype=np.int32) + 2
-    buffer_view = self.allocator.allocate_buffer_copy(
-        memory_type=iree.runtime.MemoryType.DEVICE_LOCAL,
-        allowed_usage=iree.runtime.BufferUsage.CONSTANT,
-        buffer=init_ary,
-        element_type=iree.runtime.HalElementType.SINT_32)
-
-    ary = iree.runtime.DeviceArray(self.device, buffer_view)
+    ary = iree.runtime.asdevicearray(self.device, init_ary)
     self.assertEqual(repr(ary), "<IREE DeviceArray: shape=[3, 4], dtype=int32>")
     self.assertFalse(ary.is_host_accessible)
 
@@ -66,43 +54,25 @@ class DeviceHalTest(unittest.TestCase):
 
   def testIllegalImplicitHostTransfer(self):
     init_ary = np.zeros([3, 4], dtype=np.int32) + 2
-    buffer_view = self.allocator.allocate_buffer_copy(
-        memory_type=iree.runtime.MemoryType.DEVICE_LOCAL,
-        allowed_usage=iree.runtime.BufferUsage.CONSTANT,
-        buffer=init_ary,
-        element_type=iree.runtime.HalElementType.SINT_32)
-
-    ary = iree.runtime.DeviceArray(self.device, buffer_view)
+    ary = iree.runtime.asdevicearray(self.device, init_ary)
     # Implicit transfer.
     with self.assertRaises(ValueError):
       _ = np.asarray(ary)
 
   def testImplicitHostArithmetic(self):
     init_ary = np.zeros([3, 4], dtype=np.int32) + 2
-    buffer_view = self.allocator.allocate_buffer_copy(
-        memory_type=iree.runtime.MemoryType.DEVICE_LOCAL,
-        allowed_usage=iree.runtime.BufferUsage.CONSTANT,
-        buffer=init_ary,
-        element_type=iree.runtime.HalElementType.SINT_32)
-
-    ary = iree.runtime.DeviceArray(self.device,
-                                   buffer_view,
-                                   implicit_host_transfer=True)
+    ary = iree.runtime.asdevicearray(self.device,
+                                     init_ary,
+                                     implicit_host_transfer=True)
     sum = ary + init_ary
     np.testing.assert_array_equal(sum, init_ary + 2)
     self.assertTrue(ary.is_host_accessible)
 
   def testArrayFunctions(self):
     init_ary = np.zeros([3, 4], dtype=np.float32) + 2
-    buffer_view = self.allocator.allocate_buffer_copy(
-        memory_type=iree.runtime.MemoryType.DEVICE_LOCAL,
-        allowed_usage=iree.runtime.BufferUsage.CONSTANT,
-        buffer=init_ary,
-        element_type=iree.runtime.HalElementType.SINT_32)
-
-    ary = iree.runtime.DeviceArray(self.device,
-                                   buffer_view,
-                                   implicit_host_transfer=True)
+    ary = iree.runtime.asdevicearray(self.device,
+                                     init_ary,
+                                     implicit_host_transfer=True)
     f = np.isfinite(ary)
     self.assertTrue(f.all())
 

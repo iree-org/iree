@@ -24,7 +24,10 @@ from .binding import (
 )
 
 from . import tracing
-from .array_interop import DeviceArray
+from .array_interop import (
+    map_dtype_to_element_type,
+    DeviceArray,
+)
 
 __all__ = [
     "FunctionInvoker",
@@ -309,10 +312,8 @@ def _ndarray_to_vm(inv: Invocation, t: VmVariantList, x, desc):
         _raise_argument_error(
             inv, f"shape mismatch {ndarray_shape} vs {tuple(shape)}")
   actual_dtype = x.dtype
-  for match_dtype, element_type in DTYPE_TO_HAL_ELEMENT_TYPE:
-    if match_dtype == actual_dtype:
-      break
-  else:
+  element_type = map_dtype_to_element_type(actual_dtype)
+  if element_type is None:
     _raise_argument_error(inv, f"unsupported numpy dtype {x.dtype}")
 
   if isinstance(x, DeviceArray):
@@ -469,25 +470,6 @@ ABI_TYPE_TO_DTYPE = {
     "i8": np.int8,
     "i1": np.bool_,
 }
-
-# NOTE: Numpy dtypes are not hashable and exist in a hierarchy that should
-# be queried via isinstance checks. This should be done as a fallback but
-# this is a linear list for quick access to the most common. There may also
-# be a better way to do this.
-DTYPE_TO_HAL_ELEMENT_TYPE = (
-    (np.float32, HalElementType.FLOAT_32),
-    (np.float64, HalElementType.FLOAT_64),
-    (np.float16, HalElementType.FLOAT_16),
-    (np.int32, HalElementType.SINT_32),
-    (np.int64, HalElementType.SINT_64),
-    (np.int16, HalElementType.SINT_16),
-    (np.int8, HalElementType.SINT_8),
-    (np.uint32, HalElementType.UINT_32),
-    (np.uint64, HalElementType.UINT_64),
-    (np.uint16, HalElementType.UINT_16),
-    (np.uint8, HalElementType.UINT_8),
-    (np.bool_, HalElementType.BOOL_8),
-)
 
 # When we get an ndarray as an argument and are implicitly mapping it to a
 # buffer view, flags for doing so.
