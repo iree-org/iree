@@ -24,6 +24,7 @@ from .binding import (
 )
 
 from . import tracing
+from .array_interop import DeviceArray
 
 __all__ = [
     "FunctionInvoker",
@@ -366,14 +367,16 @@ def _vm_to_ndarray(inv: Invocation, vm_list: VmVariantList, vm_index: int,
   # The descriptor for an ndarray is like:
   #   ["ndarray", "<dtype>", <rank>, <dim>...]
   #   ex: ['ndarray', 'i32', 1, 25948]
-  x = vm_list.get_as_ndarray(vm_index)
+  buffer_view = vm_list.get_as_buffer_view(vm_index)
   dtype_str = desc[1]
   try:
     dtype = ABI_TYPE_TO_DTYPE[dtype_str]
   except KeyError:
     _raise_return_error(inv, f"unrecognized dtype '{dtype_str}'")
-  if dtype != x.dtype:
-    x = x.astype(dtype)
+  x = DeviceArray(inv.device,
+                  buffer_view,
+                  implicit_host_transfer=True,
+                  override_dtype=dtype)
   return x
 
 
@@ -475,7 +478,7 @@ DTYPE_TO_HAL_ELEMENT_TYPE = (
 
 # When we get an ndarray as an argument and are implicitly mapping it to a
 # buffer view, flags for doing so.
-IMPLICIT_BUFFER_ARG_MEMORY_TYPE = (MemoryType.HOST_LOCAL |
+IMPLICIT_BUFFER_ARG_MEMORY_TYPE = (MemoryType.DEVICE_LOCAL |
                                    MemoryType.DEVICE_VISIBLE)
 IMPLICIT_BUFFER_ARG_USAGE = BufferUsage.ALL
 
@@ -582,6 +585,13 @@ def _extract_vm_sequence_to_python(inv: Invocation, vm_list, descs):
     if desc is None:
       # Dynamic (non reflection mode).
       converted = vm_list.get_variant(vm_index)
+      # Special case: Upgrade HalBufferView to a DeviceArray. We do that here
+      # since this is higher level and it preserves layering. Note that
+      # the reflection case also does this conversion.
+      if isinstance(converted, HalBufferView):
+        converted = DeviceArray(inv.device,
+                                converted,
+                                implicit_host_transfer=True)
     else:
       # Known type descriptor.
       vm_type = desc if isinstance(desc, str) else desc[0]

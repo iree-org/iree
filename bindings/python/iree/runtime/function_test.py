@@ -310,6 +310,45 @@ class FunctionTest(absltest.TestCase):
     self.assertEqual("<VmVariantList(1): [HalBufferView(2:0x20000011)]>",
                      repr(invoked_arg_list))
 
+  def testReturnBufferView(self):
+    result_array = np.asarray([1, 0], dtype=np.int32)
+
+    def invoke(arg_list, ret_list):
+      buffer_view = self.device.allocator.allocate_buffer_copy(
+          memory_type=IMPLICIT_BUFFER_ARG_MEMORY_TYPE,
+          allowed_usage=IMPLICIT_BUFFER_ARG_USAGE,
+          buffer=result_array,
+          element_type=rt.HalElementType.SINT_32)
+      ret_list.push_buffer_view(buffer_view)
+
+    vm_context = MockVmContext(invoke)
+    vm_function = MockVmFunction(reflection={
+        "iree.abi": json.dumps({
+            "a": [],
+            "r": [["ndarray", "i32", 1, 2]],
+        })
+    })
+    invoker = FunctionInvoker(vm_context, self.device, vm_function, tracer=None)
+    result = invoker()
+    np.testing.assert_array_equal([1, 0], result)
+
+  def testReturnBufferViewNoReflection(self):
+    result_array = np.asarray([1, 0], dtype=np.int32)
+
+    def invoke(arg_list, ret_list):
+      buffer_view = self.device.allocator.allocate_buffer_copy(
+          memory_type=IMPLICIT_BUFFER_ARG_MEMORY_TYPE,
+          allowed_usage=IMPLICIT_BUFFER_ARG_USAGE,
+          buffer=result_array,
+          element_type=rt.HalElementType.SINT_32)
+      ret_list.push_buffer_view(buffer_view)
+
+    vm_context = MockVmContext(invoke)
+    vm_function = MockVmFunction(reflection={})
+    invoker = FunctionInvoker(vm_context, self.device, vm_function, tracer=None)
+    result = invoker()
+    np.testing.assert_array_equal([1, 0], result)
+
   # TODO: Fill out all return types.
   def testReturnTypeNdArrayBool(self):
     result_array = np.asarray([1, 0], dtype=np.int8)
@@ -332,7 +371,7 @@ class FunctionTest(absltest.TestCase):
     invoker = FunctionInvoker(vm_context, self.device, vm_function, tracer=None)
     result = invoker()
     # assertEqual on bool arrays is fraught for... reasons.
-    self.assertEqual("array([ True, False])", repr(result))
+    np.testing.assert_array_equal([True, False], result)
 
   def testReturnTypeList(self):
     vm_list = VmVariantList(2)

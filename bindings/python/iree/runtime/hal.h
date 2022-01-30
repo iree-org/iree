@@ -99,8 +99,7 @@ struct HalShape {
 class HalBufferView
     : public ApiRefCounted<HalBufferView, iree_hal_buffer_view_t> {
  public:
-
- py::str Repr();
+  py::str Repr();
 };
 
 class HalBuffer : public ApiRefCounted<HalBuffer, iree_hal_buffer_t> {
@@ -189,6 +188,8 @@ class HalMappedMemory {
                            py::format_descriptor<float>::format(), shape.size(),
                            dims, strides);
   }
+
+  iree_hal_buffer_mapping_t& mapped_memory() { return mapped_memory_; }
 
  private:
   iree_hal_buffer_mapping_t mapped_memory_ = {{0}};

@@ -7,6 +7,7 @@
 #include "bindings/python/iree/runtime/hal.h"
 
 #include "iree/hal/api.h"
+#include "pybind11/numpy.h"
 
 namespace iree {
 namespace python {
@@ -234,6 +235,65 @@ HalDevice HalDriver::CreateDefaultDevice() {
 }
 
 //------------------------------------------------------------------------------
+// Enum helpers
+//------------------------------------------------------------------------------
+
+namespace {
+
+py::object MapElementTypeToDType(iree_hal_element_type_t element_type) {
+  // See: https://docs.python.org/3/c-api/arg.html#numbers
+  // TODO: Handle dtypes that do not map to a code (i.e. fp16).
+  const char* dtype_code;
+  switch (element_type) {
+    case IREE_HAL_ELEMENT_TYPE_INT_8:
+    case IREE_HAL_ELEMENT_TYPE_SINT_8:
+      dtype_code = "b";
+      break;
+    case IREE_HAL_ELEMENT_TYPE_UINT_8:
+      dtype_code = "B";
+      break;
+    case IREE_HAL_ELEMENT_TYPE_INT_16:
+    case IREE_HAL_ELEMENT_TYPE_SINT_16:
+      dtype_code = "h";
+      break;
+    case IREE_HAL_ELEMENT_TYPE_UINT_16:
+      dtype_code = "H";
+      break;
+    case IREE_HAL_ELEMENT_TYPE_INT_32:
+    case IREE_HAL_ELEMENT_TYPE_SINT_32:
+      dtype_code = "i";
+      break;
+    case IREE_HAL_ELEMENT_TYPE_UINT_32:
+      dtype_code = "I";
+      break;
+    case IREE_HAL_ELEMENT_TYPE_INT_64:
+    case IREE_HAL_ELEMENT_TYPE_SINT_64:
+      dtype_code = "l";
+      break;
+    case IREE_HAL_ELEMENT_TYPE_UINT_64:
+      dtype_code = "L";
+      break;
+    case IREE_HAL_ELEMENT_TYPE_FLOAT_32:
+      dtype_code = "f";
+      break;
+    case IREE_HAL_ELEMENT_TYPE_FLOAT_64:
+      dtype_code = "d";
+      break;
+    case IREE_HAL_ELEMENT_TYPE_VALUE(IREE_HAL_NUMERICAL_TYPE_INTEGER, 1):
+      // Due to layering issues it is not uncommon to get i1 buffer views
+      // and we just silently promote them to i8 since that is what they are.
+      // Really i1 should not exist at this boundary.
+      dtype_code = "b";
+      break;
+    default:
+      throw RaiseValueError("Unsupported VM Buffer -> numpy dtype mapping");
+  }
+  return py::dtype(dtype_code);
+}
+
+}  // namespace
+
+//------------------------------------------------------------------------------
 // Bindings
 //------------------------------------------------------------------------------
 
@@ -335,7 +395,8 @@ void SetupHalBindings(pybind11::module m) {
       .value("BOOL_8",
              static_cast<iree_hal_element_types_t>(IREE_HAL_ELEMENT_TYPE_VALUE(
                  IREE_HAL_NUMERICAL_TYPE_INTEGER_SIGNED, 1)))
-      .export_values();
+      .export_values()
+      .def_static("map_to_dtype", &MapElementTypeToDType);
 
   py::class_<HalDevice>(m, "HalDevice")
       .def_property_readonly("allocator", [](HalDevice& self) {
@@ -404,10 +465,35 @@ void SetupHalBindings(pybind11::module m) {
 
   py::class_<HalBufferView>(m, "HalBufferView")
       .def("map", HalMappedMemory::Create)
+      .def_property_readonly(
+          "shape",
+          [](HalBufferView& self) {
+            iree_host_size_t rank =
+                iree_hal_buffer_view_shape_rank(self.raw_ptr());
+            auto* dims = iree_hal_buffer_view_shape_dims(self.raw_ptr());
+            py::list result;
+            for (iree_host_size_t i = 0; i < rank; ++i) {
+              result.append(dims[i]);
+            }
+            return result;
+          })
+      .def_property_readonly(
+          "element_type",
+          [](HalBufferView& self) {
+            return iree_hal_buffer_view_element_type(self.raw_ptr());
+          })
       .def("__repr__", &HalBufferView::Repr);
 
   py::class_<HalMappedMemory>(m, "MappedMemory", py::buffer_protocol())
-      .def_buffer(&HalMappedMemory::ToBufferInfo);
+      .def_buffer(&HalMappedMemory::ToBufferInfo)
+      .def("asarray",
+           [](HalMappedMemory& self, std::vector<iree_host_size_t> shape,
+              py::object dtype) {
+             py::object py_mapped_memory = py::cast(self);
+             return py::array(std::move(dtype), shape,
+                              self.mapped_memory().contents.data,
+                              std::move(py_mapped_memory) /* base */);
+           });
 
   py::class_<HalShape>(m, "Shape").def(py::init(&HalShape::FromIntVector));
 }

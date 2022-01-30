@@ -119,6 +119,7 @@ class SystemApiTest(absltest.TestCase):
     arg0 = np.array([1., 2., 3., 4.], dtype=np.float32)
     arg1 = np.array([4., 5., 6., 7.], dtype=np.float32)
     results = arithmetic.simple_mul(arg0, arg1)
+    print("SIMPLE_MUL RESULTS:", results)
     np.testing.assert_allclose(results, [4., 10., 18., 28.])
 
 
