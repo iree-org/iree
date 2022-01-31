@@ -47,39 +47,33 @@ static Optional<Type> convertRank0TensorToScalar(RankedTensorType tensorType) {
   return elementType;
 }
 
-static Optional<Value> materializeCastToSignless(OpBuilder &builder,
-                                                 IntegerType toType,
-                                                 ValueRange inputs,
-                                                 Location loc) {
-  assert(inputs.size() == 1 && "too many inputs to type conversion");
-  Value fromValue = inputs[0];
-  auto fromType = fromValue.getType();
-  if (fromType.isSignlessInteger() || !toType.isSignlessInteger())
-    return llvm::None;
-  // Use unrealized conversion casts to do signful->signless conversion.
-  return builder.create<UnrealizedConversionCastOp>(loc, toType, fromValue)
-      ->getResult(0);
+static Type convertShapedToSignless(ShapedType shapedType) {
+  if (auto intType = shapedType.getElementType().dyn_cast<IntegerType>())
+    return shapedType.clone(convertIntegerToSignless(intType));
+  return shapedType;
 }
 
-static Optional<Value> materializeCastToScalar(OpBuilder &builder, Type toType,
-                                               ValueRange inputs,
-                                               Location loc) {
+static Optional<Value> materializeCast(OpBuilder &builder, Type toType,
+                                       ValueRange inputs, Location loc) {
   assert(inputs.size() == 1 && "too many inputs to type conversion");
   Value fromValue = inputs[0];
   auto fromType = fromValue.getType().dyn_cast<RankedTensorType>();
-  if (!fromType || fromType.getRank() != 0) return llvm::None;
+  if (!fromType) return llvm::None;
 
   if (auto intFromType = fromType.getElementType().dyn_cast<IntegerType>()) {
-    if (!intFromType.isSignlessInteger()) {
-      if (!toType.isSignlessInteger()) return llvm::None;
-      fromType = fromType.clone(toType).cast<RankedTensorType>();
+    Type castType = getElementTypeOrSelf(toType);
+    if (auto shapedType = fromType.dyn_cast<ShapedType>())
+      castType = shapedType.clone(castType);
+
+    if (castType != fromType)
       fromValue =
-          builder.create<UnrealizedConversionCastOp>(loc, fromType, fromValue)
+          builder.create<UnrealizedConversionCastOp>(loc, castType, fromValue)
               ->getResult(0);
-    }
   }
 
-  Type extractType = fromType.getElementType();
+  if (fromType.getRank() != 0) return fromValue;
+
+  Type extractType = getElementTypeOrSelf(toType);
   return builder.createOrFold<tensor::ExtractOp>(loc, extractType, fromValue);
 }
 
@@ -90,11 +84,13 @@ class MhloToStdTypeConverter : public TypeConverter {
   MhloToStdTypeConverter() {
     addConversion([](Type type) { return type; });
 
+    addConversion(convertShapedToSignless);
     addConversion(convertRank0TensorToScalar);
     addConversion(convertIntegerToSignless);
 
-    addArgumentMaterialization(materializeCastToScalar);
-    addTargetMaterialization(materializeCastToScalar);
+    addArgumentMaterialization(materializeCast);
+    addSourceMaterialization(materializeCast);
+    addTargetMaterialization(materializeCast);
   }
 };
 
@@ -163,8 +159,16 @@ struct SortOpConversion : public OpConversionPattern<mhlo::SortOp> {
   LogicalResult matchAndRewrite(
       mhlo::SortOp mhloSortOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const final {
+    Location loc = mhloSortOp.getLoc();
+
+    llvm::SmallVector<Type> resultTypes;
+    if (this->typeConverter
+            ->convertTypes(mhloSortOp.getResultTypes(), resultTypes)
+            .failed()) {
+      return failure();
+    };
     auto sortOp = rewriter.create<IREE::LinalgExt::SortOp>(
-        mhloSortOp.getLoc(), mhloSortOp.getResultTypes(),
+        loc, resultTypes,
         /*inputs=*/ValueRange{}, adaptor.getOperands(),
         mhloSortOp.dimensionAttr());
     rewriter.inlineRegionBefore(mhloSortOp.comparator(), sortOp.region(),
@@ -174,8 +178,9 @@ struct SortOpConversion : public OpConversionPattern<mhlo::SortOp> {
     TypeConverter::SignatureConversion signature_converter(
         block.getNumArguments());
     for (auto en : llvm::enumerate(block.getArguments())) {
-      signature_converter.addInputs(en.index(),
-                                    getElementTypeOrSelf(en.value().getType()));
+      signature_converter.addInputs(
+          en.index(), this->typeConverter->convertType(
+                          getElementTypeOrSelf(en.value().getType())));
     }
     rewriter.applySignatureConversion(&region, signature_converter);
 

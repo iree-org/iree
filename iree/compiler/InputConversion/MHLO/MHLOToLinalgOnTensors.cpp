@@ -13,6 +13,7 @@
 //===----------------------------------------------------------------------===//
 #include <memory>
 
+#include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/InputConversion/MHLO/ConvertMHLOToFlow.h"
 #include "iree/compiler/InputConversion/MHLO/PassDetail.h"
@@ -362,6 +363,7 @@ struct ConvertMHLOToLinalgOnTensorsPass
 
     // Let the rest fall through.
     target.addLegalDialect<BuiltinDialect>();
+    target.addLegalDialect<IREE::LinalgExt::IREELinalgExtDialect>();
     target.markUnknownOpDynamicallyLegal(isLegallyTypedOp);
 
     if (failed(applyPartialConversion(getOperation(), target,

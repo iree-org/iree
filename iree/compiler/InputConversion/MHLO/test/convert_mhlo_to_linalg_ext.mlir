@@ -23,6 +23,29 @@ func @sort_1d(%arg0: tensor<128xi32>) -> (tensor<128xi32>) {
 
 // -----
 
+func @sort_1d_ui(%arg0: tensor<128xui32>) -> (tensor<128xui32>) {
+  %0 = "mhlo.sort"(%arg0) ( {
+  ^bb0(%arg2: tensor<ui32>, %arg3: tensor<ui32>):  // no predecessors
+    %1 = "mhlo.compare"(%arg2, %arg3) {comparison_direction = "GT"} : (tensor<ui32>, tensor<ui32>) -> tensor<i1>
+    "mhlo.return"(%1) : (tensor<i1>) -> ()
+  }) {dimension = 0 : i64, is_stable = false} : (tensor<128xui32>) -> (tensor<128xui32>)
+  return %0 : tensor<128xui32>
+}
+// CHECK-LABEL: func @sort_1d_ui(
+// CHECK-SAME:      %[[ARG0:[a-zA-Z0-9]+]]
+// CHECK-SAME:  )
+// CHECK:         %[[CAST:.+]] = builtin.unrealized_conversion_cast %[[ARG0]] : tensor<128xui32> to tensor<128xi32>
+// CHECK:         %[[SORT:.+]] = iree_linalg_ext.sort
+// CHECK-SAME:      dimension(0)
+// CHECK-SAME:      outs(%[[CAST]] : tensor<128xi32>)
+// CHECK:           ^bb0(%[[ARG1:.+]]: i32, %[[ARG2:.+]]: i32)
+// CHECK:             %[[CMP:.+]] = arith.cmpi ugt, %[[ARG1]], %[[ARG2]]
+// CHECK:             iree_linalg_ext.yield %[[CMP]]
+// CHECK:         %[[RESULT:.+]] = builtin.unrealized_conversion_cast %[[SORT]] : tensor<128xi32> to tensor<128xui32>
+// CHECK:         return %[[RESULT]]
+
+// -----
+
 func @sort_cst_capture(%arg0: tensor<1x10xi32>) -> tensor<1x10xi32> {
   %0 = mhlo.constant dense<0> : tensor<i32>
   %1 = "mhlo.sort"(%arg0) ( {
