@@ -321,12 +321,12 @@ typedef struct iree_hal_task_semaphore_wait_cmd_t {
 
 // Cleans up a wait task by returning the event used to the pool and - if the
 // task failed - ensuring we scrub it from the timepoint list.
-static void iree_hal_task_semaphore_wait_cmd_cleanup(iree_task_t* task,
-                                                     iree_status_t status) {
+static void iree_hal_task_semaphore_wait_cmd_cleanup(
+    iree_task_t* task, iree_status_code_t status_code) {
   iree_hal_task_semaphore_wait_cmd_t* cmd =
       (iree_hal_task_semaphore_wait_cmd_t*)task;
   iree_event_pool_release(cmd->semaphore->event_pool, 1, &cmd->timepoint.event);
-  if (IREE_UNLIKELY(!iree_status_is_ok(status))) {
+  if (IREE_UNLIKELY(status_code != IREE_STATUS_OK)) {
     // Abort the timepoint. Note that this is not designed to be fast as
     // semaphore failure is an exceptional case.
     iree_slim_mutex_lock(&cmd->semaphore->mutex);

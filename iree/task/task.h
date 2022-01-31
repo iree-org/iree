@@ -112,16 +112,28 @@ enum iree_task_flag_bits_t {
   // behavior but without an additional task as dispatches are still required
   // to store information for slices.
   IREE_TASK_FLAG_DISPATCH_RETIRE = 1u << 3,
+
+  // An error occurred at or before the task and it has been aborted.
+  // Aborted tasks may continue to execute if they're already in-flight but must
+  // not begin execution after the flag has been set.
+  //
+  // The actual error that occurred is routed to the parent task scope as it
+  // happens and may be available for querying before all tasks have been
+  // cleaned up.
+  IREE_TASK_FLAG_ABORTED = 1u << 4,
 };
 typedef uint16_t iree_task_flags_t;
 
 typedef struct iree_task_t iree_task_t;
 
 // A function called to cleanup tasks.
-// The provided |status| is unowned and must be cloned if used beyond the scope
-// of the cleanup function (such as when stored for later usage).
-typedef void(IREE_API_PTR* iree_task_cleanup_fn_t)(iree_task_t* task,
-                                                   iree_status_t status);
+// Each task has its associated cleanup function called exactly once.
+// The provided |status_code| indicates the execution status of the task prior
+// to cleanup and will usually be IREE_STATUS_OK indicating the task was
+// successfully issued or IREE_STATUS_ABORTED if the task was discard prior to
+// issuing.
+typedef void(IREE_API_PTR* iree_task_cleanup_fn_t)(
+    iree_task_t* task, iree_status_code_t status_code);
 
 // A task within the task system that runs on an executor.
 // Tasks have an iree_task_type_t that defines which parameters are valid and
@@ -185,7 +197,9 @@ void iree_task_initialize(iree_task_type_t type, iree_task_scope_t* scope,
                           iree_task_t* out_task);
 
 // Sets the optional function called when the task completes (whether successful
-// or not).
+// or not). The cleanup function will receive a status indicating whether the
+// cleanup is from expected execution as the task retires (IREE_STATUS_OK)
+// or because it was aborted (IREE_STATUS_ABORTED).
 void iree_task_set_cleanup_fn(iree_task_t* task,
                               iree_task_cleanup_fn_t cleanup_fn);
 
@@ -268,6 +282,16 @@ typedef iree_alignas(iree_max_align_t) struct {
 
   // Function closure to call when the task is executed.
   iree_task_call_closure_t closure;
+
+  // Resulting status from the call available once all nested tasks have
+  // completed (or would have completed). It's possible for a call to nest
+  // additional work under it and then return a failure; to ensure we don't
+  // discard the root call while the nested tasks are still executing we set the
+  // status here and wait for the nested tasks to complete. We'll try not to
+  // issue work that was enqueued while the call was executing but it's possible
+  // for work to come from other angles and we need to err on the side of
+  // safety.
+  iree_atomic_intptr_t status;
 } iree_task_call_t;
 
 void iree_task_call_initialize(iree_task_scope_t* scope,
@@ -535,6 +559,13 @@ typedef iree_alignas(iree_max_align_t) struct iree_task_dispatch_t {
   // dispatch closure.
   uint32_t local_memory_size;
 
+  // Resulting status from the dispatch available once all workgroups have
+  // completed (or would have completed). If multiple shards/slices processing
+  // the workgroups hit an error the first will be taken and the result ignored.
+  // A dispatch with a non-ok status will mark the parent task scope as failing
+  // when it retires.
+  iree_atomic_intptr_t status;
+
   // Statistics storage used for aggregating counters across all slices.
   iree_task_dispatch_statistics_t statistics;
 
@@ -589,6 +620,9 @@ typedef iree_alignas(iree_max_align_t) struct {
   // NOTE: the following fields are mostly replicated from iree_task_dispatch_t.
   // This removes the need for touching the dispatch struct when beginning a
   // tile which would likely be a cache miss as we fan out to other cores.
+
+  // Status of the dispatch aggregating failues from all slices.
+  iree_atomic_intptr_t* dispatch_status;
 
   // Function closure to call per tile (same as the closure in the dispatch).
   iree_task_dispatch_closure_t closure;

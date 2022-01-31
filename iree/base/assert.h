@@ -61,6 +61,8 @@ extern "C" {
 #define IREE_ASSERT_TRUE(expr, ...) IREE_ASSERT(!!(expr), __VA_ARGS__)
 #define IREE_ASSERT_FALSE(expr, ...) IREE_ASSERT(!(expr), __VA_ARGS__)
 
+#define IREE_ASSERT_UNREACHABLE(...) IREE_ASSERT(false, __VA_ARGS__)
+
 #define IREE_ASSERT_EQ(x, y, ...) _IREE_ASSERT_CMP(x, ==, y, __VA_ARGS__)
 #define IREE_ASSERT_NE(x, y, ...) _IREE_ASSERT_CMP(x, !=, y, __VA_ARGS__)
 #define IREE_ASSERT_LE(x, y, ...) _IREE_ASSERT_CMP(x, <=, y, __VA_ARGS__)

@@ -124,10 +124,10 @@ TEST(ExecutorTest, Any) {
                                 [](void* user_context, iree_task_t* task,
                                    iree_task_submission_t* pending_submission) {
                                   IREE_TRACE_SCOPE0("call1");
-                                  EXPECT_EQ(1, user_context);
+                                  EXPECT_EQ((void*)1, user_context);
                                   return iree_ok_status();
                                 },
-                                1),
+                                (void*)1),
                             &call1);
 
 #if 1

@@ -53,12 +53,33 @@ bool iree_task_is_ready(iree_task_t* task) {
   return true;
 }
 
-static void iree_task_cleanup(iree_task_t* task, iree_status_t status) {
+static void iree_task_try_set_status(iree_atomic_intptr_t* permanent_status,
+                                     iree_status_t new_status) {
+  if (IREE_UNLIKELY(iree_status_is_ok(new_status))) return;
+
+  IREE_TRACE_ZONE_BEGIN(z0);
+  IREE_TRACE_ZONE_APPEND_TEXT(z0, "failed: ");
+  IREE_TRACE_ZONE_APPEND_TEXT(
+      z0, iree_status_code_string(iree_status_code(new_status)));
+
+  iree_status_t old_status = iree_ok_status();
+  if (!iree_atomic_compare_exchange_strong_intptr(
+          permanent_status, (intptr_t*)&old_status, (intptr_t)new_status,
+          iree_memory_order_seq_cst, iree_memory_order_seq_cst)) {
+    // Previous status was not OK; drop our new status.
+    IREE_IGNORE_ERROR(new_status);
+  }
+
+  IREE_TRACE_ZONE_END(z0);
+}
+
+static void iree_task_cleanup(iree_task_t* task,
+                              iree_status_code_t status_code) {
   // Call the (optional) cleanup function.
   // NOTE: this may free the memory of the task itself!
   iree_task_pool_t* pool = task->pool;
   if (task->cleanup_fn) {
-    task->cleanup_fn(task, status);
+    task->cleanup_fn(task, status_code);
   }
 
   // Return the task to the pool it was allocated from.
@@ -96,8 +117,6 @@ void iree_task_discard(iree_task_t* task, iree_task_list_t* discard_worklist) {
       break;
     }
     case IREE_TASK_TYPE_FENCE: {
-      iree_task_scope_fail(task->scope, task,
-                           iree_status_from_code(IREE_STATUS_ABORTED));
       iree_task_scope_end(task->scope);
       break;
     }
@@ -107,29 +126,58 @@ void iree_task_discard(iree_task_t* task, iree_task_list_t* discard_worklist) {
       break;
   }
 
-  iree_task_cleanup(task, iree_status_from_code(IREE_STATUS_ABORTED));
+  iree_task_cleanup(task, IREE_STATUS_ABORTED);
   // NOTE: task is invalidated here and cannot be used!
 
   IREE_TRACE_ZONE_END(z0);
 }
 
 static void iree_task_retire(iree_task_t* task,
-                             iree_task_submission_t* pending_submission) {
+                             iree_task_submission_t* pending_submission,
+                             iree_status_t status) {
   IREE_ASSERT_EQ(0, iree_atomic_load_int32(&task->pending_dependency_count,
                                            iree_memory_order_acquire));
 
   // Decrement the pending count on the completion task, if any.
   iree_task_t* completion_task = task->completion_task;
   task->completion_task = NULL;
-  if (completion_task &&
+  bool completion_task_ready =
+      completion_task &&
       iree_atomic_fetch_sub_int32(&completion_task->pending_dependency_count, 1,
-                                  iree_memory_order_acq_rel) == 1) {
-    // The completion task has retired and can now be made ready.
-    iree_task_submission_enqueue(pending_submission, completion_task);
+                                  iree_memory_order_acq_rel) == 1;
+
+  if (iree_status_is_ok(status)) {
+    // Task completed successfully.
+    iree_task_cleanup(task, IREE_STATUS_OK);
+    if (completion_task_ready) {
+      // This was the last pending dependency and the completion task is ready
+      // to run.
+      iree_task_submission_enqueue(pending_submission, completion_task);
+    }
+  } else {
+    // Task failed.
+    iree_task_scope_fail(task->scope, task, status);
+    status = iree_ok_status();  // consumed by the fail
+    iree_task_cleanup(task, IREE_STATUS_ABORTED);
+    if (completion_task_ready) {
+      // This was the last pending dependency and we know that we can safely
+      // abort the completion task by discarding.
+      iree_task_list_t discard_worklist;
+      iree_task_list_initialize(&discard_worklist);
+      iree_task_discard(completion_task, &discard_worklist);
+      iree_task_list_discard(&discard_worklist);
+    } else if (completion_task) {
+      // One or more pending dependencies are not yet satisfied and the
+      // completion task must stay alive. We can mark it as aborted, though,
+      // so that it knows not to execute when it is ready to run.
+      // TODO(benvanik): make this atomic? we only ever add bits and it's safe
+      // for it to run if we got this far.
+      completion_task->flags |= IREE_TASK_FLAG_ABORTED;
+    }
   }
 
-  iree_task_cleanup(task, iree_ok_status());
   // NOTE: task is invalidated here and cannot be used!
+  task = NULL;
 }
 
 //==============================================================================
@@ -143,36 +191,69 @@ void iree_task_nop_initialize(iree_task_scope_t* scope,
 
 void iree_task_nop_retire(iree_task_nop_t* task,
                           iree_task_submission_t* pending_submission) {
-  iree_task_retire(&task->header, pending_submission);
+  iree_task_retire(&task->header, pending_submission, iree_ok_status());
 }
 
 //==============================================================================
 // IREE_TASK_TYPE_CALL
 //==============================================================================
 
+// Returns an XXBBGGRR color (red in the lowest bits).
+// Must not be 0 (tracy will ignore).
+static uint32_t iree_math_ptr_to_xrgb(const void* ptr) {
+  // This is just a simple hack to give us a unique(ish) per-pointer color.
+  // It's only to make it easier to distinguish which tiles are from the same
+  // dispatch.
+  uint64_t ptr64 = (uintptr_t)ptr;
+  return (uint32_t)ptr64 ^ (uint32_t)(ptr64 >> 32);
+}
+
 void iree_task_call_initialize(iree_task_scope_t* scope,
                                iree_task_call_closure_t closure,
                                iree_task_call_t* out_task) {
   iree_task_initialize(IREE_TASK_TYPE_CALL, scope, &out_task->header);
   out_task->closure = closure;
+  iree_atomic_store_intptr(&out_task->status, 0, iree_memory_order_release);
 }
 
-iree_status_t iree_task_call_execute(
-    iree_task_call_t* task, iree_task_submission_t* pending_submission) {
+void iree_task_call_execute(iree_task_call_t* task,
+                            iree_task_submission_t* pending_submission) {
   IREE_TRACE_ZONE_BEGIN(z0);
+  IREE_TRACE_ZONE_SET_COLOR(z0,
+                            iree_math_ptr_to_xrgb(task->closure.user_context));
 
-  // Execute the user callback.
-  // Note that this may enqueue more nested tasks, including tasks that prevent
-  // this task from retiring.
-  iree_status_t status = task->closure.fn(task->closure.user_context,
-                                          &task->header, pending_submission);
+  if (IREE_LIKELY(
+          !iree_any_bit_set(task->header.flags, IREE_TASK_FLAG_ABORTED))) {
+    // Execute the user callback.
+    // Note that this may enqueue more nested tasks, including tasks that
+    // prevent this task from retiring.
+    iree_status_t status = task->closure.fn(task->closure.user_context,
+                                            &task->header, pending_submission);
+    if (!iree_status_is_ok(status)) {
+      // Stash the failure status on the task.
+      // If there's still pending dependencies we won't be able to discard
+      // immediately and need to keep the status around until they all complete.
+      iree_task_try_set_status(&task->status, status);
+      status = iree_ok_status();  // consumed by try_set_status
+
+      // TODO(benvanik): discard pending_submission? As we may have pending work
+      // from multiple scopes it's dangerous to discard all. We could filter
+      // based on scope, though, and if we did that we (probably) wouldn't need
+      // to handle the permanent status on the task and could discard
+      // immediately.
+    }
+  }
+
+  // Check to see if there are no pending dependencies before retiring; the
+  // dependency count can go up if new nested tasks were enqueued.
   if (iree_atomic_load_int32(&task->header.pending_dependency_count,
                              iree_memory_order_acquire) == 0) {
-    iree_task_retire(&task->header, pending_submission);
+    iree_status_t status = (iree_status_t)iree_atomic_exchange_intptr(
+        &task->status, 0, iree_memory_order_seq_cst);
+    iree_task_retire(&task->header, pending_submission, status);
   }
 
   IREE_TRACE_ZONE_END(z0);
-  return status;
 }
 
 //==============================================================================
@@ -227,7 +308,7 @@ void iree_task_barrier_retire(iree_task_barrier_t* task,
     }
   }
 
-  iree_task_retire(&task->header, pending_submission);
+  iree_task_retire(&task->header, pending_submission, iree_ok_status());
   IREE_TRACE_ZONE_END(z0);
 }
 
@@ -247,7 +328,7 @@ void iree_task_fence_retire(iree_task_fence_t* task,
 
   iree_task_scope_end(task->header.scope);
 
-  iree_task_retire(&task->header, pending_submission);
+  iree_task_retire(&task->header, pending_submission, iree_ok_status());
   IREE_TRACE_ZONE_END(z0);
 }
 
@@ -272,23 +353,13 @@ void iree_task_wait_retire(iree_task_wait_t* task,
                            iree_task_submission_t* pending_submission) {
   IREE_TRACE_ZONE_BEGIN(z0);
   // TODO(benvanik): allow deinit'ing the wait handle (if transient).
-  iree_task_retire(&task->header, pending_submission);
+  iree_task_retire(&task->header, pending_submission, iree_ok_status());
   IREE_TRACE_ZONE_END(z0);
 }
 
 //==============================================================================
 // IREE_TASK_TYPE_DISPATCH_* utilities
 //==============================================================================
-
-// Returns an XXBBGGRR color (red in the lowest bits).
-// Must not be 0 (tracy will ignore).
-static uint32_t iree_math_ptr_to_xrgb(const uintptr_t ptr) {
-  // This is just a simple hack to give us a unique(ish) per-pointer color.
-  // It's only to make it easier to distinguish which tiles are from the same
-  // dispatch.
-  uint64_t ptr64 = ptr;
-  return (uint32_t)ptr64 ^ (uint32_t)(ptr64 >> 32);
-}
 
 // Returns an XXBBGGRR color (red in the lowest bits).
 // Must not be 0 (tracy will ignore).
@@ -376,6 +447,7 @@ static void iree_task_dispatch_initialize_base(
   memcpy(out_task->workgroup_size, workgroup_size,
          sizeof(out_task->workgroup_size));
   out_task->local_memory_size = 0;
+  iree_atomic_store_intptr(&out_task->status, 0, iree_memory_order_release);
   memset(&out_task->statistics, 0, sizeof(out_task->statistics));
 }
 
@@ -611,7 +683,19 @@ void iree_task_dispatch_retire(iree_task_dispatch_t* dispatch_task,
       &dispatch_task->statistics,
       &dispatch_task->header.scope->dispatch_statistics);
 
-  iree_task_retire(&dispatch_task->header, pending_submission);
+  // Consume the status of the dispatch that may have been set from a workgroup
+  // and notify the scope. We need to do this here so that each slice/shard
+  // retires before we discard any subsequent tasks: otherwise a failure of
+  // one shard would discard the shared dispatch task (and potentially
+  // everything) while other shards were still running. We also want to avoid
+  // fine-grained synchronization across slices/shards that would occur by each
+  // checking to see if any other has hit an error; failure in a dispatch should
+  // be so exceedingly rare that allowing some shards to complete after one
+  // encounters an error is not a problem.
+  iree_status_t status = (iree_status_t)iree_atomic_exchange_intptr(
+      &dispatch_task->status, 0, iree_memory_order_seq_cst);
+
+  iree_task_retire(&dispatch_task->header, pending_submission, status);
   IREE_TRACE_ZONE_END(z0);
 }
 
@@ -628,6 +712,7 @@ void iree_task_dispatch_slice_initialize(iree_task_dispatch_t* dispatch_task,
                        dispatch_task->header.scope, &out_task->header);
   iree_task_set_completion_task(&out_task->header, &dispatch_task->header);
   out_task->closure = dispatch_task->closure;
+  out_task->dispatch_status = &dispatch_task->status;
 
   memcpy(out_task->workgroup_base, workgroup_base,
          sizeof(out_task->workgroup_base));
@@ -666,7 +751,7 @@ iree_task_dispatch_slice_t* iree_task_dispatch_slice_allocate(
   return slice_task;
 }
 
-iree_status_t iree_task_dispatch_slice_execute(
+void iree_task_dispatch_slice_execute(
     iree_task_dispatch_slice_t* task, iree_byte_span_t local_memory,
     iree_task_submission_t* pending_submission) {
   IREE_TRACE_ZONE_BEGIN(z0);
@@ -689,14 +774,19 @@ iree_status_t iree_task_dispatch_slice_execute(
   // This ensures that how much memory is used by some executions does not
   // inadvertently leak over into other executions.
   if (IREE_UNLIKELY(task->local_memory_size > local_memory.data_length)) {
-    return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
-                            "dispatch requires %ub of local memory but only "
-                            "%zub is available per-worker",
-                            task->local_memory_size, local_memory.data_length);
+    iree_task_retire(
+        &task->header, pending_submission,
+        iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
+                         "dispatch requires %ub of local memory but only "
+                         "%zub is available per-worker",
+                         task->local_memory_size, local_memory.data_length));
+    IREE_TRACE_ZONE_END(z0);
+    return;
   }
   tile_context.local_memory =
       iree_make_byte_span(local_memory.data, task->local_memory_size);
 
+  iree_status_t status = iree_ok_status();
   const uint32_t base_x = task->workgroup_base[0];
   const uint32_t base_y = task->workgroup_base[1];
   const uint32_t base_z = task->workgroup_base[2];
@@ -721,19 +811,22 @@ iree_status_t iree_task_dispatch_slice_execute(
         IREE_TRACE_ZONE_APPEND_VALUE(z_tile, z);
         // IREE_TRACE_ZONE_APPEND_VALUE(z_tile, (uint64_t)task->closure.fn);
 
-        iree_status_t status = task->closure.fn(
-            task->closure.user_context, &tile_context, pending_submission);
+        status = task->closure.fn(task->closure.user_context, &tile_context,
+                                  pending_submission);
 
         IREE_TRACE_ZONE_END(z_tile);
-        if (IREE_UNLIKELY(!iree_status_is_ok(status))) {
-          // NOTE: we don't bother to update statistics here on failure as the
-          // partial results won't really help much.
-          IREE_TRACE_ZONE_END(z0);
-          return status;
-        }
+
+        // If any tile fails we bail early from the loop. This doesn't match
+        // what an accelerator would do but saves some unneeded work.
+        // Note that other slices may have completed execution, be executing
+        // concurrently with this one, or still be pending - this does not
+        // have any influence on them and they may continue to execute even
+        // after we bail from here.
+        if (!iree_status_is_ok(status)) goto abort_slice;
       }
     }
   }
+abort_slice:
 
   // Push aggregate statistics up to the dispatch.
   if (task->dispatch_statistics) {
@@ -741,9 +834,13 @@ iree_status_t iree_task_dispatch_slice_execute(
                                         task->dispatch_statistics);
   }
 
-  iree_task_retire(&task->header, pending_submission);
+  // Propagate failures to the dispatch task.
+  if (!iree_status_is_ok(status)) {
+    iree_task_try_set_status(task->dispatch_status, status);
+  }
+
+  iree_task_retire(&task->header, pending_submission, iree_ok_status());
   IREE_TRACE_ZONE_END(z0);
-  return iree_ok_status();
 }
 
 //==============================================================================
@@ -777,7 +874,7 @@ iree_task_dispatch_shard_t* iree_task_dispatch_shard_allocate(
   return shard_task;
 }
 
-iree_status_t iree_task_dispatch_shard_execute(
+void iree_task_dispatch_shard_execute(
     iree_task_dispatch_shard_t* task, iree_byte_span_t local_memory,
     iree_task_submission_t* pending_submission) {
   IREE_TRACE_ZONE_BEGIN(z0);
@@ -801,11 +898,15 @@ iree_status_t iree_task_dispatch_shard_execute(
   // inadvertently leak over into other executions.
   if (IREE_UNLIKELY(dispatch_task->local_memory_size >
                     local_memory.data_length)) {
-    return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
-                            "dispatch requires %ub of local memory but only "
-                            "%zub is available per-worker",
-                            dispatch_task->local_memory_size,
-                            local_memory.data_length);
+    iree_task_retire(
+        &task->header, pending_submission,
+        iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
+                         "dispatch requires %ub of local memory but only "
+                         "%zub is available per-worker",
+                         dispatch_task->local_memory_size,
+                         local_memory.data_length));
+    IREE_TRACE_ZONE_END(z0);
+    return;
   }
   tile_context.local_memory =
       iree_make_byte_span(local_memory.data, dispatch_task->local_memory_size);
@@ -818,6 +919,7 @@ iree_status_t iree_task_dispatch_shard_execute(
   tile_context.statistics = &shard_statistics;
 
   // Loop over all tiles until they are all processed.
+  iree_status_t status = iree_ok_status();
   const uint32_t tile_count = shared_state->tile_count;
   const uint32_t tiles_per_reservation = shared_state->tiles_per_reservation;
   uint32_t tile_base = iree_atomic_fetch_add_int32(&shared_state->tile_index,
@@ -848,29 +950,35 @@ iree_status_t iree_task_dispatch_shard_execute(
       IREE_TRACE_ZONE_APPEND_VALUE(z_tile, tile_context.workgroup_xyz[2]);
       // IREE_TRACE_ZONE_APPEND_VALUE(z_tile, (uint64_t)task->closure.fn);
 
-      iree_status_t status =
-          dispatch_task->closure.fn(dispatch_task->closure.user_context,
-                                    &tile_context, pending_submission);
+      status = dispatch_task->closure.fn(dispatch_task->closure.user_context,
+                                         &tile_context, pending_submission);
 
       IREE_TRACE_ZONE_END(z_tile);
-      if (IREE_UNLIKELY(!iree_status_is_ok(status))) {
-        // NOTE: we don't bother to update statistics here on failure as the
-        // partial results won't really help much.
-        IREE_TRACE_ZONE_END(z0);
-        return status;
-      }
+
+      // If any tile fails we bail early from the loop. This doesn't match
+      // what an accelerator would do but saves some unneeded work.
+      // Note that other slices may have completed execution, be executing
+      // concurrently with this one, or still be pending - this does not
+      // have any influence on them and they may continue to execute even
+      // after we bail from here.
+      if (!iree_status_is_ok(status)) goto abort_shard;
     }
 
     tile_base = iree_atomic_fetch_add_int32(&shared_state->tile_index,
                                             tiles_per_reservation,
                                             iree_memory_order_relaxed);
   }
+abort_shard:
 
   // Push aggregate statistics up to the dispatch.
   iree_task_dispatch_statistics_merge(&shard_statistics,
                                       &dispatch_task->statistics);
 
-  iree_task_retire(&task->header, pending_submission);
+  // Propagate failures to the dispatch task.
+  if (!iree_status_is_ok(status)) {
+    iree_task_try_set_status(&dispatch_task->status, status);
+  }
+
+  iree_task_retire(&task->header, pending_submission, iree_ok_status());
   IREE_TRACE_ZONE_END(z0);
-  return iree_ok_status();
 }

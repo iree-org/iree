@@ -135,8 +135,8 @@ static iree_status_t iree_hal_task_queue_wait_cmd(
 
 // Cleanup for iree_hal_task_queue_wait_cmd_t that releases the retained
 // semaphores.
-static void iree_hal_task_queue_wait_cmd_cleanup(iree_task_t* task,
-                                                 iree_status_t status) {
+static void iree_hal_task_queue_wait_cmd_cleanup(
+    iree_task_t* task, iree_status_code_t status_code) {
   iree_hal_task_queue_wait_cmd_t* cmd = (iree_hal_task_queue_wait_cmd_t*)task;
   iree_hal_semaphore_list_release(&cmd->wait_semaphores);
 }
@@ -219,8 +219,8 @@ static iree_status_t iree_hal_task_queue_issue_cmd(
 
 // Cleanup for iree_hal_task_queue_issue_cmd_t that resets the queue state
 // tracking the last in-flight issue.
-static void iree_hal_task_queue_issue_cmd_cleanup(iree_task_t* task,
-                                                  iree_status_t status) {
+static void iree_hal_task_queue_issue_cmd_cleanup(
+    iree_task_t* task, iree_status_code_t status_code) {
   iree_hal_task_queue_issue_cmd_t* cmd = (iree_hal_task_queue_issue_cmd_t*)task;
 
   // Reset queue tail issue task if it was us.
@@ -307,17 +307,17 @@ static iree_status_t iree_hal_task_queue_retire_cmd(
 // Cleanup for iree_hal_task_queue_retire_cmd_t that ensures that the arena
 // holding the submission is properly disposed and that semaphores are signaled
 // (or signaled to failure if the command failed).
-static void iree_hal_task_queue_retire_cmd_cleanup(iree_task_t* task,
-                                                   iree_status_t status) {
+static void iree_hal_task_queue_retire_cmd_cleanup(
+    iree_task_t* task, iree_status_code_t status_code) {
   iree_hal_task_queue_retire_cmd_t* cmd =
       (iree_hal_task_queue_retire_cmd_t*)task;
 
   // If the command failed then fail all semaphores to ensure future
   // submissions fail as well (including those on other queues).
-  if (!iree_status_is_ok(status)) {
+  if (IREE_UNLIKELY(status_code != IREE_STATUS_OK)) {
     for (iree_host_size_t i = 0; i < cmd->signal_semaphores.count; ++i) {
       iree_hal_semaphore_fail(cmd->signal_semaphores.semaphores[i],
-                              iree_status_clone(status));
+                              iree_status_from_code(status_code));
     }
   }
 

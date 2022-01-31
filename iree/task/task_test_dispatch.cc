@@ -17,6 +17,10 @@
 
 namespace {
 
+using iree::Status;
+using iree::StatusCode;
+using iree::testing::status::StatusIs;
+
 class GridCoverage {
  public:
   explicit GridCoverage(const uint32_t workgroup_count[3])
@@ -163,6 +167,65 @@ TEST_F(TaskDispatchTest, IssueIndirect) {
   IREE_ASSERT_OK(
       SubmitTasksAndWaitIdle(&calculate_task.header, &dispatch_task.header));
   EXPECT_TRUE(coverage.Verify());
+}
+
+TEST_F(TaskDispatchTest, IssueFailure) {
+  const uint32_t kWorkgroupSize[3] = {1, 1, 1};
+  const uint32_t kWorkgroupCount[3] = {64, 1, 1};
+
+  auto tile = [](void* user_context,
+                 const iree_task_tile_context_t* tile_context,
+                 iree_task_submission_t* pending_submission) -> iree_status_t {
+    return tile_context->workgroup_xyz[0] == 32
+               ? iree_make_status(IREE_STATUS_DATA_LOSS, "whoops!")
+               : iree_ok_status();
+  };
+
+  iree_task_dispatch_t task;
+  iree_task_dispatch_initialize(&scope_,
+                                iree_task_make_dispatch_closure(tile, NULL),
+                                kWorkgroupSize, kWorkgroupCount, &task);
+  IREE_ASSERT_OK(SubmitTasksAndWaitIdle(&task.header, &task.header));
+  EXPECT_THAT(Status(iree_task_scope_consume_status(&scope_)),
+              StatusIs(StatusCode::kDataLoss));
+}
+
+TEST_F(TaskDispatchTest, IssueFailureChained) {
+  const uint32_t kWorkgroupSize[3] = {1, 1, 1};
+  const uint32_t kWorkgroupCount[3] = {64, 1, 1};
+
+  auto tile = [](void* user_context,
+                 const iree_task_tile_context_t* tile_context,
+                 iree_task_submission_t* pending_submission) -> iree_status_t {
+    return tile_context->workgroup_xyz[0] == 32
+               ? iree_make_status(IREE_STATUS_DATA_LOSS, "whoops!")
+               : iree_ok_status();
+  };
+
+  iree_task_dispatch_t dispatch_task;
+  iree_task_dispatch_initialize(
+      &scope_, iree_task_make_dispatch_closure(tile, NULL), kWorkgroupSize,
+      kWorkgroupCount, &dispatch_task);
+
+  int did_call = 0;
+  iree_task_call_t call_task;
+  iree_task_call_initialize(&scope_,
+                            iree_task_make_call_closure(
+                                [](void* user_context, iree_task_t* task,
+                                   iree_task_submission_t* pending_submission) {
+                                  int* did_call_ptr = (int*)user_context;
+                                  ++(*did_call_ptr);
+                                  return iree_ok_status();
+                                },
+                                &did_call),
+                            &call_task);
+  iree_task_set_completion_task(&dispatch_task.header, &call_task.header);
+
+  IREE_ASSERT_OK(
+      SubmitTasksAndWaitIdle(&dispatch_task.header, &call_task.header));
+  EXPECT_EQ(0, did_call);
+  EXPECT_THAT(Status(iree_task_scope_consume_status(&scope_)),
+              StatusIs(StatusCode::kDataLoss));
 }
 
 }  // namespace

@@ -34,9 +34,10 @@ void iree_task_nop_retire(iree_task_nop_t* task,
 // Executes and retires a user call.
 // May block the caller for an indeterminate amount of time and should only be
 // called from threads owned by or donated to the executor.
-// Returns the status of the user call.
-iree_status_t iree_task_call_execute(
-    iree_task_call_t* task, iree_task_submission_t* pending_submission);
+//
+// Errors are propagated to the parent scope.
+void iree_task_call_execute(iree_task_call_t* task,
+                            iree_task_submission_t* pending_submission);
 
 //==============================================================================
 // IREE_TASK_TYPE_BARRIER
@@ -128,7 +129,7 @@ iree_task_dispatch_slice_t* iree_task_dispatch_slice_allocate(
 //
 // Returns ok if all tiles were successfully executed and otherwise returns
 // an unspecified status (probably the first non-ok status hit).
-iree_status_t iree_task_dispatch_slice_execute(
+void iree_task_dispatch_slice_execute(
     iree_task_dispatch_slice_t* task, iree_byte_span_t local_memory,
     iree_task_submission_t* pending_submission);
 
@@ -150,10 +151,9 @@ iree_task_dispatch_shard_t* iree_task_dispatch_shard_allocate(
 // |local_memory| is a block of memory exclusively available to the shard
 // during execution. Contents are undefined both before and after execution.
 //
-// Returns ok if all tiles processed in the shard successfully executed and
-// otherwise returns an unspecified status (probably the first non-ok status
-// hit).
-iree_status_t iree_task_dispatch_shard_execute(
+// Errors are propagated to the parent scope and the dispatch will fail once
+// all shards have completed.
+void iree_task_dispatch_shard_execute(
     iree_task_dispatch_shard_t* task, iree_byte_span_t local_memory,
     iree_task_submission_t* pending_submission);
 
