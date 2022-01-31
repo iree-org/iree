@@ -280,20 +280,18 @@ static LogicalResult setX86SandboxRootConfig(
 
   // Hardcoded tile sizes. The configuration is derived from iree-llvm-sandbox.
   // L1 tile sizes are {1, ..., 8, 32, 16}
-  SmallVector<int64_t> l1TileSizes, nativeVectorSizes;
+  SmallVector<int64_t> l1TileSizes;
   int64_t nLoops = cast<linalg::LinalgOp>(op.getOperation()).getNumLoops();
   l1TileSizes.append(nLoops - 3, 1);
   l1TileSizes.push_back(8);
   l1TileSizes.push_back(32);
   l1TileSizes.push_back(16);
-  nativeVectorSizes.append(nLoops - 3, 1);
-  nativeVectorSizes.append(3, vectorSize);
 
   TileSizesListType tileSizes;
   tileSizes.push_back({});
   tileSizes.push_back(l1TileSizes);
   auto config = IREE::Codegen::LoweringConfigAttr::get(
-      entryPointFn.getContext(), tileSizes, nativeVectorSizes);
+      entryPointFn.getContext(), tileSizes, {});
   setLoweringConfig(op, config);
 
   return success();

@@ -1379,7 +1379,7 @@ hal.executable private @matmul_x86  {
 }
 
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"CPUDoubleTilingExpert", workload_per_wg = [64, 64]>
-//  CHECK-DAG: #[[CONFIG:.+]] =  #iree_codegen.lowering.config<tile_sizes = [{{\[}}], [8, 32, 16]], native_vector_size = [4, 4, 4]>
+//  CHECK-DAG: #[[CONFIG:.+]] =  #iree_codegen.lowering.config<tile_sizes = [{{\[}}], [8, 32, 16]], native_vector_size = []>
 //  CHECK:       linalg.matmul {lowering.config = #[[CONFIG]]}
 
 // -----

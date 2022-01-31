@@ -158,6 +158,100 @@ LogicalResult verifyTensorToVectorsPassPipelineConfig(
   return success();
 }
 
+LogicalResult verifyDoubleTilingExpertPassPipelineConfig(
+    Operation *op, IREE::Codegen::LoweringConfigAttr loweringConfig,
+    IREE::Codegen::TranslationInfoAttr translationInfo,
+    ArrayRef<int64_t> workgroupSize) {
+  if (!workgroupSize.empty()) {
+    return op->emitOpError(
+        "expected workgroup size to be empty for CPU pipelines");
+  }
+
+  // Verify that the translation info is using the right pipeline.
+  auto pipeline =
+      IREE::Codegen::DispatchLoweringPassPipeline::CPUDoubleTilingExpert;
+  StringRef pipelineName = stringifyEnum(pipeline);
+  if (translationInfo.getDispatchLoweringPassPipeline() != pipeline) {
+    return op->emitOpError("expected pipeline in translation.info to be ")
+           << pipelineName;
+  }
+
+  // Verify that the workload per workgroup is set and is non-zero.
+  SmallVector<int64_t> workloadPerWorkgroup =
+      translationInfo.getWorkloadPerWorkgroupVals();
+  if (workloadPerWorkgroup.size() > kNumMaxParallelDims) {
+    return op->emitOpError("workload_per_wg size should be less than ")
+           << kNumMaxParallelDims;
+  }
+  if (isa<linalg::LinalgOp, IREE::LinalgExt::TiledOpInterface>(op)) {
+    SmallVector<unsigned> partitionedLoops = getPartitionedLoops(op);
+    if (workloadPerWorkgroup.size() != partitionedLoops.size()) {
+      return op->emitOpError("expected ")
+             << partitionedLoops.size()
+             << " entries for workload_per_wg, but got "
+             << workloadPerWorkgroup.size();
+    }
+  }
+  if (llvm::any_of(workloadPerWorkgroup,
+                   [](int64_t val) { return val == 0; })) {
+    return op->emitOpError("invalid to use 0 in workload_per_wg");
+  }
+
+  if (loweringConfig.getTileSizes().size() != 2) {
+    return op->emitOpError("expected two levels of tile sizes for ")
+           << pipelineName << ", got " << loweringConfig.getTileSizes().size();
+  }
+  SmallVector<int64_t> firstLevelTileSizes = loweringConfig.getTileSizeVals(
+      static_cast<unsigned>(TilingLevel::WorkGroupTiles));
+  if (!firstLevelTileSizes.empty()) {
+    // Verify that if the first-level tile sizes are set, they are the same as
+    // workload_per_wg for the partitioned loops.
+    SmallVector<unsigned> partitionedLoops = getPartitionedLoops(op);
+    size_t minElements =
+        (partitionedLoops.empty() ? 0 : partitionedLoops.back() + 1);
+    if (firstLevelTileSizes.size() < minElements) {
+      return op->emitOpError("expected at least ")
+             << minElements
+             << " size for first level tiling to get the distribution fully "
+                "specified.";
+    }
+    llvm::SmallDenseSet<unsigned> partitionedLoopsSet;
+    partitionedLoopsSet.insert(partitionedLoops.begin(),
+                               partitionedLoops.end());
+    SmallVector<int64_t> partitionedTileSizes;
+    for (auto tileSize : llvm::enumerate(firstLevelTileSizes)) {
+      if (!partitionedLoopsSet.count(tileSize.index())) {
+        continue;
+      }
+      partitionedTileSizes.push_back(tileSize.value());
+    }
+    for (auto val : llvm::enumerate(llvm::reverse(workloadPerWorkgroup))) {
+      if (val.value() != partitionedTileSizes[val.index()]) {
+        return op->emitOpError("mismatch in distributed tile size value ")
+               << partitionedTileSizes[val.index()] << " at position "
+               << val.index() << " and workload_per_wg value " << val.value();
+      }
+    }
+  }
+
+  // Verify that native vector size is either empty, or if set is same as the
+  // last level of tiling
+  SmallVector<int64_t> nativeVectorSize =
+      loweringConfig.getNativeVectorSizeVals();
+  if (!nativeVectorSize.empty()) {
+    if (nativeVectorSize != loweringConfig.getTileSizeVals(
+                                static_cast<unsigned>(TilingLevel::L1Tiles))) {
+      return op->emitOpError(
+          "native_vector_size must be same as the last level of tiling");
+    }
+  }
+  return success();
+}
+
+//===---------------------------------------------------------------------===//
+// Codegen pipelines.
+//===---------------------------------------------------------------------===//
+
 void addTensorToVectorsPassPipeline(OpPassManager &passManager,
                                     bool lowerToVectors) {
   passManager.addPass(createCanonicalizerPass());

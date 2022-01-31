@@ -246,6 +246,10 @@ void addSingleTilingExpertPassPipeline(OpPassManager &passManager);
 
 /// Populates the passes needed to do two-level tile + vectorize of linalg ops
 /// using the Codegen drivers from sandbox.
+LogicalResult verifyDoubleTilingExpertPassPipelineConfig(
+    Operation *op, IREE::Codegen::LoweringConfigAttr loweringConfig,
+    IREE::Codegen::TranslationInfoAttr translationInfo,
+    ArrayRef<int64_t> workgroupSize = {});
 void addDoubleTilingExpertPassPipeline(OpPassManager &passManager);
 
 /// Populates the passes needed to multi level tile, fuse and vectorize lowering
