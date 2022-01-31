@@ -175,7 +175,9 @@ def asdevicearray(device: HalDevice,
   This is similar in purpose and usage to np.asarray, except that it takes
   a device as the first argument. This may not be the best mechanism for
   getting a DeviceArray, depending on your use case, but it is reliable
-  and simple.
+  and simple. This function may make a defensive copy or cause implicit
+  transfers to satisfy the request. If this is important to you, then a lower
+  level API is likely more appropriate.
 
   Note that additional flags `memory_type`, `allowed_usage` and `element_type`
   are only hints if creating a new DeviceArray. If `a` is already a DeviceArray,

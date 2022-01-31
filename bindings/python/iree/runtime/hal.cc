@@ -111,7 +111,7 @@ py::object HalAllocator::AllocateBufferCopy(
   // copy).
   iree_hal_encoding_type_t encoding_type =
       IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR;
-  std::vector<int> dims(py_view.ndim);
+  std::vector<iree_hal_dim_t> dims(py_view.ndim);
   std::copy(py_view.shape, py_view.shape + py_view.ndim, dims.begin());
   iree_hal_buffer_view_t* hal_buffer_view;
   CheckApiStatus(
