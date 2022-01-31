@@ -59,9 +59,9 @@ LogicalResult verifyLoweringConfiguration(
     IREE::Codegen::TranslationInfoAttr translationInfo,
     ArrayRef<int64_t> workgroupSize) {
   switch (translationInfo.getDispatchLoweringPassPipeline()) {
-    case IREE::Codegen::DispatchLoweringPassPipeline::CPUTensorToVectors:
-      return verifyTensorToVectorsPassPipelineConfig(op, loweringConfig,
-                                                     translationInfo);
+    case IREE::Codegen::DispatchLoweringPassPipeline::CPUTileFuseAndVectorize:
+      return verifyDoubleTilingExpertPassPipelineConfig(op, loweringConfig,
+                                                        translationInfo);
     default:
       break;
   }

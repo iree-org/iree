@@ -168,16 +168,8 @@ createLLVMCPULowerExecutableTargetPass();
 std::unique_ptr<OperationPass<ModuleOp>>
 createLLVMCPUSynchronizeSymbolVisibilityPass();
 
-/// Multi-level tiling and vectorization of linalg ops on tensors.
-std::unique_ptr<OperationPass<FuncOp>> createLLVMCPUTileAndVectorizePass(
-    bool lowerToVectors = true);
-
 /// Multi-level tiling, fusing and vectorization of linalg ops on tensors.
 std::unique_ptr<OperationPass<FuncOp>> createLLVMCPUTileFuseAndVectorizePass(
-    bool lowerToVectors = true);
-
-/// Vectorizes linalg ops executed in the same hal.interface.workgroup.
-std::unique_ptr<OperationPass<FuncOp>> createLLVMCPUVectorizationPass(
     bool lowerToVectors = true);
 
 /// Replaces llvm.intr.fma with its unfused mul and add ops.
