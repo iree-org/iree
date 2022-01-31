@@ -162,8 +162,9 @@ struct SortOpConversion : public OpConversionPattern<mhlo::SortOp> {
     Location loc = mhloSortOp.getLoc();
 
     llvm::SmallVector<Type> resultTypes;
-    if (this->typeConverter->convertTypes(mhloSortOp.getResultTypes(),
-                                            resultTypes).failed()) {
+    if (this->typeConverter
+            ->convertTypes(mhloSortOp.getResultTypes(), resultTypes)
+            .failed()) {
       return failure();
     };
     auto sortOp = rewriter.create<IREE::LinalgExt::SortOp>(
