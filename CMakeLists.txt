@@ -272,6 +272,11 @@ if(IREE_BUILD_PYTHON_BINDINGS)
     )
     find_package(Python3 COMPONENTS Interpreter Development REQUIRED)
   else()
+    # Configuring the Development.Module is flaky in multi-project setups.
+    # "Bootstrapping" by first looking for the optional Development component
+    # seems to be robust generally.
+    # See: https://reviews.llvm.org/D118148
+    find_package(Python3 COMPONENTS Interpreter Development)
     find_package(Python3 COMPONENTS Interpreter Development.Module REQUIRED)
   endif()
 elseif(IREE_BUILD_COMPILER OR IREE_BUILD_TESTS)

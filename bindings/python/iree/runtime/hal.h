@@ -33,6 +33,14 @@ struct ApiPtrAdapter<iree_hal_device_t> {
 };
 
 template <>
+struct ApiPtrAdapter<iree_hal_allocator_t> {
+  static void Retain(iree_hal_allocator_t* d) { iree_hal_allocator_retain(d); }
+  static void Release(iree_hal_allocator_t* d) {
+    iree_hal_allocator_release(d);
+  }
+};
+
+template <>
 struct ApiPtrAdapter<iree_hal_buffer_t> {
   static void Retain(iree_hal_buffer_t* b) { iree_hal_buffer_retain(b); }
   static void Release(iree_hal_buffer_t* b) { iree_hal_buffer_release(b); }
@@ -67,6 +75,16 @@ class HalDriver : public ApiRefCounted<HalDriver, iree_hal_driver_t> {
   HalDevice CreateDefaultDevice();
 };
 
+class HalAllocator : public ApiRefCounted<HalAllocator, iree_hal_allocator_t> {
+ public:
+  py::dict QueryStatistics();
+  py::str FormattedStatistics();
+
+  py::object AllocateBufferCopy(
+      int memory_type, int allowed_usage, py::object buffer,
+      std::optional<iree_hal_element_types_t> element_type);
+};
+
 struct HalShape {
  public:
   static HalShape FromIntVector(std::vector<int32_t> indices) {
@@ -81,6 +99,7 @@ struct HalShape {
 class HalBufferView
     : public ApiRefCounted<HalBufferView, iree_hal_buffer_view_t> {
  public:
+  py::str Repr();
 };
 
 class HalBuffer : public ApiRefCounted<HalBuffer, iree_hal_buffer_t> {
@@ -106,8 +125,10 @@ class HalBuffer : public ApiRefCounted<HalBuffer, iree_hal_buffer_t> {
                        raw_ptr(), shape.s.data(), shape.s.size(), element_type,
                        encoding_type, iree_allocator_system(), &bv),
                    "Error creating buffer view");
-    return HalBufferView::CreateRetained(bv);
+    return HalBufferView::StealFromRawPtr(bv);
   }
+
+  py::str Repr();
 };
 
 // Wrapper around an iree_hal_buffer_mapping_t and iree_hal_buffer_view_t
@@ -167,6 +188,8 @@ class HalMappedMemory {
                            py::format_descriptor<float>::format(), shape.size(),
                            dims, strides);
   }
+
+  iree_hal_buffer_mapping_t& mapped_memory() { return mapped_memory_; }
 
  private:
   iree_hal_buffer_mapping_t mapped_memory_ = {{0}};
