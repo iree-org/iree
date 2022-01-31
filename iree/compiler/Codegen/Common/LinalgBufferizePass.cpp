@@ -79,10 +79,16 @@ namespace iree_compiler {
 static SmallVector<Value, 4> getDynamicDims(OpBuilder &b, Location loc,
                                             Value v) {
   SmallVector<Value, 4> dynamicDims;
-  for (auto shape : enumerate(v.getType().cast<ShapedType>().getShape())) {
+  Type t = v.getType();
+  for (auto shape : enumerate(t.cast<ShapedType>().getShape())) {
     if (shape.value() == ShapedType::kDynamicSize) {
-      dynamicDims.push_back(
-          b.createOrFold<memref::DimOp>(loc, v, shape.index()));
+      if (t.isa<MemRefType>()) {
+        dynamicDims.push_back(
+            b.createOrFold<memref::DimOp>(loc, v, shape.index()));
+      } else {
+        dynamicDims.push_back(
+            b.createOrFold<tensor::DimOp>(loc, v, shape.index()));
+      }
     }
   }
   return dynamicDims;

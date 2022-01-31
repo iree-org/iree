@@ -2589,3 +2589,53 @@ func @forward_dispatch_3() {
   return
 }
 // CHECK: func @forward_dispatch_3()
+
+// -----
+
+func @dot_general_nontrivial_batching_mutliple_parallel_dimension() {
+  %cst = arith.constant dense<0.000000e+00> : vector<1x4x2xf32>
+  %c1 = arith.constant 1 : index
+  %c6 = arith.constant 6 : index
+  %c2 = arith.constant 2 : index
+  %cst_0 = arith.constant 0.000000e+00 : f32
+  %c0 = arith.constant 0 : index
+  %c64 = arith.constant 64 : index
+  %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(32) : !flow.dispatch.tensor<readonly:2x6x1xf32>
+  %1 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c64) alignment(32) : !flow.dispatch.tensor<readonly:2x1x2xf32>
+  %2 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(32) : !flow.dispatch.tensor<writeonly:2x6x2xf32>
+  %workgroup_id_x = hal.interface.workgroup.id[0] : index
+  %workgroup_count_x = hal.interface.workgroup.count[0] : index
+  %workgroup_id_y = hal.interface.workgroup.id[1] : index
+  %workgroup_count_y = hal.interface.workgroup.count[1] : index
+  %workgroup_id_z = hal.interface.workgroup.id[2] : index
+  %workgroup_count_z = hal.interface.workgroup.count[2] : index
+  %3 = affine.apply affine_map<()[s0] -> (s0 * 4)>()[%workgroup_id_y]
+  %4 = affine.apply affine_map<()[s0] -> (s0 * 4)>()[%workgroup_count_y]
+  %5 = affine.apply affine_map<()[s0] -> (s0 * 2)>()[%workgroup_id_x]
+  %6 = affine.apply affine_map<()[s0] -> (s0 * 2)>()[%workgroup_count_x]
+  scf.for %arg0 = %workgroup_id_z to %c2 step %workgroup_count_z {
+    scf.for %arg1 = %3 to %c6 step %4 {
+      %7 = affine.min affine_map<(d0) -> (4, -d0 + 6)>(%arg1)
+      %8 = flow.dispatch.tensor.load %0, offsets = [%arg0, %arg1, 0], sizes = [1, %7, 1], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:2x6x1xf32> -> tensor<1x?x1xf32>
+      %9 = tensor.extract_slice %8[0, 0, 0] [1, %7, 1] [1, 1, 1] : tensor<1x?x1xf32> to tensor<1x?x1xf32>
+      %10 = vector.transfer_read %9[%c0, %c0, %c0], %cst_0 {in_bounds = [true, false, true]} : tensor<1x?x1xf32>, vector<1x4x1xf32>
+      scf.for %arg2 = %5 to %c2 step %6 {
+        %11 = flow.dispatch.tensor.load %2, offsets = [%arg0, %arg1, %arg2], sizes = [1, %7, 2], strides = [1, 1, 1] : !flow.dispatch.tensor<writeonly:2x6x2xf32> -> tensor<1x?x2xf32>
+        %12 = flow.dispatch.tensor.load %1, offsets = [%arg0, 0, %arg2], sizes = [1, 1, 2], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:2x1x2xf32> -> tensor<1x1x2xf32>
+        %13 = tensor.extract_slice %11[0, 0, 0] [1, %7, 2] [1, 1, 1] : tensor<1x?x2xf32> to tensor<1x?x2xf32>
+        %14 = vector.transfer_write %cst, %13[%c0, %c0, %c0] {in_bounds = [true, false, true]} : vector<1x4x2xf32>, tensor<1x?x2xf32>
+        %15 = tensor.extract_slice %14[0, 0, 0] [1, %7, 2] [1, 1, 1] : tensor<1x?x2xf32> to tensor<1x?x2xf32>
+        %16 = vector.transfer_read %12[%c0, %c0, %c0], %cst_0 {in_bounds = [true, true, true]} : tensor<1x1x2xf32>, vector<1x1x2xf32>
+        %17 = vector.transfer_read %15[%c0, %c0, %c0], %cst_0 {in_bounds = [true, false, true]} : tensor<1x?x2xf32>, vector<1x4x2xf32>
+        %18 = vector.contract {indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d3)>, affine_map<(d0, d1, d2, d3) -> (d0, d3, d2)>, affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>], iterator_types = ["parallel", "parallel", "parallel", "reduction"], kind = #vector.kind<add>} %10, %16, %17 : vector<1x4x1xf32>, vector<1x1x2xf32> into vector<1x4x2xf32>
+        %19 = vector.transfer_write %18, %15[%c0, %c0, %c0] {in_bounds = [true, false, true]} : vector<1x4x2xf32>, tensor<1x?x2xf32>
+        %20 = tensor.insert_slice %19 into %14[0, 0, 0] [1, %7, 2] [1, 1, 1] : tensor<1x?x2xf32> into tensor<1x?x2xf32>
+        %21 = tensor.insert_slice %20 into %11[0, 0, 0] [1, %7, 2] [1, 1, 1] : tensor<1x?x2xf32> into tensor<1x?x2xf32>
+        flow.dispatch.tensor.store %21, %2, offsets = [%arg0, %arg1, %arg2], sizes = [%c1, %7, %c2], strides = [1, 1, 1] : tensor<1x?x2xf32> -> !flow.dispatch.tensor<writeonly:2x6x2xf32>
+      }
+    }
+  }
+  return
+}
+// CHECK-LABEL: func @dot_general_nontrivial_batching_mutliple_parallel_dimension()
+//   CHECK-NOT:   memref.alloc
