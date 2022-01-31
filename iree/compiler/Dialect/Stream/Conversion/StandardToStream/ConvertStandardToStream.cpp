@@ -19,15 +19,15 @@ namespace iree_compiler {
 
 void populateStandardConstantToStreamPatterns(
     MLIRContext *context, ConversionTarget &conversionTarget,
-    TypeConverter &typeConverter, OwningRewritePatternList &patterns);
+    TypeConverter &typeConverter, RewritePatternSet &patterns);
 
 void populateStandardStructuralToStreamPatterns(
     MLIRContext *context, ConversionTarget &conversionTarget,
-    TypeConverter &typeConverter, OwningRewritePatternList &patterns);
+    TypeConverter &typeConverter, RewritePatternSet &patterns);
 
 void populateStandardToStreamConversionPatterns(
     MLIRContext *context, ConversionTarget &conversionTarget,
-    TypeConverter &typeConverter, OwningRewritePatternList &patterns) {
+    TypeConverter &typeConverter, RewritePatternSet &patterns) {
   typeConverter.addConversion([](IndexType type) { return type; });
   typeConverter.addConversion([](IntegerType type) { return type; });
   typeConverter.addConversion([](FloatType type) { return type; });

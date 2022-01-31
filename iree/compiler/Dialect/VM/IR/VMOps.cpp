@@ -13,7 +13,7 @@
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/FunctionImplementation.h"
-#include "mlir/IR/FunctionSupport.h"
+#include "mlir/IR/FunctionInterfaces.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/OpImplementation.h"
@@ -26,6 +26,38 @@ namespace mlir {
 namespace iree_compiler {
 namespace IREE {
 namespace VM {
+
+namespace {
+
+template <typename NameTy>
+void setResultName(OpAsmSetValueNameFn &setNameFn, Value result, NameTy name) {
+  SmallString<32> osBuffer;
+  llvm::raw_svector_ostream os(osBuffer);
+  if (result.getType().isa<VectorType>()) {
+    os << "v";
+  }
+  os << name;
+  setNameFn(result, os.str());
+}
+
+void setResultIntegerName(OpAsmSetValueNameFn &setNameFn, Value result,
+                          IntegerAttr value) {
+  SmallString<32> osBuffer;
+  llvm::raw_svector_ostream os(osBuffer);
+  if (result.getType().isa<VectorType>()) {
+    os << "v";
+  }
+  if (!value) {
+    os << 'c';
+  } else if (value.getValue() == 0) {
+    os << "zero";
+  } else {
+    os << 'c' << value.getValue();
+  }
+  setNameFn(result, os.str());
+}
+
+}  // namespace
 
 //===----------------------------------------------------------------------===//
 // Structural ops
@@ -44,18 +76,17 @@ static LogicalResult verifyModuleOp(ModuleOp op) {
 }
 
 static ParseResult parseFuncOp(OpAsmParser &parser, OperationState *result) {
-  auto buildFuncType = [](Builder &builder, ArrayRef<Type> argTypes,
-                          ArrayRef<Type> results,
-                          function_like_impl::VariadicFlag, std::string &) {
-    return builder.getFunctionType(argTypes, results);
-  };
-  return function_like_impl::parseFunctionLikeOp(
+  auto buildFuncType =
+      [](Builder &builder, ArrayRef<Type> argTypes, ArrayRef<Type> results,
+         function_interface_impl::VariadicFlag,
+         std::string &) { return builder.getFunctionType(argTypes, results); };
+  return function_interface_impl::parseFunctionOp(
       parser, *result, /*allowVariadic=*/false, buildFuncType);
 }
 
 static void printFuncOp(OpAsmPrinter &p, FuncOp &op) {
   FunctionType fnType = op.getType();
-  function_like_impl::printFunctionLikeOp(
+  function_interface_impl::printFunctionOp(
       p, op, fnType.getInputs(), /*isVariadic=*/false, fnType.getResults());
 }
 
@@ -73,15 +104,16 @@ void FuncOp::build(OpBuilder &builder, OperationState &result, StringRef name,
 
   assert(type.getNumInputs() == argAttrs.size() &&
          "expected as many argument attribute lists as arguments");
-  function_like_impl::addArgAndResultAttrs(builder, result, argAttrs,
-                                           /*resultAttrs=*/llvm::None);
+  function_interface_impl::addArgAndResultAttrs(builder, result, argAttrs,
+                                                /*resultAttrs=*/llvm::None);
 }
 
 Block *FuncOp::addEntryBlock() {
   assert(empty() && "function already has an entry block");
   auto *entry = new Block();
   push_back(entry);
-  entry->addArguments(getType().getInputs());
+  SmallVector<Location> locs(getType().getNumInputs(), getLoc());
+  entry->addArguments(getType().getInputs(), locs);
   return entry;
 }
 
@@ -208,15 +240,15 @@ static ParseResult parseImportOp(OpAsmParser &parser, OperationState *result) {
     return parser.emitError(parser.getCurrentLocation())
            << "invalid result type list";
   }
-  function_like_impl::addArgAndResultAttrs(builder, *result, argAttrs,
-                                           /*resultAttrs=*/llvm::None);
+  function_interface_impl::addArgAndResultAttrs(builder, *result, argAttrs,
+                                                /*resultAttrs=*/llvm::None);
   if (failed(parser.parseOptionalAttrDictWithKeyword(result->attributes))) {
     return failure();
   }
 
   auto functionType =
       FunctionType::get(result->getContext(), argTypes, resultTypes);
-  result->addAttribute(mlir::function_like_impl::getTypeAttrName(),
+  result->addAttribute(mlir::function_interface_impl::getTypeAttrName(),
                        TypeAttr::get(functionType));
 
   // No clue why this is required.
@@ -229,7 +261,7 @@ static void printImportOp(OpAsmPrinter &p, ImportOp &op) {
   p << ' ';
   p.printSymbolName(op.getName());
   p << "(";
-  for (int i = 0; i < op.getNumFuncArguments(); ++i) {
+  for (int i = 0; i < op.getArgumentTypes().size(); ++i) {
     if (auto name = op.getArgAttrOfType<StringAttr>(i, "vm.name")) {
       p << '%' << name.getValue() << " : ";
     }
@@ -237,19 +269,19 @@ static void printImportOp(OpAsmPrinter &p, ImportOp &op) {
     if (op.getArgAttrOfType<UnitAttr>(i, "vm.variadic")) {
       p << " ...";
     }
-    if (i < op.getNumFuncArguments() - 1) {
+    if (i < op.getArgumentTypes().size() - 1) {
       p << ", ";
     }
   }
   p << ")";
-  if (op.getNumFuncResults() == 1) {
+  if (op.getResultTypes().size() == 1) {
     p << " -> ";
     p.printType(op.getType().getResult(0));
-  } else if (op.getNumFuncResults() > 1) {
+  } else if (op.getResultTypes().size() > 1) {
     p << " -> (" << op.getType().getResults() << ")";
   }
-  mlir::function_like_impl::printFunctionAttributes(
-      p, op, op.getNumFuncArguments(), op.getNumFuncResults(),
+  mlir::function_interface_impl::printFunctionAttributes(
+      p, op, op.getArgumentTypes().size(), op.getResultTypes().size(),
       /*elided=*/
       {
           "is_variadic",
@@ -269,8 +301,8 @@ void ImportOp::build(OpBuilder &builder, OperationState &result, StringRef name,
 
   assert(type.getNumInputs() == argAttrs.size() &&
          "expected as many argument attribute lists as arguments");
-  function_like_impl::addArgAndResultAttrs(builder, result, argAttrs,
-                                           /*resultAttrs=*/llvm::None);
+  function_interface_impl::addArgAndResultAttrs(builder, result, argAttrs,
+                                                /*resultAttrs=*/llvm::None);
 }
 
 LogicalResult ImportOp::verifyType() {
@@ -391,9 +423,17 @@ void GlobalLoadI32Op::getEffects(
   addMemoryEffectsForGlobal<GlobalI32Op>(*this, globalAttr(), effects);
 }
 
+void GlobalLoadI32Op::getAsmResultNames(OpAsmSetValueNameFn setNameFn) {
+  setResultName(setNameFn, getResult(), global());
+}
+
 void GlobalLoadI64Op::getEffects(
     SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
   addMemoryEffectsForGlobal<GlobalI64Op>(*this, globalAttr(), effects);
+}
+
+void GlobalLoadI64Op::getAsmResultNames(OpAsmSetValueNameFn setNameFn) {
+  setResultName(setNameFn, getResult(), global());
 }
 
 void GlobalLoadF32Op::getEffects(
@@ -401,14 +441,26 @@ void GlobalLoadF32Op::getEffects(
   addMemoryEffectsForGlobal<GlobalF32Op>(*this, globalAttr(), effects);
 }
 
+void GlobalLoadF32Op::getAsmResultNames(OpAsmSetValueNameFn setNameFn) {
+  setResultName(setNameFn, getResult(), global());
+}
+
 void GlobalLoadF64Op::getEffects(
     SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
   addMemoryEffectsForGlobal<GlobalF64Op>(*this, globalAttr(), effects);
 }
 
+void GlobalLoadF64Op::getAsmResultNames(OpAsmSetValueNameFn setNameFn) {
+  setResultName(setNameFn, getResult(), global());
+}
+
 void GlobalLoadRefOp::getEffects(
     SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
   addMemoryEffectsForGlobal<GlobalRefOp>(*this, globalAttr(), effects);
+}
+
+void GlobalLoadRefOp::getAsmResultNames(OpAsmSetValueNameFn setNameFn) {
+  setResultName(setNameFn, getResult(), global());
 }
 
 static LogicalResult verifyGlobalLoadOp(Operation *op) {
@@ -607,6 +659,10 @@ void ConstI32Op::build(OpBuilder &builder, OperationState &result,
   result.addTypes(newValue.getType());
 }
 
+void ConstI32Op::getAsmResultNames(OpAsmSetValueNameFn setNameFn) {
+  setResultIntegerName(setNameFn, getResult(), value().dyn_cast<IntegerAttr>());
+}
+
 void ConstI32Op::build(OpBuilder &builder, OperationState &result,
                        int32_t value) {
   return build(builder, result, builder.getI32IntegerAttr(value));
@@ -632,6 +688,10 @@ void ConstI64Op::build(OpBuilder &builder, OperationState &result,
 void ConstI64Op::build(OpBuilder &builder, OperationState &result,
                        int64_t value) {
   return build(builder, result, builder.getI64IntegerAttr(value));
+}
+
+void ConstI64Op::getAsmResultNames(OpAsmSetValueNameFn setNameFn) {
+  setResultIntegerName(setNameFn, getResult(), value().dyn_cast<IntegerAttr>());
 }
 
 // static
@@ -682,21 +742,41 @@ void ConstI32ZeroOp::build(OpBuilder &builder, OperationState &result) {
   result.addTypes(builder.getIntegerType(32));
 }
 
+void ConstI32ZeroOp::getAsmResultNames(OpAsmSetValueNameFn setNameFn) {
+  setResultName(setNameFn, getResult(), "zero");
+}
+
 void ConstI64ZeroOp::build(OpBuilder &builder, OperationState &result) {
   result.addTypes(builder.getIntegerType(64));
+}
+
+void ConstI64ZeroOp::getAsmResultNames(OpAsmSetValueNameFn setNameFn) {
+  setResultName(setNameFn, getResult(), "zero");
 }
 
 void ConstF32ZeroOp::build(OpBuilder &builder, OperationState &result) {
   result.addTypes(builder.getF32Type());
 }
 
+void ConstF32ZeroOp::getAsmResultNames(OpAsmSetValueNameFn setNameFn) {
+  setResultName(setNameFn, getResult(), "zero");
+}
+
 void ConstF64ZeroOp::build(OpBuilder &builder, OperationState &result) {
   result.addTypes(builder.getF64Type());
+}
+
+void ConstF64ZeroOp::getAsmResultNames(OpAsmSetValueNameFn setNameFn) {
+  setResultName(setNameFn, getResult(), "zero");
 }
 
 void ConstRefZeroOp::build(OpBuilder &builder, OperationState &result,
                            Type objectType) {
   result.addTypes(objectType);
+}
+
+void ConstRefZeroOp::getAsmResultNames(OpAsmSetValueNameFn setNameFn) {
+  setResultName(setNameFn, getResult(), "null");
 }
 
 void RodataOp::build(OpBuilder &builder, OperationState &result, StringRef name,
@@ -730,6 +810,10 @@ void ConstRefRodataOp::build(OpBuilder &builder, OperationState &result,
                              RodataOp rodataOp,
                              ArrayRef<NamedAttribute> attrs) {
   build(builder, result, rodataOp.getName(), attrs);
+}
+
+void ConstRefRodataOp::getAsmResultNames(OpAsmSetValueNameFn setNameFn) {
+  setResultName(setNameFn, getResult(), rodata());
 }
 
 //===----------------------------------------------------------------------===//
@@ -835,6 +919,110 @@ static ParseResult parseSwitchRefOp(OpAsmParser &parser,
 
 static void printSwitchRefOp(OpAsmPrinter &p, SwitchRefOp &op) {
   printSwitchOp(p, op);
+}
+
+//===----------------------------------------------------------------------===//
+// Comparison ops
+//===----------------------------------------------------------------------===//
+
+void CmpEQI32Op::getAsmResultNames(OpAsmSetValueNameFn setNameFn) {
+  setResultName(setNameFn, getResult(), "eq");
+}
+
+void CmpEQI64Op::getAsmResultNames(OpAsmSetValueNameFn setNameFn) {
+  setResultName(setNameFn, getResult(), "eq");
+}
+
+void CmpNEI32Op::getAsmResultNames(OpAsmSetValueNameFn setNameFn) {
+  setResultName(setNameFn, getResult(), "ne");
+}
+
+void CmpNEI64Op::getAsmResultNames(OpAsmSetValueNameFn setNameFn) {
+  setResultName(setNameFn, getResult(), "ne");
+}
+
+void CmpNZI64Op::getAsmResultNames(OpAsmSetValueNameFn setNameFn) {
+  setResultName(setNameFn, getResult(), "nz");
+}
+
+void CmpLTI32SOp::getAsmResultNames(OpAsmSetValueNameFn setNameFn) {
+  setResultName(setNameFn, getResult(), "slt");
+}
+
+void CmpLTI64SOp::getAsmResultNames(OpAsmSetValueNameFn setNameFn) {
+  setResultName(setNameFn, getResult(), "slt");
+}
+
+void CmpLTEI32SOp::getAsmResultNames(OpAsmSetValueNameFn setNameFn) {
+  setResultName(setNameFn, getResult(), "slte");
+}
+
+void CmpLTEI64SOp::getAsmResultNames(OpAsmSetValueNameFn setNameFn) {
+  setResultName(setNameFn, getResult(), "slte");
+}
+
+void CmpLTI32UOp::getAsmResultNames(OpAsmSetValueNameFn setNameFn) {
+  setResultName(setNameFn, getResult(), "ult");
+}
+
+void CmpLTI64UOp::getAsmResultNames(OpAsmSetValueNameFn setNameFn) {
+  setResultName(setNameFn, getResult(), "ult");
+}
+
+void CmpLTEI32UOp::getAsmResultNames(OpAsmSetValueNameFn setNameFn) {
+  setResultName(setNameFn, getResult(), "ulte");
+}
+
+void CmpLTEI64UOp::getAsmResultNames(OpAsmSetValueNameFn setNameFn) {
+  setResultName(setNameFn, getResult(), "ulte");
+}
+
+void CmpGTI32SOp::getAsmResultNames(OpAsmSetValueNameFn setNameFn) {
+  setResultName(setNameFn, getResult(), "sgt");
+}
+
+void CmpGTI64SOp::getAsmResultNames(OpAsmSetValueNameFn setNameFn) {
+  setResultName(setNameFn, getResult(), "sgt");
+}
+
+void CmpGTEI32SOp::getAsmResultNames(OpAsmSetValueNameFn setNameFn) {
+  setResultName(setNameFn, getResult(), "sgte");
+}
+
+void CmpGTEI64SOp::getAsmResultNames(OpAsmSetValueNameFn setNameFn) {
+  setResultName(setNameFn, getResult(), "sgte");
+}
+
+void CmpGTI32UOp::getAsmResultNames(OpAsmSetValueNameFn setNameFn) {
+  setResultName(setNameFn, getResult(), "ugt");
+}
+
+void CmpGTI64UOp::getAsmResultNames(OpAsmSetValueNameFn setNameFn) {
+  setResultName(setNameFn, getResult(), "ugt");
+}
+
+void CmpGTEI32UOp::getAsmResultNames(OpAsmSetValueNameFn setNameFn) {
+  setResultName(setNameFn, getResult(), "ugte");
+}
+
+void CmpGTEI64UOp::getAsmResultNames(OpAsmSetValueNameFn setNameFn) {
+  setResultName(setNameFn, getResult(), "ugte");
+}
+
+void CmpNZI32Op::getAsmResultNames(OpAsmSetValueNameFn setNameFn) {
+  setResultName(setNameFn, getResult(), "nz");
+}
+
+void CmpEQRefOp::getAsmResultNames(OpAsmSetValueNameFn setNameFn) {
+  setResultName(setNameFn, getResult(), "req");
+}
+
+void CmpNERefOp::getAsmResultNames(OpAsmSetValueNameFn setNameFn) {
+  setResultName(setNameFn, getResult(), "rne");
+}
+
+void CmpNZRefOp::getAsmResultNames(OpAsmSetValueNameFn setNameFn) {
+  setResultName(setNameFn, getResult(), "rnz");
 }
 
 //===----------------------------------------------------------------------===//

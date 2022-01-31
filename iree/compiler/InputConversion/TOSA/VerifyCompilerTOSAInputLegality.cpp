@@ -20,7 +20,7 @@ struct VerifyCompilerTOSAInputLegalityPass
   void runOnOperation() override {
     auto *context = &getContext();
     ConversionTarget conversionTarget(*context);
-    OwningRewritePatternList conversionPatterns(&getContext());
+    RewritePatternSet conversionPatterns(&getContext());
 
     // Note that we would prefer allow-lists of what we positively support.
     // However, it is so common to sneak input-level ops into the pipeline

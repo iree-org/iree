@@ -17,21 +17,21 @@ namespace MHLO {
 /// patterns from XLA, as well as some IREE specific modifications.
 void populateMHLOToLinalgOnTensorsConversionPatterns(
     MLIRContext *context, TypeConverter &typeConverter,
-    OwningRewritePatternList &patterns);
+    RewritePatternSet &patterns);
 
 /// Populates IREE specific patterns to convert HLO broadcasting ops to Linalg.
 /// These are being maintained separately because they are a standalone unit
 /// that is both intricate and possible to upstream, should there be alignment
 /// to do so.
-void populateMHLOBroadcastingToLinalgPatterns(
-    MLIRContext *context, TypeConverter &typeConverter,
-    OwningRewritePatternList &patterns);
+void populateMHLOBroadcastingToLinalgPatterns(MLIRContext *context,
+                                              TypeConverter &typeConverter,
+                                              RewritePatternSet &patterns);
 
 /// Populates patterns to convert MHLO/CHLO arithmetic on complex tensors to
 /// equivalent HLO level real arithmetic.
 void populateMHLOComplexToRealPatterns(MLIRContext *context,
                                        TypeConverter &typeConverter,
-                                       OwningRewritePatternList &patterns);
+                                       RewritePatternSet &patterns);
 
 }  // namespace MHLO
 }  // namespace iree_compiler

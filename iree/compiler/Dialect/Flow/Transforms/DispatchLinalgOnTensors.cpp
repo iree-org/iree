@@ -25,7 +25,7 @@
 #include "mlir/IR/BlockAndValueMapping.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinAttributes.h"
-#include "mlir/IR/FunctionSupport.h"
+#include "mlir/IR/FunctionInterfaces.h"
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/PatternMatch.h"
@@ -916,11 +916,11 @@ struct TiledOpInterfacePattern
 /// fuse with multiple root operations (i.e. replicated). For now a very simple
 /// heuristic is used below, but the mechanism should be general enough to
 /// capture any heuristic.
-static unsigned decideFusableLinalgOps(Operation *funcOp) {
+static unsigned decideFusableLinalgOps(FunctionOpInterface funcOp) {
   unsigned numRootOps = 0;
   MLIRContext *context = funcOp->getContext();
   OpBuilder builder(context);
-  for (Block &block : function_like_impl::getFunctionBody(funcOp)) {
+  for (Block &block : funcOp.getBody()) {
     // Tiling and fusion works by tiling the last operation in the fusion group
     // and then pull producer ops into the tiled loops. So go in the reverse
     // order here.
@@ -1075,7 +1075,7 @@ LogicalResult createDispatchRegionsFromRootOps(mlir::Operation *funcOp) {
   // Create the dispatch region, first without the isolate region from above
   // property.
   {
-    OwningRewritePatternList patterns(context);
+    RewritePatternSet patterns(context);
     auto linalgTilingOptions =
         linalg::LinalgTilingOptions()
             .setDistributionOptions(workgroupDistributionOptions)
@@ -1091,7 +1091,7 @@ LogicalResult createDispatchRegionsFromRootOps(mlir::Operation *funcOp) {
 
     // Run canonicalization patterns and pattern to resolve tensor.dim of result
     // values into tensor.dim of its operands..
-    OwningRewritePatternList canonicalizationPatterns(context);
+    RewritePatternSet canonicalizationPatterns(context);
     linalg::populateLinalgTilingCanonicalizationPatterns(
         canonicalizationPatterns);
     if (failed(applyPatternsAndFoldGreedily(
@@ -1108,7 +1108,7 @@ LogicalResult createDispatchRegionsFromRootOps(mlir::Operation *funcOp) {
 
   // Run necessary canonicalization patterns before rewrite destructive updates.
   {
-    OwningRewritePatternList patterns(context);
+    RewritePatternSet patterns(context);
     // Resolve `tensor.dim` of result of operations into operations on its
     // operands using the `ReifyRankedShapedTypeOpInterface`.
     memref::populateResolveRankedShapeTypeResultDimsPatterns(patterns);
@@ -1144,7 +1144,7 @@ LogicalResult createDispatchRegionsFromRootOps(mlir::Operation *funcOp) {
 }
 
 void DispatchLinalgOnTensorsPass::runOnOperation() {
-  auto funcOp = getOperation();
+  auto funcOp = llvm::cast<FunctionOpInterface>(getOperation());
 
   MLIRContext *context = funcOp->getContext();
   context->allowUnregisteredDialects(true);
@@ -1169,7 +1169,7 @@ void DispatchLinalgOnTensorsPass::runOnOperation() {
 
   /// Iterate over the remaining ops and pick up whatever needs to go into
   /// dispatch regions and mark them as root ops.
-  for (Operation &op : function_like_impl::getFunctionBody(funcOp).getOps()) {
+  for (Operation &op : funcOp.getBody().getOps()) {
     // Ignore ops that
     // - Do not implement the `LinalgOp` interface.
     // - linalg.fill ops.
@@ -1201,7 +1201,7 @@ void DispatchLinalgOnTensorsPass::runOnOperation() {
 
   /// Iterate over the remaining ops and pick up whatever needs to go into
   /// dispatch regions and mark them as root ops.
-  for (Operation &op : function_like_impl::getFunctionBody(funcOp).getOps()) {
+  for (Operation &op : funcOp.getBody().getOps()) {
     // Ignore ops that do not implement the `TiledOpInterface` interface.
     if (!isa<IREE::LinalgExt::TiledOpInterface>(&op)) continue;
     assert(!hasRootOpAttribute(&op) &&

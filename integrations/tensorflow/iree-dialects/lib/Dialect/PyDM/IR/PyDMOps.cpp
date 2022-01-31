@@ -488,6 +488,7 @@ static void print(OpAsmPrinter &p, FunctionalIfOp op) {
     // Print yield explicitly if the op defines values.
     printBlockTerminators = true;
   }
+  p << " ";
   p.printRegion(op.thenRegion(),
                 /*printEntryBlockArgs=*/false,
                 /*printBlockTerminators=*/printBlockTerminators);
@@ -495,7 +496,7 @@ static void print(OpAsmPrinter &p, FunctionalIfOp op) {
   // Print the 'else' regions if it exists and has a block.
   auto &elseRegion = op.elseRegion();
   if (!elseRegion.empty()) {
-    p << " else";
+    p << " else ";
     p.printRegion(elseRegion,
                   /*printEntryBlockArgs=*/false,
                   /*printBlockTerminators=*/printBlockTerminators);
@@ -547,19 +548,18 @@ LogicalResult PyFuncOp::verifyType() {
 }
 
 static ParseResult parseFuncOp(OpAsmParser &parser, OperationState &result) {
-  auto buildFuncType = [](Builder &builder, ArrayRef<Type> argTypes,
-                          ArrayRef<Type> results,
-                          function_like_impl::VariadicFlag, std::string &) {
-    return builder.getFunctionType(argTypes, results);
-  };
+  auto buildFuncType =
+      [](Builder &builder, ArrayRef<Type> argTypes, ArrayRef<Type> results,
+         function_interface_impl::VariadicFlag,
+         std::string &) { return builder.getFunctionType(argTypes, results); };
 
-  return function_like_impl::parseFunctionLikeOp(
+  return function_interface_impl::parseFunctionOp(
       parser, result, /*allowVariadic=*/false, buildFuncType);
 }
 
 static void print(PyFuncOp op, OpAsmPrinter &p) {
   FunctionType fnType = op.getType();
-  function_like_impl::printFunctionLikeOp(
+  function_interface_impl::printFunctionOp(
       p, op, fnType.getInputs(), /*isVariadic=*/false, fnType.getResults());
 }
 

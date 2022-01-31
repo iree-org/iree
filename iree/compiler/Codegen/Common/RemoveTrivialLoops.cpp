@@ -139,7 +139,7 @@ static LogicalResult removeOneTripTiledLoops(FuncOp funcOp,
     return getWorkgroupRange(processorValue, dims, symbols, numWorkgroups,
                              workgroupSize);
   };
-  OwningRewritePatternList patterns(funcOp.getContext());
+  RewritePatternSet patterns(funcOp.getContext());
   populateRemoveSingleIterationLoopPattern(patterns, getWorkgroupRangeFn);
   return applyPatternsAndFoldGreedily(funcOp, std::move(patterns));
 }

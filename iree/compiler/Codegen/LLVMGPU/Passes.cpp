@@ -149,8 +149,11 @@ static void addLowerToLLVMGPUPasses(OpPassManager &pm, bool useROCM) {
   pm.addNestedPass<FuncOp>(createCanonicalizerPass());
   pm.addNestedPass<FuncOp>(createCSEPass());
 
+  // math dialect elementry functions -> polynomial form.
+  pm.addNestedPass<FuncOp>(createPolynomialApproximationPass());
+
   pm.addNestedPass<FuncOp>(arith::createArithmeticExpandOpsPass());
-  pm.addNestedPass<FuncOp>(createStdExpandOpsPass());
+  pm.addNestedPass<FuncOp>(memref::createExpandOpsPass());
   pm.addPass(createLowerAffinePass());
 
   // Strip out the debug info for the kernel as CUDA driver doesn't diggest PTX
@@ -166,6 +169,8 @@ static void addLowerToLLVMGPUPasses(OpPassManager &pm, bool useROCM) {
 }
 
 void buildLLVMGPUTransformPassPipeline(OpPassManager &pm, bool useROCM) {
+  pm.nest<ModuleOp>().nest<FuncOp>().addPass(createTypePropagationPass());
+
   OpPassManager &bufferizePassPM = pm.nest<ModuleOp>();
   addLinalgBufferizePasses(bufferizePassPM, gpuAllocationFunction);
   pm.addPass(createLLVMGPULowerExecutableTargetPass());

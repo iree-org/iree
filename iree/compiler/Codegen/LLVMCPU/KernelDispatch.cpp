@@ -63,13 +63,6 @@ static llvm::cl::opt<int> defaultWorkgroupTileSize(
         "linalg.generic and linalg.indexed_generic workgroup tile size"),
     llvm::cl::init(64));
 
-// TODO(hanchung): Enable the flag by default after addressing perf
-// regresssions.
-static llvm::cl::opt<bool> useDoubleTilingExpert(
-    "iree-codegen-use-double-tiling-expert",
-    llvm::cl::desc("DEVELOPMENT ONLY, DO NOT USE THE FLAG."),
-    llvm::cl::init(false));
-
 using IREE::Codegen::DispatchLoweringPassPipeline;
 
 static bool isVMVX(FuncOp entryPointFn) {
@@ -132,8 +125,7 @@ static int64_t getVectorSize(FuncOp entryPointFn, unsigned byteWidth) {
 static int64_t getVectorSize(FuncOp entryPointFn, ShapedType shapedType) {
   Type elementType = shapedType.getElementType();
   if (!elementType.isIntOrFloat()) return 1;
-  unsigned byteWidth =
-      std::max<unsigned>(1, elementType.getIntOrFloatBitWidth() / 8);
+  unsigned byteWidth = IREE::Util::getRoundedElementByteWidth(elementType);
   return getVectorSize(entryPointFn, byteWidth);
 }
 
@@ -157,7 +149,7 @@ static unsigned getReferenceTypeLengthInBytes(FuncOp entryPointFn) {
                            .Default([&](Type t) -> Type { return nullptr; });
     if (!elementType || !elementType.isIntOrFloat()) return;
     unsigned typeWidthInBytes =
-        std::max<unsigned>(elementType.getIntOrFloatBitWidth() / 8, 1);
+        IREE::Util::getRoundedElementByteWidth(elementType);
     referenceTypeLengthInBytes =
         std::min<unsigned>(referenceTypeLengthInBytes, typeWidthInBytes);
   });
@@ -278,12 +270,38 @@ static int64_t getMaxTileSize(int64_t lb, int64_t ub, int64_t maxSize,
   return maxSize;
 }
 
-static LogicalResult setX86RootConfig(FuncOp entryPointFn,
-                                      linalg::ContractionOpInterface op,
-                                      SmallVector<int64_t> workloadPerWorkgroup,
-                                      int vectorSize) {
+static LogicalResult setX86SandboxRootConfig(
+    FuncOp entryPointFn, linalg::ContractionOpInterface op,
+    SmallVector<int64_t> workloadPerWorkgroup, int vectorSize) {
   setTranslationInfo(entryPointFn,
-                     getDispatchLoweringPassPipeline(entryPointFn, op),
+                     DispatchLoweringPassPipeline::CPUDoubleTilingExpert,
+                     workloadPerWorkgroup,
+                     /*workgroupSize=*/ArrayRef<int64_t>{});
+
+  // Hardcoded tile sizes. The configuration is derived from iree-llvm-sandbox.
+  // L1 tile sizes are {1, ..., 8, 32, 16}
+  SmallVector<int64_t> l1TileSizes;
+  int64_t nLoops = cast<linalg::LinalgOp>(op.getOperation()).getNumLoops();
+  l1TileSizes.append(nLoops - 3, 1);
+  l1TileSizes.push_back(8);
+  l1TileSizes.push_back(32);
+  l1TileSizes.push_back(16);
+
+  TileSizesListType tileSizes;
+  tileSizes.push_back({});
+  tileSizes.push_back(l1TileSizes);
+  auto config = IREE::Codegen::LoweringConfigAttr::get(
+      entryPointFn.getContext(), tileSizes, {});
+  setLoweringConfig(op, config);
+
+  return success();
+}
+
+static LogicalResult setX86TileFuseAndVectorizeRootConfig(
+    FuncOp entryPointFn, linalg::ContractionOpInterface op,
+    SmallVector<int64_t> workloadPerWorkgroup, int vectorSize) {
+  setTranslationInfo(entryPointFn,
+                     DispatchLoweringPassPipeline::CPUTileFuseAndVectorize,
                      workloadPerWorkgroup,
                      /*workgroupSize=*/ArrayRef<int64_t>{});
 
@@ -308,39 +326,6 @@ static LogicalResult setX86RootConfig(FuncOp entryPointFn,
   TileSizesListType tileSizes;
   tileSizes.push_back({});  // Empty here since there is nothing to do in first
                             // level tiling.
-  tileSizes.push_back(l1TileSizes);
-  tileSizes.push_back(vectorTileSizes);
-  auto config = IREE::Codegen::LoweringConfigAttr::get(
-      entryPointFn.getContext(), tileSizes, vectorTileSizes);
-  setLoweringConfig(op, config);
-
-  return success();
-}
-
-static LogicalResult setX86SandboxRootConfig(
-    FuncOp entryPointFn, linalg::ContractionOpInterface op,
-    SmallVector<int64_t> workloadPerWorkgroup, int vectorSize) {
-  setTranslationInfo(entryPointFn,
-                     DispatchLoweringPassPipeline::CPUDoubleTilingExpert,
-                     workloadPerWorkgroup,
-                     /*workgroupSize=*/ArrayRef<int64_t>{});
-
-  // Hardcoded tile sizes. The configuration is derived from iree-llvm-sandbox.
-  // L1 tile sizes are {1, 1, ..., 288, 128, 512}.
-  // Vector tile sizes are {1, ..., 9, 32, 16}
-  SmallVector<int64_t> l1TileSizes, vectorTileSizes;
-  int64_t nLoops = cast<linalg::LinalgOp>(op.getOperation()).getNumLoops();
-  l1TileSizes.append(nLoops - 3, 1);
-  l1TileSizes.push_back(288);
-  l1TileSizes.push_back(128);
-  l1TileSizes.push_back(512);
-  vectorTileSizes.append(nLoops - 3, 1);
-  vectorTileSizes.push_back(9);
-  vectorTileSizes.push_back(32);
-  vectorTileSizes.push_back(16);
-
-  TileSizesListType tileSizes;
-  tileSizes.push_back({});
   tileSizes.push_back(l1TileSizes);
   tileSizes.push_back(vectorTileSizes);
   auto config = IREE::Codegen::LoweringConfigAttr::get(
@@ -426,17 +411,21 @@ static LogicalResult setRootConfig(
 
   Optional<llvm::Triple> triple = getTargetTriple(entryPointFn);
   if (triple && triple.getValue().isX86()) {
-    // For DoubleTilingExpert, we will use LinalgSingleTilingExpertPassOptions
-    // to control transforms. There is a tileInterchange option that needs to be
-    // configured. However, we don't know the number of loops when adding the
-    // pass to pass manager. Thus, we don't use double tiling expert for batch
-    // gemms for now.
-    if (!numBatchDims && useDoubleTilingExpert) {
+    // There is a tileInterchange option. If it needs to be configured, we can
+    // only apply the pipeline to linalg.matmul. Because we don't know the
+    // number of loops when adding the pass to pass manager.
+    // TODO(hanchung): Embed options into attributes, so we can control options
+    // more heuristically.
+    Type lhsElemType = getElementTypeOrSelf(contractionOp.lhs().getType());
+    Type rhsElemType = getElementTypeOrSelf(contractionOp.rhs().getType());
+    Type resElemType =
+        getElementTypeOrSelf(contractionOp->getResult(0).getType());
+    if (lhsElemType == rhsElemType && rhsElemType == resElemType) {
       return setX86SandboxRootConfig(entryPointFn, contractionOp,
                                      workloadPerWorkgroup, vectorSize);
     } else {
-      return setX86RootConfig(entryPointFn, contractionOp, workloadPerWorkgroup,
-                              vectorSize);
+      return setX86TileFuseAndVectorizeRootConfig(
+          entryPointFn, contractionOp, workloadPerWorkgroup, vectorSize);
     }
   }
   // Fall back to ARM configurations.

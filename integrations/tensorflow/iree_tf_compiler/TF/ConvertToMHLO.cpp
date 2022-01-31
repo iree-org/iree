@@ -58,20 +58,20 @@ class ConvertToMHLOPass : public PassWrapper<ConvertToMHLOPass, FunctionPass> {
 
     // Lower TF Patterns must be separate from canonocalization patterns as
     // they are sometimes inversions of eachother.
-    OwningRewritePatternList lowerTfPatterns(&getContext());
+    RewritePatternSet lowerTfPatterns(&getContext());
     mlir::TF::PopulateTFLoweringBeforeHLOPatterns(context, &lowerTfPatterns);
 
-    OwningRewritePatternList canonicalizePatterns(&getContext());
+    RewritePatternSet canonicalizePatterns(&getContext());
     for (auto op : context->getRegisteredOperations()) {
       op.getCanonicalizationPatterns(canonicalizePatterns, context);
     }
 
-    OwningRewritePatternList patterns(&getContext());
+    RewritePatternSet patterns(&getContext());
     // Note that the `OperationConverter` orders patterns lexicographically by:
     // 1) Ascending legalization depth (i.e., minimum number of patterns
     // necessary to arrive at conversion target).
     // 2) Descending pattern benefit.
-    // 3) Order of patterns in `OwningRewritePatternList`.
+    // 3) Order of patterns in `RewritePatternSet`.
 
     // Add TF->HLO legalization patterns.
     mhlo::PopulateLegalizeTfPatterns(context, &patterns);

@@ -36,8 +36,10 @@ iree_cc_library(
     "IREEComprehensiveBufferizePass.cpp"
     "LinalgBufferizePass.cpp"
     "OptimizeVectorTransferPass.cpp"
+    "PolynomialApproximationPass.cpp"
     "RemoveTrivialLoops.cpp"
     "SetNumWorkgroupsPass.cpp"
+    "TypePropagationPass.cpp"
     "VectorizeConv.cpp"
     "VectorizeMMT4d.cpp"
   DEPS
@@ -48,11 +50,10 @@ iree_cc_library(
     MLIRAffineBufferizableOpInterfaceImpl
     MLIRAffineUtils
     MLIRAnalysis
-    MLIRArithBufferizableOpInterfaceImpl
     MLIRArithmetic
-    MLIRBufferizableOpInterface
+    MLIRArithmeticTransforms
     MLIRBufferization
-    MLIRComprehensiveBufferize
+    MLIRBufferizationTransforms
     MLIRGPUOps
     MLIRIR
     MLIRLLVMCommonConversion
@@ -60,8 +61,10 @@ iree_cc_library(
     MLIRLinalg
     MLIRLinalgBufferizableOpInterfaceImpl
     MLIRLinalgTransforms
+    MLIRMathTransforms
     MLIRMemRef
     MLIRMemRefTransforms
+    MLIRModuleBufferization
     MLIRPass
     MLIRSCF
     MLIRSCFBufferizableOpInterfaceImpl
@@ -70,7 +73,6 @@ iree_cc_library(
     MLIRStandard
     MLIRSupport
     MLIRTensor
-    MLIRTensorBufferizableOpInterfaceImpl
     MLIRTransforms
     MLIRVector
     MLIRVectorBufferizableOpInterfaceImpl

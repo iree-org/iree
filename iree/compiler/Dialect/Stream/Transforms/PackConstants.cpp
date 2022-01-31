@@ -332,7 +332,8 @@ static UploadResult buildStagingUpload(
   auto *entryBlock = new Block();
   executeOp.body().push_back(entryBlock);
   for (auto outerValue : capturedResources) {
-    auto arg = entryBlock->addArgument(outerValue.getType());
+    auto arg =
+        entryBlock->addArgument(outerValue.getType(), outerValue.getLoc());
     mapping.map(outerValue, arg);
   }
 

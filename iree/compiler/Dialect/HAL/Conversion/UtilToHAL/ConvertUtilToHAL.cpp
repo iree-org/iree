@@ -41,7 +41,7 @@ struct GlobalConversionPattern
 void populateUtilToHALPatterns(MLIRContext *context,
                                ConversionTarget &conversionTarget,
                                TypeConverter &typeConverter,
-                               OwningRewritePatternList &patterns) {
+                               RewritePatternSet &patterns) {
   conversionTarget.addDynamicallyLegalOp<IREE::Util::GlobalOp>(
       [&](IREE::Util::GlobalOp op) {
         return typeConverter.isLegal(op.type()) &&

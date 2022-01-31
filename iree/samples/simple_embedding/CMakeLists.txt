@@ -259,48 +259,4 @@ iree_native_test(
 
 endif()
 
-if(${IREE_HAL_DRIVER_CUDA} AND (${IREE_TARGET_BACKEND_CUDA} OR DEFINED IREE_HOST_BINARY_ROOT))
-
-iree_cc_binary(
-  NAME
-    simple_embedding_cuda
-  SRCS
-    "device_cuda.c"
-    "simple_embedding.c"
-  DEPS
-    ::simple_embedding_test_bytecode_module_cuda_c
-    iree::base
-    iree::hal
-    iree::hal::cuda::registration
-    iree::modules::hal
-    iree::vm
-    iree::vm::bytecode_module
-)
-
-iree_bytecode_module(
-  NAME
-    simple_embedding_test_bytecode_module_cuda
-  SRC
-    "simple_embedding_test.mlir"
-  C_IDENTIFIER
-    "iree_samples_simple_embedding_test_module_cuda"
-  FLAGS
-    "-iree-input-type=mhlo"
-    "-iree-mlir-to-vm-bytecode-module"
-    "-iree-hal-target-backends=cuda"
-    "-iree-llvm-debug-symbols=false"
-  PUBLIC
-)
-
-iree_native_test(
-  NAME
-    "simple_embedding_cuda_test"
-  LABELS
-    "driver=cuda"
-  SRC
-    ::simple_embedding_cuda
-)
-
-endif()
-
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

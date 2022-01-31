@@ -1,0 +1,37 @@
+# Copyright 2022 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+name: Advance Upstream Forks
+
+on:
+  # TODO(gcmn): Enable cron once this is stable
+  # schedule:
+  #   - cron: '0 10 * * *'
+
+  workflow_dispatch:
+
+jobs:
+  advance_iree-llvm-fork:
+    name: "Advance iree-llvm-fork"
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Checking out repository
+        uses: actions/checkout@v2
+        with:
+          token: ${{ secrets.WRITE_ACCESS_TOKEN }}
+          repository: google/iree-llvm-fork
+          ref: main
+
+      - name: Pull upstream main
+        run: |
+          git remote add upstream https://github.com/llvm/llvm-project.git
+          git pull --ff-only upstream main
+      - name: Pushing changes
+        uses: ad-m/github-push-action@v0.6.0
+        with:
+          github_token: ${{ secrets.WRITE_ACCESS_TOKEN }}
+          branch: main
+          repository: google/iree-llvm-fork

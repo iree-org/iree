@@ -78,6 +78,12 @@ def OptimizeVectorTransfer :
   let constructor = "mlir::iree_compiler::createOptimizeVectorTransferPass()";
 }
 
+def TypePropagation :
+    Pass<"iree-codegen-type-propagation", "FuncOp"> {
+  let summary = "Propogate the type of tensor to avoid load/stores of illegal bit widths";
+  let constructor = "mlir::iree_compiler::createTypePropagationPass()";
+}
+
 def RemoveSingleIterationLoop :
     Pass<"iree-codegen-remove-single-iteration-loop", "FuncOp"> {
   let summary = "Remove distributed loop with single iteration.";
@@ -107,6 +113,13 @@ def LinalgToVectorVectorizeMMT4d :
   let summary = "Vectorize a very specific form of linalg.mmt4d";
   let constructor =
       "mlir::iree_compiler::createLinalgToVectorVectorizeMMT4dPass()";
+}
+
+def PolynomialApproximationPass :
+    Pass<"iree-codegen-polynomial-approximation", ""> {
+  let summary = "Convert math operations to their polynomial approximation";
+  let constructor =
+      "mlir::iree_compiler::createPolynomialApproximationPass()";
 }
 //------------------------------------------------------------------------------
 // LLVMCPU

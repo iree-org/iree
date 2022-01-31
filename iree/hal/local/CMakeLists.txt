@@ -18,7 +18,7 @@ iree_cc_library(
   PUBLIC
 )
 
-iree_cc_test(
+iree_cc_binary_benchmark(
   NAME
     executable_library_benchmark
   SRCS
@@ -32,6 +32,7 @@ iree_cc_test(
     iree::hal
     iree::hal::local::loaders::embedded_library_loader
     iree::testing::benchmark
+  TESTONLY
 )
 
 iree_cc_test(

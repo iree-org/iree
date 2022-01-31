@@ -158,6 +158,11 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
               moduleOp, translationInfo.getValue(),
               verifyTensorToVectorsPassPipelineConfig);
           break;
+        case IREE::Codegen::DispatchLoweringPassPipeline::CPUDoubleTilingExpert:
+          verificationStatus = verifyLoweringConfiguration(
+              moduleOp, translationInfo.getValue(),
+              verifyDoubleTilingExpertPassPipelineConfig);
+          break;
         default:;
       }
       if (failed(verificationStatus)) {

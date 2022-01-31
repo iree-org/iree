@@ -75,7 +75,7 @@ struct LLVMCPUTileFuseAndVectorizePass
 
 LogicalResult applyTileAndFuseCanonicalizationPatterns(FuncOp funcOp) {
   auto context = funcOp.getContext();
-  OwningRewritePatternList patterns(context);
+  RewritePatternSet patterns(context);
   linalg::populateLinalgTilingCanonicalizationPatterns(patterns);
   tensor::DimOp::getCanonicalizationPatterns(patterns, context);
   memref::DimOp::getCanonicalizationPatterns(patterns, context);
@@ -152,7 +152,7 @@ void LLVMCPUTileFuseAndVectorizePass::runOnOperation() {
   }
 
   {
-    OwningRewritePatternList tileReductionPatterns(&getContext());
+    RewritePatternSet tileReductionPatterns(&getContext());
 
     // TODO(hanchung): Add a pattern to fold the tensor.extract_slice op.
     // One-trip loop can be removed. But weird patterns could be generated and
@@ -230,7 +230,7 @@ void LLVMCPUTileFuseAndVectorizePass::runOnOperation() {
       funcOp.walk([&](linalg::ContractionOpInterface op) {
         setMarker(op, getWorkgroupL1TileMarker());
       });
-      OwningRewritePatternList l2patterns(&getContext());
+      RewritePatternSet l2patterns(&getContext());
       l2patterns.insert<TileWorkgroups>(
           context,
           linalg::LinalgTilingOptions().setTileSizeComputationFunction(
@@ -274,7 +274,7 @@ void LLVMCPUTileFuseAndVectorizePass::runOnOperation() {
 
   // Apply vectorization patterns.
   {
-    OwningRewritePatternList vectorizationPatterns(&getContext());
+    RewritePatternSet vectorizationPatterns(&getContext());
     linalg::LinalgVectorizationOptions opt;
     linalg::LinalgTransformationFilter f(
         StringAttr::get(context, getVectorizeMarker()));
@@ -365,7 +365,7 @@ void LLVMCPUTileFuseAndVectorizePass::runOnOperation() {
     vector::VectorTransformsOptions vectorTransformsOptions =
         vector::VectorTransformsOptions().setVectorTransformsOptions(
             vector::VectorContractLowering::OuterProduct);
-    OwningRewritePatternList vectorContractLoweringPatterns(&getContext());
+    RewritePatternSet vectorContractLoweringPatterns(&getContext());
     vectorContractLoweringPatterns.insert<
         vector::ContractionOpToOuterProductOpLowering,
         vector::ContractionOpToMatmulOpLowering, vector::ContractionOpLowering>(

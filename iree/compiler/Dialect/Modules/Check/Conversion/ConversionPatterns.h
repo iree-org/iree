@@ -17,13 +17,13 @@ namespace Check {
 
 // Populates conversion patterns from the Check dialect to the VM dialect.
 void populateCheckToVMPatterns(MLIRContext *context, SymbolTable &importSymbols,
-                               OwningRewritePatternList &patterns,
+                               RewritePatternSet &patterns,
                                TypeConverter &typeConverter);
 
 // Populates conversion patterns from the Check dialect to the HAL dialect.
 // Mostly lowers tensors to buffer views.
 void populateCheckToHALPatterns(MLIRContext *context,
-                                OwningRewritePatternList &patterns,
+                                RewritePatternSet &patterns,
                                 TypeConverter &typeConverter);
 
 }  // namespace Check

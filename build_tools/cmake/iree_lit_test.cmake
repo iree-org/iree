@@ -73,7 +73,6 @@ function(iree_lit_test)
       "${CMAKE_SOURCE_DIR}/build_tools/cmake/run_test.${IREE_HOST_SCRIPT_EXT}"
       "${Python3_EXECUTABLE}"
       "${LLVM_SOURCE_DIR}/utils/lit/lit.py"
-      "-v"
       ${_LIT_PATH_ARGS}
       ${_TEST_FILE_PATH}
   )
@@ -83,6 +82,7 @@ function(iree_lit_test)
   set_property(TEST ${_NAME_PATH} PROPERTY REQUIRED_FILES "${_TEST_FILE_PATH}")
   set_property(TEST ${_NAME_PATH} PROPERTY ENVIRONMENT
     "TEST_TMPDIR=${IREE_BINARY_DIR}/tmp/${_NAME}_test_tmpdir"
+    "LIT_OPTS=-v"
     "FILECHECK_OPTS=--enable-var-scope")
   iree_add_test_environment_properties(${_NAME_PATH})
 

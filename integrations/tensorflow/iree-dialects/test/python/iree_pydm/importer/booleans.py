@@ -7,7 +7,7 @@ from iree.compiler.dialects.iree_pydm.importer.test_util import *
 # CHECK-LABEL: @logical_and
 # CHECK: %[[XVAL:.*]] = load_var %x
 # CHECK: %[[XBOOL:.*]] = as_bool %[[XVAL]]
-# CHECK: %[[R1:.*]] = functional_if %[[XBOOL]] {{.*}} {
+# CHECK: %[[R1:.*]] = functional_if %[[XBOOL]] {{.*}}{
 # CHECK:   %[[YVAL:.*]] = load_var %y
 # CHECK:   %[[YBOOL:.*]] = as_bool %[[YVAL]]
 # CHECK:   %[[R2:.*]] = functional_if %[[YBOOL]] {{.*}} {
@@ -31,7 +31,7 @@ def logical_and():
 # # CHECK-LABEL: @logical_or
 # CHECK: %[[XVAL:.*]] = load_var %x
 # CHECK: %[[XBOOL:.*]] = as_bool %[[XVAL]]
-# CHECK: %[[R1:.*]] = functional_if %[[XBOOL]] {{.*}} {
+# CHECK: %[[R1:.*]] = functional_if %[[XBOOL]] {{.*}}{
 # CHECK:   yield %[[XVAL]]
 # CHECK: } else {
 # CHECK:   %[[YVAL:.*]] = load_var %y
@@ -67,7 +67,7 @@ def logical_not():
 # CHECK-LABEL: func @conditional
 # CHECK: %[[XVAL:.*]] = load_var %x
 # CHECK: %[[XBOOL:.*]] = as_bool %[[XVAL]]
-# CHECK: %[[R1:.*]] = functional_if %[[XBOOL]] {{.*}} {
+# CHECK: %[[R1:.*]] = functional_if %[[XBOOL]] {{.*}}{
 # CHECK:   %[[TWOVAL:.*]] = constant 2
 # CHECK:   %[[TWOBOXED:.*]] = box %[[TWOVAL]] : !iree_pydm.integer ->
 # CHECK:   yield %[[TWOBOXED]]

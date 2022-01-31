@@ -415,9 +415,9 @@ struct ConvertExecutableOp
 
 }  // namespace
 
-void populateFlowToStreamConversionPatterns(
-    MLIRContext *context, TypeConverter &typeConverter,
-    OwningRewritePatternList &patterns) {
+void populateFlowToStreamConversionPatterns(MLIRContext *context,
+                                            TypeConverter &typeConverter,
+                                            RewritePatternSet &patterns) {
   patterns
       .insert<ConvertTensorReshapeOp, ConvertTensorSplatOp,
               ConvertTensorCloneOp, ConvertTensorSliceOp, ConvertTensorUpdateOp,
@@ -427,9 +427,10 @@ void populateFlowToStreamConversionPatterns(
   patterns.insert<ConvertExecutableOp>(typeConverter, context);
 }
 
-void populateFlowToStreamConversionPatterns(
-    MLIRContext *context, ConversionTarget &conversionTarget,
-    TypeConverter &typeConverter, OwningRewritePatternList &patterns) {
+void populateFlowToStreamConversionPatterns(MLIRContext *context,
+                                            ConversionTarget &conversionTarget,
+                                            TypeConverter &typeConverter,
+                                            RewritePatternSet &patterns) {
   // Disallow all flow ops besides the ones we pass through (today).
   // We don't have a stream-equivalent of several of the dispatch-level flow
   // ops as the codegen backends directly touch them and so long as we have both

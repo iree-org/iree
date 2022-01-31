@@ -32,7 +32,7 @@ class HALConversionDialectInterface
   // |target| must have newly legal and illegal ops/dialects specified to ensure
   // the conversion takes place.
   virtual void setupConversionTarget(ConversionTarget &target,
-                                     OwningRewritePatternList &patterns,
+                                     RewritePatternSet &patterns,
                                      TypeConverter &typeConverter) const = 0;
 
   // Converts a type.

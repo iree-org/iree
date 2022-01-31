@@ -756,7 +756,7 @@ struct ConvertDynamicReshapeOp
 
 void mlir::iree_compiler::MHLO::populateMHLOBroadcastingToLinalgPatterns(
     MLIRContext *context, TypeConverter &typeConverter,
-    OwningRewritePatternList &patterns) {
+    RewritePatternSet &patterns) {
 #define POPULATE_SIMPLE_BCAST(ChloOp, HloOp)                          \
   patterns.insert<ConvertTrivialNonBroadcastBinaryOp>(                \
       context, typeConverter, 10,                                     \

@@ -1170,45 +1170,6 @@ func @extract_slice_reduced_rank_two_dims_4(%arg0 : tensor<?x?x?x?xf32>, %arg1 :
 
 // -----
 
-func @pad_tensor(%arg0 : tensor<?x?xf32>, %arg1 : index, %arg2 : index,
-    %arg3 : index, %arg4 : index, %arg5 : f32) -> tensor<?x?xf32> {
-  %0 = linalg.pad_tensor %arg0 low[%arg1, %arg2] high[%arg3, %arg4] {
-    ^bb0(%arg6 : index, %arg7 : index):
-      linalg.yield %arg5 : f32
-  } {__internal_linalg_transform__ = "tiling_input"}
-      :  tensor<?x?xf32> to tensor<?x?xf32>
-  return %0 : tensor<?x?xf32>
-}
-//  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0, s1, s2] -> (s2 + s0 + s1)>
-//      CHECK: func @pad_tensor
-// CHECK-SAME:   %[[ARG0:[a-zA-Z0-9]+]]: tensor<?x?xf32>
-// CHECK-SAME:   %[[ARG1:[a-zA-Z0-9]+]]: index
-// CHECK-SAME:   %[[ARG2:[a-zA-Z0-9]+]]: index
-// CHECK-SAME:   %[[ARG3:[a-zA-Z0-9]+]]: index
-// CHECK-SAME:   %[[ARG4:[a-zA-Z0-9]+]]: index
-// CHECK-SAME:   %[[ARG5:[a-zA-Z0-9]+]]: f32
-//  CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
-//  CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
-//  CHECK-DAG:   %[[C10:.+]] = arith.constant 10 : index
-//  CHECK-DAG:   %[[C20:.+]] = arith.constant 20 : index
-//  CHECK-DAG:   %[[INIT:.+]] = linalg.init_tensor
-//      CHECK:   %[[D0:.+]] = tensor.dim %[[ARG0]], %[[C0]]
-//      CHECK:   %[[UBY:.+]] = affine.apply #[[MAP0]]()[%[[ARG1]], %[[ARG3]], %[[D0]]]
-//      CHECK:   %[[D1:.+]] = tensor.dim %[[ARG0]], %[[C1]]
-//      CHECK:   %[[UBX:.+]] = affine.apply #[[MAP0]]()[%[[ARG2]], %[[ARG4]], %[[D1]]]
-//      CHECK:   %[[RESULT:.+]] = scf.for %[[IV0:[a-zA-Z0-9]+]] = %[[C0]] to %[[UBY]] step %[[C10]]
-// CHECK-SAME:       iter_args(%[[ARG7:.+]] = %[[INIT]])
-//      CHECK:     %[[YIELD:.+]] = scf.for %[[IV1:[a-zA-Z0-9]+]] = %[[C0]] to %[[UBX]] step %[[C20]]
-// CHECK-SAME:         iter_args(%[[ARG9:.+]] = %[[ARG7]])
-//      CHECK:       %[[PAD_TILE:.+]] = scf.if
-//      CHECK:       %[[INSERT:.+]] = tensor.insert_slice %[[PAD_TILE]] into %[[ARG9]]
-// CHECK-SAME:           [%[[IV0]], %[[IV1]]]
-//      CHECK:       scf.yield %[[INSERT]]
-//      CHECK:     scf.yield %[[YIELD]]
-//      CHECK:   return %[[RESULT]]
-
-// -----
-
 func @scan_1d(%0: tensor<128xi32>) -> tensor<128xi32> {
   %c0 = linalg.init_tensor [] : tensor<i32>
   %1 = linalg.init_tensor [128] : tensor<128xi32>
@@ -1256,7 +1217,7 @@ func @scan_2d(%0: tensor<16x32xi32>) -> tensor<16x32xi32> {
 //      CHECK:    %[[C20:.+]] = arith.constant 20 : index
 //      CHECK:    %[[ACC:.+]] = linalg.init_tensor [32] : tensor<32xi32>
 //      CHECK:    %[[OUTPUT:.+]] = linalg.init_tensor [16, 32] : tensor<16x32xi32>
-//      CHECK:    %[[RESULT:.+]]:2 = scf.for %[[I:.+]] = %[[C0]] to %[[C32]] step %[[C20]] 
+//      CHECK:    %[[RESULT:.+]]:2 = scf.for %[[I:.+]] = %[[C0]] to %[[C32]] step %[[C20]]
 // CHECK-SAME:      iter_args(%[[ARG2:.+]] = %[[OUTPUT]], %[[ARG3:.+]] = %[[ACC]])
 //      CHECK:      %[[SIZE:.+]] = affine.min #[[MAP0]](%[[I]])[%[[C20]], %[[C32]]]
 //      CHECK:      %[[UPDATE_SLICE_IN:.+]] = tensor.extract_slice %[[ARG0]][0, %[[I]]] [%[[C16]], %[[SIZE]]]

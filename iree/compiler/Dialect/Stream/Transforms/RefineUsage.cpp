@@ -325,7 +325,7 @@ struct ApplyStreamableOp : public UsageRefinementPattern<Op> {
 
 static void insertUsageRefinementPatterns(MLIRContext *context,
                                           ResourceUsageAnalysis &analysis,
-                                          OwningRewritePatternList &patterns) {
+                                          RewritePatternSet &patterns) {
   patterns.insert<ApplyInitializerOp, ApplyFuncOp>(context, analysis);
   patterns.insert<ApplyGenericOp<IREE::Util::DoNotOptimizeOp>,
                   ApplyGenericOp<mlir::SelectOp>, ApplyGenericOp<mlir::CallOp>>(
@@ -376,7 +376,7 @@ class RefineUsagePass : public RefineUsageBase<RefineUsagePass> {
     }
 
     // Query and apply analysis results to all resources in the program.
-    OwningRewritePatternList patterns(&getContext());
+    RewritePatternSet patterns(&getContext());
     insertUsageRefinementPatterns(&getContext(), analysis, patterns);
     FrozenRewritePatternSet frozenPatterns(std::move(patterns));
     if (failed(applyPatternsAndFoldGreedily(moduleOp, frozenPatterns))) {

@@ -92,7 +92,7 @@ RUN apt-get update \
   && python3 -m pip install --upgrade pip \
   && python3 -m pip install \
     numpy==1.19.4 absl-py==0.12.0 requests PyYAML==5.4.1 wheel==0.36.2 \
-    pybind11==2.6.1
+    pybind11==2.9.0
 
 ENV PYTHON_BIN /usr/bin/python3
 

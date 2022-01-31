@@ -58,6 +58,7 @@ option(IREE_BUILD_PYTHON_BINDINGS "Builds the IREE python bindings" OFF)
 #-------------------------------------------------------------------------------
 
 option(IREE_BUILD_EXPERIMENTAL_REMOTING "Builds experimental remoting support." OFF)
+option(IREE_BUILD_EXPERIMENTAL_WEB_SAMPLES "Builds experimental web samples." OFF)
 option(IREE_HAL_DRIVER_EXPERIMENTAL_ROCM "Builds the experimental ROCm Backend." OFF)
 
 #-------------------------------------------------------------------------------
@@ -217,6 +218,7 @@ include(iree_add_all_subdirs)
 include(iree_check_test)
 include(iree_trace_runner_test)
 include(iree_native_test)
+include(iree_cc_binary_benchmark)
 include(iree_benchmark_suite)
 include(iree_hal_cts_test_suite)
 
@@ -389,7 +391,6 @@ endif()
 include(external_cc_library)
 include(flatbuffer_c_library)
 
-add_subdirectory(build_tools/third_party/cuda EXCLUDE_FROM_ALL)
 add_subdirectory(build_tools/third_party/libyaml EXCLUDE_FROM_ALL)
 add_subdirectory(build_tools/third_party/stblib EXCLUDE_FROM_ALL)
 add_subdirectory(build_tools/third_party/vulkan_memory_allocator EXCLUDE_FROM_ALL)
@@ -536,6 +537,10 @@ if(${IREE_BUILD_EXPERIMENTAL_REMOTING})
     add_subdirectory(build_tools/third_party/liburing EXCLUDE_FROM_ALL)
   endif()
   add_subdirectory(experimental/remoting)
+endif()
+
+if(${IREE_BUILD_EXPERIMENTAL_WEB_SAMPLES})
+  add_subdirectory(experimental/sample_web_static)
 endif()
 
 set(IREE_PUBLIC_INCLUDE_DIRS "${IREE_COMMON_INCLUDE_DIRS}"

@@ -197,7 +197,7 @@ struct ConvertTensorExportOp
 
 void populateHALToStreamConversionPatterns(MLIRContext *context,
                                            TypeConverter &typeConverter,
-                                           OwningRewritePatternList &patterns) {
+                                           RewritePatternSet &patterns) {
   typeConverter.addConversion(
       [](IREE::HAL::BufferViewType type) { return type; });
   patterns.insert<ConvertTensorImportOp>(typeConverter, context);
@@ -207,7 +207,7 @@ void populateHALToStreamConversionPatterns(MLIRContext *context,
 void populateHALToStreamConversionPatterns(MLIRContext *context,
                                            ConversionTarget &conversionTarget,
                                            TypeConverter &typeConverter,
-                                           OwningRewritePatternList &patterns) {
+                                           RewritePatternSet &patterns) {
   conversionTarget.addDynamicallyLegalOp<IREE::HAL::TensorImportOp>(
       [&](IREE::HAL::TensorImportOp op) {
         return typeConverter.isLegal(op.source().getType()) &&

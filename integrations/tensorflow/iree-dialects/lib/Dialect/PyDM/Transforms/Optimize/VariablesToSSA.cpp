@@ -173,7 +173,8 @@ struct VariablesToSSAPass : public VariablesToSSABase<VariablesToSSAPass> {
       auto loadOp = llvm::cast<LoadVarOp>(genericLoadOp);
       loadVarTypes.emplace_back(loadOp.getLoc(), loadOp.var(),
                                 loadOp.getResult().getType());
-      Value newArg = block.addArgument(loadOp.getResult().getType());
+      Value newArg = block.addArgument(loadOp.getResult().getType(),
+                                       genericLoadOp->getLoc());
       info.blockArgVariableValueMap[loadOp.var()] = newArg;
       loadOp.getResult().replaceAllUsesWith(newArg);
       loadOp->erase();

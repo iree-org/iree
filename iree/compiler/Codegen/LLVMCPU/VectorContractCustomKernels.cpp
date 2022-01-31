@@ -454,7 +454,7 @@ class VectorContractCustomKernelsPass
   }
   void runOnOperation() override {
     MLIRContext *context = &getContext();
-    OwningRewritePatternList patterns(context);
+    RewritePatternSet patterns(context);
     populateVectorContractCustomKernelsPatterns(target_info, patterns);
     if (failed(applyPatternsAndFoldGreedily(getOperation(),
                                             std::move(patterns)))) {
@@ -469,8 +469,7 @@ class VectorContractCustomKernelsPass
 }  // namespace
 
 void populateVectorContractCustomKernelsPatterns(
-    const CustomKernelsTargetInfo &target_info,
-    OwningRewritePatternList &patterns) {
+    const CustomKernelsTargetInfo &target_info, RewritePatternSet &patterns) {
   MLIRContext *context = patterns.getContext();
   if (target_info.aarch64 && target_info.dotprod) {
     if (target_info.intrinsics) {

@@ -79,52 +79,6 @@ static Value getF32Const(ImplicitLocOpBuilder b, ArrayRef<int64_t> shapes,
       .getResult();
 }
 
-static Value getF32SplatConst(ImplicitLocOpBuilder b, ArrayRef<int64_t> shapes,
-                              float value) {
-  return getF32Const(b, shapes, {value});
-}
-
-class DecomposeLog1PPattern : public OpRewritePattern<mhlo::Log1pOp> {
- public:
-  using OpRewritePattern<mhlo::Log1pOp>::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(mhlo::Log1pOp op,
-                                PatternRewriter &rewriter) const override {
-    Location loc = op.getLoc();
-    auto type = op.operand().getType().cast<TensorType>();
-    // https://github.com/google/iree/issues/8083
-    if (!type.hasStaticShape()) {
-      return rewriter.notifyMatchFailure(op, "TODO: Support dynamic shape");
-    }
-    DenseElementsAttr attr =
-        DenseElementsAttr::get(type, rewriter.getF32FloatAttr(1.0));
-    auto one = rewriter.create<arith::ConstantOp>(loc, attr);
-    auto x = rewriter.create<mhlo::AddOp>(loc, op.operand(), one);
-    rewriter.replaceOpWithNewOp<mhlo::LogOp>(op, x);
-    return success();
-  }
-};
-
-class DecomposeExpM1Pattern : public OpRewritePattern<mhlo::Expm1Op> {
- public:
-  using OpRewritePattern<mhlo::Expm1Op>::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(mhlo::Expm1Op op,
-                                PatternRewriter &rewriter) const override {
-    Location loc = op.getLoc();
-    auto type = op.operand().getType().cast<TensorType>();
-    // https://github.com/google/iree/issues/8083
-    if (!type.hasStaticShape()) {
-      return rewriter.notifyMatchFailure(op, "TODO: Support dynamic shape");
-    }
-    DenseElementsAttr attr =
-        DenseElementsAttr::get(type, rewriter.getF32FloatAttr(1.0));
-    auto one = rewriter.create<arith::ConstantOp>(loc, attr);
-    auto x = rewriter.create<mhlo::ExpOp>(loc, op.operand());
-    rewriter.replaceOpWithNewOp<mhlo::SubOp>(op, x, one);
-    return success();
-  }
-};
 
 class ExtractConvOpPaddingAttributes : public OpRewritePattern<mhlo::ConvOp> {
  public:
@@ -805,7 +759,7 @@ struct MHLOToMHLOPreprocessingPass
   void runOnOperation() override {
     MLIRContext *context = &getContext();
     ConversionTarget conversionTarget(*context);
-    OwningRewritePatternList conversionPatterns(&getContext());
+    RewritePatternSet conversionPatterns(&getContext());
     // Note that various input modalities may do their own legalization of
     // CHLO. Converting here allows IREE to accept CHLO dialect regardless of
     // whether it was legalized away at a higher level.
@@ -820,15 +774,14 @@ struct MHLOToMHLOPreprocessingPass
       return signalPassFailure();
     }
 
-    OwningRewritePatternList patterns(&getContext());
+    RewritePatternSet patterns(&getContext());
     // TODO: Remove once we have a general contraction to matmul pass.
     mhlo::PopulateEinsumToDotGeneralPatterns(context, &patterns);
     mhlo::PopulateUnfuseBatchNormPatterns(context, &patterns);
     mhlo::PopulateComplexLoweringPatterns(context, &patterns);
     mhlo::PopulateGatherToTorchIndexSelectPatterns(context, &patterns);
     patterns.insert<ExtractReduceWindowOpPaddingAttributes,
-                    AdjustDepthwiseFilterShape, DecomposeLog1PPattern,
-                    DecomposeExpM1Pattern, ExpandRngNormal>(context);
+                    AdjustDepthwiseFilterShape, ExpandRngNormal>(context);
 
     // dot_general canoncalization patterns.
     mhlo::PopulateGeneralDotOpLoweringPatterns(&patterns, context);

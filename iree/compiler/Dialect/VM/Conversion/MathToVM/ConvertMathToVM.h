@@ -16,7 +16,7 @@ namespace iree_compiler {
 // Appends math dialect to vm dialect patterns to the given pattern list.
 void populateMathToVMPatterns(MLIRContext *context,
                               TypeConverter &typeConverter,
-                              OwningRewritePatternList &patterns);
+                              RewritePatternSet &patterns);
 
 }  // namespace iree_compiler
 }  // namespace mlir

@@ -11,8 +11,24 @@
 
 namespace mlir {
 
+/// Struct to control pass options for `LinalgFuse` pass.
+struct LinalgFusePassOptions {
+  std::string anchorFuncOpName = "";
+  std::string anchorOpName = "";
+  SmallVector<int64_t> tileSizes = {};
+  SmallVector<int64_t> tileInterchange = {};
+  bool pad = false;
+  SmallVector<int64_t> packPaddings = {};
+  SmallVector<int64_t> hoistPaddings = {};
+  bool vectorize = false;
+  bool vectorizePadding = false;
+  int64_t tilingLevel = -1;
+};
+
 /// Creates a pass to drive tile + fuse transformations of `LinalgOp`s.
 std::unique_ptr<OperationPass<FuncOp>> createLinalgFusePass();
+std::unique_ptr<OperationPass<FuncOp>> createLinalgFusePass(
+    const LinalgFusePassOptions &options);
 
 /// Struct to control pass options for `LinalgSingleTilingExpert` pass.
 struct LinalgSingleTilingExpertPassOptions {

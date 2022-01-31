@@ -36,7 +36,7 @@ class ApplyPatternsPass
 
   void runOnOperation() override {
     auto *context = &getContext();
-    OwningRewritePatternList patterns(context);
+    RewritePatternSet patterns(context);
 
     for (auto *dialect : context->getLoadedDialects()) {
       dialect->getCanonicalizationPatterns(patterns);

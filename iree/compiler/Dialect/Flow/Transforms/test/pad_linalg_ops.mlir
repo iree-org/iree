@@ -8,9 +8,9 @@ func @matmul_f32_11x13x17(%lhs: tensor<11x17xf32>, %rhs: tensor<17x13xf32>, %ini
 //  CHECK-SAME:   %[[LHS:.+]]: tensor<11x17xf32>
 //  CHECK-SAME:   %[[RHS:.+]]: tensor<17x13xf32>
 //  CHECK-SAME:   %[[DST:.+]]: tensor<11x13xf32>
-//   CHECK-DAG:      %[[PADDED_LHS:.+]] = linalg.pad_tensor %[[LHS]]
-//   CHECK-DAG:      %[[PADDED_RHS:.+]] = linalg.pad_tensor %[[RHS]]
-//   CHECK-DAG:      %[[PADDED_DST:.+]] = linalg.pad_tensor %[[DST]]
+//   CHECK-DAG:      %[[PADDED_LHS:.+]] = tensor.pad %[[LHS]]
+//   CHECK-DAG:      %[[PADDED_RHS:.+]] = tensor.pad %[[RHS]]
+//   CHECK-DAG:      %[[PADDED_DST:.+]] = tensor.pad %[[DST]]
 //       CHECK:      %[[PADDED_RESULT:.+]] = linalg.matmul
 //  CHECK-SAME:         ins(%[[PADDED_LHS]], %[[PADDED_RHS]] : tensor<12x20xf32>, tensor<20x16xf32>)
 //  CHECK-SAME:         outs(%[[PADDED_DST]] : tensor<12x16xf32>)
@@ -27,8 +27,8 @@ func @matmul_f32_12x12x17(%lhs: tensor<12x17xf32>, %rhs: tensor<17x12xf32>, %ini
 //  CHECK-SAME:   %[[LHS:.+]]: tensor<12x17xf32>
 //  CHECK-SAME:   %[[RHS:.+]]: tensor<17x12xf32>
 //  CHECK-SAME:   %[[DST:.+]]: tensor<12x12xf32>
-//   CHECK-DAG:      %[[PADDED_LHS:.+]] = linalg.pad_tensor %[[LHS]]
-//   CHECK-DAG:      %[[PADDED_RHS:.+]] = linalg.pad_tensor %[[RHS]]
+//   CHECK-DAG:      %[[PADDED_LHS:.+]] = tensor.pad %[[LHS]]
+//   CHECK-DAG:      %[[PADDED_RHS:.+]] = tensor.pad %[[RHS]]
 //       CHECK:      %[[RESULT:.+]] = linalg.matmul
 //  CHECK-SAME:         ins(%[[PADDED_LHS]], %[[PADDED_RHS]] : tensor<12x20xf32>, tensor<20x12xf32>)
 //  CHECK-SAME:         outs(%[[DST]] : tensor<12x12xf32>)
@@ -45,9 +45,9 @@ func @matmul_i8_i8_i32_2x2x4(%lhs: tensor<2x4xi8>, %rhs: tensor<4x2xi8>, %dst: t
 //  CHECK-SAME:   %[[LHS:.+]]: tensor<2x4xi8>
 //  CHECK-SAME:   %[[RHS:.+]]: tensor<4x2xi8>
 //  CHECK-SAME:   %[[DST:.+]]: tensor<2x2xi32>
-//   CHECK-DAG:      %[[PADDED_LHS:.+]] = linalg.pad_tensor %[[LHS]]
-//   CHECK-DAG:      %[[PADDED_RHS:.+]] = linalg.pad_tensor %[[RHS]]
-//   CHECK-DAG:      %[[PADDED_DST:.+]] = linalg.pad_tensor %[[DST]]
+//   CHECK-DAG:      %[[PADDED_LHS:.+]] = tensor.pad %[[LHS]]
+//   CHECK-DAG:      %[[PADDED_RHS:.+]] = tensor.pad %[[RHS]]
+//   CHECK-DAG:      %[[PADDED_DST:.+]] = tensor.pad %[[DST]]
 //       CHECK:      %[[PADDED_RESULT:.+]] = linalg.matmul
 //  CHECK-SAME:         ins(%[[PADDED_LHS]], %[[PADDED_RHS]] : tensor<4x4xi8>, tensor<4x4xi8>)
 //  CHECK-SAME:         outs(%[[PADDED_DST]] : tensor<4x4xi32>)

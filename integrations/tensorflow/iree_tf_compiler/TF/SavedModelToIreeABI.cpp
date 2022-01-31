@@ -21,6 +21,7 @@
 #include "iree_tf_compiler/TF/Passes.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/JSON.h"
+#include "mlir/Dialect/Affine/Utils.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/MLIRContext.h"
@@ -29,7 +30,6 @@
 #include "mlir/Pass/PassRegistry.h"
 #include "mlir/Support/LLVM.h"
 #include "mlir/Support/LogicalResult.h"
-#include "mlir/Transforms/Utils.h"
 #include "tensorflow/compiler/mlir/tensorflow/ir/tf_ops.h"
 #include "tensorflow/compiler/mlir/tensorflow/ir/tf_saved_model.h"
 
@@ -409,8 +409,8 @@ LogicalResult materializeABIWrapper(ModuleOp module, FuncOp internalFunc,
                                     StringRef exportedName) {
   Location loc = internalFunc.getLoc();
   OpBuilder builder(internalFunc);
-  const Identifier savedModelIndexPathIdent =
-      builder.getIdentifier("tf_saved_model.index_path");
+  const StringAttr savedModelIndexPathIdent =
+      builder.getStringAttr("tf_saved_model.index_path");
   FunctionType internalFuncType = internalFunc.getType();
   json::Array refArgs;
   json::Array refReturns;
@@ -585,8 +585,8 @@ class SavedModelToIREEABIPass
 
   LogicalResult run() {
     mlir::Builder builder(getOperation());
-    const Identifier savedModelIndexPathIdent =
-        builder.getIdentifier("tf_saved_model.index_path");
+    const StringAttr savedModelIndexPathIdent =
+        builder.getStringAttr("tf_saved_model.index_path");
     (void)savedModelIndexPathIdent;
 
     // Handle saved model exported functions.

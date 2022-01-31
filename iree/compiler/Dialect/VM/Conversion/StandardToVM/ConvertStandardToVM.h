@@ -16,7 +16,7 @@ namespace iree_compiler {
 // Appends standard dialect to vm dialect patterns to the given pattern list.
 void populateStandardToVMPatterns(MLIRContext *context,
                                   TypeConverter &typeConverter,
-                                  OwningRewritePatternList &patterns);
+                                  RewritePatternSet &patterns);
 
 }  // namespace iree_compiler
 }  // namespace mlir

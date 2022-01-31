@@ -11,7 +11,7 @@
 
 #include "iree/compiler/Codegen/Dialect/LoweringConfig.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
-#include "mlir/Dialect/Linalg/ComprehensiveBufferize/BufferizableOpInterface.h"
+#include "mlir/Dialect/Bufferization/IR/BufferizableOpInterface.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassOptions.h"
@@ -47,10 +47,13 @@ using WorkgroupMemoryAllocationFn = std::function<Value(
 void addLinalgBufferizePasses(
     OpPassManager &passManager,
     WorkgroupMemoryAllocationFn allocationFn = nullptr);
+
+using bufferization::BufferizationOptions;
 void addIREEComprehensiveBufferizePasses(
     OpPassManager &passManager,
-    std::unique_ptr<linalg::comprehensive_bufferize::AllocationCallbacks>
-        allocationFn = nullptr);
+    Optional<BufferizationOptions::AllocationFn> allocationFn = None,
+    Optional<BufferizationOptions::DeallocationFn> deallocationFn = None,
+    Optional<BufferizationOptions::MemCpyFn> memCpyFn = None);
 
 /// Pass to perform canonicalizations/cleanups related to HAL interface/buffer
 /// allocations and view operations.
@@ -89,8 +92,9 @@ std::unique_ptr<OperationPass<FuncOp>> createForOpCanonicalizationPass();
 std::unique_ptr<OperationPass<FuncOp>> createLinalgBufferizePass(
     WorkgroupMemoryAllocationFn allocationFn = nullptr);
 std::unique_ptr<OperationPass<ModuleOp>> createIREEComprehensiveBufferizePass(
-    std::unique_ptr<linalg::comprehensive_bufferize::AllocationCallbacks> =
-        nullptr);
+    Optional<BufferizationOptions::AllocationFn> allocationFn = None,
+    Optional<BufferizationOptions::DeallocationFn> deallocationFn = None,
+    Optional<BufferizationOptions::MemCpyFn> memCpyFn = None);
 
 /// Creates a pass to remove single iteration distributed loops.
 std::unique_ptr<OperationPass<FuncOp>> createRemoveSingleIterationLoopPass();
@@ -110,11 +114,19 @@ std::unique_ptr<OperationPass<FuncOp>> createLinalgToVectorVectorizeMMT4dPass();
 /// Pass to optimize vector transfer_read and transfer_write.
 std::unique_ptr<OperationPass<FuncOp>> createOptimizeVectorTransferPass();
 
+/// Pass to propagate type to avoid generating load/stores of illegal types.
+std::unique_ptr<OperationPass<FuncOp>> createTypePropagationPass();
+
 /// Sets the number of workgroups to use for each entry point in the dispatch
 /// region.
 std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
 createSetNumWorkgroupsPass(ArrayRef<int64_t> workgroupSize = {});
 
+/// Pass to optimize vector transfer_read and transfer_write.
+std::unique_ptr<OperationPass<FuncOp>> createOptimizeVectorTransferPass();
+
+/// Pass to convert math operations to their polynomial approximation.
+std::unique_ptr<OperationPass<>> createPolynomialApproximationPass();
 //----------------------------------------------------------------------------//
 // Common codegen patterns.
 //----------------------------------------------------------------------------//
@@ -128,12 +140,12 @@ void populateFoldAffineMinInDistributedLoopsPatterns(
 /// linalg.conv op for a single thread. The linalg.conv should compute on
 /// static-sized subviews. To match, output shape must be 1x1xWoxCo, where Co
 /// Co is a multiple of 4, and filter shape must be 1x1x4xCo.
-void populateLinalgToVectorVectorizeConvPatterns(
-    MLIRContext *context, OwningRewritePatternList &patterns);
+void populateLinalgToVectorVectorizeConvPatterns(MLIRContext *context,
+                                                 RewritePatternSet &patterns);
 
 /// Populates `patterns` to convert linalg.mmt4d to vector.contract.
-void populateLinalgToVectorVectorizeMMT4dPatterns(
-    MLIRContext *context, OwningRewritePatternList &patterns);
+void populateLinalgToVectorVectorizeMMT4dPatterns(MLIRContext *context,
+                                                  RewritePatternSet &patterns);
 
 //------------------------------------------------------------------------------
 // LLVMCPU
@@ -207,11 +219,10 @@ LogicalResult InferCustomKernelsTargetInfoFromParent(
 /// Populates `patterns` to convert certain vector.contract ops to special
 /// "kernels" written either in SIMD intrinsics or inline assembly.
 void populateVectorContractCustomKernelsPatterns(
-    const CustomKernelsTargetInfo &target_info,
-    OwningRewritePatternList &patterns);
+    const CustomKernelsTargetInfo &target_info, RewritePatternSet &patterns);
 
 void populateUnfusedFMAOpsPassPatterns(MLIRContext *context,
-                                       OwningRewritePatternList &patterns);
+                                       RewritePatternSet &patterns);
 
 //----------------------------------------------------------------------------//
 // LLVMCPU backend Pass Pipelines.
@@ -237,6 +248,10 @@ void addSingleTilingExpertPassPipeline(OpPassManager &passManager);
 
 /// Populates the passes needed to do two-level tile + vectorize of linalg ops
 /// using the Codegen drivers from sandbox.
+LogicalResult verifyDoubleTilingExpertPassPipelineConfig(
+    Operation *op, IREE::Codegen::LoweringConfigAttr loweringConfig,
+    IREE::Codegen::TranslationInfoAttr translationInfo,
+    ArrayRef<int64_t> workgroupSize = {});
 void addDoubleTilingExpertPassPipeline(OpPassManager &passManager);
 
 /// Populates the passes needed to multi level tile, fuse and vectorize lowering

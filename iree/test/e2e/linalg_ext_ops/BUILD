@@ -13,29 +13,30 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
-iree_check_single_backend_test_suite(
-    name = "check_cuda",
-    srcs = enforce_glob(
-        # keep sorted
-        [
-            "reverse.mlir",
-            "scan.mlir",
-        ],
-        include = ["*.mlir"],
-        exclude = [
-        ],
-    ),
-    driver = "cuda",
-    tags = [
-        # CUDA cuInit fails with sanitizer on.
-        "noasan",
-        "nomsan",
-        "notsan",
-        "noubsan",
-        "requires-gpu-nvidia",
-    ],
-    target_backend = "cuda",
-)
+# Temporarily disabled pending build system changes.
+# iree_check_single_backend_test_suite(
+#     name = "check_cuda",
+#     srcs = enforce_glob(
+#         # keep sorted
+#         [
+#             "reverse.mlir",
+#             "scan.mlir",
+#         ],
+#         include = ["*.mlir"],
+#         exclude = [
+#         ],
+#     ),
+#     driver = "cuda",
+#     tags = [
+#         # CUDA cuInit fails with sanitizer on.
+#         "noasan",
+#         "nomsan",
+#         "notsan",
+#         "noubsan",
+#         "requires-gpu-nvidia",
+#     ],
+#     target_backend = "cuda",
+# )
 
 iree_check_single_backend_test_suite(
     name = "check_dylib-llvm-aot_dylib",

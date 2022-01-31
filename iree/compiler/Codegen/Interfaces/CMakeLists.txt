@@ -32,15 +32,16 @@ iree_cc_library(
     "BufferizationInterfaces.cpp"
   DEPS
     MLIRAffineBufferizableOpInterfaceImpl
-    MLIRArithBufferizableOpInterfaceImpl
-    MLIRBufferizableOpInterface
-    MLIRComprehensiveBufferize
+    MLIRArithmeticTransforms
+    MLIRBufferization
+    MLIRBufferizationTransforms
     MLIRLinalgBufferizableOpInterfaceImpl
     MLIRMemRef
+    MLIRModuleBufferization
     MLIRSCFBufferizableOpInterfaceImpl
     MLIRStdBufferizableOpInterfaceImpl
     MLIRSupport
-    MLIRTensorBufferizableOpInterfaceImpl
+    MLIRTensorTransforms
     MLIRVectorBufferizableOpInterfaceImpl
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::HAL::IR

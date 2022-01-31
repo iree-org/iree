@@ -8,6 +8,7 @@
 #define IREE_DIALECTS_DIALECT_PYDM_IR_PYDM_OPS_TD
 
 include "iree-dialects/Dialect/PyDM/IR/PyDMDialect.td"
+include "mlir/IR/FunctionInterfaces.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/Interfaces/CallInterfaces.td"
 include "mlir/Interfaces/ControlFlowInterfaces.td"
@@ -98,7 +99,7 @@ def IREEPyDM_StoreVarOp : IREEPyDM_Op<"store_var", [MemoryEffects<[MemWrite]>]> 
 // cell_vars attributes (with better modeling, they may not be needed at all).
 def IREEPyDM_FuncOp : IREEPyDM_Op<"func", [
     IsolatedFromAbove,
-    FunctionLike,
+    FunctionOpInterface,
     CallableOpInterface,
     Symbol,
     DeclareOpInterfaceMethods<OpAsmOpInterface, ["getDefaultDialect"]>]> {
@@ -147,19 +148,16 @@ def IREEPyDM_FuncOp : IREEPyDM_Op<"func", [
           .cast<FunctionType>();
     }
 
+    /// Returns the argument types of this function.
+    ArrayRef<Type> getArgumentTypes() { return getType().getInputs(); }
+
+    /// Returns the result types of this function.
+    ArrayRef<Type> getResultTypes() { return getType().getResults(); }
+
     /// Returns the python return type of the function (second return type).
     Type getPyReturnType() {
       return getType().getResult(1);
     }
-
-    /// Hook for OpTrait::FunctionLike, returns the number of function
-    /// arguments. Depends on the type attribute being correct as checked by
-    /// verifyType.
-    unsigned getNumFuncArguments() { return getType().getInputs().size(); }
-
-    /// Hook for OpTrait::FunctionLike, returns the number of function results.
-    /// Depends on the type attribute being correct as checked by verifyType.
-    unsigned getNumFuncResults() { return getType().getResults().size(); }
 
     /// Hook for OpTrait::FunctionLike, called after verifying that the 'type'
     /// attribute is present. This can check for preconditions of the

@@ -147,7 +147,7 @@ struct LinalgToVectorVectorizeMMT4dPass
 
   void runOnOperation() override {
     MLIRContext *context = &getContext();
-    OwningRewritePatternList patterns(&getContext());
+    RewritePatternSet patterns(&getContext());
     patterns.insert<VectorizeMMT4DOp>(context);
     if (failed(applyPatternsAndFoldGreedily(getOperation(),
                                             std::move(patterns)))) {
@@ -158,8 +158,8 @@ struct LinalgToVectorVectorizeMMT4dPass
 
 }  // namespace
 
-void populateLinalgToVectorVectorizeMMT4dPatterns(
-    MLIRContext *context, OwningRewritePatternList &patterns) {
+void populateLinalgToVectorVectorizeMMT4dPatterns(MLIRContext *context,
+                                                  RewritePatternSet &patterns) {
   patterns.insert<VectorizeMMT4DOp>(context);
 }
 
