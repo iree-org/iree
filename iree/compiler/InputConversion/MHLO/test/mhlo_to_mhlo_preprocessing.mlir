@@ -111,24 +111,6 @@ func @reduce_window_variadic(%input0: tensor<1x16x16x64xf32>, %input1: tensor<1x
 
 // -----
 
-func @log_plus_one(%input: tensor<4xf32>) -> tensor<4xf32> {
-  // CHECK: mhlo.add
-  // CHECK: mhlo.log
-  %0 = "mhlo.log_plus_one"(%input) : (tensor<4xf32>) -> tensor<4xf32>
-  return %0: tensor<4xf32>
-}
-
-// -----
-
-func @exponential_minus_one(%input: tensor<4xf32>) -> tensor<4xf32> {
-  // CHECK: mhlo.exponential
-  // CHECK: mhlo.subtract
-  %0 = "mhlo.exponential_minus_one"(%input) : (tensor<4xf32>) -> tensor<4xf32>
-  return %0: tensor<4xf32>
-}
-
-// -----
-
 // CHECK: @reorder_broadcast_in_dim_scalar_binary(%[[ARG0:.*]]: tensor<f32>, %[[ARG1:.*]]: tensor<f32>, %[[ARG2:.*]]: tensor<i32>, %[[ARG3:.*]]: tensor<i32>)
 func @reorder_broadcast_in_dim_scalar_binary(%arg0: tensor<f32>, %arg1: tensor<f32>, %arg2: tensor<i32>, %arg3: tensor<i32>) -> (tensor<1x8x8x64xf32>, tensor<1x8x8x64xf32>, tensor<1x8x8x64xf32>, tensor<1x8x8x64xf32>, tensor<1x8x8x64xf32>, tensor<1x8x8x64xf32>, tensor<1x8x8x64xf32>, tensor<1x8x8x64xf32>, tensor<1x8x8x64xf32>, tensor<1x8x8x64xf32>, tensor<1x8x8x64xf32>, tensor<1x8x8x64xf32>, tensor<1x8x8x64xi32>, tensor<1x8x8x64xi32>, tensor<1x8x8x64xi32>) {
   // CHECK: %[[ADD:.*]] = mhlo.add %[[ARG0]], %[[ARG1]] : tensor<f32>
