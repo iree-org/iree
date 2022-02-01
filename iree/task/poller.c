@@ -183,8 +183,12 @@ static iree_status_t iree_task_poller_insert_wait_handle(
         iree_wait_source_export(task->wait_source, IREE_WAIT_PRIMITIVE_TYPE_ANY,
                                 iree_immediate_timeout(), &wait_primitive);
     if (iree_status_is_ok(status)) {
-      status = iree_wait_handle_wrap_primitive(
-          wait_primitive.type, wait_primitive.value, &wait_handle);
+      // Swap the wait handle with the exported handle so we can wake it later.
+      // It'd be ideal if we retained the wait handle separate so that we could
+      // still do fast queries for local wait sources.
+      iree_wait_handle_wrap_primitive(wait_primitive.type, wait_primitive.value,
+                                      &wait_handle);
+      status = iree_wait_source_import(wait_primitive, &task->wait_source);
     }
   }
 

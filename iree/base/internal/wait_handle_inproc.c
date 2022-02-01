@@ -177,10 +177,8 @@ iree_status_t iree_wait_set_insert(iree_wait_set_t* set,
   ++set->total_handle_count;
   iree_host_size_t index = set->handle_count++;
   iree_wait_handle_t* stored_handle = &set->handles[index];
-  // NOTE: can't fail with LOCAL_FUTEX.
-  IREE_IGNORE_ERROR(iree_wait_handle_wrap_primitive(handle.type, handle.value,
-                                                    stored_handle));
-  stored_handle->set_internal.dupe_count = 0;  // just us so far
+  iree_wait_handle_wrap_primitive(handle.type, handle.value, stored_handle);
+  user_handle->set_internal.dupe_count = 0;  // just us so far
 
   return iree_ok_status();
 }

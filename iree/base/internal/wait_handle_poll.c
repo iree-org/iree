@@ -188,8 +188,7 @@ iree_status_t iree_wait_set_insert(iree_wait_set_t* set,
   iree_host_size_t index = set->handle_count++;
 
   iree_wait_handle_t* user_handle = &set->user_handles[index];
-  IREE_IGNORE_ERROR(
-      iree_wait_handle_wrap_primitive(handle.type, handle.value, user_handle));
+  iree_wait_handle_wrap_primitive(handle.type, handle.value, user_handle);
 
   // NOTE: poll will ignore any negative fds.
   struct pollfd* poll_fd = &set->poll_fds[index];

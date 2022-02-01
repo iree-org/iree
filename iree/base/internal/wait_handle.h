@@ -59,7 +59,7 @@ static inline bool iree_wait_handle_is_immediate(iree_wait_handle_t handle) {
 // Initializes a wait handle with the given primitive type and value.
 // Wait handles do not retain the provided primitives and they must be kept
 // valid (allocated and open) for the duration any wait handle references them.
-iree_status_t iree_wait_handle_wrap_primitive(
+void iree_wait_handle_wrap_primitive(
     iree_wait_primitive_type_t primitive_type,
     iree_wait_primitive_value_t primitive_value,
     iree_wait_handle_t* out_handle);
