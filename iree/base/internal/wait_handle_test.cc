@@ -6,6 +6,8 @@
 
 #include "iree/base/internal/wait_handle.h"
 
+#if !defined(IREE_WAIT_HANDLE_DISABLED)
+
 #include <chrono>
 #include <cstddef>
 #include <cstring>
@@ -181,6 +183,35 @@ TEST(Event, BlockingBehavior) {
   thread.join();
   iree_event_deinitialize(&main_to_thread);
   iree_event_deinitialize(&thread_to_main);
+}
+
+// Tests using an iree_event_t as a wait source for waiting.
+TEST(Event, WaitSourceBlocking) {
+  iree_event_t event;
+  IREE_ASSERT_OK(iree_event_initialize(/*initial_state=*/false, &event));
+  iree_wait_source_t wait_source = iree_event_await(&event);
+
+  // Initially unset.
+  IREE_EXPECT_STATUS_IS(
+      IREE_STATUS_DEADLINE_EXCEEDED,
+      iree_wait_source_wait_one(wait_source, iree_immediate_timeout()));
+
+  // Set and wait.
+  iree_event_set(&event);
+  IREE_EXPECT_OK(
+      iree_wait_source_wait_one(wait_source, iree_immediate_timeout()));
+
+  // Set should be sticky until reset manually.
+  IREE_EXPECT_OK(
+      iree_wait_source_wait_one(wait_source, iree_immediate_timeout()));
+
+  // Resetting should unsignal the event.
+  iree_event_reset(&event);
+  IREE_EXPECT_STATUS_IS(
+      IREE_STATUS_DEADLINE_EXCEEDED,
+      iree_wait_source_wait_one(wait_source, iree_immediate_timeout()));
+
+  iree_event_deinitialize(&event);
 }
 
 //===----------------------------------------------------------------------===//
@@ -810,3 +841,5 @@ TEST(WaitSet, WaitOneBlocking) {
 
 }  // namespace
 }  // namespace iree
+
+#endif  // !IREE_WAIT_HANDLE_DISABLED

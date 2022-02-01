@@ -304,6 +304,37 @@ cc_test(
     ],
 )
 
+cc_library(
+    name = "wait_handle",
+    srcs = [
+        "wait_handle.c",
+        "wait_handle_epoll.c",
+        "wait_handle_impl.h",
+        "wait_handle_kqueue.c",
+        "wait_handle_null.c",
+        "wait_handle_poll.c",
+        "wait_handle_posix.c",
+        "wait_handle_posix.h",
+        "wait_handle_win32.c",
+    ],
+    hdrs = ["wait_handle.h"],
+    deps = [
+        "//iree/base",
+        "//iree/base:core_headers",
+        "//iree/base:tracing",
+    ],
+)
+
+cc_test(
+    name = "wait_handle_test",
+    srcs = ["wait_handle_test.cc"],
+    deps = [
+        ":wait_handle",
+        "//iree/testing:gtest",
+        "//iree/testing:gtest_main",
+    ],
+)
+
 #===------------------------------------------------------------------------===#
 # Utilities with thread dependencies
 #===------------------------------------------------------------------------===#
@@ -363,36 +394,6 @@ cc_test(
         ":synchronization",
         ":threading",
         "//iree/base:cc",
-        "//iree/testing:gtest",
-        "//iree/testing:gtest_main",
-    ],
-)
-
-cc_library(
-    name = "wait_handle",
-    srcs = [
-        "wait_handle.c",
-        "wait_handle_epoll.c",
-        "wait_handle_impl.h",
-        "wait_handle_kqueue.c",
-        "wait_handle_poll.c",
-        "wait_handle_posix.c",
-        "wait_handle_posix.h",
-        "wait_handle_win32.c",
-    ],
-    hdrs = ["wait_handle.h"],
-    deps = [
-        "//iree/base",
-        "//iree/base:core_headers",
-        "//iree/base:tracing",
-    ],
-)
-
-cc_test(
-    name = "wait_handle_test",
-    srcs = ["wait_handle_test.cc"],
-    deps = [
-        ":wait_handle",
         "//iree/testing:gtest",
         "//iree/testing:gtest_main",
     ],

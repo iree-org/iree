@@ -28,17 +28,24 @@
 // Active wait API implementation selection (wait_handle_*.c)
 //===----------------------------------------------------------------------===//
 
+#include "iree/base/config.h"
 #include "iree/base/target_platform.h"
 
-// Priorities are (kqueue|epoll) > ppoll > poll
-#define IREE_WAIT_API_POLL 1
-#define IREE_WAIT_API_PPOLL 2
-#define IREE_WAIT_API_EPOLL 3
-#define IREE_WAIT_API_KQUEUE 4
+// NOTE: order matters; priorities are (kqueue|epoll) > ppoll > poll.
+// When overridden with NULL (no platform primitives) or on Win32 we always use
+// those implementations (today).
+#define IREE_WAIT_API_NULL 0
+#define IREE_WAIT_API_WIN32 1
+#define IREE_WAIT_API_POLL 2
+#define IREE_WAIT_API_PPOLL 3
+#define IREE_WAIT_API_EPOLL 4
+#define IREE_WAIT_API_KQUEUE 5
 
 // NOTE: we could be tighter here, but we today only have win32 or not-win32.
-#if defined(IREE_PLATFORM_WINDOWS)
-#define IREE_WAIT_API 0  // WFMO used in wait_handle_win32.c
+#if IREE_SYNCHRONIZATION_DISABLE_UNSAFE
+#define IREE_WAIT_API IREE_WAIT_API_NULL
+#elif defined(IREE_PLATFORM_WINDOWS)
+#define IREE_WAIT_API IREE_WAIT_API_WIN32  // WFMO used in wait_handle_win32.c
 #else
 
 // TODO(benvanik): EPOLL on android/linux/bsd/etc.
@@ -52,7 +59,7 @@
 #define IREE_WAIT_API IREE_WAIT_API_POLL
 #endif  // insanity
 
-#endif  // IREE_PLATFORM_WINDOWS
+#endif  // IREE_SYNCHRONIZATION_DISABLE_UNSAFE / IREE_PLATFORM_WINDOWS
 
 //===----------------------------------------------------------------------===//
 // Wait handle included with options set

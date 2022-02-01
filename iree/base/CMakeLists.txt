@@ -26,9 +26,22 @@ iree_cc_library(
     "string_view.h"
     "time.c"
     "time.h"
+    "wait_source.c"
+    "wait_source.h"
   DEPS
     ::core_headers
     ::tracing
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    core_headers
+  HDRS
+    "alignment.h"
+    "attributes.h"
+    "config.h"
+    "target_platform.h"
   PUBLIC
 )
 
@@ -89,17 +102,6 @@ iree_cc_test(
     ::base
     iree::testing::gtest
     iree::testing::gtest_main
-)
-
-iree_cc_library(
-  NAME
-    core_headers
-  HDRS
-    "alignment.h"
-    "attributes.h"
-    "config.h"
-    "target_platform.h"
-  PUBLIC
 )
 
 iree_cc_library(

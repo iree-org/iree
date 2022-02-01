@@ -9,7 +9,7 @@
 #include "iree/base/tracing.h"
 
 // NOTE: we could be tighter here, but we today only have win32 or not-win32.
-#if !defined(IREE_PLATFORM_WINDOWS)
+#if IREE_WAIT_API != IREE_WAIT_API_NULL && IREE_WAIT_API != IREE_WAIT_API_WIN32
 
 #include <errno.h>
 #include <fcntl.h>
@@ -76,7 +76,7 @@ static iree_status_t iree_wait_primitive_create_pipe(
   if (initial_state) {
     iree_status_t status = iree_wait_primitive_write(out_handle);
     if (!iree_status_is_ok(status)) {
-      iree_wait_primitive_close(out_handle);
+      iree_wait_handle_close(out_handle);
       return status;
     }
   }
@@ -100,7 +100,7 @@ iree_status_t iree_wait_primitive_create_native(
 #endif  // IREE_HAVE_WAIT_TYPE_*
 }
 
-void iree_wait_primitive_close_fd(int fd) {
+static void iree_wait_handle_close_fd(int fd) {
   int rv;
   IREE_SYSCALL(rv, close(fd));
   // NOTE: we could fail to close if the handle is invalid/already closed/etc.
@@ -109,23 +109,23 @@ void iree_wait_primitive_close_fd(int fd) {
   // fine to ignore the error.
 }
 
-void iree_wait_primitive_close(iree_wait_handle_t* handle) {
+void iree_wait_handle_close(iree_wait_handle_t* handle) {
   switch (handle->type) {
 #if defined(IREE_HAVE_WAIT_TYPE_EVENTFD)
     case IREE_WAIT_PRIMITIVE_TYPE_EVENT_FD: {
-      iree_wait_primitive_close_fd(handle->value.event.fd);
+      iree_wait_handle_close_fd(handle->value.event.fd);
       break;
     }
 #endif  // IREE_HAVE_WAIT_TYPE_EVENTFD
 #if defined(IREE_HAVE_WAIT_TYPE_SYNC_FILE)
     case IREE_WAIT_PRIMITIVE_TYPE_SYNC_FILE:
-      iree_wait_primitive_close_fd(handle->value.sync_file.fd);
+      iree_wait_handle_close_fd(handle->value.sync_file.fd);
       break;
 #endif  // IREE_HAVE_WAIT_TYPE_SYNC_FILE
 #if defined(IREE_HAVE_WAIT_TYPE_PIPE)
     case IREE_WAIT_PRIMITIVE_TYPE_PIPE: {
-      iree_wait_primitive_close_fd(handle->value.pipe.read_fd);
-      iree_wait_primitive_close_fd(handle->value.pipe.write_fd);
+      iree_wait_handle_close_fd(handle->value.pipe.read_fd);
+      iree_wait_handle_close_fd(handle->value.pipe.write_fd);
       break;
     }
 #endif  // IREE_HAVE_WAIT_TYPE_PIPE
@@ -268,7 +268,7 @@ iree_status_t iree_event_initialize(bool initial_state,
 }
 
 void iree_event_deinitialize(iree_event_t* event) {
-  iree_wait_primitive_close(event);
+  iree_wait_handle_close(event);
 }
 
 void iree_event_set(iree_event_t* event) {
@@ -279,4 +279,4 @@ void iree_event_reset(iree_event_t* event) {
   IREE_IGNORE_ERROR(iree_wait_primitive_clear(event));
 }
 
-#endif  // !IREE_PLATFORM_WINDOWS
+#endif  // IREE_WAIT_API != IREE_WAIT_API_NULL || IREE_WAIT_API_WIN32
