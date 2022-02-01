@@ -66,6 +66,7 @@ cc_library(
         "@llvm-project//mlir:ROCDLDialect",
         "@llvm-project//mlir:SCFDialect",
         "@llvm-project//mlir:SCFToStandard",
+        "@llvm-project//mlir:SCFTransforms",
         "@llvm-project//mlir:StandardOps",
         "@llvm-project//mlir:StandardOpsTransforms",
         "@llvm-project//mlir:Support",

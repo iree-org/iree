@@ -93,6 +93,7 @@ cc_library(
         "@llvm-project//mlir:Pass",
         "@llvm-project//mlir:SCFBufferizableOpInterfaceImpl",
         "@llvm-project//mlir:SCFDialect",
+        "@llvm-project//mlir:SCFTransforms",
         "@llvm-project//mlir:SideEffectInterfaces",
         "@llvm-project//mlir:StandardOps",
         "@llvm-project//mlir:Support",
