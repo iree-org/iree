@@ -18,6 +18,7 @@ package(
 iree_lit_test_suite(
     name = "lit",
     srcs = enforce_glob(
+        # keep sorted
         [
             "check_ir_before_llvm_conversion.mlir",
             "hal_interface_bindings.mlir",
@@ -29,7 +30,8 @@ iree_lit_test_suite(
             "test_config_mmt4d.mlir",
             "tile_fuse_and_vectorize.mlir",
             "unfused_fma.mlir",
-            "vector_contract_custom_kernels.mlir",
+            "vector_contract_to_arm_asm.mlir",
+            "vector_contract_to_arm_intrinsics.mlir",
         ],
         include = ["*.mlir"],
     ),

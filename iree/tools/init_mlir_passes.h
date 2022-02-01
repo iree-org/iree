@@ -62,6 +62,9 @@ inline void registerMlirPasses() {
   // Linalg
   registerLinalgPasses();
 
+  // LLVM
+  registerConvertArmNeon2dToIntrPass();
+
   // MemRef
   memref::registerMemRefPasses();
 

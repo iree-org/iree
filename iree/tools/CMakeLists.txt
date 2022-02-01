@@ -275,6 +275,8 @@ if(${IREE_BUILD_COMPILER})
       MLIRTosa
       MLIRTosaTransforms
       MLIRTransforms
+      MLIRArmNeon
+      MLIRArmNeon2dToIntr
       MLIRVector
     PUBLIC
   )
@@ -373,6 +375,7 @@ if(${IREE_BUILD_COMPILER})
       ::init_xla_dialects
       LLVMSupport
       MLIRIR
+      MLIRArmNeonToLLVMIRTranslation
       MLIRLLVMToLLVMIRTranslation
       MLIRSCFTransforms
       MLIRPass

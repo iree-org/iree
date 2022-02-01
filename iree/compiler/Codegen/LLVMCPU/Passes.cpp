@@ -13,6 +13,7 @@
 #include "iree/compiler/Codegen/Sandbox/Passes.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "llvm/Support/CommandLine.h"
+#include "mlir/Conversion/ReconcileUnrealizedCasts/ReconcileUnrealizedCasts.h"
 #include "mlir/Conversion/SCFToStandard/SCFToStandard.h"
 #include "mlir/Dialect/Arithmetic/Transforms/Passes.h"
 #include "mlir/Dialect/Linalg/Passes.h"
@@ -320,6 +321,7 @@ static void addLowerToLLVMPasses(OpPassManager &passManager) {
   passManager.addNestedPass<FuncOp>(arith::createArithmeticExpandOpsPass());
   passManager.addNestedPass<FuncOp>(memref::createExpandOpsPass());
   passManager.addPass(createConvertToLLVMPass());
+  passManager.addPass(createReconcileUnrealizedCastsPass());
 
   // We rely on MLIR symbol visibility being correct after this point and need
   // to mirror the LLVM linkage that was assigned during conversion.

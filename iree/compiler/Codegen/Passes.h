@@ -200,6 +200,8 @@ struct CustomKernelsTargetInfo {
   bool aarch64 = false;
   // Under aarch64: indicates dot-product extension (SDOT, UDOT)
   bool dotprod = false;
+  // Indicates that intrinsics should be used rather than inline asm
+  bool intrinsics = false;
 };
 
 // Populate target_info fields from the parent HAL::ExecutableVariantOp.

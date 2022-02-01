@@ -43,6 +43,7 @@ iree_cc_library(
     LLVMWebAssemblyCodeGen
     LLVMX86AsmParser
     LLVMX86CodeGen
+    MLIRArmNeon
     MLIRLLVMIR
     MLIRLLVMToLLVMIRTranslation
     MLIRTargetLLVMIRExport

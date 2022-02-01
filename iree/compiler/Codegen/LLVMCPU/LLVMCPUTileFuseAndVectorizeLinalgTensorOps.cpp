@@ -28,6 +28,15 @@
 namespace mlir {
 namespace iree_compiler {
 
+// A flag to switch between inline asm and intrinsics while we develop these two
+//  parallel paths.
+static llvm::cl::opt<bool> clUseMmt4dUseIntrinsics(
+    "iree-codegen-mmt4d-use-intrinsics",
+    llvm::cl::desc("Whether to use instrinsics when lowering vector contracts "
+                   "generated from mmt4d matmuls (as opposed to inline asm). "
+                   "Not for production use."),
+    llvm::cl::init(false));
+
 namespace {
 // Could just be linalg::TilingPattern with a ContractionOpInterface filter, but
 // that is always templated on an op.
@@ -342,6 +351,7 @@ void LLVMCPUTileFuseAndVectorizePass::runOnOperation() {
     // just before the generic vector ops lowerings.
     CustomKernelsTargetInfo info;
     if (succeeded(InferCustomKernelsTargetInfoFromParent(funcOp, info))) {
+      info.intrinsics = clUseMmt4dUseIntrinsics;
       RewritePatternSet patterns(context);
       populateVectorContractCustomKernelsPatterns(info, patterns);
       if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {

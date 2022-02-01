@@ -177,6 +177,9 @@ def VectorContractCustomKernels :
     Option<"dotprod", "dotprod", "bool",
             /*default=*/"false",
            "Under aarch64, enable kernels that use dotprod instructions">,
+    Option<"intrinsics", "intrinsics", "bool",
+            /*default=*/"false",
+           "Under aarch64, enable kernels that use dotprod instructions">,
   ];
 }
 

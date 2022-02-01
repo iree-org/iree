@@ -91,6 +91,8 @@ def get_test_shapes(shapes_id: ShapesId):
         TestShape(m=2, k=3, n=4),
         #TestShape(m=8, k=7, n=6),
         #TestShape(m=15, k=16, n=17),
+        # Exactly the mmt4d kernel size
+        TestShape(m=8, k=4, n=8),
         TestShape(m=14, k=19, n=23),
         #TestShape(m=31, k=33, n=32),
         TestShape(m=25, k=41, n=35),

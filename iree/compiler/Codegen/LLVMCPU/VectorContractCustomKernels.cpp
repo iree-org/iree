@@ -11,6 +11,7 @@
 #include "llvm/ADT/Triple.h"
 #include "mlir/Conversion/StandardToLLVM/ConvertStandardToLLVM.h"
 #include "mlir/Conversion/VectorToLLVM/ConvertVectorToLLVM.h"
+#include "mlir/Dialect/ArmNeon/ArmNeonDialect.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/LLVMIR/LLVMTypes.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
@@ -150,6 +151,9 @@ static bool isMatrixTimesMatrixTransposedOfGivenShape(
 
 // Checks that the Value `extResult` is defined by an arith::ExtSIOp promoting
 // from `extSrcType` to `extDstType`, and returns the input of the ExtSIOp.
+// Note that this only looks at the immediately defining operation, so we likely
+// want to have earlier passes that sink widening operations as far down as
+// possible, which is probably just good regardless.
 static Value getExtSIInput(Type extSrcType, Type extDstType, Value extResult) {
   auto extSIOp = extResult.getDefiningOp<arith::ExtSIOp>();
   if (!extSIOp) {
@@ -248,9 +252,6 @@ struct MMT_8x4x8_i8i8i32_Aarch64Dotprod_InlineAsm
           extract1DSlice(rewriter, loc, int32x4Type, flatAcc, position));
     }
 
-    // Start of the code that's specific to inline assembly. An intrinsics
-    // code path would diverge here.
-
     // Create the inline asm op's operands list.
     SmallVector<Value> asmOperands;
     // First the inputs operands.
@@ -299,9 +300,6 @@ struct MMT_8x4x8_i8i8i32_Aarch64Dotprod_InlineAsm
           loc, int32x4Type, asmOp.getRes(), rewriter.getI64ArrayAttr({i})));
     }
 
-    // End of the code that's specific to inline assembly. An intrinsics code
-    // path would merge here.
-
     // Insert the result vectors of size 4 into the overall result vector of
     // size 64, still 1D.
     VectorType int32x64xType = VectorType::get({64}, I32Type);
@@ -321,11 +319,129 @@ struct MMT_8x4x8_i8i8i32_Aarch64Dotprod_InlineAsm
   }
 };
 
+/// Converts matrix-times-matrix-transposed vector.contracts with
+/// lhs and rhs inputs defined by arith.extsi promoting from i8 to i32,
+///
+///     %lhs_i32 = arith.extsi %lhs_i8 : i8 to i32
+///     %rhs_i32 = arith.extsi %rhs_i8 : i8 to i32
+///     %result = vector.contract [...]
+///                 %lhs_i32 : vector<8x4xi32>,
+///                 %rhs_i32 : vector<8x4xi32>,
+///                 %acc_i32 : vector<8x8xi32>,
+///                 [...]
+///
+/// To vector ops reading directly from the %lhs_i8 and %rhs_i8 values
+/// (bypassing the existing arith.extsi) and passing that to a llvm.inline_asm
+/// block implementing the matrix multiplication arithmetic using Aarch64
+/// dot-product instructions (sdot).
+/// It matches the same patterns as MMT_8x4x8_i8i8i32_Aarch64Dotprod_InlineAsm
+struct MMT_8x4x8_i8i8i32_Aarch64Dotprod_Intrinsics
+    : public OpRewritePattern<vector::ContractionOp> {
+ public:
+  using OpRewritePattern<vector::ContractionOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(vector::ContractionOp contractionOp,
+                                PatternRewriter &rewriter) const override {
+    if (!isMatrixTimesMatrixTransposedOfGivenShape(contractionOp, 8, 4, 8)) {
+      return failure();
+    }
+
+    Type I8Type = rewriter.getIntegerType(8);
+    Type I32Type = rewriter.getIntegerType(32);
+
+    auto acc = contractionOp.acc();
+    auto lhs = contractionOp.lhs();
+    auto rhs = contractionOp.rhs();
+    if (acc.getType().cast<VectorType>().getElementType() != I32Type) {
+      return failure();
+    }
+
+    Value inLhs = getExtSIInput(I8Type, I32Type, lhs);
+    Value inRhs = getExtSIInput(I8Type, I32Type, rhs);
+
+    if (!inLhs || !inRhs) return failure();
+
+    auto loc = contractionOp.getLoc();
+
+    auto int32x4VType = VectorType::get({4}, I32Type);
+
+    std::array<Value, 16> accChunks;
+    {
+      int idx = 0;
+      for (int row = 0; row < 8; ++row) {
+        auto accRow = rewriter.create<vector::ExtractOp>(
+            loc, acc, ArrayRef<int64_t>{row});
+        for (int col = 0; col < 8; col += 4) {
+          auto accChunk = rewriter.create<vector::ExtractStridedSliceOp>(
+              loc, accRow, ArrayRef<int64_t>{col}, ArrayRef<int64_t>{4},
+              ArrayRef<int64_t>{1});
+          assert(accChunk.getType() == int32x4VType);
+          accChunks[idx++] = accChunk;
+        }
+      }
+    }
+
+    auto int8x4x4VType = VectorType::get({4, 4}, rewriter.getIntegerType(8));
+    auto extract4x4 = [&](Value in, int rowOffset, int colOffset) {
+      auto chunk = rewriter.create<vector::ExtractStridedSliceOp>(
+          loc, in, ArrayRef<int64_t>{rowOffset, colOffset},
+          ArrayRef<int64_t>{4, 4}, ArrayRef<int64_t>{1, 1});
+      assert(chunk.getType() == int8x4x4VType);
+      return chunk;
+    };
+
+    std::array<Value, 2> lhsHalves = {extract4x4(inLhs, 0, 0),
+                                      extract4x4(inLhs, 4, 0)};
+    std::array<Value, 2> rhsHalves = {extract4x4(inRhs, 0, 0),
+                                      extract4x4(inRhs, 4, 0)};
+
+    auto int8Zero4x4 = rewriter.create<arith::ConstantOp>(
+        loc, rewriter.getZeroAttr(int8x4x4VType));
+    auto sdot = [&](Value acc, Value a, Value b, int64_t lane) -> Value {
+      auto bReplicatedLane = rewriter.create<vector::ShuffleOp>(
+          loc, b, int8Zero4x4, ArrayRef<int64_t>{lane, lane, lane, lane});
+
+      return rewriter.create<arm_neon::Sdot2dOp>(loc, int32x4VType, acc, a,
+                                                 bReplicatedLane);
+    };
+
+    std::array<Value, 16> dstChunks;
+    {
+      int idx = 0;
+      for (Value lhs : lhsHalves) {
+        for (int lane = 0; lane < 4; ++lane) {
+          for (Value rhs : rhsHalves) {
+            dstChunks[idx] = sdot(accChunks[idx], rhs, lhs, lane);
+            ++idx;
+          }
+        }
+      }
+    }
+
+    // Put the results back in the accumulator
+    {
+      int idx = 0;
+      for (int row = 0; row < 8; ++row) {
+        for (int col = 0; col < 8; col += 4) {
+          acc = rewriter.create<vector::InsertStridedSliceOp>(
+              loc, dstChunks[idx++], acc, ArrayRef<int64_t>{row, col},
+              ArrayRef<int64_t>{1});
+        }
+      }
+    }
+    rewriter.replaceOp(contractionOp, {acc});
+    return success();
+  }
+};
+
 class VectorContractCustomKernelsPass
     : public VectorContractCustomKernelsBase<VectorContractCustomKernelsPass> {
  public:
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<vector::VectorDialect, LLVM::LLVMDialect>();
+    if (target_info.intrinsics) {
+      registry.insert<arm_neon::ArmNeonDialect>();
+    }
   }
   LogicalResult initializeOptions(StringRef options) override {
     if (failed(Pass::initializeOptions(options))) {
@@ -333,6 +449,7 @@ class VectorContractCustomKernelsPass
     }
     target_info.aarch64 = aarch64;
     target_info.dotprod = dotprod;
+    target_info.intrinsics = intrinsics;
     return success();
   }
   void runOnOperation() override {
@@ -355,7 +472,11 @@ void populateVectorContractCustomKernelsPatterns(
     const CustomKernelsTargetInfo &target_info, RewritePatternSet &patterns) {
   MLIRContext *context = patterns.getContext();
   if (target_info.aarch64 && target_info.dotprod) {
-    patterns.insert<MMT_8x4x8_i8i8i32_Aarch64Dotprod_InlineAsm>(context);
+    if (target_info.intrinsics) {
+      patterns.insert<MMT_8x4x8_i8i8i32_Aarch64Dotprod_Intrinsics>(context);
+    } else {
+      patterns.insert<MMT_8x4x8_i8i8i32_Aarch64Dotprod_InlineAsm>(context);
+    }
   }
 }
 

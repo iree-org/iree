@@ -44,6 +44,8 @@ cc_library(
         "@llvm-project//mlir:Analysis",
         "@llvm-project//mlir:ArithmeticToLLVM",
         "@llvm-project//mlir:ArithmeticTransforms",
+        "@llvm-project//mlir:ArmNeon",
+        "@llvm-project//mlir:ArmNeon2dToIntr",
         "@llvm-project//mlir:CFGTransforms",
         "@llvm-project//mlir:DialectUtils",
         "@llvm-project//mlir:IR",

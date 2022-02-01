@@ -16,6 +16,7 @@
 #include "mlir/Analysis/DataLayoutAnalysis.h"
 #include "mlir/Conversion/AffineToStandard/AffineToStandard.h"
 #include "mlir/Conversion/ArithmeticToLLVM/ArithmeticToLLVM.h"
+#include "mlir/Conversion/ArmNeon2dToIntr/ArmNeon2dToIntr.h"
 #include "mlir/Conversion/LLVMCommon/ConversionTarget.h"
 #include "mlir/Conversion/LLVMCommon/LoweringOptions.h"
 #include "mlir/Conversion/LLVMCommon/Pattern.h"
@@ -30,6 +31,7 @@
 #include "mlir/Conversion/TosaToStandard/TosaToStandard.h"
 #include "mlir/Conversion/VectorToLLVM/ConvertVectorToLLVM.h"
 #include "mlir/Conversion/VectorToSCF/VectorToSCF.h"
+#include "mlir/Dialect/ArmNeon/ArmNeonDialect.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/LLVMIR/LLVMTypes.h"
 #include "mlir/Dialect/Math/IR/Math.h"
@@ -615,7 +617,7 @@ class ConvertToLLVMPass : public ConvertToLLVMBase<ConvertToLLVMPass> {
   ConvertToLLVMPass() = default;
   ConvertToLLVMPass(const ConvertToLLVMPass &pass) {}
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<LLVM::LLVMDialect>();
+    registry.insert<LLVM::LLVMDialect, arm_neon::ArmNeonDialect>();
   }
 
   void runOnOperation() override;
@@ -673,6 +675,7 @@ void ConvertToLLVMPass::runOnOperation() {
     vector::populateVectorMaskOpLoweringPatterns(patterns);
     vector::populateVectorShapeCastLoweringPatterns(patterns);
     vector::populateVectorTransposeLoweringPatterns(patterns);
+    populateConvertArmNeon2dToIntrPatterns(patterns);
     if (failed(applyPatternsAndFoldGreedily(getOperation(),
                                             std::move(patterns)))) {
       return signalPassFailure();

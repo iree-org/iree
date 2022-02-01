@@ -135,6 +135,8 @@ cc_library(
     deps = [
         "@llvm-project//mlir:Affine",
         "@llvm-project//mlir:AffineTransforms",
+        "@llvm-project//mlir:ArmNeon",
+        "@llvm-project//mlir:ArmNeon2dToIntr",
         "@llvm-project//mlir:BufferizationDialect",
         "@llvm-project//mlir:ConversionPasses",
         "@llvm-project//mlir:GPUDialect",
@@ -389,6 +391,7 @@ cc_library(
         "//iree/compiler/Translation:HALExecutable",
         "//iree/compiler/Translation:IREEVM",
         "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:ArmNeonToLLVMIRTranslation",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:LLVMToLLVMIRTranslation",
         "@llvm-project//mlir:Pass",
