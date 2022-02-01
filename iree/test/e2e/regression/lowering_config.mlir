@@ -1,9 +1,9 @@
 #compilation0 = #iree_codegen.compilation.info<
-    #iree_codegen.lowering.config<tile_sizes = [[], [8, 8, 8]], native_vector_size = [8, 8, 8]>,
+    #iree_codegen.lowering.config<tile_sizes = [[], [8, 8, 0], [0, 0, 8]], native_vector_size = []>,
     #iree_codegen.translation.info<"CPUDoubleTilingExpert", workload_per_wg = [32, 32]>,
     workgroup_size = []>
 #compilation1 = #iree_codegen.compilation.info<
-    #iree_codegen.lowering.config<tile_sizes = [[], [4, 4, 4]], native_vector_size = [4, 4, 4]>,
+    #iree_codegen.lowering.config<tile_sizes = [[], [4, 4, 0], [0, 0, 4]], native_vector_size = []>,
     #iree_codegen.translation.info<"CPUDoubleTilingExpert", workload_per_wg = [64, 64]>,
     workgroup_size = []>
 func @lowering_config_test() {
