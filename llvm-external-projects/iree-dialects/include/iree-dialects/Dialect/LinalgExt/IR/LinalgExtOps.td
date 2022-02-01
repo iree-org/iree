@@ -350,6 +350,52 @@ def IREELinalgExt_ReverseOp : IREELinalgExt_Op<"reverse", [
   }];
 }
 
+def IREELinalgExt_BinCountOp : IREELinalgExt_Op<"bincount",
+    [DeclareOpInterfaceMethods<TiledOpInterface,
+      ["getPartitionableLoops", "generateScalarImplementation",
+       "getTiledImplementation"]>]> {
+  let summary = "BinCount operator";
+  let description = [{
+    Count the frequency of each value in a 1-d array of non-negative ints.
+
+    See https://pytorch.org/docs/stable/generated/torch.bincount.html.
+  }];
+
+  let arguments = (ins Variadic<AnyShaped>:$inputs,
+                       Variadic<AnyShaped>:$outputs
+  );
+
+  let builders = [
+    OpBuilder<(ins "ValueRange":$inputs, "ValueRange":$outputs)>
+  ];
+
+  let results = (outs Variadic<AnyRankedTensor>:$results);
+  let assemblyFormat = [{
+    attr-dict
+    `ins` `(` $inputs `:` type($inputs) `)`
+    `outs` `(` $outputs `:` type($outputs) `)`
+    (`:` type($results)^)?
+  }];
+
+  let extraClassDeclaration = extraLinalgExtOpClassDeclaration # [{
+    Value input() {
+      return getInputOperand(0)->get();
+    }
+    Value weights() {
+      return getInputOperand(1)->get();
+    }
+    Value output() {
+      return getOutputOperand(0)->get();
+    }
+    ShapedType getOperandType() {
+      return input().getType().cast<ShapedType>();
+    }
+    int64_t getOperandRank() {
+      return getOperandType().getRank();
+    }
+  }];
+}
+
 //===----------------------------------------------------------------------===//
 // Pure ops
 //===----------------------------------------------------------------------===//

@@ -604,3 +604,82 @@ func @scan_2d(%0: memref<16x32xi32>, %1: memref<16x32xi32>) {
 // CHECK:               memref.store %[[V4]], %[[BUFO]][%[[ARG1]], %[[ARG2]]]
 // CHECK:               memref.store %[[V4]], %[[ACC]][%[[ARG2]]]
 // CHECK:             }
+
+// -----
+
+func @bincount(%input: memref<20xi32>, %output: memref<100xi32>) {
+  iree_linalg_ext.bincount
+    ins(%input : memref<20xi32>) outs(%output : memref<100xi32>)
+  return
+}
+// CHECK-LABEL: func @bincount
+// CHECK-SAME:    %[[INPUT:.+]]: memref<20xi32>
+// CHECK-SAME:    %[[OUTPUT:.+]]: memref<100xi32>
+// CHECK-DAG:     %[[C0:.+]] = arith.constant 0 : index
+// CHECK-DAG:     %[[C1:.+]] = arith.constant 1 : index
+// CHECK-DAG:     %[[C20:.+]] = arith.constant 20 : index
+// CHECK-DAG:     %[[C1_I32:.+]] = arith.constant 1 : i32
+// CHECK:         scf.for %[[I:.+]] = %[[C0]] to %[[C20]] step %[[C1]]
+// CHECK:           %[[T1:.+]] = memref.load %[[INPUT]][%[[I]]] : memref<20xi32>
+// CHECK:           %[[T2:.+]] = arith.index_cast %[[T1]] : i32 to index
+// CHECK:           %[[T3:.+]] = memref.load %[[OUTPUT]][%[[T2]]] : memref<100xi32>
+// CHECK:           %[[T4:.+]] = arith.addi %[[T3]], %[[C1_I32]] : i32
+// CHECK:           memref.store %[[T4]], %[[OUTPUT]][%[[T2]]] : memref<100xi32>
+// CHECK:         }
+// CHECK:         return
+// CHECK:       }
+
+// -----
+
+func @bincount_with_weights(%input: memref<20xi32>, %weights: memref<20xi32>,
+                            %output: memref<100xf32>) {
+  iree_linalg_ext.bincount
+    ins(%input, %weights : memref<20xi32>, memref<20xi32>)
+    outs(%output : memref<100xf32>)
+  return
+}
+// CHECK-LABEL: func @bincount_with_weights
+// CHECK-SAME:    %[[INPUT:.+]]: memref<20xi32>, %[[WEIGHTS:.+]]: memref<20xi32>
+// CHECK-SAME:    %[[OUTPUT:.+]]: memref<100xf32>
+// CHECK-DAG:     %[[C0:.+]] = arith.constant 0 : index
+// CHECK-DAG:     %[[C1:.+]] = arith.constant 1 : index
+// CHECK-DAG:     %[[C20:.+]] = arith.constant 20 : index
+// CHECK:         scf.for %[[I:.+]] = %[[C0]] to %[[C20]] step %[[C1]]
+// CHECK:           %[[T1:.+]] = memref.load %[[INPUT]][%[[I]]] : memref<20xi32>
+// CHECK:           %[[T2:.+]] = arith.index_cast %[[T1]] : i32 to index
+// CHECK:           %[[T3:.+]] = memref.load %[[OUTPUT]][%[[T2]]] : memref<100xf32>
+// CHECK:           %[[T4:.+]] = memref.load %[[WEIGHTS]][%[[I]]] : memref<20xi32>
+// CHECK:           %[[T5:.+]] = arith.sitofp %[[T4]] : i32 to f32
+// CHECK:           %[[T6:.+]] = arith.addf %[[T3]], %[[T5]] : f32
+// CHECK:           memref.store %[[T6]], %[[OUTPUT]][%[[T2]]] : memref<100xf32>
+// CHECK:         }
+// CHECK:         return
+// CHECK:       }
+
+// -----
+
+func @bincount_with_weights_with_dynamic_sizes(%input: memref<?xi32>,
+                                               %weights: memref<?xi32>,
+                                               %output: memref<?xf32>) {
+  iree_linalg_ext.bincount
+    ins(%input, %weights : memref<?xi32>, memref<?xi32>)
+    outs(%output : memref<?xf32>)
+  return
+}
+// CHECK-LABEL: func @bincount_with_weights_with_dynamic_sizes
+// CHECK-SAME:    %[[INPUT:.+]]: memref<?xi32>, %[[WEIGHTS:.+]]: memref<?xi32>,
+// CHECK-SAME:    %[[OUTPUT:.+]]: memref<?xf32>
+// CHECK-DAG:     %[[C0:.+]] = arith.constant 0 : index
+// CHECK-DAG:     %[[C1:.+]] = arith.constant 1 : index
+// CHECK:         %[[UB:.+]] = memref.dim %[[INPUT]], %[[C0]] : memref<?xi32>
+// CHECK:         scf.for %[[I:.+]] = %[[C0]] to %[[UB]] step %[[C1]]
+// CHECK:           %[[T1:.+]] = memref.load %[[INPUT]][%[[I]]] : memref<?xi32>
+// CHECK:           %[[T2:.+]] = arith.index_cast %[[T1]] : i32 to index
+// CHECK:           %[[T3:.+]] = memref.load %[[OUTPUT]][%[[T2]]] : memref<?xf32>
+// CHECK:           %[[T4:.+]] = memref.load %[[WEIGHTS]][%[[I]]] : memref<?xi32>
+// CHECK:           %[[T5:.+]] = arith.sitofp %[[T4]] : i32 to f32
+// CHECK:           %[[T6:.+]] = arith.addf %[[T3]], %[[T5]] : f32
+// CHECK:           memref.store %[[T6]], %[[OUTPUT]][%[[T2]]] : memref<?xf32>
+// CHECK:         }
+// CHECK:         return
+// CHECK:       }

@@ -100,6 +100,66 @@ OpFoldResult IREE::LinalgExt::getDim(OpBuilder &builder, Location loc, Value v,
   return builder.getI64IntegerAttr(t.getDimSize(dim));
 }
 
+static Value castIntToIndex(OpBuilder &b, Location loc, Value v) {
+  assert(v.getType().isa<IntegerType>() && "must be called with integer type");
+  return b.create<arith::IndexCastOp>(loc, b.getIndexType(), v);
+}
+
+// Convert a scalar value to the target type. The scalar value can be an element
+// from a tensor or a scalar in the pytorch dialect. Both the scalar and dtype
+// should be converted builtin types.
+static Value convertScalarToDtype(OpBuilder &b, Location loc, Value scalar,
+                                  Type dtype) {
+  Type scalarType = scalar.getType();
+  if (scalarType == dtype) return scalar;
+
+  // TODO: For the byte(ui8) or char(i8) case, we need the unconverted dtype to
+  // be able to know if we need signed or unsigned conversion.
+  auto isByteOrChar = [](Type type) {
+    if (auto integerTy = type.dyn_cast<mlir::IntegerType>()) {
+      return integerTy.getWidth() == 8;
+    }
+    return false;
+  };
+
+  if (isByteOrChar(scalarType) || isByteOrChar(dtype) ||
+      scalarType.isSignlessInteger(1) || dtype.isSignlessInteger(1)) {
+    // TODO: Handle bool type.
+    mlir::emitError(loc)
+        << "unsupported byte, char or bool type for convertScalarToDtype "
+        << scalarType << "(scalar type) -> " << dtype << "(dtype)";
+    return nullptr;
+  }
+
+  if (auto dtypeFloat = dtype.dyn_cast<mlir::FloatType>()) {
+    if (auto scalarFloat = scalarType.dyn_cast<mlir::FloatType>()) {
+      if (scalarFloat.getWidth() > dtypeFloat.getWidth())
+        return b.create<arith::TruncFOp>(loc, scalar, dtype);
+      // Only scalarFloat width < dtypeFloat width can reach here.
+      return b.create<arith::ExtFOp>(loc, scalar, dtype);
+    }
+    assert(scalarType.isa<mlir::IntegerType>());
+    // It's safe to use SIToFPOp because ui8/si8 are the only ones where
+    // unsigned handling is needed, and we checked for that case above.
+    return b.create<arith::SIToFPOp>(loc, scalar, dtype);
+  }
+
+  if (auto dtypeInteger = dtype.dyn_cast<mlir::IntegerType>()) {
+    if (auto scalarFloat = scalarType.dyn_cast<mlir::FloatType>())
+      return b.create<arith::FPToSIOp>(loc, scalar, dtype);
+    assert(scalarType.isa<mlir::IntegerType>());
+    auto scalarInteger = scalarType.cast<mlir::IntegerType>();
+    if (scalarInteger.getWidth() > dtypeInteger.getWidth())
+      return b.create<arith::TruncIOp>(loc, scalar, dtype);
+    // Only scalarInteger width < dtypeInteger width can reach here.
+    // It's safe to use ExtSIOp here because ui8/si8 are the only ones where
+    // unsigned handling is needed, and we checked for that case above.
+    return b.create<arith::ExtSIOp>(loc, scalar, dtype);
+  }
+
+  llvm_unreachable("convertScalarToDtype should handle all the types");
+}
+
 //===----------------------------------------------------------------------===//
 // ScatterOp
 //===----------------------------------------------------------------------===//
@@ -1131,6 +1191,109 @@ Operation *ReverseOp::getTiledImplementation(OpBuilder &builder,
   return tiledRevOp;
 }
 
+//===----------------------------------------------------------------------===//
+// BinCountOp
+//===----------------------------------------------------------------------===//
+
+static LogicalResult verifyBinCountOp(BinCountOp op) {
+  int64_t numInputs = op.getNumInputs();
+  if (numInputs < 1 || numInputs > 2) {
+    return op.emitOpError("expected atleast one and atmost two input operands");
+  }
+  if (op.getNumOutputs() != 1) {
+    return op.emitOpError("expected one output operand");
+  }
+  auto inputType = op.input().getType().cast<ShapedType>();
+  ArrayRef<int64_t> inputShapes = inputType.getShape();
+  if (inputShapes.size() != 1) {
+    return op.emitError("expected bins rank to be one");
+  }
+  if (!inputType.getElementType().isa<mlir::IntegerType>()) {
+    return op.emitError("expected bins element type to be integer");
+  }
+  // Check if the number of input operands is two, which means weights are also
+  // given as input.
+  if (numInputs == 2) {
+    auto weightsType = op.weights().getType().cast<ShapedType>();
+    ArrayRef<int64_t> weightsShapes = weightsType.getShape();
+    if (weightsShapes.size() != 1) {
+      return op.emitError("expected weights rank to be one");
+    }
+    if (inputShapes[0] != weightsShapes[0]) {
+      return op.emitOpError("incompatible bins and weights shapes");
+    }
+    auto outputType = op.output().getType().cast<ShapedType>();
+    // If weights are given as input, the output must be floating-point type.
+    if (!outputType.getElementType().isa<mlir::FloatType>())
+      return op.emitError("expected output element type to be float");
+  }
+  return success();
+}
+
+SmallVector<Range> BinCountOp::getIterationDomain(OpBuilder &builder) {
+  int64_t operandRank = getOperandRank();
+  SmallVector<Range> loopBounds(operandRank);
+  Location loc = getLoc();
+  Value zero = builder.create<arith::ConstantIndexOp>(loc, 0);
+  Value one = builder.create<arith::ConstantIndexOp>(loc, 1);
+  Value source = input();
+  for (auto dim : llvm::seq<int64_t>(0, operandRank)) {
+    loopBounds[dim].offset = zero;
+    loopBounds[dim].size = getDimValue(builder, loc, source, dim);
+    loopBounds[dim].stride = one;
+  }
+  return loopBounds;
+}
+
+SmallVector<StringRef> BinCountOp::getLoopIteratorTypes() {
+  SmallVector<StringRef> iteratorTypes(getOperandRank(),
+                                       getParallelIteratorTypeName());
+  return iteratorTypes;
+}
+
+SmallVector<unsigned> BinCountOp::getPartitionableLoops(
+    unsigned maxNumParallelDims) {
+  auto range = llvm::seq<unsigned>(0, getOperandRank());
+  SmallVector<unsigned> partitionableLoops(range.begin(), range.end());
+  return partitionableLoops;
+}
+
+// Op description is given at
+// https://pytorch.org/docs/stable/generated/torch.bincount.html.
+LogicalResult BinCountOp::generateScalarImplementation(OpBuilder &b,
+                                                       Location loc,
+                                                       ValueRange ivs) {
+  Value input_ = input();
+  Value output_ = output();
+  Type outputType = output_.getType().cast<ShapedType>().getElementType();
+  Value one = b.create<arith::ConstantOp>(loc, b.getIntegerAttr(outputType, 1));
+  Value bin = b.create<memref::LoadOp>(loc, input_, ivs.front());
+  bin = castIntToIndex(b, loc, bin);
+  Value count = b.create<memref::LoadOp>(loc, output_, bin);
+  if (getNumInputs() == 2) {
+    Value weights_ = weights();
+    Value weight = b.create<memref::LoadOp>(loc, weights_, ivs.front());
+    weight = convertScalarToDtype(b, loc, weight, outputType);
+    if (outputType.isa<mlir::FloatType>())
+      count = b.create<arith::AddFOp>(loc, count, weight);
+    else
+      count = b.create<arith::AddIOp>(loc, count, weight);
+  } else
+    count = b.create<arith::AddIOp>(loc, count, one);
+  b.create<memref::StoreOp>(loc, count, output_, bin);
+  return success();
+}
+
+// Since the input is always a 1-d tensor, the number of loops generated will be
+// one, so tiling is not required.
+Operation *BinCountOp::getTiledImplementation(OpBuilder &builder,
+                                              ValueRange outputs,
+                                              ArrayRef<OpFoldResult> offsets,
+                                              ArrayRef<OpFoldResult> sizes,
+                                              SmallVectorImpl<Value> &results) {
+  return nullptr;
+}
+
 #define DEFINE_OP_GET_EFFECTS(OP_NAME)                                    \
   void OP_NAME::getEffects(                                               \
       SmallVectorImpl<SideEffects::EffectInstance<MemoryEffects::Effect>> \
@@ -1146,6 +1309,7 @@ DEFINE_OP_GET_EFFECTS(SortOp)
 DEFINE_OP_GET_EFFECTS(FftOp)
 DEFINE_OP_GET_EFFECTS(ReverseOp)
 DEFINE_OP_GET_EFFECTS(ScanOp)
+DEFINE_OP_GET_EFFECTS(BinCountOp)
 
 namespace {
 /// This is derived from mlir/lib/Dialect/Linalg/IR/LinalgOps.cpp without any
