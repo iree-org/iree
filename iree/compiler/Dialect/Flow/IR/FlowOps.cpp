@@ -365,7 +365,7 @@ void DispatchWorkgroupsOp::build(OpBuilder &builder, OperationState &state,
                                          : TensorAccess::ReadOnly,
                                      tensorType);
     }
-    body->addArgument(type);
+    body->addArgument(type, operand.value().getLoc());
   }
   for (auto resultType : llvm::enumerate(resultTypes)) {
     if (resultAliases[resultType.index()]) {
@@ -376,7 +376,7 @@ void DispatchWorkgroupsOp::build(OpBuilder &builder, OperationState &state,
     if (auto tensorType = type.dyn_cast<TensorType>()) {
       type = DispatchTensorType::get(TensorAccess::WriteOnly, tensorType);
     }
-    body->addArgument(type);
+    body->addArgument(type, state.location);
   }
   assert(std::next(body->begin()) == body->end());
 }
@@ -385,8 +385,8 @@ static ParseResult parseDispatchWorkgroupBody(OpAsmParser &parser,
                                               TypeRange operandTypes,
                                               TypeRange resultTypes,
                                               Region &body) {
-  SmallVector<OpAsmParser::OperandType, 16> regionArgs;
-  SmallVector<Type, 16> regionArgTypes;
+  SmallVector<OpAsmParser::OperandType> regionArgs;
+  SmallVector<Type> regionArgTypes;
   if (failed(parser.parseLParen())) {
     return failure();
   }
@@ -405,6 +405,7 @@ static ParseResult parseDispatchWorkgroupBody(OpAsmParser &parser,
     }
   }
   return parser.parseRegion(body, regionArgs, regionArgTypes,
+                            /*argLocations=*/{},
                             /*enableNameShadowing=*/true);
 }
 
@@ -840,8 +841,8 @@ SmallVector<int64_t, 4> TensorUpdateOp::getTiedResultOperandIndices() {
 // Public methods
 //===----------------------------------------------------------------------===//
 
-void populateFlowDispatchCanonicalizationPatterns(
-    OwningRewritePatternList &results, MLIRContext *context) {
+void populateFlowDispatchCanonicalizationPatterns(RewritePatternSet &results,
+                                                  MLIRContext *context) {
   DispatchTensorLoadOp::getCanonicalizationPatterns(results, context);
 }
 

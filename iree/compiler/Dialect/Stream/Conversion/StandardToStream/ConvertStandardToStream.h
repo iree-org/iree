@@ -18,7 +18,7 @@ namespace iree_compiler {
 // provided |typeConverter|.
 void populateStandardToStreamConversionPatterns(
     MLIRContext *context, ConversionTarget &conversionTarget,
-    TypeConverter &typeConverter, OwningRewritePatternList &patterns);
+    TypeConverter &typeConverter, RewritePatternSet &patterns);
 
 }  // namespace iree_compiler
 }  // namespace mlir

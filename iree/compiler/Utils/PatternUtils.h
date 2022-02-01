@@ -30,7 +30,7 @@ using GenericOpRewritePattern = LogicalResult (*)(
     OpTy op, typename OpTy::Adaptor operands, PatternRewriter &rewriter);
 
 template <typename OpTy>
-static void insertGreedyPattern(OwningRewritePatternList &patterns,
+static void insertGreedyPattern(RewritePatternSet &patterns,
                                 MLIRContext *context,
                                 GenericOpRewritePattern<OpTy> f,
                                 PatternBenefit benefit = 1) {
@@ -57,7 +57,7 @@ static void insertGreedyPattern(OwningRewritePatternList &patterns,
 }
 
 template <typename OpTy>
-static void insertConversionPattern(OwningRewritePatternList &patterns,
+static void insertConversionPattern(RewritePatternSet &patterns,
                                     MLIRContext *context,
                                     GenericOpRewritePattern<OpTy> f,
                                     PatternBenefit benefit = 1) {

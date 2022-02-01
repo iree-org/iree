@@ -297,6 +297,7 @@ func @tile_from_pointwise_outs() {
 
 #map = affine_map<(d0, d1) -> (d0, d1)>
 func @tile_from_pointwise_outs_inplace() {
+  %f1 = arith.constant 1.0 : f32
   %c0 = arith.constant 0 : index
   %c2 = arith.constant 2 : index
   %c4 = arith.constant 4 : index
@@ -319,7 +320,8 @@ func @tile_from_pointwise_outs_inplace() {
       %9 = linalg.generic {indexing_maps = [#map, #map], iterator_types = ["parallel", "parallel"]}
         ins(%8 : tensor<1x1xf32>) outs(%shape : tensor<1x1xf32>) {
         ^bb0(%arg2: f32, %s: f32):  // no predecessors
-          linalg.yield %arg2 : f32
+          %add = arith.addf %arg2, %f1 : f32
+          linalg.yield %add : f32
         } -> tensor<1x1xf32>
       %10 = linalg.matmul ins(%6, %7 : tensor<1x3xf32>, tensor<3x1xf32>) outs(%9 : tensor<1x1xf32>)  -> tensor<1x1xf32>
       flow.dispatch.tensor.store %10, %2, offsets = [%arg0, %arg1], sizes = [%c1, %c1], strides = [%c1, %c1] : tensor<1x1xf32> -> !flow.dispatch.tensor<readwrite:?x?xf32>{%M, %N}
@@ -1620,13 +1622,13 @@ func @padded_matmul() {
       %8 = flow.dispatch.tensor.load %1, offsets = [0, %arg1], sizes = [27, 16], strides = [1, 1] : !flow.dispatch.tensor<readonly:27x16xf32> -> tensor<27x16xf32>
       %9 = linalg.init_tensor [64, 16] : tensor<64x16xf32>
       %10 = linalg.fill(%cst, %9) {__internal_linalg_transform__ = "workgroup"} : f32, tensor<64x16xf32> -> tensor<64x16xf32>
-      %11 = linalg.pad_tensor %7 low[0, 0] high[0, 5]  {
+      %11 = tensor.pad %7 low[0, 0] high[0, 5]  {
       ^bb0(%arg2: index, %arg3: index):  // no predecessors
-        linalg.yield %cst : f32
+        tensor.yield %cst : f32
       } : tensor<64x27xf32> to tensor<64x32xf32>
-      %12 = linalg.pad_tensor %8 low[0, 0] high[5, 0]  {
+      %12 = tensor.pad %8 low[0, 0] high[5, 0]  {
       ^bb0(%arg2: index, %arg3: index):  // no predecessors
-        linalg.yield %cst : f32
+        tensor.yield %cst : f32
       } : tensor<27x16xf32> to tensor<32x16xf32>
       %13 = linalg.matmul ins(%11, %12 : tensor<64x32xf32>, tensor<32x16xf32>) outs(%10 : tensor<64x16xf32>) -> tensor<64x16xf32>
       %14 = tensor.cast %13 : tensor<64x16xf32> to tensor<?x?xf32>
@@ -1684,13 +1686,13 @@ func @dot_general_padded() {
       %10 = flow.dispatch.tensor.load %1, offsets = [0, %arg1], sizes = [2, %9], strides = [1, 1] : !flow.dispatch.tensor<readonly:?x?xf32>{%k, %n} -> tensor<2x?xf32>
       %11 = affine.min affine_map<(d0)[s0] -> (4, -d0 + s0)>(%arg0)[%m]
       %12 = affine.min affine_map<(d0)[s0] -> (4, -d0 + s0)>(%arg1)[%n]
-      %13 = linalg.pad_tensor %8 low[0, 0] high[1, 2]  {
+      %13 = tensor.pad %8 low[0, 0] high[1, 2]  {
       ^bb0(%arg2: index, %arg3: index):  // no predecessors
-        linalg.yield %cst : f32
+        tensor.yield %cst : f32
       } : tensor<?x2xf32> to tensor<4x4xf32>
-      %14 = linalg.pad_tensor %10 low[0, 0] high[2, 3]  {
+      %14 = tensor.pad %10 low[0, 0] high[2, 3]  {
       ^bb0(%arg2: index, %arg3: index):  // no predecessors
-        linalg.yield %cst : f32
+        tensor.yield %cst : f32
       } : tensor<2x?xf32> to tensor<4x4xf32>
       %15 = linalg.init_tensor [4, 4] : tensor<4x4xf32>
       %16 = linalg.fill(%cst, %15) : f32, tensor<4x4xf32> -> tensor<4x4xf32>
@@ -2587,3 +2589,53 @@ func @forward_dispatch_3() {
   return
 }
 // CHECK: func @forward_dispatch_3()
+
+// -----
+
+func @dot_general_nontrivial_batching_mutliple_parallel_dimension() {
+  %cst = arith.constant dense<0.000000e+00> : vector<1x4x2xf32>
+  %c1 = arith.constant 1 : index
+  %c6 = arith.constant 6 : index
+  %c2 = arith.constant 2 : index
+  %cst_0 = arith.constant 0.000000e+00 : f32
+  %c0 = arith.constant 0 : index
+  %c64 = arith.constant 64 : index
+  %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(32) : !flow.dispatch.tensor<readonly:2x6x1xf32>
+  %1 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c64) alignment(32) : !flow.dispatch.tensor<readonly:2x1x2xf32>
+  %2 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(32) : !flow.dispatch.tensor<writeonly:2x6x2xf32>
+  %workgroup_id_x = hal.interface.workgroup.id[0] : index
+  %workgroup_count_x = hal.interface.workgroup.count[0] : index
+  %workgroup_id_y = hal.interface.workgroup.id[1] : index
+  %workgroup_count_y = hal.interface.workgroup.count[1] : index
+  %workgroup_id_z = hal.interface.workgroup.id[2] : index
+  %workgroup_count_z = hal.interface.workgroup.count[2] : index
+  %3 = affine.apply affine_map<()[s0] -> (s0 * 4)>()[%workgroup_id_y]
+  %4 = affine.apply affine_map<()[s0] -> (s0 * 4)>()[%workgroup_count_y]
+  %5 = affine.apply affine_map<()[s0] -> (s0 * 2)>()[%workgroup_id_x]
+  %6 = affine.apply affine_map<()[s0] -> (s0 * 2)>()[%workgroup_count_x]
+  scf.for %arg0 = %workgroup_id_z to %c2 step %workgroup_count_z {
+    scf.for %arg1 = %3 to %c6 step %4 {
+      %7 = affine.min affine_map<(d0) -> (4, -d0 + 6)>(%arg1)
+      %8 = flow.dispatch.tensor.load %0, offsets = [%arg0, %arg1, 0], sizes = [1, %7, 1], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:2x6x1xf32> -> tensor<1x?x1xf32>
+      %9 = tensor.extract_slice %8[0, 0, 0] [1, %7, 1] [1, 1, 1] : tensor<1x?x1xf32> to tensor<1x?x1xf32>
+      %10 = vector.transfer_read %9[%c0, %c0, %c0], %cst_0 {in_bounds = [true, false, true]} : tensor<1x?x1xf32>, vector<1x4x1xf32>
+      scf.for %arg2 = %5 to %c2 step %6 {
+        %11 = flow.dispatch.tensor.load %2, offsets = [%arg0, %arg1, %arg2], sizes = [1, %7, 2], strides = [1, 1, 1] : !flow.dispatch.tensor<writeonly:2x6x2xf32> -> tensor<1x?x2xf32>
+        %12 = flow.dispatch.tensor.load %1, offsets = [%arg0, 0, %arg2], sizes = [1, 1, 2], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:2x1x2xf32> -> tensor<1x1x2xf32>
+        %13 = tensor.extract_slice %11[0, 0, 0] [1, %7, 2] [1, 1, 1] : tensor<1x?x2xf32> to tensor<1x?x2xf32>
+        %14 = vector.transfer_write %cst, %13[%c0, %c0, %c0] {in_bounds = [true, false, true]} : vector<1x4x2xf32>, tensor<1x?x2xf32>
+        %15 = tensor.extract_slice %14[0, 0, 0] [1, %7, 2] [1, 1, 1] : tensor<1x?x2xf32> to tensor<1x?x2xf32>
+        %16 = vector.transfer_read %12[%c0, %c0, %c0], %cst_0 {in_bounds = [true, true, true]} : tensor<1x1x2xf32>, vector<1x1x2xf32>
+        %17 = vector.transfer_read %15[%c0, %c0, %c0], %cst_0 {in_bounds = [true, false, true]} : tensor<1x?x2xf32>, vector<1x4x2xf32>
+        %18 = vector.contract {indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d3)>, affine_map<(d0, d1, d2, d3) -> (d0, d3, d2)>, affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>], iterator_types = ["parallel", "parallel", "parallel", "reduction"], kind = #vector.kind<add>} %10, %16, %17 : vector<1x4x1xf32>, vector<1x1x2xf32> into vector<1x4x2xf32>
+        %19 = vector.transfer_write %18, %15[%c0, %c0, %c0] {in_bounds = [true, false, true]} : vector<1x4x2xf32>, tensor<1x?x2xf32>
+        %20 = tensor.insert_slice %19 into %14[0, 0, 0] [1, %7, 2] [1, 1, 1] : tensor<1x?x2xf32> into tensor<1x?x2xf32>
+        %21 = tensor.insert_slice %20 into %11[0, 0, 0] [1, %7, 2] [1, 1, 1] : tensor<1x?x2xf32> into tensor<1x?x2xf32>
+        flow.dispatch.tensor.store %21, %2, offsets = [%arg0, %arg1, %arg2], sizes = [%c1, %7, %c2], strides = [1, 1, 1] : tensor<1x?x2xf32> -> !flow.dispatch.tensor<writeonly:2x6x2xf32>
+      }
+    }
+  }
+  return
+}
+// CHECK-LABEL: func @dot_general_nontrivial_batching_mutliple_parallel_dimension()
+//   CHECK-NOT:   memref.alloc

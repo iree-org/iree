@@ -276,7 +276,7 @@ void SPIRVCopyToWorkgroupMemoryPass::tileAndVectorizeLinalgCopy(
   });
   target->markUnknownOpDynamicallyLegal([](Operation *) { return true; });
 
-  OwningRewritePatternList patterns(&getContext());
+  RewritePatternSet patterns(&getContext());
   // TODO(antiagainst): Re-enable vectorizing workgroup memory copy once the
   // whole pipeline is in a better state.
   // patterns.add<TileAndDistributeCopyOp>(context);
@@ -296,7 +296,7 @@ void SPIRVCopyToWorkgroupMemoryPass::tileAndVectorizeLinalgCopy(
   }
 
   // 3. Vectorize the tiled linalg to be able to map it to load/store vector.
-  OwningRewritePatternList vectorizationPatterns(&getContext());
+  RewritePatternSet vectorizationPatterns(&getContext());
   linalg::VectorizationPatterns<linalg::CopyOp>::insert(
       vectorizationPatterns, linalg::LinalgVectorizationOptions(),
       linalg::LinalgTransformationFilter(

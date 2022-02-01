@@ -85,6 +85,18 @@ struct LinalgFusePass : public LinalgFuseBase<LinalgFusePass> {
     this->vectorize.setValue(vectorize);
   }
   LinalgFusePass(const LinalgFusePass &pass) {}
+  LinalgFusePass(const LinalgFusePassOptions &options) {
+    this->anchorFuncOpName = options.anchorFuncOpName;
+    this->anchorOpName = options.anchorOpName;
+    this->tileSizes = options.tileSizes;
+    this->tileInterchange = options.tileInterchange;
+    this->pad = options.pad;
+    this->packPaddings = options.packPaddings;
+    this->hoistPaddings = options.hoistPaddings;
+    this->vectorize = options.vectorize;
+    this->vectorizePadding = options.vectorizePadding;
+    this->tilingLevel = options.tilingLevel;
+  }
   void runOnOperation() override;
 };
 
@@ -342,6 +354,10 @@ void LinalgVectorLoweringPass::runOnOperation() {
 
 std::unique_ptr<OperationPass<FuncOp>> mlir::createLinalgFusePass() {
   return std::make_unique<LinalgFusePass>();
+}
+std::unique_ptr<OperationPass<FuncOp>> mlir::createLinalgFusePass(
+    const mlir::LinalgFusePassOptions &options) {
+  return std::make_unique<LinalgFusePass>(options);
 }
 
 std::unique_ptr<OperationPass<FuncOp>>

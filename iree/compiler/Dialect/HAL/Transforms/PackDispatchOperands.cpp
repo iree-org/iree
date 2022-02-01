@@ -179,8 +179,8 @@ static void updateExportFuncOp(mlir::FuncOp funcOp) {
     auto loArg = entryBlock.getArgument(newArgTypes.size());
     newArgTypes.push_back(builder.getI32Type());
     loArg.setType(builder.getI32Type());
-    auto hiArg =
-        entryBlock.insertArgument(newArgTypes.size(), builder.getI32Type());
+    auto hiArg = entryBlock.insertArgument(
+        newArgTypes.size(), builder.getI32Type(), funcOp.getLoc());
     newArgTypes.push_back(builder.getI32Type());
 
     // i64(lo) | (i64(hi) << 32)

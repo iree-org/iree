@@ -85,6 +85,20 @@ class SystemApiTest(absltest.TestCase):
     results = f(arg0, arg1)
     np.testing.assert_allclose(results, [4., 10., 18., 28.])
 
+  def test_chained_invoke(self):
+    # This ensures that everything works if DeviceArrays are returned
+    # and input to functions.
+    ctx = iree.runtime.SystemContext()
+    self.assertTrue(ctx.is_dynamic)
+    ctx.add_vm_module(create_simple_mul_module())
+    self.assertEqual(ctx.modules.arithmetic.name, "arithmetic")
+    f = ctx.modules.arithmetic["simple_mul"]
+    arg0 = np.array([1., 2., 3., 4.], dtype=np.float32)
+    arg1 = np.array([4., 5., 6., 7.], dtype=np.float32)
+    results = f(arg0, arg1)
+    results2 = f(results, results)
+    np.testing.assert_allclose(results2, [16., 100., 324., 784.])
+
   def test_tracing_explicit(self):
     with tempfile.TemporaryDirectory() as temp_dir:
       tracer = iree.runtime.Tracer(temp_dir)
@@ -119,6 +133,7 @@ class SystemApiTest(absltest.TestCase):
     arg0 = np.array([1., 2., 3., 4.], dtype=np.float32)
     arg1 = np.array([4., 5., 6., 7.], dtype=np.float32)
     results = arithmetic.simple_mul(arg0, arg1)
+    print("SIMPLE_MUL RESULTS:", results)
     np.testing.assert_allclose(results, [4., 10., 18., 28.])
 
 

@@ -21,7 +21,6 @@ iree_cc_library(
     "LLVMCPUCheckIRBeforeLLVMConversion.cpp"
     "LLVMCPULowerExecutableTarget.cpp"
     "LLVMCPUSynchronizeSymbolVisibility.cpp"
-    "LLVMCPUTileAndVectorizeLinalgTensorOps.cpp"
     "LLVMCPUTileFuseAndVectorizeLinalgTensorOps.cpp"
     "LLVMCPUUnfuseFMAOps.cpp"
     "Passes.cpp"
@@ -34,6 +33,8 @@ iree_cc_library(
     MLIRAnalysis
     MLIRArithmeticToLLVM
     MLIRArithmeticTransforms
+    MLIRArmNeon
+    MLIRArmNeon2dToIntr
     MLIRIR
     MLIRLLVMCommonConversion
     MLIRLLVMIR
@@ -50,6 +51,7 @@ iree_cc_library(
     MLIRReconcileUnrealizedCasts
     MLIRSCF
     MLIRSCFToStandard
+    MLIRSCFTransforms
     MLIRStandard
     MLIRStandardOpsTransforms
     MLIRStandardToLLVM

@@ -214,7 +214,7 @@ iree_cc_library(
   PUBLIC
 )
 
-iree_cc_test(
+iree_cc_binary_benchmark(
   NAME
     fpu_state_benchmark
   SRCS
@@ -224,6 +224,7 @@ iree_cc_test(
     benchmark
     iree::base
     iree::testing::benchmark_main
+  TESTONLY
 )
 
 iree_cc_test(
@@ -296,7 +297,7 @@ iree_cc_library(
   PUBLIC
 )
 
-iree_cc_binary(
+iree_cc_binary_benchmark(
   NAME
     synchronization_benchmark
   SRCS
@@ -306,15 +307,6 @@ iree_cc_binary(
     benchmark
     iree::testing::benchmark_main
   TESTONLY
-)
-
-iree_native_test(
-  NAME
-    "synchronization_benchmark_test"
-  ARGS
-    "--benchmark_min_time=0"
-  SRC
-    ::synchronization_benchmark
 )
 
 iree_cc_test(

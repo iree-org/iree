@@ -131,9 +131,10 @@ struct DemoteF32ToF16Pass : public DemoteF32ToF16Base<DemoteF32ToF16Pass> {
     ModuleOp moduleOp = getOperation();
 
     FloatTypeConverter converter;
-    OwningRewritePatternList patterns(&getContext());
+    RewritePatternSet patterns(&getContext());
     patterns.insert<GenericTypeConvert>(context, converter);
-    populateFunctionLikeTypeConversionPattern<FuncOp>(patterns, converter);
+    populateFunctionOpInterfaceTypeConversionPattern<FuncOp>(patterns,
+                                                             converter);
     ConversionTarget target(*context);
     // Operations are legal if they don't contain any illegal type.
     target.markUnknownOpDynamicallyLegal([](Operation *op) {

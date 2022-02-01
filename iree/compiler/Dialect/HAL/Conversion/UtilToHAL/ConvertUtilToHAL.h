@@ -19,7 +19,7 @@ namespace iree_compiler {
 void populateUtilToHALPatterns(MLIRContext *context,
                                ConversionTarget &conversionTarget,
                                TypeConverter &typeConverter,
-                               OwningRewritePatternList &patterns);
+                               RewritePatternSet &patterns);
 
 }  // namespace iree_compiler
 }  // namespace mlir

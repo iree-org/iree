@@ -14,7 +14,7 @@ namespace iree_compiler {
 void populateHALBufferViewToVMPatterns(MLIRContext *context,
                                        SymbolTable &importSymbols,
                                        TypeConverter &typeConverter,
-                                       OwningRewritePatternList &patterns) {
+                                       RewritePatternSet &patterns) {
   patterns.insert<VMImportOpConversion<IREE::HAL::BufferViewCreateOp>>(
       context, importSymbols, typeConverter, "hal.buffer_view.create");
   patterns.insert<VMImportOpConversion<IREE::HAL::BufferViewAssertOp>>(

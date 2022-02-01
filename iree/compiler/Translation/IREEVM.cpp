@@ -281,6 +281,7 @@ void registerIREEVMTranslationFlags() {
   IREE::HAL::TargetOptions::FromFlags::get();
   IREE::VM::TargetOptions::FromFlags::get();
   IREE::VM::BytecodeTargetOptions::FromFlags::get();
+  SchedulingOptions::FromFlags::get();
 }
 
 void registerIREEVMTranslation() {

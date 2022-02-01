@@ -115,7 +115,7 @@ def binary_not_in_():
 # CHECK-DAG: %[[Y:.*]] = load_var %y
 # CHECK: %[[XP:.*]], %[[YP:.*]] = dynamic_binary_promote %[[X]], %[[Y]]
 # CHECK: %[[R1:.*]] = apply_compare "lt", %[[XP]], %[[YP]]
-# CHECK: %[[RESULT:.*]] = functional_if %[[R1]] {{.*}} {
+# CHECK: %[[RESULT:.*]] = functional_if %[[R1]] {{.*}}{
 # CHECK:   %[[Z:.*]] = load_var %z
 # NOTE: Promotion happens on original loaded values, not already promoted
 # values.
@@ -144,7 +144,7 @@ def short_circuit():
 
 # CHECK-LABEL: nested_short_circuit_expression
 # Verify that the nested expression is evaluated in the context of the if.
-# CHECK: functional_if {{.*}} {
+# CHECK: functional_if {{.*}}{
 # CHECK:   apply_binary "add"
 # CHECK: } else {
 @test_import_global

@@ -13,9 +13,11 @@
 #include "iree/compiler/Codegen/Sandbox/Passes.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "llvm/Support/CommandLine.h"
+#include "mlir/Conversion/ReconcileUnrealizedCasts/ReconcileUnrealizedCasts.h"
 #include "mlir/Conversion/SCFToStandard/SCFToStandard.h"
 #include "mlir/Dialect/Arithmetic/Transforms/Passes.h"
 #include "mlir/Dialect/Linalg/Passes.h"
+#include "mlir/Dialect/MemRef/Transforms/Passes.h"
 #include "mlir/Dialect/StandardOps/Transforms/Passes.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Transforms/Passes.h"
@@ -67,7 +69,7 @@ static void cpuComprehensiveBufferizeCopyFn(OpBuilder &builder, Location loc,
 // Codegen configuration verifications.
 //===---------------------------------------------------------------------===//
 
-LogicalResult verifyTensorToVectorsPassPipelineConfig(
+LogicalResult verifyDoubleTilingExpertPassPipelineConfig(
     Operation *op, IREE::Codegen::LoweringConfigAttr loweringConfig,
     IREE::Codegen::TranslationInfoAttr translationInfo,
     ArrayRef<int64_t> workgroupSize) {
@@ -78,7 +80,7 @@ LogicalResult verifyTensorToVectorsPassPipelineConfig(
 
   // Verify that the translation info is using the right pipeline.
   auto pipeline =
-      IREE::Codegen::DispatchLoweringPassPipeline::CPUTensorToVectors;
+      IREE::Codegen::DispatchLoweringPassPipeline::CPUDoubleTilingExpert;
   StringRef pipelineName = stringifyEnum(pipeline);
   if (translationInfo.getDispatchLoweringPassPipeline() != pipeline) {
     return op->emitOpError("expected pipeline in translation.info to be ")
@@ -106,11 +108,12 @@ LogicalResult verifyTensorToVectorsPassPipelineConfig(
     return op->emitOpError("invalid to use 0 in workload_per_wg");
   }
 
-  if (loweringConfig.getTileSizes().size() != 3) {
-    return op->emitOpError("expected three levels of tile sizes for ")
+  if (loweringConfig.getTileSizes().size() != 2) {
+    return op->emitOpError("expected two levels of tile sizes for ")
            << pipelineName << ", got " << loweringConfig.getTileSizes().size();
   }
-  SmallVector<int64_t> firstLevelTileSizes = loweringConfig.getTileSizeVals(0);
+  SmallVector<int64_t> firstLevelTileSizes = loweringConfig.getTileSizeVals(
+      static_cast<unsigned>(TilingLevel::WorkGroupTiles));
   if (!firstLevelTileSizes.empty()) {
     // Verify that if the first-level tile sizes are set, they are the same as
     // workload_per_wg for the partitioned loops.
@@ -147,9 +150,8 @@ LogicalResult verifyTensorToVectorsPassPipelineConfig(
   SmallVector<int64_t> nativeVectorSize =
       loweringConfig.getNativeVectorSizeVals();
   if (!nativeVectorSize.empty()) {
-    if (nativeVectorSize !=
-        loweringConfig.getTileSizeVals(
-            static_cast<unsigned>(TilingLevel::VectorTiles))) {
+    if (nativeVectorSize != loweringConfig.getTileSizeVals(
+                                static_cast<unsigned>(TilingLevel::L1Tiles))) {
       return op->emitOpError(
           "native_vector_size must be same as the last level of tiling");
     }
@@ -157,27 +159,13 @@ LogicalResult verifyTensorToVectorsPassPipelineConfig(
   return success();
 }
 
-void addTensorToVectorsPassPipeline(OpPassManager &passManager,
-                                    bool lowerToVectors) {
-  passManager.addPass(createCanonicalizerPass());
-
-  // Tile and vectorize linalg ops on tensors.
-  passManager.addNestedPass<FuncOp>(
-      createLLVMCPUTileAndVectorizePass(lowerToVectors));
-  passManager.addNestedPass<FuncOp>(createCSEPass());
-  passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
-
-  // Use stack allocation on CPU side.
-  addLinalgBufferizePasses(passManager, cpuAllocationFunction);
-  passManager.addNestedPass<FuncOp>(createCSEPass());
-  passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
-
-  passManager.addNestedPass<FuncOp>(createForOpCanonicalizationPass());
-
-  passManager.addNestedPass<FuncOp>(createOptimizeVectorTransferPass());
-}
+//===---------------------------------------------------------------------===//
+// Codegen pipelines.
+//===---------------------------------------------------------------------===//
 
 void addSingleTilingExpertPassPipeline(OpPassManager &passManager) {
+  passManager.addNestedPass<FuncOp>(
+      createConvertToDestinationPassingStylePass());
   passManager.addPass(createCanonicalizerPass());
   // Add the sandbox single tiling expert to tile and vectorize.
   {
@@ -207,19 +195,28 @@ void addSingleTilingExpertPassPipeline(OpPassManager &passManager) {
 }
 
 void addDoubleTilingExpertPassPipeline(OpPassManager &passManager) {
+  passManager.addNestedPass<FuncOp>(
+      createConvertToDestinationPassingStylePass());
+
   passManager.addPass(createCanonicalizerPass());
+
+  // Run LinalgFusePass firstly in case that we have fill + matmul + generic
+  // ops. At this stage, we do not apply vectorization. The reduction dim won't
+  // get tiled if the case is matmul + generic op. In this case, we have to tile
+  // along reduction dim again, which needs them to be Linalg ops form.
   {
-    passManager.addNestedPass<FuncOp>(createRemoveSingleIterationLoopPass());
-    LinalgSingleTilingExpertPassOptions options;
+    LinalgFusePassOptions options;
     options.tilingLevel = static_cast<int64_t>(TilingLevel::L1Tiles);
-    options.tileInterchange = {0, 2, 1};
-    passManager.addNestedPass<FuncOp>(
-        createLinalgSingleTilingExpertPass(options));
+    passManager.addNestedPass<FuncOp>(createLinalgFusePass(options));
     passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
     passManager.addNestedPass<FuncOp>(createCSEPass());
   }
 
   // Add the sandbox single tiling expert to tile and vectorize.
+  // This might create three addtional one-trip loops if the dim sizes are not
+  // divisible by tiling sizes. It would affect performance for some cases,
+  // e.g., matmul( 1x384, 384x384 ), etc.
+  // TODO(hanchung): Add canonicalization patterns to remove one-trip loops.
   {
     // The options are derived from sandbox codegen driver. hoistPadding options
     // does not work in IREE cases. It's fine to not have it, since it's already
@@ -230,10 +227,11 @@ void addDoubleTilingExpertPassPipeline(OpPassManager &passManager) {
     options.pad = true;
     options.packPaddings = {1, 1, 0};
     // options.hoistPaddings = {5, 6, 0};
-    options.tilingLevel = static_cast<int64_t>(TilingLevel::VectorTiles);
-    options.tileInterchange = {0, 1, 2};
+    options.tilingLevel = static_cast<int64_t>(TilingLevel::L1Tiles);
     passManager.addNestedPass<FuncOp>(
         createLinalgSingleTilingExpertPass(options));
+    passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
+    passManager.addNestedPass<FuncOp>(createCSEPass());
   }
 
   // TODO(ravishankarm): This is commented cause this is WIP, to be enabled
@@ -245,6 +243,9 @@ void addDoubleTilingExpertPassPipeline(OpPassManager &passManager) {
   //         cpuComprehensiveBufferizeCopyFn);
   // addIREEComprehensiveBufferizePasses(passManager, std::move(callbacks));
   addLinalgBufferizePasses(passManager, cpuAllocationFunction);
+
+  // Run IREE specific passes before vector lowering expert.
+  passManager.addNestedPass<FuncOp>(createRemoveSingleIterationLoopPass());
 
   // Add the vector lowering expert.
   {
@@ -313,10 +314,14 @@ static void addLowerToLLVMPasses(OpPassManager &passManager) {
   passManager.addPass(createTensorConstantBufferizePass());
   passManager.addPass(createFoldTensorExtractOpPass());
 
+  // math dialect elementry functions -> polynomial form.
+  passManager.addNestedPass<FuncOp>(createPolynomialApproximationPass());
+
   // (HAL, IREE, Linalg, STD) -> LLVM
   passManager.addNestedPass<FuncOp>(arith::createArithmeticExpandOpsPass());
-  passManager.addNestedPass<FuncOp>(createStdExpandOpsPass());
+  passManager.addNestedPass<FuncOp>(memref::createExpandOpsPass());
   passManager.addPass(createConvertToLLVMPass());
+  passManager.addPass(createReconcileUnrealizedCastsPass());
 
   // We rely on MLIR symbol visibility being correct after this point and need
   // to mirror the LLVM linkage that was assigned during conversion.
@@ -327,6 +332,8 @@ static void addLowerToLLVMPasses(OpPassManager &passManager) {
 }
 
 void buildLLVMCPUCodegenPassPipeline(OpPassManager &passManager) {
+  passManager.nest<ModuleOp>().nest<FuncOp>().addPass(
+      createTypePropagationPass());
   passManager.addPass(createLLVMCPULowerExecutableTargetPass());
   OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
   addLowerToLLVMPasses(nestedModulePM);

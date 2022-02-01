@@ -772,33 +772,46 @@ Operation *FftOp::getTiledImplementation(OpBuilder &builder, ValueRange outputs,
 //===----------------------------------------------------------------------===//
 
 static LogicalResult verifyScanOp(ScanOp op) {
-  if (op.getNumInputs() != 2) {
-    return op.emitOpError("expected two input operands");
+  if (op.getNumInputs() != 1) {
+    return op.emitOpError("expected one input operands");
   }
-  if (op.getNumOutputs() != 1) {
-    return op.emitOpError("expected one output operand");
+  if (op.getNumOutputs() != 2) {
+    return op.emitOpError("expected two output operands");
   }
   if (!op.input().getType().isa<ShapedType>()) {
     return op.emitOpError("expected first input element type to be shaped");
   }
-  auto identityElementType = op.identity().getType();
-  if (!(identityElementType.isa<FloatType>() ||
-        identityElementType.isa<IntegerType>())) {
-    return op.emitOpError(
-        "expected second input element type to be float or integer");
-  }
+  auto accumulatorType = op.accumulator().getType().cast<ShapedType>();
   auto inputType = op.input().getType().cast<ShapedType>();
   auto outputType = op.output().getType().cast<ShapedType>();
-  if (identityElementType != inputType.getElementType()) {
+  ArrayRef<int64_t> inputShapes = inputType.getShape();
+  ArrayRef<int64_t> outputShapes = outputType.getShape();
+  if (accumulatorType.getElementType() != inputType.getElementType()) {
     return op.emitOpError(
-        "expected input/identity element types to be identical");
+        "expected input/accumulator element types to be identical");
+  }
+  ArrayRef<int64_t> accumulatorShape = accumulatorType.getShape();
+  int64_t accumulatorRank = accumulatorType.getRank();
+  if (accumulatorRank != inputType.getRank() - 1) {
+    return op.emitOpError(
+        "expected accumulator rank to be equal to input rank - 1");
+  }
+  SmallVector<int64_t> expectedAccumulatorShape;
+  for (int i = 0; i < inputType.getRank(); i++) {
+    if (i != op.dimension()) expectedAccumulatorShape.push_back(inputShapes[i]);
+  }
+  if (llvm::any_of(llvm::zip(expectedAccumulatorShape, accumulatorShape),
+                   [](std::tuple<int64_t, int64_t> s) {
+                     return std::get<0>(s) != ShapedType::kDynamicSize &&
+                            std::get<1>(s) != ShapedType::kDynamicSize &&
+                            std::get<0>(s) != std::get<1>(s);
+                   })) {
+    return op.emitOpError("incompatible input/accumulator shapes");
   }
   if (inputType.getElementType() != outputType.getElementType()) {
     return op.emitOpError(
         "expected input/output element types to be identical");
   }
-  ArrayRef<int64_t> inputShapes = inputType.getShape();
-  ArrayRef<int64_t> outputShapes = outputType.getShape();
   if (inputShapes.size() != outputShapes.size()) {
     return op.emitOpError("expected input/output to have identical ranks");
   }
@@ -862,6 +875,11 @@ LogicalResult ScanOp::generateScalarImplementation(OpBuilder &b, Location loc,
   auto cond = b.create<arith::CmpIOp>(loc, arith::CmpIPredicate::eq,
                                       indices[scanDim], zero);
   bool isInclusive = inclusive();
+  SmallVector<Value> accIndices;
+  for (int i = 0; i < indices.size(); i++) {
+    if (i != scanDim) accIndices.push_back(indices[i]);
+  }
+
   auto scfIf = b.create<scf::IfOp>(
       loc, TypeRange{}, cond,
       [&](OpBuilder &b, Location loc) {
@@ -869,7 +887,8 @@ LogicalResult ScanOp::generateScalarImplementation(OpBuilder &b, Location loc,
           auto value = b.create<memref::LoadOp>(loc, input(), indices);
           b.create<memref::StoreOp>(loc, value, output(), indices);
         } else {
-          b.create<memref::StoreOp>(loc, identity(), output(), indices);
+          auto value = b.create<memref::LoadOp>(loc, accumulator(), accIndices);
+          b.create<memref::StoreOp>(loc, value, output(), indices);
         }
         b.create<scf::YieldOp>(loc);
       },
@@ -902,6 +921,9 @@ LogicalResult ScanOp::generateScalarImplementation(OpBuilder &b, Location loc,
     b.create<memref::StoreOp>(
         loc, bvm.lookupOrDefault(srcBlock.getTerminator()->getOperand(0)),
         output(), indices);
+    b.create<memref::StoreOp>(
+        loc, bvm.lookupOrDefault(srcBlock.getTerminator()->getOperand(0)),
+        accumulator(), accIndices);
     b.create<scf::YieldOp>(loc);
   }
   return success();
@@ -922,23 +944,59 @@ Operation *ScanOp::getTiledImplementation(OpBuilder &builder,
   SmallVector<Value> tiledOperands;
   tiledOperands.emplace_back(
       getSlice(builder, getLoc(), input(), offsets, sizes, strides));
-  tiledOperands.emplace_back(identity());
   tiledOperands.emplace_back(
-      getSlice(builder, getLoc(), output(), offsets, sizes, strides));
+      getSlice(builder, getLoc(), outputs[0], offsets, sizes, strides));
+  SmallVector<OpFoldResult> accumOffsets, accumSizes, accumStrides;
+  if (rank > 1) {
+    for (int i = 0; i < rank; i++) {
+      if (i != dimension()) {
+        accumOffsets.push_back(offsets[i]);
+        accumSizes.push_back(sizes[i]);
+        accumStrides.push_back(strides[i]);
+      }
+    }
+    tiledOperands.emplace_back(getSlice(
+        builder, getLoc(), outputs[1], accumOffsets, accumSizes, accumStrides));
+  } else {
+    tiledOperands.emplace_back(outputs[1]);
+  }
 
   SmallVector<Type, 4> resultTypes;
   if (hasTensorSemantics()) {
+    resultTypes.push_back(tiledOperands[1].getType());
     resultTypes.push_back(tiledOperands[2].getType());
   }
 
   Operation *tiledScanOp = cast<LinalgExtOp>(getOperation())
                                .clone(builder, loc, resultTypes, tiledOperands);
   for (auto result : llvm::enumerate(tiledScanOp->getResults())) {
+    if ((result.index() == resultTypes.size() - 1) && (rank > 1)) {
+      offsets = accumOffsets;
+      sizes = accumSizes;
+      strides = accumStrides;
+    }
     auto insertSliceOp = builder.create<tensor::InsertSliceOp>(
         loc, result.value(), outputs[result.index()], offsets, sizes, strides);
     results.push_back(insertSliceOp.getResult());
   }
   return tiledScanOp;
+}
+
+static LogicalResult foldMemRefCast(Operation *op) {
+  bool folded = false;
+  for (OpOperand &operand : op->getOpOperands()) {
+    auto castOp = operand.get().getDefiningOp<memref::CastOp>();
+    if (castOp && memref::CastOp::canFoldIntoConsumerOp(castOp)) {
+      operand.set(castOp.getOperand());
+      folded = true;
+    }
+  }
+  return success(folded);
+}
+
+LogicalResult ScanOp::fold(ArrayRef<Attribute>,
+                           SmallVectorImpl<OpFoldResult> &) {
+  return foldMemRefCast(*this);
 }
 
 //===----------------------------------------------------------------------===//

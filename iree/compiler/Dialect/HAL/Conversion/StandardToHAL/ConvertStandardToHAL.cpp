@@ -19,18 +19,18 @@ namespace iree_compiler {
 
 void populateStandardShapeToHALPatterns(MLIRContext *context,
                                         ConversionTarget &conversionTarget,
-                                        OwningRewritePatternList &patterns,
+                                        RewritePatternSet &patterns,
                                         TypeConverter &converter);
 
 void populateStandardStructuralToHALPatterns(MLIRContext *context,
                                              ConversionTarget &conversionTarget,
-                                             OwningRewritePatternList &patterns,
+                                             RewritePatternSet &patterns,
                                              TypeConverter &converter);
 
 void populateStandardToHALPatterns(MLIRContext *context,
                                    ConversionTarget &conversionTarget,
                                    TypeConverter &typeConverter,
-                                   OwningRewritePatternList &patterns) {
+                                   RewritePatternSet &patterns) {
   populateStandardShapeToHALPatterns(context, conversionTarget, patterns,
                                      typeConverter);
   populateStandardStructuralToHALPatterns(context, conversionTarget, patterns,

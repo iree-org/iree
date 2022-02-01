@@ -84,12 +84,15 @@ static void addMemRefLoweringPasses(OpPassManager &pm) {
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
+  // math dialect elementry functions -> polynomial form.
+  pm.addNestedPass<FuncOp>(createPolynomialApproximationPass());
+
   // Fold load/store from/to subview ops into the original memref when possible.
   // In SPIR-V we don't use memref descriptor so it's not possible to handle
   // subview ops.
   pm.addPass(memref::createFoldSubViewOpsPass());
   pm.addNestedPass<FuncOp>(arith::createArithmeticExpandOpsPass());
-  pm.addNestedPass<FuncOp>(createStdExpandOpsPass());
+  pm.addNestedPass<FuncOp>(memref::createExpandOpsPass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
@@ -224,6 +227,7 @@ void addSPIRVTileAndDistributeCopyPassPipeline(OpPassManager &pm) {
 //===----------------------------------------------------------------------===//
 
 void buildSPIRVCodegenPassPipeline(OpPassManager &pm) {
+  pm.nest<ModuleOp>().nest<FuncOp>().addPass(createTypePropagationPass());
   pm.addPass(createSPIRVLowerExecutableTargetPass());
   addMemRefLoweringPasses(pm.nest<ModuleOp>());
   addSPIRVLoweringPasses(pm.nest<ModuleOp>());

@@ -42,6 +42,11 @@ enum iree_hal_buffer_compatibility_bits_t {
   // valid.
   IREE_HAL_BUFFER_COMPATIBILITY_IMPORTABLE = 1u << 1,
 
+  // Indicates that the allocator could export external buffers of this type and
+  // usage natively. Exports may fail due to runtime conditions (out of handles,
+  // etc) but are otherwise valid.
+  IREE_HAL_BUFFER_COMPATIBILITY_EXPORTABLE = 1u << 2,
+
   // Indicates that the buffer can be used as a transfer source or target on the
   // a device queue (such as being the source or target of a DMA operation,
   // etc). If not set then the buffer may still be usable for
@@ -52,6 +57,108 @@ enum iree_hal_buffer_compatibility_bits_t {
   IREE_HAL_BUFFER_COMPATIBILITY_QUEUE_DISPATCH = 1u << 11,
 };
 typedef uint32_t iree_hal_buffer_compatibility_t;
+
+// Defines the type of an external buffer handle.
+// Each type may only be usable in a subset of implementations and platforms and
+// may even vary based on the runtime device properties or buffer instance.
+//
+// See the notes on each type for requirements; compatibility often requires
+// the handle to check and trying to import/export is the most reliable way to
+// check for support.
+//
+// The Vulkan documentation on external memory covers a lot of the design
+// decisions made here:
+// https://www.khronos.org/registry/vulkan/specs/1.3-extensions/man/html/VK_KHR_external_memory.html
+typedef enum iree_hal_external_buffer_type_e {
+  IREE_HAL_EXTERNAL_BUFFER_TYPE_NONE = 0,
+
+  // A host pointer allocated from an external allocator.
+  // An imported/exported buffer does not own a reference to the memory and the
+  // caller is responsible for ensuring the memory remains live for as long as
+  // the iree_hal_buffer_t referencing it.
+  //
+  // CUDA:
+  //  Requires device support.
+  //  Uses cuMemHostRegister / cuMemHostUnregister.
+  //  The memory type specified on import/export determines the required device
+  //  capabilities.
+  //
+  // Vulkan:
+  //  Requires VK_EXT_external_memory_host.
+  //  Requires device support.
+  //  Uses VK_EXTERNAL_MEMORY_HANDLE_TYPE_HOST_ALLOCATION_BIT_EXT.
+  IREE_HAL_EXTERNAL_BUFFER_TYPE_HOST_ALLOCATION = 1,
+
+  // A driver/device-specific POSIX file descriptor handle.
+  // The handle supports dup, dup2, close, and transport using the SCM_RIGHTS
+  // control message. All other usage with system APIs is undefined.
+  // An imported/exported handle owns a reference to the underlying allocator
+  // memory. May only be shared with the same underlying driver and device
+  //
+  // CUDA:
+  //  Requires device support.
+  //  Uses CU_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD.
+  //
+  // Vulkan:
+  //  Requires device support.
+  //  Uses VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT.
+  IREE_HAL_EXTERNAL_BUFFER_TYPE_OPAQUE_FD = 2,
+
+  // A driver/device-specific Win32 HANDLE.
+  // The handle supports DuplicateHandle, CompareObjectHandles, CloseHandle, and
+  // Get/SetHandleInformation. All other usage with system APIs is undefined.
+  // An imported/exported handle owns a reference to the underlying allocator
+  // memory. Must only be shared with the same underlying driver and device.
+  //
+  // CUDA:
+  //  Requires device support.
+  //  Uses CU_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32.
+  //
+  // Vulkan:
+  //  Requires device support.
+  //  Uses VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_BIT.
+  IREE_HAL_EXTERNAL_BUFFER_TYPE_OPAQUE_WIN32 = 3,
+
+  // TODO(benvanik): additional memory types:
+  //  shared memory fd (shmem)/mapped file
+  //  VK_EXTERNAL_MEMORY_HANDLE_TYPE_DMA_BUF_BIT_EXT
+  //  VK_EXTERNAL_MEMORY_HANDLE_TYPE_ANDROID_HARDWARE_BUFFER_BIT_ANDROID
+} iree_hal_external_buffer_type_t;
+
+// Flags for controlling iree_hal_external_buffer_t implementation details.
+enum iree_hal_external_buffer_flag_bits_t {
+  IREE_HAL_EXTERNAL_BUFFER_FLAG_NONE = 0u,
+};
+typedef uint32_t iree_hal_external_buffer_flags_t;
+
+// Handle to a typed external buffer.
+// This is a non-owning reference and the underlying allocation must remain
+// valid for as long as the handle is in use. Some buffer types support internal
+// referencing counting but in general ownership remains with the caller.
+// See the type enum for more information.
+typedef struct iree_hal_external_buffer_t {
+  // Type of the resource used to interpret the handle.
+  iree_hal_external_buffer_type_t type;
+  // Flags indicating buffer compatibility.
+  iree_hal_external_buffer_flags_t flags;
+  // Total size of the external resource in bytes.
+  iree_device_size_t size;
+  union {
+    // IREE_HAL_EXTERNAL_BUFFER_TYPE_HOST_ALLOCATION
+    struct {
+      // Host memory pointer.
+      void* ptr;
+    } host_allocation;
+    // IREE_HAL_EXTERNAL_BUFFER_TYPE_OPAQUE_FD
+    struct {
+      int fd;
+    } opaque_fd;
+    // IREE_HAL_EXTERNAL_BUFFER_TYPE_OPAQUE_WIN32
+    struct {
+      void* handle;
+    } opaque_win32;
+  } handle;
+} iree_hal_external_buffer_t;
 
 //===----------------------------------------------------------------------===//
 // Statistics/reporting
@@ -107,6 +214,11 @@ iree_status_t iree_hal_allocator_trim(iree_hal_allocator_t* allocator);
 IREE_API_EXPORT void iree_hal_allocator_query_statistics(
     iree_hal_allocator_t* allocator,
     iree_hal_allocator_statistics_t* out_statistics);
+
+// Prints the current allocation statistics of |allocator| to |file|.
+// No-op if statistics are not enabled (IREE_STATISTICS_ENABLE).
+IREE_API_EXPORT iree_status_t iree_hal_allocator_statistics_fprint(
+    FILE* file, iree_hal_allocator_t* allocator);
 
 // Returns a bitmask indicating what operations with buffers of the given type
 // are available on the allocator.
@@ -167,10 +279,43 @@ IREE_API_EXPORT iree_status_t iree_hal_allocator_wrap_buffer(
     iree_hal_buffer_usage_t allowed_usage, iree_byte_span_t data,
     iree_allocator_t data_allocator, iree_hal_buffer_t** out_buffer);
 
-// Prints the current allocation statistics of |allocator| to |file|.
-// No-op if statistics are not enabled (IREE_STATISTICS_ENABLE).
-IREE_API_EXPORT iree_status_t iree_hal_allocator_statistics_fprint(
-    FILE* file, iree_hal_allocator_t* allocator);
+// TODO(benvanik): iree_hal_allocator_query_external_buffer_compatibility to
+// check for support without needing an external buffer already. There's a few
+// usage modes and it'd be nice to have a single function for it to keep the
+// interface slimmer.
+
+// Imports an externally-owned |external_buffer| to a buffer handle.
+// See notes on iree_hal_external_buffer_type_t for ownership information;
+// depending on the type the caller may be responsible for ensuring the external
+// buffer remains valid for the duration it is in use by the returned
+// iree_hal_buffer_t. The returned external buffer may only be usable with the
+// same driver/device.
+//
+// Fails with IREE_STATUS_UNAVAILABLE if the allocator cannot import the buffer
+// into the given memory type. This may be due to unavailable device/platform
+// capabilities or the memory type the external buffer was allocated with.
+IREE_API_EXPORT iree_status_t iree_hal_allocator_import_buffer(
+    iree_hal_allocator_t* allocator, iree_hal_memory_type_t memory_type,
+    iree_hal_memory_access_t allowed_access,
+    iree_hal_buffer_usage_t allowed_usage,
+    iree_hal_external_buffer_t* external_buffer,
+    iree_hal_buffer_t** out_buffer);
+
+// Exports an allocator-owned |buffer| to an external buffer handle.
+// See the notes on iree_hal_external_buffer_type_t for ownership information.
+// Upon successful return the caller is responsible for any required lifetime
+// management on the external buffer which may include ensuring that the
+// provided source |buffer| is kept live. The returned external buffer may only
+// be usable with the same driver/device.
+//
+// Fails with IREE_STATUS_UNAVAILABLE if the allocator cannot export the buffer
+// into the external type. This may be due to unavailable device/platform
+// capabilities or the memory type the buffer was allocated with.
+IREE_API_EXPORT iree_status_t iree_hal_allocator_export_buffer(
+    iree_hal_allocator_t* allocator, iree_hal_buffer_t* buffer,
+    iree_hal_external_buffer_type_t requested_type,
+    iree_hal_external_buffer_flags_t requested_flags,
+    iree_hal_external_buffer_t* out_external_buffer);
 
 //===----------------------------------------------------------------------===//
 // iree_hal_heap_allocator_t
@@ -216,14 +361,27 @@ typedef struct iree_hal_allocator_vtable_t {
       iree_hal_buffer_usage_t allowed_usage, iree_host_size_t allocation_size,
       iree_const_byte_span_t initial_data, iree_hal_buffer_t** out_buffer);
 
+  void(IREE_API_PTR* deallocate_buffer)(iree_hal_allocator_t* allocator,
+                                        iree_hal_buffer_t* buffer);
+
   iree_status_t(IREE_API_PTR* wrap_buffer)(
       iree_hal_allocator_t* allocator, iree_hal_memory_type_t memory_type,
       iree_hal_memory_access_t allowed_access,
       iree_hal_buffer_usage_t allowed_usage, iree_byte_span_t data,
       iree_allocator_t data_allocator, iree_hal_buffer_t** out_buffer);
 
-  void(IREE_API_PTR* deallocate_buffer)(iree_hal_allocator_t* allocator,
-                                        iree_hal_buffer_t* buffer);
+  iree_status_t(IREE_API_PTR* import_buffer)(
+      iree_hal_allocator_t* allocator, iree_hal_memory_type_t memory_type,
+      iree_hal_memory_access_t allowed_access,
+      iree_hal_buffer_usage_t allowed_usage,
+      iree_hal_external_buffer_t* external_buffer,
+      iree_hal_buffer_t** out_buffer);
+
+  iree_status_t(IREE_API_PTR* export_buffer)(
+      iree_hal_allocator_t* allocator, iree_hal_buffer_t* buffer,
+      iree_hal_external_buffer_type_t requested_type,
+      iree_hal_external_buffer_flags_t requested_flags,
+      iree_hal_external_buffer_t* out_external_buffer);
 } iree_hal_allocator_vtable_t;
 IREE_HAL_ASSERT_VTABLE_LAYOUT(iree_hal_allocator_vtable_t);
 

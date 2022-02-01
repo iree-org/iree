@@ -91,21 +91,22 @@ iree_check_single_backend_test_suite(
     target_backend = "vulkan-spirv",
 )
 
-iree_check_single_backend_test_suite(
-    name = "check_regression_cuda",
-    srcs = BACKEND_TESTS,
-    compiler_flags = ["-iree-input-type=mhlo"],
-    driver = "cuda",
-    tags = [
-        # CUDA cuInit fails with sanitizer on.
-        "noasan",
-        "nomsan",
-        "notsan",
-        "noubsan",
-        "requires-gpu-nvidia",
-    ],
-    target_backend = "cuda",
-)
+# Temporarily disabled pending build system changes.
+# iree_check_single_backend_test_suite(
+#     name = "check_regression_cuda",
+#     srcs = BACKEND_TESTS,
+#     compiler_flags = ["-iree-input-type=mhlo"],
+#     driver = "cuda",
+#     tags = [
+#         # CUDA cuInit fails with sanitizer on.
+#         "noasan",
+#         "nomsan",
+#         "notsan",
+#         "noubsan",
+#         "requires-gpu-nvidia",
+#     ],
+#     target_backend = "cuda",
+# )
 
 py_binary(
     name = "generate_e2e_matmul_tests",
@@ -129,6 +130,7 @@ py_binary(
     "f32",
 ]]
 
+# Test asm
 [iree_generated_trace_runner_test(
     name = "e2e_matmul_mmt4d_%s_small" % lhs_rhs_type,
     generator = ":generate_e2e_matmul_tests",
@@ -175,4 +177,33 @@ py_binary(
 ) for lhs_rhs_type in [
     "i8",
     "f32",
+]]
+
+# Test intrinsics. No need to run vmvx again, since it isn't affected by this
+# codegen flag.
+[iree_generated_trace_runner_test(
+    name = "e2e_matmul_mmt4d_%s_intrinsics_%s" % (lhs_rhs_type, size),
+    compiler_flags = ["--iree-codegen-mmt4d-use-intrinsics"],
+    generator = ":generate_e2e_matmul_tests",
+    generator_args = [
+        "--lhs_rhs_type=%s" % lhs_rhs_type,
+        "--shapes=%s" % size,
+    ],
+    opt_flags = [
+        "--iree-flow-convert-linalg-matmul-to-mmt4d=M0=8 K0=%d N0=8" % (4 if lhs_rhs_type == "i8" else 1),
+    ],
+    target_backends_and_drivers = [
+        ("dylib-llvm-aot", "dylib"),
+    ],
+    target_cpu_features_variants = [
+        "default",
+        "aarch64:+dotprod",
+    ],
+    trace_runner = "//iree/tools:iree-e2e-matmul-test",
+) for lhs_rhs_type in [
+    "i8",
+    "f32",
+] for size in [
+    "small",
+    "large",
 ]]

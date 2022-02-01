@@ -13,6 +13,7 @@
 //===----------------------------------------------------------------------===//
 #include <memory>
 
+#include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/InputConversion/MHLO/ConvertMHLOToFlow.h"
 #include "iree/compiler/InputConversion/MHLO/PassDetail.h"
@@ -303,7 +304,7 @@ struct ConvertMHLOToLinalgOnTensorsPass
   }
 
   void runOnOperation() override {
-    OwningRewritePatternList patterns(&getContext());
+    RewritePatternSet patterns(&getContext());
     MLIRContext *context = &getContext();
 
     auto typeConverter = mhlo::createHloToLinalgSignedIntegerConverter();
@@ -362,6 +363,7 @@ struct ConvertMHLOToLinalgOnTensorsPass
 
     // Let the rest fall through.
     target.addLegalDialect<BuiltinDialect>();
+    target.addLegalDialect<IREE::LinalgExt::IREELinalgExtDialect>();
     target.markUnknownOpDynamicallyLegal(isLegallyTypedOp);
 
     if (failed(applyPartialConversion(getOperation(), target,
@@ -375,7 +377,7 @@ struct ConvertMHLOToLinalgOnTensorsPass
 
 void populateMHLOToLinalgOnTensorsConversionPatterns(
     MLIRContext *context, TypeConverter &typeConverter,
-    OwningRewritePatternList &patterns) {
+    RewritePatternSet &patterns) {
   mhlo::populateHLOToLinalgConversionPattern(context, typeConverter, &patterns);
   // TODO(#5809): Drop ConcatenateOp lowering in favor of the upstream version
   //              then remove the PatternBenefit here

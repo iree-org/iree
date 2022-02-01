@@ -16,6 +16,7 @@
 #include "mlir/Analysis/DataLayoutAnalysis.h"
 #include "mlir/Conversion/AffineToStandard/AffineToStandard.h"
 #include "mlir/Conversion/ArithmeticToLLVM/ArithmeticToLLVM.h"
+#include "mlir/Conversion/ArmNeon2dToIntr/ArmNeon2dToIntr.h"
 #include "mlir/Conversion/LLVMCommon/ConversionTarget.h"
 #include "mlir/Conversion/LLVMCommon/LoweringOptions.h"
 #include "mlir/Conversion/LLVMCommon/Pattern.h"
@@ -30,6 +31,7 @@
 #include "mlir/Conversion/TosaToStandard/TosaToStandard.h"
 #include "mlir/Conversion/VectorToLLVM/ConvertVectorToLLVM.h"
 #include "mlir/Conversion/VectorToSCF/VectorToSCF.h"
+#include "mlir/Dialect/ArmNeon/ArmNeonDialect.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/LLVMIR/LLVMTypes.h"
 #include "mlir/Dialect/Math/IR/Math.h"
@@ -434,7 +436,7 @@ class ConvertHALEntryPointFuncOp : public ConvertToLLVMPattern {
     SmallVector<NamedAttribute, 4> funcAttrs;
     for (auto attr : stdFuncOp->getAttrs()) {
       if (attr.getName() == SymbolTable::getSymbolAttrName() ||
-          attr.getName() == mlir::function_like_impl::getTypeAttrName()) {
+          attr.getName() == mlir::function_interface_impl::getTypeAttrName()) {
         continue;
       }
       funcAttrs.push_back(attr);
@@ -615,7 +617,7 @@ class ConvertToLLVMPass : public ConvertToLLVMBase<ConvertToLLVMPass> {
   ConvertToLLVMPass() = default;
   ConvertToLLVMPass(const ConvertToLLVMPass &pass) {}
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<LLVM::LLVMDialect>();
+    registry.insert<LLVM::LLVMDialect, arm_neon::ArmNeonDialect>();
   }
 
   void runOnOperation() override;
@@ -666,34 +668,25 @@ void ConvertToLLVMPass::runOnOperation() {
 
   // Run Vector -> Vector transformations ahead of conversion to LLVM.
   {
-    OwningRewritePatternList patterns(&getContext());
+    RewritePatternSet patterns(&getContext());
     vector::populateVectorToVectorCanonicalizationPatterns(patterns);
     vector::populateVectorBroadcastLoweringPatterns(patterns);
     vector::populateVectorContractLoweringPatterns(patterns);
     vector::populateVectorMaskOpLoweringPatterns(patterns);
     vector::populateVectorShapeCastLoweringPatterns(patterns);
     vector::populateVectorTransposeLoweringPatterns(patterns);
+    populateConvertArmNeon2dToIntrPatterns(patterns);
     if (failed(applyPatternsAndFoldGreedily(getOperation(),
                                             std::move(patterns)))) {
       return signalPassFailure();
     }
   }
   {
-    OwningRewritePatternList vectorToLoopsPatterns(&getContext());
+    RewritePatternSet vectorToLoopsPatterns(&getContext());
     populateVectorToSCFConversionPatterns(
         vectorToLoopsPatterns, VectorTransferToSCFOptions().enableFullUnroll());
     if (failed(applyPatternsAndFoldGreedily(
             getOperation(), std::move(vectorToLoopsPatterns)))) {
-      return signalPassFailure();
-    }
-  }
-
-  // math dialect elementry functions -> polynomial form.
-  {
-    OwningRewritePatternList mathPatterns(&getContext());
-    populateMathPolynomialApproximationPatterns(mathPatterns);
-    if (failed(applyPatternsAndFoldGreedily(getOperation(),
-                                            std::move(mathPatterns)))) {
       return signalPassFailure();
     }
   }
@@ -705,7 +698,7 @@ void ConvertToLLVMPass::runOnOperation() {
   options.overrideIndexBitwidth(options.dataLayout.getPointerSizeInBits());
   LLVMTypeConverter converter(&getContext(), options, &dataLayoutAnalysis);
 
-  OwningRewritePatternList patterns(&getContext());
+  RewritePatternSet patterns(&getContext());
 
   // Use the default 64-bit lowering for TOSA's ApplyScale operator:
   //   This lowering widens integer types to 64-bit an performs the non-fused
@@ -771,7 +764,7 @@ void ConvertToLLVMPass::runOnOperation() {
 
   // Post conversion patterns.
   {
-    OwningRewritePatternList postPatterns(&getContext());
+    RewritePatternSet postPatterns(&getContext());
     // TODO(ravishankarm): Move this to a separate pass.
     llvm::Triple triple(targetTripleStr);
     if (triple.isWasm()) {

@@ -879,8 +879,8 @@ static Optional<ConstantAllocation> extractConstants(
     // there are any. Otherwise, if it's just yield, we can avoid the capture
     // and implicit dependency.
     if (!constantOp.use_empty() && !isOnlyUseYield(constantOp.result())) {
-      reservation.capturedArg =
-          entryBlock.addArgument(constantOp.result().getType());
+      reservation.capturedArg = entryBlock.addArgument(
+          constantOp.result().getType(), constantOp.getLoc());
     }
 
     allocation.reservations.push_back(reservation);

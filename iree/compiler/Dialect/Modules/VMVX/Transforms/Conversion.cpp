@@ -73,7 +73,7 @@ class ConversionPass
     conversionTarget.addLegalDialect<memref::MemRefDialect>();
     conversionTarget.addLegalOp<mlir::UnrealizedConversionCastOp>();
 
-    OwningRewritePatternList conversionPatterns(&getContext());
+    RewritePatternSet conversionPatterns(&getContext());
     populateHALToVMVXPatterns(context, conversionPatterns, typeConverter);
     populateStandardToVMVXPatterns(context, conversionPatterns, typeConverter);
 

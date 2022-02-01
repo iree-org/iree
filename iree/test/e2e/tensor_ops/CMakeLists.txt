@@ -38,24 +38,6 @@ iree_check_single_backend_test_suite(
 
 iree_check_single_backend_test_suite(
   NAME
-    check_cuda
-  SRCS
-    "extract_slice.mlir"
-    "tensor_insert_slice.mlir"
-  TARGET_BACKEND
-    "cuda"
-  DRIVER
-    "cuda"
-  LABELS
-    "noasan"
-    "nomsan"
-    "notsan"
-    "noubsan"
-    "requires-gpu-nvidia"
-)
-
-iree_check_single_backend_test_suite(
-  NAME
     check_vulkan-spirv_vulkan
   SRCS
     "extract_slice.mlir"

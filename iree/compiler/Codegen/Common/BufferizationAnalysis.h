@@ -64,13 +64,22 @@ class BufferizationPlan {
 
   /// Queries if the value `v` is in the same equivalence class as the result of
   /// the dispatch region.
-  bool isInStoreSet(Value v) { return storeLeaders.count(getLeaderValue(v)); }
+  bool isInStoreSet(Value v) {
+    Value leader = getLeaderValue(v);
+    if (!leader) return false;
+    return storeLeaders.count(leader);
+  }
 
   void dump();
 
  private:
   Value getLeaderValue(Value v1) const {
-    return getValue(mappedTensors.getLeaderValue(getPointer(v1)));
+    void *ptr = getPointer(v1);
+    auto it = mappedTensors.findLeader(ptr);
+    if (it == mappedTensors.member_end()) {
+      return nullptr;
+    }
+    return getValue(*it);
   }
 
   void *getPointer(Value v) const { return v.getAsOpaquePointer(); }

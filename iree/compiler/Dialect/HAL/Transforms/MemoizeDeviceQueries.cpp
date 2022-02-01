@@ -43,7 +43,8 @@ class MemoizeDeviceQueriesPass
     SmallVector<Attribute, 4> deviceQueryKeys;
     DenseMap<Attribute, std::vector<IREE::HAL::DeviceQueryOp>> deviceQueryOps;
     for (Operation &funcLikeOp : moduleOp.getOps()) {
-      if (!funcLikeOp.hasTrait<OpTrait::FunctionLike>()) continue;
+      auto funcOp = llvm::dyn_cast<FunctionOpInterface>(funcLikeOp);
+      if (!funcOp) continue;
       funcLikeOp.walk([&](IREE::HAL::DeviceQueryOp queryOp) {
         auto fullKey = ArrayAttr::get(
             moduleOp.getContext(),

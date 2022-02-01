@@ -32,8 +32,7 @@ namespace iree_compiler {
 /// Patterns for workgroup level tiling. Workgroup tiling is done at the flow
 /// level but we may have extra tiling for the reduction dimension. Therefore we
 /// tile again without distributing.
-static void populateTilingReductionPatterns(
-    OwningRewritePatternList &patterns) {
+static void populateTilingReductionPatterns(RewritePatternSet &patterns) {
   auto tileSizesFn = [&](OpBuilder &builder,
                          Operation *op) -> SmallVector<Value, 4> {
     SmallVector<unsigned> partitionedLoops = getPartitionedLoops(op);
@@ -62,7 +61,7 @@ static void populateTilingReductionPatterns(
 
 /// Patterns for warp level tiling.
 static void populateTilingToWarpPatterns(
-    OwningRewritePatternList &patterns, SmallVectorImpl<int64_t> &workgroupSize,
+    RewritePatternSet &patterns, SmallVectorImpl<int64_t> &workgroupSize,
     SmallVectorImpl<int64_t> &workloadPerWorkgroup) {
   std::array<int64_t, 3> warpPerWorkgroup = {
       workgroupSize[0] / kWarpSize, workgroupSize[1], workgroupSize[2]};
@@ -121,7 +120,7 @@ static void populateTilingToWarpPatterns(
 
 /// Patterns for thread level tiling.
 static void populateTilingToInvocationPatterns(
-    OwningRewritePatternList &patterns, SmallVectorImpl<int64_t> &workgroupSize,
+    RewritePatternSet &patterns, SmallVectorImpl<int64_t> &workgroupSize,
     SmallVectorImpl<int64_t> &workloadPerWorkgroup) {
   linalg::TileSizeComputationFunction getInnerTileSizeFn =
       [&](OpBuilder &builder, Operation *operation) {
@@ -238,7 +237,7 @@ static LogicalResult deallocateWorkgroupMemory(OpBuilder &b, Value buffer) {
 }
 
 static void populatePromotionPatterns(MLIRContext *context,
-                                      OwningRewritePatternList &patterns) {
+                                      RewritePatternSet &patterns) {
   patterns.insert<linalg::LinalgPromotionPattern<linalg::MatmulOp>,
                   linalg::LinalgPromotionPattern<linalg::BatchMatmulOp>>(
       context,
@@ -274,7 +273,7 @@ struct LLVMGPUTileAndDistributePass
       // Tile again at the workgroup level since redution dimension were
       // ignored. Dimensions already tiled will be ignore since we tile to the
       // same size.
-      OwningRewritePatternList wgTilingPatterns(context);
+      RewritePatternSet wgTilingPatterns(context);
       populateTilingReductionPatterns(wgTilingPatterns);
       if (failed(applyPatternsAndFoldGreedily(funcOp,
                                               std::move(wgTilingPatterns)))) {
@@ -308,7 +307,7 @@ struct LLVMGPUTileAndDistributePass
         workgroupSize[0] * workgroupSize[1] * workgroupSize[2];
     // Only promote to workgroup size if there are multiple warps.
     if (flatWorkgroupSize > kWarpSize) {
-      OwningRewritePatternList promotionPatterns(&getContext());
+      RewritePatternSet promotionPatterns(&getContext());
       populatePromotionPatterns(context, promotionPatterns);
       if (failed(applyPatternsAndFoldGreedily(funcOp,
                                               std::move(promotionPatterns)))) {
@@ -349,7 +348,7 @@ struct LLVMGPUTileAndDistributePass
 
     if (distributeToWarp) {
       // Apply last level of tiling and distribute to warps.
-      OwningRewritePatternList warpLevelTilingPatterns(context);
+      RewritePatternSet warpLevelTilingPatterns(context);
       populateTilingToWarpPatterns(warpLevelTilingPatterns, workgroupSize,
                                    workloadPerWorkgroup);
       if (failed(applyPatternsAndFoldGreedily(
@@ -359,7 +358,7 @@ struct LLVMGPUTileAndDistributePass
 
     } else {
       // Apply last level of tiling and distribute to threads.
-      OwningRewritePatternList threadLevelTilingPatterns(context);
+      RewritePatternSet threadLevelTilingPatterns(context);
       populateTilingToInvocationPatterns(threadLevelTilingPatterns,
                                          workgroupSize, workloadPerWorkgroup);
       if (failed(applyPatternsAndFoldGreedily(

@@ -8,9 +8,9 @@
 # These are not part of the IREE API. Though they may be used by external
 # projects their API may change at any time.
 
-load("//build_tools/bazel:native_binary.bzl", "native_test")
 load("//iree:build_defs.oss.bzl", "iree_cmake_extra_content")
 load("//build_tools/bazel:iree_lit_test.bzl", "iree_lit_test_suite")
+load("//build_tools/bazel:cc_binary_benchmark.bzl", "cc_binary_benchmark")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -209,7 +209,7 @@ cc_library(
     ],
 )
 
-cc_test(
+cc_binary_benchmark(
     name = "fpu_state_benchmark",
     srcs = ["fpu_state_benchmark.cc"],
     deps = [
@@ -283,7 +283,7 @@ cc_library(
     ],
 )
 
-cc_binary(
+cc_binary_benchmark(
     name = "synchronization_benchmark",
     testonly = True,
     srcs = ["synchronization_benchmark.cc"],
@@ -292,12 +292,6 @@ cc_binary(
         "//iree/testing:benchmark_main",
         "@com_google_benchmark//:benchmark",
     ],
-)
-
-native_test(
-    name = "synchronization_benchmark_test",
-    src = ":synchronization_benchmark",
-    args = ["--benchmark_min_time=0"],
 )
 
 cc_test(

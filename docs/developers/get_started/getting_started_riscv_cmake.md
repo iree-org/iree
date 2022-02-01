@@ -20,13 +20,13 @@ executables that can be run on the target platform.
 You'll need a RISC-V LLVM compilation toolchain and a RISC-V enabled QEMU
 emulator.
 
-* RISC-V toolchain is built from https://github.com/llvm/llvm-project (main branch).<br>
+* RISC-V toolchain is built from <https://github.com/llvm/llvm-project> (main branch).
   * Currently, the LLVM compiler is built on GNU toolchain, including libgcc,
-    GNU linker, and C libraries. You need to build GNU toolchain first.<br>
-  * Clone GNU toolchain from: https://github.com/riscv/riscv-gnu-toolchain
-    (master branch). Switch the "riscv-binutils" submodule to `rvv-1.0.x-zfh`
-    branch manually.
-* RISC-V QEMU is built from https://github.com/sifive/qemu/tree/v5.2.0-rvv-rvb-zfh
+    GNU linker, and C libraries. You need to build GNU toolchain first.
+  * Clone GNU toolchain from: <https://github.com/riscv/riscv-gnu-toolchain>
+    (master branch). Switch the "riscv-binutils" submodule to
+    `git://sourceware.org/git/binutils-gdb.git` (master branch) manually.
+* RISC-V QEMU is built from <https://github.com/sifive/qemu/tree/v5.2.0-rvv-rvb-zfh>.
 
 An environment variable `RISCV_TOOLCHAIN_ROOT` needs
 to be set to the root directory of the installed GNU toolchain. The variable can
@@ -184,7 +184,7 @@ EXEC @abs
 f32=5
 ```
 
-#### Enable RVV code-gen [Experimental]
+#### Enable RVV code-gen
 Through IREE's vectorization pass and LLVM backend, we can generate RVV
 VLS(Vector Length Specific) style codes.
 
@@ -196,7 +196,7 @@ $ ../iree-build-host/install/bin/iree-translate \
 -iree-llvm-target-triple=riscv64 \
 -iree-llvm-target-cpu=sifive-7-rv64 \
 -iree-llvm-target-abi=lp64d \
--iree-llvm-target-cpu-features="+m,+a,+d,+experimental-v" \
+-iree-llvm-target-cpu-features="+m,+a,+d,+v" \
 -riscv-v-vector-bits-min=256 -riscv-v-fixed-length-vector-lmul-max=8 \
 ${PWD}/iree/samples/simple_embedding/simple_embedding_test.mlir -o /tmp/output-rvv.vmfb
 ```

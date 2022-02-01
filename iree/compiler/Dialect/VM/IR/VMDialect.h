@@ -7,6 +7,7 @@
 #ifndef IREE_COMPILER_DIALECT_VM_IR_VMDIALECT_H_
 #define IREE_COMPILER_DIALECT_VM_IR_VMDIALECT_H_
 
+#include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "iree/compiler/Dialect/VM/IR/VMFuncEncoder.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/BuiltinAttributes.h"
@@ -28,6 +29,7 @@ namespace VM {
 class VMDialect : public Dialect {
  public:
   explicit VMDialect(MLIRContext *context);
+  ~VMDialect() override;
   static StringRef getDialectNamespace() { return "vm"; }
 
   /// Parses an attribute registered to this dialect.
@@ -45,11 +47,18 @@ class VMDialect : public Dialect {
   Operation *materializeConstant(OpBuilder &builder, Attribute value, Type type,
                                  Location loc) override;
 
+  // Provides a hook for op interface.
+  void *getRegisteredInterfaceForOp(mlir::TypeID interface,
+                                    mlir::OperationName opName) override;
+
  private:
   /// Register the attributes of this dialect.
   void registerAttributes();
   /// Register the types of this dialect.
   void registerTypes();
+
+  struct VMOpAsmInterface;
+  VMOpAsmInterface *fallbackOpAsmInterface;
 };
 
 }  // namespace VM

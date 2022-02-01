@@ -7,9 +7,10 @@
 # Doesn't use bazel_to_cmake because of custom configuration vars
 
 set(IREE_HAL_DRIVER_MODULES)
-if(${IREE_HAL_DRIVER_CUDA})
-  list(APPEND IREE_HAL_DRIVER_MODULES iree::hal::cuda::registration)
-endif()
+# Temporarily disabled pending build system changes.
+# if(${IREE_HAL_DRIVER_CUDA})
+#   list(APPEND IREE_HAL_DRIVER_MODULES iree::hal::cuda::registration)
+# endif()
 if(${IREE_HAL_DRIVER_DYLIB})
   list(APPEND IREE_HAL_DRIVER_MODULES iree::hal::dylib::registration)
 endif()

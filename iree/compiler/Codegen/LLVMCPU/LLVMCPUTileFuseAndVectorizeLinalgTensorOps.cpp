@@ -28,6 +28,15 @@
 namespace mlir {
 namespace iree_compiler {
 
+// A flag to switch between inline asm and intrinsics while we develop these two
+//  parallel paths.
+static llvm::cl::opt<bool> clUseMmt4dUseIntrinsics(
+    "iree-codegen-mmt4d-use-intrinsics",
+    llvm::cl::desc("Whether to use instrinsics when lowering vector contracts "
+                   "generated from mmt4d matmuls (as opposed to inline asm). "
+                   "Not for production use."),
+    llvm::cl::init(false));
+
 namespace {
 // Could just be linalg::TilingPattern with a ContractionOpInterface filter, but
 // that is always templated on an op.
@@ -66,7 +75,7 @@ struct LLVMCPUTileFuseAndVectorizePass
 
 LogicalResult applyTileAndFuseCanonicalizationPatterns(FuncOp funcOp) {
   auto context = funcOp.getContext();
-  OwningRewritePatternList patterns(context);
+  RewritePatternSet patterns(context);
   linalg::populateLinalgTilingCanonicalizationPatterns(patterns);
   tensor::DimOp::getCanonicalizationPatterns(patterns, context);
   memref::DimOp::getCanonicalizationPatterns(patterns, context);
@@ -143,7 +152,7 @@ void LLVMCPUTileFuseAndVectorizePass::runOnOperation() {
   }
 
   {
-    OwningRewritePatternList tileReductionPatterns(&getContext());
+    RewritePatternSet tileReductionPatterns(&getContext());
 
     // TODO(hanchung): Add a pattern to fold the tensor.extract_slice op.
     // One-trip loop can be removed. But weird patterns could be generated and
@@ -221,7 +230,7 @@ void LLVMCPUTileFuseAndVectorizePass::runOnOperation() {
       funcOp.walk([&](linalg::ContractionOpInterface op) {
         setMarker(op, getWorkgroupL1TileMarker());
       });
-      OwningRewritePatternList l2patterns(&getContext());
+      RewritePatternSet l2patterns(&getContext());
       l2patterns.insert<TileWorkgroups>(
           context,
           linalg::LinalgTilingOptions().setTileSizeComputationFunction(
@@ -265,7 +274,7 @@ void LLVMCPUTileFuseAndVectorizePass::runOnOperation() {
 
   // Apply vectorization patterns.
   {
-    OwningRewritePatternList vectorizationPatterns(&getContext());
+    RewritePatternSet vectorizationPatterns(&getContext());
     linalg::LinalgVectorizationOptions opt;
     linalg::LinalgTransformationFilter f(
         StringAttr::get(context, getVectorizeMarker()));
@@ -342,6 +351,7 @@ void LLVMCPUTileFuseAndVectorizePass::runOnOperation() {
     // just before the generic vector ops lowerings.
     CustomKernelsTargetInfo info;
     if (succeeded(InferCustomKernelsTargetInfoFromParent(funcOp, info))) {
+      info.intrinsics = clUseMmt4dUseIntrinsics;
       RewritePatternSet patterns(context);
       populateVectorContractCustomKernelsPatterns(info, patterns);
       if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
@@ -355,7 +365,7 @@ void LLVMCPUTileFuseAndVectorizePass::runOnOperation() {
     vector::VectorTransformsOptions vectorTransformsOptions =
         vector::VectorTransformsOptions().setVectorTransformsOptions(
             vector::VectorContractLowering::OuterProduct);
-    OwningRewritePatternList vectorContractLoweringPatterns(&getContext());
+    RewritePatternSet vectorContractLoweringPatterns(&getContext());
     vectorContractLoweringPatterns.insert<
         vector::ContractionOpToOuterProductOpLowering,
         vector::ContractionOpToMatmulOpLowering, vector::ContractionOpLowering>(

@@ -4,6 +4,8 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+load("//build_tools/bazel:cc_binary_benchmark.bzl", "cc_binary_benchmark")
+
 package(
     default_visibility = ["//visibility:public"],
     features = ["layering_check"],
@@ -49,7 +51,7 @@ cc_library(
     ],
 )
 
-cc_test(
+cc_binary_benchmark(
     name = "resource_set_benchmark",
     srcs = ["resource_set_benchmark.c"],
     deps = [

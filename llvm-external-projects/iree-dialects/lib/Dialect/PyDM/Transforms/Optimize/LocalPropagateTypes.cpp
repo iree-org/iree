@@ -209,7 +209,7 @@ struct LocalPropagateTypesPass
           LLVM_DEBUG(dbgs() << "  -- Creating new permutation for "
                             << mismatch.signature << "\n");
           permutation = propagator.createBlockPermutation(
-              parentInfo, mismatch.signature.getInputs(),
+              loc, parentInfo, mismatch.signature.getInputs(),
               [&](Block *newBlock, Block *origBlock,
                   BlockAndValueMapping &mapping) {
                 OpBuilder builder(newBlock, newBlock->begin());

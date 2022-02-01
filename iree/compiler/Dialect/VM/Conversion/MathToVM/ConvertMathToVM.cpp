@@ -84,7 +84,7 @@ class BinaryArithmeticOpConversion : public OpConversionPattern<SrcOpTy> {
 
 void populateMathToVMPatterns(MLIRContext *context,
                               TypeConverter &typeConverter,
-                              OwningRewritePatternList &patterns) {
+                              RewritePatternSet &patterns) {
   patterns
       .insert<UnaryArithmeticOpConversion<math::AtanOp, IREE::VM::AtanF32Op,
                                           IREE::VM::AtanF64Op>,

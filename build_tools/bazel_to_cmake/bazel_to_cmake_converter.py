@@ -735,6 +735,43 @@ class BuildFileFunctions(object):
                             f"{labels_block}"
                             f")\n\n")
 
+  def cc_binary_benchmark(
+      self,
+      name,
+      srcs=None,
+      data=None,
+      deps=None,
+      copts=None,
+      defines=None,
+      linkopts=None,
+      tags=None,
+      testonly=True,
+      # unused
+      size="small",
+      timeout=None):
+
+    name_block = _convert_string_arg_block("NAME", name, quote=False)
+    srcs_block = _convert_srcs_block(srcs)
+    data_block = _convert_target_list_block("DATA", data)
+    deps_block = _convert_target_list_block("DEPS", deps)
+    copts_block = _convert_string_list_block("COPTS", copts, sort=False)
+    defines_block = _convert_string_list_block("DEFINES", defines)
+    defines_block = _convert_string_list_block("LINKOPTS", linkopts)
+    testonly_block = _convert_option_block("TESTONLY", testonly)
+    labels_block = _convert_string_list_block("LABELS", tags)
+
+    self.converter.body += (f"iree_cc_binary_benchmark(\n"
+                            f"{name_block}"
+                            f"{srcs_block}"
+                            f"{data_block}"
+                            f"{deps_block}"
+                            f"{copts_block}"
+                            f"{defines_block}"
+                            f"{defines_block}"
+                            f"{testonly_block}"
+                            f"{labels_block}"
+                            f")\n\n")
+
   def iree_cmake_extra_content(self, content, inline=False):
     if inline:
       self.converter.body += (f"\n{content}\n")

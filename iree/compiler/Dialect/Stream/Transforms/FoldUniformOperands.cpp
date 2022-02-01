@@ -127,13 +127,11 @@ static void deduplicateOperands(
   });
 
   // Replace uses of the duplicate arguments with their base arguments.
-  SmallVector<unsigned> deadArgs;
   llvm::BitVector deadArgMap(funcOp.getNumArguments());
   for (auto replacement : llvm::enumerate(argReplacementMap)) {
     unsigned deadIdx = replacement.index();
     unsigned liveIdx = replacement.value();
     if (deadIdx == liveIdx) continue;
-    deadArgs.push_back(deadIdx);
     deadArgMap.set(deadIdx);
     entryBlock.getArgument(deadIdx).replaceAllUsesWith(
         entryBlock.getArgument(liveIdx));
@@ -150,7 +148,7 @@ static void deduplicateOperands(
 
   // Update the function signature.
   // Lame we need two data structures to do this.
-  funcOp.setType(funcOp.getTypeWithoutArgsAndResults(deadArgs, {}));
+  funcOp.setType(funcOp.getTypeWithoutArgsAndResults(deadArgMap, {}));
   entryBlock.eraseArguments(
       [&](BlockArgument arg) { return deadArgMap.test(arg.getArgNumber()); });
 }
@@ -218,13 +216,11 @@ static void inlineUniformConstants(
       IREE::Stream::CmdDispatchOp::makeOperandToArgMap(funcOp);
 
   // Replace uses of the uniform arguments with a constant value.
-  SmallVector<unsigned> deadArgs;
   llvm::BitVector deadArgMap(funcOp.getNumArguments());
   auto builder = OpBuilder::atBlockBegin(&entryBlock);
   for (auto operandIdx : uniformOperandMap.set_bits()) {
     unsigned argIdx = operandToArgMap[operandIdx];
     auto arg = entryBlock.getArgument(argIdx);
-    deadArgs.push_back(argIdx);
     deadArgMap.set(argIdx);
     auto constantOp = builder.create<arith::ConstantOp>(
         builder.getFusedLoc(operandLocs[operandIdx]),
@@ -243,7 +239,7 @@ static void inlineUniformConstants(
   }
 
   // Fixup function signature.
-  funcOp.setType(funcOp.getTypeWithoutArgsAndResults(deadArgs, {}));
+  funcOp.setType(funcOp.getTypeWithoutArgsAndResults(deadArgMap, {}));
   entryBlock.eraseArguments(
       [&](BlockArgument arg) { return deadArgMap.test(arg.getArgNumber()); });
 }

@@ -10,6 +10,8 @@
 include "mlir/Interfaces/CallInterfaces.td"
 include "mlir/Interfaces/ControlFlowInterfaces.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
+include "mlir/IR/FunctionInterfaces.td"
+include "mlir/IR/OpAsmInterface.td"
 include "mlir/IR/SymbolInterfaces.td"
 include "iree/compiler/Dialect/VM/IR/VMBase.td"
 
@@ -76,7 +78,7 @@ def VM_ModuleTerminatorOp : VM_Op<"module_terminator", [
 def VM_FuncOp : VM_Op<"func", [
     IsolatedFromAbove,
     HasParent<"IREE::VM::ModuleOp">,
-    FunctionLike,
+    FunctionOpInterface,
     CallableOpInterface,
     Symbol,
   ]> {
@@ -118,14 +120,11 @@ def VM_FuncOp : VM_Op<"func", [
           .cast<FunctionType>();
     }
 
-    /// Hook for OpTrait::FunctionLike, returns the number of function
-    /// arguments. Depends on the type attribute being correct as checked by
-    /// verifyType.
-    unsigned getNumFuncArguments() { return getType().getInputs().size(); }
+    /// Returns the argument types of this function.
+    ArrayRef<Type> getArgumentTypes() { return getType().getInputs(); }
 
-    /// Hook for OpTrait::FunctionLike, returns the number of function results.
-    /// Depends on the type attribute being correct as checked by verifyType.
-    unsigned getNumFuncResults() { return getType().getResults().size(); }
+    /// Returns the result types of this function.
+    ArrayRef<Type> getResultTypes() { return getType().getResults(); }
 
     /// Hook for OpTrait::FunctionLike, called after verifying that the 'type'
     /// attribute is present. This can check for preconditions of the
@@ -172,7 +171,7 @@ def VM_ExportOp : VM_Op<"export", [
 
 def VM_ImportOp : VM_Op<"import", [
     Symbol,
-    FunctionLike,
+    FunctionOpInterface,
     CallableOpInterface,
   ]> {
   let summary = [{imports a function from an external module}];
@@ -204,7 +203,7 @@ def VM_ImportOp : VM_Op<"import", [
 
     /// Returns true if the import must be invoked via vm.call.variadic.
     bool isVariadic() {
-      for (int i = 0; i < getNumFuncArguments(); ++i) {
+      for (int i = 0; i < getArgumentTypes().size(); ++i) {
         if (isFuncArgumentVariadic(i)) return true;
       }
       return false;
@@ -220,14 +219,12 @@ def VM_ImportOp : VM_Op<"import", [
       return !!getArgAttrOfType<UnitAttr>(i, "vm.variadic");
     }
 
-    /// Hook for OpTrait::FunctionLike, returns the number of function
-    /// arguments. Depends on the type attribute being correct as checked by
-    /// verifyType.
-    unsigned getNumFuncArguments() { return getType().getInputs().size(); }
+    /// Returns the argument types of this function.
+    ArrayRef<Type> getArgumentTypes() { return getType().getInputs(); }
 
-    /// Hook for OpTrait::FunctionLike, returns the number of function results.
-    /// Depends on the type attribute being correct as checked by verifyType.
-    unsigned getNumFuncResults() { return getType().getResults().size(); }
+    /// Returns the result types of this function.
+    ArrayRef<Type> getResultTypes() { return getType().getResults(); }
+
 
     /// Hook for OpTrait::FunctionLike, called after verifying that the 'type'
     /// attribute is present. This can check for preconditions of the
@@ -244,7 +241,7 @@ def VM_ImportOp : VM_Op<"import", [
 def VM_InitializerOp : VM_Op<"initializer", [
     IsolatedFromAbove,
     HasParent<"IREE::VM::ModuleOp">,
-    FunctionLike,
+    FunctionOpInterface,
     CallableOpInterface,
   ]> {
   let summary = [{global initialization function}];
@@ -273,8 +270,15 @@ def VM_InitializerOp : VM_Op<"initializer", [
     Block *addEntryBlock();
     Block *addBlock();
 
-    unsigned getNumFuncArguments() { return 0; }
-    unsigned getNumFuncResults() { return 0; }
+    FunctionType getType() {
+      return getTypeAttr().getValue().cast<FunctionType>();
+    }
+
+    /// Returns the argument types of this function.
+    ArrayRef<Type> getArgumentTypes() { return {}; }
+
+    /// Returns the result types of this function.
+    ArrayRef<Type> getResultTypes() { return {}; }
 
     LogicalResult verifyType() { return success(); }
 
@@ -558,28 +562,36 @@ class VM_GlobalStoreIndirectPrimitiveOp<Type type, string mnemonic,
 }
 
 def VM_GlobalLoadI32Op :
-    VM_GlobalLoadPrimitiveOp<I32, "global.load.i32", VM_OPC_GlobalLoadI32> {
+    VM_GlobalLoadPrimitiveOp<I32, "global.load.i32", VM_OPC_GlobalLoadI32, [
+      DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>
+    ]> {
   let summary = [{global 32-bit integer load operation}];
   let hasCanonicalizer = 1;
 }
 
 def VM_GlobalLoadI64Op :
-    VM_GlobalLoadPrimitiveOp<I64, "global.load.i64", VM_OPC_GlobalLoadI64,
-                             [VM_ExtI64]> {
+    VM_GlobalLoadPrimitiveOp<I64, "global.load.i64", VM_OPC_GlobalLoadI64, [
+      VM_ExtI64,
+      DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>
+    ]> {
   let summary = [{global 64-bit integer load operation}];
   let hasCanonicalizer = 1;
 }
 
 def VM_GlobalLoadF32Op :
-    VM_GlobalLoadPrimitiveOp<F32, "global.load.f32", VM_OPC_GlobalLoadF32,
-                             [VM_ExtF32]> {
+    VM_GlobalLoadPrimitiveOp<F32, "global.load.f32", VM_OPC_GlobalLoadF32, [
+      VM_ExtF32,
+      DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>
+    ]> {
   let summary = [{global 32-bit floating-point load operation}];
   let hasCanonicalizer = 1;
 }
 
 def VM_GlobalLoadF64Op :
-    VM_GlobalLoadPrimitiveOp<F64, "global.load.f64", VM_OPC_GlobalLoadF64,
-                             [VM_ExtF64]> {
+    VM_GlobalLoadPrimitiveOp<F64, "global.load.f64", VM_OPC_GlobalLoadF64, [
+      VM_ExtF64,
+      DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>
+    ]> {
   let summary = [{global 64-bit floating-point load operation}];
   let hasCanonicalizer = 1;
 }
@@ -669,7 +681,9 @@ def VM_GlobalStoreIndirectF64Op :
   let hasCanonicalizer = 1;
 }
 
-def VM_GlobalLoadRefOp : VM_GlobalLoadOp<VM_AnyRef, "global.load.ref"> {
+def VM_GlobalLoadRefOp : VM_GlobalLoadOp<VM_AnyRef, "global.load.ref", [
+      DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>
+    ]> {
   let summary = [{global ref<T> load operation}];
   let description = [{
     Loads the value of a global containing a ref of the given type.
@@ -782,7 +796,9 @@ class VM_ConstantPrimitiveOp<Type type, int width, string mnemonic,
 
 def VM_ConstI32Op :
     VM_ConstantPrimitiveOp<I32, 32, "const.i32", VM_OPC_ConstI32,
-                           "int32_t"> {
+                           "int32_t", [
+        DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>
+    ]> {
   let summary = [{32-bit integer constant operation}];
   let arguments = (ins
     VM_ConstantIntegerValueAttr<I32>:$value
@@ -793,7 +809,10 @@ def VM_ConstI32Op :
 
 def VM_ConstI64Op :
     VM_ConstantPrimitiveOp<I64, 64, "const.i64", VM_OPC_ConstI64,
-                           "int64_t", [VM_ExtI64]> {
+                           "int64_t", [
+        VM_ExtI64,
+        DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>
+    ]> {
   let summary = [{64-bit integer constant operation}];
   let arguments = (ins
     VM_ConstantIntegerValueAttr<I64>:$value
@@ -850,28 +869,39 @@ class VM_ConstantPrimitiveZeroOp<Type type, string mnemonic, VM_OPC opcode,
 
 def VM_ConstI32ZeroOp :
     VM_ConstantPrimitiveZeroOp<I32, "const.i32.zero", VM_OPC_ConstI32Zero,
-                               "int32_t"> {
+                               "int32_t", [
+      DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>
+    ]> {
   let summary = [{32-bit integer constant zero operation}];
   let hasFolder = 1;
 }
 
 def VM_ConstI64ZeroOp :
     VM_ConstantPrimitiveZeroOp<I64, "const.i64.zero", VM_OPC_ConstI64Zero,
-                               "int64_t", [VM_ExtI64]> {
+                               "int64_t", [
+      VM_ExtI64,
+      DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>
+    ]> {
   let summary = [{64-bit integer constant zero operation}];
   let hasFolder = 1;
 }
 
 def VM_ConstF32ZeroOp :
     VM_ConstantPrimitiveZeroOp<F32, "const.f32.zero", VM_OPC_ConstF32Zero,
-                               "float", [VM_ExtF32]> {
+                               "float", [
+      VM_ExtF32,
+      DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>
+    ]> {
   let summary = [{32-bit floating-point constant zero operation}];
   let hasFolder = 1;
 }
 
 def VM_ConstF64ZeroOp :
     VM_ConstantPrimitiveZeroOp<F64, "const.f64.zero", VM_OPC_ConstF64Zero,
-                               "double", [VM_ExtI64]> {
+                               "double", [
+      VM_ExtI64,
+      DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>
+    ]> {
   let summary = [{64-bit floating-point constant zero operation}];
   let hasFolder = 1;
 }
@@ -879,6 +909,7 @@ def VM_ConstF64ZeroOp :
 def VM_ConstRefZeroOp : VM_PureOp<"const.ref.zero", [
     ConstantLike,
     DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
+    DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>
   ]> {
   let summary = [{null ref constant operation}];
   let description = [{
@@ -951,6 +982,7 @@ def VM_RodataOp : VM_Op<"rodata", [
 
 def VM_ConstRefRodataOp : VM_PureOp<"const.ref.rodata", [
     DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
+    DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>
   ]> {
   let summary = [{constant rodata access operation}];
   let description = [{
@@ -2741,159 +2773,202 @@ class VM_BinaryComparisonPseudoOp<Type type, string mnemonic,
 }
 
 def VM_CmpEQI32Op :
-    VM_BinaryComparisonOp<I32, "cmp.eq.i32", VM_OPC_CmpEQI32,
-                          [Commutative]> {
+    VM_BinaryComparisonOp<I32, "cmp.eq.i32", VM_OPC_CmpEQI32, [
+        Commutative,
+        DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>
+    ]> {
   let summary = [{integer equality comparison operation}];
   let hasCanonicalizer = 1;
   let hasFolder = 1;
 }
 
 def VM_CmpEQI64Op :
-    VM_BinaryComparisonOp<I64, "cmp.eq.i64", VM_OPC_CmpEQI64,
-                          [VM_ExtI64, Commutative]> {
+    VM_BinaryComparisonOp<I64, "cmp.eq.i64", VM_OPC_CmpEQI64, [
+        VM_ExtI64,
+        Commutative,
+        DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>
+    ]> {
   let summary = [{integer equality comparison operation}];
   let hasCanonicalizer = 1;
   let hasFolder = 1;
 }
 
 def VM_CmpNEI32Op :
-    VM_BinaryComparisonOp<I32, "cmp.ne.i32", VM_OPC_CmpNEI32,
-                          [Commutative]> {
+    VM_BinaryComparisonOp<I32, "cmp.ne.i32", VM_OPC_CmpNEI32, [
+        Commutative,
+        DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>
+    ]> {
   let summary = [{integer inequality comparison operation}];
   let hasCanonicalizer = 1;
   let hasFolder = 1;
 }
 
 def VM_CmpNEI64Op :
-    VM_BinaryComparisonOp<I64, "cmp.ne.i64", VM_OPC_CmpNEI64,
-                          [VM_ExtI64, Commutative]> {
+    VM_BinaryComparisonOp<I64, "cmp.ne.i64", VM_OPC_CmpNEI64, [
+        VM_ExtI64, Commutative,
+        DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>
+    ]> {
   let summary = [{integer inequality comparison operation}];
   let hasCanonicalizer = 1;
   let hasFolder = 1;
 }
 
 def VM_CmpLTI32SOp :
-    VM_BinaryComparisonOp<I32, "cmp.lt.i32.s", VM_OPC_CmpLTI32S> {
+    VM_BinaryComparisonOp<I32, "cmp.lt.i32.s", VM_OPC_CmpLTI32S, [
+        DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>
+    ]> {
   let summary = [{signed integer less-than comparison operation}];
   let hasCanonicalizer = 1;
   let hasFolder = 1;
 }
 
 def VM_CmpLTI64SOp :
-    VM_BinaryComparisonOp<I64, "cmp.lt.i64.s", VM_OPC_CmpLTI64S,
-                          [VM_ExtI64]> {
+    VM_BinaryComparisonOp<I64, "cmp.lt.i64.s", VM_OPC_CmpLTI64S, [
+        VM_ExtI64,
+        DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>
+    ]> {
   let summary = [{signed integer less-than comparison operation}];
   let hasCanonicalizer = 1;
   let hasFolder = 1;
 }
 
 def VM_CmpLTI32UOp :
-    VM_BinaryComparisonOp<I32, "cmp.lt.i32.u", VM_OPC_CmpLTI32U> {
+    VM_BinaryComparisonOp<I32, "cmp.lt.i32.u", VM_OPC_CmpLTI32U, [
+        DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>
+    ]> {
   let summary = [{unsigned integer less-than comparison operation}];
   let hasCanonicalizer = 1;
   let hasFolder = 1;
 }
 
 def VM_CmpLTI64UOp :
-    VM_BinaryComparisonOp<I64, "cmp.lt.i64.u", VM_OPC_CmpLTI64U,
-                          [VM_ExtI64]> {
+    VM_BinaryComparisonOp<I64, "cmp.lt.i64.u", VM_OPC_CmpLTI64U, [
+        VM_ExtI64,
+        DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>
+    ]> {
   let summary = [{unsigned integer less-than comparison operation}];
   let hasCanonicalizer = 1;
   let hasFolder = 1;
 }
 
 def VM_CmpLTEI32SOp :
-    VM_BinaryComparisonPseudoOp<I32, "cmp.lte.i32.s"> {
+    VM_BinaryComparisonPseudoOp<I32, "cmp.lte.i32.s", [
+        DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>
+    ]> {
   let summary = [{signed integer less-than-or-equal comparison operation}];
   let hasCanonicalizer = 1;
   let hasFolder = 1;
 }
 
 def VM_CmpLTEI64SOp :
-    VM_BinaryComparisonPseudoOp<I64, "cmp.lte.i64.s",
-                                [VM_ExtI64]> {
+    VM_BinaryComparisonPseudoOp<I64, "cmp.lte.i64.s", [
+        VM_ExtI64,
+        DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>
+    ]> {
   let summary = [{signed integer less-than-or-equal comparison operation}];
   let hasCanonicalizer = 1;
   let hasFolder = 1;
 }
 
 def VM_CmpLTEI32UOp :
-    VM_BinaryComparisonPseudoOp<I32, "cmp.lte.i32.u"> {
+    VM_BinaryComparisonPseudoOp<I32, "cmp.lte.i32.u", [
+        DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>
+    ]> {
   let summary = [{unsigned integer less-than-or-equal comparison operation}];
   let hasCanonicalizer = 1;
   let hasFolder = 1;
 }
 
 def VM_CmpLTEI64UOp :
-    VM_BinaryComparisonPseudoOp<I64, "cmp.lte.i64.u",
-                                [VM_ExtI64]> {
+    VM_BinaryComparisonPseudoOp<I64, "cmp.lte.i64.u", [
+        VM_ExtI64,
+        DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>
+    ]> {
   let summary = [{unsigned integer less-than-or-equal comparison operation}];
   let hasCanonicalizer = 1;
   let hasFolder = 1;
 }
 
 def VM_CmpGTI32SOp :
-    VM_BinaryComparisonPseudoOp<I32, "cmp.gt.i32.s"> {
+    VM_BinaryComparisonPseudoOp<I32, "cmp.gt.i32.s", [
+        DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>
+    ]> {
   let summary = [{signed integer greater-than comparison operation}];
   let hasCanonicalizer = 1;
   let hasFolder = 1;
 }
 
 def VM_CmpGTI64SOp :
-    VM_BinaryComparisonPseudoOp<I64, "cmp.gt.i64.s",
-                                [VM_ExtI64]> {
+    VM_BinaryComparisonPseudoOp<I64, "cmp.gt.i64.s", [
+        VM_ExtI64,
+        DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>
+    ]> {
   let summary = [{signed integer greater-than comparison operation}];
   let hasCanonicalizer = 1;
   let hasFolder = 1;
 }
 
 def VM_CmpGTI32UOp :
-    VM_BinaryComparisonPseudoOp<I32, "cmp.gt.i32.u"> {
+    VM_BinaryComparisonPseudoOp<I32, "cmp.gt.i32.u", [
+        DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>
+    ]> {
   let summary = [{unsigned integer greater-than comparison operation}];
   let hasCanonicalizer = 1;
   let hasFolder = 1;
 }
 
 def VM_CmpGTI64UOp :
-    VM_BinaryComparisonPseudoOp<I64, "cmp.gt.i64.u",
-                                [VM_ExtI64]> {
+    VM_BinaryComparisonPseudoOp<I64, "cmp.gt.i64.u", [
+        VM_ExtI64,
+        DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>
+    ]> {
   let summary = [{unsigned integer greater-than comparison operation}];
   let hasCanonicalizer = 1;
   let hasFolder = 1;
 }
 
 def VM_CmpGTEI32SOp :
-    VM_BinaryComparisonPseudoOp<I32, "cmp.gte.i32.s"> {
+    VM_BinaryComparisonPseudoOp<I32, "cmp.gte.i32.s", [
+        DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>
+    ]> {
   let summary = [{signed integer greater-than-or-equal comparison operation}];
   let hasCanonicalizer = 1;
   let hasFolder = 1;
 }
 
 def VM_CmpGTEI64SOp :
-    VM_BinaryComparisonPseudoOp<I64, "cmp.gte.i64.s",
-                                [VM_ExtI64]> {
+    VM_BinaryComparisonPseudoOp<I64, "cmp.gte.i64.s", [
+        VM_ExtI64,
+        DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>
+    ]> {
   let summary = [{signed integer greater-than-or-equal comparison operation}];
   let hasCanonicalizer = 1;
   let hasFolder = 1;
 }
 
 def VM_CmpGTEI32UOp :
-    VM_BinaryComparisonPseudoOp<I32, "cmp.gte.i32.u"> {
+    VM_BinaryComparisonPseudoOp<I32, "cmp.gte.i32.u", [
+        DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>
+    ]> {
   let summary = [{unsigned integer greater-than-or-equal comparison operation}];
   let hasCanonicalizer = 1;
   let hasFolder = 1;
 }
 
 def VM_CmpGTEI64UOp :
-    VM_BinaryComparisonPseudoOp<I64, "cmp.gte.i64.u",
-                                [VM_ExtI64]> {
+    VM_BinaryComparisonPseudoOp<I64, "cmp.gte.i64.u", [
+        VM_ExtI64,
+        DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>
+    ]> {
   let summary = [{unsigned integer greater-than-or-equal comparison operation}];
   let hasCanonicalizer = 1;
   let hasFolder = 1;
 }
 
 def VM_CmpNZI32Op :
-    VM_UnaryComparisonOp<I32, "cmp.nz.i32", VM_OPC_CmpNZI32> {
+    VM_UnaryComparisonOp<I32, "cmp.nz.i32", VM_OPC_CmpNZI32, [
+        DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>
+    ]> {
   let summary = [{integer non-zero comparison operation}];
   let description = [{
     Compares the given integer operand for a non-zero value.
@@ -2902,8 +2977,10 @@ def VM_CmpNZI32Op :
 }
 
 def VM_CmpNZI64Op :
-    VM_UnaryComparisonOp<I64, "cmp.nz.i64", VM_OPC_CmpNZI64,
-                         [VM_ExtI64]> {
+    VM_UnaryComparisonOp<I64, "cmp.nz.i64", VM_OPC_CmpNZI64, [
+        VM_ExtI64,
+        DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>
+    ]> {
   let summary = [{integer non-zero comparison operation}];
   let description = [{
     Compares the given integer operand for a non-zero value.
@@ -3172,8 +3249,10 @@ def VM_CmpNaNF64Op :
 //===----------------------------------------------------------------------===//
 
 def VM_CmpEQRefOp :
-    VM_BinaryComparisonOp<VM_AnyRef, "cmp.eq.ref", VM_OPC_CmpEQRef,
-                          [Commutative]> {
+    VM_BinaryComparisonOp<VM_AnyRef, "cmp.eq.ref", VM_OPC_CmpEQRef, [
+        Commutative,
+        DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>
+    ]> {
   let summary = [{ref<T> equality comparison operation}];
   let hasFolder = 1;
   let hasCanonicalizer = 1;
@@ -3181,15 +3260,19 @@ def VM_CmpEQRefOp :
 
 // TODO(benvanik): remove and just rely on eq & flipped cond_br?
 def VM_CmpNERefOp :
-    VM_BinaryComparisonOp<VM_AnyRef, "cmp.ne.ref", VM_OPC_CmpNERef,
-                          [Commutative]> {
+    VM_BinaryComparisonOp<VM_AnyRef, "cmp.ne.ref", VM_OPC_CmpNERef, [
+        Commutative,
+        DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>
+    ]> {
   let summary = [{ref<T> inequality comparison operation}];
   let hasFolder = 1;
   let hasCanonicalizer = 1;
 }
 
 def VM_CmpNZRefOp :
-    VM_UnaryComparisonOp<VM_AnyRef, "cmp.nz.ref", VM_OPC_CmpNZRef> {
+    VM_UnaryComparisonOp<VM_AnyRef, "cmp.nz.ref", VM_OPC_CmpNZRef, [
+        DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>
+    ]> {
   let summary = [{ref<T> non-zero comparison operation}];
   let description = [{
     Compares the given ref operand for a non-zero/null value.

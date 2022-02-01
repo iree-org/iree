@@ -10,6 +10,7 @@ runtime entirely or interface with custom accelerators.
 * [CPU - Dylib](./cpu-dylib.md)
 * [CPU - Bare-Metal](./bare-metal.md) with minimal platform dependencies
 * [GPU - Vulkan](./gpu-vulkan.md)
+* [GPU - CUDA/ROCm](./gpu-cuda-rocm.md)
 
 These are just the most stable configurations IREE supports. Feel free to reach
 out on any of IREE's

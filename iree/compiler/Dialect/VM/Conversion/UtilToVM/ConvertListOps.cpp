@@ -124,7 +124,7 @@ class ListSetOpConversion : public OpConversionPattern<IREE::Util::ListSetOp> {
 void populateUtilListToVMPatterns(MLIRContext *context,
                                   ConversionTarget &conversionTarget,
                                   TypeConverter &typeConverter,
-                                  OwningRewritePatternList &patterns) {
+                                  RewritePatternSet &patterns) {
   typeConverter.addConversion(
       [&typeConverter](IREE::Util::ListType type) -> Optional<Type> {
         Type elementType;

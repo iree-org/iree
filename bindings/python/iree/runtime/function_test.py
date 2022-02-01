@@ -11,7 +11,11 @@ import numpy as np
 from absl.testing import absltest
 
 from iree import runtime as rt
-from iree.runtime.function import FunctionInvoker
+from iree.runtime.function import (
+    FunctionInvoker,
+    IMPLICIT_BUFFER_ARG_MEMORY_TYPE,
+    IMPLICIT_BUFFER_ARG_USAGE,
+)
 from iree.runtime.binding import VmVariantList
 
 
@@ -240,13 +244,122 @@ class FunctionTest(absltest.TestCase):
     with self.assertRaisesRegex(ValueError, "specified kwarg 'c' is unknown"):
       result = invoker(-1, a=1, b=2, c=3)
 
+  def testNdarrayArg(self):
+    arg_array = np.asarray([1, 0], dtype=np.int32)
+
+    invoked_arg_list = None
+
+    def invoke(arg_list, ret_list):
+      nonlocal invoked_arg_list
+      invoked_arg_list = arg_list
+
+    vm_context = MockVmContext(invoke)
+    vm_function = MockVmFunction(reflection={
+        "iree.abi": json.dumps({
+            "a": [["ndarray", "i32", 1, 2]],
+            "r": [],
+        })
+    })
+    invoker = FunctionInvoker(vm_context, self.device, vm_function, tracer=None)
+    result = invoker(arg_array)
+    self.assertEqual("<VmVariantList(1): [HalBufferView(2:0x20000011)]>",
+                     repr(invoked_arg_list))
+
+  def testBufferViewArg(self):
+    arg_buffer_view = self.device.allocator.allocate_buffer_copy(
+        memory_type=IMPLICIT_BUFFER_ARG_MEMORY_TYPE,
+        allowed_usage=IMPLICIT_BUFFER_ARG_USAGE,
+        buffer=np.asarray([1, 0], dtype=np.int32),
+        element_type=rt.HalElementType.SINT_32)
+
+    invoked_arg_list = None
+
+    def invoke(arg_list, ret_list):
+      nonlocal invoked_arg_list
+      invoked_arg_list = arg_list
+
+    vm_context = MockVmContext(invoke)
+    vm_function = MockVmFunction(reflection={
+        "iree.abi": json.dumps({
+            "a": [["ndarray", "i32", 1, 2]],
+            "r": [],
+        })
+    })
+    invoker = FunctionInvoker(vm_context, self.device, vm_function, tracer=None)
+    _ = invoker(arg_buffer_view)
+    self.assertEqual("<VmVariantList(1): [HalBufferView(2:0x20000011)]>",
+                     repr(invoked_arg_list))
+
+  def testBufferViewArgNoReflection(self):
+    arg_buffer_view = self.device.allocator.allocate_buffer_copy(
+        memory_type=IMPLICIT_BUFFER_ARG_MEMORY_TYPE,
+        allowed_usage=IMPLICIT_BUFFER_ARG_USAGE,
+        buffer=np.asarray([1, 0], dtype=np.int32),
+        element_type=rt.HalElementType.SINT_32)
+
+    invoked_arg_list = None
+
+    def invoke(arg_list, ret_list):
+      nonlocal invoked_arg_list
+      invoked_arg_list = arg_list
+
+    vm_context = MockVmContext(invoke)
+    vm_function = MockVmFunction(reflection={})
+    invoker = FunctionInvoker(vm_context, self.device, vm_function, tracer=None)
+    _ = invoker(arg_buffer_view)
+    self.assertEqual("<VmVariantList(1): [HalBufferView(2:0x20000011)]>",
+                     repr(invoked_arg_list))
+
+  def testReturnBufferView(self):
+    result_array = np.asarray([1, 0], dtype=np.int32)
+
+    def invoke(arg_list, ret_list):
+      buffer_view = self.device.allocator.allocate_buffer_copy(
+          memory_type=IMPLICIT_BUFFER_ARG_MEMORY_TYPE,
+          allowed_usage=IMPLICIT_BUFFER_ARG_USAGE,
+          buffer=result_array,
+          element_type=rt.HalElementType.SINT_32)
+      ret_list.push_buffer_view(buffer_view)
+
+    vm_context = MockVmContext(invoke)
+    vm_function = MockVmFunction(reflection={
+        "iree.abi": json.dumps({
+            "a": [],
+            "r": [["ndarray", "i32", 1, 2]],
+        })
+    })
+    invoker = FunctionInvoker(vm_context, self.device, vm_function, tracer=None)
+    result = invoker()
+    np.testing.assert_array_equal([1, 0], result)
+
+  def testReturnBufferViewNoReflection(self):
+    result_array = np.asarray([1, 0], dtype=np.int32)
+
+    def invoke(arg_list, ret_list):
+      buffer_view = self.device.allocator.allocate_buffer_copy(
+          memory_type=IMPLICIT_BUFFER_ARG_MEMORY_TYPE,
+          allowed_usage=IMPLICIT_BUFFER_ARG_USAGE,
+          buffer=result_array,
+          element_type=rt.HalElementType.SINT_32)
+      ret_list.push_buffer_view(buffer_view)
+
+    vm_context = MockVmContext(invoke)
+    vm_function = MockVmFunction(reflection={})
+    invoker = FunctionInvoker(vm_context, self.device, vm_function, tracer=None)
+    result = invoker()
+    np.testing.assert_array_equal([1, 0], result)
+
   # TODO: Fill out all return types.
   def testReturnTypeNdArrayBool(self):
     result_array = np.asarray([1, 0], dtype=np.int8)
 
     def invoke(arg_list, ret_list):
-      ret_list.push_buffer_view(self.device, result_array,
-                                rt.HalElementType.UINT_8)
+      buffer_view = self.device.allocator.allocate_buffer_copy(
+          memory_type=IMPLICIT_BUFFER_ARG_MEMORY_TYPE,
+          allowed_usage=IMPLICIT_BUFFER_ARG_USAGE,
+          buffer=result_array,
+          element_type=rt.HalElementType.UINT_8)
+      ret_list.push_buffer_view(buffer_view)
 
     vm_context = MockVmContext(invoke)
     vm_function = MockVmFunction(reflection={
@@ -258,7 +371,7 @@ class FunctionTest(absltest.TestCase):
     invoker = FunctionInvoker(vm_context, self.device, vm_function, tracer=None)
     result = invoker()
     # assertEqual on bool arrays is fraught for... reasons.
-    self.assertEqual("array([ True, False])", repr(result))
+    np.testing.assert_array_equal([True, False], result)
 
   def testReturnTypeList(self):
     vm_list = VmVariantList(2)

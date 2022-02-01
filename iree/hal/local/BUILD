@@ -8,6 +8,7 @@
 # These are generally just wrappers around host heap memory and host threads.
 
 load("//iree:build_defs.oss.bzl", "iree_cmake_extra_content")
+load("//build_tools/bazel:cc_binary_benchmark.bzl", "cc_binary_benchmark")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -20,7 +21,7 @@ cc_library(
     hdrs = ["executable_library.h"],
 )
 
-cc_test(
+cc_binary_benchmark(
     name = "executable_library_benchmark",
     srcs = ["executable_library_benchmark.c"],
     deps = [

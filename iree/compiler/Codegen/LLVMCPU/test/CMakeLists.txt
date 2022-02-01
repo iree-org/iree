@@ -19,14 +19,13 @@ iree_lit_test_suite(
     "hal_interface_constants.mlir"
     "hal_interface_workgroup_info.mlir"
     "illegal_configuration.mlir"
-    "materialize_double_tiling_expert_configuration.mlir"
     "materialize_launch_configuration.mlir"
     "synchronize_symbol_visibility.mlir"
     "test_config_mmt4d.mlir"
-    "tile_and_vectorize.mlir"
     "tile_fuse_and_vectorize.mlir"
     "unfused_fma.mlir"
-    "vector_contract_custom_kernels.mlir"
+    "vector_contract_to_arm_asm.mlir"
+    "vector_contract_to_arm_intrinsics.mlir"
   TOOLS
     FileCheck
     iree::tools::iree-opt

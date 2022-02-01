@@ -14,9 +14,32 @@ from . import binding
 
 # Pull some of the native symbols into the public API.
 # Hal imports
-from .binding import BufferUsage, HalBuffer, HalDevice, HalDriver, HalElementType, MemoryAccess, MemoryType, Shape
+from .binding import (
+    BufferCompatibility,
+    BufferUsage,
+    HalAllocator,
+    HalBuffer,
+    HalBufferView,
+    HalDevice,
+    HalDriver,
+    HalElementType,
+    MemoryAccess,
+    MemoryType,
+    Shape,
+)
+
 # Vm imports
-from .binding import create_hal_module, Linkage, VmVariantList, VmFunction, VmInstance, VmContext, VmModule
+from .binding import (
+    create_hal_module,
+    Linkage,
+    VmVariantList,
+    VmFunction,
+    VmInstance,
+    VmContext,
+    VmModule,
+)
+
+from .array_interop import *
 from .system_api import *
 from .function import *
 from .tracing import *

@@ -9,6 +9,7 @@
 #include "iree/compiler/Dialect/Flow/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/Dialect/Tensor/Utils/Utils.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -184,9 +185,9 @@ static Value pad(Location loc, PatternRewriter &rewriter, Value input,
       RankedTensorType::get(resultTypeShape, elementType);
   Value padValue = rewriter.create<arith::ConstantOp>(
       loc, elementType, rewriter.getZeroAttr(elementType));
-  return linalg::PadTensorOp::createPadScalarOp(
-      resultType, input, padValue, lowPadding, highPadding,
-      /* nofold = */ false, loc, rewriter);
+  return tensor::createPadScalarOp(resultType, input, padValue, lowPadding,
+                                   highPadding,
+                                   /* nofold = */ false, loc, rewriter);
 }
 
 // Returns a top-left slice from |input| shaped like |likeWhat|.
@@ -358,7 +359,7 @@ class ConvertLinalgMatmulToMmt4DPass final
     MLIRContext *context = &getContext();
     // Main pattern.
     {
-      OwningRewritePatternList patterns(&getContext());
+      RewritePatternSet patterns(&getContext());
       patterns.insert<LinalgMatmulOpToLinalgMmt4DOpPattern>(context, M0, K0,
                                                             N0);
       if (failed(applyPatternsAndFoldGreedily(getOperation(),
@@ -368,7 +369,7 @@ class ConvertLinalgMatmulToMmt4DPass final
     }
     // Canonicalization.
     {
-      OwningRewritePatternList patterns(&getContext());
+      RewritePatternSet patterns(&getContext());
       tensor::ExpandShapeOp::getCanonicalizationPatterns(patterns, context);
       linalg::InitTensorOp::getCanonicalizationPatterns(patterns, context);
       linalg::FillOp::getCanonicalizationPatterns(patterns, context);

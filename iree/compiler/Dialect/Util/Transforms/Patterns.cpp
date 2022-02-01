@@ -293,8 +293,7 @@ struct ElideBranchOperandsPattern
 
 }  // namespace
 
-void populateCommonPatterns(MLIRContext *context,
-                            OwningRewritePatternList &patterns) {
+void populateCommonPatterns(MLIRContext *context, RewritePatternSet &patterns) {
   context->getOrLoadDialect<IREE::Util::UtilDialect>()
       ->getCanonicalizationPatterns(patterns);
 

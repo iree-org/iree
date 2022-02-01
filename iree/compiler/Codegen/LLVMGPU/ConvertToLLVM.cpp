@@ -104,7 +104,7 @@ class TestLLVMGPULegalizeOpPass
     registry.insert<vector::VectorDialect>();
   }
   void runOnOperation() override {
-    OwningRewritePatternList patterns(&getContext());
+    RewritePatternSet patterns(&getContext());
     populateScalarizeMathOps(patterns);
     populateConvertSharedMemoryAllocOps(patterns);
     if (failed(applyPatternsAndFoldGreedily(getOperation(),
@@ -186,7 +186,7 @@ class ConvertFunc : public ConvertToLLVMPattern {
     SmallVector<NamedAttribute, 4> funcAttrs;
     for (auto attr : funcOp->getAttrs()) {
       if (attr.getName() == SymbolTable::getSymbolAttrName() ||
-          attr.getName() == mlir::function_like_impl::getTypeAttrName()) {
+          attr.getName() == mlir::function_interface_impl::getTypeAttrName()) {
         continue;
       }
       funcAttrs.push_back(attr);
@@ -349,7 +349,7 @@ struct HALInterfaceWorkgroupOpsConverter final
 }  // anonymous namespace
 
 void populateLLVMConversionPatterns(MLIRContext *context,
-                                    OwningRewritePatternList &patterns,
+                                    RewritePatternSet &patterns,
                                     LLVMTypeConverter &converter) {
   patterns
       .insert<ConvertFunc, ConvertIREEBindingSubspanOp, ConvertIREEConstantOp>(

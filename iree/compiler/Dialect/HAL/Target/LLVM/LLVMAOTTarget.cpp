@@ -24,6 +24,7 @@
 #include "llvm/Linker/Linker.h"
 #include "llvm/Support/FormatVariadic.h"
 #include "llvm/Support/TargetSelect.h"
+#include "mlir/Dialect/ArmNeon/ArmNeonDialect.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Target/LLVMIR/Dialect/LLVMIR/LLVMToLLVMIRTranslation.h"
 #include "mlir/Target/LLVMIR/Export.h"
@@ -143,7 +144,9 @@ class LLVMAOTTargetBackend final : public TargetBackend {
 
   void getDependentDialects(DialectRegistry &registry) const override {
     mlir::registerLLVMDialectTranslation(registry);
-    registry.insert<IREE::Codegen::IREECodegenDialect>();
+    // TODO: make inclusion of ArmNeon conditional?
+    registry
+        .insert<IREE::Codegen::IREECodegenDialect, arm_neon::ArmNeonDialect>();
   }
 
   IREE::HAL::DeviceTargetAttr getDefaultDeviceTarget(
@@ -303,6 +306,7 @@ class LLVMAOTTargetBackend final : public TargetBackend {
         llvm::GlobalValue::VisibilityTypes::DefaultVisibility);
     queryLibraryFunc->setLinkage(
         llvm::GlobalValue::LinkageTypes::ExternalLinkage);
+    queryLibraryFunc->setDSOLocal(false);
 
     // If linking dynamically, find a suitable linker tool and configure the
     // module with any options that tool requires.
@@ -376,13 +380,22 @@ class LLVMAOTTargetBackend final : public TargetBackend {
     // Fixup visibility from any symbols we may link in - we want to hide all
     // but the query entry point.
     for (auto &func : *llvmModule) {
-      if (func.isDeclaration() ||
-          func.getLinkage() ==
-              llvm::GlobalValue::LinkageTypes::ExternalLinkage) {
+      if (&func == queryLibraryFunc) {
+        // Leave our library query function as public/external so that it is
+        // exported from shared objects and available for linking in static
+        // objects.
+        continue;
+      } else if (func.isDeclaration()) {
+        // Declarations must have their original visibility/linkage; they most
+        // often come from declared llvm builtin ops (llvm.memcpy/etc).
         continue;
       }
       func.setDSOLocal(true);
-      func.setLinkage(llvm::GlobalValue::LinkageTypes::PrivateLinkage);
+      func.setLinkage(llvm::GlobalValue::LinkageTypes::InternalLinkage);
+    }
+    for (auto &global : llvmModule->getGlobalList()) {
+      global.setDSOLocal(true);
+      global.setLinkage(llvm::GlobalValue::LinkageTypes::InternalLinkage);
     }
 
     SmallVector<Artifact> objectFiles;
@@ -436,7 +449,6 @@ class LLVMAOTTargetBackend final : public TargetBackend {
         bitcodeFile.outputFile->keep();
       }
     }
-
     if (options_.linkStatic) {
       return serializeStaticLibraryExecutable(variantOp, executableBuilder,
                                               libraryName, queryFunctionName,

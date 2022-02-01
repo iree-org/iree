@@ -145,13 +145,13 @@ struct SimplifyUniformRangeOp : public OpRewritePattern<OpT> {
 
 }  // namespace
 
-void RangeMinOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
+void RangeMinOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                              MLIRContext *context) {
   results.insert<ExpandSimpleRangeOp<RangeMinOp, arith::MinUIOp>>(context);
   results.insert<SimplifyUniformRangeOp<RangeMinOp, INT64_MAX, xmin>>(context);
 }
 
-void RangeMaxOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
+void RangeMaxOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                              MLIRContext *context) {
   results.insert<ExpandSimpleRangeOp<RangeMaxOp, arith::MaxUIOp>>(context);
   results.insert<SimplifyUniformRangeOp<RangeMaxOp, INT64_MIN, xmax>>(context);
@@ -299,8 +299,8 @@ struct DeduplicateRangeExtentsOp : public OpRewritePattern<RangeExtentsOp> {
 
 }  // namespace
 
-void RangeExtentsOp::getCanonicalizationPatterns(
-    OwningRewritePatternList &results, MLIRContext *context) {
+void RangeExtentsOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                                 MLIRContext *context) {
   // TODO(benvanik): extract ranges with common offsets or lengths and move them
   // to min/max ops where they have a better chance of folding.
   results.insert<FoldConstantRanges>(context);
@@ -407,7 +407,7 @@ struct ExpandUnfoldableConstantOp
 }  // namespace
 
 void UnfoldableConstantOp::getCanonicalizationPatterns(
-    OwningRewritePatternList &results, MLIRContext *context) {
+    RewritePatternSet &results, MLIRContext *context) {
   results.insert<ExpandUnfoldableConstantOp>(context);
 }
 
@@ -464,13 +464,13 @@ struct InlineConstantGlobalInitializer
 
 }  // namespace
 
-void InitializerOp::getCanonicalizationPatterns(
-    OwningRewritePatternList &results, MLIRContext *context) {
+void InitializerOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                                MLIRContext *context) {
   results.insert<DropEmptyInitializerOp, InlineConstantGlobalInitializer>(
       context);
 }
 
-void GlobalOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
+void GlobalOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                            MLIRContext *context) {}
 
 namespace {
@@ -496,7 +496,7 @@ class PropagateGlobalLoadAddress
 }  // namespace
 
 void GlobalLoadIndirectOp::getCanonicalizationPatterns(
-    OwningRewritePatternList &results, MLIRContext *context) {
+    RewritePatternSet &results, MLIRContext *context) {
   results.insert<PropagateGlobalLoadAddress>(context);
 }
 
@@ -524,8 +524,8 @@ struct EraseUnusedGlobalStoreOp : public OpRewritePattern<GlobalStoreOp> {
 
 }  // namespace
 
-void GlobalStoreOp::getCanonicalizationPatterns(
-    OwningRewritePatternList &results, MLIRContext *context) {
+void GlobalStoreOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                                MLIRContext *context) {
   results.insert<EraseUnusedGlobalStoreOp>(context);
 }
 
@@ -552,7 +552,7 @@ class PropagateGlobalStoreAddress
 }  // namespace
 
 void GlobalStoreIndirectOp::getCanonicalizationPatterns(
-    OwningRewritePatternList &results, MLIRContext *context) {
+    RewritePatternSet &results, MLIRContext *context) {
   results.insert<PropagateGlobalStoreAddress>(context);
 }
 

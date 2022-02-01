@@ -135,6 +135,8 @@ cc_library(
     deps = [
         "@llvm-project//mlir:Affine",
         "@llvm-project//mlir:AffineTransforms",
+        "@llvm-project//mlir:ArmNeon",
+        "@llvm-project//mlir:ArmNeon2dToIntr",
         "@llvm-project//mlir:BufferizationDialect",
         "@llvm-project//mlir:ConversionPasses",
         "@llvm-project//mlir:GPUDialect",
@@ -193,7 +195,7 @@ cc_library(
     srcs = ["init_targets.cc"],
     hdrs = ["init_targets.h"],
     local_defines = [
-        "IREE_HAVE_CUDA_TARGET",
+        # "IREE_HAVE_CUDA_TARGET",
         "IREE_HAVE_LLVMAOT_TARGET",
         "IREE_HAVE_METALSPIRV_TARGET",
         "IREE_HAVE_ROCM_TARGET",
@@ -201,7 +203,7 @@ cc_library(
         "IREE_HAVE_VULKANSPIRV_TARGET",
     ],
     deps = [
-        "//iree/compiler/Dialect/HAL/Target/CUDA",
+        # "//iree/compiler/Dialect/HAL/Target/CUDA",
         "//iree/compiler/Dialect/HAL/Target/LLVM",
         "//iree/compiler/Dialect/HAL/Target/MetalSPIRV",
         "//iree/compiler/Dialect/HAL/Target/ROCM",
@@ -389,6 +391,7 @@ cc_library(
         "//iree/compiler/Translation:HALExecutable",
         "//iree/compiler/Translation:IREEVM",
         "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:ArmNeonToLLVMIRTranslation",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:LLVMToLLVMIRTranslation",
         "@llvm-project//mlir:Pass",
