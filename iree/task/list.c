@@ -47,6 +47,7 @@ void iree_task_list_discard(iree_task_list_t* list) {
   while (!iree_task_list_is_empty(list)) {
     iree_task_t* task = iree_task_list_pop_front(list);
     iree_task_discard(task, list);
+    task = NULL;  // invalidated during discard
   }
 }
 

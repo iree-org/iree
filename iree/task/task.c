@@ -90,17 +90,31 @@ static void iree_task_cleanup(iree_task_t* task,
   }
 }
 
+static void iree_task_barrier_discard(iree_task_barrier_t* task,
+                                      iree_task_list_t* discard_worklist);
+static void iree_task_fence_discard(iree_task_fence_t* task,
+                                    iree_task_list_t* discard_worklist);
+
 void iree_task_discard(iree_task_t* task, iree_task_list_t* discard_worklist) {
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  // NOTE: we always try adding to the head of the discard_worklist so that
-  // we hopefully get some locality benefits. This models a DFS discard in
-  // our non-recursive approach.
+  // This models a BFS discard in our non-recursive approach.
+  // We must ensure that we only discard each task once and that we discard the
+  // tasks in the appropriate order: if we had a DAG of A -> B, C -> D we must
+  // discard respecting the same topological ordering.
+
+  IREE_ASSERT_EQ(0, iree_atomic_load_int32(&task->pending_dependency_count,
+                                           iree_memory_order_acquire));
 
   // Almost all tasks will have a completion task; some may have additional
   // dependent tasks (like barriers) that will be handled below.
-  if (task->completion_task) {
-    iree_task_list_push_front(discard_worklist, task->completion_task);
+  const bool completion_task_ready =
+      task->completion_task &&
+      iree_atomic_fetch_sub_int32(
+          &task->completion_task->pending_dependency_count, 1,
+          iree_memory_order_acq_rel) == 1;
+  if (completion_task_ready) {
+    iree_task_list_push_back(discard_worklist, task->completion_task);
   }
 
   switch (task->type) {
@@ -108,18 +122,12 @@ void iree_task_discard(iree_task_t* task, iree_task_list_t* discard_worklist) {
     case IREE_TASK_TYPE_NOP:
     case IREE_TASK_TYPE_CALL:
       break;
-    case IREE_TASK_TYPE_BARRIER: {
-      iree_task_barrier_t* barrier_task = (iree_task_barrier_t*)task;
-      for (uint32_t i = 0; i < barrier_task->dependent_task_count; ++i) {
-        iree_task_list_push_front(discard_worklist,
-                                  barrier_task->dependent_tasks[i]);
-      }
+    case IREE_TASK_TYPE_BARRIER:
+      iree_task_barrier_discard((iree_task_barrier_t*)task, discard_worklist);
       break;
-    }
-    case IREE_TASK_TYPE_FENCE: {
+    case IREE_TASK_TYPE_FENCE:
       iree_task_scope_end(task->scope);
       break;
-    }
     case IREE_TASK_TYPE_WAIT:
     case IREE_TASK_TYPE_DISPATCH:
       break;
@@ -127,6 +135,7 @@ void iree_task_discard(iree_task_t* task, iree_task_list_t* discard_worklist) {
 
   iree_task_cleanup(task, IREE_STATUS_ABORTED);
   // NOTE: task is invalidated here and cannot be used!
+  task = NULL;
 
   IREE_TRACE_ZONE_END(z0);
 }
@@ -292,22 +301,59 @@ void iree_task_barrier_set_dependent_tasks(
   }
 }
 
+static void iree_task_barrier_discard(iree_task_barrier_t* task,
+                                      iree_task_list_t* discard_worklist) {
+  IREE_TRACE_ZONE_BEGIN(z0);
+
+  // Discard all of the tasks after the barrier.
+  // Note that we need to ensure we only enqueue them for discard after all of
+  // their dependencies have been met - otherwise we'll double-discard.
+  for (iree_host_size_t i = 0; i < task->dependent_task_count; ++i) {
+    iree_task_t* dependent_task = task->dependent_tasks[i];
+    const bool dependent_task_ready =
+        iree_atomic_fetch_sub_int32(&dependent_task->pending_dependency_count,
+                                    1, iree_memory_order_acq_rel) == 1;
+    if (dependent_task_ready) {
+      // The dependent task has retired and can now be discard.
+      iree_task_list_push_back(discard_worklist, dependent_task);
+    }
+  }
+
+  IREE_TRACE_ZONE_END(z0);
+}
+
 void iree_task_barrier_retire(iree_task_barrier_t* task,
                               iree_task_submission_t* pending_submission) {
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  // NOTE: we walk in reverse so that we enqueue in LIFO order.
-  for (iree_host_size_t i = 0; i < task->dependent_task_count; ++i) {
-    iree_task_t* dependent_task =
-        task->dependent_tasks[task->dependent_task_count - i - 1];
-    if (iree_atomic_fetch_sub_int32(&dependent_task->pending_dependency_count,
-                                    1, iree_memory_order_acq_rel) == 1) {
-      // The dependent task has retired and can now be made ready.
-      iree_task_submission_enqueue(pending_submission, dependent_task);
+  // If the scope has been marked as failing then we abort the barrier.
+  // This needs to happen as a poll here because one or more of the tasks we
+  // are joining may have failed.
+  const bool has_failed = iree_task_scope_has_failed(task->header.scope);
+  if (has_failed) {
+    // This was the last pending dependency and we know that we can safely
+    // abort the completion task by discarding.
+    iree_task_list_t discard_worklist;
+    iree_task_list_initialize(&discard_worklist);
+    iree_task_barrier_discard(task, &discard_worklist);
+    iree_task_list_discard(&discard_worklist);
+  } else {
+    // NOTE: we walk in reverse so that we enqueue in LIFO order.
+    for (iree_host_size_t i = 0; i < task->dependent_task_count; ++i) {
+      iree_task_t* dependent_task =
+          task->dependent_tasks[task->dependent_task_count - i - 1];
+      if (iree_atomic_fetch_sub_int32(&dependent_task->pending_dependency_count,
+                                      1, iree_memory_order_acq_rel) == 1) {
+        // The dependent task has retired and can now be made ready.
+        iree_task_submission_enqueue(pending_submission, dependent_task);
+      }
     }
   }
 
-  iree_task_retire(&task->header, pending_submission, iree_ok_status());
+  iree_task_retire(&task->header, pending_submission,
+                   has_failed ? iree_status_from_code(IREE_STATUS_ABORTED)
+                              : iree_ok_status());
+
   IREE_TRACE_ZONE_END(z0);
 }
 
@@ -328,6 +374,7 @@ void iree_task_fence_retire(iree_task_fence_t* task,
   iree_task_scope_end(task->header.scope);
 
   iree_task_retire(&task->header, pending_submission, iree_ok_status());
+
   IREE_TRACE_ZONE_END(z0);
 }
 
