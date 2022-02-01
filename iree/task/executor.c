@@ -270,6 +270,17 @@ void iree_task_executor_schedule_ready_tasks(
   IREE_TRACE_ZONE_BEGIN(z0);
   iree_task_t* task = NULL;
   while ((task = iree_task_list_pop_front(&pending_submission->ready_list))) {
+    // If the scope has been marked as failing then we abort the task.
+    // This needs to happen as a poll here because one or more of the tasks we
+    // are joining may have failed.
+    if (IREE_UNLIKELY(iree_task_scope_has_failed(task->scope))) {
+      iree_task_list_t discard_worklist;
+      iree_task_list_initialize(&discard_worklist);
+      iree_task_discard(task, &discard_worklist);
+      iree_task_list_discard(&discard_worklist);
+      continue;
+    }
+
     switch (task->type) {
       case IREE_TASK_TYPE_NOP:
         // Doesn't do anything; just retire and continue on to any dependents.

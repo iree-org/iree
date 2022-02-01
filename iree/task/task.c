@@ -326,33 +326,18 @@ void iree_task_barrier_retire(iree_task_barrier_t* task,
                               iree_task_submission_t* pending_submission) {
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  // If the scope has been marked as failing then we abort the barrier.
-  // This needs to happen as a poll here because one or more of the tasks we
-  // are joining may have failed.
-  const bool has_failed = iree_task_scope_has_failed(task->header.scope);
-  if (has_failed) {
-    // This was the last pending dependency and we know that we can safely
-    // abort the completion task by discarding.
-    iree_task_list_t discard_worklist;
-    iree_task_list_initialize(&discard_worklist);
-    iree_task_barrier_discard(task, &discard_worklist);
-    iree_task_list_discard(&discard_worklist);
-  } else {
-    // NOTE: we walk in reverse so that we enqueue in LIFO order.
-    for (iree_host_size_t i = 0; i < task->dependent_task_count; ++i) {
-      iree_task_t* dependent_task =
-          task->dependent_tasks[task->dependent_task_count - i - 1];
-      if (iree_atomic_fetch_sub_int32(&dependent_task->pending_dependency_count,
-                                      1, iree_memory_order_acq_rel) == 1) {
-        // The dependent task has retired and can now be made ready.
-        iree_task_submission_enqueue(pending_submission, dependent_task);
-      }
+  // NOTE: we walk in reverse so that we enqueue in LIFO order.
+  for (iree_host_size_t i = 0; i < task->dependent_task_count; ++i) {
+    iree_task_t* dependent_task =
+        task->dependent_tasks[task->dependent_task_count - i - 1];
+    if (iree_atomic_fetch_sub_int32(&dependent_task->pending_dependency_count,
+                                    1, iree_memory_order_acq_rel) == 1) {
+      // The dependent task has retired and can now be made ready.
+      iree_task_submission_enqueue(pending_submission, dependent_task);
     }
   }
 
-  iree_task_retire(&task->header, pending_submission,
-                   has_failed ? iree_status_from_code(IREE_STATUS_ABORTED)
-                              : iree_ok_status());
+  iree_task_retire(&task->header, pending_submission, iree_ok_status());
 
   IREE_TRACE_ZONE_END(z0);
 }
