@@ -185,6 +185,21 @@ LogicalResult verifyDoubleTilingExpertPassPipelineConfig(
     }
   }
 
+  int numLoops = interfaceOp.getNumLoops();
+  SmallVector<int64_t> secondLevelTileSizes = loweringConfig.getTileSizeVals(
+      static_cast<unsigned>(TilingLevel::L1Tiles));
+  if (secondLevelTileSizes.size() != numLoops) {
+    return op->emitOpError("expected the second tiling size to be ")
+           << numLoops << ", got " << secondLevelTileSizes.size();
+  }
+
+  SmallVector<int64_t> thirdLevelTileSizes = loweringConfig.getTileSizeVals(
+      static_cast<unsigned>(TilingLevel::VectorTiles));
+  if (thirdLevelTileSizes.size() != numLoops) {
+    return op->emitOpError("expected the second tiling size to be ")
+           << numLoops << ", got " << secondLevelTileSizes.size();
+  }
+
   // Verify that native vector size is either empty, or if set is same as the
   // last level of tiling
   SmallVector<int64_t> nativeVectorSize =
@@ -278,8 +293,8 @@ void addDoubleTilingExpertPassPipeline(OpPassManager &passManager) {
   BufferizationOptions::DeallocationFn deallocationFn =
       cpuComprehensiveBufferizeDeallocationFn;
   BufferizationOptions::MemCpyFn memcpyFn = cpuComprehensiveBufferizeCopyFn;
-  addIREEComprehensiveBufferizePasses(passManager, allocationFn, deallocationFn,
-                                      memcpyFn);
+  addIREEComprehensiveBufferizePasses(passManager, allocationFn,
+                                      deallocationFn);
 
   // Run IREE specific passes before vector lowering expert.
   passManager.addNestedPass<FuncOp>(createRemoveSingleIterationLoopPass());
