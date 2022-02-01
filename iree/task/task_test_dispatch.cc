@@ -17,6 +17,10 @@
 
 namespace {
 
+using iree::Status;
+using iree::StatusCode;
+using iree::testing::status::StatusIs;
+
 class GridCoverage {
  public:
   explicit GridCoverage(const uint32_t workgroup_count[3])
@@ -39,7 +43,7 @@ class GridCoverage {
     return true;
   }
 
-  static iree_status_t Tile(uintptr_t user_context,
+  static iree_status_t Tile(void* user_context,
                             const iree_task_tile_context_t* tile_context,
                             iree_task_submission_t* pending_submission) {
     GridCoverage* coverage = reinterpret_cast<GridCoverage*>(user_context);
@@ -70,66 +74,38 @@ class TaskDispatchTest : public TaskTest {
                              uint32_t dispatch_flags) {
     GridCoverage coverage(workgroup_count);
     iree_task_dispatch_t task;
-    iree_task_dispatch_initialize(&scope_,
-                                  iree_task_make_dispatch_closure(
-                                      GridCoverage::Tile, (uintptr_t)&coverage),
-                                  workgroup_size, workgroup_count, &task);
+    iree_task_dispatch_initialize(
+        &scope_,
+        iree_task_make_dispatch_closure(GridCoverage::Tile, (void*)&coverage),
+        workgroup_size, workgroup_count, &task);
     task.header.flags |= dispatch_flags;
     IREE_ASSERT_OK(SubmitTasksAndWaitIdle(&task.header, &task.header));
     EXPECT_TRUE(coverage.Verify());
   }
 };
 
-TEST_F(TaskDispatchTest, Issue000Sharded) {
+TEST_F(TaskDispatchTest, Issue000) {
   const uint32_t kWorkgroupSize[3] = {1, 1, 1};
   const uint32_t kWorkgroupCount[3] = {0, 0, 0};
-  DispatchAndVerifyGrid(kWorkgroupSize, kWorkgroupCount, 0);
+  DispatchAndVerifyGrid(kWorkgroupSize, kWorkgroupCount, IREE_TASK_FLAG_NONE);
 }
 
-TEST_F(TaskDispatchTest, Issue000Sliced) {
-  const uint32_t kWorkgroupSize[3] = {1, 1, 1};
-  const uint32_t kWorkgroupCount[3] = {0, 0, 0};
-  DispatchAndVerifyGrid(kWorkgroupSize, kWorkgroupCount,
-                        IREE_TASK_FLAG_DISPATCH_SLICED);
-}
-
-TEST_F(TaskDispatchTest, Issue120Sharded) {
+TEST_F(TaskDispatchTest, Issue120) {
   const uint32_t kWorkgroupSize[3] = {1, 1, 1};
   const uint32_t kWorkgroupCount[3] = {1, 2, 0};
-  DispatchAndVerifyGrid(kWorkgroupSize, kWorkgroupCount, 0);
+  DispatchAndVerifyGrid(kWorkgroupSize, kWorkgroupCount, IREE_TASK_FLAG_NONE);
 }
 
-TEST_F(TaskDispatchTest, Issue120Sliced) {
-  const uint32_t kWorkgroupSize[3] = {1, 1, 1};
-  const uint32_t kWorkgroupCount[3] = {1, 2, 0};
-  DispatchAndVerifyGrid(kWorkgroupSize, kWorkgroupCount,
-                        IREE_TASK_FLAG_DISPATCH_SLICED);
-}
-
-TEST_F(TaskDispatchTest, Issue111Sharded) {
+TEST_F(TaskDispatchTest, Issue111) {
   const uint32_t kWorkgroupSize[3] = {1, 1, 1};
   const uint32_t kWorkgroupCount[3] = {1, 1, 1};
-  DispatchAndVerifyGrid(kWorkgroupSize, kWorkgroupCount, 0);
+  DispatchAndVerifyGrid(kWorkgroupSize, kWorkgroupCount, IREE_TASK_FLAG_NONE);
 }
 
-TEST_F(TaskDispatchTest, Issue111Sliced) {
-  const uint32_t kWorkgroupSize[3] = {1, 1, 1};
-  const uint32_t kWorkgroupCount[3] = {1, 1, 1};
-  DispatchAndVerifyGrid(kWorkgroupSize, kWorkgroupCount,
-                        IREE_TASK_FLAG_DISPATCH_SLICED);
-}
-
-TEST_F(TaskDispatchTest, Issue345Sharded) {
+TEST_F(TaskDispatchTest, Issue345) {
   const uint32_t kWorkgroupSize[3] = {1, 1, 1};
   const uint32_t kWorkgroupCount[3] = {3, 4, 5};
-  DispatchAndVerifyGrid(kWorkgroupSize, kWorkgroupCount, 0);
-}
-
-TEST_F(TaskDispatchTest, Issue345Sliced) {
-  const uint32_t kWorkgroupSize[3] = {1, 1, 1};
-  const uint32_t kWorkgroupCount[3] = {3, 4, 5};
-  DispatchAndVerifyGrid(kWorkgroupSize, kWorkgroupCount,
-                        IREE_TASK_FLAG_DISPATCH_SLICED);
+  DispatchAndVerifyGrid(kWorkgroupSize, kWorkgroupCount, IREE_TASK_FLAG_NONE);
 }
 
 TEST_F(TaskDispatchTest, IssueIndirect) {
@@ -142,7 +118,7 @@ TEST_F(TaskDispatchTest, IssueIndirect) {
   iree_task_call_initialize(
       &scope_,
       iree_task_make_call_closure(
-          [](uintptr_t user_context, iree_task_t* task,
+          [](void* user_context, iree_task_t* task,
              iree_task_submission_t* pending_submission) {
             uint32_t* indirect_workgroup_count_ptr = (uint32_t*)user_context;
             for (size_t i = 0; i < IREE_ARRAYSIZE(kWorkgroupCount); ++i) {
@@ -150,19 +126,78 @@ TEST_F(TaskDispatchTest, IssueIndirect) {
             }
             return iree_ok_status();
           },
-          (uintptr_t)indirect_workgroup_count),
+          (void*)indirect_workgroup_count),
       &calculate_task);
 
   iree_task_dispatch_t dispatch_task;
   iree_task_dispatch_initialize_indirect(
       &scope_,
-      iree_task_make_dispatch_closure(GridCoverage::Tile, (uintptr_t)&coverage),
+      iree_task_make_dispatch_closure(GridCoverage::Tile, (void*)&coverage),
       kWorkgroupSize, indirect_workgroup_count, &dispatch_task);
   iree_task_set_completion_task(&calculate_task.header, &dispatch_task.header);
 
   IREE_ASSERT_OK(
       SubmitTasksAndWaitIdle(&calculate_task.header, &dispatch_task.header));
   EXPECT_TRUE(coverage.Verify());
+}
+
+TEST_F(TaskDispatchTest, IssueFailure) {
+  const uint32_t kWorkgroupSize[3] = {1, 1, 1};
+  const uint32_t kWorkgroupCount[3] = {64, 1, 1};
+
+  auto tile = [](void* user_context,
+                 const iree_task_tile_context_t* tile_context,
+                 iree_task_submission_t* pending_submission) -> iree_status_t {
+    return tile_context->workgroup_xyz[0] == 32
+               ? iree_make_status(IREE_STATUS_DATA_LOSS, "whoops!")
+               : iree_ok_status();
+  };
+
+  iree_task_dispatch_t task;
+  iree_task_dispatch_initialize(&scope_,
+                                iree_task_make_dispatch_closure(tile, NULL),
+                                kWorkgroupSize, kWorkgroupCount, &task);
+  IREE_ASSERT_OK(SubmitTasksAndWaitIdle(&task.header, &task.header));
+  EXPECT_THAT(Status(iree_task_scope_consume_status(&scope_)),
+              StatusIs(StatusCode::kDataLoss));
+}
+
+TEST_F(TaskDispatchTest, IssueFailureChained) {
+  const uint32_t kWorkgroupSize[3] = {1, 1, 1};
+  const uint32_t kWorkgroupCount[3] = {64, 1, 1};
+
+  auto tile = [](void* user_context,
+                 const iree_task_tile_context_t* tile_context,
+                 iree_task_submission_t* pending_submission) -> iree_status_t {
+    return tile_context->workgroup_xyz[0] == 32
+               ? iree_make_status(IREE_STATUS_DATA_LOSS, "whoops!")
+               : iree_ok_status();
+  };
+
+  iree_task_dispatch_t dispatch_task;
+  iree_task_dispatch_initialize(
+      &scope_, iree_task_make_dispatch_closure(tile, NULL), kWorkgroupSize,
+      kWorkgroupCount, &dispatch_task);
+
+  int did_call = 0;
+  iree_task_call_t call_task;
+  iree_task_call_initialize(&scope_,
+                            iree_task_make_call_closure(
+                                [](void* user_context, iree_task_t* task,
+                                   iree_task_submission_t* pending_submission) {
+                                  int* did_call_ptr = (int*)user_context;
+                                  ++(*did_call_ptr);
+                                  return iree_ok_status();
+                                },
+                                &did_call),
+                            &call_task);
+  iree_task_set_completion_task(&dispatch_task.header, &call_task.header);
+
+  IREE_ASSERT_OK(
+      SubmitTasksAndWaitIdle(&dispatch_task.header, &call_task.header));
+  EXPECT_EQ(0, did_call);
+  EXPECT_THAT(Status(iree_task_scope_consume_status(&scope_)),
+              StatusIs(StatusCode::kDataLoss));
 }
 
 }  // namespace

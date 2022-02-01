@@ -173,7 +173,7 @@ void iree_mutex_unlock(iree_mutex_t* mutex)
 // Though these locks support spinning they always have a fallback path that
 // ends up calling into the kernel to properly wait the thread. This is critical
 // to avoid pathological cases under contention and allowing for thread priority
-// inheritence when there are multiple threads competing that may otherwise be
+// inheritance when there are multiple threads competing that may otherwise be
 // scheduled in a potentially livelocking order.
 //
 // The "unfair" here comes from the fact that it's possible on certain platforms

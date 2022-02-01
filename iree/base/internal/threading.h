@@ -59,7 +59,7 @@ typedef enum iree_thread_priority_class_e {
 //
 // Linux/Android:
 //   sched_setaffinity is used to pin the thread to the core with the given ID.
-//   There are, naturally, issues on Android where if the governer has turned
+//   There are, naturally, issues on Android where if the governor has turned
 //   off some cores (such as powering down big cores in an ARM big.LITTLE
 //   configuration) the affinity request will be dropped on the floor even if
 //   the cores are later enabled. This is one of the reasons why we note in
@@ -150,7 +150,7 @@ void iree_thread_override_end(iree_thread_override_t* override_token);
 
 // Updates the thread affinity of the given |thread|.
 // Affinities are not sticky and may need to be refreshed over time as CPUs are
-// enabled/disabled by the OS (such as power mode changes, governer adjustments,
+// enabled/disabled by the OS (such as power mode changes, governor adjustments,
 // etc). Users wanting to ensure threads have specific affinities may want to
 // request updates whenever new large amounts of work are about to be performed.
 //

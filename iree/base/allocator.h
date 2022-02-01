@@ -213,7 +213,7 @@ typedef struct iree_allocator_alloc_params_t {
 // Function pointer for an iree_allocator_t control function.
 // |command| provides the operation to perform. Optionally some commands may use
 // |params| to pass additional operation-specific parameters. |inout_ptr| usage
-// is defined by each operation but is general a pointer to the pointer to
+// is defined by each operation but is generally a pointer to the pointer to
 // set to the newly allocated memory or a pointer to the pointer to free.
 typedef iree_status_t(IREE_API_PTR* iree_allocator_ctl_fn_t)(
     void* self, iree_allocator_command_t command, const void* params,
@@ -223,7 +223,7 @@ typedef iree_status_t(IREE_API_PTR* iree_allocator_ctl_fn_t)(
 // IREE will attempt to use this in place of the system malloc and free.
 // Pass the iree_allocator_system() macro to use the system allocator.
 typedef struct iree_allocator_t {
-  // User-defined pointer passed to all functions.
+  // Control function data.
   void* self;
   // ioctl-style control function servicing all allocator-related commands.
   // See iree_allocator_command_t for more information.

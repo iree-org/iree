@@ -326,6 +326,23 @@ endif()
 
 iree_cc_library(
   NAME
+    event_pool
+  HDRS
+    "event_pool.h"
+  SRCS
+    "event_pool.c"
+  DEPS
+    ::internal
+    ::synchronization
+    ::wait_handle
+    iree::base
+    iree::base::core_headers
+    iree::base::tracing
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
     threading
   HDRS
     "threading.h"

@@ -167,7 +167,7 @@ iree_task_t* iree_task_worker_try_steal_task(iree_task_worker_t* worker,
 // Executes a task on a worker.
 // Only task types that are scheduled to workers are handled; all others must be
 // handled by the coordinator during scheduling.
-static iree_status_t iree_task_worker_execute(
+static void iree_task_worker_execute(
     iree_task_worker_t* worker, iree_task_t* task,
     iree_task_submission_t* pending_submission) {
   // Execute the task and resolve the task and gather any tasks that are now
@@ -180,31 +180,22 @@ static iree_status_t iree_task_worker_execute(
   // TODO(benvanik): handle partial tasks and re-queuing.
   switch (task->type) {
     case IREE_TASK_TYPE_CALL: {
-      IREE_RETURN_IF_ERROR(
-          iree_task_call_execute((iree_task_call_t*)task, pending_submission));
-      break;
-    }
-    case IREE_TASK_TYPE_DISPATCH_SLICE: {
-      IREE_RETURN_IF_ERROR(iree_task_dispatch_slice_execute(
-          (iree_task_dispatch_slice_t*)task, worker->local_memory,
-          pending_submission));
+      iree_task_call_execute((iree_task_call_t*)task, pending_submission);
       break;
     }
     case IREE_TASK_TYPE_DISPATCH_SHARD: {
-      IREE_RETURN_IF_ERROR(iree_task_dispatch_shard_execute(
-          (iree_task_dispatch_shard_t*)task, worker->local_memory,
-          pending_submission));
+      iree_task_dispatch_shard_execute((iree_task_dispatch_shard_t*)task,
+                                       worker->local_memory,
+                                       pending_submission);
       break;
     }
     default:
-      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                              "incorrect task type for worker execution");
+      IREE_ASSERT_UNREACHABLE("incorrect task type for worker execution");
+      break;
   }
 
-  // NOTE: task is invalidated here!
+  // NOTE: task is invalidated above and must not be used!
   task = NULL;
-
-  return iree_ok_status();
 }
 
 // Pumps the worker thread once, processing a single task.
@@ -252,22 +243,7 @@ static bool iree_task_worker_pump_once(
 
   // Execute the task (may call out to arbitrary user code and may submit more
   // tasks for execution).
-  iree_status_t status =
-      iree_task_worker_execute(worker, task, pending_submission);
-
-  // TODO(#4026): propagate failure to task scope.
-  // We currently drop the error on the floor here; that's because the error
-  // should have already been propagated to the scope and everyone should be
-  // checking that before running things anyway.
-  //
-  // Since we can host work from multiple scopes and want to ensure an error
-  // in one doesn't bring down the whole system we pretend we executed
-  // something here by falling through.
-  if (!iree_status_is_ok(status)) {
-    iree_status_fprint(stderr, status);
-  }
-  IREE_ASSERT_TRUE(iree_status_is_ok(status));
-  iree_status_ignore(status);
+  iree_task_worker_execute(worker, task, pending_submission);
 
   IREE_TRACE_ZONE_END(z0);
   return true;  // try again

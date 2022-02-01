@@ -18,7 +18,7 @@ extern "C" {
 #endif  // __cplusplus
 
 // A point in time represented as nanoseconds since unix epoch.
-// TODO(benvanik): pick something easy to get into/outof time_t/etc.
+// TODO(benvanik): pick something easy to get into/out-of time_t/etc.
 typedef int64_t iree_time_t;
 
 // A time in the infinite past used to indicate "already happened".
@@ -155,6 +155,14 @@ static inline iree_time_t iree_timeout_as_deadline_ns(iree_timeout_t timeout) {
   return timeout.type == IREE_TIMEOUT_ABSOLUTE
              ? timeout.nanos
              : iree_relative_timeout_to_deadline_ns(timeout.nanos);
+}
+
+// Returns the earliest timeout between |lhs| and |rhs|.
+static inline iree_timeout_t iree_timeout_min(iree_timeout_t lhs,
+                                              iree_timeout_t rhs) {
+  iree_convert_timeout_to_absolute(&lhs);
+  iree_convert_timeout_to_absolute(&rhs);
+  return iree_make_deadline(lhs.nanos < rhs.nanos ? lhs.nanos : rhs.nanos);
 }
 
 #ifdef __cplusplus

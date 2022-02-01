@@ -63,7 +63,7 @@ IREE_ATTRIBUTE_ALWAYS_INLINE static inline void iree_debug_break(void) {
 // picked up. In addition, specific uses of memory like arenas can thwart tools
 // like ASAN that try to detect accesses to freed memory because we are never
 // actually malloc()'ing and free()'ing and need to tell ASAN when blocks of
-// memory come into/outof the pool.
+// memory come into/out-of the pool.
 //
 // The documentation on these interfaces is pretty sparse but it's possible to
 // find usage examples of the hooks in the compiler-provided hooks themselves.

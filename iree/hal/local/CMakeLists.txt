@@ -111,23 +111,6 @@ endif()
 
 iree_cc_library(
   NAME
-    event_pool
-  HDRS
-    "event_pool.h"
-  SRCS
-    "event_pool.c"
-  DEPS
-    iree::base
-    iree::base::core_headers
-    iree::base::internal
-    iree::base::internal::synchronization
-    iree::base::internal::wait_handle
-    iree::base::tracing
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
     task_driver
   HDRS
     "task_command_buffer.h"
@@ -146,13 +129,13 @@ iree_cc_library(
     "task_queue_state.c"
     "task_semaphore.c"
   DEPS
-    ::event_pool
     ::executable_library
     ::local
     iree::base
     iree::base::core_headers
     iree::base::internal
     iree::base::internal::arena
+    iree::base::internal::event_pool
     iree::base::internal::synchronization
     iree::base::internal::wait_handle
     iree::base::tracing

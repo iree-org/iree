@@ -54,9 +54,8 @@ enum iree_task_type_bits_t {
   IREE_TASK_TYPE_WAIT = 4u,
 
   // Task is a 3D grid dispatch of zero or more tiles.
-  // Dispatches are issued when ready by either being split into zero or more
-  // slices with one or more tiles each based on the workgroup count or one
-  // shard per worker that should process the dispatch.
+  // Dispatches are issued when ready by either being split into one shard per
+  // worker that should process the dispatch.
   //
   // If IREE_TASK_FLAG_DISPATCH_INDIRECT is set then the dispatch reads the
   // workgroup count from a buffer immediately prior to fan-out instead of using
@@ -64,26 +63,21 @@ enum iree_task_type_bits_t {
   //
   // After a dispatch has been issued the IREE_TASK_FLAG_DISPATCH_RETIRE flag is
   // set to indicate that when the dispatch becomes ready again it will be after
-  // all slices have completed.
+  // all shards have completed.
   IREE_TASK_TYPE_DISPATCH = 5u,
-
-  // Task is a slice of a larger contiguous dispatch tile range. The full
-  // dispatch will be sliced into zero or more slices and each slice will be
-  // posted to a particular worker for executiion. If work progresses unevenly
-  // then entire slices will be stolen across workers to balance out the timing.
-  // Slices retire once they have completed the tiles assigned to them.
-  IREE_TASK_TYPE_DISPATCH_SLICE = 6u,
 
   // Task is one of potentially many shards processing a larger dispatch grid.
   // Each shard may have a preference as to which parts of grid it will focus
   // on but is able to otherwise steal any available region directly from the
   // shared dispatch coordination state. Shards retire once there are no more
   // tiles remaining in the dispatch grid.
-  IREE_TASK_TYPE_DISPATCH_SHARD = 7u,
+  IREE_TASK_TYPE_DISPATCH_SHARD = 6u,
 };
 typedef uint8_t iree_task_type_t;
 
 enum iree_task_flag_bits_t {
+  IREE_TASK_FLAG_NONE = 0u,
+
   // The wait handle the task is specified to wait on has resolved and the task
   // can now be considered complete.
   IREE_TASK_FLAG_WAIT_COMPLETED = 1u << 0,
@@ -95,40 +89,46 @@ enum iree_task_flag_bits_t {
   // issued.
   IREE_TASK_FLAG_DISPATCH_INDIRECT = 1u << 1,
 
-  // The dispatch should be sliced across workers via the low-contention
-  // IREE_TASK_TYPE_DISPATCH_SLICE mechanism. This moves the dispatch overhead
-  // to the time when the grid is sliced for a savings during when the grid is
-  // executed.
-  IREE_TASK_FLAG_DISPATCH_SLICED = 1u << 2,
-
   // The dispatch has been issued and the task is waiting for one or more
-  // slices to complete. After they complete the dispatch will be readied and
+  // shards to complete. After they complete the dispatch will be readied and
   // can be retired.
   //
   // Though added by the executor after issuing a dispatch users can also set
-  // this to indicate that all dispatch slices for a particular dispatch have
+  // this to indicate that all dispatch shards for a particular dispatch have
   // been statically scheduled. Executors will then skip issuing the dispatch
-  // and instead wait until all slices complete, enabling IREE_TASK_TYPE_BARRIER
+  // and instead wait until all shards complete, enabling IREE_TASK_TYPE_BARRIER
   // behavior but without an additional task as dispatches are still required
-  // to store information for slices.
-  IREE_TASK_FLAG_DISPATCH_RETIRE = 1u << 3,
+  // to store information for shards.
+  IREE_TASK_FLAG_DISPATCH_RETIRE = 1u << 2,
+
+  // An error occurred at or before the task and it has been aborted.
+  // Aborted tasks may continue to execute if they're already in-flight but must
+  // not begin execution after the flag has been set.
+  //
+  // The actual error that occurred is routed to the parent task scope as it
+  // happens and may be available for querying before all tasks have been
+  // cleaned up.
+  IREE_TASK_FLAG_ABORTED = 1u << 3,
 };
 typedef uint16_t iree_task_flags_t;
 
 typedef struct iree_task_t iree_task_t;
 
 // A function called to cleanup tasks.
-// The provided |status| is unowned and must be cloned if used beyond the scope
-// of the cleanup function (such as when stored for later usage).
-typedef void(IREE_API_PTR* iree_task_cleanup_fn_t)(iree_task_t* task,
-                                                   iree_status_t status);
+// Each task has its associated cleanup function called exactly once.
+// The provided |status_code| indicates the execution status of the task prior
+// to cleanup and will usually be IREE_STATUS_OK indicating the task was
+// successfully issued or IREE_STATUS_ABORTED if the task was discard prior to
+// issuing.
+typedef void(IREE_API_PTR* iree_task_cleanup_fn_t)(
+    iree_task_t* task, iree_status_code_t status_code);
 
 // A task within the task system that runs on an executor.
 // Tasks have an iree_task_type_t that defines which parameters are valid and
 // how the executor is to treat the task. Dependency edges can be defined that
 // determine the execution order of tasks within the executors.
 struct iree_alignas(iree_max_align_t) iree_task_t {
-  // Instrusive pointer used to store tasks within iree_task_list_t and
+  // Intrusive pointer used to store tasks within iree_task_list_t and
   // iree_atomic_task_list_t singly-linked lists. This must come first in the
   // structure so that it is at the appropriate alignment.
   iree_task_t* next_task;
@@ -175,6 +175,9 @@ struct iree_alignas(iree_max_align_t) iree_task_t {
 };
 static_assert(offsetof(iree_task_t, next_task) == 0,
               "next_task intrusive pointer must be at offset 0");
+static_assert(sizeof(iree_task_t) <= 64,
+              "the task header greatly influences pool sizes due to alignment "
+              "requirements and should be kept tiny");
 
 // Initializes a task header with the given type.
 // Must be called on all tasks to ensure proper dependency tracking and list
@@ -185,7 +188,9 @@ void iree_task_initialize(iree_task_type_t type, iree_task_scope_t* scope,
                           iree_task_t* out_task);
 
 // Sets the optional function called when the task completes (whether successful
-// or not).
+// or not). The cleanup function will receive a status indicating whether the
+// cleanup is from expected execution as the task retires (IREE_STATUS_OK)
+// or because it was aborted (IREE_STATUS_ABORTED).
 void iree_task_set_cleanup_fn(iree_task_t* task,
                               iree_task_cleanup_fn_t cleanup_fn);
 
@@ -231,7 +236,7 @@ void iree_task_nop_initialize(iree_task_scope_t* scope,
 //==============================================================================
 
 typedef iree_status_t(IREE_API_PTR* iree_task_call_closure_fn_t)(
-    uintptr_t user_context, iree_task_t* task,
+    void* user_context, iree_task_t* task,
     iree_task_submission_t* pending_submission);
 
 // A function closure representing the function to call and its arguments.
@@ -239,12 +244,11 @@ typedef struct iree_task_call_closure_t {
   // Function called per tile invocation.
   iree_task_call_closure_fn_t fn;
 
-  // User-defined argument passed to task functions during invocation.
-  // Opaque pointer-sized values that could point to user data structures or
-  // contain embedded values. No lifetime management is performed by the task
-  // system and it is required that users ensure that the memory referenced is
-  // live until after the task has completed.
-  uintptr_t user_context;
+  // Opaque pointer to a user-provided data structure.
+  // No lifetime management is performed by the task system and it is required
+  // that users ensure that the memory referenced is live until after the task
+  // has completed.
+  void* user_context;
 
   // TODO(benvanik): cleanup function? right now assume arg is never freed.
 } iree_task_call_closure_t;
@@ -253,7 +257,7 @@ typedef struct iree_task_call_closure_t {
 // If the arguments represent pointers they must remain live until the task
 // has completed execution.
 static inline iree_task_call_closure_t iree_task_make_call_closure(
-    iree_task_call_closure_fn_t fn, uintptr_t user_context) {
+    iree_task_call_closure_fn_t fn, void* user_context) {
   iree_task_call_closure_t closure = {fn, user_context};
   return closure;
 }
@@ -269,6 +273,16 @@ typedef iree_alignas(iree_max_align_t) struct {
 
   // Function closure to call when the task is executed.
   iree_task_call_closure_t closure;
+
+  // Resulting status from the call available once all nested tasks have
+  // completed (or would have completed). It's possible for a call to nest
+  // additional work under it and then return a failure; to ensure we don't
+  // discard the root call while the nested tasks are still executing we set the
+  // status here and wait for the nested tasks to complete. We'll try not to
+  // issue work that was enqueued while the call was executing but it's possible
+  // for work to come from other angles and we need to err on the side of
+  // safety.
+  iree_atomic_intptr_t status;
 } iree_task_call_t;
 
 void iree_task_call_initialize(iree_task_scope_t* scope,
@@ -358,11 +372,14 @@ typedef struct iree_task_wait_t {
   iree_task_t header;
 
   // The external wait handle that the task is waiting on.
-  // TODO(benvanik): multiple wait handles.
+  // TODO(benvanik): null handle for sleep.
+  // TODO(benvanik): use a wait source with cached wait handle.
+  // TODO(benvanik): multiple wait handles (ptr owned by outer wrapper task).
   iree_wait_handle_t wait_handle;
 
   // TODO(benvanik): deadline_ns.
   // TODO(benvanik): condition (possibly a closure to evaluate) ala condvar.
+  // TODO(benvanik): whether a sleep.
 } iree_task_wait_t;
 
 void iree_task_wait_initialize(iree_task_scope_t* scope,
@@ -432,7 +449,7 @@ typedef iree_alignas(iree_max_align_t) struct {
   // Contents are (today) undefined upon entry.
   iree_byte_span_t local_memory;
 
-  // Shared statistics counters for the dispatch slice.
+  // Shared statistics counters for the dispatch shard.
   iree_task_dispatch_statistics_t* statistics;
 
   // TODO(benvanik): cpuid uarch.
@@ -441,26 +458,12 @@ typedef iree_alignas(iree_max_align_t) struct {
 
 typedef struct iree_task_dispatch_t iree_task_dispatch_t;
 
-// Shared state for all shards processing a dispatch.
-typedef iree_alignas(iree_max_align_t) struct {
-  // The tail tile index; the next reservation will start from here.
-  iree_atomic_int32_t tile_index;
-
-  // The total number of tiles in the dispatch bounding tile_index.
-  uint32_t tile_count;
-
-  // Maximum number of tiles to fetch per tile reservation from the grid.
-  // Bounded by IREE_TASK_DISPATCH_MAX_TILES_PER_SHARD_RESERVATION and a
-  // reasonable number chosen based on the tile and shard counts.
-  uint32_t tiles_per_reservation;
-} iree_task_dispatch_shard_state_t;
-
 //==============================================================================
 // Dispatch function closures
 //==============================================================================
 
 typedef iree_status_t(IREE_API_PTR* iree_task_dispatch_closure_fn_t)(
-    uintptr_t user_context, const iree_task_tile_context_t* tile_context,
+    void* user_context, const iree_task_tile_context_t* tile_context,
     iree_task_submission_t* pending_submission);
 
 // A function closure representing the function to call and its arguments.
@@ -473,14 +476,14 @@ typedef struct iree_task_dispatch_closure_t {
   // contain embedded values. No lifetime management is performed by the task
   // system and it is required that users ensure that the memory referenced is
   // live until after the task has completed.
-  uintptr_t user_context;
+  void* user_context;
 } iree_task_dispatch_closure_t;
 
 // Binds a function pointer and the arguments it should be called with.
 // If the arguments represent pointers they must remain live until the task
 // has completed execution.
 static inline iree_task_dispatch_closure_t iree_task_make_dispatch_closure(
-    iree_task_dispatch_closure_fn_t fn, uintptr_t user_context) {
+    iree_task_dispatch_closure_fn_t fn, void* user_context) {
   iree_task_dispatch_closure_t closure = {fn, user_context};
   return closure;
 }
@@ -490,10 +493,10 @@ static inline iree_task_dispatch_closure_t iree_task_make_dispatch_closure(
 //==============================================================================
 
 // An execution request across a tiled grid.
-// Dispatches are fork points where zero or more dispatch slice tasks are
+// Dispatches are fork points where zero or more dispatch shard tasks are
 // spawned and processed prior to joining again on the dispatch completion task.
 //
-// The total workgroup count indicates the [x,y,z] extents of the dispatch grid.
+// The total workgroup count defines the [x,y,z] extents of the dispatch grid.
 // The count may either be embedded directly into the dispatch or provided as a
 // pointer to the workgroup_count[3] that will be read immediately prior to
 // forking. If any dimension of the workgroup count is zero then the dispatch is
@@ -501,11 +504,11 @@ static inline iree_task_dispatch_closure_t iree_task_make_dispatch_closure(
 //
 // Example:
 //   dispatch([5, 1, 1])
-//     forked into slices based on affinity/scheduling parameters:
-//     -> dispatch_slice([0-1, 1, 1])
-//     -> dispatch_slice([2-3, 1, 1])
-//     -> dispatch_slice([4-5, 1, 1])
-//   completion_task run after all slices complete
+//     forked into shards based on affinity/scheduling parameters:
+//     -> dispatch_shard for core 0, processes [0-1, 1, 1]
+//     -> dispatch_shard for core 1, processes [2-3, 1, 1]
+//     -> dispatch_shard for core 2, processes [4-5, 1, 1]
+//   completion_task run after all shards complete
 typedef iree_alignas(iree_max_align_t) struct iree_task_dispatch_t {
   // Task header: implementation detail, do not use.
   iree_task_t header;
@@ -533,14 +536,33 @@ typedef iree_alignas(iree_max_align_t) struct iree_task_dispatch_t {
   // dispatch closure.
   uint32_t local_memory_size;
 
-  // Statistics storage used for aggregating counters across all slices.
+  // Resulting status from the dispatch available once all workgroups have
+  // completed (or would have completed). If multiple shards processing the
+  // workgroups hit an error the first will be taken and the result ignored. A
+  // dispatch with a non-ok status will mark the parent task scope as failing
+  // when it retires.
+  iree_atomic_intptr_t status;
+
+  // Statistics storage used for aggregating counters across all shards.
   iree_task_dispatch_statistics_t statistics;
 
-  // Shared state across all slices/shards/etc.
-  // Stored once per dispatch and then referenced by all subtasks.
-  union {
-    iree_task_dispatch_shard_state_t shard_state;
-  } shared;
+  // The total number of tiles in the dispatch bounding tile_index.
+  uint32_t tile_count;
+
+  // Maximum number of tiles to fetch per tile reservation from the grid.
+  // Bounded by IREE_TASK_DISPATCH_MAX_TILES_PER_SHARD_RESERVATION and a
+  // reasonable number chosen based on the tile and shard counts.
+  uint32_t tiles_per_reservation;
+
+  // The tail tile index; the next reservation will start from here.
+  // This is used by shards to slice off the work to perform in their inner
+  // loop. Ideally we'd have no destructive interference with other shared data
+  // in this structure but the shared parts (status/statistics) are updated once
+  // per shard instead of once per slice and are less of a concern.
+  iree_atomic_int32_t tile_index;
+
+  // Incrementing process-lifetime dispatch identifier.
+  IREE_TRACE(int64_t dispatch_id;)
 } iree_task_dispatch_t;
 
 void iree_task_dispatch_initialize(iree_task_scope_t* scope,
@@ -555,83 +577,6 @@ void iree_task_dispatch_initialize_indirect(
     iree_task_dispatch_t* out_task);
 
 //==============================================================================
-// IREE_TASK_TYPE_DISPATCH_SLICE
-//==============================================================================
-
-// TODO(benvanik): per-region dependencies (allow slices to execute directly
-// across dispatches).
-
-// A slice of tiles within a larger dispatch grid.
-// These tasks are designed to be synthesized by the task system when processing
-// a dispatch task. Based on the workgroup count, affinity settings, and
-// available executor threads zero or more slices are enqueued, executed, and
-// retired as part of the complete dispatch task. The dispatch is only
-// considered completed and subsquent tasks readied once all slices are
-// complete.
-//
-// Slices aggregate statistics from all tiles within them and then upon
-// completion merge those into the shared dispatch statistics. As slices may
-// suspend and resume several times the dispatch-level statistics should only be
-// read once all slices have completed fully.
-//
-// In general slices represent a contiguous range of tiles along the most
-// rapidly changing dimension (x, then y, then z). This ensures that we at least
-// give the opportunity for cache locality to the tiles as they are processed.
-// If work stealing is enabled then slices may shed their trailing tiles to
-// other threads that have completed all of their work (at a cost of power vs.
-// potential latency savings).
-typedef iree_alignas(iree_max_align_t) struct {
-  // Task header: implementation detail, do not use.
-  iree_task_t header;
-
-  // NOTE: the following fields are mostly replicated from iree_task_dispatch_t.
-  // This removes the need for touching the dispatch struct when beginning a
-  // tile which would likely be a cache miss as we fan out to other cores.
-
-  // Function closure to call per tile (same as the closure in the dispatch).
-  iree_task_dispatch_closure_t closure;
-
-  // Base workgroup ID for the slice range.
-  uint32_t workgroup_base[3];
-  // Total count of tiles within the slice range.
-  uint32_t workgroup_range[3];
-
-  // Workgroup size for each invocation.
-  uint32_t workgroup_size[3];
-  // Total workgroup count for the task. Can be used in conjunction with the
-  // per-invocation workgroup_xyz and workgroup_size to compute offsets/indices.
-  uint32_t workgroup_count[3];
-
-  // Optional transient shared memory size in bytes to allocate and pass into
-  // the iree_task_tile_context_t::local_memory of each invocation of the
-  // dispatch closure.
-  uint32_t local_memory_size;
-
-  // Shared statistics counters for the entire dispatch. References the storage
-  // held in the parent iree_task_dispatch_t.
-  iree_task_dispatch_statistics_t* dispatch_statistics;
-  // Statistics just for this single slice. The statistics will be added to the
-  // dispatch_statistics after the slice completes to prevent excessive
-  // contention on the shared dispatch statistics across multiple threads.
-  iree_task_dispatch_statistics_t slice_statistics;
-
-  // Per-tile initialized coroutine storage for all tiles in the range
-  // initialized as each tile begins execution.
-  // TODO(benvanik): coroutine storage as iree_task_tile_storage_t.
-} iree_task_dispatch_slice_t;
-
-// TODO(benvanik): document initialize() for slice pre-planning/embeddeding.
-// This would be useful to reduce latency when the number of slices is small
-// (~<5) as the dispatch wouldn't need to be issued. This can also be used to
-// implement per-region dependencies as direct slice->slice deps vs. fork/join
-// dispatch->dispatch deps. Show how IREE_TASK_FLAG_DISPATCH_RETIRE is set.
-void iree_task_dispatch_slice_initialize(iree_task_dispatch_t* dispatch_task,
-                                         const uint32_t workgroup_base[3],
-                                         const uint32_t workgroup_range[3],
-                                         const uint32_t workgroup_count[3],
-                                         iree_task_dispatch_slice_t* out_task);
-
-//==============================================================================
 // IREE_TASK_TYPE_DISPATCH_SHARD
 //==============================================================================
 
@@ -639,19 +584,12 @@ typedef iree_alignas(iree_max_align_t) struct {
   // Task header: implementation detail, do not use.
   iree_task_t header;
 
-  // The root dispatch task that this shard is a part of.
-  iree_task_dispatch_t* dispatch_task;
-
-  // Active dispatch progress shared across all shards.
-  // Each shard will be read/modify/writing this and there's likely to be
-  // contention.
-  iree_task_dispatch_shard_state_t* shared_state;
+  // NOTE: the parent dispatch task this shard is applied to is in the
+  // header.completion_task field.
 } iree_task_dispatch_shard_t;
 
-void iree_task_dispatch_shard_initialize(
-    iree_task_dispatch_t* dispatch_task,
-    iree_task_dispatch_shard_state_t* shared_state,
-    iree_task_dispatch_shard_t* out_task);
+void iree_task_dispatch_shard_initialize(iree_task_dispatch_t* dispatch_task,
+                                         iree_task_dispatch_shard_t* out_task);
 
 #ifdef __cplusplus
 }  // extern "C"

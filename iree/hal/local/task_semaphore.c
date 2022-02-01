@@ -133,7 +133,7 @@ static void iree_hal_task_timepoint_list_notify_ready(
 typedef struct iree_hal_task_semaphore_t {
   iree_hal_resource_t resource;
   iree_allocator_t host_allocator;
-  iree_hal_local_event_pool_t* event_pool;
+  iree_event_pool_t* event_pool;
 
   // Guards all mutable fields. We expect low contention on semaphores and since
   // iree_slim_mutex_t is (effectively) just a CAS this keeps things simpler
@@ -167,7 +167,7 @@ static iree_hal_task_semaphore_t* iree_hal_task_semaphore_cast(
 }
 
 iree_status_t iree_hal_task_semaphore_create(
-    iree_hal_local_event_pool_t* event_pool, uint64_t initial_value,
+    iree_event_pool_t* event_pool, uint64_t initial_value,
     iree_allocator_t host_allocator, iree_hal_semaphore_t** out_semaphore) {
   IREE_ASSERT_ARGUMENT(event_pool);
   IREE_ASSERT_ARGUMENT(out_semaphore);
@@ -306,8 +306,8 @@ static iree_status_t iree_hal_task_semaphore_acquire_timepoint(
     iree_hal_task_timepoint_t* out_timepoint) {
   memset(out_timepoint, 0, sizeof(*out_timepoint));
   out_timepoint->payload_value = minimum_value;
-  IREE_RETURN_IF_ERROR(iree_hal_local_event_pool_acquire(
-      semaphore->event_pool, 1, &out_timepoint->event));
+  IREE_RETURN_IF_ERROR(
+      iree_event_pool_acquire(semaphore->event_pool, 1, &out_timepoint->event));
   iree_hal_task_timepoint_list_append(&semaphore->timepoint_list,
                                       out_timepoint);
   return iree_ok_status();
@@ -321,13 +321,12 @@ typedef struct iree_hal_task_semaphore_wait_cmd_t {
 
 // Cleans up a wait task by returning the event used to the pool and - if the
 // task failed - ensuring we scrub it from the timepoint list.
-static void iree_hal_task_semaphore_wait_cmd_cleanup(iree_task_t* task,
-                                                     iree_status_t status) {
+static void iree_hal_task_semaphore_wait_cmd_cleanup(
+    iree_task_t* task, iree_status_code_t status_code) {
   iree_hal_task_semaphore_wait_cmd_t* cmd =
       (iree_hal_task_semaphore_wait_cmd_t*)task;
-  iree_hal_local_event_pool_release(cmd->semaphore->event_pool, 1,
-                                    &cmd->timepoint.event);
-  if (IREE_UNLIKELY(!iree_status_is_ok(status))) {
+  iree_event_pool_release(cmd->semaphore->event_pool, 1, &cmd->timepoint.event);
+  if (IREE_UNLIKELY(status_code != IREE_STATUS_OK)) {
     // Abort the timepoint. Note that this is not designed to be fast as
     // semaphore failure is an exceptional case.
     iree_slim_mutex_lock(&cmd->semaphore->mutex);
@@ -413,15 +412,14 @@ static iree_status_t iree_hal_task_semaphore_wait(
     iree_hal_task_timepoint_list_erase(&semaphore->timepoint_list, &timepoint);
     iree_slim_mutex_unlock(&semaphore->mutex);
   }
-  iree_hal_local_event_pool_release(semaphore->event_pool, 1, &timepoint.event);
+  iree_event_pool_release(semaphore->event_pool, 1, &timepoint.event);
   return status;
 }
 
 iree_status_t iree_hal_task_semaphore_multi_wait(
     iree_hal_wait_mode_t wait_mode,
     const iree_hal_semaphore_list_t* semaphore_list, iree_timeout_t timeout,
-    iree_hal_local_event_pool_t* event_pool,
-    iree_arena_block_pool_t* block_pool) {
+    iree_event_pool_t* event_pool, iree_arena_block_pool_t* block_pool) {
   IREE_ASSERT_ARGUMENT(semaphore_list);
   if (semaphore_list->count == 0) {
     return iree_ok_status();
@@ -487,7 +485,7 @@ iree_status_t iree_hal_task_semaphore_multi_wait(
     // TODO(benvanik): if we flip the API to multi-acquire events from the pool
     // above then we can multi-release here too.
     for (iree_host_size_t i = 0; i < timepoint_count; ++i) {
-      iree_hal_local_event_pool_release(event_pool, 1, &timepoints[i].event);
+      iree_event_pool_release(event_pool, 1, &timepoints[i].event);
     }
   }
   iree_wait_set_free(wait_set);

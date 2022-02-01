@@ -318,6 +318,20 @@ endif()
 )
 
 cc_library(
+    name = "event_pool",
+    srcs = ["event_pool.c"],
+    hdrs = ["event_pool.h"],
+    deps = [
+        ":internal",
+        ":synchronization",
+        ":wait_handle",
+        "//iree/base",
+        "//iree/base:core_headers",
+        "//iree/base:tracing",
+    ],
+)
+
+cc_library(
     name = "threading",
     srcs = [
         "threading.c",

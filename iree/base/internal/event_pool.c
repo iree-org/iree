@@ -4,7 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/hal/local/event_pool.h"
+#include "iree/base/internal/event_pool.h"
 
 #include <stdbool.h>
 #include <stddef.h>
@@ -13,7 +13,7 @@
 #include "iree/base/internal/synchronization.h"
 #include "iree/base/tracing.h"
 
-struct iree_hal_local_event_pool_t {
+struct iree_event_pool_t {
   // Allocator used to create the event pool.
   iree_allocator_t host_allocator;
   // Guards the pool. Since this pool is used to get operating system-level
@@ -31,14 +31,14 @@ struct iree_hal_local_event_pool_t {
   iree_event_t available_list[];
 };
 
-iree_status_t iree_hal_local_event_pool_allocate(
-    iree_host_size_t available_capacity, iree_allocator_t host_allocator,
-    iree_hal_local_event_pool_t** out_event_pool) {
+iree_status_t iree_event_pool_allocate(iree_host_size_t available_capacity,
+                                       iree_allocator_t host_allocator,
+                                       iree_event_pool_t** out_event_pool) {
   IREE_ASSERT_ARGUMENT(out_event_pool);
   *out_event_pool = NULL;
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  iree_hal_local_event_pool_t* event_pool = NULL;
+  iree_event_pool_t* event_pool = NULL;
   iree_host_size_t total_size =
       sizeof(*event_pool) +
       available_capacity * sizeof(event_pool->available_list[0]);
@@ -60,13 +60,13 @@ iree_status_t iree_hal_local_event_pool_allocate(
   if (iree_status_is_ok(status)) {
     *out_event_pool = event_pool;
   } else {
-    iree_hal_local_event_pool_free(event_pool);
+    iree_event_pool_free(event_pool);
   }
   IREE_TRACE_ZONE_END(z0);
   return status;
 }
 
-void iree_hal_local_event_pool_free(iree_hal_local_event_pool_t* event_pool) {
+void iree_event_pool_free(iree_event_pool_t* event_pool) {
   iree_allocator_t host_allocator = event_pool->host_allocator;
   IREE_TRACE_ZONE_BEGIN(z0);
 
@@ -79,9 +79,9 @@ void iree_hal_local_event_pool_free(iree_hal_local_event_pool_t* event_pool) {
   IREE_TRACE_ZONE_END(z0);
 }
 
-iree_status_t iree_hal_local_event_pool_acquire(
-    iree_hal_local_event_pool_t* event_pool, iree_host_size_t event_count,
-    iree_event_t* out_events) {
+iree_status_t iree_event_pool_acquire(iree_event_pool_t* event_pool,
+                                      iree_host_size_t event_count,
+                                      iree_event_t* out_events) {
   IREE_ASSERT_ARGUMENT(event_pool);
   if (!event_count) return iree_ok_status();
   IREE_ASSERT_ARGUMENT(out_events);
@@ -113,8 +113,7 @@ iree_status_t iree_hal_local_event_pool_acquire(
                                      &out_events[from_pool_count + i]);
       if (!iree_status_is_ok(status)) {
         // Must release all events we've acquired so far.
-        iree_hal_local_event_pool_release(event_pool, from_pool_count + i,
-                                          out_events);
+        iree_event_pool_release(event_pool, from_pool_count + i, out_events);
         IREE_TRACE_ZONE_END(z0);
         return status;
       }
@@ -125,9 +124,9 @@ iree_status_t iree_hal_local_event_pool_acquire(
   return iree_ok_status();
 }
 
-void iree_hal_local_event_pool_release(iree_hal_local_event_pool_t* event_pool,
-                                       iree_host_size_t event_count,
-                                       iree_event_t* events) {
+void iree_event_pool_release(iree_event_pool_t* event_pool,
+                             iree_host_size_t event_count,
+                             iree_event_t* events) {
   IREE_ASSERT_ARGUMENT(event_pool);
   if (!event_count) return;
   IREE_ASSERT_ARGUMENT(events);

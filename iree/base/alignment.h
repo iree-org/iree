@@ -59,7 +59,7 @@ static inline iree_device_size_t iree_device_align(
 
 // Returns the size of a struct padded out to iree_max_align_t.
 // This must be used when performing manual trailing allocation packing to
-// ensure the alignment requirements of the trailing data are satisified.
+// ensure the alignment requirements of the trailing data are satisfied.
 //
 // NOTE: do not use this if using VLAs (`struct { int trailing[]; }`) - those
 // must precisely follow the normal sizeof(t) as the compiler does the padding

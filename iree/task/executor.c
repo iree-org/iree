@@ -89,6 +89,14 @@ iree_status_t iree_task_executor_create(
 
   iree_status_t status = iree_ok_status();
 
+  // Pool used for system events; exposed to users of the task system to ensure
+  // we minimize the number of live events and reduce overheads in
+  // high-frequency transient parking operations.
+  if (iree_status_is_ok(status)) {
+    status = iree_event_pool_allocate(IREE_TASK_EXECUTOR_EVENT_POOL_CAPACITY,
+                                      allocator, &executor->event_pool);
+  }
+
   // Wait set used to batch syscalls for polling/waiting on wait handles.
   // This is currently limited to a relatively small max to make bad behavior
   // clearer with nice RESOURCE_EXHAUSTED errors.
@@ -97,22 +105,15 @@ iree_status_t iree_task_executor_create(
                                     allocator, &executor->wait_set);
   }
 
-  // Pool used for all dispatch->slice fanout tasks. These only live within the
-  // executor and since we know the precise lifetime of them we can keep them
-  // entirely within the system here.
-  if (iree_status_is_ok(status)) {
-    status = iree_task_pool_initialize(allocator, sizeof(iree_task_fence_t), 8,
-                                       &executor->fence_task_pool);
-  }
+  // Pool used for all fanout tasks. These only live within the executor and
+  // since we know the precise lifetime of them we can keep them entirely within
+  // the system here.
   if (iree_status_is_ok(status)) {
     status = iree_task_pool_initialize(
         allocator,
-        iree_max(sizeof(iree_task_dispatch_shard_t),
-                 sizeof(iree_task_dispatch_slice_t)),
-        worker_count *
-            iree_max(IREE_TASK_EXECUTOR_INITIAL_SHARD_RESERVATION_PER_WORKER,
-                     IREE_TASK_EXECUTOR_INITIAL_SLICE_RESERVATION_PER_WORKER),
-        &executor->dispatch_task_pool);
+        iree_max(sizeof(iree_task_fence_t), sizeof(iree_task_dispatch_shard_t)),
+        worker_count * IREE_TASK_EXECUTOR_INITIAL_SHARD_RESERVATION_PER_WORKER,
+        &executor->transient_task_pool);
   }
 
   // Bring up the workers; the threads will be created here but be suspended
@@ -188,12 +189,12 @@ static void iree_task_executor_destroy(iree_task_executor_t* executor) {
   }
 
   iree_wait_set_free(executor->wait_set);
+  iree_event_pool_free(executor->event_pool);
   iree_slim_mutex_deinitialize(&executor->wait_mutex);
   iree_slim_mutex_deinitialize(&executor->coordinator_mutex);
   iree_atomic_task_slist_deinitialize(&executor->incoming_ready_slist);
   iree_atomic_task_slist_deinitialize(&executor->incoming_waiting_slist);
-  iree_task_pool_deinitialize(&executor->fence_task_pool);
-  iree_task_pool_deinitialize(&executor->dispatch_task_pool);
+  iree_task_pool_deinitialize(&executor->transient_task_pool);
   iree_allocator_free(executor->allocator, executor);
 
   IREE_TRACE_ZONE_END(z0);
@@ -217,7 +218,12 @@ void iree_task_executor_trim(iree_task_executor_t* executor) {
   // guarantee. We'd need some global executor lock that we did here and
   // on submit - or rework pools to not have this limitation.
   // iree_task_pool_trim(&executor->fence_task_pool);
-  // iree_task_pool_trim(&executor->dispatch_task_pool);
+  // iree_task_pool_trim(&executor->transient_task_pool);
+}
+
+iree_event_pool_t* iree_task_executor_event_pool(
+    iree_task_executor_t* executor) {
+  return executor->event_pool;
 }
 
 iree_status_t iree_task_executor_acquire_fence(iree_task_executor_t* executor,
@@ -225,10 +231,10 @@ iree_status_t iree_task_executor_acquire_fence(iree_task_executor_t* executor,
                                                iree_task_fence_t** out_fence) {
   *out_fence = NULL;
   iree_task_fence_t* fence = NULL;
-  IREE_RETURN_IF_ERROR(iree_task_pool_acquire(&executor->fence_task_pool,
+  IREE_RETURN_IF_ERROR(iree_task_pool_acquire(&executor->transient_task_pool,
                                               (iree_task_t**)&fence));
   iree_task_fence_initialize(scope, fence);
-  fence->header.pool = &executor->fence_task_pool;
+  fence->header.pool = &executor->transient_task_pool;
   *out_fence = fence;
   return iree_ok_status();
 }
@@ -264,13 +270,23 @@ void iree_task_executor_schedule_ready_tasks(
   IREE_TRACE_ZONE_BEGIN(z0);
   iree_task_t* task = NULL;
   while ((task = iree_task_list_pop_front(&pending_submission->ready_list))) {
+    // If the scope has been marked as failing then we abort the task.
+    // This needs to happen as a poll here because one or more of the tasks we
+    // are joining may have failed.
+    if (IREE_UNLIKELY(iree_task_scope_has_failed(task->scope))) {
+      iree_task_list_t discard_worklist;
+      iree_task_list_initialize(&discard_worklist);
+      iree_task_discard(task, &discard_worklist);
+      iree_task_list_discard(&discard_worklist);
+      continue;
+    }
+
     switch (task->type) {
       case IREE_TASK_TYPE_NOP:
         // Doesn't do anything; just retire and continue on to any dependents.
         iree_task_nop_retire((iree_task_nop_t*)task, pending_submission);
         break;
-      case IREE_TASK_TYPE_CALL:
-      case IREE_TASK_TYPE_DISPATCH_SLICE: {
+      case IREE_TASK_TYPE_CALL: {
         // Generic routing to workers for tasks that should always run there.
         iree_task_executor_relay_to_worker(executor, post_batch, task);
         break;
@@ -305,15 +321,9 @@ void iree_task_executor_schedule_ready_tasks(
           iree_task_dispatch_retire((iree_task_dispatch_t*)task,
                                     pending_submission);
         } else {
-          if (task->flags & IREE_TASK_FLAG_DISPATCH_SLICED) {
-            iree_task_dispatch_issue_sliced((iree_task_dispatch_t*)task,
-                                            &executor->dispatch_task_pool,
-                                            pending_submission, post_batch);
-          } else {
-            iree_task_dispatch_issue_sharded((iree_task_dispatch_t*)task,
-                                             &executor->dispatch_task_pool,
-                                             pending_submission, post_batch);
-          }
+          iree_task_dispatch_issue((iree_task_dispatch_t*)task,
+                                   &executor->transient_task_pool,
+                                   pending_submission, post_batch);
         }
         break;
       }
@@ -584,7 +594,7 @@ void iree_task_executor_coordinate(iree_task_executor_t* executor,
     // any changes then.
     //
     // As we schedule tasks we may spawn new ones (like a dispatch -> many
-    // dispatch slices) and we keep track of those here. By doing a pass through
+    // dispatch shards) and we keep track of those here. By doing a pass through
     // all ready tasks and only then merging in the new submission we get
     // breadth-first traversal of task graphs even if they originate from
     // various places and have no relation - hopefully leading to better average
