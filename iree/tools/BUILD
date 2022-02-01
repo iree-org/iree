@@ -365,6 +365,7 @@ cc_binary(
     tags = ["hostonly"],
     deps = [
         "//build_tools:default_linkopts",
+        "//iree/compiler/Utils",
         "@llvm-project//llvm:Support",
         "@llvm-project//llvm:TableGen",
         "@llvm-project//mlir:MlirTableGenMain",
