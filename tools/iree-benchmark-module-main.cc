@@ -339,8 +339,8 @@ class IREEBenchmark {
     IREE_TRACE_SCOPE0("IREEBenchmark::RegisterSpecificFunction");
 
     iree_vm_function_t function;
-    IREE_RETURN_IF_ERROR(input_module_->lookup_function(
-        input_module_->self, IREE_VM_FUNCTION_LINKAGE_EXPORT,
+    IREE_RETURN_IF_ERROR(iree_vm_module_lookup_function_by_name(
+        input_module_, IREE_VM_FUNCTION_LINKAGE_EXPORT,
         iree_string_view_t{function_name.data(), function_name.size()},
         &function));
 
