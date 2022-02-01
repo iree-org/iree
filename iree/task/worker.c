@@ -183,12 +183,6 @@ static void iree_task_worker_execute(
       iree_task_call_execute((iree_task_call_t*)task, pending_submission);
       break;
     }
-    case IREE_TASK_TYPE_DISPATCH_SLICE: {
-      iree_task_dispatch_slice_execute((iree_task_dispatch_slice_t*)task,
-                                       worker->local_memory,
-                                       pending_submission);
-      break;
-    }
     case IREE_TASK_TYPE_DISPATCH_SHARD: {
       iree_task_dispatch_shard_execute((iree_task_dispatch_shard_t*)task,
                                        worker->local_memory,

@@ -67,7 +67,7 @@ extern "C" {
 //   - latency prioritization by partitioning workloads by priority
 // - scheduling overhead tradeoffs by varying:
 //   - coordination/flush frequency to reduce cross-thread communication
-//   - by statically inserting dispatch slices to avoid dynamic fan-out
+//   - by statically inserting dispatch shards to avoid dynamic fan-out
 //   - thread donation to avoid likely context switches upon submit+wait
 //   - multi-wait across all users by sharing a wait set
 //   - per-worker work-stealing specification of victim workers in the topology

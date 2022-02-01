@@ -84,56 +84,28 @@ class TaskDispatchTest : public TaskTest {
   }
 };
 
-TEST_F(TaskDispatchTest, Issue000Sharded) {
+TEST_F(TaskDispatchTest, Issue000) {
   const uint32_t kWorkgroupSize[3] = {1, 1, 1};
   const uint32_t kWorkgroupCount[3] = {0, 0, 0};
-  DispatchAndVerifyGrid(kWorkgroupSize, kWorkgroupCount, 0);
+  DispatchAndVerifyGrid(kWorkgroupSize, kWorkgroupCount, IREE_TASK_FLAG_NONE);
 }
 
-TEST_F(TaskDispatchTest, Issue000Sliced) {
-  const uint32_t kWorkgroupSize[3] = {1, 1, 1};
-  const uint32_t kWorkgroupCount[3] = {0, 0, 0};
-  DispatchAndVerifyGrid(kWorkgroupSize, kWorkgroupCount,
-                        IREE_TASK_FLAG_DISPATCH_SLICED);
-}
-
-TEST_F(TaskDispatchTest, Issue120Sharded) {
+TEST_F(TaskDispatchTest, Issue120) {
   const uint32_t kWorkgroupSize[3] = {1, 1, 1};
   const uint32_t kWorkgroupCount[3] = {1, 2, 0};
-  DispatchAndVerifyGrid(kWorkgroupSize, kWorkgroupCount, 0);
+  DispatchAndVerifyGrid(kWorkgroupSize, kWorkgroupCount, IREE_TASK_FLAG_NONE);
 }
 
-TEST_F(TaskDispatchTest, Issue120Sliced) {
-  const uint32_t kWorkgroupSize[3] = {1, 1, 1};
-  const uint32_t kWorkgroupCount[3] = {1, 2, 0};
-  DispatchAndVerifyGrid(kWorkgroupSize, kWorkgroupCount,
-                        IREE_TASK_FLAG_DISPATCH_SLICED);
-}
-
-TEST_F(TaskDispatchTest, Issue111Sharded) {
+TEST_F(TaskDispatchTest, Issue111) {
   const uint32_t kWorkgroupSize[3] = {1, 1, 1};
   const uint32_t kWorkgroupCount[3] = {1, 1, 1};
-  DispatchAndVerifyGrid(kWorkgroupSize, kWorkgroupCount, 0);
+  DispatchAndVerifyGrid(kWorkgroupSize, kWorkgroupCount, IREE_TASK_FLAG_NONE);
 }
 
-TEST_F(TaskDispatchTest, Issue111Sliced) {
-  const uint32_t kWorkgroupSize[3] = {1, 1, 1};
-  const uint32_t kWorkgroupCount[3] = {1, 1, 1};
-  DispatchAndVerifyGrid(kWorkgroupSize, kWorkgroupCount,
-                        IREE_TASK_FLAG_DISPATCH_SLICED);
-}
-
-TEST_F(TaskDispatchTest, Issue345Sharded) {
+TEST_F(TaskDispatchTest, Issue345) {
   const uint32_t kWorkgroupSize[3] = {1, 1, 1};
   const uint32_t kWorkgroupCount[3] = {3, 4, 5};
-  DispatchAndVerifyGrid(kWorkgroupSize, kWorkgroupCount, 0);
-}
-
-TEST_F(TaskDispatchTest, Issue345Sliced) {
-  const uint32_t kWorkgroupSize[3] = {1, 1, 1};
-  const uint32_t kWorkgroupCount[3] = {3, 4, 5};
-  DispatchAndVerifyGrid(kWorkgroupSize, kWorkgroupCount,
-                        IREE_TASK_FLAG_DISPATCH_SLICED);
+  DispatchAndVerifyGrid(kWorkgroupSize, kWorkgroupCount, IREE_TASK_FLAG_NONE);
 }
 
 TEST_F(TaskDispatchTest, IssueIndirect) {

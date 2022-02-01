@@ -58,8 +58,8 @@ typedef enum iree_task_worker_state_e {
 // not yet correctly) selected; see the 'LAYOUT' comments below.
 typedef struct iree_task_worker_t {
   // A LIFO mailbox used by coordinators to post tasks to this worker.
-  // As workers self-nominate to be coordinators and fan out dispatch slices
-  // they can directly emplace those slices into the workers that should execute
+  // As workers self-nominate to be coordinators and fan out dispatch shards
+  // they can directly emplace those shards into the workers that should execute
   // them based on the work distribution policy. When workers go to look for
   // more work after their local queue empties they will flush this list and
   // move all of the tasks into their local queue and restart processing.
@@ -127,7 +127,7 @@ typedef struct iree_task_worker_t {
   // workers.
   iree_byte_span_t local_memory;
 
-  // Worker-local FIFO queue containing the slices that will be processed by the
+  // Worker-local FIFO queue containing the tasks that will be processed by the
   // worker. This queue supports work-stealing by other workers if they run out
   // of work of their own.
   // LAYOUT: must be 64b away from mailbox_slist.

@@ -122,7 +122,6 @@ void iree_task_discard(iree_task_t* task, iree_task_list_t* discard_worklist) {
     }
     case IREE_TASK_TYPE_WAIT:
     case IREE_TASK_TYPE_DISPATCH:
-    case IREE_TASK_TYPE_DISPATCH_SLICE:
       break;
   }
 
@@ -449,6 +448,12 @@ static void iree_task_dispatch_initialize_base(
   out_task->local_memory_size = 0;
   iree_atomic_store_intptr(&out_task->status, 0, iree_memory_order_release);
   memset(&out_task->statistics, 0, sizeof(out_task->statistics));
+
+  IREE_TRACE({
+    static iree_atomic_int64_t next_dispatch_id = IREE_ATOMIC_VAR_INIT(0);
+    out_task->dispatch_id = iree_atomic_fetch_add_int64(
+        &next_dispatch_id, 1ll, iree_memory_order_acq_rel);
+  });
 }
 
 void iree_task_dispatch_initialize(iree_task_scope_t* scope,
@@ -470,129 +475,16 @@ void iree_task_dispatch_initialize_indirect(
   out_task->workgroup_count.ptr = workgroup_count_ptr;
 }
 
-void iree_task_dispatch_issue_sliced(iree_task_dispatch_t* dispatch_task,
-                                     iree_task_pool_t* slice_task_pool,
-                                     iree_task_submission_t* pending_submission,
-                                     iree_task_post_batch_t* post_batch) {
+void iree_task_dispatch_issue(iree_task_dispatch_t* dispatch_task,
+                              iree_task_pool_t* shard_task_pool,
+                              iree_task_submission_t* pending_submission,
+                              iree_task_post_batch_t* post_batch) {
   IREE_TRACE_ZONE_BEGIN(z0);
+  IREE_TRACE_ZONE_APPEND_VALUE(z0, dispatch_task->dispatch_id);
 
   // Mark the dispatch as having been issued; the next time it retires it'll be
   // because all work has completed.
   dispatch_task->header.flags |= IREE_TASK_FLAG_DISPATCH_RETIRE;
-
-  // Fetch the workgroup count (directly or indirectly).
-  // By the task being ready to execute we know any dependencies on the
-  // indirection buffer have been satisfied and its safe to read.
-  uint32_t workgroup_count[3];
-  if (dispatch_task->header.flags & IREE_TASK_FLAG_DISPATCH_INDIRECT) {
-    memcpy(workgroup_count, dispatch_task->workgroup_count.ptr,
-           sizeof(workgroup_count));
-  } else {
-    memcpy(workgroup_count, dispatch_task->workgroup_count.value,
-           sizeof(workgroup_count));
-  }
-  uint32_t total_workgroup_count =
-      workgroup_count[0] * workgroup_count[1] * workgroup_count[2];
-  if (total_workgroup_count == 0) {
-    // No workgroups to execute - bail early.
-    iree_task_dispatch_retire(dispatch_task, pending_submission);
-    IREE_TRACE_ZONE_END(z0);
-    return;
-  }
-
-#if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
-  char xyz_string[32];
-  int xyz_string_length =
-      snprintf(xyz_string, IREE_ARRAYSIZE(xyz_string), "%ux%ux%u",
-               workgroup_count[0], workgroup_count[1], workgroup_count[2]);
-  IREE_TRACE_ZONE_APPEND_TEXT_STRING_VIEW(z0, xyz_string, xyz_string_length);
-#endif  // IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
-
-  // Divide up all tiles into slices, our finest-granularity scheduling task.
-  const uint32_t tiles_per_slice_x = IREE_TASK_DISPATCH_TILES_PER_SLICE_X;
-  const uint32_t tiles_per_slice_y = IREE_TASK_DISPATCH_TILES_PER_SLICE_Y;
-  const uint32_t tiles_per_slice_z = IREE_TASK_DISPATCH_TILES_PER_SLICE_Z;
-  uint32_t slice_count_x = iree_max(1, workgroup_count[0] / tiles_per_slice_x);
-  uint32_t slice_count_y = iree_max(1, workgroup_count[1] / tiles_per_slice_y);
-  uint32_t slice_count_z = iree_max(1, workgroup_count[2] / tiles_per_slice_z);
-
-  // Compute how many slices each worker will process.
-  uint32_t slice_count = slice_count_x * slice_count_y * slice_count_z;
-  iree_host_size_t worker_count = iree_task_post_batch_worker_count(post_batch);
-  uint32_t slices_per_worker = iree_max(1, slice_count / worker_count);
-
-  // Randomize starting worker.
-  iree_host_size_t worker_offset = iree_task_post_batch_select_worker(
-      post_batch, dispatch_task->header.affinity_set);
-  iree_host_size_t worker_index = worker_offset;
-
-  // TODO(benvanik): rework this with some science. For now we just iteratively
-  // divide up the space from outer->inner scheduling dimension, but ideally
-  // we'd use some fun cray-style torus scheduling or hilbert curve magic to
-  // try to ensure better locality using worker constructive sharing masks.
-  // TODO(benvanik): observe affinity_set here when dividing ranges.
-  iree_host_size_t worker_slice_count = 0;
-  for (uint32_t slice_z = 0; slice_z < slice_count_z; ++slice_z) {
-    for (uint32_t slice_y = 0; slice_y < slice_count_y; ++slice_y) {
-      for (uint32_t slice_x = 0; slice_x < slice_count_x; ++slice_x) {
-        uint32_t workgroup_base[3];
-        workgroup_base[0] = slice_x * tiles_per_slice_x;
-        workgroup_base[1] = slice_y * tiles_per_slice_y;
-        workgroup_base[2] = slice_z * tiles_per_slice_z;
-        uint32_t workgroup_range[3];
-        workgroup_range[0] = iree_min(workgroup_count[0],
-                                      workgroup_base[0] + tiles_per_slice_x) -
-                             1;
-        workgroup_range[1] = iree_min(workgroup_count[1],
-                                      workgroup_base[1] + tiles_per_slice_y) -
-                             1;
-        workgroup_range[2] = iree_min(workgroup_count[2],
-                                      workgroup_base[2] + tiles_per_slice_z) -
-                             1;
-
-        // Allocate and initialize the slice.
-        iree_task_dispatch_slice_t* slice_task =
-            iree_task_dispatch_slice_allocate(dispatch_task, workgroup_base,
-                                              workgroup_range, workgroup_count,
-                                              slice_task_pool);
-
-        // Enqueue on the worker selected for the task.
-        iree_task_post_batch_enqueue(post_batch, worker_index % worker_count,
-                                     &slice_task->header);
-        if (++worker_slice_count >= slices_per_worker) {
-          ++worker_index;
-          worker_slice_count = 0;
-        }
-      }
-    }
-  }
-
-  // NOTE: the dispatch is not retired until all slices complete. Upon the last
-  // slice completing the lucky worker will retire the task inline and
-  // potentially queue up more ready tasks that follow.
-  //
-  // The gotcha here is that it's possible for there to be zero slices within
-  // a dispatch (if, for example, and indirect dispatch had its workgroup counts
-  // set to zero to prevent it from running). We check for that here.
-  if (slice_count == 0) {
-    iree_task_dispatch_retire(dispatch_task, pending_submission);
-  }
-
-  IREE_TRACE_ZONE_END(z0);
-}
-
-void iree_task_dispatch_issue_sharded(
-    iree_task_dispatch_t* dispatch_task, iree_task_pool_t* shard_task_pool,
-    iree_task_submission_t* pending_submission,
-    iree_task_post_batch_t* post_batch) {
-  IREE_TRACE_ZONE_BEGIN(z0);
-
-  // Mark the dispatch as having been issued; the next time it retires it'll be
-  // because all work has completed.
-  dispatch_task->header.flags |= IREE_TASK_FLAG_DISPATCH_RETIRE;
-
-  iree_task_dispatch_shard_state_t* shared_state =
-      &dispatch_task->shared.shard_state;
 
   // Fetch the workgroup count (directly or indirectly).
   if (dispatch_task->header.flags & IREE_TASK_FLAG_DISPATCH_INDIRECT) {
@@ -609,35 +501,35 @@ void iree_task_dispatch_issue_sharded(
   }
   const uint32_t* workgroup_count = dispatch_task->workgroup_count.value;
 
-#if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
-  char xyz_string[32];
-  int xyz_string_length =
-      snprintf(xyz_string, IREE_ARRAYSIZE(xyz_string), "%ux%ux%u",
-               workgroup_count[0], workgroup_count[1], workgroup_count[2]);
-  IREE_TRACE_ZONE_APPEND_TEXT_STRING_VIEW(z0, xyz_string, xyz_string_length);
-#endif  // IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
+  IREE_TRACE({
+    char xyz_string[32];
+    int xyz_string_length =
+        snprintf(xyz_string, IREE_ARRAYSIZE(xyz_string), "%ux%ux%u",
+                 workgroup_count[0], workgroup_count[1], workgroup_count[2]);
+    IREE_TRACE_ZONE_APPEND_TEXT_STRING_VIEW(z0, xyz_string, xyz_string_length);
+  });
 
   // Setup the iteration space for shards to pull work from the complete grid.
-  iree_atomic_store_int32(&shared_state->tile_index, 0,
+  iree_atomic_store_int32(&dispatch_task->tile_index, 0,
                           iree_memory_order_relaxed);
-  shared_state->tile_count =
+  dispatch_task->tile_count =
       workgroup_count[0] * workgroup_count[1] * workgroup_count[2];
 
   // Compute shard count - almost always worker_count unless we are a very small
   // dispatch (1x1x1, etc).
   iree_host_size_t worker_count = iree_task_post_batch_worker_count(post_batch);
   iree_host_size_t shard_count =
-      iree_min(shared_state->tile_count, worker_count);
+      iree_min(dispatch_task->tile_count, worker_count);
 
   // Compute how many tiles we want each shard to reserve at a time from the
   // larger grid. A higher number reduces overhead and improves locality while
   // a lower number reduces maximum worst-case latency (coarser work stealing).
-  if (shared_state->tile_count <
+  if (dispatch_task->tile_count <
       worker_count * IREE_TASK_DISPATCH_MAX_TILES_PER_SHARD_RESERVATION) {
     // Grid is small - allow it to be eagerly sliced up.
-    shared_state->tiles_per_reservation = 1;
+    dispatch_task->tiles_per_reservation = 1;
   } else {
-    shared_state->tiles_per_reservation =
+    dispatch_task->tiles_per_reservation =
         IREE_TASK_DISPATCH_MAX_TILES_PER_SHARD_RESERVATION;
   }
 
@@ -648,8 +540,8 @@ void iree_task_dispatch_issue_sharded(
 
   for (iree_host_size_t i = 0; i < shard_count; ++i) {
     // Allocate and initialize the shard.
-    iree_task_dispatch_shard_t* shard_task = iree_task_dispatch_shard_allocate(
-        dispatch_task, shared_state, shard_task_pool);
+    iree_task_dispatch_shard_t* shard_task =
+        iree_task_dispatch_shard_allocate(dispatch_task, shard_task_pool);
 
     // Enqueue on the worker selected for the task.
     iree_task_post_batch_enqueue(post_batch, worker_index % worker_count,
@@ -674,6 +566,7 @@ void iree_task_dispatch_issue_sharded(
 void iree_task_dispatch_retire(iree_task_dispatch_t* dispatch_task,
                                iree_task_submission_t* pending_submission) {
   IREE_TRACE_ZONE_BEGIN(z0);
+  IREE_TRACE_ZONE_APPEND_VALUE(z0, dispatch_task->dispatch_id);
 
   // TODO(benvanik): attach statistics to the tracy zone.
 
@@ -684,14 +577,14 @@ void iree_task_dispatch_retire(iree_task_dispatch_t* dispatch_task,
       &dispatch_task->header.scope->dispatch_statistics);
 
   // Consume the status of the dispatch that may have been set from a workgroup
-  // and notify the scope. We need to do this here so that each slice/shard
-  // retires before we discard any subsequent tasks: otherwise a failure of
-  // one shard would discard the shared dispatch task (and potentially
-  // everything) while other shards were still running. We also want to avoid
-  // fine-grained synchronization across slices/shards that would occur by each
-  // checking to see if any other has hit an error; failure in a dispatch should
-  // be so exceedingly rare that allowing some shards to complete after one
-  // encounters an error is not a problem.
+  // and notify the scope. We need to do this here so that each shard retires
+  // before we discard any subsequent tasks: otherwise a failure of one shard
+  // would discard the shared dispatch task (and potentially everything) while
+  // other shards were still running. We also want to avoid fine-grained
+  // synchronization across shards that would occur by each checking to see if
+  // any other has hit an error; failure in a dispatch should be so exceedingly
+  // rare that allowing some shards to complete after one encounters an error is
+  // not a problem.
   iree_status_t status = (iree_status_t)iree_atomic_exchange_intptr(
       &dispatch_task->status, 0, iree_memory_order_seq_cst);
 
@@ -700,168 +593,23 @@ void iree_task_dispatch_retire(iree_task_dispatch_t* dispatch_task,
 }
 
 //==============================================================================
-// IREE_TASK_TYPE_DISPATCH_SLICE
-//==============================================================================
-
-void iree_task_dispatch_slice_initialize(iree_task_dispatch_t* dispatch_task,
-                                         const uint32_t workgroup_base[3],
-                                         const uint32_t workgroup_range[3],
-                                         const uint32_t workgroup_count[3],
-                                         iree_task_dispatch_slice_t* out_task) {
-  iree_task_initialize(IREE_TASK_TYPE_DISPATCH_SLICE,
-                       dispatch_task->header.scope, &out_task->header);
-  iree_task_set_completion_task(&out_task->header, &dispatch_task->header);
-  out_task->closure = dispatch_task->closure;
-  out_task->dispatch_status = &dispatch_task->status;
-
-  memcpy(out_task->workgroup_base, workgroup_base,
-         sizeof(out_task->workgroup_base));
-  memcpy(out_task->workgroup_range, workgroup_range,
-         sizeof(out_task->workgroup_range));
-  memcpy(out_task->workgroup_size, dispatch_task->workgroup_size,
-         sizeof(out_task->workgroup_size));
-  memcpy(out_task->workgroup_count, workgroup_count,
-         sizeof(out_task->workgroup_count));
-
-  // Each slice requires at most this amount of memory from the worker-local
-  // pool.
-  out_task->local_memory_size = dispatch_task->local_memory_size;
-
-  // Wire up dispatch statistics; we'll track on the slice while we run and
-  // then the per-slice statistics will roll up into the dispatch statistics.
-  out_task->dispatch_statistics = &dispatch_task->statistics;
-  memset(&out_task->slice_statistics, 0, sizeof(out_task->slice_statistics));
-}
-
-iree_task_dispatch_slice_t* iree_task_dispatch_slice_allocate(
-    iree_task_dispatch_t* dispatch_task, const uint32_t workgroup_base[3],
-    const uint32_t workgroup_range[3], const uint32_t workgroup_count[3],
-    iree_task_pool_t* slice_task_pool) {
-  iree_task_dispatch_slice_t* slice_task = NULL;
-  iree_status_t status =
-      iree_task_pool_acquire(slice_task_pool, (iree_task_t**)&slice_task);
-  if (!iree_status_is_ok(status)) {
-    iree_status_ignore(status);
-    return NULL;
-  }
-  iree_task_dispatch_slice_initialize(dispatch_task, workgroup_base,
-                                      workgroup_range, workgroup_count,
-                                      slice_task);
-  slice_task->header.pool = slice_task_pool;
-  return slice_task;
-}
-
-void iree_task_dispatch_slice_execute(
-    iree_task_dispatch_slice_t* task, iree_byte_span_t local_memory,
-    iree_task_submission_t* pending_submission) {
-  IREE_TRACE_ZONE_BEGIN(z0);
-  IREE_TRACE_ZONE_SET_COLOR(z0,
-                            iree_math_ptr_to_xrgb(task->closure.user_context));
-
-  // TODO(benvanik): coroutine support. Ideally this function can be called
-  // multiple times for the same slice, and we'll have a way to ready up the
-  // slices on the same workers (some per-worker suspended list?).
-
-  // Prepare context shared for all tiles in the slice.
-  iree_task_tile_context_t tile_context;
-  memcpy(&tile_context.workgroup_size, task->workgroup_size,
-         sizeof(tile_context.workgroup_size));
-  memcpy(&tile_context.workgroup_count, task->workgroup_count,
-         sizeof(tile_context.workgroup_count));
-  tile_context.statistics = &task->slice_statistics;
-
-  // Map only the requested amount of worker local memory into the tile context.
-  // This ensures that how much memory is used by some executions does not
-  // inadvertently leak over into other executions.
-  if (IREE_UNLIKELY(task->local_memory_size > local_memory.data_length)) {
-    iree_task_retire(
-        &task->header, pending_submission,
-        iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
-                         "dispatch requires %ub of local memory but only "
-                         "%zub is available per-worker",
-                         task->local_memory_size, local_memory.data_length));
-    IREE_TRACE_ZONE_END(z0);
-    return;
-  }
-  tile_context.local_memory =
-      iree_make_byte_span(local_memory.data, task->local_memory_size);
-
-  iree_status_t status = iree_ok_status();
-  const uint32_t base_x = task->workgroup_base[0];
-  const uint32_t base_y = task->workgroup_base[1];
-  const uint32_t base_z = task->workgroup_base[2];
-  const uint32_t range_x = task->workgroup_range[0];
-  const uint32_t range_y = task->workgroup_range[1];
-  const uint32_t range_z = task->workgroup_range[2];
-  for (uint32_t z = base_z; z <= range_z; ++z) {
-    tile_context.workgroup_xyz[2] = z;
-    for (uint32_t y = base_y; y <= range_y; ++y) {
-      tile_context.workgroup_xyz[1] = y;
-      for (uint32_t x = base_x; x <= range_x; ++x) {
-        tile_context.workgroup_xyz[0] = x;
-        IREE_TRACE_ZONE_BEGIN_NAMED(z_tile,
-                                    "iree_task_dispatch_slice_execute_tile");
-        IREE_TRACE_ZONE_SET_COLOR(z_tile,
-                                  iree_task_tile_to_color(&tile_context));
-
-        // NOTE: these are useful for debugging but dramatically increase our
-        // cost here; only enable if needed for tracking work distribution:
-        IREE_TRACE_ZONE_APPEND_VALUE(z_tile, x);
-        IREE_TRACE_ZONE_APPEND_VALUE(z_tile, y);
-        IREE_TRACE_ZONE_APPEND_VALUE(z_tile, z);
-        // IREE_TRACE_ZONE_APPEND_VALUE(z_tile, (uint64_t)task->closure.fn);
-
-        status = task->closure.fn(task->closure.user_context, &tile_context,
-                                  pending_submission);
-
-        IREE_TRACE_ZONE_END(z_tile);
-
-        // If any tile fails we bail early from the loop. This doesn't match
-        // what an accelerator would do but saves some unneeded work.
-        // Note that other slices may have completed execution, be executing
-        // concurrently with this one, or still be pending - this does not
-        // have any influence on them and they may continue to execute even
-        // after we bail from here.
-        if (!iree_status_is_ok(status)) goto abort_slice;
-      }
-    }
-  }
-abort_slice:
-
-  // Push aggregate statistics up to the dispatch.
-  if (task->dispatch_statistics) {
-    iree_task_dispatch_statistics_merge(&task->slice_statistics,
-                                        task->dispatch_statistics);
-  }
-
-  // Propagate failures to the dispatch task.
-  if (!iree_status_is_ok(status)) {
-    iree_task_try_set_status(task->dispatch_status, status);
-  }
-
-  iree_task_retire(&task->header, pending_submission, iree_ok_status());
-  IREE_TRACE_ZONE_END(z0);
-}
-
-//==============================================================================
 // IREE_TASK_TYPE_DISPATCH_SHARD
 //==============================================================================
 
-void iree_task_dispatch_shard_initialize(
-    iree_task_dispatch_t* dispatch_task,
-    iree_task_dispatch_shard_state_t* shared_state,
-    iree_task_dispatch_shard_t* out_task) {
+static inline iree_task_dispatch_t* iree_task_dispatch_shard_parent(
+    iree_task_dispatch_shard_t* task) {
+  return (iree_task_dispatch_t*)task->header.completion_task;
+}
+
+void iree_task_dispatch_shard_initialize(iree_task_dispatch_t* dispatch_task,
+                                         iree_task_dispatch_shard_t* out_task) {
   iree_task_initialize(IREE_TASK_TYPE_DISPATCH_SHARD,
                        dispatch_task->header.scope, &out_task->header);
   iree_task_set_completion_task(&out_task->header, &dispatch_task->header);
-  out_task->dispatch_task = dispatch_task;
-  out_task->shared_state = shared_state;
 }
 
 iree_task_dispatch_shard_t* iree_task_dispatch_shard_allocate(
-    iree_task_dispatch_t* dispatch_task,
-    iree_task_dispatch_shard_state_t* shared_state,
-    iree_task_pool_t* shard_task_pool) {
+    iree_task_dispatch_t* dispatch_task, iree_task_pool_t* shard_task_pool) {
   iree_task_dispatch_shard_t* shard_task = NULL;
   iree_status_t status =
       iree_task_pool_acquire(shard_task_pool, (iree_task_t**)&shard_task);
@@ -869,22 +617,41 @@ iree_task_dispatch_shard_t* iree_task_dispatch_shard_allocate(
     iree_status_ignore(status);
     return NULL;
   }
-  iree_task_dispatch_shard_initialize(dispatch_task, shared_state, shard_task);
+  iree_task_dispatch_shard_initialize(dispatch_task, shard_task);
   shard_task->header.pool = shard_task_pool;
   return shard_task;
 }
 
 void iree_task_dispatch_shard_execute(
-    iree_task_dispatch_shard_t* task, iree_byte_span_t local_memory,
+    iree_task_dispatch_shard_t* task, iree_byte_span_t worker_local_memory,
     iree_task_submission_t* pending_submission) {
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  iree_task_dispatch_t* dispatch_task = task->dispatch_task;
+  iree_task_dispatch_t* dispatch_task = iree_task_dispatch_shard_parent(task);
+  IREE_TRACE_ZONE_APPEND_VALUE(z0, dispatch_task->dispatch_id);
   IREE_TRACE_ZONE_SET_COLOR(
       z0, iree_math_ptr_to_xrgb(dispatch_task->closure.user_context));
 
+  // Map only the requested amount of worker local memory into the tile context.
+  // This ensures that how much memory is used by some executions does not
+  // inadvertently leak over into other executions.
+  if (IREE_UNLIKELY(dispatch_task->local_memory_size >
+                    worker_local_memory.data_length)) {
+    iree_task_try_set_status(
+        &dispatch_task->status,
+        iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
+                         "dispatch requires %ub of local memory but only "
+                         "%zub is available per-worker",
+                         dispatch_task->local_memory_size,
+                         worker_local_memory.data_length));
+    iree_task_retire(&task->header, pending_submission, iree_ok_status());
+    IREE_TRACE_ZONE_END(z0);
+    return;
+  }
+  iree_byte_span_t local_memory = iree_make_byte_span(
+      worker_local_memory.data, dispatch_task->local_memory_size);
+
   // Prepare context shared for all tiles in the shard.
-  iree_task_dispatch_shard_state_t* shared_state = task->shared_state;
   iree_task_tile_context_t tile_context;
   memcpy(&tile_context.workgroup_size, dispatch_task->workgroup_size,
          sizeof(tile_context.workgroup_size));
@@ -892,24 +659,7 @@ void iree_task_dispatch_shard_execute(
          sizeof(tile_context.workgroup_count));
   uint32_t workgroup_count_x = tile_context.workgroup_count[0];
   uint32_t workgroup_count_y = tile_context.workgroup_count[1];
-
-  // Map only the requested amount of worker local memory into the tile context.
-  // This ensures that how much memory is used by some executions does not
-  // inadvertently leak over into other executions.
-  if (IREE_UNLIKELY(dispatch_task->local_memory_size >
-                    local_memory.data_length)) {
-    iree_task_retire(
-        &task->header, pending_submission,
-        iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
-                         "dispatch requires %ub of local memory but only "
-                         "%zub is available per-worker",
-                         dispatch_task->local_memory_size,
-                         local_memory.data_length));
-    IREE_TRACE_ZONE_END(z0);
-    return;
-  }
-  tile_context.local_memory =
-      iree_make_byte_span(local_memory.data, dispatch_task->local_memory_size);
+  tile_context.local_memory = local_memory;
 
   // We perform all our shard statistics work locally here and only push back to
   // the dispatch at the end; this avoids contention from each shard trying to
@@ -919,10 +669,9 @@ void iree_task_dispatch_shard_execute(
   tile_context.statistics = &shard_statistics;
 
   // Loop over all tiles until they are all processed.
-  iree_status_t status = iree_ok_status();
-  const uint32_t tile_count = shared_state->tile_count;
-  const uint32_t tiles_per_reservation = shared_state->tiles_per_reservation;
-  uint32_t tile_base = iree_atomic_fetch_add_int32(&shared_state->tile_index,
+  const uint32_t tile_count = dispatch_task->tile_count;
+  const uint32_t tiles_per_reservation = dispatch_task->tiles_per_reservation;
+  uint32_t tile_base = iree_atomic_fetch_add_int32(&dispatch_task->tile_index,
                                                    tiles_per_reservation,
                                                    iree_memory_order_relaxed);
   while (tile_base < tile_count) {
@@ -950,35 +699,40 @@ void iree_task_dispatch_shard_execute(
       IREE_TRACE_ZONE_APPEND_VALUE(z_tile, tile_context.workgroup_xyz[2]);
       // IREE_TRACE_ZONE_APPEND_VALUE(z_tile, (uint64_t)task->closure.fn);
 
-      status = dispatch_task->closure.fn(dispatch_task->closure.user_context,
-                                         &tile_context, pending_submission);
+      iree_status_t status =
+          dispatch_task->closure.fn(dispatch_task->closure.user_context,
+                                    &tile_context, pending_submission);
 
       IREE_TRACE_ZONE_END(z_tile);
 
       // If any tile fails we bail early from the loop. This doesn't match
       // what an accelerator would do but saves some unneeded work.
-      // Note that other slices may have completed execution, be executing
+      // Note that other shards may have completed execution, be executing
       // concurrently with this one, or still be pending - this does not
       // have any influence on them and they may continue to execute even
       // after we bail from here.
-      if (!iree_status_is_ok(status)) goto abort_shard;
+      if (!iree_status_is_ok(status)) {
+        // Propagate failures to the dispatch task.
+        iree_task_try_set_status(&dispatch_task->status, status);
+        goto abort_shard;  // out of the while-for nest
+      }
     }
 
-    tile_base = iree_atomic_fetch_add_int32(&shared_state->tile_index,
+    // Try to grab the next slice of tiles.
+    tile_base = iree_atomic_fetch_add_int32(&dispatch_task->tile_index,
                                             tiles_per_reservation,
                                             iree_memory_order_relaxed);
   }
 abort_shard:
 
   // Push aggregate statistics up to the dispatch.
+  // Note that we may have partial information here if we errored out of the
+  // loop but that's still useful to know.
   iree_task_dispatch_statistics_merge(&shard_statistics,
                                       &dispatch_task->statistics);
 
-  // Propagate failures to the dispatch task.
-  if (!iree_status_is_ok(status)) {
-    iree_task_try_set_status(&dispatch_task->status, status);
-  }
-
+  // NOTE: even if an error was hit we retire OK - the error has already been
+  // propagated to the dispatch and it'll clean up after all shards are joined.
   iree_task_retire(&task->header, pending_submission, iree_ok_status());
   IREE_TRACE_ZONE_END(z0);
 }

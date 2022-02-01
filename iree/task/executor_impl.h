@@ -43,8 +43,12 @@ struct iree_task_executor_t {
   // Pools of transient dispatch tasks shared across all workers.
   // Depending on configuration the task pool may allocate after creation using
   // the allocator provided upon executor creation.
-  iree_task_pool_t fence_task_pool;
-  iree_task_pool_t dispatch_task_pool;
+  //
+  // Sized to be able to fit at least:
+  //   iree_task_fence_t
+  //   iree_task_dispatch_shard_t
+  // Increasing the size larger than these will waste memory.
+  iree_task_pool_t transient_task_pool;
 
   // A list of incoming tasks that are ready to execute immediately.
   // The list is LIFO and we require that task lists are reversed by the

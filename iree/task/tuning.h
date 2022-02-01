@@ -17,15 +17,6 @@ extern "C" {
 // only <64 will ever be used (such as for devices with 2 cores).
 #define IREE_TASK_EXECUTOR_MAX_WORKER_COUNT (64)
 
-// Initial number of slice tasks that are allocated in the executor pool.
-// Increasing this number will decrease initial allocation storms in cases of
-// extremely wide fan-out (many dispatches with many thousands of slices) at the
-// cost of a higher minimum memory consumption.
-//
-// Set to zero if sliced dispatches will not be used or will be allocated by the
-// caller to avoid fixed overhead associated with the internal executor pool.
-#define IREE_TASK_EXECUTOR_INITIAL_SLICE_RESERVATION_PER_WORKER (0)
-
 // Initial number of shard tasks that are allocated in the executor pool.
 // Increasing this number will decrease initial allocation storms in cases of
 // extremely wide concurrency regions (many dispatches running at the same time)
@@ -80,24 +71,6 @@ extern "C" {
 // better (as latencies don't matter so long as throughput is maximized).
 #define IREE_TASK_EXECUTOR_MAX_THEFT_TASK_COUNT \
   IREE_TASK_EXECUTOR_MAX_WORKER_COUNT
-
-// Number of tiles that will be batched into a single slice along each XYZ dim.
-//
-// Larger numbers reduce overhead and ensure that more tiles are executed
-// locally on the same worker (== shared caches) while also increasing potential
-// latency as work-stealing (always per-slice) is less effective.
-//
-// Numbers >1 on Y and Z can be used to cluster tiles together within the same
-// slice when spatial coherence outside of the X dimension is useful.
-//
-// The current usage of this is provisional; we may do all of this from the
-// compiler and want this behavior to be relatively fixed so that we can predict
-// it better. The only thing we want to be introducing here is flexibility for
-// when worker topology differs at runtime from what is knowable during offline
-// compilation.
-#define IREE_TASK_DISPATCH_TILES_PER_SLICE_X (8)
-#define IREE_TASK_DISPATCH_TILES_PER_SLICE_Y (1)
-#define IREE_TASK_DISPATCH_TILES_PER_SLICE_Z (1)
 
 // Number of tiles that will be batched into a single reservation from the grid.
 // This is a maximum; if there are fewer tiles that would otherwise allow for
