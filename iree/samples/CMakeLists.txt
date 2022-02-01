@@ -7,7 +7,7 @@
 #                                                                              #
 # To disable autogeneration for this file entirely, delete this header.        #
 ################################################################################
-
+set(IREE_DISABLE_INSTALL_HEADERS ON)
 iree_add_all_subdirs()
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

@@ -4,6 +4,8 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+load("//iree:build_defs.oss.bzl", "iree_cmake_extra_content")
+
 package(
     default_visibility = ["//visibility:public"],
     features = ["layering_check"],
@@ -15,3 +17,7 @@ package(
 #===------------------------------------------------------------------------===#
 # TODO(#3817): expose :compiler as the public C API.
 # TODO(#3817): expose :cc as the public C++ wrapper API.
+
+iree_cmake_extra_content(
+    content = "set(IREE_DISABLE_INSTALL_HEADERS ON)",
+)

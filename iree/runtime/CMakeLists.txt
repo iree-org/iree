@@ -51,6 +51,9 @@ iree_cc_library(
 iree_cc_unified_library(
   NAME
     unified
+  INSTALL_COMPONENT
+    IREERuntime
   ROOT
     ::impl
 )
+

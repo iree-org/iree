@@ -6,10 +6,16 @@
 
 # Testing utilities for IREE.
 
+load("//iree:build_defs.oss.bzl", "iree_cmake_extra_content")
+
 package(
     default_visibility = ["//visibility:public"],
     features = ["layering_check"],
     licenses = ["notice"],  # Apache 2.0
+)
+
+iree_cmake_extra_content(
+    content = "set(IREE_DISABLE_INSTALL_HEADERS ON)",
 )
 
 cc_library(

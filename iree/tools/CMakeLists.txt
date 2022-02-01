@@ -12,6 +12,8 @@ if(NOT ${IREE_ENABLE_THREADING})
   return()
 endif()
 
+set(IREE_DISABLE_INSTALL_HEADERS ON)
+
 add_subdirectory(android)
 add_subdirectory(test)
 add_subdirectory(utils)

@@ -72,6 +72,7 @@ function(iree_cc_library)
 
   # Replace dependencies passed by ::name with iree::package::name
   iree_package_ns(_PACKAGE_NS)
+  iree_package_path(_PACKAGE_PATH)
   list(TRANSFORM _RULE_DEPS REPLACE "^::" "${_PACKAGE_NS}::")
 
   # Prefix the library with the package name, so we get: iree_package_name.
@@ -216,6 +217,19 @@ function(iree_cc_library)
     )
   endif()
 
+  # Install headers.
+  # Note that we install these manually vs using the PUBLIC_HEADER property
+  # because: a) we want to control header vs library install, and b) the
+  # PUBLIC_HEADER option is weird and does not preserve directory layout.
+  if(_RULE_HDRS AND NOT IREE_DISABLE_INSTALL_HEADERS)
+    install(
+      FILES ${_RULE_HDRS}
+      DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/${_PACKAGE_PATH}
+      COMPONENT IREEHeaders
+      OPTIONAL
+    )
+  endif()
+
   # Alias the iree_package_name library to iree::package::name.
   # This lets us more clearly map to Bazel and makes it possible to
   # disambiguate the underscores in paths vs. the separators.
@@ -287,7 +301,7 @@ function(iree_cc_unified_library)
   cmake_parse_arguments(
     _RULE
     "SHARED"
-    "NAME;ROOT"
+    "NAME;ROOT;INSTALL_COMPONENT"
     ""
     ${ARGN}
   )
@@ -354,5 +368,13 @@ function(iree_cc_unified_library)
   iree_package_dir(_PACKAGE_DIR)
   if(${_RULE_NAME} STREQUAL ${_PACKAGE_DIR})
     add_library(${_PACKAGE_NS} ALIAS ${_NAME})
+  endif()
+
+  # Install.
+  if(_RULE_INSTALL_COMPONENT)
+    install(
+      TARGETS ${_NAME}
+      COMPONENT ${_RULE_INSTALL_COMPONENT}
+    )
   endif()
 endfunction()
