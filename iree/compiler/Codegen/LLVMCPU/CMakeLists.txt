@@ -49,6 +49,7 @@ iree_cc_library(
     MLIRReconcileUnrealizedCasts
     MLIRSCF
     MLIRSCFToStandard
+    MLIRSCFTransforms
     MLIRStandard
     MLIRStandardOpsTransforms
     MLIRStandardToLLVM

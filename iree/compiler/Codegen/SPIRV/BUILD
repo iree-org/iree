@@ -70,6 +70,7 @@ cc_library(
         "@llvm-project//mlir:MemRefTransforms",
         "@llvm-project//mlir:Pass",
         "@llvm-project//mlir:SCFDialect",
+        "@llvm-project//mlir:SCFTransforms",
         "@llvm-project//mlir:SCFToGPUPass",
         "@llvm-project//mlir:SCFToSPIRV",
         "@llvm-project//mlir:SPIRVConversion",

@@ -61,6 +61,7 @@ iree_cc_library(
     MLIRSCF
     MLIRSCFToGPU
     MLIRSCFToSPIRV
+    MLIRSCFTransforms
     MLIRSPIRV
     MLIRSPIRVConversion
     MLIRSPIRVTransforms
