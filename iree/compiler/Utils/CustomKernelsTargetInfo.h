@@ -16,8 +16,9 @@
 namespace mlir {
 namespace iree_compiler {
 
-// Enumerates target ISAs that we care about.
-enum class CustomKernelTargetArch { None, Aarch64 };
+// Enumerates target ISAs that we care about. 'int8_t' because we somewhat
+// care because this is used in struct MMTKernel, which is passed by value.
+enum class CustomKernelTargetArch : int8_t { None, Aarch64 };
 
 // Enumerates arch-specific target features that we care about.
 // We explicitly want to stick to the default enumeration values (0, 1, 2, ...,
