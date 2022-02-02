@@ -83,9 +83,13 @@ popd
 # Serve the demo using a local webserver                                      #
 ###############################################################################
 
-echo "=== Copying static files (index.html) to the build directory ==="
+echo "=== Copying static files to the build directory ==="
 
 cp ${ROOT_DIR?}/experimental/sample_web_static/index.html ${BINARY_DIR}
+
+EASELJS_LIBRARY=${BINARY_DIR}/easeljs.min.js
+test -f ${EASELJS_LIBRARY} || \
+    wget https://code.createjs.com/1.0.0/easeljs.min.js -O ${EASELJS_LIBRARY}
 
 echo "=== Running local webserver ==="
 echo "    open at http://localhost:8000/build-emscripten/experimental/sample_web_static/"
@@ -97,6 +101,5 @@ echo "    open at http://localhost:8000/build-emscripten/experimental/sample_web
 # local_server.py is needed when using SharedArrayBuffer, with multithreading
 python3 ${ROOT_DIR?}/scripts/local_web_server.py --directory ${ROOT_DIR?}
 
-# http.server on its own is fine for single threaded use, and this doesn't
-# break CORS for external resources like easeljs from a CDN
-python3 -m http.server --directory ${ROOT_DIR?}
+# http.server on its own is fine for single threaded use
+# python3 -m http.server --directory ${ROOT_DIR?}
