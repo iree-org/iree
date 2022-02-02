@@ -15,7 +15,7 @@ import re
 import subprocess
 
 from dataclasses import dataclass
-from typing import Any, Dict, Sequence
+from typing import Any, Dict, Sequence, Tuple
 
 __all__ = [
     "AndroidDeviceInfo", "BenchmarkInfo", "BenchmarkResults", "BenchmarkRun",
@@ -65,6 +65,17 @@ def execute_cmd_and_get_output(args: Sequence[str],
   return execute_cmd(args, verbose=verbose, stdout=subprocess.PIPE,
                      **kwargs).stdout.strip()
 
+def execute_cmd_and_get_output_and_error(args: Sequence[str],
+                                         verbose: bool = False,
+                                         **kwargs) -> subprocess.CompletedProcess :
+  """Executes a command and returns the completed process with output and error
+
+  Same as execute_cmd but returns the output and the error.
+  """
+  if verbose:
+    cmd = " ".join(args)
+    print(f"cmd: {cmd}")
+  return subprocess.run(args, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, **kwargs)
 
 def get_android_device_model(verbose: bool = False) -> str:
   """Returns the Android device model."""
