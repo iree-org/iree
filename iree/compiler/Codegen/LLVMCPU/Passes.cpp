@@ -88,55 +88,66 @@ LogicalResult verifyDoubleTilingExpertPassPipelineConfig(
            << pipelineName;
   }
 
+  if (loweringConfig.getTileSizes().size() != 2) {
+    return op->emitOpError("expected two levels of tile sizes for ")
+           << pipelineName << ", got " << loweringConfig.getTileSizes().size();
+  }
+
   // Verify that the workload per workgroup is set and is non-zero.
   SmallVector<int64_t> workloadPerWorkgroup =
       translationInfo.getWorkloadPerWorkgroupVals();
-  if (workloadPerWorkgroup.size() > kNumMaxParallelDims) {
+  if (workloadPerWorkgroup.size() >= kNumMaxParallelDims) {
     return op->emitOpError("workload_per_wg size should be less than ")
            << kNumMaxParallelDims;
   }
-
   if (llvm::any_of(workloadPerWorkgroup,
                    [](int64_t val) { return val == 0; })) {
     return op->emitOpError("invalid to use 0 in workload_per_wg");
   }
 
-  if (loweringConfig.getTileSizes().size() != 2) {
-    return op->emitOpError("expected two levels of tile sizes for ")
-           << pipelineName << ", got " << loweringConfig.getTileSizes().size();
-  }
-  SmallVector<int64_t> firstLevelTileSizes = loweringConfig.getTileSizeVals(
-      static_cast<unsigned>(TilingLevel::WorkGroupTiles));
   IREE::Flow::PartitionableLoopsInterface interfaceOp =
       dyn_cast_or_null<IREE::Flow::PartitionableLoopsInterface>(op);
-  if (interfaceOp && !firstLevelTileSizes.empty()) {
-    // Verify that if the first-level tile sizes are set, they are the same as
-    // workload_per_wg for the partitioned loops.
+  if (interfaceOp) {
     SmallVector<unsigned> partitionedLoops =
         interfaceOp.getPartitionableLoops(kNumMaxParallelDims);
-    size_t minElements =
-        (partitionedLoops.empty() ? 0 : partitionedLoops.back() + 1);
-    if (firstLevelTileSizes.size() < minElements) {
-      return op->emitOpError("expected at least ")
-             << minElements
-             << " size for first level tiling to get the distribution fully "
-                "specified.";
+    if (workloadPerWorkgroup.size() != partitionedLoops.size()) {
+      return op->emitOpError("expected ")
+             << partitionedLoops.size()
+             << " entries for workload_per_wg, but got "
+             << workloadPerWorkgroup.size();
     }
-    llvm::SmallDenseSet<unsigned> partitionedLoopsSet;
-    partitionedLoopsSet.insert(partitionedLoops.begin(),
-                               partitionedLoops.end());
-    SmallVector<int64_t> partitionedTileSizes;
-    for (auto tileSize : llvm::enumerate(firstLevelTileSizes)) {
-      if (!partitionedLoopsSet.count(tileSize.index())) {
-        continue;
+    SmallVector<int64_t> firstLevelTileSizes = loweringConfig.getTileSizeVals(
+        static_cast<unsigned>(TilingLevel::WorkGroupTiles));
+
+    if (!firstLevelTileSizes.empty()) {
+      // Verify that if the first-level tile sizes are set, they are the same as
+      // workload_per_wg for the partitioned loops.
+      SmallVector<unsigned> partitionedLoops =
+          interfaceOp.getPartitionableLoops(kNumMaxParallelDims);
+      size_t minElements =
+          (partitionedLoops.empty() ? 0 : partitionedLoops.back() + 1);
+      if (firstLevelTileSizes.size() < minElements) {
+        return op->emitOpError("expected at least ")
+               << minElements
+               << " size for first level tiling to get the distribution fully "
+                  "specified.";
       }
-      partitionedTileSizes.push_back(tileSize.value());
-    }
-    for (auto val : llvm::enumerate(llvm::reverse(workloadPerWorkgroup))) {
-      if (val.value() != partitionedTileSizes[val.index()]) {
-        return op->emitOpError("mismatch in distributed tile size value ")
-               << partitionedTileSizes[val.index()] << " at position "
-               << val.index() << " and workload_per_wg value " << val.value();
+      llvm::SmallDenseSet<unsigned> partitionedLoopsSet;
+      partitionedLoopsSet.insert(partitionedLoops.begin(),
+                                 partitionedLoops.end());
+      SmallVector<int64_t> partitionedTileSizes;
+      for (auto tileSize : llvm::enumerate(firstLevelTileSizes)) {
+        if (!partitionedLoopsSet.count(tileSize.index())) {
+          continue;
+        }
+        partitionedTileSizes.push_back(tileSize.value());
+      }
+      for (auto val : llvm::enumerate(llvm::reverse(workloadPerWorkgroup))) {
+        if (val.value() != partitionedTileSizes[val.index()]) {
+          return op->emitOpError("mismatch in distributed tile size value ")
+                 << partitionedTileSizes[val.index()] << " at position "
+                 << val.index() << " and workload_per_wg value " << val.value();
+        }
       }
     }
   }
