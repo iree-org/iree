@@ -7,8 +7,10 @@
 #ifndef IREE_COMPILER_CODEGEN_UTILS_UTILS_H_
 #define IREE_COMPILER_CODEGEN_UTILS_UTILS_H_
 
+#include "iree/compiler/Dialect/Flow/IR/PartitionableLoopsInterface.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "llvm/ADT/StringMap.h"
+#include "llvm/ADT/Triple.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/SCF/SCF.h"
 #include "mlir/IR/BuiltinOps.h"
@@ -32,6 +34,13 @@ llvm::StringMap<IREE::HAL::ExecutableEntryPointOp> getAllEntryPoints(
 /// Returns the entry point op for the `funcOp`. Returns `nullptr` on failure.
 IREE::HAL::ExecutableEntryPointOp getEntryPoint(FuncOp funcOp);
 
+/// Methods to get backend information.
+bool isX86(IREE::HAL::ExecutableVariantOp variantOp);
+inline bool isX86(FuncOp entryPointFn) {
+  auto variantOp =
+      entryPointFn->getParentOfType<IREE::HAL::ExecutableVariantOp>();
+  return isX86(variantOp);
+}
 inline bool isVMVXBackend(IREE::HAL::ExecutableVariantOp variantOp) {
   return variantOp.target().getBackend().getValue() == "vmvx";
 }
@@ -59,11 +68,13 @@ SmallVector<int64_t> getUntiledResultShape(linalg::LinalgOp linalgOp,
 // Utility functions to set configurations
 //===----------------------------------------------------------------------===//
 
-/// Returns the loops that are partitioned during dispatch region formations, in
-/// order, i.e. starting from the outer-most to innermost.
-/// Note that this is the same method that is used at the Flow dispatch region
-/// formation to tile and distribute the ops.
-SmallVector<unsigned> getPartitionedLoops(Operation *op);
+/// Return the tile sizes to use for the Flow partitioned loops given the
+/// workload per workgroup. The tile sizes for the partitioned loops are
+/// obtained from the workload per workgroup. The other loops are returned as
+/// zero.
+SmallVector<int64_t> getDistributedTileSizes(
+    IREE::Flow::PartitionableLoopsInterface interfaceOp,
+    ArrayRef<int64_t> workloadPerWorkgroup);
 
 /// Information about a tiled and distributed loop.
 ///

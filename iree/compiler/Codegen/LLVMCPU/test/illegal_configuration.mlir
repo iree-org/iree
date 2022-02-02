@@ -20,7 +20,7 @@ hal.executable private @matmul_tensors {
         %lhs = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<4x8xf32>
         %rhs = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<8x16xf32>
         %result = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : memref<4x16xf32>
-        // expected-error @+1 {{expected 2 entries for workload_per_wg, but got 0}}
+        // expected-error @+1 {{expected two levels of tile sizes for CPUDoubleTilingExpert, got 0}}
         linalg.matmul {lowering.config = #config} ins(%lhs, %rhs : memref<4x8xf32>, memref<8x16xf32>)
           outs(%result: memref<4x16xf32>)
         return
@@ -31,7 +31,7 @@ hal.executable private @matmul_tensors {
 
 // -----
 
-#config = #iree_codegen.lowering.config<tile_sizes = [], native_vector_size = []>
+#config = #iree_codegen.lowering.config<tile_sizes = [[], []], native_vector_size = []>
 #translation = #iree_codegen.translation.info<"CPUDoubleTilingExpert", workload_per_wg = [1, 0]>
 #executable_layout = #hal.executable.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
@@ -62,7 +62,7 @@ hal.executable private @matmul_tensors {
 
 // -----
 
-#config = #iree_codegen.lowering.config<tile_sizes = [], native_vector_size = []>
+#config = #iree_codegen.lowering.config<tile_sizes = [[], []], native_vector_size = []>
 #translation = #iree_codegen.translation.info<"CPUDoubleTilingExpert", workload_per_wg = [1, 1, 1, 1]>
 #executable_layout = #hal.executable.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
@@ -82,7 +82,7 @@ hal.executable private @matmul_tensors {
         %lhs = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<4x8xf32>
         %rhs = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<8x16xf32>
         %result = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : memref<4x16xf32>
-        // expected-error @+1 {{workload_per_wg size should be less than 3}}
+        // expected-error @+1 {{workload_per_wg size should be less than or equal to 3}}
         linalg.matmul {lowering.config = #config} ins(%lhs, %rhs : memref<4x8xf32>, memref<8x16xf32>)
           outs(%result: memref<4x16xf32>)
         return

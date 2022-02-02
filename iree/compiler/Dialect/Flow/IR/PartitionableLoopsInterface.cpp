@@ -78,11 +78,7 @@ struct Mmt4DOpPartitionableLoops
 
   llvm::SmallVector<unsigned> getPartitionableLoops(
       Operation *op, unsigned maxNumPartitionedLoops) const {
-    llvm::SmallVector<unsigned> partitionableLoops = {0, 1};
-    if (partitionableLoops.size() > maxNumPartitionedLoops) {
-      partitionableLoops.resize(maxNumPartitionedLoops);
-    }
-    return partitionableLoops;
+    return {0, 1};
   }
 };
 
@@ -192,9 +188,9 @@ void registerPartitionableLoopsInterfaceModels(DialectRegistry &registry) {
   // clang-format on
 
   registerInterfaceForTiledOpInterfaceOps<
-      LinalgExt::FftOp, LinalgExt::ReverseOp, LinalgExt::ScatterOp,
-      LinalgExt::SortOp, tensor::ExtractSliceOp, tensor::InsertSliceOp>(
-      registry);
+      LinalgExt::FftOp, LinalgExt::ReverseOp, LinalgExt::ScanOp,
+      LinalgExt::ScatterOp, LinalgExt::SortOp, tensor::ExtractSliceOp,
+      tensor::InsertSliceOp>(registry);
 }
 
 }  // namespace Flow
