@@ -105,7 +105,8 @@ LogicalResult verifyDoubleTilingExpertPassPipelineConfig(
     return op->emitOpError("expected two levels of tile sizes for ")
            << pipelineName << ", got " << loweringConfig.getTileSizes().size();
   }
-    SmallVector<int64_t> firstLevelTileSizes = loweringConfig.getTileSizeVals(static_cast<unsigned>(TilingLevel::WorkGroupTiles));
+  SmallVector<int64_t> firstLevelTileSizes = loweringConfig.getTileSizeVals(
+      static_cast<unsigned>(TilingLevel::WorkGroupTiles));
   IREE::Flow::PartitionableLoopsInterface interfaceOp =
       dyn_cast_or_null<IREE::Flow::PartitionableLoopsInterface>(op);
   if (interfaceOp && !firstLevelTileSizes.empty()) {

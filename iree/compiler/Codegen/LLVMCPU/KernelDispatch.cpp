@@ -298,8 +298,6 @@ static LogicalResult setX86SandboxRootConfig(FuncOp entryPointFn,
   auto lhsShapedType = op.lhs().getType().cast<ShapedType>();
   int64_t K = lhsShapedType.getShape().back();
   l1TileSizes.push_back(getMaxTileSize(0, K, 16, 16));
-  nativeVectorSizes.append(nLoops - 3, 1);
-  nativeVectorSizes.append(3, vectorSize);
 
   TileSizesListType tileSizes;
   tileSizes.push_back({});
