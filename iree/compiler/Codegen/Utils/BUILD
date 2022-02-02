@@ -25,6 +25,7 @@ cc_library(
     deps = [
         "//iree/compiler/Codegen/Interfaces:ProcessorOpInterfaces",
         "//iree/compiler/Dialect/Flow/IR",
+        "//iree/compiler/Dialect/Flow/IR:PartitionableLoopsInterface",
         "//iree/compiler/Dialect/HAL/IR",
         "//llvm-external-projects/iree-dialects:IREELinalgExtDialect",
         "@llvm-project//llvm:Support",
