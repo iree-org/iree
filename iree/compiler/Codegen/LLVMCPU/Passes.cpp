@@ -96,8 +96,9 @@ LogicalResult verifyDoubleTilingExpertPassPipelineConfig(
   // Verify that the workload per workgroup is set and is non-zero.
   SmallVector<int64_t> workloadPerWorkgroup =
       translationInfo.getWorkloadPerWorkgroupVals();
-  if (workloadPerWorkgroup.size() >= kNumMaxParallelDims) {
-    return op->emitOpError("workload_per_wg size should be less than ")
+  if (workloadPerWorkgroup.size() > kNumMaxParallelDims) {
+    return op->emitOpError(
+               "workload_per_wg size should be less than or equal to ")
            << kNumMaxParallelDims;
   }
   if (llvm::any_of(workloadPerWorkgroup,
