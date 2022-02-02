@@ -283,29 +283,18 @@ function(iree_benchmark_suite)
         DEPENDS "${_TOOL_FILE}"
       )
 
-      # Create the command and target for the command-line options spec used to
-      # compile the generated artifacts.
+      # Generate a flagfile containing command-line options used to compile the
+      # generated artifacts.
       set(_COMPOPT_FILE "${_RUN_SPEC_DIR}/compilation_flagfile")
-      string(REPLACE ";" " " _TRANSLATION_ARGS_STR "${_TRANSLATION_ARGS}")
-      add_custom_command(
-        OUTPUT "${_COMPOPT_FILE}"
-        COMMAND ${CMAKE_COMMAND} -E echo "${_TRANSLATION_ARGS_STR}" > "${_COMPOPT_FILE}"
-        WORKING_DIRECTORY "${_RUN_SPEC_DIR}"
-        COMMENT "Generating ${_COMPOPT_FILE}"
-      )
-
-      set(_COMPFILE_GEN_TARGET_NAME_LIST "iree-generate-benchmark-compilation-flagfile")
-      list(APPEND _COMPFILE_GEN_TARGET_NAME_LIST ${_COMMON_NAME_SEGMENTS})
-      list(JOIN _COMPFILE_GEN_TARGET_NAME_LIST "__" _COMPFILE_GEN_TARGET_NAME)
-      add_custom_target("${_COMPFILE_GEN_TARGET_NAME}"
-        DEPENDS "${_COMPOPT_FILE}"
-      )
+      string(REPLACE ";" "\n" IREE_BENCHMARK_COMPILATION_FLAGS "${_TRANSLATION_ARGS}")
+      configure_file(
+        ${PROJECT_SOURCE_DIR}/build_tools/cmake/benchmark_compilation_flagfile.in
+        ${_COMPOPT_FILE})
 
       # Mark dependency so that we have one target to drive them all.
       add_dependencies(iree-benchmark-suites
         "${_FLAGFILE_GEN_TARGET_NAME}"
         "${_TOOLFILE_GEN_TARGET_NAME}"
-        "${_COMPFILE_GEN_TARGET_NAME}"
       )
     endforeach(_BENCHMARK_MODE IN LISTS _RULE_BENCHMARK_MODES)
 
