@@ -146,6 +146,13 @@ static inline iree_wait_primitive_t iree_make_wait_primitive(
   return primitive;
 }
 
+// Returns a wait primitive that will resolve immediately if waited on.
+static inline iree_wait_primitive_t iree_wait_primitive_immediate(void) {
+  iree_wait_primitive_value_t dummy_primitive = {0};
+  return iree_make_wait_primitive(IREE_WAIT_PRIMITIVE_TYPE_NONE,
+                                  dummy_primitive);
+}
+
 // Returns true if the |wait_primitive| is resolved immediately (empty).
 static inline bool iree_wait_primitive_is_immediate(
     iree_wait_primitive_t wait_primitive) {
@@ -235,6 +242,36 @@ typedef struct iree_wait_source_t {
 static inline iree_wait_source_t iree_wait_source_immediate(void) {
   iree_wait_source_t v = {{{NULL, 0ull}}, NULL};
   return v;
+}
+
+// Returns true if the |wait_source| is immediately resolved.
+// This can be used to neuter waits in lists/sets.
+static inline bool iree_wait_source_is_immediate(
+    iree_wait_source_t wait_source) {
+  return wait_source.ctl == NULL;
+}
+
+// Wait source control function for iree_wait_source_delay.
+IREE_API_EXPORT iree_status_t iree_wait_source_delay_ctl(
+    iree_wait_source_t wait_source, iree_wait_source_command_t command,
+    const void* params, void** inout_ptr);
+
+// Returns a wait source that indicates a delay until a point in time.
+// The source will remain unresolved until the |deadline_ns| is reached or
+// exceeded and afterward return resolved. Export is unavailable.
+static inline iree_wait_source_t iree_wait_source_delay(
+    iree_time_t deadline_ns) {
+  iree_wait_source_t v = {
+      {{NULL, (uint64_t)deadline_ns}},
+      iree_wait_source_delay_ctl,
+  };
+  return v;
+}
+
+// Returns true if the |wait_source| is a timed delay.
+// These are sleeps that can often be handled more intelligently by platforms.
+static inline bool iree_wait_source_is_delay(iree_wait_source_t wait_source) {
+  return wait_source.ctl == iree_wait_source_delay_ctl;
 }
 
 // Imports a system |wait_primitive| into a wait source in |out_wait_source|.

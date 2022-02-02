@@ -102,13 +102,16 @@ architecture, target abi, linker script, system library path, etc.
 ### Define IREE macros
 
 * `-DIREE_PLATFORM_GENERIC`: Let IREE to build the runtime library without
-targeting a specific platform
+targeting a specific platform.
 * `-DIREE_SYNCHRONIZATION_DISABLE_UNSAFE=1`: Disable thread synchronization
-support
-* `-DIREE_FILE_IO_ENABLE=0`: Disable file I/O
+support. Must only be used if there's a single thread.
+* `-DIREE_FILE_IO_ENABLE=0`: Disable file I/O.
 * `-DIREE_TIME_NOW_FN`: A function to return the system time. For the bare-metal
 system, it can be set as `-DIREE_TIME_NOW_FN=\"\{ return 0;\}\"` as there's no
-asynchronous wait handling
+asynchronous wait handling.
+* `-DIREE_WAIT_UNTIL_FN`: A function to wait until the given time in
+nanoseconds. Must match the signature `bool(uint64_t nanos)` and return
+false if the wait failed.
 
 Examples of how to setup the CMakeLists.txt and .cmake file:
 
