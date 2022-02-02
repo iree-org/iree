@@ -95,7 +95,7 @@ echo "    open at http://localhost:8000/build-emscripten/experimental/sample_web
 # them from a build/release directory.
 
 # local_server.py is needed when using SharedArrayBuffer, with multithreading
-# python3 local_server.py --directory ${ROOT_DIR?}
+python3 ${ROOT_DIR?}/scripts/local_web_server.py --directory ${ROOT_DIR?}
 
 # http.server on its own is fine for single threaded use, and this doesn't
 # break CORS for external resources like easeljs from a CDN
