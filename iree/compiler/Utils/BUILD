@@ -21,6 +21,7 @@ cc_library(
         "ModuleUtils.cpp",
         "OptionUtils.cpp",
         "PassUtils.cpp",
+        "StringUtils.cpp",
         "TracingUtils.cpp",
     ],
     hdrs = [
@@ -32,6 +33,7 @@ cc_library(
         "OptionUtils.h",
         "PassUtils.h",
         "PatternUtils.h",
+        "StringUtils.h",
         "TracingUtils.h",
     ],
     deps = [

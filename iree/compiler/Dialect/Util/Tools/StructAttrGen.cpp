@@ -4,6 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "iree/compiler/Utils/StringUtils.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringExtras.h"
@@ -334,17 +335,6 @@ static void emitAttrFactoryDef(const StructAttr &structAttr, raw_ostream &os) {
   os << "}\n\n";
 }
 
-// Replaces all occurrences of `match` in `str` with `substitute`.
-static std::string replaceAllSubstrs(std::string str, const std::string &match,
-                                     const std::string &substitute) {
-  std::string::size_type scanLoc = 0, matchLoc = std::string::npos;
-  while ((matchLoc = str.find(match, scanLoc)) != std::string::npos) {
-    str = str.replace(matchLoc, match.size(), substitute);
-    scanLoc = matchLoc + substitute.size();
-  }
-  return str;
-}
-
 static void emitTypedFactoryDef(const StructAttr &structAttr, raw_ostream &os) {
   os << "// static\n";
   os << formatv("{0} {0}::get(", structAttr.getStructClassName());
@@ -366,7 +356,8 @@ static void emitTypedFactoryDef(const StructAttr &structAttr, raw_ostream &os) {
     // wrapping quotes.
     std::string builderTemplate = type.getConstBuilderTemplate().str();
     if (StringRef(builderTemplate).contains("\"$0\"")) {
-      builderTemplate = replaceAllSubstrs(builderTemplate, "\"$0\"", "$0");
+      builderTemplate = mlir::iree_compiler::replaceAllSubstrs(builderTemplate,
+                                                               "\"$0\"", "$0");
     }
 
     os << formatv("  auto {0}Attr = {1};\n", field.getName(),
