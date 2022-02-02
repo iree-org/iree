@@ -283,6 +283,14 @@ function(iree_benchmark_suite)
         DEPENDS "${_TOOL_FILE}"
       )
 
+      # Generate a flagfile containing command-line options used to compile the
+      # generated artifacts.
+      set(_COMPOPT_FILE "${_RUN_SPEC_DIR}/compilation_flagfile")
+      string(REPLACE ";" "\n" IREE_BENCHMARK_COMPILATION_FLAGS "${_TRANSLATION_ARGS}")
+      configure_file(
+        ${PROJECT_SOURCE_DIR}/build_tools/cmake/benchmark_compilation_flagfile.in
+        ${_COMPOPT_FILE})
+
       # Mark dependency so that we have one target to drive them all.
       add_dependencies(iree-benchmark-suites
         "${_FLAGFILE_GEN_TARGET_NAME}"
