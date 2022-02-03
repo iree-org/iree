@@ -611,8 +611,9 @@ class ScatterRank0Value : public OpRewritePattern<mhlo::ScatterOp> {
     if (!operandTy || !indicesTy || !updatesTy) return failure();
 
     if (indicesTy.getRank() != 1 || !indicesTy.hasStaticShape() ||
-        updatesTy.getRank() != 0)
+        updatesTy.getRank() != 0) {
       return failure();
+    }
 
     auto dimNumbers = op.scatter_dimension_numbers();
 
@@ -636,8 +637,6 @@ class ScatterRank0Value : public OpRewritePattern<mhlo::ScatterOp> {
       return failure();
     }
 
-    Location loc = op.getLoc();
-
     // Reshape indices to add the implicit 1x out front.
     llvm::SmallVector<int64_t> newIndicesShape;
     llvm::SmallVector<Value> newIndicesDynDims;
@@ -647,6 +646,7 @@ class ScatterRank0Value : public OpRewritePattern<mhlo::ScatterOp> {
       newIndicesShape.push_back(dim);
     }
 
+    Location loc = op.getLoc();
     Value reshapedIndices = rewriter.create<mhlo::ReshapeOp>(
         loc, RankedTensorType::get(newIndicesShape, indicesTy.getElementType()),
         indices);
@@ -654,22 +654,10 @@ class ScatterRank0Value : public OpRewritePattern<mhlo::ScatterOp> {
     Value reshapedUpdates = rewriter.create<mhlo::ReshapeOp>(
         loc, RankedTensorType::get({1}, updatesTy.getElementType()), updates);
 
-    auto iota = [](llvm::SmallVector<int64_t> &vec, int start, int end) {
-      for (int i = start; i < end; i++) {
-        vec.push_back(i);
-      }
-    };
-
-    SmallVector<int64_t> updateWindowDims;
-
-    SmallVector<int64_t> insertedWindowDims;
-    iota(insertedWindowDims, 0, operandTy.getRank());
-
-    SmallVector<int64_t> scatterDimsToOperandDims;
-    iota(scatterDimsToOperandDims, 0, operandTy.getRank());
+    SmallVector<int64_t> insertedWindowDims = llvm::to_vector<4>(llvm::seq<int64_t>(0, operandTy.getRank()));
+    SmallVector<int64_t> scatterDimsToOperandDims = llvm::to_vector<4>(llvm::seq<int64_t>(0, operandTy.getRank()));
     auto newDimNumbers = mhlo::ScatterDimensionNumbersAttr::get(
-        op.getContext(), updateWindowDims, insertedWindowDims,
-        scatterDimsToOperandDims, /*indexVectorDim=*/1);
+        op.getContext(), {}, insertedWindowDims, scatterDimsToOperandDims, /*indexVectorDim=*/1);
 
     auto newScatter = rewriter.create<mhlo::ScatterOp>(
         loc, op.getType(), operand, reshapedIndices, reshapedUpdates,
