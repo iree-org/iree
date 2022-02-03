@@ -1,0 +1,12 @@
+# Codeowners for IREE Github Repository.
+# Refer to https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+# for syntax of this file.
+
+# Global code owners
+
+# Code owners for individual components/directories
+/iree/compiler/Codegen/ @MaheshRavishankar
+/iree/compiler/Codegen/LLVMCPU/ @MaheshRavishankar @hanhanW
+/iree/compiler/Codegen/LLVMGPU/ @MaheshRavishankar @ThomasRaoux
+/iree/compiler/Codegen/Sandbox/ @MaheshRavishankar @hanhanW
+/iree/compiler/Codegen/SPIRV/ @MaheshRavishankar @antiagainst
