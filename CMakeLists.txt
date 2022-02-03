@@ -74,12 +74,8 @@ cmake_dependent_option(IREE_ENABLE_EMITC "Enables MLIR EmitC dependencies." ON $
 option(IREE_HAL_DRIVER_DEFAULTS "Sets the default value for all runtime HAL drivers" ON)
 option(IREE_TARGET_BACKEND_DEFAULTS "Sets the default value for all compiler target backends" ${IREE_BUILD_COMPILER})
 
-# CUDA is not natively supported on Android or Apple platforms.
-if(ANDROID OR APPLE)
-  set(IREE_HAL_DRIVER_CUDA_DEFAULT OFF)
-else()
-  set(IREE_HAL_DRIVER_CUDA_DEFAULT ${IREE_HAL_DRIVER_DEFAULTS})
-endif()
+# CUDA support must be explicitly enabled.
+set(IREE_HAL_DRIVER_CUDA_DEFAULT OFF)
 
 # Vulkan is not natively supported on Apple platforms.
 # Metal should generally be used instead, though MoltenVK may also work.
@@ -96,7 +92,7 @@ option(IREE_HAL_DRIVER_VMVX "Enables the 'vmvx' runtime HAL driver" ${IREE_HAL_D
 option(IREE_HAL_DRIVER_VMVX_SYNC "Enables the 'vmvx-sync' runtime HAL driver" ${IREE_HAL_DRIVER_DEFAULTS})
 option(IREE_HAL_DRIVER_VULKAN "Enables the 'vulkan' runtime HAL driver" ${IREE_HAL_DRIVER_VULKAN_DEFAULT})
 
-cmake_dependent_option(IREE_TARGET_BACKEND_CUDA "Enables the 'cuda' compiler target backend" ON ${IREE_BUILD_COMPILER} OFF)
+cmake_dependent_option(IREE_TARGET_BACKEND_CUDA "Enables the 'cuda' compiler target backend" OFF ${IREE_BUILD_COMPILER} OFF)
 cmake_dependent_option(IREE_TARGET_BACKEND_DYLIB_LLVM_AOT "Enables the 'dylib-llvm-aot' compiler target backend" ON ${IREE_BUILD_COMPILER} OFF)
 cmake_dependent_option(IREE_TARGET_BACKEND_METAL_SPIRV "Enables the 'metal-spirv' compiler target backend" ON ${IREE_BUILD_COMPILER} OFF)
 cmake_dependent_option(IREE_TARGET_BACKEND_ROCM "Enables the 'rocm' compiler target backend" ON ${IREE_BUILD_COMPILER} OFF)
@@ -321,6 +317,48 @@ if(IREE_ERROR_ON_MISSING_SUBMODULES AND Python3_FOUND AND Git_FOUND)
       set(IREE_GIT_SHORT_HASH "${SHORT_HASH}" CACHE STRING "" FORCE)
     endif()
   endif()
+endif()
+
+#-------------------------------------------------------------------------------
+# CUDA configuration for both the compiler and runtime.
+# We do this at the top level so that we can fail fast and make global
+# decisions that effect both compiler and runtime. It also helps with error
+# messaging to do this all in one place, since we can provide very targeted
+# advice.
+#-------------------------------------------------------------------------------
+
+set(IREE_CUDA_LIBDEVICE_PATH "" CACHE STRING "Absolute path to an appropriate libdevice.*.bc (needed to build the IREE cuda compiler target)")
+
+# If any CUDA features are being built, try to locate a CUDA SDK. We will fall
+# back to this as needed for specific features.
+if(IREE_TARGET_BACKEND_CUDA OR IREE_HAL_DRIVER_CUDA)
+  find_package(CUDAToolkit QUIET)
+endif()
+
+# If an explicit libdevice file was not specified, and the compiler backend
+# is being built, probe for one.
+if(IREE_TARGET_BACKEND_CUDA)
+  if(CUDAToolkit_FOUND AND CUDAToolkit_LIBRARY_ROOT)
+    # Note that the variable CUDAToolkit_LIBRARY_ROOT keys off of the presence
+    # of version.txt, which was changed to version.json in recent releases
+    # and thwarts the search.
+    set(IREE_CUDA_LIBDEVICE_PATH "${CUDAToolkit_LIBRARY_ROOT}/nvvm/libdevice/libdevice.10.bc")
+  elseif(CUDAToolkit_FOUND AND CUDAToolkit_BIN_DIR)
+    # Back-track from the bin dir as a fallback.
+    set(IREE_CUDA_LIBDEVICE_PATH "${CUDAToolkit_BIN_DIR}/../nvvm/libdevice/libdevice.10.bc")
+  else()
+    message(FATAL_ERROR "Building with IREE_TARGET_BACKEND_CUDA requires either a CUDA SDK (consult CMake docs for your version: https://cmake.org/cmake/help/latest/module/FindCUDAToolkit.html) or an explicit path to libdevice (set with -DIREE_CUDA_LIBDEVICE_PATH=/path/to/libdevice.10.bc)")
+  endif()
+
+  if(EXISTS "${IREE_CUDA_LIBDEVICE_PATH}")
+    message(STATUS "Using CUDA libdevice: ${IREE_CUDA_LIBDEVICE_PATH}")
+  else()
+    message(SEND_ERROR "Cannot find CUDA libdevice file (${IREE_CUDA_LIBDEVICE_PATH}). Either configure your CUDA SDK such that it can be found or specify explicitly via -DIREE_CUDA_LIBDEVICE_PATH=/path/to/libdevice.10.bc")
+  endif()
+endif()
+
+if(IREE_HAL_DRIVER_CUDA AND NOT CUDAToolkit_FOUND)
+  message(SEND_ERROR "Cannot build IREE runtime CUDA components (-DIREE_HAL_DRIVER_CUDA=ON) because a CUDA SDK was not found. Consult CMake docs for your version: https://cmake.org/cmake/help/latest/module/FindCUDAToolkit.html")
 endif()
 
 #-------------------------------------------------------------------------------
