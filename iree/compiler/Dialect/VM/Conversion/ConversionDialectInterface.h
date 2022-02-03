@@ -51,11 +51,11 @@ class VMConversionDialectInterface
 
  protected:
   // Parses the vm.import module to be cached by the caller.
-  virtual OwningModuleRef parseVMImportModule() const = 0;
+  virtual mlir::OwningOpRef<mlir::ModuleOp> parseVMImportModule() const = 0;
 
  private:
   mutable std::once_flag importParseFlag;
-  mutable OwningModuleRef importModuleRef;
+  mutable mlir::OwningOpRef<mlir::ModuleOp> importModuleRef;
 };
 
 }  // namespace iree_compiler
