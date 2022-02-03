@@ -595,6 +595,96 @@ class TransposeReshapeGenericDotGeneral
   }
 };
 
+
+class ScatterRank0Value : public OpRewritePattern<mhlo::ScatterOp> {
+ public:
+  using OpRewritePattern<mhlo::ScatterOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(mhlo::ScatterOp op,
+                                PatternRewriter &rewriter) const override {
+    auto operand = op.operand();
+    auto indices = op.scatter_indices();
+    auto updates = op.updates();
+
+    auto operandTy = operand.getType().dyn_cast<RankedTensorType>();
+    auto indicesTy = indices.getType().dyn_cast<RankedTensorType>();
+    auto updatesTy = updates.getType().dyn_cast<RankedTensorType>();
+    if (!operandTy || !indicesTy || !updatesTy) return failure();
+
+    if (indicesTy.getRank() != 1 || !indicesTy.hasStaticShape() || updatesTy.getRank() != 0)
+      return failure();
+
+    auto dimNumbers = op.scatter_dimension_numbers();
+
+    // We only have one dim for shape so this should be 0.
+    if (dimNumbers.getIndexVectorDim() != 0) return failure();
+
+    // Require canonicalize scatter order.
+    // TODO(suderman): Transpose to canonicalized order.
+    for (auto en : llvm::enumerate(dimNumbers.getScatterDimsToOperandDims())) {
+      if (en.index() != en.value()) return failure();
+    }
+
+    // Inserted window dims should be in order. Technically we just need to
+    // check they are all contained.
+    for (auto en : llvm::enumerate(dimNumbers.getInsertedWindowDims())) {
+      if (en.index() != en.value()) return failure();
+    }
+
+    // This should be empty
+    if (dimNumbers.getUpdateWindowDims().size() != 0) {
+      return failure();
+    }
+
+    Location loc = op.getLoc();
+
+    // Reshape indices to add the implicit 1x out front.
+    llvm::SmallVector<int64_t> newIndicesShape;
+    llvm::SmallVector<Value> newIndicesDynDims;
+    newIndicesShape.push_back(1);
+    for (auto it : llvm::enumerate(indicesTy.getShape())) {
+      auto dim = it.value();
+      newIndicesShape.push_back(dim);
+    }
+
+    Value reshapedIndices = rewriter.create<mhlo::ReshapeOp>(
+      loc, RankedTensorType::get(newIndicesShape, indicesTy.getElementType()),
+      indices);
+
+    Value reshapedUpdates = rewriter.create<mhlo::ReshapeOp>(
+      loc, RankedTensorType::get({1}, updatesTy.getElementType()),
+      updates);
+
+    auto iota = [](llvm::SmallVector<int64_t>& vec, int start, int end) {
+      for (int i = start; i < end; i++) {
+        vec.push_back(i);
+      }
+    };
+
+    SmallVector<int64_t> updateWindowDims;
+
+    SmallVector<int64_t> insertedWindowDims;
+    iota(insertedWindowDims, 0, operandTy.getRank());
+
+    SmallVector<int64_t> scatterDimsToOperandDims;
+    iota(scatterDimsToOperandDims, 0, operandTy.getRank());
+    auto newDimNumbers = mhlo::ScatterDimensionNumbersAttr::get(
+      op.getContext(), updateWindowDims, insertedWindowDims,
+      scatterDimsToOperandDims, /*indexVectorDim=*/1);
+
+    auto newScatter = rewriter.create<mhlo::ScatterOp>(
+      loc, op.getType(), operand, reshapedIndices, reshapedUpdates,
+      newDimNumbers, op.indices_are_sorted(), op.unique_indices());
+
+    Region& region = newScatter.update_computation();
+    rewriter.cloneRegionBefore(op.update_computation(), region, region.end());
+
+    rewriter.replaceOp(op, newScatter.getResult());
+
+    return success();
+  }
+};
+
 // Generates Gaussian noise with uniform random generator based on Box-Muller
 // transform.
 class ExpandRngNormal : public OpRewritePattern<mhlo::RngNormalOp> {
@@ -781,7 +871,8 @@ struct MHLOToMHLOPreprocessingPass
     mhlo::PopulateComplexLoweringPatterns(context, &patterns);
     mhlo::PopulateGatherToTorchIndexSelectPatterns(context, &patterns);
     patterns.insert<ExtractReduceWindowOpPaddingAttributes,
-                    AdjustDepthwiseFilterShape, ExpandRngNormal>(context);
+                    AdjustDepthwiseFilterShape, ScatterRank0Value,
+                    ExpandRngNormal>(context);
 
     // dot_general canoncalization patterns.
     mhlo::PopulateGeneralDotOpLoweringPatterns(&patterns, context);
