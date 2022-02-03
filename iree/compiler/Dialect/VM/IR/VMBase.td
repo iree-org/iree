@@ -187,7 +187,7 @@ def VM_ImportInterface : OpInterface<"ImportInterface"> {
   ];
 }
 
-class VM_Op<string mnemonic, list<OpTrait> traits = []> :
+class VM_Op<string mnemonic, list<Trait> traits = []> :
     Op<VM_Dialect, mnemonic,
        !listconcat(traits, [VM_OpInterface])> {
   let parser = [{ return parse$cppClass(parser, &result); }];

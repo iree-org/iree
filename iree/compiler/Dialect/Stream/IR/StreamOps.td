@@ -17,7 +17,7 @@ include "mlir/Interfaces/InferTypeOpInterface.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/Interfaces/ViewLikeInterface.td"
 
-class Stream_PureOp<string mnemonic, list<OpTrait> traits = []> :
+class Stream_PureOp<string mnemonic, list<Trait> traits = []> :
     Stream_Op<mnemonic, !listconcat(traits, [NoSideEffect])>;
 
 //===----------------------------------------------------------------------===//

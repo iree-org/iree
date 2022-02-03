@@ -17,7 +17,7 @@ include "mlir/Interfaces/InferTypeOpInterface.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/Interfaces/ViewLikeInterface.td"
 
-class FLOW_PureOp<string mnemonic, list<OpTrait> traits = []> :
+class FLOW_PureOp<string mnemonic, list<Trait> traits = []> :
     FLOW_Op<mnemonic, !listconcat(traits, [NoSideEffect])>;
 
 //===----------------------------------------------------------------------===//
