@@ -21,6 +21,7 @@ iree_lit_test_suite(
         [
             "hal_executable.mlir",
             "smoketest.mlir",
+            "streams.mlir",
         ],
         include = ["*.mlir"],
     ),
