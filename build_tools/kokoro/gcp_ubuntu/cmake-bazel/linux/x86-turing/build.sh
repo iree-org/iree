@@ -59,6 +59,7 @@ CMAKE_BUILD_DIR="$HOME/iree/build/tf"
 # we can still run the other tests.
 echo "Configuring CMake"
 "${CMAKE_BIN}" -B "${CMAKE_BUILD_DIR?}" -G Ninja \
+   -DIREE_TARGET_BACKEND_CUDA=ON -DIREE_HAL_DRIVER_CUDA=ON \
    -DIREE_TF_TOOLS_ROOT="${BAZEL_BINDIR?}/iree_tf_compiler/" \
    -DCMAKE_BUILD_TYPE=RelWithDebInfo \
    -DIREE_BUILD_COMPILER=ON \
