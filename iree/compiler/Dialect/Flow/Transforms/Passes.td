@@ -109,12 +109,15 @@ def ConvertLinalgMatmulToMmt4D :
   let summary = "Convert linalg.matmul to linalg.mmt4d";
   let constructor = "mlir::iree_compiler::IREE::Flow::createConvertLinalgMatmulToMmt4DPass()";
   let options = [
-    Option<"M0", "M0", "int", /*default=*/"mlir::ShapedType::kDynamicSize",
-           "Specifies an explicit M-axis tile size, overriding the default heuristic.">,
-    Option<"K0", "K0", "int", /*default=*/"mlir::ShapedType::kDynamicSize",
-           "Specifies an explicit K-axis tile size, overriding the default heuristic.">,
-    Option<"N0", "N0", "int", /*default=*/"mlir::ShapedType::kDynamicSize",
-           "Specifies an explicit N-axis tile size, overriding the default heuristic.">,
+    Option<"arch", "arch", "std::string",
+           /*default=*/"",
+           "Target architecture, e.g. aarch64">,
+    Option<"features", "features", "std::string",
+           /*default=*/"",
+           "Additional CPU feature flags, e.g. +dotprod">,
+    Option<"enable_generic_slow", "enable_generic_slow", "bool",
+           /*default=*/"false",
+           "For tests only. Use mmt4d even for cases that are not expected to compile to efficient code by using some arbitrary generic tile shape.">,
   ];
 }
 

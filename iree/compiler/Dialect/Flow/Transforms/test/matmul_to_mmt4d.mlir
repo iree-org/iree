@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file --iree-flow-convert-linalg-matmul-to-mmt4d='M0=8 K0=2 N0=4' %s | FileCheck %s
+// RUN: iree-opt -split-input-file --iree-flow-convert-linalg-matmul-to-mmt4d=enable_generic_slow %s | FileCheck %s
 
 func @check_mmt4d_f32_static_nopad(%arg0: tensor<24x8xf32>, %arg1: tensor<8x32xf32>, %arg2: tensor<24x32xf32>) -> tensor<24x32xf32> {
     %0 = linalg.matmul ins(%arg0, %arg1 : tensor<24x8xf32>, tensor<8x32xf32>) outs(%arg2 : tensor<24x32xf32>) -> tensor<24x32xf32>
@@ -38,7 +38,9 @@ func @check_mmt4d_f32_static_nopad(%arg0: tensor<24x8xf32>, %arg1: tensor<8x32xf
 // CHECK-NEXT:    ^bb0(%{{.*}}: f32, %{{.*}}: f32):
 // CHECK-NEXT:          linalg.yield %arg3 : f32
 // CHECK-NEXT:    } -> tensor<3x8x8x4xf32>
-//      CHECK: %[[MMT4D:.+]] = linalg.mmt4d ins(%[[LHS4DT]], %[[RHS4DT]] : tensor<3x4x8x2xf32>, tensor<8x4x4x2xf32>) outs(%[[DST4DT]] : tensor<3x8x8x4xf32>) -> tensor<3x8x8x4xf32>
+//      CHECK: %[[MMT4D:.+]] = linalg.mmt4d
+// CHECK-SAME:    {comment = "generic tiling parameters, as no known kernel was matched for this matmul and target"}
+// CHECK-SAME:    ins(%[[LHS4DT]], %[[RHS4DT]] : tensor<3x4x8x2xf32>, tensor<8x4x4x2xf32>) outs(%[[DST4DT]] : tensor<3x8x8x4xf32>) -> tensor<3x8x8x4xf32>
 //      CHECK: %[[MMT4DT_INIT:.+]] = linalg.init_tensor [3, 8, 8, 4] : tensor<3x8x8x4xf32>
 //      CHECK: %[[MMT4DT:.+]] = linalg.generic
 // CHECK-SAME:    indexing_maps = [#[[MAP0]], #[[MAP1]]]

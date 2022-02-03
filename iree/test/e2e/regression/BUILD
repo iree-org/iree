@@ -139,16 +139,13 @@ py_binary(
         "--shapes=small",
     ],
     opt_flags = [
-        "--iree-flow-convert-linalg-matmul-to-mmt4d=M0=8 K0=%d N0=8" % (4 if lhs_rhs_type == "i8" else 1),
+        "--iree-flow-convert-linalg-matmul-to-mmt4d=enable_generic_slow #pass_options_variant#",
     ],
     target_backends_and_drivers = [
         ("dylib-llvm-aot", "dylib"),
-        ("vmvx", "vmvx"),
     ],
-    target_cpu_features_variants = [
-        "default",
-        "aarch64:+dotprod",
-    ],
+    target_cpu_features_variants = ["default"] +
+                                   (["aarch64:+dotprod"] if lhs_rhs_type == "i8" else []),
     trace_runner = "//iree/tools:iree-e2e-matmul-test",
 ) for lhs_rhs_type in [
     "i8",
@@ -163,16 +160,13 @@ py_binary(
         "--shapes=large",
     ],
     opt_flags = [
-        "--iree-flow-convert-linalg-matmul-to-mmt4d=M0=8 K0=%d N0=8" % (4 if lhs_rhs_type == "i8" else 1),
+        "--iree-flow-convert-linalg-matmul-to-mmt4d=enable_generic_slow #pass_options_variant#",
     ],
     target_backends_and_drivers = [
         ("dylib-llvm-aot", "dylib"),
-        # TODO: enable VMVX. Skipped for now: it's very slow for these large matmul tests.
     ],
-    target_cpu_features_variants = [
-        "default",
-        "aarch64:+dotprod",
-    ],
+    target_cpu_features_variants = ["default"] +
+                                   (["aarch64:+dotprod"] if lhs_rhs_type == "i8" else []),
     trace_runner = "//iree/tools:iree-e2e-matmul-test",
 ) for lhs_rhs_type in [
     "i8",
@@ -180,7 +174,8 @@ py_binary(
 ]]
 
 # Test intrinsics. No need to run vmvx again, since it isn't affected by this
-# codegen flag.
+# codegen flag. No need to run "large" sizes, since this only differs from other
+# tests in ways that are orthogonal to problem sizes.
 [iree_generated_trace_runner_test(
     name = "e2e_matmul_mmt4d_%s_intrinsics_%s" % (lhs_rhs_type, size),
     compiler_flags = ["--iree-codegen-mmt4d-use-intrinsics"],
@@ -190,20 +185,17 @@ py_binary(
         "--shapes=%s" % size,
     ],
     opt_flags = [
-        "--iree-flow-convert-linalg-matmul-to-mmt4d=M0=8 K0=%d N0=8" % (4 if lhs_rhs_type == "i8" else 1),
+        "--iree-flow-convert-linalg-matmul-to-mmt4d=enable_generic_slow #pass_options_variant#",
     ],
     target_backends_and_drivers = [
         ("dylib-llvm-aot", "dylib"),
     ],
-    target_cpu_features_variants = [
-        "default",
-        "aarch64:+dotprod",
-    ],
+    target_cpu_features_variants = ["default"] +
+                                   (["aarch64:+dotprod"] if lhs_rhs_type == "i8" else []),
     trace_runner = "//iree/tools:iree-e2e-matmul-test",
 ) for lhs_rhs_type in [
     "i8",
     "f32",
 ] for size in [
     "small",
-    "large",
 ]]

@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
+#include "iree/compiler/Utils/CustomKernelsTargetInfo.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/Triple.h"
@@ -22,53 +23,6 @@
 
 namespace mlir {
 namespace iree_compiler {
-
-LogicalResult InferCustomKernelsTargetInfoFromParent(
-    FuncOp entryPointFn, CustomKernelsTargetInfo &target_info) {
-  // Set the out-value to defaults early so that early returns produce
-  // consistent results and so that we can write simpler code below
-  // (for loop OR-ing booleans, assuming initial 'false' value).
-  target_info = CustomKernelsTargetInfo();
-
-  // Try to find the parent ExecutableVariantOp and its relevant attributes.
-  auto variantOp =
-      entryPointFn->getParentOfType<IREE::HAL::ExecutableVariantOp>();
-  if (!variantOp) {
-    return failure();
-  }
-  IREE::HAL::ExecutableTargetAttr targetAttr = variantOp.target();
-  if (!targetAttr) {
-    return failure();
-  }
-  auto config = targetAttr.getConfiguration();
-  if (!config) {
-    return failure();
-  }
-  auto tripleAttr = config.getAs<StringAttr>("target_triple");
-  if (!tripleAttr) {
-    return failure();
-  }
-  auto cpuFeaturesAttr = config.getAs<StringAttr>("cpu_features");
-  if (!cpuFeaturesAttr) {
-    return failure();
-  }
-
-  // Set the out-value target_info fields.
-  llvm::Triple triple(tripleAttr.getValue());
-  llvm::SmallVector<llvm::StringRef> cpuFeatures;
-  cpuFeaturesAttr.getValue().split(cpuFeatures, ',');
-  switch (triple.getArch()) {
-    case llvm::Triple::ArchType::aarch64:
-      target_info.aarch64 = true;
-      for (auto f : cpuFeatures) {
-        target_info.dotprod |= (f == "+dotprod");
-      }
-      break;
-    default:
-      break;
-  }
-  return success();
-}
 
 namespace {
 
@@ -439,7 +393,7 @@ class VectorContractCustomKernelsPass
  public:
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<vector::VectorDialect, LLVM::LLVMDialect>();
-    if (target_info.intrinsics) {
+    if (target_info.has(CustomKernelTargetFeature::Intrinsics)) {
       registry.insert<arm_neon::ArmNeonDialect>();
     }
   }
@@ -447,9 +401,12 @@ class VectorContractCustomKernelsPass
     if (failed(Pass::initializeOptions(options))) {
       return failure();
     }
-    target_info.aarch64 = aarch64;
-    target_info.dotprod = dotprod;
-    target_info.intrinsics = intrinsics;
+    if (failed(ParseCustomKernelsTargetInfo(arch, features, target_info))) {
+      return failure();
+    }
+    if (intrinsics) {
+      target_info.add(CustomKernelTargetFeature::Intrinsics);
+    }
     return success();
   }
   void runOnOperation() override {
@@ -471,8 +428,8 @@ class VectorContractCustomKernelsPass
 void populateVectorContractCustomKernelsPatterns(
     const CustomKernelsTargetInfo &target_info, RewritePatternSet &patterns) {
   MLIRContext *context = patterns.getContext();
-  if (target_info.aarch64 && target_info.dotprod) {
-    if (target_info.intrinsics) {
+  if (target_info.has(CustomKernelTargetFeature::Aarch64Dotprod)) {
+    if (target_info.has(CustomKernelTargetFeature::Intrinsics)) {
       patterns.insert<MMT_8x4x8_i8i8i32_Aarch64Dotprod_Intrinsics>(context);
     } else {
       patterns.insert<MMT_8x4x8_i8i8i32_Aarch64Dotprod_InlineAsm>(context);

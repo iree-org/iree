@@ -1,4 +1,4 @@
-// RUN: iree-opt -iree-llvmcpu-vector-contract-custom-kernels='aarch64 dotprod' %s | FileCheck %s
+// RUN: iree-opt -iree-llvmcpu-vector-contract-custom-kernels='arch=aarch64 features=+dotprod' %s | FileCheck %s
 
 func @mmt_8x4x8_i8i8i32_aarch64_dotprod_inline_asm(
     %lhs: vector<8x4xi8>,

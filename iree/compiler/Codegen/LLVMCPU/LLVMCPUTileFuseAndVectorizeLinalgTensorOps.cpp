@@ -11,6 +11,7 @@
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
+#include "iree/compiler/Dialect/HAL/Utils/InferCustomKernelsTargetInfoFromParent.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Conversion/VectorToSCF/VectorToSCF.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
@@ -30,7 +31,7 @@ namespace iree_compiler {
 
 // A flag to switch between inline asm and intrinsics while we develop these two
 //  parallel paths.
-static llvm::cl::opt<bool> clUseMmt4dUseIntrinsics(
+static llvm::cl::opt<bool> clMmt4dUseIntrinsics(
     "iree-codegen-mmt4d-use-intrinsics",
     llvm::cl::desc("Whether to use instrinsics when lowering vector contracts "
                    "generated from mmt4d matmuls (as opposed to inline asm). "
@@ -357,7 +358,9 @@ void LLVMCPUTileFuseAndVectorizePass::runOnOperation() {
     // just before the generic vector ops lowerings.
     CustomKernelsTargetInfo info;
     if (succeeded(InferCustomKernelsTargetInfoFromParent(funcOp, info))) {
-      info.intrinsics = clUseMmt4dUseIntrinsics;
+      if (clMmt4dUseIntrinsics) {
+        info.add(CustomKernelTargetFeature::Intrinsics);
+      }
       RewritePatternSet patterns(context);
       populateVectorContractCustomKernelsPatterns(info, patterns);
       if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
