@@ -595,7 +595,6 @@ class TransposeReshapeGenericDotGeneral
   }
 };
 
-
 class ScatterRank0Value : public OpRewritePattern<mhlo::ScatterOp> {
  public:
   using OpRewritePattern<mhlo::ScatterOp>::OpRewritePattern;
@@ -611,7 +610,8 @@ class ScatterRank0Value : public OpRewritePattern<mhlo::ScatterOp> {
     auto updatesTy = updates.getType().dyn_cast<RankedTensorType>();
     if (!operandTy || !indicesTy || !updatesTy) return failure();
 
-    if (indicesTy.getRank() != 1 || !indicesTy.hasStaticShape() || updatesTy.getRank() != 0)
+    if (indicesTy.getRank() != 1 || !indicesTy.hasStaticShape() ||
+        updatesTy.getRank() != 0)
       return failure();
 
     auto dimNumbers = op.scatter_dimension_numbers();
@@ -648,14 +648,13 @@ class ScatterRank0Value : public OpRewritePattern<mhlo::ScatterOp> {
     }
 
     Value reshapedIndices = rewriter.create<mhlo::ReshapeOp>(
-      loc, RankedTensorType::get(newIndicesShape, indicesTy.getElementType()),
-      indices);
+        loc, RankedTensorType::get(newIndicesShape, indicesTy.getElementType()),
+        indices);
 
     Value reshapedUpdates = rewriter.create<mhlo::ReshapeOp>(
-      loc, RankedTensorType::get({1}, updatesTy.getElementType()),
-      updates);
+        loc, RankedTensorType::get({1}, updatesTy.getElementType()), updates);
 
-    auto iota = [](llvm::SmallVector<int64_t>& vec, int start, int end) {
+    auto iota = [](llvm::SmallVector<int64_t> &vec, int start, int end) {
       for (int i = start; i < end; i++) {
         vec.push_back(i);
       }
@@ -669,14 +668,14 @@ class ScatterRank0Value : public OpRewritePattern<mhlo::ScatterOp> {
     SmallVector<int64_t> scatterDimsToOperandDims;
     iota(scatterDimsToOperandDims, 0, operandTy.getRank());
     auto newDimNumbers = mhlo::ScatterDimensionNumbersAttr::get(
-      op.getContext(), updateWindowDims, insertedWindowDims,
-      scatterDimsToOperandDims, /*indexVectorDim=*/1);
+        op.getContext(), updateWindowDims, insertedWindowDims,
+        scatterDimsToOperandDims, /*indexVectorDim=*/1);
 
     auto newScatter = rewriter.create<mhlo::ScatterOp>(
-      loc, op.getType(), operand, reshapedIndices, reshapedUpdates,
-      newDimNumbers, op.indices_are_sorted(), op.unique_indices());
+        loc, op.getType(), operand, reshapedIndices, reshapedUpdates,
+        newDimNumbers, op.indices_are_sorted(), op.unique_indices());
 
-    Region& region = newScatter.update_computation();
+    Region &region = newScatter.update_computation();
     rewriter.cloneRegionBefore(op.update_computation(), region, region.end());
 
     rewriter.replaceOp(op, newScatter.getResult());
@@ -870,9 +869,10 @@ struct MHLOToMHLOPreprocessingPass
     mhlo::PopulateUnfuseBatchNormPatterns(context, &patterns);
     mhlo::PopulateComplexLoweringPatterns(context, &patterns);
     mhlo::PopulateGatherToTorchIndexSelectPatterns(context, &patterns);
-    patterns.insert<ExtractReduceWindowOpPaddingAttributes,
-                    AdjustDepthwiseFilterShape, ScatterRank0Value,
-                    ExpandRngNormal>(context);
+    patterns
+        .insert<ExtractReduceWindowOpPaddingAttributes,
+                AdjustDepthwiseFilterShape, ScatterRank0Value, ExpandRngNormal>(
+            context);
 
     // dot_general canoncalization patterns.
     mhlo::PopulateGeneralDotOpLoweringPatterns(&patterns, context);
