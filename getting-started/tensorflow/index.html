@@ -8,18 +8,18 @@
       
       
       
-        <link rel="canonical" href="https://google.github.io/iree/ml-frameworks/jax/">
+        <link rel="canonical" href="https://google.github.io/iree/getting-started/tensorflow/">
       
       <link rel="icon" href="../../ghost.svg">
-      <meta name="generator" content="mkdocs-1.2.3, mkdocs-material-8.1.8">
+      <meta name="generator" content="mkdocs-1.2.3, mkdocs-material-8.1.9">
     
     
       
-        <title>JAX - IREE</title>
+        <title>TensorFlow - IREE</title>
       
     
     
-      <link rel="stylesheet" href="../../assets/stylesheets/main.6e60f8b8.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.2b4465f4.min.css">
       
         
         <link rel="stylesheet" href="../../assets/stylesheets/palette.e6a45f82.min.css">
@@ -66,7 +66,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#jax-integration" class="md-skip">
+        <a href="#tensorflow-integration" class="md-skip">
           Skip to content
         </a>
       
@@ -99,7 +99,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              JAX
+              TensorFlow
             
           </span>
         </div>
@@ -273,7 +273,7 @@
         
         
         <div class="md-nav__link md-nav__link--index ">
-          <a href="../">ML frameworks</a>
+          <a href="../">Getting Started</a>
           
             <label for="__nav_2">
               <span class="md-nav__icon md-icon"></span>
@@ -281,41 +281,13 @@
           
         </div>
       
-      <nav class="md-nav" aria-label="ML frameworks" data-md-level="1">
+      <nav class="md-nav" aria-label="Getting Started" data-md-level="1">
         <label class="md-nav__title" for="__nav_2">
           <span class="md-nav__icon md-icon"></span>
-          ML frameworks
+          Getting Started
         </label>
         <ul class="md-nav__list" data-md-scrollfix>
           
-            
-          
-            
-              
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../tensorflow/" class="md-nav__link">
-        TensorFlow
-      </a>
-    </li>
-  
-
-            
-          
-            
-              
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../tensorflow-lite/" class="md-nav__link">
-        TensorFlow Lite
-      </a>
-    </li>
-  
-
             
           
             
@@ -333,10 +305,136 @@
         
       
       
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          TensorFlow
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
       <a href="./" class="md-nav__link md-nav__link--active">
-        JAX
+        TensorFlow
       </a>
       
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#prerequisites" class="md-nav__link">
+    Prerequisites
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#importing-models" class="md-nav__link">
+    Importing models
+  </a>
+  
+    <nav class="md-nav" aria-label="Importing models">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#from-savedmodel-on-tensorflow-hub" class="md-nav__link">
+    From SavedModel on TensorFlow Hub
+  </a>
+  
+    <nav class="md-nav" aria-label="From SavedModel on TensorFlow Hub">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#using-the-command-line-tool" class="md-nav__link">
+    Using the command-line tool
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#training" class="md-nav__link">
+    Training
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#samples" class="md-nav__link">
+    Samples
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#troubleshooting" class="md-nav__link">
+    Troubleshooting
+  </a>
+  
+    <nav class="md-nav" aria-label="Troubleshooting">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#missing-serving-signature-in-savedmodel" class="md-nav__link">
+    Missing serving signature in SavedModel
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+            
+          
+            
+              
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../tflite/" class="md-nav__link">
+        TensorFlow Lite
+      </a>
+    </li>
+  
+
+            
+          
+            
+              
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../jax/" class="md-nav__link">
+        JAX
+      </a>
     </li>
   
 
@@ -938,6 +1036,88 @@
     
   
   
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#prerequisites" class="md-nav__link">
+    Prerequisites
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#importing-models" class="md-nav__link">
+    Importing models
+  </a>
+  
+    <nav class="md-nav" aria-label="Importing models">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#from-savedmodel-on-tensorflow-hub" class="md-nav__link">
+    From SavedModel on TensorFlow Hub
+  </a>
+  
+    <nav class="md-nav" aria-label="From SavedModel on TensorFlow Hub">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#using-the-command-line-tool" class="md-nav__link">
+    Using the command-line tool
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#training" class="md-nav__link">
+    Training
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#samples" class="md-nav__link">
+    Samples
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#troubleshooting" class="md-nav__link">
+    Troubleshooting
+  </a>
+  
+    <nav class="md-nav" aria-label="Troubleshooting">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#missing-serving-signature-in-savedmodel" class="md-nav__link">
+    Missing serving signature in SavedModel
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
 </nav>
                   </div>
                 </div>
@@ -949,18 +1129,132 @@
               
                 
 
-<h1 id="jax-integration">JAX Integration<a class="headerlink" href="#jax-integration" title="Permanent link">&para;</a></h1>
+<h1 id="tensorflow-integration">TensorFlow Integration<a class="headerlink" href="#tensorflow-integration" title="Permanent link">&para;</a></h1>
+<p>IREE supports compiling and running TensorFlow programs represented as
+<code>tf.Module</code> <a href="https://www.tensorflow.org/api_docs/python/tf/Module">classes</a>
+or stored in the <code>SavedModel</code>
+<a href="https://www.tensorflow.org/guide/saved_model">format</a>.</p>
+<!-- TODO(??): notes about TensorFlow 2.0, supported features? -->
+
+<h2 id="prerequisites">Prerequisites<a class="headerlink" href="#prerequisites" title="Permanent link">&para;</a></h2>
+<p>Install TensorFlow by following the
+<a href="https://www.tensorflow.org/install">official documentation</a>:</p>
+<div class="highlight"><pre><span></span><code>python -m pip install tf-nightly
+</code></pre></div>
+<p>Install IREE pip packages, either from pip or by
+<a href="../../building-from-source/python-bindings-and-importers/">building from source</a>:</p>
+<div class="highlight"><pre><span></span><code>python -m pip install <span class="se">\</span>
+  iree-compiler <span class="se">\</span>
+  iree-runtime <span class="se">\</span>
+  iree-tools-tf
+</code></pre></div>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>The TensorFlow package is currently only available on Linux and macOS. It
+is not available on Windows yet (see
+<a href="https://github.com/google/iree/issues/6417">this issue</a>).</p>
+</div>
+<h2 id="importing-models">Importing models<a class="headerlink" href="#importing-models" title="Permanent link">&para;</a></h2>
+<p>IREE compilers transform a model into its final deployable format in several
+sequential steps. The first step for a TensorFlow model is to use either the
+<code>iree-import-tf</code> command-line tool or IREE's Python APIs to import the model
+into a format (i.e., <a href="https://mlir.llvm.org/">MLIR</a>) compatible with the generic
+IREE compilers.</p>
+<h3 id="from-savedmodel-on-tensorflow-hub">From SavedModel on TensorFlow Hub<a class="headerlink" href="#from-savedmodel-on-tensorflow-hub" title="Permanent link">&para;</a></h3>
+<p>IREE supports importing and using SavedModels from
+<a href="https://www.tensorflow.org/hub">TensorFlow Hub</a>.</p>
+<h4 id="using-the-command-line-tool">Using the command-line tool<a class="headerlink" href="#using-the-command-line-tool" title="Permanent link">&para;</a></h4>
+<p>First download the SavedModel and load it to get the serving signature, which
+is used as the entry point for IREE compilation flow:</p>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span> <span class="nn">tensorflow.compat.v2</span> <span class="k">as</span> <span class="nn">tf</span>
+<span class="n">loaded_model</span> <span class="o">=</span> <span class="n">tf</span><span class="o">.</span><span class="n">saved_model</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s1">&#39;/path/to/downloaded/model/&#39;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="nb">list</span><span class="p">(</span><span class="n">loaded_model</span><span class="o">.</span><span class="n">signatures</span><span class="o">.</span><span class="n">keys</span><span class="p">()))</span>
+</code></pre></div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>If there are no serving signatures in the original SavedModel, you may add
+them by yourself by following
+<a href="#missing-serving-signature-in-savedmodel">"Missing serving signature in SavedModel"</a>.</p>
+</div>
+<p>Then you can import the model with <code>iree-import-tf</code>. You can read the options
+supported via <code>iree-import-tf -help</code>. Using
+<a href="https://tfhub.dev/google/tf2-preview/mobilenet_v2/classification">MobileNet v2</a>
+as an example and assuming the serving signature is <code>predict</code>:</p>
+<div class="highlight"><pre><span></span><code>iree-import-tf
+  -tf-import-type<span class="o">=</span>savedmodel_v1 <span class="se">\</span>
+  -tf-savedmodel-exported-names<span class="o">=</span>predict <span class="se">\</span>
+  /path/to/savedmodel -o iree_input.mlir
+</code></pre></div>
+<div class="admonition tip">
+<p class="admonition-title">Tip</p>
+<p><code>iree-import-tf</code> is installed as
+<code>/path/to/python/site-packages/iree/tools/tf/iree-import-tf</code>.
+You can find out the full path to the <code>site-packages</code> directory via the
+<code>python -m site</code> command.</p>
+<p><code>-tf-import-type</code> needs to match the SavedModel version. You can try both v1
+and v2 if you see one of them gives an empty dump.</p>
+</div>
+<p>Afterwards you can further compile the model in <code>iree_input.mlir</code> for
+<a href="../../deployment-configurations/cpu-dylib/">CPU</a> or
+<a href="../../deployment-configurations/gpu-vulkan/">GPU</a>.</p>
+<!-- TODO(??): overview of APIs available, code snippets (lift from Colab?) -->
+
+<h2 id="training">Training<a class="headerlink" href="#training" title="Permanent link">&para;</a></h2>
 <div class="admonition todo">
 <p class="admonition-title">Todo</p>
-<p><a href="https://github.com/google/iree/issues/5454">Issue#5454</a>: write this documentation</p>
+<p>Discuss training</p>
 </div>
-<!-- TODO(??): overview (mention XLA? numpy?) -->
-
-<!-- TODO(??): pip install vs build from source -->
-
-<!-- TODO(??): python model code vs intermediate/serialization format(s), if any -->
-
-<!-- TODO(??): Colab notebooks, code samples -->
+<h2 id="samples">Samples<a class="headerlink" href="#samples" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Colab notebooks</th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Training an MNIST digits classifier</td>
+<td><a href="https://colab.research.google.com/github/google/iree/blob/main/colab/mnist_training.ipynb"><img alt="Open in Colab" src="https://colab.research.google.com/assets/colab-badge.svg" /></a></td>
+</tr>
+<tr>
+<td>Edge detection module</td>
+<td><a href="https://colab.research.google.com/github/google/iree/blob/main/colab/edge_detection.ipynb"><img alt="Open In Colab" src="https://colab.research.google.com/assets/colab-badge.svg" /></a></td>
+</tr>
+<tr>
+<td>Pretrained ResNet50 inference</td>
+<td><a href="https://colab.research.google.com/github/google/iree/blob/main/colab/resnet.ipynb"><img alt="Open In Colab" src="https://colab.research.google.com/assets/colab-badge.svg" /></a></td>
+</tr>
+<tr>
+<td>TensorFlow Hub Import</td>
+<td><a href="https://colab.research.google.com/github/google/iree/blob/main/colab/tensorflow_hub_import.ipynb"><img alt="Open In Colab" src="https://colab.research.google.com/assets/colab-badge.svg" /></a></td>
+</tr>
+</tbody>
+</table>
+<p>End-to-end execution tests can be found in IREE's
+<a href="https://github.com/google/iree/tree/main/integrations/tensorflow/e2e">integrations/tensorflow/e2e/</a>
+directory.</p>
+<h2 id="troubleshooting">Troubleshooting<a class="headerlink" href="#troubleshooting" title="Permanent link">&para;</a></h2>
+<h3 id="missing-serving-signature-in-savedmodel">Missing serving signature in SavedModel<a class="headerlink" href="#missing-serving-signature-in-savedmodel" title="Permanent link">&para;</a></h3>
+<p>Sometimes SavedModels are exported without explicit
+<a href="https://www.tensorflow.org/guide/saved_model#specifying_signatures_during_export">serving signatures</a>.
+This happens by default for TensorFlow Hub SavedModels. However, serving
+signatures are required as entry points for IREE compilation flow. You
+can use Python to load and re-export the SavedModel to give it serving
+signatures. For example, for
+<a href="https://tfhub.dev/google/tf2-preview/mobilenet_v2/classification">MobileNet v2</a>,
+assuming we want the serving signature to be <code>predict</code> and operating on a
+224x224 RGB image:</p>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span> <span class="nn">tensorflow.compat.v2</span> <span class="k">as</span> <span class="nn">tf</span>
+<span class="n">loaded_model</span> <span class="o">=</span> <span class="n">tf</span><span class="o">.</span><span class="n">saved_model</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="s1">&#39;/path/to/downloaded/model/&#39;</span><span class="p">)</span>
+<span class="n">call</span> <span class="o">=</span> <span class="n">loaded_model</span><span class="o">.</span><span class="fm">__call__</span><span class="o">.</span><span class="n">get_concrete_function</span><span class="p">(</span>
+         <span class="n">tf</span><span class="o">.</span><span class="n">TensorSpec</span><span class="p">([</span><span class="mi">1</span><span class="p">,</span> <span class="mi">224</span><span class="p">,</span> <span class="mi">224</span><span class="p">,</span> <span class="mi">3</span><span class="p">],</span> <span class="n">tf</span><span class="o">.</span><span class="n">float32</span><span class="p">))</span>
+<span class="n">signatures</span> <span class="o">=</span> <span class="p">{</span><span class="s1">&#39;predict&#39;</span><span class="p">:</span> <span class="n">call</span><span class="p">}</span>
+<span class="n">tf</span><span class="o">.</span><span class="n">saved_model</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">loaded_model</span><span class="p">,</span>
+  <span class="s1">&#39;/path/to/resaved/model/&#39;</span><span class="p">,</span> <span class="n">signatures</span><span class="o">=</span><span class="n">signatures</span><span class="p">)</span>
+</code></pre></div>
+<p>The above will create a new SavedModel with a serving signature, <code>predict</code>, and
+save it to <code>/path/to/resaved/model/</code>.</p>
 
               
             </article>

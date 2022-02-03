@@ -11,7 +11,7 @@
         <link rel="canonical" href="https://google.github.io/iree/">
       
       <link rel="icon" href="ghost.svg">
-      <meta name="generator" content="mkdocs-1.2.3, mkdocs-material-8.1.8">
+      <meta name="generator" content="mkdocs-1.2.3, mkdocs-material-8.1.9">
     
     
       
@@ -19,7 +19,7 @@
       
     
     
-      <link rel="stylesheet" href="assets/stylesheets/main.6e60f8b8.min.css">
+      <link rel="stylesheet" href="assets/stylesheets/main.2b4465f4.min.css">
       
         
         <link rel="stylesheet" href="assets/stylesheets/palette.e6a45f82.min.css">
@@ -381,7 +381,7 @@
         
         
         <div class="md-nav__link md-nav__link--index ">
-          <a href="ml-frameworks/">ML frameworks</a>
+          <a href="getting-started/">Getting Started</a>
           
             <label for="__nav_2">
               <span class="md-nav__icon md-icon"></span>
@@ -389,10 +389,10 @@
           
         </div>
       
-      <nav class="md-nav" aria-label="ML frameworks" data-md-level="1">
+      <nav class="md-nav" aria-label="Getting Started" data-md-level="1">
         <label class="md-nav__title" for="__nav_2">
           <span class="md-nav__icon md-icon"></span>
-          ML frameworks
+          Getting Started
         </label>
         <ul class="md-nav__list" data-md-scrollfix>
           
@@ -404,7 +404,7 @@
   
   
     <li class="md-nav__item">
-      <a href="ml-frameworks/tensorflow/" class="md-nav__link">
+      <a href="getting-started/tensorflow/" class="md-nav__link">
         TensorFlow
       </a>
     </li>
@@ -418,7 +418,7 @@
   
   
     <li class="md-nav__item">
-      <a href="ml-frameworks/tensorflow-lite/" class="md-nav__link">
+      <a href="getting-started/tflite/" class="md-nav__link">
         TensorFlow Lite
       </a>
     </li>
@@ -432,7 +432,7 @@
   
   
     <li class="md-nav__item">
-      <a href="ml-frameworks/jax/" class="md-nav__link">
+      <a href="getting-started/jax/" class="md-nav__link">
         JAX
       </a>
     </li>
@@ -1190,12 +1190,14 @@ dense computation on the hardware in the form of hardware/API-specific binaries
 like <a href="https://www.khronos.org/spir/">SPIR-V</a>.</p>
 <p><img alt="IREE Architecture" src="assets/images/iree_architecture.svg" /></p>
 <h2 id="workflow-overview">Workflow overview<a class="headerlink" href="#workflow-overview" title="Permanent link">&para;</a></h2>
-<p>Using IREE involves these general steps:</p>
+<p>Specific examples outlining IREE's workflow can be found in the
+<a href="getting-started/">User Getting Started Guide</a>. Using IREE involves the following
+general steps:</p>
 <ol>
 <li>
 <p><strong>Import your model</strong></p>
-<p>Work in your <a href="./ml-frameworks">framework of choice</a>, then run your model
-through one of IREE's import tools.</p>
+<p>Develop your program using one of the <a href="./getting-started/#supported-frameworks">supported frameworks</a>, then run your model
+using one of IREE's import tools.</p>
 </li>
 <li>
 <p><strong>Select your <a href="./deployment-configurations">deployment configuration</a></strong></p>
@@ -1215,9 +1217,9 @@ deployment configuration.</p>
 <p>IREE supports importing models from a growing list of ML frameworks and model
 formats:</p>
 <ul>
-<li><a href="ml-frameworks/tensorflow/">TensorFlow</a></li>
-<li><a href="ml-frameworks/tensorflow-lite/">TensorFlow Lite</a></li>
-<li><a href="ml-frameworks/jax/">JAX</a></li>
+<li><a href="getting-started/tensorflow/">TensorFlow</a></li>
+<li><a href="getting-started/tflite/">TensorFlow Lite</a></li>
+<li><a href="getting-started/jax/">JAX</a></li>
 </ul>
 <h3 id="selecting-deployment-configurations">Selecting deployment configurations<a class="headerlink" href="#selecting-deployment-configurations" title="Permanent link">&para;</a></h3>
 <p>IREE provides a flexible set of tools for various deployment scenarios.
