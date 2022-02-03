@@ -79,7 +79,6 @@ static Value getF32Const(ImplicitLocOpBuilder b, ArrayRef<int64_t> shapes,
       .getResult();
 }
 
-
 class ExtractConvOpPaddingAttributes : public OpRewritePattern<mhlo::ConvOp> {
  public:
   using OpRewritePattern<mhlo::ConvOp>::OpRewritePattern;
@@ -654,10 +653,13 @@ class ScatterRank0Value : public OpRewritePattern<mhlo::ScatterOp> {
     Value reshapedUpdates = rewriter.create<mhlo::ReshapeOp>(
         loc, RankedTensorType::get({1}, updatesTy.getElementType()), updates);
 
-    SmallVector<int64_t> insertedWindowDims = llvm::to_vector<4>(llvm::seq<int64_t>(0, operandTy.getRank()));
-    SmallVector<int64_t> scatterDimsToOperandDims = llvm::to_vector<4>(llvm::seq<int64_t>(0, operandTy.getRank()));
+    SmallVector<int64_t> insertedWindowDims =
+        llvm::to_vector<4>(llvm::seq<int64_t>(0, operandTy.getRank()));
+    SmallVector<int64_t> scatterDimsToOperandDims =
+        llvm::to_vector<4>(llvm::seq<int64_t>(0, operandTy.getRank()));
     auto newDimNumbers = mhlo::ScatterDimensionNumbersAttr::get(
-        op.getContext(), {}, insertedWindowDims, scatterDimsToOperandDims, /*indexVectorDim=*/1);
+        op.getContext(), {}, insertedWindowDims, scatterDimsToOperandDims,
+        /*indexVectorDim=*/1);
 
     auto newScatter = rewriter.create<mhlo::ScatterOp>(
         loc, op.getType(), operand, reshapedIndices, reshapedUpdates,
