@@ -1,4 +1,4 @@
-// RUN: iree-opt %s --iree-codegen-linalg-bufferize -canonicalize -cse -split-input-file | FileCheck %s
+// RUN: iree-opt %s --iree-codegen-linalg-bufferize -canonicalize -cse -split-input-file  -verify-diagnostics | FileCheck %s
 
 func @tile_from_tensor_load() {
   %c0 = arith.constant 0 : index
@@ -2639,3 +2639,18 @@ func @dot_general_nontrivial_batching_mutliple_parallel_dimension() {
 }
 // CHECK-LABEL: func @dot_general_nontrivial_batching_mutliple_parallel_dimension()
 //   CHECK-NOT:   memref.alloc
+
+// -----
+
+func @dispatch() {
+  %c0 = arith.constant 0 : index
+  %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(32) : !flow.dispatch.tensor<readonly:4xf32>
+  %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(32) : !flow.dispatch.tensor<readonly:4xf32>
+  %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) offset(%c0) alignment(32) : !flow.dispatch.tensor<writeonly:4xf32>
+  %3 = flow.dispatch.tensor.load %0, offsets = [0], sizes = [4], strides = [1] : !flow.dispatch.tensor<readonly:4xf32> -> tensor<?xf32>
+  %4 = flow.dispatch.tensor.load %1, offsets = [0], sizes = [4], strides = [1] : !flow.dispatch.tensor<readonly:4xf32> -> tensor<?xf32>
+  // expected-error @+1 {{unhandled tensor operation}}
+  %5 = arith.mulf %3, %4 : tensor<?xf32>
+  flow.dispatch.tensor.store %5, %2, offsets = [0], sizes = [4], strides = [1] : tensor<?xf32> -> !flow.dispatch.tensor<writeonly:4xf32>
+  return
+}
