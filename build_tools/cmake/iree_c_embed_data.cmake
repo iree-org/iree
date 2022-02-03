@@ -12,7 +12,8 @@ include(CMakeParseArguments)
 #
 # Parameters:
 # NAME: Name of target (see Note).
-# SRCS: List of source files to embed.
+# SRCS: List of source files to embed (non-absolute paths will be resolved
+#     relative to CMAKE_CURRENT_SRC_DIR).
 # GENERATED_SRCS: List of generated source files to embed.
 # C_FILE_OUTPUT: The C implementation file to output.
 # H_FILE_OUTPUT: The H header file to output.
@@ -57,7 +58,11 @@ function(iree_c_embed_data)
   endif()
 
   foreach(SRC ${_RULE_SRCS})
-    list(APPEND _ARGS "${CMAKE_CURRENT_SOURCE_DIR}/${SRC}")
+    if(IS_ABSOLUTE "${SRC}")
+      list(APPEND _ARGS "${SRC}")
+    else()
+      list(APPEND _ARGS "${CMAKE_CURRENT_SOURCE_DIR}/${SRC}")
+    endif()
   endforeach(SRC)
   foreach(SRC ${_RULE_GENERATED_SRCS})
     list(APPEND _ARGS "${SRC}")

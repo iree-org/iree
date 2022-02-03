@@ -14,30 +14,28 @@ package(
 
 iree_cmake_extra_content(
     content = """
-if(${IREE_HAL_DRIVER_CUDA})
+if(IREE_HAL_DRIVER_CUDA)
 """,
     inline = True,
 )
 
-# Temporarily disabled pending build system changes.
-
-# cc_library(
-#     name = "registration",
-#     srcs = ["driver_module.c"],
-#     hdrs = ["driver_module.h"],
-#     defines = [
-#         "IREE_HAL_HAVE_CUDA_DRIVER_MODULE=1",
-#     ],
-#     deps = [
-#         "//iree/base",
-#         "//iree/base:cc",
-#         "//iree/base:core_headers",
-#         "//iree/base:tracing",
-#         "//iree/base/internal:flags",
-#         "//iree/hal",
-#         "//iree/hal/cuda",
-#     ],
-# )
+cc_library(
+    name = "registration",
+    srcs = ["driver_module.c"],
+    hdrs = ["driver_module.h"],
+    defines = [
+        "IREE_HAL_HAVE_CUDA_DRIVER_MODULE=1",
+    ],
+    deps = [
+        "//iree/base",
+        "//iree/base:cc",
+        "//iree/base:core_headers",
+        "//iree/base:tracing",
+        "//iree/base/internal:flags",
+        "//iree/hal",
+        "//iree/hal/cuda",
+    ],
+)
 
 iree_cmake_extra_content(
     content = """
