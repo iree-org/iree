@@ -33,6 +33,7 @@ If you only build the command line tool you can install:
 ```shell
 sudo apt install libcapstone-dev libtbb-dev libzstd-dev
 ```
+The zstd version on Ubuntu 18.04 is old. You will need to install it from source from https://github.com/facebook/zstd.git
 
 ### Mac
 ```shell
