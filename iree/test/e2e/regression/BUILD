@@ -91,7 +91,6 @@ iree_check_single_backend_test_suite(
     target_backend = "vulkan-spirv",
 )
 
-# Temporarily disabled pending build system changes.
 iree_check_single_backend_test_suite(
     name = "check_regression_cuda",
     srcs = BACKEND_TESTS,

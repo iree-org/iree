@@ -51,7 +51,6 @@ iree_check_single_backend_test_suite(
     target_backend = "dylib-llvm-aot",
 )
 
-# Temporarily disabled pending build system changes.
 iree_check_single_backend_test_suite(
     name = "check_cuda",
     srcs = enforce_glob(
