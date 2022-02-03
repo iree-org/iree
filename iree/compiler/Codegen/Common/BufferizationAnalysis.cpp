@@ -585,7 +585,20 @@ LogicalResult createTensorEquivalenceClasses(FuncOp funcOp,
             [&](scf::IfOp ifOp) { return analyseScfIfOp(ifOp, plan); })
         .Case<scf::ForOp>(
             [&](scf::ForOp forOp) { return analyseScfForOp(forOp, plan); })
-        .Default([&](Operation *op) { return success(); });
+        .Case<scf::YieldOp, linalg::InitTensorOp, tensor::DimOp,
+              tensor::ExtractOp, tensor::PadOp>(
+            [&](Operation *op) { return success(); })
+        .Default([&](Operation *op) -> LogicalResult {
+          if (llvm::any_of(op->getOperands(),
+                           [](Value v) {
+                             return v.getType().isa<RankedTensorType>();
+                           }) ||
+              llvm::any_of(op->getResultTypes(),
+                           [](Type t) { return t.isa<RankedTensorType>(); })) {
+            return op->emitOpError("unhandled tensor operation");
+          }
+          return success();
+        });
   };
   if (funcOp.walk<WalkOrder::PreOrder>(bufferMappingFn).wasInterrupted()) {
     return failure();
