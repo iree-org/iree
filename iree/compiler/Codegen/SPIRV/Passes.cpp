@@ -72,6 +72,7 @@ void addSPIRVBufferizePasses(OpPassManager &passManager,
 /// tiling and vectorization and before buffer transformations.
 static void addLoopMaterializationPasses(OpPassManager &pm) {
   pm.addNestedPass<FuncOp>(IREE::LinalgExt::createLinalgExtToLoopsPass());
+  pm.addNestedPass<FuncOp>(createMemrefCopyToLinalgPass());
   pm.addNestedPass<FuncOp>(createConvertLinalgToLoopsPass());
   pm.addNestedPass<FuncOp>(createRemoveSingleIterationLoopPass());
 }
@@ -193,7 +194,7 @@ void addSPIRVTileAndDistributePassPipeline(OpPassManager &pm) {
 //
 // In the former path for CodeGen, we perform bufferization first, which will
 // turn padding/copy (via flow.dispatch.tensor.load/store pairs) into
-// linalg.copy ops. Then we deduce CodeGen configuration from the linalg.copy op
+// linalg.generic ops. Then we deduce CodeGen configuration from the linalg.copy op
 // and use a `lowering.config` attribute on it to drive transformations.
 //
 // In the latter path for CodeGen, we will see linalg.pad_tensor directly.

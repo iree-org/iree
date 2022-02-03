@@ -11,7 +11,7 @@ include "iree/compiler/Dialect/Modules/VMVX/IR/VMVXBase.td"
 include "mlir/IR/OpAsmInterface.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 
-class VMVX_PureOp<string mnemonic, list<OpTrait> traits = []> :
+class VMVX_PureOp<string mnemonic, list<Trait> traits = []> :
     VMVX_Op<mnemonic, !listconcat(traits, [NoSideEffect])>;
 
 //===----------------------------------------------------------------------===//

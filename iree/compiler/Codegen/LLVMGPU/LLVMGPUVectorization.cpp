@@ -12,8 +12,8 @@
 #include "mlir/Conversion/VectorToSCF/VectorToSCF.h"
 #include "mlir/Dialect/Linalg/Transforms/Hoisting.h"
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
-#include "mlir/Dialect/Vector/VectorOps.h"
-#include "mlir/Dialect/Vector/VectorTransforms.h"
+#include "mlir/Dialect/Vector/IR/VectorOps.h"
+#include "mlir/Dialect/Vector/Transforms/VectorTransforms.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "mlir/Transforms/Passes.h"
 
@@ -31,8 +31,9 @@ static void populateVectorizationPatterns(RewritePatternSet &patterns) {
   linalg::LinalgVectorizationOptions opt;
   linalg::LinalgTransformationFilter f(
       StringAttr::get(ctx, getVectorizeMarker()));
-  linalg::VectorizationPatterns<linalg::FillOp, linalg::CopyOp,
-                                linalg::GenericOp>::insert(patterns, opt, f);
+  linalg::VectorizationPatterns<linalg::FillOp, linalg::GenericOp>::insert(
+      patterns, opt, f);
+  patterns.add<linalg::CopyVectorizationPattern>(ctx);
   patterns.add<linalg::LinalgVectorizationPattern>(
       ctx, f.addOpFilter<linalg::ContractionOpInterface>(), opt);
   vector::populateVectorTransferPermutationMapLoweringPatterns(patterns);

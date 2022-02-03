@@ -249,7 +249,7 @@ hal.executable @tensor_insert {
             %9 = affine.apply affine_map<(d0) -> (d0 + 4)>(%arg0)
             %10 = affine.apply affine_map<(d0) -> (d0 + 3)>(%arg1)
             %11 = memref.subview %1[%9, %10] [%4, %7] [1, 1] : memref<?x?xi32> to memref<?x?xi32, affine_map<(d0, d1)[s0, s1] -> (d0 * s1 + s0 + d1)>>
-            linalg.copy(%8, %11) : memref<?x?xi32, affine_map<(d0, d1)[s0, s1] -> (d0 * s1 + s0 + d1)>>, memref<?x?xi32, affine_map<(d0, d1)[s0, s1] -> (d0 * s1 + s0 + d1)>>
+            linalg.generic(%8, %11) : memref<?x?xi32, affine_map<(d0, d1)[s0, s1] -> (d0 * s1 + s0 + d1)>>, memref<?x?xi32, affine_map<(d0, d1)[s0, s1] -> (d0 * s1 + s0 + d1)>>
           }
         }
         return
@@ -268,7 +268,7 @@ hal.executable @tensor_insert {
 //  CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
 //  CHECK-DAG:   %[[NWGSX:.+]] = affine.apply #[[MAP0]]()[%[[ARG0]]]
 //      CHECK:   hal.return %[[NWGSX]], %[[ARG1]], %[[C1]]
-//      CHECK:   linalg.copy
+//      CHECK:   linalg.generic
 // CHECK-SAME:     lowering.config = #[[CONFIG]]
 
 // -----

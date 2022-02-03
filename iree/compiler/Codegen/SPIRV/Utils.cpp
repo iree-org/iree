@@ -59,51 +59,6 @@ LogicalResult updateWorkGroupSize(FuncOp funcOp,
   return success();
 }
 
-LogicalResult copyToWorkgroupMemory(OpBuilder &b, Value src, Value dst) {
-  auto copyOp = b.create<linalg::CopyOp>(src.getLoc(), src, dst);
-  setMarker(copyOp, getCopyToWorkgroupMemoryMarker());
-  return success();
-}
-
-Optional<Value> allocateWorkgroupMemory(OpBuilder &b, memref::SubViewOp subview,
-                                        ArrayRef<Value> boundingSubViewSize,
-                                        DataLayout &layout) {
-  // Allocate the memory into the entry block of the parent FuncOp. This better
-  // aligns with the semantics of this memory which is available at the entry of
-  // the function.
-  OpBuilder::InsertionGuard guard(b);
-  FuncOp funcOp = subview->getParentOfType<FuncOp>();
-  if (!funcOp) {
-    subview.emitError("expected op to be within std.func");
-    return llvm::None;
-  }
-  b.setInsertionPointToStart(&(*funcOp.getBody().begin()));
-  // The bounding subview size is expected to be constant. This specified the
-  // shape of the allocation.
-  SmallVector<int64_t, 2> shape = llvm::to_vector<2>(
-      llvm::map_range(boundingSubViewSize, [](Value v) -> int64_t {
-        APInt value;
-        if (matchPattern(v, m_ConstantInt(&value))) return value.getSExtValue();
-        return -1;
-      }));
-  if (llvm::any_of(shape, [](int64_t v) { return v == -1; })) return {};
-  MemRefType allocType = MemRefType::get(
-      shape, subview.getType().getElementType(), {}, getWorkgroupMemorySpace());
-  Value buffer = b.create<memref::AllocOp>(subview.getLoc(), allocType);
-  return buffer;
-}
-
-LogicalResult deallocateWorkgroupMemory(OpBuilder &b, Value buffer) {
-  // There is no utility of an explicit deallocation (as of now). Instead the
-  // workgroup memory is effectively stack memory that is automatically dead at
-  // the end of the function. The SPIR-V lowering treats such deallocs as
-  // no-ops. So dont insert it in the first place, rather just check that the
-  // deallocation is for workgroup memory.
-  MemRefType bufferType = buffer.getType().dyn_cast<MemRefType>();
-  if (!bufferType) return failure();
-  return success(bufferType.getMemorySpaceAsInt() == getWorkgroupMemorySpace());
-}
-
 template <typename GPUIdOp, typename GPUCountOp>
 static linalg::ProcInfo getGPUProcessorIdAndCountImpl(OpBuilder &builder,
                                                       Location loc,

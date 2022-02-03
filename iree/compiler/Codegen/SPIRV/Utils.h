@@ -41,24 +41,6 @@ spirv::TargetEnvAttr getSPIRVTargetEnvAttr(Operation *op);
 const char *getSPIRVDistributeAttrName();
 
 //===----------------------------------------------------------------------===//
-// Workgroup memory utils
-//===----------------------------------------------------------------------===//
-
-/// Allocation callback for allocation workgroup local memory.
-Optional<Value> allocateWorkgroupMemory(OpBuilder &b, memref::SubViewOp subview,
-                                        ArrayRef<Value> boundingSubViewSize,
-                                        DataLayout &layout);
-
-/// Function used as callback for copyin/copyout in promotion pattern used
-/// to promote subviews to workgroup memory when the number of threads is
-/// known to be greater than equal to the number of iteration of loops the
-/// copy is lowered to.
-LogicalResult copyToWorkgroupMemory(OpBuilder &b, Value src, Value dst);
-
-/// Deallocation callback for allocation workgroup local memory.
-LogicalResult deallocateWorkgroupMemory(OpBuilder &b, Value buffer);
-
-//===----------------------------------------------------------------------===//
 // Processor ID/size utils
 //===----------------------------------------------------------------------===//
 

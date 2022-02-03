@@ -159,7 +159,7 @@ def IREEPyDM_FuncOp : IREEPyDM_Op<"func", [
       return getType().getResult(1);
     }
 
-    /// Hook for OpTrait::FunctionLike, called after verifying that the 'type'
+    /// Hook for Trait::FunctionLike, called after verifying that the 'type'
     /// attribute is present. This can check for preconditions of the
     /// getNumArguments hook not failing.
     LogicalResult verifyType();

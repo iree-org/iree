@@ -20,7 +20,7 @@
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
 #include "mlir/Dialect/SCF/Transforms.h"
-#include "mlir/Dialect/Vector/VectorTransforms.h"
+#include "mlir/Dialect/Vector/Transforms/VectorTransforms.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
@@ -285,9 +285,9 @@ void LLVMCPUTileFuseAndVectorizePass::runOnOperation() {
     linalg::LinalgVectorizationOptions opt;
     linalg::LinalgTransformationFilter f(
         StringAttr::get(context, getVectorizeMarker()));
-    linalg::VectorizationPatterns<linalg::GenericOp, linalg::CopyOp,
-                                  linalg::FillOp>::insert(vectorizationPatterns,
-                                                          opt, f);
+    linalg::VectorizationPatterns<linalg::GenericOp, linalg::FillOp>::insert(
+        vectorizationPatterns, opt, f);
+    vectorizationPatterns.add<linalg::CopyVectorizationPattern>(context);
     vectorizationPatterns.add<linalg::LinalgVectorizationPattern>(
         &getContext(), f.addOpFilter<linalg::ContractionOpInterface>(), opt);
     vector::populateVectorTransferPermutationMapLoweringPatterns(

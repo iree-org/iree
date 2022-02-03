@@ -31,7 +31,7 @@
 #include "mlir/Dialect/SCF/SCF.h"
 #include "mlir/Dialect/SCF/Transforms.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
-#include "mlir/Dialect/Vector/VectorTransforms.h"
+#include "mlir/Dialect/Vector/Transforms/VectorTransforms.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/PatternMatch.h"
@@ -100,12 +100,13 @@ static void populateTilingToInvocationPatterns(MLIRContext *context,
       getLinalgMatchAndReplaceMarker(matchMarkers, getVectorizeMarker(),
                                      context)
           .setMatchByDefault();
-  linalg::TilingPatterns<
-      linalg::CopyOp, linalg::Conv1DNwcWcfOp, linalg::Conv3DNdhwcDhwcfOp,
-      linalg::DepthwiseConv2DNhwcHwcmOp, linalg::FillOp, linalg::GenericOp,
-      linalg::PoolingNhwcMaxOp, linalg::PoolingNhwcMinOp,
-      linalg::PoolingNhwcSumOp>::insert(patterns, tilingOptions,
-                                        filterVectorized);
+  linalg::TilingPatterns<linalg::Conv1DNwcWcfOp, linalg::Conv3DNdhwcDhwcfOp,
+                         linalg::DepthwiseConv2DNhwcHwcmOp, linalg::FillOp,
+                         linalg::GenericOp, linalg::PoolingNhwcMaxOp,
+                         linalg::PoolingNhwcMinOp,
+                         linalg::PoolingNhwcSumOp>::insert(patterns,
+                                                           tilingOptions,
+                                                           filterVectorized);
 
   linalg::LinalgTransformationFilter filterTiled =
       getLinalgMatchAndReplaceMarker(matchMarkers, getTileReductionMarker(),

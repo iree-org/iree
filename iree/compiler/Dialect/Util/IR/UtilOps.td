@@ -21,13 +21,13 @@ include "mlir/Interfaces/SideEffectInterfaces.td"
 // Op types
 //===----------------------------------------------------------------------===//
 
-class Util_Op<string mnemonic, list<OpTrait> traits = []> :
+class Util_Op<string mnemonic, list<Trait> traits = []> :
     Op<Util_Dialect, mnemonic, traits> {
   let parser = [{ return parse$cppClass(parser, result); }];
   let printer = [{ print$cppClass(p, *this); }];
 }
 
-class Util_PureOp<string mnemonic, list<OpTrait> traits = []> :
+class Util_PureOp<string mnemonic, list<Trait> traits = []> :
     Util_Op<mnemonic, !listconcat(traits, [NoSideEffect])>;
 
 //===----------------------------------------------------------------------===//

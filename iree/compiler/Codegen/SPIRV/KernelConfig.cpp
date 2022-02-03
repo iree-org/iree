@@ -397,10 +397,6 @@ static LogicalResult setDefaultOpConfig(spirv::ResourceLimitsAttr limits,
   auto untiledResultShape = getUntiledResultShape(linalgOp, 0);
   bool vectorizable =
       !linalgOp.hasIndexSemantics() &&
-      // TODO: Skip vectorization for linalg.copy ops. Right now handling of
-      // it still goes through the old bufferization-first pipeline, while
-      // vectorization pipeline expects tensor-semantic ops.
-      !isa<linalg::CopyOp>(op) &&
       // Skip vectorization for non-minor identity inputs as it generates
       // vector.transfer_read ops with permutation maps that we currently
       // cannot lower.

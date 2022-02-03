@@ -117,7 +117,7 @@ static void populateTilingToWarpPatterns(
        StringAttr::get(context, getWorkgroupMemoryMarker())},
       StringAttr::get(context, getVectorizeMarker()));
   filter.setMatchByDefault();
-  linalg::TilingPatterns<linalg::MatmulOp, linalg::FillOp, linalg::CopyOp,
+  linalg::TilingPatterns<linalg::MatmulOp, linalg::FillOp,
                          linalg::BatchMatmulOp,
                          linalg::GenericOp>::insert(patterns, tilingOptions,
                                                     filter);
@@ -185,7 +185,7 @@ static void populateTilingToInvocationPatterns(
      return success(!isa<IREE::LinalgExt::FftOp>(op));
    }).setMatchByDefault();
   linalg::TilingPatterns<
-      linalg::MatmulOp, linalg::FillOp, linalg::CopyOp, linalg::BatchMatmulOp,
+      linalg::MatmulOp, linalg::FillOp, linalg::BatchMatmulOp,
       linalg::GenericOp, linalg::Conv2DNhwcHwcfOp,
       linalg::DepthwiseConv2DNhwcHwcOp, linalg::DepthwiseConv2DNhwcHwcmOp,
       linalg::PoolingNhwcMaxOp, linalg::PoolingNhwcMinOp,
@@ -195,7 +195,7 @@ static void populateTilingToInvocationPatterns(
 }
 
 static LogicalResult copyToWorkgroupMemory(OpBuilder &b, Value src, Value dst) {
-  auto copyOp = b.create<linalg::CopyOp>(src.getLoc(), src, dst);
+  Operation *copyOp = createLinalgCopyOp(b, src.getLoc(), src, dst);
   setMarker(copyOp, getCopyToWorkgroupMemoryMarker());
   return success();
 }
@@ -327,7 +327,7 @@ struct LLVMGPUTileAndDistributePass
       // Insert barriers before and after copies to workgroup memory and skip
       // insert barriers between back to back copy to workgroup memory.
       OpBuilder builder(&getContext());
-      funcOp.walk([&builder](linalg::CopyOp copyOp) {
+      funcOp.walk([&builder](linalg::GenericOp copyOp) {
         if (hasMarker(copyOp, getCopyToWorkgroupMemoryMarker())) {
           Operation *prevOp = copyOp->getPrevNode();
           if (!prevOp || !hasMarker(prevOp, getCopyToWorkgroupMemoryMarker())) {

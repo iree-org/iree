@@ -39,7 +39,7 @@
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
 #include "mlir/Dialect/SCF/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
-#include "mlir/Dialect/Vector/VectorOps.h"
+#include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/IR/BlockAndValueMapping.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinTypes.h"
@@ -112,7 +112,8 @@ void IREEComprehensiveBufferizePass::runOnOperation() {
 // Default allocation functions.
 static FailureOr<Value> defaultAllocationFn(OpBuilder &builder, Location loc,
                                             MemRefType allocationType,
-                                            ValueRange dynamicSizes) {
+                                            ValueRange dynamicSizes,
+                                            unsigned int alignment) {
   return builder.create<memref::AllocOp>(loc, allocationType, dynamicSizes)
       .getResult();
 }
@@ -123,7 +124,7 @@ static LogicalResult defaultDeallocationFn(OpBuilder &builder, Location loc,
 }
 static LogicalResult defaultMemCpyFn(OpBuilder &builder, Location loc,
                                      Value from, Value to) {
-  builder.create<linalg::CopyOp>(loc, from, to);
+  createLinalgCopyOp(builder, loc, from, to);
   return success();
 }
 

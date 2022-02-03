@@ -451,10 +451,10 @@ LogicalResult initGPULaunchConfig(ModuleOp moduleOp) {
     }
 
     Operation *rootOperation = nullptr;
-    // Find the root operation. linalg.generic, linalg.fill and linalg.copy are
-    // not root operations if there are other compute operations present.
+    // Find the root operation. linalg.generic and linalg.fill are not root
+    // operations if there are other compute operations present.
     for (Operation *op : llvm::reverse(computeOps)) {
-      if (!isa<linalg::GenericOp, linalg::FillOp, linalg::CopyOp>(op)) {
+      if (!isa<linalg::GenericOp, linalg::FillOp>(op)) {
         rootOperation = op;
         break;
       }
@@ -469,7 +469,7 @@ LogicalResult initGPULaunchConfig(ModuleOp moduleOp) {
 
     if (!rootOperation) {
       for (Operation *op : llvm::reverse(computeOps)) {
-        if (isa<linalg::GenericOp, linalg::FillOp, linalg::CopyOp>(op)) {
+        if (isa<linalg::GenericOp, linalg::FillOp>(op)) {
           rootOperation = op;
           break;
         }
