@@ -47,7 +47,7 @@ PartitionSet partitionStreamableOpsReference(
   for (auto &op : llvm::reverse(*block)) {
     // Skip constants; they just add noise (and since they are heavily CSE'd
     // they have lots of users to test).
-    if (op.hasTrait<OpTrait::ConstantLike>()) {
+    if (op.hasTrait<Trait::ConstantLike>()) {
       LLVM_DEBUG(llvm::dbgs() << "(ignoring constant)\n");
       continue;
     } else if (!isa<IREE::Stream::StreamableOpInterface>(op)) {
@@ -249,7 +249,7 @@ PartitionSet partitionRegionConcurrencyReference(
   for (auto &op : llvm::reverse(*block)) {
     // Skip constants; they just add noise (and since they are heavily CSE'd
     // they have lots of users to test).
-    if (op.hasTrait<OpTrait::ConstantLike>()) {
+    if (op.hasTrait<Trait::ConstantLike>()) {
       LLVM_DEBUG(llvm::dbgs() << "(ignoring constant)\n");
       continue;
     }

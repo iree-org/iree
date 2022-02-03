@@ -78,7 +78,7 @@ static LogicalResult mergeModuleInto(
       llvm::map_range(sourceBlock, [&](Operation &op) { return &op; }));
 
   for (auto &op : allOps) {
-    if (op->hasTrait<OpTrait::IsTerminator>()) continue;
+    if (op->hasTrait<Trait::IsTerminator>()) continue;
     if (auto symbolOp = dyn_cast<SymbolOpInterface>(op)) {
       auto symbolName = symbolOp.getName();
 
@@ -123,7 +123,7 @@ static LogicalResult mergeModuleInto(
       targetSymbolMap[SymbolTable::getSymbolName(op).getValue()] = op;
     }
     if (!targetBlock.empty() &&
-        targetBlock.back().hasTrait<OpTrait::IsTerminator>()) {
+        targetBlock.back().hasTrait<Trait::IsTerminator>()) {
       op->moveBefore(&targetBlock.back());
     } else {
       op->moveBefore(&targetBlock, targetBlock.end());

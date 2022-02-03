@@ -39,7 +39,7 @@ int getNativeVectorSize(int64_t size) {
 }
 
 Optional<SmallVector<int64_t, 4>> getNativeVectorShape(Operation *op) {
-  if (OpTrait::hasElementwiseMappableTraits(op) && op->getNumResults() == 1) {
+  if (Trait::hasElementwiseMappableTraits(op) && op->getNumResults() == 1) {
     if (auto vecType = op->getResultTypes()[0].dyn_cast<VectorType>()) {
       SmallVector<int64_t, 4> nativeSize(vecType.getRank(), 1);
       nativeSize.back() = getNativeVectorSize(vecType.getShape().back());

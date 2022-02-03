@@ -118,7 +118,7 @@ static bool materializeRegionCOW(Region &region) {
   bool didChange = false;
   for (auto &block : region.getBlocks()) {
     for (auto &op : block) {
-      if (!op.hasTrait<OpTrait::IREE::Stream::AsyncPhaseOp>()) continue;
+      if (!op.hasTrait<Trait::IREE::Stream::AsyncPhaseOp>()) continue;
       didChange =
           TypeSwitch<Operation *, bool>(&op)
               .Case<IREE::Stream::TensorImportOp, IREE::Stream::TensorExportOp,

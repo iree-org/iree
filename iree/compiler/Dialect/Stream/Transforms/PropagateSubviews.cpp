@@ -232,7 +232,7 @@ static Value makeBlockArgResourceSize(Location loc, Value resourceValue,
         return sizeValue;
       }
     } else if (sizeValue.getDefiningOp() &&
-               sizeValue.getDefiningOp()->hasTrait<OpTrait::ConstantLike>()) {
+               sizeValue.getDefiningOp()->hasTrait<Trait::ConstantLike>()) {
       // Constant op - duplicate at the builder location so we don't have to
       // worry about SSA dominance issues. CSE will clean up the dupes later.
       return builder.clone(*sizeValue.getDefiningOp())->getResult(0);

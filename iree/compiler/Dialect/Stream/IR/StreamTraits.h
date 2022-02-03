@@ -15,19 +15,19 @@ namespace IREE {
 namespace Stream {
 
 template <typename ConcreteType>
-class TensorPhaseOp : public OpTrait::TraitBase<ConcreteType, TensorPhaseOp> {
+class TensorPhaseOp : public Trait::TraitBase<ConcreteType, TensorPhaseOp> {
  public:
   static LogicalResult verifyTrait(Operation *op) { return success(); }
 };
 
 template <typename ConcreteType>
-class AsyncPhaseOp : public OpTrait::TraitBase<ConcreteType, AsyncPhaseOp> {
+class AsyncPhaseOp : public Trait::TraitBase<ConcreteType, AsyncPhaseOp> {
  public:
   static LogicalResult verifyTrait(Operation *op) { return success(); }
 };
 
 template <typename ConcreteType>
-class CmdPhaseOp : public OpTrait::TraitBase<ConcreteType, CmdPhaseOp> {
+class CmdPhaseOp : public Trait::TraitBase<ConcreteType, CmdPhaseOp> {
  public:
   static LogicalResult verifyTrait(Operation *op) { return success(); }
 };

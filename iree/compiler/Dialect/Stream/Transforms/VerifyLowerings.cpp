@@ -209,7 +209,7 @@ class Verifier {
 
 static void markStreamTensorOpsIllegal(Verifier &verifier) {
   verifier.addOpVerifier([](Operation *op) -> Optional<Verifier::Legality> {
-    if (op->hasTrait<OpTrait::IREE::Stream::TensorPhaseOp>()) {
+    if (op->hasTrait<Trait::IREE::Stream::TensorPhaseOp>()) {
       return Verifier::Legality::ILLEGAL;
     }
     return llvm::None;
@@ -218,7 +218,7 @@ static void markStreamTensorOpsIllegal(Verifier &verifier) {
 
 static void markStreamAsyncOpsIllegal(Verifier &verifier) {
   verifier.addOpVerifier([](Operation *op) -> Optional<Verifier::Legality> {
-    if (op->hasTrait<OpTrait::IREE::Stream::AsyncPhaseOp>()) {
+    if (op->hasTrait<Trait::IREE::Stream::AsyncPhaseOp>()) {
       return Verifier::Legality::ILLEGAL;
     }
     return llvm::None;
@@ -227,7 +227,7 @@ static void markStreamAsyncOpsIllegal(Verifier &verifier) {
 
 static void markStreamCmdOpsIllegal(Verifier &verifier) {
   verifier.addOpVerifier([](Operation *op) -> Optional<Verifier::Legality> {
-    if (op->hasTrait<OpTrait::IREE::Stream::CmdPhaseOp>()) {
+    if (op->hasTrait<Trait::IREE::Stream::CmdPhaseOp>()) {
       return Verifier::Legality::ILLEGAL;
     }
     return llvm::None;

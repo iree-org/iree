@@ -15,7 +15,7 @@ namespace IREE {
 namespace HAL {
 
 template <typename ConcreteType>
-class DeviceQuery : public OpTrait::TraitBase<ConcreteType, DeviceQuery> {
+class DeviceQuery : public Trait::TraitBase<ConcreteType, DeviceQuery> {
  public:
   static LogicalResult verifyTrait(Operation *op) { return success(); }
 };

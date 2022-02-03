@@ -126,7 +126,7 @@ def VM_FuncOp : VM_Op<"func", [
     /// Returns the result types of this function.
     ArrayRef<Type> getResultTypes() { return getType().getResults(); }
 
-    /// Hook for OpTrait::FunctionLike, called after verifying that the 'type'
+    /// Hook for Trait::FunctionLike, called after verifying that the 'type'
     /// attribute is present. This can check for preconditions of the
     /// getNumArguments hook not failing.
     LogicalResult verifyType();
@@ -226,7 +226,7 @@ def VM_ImportOp : VM_Op<"import", [
     ArrayRef<Type> getResultTypes() { return getType().getResults(); }
 
 
-    /// Hook for OpTrait::FunctionLike, called after verifying that the 'type'
+    /// Hook for Trait::FunctionLike, called after verifying that the 'type'
     /// attribute is present. This can check for preconditions of the
     /// getNumArguments hook not failing.
     LogicalResult verifyType();

@@ -179,7 +179,7 @@ static bool isStructurallyEquivalentTo(Operation &lhs, Operation &rhs,
     // pollute it with our mappings.
     BlockAndValueMapping scopedRegionMapping;
     BlockAndValueMapping regionMapping =
-        lhs.hasTrait<OpTrait::IsIsolatedFromAbove>() ? scopedRegionMapping
+        lhs.hasTrait<Trait::IsIsolatedFromAbove>() ? scopedRegionMapping
                                                      : parentMapping;
 
     if (!isStructurallyEquivalentTo(lhsRegion, rhsRegion, regionMapping)) {

@@ -222,7 +222,7 @@ class ScheduleConcurrencyPass
     // creates a lot of new IR (up to O(op*partitions)).
     SetVector<Operation *> deadOps;
     for (auto &op : *block) {
-      if (op.hasTrait<OpTrait::IsTerminator>()) continue;
+      if (op.hasTrait<Trait::IsTerminator>()) continue;
       bool handled = false;
       for (auto &partitionBuilder : partitionBuilders) {
         handled = partitionBuilder.visit(&op) || handled;

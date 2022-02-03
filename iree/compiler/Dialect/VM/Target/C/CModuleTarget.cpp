@@ -264,14 +264,14 @@ static LogicalResult canonicalizeModule(
   auto *context = moduleOp.getContext();
   for (auto op : context->getRegisteredOperations()) {
     // Non-serializable ops must be removed prior to serialization.
-    if (op.hasTrait<OpTrait::IREE::VM::PseudoOp>()) {
+    if (op.hasTrait<Trait::IREE::VM::PseudoOp>()) {
       op.getCanonicalizationPatterns(patterns, context);
       target.setOpAction(op, ConversionTarget::LegalizationAction::Illegal);
     }
 
     // Debug ops must not be present when stripping.
     // TODO(benvanik): add RemoveDisabledDebugOp pattern.
-    if (op.hasTrait<OpTrait::IREE::VM::DebugOnly>() &&
+    if (op.hasTrait<Trait::IREE::VM::DebugOnly>() &&
         targetOptions.stripDebugOps) {
       target.setOpAction(op, ConversionTarget::LegalizationAction::Illegal);
     }

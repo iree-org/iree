@@ -306,7 +306,7 @@ bool ValueLiveness::isLastValueUse(Value value, Operation *useOp) {
   }
   int opOrdinal = opOrdering_[useOp];
   auto &liveRange = liveRanges_[value];
-  if (!useOp->hasTrait<OpTrait::IsTerminator>() &&
+  if (!useOp->hasTrait<Trait::IsTerminator>() &&
       liveRange.test(opOrdinal + 1)) {
     // The value is still live within the block after the useOp.
     return false;

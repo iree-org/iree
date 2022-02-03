@@ -248,7 +248,7 @@ class ScheduleExecutionPass
       // creates a lot of new IR (up to O(op*partitions)).
       SetVector<Operation *> deadOps;
       for (auto &op : *block) {
-        if (op.hasTrait<OpTrait::IsTerminator>()) continue;
+        if (op.hasTrait<Trait::IsTerminator>()) continue;
         for (auto &partitionBuilder : partitionBuilders) {
           partitionBuilder.visit(&op);
         }

@@ -50,7 +50,7 @@ LogicalResult mergeModuleInto(Operation *sourceOp, Operation *targetOp,
 
   // Resolve conflicts and move the op.
   for (auto &sourceOp : sourceOps) {
-    if (sourceOp->hasTrait<OpTrait::IsTerminator>()) continue;
+    if (sourceOp->hasTrait<Trait::IsTerminator>()) continue;
     if (auto symbolOp = dyn_cast<SymbolOpInterface>(sourceOp)) {
       auto symbolName = symbolOp.getName();
 

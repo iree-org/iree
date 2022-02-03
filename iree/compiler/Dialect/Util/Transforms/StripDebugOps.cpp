@@ -31,7 +31,7 @@ class StripDebugOpsPass
   void runOnOperation() override {
     getOperation()->walk([](Operation *op) {
       if (isa<mlir::AssertOp>(op) ||
-          op->hasTrait<OpTrait::IREE::Util::DebugOnly>()) {
+          op->hasTrait<Trait::IREE::Util::DebugOnly>()) {
         op->erase();
       }
     });

@@ -15,7 +15,7 @@ namespace IREE {
 namespace Util {
 
 template <typename ConcreteType>
-struct YieldPoint : public OpTrait::TraitBase<ConcreteType, YieldPoint> {
+struct YieldPoint : public Trait::TraitBase<ConcreteType, YieldPoint> {
   static LogicalResult verifyTrait(Operation *op) {
     // TODO(benvanik): verify yield point.
     return success();
@@ -23,7 +23,7 @@ struct YieldPoint : public OpTrait::TraitBase<ConcreteType, YieldPoint> {
 };
 
 template <typename ConcreteType>
-struct Unsafe : public OpTrait::TraitBase<ConcreteType, Unsafe> {
+struct Unsafe : public Trait::TraitBase<ConcreteType, Unsafe> {
   static LogicalResult verifyTrait(Operation *op) {
     // TODO(benvanik): verify that entire tree is marked unsafe.
     return success();
@@ -31,7 +31,7 @@ struct Unsafe : public OpTrait::TraitBase<ConcreteType, Unsafe> {
 };
 
 template <typename ConcreteType>
-struct DebugOnly : public OpTrait::TraitBase<ConcreteType, DebugOnly> {
+struct DebugOnly : public Trait::TraitBase<ConcreteType, DebugOnly> {
   // TODO(benvanik): helper for eliding safely on ops that return values.
 
   static LogicalResult verifyTrait(Operation *op) { return success(); }

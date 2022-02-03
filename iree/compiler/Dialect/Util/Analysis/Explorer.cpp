@@ -424,7 +424,7 @@ TraversalResult Explorer::walkReturnOps(Operation *parentOp,
       for (auto &region : parentFuncOp->getRegions()) {
         for (auto &block : region) {
           auto *terminatorOp = block.getTerminator();
-          if (terminatorOp->hasTrait<OpTrait::ReturnLike>()) {
+          if (terminatorOp->hasTrait<Trait::ReturnLike>()) {
             LLVM_DEBUG({
               llvm::dbgs() << "  == emitting return-like op ";
               terminatorOp->print(llvm::dbgs(), asmState);
@@ -554,7 +554,7 @@ TraversalResult Explorer::walkOutgoingBranchOperandArguments(
 TraversalResult Explorer::walkDefiningOps(Value value, ResultWalkFn fn) {
   // Fast-path short-circuit for constants, which are like 25% of all IR.
   if (value.getDefiningOp() &&
-      value.getDefiningOp()->hasTrait<OpTrait::ConstantLike>()) {
+      value.getDefiningOp()->hasTrait<Trait::ConstantLike>()) {
     fn(value.cast<OpResult>());
     return TraversalResult::COMPLETE;
   }
@@ -988,7 +988,7 @@ TraversalResult Explorer::walkTransitiveUses(Value value, UseWalkFn fn) {
       }
 
       // If op is a return then we need to walk into the caller results.
-      if (ownerOp->hasTrait<OpTrait::ReturnLike>()) {
+      if (ownerOp->hasTrait<Trait::ReturnLike>()) {
         result |= traverseReturnOp(ownerOp, use.getOperandNumber());
       }
 

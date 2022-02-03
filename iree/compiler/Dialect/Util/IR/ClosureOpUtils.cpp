@@ -94,7 +94,7 @@ void eraseRegionResults(Region &region,
                         ArrayRef<unsigned> excludedResultIndices) {
   for (auto &block : region.getBlocks()) {
     auto *terminatorOp = block.getTerminator();
-    if (terminatorOp && terminatorOp->hasTrait<OpTrait::ReturnLike>()) {
+    if (terminatorOp && terminatorOp->hasTrait<Trait::ReturnLike>()) {
       llvm::SmallVector<Value, 4> newReturns;
       for (auto it : llvm::enumerate(terminatorOp->getOperands())) {
         if (!llvm::count(excludedResultIndices, it.index())) {

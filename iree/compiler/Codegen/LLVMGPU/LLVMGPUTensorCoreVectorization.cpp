@@ -97,7 +97,7 @@ static Optional<SmallVector<int64_t, 4>> getGPUTCNativeVectorSize(
     }
     return llvm::to_vector<4>(sliceType.getShape());
   }
-  if ((OpTrait::hasElementwiseMappableTraits(op) && op->getNumResults() == 1)) {
+  if ((Trait::hasElementwiseMappableTraits(op) && op->getNumResults() == 1)) {
     if (auto vecType = op->getResultTypes()[0].dyn_cast<VectorType>()) {
       SmallVector<int64_t, 4> nativeSize(vecType.getRank() - 2, 1);
       // Map elementwise ops to the output shape.

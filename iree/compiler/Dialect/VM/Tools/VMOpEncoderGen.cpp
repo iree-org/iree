@@ -47,7 +47,7 @@ bool emitEncodeFnDefs(const llvm::RecordKeeper &recordKeeper, raw_ostream &os) {
         op.getCppClassName());
 
     for (auto &pair : prefixOpcodes) {
-      std::string traitName = (StringRef("::mlir::OpTrait::IREE::VM::") +
+      std::string traitName = (StringRef("::mlir::Trait::IREE::VM::") +
                                pair.first.substr(strlen("Prefix")))
                                   .str();
       if (op.getTrait(traitName)) {

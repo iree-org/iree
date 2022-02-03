@@ -898,7 +898,7 @@ static void insertSerializationBarriers(Location loc, Block &block,
   SmallVector<Operation *> serialOps;
   for (auto &op : block) serialOps.push_back(&op);
   for (auto *op : serialOps) {
-    if (op->hasTrait<OpTrait::IsTerminator>()) continue;
+    if (op->hasTrait<Trait::IsTerminator>()) continue;
     builder.setInsertionPointAfter(op);
     builder.create<IREE::HAL::CommandBufferExecutionBarrierOp>(
         loc, commandBuffer, sourceStage, targetStage, flags);

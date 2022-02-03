@@ -15,7 +15,7 @@ namespace IREE {
 namespace VM {
 
 template <typename ConcreteType>
-class DebugOnly : public OpTrait::TraitBase<ConcreteType, DebugOnly> {
+class DebugOnly : public Trait::TraitBase<ConcreteType, DebugOnly> {
  public:
   static LogicalResult verifyTrait(Operation *op) {
     // TODO(benvanik): verify debug-only.
@@ -24,7 +24,7 @@ class DebugOnly : public OpTrait::TraitBase<ConcreteType, DebugOnly> {
 };
 
 template <typename ConcreteType>
-class FullBarrier : public OpTrait::TraitBase<ConcreteType, FullBarrier> {
+class FullBarrier : public Trait::TraitBase<ConcreteType, FullBarrier> {
  public:
   static LogicalResult verifyTrait(Operation *op) {
     // TODO(benvanik): verify full barrier.
@@ -33,7 +33,7 @@ class FullBarrier : public OpTrait::TraitBase<ConcreteType, FullBarrier> {
 };
 
 template <typename ConcreteType>
-class PseudoOp : public OpTrait::TraitBase<ConcreteType, PseudoOp> {
+class PseudoOp : public Trait::TraitBase<ConcreteType, PseudoOp> {
  public:
   static LogicalResult verifyTrait(Operation *op) {
     // TODO(benvanik): verify pseudo op (not serializable?).
@@ -42,7 +42,7 @@ class PseudoOp : public OpTrait::TraitBase<ConcreteType, PseudoOp> {
 };
 
 template <typename ConcreteType>
-class ExtI64 : public OpTrait::TraitBase<ConcreteType, ExtI64> {
+class ExtI64 : public Trait::TraitBase<ConcreteType, ExtI64> {
  public:
   static LogicalResult verifyTrait(Operation *op) {
     // TODO(benvanik): verify i64 ext is supported.
@@ -51,7 +51,7 @@ class ExtI64 : public OpTrait::TraitBase<ConcreteType, ExtI64> {
 };
 
 template <typename ConcreteType>
-class ExtF32 : public OpTrait::TraitBase<ConcreteType, ExtF32> {
+class ExtF32 : public Trait::TraitBase<ConcreteType, ExtF32> {
  public:
   static LogicalResult verifyTrait(Operation *op) {
     // TODO(benvanik): verify f32 ext is supported.
@@ -60,7 +60,7 @@ class ExtF32 : public OpTrait::TraitBase<ConcreteType, ExtF32> {
 };
 
 template <typename ConcreteType>
-class ExtF64 : public OpTrait::TraitBase<ConcreteType, ExtF64> {
+class ExtF64 : public Trait::TraitBase<ConcreteType, ExtF64> {
  public:
   static LogicalResult verifyTrait(Operation *op) {
     // TODO(benvanik): verify f64 ext is supported.

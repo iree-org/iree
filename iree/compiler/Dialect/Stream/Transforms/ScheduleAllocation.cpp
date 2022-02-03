@@ -656,7 +656,7 @@ static LogicalResult applyAsyncAllocations(Region &region,
   auto ops = llvm::to_vector<4>(llvm::map_range(
       llvm::reverse(block), [&](Operation &op) { return &op; }));
   for (auto *op : ops) {
-    if (op->hasTrait<OpTrait::IsTerminator>()) continue;
+    if (op->hasTrait<Trait::IsTerminator>()) continue;
     if (failed(TypeSwitch<Operation *, LogicalResult>(op)
                    .Case([&](IREE::Stream::ResourceSubviewOp op) {
                      return applyResourceSubviewOp(op, scope, OpBuilder(op));
