@@ -21,6 +21,7 @@ cc_library(
     ],
     deps = [
         "//iree/compiler/Dialect/HAL/IR",
+        "//iree/compiler/Utils",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:StandardOps",
