@@ -203,7 +203,7 @@ limits, etc. So the target triple is just an approximation for usage.
 [python-bindings]: ../bindings/python.md
 [spirv]: https://www.khronos.org/registry/spir-v/
 [tf-hub-mobilenetv2]: https://tfhub.dev/google/tf2-preview/mobilenet_v2/classification
-[tf-import]: ../ml-frameworks/tensorflow.md
-[tflite-import]: ../ml-frameworks/tensorflow-lite.md
+[tf-import]: ../getting-started/tensorflow.md
+[tflite-import]: ../getting-started/tensorflow-lite.md
 [vulkan]: https://www.khronos.org/vulkan/
 [vulkan-sdk]: https://vulkan.lunarg.com/sdk/home/

@@ -196,7 +196,7 @@ concrete values.
 [pypi]: https://pypi.org/user/google-iree-pypi-deploy/
 [python-bindings]: ../bindings/python.md
 [tf-hub-mobilenetv2]: https://tfhub.dev/google/tf2-preview/mobilenet_v2/classification
-[tf-import]: ../ml-frameworks/tensorflow.md
-[tflite-import]: ../ml-frameworks/tensorflow-lite.md
+[tf-import]: ../getting-started/tensorflow.md
+[tflite-import]: ../getting-started/tensorflow-lite.md
 [cuda-toolkit]: https://developer.nvidia.com/cuda-downloads
 [rocm-toolkit]: https://rocmdocs.amd.com/en/latest/Installation_Guide/Installation_new.html

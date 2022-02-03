@@ -94,11 +94,11 @@ markdown_extensions:
 # Note: may include external links and titles are optional for internal links
 nav:
   - Home: 'index.md'
-  - 'ML frameworks':
-      - 'ml-frameworks/index.md'
-      - TensorFlow: 'ml-frameworks/tensorflow.md'
-      - TensorFlow Lite: 'ml-frameworks/tensorflow-lite.md'
-      - JAX: 'ml-frameworks/jax.md'
+  - 'Getting Started':
+      - 'getting-started/index.md'
+      - TensorFlow: 'getting-started/tensorflow.md'
+      - TensorFlow Lite: 'getting-started/tflite.md'
+      - JAX: 'getting-started/jax.md'
   - 'Deployment configurations':
       - 'deployment-configurations/index.md'
       - CPU - Dylib: 'deployment-configurations/cpu-dylib.md'

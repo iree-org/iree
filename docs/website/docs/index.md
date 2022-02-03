@@ -64,12 +64,14 @@ like [SPIR-V](https://www.khronos.org/spir/).
 
 ## Workflow overview
 
-Using IREE involves these general steps:
+Specific examples outlining IREE's workflow can be found in the
+[User Getting Started Guide](./getting-started/index.md). Using IREE involves the following
+general steps:
 
 1. **Import your model**
 
-    Work in your [framework of choice](./ml-frameworks), then run your model
-    through one of IREE's import tools.
+    Develop your program using one of the [supported frameworks](./getting-started/#supported-frameworks), then run your model
+    using one of IREE's import tools.
 
 2. **Select your [deployment configuration](./deployment-configurations)**
 
@@ -89,9 +91,9 @@ Using IREE involves these general steps:
 IREE supports importing models from a growing list of ML frameworks and model
 formats:
 
-* [TensorFlow](ml-frameworks/tensorflow.md)
-* [TensorFlow Lite](ml-frameworks/tensorflow-lite.md)
-* [JAX](ml-frameworks/jax.md)
+* [TensorFlow](getting-started/tensorflow.md)
+* [TensorFlow Lite](getting-started/tflite.md)
+* [JAX](getting-started/jax.md)
 
 ### Selecting deployment configurations
 
