@@ -347,9 +347,6 @@ createSPIRVTileAndVectorizeToCooperativeOpsPass();
 /// cooperative matrix ops when possible.
 std::unique_ptr<OperationPass<FuncOp>> createSPIRVVectorToCooperativeOpsPass();
 
-/// Pass to lower linalg.copy for copying data to workgroup memory.
-std::unique_ptr<OperationPass<FuncOp>> createSPIRVCopyToWorkgroupMemoryPass();
-
 /// Pass to tile Linalg ops with tensor semantics to invocations.
 std::unique_ptr<OperationPass<FuncOp>> createSPIRVTilePass();
 
