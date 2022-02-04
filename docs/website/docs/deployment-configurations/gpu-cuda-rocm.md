@@ -1,6 +1,9 @@
-# CUDA and ROCM GPU HAL Driver
+# CUDA and ROCm GPU HAL Driver
 
-IREE can accelerate model execution on NVIDIA GPUs using CUDA and on AMD GPUs using ROCm. Due to the similarity of CUDA and ROCm APIs and infrastructure, the CUDA and ROCm backends share much of their implementation in IREE. The IREE compiler uses a similar GPU code generation pipeline for each, but generates PTX for CUDA and hsaco for ROCm. The IREE runtime HAL driver for ROCm mirrors the one for CUDA, except for the command graph - where CUDA has "direct", "stream", and "graph" command buffers, and ROCM has only "direct" command buffers.
+IREE can accelerate model execution on NVIDIA GPUs using CUDA and on AMD GPUs using ROCm. Due to the similarity of CUDA and ROCm APIs and infrastructure, the CUDA and ROCm backends share much of their implementation in IREE:
+
+* The IREE compiler uses a similar GPU code generation pipeline for each, but generates PTX for CUDA and hsaco for ROCm
+* The IREE runtime HAL driver for ROCm mirrors the one for CUDA, except for command buffers implementations - where CUDA has "direct", "stream", and "graph" command buffers, and ROCm has only "direct" command buffers
 
 ## Prerequisites
 
@@ -25,34 +28,21 @@ environment. It can be verified by the following steps:
     rocm-smi | grep rocm
     ```
 
-    If `rocm-smi` does not exist, you will need to [install the latest ROCM Toolkit SDK][rocm-toolkit].
+    If `rocm-smi` does not exist, you will need to [install the latest ROCm Toolkit SDK][rocm-toolkit].
 
 ## Get runtime and compiler
 
-### Get IREE runtime with CUDA HAL driver
+### Get IREE runtime
 
-Next you will need to get an IREE runtime that supports the CUDA HAL driver
-so it can execute the model on GPU via CUDA for Nvidia. Or the ROCM HAL driver to execute models on AMD hardware
+Next you will need to get an IREE runtime that includes the CUDA (for Nvidia
+hardware) or ROCm (for AMD hardware) HAL driver.
 
 #### Build runtime from source
+
 Please make sure you have followed the [Getting started][get-started] page
-to build IREE for Linux/Windows.
-
-=== "Nvidia/CUDA"
-
-    The CUDA HAL driver is compiled in by default on non-Apple
-    platforms.
-
-    Ensure that the `IREE_HAL_DRIVER_CUDA` CMake option is `ON` when configuring
-    for the target.
-
-=== "AMD/ROCm"
-
-    Currently our support for ROCm/AMD hardware is still experimental. To enable it add:
-    ```
-    -DIREE_HAL_DRIVER_EXPERIMENTAL_ROCM=ON
-    ```
-    to the cmake build command.
+to build IREE from source, then enable the CUDA HAL driver with the
+`IREE_HAL_DRIVER_CUDA` option or the experimental ROCm HAL driver with the
+`IREE_HAL_DRIVER_EXPERIMENTAL_ROCM` option.
 
 #### Download as Python package
 
@@ -78,24 +68,13 @@ to build IREE for Linux/Windows.
 #### Build compiler from source
 
 Please make sure you have followed the [Getting started][get-started] page
-to build IREE for Linux/Windows and the [Android cross-compilation][android-cc]
-page for Android. The CUDA compiler backend and ROCM compiler backend is compiled in by default on all
-platforms.
-
-=== "Nvidia/CUDA"
-
-    Ensure that the `IREE_TARGET_BACKEND_CUDA` CMake option is `ON` when
-    configuring for the host.
-
-=== "AMD/ROCM"
-
-    Ensure that the `IREE_TARGET_BACKEND_ROCM` CMake option is `ON` when
-    configuring for the host.
+to build the IREE compiler, then enable the CUDA compiler target with the
+`IREE_TARGET_BACKEND_CUDA` option or the ROCm compiler target with the
+`IREE_TARGET_BACKEND_ROCM` option.
 
 ## Compile and run the model
 
-With the compiler and runtime for CUDA ready, we can now compile a model
-and run it on the GPU.
+With the compiler and runtime ready, we can now compile a model and run it on the GPU.
 
 ### Compile the model
 
@@ -135,7 +114,7 @@ IREE's TensorFlow importer. We can now compile them for each GPU by running the 
     Nvidia V100 | `sm_70`
     Nvidia A100 | `sm_80`
 
-=== "AMD/ROCM"
+=== "AMD/ROCm"
 
     ``` shell hl_lines="3-6"
     iree/tools/iree-translate \
@@ -149,7 +128,7 @@ IREE's TensorFlow importer. We can now compile them for each GPU by running the 
 
     Note ROCm Bitcode Dir(`iree-rocm-bc-dir`) path is required. If the system you are compiling IREE in has ROCm installed, then the default value of `/opt/rocm/amdgcn/bitcode` will usually suffice. If you intend on building ROCm compiler in a non-ROCm capable system, please set `iree-rocm-bc-dir` to the absolute path where you might have saved the amdgcn bitcode.
 
-    Note that a rocm target chip(`iree-rocm-target-chip`) of the form `gfx<arch_number>` is needed
+    Note that a ROCm target chip(`iree-rocm-target-chip`) of the form `gfx<arch_number>` is needed
     to compile towards each GPU architecture. If no architecture is specified then we will default to `gfx908`
     Here are a table of commonly used architecture
 
@@ -176,7 +155,7 @@ In the build directory, run the following command:
         --function_input="1x224x224x3xf32=0"
     ```
 
-=== "AMD/ROCM"
+=== "AMD/ROCm"
 
     ``` shell hl_lines="2"
     iree/tools/iree-run-module \
