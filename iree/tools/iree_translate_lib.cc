@@ -107,7 +107,8 @@ int mlir::iree_compiler::runIreeTranslateMain(int argc, char **argv) {
   // flag above then there is an error reported per possible translation rather
   // than single one, so check explicitly instead.
   if (!translationRequested) {
-    llvm::errs() << "Translation to perform option: must be specified at least once!\n";
+    llvm::errs()
+        << "Translation to perform option: must be specified at least once!\n";
     return 1;
   }
 
