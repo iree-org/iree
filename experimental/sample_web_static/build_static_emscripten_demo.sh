@@ -67,6 +67,7 @@ pushd ${ROOT_DIR?}/build-emscripten
 # Note: The sample creates a task device directly, so no drivers are required,
 #       but some targets are gated on specific CMake options.
 emcmake "${CMAKE_BIN?}" -G Ninja .. \
+  -DCMAKE_BUILD_TYPE=RelWithDebInfo \
   -DIREE_HOST_BINARY_ROOT=$PWD/../build-host/install \
   -DIREE_BUILD_EXPERIMENTAL_WEB_SAMPLES=ON \
   -DIREE_HAL_DRIVER_DEFAULTS=OFF \
@@ -83,20 +84,14 @@ popd
 # Serve the demo using a local webserver                                      #
 ###############################################################################
 
-echo "=== Copying static files (index.html) to the build directory ==="
+echo "=== Copying static files to the build directory ==="
 
 cp ${ROOT_DIR?}/experimental/sample_web_static/index.html ${BINARY_DIR}
 
-echo "=== Running local webserver ==="
-echo "    open at http://localhost:8000/build-emscripten/experimental/sample_web_static/"
+EASELJS_LIBRARY=${BINARY_DIR}/easeljs.min.js
+test -f ${EASELJS_LIBRARY} || \
+    wget https://code.createjs.com/1.0.0/easeljs.min.js -O ${EASELJS_LIBRARY}
 
-# **Note**: this serves from the root so source maps can reference code in the
-# source tree. A real deployment would bundle the output artifacts and serve
-# them from a build/release directory.
+echo "=== Running local webserver, open at http://localhost:8000/ ==="
 
-# local_server.py is needed when using SharedArrayBuffer, with multithreading
-# python3 local_server.py --directory ${ROOT_DIR?}
-
-# http.server on its own is fine for single threaded use, and this doesn't
-# break CORS for external resources like easeljs from a CDN
-python3 -m http.server --directory ${ROOT_DIR?}
+python3 ${ROOT_DIR?}/scripts/local_web_server.py --directory ${BINARY_DIR}
