@@ -34,7 +34,7 @@ quantization, along with dynamic shape support.
 ## Examples
 
 TFLite with IREE is available in Python and Java.  We have a
-[colab notebook](https://colab.sandbox.google.com/github/google/iree/blob/main/colab/tflite_text_classification.ipynb)
+[colab notebook](https://colab.research.google.com/github/google/iree/blob/main/colab/tflite_text_classification.ipynb)
 that shows how to use IREE’s python bindings and TFLite compiler tools to
 compile a pre-trained TFLite model from a flatbuffer and run using IREE.  We
 also have an
