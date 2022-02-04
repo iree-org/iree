@@ -57,6 +57,8 @@ CMAKE_BUILD_DIR="$HOME/iree/build/tf"
 # TODO(gcmn): It would be nice to be able to build and test as much as possible,
 # so a build failure only prevents building/testing things that depend on it and
 # we can still run the other tests.
+# TODO: Add "-DIREE_TARGET_BACKEND_CUDA=ON -DIREE_HAL_DRIVER_CUDA=ON" once the
+# VMs have been updated with the correct CUDA SDK.
 echo "Configuring CMake"
 "${CMAKE_BIN}" -B "${CMAKE_BUILD_DIR?}" -G Ninja \
    -DIREE_TF_TOOLS_ROOT="${BAZEL_BINDIR?}/iree_tf_compiler/" \

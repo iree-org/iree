@@ -12,6 +12,24 @@ iree_add_all_subdirs()
 
 iree_check_single_backend_test_suite(
   NAME
+    check_cuda
+  SRCS
+    "reverse.mlir"
+    "scan.mlir"
+  TARGET_BACKEND
+    "cuda"
+  DRIVER
+    "cuda"
+  LABELS
+    "noasan"
+    "nomsan"
+    "notsan"
+    "noubsan"
+    "requires-gpu-nvidia"
+)
+
+iree_check_single_backend_test_suite(
+  NAME
     check_dylib-llvm-aot_dylib
   SRCS
     "reverse.mlir"

@@ -51,30 +51,29 @@ iree_check_single_backend_test_suite(
     target_backend = "dylib-llvm-aot",
 )
 
-# Temporarily disabled pending build system changes.
-# iree_check_single_backend_test_suite(
-#     name = "check_cuda",
-#     srcs = enforce_glob(
-#         # keep sorted
-#         [
-#             "extract_slice.mlir",
-#             "tensor_insert_slice.mlir",
-#         ],
-#         include = ["*.mlir"],
-#         exclude = [
-#             "tensor_cast.mlir",
-#         ],
-#     ),
-#     driver = "cuda",
-#     tags = [
-#         "noasan",
-#         "nomsan",
-#         "notsan",
-#         "noubsan",
-#         "requires-gpu-nvidia",
-#     ],
-#     target_backend = "cuda",
-# )
+iree_check_single_backend_test_suite(
+    name = "check_cuda",
+    srcs = enforce_glob(
+        # keep sorted
+        [
+            "extract_slice.mlir",
+            "tensor_insert_slice.mlir",
+        ],
+        include = ["*.mlir"],
+        exclude = [
+            "tensor_cast.mlir",
+        ],
+    ),
+    driver = "cuda",
+    tags = [
+        "noasan",
+        "nomsan",
+        "notsan",
+        "noubsan",
+        "requires-gpu-nvidia",
+    ],
+    target_backend = "cuda",
+)
 
 iree_check_single_backend_test_suite(
     name = "check_vulkan-spirv_vulkan",

@@ -273,7 +273,8 @@ endif()
     inline = True,
 )
 
-# Temporarily disabled pending build system changes.
+# Disabled because CUDA is not universally available and Bazel does not
+# support configurability in a reasonable or useful way.
 # iree_cmake_extra_content(
 #     content = """
 # if(${IREE_HAL_DRIVER_CUDA} AND (${IREE_TARGET_BACKEND_CUDA} OR DEFINED IREE_HOST_BINARY_ROOT))
@@ -310,14 +311,13 @@ endif()
 #     ],
 # )
 
-# Simple embedding is failing in the CI.
-# native_test(
-#     name = "simple_embedding_cuda_test",
-#     tags = [
-#         "driver=cuda",
-#     ],
-#     src = ":simple_embedding_cuda",
-# )
+# # native_test(
+# #     name = "simple_embedding_cuda_test",
+# #     src = ":simple_embedding_cuda",
+# #     tags = [
+# #         "driver=cuda",
+# #     ],
+# # )
 
 # iree_cmake_extra_content(
 #     content = """
