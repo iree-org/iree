@@ -12,8 +12,22 @@ import logging
 
 import numpy as np
 
-from .binding import HalDevice, HalElementType, VmContext, VmFunction, VmVariantList
+from .binding import (
+    BufferUsage,
+    HalBufferView,
+    HalDevice,
+    HalElementType,
+    MemoryType,
+    VmContext,
+    VmFunction,
+    VmVariantList,
+)
+
 from . import tracing
+from .array_interop import (
+    map_dtype_to_element_type,
+    DeviceArray,
+)
 
 __all__ = [
     "FunctionInvoker",
@@ -280,7 +294,13 @@ def _ndarray_to_vm(inv: Invocation, t: VmVariantList, x, desc):
     except KeyError:
       _raise_argument_error(inv, f"unrecognized dtype '{dtype_str}'")
     if dtype != x.dtype:
-      x = x.astype(dtype)
+      # TODO: If we got a DeviceArray in which triggers this implicit
+      # conversion, it will fault back to the host, be converted and
+      # then sent back. This is... not great.
+      # At least warning about it so we know it might be a problem.
+      logging.warn(
+          "Implicit dtype conversion of DeviceArray forces transfer to host")
+      x = np.asarray(x).astype(dtype)
     rank = desc[2]
     shape = desc[3:]
     ndarray_shape = x.shape
@@ -292,15 +312,37 @@ def _ndarray_to_vm(inv: Invocation, t: VmVariantList, x, desc):
         _raise_argument_error(
             inv, f"shape mismatch {ndarray_shape} vs {tuple(shape)}")
   actual_dtype = x.dtype
-  for match_dtype, element_type in DTYPE_TO_HAL_ELEMENT_TYPE:
-    if match_dtype == actual_dtype:
-      break
-  else:
+  element_type = map_dtype_to_element_type(actual_dtype)
+  if element_type is None:
     _raise_argument_error(inv, f"unsupported numpy dtype {x.dtype}")
-  t.push_buffer_view(inv.device, x, element_type)
+
+  if isinstance(x, DeviceArray):
+    # Already one of ours and did not get implicitly converted.
+    buffer_view = x._buffer_view
+  else:
+    # Not one of ours. Put it on the device.
+    buffer_view = inv.device.allocator.allocate_buffer_copy(
+        memory_type=IMPLICIT_BUFFER_ARG_MEMORY_TYPE,
+        allowed_usage=IMPLICIT_BUFFER_ARG_USAGE,
+        buffer=np.asarray(x),
+        element_type=element_type)
+
+  t.push_buffer_view(buffer_view)
 
 
+def _buffer_view_to_vm(inv: Invocation, t: VmVariantList, x, desc):
+  # BufferView is a low-level object and we do no validation here for it.
+  # The assumption is that it is coming from either an advanced use case
+  # or a systematic integration that knows what it is doing. The runtime
+  # will do necessary validation.
+  t.push_buffer_view(x)
+
+
+# Called in reflection mode when we know we want to coerce from something
+# 'ndarray' like (as defined by the reflection metadata).
 def _ndarray_like_to_vm(inv: Invocation, t: VmVariantList, x, desc):
+  if isinstance(x, HalBufferView):
+    return _buffer_view_to_vm(inv, t, x, desc)
   return _ndarray_to_vm(inv, t, np.asarray(x), desc)
 
 
@@ -322,6 +364,8 @@ PYTHON_TO_VM_CONVERTERS = {
     dict: _dict_to_vm,
     str: _str_to_vm,
     np.ndarray: _ndarray_to_vm,
+    HalBufferView: _buffer_view_to_vm,
+    DeviceArray: _ndarray_to_vm,
 }
 
 # VM to Python converters. All take:
@@ -337,14 +381,16 @@ def _vm_to_ndarray(inv: Invocation, vm_list: VmVariantList, vm_index: int,
   # The descriptor for an ndarray is like:
   #   ["ndarray", "<dtype>", <rank>, <dim>...]
   #   ex: ['ndarray', 'i32', 1, 25948]
-  x = vm_list.get_as_ndarray(vm_index)
+  buffer_view = vm_list.get_as_buffer_view(vm_index)
   dtype_str = desc[1]
   try:
     dtype = ABI_TYPE_TO_DTYPE[dtype_str]
   except KeyError:
     _raise_return_error(inv, f"unrecognized dtype '{dtype_str}'")
-  if dtype != x.dtype:
-    x = x.astype(dtype)
+  x = DeviceArray(inv.device,
+                  buffer_view,
+                  implicit_host_transfer=True,
+                  override_dtype=dtype)
   return x
 
 
@@ -425,24 +471,11 @@ ABI_TYPE_TO_DTYPE = {
     "i1": np.bool_,
 }
 
-# NOTE: Numpy dtypes are not hashable and exist in a hierarchy that should
-# be queried via isinstance checks. This should be done as a fallback but
-# this is a linear list for quick access to the most common. There may also
-# be a better way to do this.
-DTYPE_TO_HAL_ELEMENT_TYPE = (
-    (np.float32, HalElementType.FLOAT_32),
-    (np.float64, HalElementType.FLOAT_64),
-    (np.float16, HalElementType.FLOAT_16),
-    (np.int32, HalElementType.SINT_32),
-    (np.int64, HalElementType.SINT_64),
-    (np.int16, HalElementType.SINT_16),
-    (np.int8, HalElementType.SINT_8),
-    (np.uint32, HalElementType.UINT_32),
-    (np.uint64, HalElementType.UINT_64),
-    (np.uint16, HalElementType.UINT_16),
-    (np.uint8, HalElementType.UINT_8),
-    (np.bool_, HalElementType.BOOL_8),
-)
+# When we get an ndarray as an argument and are implicitly mapping it to a
+# buffer view, flags for doing so.
+IMPLICIT_BUFFER_ARG_MEMORY_TYPE = (MemoryType.DEVICE_LOCAL |
+                                   MemoryType.DEVICE_VISIBLE)
+IMPLICIT_BUFFER_ARG_USAGE = BufferUsage.ALL
 
 
 def _is_ndarray_descriptor(desc):
@@ -510,19 +543,14 @@ def _merge_python_sequence_to_vm(inv: Invocation, vm_list, py_list, descs):
   for py_value, desc in zip(py_list, descs):
     inv.current_arg = py_value
     inv.current_desc = desc
-    py_type = py_value.__class__
 
     # For ndarray, we want to be able to handle array-like, so check for that
     # explicitly (duck typed vs static typed).
     if _is_ndarray_descriptor(desc):
       converter = _ndarray_like_to_vm
     else:
-      try:
-        converter = PYTHON_TO_VM_CONVERTERS[py_type]
-      except KeyError:
-        _raise_argument_error(
-            inv, f"cannot map Python type to VM: {py_type}"
-            f" (for desc {desc})")
+      converter = _get_python_to_vm_converter(inv, py_value, desc)
+
     try:
       converter(inv, vm_list, py_value, desc)
     except ArgumentError:
@@ -530,6 +558,22 @@ def _merge_python_sequence_to_vm(inv: Invocation, vm_list, py_list, descs):
     except Exception as e:
       _raise_argument_error(inv, f"exception converting from Python type to VM",
                             e)
+
+
+def _get_python_to_vm_converter(inv: Invocation, py_value, desc):
+  py_type = py_value.__class__
+  converter = PYTHON_TO_VM_CONVERTERS.get(py_type)
+  if converter is not None:
+    return converter
+  # See if it supports the __array__ protocol and if so, pull it to
+  # the host and use the ndarray converter. This will create round-trips
+  # between frameworks but at least enables interop.
+  if hasattr(py_value, "__array__"):
+    return _ndarray_to_vm
+
+  _raise_argument_error(
+      inv, f"cannot map Python type to VM: {py_type}"
+      f" (for desc {desc})")
 
 
 def _extract_vm_sequence_to_python(inv: Invocation, vm_list, descs):
@@ -547,6 +591,13 @@ def _extract_vm_sequence_to_python(inv: Invocation, vm_list, descs):
     if desc is None:
       # Dynamic (non reflection mode).
       converted = vm_list.get_variant(vm_index)
+      # Special case: Upgrade HalBufferView to a DeviceArray. We do that here
+      # since this is higher level and it preserves layering. Note that
+      # the reflection case also does this conversion.
+      if isinstance(converted, HalBufferView):
+        converted = DeviceArray(inv.device,
+                                converted,
+                                implicit_host_transfer=True)
     else:
       # Known type descriptor.
       vm_type = desc if isinstance(desc, str) else desc[0]

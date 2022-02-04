@@ -99,7 +99,7 @@ iree_check_single_backend_test_suite(
     target_backend = "cuda",
 )
 
-# Run cuda tests using stream command buffer
+# # Run cuda tests using stream command buffer
 iree_check_single_backend_test_suite(
     name = "check_cuda_streams",
     srcs = enforce_glob(

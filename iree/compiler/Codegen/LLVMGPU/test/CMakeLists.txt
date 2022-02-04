@@ -24,8 +24,8 @@ iree_lit_test_suite(
     "rocdl_pipeline_test.mlir"
     "tensorcore_vectorization.mlir"
     "vectorization.mlir"
-  DATA
-    iree::tools::IreeFileCheck
+  TOOLS
+    FileCheck
     iree::tools::iree-opt
 )
 

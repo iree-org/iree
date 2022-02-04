@@ -1,4 +1,4 @@
-// RUN: iree-opt -iree-abi-wrap-entry-points -split-input-file %s | IreeFileCheck %s
+// RUN: iree-opt -iree-abi-wrap-entry-points -split-input-file %s | FileCheck %s
 
 // CHECK-LABEL: func @dynamicEntry(
 //  CHECK-SAME:   %[[ARG0:.+]]: !hal.buffer_view, %[[ARG1:.+]]: !hal.buffer_view

@@ -21,11 +21,10 @@ iree_cc_library(
     "LLVMCPUCheckIRBeforeLLVMConversion.cpp"
     "LLVMCPULowerExecutableTarget.cpp"
     "LLVMCPUSynchronizeSymbolVisibility.cpp"
-    "LLVMCPUTileAndVectorizeLinalgTensorOps.cpp"
     "LLVMCPUTileFuseAndVectorizeLinalgTensorOps.cpp"
     "LLVMCPUUnfuseFMAOps.cpp"
     "Passes.cpp"
-    "VectorContractToAArch64InlineAsmOp.cpp"
+    "VectorContractCustomKernels.cpp"
   DEPS
     IREELinalgExtDialect
     IREELinalgExtPasses
@@ -34,6 +33,8 @@ iree_cc_library(
     MLIRAnalysis
     MLIRArithmeticToLLVM
     MLIRArithmeticTransforms
+    MLIRArmNeon
+    MLIRArmNeon2dToIntr
     MLIRIR
     MLIRLLVMCommonConversion
     MLIRLLVMIR
@@ -50,6 +51,7 @@ iree_cc_library(
     MLIRReconcileUnrealizedCasts
     MLIRSCF
     MLIRSCFToStandard
+    MLIRSCFTransforms
     MLIRStandard
     MLIRStandardOpsTransforms
     MLIRStandardToLLVM
@@ -60,6 +62,7 @@ iree_cc_library(
     MLIRVector
     MLIRVectorToLLVM
     MLIRVectorToSCF
+    MLIRVectorTransforms
     iree::compiler::Codegen::Common
     iree::compiler::Codegen::Dialect::IREECodegenDialect
     iree::compiler::Codegen::PassHeaders
@@ -67,9 +70,12 @@ iree_cc_library(
     iree::compiler::Codegen::Transforms
     iree::compiler::Codegen::Utils
     iree::compiler::Dialect::Flow::IR
+    iree::compiler::Dialect::Flow::IR::PartitionableLoopsInterface
     iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::HAL::IR::HALDialect
+    iree::compiler::Dialect::HAL::Utils
     iree::compiler::Dialect::Util::IR
+    iree::compiler::Utils
   PUBLIC
 )
 

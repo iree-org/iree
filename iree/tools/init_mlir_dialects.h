@@ -13,6 +13,7 @@
 #define IREE_TOOLS_INIT_MLIR_DIALECTS_H_
 
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
+#include "mlir/Dialect/ArmNeon/ArmNeonDialect.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/GPU/GPUDialect.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
@@ -27,7 +28,7 @@
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Tensor/IR/TensorInferTypeOpInterfaceImpl.h"
 #include "mlir/Dialect/Tosa/IR/TosaOps.h"
-#include "mlir/Dialect/Vector/VectorOps.h"
+#include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/IR/Dialect.h"
 
 #ifdef IREE_HAVE_EMITC_DIALECT
@@ -49,6 +50,7 @@ inline void registerMlirDialects(DialectRegistry &registry) {
                   scf::SCFDialect,
                   quant::QuantizationDialect,
                   spirv::SPIRVDialect,
+                  arm_neon::ArmNeonDialect,
                   StandardOpsDialect,
                   mlir::arith::ArithmeticDialect,
                   vector::VectorDialect,

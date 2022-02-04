@@ -45,10 +45,10 @@ iree_bytecode_module(
   PUBLIC
 )
 
-iree_run_binary_test(
+iree_native_test(
   NAME
     "simple_embedding_vmvx_sync_test"
-  TEST_BINARY
+  SRC
     ::simple_embedding_vmvx_sync
 )
 
@@ -176,10 +176,10 @@ iree_bytecode_module(
   PUBLIC
 )
 
-iree_run_binary_test(
+iree_native_test(
   NAME
     "simple_embedding_embedded_sync_test"
-  TEST_BINARY
+  SRC
     ::simple_embedding_embedded_sync
 )
 
@@ -206,10 +206,10 @@ iree_cc_binary(
     iree::vm::bytecode_module
 )
 
-iree_run_binary_test(
+iree_native_test(
   NAME
     "simple_embedding_dylib_test"
-  TEST_BINARY
+  SRC
     ::simple_embedding_dylib
 )
 
@@ -250,55 +250,11 @@ iree_bytecode_module(
   PUBLIC
 )
 
-iree_run_binary_test(
+iree_native_test(
   NAME
     "simple_embedding_vulkan_test"
-  TEST_BINARY
-    ::simple_embedding_vulkan
-)
-
-endif()
-
-if(${IREE_HAL_DRIVER_CUDA} AND (${IREE_TARGET_BACKEND_CUDA} OR DEFINED IREE_HOST_BINARY_ROOT))
-
-iree_cc_binary(
-  NAME
-    simple_embedding_cuda
-  SRCS
-    "device_cuda.c"
-    "simple_embedding.c"
-  DEPS
-    ::simple_embedding_test_bytecode_module_cuda_c
-    iree::base
-    iree::hal
-    iree::hal::cuda::registration
-    iree::modules::hal
-    iree::vm
-    iree::vm::bytecode_module
-)
-
-iree_bytecode_module(
-  NAME
-    simple_embedding_test_bytecode_module_cuda
   SRC
-    "simple_embedding_test.mlir"
-  C_IDENTIFIER
-    "iree_samples_simple_embedding_test_module_cuda"
-  FLAGS
-    "-iree-input-type=mhlo"
-    "-iree-mlir-to-vm-bytecode-module"
-    "-iree-hal-target-backends=cuda"
-    "-iree-llvm-debug-symbols=false"
-  PUBLIC
-)
-
-iree_run_binary_test(
-  NAME
-    "simple_embedding_cuda_test"
-  LABELS
-    "driver=cuda"
-  TEST_BINARY
-    ::simple_embedding_cuda
+    ::simple_embedding_vulkan
 )
 
 endif()

@@ -105,4 +105,32 @@ iree_tablegen_doc(
     -gen-dialect-doc FlowDialect.md
 )
 
+iree_cc_library(
+  NAME
+    PartitionableLoopsInterface
+  HDRS
+    "PartitionableLoopsInterface.h"
+  TEXTUAL_HDRS
+    "PartitionableLoopsInterface.cpp.inc"
+    "PartitionableLoopsInterface.h.inc"
+  SRCS
+    "PartitionableLoopsInterface.cpp"
+  DEPS
+    ::PartitionableLoopsInterfaceGen
+    IREELinalgExtDialect
+    LLVMSupport
+    MLIRLinalg
+  PUBLIC
+)
+
+iree_tablegen_library(
+  NAME
+    PartitionableLoopsInterfaceGen
+  TD_FILE
+    "PartitionableLoopsInterface.td"
+  OUTS
+    -gen-op-interface-decls PartitionableLoopsInterface.h.inc
+    -gen-op-interface-defs PartitionableLoopsInterface.cpp.inc
+)
+
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

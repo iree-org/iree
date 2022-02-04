@@ -53,12 +53,14 @@ class LinkIREEPyDMRTLPass : public LinkIREEPyDMRTLBase<LinkIREEPyDMRTLPass> {
       // Parse from inline asm.
       auto owningOp = parseSourceString(*localSource.asmBlob, context);
       if (!owningOp) return failure();
-      rtlModule = std::make_shared<OwningModuleRef>(std::move(owningOp));
+      rtlModule = std::make_shared<mlir::OwningOpRef<mlir::ModuleOp>>(
+          std::move(owningOp));
     } else if (localSource.asmFilePath) {
       // Parse from a file.
       auto owningOp = parseSourceFile(*localSource.asmFilePath, context);
       if (!owningOp) return failure();
-      rtlModule = std::make_shared<OwningModuleRef>(std::move(owningOp));
+      rtlModule = std::make_shared<mlir::OwningOpRef<mlir::ModuleOp>>(
+          std::move(owningOp));
     } else {
       return emitError(UnknownLoc::get(context))
              << "pass " << getArgument()
@@ -198,7 +200,7 @@ class LinkIREEPyDMRTLPass : public LinkIREEPyDMRTLBase<LinkIREEPyDMRTLPass> {
   }
 
   // Really, this is the best option for this kind of thing.
-  std::shared_ptr<OwningModuleRef> rtlModule;
+  std::shared_ptr<mlir::OwningOpRef<mlir::ModuleOp>> rtlModule;
 
   // A SymbolTable for each sub module.
   SmallVector<SymbolTable> importModules;

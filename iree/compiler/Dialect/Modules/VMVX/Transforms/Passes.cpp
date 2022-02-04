@@ -28,6 +28,8 @@ namespace IREE {
 namespace VMVX {
 
 static void buildVectorVMVXTransformPassPipeline(OpPassManager &passManager) {
+  passManager.nest<ModuleOp>().nest<FuncOp>().addPass(
+      createTypePropagationPass());
   passManager.addPass(createLLVMCPULowerExecutableTargetPass());
 
   OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
@@ -46,16 +48,17 @@ static void buildVectorVMVXTransformPassPipeline(OpPassManager &passManager) {
   // Linalg -> SCF.
   nestedModulePM.addNestedPass<FuncOp>(
       IREE::LinalgExt::createLinalgExtToLoopsPass());
+  nestedModulePM.addNestedPass<FuncOp>(createMemrefCopyToLinalgPass());
   nestedModulePM.addNestedPass<FuncOp>(createConvertLinalgToLoopsPass());
   nestedModulePM.addNestedPass<FuncOp>(createCanonicalizerPass());
   nestedModulePM.addNestedPass<FuncOp>(createCSEPass());
   nestedModulePM.addNestedPass<FuncOp>(createConvertVectorToSCFPass());
   nestedModulePM.addNestedPass<FuncOp>(createCanonicalizerPass());
   nestedModulePM.addNestedPass<FuncOp>(arith::createArithmeticExpandOpsPass());
-  nestedModulePM.addNestedPass<FuncOp>(createStdExpandOpsPass());
+  nestedModulePM.addNestedPass<FuncOp>(memref::createExpandOpsPass());
 
   // Handle tensor-type constants.
-  nestedModulePM.addPass(createTensorConstantBufferizePass());
+  nestedModulePM.addPass(arith::createConstantBufferizePass());
   nestedModulePM.addPass(createFoldTensorExtractOpPass());
 
   // Flatten and cleanup memrefs.
@@ -63,7 +66,7 @@ static void buildVectorVMVXTransformPassPipeline(OpPassManager &passManager) {
   nestedModulePM.addPass(createCanonicalizerPass());
   nestedModulePM.addPass(createCSEPass());
   nestedModulePM.addPass(createFlattenMemRefSubspanPass());
-  nestedModulePM.addPass(createNormalizeMemRefsPass());
+  nestedModulePM.addPass(memref::createNormalizeMemRefsPass());
   nestedModulePM.addNestedPass<FuncOp>(createAffineScalarReplacementPass());
   nestedModulePM.addPass(createCanonicalizerPass());
 }

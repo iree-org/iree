@@ -6,20 +6,21 @@
 
 # Doesn't use bazel_to_cmake because of various special logic throughout.
 
-if(NOT "${IREE_TARGET_BACKEND_CUDA}")
+if(NOT IREE_TARGET_BACKEND_CUDA)
   return()
+endif()
+
+if(NOT IREE_CUDA_LIBDEVICE_PATH)
+  message(FATAL_ERROR "No IREE_CUDA_LIBDEVICE_PATH found (should have been set at top level)")
 endif()
 
 iree_add_all_subdirs()
 
-# TODO(#5893): iree_c_embed_data requires a relative path and we need it to be
-# here to keep the path consistent with bazel build file. Fix it by making cmake
-# target more flexible.
 iree_c_embed_data(
   NAME
     cuda_libdevice
   SRCS
-    "../../../../../../third_party/cuda/nvvm/libdevice/libdevice.10.bc"
+    "${IREE_CUDA_LIBDEVICE_PATH}"
   C_FILE_OUTPUT
     "libdevice.c"
   H_FILE_OUTPUT
@@ -62,5 +63,3 @@ iree_cc_library(
     iree::schemas::cuda_executable_def_c_fbs
   PUBLIC
 )
-
-### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

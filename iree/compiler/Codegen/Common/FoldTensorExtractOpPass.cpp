@@ -56,7 +56,7 @@ class FoldTensorExtractOpPass
 }  // namespace
 
 void FoldTensorExtractOpPass::runOnOperation() {
-  OwningRewritePatternList patterns(&getContext());
+  RewritePatternSet patterns(&getContext());
   populateWithGenerated(patterns);
   if (failed(applyPatternsAndFoldGreedily(getOperation(), std::move(patterns))))
     signalPassFailure();

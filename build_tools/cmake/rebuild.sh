@@ -50,5 +50,5 @@ CMAKE_ARGS=(
   "-DIREE_ENABLE_ASSERTIONS=ON"
 )
 
-"$CMAKE_BIN" "${CMAKE_ARGS[@]?}" ..
+"$CMAKE_BIN" "${CMAKE_ARGS[@]?}" "$@" ..
 "$CMAKE_BIN" --build .

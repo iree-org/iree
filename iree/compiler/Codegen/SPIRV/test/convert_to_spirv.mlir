@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -pass-pipeline='hal.executable(hal.executable.variant(builtin.module(iree-convert-to-spirv)))' %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -pass-pipeline='hal.executable(hal.executable.variant(builtin.module(iree-convert-to-spirv)))' %s | FileCheck %s
 
 #executable_layout = #hal.executable.layout<push_constants = 5, sets = [
   #hal.descriptor_set.layout<0, bindings = [

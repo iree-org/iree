@@ -16,8 +16,10 @@ iree_lit_test_suite(
   SRCS
     "annotate_dispatch_arguments.mlir"
     "convert_to_stream.mlir"
+    "dump_statistics.mlir"
     "elide_async_copies.mlir"
-    "encode_tensors.mlir"
+    "encode_device_tensors.mlir"
+    "encode_host_tensors.mlir"
     "fold_globals.mlir"
     "fold_uniform_operands.mlir"
     "fuse_dispatch_bindings.mlir"
@@ -35,8 +37,8 @@ iree_lit_test_suite(
     "schedule_concurrency.mlir"
     "schedule_execution.mlir"
     "specialize_dispatches.mlir"
-  DATA
-    iree::tools::IreeFileCheck
+  TOOLS
+    FileCheck
     iree::tools::iree-opt
 )
 

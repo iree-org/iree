@@ -28,6 +28,7 @@ iree_cc_library(
     "Passes.h.inc"
     "TypeConverter.h"
   SRCS
+    "CaptureDispatchDynamicDims.cpp"
     "CleanupNumericNarrowing.cpp"
     "ConvertConv2D1x1ToMatmulPass.cpp"
     "ConvertConv2DToImg2ColPass.cpp"
@@ -47,9 +48,9 @@ iree_cc_library(
     "PadTensorToSubTensorInsert.cpp"
     "PassDetail.h"
     "Passes.cpp"
-    "PromoteI1ToI8Pass.cpp"
     "StripAndSplatConstantVariables.cpp"
     "StripSignednessPass.cpp"
+    "TestPartitionableLoopsInterface.cpp"
     "TypeConverter.cpp"
     "VerifyInputLegality.cpp"
   DEPS
@@ -69,11 +70,13 @@ iree_cc_library(
     MLIRStandard
     MLIRSupport
     MLIRTensor
+    MLIRTensorUtils
     MLIRTosa
     MLIRTransformUtils
     MLIRTransforms
     iree::compiler::Dialect::Flow::Conversion::TensorToFlow
     iree::compiler::Dialect::Flow::IR
+    iree::compiler::Dialect::Flow::IR::PartitionableLoopsInterface
     iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::Util::Analysis
     iree::compiler::Dialect::Util::Analysis::Attributes

@@ -163,6 +163,8 @@ iree_benchmark_suite(
     "CPU-ARM64-v8A"
   TRANSLATION_FLAGS
     ${ANDROID_CPU_TRANSLATION_FLAGS}
+  BENCHMARK_TOOL
+    iree-benchmark-module
   DRIVER
     "dylib-sync"
 )
@@ -186,6 +188,8 @@ iree_benchmark_suite(
     "CPU-ARM64-v8A"
   TRANSLATION_FLAGS
     ${ANDROID_CPU_TRANSLATION_FLAGS}
+  BENCHMARK_TOOL
+    iree-benchmark-module
   DRIVER
     "dylib"
   RUNTIME_FLAGS
@@ -212,6 +216,8 @@ iree_benchmark_suite(
 #     "CPU-ARM64-v8A"
 #   TRANSLATION_FLAGS
 #     ${ANDROID_CPU_TRANSLATION_FLAGS}
+#   BENCHMARK_TOOL
+#     iree-benchmark-module
 #   DRIVER
 #     "dylib"
 #   RUNTIME_FLAGS
@@ -236,6 +242,8 @@ iree_benchmark_suite(
 #     "CPU-ARM64-v8A"
 #   TRANSLATION_FLAGS
 #     ${ANDROID_CPU_TRANSLATION_FLAGS}
+#   BENCHMARK_TOOL
+#     iree-benchmark-module
 #   DRIVER
 #     "dylib"
 #   RUNTIME_FLAGS
@@ -260,6 +268,8 @@ iree_benchmark_suite(
     "CPU-ARM64-v8A"
   TRANSLATION_FLAGS
     ${ANDROID_CPU_TRANSLATION_FLAGS}
+  BENCHMARK_TOOL
+    iree-benchmark-module
   DRIVER
     "dylib"
   RUNTIME_FLAGS
@@ -284,6 +294,8 @@ iree_benchmark_suite(
     "GPU-Adreno"
   TRANSLATION_FLAGS
     ${ANDROID_ADRENO_GPU_TRANSLATION_FLAGS}
+  BENCHMARK_TOOL
+    iree-benchmark-module
   DRIVER
     "vulkan"
 )
@@ -306,6 +318,8 @@ iree_benchmark_suite(
     "GPU-Mali-Valhall"
   TRANSLATION_FLAGS
     ${ANDROID_MALI_GPU_TRANSLATION_FLAGS}
+  BENCHMARK_TOOL
+    iree-benchmark-module
   DRIVER
     "vulkan"
 )
@@ -326,6 +340,8 @@ iree_benchmark_suite(
     # This isn't a special optimization flag. It's so we can reuse the same f32
     # model file. See comments on MOBILEBERT_FP16_MODULE
     "--iree-flow-demote-f32-to-f16"
+  BENCHMARK_TOOL
+    iree-benchmark-module
   DRIVER
     "vulkan"
 )
@@ -366,6 +382,8 @@ iree_benchmark_suite(
   TRANSLATION_FLAGS
     ${ANDROID_CPU_TRANSLATION_FLAGS}
     "--iree-llvm-loop-unrolling=true"
+  BENCHMARK_TOOL
+    iree-benchmark-module
   DRIVER
     "dylib-sync"
 )
@@ -393,6 +411,8 @@ iree_benchmark_suite(
   TRANSLATION_FLAGS
     ${ANDROID_CPU_TRANSLATION_FLAGS}
     "--iree-llvm-loop-unrolling=true"
+  BENCHMARK_TOOL
+    iree-benchmark-module
   DRIVER
     "dylib"
   RUNTIME_FLAGS
@@ -420,6 +440,8 @@ iree_benchmark_suite(
 #   TRANSLATION_FLAGS
 #     ${ANDROID_CPU_TRANSLATION_FLAGS}
 #     "--iree-llvm-loop-unrolling=true"
+#   BENCHMARK_TOOL
+#     iree-benchmark-module
 #   DRIVER
 #     "dylib"
 #   RUNTIME_FLAGS
@@ -445,6 +467,8 @@ iree_benchmark_suite(
 #   TRANSLATION_FLAGS
 #     ${ANDROID_CPU_TRANSLATION_FLAGS}
 #     "--iree-llvm-loop-unrolling=true"
+#   BENCHMARK_TOOL
+#     iree-benchmark-module
 #   DRIVER
 #     "dylib"
 #   RUNTIME_FLAGS
@@ -470,6 +494,8 @@ iree_benchmark_suite(
   TRANSLATION_FLAGS
     ${ANDROID_CPU_TRANSLATION_FLAGS}
     "--iree-llvm-loop-unrolling=true"
+  BENCHMARK_TOOL
+    iree-benchmark-module
   DRIVER
     "dylib"
   RUNTIME_FLAGS
@@ -495,6 +521,8 @@ iree_benchmark_suite(
     "CPU-ARM64-v8A"
   TRANSLATION_FLAGS
     "--iree-input-type=tosa"
+  BENCHMARK_TOOL
+    iree-benchmark-module
   DRIVER
     "vmvx"
   RUNTIME_FLAGS
@@ -521,6 +549,8 @@ iree_benchmark_suite(
   TRANSLATION_FLAGS
     ${ANDROID_ADRENO_GPU_TRANSLATION_FLAGS}
     "--iree-enable-fusion-with-reduction-ops"
+  BENCHMARK_TOOL
+    iree-benchmark-module
   DRIVER
     "vulkan"
 )
@@ -544,6 +574,8 @@ iree_benchmark_suite(
   TRANSLATION_FLAGS
     ${ANDROID_MALI_GPU_TRANSLATION_FLAGS}
     "--iree-enable-fusion-with-reduction-ops"
+  BENCHMARK_TOOL
+    iree-benchmark-module
   DRIVER
     "vulkan"
 )
@@ -563,6 +595,8 @@ iree_benchmark_suite(
     "--iree-flow-demote-f32-to-f16"
     "--iree-vulkan-target-triple=valhall-unknown-android11"
     "--iree-enable-fusion-with-reduction-ops"
+  BENCHMARK_TOOL
+    iree-benchmark-module
   DRIVER
     "vulkan"
 )
@@ -599,6 +633,8 @@ iree_benchmark_suite(
     ${ANDROID_ADRENO_GPU_TRANSLATION_FLAGS}
     "--iree-enable-fusion-with-reduction-ops"
     "--iree-hal-benchmark-dispatch-repeat-count=16"
+  BENCHMARK_TOOL
+    iree-benchmark-module
   DRIVER
     "vulkan"
   RUNTIME_FLAGS
@@ -625,6 +661,8 @@ iree_benchmark_suite(
     ${ANDROID_MALI_GPU_TRANSLATION_FLAGS}
     "--iree-enable-fusion-with-reduction-ops"
     "--iree-hal-benchmark-dispatch-repeat-count=32"
+  BENCHMARK_TOOL
+    iree-benchmark-module
   DRIVER
     "vulkan"
   RUNTIME_FLAGS
@@ -647,6 +685,8 @@ iree_benchmark_suite(
     "--iree-vulkan-target-triple=valhall-unknown-android11"
     "--iree-enable-fusion-with-reduction-ops"
     "--iree-hal-benchmark-dispatch-repeat-count=32"
+  BENCHMARK_TOOL
+    iree-benchmark-module
   DRIVER
     "vulkan"
   RUNTIME_FLAGS

@@ -127,6 +127,7 @@ void* iree_hal_cuda_buffer_host_pointer(iree_hal_buffer_t* base_buffer) {
 }
 
 static const iree_hal_buffer_vtable_t iree_hal_cuda_buffer_vtable = {
+    .recycle = iree_hal_buffer_recycle,
     .destroy = iree_hal_cuda_buffer_destroy,
     .map_range = iree_hal_cuda_buffer_map_range,
     .unmap_range = iree_hal_cuda_buffer_unmap_range,

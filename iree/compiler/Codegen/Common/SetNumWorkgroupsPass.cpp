@@ -99,7 +99,7 @@ void SetNumWorkgroupsPass::runOnOperation() {
 
     if (!currWorkloadPerWorkgroup.empty()) {
       // Fold hal.workgroup.size ops.
-      OwningRewritePatternList patterns(funcOp.getContext());
+      RewritePatternSet patterns(funcOp.getContext());
       patterns.insert<SetWorkgroupSizePattern>(funcOp.getContext(),
                                                currWorkloadPerWorkgroup);
       if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
@@ -145,7 +145,7 @@ void SetNumWorkgroupsPass::runOnOperation() {
   }
 
   // Apply post distribution canonicalization passes.
-  OwningRewritePatternList canonicalization(context);
+  RewritePatternSet canonicalization(context);
   AffineMinOp::getCanonicalizationPatterns(canonicalization, context);
   populateAffineMinSCFCanonicalizationPattern(canonicalization);
   IREE::Flow::populateFlowDispatchCanonicalizationPatterns(canonicalization,

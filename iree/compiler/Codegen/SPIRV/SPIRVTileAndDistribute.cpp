@@ -21,6 +21,7 @@
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Debug.h"
+#include "mlir/Dialect/Affine/LoopUtils.h"
 #include "mlir/Dialect/GPU/GPUDialect.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/Hoisting.h"
@@ -30,14 +31,13 @@
 #include "mlir/Dialect/SCF/SCF.h"
 #include "mlir/Dialect/SCF/Transforms.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
-#include "mlir/Dialect/Vector/VectorTransforms.h"
+#include "mlir/Dialect/Vector/Transforms/VectorTransforms.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/FoldUtils.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
-#include "mlir/Transforms/LoopUtils.h"
 
 #define DEBUG_TYPE "iree-spirv-tile-and-distribute"
 
@@ -53,14 +53,14 @@ namespace iree_compiler {
 static linalg::LinalgTransformationFilter getLinalgMatchAndReplaceMarker(
     ArrayRef<StringRef> matchMarkers, Optional<StringRef> replaceMarker,
     MLIRContext *context) {
-  SmallVector<Identifier, 2> matchIds;
+  SmallVector<StringAttr, 2> matchIds;
   matchIds.reserve(matchMarkers.size());
   for (StringRef marker : matchMarkers) {
-    matchIds.emplace_back(Identifier::get(marker, context));
+    matchIds.emplace_back(StringAttr::get(context, marker));
   }
 
-  Optional<Identifier> replaceId;
-  if (replaceMarker) replaceId = Identifier::get(*replaceMarker, context);
+  Optional<StringAttr> replaceId;
+  if (replaceMarker) replaceId = StringAttr::get(context, *replaceMarker);
 
   return linalg::LinalgTransformationFilter(matchIds, replaceId);
 }
@@ -100,12 +100,13 @@ static void populateTilingToInvocationPatterns(MLIRContext *context,
       getLinalgMatchAndReplaceMarker(matchMarkers, getVectorizeMarker(),
                                      context)
           .setMatchByDefault();
-  linalg::TilingPatterns<
-      linalg::CopyOp, linalg::Conv1DNwcWcfOp, linalg::Conv3DNdhwcDhwcfOp,
-      linalg::DepthwiseConv2DNhwcHwcmOp, linalg::FillOp, linalg::GenericOp,
-      linalg::PoolingNhwcMaxOp, linalg::PoolingNhwcMinOp,
-      linalg::PoolingNhwcSumOp>::insert(patterns, tilingOptions,
-                                        filterVectorized);
+  linalg::TilingPatterns<linalg::Conv1DNwcWcfOp, linalg::Conv3DNdhwcDhwcfOp,
+                         linalg::DepthwiseConv2DNhwcHwcmOp, linalg::FillOp,
+                         linalg::GenericOp, linalg::PoolingNhwcMaxOp,
+                         linalg::PoolingNhwcMinOp,
+                         linalg::PoolingNhwcSumOp>::insert(patterns,
+                                                           tilingOptions,
+                                                           filterVectorized);
 
   linalg::LinalgTransformationFilter filterTiled =
       getLinalgMatchAndReplaceMarker(matchMarkers, getTileReductionMarker(),

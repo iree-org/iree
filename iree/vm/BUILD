@@ -5,8 +5,8 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 load("//iree:build_defs.oss.bzl", "iree_cmake_extra_content")
-load("//iree/tools:compilation.bzl", "iree_bytecode_module")
-load("//build_tools/bazel:run_binary_test.bzl", "run_binary_test")
+load("//build_tools/bazel:iree_bytecode_module.bzl", "iree_bytecode_module")
+load("//build_tools/bazel:cc_binary_benchmark.bzl", "cc_binary_benchmark")
 # load("@llvm-project//mlir:tblgen.bzl", "gentbl_cc_library")
 
 package(
@@ -138,7 +138,7 @@ cc_library(
     ],
 )
 
-cc_test(
+cc_binary_benchmark(
     name = "native_module_benchmark",
     srcs = ["native_module_benchmark.cc"],
     deps = [
@@ -251,7 +251,7 @@ cc_test(
     ],
 )
 
-cc_binary(
+cc_binary_benchmark(
     name = "bytecode_module_benchmark",
     testonly = True,
     srcs = ["bytecode_module_benchmark.cc"],
@@ -266,12 +266,6 @@ cc_binary(
     ],
 )
 
-run_binary_test(
-    name = "bytecode_module_benchmark_test",
-    args = ["--benchmark_min_time=0"],
-    test_binary = ":bytecode_module_benchmark",
-)
-
 iree_bytecode_module(
     name = "bytecode_module_benchmark_module",
     testonly = True,
@@ -280,7 +274,7 @@ iree_bytecode_module(
     flags = ["-iree-vm-ir-to-bytecode-module"],
 )
 
-cc_test(
+cc_binary_benchmark(
     name = "bytecode_module_size_benchmark",
     srcs = ["bytecode_module_size_benchmark.cc"],
     deps = [

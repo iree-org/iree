@@ -22,6 +22,9 @@ ANDROID_ABI="$1"
 # Print the UTC time when set -x is on
 export PS4='[$(date -u "+%T %Z")] '
 
+echo "Initializing submodules"
+git submodule update --init --jobs 8 --depth 1
+
 ROOT_DIR="$(git rev-parse --show-toplevel)"
 
 CMAKE_BIN="${CMAKE_BIN:-$(which cmake)}"
@@ -35,9 +38,6 @@ python3 --version
 ninja --version
 echo "Android NDK path: $ANDROID_NDK"
 
-echo "Initializing submodules"
-./scripts/git/submodule_versions.py init
-
 cd "${ROOT_DIR}"
 
 # BUILD the iree-import-tflite binary for importing models to benchmark from
@@ -48,6 +48,8 @@ BAZEL_BINDIR="$(${BAZEL_CMD[@]} info bazel-bin)"
 "${BAZEL_CMD[@]}" build //iree_tf_compiler:iree-import-tflite \
       --config=generic_clang \
       --config=remote_cache_bazel_ci
+# So the benchmark build below can find the importer binaries that were built.
+export PATH="$PWD/bazel-bin/iree_tf_compiler:$PATH"
 
 # --------------------------------------------------------------------------- #
 # Build for the host.
@@ -70,8 +72,8 @@ cd build-host
   -DIREE_BUILD_COMPILER=ON \
   -DIREE_BUILD_TESTS=OFF \
   -DIREE_BUILD_BENCHMARKS=ON \
-  -DIREE_BUILD_TFLITE_COMPILER=ON \
   -DIREE_BUILD_SAMPLES=OFF
+
 "${CMAKE_BIN}" --build . --target install
 # Also make sure that we can generate artifacts for benchmarking on Android.
 "${CMAKE_BIN}" --build . --target iree-benchmark-suites

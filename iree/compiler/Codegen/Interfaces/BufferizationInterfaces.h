@@ -7,7 +7,8 @@
 #ifndef IREE_COMPILER_CODEGEN_INTERFACES_BUFFERIZATIONINTERFACES_H_
 #define IREE_COMPILER_CODEGEN_INTERFACES_BUFFERIZATIONINTERFACES_H_
 
-#include "mlir/Dialect/Linalg/ComprehensiveBufferize/ComprehensiveBufferize.h"
+#include "mlir/Dialect/Bufferization/Transforms/Bufferize.h"
+#include "mlir/Dialect/Bufferization/Transforms/OneShotAnalysis.h"
 #include "mlir/IR/Dialect.h"
 
 namespace mlir {
@@ -18,7 +19,7 @@ void registerBufferizationInterfaces(DialectRegistry &registry);
 
 // Method to add all the analysis passes for bufferization.
 void addPostAnalysisTransformations(
-    linalg::comprehensive_bufferize::BufferizationOptions &options);
+    bufferization::AnalysisBufferizationOptions &options);
 
 }  // namespace iree_compiler
 }  // namespace mlir

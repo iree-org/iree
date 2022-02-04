@@ -109,14 +109,6 @@ jobs:
           /tmp/git-clang-format "${GITHUB_BASE_REF?}" --binary=clang-format-9 --style=file
           git diff --exit-code
 
-  submodules:
-    runs-on: ubuntu-18.04
-    steps:
-      - name: Checking out repository
-        uses: actions/checkout@v2
-      - name: Checking submodules
-        run: ./scripts/git/submodule_versions.py check
-
   tabs:
     runs-on: ubuntu-18.04
     steps:
@@ -131,9 +123,10 @@ jobs:
   yamllint:
     runs-on: ubuntu-18.04
     steps:
-      - uses: actions/checkout@v2
-      - name: yaml-lint
-        uses: ibiqlik/action-yamllint@v1
-        with:
-          strict: true
-          file_or_dir: .github/**/*.yml build_tools/buildkite/**/*.yml
+      - name: Checking out repository
+        uses: actions/checkout@v2
+      - name: Fetching Base Branch
+        # We have to explicitly fetch the base branch as well
+        run: git fetch --no-tags --prune --depth=1 origin "${GITHUB_BASE_REF?}:${GITHUB_BASE_REF?}"
+      - name: yamllint
+        run: ./scripts/run_yamllint.sh

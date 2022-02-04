@@ -9,6 +9,11 @@
 
 include "mlir/Pass/PassBase.td"
 
+def CaptureDispatchDynamicDims : Pass<"iree-flow-capture-dispatch-dynamic-dims", ""> {
+  let summary = "Captures dynamic shape dimensions required by dispatch operands/results.";
+  let constructor = "mlir::iree_compiler::IREE::Flow::createCaptureDispatchDynamicDimsPass()";
+}
+
 def CleanupNumericNarrowing :
     Pass<"iree-flow-cleanup-numeric-narrowing", ""> {
   let summary = "Cleans up any numeric narrowing ops inserted by iree-flow-infer-numeric-narrowing";
@@ -104,12 +109,15 @@ def ConvertLinalgMatmulToMmt4D :
   let summary = "Convert linalg.matmul to linalg.mmt4d";
   let constructor = "mlir::iree_compiler::IREE::Flow::createConvertLinalgMatmulToMmt4DPass()";
   let options = [
-    Option<"M0", "M0", "int", /*default=*/"mlir::ShapedType::kDynamicSize",
-           "Specifies an explicit M-axis tile size, overriding the default heuristic.">,
-    Option<"K0", "K0", "int", /*default=*/"mlir::ShapedType::kDynamicSize",
-           "Specifies an explicit K-axis tile size, overriding the default heuristic.">,
-    Option<"N0", "N0", "int", /*default=*/"mlir::ShapedType::kDynamicSize",
-           "Specifies an explicit N-axis tile size, overriding the default heuristic.">,
+    Option<"arch", "arch", "std::string",
+           /*default=*/"",
+           "Target architecture, e.g. aarch64">,
+    Option<"features", "features", "std::string",
+           /*default=*/"",
+           "Additional CPU feature flags, e.g. +dotprod">,
+    Option<"enable_generic_slow", "enable_generic_slow", "bool",
+           /*default=*/"false",
+           "For tests only. Use mmt4d even for cases that are not expected to compile to efficient code by using some arbitrary generic tile shape.">,
   ];
 }
 
@@ -117,12 +125,6 @@ def PadTensorToSubTensorInsert :
     Pass<"iree-flow-pad-tensor-to-subtensor-insert", ""> {
   let summary = "Convert linalg.pad_tensor into linalg.fill + subtensor_insert";
   let constructor = "mlir::iree_compiler::IREE::Flow::createPadTensorToSubTensorInsertPass()";
-}
-
-def PromoteI1ToI8 :
-    Pass<"iree-flow-promote-i1-to-i8", "mlir::FuncOp"> {
-  let summary = "Legalizes i1 tensor constants to i8s";
-  let constructor = "mlir::iree_compiler::IREE::Flow::createPromoteI1ToI8Pass()";
 }
 
 def StripSignedness :

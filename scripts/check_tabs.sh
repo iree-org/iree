@@ -18,6 +18,8 @@ declare -a excluded_files_patterns=(
   "/third_party/"
   "^third_party/"
   "*Makefile*"
+  # Symlinks make grep upset
+  "^integrations/tensorflow/iree-dialects$"
 )
 
 # Join on |
@@ -26,6 +28,10 @@ excluded_files_pattern="$(IFS="|" ; echo "${excluded_files_patterns[*]?}")"
 readarray -t files < <(\
   (git diff --name-only --diff-filter=d "${BASE_REF}" || kill $$) \
     | grep -v -E "${excluded_files_pattern?}")
+
+if (( ${#files[@]} == 0 )); then
+  exit 0
+fi;
 
 diff="$(grep --with-filename --line-number --perl-regexp --binary-files=without-match '\t' "${files[@]}")"
 

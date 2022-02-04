@@ -1,4 +1,4 @@
-// RUN: iree-import-tflite iree_tf_compiler/test/TFL/add.tflite | IreeFileCheck %s
+// RUN: iree-import-tflite iree_tf_compiler/test/TFL/add.tflite | FileCheck %s
 
 //      CHECK: module {
 // CHECK-NEXT:   func @main(%arg0: tensor<1x8x8x3xf32>) -> tensor<1x8x8x3xf32> attributes {tf.entry_function = {inputs = "input", outputs = "output"}} {

@@ -9,8 +9,8 @@
 #include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
-#include "mlir/Dialect/Vector/VectorOps.h"
-#include "mlir/Dialect/Vector/VectorTransforms.h"
+#include "mlir/Dialect/Vector/IR/VectorOps.h"
+#include "mlir/Dialect/Vector/Transforms/VectorTransforms.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "mlir/Transforms/Passes.h"
 
@@ -24,9 +24,9 @@ namespace iree_compiler {
 static void populateVectorizationPatterns(RewritePatternSet &patterns) {
   linalg::LinalgVectorizationOptions opt;
   linalg::LinalgTransformationFilter f(
-      Identifier::get(getVectorizeMarker(), patterns.getContext()));
-  linalg::VectorizationPatterns<linalg::FillOp, linalg::CopyOp,
-                                linalg::GenericOp>::insert(patterns, opt, f);
+      StringAttr::get(patterns.getContext(), getVectorizeMarker()));
+  linalg::VectorizationPatterns<linalg::FillOp, linalg::GenericOp>::insert(
+      patterns, opt, f);
   patterns.add<linalg::LinalgVectorizationPattern>(
       patterns.getContext(), f.addOpFilter<linalg::ContractionOpInterface>(),
       opt);

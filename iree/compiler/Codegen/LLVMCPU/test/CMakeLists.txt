@@ -22,12 +22,12 @@ iree_lit_test_suite(
     "materialize_launch_configuration.mlir"
     "synchronize_symbol_visibility.mlir"
     "test_config_mmt4d.mlir"
-    "tile_and_vectorize.mlir"
     "tile_fuse_and_vectorize.mlir"
     "unfused_fma.mlir"
-    "vector_contract_to_aarch64_asm.mlir"
-  DATA
-    iree::tools::IreeFileCheck
+    "vector_contract_to_arm_asm.mlir"
+    "vector_contract_to_arm_intrinsics.mlir"
+  TOOLS
+    FileCheck
     iree::tools::iree-opt
 )
 

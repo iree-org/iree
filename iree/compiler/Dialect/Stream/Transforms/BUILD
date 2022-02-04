@@ -17,6 +17,7 @@ cc_library(
     srcs = [
         "AnnotateDispatchArguments.cpp",
         "ConvertToStream.cpp",
+        "DumpStatistics.cpp",
         "ElideAsyncCopies.cpp",
         "EncodeTensors.cpp",
         "FoldUniformOperands.cpp",

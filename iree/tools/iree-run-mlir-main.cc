@@ -16,7 +16,7 @@
 // executed functions will be printed to stdout for checking.
 //
 // Example input:
-// // RUN: iree-run-mlir %s | IreeFileCheck %s
+// // RUN: iree-run-mlir %s | FileCheck %s
 // // CHECK-LABEL: @foo
 // // CHECK: 1xf32: 2
 // func @foo() -> tensor<f32> {
@@ -194,7 +194,7 @@ Status PrepareModule(std::string target_backend,
   // Parse input MLIR module.
   llvm::SourceMgr source_mgr;
   source_mgr.AddNewSourceBuffer(std::move(file_buffer), llvm::SMLoc());
-  mlir::OwningModuleRef mlir_module =
+  mlir::OwningOpRef<mlir::ModuleOp> mlir_module =
       mlir::parseSourceFile(source_mgr, &context);
   if (!mlir_module) {
     return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,

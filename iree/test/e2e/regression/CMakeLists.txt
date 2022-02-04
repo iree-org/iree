@@ -20,8 +20,8 @@ iree_lit_test_suite(
     "scalar.mlir"
     "trace_dispatch_tensors.mlir"
     "unused_args.mlir"
-  DATA
-    iree::tools::IreeFileCheck
+  TOOLS
+    FileCheck
     iree::tools::iree-opt
     iree::tools::iree-run-mlir
     lld
@@ -172,12 +172,13 @@ iree_generated_trace_runner_test(
     iree_tools_iree-e2e-matmul-test
   TARGET_BACKENDS
     "dylib-llvm-aot"
-    "vmvx"
   DRIVERS
     "dylib"
-    "vmvx"
   OPT_FLAGS
-    "--iree-flow-convert-linalg-matmul-to-mmt4d=M0=8 K0=4 N0=8"
+    "--iree-flow-convert-linalg-matmul-to-mmt4d=enable_generic_slow #pass_options_variant#"
+  TARGET_CPU_FEATURES_VARIANTS
+    "default"
+    "aarch64:+dotprod"
 )
 
 iree_generated_trace_runner_test(
@@ -192,12 +193,12 @@ iree_generated_trace_runner_test(
     iree_tools_iree-e2e-matmul-test
   TARGET_BACKENDS
     "dylib-llvm-aot"
-    "vmvx"
   DRIVERS
     "dylib"
-    "vmvx"
   OPT_FLAGS
-    "--iree-flow-convert-linalg-matmul-to-mmt4d=M0=8 K0=1 N0=8"
+    "--iree-flow-convert-linalg-matmul-to-mmt4d=enable_generic_slow #pass_options_variant#"
+  TARGET_CPU_FEATURES_VARIANTS
+    "default"
 )
 
 iree_generated_trace_runner_test(
@@ -215,7 +216,10 @@ iree_generated_trace_runner_test(
   DRIVERS
     "dylib"
   OPT_FLAGS
-    "--iree-flow-convert-linalg-matmul-to-mmt4d=M0=8 K0=4 N0=8"
+    "--iree-flow-convert-linalg-matmul-to-mmt4d=enable_generic_slow #pass_options_variant#"
+  TARGET_CPU_FEATURES_VARIANTS
+    "default"
+    "aarch64:+dotprod"
 )
 
 iree_generated_trace_runner_test(
@@ -233,7 +237,54 @@ iree_generated_trace_runner_test(
   DRIVERS
     "dylib"
   OPT_FLAGS
-    "--iree-flow-convert-linalg-matmul-to-mmt4d=M0=8 K0=1 N0=8"
+    "--iree-flow-convert-linalg-matmul-to-mmt4d=enable_generic_slow #pass_options_variant#"
+  TARGET_CPU_FEATURES_VARIANTS
+    "default"
+)
+
+iree_generated_trace_runner_test(
+  NAME
+    e2e_matmul_mmt4d_i8_intrinsics_small
+  GENERATOR
+    "generate_e2e_matmul_tests.py"
+  GENERATOR_ARGS
+    "--lhs_rhs_type=i8"
+    "--shapes=small"
+  TRACE_RUNNER
+    iree_tools_iree-e2e-matmul-test
+  TARGET_BACKENDS
+    "dylib-llvm-aot"
+  DRIVERS
+    "dylib"
+  COMPILER_FLAGS
+    "--iree-codegen-mmt4d-use-intrinsics"
+  OPT_FLAGS
+    "--iree-flow-convert-linalg-matmul-to-mmt4d=enable_generic_slow #pass_options_variant#"
+  TARGET_CPU_FEATURES_VARIANTS
+    "default"
+    "aarch64:+dotprod"
+)
+
+iree_generated_trace_runner_test(
+  NAME
+    e2e_matmul_mmt4d_f32_intrinsics_small
+  GENERATOR
+    "generate_e2e_matmul_tests.py"
+  GENERATOR_ARGS
+    "--lhs_rhs_type=f32"
+    "--shapes=small"
+  TRACE_RUNNER
+    iree_tools_iree-e2e-matmul-test
+  TARGET_BACKENDS
+    "dylib-llvm-aot"
+  DRIVERS
+    "dylib"
+  COMPILER_FLAGS
+    "--iree-codegen-mmt4d-use-intrinsics"
+  OPT_FLAGS
+    "--iree-flow-convert-linalg-matmul-to-mmt4d=enable_generic_slow #pass_options_variant#"
+  TARGET_CPU_FEATURES_VARIANTS
+    "default"
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

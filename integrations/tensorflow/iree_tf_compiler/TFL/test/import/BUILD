@@ -4,8 +4,8 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-load("@iree//iree:lit_test.bzl", "iree_lit_test_suite")
-load("@iree//build_tools/bazel:enforce_glob.bzl", "enforce_glob")
+load("//build_tools/bazel:iree_lit_test.bzl", "iree_lit_test_suite")
+load("//build_tools/bazel:enforce_glob.bzl", "enforce_glob")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -22,15 +22,15 @@ iree_lit_test_suite(
         ],
         include = ["*.mlir"],
     ),
-    data = glob(["*.tflite"]) + [
-        "//iree_tf_compiler:iree-import-tflite",
-        "@iree//iree/tools:IreeFileCheck",
-    ],
-    driver = "@iree//iree/tools:run_lit.sh",
+    data = glob(["*.tflite"]),
     # TODO: These tests have never passed
     tags = [
         "manual",
         "nokokoro",
         "notap",
+    ],
+    tools = [
+        "//iree_tf_compiler:iree-import-tflite",
+        "@llvm-project//llvm:FileCheck",
     ],
 )

@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -pass-pipeline='hal.executable(hal.executable.variant(builtin.module(builtin.func(iree-spirv-tile-and-distribute, cse))))' %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -pass-pipeline='hal.executable(hal.executable.variant(builtin.module(builtin.func(iree-spirv-tile-and-distribute, cse))))' %s | FileCheck %s
 
 #config = #iree_codegen.lowering.config<tile_sizes = [[1, 0, 16], [1, 0, 1]], native_vector_size = []>
 #translation = #iree_codegen.translation.info<"SPIRVDistribute", workload_per_wg = [16, 1]>
@@ -33,7 +33,12 @@ hal.executable private @static_3d_sort  {
             %5 = memref.cast %4 : memref<1x32x16xi32, affine_map<(d0, d1, d2)[s0] -> (d0 * 4096 + s0 + d1 * 128 + d2)>> to memref<?x?x?xi32>
             %6 = memref.subview %1[%arg0, 0, %arg1] [1, 32, 16] [1, 1, 1] : memref<64x32x128xi32> to memref<1x32x16xi32, affine_map<(d0, d1, d2)[s0] -> (d0 * 4096 + s0 + d1 * 128 + d2)>>
             %7 = memref.cast %6 : memref<1x32x16xi32, affine_map<(d0, d1, d2)[s0] -> (d0 * 4096 + s0 + d1 * 128 + d2)>> to memref<?x32x?xi32, affine_map<(d0, d1, d2)[s0] -> (d0 * 4096 + s0 + d1 * 128 + d2)>>
-            linalg.copy(%5, %6) {lowering.config = #config} : memref<?x?x?xi32>, memref<1x32x16xi32, affine_map<(d0, d1, d2)[s0] -> (d0 * 4096 + s0 + d1 * 128 + d2)>>
+            linalg.generic {lowering.config = #config, indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1, d2)>], iterator_types = ["parallel", "parallel", "parallel"]}
+              ins(%5 : memref<?x?x?xi32>) 
+              outs(%6 : memref<1x32x16xi32, affine_map<(d0, d1, d2)[s0] -> (d0 * 4096 + s0 + d1 * 128 + d2)>>) {
+              ^bb0(%arg4: i32, %s: i32):  // no predecessors
+                linalg.yield %arg4 : i32
+            }
             iree_linalg_ext.sort dimension(1) {lowering.config = #config} outs(%7 : memref<?x32x?xi32, affine_map<(d0, d1, d2)[s0] -> (d0 * 4096 + s0 + d1 * 128 + d2)>>)  {
             ^bb0(%arg2: i32, %arg3: i32):  // no predecessors
               %8 = arith.cmpi slt, %arg2, %arg3 : i32
@@ -55,15 +60,15 @@ hal.executable private @static_3d_sort  {
 //       CHECK:     %[[WG_INPUT:.+]] = memref.subview %[[ARG0]]
 //       CHECK:     %[[WG_INPUT_CAST:.+]] = memref.cast %[[WG_INPUT]]
 //       CHECK:     %[[WG_OUTPUT:.+]] = memref.subview %[[ARG1]]
-//       CHECK:     %[[TID_X:.+]] = "gpu.thread_id"() {dimension = "x"}
-//       CHECK:     %[[DIM_X:.+]] = "gpu.block_dim"() {dimension = "x"}
-//       CHECK:     %[[TID_Y:.+]] = "gpu.thread_id"() {dimension = "y"}
-//       CHECK:     %[[DIM_Y:.+]] = "gpu.block_dim"() {dimension = "y"}
+//       CHECK:     %[[TID_X:.+]] = gpu.thread_id x
+//       CHECK:     %[[DIM_X:.+]] = gpu.block_dim x
+//       CHECK:     %[[TID_Y:.+]] = gpu.thread_id y
+//       CHECK:     %[[DIM_Y:.+]] = gpu.block_dim y
 //       CHECK:     scf.for %[[IV_Y:.+]] = %[[TID_Y]] to %{{.+}} step %[[DIM_Y]]
 //       CHECK:       scf.for %[[IV_X:.+]] = %[[TID_X]] to %{{.+}} step %[[DIM_X]]
 //       CHECK:         %[[COPY_SOURCE:.+]] = memref.subview %[[WG_INPUT_CAST]][%[[IV_Y]], 0, %[[IV_X]]]
 //       CHECK:         %[[COPY_DEST:.+]] = memref.subview %[[WG_OUTPUT]][%[[IV_Y]], 0, %[[IV_X]]]
-//       CHECK:         linalg.copy(%[[COPY_SOURCE]], %[[COPY_DEST]])
+//       CHECK:         linalg.generic {{.*}} ins(%[[COPY_SOURCE]] {{.*}} outs(%[[COPY_DEST]]
 //       CHECK:     scf.for %[[IV_Y:.+]] = %[[TID_Y]] to %{{.+}} step %[[DIM_Y]]
 //       CHECK:       scf.for %[[IV_X:.+]] = %[[TID_X]] to %{{.+}} step %[[DIM_X]]
 //       CHECK:         %[[COPY_DEST:.+]] = memref.subview %[[WG_OUTPUT]][%[[IV_Y]], 0, %[[IV_X]]]

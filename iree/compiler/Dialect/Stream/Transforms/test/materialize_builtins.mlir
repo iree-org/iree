@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -iree-stream-materialize-builtins %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -iree-stream-materialize-builtins %s | FileCheck %s
 
 // Tests expansion of the stream.builtin.splat.i64 op.
 

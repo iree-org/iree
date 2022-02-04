@@ -16,8 +16,8 @@ iree_lit_test_suite(
   SRCS
     "shape_ops.mlir"
     "structural_ops.mlir"
-  DATA
-    iree::tools::IreeFileCheck
+  TOOLS
+    FileCheck
     iree::tools::iree-opt
 )
 

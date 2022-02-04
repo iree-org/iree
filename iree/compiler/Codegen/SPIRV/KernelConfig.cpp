@@ -269,7 +269,10 @@ static LogicalResult setFftOpConfig(spirv::ResourceLimitsAttr limits,
 
   std::array<int64_t, 3> workgroupSize = {subgroupSize, 1, 1};
 
-  auto partitionedLoops = getPartitionedLoops(op);
+  auto interfaceOp = cast<IREE::Flow::PartitionableLoopsInterface>(*op);
+  auto partitionedLoops =
+      interfaceOp.getPartitionableLoops(kNumMaxParallelDims);
+
   unsigned loopDepth = partitionedLoops.back() + 1;
   SmallVector<int64_t> workgroupTileSize(loopDepth, 0);
 
@@ -301,7 +304,9 @@ static LogicalResult setDefaultOpConfig(spirv::ResourceLimitsAttr limits,
                                         Operation *op) {
   LLVM_DEBUG(llvm::dbgs() << "Using default config for op: " << *op << "\n");
   FuncOp funcOp = op->getParentOfType<FuncOp>();
-  auto partitionedLoops = getPartitionedLoops(op);
+  auto interfaceOp = cast<IREE::Flow::PartitionableLoopsInterface>(*op);
+  auto partitionedLoops =
+      interfaceOp.getPartitionableLoops(kNumMaxParallelDims);
 
   // Special case for not tiled ops.
   if (partitionedLoops.empty()) {
@@ -392,10 +397,6 @@ static LogicalResult setDefaultOpConfig(spirv::ResourceLimitsAttr limits,
   auto untiledResultShape = getUntiledResultShape(linalgOp, 0);
   bool vectorizable =
       !linalgOp.hasIndexSemantics() &&
-      // TODO: Skip vectorization for linalg.copy ops. Right now handling of
-      // it still goes through the old bufferization-first pipeline, while
-      // vectorization pipeline expects tensor-semantic ops.
-      !isa<linalg::CopyOp>(op) &&
       // Skip vectorization for non-minor identity inputs as it generates
       // vector.transfer_read ops with permutation maps that we currently
       // cannot lower.
@@ -425,15 +426,19 @@ static LogicalResult setDefaultOpConfig(spirv::ResourceLimitsAttr limits,
 
     // Scan from the innermost shape dimension and try to deduce the
     // configuration for the corresponding GPU workgroup dimension.
-    for (int shapeDim = loopDepth - 1, wgDim = 0; shapeDim >= 0; --shapeDim) {
+    for (auto p : llvm::zip(llvm::reverse(partitionedLoops), tiledLoopInfo)) {
+      int shapeDim = std::get<0>(p);
+      int wgDim = std::get<1>(p).processorDistributionDim;
       LLVM_DEBUG({
         llvm::dbgs() << "Remaining threads: " << numThreads << "\n";
         llvm::dbgs() << "Shape dim #" << shapeDim << "=";
         llvm::dbgs() << loopBounds[shapeDim] << "\n"
                      << "Workgroup dim #" << wgDim << "\n";
       });
-      // Skip dynamic/untiled/size-1 dimensions.
-      if (loopBounds[shapeDim] <= 1) continue;
+
+      // Skip untiled or dynamic dimensions.
+      // TODO: Skip size-1 dimensions in Flow level tiling and distribution.
+      if (loopBounds[shapeDim] <= 0) continue;
 
       // Try to find some power of two that can devide the current shape dim
       // size. This vector keeps the candidate tile sizes.
@@ -441,7 +446,9 @@ static LogicalResult setDefaultOpConfig(spirv::ResourceLimitsAttr limits,
 
       // For the inner most workgroup dim, try to see if we can have 4
       // elements per thread. This enables vectorization.
-      if (vectorizable && wgDim == 0) candidates.push_back(4 * numThreads);
+      if (vectorizable && wgDim == 0 && !lossFactor) {
+        candidates.push_back(4 * numThreads);
+      }
       // Try all power of two numbers upto the subgroup size.
       for (unsigned i = numThreads; i >= 1; i >>= 1) {
         candidates.push_back(i);
@@ -464,7 +471,7 @@ static LogicalResult setDefaultOpConfig(spirv::ResourceLimitsAttr limits,
         // Found a suitable candidate. Try to let each thread handle 4
         // elements if this is the workgroup x dimension.
         workgroupTileSizes[shapeDim] = candidate;
-        if (vectorizable && wgDim == 0 && candidate % 4 == 0) {
+        if (vectorizable && wgDim == 0 && !lossFactor && candidate % 4 == 0) {
           threadTileSizes[shapeDim] = 4;
           workgroupSize[wgDim++] = candidate / 4;
           assert(numThreads % (candidate / 4) == 0);
@@ -480,9 +487,8 @@ static LogicalResult setDefaultOpConfig(spirv::ResourceLimitsAttr limits,
         break;
       }
 
-      // Check if we have distributed all threads in this subgroup all used
-      // up all distribution dims.
-      if (numThreads == 1 || wgDim > 3) break;
+      // Stop if we have distributed all threads.
+      if (numThreads == 1) break;
     }
     return numThreads;
   };

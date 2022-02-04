@@ -37,6 +37,10 @@ IREE_FLAG(bool, trace_execution, false, "Traces VM execution to stderr.");
 
 IREE_FLAG(string, driver, "vmvx", "Backend driver to use.");
 
+IREE_FLAG(int32_t, print_max_element_count, 1024,
+          "Prints up to the maximum number of elements of output tensors, "
+          "eliding the remainder.");
+
 IREE_FLAG(bool, print_statistics, false,
           "Prints runtime statistics to stderr on exit.");
 
@@ -152,7 +156,9 @@ iree_status_t Run() {
                      iree_allocator_system()),
       "invoking function '%s'", function_name.c_str());
 
-  IREE_RETURN_IF_ERROR(PrintVariantList(outputs.get()), "printing results");
+  IREE_RETURN_IF_ERROR(
+      PrintVariantList(outputs.get(), (size_t)FLAG_print_max_element_count),
+      "printing results");
 
   inputs.reset();
   outputs.reset();

@@ -15,9 +15,10 @@ iree_lit_test_suite(
     lit
   SRCS
     "dispatch_ops.mlir"
+    "executable_ops.mlir"
     "tensor_ops.mlir"
-  DATA
-    iree::tools::IreeFileCheck
+  TOOLS
+    FileCheck
     iree::tools::iree-opt
 )
 

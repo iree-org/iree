@@ -21,7 +21,7 @@
 #include "mlir/Dialect/GPU/Passes.h"
 #include "mlir/Dialect/LLVMIR/ROCDLDialect.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
-#include "mlir/Dialect/Vector/VectorOps.h"
+#include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "mlir/Transforms/Passes.h"
 
@@ -51,7 +51,7 @@ struct ConvertToROCDLPass : public ConvertToROCDLBase<ConvertToROCDLPass> {
     // conversion pass.
     // Run Vector -> Vector transformations ahead of conversion to LLVM.
     {
-      OwningRewritePatternList patterns(&getContext());
+      RewritePatternSet patterns(&getContext());
       populateScalarizeMathOps(patterns);
       populateConvertSharedMemoryAllocOps(patterns);
       populateLowerHALInterfaceOp(patterns);
@@ -70,14 +70,14 @@ struct ConvertToROCDLPass : public ConvertToROCDLBase<ConvertToROCDLPass> {
       }
     }
     {
-      OwningRewritePatternList patterns(&getContext());
+      RewritePatternSet patterns(&getContext());
       populateGpuRewritePatterns(patterns);
       if (failed(applyPatternsAndFoldGreedily(m, std::move(patterns)))) {
         return signalPassFailure();
       }
     }
     {
-      OwningRewritePatternList llvmPatterns(&getContext());
+      RewritePatternSet llvmPatterns(&getContext());
       populateLLVMConversionPatterns(&getContext(), llvmPatterns, converter);
       populateMathToLLVMConversionPatterns(converter, llvmPatterns);
       populateMemRefToLLVMConversionPatterns(converter, llvmPatterns);

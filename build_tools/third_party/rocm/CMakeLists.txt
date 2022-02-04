@@ -3,7 +3,7 @@
 # Licensed under the Apache License v2.0 with LLVM Exceptions.
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
-if(NOT ${IREE_BUILD_EXPERIMENTAL_ROCM})
+if(NOT ${IREE_HAL_DRIVER_EXPERIMENTAL_ROCM})
   return()
 endif()
 

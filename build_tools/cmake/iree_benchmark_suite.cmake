@@ -69,13 +69,13 @@ function(iree_benchmark_suite)
     _RULE
     ""
     "DRIVER;TARGET_BACKEND;TARGET_ARCHITECTURE"
-    "BENCHMARK_MODES;MODULES;TRANSLATION_FLAGS;RUNTIME_FLAGS"
+    "BENCHMARK_MODES;BENCHMARK_TOOL;MODULES;TRANSLATION_FLAGS;RUNTIME_FLAGS"
   )
 
   iree_validate_required_arguments(
     _RULE
     "DRIVER;TARGET_BACKEND;TARGET_ARCHITECTURE"
-    "BENCHMARK_MODES;MODULES"
+    "BENCHMARK_MODES;BENCHMARK_TOOL;MODULES"
   )
 
   iree_package_name(PACKAGE_NAME)
@@ -133,9 +133,10 @@ function(iree_benchmark_suite)
 
     # If the source is a TFLite file, import it.
     if("${_MODULE_SOURCE}" MATCHES "\.tflite$")
-      if (NOT IREE_BUILD_TFLITE_COMPILER)
+      if (NOT IREE_IMPORT_TFLITE_PATH)
         message(SEND_ERROR "Benchmarks of ${_MODULE_SOURCE} require"
-                          " IREE_BUILD_TFLITE_COMPILER to be ON")
+                          " that iree-import-tflite be available "
+                          " (either on PATH or via IREE_IMPORT_TFLITE_PATH)")
       endif()
       set(_TFLITE_FILE "${_MODULE_SOURCE}")
       set(_MODULE_SOURCE "${_TFLITE_FILE}.mlir")
@@ -145,11 +146,10 @@ function(iree_benchmark_suite)
         add_custom_command(
           OUTPUT "${_MODULE_SOURCE}"
           COMMAND
-            "$<TARGET_FILE:integrations::tensorflow::iree_tf_compiler::iree-import-tflite>"
+            "${IREE_IMPORT_TFLITE_PATH}"
             "${_TFLITE_FILE}"
             "-o=${_MODULE_SOURCE}"
           DEPENDS
-            integrations::tensorflow::iree_tf_compiler::iree-import-tflite
             "${_TFLITE_FILE}"
           COMMENT "Importing TFLite file ${_TFLITE_FILE_BASENAME}"
         )
@@ -234,12 +234,13 @@ function(iree_benchmark_suite)
       endif()
       add_dependencies("${_FRIENDLY_TARGET_NAME}" "${_TRANSLATION_TARGET_NAME}")
 
-      # Finally create the command and target for the flagfile used to execute the
-      # generated artifacts.
-      set(_FLAGFILE_ARTIFACTS_DIR "${_ROOT_ARTIFACTS_DIR}/${_MODULE_DIR_NAME}/${_BENCHMARK_DIR_NAME}")
-      set(_FLAG_FILE "${_FLAGFILE_ARTIFACTS_DIR}/flagfile")
+      set(_RUN_SPEC_DIR "${_ROOT_ARTIFACTS_DIR}/${_MODULE_DIR_NAME}/${_BENCHMARK_DIR_NAME}")
+
+      # Create the command and target for the flagfile spec used to execute
+      # the generated artifacts.
+      set(_FLAG_FILE "${_RUN_SPEC_DIR}/flagfile")
       set(_ADDITIONAL_ARGS_CL "--additional_args=\"${_RULE_RUNTIME_FLAGS}\"")
-      file(RELATIVE_PATH _MODULE_FILE_FLAG "${_FLAGFILE_ARTIFACTS_DIR}" "${_VMFB_FILE}")
+      file(RELATIVE_PATH _MODULE_FILE_FLAG "${_RUN_SPEC_DIR}" "${_VMFB_FILE}")
       add_custom_command(
         OUTPUT "${_FLAG_FILE}"
         COMMAND
@@ -252,7 +253,7 @@ function(iree_benchmark_suite)
             -o "${_FLAG_FILE}"
         DEPENDS
           "${IREE_ROOT_DIR}/scripts/generate_flagfile.py"
-        WORKING_DIRECTORY "${_FLAGFILE_ARTIFACTS_DIR}"
+        WORKING_DIRECTORY "${_RUN_SPEC_DIR}"
         COMMENT "Generating ${_FLAG_FILE}"
       )
 
@@ -265,8 +266,36 @@ function(iree_benchmark_suite)
         DEPENDS "${_FLAG_FILE}"
       )
 
+      # Create the command and target for the toolfile spec used to execute
+      # the generated artifacts.
+      set(_TOOL_FILE "${_RUN_SPEC_DIR}/tool")
+      add_custom_command(
+        OUTPUT "${_TOOL_FILE}"
+        COMMAND ${CMAKE_COMMAND} -E echo ${_RULE_BENCHMARK_TOOL} > "${_TOOL_FILE}"
+        WORKING_DIRECTORY "${_RUN_SPEC_DIR}"
+        COMMENT "Generating ${_TOOL_FILE}"
+      )
+
+      set(_TOOLFILE_GEN_TARGET_NAME_LIST "iree-generate-benchmark-toolfile")
+      list(APPEND _TOOLFILE_GEN_TARGET_NAME_LIST ${_COMMON_NAME_SEGMENTS})
+      list(JOIN _TOOLFILE_GEN_TARGET_NAME_LIST "__" _TOOLFILE_GEN_TARGET_NAME)
+      add_custom_target("${_TOOLFILE_GEN_TARGET_NAME}"
+        DEPENDS "${_TOOL_FILE}"
+      )
+
+      # Generate a flagfile containing command-line options used to compile the
+      # generated artifacts.
+      set(_COMPOPT_FILE "${_RUN_SPEC_DIR}/compilation_flagfile")
+      string(REPLACE ";" "\n" IREE_BENCHMARK_COMPILATION_FLAGS "${_TRANSLATION_ARGS}")
+      configure_file(
+        ${PROJECT_SOURCE_DIR}/build_tools/cmake/benchmark_compilation_flagfile.in
+        ${_COMPOPT_FILE})
+
       # Mark dependency so that we have one target to drive them all.
-      add_dependencies(iree-benchmark-suites "${_FLAGFILE_GEN_TARGET_NAME}")
+      add_dependencies(iree-benchmark-suites
+        "${_FLAGFILE_GEN_TARGET_NAME}"
+        "${_TOOLFILE_GEN_TARGET_NAME}"
+      )
     endforeach(_BENCHMARK_MODE IN LISTS _RULE_BENCHMARK_MODES)
 
   endforeach(_MODULE IN LISTS _RULE_MODULES)

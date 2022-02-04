@@ -42,40 +42,24 @@ option(IREE_BUILD_DOCS "Builds IREE docs." OFF)
 option(IREE_BUILD_SAMPLES "Builds IREE sample projects." ON)
 option(IREE_BUILD_TRACY "Builds tracy server tools." OFF)
 
-option(IREE_BUILD_TENSORFLOW_ALL "Builds all TensorFlow compiler frontends." OFF)
-option(IREE_BUILD_TENSORFLOW_COMPILER "Builds TensorFlow compiler frontend." "${IREE_BUILD_TENSORFLOW_ALL}")
-option(IREE_BUILD_TFLITE_COMPILER "Builds the TFLite compiler frontend." "${IREE_BUILD_TENSORFLOW_ALL}")
-option(IREE_BUILD_XLA_COMPILER "Builds TensorFlow XLA compiler frontend." "${IREE_BUILD_TENSORFLOW_ALL}")
-
 # Properties controlling version and naming of release artifacts.
 set(IREE_RELEASE_PACKAGE_SUFFIX "" CACHE STRING "Suffix to append to distributed package names")
 set(IREE_RELEASE_VERSION "0.1a1" CACHE STRING "Version to embed in distributed packages")
 set(IREE_RELEASE_REVISION "HEAD" CACHE STRING "Version control revision information to embed in distributed packages")
 
-# Master enable for tensorflow build support.
-# Note that this is a normal CMake variable used to gate build features (not
-# a cache variable that is user-settable).
-set(IREE_ENABLE_TENSORFLOW OFF)
-if(${IREE_BUILD_TENSORFLOW_ALL} OR
-   ${IREE_BUILD_TENSORFLOW_COMPILER} OR
-   ${IREE_BUILD_TFLITE_COMPILER} OR
-   ${IREE_BUILD_XLA_COMPILER})
-  set(IREE_ENABLE_TENSORFLOW ON)
-endif()
-
 option(IREE_BUILD_BINDINGS_TFLITE "Builds the IREE TFLite C API compatibility shim" ON)
 option(IREE_BUILD_BINDINGS_TFLITE_JAVA "Builds the IREE TFLite Java bindings with the C API compatibility shim" ON)
 
 # Default python bindings to enabled for some features.
-option(IREE_BUILD_PYTHON_BINDINGS "Builds the IREE python bindings" "${IREE_ENABLE_TENSORFLOW}")
+option(IREE_BUILD_PYTHON_BINDINGS "Builds the IREE python bindings" OFF)
 
 #-------------------------------------------------------------------------------
 # Experimental project flags
 #-------------------------------------------------------------------------------
 
 option(IREE_BUILD_EXPERIMENTAL_REMOTING "Builds experimental remoting support." OFF)
-option(IREE_BUILD_EXPERIMENTAL_ROCM "Builds the experimental ROCm Backend." OFF)
-option(IREE_ENABLE_NEW_INTEGRATION_TESTS "Enables new integration tests and disables old." OFF)
+option(IREE_BUILD_EXPERIMENTAL_WEB_SAMPLES "Builds experimental web samples." OFF)
+option(IREE_HAL_DRIVER_EXPERIMENTAL_ROCM "Builds the experimental ROCm Backend." OFF)
 
 #-------------------------------------------------------------------------------
 # Derived flags based on primary options
@@ -90,12 +74,8 @@ cmake_dependent_option(IREE_ENABLE_EMITC "Enables MLIR EmitC dependencies." ON $
 option(IREE_HAL_DRIVER_DEFAULTS "Sets the default value for all runtime HAL drivers" ON)
 option(IREE_TARGET_BACKEND_DEFAULTS "Sets the default value for all compiler target backends" ${IREE_BUILD_COMPILER})
 
-# CUDA is not natively supported on Android or Apple platforms.
-if(ANDROID OR APPLE)
-  set(IREE_HAL_DRIVER_CUDA_DEFAULT OFF)
-else()
-  set(IREE_HAL_DRIVER_CUDA_DEFAULT ${IREE_HAL_DRIVER_DEFAULTS})
-endif()
+# CUDA support must be explicitly enabled.
+set(IREE_HAL_DRIVER_CUDA_DEFAULT OFF)
 
 # Vulkan is not natively supported on Apple platforms.
 # Metal should generally be used instead, though MoltenVK may also work.
@@ -112,7 +92,7 @@ option(IREE_HAL_DRIVER_VMVX "Enables the 'vmvx' runtime HAL driver" ${IREE_HAL_D
 option(IREE_HAL_DRIVER_VMVX_SYNC "Enables the 'vmvx-sync' runtime HAL driver" ${IREE_HAL_DRIVER_DEFAULTS})
 option(IREE_HAL_DRIVER_VULKAN "Enables the 'vulkan' runtime HAL driver" ${IREE_HAL_DRIVER_VULKAN_DEFAULT})
 
-cmake_dependent_option(IREE_TARGET_BACKEND_CUDA "Enables the 'cuda' compiler target backend" ON ${IREE_BUILD_COMPILER} OFF)
+cmake_dependent_option(IREE_TARGET_BACKEND_CUDA "Enables the 'cuda' compiler target backend" OFF ${IREE_BUILD_COMPILER} OFF)
 cmake_dependent_option(IREE_TARGET_BACKEND_DYLIB_LLVM_AOT "Enables the 'dylib-llvm-aot' compiler target backend" ON ${IREE_BUILD_COMPILER} OFF)
 cmake_dependent_option(IREE_TARGET_BACKEND_METAL_SPIRV "Enables the 'metal-spirv' compiler target backend" ON ${IREE_BUILD_COMPILER} OFF)
 cmake_dependent_option(IREE_TARGET_BACKEND_ROCM "Enables the 'rocm' compiler target backend" ON ${IREE_BUILD_COMPILER} OFF)
@@ -233,7 +213,8 @@ include(iree_lit_test)
 include(iree_add_all_subdirs)
 include(iree_check_test)
 include(iree_trace_runner_test)
-include(iree_run_binary_test)
+include(iree_native_test)
+include(iree_cc_binary_benchmark)
 include(iree_benchmark_suite)
 include(iree_hal_cts_test_suite)
 
@@ -287,6 +268,11 @@ if(IREE_BUILD_PYTHON_BINDINGS)
     )
     find_package(Python3 COMPONENTS Interpreter Development REQUIRED)
   else()
+    # Configuring the Development.Module is flaky in multi-project setups.
+    # "Bootstrapping" by first looking for the optional Development component
+    # seems to be robust generally.
+    # See: https://reviews.llvm.org/D118148
+    find_package(Python3 COMPONENTS Interpreter Development)
     find_package(Python3 COMPONENTS Interpreter Development.Module REQUIRED)
   endif()
 elseif(IREE_BUILD_COMPILER OR IREE_BUILD_TESTS)
@@ -331,6 +317,48 @@ if(IREE_ERROR_ON_MISSING_SUBMODULES AND Python3_FOUND AND Git_FOUND)
       set(IREE_GIT_SHORT_HASH "${SHORT_HASH}" CACHE STRING "" FORCE)
     endif()
   endif()
+endif()
+
+#-------------------------------------------------------------------------------
+# CUDA configuration for both the compiler and runtime.
+# We do this at the top level so that we can fail fast and make global
+# decisions that effect both compiler and runtime. It also helps with error
+# messaging to do this all in one place, since we can provide very targeted
+# advice.
+#-------------------------------------------------------------------------------
+
+set(IREE_CUDA_LIBDEVICE_PATH "" CACHE STRING "Absolute path to an appropriate libdevice.*.bc (needed to build the IREE cuda compiler target)")
+
+# If any CUDA features are being built, try to locate a CUDA SDK. We will fall
+# back to this as needed for specific features.
+if(IREE_TARGET_BACKEND_CUDA OR IREE_HAL_DRIVER_CUDA)
+  find_package(CUDAToolkit QUIET)
+endif()
+
+# If an explicit libdevice file was not specified, and the compiler backend
+# is being built, probe for one.
+if(IREE_TARGET_BACKEND_CUDA)
+  if(CUDAToolkit_FOUND AND CUDAToolkit_LIBRARY_ROOT)
+    # Note that the variable CUDAToolkit_LIBRARY_ROOT keys off of the presence
+    # of version.txt, which was changed to version.json in recent releases
+    # and thwarts the search.
+    set(IREE_CUDA_LIBDEVICE_PATH "${CUDAToolkit_LIBRARY_ROOT}/nvvm/libdevice/libdevice.10.bc")
+  elseif(CUDAToolkit_FOUND AND CUDAToolkit_BIN_DIR)
+    # Back-track from the bin dir as a fallback.
+    set(IREE_CUDA_LIBDEVICE_PATH "${CUDAToolkit_BIN_DIR}/../nvvm/libdevice/libdevice.10.bc")
+  else()
+    message(FATAL_ERROR "Building with IREE_TARGET_BACKEND_CUDA requires either a CUDA SDK (consult CMake docs for your version: https://cmake.org/cmake/help/latest/module/FindCUDAToolkit.html) or an explicit path to libdevice (set with -DIREE_CUDA_LIBDEVICE_PATH=/path/to/libdevice.10.bc)")
+  endif()
+
+  if(EXISTS "${IREE_CUDA_LIBDEVICE_PATH}")
+    message(STATUS "Using CUDA libdevice: ${IREE_CUDA_LIBDEVICE_PATH}")
+  else()
+    message(SEND_ERROR "Cannot find CUDA libdevice file (${IREE_CUDA_LIBDEVICE_PATH}). Either configure your CUDA SDK such that it can be found or specify explicitly via -DIREE_CUDA_LIBDEVICE_PATH=/path/to/libdevice.10.bc")
+  endif()
+endif()
+
+if(IREE_HAL_DRIVER_CUDA AND NOT CUDAToolkit_FOUND)
+  message(SEND_ERROR "Cannot build IREE runtime CUDA components (-DIREE_HAL_DRIVER_CUDA=ON) because a CUDA SDK was not found. Consult CMake docs for your version: https://cmake.org/cmake/help/latest/module/FindCUDAToolkit.html")
 endif()
 
 #-------------------------------------------------------------------------------
@@ -406,7 +434,6 @@ endif()
 include(external_cc_library)
 include(flatbuffer_c_library)
 
-add_subdirectory(build_tools/third_party/cuda EXCLUDE_FROM_ALL)
 add_subdirectory(build_tools/third_party/libyaml EXCLUDE_FROM_ALL)
 add_subdirectory(build_tools/third_party/stblib EXCLUDE_FROM_ALL)
 add_subdirectory(build_tools/third_party/vulkan_memory_allocator EXCLUDE_FROM_ALL)
@@ -500,10 +527,16 @@ add_subdirectory(iree/test)
 add_subdirectory(iree/vm)
 
 if(${IREE_BUILD_BENCHMARKS})
+  find_program(IREE_IMPORT_TFLITE_PATH iree-import-tflite)
+  if(IREE_IMPORT_TFLITE_PATH)
+    message(STATUS "Found ${IREE_IMPORT_TFLITE_PATH} to generate benchmark artifacts")
+  else()
+    message(STATUS "iree-import-tflite not found. Some benchmarks may not configure")
+  endif()
   add_subdirectory(benchmarks)
 endif()
 
-if(${IREE_BUILD_EXPERIMENTAL_ROCM})
+if(${IREE_HAL_DRIVER_EXPERIMENTAL_ROCM})
   add_subdirectory(build_tools/third_party/rocm EXCLUDE_FROM_ALL)
   add_subdirectory(experimental/rocm)
 endif()
@@ -549,8 +582,8 @@ if(${IREE_BUILD_EXPERIMENTAL_REMOTING})
   add_subdirectory(experimental/remoting)
 endif()
 
-if(${IREE_ENABLE_TENSORFLOW})
-  add_subdirectory(integrations/tensorflow)
+if(${IREE_BUILD_EXPERIMENTAL_WEB_SAMPLES})
+  add_subdirectory(experimental/sample_web_static)
 endif()
 
 set(IREE_PUBLIC_INCLUDE_DIRS "${IREE_COMMON_INCLUDE_DIRS}"

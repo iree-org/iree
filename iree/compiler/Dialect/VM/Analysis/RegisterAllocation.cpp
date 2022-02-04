@@ -115,7 +115,7 @@ struct RegisterUsage {
         rangeAvailable &= !intRegisters.test(ordinal);
       }
       if (rangeAvailable) {
-        return ordinalStart;
+        return static_cast<int>(ordinalStart);
       }
       ordinalStart = intRegisters.find_next_unset(ordinalEnd);
     }
@@ -124,7 +124,7 @@ struct RegisterUsage {
 
   Optional<Register> allocateRegister(Type type) {
     if (type.isIntOrFloat()) {
-      size_t byteWidth = type.getIntOrFloatBitWidth() / 8;
+      size_t byteWidth = IREE::Util::getRoundedElementByteWidth(type);
       auto ordinalStartOr = findFirstUnsetIntOrdinalSpan(byteWidth);
       if (!ordinalStartOr.hasValue()) {
         return llvm::None;

@@ -100,7 +100,7 @@ struct ConvertConv2D1x1ConvToMatmulPass
 
   void runOnOperation() override {
     MLIRContext *context = &getContext();
-    OwningRewritePatternList patterns(&getContext());
+    RewritePatternSet patterns(&getContext());
     patterns.insert<Convert1x1ConvolutionMatmulOp>(context);
     if (failed(applyPatternsAndFoldGreedily(getOperation(),
                                             std::move(patterns)))) {

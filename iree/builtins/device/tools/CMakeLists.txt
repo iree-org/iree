@@ -10,7 +10,7 @@
 
 iree_add_all_subdirs()
 
-iree_cc_test(
+iree_cc_binary_benchmark(
   NAME
     libdevice_benchmark
   SRCS
@@ -20,6 +20,7 @@ iree_cc_test(
     iree::base::internal::flags
     iree::builtins::device
     iree::testing::benchmark
+  TESTONLY
 )
 
 iree_cc_test(

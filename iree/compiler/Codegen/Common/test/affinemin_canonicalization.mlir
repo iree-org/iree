@@ -1,4 +1,4 @@
-// RUN: iree-opt -iree-codegen-affinemin-scf-canonicalization %s | IreeFileCheck %s
+// RUN: iree-opt -iree-codegen-affinemin-scf-canonicalization %s | FileCheck %s
 
 // CHECK-LABEL: scf_for_distributed
 func @scf_for_distributed(%A : memref<i64>, %id1 : index, %count1 : index,

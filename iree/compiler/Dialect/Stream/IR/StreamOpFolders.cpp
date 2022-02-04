@@ -274,8 +274,8 @@ struct TieRegionResults : public OpRewritePattern<Op> {
 // stream.resource.alloc
 //===----------------------------------------------------------------------===//
 
-void ResourceAllocOp::getCanonicalizationPatterns(
-    OwningRewritePatternList &results, MLIRContext *context) {
+void ResourceAllocOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                                  MLIRContext *context) {
   // TODO(benvanik): sink to first user.
 }
 
@@ -283,8 +283,8 @@ void ResourceAllocOp::getCanonicalizationPatterns(
 // stream.resource.alloca
 //===----------------------------------------------------------------------===//
 
-void ResourceAllocaOp::getCanonicalizationPatterns(
-    OwningRewritePatternList &results, MLIRContext *context) {
+void ResourceAllocaOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                                   MLIRContext *context) {
   // TODO(benvanik): sink to first user.
   // TODO(benvanik): elide if only user is dealloc.
 }
@@ -293,8 +293,8 @@ void ResourceAllocaOp::getCanonicalizationPatterns(
 // stream.resource.dealloca
 //===----------------------------------------------------------------------===//
 
-void ResourceDeallocaOp::getCanonicalizationPatterns(
-    OwningRewritePatternList &results, MLIRContext *context) {
+void ResourceDeallocaOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                                     MLIRContext *context) {
   // TODO(benvanik): move up to producer of timepoint.
 }
 
@@ -341,8 +341,8 @@ struct SelectResourceSizeOp : public OpRewritePattern<ResourceSizeOp> {
 
 }  // namespace
 
-void ResourceSizeOp::getCanonicalizationPatterns(
-    OwningRewritePatternList &results, MLIRContext *context) {
+void ResourceSizeOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                                 MLIRContext *context) {
   results.insert<SelectResourceSizeOp>(context);
 }
 
@@ -350,8 +350,8 @@ void ResourceSizeOp::getCanonicalizationPatterns(
 // stream.resource.map
 //===----------------------------------------------------------------------===//
 
-void ResourceMapOp::getCanonicalizationPatterns(
-    OwningRewritePatternList &results, MLIRContext *context) {
+void ResourceMapOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                                MLIRContext *context) {
   // TODO(benvanik): fold subviews up into maps to limit range.
   results.insert<ElideUnusedOp<ResourceMapOp>>(context);
 }
@@ -360,8 +360,8 @@ void ResourceMapOp::getCanonicalizationPatterns(
 // stream.resource.try_map
 //===----------------------------------------------------------------------===//
 
-void ResourceTryMapOp::getCanonicalizationPatterns(
-    OwningRewritePatternList &results, MLIRContext *context) {
+void ResourceTryMapOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                                   MLIRContext *context) {
   // TODO(benvanik): fold subviews up into maps to limit range.
   // TODO(benvanik): if mapping for staging then turn into a map?
   results.insert<ElideUnusedOp<ResourceTryMapOp>>(context);
@@ -401,8 +401,8 @@ struct FoldSubviewIntoLoadOp : public OpRewritePattern<ResourceLoadOp> {
 
 }  // namespace
 
-void ResourceLoadOp::getCanonicalizationPatterns(
-    OwningRewritePatternList &results, MLIRContext *context) {
+void ResourceLoadOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                                 MLIRContext *context) {
   // TODO(benvanik): if staging resource comes from splat (through transfers)
   //                 then pull splat value.
   // TODO(benvanik): combine multiple loads from the same target if contiguous.
@@ -445,8 +445,8 @@ struct FoldSubviewIntoStoreOp : public OpRewritePattern<ResourceStoreOp> {
 
 }  // namespace
 
-void ResourceStoreOp::getCanonicalizationPatterns(
-    OwningRewritePatternList &results, MLIRContext *context) {
+void ResourceStoreOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                                  MLIRContext *context) {
   // TODO(benvanik): combine multiple stores to the same target if contiguous.
   // TODO(benvanik): if value is a constant splat then turn into fill?
   results.insert<FoldSubviewIntoStoreOp>(context);
@@ -587,8 +587,8 @@ struct CanonicalizeResourcePackIntervals
 
 }  // namespace
 
-void ResourcePackOp::getCanonicalizationPatterns(
-    OwningRewritePatternList &results, MLIRContext *context) {
+void ResourcePackOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                                 MLIRContext *context) {
   results.insert<PropagateResourcePackBaseOffset>(context);
   results.insert<CanonicalizeResourcePackIntervals>(context);
 }
@@ -663,8 +663,8 @@ struct SinkSubviewAcrossSelectOps : public OpRewritePattern<mlir::SelectOp> {
 
 }  // namespace
 
-void ResourceSubviewOp::getCanonicalizationPatterns(
-    OwningRewritePatternList &results, MLIRContext *context) {
+void ResourceSubviewOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                                    MLIRContext *context) {
   results.insert<FoldResourceSubviewOps>(context);
   results.insert<SinkSubviewAcrossSelectOps>(context);
 }
@@ -686,8 +686,8 @@ OpFoldResult TensorImportOp::fold(ArrayRef<Attribute> operands) {
   return {};
 }
 
-void TensorImportOp::getCanonicalizationPatterns(
-    OwningRewritePatternList &results, MLIRContext *context) {
+void TensorImportOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                                 MLIRContext *context) {
   // TODO(benvanik): check operand and dedupe imports.
 }
 
@@ -708,8 +708,8 @@ OpFoldResult TensorExportOp::fold(ArrayRef<Attribute> operands) {
   return {};
 }
 
-void TensorExportOp::getCanonicalizationPatterns(
-    OwningRewritePatternList &results, MLIRContext *context) {
+void TensorExportOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                                 MLIRContext *context) {
   // TODO(benvanik): check operand and dedupe exports.
 }
 
@@ -757,8 +757,8 @@ struct TensorConstantToSplat : public OpRewritePattern<TensorConstantOp> {
 
 }  // namespace
 
-void TensorConstantOp::getCanonicalizationPatterns(
-    OwningRewritePatternList &results, MLIRContext *context) {
+void TensorConstantOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                                   MLIRContext *context) {
   // TODO(benvanik): if value is _mostly_ a splat, turn into splat + updates.
   results.insert<TensorConstantToSplat>(context);
 }
@@ -902,8 +902,8 @@ struct NarrowSplatPattern : public OpRewritePattern<TensorSplatOp> {
 
 }  // namespace
 
-void TensorSplatOp::getCanonicalizationPatterns(
-    OwningRewritePatternList &results, MLIRContext *context) {
+void TensorSplatOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                                MLIRContext *context) {
   results.insert<ElideUnusedOp<TensorSplatOp>>(context);
   results.insert<NarrowSplatPattern>(context);
 }
@@ -938,8 +938,8 @@ struct ElideUnneededTensorClones : public OpRewritePattern<TensorCloneOp> {
 
 }  // namespace
 
-void TensorCloneOp::getCanonicalizationPatterns(
-    OwningRewritePatternList &results, MLIRContext *context) {
+void TensorCloneOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                                MLIRContext *context) {
   // TODO(benvanik): splat -> clone duplicates splat.
   // TODO(benvanik): some way to reduce deep clone->clone->clone chains.
   // TODO(benvanik): clone + slice => slice.
@@ -957,8 +957,8 @@ OpFoldResult TensorSliceOp::fold(ArrayRef<Attribute> operands) {
   return {};
 }
 
-void TensorSliceOp::getCanonicalizationPatterns(
-    OwningRewritePatternList &results, MLIRContext *context) {
+void TensorSliceOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                                MLIRContext *context) {
   // TODO(benvanik): turn into a transfer if target_size == update_size and
   //                 affinity/lifetime differ.
   // TODO(benvanik): splat->slice -> splat.
@@ -995,8 +995,8 @@ struct NarrowFillPattern : public OpRewritePattern<TensorFillOp> {
 
 }  // namespace
 
-void TensorFillOp::getCanonicalizationPatterns(
-    OwningRewritePatternList &results, MLIRContext *context) {
+void TensorFillOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                               MLIRContext *context) {
   // TODO(benvanik): if target_size == sizeof(value) turn into splat.
   results.insert<NarrowFillPattern>(context);
 }
@@ -1010,8 +1010,8 @@ OpFoldResult TensorUpdateOp::fold(ArrayRef<Attribute> operands) {
   return {};
 }
 
-void TensorUpdateOp::getCanonicalizationPatterns(
-    OwningRewritePatternList &results, MLIRContext *context) {
+void TensorUpdateOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                                 MLIRContext *context) {
   // TODO(benvanik): turn into a transfer if target_size == update_size and
   //                 affinity/lifetime differ.
   // TODO(benvanik): turn into fill if source is a splat.
@@ -1021,8 +1021,8 @@ void TensorUpdateOp::getCanonicalizationPatterns(
 // stream.tensor.load
 //===----------------------------------------------------------------------===//
 
-void TensorLoadOp::getCanonicalizationPatterns(
-    OwningRewritePatternList &results, MLIRContext *context) {
+void TensorLoadOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                               MLIRContext *context) {
   // TODO(benvanik): splat + load -> splat value.
   // TODO(benvanik): clone + ex load -> slice (ranged) + load.
   // TODO(benvanik): slice + ex load -> slice (ranged) + load.
@@ -1034,8 +1034,8 @@ void TensorLoadOp::getCanonicalizationPatterns(
 // stream.tensor.store
 //===----------------------------------------------------------------------===//
 
-void TensorStoreOp::getCanonicalizationPatterns(
-    OwningRewritePatternList &results, MLIRContext *context) {
+void TensorStoreOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                                MLIRContext *context) {
   // TODO(benvanik): if value is a constant splat then turn into fill.
   // TODO(benvanik): combine multiple stores to the same target if contiguous.
 }
@@ -1044,8 +1044,8 @@ void TensorStoreOp::getCanonicalizationPatterns(
 // stream.async.alloca
 //===----------------------------------------------------------------------===//
 
-void AsyncAllocaOp::getCanonicalizationPatterns(
-    OwningRewritePatternList &results, MLIRContext *context) {
+void AsyncAllocaOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                                MLIRContext *context) {
   // TODO(benvanik): alloca (staging) -> non-staging change to target.
   // TODO(benvanik): alloca (non-staging) -> staging change to target.
   // TODO(benvanik): sink to first user.
@@ -1079,8 +1079,8 @@ struct ConvertSplatConstantsIntoSplats
 
 }  // namespace
 
-void AsyncConstantOp::getCanonicalizationPatterns(
-    OwningRewritePatternList &results, MLIRContext *context) {
+void AsyncConstantOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                                  MLIRContext *context) {
   results.insert<ConvertSplatConstantsIntoSplats>(context);
   // TODO(benvanik): if value is _mostly_ a splat, turn into splat + updates.
 }
@@ -1149,8 +1149,8 @@ struct SinkSplatsToConsumers : public OpRewritePattern<AsyncSplatOp> {
 
 }  // namespace
 
-void AsyncSplatOp::getCanonicalizationPatterns(
-    OwningRewritePatternList &results, MLIRContext *context) {
+void AsyncSplatOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                               MLIRContext *context) {
   // TODO(#6972): find splat+update-from and turn into fill.
   // TODO(#6972): find splat+copy-from and turn into fill.
   // TODO(#6972): find splat+update-into and turn into alloca+fill+update.
@@ -1202,8 +1202,8 @@ struct PropagateClonableOps : public OpRewritePattern<AsyncCloneOp> {
 
 }  // namespace
 
-void AsyncCloneOp::getCanonicalizationPatterns(
-    OwningRewritePatternList &results, MLIRContext *context) {
+void AsyncCloneOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                               MLIRContext *context) {
   // TODO(benvanik): some way to reduce deep clone->clone->clone chains.
   results.insert<PropagateClonableOps>(context);
   results.insert<ElideUnusedOp<AsyncCloneOp>>(context);
@@ -1247,8 +1247,8 @@ struct PropagateSplatsThroughSlices : public OpRewritePattern<AsyncSliceOp> {
 
 }  // namespace
 
-void AsyncSliceOp::getCanonicalizationPatterns(
-    OwningRewritePatternList &results, MLIRContext *context) {
+void AsyncSliceOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                               MLIRContext *context) {
   // TODO(benvanik): turn into a transfer if target_size == update_size and
   //                 affinity/lifetime differ.
   results.insert<PropagateSplatsThroughSlices>(context);
@@ -1285,7 +1285,7 @@ struct FlattenFullFillToSplat : public OpRewritePattern<AsyncFillOp> {
 
 }  // namespace
 
-void AsyncFillOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
+void AsyncFillOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                               MLIRContext *context) {
   results.insert<FlattenFullFillToSplat>(context);
   results.insert<ElideUnusedOp<AsyncFillOp>>(context);
@@ -1369,8 +1369,8 @@ struct CombineSliceUpdateFromToCopy : public OpRewritePattern<AsyncUpdateOp> {
 
 }  // namespace
 
-void AsyncUpdateOp::getCanonicalizationPatterns(
-    OwningRewritePatternList &results, MLIRContext *context) {
+void AsyncUpdateOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                                MLIRContext *context) {
   // TODO(benvanik): turn into a transfer if target_size == update_size and
   //                 affinity/lifetime differ.
   // TODO(#6972): updates into splats could become alloca + fill exclusive
@@ -1412,7 +1412,7 @@ struct AsyncCopyFullSourceToUpdate : public OpRewritePattern<AsyncCopyOp> {
 
 }  // namespace
 
-void AsyncCopyOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
+void AsyncCopyOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                               MLIRContext *context) {
   results.insert<AsyncCopyFullSourceToUpdate>(context);
   results.insert<ElideUnusedOp<AsyncCopyOp>>(context);
@@ -1452,8 +1452,8 @@ struct RedundantTransferElision : public OpRewritePattern<AsyncTransferOp> {
 
 }  // namespace
 
-void AsyncTransferOp::getCanonicalizationPatterns(
-    OwningRewritePatternList &results, MLIRContext *context) {
+void AsyncTransferOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                                  MLIRContext *context) {
   // TODO(benvanik): staging propagation (fill of staging -> fill on device).
   results.insert<RedundantTransferElision>(context);
   results.insert<ElideUnusedOp<AsyncTransferOp>>(context);
@@ -1463,7 +1463,7 @@ void AsyncTransferOp::getCanonicalizationPatterns(
 // stream.async.load
 //===----------------------------------------------------------------------===//
 
-void AsyncLoadOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
+void AsyncLoadOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                               MLIRContext *context) {
   // TODO(benvanik): splat + load -> splat value.
   // TODO(benvanik): clone + ex load -> slice (ranged) + load.
@@ -1476,8 +1476,8 @@ void AsyncLoadOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
 // stream.async.store
 //===----------------------------------------------------------------------===//
 
-void AsyncStoreOp::getCanonicalizationPatterns(
-    OwningRewritePatternList &results, MLIRContext *context) {
+void AsyncStoreOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                               MLIRContext *context) {
   // TODO(benvanik): if value is a constant splat then turn into fill.
   // TODO(benvanik): combine multiple stores to the same target if contiguous.
 }
@@ -1486,8 +1486,8 @@ void AsyncStoreOp::getCanonicalizationPatterns(
 // stream.async.dispatch
 //===----------------------------------------------------------------------===//
 
-void AsyncDispatchOp::getCanonicalizationPatterns(
-    OwningRewritePatternList &results, MLIRContext *context) {
+void AsyncDispatchOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                                  MLIRContext *context) {
   // TODO(benvanik): nothing? maybe tied type/lifetime updates?
   results.insert<ElideUnusedOp<AsyncDispatchOp>>(context);
 }
@@ -1670,8 +1670,8 @@ struct ElideNoOpAsyncExecuteOp : public OpRewritePattern<AsyncExecuteOp> {
 
 }  // namespace
 
-void AsyncExecuteOp::getCanonicalizationPatterns(
-    OwningRewritePatternList &results, MLIRContext *context) {
+void AsyncExecuteOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                                 MLIRContext *context) {
   results.insert<ElideImmediateAsyncExecuteWaits>(context);
   results.insert<ChainAsyncExecuteWaits>(context);
   results.insert<CloneCapturedAsyncExecuteSubviewOps>(context);
@@ -1686,8 +1686,8 @@ void AsyncExecuteOp::getCanonicalizationPatterns(
 // stream.async.concurrent
 //===----------------------------------------------------------------------===//
 
-void AsyncConcurrentOp::getCanonicalizationPatterns(
-    OwningRewritePatternList &results, MLIRContext *context) {
+void AsyncConcurrentOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                                    MLIRContext *context) {
   results.insert<IREE::Util::ClosureOptimizationPattern<AsyncConcurrentOp>>(
       context);
   results.insert<TieRegionResults<AsyncConcurrentOp>>(context);
@@ -1729,7 +1729,7 @@ struct FoldSubviewsIntoCmdFlushOp : public OpRewritePattern<CmdFlushOp> {
 
 }  // namespace
 
-void CmdFlushOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
+void CmdFlushOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                              MLIRContext *context) {
   results.insert<FoldSubviewsIntoCmdFlushOp>(context);
 }
@@ -1770,8 +1770,8 @@ struct FoldSubviewsIntoCmdInvalidateOp
 
 }  // namespace
 
-void CmdInvalidateOp::getCanonicalizationPatterns(
-    OwningRewritePatternList &results, MLIRContext *context) {
+void CmdInvalidateOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                                  MLIRContext *context) {
   results.insert<FoldSubviewsIntoCmdInvalidateOp>(context);
 }
 
@@ -1810,8 +1810,8 @@ struct FoldSubviewsIntoCmdDiscardOp : public OpRewritePattern<CmdDiscardOp> {
 
 }  // namespace
 
-void CmdDiscardOp::getCanonicalizationPatterns(
-    OwningRewritePatternList &results, MLIRContext *context) {
+void CmdDiscardOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                               MLIRContext *context) {
   results.insert<FoldSubviewsIntoCmdDiscardOp>(context);
 }
 
@@ -1850,7 +1850,7 @@ struct FoldSubviewsIntoCmdFillOp : public OpRewritePattern<CmdFillOp> {
 
 }  // namespace
 
-void CmdFillOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
+void CmdFillOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                             MLIRContext *context) {
   results.insert<FoldSubviewsIntoCmdFillOp>(context);
 }
@@ -1906,7 +1906,7 @@ struct FoldSubviewsIntoCmdCopyOp : public OpRewritePattern<CmdCopyOp> {
 
 }  // namespace
 
-void CmdCopyOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
+void CmdCopyOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                             MLIRContext *context) {
   results.insert<FoldSubviewsIntoCmdCopyOp>(context);
 }
@@ -1967,8 +1967,8 @@ struct FoldSubviewsIntoCmdDispatchOp : public OpRewritePattern<CmdDispatchOp> {
 
 }  // namespace
 
-void CmdDispatchOp::getCanonicalizationPatterns(
-    OwningRewritePatternList &results, MLIRContext *context) {
+void CmdDispatchOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                                MLIRContext *context) {
   results.insert<FoldSubviewsIntoCmdDispatchOp>(context);
 }
 
@@ -2116,8 +2116,8 @@ struct ElideNoOpCmdExecuteOp : public OpRewritePattern<CmdExecuteOp> {
 
 }  // namespace
 
-void CmdExecuteOp::getCanonicalizationPatterns(
-    OwningRewritePatternList &results, MLIRContext *context) {
+void CmdExecuteOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                               MLIRContext *context) {
   results.insert<ElideImmediateCmdExecuteWaits>(context);
   results.insert<ChainCmdExecuteWaits>(context);
   results.insert<CloneCapturedCmdExecuteSubviewOps>(context);
@@ -2152,7 +2152,7 @@ struct ElideEmptyCmdRegionOp : public OpRewritePattern<OpT> {
 
 }  // namespace
 
-void CmdSerialOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
+void CmdSerialOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                               MLIRContext *context) {
   results.insert<ElideEmptyCmdRegionOp<CmdSerialOp>>(context);
 }
@@ -2161,8 +2161,8 @@ void CmdSerialOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
 // stream.cmd.concurrent
 //===----------------------------------------------------------------------===//
 
-void CmdConcurrentOp::getCanonicalizationPatterns(
-    OwningRewritePatternList &results, MLIRContext *context) {
+void CmdConcurrentOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                                  MLIRContext *context) {
   results.insert<ElideEmptyCmdRegionOp<CmdConcurrentOp>>(context);
 }
 
@@ -2283,8 +2283,8 @@ struct ExpandTimepointJoinOperands : public OpRewritePattern<TimepointJoinOp> {
 
 }  // namespace
 
-void TimepointJoinOp::getCanonicalizationPatterns(
-    OwningRewritePatternList &results, MLIRContext *context) {
+void TimepointJoinOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                                  MLIRContext *context) {
   // TODO(benvanik): elide operands if timepoint must be satisfied in use-def.
   // TODO(benvanik): sink and pull in other timepoints (join on all needed).
   results.insert<ElideImmediateTimepointJoinOperands>(context);
@@ -2537,8 +2537,8 @@ struct FoldDuplicateAwaitResources : public OpRewritePattern<TimepointAwaitOp> {
 
 }  // namespace
 
-void TimepointAwaitOp::getCanonicalizationPatterns(
-    OwningRewritePatternList &results, MLIRContext *context) {
+void TimepointAwaitOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                                   MLIRContext *context) {
   // TODO(benvanik): elide waits if timepoint must be satisfied in use-def.
   results.insert<ElideImmediateAwaits>(context);
   results.insert<SinkAwaitToFirstConsumer>(context);

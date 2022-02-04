@@ -169,6 +169,7 @@ static iree_status_t iree_hal_vulkan_vma_buffer_flush_range(
 
 namespace {
 const iree_hal_buffer_vtable_t iree_hal_vulkan_vma_buffer_vtable = {
+    /*.recycle=*/iree_hal_buffer_recycle,
     /*.destroy=*/iree_hal_vulkan_vma_buffer_destroy,
     /*.map_range=*/iree_hal_vulkan_vma_buffer_map_range,
     /*.unmap_range=*/iree_hal_vulkan_vma_buffer_unmap_range,

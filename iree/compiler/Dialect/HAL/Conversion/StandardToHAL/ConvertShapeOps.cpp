@@ -52,7 +52,7 @@ struct BufferViewRankPattern : public OpConversionPattern<tensor::RankOp> {
 
 void populateStandardShapeToHALPatterns(MLIRContext *context,
                                         ConversionTarget &conversionTarget,
-                                        OwningRewritePatternList &patterns,
+                                        RewritePatternSet &patterns,
                                         TypeConverter &typeConverter) {
   // Ensure all shape related ops are fully converted as we should no longer
   // have any types they are valid to be used on after this conversion.

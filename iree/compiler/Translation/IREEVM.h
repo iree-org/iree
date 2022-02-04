@@ -46,13 +46,10 @@ struct InputDialectOptions {
     // Applies no input transformation. Only supported core and extension ops
     // are supported.
     none,
-
     // Legalizes input defined over TOSA ops.
     tosa,
-
     // Legalizes input defined over MHLO ops.
     mhlo,
-
     // Special case of 'mhlo' legalization which also performs some XLA
     // cleanup activities.
     xla,
@@ -75,8 +72,40 @@ struct HighLevelOptimizationOptions {
   // Optimizations to reduce numeric precision where it is safe to do so.
   bool numericPrecisionReduction = false;
 
+  // Strips debug assertions after any useful information has been extracted.
+  bool stripAssertions = false;
+
   void bindOptions(OptionsBinder &binder);
   using FromFlags = OptionsFromFlags<HighLevelOptimizationOptions>;
+};
+
+// Options controlling scheduling across host/device.
+struct SchedulingOptions {
+  // TODO(benvanik): find a way to share this with
+  // Stream/Transforms/PassDetail.h w/o circular deps.
+  // Defines the output format of a dump pass.
+  enum class DumpOutputFormat {
+    // Dumping disabled.
+    None = 0,
+    // Human-readable pretty printing.
+    Pretty = 1,
+    // Pretty printing with additional information that can result in large
+    // dumps.
+    Verbose = 2,
+    // Comma separated values for throwing into Sheets.
+    CSV = 3,
+  };
+  // Enables and specifies the the format for a stream statistics dump.
+  DumpOutputFormat dumpStatisticsFormat = DumpOutputFormat::None;
+  // File path to write statistics to; or `` for stderr or `-` for stdout.
+  std::string dumpStatisticsFile = "";
+
+  // TODO(benvanik): favor size/speed/etc for partitioning.
+  // TODO(benvanik): execution model to optimize for (unified/discrete memory,
+  //                 single/multiple processors, etc).
+
+  void bindOptions(OptionsBinder &binder);
+  using FromFlags = OptionsFromFlags<SchedulingOptions>;
 };
 
 // Builds the translation pipeline with defaults.
@@ -86,6 +115,7 @@ void buildDefaultIREEVMTransformPassPipeline(OpPassManager &passManager);
 void buildIREEVMTransformPassPipeline(
     BindingOptions bindingOptions, InputDialectOptions inputOptions,
     HighLevelOptimizationOptions highLevelOptimizationOptions,
+    SchedulingOptions schedulingOptions,
     IREE::HAL::TargetOptions executableOptions,
     IREE::VM::TargetOptions targetOptions, OpPassManager &passManager);
 

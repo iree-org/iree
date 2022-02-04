@@ -637,6 +637,8 @@ IREE_API_EXPORT iree_status_t iree_vm_list_pop_front_ref_move(
   memmove(list->storage, (uint8_t*)list->storage + list->element_size,
           (list_size - 1) * list->element_size);
   --list->count;
+  memset((uint8_t*)list->storage + list->count * list->element_size, 0,
+         list->element_size);
   return iree_ok_status();
 }
 

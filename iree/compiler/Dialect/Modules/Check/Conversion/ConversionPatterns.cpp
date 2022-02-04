@@ -18,7 +18,7 @@ namespace IREE {
 namespace Check {
 
 void populateCheckToVMPatterns(MLIRContext *context, SymbolTable &importSymbols,
-                               OwningRewritePatternList &patterns,
+                               RewritePatternSet &patterns,
                                TypeConverter &typeConverter) {
   patterns.insert<VMImportOpConversion<IREE::Check::ExpectTrueOp>>(
       context, importSymbols, typeConverter, "check.expect_true");
@@ -33,7 +33,7 @@ void populateCheckToVMPatterns(MLIRContext *context, SymbolTable &importSymbols,
 }
 
 void populateCheckToHALPatterns(MLIRContext *context,
-                                OwningRewritePatternList &patterns,
+                                RewritePatternSet &patterns,
                                 TypeConverter &typeConverter) {
   // The same op handles both tensors and buffer views.
   patterns

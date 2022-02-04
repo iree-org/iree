@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -pass-pipeline='hal.executable(hal.executable.variant(iree-set-num-workgroups,builtin.module(builtin.func(iree-spirv-tile,iree-spirv-vectorize))))' %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -pass-pipeline='hal.executable(hal.executable.variant(iree-set-num-workgroups,builtin.module(builtin.func(iree-spirv-tile,iree-spirv-vectorize))))' %s | FileCheck %s
 
 #config = #iree_codegen.lowering.config<tile_sizes = [[0, 4, 4, 16], [0, 4, 1, 4], [0, 0, 0, 0, 1, 1, 4]], native_vector_size = []>
 #translation = #iree_codegen.translation.info<"SPIRVVectorize", workload_per_wg = [16, 4, 4]>

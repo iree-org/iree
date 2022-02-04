@@ -35,7 +35,7 @@ readarray -t files < <(\
     | grep -E "${included_files_pattern?}" \
     | grep -v -E "${excluded_files_pattern?}")
 
-if [ ${#files[@]} -eq 0 ]; then
+if (( ${#files[@]} == 0 )); then
   echo "No Bazel files changed"
   exit 0
 fi

@@ -123,8 +123,7 @@ static LogicalResult outlineDispatchWorkgroupsOp(
   }
 
   // Create the executable with the region cloned into it.
-  Operation *parentFuncOp =
-      regionOp->getParentWithTrait<OpTrait::FunctionLike>();
+  auto parentFuncOp = regionOp->getParentOfType<FunctionOpInterface>();
   auto executableOp =
       createExecutable(regionOp.getLoc(), namePrefix, {workgroupFuncOp},
                        parentFuncOp->getParentOfType<mlir::ModuleOp>());
@@ -152,22 +151,23 @@ class OutlineDispatchRegionsPass
   void runOnOperation() override {
     // Convert each dispatch region into a flow.executable + dispatch op.
     int initializerCount = 0;
-    for (auto it : llvm::enumerate(getOperation().getOps())) {
-      Operation &op = it.value();
-      if (!op.hasTrait<OpTrait::FunctionLike>()) continue;
+    for (auto it :
+         llvm::enumerate(getOperation().getOps<FunctionOpInterface>())) {
+      FunctionOpInterface op = it.value();
+      Operation *operation = op;
 
       // Generate a nice name if possible.
       std::string opName;
-      if (auto funcOp = llvm::dyn_cast<mlir::FuncOp>(op)) {
+      if (auto funcOp = llvm::dyn_cast<mlir::FuncOp>(operation)) {
         opName = funcOp.getName().str();
-      } else if (llvm::isa<IREE::Util::InitializerOp>(op)) {
+      } else if (llvm::isa<IREE::Util::InitializerOp>(operation)) {
         opName =
             std::string("_initializer_") + std::to_string(initializerCount++);
       } else {
         opName = std::string("_function_like_") + std::to_string(it.index());
       }
 
-      auto &bodyRegion = function_like_impl::getFunctionBody(&op);
+      auto &bodyRegion = op.getBody();
       // Outline all of the dispatch regions ops in this function.
       auto dispatchWorkgroupsOps =
           llvm::to_vector<8>(bodyRegion.getOps<DispatchWorkgroupsOp>());

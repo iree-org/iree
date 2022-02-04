@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -iree-mhlo-to-linalg-on-tensors %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -iree-mhlo-to-linalg-on-tensors %s | FileCheck %s
 
 func @dynamic_shape(%operand: tensor<?x?xf32>) -> (tensor<?x?xf32>)
 attributes {iree.dispatch_fn_name = ""} {
@@ -24,4 +24,3 @@ attributes {iree.dispatch_fn_name = ""} {
 // CHECK-NEXT:       %[[RESULT:.+]] = math.exp %[[OPERAND_IN]] : f32
 // CHECK-NEXT:       linalg.yield %[[RESULT]] : f32
 //      CHECK:   return %[[T3]]
-

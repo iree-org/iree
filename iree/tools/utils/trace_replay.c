@@ -34,10 +34,17 @@ iree_status_t iree_trace_replay_initialize(
   return iree_ok_status();
 }
 
-void iree_trace_replay_deinitialize(iree_trace_replay_t* replay) {
-  iree_hal_device_release(replay->device);
+void iree_trace_replay_deinitialize(iree_trace_replay_t* replay,
+                                    iree_trace_replay_shutdown_flags_t flags) {
   iree_vm_context_release(replay->context);
   iree_vm_instance_release(replay->instance);
+
+  if (iree_all_bits_set(flags, IREE_TRACE_REPLAY_SHUTDOWN_PRINT_STATISTICS)) {
+    IREE_IGNORE_ERROR(iree_hal_allocator_statistics_fprint(
+        stderr, iree_hal_device_allocator(replay->device)));
+  }
+  iree_hal_device_release(replay->device);
+
   memset(replay, 0, sizeof(*replay));
 }
 
@@ -973,35 +980,41 @@ iree_status_t iree_trace_replay_event_call_prepare(
     iree_trace_replay_t* replay, yaml_document_t* document,
     yaml_node_t* event_node, iree_vm_function_t* out_function,
     iree_vm_list_t** out_input_list) {
+  IREE_TRACE_ZONE_BEGIN(z0);
   memset(out_function, 0, sizeof(*out_function));
   *out_input_list = NULL;
 
   // Resolve the function ('module.function') within the context.
   yaml_node_t* function_node = NULL;
-  IREE_RETURN_IF_ERROR(iree_yaml_mapping_find(
-      document, event_node, iree_make_cstring_view("function"),
-      &function_node));
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_yaml_mapping_find(document, event_node,
+                                 iree_make_cstring_view("function"),
+                                 &function_node));
   iree_vm_function_t function;
-  IREE_RETURN_IF_ERROR(iree_vm_context_resolve_function(
-      replay->context, iree_yaml_node_as_string(function_node), &function));
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0,
+      iree_vm_context_resolve_function(
+          replay->context, iree_yaml_node_as_string(function_node), &function));
 
   // Parse function inputs.
   yaml_node_t* args_node = NULL;
-  IREE_RETURN_IF_ERROR(iree_yaml_mapping_try_find(
-      document, event_node, iree_make_cstring_view("args"), &args_node));
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0,
+      iree_yaml_mapping_try_find(document, event_node,
+                                 iree_make_cstring_view("args"), &args_node));
   iree_vm_list_t* input_list = NULL;
-  IREE_RETURN_IF_ERROR(
-      iree_vm_list_create(/*element_type=*/NULL, /*initial_capacity=*/8,
-                          replay->host_allocator, &input_list));
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_vm_list_create(/*element_type=*/NULL, /*initial_capacity=*/8,
+                              replay->host_allocator, &input_list));
   iree_status_t status = iree_trace_replay_parse_item_sequence(
       replay, document, args_node, input_list);
-
   if (iree_status_is_ok(status)) {
     *out_function = function;
     *out_input_list = input_list;
   } else {
     iree_vm_list_release(input_list);
   }
+  IREE_TRACE_ZONE_END(z0);
   return status;
 }
 
@@ -1009,12 +1022,14 @@ iree_status_t iree_trace_replay_event_call(iree_trace_replay_t* replay,
                                            yaml_document_t* document,
                                            yaml_node_t* event_node,
                                            iree_vm_list_t** out_output_list) {
+  IREE_TRACE_ZONE_BEGIN(z0);
   if (out_output_list) *out_output_list = NULL;
 
   iree_vm_function_t function;
   iree_vm_list_t* input_list = NULL;
-  IREE_RETURN_IF_ERROR(iree_trace_replay_event_call_prepare(
-      replay, document, event_node, &function, &input_list));
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_trace_replay_event_call_prepare(replay, document, event_node,
+                                               &function, &input_list));
 
   // Invoke the function to produce outputs.
   iree_vm_list_t* output_list = NULL;
@@ -1033,6 +1048,7 @@ iree_status_t iree_trace_replay_event_call(iree_trace_replay_t* replay,
   } else {
     iree_vm_list_release(output_list);
   }
+  IREE_TRACE_ZONE_END(z0);
   return status;
 }
 

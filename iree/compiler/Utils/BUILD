@@ -16,15 +16,18 @@ cc_library(
     name = "Utils",
     srcs = [
         "ConversionUtils.cpp",
+        "CustomKernelsTargetInfo.cpp",
         "FlatbufferUtils.cpp",
         "GraphUtils.cpp",
         "ModuleUtils.cpp",
         "OptionUtils.cpp",
         "PassUtils.cpp",
+        "StringUtils.cpp",
         "TracingUtils.cpp",
     ],
     hdrs = [
         "ConversionUtils.h",
+        "CustomKernelsTargetInfo.h",
         "FlatbufferUtils.h",
         "GraphUtils.h",
         "IndexSet.h",
@@ -32,6 +35,7 @@ cc_library(
         "OptionUtils.h",
         "PassUtils.h",
         "PatternUtils.h",
+        "StringUtils.h",
         "TracingUtils.h",
     ],
     deps = [

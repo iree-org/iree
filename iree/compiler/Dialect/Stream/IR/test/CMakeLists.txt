@@ -26,8 +26,8 @@ iree_lit_test_suite(
     "tensor_ops.mlir"
     "timepoint_folding.mlir"
     "timepoint_ops.mlir"
-  DATA
-    iree::tools::IreeFileCheck
+  TOOLS
+    FileCheck
     iree::tools::iree-opt
 )
 

@@ -204,9 +204,9 @@ struct GlobalStoreOpExpansion
 
 }  // namespace
 
-void populateUtilToStreamConversionPatterns(
-    MLIRContext *context, TypeConverter &typeConverter,
-    OwningRewritePatternList &patterns) {
+void populateUtilToStreamConversionPatterns(MLIRContext *context,
+                                            TypeConverter &typeConverter,
+                                            RewritePatternSet &patterns) {
   auto expansionState = std::make_shared<GlobalExpansionState>();
   // TODO(#7432): add indirect global expansion support to streams.
   patterns
@@ -214,9 +214,10 @@ void populateUtilToStreamConversionPatterns(
           expansionState, typeConverter, context);
 }
 
-void populateUtilToStreamConversionPatterns(
-    MLIRContext *context, ConversionTarget &conversionTarget,
-    TypeConverter &typeConverter, OwningRewritePatternList &patterns) {
+void populateUtilToStreamConversionPatterns(MLIRContext *context,
+                                            ConversionTarget &conversionTarget,
+                                            TypeConverter &typeConverter,
+                                            RewritePatternSet &patterns) {
   typeConverter.addConversion([=](IREE::Util::PtrType type,
                                   SmallVectorImpl<Type> &resultTypes) {
     // Expand pointers to tensors to [resource, sizeof resource] pointers.

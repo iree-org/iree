@@ -33,6 +33,7 @@ iree_cc_library(
     MLIRTransforms
     iree::compiler::Codegen::Dialect::IREECodegenDialect
     iree::compiler::Dialect::HAL::IR
+    iree::compiler::Utils
   PUBLIC
 )
 

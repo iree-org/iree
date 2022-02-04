@@ -41,7 +41,7 @@ class VMConversionDialectInterface
   // |importSymbols| contains all vm.imports that have been queried from all
   // used dialects, not just this dialect.
   virtual void populateVMConversionPatterns(
-      SymbolTable &importSymbols, OwningRewritePatternList &patterns,
+      SymbolTable &importSymbols, RewritePatternSet &patterns,
       TypeConverter &typeConverter) const = 0;
 
   // Walks all child attributes defined within a custom dialect attribute.
@@ -51,11 +51,11 @@ class VMConversionDialectInterface
 
  protected:
   // Parses the vm.import module to be cached by the caller.
-  virtual OwningModuleRef parseVMImportModule() const = 0;
+  virtual OwningOpRef<mlir::ModuleOp> parseVMImportModule() const = 0;
 
  private:
   mutable std::once_flag importParseFlag;
-  mutable OwningModuleRef importModuleRef;
+  mutable OwningOpRef<mlir::ModuleOp> importModuleRef;
 };
 
 }  // namespace iree_compiler

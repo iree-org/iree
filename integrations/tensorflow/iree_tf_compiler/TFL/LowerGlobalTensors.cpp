@@ -4,10 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
-#include "iree/compiler/Dialect/Util/IR/UtilOps.h"
-#include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
-#include "iree/compiler/Utils/ConversionUtils.h"
+#include "iree-dialects/Dialect/Input/InputDialect.h"
+#include "iree-dialects/Dialect/Input/InputOps.h"
 #include "iree_tf_compiler/TFL/PassDetail.h"
 #include "iree_tf_compiler/TFL/Passes.h"
 #include "mlir/Dialect/Tosa/IR/TosaOps.h"
@@ -28,11 +26,12 @@ class LowerGlobalTensorsPass
  public:
   void getDependentDialects(DialectRegistry& registry) const override {
     registry.insert<mlir::TFL::TensorFlowLiteDialect, tosa::TosaDialect,
-                    iree_compiler::IREE::Util::UtilDialect>();
+                    iree_compiler::IREE::Input::IREEInputDialect>();
   }
 
   // Converts TFLite state operations to the IREE equivalent.
   void runOnOperation() override {
+    auto* context = &getContext();
     auto moduleOp = getOperation();
     mlir::OpBuilder builder(moduleOp.body());
 
@@ -117,7 +116,7 @@ class LowerGlobalTensorsPass
 
       // TODO(suderman): Determine the global type based on all store
       // operations.
-      auto global = builder.create<iree_compiler::IREE::Util::GlobalOp>(
+      auto global = builder.create<iree_compiler::IREE::Input::GlobalOp>(
           loc, flowSymName, /*is_mutable=*/true, attribute.getType(),
           attribute);
       global.setPrivate();
@@ -134,24 +133,26 @@ class LowerGlobalTensorsPass
       auto attribute = std::get<1>(*constIt);
 
       builder.setInsertionPoint(handle);
-      auto address = builder.create<iree_compiler::IREE::Util::GlobalAddressOp>(
-          handle.getLoc(),
-          iree_compiler::IREE::Util::PtrType::get(attribute.getType()),
-          SymbolRefAttr::get(builder.getContext(), flowName));
+      auto address =
+          builder.create<iree_compiler::IREE::Input::GlobalAddressOp>(
+              handle.getLoc(),
+              iree_compiler::IREE::Input::PtrType::get(context,
+                                                       attribute.getType()),
+              SymbolRefAttr::get(builder.getContext(), flowName));
       handle.getResult().replaceAllUsesWith(address.getResult());
       handle.erase();
     }
 
     // Replace the assign ops with a global store operation.
     for (auto assign : assignOps) {
-      auto address = dyn_cast<iree_compiler::IREE::Util::GlobalAddressOp>(
+      auto address = dyn_cast<iree_compiler::IREE::Input::GlobalAddressOp>(
           assign.resource_id().getDefiningOp());
       if (!address) continue;
 
       builder.setInsertionPoint(assign);
       Value value = assign.value();
       Type storageType = address.getType()
-                             .cast<iree_compiler::IREE::Util::PtrType>()
+                             .cast<iree_compiler::IREE::Input::PtrType>()
                              .getTargetType();
       if (storageType != value.getType()) {
         value = builder
@@ -160,26 +161,26 @@ class LowerGlobalTensorsPass
                     .getResult(0);
       }
 
-      builder.create<iree_compiler::IREE::Util::GlobalStoreIndirectOp>(
+      builder.create<iree_compiler::IREE::Input::GlobalStoreIndirectOp>(
           assign.getLoc(), value, assign.resource_id());
       assign.erase();
     }
 
     // Replace the read ops with a global load operation.
     for (auto read : readOps) {
-      auto address = dyn_cast<iree_compiler::IREE::Util::GlobalAddressOp>(
+      auto address = dyn_cast<iree_compiler::IREE::Input::GlobalAddressOp>(
           read.resource_id().getDefiningOp());
       if (!address) continue;
 
       auto ptrType =
-          address.getType().dyn_cast<iree_compiler::IREE::Util::PtrType>();
+          address.getType().dyn_cast<iree_compiler::IREE::Input::PtrType>();
       if (!ptrType) continue;
 
       auto type = ptrType.getTargetType();
 
       builder.setInsertionPoint(read);
       Value load =
-          builder.create<iree_compiler::IREE::Util::GlobalLoadIndirectOp>(
+          builder.create<iree_compiler::IREE::Input::GlobalLoadIndirectOp>(
               read.getLoc(), type, read.resource_id());
       if (type != read.getResult().getType()) {
         load = builder

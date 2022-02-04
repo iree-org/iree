@@ -16,10 +16,10 @@ include "mlir/IR/SymbolInterfaces.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/Interfaces/ViewLikeInterface.td"
 
-class HAL_PureOp<string mnemonic, list<OpTrait> traits = []> :
+class HAL_PureOp<string mnemonic, list<Trait> traits = []> :
     HAL_Op<mnemonic, !listconcat(traits, [NoSideEffect])>;
 
-class HAL_MakeTupleOp<string mnemonic, list<OpTrait> traits = []> :
+class HAL_MakeTupleOp<string mnemonic, list<Trait> traits = []> :
     HAL_PureOp<mnemonic, traits>;
 
 //===----------------------------------------------------------------------===//
@@ -1485,7 +1485,6 @@ def HAL_ExecutableOp : HAL_Op<"executable", [
     custom<SymbolVisibility>($sym_visibility)
     $sym_name
     attr-dict-with-keyword
-    ``
     regions
   }];
 
@@ -1610,7 +1609,6 @@ def HAL_ExecutableVariantOp : HAL_Op<"executable.variant", [
     $sym_name
     `,` `target` `=` $target
     attr-dict-with-keyword
-    ``
     regions
   }];
 

@@ -28,6 +28,7 @@ iree_cc_library(
     MLIRSupport
     iree::compiler::Codegen::Interfaces::ProcessorOpInterfaces
     iree::compiler::Dialect::Flow::IR
+    iree::compiler::Dialect::Flow::IR::PartitionableLoopsInterface
     iree::compiler::Dialect::HAL::IR
   PUBLIC
 )

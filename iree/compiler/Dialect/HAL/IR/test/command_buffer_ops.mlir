@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file %s | FileCheck %s
 
 // CHECK-LABEL: @command_buffer_create
 //  CHECK-SAME: (%[[DEVICE:.+]]: !hal.device)

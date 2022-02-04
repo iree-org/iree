@@ -44,6 +44,9 @@ static LogicalResult verifyOpDynamicDims(Operation *op, ValueRange values,
   for (auto value : values) {
     if (auto shapedType = value.getType().dyn_cast<ShapedType>()) {
       requiredCount += shapedType.getNumDynamicDims();
+    } else if (auto tensorType =
+                   value.getType().dyn_cast<DispatchTensorType>()) {
+      requiredCount += tensorType.getNumDynamicDims();
     }
   }
   if (dynamicDims.size() != requiredCount) {
@@ -56,8 +59,42 @@ static LogicalResult verifyOpDynamicDims(Operation *op, ValueRange values,
 }
 
 //===----------------------------------------------------------------------===//
+// flow.dispatch.tie_shape
+//===----------------------------------------------------------------------===//
+
+static LogicalResult verifyDispatchTieShapeOp(DispatchTieShapeOp op) {
+  if (failed(verifyOpDynamicDims(op, {op.operand()}, op.dynamic_dims()))) {
+    return failure();
+  }
+  return success();
+}
+
+LogicalResult DispatchTieShapeOp::reifyResultShapes(
+    OpBuilder &b, ReifiedRankedShapedTypeDims &reifiedReturnShapes) {
+  SmallVector<Value> shape;
+  unsigned dynamicIdx = 0;
+  auto tensorType = result().getType().cast<IREE::Flow::DispatchTensorType>();
+  for (int64_t dim : tensorType.getShape()) {
+    if (dim == ShapedType::kDynamicSize) {
+      shape.push_back(dynamic_dims()[dynamicIdx++]);
+    } else {
+      shape.push_back(b.create<arith::ConstantIndexOp>(getLoc(), dim));
+    }
+  }
+  reifiedReturnShapes.push_back(shape);
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
 // flow.dispatch.tensor.load
 //===----------------------------------------------------------------------===//
+
+static LogicalResult verifyDispatchTensorLoadOp(DispatchTensorLoadOp op) {
+  if (failed(verifyOpDynamicDims(op, {op.source()}, op.source_dims()))) {
+    return failure();
+  }
+  return success();
+}
 
 /// Extracts static and dynamic values from list of `OpFoldResult`.
 static void processMixedOperands(ArrayRef<OpFoldResult> valueOrAttrs,
@@ -232,6 +269,13 @@ LogicalResult DispatchTensorLoadOp::reifyResultShapes(
 // flow.dispatch.tensor.store
 //===----------------------------------------------------------------------===//
 
+static LogicalResult verifyDispatchTensorStoreOp(DispatchTensorStoreOp op) {
+  if (failed(verifyOpDynamicDims(op, {op.target()}, op.target_dims()))) {
+    return failure();
+  }
+  return success();
+}
+
 void DispatchTensorStoreOp::build(OpBuilder &builder, OperationState &state,
                                   Value value, Value target,
                                   ValueRange targetDynamicDims,
@@ -321,7 +365,7 @@ void DispatchWorkgroupsOp::build(OpBuilder &builder, OperationState &state,
                                          : TensorAccess::ReadOnly,
                                      tensorType);
     }
-    body->addArgument(type);
+    body->addArgument(type, operand.value().getLoc());
   }
   for (auto resultType : llvm::enumerate(resultTypes)) {
     if (resultAliases[resultType.index()]) {
@@ -332,7 +376,7 @@ void DispatchWorkgroupsOp::build(OpBuilder &builder, OperationState &state,
     if (auto tensorType = type.dyn_cast<TensorType>()) {
       type = DispatchTensorType::get(TensorAccess::WriteOnly, tensorType);
     }
-    body->addArgument(type);
+    body->addArgument(type, state.location);
   }
   assert(std::next(body->begin()) == body->end());
 }
@@ -341,8 +385,8 @@ static ParseResult parseDispatchWorkgroupBody(OpAsmParser &parser,
                                               TypeRange operandTypes,
                                               TypeRange resultTypes,
                                               Region &body) {
-  SmallVector<OpAsmParser::OperandType, 16> regionArgs;
-  SmallVector<Type, 16> regionArgTypes;
+  SmallVector<OpAsmParser::OperandType> regionArgs;
+  SmallVector<Type> regionArgTypes;
   if (failed(parser.parseLParen())) {
     return failure();
   }
@@ -361,6 +405,7 @@ static ParseResult parseDispatchWorkgroupBody(OpAsmParser &parser,
     }
   }
   return parser.parseRegion(body, regionArgs, regionArgTypes,
+                            /*argLocations=*/{},
                             /*enableNameShadowing=*/true);
 }
 
@@ -373,7 +418,7 @@ static void printDispatchWorkgroupBody(OpAsmPrinter &p, Operation *op,
     p << ": ";
     p << arg.getType();
   });
-  p << ")";
+  p << ") ";
   p.printRegion(body, /*printEntryBlockArgs=*/false,
                 /*printBlockTerminators=*/true);
 }
@@ -796,8 +841,8 @@ SmallVector<int64_t, 4> TensorUpdateOp::getTiedResultOperandIndices() {
 // Public methods
 //===----------------------------------------------------------------------===//
 
-void populateFlowDispatchCanonicalizationPatterns(
-    OwningRewritePatternList &results, MLIRContext *context) {
+void populateFlowDispatchCanonicalizationPatterns(RewritePatternSet &results,
+                                                  MLIRContext *context) {
   DispatchTensorLoadOp::getCanonicalizationPatterns(results, context);
 }
 

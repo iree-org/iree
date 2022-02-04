@@ -12,6 +12,7 @@
 #include "llvm/Support/Process.h"
 #include "llvm/Support/Program.h"
 #include "llvm/Support/SourceMgr.h"
+#include "llvm/Support/WithColor.h"
 #include "llvm/Transforms/IPO/Internalize.h"
 #include "mlir/Support/FileUtilities.h"
 #include "mlir/Support/LogicalResult.h"
@@ -96,15 +97,15 @@ static std::vector<std::string> GetROCDLPaths(std::string targetChip,
   int lenOfChipPrefix = 3;
   std::string chipId = targetChip.substr(lenOfChipPrefix);
   std::string chip_isa_bc = "oclc_isa_version_" + chipId + ".bc";
-  static std::vector<std::string> *rocdl_filenames =
-      new std::vector<std::string>({"ocml.bc", "ockl.bc",
-                                    "oclc_unsafe_math_off.bc",
-                                    "oclc_daz_opt_off.bc", chip_isa_bc});
+  static const std::vector<std::string> rocdl_filenames(
+      {"hc.bc", "opencl.bc", "ocml.bc", "ockl.bc", "oclc_finite_only_off.bc",
+       "oclc_daz_opt_off.bc", "oclc_correctly_rounded_sqrt_on.bc",
+       "oclc_unsafe_math_off.bc", "oclc_wavefrontsize64_on.bc", chip_isa_bc});
 
   // Construct full path to ROCDL bitcode libraries.
   std::vector<std::string> result;
   std::string app = "/";
-  for (auto &filename : *rocdl_filenames) {
+  for (auto &filename : rocdl_filenames) {
     result.push_back(bitCodeDir + app + filename);
   }
   return result;

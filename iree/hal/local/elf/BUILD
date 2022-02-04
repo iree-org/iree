@@ -4,7 +4,7 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-load("//build_tools/bazel:run_binary_test.bzl", "run_binary_test")
+load("//build_tools/bazel:native_binary.bzl", "native_test")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -46,9 +46,9 @@ cc_binary(
     ],
 )
 
-run_binary_test(
+native_test(
     name = "elf_module_test",
-    test_binary = ":elf_module_test_binary",
+    src = ":elf_module_test_binary",
 )
 
 #===------------------------------------------------------------------------===#

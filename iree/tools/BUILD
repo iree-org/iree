@@ -13,10 +13,6 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
-exports_files([
-    "run_lit.sh",
-])
-
 cc_binary(
     name = "iree-benchmark-module",
     srcs = ["iree-benchmark-module-main.cc"],
@@ -139,6 +135,8 @@ cc_library(
     deps = [
         "@llvm-project//mlir:Affine",
         "@llvm-project//mlir:AffineTransforms",
+        "@llvm-project//mlir:ArmNeon",
+        "@llvm-project//mlir:ArmNeon2dToIntr",
         "@llvm-project//mlir:BufferizationDialect",
         "@llvm-project//mlir:ConversionPasses",
         "@llvm-project//mlir:GPUDialect",
@@ -197,7 +195,7 @@ cc_library(
     srcs = ["init_targets.cc"],
     hdrs = ["init_targets.h"],
     local_defines = [
-        "IREE_HAVE_CUDA_TARGET",
+        # "IREE_HAVE_CUDA_TARGET",
         "IREE_HAVE_LLVMAOT_TARGET",
         "IREE_HAVE_METALSPIRV_TARGET",
         "IREE_HAVE_ROCM_TARGET",
@@ -205,7 +203,7 @@ cc_library(
         "IREE_HAVE_VULKANSPIRV_TARGET",
     ],
     deps = [
-        "//iree/compiler/Dialect/HAL/Target/CUDA",
+        # "//iree/compiler/Dialect/HAL/Target/CUDA",
         "//iree/compiler/Dialect/HAL/Target/LLVM",
         "//iree/compiler/Dialect/HAL/Target/MetalSPIRV",
         "//iree/compiler/Dialect/HAL/Target/ROCM",
@@ -367,6 +365,7 @@ cc_binary(
     tags = ["hostonly"],
     deps = [
         "//build_tools:default_linkopts",
+        "//iree/compiler/Utils",
         "@llvm-project//llvm:Support",
         "@llvm-project//llvm:TableGen",
         "@llvm-project//mlir:MlirTableGenMain",
@@ -393,6 +392,7 @@ cc_library(
         "//iree/compiler/Translation:HALExecutable",
         "//iree/compiler/Translation:IREEVM",
         "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:ArmNeonToLLVMIRTranslation",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:LLVMToLLVMIRTranslation",
         "@llvm-project//mlir:Pass",
@@ -410,12 +410,4 @@ cc_binary(
     deps = [
         ":iree_translate_lib",
     ],
-)
-
-sh_binary(
-    name = "IreeFileCheck",
-    testonly = True,
-    srcs = ["IreeFileCheck.sh"],
-    data = ["@llvm-project//llvm:FileCheck"],
-    tags = ["hostonly"],
 )

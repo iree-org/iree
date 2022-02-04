@@ -49,6 +49,7 @@ iree_py_library(
     runtime
   SRCS
     "__init__.py"
+    "array_interop.py"
     "function.py"
     "system_api.py"
     "tracing.py"
@@ -89,6 +90,13 @@ endif()
 ################################################################################
 # Tests
 ################################################################################
+
+iree_py_test(
+  NAME
+    array_interop_test
+  SRCS
+    "array_interop_test.py"
+)
 
 iree_py_test(
   NAME

@@ -11,6 +11,7 @@
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
+#include "iree/compiler/Dialect/HAL/Utils/InferCustomKernelsTargetInfoFromParent.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Conversion/VectorToSCF/VectorToSCF.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
@@ -19,7 +20,7 @@
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
 #include "mlir/Dialect/SCF/Transforms.h"
-#include "mlir/Dialect/Vector/VectorTransforms.h"
+#include "mlir/Dialect/Vector/Transforms/VectorTransforms.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
@@ -27,6 +28,15 @@
 
 namespace mlir {
 namespace iree_compiler {
+
+// A flag to switch between inline asm and intrinsics while we develop these two
+//  parallel paths.
+static llvm::cl::opt<bool> clMmt4dUseIntrinsics(
+    "iree-codegen-mmt4d-use-intrinsics",
+    llvm::cl::desc("Whether to use instrinsics when lowering vector contracts "
+                   "generated from mmt4d matmuls (as opposed to inline asm). "
+                   "Not for production use."),
+    llvm::cl::init(false));
 
 namespace {
 // Could just be linalg::TilingPattern with a ContractionOpInterface filter, but
@@ -66,7 +76,7 @@ struct LLVMCPUTileFuseAndVectorizePass
 
 LogicalResult applyTileAndFuseCanonicalizationPatterns(FuncOp funcOp) {
   auto context = funcOp.getContext();
-  OwningRewritePatternList patterns(context);
+  RewritePatternSet patterns(context);
   linalg::populateLinalgTilingCanonicalizationPatterns(patterns);
   tensor::DimOp::getCanonicalizationPatterns(patterns, context);
   memref::DimOp::getCanonicalizationPatterns(patterns, context);
@@ -120,16 +130,22 @@ void LLVMCPUTileFuseAndVectorizePass::runOnOperation() {
       }
     }
     assert(consumerOp && "can't find consumerOp");
-    SmallVector<int64_t> consumerTileSize(
+    // Only the parallel loops of the consumer can be tiled for fusion.
+    SmallVector<int64_t> consumerTileSizes(
         tileSizes.begin(),
         tileSizes.begin() + consumerOp.getNumParallelLoops());
-    auto identityIndicesOrder =
-        llvm::to_vector<4>(llvm::seq<int64_t>(0, consumerTileSize.size()));
-    FailureOr<linalg::TileLoopNest> tileLoopNest =
-        linalg::tileConsumerAndFuseProducers(
-            builder, consumerOp, consumerTileSize, identityIndicesOrder);
-    if (failed(tileLoopNest)) return signalPassFailure();
-    consumerOp->replaceAllUsesWith(tileLoopNest->getRootOpReplacementResults());
+    // TODO: The fusion method failes to handle the corner case when no tiling
+    // is needed and segfaults/asserts. So guard it for now.
+    if (llvm::any_of(consumerTileSizes, [](int64_t v) { return v; })) {
+      auto identityIndicesOrder =
+          llvm::to_vector<4>(llvm::seq<int64_t>(0, consumerTileSizes.size()));
+      FailureOr<linalg::TileLoopNest> tileLoopNest =
+          linalg::tileConsumerAndFuseProducers(
+              builder, consumerOp, consumerTileSizes, identityIndicesOrder);
+      if (failed(tileLoopNest)) return signalPassFailure();
+      consumerOp->replaceAllUsesWith(
+          tileLoopNest->getRootOpReplacementResults());
+    }
 
     // Apply canoncalization
     if (failed(applyTileAndFuseCanonicalizationPatterns(funcOp))) {
@@ -143,7 +159,7 @@ void LLVMCPUTileFuseAndVectorizePass::runOnOperation() {
   }
 
   {
-    OwningRewritePatternList tileReductionPatterns(&getContext());
+    RewritePatternSet tileReductionPatterns(&getContext());
 
     // TODO(hanchung): Add a pattern to fold the tensor.extract_slice op.
     // One-trip loop can be removed. But weird patterns could be generated and
@@ -189,8 +205,8 @@ void LLVMCPUTileFuseAndVectorizePass::runOnOperation() {
                 return std::move(reductionTiles);
               }),
           linalg::LinalgTransformationFilter(
-              ArrayRef<Identifier>{},
-              Identifier::get(getVectorizeMarker(), context)));
+              ArrayRef<StringAttr>{},
+              StringAttr::get(context, getVectorizeMarker())));
 
       if (failed(applyPatternsAndFoldGreedily(
               funcOp, std::move(tileReductionPatterns)))) {
@@ -221,7 +237,7 @@ void LLVMCPUTileFuseAndVectorizePass::runOnOperation() {
       funcOp.walk([&](linalg::ContractionOpInterface op) {
         setMarker(op, getWorkgroupL1TileMarker());
       });
-      OwningRewritePatternList l2patterns(&getContext());
+      RewritePatternSet l2patterns(&getContext());
       l2patterns.insert<TileWorkgroups>(
           context,
           linalg::LinalgTilingOptions().setTileSizeComputationFunction(
@@ -231,8 +247,8 @@ void LLVMCPUTileFuseAndVectorizePass::runOnOperation() {
                     static_cast<unsigned>(TilingLevel::VectorTiles));
               }),
           linalg::LinalgTransformationFilter(
-              Identifier::get(getWorkgroupL1TileMarker(), context),
-              Identifier::get(getVectorizeMarker(), context)));
+              StringAttr::get(context, getWorkgroupL1TileMarker()),
+              StringAttr::get(context, getVectorizeMarker())));
 
       if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(l2patterns)))) {
         return signalPassFailure();
@@ -254,15 +270,24 @@ void LLVMCPUTileFuseAndVectorizePass::runOnOperation() {
         [&](linalg::LinalgOp op) { setMarker(op, getVectorizeMarker()); });
   }
 
+  // Op specific conversion.
+  {
+    RewritePatternSet patterns(context);
+    populateLinalgToVectorVectorizeMMT4dPatterns(context, patterns);
+    if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
+      return signalPassFailure();
+    }
+  }
+
   // Apply vectorization patterns.
   {
-    OwningRewritePatternList vectorizationPatterns(&getContext());
+    RewritePatternSet vectorizationPatterns(&getContext());
     linalg::LinalgVectorizationOptions opt;
     linalg::LinalgTransformationFilter f(
-        Identifier::get(getVectorizeMarker(), context));
-    linalg::VectorizationPatterns<linalg::GenericOp, linalg::CopyOp,
-                                  linalg::FillOp>::insert(vectorizationPatterns,
-                                                          opt, f);
+        StringAttr::get(context, getVectorizeMarker()));
+    linalg::VectorizationPatterns<linalg::GenericOp, linalg::FillOp>::insert(
+        vectorizationPatterns, opt, f);
+    vectorizationPatterns.add<linalg::CopyVectorizationPattern>(context);
     vectorizationPatterns.add<linalg::LinalgVectorizationPattern>(
         &getContext(), f.addOpFilter<linalg::ContractionOpInterface>(), opt);
     vector::populateVectorTransferPermutationMapLoweringPatterns(
@@ -328,12 +353,28 @@ void LLVMCPUTileFuseAndVectorizePass::runOnOperation() {
     llvm::dbgs() << "\n\n";
   });
 
+  {
+    // Special-case vector.contract codegen paths. This needs to happen
+    // just before the generic vector ops lowerings.
+    CustomKernelsTargetInfo info;
+    if (succeeded(InferCustomKernelsTargetInfoFromParent(funcOp, info))) {
+      if (clMmt4dUseIntrinsics) {
+        info.add(CustomKernelTargetFeature::Intrinsics);
+      }
+      RewritePatternSet patterns(context);
+      populateVectorContractCustomKernelsPatterns(info, patterns);
+      if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
+        return signalPassFailure();
+      }
+    }
+  }
+
   // Apply vector specific operation lowering.
   {
     vector::VectorTransformsOptions vectorTransformsOptions =
         vector::VectorTransformsOptions().setVectorTransformsOptions(
             vector::VectorContractLowering::OuterProduct);
-    OwningRewritePatternList vectorContractLoweringPatterns(&getContext());
+    RewritePatternSet vectorContractLoweringPatterns(&getContext());
     vectorContractLoweringPatterns.insert<
         vector::ContractionOpToOuterProductOpLowering,
         vector::ContractionOpToMatmulOpLowering, vector::ContractionOpLowering>(

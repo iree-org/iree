@@ -1486,8 +1486,18 @@ iree_status_t iree_vm_bytecode_dispatch(
     //===------------------------------------------------------------------===//
 
     DISPATCH_OP(CORE, Yield, {
-      // TODO(benvanik): yield with execution results.
-      return iree_ok_status();
+      // Perform branch before yielding; in this way we will resume at the
+      // target without needing to retain any information about the yield.
+      int32_t block_pc = VM_DecBranchTarget("dest");
+      const iree_vm_register_remap_list_t* remap_list =
+          VM_DecBranchOperands("operands");
+      iree_vm_bytecode_dispatch_remap_branch_registers(regs, remap_list);
+      pc = block_pc;
+
+      // Return magic status code indicating a yield.
+      // This isn't an error, though callers not supporting coroutines will
+      // treat it as one and propagate it up.
+      return iree_status_from_code(IREE_STATUS_DEFERRED);
     });
 
     //===------------------------------------------------------------------===//
@@ -1972,6 +1982,7 @@ iree_status_t iree_vm_bytecode_dispatch(
       DISPATCH_OP_EXT_F32_UNARY_F32(RsqrtF32, vm_rsqrt_f32);
       DISPATCH_OP_EXT_F32_UNARY_F32(SqrtF32, vm_sqrt_f32);
       DISPATCH_OP_EXT_F32_UNARY_F32(TanhF32, vm_tanh_f32);
+      DISPATCH_OP_EXT_F32_UNARY_F32(ErfF32, vm_erf_f32);
 
       //===----------------------------------------------------------------===//
       // ExtF32: Casting and type conversion/emulation

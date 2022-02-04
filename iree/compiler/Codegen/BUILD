@@ -36,6 +36,7 @@ cc_library(
         ":PassesIncGen",
         "//iree/compiler/Codegen/Dialect:IREECodegenDialect",
         "//iree/compiler/Dialect/HAL/IR",
+        "//iree/compiler/Utils",
         "@llvm-project//mlir:LinalgTransforms",
         "@llvm-project//mlir:Pass",
         "@llvm-project//mlir:Transforms",

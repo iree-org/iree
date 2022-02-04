@@ -5,8 +5,8 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 load("//iree:build_defs.oss.bzl", "iree_cmake_extra_content")
-load("//iree/tools:compilation.bzl", "iree_bytecode_module")
-load("//build_tools/bazel:run_binary_test.bzl", "run_binary_test")
+load("//build_tools/bazel:iree_bytecode_module.bzl", "iree_bytecode_module")
+load("//build_tools/bazel:native_binary.bzl", "native_test")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -52,9 +52,9 @@ iree_bytecode_module(
     ],
 )
 
-run_binary_test(
+native_test(
     name = "simple_embedding_vmvx_sync_test",
-    test_binary = ":simple_embedding_vmvx_sync",
+    src = ":simple_embedding_vmvx_sync",
 )
 
 iree_cmake_extra_content(
@@ -177,9 +177,9 @@ iree_bytecode_module(
     ],
 )
 
-run_binary_test(
+native_test(
     name = "simple_embedding_embedded_sync_test",
-    test_binary = ":simple_embedding_embedded_sync",
+    src = ":simple_embedding_embedded_sync",
 )
 
 iree_cmake_extra_content(
@@ -211,9 +211,9 @@ cc_binary(
     ],
 )
 
-run_binary_test(
+native_test(
     name = "simple_embedding_dylib_test",
-    test_binary = ":simple_embedding_dylib",
+    src = ":simple_embedding_dylib",
 )
 
 iree_cmake_extra_content(
@@ -261,70 +261,76 @@ iree_bytecode_module(
     ],
 )
 
-run_binary_test(
+native_test(
     name = "simple_embedding_vulkan_test",
-    test_binary = ":simple_embedding_vulkan",
+    src = ":simple_embedding_vulkan",
 )
 
 iree_cmake_extra_content(
     content = """
 endif()
-
-if(${IREE_HAL_DRIVER_CUDA} AND (${IREE_TARGET_BACKEND_CUDA} OR DEFINED IREE_HOST_BINARY_ROOT))
 """,
     inline = True,
 )
 
-cc_binary(
-    name = "simple_embedding_cuda",
-    srcs = [
-        "device_cuda.c",
-        "simple_embedding.c",
-    ],
-    deps = [
-        ":simple_embedding_test_bytecode_module_cuda_c",
-        "//iree/base",
-        "//iree/hal",
-        "//iree/hal/cuda/registration",
-        "//iree/modules/hal",
-        "//iree/vm",
-        "//iree/vm:bytecode_module",
-    ],
-)
-
-iree_bytecode_module(
-    name = "simple_embedding_test_bytecode_module_cuda",
-    src = "simple_embedding_test.mlir",
-    c_identifier = "iree_samples_simple_embedding_test_module_cuda",
-    flags = [
-        "-iree-input-type=mhlo",
-        "-iree-mlir-to-vm-bytecode-module",
-        "-iree-hal-target-backends=cuda",
-        "-iree-llvm-debug-symbols=false",
-    ],
-)
-
-# Simple embedding is failing in the CI.
-# run_binary_test(
-#     name = "simple_embedding_cuda_test",
-#     tags = [
-#         "driver=cuda",
-#     ],
-#     test_binary = ":simple_embedding_cuda",
+# Disabled because CUDA is not universally available and Bazel does not
+# support configurability in a reasonable or useful way.
+# iree_cmake_extra_content(
+#     content = """
+# if(${IREE_HAL_DRIVER_CUDA} AND (${IREE_TARGET_BACKEND_CUDA} OR DEFINED IREE_HOST_BINARY_ROOT))
+# """,
+#     inline = True,
 # )
 
-iree_cmake_extra_content(
-    content = """
-iree_run_binary_test(
-  NAME
-    "simple_embedding_cuda_test"
-  LABELS
-    "driver=cuda"
-  TEST_BINARY
-    ::simple_embedding_cuda
-)
+# cc_binary(
+#     name = "simple_embedding_cuda",
+#     srcs = [
+#         "device_cuda.c",
+#         "simple_embedding.c",
+#     ],
+#     deps = [
+#         ":simple_embedding_test_bytecode_module_cuda_c",
+#         "//iree/base",
+#         "//iree/hal",
+#         "//iree/hal/cuda/registration",
+#         "//iree/modules/hal",
+#         "//iree/vm",
+#         "//iree/vm:bytecode_module",
+#     ],
+# )
 
-endif()
-""",
-    inline = True,
-)
+# iree_bytecode_module(
+#     name = "simple_embedding_test_bytecode_module_cuda",
+#     src = "simple_embedding_test.mlir",
+#     c_identifier = "iree_samples_simple_embedding_test_module_cuda",
+#     flags = [
+#         "-iree-input-type=mhlo",
+#         "-iree-mlir-to-vm-bytecode-module",
+#         "-iree-hal-target-backends=cuda",
+#         "-iree-llvm-debug-symbols=false",
+#     ],
+# )
+
+# # native_test(
+# #     name = "simple_embedding_cuda_test",
+# #     src = ":simple_embedding_cuda",
+# #     tags = [
+# #         "driver=cuda",
+# #     ],
+# # )
+
+# iree_cmake_extra_content(
+#     content = """
+# iree_native_test(
+#   NAME
+#     "simple_embedding_cuda_test"
+#   LABELS
+#     "driver=cuda"
+#   SRC
+#     ::simple_embedding_cuda
+# )
+
+# endif()
+# """,
+#     inline = True,
+# )

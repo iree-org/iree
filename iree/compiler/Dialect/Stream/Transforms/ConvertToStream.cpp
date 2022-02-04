@@ -193,7 +193,7 @@ class ConvertToStreamPass : public ConvertToStreamBase<ConvertToStreamPass> {
 
     TypeConverter typeConverter;
     ConversionTarget conversionTarget(getContext());
-    OwningRewritePatternList patterns(&getContext());
+    RewritePatternSet patterns(&getContext());
 
     // Always allow lowerering target dialects and reasonable types.
     conversionTarget.addLegalDialect<IREE::Stream::StreamDialect>();

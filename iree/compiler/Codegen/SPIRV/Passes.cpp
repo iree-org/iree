@@ -72,6 +72,7 @@ void addSPIRVBufferizePasses(OpPassManager &passManager,
 /// tiling and vectorization and before buffer transformations.
 static void addLoopMaterializationPasses(OpPassManager &pm) {
   pm.addNestedPass<FuncOp>(IREE::LinalgExt::createLinalgExtToLoopsPass());
+  pm.addNestedPass<FuncOp>(createMemrefCopyToLinalgPass());
   pm.addNestedPass<FuncOp>(createConvertLinalgToLoopsPass());
   pm.addNestedPass<FuncOp>(createRemoveSingleIterationLoopPass());
 }
@@ -84,12 +85,15 @@ static void addMemRefLoweringPasses(OpPassManager &pm) {
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
+  // math dialect elementry functions -> polynomial form.
+  pm.addNestedPass<FuncOp>(createPolynomialApproximationPass());
+
   // Fold load/store from/to subview ops into the original memref when possible.
   // In SPIR-V we don't use memref descriptor so it's not possible to handle
   // subview ops.
   pm.addPass(memref::createFoldSubViewOpsPass());
   pm.addNestedPass<FuncOp>(arith::createArithmeticExpandOpsPass());
-  pm.addNestedPass<FuncOp>(createStdExpandOpsPass());
+  pm.addNestedPass<FuncOp>(memref::createExpandOpsPass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
@@ -190,8 +194,8 @@ void addSPIRVTileAndDistributePassPipeline(OpPassManager &pm) {
 //
 // In the former path for CodeGen, we perform bufferization first, which will
 // turn padding/copy (via flow.dispatch.tensor.load/store pairs) into
-// linalg.copy ops. Then we deduce CodeGen configuration from the linalg.copy op
-// and use a `lowering.config` attribute on it to drive transformations.
+// linalg.generic ops. Then we deduce CodeGen configuration from the linalg.copy
+// op and use a `lowering.config` attribute on it to drive transformations.
 //
 // In the latter path for CodeGen, we will see linalg.pad_tensor directly.
 // However, properly tiling and distributing it is an ongoing work. So for now
@@ -224,6 +228,7 @@ void addSPIRVTileAndDistributeCopyPassPipeline(OpPassManager &pm) {
 //===----------------------------------------------------------------------===//
 
 void buildSPIRVCodegenPassPipeline(OpPassManager &pm) {
+  pm.nest<ModuleOp>().nest<FuncOp>().addPass(createTypePropagationPass());
   pm.addPass(createSPIRVLowerExecutableTargetPass());
   addMemRefLoweringPasses(pm.nest<ModuleOp>());
   addSPIRVLoweringPasses(pm.nest<ModuleOp>());

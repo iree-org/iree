@@ -86,7 +86,7 @@ class ResolveEntryPointOrdinalsPass
 
   void runOnOperation() override {
     MLIRContext *context = &getContext();
-    OwningRewritePatternList patterns(&getContext());
+    RewritePatternSet patterns(&getContext());
     patterns.insert<ResolveCommandBufferDispatchOrdinals>(context);
     patterns.insert<ResolveCommandBufferDispatchIndirectOrdinals>(context);
     if (failed(applyPatternsAndFoldGreedily(getOperation(),

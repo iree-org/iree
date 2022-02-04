@@ -6,7 +6,7 @@
 
 iree_add_all_subdirs()
 
-if(${IREE_BUILD_EXPERIMENTAL_ROCM})
+if(${IREE_HAL_DRIVER_EXPERIMENTAL_ROCM})
 
 iree_cc_library(
   NAME
@@ -25,7 +25,7 @@ iree_cc_library(
   INCLUDES
   "${CMAKE_CURRENT_LIST_DIR}/../../.."
   DEFINES
-    "IREE_BUILD_EXPERIMENTAL_ROCM=1"
+    "IREE_HAL_HAVE_EXPERIMENTAL_ROCM_DRIVER_MODULE=1"
   PUBLIC
 )
 

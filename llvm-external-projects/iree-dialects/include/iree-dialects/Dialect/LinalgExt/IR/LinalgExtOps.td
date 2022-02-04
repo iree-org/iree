@@ -17,11 +17,11 @@ include "mlir/Interfaces/ControlFlowInterfaces.td"
 // Base class.
 //===----------------------------------------------------------------------===//
 
-class IREELinalgExt_PureOp<string mnemonic, list<OpTrait> traits = []> :
+class IREELinalgExt_PureOp<string mnemonic, list<Trait> traits = []> :
     Op<IREELinalgExt_Dialect, mnemonic, traits> {
 }
 
-class IREELinalgExt_Op<string mnemonic, list<OpTrait> traits = []> :
+class IREELinalgExt_Op<string mnemonic, list<Trait> traits = []> :
     IREELinalgExt_PureOp<mnemonic, !listconcat(traits,
         [AttrSizedOperandSegments,
          DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
@@ -243,6 +243,57 @@ def IREELinalgExt_FftOp : IREELinalgExt_Op<"fft", [
     }
     int64_t getFftLength() {
       return getOperandShape().back();
+    }
+  }];
+}
+
+def IREELinalgExt_ScanOp : IREELinalgExt_Op<"scan",
+    [DeclareOpInterfaceMethods<TiledOpInterface,
+      ["getPartitionableLoops", "generateScalarImplementation",
+       "getTiledImplementation"]>]> {
+  let summary = "Scan operator";
+  let description = [{
+    Computes the inclusive/exclusive scan along a given dimension.
+  }];
+
+  let arguments = (ins Variadic<AnyShaped>:$inputs,
+                       Variadic<AnyShaped>:$outputs,
+                       I64Attr:$dimension,
+                       BoolAttr:$inclusive
+  );
+
+  let builders = [
+    OpBuilder<(ins "ValueRange":$inputs, "ValueRange":$outputs,
+      CArg<"int64_t", "0">:$dimension, CArg<"bool", "true">:$inclusive)>
+  ];
+
+  let results = (outs Variadic<AnyRankedTensor>:$results);
+  let regions = (region AnyRegion:$region);
+  let hasFolder = 1;
+  let assemblyFormat = [{
+    `dimension` `(` $dimension `)`
+    `inclusive` `(` $inclusive `)`
+    attr-dict
+    `ins` `(` $inputs `:` type($inputs) `)`
+    `outs` `(` $outputs `:` type($outputs) `)`
+    $region (`->` type($results)^)?
+  }];
+
+  let extraClassDeclaration = extraLinalgExtOpClassDeclaration # [{
+    Value input() {
+      return getInputOperand(0)->get();
+    }
+    Value accumulator() {
+      return getOutputOperand(1)->get();
+    }
+    Value output() {
+      return getOutputOperand(0)->get();
+    }
+    ShapedType getOperandType() {
+      return input().getType().cast<ShapedType>();
+    }
+    int64_t getOperandRank() {
+      return getOperandType().getRank();
     }
   }];
 }

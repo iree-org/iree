@@ -8,9 +8,9 @@
 # These are not part of the IREE API. Though they may be used by external
 # projects their API may change at any time.
 
-load("//build_tools/bazel:run_binary_test.bzl", "run_binary_test")
 load("//iree:build_defs.oss.bzl", "iree_cmake_extra_content")
-load("//iree:lit_test.bzl", "iree_lit_test_suite")
+load("//build_tools/bazel:iree_lit_test.bzl", "iree_lit_test_suite")
+load("//build_tools/bazel:cc_binary_benchmark.bzl", "cc_binary_benchmark")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -191,11 +191,11 @@ cc_binary(
 iree_lit_test_suite(
     name = "flags_test",
     srcs = ["flags_test.txt"],
-    data = [
-        ":flags_demo",
-        "//iree/tools:IreeFileCheck",
-    ],
     tags = ["hostonly"],
+    tools = [
+        ":flags_demo",
+        "@llvm-project//llvm:FileCheck",
+    ],
 )
 
 cc_library(
@@ -209,7 +209,7 @@ cc_library(
     ],
 )
 
-cc_test(
+cc_binary_benchmark(
     name = "fpu_state_benchmark",
     srcs = ["fpu_state_benchmark.cc"],
     deps = [
@@ -283,7 +283,7 @@ cc_library(
     ],
 )
 
-cc_binary(
+cc_binary_benchmark(
     name = "synchronization_benchmark",
     testonly = True,
     srcs = ["synchronization_benchmark.cc"],
@@ -294,17 +294,42 @@ cc_binary(
     ],
 )
 
-run_binary_test(
-    name = "synchronization_benchmark_test",
-    args = ["--benchmark_min_time=0"],
-    test_binary = ":synchronization_benchmark",
-)
-
 cc_test(
     name = "synchronization_test",
     srcs = ["synchronization_test.cc"],
     deps = [
         ":synchronization",
+        "//iree/testing:gtest",
+        "//iree/testing:gtest_main",
+    ],
+)
+
+cc_library(
+    name = "wait_handle",
+    srcs = [
+        "wait_handle.c",
+        "wait_handle_epoll.c",
+        "wait_handle_impl.h",
+        "wait_handle_kqueue.c",
+        "wait_handle_null.c",
+        "wait_handle_poll.c",
+        "wait_handle_posix.c",
+        "wait_handle_posix.h",
+        "wait_handle_win32.c",
+    ],
+    hdrs = ["wait_handle.h"],
+    deps = [
+        "//iree/base",
+        "//iree/base:core_headers",
+        "//iree/base:tracing",
+    ],
+)
+
+cc_test(
+    name = "wait_handle_test",
+    srcs = ["wait_handle_test.cc"],
+    deps = [
+        ":wait_handle",
         "//iree/testing:gtest",
         "//iree/testing:gtest_main",
     ],
@@ -321,6 +346,20 @@ if(NOT ${IREE_ENABLE_THREADING})
 endif()
 """,
     inline = True,
+)
+
+cc_library(
+    name = "event_pool",
+    srcs = ["event_pool.c"],
+    hdrs = ["event_pool.h"],
+    deps = [
+        ":internal",
+        ":synchronization",
+        ":wait_handle",
+        "//iree/base",
+        "//iree/base:core_headers",
+        "//iree/base:tracing",
+    ],
 )
 
 cc_library(
@@ -355,36 +394,6 @@ cc_test(
         ":synchronization",
         ":threading",
         "//iree/base:cc",
-        "//iree/testing:gtest",
-        "//iree/testing:gtest_main",
-    ],
-)
-
-cc_library(
-    name = "wait_handle",
-    srcs = [
-        "wait_handle.c",
-        "wait_handle_epoll.c",
-        "wait_handle_impl.h",
-        "wait_handle_kqueue.c",
-        "wait_handle_poll.c",
-        "wait_handle_posix.c",
-        "wait_handle_posix.h",
-        "wait_handle_win32.c",
-    ],
-    hdrs = ["wait_handle.h"],
-    deps = [
-        "//iree/base",
-        "//iree/base:core_headers",
-        "//iree/base:tracing",
-    ],
-)
-
-cc_test(
-    name = "wait_handle_test",
-    srcs = ["wait_handle_test.cc"],
-    deps = [
-        ":wait_handle",
         "//iree/testing:gtest",
         "//iree/testing:gtest_main",
     ],

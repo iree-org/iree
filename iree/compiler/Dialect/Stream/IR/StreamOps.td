@@ -17,7 +17,7 @@ include "mlir/Interfaces/InferTypeOpInterface.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/Interfaces/ViewLikeInterface.td"
 
-class Stream_PureOp<string mnemonic, list<OpTrait> traits = []> :
+class Stream_PureOp<string mnemonic, list<Trait> traits = []> :
     Stream_Op<mnemonic, !listconcat(traits, [NoSideEffect])>;
 
 //===----------------------------------------------------------------------===//
@@ -2424,7 +2424,7 @@ def Stream_CmdSerialOp : Stream_Op<"cmd.serial", [
   let regions = (region AnyRegion:$body);
 
   let assemblyFormat = [{
-    `` $body
+    $body
     attr-dict-with-keyword
   }];
 
@@ -2486,7 +2486,7 @@ def Stream_CmdConcurrentOp : Stream_Op<"cmd.concurrent", [
   let regions = (region AnyRegion:$body);
 
   let assemblyFormat = [{
-    `` $body
+    $body
     attr-dict-with-keyword
   }];
 
@@ -2705,7 +2705,6 @@ def Stream_ExecutableOp : Stream_Op<"executable", [
     custom<SymbolVisibility>($sym_visibility)
     $sym_name
     attr-dict-with-keyword
-    ``
     regions
   }];
 
@@ -2760,6 +2759,10 @@ def Stream_ExecutableExportOp : Stream_Op<"executable.export", [
       "FlatSymbolRefAttr":$function_ref
     )>,
   ];
+
+  let extraClassDeclaration = [{
+    ::mlir::FuncOp getFunctionRef();
+  }];
 }
 
 def Stream_BindingSubspanOp : Stream_PureOp<"binding.subspan", [

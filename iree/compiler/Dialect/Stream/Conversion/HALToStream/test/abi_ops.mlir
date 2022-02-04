@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -iree-stream-conversion -canonicalize %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -iree-stream-conversion -canonicalize %s | FileCheck %s
 
 // CHECK-LABEL: @importBufferView
 // CHECK-SAME: (%[[VIEW:.+]]: !hal.buffer_view)

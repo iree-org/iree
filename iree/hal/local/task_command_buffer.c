@@ -501,7 +501,7 @@ typedef struct iree_hal_cmd_fill_buffer_t {
 } iree_hal_cmd_fill_buffer_t;
 
 static iree_status_t iree_hal_cmd_fill_tile(
-    uintptr_t user_context, const iree_task_tile_context_t* tile_context,
+    void* user_context, const iree_task_tile_context_t* tile_context,
     iree_task_submission_t* pending_submission) {
   const iree_hal_cmd_fill_buffer_t* cmd =
       (const iree_hal_cmd_fill_buffer_t*)user_context;
@@ -550,7 +550,7 @@ static iree_status_t iree_hal_task_command_buffer_fill_buffer(
   };
   iree_task_dispatch_initialize(
       command_buffer->scope,
-      iree_task_make_dispatch_closure(iree_hal_cmd_fill_tile, (uintptr_t)cmd),
+      iree_task_make_dispatch_closure(iree_hal_cmd_fill_tile, (void*)cmd),
       workgroup_size, workgroup_count, &cmd->task);
   cmd->target_buffer = target_buffer;
   cmd->target_offset = target_offset;
@@ -575,7 +575,7 @@ typedef struct iree_hal_cmd_update_buffer_t {
 } iree_hal_cmd_update_buffer_t;
 
 static iree_status_t iree_hal_cmd_update_buffer(
-    uintptr_t user_context, iree_task_t* task,
+    void* user_context, iree_task_t* task,
     iree_task_submission_t* pending_submission) {
   const iree_hal_cmd_update_buffer_t* cmd =
       (const iree_hal_cmd_update_buffer_t*)user_context;
@@ -605,7 +605,7 @@ static iree_status_t iree_hal_task_command_buffer_update_buffer(
 
   iree_task_call_initialize(
       command_buffer->scope,
-      iree_task_make_call_closure(iree_hal_cmd_update_buffer, (uintptr_t)cmd),
+      iree_task_make_call_closure(iree_hal_cmd_update_buffer, (void*)cmd),
       &cmd->task);
   cmd->target_buffer = target_buffer;
   cmd->target_offset = target_offset;
@@ -640,7 +640,7 @@ typedef struct iree_hal_cmd_copy_buffer_t {
 } iree_hal_cmd_copy_buffer_t;
 
 static iree_status_t iree_hal_cmd_copy_tile(
-    uintptr_t user_context, const iree_task_tile_context_t* tile_context,
+    void* user_context, const iree_task_tile_context_t* tile_context,
     iree_task_submission_t* pending_submission) {
   const iree_hal_cmd_copy_buffer_t* cmd =
       (const iree_hal_cmd_copy_buffer_t*)user_context;
@@ -690,7 +690,7 @@ static iree_status_t iree_hal_task_command_buffer_copy_buffer(
   };
   iree_task_dispatch_initialize(
       command_buffer->scope,
-      iree_task_make_dispatch_closure(iree_hal_cmd_copy_tile, (uintptr_t)cmd),
+      iree_task_make_dispatch_closure(iree_hal_cmd_copy_tile, (void*)cmd),
       workgroup_size, workgroup_count, &cmd->task);
   cmd->source_buffer = source_buffer;
   cmd->source_offset = source_offset;
@@ -813,7 +813,7 @@ typedef struct iree_hal_cmd_dispatch_t {
 } iree_hal_cmd_dispatch_t;
 
 static iree_status_t iree_hal_cmd_dispatch_tile(
-    uintptr_t user_context, const iree_task_tile_context_t* tile_context,
+    void* user_context, const iree_task_tile_context_t* tile_context,
     iree_task_submission_t* pending_submission) {
   const iree_hal_cmd_dispatch_t* cmd =
       (const iree_hal_cmd_dispatch_t*)user_context;
@@ -893,10 +893,10 @@ static iree_status_t iree_hal_task_command_buffer_build_dispatch(
   const uint32_t workgroup_count[3] = {workgroup_x, workgroup_y, workgroup_z};
   // TODO(benvanik): expose on API or keep fixed on executable.
   const uint32_t workgroup_size[3] = {1, 1, 1};
-  iree_task_dispatch_initialize(command_buffer->scope,
-                                iree_task_make_dispatch_closure(
-                                    iree_hal_cmd_dispatch_tile, (uintptr_t)cmd),
-                                workgroup_size, workgroup_count, &cmd->task);
+  iree_task_dispatch_initialize(
+      command_buffer->scope,
+      iree_task_make_dispatch_closure(iree_hal_cmd_dispatch_tile, (void*)cmd),
+      workgroup_size, workgroup_count, &cmd->task);
 
   // Tell the task system how much workgroup local memory is required for the
   // dispatch; each invocation of the entry point will have at least as much

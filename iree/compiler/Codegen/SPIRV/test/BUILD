@@ -6,7 +6,7 @@
 
 # Tests for common transforms.
 
-load("//iree:lit_test.bzl", "iree_lit_test_suite")
+load("//build_tools/bazel:iree_lit_test.bzl", "iree_lit_test_suite")
 load("//build_tools/bazel:enforce_glob.bzl", "enforce_glob")
 
 package(
@@ -40,7 +40,6 @@ iree_lit_test_suite(
             "tile_and_vectorize_matmul.mlir",
             "tile_and_vectorize_to_cooperative_ops.mlir",
             "vector_to_cooperative_matrix.mlir",
-            "vectorize_copy_to_workgroup_memory.mlir",
             "vectorize_elementwise_ops.mlir",
             "vectorize_matmul.mlir",
             "vectorize_load_store.mlir",
@@ -51,8 +50,8 @@ iree_lit_test_suite(
             "promote_workgroup_memory.mlir",
         ],
     ),
-    data = [
-        "//iree/tools:IreeFileCheck",
+    tools = [
         "//iree/tools:iree-opt",
+        "@llvm-project//llvm:FileCheck",
     ],
 )

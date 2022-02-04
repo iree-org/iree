@@ -1,5 +1,5 @@
-// RUN: iree-opt -split-input-file -iree-transformation-pipeline -iree-hal-target-backends=llvm %s | IreeFileCheck %s
-// RUN: iree-opt -split-input-file -iree-transformation-pipeline -iree-hal-target-backends=llvm -iree-llvm-link-embedded=false %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -iree-transformation-pipeline -iree-hal-target-backends=llvm %s | FileCheck %s
+// RUN: iree-opt -split-input-file -iree-transformation-pipeline -iree-hal-target-backends=llvm -iree-llvm-link-embedded=false %s | FileCheck %s
 
 // When lowering to CPU code through LLVM, certain LLVM intrinsics require
 // linking against libm (the standard C library of math functions, `-lm`).

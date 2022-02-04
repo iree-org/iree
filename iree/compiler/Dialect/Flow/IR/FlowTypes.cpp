@@ -194,24 +194,6 @@ void FlowDialect::registerTypes() {
 // Type printing and parsing
 //===----------------------------------------------------------------------===//
 
-Attribute FlowDialect::parseAttribute(DialectAsmParser &parser,
-                                      Type type) const {
-  StringRef mnemonic;
-  if (failed(parser.parseKeyword(&mnemonic))) return {};
-  Attribute attr;
-  auto parseResult = generatedAttributeParser(parser, mnemonic, type, attr);
-  if (parseResult.hasValue()) return attr;
-  parser.emitError(parser.getCurrentLocation())
-      << "unknown Flow attribute: " << mnemonic;
-  return {};
-}
-
-void FlowDialect::printAttribute(Attribute attr, DialectAsmPrinter &p) const {
-  if (failed(generatedAttributePrinter(attr, p))) {
-    llvm_unreachable("unknown Flow attribute");
-  }
-}
-
 Type FlowDialect::parseType(DialectAsmParser &parser) const {
   StringRef mnemonic;
   if (failed(parser.parseKeyword(&mnemonic))) return {};

@@ -470,7 +470,7 @@ static LogicalResult printOperation(CppEmitter &emitter, FuncOp functionOp) {
 
   for (Block &block : blocks) {
     // Only print a label if there is more than one block.
-    if (blocks.size() > 1) {
+    if (blocks.size() > 1 && !block.hasNoPredecessors()) {
       if (failed(emitter.emitLabel(block)))
         return failure();
     }

@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -verify-diagnostics -iree-mhlo-to-mhlo-preprocessing %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -verify-diagnostics -iree-mhlo-to-mhlo-preprocessing %s | FileCheck %s
 
 // CHECK-LABEL: @batch_norm_inference
 // CHECK-SAME: %[[X:[^:[:space:]]+]]
@@ -107,24 +107,6 @@ func @reduce_window_variadic(%input0: tensor<1x16x16x64xf32>, %input1: tensor<1x
       padding = dense<[[0, 0], [1, 1], [1, 1], [0, 0]]> : tensor<4x2xi64>
   } : (tensor<1x16x16x64xf32>, tensor<1x16x16x64xi32>, tensor<f32>, tensor<i32>) -> (tensor<1x8x8x64xf32>, tensor<1x8x8x64xi32>)
   return %0#0, %0#1 : tensor<1x8x8x64xf32>, tensor<1x8x8x64xi32>
-}
-
-// -----
-
-func @log_plus_one(%input: tensor<4xf32>) -> tensor<4xf32> {
-  // CHECK: mhlo.add
-  // CHECK: mhlo.log
-  %0 = "mhlo.log_plus_one"(%input) : (tensor<4xf32>) -> tensor<4xf32>
-  return %0: tensor<4xf32>
-}
-
-// -----
-
-func @exponential_minus_one(%input: tensor<4xf32>) -> tensor<4xf32> {
-  // CHECK: mhlo.exponential
-  // CHECK: mhlo.subtract
-  %0 = "mhlo.exponential_minus_one"(%input) : (tensor<4xf32>) -> tensor<4xf32>
-  return %0: tensor<4xf32>
 }
 
 // -----
@@ -340,3 +322,19 @@ func @rng_normal(%arg0: tensor<f32>, %arg1: tensor<f32>) -> tensor<3x5xf32> {
 // CHECK:         %[[SLICE:.+]] = tensor.extract_slice %[[CON]][0] [15] [1] : tensor<16xf32> to tensor<15xf32>
 // CHECK:         %[[RES:.+]] = "mhlo.reshape"(%[[SLICE]]) : (tensor<15xf32>) -> tensor<3x5xf32>
 // CHECK:         return %[[RES]]
+
+// -----
+
+func @scatter_rank0(%arg0: tensor<5x5xi32>, %arg1: tensor<2xi32>, %arg2: tensor<i32>) -> tensor<5x5xi32> {
+  %0 = "mhlo.scatter"(%arg0, %arg1, %arg2) ({
+  ^bb0(%arg3: tensor<i32>, %arg4: tensor<i32>):
+    "mhlo.return"(%arg4) : (tensor<i32>) -> ()
+  }) {indices_are_sorted = true, scatter_dimension_numbers = #mhlo.scatter<inserted_window_dims = [0], scatter_dims_to_operand_dims = [0]>, unique_indices = true} : (tensor<5x5xi32>, tensor<2xi32>, tensor<i32>) -> tensor<5x5xi32>
+  return %0 : tensor<5x5xi32>
+}
+
+// CHECK-LABEL: func @scatter_rank0
+// CHECK-DAG: %[[RE_I:.+]] = "mhlo.reshape"(%arg1) : (tensor<2xi32>) -> tensor<1x2xi32>
+// CHECK-DAG: %[[RE_U:.+]] = "mhlo.reshape"(%arg2) : (tensor<i32>) -> tensor<1xi32>
+// CHECK:     %[[SCATTER:.+]] = "mhlo.scatter"(%arg0, %[[RE_I]], %[[RE_U]])
+// CHECK:       "mhlo.return"(%arg4)

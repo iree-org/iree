@@ -124,6 +124,11 @@ class EmbeddedLinkerTool : public LinkerTool {
     flags.push_back("--no-undefined");
     flags.push_back("--no-allow-shlib-undefined");
 
+    // Workaround for LLD weirdness on Windows; for some reason we get symbol
+    // conflicts only on Windows starting after
+    // https://github.com/llvm/llvm-project/commit/83d59e05b201760e3f364ff6316301d347cbad95
+    flags.push_back("--allow-multiple-definition");
+
     // Drop unused sections.
     flags.push_back("--gc-sections");
 

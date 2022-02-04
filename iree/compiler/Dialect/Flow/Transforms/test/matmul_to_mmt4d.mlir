@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file --iree-flow-convert-linalg-matmul-to-mmt4d='M0=8 K0=2 N0=4' %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file --iree-flow-convert-linalg-matmul-to-mmt4d=enable_generic_slow %s | FileCheck %s
 
 func @check_mmt4d_f32_static_nopad(%arg0: tensor<24x8xf32>, %arg1: tensor<8x32xf32>, %arg2: tensor<24x32xf32>) -> tensor<24x32xf32> {
     %0 = linalg.matmul ins(%arg0, %arg1 : tensor<24x8xf32>, tensor<8x32xf32>) outs(%arg2 : tensor<24x32xf32>) -> tensor<24x32xf32>
@@ -38,7 +38,9 @@ func @check_mmt4d_f32_static_nopad(%arg0: tensor<24x8xf32>, %arg1: tensor<8x32xf
 // CHECK-NEXT:    ^bb0(%{{.*}}: f32, %{{.*}}: f32):
 // CHECK-NEXT:          linalg.yield %arg3 : f32
 // CHECK-NEXT:    } -> tensor<3x8x8x4xf32>
-//      CHECK: %[[MMT4D:.+]] = linalg.mmt4d ins(%[[LHS4DT]], %[[RHS4DT]] : tensor<3x4x8x2xf32>, tensor<8x4x4x2xf32>) outs(%[[DST4DT]] : tensor<3x8x8x4xf32>) -> tensor<3x8x8x4xf32>
+//      CHECK: %[[MMT4D:.+]] = linalg.mmt4d
+// CHECK-SAME:    {comment = "generic tiling parameters, as no known kernel was matched for this matmul and target"}
+// CHECK-SAME:    ins(%[[LHS4DT]], %[[RHS4DT]] : tensor<3x4x8x2xf32>, tensor<8x4x4x2xf32>) outs(%[[DST4DT]] : tensor<3x8x8x4xf32>) -> tensor<3x8x8x4xf32>
 //      CHECK: %[[MMT4DT_INIT:.+]] = linalg.init_tensor [3, 8, 8, 4] : tensor<3x8x8x4xf32>
 //      CHECK: %[[MMT4DT:.+]] = linalg.generic
 // CHECK-SAME:    indexing_maps = [#[[MAP0]], #[[MAP1]]]
@@ -78,11 +80,11 @@ func @check_mmt4d_i8_static_pad(%arg0: tensor<3x5xi8>, %arg1: tensor<5x2xi8>, %a
 }
 //CHECK-LABEL: @check_mmt4d_i8_static_pad(
 // CHECK-SAME: %[[LHS:.+]]: tensor<3x5xi8>, %[[RHS:.+]]: tensor<5x2xi8>, %[[ACC:.+]]: tensor<3x2xi32>)
-//      CHECK: %[[LHSPAD:.+]] = linalg.pad_tensor %[[LHS]] low[0, 0] high[5, 1]
+//      CHECK: %[[LHSPAD:.+]] = tensor.pad %[[LHS]] low[0, 0] high[5, 1]
 //      CHECK: tensor<3x5xi8> to tensor<8x6xi8>
-//      CHECK: %[[RHSPAD:.+]] = linalg.pad_tensor %[[RHS]] low[0, 0] high[1, 2]
+//      CHECK: %[[RHSPAD:.+]] = tensor.pad %[[RHS]] low[0, 0] high[1, 2]
 //      CHECK: tensor<5x2xi8> to tensor<6x4xi8>
-//      CHECK: %[[ACCPAD:.+]] = linalg.pad_tensor %[[ACC]] low[0, 0] high[5, 2]
+//      CHECK: %[[ACCPAD:.+]] = tensor.pad %[[ACC]] low[0, 0] high[5, 2]
 //      CHECK: tensor<3x2xi32> to tensor<8x4xi32>
 //      CHECK: %[[LHS4D:.+]] = tensor.expand_shape %[[LHSPAD]]
 // CHECK-SAME: tensor<8x6xi8> into tensor<1x8x3x2xi8>
@@ -107,11 +109,11 @@ func @check_mmt4d_i8_dynamic(%arg0: tensor<?x?xi8>, %arg1: tensor<?x?xi8>, %arg2
 // CHECK-SAME: %[[LHS:.+]]: tensor<?x?xi8>, %[[RHS:.+]]: tensor<?x?xi8>, %[[ACC:.+]]: tensor<?x?xi32>)
 // ... We omit checking the arithmetic computing padding amounts because that would
 // ... be testing too fine details and that is tested already by end-to-end matmul tests.
-//      CHECK: %[[LHSPAD:.+]] = linalg.pad_tensor %[[LHS]] low[0, 0] high[
+//      CHECK: %[[LHSPAD:.+]] = tensor.pad %[[LHS]] low[0, 0] high[
 //      CHECK: tensor<?x?xi8> to tensor<?x?xi8>
-//      CHECK: %[[RHSPAD:.+]] = linalg.pad_tensor %[[RHS]] low[0, 0] high[
+//      CHECK: %[[RHSPAD:.+]] = tensor.pad %[[RHS]] low[0, 0] high[
 //      CHECK: tensor<?x?xi8> to tensor<?x?xi8>
-//      CHECK: %[[ACCPAD:.+]] = linalg.pad_tensor %[[ACC]] low[0, 0] high[
+//      CHECK: %[[ACCPAD:.+]] = tensor.pad %[[ACC]] low[0, 0] high[
 //      CHECK: tensor<?x?xi32> to tensor<?x?xi32>
 //      CHECK: %[[LHS4D:.+]] = tensor.expand_shape %[[LHSPAD]]
 // CHECK-SAME: tensor<?x?xi8> into tensor<?x8x?x2xi8>

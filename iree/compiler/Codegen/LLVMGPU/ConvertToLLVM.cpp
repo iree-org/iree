@@ -18,7 +18,7 @@
 #include "mlir/Dialect/LLVMIR/ROCDLDialect.h"
 #include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
-#include "mlir/Dialect/Vector/VectorOps.h"
+#include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 namespace mlir {
@@ -104,7 +104,7 @@ class TestLLVMGPULegalizeOpPass
     registry.insert<vector::VectorDialect>();
   }
   void runOnOperation() override {
-    OwningRewritePatternList patterns(&getContext());
+    RewritePatternSet patterns(&getContext());
     populateScalarizeMathOps(patterns);
     populateConvertSharedMemoryAllocOps(patterns);
     if (failed(applyPatternsAndFoldGreedily(getOperation(),
@@ -186,7 +186,7 @@ class ConvertFunc : public ConvertToLLVMPattern {
     SmallVector<NamedAttribute, 4> funcAttrs;
     for (auto attr : funcOp->getAttrs()) {
       if (attr.getName() == SymbolTable::getSymbolAttrName() ||
-          attr.getName() == mlir::function_like_impl::getTypeAttrName()) {
+          attr.getName() == mlir::function_interface_impl::getTypeAttrName()) {
         continue;
       }
       funcAttrs.push_back(attr);
@@ -339,7 +339,8 @@ struct HALInterfaceWorkgroupOpsConverter final
       InterfaceOpTy op, typename InterfaceOpTy::Adaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     int32_t index = static_cast<int32_t>(op.dimension().getSExtValue());
-    std::array<const char *, 3> dimAttr{"x", "y", "z"};
+    std::array<gpu::Dimension, 3> dimAttr{gpu::Dimension::x, gpu::Dimension::y,
+                                          gpu::Dimension::z};
     rewriter.replaceOpWithNewOp<NewOpTy>(op, op.getType(), dimAttr[index]);
     return success();
   }
@@ -348,7 +349,7 @@ struct HALInterfaceWorkgroupOpsConverter final
 }  // anonymous namespace
 
 void populateLLVMConversionPatterns(MLIRContext *context,
-                                    OwningRewritePatternList &patterns,
+                                    RewritePatternSet &patterns,
                                     LLVMTypeConverter &converter) {
   patterns
       .insert<ConvertFunc, ConvertIREEBindingSubspanOp, ConvertIREEConstantOp>(

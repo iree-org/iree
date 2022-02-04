@@ -125,7 +125,7 @@ static ResourceConfigAttr inferResourceConfigFromAffinity(
 // static
 ResourceConfigAttr ResourceConfigAttr::lookup(Operation *op) {
   auto *context = op->getContext();
-  auto attrId = Identifier::get("stream.resources", context);
+  auto attrId = StringAttr::get(context, "stream.resources");
   while (op) {
     if (auto affinityOp = llvm::dyn_cast<AffinityOpInterface>(op)) {
       auto affinityAttr = affinityOp.getAffinity();
@@ -172,7 +172,7 @@ void TimepointAttr::print(AsmPrinter &p) const {
 //===----------------------------------------------------------------------===//
 
 AffinityAttr AffinityAttr::lookup(Operation *op) {
-  auto attrId = Identifier::get("stream.affinity", op->getContext());
+  auto attrId = StringAttr::get(op->getContext(), "stream.affinity");
   while (op) {
     if (auto affinityOp = llvm::dyn_cast<AffinityOpInterface>(op)) {
       auto affinity = affinityOp.getAffinity();
@@ -228,7 +228,7 @@ void PartitioningConfigAttr::print(AsmPrinter &p) const {
 }
 
 PartitioningConfigAttr PartitioningConfigAttr::lookup(Operation *op) {
-  auto attrId = Identifier::get("stream.partitioning", op->getContext());
+  auto attrId = StringAttr::get(op->getContext(), "stream.partitioning");
   while (op) {
     auto attr = op->getAttrOfType<PartitioningConfigAttr>(attrId);
     if (attr) return attr;
@@ -323,45 +323,6 @@ void StreamDialect::registerTypes() {
 #define GET_TYPEDEF_LIST
 #include "iree/compiler/Dialect/Stream/IR/StreamTypes.cpp.inc"  // IWYU pragma: keep
       >();
-}
-
-//===----------------------------------------------------------------------===//
-// Type printing and parsing
-//===----------------------------------------------------------------------===//
-
-Attribute StreamDialect::parseAttribute(DialectAsmParser &parser,
-                                        Type type) const {
-  StringRef mnemonic;
-  if (failed(parser.parseKeyword(&mnemonic))) return {};
-  Attribute attr;
-  auto parseResult = generatedAttributeParser(parser, mnemonic, type, attr);
-  if (parseResult.hasValue()) return attr;
-  parser.emitError(parser.getCurrentLocation())
-      << "unknown Stream attribute: " << mnemonic;
-  return {};
-}
-
-void StreamDialect::printAttribute(Attribute attr, DialectAsmPrinter &p) const {
-  if (failed(generatedAttributePrinter(attr, p))) {
-    llvm_unreachable("unknown Stream attribute");
-  }
-}
-
-Type StreamDialect::parseType(DialectAsmParser &parser) const {
-  StringRef mnemonic;
-  if (failed(parser.parseKeyword(&mnemonic))) return {};
-  Type type;
-  OptionalParseResult parseResult = generatedTypeParser(parser, mnemonic, type);
-  if (parseResult.hasValue()) return type;
-  parser.emitError(parser.getCurrentLocation())
-      << "unknown Stream type: " << mnemonic;
-  return {};
-}
-
-void StreamDialect::printType(Type type, DialectAsmPrinter &p) const {
-  if (failed(generatedTypePrinter(type, p))) {
-    llvm_unreachable("unknown Stream type");
-  }
 }
 
 }  // namespace Stream

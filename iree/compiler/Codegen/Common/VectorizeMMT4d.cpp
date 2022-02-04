@@ -7,7 +7,7 @@
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
-#include "mlir/Dialect/Vector/VectorOps.h"
+#include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 namespace mlir {
@@ -147,7 +147,7 @@ struct LinalgToVectorVectorizeMMT4dPass
 
   void runOnOperation() override {
     MLIRContext *context = &getContext();
-    OwningRewritePatternList patterns(&getContext());
+    RewritePatternSet patterns(&getContext());
     patterns.insert<VectorizeMMT4DOp>(context);
     if (failed(applyPatternsAndFoldGreedily(getOperation(),
                                             std::move(patterns)))) {
@@ -158,8 +158,8 @@ struct LinalgToVectorVectorizeMMT4dPass
 
 }  // namespace
 
-void populateLinalgToVectorVectorizeMMT4dPatterns(
-    MLIRContext *context, OwningRewritePatternList &patterns) {
+void populateLinalgToVectorVectorizeMMT4dPatterns(MLIRContext *context,
+                                                  RewritePatternSet &patterns) {
   patterns.insert<VectorizeMMT4DOp>(context);
 }
 

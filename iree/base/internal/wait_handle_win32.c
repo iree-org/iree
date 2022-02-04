@@ -17,7 +17,7 @@
 #include "iree/base/internal/wait_handle.h"
 #include "iree/base/target_platform.h"
 
-#if defined(IREE_PLATFORM_WINDOWS)
+#if IREE_WAIT_API == IREE_WAIT_API_WIN32
 
 #include "iree/base/tracing.h"
 
@@ -35,7 +35,7 @@ static_assert(
 
 // Clones a wait handle such that both the |source_handle| and new
 // |out_target_handle| both reference the same wait primitive. The handle must
-// be closed with iree_wait_primitive_close as if it had been created.
+// be closed with iree_wait_handle_close as if it had been created.
 static iree_status_t iree_wait_primitive_clone(
     iree_wait_handle_t* source_handle, iree_wait_handle_t* out_target_handle) {
   if (source_handle->type != IREE_WAIT_PRIMITIVE_TYPE_WIN32_HANDLE) {
@@ -60,7 +60,7 @@ static iree_status_t iree_wait_primitive_clone(
 // Closes an existing handle that was either created manually or via
 // iree_wait_primitive_clone. Must not be called while there are any waiters on
 // the handle.
-static void iree_wait_primitive_close(iree_wait_handle_t* handle) {
+void iree_wait_handle_close(iree_wait_handle_t* handle) {
   if (IREE_LIKELY(handle->value.win32.handle != 0)) {
     CloseHandle((HANDLE)handle->value.win32.handle);
   }
@@ -439,7 +439,7 @@ iree_status_t iree_event_initialize(bool initial_state,
 }
 
 void iree_event_deinitialize(iree_event_t* event) {
-  iree_wait_primitive_close(event);
+  iree_wait_handle_close(event);
 }
 
 void iree_event_set(iree_event_t* event) {
@@ -450,4 +450,4 @@ void iree_event_reset(iree_event_t* event) {
   ResetEvent((HANDLE)event->value.win32.handle);
 }
 
-#endif  // IREE_PLATFORM_WINDOWS
+#endif  // IREE_WAIT_API == IREE_WAIT_API_WIN32

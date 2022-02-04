@@ -42,7 +42,7 @@ class ConvertStandardToVMTestPass
     IREE::VM::TypeConverter typeConverter(
         IREE::VM::TargetOptions::FromFlags::get());
 
-    OwningRewritePatternList patterns(&getContext());
+    RewritePatternSet patterns(&getContext());
     populateStandardToVMPatterns(&getContext(), typeConverter, patterns);
 
     // NOTE: we allow other dialects besides just VM during this pass as we are

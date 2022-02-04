@@ -25,14 +25,14 @@ class CheckToVmConversionInterface : public VMConversionDialectInterface {
  public:
   using VMConversionDialectInterface::VMConversionDialectInterface;
 
-  OwningModuleRef parseVMImportModule() const override {
+  OwningOpRef<mlir::ModuleOp> parseVMImportModule() const override {
     return mlir::parseSourceString(StringRef(iree_check_imports_create()->data,
                                              iree_check_imports_create()->size),
                                    getDialect()->getContext());
   }
 
   void populateVMConversionPatterns(
-      SymbolTable &importSymbols, OwningRewritePatternList &patterns,
+      SymbolTable &importSymbols, RewritePatternSet &patterns,
       TypeConverter &typeConverter) const override {
     populateCheckToVMPatterns(getDialect()->getContext(), importSymbols,
                               patterns, typeConverter);
@@ -44,7 +44,7 @@ class CheckToHalConversionInterface : public HALConversionDialectInterface {
   using HALConversionDialectInterface::HALConversionDialectInterface;
 
   void setupConversionTarget(ConversionTarget &target,
-                             OwningRewritePatternList &patterns,
+                             RewritePatternSet &patterns,
                              TypeConverter &typeConverter) const override {
     populateCheckToHALPatterns(getDialect()->getContext(), patterns,
                                typeConverter);

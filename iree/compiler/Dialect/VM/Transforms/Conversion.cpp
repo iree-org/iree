@@ -115,7 +115,7 @@ class ConversionPass
       }
     }
 
-    OwningRewritePatternList conversionPatterns(&getContext());
+    RewritePatternSet conversionPatterns(&getContext());
     populateUtilConversionPatterns(context, conversionTarget, typeConverter,
                                    conversionPatterns);
     populateUtilToVMPatterns(context, conversionTarget, typeConverter,

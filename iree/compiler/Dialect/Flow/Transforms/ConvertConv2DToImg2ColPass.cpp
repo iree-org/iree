@@ -344,7 +344,7 @@ struct ConvertConv2DToImg2ColPass
   }
   void runOnOperation() override {
     MLIRContext *context = &getContext();
-    OwningRewritePatternList patterns(&getContext());
+    RewritePatternSet patterns(&getContext());
     patterns.insert<Conv2DImg2ColMatmulConversion,
                     DepthwiseConv2DNHWCHWCImg2ColMatmulConversion>(context);
     if (failed(applyPatternsAndFoldGreedily(getOperation(),

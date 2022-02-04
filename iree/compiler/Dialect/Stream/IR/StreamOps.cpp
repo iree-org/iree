@@ -284,6 +284,7 @@ static ParseResult parseResourceRegion(
     }
   }
   return parser.parseRegion(body, regionArgs, operandTypes,
+                            /*argLocations=*/{},
                             /*enableNameShadowing=*/false);
 }
 
@@ -315,6 +316,7 @@ static void printResourceRegion(OpAsmPrinter &p, Operation *op,
                           resultTypes, resultSizes, tiedOperands);
     if (resultTypes.size() != 1) p << ")";
   }
+  p << " ";
   p.printRegion(body, /*printEntryBlockArgs=*/false,
                 /*printBlockTerminators=*/true);
 }
@@ -353,6 +355,7 @@ static ParseResult parseExplicitResourceRegion(
     }
   }
   if (failed(parser.parseRegion(body, regionArgs, operandTypes,
+                                /*argLocations=*/{},
                                 /*enableNameShadowing=*/false))) {
     return failure();
   }
@@ -383,7 +386,7 @@ static void printExplicitResourceRegion(OpAsmPrinter &p, Operation *op,
           operandSizes = operandSizes.drop_front(1);
         }
       });
-  p << ")";
+  p << ") ";
   p.printRegion(body, /*printEntryBlockArgs=*/false,
                 /*printBlockTerminators=*/false);
 }
@@ -1960,6 +1963,14 @@ void ExecutableExportOp::build(OpBuilder &builder, OperationState &state,
                                FlatSymbolRefAttr function_ref) {
   build(builder, state, /*sym_visibility=*/nullptr,
         builder.getStringAttr(sym_name), function_ref);
+}
+
+::mlir::FuncOp ExecutableExportOp::getFunctionRef() {
+  auto executableOp =
+      this->getOperation()->getParentOfType<IREE::Stream::ExecutableOp>();
+  if (!executableOp) return {};
+  return executableOp.getInnerModule().lookupSymbol<::mlir::FuncOp>(
+      function_ref());
 }
 
 //===----------------------------------------------------------------------===//

@@ -78,6 +78,12 @@ def OptimizeVectorTransfer :
   let constructor = "mlir::iree_compiler::createOptimizeVectorTransferPass()";
 }
 
+def TypePropagation :
+    Pass<"iree-codegen-type-propagation", "FuncOp"> {
+  let summary = "Propogate the type of tensor to avoid load/stores of illegal bit widths";
+  let constructor = "mlir::iree_compiler::createTypePropagationPass()";
+}
+
 def RemoveSingleIterationLoop :
     Pass<"iree-codegen-remove-single-iteration-loop", "FuncOp"> {
   let summary = "Remove distributed loop with single iteration.";
@@ -107,6 +113,20 @@ def LinalgToVectorVectorizeMMT4d :
   let summary = "Vectorize a very specific form of linalg.mmt4d";
   let constructor =
       "mlir::iree_compiler::createLinalgToVectorVectorizeMMT4dPass()";
+}
+
+def PolynomialApproximationPass :
+    Pass<"iree-codegen-polynomial-approximation", ""> {
+  let summary = "Convert math operations to their polynomial approximation";
+  let constructor =
+      "mlir::iree_compiler::createPolynomialApproximationPass()";
+}
+
+def MemrefCopyToLinalgPass :
+    Pass<"iree-codegen-memrefcopy-to-linalg", "FuncOp"> {
+  let summary = "Convert memref.copy to linalg op";
+  let constructor =
+      "mlir::iree_compiler::createMemrefCopyToLinalgPass()";
 }
 //------------------------------------------------------------------------------
 // LLVMCPU
@@ -140,12 +160,6 @@ def LLVMCPUSynchronizeSymbolVisibility :
   let constructor = "mlir::iree_compiler::createLLVMCPUSynchronizeSymbolVisibilityPass()";
 }
 
-def LLVMCPUTileAndVectorize
-    : Pass<"iree-llvmcpu-tile-and-vectorize", "FuncOp"> {
-  let summary = "Tile and vectorize workgroups tiles";
-  let constructor = "mlir::iree_compiler::createLLVMCPUTileAndVectorizePass()";
-}
-
 def LLVMCPUTileFuseAndVectorize
     : Pass<"iree-llvmcpu-tile-fuse-and-vectorize", "FuncOp"> {
   let summary = "Tile, fuse and vectorize Linalg ops";
@@ -159,10 +173,21 @@ def LLVMCPUUnfuseFMAOps :
   let constructor = "mlir::iree_compiler::createLLVMCPUUnfuseFMAOpsPass()";
 }
 
-def VectorToAArch64InlineAsm :
-    Pass<"iree-llvmcpu-vector-to-aarch64-inline-asm", "FuncOp"> {
-  let summary = "Convert vector operations to aarch64 inline asm LLVMIR dialect";
-  let constructor = "mlir::iree_compiler::createVectorToAArch64InlineAssemblyPass()";
+def VectorContractCustomKernels :
+    Pass<"iree-llvmcpu-vector-contract-custom-kernels", "FuncOp"> {
+  let summary = "Enable custom kernels (inline assembly or intrinsics) for some vector.contract ops";
+  let constructor = "mlir::iree_compiler::createVectorContractCustomKernelsPass()";
+  let options = [
+    Option<"arch", "arch", "std::string",
+            /*default=*/"",
+           "Target architecture, e.g. aarch64">,
+    Option<"features", "features", "std::string",
+            /*default=*/"",
+           "Additional CPU feature flags, e.g. +dotprod">,
+    Option<"intrinsics", "intrinsics", "bool",
+            /*default=*/"false",
+           "Use intrinsics over inline assembly where applicable">,
+  ];
 }
 
 //------------------------------------------------------------------------------
@@ -294,13 +319,6 @@ def SPIRVVectorizeLoadStore :
     Pass<"iree-spirv-vectorize-load-store", "ModuleOp"> {
   let summary = "Vectorize load/store of memrefs for better memory access";
   let constructor = "mlir::iree_compiler::createSPIRVVectorizeLoadStore()";
-}
-
-def SPIRVCopyToWorkgroupMemory :
-    Pass<"iree-spirv-copy-to-workgroup-memory", "FuncOp"> {
-  let summary = "Lower linalg.copy for copying data to workgroup memory";
-  let constructor =
-      "mlir::iree_compiler::createSPIRVCopyToWorkgroupMemoryPass()";
 }
 
 //------------------------------------------------------------------------------

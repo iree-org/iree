@@ -19,8 +19,8 @@ iree_lit_test_suite(
     "hoist_inlined_rodata.mlir"
     "ordinal_allocation.mlir"
     "sink_defining_ops.mlir"
-  DATA
-    iree::tools::IreeFileCheck
+  TOOLS
+    FileCheck
     iree::tools::iree-opt
 )
 

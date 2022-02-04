@@ -153,10 +153,10 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
     if (translationInfo.hasValue()) {
       LogicalResult verificationStatus = success();
       switch (translationInfo.getValue().getDispatchLoweringPassPipeline()) {
-        case IREE::Codegen::DispatchLoweringPassPipeline::CPUTensorToVectors:
+        case IREE::Codegen::DispatchLoweringPassPipeline::CPUDoubleTilingExpert:
           verificationStatus = verifyLoweringConfiguration(
               moduleOp, translationInfo.getValue(),
-              verifyTensorToVectorsPassPipelineConfig);
+              verifyDoubleTilingExpertPassPipelineConfig);
           break;
         default:;
       }
@@ -177,12 +177,11 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
             break;
           case IREE::Codegen::DispatchLoweringPassPipeline::
               CPUSingleTilingExpert:
-            nestedModulePM.addNestedPass<FuncOp>(
-                createConvertToDestinationPassingStylePass());
             addSingleTilingExpertPassPipeline(nestedModulePM);
             break;
-          case IREE::Codegen::DispatchLoweringPassPipeline::CPUTensorToVectors:
-            addTensorToVectorsPassPipeline(nestedModulePM, lowerToVectors);
+          case IREE::Codegen::DispatchLoweringPassPipeline::
+              CPUDoubleTilingExpert:
+            addDoubleTilingExpertPassPipeline(nestedModulePM);
             break;
           case IREE::Codegen::DispatchLoweringPassPipeline::
               CPUTileFuseAndVectorize:

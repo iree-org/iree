@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -pass-pipeline='hal.executable(hal.executable.variant(builtin.module(builtin.func(iree-spirv-vector-to-cooperative-ops,cse))))' %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -pass-pipeline='hal.executable(hal.executable.variant(builtin.module(builtin.func(iree-spirv-vector-to-cooperative-ops,cse))))' %s | FileCheck %s
 
 #map0 = affine_map<(d0, d1) -> (d0, d1)>
 #map1 = affine_map<(d0, d1, d2) -> (d0, d2)>
@@ -154,5 +154,3 @@ hal.executable private @const_elementwise_ops  {
     }
   }
 }
-
-

@@ -16,11 +16,11 @@
 
 set -euo pipefail
 
-POLICY="${1:-always_on}"
+POLICY="${1:-performance}"
 
 readonly MALI_GPU_PATH="/sys/devices/platform/1c500000.mali"
 
-echo "GPU info (before changing power policy):"
+echo "GPU info (before changing frequency scaling policy):"
 echo 'policy\t\t\t\t\tcur\tmin\tmax'
 echo "--------------------------------------------------------------"
 paste \
@@ -29,22 +29,26 @@ paste \
   "${MALI_GPU_PATH}/min_freq" \
   "${MALI_GPU_PATH}/max_freq"
 
-echo "Setting GPU power policy to ${POLICY}"
+echo "Setting GPU frequency scaling policy to ${POLICY}"
 
-if [[ "$POLICY" == "always_on" ]]; then
-  echo "always_on" > "${MALI_GPU_PATH}/power_policy"
-  cat "${MALI_GPU_PATH}/max_freq" > "${MALI_GPU_PATH}/scaling_max_freq"
-  cat "${MALI_GPU_PATH}/max_freq" > "${MALI_GPU_PATH}/scaling_min_freq"
-elif [[ "$POLICY" == "coarse_demand" ]]; then
-  echo "coarse_demand" > "${MALI_GPU_PATH}/power_policy"
-  cat "${MALI_GPU_PATH}/max_freq" > "${MALI_GPU_PATH}/scaling_max_freq"
-  cat "${MALI_GPU_PATH}/min_freq" > "${MALI_GPU_PATH}/scaling_min_freq"
-else
-  echo "Unknown power policy: ${POLICY}"
-  exit 1
-fi
+case "$POLICY" in
+  performance)
+    echo "always_on" > "${MALI_GPU_PATH}/power_policy"
+    cat "${MALI_GPU_PATH}/max_freq" > "${MALI_GPU_PATH}/scaling_max_freq"
+    cat "${MALI_GPU_PATH}/max_freq" > "${MALI_GPU_PATH}/scaling_min_freq"
+    ;;
+  default)
+    echo "coarse_demand" > "${MALI_GPU_PATH}/power_policy"
+    cat "${MALI_GPU_PATH}/max_freq" > "${MALI_GPU_PATH}/scaling_max_freq"
+    cat "${MALI_GPU_PATH}/min_freq" > "${MALI_GPU_PATH}/scaling_min_freq"
+    ;;
+  *)
+    echo "Unknown frequency scaling policy: ${POLICY}"
+    exit 1
+    ;;
+esac
 
-echo "GPU info (after changing power policy):"
+echo "GPU info (after changing frequency scaling policy):"
 echo 'policy\t\t\t\t\tcur\tmin\tmax'
 echo "--------------------------------------------------------------"
 paste \

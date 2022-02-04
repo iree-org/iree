@@ -113,7 +113,7 @@ class ExecutableCreateOpConversion
 void populateHALExecutableToVMPatterns(MLIRContext *context,
                                        SymbolTable &importSymbols,
                                        TypeConverter &typeConverter,
-                                       OwningRewritePatternList &patterns) {
+                                       RewritePatternSet &patterns) {
   // hal.executables are not needed after conversion as we extract their
   // contents during conversion of the ops that use them.
   patterns.insert<RemoveExecutableOpConversion>(context);

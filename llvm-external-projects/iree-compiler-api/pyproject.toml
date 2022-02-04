@@ -4,7 +4,7 @@ requires = [
     "wheel",
     # There is no fundamental reason to pin this CMake version, beyond
     # build stability.
-    "cmake==3.18",
+    "cmake==3.22.2",
     "ninja==1.10.2",
     # MLIR build depends.
     "numpy",

@@ -44,7 +44,7 @@ inline void registerMlirPasses() {
   registerLoopCoalescingPass();
   registerLoopInvariantCodeMotionPass();
   registerAffineScalarReplacementPass();
-  registerParallelLoopCollapsingPass();
+  registerSCFParallelLoopCollapsingPass();
   registerPrintOpStatsPass();
   registerViewOpGraphPass();
   registerStripDebugInfoPass();
@@ -61,6 +61,9 @@ inline void registerMlirPasses() {
 
   // Linalg
   registerLinalgPasses();
+
+  // LLVM
+  registerConvertArmNeon2dToIntrPass();
 
   // MemRef
   memref::registerMemRefPasses();

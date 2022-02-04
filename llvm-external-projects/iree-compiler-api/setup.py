@@ -91,12 +91,18 @@ class CMakeBuildPy(_build_py):
     cfg = "Release"
     cmake_args = [
         "-GNinja",
+        "--log-level=VERBOSE",
         "-DCMAKE_INSTALL_PREFIX={}".format(cmake_install_dir),
         "-DPython3_EXECUTABLE={}".format(sys.executable),
         "-DPython3_INCLUDE_DIRS={}".format(sysconfig.get_path("include")),
         "-DIREE_VERSION_INFO={}".format(self.distribution.get_version()),
         "-DCMAKE_BUILD_TYPE={}".format(cfg),
     ]
+
+    # Enable CUDA if specified.
+    cuda_target_option = os.getenv("IREE_TARGET_BACKEND_CUDA")
+    if cuda_target_option:
+      cmake_args.append(f"-DIREE_TARGET_BACKEND_CUDA={cuda_target_option}")
 
     build_args = []
     if os.path.exists(cmake_install_dir):

@@ -8,6 +8,7 @@
 # These are generally just wrappers around host heap memory and host threads.
 
 load("//iree:build_defs.oss.bzl", "iree_cmake_extra_content")
+load("//build_tools/bazel:cc_binary_benchmark.bzl", "cc_binary_benchmark")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -20,7 +21,7 @@ cc_library(
     hdrs = ["executable_library.h"],
 )
 
-cc_test(
+cc_binary_benchmark(
     name = "executable_library_benchmark",
     srcs = ["executable_library_benchmark.c"],
     deps = [
@@ -121,22 +122,6 @@ endif()
     inline = True,
 )
 
-# TODO(benvanik): move into base/? may be useful for other backends or for other
-# parts of the system (like modules handling IO/RPC).
-cc_library(
-    name = "event_pool",
-    srcs = ["event_pool.c"],
-    hdrs = ["event_pool.h"],
-    deps = [
-        "//iree/base",
-        "//iree/base:core_headers",
-        "//iree/base:tracing",
-        "//iree/base/internal",
-        "//iree/base/internal:synchronization",
-        "//iree/base/internal:wait_handle",
-    ],
-)
-
 cc_library(
     name = "task_driver",
     srcs = [
@@ -158,7 +143,6 @@ cc_library(
         "task_semaphore.h",
     ],
     deps = [
-        ":event_pool",
         ":executable_library",
         ":local",
         "//iree/base",
@@ -166,6 +150,7 @@ cc_library(
         "//iree/base:tracing",
         "//iree/base/internal",
         "//iree/base/internal:arena",
+        "//iree/base/internal:event_pool",
         "//iree/base/internal:synchronization",
         "//iree/base/internal:wait_handle",
         "//iree/hal",

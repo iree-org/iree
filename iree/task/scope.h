@@ -51,7 +51,7 @@ typedef struct iree_task_scope_t {
   IREE_TRACE(uint32_t task_trace_color;)
 
   // A permanent status code set when a task within the scope fails. All pending
-  // tasks will be cancelled, though any in-flight tasks may continue executing
+  // tasks will be aborted, though any in-flight tasks may continue executing
   // to completion.
   iree_atomic_intptr_t permanent_status;
 
@@ -103,6 +103,11 @@ iree_string_view_t iree_task_scope_name(iree_task_scope_t* scope);
 // is performed while tasks are in-flight.
 iree_task_dispatch_statistics_t iree_task_scope_consume_statistics(
     iree_task_scope_t* scope);
+
+// Returns true if the scope has failed.
+// iree_task_scope_consume_status can be used once to get the full status
+// describing the failure and subsequent calls will return the status code.
+bool iree_task_scope_has_failed(iree_task_scope_t* scope);
 
 // Returns the permanent scope failure status to the caller (transfering
 // ownership). The scope will remain in a failed state with the status code.

@@ -171,7 +171,7 @@ static void insertConstantTableLookup(mlir::FuncOp funcOp,
   // insertDispatchSiteIdentifiers). This is how we know which dispatch is
   // calling us and which table row we need to select.
   auto builder = OpBuilder::atBlockBegin(&entryBlock);
-  auto siteId = entryBlock.addArgument(builder.getIndexType());
+  auto siteId = entryBlock.addArgument(builder.getIndexType(), funcOp.getLoc());
 
   IndexSet indexSet(funcOp.getLoc(), builder);
 
@@ -211,14 +211,12 @@ static void insertConstantTableLookup(mlir::FuncOp funcOp,
   }
 
   // Fixup function signature.
-  SmallVector<unsigned> deadArgs;
   llvm::BitVector deadArgMap(funcOp.getNumArguments() + 1);
   for (auto operandIdx : constantTable.coveredOperands.set_bits()) {
     unsigned argIdx = operandToArgMap[operandIdx];
-    deadArgs.push_back(argIdx);
     deadArgMap.set(argIdx);
   }
-  funcOp.setType(funcOp.getTypeWithoutArgsAndResults(deadArgs, {}));
+  funcOp.setType(funcOp.getTypeWithoutArgsAndResults(deadArgMap, {}));
   funcOp.setType(funcOp.getTypeWithArgsAndResults(
       {funcOp.getNumArguments()}, {builder.getIndexType()}, {}, {}));
   entryBlock.eraseArguments(
@@ -290,8 +288,7 @@ static void specializeDispatches(
     MemoizedCmdConstants &memoizedConstants) {
   if (dispatchOps.empty()) return;  // no-op if no dispatches
 
-  auto funcOp = executableOp.getInnerModule().lookupSymbol<mlir::FuncOp>(
-      exportOp.function_refAttr());
+  auto funcOp = exportOp.getFunctionRef();
 
   // Build a constant table for unique per-dispatch constant values.
   auto constantTable = buildConstantTable(funcOp, dispatchOps);

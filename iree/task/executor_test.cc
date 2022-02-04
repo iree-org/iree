@@ -57,9 +57,10 @@ TEST(ExecutorTest, Any) {
   iree_task_executor_t* executor = NULL;
   iree_task_scheduling_mode_t scheduling_mode =
       IREE_TASK_SCHEDULING_MODE_RESERVED;
-  IREE_CHECK_OK(iree_task_executor_create(
-      scheduling_mode, &topology,
-      /*worker_local_memory_size=*/(64 * 1024), allocator, &executor));
+  iree_host_size_t worker_local_memory_size = 0;  // 64 * 1024;
+  IREE_CHECK_OK(iree_task_executor_create(scheduling_mode, &topology,
+                                          worker_local_memory_size, allocator,
+                                          &executor));
   iree_task_topology_deinitialize(&topology);
 
   //
@@ -70,7 +71,7 @@ TEST(ExecutorTest, Any) {
   iree_task_call_t call0;
   iree_task_call_initialize(&scope_a,
                             iree_task_make_call_closure(
-                                [](uintptr_t user_context, iree_task_t* task,
+                                [](void* user_context, iree_task_t* task,
                                    iree_task_submission_t* pending_submission) {
                                   IREE_TRACE_SCOPE0("call0");
                                   EXPECT_EQ(0, user_context);
@@ -85,8 +86,7 @@ TEST(ExecutorTest, Any) {
   iree_task_dispatch_initialize(
       &scope_a,
       iree_task_make_dispatch_closure(
-          [](uintptr_t user_context,
-             const iree_task_tile_context_t* tile_context,
+          [](void* user_context, const iree_task_tile_context_t* tile_context,
              iree_task_submission_t* pending_submission) {
             IREE_TRACE_SCOPE0("tile0");
             EXPECT_EQ(0, user_context);
@@ -97,7 +97,6 @@ TEST(ExecutorTest, Any) {
           },
           0),
       workgroup_size_0, workgroup_count_0, &dispatch0);
-  // dispatch0.header.flags |= IREE_TASK_FLAG_DISPATCH_SLICED;
 
   const uint32_t workgroup_size_1[3] = {128, 1, 1};
   const uint32_t workgroup_count_1[3] = {16, 2, 1};
@@ -105,8 +104,7 @@ TEST(ExecutorTest, Any) {
   iree_task_dispatch_initialize(
       &scope_a,
       iree_task_make_dispatch_closure(
-          [](uintptr_t user_context,
-             const iree_task_tile_context_t* tile_context,
+          [](void* user_context, const iree_task_tile_context_t* tile_context,
              iree_task_submission_t* pending_submission) {
             IREE_TRACE_SCOPE0("tile1");
             EXPECT_EQ(0, user_context);
@@ -117,19 +115,18 @@ TEST(ExecutorTest, Any) {
           },
           0),
       workgroup_size_1, workgroup_count_1, &dispatch1);
-  dispatch1.header.flags |= IREE_TASK_FLAG_DISPATCH_SLICED;
 
   //
   iree_task_call_t call1;
   iree_task_call_initialize(&scope_a,
                             iree_task_make_call_closure(
-                                [](uintptr_t user_context, iree_task_t* task,
+                                [](void* user_context, iree_task_t* task,
                                    iree_task_submission_t* pending_submission) {
                                   IREE_TRACE_SCOPE0("call1");
-                                  EXPECT_EQ(1, user_context);
+                                  EXPECT_EQ((void*)1, user_context);
                                   return iree_ok_status();
                                 },
-                                1),
+                                (void*)1),
                             &call1);
 
 #if 1

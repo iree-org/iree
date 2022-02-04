@@ -6,8 +6,8 @@
 
 """Macros for defining tests that use a trace-runner."""
 
-load("//iree/tools:compilation.bzl", "iree_bytecode_module")
-load("//build_tools/bazel:run_binary_test.bzl", "run_binary_test")
+load("//build_tools/bazel:iree_bytecode_module.bzl", "iree_bytecode_module")
+load("//build_tools/bazel:native_binary.bzl", "native_test")
 
 def iree_trace_runner_test(
         name,
@@ -22,6 +22,7 @@ def iree_trace_runner_test(
         opt_tool = "//iree/tools:iree-opt",
         opt_flags = [],
         tags = [],
+        target_cpu_features = None,
         timeout = None,
         **kwargs):
     """Creates a test running a custom trace-runner on a trace file (yaml).
@@ -46,8 +47,12 @@ def iree_trace_runner_test(
         module: specifies the  path to use for the enerated IREE module (.vmfb). Mandatory,
             unlike in iree_check_test, because trace files (.yaml) reference a specific module file path.
         timeout: timeout for the generated tests.
+        target_cpu_features: currently unimplemented (must be empty), will eventually allow specifying target CPU features.
         **kwargs: any additional attributes to pass to the underlying tests and test suite.
     """
+
+    if target_cpu_features:
+        fail("target_cpu_features must currently be empty")
 
     bytecode_module_name = name + "_bytecode_module"
     iree_bytecode_module(
@@ -65,7 +70,7 @@ def iree_trace_runner_test(
         **kwargs
     )
 
-    run_binary_test(
+    native_test(
         name = name,
         args = [
             "--driver=%s" % driver,
@@ -75,7 +80,7 @@ def iree_trace_runner_test(
             ":%s" % bytecode_module_name,
             ":%s" % trace,
         ],
-        test_binary = trace_runner,
+        src = trace_runner,
         tags = tags + ["driver=%s" % driver],
         timeout = timeout,
         **kwargs
@@ -93,6 +98,7 @@ def iree_single_backend_generated_trace_runner_test(
         opt_tool = "//iree/tools:iree-opt",
         opt_flags = [],
         tags = [],
+        target_cpu_features = None,
         timeout = None,
         **kwargs):
     """Generates an iree_trace_runner_test using a custom python generator script.
@@ -122,8 +128,12 @@ def iree_single_backend_generated_trace_runner_test(
             these flags.
         trace_runner: trace-runner program to run.
         timeout: timeout for the generated tests.
+        target_cpu_features: currently unimplemented (must be empty), will eventually allow specifying target CPU features.
         **kwargs: any additional attributes to pass to the underlying tests and test suite.
     """
+
+    if target_cpu_features:
+        fail("target_cpu_features must currently be empty")
 
     src = "%s.mlir" % (name)
     trace = "%s.yaml" % (name)
@@ -175,6 +185,7 @@ def iree_generated_trace_runner_test(
         opt_flags = [],
         tags = [],
         timeout = None,
+        target_cpu_features_variants = [],
         **kwargs):
     """Generates a suite of iree_trace_runner_test on multiple backends/drivers.
 
@@ -196,13 +207,25 @@ def iree_generated_trace_runner_test(
         opt_tool: Defaulting to iree-opt. Tool used to preprocess the source files
             if opt_flags is specified.
         opt_flags: If specified, source files are preprocessed with opt_tool with
-            these flags.
+            these flags. The special string "#pass_options_variant#" is replaced
+            with the empty string. That may in the future be changed to some
+            automatically determined pass options for each entry in
+            target_cpu_features_variants, as is currently done in the CMake
+            build.
         trace_runner: trace-runner program to run.
         timeout: timeout for the generated tests.
+        target_cpu_features_variants: list of target cpu features variants. Currently unimplemented, so each
+            entry must be either "default" or start with "aarch64:" so as Bazel builds are currently x86-only,
+            we know that it is correct to ignore this.
         **kwargs: any additional attributes to pass to the underlying tests and test suite.
     """
 
+    for target_cpu_features in target_cpu_features_variants:
+        if not (target_cpu_features == "default" or target_cpu_features.startswith("aarch64:")):
+            fail("Entry %s in target_cpu_features_variants: unimplemented" % target_cpu_features)
+
     tests = []
+    processed_opt_flags = [flag.replace("#pass_options_variant#", "") for flag in opt_flags]
     for backend, driver in target_backends_and_drivers:
         suite_entry_name = "_".join([name, backend, driver])
         iree_single_backend_generated_trace_runner_test(
@@ -215,7 +238,7 @@ def iree_generated_trace_runner_test(
             compiler_flags = compiler_flags,
             runner_args = runner_args,
             opt_tool = opt_tool,
-            opt_flags = opt_flags,
+            opt_flags = processed_opt_flags,
             tags = tags,
             timeout = timeout,
             **kwargs

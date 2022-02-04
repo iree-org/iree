@@ -1,4 +1,4 @@
-// RUN: iree-opt -allow-unregistered-dialect -split-input-file -iree-hal-inline-device-switches -canonicalize %s | IreeFileCheck %s
+// RUN: iree-opt -allow-unregistered-dialect -split-input-file -iree-hal-inline-device-switches -canonicalize %s | FileCheck %s
 
 // CHECK-LABEL: @simple_constants
 // CHECK-SAME: %[[DEVICE:.+]]: !hal.device

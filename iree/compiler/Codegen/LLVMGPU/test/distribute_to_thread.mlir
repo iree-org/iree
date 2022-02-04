@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -pass-pipeline='hal.executable(hal.executable.variant(builtin.module(builtin.func(iree-llvmgpu-tile-and-distribute))))' %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -pass-pipeline='hal.executable(hal.executable.variant(builtin.module(builtin.func(iree-llvmgpu-tile-and-distribute))))' %s | FileCheck %s
 
 #config = #iree_codegen.lowering.config<tile_sizes = [[2, 256, 4]], native_vector_size = []>
 #translation = #iree_codegen.translation.info<"LLVMGPUMatmulSimt", workload_per_wg = [256, 2]>
@@ -73,9 +73,9 @@ hal.executable private @dot_dispatch_0  {
 //     CHECK-DAG:  %[[BUFFER1:.+]] = memref.get_global @__shared_memory__ : memref<2x4xf32, 3>
 //         CHECK:  scf.for %[[K:.+]] = %[[C0]] to %[[C1024]] step %[[C4]] {
 //         CHECK:    gpu.barrier
-//         CHECK:    linalg.copy(%{{.*}}, %{{.*}}) {__internal_linalg_transform__ = "copy_to_workgroup_memory"} : memref<2x4xf32, #{{.*}}>, memref<2x4xf32, 3>
+//         CHECK:    linalg.generic {{.*}} ins(%{{.*}} : memref<2x4xf32, #{{.*}}>) outs(%{{.*}} : memref<2x4xf32, 3>) attrs = {__internal_linalg_transform__ = "copy_to_workgroup_memory"}
 //     CHECK-NOT:    gpu.barrier
-//         CHECK:    linalg.copy(%{{.*}}, %{{.*}}) {__internal_linalg_transform__ = "copy_to_workgroup_memory"} : memref<4x256xf32, #{{.*}}>, memref<4x256xf32, 3>
+//         CHECK:    linalg.generic {{.*}} ins(%{{.*}} : memref<4x256xf32, #{{.*}}>) outs(%{{.*}} : memref<4x256xf32, 3>) attrs = {__internal_linalg_transform__ = "copy_to_workgroup_memory"}
 //         CHECK:    gpu.barrier
 //         CHECK:    scf.for %[[IND0:.+]] = %{{.*}} to %[[C2]] step %[[C2]] {
 //         CHECK:      scf.for %[[IND1:.+]] = %{{.*}} to %[[C256]] step %[[C256]] {

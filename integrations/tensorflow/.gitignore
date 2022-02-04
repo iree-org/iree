@@ -1,1 +1,2 @@
 tf-user.bazelrc
+*.egg-info/

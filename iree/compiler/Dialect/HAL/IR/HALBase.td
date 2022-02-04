@@ -792,7 +792,7 @@ def HAL_DeviceMatchExecutableFormatAttr :
 // Base HAL op classes
 //===----------------------------------------------------------------------===//
 
-class HAL_Op<string mnemonic, list<OpTrait> traits = []> :
+class HAL_Op<string mnemonic, list<Trait> traits = []> :
     Op<HAL_Dialect, mnemonic, traits> {
   let parser = [{ return parse$cppClass(parser, &result); }];
   let printer = [{ return print$cppClass(p, *this); }];

@@ -56,6 +56,7 @@ iree_cc_library(
     MLIRROCDLIR
     MLIRSCF
     MLIRSCFToStandard
+    MLIRSCFTransforms
     MLIRStandard
     MLIRStandardOpsTransforms
     MLIRStandardToLLVM
@@ -65,6 +66,7 @@ iree_cc_library(
     MLIRVectorToGPU
     MLIRVectorToLLVM
     MLIRVectorToSCF
+    MLIRVectorTransforms
     iree::compiler::Codegen::Common
     iree::compiler::Codegen::Dialect::IREECodegenDialect
     iree::compiler::Codegen::PassHeaders

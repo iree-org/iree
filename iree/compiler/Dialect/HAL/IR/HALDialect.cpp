@@ -77,14 +77,14 @@ class HALToVMConversionInterface : public VMConversionDialectInterface {
  public:
   using VMConversionDialectInterface::VMConversionDialectInterface;
 
-  OwningModuleRef parseVMImportModule() const override {
+  OwningOpRef<mlir::ModuleOp> parseVMImportModule() const override {
     return mlir::parseSourceString(StringRef(iree_hal_imports_create()->data,
                                              iree_hal_imports_create()->size),
                                    getDialect()->getContext());
   }
 
   void populateVMConversionPatterns(
-      SymbolTable &importSymbols, OwningRewritePatternList &patterns,
+      SymbolTable &importSymbols, RewritePatternSet &patterns,
       TypeConverter &typeConverter) const override {
     populateHALToVMPatterns(getDialect()->getContext(), importSymbols, patterns,
                             typeConverter);

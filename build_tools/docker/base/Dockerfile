@@ -65,7 +65,7 @@ RUN wget "https://github.com/Kitware/CMake/releases/download/v${CMAKE_VERSION?}/
 
 ######## Bazel ########
 WORKDIR /install-bazel
-ARG BAZEL_VERSION=3.7.1
+ARG BAZEL_VERSION=4.2.2
 
 # https://docs.bazel.build/versions/master/install-ubuntu.html
 RUN wget -qO - https://bazel.build/bazel-release.pub.gpg | apt-key add - \
@@ -92,7 +92,7 @@ RUN apt-get update \
   && python3 -m pip install --upgrade pip \
   && python3 -m pip install \
     numpy==1.19.4 absl-py==0.12.0 requests PyYAML==5.4.1 wheel==0.36.2 \
-    pybind11==2.6.1
+    pybind11==2.9.0
 
 ENV PYTHON_BIN /usr/bin/python3
 

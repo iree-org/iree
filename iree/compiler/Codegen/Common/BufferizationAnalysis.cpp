@@ -24,7 +24,7 @@
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
 #include "mlir/Dialect/SCF/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
-#include "mlir/Dialect/Vector/VectorOps.h"
+#include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/IR/BuiltinTypes.h"
 
 #define DEBUG_TYPE "iree-codegen-bufferization-analysis"
@@ -198,7 +198,7 @@ static LogicalResult analyseInterfaceBindingSubspanOp(
   return success();
 }
 
-static LogicalResult analysePadTensorOp(linalg::PadTensorOp padTensorOp,
+static LogicalResult analysePadTensorOp(tensor::PadOp padTensorOp,
                                         BufferizationPlan &plan) {
   plan.insert(padTensorOp.source());
   plan.insert(padTensorOp.result());
@@ -362,56 +362,102 @@ static LogicalResult analyseScfForOp(scf::ForOp forOp,
   return success();
 }
 
-/// Look for destructive update loop pattern.
-///
-/// ```mlir
-///   %result = scf.for %arg0 = ... iter_args(%arg1 = %init) {
-///     %st = subtensor %arg1[...]
-///
-///     %yieldVal = tensor.insert_slice %val, %arg1[...]
-///     scf.yield %yieldVal
-///   }
-///
-/// `%result`, `%arg1` and `%yieldVal` are all already in the same equivalence
-/// class. `%st` and `%arg` can be added to the same equivalence class even
-/// though `%arg1` has multiple uses. Same is true for `%yieldVal` and
-/// `%arg1`. Here we also verify there are no other "value" uses of
-/// `%arg1`. This might be overly constraining, but we can relax gradually.
-static LogicalResult hasDestructiveUpdateLoopPattern(scf::ForOp forOp,
-                                                     BufferizationPlan &plan) {
-  for (BlockArgument arg : forOp.getRegionIterArgs()) {
-    auto isDestructiveUpdateUses = [&](OpOperand &use) -> bool {
-      Operation *user = use.getOwner();
-      return TypeSwitch<Operation *, bool>(user)
-          .Case<tensor::ExtractSliceOp>([&](tensor::ExtractSliceOp sliceOp) {
-            return sliceOp.source() == arg;
-          })
-          .Case<tensor::InsertSliceOp>(
-              [&](tensor::InsertSliceOp subTensorInsertOp) {
-                return subTensorInsertOp.dest() == arg;
-              })
-          .Case<memref::DimOp, scf::YieldOp, tensor::DimOp>(
-              [&](auto op) { return true; })
-          .Default([&](Operation *op) { return false; });
-    };
-    if (llvm::all_of(arg.getUses(), isDestructiveUpdateUses)) {
-      for (Operation *user : arg.getUsers()) {
-        TypeSwitch<Operation *>(user)
-            .Case<tensor::ExtractSliceOp>([&](tensor::ExtractSliceOp sliceOp) {
-              plan.unionSets(sliceOp.source(), sliceOp.result());
-            })
-            .Case<tensor::InsertSliceOp>(
-                [&](tensor::InsertSliceOp subTensorInsertOp) {
-                  if (!isFromReadOnlyTensor(subTensorInsertOp.source(), plan)) {
-                    plan.unionSets(subTensorInsertOp.source(),
-                                   subTensorInsertOp.dest());
-                  }
-                })
-            .Default([&](Operation *) {});
+/// Look for destructive update loop pattern involving `source` using these
+/// constraints
+/// - single tensor.insert_slice operation where `source` is the `dest` operand.
+/// - all `tensor.extract_slice` operations dominate the `tensor.insert_slice`
+/// op.
+static void hasDestructiveUpdatePattern(Value source, BufferizationPlan &plan) {
+  auto isUpdateOp = [](Operation *op) {
+    return isa<tensor::InsertSliceOp, vector::TransferWriteOp>(op);
+  };
+  auto isReadOp = [](Operation *op) {
+    return isa<tensor::ExtractSliceOp, vector::TransferReadOp>(op);
+  };
+  auto getDest = [](Operation *op) -> Value {
+    if (auto insertSliceOp = dyn_cast<tensor::InsertSliceOp>(op)) {
+      return insertSliceOp.dest();
+    }
+    if (auto transferWriteOp = dyn_cast<vector::TransferWriteOp>(op)) {
+      return transferWriteOp.source();
+    }
+    return nullptr;
+  };
+  auto getSource = [](Operation *op) -> Value {
+    if (auto extractSliceOp = dyn_cast<tensor::ExtractSliceOp>(op)) {
+      return extractSliceOp.source();
+    }
+    if (auto transferReadOp = dyn_cast<vector::TransferReadOp>(op)) {
+      return transferReadOp.source();
+    }
+    return nullptr;
+  };
+  // Source should have only one use that is a tensor::InsertSliceOp as a `dest`
+  // operand.
+  Operation *updateOp = nullptr;
+  for (OpOperand &use : source.getUses()) {
+    auto user = use.getOwner();
+    // Process only update ops uses here.
+    if (!isUpdateOp(user)) continue;
+    // If this is not the first use in a tensor::InsertSliceOp abort.
+    if (updateOp) {
+      return;
+    }
+    // If the use is not the `dest` operand, abort.
+    Value dest = getDest(user);
+    assert(dest && "unable to get dest of update op");
+    if (use.get() != dest) {
+      return;
+    }
+    if (isFromReadOnlyTensor(dest, plan)) {
+      return;
+    }
+    updateOp = user;
+  }
+  // Need to have one use of tensor::InsertSliceOp for destructive update
+  // pattern.
+  if (!updateOp) {
+    return;
+  }
+
+  Block *updateOpBlock = updateOp->getBlock();
+  for (OpOperand &use : source.getUses()) {
+    Operation *user = use.getOwner();
+    if (user == updateOp) continue;
+    if (isReadOp(user)) {
+      Value source = getSource(user);
+      assert(source && "unable to find source from read op");
+      if (source != use.get()) {
+        return;
+      }
+      // The read must dominate the insert op. For now just check its in the
+      // same block and before it.
+      if (user->getBlock() != updateOpBlock ||
+          !user->isBeforeInBlock(updateOp)) {
+        return;
+      }
+      continue;
+    } else if (isa<scf::YieldOp, tensor::DimOp>(user)) {
+      continue;
+    }
+    // Unaccounted for use. Return without doing anything;
+    return;
+  }
+
+  // Found destructive update pattern. Tie all the
+  // - extract_slice source and result
+  // - insert_slice value and dest
+  for (Operation *user : source.getUsers()) {
+    if (auto extractSliceOp = dyn_cast<tensor::ExtractSliceOp>(user)) {
+      plan.unionSets(extractSliceOp.source(), extractSliceOp.result());
+      continue;
+    }
+    if (auto insertSliceOp = dyn_cast<tensor::InsertSliceOp>(user)) {
+      if (!isFromReadOnlyTensor(insertSliceOp.source(), plan)) {
+        plan.unionSets(insertSliceOp.source(), insertSliceOp.dest());
       }
     }
   }
-  return success();
 }
 
 /// Ties together operands for operand fusion as exists today by reusing buffer
@@ -486,7 +532,7 @@ LogicalResult createTensorEquivalenceClasses(FuncOp funcOp,
             [&](IREE::HAL::InterfaceBindingSubspanOp subspanOp) {
               return analyseInterfaceBindingSubspanOp(subspanOp, plan);
             })
-        .Case<linalg::PadTensorOp>([&](linalg::PadTensorOp padTensorOp) {
+        .Case<tensor::PadOp>([&](tensor::PadOp padTensorOp) {
           return analysePadTensorOp(padTensorOp, plan);
         })
         .Case<linalg::LinalgOp>([&](linalg::LinalgOp linalgOp) {
@@ -521,11 +567,16 @@ LogicalResult createTensorEquivalenceClasses(FuncOp funcOp,
         })
         .Case<vector::TransferReadOp>(
             [&](vector::TransferReadOp transferReadOp) {
-              plan.insert(transferReadOp.source());
+              if (transferReadOp.source().getType().isa<RankedTensorType>()) {
+                plan.insert(transferReadOp.source());
+              }
               return success();
             })
         .Case<vector::TransferWriteOp>(
             [&](vector::TransferWriteOp transferWriteOp) {
+              if (!transferWriteOp.result().getType().isa<RankedTensorType>()) {
+                return success();
+              }
               return analyseDestructiveUpdateOp(transferWriteOp, nullptr,
                                                 transferWriteOp.source(),
                                                 transferWriteOp.result(), plan);
@@ -534,7 +585,20 @@ LogicalResult createTensorEquivalenceClasses(FuncOp funcOp,
             [&](scf::IfOp ifOp) { return analyseScfIfOp(ifOp, plan); })
         .Case<scf::ForOp>(
             [&](scf::ForOp forOp) { return analyseScfForOp(forOp, plan); })
-        .Default([&](Operation *op) { return success(); });
+        .Case<scf::YieldOp, linalg::InitTensorOp, tensor::DimOp,
+              tensor::ExtractOp, tensor::PadOp>(
+            [&](Operation *op) { return success(); })
+        .Default([&](Operation *op) -> LogicalResult {
+          if (llvm::any_of(op->getOperands(),
+                           [](Value v) {
+                             return v.getType().isa<RankedTensorType>();
+                           }) ||
+              llvm::any_of(op->getResultTypes(),
+                           [](Type t) { return t.isa<RankedTensorType>(); })) {
+            return op->emitOpError("unhandled tensor operation");
+          }
+          return success();
+        });
   };
   if (funcOp.walk<WalkOrder::PreOrder>(bufferMappingFn).wasInterrupted()) {
     return failure();
@@ -544,13 +608,17 @@ LogicalResult createTensorEquivalenceClasses(FuncOp funcOp,
     plan.dump();
   });
 
-  if (funcOp
-          .walk([&](scf::ForOp forOp) -> WalkResult {
-            return hasDestructiveUpdateLoopPattern(forOp, plan);
-          })
-          .wasInterrupted()) {
-    return failure();
-  }
+  funcOp.walk([&](Operation *updateOp) {
+    if (auto insertSliceOp = dyn_cast<tensor::InsertSliceOp>(updateOp)) {
+      hasDestructiveUpdatePattern(insertSliceOp.dest(), plan);
+      return;
+    }
+    if (auto vectorWriteOp = dyn_cast<vector::TransferWriteOp>(updateOp)) {
+      if (vectorWriteOp.source().getType().isa<RankedTensorType>()) {
+        hasDestructiveUpdatePattern(vectorWriteOp.source(), plan);
+      }
+    }
+  });
   DEBUG_WITH_TYPE(DEBUG_TYPE, {
     llvm::dbgs() << "After Destructive update walk ";
     plan.dump();

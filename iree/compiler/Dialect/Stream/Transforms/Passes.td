@@ -33,11 +33,19 @@ def ConvertToStream :
   }];
 }
 
-def EncodeTensors :
-    Pass<"iree-stream-encode-tensors", ""> {
+def EncodeHostTensors :
+    Pass<"iree-stream-encode-host-tensors", ""> {
   let summary = "Encodes tensors into binary formats based on affinity and target support.";
   let constructor = [{
-    mlir::iree_compiler::IREE::Stream::createEncodeTensorsPass()
+    mlir::iree_compiler::IREE::Stream::createEncodeHostTensorsPass()
+  }];
+}
+
+def EncodeDeviceTensors :
+    Pass<"iree-stream-encode-device-tensors", ""> {
+  let summary = "Encodes tensors into binary formats based on affinity and target support.";
+  let constructor = [{
+    mlir::iree_compiler::IREE::Stream::createEncodeDeviceTensorsPass()
   }];
 }
 
@@ -198,15 +206,29 @@ def AnnotateDispatchArguments :
 }
 
 //===----------------------------------------------------------------------===//
-// Stream memoization
-//===----------------------------------------------------------------------===//
-
-// TODO(benvanik): outline streams (ala dispatch regions).
-// TODO(benvanik): deduplicate outlined streams.
-
-//===----------------------------------------------------------------------===//
 // Diagnostics
 //===----------------------------------------------------------------------===//
+
+def DumpStatistics :
+    Pass<"iree-stream-dump-statistics", "mlir::ModuleOp"> {
+  let summary = "Dumps stream dialect usage information to a file.";
+  let constructor = [{
+    mlir::iree_compiler::IREE::Stream::createDumpStatisticsPass()
+  }];
+  let options = [
+    Option<"outputFormat", "output-format", "IREE::Stream::DumpOutputFormat",
+           "IREE::Stream::DumpOutputFormat::Pretty",
+           "Specifies the output format to produce.",
+           [{::llvm::cl::values(
+             clEnumValN(IREE::Stream::DumpOutputFormat::Pretty, "pretty", "Human-readable pretty printed output."),
+             clEnumValN(IREE::Stream::DumpOutputFormat::Verbose, "verbose", "Pretty printed output with additional IR."),
+             clEnumValN(IREE::Stream::DumpOutputFormat::CSV, "csv", "Comma separated values.")
+           )}]>,
+    Option<"outputFile", "output-file",
+           "std::string", /*default=*/"std::string()",
+           "File path to write to; or `` for stderr or `-` for stdout.">
+  ];
+}
 
 def VerifyInput :
     Pass<"iree-stream-verify-input", "mlir::ModuleOp"> {

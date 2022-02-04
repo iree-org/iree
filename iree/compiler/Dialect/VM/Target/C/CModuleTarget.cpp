@@ -27,10 +27,6 @@ static void printCompilerConfigurationBlock(llvm::raw_ostream &output) {
   output << "//" << std::string(77, '=') << "\n"
          << "// compiler configuration\n"
          << "//" << std::string(77, '=') << "\n\n";
-
-  output << "#if defined(IREE_COMPILER_MSVC)\n";
-  output << "#pragma warning(disable:4102)\n";
-  output << "#endif  // IREE_COMPILER_MSVC\n";
 }
 
 static void printModuleComment(IREE::VM::ModuleOp &moduleOp,
@@ -40,6 +36,28 @@ static void printModuleComment(IREE::VM::ModuleOp &moduleOp,
          << "\"\n"
             "//"
          << std::string(77, '=') << "\n";
+}
+
+static LogicalResult printFunctionDeclaration(
+    mlir::FuncOp funcOp, llvm::raw_ostream &output,
+    mlir::emitc::CppEmitter &emitter) {
+  Operation *op = funcOp.getOperation();
+  if (op->hasAttr("emitc.static")) output << "static ";
+
+  if (failed(emitter.emitTypes(funcOp.getLoc(), funcOp.getType().getResults())))
+    return failure();
+  output << " " << funcOp.getName();
+
+  output << "(";
+
+  bool error = false;
+  llvm::interleaveComma(funcOp.getArguments(), output, [&](BlockArgument arg) {
+    if (failed(emitter.emitType(funcOp.getLoc(), arg.getType()))) error = true;
+  });
+  if (error) return failure();
+  output << ");\n";
+
+  return success();
 }
 
 static LogicalResult printRodataBuffers(IREE::VM::ModuleOp &moduleOp,
@@ -117,18 +135,6 @@ static LogicalResult printStructDefinitions(IREE::VM::ModuleOp &moduleOp,
   return success();
 }
 
-static LogicalResult printShim(mlir::FuncOp &funcOp,
-                               llvm::raw_ostream &output) {
-  StringAttr callingConvention = funcOp.getOperation()
-                                     ->getAttr("vm.calling_convention")
-                                     .cast<StringAttr>();
-  if (!callingConvention) {
-    return funcOp.emitError("Couldn't find calling convention attribute");
-  }
-  output << "call_" << callingConvention.getValue() << "_shim";
-  return success();
-}
-
 static LogicalResult buildModuleDescriptors(IREE::VM::ModuleOp &moduleOp,
                                             mlir::emitc::CppEmitter &emitter) {
   SymbolTable symbolTable(moduleOp);
@@ -151,7 +157,7 @@ static LogicalResult buildModuleDescriptors(IREE::VM::ModuleOp &moduleOp,
          << "[] = {\n";
   if (exportOps.empty()) {
     // Empty list placeholder.
-    output << "    {0},\n";
+    output << "    {{0}},\n";
   } else {
     // sort export ops
     llvm::sort(exportOps, [](auto &lhs, auto &rhs) {
@@ -219,12 +225,7 @@ static LogicalResult buildModuleDescriptors(IREE::VM::ModuleOp &moduleOp,
         return exportOp.emitError("Couldn't find referenced FuncOp");
       }
       output << "{"
-             << "(iree_vm_native_function_shim_t)";
-
-      if (failed(printShim(funcOp, output))) {
-        return funcOp.emitError("Error generating shim");
-      }
-      output << ", "
+             << "(iree_vm_native_function_shim_t)iree_emitc_shim, "
              << "(iree_vm_native_function_target_t)" << funcName << "},\n";
     }
   }
@@ -254,7 +255,7 @@ static LogicalResult buildModuleDescriptors(IREE::VM::ModuleOp &moduleOp,
 /// Adapted from BytecodeModuleTarget and extended by C specific passes
 static LogicalResult canonicalizeModule(
     IREE::VM::ModuleOp moduleOp, IREE::VM::CTargetOptions targetOptions) {
-  OwningRewritePatternList patterns(moduleOp.getContext());
+  RewritePatternSet patterns(moduleOp.getContext());
   ConversionTarget target(*moduleOp.getContext());
   target.addLegalDialect<IREE::VM::VMDialect>();
   target.addLegalOp<IREE::Util::DoNotOptimizeOp>();
@@ -343,11 +344,39 @@ LogicalResult translateModuleToC(IREE::VM::ModuleOp moduleOp,
     return success();
   }
 
+  std::string includeGuard = moduleOp.getName().upper();
+  output << "#ifndef " << includeGuard << "_H_\n";
+  output << "#define " << includeGuard << "_H_\n";
+
   auto printInclude = [&output](std::string include) {
     output << "#include \"" << include << "\"\n";
   };
 
   printInclude("iree/vm/api.h");
+  output << "\n";
+
+  output << "#ifdef __cplusplus\n";
+  output << "extern \"C\" {\n";
+  output << "#endif  // __cplusplus\n";
+  output << "\n";
+
+  mlir::emitc::CppEmitter emitter(output, /*declareVariablesAtTop=*/true);
+  for (auto funcOp : moduleOp.getOps<mlir::FuncOp>()) {
+    Operation *op = funcOp.getOperation();
+    if (!op->hasAttr("vm.module.constructor")) continue;
+    if (failed(printFunctionDeclaration(funcOp, output, emitter)))
+      return failure();
+  }
+
+  output << "\n";
+  output << "#ifdef __cplusplus\n";
+  output << "}  // extern \"C\"\n";
+  output << "#endif  // __cplusplus\n";
+  output << "\n";
+
+  output << "#endif  // " << includeGuard << "_H_\n\n";
+  output << "#if defined(EMITC_IMPLEMENTATION)\n";
+
   printInclude("iree/vm/ops.h");
   printInclude("iree/vm/ops_emitc.h");
   printInclude("iree/vm/shims_emitc.h");
@@ -359,7 +388,6 @@ LogicalResult translateModuleToC(IREE::VM::ModuleOp moduleOp,
   printModuleComment(moduleOp, output);
   output << "\n";
 
-  mlir::emitc::CppEmitter emitter(output, /*declareVariablesAtTop=*/true);
   mlir::emitc::CppEmitter::Scope scope(emitter);
 
   if (failed(printRodataBuffers(moduleOp, emitter))) {
@@ -376,33 +404,22 @@ LogicalResult translateModuleToC(IREE::VM::ModuleOp moduleOp,
 
   for (auto funcOp : moduleOp.getOps<mlir::FuncOp>()) {
     Operation *op = funcOp.getOperation();
-    if (op->hasAttr("emitc.static")) output << "static ";
-
-    if (failed(
-            emitter.emitTypes(funcOp.getLoc(), funcOp.getType().getResults())))
+    if (op->hasAttr("vm.module.constructor")) continue;
+    if (failed(printFunctionDeclaration(funcOp, output, emitter)))
       return failure();
-    output << " " << funcOp.getName();
-
-    output << "(";
-
-    bool error = false;
-    llvm::interleaveComma(
-        funcOp.getArguments(), output, [&](BlockArgument arg) {
-          if (failed(emitter.emitType(funcOp.getLoc(), arg.getType())))
-            error = true;
-        });
-    if (error) return failure();
-    output << ");\n";
   }
 
   output << "// DEFINE FUNCTIONS\n";
 
   // Emit code for functions skipping those marked with `vm.emit_at_end`.
-  for (auto funcOp : moduleOp.getOps<mlir::FuncOp>()) {
-    Operation *op = funcOp.getOperation();
-    if (op->hasAttr("vm.emit_at_end")) continue;
-    if (op->hasAttr("emitc.static")) output << "static ";
-    if (failed(emitter.emitOperation(*funcOp.getOperation(),
+  for (Operation &op : moduleOp.getOps()) {
+    // TODO(simon-camp): Clean up. We generate calls to a macro that defines a
+    // struct. As we declare all variables at the start of the function, the
+    // macro call cannot be inlined into the function.
+    if (!isa<mlir::FuncOp, emitc::CallOp>(op)) continue;
+    if (op.hasAttr("vm.emit_at_end")) continue;
+    if (op.hasAttr("emitc.static")) output << "static ";
+    if (failed(emitter.emitOperation(op,
                                      /*trailingSemicolon=*/false)))
       return failure();
   }
@@ -424,6 +441,7 @@ LogicalResult translateModuleToC(IREE::VM::ModuleOp moduleOp,
       return failure();
   }
 
+  output << "#endif  // EMITC_IMPLEMENTATION\n";
   return success();
 }
 

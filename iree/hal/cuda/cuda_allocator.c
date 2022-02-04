@@ -147,6 +147,7 @@ iree_hal_cuda_allocator_query_buffer_compatibility(
 static void iree_hal_cuda_buffer_free(iree_hal_cuda_context_wrapper_t* context,
                                       iree_hal_memory_type_t memory_type,
                                       CUdeviceptr device_ptr, void* host_ptr) {
+  IREE_TRACE_ZONE_BEGIN(z0);
   if (iree_all_bits_set(memory_type, IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL)) {
     // Device local.
     CUDA_IGNORE_ERROR(context->syms, cuMemFree(device_ptr));
@@ -154,6 +155,7 @@ static void iree_hal_cuda_buffer_free(iree_hal_cuda_context_wrapper_t* context,
     // Host local.
     CUDA_IGNORE_ERROR(context->syms, cuMemFreeHost(host_ptr));
   }
+  IREE_TRACE_ZONE_END(z0);
 }
 
 static iree_status_t iree_hal_cuda_allocator_allocate_buffer(
@@ -181,9 +183,10 @@ static iree_status_t iree_hal_cuda_allocator_allocate_buffer(
         IREE_HAL_MEMORY_TYPE_HOST_LOCAL | IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE;
   }
 
-  iree_status_t status;
+  iree_status_t status = iree_ok_status();
   void* host_ptr = NULL;
   CUdeviceptr device_ptr = 0;
+  IREE_TRACE_ZONE_BEGIN_NAMED(z0, "iree_hal_cuda_buffer_allocate");
   if (iree_all_bits_set(memory_type, IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL)) {
     // Device local case.
     if (iree_all_bits_set(memory_type, IREE_HAL_MEMORY_TYPE_HOST_VISIBLE)) {
@@ -218,6 +221,7 @@ static iree_status_t iree_hal_cuda_allocator_allocate_buffer(
           cuMemHostGetDevicePointer(&device_ptr, host_ptr, /*flags=*/0));
     }
   }
+  IREE_TRACE_ZONE_END(z0);
 
   iree_hal_buffer_t* buffer = NULL;
   if (iree_status_is_ok(status)) {
@@ -255,15 +259,6 @@ static iree_status_t iree_hal_cuda_allocator_allocate_buffer(
   return status;
 }
 
-static iree_status_t iree_hal_cuda_allocator_wrap_buffer(
-    iree_hal_allocator_t* base_allocator, iree_hal_memory_type_t memory_type,
-    iree_hal_memory_access_t allowed_access,
-    iree_hal_buffer_usage_t allowed_usage, iree_byte_span_t data,
-    iree_allocator_t data_allocator, iree_hal_buffer_t** out_buffer) {
-  return iree_make_status(IREE_STATUS_UNAVAILABLE,
-                          "wrapping of external buffers not supported");
-}
-
 static void iree_hal_cuda_allocator_deallocate_buffer(
     iree_hal_allocator_t* base_allocator, iree_hal_buffer_t* base_buffer) {
   iree_hal_cuda_allocator_t* allocator =
@@ -280,6 +275,34 @@ static void iree_hal_cuda_allocator_deallocate_buffer(
   iree_hal_buffer_destroy(base_buffer);
 }
 
+static iree_status_t iree_hal_cuda_allocator_wrap_buffer(
+    iree_hal_allocator_t* base_allocator, iree_hal_memory_type_t memory_type,
+    iree_hal_memory_access_t allowed_access,
+    iree_hal_buffer_usage_t allowed_usage, iree_byte_span_t data,
+    iree_allocator_t data_allocator, iree_hal_buffer_t** out_buffer) {
+  return iree_make_status(IREE_STATUS_UNAVAILABLE,
+                          "wrapping of external buffers not supported");
+}
+
+static iree_status_t iree_hal_cuda_allocator_import_buffer(
+    iree_hal_allocator_t* base_allocator, iree_hal_memory_type_t memory_type,
+    iree_hal_memory_access_t allowed_access,
+    iree_hal_buffer_usage_t allowed_usage,
+    iree_hal_external_buffer_t* external_buffer,
+    iree_hal_buffer_t** out_buffer) {
+  return iree_make_status(IREE_STATUS_UNAVAILABLE,
+                          "importing from external buffers not supported");
+}
+
+static iree_status_t iree_hal_cuda_allocator_export_buffer(
+    iree_hal_allocator_t* base_allocator, iree_hal_buffer_t* buffer,
+    iree_hal_external_buffer_type_t requested_type,
+    iree_hal_external_buffer_flags_t requested_flags,
+    iree_hal_external_buffer_t* out_external_buffer) {
+  return iree_make_status(IREE_STATUS_UNAVAILABLE,
+                          "exporting to external buffers not supported");
+}
+
 static const iree_hal_allocator_vtable_t iree_hal_cuda_allocator_vtable = {
     .destroy = iree_hal_cuda_allocator_destroy,
     .host_allocator = iree_hal_cuda_allocator_host_allocator,
@@ -288,6 +311,8 @@ static const iree_hal_allocator_vtable_t iree_hal_cuda_allocator_vtable = {
     .query_buffer_compatibility =
         iree_hal_cuda_allocator_query_buffer_compatibility,
     .allocate_buffer = iree_hal_cuda_allocator_allocate_buffer,
-    .wrap_buffer = iree_hal_cuda_allocator_wrap_buffer,
     .deallocate_buffer = iree_hal_cuda_allocator_deallocate_buffer,
+    .wrap_buffer = iree_hal_cuda_allocator_wrap_buffer,
+    .import_buffer = iree_hal_cuda_allocator_import_buffer,
+    .export_buffer = iree_hal_cuda_allocator_export_buffer,
 };

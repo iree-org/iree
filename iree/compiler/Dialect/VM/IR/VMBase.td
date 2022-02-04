@@ -187,7 +187,7 @@ def VM_ImportInterface : OpInterface<"ImportInterface"> {
   ];
 }
 
-class VM_Op<string mnemonic, list<OpTrait> traits = []> :
+class VM_Op<string mnemonic, list<Trait> traits = []> :
     Op<VM_Dialect, mnemonic,
        !listconcat(traits, [VM_OpInterface])> {
   let parser = [{ return parse$cppClass(parser, &result); }];
@@ -214,7 +214,7 @@ def VM_GlobalOpInterface : OpInterface<"VMGlobalOp"> {
       auto storageType = $_self.getStorageType();
       assert(storageType.isIntOrFloat());
       assert(storageType.getIntOrFloatBitWidth() % 8 == 0);
-      return storageType.getIntOrFloatBitWidth() / 8;
+      return IREE::Util::getRoundedElementByteWidth(storageType);
     }]>,
     InterfaceMethod<[{}], "StringRef", "getSymbolName", (ins)>,
     InterfaceMethod<[{}], "bool", "isMutable", (ins)>,

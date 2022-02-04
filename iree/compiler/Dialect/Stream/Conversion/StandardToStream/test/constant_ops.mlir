@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -iree-stream-conversion %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -iree-stream-conversion %s | FileCheck %s
 
 // CHECK-LABEL: @constantTensor
 func @constantTensor() {

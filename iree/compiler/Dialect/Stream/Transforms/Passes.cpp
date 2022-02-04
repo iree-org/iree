@@ -108,9 +108,11 @@ void buildStreamAsyncPassPipeline(OpPassManager &passManager,
   // Lower stream.tensor.* ops to stream.async.* ops based on
   // affinity/configuration assigned during placement.
   passManager.addNestedPass<IREE::Util::InitializerOp>(
-      IREE::Stream::createEncodeTensorsPass());
+      IREE::Stream::createEncodeHostTensorsPass());
   passManager.addNestedPass<mlir::FuncOp>(
-      IREE::Stream::createEncodeTensorsPass());
+      IREE::Stream::createEncodeHostTensorsPass());
+  passManager.addNestedPass<IREE::Stream::ExecutableOp>(
+      IREE::Stream::createEncodeDeviceTensorsPass());
 
   // Expand builtins to dispatches. This may introduce new executables.
   passManager.addPass(IREE::Stream::createMaterializeBuiltinsPass());
@@ -223,13 +225,15 @@ void buildStreamCmdPassPipeline(OpPassManager &passManager,
 
 void buildStreamOptimizationPassPipeline(
     OpPassManager &passManager, const TransformOptions &transformOptions) {
+  // Forming streams involves a fair amount of subgraph stitching, which can
+  // cause duplication. Run CSE to collapse.
+  addCleanupPatterns(passManager);
+
   //----------------------------------------------------------------------------
   // Binding optimization
   //----------------------------------------------------------------------------
 
   if (transformOptions.optimizeBindings) {
-    // Canonicalizer needs to run so that we have predictable inputs for fusion.
-    passManager.addPass(mlir::createCanonicalizerPass());
     passManager.addPass(IREE::Stream::createFuseDispatchBindingsPass());
 
     // Folding operands requires that CSE folds the inputs that we check for.
@@ -274,6 +278,15 @@ void buildStreamTransformPassPipeline(
   buildStreamAsyncPassPipeline(passManager, transformOptions);
   buildStreamCmdPassPipeline(passManager, transformOptions);
 
+  // Dump statistics before the deeper optimizations happen.
+  // Optimizations such as dispatch operand fusion remove information we can use
+  // to determine memory usage by dispatches.
+  if (transformOptions.dumpStatisticsFormat != DumpOutputFormat::None) {
+    passManager.addPass(IREE::Stream::createDumpStatisticsPass(
+        transformOptions.dumpStatisticsFormat,
+        transformOptions.dumpStatisticsFile));
+  }
+
   //----------------------------------------------------------------------------
   // Optimizations (may be required by some targets)
   //----------------------------------------------------------------------------
@@ -284,8 +297,7 @@ void buildStreamTransformPassPipeline(
   // Post-pipeline cleanup
   //----------------------------------------------------------------------------
 
-  // Forming streams involves a fair amount of subgraph stitching, which can
-  // cause duplication. Run CSE to collapse.
+  // Final cleanup after we optimize dispatches and fuse operands and bindings.
   addCleanupPatterns(passManager);
 
   // Symbol DCE any remaining variables/functions that are now no longer

@@ -66,6 +66,11 @@ iree_task_dispatch_statistics_t iree_task_scope_consume_statistics(
   return result;
 }
 
+bool iree_task_scope_has_failed(iree_task_scope_t* scope) {
+  return iree_atomic_load_intptr(&scope->permanent_status,
+                                 iree_memory_order_seq_cst) != 0;
+}
+
 iree_status_t iree_task_scope_consume_status(iree_task_scope_t* scope) {
   iree_status_t old_status = iree_ok_status();
   iree_status_t new_status = iree_ok_status();
@@ -107,7 +112,6 @@ void iree_task_scope_abort(iree_task_scope_t* scope) {
 
 void iree_task_scope_fail(iree_task_scope_t* scope, iree_task_t* task,
                           iree_status_t status) {
-  // TODO(benvanik): logging/tracing based on task.
   iree_task_scope_try_set_status(scope, status);
 }
 

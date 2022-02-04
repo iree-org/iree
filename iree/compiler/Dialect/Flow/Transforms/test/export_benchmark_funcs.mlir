@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -iree-mhlo-input-transformation-pipeline -iree-flow-transformation-pipeline -iree-flow-export-benchmark-funcs %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -iree-mhlo-input-transformation-pipeline -iree-flow-transformation-pipeline -iree-flow-export-benchmark-funcs %s | FileCheck %s
 
 module {
   func @two_dispatch(%arg0: tensor<5x3xf32>, %arg1: tensor<3x5xf32>) -> (tensor<5x5xf32>, tensor<3x5xf32>) {

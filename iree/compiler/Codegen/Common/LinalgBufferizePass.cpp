@@ -57,7 +57,7 @@
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
 #include "mlir/Dialect/SCF/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
-#include "mlir/Dialect/Vector/VectorOps.h"
+#include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/Value.h"
@@ -79,10 +79,16 @@ namespace iree_compiler {
 static SmallVector<Value, 4> getDynamicDims(OpBuilder &b, Location loc,
                                             Value v) {
   SmallVector<Value, 4> dynamicDims;
-  for (auto shape : enumerate(v.getType().cast<ShapedType>().getShape())) {
+  Type t = v.getType();
+  for (auto shape : enumerate(t.cast<ShapedType>().getShape())) {
     if (shape.value() == ShapedType::kDynamicSize) {
-      dynamicDims.push_back(
-          b.createOrFold<memref::DimOp>(loc, v, shape.index()));
+      if (t.isa<MemRefType>()) {
+        dynamicDims.push_back(
+            b.createOrFold<memref::DimOp>(loc, v, shape.index()));
+      } else {
+        dynamicDims.push_back(
+            b.createOrFold<tensor::DimOp>(loc, v, shape.index()));
+      }
     }
   }
   return dynamicDims;
@@ -168,7 +174,7 @@ static bool generatesNoOpSubView(Value src, ArrayRef<OpFoldResult> offsets,
       })) {
     return false;
   }
-  /// Check strides are 0.
+  /// Check strides are 1.
   if (llvm::any_of(strides, [](OpFoldResult ofr) {
         Optional<int64_t> intValue = getConstantIntValue(ofr);
         return !intValue || intValue.getValue() != 1;
@@ -185,6 +191,9 @@ static bool generatesNoOpSubView(Value src, ArrayRef<OpFoldResult> offsets,
         return false;
       }
       continue;
+    }
+    if (dynamicDimsPos >= dynamicDims.size()) {
+      return false;
     }
     if (size.value().get<Value>() == dynamicDims[dynamicDimsPos]) {
       dynamicDimsPos++;
@@ -698,7 +707,7 @@ static LogicalResult convertAnyLinalgOp(
     Value outBuffer = bvm.lookupOrNull(outTensor);
     if (outBuffer && !plan.isEquivalent(outTensor, resultTensor) &&
         op.payloadUsesValueFromOperand(outOperand)) {
-      b.create<linalg::CopyOp>(loc, outBuffer, resultBuffer);
+      createLinalgCopyOp(b, loc, outBuffer, resultBuffer);
     }
     newOutputBuffers.push_back(resultBuffer);
   }
@@ -761,8 +770,7 @@ static LogicalResult convertInterfaceStoreTensorOp(
       b, storeOp.getLoc(), storeFrom.getType().cast<ShapedType>().getRank(),
       storeTo, storeOp.getMixedOffsets(), storeOp.getMixedSizes(),
       storeOp.getMixedStrides());
-
-  b.create<linalg::CopyOp>(storeOp->getLoc(), storeFrom, subview);
+  createLinalgCopyOp(b, storeOp->getLoc(), storeFrom, subview);
   return success();
 }
 
@@ -782,7 +790,7 @@ static LogicalResult convertSubTensorInsertOp(OpBuilder &b,
   Value dest = op.dest();
   if (!plan.isEquivalent(dest, result)) {
     Value destBuffer = bvm.lookup(dest);
-    b.create<linalg::CopyOp>(loc, destBuffer, resultBuffer);
+    createLinalgCopyOp(b, loc, destBuffer, resultBuffer);
   }
 
   Value source = op.source();
@@ -798,7 +806,7 @@ static LogicalResult convertSubTensorInsertOp(OpBuilder &b,
   SmallVector<OpFoldResult> strides = op.getMixedStrides();
   Value subViewOp = createSubviewOp(b, loc, sourceType.getRank(), resultBuffer,
                                     offsets, sizes, strides);
-  b.create<linalg::CopyOp>(loc, sourceBuffer, subViewOp);
+  createLinalgCopyOp(b, loc, sourceBuffer, subViewOp);
   return success();
 }
 
@@ -811,7 +819,7 @@ static LogicalResult convertTensorInsertOp(OpBuilder &b, tensor::InsertOp op,
   Value resultBuffer = bvm.lookup(result);
   if (!plan.isEquivalent(op.dest(), result)) {
     Value destBuffer = bvm.lookup(op.dest());
-    b.create<linalg::CopyOp>(loc, destBuffer, resultBuffer);
+    createLinalgCopyOp(b, loc, destBuffer, resultBuffer);
   }
 
   b.create<memref::StoreOp>(loc, op.scalar(), resultBuffer, op.indices());
@@ -834,7 +842,7 @@ static LogicalResult convertVectorTransferWriteOp(OpBuilder &b,
       // initial value and can avoid the copy.
       !op.source().getDefiningOp<linalg::InitTensorOp>()) {
     Value destBuffer = bvm.lookup(op.source());
-    b.create<linalg::CopyOp>(loc, destBuffer, resultBuffer);
+    createLinalgCopyOp(b, loc, destBuffer, resultBuffer);
   }
 
   // Create a new vector.transfer_write operation without a result value.
@@ -859,7 +867,7 @@ static LogicalResult convertScfForOp(OpBuilder &b, scf::ForOp forOp,
     bvm.map(yieldOperand, resultBuffer);
     if (!plan.isEquivalent(arg.value(), initOperand.get())) {
       Value initBuffer = bvm.lookup(initOperand.get());
-      b.create<linalg::CopyOp>(loc, initBuffer, resultBuffer);
+      createLinalgCopyOp(b, loc, initBuffer, resultBuffer);
     }
   }
   return success();
@@ -892,8 +900,8 @@ static void copyFromAliasingBufferToResultBuffer(
   for (auto result : enumerate(tiedResults)) {
     Value operand = tiedOperands[result.index()];
     if (!plan.isEquivalent(result.value(), operand)) {
-      b.create<linalg::CopyOp>(loc, aliasingBuffers[result.index()],
-                               bvm.lookup(result.value()));
+      createLinalgCopyOp(b, loc, aliasingBuffers[result.index()],
+                         bvm.lookup(result.value()));
     }
   }
 }
@@ -914,28 +922,26 @@ static SmallVector<OpFoldResult> getMemrefSizes(OpBuilder &b, Location loc,
   return sizeMixedValues;
 }
 
-static LogicalResult convertPadTensorOp(OpBuilder &b,
-                                        linalg::PadTensorOp padTensorOp,
+static LogicalResult convertPadTensorOp(OpBuilder &b, tensor::PadOp tensorPadOp,
                                         BlockAndValueMapping &bvm) {
-  auto inputTensor = padTensorOp.source();
+  auto inputTensor = tensorPadOp.source();
   auto inputMemref = bvm.lookup(inputTensor);
 
-  auto loc = padTensorOp.getLoc();
+  auto loc = tensorPadOp.getLoc();
 
-  auto resultPaddedBuffer = bvm.lookup(padTensorOp.result());
+  auto resultPaddedBuffer = bvm.lookup(tensorPadOp.result());
 
   // Get padding value and fill the result buffer.
-  linalg::YieldOp yeildOp =
-      *padTensorOp.region().getOps<linalg::YieldOp>().begin();
-  Value paddingValue = yeildOp.values()[0];
+  auto yeildOp = *tensorPadOp.region().getOps<tensor::YieldOp>().begin();
+  Value paddingValue = yeildOp.value();
 
   auto constOp = paddingValue.getDefiningOp<arith::ConstantOp>();
   if (!constOp) {
-    return padTensorOp.emitError(
+    return tensorPadOp.emitError(
         "Converting linalg.pad_tensor with non-constant padding value");
   }
   if (constOp.getValue().isa<DenseElementsAttr>()) {
-    return padTensorOp.emitError(
+    return tensorPadOp.emitError(
         "Converting linalg.pad_tensor with non-scalar constant padding "
         "value");
   }
@@ -950,10 +956,10 @@ static LogicalResult convertPadTensorOp(OpBuilder &b,
       b.getI64IntegerAttr(1));
 
   auto resultSubView = b.create<memref::SubViewOp>(loc, resultPaddedBuffer,
-                                                   padTensorOp.getMixedLowPad(),
+                                                   tensorPadOp.getMixedLowPad(),
                                                    sizeMixedValues, strides);
   // Copy to the interior region.
-  b.create<linalg::CopyOp>(loc, inputMemref, resultSubView);
+  createLinalgCopyOp(b, loc, inputMemref, resultSubView);
   return success();
 }
 
@@ -1051,12 +1057,12 @@ void LinalgBufferizePass::runOnOperation() {
                   aliasingOp->getResult(0), aliasingBuffers, bvm, plan);
               return success();
             })
-        .Case<linalg::PadTensorOp>([&](linalg::PadTensorOp padTensorOp) {
-          if (failed(getOrAllocateResultBuffers(b, padTensorOp, bvm, plan,
+        .Case<tensor::PadOp>([&](tensor::PadOp tensorPadOp) {
+          if (failed(getOrAllocateResultBuffers(b, tensorPadOp, bvm, plan,
                                                 allocationFn))) {
             return failure();
           }
-          return convertPadTensorOp(b, padTensorOp, bvm);
+          return convertPadTensorOp(b, tensorPadOp, bvm);
         })
         .Case<linalg::LinalgOp, IREE::LinalgExt::LinalgExtOp>([&](auto op) {
           if (failed(

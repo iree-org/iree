@@ -9,6 +9,7 @@
 #include "iree/compiler/InputConversion/MHLO/PassDetail.h"
 #include "iree/compiler/InputConversion/MHLO/Passes.h"
 #include "mlir-hlo/Dialect/mhlo/IR/hlo_ops.h"
+#include "mlir/Dialect/Affine/Utils.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/BlockAndValueMapping.h"
@@ -22,7 +23,6 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassRegistry.h"
 #include "mlir/Transforms/DialectConversion.h"
-#include "mlir/Transforms/Utils.h"
 
 namespace mlir {
 namespace iree_compiler {
@@ -163,10 +163,12 @@ static LogicalResult convertRegion(Region &oldRegion, Region &newRegion,
       return oldBlock.front().emitError()
              << "unable to legalize block signature";
     }
-    newBlock.addArguments(blockSignature->getConvertedTypes());
-    for (auto oldNewArg :
-         llvm::zip(oldBlock.getArguments(), newBlock.getArguments())) {
-      mapping.map(std::get<0>(oldNewArg), std::get<1>(oldNewArg));
+    for (auto it : llvm::zip(oldBlock.getArguments(),
+                             blockSignature->getConvertedTypes())) {
+      auto oldArg = std::get<0>(it);
+      auto newArgType = std::get<1>(it);
+      auto newArg = newBlock.addArgument(newArgType, oldArg.getLoc());
+      mapping.map(oldArg, newArg);
     }
     mapping.map(&oldBlock, &newBlock);
   }

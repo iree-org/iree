@@ -278,7 +278,7 @@ class GlobalStoreIndirectOpConversion
 void populateUtilGlobalToVMPatterns(MLIRContext *context,
                                     ConversionTarget &conversionTarget,
                                     TypeConverter &typeConverter,
-                                    OwningRewritePatternList &patterns) {
+                                    RewritePatternSet &patterns) {
   conversionTarget.addIllegalOp<IREE::Util::InitializerOp,
                                 IREE::Util::InitializerReturnOp>();
   patterns.insert<InitializerOpConversion, InitializerReturnOpConversion>(

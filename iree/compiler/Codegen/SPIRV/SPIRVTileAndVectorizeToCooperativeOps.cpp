@@ -27,8 +27,8 @@
 #include "mlir/Dialect/Linalg/Transforms/Hoisting.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/SPIRV/IR/TargetAndABI.h"
-#include "mlir/Dialect/Vector/VectorOps.h"
-#include "mlir/Dialect/Vector/VectorTransforms.h"
+#include "mlir/Dialect/Vector/IR/VectorOps.h"
+#include "mlir/Dialect/Vector/Transforms/VectorTransforms.h"
 #include "mlir/Interfaces/VectorInterfaces.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -133,7 +133,7 @@ static void populateTilingToSubgroupPatterns(ArrayRef<int64_t> subgroupCounts,
           .setDistributionOptions(distributionOptions);
 
   auto filter = linalg::LinalgTransformationFilter(
-      ArrayRef<Identifier>{}, Identifier::get(getVectorizeMarker(), context));
+      ArrayRef<StringAttr>{}, StringAttr::get(context, getVectorizeMarker()));
   linalg::TilingPatterns<linalg::FillOp, linalg::MatmulOp,
                          linalg::GenericOp>::insert(patterns, tilingOptions,
                                                     filter);
@@ -148,7 +148,7 @@ void populateVectorizationPatterns(MLIRContext *context,
                                    RewritePatternSet &patterns) {
   linalg::LinalgVectorizationOptions opt;
   linalg::LinalgTransformationFilter f(
-      Identifier::get(getVectorizeMarker(), context));
+      StringAttr::get(context, getVectorizeMarker()));
   linalg::VectorizationPatterns<linalg::FillOp, linalg::GenericOp>::insert(
       patterns, opt, f);
   patterns.add<linalg::LinalgVectorizationPattern>(

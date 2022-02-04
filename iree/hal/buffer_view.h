@@ -74,6 +74,7 @@ typedef uint8_t iree_hal_numerical_type_t;
   iree_all_bits_set(iree_hal_element_numerical_type(element_type), \
                     IREE_HAL_NUMERICAL_TYPE_FLOAT)
 
+// TODO(#8193): split out logical and physical bit widths.
 // Returns the bit width of each element.
 #define iree_hal_element_bit_count(element_type) (size_t)((element_type)&0xFF)
 

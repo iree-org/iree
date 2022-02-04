@@ -10,10 +10,12 @@
 include "mlir/Interfaces/CallInterfaces.td"
 include "mlir/Interfaces/ControlFlowInterfaces.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
+include "mlir/IR/FunctionInterfaces.td"
+include "mlir/IR/OpAsmInterface.td"
 include "mlir/IR/SymbolInterfaces.td"
 include "iree/compiler/Dialect/VM/IR/VMBase.td"
 
-class VM_PureOp<string mnemonic, list<OpTrait> traits = []> :
+class VM_PureOp<string mnemonic, list<Trait> traits = []> :
     VM_Op<mnemonic, !listconcat(traits, [NoSideEffect])>;
 
 //===----------------------------------------------------------------------===//
@@ -44,7 +46,6 @@ def VM_ModuleOp : VM_Op<"module", [
     custom<SymbolVisibility>($sym_visibility)
     $sym_name
     attr-dict-with-keyword
-    ``
     regions
   }];
 
@@ -77,7 +78,7 @@ def VM_ModuleTerminatorOp : VM_Op<"module_terminator", [
 def VM_FuncOp : VM_Op<"func", [
     IsolatedFromAbove,
     HasParent<"IREE::VM::ModuleOp">,
-    FunctionLike,
+    FunctionOpInterface,
     CallableOpInterface,
     Symbol,
   ]> {
@@ -119,14 +120,11 @@ def VM_FuncOp : VM_Op<"func", [
           .cast<FunctionType>();
     }
 
-    /// Hook for OpTrait::FunctionLike, returns the number of function
-    /// arguments. Depends on the type attribute being correct as checked by
-    /// verifyType.
-    unsigned getNumFuncArguments() { return getType().getInputs().size(); }
+    /// Returns the argument types of this function.
+    ArrayRef<Type> getArgumentTypes() { return getType().getInputs(); }
 
-    /// Hook for OpTrait::FunctionLike, returns the number of function results.
-    /// Depends on the type attribute being correct as checked by verifyType.
-    unsigned getNumFuncResults() { return getType().getResults().size(); }
+    /// Returns the result types of this function.
+    ArrayRef<Type> getResultTypes() { return getType().getResults(); }
 
     /// Hook for OpTrait::FunctionLike, called after verifying that the 'type'
     /// attribute is present. This can check for preconditions of the
@@ -173,7 +171,7 @@ def VM_ExportOp : VM_Op<"export", [
 
 def VM_ImportOp : VM_Op<"import", [
     Symbol,
-    FunctionLike,
+    FunctionOpInterface,
     CallableOpInterface,
   ]> {
   let summary = [{imports a function from an external module}];
@@ -205,7 +203,7 @@ def VM_ImportOp : VM_Op<"import", [
 
     /// Returns true if the import must be invoked via vm.call.variadic.
     bool isVariadic() {
-      for (int i = 0; i < getNumFuncArguments(); ++i) {
+      for (int i = 0; i < getArgumentTypes().size(); ++i) {
         if (isFuncArgumentVariadic(i)) return true;
       }
       return false;
@@ -221,14 +219,12 @@ def VM_ImportOp : VM_Op<"import", [
       return !!getArgAttrOfType<UnitAttr>(i, "vm.variadic");
     }
 
-    /// Hook for OpTrait::FunctionLike, returns the number of function
-    /// arguments. Depends on the type attribute being correct as checked by
-    /// verifyType.
-    unsigned getNumFuncArguments() { return getType().getInputs().size(); }
+    /// Returns the argument types of this function.
+    ArrayRef<Type> getArgumentTypes() { return getType().getInputs(); }
 
-    /// Hook for OpTrait::FunctionLike, returns the number of function results.
-    /// Depends on the type attribute being correct as checked by verifyType.
-    unsigned getNumFuncResults() { return getType().getResults().size(); }
+    /// Returns the result types of this function.
+    ArrayRef<Type> getResultTypes() { return getType().getResults(); }
+
 
     /// Hook for OpTrait::FunctionLike, called after verifying that the 'type'
     /// attribute is present. This can check for preconditions of the
@@ -245,7 +241,7 @@ def VM_ImportOp : VM_Op<"import", [
 def VM_InitializerOp : VM_Op<"initializer", [
     IsolatedFromAbove,
     HasParent<"IREE::VM::ModuleOp">,
-    FunctionLike,
+    FunctionOpInterface,
     CallableOpInterface,
   ]> {
   let summary = [{global initialization function}];
@@ -274,8 +270,15 @@ def VM_InitializerOp : VM_Op<"initializer", [
     Block *addEntryBlock();
     Block *addBlock();
 
-    unsigned getNumFuncArguments() { return 0; }
-    unsigned getNumFuncResults() { return 0; }
+    FunctionType getType() {
+      return getTypeAttr().getValue().cast<FunctionType>();
+    }
+
+    /// Returns the argument types of this function.
+    ArrayRef<Type> getArgumentTypes() { return {}; }
+
+    /// Returns the result types of this function.
+    ArrayRef<Type> getResultTypes() { return {}; }
 
     LogicalResult verifyType() { return success(); }
 
@@ -292,7 +295,7 @@ def VM_InitializerOp : VM_Op<"initializer", [
 
 // TODO(b/142336293): DCE globals when unused and not exports. Note that side
 // effects may need to be observed.
-class VM_GlobalOp<string mnemonic, Attr attr_type, list<OpTrait> traits = []> :
+class VM_GlobalOp<string mnemonic, Attr attr_type, list<Trait> traits = []> :
     VM_Op<mnemonic, !listconcat(traits, [
       IsolatedFromAbove,
       HasParent<"IREE::VM::ModuleOp">,
@@ -440,7 +443,7 @@ def VM_GlobalAddressOp : VM_PureOp<"global.address"> {
   let verifier = [{ return verifyGlobalAddressOp(*this); }];
 }
 
-class VM_GlobalLoadOp<Type type, string mnemonic, list<OpTrait> traits = []> :
+class VM_GlobalLoadOp<Type type, string mnemonic, list<Trait> traits = []> :
     VM_Op<mnemonic, !listconcat(traits, [
       DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
       // HACK: works around the lack of symbol side effects in C++.
@@ -459,7 +462,7 @@ class VM_GlobalLoadOp<Type type, string mnemonic, list<OpTrait> traits = []> :
 }
 
 class VM_GlobalLoadPrimitiveOp<Type type, string mnemonic, VM_OPC opcode,
-                               list<OpTrait> traits = []> :
+                               list<Trait> traits = []> :
     VM_GlobalLoadOp<type, mnemonic, traits> {
   let description = [{
     Loads the value of a global containing an primitive value.
@@ -472,7 +475,7 @@ class VM_GlobalLoadPrimitiveOp<Type type, string mnemonic, VM_OPC opcode,
   ];
 }
 
-class VM_GlobalStoreOp<Type type, string mnemonic, list<OpTrait> traits = []> :
+class VM_GlobalStoreOp<Type type, string mnemonic, list<Trait> traits = []> :
     VM_Op<mnemonic, !listconcat(traits, [
       DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
     ])> {
@@ -487,7 +490,7 @@ class VM_GlobalStoreOp<Type type, string mnemonic, list<OpTrait> traits = []> :
 }
 
 class VM_GlobalStorePrimitiveOp<Type type, string mnemonic, VM_OPC opcode,
-                                list<OpTrait> traits = []> :
+                                list<Trait> traits = []> :
     VM_GlobalStoreOp<type, mnemonic, traits> {
   let description = [{
     Stores a primitive value value to a global.
@@ -501,7 +504,7 @@ class VM_GlobalStorePrimitiveOp<Type type, string mnemonic, VM_OPC opcode,
 }
 
 class VM_GlobalLoadIndirectOp<Type type, string mnemonic,
-                              list<OpTrait> traits = []> :
+                              list<Trait> traits = []> :
     VM_Op<mnemonic, !listconcat(traits, [
       DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
     ])> {
@@ -517,7 +520,7 @@ class VM_GlobalLoadIndirectOp<Type type, string mnemonic,
 
 class VM_GlobalLoadIndirectPrimitiveOp<Type type, string mnemonic,
                                        VM_OPC opcode,
-                                       list<OpTrait> traits = []> :
+                                       list<Trait> traits = []> :
     VM_GlobalLoadIndirectOp<type, mnemonic, traits> {
   let description = [{
     Loads the value of a global containing a primitive value.
@@ -531,7 +534,7 @@ class VM_GlobalLoadIndirectPrimitiveOp<Type type, string mnemonic,
 }
 
 class VM_GlobalStoreIndirectOp<Type type, string mnemonic,
-                               list<OpTrait> traits = []> :
+                               list<Trait> traits = []> :
     VM_Op<mnemonic, !listconcat(traits, [
       DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
     ])> {
@@ -545,7 +548,7 @@ class VM_GlobalStoreIndirectOp<Type type, string mnemonic,
 
 class VM_GlobalStoreIndirectPrimitiveOp<Type type, string mnemonic,
                                         VM_OPC opcode,
-                                        list<OpTrait> traits = []> :
+                                        list<Trait> traits = []> :
     VM_GlobalStoreIndirectOp<type, mnemonic, traits> {
   let description = [{
     Stores a primitive value to a global.
@@ -559,28 +562,36 @@ class VM_GlobalStoreIndirectPrimitiveOp<Type type, string mnemonic,
 }
 
 def VM_GlobalLoadI32Op :
-    VM_GlobalLoadPrimitiveOp<I32, "global.load.i32", VM_OPC_GlobalLoadI32> {
+    VM_GlobalLoadPrimitiveOp<I32, "global.load.i32", VM_OPC_GlobalLoadI32, [
+      DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>
+    ]> {
   let summary = [{global 32-bit integer load operation}];
   let hasCanonicalizer = 1;
 }
 
 def VM_GlobalLoadI64Op :
-    VM_GlobalLoadPrimitiveOp<I64, "global.load.i64", VM_OPC_GlobalLoadI64,
-                             [VM_ExtI64]> {
+    VM_GlobalLoadPrimitiveOp<I64, "global.load.i64", VM_OPC_GlobalLoadI64, [
+      VM_ExtI64,
+      DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>
+    ]> {
   let summary = [{global 64-bit integer load operation}];
   let hasCanonicalizer = 1;
 }
 
 def VM_GlobalLoadF32Op :
-    VM_GlobalLoadPrimitiveOp<F32, "global.load.f32", VM_OPC_GlobalLoadF32,
-                             [VM_ExtF32]> {
+    VM_GlobalLoadPrimitiveOp<F32, "global.load.f32", VM_OPC_GlobalLoadF32, [
+      VM_ExtF32,
+      DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>
+    ]> {
   let summary = [{global 32-bit floating-point load operation}];
   let hasCanonicalizer = 1;
 }
 
 def VM_GlobalLoadF64Op :
-    VM_GlobalLoadPrimitiveOp<F64, "global.load.f64", VM_OPC_GlobalLoadF64,
-                             [VM_ExtF64]> {
+    VM_GlobalLoadPrimitiveOp<F64, "global.load.f64", VM_OPC_GlobalLoadF64, [
+      VM_ExtF64,
+      DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>
+    ]> {
   let summary = [{global 64-bit floating-point load operation}];
   let hasCanonicalizer = 1;
 }
@@ -670,7 +681,9 @@ def VM_GlobalStoreIndirectF64Op :
   let hasCanonicalizer = 1;
 }
 
-def VM_GlobalLoadRefOp : VM_GlobalLoadOp<VM_AnyRef, "global.load.ref"> {
+def VM_GlobalLoadRefOp : VM_GlobalLoadOp<VM_AnyRef, "global.load.ref", [
+      DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>
+    ]> {
   let summary = [{global ref<T> load operation}];
   let description = [{
     Loads the value of a global containing a ref of the given type.
@@ -738,7 +751,7 @@ def VM_GlobalStoreIndirectRefOp :
 // Constants
 //===----------------------------------------------------------------------===//
 
-class VM_ConstOp<string mnemonic, string ctype, list<OpTrait> traits = []> :
+class VM_ConstOp<string mnemonic, string ctype, list<Trait> traits = []> :
     VM_PureOp<mnemonic, !listconcat(traits, [
       ConstantLike,
       DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
@@ -761,7 +774,7 @@ class VM_ConstOp<string mnemonic, string ctype, list<OpTrait> traits = []> :
 
 class VM_ConstantPrimitiveOp<Type type, int width, string mnemonic,
                              VM_OPC opcode,
-                             string ctype, list<OpTrait> traits = []> :
+                             string ctype, list<Trait> traits = []> :
     VM_ConstOp<mnemonic, ctype, traits> {
   let description = [{
     Defines a constant value that is treated as a scalar literal at runtime.
@@ -783,7 +796,9 @@ class VM_ConstantPrimitiveOp<Type type, int width, string mnemonic,
 
 def VM_ConstI32Op :
     VM_ConstantPrimitiveOp<I32, 32, "const.i32", VM_OPC_ConstI32,
-                           "int32_t"> {
+                           "int32_t", [
+        DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>
+    ]> {
   let summary = [{32-bit integer constant operation}];
   let arguments = (ins
     VM_ConstantIntegerValueAttr<I32>:$value
@@ -794,7 +809,10 @@ def VM_ConstI32Op :
 
 def VM_ConstI64Op :
     VM_ConstantPrimitiveOp<I64, 64, "const.i64", VM_OPC_ConstI64,
-                           "int64_t", [VM_ExtI64]> {
+                           "int64_t", [
+        VM_ExtI64,
+        DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>
+    ]> {
   let summary = [{64-bit integer constant operation}];
   let arguments = (ins
     VM_ConstantIntegerValueAttr<I64>:$value
@@ -826,7 +844,7 @@ def VM_ConstF64Op :
 }
 
 class VM_ConstantPrimitiveZeroOp<Type type, string mnemonic, VM_OPC opcode,
-                                 string ctype, list<OpTrait> traits = []> :
+                                 string ctype, list<Trait> traits = []> :
     VM_ConstOp<mnemonic, ctype, traits> {
   let description = [{
     Defines a constant zero primitive.
@@ -851,28 +869,39 @@ class VM_ConstantPrimitiveZeroOp<Type type, string mnemonic, VM_OPC opcode,
 
 def VM_ConstI32ZeroOp :
     VM_ConstantPrimitiveZeroOp<I32, "const.i32.zero", VM_OPC_ConstI32Zero,
-                               "int32_t"> {
+                               "int32_t", [
+      DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>
+    ]> {
   let summary = [{32-bit integer constant zero operation}];
   let hasFolder = 1;
 }
 
 def VM_ConstI64ZeroOp :
     VM_ConstantPrimitiveZeroOp<I64, "const.i64.zero", VM_OPC_ConstI64Zero,
-                               "int64_t", [VM_ExtI64]> {
+                               "int64_t", [
+      VM_ExtI64,
+      DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>
+    ]> {
   let summary = [{64-bit integer constant zero operation}];
   let hasFolder = 1;
 }
 
 def VM_ConstF32ZeroOp :
     VM_ConstantPrimitiveZeroOp<F32, "const.f32.zero", VM_OPC_ConstF32Zero,
-                               "float", [VM_ExtF32]> {
+                               "float", [
+      VM_ExtF32,
+      DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>
+    ]> {
   let summary = [{32-bit floating-point constant zero operation}];
   let hasFolder = 1;
 }
 
 def VM_ConstF64ZeroOp :
     VM_ConstantPrimitiveZeroOp<F64, "const.f64.zero", VM_OPC_ConstF64Zero,
-                               "double", [VM_ExtI64]> {
+                               "double", [
+      VM_ExtI64,
+      DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>
+    ]> {
   let summary = [{64-bit floating-point constant zero operation}];
   let hasFolder = 1;
 }
@@ -880,6 +909,7 @@ def VM_ConstF64ZeroOp :
 def VM_ConstRefZeroOp : VM_PureOp<"const.ref.zero", [
     ConstantLike,
     DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
+    DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>
   ]> {
   let summary = [{null ref constant operation}];
   let description = [{
@@ -952,6 +982,7 @@ def VM_RodataOp : VM_Op<"rodata", [
 
 def VM_ConstRefRodataOp : VM_PureOp<"const.ref.rodata", [
     DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
+    DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>
   ]> {
   let summary = [{constant rodata access operation}];
   let description = [{
@@ -1179,7 +1210,7 @@ def VM_BufferCompareOp :
 }
 
 class VM_BufferFillOp<Type type, string mnemonic, VM_OPC opcode,
-                      list<OpTrait> traits = []> :
+                      list<Trait> traits = []> :
     VM_Op<mnemonic, !listconcat(traits, [
       DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
       MemoryEffects<[MemWrite]>,
@@ -1238,7 +1269,7 @@ def VM_BufferFillF64Op :
 }
 
 class VM_BufferLoadOp<Type type, string mnemonic, VM_OPC opcode,
-                      list<OpTrait> traits = []> :
+                      list<Trait> traits = []> :
     VM_PureOp<mnemonic, !listconcat(traits, [
       DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
       MemoryEffects<[MemRead]>,
@@ -1271,7 +1302,7 @@ class VM_BufferLoadOp<Type type, string mnemonic, VM_OPC opcode,
 }
 
 class VM_BufferStoreOp<Type type, string mnemonic, VM_OPC opcode,
-                       list<OpTrait> traits = []> :
+                       list<Trait> traits = []> :
     VM_Op<mnemonic, !listconcat(traits, [
       DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
       MemoryEffects<[MemWrite]>,
@@ -1480,7 +1511,7 @@ def VM_ListResizeOp :
 }
 
 class VM_ListGetPrimitiveOp<Type type, string mnemonic, VM_OPC opcode,
-                            list<OpTrait> traits = []> :
+                            list<Trait> traits = []> :
     VM_PureOp<mnemonic, !listconcat(traits, [
       DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
       MemoryEffects<[MemRead]>,
@@ -1509,7 +1540,7 @@ class VM_ListGetPrimitiveOp<Type type, string mnemonic, VM_OPC opcode,
 }
 
 class VM_ListSetPrimitiveOp<Type type, string mnemonic, VM_OPC opcode,
-                            list<OpTrait> traits = []> :
+                            list<Trait> traits = []> :
     VM_Op<mnemonic, !listconcat(traits, [
       DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
       MemoryEffects<[MemWrite]>,
@@ -1624,7 +1655,7 @@ def VM_ListSetRefOp :
 //===----------------------------------------------------------------------===//
 
 class VM_SelectPrimitiveOp<Type type, string mnemonic, VM_OPC opcode,
-                           list<OpTrait> traits = []> :
+                           list<Trait> traits = []> :
     VM_PureOp<mnemonic, !listconcat(traits, [
       DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
       AllTypesMatch<["true_value", "false_value", "result"]>,
@@ -1720,7 +1751,7 @@ def VM_SelectRefOp : VM_PureOp<"select.ref", [
 }
 
 class VM_SwitchIntegerOp<I type, string mnemonic, VM_OPC opcode,
-                         list<OpTrait> traits = []> :
+                         list<Trait> traits = []> :
     VM_PureOp<mnemonic, !listconcat(traits, [
       DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
       AllTypesMatch<["default_value", "result"]>,
@@ -1759,7 +1790,7 @@ class VM_SwitchIntegerOp<I type, string mnemonic, VM_OPC opcode,
 }
 
 class VM_SwitchFloatOp<F type, string mnemonic, VM_OPC opcode,
-                       list<OpTrait> traits = []> :
+                       list<Trait> traits = []> :
     VM_PureOp<mnemonic, !listconcat(traits, [
       DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
       AllTypesMatch<["default_value", "result"]>,
@@ -1867,7 +1898,7 @@ def VM_SwitchRefOp : VM_PureOp<"switch.ref", [
 //===----------------------------------------------------------------------===//
 
 class VM_UnaryArithmeticOp<Type type, string mnemonic, VM_OPC opcode,
-                           list<OpTrait> traits = []> :
+                           list<Trait> traits = []> :
     VM_PureOp<mnemonic, !listconcat(traits, [
       DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
       AllTypesMatch<["operand", "result"]>,
@@ -1889,7 +1920,7 @@ class VM_UnaryArithmeticOp<Type type, string mnemonic, VM_OPC opcode,
 }
 
 class VM_BinaryArithmeticOp<Type type, string mnemonic, VM_OPC opcode,
-                            list<OpTrait> traits = []> :
+                            list<Trait> traits = []> :
     VM_PureOp<mnemonic, !listconcat(traits, [
       DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
       AllTypesMatch<["lhs", "rhs", "result"]>,
@@ -1913,7 +1944,7 @@ class VM_BinaryArithmeticOp<Type type, string mnemonic, VM_OPC opcode,
 }
 
 class VM_TernaryArithmeticOp<Type type, string mnemonic, VM_OPC opcode,
-                             list<OpTrait> traits = []> :
+                             list<Trait> traits = []> :
     VM_PureOp<mnemonic, !listconcat(traits, [
       DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
       AllTypesMatch<["a", "b", "c", "result"]>,
@@ -2302,6 +2333,13 @@ def VM_TanhF64Op : VM_UnaryArithmeticOp<F64, "tanh.f64", VM_OPC_TanhF64, [VM_Ext
   let summary = [{hyperbolic tangent of the specified value}];
 }
 
+def VM_ErfF32Op : VM_UnaryArithmeticOp<F32, "erf.f32", VM_OPC_ErfF32, [VM_ExtF32]> {
+  let summary = [{computes the error function of the specified value}];
+}
+def VM_ErfF64Op : VM_UnaryArithmeticOp<F64, "erf.f64", VM_OPC_ErfF64, [VM_ExtF64]> {
+  let summary = [{computes the error function of the specified value}];
+}
+
 //===----------------------------------------------------------------------===//
 // Integer bit manipulation
 //===----------------------------------------------------------------------===//
@@ -2366,7 +2404,7 @@ def VM_XorI64Op :
 //===----------------------------------------------------------------------===//
 
 class VM_ShiftArithmeticOp<I type, string mnemonic, VM_OPC opcode,
-                           list<OpTrait> traits = []> :
+                           list<Trait> traits = []> :
     VM_PureOp<mnemonic, !listconcat(traits, [
       DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
       AllTypesMatch<["operand", "result"]>,
@@ -2431,7 +2469,7 @@ def VM_ShrI64UOp : VM_ShiftArithmeticOp<I64, "shr.i64.u", VM_OPC_ShrI64U,
 //===----------------------------------------------------------------------===//
 
 class VM_ConversionOp<Type src_type, Type dst_type, string mnemonic,
-                      VM_OPC opcode, list<OpTrait> traits = []> :
+                      VM_OPC opcode, list<Trait> traits = []> :
     VM_PureOp<mnemonic, !listconcat(traits, [
       DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
     ])> {
@@ -2452,7 +2490,7 @@ class VM_ConversionOp<Type src_type, Type dst_type, string mnemonic,
 }
 
 class VM_ConversionPseudoOp<Type src_type, Type dst_type, string mnemonic,
-                            list<OpTrait> traits = []> :
+                            list<Trait> traits = []> :
     VM_PureOp<mnemonic, traits> {
   let arguments = (ins
     src_type:$operand
@@ -2642,7 +2680,7 @@ def VM_BitcastF64I64Op :
 //===----------------------------------------------------------------------===//
 
 class VM_UnaryComparisonOp<Type type, string mnemonic, VM_OPC opcode,
-                           list<OpTrait> traits = []> :
+                           list<Trait> traits = []> :
     VM_PureOp<mnemonic, !listconcat(traits, [
       DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
     ])> {
@@ -2667,7 +2705,7 @@ class VM_UnaryComparisonOp<Type type, string mnemonic, VM_OPC opcode,
 }
 
 class VM_UnaryComparisonPseudoOp<Type type, string mnemonic,
-                                 list<OpTrait> traits = []> :
+                                 list<Trait> traits = []> :
     VM_PureOp<mnemonic, !listconcat(traits, [
       VM_PseudoOp,
     ])> {
@@ -2686,7 +2724,7 @@ class VM_UnaryComparisonPseudoOp<Type type, string mnemonic,
 }
 
 class VM_BinaryComparisonOp<Type type, string mnemonic, VM_OPC opcode,
-                            list<OpTrait> traits = []> :
+                            list<Trait> traits = []> :
     VM_PureOp<mnemonic, !listconcat(traits, [
       DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
       AllTypesMatch<["lhs", "rhs"]>,
@@ -2714,7 +2752,7 @@ class VM_BinaryComparisonOp<Type type, string mnemonic, VM_OPC opcode,
 }
 
 class VM_BinaryComparisonPseudoOp<Type type, string mnemonic,
-                                  list<OpTrait> traits = []> :
+                                  list<Trait> traits = []> :
     VM_PureOp<mnemonic, !listconcat(traits, [
       AllTypesMatch<["lhs", "rhs"]>,
       VM_PseudoOp,
@@ -2735,159 +2773,202 @@ class VM_BinaryComparisonPseudoOp<Type type, string mnemonic,
 }
 
 def VM_CmpEQI32Op :
-    VM_BinaryComparisonOp<I32, "cmp.eq.i32", VM_OPC_CmpEQI32,
-                          [Commutative]> {
+    VM_BinaryComparisonOp<I32, "cmp.eq.i32", VM_OPC_CmpEQI32, [
+        Commutative,
+        DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>
+    ]> {
   let summary = [{integer equality comparison operation}];
   let hasCanonicalizer = 1;
   let hasFolder = 1;
 }
 
 def VM_CmpEQI64Op :
-    VM_BinaryComparisonOp<I64, "cmp.eq.i64", VM_OPC_CmpEQI64,
-                          [VM_ExtI64, Commutative]> {
+    VM_BinaryComparisonOp<I64, "cmp.eq.i64", VM_OPC_CmpEQI64, [
+        VM_ExtI64,
+        Commutative,
+        DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>
+    ]> {
   let summary = [{integer equality comparison operation}];
   let hasCanonicalizer = 1;
   let hasFolder = 1;
 }
 
 def VM_CmpNEI32Op :
-    VM_BinaryComparisonOp<I32, "cmp.ne.i32", VM_OPC_CmpNEI32,
-                          [Commutative]> {
+    VM_BinaryComparisonOp<I32, "cmp.ne.i32", VM_OPC_CmpNEI32, [
+        Commutative,
+        DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>
+    ]> {
   let summary = [{integer inequality comparison operation}];
   let hasCanonicalizer = 1;
   let hasFolder = 1;
 }
 
 def VM_CmpNEI64Op :
-    VM_BinaryComparisonOp<I64, "cmp.ne.i64", VM_OPC_CmpNEI64,
-                          [VM_ExtI64, Commutative]> {
+    VM_BinaryComparisonOp<I64, "cmp.ne.i64", VM_OPC_CmpNEI64, [
+        VM_ExtI64, Commutative,
+        DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>
+    ]> {
   let summary = [{integer inequality comparison operation}];
   let hasCanonicalizer = 1;
   let hasFolder = 1;
 }
 
 def VM_CmpLTI32SOp :
-    VM_BinaryComparisonOp<I32, "cmp.lt.i32.s", VM_OPC_CmpLTI32S> {
+    VM_BinaryComparisonOp<I32, "cmp.lt.i32.s", VM_OPC_CmpLTI32S, [
+        DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>
+    ]> {
   let summary = [{signed integer less-than comparison operation}];
   let hasCanonicalizer = 1;
   let hasFolder = 1;
 }
 
 def VM_CmpLTI64SOp :
-    VM_BinaryComparisonOp<I64, "cmp.lt.i64.s", VM_OPC_CmpLTI64S,
-                          [VM_ExtI64]> {
+    VM_BinaryComparisonOp<I64, "cmp.lt.i64.s", VM_OPC_CmpLTI64S, [
+        VM_ExtI64,
+        DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>
+    ]> {
   let summary = [{signed integer less-than comparison operation}];
   let hasCanonicalizer = 1;
   let hasFolder = 1;
 }
 
 def VM_CmpLTI32UOp :
-    VM_BinaryComparisonOp<I32, "cmp.lt.i32.u", VM_OPC_CmpLTI32U> {
+    VM_BinaryComparisonOp<I32, "cmp.lt.i32.u", VM_OPC_CmpLTI32U, [
+        DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>
+    ]> {
   let summary = [{unsigned integer less-than comparison operation}];
   let hasCanonicalizer = 1;
   let hasFolder = 1;
 }
 
 def VM_CmpLTI64UOp :
-    VM_BinaryComparisonOp<I64, "cmp.lt.i64.u", VM_OPC_CmpLTI64U,
-                          [VM_ExtI64]> {
+    VM_BinaryComparisonOp<I64, "cmp.lt.i64.u", VM_OPC_CmpLTI64U, [
+        VM_ExtI64,
+        DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>
+    ]> {
   let summary = [{unsigned integer less-than comparison operation}];
   let hasCanonicalizer = 1;
   let hasFolder = 1;
 }
 
 def VM_CmpLTEI32SOp :
-    VM_BinaryComparisonPseudoOp<I32, "cmp.lte.i32.s"> {
+    VM_BinaryComparisonPseudoOp<I32, "cmp.lte.i32.s", [
+        DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>
+    ]> {
   let summary = [{signed integer less-than-or-equal comparison operation}];
   let hasCanonicalizer = 1;
   let hasFolder = 1;
 }
 
 def VM_CmpLTEI64SOp :
-    VM_BinaryComparisonPseudoOp<I64, "cmp.lte.i64.s",
-                                [VM_ExtI64]> {
+    VM_BinaryComparisonPseudoOp<I64, "cmp.lte.i64.s", [
+        VM_ExtI64,
+        DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>
+    ]> {
   let summary = [{signed integer less-than-or-equal comparison operation}];
   let hasCanonicalizer = 1;
   let hasFolder = 1;
 }
 
 def VM_CmpLTEI32UOp :
-    VM_BinaryComparisonPseudoOp<I32, "cmp.lte.i32.u"> {
+    VM_BinaryComparisonPseudoOp<I32, "cmp.lte.i32.u", [
+        DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>
+    ]> {
   let summary = [{unsigned integer less-than-or-equal comparison operation}];
   let hasCanonicalizer = 1;
   let hasFolder = 1;
 }
 
 def VM_CmpLTEI64UOp :
-    VM_BinaryComparisonPseudoOp<I64, "cmp.lte.i64.u",
-                                [VM_ExtI64]> {
+    VM_BinaryComparisonPseudoOp<I64, "cmp.lte.i64.u", [
+        VM_ExtI64,
+        DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>
+    ]> {
   let summary = [{unsigned integer less-than-or-equal comparison operation}];
   let hasCanonicalizer = 1;
   let hasFolder = 1;
 }
 
 def VM_CmpGTI32SOp :
-    VM_BinaryComparisonPseudoOp<I32, "cmp.gt.i32.s"> {
+    VM_BinaryComparisonPseudoOp<I32, "cmp.gt.i32.s", [
+        DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>
+    ]> {
   let summary = [{signed integer greater-than comparison operation}];
   let hasCanonicalizer = 1;
   let hasFolder = 1;
 }
 
 def VM_CmpGTI64SOp :
-    VM_BinaryComparisonPseudoOp<I64, "cmp.gt.i64.s",
-                                [VM_ExtI64]> {
+    VM_BinaryComparisonPseudoOp<I64, "cmp.gt.i64.s", [
+        VM_ExtI64,
+        DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>
+    ]> {
   let summary = [{signed integer greater-than comparison operation}];
   let hasCanonicalizer = 1;
   let hasFolder = 1;
 }
 
 def VM_CmpGTI32UOp :
-    VM_BinaryComparisonPseudoOp<I32, "cmp.gt.i32.u"> {
+    VM_BinaryComparisonPseudoOp<I32, "cmp.gt.i32.u", [
+        DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>
+    ]> {
   let summary = [{unsigned integer greater-than comparison operation}];
   let hasCanonicalizer = 1;
   let hasFolder = 1;
 }
 
 def VM_CmpGTI64UOp :
-    VM_BinaryComparisonPseudoOp<I64, "cmp.gt.i64.u",
-                                [VM_ExtI64]> {
+    VM_BinaryComparisonPseudoOp<I64, "cmp.gt.i64.u", [
+        VM_ExtI64,
+        DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>
+    ]> {
   let summary = [{unsigned integer greater-than comparison operation}];
   let hasCanonicalizer = 1;
   let hasFolder = 1;
 }
 
 def VM_CmpGTEI32SOp :
-    VM_BinaryComparisonPseudoOp<I32, "cmp.gte.i32.s"> {
+    VM_BinaryComparisonPseudoOp<I32, "cmp.gte.i32.s", [
+        DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>
+    ]> {
   let summary = [{signed integer greater-than-or-equal comparison operation}];
   let hasCanonicalizer = 1;
   let hasFolder = 1;
 }
 
 def VM_CmpGTEI64SOp :
-    VM_BinaryComparisonPseudoOp<I64, "cmp.gte.i64.s",
-                                [VM_ExtI64]> {
+    VM_BinaryComparisonPseudoOp<I64, "cmp.gte.i64.s", [
+        VM_ExtI64,
+        DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>
+    ]> {
   let summary = [{signed integer greater-than-or-equal comparison operation}];
   let hasCanonicalizer = 1;
   let hasFolder = 1;
 }
 
 def VM_CmpGTEI32UOp :
-    VM_BinaryComparisonPseudoOp<I32, "cmp.gte.i32.u"> {
+    VM_BinaryComparisonPseudoOp<I32, "cmp.gte.i32.u", [
+        DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>
+    ]> {
   let summary = [{unsigned integer greater-than-or-equal comparison operation}];
   let hasCanonicalizer = 1;
   let hasFolder = 1;
 }
 
 def VM_CmpGTEI64UOp :
-    VM_BinaryComparisonPseudoOp<I64, "cmp.gte.i64.u",
-                                [VM_ExtI64]> {
+    VM_BinaryComparisonPseudoOp<I64, "cmp.gte.i64.u", [
+        VM_ExtI64,
+        DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>
+    ]> {
   let summary = [{unsigned integer greater-than-or-equal comparison operation}];
   let hasCanonicalizer = 1;
   let hasFolder = 1;
 }
 
 def VM_CmpNZI32Op :
-    VM_UnaryComparisonOp<I32, "cmp.nz.i32", VM_OPC_CmpNZI32> {
+    VM_UnaryComparisonOp<I32, "cmp.nz.i32", VM_OPC_CmpNZI32, [
+        DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>
+    ]> {
   let summary = [{integer non-zero comparison operation}];
   let description = [{
     Compares the given integer operand for a non-zero value.
@@ -2896,8 +2977,10 @@ def VM_CmpNZI32Op :
 }
 
 def VM_CmpNZI64Op :
-    VM_UnaryComparisonOp<I64, "cmp.nz.i64", VM_OPC_CmpNZI64,
-                         [VM_ExtI64]> {
+    VM_UnaryComparisonOp<I64, "cmp.nz.i64", VM_OPC_CmpNZI64, [
+        VM_ExtI64,
+        DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>
+    ]> {
   let summary = [{integer non-zero comparison operation}];
   let description = [{
     Compares the given integer operand for a non-zero value.
@@ -3166,8 +3249,10 @@ def VM_CmpNaNF64Op :
 //===----------------------------------------------------------------------===//
 
 def VM_CmpEQRefOp :
-    VM_BinaryComparisonOp<VM_AnyRef, "cmp.eq.ref", VM_OPC_CmpEQRef,
-                          [Commutative]> {
+    VM_BinaryComparisonOp<VM_AnyRef, "cmp.eq.ref", VM_OPC_CmpEQRef, [
+        Commutative,
+        DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>
+    ]> {
   let summary = [{ref<T> equality comparison operation}];
   let hasFolder = 1;
   let hasCanonicalizer = 1;
@@ -3175,15 +3260,19 @@ def VM_CmpEQRefOp :
 
 // TODO(benvanik): remove and just rely on eq & flipped cond_br?
 def VM_CmpNERefOp :
-    VM_BinaryComparisonOp<VM_AnyRef, "cmp.ne.ref", VM_OPC_CmpNERef,
-                          [Commutative]> {
+    VM_BinaryComparisonOp<VM_AnyRef, "cmp.ne.ref", VM_OPC_CmpNERef, [
+        Commutative,
+        DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>
+    ]> {
   let summary = [{ref<T> inequality comparison operation}];
   let hasFolder = 1;
   let hasCanonicalizer = 1;
 }
 
 def VM_CmpNZRefOp :
-    VM_UnaryComparisonOp<VM_AnyRef, "cmp.nz.ref", VM_OPC_CmpNZRef> {
+    VM_UnaryComparisonOp<VM_AnyRef, "cmp.nz.ref", VM_OPC_CmpNZRef, [
+        DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>
+    ]> {
   let summary = [{ref<T> non-zero comparison operation}];
   let description = [{
     Compares the given ref operand for a non-zero/null value.
@@ -3380,7 +3469,7 @@ def VM_CondBranchOp : VM_Op<"cond_br", [
   let hasCanonicalizer = 1;
 }
 
-class VM_CallBaseOp<string mnemonic, list<OpTrait> traits = []> :
+class VM_CallBaseOp<string mnemonic, list<Trait> traits = []> :
     VM_Op<mnemonic, !listconcat(traits, [
       DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
       DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
@@ -3648,7 +3737,7 @@ def VM_CondFailOp : VM_Op<"cond_fail", [
   let hasCanonicalizer = 1;
 }
 
-class VM_CheckOp<string mnemonic, list<OpTrait> traits = []> :
+class VM_CheckOp<string mnemonic, list<Trait> traits = []> :
     VM_Op<mnemonic, !listconcat(traits, [
       VM_PseudoOp,
     ])> {
@@ -3670,7 +3759,7 @@ class VM_CheckOp<string mnemonic, list<OpTrait> traits = []> :
   }];
 }
 
-class VM_UnaryCheckOp<string mnemonic, list<OpTrait> traits = []> :
+class VM_UnaryCheckOp<string mnemonic, list<Trait> traits = []> :
     VM_CheckOp<mnemonic, traits> {
   let arguments = (ins
     VM_AnyType:$value,
@@ -3692,7 +3781,7 @@ class VM_UnaryCheckOp<string mnemonic, list<OpTrait> traits = []> :
   ];
 }
 
-class VM_BinaryCheckOp<string mnemonic, list<OpTrait> traits = []> :
+class VM_BinaryCheckOp<string mnemonic, list<Trait> traits = []> :
     VM_CheckOp<mnemonic, !listconcat(traits, [
       AllTypesMatch<["lhs", "rhs"]>,
     ])> {
@@ -3739,21 +3828,57 @@ def VM_CheckNZOp : VM_UnaryCheckOp<"check.nz"> {
 //   await_any
 
 def VM_YieldOp : VM_Op<"yield", [
+    DeclareOpInterfaceMethods<BranchOpInterface>,
     DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
     HasParent<"IREE::VM::FuncOp">,
+    Terminator,
     YieldPoint,
   ]> {
   let summary = [{unconditional fiber yield operation}];
   let description = [{
     Yields the fiber for some (likely short) amount of time. This can be used to
-    perform cooperative scheduling and ensure fair (enough) execution.
+    perform cooperative scheduling and ensure fair (enough) execution. Execution
+    resumes at the specified target branch.
+
+    ```
+    ^bb0:
+      vm.yield ^on_resume
+    ^on_resume:
+      ...
+   ```
   }];
 
-  let assemblyFormat = "attr-dict";
+  let arguments = (ins
+    Variadic<VM_AnyType>:$destOperands
+  );
+
+  let successors = (successor
+    AnySuccessor:$dest
+  );
+
+  let assemblyFormat = [{
+    $dest (`(` $destOperands^ `:` type($destOperands) `)`)? attr-dict
+  }];
 
   let encoding = [
     VM_EncOpcode<VM_OPC_Yield>,
+    VM_EncBranch<"dest", "getOperands", 0>,
   ];
+
+  let builders = [
+    OpBuilder<(ins "Block *":$dest, CArg<"ValueRange", "{}">:$destOperands), [{
+      $_state.addSuccessors(dest);
+      $_state.addOperands(destOperands);
+    }]>,
+  ];
+
+  let extraClassDeclaration = [{
+    Block *getDest();
+    void setDest(Block *block);
+
+    /// Erase the operand at 'index' from the operand list.
+    void eraseOperand(unsigned index);
+  }];
 }
 
 //===----------------------------------------------------------------------===//
@@ -3851,11 +3976,11 @@ def VM_BreakOp : VM_Op<"break", [
   ];
 
   let builders = [
-    OpBuilder<(ins "Block *":$dest, CArg<"ValueRange", "{}">:$destOperands),
-    [{
+    OpBuilder<(ins "Block *":$dest, CArg<"ValueRange", "{}">:$destOperands), [{
       $_state.addSuccessors(dest);
       $_state.addOperands(destOperands);
-  }]>];
+    }]>,
+  ];
 
   let extraClassDeclaration = [{
     Block *getDest();

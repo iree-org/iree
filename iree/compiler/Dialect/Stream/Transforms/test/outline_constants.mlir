@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -iree-stream-outline-constants %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -iree-stream-outline-constants %s | FileCheck %s
 
 // CHECK-LABEL: @scalarConstant
 func @scalarConstant() {

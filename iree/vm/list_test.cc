@@ -41,6 +41,9 @@ IREE_VM_DEFINE_TYPE_ADAPTERS(test_b, B);
 
 namespace {
 
+using ::iree::Status;
+using ::iree::testing::status::StatusIs;
+
 template <typename T>
 static void RegisterRefType(iree_vm_ref_type_descriptor_t* descriptor,
                             const char* type_name) {
@@ -385,6 +388,70 @@ TEST_F(VMListTest, ResizeVariant) {
 // TODO(benvanik): test value conversion.
 
 // TODO(benvanik): test ref get/set.
+
+// Tests pushing and popping ref objects.
+TEST_F(VMListTest, PushPopRef) {
+  iree_vm_type_def_t element_type =
+      iree_vm_type_def_make_ref_type(test_a_type_id());
+  iree_host_size_t initial_capacity = 4;
+  iree_vm_list_t* list = nullptr;
+  IREE_ASSERT_OK(iree_vm_list_create(&element_type, initial_capacity,
+                                     iree_allocator_system(), &list));
+  EXPECT_LE(initial_capacity, iree_vm_list_capacity(list));
+  EXPECT_EQ(0, iree_vm_list_size(list));
+
+  // Pops when empty fail.
+  iree_vm_ref_t empty_ref{0};
+  EXPECT_THAT(Status(iree_vm_list_pop_front_ref_move(list, &empty_ref)),
+              StatusIs(iree::StatusCode::kOutOfRange));
+
+  // Push back [0, 5).
+  for (iree_host_size_t i = 0; i < 5; ++i) {
+    iree_vm_ref_t ref_a = MakeRef<A>((float)i);
+    IREE_ASSERT_OK(iree_vm_list_push_ref_move(list, &ref_a));
+  }
+
+  // Pop the first two [0, 1] and leave [2, 5).
+  // This ensures that we test the ref path during cleanup:
+  // [ref, ref, ref, ref, ref]
+  //  |______| <- popped region
+  for (iree_host_size_t i = 0; i < 2; ++i) {
+    iree_vm_ref_t ref_a{0};
+    IREE_ASSERT_OK(iree_vm_list_pop_front_ref_move(list, &ref_a));
+    EXPECT_TRUE(test_a_isa(ref_a));
+    auto* a = test_a_deref(ref_a);
+    EXPECT_EQ(i, a->data());
+    iree_vm_ref_release(&ref_a);
+  }
+
+  // Ensure that elements 2+ are valid but now at offset 0.
+  for (iree_host_size_t i = 2; i < 5; ++i) {
+    iree_vm_ref_t ref_a{0};
+    IREE_ASSERT_OK(iree_vm_list_get_ref_retain(list, i - 2, &ref_a));
+    EXPECT_TRUE(test_a_isa(ref_a));
+    auto* a = test_a_deref(ref_a);
+    EXPECT_EQ(i, a->data());
+    iree_vm_ref_release(&ref_a);
+  }
+
+  // Push back two more to get [2, 7).
+  for (iree_host_size_t i = 5; i < 7; ++i) {
+    iree_vm_ref_t ref_a = MakeRef<A>((float)i);
+    IREE_ASSERT_OK(iree_vm_list_push_ref_move(list, &ref_a));
+  }
+
+  // Ensure the new elements got added to the end.
+  for (iree_host_size_t i = 2; i < 7; ++i) {
+    iree_vm_ref_t ref_a{0};
+    IREE_ASSERT_OK(iree_vm_list_get_ref_retain(list, i - 2, &ref_a));
+    EXPECT_TRUE(test_a_isa(ref_a));
+    auto* a = test_a_deref(ref_a);
+    EXPECT_EQ(i, a->data());
+    iree_vm_ref_release(&ref_a);
+  }
+
+  iree_vm_list_release(list);
+}
 
 // TODO(benvanik): test primitive variant get/set.
 

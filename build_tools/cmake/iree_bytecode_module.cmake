@@ -91,6 +91,7 @@ function(iree_bytecode_module)
       DEPENDS
         ${_OPT_TOOL_EXECUTABLE}
         ${_RULE_SRC}
+      VERBATIM
     )
   else()
     # OPT_FLAGS was not specified, so are not using the OPT_TOOL.
@@ -123,6 +124,7 @@ function(iree_bytecode_module)
       ${_TRANSLATE_TOOL_EXECUTABLE}
       ${_EMBEDDED_LINKER_TOOL_EXECUTABLE}
       ${_TRANSLATE_SRC}
+    VERBATIM
   )
 
   if(_RULE_TESTONLY)

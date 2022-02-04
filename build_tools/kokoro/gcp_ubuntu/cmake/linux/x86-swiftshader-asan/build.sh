@@ -21,13 +21,13 @@ export CMAKE_BIN="$(which cmake)"
 "${CXX?}" --version
 python3 --version
 
+echo "Initializing submodules"
+git submodule update --init --jobs 8 --depth 1
+
 ./build_tools/kokoro/gcp_ubuntu/check_vulkan.sh
 
 # Print SwiftShader git commit
 cat /swiftshader/git-commit
-
-echo "Initializing submodules"
-./scripts/git/submodule_versions.py init
 
 CMAKE_BUILD_DIR="${CMAKE_BUILD_DIR:-$HOME/build}"
 

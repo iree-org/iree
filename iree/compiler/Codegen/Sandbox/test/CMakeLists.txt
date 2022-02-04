@@ -18,8 +18,8 @@ iree_lit_test_suite(
     "outline_one_parent_loop.mlir"
     "single_tiling_expert.mlir"
     "unroll_one_vector_op.mlir"
-  DATA
-    iree::tools::IreeFileCheck
+  TOOLS
+    FileCheck
     iree::tools::iree-opt
 )
 

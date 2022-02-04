@@ -20,8 +20,8 @@ iree_lit_test_suite(
     "hint_ops.mlir"
     "list_ops.mlir"
     "status_ops.mlir"
-  DATA
-    iree::tools::IreeFileCheck
+  TOOLS
+    FileCheck
     iree::tools::iree-opt
 )
 

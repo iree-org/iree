@@ -15,8 +15,8 @@ iree_lit_test_suite(
     lit
   SRCS
     "tensor_cast.mlir"
-  DATA
-    iree::tools::IreeFileCheck
+  TOOLS
+    FileCheck
     iree::tools::iree-benchmark-module
     iree::tools::iree-run-mlir
     iree::tools::iree-translate

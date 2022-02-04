@@ -21,18 +21,20 @@ export CMAKE_BIN="$(which cmake)"
 "${CXX?}" --version
 python3 --version
 
+echo "Initializing submodules"
+git submodule update --init --jobs 8 --depth 1
+
 # Print NVIDIA GPU information inside the docker
 dpkg -l | grep nvidia
 nvidia-smi || true
 
 ./build_tools/kokoro/gcp_ubuntu/check_vulkan.sh
 
-echo "Initializing submodules"
-./scripts/git/submodule_versions.py init
-
 # TODO(gcmn): It would be nice to be able to build and test as much as possible,
 # so a build failure only prevents building/testing things that depend on it and
 # we can still run the other tests.
+# TODO: Add "-DIREE_TARGET_BACKEND_CUDA=ON -DIREE_HAL_DRIVER_CUDA=ON" once the
+# VMs have been updated with the correct CUDA SDK.
 echo "Building with cmake"
 ./build_tools/cmake/clean_build.sh
 

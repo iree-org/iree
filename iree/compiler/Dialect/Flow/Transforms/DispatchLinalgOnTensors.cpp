@@ -9,6 +9,7 @@
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowTypes.h"
+#include "iree/compiler/Dialect/Flow/IR/PartitionableLoopsInterface.h"
 #include "iree/compiler/Dialect/Flow/Transforms/DestructiveUpdateUtils.h"
 #include "iree/compiler/Dialect/Flow/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
@@ -25,7 +26,7 @@
 #include "mlir/IR/BlockAndValueMapping.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinAttributes.h"
-#include "mlir/IR/FunctionSupport.h"
+#include "mlir/IR/FunctionInterfaces.h"
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/PatternMatch.h"
@@ -693,31 +694,6 @@ static LogicalResult legalizeDispatchWorkgroupOperands(
   return success();
 }
 
-/// Returns the loops that are partitioned during dispatch region formations, in
-/// order, i.e. starting from the outer-most to innermost.
-static SmallVector<unsigned> getPartitionedLoops(Operation *op) {
-  if (auto mmt4dOp = dyn_cast<linalg::Mmt4DOp>(op)) {
-    return {0, 1};
-  }
-  if (auto linalgOp = dyn_cast<linalg::LinalgOp>(op)) {
-    SmallVector<unsigned> partitionedLoops;
-    for (auto indexedIterator : llvm::enumerate(linalgOp.iterator_types())) {
-      if (isParallelIterator(indexedIterator.value())) {
-        partitionedLoops.push_back(indexedIterator.index());
-      }
-    }
-    // Only keep the last kNumMaxParallelDims if we have more than that.
-    while (partitionedLoops.size() > kNumMaxParallelDims) {
-      partitionedLoops.erase(partitionedLoops.begin());
-    }
-    return partitionedLoops;
-  }
-  if (auto tilableOp = dyn_cast<IREE::LinalgExt::TiledOpInterface>(op)) {
-    return tilableOp.getPartitionableLoops(kNumMaxParallelDims);
-  }
-  return {};
-}
-
 static bool hasOnlyDimUses(Operation *op) {
   return llvm::all_of(op->getUsers(), [&](Operation *user) {
     return isa<tensor::DimOp>(user);
@@ -768,7 +744,9 @@ struct TileAndDistributeLinalgOpsPattern : public linalg::LinalgTilingPattern {
     // of the outermost parallel loops that can be distributed.
     Location loc = linalgOp->getLoc();
     SmallVector<Range> loopRanges = linalgOp.createLoopRanges(rewriter, loc);
-    SmallVector<unsigned> partitionedLoops = getPartitionedLoops(linalgOp);
+    SmallVector<unsigned> partitionedLoops =
+        cast<PartitionableLoopsInterface>(linalgOp.getOperation())
+            .getPartitionableLoops(kNumMaxParallelDims);
     SmallVector<Value> count;
     for (auto dim : partitionedLoops) {
       count.push_back(loopRanges[dim].size);
@@ -847,7 +825,9 @@ struct TiledOpInterfacePattern
 
     SmallVector<StringRef> iteratorTypes = tilableOp.getLoopIteratorTypes();
     SmallVector<Range> loopRanges = tilableOp.getIterationDomain(rewriter);
-    SmallVector<unsigned> partitionedLoops = getPartitionedLoops(tilableOp);
+    SmallVector<unsigned> partitionedLoops =
+        cast<PartitionableLoopsInterface>(tilableOp.getOperation())
+            .getPartitionableLoops(kNumMaxParallelDims);
     SmallVector<Value> count;
     for (auto dim : partitionedLoops) {
       count.push_back(loopRanges[dim].size);
@@ -916,11 +896,11 @@ struct TiledOpInterfacePattern
 /// fuse with multiple root operations (i.e. replicated). For now a very simple
 /// heuristic is used below, but the mechanism should be general enough to
 /// capture any heuristic.
-static unsigned decideFusableLinalgOps(Operation *funcOp) {
+static unsigned decideFusableLinalgOps(FunctionOpInterface funcOp) {
   unsigned numRootOps = 0;
   MLIRContext *context = funcOp->getContext();
   OpBuilder builder(context);
-  for (Block &block : function_like_impl::getFunctionBody(funcOp)) {
+  for (Block &block : funcOp.getBody()) {
     // Tiling and fusion works by tiling the last operation in the fusion group
     // and then pull producer ops into the tiled loops. So go in the reverse
     // order here.
@@ -1039,7 +1019,11 @@ LogicalResult createDispatchRegionsFromRootOps(mlir::Operation *funcOp) {
   // workgroup size specified by the backend.
   auto tileSizeFn = [&](OpBuilder &builder,
                         Operation *op) -> SmallVector<Value, 4> {
-    SmallVector<unsigned> partitionedLoops = getPartitionedLoops(op);
+    PartitionableLoopsInterface interfaceOp =
+        dyn_cast<PartitionableLoopsInterface>(op);
+    if (!interfaceOp) return {};
+    SmallVector<unsigned> partitionedLoops =
+        interfaceOp.getPartitionableLoops(kNumMaxParallelDims);
     if (partitionedLoops.empty()) return {};
     unsigned maxDepth = partitionedLoops.back() + 1;
 
@@ -1075,7 +1059,7 @@ LogicalResult createDispatchRegionsFromRootOps(mlir::Operation *funcOp) {
   // Create the dispatch region, first without the isolate region from above
   // property.
   {
-    OwningRewritePatternList patterns(context);
+    RewritePatternSet patterns(context);
     auto linalgTilingOptions =
         linalg::LinalgTilingOptions()
             .setDistributionOptions(workgroupDistributionOptions)
@@ -1091,7 +1075,7 @@ LogicalResult createDispatchRegionsFromRootOps(mlir::Operation *funcOp) {
 
     // Run canonicalization patterns and pattern to resolve tensor.dim of result
     // values into tensor.dim of its operands..
-    OwningRewritePatternList canonicalizationPatterns(context);
+    RewritePatternSet canonicalizationPatterns(context);
     linalg::populateLinalgTilingCanonicalizationPatterns(
         canonicalizationPatterns);
     if (failed(applyPatternsAndFoldGreedily(
@@ -1108,7 +1092,7 @@ LogicalResult createDispatchRegionsFromRootOps(mlir::Operation *funcOp) {
 
   // Run necessary canonicalization patterns before rewrite destructive updates.
   {
-    OwningRewritePatternList patterns(context);
+    RewritePatternSet patterns(context);
     // Resolve `tensor.dim` of result of operations into operations on its
     // operands using the `ReifyRankedShapedTypeOpInterface`.
     memref::populateResolveRankedShapeTypeResultDimsPatterns(patterns);
@@ -1144,7 +1128,7 @@ LogicalResult createDispatchRegionsFromRootOps(mlir::Operation *funcOp) {
 }
 
 void DispatchLinalgOnTensorsPass::runOnOperation() {
-  auto funcOp = getOperation();
+  auto funcOp = llvm::cast<FunctionOpInterface>(getOperation());
 
   MLIRContext *context = funcOp->getContext();
   context->allowUnregisteredDialects(true);
@@ -1169,7 +1153,7 @@ void DispatchLinalgOnTensorsPass::runOnOperation() {
 
   /// Iterate over the remaining ops and pick up whatever needs to go into
   /// dispatch regions and mark them as root ops.
-  for (Operation &op : function_like_impl::getFunctionBody(funcOp).getOps()) {
+  for (Operation &op : funcOp.getBody().getOps()) {
     // Ignore ops that
     // - Do not implement the `LinalgOp` interface.
     // - linalg.fill ops.
@@ -1201,7 +1185,7 @@ void DispatchLinalgOnTensorsPass::runOnOperation() {
 
   /// Iterate over the remaining ops and pick up whatever needs to go into
   /// dispatch regions and mark them as root ops.
-  for (Operation &op : function_like_impl::getFunctionBody(funcOp).getOps()) {
+  for (Operation &op : funcOp.getBody().getOps()) {
     // Ignore ops that do not implement the `TiledOpInterface` interface.
     if (!isa<IREE::LinalgExt::TiledOpInterface>(&op)) continue;
     assert(!hasRootOpAttribute(&op) &&

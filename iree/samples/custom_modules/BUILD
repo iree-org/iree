@@ -4,7 +4,7 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-load("//iree/tools:compilation.bzl", "iree_bytecode_module")
+load("//build_tools/bazel:iree_bytecode_module.bzl", "iree_bytecode_module")
 load("//iree:build_defs.oss.bzl", "iree_cmake_extra_content")
 
 package(

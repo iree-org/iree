@@ -23,6 +23,9 @@
 
 IREE_FLAG(string, driver, "vmvx", "Backend driver to use.");
 
+IREE_FLAG(bool, print_statistics, false,
+          "Prints runtime statistics to stderr on exit.");
+
 IREE_FLAG(int32_t, call_iterations, 1,
           "Number of times to invoke each call in the trace. May break usage "
           "with stateful models.");
@@ -192,7 +195,7 @@ static iree_status_t iree_replay_benchmark_run_file(
     const iree_benchmark_def_t* benchmark_def,
     iree_benchmark_state_t* benchmark_state) {
   const iree_replay_benchmark_registration_t* registration =
-      (const iree_replay_benchmark_registration_t*)benchmark_def;
+      (const iree_replay_benchmark_registration_t*)benchmark_def->user_data;
 
   // Setup replay state used for this benchmark.
   iree_trace_replay_t replay;
@@ -224,7 +227,10 @@ static iree_status_t iree_replay_benchmark_run_file(
   }
 
   iree_replay_benchmark_call_list_deinitialize(&call_list);
-  iree_trace_replay_deinitialize(&replay);
+  iree_trace_replay_deinitialize(
+      &replay, FLAG_print_statistics
+                   ? IREE_TRACE_REPLAY_SHUTDOWN_PRINT_STATISTICS
+                   : IREE_TRACE_REPLAY_SHUTDOWN_QUIET);
   return iree_ok_status();
 }
 
@@ -248,6 +254,7 @@ static void iree_replay_benchmark_register_trace_files(
         .minimum_duration_ns = 0,
         .iteration_count = 0,
         .run = iree_replay_benchmark_run_file,
+        .user_data = &registrations[i],
     };
     iree_benchmark_register(iree_file_path_stem(file_path),
                             &registrations[i].benchmark_def);

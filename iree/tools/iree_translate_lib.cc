@@ -36,6 +36,7 @@
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Support/Timing.h"
 #include "mlir/Support/ToolUtilities.h"
+#include "mlir/Target/LLVMIR/Dialect/ArmNeon/ArmNeonToLLVMIRTranslation.h"
 #include "mlir/Target/LLVMIR/Dialect/LLVMIR/LLVMToLLVMIRTranslation.h"
 #include "mlir/Translation.h"
 
@@ -44,6 +45,8 @@ int mlir::iree_compiler::runIreeTranslateMain(int argc, char **argv) {
   mlir::DialectRegistry registry;
   mlir::registerMlirDialects(registry);
   mlir::registerLLVMDialectTranslation(registry);
+  // TODO: Make this conditional?
+  mlir::registerArmNeonDialectTranslation(registry);
   mlir::registerXLADialects(registry);
   mlir::iree_compiler::registerAllPasses();
   mlir::iree_compiler::registerIreeDialects(registry);

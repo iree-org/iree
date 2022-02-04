@@ -23,19 +23,19 @@ namespace iree_compiler {
 void populateUtilGlobalToVMPatterns(MLIRContext *context,
                                     ConversionTarget &conversionTarget,
                                     TypeConverter &typeConverter,
-                                    OwningRewritePatternList &patterns);
+                                    RewritePatternSet &patterns);
 void populateUtilListToVMPatterns(MLIRContext *context,
                                   ConversionTarget &conversionTarget,
                                   TypeConverter &typeConverter,
-                                  OwningRewritePatternList &patterns);
+                                  RewritePatternSet &patterns);
 void populateUtilStatusToVMPatterns(MLIRContext *context,
                                     ConversionTarget &conversionTarget,
                                     TypeConverter &typeConverter,
-                                    OwningRewritePatternList &patterns);
+                                    RewritePatternSet &patterns);
 void populateUtilAlignmentToVMPatterns(MLIRContext *context,
                                        ConversionTarget &conversionTarget,
                                        TypeConverter &typeConverter,
-                                       OwningRewritePatternList &patterns);
+                                       RewritePatternSet &patterns);
 
 namespace {
 
@@ -117,7 +117,7 @@ struct UnreachableOpConversion
 void populateUtilToVMPatterns(MLIRContext *context,
                               ConversionTarget &conversionTarget,
                               TypeConverter &typeConverter,
-                              OwningRewritePatternList &patterns) {
+                              RewritePatternSet &patterns) {
   patterns.insert<NullOpConversion>(typeConverter, context);
   patterns.insert<CmpEQOpConversion>(typeConverter, context);
   patterns.insert<ByteBufferConstantOpConversion>(typeConverter, context);

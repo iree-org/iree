@@ -1,4 +1,4 @@
-// RUN: iree-tf-opt -split-input-file -verify-diagnostics -pass-pipeline='builtin.func(iree-tf-strip-asserts)' %s | IreeFileCheck %s
+// RUN: iree-tf-opt -split-input-file -verify-diagnostics -pass-pipeline='builtin.func(iree-tf-strip-asserts)' %s | FileCheck %s
 
 // CHECK-LABEL: @asserts
 // CHECK-NOT: tf.Assert

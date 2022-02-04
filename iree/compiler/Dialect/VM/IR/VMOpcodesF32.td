@@ -62,6 +62,7 @@ def VM_OPC_PowF32                : VM_OPC<0x4B, "PowF32">;
 def VM_OPC_RsqrtF32              : VM_OPC<0x4C, "RsqrtF32">;
 def VM_OPC_SqrtF32               : VM_OPC<0x4D, "SqrtF32">;
 def VM_OPC_TanhF32               : VM_OPC<0x4E, "TanhF32">;
+def VM_OPC_ErfF32                : VM_OPC<0x4F, "ErfF32">;
 
 def VM_OPC_CmpEQF32O             : VM_OPC<0x60, "CmpEQF32O">;
 def VM_OPC_CmpEQF32U             : VM_OPC<0x61, "CmpEQF32U">;

@@ -32,11 +32,12 @@ namespace iree_compiler {
 /// Patterns for workgroup level tiling. Workgroup tiling is done at the flow
 /// level but we may have extra tiling for the reduction dimension. Therefore we
 /// tile again without distributing.
-static void populateTilingReductionPatterns(
-    OwningRewritePatternList &patterns) {
+static void populateTilingReductionPatterns(RewritePatternSet &patterns) {
   auto tileSizesFn = [&](OpBuilder &builder,
                          Operation *op) -> SmallVector<Value, 4> {
-    SmallVector<unsigned> partitionedLoops = getPartitionedLoops(op);
+    auto interfaceOp = cast<IREE::Flow::PartitionableLoopsInterface>(*op);
+    auto partitionedLoops =
+        interfaceOp.getPartitionableLoops(kNumMaxParallelDims);
     SmallVector<Value, 4> tileSizes = getTileSizes(builder, op, 0);
     auto zero = builder.create<arith::ConstantIndexOp>(op->getLoc(), 0);
     for (unsigned depth : partitionedLoops) {
@@ -53,8 +54,8 @@ static void populateTilingReductionPatterns(
   MLIRContext *context = patterns.getContext();
 
   linalg::LinalgTransformationFilter filter(
-      ArrayRef<Identifier>{},
-      Identifier::get(getWorkgroupKTiledMarker(), context));
+      ArrayRef<StringAttr>{},
+      StringAttr::get(context, getWorkgroupKTiledMarker()));
   linalg::TilingPatterns<linalg::MatmulOp, linalg::BatchMatmulOp,
                          linalg::GenericOp>::insert(patterns, tilingOptions,
                                                     filter);
@@ -62,7 +63,7 @@ static void populateTilingReductionPatterns(
 
 /// Patterns for warp level tiling.
 static void populateTilingToWarpPatterns(
-    OwningRewritePatternList &patterns, SmallVectorImpl<int64_t> &workgroupSize,
+    RewritePatternSet &patterns, SmallVectorImpl<int64_t> &workgroupSize,
     SmallVectorImpl<int64_t> &workloadPerWorkgroup) {
   std::array<int64_t, 3> warpPerWorkgroup = {
       workgroupSize[0] / kWarpSize, workgroupSize[1], workgroupSize[2]};
@@ -78,7 +79,10 @@ static void populateTilingToWarpPatterns(
         }
         std::reverse(tileSizes.begin(), tileSizes.end());
         if (tileSizes.empty()) return SmallVector<Value, 4>();
-        SmallVector<unsigned> partitionedLoops = getPartitionedLoops(operation);
+        auto interfaceOp =
+            cast<IREE::Flow::PartitionableLoopsInterface>(*operation);
+        auto partitionedLoops =
+            interfaceOp.getPartitionableLoops(kNumMaxParallelDims);
         unsigned maxDepth = partitionedLoops.back() + 1;
         auto zero =
             builder.create<arith::ConstantIndexOp>(operation->getLoc(), 0);
@@ -109,11 +113,11 @@ static void populateTilingToWarpPatterns(
                            .setDistributionOptions(warpDistributionOptions);
   MLIRContext *context = patterns.getContext();
   linalg::LinalgTransformationFilter filter(
-      {Identifier::get(getWorkgroupKTiledMarker(), context),
-       Identifier::get(getWorkgroupMemoryMarker(), context)},
-      Identifier::get(getVectorizeMarker(), context));
+      {StringAttr::get(context, getWorkgroupKTiledMarker()),
+       StringAttr::get(context, getWorkgroupMemoryMarker())},
+      StringAttr::get(context, getVectorizeMarker()));
   filter.setMatchByDefault();
-  linalg::TilingPatterns<linalg::MatmulOp, linalg::FillOp, linalg::CopyOp,
+  linalg::TilingPatterns<linalg::MatmulOp, linalg::FillOp,
                          linalg::BatchMatmulOp,
                          linalg::GenericOp>::insert(patterns, tilingOptions,
                                                     filter);
@@ -121,7 +125,7 @@ static void populateTilingToWarpPatterns(
 
 /// Patterns for thread level tiling.
 static void populateTilingToInvocationPatterns(
-    OwningRewritePatternList &patterns, SmallVectorImpl<int64_t> &workgroupSize,
+    RewritePatternSet &patterns, SmallVectorImpl<int64_t> &workgroupSize,
     SmallVectorImpl<int64_t> &workloadPerWorkgroup) {
   linalg::TileSizeComputationFunction getInnerTileSizeFn =
       [&](OpBuilder &builder, Operation *operation) {
@@ -133,7 +137,13 @@ static void populateTilingToInvocationPatterns(
         }
         std::reverse(tileSizes.begin(), tileSizes.end());
         if (tileSizes.empty()) return SmallVector<Value, 4>();
-        SmallVector<unsigned> partitionedLoops = getPartitionedLoops(operation);
+        auto interfaceOp =
+            cast<IREE::Flow::PartitionableLoopsInterface>(*operation);
+        auto partitionedLoops =
+            interfaceOp.getPartitionableLoops(kNumMaxParallelDims);
+        if (partitionedLoops.empty()) {
+          return tileSizesVal;
+        }
         unsigned maxDepth = partitionedLoops.back() + 1;
         auto zero =
             builder.create<arith::ConstantIndexOp>(operation->getLoc(), 0);
@@ -167,15 +177,15 @@ static void populateTilingToInvocationPatterns(
 
   MLIRContext *context = patterns.getContext();
   linalg::LinalgTransformationFilter f(
-      {Identifier::get(getWorkgroupKTiledMarker(), context),
-       Identifier::get(getWorkgroupMemoryMarker(), context)},
-      Identifier::get(getVectorizeMarker(), context));
+      {StringAttr::get(context, getWorkgroupKTiledMarker()),
+       StringAttr::get(context, getWorkgroupMemoryMarker())},
+      StringAttr::get(context, getVectorizeMarker()));
   f.addFilter([](Operation *op) {
      // FFT doesn't support second level of tiling yet.
      return success(!isa<IREE::LinalgExt::FftOp>(op));
    }).setMatchByDefault();
   linalg::TilingPatterns<
-      linalg::MatmulOp, linalg::FillOp, linalg::CopyOp, linalg::BatchMatmulOp,
+      linalg::MatmulOp, linalg::FillOp, linalg::BatchMatmulOp,
       linalg::GenericOp, linalg::Conv2DNhwcHwcfOp,
       linalg::DepthwiseConv2DNhwcHwcOp, linalg::DepthwiseConv2DNhwcHwcmOp,
       linalg::PoolingNhwcMaxOp, linalg::PoolingNhwcMinOp,
@@ -185,7 +195,7 @@ static void populateTilingToInvocationPatterns(
 }
 
 static LogicalResult copyToWorkgroupMemory(OpBuilder &b, Value src, Value dst) {
-  auto copyOp = b.create<linalg::CopyOp>(src.getLoc(), src, dst);
+  Operation *copyOp = createLinalgCopyOp(b, src.getLoc(), src, dst);
   setMarker(copyOp, getCopyToWorkgroupMemoryMarker());
   return success();
 }
@@ -238,7 +248,7 @@ static LogicalResult deallocateWorkgroupMemory(OpBuilder &b, Value buffer) {
 }
 
 static void populatePromotionPatterns(MLIRContext *context,
-                                      OwningRewritePatternList &patterns) {
+                                      RewritePatternSet &patterns) {
   patterns.insert<linalg::LinalgPromotionPattern<linalg::MatmulOp>,
                   linalg::LinalgPromotionPattern<linalg::BatchMatmulOp>>(
       context,
@@ -249,8 +259,8 @@ static void populatePromotionPatterns(MLIRContext *context,
           .setOperandsToPromote({0, 1})
           .setUseFullTileBuffers({false, false}),
       linalg::LinalgTransformationFilter(
-          {Identifier::get(getWorkgroupKTiledMarker(), context)},
-          Identifier::get(getWorkgroupMemoryMarker(), context)));
+          {StringAttr::get(context, getWorkgroupKTiledMarker())},
+          StringAttr::get(context, getWorkgroupMemoryMarker())));
 }
 
 namespace {
@@ -274,7 +284,7 @@ struct LLVMGPUTileAndDistributePass
       // Tile again at the workgroup level since redution dimension were
       // ignored. Dimensions already tiled will be ignore since we tile to the
       // same size.
-      OwningRewritePatternList wgTilingPatterns(context);
+      RewritePatternSet wgTilingPatterns(context);
       populateTilingReductionPatterns(wgTilingPatterns);
       if (failed(applyPatternsAndFoldGreedily(funcOp,
                                               std::move(wgTilingPatterns)))) {
@@ -308,7 +318,7 @@ struct LLVMGPUTileAndDistributePass
         workgroupSize[0] * workgroupSize[1] * workgroupSize[2];
     // Only promote to workgroup size if there are multiple warps.
     if (flatWorkgroupSize > kWarpSize) {
-      OwningRewritePatternList promotionPatterns(&getContext());
+      RewritePatternSet promotionPatterns(&getContext());
       populatePromotionPatterns(context, promotionPatterns);
       if (failed(applyPatternsAndFoldGreedily(funcOp,
                                               std::move(promotionPatterns)))) {
@@ -317,7 +327,7 @@ struct LLVMGPUTileAndDistributePass
       // Insert barriers before and after copies to workgroup memory and skip
       // insert barriers between back to back copy to workgroup memory.
       OpBuilder builder(&getContext());
-      funcOp.walk([&builder](linalg::CopyOp copyOp) {
+      funcOp.walk([&builder](linalg::GenericOp copyOp) {
         if (hasMarker(copyOp, getCopyToWorkgroupMemoryMarker())) {
           Operation *prevOp = copyOp->getPrevNode();
           if (!prevOp || !hasMarker(prevOp, getCopyToWorkgroupMemoryMarker())) {
@@ -349,7 +359,7 @@ struct LLVMGPUTileAndDistributePass
 
     if (distributeToWarp) {
       // Apply last level of tiling and distribute to warps.
-      OwningRewritePatternList warpLevelTilingPatterns(context);
+      RewritePatternSet warpLevelTilingPatterns(context);
       populateTilingToWarpPatterns(warpLevelTilingPatterns, workgroupSize,
                                    workloadPerWorkgroup);
       if (failed(applyPatternsAndFoldGreedily(
@@ -359,7 +369,7 @@ struct LLVMGPUTileAndDistributePass
 
     } else {
       // Apply last level of tiling and distribute to threads.
-      OwningRewritePatternList threadLevelTilingPatterns(context);
+      RewritePatternSet threadLevelTilingPatterns(context);
       populateTilingToInvocationPatterns(threadLevelTilingPatterns,
                                          workgroupSize, workloadPerWorkgroup);
       if (failed(applyPatternsAndFoldGreedily(

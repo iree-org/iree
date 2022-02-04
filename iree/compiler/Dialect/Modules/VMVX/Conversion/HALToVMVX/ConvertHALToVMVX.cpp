@@ -94,7 +94,8 @@ LogicalResult updateHALToVMVXEntryFuncOp(FuncOp funcOp,
                                    {});
 
   funcOp.setType(newType);
-  funcOp.front().addArguments(newType.getInputs());
+  SmallVector<Location> locs(newType.getNumInputs(), funcOp.getLoc());
+  funcOp.front().addArguments(newType.getInputs(), locs);
 
   return success();
 }
@@ -259,7 +260,7 @@ class ConvertHALInterfaceBindingSubspanOp
 }  // namespace
 
 void populateHALToVMVXPatterns(MLIRContext *context,
-                               OwningRewritePatternList &patterns,
+                               RewritePatternSet &patterns,
                                TypeConverter &typeConverter) {
   patterns.insert<ConvertHALInterfaceWorkgroupIDOp>(typeConverter, context);
   patterns.insert<ConvertHALInterfaceWorkgroupSizeOp>(typeConverter, context);

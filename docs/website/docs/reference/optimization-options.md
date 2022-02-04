@@ -52,3 +52,12 @@ and constant data rewritten to lower precision types.
 
 This feature is actively evolving and will be the subject of dedicated
 documentation when ready.
+
+### Strip Debug Assertions (`--iree-opt-strip-assertions` (off))
+
+Strips all `std.assert` ops in the input program after useful information for
+optimization analysis has been extracted. Assertions provide useful user-visible
+error messages but can prevent critical optimizations. Assertions are not,
+however, a substitution for control flow and frontends that want to check errors
+in optimized release builds should do so via actual code - similar to when one
+would `if (foo) return false;` vs. `assert(foo);` in a normal program.

@@ -14,6 +14,19 @@ namespace iree_compiler {
 namespace IREE {
 namespace Stream {
 
+// TODO(benvanik): find a way to share this with IREEVM.h w/o circular deps.
+// Defines the output format of a dump pass.
+enum class DumpOutputFormat {
+  // Dumping disabled.
+  None = 0,
+  // Human-readable pretty printing.
+  Pretty = 1,
+  // Pretty printing with additional information that can result in large dumps.
+  Verbose = 2,
+  // Comma separated values for throwing into Sheets.
+  CSV = 3,
+};
+
 #define GEN_PASS_CLASSES
 #include "iree/compiler/Dialect/Stream/Transforms/Passes.h.inc"  // IWYU pragma: keep
 

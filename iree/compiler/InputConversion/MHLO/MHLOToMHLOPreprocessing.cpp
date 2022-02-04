@@ -79,45 +79,6 @@ static Value getF32Const(ImplicitLocOpBuilder b, ArrayRef<int64_t> shapes,
       .getResult();
 }
 
-static Value getF32SplatConst(ImplicitLocOpBuilder b, ArrayRef<int64_t> shapes,
-                              float value) {
-  return getF32Const(b, shapes, {value});
-}
-
-class DecomposeLog1PPattern : public OpRewritePattern<mhlo::Log1pOp> {
- public:
-  using OpRewritePattern<mhlo::Log1pOp>::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(mhlo::Log1pOp op,
-                                PatternRewriter &rewriter) const override {
-    Location loc = op.getLoc();
-    auto type = op.operand().getType().cast<TensorType>();
-    DenseElementsAttr attr =
-        DenseElementsAttr::get(type, rewriter.getF32FloatAttr(1.0));
-    auto one = rewriter.create<arith::ConstantOp>(loc, attr);
-    auto x = rewriter.create<mhlo::AddOp>(loc, op.operand(), one);
-    rewriter.replaceOpWithNewOp<mhlo::LogOp>(op, x);
-    return success();
-  }
-};
-
-class DecomposeExpM1Pattern : public OpRewritePattern<mhlo::Expm1Op> {
- public:
-  using OpRewritePattern<mhlo::Expm1Op>::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(mhlo::Expm1Op op,
-                                PatternRewriter &rewriter) const override {
-    Location loc = op.getLoc();
-    auto type = op.operand().getType().cast<TensorType>();
-    DenseElementsAttr attr =
-        DenseElementsAttr::get(type, rewriter.getF32FloatAttr(1.0));
-    auto one = rewriter.create<arith::ConstantOp>(loc, attr);
-    auto x = rewriter.create<mhlo::ExpOp>(loc, op.operand());
-    rewriter.replaceOpWithNewOp<mhlo::SubOp>(op, x, one);
-    return success();
-  }
-};
-
 class ExtractConvOpPaddingAttributes : public OpRewritePattern<mhlo::ConvOp> {
  public:
   using OpRewritePattern<mhlo::ConvOp>::OpRewritePattern;
@@ -633,6 +594,86 @@ class TransposeReshapeGenericDotGeneral
   }
 };
 
+class ScatterRank0Value : public OpRewritePattern<mhlo::ScatterOp> {
+ public:
+  using OpRewritePattern<mhlo::ScatterOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(mhlo::ScatterOp op,
+                                PatternRewriter &rewriter) const override {
+    auto operand = op.operand();
+    auto indices = op.scatter_indices();
+    auto updates = op.updates();
+
+    auto operandTy = operand.getType().dyn_cast<RankedTensorType>();
+    auto indicesTy = indices.getType().dyn_cast<RankedTensorType>();
+    auto updatesTy = updates.getType().dyn_cast<RankedTensorType>();
+    if (!operandTy || !indicesTy || !updatesTy) return failure();
+
+    if (indicesTy.getRank() != 1 || !indicesTy.hasStaticShape() ||
+        updatesTy.getRank() != 0) {
+      return failure();
+    }
+
+    auto dimNumbers = op.scatter_dimension_numbers();
+
+    // We only have one dim for shape so this should be 0.
+    if (dimNumbers.getIndexVectorDim() != 0) return failure();
+
+    // Require canonicalize scatter order.
+    // TODO(suderman): Transpose to canonicalized order.
+    for (auto en : llvm::enumerate(dimNumbers.getScatterDimsToOperandDims())) {
+      if (en.index() != en.value()) return failure();
+    }
+
+    // Inserted window dims should be in order. Technically we just need to
+    // check they are all contained.
+    for (auto en : llvm::enumerate(dimNumbers.getInsertedWindowDims())) {
+      if (en.index() != en.value()) return failure();
+    }
+
+    // This should be empty
+    if (dimNumbers.getUpdateWindowDims().size() != 0) {
+      return failure();
+    }
+
+    // Reshape indices to add the implicit 1x out front.
+    llvm::SmallVector<int64_t> newIndicesShape;
+    llvm::SmallVector<Value> newIndicesDynDims;
+    newIndicesShape.push_back(1);
+    for (auto it : llvm::enumerate(indicesTy.getShape())) {
+      auto dim = it.value();
+      newIndicesShape.push_back(dim);
+    }
+
+    Location loc = op.getLoc();
+    Value reshapedIndices = rewriter.create<mhlo::ReshapeOp>(
+        loc, RankedTensorType::get(newIndicesShape, indicesTy.getElementType()),
+        indices);
+
+    Value reshapedUpdates = rewriter.create<mhlo::ReshapeOp>(
+        loc, RankedTensorType::get({1}, updatesTy.getElementType()), updates);
+
+    SmallVector<int64_t> insertedWindowDims =
+        llvm::to_vector<4>(llvm::seq<int64_t>(0, operandTy.getRank()));
+    SmallVector<int64_t> scatterDimsToOperandDims =
+        llvm::to_vector<4>(llvm::seq<int64_t>(0, operandTy.getRank()));
+    auto newDimNumbers = mhlo::ScatterDimensionNumbersAttr::get(
+        op.getContext(), {}, insertedWindowDims, scatterDimsToOperandDims,
+        /*indexVectorDim=*/1);
+
+    auto newScatter = rewriter.create<mhlo::ScatterOp>(
+        loc, op.getType(), operand, reshapedIndices, reshapedUpdates,
+        newDimNumbers, op.indices_are_sorted(), op.unique_indices());
+
+    Region &region = newScatter.update_computation();
+    rewriter.cloneRegionBefore(op.update_computation(), region, region.end());
+
+    rewriter.replaceOp(op, newScatter.getResult());
+
+    return success();
+  }
+};
+
 // Generates Gaussian noise with uniform random generator based on Box-Muller
 // transform.
 class ExpandRngNormal : public OpRewritePattern<mhlo::RngNormalOp> {
@@ -797,7 +838,7 @@ struct MHLOToMHLOPreprocessingPass
   void runOnOperation() override {
     MLIRContext *context = &getContext();
     ConversionTarget conversionTarget(*context);
-    OwningRewritePatternList conversionPatterns(&getContext());
+    RewritePatternSet conversionPatterns(&getContext());
     // Note that various input modalities may do their own legalization of
     // CHLO. Converting here allows IREE to accept CHLO dialect regardless of
     // whether it was legalized away at a higher level.
@@ -812,15 +853,16 @@ struct MHLOToMHLOPreprocessingPass
       return signalPassFailure();
     }
 
-    OwningRewritePatternList patterns(&getContext());
+    RewritePatternSet patterns(&getContext());
     // TODO: Remove once we have a general contraction to matmul pass.
     mhlo::PopulateEinsumToDotGeneralPatterns(context, &patterns);
     mhlo::PopulateUnfuseBatchNormPatterns(context, &patterns);
     mhlo::PopulateComplexLoweringPatterns(context, &patterns);
     mhlo::PopulateGatherToTorchIndexSelectPatterns(context, &patterns);
-    patterns.insert<ExtractReduceWindowOpPaddingAttributes,
-                    AdjustDepthwiseFilterShape, DecomposeLog1PPattern,
-                    DecomposeExpM1Pattern, ExpandRngNormal>(context);
+    patterns
+        .insert<ExtractReduceWindowOpPaddingAttributes,
+                AdjustDepthwiseFilterShape, ScatterRank0Value, ExpandRngNormal>(
+            context);
 
     // dot_general canoncalization patterns.
     mhlo::PopulateGeneralDotOpLoweringPatterns(&patterns, context);

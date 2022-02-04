@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file %s | iree-opt -split-input-file | IreeFileCheck %s
+// RUN: iree-opt -split-input-file %s | iree-opt -split-input-file | FileCheck %s
 
 // CHECK-LABEL: @allocator_allocate
 //  CHECK-SAME: (%[[ALLOCATOR:.+]]: !hal.allocator)
@@ -6,7 +6,7 @@ func @allocator_allocate(%allocator: !hal.allocator) {
   // CHECK-DAG: %[[SIZE:.+]] = arith.constant 123
   %size = arith.constant 123 : index
   //      CHECK: %[[REF:.+]] = hal.allocator.allocate<%[[ALLOCATOR]] : !hal.allocator>
-  // CHECK-SAME:   type("HostVisible|HostCoherent")
+  // CHECK-SAME:   type("HostVisible|HostCoherent|HostLocal")
   // CHECK-SAME:   usage(Transfer)
   // CHECK-SAME:   : !hal.buffer{%[[SIZE]]}
   %ref = hal.allocator.allocate<%allocator : !hal.allocator>

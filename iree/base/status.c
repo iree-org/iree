@@ -220,8 +220,6 @@ IREE_API_EXPORT const char* iree_status_code_string(iree_status_code_t code) {
       return "ALREADY_EXISTS";
     case IREE_STATUS_PERMISSION_DENIED:
       return "PERMISSION_DENIED";
-    case IREE_STATUS_UNAUTHENTICATED:
-      return "UNAUTHENTICATED";
     case IREE_STATUS_RESOURCE_EXHAUSTED:
       return "RESOURCE_EXHAUSTED";
     case IREE_STATUS_FAILED_PRECONDITION:
@@ -238,6 +236,10 @@ IREE_API_EXPORT const char* iree_status_code_string(iree_status_code_t code) {
       return "UNAVAILABLE";
     case IREE_STATUS_DATA_LOSS:
       return "DATA_LOSS";
+    case IREE_STATUS_UNAUTHENTICATED:
+      return "UNAUTHENTICATED";
+    case IREE_STATUS_DEFERRED:
+      return "DEFERRED";
     default:
       return "";
   }

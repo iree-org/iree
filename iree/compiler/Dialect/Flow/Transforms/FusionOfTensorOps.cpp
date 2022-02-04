@@ -42,8 +42,8 @@ struct FusionOfTensorOpsPass
   }
 
   void runOnOperation() override {
-    OwningRewritePatternList fusionPatterns(&getContext());
-    OwningRewritePatternList interfacePatterns(&getContext());
+    RewritePatternSet fusionPatterns(&getContext());
+    RewritePatternSet interfacePatterns(&getContext());
     Operation *op = getOperation();
     MLIRContext *context = op->getContext();
 
@@ -99,7 +99,16 @@ struct FusionOfTensorOpsPass
           // simplistic heuristic to avoid duplicating ops that may be
           // expensive.
           // TODO: Add a cost model to allow ops to be duplicated.
+          bool hasI1ReturnType =
+              llvm::any_of(producer->getResultTypes(), [](Type t) {
+                if (t.isInteger(1)) return true;
+                if (auto shapedType = t.dyn_cast<ShapedType>()) {
+                  if (shapedType.getElementType().isInteger(1)) return true;
+                }
+                return false;
+              });
           if (!isBroadcast && !isa<arith::ConstantOp>(producer) &&
+              !hasI1ReturnType &&
               !llvm::hasSingleElement(producerResult.getUsers())) {
             return false;
           }
@@ -134,7 +143,7 @@ struct FusionOfTensorOpsPass
       return signalPassFailure();
     }
 
-    OwningRewritePatternList reshapeCanonicalizations(&getContext());
+    RewritePatternSet reshapeCanonicalizations(&getContext());
     linalg::populateFoldUnitDimsReshapeOpsByLinearizationPatterns(
         reshapeCanonicalizations);
     tensor::CollapseShapeOp::getCanonicalizationPatterns(
@@ -151,7 +160,7 @@ struct FusionOfTensorOpsPass
     }
 
     // Push the remaining reshapes down the graphs.
-    OwningRewritePatternList pushReshapePatterns(&getContext());
+    RewritePatternSet pushReshapePatterns(&getContext());
     linalg::populatePushReshapeOpsPatterns(pushReshapePatterns);
     tensor::CollapseShapeOp::getCanonicalizationPatterns(pushReshapePatterns,
                                                          context);

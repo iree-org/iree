@@ -19,6 +19,7 @@ iree_check_single_backend_test_suite(
         # keep sorted
         [
             "reverse.mlir",
+            "scan.mlir",
         ],
         include = ["*.mlir"],
         exclude = [
@@ -42,6 +43,7 @@ iree_check_single_backend_test_suite(
         # keep sorted
         [
             "reverse.mlir",
+            "scan.mlir",
         ],
         include = ["*.mlir"],
         exclude = [
@@ -57,6 +59,7 @@ iree_check_single_backend_test_suite(
         # keep sorted
         [
             "reverse.mlir",
+            "scan.mlir",
         ],
         include = ["*.mlir"],
         exclude = [
@@ -75,6 +78,9 @@ iree_check_single_backend_test_suite(
         ],
         include = ["*.mlir"],
         exclude = [
+            # TODO(antiagainst): scan fails on Adreno GPUs due to driver bug.
+            # Re-enable this once we have new devices with up-to-date drivers.
+            "scan.mlir",
         ],
     ),
     driver = "vulkan",

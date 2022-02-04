@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -iree-consteval-jit-globals %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -iree-consteval-jit-globals %s | FileCheck %s
 
 // TODO: Full type matrix for tests.
 

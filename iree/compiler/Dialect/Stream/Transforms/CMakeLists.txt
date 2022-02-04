@@ -19,6 +19,7 @@ iree_cc_library(
   SRCS
     "AnnotateDispatchArguments.cpp"
     "ConvertToStream.cpp"
+    "DumpStatistics.cpp"
     "ElideAsyncCopies.cpp"
     "EncodeTensors.cpp"
     "FoldUniformOperands.cpp"

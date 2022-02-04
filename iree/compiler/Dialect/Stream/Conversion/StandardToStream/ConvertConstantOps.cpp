@@ -52,7 +52,7 @@ struct ConvertTensorConstantOp : public OpConversionPattern<arith::ConstantOp> {
 
 void populateStandardConstantToStreamPatterns(
     MLIRContext *context, ConversionTarget &conversionTarget,
-    TypeConverter &typeConverter, OwningRewritePatternList &patterns) {
+    TypeConverter &typeConverter, RewritePatternSet &patterns) {
   conversionTarget.addDynamicallyLegalOp<arith::ConstantOp>(
       [](arith::ConstantOp op) { return !op.getType().isa<TensorType>(); });
 

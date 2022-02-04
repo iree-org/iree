@@ -28,10 +28,11 @@ iree_lit_test_suite(
     "remove_dead_allocs.mlir"
     "remove_trivial_loops.mlir"
     "transpose_canonicalization.mlir"
+    "type_propagation.mlir"
     "vectorize_linalg_conv.mlir"
     "vectorize_linalg_mmt4d.mlir"
-  DATA
-    iree::tools::IreeFileCheck
+  TOOLS
+    FileCheck
     iree::tools::iree-opt
 )
 

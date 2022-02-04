@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file %s | iree-opt -allow-unregistered-dialect -split-input-file | IreeFileCheck %s
+// RUN: iree-opt -split-input-file %s | iree-opt -allow-unregistered-dialect -split-input-file | FileCheck %s
 
 // CHECK-LABEL: @buffer_view_create
 func @buffer_view_create(%arg0: !hal.buffer, %arg1: index, %arg2: index) -> !hal.buffer_view {

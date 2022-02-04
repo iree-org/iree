@@ -15,6 +15,7 @@ iree_cc_library(
     Utils
   HDRS
     "ConversionUtils.h"
+    "CustomKernelsTargetInfo.h"
     "FlatbufferUtils.h"
     "GraphUtils.h"
     "IndexSet.h"
@@ -22,14 +23,17 @@ iree_cc_library(
     "OptionUtils.h"
     "PassUtils.h"
     "PatternUtils.h"
+    "StringUtils.h"
     "TracingUtils.h"
   SRCS
     "ConversionUtils.cpp"
+    "CustomKernelsTargetInfo.cpp"
     "FlatbufferUtils.cpp"
     "GraphUtils.cpp"
     "ModuleUtils.cpp"
     "OptionUtils.cpp"
     "PassUtils.cpp"
+    "StringUtils.cpp"
     "TracingUtils.cpp"
   DEPS
     LLVMSupport

@@ -108,6 +108,62 @@ TEST(TaskListTest, Discard) {
   // IMPLICIT: if the tasks were not released back to the pool we'll leak.
 }
 
+TEST(TaskListTest, DiscardSequence) {
+  auto pool = AllocateNopPool();
+  auto scope = AllocateScope("a");
+
+  iree_task_list_t list;
+  iree_task_list_initialize(&list);
+  EXPECT_TRUE(iree_task_list_is_empty(&list));
+
+  auto task0 = AcquireNopTask(pool, scope, 0);
+  auto task1 = AcquireNopTask(pool, scope, 1);
+  auto task2 = AcquireNopTask(pool, scope, 2);
+  auto task3 = AcquireNopTask(pool, scope, 3);
+  iree_task_set_completion_task(task0, task1);
+  iree_task_set_completion_task(task1, task2);
+  iree_task_set_completion_task(task2, task3);
+  iree_task_list_push_back(&list, task0);
+  iree_task_list_push_back(&list, task1);
+  iree_task_list_push_back(&list, task2);
+  iree_task_list_push_back(&list, task3);
+  EXPECT_EQ(4, iree_task_list_calculate_size(&list));
+  EXPECT_TRUE(CheckListOrderFIFO(&list));
+
+  iree_task_list_discard(&list);
+  EXPECT_TRUE(iree_task_list_is_empty(&list));
+
+  // IMPLICIT: if the tasks were not released back to the pool we'll leak.
+}
+
+TEST(TaskListTest, DiscardJoin) {
+  auto pool = AllocateNopPool();
+  auto scope = AllocateScope("a");
+
+  iree_task_list_t list;
+  iree_task_list_initialize(&list);
+  EXPECT_TRUE(iree_task_list_is_empty(&list));
+
+  auto task0 = AcquireNopTask(pool, scope, 0);
+  auto task1 = AcquireNopTask(pool, scope, 1);
+  auto task2 = AcquireNopTask(pool, scope, 2);
+  auto task3 = AcquireNopTask(pool, scope, 3);
+  iree_task_set_completion_task(task0, task3);
+  iree_task_set_completion_task(task1, task3);
+  iree_task_set_completion_task(task2, task3);
+  iree_task_list_push_back(&list, task0);
+  iree_task_list_push_back(&list, task1);
+  iree_task_list_push_back(&list, task2);
+  iree_task_list_push_back(&list, task3);
+  EXPECT_EQ(4, iree_task_list_calculate_size(&list));
+  EXPECT_TRUE(CheckListOrderFIFO(&list));
+
+  iree_task_list_discard(&list);
+  EXPECT_TRUE(iree_task_list_is_empty(&list));
+
+  // IMPLICIT: if the tasks were not released back to the pool we'll leak.
+}
+
 TEST(TaskListTest, PushFront) {
   auto pool = AllocateNopPool();
   auto scope = AllocateScope("a");

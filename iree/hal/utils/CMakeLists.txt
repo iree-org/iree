@@ -55,7 +55,7 @@ iree_cc_library(
   PUBLIC
 )
 
-iree_cc_test(
+iree_cc_binary_benchmark(
   NAME
     resource_set_benchmark
   SRCS
@@ -66,6 +66,7 @@ iree_cc_test(
     iree::base::internal::prng
     iree::hal
     iree::testing::benchmark
+  TESTONLY
 )
 
 iree_cc_test(

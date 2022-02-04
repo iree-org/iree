@@ -155,6 +155,7 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
       .addPass(mlir::createCanonicalizerPass)
       .addPass(createDispatchLinalgOnTensorsPass)
       .addPass(memref::createResolveShapedTypeResultDimsPass)
+      .addPass(createCaptureDispatchDynamicDimsPass)
       .addPass(createConvertToFlowAfterDispatchFormation)
       .addPass(mlir::createCanonicalizerPass)
       .addPass(memref::createResolveShapedTypeResultDimsPass)
@@ -168,6 +169,12 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
   // Module pass to outline the dispatch regions into their own functions
   // wrapped in executables.
   passManager.addPass(createOutlineDispatchRegionsPass());
+
+  // Strip assertions from executables. We could support them with a bunch of
+  // work but our generated executables are designed to be safe in the face of
+  // invalid values and it'd only be useful for debugging.
+  passManager.addNestedPass<IREE::Flow::ExecutableOp>(
+      IREE::Util::createStripDebugOpsPass());
 
   // Cleanup identity ops that clutter up the IR and canonicalize.
   FunctionLikeNest(passManager).addPass(mlir::createCanonicalizerPass);
@@ -218,9 +225,21 @@ namespace {
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h.inc"  // IWYU pragma: export
 }  // namespace
 
+/// Test passes.
+std::unique_ptr<OperationPass<void>>
+createTestPartitionableLoopsInterfacePass();
+
+/// Register test passes.
+inline void registerTestPasses() {
+  createTestPartitionableLoopsInterfacePass();
+}
+
 void registerFlowPasses() {
   // Generated.
   registerPasses();
+
+  // Test passes.
+  registerTestPasses();
 
   // Pipelines.
   registerFlowTransformPassPipeline();

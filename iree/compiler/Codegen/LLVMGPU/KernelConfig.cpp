@@ -99,9 +99,41 @@ static LogicalResult setContractConfig(FuncOp entryPoint, linalg::LinalgOp op) {
                          IREE::Codegen::DispatchLoweringPassPipeline pipeline) {
         TileSizesListType tileSizes;
         SmallVector<int64_t> ts;
+        SmallVector<unsigned> partitionedLoops =
+            cast<IREE::Flow::PartitionableLoopsInterface>(op.getOperation())
+                .getPartitionableLoops(kNumMaxParallelDims);
+        unsigned index = 0;
         // Tile all the higher parallel dimension with a size of 1 and the 2
         // most inner dimension with the tileX/tileY size.
-        ts.append(op.getNumParallelLoops() - 2, 1);
+        for (auto loopNum :
+             llvm::seq<unsigned>(0, op.getNumParallelLoops() - 2)) {
+          int64_t tileSize = 0;
+          if (index < partitionedLoops.size() &&
+              partitionedLoops[index] == loopNum) {
+            tileSize = 1;
+            index++;
+          }
+          ts.push_back(tileSize);
+        }
+
+        // Check for M loop being partitioned.
+        if (index < partitionedLoops.size() &&
+            partitionedLoops[index] == op.getNumParallelLoops() - 2) {
+          index++;
+        } else {
+          // M dim isnt partitioned.
+          tileX = 0;
+        }
+
+        // Check for N loop being partitioned.
+        if (index < partitionedLoops.size() &&
+            partitionedLoops[index] == op.getNumParallelLoops() - 1) {
+          index++;
+        } else {
+          // N dim isnt partitioned.
+          tileY = 0;
+        }
+
         ts.append({tileX, tileY});
         // Tile all the reduction dimensions.
         ts.append(op.getNumReductionLoops(), tileK);
@@ -196,7 +228,9 @@ static LogicalResult setContractConfig(FuncOp entryPoint, linalg::LinalgOp op) {
 
 static LogicalResult setFftConfig(FuncOp entryPoint,
                                   IREE::LinalgExt::FftOp op) {
-  auto partitionedLoops = getPartitionedLoops(op);
+  auto interfaceOp = cast<IREE::Flow::PartitionableLoopsInterface>(*op);
+  auto partitionedLoops =
+      interfaceOp.getPartitionableLoops(kNumMaxParallelDims);
   unsigned loopDepth = partitionedLoops.back() + 1;
   SmallVector<int64_t> workgroupTileSize(loopDepth, 0);
   SmallVector<int64_t, 3> workgroupSize = {cudaWarpSize, 1, 1};
@@ -224,7 +258,9 @@ static LogicalResult setFftConfig(FuncOp entryPoint,
 
 static LogicalResult setSortConfig(FuncOp entryPoint, Operation *op) {
   TileSizesListType tileSizes;
-  SmallVector<unsigned> partitionedLoops = getPartitionedLoops(op);
+  auto interfaceOp = cast<IREE::Flow::PartitionableLoopsInterface>(*op);
+  auto partitionedLoops =
+      interfaceOp.getPartitionableLoops(kNumMaxParallelDims);
   if (partitionedLoops.empty()) {
     tileSizes.push_back({});
     return setOpConfigAndEntryPointFnTranslation(
@@ -264,7 +300,9 @@ static LogicalResult setRootDefaultConfig(FuncOp entryPoint, Operation *op) {
   IREE::Codegen::DispatchLoweringPassPipeline passPipeline =
       IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUDistribute;
   TileSizesListType tileSizes;
-  SmallVector<unsigned> partitionedLoops = getPartitionedLoops(op);
+  auto interfaceOp = cast<IREE::Flow::PartitionableLoopsInterface>(*op);
+  auto partitionedLoops =
+      interfaceOp.getPartitionableLoops(kNumMaxParallelDims);
   if (partitionedLoops.empty()) {
     tileSizes.push_back({});
     return setOpConfigAndEntryPointFnTranslation(
@@ -413,10 +451,10 @@ LogicalResult initGPULaunchConfig(ModuleOp moduleOp) {
     }
 
     Operation *rootOperation = nullptr;
-    // Find the root operation. linalg.generic, linalg.fill and linalg.copy are
-    // not root operations if there are other compute operations present.
+    // Find the root operation. linalg.generic and linalg.fill are not root
+    // operations if there are other compute operations present.
     for (Operation *op : llvm::reverse(computeOps)) {
-      if (!isa<linalg::GenericOp, linalg::FillOp, linalg::CopyOp>(op)) {
+      if (!isa<linalg::GenericOp, linalg::FillOp>(op)) {
         rootOperation = op;
         break;
       }
@@ -431,7 +469,7 @@ LogicalResult initGPULaunchConfig(ModuleOp moduleOp) {
 
     if (!rootOperation) {
       for (Operation *op : llvm::reverse(computeOps)) {
-        if (isa<linalg::GenericOp, linalg::FillOp, linalg::CopyOp>(op)) {
+        if (isa<linalg::GenericOp, linalg::FillOp>(op)) {
           rootOperation = op;
           break;
         }

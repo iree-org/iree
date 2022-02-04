@@ -14,7 +14,7 @@
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
 #include "mlir/Dialect/GPU/Passes.h"
-#include "mlir/Dialect/Vector/VectorTransforms.h"
+#include "mlir/Dialect/Vector/Transforms/VectorTransforms.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/Support/MathExtras.h"
@@ -33,7 +33,7 @@ namespace iree_compiler {
 /// part of the launch config but needs to be distributed on the workgroup
 /// picked by the root op.
 static void populateTilingCopyToWorkgroupMemPatterns(
-    OwningRewritePatternList &patterns, ArrayRef<int64_t> workgroupSize) {
+    RewritePatternSet &patterns, ArrayRef<int64_t> workgroupSize) {
   // Tile and distribute copy to workgroup memory.
   linalg::TileSizeComputationFunction wgCopyTileSizeFn =
       [](OpBuilder &builder, Operation *operation) {
@@ -41,8 +41,11 @@ static void populateTilingCopyToWorkgroupMemPatterns(
         // We tile to 4 as we want each thread to load 4 element in a cyclic
         // distribution.
         SmallVector<Value, 4> tileSizesVal;
-        unsigned rank =
-            cast<linalg::CopyOp>(operation).getOutputBufferTypes()[0].getRank();
+        unsigned rank = cast<linalg::GenericOp>(operation)
+                            .getOperand(0)
+                            .getType()
+                            .cast<MemRefType>()
+                            .getRank();
         for (unsigned i = 0; i < rank - 1; i++) {
           int64_t t = (rank - i) <= kNumGPUDims ? 1 : 0;
           tileSizesVal.push_back(
@@ -70,18 +73,19 @@ static void populateTilingCopyToWorkgroupMemPatterns(
           .setTileSizeComputationFunction(wgCopyTileSizeFn)
           .setDistributionOptions(copyInvocationDistributionOptions);
   patterns.insert<linalg::LinalgTilingPattern>(
-      linalg::CopyOp::getOperationName(), patterns.getContext(), tilingOptions,
+      linalg::GenericOp::getOperationName(), patterns.getContext(),
+      tilingOptions,
       linalg::LinalgTransformationFilter(
-          {Identifier::get(getCopyToWorkgroupMemoryMarker(),
-                           patterns.getContext())},
-          Identifier::get(getVectorizeMarker(), patterns.getContext())));
+          {StringAttr::get(patterns.getContext(),
+                           getCopyToWorkgroupMemoryMarker())},
+          StringAttr::get(patterns.getContext(), getVectorizeMarker())));
 }
 
 static void populateVectorizationPatterns(RewritePatternSet &patterns) {
-  linalg::VectorizationPatterns<linalg::CopyOp>::insert(
+  linalg::VectorizationPatterns<linalg::GenericOp>::insert(
       patterns, linalg::LinalgVectorizationOptions(),
-      linalg::LinalgTransformationFilter(Identifier::get(
-          getCopyToWorkgroupMemoryMarker(), patterns.getContext())));
+      linalg::LinalgTransformationFilter(StringAttr::get(
+          patterns.getContext(), getCopyToWorkgroupMemoryMarker())));
 }
 
 // TODO(thomasraoux): Extend this to support smaller vector size as well.
@@ -130,12 +134,12 @@ static Value createFlatId(FuncOp funcOp, ArrayRef<int64_t> workgroupSize) {
   AffineExpr d0 = getAffineDimExpr(0, b.getContext());
   AffineExpr d1 = getAffineDimExpr(1, b.getContext());
   AffineExpr d2 = getAffineDimExpr(2, b.getContext());
-  Value threadX = b.create<gpu::ThreadIdOp>(funcOp.getLoc(), indexType,
-                                            b.getStringAttr("x"));
-  Value threadY = b.create<gpu::ThreadIdOp>(funcOp.getLoc(), indexType,
-                                            b.getStringAttr("y"));
-  Value threadZ = b.create<gpu::ThreadIdOp>(funcOp.getLoc(), indexType,
-                                            b.getStringAttr("z"));
+  Value threadX =
+      b.create<gpu::ThreadIdOp>(funcOp.getLoc(), indexType, gpu::Dimension::x);
+  Value threadY =
+      b.create<gpu::ThreadIdOp>(funcOp.getLoc(), indexType, gpu::Dimension::y);
+  Value threadZ =
+      b.create<gpu::ThreadIdOp>(funcOp.getLoc(), indexType, gpu::Dimension::z);
   Value flatThreadId = makeComposedAffineApply(
       b, funcOp.getLoc(),
       d0 + workgroupSize[0] * d1 + (workgroupSize[0] * workgroupSize[1]) * d2,
@@ -194,7 +198,7 @@ class LLVMGPUDistributeSharedMemoryCopyPass
     : public LLVMGPUDistributeSharedMemoryCopyBase<
           LLVMGPUDistributeSharedMemoryCopyPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<vector::VectorDialect>();
+    registry.insert<vector::VectorDialect, scf::SCFDialect>();
   }
   void runOnOperation() override {
     FuncOp funcOp = getOperation();
@@ -203,8 +207,8 @@ class LLVMGPUDistributeSharedMemoryCopyPass
     auto workgroupSize = getWorkgroupSize(entryPointOp);
     workgroupSize.resize(3, 1);
     MLIRContext *context = &getContext();
-    SmallVector<linalg::CopyOp> copiesToWorkgroupMem;
-    funcOp.walk([&](linalg::CopyOp copyOp) {
+    SmallVector<linalg::GenericOp> copiesToWorkgroupMem;
+    funcOp.walk([&](linalg::GenericOp copyOp) {
       if (hasMarker(copyOp, getCopyToWorkgroupMemoryMarker()))
         copiesToWorkgroupMem.push_back(copyOp);
     });
@@ -212,8 +216,9 @@ class LLVMGPUDistributeSharedMemoryCopyPass
     int64_t flatWorkgroupSize =
         workgroupSize[0] * workgroupSize[1] * workgroupSize[2];
     bool isAligned = llvm::all_of(
-        copiesToWorkgroupMem, [flatWorkgroupSize](linalg::CopyOp copyOp) {
-          auto shape = copyOp.output().getType().cast<MemRefType>().getShape();
+        copiesToWorkgroupMem, [flatWorkgroupSize](linalg::GenericOp copyOp) {
+          auto shape =
+              copyOp.getOperand(0).getType().cast<MemRefType>().getShape();
           // Verify that each dimension of the shape can be distributed on the
           // threads
           int64_t threadsAvailable = flatWorkgroupSize;
@@ -263,7 +268,7 @@ class LLVMGPUDistributeSharedMemoryCopyPass
       // well aligned on the number of threads.
       // TODO(thomasraoux): Handle this case with padding instead so that we get
       // good performance for more complex shapes.
-      OwningRewritePatternList threadLevelTilingPatterns(context);
+      RewritePatternSet threadLevelTilingPatterns(context);
       populateTilingCopyToWorkgroupMemPatterns(threadLevelTilingPatterns,
                                                workgroupSize);
       if (failed(applyPatternsAndFoldGreedily(
