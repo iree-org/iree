@@ -44,7 +44,7 @@ enum ImportType {
 
 }  // namespace
 
-static mlir::OwningOpRef<mlir::ModuleOp> importSavedModelV2(
+static OwningModuleRef importSavedModelV2(
     MLIRContext &context, const std::string &inputPath,
     const std::string &savedModelExportedNames) {
   tensorflow::SavedModelV2Bundle bundle;
@@ -76,7 +76,7 @@ static mlir::OwningOpRef<mlir::ModuleOp> importSavedModelV2(
   return loadedModule.ConsumeValueOrDie();
 }
 
-static mlir::OwningOpRef<mlir::ModuleOp> importSavedModelV1(
+static OwningModuleRef importSavedModelV1(
     MLIRContext &context, const std::string &inputPath,
     const std::string &savedModelExportedNames,
     const std::string &savedModelTags) {
@@ -182,7 +182,7 @@ int main(int argc, char **argv) {
   llvm::SourceMgr sourceMgr;
   mlir::SourceMgrDiagnosticHandler sourceMgrHandler(sourceMgr, &context);
 
-  mlir::OwningOpRef<mlir::ModuleOp> module;
+  OwningModuleRef module;
 
   auto saveToFile = [&](llvm::StringRef savePath) -> LogicalResult {
     auto outputFile = openOutputFile(savePath);

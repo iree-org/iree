@@ -17,11 +17,11 @@ include "mlir/Interfaces/ControlFlowInterfaces.td"
 // Base class.
 //===----------------------------------------------------------------------===//
 
-class IREELinalgExt_PureOp<string mnemonic, list<Trait> traits = []> :
+class IREELinalgExt_PureOp<string mnemonic, list<OpTrait> traits = []> :
     Op<IREELinalgExt_Dialect, mnemonic, traits> {
 }
 
-class IREELinalgExt_Op<string mnemonic, list<Trait> traits = []> :
+class IREELinalgExt_Op<string mnemonic, list<OpTrait> traits = []> :
     IREELinalgExt_PureOp<mnemonic, !listconcat(traits,
         [AttrSizedOperandSegments,
          DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
