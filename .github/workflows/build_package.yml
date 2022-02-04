@@ -70,7 +70,7 @@ jobs:
       # Note that on Linux, we run under docker with an altered path.
       # Note that on Windows, we need to configure the compiler api project to
       # but its CMake build directory on a short path to avoid path overflow.
-      CIBW_ENVIRONMENT_LINUX: "REPO_DIR=/project/main_checkout BINDIST_DIR=/output CMAKE_GENERATOR=Ninja"
+      CIBW_ENVIRONMENT_LINUX: "REPO_DIR=/project/main_checkout BINDIST_DIR=/output CMAKE_GENERATOR=Ninja IREE_TARGET_BACKEND_CUDA=ON"
       CIBW_ENVIRONMENT_MACOS: "REPO_DIR=${{ github.workspace }}/main_checkout CMAKE_GENERATOR=Ninja"
       CIBW_ENVIRONMENT_WINDOWS: "REPO_DIR='${{ github.workspace }}\\main_checkout' CMAKE_GENERATOR=Ninja IREE_COMPILER_API_CMAKE_BUILD_DIR=D:/b"
 
