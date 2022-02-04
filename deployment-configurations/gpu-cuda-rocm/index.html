@@ -487,11 +487,11 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#get-iree-runtime-with-cuda-hal-driver" class="md-nav__link">
-    Get IREE runtime with CUDA HAL driver
+  <a href="#get-iree-runtime" class="md-nav__link">
+    Get IREE runtime
   </a>
   
-    <nav class="md-nav" aria-label="Get IREE runtime with CUDA HAL driver">
+    <nav class="md-nav" aria-label="Get IREE runtime">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -1091,11 +1091,11 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#get-iree-runtime-with-cuda-hal-driver" class="md-nav__link">
-    Get IREE runtime with CUDA HAL driver
+  <a href="#get-iree-runtime" class="md-nav__link">
+    Get IREE runtime
   </a>
   
-    <nav class="md-nav" aria-label="Get IREE runtime with CUDA HAL driver">
+    <nav class="md-nav" aria-label="Get IREE runtime">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -1195,8 +1195,12 @@
               
                 
 
-<h1 id="cuda-and-rocm-gpu-hal-driver">CUDA and ROCM GPU HAL Driver<a class="headerlink" href="#cuda-and-rocm-gpu-hal-driver" title="Permanent link">&para;</a></h1>
-<p>IREE can accelerate model execution on NVIDIA GPUs using CUDA and on AMD GPUs using ROCm. Due to the similarity of CUDA and ROCm APIs and infrastructure, the CUDA and ROCm backends share much of their implementation in IREE. The IREE compiler uses a similar GPU code generation pipeline for each, but generates PTX for CUDA and hsaco for ROCm. The IREE runtime HAL driver for ROCm mirrors the one for CUDA, except for the command graph - where CUDA has "direct", "stream", and "graph" command buffers, and ROCM has only "direct" command buffers.</p>
+<h1 id="cuda-and-rocm-gpu-hal-driver">CUDA and ROCm GPU HAL Driver<a class="headerlink" href="#cuda-and-rocm-gpu-hal-driver" title="Permanent link">&para;</a></h1>
+<p>IREE can accelerate model execution on NVIDIA GPUs using CUDA and on AMD GPUs using ROCm. Due to the similarity of CUDA and ROCm APIs and infrastructure, the CUDA and ROCm backends share much of their implementation in IREE:</p>
+<ul>
+<li>The IREE compiler uses a similar GPU code generation pipeline for each, but generates PTX for CUDA and hsaco for ROCm</li>
+<li>The IREE runtime HAL driver for ROCm mirrors the one for CUDA, except for command buffers implementations - where CUDA has "direct", "stream", and "graph" command buffers, and ROCm has only "direct" command buffers</li>
+</ul>
 <h2 id="prerequisites">Prerequisites<a class="headerlink" href="#prerequisites" title="Permanent link">&para;</a></h2>
 <p>In order to use CUDA or ROCm to drive the GPU, you need to have a functional CUDA or ROCm
 environment. It can be verified by the following steps:</p>
@@ -1212,35 +1216,21 @@ environment. It can be verified by the following steps:</p>
 <p>Run the following command in a shell:</p>
 <div class="highlight"><pre><span></span><code>rocm-smi <span class="p">|</span> grep rocm
 </code></pre></div>
-<p>If <code>rocm-smi</code> does not exist, you will need to <a href="https://rocmdocs.amd.com/en/latest/Installation_Guide/Installation_new.html">install the latest ROCM Toolkit SDK</a>.</p>
+<p>If <code>rocm-smi</code> does not exist, you will need to <a href="https://rocmdocs.amd.com/en/latest/Installation_Guide/Installation_new.html">install the latest ROCm Toolkit SDK</a>.</p>
 </div>
 </div>
 </div>
 <h2 id="get-runtime-and-compiler">Get runtime and compiler<a class="headerlink" href="#get-runtime-and-compiler" title="Permanent link">&para;</a></h2>
-<h3 id="get-iree-runtime-with-cuda-hal-driver">Get IREE runtime with CUDA HAL driver<a class="headerlink" href="#get-iree-runtime-with-cuda-hal-driver" title="Permanent link">&para;</a></h3>
-<p>Next you will need to get an IREE runtime that supports the CUDA HAL driver
-so it can execute the model on GPU via CUDA for Nvidia. Or the ROCM HAL driver to execute models on AMD hardware</p>
+<h3 id="get-iree-runtime">Get IREE runtime<a class="headerlink" href="#get-iree-runtime" title="Permanent link">&para;</a></h3>
+<p>Next you will need to get an IREE runtime that includes the CUDA (for Nvidia
+hardware) or ROCm (for AMD hardware) HAL driver.</p>
 <h4 id="build-runtime-from-source">Build runtime from source<a class="headerlink" href="#build-runtime-from-source" title="Permanent link">&para;</a></h4>
 <p>Please make sure you have followed the <a href="../../building-from-source/getting-started/">Getting started</a> page
-to build IREE for Linux/Windows.</p>
-<div class="tabbed-set tabbed-alternate" data-tabs="2:2"><input checked="checked" id="__tabbed_2_1" name="__tabbed_2" type="radio" /><input id="__tabbed_2_2" name="__tabbed_2" type="radio" /><div class="tabbed-labels"><label for="__tabbed_2_1">Nvidia/CUDA</label><label for="__tabbed_2_2">AMD/ROCm</label></div>
-<div class="tabbed-content">
-<div class="tabbed-block">
-<p>The CUDA HAL driver is compiled in by default on non-Apple
-platforms.</p>
-<p>Ensure that the <code>IREE_HAL_DRIVER_CUDA</code> CMake option is <code>ON</code> when configuring
-for the target.</p>
-</div>
-<div class="tabbed-block">
-<p>Currently our support for ROCm/AMD hardware is still experimental. To enable it add:
-<div class="highlight"><pre><span></span><code>-DIREE_HAL_DRIVER_EXPERIMENTAL_ROCM=ON
-</code></pre></div>
-to the cmake build command.</p>
-</div>
-</div>
-</div>
+to build IREE from source, then enable the CUDA HAL driver with the
+<code>IREE_HAL_DRIVER_CUDA</code> option or the experimental ROCm HAL driver with the
+<code>IREE_HAL_DRIVER_EXPERIMENTAL_ROCM</code> option.</p>
 <h4 id="download-as-python-package">Download as Python package<a class="headerlink" href="#download-as-python-package" title="Permanent link">&para;</a></h4>
-<div class="tabbed-set tabbed-alternate" data-tabs="3:2"><input checked="checked" id="__tabbed_3_1" name="__tabbed_3" type="radio" /><input id="__tabbed_3_2" name="__tabbed_3" type="radio" /><div class="tabbed-labels"><label for="__tabbed_3_1">Nvidia/CUDA</label><label for="__tabbed_3_2">AMD/ROCm</label></div>
+<div class="tabbed-set tabbed-alternate" data-tabs="2:2"><input checked="checked" id="__tabbed_2_1" name="__tabbed_2" type="radio" /><input id="__tabbed_2_2" name="__tabbed_2" type="radio" /><div class="tabbed-labels"><label for="__tabbed_2_1">Nvidia/CUDA</label><label for="__tabbed_2_2">AMD/ROCm</label></div>
 <div class="tabbed-content">
 <div class="tabbed-block">
 <p>Python packages for various IREE functionalities are regularly published
@@ -1262,24 +1252,11 @@ You can find out the full path to the <code>site-packages</code> directory via t
 </div>
 <h4 id="build-compiler-from-source">Build compiler from source<a class="headerlink" href="#build-compiler-from-source" title="Permanent link">&para;</a></h4>
 <p>Please make sure you have followed the <a href="../../building-from-source/getting-started/">Getting started</a> page
-to build IREE for Linux/Windows and the [Android cross-compilation][android-cc]
-page for Android. The CUDA compiler backend and ROCM compiler backend is compiled in by default on all
-platforms.</p>
-<div class="tabbed-set tabbed-alternate" data-tabs="4:2"><input checked="checked" id="__tabbed_4_1" name="__tabbed_4" type="radio" /><input id="__tabbed_4_2" name="__tabbed_4" type="radio" /><div class="tabbed-labels"><label for="__tabbed_4_1">Nvidia/CUDA</label><label for="__tabbed_4_2">AMD/ROCM</label></div>
-<div class="tabbed-content">
-<div class="tabbed-block">
-<p>Ensure that the <code>IREE_TARGET_BACKEND_CUDA</code> CMake option is <code>ON</code> when
-configuring for the host.</p>
-</div>
-<div class="tabbed-block">
-<p>Ensure that the <code>IREE_TARGET_BACKEND_ROCM</code> CMake option is <code>ON</code> when
-configuring for the host.</p>
-</div>
-</div>
-</div>
+to build the IREE compiler, then enable the CUDA compiler target with the
+<code>IREE_TARGET_BACKEND_CUDA</code> option or the ROCm compiler target with the
+<code>IREE_TARGET_BACKEND_ROCM</code> option.</p>
 <h2 id="compile-and-run-the-model">Compile and run the model<a class="headerlink" href="#compile-and-run-the-model" title="Permanent link">&para;</a></h2>
-<p>With the compiler and runtime for CUDA ready, we can now compile a model
-and run it on the GPU.</p>
+<p>With the compiler and runtime ready, we can now compile a model and run it on the GPU.</p>
 <h3 id="compile-the-model">Compile the model<a class="headerlink" href="#compile-the-model" title="Permanent link">&para;</a></h3>
 <p>IREE compilers transform a model into its final deployable format in many
 sequential steps. A model authored with Python in an ML framework should use the
@@ -1291,7 +1268,7 @@ weights from <a href="https://tfhub.dev/google/tf2-preview/mobilenet_v2/classifi
 <h4 id="compile-using-the-command-line">Compile using the command-line<a class="headerlink" href="#compile-using-the-command-line" title="Permanent link">&para;</a></h4>
 <p>Let <code>iree_input.mlir</code> be the model's initial MLIR representation generated by
 IREE's TensorFlow importer. We can now compile them for each GPU by running the following command:</p>
-<div class="tabbed-set tabbed-alternate" data-tabs="5:2"><input checked="checked" id="__tabbed_5_1" name="__tabbed_5" type="radio" /><input id="__tabbed_5_2" name="__tabbed_5" type="radio" /><div class="tabbed-labels"><label for="__tabbed_5_1">Nvidia/CUDA</label><label for="__tabbed_5_2">AMD/ROCM</label></div>
+<div class="tabbed-set tabbed-alternate" data-tabs="3:2"><input checked="checked" id="__tabbed_3_1" name="__tabbed_3" type="radio" /><input id="__tabbed_3_2" name="__tabbed_3" type="radio" /><div class="tabbed-labels"><label for="__tabbed_3_1">Nvidia/CUDA</label><label for="__tabbed_3_2">AMD/ROCm</label></div>
 <div class="tabbed-content">
 <div class="tabbed-block">
 <div class="highlight"><pre><span></span><code>iree/tools/iree-translate <span class="se">\</span>
@@ -1341,7 +1318,7 @@ Here are a table of commonly used architecture</p>
 </span>    iree_input.mlir -o mobilenet-rocm.vmfb
 </code></pre></div>
 <p>Note ROCm Bitcode Dir(<code>iree-rocm-bc-dir</code>) path is required. If the system you are compiling IREE in has ROCm installed, then the default value of <code>/opt/rocm/amdgcn/bitcode</code> will usually suffice. If you intend on building ROCm compiler in a non-ROCm capable system, please set <code>iree-rocm-bc-dir</code> to the absolute path where you might have saved the amdgcn bitcode.</p>
-<p>Note that a rocm target chip(<code>iree-rocm-target-chip</code>) of the form <code>gfx&lt;arch_number&gt;</code> is needed
+<p>Note that a ROCm target chip(<code>iree-rocm-target-chip</code>) of the form <code>gfx&lt;arch_number&gt;</code> is needed
 to compile towards each GPU architecture. If no architecture is specified then we will default to <code>gfx908</code>
 Here are a table of commonly used architecture</p>
 <table>
@@ -1376,7 +1353,7 @@ Here are a table of commonly used architecture</p>
 <h3 id="run-the-model">Run the model<a class="headerlink" href="#run-the-model" title="Permanent link">&para;</a></h3>
 <h4 id="run-using-the-command-line">Run using the command-line<a class="headerlink" href="#run-using-the-command-line" title="Permanent link">&para;</a></h4>
 <p>In the build directory, run the following command:</p>
-<div class="tabbed-set tabbed-alternate" data-tabs="6:2"><input checked="checked" id="__tabbed_6_1" name="__tabbed_6" type="radio" /><input id="__tabbed_6_2" name="__tabbed_6" type="radio" /><div class="tabbed-labels"><label for="__tabbed_6_1">Nvidia/CUDA</label><label for="__tabbed_6_2">AMD/ROCM</label></div>
+<div class="tabbed-set tabbed-alternate" data-tabs="4:2"><input checked="checked" id="__tabbed_4_1" name="__tabbed_4" type="radio" /><input id="__tabbed_4_2" name="__tabbed_4" type="radio" /><div class="tabbed-labels"><label for="__tabbed_4_1">Nvidia/CUDA</label><label for="__tabbed_4_2">AMD/ROCm</label></div>
 <div class="tabbed-content">
 <div class="tabbed-block">
 <div class="highlight"><pre><span></span><code>iree/tools/iree-run-module <span class="se">\</span>
