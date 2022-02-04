@@ -35,7 +35,6 @@ iree_lit_test_suite(
     "tile_and_vectorize_matmul.mlir"
     "tile_and_vectorize_to_cooperative_ops.mlir"
     "vector_to_cooperative_matrix.mlir"
-    "vectorize_copy_to_workgroup_memory.mlir"
     "vectorize_elementwise_ops.mlir"
     "vectorize_load_store.mlir"
     "vectorize_matmul.mlir"

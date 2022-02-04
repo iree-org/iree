@@ -314,13 +314,6 @@ def SPIRVVectorizeLoadStore :
   let constructor = "mlir::iree_compiler::createSPIRVVectorizeLoadStore()";
 }
 
-def SPIRVCopyToWorkgroupMemory :
-    Pass<"iree-spirv-copy-to-workgroup-memory", "FuncOp"> {
-  let summary = "Lower linalg.copy for copying data to workgroup memory";
-  let constructor =
-      "mlir::iree_compiler::createSPIRVCopyToWorkgroupMemoryPass()";
-}
-
 //------------------------------------------------------------------------------
 // Test passes
 //------------------------------------------------------------------------------

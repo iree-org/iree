@@ -24,7 +24,6 @@ iree_cc_library(
     "MaliConfig.cpp"
     "NVIDIAConfig.cpp"
     "Passes.cpp"
-    "SPIRVCopyToWorkgroupMemory.cpp"
     "SPIRVDistribute.cpp"
     "SPIRVInitConfigPass.cpp"
     "SPIRVLowerExecutableTargetPass.cpp"
