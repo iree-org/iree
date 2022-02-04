@@ -77,3 +77,8 @@ iree_cc_test(
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
+if(${IREE_BUILD_EXPERIMENTAL_ALLOCATOR_CACHING})
+  message(STATUS "Experimental feature caching allocator is enabled")
+  target_sources(iree_hal_hal PUBLIC "${IREE_ROOT_DIR}/experimental/hal/allocator_caching.c" "${IREE_ROOT_DIR}/experimental/hal/allocator_caching.h")
+  target_compile_definitions(iree_hal_hal PUBLIC IREE_BUILD_EXPERIMENTAL_ALLOCATOR_CACHING)
+endif()
