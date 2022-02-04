@@ -51,10 +51,10 @@ jobs:
           # Windows packages.
           - os: windows-2019
             build_package: py-compiler-pkg
-            experimental: false
+            experimental: true
           - os: windows-2019
             build_package: py-runtime-pkg
-            experimental: false
+            experimental: true
 
           # Macos packages.
           - os: macos-latest
@@ -66,7 +66,6 @@ jobs:
     env:
       CIBW_BUILD_VERBOSITY: 1
 
-      # TODO: in-tree-build can be removed once pip 21.3 is released.
       # Note that on Linux, we run under docker with an altered path.
       # Note that on Windows, we need to configure the compiler api project to
       # but its CMake build directory on a short path to avoid path overflow.
@@ -191,14 +190,9 @@ jobs:
         if: "matrix.build_package == 'py-compiler-pkg'"
         shell: bash
         run: |
-          # Need a newer pip to use in-tree-build. *but* the old default pip
-          # can't accept the in-tree-build feature while upgrading itself.
-          # Facepalm. Since there is no way to customize CIBW, we just manually
-          # install a pre-release build of 21.3, in which the in-tree-build
-          # feature is enabled by default, obviating the need to configure it.
-          # After the 2021 October release, this can just be changed to install
-          # pip >= 21.3 from official sources. I'm sorry about this folks.
-          export CIBW_BEFORE_BUILD="python -m pip install --upgrade pip==21.3dev0 -f https://github.com/stellaraccident/pip/releases/tag/21.3dev20210925"
+          # In pip 21.3, in-tree builds became the default and only way to
+          # build. We require that and make sure to be past that threshold.
+          export CIBW_BEFORE_BUILD="python -m pip install --upgrade pip>=21.3"
           python -m cibuildwheel --output-dir bindist ./main_checkout/llvm-external-projects/iree-compiler-api
 
       # Compiler tools wheels are not python version specific, so just build
