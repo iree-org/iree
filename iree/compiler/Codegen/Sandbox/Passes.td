@@ -32,13 +32,15 @@ def LinalgFuse : Pass<"linalg-fuse", "FuncOp"> {
     ListOption<"hoistPaddings", "hoist-paddings", "int64_t",
                "Hoist padding depths.",
                "llvm::cl::ZeroOrMore, llvm::cl::MiscFlags::CommaSeparated">,
-
+    ListOption<"transposePaddings", "transpose-paddings", "std::string",
+               "Transpose paddings.",
+               "llvm::cl::ZeroOrMore, llvm::cl::MiscFlags::CommaSeparated">,
     // Vectorization options.
     Option<"vectorize", "vectorize", "bool", /*default=*/"false",
       "Rewrite the linalg op as a vector operation.">,
     Option<"vectorizePadding", "vectorize-padding", "bool", /*default=*/"false",
-      "Rewrite all linalg.pad_tensor ops in the function to vector form.">,
-  
+      "Rewrite all tensor.pad ops in the function to vector form.">,
+
     // IREE specific options
     Option<"tilingLevel", "tiling-level", "int64_t", /*default=*/"-1",
       "Use default tiling level used to retrieve the configuration from lowering.config">
@@ -77,6 +79,9 @@ def LinalgSingleTilingExpert
                "llvm::cl::ZeroOrMore, llvm::cl::MiscFlags::CommaSeparated">,
     ListOption<"hoistPaddings", "hoist-paddings", "int64_t",
                "Hoist padding depths.",
+               "llvm::cl::ZeroOrMore, llvm::cl::MiscFlags::CommaSeparated">,
+    ListOption<"transposePaddings", "transpose-paddings", "std::string",
+               "Transpose paddings.",
                "llvm::cl::ZeroOrMore, llvm::cl::MiscFlags::CommaSeparated">,
     Option<"scalarizeDynamicDims", "scalarize-dynamic-dims", "bool",
       /*default=*/"false", "Tile dynamic dimensions by 1.">,
