@@ -34,7 +34,8 @@ nvidia-smi || true
 # so a build failure only prevents building/testing things that depend on it and
 # we can still run the other tests.
 echo "Building with cmake"
-./build_tools/cmake/clean_build.sh
+./build_tools/cmake/clean_build.sh \
+    -DIREE_TARGET_BACKEND_CUDA=ON -DIREE_HAL_DRIVER_CUDA=ON
 
 export IREE_VULKAN_F16_DISABLE=0
 export IREE_CUDA_DISABLE=0

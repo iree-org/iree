@@ -17,4 +17,4 @@ ROOT_DIR=$(git rev-parse --show-toplevel)
 
 cd ${ROOT_DIR?}
 rm -rf build/
-./build_tools/cmake/rebuild.sh
+./build_tools/cmake/rebuild.sh "$@"
