@@ -134,12 +134,13 @@ static void addLowerToLLVMGPUPasses(OpPassManager &pm, bool useROCM) {
   pm.addNestedPass<FuncOp>(IREE::LinalgExt::createLinalgExtToLoopsPass());
 
   // Linalg -> SCF
+  pm.addNestedPass<FuncOp>(createMemrefCopyToLinalgPass());
   pm.addNestedPass<FuncOp>(createConvertLinalgToLoopsPass());
   pm.addNestedPass<FuncOp>(createCanonicalizerPass());
   pm.addNestedPass<FuncOp>(createCSEPass());
 
   // Handled tensor-type constants.
-  pm.addPass(createTensorConstantBufferizePass());
+  pm.addPass(arith::createConstantBufferizePass());
   pm.addPass(createFoldTensorExtractOpPass());
 
   pm.addNestedPass<FuncOp>(createLLVMGPUVectorLoweringPass());

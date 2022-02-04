@@ -79,7 +79,7 @@ def VMVX_OpInterface : OpInterface<"VMVXOp"> {
   ];
 }
 
-class VMVX_Op<string mnemonic, list<OpTrait> traits = []> :
+class VMVX_Op<string mnemonic, list<Trait> traits = []> :
     Op<VMVX_Dialect, mnemonic, !listconcat(traits, [])> {}
 
 #endif  // IREE_DIALECT_MODULES_VMVX_BASE

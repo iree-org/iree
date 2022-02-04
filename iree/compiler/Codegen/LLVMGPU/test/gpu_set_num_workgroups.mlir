@@ -249,7 +249,12 @@ hal.executable @tensor_insert {
             %9 = affine.apply affine_map<(d0) -> (d0 + 4)>(%arg0)
             %10 = affine.apply affine_map<(d0) -> (d0 + 3)>(%arg1)
             %11 = memref.subview %1[%9, %10] [%4, %7] [1, 1] : memref<?x?xi32> to memref<?x?xi32, affine_map<(d0, d1)[s0, s1] -> (d0 * s1 + s0 + d1)>>
-            linalg.copy(%8, %11) : memref<?x?xi32, affine_map<(d0, d1)[s0, s1] -> (d0 * s1 + s0 + d1)>>, memref<?x?xi32, affine_map<(d0, d1)[s0, s1] -> (d0 * s1 + s0 + d1)>>
+            linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]}
+              ins(%8 : memref<?x?xi32, affine_map<(d0, d1)[s0, s1] -> (d0 * s1 + s0 + d1)>>) 
+              outs(%11 : memref<?x?xi32, affine_map<(d0, d1)[s0, s1] -> (d0 * s1 + s0 + d1)>>) {
+              ^bb0(%arg4: i32, %s: i32):  // no predecessors
+                linalg.yield %arg4 : i32
+            }
           }
         }
         return
@@ -258,9 +263,9 @@ hal.executable @tensor_insert {
   }
 }
 
-//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering.config<tile_sizes = {{\[}}[1, 256]{{\]}}, native_vector_size = []>
-//  CHECK-DAG: #[[MAP:.+]] = affine_map<()[s0] -> (s0 ceildiv 256)>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"LLVMGPUVectorize", workload_per_wg = [256, 1]>
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering.config<tile_sizes = {{\[}}[1, 64]{{\]}}, native_vector_size = []>
+//  CHECK-DAG: #[[MAP:.+]] = affine_map<()[s0] -> (s0 ceildiv 64)>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"LLVMGPUVectorize", workload_per_wg = [64, 1]>
 //      CHECK: hal.executable.entry_point public @tensor_insert_slice
 // CHECK-SAME:   translation.info = #[[TRANSLATION]]
 // CHECK-NEXT:   %[[ARG0:[a-zA-Z0-9_]+]]: index
@@ -268,7 +273,7 @@ hal.executable @tensor_insert {
 //  CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
 //  CHECK-DAG:   %[[NWGSX:.+]] = affine.apply #[[MAP0]]()[%[[ARG0]]]
 //      CHECK:   hal.return %[[NWGSX]], %[[ARG1]], %[[C1]]
-//      CHECK:   linalg.copy
+//      CHECK:   linalg.generic
 // CHECK-SAME:     lowering.config = #[[CONFIG]]
 
 // -----

@@ -15,7 +15,7 @@ include "mlir/IR/OpAsmInterface.td"
 include "mlir/IR/SymbolInterfaces.td"
 include "iree/compiler/Dialect/VM/IR/VMBase.td"
 
-class VM_PureOp<string mnemonic, list<OpTrait> traits = []> :
+class VM_PureOp<string mnemonic, list<Trait> traits = []> :
     VM_Op<mnemonic, !listconcat(traits, [NoSideEffect])>;
 
 //===----------------------------------------------------------------------===//
@@ -295,7 +295,7 @@ def VM_InitializerOp : VM_Op<"initializer", [
 
 // TODO(b/142336293): DCE globals when unused and not exports. Note that side
 // effects may need to be observed.
-class VM_GlobalOp<string mnemonic, Attr attr_type, list<OpTrait> traits = []> :
+class VM_GlobalOp<string mnemonic, Attr attr_type, list<Trait> traits = []> :
     VM_Op<mnemonic, !listconcat(traits, [
       IsolatedFromAbove,
       HasParent<"IREE::VM::ModuleOp">,
@@ -443,7 +443,7 @@ def VM_GlobalAddressOp : VM_PureOp<"global.address"> {
   let verifier = [{ return verifyGlobalAddressOp(*this); }];
 }
 
-class VM_GlobalLoadOp<Type type, string mnemonic, list<OpTrait> traits = []> :
+class VM_GlobalLoadOp<Type type, string mnemonic, list<Trait> traits = []> :
     VM_Op<mnemonic, !listconcat(traits, [
       DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
       // HACK: works around the lack of symbol side effects in C++.
@@ -462,7 +462,7 @@ class VM_GlobalLoadOp<Type type, string mnemonic, list<OpTrait> traits = []> :
 }
 
 class VM_GlobalLoadPrimitiveOp<Type type, string mnemonic, VM_OPC opcode,
-                               list<OpTrait> traits = []> :
+                               list<Trait> traits = []> :
     VM_GlobalLoadOp<type, mnemonic, traits> {
   let description = [{
     Loads the value of a global containing an primitive value.
@@ -475,7 +475,7 @@ class VM_GlobalLoadPrimitiveOp<Type type, string mnemonic, VM_OPC opcode,
   ];
 }
 
-class VM_GlobalStoreOp<Type type, string mnemonic, list<OpTrait> traits = []> :
+class VM_GlobalStoreOp<Type type, string mnemonic, list<Trait> traits = []> :
     VM_Op<mnemonic, !listconcat(traits, [
       DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
     ])> {
@@ -490,7 +490,7 @@ class VM_GlobalStoreOp<Type type, string mnemonic, list<OpTrait> traits = []> :
 }
 
 class VM_GlobalStorePrimitiveOp<Type type, string mnemonic, VM_OPC opcode,
-                                list<OpTrait> traits = []> :
+                                list<Trait> traits = []> :
     VM_GlobalStoreOp<type, mnemonic, traits> {
   let description = [{
     Stores a primitive value value to a global.
@@ -504,7 +504,7 @@ class VM_GlobalStorePrimitiveOp<Type type, string mnemonic, VM_OPC opcode,
 }
 
 class VM_GlobalLoadIndirectOp<Type type, string mnemonic,
-                              list<OpTrait> traits = []> :
+                              list<Trait> traits = []> :
     VM_Op<mnemonic, !listconcat(traits, [
       DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
     ])> {
@@ -520,7 +520,7 @@ class VM_GlobalLoadIndirectOp<Type type, string mnemonic,
 
 class VM_GlobalLoadIndirectPrimitiveOp<Type type, string mnemonic,
                                        VM_OPC opcode,
-                                       list<OpTrait> traits = []> :
+                                       list<Trait> traits = []> :
     VM_GlobalLoadIndirectOp<type, mnemonic, traits> {
   let description = [{
     Loads the value of a global containing a primitive value.
@@ -534,7 +534,7 @@ class VM_GlobalLoadIndirectPrimitiveOp<Type type, string mnemonic,
 }
 
 class VM_GlobalStoreIndirectOp<Type type, string mnemonic,
-                               list<OpTrait> traits = []> :
+                               list<Trait> traits = []> :
     VM_Op<mnemonic, !listconcat(traits, [
       DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
     ])> {
@@ -548,7 +548,7 @@ class VM_GlobalStoreIndirectOp<Type type, string mnemonic,
 
 class VM_GlobalStoreIndirectPrimitiveOp<Type type, string mnemonic,
                                         VM_OPC opcode,
-                                        list<OpTrait> traits = []> :
+                                        list<Trait> traits = []> :
     VM_GlobalStoreIndirectOp<type, mnemonic, traits> {
   let description = [{
     Stores a primitive value to a global.
@@ -751,7 +751,7 @@ def VM_GlobalStoreIndirectRefOp :
 // Constants
 //===----------------------------------------------------------------------===//
 
-class VM_ConstOp<string mnemonic, string ctype, list<OpTrait> traits = []> :
+class VM_ConstOp<string mnemonic, string ctype, list<Trait> traits = []> :
     VM_PureOp<mnemonic, !listconcat(traits, [
       ConstantLike,
       DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
@@ -774,7 +774,7 @@ class VM_ConstOp<string mnemonic, string ctype, list<OpTrait> traits = []> :
 
 class VM_ConstantPrimitiveOp<Type type, int width, string mnemonic,
                              VM_OPC opcode,
-                             string ctype, list<OpTrait> traits = []> :
+                             string ctype, list<Trait> traits = []> :
     VM_ConstOp<mnemonic, ctype, traits> {
   let description = [{
     Defines a constant value that is treated as a scalar literal at runtime.
@@ -844,7 +844,7 @@ def VM_ConstF64Op :
 }
 
 class VM_ConstantPrimitiveZeroOp<Type type, string mnemonic, VM_OPC opcode,
-                                 string ctype, list<OpTrait> traits = []> :
+                                 string ctype, list<Trait> traits = []> :
     VM_ConstOp<mnemonic, ctype, traits> {
   let description = [{
     Defines a constant zero primitive.
@@ -1210,7 +1210,7 @@ def VM_BufferCompareOp :
 }
 
 class VM_BufferFillOp<Type type, string mnemonic, VM_OPC opcode,
-                      list<OpTrait> traits = []> :
+                      list<Trait> traits = []> :
     VM_Op<mnemonic, !listconcat(traits, [
       DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
       MemoryEffects<[MemWrite]>,
@@ -1269,7 +1269,7 @@ def VM_BufferFillF64Op :
 }
 
 class VM_BufferLoadOp<Type type, string mnemonic, VM_OPC opcode,
-                      list<OpTrait> traits = []> :
+                      list<Trait> traits = []> :
     VM_PureOp<mnemonic, !listconcat(traits, [
       DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
       MemoryEffects<[MemRead]>,
@@ -1302,7 +1302,7 @@ class VM_BufferLoadOp<Type type, string mnemonic, VM_OPC opcode,
 }
 
 class VM_BufferStoreOp<Type type, string mnemonic, VM_OPC opcode,
-                       list<OpTrait> traits = []> :
+                       list<Trait> traits = []> :
     VM_Op<mnemonic, !listconcat(traits, [
       DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
       MemoryEffects<[MemWrite]>,
@@ -1511,7 +1511,7 @@ def VM_ListResizeOp :
 }
 
 class VM_ListGetPrimitiveOp<Type type, string mnemonic, VM_OPC opcode,
-                            list<OpTrait> traits = []> :
+                            list<Trait> traits = []> :
     VM_PureOp<mnemonic, !listconcat(traits, [
       DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
       MemoryEffects<[MemRead]>,
@@ -1540,7 +1540,7 @@ class VM_ListGetPrimitiveOp<Type type, string mnemonic, VM_OPC opcode,
 }
 
 class VM_ListSetPrimitiveOp<Type type, string mnemonic, VM_OPC opcode,
-                            list<OpTrait> traits = []> :
+                            list<Trait> traits = []> :
     VM_Op<mnemonic, !listconcat(traits, [
       DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
       MemoryEffects<[MemWrite]>,
@@ -1655,7 +1655,7 @@ def VM_ListSetRefOp :
 //===----------------------------------------------------------------------===//
 
 class VM_SelectPrimitiveOp<Type type, string mnemonic, VM_OPC opcode,
-                           list<OpTrait> traits = []> :
+                           list<Trait> traits = []> :
     VM_PureOp<mnemonic, !listconcat(traits, [
       DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
       AllTypesMatch<["true_value", "false_value", "result"]>,
@@ -1751,7 +1751,7 @@ def VM_SelectRefOp : VM_PureOp<"select.ref", [
 }
 
 class VM_SwitchIntegerOp<I type, string mnemonic, VM_OPC opcode,
-                         list<OpTrait> traits = []> :
+                         list<Trait> traits = []> :
     VM_PureOp<mnemonic, !listconcat(traits, [
       DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
       AllTypesMatch<["default_value", "result"]>,
@@ -1790,7 +1790,7 @@ class VM_SwitchIntegerOp<I type, string mnemonic, VM_OPC opcode,
 }
 
 class VM_SwitchFloatOp<F type, string mnemonic, VM_OPC opcode,
-                       list<OpTrait> traits = []> :
+                       list<Trait> traits = []> :
     VM_PureOp<mnemonic, !listconcat(traits, [
       DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
       AllTypesMatch<["default_value", "result"]>,
@@ -1898,7 +1898,7 @@ def VM_SwitchRefOp : VM_PureOp<"switch.ref", [
 //===----------------------------------------------------------------------===//
 
 class VM_UnaryArithmeticOp<Type type, string mnemonic, VM_OPC opcode,
-                           list<OpTrait> traits = []> :
+                           list<Trait> traits = []> :
     VM_PureOp<mnemonic, !listconcat(traits, [
       DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
       AllTypesMatch<["operand", "result"]>,
@@ -1920,7 +1920,7 @@ class VM_UnaryArithmeticOp<Type type, string mnemonic, VM_OPC opcode,
 }
 
 class VM_BinaryArithmeticOp<Type type, string mnemonic, VM_OPC opcode,
-                            list<OpTrait> traits = []> :
+                            list<Trait> traits = []> :
     VM_PureOp<mnemonic, !listconcat(traits, [
       DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
       AllTypesMatch<["lhs", "rhs", "result"]>,
@@ -1944,7 +1944,7 @@ class VM_BinaryArithmeticOp<Type type, string mnemonic, VM_OPC opcode,
 }
 
 class VM_TernaryArithmeticOp<Type type, string mnemonic, VM_OPC opcode,
-                             list<OpTrait> traits = []> :
+                             list<Trait> traits = []> :
     VM_PureOp<mnemonic, !listconcat(traits, [
       DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
       AllTypesMatch<["a", "b", "c", "result"]>,
@@ -2404,7 +2404,7 @@ def VM_XorI64Op :
 //===----------------------------------------------------------------------===//
 
 class VM_ShiftArithmeticOp<I type, string mnemonic, VM_OPC opcode,
-                           list<OpTrait> traits = []> :
+                           list<Trait> traits = []> :
     VM_PureOp<mnemonic, !listconcat(traits, [
       DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
       AllTypesMatch<["operand", "result"]>,
@@ -2469,7 +2469,7 @@ def VM_ShrI64UOp : VM_ShiftArithmeticOp<I64, "shr.i64.u", VM_OPC_ShrI64U,
 //===----------------------------------------------------------------------===//
 
 class VM_ConversionOp<Type src_type, Type dst_type, string mnemonic,
-                      VM_OPC opcode, list<OpTrait> traits = []> :
+                      VM_OPC opcode, list<Trait> traits = []> :
     VM_PureOp<mnemonic, !listconcat(traits, [
       DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
     ])> {
@@ -2490,7 +2490,7 @@ class VM_ConversionOp<Type src_type, Type dst_type, string mnemonic,
 }
 
 class VM_ConversionPseudoOp<Type src_type, Type dst_type, string mnemonic,
-                            list<OpTrait> traits = []> :
+                            list<Trait> traits = []> :
     VM_PureOp<mnemonic, traits> {
   let arguments = (ins
     src_type:$operand
@@ -2680,7 +2680,7 @@ def VM_BitcastF64I64Op :
 //===----------------------------------------------------------------------===//
 
 class VM_UnaryComparisonOp<Type type, string mnemonic, VM_OPC opcode,
-                           list<OpTrait> traits = []> :
+                           list<Trait> traits = []> :
     VM_PureOp<mnemonic, !listconcat(traits, [
       DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
     ])> {
@@ -2705,7 +2705,7 @@ class VM_UnaryComparisonOp<Type type, string mnemonic, VM_OPC opcode,
 }
 
 class VM_UnaryComparisonPseudoOp<Type type, string mnemonic,
-                                 list<OpTrait> traits = []> :
+                                 list<Trait> traits = []> :
     VM_PureOp<mnemonic, !listconcat(traits, [
       VM_PseudoOp,
     ])> {
@@ -2724,7 +2724,7 @@ class VM_UnaryComparisonPseudoOp<Type type, string mnemonic,
 }
 
 class VM_BinaryComparisonOp<Type type, string mnemonic, VM_OPC opcode,
-                            list<OpTrait> traits = []> :
+                            list<Trait> traits = []> :
     VM_PureOp<mnemonic, !listconcat(traits, [
       DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
       AllTypesMatch<["lhs", "rhs"]>,
@@ -2752,7 +2752,7 @@ class VM_BinaryComparisonOp<Type type, string mnemonic, VM_OPC opcode,
 }
 
 class VM_BinaryComparisonPseudoOp<Type type, string mnemonic,
-                                  list<OpTrait> traits = []> :
+                                  list<Trait> traits = []> :
     VM_PureOp<mnemonic, !listconcat(traits, [
       AllTypesMatch<["lhs", "rhs"]>,
       VM_PseudoOp,
@@ -3469,7 +3469,7 @@ def VM_CondBranchOp : VM_Op<"cond_br", [
   let hasCanonicalizer = 1;
 }
 
-class VM_CallBaseOp<string mnemonic, list<OpTrait> traits = []> :
+class VM_CallBaseOp<string mnemonic, list<Trait> traits = []> :
     VM_Op<mnemonic, !listconcat(traits, [
       DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
       DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
@@ -3737,7 +3737,7 @@ def VM_CondFailOp : VM_Op<"cond_fail", [
   let hasCanonicalizer = 1;
 }
 
-class VM_CheckOp<string mnemonic, list<OpTrait> traits = []> :
+class VM_CheckOp<string mnemonic, list<Trait> traits = []> :
     VM_Op<mnemonic, !listconcat(traits, [
       VM_PseudoOp,
     ])> {
@@ -3759,7 +3759,7 @@ class VM_CheckOp<string mnemonic, list<OpTrait> traits = []> :
   }];
 }
 
-class VM_UnaryCheckOp<string mnemonic, list<OpTrait> traits = []> :
+class VM_UnaryCheckOp<string mnemonic, list<Trait> traits = []> :
     VM_CheckOp<mnemonic, traits> {
   let arguments = (ins
     VM_AnyType:$value,
@@ -3781,7 +3781,7 @@ class VM_UnaryCheckOp<string mnemonic, list<OpTrait> traits = []> :
   ];
 }
 
-class VM_BinaryCheckOp<string mnemonic, list<OpTrait> traits = []> :
+class VM_BinaryCheckOp<string mnemonic, list<Trait> traits = []> :
     VM_CheckOp<mnemonic, !listconcat(traits, [
       AllTypesMatch<["lhs", "rhs"]>,
     ])> {

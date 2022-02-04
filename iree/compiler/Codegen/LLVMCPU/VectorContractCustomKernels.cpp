@@ -16,7 +16,7 @@
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/LLVMIR/LLVMTypes.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
-#include "mlir/Dialect/Vector/VectorOps.h"
+#include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -245,7 +245,8 @@ struct MMT_8x4x8_i8i8i32_Aarch64Dotprod_InlineAsm
           )ASM",
         "=w,=w,=w,=w,=w,=w,=w,=w,=w,=w,=w,=w,=w,=w,=w,=w,w,w,w,w,0,1,2,3,4,5,6,"
         "7,8,9,10,11,12,13,14,15",
-        /*has_side_effects=*/false, /*is_align_stack=*/false, dialectAttr);
+        /*has_side_effects=*/false, /*is_align_stack=*/false, dialectAttr,
+        /*operand_attrs=*/ArrayAttr());
 
     // Extract result vectors from the asm op.
     SmallVector<Value, 16> resVec;

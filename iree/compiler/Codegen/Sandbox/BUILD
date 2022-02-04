@@ -64,6 +64,7 @@ cc_library(
         "@llvm-project//mlir:TensorDialect",
         "@llvm-project//mlir:Transforms",
         "@llvm-project//mlir:VectorOps",
+        "@llvm-project//mlir:VectorTransforms",
         "@llvm-project//mlir:X86VectorTransforms",
     ],
 )

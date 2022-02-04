@@ -35,6 +35,7 @@ iree_cc_library(
     "ForOpCanonicalizationPass.cpp"
     "IREEComprehensiveBufferizePass.cpp"
     "LinalgBufferizePass.cpp"
+    "MemrefCopyToLinalg.cpp"
     "OptimizeVectorTransferPass.cpp"
     "PolynomialApproximationPass.cpp"
     "RemoveTrivialLoops.cpp"
@@ -67,7 +68,6 @@ iree_cc_library(
     MLIRModuleBufferization
     MLIRPass
     MLIRSCF
-    MLIRSCFBufferizableOpInterfaceImpl
     MLIRSCFToStandard
     MLIRSCFTransforms
     MLIRSideEffectInterfaces
@@ -76,7 +76,7 @@ iree_cc_library(
     MLIRTensor
     MLIRTransforms
     MLIRVector
-    MLIRVectorBufferizableOpInterfaceImpl
+    MLIRVectorTransforms
     iree::compiler::Codegen::Common::FoldTensorExtractOpIncGen
     iree::compiler::Codegen::Dialect::IREECodegenDialect
     iree::compiler::Codegen::Interfaces::BufferizationInterfaces

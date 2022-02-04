@@ -77,7 +77,7 @@ class HALToVMConversionInterface : public VMConversionDialectInterface {
  public:
   using VMConversionDialectInterface::VMConversionDialectInterface;
 
-  OwningModuleRef parseVMImportModule() const override {
+  OwningOpRef<mlir::ModuleOp> parseVMImportModule() const override {
     return mlir::parseSourceString(StringRef(iree_hal_imports_create()->data,
                                              iree_hal_imports_create()->size),
                                    getDialect()->getContext());

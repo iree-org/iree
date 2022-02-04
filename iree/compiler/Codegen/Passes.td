@@ -121,6 +121,13 @@ def PolynomialApproximationPass :
   let constructor =
       "mlir::iree_compiler::createPolynomialApproximationPass()";
 }
+
+def MemrefCopyToLinalgPass :
+    Pass<"iree-codegen-memrefcopy-to-linalg", "FuncOp"> {
+  let summary = "Convert memref.copy to linalg op";
+  let constructor =
+      "mlir::iree_compiler::createMemrefCopyToLinalgPass()";
+}
 //------------------------------------------------------------------------------
 // LLVMCPU
 //------------------------------------------------------------------------------

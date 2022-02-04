@@ -87,7 +87,11 @@ hal.executable private @static_3d_sort {
             %8 = memref.subview %0[%arg0, 0, %arg1] [%4, 32, %7] [1, 1, 1] : memref<64x32x128xi32> to memref<?x32x?xi32, affine_map<(d0, d1, d2)[s0] -> (d0 * 4096 + s0 + d1 * 128 + d2)>>
             %9 = memref.cast %8 : memref<?x32x?xi32, affine_map<(d0, d1, d2)[s0] -> (d0 * 4096 + s0 + d1 * 128 + d2)>> to memref<?x?x?xi32>
             %10 = memref.subview %1[%arg0, 0, %arg1] [%4, 32, %7] [1, 1, 1] : memref<64x32x128xi32> to memref<?x32x?xi32, affine_map<(d0, d1, d2)[s0] -> (d0 * 4096 + s0 + d1 * 128 + d2)>>
-            linalg.copy(%9, %10) : memref<?x?x?xi32>, memref<?x32x?xi32, affine_map<(d0, d1, d2)[s0] -> (d0 * 4096 + s0 + d1 * 128 + d2)>>
+            linalg.generic {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1, d2)>], iterator_types = ["parallel", "parallel", "parallel"]}
+              ins(%9 : memref<?x?x?xi32>) outs(%10 : memref<?x32x?xi32, affine_map<(d0, d1, d2)[s0] -> (d0 * 4096 + s0 + d1 * 128 + d2)>>) {
+              ^bb0(%arg4: i32, %s: i32):  // no predecessors
+                linalg.yield %arg4 : i32
+            }
             iree_linalg_ext.sort dimension(1) {__internal_linalg_transform__ = "workgroup"} outs(%10 : memref<?x32x?xi32, affine_map<(d0, d1, d2)[s0] -> (d0 * 4096 + s0 + d1 * 128 + d2)>>)  {
             ^bb0(%arg2: i32, %arg3: i32):  // no predecessors
               %11 = arith.cmpi slt, %arg2, %arg3 : i32

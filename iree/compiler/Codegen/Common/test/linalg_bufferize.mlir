@@ -39,7 +39,7 @@ func @tile_from_tensor_load() {
 //   CHECK-DAG:       %[[RHS:.+]] = memref.subview %[[TENSOR_RHS]][0, %[[IV1]]] [3, 1] [1, 1]
 //   CHECK-DAG:       %[[INIT:.+]] = memref.subview %[[TENSOR_INIT]][%[[IV0]], %[[IV1]]] [1, 1] [1, 1]
 //   CHECK-DAG:       %[[RESULT:.+]] = memref.subview %[[RETURN]][%[[IV0]], %[[IV1]]] [1, 1] [1, 1]
-//       CHECK:       linalg.copy(%[[INIT]], %[[RESULT]])
+//       CHECK:       linalg.generic {{.*}} ins(%[[INIT]] {{.*}} outs(%[[RESULT]]
 //       CHECK:       linalg.matmul
 //  CHECK-SAME:         ins(%[[LHS]], %[[RHS]]
 //  CHECK-SAME:         outs(%[[RESULT]]
@@ -129,7 +129,7 @@ func @tile_from_tensor_load_inplace_and_copy() {
 //  CHECK-SAME:         ins(%[[LHS]], %[[RHS]]
 //  CHECK-SAME:         outs(%[[RESULT1]]
 //       CHECK:       %[[RESULT2:.+]] = memref.subview %[[RETURN2]][%[[IV0]], %[[IV1]]] [1, 1] [1, 1]
-//       CHECK:       linalg.copy(%[[RESULT1]], %[[RESULT2]])
+//       CHECK:       linalg.generic {{.*}} ins(%[[RESULT1]] {{.*}} outs(%[[RESULT2]]
 
 // -----
 
@@ -182,7 +182,7 @@ func @tile_from_pointwise_lhs() {
 //  CHECK-SAME:         outs(%[[ALLOC]]
 //   CHECK-DAG:       %[[INIT:.+]] = memref.subview %[[TENSOR_INIT]][%[[IV0]], %[[IV1]]] [1, 1] [1, 1]
 //   CHECK-DAG:       %[[RESULT:.+]] = memref.subview %[[RETURN]][%[[IV0]], %[[IV1]]] [1, 1] [1, 1]
-//       CHECK:       linalg.copy(%[[INIT]], %[[RESULT]])
+//       CHECK:       linalg.generic {{.*}} ins(%[[INIT]] {{.*}} outs(%[[RESULT]]
 //       CHECK:       linalg.matmul
 //  CHECK-SAME:         ins(%[[ALLOC]], %[[RHS]]
 //  CHECK-SAME:         outs(%[[RESULT]]
@@ -388,7 +388,7 @@ func @tile_from_matmul_outs() {
 //   CHECK-DAG:       %[[RHS:.+]] = memref.subview %[[TENSOR_RHS]][0, %[[IV1]]] [3, 1] [1, 1]
 //   CHECK-DAG:       %[[INIT:.+]] = memref.subview %[[TENSOR_INIT]][%[[IV0]], %[[IV1]]] [1, 1] [1, 1]
 //   CHECK-DAG:       %[[RESULT:.+]] = memref.subview %[[RETURN]][%[[IV0]], %[[IV1]]] [1, 1] [1, 1]
-//       CHECK:       linalg.copy(%[[INIT]], %[[RESULT]])
+//       CHECK:       linalg.generic {{.*}} ins(%[[INIT]] {{.*}} outs(%[[RESULT]]
 //       CHECK:       linalg.matmul
 //  CHECK-SAME:         outs(%[[RESULT]]
 //       CHECK:       linalg.matmul
@@ -509,7 +509,7 @@ func @bufferize_dynamic() {
 //       CHECK:       %[[TILE_N_2:.+]] = affine.min #[[MAP2]](%[[IV1]])[%[[WGSIZE_X]], %[[DIM5]]]
 //   CHECK-DAG:       %[[INIT_TILE:.+]] = memref.subview %[[INIT]][%[[IV0]], %[[IV1]]] [%[[TILE_M_2]], %[[TILE_N_2]]]
 //   CHECK-DAG:       %[[RESULT_TILE:.+]] = memref.subview %[[RESULT]][%[[IV0]], %[[IV1]]] [%[[TILE_M_2]], %[[TILE_N_2]]]
-//       CHECK:       linalg.copy(%[[INIT_TILE]], %[[RESULT_TILE]])
+//       CHECK:       linalg.generic {{.*}} ins(%[[INIT_TILE]] {{.*}} outs(%[[RESULT_TILE]]
 //       CHECK:       linalg.matmul
 //  CHECK-SAME:         ins(%[[LHS_TILE]], %[[RHS_TILE]]
 //  CHECK-SAME:         outs(%[[RESULT_TILE]]
@@ -601,7 +601,7 @@ func @reshape_simple() {
 //   CHECK-DAG:   %[[ARG0:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer)
 //   CHECK-DAG:   %[[RET0:.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer)
 //       CHECK:   %[[RESHAPE:.+]] = memref.expand_shape %[[ARG0]] {{\[}}[0, 1]]
-//       CHECK:   linalg.copy(%[[RESHAPE]], %[[RET0]])
+//       CHECK:   linalg.generic {{.*}} ins(%[[RESHAPE]] {{.*}} outs(%[[RET0]]
 
 // -----
 
@@ -671,7 +671,7 @@ func @reshape_fused_source_and_copyout() {
 //       CHECK:   linalg.generic
 //  CHECK-SAME:     ins(%[[RESHAPE]] : memref<3x4xi32>)
 //  CHECK-SAME:     outs(%[[RET0]] : memref<3x4xi32>)
-//       CHECK:   linalg.copy(%[[RESHAPE]], %[[RET1]])
+//       CHECK:   linalg.generic {{.*}} ins(%[[RESHAPE]] {{.*}} outs(%[[RET1]]
 
 // -----
 
@@ -779,7 +779,7 @@ func @slice() {
 //   CHECK-DAG: %[[ARG:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer)
 //   CHECK-DAG: %[[RETURN:.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer)
 //       CHECK: %[[SUBVIEW:.+]] = memref.subview %[[ARG]]
-//       CHECK: linalg.copy(%[[SUBVIEW]], %[[RETURN]])
+//       CHECK: linalg.generic {{.*}} ins(%[[SUBVIEW]] {{.*}} outs(%[[RETURN]]
 
 // -----
 
@@ -802,7 +802,7 @@ func @slice_rank_reducing() {
 //   CHECK-DAG: %[[ARG:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer)
 //   CHECK-DAG: %[[RETURN:.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer)
 //       CHECK: %[[SUBVIEW:.+]] = memref.subview %[[ARG]]
-//       CHECK: linalg.copy(%[[SUBVIEW]], %[[RETURN]])
+//       CHECK: linalg.generic {{.*}} ins(%[[SUBVIEW]] {{.*}} outs(%[[RETURN]]
 
 // -----
 
@@ -834,10 +834,10 @@ func @slice_multiple_copy() {
 //   CHECK-DAG: %[[SIZE2:.+]] = hal.interface.constant.load[4] : index
 //   CHECK-DAG: %[[SIZE3:.+]] = hal.interface.constant.load[5] : index
 //       CHECK: %[[SUBVIEW1:.+]] = memref.subview %[[ARG]][%{{.+}}, %{{.+}}, %{{.+}}] [%[[SIZE1]], %[[SIZE2]], %[[SIZE3]]]
-//       CHECK: linalg.copy(%[[SUBVIEW1]], %[[RETURN1]])
+//       CHECK: linalg.generic {{.*}} ins(%[[SUBVIEW1]] {{.*}} outs(%[[RETURN1]]
 //   CHECK-DAG: %[[SUBVIEW2:.+]] = memref.subview %[[ARG]][%{{.+}}, %{{.+}}, %{{.+}}] [%[[SIZE1]], 1, %[[SIZE3]]]
 //   CHECK-DAG: %[[RETURNVIEW:.+]] = memref.subview %[[RETURN2]]
-//       CHECK: linalg.copy(%[[SUBVIEW2]], %[[RETURNVIEW]])
+//       CHECK: linalg.generic {{.*}} ins(%[[SUBVIEW2]] {{.*}} outs(%[[RETURNVIEW]]
 
 // -----
 
@@ -852,7 +852,7 @@ func @slice_in_place() {
 }
 
 // CHECK-LABEL: func @slice_in_place()
-//   CHECK-NOT:   linalg.copy
+//   CHECK-NOT:   linalg.generic
 
 
 // -----
@@ -876,7 +876,7 @@ func @slice_whole_stride_dispatch_0() {
 //   CHECK-DAG:   %[[OUTPUT:.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer)
 //   CHECK-DAG:   %[[SUBVIEW_INPUT:.+]] = memref.subview %[[INPUT]]
 //   CHECK-DAG:   %[[SUBVIEW_OUTPUT:.+]] = memref.subview %[[OUTPUT]]
-//       CHECK:   linalg.copy(%[[SUBVIEW_INPUT]], %[[SUBVIEW_OUTPUT]])
+//       CHECK:   linalg.generic {{.*}} ins(%[[SUBVIEW_INPUT]] {{.*}} outs(%[[SUBVIEW_OUTPUT]]
 
 // -----
 
@@ -907,9 +907,9 @@ func @subtensor_insert() {
 //   CHECK-DAG:   %[[RET0:.+]] = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer)
 //   CHECK-DAG:   %[[D0:.+]] = hal.interface.constant.load[0] : index
 //   CHECK-DAG:   %[[D1:.+]] = hal.interface.constant.load[1] : index
-//       CHECK:   linalg.copy(%[[ARG1]], %[[RET0]])
+//       CHECK:   linalg.generic {{.*}} ins(%[[ARG1]] {{.*}} outs(%[[RET0]]
 //       CHECK:   %[[SUBVIEW:.+]] = memref.subview %[[RET0]][3, 4] [%[[D0]], %[[D1]]] [1, 1]
-//       CHECK:   linalg.copy(%[[ARG0]], %[[SUBVIEW]])
+//       CHECK:   linalg.generic {{.*}} ins(%[[ARG0]] {{.*}} outs(%[[SUBVIEW]]
 
 // -----
 
@@ -945,7 +945,7 @@ func @load_to_store() {
 // CHECK-LABEL: func @load_to_store()
 //       CHECK:   %[[OUT:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<3x4xi32>
 //       CHECK:   %[[IN:.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<3x4xi32>
-//       CHECK:   linalg.copy(%[[IN]], %[[OUT]]) : memref<3x4xi32>, memref<3x4xi32>
+//       CHECK:   linalg.generic {{.*}} ins(%[[IN]] {{.*}} outs(%[[OUT]]
 
 // -----
 
@@ -961,7 +961,7 @@ func @constant() {
 //       CHECK:   %[[CST:.+]] = arith.constant {{.+}} : tensor<2x2x3xi32>
 //       CHECK:   %[[MEMREF:.+]] = bufferization.to_memref %[[CST]] : memref<2x2x3xi32>
 //       CHECK:   %[[RESULT:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer)
-//       CHECK:   linalg.copy(%[[MEMREF]], %[[RESULT]])
+//       CHECK:   linalg.generic {{.*}} ins(%[[MEMREF]] {{.*}} outs(%[[RESULT]]
 
 // -----
 
@@ -1332,7 +1332,7 @@ func @bufferize_cst_output_tensor() {
 //       CHECK: %[[CAST5:.+]] = bufferization.to_memref %[[CST5]] : memref<5xi32>
 //       CHECK: %[[INPUT:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<5xf32>
 //       CHECK: %[[OUTPUT:.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<i32>
-//       CHECK: linalg.copy(%[[CAST1]], %[[OUTPUT]])
+//       CHECK: linalg.generic {{.*}} ins(%[[CAST1]] {{.*}} outs(%[[OUTPUT]]
 //       CHECK: linalg.generic
 //  CHECK-SAME:   ins(%[[INPUT]], %[[CAST5]] : memref<5xf32>, memref<5xi32>)
 //  CHECK-SAME:   outs(%[[OUTPUT]] : memref<i32>)
@@ -1412,7 +1412,7 @@ func @rank_reduced_subtensor_insert() {
 //   CHECK-DAG:   %[[ARG:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer)
 //   CHECK-DAG:   %[[RET:.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer)
 //       CHECK:   %[[SUBVIEW:.+]] = memref.subview %[[RET]]
-//       CHECK:   linalg.copy(%[[ARG]], %[[SUBVIEW]])
+//       CHECK:   linalg.generic {{.*}} ins(%[[ARG]] {{.*}} outs(%[[SUBVIEW]]
 
 // -----
 
@@ -1467,7 +1467,7 @@ func @bufferize_transfer_op() {
 // CHECK-COUNT-3:   vector.transfer_read %[[ARG1V]]
 // CHECK-COUNT-2:   vector.transfer_read %[[ARG2V]]
 //         CHECK:   %[[RET0V:.+]] = memref.subview %[[RET0]]
-//         CHECK:   linalg.copy(%[[ARG2V]], %[[RET0V]])
+//         CHECK:   linalg.generic {{.*}} ins(%[[ARG2V]] {{.*}} outs(%[[RET0V]]
 //         CHECK:   vector.transfer_write %{{.+}}, %[[RET0V]]
 //         CHECK:   vector.transfer_write %{{.+}}, %[[RET0V]]
 
@@ -1521,7 +1521,7 @@ func @bufferize_transfer_op_inplace() {
 // CHECK-COUNT-6:   vector.transfer_read %[[ARG0V]]
 // CHECK-COUNT-3:   vector.transfer_read %[[ARG1V]]
 // CHECK-COUNT-2:   vector.transfer_read %[[RET0V]]
-//     CHECK-NOT:   linalg.copy
+//     CHECK-NOT:   linalg.generic
 //         CHECK:   vector.transfer_write %{{.+}}, %[[RET0V]]
 //         CHECK:   vector.transfer_write %{{.+}}, %[[RET0V]]
 
@@ -1651,10 +1651,10 @@ func @padded_matmul() {
 //     CHECK: linalg.fill(%[[C0]], %[[DST_V]])
 //     CHECK: linalg.fill(%[[C0]], %[[LHS_PADDED]]) : f32, memref<64x32xf32>
 //     CHECK: %[[LHS_PADDED_INTER:.+]] = memref.subview %[[LHS_PADDED]][0, 0] [64, 27] [1, 1]
-//     CHECK: linalg.copy(%[[LHS_V]], %[[LHS_PADDED_INTER]])
+//     CHECK: linalg.generic {{.*}} ins(%[[LHS_V]] {{.*}} outs(%[[LHS_PADDED_INTER]]
 //     CHECK: linalg.fill(%[[C0]], %[[RHS_PADDED]]) : f32, memref<32x16xf32>
 //     CHECK: %[[RHS_PADDED_INTER:.+]] = memref.subview %[[RHS_PADDED]][0, 0] [27, 16] [1, 1]
-//     CHECK: linalg.copy(%[[RHS_V]], %[[RHS_PADDED_INTER]])
+//     CHECK: linalg.generic {{.*}} ins(%[[RHS_V]] {{.*}} outs(%[[RHS_PADDED_INTER]]
 //     CHECK: linalg.matmul ins(%[[LHS_PADDED]], %[[RHS_PADDED]] : memref<64x32xf32>, memref<32x16xf32>)
 
 // -----
@@ -1722,16 +1722,16 @@ func @dot_general_padded() {
 //   CHECK-DAG:      %[[ARG1_SV:.+]] = memref.subview %[[ARG1]]
 //       CHECK:       linalg.fill(%{{.*}}, %[[ALLOC_ARG0]]
 //       CHECK:      %[[ALLOC_ARG0_SV:.+]] = memref.subview %[[ALLOC_ARG0]]
-//       CHECK:       linalg.copy(%[[ARG0_SV]], %[[ALLOC_ARG0_SV]])
+//       CHECK:      linalg.generic {{.*}} ins(%[[ARG0_SV]] {{.*}} outs(%[[ALLOC_ARG0_SV]]
 //       CHECK:      linalg.fill(%{{.*}}, %[[ALLOC_ARG1]]
-//       CHECK:      linalg.copy(%[[ARG1_SV]]
+//       CHECK:      linalg.generic {{.*}} ins(%[[ARG1_SV]]
 //       CHECK:      linalg.fill(%{{.*}}, %[[ALLOC_RET0]]
 //       CHECK:      linalg.matmul
 //  CHECK-SAME:        ins(%[[ALLOC_ARG0]], %[[ALLOC_ARG1]]
 //  CHECK-SAME:        outs(%[[ALLOC_RET0]]
 //   CHECK-DAG:      %[[RET0_SV:.+]] = memref.subview %[[RET0]]
 //   CHECK-DAG:      %[[ALLOC_RET0_SV:.+]] = memref.subview
-//       CHECK:      linalg.copy(%[[ALLOC_RET0_SV]], %[[RET0_SV]])
+//       CHECK:      linalg.generic {{.*}} ins(%[[ALLOC_RET0_SV]] {{.*}} outs(%[[RET0_SV]]
 
 // -----
 
@@ -1875,7 +1875,7 @@ func @l1_tiled_matmul_no_fill() {
 //    CHECK-DAG:        %[[RHS_WORKGROUP_TILE:.+]] = memref.subview %[[RHS]][0, %[[WORKGROUP_J]]] [144, %[[WORKGROUP_J_SIZE]]] [1, 1] : memref<144x370xf32> to memref<144x?xf32
 //    CHECK-DAG:            %[[INIT_WORKGROUP_TILE:.+]] = memref.subview %[[INIT]][%[[WORKGROUP_I]], %[[WORKGROUP_J]]] [%[[WORKGROUP_I_SIZE]], %[[WORKGROUP_J_SIZE]]]
 //    CHECK-DAG:            %[[DST_WORKGROUP_TILE:.+]] = memref.subview %[[DST]][%[[WORKGROUP_I]], %[[WORKGROUP_J]]] [%[[WORKGROUP_I_SIZE]], %[[WORKGROUP_J_SIZE]]]
-//        CHECK:            linalg.copy(%[[INIT_WORKGROUP_TILE]], %[[DST_WORKGROUP_TILE]])
+//        CHECK:            linalg.generic {{.*}} ins(%[[INIT_WORKGROUP_TILE]] {{.*}} outs(%[[DST_WORKGROUP_TILE]]
 //        CHECK:            scf.for %[[L1_I:.+]] = %{{.*}} to %[[M]] step %[[L1_MN_SIZE]] {
 //        CHECK:              scf.for %[[L1_J:.+]] = %{{.*}} to %[[N]] step %[[L1_MN_SIZE]] {
 //        CHECK:                scf.for %[[L1_K:.+]] = %{{.*}} to %[[K]] step %[[L1_K_SIZE]] {
@@ -2110,7 +2110,7 @@ func @sort1D() {
 // CHECK-LABEL: func @sort1D()
 //   CHECK-DAG:   %[[INPUT:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer)
 //   CHECK-DAG:   %[[OUTPUT:.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer)
-//       CHECK:   linalg.copy(%[[INPUT]], %[[OUTPUT]])
+//       CHECK:   linalg.generic {{.*}} ins(%[[INPUT]] {{.*}} outs(%[[OUTPUT]]
 //       CHECK:   scf.for %[[ARG0:.+]] =
 //       CHECK:     scf.for %[[ARG1:.+]] =
 //   CHECK-DAG:       %[[P1:.+]] = arith.addi %[[ARG1]]
@@ -2229,7 +2229,7 @@ builtin.func @tensor_insert_slice() {
 //   CHECK-DAG:       %[[DST_IDX_Y:.+]] = affine.apply #[[MAP]](%[[IV0]])[%[[OFFSET_Y]]]
 //   CHECK-DAG:       %[[DST_IDX_X:.+]] = affine.apply #[[MAP]](%[[IV1]])[%[[OFFSET_X]]]
 //       CHECK:       %[[DST_VIEW:.+]] = memref.subview %[[DST]][%[[DST_IDX_Y]], %[[DST_IDX_X]]]
-//       CHECK:       linalg.copy(%[[SRC_VIEW]], %[[DST_VIEW]])
+//       CHECK:       linalg.generic {{.*}} ins(%[[SRC_VIEW]] {{.*}} outs(%[[DST_VIEW]]
 
 
 // -----
@@ -2273,7 +2273,7 @@ builtin.func @dynamic_update_slice() {
 //  CHECK-SAME:         : memref<?xi32> to memref<?xi32, #{{.+}}>
 //       CHECK:     %[[DST_VIEW:.+]] = memref.subview %[[DST]][0, %{{.+}}] [1, %{{.+}}]
 //  CHECK-SAME:         : memref<?x?xi32> to memref<?xi32, #{{.+}}>
-//       CHECK:     linalg.copy(%[[SRC_VIEW]], %[[DST_VIEW]])
+//       CHECK:     linalg.generic {{.*}} ins(%[[SRC_VIEW]] {{.*}} outs(%[[DST_VIEW]]
 
 // -----
 

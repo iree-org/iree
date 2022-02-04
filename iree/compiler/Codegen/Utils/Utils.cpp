@@ -595,5 +595,30 @@ SmallVector<LoopTilingAndDistributionInfo> getTiledAndDistributedLoopInfo(
   return info;
 }
 
+/// Create a linalg::GenericOp version of an n-D copy that can further tile,
+/// lower to loops or vectorize, unlike the current implementation of
+/// memref::CopyOp.
+Operation *createLinalgCopyOp(OpBuilder &b, Location loc, Value from,
+                              Value to) {
+  auto memrefTypeFrom = from.getType().cast<MemRefType>();
+  auto memrefTypeTo = to.getType().cast<MemRefType>();
+  (void)memrefTypeFrom;
+  assert(memrefTypeFrom && memrefTypeTo &&
+         memrefTypeFrom.getRank() == memrefTypeTo.getRank());
+  AffineMap id =
+      AffineMap::getMultiDimIdentityMap(memrefTypeTo.getRank(), b.getContext());
+  SmallVector<StringRef> iteratorTypes(memrefTypeTo.getRank(),
+                                       getParallelIteratorTypeName());
+  return b.create<linalg::GenericOp>(
+      loc,
+      /*inputs=*/from,
+      /*outputs=*/to,
+      /*indexingMaps=*/llvm::makeArrayRef({id, id}),
+      /*iteratorTypes=*/iteratorTypes,
+      [](OpBuilder &b, Location loc, ValueRange args) {
+        b.create<linalg::YieldOp>(loc, args.front());
+      });
+}
+
 }  // namespace iree_compiler
 }  // namespace mlir

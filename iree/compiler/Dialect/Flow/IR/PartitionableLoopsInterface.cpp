@@ -157,7 +157,6 @@ void registerPartitionableLoopsInterfaceModels(DialectRegistry &registry) {
   ::mlir::linalg::Conv2DOp,
   ::mlir::linalg::Conv3DNdhwcDhwcfOp,
   ::mlir::linalg::Conv3DOp,
-  ::mlir::linalg::CopyOp,
   ::mlir::linalg::DepthwiseConv1DNwcWcOp,
   ::mlir::linalg::DepthwiseConv2DNhwcHwcOp,
   ::mlir::linalg::DepthwiseConv2DNhwcHwcQOp,

@@ -48,6 +48,7 @@ static void buildVectorVMVXTransformPassPipeline(OpPassManager &passManager) {
   // Linalg -> SCF.
   nestedModulePM.addNestedPass<FuncOp>(
       IREE::LinalgExt::createLinalgExtToLoopsPass());
+  nestedModulePM.addNestedPass<FuncOp>(createMemrefCopyToLinalgPass());
   nestedModulePM.addNestedPass<FuncOp>(createConvertLinalgToLoopsPass());
   nestedModulePM.addNestedPass<FuncOp>(createCanonicalizerPass());
   nestedModulePM.addNestedPass<FuncOp>(createCSEPass());
@@ -57,7 +58,7 @@ static void buildVectorVMVXTransformPassPipeline(OpPassManager &passManager) {
   nestedModulePM.addNestedPass<FuncOp>(memref::createExpandOpsPass());
 
   // Handle tensor-type constants.
-  nestedModulePM.addPass(createTensorConstantBufferizePass());
+  nestedModulePM.addPass(arith::createConstantBufferizePass());
   nestedModulePM.addPass(createFoldTensorExtractOpPass());
 
   // Flatten and cleanup memrefs.

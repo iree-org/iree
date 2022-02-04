@@ -62,9 +62,9 @@ hal.executable private @matmul_promote_workgroup_memory  {
 //       CHECK:     %[[RET0SV:.+]] = memref.subview %[[RET0]]
 //       CHECK:     %[[SUBVIEW1:.+]] = memref.subview %[[ALLOC1]]
 //       CHECK:     %[[SUBVIEW2:.+]] = memref.subview %[[ALLOC2]]
-//       CHECK:     linalg.copy(%[[ARG0SV]], %[[SUBVIEW1]])
+//       CHECK:     linalg.generic(%[[ARG0SV]], %[[SUBVIEW1]])
 //  CHECK-SAME:       "copy_to_workgroup_memory"
-//       CHECK:     linalg.copy(%[[ARG1SV]], %[[SUBVIEW2]])
+//       CHECK:     linalg.generic(%[[ARG1SV]], %[[SUBVIEW2]])
 //  CHECK-SAME:       "copy_to_workgroup_memory"
 //       CHECK:     scf.for
 //       CHECK:       scf.for
@@ -125,7 +125,7 @@ hal.executable private @conv_promote_workgroup_memory  {
 //       CHECK:   %[[ARG1SV:.+]] = memref.subview %[[ARG1]]
 //       CHECK:   %[[RET0SV:.+]] = memref.subview %[[RET0]]
 //       CHECK:   %[[SUBVIEW1:.+]] = memref.subview %[[ALLOC1]]
-//       CHECK:   linalg.copy(%[[ARG1SV]], %[[SUBVIEW1]])
+//       CHECK:   linalg.generic(%[[ARG1SV]], %[[SUBVIEW1]])
 //  CHECK-SAME:      "copy_to_workgroup_memory"
 //       CHECK:   scf.for
 //       CHECK:     scf.for

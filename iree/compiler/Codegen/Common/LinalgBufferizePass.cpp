@@ -57,7 +57,7 @@
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
 #include "mlir/Dialect/SCF/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
-#include "mlir/Dialect/Vector/VectorOps.h"
+#include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/Value.h"
@@ -707,7 +707,7 @@ static LogicalResult convertAnyLinalgOp(
     Value outBuffer = bvm.lookupOrNull(outTensor);
     if (outBuffer && !plan.isEquivalent(outTensor, resultTensor) &&
         op.payloadUsesValueFromOperand(outOperand)) {
-      b.create<linalg::CopyOp>(loc, outBuffer, resultBuffer);
+      createLinalgCopyOp(b, loc, outBuffer, resultBuffer);
     }
     newOutputBuffers.push_back(resultBuffer);
   }
@@ -770,8 +770,7 @@ static LogicalResult convertInterfaceStoreTensorOp(
       b, storeOp.getLoc(), storeFrom.getType().cast<ShapedType>().getRank(),
       storeTo, storeOp.getMixedOffsets(), storeOp.getMixedSizes(),
       storeOp.getMixedStrides());
-
-  b.create<linalg::CopyOp>(storeOp->getLoc(), storeFrom, subview);
+  createLinalgCopyOp(b, storeOp->getLoc(), storeFrom, subview);
   return success();
 }
 
@@ -791,7 +790,7 @@ static LogicalResult convertSubTensorInsertOp(OpBuilder &b,
   Value dest = op.dest();
   if (!plan.isEquivalent(dest, result)) {
     Value destBuffer = bvm.lookup(dest);
-    b.create<linalg::CopyOp>(loc, destBuffer, resultBuffer);
+    createLinalgCopyOp(b, loc, destBuffer, resultBuffer);
   }
 
   Value source = op.source();
@@ -807,7 +806,7 @@ static LogicalResult convertSubTensorInsertOp(OpBuilder &b,
   SmallVector<OpFoldResult> strides = op.getMixedStrides();
   Value subViewOp = createSubviewOp(b, loc, sourceType.getRank(), resultBuffer,
                                     offsets, sizes, strides);
-  b.create<linalg::CopyOp>(loc, sourceBuffer, subViewOp);
+  createLinalgCopyOp(b, loc, sourceBuffer, subViewOp);
   return success();
 }
 
@@ -820,7 +819,7 @@ static LogicalResult convertTensorInsertOp(OpBuilder &b, tensor::InsertOp op,
   Value resultBuffer = bvm.lookup(result);
   if (!plan.isEquivalent(op.dest(), result)) {
     Value destBuffer = bvm.lookup(op.dest());
-    b.create<linalg::CopyOp>(loc, destBuffer, resultBuffer);
+    createLinalgCopyOp(b, loc, destBuffer, resultBuffer);
   }
 
   b.create<memref::StoreOp>(loc, op.scalar(), resultBuffer, op.indices());
@@ -843,7 +842,7 @@ static LogicalResult convertVectorTransferWriteOp(OpBuilder &b,
       // initial value and can avoid the copy.
       !op.source().getDefiningOp<linalg::InitTensorOp>()) {
     Value destBuffer = bvm.lookup(op.source());
-    b.create<linalg::CopyOp>(loc, destBuffer, resultBuffer);
+    createLinalgCopyOp(b, loc, destBuffer, resultBuffer);
   }
 
   // Create a new vector.transfer_write operation without a result value.
@@ -868,7 +867,7 @@ static LogicalResult convertScfForOp(OpBuilder &b, scf::ForOp forOp,
     bvm.map(yieldOperand, resultBuffer);
     if (!plan.isEquivalent(arg.value(), initOperand.get())) {
       Value initBuffer = bvm.lookup(initOperand.get());
-      b.create<linalg::CopyOp>(loc, initBuffer, resultBuffer);
+      createLinalgCopyOp(b, loc, initBuffer, resultBuffer);
     }
   }
   return success();
@@ -901,8 +900,8 @@ static void copyFromAliasingBufferToResultBuffer(
   for (auto result : enumerate(tiedResults)) {
     Value operand = tiedOperands[result.index()];
     if (!plan.isEquivalent(result.value(), operand)) {
-      b.create<linalg::CopyOp>(loc, aliasingBuffers[result.index()],
-                               bvm.lookup(result.value()));
+      createLinalgCopyOp(b, loc, aliasingBuffers[result.index()],
+                         bvm.lookup(result.value()));
     }
   }
 }
@@ -960,7 +959,7 @@ static LogicalResult convertPadTensorOp(OpBuilder &b, tensor::PadOp tensorPadOp,
                                                    tensorPadOp.getMixedLowPad(),
                                                    sizeMixedValues, strides);
   // Copy to the interior region.
-  b.create<linalg::CopyOp>(loc, inputMemref, resultSubView);
+  createLinalgCopyOp(b, loc, inputMemref, resultSubView);
   return success();
 }
 

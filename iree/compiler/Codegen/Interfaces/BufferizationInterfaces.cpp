@@ -17,11 +17,11 @@
 #include "mlir/Dialect/Linalg/ComprehensiveBufferize/AffineInterfaceImpl.h"
 #include "mlir/Dialect/Linalg/ComprehensiveBufferize/LinalgInterfaceImpl.h"
 #include "mlir/Dialect/Linalg/ComprehensiveBufferize/ModuleBufferization.h"
-#include "mlir/Dialect/Linalg/ComprehensiveBufferize/SCFInterfaceImpl.h"
-#include "mlir/Dialect/Linalg/ComprehensiveBufferize/StdInterfaceImpl.h"
-#include "mlir/Dialect/Linalg/ComprehensiveBufferize/VectorInterfaceImpl.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
+#include "mlir/Dialect/SCF/BufferizableOpInterfaceImpl.h"
+#include "mlir/Dialect/StandardOps/Transforms/BufferizableOpInterfaceImpl.h"
 #include "mlir/Dialect/Tensor/Transforms/BufferizableOpInterfaceImpl.h"
+#include "mlir/Dialect/Vector/Transforms/BufferizableOpInterfaceImpl.h"
 #include "mlir/Support/LLVM.h"
 
 using mlir::bufferization::AnalysisBufferizationOptions;
@@ -212,7 +212,7 @@ struct StoreTensorOpAnchoredInitTensorEliminationStep
     return eliminateInitTensors(
         op, state, aliasInfo,
         /*anchorMatchFunc=*/
-        [&](OpOperand &operand) {
+        [&](OpOperand &operand, SmallVector<Value> &) {
           return isa<IREE::Flow::DispatchTensorStoreOp>(operand.getOwner());
         },
         /*rewriteFunc=*/
@@ -284,15 +284,12 @@ void registerBufferizationInterfaces(DialectRegistry &registry) {
   arith::registerBufferizableOpInterfaceExternalModels(registry);
   linalg::comprehensive_bufferize::linalg_ext::
       registerBufferizableOpInterfaceExternalModels(registry);
-  linalg::comprehensive_bufferize::scf_ext::
-      registerBufferizableOpInterfaceExternalModels(registry);
+  scf::registerBufferizableOpInterfaceExternalModels(registry);
   linalg::comprehensive_bufferize::std_ext::
       registerModuleBufferizationExternalModels(registry);
-  linalg::comprehensive_bufferize::std_ext::
-      registerBufferizableOpInterfaceExternalModels(registry);
+  registerBufferizableOpInterfaceExternalModels(registry);
   tensor::registerBufferizableOpInterfaceExternalModels(registry);
-  linalg::comprehensive_bufferize::vector_ext::
-      registerBufferizableOpInterfaceExternalModels(registry);
+  vector::registerBufferizableOpInterfaceExternalModels(registry);
 
   // Register IREE operations.
   registry.addOpInterface<IREE::Flow::DispatchTensorLoadOp,

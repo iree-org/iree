@@ -97,7 +97,11 @@ hal.executable @tensor_insert {
             %9 = affine.apply affine_map<(d0) -> (d0 + 4)>(%arg0)
             %10 = affine.apply affine_map<(d0) -> (d0 + 3)>(%arg1)
             %11 = memref.subview %1[%9, %10] [%4, %7] [1, 1] : memref<?x?xi32> to memref<?x?xi32, affine_map<(d0, d1)[s0, s1] -> (d0 * s1 + s0 + d1)>>
-            linalg.copy(%8, %11) : memref<?x?xi32, affine_map<(d0, d1)[s0, s1] -> (d0 * s1 + s0 + d1)>>, memref<?x?xi32, affine_map<(d0, d1)[s0, s1] -> (d0 * s1 + s0 + d1)>>
+            linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]}
+              ins(%8 : memref<?x?xi32, affine_map<(d0, d1)[s0, s1] -> (d0 * s1 + s0 + d1)>>) outs(%11 : memref<?x?xi32, affine_map<(d0, d1)[s0, s1] -> (d0 * s1 + s0 + d1)>>) {
+              ^bb0(%arg4: i32, %s: i32):  // no predecessors
+                linalg.yield %arg4 : i32
+            }
           }
         }
         return
@@ -116,7 +120,7 @@ hal.executable @tensor_insert {
 //  CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
 //  CHECK-DAG:   %[[NWGSX:.+]] = affine.apply #[[MAP]]()[%[[ARG0]]]
 //      CHECK:   hal.return %[[NWGSX]], %[[ARG1]], %[[C1]]
-//      CHECK:   linalg.copy
+//      CHECK:   linalg.generic
 // CHECK-SAME:     lowering.config = #[[CONFIG]]
 
 // -----
@@ -166,7 +170,12 @@ hal.executable @tensor_insert {
               %10 = affine.min affine_map<(d0)[s0] -> (s0, -d0 + 3)>(%arg2)[%workgroup_size_x]
               %11 = memref.subview %1[0, %arg0, %arg1, %arg2] [1, %4, %7, %10] [1, 1, 1, 1] : memref<1x224x224x3xf32> to memref<1x?x?x?xf32, affine_map<(d0, d1, d2, d3)[s0] -> (d0 * 150528 + s0 + d1 * 672 + d2 * 3 + d3)>>
               %12 = memref.subview %0[0, %arg0, %arg1, %arg2] [1, %4, %7, %10] [1, 1, 1, 1] : memref<1x225x225x3xf32> to memref<1x?x?x?xf32, affine_map<(d0, d1, d2, d3)[s0] -> (d0 * 151875 + s0 + d1 * 675 + d2 * 3 + d3)>>
-              linalg.copy(%11, %12) : memref<1x?x?x?xf32, affine_map<(d0, d1, d2, d3)[s0] -> (d0 * 150528 + s0 + d1 * 672 + d2 * 3 + d3)>>, memref<1x?x?x?xf32, affine_map<(d0, d1, d2, d3)[s0] -> (d0 * 151875 + s0 + d1 * 675 + d2 * 3 + d3)>>
+              linalg.generic {indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>, affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>], iterator_types = ["parallel", "parallel", "parallel", "parallel"]}
+                ins(%11 : memref<1x?x?x?xf32, affine_map<(d0, d1, d2, d3)[s0] -> (d0 * 150528 + s0 + d1 * 672 + d2 * 3 + d3)>>) 
+                outs(%12 : memref<1x?x?x?xf32, affine_map<(d0, d1, d2, d3)[s0] -> (d0 * 151875 + s0 + d1 * 675 + d2 * 3 + d3)>>) {
+                ^bb0(%arg4: f32, %s: f32):  // no predecessors
+                  linalg.yield %arg4 : f32
+              }
             }
           }
         }
@@ -188,7 +197,7 @@ hal.executable @tensor_insert {
 //  CHECK-DAG:   %[[Z_COUNT:.+]] = affine.apply #[[MAP_Z]]()[%[[Z]]]
 //      CHECK:   hal.return %[[X]], %[[Y_COUNT]], %[[Z_COUNT]]
 
-//      CHECK:   linalg.copy
+//      CHECK:   linalg.generic
 // CHECK-SAME:     lowering.config = #[[CONFIG]]
 
 // -----

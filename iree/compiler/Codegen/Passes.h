@@ -128,6 +128,9 @@ std::unique_ptr<OperationPass<FuncOp>> createOptimizeVectorTransferPass();
 
 /// Pass to convert math operations to their polynomial approximation.
 std::unique_ptr<OperationPass<>> createPolynomialApproximationPass();
+
+/// Creates a pass to convert memref.copy to linalg op.
+std::unique_ptr<OperationPass<FuncOp>> createMemrefCopyToLinalgPass();
 //----------------------------------------------------------------------------//
 // Common codegen patterns.
 //----------------------------------------------------------------------------//

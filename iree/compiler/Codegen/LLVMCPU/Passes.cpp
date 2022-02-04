@@ -63,7 +63,7 @@ static void cpuComprehensiveBufferizeDeallocationFn(OpBuilder &builder,
 
 static void cpuComprehensiveBufferizeCopyFn(OpBuilder &builder, Location loc,
                                             Value from, Value to) {
-  builder.create<linalg::CopyOp>(loc, from, to);
+  createLinalgCopyOp(builder, loc, from, to);
 }
 
 //===---------------------------------------------------------------------===//
@@ -306,6 +306,7 @@ static void addLowerToLLVMPasses(OpPassManager &passManager) {
       IREE::LinalgExt::createLinalgExtToLoopsPass());
 
   // Linalg -> SCF
+  passManager.addNestedPass<FuncOp>(createMemrefCopyToLinalgPass());
   passManager.addNestedPass<FuncOp>(createConvertLinalgToLoopsPass());
   passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
   passManager.addNestedPass<FuncOp>(createCSEPass());
@@ -319,7 +320,7 @@ static void addLowerToLLVMPasses(OpPassManager &passManager) {
     passManager.addPass(createLLVMCPUCheckIRBeforeLLVMConversionPass());
   }
   // Handled tensor-type constants.
-  passManager.addPass(createTensorConstantBufferizePass());
+  passManager.addPass(arith::createConstantBufferizePass());
   passManager.addPass(createFoldTensorExtractOpPass());
 
   // math dialect elementry functions -> polynomial form.

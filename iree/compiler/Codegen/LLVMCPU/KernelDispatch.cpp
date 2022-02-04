@@ -650,10 +650,10 @@ static LogicalResult setRootConfig(
   }
   if (rootOp) return success();
 
-  // If there are any other ops other than `linalg.generic`, `linalg.copy` or
+  // If there are any other ops other than `linalg.generic`, `linalg.generic` or
   // `linalg.fill` then just use the default.
   for (auto computeOp : computeOps) {
-    if (!isa<linalg::GenericOp, linalg::CopyOp, linalg::FillOp>(computeOp)) {
+    if (!isa<linalg::GenericOp, linalg::FillOp>(computeOp)) {
       return success();
     }
   }

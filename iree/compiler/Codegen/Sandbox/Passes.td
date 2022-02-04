@@ -137,7 +137,7 @@ def LinalgVectorLowering : Pass<"linalg-vector-lowering", "FuncOp"> {
       [{Split vector transfers between slow (masked) and fast "
         "(unmasked) variants. Possible options are:\n"
           "\tnone [default]: keep unsplit vector.transfer and pay the price\n"
-          "\tlinalg-copy: use linalg.fill + linalg.copy for the slow path\n"
+          "\tlinalg-copy: use linalg.fill + linalg.generic for the slow path\n"
           "\tvector-transfers: use extra small unmasked vector.transfers for"
           " the slow path\n}]>,
     Option<"lowerVectorTransposeTo", "lower-vector-transpose-to",

@@ -107,7 +107,7 @@ def Stream_Dialect : Dialect {
 // Base stream dialect op classes
 //===----------------------------------------------------------------------===//
 
-class Stream_Op<string mnemonic, list<OpTrait> traits = []> :
+class Stream_Op<string mnemonic, list<Trait> traits = []> :
     Op<Stream_Dialect, mnemonic, traits> {
   let parser = [{ return parse$cppClass(parser, &result); }];
   let printer = [{ return print$cppClass(p, *this); }];

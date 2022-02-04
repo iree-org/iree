@@ -62,11 +62,11 @@ cc_library(
         "@llvm-project//mlir:LinalgBufferizableOpInterfaceImpl",
         "@llvm-project//mlir:MemRefDialect",
         "@llvm-project//mlir:ModuleBufferization",
-        "@llvm-project//mlir:SCFBufferizableOpInterfaceImpl",
-        "@llvm-project//mlir:StdBufferizableOpInterfaceImpl",
+        "@llvm-project//mlir:SCFTransforms",
+        "@llvm-project//mlir:StandardOpsTransforms",
         "@llvm-project//mlir:Support",
         "@llvm-project//mlir:TensorTransforms",
-        "@llvm-project//mlir:VectorBufferizableOpInterfaceImpl",
+        "@llvm-project//mlir:VectorTransforms",
     ],
 )
 
