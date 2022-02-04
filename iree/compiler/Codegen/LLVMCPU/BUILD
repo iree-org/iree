@@ -78,5 +78,6 @@ cc_library(
         "@llvm-project//mlir:VectorOps",
         "@llvm-project//mlir:VectorToLLVM",
         "@llvm-project//mlir:VectorToSCF",
+        "@llvm-project//mlir:VectorTransforms",
     ],
 )

@@ -86,5 +86,6 @@ cc_library(
         "@llvm-project//mlir:VectorInterfaces",
         "@llvm-project//mlir:VectorOps",
         "@llvm-project//mlir:VectorToSPIRV",
+        "@llvm-project//mlir:VectorTransforms",
     ],
 )
