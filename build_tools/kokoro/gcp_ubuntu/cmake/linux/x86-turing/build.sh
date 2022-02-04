@@ -33,9 +33,10 @@ nvidia-smi || true
 # TODO(gcmn): It would be nice to be able to build and test as much as possible,
 # so a build failure only prevents building/testing things that depend on it and
 # we can still run the other tests.
+# TODO: Add "-DIREE_TARGET_BACKEND_CUDA=ON -DIREE_HAL_DRIVER_CUDA=ON" once the
+# VMs have been updated with the correct CUDA SDK.
 echo "Building with cmake"
-./build_tools/cmake/clean_build.sh \
-    -DIREE_TARGET_BACKEND_CUDA=ON -DIREE_HAL_DRIVER_CUDA=ON
+./build_tools/cmake/clean_build.sh
 
 export IREE_VULKAN_F16_DISABLE=0
 export IREE_CUDA_DISABLE=0
