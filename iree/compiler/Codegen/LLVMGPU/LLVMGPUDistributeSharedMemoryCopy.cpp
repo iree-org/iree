@@ -82,7 +82,10 @@ static void populateTilingCopyToWorkgroupMemPatterns(
 }
 
 static void populateVectorizationPatterns(RewritePatternSet &patterns) {
-  patterns.add<linalg::CopyVectorizationPattern>(patterns.getContext());
+  linalg::VectorizationPatterns<linalg::GenericOp>::insert(
+      patterns, linalg::LinalgVectorizationOptions(),
+      linalg::LinalgTransformationFilter(StringAttr::get(
+          patterns.getContext(), getCopyToWorkgroupMemoryMarker())));
 }
 
 // TODO(thomasraoux): Extend this to support smaller vector size as well.
@@ -195,7 +198,7 @@ class LLVMGPUDistributeSharedMemoryCopyPass
     : public LLVMGPUDistributeSharedMemoryCopyBase<
           LLVMGPUDistributeSharedMemoryCopyPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<vector::VectorDialect>();
+    registry.insert<vector::VectorDialect, scf::SCFDialect>();
   }
   void runOnOperation() override {
     FuncOp funcOp = getOperation();
@@ -231,7 +234,7 @@ class LLVMGPUDistributeSharedMemoryCopyPass
           }
           return threadsAvailable == 1;
         });
-    if (0 && isAligned) {
+    if (isAligned) {
       // Step 1. Vectorize the shared memory copy.
       RewritePatternSet vectorizationPatterns(context);
       populateVectorizationPatterns(vectorizationPatterns);

@@ -49,7 +49,14 @@ hal.executable private @shared_mem_cpy  {
     //     CHECK: vector.transfer_write %[[R0]], %{{.*}}[%[[Y0]], %[[X0]]] {in_bounds = [true, true]} : vector<1x4xf32>, memref<64x16xf32, 3>
     //     CHECK: vector.transfer_write %[[R1]], %{{.*}}[%[[Y1]], %[[X0]]] {in_bounds = [true, true]} : vector<1x4xf32>, memref<64x16xf32, 3>
 
-        linalg.generic %m0, %sm0 {__internal_linalg_transform__ = "copy_to_workgroup_memory"} : memref<64x16xf32> to memref<64x16xf32, 3>
+        linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>], 
+        iterator_types = ["parallel", "parallel"]}
+          ins(%m0 : memref<64x16xf32>) 
+          outs(%sm0 : memref<64x16xf32, 3>) 
+          attrs= {__internal_linalg_transform__ = "copy_to_workgroup_memory"} {
+          ^bb0(%arg4: f32, %s: f32):  // no predecessors
+            linalg.yield %arg4 : f32
+        }
 
     //     CHECK: %[[Y1:.*]] = affine.apply #[[$MAP3]]()[%[[TX]], %[[TY]], %[[TZ]]]
     //     CHECK: %[[R2:.*]] = vector.transfer_read %{{.*}}[%[[Y1]], %[[C0]]], %{{.*}} {in_bounds = [true, true]} : memref<256x4xf32>, vector<1x4xf32>
@@ -58,7 +65,14 @@ hal.executable private @shared_mem_cpy  {
     //     CHECK: vector.transfer_write %[[R2]], %{{.*}}[%[[Y1]], %[[C0]]] {in_bounds = [true, true]} : vector<1x4xf32>, memref<256x4xf32, 3>
     //     CHECK: vector.transfer_write %[[R3]], %{{.*}}[%[[Y2]], %[[C0]]] {in_bounds = [true, true]} : vector<1x4xf32>, memref<256x4xf32, 3>
 
-        linalg.generic %m1, %sm1 {__internal_linalg_transform__ = "copy_to_workgroup_memory"} : memref<256x4xf32> to memref<256x4xf32, 3>
+        linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>], 
+        iterator_types = ["parallel", "parallel"]}
+          ins(%m1 : memref<256x4xf32>) 
+          outs(%sm1 : memref<256x4xf32, 3>) 
+          attrs= {__internal_linalg_transform__ = "copy_to_workgroup_memory"} {
+          ^bb0(%arg4: f32, %s: f32):  // no predecessors
+            linalg.yield %arg4 : f32
+        }
 
     //     CHECK: %[[X1:.*]] = affine.apply #[[$MAP5]]()[%[[TX]], %[[TY]], %[[TZ]]]
     //     CHECK: %[[R4:.*]] = vector.transfer_read %{{.*}}[%[[C0]], %[[X1]]], %{{.*}} {in_bounds = [true, true]} : memref<3x512xf32>, vector<1x4xf32>
@@ -68,7 +82,14 @@ hal.executable private @shared_mem_cpy  {
     //     CHECK: vector.transfer_write %[[R5]], %{{.*}}[%c1, %15] {in_bounds = [true, true]} : vector<1x4xf32>, memref<3x512xf32, 3>
     //     CHECK: vector.transfer_write %[[R6]], %{{.*}}[%c2, %15] {in_bounds = [true, true]} : vector<1x4xf32>, memref<3x512xf32, 3>
 
-        linalg.generic %m2, %sm2 {__internal_linalg_transform__ = "copy_to_workgroup_memory"} : memref<3x512xf32> to memref<3x512xf32, 3>
+        linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>], 
+        iterator_types = ["parallel", "parallel"]}
+          ins(%m2 : memref<3x512xf32>) 
+          outs(%sm2 : memref<3x512xf32, 3>) 
+          attrs= {__internal_linalg_transform__ = "copy_to_workgroup_memory"} {
+          ^bb0(%arg4: f32, %s: f32):  // no predecessors
+            linalg.yield %arg4 : f32
+        }
         gpu.barrier
         return
       }
