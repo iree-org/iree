@@ -379,6 +379,7 @@ class MMTKernelGenerator {
       for (const auto &val : vals) {
         Type type = val.getType().dyn_cast<VectorType>();
         assert(type == expectedElemType);
+        (void)type;
       }
       (void)vals;
       (void)expectedSize;
@@ -462,7 +463,7 @@ class MMTKernelGenerator {
         /*has_side_effects=*/false, /*is_align_stack=*/false, dialectAttr,
         /*operand_attrs=*/ArrayAttr());
     // Extract result vectors from the asm op.
-    SmallVector<Value, 16> resVec;
+    SmallVector<Value> resVec;
     for (int i = 0; i < 16; ++i) {
       resVec.push_back(rewriter.create<LLVM::ExtractValueOp>(
           loc, getAccRegVectorType(), asmOp.getRes(),
