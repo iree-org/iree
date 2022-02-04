@@ -600,7 +600,6 @@ SmallVector<LoopTilingAndDistributionInfo> getTiledAndDistributedLoopInfo(
 /// memref::CopyOp.
 Operation *createLinalgCopyOp(OpBuilder &b, Location loc, Value from,
                               Value to) {
-  auto memrefTypeFrom = from.getType().cast<MemRefType>();
   auto memrefTypeTo = to.getType().cast<MemRefType>();
   assert(memrefTypeFrom && memrefTypeTo &&
          memrefTypeFrom.getRank() == memrefTypeTo.getRank());
