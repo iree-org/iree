@@ -49,8 +49,9 @@ target_link_options(${_NAME} PRIVATE
   #
   "-sASSERTIONS=1"
   #
-  "-gsource-map"
-  "-source-map-base="
+  # https://developer.chrome.com/blog/wasm-debugging-2020/
+  "-g"
+  "-gseparate-dwarf"
 )
 
 #-------------------------------------------------------------------------------
@@ -91,8 +92,9 @@ target_link_options(${_NAME} PRIVATE
   #
   "-sASSERTIONS=1"
   #
-  "-gsource-map"
-  "-source-map-base="
+  # https://developer.chrome.com/blog/wasm-debugging-2020/
+  "-g"
+  "-gseparate-dwarf"
   #
   # https://emscripten.org/docs/porting/pthreads.html#compiling-with-pthreads-enabled
   "-pthread"
