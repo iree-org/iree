@@ -480,10 +480,10 @@ func @matmul_tile()
       %13 = subview %12[%c0, %c0]...
       %14 = alloc(%c4, %c8) : memref<?x?xf32, 3>
       %15 = subview %14[%c0, %c0]...
-      memref.copy(%5, %13) {__internal_linalg_transform__ = "workgroup"}
+      linalg.copy(%5, %13) {__internal_linalg_transform__ = "workgroup"}
         : memref<?x?xf32, #map2>, memref<?x?xf32, #map2, 3>
       spv.ControlBarrier "Workgroup", "Workgroup", "AcquireRelease"
-      memref.copy(%8, %15) {__internal_linalg_transform__ = "workgroup"}
+      linalg.copy(%8, %15) {__internal_linalg_transform__ = "workgroup"}
         : memref<?x?xf32, #map2>, memref<?x?xf32, #map2, 3>
       spv.ControlBarrier "Workgroup", "Workgroup", "AcquireRelease"
       linalg.matmul {__internal_linalg_transform__ = "workgroup"} %13, %15, %11...
