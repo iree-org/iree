@@ -52,6 +52,7 @@ iree_cc_library(
     MLIRLinalgTransforms
     MLIRPass
     MLIRSCF
+    MLIRSCFUtils
     MLIRTensor
     MLIRTransforms
     MLIRVector
