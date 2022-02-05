@@ -6,7 +6,7 @@
 
 # An image for building IREE through Emscripten.
 
-FROM gcr.io/iree-oss/base@sha256:ec10501f22c04c2199c68df5f6782946224fb63568e2a1701ddb3c4928a42bb5
+FROM gcr.io/iree-oss/base@sha256:4ba13defc7aa8eda96977b430c01b5fbc2572185dceb83a4a6a5e4d9688d7886
 
 # See also
 #   * https://github.com/emscripten-core/emsdk/blob/main/docker/Dockerfile

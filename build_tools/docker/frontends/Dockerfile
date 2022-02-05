@@ -4,7 +4,7 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-FROM gcr.io/iree-oss/android@sha256:22368d0c424160c68109ff33772b84b4633304d315709de959353db8ffd81c52
+FROM gcr.io/iree-oss/android@sha256:3c25fe04b9269807ac4754da9ffc9644ca7b70d3bc07a1bab850c1ae826d220f
 
 WORKDIR /install-kws
 
