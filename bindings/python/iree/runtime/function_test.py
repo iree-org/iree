@@ -265,6 +265,32 @@ class FunctionTest(absltest.TestCase):
     self.assertEqual("<VmVariantList(1): [HalBufferView(2:0x20000011)]>",
                      repr(invoked_arg_list))
 
+  def testDeviceArrayArg(self):
+    # Note that since the device array is set up to disallow implicit host
+    # transfers, this also verifies that no accidental/automatic transfers
+    # are done as part of marshalling the array to the function.
+    arg_array = rt.asdevicearray(self.device,
+                                 np.asarray([1, 0], dtype=np.int32),
+                                 implicit_host_transfer=False)
+
+    invoked_arg_list = None
+
+    def invoke(arg_list, ret_list):
+      nonlocal invoked_arg_list
+      invoked_arg_list = arg_list
+
+    vm_context = MockVmContext(invoke)
+    vm_function = MockVmFunction(reflection={
+        "iree.abi": json.dumps({
+            "a": [["ndarray", "i32", 1, 2]],
+            "r": [],
+        })
+    })
+    invoker = FunctionInvoker(vm_context, self.device, vm_function, tracer=None)
+    result = invoker(arg_array)
+    self.assertEqual("<VmVariantList(1): [HalBufferView(2:0x20000011)]>",
+                     repr(invoked_arg_list))
+
   def testBufferViewArg(self):
     arg_buffer_view = self.device.allocator.allocate_buffer_copy(
         memory_type=IMPLICIT_BUFFER_ARG_MEMORY_TYPE,

@@ -343,7 +343,7 @@ def _buffer_view_to_vm(inv: Invocation, t: VmVariantList, x, desc):
 def _ndarray_like_to_vm(inv: Invocation, t: VmVariantList, x, desc):
   if isinstance(x, HalBufferView):
     return _buffer_view_to_vm(inv, t, x, desc)
-  return _ndarray_to_vm(inv, t, np.asarray(x), desc)
+  return _ndarray_to_vm(inv, t, x, desc)
 
 
 class _MissingArgument:
