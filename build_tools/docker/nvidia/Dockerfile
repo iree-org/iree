@@ -51,4 +51,9 @@ RUN apt-get install "/tmp/${NVIDIA_COMMON_DEB?}" \
   "/tmp/${NVIDIA_GL_DEB?}" \
   "/tmp/${NVIDIA_COMPUTE_DEB?}"
 
-RUN apt-get install -y nvidia-cuda-toolkit
+# install cuda sdk
+RUN wget https://developer.download.nvidia.com/compute/cuda/11.6.0/local_installers/cuda-repo-debian11-11-6-local_11.6.0-510.39.01-1_amd64.deb
+RUN dpkg -i cuda-repo-debian11-11-6-local_11.6.0-510.39.01-1_amd64.deb
+RUN apt-key add /var/cuda-repo-debian11-11-6-local/7fa2af80.pub
+RUN apt-get update
+RUN apt-get -y install cuda-toolkit-11-6
