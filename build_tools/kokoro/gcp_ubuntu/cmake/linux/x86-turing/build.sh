@@ -29,7 +29,7 @@ dpkg -l | grep nvidia
 nvidia-smi || true
 
 ./build_tools/kokoro/gcp_ubuntu/check_vulkan.sh
-
+IREE_SRC_DIR="$PWD"
 # TODO(gcmn): It would be nice to be able to build and test as much as possible,
 # so a build failure only prevents building/testing things that depend on it and
 # we can still run the other tests.
@@ -88,6 +88,7 @@ CMAKE_ARGS=(
 "$CMAKE_BIN" "${CMAKE_ARGS[@]?}" "$@" ..
 "$CMAKE_BIN" --build .
 
+cd "$IREE_SRC_DIR"
 
 export IREE_VULKAN_F16_DISABLE=0
 export IREE_CUDA_DISABLE=0
