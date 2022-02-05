@@ -13,6 +13,7 @@
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/Triple.h"
 #include "llvm/Support/FormatVariadic.h"
+#include "llvm/Support/MathExtras.h"
 #include "mlir/Conversion/StandardToLLVM/ConvertStandardToLLVM.h"
 #include "mlir/Conversion/VectorToLLVM/ConvertVectorToLLVM.h"
 #include "mlir/Dialect/ArmNeon/ArmNeonDialect.h"
@@ -143,20 +144,15 @@ static Value flatten(PatternRewriter &rewriter, Location loc, Value vector) {
   return rewriter.create<vector::ShapeCastOp>(loc, dstType, vector);
 }
 
-// We only constant-evaluate this function. We could enforce this in C++20 with
-// consteval.
-constexpr bool isPowerOfTwo(int i) { return (i > 0) && ((i & (i - 1)) == 0); }
-
-// We only constant-evaluate this function. We could enforce this in C++20 with
-// consteval. This is the reason why we prefer a naive loop implementation
-// (OK in constexpr function since C++14) over builtins/intrinsics which might
-// not be constexpr (which we can't enforce until C++20 consteval).
-constexpr int8_t exactLog2(int i) {
-  assert(isPowerOfTwo(i));
-  int8_t e = 0;
-  for (; (i - 1) >> e; ++e) {
-  }
-  return e;
+// Asserts that i is a power of two, and returns its log2.
+// Note: the llvm helpers used internally operate on uint32, but we keep that
+// an internal detail as the surrounding code here is all operating on signed
+// integers and mixing signed and unsigned would be error-prone.
+constexpr int8_t exactLog2(int32_t i) {
+  assert(i > 0);
+  uint32_t u = i;
+  assert(llvm::isPowerOf2_32(u));
+  return llvm::countTrailingZeros(u);
 }
 
 // Helper to handle powers of two size computations without the overhead
@@ -179,7 +175,7 @@ class PowerOfTwo {
 
  public:
   PowerOfTwo() {}
-  explicit constexpr PowerOfTwo(int i) : exponent(exactLog2(i)) {}
+  explicit constexpr PowerOfTwo(int32_t i) : exponent(exactLog2(i)) {}
   int getExponent() const { return exponent; }
   int val() const {
     assert(exponent < 8 * sizeof(int) - 1);
@@ -377,11 +373,8 @@ class MMTKernelGenerator {
                        VectorType expectedElemType) {
       assert(vals.size() == expectedSize);
       for (const auto &val : vals) {
-        Type type = val.getType().dyn_cast<VectorType>();
-        assert(type == expectedElemType);
-        (void)type;
+        assert(val.getType().dyn_cast<VectorType>() == expectedElemType);
       }
-      (void)vals;
       (void)expectedSize;
       (void)expectedElemType;
     };
