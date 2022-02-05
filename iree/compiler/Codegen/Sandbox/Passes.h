@@ -75,6 +75,16 @@ std::unique_ptr<OperationPass<FuncOp>> createLinalgVectorLoweringPass(
 std::unique_ptr<OperationPass<FuncOp>> createLinalgVectorLoweringPass(
     const LinalgVectorLoweringPassOptions &options);
 
+/// Create a pass to drive the unrolling of a single vector op.
+std::unique_ptr<OperationPass<FuncOp>> createUnrollOneVectorOpPass();
+
+/// Create a pass to drive the unrolling of a single parent loop of an op.
+std::unique_ptr<OperationPass<FuncOp>> createUnrollOneParentLoopPass();
+
+/// Create a pass to drive the outlining of the region of a single parent loop
+/// of an op.
+std::unique_ptr<OperationPass<FuncOp>> createOutlineOneParentLoopPass();
+
 //===----------------------------------------------------------------------===//
 // Transforms that tie together individual drivers.
 //===----------------------------------------------------------------------===//
