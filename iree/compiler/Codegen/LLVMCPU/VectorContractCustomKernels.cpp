@@ -370,6 +370,7 @@ class MMTKernelGenerator {
       assert(vals.size() == expectedSize);
       for (const auto &val : vals) {
         assert(val.getType().dyn_cast<VectorType>() == expectedElemType);
+        (void)val;
       }
       (void)expectedSize;
       (void)expectedElemType;
