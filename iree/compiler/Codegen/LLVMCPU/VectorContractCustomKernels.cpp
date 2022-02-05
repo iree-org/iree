@@ -296,12 +296,8 @@ Type mlirType(MLIRContext *context, MMTKernel::ScalarType t) {
 
 // This class is a helper for patterns generating custom kernels based on
 // MMTKernel structs.
-// It provides helpers, mainly the generate() method, to generate the kernel
-// described by the MMTKernel struct passed to the constructor.
-// The rest is just helpers, for generate() and for the pattern using it.
 class MMTKernelGenerator {
  public:
-  // Constructor, typically used by RewritePatternSet::add.
   MMTKernelGenerator(MLIRContext *context, MMTKernel kernel)
       : context(context), kernel(kernel) {}
   // Generates the kernel. Returns the output accumulator values.
