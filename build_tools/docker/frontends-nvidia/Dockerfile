@@ -26,24 +26,6 @@ RUN wget -q "https://storage.googleapis.com/iree-shared-files/${NVIDIA_COMMON_DE
   "./${NVIDIA_COMPUTE_DEB?}" \
   && rm -rf /install-nvidia
 
-# Get the SDK from nvidia's repository
-RUN wget -q https://developer.download.nvidia.com/compute/cuda/repos/debian11/x86_64/cuda-cccl-11-6_11.6.55-1_amd64.deb
-RUN wget -q https://developer.download.nvidia.com/compute/cuda/repos/debian11/x86_64/cuda-cudart-11-6_11.6.55-1_amd64.deb
-RUN wget -q https://developer.download.nvidia.com/compute/cuda/repos/debian11/x86_64/cuda-cudart-dev-11-6_11.6.55-1_amd64.deb
-RUN wget -q https://developer.download.nvidia.com/compute/cuda/repos/debian11/x86_64/cuda-driver-dev-11-6_11.6.55-1_amd64.deb
-RUN wget -q https://developer.download.nvidia.com/compute/cuda/repos/debian11/x86_64/cuda-nvcc-11-6_11.6.55-1_amd64.deb
-RUN wget -q https://developer.download.nvidia.com/compute/cuda/repos/debian11/x86_64/cuda-toolkit-11-6-config-common_11.6.55-1_all.deb
-RUN wget -q https://developer.download.nvidia.com/compute/cuda/repos/debian11/x86_64/cuda-toolkit-11-config-common_11.6.55-1_all.deb
-RUN wget -q https://developer.download.nvidia.com/compute/cuda/repos/debian11/x86_64/cuda-toolkit-config-common_11.6.55-1_all.deb
-
-
-RUN apt-get install ./cuda-cccl-11-6_11.6.55-1_amd64.deb \
-   ./cuda-cudart-11-6_11.6.55-1_amd64.deb \
-   ./cuda-cudart-dev-11-6_11.6.55-1_amd64.deb \
-   ./cuda-driver-dev-11-6_11.6.55-1_amd64.deb \
-   ./cuda-nvcc-11-6_11.6.55-1_amd64.deb \
-   ./cuda-toolkit-11-6-config-common_11.6.55-1_all.deb \
-   ./cuda-toolkit-11-config-common_11.6.55-1_all.deb \
-   ./cuda-toolkit-config-common_11.6.55-1_all.deb
+RUN apt-get install -y nvidia-cuda-toolkit
 
 WORKDIR /

@@ -26,16 +26,6 @@ RUN wget -q "https://storage.googleapis.com/iree-shared-files/${NVIDIA_COMMON_DE
 RUN wget -q "https://storage.googleapis.com/iree-shared-files/${NVIDIA_GL_DEB?}"
 RUN wget -q "https://storage.googleapis.com/iree-shared-files/${NVIDIA_COMPUTE_DEB}"
 
-# Get the SDK from nvidia's repository
-RUN wget -q https://developer.download.nvidia.com/compute/cuda/repos/debian11/x86_64/cuda-cccl-11-6_11.6.55-1_amd64.deb
-RUN wget -q https://developer.download.nvidia.com/compute/cuda/repos/debian11/x86_64/cuda-cudart-11-6_11.6.55-1_amd64.deb
-RUN wget -q https://developer.download.nvidia.com/compute/cuda/repos/debian11/x86_64/cuda-cudart-dev-11-6_11.6.55-1_amd64.deb
-RUN wget -q https://developer.download.nvidia.com/compute/cuda/repos/debian11/x86_64/cuda-driver-dev-11-6_11.6.55-1_amd64.deb
-RUN wget -q https://developer.download.nvidia.com/compute/cuda/repos/debian11/x86_64/cuda-nvcc-11-6_11.6.55-1_amd64.deb
-RUN wget -q https://developer.download.nvidia.com/compute/cuda/repos/debian11/x86_64/cuda-toolkit-11-6-config-common_11.6.55-1_all.deb
-RUN wget -q https://developer.download.nvidia.com/compute/cuda/repos/debian11/x86_64/cuda-toolkit-11-config-common_11.6.55-1_all.deb
-RUN wget -q https://developer.download.nvidia.com/compute/cuda/repos/debian11/x86_64/cuda-toolkit-config-common_11.6.55-1_all.deb
-
 # Set up the image and working directory by inheriting the vulkan CMake
 # configuration.
 # Note that we don't start from NVIDIA's docker base:
@@ -62,11 +52,4 @@ RUN apt-get install "/tmp/${NVIDIA_COMMON_DEB?}" \
   "/tmp/${NVIDIA_COMPUTE_DEB?}"
 
 
-RUN apt-get install /tmp/cuda-cccl-11-6_11.6.55-1_amd64.deb \
-   /tmp/cuda-cudart-11-6_11.6.55-1_amd64.deb \
-   /tmp/cuda-cudart-dev-11-6_11.6.55-1_amd64.deb \
-   /tmp/cuda-driver-dev-11-6_11.6.55-1_amd64.deb \
-   /tmp/cuda-nvcc-11-6_11.6.55-1_amd64.deb \
-   /tmp/cuda-toolkit-11-6-config-common_11.6.55-1_all.deb \
-   /tmp/cuda-toolkit-11-config-common_11.6.55-1_all.deb \
-   /tmp/cuda-toolkit-config-common_11.6.55-1_all.deb
+RUN apt-get install -y nvidia-cuda-toolkit
