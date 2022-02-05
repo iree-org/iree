@@ -148,7 +148,7 @@ static Value flatten(PatternRewriter &rewriter, Location loc, Value vector) {
 // Note: the llvm helpers used internally operate on uint32, but we keep that
 // an internal detail as the surrounding code here is all operating on signed
 // integers and mixing signed and unsigned would be error-prone.
-constexpr int8_t exactLog2(int32_t i) {
+int8_t exactLog2(int32_t i) {
   assert(i > 0);
   uint32_t u = i;
   assert(llvm::isPowerOf2_32(u));
@@ -164,18 +164,14 @@ constexpr int8_t exactLog2(int32_t i) {
 //
 // kernel.registerBitWidth is *initialized* from a literal value (say 128) but
 // it would be cumbersome to have to preserve its constant-expression status
-// throughout (would have to templatize on a kernel type or perhaps try to
-// achieve something equivalent with just constexpr). So this class has
-// a constexpr constructor that would in a case like this evaluate at compile
-// time, and from that point on, we have this power of two represented
-// by its exponent so we are able to perform the above division as a bit-shift.
+// throughout.
 class PowerOfTwo {
  private:
   int8_t exponent = 0;
 
  public:
   PowerOfTwo() {}
-  explicit constexpr PowerOfTwo(int32_t i) : exponent(exactLog2(i)) {}
+  explicit PowerOfTwo(int32_t i) : exponent(exactLog2(i)) {}
   int getExponent() const { return exponent; }
   int val() const {
     assert(exponent < 8 * sizeof(int) - 1);
