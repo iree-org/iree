@@ -181,11 +181,10 @@ void addSingleTilingExpertPassPipeline(OpPassManager &passManager) {
   passManager.addPass(createCanonicalizerPass());
   // Add the sandbox single tiling expert to tile and vectorize.
   {
-    LinalgSingleTilingExpertPassOptions options;
+    LinalgFusePassOptions options;
     options.vectorize = true;
     options.tilingLevel = static_cast<int64_t>(TilingLevel::L1Tiles);
-    passManager.addNestedPass<FuncOp>(
-        createLinalgSingleTilingExpertPass(options));
+    passManager.addNestedPass<FuncOp>(createLinalgFusePass(options));
   }
 
   // TODO(ravishankarm): This is commented cause this is WIP, to be enabled
