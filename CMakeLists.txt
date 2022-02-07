@@ -4,7 +4,7 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-cmake_minimum_required(VERSION 3.16.3...3.21)
+cmake_minimum_required(VERSION 3.17...3.22)
 
 # LLVM requires CMP0116 for tblgen: https://reviews.llvm.org/D101083
 # CMP0116: Ninja generators transform `DEPFILE`s from `add_custom_command()`

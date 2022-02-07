@@ -33,10 +33,40 @@ nvidia-smi || true
 # TODO(gcmn): It would be nice to be able to build and test as much as possible,
 # so a build failure only prevents building/testing things that depend on it and
 # we can still run the other tests.
-# TODO: Add "-DIREE_TARGET_BACKEND_CUDA=ON -DIREE_HAL_DRIVER_CUDA=ON" once the
-# VMs have been updated with the correct CUDA SDK.
 echo "Building with cmake"
-./build_tools/cmake/clean_build.sh
+
+ROOT_DIR=$(git rev-parse --show-toplevel)
+
+cd ${ROOT_DIR?}
+rm -rf build/
+
+CMAKE_BIN=${CMAKE_BIN:-$(which cmake)}
+
+"$CMAKE_BIN" --version
+ninja --version
+
+mkdir build
+cd build
+
+CMAKE_ARGS=(
+  "-G" "Ninja"
+  # Let's make linking fast
+  "-DIREE_ENABLE_LLD=ON"
+  "-DCMAKE_BUILD_TYPE=RelWithDebInfo"
+
+  "-DIREE_BUILD_PYTHON_BINDINGS=ON"
+
+  "-DIREE_ENABLE_ASSERTIONS=ON"
+
+  # Enable CUDA backend to test on Turing hardware.
+  "-DIREE_TARGET_BACKEND_CUDA=ON"
+  "-DIREE_HAL_DRIVER_CUDA=ON"
+)
+
+"$CMAKE_BIN" "${CMAKE_ARGS[@]?}" "$@" ..
+"$CMAKE_BIN" --build .
+
+cd ${ROOT_DIR?}
 
 export IREE_VULKAN_F16_DISABLE=0
 export IREE_CUDA_DISABLE=0
