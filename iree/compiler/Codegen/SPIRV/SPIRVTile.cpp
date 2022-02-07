@@ -222,6 +222,9 @@ class SPIRVTilePass final : public SPIRVTileBase<SPIRVTilePass> {
       // Pulling in upstream scf.for and affine.min canonicalization patterns.
       // They work on tiled (but not distributed) loops.
       scf::populateSCFForLoopCanonicalizationPatterns(patterns);
+      // Pulling in scf.if canonicalization patterns to remove scf.if ops with
+      // static true/false conditions.
+      scf::IfOp::getCanonicalizationPatterns(patterns, context);
       // Pulling in IREE scf.for and affine.min canonicalization patterns.
       // They work on tiled and distributed loops.
       populateFoldAffineMinInDistributedLoopsPatterns(patterns);
