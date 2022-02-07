@@ -58,7 +58,6 @@ CMAKE_ARGS=(
 
   "-DIREE_BUILD_PYTHON_BINDINGS=ON"
 
-  # Enable assertions.
   "-DIREE_ENABLE_ASSERTIONS=ON"
 
   # Enable CUDA backend to test on Turing hardware.
