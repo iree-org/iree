@@ -45,8 +45,6 @@ CMAKE_BIN=${CMAKE_BIN:-$(which cmake)}
 "$CMAKE_BIN" --version
 ninja --version
 
-cd ${ROOT_DIR?}
-
 mkdir build
 cd build
 
