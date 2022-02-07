@@ -8,6 +8,7 @@
 
 #include "iree/builtins/device/bin/libdevice.h"
 #include "llvm/Bitcode/BitcodeReader.h"
+#include "llvm/IR/Constants.h"
 #include "llvm/Support/MemoryBufferRef.h"
 #include "mlir/Support/LLVM.h"
 

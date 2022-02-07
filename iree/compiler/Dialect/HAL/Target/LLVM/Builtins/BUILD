@@ -26,6 +26,7 @@ cc_library(
         "@llvm-project//llvm:BitReader",
         "@llvm-project//llvm:Support",
         "@llvm-project//llvm:Target",
+        "@llvm-project//llvm:ir_headers",
         "@llvm-project//mlir:Support",
     ],
 )
