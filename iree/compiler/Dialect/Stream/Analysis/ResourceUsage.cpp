@@ -233,7 +233,7 @@ class ValueResourceUsage : public AbstractResourceUsage<DFX::ValueElement> {
     if (!result.getType().isa<IREE::Stream::ResourceType>()) return;
 
     TypeSwitch<Operation *, void>(result.getOwner())
-        .Case([&](mlir::SelectOp op) {
+        .Case([&](mlir::arith::SelectOp op) {
           auto trueUsage = solver.getElementFor<ValueResourceUsage>(
               *this, Position::forValue(op.getTrueValue()),
               DFX::Resolution::REQUIRED);
@@ -403,7 +403,7 @@ class ValueResourceUsage : public AbstractResourceUsage<DFX::ValueElement> {
     auto *userOp = operand.getOwner();
     unsigned operandIdx = operand.getOperandNumber();
     TypeSwitch<Operation *, void>(userOp)
-        .Case([&](mlir::SelectOp op) {
+        .Case([&](mlir::arith::SelectOp op) {
           auto resultUsage = solver.getElementFor<ValueResourceUsage>(
               *this, Position::forValue(op.getResult()),
               DFX::Resolution::REQUIRED);

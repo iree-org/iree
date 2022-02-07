@@ -915,7 +915,7 @@ class SequenceCloneBuiltinConversion
         rewriter.create<arith::ConstantIntOp>(loc, 0, countInteger.getType());
     Value countClampsToZero = rewriter.create<arith::CmpIOp>(
         loc, arith::CmpIPredicate::sle, countInteger, zeroInteger);
-    Value clampedCountIndex = rewriter.create<mlir::SelectOp>(
+    Value clampedCountIndex = rewriter.create<mlir::arith::SelectOp>(
         loc, countClampsToZero, zeroIndex, countIndex);
     Value newListSize =
         rewriter.create<arith::MulIOp>(loc, subListSize, clampedCountIndex);
@@ -1253,14 +1253,15 @@ class BuiltinCondBranchConversion
   }
 };
 
-class BuiltinSelectConversion : public OpConversionPattern<mlir::SelectOp> {
+class BuiltinSelectConversion
+    : public OpConversionPattern<mlir::arith::SelectOp> {
   using OpConversionPattern::OpConversionPattern;
   LogicalResult matchAndRewrite(
-      mlir::SelectOp srcOp, OpAdaptor adaptor,
+      mlir::arith::SelectOp srcOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    rewriter.replaceOpWithNewOp<mlir::SelectOp>(srcOp, adaptor.getCondition(),
-                                                adaptor.getTrueValue(),
-                                                adaptor.getFalseValue());
+    rewriter.replaceOpWithNewOp<mlir::arith::SelectOp>(
+        srcOp, adaptor.getCondition(), adaptor.getTrueValue(),
+        adaptor.getFalseValue());
     return success();
   }
 };

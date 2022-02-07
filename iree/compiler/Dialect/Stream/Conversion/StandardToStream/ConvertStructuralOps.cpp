@@ -184,10 +184,10 @@ struct CondBranchOpConversion : public OpConversionPattern<mlir::CondBranchOp> {
   }
 };
 
-struct SelectOpConversion : public OpConversionPattern<mlir::SelectOp> {
+struct SelectOpConversion : public OpConversionPattern<mlir::arith::SelectOp> {
   using OpConversionPattern::OpConversionPattern;
   LogicalResult matchAndRewrite(
-      mlir::SelectOp op, OpAdaptor adaptor,
+      mlir::arith::SelectOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     // Only handle selects where the operands are tensors (resources).
     if (!op.getTrueValue().getType().isa<TensorType>()) return failure();
@@ -195,10 +195,10 @@ struct SelectOpConversion : public OpConversionPattern<mlir::SelectOp> {
         consumeTensorOperand(op.getLoc(), adaptor.getTrueValue(), rewriter);
     auto falseOperand =
         consumeTensorOperand(op.getLoc(), adaptor.getFalseValue(), rewriter);
-    auto resourceSelectOp = rewriter.create<mlir::SelectOp>(
+    auto resourceSelectOp = rewriter.create<mlir::arith::SelectOp>(
         op.getLoc(), adaptor.getCondition(), trueOperand.resource,
         falseOperand.resource);
-    auto sizeSelectOp = rewriter.create<mlir::SelectOp>(
+    auto sizeSelectOp = rewriter.create<mlir::arith::SelectOp>(
         op.getLoc(), adaptor.getCondition(), trueOperand.resourceSize,
         falseOperand.resourceSize);
     rewriter.replaceOpWithNewOp<mlir::UnrealizedConversionCastOp>(

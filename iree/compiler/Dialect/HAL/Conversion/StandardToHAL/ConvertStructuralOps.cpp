@@ -123,14 +123,14 @@ class ReturnOpConversion : public OpConversionPattern<mlir::ReturnOp> {
   }
 };
 
-class SelectOpConversion : public OpConversionPattern<mlir::SelectOp> {
+class SelectOpConversion : public OpConversionPattern<mlir::arith::SelectOp> {
  public:
   using OpConversionPattern::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      mlir::SelectOp selectOp, OpAdaptor adaptor,
+      mlir::arith::SelectOp selectOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    rewriter.replaceOpWithNewOp<mlir::SelectOp>(
+    rewriter.replaceOpWithNewOp<mlir::arith::SelectOp>(
         selectOp, adaptor.getCondition(), adaptor.getTrueValue(),
         adaptor.getFalseValue());
     return success();

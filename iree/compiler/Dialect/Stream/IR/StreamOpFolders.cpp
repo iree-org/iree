@@ -327,14 +327,14 @@ struct SelectResourceSizeOp : public OpRewritePattern<ResourceSizeOp> {
   using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(ResourceSizeOp op,
                                 PatternRewriter &rewriter) const override {
-    auto selectOp = op.operand().getDefiningOp<mlir::SelectOp>();
+    auto selectOp = op.operand().getDefiningOp<mlir::arith::SelectOp>();
     if (!selectOp) return failure();
     auto trueSize = rewriter.createOrFold<IREE::Stream::ResourceSizeOp>(
         op.getLoc(), selectOp.getTrueValue(), op.affinityAttr());
     auto falseSize = rewriter.createOrFold<IREE::Stream::ResourceSizeOp>(
         op.getLoc(), selectOp.getFalseValue(), op.affinityAttr());
-    rewriter.replaceOpWithNewOp<mlir::SelectOp>(op, selectOp.getCondition(),
-                                                trueSize, falseSize);
+    rewriter.replaceOpWithNewOp<mlir::arith::SelectOp>(
+        op, selectOp.getCondition(), trueSize, falseSize);
     return success();
   }
 };
@@ -636,9 +636,10 @@ struct FoldResourceSubviewOps : public OpRewritePattern<ResourceSubviewOp> {
 // ->
 //  %offset = select %cond, %offset0, %offset1 : index
 //  %subview = stream.resource.subview %src[%offset]
-struct SinkSubviewAcrossSelectOps : public OpRewritePattern<mlir::SelectOp> {
+struct SinkSubviewAcrossSelectOps
+    : public OpRewritePattern<mlir::arith::SelectOp> {
   using OpRewritePattern::OpRewritePattern;
-  LogicalResult matchAndRewrite(mlir::SelectOp op,
+  LogicalResult matchAndRewrite(mlir::arith::SelectOp op,
                                 PatternRewriter &rewriter) const override {
     if (!op.getType().isa<IREE::Stream::ResourceType>()) return failure();
     auto trueSubview = dyn_cast_or_null<IREE::Stream::ResourceSubviewOp>(
@@ -650,7 +651,7 @@ struct SinkSubviewAcrossSelectOps : public OpRewritePattern<mlir::SelectOp> {
         trueSubview.result_size() != falseSubview.result_size()) {
       return failure();
     }
-    auto offsetSelectOp = rewriter.create<mlir::SelectOp>(
+    auto offsetSelectOp = rewriter.create<mlir::arith::SelectOp>(
         op.getLoc(), op.getCondition(), trueSubview.source_offset(),
         falseSubview.source_offset());
     rewriter.replaceOpWithNewOp<IREE::Stream::ResourceSubviewOp>(

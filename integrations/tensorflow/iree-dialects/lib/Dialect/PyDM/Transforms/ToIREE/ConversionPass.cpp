@@ -56,8 +56,8 @@ struct ConvertIREEPyDMToIREEPass
         });
 
     // Standard select can be emitted as part of CFG canonicalization.
-    target.addDynamicallyLegalOp<mlir::SelectOp>(
-        [&](mlir::SelectOp op) -> bool {
+    target.addDynamicallyLegalOp<mlir::arith::SelectOp>(
+        [&](mlir::arith::SelectOp op) -> bool {
           return typeConverter.areTypesLegal(op.getOperandTypes());
         });
 
