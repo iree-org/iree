@@ -43,6 +43,7 @@ ${TRANSLATE_TOOL?} ${INPUT_PATH} \
   --iree-input-type=mhlo \
   --iree-hal-target-backends=llvm \
   --iree-llvm-target-triple=wasm32-unknown-unknown \
+  --iree-llvm-target-cpu-features=+simd128 \
   --iree-llvm-link-embedded=false \
   --iree-llvm-link-static \
   --iree-llvm-static-library-output-path=${BINARY_DIR}/${INPUT_NAME}_static.o \
@@ -76,8 +77,9 @@ emcmake "${CMAKE_BIN?}" -G Ninja .. \
   -DIREE_BUILD_TESTS=OFF
 
 "${CMAKE_BIN?}" --build . --target \
-  iree_experimental_sample_web_static_sync
-  # iree_experimental_sample_web_static_multithreaded
+    iree_experimental_sample_web_static_sync \
+    iree_experimental_sample_web_static_multithreaded
+
 popd
 
 ###############################################################################

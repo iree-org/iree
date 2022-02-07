@@ -304,6 +304,21 @@ else()
   # Android provides its own pthreads support with no linking required.
 endif()
 
+# Emscripten needs -pthread specified in link _and_ compile options when using
+# atomics, shared memory, or pthreads. If we bring our own threading impl and
+# try to omit this, we get this error:
+#   `--shared-memory is disallowed because it was not compiled with 'atomics'
+#    or 'bulk-memory' features`
+# TODO(scotttodd): Figure out how to use atomics and/or shared memory without
+#                  Specifying this flag
+# https://emscripten.org/docs/porting/pthreads.html#compiling-with-pthreads-enabled
+if(EMSCRIPTEN AND ${IREE_ENABLE_THREADING})
+  iree_select_compiler_opts(IREE_DEFAULT_COPTS
+    ALL
+      "-pthread"
+  )
+endif()
+
 if(ANDROID)
   # logging.h on Android needs llog to link in Android logging.
   iree_select_compiler_opts(_IREE_LOGGING_LINKOPTS

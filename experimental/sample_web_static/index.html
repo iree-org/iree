@@ -61,6 +61,7 @@ SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
       ireePredictDigit(getRescaledCanvasData()).then((result) => {
         predictionResultElement.innerHTML = result;
       }).catch((error) => {
+        console.error('error predicting digit:', error);
         predictionResultElement.innerHTML = "<b>" + error + "</b>";
       });
     }

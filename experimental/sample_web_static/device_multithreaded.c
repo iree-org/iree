@@ -34,7 +34,7 @@ iree_status_t create_device_with_static_loader(iree_allocator_t host_allocator,
   iree_task_topology_t topology;
   iree_task_topology_initialize(&topology);
   // TODO(scotttodd): Try with more threads
-  iree_task_topology_initialize_from_group_count(/*group_count=*/1, &topology);
+  iree_task_topology_initialize_from_group_count(/*group_count=*/4, &topology);
   if (iree_status_is_ok(status)) {
     status = iree_task_executor_create(scheduling_mode, &topology,
                                        worker_local_memory, host_allocator,
