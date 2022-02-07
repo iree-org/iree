@@ -33,7 +33,6 @@ nvidia-smi || true
 # TODO(gcmn): It would be nice to be able to build and test as much as possible,
 # so a build failure only prevents building/testing things that depend on it and
 # we can still run the other tests.
-# VMs have been updated with the correct CUDA SDK.
 echo "Building with cmake"
 
 ROOT_DIR=$(git rev-parse --show-toplevel)
