@@ -217,10 +217,12 @@ static bool haveEqualShapeDim(Value x, Value y, int i) {
          y.getType().cast<ShapedType>().getDimSize(i);
 }
 
+// Helper to pick the tile shapes to use as the 2 inner dimensions of the
+// 4D shapes appearing in a Mmt4D.
 class Mmt4DTileParams {
  public:
-  Mmt4DTileParams(int64_t M0, int64_t K0, int64_t N0, std::string comment)
-      : M0(M0), K0(K0), N0(N0), comment(comment) {}
+  Mmt4DTileParams(ArrayRef<int> m0k0n0, const llvm::StringRef comment)
+      : M0(m0k0n0[0]), K0(m0k0n0[1]), N0(m0k0n0[2]), comment(comment) {}
   std::array<int64_t, 2> lhs() const { return {M0, K0}; }
   std::array<int64_t, 2> rhs() const { return {K0, N0}; }
   std::array<int64_t, 2> acc() const { return {M0, N0}; }
@@ -306,6 +308,8 @@ class LinalgMatmulOpToLinalgMmt4DOpPattern
   }
 
  private:
+  // Returns the Mmt4DTileParams to use for the given input matrices, or None
+  // if mmt4d is not to be used for this matmul.
   llvm::Optional<Mmt4DTileParams> chooseTileParams(Value lhs, Value rhs,
                                                    Value acc) const;
 
@@ -316,18 +320,54 @@ class LinalgMatmulOpToLinalgMmt4DOpPattern
 llvm::Optional<Mmt4DTileParams>
 LinalgMatmulOpToLinalgMmt4DOpPattern::chooseTileParams(Value lhs, Value rhs,
                                                        Value acc) const {
-  Type lhsElemType = lhs.getType().cast<ShapedType>().getElementType();
-  Type rhsElemType = rhs.getType().cast<ShapedType>().getElementType();
-  Type accElemType = acc.getType().cast<ShapedType>().getElementType();
-  if (lhsElemType.isSignlessInteger(8) && rhsElemType.isSignlessInteger(8) &&
-      accElemType.isSignlessInteger(32) &&
-      target_info.has(CustomKernelTargetFeature::Aarch64Dotprod)) {
-    return Mmt4DTileParams(8, 4, 8, "i8*i8->i32, aarch64 +dotprod");
+  ShapedType lhsType = lhs.getType().cast<ShapedType>();
+  ShapedType rhsType = rhs.getType().cast<ShapedType>();
+  ShapedType accType = acc.getType().cast<ShapedType>();
+  Type lhsElemType = lhsType.getElementType();
+  Type rhsElemType = rhsType.getElementType();
+  Type accElemType = accType.getElementType();
+  int64_t shapeM = lhsType.getShape()[0];
+  int64_t shapeN = rhsType.getShape()[1];
+  auto chooseMatMulOrMatVec = [=](ArrayRef<int> m0k0n0,
+                                  ArrayRef<int> m0k0n0ForMatVec,
+                                  std::string comment) {
+    assert(m0k0n0ForMatVec[2] == 1 && "not a matrix*vector shape");
+    if (shapeN == 1) {
+      return Mmt4DTileParams(m0k0n0ForMatVec, comment + ", matrix*vector");
+    } else if (shapeM == 1) {
+      // The vector*matrix case is intentionally derived from the matrix*vector
+      // case by swapping M and N dims so that in kernel codegen we can reuse
+      // matrix*vector kernels by swapping LHS and RHS.
+      int m0k0n0ForVecMat[3] = {m0k0n0ForMatVec[2], m0k0n0ForMatVec[1],
+                                m0k0n0ForMatVec[0]};
+      return Mmt4DTileParams(m0k0n0ForVecMat, comment + ", vector*matrix");
+    } else {
+      return Mmt4DTileParams(m0k0n0, comment);
+    }
+  };
+  if (target_info.is(CustomKernelTargetArch::Aarch64)) {
+    if (lhsElemType.isSignlessInteger(8) && rhsElemType.isSignlessInteger(8) &&
+        accElemType.isSignlessInteger(32)) {
+      if (target_info.has(CustomKernelTargetFeature::Aarch64Dotprod)) {
+        return chooseMatMulOrMatVec({8, 4, 8}, {8, 4, 1},
+                                    "i8*i8->i32, aarch64 +dotprod");
+      } else {
+        return chooseMatMulOrMatVec({8, 1, 8}, {8, 8, 1},
+                                    "i8*i8->i32, aarch64");
+      }
+    }
+    if (lhsElemType.isF32() && rhsElemType.isF32() && accElemType.isF32()) {
+      return chooseMatMulOrMatVec({8, 1, 8}, {8, 1, 1},
+                                  "f32*f32->f32, aarch64");
+    }
   }
+  // enable_generic_slow is meant for tests only. It's just a way to get some
+  // test coverage for Mmt4d where we do not currently have kernels.
   if (enable_generic_slow) {
-    return Mmt4DTileParams(8, 2, 4,
-                           "generic tiling parameters, as no known kernel was "
-                           "matched for this matmul and target");
+    return chooseMatMulOrMatVec(
+        {8, 2, 4}, {8, 2, 1},  // arbitrary values.
+        "generic tiling parameters, as no known kernel was "
+        "matched for this matmul and target");
   }
   return llvm::None;
 }

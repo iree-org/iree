@@ -312,7 +312,9 @@ endfunction()
 #                    _TARGET_CPU_FEATURES="+dotprod",
 #                    _TARGET_CPU_FEATURES_SUFFIX="_dotprod",
 #                    _TARGET_PASS_OPTIONS="arch=aarch64 features=+dotprod"
-# default -> _ENABLED="TRUE" unconditionally, other output strings are "".
+# default -> _ENABLED="TRUE" unconditionally,
+#            _TARGET_PASS_OPTIONS="arch=${CMAKE_SYSTEM_PROCESSOR}"
+#            other output strings are "".
 function(process_target_cpu_features _INPUT_TARGET_CPU_FEATURES _ENABLED
          _TARGET_CPU_FEATURES _TARGET_CPU_FEATURES_SUFFIX _TARGET_PASS_OPTIONS)
   set(_TARGET_CPU_FEATURES "" PARENT_SCOPE)
@@ -320,6 +322,7 @@ function(process_target_cpu_features _INPUT_TARGET_CPU_FEATURES _ENABLED
   set(_TARGET_PASS_OPTIONS "" PARENT_SCOPE)
   if ("${_INPUT_TARGET_CPU_FEATURES}" STREQUAL "default")
     set(_ENABLED "TRUE" PARENT_SCOPE)
+    set(_TARGET_PASS_OPTIONS "arch=${CMAKE_SYSTEM_PROCESSOR}" PARENT_SCOPE)
     return()
   endif()
   string(REGEX MATCHALL "[^:]+" _COMPONENTS "${_INPUT_TARGET_CPU_FEATURES}")
@@ -459,7 +462,7 @@ function(iree_check_test_suite)
         OPT_TOOL
           ${_RULE_OPT_TOOL}
         OPT_FLAGS
-          ${_RULE_OPT_FLAGS}
+          ${_PROCESSED_OPT_FLAGS}
         TARGET_CPU_FEATURES
           ${_TARGET_CPU_FEATURES}
       )

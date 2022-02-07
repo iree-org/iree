@@ -8,6 +8,7 @@
 
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/Triple.h"
+#include "llvm/Support/raw_ostream.h"
 
 namespace mlir {
 namespace iree_compiler {
@@ -16,9 +17,13 @@ LogicalResult ParseCustomKernelTargetFeaturesForAarch64(
     const llvm::SmallVector<llvm::StringRef> &features,
     CustomKernelsTargetInfo &target_info) {
   for (auto f : features) {
+    if (f.empty()) {
+      continue;
+    }
     if (f == "+dotprod") {
       target_info.add(CustomKernelTargetFeature::Aarch64Dotprod);
     } else {
+      llvm::errs() << "Unhandled aarch64 CPU feature: " << f << "\n";
       return failure();
     }
   }
@@ -44,7 +49,13 @@ LogicalResult ParseCustomKernelsTargetInfo(
     return ParseCustomKernelTargetFeaturesForAarch64(features, target_info);
   }
 
-  return failure();
+  // Currently, on unknown arch, we return success as long as no features
+  // were specified (we wouldn't know how to parse features for an unknown arch)
+  // as we don't necessarily know all the arch strings that IREE is being used
+  // on and don't want to create friction. Anyway, this leaves the `arch`
+  // value with its default value None, so this will produce the intended
+  // behaviour of not enabling arch-specific code paths.
+  return featuresStr.empty() ? success() : failure();
 }
 
 }  // namespace iree_compiler
