@@ -4,7 +4,7 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-FROM gcr.io/iree-oss/android@sha256:3c25fe04b9269807ac4754da9ffc9644ca7b70d3bc07a1bab850c1ae826d220f
+FROM gcr.io/iree-oss/android@sha256:a98f4d2299257c311ecf182e3ecbdf24f228ce55d22ed9f6b229a92c96a16c86
 
 WORKDIR /install-kws
 
@@ -22,9 +22,8 @@ RUN wget "https://github.com/google-research/google-research/tarball/${KWS_COMMI
 WORKDIR /
 
 RUN python3 -m pip install --upgrade \
-  # Matching versions of TF and Keras
-  tf-nightly==2.7.0.dev20210806 \
-  keras-nightly==2.7.0.dev2021080600 \
+  tensorflow==2.7.1 \
+  keras==2.7.0 \
   # JAX.
   jax \
   jaxlib \
