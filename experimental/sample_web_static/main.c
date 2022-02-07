@@ -16,7 +16,6 @@
 //===----------------------------------------------------------------------===//
 
 typedef struct iree_sample_state_t iree_sample_state_t;
-static void iree_sample_state_initialize(iree_sample_state_t* out_state);
 
 // TODO(scotttodd): figure out error handling and state management
 //     * out_state and return status would make sense, but emscripten...

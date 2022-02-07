@@ -65,7 +65,7 @@ echo "=== Building web artifacts using Emscripten ==="
 pushd ${ROOT_DIR?}/build-emscripten
 
 # Configure using Emscripten's CMake wrapper, then build.
-# Note: The sample creates a task device directly, so no drivers are required,
+# Note: The sample creates a device directly, so no drivers are required,
 #       but some targets are gated on specific CMake options.
 emcmake "${CMAKE_BIN?}" -G Ninja .. \
   -DCMAKE_BUILD_TYPE=RelWithDebInfo \

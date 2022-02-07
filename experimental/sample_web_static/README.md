@@ -4,13 +4,16 @@ This experimental sample demonstrates one way to target the web platform with
 IREE. The output artifact is a web page containing an interactive MNIST digits
 classifier.
 
+The MNIST ML model is compiled statically together with the IREE runtime into
+a single .js + .wasm bundle.
+
 ## Quickstart
 
 1. Install IREE's host tools (e.g. by building the `install` target with CMake)
 2. Install the Emscripten SDK by
    [following these directions](https://emscripten.org/docs/getting_started/downloads.html)
 3. Initialize your Emscripten environment (e.g. run `emsdk_env.bat`)
-4. From this directory, run `bash ./build_static_emscripten_demo.sh`
+4. From this directory, run `bash ./build_sample.sh`
     * You may need to set the path to your host tools install
 5. Open the localhost address linked in the script output
 

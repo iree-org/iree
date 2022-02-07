@@ -602,6 +602,7 @@ if(${IREE_BUILD_EXPERIMENTAL_REMOTING})
 endif()
 
 if(${IREE_BUILD_EXPERIMENTAL_WEB_SAMPLES})
+  add_subdirectory(experimental/sample_web_dynamic)
   add_subdirectory(experimental/sample_web_static)
 endif()
 

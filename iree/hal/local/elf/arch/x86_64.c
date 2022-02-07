@@ -13,7 +13,8 @@
 #include "iree/hal/local/elf/arch.h"
 #include "iree/hal/local/elf/elf_types.h"
 
-#if defined(IREE_ARCH_X86_64)
+#if defined(IREE_ARCH_X86_64) || defined(IREE_ARCH_WASM_64)
+// TODO(scotttodd): Move IREE_ARCH_WASM_64 to its own wasm_64.c file
 
 // Documentation:
 // https://github.com/hjl-tools/x86-psABI/wiki/x86-64-psABI-1.0.pdf

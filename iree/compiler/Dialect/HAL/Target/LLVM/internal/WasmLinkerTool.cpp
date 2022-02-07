@@ -86,9 +86,17 @@ class WasmLinkerTool : public LinkerTool {
         // Treat warnings as errors.
         "--fatal-warnings",
 
-        // Generated a shared object, not an executable.
-        // Note: disabled since creating shared libraries is not yet supported.
-        // "--shared",
+        // Generated a shared object containing position-independent-code.
+        "--experimental-pic",
+        "--shared",
+
+        // Import [shared] memory from the environment.
+        // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/WebAssembly/Memory#creating_a_shared_memory
+        // TODO(scotttodd): Add a flag controlling these - some combination is
+        //   required when using multithreading + SharedArrayBuffer, but they
+        //   must be left off when running single threaded.
+        // "--import-memory",
+        // "--shared-memory",
 
         "-o " + artifacts.libraryFile.path,
     };
