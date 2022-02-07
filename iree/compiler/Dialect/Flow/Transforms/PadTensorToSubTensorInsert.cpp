@@ -15,12 +15,19 @@
 #include "iree/compiler/Dialect/Flow/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+
+static llvm::cl::opt<bool> clEnableFusePaddingIntoConsumerOps(
+    "iree-flow-enable-fuse-padding-into-consumer-ops",
+    llvm::cl::desc("Enable fusing linalg pad_tensor ops into consumer ops"),
+    llvm::cl::init(false));
+
 
 namespace mlir {
 namespace iree_compiler {
@@ -35,6 +42,14 @@ struct PadTensorOpConversion : public OpRewritePattern<tensor::PadOp> {
 
   LogicalResult matchAndRewrite(tensor::PadOp padTensorOp,
                                 PatternRewriter &rewriter) const override {
+    if (clEnableFusePaddingIntoConsumerOps) {
+      for (Operation *userOp : padTensorOp.getResult().getUsers()) {
+        if (isa<linalg::ContractionOpInterface>(userOp) ||
+            isa<linalg::ConvolutionOpInterface>(userOp))
+          return failure();
+      }
+    }
+
     // Check that the region is just a yield operation which is returning a
     // scalar that is not one of the arguments of the linalg operation.
     Region &region = padTensorOp.region();
