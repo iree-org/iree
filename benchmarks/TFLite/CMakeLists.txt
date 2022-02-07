@@ -282,7 +282,6 @@ iree_benchmark_suite(
     "${DEEPLABV3_FP32_MODULE}"
     "${MOBILESSD_FP32_MODULE}"
     "${POSENET_FP32_MODULE}"
-    "${MOBILEBERT_FP32_MODULE}"
     "${MOBILENET_V2_MODULE}"
     "${MOBILENET_V3SMALL_MODULE}"
 
@@ -306,7 +305,6 @@ iree_benchmark_suite(
     "${DEEPLABV3_FP32_MODULE}"
     "${MOBILESSD_FP32_MODULE}"
     "${POSENET_FP32_MODULE}"
-    "${MOBILEBERT_FP32_MODULE}"
     "${MOBILENET_V2_MODULE}"
     "${MOBILENET_V3SMALL_MODULE}"
 
@@ -325,26 +323,26 @@ iree_benchmark_suite(
 )
 
 # GPU, Vulkan, Mali, full-inference
-iree_benchmark_suite(
-  MODULES
-    "${MOBILEBERT_FP16_MODULE}"
+#iree_benchmark_suite(
+#  MODULES
+#    "${MOBILEBERT_FP16_MODULE}"
 
-  BENCHMARK_MODES
-    "full-inference,default-flags"
-  TARGET_BACKEND
-    "vulkan-spirv"
-  TARGET_ARCHITECTURE
-    "GPU-Mali-Valhall"
-  TRANSLATION_FLAGS
-    ${ANDROID_MALI_GPU_TRANSLATION_FLAGS}
+#  BENCHMARK_MODES
+#    "full-inference,default-flags"
+#  TARGET_BACKEND
+#    "vulkan-spirv"
+#  TARGET_ARCHITECTURE
+#    "GPU-Mali-Valhall"
+#  TRANSLATION_FLAGS
+#    ${ANDROID_MALI_GPU_TRANSLATION_FLAGS}
     # This isn't a special optimization flag. It's so we can reuse the same f32
     # model file. See comments on MOBILEBERT_FP16_MODULE
-    "--iree-flow-demote-f32-to-f16"
-  BENCHMARK_TOOL
-    iree-benchmark-module
-  DRIVER
-    "vulkan"
-)
+    #    "--iree-flow-demote-f32-to-f16"
+    #  BENCHMARK_TOOL
+    #    iree-benchmark-module
+    #  DRIVER
+    #    "vulkan"
+    #)
 
 ################################################################################
 
@@ -536,7 +534,6 @@ iree_benchmark_suite(
     "${DEEPLABV3_FP32_MODULE}"
     "${MOBILESSD_FP32_MODULE}"
     "${POSENET_FP32_MODULE}"
-    "${MOBILEBERT_FP32_MODULE}"
     "${MOBILENET_V2_MODULE}"
     "${MOBILENET_V3SMALL_MODULE}"
 
@@ -563,7 +560,6 @@ iree_benchmark_suite(
     "${DEEPLABV3_FP32_MODULE}"
     "${MOBILESSD_FP32_MODULE}"
     "${POSENET_FP32_MODULE}"
-    "${MOBILEBERT_FP32_MODULE}"
     "${MOBILENET_V2_MODULE}"
     "${MOBILENET_V3SMALL_MODULE}"
 
@@ -584,28 +580,28 @@ iree_benchmark_suite(
     "vulkan"
 )
 
-iree_benchmark_suite(
-  MODULES
-    "${MOBILEBERT_FP16_MODULE}"
-
-  BENCHMARK_MODES
-    "full-inference,experimental-flags"
-  TARGET_BACKEND
-    "vulkan-spirv"
-  TARGET_ARCHITECTURE
-    "GPU-Mali-Valhall"
-  TRANSLATION_FLAGS
-    "--iree-input-type=tosa"
-    "--iree-flow-demote-f32-to-f16"
-    "--iree-vulkan-target-triple=valhall-unknown-android11"
-    "--iree-flow-enable-padding-linalg-ops"
-    "--iree-flow-enable-fuse-padding-into-consumer-ops"
-    "--iree-enable-fusion-with-reduction-ops"
-  BENCHMARK_TOOL
-    iree-benchmark-module
-  DRIVER
-    "vulkan"
-)
+# iree_benchmark_suite(
+#   MODULES
+#     "${MOBILEBERT_FP16_MODULE}"
+#
+#   BENCHMARK_MODES
+#     "full-inference,experimental-flags"
+#   TARGET_BACKEND
+#     "vulkan-spirv"
+#   TARGET_ARCHITECTURE
+#     "GPU-Mali-Valhall"
+#   TRANSLATION_FLAGS
+#     "--iree-input-type=tosa"
+#     "--iree-flow-demote-f32-to-f16"
+#     "--iree-vulkan-target-triple=valhall-unknown-android11"
+#     "--iree-flow-enable-padding-linalg-ops"
+#     "--iree-flow-enable-fuse-padding-into-consumer-ops"
+#     "--iree-enable-fusion-with-reduction-ops"
+#   BENCHMARK_TOOL
+#     iree-benchmark-module
+#   DRIVER
+#     "vulkan"
+# )
 
 # kernel-execution
 
@@ -655,7 +651,6 @@ iree_benchmark_suite(
     "${DEEPLABV3_FP32_MODULE}"
     "${MOBILESSD_FP32_MODULE}"
     "${POSENET_FP32_MODULE}"
-    "${MOBILEBERT_FP32_MODULE}"
     "${MOBILENET_V2_MODULE}"
     "${MOBILENET_V3SMALL_MODULE}"
 
@@ -679,28 +674,28 @@ iree_benchmark_suite(
     "--batch_size=32"
 )
 
-iree_benchmark_suite(
-  MODULES
-    "${MOBILEBERT_FP16_MODULE}"
-
-  BENCHMARK_MODES
-    "kernel-execution,experimental-flags"
-  TARGET_BACKEND
-    "vulkan-spirv"
-  TARGET_ARCHITECTURE
-    "GPU-Mali-Valhall"
-  TRANSLATION_FLAGS
-    "--iree-input-type=tosa"
-    "--iree-flow-demote-f32-to-f16"
-    "--iree-vulkan-target-triple=valhall-unknown-android11"
-    "--iree-flow-enable-padding-linalg-ops"
-    "--iree-flow-enable-fuse-padding-into-consumer-ops"
-    "--iree-enable-fusion-with-reduction-ops"
-    "--iree-hal-benchmark-dispatch-repeat-count=32"
-  BENCHMARK_TOOL
-    iree-benchmark-module
-  DRIVER
-    "vulkan"
-  RUNTIME_FLAGS
-    "--batch_size=32"
-)
+# iree_benchmark_suite(
+#   MODULES
+#     "${MOBILEBERT_FP16_MODULE}"
+#
+#   BENCHMARK_MODES
+#     "kernel-execution,experimental-flags"
+#   TARGET_BACKEND
+#     "vulkan-spirv"
+#   TARGET_ARCHITECTURE
+#     "GPU-Mali-Valhall"
+#   TRANSLATION_FLAGS
+#     "--iree-input-type=tosa"
+#     "--iree-flow-demote-f32-to-f16"
+#     "--iree-vulkan-target-triple=valhall-unknown-android11"
+#     "--iree-flow-enable-padding-linalg-ops"
+#     "--iree-flow-enable-fuse-padding-into-consumer-ops"
+#     "--iree-enable-fusion-with-reduction-ops"
+#     "--iree-hal-benchmark-dispatch-repeat-count=32"
+#   BENCHMARK_TOOL
+#     iree-benchmark-module
+#   DRIVER
+#     "vulkan"
+#   RUNTIME_FLAGS
+#     "--batch_size=32"
+# )
