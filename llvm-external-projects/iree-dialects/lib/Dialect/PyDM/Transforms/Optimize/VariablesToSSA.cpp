@@ -111,7 +111,8 @@ struct VariablesToSSAPass : public VariablesToSSABase<VariablesToSSAPass> {
     }
     Operation *terminator = block.getTerminator();
     if (!terminator ||
-        !llvm::isa<cf::BranchOp, cf::CondBranchOp, PYDM::ReturnOp>(terminator)) {
+        !llvm::isa<cf::BranchOp, cf::CondBranchOp, PYDM::ReturnOp>(
+            terminator)) {
       return emitError(terminator->getLoc())
              << "unsupported terminator for block";
     }
@@ -195,7 +196,8 @@ struct VariablesToSSAPass : public VariablesToSSABase<VariablesToSSAPass> {
 
       if (auto branchOp = llvm::dyn_cast<cf::BranchOp>(terminator)) {
         branchOp.getDestOperandsMutable().append(newLoadValues);
-      } else if (auto condBranchOp = llvm::dyn_cast<cf::CondBranchOp>(terminator)) {
+      } else if (auto condBranchOp =
+                     llvm::dyn_cast<cf::CondBranchOp>(terminator)) {
         if (condBranchOp.getTrueDest() == &block) {
           condBranchOp.getTrueDestOperandsMutable().append(newLoadValues);
         } else if (condBranchOp.getFalseDest() == &block) {
