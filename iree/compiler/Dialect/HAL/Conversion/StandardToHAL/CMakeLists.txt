@@ -21,11 +21,12 @@ iree_cc_library(
     "ConvertStructuralOps.cpp"
   DEPS
     LLVMSupport
-    MLIRControlFlow
+    MLIRControlFlowToLLVM
     MLIRIR
     MLIRPass
     MLIRSCF
     MLIRShape
+    MLIRStandard
     MLIRTensor
     MLIRTransforms
     iree::compiler::Dialect::HAL::Conversion

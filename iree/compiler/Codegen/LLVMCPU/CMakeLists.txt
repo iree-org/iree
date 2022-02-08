@@ -35,6 +35,7 @@ iree_cc_library(
     MLIRArithmeticTransforms
     MLIRArmNeon
     MLIRArmNeon2dToIntr
+    MLIRControlFlowToLLVM
     MLIRIR
     MLIRLLVMCommonConversion
     MLIRLLVMIR

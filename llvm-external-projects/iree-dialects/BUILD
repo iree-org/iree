@@ -479,6 +479,7 @@ cc_library(
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:ArithmeticDialect",
         "@llvm-project//mlir:ControlFlowInterfaces",
+        "@llvm-project//mlir:ControlFlowOps",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:MathDialect",
         "@llvm-project//mlir:Parser",

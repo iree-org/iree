@@ -48,6 +48,7 @@ cc_library(
         "@llvm-project//mlir:AffineToStandard",
         "@llvm-project//mlir:ArithmeticToLLVM",
         "@llvm-project//mlir:ArithmeticTransforms",
+        "@llvm-project//mlir:ControlFlowToLLVM",
         "@llvm-project//mlir:GPUDialect",
         "@llvm-project//mlir:GPUToNVVMTransforms",
         "@llvm-project//mlir:GPUToROCDLTransforms",
