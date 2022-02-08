@@ -29,8 +29,7 @@ from .array_interop import (
     DeviceArray,
 )
 from .flags import (
-  FUNCTION_INPUT_VALIDATION,
-)
+    FUNCTION_INPUT_VALIDATION,)
 
 __all__ = [
     "FunctionInvoker",
