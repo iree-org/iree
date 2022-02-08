@@ -110,7 +110,7 @@ the main-project version should be copied over the integrations version.
 
 ```
 cd ~/src
-git clone git clone https://github.com/tensorflow/tensorflow.git
+git clone https://github.com/tensorflow/tensorflow.git
 git clone https://github.com/tensorflow/mlir-hlo.git
 ```
 
