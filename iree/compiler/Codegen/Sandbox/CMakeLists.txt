@@ -49,7 +49,6 @@ iree_cc_library(
     MLIRAffine
     MLIRArithmetic
     MLIRControlFlow
-    MLIRControlFlowDialect
     MLIRLinalg
     MLIRLinalgTransforms
     MLIRPass

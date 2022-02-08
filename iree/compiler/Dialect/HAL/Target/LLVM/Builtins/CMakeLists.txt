@@ -23,7 +23,6 @@ iree_cc_library(
     LLVMBitReader
     LLVMSupport
     LLVMTarget
-    LLVMir_headers
     MLIRSupport
     iree::builtins::device::bin::libdevice
     iree::builtins::musl::bin::libmusl

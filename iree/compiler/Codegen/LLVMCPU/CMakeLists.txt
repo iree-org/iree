@@ -51,7 +51,6 @@ iree_cc_library(
     MLIRReconcileUnrealizedCasts
     MLIRSCF
     MLIRSCFToControlFlow
-    MLIRSCFToStandard
     MLIRSCFTransforms
     MLIRStandard
     MLIRStandardOpsTransforms
