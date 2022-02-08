@@ -203,21 +203,3 @@ void iree_tracing_mutex_after_unlock(uint32_t lock_id) {
 #ifdef __cplusplus
 }  // extern "C"
 #endif  // __cplusplus
-
-#if defined(__cplusplus) &&                                               \
-    (IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_ALLOCATION_TRACKING) && \
-    !IREE_SANITIZER_ADDRESS && !IREE_SANITIZER_MEMORY &&                  \
-    !IREE_SANITIZER_THREAD
-
-void* operator new(size_t count) noexcept {
-  auto ptr = malloc(count);
-  IREE_TRACE_ALLOC(ptr, count);
-  return ptr;
-}
-
-void operator delete(void* ptr) noexcept {
-  IREE_TRACE_FREE(ptr);
-  free(ptr);
-}
-
-#endif  // __cplusplus && IREE_TRACING_FEATURE_ALLOCATION_TRACKING
