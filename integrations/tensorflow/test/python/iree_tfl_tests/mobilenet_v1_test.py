@@ -6,7 +6,7 @@
 
 import absl.testing
 import numpy
-import iree.tflite.support.test_util as test_util
+from . import test_util
 
 model_path = "https://storage.googleapis.com/iree-model-artifacts/tflite-integration-tests/mobilenet_v1.tflite"
 
