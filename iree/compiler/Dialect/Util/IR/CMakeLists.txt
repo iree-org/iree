@@ -49,6 +49,7 @@ iree_cc_library(
     MLIRMemRef
     MLIRParser
     MLIRSideEffectInterfaces
+    MLIRStandard
     MLIRSupport
     MLIRTensor
     MLIRTransforms

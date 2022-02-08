@@ -119,15 +119,15 @@ func private @callee(%arg0: !stream.resource<external>, %arg1: !stream.resource<
 
 // -----
 
-// Tests that cf.branch arguments are expanded into an explicit subview of
+// Tests that branch arguments are expanded into an explicit subview of
 // (resource, size, offset, length).
 //
-// This rotates subviews on cf.branch operands into successors.
+// This rotates subviews on branch operands into successors.
 
 // CHECK-LABEL: @br
 // CHECK-SAME: (%[[RESOURCE0:.+]]: !stream.resource<external>, %[[STORAGE_SIZE0:.+]]: index, %[[OFFSET0:.+]]: index, %[[LENGTH0:.+]]: index, %[[RESOURCE1:.+]]: !stream.resource<transient>, %[[STORAGE_SIZE1:.+]]: index, %[[OFFSET1:.+]]: index, %[[LENGTH1:.+]]: index)
 func @br(%resource0: !stream.resource<external>, %resource1: !stream.resource<transient>) {
-  // NOTE: there will be extra stuff here from the arg insertion. The cf.branch
+  // NOTE: there will be extra stuff here from the arg insertion. The branch
   // consumes the unready resources and we expect the args to be passed directly
   // to the cf.br.
 

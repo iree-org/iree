@@ -71,7 +71,7 @@ func @partitionWithinBlocks(%cond: i1) -> !stream.resource<transient> {
 
 // Tests a complex device->host->device sequence gets turned into the proper
 // execute->await->execute. These data-dependent operations can happen in a
-// single block and cf.break the assumption that one block == one partition.
+// single block and break the assumption that one block == one partition.
 
 // CHECK-LABEL: @deviceHostDevice
 func @deviceHostDevice() -> !stream.resource<transient> {

@@ -19,7 +19,7 @@
 // NOTE: there's a maintenance burden to adding new ops as they may have to be
 // carried around forever. Always try to convert to the ops that exist unless
 // it's performance critical - a few lines of a conversion pattern saves future
-// us a lot of pain and cf.breaking changes.
+// us a lot of pain and breaking changes.
 //
 // NOTE: experimental functions that are not yet ready to be parts of the core
 // module must be prefixed with `ex.` like `vmvx.ex.my_test_op`.

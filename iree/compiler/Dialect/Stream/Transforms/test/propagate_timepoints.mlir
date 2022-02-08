@@ -121,16 +121,16 @@ func private @callee(%arg0: !stream.resource<external>, %arg1: !stream.resource<
 
 // -----
 
-// Tests that cf.branch args are expanded into (timepoint, resource) and that
-// cf.branch operands are properly expanded.
+// Tests that branch args are expanded into (timepoint, resource) and that
+// branch operands are properly expanded.
 //
-// This rotates waits on cf.branch operands into successors.
+// This rotates waits on branch operands into successors.
 
 // CHECK-LABEL: @br
 // CHECK-SAME: (%[[TIMEPOINT0:.+]]: !stream.timepoint, %[[UNREADY0:.+]]: !stream.resource<external>,
 // CHECK-SAME:  %[[TIMEPOINT1:.+]]: !stream.timepoint, %[[UNREADY1:.+]]: !stream.resource<transient>)
 func @br(%arg0: !stream.resource<external>, %arg1: !stream.resource<transient>) {
-  // NOTE: there will be extra stuff here from the arg insertion. The cf.branch
+  // NOTE: there will be extra stuff here from the arg insertion. The branch
   // consumes the unready resources and we expect the args to be passed directly
   // to the cf.br.
 
