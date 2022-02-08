@@ -34,6 +34,7 @@ iree_cc_library(
     MLIRControlFlow
     MLIRIR
     MLIRPass
+    MLIRStandard
     MLIRSupport
     MLIRTransforms
     iree::compiler::Dialect::Util::Analysis
