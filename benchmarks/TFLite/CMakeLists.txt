@@ -119,6 +119,166 @@ set(MOBILENET_V3SMALL_MODULE
     "1x224x224x3xf32"
 )
 
+################################################################################
+# MOBILEBERT_TF2
+# These versions of MobileBert have been trained with Tensorflow 2.0 and
+# quantized using PQT (post-training quantization).
+
+set(MOBILEBERT_TF2_FP32_MODULE
+  NAME
+    "MobileBertTf2"
+  TAGS
+    "fp32,squad"
+  SOURCE
+    "https://storage.googleapis.com/iree-model-artifacts/mobilebert-baseline-tf2-float.tflite"
+  ENTRY_FUNCTION
+    "main"
+  FUNCTION_INPUTS
+    "1x384xi32,1x384xi32,1x384xi32"
+)
+
+set(MOBILEBERT_TF2_INT8_MODULE
+  NAME
+    "MobileBertTf2"
+  TAGS
+    "int8,squad"
+  SOURCE
+    "https://storage.googleapis.com/iree-model-artifacts/mobilebert-baseline-tf2-quant.tflite"
+  ENTRY_FUNCTION
+    "main"
+  FUNCTION_INPUTS
+    "1x384xi32,1x384xi32,1x384xi32"
+)
+
+################################################################################
+# MOBILEBERT_EDGETPU_S
+# We include the MobileBert EdgeTPU Small version because it has 2x more
+# hardware utilization on the EdgeTPU compared with MobileBert.
+# It also includes grouped convolutions which present more opportunities for
+# concurrency.
+
+set(MOBILEBERT_EDGETPU_S_FP32_MODULE
+  NAME
+    "MobileBertEdgetpu"
+  TAGS
+    "fp32,squad"
+  SOURCE
+    "https://storage.googleapis.com/iree-model-artifacts/mobilebert-edgetpu-s-float.tflite"
+  ENTRY_FUNCTION
+    "main"
+  FUNCTION_INPUTS
+    "1x384xi32,1x384xi32,1x384xi32"
+)
+
+set(MOBILEBERT_EDGETPU_S_INT8_MODULE
+  NAME
+    "MobileBertEdgetpu"
+  TAGS
+    "int8,squad"
+  SOURCE
+    "https://storage.googleapis.com/iree-model-artifacts/mobilebert-edgetpu-s-quant.tflite"
+  ENTRY_FUNCTION
+    "main"
+  FUNCTION_INPUTS
+    "1x384xi32,1x384xi32,1x384xi32"
+)
+
+################################################################################
+# MOBILENET_V3_LARGE
+# MobileNet V3 consists of new ops/architecture blocks like HardSwish and
+# Squeeze-and-Excite. These blocks work well for CPU but have historically been
+# a poor fit for accelerators. Squeeze-and-Excite blocks, for example, have
+# global pooling and upsampling operators that involve large amounts of data
+# movement across processing elements. Includes a dynamic batch dimension.
+
+set(MOBILENET_V3_LARGE_FP32_MODULE
+  NAME
+    "MobilenetV3Large"
+  TAGS
+    "fp32,imagenet,dynamic"
+  SOURCE
+    "https://storage.googleapis.com/iree-model-artifacts/mobilenet_v3-large_224_1.0_float.tflite"
+  ENTRY_FUNCTION
+    "main"
+  FUNCTION_INPUTS
+    "1x224x224x3xf32"
+)
+
+set(MOBILENET_V3_LARGE_UINT8_MODULE
+  NAME
+    "MobilenetV3Large"
+  TAGS
+    "uint8,imagenet"
+  SOURCE
+    "https://storage.googleapis.com/iree-model-artifacts/mobilenet_v3-large_224_1.0_uint8.tflite"
+  ENTRY_FUNCTION
+    "main"
+  FUNCTION_INPUTS
+    "1x224x224x3xui8"
+)
+
+################################################################################
+# SSD_MOBILENET_V1
+# These models are still widely used in microcontrollers where the parameter
+# count and op count is low compared with subsequent MobileNet versions.
+
+set(SSD_MOBILENET_V1_FP32_MODULE
+  NAME
+    "SsdMobilenetV1"
+  TAGS
+    "fp32,coco"
+  SOURCE
+    "https://storage.googleapis.com/iree-model-artifacts/ssd_mobilenet_v1_320_1.0_float.tflite"
+  ENTRY_FUNCTION
+    "main"
+  FUNCTION_INPUTS
+    "1x320x320x3xf32"
+)
+
+set(SSD_MOBILENET_V1_UINT8_MODULE
+  NAME
+    "SsdMobilenetV1"
+  TAGS
+    "uint8,coco"
+  SOURCE
+    "https://storage.googleapis.com/iree-model-artifacts/ssd_mobilenet_v1_320_1.0_uint8.tflite"
+  ENTRY_FUNCTION
+    "main"
+  FUNCTION_INPUTS
+    "1x320x320x3xui8"
+)
+
+################################################################################
+# SSD_SPAGHETTINET_LARGE
+# This model is SOTA on COCO EdgeTPU. Similar to MOBILEBERT_EDGETPU_S, it
+# includes group convolutions which can be parallelized. These models also
+# use more exotic ops like StridedSlice, ResizeNearestNeighbor, MaxPool2D.
+
+set(SSD_SPAGHETTINET_LARGE_FP32_MODULE
+  NAME
+    "SsdSpaghettinetLarge"
+  TAGS
+    "fp32,coco"
+  SOURCE
+    "https://storage.googleapis.com/iree-model-artifacts/ssd_spaghettinet_edgetpu_large.tflite"
+  ENTRY_FUNCTION
+    "main"
+  FUNCTION_INPUTS
+    "1x320x320x3xf32"
+)
+
+set(SSD_SPAGHETTINET_LARGE_UINT8_MODULE
+  NAME
+    "SsdSpaghettinetLarge"
+  TAGS
+    "uint8,coco"
+  SOURCE
+    "https://storage.googleapis.com/iree-model-artifacts/ssd_spaghettinet_edgetpu_large_uint8.tflite"
+  ENTRY_FUNCTION
+    "main"
+  FUNCTION_INPUTS
+    "1x320x320x3xui8"
+)
 
 ################################################################################
 #                                                                              #
@@ -148,11 +308,19 @@ set(ANDROID_MALI_GPU_TRANSLATION_FLAGS
 iree_benchmark_suite(
   MODULES
     "${DEEPLABV3_FP32_MODULE}"
-    "${MOBILESSD_FP32_MODULE}"
     "${POSENET_FP32_MODULE}"
-    "${MOBILEBERT_FP32_MODULE}"
     "${MOBILENET_V2_MODULE}"
     "${MOBILENET_V3SMALL_MODULE}"
+    "${MOBILEBERT_TF2_FP32_MODULE}"
+    "${MOBILEBERT_TF2_INT8_MODULE}"
+    "${MOBILEBERT_EDGETPU_S_FP32_MODULE}"
+    "${MOBILEBERT_EDGETPU_S_INT8_MODULE}"
+    "${MOBILENET_V3_LARGE_FP32_MODULE}"
+    "${MOBILENET_V3_LARGE_UINT8_MODULE}"
+    "${SSD_MOBILENET_V1_FP32_MODULE}"
+    "${SSD_MOBILENET_V1_UINT8_MODULE}"
+    "${SSD_SPAGHETTINET_LARGE_FP32_MODULE}"
+    "${SSD_SPAGHETTINET_LARGE_UINT8_MODULE}"
 
   BENCHMARK_MODES
     "big-core,full-inference,default-flags"
@@ -173,11 +341,19 @@ iree_benchmark_suite(
 iree_benchmark_suite(
   MODULES
     "${DEEPLABV3_FP32_MODULE}"
-    "${MOBILESSD_FP32_MODULE}"
     "${POSENET_FP32_MODULE}"
-    "${MOBILEBERT_FP32_MODULE}"
     "${MOBILENET_V2_MODULE}"
     "${MOBILENET_V3SMALL_MODULE}"
+    "${MOBILEBERT_TF2_FP32_MODULE}"
+    "${MOBILEBERT_TF2_INT8_MODULE}"
+    "${MOBILEBERT_EDGETPU_S_FP32_MODULE}"
+    "${MOBILEBERT_EDGETPU_S_INT8_MODULE}"
+    "${MOBILENET_V3_LARGE_FP32_MODULE}"
+    "${MOBILENET_V3_LARGE_UINT8_MODULE}"
+    "${SSD_MOBILENET_V1_FP32_MODULE}"
+    "${SSD_MOBILENET_V1_UINT8_MODULE}"
+    "${SSD_SPAGHETTINET_LARGE_FP32_MODULE}"
+    "${SSD_SPAGHETTINET_LARGE_UINT8_MODULE}"
 
   BENCHMARK_MODES
     "1-thread,big-core,full-inference,default-flags"
@@ -253,11 +429,19 @@ iree_benchmark_suite(
 iree_benchmark_suite(
   MODULES
     "${DEEPLABV3_FP32_MODULE}"
-    "${MOBILESSD_FP32_MODULE}"
     "${POSENET_FP32_MODULE}"
-    "${MOBILEBERT_FP32_MODULE}"
     "${MOBILENET_V2_MODULE}"
     "${MOBILENET_V3SMALL_MODULE}"
+    "${MOBILEBERT_TF2_FP32_MODULE}"
+    "${MOBILEBERT_TF2_INT8_MODULE}"
+    "${MOBILEBERT_EDGETPU_S_FP32_MODULE}"
+    "${MOBILEBERT_EDGETPU_S_INT8_MODULE}"
+    "${MOBILENET_V3_LARGE_FP32_MODULE}"
+    "${MOBILENET_V3_LARGE_UINT8_MODULE}"
+    "${SSD_MOBILENET_V1_FP32_MODULE}"
+    "${SSD_MOBILENET_V1_UINT8_MODULE}"
+    "${SSD_SPAGHETTINET_LARGE_FP32_MODULE}"
+    "${SSD_SPAGHETTINET_LARGE_UINT8_MODULE}"
 
   BENCHMARK_MODES
     "4-thread,big-core,full-inference,default-flags"
@@ -366,11 +550,19 @@ iree_benchmark_suite(
 iree_benchmark_suite(
   MODULES
     "${DEEPLABV3_FP32_MODULE}"
-    "${MOBILESSD_FP32_MODULE}"
     "${POSENET_FP32_MODULE}"
-    "${MOBILEBERT_FP32_MODULE}"
     "${MOBILENET_V2_MODULE}"
     "${MOBILENET_V3SMALL_MODULE}"
+    "${MOBILEBERT_TF2_FP32_MODULE}"
+    "${MOBILEBERT_TF2_INT8_MODULE}"
+    "${MOBILEBERT_EDGETPU_S_FP32_MODULE}"
+    "${MOBILEBERT_EDGETPU_S_INT8_MODULE}"
+    "${MOBILENET_V3_LARGE_FP32_MODULE}"
+    "${MOBILENET_V3_LARGE_UINT8_MODULE}"
+    "${SSD_MOBILENET_V1_FP32_MODULE}"
+    "${SSD_MOBILENET_V1_UINT8_MODULE}"
+    "${SSD_SPAGHETTINET_LARGE_FP32_MODULE}"
+    "${SSD_SPAGHETTINET_LARGE_UINT8_MODULE}"
 
   BENCHMARK_MODES
     "big-core,full-inference,experimental-flags"
@@ -395,11 +587,19 @@ iree_benchmark_suite(
 iree_benchmark_suite(
   MODULES
     "${DEEPLABV3_FP32_MODULE}"
-    "${MOBILESSD_FP32_MODULE}"
     "${POSENET_FP32_MODULE}"
-    "${MOBILEBERT_FP32_MODULE}"
     "${MOBILENET_V2_MODULE}"
     "${MOBILENET_V3SMALL_MODULE}"
+    "${MOBILEBERT_TF2_FP32_MODULE}"
+    "${MOBILEBERT_TF2_INT8_MODULE}"
+    "${MOBILEBERT_EDGETPU_S_FP32_MODULE}"
+    "${MOBILEBERT_EDGETPU_S_INT8_MODULE}"
+    "${MOBILENET_V3_LARGE_FP32_MODULE}"
+    "${MOBILENET_V3_LARGE_UINT8_MODULE}"
+    "${SSD_MOBILENET_V1_FP32_MODULE}"
+    "${SSD_MOBILENET_V1_UINT8_MODULE}"
+    "${SSD_SPAGHETTINET_LARGE_FP32_MODULE}"
+    "${SSD_SPAGHETTINET_LARGE_UINT8_MODULE}"
 
   BENCHMARK_MODES
     "1-thread,big-core,full-inference,experimental-flags"
@@ -478,11 +678,19 @@ iree_benchmark_suite(
 iree_benchmark_suite(
   MODULES
     "${DEEPLABV3_FP32_MODULE}"
-    "${MOBILESSD_FP32_MODULE}"
     "${POSENET_FP32_MODULE}"
-    "${MOBILEBERT_FP32_MODULE}"
     "${MOBILENET_V2_MODULE}"
     "${MOBILENET_V3SMALL_MODULE}"
+    "${MOBILEBERT_TF2_FP32_MODULE}"
+    "${MOBILEBERT_TF2_INT8_MODULE}"
+    "${MOBILEBERT_EDGETPU_S_FP32_MODULE}"
+    "${MOBILEBERT_EDGETPU_S_INT8_MODULE}"
+    "${MOBILENET_V3_LARGE_FP32_MODULE}"
+    "${MOBILENET_V3_LARGE_UINT8_MODULE}"
+    "${SSD_MOBILENET_V1_FP32_MODULE}"
+    "${SSD_MOBILENET_V1_UINT8_MODULE}"
+    "${SSD_SPAGHETTINET_LARGE_FP32_MODULE}"
+    "${SSD_SPAGHETTINET_LARGE_UINT8_MODULE}"
 
   BENCHMARK_MODES
     "4-thread,big-core,full-inference,experimental-flags"
