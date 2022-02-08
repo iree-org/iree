@@ -4981,8 +4981,9 @@ class ConvertVMToEmitCPass
                               importShims);
 
     target.addLegalDialect<
-        emitc::EmitCDialect, mlir::BuiltinDialect, mlir::StandardOpsDialect,
-        mlir::arith::ArithmeticDialect, mlir::math::MathDialect>();
+        emitc::EmitCDialect, mlir::BuiltinDialect, mlir::cf::ControlFlowDialect,
+        mlir::StandardOpsDialect, mlir::arith::ArithmeticDialect,
+        mlir::math::MathDialect>();
 
     target.addDynamicallyLegalOp<mlir::FuncOp>([&](mlir::FuncOp op) {
       return typeConverter.isSignatureLegal(op.getType());
