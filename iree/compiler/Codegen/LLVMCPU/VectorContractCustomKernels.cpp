@@ -7,9 +7,13 @@
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Utils/CustomKernelsTargetInfo.h"
+#include "iree/compiler/Utils/StringUtils.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/Triple.h"
+#include "llvm/Support/FormatVariadic.h"
+#include "llvm/Support/MathExtras.h"
 #include "mlir/Conversion/StandardToLLVM/ConvertStandardToLLVM.h"
 #include "mlir/Conversion/VectorToLLVM/ConvertVectorToLLVM.h"
 #include "mlir/Dialect/ArmNeon/ArmNeonDialect.h"
@@ -108,7 +112,8 @@ static bool isMatrixTimesMatrixTransposedOfGivenShape(
 // Note that this only looks at the immediately defining operation, so we likely
 // want to have earlier passes that sink widening operations as far down as
 // possible, which is probably just good regardless.
-static Value getExtSIInput(Type extSrcType, Type extDstType, Value extResult) {
+static Value getUnpromotedInput(Type extSrcType, Type extDstType,
+                                Value extResult) {
   auto extSIOp = extResult.getDefiningOp<arith::ExtSIOp>();
   if (!extSIOp) {
     return nullptr;
@@ -139,8 +144,331 @@ static Value flatten(PatternRewriter &rewriter, Location loc, Value vector) {
   return rewriter.create<vector::ShapeCastOp>(loc, dstType, vector);
 }
 
-/// Converts matrix-times-matrix-transposed vector.contracts with
-/// lhs and rhs inputs defined by arith.extsi promoting from i8 to i32,
+// Asserts that i is a power of two, and returns its log2.
+// Note: the llvm helpers used internally operate on uint32, but we keep that
+// an internal detail as the surrounding code here is all operating on signed
+// integers and mixing signed and unsigned would be error-prone.
+int8_t exactLog2(int32_t i) {
+  assert(i > 0);
+  uint32_t u = i;
+  assert(llvm::isPowerOf2_32(u));
+  return llvm::countTrailingZeros(u);
+}
+
+// Helper to handle powers of two size computations without the overhead
+// of runtime divisions. Divisions remain very expensive compared to most other
+// instructions.  Divisions are of course cheap when the divisor is
+// a constant, but a typical use case for us is
+//
+//    lhsBitWidth / kernel.registerBitWidth
+//
+// kernel.registerBitWidth is *initialized* from a literal value (say 128) but
+// it would be cumbersome to have to preserve its constant-expression status
+// throughout.
+class PowerOfTwo {
+ private:
+  int8_t exponent = 0;
+
+ public:
+  PowerOfTwo() {}
+  explicit PowerOfTwo(int32_t i) : exponent(exactLog2(i)) {}
+  int getExponent() const { return exponent; }
+  int val() const {
+    assert(exponent < 8 * sizeof(int) - 1);
+    return 1 << exponent;
+  }
+};
+
+// Returns i/p, asserting that p divides i. Requires i >= 0.
+// Fast: bit shift, not actual div.
+int32_t fastExactDiv(int32_t i, PowerOfTwo p) {
+  assert(i >= 0 && "exact log of negative number");
+  int32_t result = i >> p.getExponent();
+  assert(result << p.getExponent() == i && "exact log of non-power of two");
+  return result;
+}
+
+int32_t operator*(int32_t i, PowerOfTwo p) {
+  assert(i >= 0 && "only nonnegative values are supported");
+  uint32_t u = i;
+  assert(llvm::countLeadingZeros(u) > static_cast<unsigned>(p.getExponent()));
+  (void)u;
+  return i << p.getExponent();
+}
+
+// Describes a kernel. This struct is kept small to separate the kernels
+// themselves from the MLIR-specific generators consuming them
+// (see MMTKernelGenerator).
+struct MMTKernel {
+  enum class ScalarType : int8_t { None, I8, I32, F32 };
+  // Target architecture. Needed to generate inline asm constraints.
+  CustomKernelTargetArch arch = CustomKernelTargetArch::None;
+  // Bit width of the Simd registers used by the kernel. Needed to determine
+  // how to slice Vectors into register-sized Vectors. Not in general fully
+  // determined by the arch as it's typical for each arch to have different
+  // collections of SIMD instructions with different widths.
+  PowerOfTwo registerBitWidth;
+  // Element type of the LHS vectors.
+  ScalarType lhsType = ScalarType::None;
+  // Element type of the RHS vectors.
+  ScalarType rhsType = ScalarType::None;
+  // Element type of the Accumulator and output vectors.
+  ScalarType accType = ScalarType::None;
+  // Number of rows of the LHS and Accumulator tile.
+  int8_t m0 = 0;
+  // Reduction dimension, i.e. number of columns of the LHS.
+  int8_t k0 = 0;
+  // Number of rows of the RHS (note that the operation being targeted, MMT,
+  // is matrix multiplication with a *transposed* RHS)
+  int8_t n0 = 0;
+  // If not null, points to the inline asm code template for this kernel.
+  // Register operands for the LHS, RHS and Accumulator are to be referenced as
+  // $(lhs:<i>), $(rhs:<i>), $(acc:<i>) respectively, where i is a decimal
+  // integer specifying the i-th register for each case (numbered independently,
+  // so each starts at 0).
+  const char *implAsm = nullptr;
+};
+
+// It's not the end of the world to grow this, but let's be mindful as we have
+// so far made the choice to pass MMTKernels by value.
+static_assert(sizeof(MMTKernel) == 8 + sizeof(void *), "");
+
+// i8*i8->i32 kernel for Aarch64 NEON +dotprod
+MMTKernel MMTKernel_8x4x8_i8i8i32_Aarch64Dotprod_InlineAsm() {
+  MMTKernel kernel;
+  kernel.arch = CustomKernelTargetArch::Aarch64;
+  kernel.m0 = 8;
+  kernel.k0 = 4;
+  kernel.n0 = 8;
+  kernel.lhsType = MMTKernel::ScalarType::I8;
+  kernel.rhsType = MMTKernel::ScalarType::I8;
+  kernel.accType = MMTKernel::ScalarType::I32;
+  kernel.registerBitWidth = PowerOfTwo(128);
+  kernel.implAsm = R"ASM(
+      sdot $(acc:0).4s, $(rhs:0).16b, $(lhs:0).4b[0]
+      sdot $(acc:1).4s, $(rhs:1).16b, $(lhs:0).4b[0]
+      sdot $(acc:2).4s, $(rhs:0).16b, $(lhs:0).4b[1]
+      sdot $(acc:3).4s, $(rhs:1).16b, $(lhs:0).4b[1]
+      sdot $(acc:4).4s, $(rhs:0).16b, $(lhs:0).4b[2]
+      sdot $(acc:5).4s, $(rhs:1).16b, $(lhs:0).4b[2]
+      sdot $(acc:6).4s, $(rhs:0).16b, $(lhs:0).4b[3]
+      sdot $(acc:7).4s, $(rhs:1).16b, $(lhs:0).4b[3]
+      sdot $(acc:8).4s, $(rhs:0).16b, $(lhs:1).4b[0]
+      sdot $(acc:9).4s, $(rhs:1).16b, $(lhs:1).4b[0]
+      sdot $(acc:10).4s, $(rhs:0).16b, $(lhs:1).4b[1]
+      sdot $(acc:11).4s, $(rhs:1).16b, $(lhs:1).4b[1]
+      sdot $(acc:12).4s, $(rhs:0).16b, $(lhs:1).4b[2]
+      sdot $(acc:13).4s, $(rhs:1).16b, $(lhs:1).4b[2]
+      sdot $(acc:14).4s, $(rhs:0).16b, $(lhs:1).4b[3]
+      sdot $(acc:15).4s, $(rhs:1).16b, $(lhs:1).4b[3]
+    )ASM";
+  return kernel;
+}
+
+// Returns the bit-width ( = 8 * sizeof ) of the given scalar type.
+PowerOfTwo bitWidth(MMTKernel::ScalarType t) {
+  switch (t) {
+    case MMTKernel::ScalarType::None:
+      break;
+    case MMTKernel::ScalarType::I8:
+      return PowerOfTwo(8);
+    case MMTKernel::ScalarType::I32:
+      return PowerOfTwo(32);
+    case MMTKernel::ScalarType::F32:
+      return PowerOfTwo(32);
+  }
+  assert(false);
+  return PowerOfTwo();
+}
+
+// Constructs the mlir::Type corresponding to a scalar type.
+Type mlirType(MLIRContext *context, MMTKernel::ScalarType t) {
+  switch (t) {
+    case MMTKernel::ScalarType::None:
+      break;
+    case MMTKernel::ScalarType::I8:
+      return IntegerType::get(context, 8, IntegerType::Signless);
+    case MMTKernel::ScalarType::I32:
+      return IntegerType::get(context, 32, IntegerType::Signless);
+    case MMTKernel::ScalarType::F32:
+      return FloatType::getF32(context);
+  }
+  assert(false);
+  return Type();
+}
+
+// This class is a helper for patterns generating custom kernels based on
+// MMTKernel structs.
+class MMTKernelGenerator {
+ public:
+  MMTKernelGenerator(MLIRContext *context, MMTKernel kernel)
+      : context(context), kernel(kernel) {}
+  // Generates the kernel. Returns the output accumulator values.
+  SmallVector<Value> generate(PatternRewriter &rewriter, Location loc,
+                              ArrayRef<Value> lhs, ArrayRef<Value> rhs,
+                              ArrayRef<Value> acc) {
+    validateOperands(lhs, rhs, acc);
+    if (kernel.implAsm) {
+      return generateAsm(rewriter, loc, lhs, rhs, acc);
+    }
+    // In the future we may have alternate generator paths, e.g. 1D intrinsics
+    // or other asm paths with a different interface, e.g. handling also
+    // the memory load accesses.
+    assert(false && "no implementation provided for kernel");
+    return {};
+  }
+  // Returns the number of SIMD registers needed for the LHS
+  int getLhsRegsCount() const {
+    int lhsBitWidth = kernel.m0 * kernel.k0 * bitWidth(kernel.lhsType);
+    return fastExactDiv(lhsBitWidth, kernel.registerBitWidth);
+  }
+  // Returns the number of SIMD registers needed for the RHS
+  int getRhsRegsCount() const {
+    int rhsBitWidth = kernel.n0 * kernel.k0 * bitWidth(kernel.rhsType);
+    return fastExactDiv(rhsBitWidth, kernel.registerBitWidth);
+  }
+  // Returns the number of SIMD registers needed for the Accumulator
+  int getAccRegsCount() const {
+    int accBitWidth = kernel.m0 * kernel.n0 * bitWidth(kernel.accType);
+    return fastExactDiv(accBitWidth, kernel.registerBitWidth);
+  }
+  // Returns the MLIR element type (not vector type) of the LHS
+  Type getLhsType() const { return mlirType(context, kernel.lhsType); }
+  // Returns the MLIR element type (not vector type) of the RHS
+  Type getRhsType() const { return mlirType(context, kernel.rhsType); }
+  // Returns the MLIR element type (not vector type) of the Accumulator
+  Type getAccType() const { return mlirType(context, kernel.accType); }
+  // Returns the VectorType of LHS SIMD register vectors
+  VectorType getLhsRegVectorType() const {
+    return VectorType::get(
+        {fastExactDiv(kernel.registerBitWidth.val(), bitWidth(kernel.lhsType))},
+        getLhsType());
+  }
+  // Returns the VectorType of RHS SIMD register vectors
+  VectorType getRhsRegVectorType() const {
+    return VectorType::get(
+        {fastExactDiv(kernel.registerBitWidth.val(), bitWidth(kernel.rhsType))},
+        getRhsType());
+  }
+  // Returns the VectorType of Accumulator SIMD register vectors
+  VectorType getAccRegVectorType() const {
+    return VectorType::get(
+        {fastExactDiv(kernel.registerBitWidth.val(), bitWidth(kernel.accType))},
+        getAccType());
+  }
+
+ private:
+  MLIRContext *context;
+  MMTKernel kernel;
+
+  // Helper for generate(). Asserts sanity of the vector-of-register-vectors.
+  void validateOperands(ArrayRef<Value> lhs, ArrayRef<Value> rhs,
+                        ArrayRef<Value> acc) {
+    auto validate = [](ArrayRef<Value> vals, int expectedSize,
+                       VectorType expectedElemType) {
+      assert(vals.size() == expectedSize);
+      for (const auto &val : vals) {
+        assert(val.getType().dyn_cast<VectorType>() == expectedElemType);
+        (void)val;
+      }
+      (void)expectedSize;
+      (void)expectedElemType;
+    };
+    validate(lhs, getLhsRegsCount(), getLhsRegVectorType());
+    validate(rhs, getRhsRegsCount(), getRhsRegVectorType());
+    validate(acc, getAccRegsCount(), getAccRegVectorType());
+  }
+  // Helper for generateAsmCodeAndConstraints
+  std::string getInlineAsmConstraintForSimdRegister() const {
+    switch (kernel.arch) {
+      case CustomKernelTargetArch::Aarch64:
+        return "w";
+      case CustomKernelTargetArch::None:
+        break;
+    }
+    assert(false && "Unhandled CustomKernelTargetFeature value");
+    return {};
+  }
+  // Helper for generateAsm. Performs some pre-processing of the kernel's
+  // implAsm. Refer to the comment on kernel::implAsm.
+  void generateAsmCodeAndConstraints(std::string &code,
+                                     std::string &constraints) {
+    assert(code.empty());
+    assert(constraints.empty());
+    // The LLVM inline asm syntax is documented here:
+    // https://llvm.org/docs/LangRef.html#inline-assembler-expressions
+    std::vector<std::string> outputConstraints;
+    std::vector<std::string> inputConstraints;
+    std::vector<std::string> tiedInputConstraints;
+    code = kernel.implAsm;
+    int numberedOperand = 0;
+    enum class OperandKind { Input, InputOutput };
+    std::string simdRegConstraint = getInlineAsmConstraintForSimdRegister();
+    auto processOperands = [&](OperandKind kind, int count, const char *name) {
+      for (int i = 0; i < count; ++i) {
+        std::string numberedOperandStr = llvm::itostr(numberedOperand++);
+        std::string match = llvm::formatv("$({0}:{1})", name, i);
+        std::string substitute = std::string("$") + numberedOperandStr;
+        replaceAllSubstrsInPlace(code, match, substitute);
+        if (kind == OperandKind::InputOutput) {
+          outputConstraints.push_back(std::string("=") + simdRegConstraint);
+          tiedInputConstraints.push_back(numberedOperandStr);
+        } else {
+          inputConstraints.push_back(simdRegConstraint);
+        }
+      }
+    };
+    processOperands(OperandKind::InputOutput, getAccRegsCount(), "acc");
+    processOperands(OperandKind::Input, getLhsRegsCount(), "lhs");
+    processOperands(OperandKind::Input, getRhsRegsCount(), "rhs");
+    constraints = llvm::join(outputConstraints, ",") + "," +
+                  llvm::join(inputConstraints, ",") + "," +
+                  llvm::join(tiedInputConstraints, ",");
+  }
+  // Helper for generate(). Implements the asm path.
+  SmallVector<Value> generateAsm(PatternRewriter &rewriter, Location loc,
+                                 ArrayRef<Value> lhs, ArrayRef<Value> rhs,
+                                 ArrayRef<Value> acc) {
+    SmallVector<Value> inputs;
+    // First the input operands. This matches how in the constraints we are
+    // placing the inputConstraints before the tiedInputConstraints, the latter
+    // being the input-output operands.
+    inputs.append(lhs.begin(), lhs.end());
+    inputs.append(rhs.begin(), rhs.end());
+    // Then the input-output operands.
+    inputs.append(acc.begin(), acc.end());
+    // Create the inline asm op.
+    SmallVector<Type> outputOperandTypes(
+        llvm::map_range(acc, [](Value v) { return v.getType(); }));
+    auto returnType =
+        LLVM::LLVMStructType::getLiteral(context, outputOperandTypes);
+    auto dialectAttr =
+        LLVM::AsmDialectAttr::get(context, LLVM::AsmDialect::AD_ATT);
+    std::string code;
+    std::string constraints;
+    generateAsmCodeAndConstraints(code, constraints);
+    LLVM::InlineAsmOp asmOp = rewriter.create<LLVM::InlineAsmOp>(
+        loc, returnType, inputs, code, constraints,
+        /*has_side_effects=*/false, /*is_align_stack=*/false, dialectAttr,
+        /*operand_attrs=*/ArrayAttr());
+    // Extract result vectors from the asm op.
+    SmallVector<Value> resVec;
+    for (int i = 0; i < 16; ++i) {
+      resVec.push_back(rewriter.create<LLVM::ExtractValueOp>(
+          loc, getAccRegVectorType(), asmOp.getRes(),
+          rewriter.getI64ArrayAttr({i})));
+    }
+    return resVec;
+  }
+};
+
+/// Converts matrix-times-matrix-transposed vector.contracts, and possibly also
+/// any type-promotion op (such as arith.extsi) on the input operands, to
+/// a custom kernel (at the moment a llvm.inline_asm op) provided by the
+/// MMTKernel struct.
+///
+/// For example, in the case of a i8*i8->i32 kernel, the IR being replaced
+/// by the llvm.inline_asm op might look like:
 ///
 ///     %lhs_i32 = arith.extsi %lhs_i8 : i8 to i32
 ///     %rhs_i32 = arith.extsi %rhs_i8 : i8 to i32
@@ -150,126 +478,83 @@ static Value flatten(PatternRewriter &rewriter, Location loc, Value vector) {
 ///                 %acc_i32 : vector<8x8xi32>,
 ///                 [...]
 ///
-/// To vector ops reading directly from the %lhs_i8 and %rhs_i8 values
-/// (bypassing the existing arith.extsi) and passing that to a llvm.inline_asm
-/// block implementing the matrix multiplication arithmetic using Aarch64
-/// dot-product instructions (sdot).
-struct MMT_8x4x8_i8i8i32_Aarch64Dotprod_InlineAsm
-    : OpRewritePattern<vector::ContractionOp> {
-  using OpRewritePattern<vector::ContractionOp>::OpRewritePattern;
+class MMTCustomKernelPattern : public OpRewritePattern<vector::ContractionOp> {
+ private:
+  MMTKernel kernel;
+
+ public:
+  MMTCustomKernelPattern(MLIRContext *context, MMTKernel kernel)
+      : OpRewritePattern<vector::ContractionOp>(context), kernel(kernel) {}
 
   LogicalResult matchAndRewrite(vector::ContractionOp contractionOp,
                                 PatternRewriter &rewriter) const override {
-    // Check if `contractionOp` matches, and obtain the un-promoted i8 input
-    // LHS and RHS vectors, `lhsI8` and `rhsI8`.
-    if (!isMatrixTimesMatrixTransposedOfGivenShape(contractionOp, 8, 4, 8)) {
+    // Check if `contractionOp` matches, and obtain the (un-promoted) input
+    // LHS and RHS vectors.
+    if (!isMatrixTimesMatrixTransposedOfGivenShape(contractionOp, kernel.m0,
+                                                   kernel.k0, kernel.n0)) {
       return failure();
     }
-    Type I8Type = rewriter.getIntegerType(8);
-    Type I32Type = rewriter.getIntegerType(32);
+    MMTKernelGenerator generator(rewriter.getContext(), kernel);
+    Type lhsElemType = generator.getLhsType();
+    Type rhsElemType = generator.getRhsType();
+    Type accElemType = generator.getAccType();
     VectorType accType = contractionOp.acc().getType().cast<VectorType>();
-    if (accType.getElementType() != I32Type) {
+    if (accType.getElementType() != accElemType) {
       return failure();
     }
-    Value lhsI8 = getExtSIInput(I8Type, I32Type, contractionOp.lhs());
-    Value rhsI8 = getExtSIInput(I8Type, I32Type, contractionOp.rhs());
-    if (!lhsI8 || !rhsI8) {
+    Value unpromotedLhs =
+        getUnpromotedInput(lhsElemType, accElemType, contractionOp.lhs());
+    Value unpromotedRhs =
+        getUnpromotedInput(rhsElemType, accElemType, contractionOp.rhs());
+    if (!unpromotedLhs || !unpromotedRhs) {
       return failure();
     }
-
-    // `contractionOp` matches, start rewriting it. We only reference
-    // the `lhsI8` and `rhsI8` values obtained above as the inputs of the
-    // arith.extsi, so this rewrite will leave the existing arith.extsi without
-    // any user (unless something else was using them), so they may be
-    // removed by another transformation.
+    // `contractionOp` matches, start rewriting it.
     Location loc = contractionOp.getLoc();
     // Flatten the inputs to 1D vectors.
-    Value flatLhsI8 = flatten(rewriter, loc, lhsI8);
-    Value flatRhsI8 = flatten(rewriter, loc, rhsI8);
+    Value flatLhs = flatten(rewriter, loc, unpromotedLhs);
+    Value flatRhs = flatten(rewriter, loc, unpromotedRhs);
     Value flatAcc = flatten(rewriter, loc, contractionOp.acc());
-
-    // Create the 1D input vectors of 16 bytes each that are directly what
-    // the target SIMD instructions will want.
-    SmallVector<Value> lhsVec;
-    SmallVector<Value> rhsVec;
-    VectorType vector16xi8Type = VectorType::get({16}, I8Type);
-    for (int position = 0; position < 8 * 4; position += 16) {
-      lhsVec.push_back(
-          extract1DSlice(rewriter, loc, vector16xi8Type, flatLhsI8, position));
-      rhsVec.push_back(
-          extract1DSlice(rewriter, loc, vector16xi8Type, flatRhsI8, position));
-    }
-    SmallVector<Value> accVec;
-    VectorType int32x4Type = VectorType::get({4}, I32Type);
-    for (int position = 0; position < 8 * 8; position += 4) {
-      accVec.push_back(
-          extract1DSlice(rewriter, loc, int32x4Type, flatAcc, position));
-    }
-
-    // Create the inline asm op's operands list.
-    SmallVector<Value> asmOperands;
-    // First the inputs operands.
-    asmOperands.append(lhsVec);
-    asmOperands.append(rhsVec);
-    // Then the input-output operands.
-    asmOperands.append(accVec);
-    SmallVector<Type> asmOutputOperandTypes(
-        llvm::map_range(accVec, [](Value v) { return v.getType(); }));
-
-    // Create the inline asm op.
-    auto returnType = LLVM::LLVMStructType::getLiteral(rewriter.getContext(),
-                                                       asmOutputOperandTypes);
-    auto dialectAttr = LLVM::AsmDialectAttr::get(rewriter.getContext(),
-                                                 LLVM::AsmDialect::AD_ATT);
-    // The LLVM inline asm syntax is documented here:
-    // https://llvm.org/docs/LangRef.html#inline-assembler-expressions
-    LLVM::InlineAsmOp asmOp = rewriter.create<LLVM::InlineAsmOp>(
-        loc, returnType, asmOperands,
-        R"ASM(
-            sdot $0.4s, $18.16b, $16.4b[0]
-            sdot $1.4s, $19.16b, $16.4b[0]
-            sdot $2.4s, $18.16b, $16.4b[1]
-            sdot $3.4s, $19.16b, $16.4b[1]
-            sdot $4.4s, $18.16b, $16.4b[2]
-            sdot $5.4s, $19.16b, $16.4b[2]
-            sdot $6.4s, $18.16b, $16.4b[3]
-            sdot $7.4s, $19.16b, $16.4b[3]
-            sdot $8.4s, $18.16b, $17.4b[0]
-            sdot $9.4s, $19.16b, $17.4b[0]
-            sdot $10.4s, $18.16b, $17.4b[1]
-            sdot $11.4s, $19.16b, $17.4b[1]
-            sdot $12.4s, $18.16b, $17.4b[2]
-            sdot $13.4s, $19.16b, $17.4b[2]
-            sdot $14.4s, $18.16b, $17.4b[3]
-            sdot $15.4s, $19.16b, $17.4b[3]
-          )ASM",
-        "=w,=w,=w,=w,=w,=w,=w,=w,=w,=w,=w,=w,=w,=w,=w,=w,w,w,w,w,0,1,2,3,4,5,6,"
-        "7,8,9,10,11,12,13,14,15",
-        /*has_side_effects=*/false, /*is_align_stack=*/false, dialectAttr,
-        /*operand_attrs=*/ArrayAttr());
-
-    // Extract result vectors from the asm op.
-    SmallVector<Value, 16> resVec;
-    for (int i = 0; i < 16; ++i) {
-      resVec.push_back(rewriter.create<LLVM::ExtractValueOp>(
-          loc, int32x4Type, asmOp.getRes(), rewriter.getI64ArrayAttr({i})));
-    }
-
+    // Slice into SIMD-register-sized 1D input vectors ready to feed to the
+    // target SIMD instructions.
+    auto sliceIntoRegVectors = [&](int size, VectorType regVectorType,
+                                   Value src) {
+      SmallVector<Value> regVectors;
+      int regSize = regVectorType.getNumElements();
+      for (int position = 0; position < size; position += regSize) {
+        regVectors.push_back(
+            extract1DSlice(rewriter, loc, regVectorType, src, position));
+      }
+      return regVectors;
+    };
+    VectorType lhsRegVectorType = generator.getLhsRegVectorType();
+    VectorType rhsRegVectorType = generator.getRhsRegVectorType();
+    VectorType accRegVectorType = generator.getAccRegVectorType();
+    const SmallVector<Value> &lhsRegVectors =
+        sliceIntoRegVectors(kernel.m0 * kernel.k0, lhsRegVectorType, flatLhs);
+    const SmallVector<Value> &rhsRegVectors =
+        sliceIntoRegVectors(kernel.n0 * kernel.k0, rhsRegVectorType, flatRhs);
+    const SmallVector<Value> &accRegVectors =
+        sliceIntoRegVectors(kernel.m0 * kernel.n0, accRegVectorType, flatAcc);
+    SmallVector<Value> resRegVectors = generator.generate(
+        rewriter, loc, lhsRegVectors, rhsRegVectors, accRegVectors);
     // Insert the result vectors of size 4 into the overall result vector of
     // size 64, still 1D.
-    VectorType int32x64xType = VectorType::get({64}, I32Type);
+    VectorType flatAccVectorType = flatAcc.getType().cast<VectorType>();
     Value result = rewriter.create<arith::ConstantOp>(
-        loc, int32x64xType, DenseIntElementsAttr::get(int32x64xType, 0));
-    for (int i = 0; i < 16; ++i) {
+        loc, flatAccVectorType,
+        DenseIntElementsAttr::get(flatAccVectorType, 0));
+    int accRegsCount = generator.getAccRegsCount();
+    int accRegNumElements = accRegVectorType.getNumElements();
+    for (int i = 0; i < accRegsCount; ++i) {
       result = rewriter.create<vector::InsertStridedSliceOp>(
-          loc, resVec[i], result, std::array<int64_t, 1>{4 * i},
+          loc, resRegVectors[i], result,
+          std::array<int64_t, 1>{accRegNumElements * i},
           std::array<int64_t, 1>{1});
     }
-
     // Cast the result from 1D to 2D and replace the original vector.contract.
-    VectorType int32x8x8xType = VectorType::get({8, 8}, I32Type);
-    rewriter.replaceOpWithNewOp<vector::ShapeCastOp>(contractionOp,
-                                                     int32x8x8xType, result);
+    rewriter.replaceOpWithNewOp<vector::ShapeCastOp>(contractionOp, accType,
+                                                     result);
     return success();
   }
 };
@@ -311,8 +596,8 @@ struct MMT_8x4x8_i8i8i32_Aarch64Dotprod_Intrinsics
       return failure();
     }
 
-    Value inLhs = getExtSIInput(I8Type, I32Type, lhs);
-    Value inRhs = getExtSIInput(I8Type, I32Type, rhs);
+    Value inLhs = getUnpromotedInput(I8Type, I32Type, lhs);
+    Value inRhs = getUnpromotedInput(I8Type, I32Type, rhs);
 
     if (!inLhs || !inRhs) return failure();
 
@@ -431,9 +716,10 @@ void populateVectorContractCustomKernelsPatterns(
   MLIRContext *context = patterns.getContext();
   if (target_info.has(CustomKernelTargetFeature::Aarch64Dotprod)) {
     if (target_info.has(CustomKernelTargetFeature::Intrinsics)) {
-      patterns.insert<MMT_8x4x8_i8i8i32_Aarch64Dotprod_Intrinsics>(context);
+      patterns.add<MMT_8x4x8_i8i8i32_Aarch64Dotprod_Intrinsics>(context);
     } else {
-      patterns.insert<MMT_8x4x8_i8i8i32_Aarch64Dotprod_InlineAsm>(context);
+      patterns.add<MMTCustomKernelPattern>(
+          context, MMTKernel_8x4x8_i8i8i32_Aarch64Dotprod_InlineAsm());
     }
   }
 }

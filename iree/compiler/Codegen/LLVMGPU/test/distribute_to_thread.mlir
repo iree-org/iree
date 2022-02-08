@@ -62,15 +62,13 @@ hal.executable private @dot_dispatch_0  {
 
 //   CHECK-LABEL: hal.executable private @dot_dispatch_0
 //         CHECK:   hal.executable.variant public @cuda
-//         CHECK:  memref.global "private" @{{.*}} : memref<4x256xf32, 3>
-//         CHECK:  memref.global "private" @{{.*}} : memref<2x4xf32, 3>
 //     CHECK-DAG:  %[[C0:.+]] = arith.constant 0 : index
 //     CHECK-DAG:  %[[C2:.+]] = arith.constant 2 : index
 //     CHECK-DAG:  %[[C4:.+]] = arith.constant 4 : index
 //     CHECK-DAG:  %[[C256:.+]] = arith.constant 256 : index
 //     CHECK-DAG:  %[[C1024:.+]] = arith.constant 1024 : index
-//     CHECK-DAG:  %[[BUFFER0:.+]] = memref.get_global @__shared_memory___0 : memref<4x256xf32, 3>
-//     CHECK-DAG:  %[[BUFFER1:.+]] = memref.get_global @__shared_memory__ : memref<2x4xf32, 3>
+//     CHECK-DAG:  %[[BUFFER0:.+]] = memref.alloc() : memref<4x256xf32, 3>
+//     CHECK-DAG:  %[[BUFFER1:.+]] = memref.alloc() : memref<2x4xf32, 3>
 //         CHECK:  scf.for %[[K:.+]] = %[[C0]] to %[[C1024]] step %[[C4]] {
 //         CHECK:    gpu.barrier
 //         CHECK:    linalg.generic {{.*}} ins(%{{.*}} : memref<2x4xf32, #{{.*}}>) outs(%{{.*}} : memref<2x4xf32, 3>) attrs = {__internal_linalg_transform__ = "copy_to_workgroup_memory"}

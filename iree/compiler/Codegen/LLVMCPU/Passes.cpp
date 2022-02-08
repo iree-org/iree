@@ -48,22 +48,26 @@ static Value cpuAllocationFunction(OpBuilder &builder, Location loc,
 }
 
 // Allocation callbacks to use with upstream comprehensive bufferization
-static Optional<Value> cpuComprehensiveBufferizeAllocationFn(
+static FailureOr<Value> cpuComprehensiveBufferizeAllocationFn(
     OpBuilder &builder, Location loc, MemRefType memRefType,
-    ArrayRef<Value> dynamicSizes) {
-  return builder.create<memref::AllocaOp>(loc, memRefType, dynamicSizes)
+    ValueRange dynamicSizes, unsigned alignment) {
+  return builder
+      .create<memref::AllocaOp>(loc, memRefType, dynamicSizes,
+                                builder.getI64IntegerAttr(alignment))
       .getResult();
 }
 
-static void cpuComprehensiveBufferizeDeallocationFn(OpBuilder &builder,
-                                                    Location loc,
-                                                    Value allocation) {
-  return;
+static LogicalResult cpuComprehensiveBufferizeDeallocationFn(OpBuilder &builder,
+                                                             Location loc,
+                                                             Value allocation) {
+  return success();
 }
 
-static void cpuComprehensiveBufferizeCopyFn(OpBuilder &builder, Location loc,
-                                            Value from, Value to) {
+static LogicalResult cpuComprehensiveBufferizeCopyFn(OpBuilder &builder,
+                                                     Location loc, Value from,
+                                                     Value to) {
   createLinalgCopyOp(builder, loc, from, to);
+  return success();
 }
 
 //===---------------------------------------------------------------------===//
@@ -242,15 +246,13 @@ void addDoubleTilingExpertPassPipeline(OpPassManager &passManager) {
     passManager.addNestedPass<FuncOp>(createCSEPass());
   }
 
-  // TODO(ravishankarm): This is commented cause this is WIP, to be enabled
-  // soon.
-  // auto callbacks =
-  //     std::make_unique<linalg::comprehensive_bufferize::AllocationCallbacks>(
-  //         cpuComprehensiveBufferizeAllocationFn,
-  //         cpuComprehensiveBufferizeDeallocationFn,
-  //         cpuComprehensiveBufferizeCopyFn);
-  // addIREEComprehensiveBufferizePasses(passManager, std::move(callbacks));
-  addLinalgBufferizePasses(passManager, cpuAllocationFunction);
+  BufferizationOptions::AllocationFn allocationFn =
+      cpuComprehensiveBufferizeAllocationFn;
+  BufferizationOptions::DeallocationFn deallocationFn =
+      cpuComprehensiveBufferizeDeallocationFn;
+  BufferizationOptions::MemCpyFn memcpyFn = cpuComprehensiveBufferizeCopyFn;
+  addIREEComprehensiveBufferizePasses(passManager, allocationFn, deallocationFn,
+                                      memcpyFn);
 
   // Run IREE specific passes before vector lowering expert.
   passManager.addNestedPass<FuncOp>(createRemoveSingleIterationLoopPass());

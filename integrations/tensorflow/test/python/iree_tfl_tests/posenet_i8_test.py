@@ -5,7 +5,7 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 import absl.testing
-import iree.tflite.support.test_util as test_util
+from . import test_util
 import numpy
 import urllib.request
 

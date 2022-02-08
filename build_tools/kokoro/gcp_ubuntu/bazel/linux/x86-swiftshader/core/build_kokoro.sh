@@ -28,7 +28,7 @@ docker_setup
 # and the cache key is the docker container it's run in (to ensure correct cache
 # hits).
 docker run "${DOCKER_RUN_ARGS[@]?}" \
-  gcr.io/iree-oss/frontends-swiftshader@sha256:fdeddccf858fef91e89b8100cebe8a4416e0a17229a7ee4d8ec12b740fa2a46f \
+  gcr.io/iree-oss/frontends-swiftshader@sha256:4327fef0ed53c8658f052d145f2aa8ce395c29f48fb075df78638fd3ce3603e5 \
   build_tools/kokoro/gcp_ubuntu/bazel/linux/x86-swiftshader/core/build.sh
 
 # Kokoro will rsync this entire directory back to the executor orchestrating the
