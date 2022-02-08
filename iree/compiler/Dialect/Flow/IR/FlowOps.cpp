@@ -10,6 +10,7 @@
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "llvm/ADT/BitVector.h"
+#include "llvm/ADT/SmallBitVector.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/CommandLine.h"
 #include "mlir/Dialect/Arithmetic/Utils/Utils.h"
@@ -156,11 +157,11 @@ RankedTensorType DispatchTensorLoadOp::inferRankReducedResultType(
   auto inferredType = RankedTensorType::get(shape, sourceType.getElementType());
   int rankDiff = sourceType.getRank() - resultRank;
   if (rankDiff > 0) {
-    llvm::SmallDenseSet<unsigned> dimsToProject;
-    mlir::getPositionsOfShapeOne(rankDiff, shape, dimsToProject);
+    llvm::SmallBitVector dimsToProject =
+        mlir::getPositionsOfShapeOne(rankDiff, shape);
     SmallVector<int64_t> projectedShape;
     for (unsigned pos = 0, e = shape.size(); pos < e; ++pos) {
-      if (!dimsToProject.contains(pos)) {
+      if (!dimsToProject.test(pos)) {
         projectedShape.push_back(shape[pos]);
       }
     }
