@@ -83,27 +83,28 @@ class CallOpConversion : public OpConversionPattern<mlir::CallOp> {
   }
 };
 
-class BranchOpConversion : public OpConversionPattern<mlir::BranchOp> {
+class BranchOpConversion : public OpConversionPattern<mlir::cf::BranchOp> {
  public:
   using OpConversionPattern::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      mlir::BranchOp op, OpAdaptor adaptor,
+      mlir::cf::BranchOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    rewriter.replaceOpWithNewOp<mlir::BranchOp>(op, op.getDest(),
-                                                adaptor.getDestOperands());
+    rewriter.replaceOpWithNewOp<mlir::cf::BranchOp>(op, op.getDest(),
+                                                    adaptor.getDestOperands());
     return success();
   }
 };
 
-class CondBranchOpConversion : public OpConversionPattern<mlir::CondBranchOp> {
+class CondBranchOpConversion
+    : public OpConversionPattern<mlir::cf::CondBranchOp> {
  public:
   using OpConversionPattern::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      mlir::CondBranchOp op, OpAdaptor adaptor,
+      mlir::cf::CondBranchOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    rewriter.replaceOpWithNewOp<mlir::CondBranchOp>(
+    rewriter.replaceOpWithNewOp<mlir::cf::CondBranchOp>(
         op, adaptor.getCondition(), op.getTrueDest(),
         adaptor.getTrueDestOperands(), op.getFalseDest(),
         adaptor.getFalseDestOperands());

@@ -18,6 +18,7 @@ if(${IREE_ENABLE_EMITC})
     DEPS
       MLIREmitC
       MLIRIR
+      MLIRControlFlowOps
       MLIRSCF
       MLIRStandard
   )

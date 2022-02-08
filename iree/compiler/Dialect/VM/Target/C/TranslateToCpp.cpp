@@ -11,6 +11,7 @@
 
 #include "mlir/Dialect/EmitC/IR/EmitC.h"
 #include "mlir/Dialect/SCF/SCF.h"
+#include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/BuiltinTypes.h"
@@ -27,6 +28,7 @@
 #define DEBUG_TYPE "translate-to-cpp"
 
 using namespace mlir;
+using namespace mlir::cf;
 using namespace mlir::emitc;
 using llvm::formatv;
 
