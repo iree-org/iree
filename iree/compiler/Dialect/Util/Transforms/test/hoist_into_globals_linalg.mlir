@@ -10,7 +10,7 @@ module @compute_hoisted {
   builtin.func @main() -> (tensor<5x6xf32>) {
     %cst_0 = arith.constant dense<1.270000e+02> : tensor<f32>
 
-    // A non-leaf cf.broadcast.
+    // A non-leaf broadcast.
     %0 = linalg.init_tensor [5, 6] : tensor<5x6xf32>
     %1 = linalg.generic {indexing_maps = [#map0, #map1], iterator_types = ["parallel", "parallel"]} ins(%cst_0 : tensor<f32>) outs(%0 : tensor<5x6xf32>) {
     ^bb0(%arg1: f32, %arg2: f32):  // no predecessors
@@ -46,7 +46,7 @@ module @broadcast_treated_as_leaf {
     %cst_0 = arith.constant dense<1.270000e+02> : tensor<f32>
     // CHECK: linalg.init_tensor
     %0 = linalg.init_tensor [5, 6] : tensor<5x6xf32>
-    // A cf.broadcast.
+    // A broadcast.
     // CHECK: linalg.generic
     %1 = linalg.generic {indexing_maps = [#map0, #map1], iterator_types = ["parallel", "parallel"]} ins(%cst_0 : tensor<f32>) outs(%0 : tensor<5x6xf32>) {
     ^bb0(%arg1: f32, %arg2: f32):  // no predecessors
