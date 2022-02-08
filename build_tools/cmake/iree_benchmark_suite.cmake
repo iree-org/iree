@@ -38,6 +38,8 @@
 #   DRIVER: The runtime driver.
 #   RUNTIME_FLAGS: A list of command-line options and their values to pass
 #       to the IREE runtime during benchmark exectuion.
+#   COLLECT_COMPILATION_STATISTICS: Indidate whether to collect compilation
+#       statistics.
 #
 # The above parameters largely fall into two categories: 1) for specifying
 # the MLIR input module and its metadata, 2) for specifying the translation/
@@ -67,7 +69,7 @@ function(iree_benchmark_suite)
   cmake_parse_arguments(
     PARSE_ARGV 0
     _RULE
-    ""
+    "COLLECT_COMPILATION_STATISTICS"
     "DRIVER;TARGET_BACKEND;TARGET_ARCHITECTURE"
     "BENCHMARK_MODES;BENCHMARK_TOOL;MODULES;TRANSLATION_FLAGS;RUNTIME_FLAGS"
   )
@@ -192,6 +194,13 @@ function(iree_benchmark_suite)
       string(MD5 _VMFB_HASH "${_TRANSLATION_ARGS};${_MODULE_SOURCE}")
       get_filename_component(_MODULE_SOURCE_BASENAME "${_MODULE_SOURCE}" NAME)
       set(_VMFB_FILE "${_VMFB_ARTIFACTS_DIR}/${_MODULE_SOURCE_BASENAME}-${_VMFB_HASH}.vmfb")
+      set(_VMFB_STAT_FILE
+          "${_VMFB_ARTIFACTS_DIR}/${_MODULE_SOURCE_BASENAME}-${_VMFB_HASH}.compilation_statistics.json")
+
+      # Flags to generate compilation statistics.
+      set(_STATS_FLAGS
+          "--iree-scheduling-dump-statistics-format=json"
+          "--iree-scheduling-dump-statistics-file=${_VMFB_STAT_FILE}")
 
       # Register the target once and share across all benchmarks having the same
       # MLIR source and translation flags.
@@ -201,13 +210,15 @@ function(iree_benchmark_suite)
       )
       if(NOT TARGET "${_TRANSLATION_TARGET_NAME}")
         add_custom_command(
-          OUTPUT "${_VMFB_FILE}"
+          OUTPUT "${_VMFB_FILE}" "${_VMFB_STAT_FILE}"
           COMMAND
             "$<TARGET_FILE:iree::tools::iree-translate>"
               ${_TRANSLATION_ARGS}
+              ${_STATS_FLAGS}
               "--mlir-print-op-on-diagnostic=false"
               "${_MODULE_SOURCE}"
               -o "${_VMFB_FILE}"
+          COMMAND_EXPAND_LISTS
           WORKING_DIRECTORY "${_VMFB_ARTIFACTS_DIR}"
           DEPENDS
             iree::tools::iree-translate
@@ -216,7 +227,7 @@ function(iree_benchmark_suite)
         )
 
         add_custom_target("${_TRANSLATION_TARGET_NAME}"
-          DEPENDS "${_VMFB_FILE}"
+          DEPENDS "${_VMFB_FILE}" "${_VMFB_STAT_FILE}"
         )
 
         # Mark dependency so that we have one target to drive them all.
@@ -296,6 +307,25 @@ function(iree_benchmark_suite)
         "${_FLAGFILE_GEN_TARGET_NAME}"
         "${_TOOLFILE_GEN_TARGET_NAME}"
       )
+
+      if (_RULE_COLLECT_COMPILATION_STATISTICS)
+        # Copy over the statistics JSON file generated during compiling the
+        # artifact for this benchmark.
+        set(_STAT_FILE "${_RUN_SPEC_DIR}/compilation_statistics.json")
+        add_custom_command(
+          OUTPUT "${_STAT_FILE}"
+          COMMAND ${CMAKE_COMMAND} -E copy_if_different "${_VMFB_STAT_FILE}" "${_STAT_FILE}"
+          DEPENDS "${_VMFB_STAT_FILE}"
+          WORKING_DIRECTORY "${_RUN_SPEC_DIR}"
+          COMMENT "Generating ${_STAT_FILE}"
+        )
+
+        set(_STATFILE_GEN_TARGET_NAME_LIST "iree-generate-benchmark-statsfile")
+        list(APPEND _STATFILE_GEN_TARGET_NAME_LIST ${_COMMON_NAME_SEGMENTS})
+        list(JOIN _STATFILE_GEN_TARGET_NAME_LIST "__" _STATFILE_GEN_TARGET_NAME)
+        add_custom_target("${_STATFILE_GEN_TARGET_NAME}" DEPENDS "${_STAT_FILE}")
+        add_dependencies(iree-benchmark-suites "${_STATFILE_GEN_TARGET_NAME}")
+      endif()
     endforeach(_BENCHMARK_MODE IN LISTS _RULE_BENCHMARK_MODES)
 
   endforeach(_MODULE IN LISTS _RULE_MODULES)

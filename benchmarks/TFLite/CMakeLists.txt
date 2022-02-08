@@ -298,6 +298,8 @@ iree_benchmark_suite(
     iree-benchmark-module
   DRIVER
     "vulkan"
+
+  COLLECT_COMPILATION_STATISTICS
 )
 
 # GPU, Vulkan, Mali, full-inference

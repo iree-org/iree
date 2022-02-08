@@ -15,12 +15,7 @@ import re
 import subprocess
 
 from dataclasses import dataclass
-from typing import Any, Dict, Sequence
-
-__all__ = [
-    "AndroidDeviceInfo", "BenchmarkInfo", "BenchmarkResults", "BenchmarkRun",
-    "execute_cmd_and_get_output", "execute_cmd"
-]
+from typing import Any, Dict, Optional, Sequence
 
 # A map for IREE driver names. This allows us to normalize driver names like
 # mapping to more friendly ones and detach to keep driver names used in
@@ -179,10 +174,10 @@ class AndroidDeviceInfo:
 
 
 @dataclass
-class BenchmarkInfo:
-  """An object describing the current benchmark.
+class BenchmarkOrStatisticInfo:
+  """An object describing the current benchmark or statistic.
 
-  It includes the following benchmark characteristics:
+  It includes the following characteristics:
   - model_name: the model name, e.g., 'MobileNetV2'
   - model_tags: a list of tags used to describe additional model information,
       e.g., ['imagenet']
@@ -190,27 +185,40 @@ class BenchmarkInfo:
   - bench_mode: a list of tags for benchmark mode,
       e.g., ['1-thread', 'big-core', 'full-inference']
   - runner: which runner is used for benchmarking, e.g., 'iree_vulkan', 'tflite'
+      optional for statistics
   - device_info: an AndroidDeviceInfo object describing the phone where
-      benchmarks run
+      benchmarks run; optional for statistics
+  - statistic: breadcrumb hierarchical description of the statistic;
+      missing for benchmarks
   """
 
+  # Common fields for benchmarks and statistics
   model_name: str
   model_tags: Sequence[str]
   model_source: str
   bench_mode: Sequence[str]
-  runner: str
-  device_info: AndroidDeviceInfo
+
+  # Fields that might be missing for statistics
+  runner: Optional[str] = None
+  device_info: Optional[AndroidDeviceInfo] = None
+
+  # Fields missing for benchmarks
+  statistic: Sequence[str] = ()
 
   def __str__(self):
-    # Get the target architecture and better driver name depending on the runner.
+    # Get the target architecture and pretty driver name depending on the runner.
     target_arch = ""
     driver = ""
-    if self.runner == "iree-vulkan":
-      target_arch = "GPU-" + self.device_info.gpu_name
+    if self.runner is None:
+      pass
+    elif self.runner == "iree-vulkan":
+      if self.device_info:
+        target_arch = "GPU-" + self.device_info.gpu_name
       driver = IREE_DRIVERS_TO_PRETTY_NAMES[self.runner]
     elif (self.runner == "iree-dylib" or self.runner == "iree-dylib-sync" or
           self.runner == "iree-vmvx" or self.runner == "iree-vmvx-sync"):
-      target_arch = "CPU-" + self.device_info.get_arm_arch_revision()
+      if self.device_info:
+        target_arch = "CPU-" + self.device_info.get_arm_arch_revision()
       driver = IREE_DRIVERS_TO_PRETTY_NAMES[self.runner]
     else:
       raise ValueError(
@@ -221,10 +229,18 @@ class BenchmarkInfo:
       model_part = f"{self.model_name} [{tags}] ({self.model_source})"
     else:
       model_part = f"{self.model_name} ({self.model_source})"
-    phone_part = f"{self.device_info.model} ({target_arch})"
     mode = ",".join(self.bench_mode)
 
-    return f"{model_part} {mode} with {driver} @ {phone_part}"
+    stat = " statistic:" + "-".join(self.statistic) if self.statistic else ""
+
+    full_str = f"{model_part} {mode}{stat}"
+    if self.runner:
+      full_str += f" with {driver}"
+
+    if self.device_info:
+      phone_part = f"{self.device_info.model} ({target_arch})"
+      full_str += f" @ {phone_part}"
+    return full_str
 
   @staticmethod
   def from_device_info_and_name(device_info: AndroidDeviceInfo, name: str):
@@ -243,8 +259,8 @@ class BenchmarkInfo:
     model_tags = model_tags.strip("[]").split(",")
     bench_mode = bench_mode.split(",")
     runner = IREE_PRETTY_NAMES_TO_DRIVERS.get(runner)
-    return BenchmarkInfo(model_name, model_tags, model_source, bench_mode,
-                         runner, device_info)
+    return BenchmarkOrStatisticInfo(model_name, model_tags, model_source,
+                                    bench_mode, runner, device_info)
 
   def deduce_taskset(self) -> str:
     """Deduces the CPU affinity taskset mask according to benchmark modes."""
@@ -258,35 +274,45 @@ class BenchmarkInfo:
     return "80"
 
   def to_json_object(self) -> Dict[str, Any]:
-    return {
+    json_object = {
         "model_name": self.model_name,
         "model_tags": self.model_tags,
         "model_source": self.model_source,
         "bench_mode": self.bench_mode,
-        "runner": self.runner,
-        "device_info": self.device_info.to_json_object(),
     }
+    if self.runner:
+      json_object["runner"] = self.runner
+    if self.device_info:
+      json_object["device_info"] = self.device_info.to_json_object()
+    if self.statistic:
+      json_object["statistic"] = self.statistic
+    return json_object
 
   @staticmethod
   def from_json_object(json_object: Dict[str, Any]):
-    return BenchmarkInfo(model_name=json_object["model_name"],
-                         model_tags=json_object["model_tags"],
-                         model_source=json_object["model_source"],
-                         bench_mode=json_object["bench_mode"],
-                         runner=json_object["runner"],
-                         device_info=AndroidDeviceInfo.from_json_object(
-                             json_object["device_info"]))
+    device_info = None
+    if "device_info" in json_object:
+      device_info = AndroidDeviceInfo.from_json_object(
+          json_object["device_info"])
+
+    return BenchmarkOrStatisticInfo(model_name=json_object["model_name"],
+                                    model_tags=json_object["model_tags"],
+                                    model_source=json_object["model_source"],
+                                    bench_mode=json_object["bench_mode"],
+                                    runner=json_object.get("runner"),
+                                    device_info=device_info,
+                                    statistic=json_object.get("statistic"))
 
 
 @dataclass
 class BenchmarkRun(object):
   """An object describing a single run of the benchmark binary.
 
-  - benchmark_info: a BenchmarkInfo object describing the benchmark setup.
+  - benchmark_info: a BenchmarkOrStatisticInfo object describing the benchmark setup.
   - context: the benchmark context returned by the benchmarking framework.
   - results: the benchmark results returned by the benchmarking framework.
   """
-  benchmark_info: BenchmarkInfo
+  benchmark_info: BenchmarkOrStatisticInfo
   context: Dict[str, Any]
   results: Sequence[Dict[str, Any]]
 
@@ -303,8 +329,9 @@ class BenchmarkRun(object):
   @staticmethod
   def from_json_object(json_object: Dict[str, Any]):
     return BenchmarkRun(
-        BenchmarkInfo.from_json_object(json_object["benchmark_info"]),
-        json_object["context"], json_object["results"])
+        BenchmarkOrStatisticInfo.from_json_object(
+            json_object["benchmark_info"]), json_object["context"],
+        json_object["results"])
 
 
 class BenchmarkResults(object):
@@ -358,5 +385,67 @@ class BenchmarkResults(object):
     results.set_commit(json_object["commit"])
     results.benchmarks = [
         BenchmarkRun.from_json_object(b) for b in json_object["benchmarks"]
+    ]
+    return results
+
+
+@dataclass
+class StatisticInstance(object):
+  """An object describing a single instance of a statistic.
+
+  - statistic_info: a BenchmarkOrStatisticInfo object describing the statistic setup.
+  - value: the value for this statistic instance.
+  """
+  statistic_info: BenchmarkOrStatisticInfo
+  value: Any
+
+  def to_json_object(self) -> Dict[str, Any]:
+    return {
+        "statistic_info": self.statistic_info.to_json_object(),
+        "value": self.value,
+    }
+
+  def to_json_str(self) -> str:
+    return json.dumps(self.to_json_object())
+
+  @staticmethod
+  def from_json_object(json_object: Dict[str, Any]):
+    return StatisticInstance(
+        BenchmarkOrStatisticInfo.from_json_object(
+            json_object["statistic_info"]), json_object["value"])
+
+
+class StatisticResults(object):
+  """An object describing a set of statistics for one particular commit.
+
+    It contains the following fields:
+    - commit: the commit SHA for this set of benchmarks.
+    - statistics: a list of statistics.
+    """
+
+  def __init__(self):
+    self.commit = "<unknown>"
+    self.statistics = []
+
+  def set_commit(self, commit: str):
+    self.commit = commit
+
+  def merge(self, other):
+    if self.commit != other.commit:
+      raise ValueError("Inconsistent pull request commit")
+    self.statistics.extend(other.statistics)
+
+  def to_json_str(self) -> str:
+    json_object = {"commit": self.commit}
+    json_object["statistics"] = [s.to_json_object() for s in self.statistics]
+    return json.dumps(json_object)
+
+  @staticmethod
+  def from_json_str(json_str: str):
+    json_object = json.loads(json_str)
+    results = BenchmarkResults()
+    results.set_commit(json_object["commit"])
+    results.statistics = [
+        StatisticInstance.from_json_object(b) for b in json_object["statistics"]
     ]
     return results

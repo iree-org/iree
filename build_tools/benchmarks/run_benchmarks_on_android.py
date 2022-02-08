@@ -43,7 +43,7 @@ import sys
 from typing import Any, Dict, List, Optional, Sequence, Tuple, TextIO, Set
 
 from common.benchmark_definition import (
-    AndroidDeviceInfo, BenchmarkInfo, BenchmarkResults, BenchmarkRun,
+    AndroidDeviceInfo, BenchmarkOrStatisticInfo, BenchmarkResults, BenchmarkRun,
     execute_cmd, execute_cmd_and_get_output, get_android_device_model,
     get_android_gpu_name, IREE_PRETTY_NAMES_TO_DRIVERS)
 from common.benchmark_suite import (BENCHMARK_SUITE_REL_PATH,
@@ -274,8 +274,8 @@ def run_benchmarks_for_category(
     with open(os.path.join(benchmark_case_dir, MODEL_TOOLFILE_NAME)) as f:
       tool = f.read().strip()
 
-    benchmark_info = compose_info_object(device_info, benchmark_category_dir,
-                                         benchmark_case_dir)
+    benchmark_info = compose_info_object(benchmark_category_dir,
+                                         benchmark_case_dir, device_info)
     benchmark_key = str(benchmark_info)
     # If we're not running the benchmark or the capture, just skip ahead.
     # No need to push files.
@@ -679,7 +679,7 @@ def main(args):
   for b in benchmarks:
     with open(b) as f:
       result_json_object = json.loads(f.read())
-    benchmark_info = BenchmarkInfo.from_device_info_and_name(
+    benchmark_info = BenchmarkOrStatisticInfo.from_device_info_and_name(
         device_info,
         os.path.splitext(os.path.basename(b))[0])
     benchmark_run = BenchmarkRun(benchmark_info, result_json_object["context"],

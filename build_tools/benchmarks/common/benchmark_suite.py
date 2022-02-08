@@ -11,18 +11,18 @@ CMake target, which put them in the following directory structure:
 <root-build-dir>/benchmark_suites
 └── <benchmark-category> (e.g., TFLite)
     ├── <benchmark-suite> (e.g., MobileBertSquad-fp32)
-    │   ├── <benchmark-case> (e.g., iree-vulkan__GPU-Mali-Valhall__kernel-execution)
-    │   │   ├── compilation_statistics.json
-    │   │   ├── tool
-    │   │   └── flagfile
-    │   ├── ...
-    │   │   ├── compilation_statistics.json
-    │   │   ├── tool
-    │   │   └── flagfile
-    │   └── <benchmark_case>
-    │   │   ├── compilation_statistics.json
-    │       ├── tool
-    │       └── flagfile
+    │   ├── <benchmark-case> (e.g., iree-vulkan__GPU-Mali-Valhall__kernel-execution)
+    │   │   ├── compilation_statistics.json
+    │   │   ├── tool
+    │   │   └── flagfile
+    │   ├── ...
+    │   │   ├── compilation_statistics.json
+    │   │   ├── tool
+    │   │   └── flagfile
+    │   └── <benchmark_case>
+    │       ├── compilation_statistics.json
+    │       ├── tool
+    │       └── flagfile
     └── vmfb
         ├── <compiled-iree-model>-<sha1>.vmfb
         ├── ...
@@ -34,22 +34,29 @@ import os
 
 from typing import List, Optional, Sequence
 
-from .benchmark_definition import AndroidDeviceInfo, BenchmarkInfo
+from .benchmark_definition import AndroidDeviceInfo, BenchmarkOrStatisticInfo
 
 # All benchmarks' relative path against root build directory.
 BENCHMARK_SUITE_REL_PATH = "benchmark_suites"
 
 
-def compose_info_object(device_info: AndroidDeviceInfo,
-                        benchmark_category_dir: str,
-                        benchmark_case_dir: str) -> BenchmarkInfo:
-  """Creates an BenchmarkInfo object to describe the benchmark.
+def compose_info_object(
+    benchmark_category_dir: str,
+    benchmark_case_dir: str,
+    device_info: Optional[AndroidDeviceInfo],
+    statistic: Optional[Sequence[str]] = None,
+    ignore_driver: bool = False) -> BenchmarkOrStatisticInfo:
+  """Creates an BenchmarkOrStatisticInfo object to describe the benchmark or
+     statistics.
+
   Args:
-    device_info: an AndroidDeviceInfo object.
     benchmark_category_dir: the directory to a specific benchmark category.
     benchmark_case_dir: a directory containing the benchmark case.
+    device_info: an optional AndroidDeviceInfo object.
+    statistic: an optional statistic breadcrumb hierarchy.
+
   Returns:
-    A BenchmarkInfo object.
+    A BenchmarkOrStatisticInfo object.
   """
   # Extract the model name from the directory path. This uses the relative
   # path under the root model directory. If there are multiple segments,
@@ -75,12 +82,14 @@ def compose_info_object(device_info: AndroidDeviceInfo,
 
   model_source = os.path.basename(benchmark_category_dir)
 
-  return BenchmarkInfo(model_name=model_name,
-                       model_tags=model_tags,
-                       model_source=model_source,
-                       bench_mode=bench_mode.split(","),
-                       runner=iree_driver,
-                       device_info=device_info)
+  return BenchmarkOrStatisticInfo(
+      model_name=model_name,
+      model_tags=model_tags,
+      model_source=model_source,
+      bench_mode=bench_mode.split(","),
+      runner=(None if ignore_driver else iree_driver),
+      device_info=device_info,
+      statistic=statistic)
 
 
 def filter_benchmarks_for_category(benchmark_category_dir: str,
@@ -89,12 +98,14 @@ def filter_benchmarks_for_category(benchmark_category_dir: str,
                                    driver_filter: Optional[str],
                                    verbose: bool = False) -> Sequence[str]:
   """Filters benchmarks in a specific category for the given device.
+
   Args:
     benchmark_category_dir: the directory to a specific benchmark category.
     cpu_target_arch_filter: CPU target architecture filter regex.
     gpu_target_arch_filter: GPU target architecture filter regex.
     driver_filter: driver filter regex.
     verbose: whether to print additional debug info.
+
   Returns:
     A list containing all matched benchmark cases' directories.
   """

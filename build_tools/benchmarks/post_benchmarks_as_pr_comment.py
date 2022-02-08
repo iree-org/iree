@@ -113,9 +113,8 @@ def get_from_dashboard(url: str,
   return data
 
 
-def query_base_benchmark_results(commit,
-                                 verbose: bool = False) -> Dict[str, int]:
-  """Queries the benchmark results for the given commit."""
+def query_base_results(commit, verbose: bool = False) -> Dict[str, int]:
+  """Queries the benchmark/statistic results for the given commit."""
   build_id = get_git_total_commit_count(commit, verbose)
 
   url = get_required_env_var('IREE_DASHBOARD_URL')
@@ -123,16 +122,16 @@ def query_base_benchmark_results(commit,
   return get_from_dashboard(f'{url}/apis/getBuild', payload, verbose=verbose)
 
 
-def get_benchmark_result_markdown(benchmark_files: Sequence[str],
+def get_benchmark_result_markdown(result_files: Sequence[str],
                                   query_base: bool,
                                   verbose: bool = False) -> Tuple[str, str]:
   """Gets the full/abbreviated markdown summary of all benchmarks in files."""
   pr_commit = get_required_env_var("BUILDKITE_COMMIT")
-  all_benchmarks = aggregate_all_benchmarks(benchmark_files,
-                                            pr_commit,
-                                            verbose=verbose)
+  all_benchmarks, all_statistics = aggregate_all_benchmarks_and_statistics(
+      result_files, pr_commit, verbose=verbose)
 
   build_url = get_required_env_var("BUILDKITE_BUILD_URL")
+  build_number = get_required_env_var("BUILDKITE_BUILD_NUMBER")
   pr_number = get_required_env_var("BUILDKITE_PULL_REQUEST")
   pr_commit = md.link(pr_commit,
                       f"{GITHUB_IREE_REPO_PREFIX}/commit/{pr_commit}")
@@ -143,45 +142,56 @@ def get_benchmark_result_markdown(benchmark_files: Sequence[str],
     # tree. Bail out if the maximal trial number is exceeded.
     for i in range(MAX_BASE_COMMIT_QUERY_COUNT):
       base_commit = get_origin_tree_commit(i, verbose)
-      base_benchmarks = query_base_benchmark_results(base_commit, verbose)
+      base_results = query_base_results(base_commit, verbose)
       base_commit = md.link(base_commit,
                             f"{GITHUB_IREE_REPO_PREFIX}/commit/{base_commit}")
 
-      if len(base_benchmarks) == 0:
-        commit_info = (f"@ commit {pr_commit} (no previous benchmark results to"
+      if len(base_results) == 0:
+        commit_info = (f"@ commit {pr_commit} (no previous results to"
                        f" compare against since {base_commit})")
         continue
 
       # Update the aggregate benchmarks with base numbers.
-      for bench in base_benchmarks:
-        if bench in all_benchmarks:
-          all_benchmarks[bench].base_mean_time = base_benchmarks[bench]
+      for name in base_results:
+        if name in all_benchmarks:
+          all_benchmarks[name].base_mean_time = base_results[name]
+        elif name in all_statistics:
+          all_statistics[name].base_value = base_results[name]
       commit_info = f"@ commit {pr_commit} (vs. base {base_commit})"
       break
 
-  pr_info = md.link("Pull request",
+  pr_info = md.link(f"Pull request #{pr_number}",
                     f"{GITHUB_IREE_REPO_PREFIX}/pull/{pr_number}")
-  buildkite_info = md.link("Buildkite build", build_url)
+  buildkite_info = md.link(f"Buildkite build #{build_number}", build_url)
 
   # Compose the full benchmark tables.
-  full_table = [md.header("Full Benchmark Summary", 2)]
-  full_table.append(md.unordered_list([commit_info, pr_info, buildkite_info]))
+  full_table = [md.header("Information", 2)]
+  full_table.append(commit_info)
+  full_table.append(md.unordered_list([pr_info, buildkite_info]))
+  full_table.append(md.header("Full Benchmark Summary", 2))
   full_table.append(categorize_benchmarks_into_tables(all_benchmarks))
+  full_table.append(md.header("Full Statistic Summary", 2))
+  full_table.append(categorize_statistics_into_tables(all_statistics))
 
   # Compose the abbreviated benchmark tables.
-  abbr_table = [md.header(ABBR_PR_COMMENT_TITLE, 2)]
+  abbr_table = [md.header("Information", 2)]
   abbr_table.append(commit_info)
+  # We don't know until a Gist is really created. Use a placeholder for now
+  # and replace later.
+  full_result_info = md.link("Full result tables", "<<placeholder-link>>")
+  abbr_table.append(md.unordered_list([full_result_info, buildkite_info]))
+  abbr_table.append(md.header(ABBR_PR_COMMENT_TITLE, 2))
   tables = categorize_benchmarks_into_tables(all_benchmarks, TABLE_SIZE_CUT)
   if len(tables) == 0:
     abbr_table.append("No improved or regressed benchmarks 🏖️")
   else:
     abbr_table.append(tables)
-  abbr_table.append("For more information:")
-  # We don't know until a Gist is really created. Use a placeholder for now
-  # and replace later.
-  full_result_info = md.link("Full benchmark result tables",
-                             "<<placeholder-link>>")
-  abbr_table.append(md.unordered_list([full_result_info, buildkite_info]))
+  abbr_table.append(md.header("Abbreviated Statistics Summary", 2))
+  tables = categorize_statistics_into_tables(all_statistics, TABLE_SIZE_CUT)
+  if len(tables) == 0:
+    abbr_table.append("No improved or regressed statistics 🏖️")
+  else:
+    abbr_table.append(tables)
 
   return "\n\n".join(full_table), "\n\n".join(abbr_table)
 
@@ -292,7 +302,7 @@ def parse_arguments():
       raise ValueError(path)
 
   parser = argparse.ArgumentParser()
-  parser.add_argument("benchmark_files",
+  parser.add_argument("result_files",
                       metavar="<benchmark-json-file>",
                       type=check_file_path,
                       nargs="+",
@@ -315,7 +325,7 @@ def parse_arguments():
 
 
 def main(args):
-  full_md, abbr_md = get_benchmark_result_markdown(args.benchmark_files,
+  full_md, abbr_md = get_benchmark_result_markdown(args.result_files,
                                                    query_base=args.query_base,
                                                    verbose=args.verbose)
 
@@ -330,7 +340,7 @@ def main(args):
     raise ValueError("Not a pull request")
 
   build_number = get_required_env_var("BUILDKITE_BUILD_NUMBER")
-  filename = f"iree-full-benchmark-result-{build_number}.md"
+  filename = f"iree-full-result-{build_number}.md"
   gist_url = post_to_gist(filename, full_md, args.verbose)
   abbr_md = abbr_md.replace("<<placeholder-link>>", gist_url)
 

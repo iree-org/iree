@@ -23,8 +23,11 @@ def get_benchmark_result_markdown(base_benchmark_file: str,
                                   target_benchmark_file: str,
                                   verbose: bool = False) -> str:
   """Gets the full markdown summary of all benchmarks in files."""
-  base_benchmarks = aggregate_all_benchmarks([base_benchmark_file])
-  target_benchmarks = aggregate_all_benchmarks([target_benchmark_file])
+  # TODO: support diffing statistics
+  base_benchmarks = aggregate_all_benchmarks_and_statistics(
+      [base_benchmark_file])[0]
+  target_benchmarks = aggregate_all_benchmarks_and_statistics(
+      [target_benchmark_file])[0]
 
   # Update the target benchmarks with their corresponding base numbers.
   for bench in base_benchmarks:

@@ -26,7 +26,8 @@ import time
 
 from typing import Any, Dict, Optional
 
-from common.benchmark_definition import (BenchmarkInfo, BenchmarkResults,
+from common.benchmark_definition import (BenchmarkOrStatisticInfo,
+                                         BenchmarkResults, StatisticResults,
                                          execute_cmd_and_get_output)
 from common.benchmark_thresholds import BENCHMARK_THRESHOLDS
 
@@ -66,13 +67,13 @@ IREE_TFLITE_MODEL_SOURCE_URL = {
 }
 
 
-def get_model_description(benchmark_info: BenchmarkInfo) -> Optional[str]:
+def get_model_description(info: BenchmarkOrStatisticInfo) -> Optional[str]:
   """Gets the model description for the given benchmark."""
   url = None
-  name = benchmark_info.model_name
-  if benchmark_info.model_source == "TensorFlow":
+  name = info.model_name
+  if info.model_source == "TensorFlow":
     url = IREE_TF_MODEL_SOURCE_URL.get(name)
-  elif benchmark_info.model_source == "TFLite":
+  elif info.model_source == "TFLite":
     url = IREE_TFLITE_MODEL_SOURCE_URL.get(name)
   if url is not None:
     description = f'{name} from <a href="{url}">{url}</a>.'
@@ -273,11 +274,12 @@ def parse_arguments():
       raise ValueError(path)
 
   parser = argparse.ArgumentParser()
-  parser.add_argument('benchmark_files',
-                      metavar='<benchmark-json-file>',
-                      type=check_file_path,
-                      nargs='+',
-                      help='Path to the JSON file containing benchmark results')
+  parser.add_argument(
+      'result_files',
+      metavar='<result-json-file>',
+      type=check_file_path,
+      nargs='+',
+      help='Path to the JSON file containing benchmark/statistic results')
   parser.add_argument("--dry-run",
                       action="store_true",
                       help="Print the comment instead of posting to dashboard")
@@ -291,27 +293,37 @@ def parse_arguments():
 
 def main(args):
   # Collect benchmark results from all files.
-  all_results = []
-  for benchmark_file in args.benchmark_files:
+  benchmark_results = []
+  statistic_results = []
+  for benchmark_file in args.result_files:
     with open(benchmark_file) as f:
       content = f.read()
-    all_results.append(BenchmarkResults.from_json_str(content))
-  for other_results in all_results[1:]:
-    all_results[0].merge(other_results)
-  all_results = all_results[0]
+    is_statistics = "statistics" in json.loads(content)
+    if is_statistics:
+      statistic_results.append(StatisticResults.from_json_str(content))
+    else:
+      benchmark_results.append(BenchmarkResults.from_json_str(content))
+  for other_results in benchmark_results[1:]:
+    benchmark_results[0].merge(other_results)
+  benchmark_results = benchmark_results[0]
+  for other_results in statistic_results[1:]:
+    statistic_results[0].merge(other_results)
+  statistic_results = statistic_results[0]
 
   # Register a new build for the current commit.
-  commit_hash = get_git_commit_hash(all_results.commit, verbose=args.verbose)
+  commit_hash = get_git_commit_hash(benchmark_results.commit,
+                                    verbose=args.verbose)
   commit_count = get_git_total_commit_count(commit_hash, verbose=args.verbose)
   add_new_iree_build(commit_count,
                      commit_hash,
                      dry_run=args.dry_run,
                      verbose=args.verbose)
 
-  # Get the mean time for all benchmarks.
   aggregate_results = {}
-  for benchmark_index in range(len(all_results.benchmarks)):
-    benchmark_case = all_results.benchmarks[benchmark_index]
+
+  # Get the mean time for all benchmarks.
+  for benchmark_index in range(len(benchmark_results.benchmarks)):
+    benchmark_case = benchmark_results.benchmarks[benchmark_index]
     benchmark_info = benchmark_case.benchmark_info
 
     # Make sure each benchmark has a unique name.
@@ -319,12 +331,24 @@ def main(args):
     if name in aggregate_results:
       raise ValueError(f"Duplicated benchmarks: {name}")
 
-    mean_time = all_results.get_aggregate_time(benchmark_index, "mean")
+    mean_time = benchmark_results.get_aggregate_time(benchmark_index, "mean")
     aggregate_results[name] = (mean_time, benchmark_info)
 
+  # Get the value for all statistics.
+  for statistic_index in range(len(statistic_results.statistics)):
+    statistic_case = statistic_results.statistics[statistic_index]
+    statistic_info = statistic_case.statistic_info
+
+    # Make sure each statistic has a unique name.
+    name = str(statistic_info)
+    if name in aggregate_results:
+      raise ValueError(f"Duplicated statistics: {name}")
+
+    aggregate_results[name] = (statistic_case.value, statistic_info)
+
   # Upload benchmark results to the dashboard.
-  for series_id, (sample_value, benchmark_info) in aggregate_results.items():
-    description = get_model_description(benchmark_info)
+  for series_id, (sample_value, info) in aggregate_results.items():
+    description = get_model_description(info)
     if description is None:
       description = ""
     description += COMMON_DESCRIIPTION

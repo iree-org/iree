@@ -10,6 +10,7 @@ steps:
   - label: "Build"
     commands:
       - "docker run --user=$(id -u):$(id -g) --volume=\\${HOME?}:\\${HOME?} --volume=/etc/passwd:/etc/passwd:ro --volume=/etc/group:/etc/group:ro --volume=\\$PWD:\\$IREE_DOCKER_WORKDIR --workdir=\\$IREE_DOCKER_WORKDIR --rm gcr.io/iree-oss/frontends@sha256:3eab65512589e7dabeced8aeb2c392e82f5bf1caafad7639e1b679be908ceb33 build_tools/cmake/build_android_benchmark.sh"
+      - "python3 build_tools/benchmarks/collect_compilation_statistics_from_host.py -o compilation-statistics-${BUILDKITE_BUILD_NUMBER}.json --verbose build-host/"
       - "tar --exclude='*.tar.gz' --exclude='*.tgz' --exclude='*.mlir' --exclude='*.tflite' -czvf benchmark-suites-${BUILDKITE_BUILD_NUMBER}.tgz build-host/benchmark_suites"
       - "tar -czvf iree-android-tools-${BUILDKITE_BUILD_NUMBER}.tgz build-android/iree/tools/iree-benchmark-module build-android-trace/iree/tools/iree-benchmark-module"
     if: "build.pull_request.id == null || (build.pull_request.labels includes 'buildkite:benchmark')"
@@ -20,6 +21,7 @@ steps:
     artifact_paths:
       - "benchmark-suites-${BUILDKITE_BUILD_NUMBER}.tgz"
       - "iree-android-tools-${BUILDKITE_BUILD_NUMBER}.tgz"
+      - "compilation-statistics-${BUILDKITE_BUILD_NUMBER}.json"
 
   - wait
 
@@ -88,8 +90,9 @@ steps:
   - label: "Comment benchmark results on pull request"
     commands:
       - "git clean -fdx"
+      - "buildkite-agent artifact download --step Build compilation-statistics-*.json ./"
       - "buildkite-agent artifact download benchmark-results-*.json ./"
-      - "python3 build_tools/benchmarks/post_benchmarks_as_pr_comment.py --verbose --query-base benchmark-results-*.json"
+      - "python3 build_tools/benchmarks/post_benchmarks_as_pr_comment.py --verbose --query-base compilation-statistics-*.json benchmark-results-*.json"
     key: "post-on-pr"
     if: "build.pull_request.id != null && (build.pull_request.labels includes 'buildkite:benchmark')"
     agents:
@@ -98,8 +101,9 @@ steps:
   - label: "Push benchmark results to dashboard"
     commands:
       - "git clean -fdx"
+      - "buildkite-agent artifact download --step Build compilation-statistics-*.json ./"
       - "buildkite-agent artifact download benchmark-results-*.json ./"
-      - "python3 build_tools/benchmarks/upload_benchmarks_to_dashboard.py --verbose benchmark-results-*.json"
+      - "python3 build_tools/benchmarks/upload_benchmarks_to_dashboard.py --verbose compilation-statistics-*.json benchmark-results-*.json"
     key: "upload-to-dashboard"
     branches: "main"
     agents:
