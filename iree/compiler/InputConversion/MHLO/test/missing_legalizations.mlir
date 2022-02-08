@@ -29,7 +29,7 @@ func @shift_right_logicalWithoutBroadcast(%arg0: tensor<4xf32>, %arg1: tensor<4x
 }
 
 // -----
-// Non-numpy compatible broadcast_dimensions are not supported.
+// Non-numpy compatible cf.broadcast_dimensions are not supported.
 // Note: This is by design and support is not planned.
 func @dynamicNonScalarBroadcastDimensionsSizeMismatch(%arg0: tensor<1x4xf32>, %arg1: tensor<4xf32>) -> tensor<1x4xf32> {
   // expected-error@+1 {{failed to legalize operation 'chlo.broadcast_add' that was explicitly marked illegal}}
@@ -38,7 +38,7 @@ func @dynamicNonScalarBroadcastDimensionsSizeMismatch(%arg0: tensor<1x4xf32>, %a
 }
 
 // -----
-// Non-numpy compatible broadcast_dimensions are not supported.
+// Non-numpy compatible cf.broadcast_dimensions are not supported.
 // Note: This is by design and support is not planned.
 func @dynamicNonScalarBroadcastDimensionsMismatch(%arg0: tensor<1x4xf32>, %arg1: tensor<4xf32>) -> tensor<1x4xf32> {
   // expected-error@+1 {{failed to legalize operation 'chlo.broadcast_add' that was explicitly marked illegal}}

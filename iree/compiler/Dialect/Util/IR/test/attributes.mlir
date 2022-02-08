@@ -2,7 +2,7 @@
 
 // CHECK-LABEL: @byte_range
 builtin.module @byte_range attributes {
-  // CHECK: br0 = #util.byte_range<123, 456>
+  // CHECK: cf.br0 = #util.byte_range<123, 456>
   util.br0 = #util.byte_range<123, 456>
 } {}
 

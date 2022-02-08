@@ -1,9 +1,9 @@
 // RUN: iree-opt -split-input-file -iree-mhlo-to-linalg-on-tensors %s | FileCheck %s
 
 // Check the non-broadcast case for each registered op, then just check a
-// representative op for detailed broadcast semantics. Since the broadcasting
-// implementation lowers through mhlo ops, we are primarily checking broadcast
-// semantics and not exhaustively checking that the non broadcasting ops lower
+// representative op for detailed cf.broadcast semantics. Since the cf.broadcasting
+// implementation lowers through mhlo ops, we are primarily checking cf.broadcast
+// semantics and not exhaustively checking that the non cf.broadcasting ops lower
 // to the right linalg sequences.
 
 // CHECK-LABEL: @addWithoutBroadcast
@@ -21,7 +21,7 @@ func @addWithoutBroadcast(%arg0: tensor<4xf32>, %arg1: tensor<4xf32>) -> tensor<
 // CHECK: #map1 = affine_map<(d0, d1) -> (d0, d1)>
 // CHECK-LABEL: @dynamicBroadcast
 func @dynamicBroadcast(%arg0: tensor<?xf32>, %arg1: tensor<?x?xf32>) -> tensor<?x?xf32> {
-  // Should broadcast %arg0 -> %arg1 and assert on dynamic expansion.
+  // Should cf.broadcast %arg0 -> %arg1 and cf.assert on dynamic expansion.
 
   // CHECK: %[[C0_0:.*]] = arith.constant 0 : index
   // CHECK: %[[ARG0_D0:.*]] = tensor.dim %arg0, %[[C0_0]]
@@ -30,7 +30,7 @@ func @dynamicBroadcast(%arg0: tensor<?xf32>, %arg1: tensor<?x?xf32>) -> tensor<?
   // CHECK: %[[C1_0:.*]] = arith.constant 1 : index
   // CHECK: %[[ARG1_D1:.*]] = tensor.dim %arg1, %[[C1_0]] : tensor<?x?xf32>
   // CHECK: %[[EQ:.*]] = arith.cmpi eq, %[[ARG0_D0]], %[[ARG1_D1]] : index
-  // CHECK: assert %[[EQ]], "mismatched dynamic broadcast extents"
+  // CHECK: cf.assert %[[EQ]], "mismatched dynamic cf.broadcast extents"
 
   // CHECK: %[[INIT_0:.*]] = linalg.init_tensor [%[[ARG1_D0]], %[[ARG0_D0]]] : tensor<?x?xf32>
   // CHECK: %[[BCAST_ARG0:.*]] = linalg.generic {indexing_maps = [#map0, #map1], iterator_types = ["parallel", "parallel"]}
@@ -45,7 +45,7 @@ func @dynamicBroadcast(%arg0: tensor<?xf32>, %arg1: tensor<?x?xf32>) -> tensor<?
 }
 
 // -----
-// Verifies that broadcast_dimensions validity checks are valid.
+// Verifies that cf.broadcast_dimensions validity checks are valid.
 // CHECK-LABEL: @dynamicNonScalarBroadcastDimensions
 func @dynamicNonScalarBroadcastDimensions(%arg0: tensor<1x4xf32>, %arg1: tensor<4xf32>) -> tensor<1x4xf32> {
   %0 = chlo.broadcast_add %arg0, %arg1 {broadcast_dimensions = dense<1> : tensor<1xi64>} : (tensor<1x4xf32>, tensor<4xf32>) -> tensor<1x4xf32>
@@ -53,7 +53,7 @@ func @dynamicNonScalarBroadcastDimensions(%arg0: tensor<1x4xf32>, %arg1: tensor<
 }
 
 // -----
-// Verifies that broadcast_dimensions validity checks are valid.
+// Verifies that cf.broadcast_dimensions validity checks are valid.
 // CHECK-LABEL: @dynamicNonScalarByScalarBroadcastDimensions
 func @dynamicNonScalarByScalarBroadcastDimensions(%arg0: tensor<1x4xf32>, %arg1: tensor<f32>) -> tensor<1x4xf32> {
   %0 = chlo.broadcast_add %arg0, %arg1 {broadcast_dimensions = dense<[]> : tensor<0xi64>} : (tensor<1x4xf32>, tensor<f32>) -> tensor<1x4xf32>
@@ -88,7 +88,7 @@ func @dynamicBroadcastCompare(%arg0: tensor<?xf32>, %arg1: tensor<?x?xf32>) -> t
 func @selectv2(%arg0: tensor<2xi1>, %arg1: tensor<2xi32>, %arg2: tensor<2xi32>) -> tensor<2xi32> {
   // All same type: should just short-circtuit to one mhlo.select / one generic.
   // CHECK: linalg.generic
-  // CHECK:   %[[BODY:.*]] = select
+  // CHECK:   %[[BODY:.*]] = arith.select
   // CHECK-NOT: linalg.generic
   %0 = "chlo.broadcast_select"(%arg0, %arg1, %arg2) : (tensor<2xi1>, tensor<2xi32>, tensor<2xi32>) -> tensor<2xi32>
   return %0: tensor<2xi32>
@@ -118,7 +118,7 @@ func @selectv2_broadcast_then(%arg0: tensor<i1>, %arg1: tensor<8x1xi32>, %arg2: 
   // CHECK: %[[BCAST_THEN:.*]] = linalg.generic {indexing_maps = [#map2, #map1], iterator_types = ["parallel", "parallel", "parallel"]} ins(%arg1 : tensor<8x1xi32>)
   // CHECK: linalg.generic
   // CHECK-SAME: ins(%[[BCAST_PRED]], %[[BCAST_THEN]], %arg2 : tensor<2x8x8xi1>, tensor<2x8x8xi32>, tensor<2x8x8xi32>)
-  // CHECK: select
+  // CHECK: arith.select
   %0 = "chlo.broadcast_select"(%arg0, %arg1, %arg2) : (tensor<i1>, tensor<8x1xi32>, tensor<2x8x8xi32>) -> tensor<2x8x8xi32>
   return %0: tensor<2x8x8xi32>
 }
@@ -133,7 +133,7 @@ func @selectv2_broadcast_else(%arg0: tensor<i1>, %arg1: tensor<2x8x8xi32>, %arg2
   // CHECK: %[[BCAST_ELSE:.*]] = linalg.generic {indexing_maps = [#map2, #map1], iterator_types = ["parallel", "parallel", "parallel"]} ins(%arg2 : tensor<8x1xi32>)
   // CHECK: linalg.generic
   // CHECK-SAME: ins(%[[BCAST_PRED]], %arg1, %[[BCAST_ELSE]] : tensor<2x8x8xi1>, tensor<2x8x8xi32>, tensor<2x8x8xi32>)
-  // CHECK: select
+  // CHECK: arith.select
   %0 = "chlo.broadcast_select"(%arg0, %arg1, %arg2) : (tensor<i1>, tensor<2x8x8xi32>, tensor<8x1xi32>) -> tensor<2x8x8xi32>
   return %0: tensor<2x8x8xi32>
 }
@@ -146,7 +146,7 @@ func @selectv2_broadcast_pred(%arg0: tensor<1xi1>, %arg1: tensor<2x8x8xi32>, %ar
   // CHECK: %[[BCAST_PRED:.*]] = linalg.generic {indexing_maps = [#map0, #map1], iterator_types = ["parallel", "parallel", "parallel"]} ins(%arg0 : tensor<1xi1>)
   // CHECK: linalg.generic
   // CHECK-SAME: ins(%[[BCAST_PRED]], %arg1, %arg2 : tensor<2x8x8xi1>, tensor<2x8x8xi32>, tensor<2x8x8xi32>)
-  // CHECK: select
+  // CHECK: arith.select
   %0 = "chlo.broadcast_select"(%arg0, %arg1, %arg2) : (tensor<1xi1>, tensor<2x8x8xi32>, tensor<2x8x8xi32>) -> tensor<2x8x8xi32>
   return %0: tensor<2x8x8xi32>
 }
@@ -265,17 +265,17 @@ func @selectv2_broadcast_dyn_all(%arg0: tensor<?x1x1xi1>, %arg1: tensor<?x8x1xi3
   // CHECK: %[[C2:.*]] = arith.constant 2 : index
   // CHECK: %[[ELSE_D2:.*]] = tensor.dim %arg2, %[[C2]] : tensor<?x1x?xi32>
   // CHECK: %[[CMP_0:.*]] = arith.cmpi eq, %[[PRED_D0]], %[[THEN_D0]] : index
-  // CHECK: assert %[[CMP_0]], "mismatched dynamic broadcast extents"
+  // CHECK: cf.assert %[[CMP_0]], "mismatched dynamic cf.broadcast extents"
   // CHECK: %[[CMP_1:.*]] = arith.cmpi eq, %[[PRED_D0]], %[[ELSE_D0]] : index
-  // CHECK: assert %[[CMP_1]], "mismatched dynamic broadcast extents"
-  // Only two asserts are needed. The rest are statically verified.
-  // CHECK-NOT: assert
+  // CHECK: cf.assert %[[CMP_1]], "mismatched dynamic cf.broadcast extents"
+  // Only two cf.asserts are needed. The rest are statically verified.
+  // CHECK-NOT: cf.assert
   %0 = "chlo.broadcast_select"(%arg0, %arg1, %arg2) : (tensor<?x1x1xi1>, tensor<?x8x1xi32>, tensor<?x1x?xi32>) -> tensor<?x8x?xi32>
   return %0: tensor<?x8x?xi32>
 }
 
 // -----
-// Note that broadcast_add is used as a proxy for all of the template
+// Note that cf.broadcast_add is used as a proxy for all of the template
 // expansions. Tests below merely verify that the op has an expansion.
 // CHECK-LABEL: @andWithoutBroadcast
 func @andWithoutBroadcast(%arg0: tensor<4xi1>, %arg1: tensor<4xi1>) -> tensor<4xi1> {

@@ -14,7 +14,7 @@ func @simple_constants(%device : !hal.device, %arg : i32) -> i32 {
   // CHECK-DAG: %[[C4:.+]] = arith.constant 4
   %0 = hal.device.switch<%device : !hal.device> -> i32
     // CHECK-NEXT: %{{.+}}, %[[IS0:.+]] = hal.device.query<%[[DEVICE]] : !hal.device> key("hal.device.id" :: "vulkan-v1.?-*") : i1, i1 = false
-    // CHECK-NEXT: cond_br %[[IS0]], ^bb3(%[[C1]] : i32), ^bb1
+    // CHECK-NEXT: cf.cond_br %[[IS0]], ^bb3(%[[C1]] : i32), ^bb1
     #hal.device.match.id<"vulkan-v1.?-*"> {
       hal.return %c1 : i32
     },
@@ -22,13 +22,13 @@ func @simple_constants(%device : !hal.device, %arg : i32) -> i32 {
     // CHECK-NEXT:  %{{.+}}, %[[IS1L:.+]] = hal.device.query<%[[DEVICE]] : !hal.device> key("hal.device.id" :: "vmvx") : i1, i1 = false
     // CHECK-NEXT:  %{{.+}}, %[[IS1R:.+]] = hal.device.query<%[[DEVICE]] : !hal.device> key("hal.device.id" :: "vulkan-*") : i1, i1 = false
     // CHECK-NEXT:  %[[IS1:.+]] = arith.ori %[[IS1L]], %[[IS1R]] : i1
-    // CHECK-NEXT:  cond_br %[[IS1]], ^bb2, ^bb3(%[[C0]] : i32)
+    // CHECK-NEXT:  cf.cond_br %[[IS1]], ^bb2, ^bb3(%[[C0]] : i32)
     // CHECK-NEXT: ^bb2:
     // CHECK-NEXT:  %[[EQZ:.+]] = arith.cmpi eq, %[[ARG]], %[[C2]] : i32
-    // CHECK-NEXT:  cond_br %[[EQZ]], ^bb3(%[[C3]] : i32), ^bb3(%[[C4]] : i32)
+    // CHECK-NEXT:  cf.cond_br %[[EQZ]], ^bb3(%[[C3]] : i32), ^bb3(%[[C4]] : i32)
     #hal.match.any<[#hal.device.match.id<"vmvx">, #hal.device.match.id<"vulkan-*">]> {
       %eqz = arith.cmpi eq, %arg, %c2 : i32
-      cond_br %eqz, ^bb_true, ^bb_false
+      cf.cond_br %eqz, ^bb_true, ^bb_false
     ^bb_true:
       %c3 = arith.constant 3 : i32
       hal.return %c3 : i32
@@ -51,10 +51,10 @@ func @simple_constants(%device : !hal.device, %arg : i32) -> i32 {
 func @no_results(%device : !hal.device) {
   hal.device.switch<%device : !hal.device>
     // CHECK-NEXT:  %{{.+}}, %[[IS0:.+]] = hal.device.query<%[[DEVICE]] : !hal.device> key("hal.device.id" :: "vulkan-v1.?-*") : i1, i1 = false
-    // CHECK-NEXT:  cond_br %[[IS0]], ^bb1, ^bb2
+    // CHECK-NEXT:  cf.cond_br %[[IS0]], ^bb1, ^bb2
     // CHECK-NEXT: ^bb1:
     // CHECK-NEXT:  "some.op_a"()
-    // CHECK-NEXT:  br ^bb5
+    // CHECK-NEXT:  cf.br ^bb5
     #hal.device.match.id<"vulkan-v1.?-*"> {
       "some.op_a"() : () -> ()
       hal.return
@@ -63,17 +63,17 @@ func @no_results(%device : !hal.device) {
     // CHECK-NEXT:  %{{.+}}, %[[IS1L:.+]] = hal.device.query<%[[DEVICE]] : !hal.device> key("hal.device.id" :: "vmvx") : i1, i1 = false
     // CHECK-NEXT:  %{{.+}}, %[[IS1R:.+]] = hal.device.query<%[[DEVICE]] : !hal.device> key("hal.device.id" :: "vulkan-*") : i1, i1 = false
     // CHECK-NEXT:  %[[IS1:.+]] = arith.ori %[[IS1L]], %[[IS1R]] : i1
-    // CHECK-NEXT:  cond_br %[[IS1]], ^bb3, ^bb4
+    // CHECK-NEXT:  cf.cond_br %[[IS1]], ^bb3, ^bb4
     // CHECK-NEXT: ^bb3:
     // CHECK-NEXT:  "some.op_b"()
-    // CHECK-NEXT:  br ^bb5
+    // CHECK-NEXT:  cf.br ^bb5
     #hal.match.any<[#hal.device.match.id<"vmvx">, #hal.device.match.id<"vulkan-*">]> {
       "some.op_b"() : () -> ()
       hal.return
     },
     // CHECK-NEXT: ^bb4:
     // CHECK-NEXT:  "some.op_c"()
-    // CHECK-NEXT:  br ^bb5
+    // CHECK-NEXT:  cf.br ^bb5
     #hal.match.always {
       "some.op_c"() : () -> ()
       hal.return

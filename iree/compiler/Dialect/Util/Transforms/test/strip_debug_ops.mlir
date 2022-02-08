@@ -2,7 +2,7 @@
 
 // CHECK-LABEL: @stripAssert
 func @stripAssert(%cond: i1) {
-  // CHECK-NOT: assert
-  assert %cond, "hello!"
+  // CHECK-NOT: cf.assert
+  cf.assert %cond, "hello!"
   return
 }

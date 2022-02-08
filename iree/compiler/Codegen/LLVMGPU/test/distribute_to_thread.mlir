@@ -112,9 +112,9 @@ hal.executable @reduction_dispatch {
         linalg.generic {indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> ()>], iterator_types = ["reduction"]} ins(%0 : memref<1000xf32>) outs(%1 : memref<f32>) attrs = {lowering.config = #config} {
         ^bb0(%arg0: f32, %arg1: f32):  // no predecessors
           %2 = arith.cmpf ogt, %arg0, %arg1 : f32
-          %3 = select %2, %arg0, %arg1 : f32
+          %3 = arith.select %2, %arg0, %arg1 : f32
           %4 = arith.cmpf uno, %arg0, %arg1 : f32
-          %5 = select %4, %cst, %3 : f32
+          %5 = arith.select %4, %cst, %3 : f32
           linalg.yield %5 : f32
         }
         return

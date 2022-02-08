@@ -599,7 +599,7 @@ func @inline_dag_2(
   %0 = tensor.expand_shape %arg0 [[0, 1]] : tensor<?xf32> into tensor<1x?xf32>
   %1 = tensor.extract_slice %0[0, 20] [1, %arg3] [1, 1] : tensor<1x?xf32> to tensor<1x?xf32>
   %2 = tensor.collapse_shape %arg1 [[0, 1]] : tensor<1x?xf32> into tensor<?xf32>
-  br ^bb1
+  cf.br ^bb1
 ^bb1:
   %3 = tensor.collapse_shape %1 [[0, 1]] : tensor<1x?xf32> into tensor<?xf32>
   %4 = tensor.extract_slice %0[0, 10] [1, %arg3] [1, 1] : tensor<1x?xf32> to tensor<1x?xf32>
@@ -654,9 +654,9 @@ func @inline_dag_3(%240 : tensor<9xi32>, %244 : tensor<18xi32>, %247 : tensor<i3
   %245 = flow.tensor.update %240, %244[%c9] : tensor<9xi32> -> %244 as tensor<18xi32>
   %248 = tensor.extract %247[] : tensor<i32>
   %249 = arith.cmpi slt, %248, %c9_i32 : i32
-  %250 = select %249, %248, %c9_i32 : i32
+  %250 = arith.select %249, %248, %c9_i32 : i32
   %251 = arith.cmpi sgt, %250, %c0_i32 : i32
-  %252 = select %251, %250, %c0_i32 : i32
+  %252 = arith.select %251, %250, %c0_i32 : i32
   %253 = arith.index_cast %252 : i32 to index
   %254 = tensor.extract_slice %245[%253] [9] [1] : tensor<18xi32> to tensor<9xi32>
   %255 = linalg.init_tensor [9] : tensor<9xi1>
@@ -688,9 +688,9 @@ func @inline_dag_3(%240 : tensor<9xi32>, %244 : tensor<18xi32>, %247 : tensor<i3
 //   CHECK-DAG:     %[[ARG3V:.+]] = flow.dispatch.tensor.load %[[ARG3]]
 //   CHECK-DAG:     %[[EXTRACT:.+]] = tensor.extract %[[ARG3V]]
 //   CHECK-DAG:     %[[CMP1:.+]] = arith.cmpi slt, %[[EXTRACT]]
-//   CHECK-DAG:     %[[SELECT1:.+]] = select %[[CMP1]], %[[EXTRACT]], %[[C9]]
+//   CHECK-DAG:     %[[SELECT1:.+]] = arith.select %[[CMP1]], %[[EXTRACT]], %[[C9]]
 //   CHECK-DAG:     %[[CMP2:.+]] = arith.cmpi sgt, %[[SELECT1]], %[[C0]]
-//   CHECK-DAG:     %[[SELECT2:.+]] = select %[[CMP2]], %[[SELECT1]], %[[C0]]
+//   CHECK-DAG:     %[[SELECT2:.+]] = arith.select %[[CMP2]], %[[SELECT1]], %[[C0]]
 //   CHECK-DAG:     %[[INDEX_CAST:.+]] = arith.index_cast %[[SELECT2]]
 //       CHECK:     scf.for %[[IV0:.+]] =
 //       CHECK:       %[[OFFSET:.+]] = affine.apply #[[MAP0]](%[[IV0]])[%[[INDEX_CAST]]
@@ -705,12 +705,12 @@ func @inline_dag_4(%arg0: tensor<4xi32>, %arg1: tensor<i32>) -> tensor<i16> {
   %c0_i32 = arith.constant 0 : i32
   %0 = tensor.extract %arg1[] : tensor<i32>
   %1 = arith.cmpi slt, %0, %c3_i32 : i32
-  %2 = select %1, %0, %c3_i32 : i32
+  %2 = arith.select %1, %0, %c3_i32 : i32
   %3 = arith.cmpi sgt, %2, %c0_i32 : i32
-  %4 = select %3, %2, %c0_i32 : i32
+  %4 = arith.select %3, %2, %c0_i32 : i32
   %5 = arith.index_cast %4 : i32 to index
   %6 = tensor.extract_slice %arg0[%5] [1] [1] : tensor<4xi32> to tensor<i32>
-  br ^bb1
+  cf.br ^bb1
 ^bb1:  // pred: ^bb0
   %7 = linalg.init_tensor [] : tensor<i16>
   %8 = linalg.generic {indexing_maps = [#map, #map], iterator_types = []} ins(%6 : tensor<i32>) outs(%7 : tensor<i16>) {
@@ -735,9 +735,9 @@ func @inline_dag_4(%arg0: tensor<4xi32>, %arg1: tensor<i32>) -> tensor<i16> {
 //       CHECK:     %[[INIT:.+]] = linalg.init_tensor [] : tensor<i16>
 //       CHECK:     %[[OP1:.+]] = tensor.extract %[[LEAF2]][] : tensor<i32>
 //       CHECK:     %[[OP2:.+]] = arith.cmpi slt, %[[OP1]], %[[C3]] : i32
-//       CHECK:     %[[OP3:.+]] = select %[[OP2]], %[[OP1]], %[[C3]] : i32
+//       CHECK:     %[[OP3:.+]] = arith.select %[[OP2]], %[[OP1]], %[[C3]] : i32
 //       CHECK:     %[[OP4:.+]] = arith.cmpi sgt, %[[OP3]], %[[C0]] : i32
-//       CHECK:     %[[OP5:.+]] = select %[[OP4]], %[[OP3]], %[[C0]] : i32
+//       CHECK:     %[[OP5:.+]] = arith.select %[[OP4]], %[[OP3]], %[[C0]] : i32
 //       CHECK:     %[[OP6:.+]] = arith.index_cast %[[OP5]] : i32 to index
 //       CHECK:     %[[OP7:.+]] = tensor.extract_slice %[[LEAF1]][%[[OP6]]] [1] [1] : tensor<4xi32> to tensor<i32>
 //       CHECK:     %[[RES:.+]] = linalg.generi
@@ -769,12 +769,12 @@ func @multi_result(%arg0: tensor<?x?xi32>, %arg1: tensor<?x?xi32>) -> (tensor<?x
       outs(%1, %2 : tensor<?xi32>, tensor<?xi32>) {
   ^bb0(%arg2: i32, %arg3: i32, %arg4: i32, %arg5: i32):  // no predecessors
     %5 = arith.cmpi sge, %arg2, %arg4 : i32
-    %6 = select %5, %arg2, %arg4 : i32
+    %6 = arith.select %5, %arg2, %arg4 : i32
     %7 = arith.cmpi eq, %arg2, %arg4 : i32
     %8 = arith.cmpi slt, %arg3, %arg5 : i32
-    %9 = select %8, %arg3, %arg5 : i32
-    %10 = select %5, %arg3, %arg5 : i32
-    %11 = select %7, %9, %10 : i32
+    %9 = arith.select %8, %arg3, %arg5 : i32
+    %10 = arith.select %5, %arg3, %arg5 : i32
+    %11 = arith.select %7, %9, %10 : i32
     linalg.yield %6, %11 : i32, i32
   } -> (tensor<?xi32>, tensor<?xi32>)
   return %4#0, %4#1 : tensor<?xi32>, tensor<?xi32>
@@ -796,15 +796,15 @@ func @dynamic_slice(%arg0: tensor<?x?xi32>, %arg1: tensor<i32>, %arg2: tensor<i3
   %c0_i32 = arith.constant 0 : i32
   %0 = tensor.extract %arg1[] : tensor<i32>
   %1 = arith.cmpi slt, %0, %c1_i32 : i32
-  %2 = select %1, %0, %c1_i32 : i32
+  %2 = arith.select %1, %0, %c1_i32 : i32
   %3 = arith.cmpi sgt, %2, %c0_i32 : i32
-  %4 = select %3, %2, %c0_i32 : i32
+  %4 = arith.select %3, %2, %c0_i32 : i32
   %5 = arith.index_cast %4 : i32 to index
   %6 = tensor.extract %arg2[] : tensor<i32>
   %7 = arith.cmpi slt, %6, %c0_i32 : i32
-  %8 = select %7, %6, %c0_i32 : i32
+  %8 = arith.select %7, %6, %c0_i32 : i32
   %9 = arith.cmpi sgt, %8, %c0_i32 : i32
-  %10 = select %9, %8, %c0_i32 : i32
+  %10 = arith.select %9, %8, %c0_i32 : i32
   %11 = arith.index_cast %10 : i32 to index
   %12 = tensor.extract_slice %arg0[%5, %11] [1, %arg3] [1, 1] : tensor<?x?xi32> to tensor<1x?xi32>
   return %12 : tensor<1x?xi32>
@@ -821,13 +821,13 @@ func @dynamic_slice(%arg0: tensor<?x?xi32>, %arg1: tensor<i32>, %arg2: tensor<i3
 //  CHECK-SAME:     [%[[ARG3]], %[[C1]], %[[C1]]]
 //  CHECK-SAME:     (%[[ARG3]], %[[ARG1]], %[[ARG2]], %[[ARG0]], %[[ARG0_D0]], %[[ARG0_D1]])
 //   CHECK-DAG:     cmpi
-//   CHECK-DAG:     select
+//   CHECK-DAG:     arith.select
 //   CHECK-DAG:     cmpi
-//   CHECK-DAG:     select
+//   CHECK-DAG:     arith.select
 //   CHECK-DAG:     cmpi
 //   CHECK-DAG:     cmpi
-//   CHECK-DAG:     select
-//   CHECK-DAG:     select
+//   CHECK-DAG:     arith.select
+//   CHECK-DAG:     arith.select
 //   CHECK-DAG:     index_cast
 //   CHECK-DAG:     index_cast
 //   CHECK-NOT:     tensor.extract
@@ -1105,14 +1105,14 @@ func @dynamic_slice(%arg0 : i32, %arg1 : i32, %arg2 : tensor<?xi32>,
   %c0_i32 = arith.constant 0 : i32
   %c2_i32 = arith.constant 2 : i32
   %5 = arith.cmpi slt, %arg0, %c2_i32 : i32
-  %6 = select %5, %arg0, %c2_i32 : i32
+  %6 = arith.select %5, %arg0, %c2_i32 : i32
   %7 = arith.cmpi sgt, %6, %c0_i32 : i32
-  %8 = select %7, %6, %c0_i32 : i32
+  %8 = arith.select %7, %6, %c0_i32 : i32
   %9 = arith.index_cast %8 : i32 to index
   %11 = arith.cmpi slt, %arg1, %c0_i32 : i32
-  %12 = select %11, %arg1, %c0_i32 : i32
+  %12 = arith.select %11, %arg1, %c0_i32 : i32
   %13 = arith.cmpi sgt, %12, %c0_i32 : i32
-  %14 = select %13, %12, %c0_i32 : i32
+  %14 = arith.select %13, %12, %c0_i32 : i32
   %15 = arith.index_cast %14 : i32 to index
   %d0 = tensor.dim %arg2, %c0 : tensor<?xi32>
   %17 = tensor.insert_slice %arg2 into

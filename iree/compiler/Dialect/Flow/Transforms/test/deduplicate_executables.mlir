@@ -307,7 +307,7 @@ flow.executable @block_successors_ex_0 {
       %c0 = arith.constant 0 : i32
       %c1 = arith.constant 1 : i32
       %eqz = arith.cmpi eq, %arg0, %arg1 : i32
-      cond_br %eqz, ^bb_a(%c0 : i32), ^bb_b(%c1 : i32)
+      cf.cond_br %eqz, ^bb_a(%c0 : i32), ^bb_b(%c1 : i32)
     ^bb_a(%bb_a_arg0 : i32):
       return %bb_a_arg0 : i32
     ^bb_b(%bb_b_arg0 : i32):
@@ -323,7 +323,7 @@ flow.executable @block_successors_ex_with_swapped_cond_br {
       %c0 = arith.constant 0 : i32
       %c1 = arith.constant 1 : i32
       %eqz = arith.cmpi eq, %arg0, %arg1 : i32
-      cond_br %eqz, ^bb_b(%c0 : i32), ^bb_b(%c1 : i32)
+      cf.cond_br %eqz, ^bb_b(%c0 : i32), ^bb_b(%c1 : i32)
     ^bb_a(%bb_a_arg0 : i32):
       return %bb_a_arg0 : i32
     ^bb_b(%bb_b_arg0 : i32):

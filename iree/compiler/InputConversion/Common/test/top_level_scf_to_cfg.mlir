@@ -24,7 +24,7 @@ func @generic_nested_for(%arg0: tensor<?x?x?x?xi32>, %arg1: tensor<?x?x?x?xi32>,
       %28 = arith.andi %arg8, %c1_i32 : i32
       %29 = arith.cmpi eq, %28, %c1_i32 : i32
       %30 = arith.muli %arg6, %arg7 : i32
-      %31 = select %29, %30, %arg6 : i32
+      %31 = arith.select %29, %30, %arg6 : i32
       %32 = arith.muli %arg7, %arg7 : i32
       %33 = arith.shrui %arg8, %c1_i32 : i32
       scf.yield %31, %32, %33 : i32, i32, i32
@@ -34,10 +34,10 @@ func @generic_nested_for(%arg0: tensor<?x?x?x?xi32>, %arg1: tensor<?x?x?x?xi32>,
     %21 = arith.cmpi slt, %arg3, %c0_i32 : i32
     %22 = arith.cmpi eq, %arg2, %c1_i32 : i32
     %23 = arith.cmpi eq, %arg2, %c-1_i32 : i32
-    %24 = select %22, %c1_i32, %c0_i32 : i32
-    %25 = select %20, %c1_i32, %c-1_i32 : i32
-    %26 = select %23, %25, %24 : i32
-    %27 = select %21, %26, %18#0 : i32
+    %24 = arith.select %22, %c1_i32, %c0_i32 : i32
+    %25 = arith.select %20, %c1_i32, %c-1_i32 : i32
+    %26 = arith.select %23, %25, %24 : i32
+    %27 = arith.select %21, %26, %18#0 : i32
     linalg.yield %27 : i32
   } -> tensor<?x?x?x?xi32>
 

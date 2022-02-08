@@ -105,23 +105,23 @@ func @SinkAwaitToFirstConsumer(
   %c200 = arith.constant 200 : index
   // CHECK-NOT: stream.timepoint.await
   %0:2 = stream.timepoint.await %arg5 => %arg2, %arg3 : !stream.resource<constant>{%c100}, !stream.resource<staging>{%c200}
-  // CHECK: cond_br %arg0, ^bb1, ^bb4
-  cond_br %arg0, ^bb1, ^bb4(%arg4 : !stream.resource<external>)
+  // CHECK: cf.cond_br %arg0, ^bb1, ^bb4
+  cf.cond_br %arg0, ^bb1, ^bb4(%arg4 : !stream.resource<external>)
 // CHECK: ^bb1:
 ^bb1:
   // CHECK: %[[READY:.+]]:2 = stream.timepoint.await %arg5 => %arg2, %arg3 : !stream.resource<constant>{%c100}, !stream.resource<staging>{%c200}
-  // CHECK-NEXT: cond_br %arg1, ^bb2, ^bb3
-  cond_br %arg1, ^bb2, ^bb3
+  // CHECK-NEXT: cf.cond_br %arg1, ^bb2, ^bb3
+  cf.cond_br %arg1, ^bb2, ^bb3
 // CHECK: ^bb2:
 ^bb2:
   // CHECK: = stream.async.transfer %[[READY]]#0
   %1 = stream.async.transfer %0#0 : !stream.resource<constant>{%c100} -> !stream.resource<external>{%c100}
-  br ^bb4(%1 : !stream.resource<external>)
+  cf.br ^bb4(%1 : !stream.resource<external>)
 // CHECK: ^bb3:
 ^bb3:
   // CHECK: = stream.async.transfer %[[READY]]#1
   %2 = stream.async.transfer %0#1 : !stream.resource<staging>{%c200} -> !stream.resource<external>{%c200}
-  br ^bb4(%2 : !stream.resource<external>)
+  cf.br ^bb4(%2 : !stream.resource<external>)
 // CHECK: ^bb4(
 ^bb4(%arg6: !stream.resource<external>):
   return %arg6 : !stream.resource<external>

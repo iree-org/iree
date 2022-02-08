@@ -99,8 +99,8 @@ func private @blockArgMove(%cond: i1, %size: index) -> (!stream.resource<*>, !st
   %splat0 = stream.async.splat %c123_i32 : i32 -> !stream.resource<*>{%size}
   // CHECK: %[[SPLAT1:.+]] = stream.async.splat %c456
   %splat1 = stream.async.splat %c456_i32 : i32 -> !stream.resource<*>{%size}
-  // CHECK: br ^bb1(%[[SPLAT0]], %[[SPLAT1]]
-  br ^bb1(%splat0, %splat1 : !stream.resource<*>, !stream.resource<*>)
+  // CHECK: cf.br ^bb1(%[[SPLAT0]], %[[SPLAT1]]
+  cf.br ^bb1(%splat0, %splat1 : !stream.resource<*>, !stream.resource<*>)
 // CHECK: ^bb1(%[[BB1_ARG0:.+]]: !stream.resource<*>, %[[BB1_ARG1:.+]]: !stream.resource<*>)
 ^bb1(%bb1_0: !stream.resource<*>, %bb1_1: !stream.resource<*>):
   // CHECK-NOT: stream.async.clone
@@ -111,11 +111,11 @@ func private @blockArgMove(%cond: i1, %size: index) -> (!stream.resource<*>, !st
   %clone1 = stream.async.clone %bb1_1 : !stream.resource<*>{%size} -> !stream.resource<*>{%size}
   // CHECK: %[[FILL1:.+]] = stream.async.fill %c456_i32, %[[CLONE1]]
   %fill1 = stream.async.fill %c456_i32, %clone1[%c0 to %c128 for %c128] : i32 -> !stream.resource<*>{%size}
-  // CHECK: %[[SELECT:.+]] = select %[[COND]], %[[SPLAT1]], %[[FILL1]]
-  %bb1_1_new = select %cond, %splat1, %fill1 : !stream.resource<*>
-  // CHECK: cond_br %[[COND]], ^bb1(%[[FILL0]], %[[SELECT]]
+  // CHECK: %[[SELECT:.+]] = arith.select %[[COND]], %[[SPLAT1]], %[[FILL1]]
+  %bb1_1_new = arith.select %cond, %splat1, %fill1 : !stream.resource<*>
+  // CHECK: cf.cond_br %[[COND]], ^bb1(%[[FILL0]], %[[SELECT]]
   // CHECK-SAME:               ^bb2(%[[FILL0]], %[[SELECT]]
-  cond_br %cond, ^bb1(%fill0, %bb1_1_new : !stream.resource<*>, !stream.resource<*>),
+  cf.cond_br %cond, ^bb1(%fill0, %bb1_1_new : !stream.resource<*>, !stream.resource<*>),
                  ^bb2(%fill0, %bb1_1_new : !stream.resource<*>, !stream.resource<*>)
 ^bb2(%bb2_0: !stream.resource<*>, %bb2_1: !stream.resource<*>):
   return %bb2_0, %bb2_1 : !stream.resource<*>, !stream.resource<*>

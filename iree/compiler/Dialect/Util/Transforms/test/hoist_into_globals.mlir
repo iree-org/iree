@@ -143,7 +143,7 @@ module @hoist_tree_const_expr {
 }
 
 // -----
-// Ensures that non-leaf const-exprs (i.e. think broadcasts and other ops
+// Ensures that non-leaf const-exprs (i.e. think cf.broadcasts and other ops
 // that should be considered const-expr but that you never want to hoist as
 // a leaf) are hoisted internal to a const-expr but are left as-is at the leaf.
 // CHECK-LABEL: @hoist_non_leaf_const_expr

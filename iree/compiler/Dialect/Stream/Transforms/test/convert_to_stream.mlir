@@ -129,8 +129,8 @@ func @while_test() {
   %0 = util.do_not_optimize(%cst) : tensor<i32>
 
   // CHECK: %[[VAR_SIZE:.+]] = stream.resource.size %[[INITIAL_DNO]] : !stream.resource<*>
-  // CHECK: br ^bb1(%[[INITIAL_DNO]], %[[VAR_SIZE]] : !stream.resource<*>, index)
-  br ^bb1(%0 : tensor<i32>)
+  // CHECK: cf.br ^bb1(%[[INITIAL_DNO]], %[[VAR_SIZE]] : !stream.resource<*>, index)
+  cf.br ^bb1(%0 : tensor<i32>)
 
 // CHECK: ^bb1(%[[BB1_ARG:.+]]: !stream.resource<*>, %[[BB1_ARG_SIZE:.+]]: index):
 ^bb1(%1: tensor<i32>):
@@ -142,8 +142,8 @@ func @while_test() {
   // CHECK: %[[COND:.+]] = stream.tensor.load %[[READBACK]] : tensor<i1> in !stream.resource<staging>{%[[COND_SIZE]]} -> i1
   %3 = flow.tensor.load %2 : tensor<i1>
 
-  // CHECK: cond_br %[[COND]], ^bb2, ^bb3
-  cond_br %3, ^bb2, ^bb3
+  // CHECK: cf.cond_br %[[COND]], ^bb2, ^bb3
+  cf.cond_br %3, ^bb2, ^bb3
 
 // CHECK: ^bb2:
 ^bb2:
@@ -151,8 +151,8 @@ func @while_test() {
   // CHECK: %[[BB2_VAR:.+]] = stream.async.dispatch @while_test_dispatch_1::@dispatch[%c1, %c1, %c1](%[[BB1_ARG]]) : (!stream.resource<*>{%[[BB1_ARG_SIZE]]}) -> !stream.resource<*>{%[[BB2_VAR_SIZE]]}
   %4 = flow.dispatch @while_test_dispatch_1::@dispatch[%c1, %c1, %c1](%1) : (tensor<i32>) -> tensor<i32>
 
-  // CHECK: br ^bb1(%[[BB2_VAR]], %[[BB2_VAR_SIZE]] : !stream.resource<*>, index)
-  br ^bb1(%4 : tensor<i32>)
+  // CHECK: cf.br ^bb1(%[[BB2_VAR]], %[[BB2_VAR_SIZE]] : !stream.resource<*>, index)
+  cf.br ^bb1(%4 : tensor<i32>)
 
 // CHECK: ^bb3:
 ^bb3:
@@ -173,9 +173,9 @@ func @while_test() {
 // CHECK-LABEL: unrealizedCastCleanup
 // CHECK-SAME: (%[[COND:.+]]: i1, %[[LHS:.+]]: !stream.resource<*>, %[[LHS_SIZE:.+]]: index, %[[RHS:.+]]: !stream.resource<*>, %[[RHS_SIZE:.+]]: index) -> (!stream.resource<*>, index)
 func @unrealizedCastCleanup(%cond: i1, %lhs: tensor<1024xf32>, %rhs: tensor<1024xf32>) -> tensor<1024xf32> {
-  // CHECK-DAG: %[[RET:.+]] = select %[[COND]], %[[LHS]], %[[RHS]] : !stream.resource<*>
-  // CHECK-DAG: %[[RET_SIZE:.+]] = select %[[COND]], %[[LHS_SIZE]], %[[RHS_SIZE]] : index
-  %0 = select %cond, %lhs, %rhs : tensor<1024xf32>
+  // CHECK-DAG: %[[RET:.+]] = arith.select %[[COND]], %[[LHS]], %[[RHS]] : !stream.resource<*>
+  // CHECK-DAG: %[[RET_SIZE:.+]] = arith.select %[[COND]], %[[LHS_SIZE]], %[[RHS_SIZE]] : index
+  %0 = arith.select %cond, %lhs, %rhs : tensor<1024xf32>
   // CHECK: return %[[RET]], %[[RET_SIZE]]
   return %0 : tensor<1024xf32>
 }
