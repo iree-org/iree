@@ -32,6 +32,37 @@ static Value gpuAllocationFunction(OpBuilder &builder, Location loc,
   return builder.create<memref::AllocOp>(loc, allocType, dynamicSizes);
 }
 
+//===---------------------------------------------------------------------===//
+// Codegen configuration verifications.
+//===---------------------------------------------------------------------===//
+
+LogicalResult verifyGPUMatmulSimtPassPipeline(
+    Operation *op, IREE::Codegen::LoweringConfigAttr loweringConfig,
+    IREE::Codegen::TranslationInfoAttr translationInfo,
+    ArrayRef<int64_t> workgroupSize) {
+  if (workgroupSize.empty()) {
+    return op->emitOpError("Expected workgroup size for GPU pipelines");
+  }
+
+  // Verify that the workgroup size is <= 1024
+  auto pipeline =
+      IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUMatmulSimt;
+  StringRef pipelineName = stringifyEnum(pipeline);
+  int64_t totalWorkgroupSize =
+      workgroupSize[0] * workgroupSize[1] * workgroupSize[2];
+
+  if (totalWorkgroupSize > 1024) {
+    return op->emitOpError("expected workgroup size to be <=1024 for ")
+           << pipelineName << ", got " << totalWorkgroupSize;
+  }
+
+  return success();
+}
+
+//===---------------------------------------------------------------------===//
+// Codegen pipelines.
+//===---------------------------------------------------------------------===//
+
 void addGPUVectorizationPassPipeline(OpPassManager &pm) {
   //===--------------------------------------------------------------------===//
   // Initial clean up.
