@@ -16,6 +16,7 @@
 #include "llvm/ADT/BreadthFirstIterator.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Debug.h"
+#include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/BlockAndValueMapping.h"
@@ -580,6 +581,7 @@ class PropagateTimepointsPass
 
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<mlir::StandardOpsDialect>();
+    registry.insert<mlir::cf::ControlFlowDialect>();
     registry.insert<IREE::Stream::StreamDialect>();
     registry.insert<IREE::Util::UtilDialect>();
   }

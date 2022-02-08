@@ -11,7 +11,7 @@
 #include "llvm/ADT/iterator_range.h"
 #include "mlir-hlo/Dialect/mhlo/IR/hlo_ops.h"
 #include "mlir/Dialect/Affine/Utils.h"
-#include "mlir/Dialect/StandardOps/IR/Ops.h"
+#include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
 #include "mlir/IR/BlockAndValueMapping.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinTypes.h"
@@ -175,7 +175,7 @@ bool convertIndirectCallOp(CallIndirectOp *oldOp, OpBuilder &builder,
   return false;
 }
 
-bool convertBranchOp(BranchOp *oldOp, OpBuilder &builder,
+bool convertBranchOp(cf::BranchOp *oldOp, OpBuilder &builder,
                      BlockAndValueMapping *mapping) {
   llvm::SmallVector<Value, 4> newArgs;
   if (untupleAndLookupValues(oldOp->getOperands(), &newArgs, builder,
@@ -183,7 +183,7 @@ bool convertBranchOp(BranchOp *oldOp, OpBuilder &builder,
     return true;
   }
 
-  auto newOp = builder.create<BranchOp>(
+  auto newOp = builder.create<cf::BranchOp>(
       oldOp->getLoc(), mapping->lookupOrNull(oldOp->getDest()), newArgs);
 
   copyOperationAttrs(oldOp->getOperation(), newOp.getOperation());
@@ -191,7 +191,7 @@ bool convertBranchOp(BranchOp *oldOp, OpBuilder &builder,
   return false;
 }
 
-bool convertCondBranchOp(CondBranchOp *oldOp, OpBuilder &builder,
+bool convertCondBranchOp(cf::CondBranchOp *oldOp, OpBuilder &builder,
                          BlockAndValueMapping *mapping) {
   llvm::SmallVector<Value, 4> trueArgs;
   if (untupleAndLookupValues(oldOp->getTrueOperands(), &trueArgs, builder,
@@ -205,7 +205,7 @@ bool convertCondBranchOp(CondBranchOp *oldOp, OpBuilder &builder,
     return true;
   }
 
-  auto newOp = builder.create<CondBranchOp>(
+  auto newOp = builder.create<cf::CondBranchOp>(
       oldOp->getLoc(), mapping->lookupOrNull(oldOp->getCondition()),
       mapping->lookupOrNull(oldOp->getTrueDest()), trueArgs,
       mapping->lookupOrNull(oldOp->getFalseDest()), falseArgs);
@@ -223,9 +223,9 @@ bool convertOperation(Operation *op, OpBuilder &builder,
     return convertCallOp(&callOp, builder, mapping);
   } else if (auto callIndirectOp = dyn_cast<CallIndirectOp>(op)) {
     return convertIndirectCallOp(&callIndirectOp, builder, mapping);
-  } else if (auto branchOp = dyn_cast<BranchOp>(op)) {
+  } else if (auto branchOp = dyn_cast<cf::BranchOp>(op)) {
     return convertBranchOp(&branchOp, builder, mapping);
-  } else if (auto condBranchOp = dyn_cast<CondBranchOp>(op)) {
+  } else if (auto condBranchOp = dyn_cast<cf::CondBranchOp>(op)) {
     return convertCondBranchOp(&condBranchOp, builder, mapping);
   }
 

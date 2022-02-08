@@ -15,7 +15,7 @@
 #include "iree/compiler/Dialect/Flow/IR/PartitionableLoopsInterface.h"
 #include "llvm/Support/CommandLine.h"
 #include "mlir/Conversion/ReconcileUnrealizedCasts/ReconcileUnrealizedCasts.h"
-#include "mlir/Conversion/SCFToStandard/SCFToStandard.h"
+#include "mlir/Conversion/SCFToControlFlow/SCFToControlFlow.h"
 #include "mlir/Dialect/Arithmetic/Transforms/Passes.h"
 #include "mlir/Dialect/Linalg/Passes.h"
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
@@ -314,7 +314,7 @@ static void addLowerToLLVMPasses(OpPassManager &passManager) {
   passManager.addNestedPass<FuncOp>(createCSEPass());
 
   // SCF -> STD
-  passManager.addNestedPass<FuncOp>(createLowerToCFGPass());
+  passManager.addNestedPass<FuncOp>(createConvertSCFToCFPass());
   passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
   passManager.addNestedPass<FuncOp>(createCSEPass());
 

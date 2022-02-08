@@ -9,7 +9,7 @@
 #include "iree/compiler/InputConversion/Common/Passes.h"
 #include "mlir-hlo/Dialect/mhlo/transforms/passes.h"
 #include "mlir/Conversion/ReconcileUnrealizedCasts/ReconcileUnrealizedCasts.h"
-#include "mlir/Conversion/SCFToStandard/SCFToStandard.h"
+#include "mlir/Conversion/SCFToControlFlow/SCFToControlFlow.h"
 #include "mlir/Conversion/ShapeToStandard/ShapeToStandard.h"
 #include "mlir/Dialect/SCF/Passes.h"
 #include "mlir/Dialect/Shape/Transforms/Passes.h"

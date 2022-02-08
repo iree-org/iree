@@ -48,6 +48,8 @@ iree_cc_library(
     LLVMSupport
     MLIRAffine
     MLIRArithmetic
+    MLIRControlFlow
+    MLIRControlFlowDialect
     MLIRLinalg
     MLIRLinalgTransforms
     MLIRPass

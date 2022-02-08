@@ -14,6 +14,7 @@
 #include "mlir-hlo/Dialect/mhlo/IR/hlo_ops.h"
 #include "mlir-hlo/Dialect/mhlo/transforms/rewriters.h"
 #include "mlir-hlo/utils/broadcast_utils.h"
+#include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
@@ -195,7 +196,7 @@ Optional<Extent> computeBinaryResultExtent(OpBuilder &builder, Location loc,
 
   Value isEqual = builder.create<arith::CmpIOp>(loc, arith::CmpIPredicate::eq,
                                                 lhsExtentValue, rhsExtentValue);
-  builder.create<AssertOp>(
+  builder.create<cf::AssertOp>(
       loc, isEqual,
       builder.getStringAttr("mismatched dynamic broadcast extents"));
 
@@ -272,7 +273,7 @@ Optional<Extent> computeTernaryResultExtent(OpBuilder &builder, Location loc,
     Value cmpRhsValue = cmpRhs.convertToValue(builder, loc);
     Value isEqual = builder.create<arith::CmpIOp>(loc, arith::CmpIPredicate::eq,
                                                   cmpLhsValue, cmpRhsValue);
-    builder.create<AssertOp>(
+    builder.create<cf::AssertOp>(
         loc, isEqual,
         builder.getStringAttr("mismatched dynamic broadcast extents"));
   }

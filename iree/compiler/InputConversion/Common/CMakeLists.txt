@@ -50,7 +50,7 @@ iree_cc_library(
     MLIRLinalg
     MLIRPass
     MLIRSCF
-    MLIRSCFToStandard
+    MLIRSCFToControlFlow
     MLIRStandard
     MLIRTransforms
     iree::compiler::Dialect::Flow::IR

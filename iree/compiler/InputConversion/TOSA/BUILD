@@ -56,7 +56,7 @@ cc_library(
         "//iree/compiler/Dialect/Flow/Transforms",
         "//iree/compiler/InputConversion/Common",
         "@llvm-project//mlir:Pass",
-        "@llvm-project//mlir:SCFToStandard",
+        "@llvm-project//mlir:SCFToControlFlow",
         "@llvm-project//mlir:TosaDialect",
         "@llvm-project//mlir:TosaToLinalg",
         "@llvm-project//mlir:TosaToSCF",

@@ -48,7 +48,7 @@ def LinalgFuse : Pass<"linalg-fuse", "FuncOp"> {
   let dependentDialects = [
     "::mlir::arith::ArithmeticDialect", "::mlir::AffineDialect",
     "::mlir::linalg::LinalgDialect", "::mlir::scf::SCFDialect",
-    "::mlir::StandardOpsDialect", "::mlir::tensor::TensorDialect",
+    "::mlir::cf::ControlFlowDialect", "::mlir::tensor::TensorDialect",
     "::mlir::vector::VectorDialect"
   ];
 }
@@ -114,7 +114,7 @@ def LinalgSingleTilingExpert
   let dependentDialects = [
     "::mlir::arith::ArithmeticDialect", "::mlir::AffineDialect",
     "::mlir::linalg::LinalgDialect", "::mlir::scf::SCFDialect",
-    "::mlir::StandardOpsDialect", "::mlir::tensor::TensorDialect",
+    "::mlir::cf::ControlFlowDialect", "::mlir::tensor::TensorDialect",
     "::mlir::vector::VectorDialect"
   ];
 }
@@ -169,7 +169,7 @@ def LinalgVectorLowering : Pass<"linalg-vector-lowering", "FuncOp"> {
   let dependentDialects = [
     "::mlir::arith::ArithmeticDialect", "::mlir::AffineDialect",
     "::mlir::linalg::LinalgDialect", "::mlir::memref::MemRefDialect",
-    "::mlir::scf::SCFDialect", "::mlir::StandardOpsDialect",
+    "::mlir::scf::SCFDialect", "::mlir::cf::ControlFlowDialect",
     "::mlir::vector::VectorDialect"
   ];
 }
@@ -192,7 +192,7 @@ def UnrollOneVectorOp : Pass<"unroll-one-vector-op", "FuncOp"> {
   let dependentDialects = [
     "::mlir::arith::ArithmeticDialect", "::mlir::AffineDialect",
     "::mlir::linalg::LinalgDialect", "::mlir::scf::SCFDialect",
-    "::mlir::StandardOpsDialect", "::mlir::tensor::TensorDialect",
+    "::mlir::cf::ControlFlowDialect", "::mlir::tensor::TensorDialect",
     "::mlir::vector::VectorDialect"
   ];
 }
@@ -215,7 +215,7 @@ def UnrollOneParentLoop : Pass<"unroll-one-parent-loop", "FuncOp"> {
   let dependentDialects = [
     "::mlir::arith::ArithmeticDialect", "::mlir::AffineDialect",
     "::mlir::linalg::LinalgDialect", "::mlir::scf::SCFDialect",
-    "::mlir::StandardOpsDialect", "::mlir::tensor::TensorDialect",
+    "::mlir::cf::ControlFlowDialect", "::mlir::tensor::TensorDialect",
     "::mlir::vector::VectorDialect"
   ];
 }
@@ -238,7 +238,7 @@ def OutlineOneParentLoop : Pass<"outline-one-parent-loop", "FuncOp"> {
   let dependentDialects = [
     "::mlir::arith::ArithmeticDialect", "::mlir::AffineDialect",
     "::mlir::linalg::LinalgDialect", "::mlir::scf::SCFDialect",
-    "::mlir::StandardOpsDialect", "::mlir::tensor::TensorDialect",
+    "::mlir::cf::ControlFlowDialect", "::mlir::tensor::TensorDialect",
     "::mlir::vector::VectorDialect"
   ];
 }

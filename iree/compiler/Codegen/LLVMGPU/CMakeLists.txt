@@ -55,6 +55,7 @@ iree_cc_library(
     MLIRPass
     MLIRROCDLIR
     MLIRSCF
+    MLIRSCFToControlFlow
     MLIRSCFToStandard
     MLIRSCFTransforms
     MLIRStandard

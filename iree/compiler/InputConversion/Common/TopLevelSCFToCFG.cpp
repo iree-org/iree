@@ -6,7 +6,7 @@
 
 #include "iree/compiler/InputConversion/Common/PassDetail.h"
 #include "iree/compiler/InputConversion/Common/Passes.h"
-#include "mlir/Conversion/SCFToStandard/SCFToStandard.h"
+#include "mlir/Conversion/SCFToControlFlow/SCFToControlFlow.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/SCF/SCF.h"
 #include "mlir/Pass/Pass.h"
@@ -27,7 +27,7 @@ struct TopLevelSCFToCFGPass
 
 void TopLevelSCFToCFGPass::runOnOperation() {
   RewritePatternSet patterns(&getContext());
-  populateLoopToStdConversionPatterns(patterns);
+  populateSCFToControlFlowConversionPatterns(patterns);
   // Configure conversion to lower out scf.for, scf.if, scf.parallel and
   // scf.while. Anything else is fine.
   ConversionTarget target(getContext());

@@ -50,6 +50,7 @@ iree_cc_library(
     MLIRPass
     MLIRReconcileUnrealizedCasts
     MLIRSCF
+    MLIRSCFToControlFlow
     MLIRSCFToStandard
     MLIRSCFTransforms
     MLIRStandard

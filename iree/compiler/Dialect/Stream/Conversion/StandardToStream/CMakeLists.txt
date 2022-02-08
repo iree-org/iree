@@ -22,7 +22,7 @@ iree_cc_library(
   DEPS
     LLVMSupport
     MLIRArithmetic
-    MLIRControlFlowOps
+    MLIRControlFlow
     MLIRIR
     MLIRMemRef
     MLIRPass

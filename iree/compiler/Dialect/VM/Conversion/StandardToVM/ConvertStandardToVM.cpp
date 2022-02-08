@@ -11,6 +11,7 @@
 #include "iree/compiler/Dialect/VM/Conversion/TargetOptions.h"
 #include "iree/compiler/Dialect/VM/Conversion/TypeConverter.h"
 #include "iree/compiler/Dialect/VM/IR/VMOps.h"
+#include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
 #include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/Attributes.h"
@@ -716,10 +717,10 @@ class BitcastOpConversion : public OpConversionPattern<arith::BitcastOp> {
   }
 };
 
-class SelectOpConversion : public OpConversionPattern<SelectOp> {
+class SelectOpConversion : public OpConversionPattern<arith::SelectOp> {
   using OpConversionPattern::OpConversionPattern;
   LogicalResult matchAndRewrite(
-      SelectOp srcOp, OpAdaptor adaptor,
+      arith::SelectOp srcOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     auto valueType = adaptor.getTrueValue().getType();
     if (valueType.isInteger(32)) {
@@ -754,10 +755,10 @@ class SelectOpConversion : public OpConversionPattern<SelectOp> {
   }
 };
 
-class AssertOpConversion : public OpConversionPattern<AssertOp> {
+class AssertOpConversion : public OpConversionPattern<cf::AssertOp> {
   using OpConversionPattern::OpConversionPattern;
   LogicalResult matchAndRewrite(
-      AssertOp srcOp, OpAdaptor adaptor,
+      cf::AssertOp srcOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     auto status = rewriter.create<IREE::VM::ConstI32Op>(
         srcOp.getLoc(),
@@ -774,10 +775,10 @@ class AssertOpConversion : public OpConversionPattern<AssertOp> {
   }
 };
 
-class BranchOpConversion : public OpConversionPattern<BranchOp> {
+class BranchOpConversion : public OpConversionPattern<cf::BranchOp> {
   using OpConversionPattern::OpConversionPattern;
   LogicalResult matchAndRewrite(
-      BranchOp srcOp, OpAdaptor adaptor,
+      cf::BranchOp srcOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     rewriter.replaceOpWithNewOp<IREE::VM::BranchOp>(srcOp, srcOp.getDest(),
                                                     adaptor.getOperands());
@@ -785,10 +786,10 @@ class BranchOpConversion : public OpConversionPattern<BranchOp> {
   }
 };
 
-class CondBranchOpConversion : public OpConversionPattern<CondBranchOp> {
+class CondBranchOpConversion : public OpConversionPattern<cf::CondBranchOp> {
   using OpConversionPattern::OpConversionPattern;
   LogicalResult matchAndRewrite(
-      CondBranchOp srcOp, OpAdaptor adaptor,
+      cf::CondBranchOp srcOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     Block *trueDest = srcOp.getTrueDest();
     rewriter.replaceOpWithNewOp<IREE::VM::CondBranchOp>(

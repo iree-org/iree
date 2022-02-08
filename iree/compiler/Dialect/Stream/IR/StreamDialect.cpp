@@ -111,9 +111,7 @@ void StreamDialect::getCanonicalizationPatterns(
 Operation *StreamDialect::materializeConstant(OpBuilder &builder,
                                               Attribute value, Type type,
                                               Location loc) {
-  if (mlir::ConstantOp::isBuildableWith(value, type)) {
-    return builder.create<mlir::ConstantOp>(loc, type, value);
-  } else if (arith::ConstantOp::isBuildableWith(value, type)) {
+  if (arith::ConstantOp::isBuildableWith(value, type)) {
     return builder.create<arith::ConstantOp>(loc, type, value);
   } else if (value.isa<IREE::Stream::TimepointAttr>()) {
     return builder.create<IREE::Stream::TimepointImmediateOp>(loc);

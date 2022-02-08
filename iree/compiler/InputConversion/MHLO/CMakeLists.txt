@@ -63,6 +63,7 @@ iree_cc_library(
     MLIRAffine
     MLIRAffineUtils
     MLIRComplex
+    MLIRControlFlow
     MLIRIR
     MLIRLinalg
     MLIRLinalgTransforms
@@ -71,7 +72,7 @@ iree_cc_library(
     MLIRMhloUtils
     MLIRPass
     MLIRReconcileUnrealizedCasts
-    MLIRSCFToStandard
+    MLIRSCFToControlFlow
     MLIRSCFTransforms
     MLIRShape
     MLIRShapeOpsTransforms
