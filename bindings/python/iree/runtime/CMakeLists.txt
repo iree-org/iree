@@ -37,6 +37,7 @@ iree_pyext_module(
   DEPS
     iree::base
     iree::base::cc
+    iree::base::internal::flags
     iree::hal
     iree::hal::drivers
     iree::modules::hal
@@ -50,6 +51,7 @@ iree_py_library(
   SRCS
     "__init__.py"
     "array_interop.py"
+    "flags.py"
     "function.py"
     "system_api.py"
     "tracing.py"
@@ -96,6 +98,13 @@ iree_py_test(
     array_interop_test
   SRCS
     "array_interop_test.py"
+)
+
+iree_py_test(
+  NAME
+    flags_test
+  SRCS
+    "flags_test.py"
 )
 
 iree_py_test(

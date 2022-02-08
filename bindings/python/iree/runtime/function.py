@@ -28,6 +28,8 @@ from .array_interop import (
     map_dtype_to_element_type,
     DeviceArray,
 )
+from .flags import (
+    FUNCTION_INPUT_VALIDATION,)
 
 __all__ = [
     "FunctionInvoker",
@@ -140,7 +142,7 @@ class FunctionInvoker:
       _merge_python_sequence_to_vm(inv, arg_list, args, self._arg_descs)
       if call_trace:
         call_trace.add_vm_list(arg_list, "args")
-      self._vm_context.invoke(self._vm_function, arg_list, ret_list)
+      self._invoke(arg_list, ret_list)
       if call_trace:
         call_trace.add_vm_list(ret_list, "results")
 
@@ -161,6 +163,10 @@ class FunctionInvoker:
     finally:
       if call_trace:
         call_trace.end_call()
+
+  # Break out invoke so it shows up in profiles.
+  def _invoke(self, arg_list, ret_list):
+    self._vm_context.invoke(self._vm_function, arg_list, ret_list)
 
   def _parse_abi_dict(self, vm_function: VmFunction):
     reflection = vm_function.reflection
@@ -284,7 +290,7 @@ def _str_to_vm(inv: Invocation, t: VmVariantList, x, desc):
 
 def _ndarray_to_vm(inv: Invocation, t: VmVariantList, x, desc):
   # Validate and implicit conversion against type descriptor.
-  if desc is not None:
+  if FUNCTION_INPUT_VALIDATION and desc is not None:
     desc_type = desc[0]
     if desc_type != "ndarray":
       _raise_argument_error(inv, f"passed an ndarray but expected {desc_type}")
@@ -532,7 +538,7 @@ def _merge_python_sequence_to_vm(inv: Invocation, vm_list, py_list, descs):
   # For dynamic mode, just assume we have the right arity.
   if descs is None:
     descs = [None] * len(py_list)
-  else:
+  elif FUNCTION_INPUT_VALIDATION:
     len_py_list = sum([1 for x in py_list if x is not MissingArgument])
     if len(py_list) != len_py_list:
       _raise_argument_error(
