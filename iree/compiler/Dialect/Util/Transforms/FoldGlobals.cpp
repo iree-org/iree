@@ -253,8 +253,6 @@ static Value tryMaterializeConstant(Location loc, Type type, Attribute attr,
   if (arith::ConstantOp::isBuildableWith(attr, type)) {
     // Common case fast-path.
     return builder.create<arith::ConstantOp>(loc, type, attr);
-  } else if (mlir::ConstantOp::isBuildableWith(attr, type)) {
-    return builder.create<mlir::ConstantOp>(loc, type, attr);
   }
   // Fallback that asks a dialect to materialize things. This may fail!
   auto *op = attr.getDialect().materializeConstant(builder, attr, type, loc);
