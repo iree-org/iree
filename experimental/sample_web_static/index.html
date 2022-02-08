@@ -15,6 +15,7 @@ SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
   <meta name="viewport" content="width=device-width, initial-scale=1">
 
   <script src="./easeljs.min.js"></script>
+  <script src="./iree_api.js"></script>
 </head>
 
 <body style="background-color: #2b2c30; color: #ABB2BF">
@@ -29,120 +30,53 @@ SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
   </canvas>
 
   <br>
-  <div style="border:2px solid #000000; background-color: #CCCCCC; padding: 8px; color: #111111" width="400px" height="300px">
+  <div style="border:2px solid #000000; background-color: #CCCCCC; padding: 8px; color: #111111; width:440px">
     <button id="predictButton" disabled onclick="predictDigit()">Predict handwritten digit</button>
+    <button id="clearCanvasButton" onclick="clearCanvas()">Clear canvas</button>
     <br>
-    Prediction result: <div id="predictionResult"></div>
+    Prediction result: <div id="predictionResult" style="display:inline"></div>
   </div>
 
   <script>
-    let setupNativeSample;
-    let cleanupNativeSample;
-    let runNativeSample;
-    let nativeState;
-    const predictionResultElement = document.getElementById("predictionResult");
-    const predictButtonElement = document.getElementById("predictButton");
-    let initialized = false;
-
-    const imagePixelCount = 28 * 28;
-    let imageBuffer;
-
-    var Module = {
-      print: function(text) {
-        console.log(text);
-      },
-      printErr: function(text) {
-        console.error(text);
-      },
-      onRuntimeInitialized: function() {
-        console.log("WebAssembly module onRuntimeInitialized()");
-
-        setupNativeSample = Module.cwrap("setup_sample", "number", []);
-        cleanupNativeSample = Module.cwrap("cleanup_sample", null, ["number"]);
-        runNativeSample = Module.cwrap("run_sample", "number", ["number", "number"]);
-
-        setupSample();
-      },
-      // https://emscripten.org/docs/api_reference/module.html#Module.noInitialRun
-      noInitialRun: true,
-    };
-
-    function setupSample() {
-      nativeState = setupNativeSample();
-      predictButtonElement.disabled = false;
-      imageBuffer = Module._malloc(imagePixelCount * Float32Array.BYTES_PER_ELEMENT);
-      initialized = true;
-    }
-
-    // TODO(scotttodd): call this on page suspend?
-    function cleanupSample() {
-      initialized = false;
-      Module._free(imageDataBuffer);
-      predictButtonElement.disabled = true;
-      cleanupNativeSample();
-      nativeState = null;
-    }
-
-    function predictDigit() {
-      const rawImageData = getRescaledCanvasData();
-      preprocessImageData(rawImageData);
-
-      result = runNativeSample(nativeState, imageBuffer);
-      if (result != -1) {
-        predictionResultElement.innerHTML = result;
-      } else {
-        predictionResultElement.innerHTML = "Error";
-      }
-    }
-
-    // https://becominghuman.ai/passing-and-returning-webassembly-array-parameters-a0f572c65d97
-    // https://developers.google.com/web/updates/2018/03/emscripting-a-c-library#get_an_image_from_javascript_into_wasm
-    function preprocessImageData(rawImageData) {
-      // * getImageData() returns a Uint8ClampedArray with RGBA image data
-      // * this MNIST model takes tensor<1x28x28x1xf32> with grayscale pixels
-      //   in [0.0, 1.0]
-
-      // This conversion is terrible, but this is a toy demo with a small image
-      // Hopefully there aren't any logic / iteration order issues...
-      const typedArray = new Float32Array(imagePixelCount);
-      for (let y = 0; y < 28; ++y) {
-        for (let x = 0; x < 28; ++x) {
-          const typedIndex = y * 28 + x;
-          const rawIndex = 4 * (y * 28 + x) + 3;  // Assume colorSpace srgb
-          typedArray[typedIndex] = rawImageData.data[rawIndex] / 255.0;
-        }
-      }
-
-      // Copy into Wasm heap.
-      // Note: we could have done the conversion in-place, but this is demo code
-      Module.HEAPF32.set(typedArray, imageBuffer >> 2);
-    }
-
-  </script>
-  <script src="sample-web-static-sync.js"></script>
-  <!-- <script src="sample-web-static-multithreaded.js"></script> -->
-
-
-  <script>
-    // Forked from:
+    // <canvas> drawing using easeljs forked from:
     //   https://createjs.com/demos/easeljs/curveto
     //   https://github.com/CreateJS/EaselJS/blob/master/examples/CurveTo.html
 
-    let drawingCanvasElement;
-    let rescaledCanvasElement, rescaledCanvasContext;
+    const predictButtonElement = document.getElementById('predictButton');
+    const predictionResultElement = document.getElementById('predictionResult');
+    const drawingCanvasElement = document.getElementById("drawingCanvas");
+    const rescaledCanvasElement = document.getElementById("rescaledCanvas");
+    const rescaledCanvasContext = rescaledCanvasElement.getContext("2d");
     let stage;
     let drawingCanvasShape;
     let oldPt, oldMidPt;
     let titleText;
+    let ireeInitialized = false;
     const primaryColor = "#000000";
     const eraseColor = "#FFFFFF";
     const stroke = 32;
 
-    function initDrawing() {
-      drawingCanvasElement = document.getElementById("drawingCanvas");
+    function predictDigit() {
+      // TODO(scotttodd): debounce / rate limit this?
+      ireePredictDigit(getRescaledCanvasData()).then((result) => {
+        predictionResultElement.innerHTML = result;
+      }).catch((error) => {
+        predictionResultElement.innerHTML = "<b>" + error + "</b>";
+      });
+    }
 
-      rescaledCanvasElement = document.getElementById("rescaledCanvas");
-      rescaledCanvasContext = rescaledCanvasElement.getContext("2d");
+    function clearCanvas() {
+      stage.clear();
+      stage.removeAllChildren();
+
+      drawingCanvasShape = new createjs.Shape();
+      stage.addChild(drawingCanvasShape);
+      stage.update();
+
+      updateRescaledCanvas();
+    }
+
+    function initDrawing() {
       rescaledCanvasContext.imageSmoothingEnabled = false;
       rescaledCanvasContext.mozImageSmoothingEnabled = false;
       rescaledCanvasContext.webkitImageSmoothingEnabled = false;
@@ -203,8 +137,7 @@ SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
       stage.update();
       updateRescaledCanvas();
 
-      if (initialized) {
-        // TODO(scotttodd): debounce / rate limit this
+      if (ireeInitialized) {
         predictDigit();
       }
     }
@@ -215,6 +148,8 @@ SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
     }
 
     function updateRescaledCanvas() {
+      rescaledCanvasContext.clearRect(
+        0, 0, rescaledCanvasElement.width, rescaledCanvasElement.height);
       rescaledCanvasContext.drawImage(
           drawingCanvasElement,
           /*sx=*/0, /*sy=*/0,
@@ -228,6 +163,13 @@ SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
     }
 
     initDrawing();
+
+    ireeInitializeWorker().then((result) => {
+      predictButtonElement.disabled = false;
+      ireeInitialized = true;
+    }).catch((error) => {
+      console.error("Failed to initialize IREE, error: '" + error + "'");
+    });
   </script>
 </body>
 

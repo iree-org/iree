@@ -87,6 +87,8 @@ popd
 echo "=== Copying static files to the build directory ==="
 
 cp ${ROOT_DIR?}/experimental/sample_web_static/index.html ${BINARY_DIR}
+cp ${ROOT_DIR?}/experimental/sample_web_static/iree_api.js ${BINARY_DIR}
+cp ${ROOT_DIR?}/experimental/sample_web_static/iree_worker.js ${BINARY_DIR}
 
 EASELJS_LIBRARY=${BINARY_DIR}/easeljs.min.js
 test -f ${EASELJS_LIBRARY} || \
