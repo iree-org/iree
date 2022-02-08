@@ -34,6 +34,10 @@ iree_pyext_module(
     "vm.cc"
   UNIX_LINKER_SCRIPT
     "unix_version.lds"
+  DEFINES
+    # Pybind code seems to be incompatible with C++ allocation tracing
+    # hooks so disable it.
+    IREE_TRACING_HOOK_CPP_NEW_DELETE=0
   DEPS
     iree::base
     iree::base::cc

@@ -142,11 +142,14 @@ endfunction()
 # MODULE_NAME: Base-name of the module.
 # SRCS: List of source files for the library
 # DEPS: List of other targets the test python libraries require
+# COPTS: List of private compile options
+# DEFINES: List of public defines
+# INCLUDES: Include directories to add to dependencies
 function(iree_pyext_module)
   cmake_parse_arguments(ARG
     ""
     "NAME;MODULE_NAME;UNIX_LINKER_SCRIPT"
-    "SRCS;DEPS;COPTS;INCLUDES"
+    "SRCS;DEPS;COPTS;DEFINES;INCLUDES"
     ${ARGN})
 
   iree_package_ns(_PACKAGE_NS)
@@ -214,6 +217,11 @@ function(iree_pyext_module)
     ${ARG_COPTS}
     ${IREE_DEFAULT_COPTS}
     ${_RTTI_AND_EXCEPTION_COPTS}
+  )
+
+  target_compile_definitions(
+    ${_NAME} PUBLIC
+    ${ARG_DEFINES}
   )
 
   # Link flags.

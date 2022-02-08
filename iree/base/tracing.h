@@ -29,6 +29,10 @@
 #include <stdint.h>
 #include <stdlib.h>
 
+#if defined(__cplusplus)
+#include <new>
+#endif
+
 #include "iree/base/attributes.h"
 #include "iree/base/config.h"
 
@@ -177,6 +181,16 @@
 #if IREE_TRACING_MAX_CALLSTACK_DEPTH == 0
 #undef TRACY_CALLSTACK
 #endif  // IREE_TRACING_MAX_CALLSTACK_DEPTH
+
+// By default, hook the C++ new and delete operators if allocation tracing
+// is enabled. We allow this to be controlled indendently because not all
+// C++ code is well behaved with respect to allocations, and Tracy gets
+// very angry when unbalanced. Such code can:
+//   #define IREE_TRACING_HOOK_CPP_NEW_DELETE 0
+// before including this file.
+#if !defined(IREE_TRACING_HOOK_CPP_NEW_DELETE)
+#define IREE_TRACING_HOOK_CPP_NEW_DELETE 1
+#endif
 
 //===----------------------------------------------------------------------===//
 // C API used for Tracy control
@@ -466,10 +480,26 @@ enum {
 #define IREE_TRACE_FREE_NAMED(name, ptr)
 #endif  // IREE_TRACING_FEATURE_ALLOCATION_TRACKING
 
-#if defined(__cplusplus) && \
-    (IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_ALLOCATION_TRACKING)
-void* operator new(size_t count) noexcept;
-void operator delete(void* ptr) noexcept;
+#if defined(__cplusplus) && IREE_TRACING_HOOK_CPP_NEW_DELETE &&           \
+    (IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_ALLOCATION_TRACKING) && \
+    (!IREE_SANITIZER_ADDRESS && !IREE_SANITIZER_MEMORY &&                 \
+     !IREE_SANITIZER_THREAD)
+inline void* operator new(size_t count, const std::nothrow_t&) noexcept {
+  auto ptr = malloc(count);
+  IREE_TRACE_ALLOC(ptr, count);
+  return ptr;
+}
+
+inline void* operator new(size_t count) throw(std::bad_alloc) {
+  auto ptr = malloc(count);
+  IREE_TRACE_ALLOC(ptr, count);
+  return ptr;
+}
+
+inline void operator delete(void* ptr) noexcept {
+  IREE_TRACE_FREE(ptr);
+  free(ptr);
+}
 #endif  // __cplusplus && IREE_TRACING_FEATURE_ALLOCATION_TRACKING
 
 //===----------------------------------------------------------------------===//
