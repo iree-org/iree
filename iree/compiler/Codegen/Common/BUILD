@@ -93,7 +93,6 @@ cc_library(
         "@llvm-project//mlir:ModuleBufferization",
         "@llvm-project//mlir:Pass",
         "@llvm-project//mlir:SCFDialect",
-        "@llvm-project//mlir:SCFToControlFlow",
         "@llvm-project//mlir:SCFTransforms",
         "@llvm-project//mlir:SideEffectInterfaces",
         "@llvm-project//mlir:StandardOps",

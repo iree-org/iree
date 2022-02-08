@@ -73,7 +73,7 @@ cc_library(
         ":UtilOpsGen",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:ArithmeticDialect",
-        "@llvm-project//mlir:ControlFlow",
+        "@llvm-project//mlir:ControlFlowOps",
         "@llvm-project//mlir:ControlFlowInterfaces",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:MemRefDialect",
