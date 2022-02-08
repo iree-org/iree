@@ -181,16 +181,18 @@ class PowerOfTwo {
 
 // Returns i/p, asserting that p divides i. Requires i >= 0.
 // Fast: bit shift, not actual div.
-int fastExactDiv(int i, PowerOfTwo p) {
-  assert(i >= 0);
-  int result = i >> p.getExponent();
-  assert(result << p.getExponent() == i);
+int32_t fastExactDiv(int32_t i, PowerOfTwo p) {
+  assert(i >= 0 && "exact log of negative number");
+  int32_t result = i >> p.getExponent();
+  assert(result << p.getExponent() == i && "exact log of non-power of two");
   return result;
 }
 
-int operator*(int i, PowerOfTwo p) {
-  assert(i >= 0);               // We only deal with nonnegative values.
-  return i << p.getExponent();  // Note: would be wrong if i < 0.
+int32_t operator*(int32_t i, PowerOfTwo p) {
+  assert(i >= 0 && "only nonnegative values are supported");
+  uint32_t u = i;
+  assert(llvm::countLeadingZeros(u) > static_cast<unsigned>(p.getExponent()));
+  return i << p.getExponent();
 }
 
 // Describes a kernel. This struct is kept small to separate the kernels
