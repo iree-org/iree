@@ -192,7 +192,7 @@ int32_t operator*(int32_t i, PowerOfTwo p) {
   assert(i >= 0 && "only nonnegative values are supported");
   uint32_t u = i;
   assert(llvm::countLeadingZeros(u) > static_cast<unsigned>(p.getExponent()));
-  (void) u;
+  (void)u;
   return i << p.getExponent();
 }
 
