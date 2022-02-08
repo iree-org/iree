@@ -6,7 +6,7 @@
 
 import absl.testing
 import numpy
-import iree.tflite.support.test_util as test_util
+from . import test_util
 
 model_path = "https://tfhub.dev/tensorflow/lite-model/mnasnet_1.0_224/1/metadata/1?lite-format=tflite"
 

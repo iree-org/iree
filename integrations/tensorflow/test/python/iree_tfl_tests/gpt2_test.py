@@ -6,7 +6,7 @@
 
 import absl.testing
 import numpy
-import iree.tflite.support.test_util as test_util
+from . import test_util
 
 model_path = "https://s3.amazonaws.com/models.huggingface.co/bert/gpt2-64.tflite"
 
