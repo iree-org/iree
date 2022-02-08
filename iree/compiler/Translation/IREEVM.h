@@ -94,6 +94,8 @@ struct SchedulingOptions {
     Verbose = 2,
     // Comma separated values for throwing into Sheets.
     CSV = 3,
+    // JSON format for better structure and data exchange.
+    JSON = 4,
   };
   // Enables and specifies the the format for a stream statistics dump.
   DumpOutputFormat dumpStatisticsFormat = DumpOutputFormat::None;

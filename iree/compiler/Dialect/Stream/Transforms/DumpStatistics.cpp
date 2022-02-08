@@ -476,6 +476,55 @@ static void dumpCSVTables(const UsageInfo &usageInfo,
 }
 
 //===----------------------------------------------------------------------===//
+// JSON structures
+//===----------------------------------------------------------------------===//
+
+static void dumpAggregateJSONStructure(const UsageInfo &usageInfo,
+                                       llvm::raw_fd_ostream &os) {
+  Statistics stats;
+  stats.analyze(usageInfo);
+
+  const char kvPair[] = "    \"{0}\": {1},\n";
+  const char kvPairNoComma[] = "    \"{0}\": {1}\n";
+
+  os << "  \"global\": {\n";
+  os << llvm::formatv(kvPair, "constant-count", stats.constantCount);
+  os << llvm::formatv(kvPair, "constant-size", stats.constantSize);
+  os << llvm::formatv(kvPair, "variable-count", stats.variableCount);
+  os << llvm::formatv(kvPairNoComma, "variable-size", stats.variableSize);
+  os << "  },\n";
+
+  os << "  \"synchronization\": {\n";
+  os << llvm::formatv(kvPairNoComma, "await-count", stats.awaitCount);
+  os << "  },\n";
+
+  os << "  \"execution\": {\n";
+  os << llvm::formatv(kvPair, "submission-count", stats.submissionCount);
+  os << llvm::formatv(kvPair, "transient-memory-size", stats.transientSize);
+  os << llvm::formatv(kvPair, "fill-count", stats.fillCount);
+  os << llvm::formatv(kvPair, "copy-count", stats.copyCount);
+  os << llvm::formatv(kvPairNoComma, "dispatch-count", stats.dispatchCount);
+  os << "  },\n";
+
+  os << "  \"executable\": {\n";
+  os << llvm::formatv(kvPairNoComma, "executable-count", stats.executableCount);
+  os << "  }\n";
+}
+
+static void dumpJSONStructures(const UsageInfo &usageInfo,
+                               llvm::raw_fd_ostream &os) {
+  os << "{\n";
+
+  os << "\"stream-aggregate\": {\n";
+  dumpAggregateJSONStructure(usageInfo, os);
+  os << "}\n";
+
+  // TODO(antiagainst): dump per-execution data if needed.
+
+  os << "}\n";
+}
+
+//===----------------------------------------------------------------------===//
 // -iree-stream-dump-statistics
 //===----------------------------------------------------------------------===//
 
@@ -532,6 +581,9 @@ class DumpStatisticsPass : public DumpStatisticsBase<DumpStatisticsPass> {
         break;
       case DumpOutputFormat::CSV:
         dumpCSVTables(usageInfo, *os);
+        break;
+      case DumpOutputFormat::JSON:
+        dumpJSONStructures(usageInfo, *os);
         break;
       default:
         break;
