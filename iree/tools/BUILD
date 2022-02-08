@@ -152,6 +152,7 @@ cc_library(
         "@llvm-project//mlir:MathDialect",
         "@llvm-project//mlir:MemRefDialect",
         "@llvm-project//mlir:QuantOps",
+        "@llvm-project//mlir:QuantTransforms",
         "@llvm-project//mlir:SCFDialect",
         "@llvm-project//mlir:SCFToGPUPass",
         "@llvm-project//mlir:SCFTransforms",

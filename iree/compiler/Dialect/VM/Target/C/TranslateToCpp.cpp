@@ -28,7 +28,6 @@
 #define DEBUG_TYPE "translate-to-cpp"
 
 using namespace mlir;
-using namespace mlir::cf;
 using namespace mlir::emitc;
 using llvm::formatv;
 
@@ -73,9 +72,9 @@ static LogicalResult printOperation(CppEmitter &emitter,
 }
 
 static LogicalResult printOperation(CppEmitter &emitter,
-                                    arith::ConstantOp constantOp) {
+                                    mlir::ConstantOp constantOp) {
   Operation *operation = constantOp.getOperation();
-  Attribute value = constantOp.getValue();
+  Attribute value = constantOp.getValueAttr();
 
   return printConstantOp(emitter, operation, value);
 }
@@ -746,7 +745,7 @@ LogicalResult CppEmitter::emitOperation(Operation &op, bool trailingSemicolon) {
           .Case<scf::ForOp, scf::IfOp, scf::YieldOp>(
               [&](auto op) { return printOperation(*this, op); })
           // Standard ops.
-          .Case<cf::BranchOp, mlir::CallOp, cf::CondBranchOp, arith::ConstantOp,
+          .Case<cf::BranchOp, mlir::CallOp, cf::CondBranchOp, mlir::ConstantOp,
                 FuncOp, ModuleOp, ReturnOp>(
               [&](auto op) { return printOperation(*this, op); })
           .Default([&](Operation *) {
