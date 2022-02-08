@@ -25,15 +25,6 @@ IREE_FLAG(
     "threads for potential latency additions later on as threads take longer\n"
     "to wake on their first use.");
 
-IREE_FLAG(
-    bool, task_scheduling_dedicated_wait_thread, false,
-    "Creates a dedicated thread performing waits on root wait handles. On\n"
-    "workloads with many short-duration waits this will reduce total\n"
-    "latency as the waits are aggressively processed and dependent tasks are\n"
-    "scheduled. It also keeps any wait-related syscalls off the worker\n"
-    "threads that would otherwise need to perform the syscalls during\n"
-    "coordination.");
-
 // TODO(benvanik): enable this when we use it - though hopefully we don't!
 IREE_FLAG(
     int32_t, task_worker_local_memory, 0,  // 64 * 1024,
@@ -92,9 +83,6 @@ iree_status_t iree_task_executor_create_from_flags(
   iree_task_scheduling_mode_t scheduling_mode = 0;
   if (FLAG_task_scheduling_defer_worker_startup) {
     scheduling_mode |= IREE_TASK_SCHEDULING_MODE_DEFER_WORKER_STARTUP;
-  }
-  if (FLAG_task_scheduling_dedicated_wait_thread) {
-    scheduling_mode |= IREE_TASK_SCHEDULING_MODE_DEDICATED_WAIT_THREAD;
   }
 
   iree_host_size_t worker_local_memory =

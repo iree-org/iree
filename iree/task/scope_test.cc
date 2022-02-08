@@ -140,7 +140,8 @@ TEST(ScopeTest, WaitIdleDeadlineExceeded) {
 
   // Enqueue a task to the scope so it is no longer idle.
   iree_task_fence_t fence_task;
-  iree_task_fence_initialize(&scope, &fence_task);
+  iree_task_fence_initialize(&scope, iree_wait_primitive_immediate(),
+                             &fence_task);
   EXPECT_FALSE(iree_task_scope_is_idle(&scope));
 
   // Poll, which should fail immediately because we have the outstanding task.
@@ -168,7 +169,8 @@ TEST(ScopeTest, WaitIdleSuccess) {
 
   // Enqueue a task to the scope so it is no longer idle.
   iree_task_fence_t fence_task;
-  iree_task_fence_initialize(&scope, &fence_task);
+  iree_task_fence_initialize(&scope, iree_wait_primitive_immediate(),
+                             &fence_task);
   EXPECT_FALSE(iree_task_scope_is_idle(&scope));
 
   // Spin up a thread to wait on the scope.
@@ -181,7 +183,7 @@ TEST(ScopeTest, WaitIdleSuccess) {
 
   // Wait a moment for the thread to spin up.
   // NOTE: this may flake. Need to see if there's a better way to do this.
-  std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+  std::this_thread::sleep_for(std::chrono::milliseconds(150));
 
   // Complete the task.
   iree_task_submission_t pending_submission;
@@ -206,7 +208,8 @@ TEST(ScopeTest, WaitIdleFailure) {
 
   // Enqueue a task to the scope so it is no longer idle.
   iree_task_fence_t fence_task;
-  iree_task_fence_initialize(&scope, &fence_task);
+  iree_task_fence_initialize(&scope, iree_wait_primitive_immediate(),
+                             &fence_task);
   EXPECT_FALSE(iree_task_scope_is_idle(&scope));
 
   // Spin up a thread to wait on the scope.
@@ -219,7 +222,7 @@ TEST(ScopeTest, WaitIdleFailure) {
 
   // Wait a moment for the thread to spin up.
   // NOTE: this may flake. Need to see if there's a better way to do this.
-  std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+  std::this_thread::sleep_for(std::chrono::milliseconds(150));
 
   // Set the failure state.
   iree_task_scope_fail(

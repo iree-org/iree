@@ -357,8 +357,9 @@ iree_status_t iree_hal_task_semaphore_enqueue_timepoint(
           semaphore, minimum_value, &cmd->timepoint);
     }
     if (iree_status_is_ok(status)) {
-      iree_task_wait_initialize(issue_task->scope, cmd->timepoint.event,
-                                &cmd->task);
+      iree_task_wait_initialize(issue_task->scope,
+                                iree_event_await(&cmd->timepoint.event),
+                                IREE_TIME_INFINITE_FUTURE, &cmd->task);
       iree_task_set_cleanup_fn(&cmd->task.header,
                                iree_hal_task_semaphore_wait_cmd_cleanup);
       iree_task_set_completion_task(&cmd->task.header, issue_task);

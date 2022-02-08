@@ -20,14 +20,14 @@ class TaskFenceTest : public TaskTest {};
 // Tests a chain of fences A -> B -> C.
 TEST_F(TaskFenceTest, IssueChained) {
   iree_task_fence_t task_a;
-  iree_task_fence_initialize(&scope_, &task_a);
+  iree_task_fence_initialize(&scope_, iree_wait_primitive_immediate(), &task_a);
 
   iree_task_fence_t task_b;
-  iree_task_fence_initialize(&scope_, &task_b);
+  iree_task_fence_initialize(&scope_, iree_wait_primitive_immediate(), &task_b);
   iree_task_set_completion_task(&task_a.header, &task_b.header);
 
   iree_task_fence_t task_c;
-  iree_task_fence_initialize(&scope_, &task_c);
+  iree_task_fence_initialize(&scope_, iree_wait_primitive_immediate(), &task_c);
   iree_task_set_completion_task(&task_b.header, &task_c.header);
 
   IREE_ASSERT_OK(SubmitTasksAndWaitIdle(&task_a.header, &task_c.header));
@@ -51,7 +51,8 @@ TEST_F(TaskFenceTest, IssueChainedFailure) {
                             &task_a);
 
   iree_task_fence_t fence_task;
-  iree_task_fence_initialize(&scope_, &fence_task);
+  iree_task_fence_initialize(&scope_, iree_wait_primitive_immediate(),
+                             &fence_task);
   iree_task_set_completion_task(&task_a.header, &fence_task.header);
 
   int did_call_b = 0;

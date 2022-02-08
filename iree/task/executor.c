@@ -54,6 +54,7 @@ iree_status_t iree_task_executor_create(
   // so ensure we are aligned to at least the destructive interference size.
   worker_local_memory_size = iree_host_align(
       worker_local_memory_size, iree_hardware_destructive_interference_size);
+  IREE_TRACE_ZONE_APPEND_VALUE(z0, (int64_t)worker_local_memory_size);
   iree_host_size_t executor_base_size =
       iree_host_align(sizeof(iree_task_executor_t),
                       iree_hardware_destructive_interference_size);
@@ -71,9 +72,7 @@ iree_status_t iree_task_executor_create(
   executor->allocator = allocator;
   executor->scheduling_mode = scheduling_mode;
   iree_atomic_task_slist_initialize(&executor->incoming_ready_slist);
-  iree_atomic_task_slist_initialize(&executor->incoming_waiting_slist);
   iree_slim_mutex_initialize(&executor->coordinator_mutex);
-  iree_slim_mutex_initialize(&executor->wait_mutex);
 
   // Simple PRNG used to generate seeds for the per-worker PRNGs used to
   // distribute work. This isn't strong (and doesn't need to be); it's just
@@ -97,14 +96,6 @@ iree_status_t iree_task_executor_create(
                                       allocator, &executor->event_pool);
   }
 
-  // Wait set used to batch syscalls for polling/waiting on wait handles.
-  // This is currently limited to a relatively small max to make bad behavior
-  // clearer with nice RESOURCE_EXHAUSTED errors.
-  if (iree_status_is_ok(status)) {
-    status = iree_wait_set_allocate(IREE_TASK_EXECUTOR_MAX_OUTSTANDING_WAITS,
-                                    allocator, &executor->wait_set);
-  }
-
   // Pool used for all fanout tasks. These only live within the executor and
   // since we know the precise lifetime of them we can keep them entirely within
   // the system here.
@@ -114,6 +105,17 @@ iree_status_t iree_task_executor_create(
         iree_max(sizeof(iree_task_fence_t), sizeof(iree_task_dispatch_shard_t)),
         worker_count * IREE_TASK_EXECUTOR_INITIAL_SHARD_RESERVATION_PER_WORKER,
         &executor->transient_task_pool);
+  }
+
+  // Wait handling polling and waiting use a dedicated thread to ensure that
+  // blocking syscalls stay off the workers.
+  if (iree_status_is_ok(status)) {
+    // For now we allow the poller to run anywhere - we should allow callers to
+    // specify it via the topology (or something).
+    iree_thread_affinity_t poller_thread_affinity;
+    iree_thread_affinity_set_any(&poller_thread_affinity);
+    status = iree_task_poller_initialize(executor, poller_thread_affinity,
+                                         &executor->poller);
   }
 
   // Bring up the workers; the threads will be created here but be suspended
@@ -180,6 +182,10 @@ static void iree_task_executor_destroy(iree_task_executor_t* executor) {
     iree_task_worker_request_exit(worker);
   }
 
+  // Also ask the poller to exit - it'll wake from any wait it's in and abort
+  // all the remaining waits.
+  iree_task_poller_request_exit(&executor->poller);
+
   // Now that all workers should be in the process of exiting we can join with
   // them. Some may take longer than others to exit but that's fine as we can't
   // return from here until they do anyway.
@@ -188,12 +194,12 @@ static void iree_task_executor_destroy(iree_task_executor_t* executor) {
     iree_task_worker_deinitialize(worker);
   }
 
-  iree_wait_set_free(executor->wait_set);
+  // Once no more workers can possibly put work on the poller we can kill it.
+  iree_task_poller_deinitialize(&executor->poller);
+
   iree_event_pool_free(executor->event_pool);
-  iree_slim_mutex_deinitialize(&executor->wait_mutex);
   iree_slim_mutex_deinitialize(&executor->coordinator_mutex);
   iree_atomic_task_slist_deinitialize(&executor->incoming_ready_slist);
-  iree_atomic_task_slist_deinitialize(&executor->incoming_waiting_slist);
   iree_task_pool_deinitialize(&executor->transient_task_pool);
   iree_allocator_free(executor->allocator, executor);
 
@@ -230,11 +236,13 @@ iree_status_t iree_task_executor_acquire_fence(iree_task_executor_t* executor,
                                                iree_task_scope_t* scope,
                                                iree_task_fence_t** out_fence) {
   *out_fence = NULL;
+
   iree_task_fence_t* fence = NULL;
   IREE_RETURN_IF_ERROR(iree_task_pool_acquire(&executor->transient_task_pool,
                                               (iree_task_t**)&fence));
-  iree_task_fence_initialize(scope, fence);
+  iree_task_fence_initialize(scope, iree_wait_primitive_immediate(), fence);
   fence->header.pool = &executor->transient_task_pool;
+
   *out_fence = fence;
   return iree_ok_status();
 }
@@ -266,7 +274,6 @@ static void iree_task_executor_relay_to_worker(
 void iree_task_executor_schedule_ready_tasks(
     iree_task_executor_t* executor, iree_task_submission_t* pending_submission,
     iree_task_post_batch_t* post_batch) {
-  if (iree_task_list_is_empty(&pending_submission->ready_list)) return;
   IREE_TRACE_ZONE_BEGIN(z0);
   iree_task_t* task = NULL;
   while ((task = iree_task_list_pop_front(&pending_submission->ready_list))) {
@@ -305,13 +312,15 @@ void iree_task_executor_schedule_ready_tasks(
         break;
       }
       case IREE_TASK_TYPE_WAIT: {
-        // Waits may need to be moved into the wait list (not completed) or
-        // retired (after the wait condition is met).
-        if (task->flags & IREE_TASK_FLAG_WAIT_COMPLETED) {
-          iree_task_wait_retire((iree_task_wait_t*)task, pending_submission);
-        } else {
-          iree_task_submission_enqueue(pending_submission, task);
-        }
+        // We should only ever see completed waits here; ones that have yet to
+        // resolve are sent to the poller.
+        iree_task_wait_retire(
+            (iree_task_wait_t*)task, pending_submission,
+            iree_all_bits_set(task->flags, IREE_TASK_FLAG_WAIT_COMPLETED)
+                ? iree_ok_status()
+                : iree_make_status(IREE_STATUS_INTERNAL,
+                                   "unresolved wait task ended up in the "
+                                   "executor run queue"));
         break;
       }
       case IREE_TASK_TYPE_DISPATCH: {
@@ -341,9 +350,11 @@ void iree_task_executor_merge_submission(iree_task_executor_t* executor,
   iree_atomic_task_slist_concat(&executor->incoming_ready_slist,
                                 submission->ready_list.head,
                                 submission->ready_list.tail);
-  iree_atomic_task_slist_concat(&executor->incoming_waiting_slist,
-                                submission->waiting_list.head,
-                                submission->waiting_list.tail);
+
+  // Enqueue waiting tasks with the poller immediately: this may issue a
+  // syscall to kick the poller. If we see bad context switches here then we
+  // should split this into an enqueue/flush pair.
+  iree_task_poller_enqueue(&executor->poller, &submission->waiting_list);
 
   // NOTE: after concatenating the intrusive next_task pointers may immediately
   // be modified by other threads. We can no longer assume anything about the
@@ -366,215 +377,22 @@ void iree_task_executor_flush(iree_task_executor_t* executor) {
 
   // Mostly a no-op today as we aren't deferring submission with the scheduling
   // mode. Instead, we'll just run the coordinator inline to ensure all tasks
-  // are pushed to workers.
-  iree_task_executor_coordinate(executor, /*current_worker=*/NULL,
-                                /*wait_on_idle=*/false);
+  // are pushed to workers. This will not wait - but may block.
+  iree_task_executor_coordinate(executor, /*current_worker=*/NULL);
 
-  IREE_TRACE_ZONE_END(z0);
-}
-
-// Merges incoming likely-unresolved wait tasks into the primary executor lists.
-// The handle of each task will be inserted into the wait_set (where it may be
-// a duplicate).
-//
-// Only called during coordination and expects the coordinator lock to be held.
-static void iree_task_executor_merge_wait_list(
-    iree_task_executor_t* executor, iree_task_list_t* incoming_waiting_list) {
-  if (iree_task_list_is_empty(incoming_waiting_list)) return;
-
-  iree_slim_mutex_lock(&executor->wait_mutex);
-
-  // Walk the list of incoming wait tasks and add them to our wait_set.
-  iree_task_wait_t* wait_task =
-      (iree_task_wait_t*)iree_task_list_front(incoming_waiting_list);
-  do {
-    iree_status_t status =
-        iree_wait_set_insert(executor->wait_set, wait_task->wait_handle);
-    // TODO(#4026): propagate failure to the task scope.
-    IREE_ASSERT_TRUE(iree_status_is_ok(status));
-    iree_status_ignore(status);
-    wait_task = (iree_task_wait_t*)wait_task->header.next_task;
-  } while (wait_task);
-
-  iree_slim_mutex_unlock(&executor->wait_mutex);
-
-  // Add (in undefined order) to the primary wait list used for tracking the
-  // root wait tasks until they are ready.
-  iree_task_list_append(&executor->waiting_list, incoming_waiting_list);
-}
-
-// Finds the waiting task corresponding to |wake_handle| and retires it.
-// Any dependent tasks will be enqueued in the |pending_submission| for issuing.
-// If multiple tasks were waiting on the same wait handle all will be readied.
-//
-// Only called during coordination and expects the coordinator lock to be held.
-// The wait lock must be held as the wait_set is modified.
-static void iree_task_executor_wake_waiting_task(
-    iree_task_executor_t* executor, iree_wait_handle_t wake_handle,
-    iree_task_submission_t* pending_submission) {
-  // Walk through the waiting_list and find all waits with this handle.
-  // Some may not have resolved yet and need to remain in the list.
-  iree_task_t* prev_task = NULL;
-  iree_task_t* task = iree_task_list_front(&executor->waiting_list);
-  while (task != NULL) {
-    iree_task_t* next_task = task->next_task;
-    iree_task_wait_t* wait_task = (iree_task_wait_t*)task;
-    if (wake_handle.type == wait_task->wait_handle.type &&
-        memcmp(&wake_handle.value, &wait_task->wait_handle.value,
-               sizeof(wake_handle.value)) == 0) {
-      // Found one of possibly many. If its condition is met then remove from
-      // the wait set and ready up.
-      if (iree_task_wait_check_condition(wait_task)) {
-        iree_wait_set_erase(executor->wait_set, wake_handle);
-        iree_task_list_erase(&executor->waiting_list, prev_task, task);
-        iree_task_submission_enqueue(pending_submission, task);
-        task = prev_task;
-      }
-    }
-    prev_task = task;
-    task = next_task;
-  }
-}
-
-// Polls all waiting tasks to see if they have completed and adds any newly
-// ready dependencies to |pending_submission|.
-//
-// Only called during coordination and expects the coordinator lock to be held.
-static void iree_task_executor_poll_waiting_tasks(
-    iree_task_executor_t* executor,
-    iree_task_submission_t* pending_submission) {
-  if (iree_task_list_is_empty(&executor->waiting_list)) return;
-
-  // Hold the wait lock for the duration we use the wait_set.
-  if (!iree_slim_mutex_try_lock(&executor->wait_mutex)) {
-    return;
-  }
-
-  IREE_TRACE_ZONE_BEGIN(z0);
-
-  // Poll all root waiting tasks (infinite-past duration) to see if any have
-  // completed. If one or more have resolved then wake_handle will contain an
-  // unspecified wake handle.
-  int woken_tasks = 0;
-  do {
-    iree_wait_handle_t wake_handle;
-    iree_status_t status = iree_wait_any(executor->wait_set,
-                                         IREE_TIME_INFINITE_PAST, &wake_handle);
-    if (iree_status_is_ok(status)) {
-      // One or more waiters is ready. We don't support multi-wake right now so
-      // we'll just take the one we got back and try again.
-      iree_task_executor_wake_waiting_task(executor, wake_handle,
-                                           pending_submission);
-      ++woken_tasks;
-      continue;
-    } else if (iree_status_is_deadline_exceeded(status)) {
-      // Indicates nothing was woken. Gracefully bail for now.
-      break;
-    } else {
-      // (Spurious?) error during poll.
-      // TODO(#4026): propagate failure to all scopes involved.
-      // It may be ok to ignore when polling as the eventual wait will handle
-      // the full propagation. For now we assert so its easy to see if we have
-      // tried to perform a bad iree_wait_any.
-      IREE_ASSERT_TRUE(iree_status_is_ok(status));
-      iree_status_ignore(status);
-      break;
-    }
-  } while (!iree_task_list_is_empty(&executor->waiting_list));
-
-  iree_slim_mutex_unlock(&executor->wait_mutex);
-
-  IREE_TRACE_ZONE_APPEND_VALUE(z0, woken_tasks);
-  IREE_TRACE_ZONE_END(z0);
-}
-
-// Waits for one or more waiting tasks to be ready to execute.
-// If a wait task retires any newly-ready tasks will be added to
-// |pending_submission|.
-//
-// Only called during coordination and expects the coordinator lock to be held.
-static void iree_task_executor_wait_any_task(
-    iree_task_executor_t* executor, iree_task_worker_t* current_worker,
-    iree_task_submission_t* pending_submission) {
-  if (iree_task_list_is_empty(&executor->waiting_list)) return;
-
-  IREE_TRACE_ZONE_BEGIN(z0);
-  iree_slim_mutex_unlock(&executor->coordinator_mutex);
-
-  // We can't hold the coordinator lock during the wait but also need to ensure
-  // no other coordination messes with the wait set. We have a dedicated wait
-  // mutex and guard wait-set accesses (polling/waiting/etc) with that. Polls
-  // may try-lock and bail if the lock is held indicating that someone else has
-  // a non-polling wait active.
-
-  // TODO(benvanik): ensure coordinator wake semantics are modeled:
-  // - donator:
-  //   attempt 0:
-  //     try steal
-  //     if fail to steal: coordinate
-  //   attempt 1:
-  //     try steal
-  //     if fail to steal: await any-posted notification?
-  // - worker:
-  //   attempt 0:
-  //     try steal
-  //     if fail to steal: coordinate
-
-  iree_slim_mutex_lock(&executor->wait_mutex);
-
-  iree_time_t deadline_ns = IREE_TIME_INFINITE_FUTURE;
-  iree_wait_handle_t wake_handle;
-  iree_status_t status =
-      iree_wait_any(executor->wait_set, deadline_ns, &wake_handle);
-
-  iree_slim_mutex_unlock(&executor->wait_mutex);
-
-  // TODO(#4026): propagate failure to all scopes involved.
-  IREE_ASSERT_TRUE(iree_status_is_ok(status));
-  iree_status_ignore(status);
-
-  iree_slim_mutex_lock(&executor->coordinator_mutex);
-
-  int woken_tasks = 0;
-  if (iree_status_is_ok(status)) {
-    // One or more waiters is ready. We don't support multi-wake right now so
-    // we'll just take the one we got back and try again.
-    iree_task_executor_wake_waiting_task(executor, wake_handle,
-                                         pending_submission);
-    ++woken_tasks;
-  } else if (iree_status_is_deadline_exceeded(status)) {
-    // Indicates nothing was woken. Gracefully bail and return to the
-    // coordinator to see if we should wait again.
-  } else {
-    // (Spurious?) error during wait.
-    // TODO(#4026): propagate failure to all scopes involved.
-    // Failures during waits are serious: ignoring them could lead to live-lock
-    // as tasks further in the pipeline expect them to have completed or - even
-    // worse - user code/other processes/drivers/etc may expect them to
-    // complete.
-    IREE_ASSERT_TRUE(iree_status_is_ok(status));
-    iree_status_ignore(status);
-  }
-
-  IREE_TRACE_ZONE_APPEND_VALUE(z0, woken_tasks);
   IREE_TRACE_ZONE_END(z0);
 }
 
 // Dispatches tasks in the global submission queue to workers.
 // This is called by users upon submission of new tasks or by workers when they
-// run out of tasks to process. |wait_on_idle| indicates whether the
-// coordination request is done as a fallback in the event of there possibly
-// being new work available.
+// run out of tasks to process. If |current_worker| is provided then tasks will
+// prefer to be routed back to it for immediate processing.
 //
-// If a coordination run ends up with no ready tasks and one or more waiting
-// tasks then the coordinator will wait for one of the tasks to become ready.
-// This only happens in the |wait_on_idle| case (so it's always a worker) as in
-// those cases the next step for the worker would have been to wait anyway. In
-// the non-speculative case the coordinator polls the wait handles to see if
-// they have resolved instead, possibly readying more tasks immediately.
+// If a coordination run ends up with no ready tasks and |current_worker| is
+// provided the calling thread will enter a wait until the worker has more tasks
+// posted to it.
 void iree_task_executor_coordinate(iree_task_executor_t* executor,
-                                   iree_task_worker_t* current_worker,
-                                   bool wait_on_idle) {
+                                   iree_task_worker_t* current_worker) {
   iree_slim_mutex_lock(&executor->coordinator_mutex);
   IREE_TRACE_ZONE_BEGIN(z0);
 
@@ -602,8 +420,7 @@ void iree_task_executor_coordinate(iree_task_executor_t* executor,
     iree_task_submission_t pending_submission;
     iree_task_submission_initialize_from_lifo_slist(
         &executor->incoming_ready_slist, &pending_submission);
-    iree_task_list_append_from_fifo_slist(&pending_submission.waiting_list,
-                                          &executor->incoming_waiting_slist);
+    if (iree_task_list_is_empty(&pending_submission.ready_list)) break;
 
     // Scratch coordinator submission batch used during scheduling to batch up
     // all tasks that will be posted to each worker. We could stash this on the
@@ -615,49 +432,19 @@ void iree_task_executor_coordinate(iree_task_executor_t* executor,
                     executor->worker_count * sizeof(iree_task_list_t));
     iree_task_post_batch_initialize(executor, current_worker, post_batch);
 
-    // Poll the waiting tasks to see if any have resolved. This dramatically
-    // cuts latency in cases where the wait handle completes prior to us
-    // entering the real wait. When we have semaphores sequencing back-to-back
-    // work this ensures that we pack in future dispatch work earlier vs.
-    // waiting for a full thread hop.
-    //
-    // If any waits have resolved then they'll be moved to the ready list here
-    // and then get processed FIFO with the tasks that were ready in the
-    // request.
-    iree_task_executor_poll_waiting_tasks(executor, &pending_submission);
-
     // Schedule all ready tasks in this batch. Some may complete inline (such
     // as ready barriers with all their dependencies resolved) while others may
     // be scheduled on workers via the post batch.
     iree_task_executor_schedule_ready_tasks(executor, &pending_submission,
                                             post_batch);
 
-    // Merge any newly waiting tasks into the global wait list.
-    iree_task_executor_merge_wait_list(executor,
-                                       &pending_submission.waiting_list);
+    // Route waiting tasks to the poller.
+    iree_task_poller_enqueue(&executor->poller,
+                             &pending_submission.waiting_list);
 
     // Post all new work to workers; they may wake and begin executing
     // immediately. Returns whether this worker has new tasks for it to work on.
-    bool did_post = iree_task_post_batch_submit(post_batch);
-    if (!did_post && wait_on_idle) {
-      // No work was found; wait on one or more of our wait handles.
-      // This will block the calling thread but that's fine as they were going
-      // to wait anyway and were just speculatively seeing if there was work
-      // first by requesting coordination. If work completes here we'll catch it
-      // on the poll next loop around.
-      iree_task_executor_wait_any_task(executor, current_worker,
-                                       &pending_submission);
-    }
-
-    // Merge any new work into the submission list for future coordinators to
-    // deal with - we don't want the possibility of starvation by looping on
-    // this.
-    if (!iree_task_submission_is_empty(&pending_submission)) {
-      iree_task_executor_merge_submission(executor, &pending_submission);
-      schedule_dirty = true;
-    } else {
-      schedule_dirty = false;
-    }
+    schedule_dirty = iree_task_post_batch_submit(post_batch);
   } while (schedule_dirty);
 
   iree_slim_mutex_unlock(&executor->coordinator_mutex);
@@ -770,16 +557,19 @@ iree_task_t* iree_task_executor_try_steal_task(
 }
 
 iree_status_t iree_task_executor_donate_caller(iree_task_executor_t* executor,
-                                               iree_wait_handle_t* wait_handle,
-                                               iree_time_t deadline_ns) {
+                                               iree_wait_source_t wait_source,
+                                               iree_timeout_t timeout) {
   IREE_TRACE_ZONE_BEGIN(z0);
 
   // Perform an immediate flush/coordination (in case the caller queued).
   iree_task_executor_flush(executor);
 
   // Wait until completed.
-  // TODO(benvanik): make this steal tasks until wait_handle resolves.
-  iree_status_t status = iree_wait_one(wait_handle, deadline_ns);
+  // TODO(benvanik): make this steal tasks until wait_handle resolves?
+  // Somewhat dangerous as we don't know what kind of thread we are running on;
+  // it may have a smaller stack than we are expecting or have some weird thread
+  // local state (FPU rounding modes/etc).
+  iree_status_t status = iree_wait_source_wait_one(wait_source, timeout);
 
   IREE_TRACE_ZONE_END(z0);
   return status;

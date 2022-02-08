@@ -46,6 +46,13 @@ extern "C" {
 // sources.
 #define IREE_TASK_EXECUTOR_MAX_OUTSTANDING_WAITS (64 - 1)
 
+// Amount of time that can remain in a delay task while still retiring.
+// This prevents additional system sleeps when the remaining time before the
+// deadline is less than the granularity the system is likely able to sleep for.
+// Some platforms may have as much as 10-15ms of potential slop and sleeping for
+// 1ms may result in 10-15ms.
+#define IREE_TASK_EXECUTOR_DELAY_SLOP_NS (1 /*ms*/ * 1000000)
+
 // Allows for dividing the total number of attempts that a worker will make to
 // steal tasks from other workers. By default all other workers will be
 // attempted while setting this to 2, for example, will try for only half of
