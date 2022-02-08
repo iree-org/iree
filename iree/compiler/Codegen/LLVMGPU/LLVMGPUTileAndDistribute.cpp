@@ -203,17 +203,12 @@ static LogicalResult copyToWorkgroupMemory(OpBuilder &b, Value src, Value dst) {
 static Optional<Value> allocateWorkgroupMemory(
     OpBuilder &b, memref::SubViewOp subview,
     ArrayRef<Value> boundingSubViewSize, DataLayout &layout) {
-  // In CUDA workgroup memory is represented by a global variable. Create a
-  // global variable and a memref.GetGlobalOp at the beginning of the function
-  // to get the memref.
   OpBuilder::InsertionGuard guard(b);
   FuncOp funcOp = subview->getParentOfType<FuncOp>();
   if (!funcOp) {
     subview.emitError("expected op to be within std.func");
     return llvm::None;
   }
-  ModuleOp moduleOp = funcOp->getParentOfType<ModuleOp>();
-  SymbolTable symbolTable(moduleOp);
 
   // The bounding subview size is expected to be constant. This specified the
   // shape of the allocation.
@@ -227,18 +222,8 @@ static Optional<Value> allocateWorkgroupMemory(
   MemRefType allocType =
       MemRefType::get(shape, subview.getType().getElementType(), {},
                       gpu::GPUDialect::getWorkgroupAddressSpace());
-  b.setInsertionPoint(&moduleOp.front());
-  auto global = b.create<memref::GlobalOp>(
-      funcOp.getLoc(), "__shared_memory__",
-      /*sym_visibility=*/b.getStringAttr("private"),
-      /*type=*/allocType,
-      /*initial_value=*/ElementsAttr(),
-      /*constant=*/false, /*alignment=*/IntegerAttr());
-  symbolTable.insert(global);
-
-  b.setInsertionPointToStart(&(*funcOp.getBody().begin()));
-  Value buffer = b.create<memref::GetGlobalOp>(funcOp.getLoc(), global.type(),
-                                               global.getName());
+  b.setInsertionPoint(&funcOp.front(), funcOp.front().begin());
+  Value buffer = b.create<memref::AllocOp>(funcOp.getLoc(), allocType);
   return buffer;
 }
 
