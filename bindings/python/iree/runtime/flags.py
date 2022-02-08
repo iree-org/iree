@@ -10,4 +10,3 @@ from .binding import parse_flags
 # event of errors, this will yield nicer error messages but comes with a
 # runtime cost.
 FUNCTION_INPUT_VALIDATION = True
-
