@@ -12,6 +12,7 @@
 #include "iree-dialects/Dialect/PyDM/Transforms/ToIREE/Patterns.h"
 #include "iree-dialects/Dialect/PyDM/Transforms/ToIREE/TypeConverter.h"
 #include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
+#include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
 #include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/BuiltinDialect.h"
