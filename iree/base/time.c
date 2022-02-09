@@ -123,8 +123,8 @@ static bool iree_wait_until_impl(iree_time_t deadline_ns) {
 // from the API.
 static bool iree_wait_until_impl(iree_time_t deadline_ns) {
   struct timespec ts = {
-      .tv_sec = (time_t)(deadline_ns / 1000000000ull),
-      .tv_nsec = (long)(deadline_ns % 1000000000ull),
+      .tv_sec = 0,
+      .tv_nsec = deadline_ns,
   };
   int ret = clock_nanosleep(CLOCK_REALTIME, TIMER_ABSTIME, &ts, NULL);
   return ret == 0;
@@ -143,9 +143,9 @@ static bool iree_wait_until_impl(iree_time_t deadline_ns) {
   iree_time_t now_ns = iree_time_now();
   while (now_ns < deadline_ns) {
     iree_time_t delta_ns = deadline_ns - now_ns;
-    struct timespec abs_ts = {
-        .tv_sec = (time_t)(delta_ns / 1000000000ull),
-        .tv_nsec = (long)(delta_ns % 1000000000ull),
+    struct timespec ts = {
+        .tv_sec = 0,
+        .tv_nsec = delta_ns,
     };
     int ret = nanosleep(&ts, NULL);
     if (ret != 0) return false;
