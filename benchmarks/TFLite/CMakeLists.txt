@@ -62,10 +62,22 @@ set(MOBILEBERT_FP32_MODULE
   NAME
     "MobileBertSquad"
   TAGS
-    "fp32"
+    "fp32,squad"
   SOURCE
-    # Mirror of https://tfhub.dev/tensorflow/lite-model/mobilebert/1/default/1
-    "https://storage.googleapis.com/iree-model-artifacts/mobilebertsquad.tflite"
+    "https://storage.googleapis.com/iree-model-artifacts/mobilebert-baseline-tf2-float.tflite"
+  ENTRY_FUNCTION
+    "main"
+  FUNCTION_INPUTS
+    "1x384xi32,1x384xi32,1x384xi32"
+)
+
+set(MOBILEBERT_INT8_MODULE
+  NAME
+    "MobileBertSquad"
+  TAGS
+    "int8,squad"
+  SOURCE
+    "https://storage.googleapis.com/iree-model-artifacts/mobilebert-baseline-tf2-quant.tflite"
   ENTRY_FUNCTION
     "main"
   FUNCTION_INPUTS
@@ -151,6 +163,7 @@ iree_benchmark_suite(
     "${MOBILESSD_FP32_MODULE}"
     "${POSENET_FP32_MODULE}"
     "${MOBILEBERT_FP32_MODULE}"
+    "${MOBILEBERT_INT8_MODULE}"
     "${MOBILENET_V2_MODULE}"
     "${MOBILENET_V3SMALL_MODULE}"
 
@@ -176,6 +189,7 @@ iree_benchmark_suite(
     "${MOBILESSD_FP32_MODULE}"
     "${POSENET_FP32_MODULE}"
     "${MOBILEBERT_FP32_MODULE}"
+    "${MOBILEBERT_INT8_MODULE}"
     "${MOBILENET_V2_MODULE}"
     "${MOBILENET_V3SMALL_MODULE}"
 
@@ -256,6 +270,7 @@ iree_benchmark_suite(
     "${MOBILESSD_FP32_MODULE}"
     "${POSENET_FP32_MODULE}"
     "${MOBILEBERT_FP32_MODULE}"
+    "${MOBILEBERT_INT8_MODULE}"
     "${MOBILENET_V2_MODULE}"
     "${MOBILENET_V3SMALL_MODULE}"
 
