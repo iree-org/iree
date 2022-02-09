@@ -27,7 +27,7 @@ void registerTFImportPassPipeline();
 //===----------------------------------------------------------------------===//
 
 // Converts the TF dialect to the XLA MHLO dialect.
-std::unique_ptr<FunctionPass> createConvertToMHLOPass();
+std::unique_ptr<Pass> createConvertToMHLOPass();
 
 // In a module tagged with `tf_saved_model.semantics`, lowers
 // `tf_saved_model.global_variable`'s to `util.global`'s.
