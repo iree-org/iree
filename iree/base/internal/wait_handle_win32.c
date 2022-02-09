@@ -175,7 +175,9 @@ iree_status_t iree_wait_set_insert(iree_wait_set_t* set,
                                    iree_wait_handle_t handle) {
   if (set->total_handle_count + 1 > set->handle_capacity) {
     return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
-                            "wait set capacity reached");
+                            "wait set capacity %" PRIhsz
+                            " reached; no more wait handles available",
+                            set->handle_capacity);
   }
 
   // First check to see if we already have the handle in the set; since APIs

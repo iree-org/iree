@@ -329,6 +329,7 @@ iree_cc_library(
     "wait_handle.c"
     "wait_handle_epoll.c"
     "wait_handle_impl.h"
+    "wait_handle_inproc.c"
     "wait_handle_kqueue.c"
     "wait_handle_null.c"
     "wait_handle_poll.c"
@@ -336,6 +337,7 @@ iree_cc_library(
     "wait_handle_posix.h"
     "wait_handle_win32.c"
   DEPS
+    ::synchronization
     iree::base
     iree::base::core_headers
     iree::base::tracing
