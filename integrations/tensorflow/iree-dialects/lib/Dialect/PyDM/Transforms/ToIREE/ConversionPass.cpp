@@ -12,6 +12,7 @@
 #include "iree-dialects/Dialect/PyDM/Transforms/ToIREE/Patterns.h"
 #include "iree-dialects/Dialect/PyDM/Transforms/ToIREE/TypeConverter.h"
 #include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
+#include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
 #include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/BuiltinDialect.h"
@@ -47,11 +48,12 @@ struct ConvertIREEPyDMToIREEPass
 
     // Some CFG ops can be present in the original pydm program. Need to
     // verify legality based on types.
-    target.addDynamicallyLegalOp<BranchOp>([&](mlir::BranchOp op) -> bool {
-      return typeConverter.areTypesLegal(op.getOperandTypes());
-    });
-    target.addDynamicallyLegalOp<CondBranchOp>(
-        [&](mlir::CondBranchOp op) -> bool {
+    target.addDynamicallyLegalOp<mlir::cf::BranchOp>(
+        [&](mlir::cf::BranchOp op) -> bool {
+          return typeConverter.areTypesLegal(op.getOperandTypes());
+        });
+    target.addDynamicallyLegalOp<mlir::cf::CondBranchOp>(
+        [&](mlir::cf::CondBranchOp op) -> bool {
           return typeConverter.areTypesLegal(op.getOperandTypes());
         });
 

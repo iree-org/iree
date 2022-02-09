@@ -80,7 +80,7 @@ def if_elif(cond, a, b):
 
 
 # CHECK-LABEL: @simple_while
-# CHECK: std.br ^bb1
+# CHECK: cf.br ^bb1
 # CHECK: ^bb1:  // 2 preds: ^bb0, ^bb2
 # CHECK:   %[[COND:.*]] = load_var %cond
 # CHECK:   %[[COND_BOOL:.*]] = as_bool %[[COND]]
@@ -88,7 +88,7 @@ def if_elif(cond, a, b):
 # CHECL:   std.cond_br %2, ^bb2, ^bb3
 # CHECK: ^bb2:  // pred: ^bb1
 # CHECK:   store_var %a
-# CHECK:   std.br ^bb1
+# CHECK:   cf.br ^bb1
 # CHECK: ^bb3:  // pred: ^bb1
 # CHECK:   load_var %a
 @test_import_global
@@ -102,7 +102,7 @@ def simple_while(cond):
 # CHECK: ^bb1:  // 2 preds: ^bb0, ^bb4
 # CHECK: ^bb2:  // pred: ^bb1
 # CHECK: ^bb3:  // pred: ^bb2
-# CHECK:   std.br ^bb5
+# CHECK:   cf.br ^bb5
 # CHECK: ^bb4:  // pred: ^bb2
 # CHECK: ^bb5:  // 2 preds: ^bb1, ^bb3
 # CHECK:   load_var %a
@@ -120,7 +120,7 @@ def while_break(cond):
 # CHECK: ^bb1:  // 3 preds: ^bb0, ^bb3, ^bb4
 # CHECK: ^bb2:  // pred: ^bb1
 # CHECK: ^bb3:  // pred: ^bb2
-# CHECK:   std.br ^bb1
+# CHECK:   cf.br ^bb1
 # CHECK: ^bb4:  // pred: ^bb2
 # CHECK: ^bb5:  // pred: ^bb1
 # CHECK:   load_var %a
@@ -138,7 +138,7 @@ def while_continue(cond):
 # CHECK: ^bb1:  // 2 preds: ^bb0, ^bb4
 # CHECK: ^bb2:  // pred: ^bb1
 # CHECK: ^bb3:  // pred: ^bb2
-# CHECK:   std.br ^bb6
+# CHECK:   cf.br ^bb6
 # CHECK: ^bb4:  // pred: ^bb2
 # CHECK: ^bb5:  // pred: ^bb1
 # CHECK:   store_var %c

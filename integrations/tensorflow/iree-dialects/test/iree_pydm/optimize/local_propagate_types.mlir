@@ -28,7 +28,7 @@ iree_pydm.func @sink_static_info_cast_into_refinable(%arg0 : !iree_pydm.object<!
 // CHECK: ^bb1(%[[BB1_PHI0:.*]]: !iree_pydm.object<!iree_pydm.integer<32>>): // pred: ^bb0
 // CHECK:   %[[BB1_V0:.*]] = static_info_cast %[[BB1_PHI0]] : !iree_pydm.object<!iree_pydm.integer<32>> -> !iree_pydm.object
 // CHECK:   %[[BB1_V1:.*]] = "custom.donotoptimize"(%[[BB1_V0]]) : (!iree_pydm.object) -> !iree_pydm.object
-// CHECK:   std.br ^bb3(%[[BB1_V1]] : !iree_pydm.object)
+// CHECK:   cf.br ^bb3(%[[BB1_V1]] : !iree_pydm.object)
 // CHECK: ^bb2(%[[BB2_PHI0:.*]]: !iree_pydm.object<!iree_pydm.integer<32>>): // pred: ^bb0
 // CHECK:   %[[BB2_V0:.*]] = make_list %[[BB2_PHI0]]
 // CHECK:   return %[[BB2_V0]]
@@ -40,7 +40,7 @@ iree_pydm.func @sink_static_info_cast_into_branch(%pred : i1, %arg0 : !iree_pydm
   std.cond_br %pred, ^bb1(%0 : !iree_pydm.object), ^bb2(%0 : !iree_pydm.object)
 ^bb1(%phi0 : !iree_pydm.object):
   %1 = "custom.donotoptimize"(%phi0) : (!iree_pydm.object) -> (!iree_pydm.object)
-  std.br ^bb2(%1 : !iree_pydm.object)
+  cf.br ^bb2(%1 : !iree_pydm.object)
 ^bb2(%phi1 : !iree_pydm.object):
   %list = make_list %phi1 : !iree_pydm.object -> !iree_pydm.list
   return %list : !iree_pydm.list
