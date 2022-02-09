@@ -92,8 +92,6 @@ static void iree_task_cleanup(iree_task_t* task,
 
 static void iree_task_barrier_discard(iree_task_barrier_t* task,
                                       iree_task_list_t* discard_worklist);
-static void iree_task_fence_discard(iree_task_fence_t* task,
-                                    iree_task_list_t* discard_worklist);
 
 void iree_task_discard(iree_task_t* task, iree_task_list_t* discard_worklist) {
   IREE_TRACE_ZONE_BEGIN(z0);
@@ -117,6 +115,7 @@ void iree_task_discard(iree_task_t* task, iree_task_list_t* discard_worklist) {
     iree_task_list_push_back(discard_worklist, task->completion_task);
   }
 
+  iree_task_scope_t* end_scope = NULL;
   switch (task->type) {
     default:
     case IREE_TASK_TYPE_NOP:
@@ -126,7 +125,7 @@ void iree_task_discard(iree_task_t* task, iree_task_list_t* discard_worklist) {
       iree_task_barrier_discard((iree_task_barrier_t*)task, discard_worklist);
       break;
     case IREE_TASK_TYPE_FENCE:
-      iree_task_scope_end(task->scope);
+      end_scope = task->scope;  // need to clean up the task first
       break;
     case IREE_TASK_TYPE_WAIT:
     case IREE_TASK_TYPE_DISPATCH:
@@ -136,6 +135,10 @@ void iree_task_discard(iree_task_t* task, iree_task_list_t* discard_worklist) {
   iree_task_cleanup(task, IREE_STATUS_ABORTED);
   // NOTE: task is invalidated here and cannot be used!
   task = NULL;
+
+  if (end_scope) {
+    iree_task_scope_end(end_scope);
+  }
 
   IREE_TRACE_ZONE_END(z0);
 }
@@ -149,14 +152,14 @@ static void iree_task_retire(iree_task_t* task,
   // Decrement the pending count on the completion task, if any.
   iree_task_t* completion_task = task->completion_task;
   task->completion_task = NULL;
-  bool completion_task_ready =
-      completion_task &&
-      iree_atomic_fetch_sub_int32(&completion_task->pending_dependency_count, 1,
-                                  iree_memory_order_acq_rel) == 1;
 
   if (iree_status_is_ok(status)) {
     // Task completed successfully.
     iree_task_cleanup(task, IREE_STATUS_OK);
+    bool completion_task_ready =
+        completion_task &&
+        iree_atomic_fetch_sub_int32(&completion_task->pending_dependency_count,
+                                    1, iree_memory_order_acq_rel) == 1;
     if (completion_task_ready) {
       // This was the last pending dependency and the completion task is ready
       // to run.
@@ -167,6 +170,10 @@ static void iree_task_retire(iree_task_t* task,
     iree_task_scope_fail(task->scope, task, status);
     status = iree_ok_status();  // consumed by the fail
     iree_task_cleanup(task, IREE_STATUS_ABORTED);
+    bool completion_task_ready =
+        completion_task &&
+        iree_atomic_fetch_sub_int32(&completion_task->pending_dependency_count,
+                                    1, iree_memory_order_acq_rel) == 1;
     if (completion_task_ready) {
       // This was the last pending dependency and we know that we can safely
       // abort the completion task by discarding.
@@ -358,7 +365,11 @@ void iree_task_fence_retire(iree_task_fence_t* task,
                             iree_task_submission_t* pending_submission) {
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  iree_task_scope_end(task->header.scope);
+  // Need to wait until after we clean up the task before ending the scope.
+  // This way anyone waiting on the scope to go idle will be able to ensure the
+  // scope is actually idle - otherwise it may try to free the task memory
+  // while we are still using it.
+  iree_task_scope_t* end_scope = task->header.scope;
 
   // TODO(benvanik): better API that doesn't require wrapping or requiring that
   // iree_event_t is an iree_wait_handle_t.
@@ -369,6 +380,10 @@ void iree_task_fence_retire(iree_task_fence_t* task,
   iree_event_set(&signal_handle);
 
   iree_task_retire(&task->header, pending_submission, iree_ok_status());
+
+  if (end_scope) {
+    iree_task_scope_end(end_scope);
+  }
 
   IREE_TRACE_ZONE_END(z0);
 }
