@@ -123,11 +123,12 @@ void iree_task_scope_begin(iree_task_scope_t* scope) {
 
 void iree_task_scope_end(iree_task_scope_t* scope) {
   iree_slim_mutex_lock(&scope->mutex);
-  if (--scope->pending_submissions == 0) {
+  bool signal = (--scope->pending_submissions == 0);
+  iree_slim_mutex_unlock(&scope->mutex);
+  if (signal) {
     // All submissions have completed in this scope - notify any waiters.
     iree_notification_post(&scope->idle_notification, IREE_ALL_WAITERS);
   }
-  iree_slim_mutex_unlock(&scope->mutex);
 }
 
 bool iree_task_scope_is_idle(iree_task_scope_t* scope) {
