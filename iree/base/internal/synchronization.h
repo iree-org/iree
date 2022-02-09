@@ -330,15 +330,18 @@ iree_wait_token_t iree_notification_prepare_wait(
     iree_notification_t* notification);
 
 // Commits a pending wait operation when the caller has ensured it must wait.
-// Waiting will continue until a notification has been posted.
+// Waiting will continue until a notification has been posted or |deadline_ns|
+// is reached. Returns false if the deadline is reached before a notification is
+// posted.
 //
 // Acts as (at least) a memory_order_acquire barrier:
 //   A load operation with this memory order performs the acquire operation on
 //   the affected memory location: no reads or writes in the current thread can
 //   be reordered before this load. All writes in other threads that release the
 //   same atomic variable are visible in the current thread.
-void iree_notification_commit_wait(iree_notification_t* notification,
-                                   iree_wait_token_t wait_token);
+bool iree_notification_commit_wait(iree_notification_t* notification,
+                                   iree_wait_token_t wait_token,
+                                   iree_time_t deadline_ns);
 
 // Cancels a pending wait operation without blocking.
 //
@@ -355,6 +358,8 @@ typedef bool (*iree_condition_fn_t)(void* arg);
 
 // Blocks and waits until |condition_fn| returns true. Other threads must modify
 // state checked by the |condition_fn| and post the notification.
+// Returns true if the condition is true before |timeout| is reached. If the
+// timeout is infinite then the return will always be true.
 //
 // Example:
 //  thread 1:
@@ -367,9 +372,9 @@ typedef bool (*iree_condition_fn_t)(void* arg);
 //  thread 2:
 //   iree_atomic_int32_store(flag, 1, iree_memory_order_release);
 //   iree_notification_post(&notification, IREE_ALL_WAITERS);
-void iree_notification_await(iree_notification_t* notification,
+bool iree_notification_await(iree_notification_t* notification,
                              iree_condition_fn_t condition_fn,
-                             void* condition_arg);
+                             void* condition_arg, iree_timeout_t timeout);
 
 #ifdef __cplusplus
 }  // extern "C"
