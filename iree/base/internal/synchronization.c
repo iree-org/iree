@@ -129,9 +129,9 @@ static inline iree_status_code_t iree_futex_wait(void* address,
   int rc = syscall(
       SYS_futex, address, FUTEX_WAIT | FUTEX_PRIVATE_FLAG, expected_value,
       timeout_ms == IREE_INFINITE_TIMEOUT_MS ? NULL : &timeout, NULL, 0);
-  if (IREE_LIKELY(rc == 0)) {
+  if (IREE_LIKELY(rc == 0) || errno == EAGAIN) {
     return IREE_STATUS_OK;
-  } else if (rc == ETIMEDOUT) {
+  } else if (errno == ETIMEDOUT) {
     return IREE_STATUS_DEADLINE_EXCEEDED;
   }
   return IREE_STATUS_UNAVAILABLE;
