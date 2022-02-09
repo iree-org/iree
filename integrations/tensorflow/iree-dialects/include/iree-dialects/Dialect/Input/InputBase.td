@@ -28,9 +28,9 @@ def IREEInput_Dialect : Dialect {
   let cppNamespace = "::mlir::iree_compiler::IREE::Input";
 }
 
-class IREEInput_Op<string mnemonic, list<OpTrait> traits = []> :
+class IREEInput_Op<string mnemonic, list<Trait> traits = []> :
     Op<IREEInput_Dialect, mnemonic, traits>;
-class IREEInput_PureOp<string mnemonic, list<OpTrait> traits = []> :
+class IREEInput_PureOp<string mnemonic, list<Trait> traits = []> :
     Op<IREEInput_Dialect, mnemonic, !listconcat(traits, [NoSideEffect])>;
 class IREEInput_Type<string name> : TypeDef<IREEInput_Dialect, name>;
 

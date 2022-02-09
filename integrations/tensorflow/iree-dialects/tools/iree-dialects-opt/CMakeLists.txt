@@ -1,6 +1,5 @@
 set(LIBS
   MLIRArithmetic
-  MLIRControlFlow
   MLIRDialect
   MLIRLinalg
   MLIRMemRef

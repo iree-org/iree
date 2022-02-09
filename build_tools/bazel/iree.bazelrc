@@ -41,9 +41,10 @@ build --enable_runfiles
 # C++14 standard version is required.
 build:generic_gcc --cxxopt=-std=c++14 --host_cxxopt=-std=c++14
 
+# TODO: OSS assert builds of TF became non functional around 1/27/2022. RIP.
 # Default to adding back asserts in optimized builds.
 # This is a good compromise between runtime and debugability.
-build:generic_gcc --copt=-UNDEBUG
+#build:generic_gcc --copt=-UNDEBUG
 
 # Disable warnings we don't care about or that generally have a low signal/noise
 # ratio.
@@ -61,9 +62,10 @@ build:generic_gcc --copt=-Wno-stringop-truncation
 # C++14 standard version is required.
 build:generic_clang --cxxopt=-std=c++14 --host_cxxopt=-std=c++14
 
+# TODO: OSS assert builds of TF became non functional around 1/27/2022. RIP.
 # Default to adding back asserts in optimized builds.
 # This is a good compromise between runtime and debugability.
-build:generic_clang --copt=-UNDEBUG
+#build:generic_clang --copt=-UNDEBUG
 
 # Treat warnings as errors...
 build:generic_clang --copt=-Werror --host_copt=-Werror
