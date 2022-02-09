@@ -23,6 +23,7 @@
 #include "mlir-hlo/Dialect/mhlo/IR/hlo_ops.h"
 #include "mlir-hlo/Dialect/mhlo/transforms/rewriters.h"
 #include "mlir/Dialect/Complex/IR/Complex.h"
+#include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
@@ -325,9 +326,9 @@ struct ConvertMHLOToLinalgOnTensorsPass
                                         *typeConverter, context);
     patterns.insert<GenericTypeConvert>(CallOp::getOperationName(),
                                         *typeConverter, context);
-    patterns.insert<GenericTypeConvert>(CondBranchOp::getOperationName(),
+    patterns.insert<GenericTypeConvert>(cf::CondBranchOp::getOperationName(),
                                         *typeConverter, context);
-    patterns.insert<GenericTypeConvert>(BranchOp::getOperationName(),
+    patterns.insert<GenericTypeConvert>(cf::BranchOp::getOperationName(),
                                         *typeConverter, context);
 
     ConversionTarget target(getContext());

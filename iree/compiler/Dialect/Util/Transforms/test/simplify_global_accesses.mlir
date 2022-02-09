@@ -27,18 +27,18 @@ util.global private @varB = 2 : i32
 func @constants_in_cfg(%start: i32, %bound: i32) -> i32 {
   // CHECK-NEXT: %[[VAR_A:.+]] = util.global.load @varA : i32
   // CHECK-NEXT: %[[VAR_B:.+]] = util.global.load @varB : i32
-  // CHECK-NEXT: br ^bb1
-  br ^bb1(%start : i32)
+  // CHECK-NEXT: cf.br ^bb1
+  cf.br ^bb1(%start : i32)
 // CHECK: ^bb1(%[[BB1_ARG:.+]]: i32):
 ^bb1(%2: i32):
   %cmp = arith.cmpi slt, %2, %bound : i32
-  cond_br %cmp, ^bb2(%2 : i32), ^bb3(%2 : i32)
+  cf.cond_br %cmp, ^bb2(%2 : i32), ^bb3(%2 : i32)
 // CHECK: ^bb2(%[[BB2_ARG:.+]]: i32):
 ^bb2(%5: i32):
   %6 = util.global.load @varA : i32
   // CHECK-NEXT: = arith.addi %[[BB2_ARG]], %[[VAR_A]] : i32
   %7 = arith.addi %5, %6 : i32
-  br ^bb1(%7 : i32)
+  cf.br ^bb1(%7 : i32)
 // CHECK: ^bb3(%[[BB3_ARG:.+]]: i32):
 ^bb3(%8: i32):
   %9 = util.global.load @varA : i32

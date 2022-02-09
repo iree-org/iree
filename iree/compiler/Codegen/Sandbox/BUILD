@@ -57,6 +57,7 @@ cc_library(
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:Affine",
         "@llvm-project//mlir:ArithmeticDialect",
+        "@llvm-project//mlir:ControlFlowOps",
         "@llvm-project//mlir:LinalgOps",
         "@llvm-project//mlir:LinalgTransforms",
         "@llvm-project//mlir:Pass",

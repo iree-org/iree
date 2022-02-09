@@ -12,12 +12,12 @@ module @func_cfg_conversion {
 
   // CHECK: func @callee(%arg0: tensor<2xi32>, %arg1: i1) -> tensor<2xi32>
   func @callee(%arg0: tensor<2xui32>, %arg1: i1) -> tensor<2xui32> {
-    // CHECK: cond_br %arg1, ^bb1(%arg0 : tensor<2xi32>), ^bb2(%arg0 : tensor<2xi32>)
-    cond_br %arg1, ^bb1(%arg0 : tensor<2xui32>), ^bb2(%arg0 : tensor<2xui32>)
+    // CHECK: cf.cond_br %arg1, ^bb1(%arg0 : tensor<2xi32>), ^bb2(%arg0 : tensor<2xi32>)
+    cf.cond_br %arg1, ^bb1(%arg0 : tensor<2xui32>), ^bb2(%arg0 : tensor<2xui32>)
   // CHECK: ^bb1(%[[BB1_PHI:.*]]: tensor<2xi32>)
   ^bb1(%phi0 : tensor<2xui32>) :
-    // CHECK: br ^bb2(%[[BB1_PHI]] : tensor<2xi32>)
-    br ^bb2(%phi0 : tensor<2xui32>)
+    // CHECK: cf.br ^bb2(%[[BB1_PHI]] : tensor<2xi32>)
+    cf.br ^bb2(%phi0 : tensor<2xui32>)
   // CHECK: ^bb2(%[[BB2_PHI:.*]]: tensor<2xi32>)
   ^bb2(%phi1 : tensor<2xui32>):
     return %phi1 : tensor<2xui32>

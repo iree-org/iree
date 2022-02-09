@@ -43,6 +43,7 @@ iree_cc_library(
     ::UtilOpsGen
     LLVMSupport
     MLIRArithmetic
+    MLIRControlFlow
     MLIRControlFlowInterfaces
     MLIRIR
     MLIRMemRef

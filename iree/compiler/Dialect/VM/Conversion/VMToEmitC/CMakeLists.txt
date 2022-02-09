@@ -20,6 +20,7 @@ if(${IREE_ENABLE_EMITC})
       "DropExcludedExports.cpp"
       "EmitCTypeConverter.cpp"
     DEPS
+      MLIRControlFlow
       MLIREmitC
       MLIRIR
       MLIRPass

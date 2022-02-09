@@ -10,6 +10,7 @@ add_mlir_library(IREEPyDMToIREEPasses
   IREEInputDialect
   IREEPyDMDialect
   MLIRArithmetic
+  MLIRControlFlow
   MLIRIR
   MLIRMath
   MLIRStandard

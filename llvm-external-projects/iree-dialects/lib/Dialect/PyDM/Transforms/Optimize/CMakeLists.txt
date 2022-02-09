@@ -9,6 +9,7 @@ add_mlir_library(IREEPyDMOptimizePasses
   LINK_LIBS PUBLIC
   IREEPyDMDialect
   IREEPyDMUtils
+  MLIRControlFlow
   MLIRIR
   MLIRTransformUtils
 )

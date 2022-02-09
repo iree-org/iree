@@ -62,7 +62,7 @@ cc_library(
         "@llvm-project//mlir:LinalgOps",
         "@llvm-project//mlir:Pass",
         "@llvm-project//mlir:SCFDialect",
-        "@llvm-project//mlir:SCFToStandard",
+        "@llvm-project//mlir:SCFToControlFlow",
         "@llvm-project//mlir:StandardOps",
         "@llvm-project//mlir:Transforms",
     ],

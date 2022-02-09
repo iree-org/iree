@@ -12,6 +12,7 @@ add_mlir_library(IREELinalgExtDialect
 
   LINK_LIBS PUBLIC
   MLIRAffine
+  MLIRArithmeticUtils
   MLIRDialectUtils
   MLIRIR
   MLIRLinalg

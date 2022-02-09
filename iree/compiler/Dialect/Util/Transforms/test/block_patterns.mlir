@@ -3,18 +3,18 @@
 // CHECK-LABEL: @foldBrArguments
 // CHECK-SAME: (%[[COND:.+]]: i1, %[[ARG1:.+]]: index)
 func @foldBrArguments(%cond: i1, %arg1: index) -> index {
-  // CHECK: cond_br %[[COND]]
-  cond_br %cond, ^bb1, ^bb2
+  // CHECK: cf.cond_br %[[COND]]
+  cf.cond_br %cond, ^bb1, ^bb2
 ^bb1:
   // CHECK: %[[OP1:.+]] = "some.op1"
   %0 = "some.op1"() : () -> index
-  // CHECK: br ^bb3(%[[OP1]], %[[ARG1]] : index, index)
-  br ^bb3(%0, %arg1, %0 : index, index, index)
+  // CHECK: cf.br ^bb3(%[[OP1]], %[[ARG1]] : index, index)
+  cf.br ^bb3(%0, %arg1, %0 : index, index, index)
 ^bb2:
   // CHECK: %[[OP2:.+]] = "some.op2"
   %1 = "some.op2"() : () -> index
-  // CHECK: br ^bb3(%[[OP2]], %[[OP2]] : index, index)
-  br ^bb3(%1, %1, %1 : index, index, index)
+  // CHECK: cf.br ^bb3(%[[OP2]], %[[OP2]] : index, index)
+  cf.br ^bb3(%1, %1, %1 : index, index, index)
 // CHECK: ^bb3(%[[BB3_ARG0:.+]]: index, %[[BB3_ARG1:.+]]: index):
 ^bb3(%bb3_0: index, %bb3_1: index, %bb3_2: index):
   // CHECK: %[[OP3:.+]] = "some.op3"(%[[BB3_ARG0]], %[[BB3_ARG1]], %[[BB3_ARG0]])
@@ -28,8 +28,8 @@ func @foldBrArguments(%cond: i1, %arg1: index) -> index {
 // CHECK-LABEL: @foldCondBrArguments
 // CHECK-SAME: (%[[COND:.+]]: i1, %[[ARG1:.+]]: index, %[[ARG2:.+]]: index)
 func @foldCondBrArguments(%cond: i1, %arg1: index, %arg2: index) -> index {
-  // CHECK: cond_br %[[COND]], ^bb1, ^bb2
-  cond_br %cond, ^bb1(%arg1, %arg2, %arg2 : index, index, index),
+  // CHECK: cf.cond_br %[[COND]], ^bb1, ^bb2
+  cf.cond_br %cond, ^bb1(%arg1, %arg2, %arg2 : index, index, index),
                  ^bb2(%arg1, %arg1, %arg2 : index, index, index)
   // CHECK: ^bb1:
 ^bb1(%bb1_0: index, %bb1_1: index, %bb1_2: index):
@@ -54,14 +54,14 @@ func @elideBranchOperands(%arg0: index, %arg1: index) -> i32 {
   // CHECK-DAG: %[[C1I32:.+]] = arith.constant 1 : i32
   // CHECK-DAG: %[[C1:.+]] = arith.constant 1 : index
   %initialValue = arith.constant 5 : i32
-  // CHECK: br ^bb1(%[[C5I32]], %[[ARG0]] : i32, index)
-  br ^loopHeader(%initialValue, %arg0, %arg1 : i32, index, index)
+  // CHECK: cf.br ^bb1(%[[C5I32]], %[[ARG0]] : i32, index)
+  cf.br ^loopHeader(%initialValue, %arg0, %arg1 : i32, index, index)
   // CHECK: ^bb1(%[[BB1_ARG0:.+]]: i32, %[[BB1_ARG1:.+]]: index)
 ^loopHeader(%headerValue: i32, %counter: index, %headerMax: index):
   // CHECK: %[[CMP:.+]] = arith.cmpi slt, %[[BB1_ARG1]], %[[ARG1]]
   %lessThan = arith.cmpi slt, %counter, %headerMax : index
-  // CHECK: cond_br %[[CMP]], ^bb2, ^bb3
-  cond_br %lessThan, ^loopBody(%headerValue, %headerMax : i32, index),
+  // CHECK: cf.cond_br %[[CMP]], ^bb2, ^bb3
+  cf.cond_br %lessThan, ^loopBody(%headerValue, %headerMax : i32, index),
                      ^exit(%headerValue: i32)
   // CHECK: ^bb2:
 ^loopBody(%bodyValue: i32, %bodyMax: index):
@@ -71,8 +71,8 @@ func @elideBranchOperands(%arg0: index, %arg1: index) -> i32 {
   %cst1 = arith.constant 1 : index
   // CHECK-DAG: %[[NEXT:.+]] = arith.addi %[[BB1_ARG1]], %[[C1]]
   %newCounter = arith.addi %counter, %cst1 : index
-  // CHECK: br ^bb1(%[[SUM]], %[[NEXT]] : i32, index)
-  br ^loopHeader(%newValue, %newCounter, %bodyMax : i32, index, index)
+  // CHECK: cf.br ^bb1(%[[SUM]], %[[NEXT]] : i32, index)
+  cf.br ^loopHeader(%newValue, %newCounter, %bodyMax : i32, index, index)
   // CHECK: ^bb3:
 ^exit(%finalValue: i32):
   // CHECK: return %[[BB1_ARG0]]

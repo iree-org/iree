@@ -46,6 +46,7 @@ iree_cc_library(
     MLIRAffine
     MLIRAnalysis
     MLIRArithmetic
+    MLIRControlFlow
     MLIRIR
     MLIRLinalg
     MLIRMemRef

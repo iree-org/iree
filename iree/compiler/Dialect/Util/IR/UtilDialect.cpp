@@ -11,8 +11,8 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/SourceMgr.h"
 #include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
+#include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
-#include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/DialectImplementation.h"
@@ -71,7 +71,7 @@ struct UtilInlinerInterface : public DialectInlinerInterface {
     if (!returnOp) return;
     // util.initialize.return takes no args - just branch to the new block.
     OpBuilder builder(op);
-    builder.create<mlir::BranchOp>(op->getLoc(), newDest, ValueRange{});
+    builder.create<mlir::cf::BranchOp>(op->getLoc(), newDest, ValueRange{});
     op->erase();
   }
 

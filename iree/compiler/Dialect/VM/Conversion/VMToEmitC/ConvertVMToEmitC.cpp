@@ -13,6 +13,7 @@
 #include "iree/compiler/Dialect/VM/IR/VMOps.h"
 #include "iree/compiler/Dialect/VM/Utils/CallingConvention.h"
 #include "llvm/ADT/TypeSwitch.h"
+#include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
 #include "mlir/Dialect/EmitC/IR/EmitC.h"
 #include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
@@ -290,9 +291,10 @@ LogicalResult removeBlockArguments(
 
     for (auto pred : block->getPredecessors()) {
       auto terminator = pred->getTerminator();
-      if (auto branchOp = dyn_cast<mlir::BranchOp>(terminator)) {
+      if (auto branchOp = dyn_cast<mlir::cf::BranchOp>(terminator)) {
         branchOp.eraseOperand(blockArg.getArgNumber());
-      } else if (auto condBranchOp = dyn_cast<mlir::CondBranchOp>(terminator)) {
+      } else if (auto condBranchOp =
+                     dyn_cast<mlir::cf::CondBranchOp>(terminator)) {
         if (condBranchOp.getTrueDest() == block) {
           condBranchOp.eraseTrueOperand(blockArg.getArgNumber());
         } else {
@@ -3332,8 +3334,8 @@ class BranchOpConversion : public OpConversionPattern<IREE::VM::BranchOp> {
     // If we don't have ref block arguments, we can convert the operation
     // directly.
     if (adaptor.getOperands().size() == nonRefOperands.size()) {
-      rewriter.replaceOpWithNewOp<mlir::BranchOp>(op, op.dest(),
-                                                  op.getOperands());
+      rewriter.replaceOpWithNewOp<mlir::cf::BranchOp>(op, op.dest(),
+                                                      op.getOperands());
       return success();
     }
 
@@ -3383,10 +3385,10 @@ class BranchOpConversion : public OpConversionPattern<IREE::VM::BranchOp> {
             /*operands=*/
             ArrayRef<Value>{operandRef.getValue(), blockArgRef.getValue()});
       }
-      rewriter.create<mlir::BranchOp>(loc, op.dest(), op.getOperands());
+      rewriter.create<mlir::cf::BranchOp>(loc, op.dest(), op.getOperands());
     }
 
-    rewriter.replaceOpWithNewOp<mlir::BranchOp>(op, destDispatch);
+    rewriter.replaceOpWithNewOp<mlir::cf::BranchOp>(op, destDispatch);
 
     return success();
   }
@@ -3460,7 +3462,7 @@ class CondBranchOpConversion
     // If we don't have ref block arguments, we can convert the operation
     // directly.
     if (adaptor.getOperands().size() == nonRefOperands.size()) {
-      rewriter.replaceOpWithNewOp<mlir::CondBranchOp>(
+      rewriter.replaceOpWithNewOp<mlir::cf::CondBranchOp>(
           op, conditionI1.getResult(0), op.trueDest(), op.getTrueOperands(),
           op.falseDest(), op.getFalseOperands());
       return success();
@@ -3512,7 +3514,8 @@ class CondBranchOpConversion
             /*operands=*/
             ArrayRef<Value>{operandRef.getValue(), blockArgRef.getValue()});
       }
-      rewriter.create<mlir::BranchOp>(loc, op.trueDest(), op.getTrueOperands());
+      rewriter.create<mlir::cf::BranchOp>(loc, op.trueDest(),
+                                          op.getTrueOperands());
     }
 
     Block *falseDestDispatch;
@@ -3552,11 +3555,11 @@ class CondBranchOpConversion
             /*operands=*/
             ArrayRef<Value>{operandRef.getValue(), blockArgRef.getValue()});
       }
-      rewriter.create<mlir::BranchOp>(loc, op.falseDest(),
-                                      op.getFalseOperands());
+      rewriter.create<mlir::cf::BranchOp>(loc, op.falseDest(),
+                                          op.getFalseOperands());
     }
 
-    rewriter.replaceOpWithNewOp<mlir::CondBranchOp>(
+    rewriter.replaceOpWithNewOp<mlir::cf::CondBranchOp>(
         op, conditionI1.getResult(0), trueDestDispatch, falseDestDispatch);
 
     return success();
@@ -3752,7 +3755,7 @@ class FailOpConversion : public OpConversionPattern<IREE::VM::FailOp> {
         /*templateArgs=*/ArrayAttr{},
         /*operands=*/ArrayRef<Value>{op.status()});
 
-    rewriter.replaceOpWithNewOp<mlir::CondBranchOp>(
+    rewriter.replaceOpWithNewOp<mlir::cf::CondBranchOp>(
         op, condition.getResult(0), failureBlock, passthroughBlock);
 
     return success();
@@ -4438,7 +4441,7 @@ class ListGetRefOpConversion
           /*templateArgs=*/ArrayAttr{},
           /*operands=*/ArrayRef<Value>{ref.getValue()});
 
-      rewriter.create<mlir::BranchOp>(loc, continuationBlock);
+      rewriter.create<mlir::cf::BranchOp>(loc, continuationBlock);
     }
 
     rewriter.setInsertionPointToEnd(condBlock);
@@ -4978,8 +4981,9 @@ class ConvertVMToEmitCPass
                               importShims);
 
     target.addLegalDialect<
-        emitc::EmitCDialect, mlir::BuiltinDialect, mlir::StandardOpsDialect,
-        mlir::arith::ArithmeticDialect, mlir::math::MathDialect>();
+        emitc::EmitCDialect, mlir::BuiltinDialect, mlir::cf::ControlFlowDialect,
+        mlir::StandardOpsDialect, mlir::arith::ArithmeticDialect,
+        mlir::math::MathDialect>();
 
     target.addDynamicallyLegalOp<mlir::FuncOp>([&](mlir::FuncOp op) {
       return typeConverter.isSignatureLegal(op.getType());

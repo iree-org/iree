@@ -8,7 +8,7 @@
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTraits.h"
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
-#include "mlir/Dialect/StandardOps/IR/Ops.h"
+#include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassRegistry.h"
 
@@ -30,7 +30,7 @@ class StripDebugOpsPass
 
   void runOnOperation() override {
     getOperation()->walk([](Operation *op) {
-      if (isa<mlir::AssertOp>(op) ||
+      if (isa<mlir::cf::AssertOp>(op) ||
           op->hasTrait<OpTrait::IREE::Util::DebugOnly>()) {
         op->erase();
       }

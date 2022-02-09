@@ -328,8 +328,8 @@ static void insertUsageRefinementPatterns(MLIRContext *context,
                                           RewritePatternSet &patterns) {
   patterns.insert<ApplyInitializerOp, ApplyFuncOp>(context, analysis);
   patterns.insert<ApplyGenericOp<IREE::Util::DoNotOptimizeOp>,
-                  ApplyGenericOp<mlir::SelectOp>, ApplyGenericOp<mlir::CallOp>>(
-      context, analysis);
+                  ApplyGenericOp<mlir::arith::SelectOp>,
+                  ApplyGenericOp<mlir::CallOp>>(context, analysis);
   patterns.insert<ApplyStreamableOp<IREE::Stream::TensorImportOp>,
                   ApplyStreamableOp<IREE::Stream::TensorExportOp>,
                   ApplyStreamableOp<IREE::Stream::AsyncAllocaOp>,

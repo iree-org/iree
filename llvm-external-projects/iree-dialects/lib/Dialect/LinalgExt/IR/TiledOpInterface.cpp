@@ -6,6 +6,7 @@
 
 #include "iree-dialects/Dialect/LinalgExt/IR/TiledOpInterface.h"
 
+#include "llvm/ADT/SmallBitVector.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
@@ -90,7 +91,7 @@ struct ExtractSliceTiledOpInterface
 
     // Compute the offset and sizes for the tiled `tensor.extract_slice`
     // operation.
-    llvm::SmallDenseSet<unsigned> droppedDims = extractOp.getDroppedDims();
+    llvm::SmallBitVector droppedDims = extractOp.getDroppedDims();
     unsigned resultDimPos = 0;
     auto opOffsets = extractOp.getMixedOffsets();
     auto opSizes = extractOp.getMixedSizes();
@@ -99,7 +100,7 @@ struct ExtractSliceTiledOpInterface
     SmallVector<OpFoldResult> newOffset, newSizes, newStrides;
     for (auto opOffset : enumerate(opOffsets)) {
       // If the dimension is dropped, use the same offset.
-      if (droppedDims.count(opOffset.index())) {
+      if (droppedDims.test(opOffset.index())) {
         newOffset.push_back(opOffset.value());
         newSizes.push_back(opSizes[opOffset.index()]);
       } else {

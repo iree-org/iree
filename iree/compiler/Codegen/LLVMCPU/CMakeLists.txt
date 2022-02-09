@@ -35,6 +35,7 @@ iree_cc_library(
     MLIRArithmeticTransforms
     MLIRArmNeon
     MLIRArmNeon2dToIntr
+    MLIRControlFlowToLLVM
     MLIRIR
     MLIRLLVMCommonConversion
     MLIRLLVMIR
@@ -50,7 +51,7 @@ iree_cc_library(
     MLIRPass
     MLIRReconcileUnrealizedCasts
     MLIRSCF
-    MLIRSCFToStandard
+    MLIRSCFToControlFlow
     MLIRSCFTransforms
     MLIRStandard
     MLIRStandardOpsTransforms

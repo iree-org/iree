@@ -61,6 +61,7 @@ set(_source_components
   # Core dialects (constrained to IREE input dialects).
   MLIRPythonSources.Dialects.arith
   MLIRPythonSources.Dialects.builtin
+  MLIRPythonSources.Dialects.cf
   MLIRPythonSources.Dialects.linalg
   MLIRPythonSources.Dialects.math
   MLIRPythonSources.Dialects.memref

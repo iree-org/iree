@@ -45,7 +45,7 @@ iree_cc_library(
     ::PassHeaders
     ::PassesIncGen
     MLIRPass
-    MLIRSCFToStandard
+    MLIRSCFToControlFlow
     MLIRTosa
     MLIRTosaToLinalg
     MLIRTosaToSCF

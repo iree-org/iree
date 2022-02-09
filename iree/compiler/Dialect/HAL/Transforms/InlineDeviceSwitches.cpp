@@ -11,7 +11,7 @@
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "llvm/ADT/StringSet.h"
-#include "mlir/Dialect/StandardOps/IR/Ops.h"
+#include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/BlockAndValueMapping.h"
 #include "mlir/IR/Builders.h"
@@ -48,8 +48,8 @@ static void inlineConditionRegion(Region &conditionRegion, Block *exitBlock,
     if (auto returnOp =
             dyn_cast<IREE::HAL::ReturnOp>(newBlock.getTerminator())) {
       OpBuilder branchBuilder(returnOp);
-      branchBuilder.create<BranchOp>(returnOp.getLoc(), exitBlock,
-                                     returnOp.getOperands());
+      branchBuilder.create<cf::BranchOp>(returnOp.getLoc(), exitBlock,
+                                         returnOp.getOperands());
       returnOp.erase();
     }
   }
@@ -108,8 +108,8 @@ static void buildConditionDispatchTable(IREE::HAL::DeviceSwitchOp switchOp,
         switchOp.getLoc(), switchOp.device(), funcBuilder);
     auto *matchBlock = conditionMatchBlocks[condition.index()];
     auto *fallthroughBlock = conditionFallthroughBlocks[condition.index()];
-    funcBuilder.create<CondBranchOp>(switchOp.getLoc(), isMatch, matchBlock,
-                                     fallthroughBlock);
+    funcBuilder.create<cf::CondBranchOp>(switchOp.getLoc(), isMatch, matchBlock,
+                                         fallthroughBlock);
 
     // Block that contains the inlined region and then jumps out of the chain.
     funcBuilder.setInsertionPointToStart(matchBlock);

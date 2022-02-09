@@ -91,7 +91,7 @@ int main(int argc, char **argv) {
                                         outputArrayFlag.end());
   auto loc = mlir::FileLineColLoc::get(&context,
                                        inputFile->getBufferIdentifier(), 0, 0);
-  OwningModuleRef module = tflite::FlatBufferToMlir(
+  OwningOpRef<mlir::ModuleOp> module = tflite::FlatBufferToMlir(
       absl::string_view(inputFile->getBufferStart(),
                         inputFile->getBufferSize()),
       &context, loc,

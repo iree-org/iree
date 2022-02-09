@@ -17,6 +17,7 @@
 #include "llvm/ADT/BreadthFirstIterator.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Debug.h"
+#include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/BlockAndValueMapping.h"
@@ -495,20 +496,20 @@ static void expandReturnOp(mlir::ReturnOp op, IndexSet &indexSet,
 //    br ^bb1(%0, %sz, %o, %l)
 //  ^bb1(%a, %b, %c, %d):
 //    %1 = stream.resource.subview %a[%b] : {%c} -> {%d}
-static void expandBranchOp(mlir::BranchOp op, IndexSet &indexSet,
+static void expandBranchOp(mlir::cf::BranchOp op, IndexSet &indexSet,
                            SubviewMap &subviewMap) {
   OpBuilder builder(op);
   auto operands = expandOperands(op.getLoc(), op.getDestOperands(), subviewMap,
                                  indexSet, builder);
-  builder.create<mlir::BranchOp>(op.getLoc(), op.getDest(), operands);
+  builder.create<mlir::cf::BranchOp>(op.getLoc(), op.getDest(), operands);
   op.erase();
 }
 
-static void expandCondBranchOp(mlir::CondBranchOp op, IndexSet &indexSet,
+static void expandCondBranchOp(mlir::cf::CondBranchOp op, IndexSet &indexSet,
                                SubviewMap &subviewMap) {
   if (!usesResources(op)) return;
   OpBuilder builder(op);
-  builder.create<mlir::CondBranchOp>(
+  builder.create<mlir::cf::CondBranchOp>(
       op.getLoc(), op.getCondition(), op.getTrueDest(),
       expandOperands(op.getLoc(), op.getTrueDestOperands(), subviewMap,
                      indexSet, builder),
@@ -533,9 +534,9 @@ static void expandSubviews(Operation *op, ExpandedGlobalMap &globalMap,
     expandCallOp(callOp, indexSet, subviewMap);
   } else if (auto returnOp = dyn_cast<mlir::ReturnOp>(op)) {
     expandReturnOp(returnOp, indexSet, subviewMap);
-  } else if (auto branchOp = dyn_cast<mlir::BranchOp>(op)) {
+  } else if (auto branchOp = dyn_cast<mlir::cf::BranchOp>(op)) {
     expandBranchOp(branchOp, indexSet, subviewMap);
-  } else if (auto condBranchOp = dyn_cast<mlir::CondBranchOp>(op)) {
+  } else if (auto condBranchOp = dyn_cast<mlir::cf::CondBranchOp>(op)) {
     expandCondBranchOp(condBranchOp, indexSet, subviewMap);
   }
 }

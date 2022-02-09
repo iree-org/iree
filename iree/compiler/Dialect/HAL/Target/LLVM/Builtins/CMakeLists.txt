@@ -21,6 +21,7 @@ iree_cc_library(
     "Musl.cpp"
   DEPS
     LLVMBitReader
+    LLVMCore
     LLVMSupport
     LLVMTarget
     MLIRSupport

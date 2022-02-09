@@ -23,6 +23,7 @@ cc_library(
         "//iree/compiler/Dialect/Util/IR",
         "//iree/compiler/Dialect/VM/Conversion",
         "//iree/compiler/Dialect/VM/IR",
+        "@llvm-project//mlir:ControlFlowOps",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:MathDialect",
         "@llvm-project//mlir:Pass",

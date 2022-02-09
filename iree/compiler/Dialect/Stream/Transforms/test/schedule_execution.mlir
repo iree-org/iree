@@ -45,8 +45,8 @@ func @partitionWithinBlocks(%cond: i1) -> !stream.resource<transient> {
   // CHECK: %[[SPLAT:.+]], %[[SPLAT_TIMEPOINT:.+]] = stream.async.execute
   // CHECK: stream.async.splat
   %splat = stream.async.splat %c255_i32 : i32 -> !stream.resource<transient>{%c1280}
-  // CHECK: cond_br
-  cond_br %cond, ^bb1, ^bb2
+  // CHECK: cf.cond_br
+  cf.cond_br %cond, ^bb1, ^bb2
 ^bb1:
   // CHECK: %[[BB1_RESULT:.+]], %[[BB1_TIMEPOINT:.+]] = stream.async.execute await(%[[SPLAT_TIMEPOINT]]) =>
   // CHECK-SAME: with(%[[SPLAT]] as %[[BB1_SPLAT:.+]]: !stream.resource<transient>{%c1280})
@@ -105,7 +105,7 @@ func @deviceHostDevice() -> !stream.resource<transient> {
 
 // -----
 
-// Tests that partitioning does not hoist ops across asserts.
+// Tests that partitioning does not hoist ops across cf.asserts.
 
 // CHECK-LABEL: @dontHoistPastAsserts
 func @dontHoistPastAsserts(%arg0: !stream.resource<external>, %arg1: !stream.resource<external>) -> !stream.resource<external> {
@@ -124,7 +124,7 @@ func @dontHoistPastAsserts(%arg0: !stream.resource<external>, %arg1: !stream.res
   %3 = stream.async.dispatch @ex::@dispatch_0[%c1, %c1, %c1](%2, %arg1) : (!stream.resource<transient>{%c1280}, !stream.resource<external>{%c80}) -> %2{%c1280}
 
   // CHECK: "assert A"
-  assert %cond_a, "assert A"
+  cf.assert %cond_a, "assert A"
 
   // CHECK: stream.async.execute
   // CHECK-NEXT: stream.async.splat
@@ -133,7 +133,7 @@ func @dontHoistPastAsserts(%arg0: !stream.resource<external>, %arg1: !stream.res
   %5 = stream.async.dispatch @ex::@dispatch_1[%c1, %c1, %c1](%arg0, %4) : (!stream.resource<external>{%c20}, !stream.resource<transient>{%c20}) -> %4{%c20}
 
   // CHECK: "assert B"
-  assert %cond_b, "assert B"
+  cf.assert %cond_b, "assert B"
 
   // CHECK: stream.async.execute
   // CHECK-NEXT: stream.async.dispatch @ex::@dispatch_2
@@ -184,7 +184,7 @@ func @cloneAcrossPartitions(%cond: i1) -> (!stream.resource<external>) {
 
 // Tests multiple partitions with dependencies that cross both host and
 // device boundaries. Here %1 is used in both partitions and indirectly through
-// the select op that executes on the host. In the scheduling code this requires
+// the arith.select op that executes on the host. In the scheduling code this requires
 // tracking both the host and device hazards correctly.
 
 // CHECK-LABEL: @deviceHostDeviceCrossing
@@ -201,8 +201,8 @@ func @deviceHostDeviceCrossing(%arg0: i1) -> !stream.resource<transient> {
   // CHECK-NEXT: stream.async.dispatch @ex::@dispatch1
   %2 = stream.async.dispatch @ex::@dispatch1[%c1, %c1, %c1](%1) : (!stream.resource<transient>{%c128}) -> !stream.resource<transient>{%c128}
 
-  // CHECK: select
-  %3 = select %arg0, %1, %2 : !stream.resource<transient>
+  // CHECK: arith.select
+  %3 = arith.select %arg0, %1, %2 : !stream.resource<transient>
 
   // CHECK: stream.async.execute
   // CHECK-NEXT: stream.async.dispatch @ex::@dispatch2

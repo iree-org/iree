@@ -20,14 +20,14 @@ module {
 // -----
 
 func @while(%start: tensor<i32>, %bound: tensor<i32>) -> tensor<i32> {
-  br ^bb1(%start : tensor<i32>)
+  cf.br ^bb1(%start : tensor<i32>)
 ^bb1(%0: tensor<i32>):
   %1 = "mhlo.compare"(%0, %bound) {comparison_direction = "LT"} : (tensor<i32>, tensor<i32>) -> tensor<i1>
   %2 = tensor.extract %1[] : tensor<i1>
-  cond_br %2, ^bb2(%0 : tensor<i32>), ^bb3(%0 : tensor<i32>)
+  cf.cond_br %2, ^bb2(%0 : tensor<i32>), ^bb3(%0 : tensor<i32>)
 ^bb2(%3: tensor<i32>):
   %4 = mhlo.add %3, %3 : tensor<i32>
-  br ^bb1(%4 : tensor<i32>)
+  cf.br ^bb1(%4 : tensor<i32>)
 ^bb3(%5: tensor<i32>):
   return %5 : tensor<i32>
 }

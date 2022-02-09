@@ -138,6 +138,7 @@ cc_library(
         "@llvm-project//mlir:ArmNeon",
         "@llvm-project//mlir:ArmNeon2dToIntr",
         "@llvm-project//mlir:BufferizationDialect",
+        "@llvm-project//mlir:ControlFlowOps",
         "@llvm-project//mlir:ConversionPasses",
         "@llvm-project//mlir:GPUDialect",
         "@llvm-project//mlir:GPUToSPIRV",

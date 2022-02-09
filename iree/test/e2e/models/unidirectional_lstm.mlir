@@ -63,11 +63,11 @@ func private @Forward_o16DF3vQKaI__disable_call_shape_inference_true_.189(%arg0:
   %23 = "mhlo.convert"(%22) : (tensor<i32>) -> tensor<i64>
   %24 = mhlo.subtract %cst_2, %14 : tensor<i32>
   %25 = "mhlo.convert"(%24) : (tensor<i32>) -> tensor<i64>
-  br ^bb1(%23, %25, %1, %cst_4, %cst_3, %cst_4, %arg0, %arg1, %arg2, %arg3, %arg4, %2, %3, %3 : tensor<i64>, tensor<i64>, tensor<40xf32>, tensor<i64>, tensor<74x40xf32>, tensor<i64>, tensor<1x10xf32>, tensor<1x10xf32>, tensor<5x1x64xf32>, tensor<5x1x1xf32>, tensor<5x1x1xf32>, tensor<5xi64>, tensor<5x1x10xf32>, tensor<5x1x10xf32>)
+  cf.br ^bb1(%23, %25, %1, %cst_4, %cst_3, %cst_4, %arg0, %arg1, %arg2, %arg3, %arg4, %2, %3, %3 : tensor<i64>, tensor<i64>, tensor<40xf32>, tensor<i64>, tensor<74x40xf32>, tensor<i64>, tensor<1x10xf32>, tensor<1x10xf32>, tensor<5x1x64xf32>, tensor<5x1x1xf32>, tensor<5x1x1xf32>, tensor<5xi64>, tensor<5x1x10xf32>, tensor<5x1x10xf32>)
 ^bb1(%26: tensor<i64>, %27: tensor<i64>, %28: tensor<40xf32>, %29: tensor<i64>, %30: tensor<74x40xf32>, %31: tensor<i64>, %32: tensor<1x10xf32>, %33: tensor<1x10xf32>, %34: tensor<5x1x64xf32>, %35: tensor<5x1x1xf32>, %36: tensor<5x1x1xf32>, %37: tensor<5xi64>, %38: tensor<5x1x10xf32>, %39: tensor<5x1x10xf32>):  // 2 preds: ^bb0, ^bb2
   %40 = call @ForwardLoopCond_gFAnjWGSoLs__.167(%26, %27, %28, %29, %30, %31, %32, %33, %34, %35, %36, %37, %38, %39) : (tensor<i64>, tensor<i64>, tensor<40xf32>, tensor<i64>, tensor<74x40xf32>, tensor<i64>, tensor<1x10xf32>, tensor<1x10xf32>, tensor<5x1x64xf32>, tensor<5x1x1xf32>, tensor<5x1x1xf32>, tensor<5xi64>, tensor<5x1x10xf32>, tensor<5x1x10xf32>) -> tensor<i1>
   %41 = tensor.extract %40[] : tensor<i1>
-  cond_br %41, ^bb2(%26, %27, %28, %29, %30, %31, %32, %33, %34, %35, %36, %37, %38, %39 : tensor<i64>, tensor<i64>, tensor<40xf32>, tensor<i64>, tensor<74x40xf32>, tensor<i64>, tensor<1x10xf32>, tensor<1x10xf32>, tensor<5x1x64xf32>, tensor<5x1x1xf32>, tensor<5x1x1xf32>, tensor<5xi64>, tensor<5x1x10xf32>, tensor<5x1x10xf32>), ^bb3(%26, %31, %32, %33, %37, %38, %39 : tensor<i64>, tensor<i64>, tensor<1x10xf32>, tensor<1x10xf32>, tensor<5xi64>, tensor<5x1x10xf32>, tensor<5x1x10xf32>)
+  cf.cond_br %41, ^bb2(%26, %27, %28, %29, %30, %31, %32, %33, %34, %35, %36, %37, %38, %39 : tensor<i64>, tensor<i64>, tensor<40xf32>, tensor<i64>, tensor<74x40xf32>, tensor<i64>, tensor<1x10xf32>, tensor<1x10xf32>, tensor<5x1x64xf32>, tensor<5x1x1xf32>, tensor<5x1x1xf32>, tensor<5xi64>, tensor<5x1x10xf32>, tensor<5x1x10xf32>), ^bb3(%26, %31, %32, %33, %37, %38, %39 : tensor<i64>, tensor<i64>, tensor<1x10xf32>, tensor<1x10xf32>, tensor<5xi64>, tensor<5x1x10xf32>, tensor<5x1x10xf32>)
 ^bb2(%42: tensor<i64>, %43: tensor<i64>, %44: tensor<40xf32>, %45: tensor<i64>, %46: tensor<74x40xf32>, %47: tensor<i64>, %48: tensor<1x10xf32>, %49: tensor<1x10xf32>, %50: tensor<5x1x64xf32>, %51: tensor<5x1x1xf32>, %52: tensor<5x1x1xf32>, %53: tensor<5xi64>, %54: tensor<5x1x10xf32>, %55: tensor<5x1x10xf32>):  // pred: ^bb1
   %56 = mhlo.add %42, %cst_5 : tensor<i64>
   %57 = "mhlo.gather"(%51, %42) {
@@ -137,7 +137,7 @@ func private @Forward_o16DF3vQKaI__disable_call_shape_inference_true_.189(%arg0:
   %105 = "mhlo.reshape"(%96) : (tensor<1x10xf32>) -> tensor<1x1x10xf32>
   %106 = "mhlo.reshape"(%99) : (tensor<1xi32>) -> tensor<i32>
   %107 = "mhlo.dynamic-update-slice"(%55, %105, %106, %cst_6, %cst_6) : (tensor<5x1x10xf32>, tensor<1x1x10xf32>, tensor<i32>, tensor<i32>, tensor<i32>) -> tensor<5x1x10xf32>
-  br ^bb1(%56, %43, %44, %45, %46, %47, %84, %96, %50, %51, %52, %101, %104, %107 : tensor<i64>, tensor<i64>, tensor<40xf32>, tensor<i64>, tensor<74x40xf32>, tensor<i64>, tensor<1x10xf32>, tensor<1x10xf32>, tensor<5x1x64xf32>, tensor<5x1x1xf32>, tensor<5x1x1xf32>, tensor<5xi64>, tensor<5x1x10xf32>, tensor<5x1x10xf32>)
+  cf.br ^bb1(%56, %43, %44, %45, %46, %47, %84, %96, %50, %51, %52, %101, %104, %107 : tensor<i64>, tensor<i64>, tensor<40xf32>, tensor<i64>, tensor<74x40xf32>, tensor<i64>, tensor<1x10xf32>, tensor<1x10xf32>, tensor<5x1x64xf32>, tensor<5x1x1xf32>, tensor<5x1x1xf32>, tensor<5xi64>, tensor<5x1x10xf32>, tensor<5x1x10xf32>)
 ^bb3(%108: tensor<i64>, %109: tensor<i64>, %110: tensor<1x10xf32>, %111: tensor<1x10xf32>, %112: tensor<5xi64>, %113: tensor<5x1x10xf32>, %114: tensor<5x1x10xf32>):  // pred: ^bb1
   return %108, %112, %113, %114, %109, %110, %111 : tensor<i64>, tensor<5xi64>, tensor<5x1x10xf32>, tensor<5x1x10xf32>, tensor<i64>, tensor<1x10xf32>, tensor<1x10xf32>
 }

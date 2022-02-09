@@ -1317,7 +1317,7 @@ func @bufferize_cst_output_tensor() {
     %9 = arith.extui %8 : i1 to i32
     %10 = arith.muli %9, %arg1 : i32
     %11 = arith.cmpi sgt, %10, %arg2 : i32
-    %12 = select %11, %10, %arg2 : i32
+    %12 = arith.select %11, %10, %arg2 : i32
     linalg.yield %12 : i32
   } -> tensor<i32>
   flow.dispatch.tensor.store %2, %output, offsets=[], sizes=[], strides=[] : tensor<i32> -> !flow.dispatch.tensor<writeonly:i32>
@@ -1761,12 +1761,12 @@ func @multi_result_reduce() {
     %18:2 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d1, d0)>, affine_map<(d0, d1) -> (d1, d0)>, affine_map<(d0, d1) -> (d0)>, affine_map<(d0, d1) -> (d0)>], iterator_types = ["parallel", "reduction"]} ins(%7, %9 : tensor<?x?xi32>, tensor<?x?xi32>) outs(%14, %17 : tensor<?xi32>, tensor<?xi32>) attrs =  {__internal_linalg_transform__ = "workgroup", lowering.config = {tileSizes = [[128]]}} {
     ^bb0(%arg1: i32, %arg2: i32, %arg3: i32, %arg4: i32):  // no predecessors
       %19 = arith.cmpi sge, %arg1, %arg3 : i32
-      %20 = select %19, %arg1, %arg3 : i32
+      %20 = arith.select %19, %arg1, %arg3 : i32
       %21 = arith.cmpi eq, %arg1, %arg3 : i32
       %22 = arith.cmpi slt, %arg2, %arg4 : i32
-      %23 = select %22, %arg2, %arg4 : i32
-      %24 = select %19, %arg2, %arg4 : i32
-      %25 = select %21, %23, %24 : i32
+      %23 = arith.select %22, %arg2, %arg4 : i32
+      %24 = arith.select %19, %arg2, %arg4 : i32
+      %25 = arith.select %21, %23, %24 : i32
       linalg.yield %20, %25 : i32, i32
     } -> (tensor<?xi32>, tensor<?xi32>)
     flow.dispatch.tensor.store %18#0, %2, offsets = [%arg0], sizes = [%6], strides = [1] : tensor<?xi32> -> !flow.dispatch.tensor<writeonly:?xi32>{%d2}
@@ -2246,9 +2246,9 @@ builtin.func @dynamic_update_slice() {
   %3 = flow.dispatch.tensor.load %1, offsets = [], sizes = [], strides = [] : !flow.dispatch.tensor<readonly:i32> -> tensor<i32>
   %4 = tensor.extract %3[] : tensor<i32>
   %5 = arith.cmpi slt, %4, %c0_i32 : i32
-  %6 = select %5, %4, %c0_i32 : i32
+  %6 = arith.select %5, %4, %c0_i32 : i32
   %7 = arith.cmpi sgt, %6, %c0_i32 : i32
-  %8 = select %7, %6, %c0_i32 : i32
+  %8 = arith.select %7, %6, %c0_i32 : i32
   %9 = arith.index_cast %8 : i32 to index
   %workgroup_id_x = hal.interface.workgroup.id[0] : index
   %workgroup_count_x = hal.interface.workgroup.count[0] : index
@@ -2577,9 +2577,9 @@ func @forward_dispatch_3() {
         %17 = linalg.index 1 : index
         %18 = affine.apply affine_map<(d0, d1) -> (d0 + d1)>(%17, %arg1)
         %19 = arith.cmpi slt, %arg2, %c512_i64 : i64
-        assert %19, "index must be smaller than dim size"
+        cf.assert %19, "index must be smaller than dim size"
         %20 = arith.cmpi sge, %arg2, %c0_i64 : i64
-        assert %20, "index must be larger or equal to 0"
+        cf.assert %20, "index must be larger or equal to 0"
         %21 = tensor.extract %6[%16, %18] : tensor<512x384xf32>
         linalg.yield %21 : f32
       } -> tensor<?x64xf32>
