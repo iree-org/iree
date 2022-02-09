@@ -17,6 +17,8 @@ import argparse
 import logging
 import sys
 
+print(sys.path)
+
 from .base import (
     RtlBuilder,
     RtlModule,
