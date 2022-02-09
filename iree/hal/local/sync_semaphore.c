@@ -269,7 +269,7 @@ static iree_status_t iree_hal_sync_semaphore_wait(
   iree_notification_await(
       &shared_state->notification,
       (iree_condition_fn_t)iree_hal_sync_semaphore_is_signaled,
-      (void*)&notify_state, timeout);
+      (void*)&notify_state);
 
   iree_status_t status = iree_ok_status();
   iree_slim_mutex_lock(&semaphore->mutex);
@@ -384,13 +384,18 @@ iree_status_t iree_hal_sync_semaphore_multi_wait(
     return status;
   }
 
-  // Perform wait on the global notification.
+  // TODO(#4680): we should be checking for DEADLINE_EXCEEDED here. This is
+  // easy when it's iree_timeout_is_infinite (we can just use the notification
+  // as below) but if it's an actual deadline we'll need to probably switch to
+  // iree_wait_handle_t.
+
+  // Perform wait on the global notification. Will wait forever.
   iree_notification_await(
       &shared_state->notification,
       wait_mode == IREE_HAL_WAIT_MODE_ALL
           ? (iree_condition_fn_t)iree_hal_sync_semaphore_all_signaled
           : (iree_condition_fn_t)iree_hal_sync_semaphore_any_signaled,
-      (void*)semaphore_list, iree_infinite_timeout());
+      (void*)semaphore_list);
 
   // We may have been successful - or may have a partial failure.
   iree_status_t status =

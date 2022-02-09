@@ -149,13 +149,16 @@ iree_status_t iree_task_scope_wait_idle(iree_task_scope_t* scope,
     } else {
       status = iree_status_from_code(IREE_STATUS_DEADLINE_EXCEEDED);
     }
-  } else {
+  } else if (deadline_ns == IREE_TIME_INFINITE_FUTURE) {
     // Wait for the scope to enter the idle state.
-    if (!iree_notification_await(&scope->idle_notification,
-                                 (iree_condition_fn_t)iree_task_scope_is_idle,
-                                 scope, iree_make_deadline(deadline_ns))) {
-      status = iree_status_from_code(IREE_STATUS_DEADLINE_EXCEEDED);
-    }
+    iree_notification_await(&scope->idle_notification,
+                            (iree_condition_fn_t)iree_task_scope_is_idle,
+                            scope);
+  } else {
+    // NOTE: we are currently ignoring |deadline_ns|.
+    // We need to support timeouts on iree_notification_t to support this.
+    status = iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                              "scope-based waits do not yet support timeouts");
   }
 
   IREE_TRACE_ZONE_END(z0);
