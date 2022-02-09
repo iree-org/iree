@@ -132,6 +132,9 @@ cc_library(
         "init_mlir_dialects.h",
         "init_mlir_passes.h",
     ],
+    defines = [
+        "IREE_HAVE_EMITC_DIALECT",
+    ],
     deps = [
         "@llvm-project//mlir:Affine",
         "@llvm-project//mlir:AffineTransforms",
@@ -140,6 +143,7 @@ cc_library(
         "@llvm-project//mlir:BufferizationDialect",
         "@llvm-project//mlir:ControlFlowOps",
         "@llvm-project//mlir:ConversionPasses",
+        "@llvm-project//mlir:EmitC",
         "@llvm-project//mlir:GPUDialect",
         "@llvm-project//mlir:GPUToSPIRV",
         "@llvm-project//mlir:GPUTransforms",
