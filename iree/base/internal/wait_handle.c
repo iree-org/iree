@@ -29,7 +29,7 @@ void iree_wait_handle_deinitialize(iree_wait_handle_t* handle) {
 iree_status_t iree_wait_handle_ctl(iree_wait_source_t wait_source,
                                    iree_wait_source_command_t command,
                                    const void* params, void** inout_ptr) {
-  iree_wait_handle_t* wait_handle = (iree_wait_handle_t*)wait_source.storage;
+  iree_wait_handle_t* wait_handle = iree_wait_handle_from_source(&wait_source);
   switch (command) {
     case IREE_WAIT_SOURCE_COMMAND_QUERY: {
       iree_status_code_t* out_wait_status_code = (iree_status_code_t*)inout_ptr;

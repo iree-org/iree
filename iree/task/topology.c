@@ -17,7 +17,7 @@ void iree_task_topology_group_initialize(
     uint8_t group_index, iree_task_topology_group_t* out_group) {
   memset(out_group, 0, sizeof(*out_group));
   out_group->group_index = group_index;
-  snprintf(out_group->name, IREE_ARRAYSIZE(out_group->name), "worker[%u]",
+  snprintf(out_group->name, IREE_ARRAYSIZE(out_group->name), "iree-worker-%u",
            group_index);
   iree_thread_affinity_set_any(&out_group->ideal_thread_affinity);
   out_group->constructive_sharing_mask = IREE_TASK_TOPOLOGY_GROUP_MASK_ALL;

@@ -74,40 +74,6 @@ iree_status_t iree_task_worker_initialize(
   return status;
 }
 
-// Returns true if the worker is in the zombie state (exited and awaiting
-// teardown).
-static bool iree_task_worker_is_zombie(iree_task_worker_t* worker) {
-  return iree_atomic_load_int32(&worker->state, iree_memory_order_seq_cst) ==
-         IREE_TASK_WORKER_STATE_ZOMBIE;
-}
-
-void iree_task_worker_deinitialize(iree_task_worker_t* worker) {
-  IREE_TRACE_ZONE_BEGIN(z0);
-
-  // Wait for the thread to enter the zombie state indicating it has exited our
-  // main function - it may still be live in the OS, but it'll not be touching
-  // any of our data structures again so it's fine to blast away.
-  if (worker->thread) {
-    iree_notification_await(&worker->state_notification,
-                            (iree_condition_fn_t)iree_task_worker_is_zombie,
-                            worker);
-  }
-  iree_thread_release(worker->thread);
-
-  // Release unfinished tasks by flushing the mailbox (which if we're here can't
-  // get anything more posted to it) and then discarding everything we still
-  // have a reference to.
-  iree_atomic_task_slist_discard(&worker->mailbox_slist);
-  iree_task_list_discard(&worker->local_task_queue.list);
-
-  iree_notification_deinitialize(&worker->wake_notification);
-  iree_notification_deinitialize(&worker->state_notification);
-  iree_atomic_task_slist_deinitialize(&worker->mailbox_slist);
-  iree_task_queue_deinitialize(&worker->local_task_queue);
-
-  IREE_TRACE_ZONE_END(z0);
-}
-
 void iree_task_worker_request_exit(iree_task_worker_t* worker) {
   if (!worker->thread) return;
   IREE_TRACE_ZONE_BEGIN(z0);
@@ -135,6 +101,41 @@ void iree_task_worker_request_exit(iree_task_worker_t* worker) {
 
   // Kick the worker in case it is waiting for work.
   iree_notification_post(&worker->wake_notification, 1);
+
+  IREE_TRACE_ZONE_END(z0);
+}
+
+// Returns true if the worker is in the zombie state (exited and awaiting
+// teardown).
+static bool iree_task_worker_is_zombie(iree_task_worker_t* worker) {
+  return iree_atomic_load_int32(&worker->state, iree_memory_order_seq_cst) ==
+         IREE_TASK_WORKER_STATE_ZOMBIE;
+}
+
+void iree_task_worker_deinitialize(iree_task_worker_t* worker) {
+  IREE_TRACE_ZONE_BEGIN(z0);
+
+  // Wait for the thread to enter the zombie state indicating it has exited our
+  // main function - it may still be live in the OS, but it'll not be touching
+  // any of our data structures again so it's fine to blast away.
+  if (worker->thread) {
+    iree_notification_await(&worker->state_notification,
+                            (iree_condition_fn_t)iree_task_worker_is_zombie,
+                            worker);
+  }
+  iree_thread_release(worker->thread);
+  worker->thread = NULL;
+
+  // Release unfinished tasks by flushing the mailbox (which if we're here can't
+  // get anything more posted to it) and then discarding everything we still
+  // have a reference to.
+  iree_atomic_task_slist_discard(&worker->mailbox_slist);
+  iree_task_list_discard(&worker->local_task_queue.list);
+
+  iree_notification_deinitialize(&worker->wake_notification);
+  iree_notification_deinitialize(&worker->state_notification);
+  iree_atomic_task_slist_deinitialize(&worker->mailbox_slist);
+  iree_task_queue_deinitialize(&worker->local_task_queue);
 
   IREE_TRACE_ZONE_END(z0);
 }
@@ -304,8 +305,7 @@ static void iree_task_worker_pump_until_exit(iree_task_worker_t* worker) {
 
     // First self-nominate; this *may* do something or just be ignored (if
     // another worker is already coordinating).
-    iree_task_executor_coordinate(worker->executor, worker,
-                                  /*speculative=*/true);
+    iree_task_executor_coordinate(worker->executor, worker);
 
     // If nothing has been enqueued since we started this loop (so even
     // coordination didn't find anything) we go idle. Otherwise we fall
@@ -342,7 +342,7 @@ static int iree_task_worker_main(iree_task_worker_t* worker) {
   // Enter the running state immediately. Note that we could have been requested
   // to exit while suspended/still starting up, so check that here before we
   // mess with any data structures.
-  bool should_run =
+  const bool should_run =
       iree_atomic_exchange_int32(&worker->state, IREE_TASK_WORKER_STATE_RUNNING,
                                  iree_memory_order_seq_cst) !=
       IREE_TASK_WORKER_STATE_EXITING;

@@ -347,8 +347,10 @@ void iree_task_barrier_retire(iree_task_barrier_t* task,
 //==============================================================================
 
 void iree_task_fence_initialize(iree_task_scope_t* scope,
+                                iree_wait_primitive_t signal_handle,
                                 iree_task_fence_t* out_task) {
   iree_task_initialize(IREE_TASK_TYPE_FENCE, scope, &out_task->header);
+  out_task->signal_handle = signal_handle;
   iree_task_scope_begin(scope);
 }
 
@@ -357,6 +359,14 @@ void iree_task_fence_retire(iree_task_fence_t* task,
   IREE_TRACE_ZONE_BEGIN(z0);
 
   iree_task_scope_end(task->header.scope);
+
+  // TODO(benvanik): better API that doesn't require wrapping or requiring that
+  // iree_event_t is an iree_wait_handle_t.
+  iree_wait_handle_t signal_handle = {
+      .type = task->signal_handle.type,
+      .value = task->signal_handle.value,
+  };
+  iree_event_set(&signal_handle);
 
   iree_task_retire(&task->header, pending_submission, iree_ok_status());
 
@@ -368,23 +378,39 @@ void iree_task_fence_retire(iree_task_fence_t* task,
 //==============================================================================
 
 void iree_task_wait_initialize(iree_task_scope_t* scope,
-                               iree_wait_handle_t wait_handle,
+                               iree_wait_source_t wait_source,
+                               iree_time_t deadline_ns,
                                iree_task_wait_t* out_task) {
   iree_task_initialize(IREE_TASK_TYPE_WAIT, scope, &out_task->header);
-  out_task->wait_handle = wait_handle;
+  out_task->wait_source = wait_source;
+  out_task->deadline_ns = deadline_ns;
+  out_task->cancellation_flag = NULL;
 }
 
-bool iree_task_wait_check_condition(iree_task_wait_t* task) {
-  // TODO(benvanik): conditions.
-  task->header.flags |= IREE_TASK_FLAG_WAIT_COMPLETED;
-  return true;
+void iree_task_wait_initialize_delay(iree_task_scope_t* scope,
+                                     iree_time_t deadline_ns,
+                                     iree_task_wait_t* out_task) {
+  iree_task_wait_initialize(scope, iree_wait_source_delay(deadline_ns),
+                            IREE_TIME_INFINITE_FUTURE, out_task);
+}
+
+void iree_task_wait_set_wait_any(iree_task_wait_t* task,
+                                 iree_atomic_int32_t* cancellation_flag) {
+  task->header.flags |= IREE_TASK_FLAG_WAIT_ANY;
+  task->cancellation_flag = cancellation_flag;
 }
 
 void iree_task_wait_retire(iree_task_wait_t* task,
-                           iree_task_submission_t* pending_submission) {
+                           iree_task_submission_t* pending_submission,
+                           iree_status_t status) {
   IREE_TRACE_ZONE_BEGIN(z0);
-  // TODO(benvanik): allow deinit'ing the wait handle (if transient).
-  iree_task_retire(&task->header, pending_submission, iree_ok_status());
+
+  task->header.flags &= ~IREE_TASK_FLAG_WAIT_COMPLETED;  // reset for future use
+
+  // TODO(benvanik): allow deinit'ing the wait handle (if transient/from the
+  // executor event pool).
+  iree_task_retire(&task->header, pending_submission, status);
+
   IREE_TRACE_ZONE_END(z0);
 }
 

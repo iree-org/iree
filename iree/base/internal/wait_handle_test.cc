@@ -94,6 +94,18 @@ TEST(Event, WaitOneInitialTrue) {
   iree_event_deinitialize(&event);
 }
 
+// Tests an event that was wrapped from an immediate primitive.
+// These are used to neuter events in lists/sets and should be no-ops.
+TEST(Event, ImmediateEvent) {
+  iree_event_t event;
+  IREE_ASSERT_OK(iree_wait_handle_wrap_primitive(IREE_WAIT_PRIMITIVE_TYPE_NONE,
+                                                 {0}, &event));
+  iree_event_set(&event);
+  IREE_EXPECT_OK(iree_wait_one(&event, IREE_TIME_INFINITE_PAST));
+  iree_event_reset(&event);
+  IREE_EXPECT_OK(iree_wait_one(&event, IREE_TIME_INFINITE_PAST));
+}
+
 TEST(Event, SetWait) {
   iree_event_t event;
   IREE_ASSERT_OK(iree_event_initialize(/*initial_state=*/false, &event));

@@ -171,6 +171,8 @@ iree_status_t iree_wait_primitive_read(iree_wait_handle_t* handle,
 
   int rv = -1;
   switch (handle->type) {
+    case IREE_WAIT_PRIMITIVE_TYPE_NONE:
+      return iree_ok_status();  // no-op
 #if defined(IREE_HAVE_WAIT_TYPE_EVENTFD)
     case IREE_WAIT_PRIMITIVE_TYPE_EVENT_FD: {
       eventfd_t val = 0;
@@ -211,6 +213,8 @@ iree_status_t iree_wait_primitive_read(iree_wait_handle_t* handle,
 iree_status_t iree_wait_primitive_write(iree_wait_handle_t* handle) {
   int rv = -1;
   switch (handle->type) {
+    case IREE_WAIT_PRIMITIVE_TYPE_NONE:
+      return iree_ok_status();  // no-op
 #if defined(IREE_HAVE_WAIT_TYPE_EVENTFD)
     case IREE_WAIT_PRIMITIVE_TYPE_EVENT_FD: {
       IREE_SYSCALL(rv, eventfd_write(handle->value.event.fd, 1ull));
@@ -242,6 +246,9 @@ iree_status_t iree_wait_primitive_write(iree_wait_handle_t* handle) {
 }
 
 iree_status_t iree_wait_primitive_clear(iree_wait_handle_t* handle) {
+  // No-op for null handles.
+  if (handle->type == IREE_WAIT_PRIMITIVE_TYPE_NONE) return iree_ok_status();
+
   // Read in a loop until the read would block.
   // Depending on how the user setup the fd the act of reading may reset the
   // entire handle (such as with the default eventfd mode) or multiple reads may

@@ -44,6 +44,13 @@ static_assert(sizeof(iree_wait_handle_t) <= sizeof(uint64_t) * 2,
               "iree_wait_handle_t must fit in 16-bytes so it can be stored in "
               "other data structures");
 
+// Returns a wait handle that is immediately resolved.
+static inline iree_wait_handle_t iree_wait_handle_immediate(void) {
+  iree_wait_handle_t wait_handle;
+  memset(&wait_handle, 0, sizeof(wait_handle));
+  return wait_handle;
+}
+
 // Returns true if the wait |handle| is resolved immediately (empty).
 static inline bool iree_wait_handle_is_immediate(iree_wait_handle_t handle) {
   return handle.type == IREE_WAIT_PRIMITIVE_TYPE_NONE;
@@ -69,6 +76,15 @@ void iree_wait_handle_close(iree_wait_handle_t* handle);
 iree_status_t iree_wait_handle_ctl(iree_wait_source_t wait_source,
                                    iree_wait_source_command_t command,
                                    const void* params, void** inout_ptr);
+
+// Returns a pointer to the wait handle in |wait_source| if it is using
+// iree_wait_handle_ctl and otherwise NULL.
+static inline iree_wait_handle_t* iree_wait_handle_from_source(
+    iree_wait_source_t* wait_source) {
+  return wait_source->ctl == iree_wait_handle_ctl
+             ? (iree_wait_handle_t*)wait_source->storage
+             : NULL;
+}
 
 //===----------------------------------------------------------------------===//
 // iree_wait_set_t

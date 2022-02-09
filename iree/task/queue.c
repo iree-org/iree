@@ -48,7 +48,7 @@ iree_task_t* iree_task_queue_flush_from_lifo_slist(
   // atomic and then we own it exclusively.
   iree_task_list_t suffix;
   iree_task_list_initialize(&suffix);
-  bool did_flush = iree_atomic_task_slist_flush(
+  const bool did_flush = iree_atomic_task_slist_flush(
       source_slist, IREE_ATOMIC_SLIST_FLUSH_ORDER_APPROXIMATE_FIFO,
       &suffix.head, &suffix.tail);
 
