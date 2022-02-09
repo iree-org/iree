@@ -125,7 +125,7 @@ void iree_task_poller_deinitialize(iree_task_poller_t* poller) {
   if (poller->thread) {
     iree_notification_await(&poller->state_notification,
                             (iree_condition_fn_t)iree_task_poller_is_zombie,
-                            poller);
+                            poller, iree_infinite_timeout());
   }
   iree_thread_release(poller->thread);
   poller->thread = NULL;

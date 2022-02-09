@@ -109,7 +109,8 @@ static void* iree_thread_start_routine(void* param) {
   while (iree_atomic_load_int32(&thread->suspend_count,
                                 iree_memory_order_seq_cst) > 0) {
     iree_notification_await(&thread->suspend_barrier,
-                            iree_thread_resumed_predicate, thread);
+                            iree_thread_resumed_predicate, thread,
+                            iree_infinite_timeout());
   }
 
   // "Consume" the entry info so that we don't see it again (as we don't own
