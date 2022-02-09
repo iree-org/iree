@@ -21,7 +21,7 @@ iree_cc_library(
     "ConvertStructuralOps.cpp"
   DEPS
     LLVMSupport
-    MLIRControlFlowToLLVM
+    MLIRControlFlow
     MLIRIR
     MLIRPass
     MLIRSCF
