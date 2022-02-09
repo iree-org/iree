@@ -15,7 +15,7 @@ import textwrap
 from .util import DefaultImportHooks, ImportContext, ImportHooks, ImportStage, Intrinsic
 
 from ... import iree_pydm as d
-from ... import std as std_d
+from ... import cf as cf_d
 from .... import ir
 
 
@@ -258,7 +258,7 @@ class FunctionDefBodyImporter(BaseNodeVisitor):
         # Add a default terminator.
         if self.successor_block:
           # Branch to the successor.
-          std_d.BranchOp([], dest=self.successor_block)
+          cf_d.BranchOp([], dest=self.successor_block)
         else:
           # Return from function.
           none_value = d.NoneOp(d.NoneType.get()).result
@@ -319,7 +319,7 @@ class FunctionDefBodyImporter(BaseNodeVisitor):
     if not self.break_block:
       ic.abort(f"cannot 'break' outside of a loop")
     with ic.ip, ic.loc:
-      std_d.BranchOp([], self.break_block)
+      cf_d.BranchOp([], self.break_block)
     self.terminated = True
 
   def visit_Continue(self, node: ast.Continue):
@@ -330,7 +330,7 @@ class FunctionDefBodyImporter(BaseNodeVisitor):
     if not self.continue_block:
       ic.abort(f"cannot 'continue' outside of a loop")
     with ic.ip, ic.loc:
-      std_d.BranchOp([], self.continue_block)
+      cf_d.BranchOp([], self.continue_block)
     self.terminated = True
 
   def visit_Expr(self, node: ast.Expr):
@@ -390,11 +390,11 @@ class FunctionDefBodyImporter(BaseNodeVisitor):
     # block.
     fctx.update_loc(node)
     with ic.ip, ic.loc:
-      std_d.CondBranchOp(condition=test_pred,
-                         trueDestOperands=[],
-                         falseDestOperands=[],
-                         trueDest=true_block,
-                         falseDest=false_block)
+      cf_d.CondBranchOp(condition=test_pred,
+                        trueDestOperands=[],
+                        falseDestOperands=[],
+                        trueDest=true_block,
+                        falseDest=false_block)
 
     # And emission continues here.
     ic.reset_ip(ir.InsertionPoint(successor_block))
@@ -437,7 +437,7 @@ class FunctionDefBodyImporter(BaseNodeVisitor):
 
     # Unconditional branch to the condition block.
     with ic.ip, ic.loc:
-      std_d.BranchOp([], condition_block)
+      cf_d.BranchOp([], condition_block)
 
     # Emit test.
     with ic.scoped_ip(ir.InsertionPoint(condition_block)):
@@ -448,7 +448,7 @@ class FunctionDefBodyImporter(BaseNodeVisitor):
                                test_expr.get_immediate()).result
         test_pred = d.BoolToPredOp(ir.IntegerType.get_signless(1),
                                    test_bool).result
-        std_d.CondBranchOp(
+        cf_d.CondBranchOp(
             condition=test_pred,
             trueDestOperands=[],
             falseDestOperands=[],
