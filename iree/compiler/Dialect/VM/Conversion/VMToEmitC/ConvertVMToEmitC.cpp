@@ -17,6 +17,7 @@
 #include "mlir/Dialect/EmitC/IR/EmitC.h"
 #include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
+#include "mlir/IR/BlockAndValueMapping.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinDialect.h"
 #include "mlir/IR/BuiltinOps.h"
@@ -3584,6 +3585,47 @@ class ReturnOpConversion : public OpConversionPattern<IREE::VM::ReturnOp> {
     unsigned int firstOutputArgumentIndex =
         funcOp.getNumArguments() - op.getOperands().size();
 
+    // NOTE: We need to move the ref operands of the return op into our result
+    // function arguments. As these two sets may alias we create some
+    // temporaries; We take the simple path here and save all refs.
+    BlockAndValueMapping mapping;
+    for (const auto &operand : op.getOperands()) {
+      if (operand.getType().isa<IREE::VM::RefType>()) {
+        Optional<Value> operandRef = typeConverter->materializeRef(operand);
+
+        if (!operandRef.hasValue()) {
+          return op->emitError() << "local ref not found";
+        }
+
+        auto refOp = rewriter.create<emitc::ConstantOp>(
+            /*location=*/loc,
+            /*resultType=*/emitc::OpaqueType::get(ctx, "iree_vm_ref_t"),
+            /*value=*/emitc::OpaqueAttr::get(ctx, ""));
+
+        auto refPtrOp = rewriter.create<emitc::ApplyOp>(
+            /*location=*/loc,
+            /*result=*/emitc::OpaqueType::get(ctx, "iree_vm_ref_t*"),
+            /*applicableOperator=*/StringAttr::get(ctx, "&"),
+            /*operand=*/refOp.getResult());
+
+        if (failed(clearStruct(rewriter, refPtrOp.getResult(),
+                               /*isPointer=*/true))) {
+          return failure();
+        }
+
+        rewriter.create<emitc::CallOp>(
+            /*location=*/loc,
+            /*type=*/TypeRange{},
+            /*callee=*/StringAttr::get(ctx, "iree_vm_ref_move"),
+            /*args=*/ArrayAttr{},
+            /*templateArgs=*/ArrayAttr{},
+            /*operands=*/
+            ArrayRef<Value>{operandRef.getValue(), refPtrOp.getResult()});
+
+        mapping.map(operandRef.getValue(), refPtrOp.getResult());
+      }
+    }
+
     for (auto &pair : llvm::enumerate(op.getOperands())) {
       Value operand = pair.value();
       size_t index = pair.index();
@@ -3601,6 +3643,8 @@ class ReturnOpConversion : public OpConversionPattern<IREE::VM::ReturnOp> {
           return op->emitError() << "local ref not found";
         }
 
+        Value tmpRef = mapping.lookup(operandRef.getValue());
+
         rewriter.create<emitc::CallOp>(
             /*location=*/loc,
             /*type=*/TypeRange{},
@@ -3608,7 +3652,7 @@ class ReturnOpConversion : public OpConversionPattern<IREE::VM::ReturnOp> {
             /*args=*/ArrayAttr{},
             /*templateArgs=*/ArrayAttr{},
             /*operands=*/
-            ArrayRef<Value>{operandRef.getValue(), resultArgument});
+            ArrayRef<Value>{tmpRef, resultArgument});
       } else {
         rewriter.create<emitc::CallOp>(
             /*location=*/loc,
