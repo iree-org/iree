@@ -3608,6 +3608,11 @@ class ReturnOpConversion : public OpConversionPattern<IREE::VM::ReturnOp> {
             /*applicableOperator=*/StringAttr::get(ctx, "&"),
             /*operand=*/refOp.getResult());
 
+        if (failed(clearStruct(rewriter, refPtrOp.getResult(),
+                               /*isPointer=*/true))) {
+          return failure();
+        }
+
         rewriter.create<emitc::CallOp>(
             /*location=*/loc,
             /*type=*/TypeRange{},
