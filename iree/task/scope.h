@@ -121,13 +121,12 @@ iree_status_t iree_task_scope_consume_status(iree_task_scope_t* scope);
 // the previous error status is preserved.
 void iree_task_scope_abort(iree_task_scope_t* scope);
 
-// Marks the scope as having encountered an error while processing |task|.
+// Marks the scope as having encountered an error while processing a task.
 // The scope will be moved into a permanent failure state and all pending tasks
 // will be aborted. In-flight tasks may continue executing prior to
 // iree_task_scope_wait_idle returning true. If the scope has already been
 // marked as failing then the status is ignored.
-void iree_task_scope_fail(iree_task_scope_t* scope, iree_task_t* task,
-                          iree_status_t status);
+void iree_task_scope_fail(iree_task_scope_t* scope, iree_status_t status);
 
 // Notifies the scope that a new execution task assigned to the scope has begun.
 // The scope is considered active until it is notified execution has completed

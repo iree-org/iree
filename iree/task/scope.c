@@ -110,8 +110,7 @@ void iree_task_scope_abort(iree_task_scope_t* scope) {
   iree_task_scope_try_set_status(scope, status);
 }
 
-void iree_task_scope_fail(iree_task_scope_t* scope, iree_task_t* task,
-                          iree_status_t status) {
+void iree_task_scope_fail(iree_task_scope_t* scope, iree_status_t status) {
   iree_task_scope_try_set_status(scope, status);
 }
 

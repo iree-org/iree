@@ -11,23 +11,7 @@
 void iree_atomic_task_slist_discard(iree_atomic_task_slist_t* slist) {
   iree_task_list_t discard_list;
   iree_task_list_initialize(&discard_list);
-
-  // Flush the entire slist and walk it discarding the tasks as we go. This
-  // avoids the need to do more than one walk if we were simply trying to flush
-  // and discard into an iree_task_list_t.
-  //
-  // Note that we may accumulate additional tasks that need to be discarded;
-  // that's when we use the iree_task_list_t discard logic which works because
-  // we have a head/tail and are no longer in atomic land.
-  iree_task_t* task_head = NULL;
-  iree_atomic_task_slist_flush(
-      slist, IREE_ATOMIC_SLIST_FLUSH_ORDER_APPROXIMATE_LIFO, &task_head, NULL);
-  while (task_head != NULL) {
-    iree_task_t* next_task = task_head->next_task;
-    iree_task_discard(task_head, &discard_list);
-    task_head = next_task;
-  }
-
+  iree_task_list_append_from_fifo_slist(&discard_list, slist);
   iree_task_list_discard(&discard_list);
 }
 

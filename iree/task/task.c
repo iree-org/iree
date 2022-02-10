@@ -166,10 +166,17 @@ static void iree_task_retire(iree_task_t* task,
       iree_task_submission_enqueue(pending_submission, completion_task);
     }
   } else {
-    // Task failed.
-    iree_task_scope_fail(task->scope, task, status);
+    // Task failed: notify the scope.
+    iree_task_scope_t* scope = task->scope;
+    iree_task_scope_fail(scope, status);
     status = iree_ok_status();  // consumed by the fail
+
+    // We need to carefully clean up the task: if we go discarding fences we'll
+    // end up waking waiters before we're done. To ensure this doesn't happen
+    // we retain the scope until we've finished cleaning things up.
+    iree_task_scope_begin(scope);
     iree_task_cleanup(task, IREE_STATUS_ABORTED);
+
     bool completion_task_ready =
         completion_task &&
         iree_atomic_fetch_sub_int32(&completion_task->pending_dependency_count,
@@ -189,6 +196,9 @@ static void iree_task_retire(iree_task_t* task,
       // for it to run if we got this far.
       completion_task->flags |= IREE_TASK_FLAG_ABORTED;
     }
+
+    // Unlock the scope; it may immediately be freed before this returns!
+    iree_task_scope_end(scope);
   }
 
   // NOTE: task is invalidated here and cannot be used!
