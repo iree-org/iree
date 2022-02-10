@@ -255,6 +255,8 @@ if(${IREE_BUILD_COMPILER})
     DEPS
       MLIRAffine
       MLIRAffineTransforms
+      MLIRBufferization
+      MLIRControlFlow
       MLIRGPUOps
       MLIRGPUToSPIRV
       MLIRIR
