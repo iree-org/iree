@@ -255,6 +255,10 @@ if(${IREE_BUILD_COMPILER})
     DEPS
       MLIRAffine
       MLIRAffineTransforms
+      MLIRArmNeon
+      MLIRArmNeon2dToIntr
+      MLIRBufferization
+      MLIRControlFlow
       MLIRGPUOps
       MLIRGPUToSPIRV
       MLIRIR
@@ -277,8 +281,6 @@ if(${IREE_BUILD_COMPILER})
       MLIRTosa
       MLIRTosaTransforms
       MLIRTransforms
-      MLIRArmNeon
-      MLIRArmNeon2dToIntr
       MLIRVector
       ${IREE_EMITC_CONDITIONAL_DEP}
     PUBLIC
