@@ -62,7 +62,7 @@ set(MOBILEBERT_FP32_MODULE
   NAME
     "MobileBertSquad"
   TAGS
-    "fp32,squad"
+    "fp32"
   SOURCE
     "https://storage.googleapis.com/iree-model-artifacts/mobilebert-baseline-tf2-float.tflite"
   ENTRY_FUNCTION
@@ -75,7 +75,7 @@ set(MOBILEBERT_INT8_MODULE
   NAME
     "MobileBertSquad"
   TAGS
-    "int8,squad"
+    "int8"
   SOURCE
     "https://storage.googleapis.com/iree-model-artifacts/mobilebert-baseline-tf2-quant.tflite"
   ENTRY_FUNCTION
