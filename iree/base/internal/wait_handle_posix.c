@@ -8,8 +8,7 @@
 
 #include "iree/base/tracing.h"
 
-// NOTE: we could be tighter here, but we today only have win32 or not-win32.
-#if IREE_WAIT_API != IREE_WAIT_API_NULL && IREE_WAIT_API != IREE_WAIT_API_WIN32
+#if defined(IREE_WAIT_API_POSIX_LIKE)
 
 #include <errno.h>
 #include <fcntl.h>
@@ -286,4 +285,4 @@ void iree_event_reset(iree_event_t* event) {
   IREE_IGNORE_ERROR(iree_wait_primitive_clear(event));
 }
 
-#endif  // IREE_WAIT_API != IREE_WAIT_API_NULL || IREE_WAIT_API_WIN32
+#endif  // IREE_WAIT_API_POSIX_LIKE

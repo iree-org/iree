@@ -41,6 +41,10 @@ extern "C" {
 #define IREE_HAVE_WAIT_TYPE_SYNC_FILE 1
 #endif  // IREE_PLATFORM_ANDROID
 
+#if !IREE_SYNCHRONIZATION_DISABLE_UNSAFE
+#define IREE_HAVE_WAIT_TYPE_LOCAL_FUTEX 1
+#endif  // threading enabled
+
 // Specifies the type of a system wait primitive.
 // Enums that are unavailable on a platform are still present to allow for
 // platform-independent code to still route wait primitives but actually using
@@ -91,6 +95,11 @@ enum iree_wait_primitive_type_bits_t {
   // https://docs.microsoft.com/en-us/windows/win32/sync/using-event-objects
   IREE_WAIT_PRIMITIVE_TYPE_WIN32_HANDLE = 4u,
 
+  // Process-local futex.
+  // These are only valid for multi-wait when used with an in-process wait
+  // handle implementation (IREE_WAIT_API == IREE_WAIT_API_INPROC).
+  IREE_WAIT_PRIMITIVE_TYPE_LOCAL_FUTEX = 5u,
+
   // Placeholder for wildcard queries of primitive types.
   // On an export request this indicates that the source may export any type it
   // can.
@@ -131,6 +140,9 @@ typedef union {
     uintptr_t handle;
   } win32;
 #endif  // IREE_HAVE_WAIT_TYPE_WIN32_HANDLE
+#if defined(IREE_HAVE_WAIT_TYPE_LOCAL_FUTEX)
+  /*iree_futex_handle_t*/ void* local_futex;
+#endif  // IREE_HAVE_WAIT_TYPE_LOCAL_FUTEX
 } iree_wait_primitive_value_t;
 
 // A (type, value) pair describing a system wait primitive handle.
