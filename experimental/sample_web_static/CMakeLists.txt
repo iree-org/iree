@@ -116,5 +116,12 @@ target_link_options(${_NAME} PRIVATE
   "-sPTHREAD_POOL_SIZE_STRICT=0"
   # "-sPTHREAD_POOL_SIZE=N"
   # "-sPROXY_TO_PTHREAD"
+  #
+  # Threads use memory, so using a larger pool of memory or allowing memory
+  # growth may be necessary when using `emscripten_num_logical_cores()`
+  # or `navigator.hardwareConcurrency` to pick the worker thread count.
+  # IREE is pretty good about not allocating outside of startup, so concerns
+  # about this causing slow access to memory *may* not affect IREE too much.
+  # "-sALLOW_MEMORY_GROWTH=1"
   # ------------------------------------------------------------------------- #
 )
