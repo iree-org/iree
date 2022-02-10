@@ -29,9 +29,29 @@ embedded into a C file that is similarly linked in.
 [Emscripten](https://emscripten.org/) is used (via the `emcmake` CMake wrapper)
 to compile the output binary into WebAssembly and JavaScript files.
 
-The provided `index.html` file can be served together with the output `.js`
-and `.wasm` files.
+The provided [`index.html`](./index.html) file can be served together with the
+output `.js` and `.wasm` files.
 
-## Multithreading
+### Asynchronous API
 
-TODO(scotttodd): this is incomplete - more changes are needed to the C runtime
+* [`iree_api.js`](./iree_api.js) exposes a Promise-based API to the hosting
+  application in [`index.html`](./index.html)
+* [`iree_api.js`](./iree_api.js) creates a worker running iree_worker.js, which
+  includes Emscripten's JS code and instantiates the WebAssembly module
+* messages are passed back and forth between [`iree_api.js`](./iree_api.js) and
+  [`iree_worker.js`](./iree_worker.js) internally
+
+### Multithreading
+
+The sample supports running both single-threaded using
+[`device_sync.c`](./device_sync.c) (backed by the local HAL's 'sync' device)
+and multi-threaded using [`device_multithreaded.c`](./device_multithreaded.c)
+(backed by the local HAL's 'task' device).
+
+Each configuration is offered as a CMake target, then
+[`iree_worker.js`](./iree_worker.js) specifies which script URL to load.
+
+Multithreading requires Web Workers and SharedArrayBuffer:
+
+* https://caniuse.com/webworkers
+* https://caniuse.com/sharedarraybuffer

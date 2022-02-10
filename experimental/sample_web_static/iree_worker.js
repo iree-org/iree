@@ -16,6 +16,7 @@ function ireeError(...args) {
   console.error(ireeNamePrefix(), ...args);
 }
 
+// TODO(scotttodd): configure this through the build system / scripts?
 const MAIN_SCRIPT_URL = 'sample-web-static-multithreaded.js';
 // const MAIN_SCRIPT_URL = 'sample-web-static-sync.js';
 
