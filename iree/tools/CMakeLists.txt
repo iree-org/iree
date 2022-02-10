@@ -280,6 +280,7 @@ if(${IREE_BUILD_COMPILER})
       MLIRArmNeon
       MLIRArmNeon2dToIntr
       MLIRVector
+      ${IREE_EMITC_CONDITIONAL_DEP}
     PUBLIC
   )
 
@@ -357,7 +358,6 @@ if(${IREE_BUILD_COMPILER})
       MLIRIR
       MLIROptLib
       MLIRSupport
-      ${IREE_EMITC_CONDITIONAL_DEP}
     PUBLIC
   )
 
@@ -389,7 +389,6 @@ if(${IREE_BUILD_COMPILER})
       iree::compiler::Dialect::VM::Target::init_targets
       iree::compiler::Translation::HALExecutable
       iree::compiler::Translation::IREEVM
-      ${IREE_EMITC_CONDITIONAL_DEP}
     PUBLIC
   )
 
@@ -425,7 +424,6 @@ if(${IREE_BUILD_COMPILER})
       MLIRIR
       MLIRLspServerLib
       MLIRSupport
-      ${IREE_EMITC_CONDITIONAL_DEP}
     PUBLIC
   )
 
