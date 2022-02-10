@@ -247,6 +247,10 @@ void buildLLVMCPUCodegenPassPipeline(OpPassManager &passManager);
 void addGPUVectorizationPassPipeline(OpPassManager &pm);
 
 /// Lowering calling vectorization patterns.
+LogicalResult verifyGPUMatmulSimtPassPipeline(
+    Operation *op, IREE::Codegen::LoweringConfigAttr loweringConfig,
+    IREE::Codegen::TranslationInfoAttr translationInfo,
+    ArrayRef<int64_t> workgroupSize = {});
 void addGPUMatmulSimtPassPipeline(OpPassManager &pm);
 
 /// Lowering using tensorcore operations.
