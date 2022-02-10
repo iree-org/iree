@@ -23,7 +23,10 @@
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/SCF/SCF.h"
 #include "mlir/Dialect/SCF/Transforms.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Tensor/Transforms/Transforms.h"
+#include "mlir/IR/Matchers.h"
+#include "mlir/IR/PatternMatch.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #define DEBUG_TYPE "iree-spirv-tile"
@@ -53,6 +56,40 @@ static void populateTilingReductionPatterns(RewritePatternSet &patterns) {
                          linalg::MatmulOp>::insert(patterns, tilingOptions,
                                                    filter);
 }
+
+struct ConcretizePadResultShape final : public OpRewritePattern<tensor::PadOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(tensor::PadOp padOp,
+                                PatternRewriter &rewriter) const override {
+    ReifiedRankedShapedTypeDims resultShapes;
+    auto interface = cast<ReifyRankedShapedTypeOpInterface>(*padOp);
+    if (failed(interface.reifyResultShapes(rewriter, resultShapes))) {
+      return rewriter.notifyMatchFailure(
+          padOp, "failed to reify tensor.pad op result shape");
+    }
+
+    auto oldType = padOp.getResultType();
+
+    SmallVector<int64_t> staticShape;
+    staticShape.reserve(oldType.getRank());
+    for (Value v : resultShapes.front()) {
+      IntegerAttr cstAttr;
+      if (matchPattern(v, m_Constant(&cstAttr))) {
+        staticShape.push_back(cstAttr.getValue().getZExtValue());
+      } else {
+        return rewriter.notifyMatchFailure(padOp,
+                                           "found non-constant dim size");
+      }
+    }
+
+    rewriter.startRootUpdate(padOp);
+    padOp.result().setType(RankedTensorType::get(
+        staticShape, oldType.getElementType(), oldType.getEncoding()));
+    rewriter.finalizeRootUpdate(padOp);
+    return success();
+  };
+};
 
 //===----------------------------------------------------------------------===//
 // Tiling configuration
@@ -97,7 +134,7 @@ class SPIRVTilePass final : public SPIRVTileBase<SPIRVTilePass> {
       RewritePatternSet patterns(context);
       tensor::populateSplitPaddingPatterns(patterns);
       scf::populateIfRegionExpansionPatterns(patterns);
-      linalg::populateConcretizePadResultShapePatterns(patterns);
+      patterns.add<ConcretizePadResultShape>(context);
       (void)applyPatternsAndFoldGreedily(funcOp, std::move(patterns));
 
       LLVM_DEBUG({
@@ -232,7 +269,7 @@ class SPIRVTilePass final : public SPIRVTileBase<SPIRVTilePass> {
       // patterns. Tiling can generate dim ops taking them as operands.
       IREE::Flow::populateFlowDispatchCanonicalizationPatterns(patterns,
                                                                context);
-      linalg::populateConcretizePadResultShapePatterns(patterns);
+      patterns.add<ConcretizePadResultShape>(context);
       (void)applyPatternsAndFoldGreedily(funcOp, std::move(patterns));
 
       LLVM_DEBUG({
@@ -293,7 +330,7 @@ class SPIRVTilePass final : public SPIRVTileBase<SPIRVTilePass> {
       // patterns. Tiling can generate dim ops taking them as operands.
       IREE::Flow::populateFlowDispatchCanonicalizationPatterns(patterns,
                                                                context);
-      linalg::populateConcretizePadResultShapePatterns(patterns);
+      patterns.add<ConcretizePadResultShape>(context);
       (void)applyPatternsAndFoldGreedily(funcOp, std::move(patterns));
 
       LLVM_DEBUG({
