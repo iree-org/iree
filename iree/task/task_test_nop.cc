@@ -14,6 +14,7 @@ namespace {
 class TaskNopTest : public TaskTest {};
 
 TEST_F(TaskNopTest, Issue) {
+  IREE_TRACE_SCOPE();
   iree_task_nop_t task;
   iree_task_nop_initialize(&scope_, &task);
   IREE_ASSERT_OK(SubmitTasksAndWaitIdle(&task.header, &task.header));

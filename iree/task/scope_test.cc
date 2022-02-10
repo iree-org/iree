@@ -64,7 +64,7 @@ TEST(ScopeTest, FailEmpty) {
   // Enter failure state.
   iree_task_t failed_task = {0};
   failed_task.scope = &scope;
-  iree_task_scope_fail(&scope, &failed_task,
+  iree_task_scope_fail(&scope,
                        iree_make_status(IREE_STATUS_DATA_LOSS, "whoops!"));
   iree_status_t consumed_status = iree_task_scope_consume_status(&scope);
   EXPECT_TRUE(iree_status_is_data_loss(consumed_status));
@@ -89,7 +89,7 @@ TEST(ScopeTest, FailAgain) {
   // Enter initial failure state.
   iree_task_t failed_task_a = {0};
   failed_task_a.scope = &scope;
-  iree_task_scope_fail(&scope, &failed_task_a,
+  iree_task_scope_fail(&scope,
                        iree_make_status(IREE_STATUS_DATA_LOSS, "whoops 1"));
   iree_status_t consumed_status_a = iree_task_scope_consume_status(&scope);
   EXPECT_TRUE(iree_status_is_data_loss(consumed_status_a));
@@ -102,8 +102,7 @@ TEST(ScopeTest, FailAgain) {
   iree_task_t failed_task_b = {0};
   failed_task_b.scope = &scope;
   iree_task_scope_fail(
-      &scope, &failed_task_b,
-      iree_make_status(IREE_STATUS_FAILED_PRECONDITION, "whoops 2"));
+      &scope, iree_make_status(IREE_STATUS_FAILED_PRECONDITION, "whoops 2"));
   iree_status_t consumed_status_b = iree_task_scope_consume_status(&scope);
   EXPECT_TRUE(iree_status_is_data_loss(consumed_status_b));
   iree_status_ignore(consumed_status_b);
@@ -226,8 +225,7 @@ TEST(ScopeTest, WaitIdleFailure) {
 
   // Set the failure state.
   iree_task_scope_fail(
-      &scope, &fence_task.header,
-      iree_make_status(IREE_STATUS_FAILED_PRECONDITION, "whoops"));
+      &scope, iree_make_status(IREE_STATUS_FAILED_PRECONDITION, "whoops"));
   EXPECT_FALSE(iree_task_scope_is_idle(&scope));
 
   // Complete the task.

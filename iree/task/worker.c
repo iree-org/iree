@@ -118,10 +118,11 @@ void iree_task_worker_deinitialize(iree_task_worker_t* worker) {
   // Wait for the thread to enter the zombie state indicating it has exited our
   // main function - it may still be live in the OS, but it'll not be touching
   // any of our data structures again so it's fine to blast away.
+  iree_task_worker_request_exit(worker);
   if (worker->thread) {
     iree_notification_await(&worker->state_notification,
                             (iree_condition_fn_t)iree_task_worker_is_zombie,
-                            worker);
+                            worker, iree_infinite_timeout());
   }
   iree_thread_release(worker->thread);
   worker->thread = NULL;
@@ -317,7 +318,8 @@ static void iree_task_worker_pump_until_exit(iree_task_worker_t* worker) {
     } else {
       IREE_TRACE_ZONE_BEGIN_NAMED(z_wait,
                                   "iree_task_worker_main_pump_wake_wait");
-      iree_notification_commit_wait(&worker->wake_notification, wait_token);
+      iree_notification_commit_wait(&worker->wake_notification, wait_token,
+                                    IREE_TIME_INFINITE_FUTURE);
       IREE_TRACE_ZONE_END(z_wait);
     }
 

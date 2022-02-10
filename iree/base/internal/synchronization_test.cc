@@ -175,4 +175,44 @@ TEST(SlimMutexTest, ExclusiveAccessTryLock) {
 
 // Tested implicitly in threading_test.cc.
 
+TEST(NotificationTest, TimeoutImmediate) {
+  iree_notification_t notification;
+  iree_notification_initialize(&notification);
+
+  iree_time_t start_ns = iree_time_now();
+
+  EXPECT_FALSE(iree_notification_await(
+      &notification,
+      +[](void* entry_arg) -> bool {
+        return false;  // condition is never true
+      },
+      NULL, iree_immediate_timeout()));
+
+  iree_duration_t delta_ns = iree_time_now() - start_ns;
+  iree_duration_t delta_ms = delta_ns / 1000000;
+  EXPECT_LT(delta_ms, 50);  // slop
+
+  iree_notification_deinitialize(&notification);
+}
+
+TEST(NotificationTest, Timeout) {
+  iree_notification_t notification;
+  iree_notification_initialize(&notification);
+
+  iree_time_t start_ns = iree_time_now();
+
+  EXPECT_FALSE(iree_notification_await(
+      &notification,
+      +[](void* entry_arg) -> bool {
+        return false;  // condition is never true
+      },
+      NULL, iree_make_timeout(100 * 1000000)));
+
+  iree_duration_t delta_ns = iree_time_now() - start_ns;
+  iree_duration_t delta_ms = delta_ns / 1000000;
+  EXPECT_GE(delta_ms, 50);  // slop
+
+  iree_notification_deinitialize(&notification);
+}
+
 }  // namespace

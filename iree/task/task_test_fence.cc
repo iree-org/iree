@@ -36,12 +36,15 @@ TEST_F(TaskFenceTest, IssueChained) {
 // Tests that failures propagate through fences; task B should not be called.
 // A fails -> fence -> B
 TEST_F(TaskFenceTest, IssueChainedFailure) {
+  IREE_TRACE_SCOPE();
+
   int did_call_a = 0;
   iree_task_call_t task_a;
   iree_task_call_initialize(&scope_,
                             iree_task_make_call_closure(
                                 [](void* user_context, iree_task_t* task,
                                    iree_task_submission_t* pending_submission) {
+                                  IREE_TRACE_SCOPE();
                                   int* did_call_ptr = (int*)user_context;
                                   ++(*did_call_ptr);
                                   return iree_make_status(IREE_STATUS_DATA_LOSS,
@@ -61,6 +64,7 @@ TEST_F(TaskFenceTest, IssueChainedFailure) {
                             iree_task_make_call_closure(
                                 [](void* user_context, iree_task_t* task,
                                    iree_task_submission_t* pending_submission) {
+                                  IREE_TRACE_SCOPE();
                                   int* did_call_ptr = (int*)user_context;
                                   ++(*did_call_ptr);
                                   return iree_ok_status();

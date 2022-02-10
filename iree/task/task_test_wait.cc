@@ -29,6 +29,8 @@ class TaskWaitTest : public TaskTest {};
 // The poller will query the status of the handle and immediately retire the
 // task.
 TEST_F(TaskWaitTest, IssueSignaled) {
+  IREE_TRACE_SCOPE();
+
   iree_event_t event;
   iree_event_initialize(/*initial_state=*/true, &event);
 
@@ -46,6 +48,8 @@ TEST_F(TaskWaitTest, IssueSignaled) {
 // We'll spin up a thread that sets it a short time in the future and ensure
 // that the poller woke and retired the task.
 TEST_F(TaskWaitTest, IssueUnsignaled) {
+  IREE_TRACE_SCOPE();
+
   iree_event_t event;
   iree_event_initialize(/*initial_state=*/false, &event);
 
@@ -56,6 +60,7 @@ TEST_F(TaskWaitTest, IssueUnsignaled) {
   // Spin up a thread that will signal the event after we start waiting on it.
   std::atomic<bool> has_signaled = {false};
   std::thread signal_thread([&]() {
+    IREE_TRACE_SCOPE();
     std::this_thread::sleep_for(std::chrono::milliseconds(150));
     EXPECT_FALSE(has_signaled);
     has_signaled = true;
@@ -75,6 +80,8 @@ TEST_F(TaskWaitTest, IssueUnsignaled) {
 // We set the deadline in the near future and ensure that the poller correctly
 // fails the wait with a DEADLINE_EXCEEDED.
 TEST_F(TaskWaitTest, IssueTimeout) {
+  IREE_TRACE_SCOPE();
+
   iree_event_t event;
   iree_event_initialize(/*initial_state=*/false, &event);
 
@@ -93,6 +100,8 @@ TEST_F(TaskWaitTest, IssueTimeout) {
 // NOTE: this kind of test can be flaky - if we have issues we can bump the
 // sleep time up.
 TEST_F(TaskWaitTest, IssueDelay) {
+  IREE_TRACE_SCOPE();
+
   iree_time_t start_time_ns = iree_time_now();
 
   iree_task_wait_t task;
@@ -108,6 +117,8 @@ TEST_F(TaskWaitTest, IssueDelay) {
 
 // Issues multiple waits that join on a single task. This models a wait-all.
 TEST_F(TaskWaitTest, WaitAll) {
+  IREE_TRACE_SCOPE();
+
   iree_event_t event_a;
   iree_event_initialize(/*initial_state=*/false, &event_a);
   iree_task_wait_t task_a;
@@ -133,6 +144,7 @@ TEST_F(TaskWaitTest, WaitAll) {
   // Spin up a thread that will signal the event after we start waiting on it.
   std::atomic<bool> has_signaled = {false};
   std::thread signal_thread([&]() {
+    IREE_TRACE_SCOPE();
     std::this_thread::sleep_for(std::chrono::milliseconds(50));
     EXPECT_FALSE(has_signaled);
     iree_event_set(&event_a);
@@ -153,6 +165,8 @@ TEST_F(TaskWaitTest, WaitAll) {
 
 // Issues multiple waits that join on a single task but where one times out.
 TEST_F(TaskWaitTest, WaitAllTimeout) {
+  IREE_TRACE_SCOPE();
+
   iree_event_t event_a;
   iree_event_initialize(/*initial_state=*/true, &event_a);
   iree_task_wait_t task_a;
@@ -189,6 +203,8 @@ TEST_F(TaskWaitTest, WaitAllTimeout) {
 //
 // Here event_a is signaled but event_b is not.
 TEST_F(TaskWaitTest, WaitAny) {
+  IREE_TRACE_SCOPE();
+
   // Flag shared between all waits in a group.
   iree_atomic_int32_t cancellation_flag = IREE_ATOMIC_VAR_INIT(0);
 
@@ -219,6 +235,7 @@ TEST_F(TaskWaitTest, WaitAny) {
   // Spin up a thread that will signal the event after we start waiting on it.
   std::atomic<bool> has_signaled = {false};
   std::thread signal_thread([&]() {
+    IREE_TRACE_SCOPE();
     // NOTE: we only signal event_a - event_b remains unsignaled.
     std::this_thread::sleep_for(std::chrono::milliseconds(50));
     EXPECT_FALSE(has_signaled);
@@ -240,6 +257,8 @@ TEST_F(TaskWaitTest, WaitAny) {
 // Here instead of signaling anything we cause event_a to timeout so that the
 // entire wait is cancelled.
 TEST_F(TaskWaitTest, WaitAnyTimeout) {
+  IREE_TRACE_SCOPE();
+
   // Flag shared between all waits in a group.
   iree_atomic_int32_t cancellation_flag = IREE_ATOMIC_VAR_INIT(0);
 
