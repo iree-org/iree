@@ -794,8 +794,7 @@ def HAL_DeviceMatchExecutableFormatAttr :
 
 class HAL_Op<string mnemonic, list<Trait> traits = []> :
     Op<HAL_Dialect, mnemonic, traits> {
-  let parser = [{ return parse$cppClass(parser, &result); }];
-  let printer = [{ return print$cppClass(p, *this); }];
+  let hasCustomAssemblyFormat = 1;
 }
 
 #endif  // IREE_DIALECT_HAL_BASE

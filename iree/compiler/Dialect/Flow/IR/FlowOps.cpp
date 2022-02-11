@@ -680,8 +680,8 @@ void DispatchEntryOp::build(OpBuilder &builder, OperationState &state,
         builder.getStringAttr(sym_name), function_ref, workgroup_rank);
 }
 
-static ParseResult parseDispatchEntryOp(OpAsmParser &parser,
-                                        OperationState *result) {
+ParseResult DispatchEntryOp::parse(OpAsmParser &parser,
+                                   OperationState &result) {
   StringAttr visibilityAttr;
   if (failed(parseSymbolVisibility(parser, visibilityAttr))) {
     return failure();
@@ -689,7 +689,7 @@ static ParseResult parseDispatchEntryOp(OpAsmParser &parser,
 
   FlatSymbolRefAttr functionRefAttr;
   if (failed(parser.parseAttribute(functionRefAttr, "function_ref",
-                                   result->attributes))) {
+                                   result.attributes))) {
     return failure();
   }
 
@@ -697,29 +697,30 @@ static ParseResult parseDispatchEntryOp(OpAsmParser &parser,
     StringAttr exportNameAttr;
     if (failed(parser.parseLParen()) ||
         failed(parser.parseAttribute(exportNameAttr, "sym_name",
-                                     result->attributes)) ||
+                                     result.attributes)) ||
         failed(parser.parseRParen())) {
       return failure();
     }
   } else {
-    result->addAttribute("sym_name", parser.getBuilder().getStringAttr(
-                                         functionRefAttr.getValue()));
+    result.addAttribute("sym_name", parser.getBuilder().getStringAttr(
+                                        functionRefAttr.getValue()));
   }
 
-  if (failed(parser.parseOptionalAttrDictWithKeyword(result->attributes))) {
+  if (failed(parser.parseOptionalAttrDictWithKeyword(result.attributes))) {
     return failure();
   }
 
   return success();
 }
 
-static void printDispatchEntryOp(OpAsmPrinter &p, DispatchEntryOp op) {
+void DispatchEntryOp::print(OpAsmPrinter &p) {
   p << ' ';
+  Operation *op = getOperation();
   printSymbolVisibility(p, op, op->getAttrOfType<StringAttr>("sym_visibility"));
   p << ' ';
-  p.printSymbolName(op.function_ref());
-  if (op.sym_name() != op.function_ref()) {
-    p << " as(\"" << op.sym_name() << "\")";
+  p.printSymbolName(function_ref());
+  if (sym_name() != function_ref()) {
+    p << " as(\"" << sym_name() << "\")";
   }
   p.printOptionalAttrDictWithKeyword(
       op->getAttrs(), /*elidedAttrs=*/{"function_ref", "sym_name"});

@@ -23,8 +23,7 @@ include "mlir/Interfaces/SideEffectInterfaces.td"
 
 class Util_Op<string mnemonic, list<Trait> traits = []> :
     Op<Util_Dialect, mnemonic, traits> {
-  let parser = [{ return parse$cppClass(parser, result); }];
-  let printer = [{ print$cppClass(p, *this); }];
+  let hasCustomAssemblyFormat = 1;
 }
 
 class Util_PureOp<string mnemonic, list<Trait> traits = []> :

@@ -69,8 +69,7 @@ def Flow_Dialect : Dialect {
 
 class FLOW_Op<string mnemonic, list<Trait> traits = []> :
     Op<Flow_Dialect, mnemonic, traits> {
-  let parser = [{ return parse$cppClass(parser, &result); }];
-  let printer = [{ return print$cppClass(p, *this); }];
+  let hasCustomAssemblyFormat = 1;
 }
 
 //===----------------------------------------------------------------------===//

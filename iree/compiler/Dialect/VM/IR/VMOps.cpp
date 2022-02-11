@@ -75,17 +75,18 @@ static LogicalResult verifyModuleOp(ModuleOp op) {
   return success();
 }
 
-static ParseResult parseFuncOp(OpAsmParser &parser, OperationState *result) {
+ParseResult FuncOp::parse(OpAsmParser &parser, OperationState &result) {
   auto buildFuncType =
       [](Builder &builder, ArrayRef<Type> argTypes, ArrayRef<Type> results,
          function_interface_impl::VariadicFlag,
          std::string &) { return builder.getFunctionType(argTypes, results); };
   return function_interface_impl::parseFunctionOp(
-      parser, *result, /*allowVariadic=*/false, buildFuncType);
+      parser, result, /*allowVariadic=*/false, buildFuncType);
 }
 
-static void printFuncOp(OpAsmPrinter &p, FuncOp &op) {
-  FunctionType fnType = op.getType();
+void FuncOp::print(OpAsmPrinter &p) {
+  Operation *op = getOperation();
+  FunctionType fnType = getType();
   function_interface_impl::printFunctionOp(
       p, op, fnType.getInputs(), /*isVariadic=*/false, fnType.getResults());
 }
@@ -148,10 +149,10 @@ void FuncOp::setReflectionAttr(StringRef name, Attribute value) {
                           DictionaryAttr::getWithSorted(getContext(), attrs));
 }
 
-static ParseResult parseExportOp(OpAsmParser &parser, OperationState *result) {
+ParseResult ExportOp::parse(OpAsmParser &parser, OperationState &result) {
   FlatSymbolRefAttr functionRefAttr;
   if (failed(parser.parseAttribute(functionRefAttr, "function_ref",
-                                   result->attributes))) {
+                                   result.attributes))) {
     return failure();
   }
 
@@ -159,27 +160,28 @@ static ParseResult parseExportOp(OpAsmParser &parser, OperationState *result) {
     StringAttr exportNameAttr;
     if (failed(parser.parseLParen()) ||
         failed(parser.parseAttribute(exportNameAttr, "export_name",
-                                     result->attributes)) ||
+                                     result.attributes)) ||
         failed(parser.parseRParen())) {
       return failure();
     }
   } else {
-    result->addAttribute("export_name", parser.getBuilder().getStringAttr(
-                                            functionRefAttr.getValue()));
+    result.addAttribute("export_name", parser.getBuilder().getStringAttr(
+                                           functionRefAttr.getValue()));
   }
 
-  if (failed(parser.parseOptionalAttrDictWithKeyword(result->attributes))) {
+  if (failed(parser.parseOptionalAttrDictWithKeyword(result.attributes))) {
     return failure();
   }
 
   return success();
 }
 
-static void printExportOp(OpAsmPrinter &p, ExportOp op) {
+void ExportOp::print(OpAsmPrinter &p) {
+  Operation *op = getOperation();
   p << ' ';
-  p.printSymbolName(op.function_ref());
-  if (op.export_name() != op.function_ref()) {
-    p << " as(\"" << op.export_name() << "\")";
+  p.printSymbolName(function_ref());
+  if (export_name() != function_ref()) {
+    p << " as(\"" << export_name() << "\")";
   }
   p.printOptionalAttrDictWithKeyword(
       op->getAttrs(), /*elidedAttrs=*/{"function_ref", "export_name"});
@@ -200,12 +202,12 @@ void ExportOp::build(OpBuilder &builder, OperationState &result,
   result.attributes.append(attrs.begin(), attrs.end());
 }
 
-static ParseResult parseImportOp(OpAsmParser &parser, OperationState *result) {
+ParseResult ImportOp::parse(OpAsmParser &parser, OperationState &result) {
   auto builder = parser.getBuilder();
   StringAttr nameAttr;
   if (failed(parser.parseSymbolName(nameAttr,
                                     mlir::SymbolTable::getSymbolAttrName(),
-                                    result->attributes)) ||
+                                    result.attributes)) ||
       failed(parser.parseLParen())) {
     return parser.emitError(parser.getNameLoc()) << "invalid import name";
   }
@@ -226,7 +228,7 @@ static ParseResult parseImportOp(OpAsmParser &parser, OperationState *result) {
     if (succeeded(parser.parseOptionalEllipsis())) {
       argAttrList.set("vm.variadic", builder.getUnitAttr());
     }
-    argAttrs.push_back(argAttrList.getDictionary(result->getContext()));
+    argAttrs.push_back(argAttrList.getDictionary(result.getContext()));
     if (failed(parser.parseOptionalComma())) {
       if (failed(parser.parseRParen())) {
         return parser.emitError(parser.getCurrentLocation())
@@ -240,48 +242,49 @@ static ParseResult parseImportOp(OpAsmParser &parser, OperationState *result) {
     return parser.emitError(parser.getCurrentLocation())
            << "invalid result type list";
   }
-  function_interface_impl::addArgAndResultAttrs(builder, *result, argAttrs,
+  function_interface_impl::addArgAndResultAttrs(builder, result, argAttrs,
                                                 /*resultAttrs=*/llvm::None);
-  if (failed(parser.parseOptionalAttrDictWithKeyword(result->attributes))) {
+  if (failed(parser.parseOptionalAttrDictWithKeyword(result.attributes))) {
     return failure();
   }
 
   auto functionType =
-      FunctionType::get(result->getContext(), argTypes, resultTypes);
-  result->addAttribute(mlir::function_interface_impl::getTypeAttrName(),
-                       TypeAttr::get(functionType));
+      FunctionType::get(result.getContext(), argTypes, resultTypes);
+  result.addAttribute(mlir::function_interface_impl::getTypeAttrName(),
+                      TypeAttr::get(functionType));
 
   // No clue why this is required.
-  result->addRegion();
+  result.addRegion();
 
   return success();
 }
 
-static void printImportOp(OpAsmPrinter &p, ImportOp &op) {
+void ImportOp::print(OpAsmPrinter &p) {
+  Operation *op = getOperation();
   p << ' ';
-  p.printSymbolName(op.getName());
+  p.printSymbolName(getName());
   p << "(";
-  for (int i = 0; i < op.getArgumentTypes().size(); ++i) {
-    if (auto name = op.getArgAttrOfType<StringAttr>(i, "vm.name")) {
+  for (int i = 0; i < getArgumentTypes().size(); ++i) {
+    if (auto name = getArgAttrOfType<StringAttr>(i, "vm.name")) {
       p << '%' << name.getValue() << " : ";
     }
-    p.printType(op.getType().getInput(i));
-    if (op.getArgAttrOfType<UnitAttr>(i, "vm.variadic")) {
+    p.printType(getType().getInput(i));
+    if (getArgAttrOfType<UnitAttr>(i, "vm.variadic")) {
       p << " ...";
     }
-    if (i < op.getArgumentTypes().size() - 1) {
+    if (i < getArgumentTypes().size() - 1) {
       p << ", ";
     }
   }
   p << ")";
-  if (op.getResultTypes().size() == 1) {
+  if (getResultTypes().size() == 1) {
     p << " -> ";
-    p.printType(op.getType().getResult(0));
-  } else if (op.getResultTypes().size() > 1) {
-    p << " -> (" << op.getType().getResults() << ")";
+    p.printType(getType().getResult(0));
+  } else if (getResultTypes().size() > 1) {
+    p << " -> (" << getType().getResults() << ")";
   }
   mlir::function_interface_impl::printFunctionAttributes(
-      p, op, op.getArgumentTypes().size(), op.getResultTypes().size(),
+      p, op, getArgumentTypes().size(), getResultTypes().size(),
       /*elided=*/
       {
           "is_variadic",
@@ -321,24 +324,24 @@ void InitializerOp::build(OpBuilder &builder, OperationState &result,
   result.attributes.append(attrs.begin(), attrs.end());
 }
 
-static ParseResult parseInitializerOp(OpAsmParser &parser,
-                                      OperationState *result) {
-  result->addAttribute(
-      "type", TypeAttr::get(FunctionType::get(result->getContext(), {}, {})));
-  if (parser.parseOptionalAttrDictWithKeyword(result->attributes)) {
+ParseResult InitializerOp::parse(OpAsmParser &parser, OperationState &result) {
+  result.addAttribute(
+      "type", TypeAttr::get(FunctionType::get(result.getContext(), {}, {})));
+  if (parser.parseOptionalAttrDictWithKeyword(result.attributes)) {
     return failure();
   }
-  auto &body = *result->addRegion();
+  auto &body = *result.addRegion();
   if (failed(parser.parseRegion(body))) {
     return failure();
   }
   return success();
 }
 
-static void printInitializerOp(OpAsmPrinter &p, InitializerOp &op) {
+void InitializerOp::print(OpAsmPrinter &p) {
+  Operation *op = getOperation();
   p.printOptionalAttrDictWithKeyword(op->getAttrs(), /*elidedAttrs=*/{"type"});
   p << " ";
-  p.printRegion(op.body());
+  p.printRegion(body());
 }
 
 Block *InitializerOp::addEntryBlock() {
@@ -509,7 +512,7 @@ static LogicalResult verifyGlobalStoreOp(Operation *op) {
 //===----------------------------------------------------------------------===//
 
 template <typename T>
-static ParseResult parseConstOp(OpAsmParser &parser, OperationState *result) {
+static ParseResult parseConstOp(OpAsmParser &parser, OperationState &result) {
   Attribute valueAttr;
   NamedAttrList dummyAttrs;
   if (failed(parser.parseAttribute(valueAttr, "value", dummyAttrs))) {
@@ -521,12 +524,12 @@ static ParseResult parseConstOp(OpAsmParser &parser, OperationState *result) {
            << "Incompatible type or invalid type value formatting";
   }
   valueAttr = T::convertConstValue(valueAttr);
-  result->addAttribute("value", valueAttr);
-  if (failed(parser.parseOptionalAttrDict(result->attributes))) {
+  result.addAttribute("value", valueAttr);
+  if (failed(parser.parseOptionalAttrDict(result.attributes))) {
     return parser.emitError(parser.getCurrentLocation())
            << "Failed to parse optional attribute dict";
   }
-  return parser.addTypeToList(valueAttr.getType(), result->types);
+  return parser.addTypeToList(valueAttr.getType(), result.types);
 }
 
 template <typename T>
@@ -876,7 +879,7 @@ static LogicalResult verifyListSetRefOp(ListSetRefOp &op) {
 // Assignment
 //===----------------------------------------------------------------------===//
 
-static ParseResult parseSwitchOp(OpAsmParser &parser, OperationState *result) {
+static ParseResult parseSwitchOp(OpAsmParser &parser, OperationState &result) {
   SmallVector<OpAsmParser::OperandType, 4> values;
   OpAsmParser::OperandType index;
   OpAsmParser::OperandType defaultValue;
@@ -885,14 +888,13 @@ static ParseResult parseSwitchOp(OpAsmParser &parser, OperationState *result) {
       failed(parser.parseOperandList(values, OpAsmParser::Delimiter::Square)) ||
       failed(parser.parseKeyword("else")) ||
       failed(parser.parseOperand(defaultValue)) ||
-      failed(parser.parseOptionalAttrDict(result->attributes)) ||
+      failed(parser.parseOptionalAttrDict(result.attributes)) ||
       failed(parser.parseColonType(type)) ||
-      failed(parser.resolveOperand(index,
-                                   IntegerType::get(result->getContext(), 32),
-                                   result->operands)) ||
-      failed(parser.resolveOperand(defaultValue, type, result->operands)) ||
-      failed(parser.resolveOperands(values, type, result->operands)) ||
-      failed(parser.addTypeToList(type, result->types))) {
+      failed(parser.resolveOperand(
+          index, IntegerType::get(result.getContext(), 32), result.operands)) ||
+      failed(parser.resolveOperand(defaultValue, type, result.operands)) ||
+      failed(parser.resolveOperands(values, type, result.operands)) ||
+      failed(parser.addTypeToList(type, result.types))) {
     return failure();
   }
   return success();
@@ -912,14 +914,11 @@ static void printSwitchOp(OpAsmPrinter &p, T &op) {
   p.printType(op.default_value().getType());
 }
 
-static ParseResult parseSwitchRefOp(OpAsmParser &parser,
-                                    OperationState *result) {
+ParseResult SwitchRefOp::parse(OpAsmParser &parser, OperationState &result) {
   return parseSwitchOp(parser, result);
 }
 
-static void printSwitchRefOp(OpAsmPrinter &p, SwitchRefOp &op) {
-  printSwitchOp(p, op);
-}
+void SwitchRefOp::print(OpAsmPrinter &p) { printSwitchOp(p, *this); }
 
 //===----------------------------------------------------------------------===//
 // Comparison ops
@@ -1063,11 +1062,10 @@ void CallVariadicOp::getEffects(
   }
 }
 
-static ParseResult parseCallVariadicOp(OpAsmParser &parser,
-                                       OperationState *result) {
+ParseResult CallVariadicOp::parse(OpAsmParser &parser, OperationState &result) {
   FlatSymbolRefAttr calleeAttr;
   auto calleeLoc = parser.getNameLoc();
-  if (failed(parser.parseAttribute(calleeAttr, "callee", result->attributes)) ||
+  if (failed(parser.parseAttribute(calleeAttr, "callee", result.attributes)) ||
       failed(parser.parseLParen())) {
     return parser.emitError(calleeLoc) << "invalid callee symbol";
   }
@@ -1140,7 +1138,7 @@ static ParseResult parseCallVariadicOp(OpAsmParser &parser,
     }
   }
 
-  if (failed(parser.parseOptionalAttrDict(result->attributes)) ||
+  if (failed(parser.parseOptionalAttrDict(result.attributes)) ||
       failed(parser.parseColon()) || failed(parser.parseLParen())) {
     return parser.emitError(parser.getCurrentLocation())
            << "malformed optional attributes list";
@@ -1187,23 +1185,23 @@ static ParseResult parseCallVariadicOp(OpAsmParser &parser,
     }
   }
   if (failed(parser.resolveOperands(flatOperands, flatOperandTypes, calleeLoc,
-                                    result->operands))) {
+                                    result.operands))) {
     return parser.emitError(parser.getCurrentLocation())
            << "operands do not match type list";
   }
-  result->addAttribute(
+  result.addAttribute(
       "segment_sizes",
       DenseIntElementsAttr::get(
           VectorType::get({static_cast<int64_t>(segmentSizes.size())},
                           parser.getBuilder().getIntegerType(16)),
           segmentSizes));
-  result->addAttribute("segment_types",
-                       parser.getBuilder().getArrayAttr(llvm::to_vector<4>(
-                           llvm::map_range(segmentTypes, [&](Type type) {
-                             return TypeAttr::get(type).cast<Attribute>();
-                           }))));
+  result.addAttribute("segment_types",
+                      parser.getBuilder().getArrayAttr(llvm::to_vector<4>(
+                          llvm::map_range(segmentTypes, [&](Type type) {
+                            return TypeAttr::get(type).cast<Attribute>();
+                          }))));
 
-  if (failed(parser.parseOptionalArrowTypeList(result->types))) {
+  if (failed(parser.parseOptionalArrowTypeList(result.types))) {
     return parser.emitError(parser.getCurrentLocation())
            << "malformed function type results";
   }
@@ -1211,17 +1209,18 @@ static ParseResult parseCallVariadicOp(OpAsmParser &parser,
   return success();
 }
 
-static void printCallVariadicOp(OpAsmPrinter &p, CallVariadicOp &op) {
+void CallVariadicOp::print(OpAsmPrinter &p) {
+  Operation *op = getOperation();
   p << ' ' << op->getAttr("callee") << '(';
   int operand = 0;
   llvm::interleaveComma(
-      llvm::zip(op.segment_sizes(), op.segment_types()), p,
+      llvm::zip(segment_sizes(), segment_types()), p,
       [&](std::tuple<APInt, Attribute> segmentSizeType) {
         int segmentSize = std::get<0>(segmentSizeType).getSExtValue();
         Type segmentType =
             std::get<1>(segmentSizeType).cast<TypeAttr>().getValue();
         if (segmentSize == -1) {
-          p.printOperand(op.getOperand(operand++));
+          p.printOperand(getOperand(operand++));
         } else {
           p << '[';
           if (auto tupleType = segmentType.dyn_cast<TupleType>()) {
@@ -1229,7 +1228,7 @@ static void printCallVariadicOp(OpAsmPrinter &p, CallVariadicOp &op) {
               p << '(';
               SmallVector<Value, 4> tupleOperands;
               for (size_t j = 0; j < tupleType.size(); ++j) {
-                tupleOperands.push_back(op.getOperand(operand++));
+                tupleOperands.push_back(getOperand(operand++));
               }
               p << tupleOperands;
               p << ')';
@@ -1238,7 +1237,7 @@ static void printCallVariadicOp(OpAsmPrinter &p, CallVariadicOp &op) {
           } else {
             SmallVector<Value, 4> segmentOperands;
             for (int i = 0; i < segmentSize; ++i) {
-              segmentOperands.push_back(op.getOperand(operand++));
+              segmentOperands.push_back(getOperand(operand++));
             }
             p << segmentOperands;
           }
@@ -1253,7 +1252,7 @@ static void printCallVariadicOp(OpAsmPrinter &p, CallVariadicOp &op) {
                           });
   p << " : (";
   llvm::interleaveComma(
-      llvm::zip(op.segment_sizes(), op.segment_types()), p,
+      llvm::zip(segment_sizes(), segment_types()), p,
       [&](std::tuple<APInt, Attribute> segmentSizeType) {
         int segmentSize = std::get<0>(segmentSizeType).getSExtValue();
         Type segmentType =
@@ -1266,10 +1265,10 @@ static void printCallVariadicOp(OpAsmPrinter &p, CallVariadicOp &op) {
         }
       });
   p << ")";
-  if (op.getNumResults() == 1) {
-    p << " -> " << op.getResult(0).getType();
-  } else if (op.getNumResults() > 1) {
-    p << " -> (" << op.getResultTypes() << ")";
+  if (getNumResults() == 1) {
+    p << " -> " << getResult(0).getType();
+  } else if (getNumResults() > 1) {
+    p << " -> (" << getResultTypes() << ")";
   }
 }
 
@@ -1291,8 +1290,7 @@ static LogicalResult verifyFailOp(T op) {
   return success();
 }
 
-static ParseResult parseCondFailOp(OpAsmParser &parser,
-                                   OperationState *result) {
+ParseResult CondFailOp::parse(OpAsmParser &parser, OperationState &result) {
   // First operand is either 'condition' or 'status', both i32.
   OpAsmParser::OperandType condition;
   if (failed(parser.parseOperand(condition))) {
@@ -1311,29 +1309,30 @@ static ParseResult parseCondFailOp(OpAsmParser &parser,
   StringAttr messageAttr;
   if ((trailingComma || succeeded(parser.parseOptionalComma())) &&
       failed(
-          parser.parseAttribute(messageAttr, "message", result->attributes))) {
+          parser.parseAttribute(messageAttr, "message", result.attributes))) {
     return failure();
   }
 
-  Type operandType = IntegerType::get(result->getContext(), 32);
-  if (failed(parser.resolveOperand(condition, operandType, result->operands)) ||
-      failed(parser.resolveOperand(status, operandType, result->operands))) {
+  Type operandType = IntegerType::get(result.getContext(), 32);
+  if (failed(parser.resolveOperand(condition, operandType, result.operands)) ||
+      failed(parser.resolveOperand(status, operandType, result.operands))) {
     return failure();
   }
 
-  return parser.parseOptionalAttrDict(result->attributes);
+  return parser.parseOptionalAttrDict(result.attributes);
 }
 
-static void printCondFailOp(OpAsmPrinter &p, CondFailOp op) {
+void CondFailOp::print(OpAsmPrinter &p) {
   p << ' ';
-  if (op.condition() != op.status()) {
-    p << op.condition() << ", ";
+  if (condition() != status()) {
+    p << condition() << ", ";
   }
-  p << op.status();
-  if (op.message().hasValue()) {
-    p << ", \"" << op.message().getValue() << "\"";
+  p << status();
+  if (message().hasValue()) {
+    p << ", \"" << message().getValue() << "\"";
   }
-  p.printOptionalAttrDict(op->getAttrs(), /*elidedAttrs=*/{"message"});
+  p.printOptionalAttrDict(getOperation()->getAttrs(),
+                          /*elidedAttrs=*/{"message"});
 }
 
 //===----------------------------------------------------------------------===//

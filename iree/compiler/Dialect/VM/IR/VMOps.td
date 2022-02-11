@@ -790,7 +790,8 @@ class VM_ConstantPrimitiveOp<Type type, int width, string mnemonic,
     VM_EncResult<"result">,
   ];
 
-  let parser = [{ return parseConstOp<$cppClass>(parser, &result); }];
+  let hasCustomAssemblyFormat = 0;
+  let parser = [{ return parseConstOp<$cppClass>(parser, result); }];
   let printer = [{ return printConstOp<$cppClass>(p, *this); }];
 }
 
