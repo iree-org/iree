@@ -1,0 +1,3 @@
+// RUN: ${TEST_CMD} ${BUILD_RISCV_DIR}/iree/samples/simple_embedding/simple_embedding_dylib
+// RUN: ${TEST_CMD} ${BUILD_RISCV_DIR}/iree/samples/simple_embedding/simple_embedding_embedded_sync
+// RUN: ${TEST_CMD} ${BUILD_RISCV_DIR}/iree/samples/simple_embedding/simple_embedding_vmvx_sync

@@ -18,41 +18,28 @@ export PS4='[$(date -u "+%T %Z")] '
 # dylib-llvm-aot bytecode codegen.
 export RISCV_TOOLCHAIN_ROOT=${RISCV_RV64_LINUX_TOOLCHAIN_ROOT?}
 
-# Run the binaries under QEMU.
-echo "Test simple_embedding binaries"
-pushd "${BUILD_RISCV_DIR?}/iree/samples/simple_embedding" > /dev/null
 
-"${QEMU_RV64_BIN?}" -cpu rv64,x-v=true,x-k=true,vlen=256,elen=64,vext_spec=v1.0 \
--L "${RISCV_TOOLCHAIN_ROOT?}/sysroot" simple_embedding_dylib
+function generate_dylib_vmfb {
+  local target="${1}"; shift
+  local translate_arg=(
+    -iree-mlir-to-vm-bytecode-module -iree-hal-target-backends=dylib-llvm-aot
+    -iree-llvm-embedded-linker-path=${BUILD_HOST_DIR?}/install/bin/lld
+    -iree-llvm-target-triple=riscv64
+    -iree-llvm-target-cpu=generic-rv64
+    -iree-llvm-target-abi=lp64d
+  )
+  if [[ "${target}" == "mhlo" ]]; then
+    translate_arg+=(
+      -iree-input-type=mhlo
+      -iree-llvm-target-cpu-features="+m,+a,+f,+d,+c"
+    )
+  fi
+  "${BUILD_HOST_DIR?}/install/bin/iree-translate" "${translate_arg[@]}" "$@"
+}
 
-"${QEMU_RV64_BIN?}" -cpu rv64,x-v=true,x-k=true,vlen=256,elen=64,vext_spec=v1.0 \
--L "${RISCV_TOOLCHAIN_ROOT?}/sysroot" simple_embedding_embedded_sync
-
-"${QEMU_RV64_BIN?}" -cpu rv64,x-v=true,x-k=true,vlen=256,elen=64,vext_spec=v1.0 \
--L "${RISCV_TOOLCHAIN_ROOT?}/sysroot" simple_embedding_vmvx_sync
-
-popd > /dev/null
-
-echo "Test e2e mlir --> bytecode module --> iree-run-module"
-
-"${BUILD_HOST_DIR?}/install/bin/iree-translate" \
-  -iree-input-type=mhlo \
-  -iree-mlir-to-vm-bytecode-module -iree-hal-target-backends=dylib-llvm-aot \
-  -iree-llvm-embedded-linker-path=${BUILD_HOST_DIR?}/install/bin/lld \
-  -iree-llvm-target-triple=riscv64 \
-  -iree-llvm-target-cpu=generic-rv64 \
-  -iree-llvm-target-cpu-features="+m,+a,+f,+d,+c" \
-  -iree-llvm-target-abi=lp64d \
+generate_dylib_vmfb mhlo \
   "${ROOT_DIR?}/iree/tools/test/iree-run-module.mlir" \
   -o "${BUILD_RISCV_DIR?}/iree-run-module-llvm_aot.vmfb"
 
-IREE_RUN_OUT=$(${QEMU_RV64_BIN?} -cpu rv64,x-v=true,x-k=true,vlen=256,elen=64,vext_spec=v1.0 \
-    -L "${RISCV_TOOLCHAIN_ROOT?}/sysroot" \
-    "${BUILD_RISCV_DIR?}/iree/tools/iree-run-module" --driver=dylib \
-    --module_file="${BUILD_RISCV_DIR?}/iree-run-module-llvm_aot.vmfb" \
-    --entry_function=abs --function_input="f32=-10")
-
-# Check the result of running abs(-10).
-if [[ "${IREE_RUN_OUT}" != *"f32=10" ]]; then
-    exit 1
-fi
+${PYTHON_BIN?} "${ROOT_DIR?}/third_party/llvm-project/llvm/utils/lit/lit.py" \
+  -v "${ROOT_DIR?}/build_tools/kokoro/gcp_ubuntu/cmake/linux/riscv64/"
