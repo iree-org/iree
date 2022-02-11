@@ -242,7 +242,7 @@ def IREEPyDM_ListType : IREEPyDM_PrimitiveTypeDef<"List", ["isRefinable"]> {
   }];
 
   let parser = [{
-    if (parser.parseOptionalLess())
+    if ($_parser.parseOptionalLess())
       return get($_ctxt, CollectionStorageClass::Boxed, nullptr);
 
     Type t;
@@ -431,7 +431,7 @@ def IREEPyDM_ObjectType : IREEPyDM_TypeDef<
   }];
 
   let parser = [{
-    if (parser.parseOptionalLess())
+    if ($_parser.parseOptionalLess())
       return get($_ctxt, nullptr);
 
     Type t;
@@ -484,7 +484,7 @@ def IREEPyDM_UnionType : IREEPyDM_TypeDef<"Union"> {
   }];
 
   let parser = [{
-    if (parser.parseOptionalLess())
+    if ($_parser.parseOptionalLess())
       return get($_ctxt, {});
 
     SmallVector<::mlir::Type> alternatives;
