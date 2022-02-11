@@ -525,7 +525,8 @@ static void printSymbolAlias(OpAsmPrinter &p, Operation *op,
 // stream.resource.alloc
 //===----------------------------------------------------------------------===//
 
-static LogicalResult verifyOp(ResourceAllocOp op) {
+LogicalResult ResourceAllocOp::verify() {
+  ResourceAllocOp op = *this;
   if (failed(verifyOpValueSizes(op, op.results(), op.storage_sizes()))) {
     return failure();
   }
@@ -546,7 +547,8 @@ static LogicalResult verifyOp(ResourceAllocOp op) {
 // stream.resource.map
 //===----------------------------------------------------------------------===//
 
-static LogicalResult verifyOp(ResourceMapOp op) {
+LogicalResult ResourceMapOp::verify() {
+  ResourceMapOp op = *this;
   if (failed(verifyOpValueSizes(op, op.result(), op.result_size()))) {
     return failure();
   }
@@ -557,7 +559,8 @@ static LogicalResult verifyOp(ResourceMapOp op) {
 // stream.resource.try_map
 //===----------------------------------------------------------------------===//
 
-static LogicalResult verifyOp(ResourceTryMapOp op) {
+LogicalResult ResourceTryMapOp::verify() {
+  ResourceTryMapOp op = *this;
   if (failed(verifyOpValueSizes(op, op.result(), op.result_size()))) {
     return failure();
   }
@@ -568,7 +571,8 @@ static LogicalResult verifyOp(ResourceTryMapOp op) {
 // stream.resource.load
 //===----------------------------------------------------------------------===//
 
-static LogicalResult verifyOp(ResourceLoadOp op) {
+LogicalResult ResourceLoadOp::verify() {
+  ResourceLoadOp op = *this;
   if (failed(verifyOpValueSizes(op, op.source(), op.source_size()))) {
     return failure();
   }
@@ -579,7 +583,8 @@ static LogicalResult verifyOp(ResourceLoadOp op) {
 // stream.resource.store
 //===----------------------------------------------------------------------===//
 
-static LogicalResult verifyOp(ResourceStoreOp op) {
+LogicalResult ResourceStoreOp::verify() {
+  ResourceStoreOp op = *this;
   if (failed(verifyOpValueSizes(op, op.target(), op.target_size()))) {
     return failure();
   }
@@ -603,7 +608,8 @@ void ResourcePackOp::getAsmResultNames(
   // }
 }
 
-static LogicalResult verifyOp(ResourcePackOp op) {
+LogicalResult ResourcePackOp::verify() {
+  ResourcePackOp op = *this;
   size_t sliceCount = op.packed_offsets().size();
   if (op.lifetime_intervals().size() != sliceCount * 2) {
     return op.emitOpError() << "requires a [start, end] range for each slice";
@@ -631,7 +637,8 @@ SmallVector<ResourcePackOp::Slice> ResourcePackOp::getSlices() {
 // stream.resource.constants
 //===----------------------------------------------------------------------===//
 
-static LogicalResult verifyOp(ResourceConstantsOp op) {
+LogicalResult ResourceConstantsOp::verify() {
+  ResourceConstantsOp op = *this;
   size_t count = op.results().size();
   if (op.result_sizes().size() != count || op.values().size() != count) {
     return op.emitOpError() << "mismatched constant/result counts";
@@ -653,7 +660,8 @@ static LogicalResult verifyOp(ResourceConstantsOp op) {
 // stream.resource.subview
 //===----------------------------------------------------------------------===//
 
-static LogicalResult verifyOp(ResourceSubviewOp op) {
+LogicalResult ResourceSubviewOp::verify() {
+  ResourceSubviewOp op = *this;
   if (failed(verifyOpValueSizes(op, op.source(), op.source_size())) ||
       failed(verifyOpValueSizes(op, op.result(), op.result_size()))) {
     return failure();
@@ -704,7 +712,8 @@ IREE::Stream::ResourceSubviewOp ResourceSubviewOp::findSubviewOp(Value value) {
 // stream.tensor.import
 //===----------------------------------------------------------------------===//
 
-static LogicalResult verifyOp(TensorImportOp op) {
+LogicalResult TensorImportOp::verify() {
+  TensorImportOp op = *this;
   if (failed(verifyOpDynamicDims(op, op.result_encoding(),
                                  op.result_encoding_dims())) ||
       failed(verifyOpValueSizes(op, op.result(), op.result_size()))) {
@@ -730,7 +739,8 @@ SmallVector<int64_t, 4> TensorImportOp::getTiedResultOperandIndices() {
 // stream.tensor.export
 //===----------------------------------------------------------------------===//
 
-static LogicalResult verifyOp(TensorExportOp op) {
+LogicalResult TensorExportOp::verify() {
+  TensorExportOp op = *this;
   if (failed(verifyOpDynamicDims(op, op.source_encoding(),
                                  op.source_encoding_dims())) ||
       failed(verifyOpValueSizes(op, op.source(), op.source_size()))) {
@@ -756,7 +766,8 @@ SmallVector<int64_t, 4> TensorExportOp::getTiedResultOperandIndices() {
 // stream.tensor.sizeof
 //===----------------------------------------------------------------------===//
 
-static LogicalResult verifyOp(TensorSizeOfOp op) {
+LogicalResult TensorSizeOfOp::verify() {
+  TensorSizeOfOp op = *this;
   if (failed(verifyOpDynamicDims(op, op.encoding(), op.encoding_dims()))) {
     return failure();
   }
@@ -771,7 +782,8 @@ void TensorConstantOp::getAsmResultNames(mlir::OpAsmSetValueNameFn setNameFn) {
   setNameFn(result(), "cst");
 }
 
-static LogicalResult verifyOp(TensorConstantOp op) {
+LogicalResult TensorConstantOp::verify() {
+  TensorConstantOp op = *this;
   if (failed(verifyOpDynamicDims(op, op.result_encoding(),
                                  op.result_encoding_dims()))) {
     return failure();
@@ -783,7 +795,8 @@ static LogicalResult verifyOp(TensorConstantOp op) {
 // stream.tensor.splat
 //===----------------------------------------------------------------------===//
 
-static LogicalResult verifyOp(TensorSplatOp op) {
+LogicalResult TensorSplatOp::verify() {
+  TensorSplatOp op = *this;
   if (failed(verifyOpDynamicDims(op, op.result_encoding(),
                                  op.result_encoding_dims())) ||
       failed(verifyOpValueSizes(op, op.result(), op.result_size()))) {
@@ -796,7 +809,8 @@ static LogicalResult verifyOp(TensorSplatOp op) {
 // stream.tensor.clone
 //===----------------------------------------------------------------------===//
 
-static LogicalResult verifyOp(TensorCloneOp op) {
+LogicalResult TensorCloneOp::verify() {
+  TensorCloneOp op = *this;
   // Clones can't change encodings but they can change shape information.
   auto sourceEncoding = op.source_encoding().cast<RankedTensorType>();
   auto resultEncoding = op.result_encoding().cast<RankedTensorType>();
@@ -820,7 +834,8 @@ static LogicalResult verifyOp(TensorCloneOp op) {
 // stream.tensor.slice
 //===----------------------------------------------------------------------===//
 
-static LogicalResult verifyOp(TensorSliceOp op) {
+LogicalResult TensorSliceOp::verify() {
+  TensorSliceOp op = *this;
   if (failed(verifyOpDynamicDims(op, op.source_encoding(),
                                  op.source_encoding_dims())) ||
       failed(verifyOpDynamicDims(op, op.result_encoding(),
@@ -841,7 +856,8 @@ static LogicalResult verifyOp(TensorSliceOp op) {
 // stream.tensor.update
 //===----------------------------------------------------------------------===//
 
-static LogicalResult verifyOp(TensorUpdateOp op) {
+LogicalResult TensorUpdateOp::verify() {
+  TensorUpdateOp op = *this;
   if (failed(verifyOpDynamicDims(op, op.update_encoding(),
                                  op.update_encoding_dims())) ||
       failed(verifyOpDynamicDims(op, op.target_encoding(),
@@ -870,7 +886,8 @@ SmallVector<int64_t, 4> TensorUpdateOp::getTiedResultOperandIndices() {
 // stream.tensor.fill
 //===----------------------------------------------------------------------===//
 
-static LogicalResult verifyOp(TensorFillOp op) {
+LogicalResult TensorFillOp::verify() {
+  TensorFillOp op = *this;
   if (failed(verifyOpDynamicDims(op, op.target_encoding(),
                                  op.target_encoding_dims())) ||
       failed(verifyOpValueSizes(op, op.result(), op.target_size()))) {
@@ -896,7 +913,8 @@ SmallVector<int64_t, 4> TensorFillOp::getTiedResultOperandIndices() {
 // stream.tensor.load
 //===----------------------------------------------------------------------===//
 
-static LogicalResult verifyOp(TensorLoadOp op) {
+LogicalResult TensorLoadOp::verify() {
+  TensorLoadOp op = *this;
   if (failed(verifyOpDynamicDims(op, op.source_encoding(),
                                  op.source_encoding_dims())) ||
       failed(verifyOpValueSizes(op, op.source(), op.source_size()))) {
@@ -913,7 +931,8 @@ static LogicalResult verifyOp(TensorLoadOp op) {
 // stream.tensor.store
 //===----------------------------------------------------------------------===//
 
-static LogicalResult verifyOp(TensorStoreOp op) {
+LogicalResult TensorStoreOp::verify() {
+  TensorStoreOp op = *this;
   if (failed(verifyOpDynamicDims(op, op.target_encoding(),
                                  op.target_encoding_dims())) ||
       failed(verifyOpValueSizes(op, op.target(), op.target_size()))) {
@@ -974,7 +993,8 @@ static LogicalResult mergeBuiltinModuleSource(Location loc, StringRef fileName,
 // stream.builtin.splat.i64
 //===----------------------------------------------------------------------===//
 
-static LogicalResult verifyOp(BuiltinSplatI64Op op) {
+LogicalResult BuiltinSplatI64Op::verify() {
+  BuiltinSplatI64Op op = *this;
   if (failed(verifyOpValueSizes(op, op.result(), op.result_size()))) {
     return failure();
   }
@@ -1026,7 +1046,8 @@ LogicalResult BuiltinSplatI64Op::convertBuiltinOp(OpBuilder &builder) {
 // stream.builtin.fill.i64
 //===----------------------------------------------------------------------===//
 
-static LogicalResult verifyOp(BuiltinFillI64Op op) {
+LogicalResult BuiltinFillI64Op::verify() {
+  BuiltinFillI64Op op = *this;
   if (failed(verifyOpValueSizes(op, op.result(), op.target_size()))) {
     return failure();
   }
@@ -1109,7 +1130,8 @@ void AsyncConstantOp::getAsmResultNames(mlir::OpAsmSetValueNameFn setNameFn) {
   setNameFn(result(), "cst");
 }
 
-static LogicalResult verifyOp(AsyncConstantOp op) {
+LogicalResult AsyncConstantOp::verify() {
+  AsyncConstantOp op = *this;
   if (failed(verifyOpValueSizes(op, op.result(), op.result_size()))) {
     return failure();
   }
@@ -1120,7 +1142,8 @@ static LogicalResult verifyOp(AsyncConstantOp op) {
 // stream.async.splat
 //===----------------------------------------------------------------------===//
 
-static LogicalResult verifyOp(AsyncSplatOp op) {
+LogicalResult AsyncSplatOp::verify() {
+  AsyncSplatOp op = *this;
   if (failed(verifyOpValueSizes(op, op.result(), op.result_size()))) {
     return failure();
   }
@@ -1133,7 +1156,8 @@ bool AsyncSplatOp::preferCloneToConsumers() { return true; }
 // stream.async.clone
 //===----------------------------------------------------------------------===//
 
-static LogicalResult verifyOp(AsyncCloneOp op) {
+LogicalResult AsyncCloneOp::verify() {
+  AsyncCloneOp op = *this;
   if (failed(verifyOpValueSizes(op, op.source(), op.source_size())) ||
       failed(verifyOpValueSizes(op, op.result(), op.result_size()))) {
     return failure();
@@ -1147,7 +1171,8 @@ bool AsyncCloneOp::preferCloneToConsumers() { return true; }
 // stream.async.slice
 //===----------------------------------------------------------------------===//
 
-static LogicalResult verifyOp(AsyncSliceOp op) {
+LogicalResult AsyncSliceOp::verify() {
+  AsyncSliceOp op = *this;
   if (failed(verifyOpValueSizes(op, op.source(), op.source_size())) ||
       failed(verifyOpValueSizes(op, op.result(), op.result_size()))) {
     return failure();
@@ -1161,7 +1186,8 @@ bool AsyncSliceOp::isMetadata() { return true; }
 // stream.async.fill
 //===----------------------------------------------------------------------===//
 
-static LogicalResult verifyOp(AsyncFillOp op) {
+LogicalResult AsyncFillOp::verify() {
+  AsyncFillOp op = *this;
   if (failed(verifyOpValueSizes(op, op.result(), op.target_size()))) {
     return failure();
   }
@@ -1185,7 +1211,8 @@ SmallVector<int64_t, 4> AsyncFillOp::getTiedResultOperandIndices() {
 // stream.async.update
 //===----------------------------------------------------------------------===//
 
-static LogicalResult verifyOp(AsyncUpdateOp op) {
+LogicalResult AsyncUpdateOp::verify() {
+  AsyncUpdateOp op = *this;
   if (failed(verifyOpValueSizes(op, op.update(), op.update_size())) ||
       failed(verifyOpValueSizes(op, op.result(), op.target_size()))) {
     return failure();
@@ -1212,7 +1239,8 @@ SmallVector<int64_t, 4> AsyncUpdateOp::getTiedResultOperandIndices() {
 // stream.async.copy
 //===----------------------------------------------------------------------===//
 
-static LogicalResult verifyOp(AsyncCopyOp op) {
+LogicalResult AsyncCopyOp::verify() {
+  AsyncCopyOp op = *this;
   if (op.source() == op.target()) {
     // If we want to perform memmove-like operations where it's safe to copy
     // overlapping ranges we'll need to emit some runtime checks. We can in
@@ -1244,7 +1272,8 @@ SmallVector<int64_t, 4> AsyncCopyOp::getTiedResultOperandIndices() {
 // stream.async.transfer
 //===----------------------------------------------------------------------===//
 
-static LogicalResult verifyOp(AsyncTransferOp op) {
+LogicalResult AsyncTransferOp::verify() {
+  AsyncTransferOp op = *this;
   if (failed(verifyOpValueSizes(op, op.source(), op.source_size())) ||
       failed(verifyOpValueSizes(op, op.result(), op.result_size()))) {
     return failure();
@@ -1256,7 +1285,8 @@ static LogicalResult verifyOp(AsyncTransferOp op) {
 // stream.async.load
 //===----------------------------------------------------------------------===//
 
-static LogicalResult verifyOp(AsyncLoadOp op) {
+LogicalResult AsyncLoadOp::verify() {
+  AsyncLoadOp op = *this;
   if (failed(verifyOpValueSizes(op, op.source(), op.source_size()))) {
     return failure();
   }
@@ -1267,7 +1297,8 @@ static LogicalResult verifyOp(AsyncLoadOp op) {
 // stream.async.store
 //===----------------------------------------------------------------------===//
 
-static LogicalResult verifyOp(AsyncStoreOp op) {
+LogicalResult AsyncStoreOp::verify() {
+  AsyncStoreOp op = *this;
   if (failed(verifyOpValueSizes(op, op.target(), op.target_size()))) {
     return failure();
   }
@@ -1291,7 +1322,8 @@ SmallVector<int64_t, 4> AsyncStoreOp::getTiedResultOperandIndices() {
 // stream.async.dispatch
 //===----------------------------------------------------------------------===//
 
-static LogicalResult verifyOp(AsyncDispatchOp op) {
+LogicalResult AsyncDispatchOp::verify() {
+  AsyncDispatchOp op = *this;
   if (failed(verifyOpValueSizes(op, op.operands(), op.operand_sizes())) ||
       failed(verifyOpValueSizes(op, op.results(), op.result_sizes()))) {
     return failure();
@@ -1334,7 +1366,8 @@ void AsyncExecuteOp::build(OpBuilder &builder, OperationState &state,
   state.addRegion();
 }
 
-static LogicalResult verifyOp(AsyncExecuteOp op) {
+LogicalResult AsyncExecuteOp::verify() {
+  AsyncExecuteOp op = *this;
   if (failed(RegionBranchOpInterface::verifyTypes(op))) return failure();
   if (failed(verifyOpValueSizes(op, op.operands(), op.operand_sizes())) ||
       failed(verifyOpValueSizes(op, op.results(), op.result_sizes()))) {
@@ -1449,7 +1482,8 @@ void AsyncConcurrentOp::build(OpBuilder &builder, OperationState &state,
   state.addRegion();
 }
 
-static LogicalResult verifyOp(AsyncConcurrentOp op) {
+LogicalResult AsyncConcurrentOp::verify() {
+  AsyncConcurrentOp op = *this;
   if (failed(RegionBranchOpInterface::verifyTypes(op))) return failure();
   if (failed(verifyOpValueSizes(op, op.operands(), op.operand_sizes())) ||
       failed(verifyOpValueSizes(op, op.results(), op.result_sizes()))) {
@@ -1536,7 +1570,8 @@ AsyncConcurrentOp::cloneReplacementExcludingOperandsAndResults(
 // stream.cmd.flush
 //===----------------------------------------------------------------------===//
 
-static LogicalResult verifyOp(CmdFlushOp op) {
+LogicalResult CmdFlushOp::verify() {
+  CmdFlushOp op = *this;
   if (failed(verifyOpValueSizes(op, op.target(), op.target_size()))) {
     return failure();
   }
@@ -1547,7 +1582,8 @@ static LogicalResult verifyOp(CmdFlushOp op) {
 // stream.cmd.invalidate
 //===----------------------------------------------------------------------===//
 
-static LogicalResult verifyOp(CmdInvalidateOp op) {
+LogicalResult CmdInvalidateOp::verify() {
+  CmdInvalidateOp op = *this;
   if (failed(verifyOpValueSizes(op, op.target(), op.target_size()))) {
     return failure();
   }
@@ -1558,7 +1594,8 @@ static LogicalResult verifyOp(CmdInvalidateOp op) {
 // stream.cmd.discard
 //===----------------------------------------------------------------------===//
 
-static LogicalResult verifyOp(CmdDiscardOp op) {
+LogicalResult CmdDiscardOp::verify() {
+  CmdDiscardOp op = *this;
   if (failed(verifyOpValueSizes(op, op.target(), op.target_size()))) {
     return failure();
   }
@@ -1569,7 +1606,8 @@ static LogicalResult verifyOp(CmdDiscardOp op) {
 // stream.cmd.fill
 //===----------------------------------------------------------------------===//
 
-static LogicalResult verifyOp(CmdFillOp op) {
+LogicalResult CmdFillOp::verify() {
+  CmdFillOp op = *this;
   if (failed(verifyOpValueSizes(op, op.target(), op.target_size()))) {
     return failure();
   }
@@ -1580,7 +1618,8 @@ static LogicalResult verifyOp(CmdFillOp op) {
 // stream.cmd.copy
 //===----------------------------------------------------------------------===//
 
-static LogicalResult verifyOp(CmdCopyOp op) {
+LogicalResult CmdCopyOp::verify() {
+  CmdCopyOp op = *this;
   if (failed(verifyOpValueSizes(op, op.source(), op.source_size())) ||
       failed(verifyOpValueSizes(op, op.target(), op.target_size()))) {
     return failure();
@@ -1592,7 +1631,8 @@ static LogicalResult verifyOp(CmdCopyOp op) {
 // stream.cmd.dispatch
 //===----------------------------------------------------------------------===//
 
-static LogicalResult verifyOp(CmdDispatchOp op) {
+LogicalResult CmdDispatchOp::verify() {
+  CmdDispatchOp op = *this;
   size_t resourceCount = op.resources().size();
   if (op.resource_sizes().size() != resourceCount ||
       op.resource_offsets().size() != resourceCount ||
@@ -1767,7 +1807,8 @@ static LogicalResult verifyCmdOp(Operation *op) {
   return success();
 }
 
-static LogicalResult verifyOp(CmdExecuteOp op) {
+LogicalResult CmdExecuteOp::verify() {
+  CmdExecuteOp op = *this;
   if (failed(RegionBranchOpInterface::verifyTypes(op))) return failure();
   if (failed(verifyOpValueSizes(op, op.operands(), op.operand_sizes()))) {
     return failure();
@@ -1843,7 +1884,8 @@ CmdExecuteOp::cloneReplacementExcludingOperandsAndResults(
 // stream.cmd.serial
 //===----------------------------------------------------------------------===//
 
-static LogicalResult verifyOp(CmdSerialOp op) {
+LogicalResult CmdSerialOp::verify() {
+  CmdSerialOp op = *this;
   for (auto &nestedOp : op.body().front()) {
     if (failed(verifyCmdOp(&nestedOp))) return failure();
   }
@@ -1867,7 +1909,8 @@ void CmdSerialOp::getSuccessorRegions(
 // stream.cmd.concurrent
 //===----------------------------------------------------------------------===//
 
-static LogicalResult verifyOp(CmdConcurrentOp op) {
+LogicalResult CmdConcurrentOp::verify() {
+  CmdConcurrentOp op = *this;
   for (auto &nestedOp : op.body().front()) {
     if (failed(verifyCmdOp(&nestedOp))) return failure();
   }
@@ -1891,7 +1934,7 @@ void CmdConcurrentOp::getSuccessorRegions(
 // stream.timepoint.join
 //===----------------------------------------------------------------------===//
 
-static LogicalResult verifyOp(TimepointJoinOp op) {
+LogicalResult TimepointJoinOp::verify() {
   // We could test if timepoints all come from the same place - this is not
   // strictly required but if we could avoid it things will be easier to
   // implement at runtime (won't have to do a cuda<->vulkan sync, etc).
@@ -1921,7 +1964,8 @@ void TimepointAwaitOp::build(OpBuilder &builder, OperationState &state,
                      }));
 }
 
-static LogicalResult verifyOp(TimepointAwaitOp op) {
+LogicalResult TimepointAwaitOp::verify() {
+  TimepointAwaitOp op = *this;
   if (failed(verifyOpValueSizes(op, op.operands(), op.operand_sizes())) ||
       failed(verifyOpValueSizes(op, op.results(), op.operand_sizes()))) {
     return failure();
@@ -1949,7 +1993,7 @@ void ExecutableOp::build(OpBuilder &builder, OperationState &state,
                      builder.getStringAttr(sym_name));
 }
 
-static LogicalResult verifyOp(ExecutableOp op) {
+LogicalResult ExecutableOp::verify() {
   // TODO(benvanik): check export name conflicts.
   return success();
 }
@@ -1977,7 +2021,8 @@ void ExecutableExportOp::build(OpBuilder &builder, OperationState &state,
 // stream.binding.subspan
 //===----------------------------------------------------------------------===//
 
-static LogicalResult verifyOp(BindingSubspanOp op) {
+LogicalResult BindingSubspanOp::verify() {
+  BindingSubspanOp op = *this;
   if (auto shapedType = op.getType().dyn_cast<ShapedType>()) {
     if (failed(verifyOpDynamicDims(op, shapedType, op.dynamic_dims()))) {
       return failure();
