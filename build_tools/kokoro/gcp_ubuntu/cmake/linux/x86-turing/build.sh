@@ -64,7 +64,7 @@ CMAKE_ARGS=(
 )
 
 "$CMAKE_BIN" "${CMAKE_ARGS[@]?}" "$@" ..
-"$CMAKE_BIN" --build .
+"$CMAKE_BIN" --build -k .
 
 cd ${ROOT_DIR?}
 
