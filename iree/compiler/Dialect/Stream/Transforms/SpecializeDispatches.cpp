@@ -204,7 +204,7 @@ static void insertConstantTableLookup(mlir::FuncOp funcOp,
                                 .result();
       if (extractedValue.getType() != arg.getType()) {
         extractedValue = builder.create<arith::IndexCastOp>(
-            arg.getLoc(), extractedValue, arg.getType());
+            arg.getLoc(), arg.getType(), extractedValue);
       }
       arg.replaceAllUsesWith(extractedValue);
     }

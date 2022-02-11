@@ -52,7 +52,7 @@ class CommandBufferFillBufferOpConversion
     Value pattern = op.pattern();
     if (patternBitWidth < 32) {
       pattern = rewriter.createOrFold<arith::ExtUIOp>(
-          op.getLoc(), pattern, rewriter.getIntegerType(32));
+          op.getLoc(), rewriter.getIntegerType(32), pattern);
     }
     callOperands.push_back(pattern);
     callOperands.push_back(patternLengthConst);
