@@ -816,8 +816,8 @@ void ExecutableLookupOp::getAsmResultNames(
 // hal.interface.binding.subspan
 //===----------------------------------------------------------------------===//
 
-static LogicalResult verifyInterfaceBindingSubspanOp(
-    InterfaceBindingSubspanOp op) {
+LogicalResult InterfaceBindingSubspanOp::verify() {
+  InterfaceBindingSubspanOp op = *this;
   if (ShapedType shapedType = op.getType().dyn_cast<ShapedType>()) {
     if (shapedType.getNumDynamicDims() != op.dynamic_dims().size()) {
       return op.emitOpError("result type ")
