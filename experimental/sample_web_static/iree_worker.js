@@ -4,6 +4,22 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+// Helpers that prefix logs with the 'name' from DedicatedWorkerGlobalScope.
+// This helps with debugging thread creation.
+function ireeNamePrefix() {
+  return self.name ? (self.name + ':') : '(unnamed scope)';
+}
+function ireeLog(...args) {
+  console.log(ireeNamePrefix(), ...args);
+}
+function ireeError(...args) {
+  console.error(ireeNamePrefix(), ...args);
+}
+
+// TODO(scotttodd): configure this through the build system / scripts?
+const MAIN_SCRIPT_URL = 'sample-web-static-multithreaded.js';
+// const MAIN_SCRIPT_URL = 'sample-web-static-sync.js';
+
 let wasmSetupSampleFn;
 let wasmCleanupSampleFn;
 let wasmRunSampleFn;
@@ -16,13 +32,13 @@ let imageBuffer;
 
 var Module = {
   print: function(text) {
-    console.log('(C)', text);
+    ireeLog('(C/Wasm) ' + text);
   },
   printErr: function(text) {
-    console.error('(C)', text);
+    ireeError('(C/Wasm) ' + text);
   },
   onRuntimeInitialized: function() {
-    console.log('WebAssembly module onRuntimeInitialized()');
+    ireeLog('WebAssembly module onRuntimeInitialized()');
 
     wasmSetupSampleFn = Module.cwrap('setup_sample', 'number', []);
     wasmCleanupSampleFn = Module.cwrap('cleanup_sample', null, ['number']);
@@ -31,6 +47,7 @@ var Module = {
 
     initializeSample();
   },
+  mainScriptUrlOrBlob: MAIN_SCRIPT_URL,
   noInitialRun: true,
 };
 
@@ -96,7 +113,7 @@ function handlePredict(id, canvasData) {
   }
 }
 
-onmessage = function(messageEvent) {
+self.onmessage = function(messageEvent) {
   const {messageType, id, payload} = messageEvent.data;
 
   if (messageType == 'predict') {
@@ -104,5 +121,6 @@ onmessage = function(messageEvent) {
   }
 };
 
-importScripts('sample-web-static-sync.js');
-// importScripts('sample-web-static-multithreaded.js');
+ireeLog('iree_worker importing \'' + MAIN_SCRIPT_URL + '\'');
+
+importScripts(MAIN_SCRIPT_URL);

@@ -29,7 +29,7 @@ function _handleMessageFromWorker(messageEvent) {
     pendingPromises['initialize']['resolve']();
     delete pendingPromises['initialize'];
   } else if (messageType == 'predictResult') {
-    if (payload) {
+    if (payload !== undefined) {
       pendingPromises[id]['resolve'](payload);
     } else {
       pendingPromises[id]['reject'](error);
@@ -47,7 +47,7 @@ function ireeInitializeWorker() {
       'reject': reject,
     };
 
-    ireeWorker = new Worker('iree_worker.js');
+    ireeWorker = new Worker('iree_worker.js', {name: 'IREE-main'});
     ireeWorker.onmessage = _handleMessageFromWorker;
   });
 }
