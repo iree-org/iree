@@ -86,7 +86,7 @@ cmake -B "${SWIFTSHADER_INSTALL_DIR?}" \
     "${SWIFTSHADER_DIR?}"
 
 # Build the project, choosing just the vk_swiftshader target.
-cmake --build "${SWIFTSHADER_INSTALL_DIR?}" --config Release --target vk_swiftshader
+cmake --build "${SWIFTSHADER_INSTALL_DIR?}" --config Release --target vk_swiftshader -- -k 0
 
 echo
 echo "Ensure the following variable is set in your enviroment:"

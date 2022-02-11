@@ -24,7 +24,7 @@ test -f ${ARTIFACTS_DIR}/counter_vmvx.vmfb && echo "counter_vmvx.vmfb exists"
 
 # 2. Compile the `iree_samples_variables_and_state` CMake target.
 cmake -B ${BUILD_DIR} -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo ${ROOT_DIR}
-cmake --build ${BUILD_DIR} --target iree_samples_variables_and_state
+cmake --build ${BUILD_DIR} --target iree_samples_variables_and_state -- -k 0
 
 # 3. Run the sample binary.
 ${BUILD_DIR}/iree/samples/variables_and_state/variables-and-state \

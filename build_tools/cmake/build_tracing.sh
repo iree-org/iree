@@ -35,4 +35,4 @@ cd build-tracing
   -DCMAKE_BUILD_TYPE=RelWithDebInfo \
   -DIREE_ENABLE_RUNTIME_TRACING=ON \
   -DIREE_BUILD_COMPILER=OFF
-"${CMAKE_BIN?}" --build .
+"${CMAKE_BIN?}" --build . -- -k 0

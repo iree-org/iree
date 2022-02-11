@@ -33,4 +33,4 @@ cd build-host
   -DCMAKE_INSTALL_PREFIX=./install \
   -DIREE_BUILD_TESTS=OFF \
   -DIREE_BUILD_SAMPLES=OFF
-"${CMAKE_BIN?}" --build . --target install
+"${CMAKE_BIN?}" --build . --target install -- -k 0

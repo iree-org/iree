@@ -74,9 +74,9 @@ cd build-host
   -DIREE_BUILD_BENCHMARKS=ON \
   -DIREE_BUILD_SAMPLES=OFF
 
-"${CMAKE_BIN}" --build . --target install
+"${CMAKE_BIN}" --build . --target install -- -k 0
 # Also make sure that we can generate artifacts for benchmarking on Android.
-"${CMAKE_BIN}" --build . --target iree-benchmark-suites
+"${CMAKE_BIN}" --build . --target iree-benchmark-suites -- -k 0
 # --------------------------------------------------------------------------- #
 
 # --------------------------------------------------------------------------- #
@@ -103,4 +103,4 @@ cd build-android
   -DIREE_BUILD_COMPILER=OFF \
   -DIREE_BUILD_TESTS=ON \
   -DIREE_BUILD_SAMPLES=OFF
-"${CMAKE_BIN}" --build .
+"${CMAKE_BIN}" --build . -- -k 0

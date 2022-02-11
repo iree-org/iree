@@ -42,7 +42,7 @@ echo "Configuring CMake"
 "${CMAKE_BIN?}" "${CMAKE_ARGS[@]?}"
 
 echo "Building with CMake"
-"${CMAKE_BIN?}" --build "${CMAKE_BUILD_DIR?}"
+"${CMAKE_BIN?}" --build "${CMAKE_BUILD_DIR?}" -- -k 0
 
 # Respect the user setting, but default to as many jobs as we have cores.
 export CTEST_PARALLEL_LEVEL=${CTEST_PARALLEL_LEVEL:-$(nproc)}

@@ -71,4 +71,4 @@ echo "******************** Running main project ctests ************************"
 ctest --timeout 900 --output-on-failure --label-exclude "${label_exclude_regex?}"
 
 echo "******************** llvm-external-projects tests ***********************"
-cmake --build . --target check-iree-dialects
+cmake --build . --target check-iree-dialects -- -k 0

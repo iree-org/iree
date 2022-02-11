@@ -45,7 +45,7 @@ fi
   -DIREE_BUILD_TESTS=OFF \
   -DIREE_BUILD_SAMPLES=OFF \
   "${ROOT_DIR?}"
-"${CMAKE_BIN?}" --build "${BUILD_HOST_DIR?}" --target install
+"${CMAKE_BIN?}" --build "${BUILD_HOST_DIR?}" --target install -- -k 0
 # --------------------------------------------------------------------------- #
 
 
@@ -89,4 +89,4 @@ fi
 
 args_str=$(IFS=' ' ; echo "${args[*]}")
 "${CMAKE_BIN?}" ${args_str} "${ROOT_DIR?}"
-"${CMAKE_BIN?}" --build "${BUILD_RISCV_DIR?}"
+"${CMAKE_BIN?}" --build "${BUILD_RISCV_DIR?}" -- -k 0

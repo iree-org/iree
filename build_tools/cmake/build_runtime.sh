@@ -31,4 +31,4 @@ cd build-runtime
 "${CMAKE_BIN?}" -G Ninja .. \
   -DCMAKE_BUILD_TYPE=RelWithDebInfo \
   -DIREE_BUILD_COMPILER=OFF
-"${CMAKE_BIN?}" --build .
+"${CMAKE_BIN?}" --build . -- -k 0

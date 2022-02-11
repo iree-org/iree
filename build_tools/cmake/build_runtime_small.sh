@@ -32,4 +32,4 @@ cd build-runtime-small
   -DCMAKE_BUILD_TYPE=MinSizeRel \
   -DIREE_SIZE_OPTIMIZED=ON \
   -DIREE_BUILD_COMPILER=OFF
-"${CMAKE_BIN?}" --build .
+"${CMAKE_BIN?}" --build . -- -k 0

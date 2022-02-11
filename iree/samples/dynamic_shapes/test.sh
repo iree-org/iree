@@ -23,7 +23,7 @@ test -f ${ARTIFACTS_DIR}/dynamic_shapes.mlir && echo "dynamic_shapes.mlir exists
 
 # 2. Compile the `iree-translate` tool.
 cmake -B ${BUILD_DIR} -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo ${ROOT_DIR}
-cmake --build ${BUILD_DIR} --target iree_tools_iree-translate
+cmake --build ${BUILD_DIR} --target iree_tools_iree-translate -- -k 0
 
 # 3. Compile `dynamic_shapes.mlir` using `iree-translate`.
 ${BUILD_DIR}/iree/tools/iree-translate \
@@ -33,7 +33,7 @@ ${BUILD_DIR}/iree/tools/iree-translate \
   ${ARTIFACTS_DIR}/dynamic_shapes.mlir -o ${ARTIFACTS_DIR}/dynamic_shapes_dylib.vmfb
 
 # 4. Build the `iree_samples_dynamic_shapes` CMake target.
-cmake --build ${BUILD_DIR} --target iree_samples_dynamic_shapes
+cmake --build ${BUILD_DIR} --target iree_samples_dynamic_shapes -- -k 0
 
 # 5. Run the sample binary.
 ${BUILD_DIR}/iree/samples/dynamic_shapes/dynamic-shapes \
