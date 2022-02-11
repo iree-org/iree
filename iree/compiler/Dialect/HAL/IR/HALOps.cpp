@@ -423,53 +423,6 @@ void CommandBufferCreateOp::getAsmResultNames(
 }
 
 //===----------------------------------------------------------------------===//
-// hal.command_buffer.execution_barrier
-//===----------------------------------------------------------------------===//
-
-static ParseResult parseCommandBufferExecutionBarrierOp(
-    OpAsmParser &parser, OperationState *result) {
-  OpAsmParser::OperandType commandBuffer;
-  if (failed(parser.parseOperand(commandBuffer)) ||
-      failed(parser.resolveOperand(commandBuffer,
-                                   CommandBufferType::get(result->getContext()),
-                                   result->operands)) ||
-      failed(parser.parseComma()) ||
-      failed(parseEnumAttr<ExecutionStageBitfield>(parser, "source_stage_mask",
-                                                   result->attributes)) ||
-      failed(parser.parseComma()) ||
-      failed(parseEnumAttr<ExecutionStageBitfield>(parser, "target_stage_mask",
-                                                   result->attributes)) ||
-      failed(parser.parseComma()) ||
-      failed(parseEnumAttr<ExecutionBarrierFlagBitfield>(parser, "flags",
-                                                         result->attributes))) {
-    return failure();
-  }
-  if (failed(parser.parseOptionalAttrDictWithKeyword(result->attributes))) {
-    return failure();
-  }
-  return success();
-}
-
-static void printCommandBufferExecutionBarrierOp(
-    OpAsmPrinter &p, CommandBufferExecutionBarrierOp op) {
-  p << ' ';
-  p.printOperand(op.command_buffer());
-  p << ", \"";
-  p << stringifyExecutionStageBitfield(op.source_stage_mask());
-  p << "\", \"";
-  p << stringifyExecutionStageBitfield(op.target_stage_mask());
-  p << "\", \"";
-  p << stringifyExecutionBarrierFlagBitfield(op.flags());
-  p << "\"";
-  p.printOptionalAttrDictWithKeyword(op->getAttrs(),
-                                     /*elidedAttrs=*/{
-                                         "source_stage_mask",
-                                         "target_stage_mask",
-                                         "flags",
-                                     });
-}
-
-//===----------------------------------------------------------------------===//
 // hal.command_buffer.push_descriptor_set
 //===----------------------------------------------------------------------===//
 
@@ -590,15 +543,14 @@ void DeviceSwitchOp::build(OpBuilder &builder, OperationState &state,
   state.addAttributes(attributes);
 }
 
-static ParseResult parseDeviceSwitchOp(OpAsmParser &parser,
-                                       OperationState *result) {
+ParseResult DeviceSwitchOp::parse(OpAsmParser &parser, OperationState &result) {
   OpAsmParser::OperandType device;
   Type deviceType;
   if (failed(parser.parseLess()) || failed(parser.parseOperand(device)) ||
       failed(parser.parseColonType(deviceType)) ||
-      failed(parser.resolveOperand(device, deviceType, result->operands)) ||
+      failed(parser.resolveOperand(device, deviceType, result.operands)) ||
       failed(parser.parseGreater()) ||
-      failed(parser.parseOptionalArrowTypeList(result->types))) {
+      failed(parser.parseOptionalArrowTypeList(result.types))) {
     return failure();
   }
 
@@ -616,31 +568,32 @@ static ParseResult parseDeviceSwitchOp(OpAsmParser &parser,
     conditionAttrs.push_back(conditionAttr);
     SmallVector<OpAsmParser::OperandType> regionArgs;
     SmallVector<Type> regionArgTypes;
-    auto *regionBody = result->addRegion();
+    auto *regionBody = result.addRegion();
     if (failed(parser.parseRegion(*regionBody, regionArgs, regionArgTypes))) {
       return failure();
     }
   } while (succeeded(parser.parseOptionalComma()));
-  result->addAttribute("conditions",
-                       ArrayAttr::get(result->getContext(), conditionAttrs));
+  result.addAttribute("conditions",
+                      ArrayAttr::get(result.getContext(), conditionAttrs));
 
-  if (failed(parser.parseOptionalAttrDictWithKeyword(result->attributes))) {
+  if (failed(parser.parseOptionalAttrDictWithKeyword(result.attributes))) {
     return failure();
   }
   return success();
 }
 
-static void printDeviceSwitchOp(OpAsmPrinter &p, DeviceSwitchOp op) {
+void DeviceSwitchOp::print(OpAsmPrinter &p) {
+  Operation *op = getOperation();
   p << "<";
-  p.printOperand(op.device());
+  p.printOperand(device());
   p << " : ";
-  p.printType(op.device().getType());
+  p.printType(device().getType());
   p << ">";
-  p.printOptionalArrowTypeList(op.getResultTypes());
+  p.printOptionalArrowTypeList(getResultTypes());
   p << "\n";
   p.getStream().indent(4);
   interleave(
-      llvm::zip(op.conditions(), op.condition_regions()),
+      llvm::zip(conditions(), condition_regions()),
       [&](std::tuple<Attribute, Region &> it) {
         auto &conditionAttr = std::get<0>(it);
         auto &conditionRegion = std::get<1>(it);
@@ -700,8 +653,8 @@ static LogicalResult verifyExecutableOp(ExecutableOp op) {
 // hal.executable.entry_point
 //===----------------------------------------------------------------------===//
 
-static ParseResult parseExecutableEntryPointOp(OpAsmParser &parser,
-                                               OperationState *result) {
+ParseResult ExecutableEntryPointOp::parse(OpAsmParser &parser,
+                                          OperationState &result) {
   StringAttr visibilityAttr;
   if (failed(parseSymbolVisibility(parser, visibilityAttr))) {
     return failure();
@@ -711,7 +664,7 @@ static ParseResult parseExecutableEntryPointOp(OpAsmParser &parser,
   IREE::HAL::ExecutableLayoutAttr layoutAttr;
   if (failed(parser.parseSymbolName(nameAttr,
                                     mlir::SymbolTable::getSymbolAttrName(),
-                                    result->attributes))) {
+                                    result.attributes))) {
     return failure();
   }
   if (succeeded(parser.parseOptionalKeyword("ordinal"))) {
@@ -722,15 +675,15 @@ static ParseResult parseExecutableEntryPointOp(OpAsmParser &parser,
         failed(parser.parseRParen())) {
       return failure();
     }
-    result->addAttribute("ordinal", ordinalAttr);
+    result.addAttribute("ordinal", ordinalAttr);
   }
   if (failed(parser.parseKeyword("layout")) || failed(parser.parseLParen()) ||
       failed(parser.parseAttribute(layoutAttr)) ||
       failed(parser.parseRParen()) ||
-      failed(parser.parseOptionalAttrDictWithKeyword(result->attributes))) {
+      failed(parser.parseOptionalAttrDictWithKeyword(result.attributes))) {
     return failure();
   }
-  result->addAttribute("layout", layoutAttr);
+  result.addAttribute("layout", layoutAttr);
 
   // For now assume that the workload is at max 3D. So arguments to the region
   // are workload along x, y and z.
@@ -741,30 +694,30 @@ static ParseResult parseExecutableEntryPointOp(OpAsmParser &parser,
       parser.parseOptionalRegion(region, regionOperands, regionTypes);
   if (!parseResult.hasValue()) return success();
   if (failed(*parseResult)) return failure();
-  result->addRegion(std::move(region));
+  result.addRegion(std::move(region));
 
   return success();
 }
 
-static void printExecutableEntryPointOp(OpAsmPrinter &p,
-                                        ExecutableEntryPointOp op) {
+void ExecutableEntryPointOp::print(OpAsmPrinter &p) {
+  Operation *op = getOperation();
   p << ' ';
   printSymbolVisibility(p, op, op->getAttrOfType<StringAttr>("sym_visibility"));
   p << ' ';
-  p.printSymbolName(op.sym_name());
-  if (op.ordinalAttr()) {
+  p.printSymbolName(sym_name());
+  if (ordinalAttr()) {
     p << " ordinal(";
-    p.printAttributeWithoutType(op.ordinalAttr());
+    p.printAttributeWithoutType(ordinalAttr());
     p << ")";
   }
   p << " layout(";
-  p.printAttribute(op.layout());
+  p.printAttribute(layout());
   p << ")";
   p.printOptionalAttrDict(op->getAttrs(),
                           /*elidedAttrs=*/{"sym_name", "layout", "ordinal"});
-  if (op.workgroup_count_region().empty()) return;
+  if (workgroup_count_region().empty()) return;
   p << " ";
-  p.printRegion(op.workgroup_count_region().front());
+  p.printRegion(workgroup_count_region().front());
 }
 
 static LogicalResult verifyExecutableEntryPointOp(ExecutableEntryPointOp op) {

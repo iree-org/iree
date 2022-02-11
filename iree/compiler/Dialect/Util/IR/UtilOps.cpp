@@ -578,7 +578,7 @@ void DoNotOptimizeOp::build(OpBuilder &builder, OperationState &state,
   state.addAttributes(attributes);
 }
 
-ParseResult parseDoNotOptimizeOp(OpAsmParser &parser, OperationState &state) {
+ParseResult DoNotOptimizeOp::parse(OpAsmParser &parser, OperationState &state) {
   SmallVector<OpAsmParser::OperandType, 2> args;
   // Operands and results have the same types.
   auto &operandTypes = state.types;
@@ -595,7 +595,8 @@ ParseResult parseDoNotOptimizeOp(OpAsmParser &parser, OperationState &state) {
   return success();
 }
 
-void printDoNotOptimizeOp(OpAsmPrinter &p, Operation *op) {
+void DoNotOptimizeOp::print(OpAsmPrinter &p) {
+  Operation *op = getOperation();
   p << "(";
   p.printOperands(op->getOperands());
   p << ")";
@@ -603,7 +604,7 @@ void printDoNotOptimizeOp(OpAsmPrinter &p, Operation *op) {
 
   if (op->getNumOperands() != 0) {
     p << " : ";
-    interleaveComma(op->getOperandTypes(), p);
+    interleaveComma(getOperandTypes(), p);
   }
 }
 
@@ -632,8 +633,8 @@ static LogicalResult verifyDoNotOptimizeOp(DoNotOptimizeOp op) {
 
 // Parsing/printing copied from std.constant
 
-ParseResult parseUnfoldableConstantOp(OpAsmParser &parser,
-                                      OperationState &state) {
+ParseResult UnfoldableConstantOp::parse(OpAsmParser &parser,
+                                        OperationState &state) {
   Attribute valueAttr;
   if (parser.parseOptionalAttrDict(state.attributes) ||
       parser.parseAttribute(valueAttr, "value", state.attributes))
@@ -650,16 +651,16 @@ ParseResult parseUnfoldableConstantOp(OpAsmParser &parser,
   return parser.addTypeToList(type, state.types);
 }
 
-void printUnfoldableConstantOp(OpAsmPrinter &p, Operation *op) {
-  auto constOp = cast<IREE::Util::UnfoldableConstantOp>(op);
+void UnfoldableConstantOp::print(OpAsmPrinter &p) {
+  Operation *op = getOperation();
   p << " ";
-  p.printOptionalAttrDict(constOp->getAttrs(), /*elidedAttrs=*/{"value"});
+  p.printOptionalAttrDict(op->getAttrs(), /*elidedAttrs=*/{"value"});
 
-  if (constOp->getAttrs().size() > 1) p << ' ';
-  p << constOp.value();
+  if (op->getAttrs().size() > 1) p << ' ';
+  p << value();
 
   // If the value is a symbol reference, print a trailing type.
-  if (constOp.value().isa<SymbolRefAttr>()) p << " : " << constOp.getType();
+  if (value().isa<SymbolRefAttr>()) p << " : " << getType();
 }
 
 //===----------------------------------------------------------------------===//
@@ -692,8 +693,7 @@ void InitializerOp::build(OpBuilder &builder, OperationState &result,
   result.attributes.append(attrs.begin(), attrs.end());
 }
 
-static ParseResult parseInitializerOp(OpAsmParser &parser,
-                                      OperationState &result) {
+ParseResult InitializerOp::parse(OpAsmParser &parser, OperationState &result) {
   result.addAttribute(
       "type", TypeAttr::get(FunctionType::get(result.getContext(), {}, {})));
   if (parser.parseOptionalAttrDictWithKeyword(result.attributes)) {
@@ -706,10 +706,11 @@ static ParseResult parseInitializerOp(OpAsmParser &parser,
   return success();
 }
 
-static void printInitializerOp(OpAsmPrinter &p, InitializerOp &op) {
+void InitializerOp::print(OpAsmPrinter &p) {
+  Operation *op = getOperation();
   p.printOptionalAttrDictWithKeyword(op->getAttrs(), /*elidedAttrs=*/{"type"});
   p << " ";
-  p.printRegion(op.body());
+  p.printRegion(body());
 }
 
 Block *InitializerOp::addEntryBlock() {

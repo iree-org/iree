@@ -23,11 +23,11 @@ Value promoteVector(Location loc, Value inputVector, Type promotedElementType,
   } else {
     auto promotedVectorType = inputVectorType.clone(promotedElementType);
     if (promotedElementType.isIntOrIndex()) {
-      return rewriter.create<arith::ExtSIOp>(loc, inputVector,
-                                             promotedVectorType);
+      return rewriter.create<arith::ExtSIOp>(loc, promotedVectorType,
+                                             inputVector);
     } else {
-      return rewriter.create<arith::ExtFOp>(loc, inputVector,
-                                            promotedVectorType);
+      return rewriter.create<arith::ExtFOp>(loc, promotedVectorType,
+                                            inputVector);
     }
   }
 }

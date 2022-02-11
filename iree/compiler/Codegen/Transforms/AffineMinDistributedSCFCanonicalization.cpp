@@ -167,7 +167,7 @@ struct AffineMinDistributedSCFCanonicalizationPattern
 /// individually.
 struct AffineMinDistributedSCFCanonicalizationPass
     : public PassWrapper<AffineMinDistributedSCFCanonicalizationPass,
-                         FunctionPass> {
+                         OperationPass<FuncOp>> {
   StringRef getArgument() const override {
     return "iree-codegen-affinemin-scf-canonicalization";
   }
@@ -177,8 +177,8 @@ struct AffineMinDistributedSCFCanonicalizationPass
            "distribute.";
   }
 
-  void runOnFunction() override {
-    FuncOp funcOp = getFunction();
+  void runOnOperation() override {
+    FuncOp funcOp = getOperation();
     RewritePatternSet foldPattern(&getContext());
     populateAffineMinSCFCanonicalizationPattern(foldPattern);
     FrozenRewritePatternSet frozenPatterns(std::move(foldPattern));

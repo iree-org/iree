@@ -69,7 +69,7 @@ static Value getBufferOffset(Location loc, Value memrefValue,
   // Rank 1 memrefs are just offset by their element width by the offset.
   Value offset = rewriter.createOrFold<AffineApplyOp>(
       loc, scalingExpr, ArrayRef<Value>{indices.front()});
-  return rewriter.create<arith::IndexCastOp>(loc, offset, indiceType);
+  return rewriter.create<arith::IndexCastOp>(loc, indiceType, offset);
 }
 
 class ConvertMemRefGlobalOp : public OpConversionPattern<memref::GlobalOp> {

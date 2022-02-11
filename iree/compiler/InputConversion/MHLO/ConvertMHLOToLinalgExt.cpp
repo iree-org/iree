@@ -366,7 +366,7 @@ struct FftOpConversion : public OpConversionPattern<mhlo::FftOp> {
             ivs.push_back(b.create<linalg::IndexOp>(loc, i));
           }
           ivs.push_back(
-              b.create<arith::IndexCastOp>(loc, args[0], b.getIndexType()));
+              b.create<arith::IndexCastOp>(loc, b.getIndexType(), args[0]));
           b.create<linalg::YieldOp>(
               loc, b.create<tensor::ExtractOp>(loc, real, ivs).getResult());
         });
