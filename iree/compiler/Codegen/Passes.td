@@ -253,6 +253,12 @@ def LLVMGPUPipelining :
   let constructor = "mlir::iree_compiler::createLLVMGPUPipeliningPass()";
 }
 
+def LLVMGPUScanToGPU :
+    Pass<"iree-llvmgpu-scan-to-gpu", "FuncOp"> {
+  let summary = "Convert vector scan ops to gpu ops.";
+  let constructor = "mlir::iree_compiler::createConvertVectorScanToGPUPass()";
+}
+
 //------------------------------------------------------------------------------
 // SPIR-V
 //------------------------------------------------------------------------------

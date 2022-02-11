@@ -198,6 +198,8 @@ FailureOr<TiledOp> tileInterfaceOp(OpBuilder &b, TiledOpInterface tilableOp,
   tileSizes.resize(iteratorTypes.size(), zeroAttr);
   for (auto en : llvm::enumerate(iteratorTypes)) {
     if (en.value() == getParallelIteratorTypeName()) continue;
+    if (isa<IREE::LinalgExt::ScanOp>(tilableOp.getOperation()))
+        continue;
     if (!isUntiledLoop(tileSizes[en.index()])) {
       return static_cast<LogicalResult>(tilableOp.emitOpError(
           "unimplemented tiling of non-parallel loop iterator type"));

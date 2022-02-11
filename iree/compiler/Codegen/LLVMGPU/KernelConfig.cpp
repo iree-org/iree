@@ -226,6 +226,22 @@ static LogicalResult setContractConfig(FuncOp entryPoint, linalg::LinalgOp op) {
       IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUMatmulSimt);
 }
 
+static LogicalResult setScanConfig(FuncOp entryPoint,
+                                   IREE::LinalgExt::ScanOp op) {
+  std::array<int64_t, 3> workgroupSize = {cudaWarpSize, 1, 1};
+  auto partitionedLoops = op.getPartitionableLoops(kNumMaxParallelDims);
+  size_t loopDepth = partitionedLoops.empty() ? 1 : partitionedLoops.back() + 1;
+  SmallVector<int64_t, 4> workgroupTileSizes(loopDepth, 1);
+  workgroupTileSizes[op.dimension()] = cudaWarpSize;
+  TileSizesListType tileSizes;
+  tileSizes.emplace_back(std::move(workgroupTileSizes));  // Workgroup level
+  return setOpConfigAndEntryPointFnTranslation(
+      entryPoint, op, tileSizes, /*nativeVectorSize=*/ArrayRef<int64_t>{},
+      IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUWarpLevelScan,
+      workgroupSize);
+  return success();
+}
+
 static LogicalResult setFftConfig(FuncOp entryPoint,
                                   IREE::LinalgExt::FftOp op) {
   auto interfaceOp = cast<IREE::Flow::PartitionableLoopsInterface>(*op);
@@ -400,6 +416,9 @@ static LogicalResult setRootConfig(FuncOp entryPointFn, Operation *computeOp) {
         linalgOp.getNumParallelLoops() >= 2) {
       return setContractConfig(entryPointFn, linalgOp);
     }
+  }
+  if (auto scanOp = dyn_cast<IREE::LinalgExt::ScanOp>(computeOp)) {
+    if (succeeded(setScanConfig(entryPointFn, scanOp))) return success();
   }
   if (auto fftOp = dyn_cast<IREE::LinalgExt::FftOp>(computeOp)) {
     return setFftConfig(entryPointFn, fftOp);

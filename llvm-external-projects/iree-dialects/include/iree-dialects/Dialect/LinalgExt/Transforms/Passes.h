@@ -20,6 +20,8 @@ std::unique_ptr<OperationPass<FuncOp>> createLinalgExtToLoopsPass();
 
 std::unique_ptr<OperationPass<>> createPadContractionToBlockSizePass();
 
+std::unique_ptr<OperationPass<FuncOp>> createScanVectorizationPass();
+
 void registerPasses();
 
 }  // namespace LinalgExt

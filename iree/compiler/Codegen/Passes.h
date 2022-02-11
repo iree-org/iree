@@ -256,6 +256,8 @@ void addGPUMatmulSimtPassPipeline(OpPassManager &pm);
 /// Lowering using tensorcore operations.
 void addGPUMatmulTensorCorePassPipeline(OpPassManager &pm);
 
+void addGPUWarpLevelScanPassPipeline(OpPassManager &pm);
+
 /// Simple lowering only distributute linalg ops on blocks and threads. This
 /// will result in scalar operations. Expects pass manager to be a module-level
 /// pass manager.
@@ -296,6 +298,8 @@ createLLVMGPUDistributeSharedMemoryCopy();
 
 /// Apply software pipelining.
 std::unique_ptr<OperationPass<FuncOp>> createLLVMGPUPipeliningPass();
+
+std::unique_ptr<OperationPass<FuncOp>> createConvertVectorScanToGPUPass();
 
 //------------------------------------------------------------------------------
 // SPIR-V Passes

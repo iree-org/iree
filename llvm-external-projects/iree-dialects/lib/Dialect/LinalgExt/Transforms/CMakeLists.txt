@@ -3,6 +3,7 @@ add_mlir_library(IREELinalgExtPasses
   PadContractionToBlockSize.cpp
   Passes.cpp
   Tiling.cpp
+  ScanVectorization.cpp
 
   DEPENDS
   IREELinalgExtTransformsPassesIncGen

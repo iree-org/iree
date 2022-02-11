@@ -31,6 +31,7 @@ iree_cc_library(
     "LLVMGPUVectorLowering.cpp"
     "LLVMGPUVectorization.cpp"
     "Passes.cpp"
+    "VectorScanToGPU.cpp"
   DEPS
     IREELinalgExtDialect
     IREELinalgExtPasses

@@ -57,8 +57,10 @@ static void populateTilingReductionPatterns(RewritePatternSet &patterns) {
       ArrayRef<StringAttr>{},
       StringAttr::get(context, getWorkgroupKTiledMarker()));
   linalg::TilingPatterns<linalg::MatmulOp, linalg::BatchMatmulOp,
-                         linalg::GenericOp>::insert(patterns, tilingOptions,
+                         linalg::GenericOp, IREE::LinalgExt::ScanOp>::insert(patterns, tilingOptions,
                                                     filter);
+  patterns.insert<IREE::LinalgExt::TiledOpInterfaceTilingPattern>(
+      context, tilingOptions, filter);
 }
 
 /// Patterns for warp level tiling.

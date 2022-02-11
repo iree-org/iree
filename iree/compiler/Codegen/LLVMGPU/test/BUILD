@@ -30,6 +30,7 @@ iree_lit_test_suite(
             "legalize.mlir",
             "tensorcore_vectorization.mlir",
             "vectorization.mlir",
+            "vector_scan_to_gpu.mlir",
         ],
         include = ["*.mlir"],
     ),

@@ -44,4 +44,10 @@ def PadContractionToBlockSize :
   ];
 }
 
+def ScanVectorization :
+    Pass<"iree-linalg-ext-scan-vec", "FuncOp"> {
+  let summary = "Test pass for vectorizing scan op";
+  let constructor = "mlir::iree_compiler::IREE::LinalgExt::createScanVectorizationPass()";
+}
+
 #endif  // IREE_DIALECT_LINALGEXT_PASSES
