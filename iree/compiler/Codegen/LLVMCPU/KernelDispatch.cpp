@@ -560,7 +560,7 @@ static LogicalResult setRootConfig(
       DispatchLoweringPassPipeline::CPUDefault);
 }
 
-/// Sets the lowering configuration for a generic op to use SingleTilingExpert.
+/// Sets the lowering configuration for a generic op to use DoubleTilingExpert.
 static LogicalResult setRootConfig(
     FuncOp entryPointFn, linalg::GenericOp genericOp,
     ArrayRef<LoopTilingAndDistributionInfo> tiledLoops) {
@@ -598,16 +598,29 @@ static LogicalResult setRootConfig(
   SmallVector<int64_t> workloadPerWorkgroup = getDefaultWorkloadPerWorkgroup(
       tiledLoops, partitionedLoops, nativeVectorSize);
   setTranslationInfo(entryPointFn,
-                     DispatchLoweringPassPipeline::CPUSingleTilingExpert,
+                     DispatchLoweringPassPipeline::CPUDoubleTilingExpert,
                      workloadPerWorkgroup,
                      /*workgroupSize=*/ArrayRef<int64_t>{});
 
   SmallVector<int64_t> l1TileSizes = nativeVectorSize;
+  SmallVector<int64_t> vectorTileSizes = nativeVectorSize;
+  {
+    SmallVector<unsigned> reductionDims;
+    genericOp.getReductionDims(reductionDims);
+    for (auto d : reductionDims) l1TileSizes[d] = 0;
+  }
+  {
+    SmallVector<unsigned> parallelDims;
+    genericOp.getParallelDims(parallelDims);
+    for (auto d : parallelDims) vectorTileSizes[d] = 0;
+  }
+
   TileSizesListType tileSizes;
   tileSizes.push_back({});  // Empty since nothing to do for first level tiling.
   tileSizes.push_back(l1TileSizes);
+  tileSizes.push_back(vectorTileSizes);
   auto config = IREE::Codegen::LoweringConfigAttr::get(
-      entryPointFn.getContext(), tileSizes, nativeVectorSize);
+      entryPointFn.getContext(), tileSizes, {});
   setLoweringConfig(genericOp, config);
 
   return success();
