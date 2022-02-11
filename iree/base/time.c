@@ -147,7 +147,7 @@ static bool iree_wait_until_impl(iree_time_t deadline_ns) {
         .tv_sec = (time_t)(delta_ns / 1000000000ull),
         .tv_nsec = (long)(delta_ns % 1000000000ull),
     };
-    int ret = nanosleep(&ts, NULL);
+    int ret = nanosleep(&abs_ts, NULL);
     if (ret != 0) return false;
     now_ns = iree_time_now();
   }
