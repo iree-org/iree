@@ -24,8 +24,8 @@ func private @callee(%arg0: tensor<4x?xf32>, %arg1: i1, %arg2: tensor<i32>)
 //  CHECK-SAME: (%[[ARG0:.+]]: !stream.resource<*>, %[[ARG0_SIZE:.+]]: index, %arg2: i1)
 //  CHECK-SAME: -> (!stream.resource<*>, index, i1)
 func @brExpansion(%arg0: tensor<1xf32>, %arg1: i1) -> (tensor<1xf32>, i1) {
-  // CHECK: br ^bb1(%[[ARG0]], %[[ARG0_SIZE]], %arg2 : !stream.resource<*>, index, i1)
-  br ^bb1(%arg0, %arg1 : tensor<1xf32>, i1)
+  // CHECK: cf.br ^bb1(%[[ARG0]], %[[ARG0_SIZE]], %arg2 : !stream.resource<*>, index, i1)
+  cf.br ^bb1(%arg0, %arg1 : tensor<1xf32>, i1)
 // CHECK: ^bb1(%[[BB_ARG0:.+]]: !stream.resource<*>, %[[BB_ARG1:.+]]: index, %[[BB_ARG2:.+]]: i1):
 ^bb1(%0: tensor<1xf32>, %1: i1):
   // CHECK: return %[[BB_ARG0]], %[[BB_ARG1]], %[[BB_ARG2]] : !stream.resource<*>, index, i1
@@ -40,10 +40,10 @@ func @brExpansion(%arg0: tensor<1xf32>, %arg1: i1) -> (tensor<1xf32>, i1) {
 //  CHECK-SAME: -> (!stream.resource<*>, index)
 func @condBrExpansion(%arg0: tensor<1xf32>, %arg1: tensor<1xf32>) -> tensor<1xf32> {
   %true = arith.constant 1 : i1
-  //      CHECK: cond_br %true,
+  //      CHECK: cf.cond_br %true,
   // CHECK-SAME:   ^bb1(%[[ARG0]], %[[ARG0_SIZE]] : !stream.resource<*>, index),
   // CHECK-SAME:   ^bb1(%[[ARG1]], %[[ARG1_SIZE]] : !stream.resource<*>, index)
-  cond_br %true, ^bb1(%arg0 : tensor<1xf32>), ^bb1(%arg1 : tensor<1xf32>)
+  cf.cond_br %true, ^bb1(%arg0 : tensor<1xf32>), ^bb1(%arg1 : tensor<1xf32>)
 ^bb1(%0: tensor<1xf32>):
   return %0 : tensor<1xf32>
 }
@@ -56,9 +56,9 @@ func @condBrExpansion(%arg0: tensor<1xf32>, %arg1: tensor<1xf32>) -> tensor<1xf3
 //  CHECK-SAME:  %[[ARG1:.+]]: !stream.resource<*>, %[[ARG1_SIZE:.+]]: index)
 //  CHECK-SAME: -> (!stream.resource<*>, index)
 func @selectExpansion(%arg0: tensor<1xf32>, %cond: i1, %arg1: tensor<1xf32>) -> tensor<1xf32> {
-  // CHECK-DAG: %[[RET:.+]] = select %[[COND]], %[[ARG0]], %[[ARG1]] : !stream.resource<*>
-  // CHECK-DAG: %[[RET_SIZE:.+]] = select %[[COND]], %[[ARG0_SIZE]], %[[ARG1_SIZE]] : index
-  %0 = select %cond, %arg0, %arg1 : tensor<1xf32>
+  // CHECK-DAG: %[[RET:.+]] = arith.select %[[COND]], %[[ARG0]], %[[ARG1]] : !stream.resource<*>
+  // CHECK-DAG: %[[RET_SIZE:.+]] = arith.select %[[COND]], %[[ARG0_SIZE]], %[[ARG1_SIZE]] : index
+  %0 = arith.select %cond, %arg0, %arg1 : tensor<1xf32>
   // CHECK: return %[[RET]], %[[RET_SIZE]] : !stream.resource<*>, index
   return %0 : tensor<1xf32>
 }

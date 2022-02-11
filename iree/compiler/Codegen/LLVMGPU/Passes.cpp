@@ -10,7 +10,7 @@
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "mlir/Conversion/AffineToStandard/AffineToStandard.h"
 #include "mlir/Conversion/GPUToNVVM/GPUToNVVMPass.h"
-#include "mlir/Conversion/SCFToStandard/SCFToStandard.h"
+#include "mlir/Conversion/SCFToControlFlow/SCFToControlFlow.h"
 #include "mlir/Conversion/VectorToGPU/VectorToGPU.h"
 #include "mlir/Dialect/Arithmetic/Transforms/Passes.h"
 #include "mlir/Dialect/Linalg/Passes.h"
@@ -31,6 +31,37 @@ static Value gpuAllocationFunction(OpBuilder &builder, Location loc,
   MemRefType allocType = MemRefType::get(staticShape, elementType, {}, 3);
   return builder.create<memref::AllocOp>(loc, allocType, dynamicSizes);
 }
+
+//===---------------------------------------------------------------------===//
+// Codegen configuration verifications.
+//===---------------------------------------------------------------------===//
+
+LogicalResult verifyGPUMatmulSimtPassPipeline(
+    Operation *op, IREE::Codegen::LoweringConfigAttr loweringConfig,
+    IREE::Codegen::TranslationInfoAttr translationInfo,
+    ArrayRef<int64_t> workgroupSize) {
+  if (workgroupSize.empty()) {
+    return op->emitOpError("Expected workgroup size for GPU pipelines");
+  }
+
+  // Verify that the workgroup size is <= 1024
+  auto pipeline =
+      IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUMatmulSimt;
+  StringRef pipelineName = stringifyEnum(pipeline);
+  int64_t totalWorkgroupSize =
+      workgroupSize[0] * workgroupSize[1] * workgroupSize[2];
+
+  if (totalWorkgroupSize > 1024) {
+    return op->emitOpError("expected workgroup size to be <=1024 for ")
+           << pipelineName << ", got " << totalWorkgroupSize;
+  }
+
+  return success();
+}
+
+//===---------------------------------------------------------------------===//
+// Codegen pipelines.
+//===---------------------------------------------------------------------===//
 
 void addGPUVectorizationPassPipeline(OpPassManager &pm) {
   //===--------------------------------------------------------------------===//
@@ -146,7 +177,7 @@ static void addLowerToLLVMGPUPasses(OpPassManager &pm, bool useROCM) {
   pm.addNestedPass<FuncOp>(createLLVMGPUVectorLoweringPass());
 
   // SCF -> STD
-  pm.addNestedPass<FuncOp>(createLowerToCFGPass());
+  pm.addNestedPass<FuncOp>(createConvertSCFToCFPass());
   pm.addNestedPass<FuncOp>(createCanonicalizerPass());
   pm.addNestedPass<FuncOp>(createCSEPass());
 

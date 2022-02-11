@@ -25,6 +25,8 @@ class TaskCallTest : public TaskTest {};
 
 // Tests issuing a single call and waiting for it to complete.
 TEST_F(TaskCallTest, Issue) {
+  IREE_TRACE_SCOPE();
+
   struct TestCtx {
     int did_call = 0;
   };
@@ -35,6 +37,7 @@ TEST_F(TaskCallTest, Issue) {
                             iree_task_make_call_closure(
                                 [](void* user_context, iree_task_t* task,
                                    iree_task_submission_t* pending_submission) {
+                                  IREE_TRACE_SCOPE();
                                   auto* ctx = (TestCtx*)user_context;
                                   EXPECT_TRUE(NULL != ctx);
                                   EXPECT_EQ(0, ctx->did_call);
@@ -51,6 +54,8 @@ TEST_F(TaskCallTest, Issue) {
 // Tests issuing a single call that returns a failure.
 // The failure should be propagated back on the task scope.
 TEST_F(TaskCallTest, IssueFailure) {
+  IREE_TRACE_SCOPE();
+
   struct TestCtx {
     int did_call = 0;
   };
@@ -62,6 +67,7 @@ TEST_F(TaskCallTest, IssueFailure) {
                             iree_task_make_call_closure(
                                 [](void* user_context, iree_task_t* task,
                                    iree_task_submission_t* pending_submission) {
+                                  IREE_TRACE_SCOPE();
                                   auto* ctx = (TestCtx*)user_context;
                                   EXPECT_TRUE(NULL != ctx);
                                   EXPECT_EQ(0, ctx->did_call);
@@ -77,6 +83,7 @@ TEST_F(TaskCallTest, IssueFailure) {
   did_cleanup = 0;
   iree_task_set_cleanup_fn(
       &task.header, +[](iree_task_t* task, iree_status_code_t status_code) {
+        IREE_TRACE_SCOPE();
         EXPECT_EQ(status_code, IREE_STATUS_ABORTED);
         ++did_cleanup;
       });
@@ -95,6 +102,8 @@ TEST_F(TaskCallTest, IssueFailure) {
 // The failure should be propagated back on the task scope and the chained call
 // should be aborted.
 TEST_F(TaskCallTest, IssueFailureChained) {
+  IREE_TRACE_SCOPE();
+
   struct TestCtx {
     int did_call_a = 0;
     int did_call_b = 0;
@@ -107,6 +116,7 @@ TEST_F(TaskCallTest, IssueFailureChained) {
                             iree_task_make_call_closure(
                                 [](void* user_context, iree_task_t* task,
                                    iree_task_submission_t* pending_submission) {
+                                  IREE_TRACE_SCOPE();
                                   auto* ctx = (TestCtx*)user_context;
                                   EXPECT_TRUE(NULL != ctx);
                                   EXPECT_EQ(0, ctx->did_call_a);
@@ -122,6 +132,7 @@ TEST_F(TaskCallTest, IssueFailureChained) {
   iree_task_set_cleanup_fn(
       &task_a.header, +[](iree_task_t* task, iree_status_code_t status_code) {
         // Expect that the cleanup gets a signal indicating the task failed.
+        IREE_TRACE_SCOPE();
         EXPECT_EQ(status_code, IREE_STATUS_ABORTED);
         ++did_cleanup_a;
       });
@@ -133,6 +144,7 @@ TEST_F(TaskCallTest, IssueFailureChained) {
                                 [](void* user_context, iree_task_t* task,
                                    iree_task_submission_t* pending_submission) {
                                   // This should never get called!
+                                  IREE_TRACE_SCOPE();
                                   auto* ctx = (TestCtx*)user_context;
                                   EXPECT_TRUE(NULL != ctx);
                                   EXPECT_EQ(0, ctx->did_call_b);
@@ -146,6 +158,7 @@ TEST_F(TaskCallTest, IssueFailureChained) {
   iree_task_set_cleanup_fn(
       &task_b.header, +[](iree_task_t* task, iree_status_code_t status_code) {
         // Expect that the cleanup gets a signal indicating the task failed.
+        IREE_TRACE_SCOPE();
         EXPECT_EQ(status_code, IREE_STATUS_ABORTED);
         ++did_cleanup_b;
       });
@@ -168,6 +181,8 @@ TEST_F(TaskCallTest, IssueFailureChained) {
 // prior to progressing. This models dynamic parallelism:
 // http://developer.download.nvidia.com/GTC/PDF/GTC2012/PresentationPDF/S0338-GTC2012-CUDA-Programming-Model.pdf
 TEST_F(TaskCallTest, IssueNested) {
+  IREE_TRACE_SCOPE();
+
   struct TestCtx {
     std::atomic<int> did_call_a = {0};
     std::atomic<int> did_call_b = {0};
@@ -187,6 +202,7 @@ TEST_F(TaskCallTest, IssueNested) {
       iree_task_make_call_closure(
           [](void* user_context, iree_task_t* task,
              iree_task_submission_t* pending_submission) {
+            IREE_TRACE_SCOPE();
             auto* ctx = (TestCtx*)user_context;
             EXPECT_TRUE(NULL != ctx);
 
@@ -199,6 +215,7 @@ TEST_F(TaskCallTest, IssueNested) {
                   iree_task_make_call_closure(
                       [](void* user_context, iree_task_t* task,
                          iree_task_submission_t* pending_submission) {
+                        IREE_TRACE_SCOPE();
                         auto* ctx = (TestCtx*)user_context;
                         EXPECT_TRUE(NULL != ctx);
                         EXPECT_EQ(0, ctx->did_call_b);
@@ -230,6 +247,8 @@ TEST_F(TaskCallTest, IssueNested) {
 // Sibling tasks don't abort each other and as such we are guaranteed that C
 // will run: A -> [B fail, C ok] -> A fail
 TEST_F(TaskCallTest, IssueNestedFailure) {
+  IREE_TRACE_SCOPE();
+
   struct TestCtx {
     std::atomic<int> did_call_a = {0};
     std::atomic<int> did_call_b = {0};
@@ -263,6 +282,7 @@ TEST_F(TaskCallTest, IssueNestedFailure) {
                   iree_task_make_call_closure(
                       [](void* user_context, iree_task_t* task,
                          iree_task_submission_t* pending_submission) {
+                        IREE_TRACE_SCOPE();
                         auto* ctx = (TestCtx*)user_context;
                         EXPECT_TRUE(NULL != ctx);
                         EXPECT_EQ(0, ctx->did_call_b);
@@ -281,6 +301,7 @@ TEST_F(TaskCallTest, IssueNestedFailure) {
                   iree_task_make_call_closure(
                       [](void* user_context, iree_task_t* task,
                          iree_task_submission_t* pending_submission) {
+                        IREE_TRACE_SCOPE();
                         auto* ctx = (TestCtx*)user_context;
                         EXPECT_TRUE(NULL != ctx);
                         EXPECT_EQ(0, ctx->did_call_c);

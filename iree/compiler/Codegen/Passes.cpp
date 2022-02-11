@@ -62,6 +62,9 @@ LogicalResult verifyLoweringConfiguration(
     case IREE::Codegen::DispatchLoweringPassPipeline::CPUTileFuseAndVectorize:
       return verifyDoubleTilingExpertPassPipelineConfig(op, loweringConfig,
                                                         translationInfo);
+    case IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUMatmulSimt:
+      return verifyGPUMatmulSimtPassPipeline(op, loweringConfig,
+                                             translationInfo, workgroupSize);
     default:
       break;
   }

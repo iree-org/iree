@@ -21,7 +21,7 @@ namespace iree_integrations {
 namespace TF {
 
 class VerifyFullyConvertedPass
-    : public PassWrapper<VerifyFullyConvertedPass, FunctionPass> {
+    : public PassWrapper<VerifyFullyConvertedPass, OperationPass<FuncOp>> {
  public:
   StringRef getArgument() const override {
     return "iree-tf-verify-fully-converted";
@@ -33,7 +33,7 @@ class VerifyFullyConvertedPass
   }
 
   // Validates that no TensorFlow frontends ops are in the function.
-  void runOnFunction() override {
+  void runOnOperation() override {
     ConversionTarget target(getContext());
     target.markUnknownOpDynamicallyLegal([](Operation *) { return true; });
     target

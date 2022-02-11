@@ -60,9 +60,9 @@
 // |timeout_ms| can be either IREE_INFINITE_TIMEOUT_MS to wait forever or a
 // relative number of milliseconds to wait prior to returning early with
 // IREE_STATUS_DEADLINE_EXCEEDED.
-static inline iree_status_t iree_futex_wait(void* address,
-                                            uint32_t expected_value,
-                                            uint32_t timeout_ms);
+static inline iree_status_code_t iree_futex_wait(void* address,
+                                                 uint32_t expected_value,
+                                                 uint32_t timeout_ms);
 
 // Wakes at most |count| threads waiting for the |address| to change.
 // Use IREE_ALL_WAITERS to wake all waiters. Which waiters are woken is
@@ -72,17 +72,17 @@ static inline void iree_futex_wake(void* address, int32_t count);
 
 #if defined(IREE_PLATFORM_EMSCRIPTEN)
 
-static inline iree_status_t iree_futex_wait(void* address,
-                                            uint32_t expected_value,
-                                            uint32_t timeout_ms) {
+static inline iree_status_code_t iree_futex_wait(void* address,
+                                                 uint32_t expected_value,
+                                                 uint32_t timeout_ms) {
   int rc = emscripten_futex_wait(address, expected_value, (double)timeout_ms);
   switch (rc) {
     default:
-      return iree_ok_status();
+      return IREE_STATUS_OK;
     case -ETIMEDOUT:
-      return iree_status_from_code(IREE_STATUS_DEADLINE_EXCEEDED);
+      return IREE_STATUS_DEADLINE_EXCEEDED;
     case -EWOULDBLOCK:
-      return iree_status_from_code(IREE_STATUS_UNAVAILABLE);
+      return IREE_STATUS_UNAVAILABLE;
   }
 }
 
@@ -94,17 +94,17 @@ static inline void iree_futex_wake(void* address, int32_t count) {
 
 #pragma comment(lib, "Synchronization.lib")
 
-static inline iree_status_t iree_futex_wait(void* address,
-                                            uint32_t expected_value,
-                                            uint32_t timeout_ms) {
+static inline iree_status_code_t iree_futex_wait(void* address,
+                                                 uint32_t expected_value,
+                                                 uint32_t timeout_ms) {
   if (IREE_LIKELY(WaitOnAddress(address, &expected_value,
                                 sizeof(expected_value), timeout_ms) == TRUE)) {
-    return iree_ok_status();
+    return IREE_STATUS_OK;
   }
   if (GetLastError() == ERROR_TIMEOUT) {
-    return iree_status_from_code(IREE_STATUS_DEADLINE_EXCEEDED);
+    return IREE_STATUS_DEADLINE_EXCEEDED;
   }
-  return iree_status_from_code(IREE_STATUS_UNAVAILABLE);
+  return IREE_STATUS_UNAVAILABLE;
 }
 
 static inline void iree_futex_wake(void* address, int32_t count) {
@@ -119,21 +119,22 @@ static inline void iree_futex_wake(void* address, int32_t count) {
 
 #elif defined(IREE_PLATFORM_ANDROID) || defined(IREE_PLATFORM_LINUX)
 
-static inline iree_status_t iree_futex_wait(void* address,
-                                            uint32_t expected_value,
-                                            uint32_t timeout_ms) {
-  struct timespec timeout;
-  timeout.tv_sec = timeout_ms / 1000;
-  timeout.tv_nsec = (timeout_ms % 1000) * 1000000;
+static inline iree_status_code_t iree_futex_wait(void* address,
+                                                 uint32_t expected_value,
+                                                 uint32_t timeout_ms) {
+  struct timespec timeout = {
+      .tv_sec = timeout_ms / 1000,
+      .tv_nsec = (timeout_ms % 1000) * 1000000,
+  };
   int rc = syscall(
       SYS_futex, address, FUTEX_WAIT | FUTEX_PRIVATE_FLAG, expected_value,
       timeout_ms == IREE_INFINITE_TIMEOUT_MS ? NULL : &timeout, NULL, 0);
-  if (IREE_LIKELY(rc == 0)) {
-    return iree_ok_status();
-  } else if (rc == ETIMEDOUT) {
-    return iree_status_from_code(IREE_STATUS_DEADLINE_EXCEEDED);
+  if (IREE_LIKELY(rc == 0) || errno == EAGAIN) {
+    return IREE_STATUS_OK;
+  } else if (errno == ETIMEDOUT) {
+    return IREE_STATUS_DEADLINE_EXCEEDED;
   }
-  return iree_status_from_code(IREE_STATUS_UNAVAILABLE);
+  return IREE_STATUS_UNAVAILABLE;
 }
 
 static inline void iree_futex_wake(void* address, int32_t count) {
@@ -451,8 +452,7 @@ void iree_slim_mutex_lock(iree_slim_mutex_t* mutex)
     while (iree_slim_mutex_is_locked(value)) {
       // NOTE: we don't care about wait failure here as we are going to loop
       // and check again anyway.
-      iree_status_ignore(
-          iree_futex_wait(&mutex->value, value, IREE_INFINITE_TIMEOUT_MS));
+      iree_futex_wait(&mutex->value, value, IREE_INFINITE_TIMEOUT_MS);
       value = iree_atomic_load_int32(&mutex->value, iree_memory_order_relaxed);
     }
   }
@@ -606,24 +606,38 @@ iree_wait_token_t iree_notification_prepare_wait(
   return (iree_wait_token_t)(previous_value >> IREE_NOTIFICATION_EPOCH_SHIFT);
 }
 
-void iree_notification_commit_wait(iree_notification_t* notification,
-                                   iree_wait_token_t wait_token) {
+bool iree_notification_commit_wait(iree_notification_t* notification,
+                                   iree_wait_token_t wait_token,
+                                   iree_time_t deadline_ns) {
+  bool result = true;
+
   // Spin until notified and the epoch increments from what we captured during
   // iree_notification_prepare_wait.
   while ((iree_atomic_load_int64(&notification->value,
                                  iree_memory_order_acquire) >>
           IREE_NOTIFICATION_EPOCH_SHIFT) == wait_token) {
+    iree_status_code_t status_code = IREE_STATUS_OK;
 #if IREE_SYNCHRONIZATION_DISABLE_UNSAFE
     // TODO(benvanik): platform sleep? this spins.
 #elif defined(IREE_PLATFORM_HAS_FUTEX)
-    iree_status_ignore(
-        iree_futex_wait(iree_notification_epoch_address(notification),
-                        wait_token, IREE_INFINITE_TIMEOUT_MS));
+    uint32_t timeout_ms = iree_absolute_deadline_to_timeout_ms(deadline_ns);
+    status_code = iree_futex_wait(iree_notification_epoch_address(notification),
+                                  wait_token, timeout_ms);
 #else
+    struct timespec abs_ts = {
+        .tv_sec = (time_t)(deadline_ns / 1000000000ull),
+        .tv_nsec = (long)(deadline_ns % 1000000000ull),
+    };
     pthread_mutex_lock(&notification->mutex);
-    pthread_cond_wait(&notification->cond, &notification->mutex);
+    int ret = pthread_cond_timedwait(&notification->cond, &notification->mutex,
+                                     &abs_ts);
     pthread_mutex_unlock(&notification->mutex);
+    status_code = ret == 0 ? IREE_STATUS_OK : IREE_STATUS_DEADLINE_EXCEEDED;
 #endif  // IREE_PLATFORM_HAS_FUTEX
+    if (status_code != IREE_STATUS_OK) {
+      result = false;
+      break;
+    }
   }
 
   // TODO(benvanik): benchmark under real workloads.
@@ -633,6 +647,8 @@ void iree_notification_commit_wait(iree_notification_t* notification,
       &notification->value, IREE_NOTIFICATION_WAITER_DEC,
       iree_memory_order_seq_cst);
   SYNC_ASSERT((previous_value & IREE_NOTIFICATION_WAITER_MASK) != 0);
+
+  return result;
 }
 
 void iree_notification_cancel_wait(iree_notification_t* notification) {
@@ -645,22 +661,35 @@ void iree_notification_cancel_wait(iree_notification_t* notification) {
   SYNC_ASSERT((previous_value & IREE_NOTIFICATION_WAITER_MASK) != 0);
 }
 
-void iree_notification_await(iree_notification_t* notification,
+bool iree_notification_await(iree_notification_t* notification,
                              iree_condition_fn_t condition_fn,
-                             void* condition_arg) {
+                             void* condition_arg, iree_timeout_t timeout) {
   if (IREE_LIKELY(condition_fn(condition_arg))) {
     // Fast-path with condition already met.
-    return;
+    return true;
   }
+
+  // If a (silly) query then bail immediately after our first condition check.
+  // Otherwise we may have a real deadline and want it in absolute form so that
+  // we can easily handle spurious wakes.
+  if (iree_timeout_is_immediate(timeout)) return false;
+  const iree_time_t deadline_ns = iree_timeout_as_deadline_ns(timeout);
+
   // Slow-path: try-wait until the condition is met.
   while (true) {
     iree_wait_token_t wait_token = iree_notification_prepare_wait(notification);
     if (condition_fn(condition_arg)) {
       // Condition is now met; no need to wait on the futex.
       iree_notification_cancel_wait(notification);
-      return;
+      return true;
     } else {
-      iree_notification_commit_wait(notification, wait_token);
+      if (!iree_notification_commit_wait(notification, wait_token,
+                                         deadline_ns)) {
+        // Wait hit the deadline before we hit the condition.
+        return false;
+      }
     }
   }
+
+  return true;
 }

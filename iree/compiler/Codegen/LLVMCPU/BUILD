@@ -50,6 +50,7 @@ cc_library(
         "@llvm-project//mlir:ArmNeon",
         "@llvm-project//mlir:ArmNeon2dToIntr",
         "@llvm-project//mlir:CFGTransforms",
+        "@llvm-project//mlir:ControlFlowToLLVM",
         "@llvm-project//mlir:DialectUtils",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:LLVMCommonConversion",

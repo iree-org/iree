@@ -40,6 +40,7 @@ iree_cc_library(
     ::StreamTypesGen
     LLVMSupport
     MLIRArithmetic
+    MLIRArithmeticUtils
     MLIRIR
     MLIRInferTypeOpInterface
     MLIRMemRef

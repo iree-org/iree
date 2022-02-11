@@ -10,10 +10,12 @@
 #include "iree/base/internal/math.h"
 #include "iree/base/internal/prng.h"
 #include "iree/base/internal/synchronization.h"
+#include "iree/base/internal/wait_handle.h"
 #include "iree/base/tracing.h"
 #include "iree/task/affinity_set.h"
 #include "iree/task/executor.h"
 #include "iree/task/list.h"
+#include "iree/task/poller.h"
 #include "iree/task/pool.h"
 #include "iree/task/post_batch.h"
 #include "iree/task/queue.h"
@@ -65,9 +67,6 @@ struct iree_task_executor_t {
   //        new tasks: 1 2 3
   //    updated tasks: 3 2 1 C B A
   iree_atomic_task_slist_t incoming_ready_slist;
-  // A list of incoming wait tasks that need to be waited on. Order doesn't
-  // really matter here as all tasks will be waited on simultaneously.
-  iree_atomic_task_slist_t incoming_waiting_slist;
 
   // iree_event_t pool used to acquire system wait handles.
   // Many subsystems interacting with the executor will need events to park
@@ -79,15 +78,13 @@ struct iree_task_executor_t {
   // Guards coordination logic; only one thread at a time may be acting as the
   // coordinator.
   iree_slim_mutex_t coordinator_mutex;
-  // A list of wait tasks with external handles that need to be waited on.
-  // Coordinators can choose to poll/wait on these.
-  iree_task_list_t waiting_list;
-  // Guards manipulation and use of the wait_set.
-  // coordinator_mutex may be held when taking this lock.
-  iree_slim_mutex_t wait_mutex;
-  // Wait set containing all the tasks in waiting_list. Coordinator manages
-  // keeping the waiting_list and wait_set in sync.
-  iree_wait_set_t* wait_set;
+
+  // Wait task polling and wait thread manager.
+  // This handles all system waits so that we can keep the syscalls off the
+  // worker threads and lower wake latencies (the wait thread can enqueue
+  // completed waits immediately after they resolve instead of waiting for
+  // existing computation on the workers to finish).
+  iree_task_poller_t poller;
 
   // A bitset indicating which workers are live and usable; all attempts to
   // push work onto a particular worker should check first with this mask. This
@@ -131,12 +128,12 @@ void iree_task_executor_schedule_ready_tasks(
 // otherwise be the current worker; used to avoid round-tripping through the
 // whole system to post to oneself.
 //
-// If the |current_worker| has no more work remaining and |wait_on_idle| is set
-// then the calling thread may wait on any pending wait tasks until one resolves
-// or more work is scheduled for the worker.
+// If the |current_worker| has no more work remaining then the calling thread
+// may wait on any pending wait tasks until one resolves or more work is
+// scheduled for the worker. If no worker is provided the call will return
+// without waiting.
 void iree_task_executor_coordinate(iree_task_executor_t* executor,
-                                   iree_task_worker_t* current_worker,
-                                   bool wait_on_idle);
+                                   iree_task_worker_t* current_worker);
 
 // Tries to steal an entire task from a sibling worker (based on topology).
 // Returns a task that is available (has not yet begun processing at all).

@@ -73,7 +73,8 @@ bool iree_task_wait_check_condition(iree_task_wait_t* task);
 //
 // Only called during coordination and expects the coordinator lock to be held.
 void iree_task_wait_retire(iree_task_wait_t* task,
-                           iree_task_submission_t* pending_submission);
+                           iree_task_submission_t* pending_submission,
+                           iree_status_t status);
 
 //==============================================================================
 // IREE_TASK_TYPE_DISPATCH

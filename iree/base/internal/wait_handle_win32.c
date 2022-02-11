@@ -175,7 +175,9 @@ iree_status_t iree_wait_set_insert(iree_wait_set_t* set,
                                    iree_wait_handle_t handle) {
   if (set->total_handle_count + 1 > set->handle_capacity) {
     return iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
-                            "wait set capacity reached");
+                            "wait set capacity %" PRIhsz
+                            " reached; no more wait handles available",
+                            set->handle_capacity);
   }
 
   // First check to see if we already have the handle in the set; since APIs
@@ -292,8 +294,7 @@ static iree_status_t iree_wait_multi(iree_wait_set_t* set, bool require_all,
 
   // Remap absolute timeout to relative timeout, handling special values as
   // needed.
-  DWORD timeout_ms =
-      (DWORD)(iree_absolute_deadline_to_timeout_ns(deadline_ns) / 1000000ull);
+  DWORD timeout_ms = iree_absolute_deadline_to_timeout_ms(deadline_ns);
 
   // Perform the wait; this is allowed to yield the calling thread even if the
   // timeout_ms is 0 to indicate a poll.
@@ -374,8 +375,7 @@ iree_status_t iree_wait_one(iree_wait_handle_t* handle,
 
   // Remap absolute timeout to relative timeout, handling special values as
   // needed.
-  DWORD timeout_ms =
-      (DWORD)(iree_absolute_deadline_to_timeout_ns(deadline_ns) / 1000000ull);
+  DWORD timeout_ms = iree_absolute_deadline_to_timeout_ms(deadline_ns);
 
   // Perform the wait; this is allowed to yield the calling thread even if the
   // timeout_ms is 0 to indicate a poll.
@@ -390,7 +390,7 @@ iree_status_t iree_wait_one(iree_wait_handle_t* handle,
     // here as we don't want to track all that in non-exceptional cases.
     status = iree_status_from_code(IREE_STATUS_DEADLINE_EXCEEDED);
   } else if (result == WAIT_OBJECT_0) {
-    // Handle was signaled sucessfully.
+    // Handle was signaled successfully.
     status = iree_ok_status();
   } else if (result == WAIT_ABANDONED_0) {
     // The mutex handle was abandonded during the wait.
@@ -443,11 +443,13 @@ void iree_event_deinitialize(iree_event_t* event) {
 }
 
 void iree_event_set(iree_event_t* event) {
-  SetEvent((HANDLE)event->value.win32.handle);
+  HANDLE handle = (HANDLE)event->value.win32.handle;
+  if (handle) SetEvent(handle);
 }
 
 void iree_event_reset(iree_event_t* event) {
-  ResetEvent((HANDLE)event->value.win32.handle);
+  HANDLE handle = (HANDLE)event->value.win32.handle;
+  if (handle) ResetEvent(handle);
 }
 
 #endif  // IREE_WAIT_API == IREE_WAIT_API_WIN32

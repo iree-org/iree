@@ -105,7 +105,9 @@ void SchedulingOptions::bindOptions(OptionsBinder &binder) {
                      "Human-readable pretty printed output."),
           clEnumValN(DumpOutputFormat::Verbose, "verbose",
                      "Pretty printed output with additional IR."),
-          clEnumValN(DumpOutputFormat::CSV, "csv", "Comma separated values.")));
+          clEnumValN(DumpOutputFormat::CSV, "csv", "Comma separated values."),
+          clEnumValN(DumpOutputFormat::JSON, "json",
+                     "JSON output with structures for data exchange")));
   binder.opt<std::string>("iree-scheduling-dump-statistics-file",
                           dumpStatisticsFile,
                           llvm::cl::desc("File path to write statistics to; or "

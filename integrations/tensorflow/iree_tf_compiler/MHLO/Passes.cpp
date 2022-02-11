@@ -7,7 +7,6 @@
 #include "iree_tf_compiler/MHLO/Passes.h"
 
 #include "mlir-hlo/Dialect/mhlo/transforms/passes.h"
-#include "mlir/Conversion/SCFToStandard/SCFToStandard.h"
 #include "mlir/Dialect/SCF/Passes.h"
 #include "mlir/Dialect/Shape/Transforms/Passes.h"
 #include "mlir/Pass/PassManager.h"

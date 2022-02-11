@@ -310,6 +310,7 @@ cc_library(
         "wait_handle.c",
         "wait_handle_epoll.c",
         "wait_handle_impl.h",
+        "wait_handle_inproc.c",
         "wait_handle_kqueue.c",
         "wait_handle_null.c",
         "wait_handle_poll.c",
@@ -319,6 +320,7 @@ cc_library(
     ],
     hdrs = ["wait_handle.h"],
     deps = [
+        ":synchronization",
         "//iree/base",
         "//iree/base:core_headers",
         "//iree/base:tracing",

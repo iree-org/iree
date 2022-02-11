@@ -21,11 +21,11 @@ iree_cc_library(
   DEPS
     LLVMSupport
     MLIRAffineUtils
+    MLIRControlFlow
     MLIRIR
     MLIRPass
     MLIRShape
     MLIRShapeOpsTransforms
-    MLIRStandard
     MLIRSupport
     MLIRTensor
     MLIRTransformUtils

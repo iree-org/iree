@@ -148,7 +148,8 @@ int main(int argc, char **argv) {
   registry.insert<mlir::StandardOpsDialect, mlir::arith::ArithmeticDialect,
                   mlir::math::MathDialect>();
   MLIRContext context;
-  OwningModuleRef module = ModuleOp::create(mlir::UnknownLoc::get(&context));
+  OwningOpRef<mlir::ModuleOp> module =
+      ModuleOp::create(mlir::UnknownLoc::get(&context));
   context.appendDialectRegistry(registry);
   context.loadAllAvailableDialects();
 

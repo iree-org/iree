@@ -49,15 +49,15 @@ builtin.func @orderedCombining(%arg0: index) -> (index, index, index) {
 util.global private mutable @globalA : index
 util.initializer {
   %cond = arith.constant 1 : i1
-  cond_br %cond, ^bb1, ^bb2
+  cf.cond_br %cond, ^bb1, ^bb2
 ^bb1:
   %c100 = arith.constant 100 : index
   util.global.store %c100, @globalA : index
-  br ^bb3
+  cf.br ^bb3
 ^bb2:
   %c200 = arith.constant 200 : index
   util.global.store %c200, @globalA : index
-  br ^bb3
+  cf.br ^bb3
 ^bb3:
   util.initializer.return
 }
@@ -70,11 +70,11 @@ util.initializer {
 }
 // CHECK: util.initializer {
 // CHECK: ^bb1:
-// CHECK:   br ^bb3
+// CHECK:   cf.br ^bb3
 // CHECK: ^bb2:
-// CHECK:   br ^bb3
+// CHECK:   cf.br ^bb3
 // CHECK: ^bb3:
-// CHECK:   br ^bb4
+// CHECK:   cf.br ^bb4
 // CHECK: ^bb4:
 // CHECK:   util.initializer.return
 // CHECK: }

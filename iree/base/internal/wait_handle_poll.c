@@ -37,12 +37,8 @@ static iree_status_t iree_syscall_poll(struct pollfd* fds, nfds_t nfds,
   *out_signaled_count = 0;
   int rv = -1;
   do {
-    iree_duration_t timeout_ns =
-        iree_absolute_deadline_to_timeout_ns(deadline_ns);
-    int timeout_ms = timeout_ns != IREE_TIME_INFINITE_FUTURE
-                         ? (int)(timeout_ns / 1000000ull)
-                         : (int)timeout_ns;
-    rv = poll(fds, nfds, timeout_ms);
+    uint32_t timeout_ms = iree_absolute_deadline_to_timeout_ms(deadline_ns);
+    rv = poll(fds, nfds, (int)timeout_ms);
   } while (rv < 0 && errno == EINTR);
   if (rv > 0) {
     // One or more events set.

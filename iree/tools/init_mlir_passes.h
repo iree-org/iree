@@ -71,7 +71,7 @@ inline void registerMlirPasses() {
   // SCF
   registerSCFParallelLoopFusionPass();
   registerSCFParallelLoopTilingPass();
-  registerSCFToStandardPass();
+  registerSCFToControlFlowPass();
 
   // Quant
   quant::registerQuantPasses();

@@ -41,6 +41,10 @@ extern "C" {
 #define IREE_HAVE_WAIT_TYPE_SYNC_FILE 1
 #endif  // IREE_PLATFORM_ANDROID
 
+#if !IREE_SYNCHRONIZATION_DISABLE_UNSAFE
+#define IREE_HAVE_WAIT_TYPE_LOCAL_FUTEX 1
+#endif  // threading enabled
+
 // Specifies the type of a system wait primitive.
 // Enums that are unavailable on a platform are still present to allow for
 // platform-independent code to still route wait primitives but actually using
@@ -91,6 +95,11 @@ enum iree_wait_primitive_type_bits_t {
   // https://docs.microsoft.com/en-us/windows/win32/sync/using-event-objects
   IREE_WAIT_PRIMITIVE_TYPE_WIN32_HANDLE = 4u,
 
+  // Process-local futex.
+  // These are only valid for multi-wait when used with an in-process wait
+  // handle implementation (IREE_WAIT_API == IREE_WAIT_API_INPROC).
+  IREE_WAIT_PRIMITIVE_TYPE_LOCAL_FUTEX = 5u,
+
   // Placeholder for wildcard queries of primitive types.
   // On an export request this indicates that the source may export any type it
   // can.
@@ -131,6 +140,9 @@ typedef union {
     uintptr_t handle;
   } win32;
 #endif  // IREE_HAVE_WAIT_TYPE_WIN32_HANDLE
+#if defined(IREE_HAVE_WAIT_TYPE_LOCAL_FUTEX)
+  /*iree_futex_handle_t*/ void* local_futex;
+#endif  // IREE_HAVE_WAIT_TYPE_LOCAL_FUTEX
 } iree_wait_primitive_value_t;
 
 // A (type, value) pair describing a system wait primitive handle.
@@ -144,6 +156,13 @@ static inline iree_wait_primitive_t iree_make_wait_primitive(
     iree_wait_primitive_type_t type, iree_wait_primitive_value_t value) {
   iree_wait_primitive_t primitive = {type, value};
   return primitive;
+}
+
+// Returns a wait primitive that will resolve immediately if waited on.
+static inline iree_wait_primitive_t iree_wait_primitive_immediate(void) {
+  iree_wait_primitive_value_t dummy_primitive = {0};
+  return iree_make_wait_primitive(IREE_WAIT_PRIMITIVE_TYPE_NONE,
+                                  dummy_primitive);
 }
 
 // Returns true if the |wait_primitive| is resolved immediately (empty).
@@ -235,6 +254,36 @@ typedef struct iree_wait_source_t {
 static inline iree_wait_source_t iree_wait_source_immediate(void) {
   iree_wait_source_t v = {{{NULL, 0ull}}, NULL};
   return v;
+}
+
+// Returns true if the |wait_source| is immediately resolved.
+// This can be used to neuter waits in lists/sets.
+static inline bool iree_wait_source_is_immediate(
+    iree_wait_source_t wait_source) {
+  return wait_source.ctl == NULL;
+}
+
+// Wait source control function for iree_wait_source_delay.
+IREE_API_EXPORT iree_status_t iree_wait_source_delay_ctl(
+    iree_wait_source_t wait_source, iree_wait_source_command_t command,
+    const void* params, void** inout_ptr);
+
+// Returns a wait source that indicates a delay until a point in time.
+// The source will remain unresolved until the |deadline_ns| is reached or
+// exceeded and afterward return resolved. Export is unavailable.
+static inline iree_wait_source_t iree_wait_source_delay(
+    iree_time_t deadline_ns) {
+  iree_wait_source_t v = {
+      {{NULL, (uint64_t)deadline_ns}},
+      iree_wait_source_delay_ctl,
+  };
+  return v;
+}
+
+// Returns true if the |wait_source| is a timed delay.
+// These are sleeps that can often be handled more intelligently by platforms.
+static inline bool iree_wait_source_is_delay(iree_wait_source_t wait_source) {
+  return wait_source.ctl == iree_wait_source_delay_ctl;
 }
 
 // Imports a system |wait_primitive| into a wait source in |out_wait_source|.

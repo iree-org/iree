@@ -36,6 +36,7 @@ iree_cc_library(
     MLIRAffineToStandard
     MLIRArithmetic
     MLIRBufferization
+    MLIRControlFlow
     MLIRIR
     MLIRPass
     MLIRStandard

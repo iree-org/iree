@@ -96,10 +96,32 @@ target_link_options(${_NAME} PRIVATE
   "-g"
   "-gseparate-dwarf"
   #
-  # https://emscripten.org/docs/porting/pthreads.html#compiling-with-pthreads-enabled
+  # ------------------------------------------------------------------------- #
+  # Multithreading with pthreads, built on Web Workers and SharedArrayBuffer.
+  # Docs: https://emscripten.org/docs/porting/pthreads.html
+  # IREE's use of threading is pretty restricted so we could eventually drop
+  # Emscripten's pthreads implementation in favor of our own.
+  #
+  # Note: this -pthread flag also needs to be set in compile options.
   "-pthread"
-  # "-sINITIAL_MEMORY=67108864"  # 64MB
-  "-sPTHREAD_POOL_SIZE=2"
-  # https://emscripten.org/docs/porting/pthreads.html#additional-flags
+  #
+  # IREE creates long lived worker threads during device creation around system
+  # startup time. No fixed size thread pool is necessary, so disable thread
+  # pool size checks and do not specify the pool size.
+  # By starting IREE from a Web Worker, we can avoid needing `PROXY_TO_PTHREAD`
+  # and can block when interacting with threads.
+  # Web Worker creation requires yielding back to the main browser event loop,
+  # so splitting program execution across multiple JavaScript function calls
+  # (e.g. `createDevice(); runInference();`) also helps avoid deadlocks.
+  "-sPTHREAD_POOL_SIZE_STRICT=0"
+  # "-sPTHREAD_POOL_SIZE=N"
   # "-sPROXY_TO_PTHREAD"
+  #
+  # Threads use memory, so using a larger pool of memory or allowing memory
+  # growth may be necessary when using `emscripten_num_logical_cores()`
+  # or `navigator.hardwareConcurrency` to pick the worker thread count.
+  # IREE is pretty good about not allocating outside of startup, so concerns
+  # about this causing slow access to memory *may* not affect IREE too much.
+  # "-sALLOW_MEMORY_GROWTH=1"
+  # ------------------------------------------------------------------------- #
 )

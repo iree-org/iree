@@ -17,6 +17,7 @@
 #include "iree/compiler/InputConversion/MHLO/Rewriters.h"
 #include "mlir-hlo/Dialect/mhlo/IR/hlo_ops.h"
 #include "mlir-hlo/Dialect/mhlo/transforms/map_mhlo_to_scalar_op.h"
+#include "mlir/Dialect/ControlFlow/IR/ControlFlow.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Utils/ReshapeOpsUtils.h"
@@ -486,7 +487,7 @@ struct ConvertMHLOToLinalgExtPass
   void getDependentDialects(DialectRegistry &registry) const override {
     registry
         .insert<IREE::LinalgExt::IREELinalgExtDialect, linalg::LinalgDialect,
-                IREE::Flow::FlowDialect, StandardOpsDialect,
+                IREE::Flow::FlowDialect, mlir::cf::ControlFlowDialect,
                 mlir::math::MathDialect, mlir::arith::ArithmeticDialect,
                 complex::ComplexDialect, tensor::TensorDialect>();
   }
@@ -547,11 +548,11 @@ struct ConvertMHLOToLinalgExtPass
                 LinalgExtRegionReturnOpConversion>(typeConverter, context);
 
     ConversionTarget target(getContext());
-    target.addLegalDialect<IREE::LinalgExt::IREELinalgExtDialect,
-                           linalg::LinalgDialect, IREE::Flow::FlowDialect,
-                           StandardOpsDialect, mlir::math::MathDialect,
-                           mlir::arith::ArithmeticDialect,
-                           tensor::TensorDialect, complex::ComplexDialect>();
+    target.addLegalDialect<
+        IREE::LinalgExt::IREELinalgExtDialect, linalg::LinalgDialect,
+        IREE::Flow::FlowDialect, mlir::cf::ControlFlowDialect,
+        mlir::math::MathDialect, mlir::arith::ArithmeticDialect,
+        tensor::TensorDialect, complex::ComplexDialect>();
     target.addIllegalOp<mhlo::SortOp, mhlo::ScatterOp, mhlo::FftOp,
                         mhlo::ReverseOp>();
     // FFT conversion creates complex ops which will be converted by the normal

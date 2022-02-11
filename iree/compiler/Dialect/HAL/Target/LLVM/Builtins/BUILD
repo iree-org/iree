@@ -24,6 +24,7 @@ cc_library(
         "//iree/builtins/device/bin:libdevice",
         "//iree/builtins/musl/bin:libmusl",
         "@llvm-project//llvm:BitReader",
+        "@llvm-project//llvm:Core",
         "@llvm-project//llvm:Support",
         "@llvm-project//llvm:Target",
         "@llvm-project//mlir:Support",

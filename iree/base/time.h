@@ -58,11 +58,17 @@ IREE_API_EXPORT iree_time_t iree_time_now(void);
 IREE_API_EXPORT iree_time_t
 iree_relative_timeout_to_deadline_ns(iree_duration_t timeout_ns);
 
-// Converts an absolute deadline time to a relative timeout duration.
+// Converts an absolute deadline time to a relative timeout duration in nanos.
 // This handles the special cases of IREE_TIME_INFINITE_PAST and
 // IREE_TIME_INFINITE_FUTURE to avoid extraneous time queries.
 IREE_API_EXPORT iree_duration_t
 iree_absolute_deadline_to_timeout_ns(iree_time_t deadline_ns);
+
+// Converts an absolute deadline time to a relative timeout duration in millis.
+// This handles the special cases of IREE_TIME_INFINITE_PAST and
+// IREE_TIME_INFINITE_FUTURE to avoid extraneous time queries.
+IREE_API_EXPORT uint32_t
+iree_absolute_deadline_to_timeout_ms(iree_time_t deadline_ns);
 
 typedef enum iree_timeout_type_e {
   // Timeout is defined by an absolute value `deadline_ns`.
@@ -164,6 +170,12 @@ static inline iree_timeout_t iree_timeout_min(iree_timeout_t lhs,
   iree_convert_timeout_to_absolute(&rhs);
   return iree_make_deadline(lhs.nanos < rhs.nanos ? lhs.nanos : rhs.nanos);
 }
+
+// Waits until |deadline_ns| (or longer), putting the calling thread to sleep.
+// The precision of this varies across platforms and may have a minimum
+// granularity anywhere between microsecond to milliseconds.
+// Returns true if the sleep completed successfully and false if it was aborted.
+bool iree_wait_until(iree_time_t deadline_ns);
 
 #ifdef __cplusplus
 }  // extern "C"

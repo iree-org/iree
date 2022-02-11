@@ -19,9 +19,9 @@ func @SelectResourceSizeOp(%arg0: !stream.resource<staging>, %arg1: index, %arg2
   %0 = stream.async.transfer %arg0 : !stream.resource<staging>{%arg1} -> !stream.resource<*>{%arg1}
   // CHECK: %[[ARG2_T:.+]] = stream.async.transfer %arg2 {{.+}} -> !stream.resource<*>{%[[ARG2_SZ:.+]]}
   %1 = stream.async.transfer %arg2 : !stream.resource<staging>{%arg3} -> !stream.resource<*>{%arg3}
-  // CHECK: %[[RET_T:.+]] = select %arg4, %[[ARG0_T]], %[[ARG2_T]] : !stream.resource<*>
-  %2 = select %arg4, %0, %1 : !stream.resource<*>
-  // CHECK: %[[RET_SIZE:.+]] = select %arg4, %[[ARG0_SZ]], %[[ARG2_SZ]] : index
+  // CHECK: %[[RET_T:.+]] = arith.select %arg4, %[[ARG0_T]], %[[ARG2_T]] : !stream.resource<*>
+  %2 = arith.select %arg4, %0, %1 : !stream.resource<*>
+  // CHECK: %[[RET_SIZE:.+]] = arith.select %arg4, %[[ARG0_SZ]], %[[ARG2_SZ]] : index
   %3 = stream.resource.size %2 : !stream.resource<*>
   // CHECK: = stream.async.transfer %[[RET_T]] : !stream.resource<*>{%[[RET_SIZE]]}
   %4 = stream.async.transfer %2 : !stream.resource<*>{%3} -> !stream.resource<staging>{%3}
@@ -189,8 +189,8 @@ func @SinkSubviewAcrossSelectOps(%arg0: !stream.resource<*>, %arg1: i1) -> !stre
   %0 = stream.resource.subview %arg0[%c0] : !stream.resource<*>{%c256} -> !stream.resource<*>{%c128}
   // CHECK-NOT: stream.resource.subview
   %1 = stream.resource.subview %arg0[%c128] : !stream.resource<*>{%c256} -> !stream.resource<*>{%c128}
-  // CHECK: %[[OFFSET:.+]] = select %arg1, %c0, %c128 : index
-  %2 = select %arg1, %0, %1 : !stream.resource<*>
+  // CHECK: %[[OFFSET:.+]] = arith.select %arg1, %c0, %c128 : index
+  %2 = arith.select %arg1, %0, %1 : !stream.resource<*>
   // CHECK-NEXT: %[[SUBVIEW:.+]] = stream.resource.subview %arg0[%[[OFFSET]]] : !stream.resource<*>{%c256} -> !stream.resource<*>{%c128}
   // CHECK-NEXT: return %[[SUBVIEW]]
   return %2 : !stream.resource<*>

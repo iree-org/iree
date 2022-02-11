@@ -4,6 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include <emscripten/threading.h>
+
 #include "iree/hal/local/loaders/static_library_loader.h"
 #include "iree/hal/local/task_device.h"
 #include "iree/task/api.h"
@@ -33,8 +35,13 @@ iree_status_t create_device_with_static_loader(iree_allocator_t host_allocator,
   iree_host_size_t worker_local_memory = 0;
   iree_task_topology_t topology;
   iree_task_topology_initialize(&topology);
-  // TODO(scotttodd): Try with more threads
-  iree_task_topology_initialize_from_group_count(/*group_count=*/1, &topology);
+  iree_task_topology_initialize_from_group_count(
+      /*group_count=*/4, &topology);
+  // Note: threads increase memory usage. If using a high thread count, consider
+  // passing in a larger WebAssembly.Memory object, increasing Emscripten's
+  // INITIAL_MEMORY, or setting Emscripten's ALLOW_MEMORY_GROWTH.
+  // iree_task_topology_initialize_from_group_count(
+  //     /*group_count=*/emscripten_num_logical_cores(), &topology);
   if (iree_status_is_ok(status)) {
     status = iree_task_executor_create(scheduling_mode, &topology,
                                        worker_local_memory, host_allocator,

@@ -255,6 +255,10 @@ if(${IREE_BUILD_COMPILER})
     DEPS
       MLIRAffine
       MLIRAffineTransforms
+      MLIRArmNeon
+      MLIRArmNeon2dToIntr
+      MLIRBufferization
+      MLIRControlFlow
       MLIRGPUOps
       MLIRGPUToSPIRV
       MLIRIR
@@ -264,6 +268,7 @@ if(${IREE_BUILD_COMPILER})
       MLIRLinalgToSPIRV
       MLIRLinalgTransforms
       MLIRQuant
+      MLIRQuantTransforms
       MLIRSCF
       MLIRSCFToGPU
       MLIRSCFTransforms
@@ -276,9 +281,8 @@ if(${IREE_BUILD_COMPILER})
       MLIRTosa
       MLIRTosaTransforms
       MLIRTransforms
-      MLIRArmNeon
-      MLIRArmNeon2dToIntr
       MLIRVector
+      ${IREE_EMITC_CONDITIONAL_DEP}
     PUBLIC
   )
 
@@ -356,7 +360,6 @@ if(${IREE_BUILD_COMPILER})
       MLIRIR
       MLIROptLib
       MLIRSupport
-      ${IREE_EMITC_CONDITIONAL_DEP}
     PUBLIC
   )
 
@@ -388,7 +391,6 @@ if(${IREE_BUILD_COMPILER})
       iree::compiler::Dialect::VM::Target::init_targets
       iree::compiler::Translation::HALExecutable
       iree::compiler::Translation::IREEVM
-      ${IREE_EMITC_CONDITIONAL_DEP}
     PUBLIC
   )
 
@@ -424,7 +426,6 @@ if(${IREE_BUILD_COMPILER})
       MLIRIR
       MLIRLspServerLib
       MLIRSupport
-      ${IREE_EMITC_CONDITIONAL_DEP}
     PUBLIC
   )
 

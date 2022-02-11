@@ -31,6 +31,7 @@ iree_cc_library(
   DEPS
     LLVMSupport
     MLIRAnalysis
+    MLIRControlFlow
     MLIRIR
     MLIRPass
     MLIRStandard

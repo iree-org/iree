@@ -12,7 +12,6 @@
 #include "iree/base/api.h"
 #include "iree/base/internal/atomics.h"
 #include "iree/base/internal/event_pool.h"
-#include "iree/base/internal/wait_handle.h"
 #include "iree/task/scope.h"
 #include "iree/task/submission.h"
 #include "iree/task/task.h"
@@ -115,22 +114,19 @@ extern "C" {
 //
 // 2. iree_task_executor_submit (LIFO, atomic slist)
 //    Submissions have their task thread-local lists concatenated into a LIFO
-//    incoming_ready_slist or incoming_waiting_slist shared by the executor.
+//    incoming_ready_slist or the wait poller shared by the executor.
 //
 // 3. iree_task_executor_flush (or a worker puts on its coordinator hat 🎩)
 //
 //   a. Tasks are flushed from the incoming_ready_slist into a coordinator-local
-//      FIFO task queue and incoming_waiting_slist is concatenated into the
-//      primary executor waitlist.
+//      FIFO task queue. This centralizes enqueuing from all threads into a
+//      single ordered list.
 //
-//   b. iree_task_executor_poll_waiting_tasks: finds waiting tasks that are now
-//      ready and they are moved into the coordinator-local FIFO task queue.
-//
-//   c. iree_task_executor_schedule_ready_tasks: walks the FIFO task queue and
+//   b. iree_task_executor_schedule_ready_tasks: walks the FIFO task queue and
 //      builds a iree_task_post_batch_t containing the per-worker tasks
 //      in LIFO order.
 //
-//   d. iree_task_post_batch_submit: per-worker tasks are pushed to their
+//   c. iree_task_post_batch_submit: per-worker tasks are pushed to their
 //      respective iree_task_worker_t mailbox_slist and the workers with new
 //      tasks are notified to wake up (if not already awake).
 //
@@ -147,8 +143,8 @@ extern "C" {
 //
 //    c. Any tasks in the local_task_queue are executed until empty.
 //       Tasks are retired and dependent tasks (via completion_task or barriers)
-//       are made ready and placed in the executor incoming_ready_slist or
-//       incoming_waiting_slist as with iree_task_executor_submit.
+//       are made ready and placed in the executor incoming_ready_slist as with
+//       iree_task_executor_submit.
 //
 //    d. If no more thread-local work is available and the mailbox_slist is
 //       empty the worker will self-nominate for coordination and attempt to don
@@ -286,14 +282,6 @@ enum iree_task_scheduling_mode_bits_t {
   // much faster schedule all worker quantums and in many cases all workers will
   // begin processing simultaneously immediately after the submission is made.
   IREE_TASK_SCHEDULING_MODE_DEFER_WORKER_STARTUP = 1u << 0,
-
-  // TODO(#4027): implement IREE_TASK_SCHEDULING_MODE_DEDICATED_WAIT_THREAD.
-  // Creates a dedicated thread performing waits on root wait handles.
-  // On workloads with many short-duration waits this will reduce total latency
-  // as the waits are aggressively processed and dependent tasks are scheduled.
-  // It also keeps any wait-related syscalls off the worker threads that would
-  // otherwise need to perform the syscalls during coordination.
-  IREE_TASK_SCHEDULING_MODE_DEDICATED_WAIT_THREAD = 1u << 1,
 };
 typedef uint32_t iree_task_scheduling_mode_t;
 
@@ -364,14 +352,14 @@ void iree_task_executor_submit(iree_task_executor_t* executor,
 // after the flush has occurred but prior to this call returning.
 void iree_task_executor_flush(iree_task_executor_t* executor);
 
-// Donates the calling thread to the executor until either |wait_handle|
-// resolves or |deadline_ns| is exceeded. Flushes any pending task batches prior
+// Donates the calling thread to the executor until either |wait_source|
+// resolves or |timeout| is exceeded. Flushes any pending task batches prior
 // to doing any work or waiting.
 //
 // If there are no tasks available then the calling thread will block as if
-// iree_wait_one had been used on |wait_handle|. If tasks are ready then the
-// caller will not block prior to starting to perform work on behalf of the
-// executor.
+// iree_wait_source_wait_one had been used on |wait_source|. If tasks are ready
+// then the caller will not block prior to starting to perform work on behalf of
+// the executor.
 //
 // Donation is intended as an optimization to elide context switches when the
 // caller would have waited anyway; now instead of performing a kernel wait and
@@ -393,8 +381,8 @@ void iree_task_executor_flush(iree_task_executor_t* executor);
 //
 // Safe to call from any thread (though bad to reentrantly call from workers).
 iree_status_t iree_task_executor_donate_caller(iree_task_executor_t* executor,
-                                               iree_wait_handle_t* wait_handle,
-                                               iree_time_t deadline_ns);
+                                               iree_wait_source_t wait_source,
+                                               iree_timeout_t timeout);
 
 #ifdef __cplusplus
 }  // extern "C"

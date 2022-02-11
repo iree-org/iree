@@ -72,6 +72,7 @@ class TaskDispatchTest : public TaskTest {
   void DispatchAndVerifyGrid(const uint32_t workgroup_size[3],
                              const uint32_t workgroup_count[3],
                              uint32_t dispatch_flags) {
+    IREE_TRACE_SCOPE();
     GridCoverage coverage(workgroup_count);
     iree_task_dispatch_t task;
     iree_task_dispatch_initialize(
@@ -85,30 +86,36 @@ class TaskDispatchTest : public TaskTest {
 };
 
 TEST_F(TaskDispatchTest, Issue000) {
+  IREE_TRACE_SCOPE();
   const uint32_t kWorkgroupSize[3] = {1, 1, 1};
   const uint32_t kWorkgroupCount[3] = {0, 0, 0};
   DispatchAndVerifyGrid(kWorkgroupSize, kWorkgroupCount, IREE_TASK_FLAG_NONE);
 }
 
 TEST_F(TaskDispatchTest, Issue120) {
+  IREE_TRACE_SCOPE();
   const uint32_t kWorkgroupSize[3] = {1, 1, 1};
   const uint32_t kWorkgroupCount[3] = {1, 2, 0};
   DispatchAndVerifyGrid(kWorkgroupSize, kWorkgroupCount, IREE_TASK_FLAG_NONE);
 }
 
 TEST_F(TaskDispatchTest, Issue111) {
+  IREE_TRACE_SCOPE();
   const uint32_t kWorkgroupSize[3] = {1, 1, 1};
   const uint32_t kWorkgroupCount[3] = {1, 1, 1};
   DispatchAndVerifyGrid(kWorkgroupSize, kWorkgroupCount, IREE_TASK_FLAG_NONE);
 }
 
 TEST_F(TaskDispatchTest, Issue345) {
+  IREE_TRACE_SCOPE();
   const uint32_t kWorkgroupSize[3] = {1, 1, 1};
   const uint32_t kWorkgroupCount[3] = {3, 4, 5};
   DispatchAndVerifyGrid(kWorkgroupSize, kWorkgroupCount, IREE_TASK_FLAG_NONE);
 }
 
 TEST_F(TaskDispatchTest, IssueIndirect) {
+  IREE_TRACE_SCOPE();
+
   static const uint32_t kWorkgroupSize[3] = {1, 1, 1};
   static const uint32_t kWorkgroupCount[3] = {3, 4, 5};
   uint32_t indirect_workgroup_count[3] = {0, 0, 0};
@@ -120,6 +127,7 @@ TEST_F(TaskDispatchTest, IssueIndirect) {
       iree_task_make_call_closure(
           [](void* user_context, iree_task_t* task,
              iree_task_submission_t* pending_submission) {
+            IREE_TRACE_SCOPE();
             uint32_t* indirect_workgroup_count_ptr = (uint32_t*)user_context;
             for (size_t i = 0; i < IREE_ARRAYSIZE(kWorkgroupCount); ++i) {
               indirect_workgroup_count_ptr[i] = kWorkgroupCount[i];
@@ -142,12 +150,15 @@ TEST_F(TaskDispatchTest, IssueIndirect) {
 }
 
 TEST_F(TaskDispatchTest, IssueFailure) {
+  IREE_TRACE_SCOPE();
+
   const uint32_t kWorkgroupSize[3] = {1, 1, 1};
   const uint32_t kWorkgroupCount[3] = {64, 1, 1};
 
   auto tile = [](void* user_context,
                  const iree_task_tile_context_t* tile_context,
                  iree_task_submission_t* pending_submission) -> iree_status_t {
+    IREE_TRACE_SCOPE();
     return tile_context->workgroup_xyz[0] == 32
                ? iree_make_status(IREE_STATUS_DATA_LOSS, "whoops!")
                : iree_ok_status();
@@ -163,6 +174,8 @@ TEST_F(TaskDispatchTest, IssueFailure) {
 }
 
 TEST_F(TaskDispatchTest, IssueFailureChained) {
+  IREE_TRACE_SCOPE();
+
   const uint32_t kWorkgroupSize[3] = {1, 1, 1};
   const uint32_t kWorkgroupCount[3] = {64, 1, 1};
 
@@ -185,6 +198,7 @@ TEST_F(TaskDispatchTest, IssueFailureChained) {
                             iree_task_make_call_closure(
                                 [](void* user_context, iree_task_t* task,
                                    iree_task_submission_t* pending_submission) {
+                                  IREE_TRACE_SCOPE();
                                   int* did_call_ptr = (int*)user_context;
                                   ++(*did_call_ptr);
                                   return iree_ok_status();

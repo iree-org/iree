@@ -38,6 +38,7 @@ struct TaskCtx {
   iree_task_make_call_closure(                                 \
       [](void* user_context, iree_task_t* task,                \
          iree_task_submission_t* pending_submission) {         \
+        IREE_TRACE_SCOPE();                                    \
         auto* ctx = (TaskCtx*)user_context;                    \
         EXPECT_EQ(0, (ctx->tasks_called & (task_id)));         \
         ctx->tasks_called |= (task_id);                        \
@@ -57,6 +58,7 @@ TEST_F(TaskBarrierTest, IssueStandalone) {
 // Issues a serialized sequence:
 //  { a | barrier | b }
 TEST_F(TaskBarrierTest, IssueSequence) {
+  IREE_TRACE_SCOPE();
   TaskCtx task_ctx;
 
   iree_task_call_t task_a;
@@ -82,6 +84,7 @@ TEST_F(TaskBarrierTest, IssueSequence) {
 //  { a | barrier | b }
 // B should not be run.
 TEST_F(TaskBarrierTest, IssueSequenceFailure) {
+  IREE_TRACE_SCOPE();
   TaskCtx task_ctx;
 
   iree_task_call_t task_a;
@@ -109,6 +112,7 @@ TEST_F(TaskBarrierTest, IssueSequenceFailure) {
 //  { a | barrier | b | barrier | c }
 // B and C should not be run.
 TEST_F(TaskBarrierTest, IssueDeepSequenceFailure) {
+  IREE_TRACE_SCOPE();
   TaskCtx task_ctx;
 
   iree_task_call_t task_a;
@@ -145,6 +149,7 @@ TEST_F(TaskBarrierTest, IssueDeepSequenceFailure) {
 // Issues a join:
 //  { a, b, c | barrier | d }
 TEST_F(TaskBarrierTest, IssueJoin) {
+  IREE_TRACE_SCOPE();
   TaskCtx task_ctx;
 
   iree_task_call_t task_a;
@@ -185,6 +190,7 @@ TEST_F(TaskBarrierTest, IssueJoin) {
 //  { a, b, c | barrier | d }
 // A, B, and C should all run but the barrier should fail and D should not.
 TEST_F(TaskBarrierTest, IssueJoinFailure) {
+  IREE_TRACE_SCOPE();
   TaskCtx task_ctx;
 
   iree_task_call_t task_a;
@@ -226,6 +232,7 @@ TEST_F(TaskBarrierTest, IssueJoinFailure) {
 // Issues a fork:
 //  { a | barrier | b, c, d | nop }
 TEST_F(TaskBarrierTest, IssueFork) {
+  IREE_TRACE_SCOPE();
   TaskCtx task_ctx;
 
   iree_task_call_t task_a;
@@ -270,6 +277,7 @@ TEST_F(TaskBarrierTest, IssueFork) {
 //  { a (fails) | barrier | b, c, d | nop }
 // The barrier should fail and none of the subsequent tasks B, C, D should run.
 TEST_F(TaskBarrierTest, IssueForkFailure) {
+  IREE_TRACE_SCOPE();
   TaskCtx task_ctx;
 
   iree_task_call_t task_a;

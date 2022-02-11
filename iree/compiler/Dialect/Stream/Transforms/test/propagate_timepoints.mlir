@@ -132,10 +132,10 @@ func private @callee(%arg0: !stream.resource<external>, %arg1: !stream.resource<
 func @br(%arg0: !stream.resource<external>, %arg1: !stream.resource<transient>) {
   // NOTE: there will be extra stuff here from the arg insertion. The branch
   // consumes the unready resources and we expect the args to be passed directly
-  // to the br.
+  // to the cf.br.
 
-  // CHECK: br ^bb1(%[[TIMEPOINT0]], %[[UNREADY0]], %[[TIMEPOINT1]], %[[UNREADY1]]
-  br ^bb1(%arg0, %arg1 : !stream.resource<external>, !stream.resource<transient>)
+  // CHECK: cf.br ^bb1(%[[TIMEPOINT0]], %[[UNREADY0]], %[[TIMEPOINT1]], %[[UNREADY1]]
+  cf.br ^bb1(%arg0, %arg1 : !stream.resource<external>, !stream.resource<transient>)
 
 // CHECK-NEXT: ^bb1(%[[BB1_TIMEPOINT0:.+]]: !stream.timepoint, %[[BB1_UNREADY0:.+]]: !stream.resource<external>,
 // CHECK-SAME:      %[[BB1_TIMEPOINT1:.+]]: !stream.timepoint, %[[BB1_UNREADY1:.+]]: !stream.resource<transient>):

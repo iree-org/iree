@@ -68,7 +68,7 @@ iree_cc_library(
     MLIRModuleBufferization
     MLIRPass
     MLIRSCF
-    MLIRSCFToStandard
+    MLIRSCFToControlFlow
     MLIRSCFTransforms
     MLIRSideEffectInterfaces
     MLIRStandard

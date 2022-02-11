@@ -31,7 +31,8 @@ namespace TF {
 //    tensorflow/compiler/mlir/xla/transforms/legalize_tf.cc
 // It does not require the same number of options as we can hardcode as the pass
 // the IREE requires.
-class ConvertToMHLOPass : public PassWrapper<ConvertToMHLOPass, FunctionPass> {
+class ConvertToMHLOPass
+    : public PassWrapper<ConvertToMHLOPass, OperationPass<FuncOp>> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry
         .insert<mlir::linalg::LinalgDialect, mlir::TF::TensorFlowDialect,
@@ -52,8 +53,8 @@ class ConvertToMHLOPass : public PassWrapper<ConvertToMHLOPass, FunctionPass> {
   ConvertToMHLOPass() = default;
   ConvertToMHLOPass(const ConvertToMHLOPass &) {}
 
-  void runOnFunction() override {
-    auto op = getFunction();
+  void runOnOperation() override {
+    auto op = getOperation();
     MLIRContext *context = op.getContext();
 
     // Lower TF Patterns must be separate from canonocalization patterns as
@@ -169,7 +170,7 @@ class ConvertToMHLOPass : public PassWrapper<ConvertToMHLOPass, FunctionPass> {
       llvm::cl::init("INVALID_DEVICE_TYPE")};
 };
 
-std::unique_ptr<FunctionPass> createConvertToMHLOPass() {
+std::unique_ptr<Pass> createConvertToMHLOPass() {
   return std::make_unique<ConvertToMHLOPass>();
 }
 

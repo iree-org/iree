@@ -64,7 +64,7 @@ TEST(ScopeTest, FailEmpty) {
   // Enter failure state.
   iree_task_t failed_task = {0};
   failed_task.scope = &scope;
-  iree_task_scope_fail(&scope, &failed_task,
+  iree_task_scope_fail(&scope,
                        iree_make_status(IREE_STATUS_DATA_LOSS, "whoops!"));
   iree_status_t consumed_status = iree_task_scope_consume_status(&scope);
   EXPECT_TRUE(iree_status_is_data_loss(consumed_status));
@@ -89,7 +89,7 @@ TEST(ScopeTest, FailAgain) {
   // Enter initial failure state.
   iree_task_t failed_task_a = {0};
   failed_task_a.scope = &scope;
-  iree_task_scope_fail(&scope, &failed_task_a,
+  iree_task_scope_fail(&scope,
                        iree_make_status(IREE_STATUS_DATA_LOSS, "whoops 1"));
   iree_status_t consumed_status_a = iree_task_scope_consume_status(&scope);
   EXPECT_TRUE(iree_status_is_data_loss(consumed_status_a));
@@ -102,8 +102,7 @@ TEST(ScopeTest, FailAgain) {
   iree_task_t failed_task_b = {0};
   failed_task_b.scope = &scope;
   iree_task_scope_fail(
-      &scope, &failed_task_b,
-      iree_make_status(IREE_STATUS_FAILED_PRECONDITION, "whoops 2"));
+      &scope, iree_make_status(IREE_STATUS_FAILED_PRECONDITION, "whoops 2"));
   iree_status_t consumed_status_b = iree_task_scope_consume_status(&scope);
   EXPECT_TRUE(iree_status_is_data_loss(consumed_status_b));
   iree_status_ignore(consumed_status_b);
@@ -140,7 +139,8 @@ TEST(ScopeTest, WaitIdleDeadlineExceeded) {
 
   // Enqueue a task to the scope so it is no longer idle.
   iree_task_fence_t fence_task;
-  iree_task_fence_initialize(&scope, &fence_task);
+  iree_task_fence_initialize(&scope, iree_wait_primitive_immediate(),
+                             &fence_task);
   EXPECT_FALSE(iree_task_scope_is_idle(&scope));
 
   // Poll, which should fail immediately because we have the outstanding task.
@@ -168,7 +168,8 @@ TEST(ScopeTest, WaitIdleSuccess) {
 
   // Enqueue a task to the scope so it is no longer idle.
   iree_task_fence_t fence_task;
-  iree_task_fence_initialize(&scope, &fence_task);
+  iree_task_fence_initialize(&scope, iree_wait_primitive_immediate(),
+                             &fence_task);
   EXPECT_FALSE(iree_task_scope_is_idle(&scope));
 
   // Spin up a thread to wait on the scope.
@@ -181,7 +182,7 @@ TEST(ScopeTest, WaitIdleSuccess) {
 
   // Wait a moment for the thread to spin up.
   // NOTE: this may flake. Need to see if there's a better way to do this.
-  std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+  std::this_thread::sleep_for(std::chrono::milliseconds(150));
 
   // Complete the task.
   iree_task_submission_t pending_submission;
@@ -206,7 +207,8 @@ TEST(ScopeTest, WaitIdleFailure) {
 
   // Enqueue a task to the scope so it is no longer idle.
   iree_task_fence_t fence_task;
-  iree_task_fence_initialize(&scope, &fence_task);
+  iree_task_fence_initialize(&scope, iree_wait_primitive_immediate(),
+                             &fence_task);
   EXPECT_FALSE(iree_task_scope_is_idle(&scope));
 
   // Spin up a thread to wait on the scope.
@@ -219,12 +221,11 @@ TEST(ScopeTest, WaitIdleFailure) {
 
   // Wait a moment for the thread to spin up.
   // NOTE: this may flake. Need to see if there's a better way to do this.
-  std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+  std::this_thread::sleep_for(std::chrono::milliseconds(150));
 
   // Set the failure state.
   iree_task_scope_fail(
-      &scope, &fence_task.header,
-      iree_make_status(IREE_STATUS_FAILED_PRECONDITION, "whoops"));
+      &scope, iree_make_status(IREE_STATUS_FAILED_PRECONDITION, "whoops"));
   EXPECT_FALSE(iree_task_scope_is_idle(&scope));
 
   // Complete the task.

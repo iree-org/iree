@@ -112,7 +112,8 @@ Operation *StreamDialect::materializeConstant(OpBuilder &builder,
                                               Attribute value, Type type,
                                               Location loc) {
   if (mlir::ConstantOp::isBuildableWith(value, type)) {
-    return builder.create<mlir::ConstantOp>(loc, type, value);
+    return builder.create<mlir::ConstantOp>(loc, type,
+                                            value.cast<FlatSymbolRefAttr>());
   } else if (arith::ConstantOp::isBuildableWith(value, type)) {
     return builder.create<arith::ConstantOp>(loc, type, value);
   } else if (value.isa<IREE::Stream::TimepointAttr>()) {

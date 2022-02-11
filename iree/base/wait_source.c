@@ -72,3 +72,46 @@ IREE_API_EXPORT iree_status_t iree_wait_source_wait_one(
   IREE_TRACE_ZONE_END(z0);
   return status;
 }
+
+//===----------------------------------------------------------------------===//
+// iree_wait_source_delay
+//===----------------------------------------------------------------------===//
+
+IREE_API_EXPORT iree_status_t iree_wait_source_delay_ctl(
+    iree_wait_source_t wait_source, iree_wait_source_command_t command,
+    const void* params, void** inout_ptr) {
+  iree_time_t delay_deadline_ns = (iree_time_t)wait_source.data;
+  switch (command) {
+    case IREE_WAIT_SOURCE_COMMAND_QUERY: {
+      iree_status_code_t* out_wait_status_code = (iree_status_code_t*)inout_ptr;
+      *out_wait_status_code = iree_time_now() >= delay_deadline_ns
+                                  ? IREE_STATUS_OK
+                                  : IREE_STATUS_DEFERRED;
+      return iree_ok_status();
+    }
+    case IREE_WAIT_SOURCE_COMMAND_WAIT_ONE: {
+      iree_time_t timeout_deadline_ns = iree_timeout_as_deadline_ns(
+          ((const iree_wait_source_wait_params_t*)params)->timeout);
+      if (timeout_deadline_ns > delay_deadline_ns) {
+        // Delay is before timeout and we can perform a simple sleep.
+        return iree_wait_until(delay_deadline_ns)
+                   ? iree_ok_status()
+                   : iree_status_from_code(IREE_STATUS_DEFERRED);
+      } else {
+        // Timeout is before deadline, just wait for the deadline. We _may_
+        // wake after the delay deadline but can't be sure.
+        iree_wait_until(timeout_deadline_ns);
+        return iree_time_now() >= delay_deadline_ns
+                   ? iree_ok_status()
+                   : iree_status_from_code(IREE_STATUS_DEADLINE_EXCEEDED);
+      }
+      return iree_status_from_code(IREE_STATUS_DEFERRED);
+    }
+    case IREE_WAIT_SOURCE_COMMAND_EXPORT:
+      return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                              "delay wait sources cannot be exported");
+    default:
+      return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
+                              "unhandled wait source command");
+  }
+}

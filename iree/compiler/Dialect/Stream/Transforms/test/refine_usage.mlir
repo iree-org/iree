@@ -67,8 +67,8 @@ func private @propagateBlocks(%cond: i1, %size: index) -> (!stream.resource<*>, 
   %splat0 = stream.async.splat %c123_i32 : i32 -> !stream.resource<*>{%size}
   // CHECK: %[[SPLAT1:.+]] = stream.async.splat %c456_i32 {{.+}} -> !stream.resource<external>
   %splat1 = stream.async.splat %c456_i32 : i32 -> !stream.resource<*>{%size}
-  // CHECK: br ^bb1(%[[SPLAT0]], %[[SPLAT1]]
-  br ^bb1(%splat0, %splat1 : !stream.resource<*>, !stream.resource<*>)
+  // CHECK: cf.br ^bb1(%[[SPLAT0]], %[[SPLAT1]]
+  cf.br ^bb1(%splat0, %splat1 : !stream.resource<*>, !stream.resource<*>)
 // CHECK: ^bb1(%[[BB1_ARG0:.+]]: !stream.resource<transient>, %[[BB1_ARG1:.+]]: !stream.resource<external>)
 ^bb1(%bb1_0: !stream.resource<*>, %bb1_1: !stream.resource<*>):
   // CHECK: %[[CLONE0:.+]] = stream.async.clone %[[BB1_ARG0]] {{.+}} !stream.resource<transient>
@@ -79,11 +79,11 @@ func private @propagateBlocks(%cond: i1, %size: index) -> (!stream.resource<*>, 
   %clone1 = stream.async.clone %bb1_1 : !stream.resource<*>{%size} -> !stream.resource<*>{%size}
   // CHECK: %[[FILL1:.+]] = stream.async.fill %c456_i32, %[[CLONE1]]{{.+}} !stream.resource<external>
   %fill1 = stream.async.fill %c456_i32, %clone1[%c0 to %c128 for %c128] : i32 -> !stream.resource<*>{%size}
-  // CHECK: %[[SELECT:.+]] = select %[[COND]], %[[SPLAT1]], %[[FILL1]] : !stream.resource<external>
-  %bb1_1_new = select %cond, %splat1, %fill1 : !stream.resource<*>
-  // CHECK: cond_br %[[COND]], ^bb1(%[[FILL0]], %[[SELECT]]
+  // CHECK: %[[SELECT:.+]] = arith.select %[[COND]], %[[SPLAT1]], %[[FILL1]] : !stream.resource<external>
+  %bb1_1_new = arith.select %cond, %splat1, %fill1 : !stream.resource<*>
+  // CHECK: cf.cond_br %[[COND]], ^bb1(%[[FILL0]], %[[SELECT]]
   // CHECK-SAME:               ^bb2(%[[FILL0]], %[[SELECT]]
-  cond_br %cond, ^bb1(%fill0, %bb1_1_new : !stream.resource<*>, !stream.resource<*>),
+  cf.cond_br %cond, ^bb1(%fill0, %bb1_1_new : !stream.resource<*>, !stream.resource<*>),
                  ^bb2(%fill0, %bb1_1_new : !stream.resource<*>, !stream.resource<*>)
 // CHECK: ^bb2(%[[BB2_ARG0:.+]]: !stream.resource<transient>, %[[BB2_ARG1:.+]]: !stream.resource<external>)
 ^bb2(%bb2_0: !stream.resource<*>, %bb2_1: !stream.resource<*>):
@@ -106,8 +106,8 @@ func @conflictResolution(%cond: i1, %arg0: !stream.resource<transient>, %arg1: !
   %arg0_any = stream.async.transfer %arg0 : !stream.resource<transient>{%size} -> !stream.resource<*>{%size}
   // CHECK-NOT: stream.async.transfer %[[ARG1]]
   %arg1_any = stream.async.transfer %arg1 : !stream.resource<external>{%size} -> !stream.resource<*>{%size}
-  // CHECK: %[[RET:.+]] = select %[[COND]], %[[ARG0_EXT]], %[[ARG1]] : !stream.resource<external>
-  %0 = select %cond, %arg0_any, %arg1_any : !stream.resource<*>
+  // CHECK: %[[RET:.+]] = arith.select %[[COND]], %[[ARG0_EXT]], %[[ARG1]] : !stream.resource<external>
+  %0 = arith.select %cond, %arg0_any, %arg1_any : !stream.resource<*>
   // CHECK: return %[[RET]] : !stream.resource<external>
   return %0 : !stream.resource<*>
 }

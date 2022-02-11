@@ -18,7 +18,7 @@
 
 // Only recalculate shapes if the shapes are dirty.
 //       CHECK:   %[[IS_DIRTY:.+]] = util.global.load @_tflite_dynamicEntry_shapes_dirty : i1
-//  CHECK-NEXT:   cond_br %[[IS_DIRTY]], ^bb1, ^bb2
+//  CHECK-NEXT:   cf.cond_br %[[IS_DIRTY]], ^bb1, ^bb2
 
 //       CHECK: ^bb1:
 //  CHECK-NEXT:   %[[NULL:.+]] = util.null : !hal.buffer
@@ -57,7 +57,7 @@
 
 // Query input0 shape:
 //       CHECK:   %[[IS_0:.+]] = arith.cmpi eq, %[[INDEX]], %c0 : index
-//  CHECK-NEXT:   cond_br %[[IS_0]], ^bb1, ^bb2
+//  CHECK-NEXT:   cf.cond_br %[[IS_0]], ^bb1, ^bb2
 //  CHECK-NEXT: ^bb1:
 //  CHECK-NEXT:   util.list.resize %[[LIST]], %c4 : !util.list<index>
 //  CHECK-NEXT:   %[[IN0_DIM0:.+]] = util.global.load @_tflite_dynamicEntry_input0_shape_dim0 : index
@@ -65,12 +65,12 @@
 //  CHECK-NEXT:   util.list.set %[[LIST]][%c1], %c8 : !util.list<index>
 //  CHECK-NEXT:   util.list.set %[[LIST]][%c2], %c8 : !util.list<index>
 //  CHECK-NEXT:   util.list.set %[[LIST]][%c3], %c3 : !util.list<index>
-//  CHECK-NEXT:   br ^bb4
+//  CHECK-NEXT:   cf.br ^bb4
 
 // Query input1 shape:
 //       CHECK: ^bb2:
 //  CHECK-NEXT:   %[[IS_1:.+]] = arith.cmpi eq, %[[INDEX]], %c1 : index
-//  CHECK-NEXT:   cond_br %[[IS_1]], ^bb3, ^bb4
+//  CHECK-NEXT:   cf.cond_br %[[IS_1]], ^bb3, ^bb4
 //  CHECK-NEXT: ^bb3:
 //  CHECK-NEXT:   util.list.resize %[[LIST]], %c4 : !util.list<index>
 //  CHECK-NEXT:   %[[IN1_DIM0:.+]] = util.global.load @_tflite_dynamicEntry_input1_shape_dim0 : index
@@ -78,7 +78,7 @@
 //  CHECK-NEXT:   util.list.set %[[LIST]][%c1], %c8 : !util.list<index>
 //  CHECK-NEXT:   util.list.set %[[LIST]][%c2], %c8 : !util.list<index>
 //  CHECK-NEXT:   util.list.set %[[LIST]][%c3], %c3 : !util.list<index>
-//  CHECK-NEXT:   br ^bb4
+//  CHECK-NEXT:   cf.br ^bb4
 
 // Invalid input index:
 //       CHECK: ^bb4:
@@ -91,19 +91,19 @@
 //  CHECK-SAME:   (%[[INDEX:.+]]: index, %[[LIST:.+]]: !util.list<index>)
 
 //       CHECK:   %[[IS_0:.+]] = arith.cmpi eq, %[[INDEX]], %c0 : index
-//  CHECK-NEXT:   cond_br %[[IS_0]], ^bb1, ^bb2
+//  CHECK-NEXT:   cf.cond_br %[[IS_0]], ^bb1, ^bb2
 //  CHECK-NEXT: ^bb1:
 //  CHECK-NEXT:   %[[IN0_DIM0:.+]] = util.list.get %[[LIST]][%c0] : !util.list<index>
 //  CHECK-NEXT:   util.global.store %[[IN0_DIM0]], @_tflite_dynamicEntry_input0_shape_dim0 : index
-//  CHECK-NEXT:   br ^bb4
+//  CHECK-NEXT:   cf.br ^bb4
 
 //       CHECK: ^bb2:
 //  CHECK-NEXT:   %[[IS_1:.+]] = arith.cmpi eq, %[[INDEX]], %c1 : index
-//  CHECK-NEXT:   cond_br %[[IS_1]], ^bb3, ^bb4
+//  CHECK-NEXT:   cf.cond_br %[[IS_1]], ^bb3, ^bb4
 //  CHECK-NEXT: ^bb3:
 //  CHECK-NEXT:   %[[IN1_DIM0:.+]] = util.list.get %[[LIST]][%c0] : !util.list<index>
 //  CHECK-NEXT:   util.global.store %[[IN1_DIM0]], @_tflite_dynamicEntry_input1_shape_dim0 : index
-//  CHECK-NEXT:   br ^bb4
+//  CHECK-NEXT:   cf.br ^bb4
 
 // Set the dirty flag so that shape calculation must run again.
 //  CHECK-NEXT: ^bb4:
@@ -121,7 +121,7 @@
 
 // Query output0:
 //       CHECK:   %[[IS_0:.+]] = arith.cmpi eq, %[[INDEX]], %c0 : index
-//  CHECK-NEXT:   cond_br %[[IS_0]], ^bb1, ^bb2
+//  CHECK-NEXT:   cf.cond_br %[[IS_0]], ^bb1, ^bb2
 //  CHECK-NEXT: ^bb1:
 //  CHECK-NEXT:   util.list.resize %[[LIST]], %c4 : !util.list<index>
 //  CHECK-NEXT:   %[[OUT0_DIM0:.+]] = util.global.load @_tflite_dynamicEntry_output0_shape_dim0 : index
@@ -129,12 +129,12 @@
 //  CHECK-NEXT:   util.list.set %[[LIST]][%c1], %c8 : !util.list<index>
 //  CHECK-NEXT:   util.list.set %[[LIST]][%c2], %c8 : !util.list<index>
 //  CHECK-NEXT:   util.list.set %[[LIST]][%c3], %c3 : !util.list<index>
-//  CHECK-NEXT:   br ^bb4
+//  CHECK-NEXT:   cf.br ^bb4
 
 // Query output1:
 //       CHECK: ^bb2:
 //  CHECK-NEXT:   %[[IS_1:.+]] = arith.cmpi eq, %[[INDEX]], %c1 : index
-//  CHECK-NEXT:   cond_br %[[IS_1]], ^bb3, ^bb4
+//  CHECK-NEXT:   cf.cond_br %[[IS_1]], ^bb3, ^bb4
 //  CHECK-NEXT: ^bb3:
 //  CHECK-NEXT:   util.list.resize %[[LIST]], %c4 : !util.list<index>
 //  CHECK-NEXT:   %[[OUT1_DIM0:.+]] = util.global.load @_tflite_dynamicEntry_output1_shape_dim0 : index
@@ -142,7 +142,7 @@
 //  CHECK-NEXT:   util.list.set %[[LIST]][%c1], %c8 : !util.list<index>
 //  CHECK-NEXT:   util.list.set %[[LIST]][%c2], %c8 : !util.list<index>
 //  CHECK-NEXT:   util.list.set %[[LIST]][%c3], %c3 : !util.list<index>
-//  CHECK-NEXT:   br ^bb4
+//  CHECK-NEXT:   cf.br ^bb4
 
 //  CHECK-NEXT: ^bb4:
 //  CHECK-NEXT:   return

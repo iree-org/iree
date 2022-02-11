@@ -10,6 +10,7 @@
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "mlir/Conversion/ArithmeticToLLVM/ArithmeticToLLVM.h"
+#include "mlir/Conversion/ControlFlowToLLVM/ControlFlowToLLVM.h"
 #include "mlir/Conversion/GPUToNVVM/GPUToNVVMPass.h"
 #include "mlir/Conversion/LLVMCommon/ConversionTarget.h"
 #include "mlir/Conversion/LLVMCommon/LoweringOptions.h"
@@ -86,6 +87,7 @@ struct ConvertToNVVMPass : public ConvertToNVVMBase<ConvertToNVVMPass> {
       populateMathToLLVMConversionPatterns(converter, llvmPatterns);
       populateMemRefToLLVMConversionPatterns(converter, llvmPatterns);
       populateStdToLLVMConversionPatterns(converter, llvmPatterns);
+      cf::populateControlFlowToLLVMConversionPatterns(converter, llvmPatterns);
       arith::populateArithmeticToLLVMConversionPatterns(converter,
                                                         llvmPatterns);
       populateVectorToLLVMConversionPatterns(converter, llvmPatterns);

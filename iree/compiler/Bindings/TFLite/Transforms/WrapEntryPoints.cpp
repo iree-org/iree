@@ -11,7 +11,7 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/StringExtras.h"
 #include "mlir/Dialect/Affine/Utils.h"
-#include "mlir/Dialect/StandardOps/IR/Ops.h"
+#include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/MLIRContext.h"
@@ -204,8 +204,8 @@ class WrapEntryPointsPass
         loc, dirtyGlobalOp.type(), dirtyGlobalOp.getName());
     auto *recalculateBlock = calcFuncOp.addBlock();
     auto *returnBlock = calcFuncOp.addBlock();
-    entryBuilder.create<mlir::CondBranchOp>(loc, dirtyValue, recalculateBlock,
-                                            returnBlock);
+    entryBuilder.create<mlir::cf::CondBranchOp>(loc, dirtyValue,
+                                                recalculateBlock, returnBlock);
     auto *followBlock = entryBlock.splitBlock(entryBuilder.getInsertionPoint());
 
     auto bufferType = entryBuilder.getType<IREE::HAL::BufferType>();
@@ -233,7 +233,7 @@ class WrapEntryPointsPass
     while (entryBlock.getNumArguments() > 0) {
       entryBlock.eraseArgument(entryBlock.getNumArguments() - 1);
     }
-    recalculateBuilder.create<mlir::BranchOp>(loc, followBlock);
+    recalculateBuilder.create<mlir::cf::BranchOp>(loc, followBlock);
     recalculateBlock->moveBefore(followBlock);
 
     // Replace each exit from the function with a storage back to the shape
@@ -285,7 +285,7 @@ class WrapEntryPointsPass
     auto *exitBlock = builder.createBlock(entryBlock->getParent(),
                                           ++Region::iterator(entryBlock));
     if (caseCount == 0) {
-      builder.create<mlir::BranchOp>(loc, exitBlock);
+      builder.create<mlir::cf::BranchOp>(loc, exitBlock);
       return exitBlock;
     }
     SmallVector<Block *, 4> compareBlocks;
@@ -295,20 +295,20 @@ class WrapEntryPointsPass
       caseBlocks.push_back(builder.createBlock(exitBlock));
     }
     builder.restoreInsertionPoint(ip);
-    builder.create<mlir::BranchOp>(loc, compareBlocks[0]);
+    builder.create<mlir::cf::BranchOp>(loc, compareBlocks[0]);
     for (size_t i = 0; i < caseCount; ++i) {
       auto compareBuilder = OpBuilder::atBlockBegin(compareBlocks[i]);
       auto caseValue =
           compareBuilder.createOrFold<arith::ConstantIndexOp>(loc, i);
       auto eqValue = compareBuilder.createOrFold<arith::CmpIOp>(
           loc, arith::CmpIPredicate::eq, indexValue, caseValue);
-      compareBuilder.create<mlir::CondBranchOp>(
+      compareBuilder.create<mlir::cf::CondBranchOp>(
           loc, eqValue, caseBlocks[i],
           i < caseCount - 1 ? compareBlocks[i + 1] : exitBlock);
 
       auto caseBuilder = OpBuilder::atBlockBegin(caseBlocks[i]);
       caseGenerator(i, caseBuilder);
-      caseBuilder.create<mlir::BranchOp>(loc, exitBlock);
+      caseBuilder.create<mlir::cf::BranchOp>(loc, exitBlock);
     }
     builder = OpBuilder::atBlockBegin(exitBlock);
     return exitBlock;

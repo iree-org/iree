@@ -10,8 +10,7 @@
 #ifndef IREE_BASE_INTERNAL_WAIT_HANDLE_POSIX_H_
 #define IREE_BASE_INTERNAL_WAIT_HANDLE_POSIX_H_
 
-// NOTE: we could be tighter here, but we today only have win32 or not-win32.
-#if IREE_WAIT_API != IREE_WAIT_API_NULL && IREE_WAIT_API != IREE_WAIT_API_WIN32
+#if defined(IREE_WAIT_API_POSIX_LIKE)
 
 #ifdef __cplusplus
 extern "C" {
@@ -73,6 +72,6 @@ iree_status_t iree_wait_primitive_clear(iree_wait_handle_t* handle);
 }  // extern "C"
 #endif  // __cplusplus
 
-#endif  // !IREE_WAIT_API_NULL && !IREE_WAIT_API_WIN32
+#endif  // IREE_WAIT_API_POSIX_LIKE
 
 #endif  // IREE_BASE_INTERNAL_WAIT_HANDLE_POSIX_H_

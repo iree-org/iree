@@ -156,7 +156,7 @@ class ValuePVS : public DFX::StateWrapper<DFX::PotentialConstantIntValuesState,
           // summed to all of %rhs). May not be worth it, though.
           // TODO(benvanik): move select op walking to the explorer.
           if (auto selectOp =
-                  dyn_cast<mlir::SelectOp>(result.getDefiningOp())) {
+                  dyn_cast<mlir::arith::SelectOp>(result.getDefiningOp())) {
             auto lhs = solver.getElementFor<ValuePVS>(
                 *this, Position::forValue(selectOp.getTrueValue()),
                 DFX::Resolution::REQUIRED);

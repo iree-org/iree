@@ -103,6 +103,15 @@ int mlir::iree_compiler::runIreeTranslateMain(int argc, char **argv) {
     return 1;
   }
 
+  // The value is required in processBuffer but if Required option is set on
+  // flag above then there is an error reported per possible translation rather
+  // than single one, so check explicitly instead.
+  if (!translationRequested) {
+    llvm::errs()
+        << "Translation to perform option: must be specified at least once!\n";
+    return 1;
+  }
+
   /// Processes the memory buffer with a new MLIRContext.
   auto processBuffer = [&](std::unique_ptr<llvm::MemoryBuffer> ownedBuffer,
                            llvm::raw_ostream &os) {

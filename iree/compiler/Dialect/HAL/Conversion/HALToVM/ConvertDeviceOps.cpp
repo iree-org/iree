@@ -62,7 +62,7 @@ class DeviceQueryIntCastOpConversion
       // Select the default value based on the converted type as that's the type
       // of the attribute we have is in. 'ok' result is set to true as we've
       // already handled the error case.
-      value = rewriter.createOrFold<SelectOp>(
+      value = rewriter.createOrFold<arith::SelectOp>(
           op.getLoc(), ok, value,
           rewriter.createOrFold<arith::ConstantOp>(op.getLoc(),
                                                    op.default_valueAttr()));
@@ -94,7 +94,7 @@ class DeviceQueryI32OpConversion
     auto ok = results->front();
     auto value = results->back();
     if (op.default_value().hasValue()) {
-      value = rewriter.createOrFold<SelectOp>(
+      value = rewriter.createOrFold<arith::SelectOp>(
           op.getLoc(), ok, value,
           rewriter.createOrFold<IREE::VM::ConstI32Op>(op.getLoc(),
                                                       op.default_valueAttr()));

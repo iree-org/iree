@@ -8,6 +8,7 @@
 #include "iree-dialects/Dialect/PyDM/IR/PyDMOps.h"
 #include "iree-dialects/Dialect/PyDM/Transforms/ToIREE/Patterns.h"
 #include "llvm/ADT/TypeSwitch.h"
+#include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
 #include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/BuiltinOps.h"
@@ -358,9 +359,9 @@ class AssignSubscriptListConversion
           loc, arith::CmpIPredicate::slt, slice, zero);
       auto sliceIndex =
           rewriter.create<arith::IndexCastOp>(loc, indexType, slice);
-      rewriter.create<mlir::CondBranchOp>(loc, ltZero, indexLtZeroBlock,
-                                          indexCheckBlock,
-                                          ValueRange{sliceIndex});
+      rewriter.create<mlir::cf::CondBranchOp>(loc, ltZero, indexLtZeroBlock,
+                                              indexCheckBlock,
+                                              ValueRange{sliceIndex});
     }
 
     // Handle index < 0.
@@ -370,8 +371,8 @@ class AssignSubscriptListConversion
           rewriter.create<arith::AddIOp>(loc, slice, listSizeInteger);
       Value positiveSliceIndex =
           rewriter.create<arith::IndexCastOp>(loc, indexType, positiveSlice);
-      rewriter.create<mlir::BranchOp>(loc, ValueRange{positiveSliceIndex},
-                                      indexCheckBlock);
+      rewriter.create<mlir::cf::BranchOp>(loc, ValueRange{positiveSliceIndex},
+                                          indexCheckBlock);
     }
 
     // Index check.
@@ -380,9 +381,9 @@ class AssignSubscriptListConversion
       Value sliceIndex = indexCheckBlock->getArgument(0);
       Value ltSize = rewriter.create<arith::CmpIOp>(
           loc, arith::CmpIPredicate::ult, sliceIndex, listSizeIndex);
-      rewriter.create<mlir::CondBranchOp>(loc, ltSize, setElementBlock,
-                                          ValueRange{sliceIndex}, failureBlock,
-                                          ValueRange{});
+      rewriter.create<mlir::cf::CondBranchOp>(loc, ltSize, setElementBlock,
+                                              ValueRange{sliceIndex},
+                                              failureBlock, ValueRange{});
     }
 
     // Set element.
@@ -391,8 +392,8 @@ class AssignSubscriptListConversion
       Value successResult = getSuccessStatusValue(loc, rewriter);
       rewriter.create<Input::ListSetOp>(
           loc, sequence, setElementBlock->getArgument(0), valueToSet);
-      rewriter.create<mlir::BranchOp>(loc, continuationBlock,
-                                      ValueRange{successResult});
+      rewriter.create<mlir::cf::BranchOp>(loc, continuationBlock,
+                                          ValueRange{successResult});
     }
 
     // Failure.
@@ -400,8 +401,8 @@ class AssignSubscriptListConversion
       rewriter.setInsertionPointToEnd(failureBlock);
       Value failureResult =
           getFailureStatusValue(loc, rewriter, ExceptionCode::IndexError);
-      rewriter.create<mlir::BranchOp>(loc, continuationBlock,
-                                      ValueRange{failureResult});
+      rewriter.create<mlir::cf::BranchOp>(loc, continuationBlock,
+                                          ValueRange{failureResult});
     }
 
     return success();
@@ -563,8 +564,8 @@ class DynamicUnpackOpConversion
           loc, rewriter.getIndexType(), adaptor.sequence());
       Value arityMatch = rewriter.create<arith::CmpIOp>(
           loc, arith::CmpIPredicate::eq, arityValue, listSize);
-      rewriter.create<mlir::CondBranchOp>(loc, arityMatch, arityMatchBlock,
-                                          errorBlock);
+      rewriter.create<mlir::cf::CondBranchOp>(loc, arityMatch, arityMatchBlock,
+                                              errorBlock);
     }
 
     // Arity match.
@@ -579,7 +580,7 @@ class DynamicUnpackOpConversion
             loc, it.value(), adaptor.sequence(), index);
         branchArgs.push_back(slotValue);
       }
-      rewriter.create<mlir::BranchOp>(loc, continuationBlock, branchArgs);
+      rewriter.create<mlir::cf::BranchOp>(loc, continuationBlock, branchArgs);
     }
 
     // Error block.
@@ -591,7 +592,7 @@ class DynamicUnpackOpConversion
       for (Type slotType : slotTypes) {
         branchArgs.push_back(getNullValue(loc, rewriter, slotType));
       }
-      rewriter.create<mlir::BranchOp>(loc, continuationBlock, branchArgs);
+      rewriter.create<mlir::cf::BranchOp>(loc, continuationBlock, branchArgs);
     }
 
     return success();
@@ -848,8 +849,8 @@ class RaiseOnFailureOpConversion
     Value successValue = getSuccessStatusValue(loc, rewriter);
     Value isSuccess = rewriter.create<arith::CmpIOp>(
         loc, arith::CmpIPredicate::eq, successValue, status);
-    rewriter.create<mlir::CondBranchOp>(loc, isSuccess, continuationBlock,
-                                        raiseAndReturnBlock);
+    rewriter.create<mlir::cf::CondBranchOp>(loc, isSuccess, continuationBlock,
+                                            raiseAndReturnBlock);
     rewriter.eraseOp(srcOp);
 
     // Raise and return block.
@@ -915,7 +916,7 @@ class SequenceCloneBuiltinConversion
         rewriter.create<arith::ConstantIntOp>(loc, 0, countInteger.getType());
     Value countClampsToZero = rewriter.create<arith::CmpIOp>(
         loc, arith::CmpIPredicate::sle, countInteger, zeroInteger);
-    Value clampedCountIndex = rewriter.create<mlir::SelectOp>(
+    Value clampedCountIndex = rewriter.create<mlir::arith::SelectOp>(
         loc, countClampsToZero, zeroIndex, countIndex);
     Value newListSize =
         rewriter.create<arith::MulIOp>(loc, subListSize, clampedCountIndex);
@@ -941,7 +942,8 @@ class SequenceCloneBuiltinConversion
     // Entry block.
     {
       rewriter.setInsertionPointToEnd(entryBlock);
-      rewriter.create<BranchOp>(loc, outerCond, ValueRange{zeroIndex});
+      rewriter.create<mlir::cf::BranchOp>(loc, outerCond,
+                                          ValueRange{zeroIndex});
     }
 
     // Outer cond.
@@ -950,9 +952,9 @@ class SequenceCloneBuiltinConversion
       Value newListIt = outerCond->getArgument(0);
       Value inBounds = rewriter.create<arith::CmpIOp>(
           loc, arith::CmpIPredicate::ult, newListIt, newListSize);
-      rewriter.create<CondBranchOp>(loc, inBounds, innerCond,
-                                    ValueRange{newListIt, zeroIndex},
-                                    continuationBlock, ValueRange{});
+      rewriter.create<mlir::cf::CondBranchOp>(loc, inBounds, innerCond,
+                                              ValueRange{newListIt, zeroIndex},
+                                              continuationBlock, ValueRange{});
     }
 
     // Inner cond.
@@ -962,9 +964,9 @@ class SequenceCloneBuiltinConversion
       Value subListIt = innerCond->getArgument(1);
       Value inBounds = rewriter.create<arith::CmpIOp>(
           loc, arith::CmpIPredicate::ult, subListIt, subListSize);
-      rewriter.create<CondBranchOp>(loc, inBounds, innerBody,
-                                    ValueRange{newListIt, subListIt}, outerCond,
-                                    ValueRange{newListIt});
+      rewriter.create<mlir::cf::CondBranchOp>(loc, inBounds, innerBody,
+                                              ValueRange{newListIt, subListIt},
+                                              outerCond, ValueRange{newListIt});
     }
 
     // Inner body.
@@ -979,8 +981,8 @@ class SequenceCloneBuiltinConversion
 
       newListIt = rewriter.create<arith::AddIOp>(loc, newListIt, oneIndex);
       subListIt = rewriter.create<arith::AddIOp>(loc, subListIt, oneIndex);
-      rewriter.create<BranchOp>(loc, innerCond,
-                                ValueRange{newListIt, subListIt});
+      rewriter.create<mlir::cf::BranchOp>(loc, innerCond,
+                                          ValueRange{newListIt, subListIt});
     }
 
     // Continuation.
@@ -1091,9 +1093,9 @@ class SubscriptOpBuiltinSequenceConversion
           loc, arith::CmpIPredicate::slt, slice, zero);
       auto sliceIndex =
           rewriter.create<arith::IndexCastOp>(loc, indexType, slice);
-      rewriter.create<mlir::CondBranchOp>(loc, ltZero, indexLtZeroBlock,
-                                          indexCheckBlock,
-                                          ValueRange{sliceIndex});
+      rewriter.create<mlir::cf::CondBranchOp>(loc, ltZero, indexLtZeroBlock,
+                                              indexCheckBlock,
+                                              ValueRange{sliceIndex});
     }
 
     // Handle index < 0.
@@ -1103,8 +1105,8 @@ class SubscriptOpBuiltinSequenceConversion
           rewriter.create<arith::AddIOp>(loc, slice, listSizeInteger);
       Value positiveSliceIndex =
           rewriter.create<arith::IndexCastOp>(loc, indexType, positiveSlice);
-      rewriter.create<mlir::BranchOp>(loc, ValueRange{positiveSliceIndex},
-                                      indexCheckBlock);
+      rewriter.create<mlir::cf::BranchOp>(loc, ValueRange{positiveSliceIndex},
+                                          indexCheckBlock);
     }
 
     // Index check.
@@ -1113,9 +1115,9 @@ class SubscriptOpBuiltinSequenceConversion
       Value sliceIndex = indexCheckBlock->getArgument(0);
       Value ltSize = rewriter.create<arith::CmpIOp>(
           loc, arith::CmpIPredicate::ult, sliceIndex, listSizeIndex);
-      rewriter.create<mlir::CondBranchOp>(loc, ltSize, getElementBlock,
-                                          ValueRange{sliceIndex}, failureBlock,
-                                          ValueRange{});
+      rewriter.create<mlir::cf::CondBranchOp>(loc, ltSize, getElementBlock,
+                                              ValueRange{sliceIndex},
+                                              failureBlock, ValueRange{});
     }
 
     // Get element.
@@ -1124,8 +1126,8 @@ class SubscriptOpBuiltinSequenceConversion
       Value successResult = getSuccessStatusValue(loc, rewriter);
       Value resultValue = rewriter.create<Input::ListGetOp>(
           loc, resultType, adaptor.value(), getElementBlock->getArgument(0));
-      rewriter.create<mlir::BranchOp>(loc, continuationBlock,
-                                      ValueRange{successResult, resultValue});
+      rewriter.create<mlir::cf::BranchOp>(
+          loc, continuationBlock, ValueRange{successResult, resultValue});
     }
 
     // Failure.
@@ -1134,8 +1136,8 @@ class SubscriptOpBuiltinSequenceConversion
       Value failureResult =
           getFailureStatusValue(loc, rewriter, ExceptionCode::IndexError);
       Value nullResult = getNullValue(loc, rewriter, resultType);
-      rewriter.create<mlir::BranchOp>(loc, continuationBlock,
-                                      ValueRange{failureResult, nullResult});
+      rewriter.create<mlir::cf::BranchOp>(
+          loc, continuationBlock, ValueRange{failureResult, nullResult});
     }
 
     return success();
@@ -1191,8 +1193,8 @@ class UnboxOpConversion : public OpConversionPattern<PYDM::UnboxOp> {
       Value typeCodeEqual = rewriter.create<arith::CmpIOp>(
           loc, arith::CmpIPredicate::eq, requiredTypeCodeValue,
           actualTypeCodeValue);
-      rewriter.create<mlir::CondBranchOp>(loc, typeCodeEqual, typesMatchBlock,
-                                          slowPathMismatchBlock);
+      rewriter.create<mlir::cf::CondBranchOp>(
+          loc, typeCodeEqual, typesMatchBlock, slowPathMismatchBlock);
     }
 
     // Fast path types match block.
@@ -1203,8 +1205,8 @@ class UnboxOpConversion : public OpConversionPattern<PYDM::UnboxOp> {
       Value successResult = getSuccessStatusValue(loc, rewriter);
       Value unboxedValue = rewriter.create<Input::ListGetOp>(
           loc, targetUnboxedType, list, index1);
-      rewriter.create<mlir::BranchOp>(loc, continuationBlock,
-                                      ValueRange{successResult, unboxedValue});
+      rewriter.create<mlir::cf::BranchOp>(
+          loc, continuationBlock, ValueRange{successResult, unboxedValue});
     }
 
     // Slow path coercion on mismatch.
@@ -1214,8 +1216,8 @@ class UnboxOpConversion : public OpConversionPattern<PYDM::UnboxOp> {
       Value failureResult =
           getFailureStatusValue(loc, rewriter, ExceptionCode::ValueError);
       Value nullResult = getNullValue(loc, rewriter, targetUnboxedType);
-      rewriter.create<mlir::BranchOp>(loc, continuationBlock,
-                                      ValueRange{failureResult, nullResult});
+      rewriter.create<mlir::cf::BranchOp>(
+          loc, continuationBlock, ValueRange{failureResult, nullResult});
     }
 
     return success();
@@ -1228,24 +1230,24 @@ class UnboxOpConversion : public OpConversionPattern<PYDM::UnboxOp> {
 // those that can be emitted as part of canonicalizations.
 //------------------------------------------------------------------------------
 
-class BuiltinBranchConversion : public OpConversionPattern<mlir::BranchOp> {
+class BuiltinBranchConversion : public OpConversionPattern<mlir::cf::BranchOp> {
   using OpConversionPattern::OpConversionPattern;
   LogicalResult matchAndRewrite(
-      mlir::BranchOp srcOp, OpAdaptor adaptor,
+      mlir::cf::BranchOp srcOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    rewriter.replaceOpWithNewOp<mlir::BranchOp>(srcOp, srcOp.getDest(),
-                                                adaptor.getDestOperands());
+    rewriter.replaceOpWithNewOp<mlir::cf::BranchOp>(srcOp, srcOp.getDest(),
+                                                    adaptor.getDestOperands());
     return success();
   }
 };
 
 class BuiltinCondBranchConversion
-    : public OpConversionPattern<mlir::CondBranchOp> {
+    : public OpConversionPattern<mlir::cf::CondBranchOp> {
   using OpConversionPattern::OpConversionPattern;
   LogicalResult matchAndRewrite(
-      mlir::CondBranchOp srcOp, OpAdaptor adaptor,
+      mlir::cf::CondBranchOp srcOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    rewriter.replaceOpWithNewOp<mlir::CondBranchOp>(
+    rewriter.replaceOpWithNewOp<mlir::cf::CondBranchOp>(
         srcOp, adaptor.getCondition(), srcOp.getTrueDest(),
         adaptor.getTrueDestOperands(), srcOp.getFalseDest(),
         adaptor.getFalseDestOperands());
@@ -1253,14 +1255,15 @@ class BuiltinCondBranchConversion
   }
 };
 
-class BuiltinSelectConversion : public OpConversionPattern<mlir::SelectOp> {
+class BuiltinSelectConversion
+    : public OpConversionPattern<mlir::arith::SelectOp> {
   using OpConversionPattern::OpConversionPattern;
   LogicalResult matchAndRewrite(
-      mlir::SelectOp srcOp, OpAdaptor adaptor,
+      mlir::arith::SelectOp srcOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    rewriter.replaceOpWithNewOp<mlir::SelectOp>(srcOp, adaptor.getCondition(),
-                                                adaptor.getTrueValue(),
-                                                adaptor.getFalseValue());
+    rewriter.replaceOpWithNewOp<mlir::arith::SelectOp>(
+        srcOp, adaptor.getCondition(), adaptor.getTrueValue(),
+        adaptor.getFalseValue());
     return success();
   }
 };

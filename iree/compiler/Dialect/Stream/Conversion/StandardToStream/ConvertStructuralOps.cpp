@@ -9,6 +9,7 @@
 #include "iree/compiler/Dialect/Stream/IR/StreamOps.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamTypes.h"
 #include "llvm/ADT/DenseMap.h"
+#include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/BlockAndValueMapping.h"
@@ -153,41 +154,42 @@ struct ReturnOpConversion : public OpConversionPattern<mlir::ReturnOp> {
   }
 };
 
-struct BranchOpConversion : public OpConversionPattern<mlir::BranchOp> {
+struct BranchOpConversion : public OpConversionPattern<mlir::cf::BranchOp> {
   using OpConversionPattern::OpConversionPattern;
   LogicalResult matchAndRewrite(
-      mlir::BranchOp op, OpAdaptor adaptor,
+      mlir::cf::BranchOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     // Expand any resource operands to resource + size.
     auto expandedOperands = expandResourceOperands(
         op.getLoc(), adaptor.getDestOperands(), rewriter);
-    rewriter.replaceOpWithNewOp<mlir::BranchOp>(op, op.getDest(),
-                                                expandedOperands);
+    rewriter.replaceOpWithNewOp<mlir::cf::BranchOp>(op, op.getDest(),
+                                                    expandedOperands);
     return success();
   }
 };
 
-struct CondBranchOpConversion : public OpConversionPattern<mlir::CondBranchOp> {
+struct CondBranchOpConversion
+    : public OpConversionPattern<mlir::cf::CondBranchOp> {
   using OpConversionPattern::OpConversionPattern;
   LogicalResult matchAndRewrite(
-      mlir::CondBranchOp op, OpAdaptor adaptor,
+      mlir::cf::CondBranchOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     // Expand any resource operands to resource + size.
     auto trueDestOperands = expandResourceOperands(
         op.getLoc(), adaptor.getTrueDestOperands(), rewriter);
     auto falseDestOperands = expandResourceOperands(
         op.getLoc(), adaptor.getFalseDestOperands(), rewriter);
-    rewriter.replaceOpWithNewOp<mlir::CondBranchOp>(
+    rewriter.replaceOpWithNewOp<mlir::cf::CondBranchOp>(
         op, adaptor.getCondition(), op.getTrueDest(), trueDestOperands,
         op.getFalseDest(), falseDestOperands);
     return success();
   }
 };
 
-struct SelectOpConversion : public OpConversionPattern<mlir::SelectOp> {
+struct SelectOpConversion : public OpConversionPattern<mlir::arith::SelectOp> {
   using OpConversionPattern::OpConversionPattern;
   LogicalResult matchAndRewrite(
-      mlir::SelectOp op, OpAdaptor adaptor,
+      mlir::arith::SelectOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     // Only handle selects where the operands are tensors (resources).
     if (!op.getTrueValue().getType().isa<TensorType>()) return failure();
@@ -195,10 +197,10 @@ struct SelectOpConversion : public OpConversionPattern<mlir::SelectOp> {
         consumeTensorOperand(op.getLoc(), adaptor.getTrueValue(), rewriter);
     auto falseOperand =
         consumeTensorOperand(op.getLoc(), adaptor.getFalseValue(), rewriter);
-    auto resourceSelectOp = rewriter.create<mlir::SelectOp>(
+    auto resourceSelectOp = rewriter.create<mlir::arith::SelectOp>(
         op.getLoc(), adaptor.getCondition(), trueOperand.resource,
         falseOperand.resource);
-    auto sizeSelectOp = rewriter.create<mlir::SelectOp>(
+    auto sizeSelectOp = rewriter.create<mlir::arith::SelectOp>(
         op.getLoc(), adaptor.getCondition(), trueOperand.resourceSize,
         falseOperand.resourceSize);
     rewriter.replaceOpWithNewOp<mlir::UnrealizedConversionCastOp>(
@@ -237,14 +239,14 @@ void populateStandardStructuralToStreamPatterns(
         });
       });
 
-  conversionTarget.addDynamicallyLegalOp<mlir::BranchOp>(
-      [&](mlir::BranchOp op) {
+  conversionTarget.addDynamicallyLegalOp<mlir::cf::BranchOp>(
+      [&](mlir::cf::BranchOp op) {
         return llvm::all_of(op.getOperandTypes(), [&](Type type) {
           return typeConverter.isLegal(type);
         });
       });
-  conversionTarget.addDynamicallyLegalOp<mlir::CondBranchOp>(
-      [&](mlir::CondBranchOp op) {
+  conversionTarget.addDynamicallyLegalOp<mlir::cf::CondBranchOp>(
+      [&](mlir::cf::CondBranchOp op) {
         return llvm::all_of(op.getOperandTypes(), [&](Type type) {
           return typeConverter.isLegal(type);
         });

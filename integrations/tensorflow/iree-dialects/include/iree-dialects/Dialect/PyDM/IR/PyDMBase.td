@@ -33,12 +33,12 @@ def IREEPyDM_Dialect : Dialect {
   let hasConstantMaterializer = 1;
 }
 
-class IREEPyDM_Op<string mnemonic, list<OpTrait> traits = []> :
+class IREEPyDM_Op<string mnemonic, list<Trait> traits = []> :
     Op<IREEPyDM_Dialect, mnemonic, traits> {
   let verifier = [{ return ::verify(*this); }];
 }
 
-class IREEPyDM_PureOp<string mnemonic, list<OpTrait> traits = []> :
+class IREEPyDM_PureOp<string mnemonic, list<Trait> traits = []> :
     Op<IREEPyDM_Dialect, mnemonic, !listconcat(traits, [NoSideEffect])> {
   let verifier = [{ return ::verify(*this); }];
 }

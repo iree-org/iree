@@ -34,7 +34,7 @@ iree_cc_library(
     MLIRMemRefTransforms
     MLIRPass
     MLIRSCF
-    MLIRSCFToStandard
+    MLIRSCFToControlFlow
     MLIRStandard
     MLIRStandardOpsTransforms
     MLIRSupport

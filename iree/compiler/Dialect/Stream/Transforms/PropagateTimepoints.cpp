@@ -16,6 +16,7 @@
 #include "llvm/ADT/BreadthFirstIterator.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Debug.h"
+#include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/BlockAndValueMapping.h"
@@ -452,21 +453,21 @@ static void expandReturnOp(mlir::ReturnOp op,
 //    br ^bb1(%t, %0)
 //  ^bb1(%a, %b):
 //    %1 = stream.timepoint.await %a, %b
-static void expandBranchOp(mlir::BranchOp op,
+static void expandBranchOp(mlir::cf::BranchOp op,
                            BlockAndValueMapping &resourceTimepointMap) {
   if (!usesResources(op)) return;
   OpBuilder builder(op);
   auto operands = expandOperands(op.getLoc(), op.getDestOperands(),
                                  resourceTimepointMap, builder);
-  builder.create<mlir::BranchOp>(op.getLoc(), op.getDest(), operands);
+  builder.create<mlir::cf::BranchOp>(op.getLoc(), op.getDest(), operands);
   op.erase();
 }
 
-static void expandCondBranchOp(mlir::CondBranchOp op,
+static void expandCondBranchOp(mlir::cf::CondBranchOp op,
                                BlockAndValueMapping &resourceTimepointMap) {
   if (!usesResources(op)) return;
   OpBuilder builder(op);
-  builder.create<mlir::CondBranchOp>(
+  builder.create<mlir::cf::CondBranchOp>(
       op.getLoc(), op.getCondition(), op.getTrueDest(),
       expandOperands(op.getLoc(), op.getTrueDestOperands(),
                      resourceTimepointMap, builder),
@@ -548,9 +549,9 @@ static void expandTimepoints(Operation *op, ExpandedGlobalMap &globalMap,
     expandCallOp(callOp, resourceTimepointMap);
   } else if (auto returnOp = dyn_cast<mlir::ReturnOp>(op)) {
     expandReturnOp(returnOp, resourceTimepointMap);
-  } else if (auto branchOp = dyn_cast<mlir::BranchOp>(op)) {
+  } else if (auto branchOp = dyn_cast<mlir::cf::BranchOp>(op)) {
     expandBranchOp(branchOp, resourceTimepointMap);
-  } else if (auto condBranchOp = dyn_cast<mlir::CondBranchOp>(op)) {
+  } else if (auto condBranchOp = dyn_cast<mlir::cf::CondBranchOp>(op)) {
     expandCondBranchOp(condBranchOp, resourceTimepointMap);
   } else if (auto awaitOp = dyn_cast<IREE::Stream::TimepointAwaitOp>(op)) {
     expandAwaitOp(awaitOp, resourceTimepointMap);
@@ -580,6 +581,7 @@ class PropagateTimepointsPass
 
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<mlir::StandardOpsDialect>();
+    registry.insert<mlir::cf::ControlFlowDialect>();
     registry.insert<IREE::Stream::StreamDialect>();
     registry.insert<IREE::Util::UtilDialect>();
   }

@@ -9,6 +9,7 @@
 #include "iree-dialects/Dialect/PyDM/Transforms/Passes.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/Support/Debug.h"
+#include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/Dominance.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -111,7 +112,8 @@ struct VariablesToSSAPass : public VariablesToSSABase<VariablesToSSAPass> {
     }
     Operation *terminator = block.getTerminator();
     if (!terminator ||
-        !llvm::isa<BranchOp, CondBranchOp, PYDM::ReturnOp>(terminator)) {
+        !llvm::isa<cf::BranchOp, cf::CondBranchOp, PYDM::ReturnOp>(
+            terminator)) {
       return emitError(terminator->getLoc())
              << "unsupported terminator for block";
     }
@@ -193,9 +195,10 @@ struct VariablesToSSAPass : public VariablesToSSABase<VariablesToSSAPass> {
             builder.create<LoadVarOp>(loc, loadType, varValue));
       }
 
-      if (auto branchOp = llvm::dyn_cast<BranchOp>(terminator)) {
+      if (auto branchOp = llvm::dyn_cast<cf::BranchOp>(terminator)) {
         branchOp.getDestOperandsMutable().append(newLoadValues);
-      } else if (auto condBranchOp = llvm::dyn_cast<CondBranchOp>(terminator)) {
+      } else if (auto condBranchOp =
+                     llvm::dyn_cast<cf::CondBranchOp>(terminator)) {
         if (condBranchOp.getTrueDest() == &block) {
           condBranchOp.getTrueDestOperandsMutable().append(newLoadValues);
         } else if (condBranchOp.getFalseDest() == &block) {

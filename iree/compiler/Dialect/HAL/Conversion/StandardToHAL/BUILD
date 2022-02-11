@@ -27,6 +27,7 @@ cc_library(
         "//iree/compiler/Dialect/HAL/Target",
         "//iree/compiler/Dialect/Util/Conversion",
         "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:ControlFlowOps",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:Pass",
         "@llvm-project//mlir:SCFDialect",

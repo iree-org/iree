@@ -63,7 +63,7 @@ TEST(ThreadTest, Lifetime) {
         return iree_atomic_load_int32(&entry_data->value,
                                       iree_memory_order_relaxed) == (123 + 1);
       },
-      &entry_data);
+      &entry_data, iree_infinite_timeout());
   iree_notification_deinitialize(&entry_data.barrier);
 }
 
@@ -110,7 +110,7 @@ TEST(ThreadTest, CreateSuspended) {
         return iree_atomic_load_int32(&entry_data->value,
                                       iree_memory_order_relaxed) == (123 + 1);
       },
-      &entry_data);
+      &entry_data, iree_infinite_timeout());
   iree_notification_deinitialize(&entry_data.barrier);
   iree_thread_release(thread);
 }
@@ -161,7 +161,7 @@ TEST(ThreadTest, PriorityOverride) {
         return iree_atomic_load_int32(&entry_data->value,
                                       iree_memory_order_relaxed) == 1;
       },
-      &entry_data);
+      &entry_data, iree_infinite_timeout());
   iree_notification_deinitialize(&entry_data.barrier);
 
   // Pop overrides (in opposite order intentionally).

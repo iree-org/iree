@@ -9,6 +9,7 @@
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "iree/compiler/Dialect/Util/Conversion/ConversionPatterns.h"
 #include "llvm/ADT/DenseMap.h"
+#include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
 #include "mlir/Dialect/SCF/SCF.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/Attributes.h"
@@ -83,27 +84,28 @@ class CallOpConversion : public OpConversionPattern<mlir::CallOp> {
   }
 };
 
-class BranchOpConversion : public OpConversionPattern<mlir::BranchOp> {
+class BranchOpConversion : public OpConversionPattern<mlir::cf::BranchOp> {
  public:
   using OpConversionPattern::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      mlir::BranchOp op, OpAdaptor adaptor,
+      mlir::cf::BranchOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    rewriter.replaceOpWithNewOp<mlir::BranchOp>(op, op.getDest(),
-                                                adaptor.getDestOperands());
+    rewriter.replaceOpWithNewOp<mlir::cf::BranchOp>(op, op.getDest(),
+                                                    adaptor.getDestOperands());
     return success();
   }
 };
 
-class CondBranchOpConversion : public OpConversionPattern<mlir::CondBranchOp> {
+class CondBranchOpConversion
+    : public OpConversionPattern<mlir::cf::CondBranchOp> {
  public:
   using OpConversionPattern::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      mlir::CondBranchOp op, OpAdaptor adaptor,
+      mlir::cf::CondBranchOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    rewriter.replaceOpWithNewOp<mlir::CondBranchOp>(
+    rewriter.replaceOpWithNewOp<mlir::cf::CondBranchOp>(
         op, adaptor.getCondition(), op.getTrueDest(),
         adaptor.getTrueDestOperands(), op.getFalseDest(),
         adaptor.getFalseDestOperands());
@@ -123,14 +125,14 @@ class ReturnOpConversion : public OpConversionPattern<mlir::ReturnOp> {
   }
 };
 
-class SelectOpConversion : public OpConversionPattern<mlir::SelectOp> {
+class SelectOpConversion : public OpConversionPattern<mlir::arith::SelectOp> {
  public:
   using OpConversionPattern::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      mlir::SelectOp selectOp, OpAdaptor adaptor,
+      mlir::arith::SelectOp selectOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    rewriter.replaceOpWithNewOp<mlir::SelectOp>(
+    rewriter.replaceOpWithNewOp<mlir::arith::SelectOp>(
         selectOp, adaptor.getCondition(), adaptor.getTrueValue(),
         adaptor.getFalseValue());
     return success();

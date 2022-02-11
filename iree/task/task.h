@@ -15,7 +15,6 @@
 #include "iree/base/internal/atomic_slist.h"
 #include "iree/base/internal/atomics.h"
 #include "iree/base/internal/synchronization.h"
-#include "iree/base/internal/wait_handle.h"
 #include "iree/task/affinity_set.h"
 
 #ifdef __cplusplus
@@ -78,16 +77,24 @@ typedef uint8_t iree_task_type_t;
 enum iree_task_flag_bits_t {
   IREE_TASK_FLAG_NONE = 0u,
 
+  // Indicates that a wait task is part of a wait-any operation and the
+  // cancellation flag should be latched by any wait that resolves.
+  IREE_TASK_FLAG_WAIT_ANY = 1u << 0,
+
+  // The wait handle of the wait task has been acquired and the task can be
+  // waited on with system APIs.
+  IREE_TASK_FLAG_WAIT_EXPORTED = 1u << 1,
+
   // The wait handle the task is specified to wait on has resolved and the task
   // can now be considered complete.
-  IREE_TASK_FLAG_WAIT_COMPLETED = 1u << 0,
+  IREE_TASK_FLAG_WAIT_COMPLETED = 1u << 2,
 
   // The workgroup count for the dispatch is provided by way of a pointer to a
   // list of 3 uint32_t values that will be sampled immediately prior to
   // issuing of the dispatch. The contents of the pointer can be safely modified
   // up until the last dependency has completed and the dispatch is about to be
   // issued.
-  IREE_TASK_FLAG_DISPATCH_INDIRECT = 1u << 1,
+  IREE_TASK_FLAG_DISPATCH_INDIRECT = 1u << 3,
 
   // The dispatch has been issued and the task is waiting for one or more
   // shards to complete. After they complete the dispatch will be readied and
@@ -99,7 +106,7 @@ enum iree_task_flag_bits_t {
   // and instead wait until all shards complete, enabling IREE_TASK_TYPE_BARRIER
   // behavior but without an additional task as dispatches are still required
   // to store information for shards.
-  IREE_TASK_FLAG_DISPATCH_RETIRE = 1u << 2,
+  IREE_TASK_FLAG_DISPATCH_RETIRE = 1u << 4,
 
   // An error occurred at or before the task and it has been aborted.
   // Aborted tasks may continue to execute if they're already in-flight but must
@@ -108,7 +115,7 @@ enum iree_task_flag_bits_t {
   // The actual error that occurred is routed to the parent task scope as it
   // happens and may be available for querying before all tasks have been
   // cleaned up.
-  IREE_TASK_FLAG_ABORTED = 1u << 3,
+  IREE_TASK_FLAG_ABORTED = 1u << 5,
 };
 typedef uint16_t iree_task_flags_t;
 
@@ -352,39 +359,119 @@ void iree_task_barrier_set_dependent_tasks(
 // When all of the dependencies of a fence have retired the fence will notify
 // the parent scope of the task by decrementing the pending_submissions count
 // and publishing an idle_notification if it was the last in-flight submission.
+//
+// An optional platform primitive may be provided to signal in a way determined
+// by the primitive type via iree_event_set.
 typedef iree_alignas(iree_max_align_t) struct {
   // Task header: implementation detail, do not use.
   iree_task_t header;
 
-  // TODO(benvanik): user-defined fence data for semaphore signaling. Optional
-  // wait_handle to signal?
+  // An optional wait primitive to signal when the fence is hit.
+  // If iree_wait_primitive_immediate then the signal will be ignored.
+  iree_wait_primitive_t signal_handle;
 } iree_task_fence_t;
 
+// Initializes a fence in |out_task| that demarcates activity in a |scope|.
+// An optional unowned |signal_handle| can be provided that will be signaled
+// with iree_event_set when the fence is reached.
 void iree_task_fence_initialize(iree_task_scope_t* scope,
+                                iree_wait_primitive_t signal_handle,
                                 iree_task_fence_t* out_task);
 
 //==============================================================================
 // IREE_TASK_TYPE_WAIT
 //==============================================================================
 
-typedef struct iree_task_wait_t {
+// A task representing either a delay until a point in time or a wait on a wait
+// source external to the task system.
+//
+// Waits are modeled in the task graph to enable reducing the number of times a
+// full system wait is required by only beginning the wait when the task
+// dependencies have completed. Wait sources will be eagerly queried and
+// exported to wait handles when the task system would otherwise go idle. All
+// wait sources from all pending wait tasks will be accumulated into a wait set
+// and waited on in a single syscall.
+//
+// Waits will block the completion task until the wait resolves successfully or
+// the deadline is reached or exceeded.
+//
+// Sleeps (where wait_source is iree_wait_source_delay) will delay the
+// completion task until the delay time is reached or exceeded and will do so
+// without triggering an IREE_STATUS_DEADLINE_EXCEEDED.
+//
+// Wait-all behavior can be modeled with multiple wait tasks joined on one task;
+// all of the waits must successfully resolve prior to the completion task being
+// issued. If any wait fails then the scope is failed.
+//
+// Wait-any behavior can be modeled with multiple wait tasks joined on one task
+// as with wait-all but with each sharing a cancellation flag and having the
+// IREE_TASK_FLAG_WAIT_ANY bit set. If any wait successfully resolves or fails
+// the flag will be set to cancel all sibling waits. The cancellation flag must
+// be owned by the completion task to ensure that it is live for the lifetime of
+// all wait tasks sharing it. In more sophisticated scenarios the cancellation
+// flag may be owned by anything in the system that can guarantee the lifetime,
+// enabling cancellation actions from external code.
+//
+// Non-failing deadlines can be implemented with a wait-any on one or more wait
+// sources as well as on a delay task: if the delay task is resolved before any
+// of the other waits they will be cancelled and the completion task will be
+// issued without an IREE_STATUS_DEADLINE_EXCEEDED being emitted.
+typedef iree_alignas(iree_max_align_t) struct {
   // Task header: implementation detail, do not use.
   iree_task_t header;
 
-  // The external wait handle that the task is waiting on.
-  // TODO(benvanik): null handle for sleep.
-  // TODO(benvanik): use a wait source with cached wait handle.
-  // TODO(benvanik): multiple wait handles (ptr owned by outer wrapper task).
-  iree_wait_handle_t wait_handle;
+  // The wait source that the task is waiting on.
+  // May be iree_wait_source_immediate if the wait is neutered or
+  // iree_wait_source_delay if this is a delay (sleep).
+  iree_wait_source_t wait_source;
 
-  // TODO(benvanik): deadline_ns.
-  // TODO(benvanik): condition (possibly a closure to evaluate) ala condvar.
-  // TODO(benvanik): whether a sleep.
+  // Deadline for the wait; if this time elapses the wait will be failed with
+  // IREE_STATUS_DEADLINE_EXCEEDED. May be IREE_TIME_INFINITE_FUTURE to indicate
+  // that the wait has no deadline.
+  iree_time_t deadline_ns;
+
+  // Optional pointer to a shared cancellation flag.
+  // Set to non-zero to have the wait cancel and issue the completion task as if
+  // it had successfully waited. No error will be raised and the completion task
+  // will need to handle the wake. This is used to model wait-any behavior where
+  // multiple waits can be issued but if any one resolves all waits are silently
+  // cancelled.
+  //
+  // The flag memory must remain valid until all waits sharing it have retired.
+  // For a wait-any it would commonly be stored on the completion task to ensure
+  // that no waits tasks will be live when it is cleaned up.
+  //
+  // If omitted no cancellation behavior is enabled.
+  // If specified the wait task will check the flag prior to entering a system
+  // wait scope. Cancellation does not impact waits once the system is entered.
+  // If the IREE_TASK_FLAG_WAIT_ANY bit is set on the task the cancellation flag
+  // will be set to non-zero after it resolves in order to cancel the sibling
+  // waits in the wait-any operation.
+  iree_atomic_int32_t* cancellation_flag;
 } iree_task_wait_t;
 
+// Initializes |out_task| as a wait task on |wait_source|.
+// The wait will fail with IREE_STATUS_DEADLINE_EXCEEDED if |deadline_ns| is
+// exceeded prior to the wait resolving. If the wait fails (system error, etc)
+// the failure will be propagated to the |scope|.
 void iree_task_wait_initialize(iree_task_scope_t* scope,
-                               iree_wait_handle_t wait_handle,
+                               iree_wait_source_t wait_source,
+                               iree_time_t deadline_ns,
                                iree_task_wait_t* out_task);
+
+// Initializes |out_task| as a delay until the given |deadline_ns| is reached or
+// exceeded. The completion task will be issued instead of failing with an
+// IREE_STATUS_DEADLINE_EXCEEDED.
+void iree_task_wait_initialize_delay(iree_task_scope_t* scope,
+                                     iree_time_t deadline_ns,
+                                     iree_task_wait_t* out_task);
+
+// Sets the wait |task| to a cooperative wait-any mode by marking the
+// IREE_TASK_FLAG_WAIT_ANY bit and storing the |cancellation_flag|.
+// The cancellation flag must be kept live until after the wait task has
+// retired.
+void iree_task_wait_set_wait_any(iree_task_wait_t* task,
+                                 iree_atomic_int32_t* cancellation_flag);
 
 //==============================================================================
 // IREE_TASK_TYPE_DISPATCH_* structures
