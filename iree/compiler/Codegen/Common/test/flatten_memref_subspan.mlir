@@ -322,3 +322,25 @@ func @expand_shape(%offset : index, %i0: index, %i1: index, %i2: index, %i3: ind
 //      CHECK:   %[[SUBSPAN:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%[[C0]]) : memref<?xf32>{%[[SIZE]]}
 //      CHECK:   %[[INDEX:.+]] = affine.apply #[[MAP]]()[%[[I0]], %[[I1]], %[[I2]], %[[I3]], %[[OFFSET]]]
 //      CHECK:   memref.load %[[SUBSPAN]][%[[INDEX]]]
+
+// -----
+
+func @load_store_rank_one_static_size_subspan_with_offset(%offset : index, %i: index) {
+  %subspan0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%offset) : memref<32xf32>
+  %subspan1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%offset) : memref<32xf32>
+  %val = memref.load %subspan0[%i] : memref<32xf32>
+  memref.store %val, %subspan1[%i] : memref<32xf32>
+  return
+}
+
+//      CHECK: #[[MAP:.+]] = affine_map<()[s0, s1] -> (s0 + s1 floordiv 4)>
+//      CHECK: func @load_store_rank_one_static_size_subspan_with_offset
+// CHECK-SAME: %[[OFFSET:.+]]: index, %[[I:.+]]: index
+//      CHECK:   %[[C0:.+]] = arith.constant 0 : index
+//      CHECK:   %[[C32:.+]] = arith.constant 32 : index
+//      CHECK:   %[[SPAN0:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%[[C0]]) : memref<?xf32>{%[[C32]]}
+//      CHECK:   %[[SPAN1:.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%[[C0]]) : memref<?xf32>{%[[C32]]}
+//      CHECK:   %[[I0:.+]] = affine.apply #[[MAP]]()[%[[I]], %[[OFFSET]]]
+//      CHECK:   %[[V:.+]] = memref.load %[[SPAN0]][%[[I0]]] : memref<?xf32>
+//      CHECK:   %[[I1:.+]] = affine.apply #[[MAP]]()[%[[I]], %[[OFFSET]]]
+//      CHECK:   memref.store %[[V]], %[[SPAN1]][%[[I1]]] : memref<?xf32>
