@@ -33,6 +33,25 @@ function generate_dylib_vmfb {
       -iree-input-type=mhlo
       -iree-llvm-target-cpu-features="+m,+a,+f,+d,+c"
     )
+  elif [[ "${target}" == "tosa" ]]; then
+    local input_file="${1}"; shift
+    iree-import-tflite -o "${BUILD_RISCV_DIR?}/tosa.mlir" "${input_file}"
+    translate_arg+=(
+      -iree-input-type=tosa
+      -iree-llvm-target-cpu-features="+m,+a,+f,+d,+c"
+      "${BUILD_RISCV_DIR?}/tosa.mlir"
+    )
+  elif [[ "${target}" == "tosa-rvv" ]]; then
+    local input_file="${1}"; shift
+    iree-import-tflite -o "${BUILD_RISCV_DIR?}/tosa.mlir" "${input_file}"
+    translate_arg+=(
+      -iree-input-type=tosa
+      -iree-llvm-target-cpu-features="+m,+a,+f,+d,+c,+v"
+      -riscv-v-fixed-length-vector-lmul-max=8
+      -riscv-v-vector-bits-min=256
+      -riscv-v-fixed-length-vector-elen-max=64
+      "${BUILD_RISCV_DIR?}/tosa.mlir"
+    )
   fi
   "${BUILD_HOST_DIR?}/install/bin/iree-translate" "${translate_arg[@]}" "$@"
 }
@@ -40,6 +59,16 @@ function generate_dylib_vmfb {
 generate_dylib_vmfb mhlo \
   "${ROOT_DIR?}/iree/tools/test/iree-run-module.mlir" \
   -o "${BUILD_RISCV_DIR?}/iree-run-module-llvm_aot.vmfb"
+
+wget -P "${BUILD_RISCV_DIR?}/" https://github.com/tensorflow/tflite-micro/raw/aeac6f39e5c7475cea20c54e86d41e3a38312546/tensorflow/lite/micro/models/person_detect.tflite
+
+generate_dylib_vmfb tosa \
+  "${BUILD_RISCV_DIR?}/person_detect.tflite" \
+  -o "${BUILD_RISCV_DIR?}/person_detect.vmfb"
+
+generate_dylib_vmfb tosa-rvv \
+  "${BUILD_RISCV_DIR?}/person_detect.tflite" \
+  -o "${BUILD_RISCV_DIR?}/person_detect_rvv.vmfb"
 
 ${PYTHON_BIN?} "${ROOT_DIR?}/third_party/llvm-project/llvm/utils/lit/lit.py" \
   -v "${ROOT_DIR?}/build_tools/kokoro/gcp_ubuntu/cmake/linux/riscv64/"
