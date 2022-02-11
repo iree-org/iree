@@ -372,7 +372,7 @@ hal.executable private @batch_matmul_tensors {
 // -----
 
 #compilation = #iree_codegen.compilation.info<
-    #iree_codegen.lowering.config<tile_sizes = [[], [32, 32, 0], [0, 0, 32]], native_vector_size = [32, 32, 32]>,
+    #iree_codegen.lowering.config<tile_sizes = [[], [32, 32, 0], [0, 0, 32]], native_vector_size = []>,
     #iree_codegen.translation.info<"CPUDoubleTilingExpert", workload_per_wg = [32, 32]>,
     workgroup_size = []>
 #executable_layout = #hal.executable.layout<push_constants = 0, sets = [
@@ -428,7 +428,7 @@ hal.executable private @preset_config_matmul_tensors  {
   }
 }
 
-//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering.config<tile_sizes = {{\[}}[], [32, 32, 0], [0, 0, 32]], native_vector_size = [32, 32, 32]>
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering.config<tile_sizes = {{\[}}[], [32, 32, 0], [0, 0, 32]], native_vector_size = []>
 //  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 32)>
 //  CHECK-DAG: #[[MAP1:.+]] = affine_map<()[s0] -> (s0 * 32)>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"CPUDoubleTilingExpert", workload_per_wg = [32, 32]>
