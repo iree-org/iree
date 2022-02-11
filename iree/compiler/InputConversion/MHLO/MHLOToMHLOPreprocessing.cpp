@@ -858,7 +858,6 @@ struct MHLOToMHLOPreprocessingPass
     mhlo::PopulateEinsumToDotGeneralPatterns(context, &patterns);
     mhlo::PopulateUnfuseBatchNormPatterns(context, &patterns);
     mhlo::PopulateComplexLoweringPatterns(context, &patterns);
-    mhlo::PopulateGatherToTorchIndexSelectPatterns(context, &patterns);
     patterns
         .insert<ExtractReduceWindowOpPaddingAttributes,
                 AdjustDepthwiseFilterShape, ScatterRank0Value, ExpandRngNormal>(
