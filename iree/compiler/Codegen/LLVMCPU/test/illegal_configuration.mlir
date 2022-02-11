@@ -156,7 +156,7 @@ hal.executable private @matmul_tensors {
 // -----
 
 #config = #iree_codegen.lowering.config<tile_sizes = [[], [8, 32, 0], [0, 0, 16]], native_vector_size = []>
-#translation = #iree_codegen.translation.info<"CPUDoubleTilingExpert", workload_per_wg = []>
+#translation = #iree_codegen.translation.info<"CPUDoubleTilingExpert", workload_per_wg = [32]>
 #executable_layout = #hal.executable.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
@@ -175,7 +175,7 @@ hal.executable private @matmul_tensors {
         %lhs = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<4x8xf32>
         %rhs = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<8x16xf32>
         %result = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : memref<4x16xf32>
-        // expected-error @+1 {{expected 2 entries for workload_per_wg, but got 0}}
+        // expected-error @+1 {{expected 2 entries for workload_per_wg, but got 1}}
         linalg.matmul {lowering.config = #config} ins(%lhs, %rhs : memref<4x8xf32>, memref<8x16xf32>)
           outs(%result: memref<4x16xf32>)
         return
