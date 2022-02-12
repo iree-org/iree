@@ -446,8 +446,7 @@ static LogicalResult verify(FunctionalIfOp op) {
   return RegionBranchOpInterface::verifyTypes(op);
 }
 
-static ParseResult parseFunctionalIfOp(OpAsmParser &parser,
-                                       OperationState &result) {
+ParseResult FunctionalIfOp::parse(OpAsmParser &parser, OperationState &result) {
   // Create the regions for 'then'.
   result.regions.reserve(2);
   Region *thenRegion = result.addRegion();
@@ -479,7 +478,8 @@ static ParseResult parseFunctionalIfOp(OpAsmParser &parser,
   return success();
 }
 
-static void print(OpAsmPrinter &p, FunctionalIfOp op) {
+void FunctionalIfOp::print(OpAsmPrinter &p) {
+  FunctionalIfOp op = *this;
   bool printBlockTerminators = false;
 
   p << " " << op.condition();
@@ -547,7 +547,7 @@ LogicalResult PyFuncOp::verifyType() {
   return success();
 }
 
-static ParseResult parseFuncOp(OpAsmParser &parser, OperationState &result) {
+ParseResult PyFuncOp::parse(OpAsmParser &parser, OperationState &result) {
   auto buildFuncType =
       [](Builder &builder, ArrayRef<Type> argTypes, ArrayRef<Type> results,
          function_interface_impl::VariadicFlag,
@@ -557,10 +557,10 @@ static ParseResult parseFuncOp(OpAsmParser &parser, OperationState &result) {
       parser, result, /*allowVariadic=*/false, buildFuncType);
 }
 
-static void print(PyFuncOp op, OpAsmPrinter &p) {
-  FunctionType fnType = op.getType();
+void PyFuncOp::print(OpAsmPrinter &p) {
+  FunctionType fnType = getType();
   function_interface_impl::printFunctionOp(
-      p, op, fnType.getInputs(), /*isVariadic=*/false, fnType.getResults());
+      p, *this, fnType.getInputs(), /*isVariadic=*/false, fnType.getResults());
 }
 
 static LogicalResult verify(PyFuncOp op) {
