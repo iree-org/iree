@@ -72,6 +72,7 @@ iree_cc_library(
     MLIRMhloUtils
     MLIRPass
     MLIRReconcileUnrealizedCasts
+    MLIRSCF
     MLIRSCFToControlFlow
     MLIRSCFTransforms
     MLIRShape
