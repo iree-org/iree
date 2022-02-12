@@ -59,8 +59,7 @@ struct VMDialect::VMOpAsmInterface
 
   void getAsmBlockArgumentNames(Operation *op, Region &region,
                                 OpAsmSetValueNameFn setNameFn) const {}
-  void getAsmBlockNames(Operation *op,
-                        OpAsmSetBlockNameFn setNameFn) const {}
+  void getAsmBlockNames(Operation *op, OpAsmSetBlockNameFn setNameFn) const {}
 
   static StringRef getDefaultDialect() { return ""; }
 };
