@@ -46,6 +46,7 @@ cc_library(
     srcs = [
         "IREEImportPublic.cpp",
         "Passes.cpp",
+        "PushTensorDimAcrossLinalgPass.cpp"
         "TopLevelSCFToCFG.cpp",
     ],
     hdrs = [
