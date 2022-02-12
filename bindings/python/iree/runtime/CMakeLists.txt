@@ -24,13 +24,15 @@ iree_pyext_module(
     PyExtRt
   MODULE_NAME binding
   SRCS
-    "initialize_module.cc"
     "binding.h"
+    "initialize_module.cc"
+    "invoke.h"
+    "invoke.cc"
     "hal.h"
-    "vm.h"
     "hal.cc"
     "status_utils.cc"
     "status_utils.h"
+    "vm.h"
     "vm.cc"
   UNIX_LINKER_SCRIPT
     "unix_version.lds"
@@ -42,6 +44,7 @@ iree_pyext_module(
     iree::base
     iree::base::cc
     iree::base::internal::flags
+    iree::base::tracing
     iree::hal
     iree::hal::drivers
     iree::modules::hal

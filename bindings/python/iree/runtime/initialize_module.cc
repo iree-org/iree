@@ -6,6 +6,7 @@
 
 #include "bindings/python/iree/runtime/binding.h"
 #include "bindings/python/iree/runtime/hal.h"
+#include "bindings/python/iree/runtime/invoke.h"
 #include "bindings/python/iree/runtime/status_utils.h"
 #include "bindings/python/iree/runtime/vm.h"
 #include "iree/base/internal/flags.h"
@@ -21,6 +22,7 @@ PYBIND11_MODULE(binding, m) {
 
   m.doc() = "IREE Binding Backend Helpers";
   SetupHalBindings(m);
+  SetupInvokeBindings(m);
   SetupVmBindings(m);
 
   m.def("parse_flags", [](py::args py_flags) {
