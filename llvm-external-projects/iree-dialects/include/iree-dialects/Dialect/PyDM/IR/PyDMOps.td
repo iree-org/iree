@@ -182,8 +182,7 @@ def IREEPyDM_FuncOp : IREEPyDM_Op<"func", [
     }]>
   ];
 
-  let parser = [{ return ::parseFuncOp(parser, result); }];
-  let printer = [{ return ::print(*this, p); }];
+  let hasCustomAssemblyFormat = 1;
 }
 
 def IREEPyDM_ReturnOp : IREEPyDM_Op<"return", [
@@ -607,8 +606,7 @@ def FunctionalIfOp : IREEPyDM_Op<"functional_if", [
   let results = (outs Variadic<AnyType>:$results);
   let regions = (region SizedRegion<1>:$thenRegion, AnyRegion:$elseRegion);
 
-  let printer = [{ return ::print(p, *this); }];
-  let parser = [{ return ::parse$cppClass(parser, result); }];
+  let hasCustomAssemblyFormat = 1;
 }
 
 def YieldOp : IREEPyDM_Op<"yield", [NoSideEffect, ReturnLike, Terminator,
