@@ -41,6 +41,7 @@ iree_cc_library(
   SRCS
     "IREEImportPublic.cpp"
     "Passes.cpp"
+    "PushTensorDimAcrossLinalgPass.cpp"
     "TopLevelSCFToCFG.cpp"
   DEPS
     ::PassHeaders

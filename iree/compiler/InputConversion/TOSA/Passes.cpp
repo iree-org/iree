@@ -50,6 +50,10 @@ void buildTOSAInputConversionPassPipeline(OpPassManager &passManager) {
   passManager.addNestedPass<FuncOp>(IREE::Flow::createStripSignednessPass());
   passManager.addNestedPass<FuncOp>(mlir::createCanonicalizerPass());
 
+  passManager.addNestedPass<FuncOp>(createPushTensorDimAcrossLinalgPass());
+  passManager.addNestedPass<FuncOp>(mlir::createCanonicalizerPass());
+  passManager.addNestedPass<FuncOp>(mlir::createCSEPass());
+
   //----------------------------------------------------------------------------
   // Entry dialect cleanup
   //----------------------------------------------------------------------------

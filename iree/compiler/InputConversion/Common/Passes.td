@@ -15,6 +15,12 @@ def TopLevelSCFToCFG :
   let constructor = "mlir::iree_compiler::createTopLevelSCFToCFGPass()";
 }
 
+def PushTensorDimAcrossLinalg :
+    Pass<"iree-push-tensor-dim-across-linalg", "FuncOp"> {
+  let summary = "Pushes tensor.dim operation across linalg operations).";
+  let constructor = "mlir::iree_compiler::createPushTensorDimAcrossLinalgPass()";
+}
+
 def IREEImportPublic :
     Pass<"iree-import-public", "ModuleOp"> {
   let summary = "Imports IREE public dialect to internal implementation.";

@@ -79,6 +79,11 @@ void buildMHLOInputConversionPassPipeline(OpPassManager &passManager) {
   // canonicalization. See comments in the above pass and find a better way.
   passManager.addNestedPass<FuncOp>(mlir::createCanonicalizerPass());
 
+  // Push dim operations forward.
+  passManager.addNestedPass<FuncOp>(createPushTensorDimAcrossLinalgPass());
+  passManager.addNestedPass<FuncOp>(mlir::createCanonicalizerPass());
+  passManager.addNestedPass<FuncOp>(mlir::createCSEPass());
+
   //----------------------------------------------------------------------------
   // Entry dialect cleanup
   //----------------------------------------------------------------------------
