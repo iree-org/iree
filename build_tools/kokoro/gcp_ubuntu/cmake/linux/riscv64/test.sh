@@ -71,4 +71,5 @@ generate_dylib_vmfb tosa-rvv \
   -o "${BUILD_RISCV_DIR?}/person_detect_rvv.vmfb"
 
 ${PYTHON_BIN?} "${ROOT_DIR?}/third_party/llvm-project/llvm/utils/lit/lit.py" \
-  -v "${ROOT_DIR?}/build_tools/kokoro/gcp_ubuntu/cmake/linux/riscv64/"
+  -v --path "${BUILD_HOST_DIR?}/third_party/llvm-project/llvm/bin" \
+  "${ROOT_DIR?}/build_tools/kokoro/gcp_ubuntu/cmake/linux/riscv64/tests"

@@ -11,8 +11,7 @@ config.name = "RISC-V tests"
 config.test_format = lit.formats.ShTest(True)
 
 config.suffixes = [".run"]
-config.environment["FILECHECK_DIR"] = os.getenv(
-    "BUILD_HOST_DIR") + "/third_party/llvm-project/llvm/bin"
+
 config.environment["BUILD_RISCV_DIR"] = os.getenv("BUILD_RISCV_DIR")
 
 config.environment["TEST_CMD"] = (
