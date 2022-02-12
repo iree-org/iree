@@ -405,6 +405,41 @@ func @scatter_update_batch_slice_3D_dynamic(%arg0: tensor<1x24x512xi32>,
 
 // -----
 
+func @scatter_all_cases(%arg0: tensor<1x2x64x1x64xf32>, %arg1: tensor<1x3xi32>, %arg2: tensor<1x1x1x64xf32>) -> tensor<1x2x64x1x64xf32> { 
+  %0 = "mhlo.scatter"(%arg0, %arg1, %arg2) ({
+  ^bb0(%arg3: tensor<f32>, %arg4: tensor<f32>):
+    "mhlo.return"(%arg3) : (tensor<f32>) -> ()
+  }) {indices_are_sorted = true, scatter_dimension_numbers = #mhlo.scatter<update_window_dims = [0, 2, 4], inserted_window_dims = [1, 3], scatter_dims_to_operand_dims = [0, 1, 2], index_vector_dim = 1>, unique_indices = true} : (tensor<1x2x64x1x64xf32>, tensor<1x3xi32>, tensor<1x1x1x64xf32>) -> tensor<1x2x64x1x64xf32>
+  return %0 : tensor<1x2x64x1x64xf32>
+}
+
+// CHECK-LABEL: func @scatter_all_cases
+// CHECK:         %[[ARG0:[a-zA-Z0-9]+]]
+// CHECK:         %[[ARG1:[a-zA-Z0-9]+]]
+// CHECK:         %[[ARG2:[a-zA-Z0-9]+]]
+// CHECK:         %[[COLLAPSE:.+]] = tensor.collapse_shape %[[ARG2]] {{\[\[}}0, 1, 2], [3]] : tensor<1x1x1x64xf32> into tensor<1x64xf32>
+// CHECK:         %[[EXPAND:.+]] = tensor.expand_shape %[[COLLAPSE]] {{\[\[}}0], [1, 2]] : tensor<1x64xf32> into tensor<1x1x64xf32>
+// CHECK:         %[[SCATTER:.+]] = iree_linalg_ext.scatter
+// CHECK-SAME:        ins(%[[EXPAND]], %[[ARG1]] : tensor<1x1x64xf32>, tensor<1x3xi32>)
+// CHECK-SAME:        outs(%[[ARG0]] : tensor<1x2x64x1x64xf32>)
+// CHECK:         return %[[SCATTER]]
+
+// -----
+
+func @scatter_slice_not_supported(%arg0: tensor<1x2x64x12x64xf32>, %arg1: tensor<1x2x4xi32>, %arg2: tensor<1x2x2x1x2x64xf32>) -> tensor<1x2x64x12x64xf32> {
+  %0 = "mhlo.scatter"(%arg0, %arg1, %arg2) ({
+  ^bb0(%arg3: tensor<f32>, %arg4: tensor<f32>):
+    %1 = mhlo.add %arg3, %arg4 : tensor<f32>
+    "mhlo.return"(%1) : (tensor<f32>) -> ()
+  }) {indices_are_sorted = true, scatter_dimension_numbers = #mhlo.scatter<update_window_dims = [0, 2, 3, 4], inserted_window_dims = [1], scatter_dims_to_operand_dims = [0, 1, 2, 3], index_vector_dim = 2>, unique_indices = true} : (tensor<1x2x64x12x64xf32>, tensor<1x2x4xi32>, tensor<1x2x2x1x2x64xf32>) -> tensor<1x2x64x12x64xf32>
+  return %0 : tensor<1x2x64x12x64xf32>
+}
+
+// CHECK-LABEL: @scatter_slice_not_supported
+// CHECK: "mhlo.scatter"
+
+// -----
+
 func @rfft_1d(%input: tensor<8xf32>) -> (tensor<5xf32>, tensor<5xf32>) {
   %0 = "mhlo.fft"(%input) {
     fft_length = dense<8> : tensor<1xi64>, fft_type = "RFFT"
