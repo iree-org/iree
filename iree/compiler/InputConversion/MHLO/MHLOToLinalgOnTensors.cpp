@@ -27,6 +27,7 @@
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
+#include "mlir/Dialect/SCF/SCF.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/Attributes.h"
@@ -215,6 +216,210 @@ struct FftOpConversion : public OpConversionPattern<mhlo::FftOp> {
   }
 };
 
+/// We can convert an mhlo.scatter to a sequence of slices and update slices,
+/// with a linalg.generic operation to perform the computational update.
+class ScatterToDynamicUpdateSlice
+    : public OpConversionPattern<mhlo::ScatterOp> {
+ public:
+  using OpConversionPattern<mhlo::ScatterOp>::OpConversionPattern;
+
+  static Value collapseFrontDimsIfNeeded(Value value, int64_t batchDims,
+                                         ImplicitLocOpBuilder &b) {
+    if (batchDims == 1) return value;
+
+    auto type = value.getType().cast<RankedTensorType>();
+    auto rank = type.getRank();
+    int64_t batchSize = 1;
+    for (int i = 0; i < batchDims; i++)
+      batchSize = combineDims(batchSize, type.getDimSize(i));
+
+    SmallVector<ReassociationIndices> map;
+    map.emplace_back(llvm::to_vector<4>(llvm::seq<int64_t>(0, batchDims)));
+
+    llvm::SmallVector<int64_t> newShape = {batchSize};
+    for (int i = batchDims; i < rank; i++) {
+      newShape.push_back(type.getDimSize(i));
+      map.emplace_back(1, i);
+    }
+
+    auto resultType = RankedTensorType::get(newShape, type.getElementType());
+    return b.create<tensor::CollapseShapeOp>(resultType, value, map);
+  }
+
+  static int64_t combineDims(int64_t a, int64_t b) {
+    if (a == ShapedType::kDynamicSize || b == ShapedType::kDynamicSize)
+      return ShapedType::kDynamicSize;
+    return a * b;
+  }
+
+  LogicalResult matchAndRewrite(
+      mhlo::ScatterOp op, OpAdaptor adaptor,
+      ConversionPatternRewriter &rewriter) const override {
+    auto operand = op.operand();
+    auto indices = op.scatter_indices();
+    auto updates = op.updates();
+
+    auto operandTy = operand.getType().dyn_cast<RankedTensorType>();
+    auto indicesTy = indices.getType().dyn_cast<RankedTensorType>();
+    auto updatesTy = updates.getType().dyn_cast<RankedTensorType>();
+    if (!operandTy || !indicesTy || !updatesTy) return failure();
+
+    if (indicesTy.getRank() < 2) return failure();
+
+    auto dimNumbers = op.scatter_dimension_numbers();
+    int64_t batchDims = dimNumbers.getIndexVectorDim();
+    int64_t numIndices = indicesTy.getDimSize(batchDims);
+
+    // No support for a dynamic number of indices.
+    if (batchDims != indicesTy.getRank() - 1 ||
+        indicesTy.isDynamicDim(batchDims))
+      return failure();
+
+    // Bail on dynamic update dimensions right now to avoid slice validation.
+    for (int i = batchDims, s = updatesTy.getRank(); i < s; i++) {
+      if (updatesTy.isDynamicDim(i)) return failure();
+    }
+
+    Location loc = op.getLoc();
+    ImplicitLocOpBuilder b(loc, rewriter);
+
+    // Make insertion dimensions explicit.
+    llvm::SmallVector<int64_t> updatesShape;
+    for (int i = 0; i < batchDims; i++)
+      updatesShape.push_back(updatesTy.getDimSize(i));
+    updatesShape.resize(operandTy.getRank() + batchDims, 1);
+    SmallVector<ReassociationIndices> map;
+    for (int i = 0; i < batchDims; i++) map.emplace_back(1, i);
+
+    auto updateWindowDims = dimNumbers.getUpdateWindowDims();
+    for (int operandDim = 0; operandDim < operandTy.getRank(); operandDim++) {
+      int64_t updatesDim = operandDim + batchDims;
+      auto begin = updateWindowDims.begin();
+      auto end = updateWindowDims.end();
+      if (std::find(begin, end, operandDim) == end) {
+        map.back().emplace_back(updatesDim);
+        continue;
+      }
+      updatesShape[updatesDim] = updatesTy.getDimSize(map.size());
+      map.emplace_back(1, updatesDim);
+    }
+
+    if (updatesTy.getRank() < updatesShape.size()) {
+      updatesTy =
+          RankedTensorType::get(updatesShape, updatesTy.getElementType());
+      updates = b.create<tensor::ExpandShapeOp>(updatesTy, updates, map);
+    }
+
+    // Collapse batch dimensions together so that we iterate over all batch
+    // dimensions together.
+    indices = collapseFrontDimsIfNeeded(indices, batchDims, b);
+    updates = collapseFrontDimsIfNeeded(updates, batchDims, b);
+    indicesTy = indices.getType().cast<RankedTensorType>();
+    updatesTy = updates.getType().cast<RankedTensorType>();
+
+    // Grab the first update dimension before it is merged with the batch. We
+    // already verified this must be static.
+    int64_t firstUpdateStaticDim = updatesTy.getDimSize(1);
+    Value firstUpdateDynDim = b.create<tensor::DimOp>(updates, 1);
+
+    // Collapsed the batch dimension into the first update dimension, this
+    // avoids reshaping each slice.
+    updates = collapseFrontDimsIfNeeded(updates, 2, b);
+    updatesTy = updates.getType().cast<RankedTensorType>();
+
+    // Iterate over the batch dimension of the indices.
+    Value start = b.create<arith::ConstantIndexOp>(0);
+    Value end = b.create<tensor::DimOp>(indices, 0);
+    Value step = b.create<arith::ConstantIndexOp>(1);
+
+    auto forOp = b.create<scf::ForOp>(start, end, step, ValueRange({operand}));
+    b.setInsertionPointToStart(forOp.getBody());
+
+    // Extract the individual scatter value from the updates.
+    llvm::SmallVector<int64_t> updateSliceSizes(updatesTy.getShape().begin(),
+                                                updatesTy.getShape().end());
+    llvm::SmallVector<int64_t> updateSliceOffsets(operandTy.getRank(), 0);
+    llvm::SmallVector<int64_t> updateSliceStrides(operandTy.getRank(), 1);
+
+    updateSliceOffsets[0] = ShapedType::kDynamicStrideOrOffset;
+    updateSliceSizes[0] = firstUpdateStaticDim;
+
+    Value firstDimIndex =
+        b.create<arith::MulIOp>(forOp.getInductionVar(), firstUpdateDynDim);
+    Value updateSlice = b.create<tensor::ExtractSliceOp>(
+        RankedTensorType::get(updateSliceSizes, updatesTy.getElementType()),
+        updates, ValueRange{firstDimIndex}, ValueRange{}, ValueRange{},
+        b.getI64ArrayAttr(updateSliceOffsets),
+        b.getI64ArrayAttr(updateSliceSizes),
+        b.getI64ArrayAttr(updateSliceStrides));
+
+    // Determine the slice information for the operand value. This includes
+    // adjusting for a dynamic batch.
+    llvm::SmallVector<Value> updateIndices;
+    for (int i = 0; i < numIndices; i++) {
+      Value ix = b.create<arith::ConstantIndexOp>(i);
+      Value extract =
+          b.create<tensor::ExtractOp>(indicesTy.getElementType(), indices,
+                                      ValueRange{forOp.getInductionVar(), ix})
+              .getResult();
+      Value cast = b.create<arith::IndexCastOp>(b.getIndexType(), extract);
+      updateIndices.push_back(cast);
+    }
+
+    // Strides are dynamic for all indices and 0 otherwise.
+    llvm::SmallVector<int64_t> insertOffset(updateIndices.size(),
+                                            ShapedType::kDynamicStrideOrOffset);
+    insertOffset.resize(operandTy.getRank(), 0);
+
+    auto extractSliceOperandTy =
+        RankedTensorType::get(updateSliceSizes, operandTy.getElementType());
+
+    // Extract the slice from the source operand.
+    auto extractSliceOperand = b.create<tensor::ExtractSliceOp>(
+        extractSliceOperandTy, operand, updateIndices, ValueRange{},
+        ValueRange{}, b.getI64ArrayAttr(insertOffset),
+        b.getI64ArrayAttr(updateSliceSizes),
+        b.getI64ArrayAttr(updateSliceStrides));
+
+    // Generate a linalg::Generic operation to perform
+    SmallVector<AffineMap> affineMaps(
+        2, b.getMultiDimIdentityMap(operandTy.getRank()));
+    SmallVector<StringRef> loopAttrs(operandTy.getRank(),
+                                     getParallelIteratorTypeName());
+
+    auto generic = b.create<linalg::GenericOp>(
+        loc, TypeRange{extractSliceOperandTy}, ValueRange({updateSlice}),
+        ValueRange({extractSliceOperand}), affineMaps, loopAttrs);
+    Value genericValue = generic.getResult(0);
+
+    // Inline the update computation and change to scalar operations from rank-0
+    // tensors.
+    rewriter.inlineRegionBefore(op.update_computation(), generic.region(),
+                                generic.region().begin());
+    TypeConverter::SignatureConversion signatureConverter(2);
+    for (const auto &it : llvm::enumerate(generic->getOperands())) {
+      signatureConverter.addInputs(
+          it.index(), it.value().getType().cast<ShapedType>().getElementType());
+    }
+    rewriter.applySignatureConversion(&generic.region(), signatureConverter);
+
+    // Insert the resulting value into the target.
+    Value insertSlice = b.create<tensor::InsertSliceOp>(
+        operandTy, genericValue, operand, updateIndices, ValueRange{},
+        ValueRange{}, b.getI64ArrayAttr(insertOffset),
+        b.getI64ArrayAttr(updateSliceSizes),
+        b.getI64ArrayAttr(updateSliceStrides));
+
+    // For each iteration of the loop we need to apply it to the insertion.
+    b.create<scf::YieldOp>(loc, insertSlice);
+
+    // Replace the previous operation.
+    b.setInsertionPointAfterValue(forOp.getResult(0));
+    rewriter.replaceOp(op, forOp.getResult(0));
+    return success();
+  }
+};
+
 // We need to convert func ops in order to convert types.
 class BuiltinFuncOpPattern : public OpConversionPattern<FuncOp> {
   using OpConversionPattern<FuncOp>::OpConversionPattern;
@@ -301,6 +506,7 @@ struct ConvertMHLOToLinalgOnTensorsPass
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<IREE::Flow::FlowDialect, linalg::LinalgDialect,
                     mhlo::MhloDialect, shape::ShapeDialect, math::MathDialect,
+                    tensor::TensorDialect, scf::SCFDialect,
                     memref::MemRefDialect, complex::ComplexDialect>();
   }
 
@@ -382,6 +588,7 @@ void populateMHLOToLinalgOnTensorsConversionPatterns(
   mhlo::populateHLOToLinalgConversionPattern(context, typeConverter, &patterns);
   // TODO(#5809): Drop ConcatenateOp lowering in favor of the upstream version
   //              then remove the PatternBenefit here
+  patterns.insert<ScatterToDynamicUpdateSlice>(typeConverter, context);
   patterns.insert<ConcatenateOpConversion, FftOpConversion>(
       typeConverter, context, PatternBenefit(1000));
 }
