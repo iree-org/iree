@@ -137,12 +137,16 @@ struct iree_wait_set_t {
 iree_status_t iree_wait_set_allocate(iree_host_size_t capacity,
                                      iree_allocator_t allocator,
                                      iree_wait_set_t** out_set) {
+  IREE_ASSERT_ARGUMENT(out_set);
+
   // Be reasonable; 64 MAXIMUM_WAIT_OBJECTS is low, but 64K objects is too high.
   if (capacity >= UINT16_MAX) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                             "wait set capacity of %zu is unreasonably large",
                             capacity);
   }
+
+  IREE_TRACE_ZONE_BEGIN(z0);
 
   iree_host_size_t user_handle_list_size =
       capacity * sizeof(iree_wait_handle_t);
@@ -151,8 +155,8 @@ iree_status_t iree_wait_set_allocate(iree_host_size_t capacity,
                                 user_handle_list_size + native_handle_list_size;
 
   iree_wait_set_t* set = NULL;
-  IREE_RETURN_IF_ERROR(
-      iree_allocator_malloc(allocator, total_size, (void**)&set));
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_allocator_malloc(allocator, total_size, (void**)&set));
   set->allocator = allocator;
   set->handle_capacity = capacity;
   iree_wait_set_clear(set);
@@ -164,11 +168,15 @@ iree_status_t iree_wait_set_allocate(iree_host_size_t capacity,
       (HANDLE*)((uint8_t*)set->user_handles + user_handle_list_size);
 
   *out_set = set;
+  IREE_TRACE_ZONE_END(z0);
   return iree_ok_status();
 }
 
 void iree_wait_set_free(iree_wait_set_t* set) {
+  if (!set) return;
+  IREE_TRACE_ZONE_BEGIN(z0);
   iree_allocator_free(set->allocator, set);
+  IREE_TRACE_ZONE_END(z0);
 }
 
 iree_status_t iree_wait_set_insert(iree_wait_set_t* set,
