@@ -350,54 +350,6 @@ def _raise_return_error(inv: Invocation,
     raise new_e
 
 
-def _merge_python_sequence_to_vm(inv: Invocation, vm_list, py_list, descs):
-  # For dynamic mode, just assume we have the right arity.
-  if descs is None:
-    descs = [None] * len(py_list)
-  elif FUNCTION_INPUT_VALIDATION:
-    len_py_list = sum([1 for x in py_list if x is not MissingArgument])
-    if len(py_list) != len_py_list:
-      _raise_argument_error(
-          inv,
-          f"mismatched call arity: expected {len(descs)} arguments but got "
-          f"{len_py_list}. Expected signature=\n{descs}\nfor input=\n{py_list}")
-
-  for py_value, desc in zip(py_list, descs):
-    inv.current_arg = py_value
-    inv.current_desc = desc
-
-    # For ndarray, we want to be able to handle array-like, so check for that
-    # explicitly (duck typed vs static typed).
-    if _is_ndarray_descriptor(desc):
-      converter = _ndarray_like_to_vm
-    else:
-      converter = _get_python_to_vm_converter(inv, py_value, desc)
-
-    try:
-      converter(inv, vm_list, py_value, desc)
-    except ArgumentError:
-      raise
-    except Exception as e:
-      _raise_argument_error(inv, f"exception converting from Python type to VM",
-                            e)
-
-
-def _get_python_to_vm_converter(inv: Invocation, py_value, desc):
-  py_type = py_value.__class__
-  converter = PYTHON_TO_VM_CONVERTERS.get(py_type)
-  if converter is not None:
-    return converter
-  # See if it supports the __array__ protocol and if so, pull it to
-  # the host and use the ndarray converter. This will create round-trips
-  # between frameworks but at least enables interop.
-  if hasattr(py_value, "__array__"):
-    return _ndarray_to_vm
-
-  _raise_argument_error(
-      inv, f"cannot map Python type to VM: {py_type}"
-      f" (for desc {desc})")
-
-
 def _extract_vm_sequence_to_python(inv: Invocation, vm_list, descs):
   vm_list_arity = len(vm_list)
   if descs is None:

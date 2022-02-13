@@ -214,8 +214,7 @@ class FunctionTest(absltest.TestCase):
       ret_list.push_int(3)
 
     vm_context = MockVmContext(invoke)
-    vm_function = MockVmFunction(
-        reflection={})
+    vm_function = MockVmFunction(reflection={})
     invoker = FunctionInvoker(vm_context, self.device, vm_function, tracer=None)
     _ = invoker({"b": 3, "a": 2})
     self.assertEqual("[<VmVariantList(1): [List[2, 3]]>]",
