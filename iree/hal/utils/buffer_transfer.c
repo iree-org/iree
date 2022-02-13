@@ -26,12 +26,16 @@ IREE_API_EXPORT iree_status_t iree_hal_device_submit_transfer_range_and_wait(
   // TODO(benvanik): check for device-local -> device-local and avoid mapping.
   bool is_source_mappable =
       !source.device_buffer ||
-      iree_all_bits_set(iree_hal_buffer_allowed_usage(source.device_buffer),
-                        IREE_HAL_BUFFER_USAGE_MAPPING);
+      (iree_all_bits_set(iree_hal_buffer_memory_type(source.device_buffer),
+                         IREE_HAL_MEMORY_TYPE_HOST_VISIBLE) &&
+       iree_all_bits_set(iree_hal_buffer_allowed_usage(source.device_buffer),
+                         IREE_HAL_BUFFER_USAGE_MAPPING));
   bool is_target_mappable =
       !target.device_buffer ||
-      iree_all_bits_set(iree_hal_buffer_allowed_usage(target.device_buffer),
-                        IREE_HAL_BUFFER_USAGE_MAPPING);
+      (iree_all_bits_set(iree_hal_buffer_memory_type(target.device_buffer),
+                         IREE_HAL_MEMORY_TYPE_HOST_VISIBLE) &&
+       iree_all_bits_set(iree_hal_buffer_allowed_usage(target.device_buffer),
+                         IREE_HAL_BUFFER_USAGE_MAPPING));
   if (is_source_mappable && is_target_mappable) {
     return iree_hal_device_transfer_mappable_range(
         device, source, source_offset, target, target_offset, data_length,
@@ -68,6 +72,8 @@ IREE_API_EXPORT iree_status_t iree_hal_device_submit_transfer_range_and_wait(
     // the portion being transferred.
     // TODO(benvanik): use wrap_buffer if supported to avoid the
     // allocation/copy.
+    // TODO(benvanik): make this device-local + host-visible? can be better for
+    // uploads as we know we are never going to read it back.
     status = iree_hal_allocator_allocate_buffer(
         iree_hal_device_allocator(device),
         IREE_HAL_MEMORY_TYPE_HOST_LOCAL | IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE,
