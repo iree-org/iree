@@ -72,7 +72,7 @@ def Stream_ResourceAllocOp : Stream_PureOp<"resource.alloc", [
     Value getResultSize(unsigned idx) { return storage_sizes()[idx]; }
   }];
 
-  let verifier = [{ return verifyOp(*this); }];
+  let hasVerifier = 1;
 
   let hasCanonicalizer = 1;
 }
@@ -247,7 +247,7 @@ def Stream_ResourceMapOp : Stream_Op<"resource.map", [
     Value getResultSize(unsigned idx) { return result_size(); }
   }];
 
-  let verifier = [{ return verifyOp(*this); }];
+  let hasVerifier = 1;
 
   let hasCanonicalizer = 1;
 }
@@ -291,7 +291,7 @@ def Stream_ResourceTryMapOp : Stream_PureOp<"resource.try_map", [
     Value getResultSize(unsigned idx) { return result_size(); }
   }];
 
-  let verifier = [{ return verifyOp(*this); }];
+  let hasVerifier = 1;
 
   let hasCanonicalizer = 1;
 }
@@ -328,7 +328,7 @@ def Stream_ResourceLoadOp : Stream_Op<"resource.load", [
     Value getResultSize(unsigned idx) { return {}; }
   }];
 
-  let verifier = [{ return verifyOp(*this); }];
+  let hasVerifier = 1;
 
   let hasCanonicalizer = 1;
 }
@@ -364,7 +364,7 @@ def Stream_ResourceStoreOp : Stream_Op<"resource.store", [
     Value getResultSize(unsigned idx) { return {}; }
   }];
 
-  let verifier = [{ return verifyOp(*this); }];
+  let hasVerifier = 1;
 
   let hasCanonicalizer = 1;
 }
@@ -439,7 +439,7 @@ def Stream_ResourcePackOp : Stream_PureOp<"resource.pack", [
     attr-dict-with-keyword
   }];
 
-  let verifier = [{ return verifyOp(*this); }];
+  let hasVerifier = 1;
 
   let extraClassDeclaration = [{
     struct Slice {
@@ -526,7 +526,7 @@ def Stream_ResourceConstantsOp : Stream_PureOp<"resource.constants", [
     `\n` ` ` ` ` `=` `` `>` type($result_timepoint)
   }];
 
-  let verifier = [{ return verifyOp(*this); }];
+  let hasVerifier = 1;
 
   let extraClassDeclaration = [{
     Value getOperandSize(unsigned idx) { return {}; }
@@ -577,7 +577,7 @@ def Stream_ResourceSubviewOp : Stream_PureOp<"resource.subview", [
     static IREE::Stream::ResourceSubviewOp findSubviewOp(Value value);
   }];
 
-  let verifier = [{ return verifyOp(*this); }];
+  let hasVerifier = 1;
 
   let hasCanonicalizer = 1;
   let hasFolder = 1;
@@ -634,7 +634,7 @@ def Stream_TensorImportOp : Stream_PureOp<"tensor.import", [
     Value getResultSize(unsigned idx) { return result_size(); }
   }];
 
-  let verifier = [{ return verifyOp(*this); }];
+  let hasVerifier = 1;
 
   let hasCanonicalizer = 1;
   let hasFolder = 1;
@@ -687,7 +687,7 @@ def Stream_TensorExportOp : Stream_PureOp<"tensor.export", [
     Value getResultSize(unsigned idx) { return {}; }
   }];
 
-  let verifier = [{ return verifyOp(*this); }];
+  let hasVerifier = 1;
 
   let hasCanonicalizer = 1;
   let hasFolder = 1;
@@ -725,7 +725,7 @@ def Stream_TensorSizeOfOp : Stream_PureOp<"tensor.sizeof", [
     attr-dict `:` type($storage_size)
   }];
 
-  let verifier = [{ return verifyOp(*this); }];
+  let hasVerifier = 1;
 }
 
 def Stream_TensorConstantOp : Stream_PureOp<"tensor.constant", [
@@ -766,7 +766,7 @@ def Stream_TensorConstantOp : Stream_PureOp<"tensor.constant", [
     ValueRange getResultDynamicDims(unsigned idx) { return result_encoding_dims(); }
   }];
 
-  let verifier = [{ return verifyOp(*this); }];
+  let hasVerifier = 1;
 
   let hasCanonicalizer = 1;
 }
@@ -812,7 +812,7 @@ def Stream_TensorSplatOp : Stream_PureOp<"tensor.splat", [
     Value getResultSize(unsigned idx) { return result_size(); }
   }];
 
-  let verifier = [{ return verifyOp(*this); }];
+  let hasVerifier = 1;
 
   let hasCanonicalizer = 1;
 }
@@ -865,7 +865,7 @@ def Stream_TensorCloneOp : Stream_PureOp<"tensor.clone", [
     Value getResultSize(unsigned idx) { return result_size(); }
   }];
 
-  let verifier = [{ return verifyOp(*this); }];
+  let hasVerifier = 1;
 
   let hasCanonicalizer = 1;
   let hasFolder = 1;
@@ -921,7 +921,7 @@ def Stream_TensorSliceOp : Stream_PureOp<"tensor.slice", [
     Value getResultSize(unsigned idx) { return result_size(); }
   }];
 
-  let verifier = [{ return verifyOp(*this); }];
+  let hasVerifier = 1;
 
   let hasCanonicalizer = 1;
   let hasFolder = 1;
@@ -981,7 +981,7 @@ def Stream_TensorFillOp : Stream_Op<"tensor.fill", [
     Value getResultSize(unsigned idx) { return target_size(); }
   }];
 
-  let verifier = [{ return verifyOp(*this); }];
+  let hasVerifier = 1;
 
   let hasCanonicalizer = 1;
 }
@@ -1046,7 +1046,7 @@ def Stream_TensorUpdateOp : Stream_Op<"tensor.update", [
     Value getResultSize(unsigned idx) { return target_size(); }
   }];
 
-  let verifier = [{ return verifyOp(*this); }];
+  let hasVerifier = 1;
 
   let hasCanonicalizer = 1;
   let hasFolder = 1;
@@ -1091,7 +1091,7 @@ def Stream_TensorLoadOp : Stream_PureOp<"tensor.load", [
     Value getResultSize(unsigned idx) { return {}; }
   }];
 
-  let verifier = [{ return verifyOp(*this); }];
+  let hasVerifier = 1;
 
   let hasCanonicalizer = 1;
 }
@@ -1143,7 +1143,7 @@ def Stream_TensorStoreOp : Stream_PureOp<"tensor.store", [
     Value getResultSize(unsigned idx) { return target_size(); }
   }];
 
-  let verifier = [{ return verifyOp(*this); }];
+  let hasVerifier = 1;
 
   let hasCanonicalizer = 1;
 }
@@ -1209,7 +1209,7 @@ def Stream_BuiltinSplatI64Op : Stream_Op<"builtin.splat.i64", [
     Value getResultSize(unsigned idx) { return result_size(); }
   }];
 
-  let verifier = [{ return verifyOp(*this); }];
+  let hasVerifier = 1;
 }
 
 def Stream_BuiltinFillI64Op : Stream_Op<"builtin.fill.i64", [
@@ -1261,7 +1261,7 @@ def Stream_BuiltinFillI64Op : Stream_Op<"builtin.fill.i64", [
     Value getResultSize(unsigned idx) { return target_size(); }
   }];
 
-  let verifier = [{ return verifyOp(*this); }];
+  let hasVerifier = 1;
 }
 
 //===----------------------------------------------------------------------===//
@@ -1346,7 +1346,7 @@ def Stream_AsyncConstantOp : Stream_PureOp<"async.constant", [
     Value getResultSize(unsigned idx) { return result_size(); }
   }];
 
-  let verifier = [{ return verifyOp(*this); }];
+  let hasVerifier = 1;
 
   let hasCanonicalizer = 1;
 }
@@ -1385,7 +1385,7 @@ def Stream_AsyncSplatOp : Stream_Op<"async.splat", [
     Value getResultSize(unsigned idx) { return result_size(); }
   }];
 
-  let verifier = [{ return verifyOp(*this); }];
+  let hasVerifier = 1;
 
   let hasCanonicalizer = 1;
 }
@@ -1427,7 +1427,7 @@ def Stream_AsyncCloneOp : Stream_Op<"async.clone", [
     Value getResultSize(unsigned idx) { return result_size(); }
   }];
 
-  let verifier = [{ return verifyOp(*this); }];
+  let hasVerifier = 1;
 
   let hasCanonicalizer = 1;
   let hasFolder = 1;
@@ -1473,7 +1473,7 @@ def Stream_AsyncSliceOp : Stream_PureOp<"async.slice", [
     Value getResultSize(unsigned idx) { return result_size(); }
   }];
 
-  let verifier = [{ return verifyOp(*this); }];
+  let hasVerifier = 1;
 
   let hasCanonicalizer = 1;
   let hasFolder = 1;
@@ -1526,7 +1526,7 @@ def Stream_AsyncFillOp : Stream_Op<"async.fill", [
     Value getResultSize(unsigned idx) { return target_size(); }
   }];
 
-  let verifier = [{ return verifyOp(*this); }];
+  let hasVerifier = 1;
 
   let hasCanonicalizer = 1;
 }
@@ -1581,7 +1581,7 @@ def Stream_AsyncUpdateOp : Stream_Op<"async.update", [
     Value getResultSize(unsigned idx) { return target_size(); }
   }];
 
-  let verifier = [{ return verifyOp(*this); }];
+  let hasVerifier = 1;
 
   let hasCanonicalizer = 1;
   let hasFolder = 1;
@@ -1642,7 +1642,7 @@ def Stream_AsyncCopyOp : Stream_Op<"async.copy", [
     Value getResultSize(unsigned idx) { return target_size(); }
   }];
 
-  let verifier = [{ return verifyOp(*this); }];
+  let hasVerifier = 1;
 
   let hasCanonicalizer = 1;
 }
@@ -1692,7 +1692,7 @@ def Stream_AsyncTransferOp : Stream_Op<"async.transfer", [
     Value getResultSize(unsigned idx) { return result_size(); }
   }];
 
-  let verifier = [{ return verifyOp(*this); }];
+  let hasVerifier = 1;
 
   let hasCanonicalizer = 1;
   let hasFolder = 1;
@@ -1729,7 +1729,7 @@ def Stream_AsyncLoadOp : Stream_PureOp<"async.load", [
     Value getResultSize(unsigned idx) { return {}; }
   }];
 
-  let verifier = [{ return verifyOp(*this); }];
+  let hasVerifier = 1;
 
   let hasCanonicalizer = 1;
 }
@@ -1774,7 +1774,7 @@ def Stream_AsyncStoreOp : Stream_PureOp<"async.store", [
     Value getResultSize(unsigned idx) { return target_size(); }
   }];
 
-  let verifier = [{ return verifyOp(*this); }];
+  let hasVerifier = 1;
 
   let hasCanonicalizer = 1;
 }
@@ -1831,7 +1831,7 @@ def Stream_AsyncDispatchOp : Stream_Op<"async.dispatch", [
     }
   }];
 
-  let verifier = [{ return verifyOp(*this); }];
+  let hasVerifier = 1;
 
   let hasCanonicalizer = 1;
 }
@@ -1923,7 +1923,7 @@ def Stream_AsyncExecuteOp : Stream_Op<"async.execute", [
     }
   }];
 
-  let verifier = [{ return verifyOp(*this); }];
+  let hasVerifier = 1;
 
   let hasCanonicalizer = 1;
 }
@@ -2031,7 +2031,7 @@ def Stream_AsyncConcurrentOp : Stream_Op<"async.concurrent", [
     }
   }];
 
-  let verifier = [{ return verifyOp(*this); }];
+  let hasVerifier = 1;
 
   let hasCanonicalizer = 1;
 }
@@ -2074,7 +2074,7 @@ def Stream_CmdFlushOp : Stream_Op<"cmd.flush", [
     Value getResultSize(unsigned idx) { return {}; }
   }];
 
-  let verifier = [{ return verifyOp(*this); }];
+  let hasVerifier = 1;
 
   let hasCanonicalizer = 1;
 }
@@ -2113,7 +2113,7 @@ def Stream_CmdInvalidateOp : Stream_Op<"cmd.invalidate", [
     Value getResultSize(unsigned idx) { return {}; }
   }];
 
-  let verifier = [{ return verifyOp(*this); }];
+  let hasVerifier = 1;
 
   let hasCanonicalizer = 1;
 }
@@ -2150,7 +2150,7 @@ def Stream_CmdDiscardOp : Stream_Op<"cmd.discard", [
     Value getResultSize(unsigned idx) { return {}; }
   }];
 
-  let verifier = [{ return verifyOp(*this); }];
+  let hasVerifier = 1;
 
   let hasCanonicalizer = 1;
 }
@@ -2189,7 +2189,7 @@ def Stream_CmdFillOp : Stream_Op<"cmd.fill", [
     Value getResultSize(unsigned idx) { return {}; }
   }];
 
-  let verifier = [{ return verifyOp(*this); }];
+  let hasVerifier = 1;
 
   let hasCanonicalizer = 1;
 }
@@ -2234,7 +2234,7 @@ def Stream_CmdCopyOp : Stream_Op<"cmd.copy", [
     Value getResultSize(unsigned idx) { return {}; }
   }];
 
-  let verifier = [{ return verifyOp(*this); }];
+  let hasVerifier = 1;
 
   let hasCanonicalizer = 1;
 }
@@ -2289,7 +2289,7 @@ def Stream_CmdDispatchOp : Stream_Op<"cmd.dispatch", [
     static SmallVector<unsigned> makeResourceToArgMap(mlir::FuncOp funcOp);
   }];
 
-  let verifier = [{ return verifyOp(*this); }];
+  let hasVerifier = 1;
 
   let hasCanonicalizer = 1;
 }
@@ -2361,7 +2361,7 @@ def Stream_CmdExecuteOp : Stream_Op<"cmd.execute", [
     }
   }];
 
-  let verifier = [{ return verifyOp(*this); }];
+  let hasVerifier = 1;
 
   let hasCanonicalizer = 1;
 }
@@ -2428,7 +2428,7 @@ def Stream_CmdSerialOp : Stream_Op<"cmd.serial", [
     attr-dict-with-keyword
   }];
 
-  let verifier = [{ return verifyOp(*this); }];
+  let hasVerifier = 1;
 
   let hasCanonicalizer = 1;
 }
@@ -2490,7 +2490,7 @@ def Stream_CmdConcurrentOp : Stream_Op<"cmd.concurrent", [
     attr-dict-with-keyword
   }];
 
-  let verifier = [{ return verifyOp(*this); }];
+  let hasVerifier = 1;
 
   let hasCanonicalizer = 1;
 }
@@ -2604,7 +2604,7 @@ def Stream_TimepointJoinOp : Stream_PureOp<"timepoint.join", [
     attr-dict-with-keyword
   }];
 
-  let verifier = [{ return verifyOp(*this); }];
+  let hasVerifier = 1;
 
   let hasCanonicalizer = 1;
   let hasFolder = 1;
@@ -2671,7 +2671,7 @@ def Stream_TimepointAwaitOp : Stream_PureOp<"timepoint.await", [
     }
   }];
 
-  let verifier = [{ return verifyOp(*this); }];
+  let hasVerifier = 1;
 
   let hasCanonicalizer = 1;
   let hasFolder = 1;
@@ -2720,7 +2720,7 @@ def Stream_ExecutableOp : Stream_Op<"executable", [
     }
   }];
 
-  let verifier = [{ return verifyOp(*this); }];
+  let hasVerifier = 1;
 }
 
 def Stream_ExecutableEndOp : Stream_Op<"executable.end", [
@@ -2788,7 +2788,7 @@ def Stream_BindingSubspanOp : Stream_PureOp<"binding.subspan", [
     attr-dict `:` type($binding) `->` type($result) (`{` $dynamic_dims^ `}`)?
   }];
 
-  let verifier = [{ return verifyOp(*this); }];
+  let hasVerifier = 1;
 
   let extraClassDeclaration = [{
     ValueRange getOperandDynamicDims(unsigned idx) { return ValueRange{}; }

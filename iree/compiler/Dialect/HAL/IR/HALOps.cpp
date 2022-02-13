@@ -259,7 +259,8 @@ static LogicalResult verifyTypeStorageCompatibility(Operation *op,
   return success();
 }
 
-static LogicalResult verifyTensorImportOp(TensorImportOp op) {
+LogicalResult TensorImportOp::verify() {
+  TensorImportOp op = *this;
   auto targetType = op.target().getType().cast<TensorType>();
   if (targetType.getNumDynamicDims() != op.target_dims().size()) {
     return op->emitOpError() << "number of target_dims must match number of "
@@ -289,7 +290,8 @@ SmallVector<int64_t, 4> TensorExportOp::getTiedResultOperandIndices() {
   return {0};  // source
 }
 
-static LogicalResult verifyTensorExportOp(TensorExportOp op) {
+LogicalResult TensorExportOp::verify() {
+  TensorExportOp op = *this;
   auto sourceType = op.source().getType().cast<TensorType>();
   if (sourceType.getNumDynamicDims() != op.source_dims().size()) {
     return op->emitOpError() << "number of source_dims must match number of "
@@ -516,7 +518,8 @@ void DeviceAllocatorOp::getAsmResultNames(
 // hal.device.query
 //===----------------------------------------------------------------------===//
 
-static LogicalResult verifyDeviceQueryOp(DeviceQueryOp op) {
+LogicalResult DeviceQueryOp::verify() {
+  DeviceQueryOp op = *this;
   if (op.default_value().hasValue()) {
     if (op.default_value()->getType() != op.value().getType()) {
       return op.emitOpError()
@@ -611,7 +614,8 @@ void DeviceSwitchOp::print(OpAsmPrinter &p) {
                                      /*elidedAttrs=*/{"conditions"});
 }
 
-static LogicalResult verifyDeviceSwitchOp(DeviceSwitchOp op) {
+LogicalResult DeviceSwitchOp::verify() {
+  DeviceSwitchOp op = *this;
   if (op.conditions().size() != op.condition_regions().size()) {
     return op.emitOpError() << "requires conditions and regions be matched 1:1";
   } else if (op.condition_regions().empty()) {
@@ -644,7 +648,7 @@ void ExecutableOp::build(OpBuilder &builder, OperationState &state,
                      builder.getStringAttr(name));
 }
 
-static LogicalResult verifyExecutableOp(ExecutableOp op) {
+LogicalResult ExecutableOp::verify() {
   // TODO(benvanik): check export name conflicts.
   return success();
 }
@@ -720,7 +724,8 @@ void ExecutableEntryPointOp::print(OpAsmPrinter &p) {
   p.printRegion(workgroup_count_region().front());
 }
 
-static LogicalResult verifyExecutableEntryPointOp(ExecutableEntryPointOp op) {
+LogicalResult ExecutableEntryPointOp::verify() {
+  ExecutableEntryPointOp op = *this;
   Region *region = op.getBody();
   // When there is no region, nothing to verify.
   if (!region) return success();
@@ -811,8 +816,8 @@ void ExecutableLookupOp::getAsmResultNames(
 // hal.interface.binding.subspan
 //===----------------------------------------------------------------------===//
 
-static LogicalResult verifyInterfaceBindingSubspanOp(
-    InterfaceBindingSubspanOp op) {
+LogicalResult InterfaceBindingSubspanOp::verify() {
+  InterfaceBindingSubspanOp op = *this;
   if (ShapedType shapedType = op.getType().dyn_cast<ShapedType>()) {
     if (shapedType.getNumDynamicDims() != op.dynamic_dims().size()) {
       return op.emitOpError("result type ")

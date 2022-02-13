@@ -109,7 +109,7 @@ def HAL_TensorImportOp : HAL_PureOp<"tensor.import", [
     ValueRange getResultDynamicDims(unsigned idx) { return target_dims(); }
   }];
 
-  let verifier = [{ return verifyTensorImportOp(*this); }];
+  let hasVerifier = 1;
 
   let hasFolder = 1;
 }
@@ -175,7 +175,7 @@ def HAL_TensorExportOp : HAL_PureOp<"tensor.export", [
     ValueRange getResultDynamicDims(unsigned idx) { return {}; }
   }];
 
-  let verifier = [{ return verifyTensorExportOp(*this); }];
+  let hasVerifier = 1;
 
   let hasFolder = 1;
 }
@@ -1337,7 +1337,7 @@ def HAL_DeviceSwitchOp : HAL_Op<"device.switch", [
   ];
 
 
-  let verifier = [{ return verifyDeviceSwitchOp(*this); }];
+  let hasVerifier = 1;
 }
 
 def HAL_ReturnOp : HAL_Op<"return", [Terminator]> {
@@ -1407,7 +1407,7 @@ def HAL_DeviceQueryOp :
     attr-dict-with-keyword
   }];
 
-  let verifier = [{ return verifyDeviceQueryOp(*this); }];
+  let hasVerifier = 1;
 }
 
 //===----------------------------------------------------------------------===//
@@ -1497,7 +1497,7 @@ def HAL_ExecutableOp : HAL_Op<"executable", [
     Block& getBlock() { return body().front(); }
   }];
 
-  let verifier = [{ return verifyExecutableOp(*this); }];
+  let hasVerifier = 1;
 }
 
 def HAL_ExecutableEndOp : HAL_Op<"executable_end", [
@@ -1568,7 +1568,7 @@ def HAL_ExecutableEntryPointOp : HAL_Op<"executable.entry_point", [
     }]>
   ];
 
-  let verifier = [{ return verifyExecutableEntryPointOp(*this); }];
+  let hasVerifier = 1;
 
   let extraClassDeclaration = [{
     Region *getBody() {
@@ -1901,7 +1901,7 @@ def HAL_InterfaceBindingSubspanOp : HAL_Op<"interface.binding.subspan", [
     attr-dict `:` type($result) (`{` $dynamic_dims^ `}`)?
   }];
 
-  let verifier = [{ return verifyInterfaceBindingSubspanOp(*this); }];
+  let hasVerifier = 1;
 
   let extraClassDeclaration = [{
     ValueRange getOperandDynamicDims(unsigned idx) { return ValueRange{}; }
