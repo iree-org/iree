@@ -150,7 +150,8 @@ class InvokeStatics {
         // Extract static information about the target.
         std::vector<int64_t> abi_shape(py::len(desc) - 2);
         for (size_t i = 0, e = abi_shape.size(); i < e; ++i) {
-          abi_shape[i] = py::cast<int64_t>(desc[py::int_(i + 2)]);
+          py::handle dim = desc[py::int_(i + 2)];
+          abi_shape[i] = dim.is_none() ? -1 : py::cast<int64_t>(dim);
         }
 
         // Map abi element type to dtype.
