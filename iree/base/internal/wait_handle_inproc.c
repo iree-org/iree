@@ -138,6 +138,7 @@ iree_status_t iree_wait_set_allocate(iree_host_size_t capacity,
 }
 
 void iree_wait_set_free(iree_wait_set_t* set) {
+  if (!set) return;
   IREE_TRACE_ZONE_BEGIN(z0);
   iree_allocator_t allocator = set->allocator;
   iree_allocator_free(allocator, set);
