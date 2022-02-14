@@ -284,10 +284,10 @@ static LogicalResult setDefaultLaunchConfig(
   return success();
 }
 
-static LogicalResult setX86SandboxRootConfig(FuncOp entryPointFn,
-                                             linalg::ContractionOpInterface op,
-                                             ArrayRef<int64_t> flowTileSizes,
-                                             int vectorSize) {
+static LogicalResult setX86SandboxRootConfig(
+    FuncOp entryPointFn, linalg::ContractionOpInterface op,
+    ArrayRef<int64_t> flowTileSizes, ArrayRef<unsigned> partionableLoops,
+    int vectorSize) {
   // Hardcoded tiling sizes {1, 1, ..., 8, 32, 16}.
   // The tiling for parallel dims and reduction dims should be separated.
   SmallVector<int64_t> l1TileSizes;
@@ -296,6 +296,13 @@ static LogicalResult setX86SandboxRootConfig(FuncOp entryPointFn,
   l1TileSizes.push_back(getMaxTileSize(0, flowTileSizes[nLoops - 3], 8, 8));
   l1TileSizes.push_back(getMaxTileSize(0, flowTileSizes[nLoops - 2], 32, 32));
   l1TileSizes.push_back(0);
+  llvm::SmallDenseSet<unsigned> pLoopsSet;
+  for (auto i : partionableLoops) pLoopsSet.insert(i);
+  for (auto en : llvm::enumerate(l1TileSizes)) {
+    if (en.value() != 0 && !pLoopsSet.contains(en.index())) {
+      l1TileSizes[en.index()] = 0;
+    }
+  }
 
   auto lhsShapedType = op.lhs().getType().cast<ShapedType>();
   int64_t K = lhsShapedType.getShape().back();
@@ -432,7 +439,8 @@ static LogicalResult setRootConfig(
     if (lhsElemType == rhsElemType && rhsElemType == resElemType) {
       passPipeline = DispatchLoweringPassPipeline::CPUDoubleTilingExpert;
       if (failed(setX86SandboxRootConfig(entryPointFn, contractionOp,
-                                         flowTileSizes, vectorSize))) {
+                                         flowTileSizes, partitionedLoops,
+                                         vectorSize))) {
         return failure();
       }
     } else {

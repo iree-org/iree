@@ -155,21 +155,34 @@ LogicalResult verifyDoubleTilingExpertPassPipelineConfig(
         }
       }
     }
-  }
 
-  int numLoops = interfaceOp.getNumLoops();
-  SmallVector<int64_t> secondLevelTileSizes = loweringConfig.getTileSizeVals(
-      static_cast<unsigned>(TilingLevel::L1Tiles));
-  if (secondLevelTileSizes.size() != numLoops) {
-    return op->emitOpError("expected the second tiling size to be ")
-           << numLoops << ", got " << secondLevelTileSizes.size();
-  }
+    llvm::SmallDenseSet<unsigned> pLoopsSet;
+    for (auto i : interfaceOp.getPartitionableLoops(
+             /*maxNumPartitionedLoops=*/std::numeric_limits<unsigned>::max())) {
+      pLoopsSet.insert(i);
+    }
 
-  SmallVector<int64_t> thirdLevelTileSizes = loweringConfig.getTileSizeVals(
-      static_cast<unsigned>(TilingLevel::VectorTiles));
-  if (thirdLevelTileSizes.size() != numLoops) {
-    return op->emitOpError("expected the second tiling size to be ")
-           << numLoops << ", got " << secondLevelTileSizes.size();
+    SmallVector<int64_t> secondLevelTileSizes = loweringConfig.getTileSizeVals(
+        static_cast<unsigned>(TilingLevel::L1Tiles));
+    for (auto en : llvm::enumerate(secondLevelTileSizes)) {
+      if (en.value() != 0 && !pLoopsSet.contains(en.index())) {
+        return op->emitOpError(
+                   "expected only non-unit parallel dims can be set in the "
+                   "second tiling sizes, got ")
+               << en.index() << "-th tile size set";
+      }
+    }
+
+    SmallVector<int64_t> thirdLevelTileSizes = loweringConfig.getTileSizeVals(
+        static_cast<unsigned>(TilingLevel::VectorTiles));
+    for (auto en : llvm::enumerate(thirdLevelTileSizes)) {
+      if (en.value() != 0 && pLoopsSet.contains(en.index())) {
+        return op->emitOpError(
+                   "expected only reduction dims can be set in the third "
+                   "tiling sizes, got ")
+               << en.index() << "-th tile size set";
+      }
+    }
   }
 
   // Verify that native vector size is either empty, or if set is same as the
