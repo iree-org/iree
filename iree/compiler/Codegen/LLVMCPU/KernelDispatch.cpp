@@ -602,12 +602,14 @@ static LogicalResult setRootConfig(
                      workloadPerWorkgroup,
                      /*workgroupSize=*/ArrayRef<int64_t>{});
 
+  llvm::SmallDenseSet<unsigned> pLoopsSet;
+  for (auto i : partitionedLoops) pLoopsSet.insert(i);
+
   SmallVector<int64_t> l1TileSizes = nativeVectorSize;
   SmallVector<int64_t> vectorTileSizes = nativeVectorSize;
-  {
-    SmallVector<unsigned> reductionDims;
-    genericOp.getReductionDims(reductionDims);
-    for (auto d : reductionDims) l1TileSizes[d] = 0;
+  for (auto i : llvm::seq<unsigned>(0, l1TileSizes.size())) {
+    // This excludes unit parallel dims.
+    if (!pLoopsSet.contains(i)) l1TileSizes[i] = 0;
   }
   {
     SmallVector<unsigned> parallelDims;
