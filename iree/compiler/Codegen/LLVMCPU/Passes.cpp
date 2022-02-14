@@ -265,8 +265,8 @@ void addDoubleTilingExpertPassPipeline(OpPassManager &passManager) {
   BufferizationOptions::DeallocationFn deallocationFn =
       cpuComprehensiveBufferizeDeallocationFn;
   BufferizationOptions::MemCpyFn memcpyFn = cpuComprehensiveBufferizeCopyFn;
-  addIREEComprehensiveBufferizePasses(passManager, allocationFn,
-                                      deallocationFn);
+  addIREEComprehensiveBufferizePasses(passManager, allocationFn, deallocationFn,
+                                      memcpyFn);
 
   // Run IREE specific passes before vector lowering expert.
   passManager.addNestedPass<FuncOp>(createRemoveSingleIterationLoopPass());
