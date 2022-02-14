@@ -59,6 +59,7 @@ class CustomKernelsTargetInfo {
     assert(arch == CustomKernelTargetArch::None);
     arch = a;
   }
+  bool is(CustomKernelTargetArch a) const { return arch == a; }
   bool has(CustomKernelTargetFeature f) const {
     if (!isFeatureForArch(f, arch)) {
       return false;
