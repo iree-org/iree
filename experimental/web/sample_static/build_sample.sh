@@ -66,14 +66,12 @@ echo "=== Building web artifacts using Emscripten ==="
 pushd ${BUILD_DIR}
 
 # Configure using Emscripten's CMake wrapper, then build.
-# Note: The sample creates a device directly, so no drivers are required,
-#       but some targets are gated on specific CMake options.
+# Note: The sample creates a device directly, so no drivers are required.
 emcmake "${CMAKE_BIN?}" -G Ninja .. \
   -DCMAKE_BUILD_TYPE=RelWithDebInfo \
   -DIREE_HOST_BINARY_ROOT=$PWD/../build-host/install \
   -DIREE_BUILD_EXPERIMENTAL_WEB_SAMPLES=ON \
   -DIREE_HAL_DRIVER_DEFAULTS=OFF \
-  -DIREE_HAL_DRIVER_DYLIB=ON \
   -DIREE_BUILD_COMPILER=OFF \
   -DIREE_BUILD_TESTS=OFF
 

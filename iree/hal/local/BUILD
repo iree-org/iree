@@ -115,7 +115,9 @@ cc_library(
 iree_cmake_extra_content(
     content = """
 # task_driver is used by asynchronuous drivers.
-if(NOT (${IREE_HAL_DRIVER_DYLIB} OR ${IREE_HAL_DRIVER_VMVX}))
+# TODO(scotttodd): refactor this - code depending on threading should be
+#   possible to declare in the build system but conditionally link in
+if(NOT EMSCRIPTEN AND NOT (${IREE_HAL_DRIVER_DYLIB} OR ${IREE_HAL_DRIVER_VMVX}))
   return()
 endif()
 """,

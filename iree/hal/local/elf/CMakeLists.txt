@@ -73,7 +73,6 @@ iree_cc_library(
     "platform.h"
   SRCS
     "platform/apple.c"
-    "platform/emscripten.c"
     "platform/generic.c"
     "platform/linux.c"
     "platform/windows.c"

@@ -27,6 +27,8 @@ set_target_properties(${_NAME} PROPERTIES OUTPUT_NAME "web-sample-dynamic-sync")
 # drivers/devices, which include code not compatible with Emscripten.
 target_link_libraries(${_NAME}
   iree_runtime_runtime
+  iree_hal_local_loaders_system_library_loader
+  iree_hal_local_sync_driver
 )
 
 target_link_options(${_NAME} PRIVATE

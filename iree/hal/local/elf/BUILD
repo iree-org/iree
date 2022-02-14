@@ -79,7 +79,6 @@ cc_library(
     name = "platform",
     srcs = [
         "platform/apple.c",
-        "platform/emscripten.c",
         "platform/generic.c",
         "platform/linux.c",
         "platform/windows.c",

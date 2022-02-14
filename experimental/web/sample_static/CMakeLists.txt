@@ -8,6 +8,11 @@ if(NOT EMSCRIPTEN)
   return()
 endif()
 
+if(NOT EXISTS "${CMAKE_CURRENT_BINARY_DIR}/mnist_static.h")
+  message(WARNING "Missing mnist_static.h, run ${CMAKE_CURRENT_SOURCE_DIR}/build_sample.sh to generate it")
+  return()
+endif()
+
 set(_MNIST_OBJECT_NAME "iree_experimental_web_sample_static_mnist")
 add_library(${_MNIST_OBJECT_NAME} STATIC ${CMAKE_CURRENT_BINARY_DIR}/mnist_static.o)
 SET_TARGET_PROPERTIES(${_MNIST_OBJECT_NAME} PROPERTIES LINKER_LANGUAGE C)

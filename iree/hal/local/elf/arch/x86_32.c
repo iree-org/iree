@@ -13,8 +13,7 @@
 #include "iree/hal/local/elf/arch.h"
 #include "iree/hal/local/elf/elf_types.h"
 
-#if defined(IREE_ARCH_X86_32) || defined(IREE_ARCH_WASM_32)
-// TODO(scotttodd): Move IREE_ARCH_WASM_32 to its own wasm_32.c file
+#if defined(IREE_ARCH_X86_32)
 
 // Documentation:
 // https://uclibc.org/docs/psABI-i386.pdf
