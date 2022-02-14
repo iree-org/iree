@@ -317,6 +317,7 @@ static LogicalResult canonicalizeModule(
 
   // C target specific pass
   modulePasses.addPass(createConvertVMToEmitCPass());
+  modulePasses.addPass(mlir::createCanonicalizerPass());
 
   modulePasses.addPass(IREE::Util::createDropCompilerHintsPass());
 
