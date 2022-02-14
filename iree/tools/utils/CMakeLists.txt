@@ -87,6 +87,18 @@ iree_cc_library(
   PUBLIC
 )
 
+iree_cc_library(
+  NAME
+    cpu_features
+  HDRS
+    "cpu_features.h"
+  SRCS
+    "cpu_features.c"
+  DEPS
+    iree::base
+  PUBLIC
+)
+
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
 
 # image utility library based on stb_image.h in https://github.com/nothings/stb

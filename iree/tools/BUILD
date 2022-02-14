@@ -354,6 +354,7 @@ cc_binary(
         "//iree/hal",
         "//iree/hal/drivers",
         "//iree/modules/hal",
+        "//iree/tools/utils:cpu_features",
         "//iree/tools/utils:trace_replay",
         "//iree/tools/utils:yaml_util",
         "//iree/vm",

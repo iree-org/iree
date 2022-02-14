@@ -146,7 +146,10 @@ py_binary(
         ("dylib-llvm-aot", "dylib"),
     ],
     target_cpu_features_variants = ["default"] +
-                                   (["aarch64:+dotprod"] if lhs_rhs_type == "i8" else []),
+                                   ([
+                                       "aarch64:+dotprod",
+                                       "aarch64:+i8mm",
+                                   ] if lhs_rhs_type == "i8" else []),
     trace_runner = "//iree/tools:iree-e2e-matmul-test",
 ) for lhs_rhs_type in [
     "i8",
@@ -167,7 +170,10 @@ py_binary(
         ("dylib-llvm-aot", "dylib"),
     ],
     target_cpu_features_variants = ["default"] +
-                                   (["aarch64:+dotprod"] if lhs_rhs_type == "i8" else []),
+                                   ([
+                                       "aarch64:+dotprod",
+                                       "aarch64:+i8mm",
+                                   ] if lhs_rhs_type == "i8" else []),
     trace_runner = "//iree/tools:iree-e2e-matmul-test",
 ) for lhs_rhs_type in [
     "i8",
@@ -192,7 +198,10 @@ py_binary(
         ("dylib-llvm-aot", "dylib"),
     ],
     target_cpu_features_variants = ["default"] +
-                                   (["aarch64:+dotprod"] if lhs_rhs_type == "i8" else []),
+                                   ([
+                                       "aarch64:+dotprod",
+                                       "aarch64:+i8mm",
+                                   ] if lhs_rhs_type == "i8" else []),
     trace_runner = "//iree/tools:iree-e2e-matmul-test",
 ) for lhs_rhs_type in [
     "i8",

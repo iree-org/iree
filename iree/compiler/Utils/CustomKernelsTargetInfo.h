@@ -33,6 +33,7 @@ enum class CustomKernelTargetFeature {
   Intrinsics,
   // Aarch64 features.
   Aarch64Dotprod,
+  Aarch64I8mm,
 };
 
 inline bool isFeatureForArch(CustomKernelTargetFeature feature,
@@ -41,6 +42,8 @@ inline bool isFeatureForArch(CustomKernelTargetFeature feature,
     case CustomKernelTargetFeature::Intrinsics:
       return true;
     case CustomKernelTargetFeature::Aarch64Dotprod:
+      return arch == CustomKernelTargetArch::Aarch64;
+    case CustomKernelTargetFeature::Aarch64I8mm:
       return arch == CustomKernelTargetArch::Aarch64;
   }
   assert(false && "Unhandled CustomKernelTargetFeature value");

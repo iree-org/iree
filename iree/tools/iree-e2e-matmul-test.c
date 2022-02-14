@@ -16,6 +16,7 @@
 #include "iree/hal/api.h"
 #include "iree/hal/drivers/init.h"
 #include "iree/modules/hal/module.h"
+#include "iree/tools/utils/cpu_features.h"
 #include "iree/tools/utils/trace_replay.h"
 #include "iree/tools/utils/yaml_util.h"
 #include "iree/vm/api.h"
@@ -174,6 +175,7 @@ static iree_status_t reference_matmul(iree_vm_list_t* input_list,
   iree_hal_dim_t m_size, k_size, n_size;
   IREE_RETURN_IF_ERROR(
       get_matmul_sizes(lhs, rhs, acc, result, &m_size, &k_size, &n_size));
+  fprintf(stderr, "Matmul shape (MxKxN): %dx%dx%d\n", m_size, k_size, n_size);
   void* lhs_data;
   void* rhs_data;
   void* acc_data;
@@ -534,6 +536,53 @@ static iree_status_t copy_list_of_buffer_views(
   return iree_ok_status();
 }
 
+static iree_status_t iree_cpu_features_have_all_target_features(
+    iree_cpu_features_t* cpu_features, yaml_document_t* document,
+    yaml_node_t* target_features_node) {
+  for (yaml_node_item_t* item = target_features_node->data.sequence.items.start;
+       item != target_features_node->data.sequence.items.top; ++item) {
+    yaml_node_t* item_node = yaml_document_get_node(document, *item);
+    iree_string_view_t required_feature = iree_yaml_node_as_string(item_node);
+    if (iree_string_view_is_empty(required_feature)) continue;
+    bool feature_is_supported = false;
+    IREE_RETURN_IF_ERROR(iree_cpu_features_query(cpu_features, required_feature,
+                                                 &feature_is_supported));
+    if (!feature_is_supported) {
+      return iree_make_status(
+          // The error status matters. We distinguish "feature not supported",
+          // which is a normal thing to happen, from actual errors.
+          IREE_STATUS_UNAVAILABLE,
+          "The target device does not have the required feature '%.*s'.\n",
+          (int)required_feature.size, required_feature.data);
+    }
+  }
+  return iree_ok_status();
+}
+
+static iree_status_t replay_event_requirements(iree_trace_replay_t* replay,
+                                               yaml_document_t* document,
+                                               yaml_node_t* event_node) {
+  yaml_node_t* target_features_node = NULL;
+  IREE_RETURN_IF_ERROR(iree_yaml_mapping_find(
+      document, event_node, iree_make_cstring_view("target_features"),
+      &target_features_node));
+  // Creating/destroying CPU features here everytime makes this function
+  // expensive beyond just the allocator churn, as it amounts to clearing a
+  // cache, so the subsequent feature checks are potentially expensive, e.g.
+  // on Linux/Aarch64, retriggering the trapped reads of privileged CPU features
+  // registers.
+  //
+  // But that's fine because this function is only called once per requirements
+  // node, and there's only one such node at the start of the entire trace.
+  iree_cpu_features_t* cpu_features;
+  IREE_RETURN_IF_ERROR(
+      iree_cpu_features_allocate(replay->host_allocator, &cpu_features));
+  iree_status_t status = iree_cpu_features_have_all_target_features(
+      cpu_features, document, target_features_node);
+  iree_cpu_features_free(replay->host_allocator, cpu_features);
+  return status;
+}
+
 // Special handler for function calls in a e2e matmul test trace.
 // Assumes that all calls are to functions that take 3 inputs (lhs, rhs, acc)
 // and return the result of a matmul (lhs*rhs+acc).
@@ -612,6 +661,9 @@ static iree_status_t iree_e2e_matmul_test_trace_replay_event(
       document, event_node, iree_make_cstring_view("type"), &type_node));
   if (iree_yaml_string_equal(type_node, iree_make_cstring_view("call"))) {
     return replay_event_call(replay, document, event_node);
+  } else if (iree_yaml_string_equal(type_node,
+                                    iree_make_cstring_view("requirements"))) {
+    return replay_event_requirements(replay, document, event_node);
   } else {
     return iree_trace_replay_event(replay, document, event_node);
   }
@@ -685,7 +737,7 @@ int main(int argc, char** argv) {
   iree_flags_parse_checked(IREE_FLAGS_PARSE_MODE_DEFAULT, &argc, &argv);
   if (argc <= 1) {
     fprintf(stderr,
-            "no trace files provided; pass one or more yaml file paths");
+            "no trace files provided; pass one or more yaml file paths\n");
     return 1;
   }
 
@@ -700,8 +752,9 @@ int main(int argc, char** argv) {
   iree_vm_instance_release(instance);
   if (!iree_status_is_ok(status)) {
     iree_status_fprint(stderr, status);
+    bool is_unavailable = iree_status_is_unavailable(status);
     iree_status_free(status);
-    return 1;
+    return is_unavailable ? EXIT_SUCCESS : EXIT_FAILURE;
   }
-  return 0;
+  return EXIT_SUCCESS;
 }
