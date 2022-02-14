@@ -115,7 +115,6 @@ From the `iree-build` directory:
     # Add ./bindings/python and compiler-api/python_package to PYTHONPATH and
     # use the API.
     source .env && export PYTHONPATH
-    export PYTHONPATH="$PWD/bindings/python"
     python -c "import iree.compiler"
     python -c "import iree.runtime"
     ```
