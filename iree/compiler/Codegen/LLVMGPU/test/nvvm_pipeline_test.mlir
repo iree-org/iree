@@ -522,3 +522,90 @@ hal.executable @mma_fused {
 //   CHECK-COUNT-2:   nvvm.wmma.mma
 //   CHECK-COUNT-8:   llvm.fadd
 //   CHECK-COUNT-1:   nvvm.wmma.store {{.*}} : !llvm.ptr<f32>, f32, f32, f32, f32, f32, f32, f32, f32
+
+// -----
+
+#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>, 
+    #hal.descriptor_set.binding<1, storage_buffer>, 
+    #hal.descriptor_set.binding<2, storage_buffer>
+  ]>
+]>
+#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {target_arch = "sm_80"}>
+#map0 = affine_map<()[s0, s1] -> (s0 * s1)>
+#map1 = affine_map<(d0)[s0] -> (s0, -d0 + 4)>
+#map2 = affine_map<(d0)[s0] -> (s0, -d0 + 32)>
+#map3 = affine_map<(d0)[s0] -> (s0, -d0 + 64)>
+#map4 = affine_map<(d0)[s0] -> (-d0 + 4, s0)>
+#map5 = affine_map<(d0)[s0] -> (-d0 + 32, s0)>
+#map6 = affine_map<(d0)[s0] -> (-d0 + 64, s0)>
+  hal.executable @large_dot_general_dispatch_0 {
+    hal.executable.variant public @cuda, target = #executable_target_cuda_nvptx_fb {
+      hal.executable.entry_point @large_dot_general_dispatch_0 layout(#executable_layout)
+      builtin.module {
+        func @large_dot_general_dispatch_0() {
+          %c64 = arith.constant 64 : index
+          %c32 = arith.constant 32 : index
+          %c4 = arith.constant 4 : index
+          %cst = arith.constant 0.000000e+00 : f32
+          %c0 = arith.constant 0 : index
+          %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(32) : !flow.dispatch.tensor<readonly:4x32x1024xf32>
+          %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(32) : !flow.dispatch.tensor<readonly:4x1024x64xf32>
+          %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) offset(%c0) alignment(32) : !flow.dispatch.tensor<writeonly:4x32x64xf32>
+          %workgroup_size_x = hal.interface.workgroup.size[0] : index
+          %workgroup_size_y = hal.interface.workgroup.size[1] : index
+          %workgroup_size_z = hal.interface.workgroup.size[2] : index
+          %workgroup_id_x = hal.interface.workgroup.id[0] : index
+          %workgroup_count_x = hal.interface.workgroup.count[0] : index
+          %workgroup_id_y = hal.interface.workgroup.id[1] : index
+          %workgroup_count_y = hal.interface.workgroup.count[1] : index
+          %workgroup_id_z = hal.interface.workgroup.id[2] : index
+          %workgroup_count_z = hal.interface.workgroup.count[2] : index
+          %3 = affine.apply #map0()[%workgroup_id_z, %workgroup_size_z]
+          %4 = affine.apply #map0()[%workgroup_count_z, %workgroup_size_z]
+          scf.for %arg0 = %3 to %c4 step %4 {
+            %5 = affine.apply #map0()[%workgroup_id_y, %workgroup_size_y]
+            %6 = affine.apply #map0()[%workgroup_count_y, %workgroup_size_y]
+            scf.for %arg1 = %5 to %c32 step %6 {
+              %7 = affine.apply #map0()[%workgroup_id_x, %workgroup_size_x]
+              %8 = affine.apply #map0()[%workgroup_count_x, %workgroup_size_x]
+              scf.for %arg2 = %7 to %c64 step %8 {
+                %9 = affine.min #map1(%arg0)[%workgroup_size_z]
+                %10 = affine.min #map2(%arg1)[%workgroup_size_y]
+                %11 = flow.dispatch.tensor.load %0, offsets = [%arg0, %arg1, 0], sizes = [%9, %10, 1024], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:4x32x1024xf32> -> tensor<?x?x1024xf32>
+                %12 = affine.min #map3(%arg2)[%workgroup_size_x]
+                %13 = flow.dispatch.tensor.load %1, offsets = [%arg0, 0, %arg2], sizes = [%9, 1024, %12], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:4x1024x64xf32> -> tensor<?x1024x?xf32>
+                %14 = affine.min #map4(%arg0)[%workgroup_size_z]
+                %15 = affine.min #map5(%arg1)[%workgroup_size_y]
+                %16 = affine.min #map6(%arg2)[%workgroup_size_x]
+                %17 = linalg.init_tensor [%14, %15, %16] : tensor<?x?x?xf32>
+                %18 = linalg.fill(%cst, %17) : f32, tensor<?x?x?xf32> -> tensor<?x?x?xf32> 
+                %19 = linalg.batch_matmul ins(%11, %13 : tensor<?x?x1024xf32>, tensor<?x1024x?xf32>) outs(%18 : tensor<?x?x?xf32>) -> tensor<?x?x?xf32>
+                flow.dispatch.tensor.store %19, %2, offsets = [%arg0, %arg1, %arg2], sizes = [%9, %10, %12], strides = [1, 1, 1] : tensor<?x?x?xf32> -> !flow.dispatch.tensor<writeonly:4x32x64xf32>
+              }
+            }
+          }
+          return
+        }
+      }
+    }
+  }
+//     CHECK-LABEL: hal.executable public @large_dot_general_dispatch_0
+//           CHECK:   hal.executable.variant public @cuda
+//  CHECK-COUNT-16:   llvm.store {{.*}} : !llvm.ptr<vector<16xf32>>
+//   CHECK-COUNT-2:   llvm.load {{.*}} : !llvm.ptr<vector<4xf32>>
+//           CHECK:   llvm.br
+//   CHECK-COUNT-2:   llvm.store {{.*}} : !llvm.ptr<vector<4xf32>, 3>
+//   CHECK-COUNT-4:   nvvm.wmma.load{{.*}} : (!llvm.ptr<f32, 3>) -> !llvm.struct<(i32, i32, i32, i32)
+//           CHECK:   nvvm.wmma.load{{.*}} : (!llvm.ptr<f32>) -> !llvm.struct<(f32, f32, f32, f32, f32, f32, f32, f32)
+//   CHECK-COUNT-2:   nvvm.wmma.mma
+//           CHECK:   nvvm.wmma.store {{.*}} : !llvm.ptr<f32>, f32, f32, f32, f32, f32, f32, f32, f32
+//   CHECK-COUNT-2:   llvm.load {{.*}} : !llvm.ptr<vector<4xf32>>
+//           CHECK:   llvm.br
+//   CHECK-COUNT-2:   llvm.store {{.*}} : !llvm.ptr<vector<4xf32>, 3>
+//   CHECK-COUNT-4:   nvvm.wmma.load{{.*}} : (!llvm.ptr<f32, 3>) -> !llvm.struct<(i32, i32, i32, i32)
+//           CHECK:   nvvm.wmma.load{{.*}} : (!llvm.ptr<f32>) -> !llvm.struct<(f32, f32, f32, f32, f32, f32, f32, f32)
+//   CHECK-COUNT-2:   nvvm.wmma.mma
+//       CHECK-NOT:   llvm.fadd
+//   CHECK-COUNT-1:   nvvm.wmma.store {{.*}} : !llvm.ptr<f32>, f32, f32, f32, f32, f32, f32, f32, f32
