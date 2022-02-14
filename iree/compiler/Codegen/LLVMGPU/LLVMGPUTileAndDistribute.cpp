@@ -61,39 +61,48 @@ static void populateTilingReductionPatterns(RewritePatternSet &patterns) {
                                                     filter);
 }
 
+/// Return the tile size associated to one thread or warp based on the number of
+/// element in the group.
+static SmallVector<Value, 4> calculateDistributedTileSize(
+    ArrayRef<int64_t> numElements, OpBuilder &builder, Operation *operation) {
+  SmallVector<int64_t> blockTileSize = getTileSizes(operation, 0);
+  SmallVector<Value, 4> tileSizesVal;
+  // Use partitionedLoop to know what loop needs to be distributed.
+  auto interfaceOp = cast<IREE::Flow::PartitionableLoopsInterface>(*operation);
+  auto partitionedLoops =
+      interfaceOp.getPartitionableLoops(kNumMaxParallelDims);
+  if (partitionedLoops.empty()) {
+    return tileSizesVal;
+  }
+  unsigned maxDepth = partitionedLoops.back() + 1;
+  auto zero = builder.create<arith::ConstantIndexOp>(operation->getLoc(), 0);
+  tileSizesVal.resize(maxDepth, zero);
+  // partitionedLoops contains the dimensions we want to distribute.
+  // We are distributing them in order onto the different workgroup
+  // dimensions.
+  SmallVector<int64_t> distributedDim(numElements.begin(), numElements.end());
+  distributedDim.resize(partitionedLoops.size());
+  unsigned idIdx = 0;
+  std::reverse(distributedDim.begin(), distributedDim.end());
+  for (unsigned depth : partitionedLoops) {
+    if (depth >= blockTileSize.size()) continue;
+    tileSizesVal[depth] = builder.create<arith::ConstantIndexOp>(
+        operation->getLoc(), blockTileSize[depth] / distributedDim[idIdx++]);
+    if (idIdx == kNumMaxParallelDims) break;
+  }
+  return tileSizesVal;
+}
+
 /// Patterns for warp level tiling.
 static void populateTilingToWarpPatterns(
-    RewritePatternSet &patterns, SmallVectorImpl<int64_t> &workgroupSize,
-    SmallVectorImpl<int64_t> &workloadPerWorkgroup) {
+    RewritePatternSet &patterns, SmallVectorImpl<int64_t> &workgroupSize) {
   std::array<int64_t, 3> warpPerWorkgroup = {
       workgroupSize[0] / kWarpSize, workgroupSize[1], workgroupSize[2]};
 
   linalg::TileSizeComputationFunction getInnerTileSizeFn =
-      [&workloadPerWorkgroup, warpPerWorkgroup](OpBuilder &builder,
-                                                Operation *operation) {
-        SmallVector<Value, 4> tileSizesVal;
-        SmallVector<int64_t, 4> tileSizes;
-        for (auto workload : llvm::enumerate(workloadPerWorkgroup)) {
-          tileSizes.push_back(workload.value() /
-                              warpPerWorkgroup[workload.index()]);
-        }
-        std::reverse(tileSizes.begin(), tileSizes.end());
-        if (tileSizes.empty()) return SmallVector<Value, 4>();
-        auto interfaceOp =
-            cast<IREE::Flow::PartitionableLoopsInterface>(*operation);
-        auto partitionedLoops =
-            interfaceOp.getPartitionableLoops(kNumMaxParallelDims);
-        unsigned maxDepth = partitionedLoops.back() + 1;
-        auto zero =
-            builder.create<arith::ConstantIndexOp>(operation->getLoc(), 0);
-        tileSizesVal.resize(maxDepth, zero);
-        size_t tileSizeIdx = 0;
-        for (unsigned depth : partitionedLoops) {
-          tileSizesVal[depth] = builder.create<arith::ConstantIndexOp>(
-              operation->getLoc(), tileSizes[tileSizeIdx++]);
-          if (tileSizeIdx == tileSizes.size()) break;
-        }
-        return tileSizesVal;
+      [warpPerWorkgroup](OpBuilder &builder, Operation *operation) {
+        return calculateDistributedTileSize(warpPerWorkgroup, builder,
+                                            operation);
       };
   auto getWarpProcInfoFn = [warpPerWorkgroup](
                                OpBuilder &builder, Location loc,
@@ -125,38 +134,11 @@ static void populateTilingToWarpPatterns(
 
 /// Patterns for thread level tiling.
 static void populateTilingToInvocationPatterns(
-    RewritePatternSet &patterns, SmallVectorImpl<int64_t> &workgroupSize,
-    SmallVectorImpl<int64_t> &workloadPerWorkgroup) {
+    RewritePatternSet &patterns, SmallVectorImpl<int64_t> &workgroupSize) {
   linalg::TileSizeComputationFunction getInnerTileSizeFn =
       [&](OpBuilder &builder, Operation *operation) {
-        SmallVector<Value, 4> tileSizesVal;
-        SmallVector<int64_t, 4> tileSizes;
-        for (auto workload : llvm::enumerate(workloadPerWorkgroup)) {
-          tileSizes.push_back(workload.value() /
-                              workgroupSize[workload.index()]);
-        }
-        std::reverse(tileSizes.begin(), tileSizes.end());
-        if (tileSizes.empty()) return SmallVector<Value, 4>();
-        auto interfaceOp =
-            cast<IREE::Flow::PartitionableLoopsInterface>(*operation);
-        auto partitionedLoops =
-            interfaceOp.getPartitionableLoops(kNumMaxParallelDims);
-        if (partitionedLoops.empty()) {
-          return tileSizesVal;
-        }
-        unsigned maxDepth = partitionedLoops.back() + 1;
-        auto zero =
-            builder.create<arith::ConstantIndexOp>(operation->getLoc(), 0);
-        tileSizesVal.resize(maxDepth, zero);
-        size_t tileSizeIdx = 0;
-        for (unsigned depth : partitionedLoops) {
-          tileSizesVal[depth] = builder.create<arith::ConstantIndexOp>(
-              operation->getLoc(), tileSizes[tileSizeIdx++]);
-          if (tileSizeIdx == tileSizes.size()) break;
-        }
-        return tileSizesVal;
+        return calculateDistributedTileSize(workgroupSize, builder, operation);
       };
-
   auto getThreadProcInfoFn = [&workgroupSize](
                                  OpBuilder &builder, Location loc,
                                  ArrayRef<Range> parallelLoopRanges) {
@@ -296,8 +278,6 @@ struct LLVMGPUTileAndDistributePass
     auto workgroupSize = llvm::to_vector<4>(llvm::map_range(
         getEntryPoint(funcOp).workgroup_size().getValue(),
         [&](Attribute attr) { return attr.cast<IntegerAttr>().getInt(); }));
-    auto workloadPerWorkgroup =
-        getTranslationInfo(getEntryPoint(funcOp)).getWorkloadPerWorkgroupVals();
 
     int64_t flatWorkgroupSize =
         workgroupSize[0] * workgroupSize[1] * workgroupSize[2];
@@ -345,8 +325,7 @@ struct LLVMGPUTileAndDistributePass
     if (distributeToWarp) {
       // Apply last level of tiling and distribute to warps.
       RewritePatternSet warpLevelTilingPatterns(context);
-      populateTilingToWarpPatterns(warpLevelTilingPatterns, workgroupSize,
-                                   workloadPerWorkgroup);
+      populateTilingToWarpPatterns(warpLevelTilingPatterns, workgroupSize);
       if (failed(applyPatternsAndFoldGreedily(
               funcOp, std::move(warpLevelTilingPatterns)))) {
         return signalPassFailure();
@@ -356,7 +335,7 @@ struct LLVMGPUTileAndDistributePass
       // Apply last level of tiling and distribute to threads.
       RewritePatternSet threadLevelTilingPatterns(context);
       populateTilingToInvocationPatterns(threadLevelTilingPatterns,
-                                         workgroupSize, workloadPerWorkgroup);
+                                         workgroupSize);
       if (failed(applyPatternsAndFoldGreedily(
               funcOp, std::move(threadLevelTilingPatterns)))) {
         return signalPassFailure();

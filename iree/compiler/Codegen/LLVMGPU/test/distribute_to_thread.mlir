@@ -86,6 +86,80 @@ hal.executable private @dot_dispatch_0  {
 
 // -----
 
+#translation = #iree_codegen.translation.info<"LLVMGPUMatmulSimt", workload_per_wg = [32, 8, 1]>
+#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb">
+#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>,
+    #hal.descriptor_set.binding<2, storage_buffer>
+  ]>
+]>
+hal.executable private @batch_matmul_func  {
+  hal.executable.variant @cuda, target = #executable_target_cuda_nvptx_fb {
+    hal.executable.entry_point @batch_matmul_func layout(#executable_layout) attributes {
+      translation.info = #translation,
+      workgroup_size = [8 : index, 8 : index, 1 : index]
+    }
+builtin.module {
+  func @batch_matmul_func() {
+    %c0 = arith.constant 0 : index
+    %cst = arith.constant 0.000000e+00 : f32
+    %c4 = arith.constant 4 : index
+    %c32 = arith.constant 32 : index
+    %c64 = arith.constant 64 : index
+    %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(32) : memref<4x32x1024xf32>
+    memref.assume_alignment %0, 32 : memref<4x32x1024xf32>
+    %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(32) : memref<4x1024x64xf32>
+    memref.assume_alignment %1, 32 : memref<4x1024x64xf32>
+    %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) offset(%c0) alignment(32) : memref<4x32x64xf32>
+    memref.assume_alignment %2, 32 : memref<4x32x64xf32>
+    %workgroup_id_x = hal.interface.workgroup.id[0] : index
+    %workgroup_count_x = hal.interface.workgroup.count[0] : index
+    %workgroup_id_y = hal.interface.workgroup.id[1] : index
+    %workgroup_count_y = hal.interface.workgroup.count[1] : index
+    %workgroup_id_z = hal.interface.workgroup.id[2] : index
+    %workgroup_count_z = hal.interface.workgroup.count[2] : index
+    scf.for %arg0 = %workgroup_id_z to %c4 step %workgroup_count_z {
+      %3 = affine.apply affine_map<()[s0] -> (s0 * 8)>()[%workgroup_id_y]
+      %4 = affine.apply affine_map<()[s0] -> (s0 * 8)>()[%workgroup_count_y]
+      scf.for %arg1 = %3 to %c32 step %4 {
+        %5 = affine.apply affine_map<()[s0] -> (s0 * 32)>()[%workgroup_id_x]
+        %6 = affine.apply affine_map<()[s0] -> (s0 * 32)>()[%workgroup_count_x]
+        scf.for %arg2 = %5 to %c64 step %6 {
+          %7 = memref.subview %0[%arg0, %arg1, 0] [1, 8, 1024] [1, 1, 1] : memref<4x32x1024xf32> to memref<1x8x1024xf32, affine_map<(d0, d1, d2)[s0] -> (d0 * 32768 + s0 + d1 * 1024 + d2)>>
+          %8 = memref.subview %1[%arg0, 0, %arg2] [1, 1024, 32] [1, 1, 1] : memref<4x1024x64xf32> to memref<1x1024x32xf32, affine_map<(d0, d1, d2)[s0] -> (d0 * 65536 + s0 + d1 * 64 + d2)>>
+          %9 = memref.subview %2[%arg0, %arg1, %arg2] [1, 8, 32] [1, 1, 1] : memref<4x32x64xf32> to memref<1x8x32xf32, affine_map<(d0, d1, d2)[s0] -> (d0 * 2048 + s0 + d1 * 64 + d2)>> 
+          linalg.fill(%cst, %9) {lowering.config = #iree_codegen.lowering.config<tile_sizes = [[1, 8, 32, 32]], native_vector_size = []>} : f32, memref<1x8x32xf32, affine_map<(d0, d1, d2)[s0] -> (d0 * 2048 + s0 + d1 * 64 + d2)>>  
+          linalg.batch_matmul {lowering.config = #iree_codegen.lowering.config<tile_sizes = [[1, 8, 32, 32]], native_vector_size = []>} ins(%7, %8 : memref<1x8x1024xf32, affine_map<(d0, d1, d2)[s0] -> (d0 * 32768 + s0 + d1 * 1024 + d2)>>, memref<1x1024x32xf32, affine_map<(d0, d1, d2)[s0] -> (d0 * 65536 + s0 + d1 * 64 + d2)>>) outs(%9 : memref<1x8x32xf32, affine_map<(d0, d1, d2)[s0] -> (d0 * 2048 + s0 + d1 * 64 + d2)>>)
+        }
+      }
+    }
+    return
+  }
+}
+}
+}
+
+//         CHECK: #[[$MAP:.*]] = affine_map<()[s0] -> (s0 * 4)>
+//   CHECK-LABEL: hal.executable private @batch_matmul_func
+//         CHECK:   hal.executable.variant public @cuda
+//     CHECK-DAG:   %[[C8:.+]] = arith.constant 8 : index
+//     CHECK-DAG:   %[[C32:.+]] = arith.constant 32 : index
+//     CHECK-DAG:   %[[TX:.*]] = gpu.thread_id  x
+//     CHECK-DAG:   %[[TY:.*]] = gpu.thread_id  y
+//         CHECK:   scf.for %{{.*}} = %[[TY]] to %[[C8]] step %[[C8]] {
+//         CHECK:     %[[TX4:.*]] = affine.apply #[[$MAP]]()[%16]
+//         CHECK:     scf.for %[[IND1:.+]] = %[[TX4]] to %[[C32]] step %[[C32]] {
+//     CHECK-DAG:       memref.subview
+//     CHECK-DAG:       memref.subview
+//     CHECK-DAG:       memref.subview
+//         CHECK:       linalg.batch_matmul {__internal_linalg_transform__ = "vectorize", {{.*}}} ins(%{{.*}}, %{{.*}} : memref<1x1x32xf32, #{{.*}}, 3>, memref<1x32x4xf32, #{{.*}}, 3>) outs(%{{.*}} : memref<1x1x4xf32, #{{.*}}>)
+//         CHECK:    }
+//         CHECK:  }
+
+// -----
+
 #config = #iree_codegen.lowering.config<tile_sizes = [[]], native_vector_size = []>
 #translation = #iree_codegen.translation.info<"LLVMGPUVectorize", workload_per_wg = []>
 #executable_layout = #hal.executable.layout<push_constants = 0, sets = [
