@@ -121,6 +121,7 @@ static void addSPIRVLoweringPasses(OpPassManager &pm) {
   pm.addPass(createConvertToSPIRVPass());
 
   OpPassManager &spirvPM = pm.nest<spirv::ModuleOp>();
+  spirvPM.addPass(spirv::createUnifyAliasedResourcePass());
   spirvPM.addPass(spirv::createLowerABIAttributesPass());
   spirvPM.addPass(createCanonicalizerPass());
   spirvPM.addPass(createCSEPass());
