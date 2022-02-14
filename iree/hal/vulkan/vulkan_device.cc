@@ -70,6 +70,16 @@ IREE_API_EXPORT iree_status_t iree_hal_vulkan_query_extensibility_set(
   // here changes our minimum requirements and should be done carefully.
   // Optional extensions here are feature detected by the runtime.
 
+#ifdef IREE_PLATFORM_APPLE
+  // VK_KHR_portability_subset:
+  // For Apple platforms, Vulkan is layered on top of Metal via MoltenVK.
+  // It exposes this extension to allow a non-conformant Vulkan implementation
+  // to be built on top of another non-Vulkan graphics API. This extension must
+  // be enabled if exists.
+  ADD_EXT(IREE_HAL_VULKAN_EXTENSIBILITY_DEVICE_EXTENSIONS_REQUIRED,
+          VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME);
+#endif
+
   // VK_KHR_storage_buffer_storage_class:
   // Our generated SPIR-V kernels use storage buffers for all their data access.
   ADD_EXT(IREE_HAL_VULKAN_EXTENSIBILITY_DEVICE_EXTENSIONS_REQUIRED,
