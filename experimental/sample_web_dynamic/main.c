@@ -20,6 +20,11 @@ int load_program(uint8_t* vmfb_data, size_t length);
 // Implementation
 //===----------------------------------------------------------------------===//
 
+// We're not really using cpuinfo here, but the linker complains about this
+// function not being defined. It actually is defined though, _if_ you patch
+// cpuinfo's CMake configuration: https://github.com/pytorch/cpuinfo/issues/34.
+void __attribute__((weak)) cpuinfo_emscripten_init(void) {}
+
 extern iree_status_t create_device_with_wasm_loader(
     iree_allocator_t host_allocator, iree_hal_device_t** out_device);
 
