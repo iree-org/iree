@@ -178,6 +178,10 @@ void iree_wait_set_free(iree_wait_set_t* set) {
   IREE_TRACE_ZONE_END(z0);
 }
 
+bool iree_wait_set_is_empty(const iree_wait_set_t* set) {
+  return set->handle_count != 0;
+}
+
 iree_status_t iree_wait_set_insert(iree_wait_set_t* set,
                                    iree_wait_handle_t handle) {
   if (set->handle_count + 1 > set->handle_capacity) {

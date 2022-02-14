@@ -119,6 +119,9 @@ iree_status_t iree_wait_set_allocate(iree_host_size_t capacity,
 // Frees a wait set. The wait set must not be being waited on.
 void iree_wait_set_free(iree_wait_set_t* set);
 
+// Returns true if there are no handles registered with the set.
+bool iree_wait_set_is_empty(const iree_wait_set_t* set);
+
 // Inserts a wait handle into the set.
 // If the handle is already in the set it will be reference counted such that a
 // matching number of iree_wait_set_erase calls are required.
