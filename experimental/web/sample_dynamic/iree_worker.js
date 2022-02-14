@@ -5,8 +5,8 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 // TODO(scotttodd): configure this through the build system / scripts?
-// const MAIN_SCRIPT_URL = 'sample-web-dynamic-multithreaded.js';
-const MAIN_SCRIPT_URL = 'sample-web-dynamic-sync.js';
+// const MAIN_SCRIPT_URL = 'web-sample-dynamic-multithreaded.js';
+const MAIN_SCRIPT_URL = 'web-sample-dynamic-sync.js';
 
 let wasmLoadProgramFn;
 var Module = {
@@ -16,7 +16,6 @@ var Module = {
   printErr: function(text) {
     console.error('(C)', text);
   },
-  // wasmMemory: appWasmMemory,
   onRuntimeInitialized: function() {
     console.log('WebAssembly module onRuntimeInitialized()');
 

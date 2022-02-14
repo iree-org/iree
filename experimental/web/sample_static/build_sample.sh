@@ -19,34 +19,43 @@ fi
 
 CMAKE_BIN=${CMAKE_BIN:-$(which cmake)}
 ROOT_DIR=$(git rev-parse --show-toplevel)
-SOURCE_DIR=${ROOT_DIR}/experimental/sample_web_dynamic
+SOURCE_DIR=${ROOT_DIR}/experimental/web/sample_static
 
 BUILD_DIR=${ROOT_DIR?}/build-emscripten
 mkdir -p ${BUILD_DIR}
 
-BINARY_DIR=${BUILD_DIR}/experimental/sample_web_dynamic
+BINARY_DIR=${BUILD_DIR}/experimental/web/sample_static/
 mkdir -p ${BINARY_DIR}
 
 ###############################################################################
-# Compile from .mlir input to portable .vmfb file using host tools            #
+# Compile from .mlir input to static C source files using host tools          #
 ###############################################################################
 
 # TODO(scotttodd): portable path ... discover from python install if on $PATH?
 INSTALL_ROOT="D:\dev\projects\iree-build\install\bin"
 TRANSLATE_TOOL="${INSTALL_ROOT?}/iree-translate.exe"
 EMBED_DATA_TOOL="${INSTALL_ROOT?}/generate_embed_data.exe"
-INPUT_NAME="simple_abs"
-INPUT_PATH="${ROOT_DIR?}/iree/samples/models/simple_abs.mlir"
+INPUT_NAME="mnist"
+INPUT_PATH="${ROOT_DIR?}/iree/samples/models/mnist.mlir"
 
-echo "=== Translating MLIR to Wasm VM flatbuffer output (.vmfb) ==="
+echo "=== Translating MLIR to static library output (.vmfb, .h, .o) ==="
 ${TRANSLATE_TOOL?} ${INPUT_PATH} \
   --iree-mlir-to-vm-bytecode-module \
   --iree-input-type=mhlo \
   --iree-hal-target-backends=llvm \
-  --iree-llvm-target-triple=wasm32-unknown-emscripten \
-  --iree-llvm-target-cpu-features=+atomics,+bulk-memory,+simd128 \
+  --iree-llvm-target-triple=wasm32-unknown-unknown \
+  --iree-llvm-target-cpu-features=+simd128 \
   --iree-llvm-link-embedded=false \
+  --iree-llvm-link-static \
+  --iree-llvm-static-library-output-path=${BINARY_DIR}/${INPUT_NAME}_static.o \
   --o ${BINARY_DIR}/${INPUT_NAME}.vmfb
+
+echo "=== Embedding bytecode module (.vmfb) into C source files (.h, .c) ==="
+${EMBED_DATA_TOOL?} ${BINARY_DIR}/${INPUT_NAME}.vmfb \
+  --output_header=${BINARY_DIR}/${INPUT_NAME}_bytecode.h \
+  --output_impl=${BINARY_DIR}/${INPUT_NAME}_bytecode.c \
+  --identifier=iree_static_${INPUT_NAME} \
+  --flatten
 
 ###############################################################################
 # Build the web artifacts using Emscripten                                    #
@@ -54,7 +63,7 @@ ${TRANSLATE_TOOL?} ${INPUT_PATH} \
 
 echo "=== Building web artifacts using Emscripten ==="
 
-pushd ${ROOT_DIR?}/build-emscripten
+pushd ${BUILD_DIR}
 
 # Configure using Emscripten's CMake wrapper, then build.
 # Note: The sample creates a device directly, so no drivers are required,
@@ -64,23 +73,29 @@ emcmake "${CMAKE_BIN?}" -G Ninja .. \
   -DIREE_HOST_BINARY_ROOT=$PWD/../build-host/install \
   -DIREE_BUILD_EXPERIMENTAL_WEB_SAMPLES=ON \
   -DIREE_HAL_DRIVER_DEFAULTS=OFF \
-  -DIREE_HAL_DRIVER_DYLIB_SYNC=ON \
+  -DIREE_HAL_DRIVER_DYLIB=ON \
   -DIREE_BUILD_COMPILER=OFF \
   -DIREE_BUILD_TESTS=OFF
 
 "${CMAKE_BIN?}" --build . --target \
-  iree_experimental_sample_web_dynamic_sync
+    iree_experimental_web_sample_static_sync \
+    iree_experimental_web_sample_static_multithreaded
+
 popd
 
 ###############################################################################
-# Serve the demo using a local webserver                                      #
+# Serve the sample using a local webserver                                    #
 ###############################################################################
 
-echo "=== Copying static files (.html, .js) to the build directory ==="
+echo "=== Copying static files to the build directory ==="
 
-cp ${SOURCE_DIR?}/index.html ${BINARY_DIR}
-cp ${SOURCE_DIR?}/iree_api.js ${BINARY_DIR}
-cp ${SOURCE_DIR?}/iree_worker.js ${BINARY_DIR}
+cp ${SOURCE_DIR}/index.html ${BINARY_DIR}
+cp ${SOURCE_DIR}/iree_api.js ${BINARY_DIR}
+cp ${SOURCE_DIR}/iree_worker.js ${BINARY_DIR}
+
+EASELJS_LIBRARY=${BINARY_DIR}/easeljs.min.js
+test -f ${EASELJS_LIBRARY} || \
+    wget https://code.createjs.com/1.0.0/easeljs.min.js -O ${EASELJS_LIBRARY}
 
 echo "=== Running local webserver, open at http://localhost:8000/ ==="
 

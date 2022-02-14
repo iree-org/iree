@@ -17,15 +17,15 @@ a single .js + .wasm bundle.
     * You may need to set the path to your host tools install
 5. Open the localhost address linked in the script output
 
-To rebuild most parts of the demo (C runtime, sample HTML, CMake config, etc.),
-just `control + C` to stop the local webserver and rerun the script.
+To rebuild most parts of the sample (C runtime, sample HTML, CMake config,
+etc.), just `control + C` to stop the local webserver and rerun the script.
 
 ## How it works
 
-This [MNIST model](../../iree/samples/models/mnist.mlir), also used in the
-[Vision sample](../../iree/samples/vision/), is compiled using the "static
+This [MNIST model](../../../iree/samples/models/mnist.mlir), also used in the
+[Vision sample](../../../iree/samples/vision/), is compiled using the "static
 library" output setting of IREE's compiler (see the
-[Static library sample](../../iree/samples/static_library)). The resulting
+[Static library sample](../../../iree/samples/static_library)). The resulting
 `.h` and `.o` files are compiled together with `main.c`, while the `.vmfb` is
 embedded into a C file that is similarly linked in.
 

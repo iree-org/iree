@@ -14,8 +14,8 @@ IREE. The output artifact is a web page that loads a separately provided IREE
     * You may need to set the path to your host tools install
 5. Open the localhost address linked in the script output
 
-To rebuild most parts of the demo (C runtime, sample HTML, CMake config, etc.),
-just `control + C` to stop the local webserver and rerun the script.
+To rebuild most parts of the sample (C runtime, sample HTML, CMake config,
+etc.), just `control + C` to stop the local webserver and rerun the script.
 
 ## How it works
 
@@ -23,7 +23,7 @@ just `control + C` to stop the local webserver and rerun the script.
 to compile the runtime into WebAssembly and JavaScript files.
 
 Any supported IREE program, such as
-[simple_abs.mlir](../../iree/samples/models/simple_abs.mlir), is compiled using
+[simple_abs.mlir](../../../iree/samples/models/simple_abs.mlir), is compiled using
 the "system library" linking mode (i.e. `--iree-llvm-link-embedded=false`).
 This creates a shared object (typically .so/.dll, .wasm in this case). When the
 runtime attempts to load this file using `dlopen()` and `dlsym()`, Emscripten
