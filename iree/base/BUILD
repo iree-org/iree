@@ -25,6 +25,8 @@ cc_library(
         "assert.h",
         "bitfield.c",
         "bitfield.h",
+        "loop.c",
+        "loop.h",
         "status.c",
         "status.h",
         "string_builder.c",
