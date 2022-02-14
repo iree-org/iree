@@ -27,6 +27,8 @@ cc_library(
         "bitfield.h",
         "loop.c",
         "loop.h",
+        "loop_inline.c",
+        "loop_inline.h",
         "status.c",
         "status.h",
         "string_builder.c",
@@ -69,6 +71,34 @@ cc_test(
         ":base",
         "//iree/testing:gtest",
         "//iree/testing:gtest_main",
+    ],
+)
+
+cc_test(
+    name = "loop_inline_test",
+    srcs = [
+        "loop_inline_test.cc",
+    ],
+    deps = [
+        ":base",
+        ":cc",
+        ":loop_test_hdrs",
+        "//iree/testing:gtest",
+        "//iree/testing:gtest_main",
+    ],
+)
+
+cc_library(
+    name = "loop_test_hdrs",
+    testonly = 1,
+    hdrs = [
+        "loop_test.h",
+    ],
+    deps = [
+        ":base",
+        ":tracing",
+        "//iree/base/internal:wait_handle",
+        "//iree/testing:gtest",
     ],
 )
 

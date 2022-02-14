@@ -98,6 +98,7 @@
 #include "iree/base/bitfield.h"        // IWYU pragma: export
 #include "iree/base/config.h"          // IWYU pragma: export
 #include "iree/base/loop.h"            // IWYU pragma: export
+#include "iree/base/loop_inline.h"     // IWYU pragma: export
 #include "iree/base/status.h"          // IWYU pragma: export
 #include "iree/base/string_builder.h"  // IWYU pragma: export
 #include "iree/base/string_view.h"     // IWYU pragma: export
