@@ -9,6 +9,7 @@
 #include "bindings/python/iree/runtime/status_utils.h"
 #include "iree/base/api.h"
 #include "iree/base/status_cc.h"
+#include "iree/base/tracing.h"
 #include "iree/hal/api.h"
 #include "iree/modules/hal/module.h"
 #include "iree/vm/api.h"
@@ -63,6 +64,7 @@ py::dict GetFunctionReflectionDict(iree_vm_function_t& f) {
 //------------------------------------------------------------------------------
 
 VmInstance VmInstance::Create() {
+  IREE_TRACE_SCOPE0("VmInstance::Create");
   iree_vm_instance_t* instance;
   auto status = iree_vm_instance_create(iree_allocator_system(), &instance);
   CheckApiStatus(status, "Error creating instance");
@@ -75,6 +77,7 @@ VmInstance VmInstance::Create() {
 
 VmContext VmContext::Create(VmInstance* instance,
                             std::optional<std::vector<VmModule*>> modules) {
+  IREE_TRACE_SCOPE0("VmContext::Create");
   iree_vm_context_t* context;
   if (!modules) {
     // Simple create with open allowed modules.
@@ -112,6 +115,7 @@ void VmContext::RegisterModules(std::vector<VmModule*> modules) {
 
 void VmContext::Invoke(iree_vm_function_t f, VmVariantList& inputs,
                        VmVariantList& outputs) {
+  py::gil_scoped_release release;
   CheckApiStatus(iree_vm_invoke(raw_ptr(), f, IREE_VM_INVOCATION_FLAG_NONE,
                                 nullptr, inputs.raw_ptr(), outputs.raw_ptr(),
                                 iree_allocator_system()),
@@ -123,6 +127,7 @@ void VmContext::Invoke(iree_vm_function_t f, VmVariantList& inputs,
 //------------------------------------------------------------------------------
 
 VmModule VmModule::FromFlatbufferBlob(py::object flatbuffer_blob_object) {
+  IREE_TRACE_SCOPE0("VmModule::FromFlatbufferBlob");
   auto flatbuffer_blob = py::cast<py::buffer>(flatbuffer_blob_object);
   auto buffer_info = flatbuffer_blob.request();
   iree_vm_module_t* module;

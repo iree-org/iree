@@ -6,6 +6,7 @@
 
 #include "bindings/python/iree/runtime/hal.h"
 
+#include "iree/base/tracing.h"
 #include "iree/hal/api.h"
 #include "pybind11/numpy.h"
 
@@ -79,6 +80,7 @@ py::str HalAllocator::FormattedStatistics() {
 py::object HalAllocator::AllocateBufferCopy(
     int memory_type, int allowed_usage, py::object buffer,
     std::optional<iree_hal_element_types_t> element_type) {
+  IREE_TRACE_SCOPE0("HalAllocator::AllocateBufferCopy");
   // Request a view of the buffer (use the raw python C API to avoid
   // some allocation and copying at the pybind level).
   Py_buffer py_view;
@@ -96,11 +98,16 @@ py::object HalAllocator::AllocateBufferCopy(
   PyBufferReleaser py_view_releaser(py_view);
 
   iree_hal_buffer_t* hal_buffer;
-  CheckApiStatus(
-      iree_hal_allocator_allocate_buffer(
-          raw_ptr(), memory_type, allowed_usage, py_view.len,
-          iree_make_const_byte_span(py_view.buf, py_view.len), &hal_buffer),
-      "Failed to allocate device visible buffer");
+  // TODO: Should not require host visible :(
+  {
+    py::gil_scoped_release release;
+    CheckApiStatus(
+        iree_hal_allocator_allocate_buffer(
+            raw_ptr(), memory_type | IREE_HAL_MEMORY_TYPE_HOST_VISIBLE,
+            allowed_usage, py_view.len,
+            iree_make_const_byte_span(py_view.buf, py_view.len), &hal_buffer),
+        "Failed to allocate device visible buffer");
+  }
 
   if (!element_type) {
     return py::cast(HalBuffer::StealFromRawPtr(hal_buffer),
@@ -306,7 +313,7 @@ void SetupHalBindings(pybind11::module m) {
       .value("HOST_COHERENT", IREE_HAL_MEMORY_TYPE_HOST_COHERENT)
       .value("HOST_CACHED", IREE_HAL_MEMORY_TYPE_HOST_CACHED)
       .value("HOST_LOCAL", IREE_HAL_MEMORY_TYPE_HOST_LOCAL)
-      .value("DEVICE_VISIBLE", IREE_HAL_MEMORY_TYPE_HOST_VISIBLE)
+      .value("DEVICE_VISIBLE", IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE)
       .value("DEVICE_LOCAL", IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL)
       .export_values()
       .def("__or__",

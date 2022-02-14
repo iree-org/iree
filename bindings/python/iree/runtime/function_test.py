@@ -43,10 +43,11 @@ class MockVmFunction:
 
 class FunctionTest(absltest.TestCase):
 
-  def setUp(self):
+  @classmethod
+  def setUpClass(cls):
     # Doesn't matter what device. We just need one.
     config = rt.Config("vmvx")
-    self.device = config.device
+    cls.device = config.device
 
   def testNoReflectionScalars(self):
 
@@ -84,6 +85,140 @@ class FunctionTest(absltest.TestCase):
     self.assertEqual("[<VmVariantList(3): [-1, 1, 2]>]",
                      vm_context.mock_arg_reprs)
     self.assertEqual(3, result)
+
+  def testListArg(self):
+
+    def invoke(arg_list, ret_list):
+      ret_list.push_int(3)
+
+    vm_context = MockVmContext(invoke)
+    vm_function = MockVmFunction(reflection={
+        "iree.abi":
+            json.dumps({
+                "a": [["slist", "i32", "i32"],],
+                "r": ["i32",],
+            })
+    })
+    invoker = FunctionInvoker(vm_context, self.device, vm_function, tracer=None)
+    _ = invoker([2, 3])
+    self.assertEqual("[<VmVariantList(1): [List[2, 3]]>]",
+                     vm_context.mock_arg_reprs)
+
+  def testListArgNoReflection(self):
+
+    def invoke(arg_list, ret_list):
+      ret_list.push_int(3)
+
+    vm_context = MockVmContext(invoke)
+    vm_function = MockVmFunction(reflection={})
+    invoker = FunctionInvoker(vm_context, self.device, vm_function, tracer=None)
+    _ = invoker([2, 3])
+    self.assertEqual("[<VmVariantList(1): [List[2, 3]]>]",
+                     vm_context.mock_arg_reprs)
+
+  def testListArgArityMismatch(self):
+
+    def invoke(arg_list, ret_list):
+      ret_list.push_int(3)
+
+    vm_context = MockVmContext(invoke)
+    vm_function = MockVmFunction(reflection={
+        "iree.abi":
+            json.dumps({
+                "a": [["slist", "i32", "i32"],],
+                "r": ["i32",],
+            })
+    })
+    invoker = FunctionInvoker(vm_context, self.device, vm_function, tracer=None)
+    with self.assertRaisesRegex(ValueError,
+                                "expected a sequence with 2 values. got:"):
+      _ = invoker([2, 3, 4])
+
+  def testTupleArg(self):
+
+    def invoke(arg_list, ret_list):
+      ret_list.push_int(3)
+
+    vm_context = MockVmContext(invoke)
+    vm_function = MockVmFunction(reflection={
+        "iree.abi":
+            json.dumps({
+                "a": [["stuple", "i32", "i32"],],
+                "r": ["i32",],
+            })
+    })
+    invoker = FunctionInvoker(vm_context, self.device, vm_function, tracer=None)
+    _ = invoker((2, 3))
+    self.assertEqual("[<VmVariantList(1): [List[2, 3]]>]",
+                     vm_context.mock_arg_reprs)
+
+  def testDictArg(self):
+
+    def invoke(arg_list, ret_list):
+      ret_list.push_int(3)
+
+    vm_context = MockVmContext(invoke)
+    vm_function = MockVmFunction(
+        reflection={
+            "iree.abi":
+                json.dumps({
+                    "a": [["sdict", ["a", "i32"], ["b", "i32"]],],
+                    "r": ["i32",],
+                })
+        })
+    invoker = FunctionInvoker(vm_context, self.device, vm_function, tracer=None)
+    _ = invoker({"b": 3, "a": 2})
+    self.assertEqual("[<VmVariantList(1): [List[2, 3]]>]",
+                     vm_context.mock_arg_reprs)
+
+  def testDictArgArityMismatch(self):
+
+    def invoke(arg_list, ret_list):
+      ret_list.push_int(3)
+
+    vm_context = MockVmContext(invoke)
+    vm_function = MockVmFunction(
+        reflection={
+            "iree.abi":
+                json.dumps({
+                    "a": [["sdict", ["a", "i32"], ["b", "i32"]],],
+                    "r": ["i32",],
+                })
+        })
+    invoker = FunctionInvoker(vm_context, self.device, vm_function, tracer=None)
+    with self.assertRaisesRegex(ValueError,
+                                "expected a dict with 2 values. got:"):
+      _ = invoker({"a": 2, "b": 3, "c": 4})
+
+  def testDictArgKeyError(self):
+
+    def invoke(arg_list, ret_list):
+      ret_list.push_int(3)
+
+    vm_context = MockVmContext(invoke)
+    vm_function = MockVmFunction(
+        reflection={
+            "iree.abi":
+                json.dumps({
+                    "a": [["sdict", ["a", "i32"], ["b", "i32"]],],
+                    "r": ["i32",],
+                })
+        })
+    invoker = FunctionInvoker(vm_context, self.device, vm_function, tracer=None)
+    with self.assertRaisesRegex(ValueError, "could not get item 'b' from: "):
+      _ = invoker({"a": 2, "c": 3})
+
+  def testDictArgNoReflection(self):
+
+    def invoke(arg_list, ret_list):
+      ret_list.push_int(3)
+
+    vm_context = MockVmContext(invoke)
+    vm_function = MockVmFunction(reflection={})
+    invoker = FunctionInvoker(vm_context, self.device, vm_function, tracer=None)
+    _ = invoker({"b": 3, "a": 2})
+    self.assertEqual("[<VmVariantList(1): [List[2, 3]]>]",
+                     vm_context.mock_arg_reprs)
 
   def testInlinedResults(self):
 
@@ -313,6 +448,43 @@ class FunctionTest(absltest.TestCase):
     })
     invoker = FunctionInvoker(vm_context, self.device, vm_function, tracer=None)
     _ = invoker(arg_buffer_view)
+    self.assertEqual("<VmVariantList(1): [HalBufferView(2:0x20000011)]>",
+                     repr(invoked_arg_list))
+
+  def testNdarrayArgNoReflection(self):
+    arg_array = np.asarray([1, 0], dtype=np.int32)
+
+    invoked_arg_list = None
+
+    def invoke(arg_list, ret_list):
+      nonlocal invoked_arg_list
+      invoked_arg_list = arg_list
+
+    vm_context = MockVmContext(invoke)
+    vm_function = MockVmFunction(reflection={})
+    invoker = FunctionInvoker(vm_context, self.device, vm_function, tracer=None)
+    result = invoker(arg_array)
+    self.assertEqual("<VmVariantList(1): [HalBufferView(2:0x20000011)]>",
+                     repr(invoked_arg_list))
+
+  def testDeviceArrayArgNoReflection(self):
+    # Note that since the device array is set up to disallow implicit host
+    # transfers, this also verifies that no accidental/automatic transfers
+    # are done as part of marshalling the array to the function.
+    arg_array = rt.asdevicearray(self.device,
+                                 np.asarray([1, 0], dtype=np.int32),
+                                 implicit_host_transfer=False)
+
+    invoked_arg_list = None
+
+    def invoke(arg_list, ret_list):
+      nonlocal invoked_arg_list
+      invoked_arg_list = arg_list
+
+    vm_context = MockVmContext(invoke)
+    vm_function = MockVmFunction(reflection={})
+    invoker = FunctionInvoker(vm_context, self.device, vm_function, tracer=None)
+    result = invoker(arg_array)
     self.assertEqual("<VmVariantList(1): [HalBufferView(2:0x20000011)]>",
                      repr(invoked_arg_list))
 

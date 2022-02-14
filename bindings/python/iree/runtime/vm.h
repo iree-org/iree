@@ -83,7 +83,11 @@ class VmVariantList {
 
   iree_vm_list_t* raw_ptr() { return list_; }
   const iree_vm_list_t* raw_ptr() const { return list_; }
-
+  iree_vm_list_t* steal_raw_ptr() {
+    iree_vm_list_t* stolen = list_;
+    list_ = nullptr;
+    return stolen;
+  }
   void AppendNullRef() {
     iree_vm_ref_t null_ref = {0};
     CheckApiStatus(iree_vm_list_push_ref_move(raw_ptr(), &null_ref),

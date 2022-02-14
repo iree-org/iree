@@ -13,10 +13,12 @@ import logging
 import numpy as np
 
 from .binding import (
+    _invoke_statics,
+    ArgumentPacker,
     BufferUsage,
     HalBufferView,
     HalDevice,
-    HalElementType,
+    InvokeContext,
     MemoryType,
     VmContext,
     VmFunction,
@@ -81,9 +83,8 @@ class FunctionInvoker:
       "_vm_function",
       "_abi_dict",
       "_arg_descs",
+      "_arg_packer",
       "_ret_descs",
-      "_named_arg_indices",
-      "_max_named_arg_index",
       "_has_inlined_results",
       "_tracer",
   ]
@@ -102,15 +103,17 @@ class FunctionInvoker:
     self._arg_descs = None
     self._ret_descs = None
     self._has_inlined_results = False
-    self._named_arg_indices: Dict[str, int] = {}
-    self._max_named_arg_index: int = -1
     self._parse_abi_dict(vm_function)
+    self._arg_packer = ArgumentPacker(_invoke_statics, self._arg_descs)
 
   @property
   def vm_function(self) -> VmFunction:
     return self._vm_function
 
   def __call__(self, *args, **kwargs):
+    invoke_context = InvokeContext(self._device)
+    arg_list = self._arg_packer.pack(invoke_context, args, kwargs)
+
     call_trace = None  # type: Optional[tracing.CallTrace]
     if self._tracer:
       call_trace = self._tracer.start_call(self._vm_function)
@@ -121,25 +124,7 @@ class FunctionInvoker:
       inv = Invocation(self._device)
       ret_descs = self._ret_descs
 
-      # Merge keyword args in by name->position mapping.
-      if kwargs:
-        args = list(args)
-        len_delta = self._max_named_arg_index - len(args) + 1
-        if len_delta > 0:
-          # Fill in MissingArgument placeholders before arranging kwarg input.
-          # Any remaining placeholders will fail arity checks later on.
-          args.extend([MissingArgument] * len_delta)
-
-        for kwarg_key, kwarg_value in kwargs.items():
-          try:
-            kwarg_index = self._named_arg_indices[kwarg_key]
-          except KeyError:
-            raise ArgumentError(f"specified kwarg '{kwarg_key}' is unknown")
-          args[kwarg_index] = kwarg_value
-
-      arg_list = VmVariantList(len(args))
       ret_list = VmVariantList(len(ret_descs) if ret_descs is not None else 1)
-      _merge_python_sequence_to_vm(inv, arg_list, args, self._arg_descs)
       if call_trace:
         call_trace.add_vm_list(arg_list, "args")
       self._invoke(arg_list, ret_list)
@@ -194,17 +179,6 @@ class FunctionInvoker:
       raise RuntimeError(
           f"Malformed function reflection metadata structure: {reflection}")
 
-    # Post-process the arg descs to transform "named" records to just their
-    # type, stashing the index.
-    for i in range(len(self._arg_descs)):
-      maybe_named_desc = self._arg_descs[i]
-      if maybe_named_desc and maybe_named_desc[0] == "named":
-        arg_name, arg_type_desc = maybe_named_desc[1:]
-        self._arg_descs[i] = arg_type_desc
-        self._named_arg_indices[arg_name] = i
-        if i > self._max_named_arg_index:
-          self._max_named_arg_index = i
-
     # Detect whether the results are a slist/stuple/sdict, which indicates
     # that they are inlined with the function's results.
     if len(self._ret_descs) == 1:
@@ -215,164 +189,6 @@ class FunctionInvoker:
   def __repr__(self):
     return repr(self._vm_function)
 
-
-# Python type to VM Type converters. All of these take:
-#   inv: Invocation
-#   target_list: VmVariantList to append to
-#   python_value: The python value of the given type
-#   desc: The ABI descriptor list (or None if in dynamic mode).
-
-
-def _bool_to_vm(inv: Invocation, t: VmVariantList, x, desc):
-  _int_to_vm(inv, t, int(x), desc)
-
-
-def _int_to_vm(inv: Invocation, t: VmVariantList, x, desc):
-  # Implicit conversion to a 0d tensor.
-  if desc and _is_0d_ndarray_descriptor(desc):
-    casted = _cast_scalar_to_ndarray(inv, x, desc)
-    _ndarray_to_vm(inv, t, casted, desc)
-    return
-  t.push_int(x)
-
-
-def _float_to_vm(inv: Invocation, t: VmVariantList, x, desc):
-  # Implicit conversion to a 0d tensor.
-  if desc and _is_0d_ndarray_descriptor(desc):
-    casted = _cast_scalar_to_ndarray(inv, x, desc)
-    _ndarray_to_vm(inv, t, casted, desc)
-    return
-  t.push_float(x)
-
-
-def _list_or_tuple_to_vm(inv: Invocation, t: VmVariantList, x, desc):
-  desc_type = desc[0]
-  if desc_type != "slist" and desc_type != "stuple":
-    _raise_argument_error(inv,
-                          f"passed a list or tuple but expected {desc_type}")
-  # When decoding a list or tuple, the desc object is like:
-  # ['slist', [...value_type_0...], ...]
-  # Where the type is either 'slist' or 'stuple'.
-  sub_descriptors = desc[1:]
-  arity = len(sub_descriptors)
-  if len(x) != arity:
-    _raise_argument_error(inv,
-                          f"mismatched list/tuple arity: {len(x)} vs {arity}")
-  sub_list = VmVariantList(arity)
-  _merge_python_sequence_to_vm(inv, sub_list, x, sub_descriptors)
-  t.push_list(sub_list)
-
-
-def _dict_to_vm(inv: Invocation, t: VmVariantList, x, desc):
-  desc_type = desc[0]
-  if desc_type != "sdict":
-    _raise_argument_error(inv, f"passed a dict but expected {desc_type}")
-  # When decoding a dict, the desc object is like:
-  # ['sdict', ['key0', [...value_type_0...]], ['key1', [...value_type_1...]]]]
-  sub_descriptors = desc[1:]
-  py_values = []
-  value_descs = []
-  for key, value_desc in sub_descriptors:
-    try:
-      py_values.append(x[key])
-    except KeyError:
-      _raise_argument_error(inv, f"expected dict item with key '{key}'")
-    value_descs.append(value_desc)
-
-  sub_list = VmVariantList(len(py_values))
-  _merge_python_sequence_to_vm(inv, sub_list, py_values, value_descs)
-  t.push_list(sub_list)
-
-
-def _str_to_vm(inv: Invocation, t: VmVariantList, x, desc):
-  _raise_argument_error(inv, "Python str arguments not yet supported")
-
-
-def _ndarray_to_vm(inv: Invocation, t: VmVariantList, x, desc):
-  # Validate and implicit conversion against type descriptor.
-  if FUNCTION_INPUT_VALIDATION and desc is not None:
-    desc_type = desc[0]
-    if desc_type != "ndarray":
-      _raise_argument_error(inv, f"passed an ndarray but expected {desc_type}")
-    dtype_str = desc[1]
-    try:
-      dtype = ABI_TYPE_TO_DTYPE[dtype_str]
-    except KeyError:
-      _raise_argument_error(inv, f"unrecognized dtype '{dtype_str}'")
-    if dtype != x.dtype:
-      # TODO: If we got a DeviceArray in which triggers this implicit
-      # conversion, it will fault back to the host, be converted and
-      # then sent back. This is... not great.
-      # At least warning about it so we know it might be a problem.
-      logging.warn(
-          "Implicit dtype conversion of DeviceArray forces transfer to host")
-      x = np.asarray(x).astype(dtype)
-    rank = desc[2]
-    shape = desc[3:]
-    ndarray_shape = x.shape
-    if len(shape) != len(ndarray_shape) or rank != len(ndarray_shape):
-      _raise_argument_error(
-          inv, f"rank mismatch {len(ndarray_shape)} vs {len(shape)}")
-    for exp_dim, act_dim in zip(shape, ndarray_shape):
-      if exp_dim is not None and exp_dim != act_dim:
-        _raise_argument_error(
-            inv, f"shape mismatch {ndarray_shape} vs {tuple(shape)}")
-  actual_dtype = x.dtype
-  element_type = map_dtype_to_element_type(actual_dtype)
-  if element_type is None:
-    _raise_argument_error(inv, f"unsupported numpy dtype {x.dtype}")
-
-  if isinstance(x, DeviceArray):
-    # Already one of ours and did not get implicitly converted.
-    buffer_view = x._buffer_view
-  else:
-    # Not one of ours. Put it on the device.
-    buffer_view = inv.device.allocator.allocate_buffer_copy(
-        memory_type=IMPLICIT_BUFFER_ARG_MEMORY_TYPE,
-        allowed_usage=IMPLICIT_BUFFER_ARG_USAGE,
-        buffer=np.asarray(x),
-        element_type=element_type)
-
-  t.push_buffer_view(buffer_view)
-
-
-def _buffer_view_to_vm(inv: Invocation, t: VmVariantList, x, desc):
-  # BufferView is a low-level object and we do no validation here for it.
-  # The assumption is that it is coming from either an advanced use case
-  # or a systematic integration that knows what it is doing. The runtime
-  # will do necessary validation.
-  t.push_buffer_view(x)
-
-
-# Called in reflection mode when we know we want to coerce from something
-# 'ndarray' like (as defined by the reflection metadata).
-def _ndarray_like_to_vm(inv: Invocation, t: VmVariantList, x, desc):
-  if isinstance(x, HalBufferView):
-    return _buffer_view_to_vm(inv, t, x, desc)
-  return _ndarray_to_vm(inv, t, x, desc)
-
-
-class _MissingArgument:
-  """Placeholder for missing kwargs in the function input."""
-
-  def __repr__(self):
-    return "<mising argument>"
-
-
-MissingArgument = _MissingArgument()
-
-PYTHON_TO_VM_CONVERTERS = {
-    bool: _bool_to_vm,
-    int: _int_to_vm,
-    float: _float_to_vm,
-    list: _list_or_tuple_to_vm,
-    tuple: _list_or_tuple_to_vm,
-    dict: _dict_to_vm,
-    str: _str_to_vm,
-    np.ndarray: _ndarray_to_vm,
-    HalBufferView: _buffer_view_to_vm,
-    DeviceArray: _ndarray_to_vm,
-}
 
 # VM to Python converters. All take:
 #   inv: Invocation
@@ -532,54 +348,6 @@ def _raise_return_error(inv: Invocation,
     raise new_e from e
   else:
     raise new_e
-
-
-def _merge_python_sequence_to_vm(inv: Invocation, vm_list, py_list, descs):
-  # For dynamic mode, just assume we have the right arity.
-  if descs is None:
-    descs = [None] * len(py_list)
-  elif FUNCTION_INPUT_VALIDATION:
-    len_py_list = sum([1 for x in py_list if x is not MissingArgument])
-    if len(py_list) != len_py_list:
-      _raise_argument_error(
-          inv,
-          f"mismatched call arity: expected {len(descs)} arguments but got "
-          f"{len_py_list}. Expected signature=\n{descs}\nfor input=\n{py_list}")
-
-  for py_value, desc in zip(py_list, descs):
-    inv.current_arg = py_value
-    inv.current_desc = desc
-
-    # For ndarray, we want to be able to handle array-like, so check for that
-    # explicitly (duck typed vs static typed).
-    if _is_ndarray_descriptor(desc):
-      converter = _ndarray_like_to_vm
-    else:
-      converter = _get_python_to_vm_converter(inv, py_value, desc)
-
-    try:
-      converter(inv, vm_list, py_value, desc)
-    except ArgumentError:
-      raise
-    except Exception as e:
-      _raise_argument_error(inv, f"exception converting from Python type to VM",
-                            e)
-
-
-def _get_python_to_vm_converter(inv: Invocation, py_value, desc):
-  py_type = py_value.__class__
-  converter = PYTHON_TO_VM_CONVERTERS.get(py_type)
-  if converter is not None:
-    return converter
-  # See if it supports the __array__ protocol and if so, pull it to
-  # the host and use the ndarray converter. This will create round-trips
-  # between frameworks but at least enables interop.
-  if hasattr(py_value, "__array__"):
-    return _ndarray_to_vm
-
-  _raise_argument_error(
-      inv, f"cannot map Python type to VM: {py_type}"
-      f" (for desc {desc})")
 
 
 def _extract_vm_sequence_to_python(inv: Invocation, vm_list, descs):

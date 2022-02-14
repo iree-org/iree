@@ -26,6 +26,7 @@ template <typename Self, typename T>
 class ApiRefCounted {
  public:
   ApiRefCounted() : instance_(nullptr) {}
+  ApiRefCounted(ApiRefCounted& other) : instance_(other.instance_) { Retain(); }
   ApiRefCounted(ApiRefCounted&& other) : instance_(other.instance_) {
     other.instance_ = nullptr;
   }
