@@ -28,6 +28,24 @@ export ROOT_DIR="$(git rev-parse --show-toplevel)"
 export BUILD_HOST_DIR="${ROOT_DIR?}/build-host"
 export BUILD_RISCV_DIR="${ROOT_DIR?}/build-riscv"
 
+# BUILD the integrations iree-import-tflite with Bazel
+echo "Build iree-import-tflite with Bazel"
+pushd "${ROOT_DIR}/integrations/tensorflow"
+BAZEL_CMD=(bazel --noworkspace_rc --bazelrc=build_tools/bazel/iree-tf.bazelrc)
+BAZEL_BINDIR="$(${BAZEL_CMD[@]?} info bazel-bin)"
+# xargs is set to high arg limits to avoid multiple Bazel invocations and will
+# hard fail if the limits are exceeded.
+# See https://github.com/bazelbuild/bazel/issues/12479
+xargs --max-args 1000000 --max-chars 1000000 --exit \
+  "${BAZEL_CMD[@]?}" build \
+    --config=remote_cache_bazel_ci \
+    --config=generic_clang \
+    --build_tag_filters="-nokokoro" \
+    //iree_tf_compiler:iree-import-tflite
+popd
+
+export PATH="${BAZEL_BINDIR?}/iree_tf_compiler:${PATH}"
+
 echo "Cross-compiling with cmake"
 ./build_tools/cmake/build_riscv.sh
 

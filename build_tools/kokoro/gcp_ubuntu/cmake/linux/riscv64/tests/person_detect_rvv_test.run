@@ -1,0 +1,4 @@
+// RUN: ${TEST_MODULE_CMD} --module_file="${BUILD_RISCV_DIR}/person_detect_rvv.vmfb" \
+// RUN:   --entry_function=main --function_input="1x96x96x1xi8=0" 2>&1 | FileCheck %s
+// CHECK: {{1x2xi8=\[72 -72\]}}
+// XFAIL: *

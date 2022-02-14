@@ -1,0 +1,3 @@
+// RUN: ${TEST_MODULE_CMD} --module_file="${BUILD_RISCV_DIR}/iree-run-module-llvm_aot.vmfb" \
+// RUN:   --entry_function=abs --function_input="f32=-10" 2>&1 | FileCheck %s
+// CHECK: {{f32=10}}

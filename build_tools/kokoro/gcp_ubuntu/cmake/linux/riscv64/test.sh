@@ -18,41 +18,58 @@ export PS4='[$(date -u "+%T %Z")] '
 # dylib-llvm-aot bytecode codegen.
 export RISCV_TOOLCHAIN_ROOT=${RISCV_RV64_LINUX_TOOLCHAIN_ROOT?}
 
-# Run the binaries under QEMU.
-echo "Test simple_embedding binaries"
-pushd "${BUILD_RISCV_DIR?}/iree/samples/simple_embedding" > /dev/null
 
-"${QEMU_RV64_BIN?}" -cpu rv64,x-v=true,x-k=true,vlen=256,elen=64,vext_spec=v1.0 \
--L "${RISCV_TOOLCHAIN_ROOT?}/sysroot" simple_embedding_dylib
+function generate_dylib_vmfb {
+  local target="${1}"; shift
+  local translate_arg=(
+    -iree-mlir-to-vm-bytecode-module -iree-hal-target-backends=dylib-llvm-aot
+    -iree-llvm-embedded-linker-path=${BUILD_HOST_DIR?}/install/bin/lld
+    -iree-llvm-target-triple=riscv64
+    -iree-llvm-target-cpu=generic-rv64
+    -iree-llvm-target-abi=lp64d
+  )
+  if [[ "${target}" == "mhlo" ]]; then
+    translate_arg+=(
+      -iree-input-type=mhlo
+      -iree-llvm-target-cpu-features="+m,+a,+f,+d,+c"
+    )
+  elif [[ "${target}" == "tosa" ]]; then
+    local input_file="${1}"; shift
+    iree-import-tflite -o "${BUILD_RISCV_DIR?}/tosa.mlir" "${input_file}"
+    translate_arg+=(
+      -iree-input-type=tosa
+      -iree-llvm-target-cpu-features="+m,+a,+f,+d,+c"
+      "${BUILD_RISCV_DIR?}/tosa.mlir"
+    )
+  elif [[ "${target}" == "tosa-rvv" ]]; then
+    local input_file="${1}"; shift
+    iree-import-tflite -o "${BUILD_RISCV_DIR?}/tosa.mlir" "${input_file}"
+    translate_arg+=(
+      -iree-input-type=tosa
+      -iree-llvm-target-cpu-features="+m,+a,+f,+d,+c,+v"
+      -riscv-v-fixed-length-vector-lmul-max=8
+      -riscv-v-vector-bits-min=256
+      -riscv-v-fixed-length-vector-elen-max=64
+      "${BUILD_RISCV_DIR?}/tosa.mlir"
+    )
+  fi
+  "${BUILD_HOST_DIR?}/install/bin/iree-translate" "${translate_arg[@]}" "$@"
+}
 
-"${QEMU_RV64_BIN?}" -cpu rv64,x-v=true,x-k=true,vlen=256,elen=64,vext_spec=v1.0 \
--L "${RISCV_TOOLCHAIN_ROOT?}/sysroot" simple_embedding_embedded_sync
-
-"${QEMU_RV64_BIN?}" -cpu rv64,x-v=true,x-k=true,vlen=256,elen=64,vext_spec=v1.0 \
--L "${RISCV_TOOLCHAIN_ROOT?}/sysroot" simple_embedding_vmvx_sync
-
-popd > /dev/null
-
-echo "Test e2e mlir --> bytecode module --> iree-run-module"
-
-"${BUILD_HOST_DIR?}/install/bin/iree-translate" \
-  -iree-input-type=mhlo \
-  -iree-mlir-to-vm-bytecode-module -iree-hal-target-backends=dylib-llvm-aot \
-  -iree-llvm-embedded-linker-path=${BUILD_HOST_DIR?}/install/bin/lld \
-  -iree-llvm-target-triple=riscv64 \
-  -iree-llvm-target-cpu=generic-rv64 \
-  -iree-llvm-target-cpu-features="+m,+a,+f,+d,+c" \
-  -iree-llvm-target-abi=lp64d \
+generate_dylib_vmfb mhlo \
   "${ROOT_DIR?}/iree/tools/test/iree-run-module.mlir" \
   -o "${BUILD_RISCV_DIR?}/iree-run-module-llvm_aot.vmfb"
 
-IREE_RUN_OUT=$(${QEMU_RV64_BIN?} -cpu rv64,x-v=true,x-k=true,vlen=256,elen=64,vext_spec=v1.0 \
-    -L "${RISCV_TOOLCHAIN_ROOT?}/sysroot" \
-    "${BUILD_RISCV_DIR?}/iree/tools/iree-run-module" --driver=dylib \
-    --module_file="${BUILD_RISCV_DIR?}/iree-run-module-llvm_aot.vmfb" \
-    --entry_function=abs --function_input="f32=-10")
+wget -P "${BUILD_RISCV_DIR?}/" https://github.com/tensorflow/tflite-micro/raw/aeac6f39e5c7475cea20c54e86d41e3a38312546/tensorflow/lite/micro/models/person_detect.tflite
 
-# Check the result of running abs(-10).
-if [[ "${IREE_RUN_OUT}" != *"f32=10" ]]; then
-    exit 1
-fi
+generate_dylib_vmfb tosa \
+  "${BUILD_RISCV_DIR?}/person_detect.tflite" \
+  -o "${BUILD_RISCV_DIR?}/person_detect.vmfb"
+
+generate_dylib_vmfb tosa-rvv \
+  "${BUILD_RISCV_DIR?}/person_detect.tflite" \
+  -o "${BUILD_RISCV_DIR?}/person_detect_rvv.vmfb"
+
+${PYTHON_BIN?} "${ROOT_DIR?}/third_party/llvm-project/llvm/utils/lit/lit.py" \
+  -v --path "${BUILD_HOST_DIR?}/third_party/llvm-project/llvm/bin" \
+  "${ROOT_DIR?}/build_tools/kokoro/gcp_ubuntu/cmake/linux/riscv64/tests"
