@@ -327,8 +327,6 @@ endif()
 # advice.
 #-------------------------------------------------------------------------------
 
-set(IREE_CUDA_LIBDEVICE_PATH "" CACHE STRING "Absolute path to an appropriate libdevice.*.bc (needed to build the IREE cuda compiler target)")
-
 # If any CUDA features are being built, try to locate a CUDA SDK. We will fall
 # back to this as needed for specific features.
 if(IREE_TARGET_BACKEND_CUDA OR IREE_HAL_DRIVER_CUDA)
@@ -338,23 +336,24 @@ endif()
 # If an explicit libdevice file was not specified, and the compiler backend
 # is being built, probe for one.
 if(IREE_TARGET_BACKEND_CUDA)
-  if(CUDAToolkit_FOUND AND CUDAToolkit_LIBRARY_ROOT)
-    # Note that the variable CUDAToolkit_LIBRARY_ROOT keys off of the presence
-    # of version.txt, which was changed to version.json in recent releases
-    # and thwarts the search.
-    set(IREE_CUDA_LIBDEVICE_PATH "${CUDAToolkit_LIBRARY_ROOT}/nvvm/libdevice/libdevice.10.bc")
-  elseif(CUDAToolkit_FOUND AND CUDAToolkit_BIN_DIR)
-    # Back-track from the bin dir as a fallback.
-    set(IREE_CUDA_LIBDEVICE_PATH "${CUDAToolkit_BIN_DIR}/../nvvm/libdevice/libdevice.10.bc")
-  elseif(CUDAToolkit_ROOT)
-    # Sometimes the CUDA toolkit doesn't detect... because, you know. Computers
-    # are hard and such. In this case, if the user went to the trouble to
-    # tell us where it is, we have enough information.
-    set(IREE_CUDA_LIBDEVICE_PATH "${CUDAToolkit_ROOT}/nvvm/libdevice/libdevice.10.bc")
-  else()
-    message(FATAL_ERROR "Building with IREE_TARGET_BACKEND_CUDA requires either a CUDA SDK (consult CMake docs for your version: https://cmake.org/cmake/help/latest/module/FindCUDAToolkit.html) or an explicit path to libdevice (set with -DIREE_CUDA_LIBDEVICE_PATH=/path/to/libdevice.10.bc)")
+  if(NOT EXISTS "${IREE_CUDA_LIBDEVICE_PATH}")
+    if(CUDAToolkit_FOUND AND CUDAToolkit_LIBRARY_ROOT)
+      # Note that the variable CUDAToolkit_LIBRARY_ROOT keys off of the presence
+      # of version.txt, which was changed to version.json in recent releases
+      # and thwarts the search.
+      set(IREE_CUDA_LIBDEVICE_PATH "${CUDAToolkit_LIBRARY_ROOT}/nvvm/libdevice/libdevice.10.bc")
+    elseif(CUDAToolkit_FOUND AND CUDAToolkit_BIN_DIR)
+      # Back-track from the bin dir as a fallback.
+      set(IREE_CUDA_LIBDEVICE_PATH "${CUDAToolkit_BIN_DIR}/../nvvm/libdevice/libdevice.10.bc")
+    elseif(CUDAToolkit_ROOT)
+      # Sometimes the CUDA toolkit doesn't detect... because, you know. Computers
+      # are hard and such. In this case, if the user went to the trouble to
+      # tell us where it is, we have enough information.
+      set(IREE_CUDA_LIBDEVICE_PATH "${CUDAToolkit_ROOT}/nvvm/libdevice/libdevice.10.bc")
+    else()
+      message(FATAL_ERROR "Building with IREE_TARGET_BACKEND_CUDA requires either a CUDA SDK (consult CMake docs for your version: https://cmake.org/cmake/help/latest/module/FindCUDAToolkit.html) or an explicit path to libdevice (set with -DIREE_CUDA_LIBDEVICE_PATH=/path/to/libdevice.10.bc)")
+    endif()
   endif()
-
   if(EXISTS "${IREE_CUDA_LIBDEVICE_PATH}")
     message(STATUS "Using CUDA libdevice: ${IREE_CUDA_LIBDEVICE_PATH}")
   else()
