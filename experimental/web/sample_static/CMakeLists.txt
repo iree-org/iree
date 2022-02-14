@@ -8,7 +8,12 @@ if(NOT EMSCRIPTEN)
   return()
 endif()
 
-set(_MNIST_OBJECT_NAME "iree_experimental_sample_web_static_mnist")
+if(NOT EXISTS "${CMAKE_CURRENT_BINARY_DIR}/mnist_static.h")
+  message(WARNING "Missing mnist_static.h, run ${CMAKE_CURRENT_SOURCE_DIR}/build_sample.sh to generate it")
+  return()
+endif()
+
+set(_MNIST_OBJECT_NAME "iree_experimental_web_sample_static_mnist")
 add_library(${_MNIST_OBJECT_NAME} STATIC ${CMAKE_CURRENT_BINARY_DIR}/mnist_static.o)
 SET_TARGET_PROPERTIES(${_MNIST_OBJECT_NAME} PROPERTIES LINKER_LANGUAGE C)
 
@@ -16,7 +21,7 @@ SET_TARGET_PROPERTIES(${_MNIST_OBJECT_NAME} PROPERTIES LINKER_LANGUAGE C)
 # Sync
 #-------------------------------------------------------------------------------
 
-set(_NAME "iree_experimental_sample_web_static_sync")
+set(_NAME "iree_experimental_web_sample_static_sync")
 add_executable(${_NAME} "")
 target_include_directories(${_NAME} PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>
@@ -29,7 +34,7 @@ target_sources(${_NAME}
     ${CMAKE_CURRENT_BINARY_DIR}/mnist_bytecode.h
     ${CMAKE_CURRENT_BINARY_DIR}/mnist_bytecode.c
 )
-set_target_properties(${_NAME} PROPERTIES OUTPUT_NAME "sample-web-static-sync")
+set_target_properties(${_NAME} PROPERTIES OUTPUT_NAME "web-sample-static-sync")
 
 # Note: we have to be very careful about dependencies here.
 #
@@ -58,7 +63,7 @@ target_link_options(${_NAME} PRIVATE
 # Multithreaded
 #-------------------------------------------------------------------------------
 
-set(_NAME "iree_experimental_sample_web_static_multithreaded")
+set(_NAME "iree_experimental_web_sample_static_multithreaded")
 add_executable(${_NAME} "")
 target_include_directories(${_NAME} PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>
@@ -71,7 +76,7 @@ target_sources(${_NAME}
     ${CMAKE_CURRENT_BINARY_DIR}/mnist_bytecode.h
     ${CMAKE_CURRENT_BINARY_DIR}/mnist_bytecode.c
 )
-set_target_properties(${_NAME} PROPERTIES OUTPUT_NAME "sample-web-static-multithreaded")
+set_target_properties(${_NAME} PROPERTIES OUTPUT_NAME "web-sample-static-multithreaded")
 
 # Note: we have to be very careful about dependencies here.
 #

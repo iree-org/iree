@@ -602,7 +602,7 @@ if(${IREE_BUILD_EXPERIMENTAL_REMOTING})
 endif()
 
 if(${IREE_BUILD_EXPERIMENTAL_WEB_SAMPLES})
-  add_subdirectory(experimental/sample_web_static)
+  add_subdirectory(experimental/web)
 endif()
 
 set(IREE_PUBLIC_INCLUDE_DIRS "${IREE_COMMON_INCLUDE_DIRS}"

@@ -19,11 +19,12 @@ fi
 
 CMAKE_BIN=${CMAKE_BIN:-$(which cmake)}
 ROOT_DIR=$(git rev-parse --show-toplevel)
+SOURCE_DIR=${ROOT_DIR}/experimental/web/sample_static
 
 BUILD_DIR=${ROOT_DIR?}/build-emscripten
 mkdir -p ${BUILD_DIR}
 
-BINARY_DIR=${BUILD_DIR}/experimental/sample_web_static/
+BINARY_DIR=${BUILD_DIR}/experimental/web/sample_static/
 mkdir -p ${BINARY_DIR}
 
 ###############################################################################
@@ -62,35 +63,33 @@ ${EMBED_DATA_TOOL?} ${BINARY_DIR}/${INPUT_NAME}.vmfb \
 
 echo "=== Building web artifacts using Emscripten ==="
 
-pushd ${ROOT_DIR?}/build-emscripten
+pushd ${BUILD_DIR}
 
 # Configure using Emscripten's CMake wrapper, then build.
-# Note: The sample creates a task device directly, so no drivers are required,
-#       but some targets are gated on specific CMake options.
+# Note: The sample creates a device directly, so no drivers are required.
 emcmake "${CMAKE_BIN?}" -G Ninja .. \
   -DCMAKE_BUILD_TYPE=RelWithDebInfo \
   -DIREE_HOST_BINARY_ROOT=$PWD/../build-host/install \
   -DIREE_BUILD_EXPERIMENTAL_WEB_SAMPLES=ON \
   -DIREE_HAL_DRIVER_DEFAULTS=OFF \
-  -DIREE_HAL_DRIVER_DYLIB=ON \
   -DIREE_BUILD_COMPILER=OFF \
   -DIREE_BUILD_TESTS=OFF
 
 "${CMAKE_BIN?}" --build . --target \
-    iree_experimental_sample_web_static_sync \
-    iree_experimental_sample_web_static_multithreaded
+    iree_experimental_web_sample_static_sync \
+    iree_experimental_web_sample_static_multithreaded
 
 popd
 
 ###############################################################################
-# Serve the demo using a local webserver                                      #
+# Serve the sample using a local webserver                                    #
 ###############################################################################
 
 echo "=== Copying static files to the build directory ==="
 
-cp ${ROOT_DIR?}/experimental/sample_web_static/index.html ${BINARY_DIR}
-cp ${ROOT_DIR?}/experimental/sample_web_static/iree_api.js ${BINARY_DIR}
-cp ${ROOT_DIR?}/experimental/sample_web_static/iree_worker.js ${BINARY_DIR}
+cp ${SOURCE_DIR}/index.html ${BINARY_DIR}
+cp ${SOURCE_DIR}/iree_api.js ${BINARY_DIR}
+cp ${SOURCE_DIR}/iree_worker.js ${BINARY_DIR}
 
 EASELJS_LIBRARY=${BINARY_DIR}/easeljs.min.js
 test -f ${EASELJS_LIBRARY} || \

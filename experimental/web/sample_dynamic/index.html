@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html>
+
+<!--
+Copyright 2022 The IREE Authors
+
+Licensed under the Apache License v2.0 with LLVM Exceptions.
+See https://llvm.org/LICENSE.txt for license information.
+SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+-->
+
+<head>
+  <meta charset="utf-8" />
+  <title>IREE Dynamic Web Sample (dlopen)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <script src="./iree_api.js"></script>
+</head>
+
+<body style="background-color: #2b2c30; color: #ABB2BF">
+  <h1>IREE Dynamic Web Sample (dlopen)</h1>
+
+  <!-- TODO(scotttodd): drag and drop UI -->
+  <!-- TODO(scotttodd): <div>s with output (or just console.log?)-->
+
+  <script>
+    let ireeInitialized = false;
+
+    // TODO(scotttodd): rewrite with async + await?
+    // TODO(scotttodd): call ireeLoadProgram after some user interaction?
+    ireeInitializeWorker().then((result) => {
+      ireeInitialized = true;
+
+      console.log("IREE initialized, loading program...");
+
+      ireeLoadProgram("./simple_abs.vmfb").then((result) => {
+        console.log("Load program success!");
+      }).catch((error) => {
+        console.error("Failed to load program, error: '" + error + "'");
+      });
+    }).catch((error) => {
+      console.error("Failed to initialize IREE, error: '" + error + "'");
+    });
+  </script>
+</body>
+
+</html>

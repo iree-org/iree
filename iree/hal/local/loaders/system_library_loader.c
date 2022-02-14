@@ -413,6 +413,8 @@ static void iree_hal_system_library_loader_destroy(
 #define IREE_PLATFORM_DYLIB_TYPE "dylib"
 #elif defined(IREE_PLATFORM_WINDOWS)
 #define IREE_PLATFORM_DYLIB_TYPE "dll"
+#elif defined(IREE_PLATFORM_EMSCRIPTEN)
+#define IREE_PLATFORM_DYLIB_TYPE "wasm"
 #else
 #define IREE_PLATFORM_DYLIB_TYPE "elf"
 #endif  // IREE_PLATFORM_*

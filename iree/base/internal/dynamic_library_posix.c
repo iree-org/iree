@@ -15,7 +15,7 @@
 #include "iree/base/tracing.h"
 
 #if defined(IREE_PLATFORM_ANDROID) || defined(IREE_PLATFORM_APPLE) || \
-    defined(IREE_PLATFORM_LINUX)
+    defined(IREE_PLATFORM_LINUX) || defined(IREE_PLATFORM_EMSCRIPTEN)
 
 #include <dlfcn.h>
 #include <errno.h>
