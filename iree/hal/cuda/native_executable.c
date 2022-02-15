@@ -24,6 +24,7 @@ typedef struct iree_hal_cuda_native_executable_function_t {
   uint32_t block_size_x;
   uint32_t block_size_y;
   uint32_t block_size_z;
+  uint32_t shared_memory_size;
 } iree_hal_cuda_native_executable_function_t;
 
 typedef struct iree_hal_cuda_native_executable_t {
@@ -63,6 +64,8 @@ iree_status_t iree_hal_cuda_native_executable_create(
   // Create the kernel module.
   flatbuffers_string_t ptx_image =
       iree_CUDAExecutableDef_ptx_image_get(executable_def);
+  flatbuffers_uint32_vec_t shared_memory_sizes =
+      iree_CUDAExecutableDef_shared_memory_size_get(executable_def);
   flatbuffers_string_vec_t entry_points_vec =
       iree_CUDAExecutableDef_entry_points_get(executable_def);
   iree_CUDABlockSizeDef_vec_t block_sizes_vec =
@@ -102,6 +105,8 @@ iree_status_t iree_hal_cuda_native_executable_create(
       executable->entry_functions[i].block_size_x = block_sizes_vec[i].x;
       executable->entry_functions[i].block_size_y = block_sizes_vec[i].y;
       executable->entry_functions[i].block_size_z = block_sizes_vec[i].z;
+      executable->entry_functions[i].shared_memory_size =
+          shared_memory_sizes[i];
       executable->executable_layouts[i] =
           executable_spec->executable_layouts[i];
       iree_hal_executable_layout_retain(executable_spec->executable_layouts[i]);
@@ -148,6 +153,16 @@ iree_status_t iree_hal_cuda_native_executable_block_size(
   *x = executable->entry_functions[entry_point].block_size_x;
   *y = executable->entry_functions[entry_point].block_size_y;
   *z = executable->entry_functions[entry_point].block_size_z;
+  return iree_ok_status();
+}
+
+iree_status_t iree_hal_cuda_native_executable_shared_memory_size(
+    iree_hal_executable_t* base_executable, int32_t entry_point,
+    uint32_t* shared_memory_size) {
+  iree_hal_cuda_native_executable_t* executable =
+      iree_hal_cuda_native_executable_cast(base_executable);
+  *shared_memory_size =
+      executable->entry_functions[entry_point].shared_memory_size;
   return iree_ok_status();
 }
 

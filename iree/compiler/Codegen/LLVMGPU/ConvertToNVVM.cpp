@@ -108,6 +108,7 @@ struct ConvertToNVVMPass : public ConvertToNVVMBase<ConvertToNVVMPass> {
         signalPassFailure();
       }
     }
+    ConvertToDynamicSharedMemory(m);
   }
 };
 

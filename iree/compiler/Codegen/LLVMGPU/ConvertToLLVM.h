@@ -24,6 +24,8 @@ void populateLowerHALInterfaceOp(RewritePatternSet &patterns);
 /// Add patterns to convert AllocOp of shared memory to a global variable.
 void populateConvertSharedMemoryAllocOps(RewritePatternSet &patterns);
 
+void ConvertToDynamicSharedMemory(ModuleOp moduleOp);
+
 }  // namespace iree_compiler
 }  // namespace mlir
 
