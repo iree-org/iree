@@ -29,11 +29,15 @@
 typedef struct iree_hal_cuda_graph_command_buffer_t {
   iree_hal_command_buffer_t base;
   iree_hal_cuda_context_wrapper_t* context;
-  iree_arena_block_pool_t* block_pool;
 
   // Maintains a reference to all resources used within the command buffer.
   // Reset on each begin.
   iree_hal_resource_set_t* resource_set;
+
+  // Staging arena used for host->device transfers.
+  // Used for when we need CUDA to be able to reference memory as it performs
+  // asynchronous operations.
+  iree_arena_allocator_t arena;
 
   CUgraph graph;
   CUgraphExec exec;
@@ -78,7 +82,7 @@ iree_status_t iree_hal_cuda_graph_command_buffer_create(
         device, mode, command_categories, queue_affinity,
         &iree_hal_cuda_graph_command_buffer_vtable, &command_buffer->base);
     command_buffer->context = context;
-    command_buffer->block_pool = block_pool;
+    iree_arena_initialize(block_pool, &command_buffer->arena);
     command_buffer->graph = NULL;
     command_buffer->exec = NULL;
     command_buffer->last_node = NULL;
@@ -120,6 +124,7 @@ static void iree_hal_cuda_graph_command_buffer_reset(
   command_buffer->last_node = NULL;
 
   iree_hal_resource_set_reset(command_buffer->resource_set);
+  iree_arena_reset(&command_buffer->arena);
 }
 
 static void iree_hal_cuda_graph_command_buffer_destroy(
@@ -130,6 +135,7 @@ static void iree_hal_cuda_graph_command_buffer_destroy(
 
   iree_hal_cuda_graph_command_buffer_reset(command_buffer);
   iree_hal_resource_set_free(command_buffer->resource_set);
+  iree_arena_deinitialize(&command_buffer->arena);
   iree_allocator_free(command_buffer->context->host_allocator, command_buffer);
 
   IREE_TRACE_ZONE_END(z0);
@@ -257,7 +263,8 @@ static iree_status_t iree_hal_cuda_graph_command_buffer_wait_events(
 
 static iree_status_t iree_hal_cuda_graph_command_buffer_discard_buffer(
     iree_hal_command_buffer_t* base_command_buffer, iree_hal_buffer_t* buffer) {
-  // nothing to do.
+  // We could mark the memory as invalidated so that if managed CUDA does not
+  // try to copy it back to the host.
   return iree_ok_status();
 }
 
@@ -322,8 +329,47 @@ static iree_status_t iree_hal_cuda_graph_command_buffer_update_buffer(
     iree_hal_command_buffer_t* base_command_buffer, const void* source_buffer,
     iree_host_size_t source_offset, iree_hal_buffer_t* target_buffer,
     iree_device_size_t target_offset, iree_device_size_t length) {
-  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                          "need cuda implementation");
+  iree_hal_cuda_graph_command_buffer_t* command_buffer =
+      iree_hal_cuda_graph_command_buffer_cast(base_command_buffer);
+
+  // Allocate scratch space in the arena for the data and copy it in.
+  // The update buffer API requires that the command buffer capture the host
+  // memory at the time the method is called in case the caller wants to reuse
+  // the memory. Because CUDA memcpys are async if we didn't copy it's possible
+  // for the reused memory to change before the stream reaches the copy
+  // operation and get the wrong data.
+  uint8_t* storage = NULL;
+  IREE_RETURN_IF_ERROR(
+      iree_arena_allocate(&command_buffer->arena, length, (void**)&storage));
+  memcpy(storage, (const uint8_t*)source_buffer + source_offset, length);
+
+  IREE_RETURN_IF_ERROR(iree_hal_resource_set_insert(
+      command_buffer->resource_set, 1, &target_buffer));
+
+  CUdeviceptr target_device_buffer = iree_hal_cuda_buffer_device_pointer(
+      iree_hal_buffer_allocated_buffer(target_buffer));
+  CUdeviceptr dst = target_device_buffer +
+                    iree_hal_buffer_byte_offset(target_buffer) + target_offset;
+  CUDA_MEMCPY3D params = {
+      .srcMemoryType = CU_MEMORYTYPE_HOST,
+      .srcHost = storage,
+      .dstMemoryType = CU_MEMORYTYPE_DEVICE,
+      .dstDevice = target_device_buffer,
+      .dstXInBytes = target_offset,
+      .WidthInBytes = length,
+      .Height = 1,
+      .Depth = 1,
+  };
+  // Serialize all the nodes for now.
+  CUgraphNode dep[] = {command_buffer->last_node};
+  size_t numNode = command_buffer->last_node ? 1 : 0;
+  CUDA_RETURN_IF_ERROR(
+      command_buffer->context->syms,
+      cuGraphAddMemcpyNode(&command_buffer->last_node, command_buffer->graph,
+                           dep, numNode, &params,
+                           command_buffer->context->cu_context),
+      "cuGraphAddMemcpyNode");
+  return iree_ok_status();
 }
 
 static iree_status_t iree_hal_cuda_graph_command_buffer_copy_buffer(
@@ -345,15 +391,15 @@ static iree_status_t iree_hal_cuda_graph_command_buffer_copy_buffer(
       iree_hal_buffer_allocated_buffer(source_buffer));
   source_offset += iree_hal_buffer_byte_offset(source_buffer);
   CUDA_MEMCPY3D params = {
-      .Depth = 1,
-      .Height = 1,
-      .WidthInBytes = length,
-      .dstDevice = target_device_buffer,
+      .srcMemoryType = CU_MEMORYTYPE_DEVICE,
       .srcDevice = source_device_buffer,
       .srcXInBytes = source_offset,
-      .dstXInBytes = target_offset,
-      .srcMemoryType = CU_MEMORYTYPE_DEVICE,
       .dstMemoryType = CU_MEMORYTYPE_DEVICE,
+      .dstDevice = target_device_buffer,
+      .dstXInBytes = target_offset,
+      .WidthInBytes = length,
+      .Height = 1,
+      .Depth = 1,
   };
   // Serialize all the nodes for now.
   CUgraphNode dep[] = {command_buffer->last_node};

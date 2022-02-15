@@ -47,8 +47,8 @@ CU_PFN_DECL(cuMemsetD16Async, unsigned long long, unsigned short, size_t,
             CUstream)
 CU_PFN_DECL(cuMemsetD8Async, unsigned long long, unsigned char, size_t,
             CUstream)
-
 CU_PFN_DECL(cuMemcpyAsync, CUdeviceptr, CUdeviceptr, size_t, CUstream)
+CU_PFN_DECL(cuMemcpyHtoDAsync_v2, CUdeviceptr, const void *, size_t, CUstream)
 CU_PFN_DECL(cuLaunchKernel, CUfunction, unsigned int, unsigned int,
             unsigned int, unsigned int, unsigned int, unsigned int,
             unsigned int, CUstream, void **, void **)
