@@ -41,8 +41,8 @@
 
 # llvm-external-projects
 /llvm-external-projects/ @stellaraccident
-/llvm-external-projects/iree-dialects/**/Dialect/LinalgExt/ @hanhan@ @MaheshRavishankar
-/llvm-external-projects/iree-dialects/test/iree_linalgext @hanhan@ @MaheshRavishankar
+/llvm-external-projects/iree-dialects/**/Dialect/LinalgExt/ @hanhanW @MaheshRavishankar
+/llvm-external-projects/iree-dialects/test/iree_linalgext @hanhanW @MaheshRavishankar
 
 # Other Top-Level Directories
 /colab/ @ScottTodd
