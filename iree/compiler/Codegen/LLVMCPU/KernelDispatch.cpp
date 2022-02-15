@@ -592,9 +592,10 @@ static LogicalResult setRootConfig(
   }
 
   // Set the flow level tiling to the default.
+  auto interfaceOp =
+      cast<IREE::Flow::PartitionableLoopsInterface>(genericOp.getOperation());
   SmallVector<unsigned> partitionedLoops =
-      cast<IREE::Flow::PartitionableLoopsInterface>(genericOp.getOperation())
-          .getPartitionableLoops(kNumMaxParallelDims);
+      interfaceOp.getPartitionableLoops(kNumMaxParallelDims);
   SmallVector<int64_t> workloadPerWorkgroup = getDefaultWorkloadPerWorkgroup(
       tiledLoops, partitionedLoops, nativeVectorSize);
   setTranslationInfo(entryPointFn,
@@ -603,7 +604,10 @@ static LogicalResult setRootConfig(
                      /*workgroupSize=*/ArrayRef<int64_t>{});
 
   llvm::SmallDenseSet<unsigned> pLoopsSet;
-  for (auto i : partitionedLoops) pLoopsSet.insert(i);
+  for (auto i : interfaceOp.getPartitionableLoops(
+           /*maxNumPartitionedLoops=*/std::numeric_limits<unsigned>::max())) {
+    pLoopsSet.insert(i);
+  }
 
   SmallVector<int64_t> l1TileSizes = nativeVectorSize;
   SmallVector<int64_t> vectorTileSizes = nativeVectorSize;
