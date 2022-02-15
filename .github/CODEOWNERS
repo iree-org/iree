@@ -39,23 +39,30 @@
 /.github/ @GMNGeoffrey @ScottTodd
 /scripts/ @GMNGeoffrey @ScottTodd
 
+# llvm-external-projects
+/llvm-external-projects/ @stellaraccident
+/llvm-external-projects/iree-dialects/**/Dialect/LinalgExt/ @hanhan@ @MaheshRavishankar
+/llvm-external-projects/iree-dialects/test/iree_linalgext @hanhan@ @MaheshRavishankar
+
 # Other Top-Level Directories
 /colab/ @ScottTodd
 /docs/ @ScottTodd
-/llvm-external-projects/ @stellaraccident
+
 
 # Main IREE directories
 /iree/ @benvanik
 
 # Compiler
 /iree/compiler/Codegen/ @MaheshRavishankar
-/iree/compiler/Codegen/LLVMCPU/ @MaheshRavishankar @hanhanW
+/iree/compiler/Codegen/LLVMCPU/ @hanhanW @MaheshRavishankar
 /iree/compiler/Codegen/LLVMGPU/ @MaheshRavishankar @ThomasRaoux
-/iree/compiler/Codegen/Sandbox/ @MaheshRavishankar @hanhanW
-/iree/compiler/Codegen/SPIRV/ @MaheshRavishankar @antiagainst
+/iree/compiler/Codegen/Sandbox/ @hanhanW @MaheshRavishankar
+/iree/compiler/Codegen/SPIRV/ @antiagainst @MaheshRavishankar
 /iree/compiler/ConstEval/ @stellaraccident
 /iree/compiler/Dialect/Vulkan/ @antiagainst
-/iree/compiler/InputConversion/ @stellaraccident
+/iree/compiler/InputConversion/ @MaheshRavishankar @stellaraccident
+/iree/compiler/InputConversion/MHLO @hanhanW @MaheshRavishankar @stellaraccident
+
 
 # Runtime
 /iree/hal/cuda/ @ThomasRaoux
