@@ -24,6 +24,11 @@ typedef struct {
   iree_hal_cuda_context_wrapper_t* context;
   CUstream stream;
 
+  // Staging arena used for host->device transfers.
+  // Used for when we need CUDA to be able to reference memory as it performs
+  // asynchronous operations.
+  iree_arena_allocator_t arena;
+
   int32_t push_constant[IREE_HAL_CUDA_MAX_PUSH_CONSTANT_COUNT];
   // Keep track of the current set of kernel arguments.
   void* current_descriptor[IREE_HAL_CUDA_MAX_KERNEL_ARG];
@@ -44,7 +49,9 @@ iree_status_t iree_hal_cuda_stream_command_buffer_create(
     iree_hal_device_t* device, iree_hal_cuda_context_wrapper_t* context,
     iree_hal_command_buffer_mode_t mode,
     iree_hal_command_category_t command_categories, CUstream stream,
+    iree_arena_block_pool_t* block_pool,
     iree_hal_command_buffer_t** out_command_buffer) {
+  IREE_ASSERT_ARGUMENT(device);
   IREE_ASSERT_ARGUMENT(context);
   IREE_ASSERT_ARGUMENT(out_command_buffer);
   *out_command_buffer = NULL;
@@ -60,6 +67,7 @@ iree_status_t iree_hal_cuda_stream_command_buffer_create(
         &iree_hal_cuda_stream_command_buffer_vtable, &command_buffer->base);
     command_buffer->context = context;
     command_buffer->stream = stream;
+    iree_arena_initialize(block_pool, &command_buffer->arena);
     for (size_t i = 0; i < IREE_HAL_CUDA_MAX_KERNEL_ARG; i++) {
       command_buffer->current_descriptor[i] = &command_buffer->device_ptrs[i];
     }
@@ -76,6 +84,7 @@ static void iree_hal_cuda_stream_command_buffer_destroy(
       iree_hal_cuda_stream_command_buffer_cast(base_command_buffer);
   IREE_TRACE_ZONE_BEGIN(z0);
 
+  iree_arena_deinitialize(&command_buffer->arena);
   iree_allocator_free(command_buffer->context->host_allocator, command_buffer);
 
   IREE_TRACE_ZONE_END(z0);
@@ -98,6 +107,9 @@ static void* iree_hal_cuda_stream_command_buffer_dyn_cast(
 
 static iree_status_t iree_hal_cuda_stream_command_buffer_begin(
     iree_hal_command_buffer_t* base_command_buffer) {
+  iree_hal_cuda_stream_command_buffer_t* command_buffer =
+      iree_hal_cuda_stream_command_buffer_cast(base_command_buffer);
+  iree_arena_reset(&command_buffer->arena);
   return iree_ok_status();
 }
 
@@ -148,7 +160,8 @@ static iree_status_t iree_hal_cuda_stream_command_buffer_wait_events(
 
 static iree_status_t iree_hal_cuda_stream_command_buffer_discard_buffer(
     iree_hal_command_buffer_t* base_command_buffer, iree_hal_buffer_t* buffer) {
-  // nothing to do.
+  // We could mark the memory as invalidated so that if managed CUDA does not
+  // try to copy it back to the host.
   return iree_ok_status();
 }
 
@@ -201,8 +214,34 @@ static iree_status_t iree_hal_cuda_stream_command_buffer_update_buffer(
     iree_hal_command_buffer_t* base_command_buffer, const void* source_buffer,
     iree_host_size_t source_offset, iree_hal_buffer_t* target_buffer,
     iree_device_size_t target_offset, iree_device_size_t length) {
-  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                          "need cuda implementation of update buffer");
+  iree_hal_cuda_stream_command_buffer_t* command_buffer =
+      iree_hal_cuda_stream_command_buffer_cast(base_command_buffer);
+
+  // Allocate scratch space in the arena for the data and copy it in.
+  // The update buffer API requires that the command buffer capture the host
+  // memory at the time the method is called in case the caller wants to reuse
+  // the memory. Because CUDA memcpys are async if we didn't copy it's possible
+  // for the reused memory to change before the stream reaches the copy
+  // operation and get the wrong data.
+  const uint8_t* src = (const uint8_t*)source_buffer + source_offset;
+  if (command_buffer->arena.block_pool) {
+    uint8_t* storage = NULL;
+    IREE_RETURN_IF_ERROR(
+        iree_arena_allocate(&command_buffer->arena, length, (void**)&storage));
+    memcpy(storage, src, length);
+    src = storage;
+  }
+
+  // Issue the copy using the scratch memory as the source.
+  CUdeviceptr target_device_buffer = iree_hal_cuda_buffer_device_pointer(
+      iree_hal_buffer_allocated_buffer(target_buffer));
+  CUdeviceptr dst = target_device_buffer +
+                    iree_hal_buffer_byte_offset(target_buffer) + target_offset;
+  CUDA_RETURN_IF_ERROR(
+      command_buffer->context->syms,
+      cuMemcpyHtoDAsync_v2(dst, src, length, command_buffer->stream),
+      "cuMemcpyHtoDAsync_v2");
+  return iree_ok_status();
 }
 
 static iree_status_t iree_hal_cuda_stream_command_buffer_copy_buffer(

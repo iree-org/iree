@@ -120,7 +120,7 @@ static iree_status_t iree_hal_cuda_device_create_internal(
     status = iree_hal_cuda_stream_command_buffer_create(
         (iree_hal_device_t*)device, &device->context_wrapper,
         IREE_HAL_COMMAND_BUFFER_MODE_ALLOW_INLINE_EXECUTION,
-        IREE_HAL_COMMAND_CATEGORY_ANY, device->stream,
+        IREE_HAL_COMMAND_CATEGORY_ANY, device->stream, /*block_pool=*/NULL,
         &device->stream_command_buffer);
   }
 
@@ -244,7 +244,7 @@ static iree_status_t iree_hal_cuda_device_create_command_buffer(
     // directly route commands to a CUDA stream and let it eagerly flush.
     return iree_hal_cuda_stream_command_buffer_create(
         base_device, &device->context_wrapper, mode, command_categories,
-        device->stream, out_command_buffer);
+        device->stream, &device->block_pool, out_command_buffer);
   }
   switch (device->params.command_buffer_mode) {
     case IREE_HAL_CUDA_COMMAND_BUFFER_MODE_GRAPH:
