@@ -61,7 +61,8 @@
 /iree/compiler/ConstEval/ @stellaraccident
 /iree/compiler/Dialect/Vulkan/ @antiagainst
 /iree/compiler/InputConversion/ @MaheshRavishankar @stellaraccident
-/iree/compiler/InputConversion/MHLO @hanhanW @MaheshRavishankar @stellaraccident
+/iree/compiler/InputConversion/MHLO @hanhanW @MaheshRavishankar
+/iree/compiler/InputConversion/MHLO @rsuderman
 
 
 # Runtime
