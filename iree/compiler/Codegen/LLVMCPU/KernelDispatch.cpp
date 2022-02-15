@@ -560,7 +560,7 @@ static LogicalResult setRootConfig(
       DispatchLoweringPassPipeline::CPUDefault);
 }
 
-/// Sets the lowering configuration for a generic op to use SingleTilingExpert.
+/// Sets the lowering configuration for a generic op to use DoubleTilingExpert.
 static LogicalResult setRootConfig(
     FuncOp entryPointFn, linalg::GenericOp genericOp,
     ArrayRef<LoopTilingAndDistributionInfo> tiledLoops) {
@@ -592,22 +592,41 @@ static LogicalResult setRootConfig(
   }
 
   // Set the flow level tiling to the default.
+  auto interfaceOp =
+      cast<IREE::Flow::PartitionableLoopsInterface>(genericOp.getOperation());
   SmallVector<unsigned> partitionedLoops =
-      cast<IREE::Flow::PartitionableLoopsInterface>(genericOp.getOperation())
-          .getPartitionableLoops(kNumMaxParallelDims);
+      interfaceOp.getPartitionableLoops(kNumMaxParallelDims);
   SmallVector<int64_t> workloadPerWorkgroup = getDefaultWorkloadPerWorkgroup(
       tiledLoops, partitionedLoops, nativeVectorSize);
   setTranslationInfo(entryPointFn,
-                     DispatchLoweringPassPipeline::CPUSingleTilingExpert,
+                     DispatchLoweringPassPipeline::CPUDoubleTilingExpert,
                      workloadPerWorkgroup,
                      /*workgroupSize=*/ArrayRef<int64_t>{});
 
+  llvm::SmallDenseSet<unsigned> pLoopsSet;
+  for (auto i : interfaceOp.getPartitionableLoops(
+           /*maxNumPartitionedLoops=*/std::numeric_limits<unsigned>::max())) {
+    pLoopsSet.insert(i);
+  }
+
   SmallVector<int64_t> l1TileSizes = nativeVectorSize;
+  SmallVector<int64_t> vectorTileSizes = nativeVectorSize;
+  for (auto i : llvm::seq<unsigned>(0, l1TileSizes.size())) {
+    // This excludes unit parallel dims.
+    if (!pLoopsSet.contains(i)) l1TileSizes[i] = 0;
+  }
+  {
+    SmallVector<unsigned> parallelDims;
+    genericOp.getParallelDims(parallelDims);
+    for (auto d : parallelDims) vectorTileSizes[d] = 0;
+  }
+
   TileSizesListType tileSizes;
   tileSizes.push_back({});  // Empty since nothing to do for first level tiling.
   tileSizes.push_back(l1TileSizes);
+  tileSizes.push_back(vectorTileSizes);
   auto config = IREE::Codegen::LoweringConfigAttr::get(
-      entryPointFn.getContext(), tileSizes, nativeVectorSize);
+      entryPointFn.getContext(), tileSizes, {});
   setLoweringConfig(genericOp, config);
 
   return success();

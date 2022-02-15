@@ -115,7 +115,10 @@ LogicalResult verifyDoubleTilingExpertPassPipelineConfig(
   if (interfaceOp) {
     SmallVector<unsigned> partitionedLoops =
         interfaceOp.getPartitionableLoops(kNumMaxParallelDims);
-    if (workloadPerWorkgroup.size() != partitionedLoops.size()) {
+    // TODO(hanchung): Allow empty workloadPerWorkgroup for now. We're going to
+    // defer tile and distribution which may affect this.
+    if (!workloadPerWorkgroup.empty() &&
+        workloadPerWorkgroup.size() != partitionedLoops.size()) {
       return op->emitOpError("expected ")
              << partitionedLoops.size()
              << " entries for workload_per_wg, but got "
