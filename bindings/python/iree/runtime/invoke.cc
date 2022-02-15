@@ -557,7 +557,6 @@ class ArgumentPacker {
       dynamic_dispatch_ = true;
     } else {
       // Reflection dispatch.
-      bool found_named = false;
       for (py::handle desc : *arg_descs) {
         int arg_index = flat_arg_packers_.size();
         std::optional<std::string> kwarg_name;
@@ -571,7 +570,6 @@ class ArgumentPacker {
         if (desc_is_list) {
           py::object maybe_named_field = desc[statics.kZero];
           if (maybe_named_field.equal(statics.kNamedTag)) {
-            found_named = true;
             py::object name_field = desc[statics.kOne];
             retained_sub_desc = desc[statics.kTwo];
             kwarg_name = py::cast<std::string>(name_field);
