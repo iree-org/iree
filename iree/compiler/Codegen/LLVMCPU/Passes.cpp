@@ -92,8 +92,8 @@ LogicalResult verifyDoubleTilingExpertPassPipelineConfig(
            << pipelineName;
   }
 
-  if (loweringConfig.getTileSizes().size() != 2) {
-    return op->emitOpError("expected two levels of tile sizes for ")
+  if (loweringConfig.getTileSizes().size() != 3) {
+    return op->emitOpError("expected three tiling sizes for ")
            << pipelineName << ", got " << loweringConfig.getTileSizes().size();
   }
 
@@ -155,6 +155,34 @@ LogicalResult verifyDoubleTilingExpertPassPipelineConfig(
         }
       }
     }
+
+    llvm::SmallDenseSet<unsigned> pLoopsSet;
+    for (auto i : interfaceOp.getPartitionableLoops(
+             /*maxNumPartitionedLoops=*/std::numeric_limits<unsigned>::max())) {
+      pLoopsSet.insert(i);
+    }
+
+    SmallVector<int64_t> secondLevelTileSizes = loweringConfig.getTileSizeVals(
+        static_cast<unsigned>(TilingLevel::L1Tiles));
+    for (auto en : llvm::enumerate(secondLevelTileSizes)) {
+      if (en.value() != 0 && !pLoopsSet.contains(en.index())) {
+        return op->emitOpError(
+                   "expected only non-unit parallel dims can be set in the "
+                   "second tiling sizes, got ")
+               << en.index() << "-th tile size set";
+      }
+    }
+
+    SmallVector<int64_t> thirdLevelTileSizes = loweringConfig.getTileSizeVals(
+        static_cast<unsigned>(TilingLevel::VectorTiles));
+    for (auto en : llvm::enumerate(thirdLevelTileSizes)) {
+      if (en.value() != 0 && pLoopsSet.contains(en.index())) {
+        return op->emitOpError(
+                   "expected only reduction dims can be set in the third "
+                   "tiling sizes, got ")
+               << en.index() << "-th tile size set";
+      }
+    }
   }
 
   // Verify that native vector size is either empty, or if set is same as the
@@ -162,8 +190,9 @@ LogicalResult verifyDoubleTilingExpertPassPipelineConfig(
   SmallVector<int64_t> nativeVectorSize =
       loweringConfig.getNativeVectorSizeVals();
   if (!nativeVectorSize.empty()) {
-    if (nativeVectorSize != loweringConfig.getTileSizeVals(
-                                static_cast<unsigned>(TilingLevel::L1Tiles))) {
+    if (nativeVectorSize !=
+        loweringConfig.getTileSizeVals(
+            static_cast<unsigned>(TilingLevel::VectorTiles))) {
       return op->emitOpError(
           "native_vector_size must be same as the last level of tiling");
     }
@@ -225,10 +254,6 @@ void addDoubleTilingExpertPassPipeline(OpPassManager &passManager) {
   }
 
   // Add the sandbox single tiling expert to tile and vectorize.
-  // This might create three addtional one-trip loops if the dim sizes are not
-  // divisible by tiling sizes. It would affect performance for some cases,
-  // e.g., matmul( 1x384, 384x384 ), etc.
-  // TODO(hanchung): Add canonicalization patterns to remove one-trip loops.
   {
     // The options are derived from sandbox codegen driver. hoistPadding options
     // does not work in IREE cases. It's fine to not have it, since it's already
@@ -236,10 +261,12 @@ void addDoubleTilingExpertPassPipeline(OpPassManager &passManager) {
     LinalgSingleTilingExpertPassOptions options;
     options.vectorize = true;
     options.vectorizePadding = true;
-    options.pad = true;
-    options.packPaddings = {1, 1, 0};
-    // options.hoistPaddings = {5, 6, 0};
-    options.tilingLevel = static_cast<int64_t>(TilingLevel::L1Tiles);
+    // TODO(#8228): Enable the padding once we know how to deal with fusion. For
+    // now, we don't enable padding because alloca ops will be created in
+    // bufferization for some cases.
+    // options.pad = true;
+    // options.packPaddings = {1, 1, 0};
+    options.tilingLevel = static_cast<int64_t>(TilingLevel::VectorTiles);
     passManager.addNestedPass<FuncOp>(
         createLinalgSingleTilingExpertPass(options));
     passManager.addNestedPass<FuncOp>(createCanonicalizerPass());

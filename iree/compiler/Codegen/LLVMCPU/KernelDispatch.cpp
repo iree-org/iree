@@ -284,24 +284,36 @@ static LogicalResult setDefaultLaunchConfig(
   return success();
 }
 
-static LogicalResult setX86SandboxRootConfig(FuncOp entryPointFn,
-                                             linalg::ContractionOpInterface op,
-                                             ArrayRef<int64_t> flowTileSizes,
-                                             int vectorSize) {
-  // Hardcoded tile sizes. The configuration is derived from iree-llvm-sandbox.
-  // L1 tile sizes are {1, ..., 8, 32, 16}
+static LogicalResult setX86SandboxRootConfig(
+    FuncOp entryPointFn, linalg::ContractionOpInterface op,
+    ArrayRef<int64_t> flowTileSizes, ArrayRef<unsigned> partionableLoops,
+    int vectorSize) {
+  // Hardcoded tiling sizes {1, 1, ..., 8, 32, 16}.
+  // The tiling for parallel dims and reduction dims should be separated.
   SmallVector<int64_t> l1TileSizes;
   int64_t nLoops = cast<linalg::LinalgOp>(op.getOperation()).getNumLoops();
   l1TileSizes.append(nLoops - 3, 1);
   l1TileSizes.push_back(getMaxTileSize(0, flowTileSizes[nLoops - 3], 8, 8));
   l1TileSizes.push_back(getMaxTileSize(0, flowTileSizes[nLoops - 2], 32, 32));
+  l1TileSizes.push_back(0);
+  llvm::SmallDenseSet<unsigned> pLoopsSet;
+  for (auto i : partionableLoops) pLoopsSet.insert(i);
+  for (auto en : llvm::enumerate(l1TileSizes)) {
+    if (en.value() != 0 && !pLoopsSet.contains(en.index())) {
+      l1TileSizes[en.index()] = 0;
+    }
+  }
+
   auto lhsShapedType = op.lhs().getType().cast<ShapedType>();
   int64_t K = lhsShapedType.getShape().back();
-  l1TileSizes.push_back(getMaxTileSize(0, K, 16, 16));
+  SmallVector<int64_t> vectorTileSizes;
+  vectorTileSizes.append(nLoops - 1, 0);
+  vectorTileSizes.push_back(getMaxTileSize(0, K, 16, 16));
 
   TileSizesListType tileSizes;
   tileSizes.push_back({});
   tileSizes.push_back(l1TileSizes);
+  tileSizes.push_back(vectorTileSizes);
   auto config = IREE::Codegen::LoweringConfigAttr::get(
       entryPointFn.getContext(), tileSizes, {});
   setLoweringConfig(op, config);
@@ -415,9 +427,6 @@ static LogicalResult setRootConfig(
 
   Optional<DispatchLoweringPassPipeline> passPipeline = {};
   if (isX86(entryPointFn)) {
-    setTranslationInfo(
-        entryPointFn, DispatchLoweringPassPipeline::CPUDoubleTilingExpert,
-        workloadPerWorkgroup, /*workgroupSize=*/ArrayRef<int64_t>{});
     // There is a tileInterchange option. If it needs to be configured, we can
     // only apply the pipeline to linalg.matmul. Because we don't know the
     // number of loops when adding the pass to pass manager.
@@ -430,7 +439,8 @@ static LogicalResult setRootConfig(
     if (lhsElemType == rhsElemType && rhsElemType == resElemType) {
       passPipeline = DispatchLoweringPassPipeline::CPUDoubleTilingExpert;
       if (failed(setX86SandboxRootConfig(entryPointFn, contractionOp,
-                                         flowTileSizes, vectorSize))) {
+                                         flowTileSizes, partitionedLoops,
+                                         vectorSize))) {
         return failure();
       }
     } else {
