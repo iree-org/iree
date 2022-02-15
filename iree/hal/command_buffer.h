@@ -409,7 +409,7 @@ IREE_API_EXPORT iree_status_t iree_hal_command_buffer_fill_buffer(
 // occupies command buffer space. It is strongly recommended that large buffer
 // updates are performed via iree_hal_command_buffer_copy_buffer where there is
 // the possibility of a zero-copy path.
-// The |source_buffer| may be releaed by the caller immediately after this
+// The |source_buffer| may be released by the caller immediately after this
 // call returns.
 // The |target_buffer| must be compatible with the devices owned by this
 // device queue and be allocated with IREE_HAL_BUFFER_USAGE_TRANSFER.
