@@ -1,12 +1,76 @@
 # Codeowners for IREE Github Repository.
 # Refer to https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
-# for syntax of this file.
+# for syntax of this file (tl;dr: syntax is like .gitignore. Last matching rule
+# takes precedence).
+# Because of the precedence, rules for directories are listed topologically.
 
-# Global code owners
+# No global owners because we don't really want e.g. changing the root
+# CMakeLists.txt file to always ping a bunch of people.
 
 # Code owners for individual components/directories
+
+# Third-Party Code
+/.gitmodules @GMNGeoffrey @ScottTodd @stellaraccident
+/third_party/ @GMNGeoffrey @ScottTodd @stellaraccident
+
+# Bindings
+/bindings/python/ @stellaraccident
+/bindings/tflite/ @benvanik
+
+# Integrations
+/integrations/ @benvanik @stellaraccident
+/integrations/tensorflow/ @stellaraccident
+/integrations/tensorflow/build_tools/ @GMNGeoffrey @stellaraccident
+/integrations/tensorflow/test/**/iree_tfl_tests/ @rsuderman
+
+# Experimental
+# It's experimental, but we still don't want any old directory added here.
+/experimental/ @benvanik @GMNGeoffrey @stellaraccident
+/experimental/remoting/ @stellaraccident
+/experimental/rocm/ @ThomasRaoux
+/experimental/web/ @ScottTodd
+
+# Infra Top-Level Directories
+/benchmarks/ @GMNGeoffrey @antiagainst
+/build_tools/ @GMNGeoffrey @ScottTodd
+/build_tools/benchmarks/ @GMNGeoffrey @antiagainst
+/build_tools/python_deploy/ @stellaraccident
+/build_tools/third_party/ @GMNGeoffrey @ScottTodd @stellaraccident
+/.github/ @GMNGeoffrey @ScottTodd
+/scripts/ @GMNGeoffrey @ScottTodd
+
+# llvm-external-projects
+/llvm-external-projects/ @stellaraccident
+/llvm-external-projects/iree-dialects/**/Dialect/LinalgExt/ @hanhanW @MaheshRavishankar
+/llvm-external-projects/iree-dialects/test/iree_linalgext @hanhanW @MaheshRavishankar
+
+# Other Top-Level Directories
+/colab/ @ScottTodd
+/docs/ @ScottTodd
+
+
+# Main IREE directories
+/iree/ @benvanik
+
+# Compiler
 /iree/compiler/Codegen/ @MaheshRavishankar
-/iree/compiler/Codegen/LLVMCPU/ @MaheshRavishankar @hanhanW
+/iree/compiler/Codegen/LLVMCPU/ @hanhanW @MaheshRavishankar
 /iree/compiler/Codegen/LLVMGPU/ @MaheshRavishankar @ThomasRaoux
-/iree/compiler/Codegen/Sandbox/ @MaheshRavishankar @hanhanW
-/iree/compiler/Codegen/SPIRV/ @MaheshRavishankar @antiagainst
+/iree/compiler/Codegen/Sandbox/ @hanhanW @MaheshRavishankar
+/iree/compiler/Codegen/SPIRV/ @antiagainst @MaheshRavishankar
+/iree/compiler/ConstEval/ @stellaraccident
+/iree/compiler/Dialect/Vulkan/ @antiagainst
+/iree/compiler/InputConversion/ @MaheshRavishankar @stellaraccident
+/iree/compiler/InputConversion/MHLO @hanhanW @MaheshRavishankar @rsuderman
+/iree/compiler/InputConversion/TOSA @rsuderman
+
+
+# Runtime
+/iree/hal/cuda/ @ThomasRaoux
+/iree/hal/cts/ @ScottTodd
+/iree/hal/vulkan/ @antiagainst @ScottTodd
+
+# Other IREE directories
+/iree/samples/ @ScottTodd
+/iree/test/ @MaheshRavishankar @hanhanW @GMNGeoffrey
+/iree/tools/ @benvanik @GMNGeoffrey
