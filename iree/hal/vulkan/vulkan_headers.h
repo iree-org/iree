@@ -33,7 +33,10 @@
 // https://djang86.blogspot.com/2019/01/what-is-vknoprototypes.html
 #define VK_NO_PROTOTYPES 1
 
-#include <vulkan/vulkan.h>       // IWYU pragma: export
+#include <vulkan/vulkan.h>  // IWYU pragma: export
+
+#ifdef IREE_PLATFORM_APPLE
 #include <vulkan/vulkan_beta.h>  // IWYU pragma: export
+#endif
 
 #endif  // IREE_HAL_VULKAN_VULKAN_HEADERS_H_
