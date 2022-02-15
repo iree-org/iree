@@ -47,9 +47,9 @@
 # Main IREE directories
 /iree/ @benvanik
 /iree/compiler/Codegen/ @MaheshRavishankar
-/iree/compiler/Codegen/LLVMCPU/ @MaheshRavishankar @hanhanw
+/iree/compiler/Codegen/LLVMCPU/ @MaheshRavishankar @hanhanW
 /iree/compiler/Codegen/LLVMGPU/ @MaheshRavishankar @ThomasRaoux
-/iree/compiler/Codegen/Sandbox/ @MaheshRavishankar @hanhanw
+/iree/compiler/Codegen/Sandbox/ @MaheshRavishankar @hanhanW
 /iree/compiler/Codegen/SPIRV/ @MaheshRavishankar @antiagainst
 /iree/compiler/ConstEval/ @stellaraccident
 /iree/compiler/InputConversion/ @stellaraccident
@@ -57,5 +57,5 @@
 /iree/hal/cts/ @ScottTodd
 /iree/hal/vulkan/ @antiagainst @ScottTodd
 /iree/samples/ @ScottTodd
-/iree/test/ @MaheshRavishankar @hanhanw @GMNGeoffrey
+/iree/test/ @MaheshRavishankar @hanhanW @GMNGeoffrey
 /iree/tools/ @benvanik @GMNGeoffrey
