@@ -54,6 +54,7 @@
 /iree/compiler/Codegen/Sandbox/ @MaheshRavishankar @hanhanW
 /iree/compiler/Codegen/SPIRV/ @MaheshRavishankar @antiagainst
 /iree/compiler/ConstEval/ @stellaraccident
+/iree/compiler/Dialect/Vulkan/ @antiagainst
 /iree/compiler/InputConversion/ @stellaraccident
 
 # Runtime
