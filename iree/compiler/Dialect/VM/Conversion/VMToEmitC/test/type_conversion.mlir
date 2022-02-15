@@ -3,8 +3,9 @@
 vm.module @my_module {
   // CHECK-LABEL: @my_module_list_alloc
   vm.func @list_alloc(%arg0: i32) {
-    // CHECK: %[[REF:.+]] = "emitc.constant"() {value = #emitc.opaque<"">} : () -> !emitc.opaque<"iree_vm_ref_t">
-    // CHECK: %[[REFPTR:.+]] = emitc.apply "&"(%[[REF]]) : (!emitc.opaque<"iree_vm_ref_t">) -> !emitc.opaque<"iree_vm_ref_t*">
+    // CHECK: %[[SIZE:.+]] = emitc.call "sizeof"() {args = [!emitc.opaque<"iree_vm_ref_t">]} : () -> i32
+    // CHECK-NEXT: %[[VOIDPTR:.+]] = emitc.call "iree_alloca"(%[[SIZE]]) : (i32) -> !emitc.opaque<"void*">
+    // CHECK-NEXT: %[[REFPTR:.+]] = emitc.call "EMITC_CAST"(%[[VOIDPTR]]) {args = [0 : index, !emitc.opaque<"iree_vm_ref_t*">]} : (!emitc.opaque<"void*">) -> !emitc.opaque<"iree_vm_ref_t*">
     %list = vm.list.alloc %arg0 : (i32) -> !vm.list<i32>
     %list_dno = util.do_not_optimize(%list) : !vm.list<i32>
     // CHECK: util.do_not_optimize(%[[REFPTR]]) : !emitc.opaque<"iree_vm_ref_t*">
@@ -14,8 +15,9 @@ vm.module @my_module {
   // CHECK-LABEL: @my_module_list_size
   vm.func @list_size(%arg0: i32) {
     %list = vm.list.alloc %arg0 : (i32) -> !vm.list<i32>
-    // CHECK: %[[REF:.+]] = "emitc.constant"() {value = #emitc.opaque<"">} : () -> !emitc.opaque<"iree_vm_ref_t">
-    // CHECK: %[[REFPTR:.+]] = emitc.apply "&"(%[[REF]]) : (!emitc.opaque<"iree_vm_ref_t">) -> !emitc.opaque<"iree_vm_ref_t*">
+    // CHECK: %[[SIZE:.+]] = emitc.call "sizeof"() {args = [!emitc.opaque<"iree_vm_ref_t">]} : () -> i32
+    // CHECK-NEXT: %[[VOIDPTR:.+]] = emitc.call "iree_alloca"(%[[SIZE]]) : (i32) -> !emitc.opaque<"void*">
+    // CHECK-NEXT: %[[REFPTR:.+]] = emitc.call "EMITC_CAST"(%[[VOIDPTR]]) {args = [0 : index, !emitc.opaque<"iree_vm_ref_t*">]} : (!emitc.opaque<"void*">) -> !emitc.opaque<"iree_vm_ref_t*">
     %size = vm.list.size %list : (!vm.list<i32>) -> i32
     // CHECK: %[[SIZE:.+]] = emitc.call "iree_vm_list_size"(%{{.+}})
     %size_dno = util.do_not_optimize(%size) : i32
@@ -31,8 +33,9 @@ vm.module @my_module {
   // CHECK-LABEL: @my_module_ref
   vm.export @ref
   vm.func @ref(%arg0: i32) {
-    // CHECK: %[[REF:.+]] = "emitc.constant"() {value = #emitc.opaque<"">} : () -> !emitc.opaque<"iree_vm_ref_t">
-    // CHECK: %[[REFPTR:.+]] = emitc.apply "&"(%[[REF]]) : (!emitc.opaque<"iree_vm_ref_t">) -> !emitc.opaque<"iree_vm_ref_t*">
+    // CHECK: %[[SIZE:.+]] = emitc.call "sizeof"() {args = [!emitc.opaque<"iree_vm_ref_t">]} : () -> i32
+    // CHECK-NEXT: %[[VOIDPTR:.+]] = emitc.call "iree_alloca"(%[[SIZE]]) : (i32) -> !emitc.opaque<"void*">
+    // CHECK-NEXT: %[[REFPTR:.+]] = emitc.call "EMITC_CAST"(%[[VOIDPTR]]) {args = [0 : index, !emitc.opaque<"iree_vm_ref_t*">]} : (!emitc.opaque<"void*">) -> !emitc.opaque<"iree_vm_ref_t*">
     %buffer = vm.const.ref.rodata @byte_buffer : !vm.buffer
     %buffer_dno = util.do_not_optimize(%buffer) : !vm.buffer
     // CHECK: util.do_not_optimize(%[[REFPTR]]) : !emitc.opaque<"iree_vm_ref_t*">
