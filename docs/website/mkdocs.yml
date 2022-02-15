@@ -80,7 +80,11 @@ markdown_extensions:
       options:
         custom_icons:
           - overrides/.icons
-  - pymdownx.superfences
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
   - pymdownx.tabbed:
       alternate_style: true
   - pymdownx.tasklist:
@@ -124,6 +128,7 @@ nav:
       - Work in progress on Matrix Multiplication on CPU: 'blog/2021-10-13-mmt4d.md'
       - TFLite Support via TOSA: 'blog/2021-07-19-tflite-tosa.md'
   - 'Reference':
+      - Compilation Map: 'reference/compilation.md'
       - Glossary: 'reference/glossary.md'
       - Optimization Options: 'reference/optimization-options.md'
   - 'Community':
