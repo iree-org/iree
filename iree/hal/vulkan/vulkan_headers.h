@@ -35,4 +35,8 @@
 
 #include <vulkan/vulkan.h>  // IWYU pragma: export
 
+#ifdef IREE_PLATFORM_APPLE
+#include <vulkan/vulkan_beta.h>  // IWYU pragma: export
+#endif
+
 #endif  // IREE_HAL_VULKAN_VULKAN_HEADERS_H_
