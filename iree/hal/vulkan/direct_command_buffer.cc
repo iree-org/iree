@@ -615,7 +615,8 @@ static iree_status_t iree_hal_vulkan_direct_command_buffer_update_buffer(
   // may be slower than just using write-through mapped memory). The
   // recommendation in the spec for larger updates is to split the single update
   // into multiple updates over the entire desired range.
-  const auto* source_buffer_ptr = static_cast<const uint8_t*>(source_buffer);
+  const auto* source_buffer_ptr =
+      static_cast<const uint8_t*>(source_buffer) + source_offset;
   target_offset += iree_hal_buffer_byte_offset(target_buffer);
   while (length > 0) {
     iree_device_size_t chunk_length =
