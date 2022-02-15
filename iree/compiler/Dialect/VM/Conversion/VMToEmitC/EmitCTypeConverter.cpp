@@ -93,8 +93,7 @@ Optional<Value> EmitCTypeConverter::materializeRef(Value ref) {
     }
   }
 
-  emitc::ApplyOp applyOp = vmAnalysis.getValue().get().lookupLocalRef(ordinal);
-  return applyOp.getResult();
+  return vmAnalysis.getValue().get().lookupLocalRef(ordinal);
 }
 
 }  // namespace VM

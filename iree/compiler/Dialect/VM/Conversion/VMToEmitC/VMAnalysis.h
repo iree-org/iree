@@ -44,25 +44,24 @@ struct VMAnalysis {
     return valueLiveness.isLastValueUse(ref, op);
   }
 
-  void cacheLocalRef(int64_t ordinal, emitc::ApplyOp &applyOp) {
+  void cacheLocalRef(int64_t ordinal, Value ref) {
     assert(!refs.count(ordinal));
-    refs[ordinal] = applyOp.getOperation();
+    refs[ordinal] = ref;
   }
 
-  emitc::ApplyOp lookupLocalRef(int64_t ordinal) {
+  Value lookupLocalRef(int64_t ordinal) {
     assert(refs.count(ordinal));
-    Operation *op = refs[ordinal];
-    return cast<emitc::ApplyOp>(op);
+    return refs[ordinal];
   }
 
-  DenseMap<int64_t, Operation *> &localRefs() { return refs; }
+  DenseMap<int64_t, Value> &localRefs() { return refs; }
   size_t numRefArguments;
   FunctionType originalFunctionType;
 
  private:
   RegisterAllocation registerAllocation;
   ValueLiveness valueLiveness;
-  DenseMap<int64_t, Operation *> refs;
+  DenseMap<int64_t, Value> refs;
 };
 
 using VMAnalysisCache = DenseMap<Operation *, VMAnalysis>;
