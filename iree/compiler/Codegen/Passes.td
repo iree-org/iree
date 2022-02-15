@@ -78,6 +78,12 @@ def OptimizeVectorTransfer :
   let constructor = "mlir::iree_compiler::createOptimizeVectorTransferPass()";
 }
 
+def TileAndDistributeToWorkgroups :
+    Pass<"iree-codegen-tile-and-distribute-to-workgroups", "FuncOp"> {
+  let summary = "Tile and distribute operations to workgroups";
+  let constructor = "mlir::iree_compiler::createTileAndDistributeToWorkgroupsPass()";
+}
+
 def TypePropagation :
     Pass<"iree-codegen-type-propagation", "FuncOp"> {
   let summary = "Propogate the type of tensor to avoid load/stores of illegal bit widths";

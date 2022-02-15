@@ -4,20 +4,13 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#ifndef IREE_COMPILER_DIALECT_FLOW_TRANSFORMS_DESTRUCTIVEUPDATEUTILS_H_
-#define IREE_COMPILER_DIALECT_FLOW_TRANSFORMS_DESTRUCTIVEUPDATEUTILS_H_
+#ifndef IREE_COMPILER_CODEGEN_COMMON_DESTRUCTIVEUPDATEUTILS_H_
+#define IREE_COMPILER_CODEGEN_COMMON_DESTRUCTIVEUPDATEUTILS_H_
 
-#include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
-#include "llvm/ADT/StringMap.h"
 #include "mlir/IR/BuiltinOps.h"
-#include "mlir/Pass/Pass.h"
-#include "mlir/Pass/PassManager.h"
-#include "mlir/Support/LLVM.h"
 
 namespace mlir {
 namespace iree_compiler {
-namespace IREE {
-namespace Flow {
 
 // Traverse `funcOp` and rewrite specific tensor.{extract|insert}_slice ops that
 // match a "destructive tensor update" pattern, by an inplace update via
@@ -85,12 +78,9 @@ namespace Flow {
 //     tensor<...> -> !flow.dispatch.tensor<writeonly:...>
 // ```
 // is elided.
-LogicalResult rewriteLinalgDestructiveUpdates(
-    IREE::Flow::DispatchWorkgroupsOp dispatchOp);
+LogicalResult rewriteLinalgDestructiveUpdates(FuncOp parentOp);
 
-}  // namespace Flow
-}  // namespace IREE
 }  // namespace iree_compiler
 }  // namespace mlir
 
-#endif  // IREE_COMPILER_DIALECT_FLOW_TRANSFORMS_DESTRUCTIVEUPDATEUTILS_H_
+#endif  // IREE_COMPILER_CODEGEN_COMMON_DESTRUCTIVEUPDATEUTILS_H_

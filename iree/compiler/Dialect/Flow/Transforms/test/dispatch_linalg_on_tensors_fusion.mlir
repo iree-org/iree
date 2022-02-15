@@ -32,16 +32,13 @@ func @fuse_conv2d_elementwise(%input: tensor<1x225x225x16xf32>, %filter: tensor<
 // CHECK-LABEL: func @fuse_conv2d_elementwise
 
 //      CHECK: flow.dispatch.workgroups
-//      CHECK:   scf.for
-//      CHECK:     scf.for
-//      CHECK:       %[[INIT:.+]] = linalg.init_tensor
-//      CHECK:       %[[FILL0:.+]] = linalg.fill(%{{.+}}, %[[INIT]])
-//      CHECK:       %[[CONV:.+]] = linalg.conv_2d_nhwc_hwcf
-// CHECK-SAME:         outs(%[[FILL0]] : tensor<1x?x?x?xf32>)
-//      CHECK:       %[[FILL1:.+]] = linalg.fill(%{{.+}}, %[[INIT]])
-//      CHECK:       linalg.generic
-// CHECK-SAME:         ins(%[[CONV]], %{{.+}} : tensor<1x?x?x?xf32>, tensor<?xf32>)
-// CHECK-SAME:         outs(%[[FILL1]] : tensor<1x?x?x?xf32>)
+//      CHECK:   %[[INIT:.+]] = linalg.init_tensor
+//      CHECK:   %[[FILL:.+]] = linalg.fill(%{{.+}}, %[[INIT]])
+//      CHECK:   %[[CONV:.+]] = linalg.conv_2d_nhwc_hwcf
+// CHECK-SAME:     outs(%[[FILL]] :
+//      CHECK:   linalg.generic
+// CHECK-SAME:     ins(%[[CONV]], %{{.+}} : tensor<1x112x112x32xf32>, tensor<32xf32>)
+// CHECK-SAME:     outs(%[[FILL]] : tensor<1x112x112x32xf32>)
 
 // -----
 
@@ -73,12 +70,10 @@ func @dont_fuse_conv2d_with_multiple_uses(%input: tensor<1x225x225x16xf32>, %fil
 // CHECK-LABLE: func @dont_fuse_conv2d_with_multiple_uses
 
 // CHECK: flow.dispatch.workgroups
-// CHECK:   scf.for
-// CHECK:     scf.for
-// CHECK:       linalg.conv_2d_nhwc_hwcf
+// CHECK:   linalg.conv_2d_nhwc_hwcf
 
 // CHECK: flow.dispatch.workgroups
-// CHECK:       linalg.generic
+// CHECK:   linalg.generic
 
 // -----
 
@@ -109,9 +104,7 @@ func @dont_fuse_conv2d_with_non_identity_map(%input: tensor<1x225x225x16xf32>, %
 // CHECK-LABEL: func @dont_fuse_conv2d_with_non_identity_map
 
 // CHECK: flow.dispatch.workgroups
-// CHECK:   scf.for
-// CHECK:     scf.for
-// CHECK:       linalg.conv_2d_nhwc_hwcf
+// CHECK:   linalg.conv_2d_nhwc_hwcf
 
 // CHECK: flow.dispatch.workgroups
-// CHECK:       linalg.generic
+// CHECK:   linalg.generic

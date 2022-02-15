@@ -32,8 +32,6 @@
 
 namespace mlir {
 namespace iree_compiler {
-namespace IREE {
-namespace Flow {
 
 // Detect the pattern:
 // %d0 = for  (iter_args %e0 = %0)
@@ -296,10 +294,9 @@ LogicalResult rewriteDestructiveUpdateInPlace<tensor::InsertSliceOp>(
 
 // Return true if any control flow is found in the DispatchWorkgroupsOp besides
 // scf::ForOp.
-static bool hasNonScfForControlFlow(
-    IREE::Flow::DispatchWorkgroupsOp dispatchOp) {
-  return dispatchOp
-      .walk([&](Operation *op) {
+static bool hasNonScfForControlFlow(FuncOp funcOp) {
+  return funcOp
+      ->walk([&](Operation *op) {
         if (isa<BranchOpInterface>(op) || isa<RegionBranchOpInterface>(op)) {
           if (!isa<scf::ForOp, scf::IfOp>(op) &&
               !isa<IREE::Flow::DispatchWorkgroupsOp>(op))
@@ -338,17 +335,16 @@ static LogicalResult rewriteDestructiveUpdateInPlace(
   return success();
 }
 
-LogicalResult rewriteLinalgDestructiveUpdates(
-    IREE::Flow::DispatchWorkgroupsOp dispatchOp) {
+LogicalResult rewriteLinalgDestructiveUpdates(FuncOp funcOp) {
   // Bail on any control-flow for now.
-  if (hasNonScfForControlFlow(dispatchOp)) return success();
+  if (hasNonScfForControlFlow(funcOp)) return success();
 
-  MLIRContext *context = dispatchOp->getContext();
+  MLIRContext *context = funcOp->getContext();
   OpBuilder b(context);
   SmallVector<IREE::Flow::DispatchTensorStoreOp> processedStores;
   // For each tensor store op, look for destructive updates and replace the
   // destructive pattern by a custom inplace update pattern.
-  auto walkResult = dispatchOp.walk([&](IREE::Flow::DispatchTensorStoreOp op) {
+  auto walkResult = funcOp.walk([&](IREE::Flow::DispatchTensorStoreOp op) {
     SpecialTerminatorOpCapture capture;
     capture.initValue = op.value();
     Value sourceValue = isADestructiveUpdatePattern(capture.initValue, capture);
@@ -369,11 +365,9 @@ LogicalResult rewriteLinalgDestructiveUpdates(
   // affineminscf and others as needed.
   RewritePatternSet canonicalizationPatterns(context);
   scf::ForOp::getCanonicalizationPatterns(canonicalizationPatterns, context);
-  return applyPatternsAndFoldGreedily(dispatchOp,
+  return applyPatternsAndFoldGreedily(funcOp,
                                       std::move(canonicalizationPatterns));
 }
 
-}  // namespace Flow
-}  // namespace IREE
 }  // namespace iree_compiler
 }  // namespace mlir

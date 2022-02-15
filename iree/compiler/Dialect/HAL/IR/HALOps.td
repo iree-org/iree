@@ -1769,6 +1769,13 @@ def HAL_InterfaceWorkgroupIDOp : HAL_PureOp<"interface.workgroup.id", [
   let arguments = (ins IndexAttr:$dimension);
   let results = (outs HAL_Dim:$result);
 
+  let builders = [
+    OpBuilder<(ins "unsigned":$dim),
+    [{
+      build($_builder, $_state, $_builder.getIndexType(), $_builder.getIndexAttr(dim));
+    }]>,
+  ];
+
   let assemblyFormat = [{
     `[` $dimension `]` attr-dict `:` type($result)
   }];
@@ -1796,6 +1803,13 @@ def HAL_InterfaceWorkgroupCountOp : HAL_PureOp<"interface.workgroup.count", [
   let arguments = (ins IndexAttr:$dimension);
   let results = (outs HAL_Dim:$result);
 
+  let builders = [
+    OpBuilder<(ins "unsigned":$dim),
+    [{
+      build($_builder, $_state, $_builder.getIndexType(), $_builder.getIndexAttr(dim));
+    }]>,
+  ];
+
   let assemblyFormat = [{
     `[` $dimension `]` attr-dict `:` type($result)
   }];
@@ -1822,6 +1836,13 @@ def HAL_InterfaceWorkgroupSizeOp : HAL_PureOp<"interface.workgroup.size", [
 
   let arguments = (ins IndexAttr:$dimension);
   let results = (outs HAL_Dim:$result);
+
+  let builders = [
+    OpBuilder<(ins "unsigned":$dim),
+    [{
+      build($_builder, $_state, $_builder.getIndexType(), $_builder.getIndexAttr(dim));
+    }]>,
+  ];
 
   let assemblyFormat = [{
     `[` $dimension `]` attr-dict `:` type($result)

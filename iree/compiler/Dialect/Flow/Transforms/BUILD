@@ -38,7 +38,6 @@ cc_library(
         "ConvertLinalgMatmulToMmt4D.cpp",
         "ConvertToFlow.cpp",
         "DeduplicateExecutables.cpp",
-        "DestructiveUpdateUtils.cpp",
         "DispatchLinalgOnTensors.cpp",
         "ExportBenchmarkFuncs.cpp",
         "FusionOfTensorOps.cpp",
@@ -58,7 +57,6 @@ cc_library(
         "VerifyInputLegality.cpp",
     ],
     hdrs = [
-        "DestructiveUpdateUtils.h",
         "Passes.h",
         "Passes.h.inc",
         "TypeConverter.h",

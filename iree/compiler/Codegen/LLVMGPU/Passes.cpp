@@ -209,6 +209,10 @@ static void addLowerToLLVMGPUPasses(OpPassManager &pm, bool useROCM) {
 
 void buildLLVMGPUTransformPassPipeline(OpPassManager &pm, bool useROCM) {
   pm.nest<ModuleOp>().nest<FuncOp>().addPass(createTypePropagationPass());
+  pm.nest<ModuleOp>().nest<FuncOp>().addPass(
+      createTileAndDistributeToWorkgroupsPass());
+  pm.addPass(createCanonicalizerPass());
+  pm.addPass(createCSEPass());
 
   OpPassManager &bufferizePassPM = pm.nest<ModuleOp>();
   addLinalgBufferizePasses(bufferizePassPM, gpuAllocationFunction);
