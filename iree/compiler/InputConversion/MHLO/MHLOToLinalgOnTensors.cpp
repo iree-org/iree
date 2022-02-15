@@ -53,6 +53,35 @@ namespace MHLO {
 //===----------------------------------------------------------------------===//
 
 namespace {
+static Value collapseFrontDimsIfNeeded(Value value, int64_t batchDims,
+                                       ImplicitLocOpBuilder &b) {
+  if (batchDims == 1) return value;
+
+  auto type = value.getType().cast<RankedTensorType>();
+  auto rank = type.getRank();
+  int64_t batchSize = 1;
+  for (int i = 0; i < batchDims; i++)
+    batchSize = combineDims(batchSize, type.getDimSize(i));
+
+  SmallVector<ReassociationIndices> map;
+  map.emplace_back(llvm::to_vector<4>(llvm::seq<int64_t>(0, batchDims)));
+
+  llvm::SmallVector<int64_t> newShape = {batchSize};
+  for (int i = batchDims; i < rank; i++) {
+    newShape.push_back(type.getDimSize(i));
+    map.emplace_back(1, i);
+  }
+
+  auto resultType = RankedTensorType::get(newShape, type.getElementType());
+  return b.create<tensor::CollapseShapeOp>(resultType, value, map);
+}
+
+static int64_t combineDims(int64_t a, int64_t b) {
+  if (a == ShapedType::kDynamicSize || b == ShapedType::kDynamicSize)
+    return ShapedType::kDynamicSize;
+  return a * b;
+}
+
 /// Converts mhlo.concatenate operation to extract_slice ops + insert_slice ops.
 struct ConcatenateOpConversion
     : public OpConversionPattern<mhlo::ConcatenateOp> {
@@ -223,34 +252,7 @@ class ScatterToDynamicUpdateSlice
  public:
   using OpConversionPattern<mhlo::ScatterOp>::OpConversionPattern;
 
-  static Value collapseFrontDimsIfNeeded(Value value, int64_t batchDims,
-                                         ImplicitLocOpBuilder &b) {
-    if (batchDims == 1) return value;
 
-    auto type = value.getType().cast<RankedTensorType>();
-    auto rank = type.getRank();
-    int64_t batchSize = 1;
-    for (int i = 0; i < batchDims; i++)
-      batchSize = combineDims(batchSize, type.getDimSize(i));
-
-    SmallVector<ReassociationIndices> map;
-    map.emplace_back(llvm::to_vector<4>(llvm::seq<int64_t>(0, batchDims)));
-
-    llvm::SmallVector<int64_t> newShape = {batchSize};
-    for (int i = batchDims; i < rank; i++) {
-      newShape.push_back(type.getDimSize(i));
-      map.emplace_back(1, i);
-    }
-
-    auto resultType = RankedTensorType::get(newShape, type.getElementType());
-    return b.create<tensor::CollapseShapeOp>(resultType, value, map);
-  }
-
-  static int64_t combineDims(int64_t a, int64_t b) {
-    if (a == ShapedType::kDynamicSize || b == ShapedType::kDynamicSize)
-      return ShapedType::kDynamicSize;
-    return a * b;
-  }
 
   LogicalResult matchAndRewrite(
       mhlo::ScatterOp op, OpAdaptor adaptor,
@@ -324,7 +326,7 @@ class ScatterToDynamicUpdateSlice
 
     // Collapsed the batch dimension into the first update dimension, this
     // avoids reshaping each slice.
-    updates = collapseFrontDimsIfNeeded(updates, 2, b);
+    updates = collapseFrontDimsIfNeeded(updates, /*dims=*/2, b);
     updatesTy = updates.getType().cast<RankedTensorType>();
 
     // Iterate over the batch dimension of the indices.
