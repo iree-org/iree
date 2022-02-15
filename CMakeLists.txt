@@ -338,7 +338,9 @@ endif()
 # If an explicit libdevice file was not specified, and the compiler backend
 # is being built, probe for one.
 if(IREE_TARGET_BACKEND_CUDA)
-  if(CUDAToolkit_FOUND AND CUDAToolkit_LIBRARY_ROOT)
+  if(IREE_CUDA_LIBDEVICE_PATH)
+    # Explicitly provided: do nothing.
+  elseif(CUDAToolkit_FOUND AND CUDAToolkit_LIBRARY_ROOT)
     # Note that the variable CUDAToolkit_LIBRARY_ROOT keys off of the presence
     # of version.txt, which was changed to version.json in recent releases
     # and thwarts the search.
