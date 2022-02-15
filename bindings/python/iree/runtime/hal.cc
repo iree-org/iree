@@ -99,15 +99,15 @@ py::object HalAllocator::AllocateBufferCopy(
 
   iree_hal_buffer_t* hal_buffer;
   // TODO: Should not require host visible :(
+  iree_status_t status;
   {
     py::gil_scoped_release release;
-    CheckApiStatus(
-        iree_hal_allocator_allocate_buffer(
-            raw_ptr(), memory_type | IREE_HAL_MEMORY_TYPE_HOST_VISIBLE,
-            allowed_usage, py_view.len,
-            iree_make_const_byte_span(py_view.buf, py_view.len), &hal_buffer),
-        "Failed to allocate device visible buffer");
+    status = iree_hal_allocator_allocate_buffer(
+        raw_ptr(), memory_type | IREE_HAL_MEMORY_TYPE_HOST_VISIBLE,
+        allowed_usage, py_view.len,
+        iree_make_const_byte_span(py_view.buf, py_view.len), &hal_buffer);
   }
+  CheckApiStatus(status, "Failed to allocate device visible buffer");
 
   if (!element_type) {
     return py::cast(HalBuffer::StealFromRawPtr(hal_buffer),
