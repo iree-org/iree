@@ -174,6 +174,33 @@ cc_library(
 )
 
 cc_library(
+    name = "loop_sync",
+    srcs = ["loop_sync.c"],
+    hdrs = ["loop_sync.h"],
+    deps = [
+        ":base",
+        ":tracing",
+        "//iree/base/internal",
+        "//iree/base/internal:wait_handle",
+    ],
+)
+
+cc_test(
+    name = "loop_sync_test",
+    srcs = [
+        "loop_sync_test.cc",
+    ],
+    deps = [
+        ":base",
+        ":cc",
+        ":loop_sync",
+        ":loop_test_hdrs",
+        "//iree/testing:gtest",
+        "//iree/testing:gtest_main",
+    ],
+)
+
+cc_library(
     name = "tracing",
     hdrs = ["tracing.h"],
     deps = [

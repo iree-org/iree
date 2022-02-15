@@ -159,6 +159,36 @@ iree_cc_library(
   PUBLIC
 )
 
+iree_cc_library(
+  NAME
+    loop_sync
+  HDRS
+    "loop_sync.h"
+  SRCS
+    "loop_sync.c"
+  DEPS
+    ::base
+    ::tracing
+    iree::base::internal
+    iree::base::internal::wait_handle
+  PUBLIC
+)
+
+iree_cc_test(
+  NAME
+    loop_sync_test
+  SRCS
+    "loop_sync_test.cc"
+  DEPS
+    ::base
+    ::cc
+    ::loop_sync
+    ::loop_test_hdrs
+    ::tracing
+    iree::testing::gtest
+    iree::testing::gtest_main
+)
+
 # TODO(benvanik): evaluate if we want this as part of the API. Could restrict it
 # to excusively static linkage scenarios and note that it's unstable. It's just
 # really really useful and the only way for applications to interleave with our
