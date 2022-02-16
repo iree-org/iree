@@ -15,9 +15,9 @@ Cloud TPUs.
 [Multi Level Intermediate Representation](https://mlir.llvm.org/) is
 the compiler framework that IREE is built around. Beyond the tooling
 this includes a set of common dialects and transformations that IREE
-utilizes for it's code generation system.
+utilizes for its code generation system.
 
-For general discussion on MLIR see the projects
+For general discussion on MLIR see the project's
 [discourse](https://discourse.llvm.org/c/mlir/31) group.
 
 ## LinAlg
