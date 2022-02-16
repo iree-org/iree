@@ -24,25 +24,16 @@ using ::testing::ContainerEq;
 
 class command_buffer_test : public CtsTestBase {
  protected:
-  std::vector<uint8_t> RunFillBufferTest(iree_device_size_t buffer_size,
-                                         iree_device_size_t target_offset,
-                                         iree_device_size_t fill_length,
-                                         const void* pattern,
-                                         iree_host_size_t pattern_length) {
-    iree_hal_command_buffer_t* command_buffer;
-    IREE_CHECK_OK(iree_hal_command_buffer_create(
-        device_, IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT,
-        IREE_HAL_COMMAND_CATEGORY_ANY, IREE_HAL_QUEUE_AFFINITY_ANY,
-        &command_buffer));
-    iree_hal_buffer_t* device_buffer;
+  void CreateZeroedDeviceBuffer(iree_hal_command_buffer_t* command_buffer,
+                                iree_device_size_t buffer_size,
+                                iree_hal_buffer_t** out_buffer) {
+    iree_hal_buffer_t* device_buffer = NULL;
     IREE_CHECK_OK(iree_hal_allocator_allocate_buffer(
         iree_hal_device_allocator(device_),
         IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL | IREE_HAL_MEMORY_TYPE_HOST_VISIBLE,
         IREE_HAL_BUFFER_USAGE_ALL, buffer_size, iree_const_byte_span_empty(),
         &device_buffer));
 
-    IREE_CHECK_OK(iree_hal_command_buffer_begin(command_buffer));
-    // Start with a zero fill on the entire buffer...
     uint8_t zero_val = 0x0;
     IREE_CHECK_OK(iree_hal_command_buffer_fill_buffer(
         command_buffer, device_buffer, /*target_offset=*/0,
@@ -61,7 +52,26 @@ class command_buffer_test : public CtsTestBase {
         IREE_HAL_EXECUTION_STAGE_TRANSFER | IREE_HAL_EXECUTION_STAGE_DISPATCH,
         IREE_HAL_EXECUTION_BARRIER_FLAG_NONE, /*memory_barrier_count=*/0, NULL,
         /*buffer_barrier_count=*/1, &buffer_barrier));
-    // ... then fill the pattern on top.
+
+    *out_buffer = device_buffer;
+  }
+
+  std::vector<uint8_t> RunFillBufferTest(iree_device_size_t buffer_size,
+                                         iree_device_size_t target_offset,
+                                         iree_device_size_t fill_length,
+                                         const void* pattern,
+                                         iree_host_size_t pattern_length) {
+    iree_hal_command_buffer_t* command_buffer;
+    IREE_CHECK_OK(iree_hal_command_buffer_create(
+        device_, IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT,
+        IREE_HAL_COMMAND_CATEGORY_ANY, IREE_HAL_QUEUE_AFFINITY_ANY,
+        &command_buffer));
+    IREE_CHECK_OK(iree_hal_command_buffer_begin(command_buffer));
+
+    iree_hal_buffer_t* device_buffer;
+    CreateZeroedDeviceBuffer(command_buffer, buffer_size, &device_buffer);
+
+    // Fill the pattern on top.
     IREE_CHECK_OK(iree_hal_command_buffer_fill_buffer(
         command_buffer, device_buffer, target_offset, fill_length, pattern,
         pattern_length));
@@ -69,15 +79,16 @@ class command_buffer_test : public CtsTestBase {
     IREE_CHECK_OK(SubmitCommandBufferAndWait(IREE_HAL_COMMAND_CATEGORY_ANY,
                                              command_buffer));
 
+    // Read data for returning.
     std::vector<uint8_t> actual_data(buffer_size);
     IREE_CHECK_OK(
         iree_hal_buffer_read_data(device_buffer, /*source_offset=*/0,
                                   /*target_buffer=*/actual_data.data(),
                                   /*data_length=*/buffer_size));
 
+    // Cleanup and return.
     iree_hal_command_buffer_release(command_buffer);
     iree_hal_buffer_release(device_buffer);
-
     return actual_data;
   }
 
@@ -90,34 +101,13 @@ class command_buffer_test : public CtsTestBase {
         device_, IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT,
         IREE_HAL_COMMAND_CATEGORY_ANY, IREE_HAL_QUEUE_AFFINITY_ANY,
         &command_buffer));
-    iree_hal_buffer_t* device_buffer;
-    IREE_CHECK_OK(iree_hal_allocator_allocate_buffer(
-        iree_hal_device_allocator(device_),
-        IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL | IREE_HAL_MEMORY_TYPE_HOST_VISIBLE,
-        IREE_HAL_BUFFER_USAGE_ALL, target_buffer_size,
-        iree_const_byte_span_empty(), &device_buffer));
-
     IREE_CHECK_OK(iree_hal_command_buffer_begin(command_buffer));
-    // Start with a zero fill on the entire buffer...
-    uint8_t zero_val = 0x0;
-    IREE_CHECK_OK(iree_hal_command_buffer_fill_buffer(
-        command_buffer, device_buffer, /*target_offset=*/0,
-        /*length=*/target_buffer_size, &zero_val,
-        /*pattern_length=*/sizeof(zero_val)));
-    // (buffer barrier between the fill and the copy)
-    iree_hal_buffer_barrier_t buffer_barrier;
-    buffer_barrier.source_scope = IREE_HAL_ACCESS_SCOPE_TRANSFER_WRITE;
-    buffer_barrier.target_scope = IREE_HAL_ACCESS_SCOPE_TRANSFER_WRITE |
-                                  IREE_HAL_ACCESS_SCOPE_DISPATCH_WRITE;
-    buffer_barrier.buffer = device_buffer;
-    buffer_barrier.offset = 0;
-    buffer_barrier.length = target_buffer_size;
-    IREE_CHECK_OK(iree_hal_command_buffer_execution_barrier(
-        command_buffer, IREE_HAL_EXECUTION_STAGE_TRANSFER,
-        IREE_HAL_EXECUTION_STAGE_TRANSFER | IREE_HAL_EXECUTION_STAGE_DISPATCH,
-        IREE_HAL_EXECUTION_BARRIER_FLAG_NONE, /*memory_barrier_count=*/0, NULL,
-        /*buffer_barrier_count=*/1, &buffer_barrier));
-    // ... then issue the update_buffer command.
+
+    iree_hal_buffer_t* device_buffer;
+    CreateZeroedDeviceBuffer(command_buffer, target_buffer_size,
+                             &device_buffer);
+
+    // Issue the update_buffer command.
     IREE_CHECK_OK(iree_hal_command_buffer_update_buffer(
         command_buffer, source_buffer, source_offset, device_buffer,
         target_offset, length));
@@ -125,15 +115,16 @@ class command_buffer_test : public CtsTestBase {
     IREE_CHECK_OK(SubmitCommandBufferAndWait(IREE_HAL_COMMAND_CATEGORY_ANY,
                                              command_buffer));
 
+    // Read data for returning.
     std::vector<uint8_t> actual_data(target_buffer_size);
     IREE_CHECK_OK(
         iree_hal_buffer_read_data(device_buffer, /*source_offset=*/0,
                                   /*target_buffer=*/actual_data.data(),
                                   /*data_length=*/target_buffer_size));
 
+    // Cleanup and return.
     iree_hal_command_buffer_release(command_buffer);
     iree_hal_buffer_release(device_buffer);
-
     return actual_data;
   }
 
