@@ -1,8 +1,8 @@
 # Glossary
 
-IREE is a composition of multiple acronym described projects making it
-difficult to understand these components interact. Below is a summation
-of these projects with the problems they instend to address.
+IREE exists in an ecosystem of projects, each using their own terminology
+and interacting in various ways. Below is a summation of these projects
+with the problems they are built to address.
 
 ## JAX
 
