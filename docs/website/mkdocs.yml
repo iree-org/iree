@@ -118,12 +118,13 @@ nav:
       - TensorFlow Lite: 'bindings/tensorflow-lite.md'
   - 'Extensions':
       - 'extensions/index.md'
-  - 'Reference':
-      - Optimization Options: 'reference/optimization-options.md'
-  - 'Community':
-      - 'community/index.md'
   - 'Blog':
       - 'blog/index.md'
       - CUDA backend: 'blog/2021-10-15-cuda-backend.md'
       - Work in progress on Matrix Multiplication on CPU: 'blog/2021-10-13-mmt4d.md'
       - TFLite Support via TOSA: 'blog/2021-07-19-tflite-tosa.md'
+  - 'Reference':
+      - Glossary: 'reference/glossary.md'
+      - Optimization Options: 'reference/optimization-options.md'
+  - 'Community':
+      - 'community/index.md'
