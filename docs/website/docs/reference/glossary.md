@@ -31,10 +31,10 @@ GPU backends.
 
 ## SPIR-V
 
-[SPIR-V](https://www.khronos.org/spir/) kernel language for expressing
-parallel computation typically used for accelerators. It serves as
-a hardware agnostic assembly format for distributing complex,
-computationally complex programs. It is the preferred method for
+[SPIR-V](https://www.khronos.org/spir/) is a shader and kernel intermediate
+language for expressing parallel computation typically used for GPUs. It serves
+as a hardware agnostic assembly format for distributing complex,
+computationally intensive programs. It is the preferred method for
 shipping platform agnostic binaries to run on GPUs.
 
 ## TOSA
