@@ -110,69 +110,6 @@ struct FoldAffineMinOverDistributedLoopInductionVariable final
   }
 };
 
-/// Folds `affine.apply` ops over induction variables that actually can only
-/// take one single value.
-//
-// TODO: This should be removed and use the above pattern. But for some reason
-// the above pattern does not handle a specific corner case:
-//
-// ```mlir
-// scf.for %iv = %c0 to %c4 step %c4 {
-//   %0 = affine.min affine_map<(d0, d1)[] -> (4, d1 - d0)> (%iv, %c4)
-// ```
-//
-// The above will be folded into
-//
-// ```mlir
-// scf.for %iv = %c0 to %c4 step %c4 {
-//   %0 = affine.apply affine_map<(d0) -> (-d0 + 4)>(%iv)
-// ```
-//
-// But we would expect `%0` to be `%c4` entirely. It looks like a bug. So use
-// the following specific pattern to stop gap for now.
-struct FoldAffineApplyOverSingleValueInductionVariable final
-    : public OpRewritePattern<AffineApplyOp> {
-  using OpRewritePattern::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(AffineApplyOp applyOp,
-                                PatternRewriter &rewriter) const override {
-    for (auto indexedOperand : llvm::enumerate(applyOp.getMapOperands())) {
-      Value iv = indexedOperand.value();
-      scf::ForOp forOp = scf::getForInductionVarOwner(iv);
-      if (!forOp) continue;
-
-      auto loopInfo = isTiledAndDistributedLoop(forOp);
-      if (!loopInfo) continue;
-      LLVM_DEBUG(llvm::dbgs() << *loopInfo);
-
-      auto lbAttr = loopInfo->untiledLowerBound.dyn_cast<Attribute>();
-      auto ubAttr = loopInfo->untiledUpperBound.dyn_cast<Attribute>();
-      auto stepAttr = loopInfo->untiledStep.dyn_cast<Attribute>();
-      auto tileSize = loopInfo->tileSize;
-      if (!lbAttr || !ubAttr || !stepAttr || !tileSize) continue;
-
-      int lb = lbAttr.cast<IntegerAttr>().getInt();
-      int ub = ubAttr.cast<IntegerAttr>().getInt();
-      int step = stepAttr.cast<IntegerAttr>().getInt();
-
-      // For IREE right now the original untiled loop should have lower bound of
-      // 1 and step 1. Then we tile to processors with each processor handling
-      // `tileSize`.
-      if (lb == 0 && step == 1 && lb < ub && *tileSize == ub) {
-        // This is just tiling the whole workload into one tile.
-        auto operands = llvm::to_vector<4>(applyOp.getMapOperands());
-        operands[indexedOperand.index()] =
-            getAsValue(loopInfo->untiledLowerBound, rewriter, iv.getLoc());
-        rewriter.replaceOpWithNewOp<AffineMinOp>(
-            applyOp, applyOp.getAffineMap(), operands);
-        return success();
-      }
-    }
-
-    return failure();
-  }
-};
-
 struct FoldAffineMinInDistributedLoopsPass final
     : public FoldAffineMinInDistributedLoopsBase<
           FoldAffineMinInDistributedLoopsPass> {
@@ -181,9 +118,10 @@ struct FoldAffineMinInDistributedLoopsPass final
     populateFoldAffineMinInDistributedLoopsPatterns(patterns);
     if (failed(applyPatternsAndFoldGreedily(getOperation(),
                                             std::move(patterns)))) {
-      // TODO(#4759): Terrifyingly, this fails. Errors here were ignored for a
-      // long time and now tests for this pass actually fail if we propagate the
-      // failure correctly. Fix this.
+      // TODO(#4759): This does not converge after the max number of iterations.
+      // It indicates that some pattern upstream is generating ops even when the
+      // pattern failed to match. Not related to correctness, but would be good
+      // to figure out and fix.
       // return signalPassFailure();
     }
   }
@@ -192,8 +130,7 @@ struct FoldAffineMinInDistributedLoopsPass final
 
 void populateFoldAffineMinInDistributedLoopsPatterns(
     RewritePatternSet &patterns) {
-  patterns.add<FoldAffineMinOverDistributedLoopInductionVariable,
-               FoldAffineApplyOverSingleValueInductionVariable>(
+  patterns.add<FoldAffineMinOverDistributedLoopInductionVariable>(
       patterns.getContext());
 }
 
