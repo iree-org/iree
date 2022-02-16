@@ -1,4 +1,5 @@
-// RUN: iree-opt -split-input-file -pass-pipeline='hal.executable(hal.executable.variant(iree-codegen-linalg-to-nvvm-pipeline))' %s | FileCheck %s
+// RUN: iree-opt -split-input-file -pass-pipeline='hal.executable(hal.executable.variant(iree-codegen-linalg-to-nvvm-pipeline))' -iree-codegen-cuda-pipeline-depth=1 %s | FileCheck %s
+// RUN: iree-opt -split-input-file -pass-pipeline='hal.executable(hal.executable.variant(iree-codegen-linalg-to-nvvm-pipeline))' -iree-codegen-cuda-pipeline-depth=4 %s | FileCheck %s -check-prefix=CHECKP
 
 // Verify that a simple element wise op gets lowered succefully all the way to
 // nvvm/llvm dialect.
@@ -447,9 +448,6 @@ hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
 
 // -----
 
-#map0 = affine_map<()[s0, s1] -> (s0 * s1)>
-#map1 = affine_map<(d0)[s0] -> (s0, -d0 + 1024)>
-#map2 = affine_map<(d0)[s0] -> (-d0 + 1024, s0)>
 #executable_layout = #hal.executable.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
@@ -458,70 +456,104 @@ hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
   ]>
 ]>
 hal.executable @mma_fused {
-  hal.executable.variant @cuda, target = #hal.executable.target<"cuda", "cuda-nvptx-fb", {target_arch = "sm_80"}> {
-    hal.executable.entry_point @mma_fused layout(#executable_layout)
-    builtin.module {
-      func @mma_fused() {
-        %cst = arith.constant 0.000000e+00 : f32
-        %c0 = arith.constant 0 : index
-        %c1024 = arith.constant 1024 : index
-        %c1 = arith.constant 1 : index
-        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<readonly:1024x1024xf32>
-        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : !flow.dispatch.tensor<readonly:1024x1024xf32>
-        %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : !flow.dispatch.tensor<writeonly:1024x1024xf32>
-        %workgroup_size_x = hal.interface.workgroup.size[0] : index
-        %workgroup_size_y = hal.interface.workgroup.size[1] : index
-        %workgroup_id_x = hal.interface.workgroup.id[0] : index
-        %workgroup_count_x = hal.interface.workgroup.count[0] : index
-        %workgroup_id_y = hal.interface.workgroup.id[1] : index
-        %workgroup_count_y = hal.interface.workgroup.count[1] : index
-        %3 = affine.apply #map0()[%workgroup_id_y, %workgroup_size_y]
-        %4 = affine.apply #map0()[%workgroup_count_y, %workgroup_size_y]
-        scf.for %arg0 = %3 to %c1024 step %4 {
-          %5 = affine.apply #map0()[%workgroup_id_x, %workgroup_size_x]
-          %6 = affine.apply #map0()[%workgroup_count_x, %workgroup_size_x]
-          scf.for %arg1 = %5 to %c1024 step %6 {
-            %7 = affine.min #map1(%arg0)[%workgroup_size_y]
-            %8 = flow.dispatch.tensor.load %0, offsets = [%arg0, %c0], sizes = [%7, %c1024], strides = [%c1, %c1] : !flow.dispatch.tensor<readonly:1024x1024xf32> -> tensor<?x1024xf32>
-            %9 = affine.min #map1(%arg1)[%workgroup_size_x]
-            %10 = flow.dispatch.tensor.load %1, offsets = [%c0, %arg1], sizes = [%c1024, %9], strides = [%c1, %c1] : !flow.dispatch.tensor<readonly:1024x1024xf32> -> tensor<1024x?xf32>
-            %11 = affine.min #map1(%arg0)[%workgroup_size_y]
-            %12 = affine.min #map1(%arg1)[%workgroup_size_x]
-            %13 = affine.min #map2(%arg0)[%workgroup_size_y]
-            %14 = affine.min #map2(%arg1)[%workgroup_size_x]
-            %15 = linalg.init_tensor [%13, %14] : tensor<?x?xf32>
-            %16 = linalg.fill(%cst, %15) : f32, tensor<?x?xf32> -> tensor<?x?xf32>
-            %17 = linalg.matmul ins(%8, %10 : tensor<?x1024xf32>, tensor<1024x?xf32>) outs(%16 : tensor<?x?xf32>) -> tensor<?x?xf32>
-            %18 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>],
-              iterator_types = ["parallel", "parallel"]} ins(%17, %17 : tensor<?x?xf32>, tensor<?x?xf32>) outs(%17 : tensor<?x?xf32>) {
+  hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb", {target_arch = "sm_80"}> {
+  hal.executable.entry_point public @_large_aligned_dispatch_0 ordinal(0) layout(#hal.executable.layout<push_constants = 0, sets = [#hal.descriptor_set.layout<0, bindings = [#hal.descriptor_set.binding<0, storage_buffer>, #hal.descriptor_set.binding<1, storage_buffer>, #hal.descriptor_set.binding<2, storage_buffer>]>]>)
+  builtin.module {
+    func @_large_aligned_dispatch_0() {
+      %c0 = arith.constant 0 : index
+      %cst = arith.constant 0.000000e+00 : f32
+      %c2048 = arith.constant 2048 : index
+      %c512 = arith.constant 512 : index
+      %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(32) : memref<2048x1024xf32>
+      memref.assume_alignment %0, 32 : memref<2048x1024xf32>
+      %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(32) : memref<1024x512xf32>
+      memref.assume_alignment %1, 32 : memref<1024x512xf32>
+      %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) offset(%c0) alignment(32) : memref<2048x512xf32>
+      memref.assume_alignment %2, 32 : memref<2048x512xf32>
+      %workgroup_size_x = hal.interface.workgroup.size[0] : index
+      %workgroup_size_y = hal.interface.workgroup.size[1] : index
+      %workgroup_id_x = hal.interface.workgroup.id[0] : index
+      %workgroup_count_x = hal.interface.workgroup.count[0] : index
+      %workgroup_id_y = hal.interface.workgroup.id[1] : index
+      %workgroup_count_y = hal.interface.workgroup.count[1] : index
+      %3 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_id_y, %workgroup_size_y]
+      %4 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_count_y, %workgroup_size_y]
+      scf.for %arg0 = %3 to %c2048 step %4 {
+        %5 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_id_x, %workgroup_size_x]
+        %6 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_count_x, %workgroup_size_x]
+        scf.for %arg1 = %5 to %c512 step %6 {
+          %7 = affine.min affine_map<(d0)[s0] -> (s0, -d0 + 2048)>(%arg0)[%workgroup_size_y]
+          %8 = memref.subview %0[%arg0, 0] [%7, 1024] [1, 1] : memref<2048x1024xf32> to memref<?x1024xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
+          %9 = affine.min affine_map<(d0)[s0] -> (s0, -d0 + 512)>(%arg1)[%workgroup_size_x]
+          %10 = memref.subview %1[0, %arg1] [1024, %9] [1, 1] : memref<1024x512xf32> to memref<1024x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 512 + s0 + d1)>>
+          %11 = memref.subview %2[%arg0, %arg1] [%7, %9] [1, 1] : memref<2048x512xf32> to memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 512 + s0 + d1)>>
+          linalg.fill(%cst, %11) : f32, memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 512 + s0 + d1)>> 
+          linalg.matmul ins(%8, %10 : memref<?x1024xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>, memref<1024x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 512 + s0 + d1)>>) outs(%11 : memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 512 + s0 + d1)>>)
+          linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>],
+              iterator_types = ["parallel", "parallel"]} ins(%11, %11 : memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 512 + s0 + d1)>>, memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 512 + s0 + d1)>>) outs(%11 : memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 512 + s0 + d1)>>) {
             ^bb0(%arg3: f32, %arg4: f32, %arg5: f32):  // no predecessors
               %19 = arith.addf %arg3, %arg4 : f32
              linalg.yield %19 : f32
-            } -> tensor<?x?xf32>
-            flow.dispatch.tensor.store %18, %2, offsets = [%arg0, %arg1], sizes = [%11, %12], strides = [%c1, %c1] : tensor<?x?xf32> -> !flow.dispatch.tensor<writeonly:1024x1024xf32>
-          }
+            }     
         }
-        return
       }
+      return
     }
   }
+}
 }
 
 //     CHECK-LABEL: hal.executable public @mma_fused
 //           CHECK:   hal.executable.variant public @cuda
 //       CHECK-NOT:   llvm.store
-//   CHECK-COUNT-2:   llvm.load {{.*}} : !llvm.ptr<vector<4xf32>>
+//   CHECK-COUNT-2:   nvvm.cp.async.shared.global {{.*}}, {{.*}}, 16
+//           CHECK:   nvvm.cp.async.commit.group
 //           CHECK:   llvm.br
-//   CHECK-COUNT-2:   llvm.store {{.*}} : !llvm.ptr<vector<4xf32>, 3>
+//           CHECK:   nvvm.cp.async.wait.group 0
 //   CHECK-COUNT-4:   nvvm.wmma.load{{.*}} : (!llvm.ptr<f32, 3>) -> !llvm.struct<(i32, i32, i32, i32)
 //   CHECK-COUNT-2:   nvvm.wmma.mma
-//   CHECK-COUNT-2:   llvm.load {{.*}} : !llvm.ptr<vector<4xf32>>
+//   CHECK-COUNT-2:   nvvm.cp.async.shared.global {{.*}}, {{.*}}, 16
+//           CHECK:   nvvm.cp.async.commit.group
 //           CHECK:   llvm.br
-//   CHECK-COUNT-2:   llvm.store {{.*}} : !llvm.ptr<vector<4xf32>, 3>
+//           CHECK:   nvvm.cp.async.wait.group 0
 //   CHECK-COUNT-4:   nvvm.wmma.load{{.*}} : (!llvm.ptr<f32, 3>) -> !llvm.struct<(i32, i32, i32, i32)
 //   CHECK-COUNT-2:   nvvm.wmma.mma
 //   CHECK-COUNT-8:   llvm.fadd
 //   CHECK-COUNT-1:   nvvm.wmma.store {{.*}} : !llvm.ptr<f32>, f32, f32, f32, f32, f32, f32, f32, f32
+
+// case with larger pipeline depth
+//     CHECKP-LABEL: hal.executable public @mma_fused
+//           CHECKP:   hal.executable.variant public @cuda
+//       CHECKP-NOT:   llvm.store
+//   CHECKP-COUNT-2:   nvvm.cp.async.shared.global {{.*}}, {{.*}}, 16
+//           CHECKP:   nvvm.cp.async.commit.group
+//   CHECKP-COUNT-2:   nvvm.cp.async.shared.global {{.*}}, {{.*}}, 16
+//           CHECKP:   nvvm.cp.async.commit.group
+//   CHECKP-COUNT-2:   nvvm.cp.async.shared.global {{.*}}, {{.*}}, 16
+//           CHECKP:   nvvm.cp.async.commit.group
+//   CHECKP-COUNT-2:   nvvm.cp.async.shared.global {{.*}}, {{.*}}, 16
+//           CHECKP:   nvvm.cp.async.commit.group
+//           CHECKP:   llvm.br
+//           CHECKP:   nvvm.cp.async.wait.group 3
+//   CHECKP-COUNT-4:   nvvm.wmma.load{{.*}} : (!llvm.ptr<f32, 3>) -> !llvm.struct<(i32, i32, i32, i32)
+//   CHECKP-COUNT-2:   nvvm.wmma.mma
+//   CHECKP-COUNT-2:   nvvm.cp.async.shared.global {{.*}}, {{.*}}, 16
+//           CHECKP:   nvvm.cp.async.commit.group
+//           CHECKP:   llvm.br
+//           CHECKP:   nvvm.cp.async.wait.group 3
+//   CHECKP-COUNT-4:   nvvm.wmma.load{{.*}} : (!llvm.ptr<f32, 3>) -> !llvm.struct<(i32, i32, i32, i32)
+//   CHECKP-COUNT-2:   nvvm.wmma.mma
+//           CHECKP:   nvvm.cp.async.wait.group 2
+//   CHECKP-COUNT-4:   nvvm.wmma.load{{.*}} : (!llvm.ptr<f32, 3>) -> !llvm.struct<(i32, i32, i32, i32)
+//   CHECKP-COUNT-2:   nvvm.wmma.mma
+//           CHECKP:   nvvm.cp.async.wait.group 1
+//   CHECKP-COUNT-4:   nvvm.wmma.load{{.*}} : (!llvm.ptr<f32, 3>) -> !llvm.struct<(i32, i32, i32, i32)
+//   CHECKP-COUNT-2:   nvvm.wmma.mma
+//           CHECKP:   nvvm.cp.async.wait.group 0
+//   CHECKP-COUNT-4:   nvvm.wmma.load{{.*}} : (!llvm.ptr<f32, 3>) -> !llvm.struct<(i32, i32, i32, i32)
+//   CHECKP-COUNT-2:   nvvm.wmma.mma
+//   CHECKP-COUNT-8:   llvm.fadd
+//   CHECKP-COUNT-1:   nvvm.wmma.store {{.*}} : !llvm.ptr<f32>, f32, f32, f32, f32, f32, f32, f32, f32
 
 // -----
 
@@ -594,14 +626,49 @@ hal.executable @mma_fused {
 //     CHECK-LABEL: hal.executable public @large_dot_general_dispatch_0
 //           CHECK:   hal.executable.variant public @cuda
 //       CHECK-NOT:   llvm.store
-//   CHECK-COUNT-2:   llvm.load {{.*}} : !llvm.ptr<vector<4xf32>>
+//   CHECK-COUNT-2:   nvvm.cp.async.shared.global {{.*}}, {{.*}}, 16
+//           CHECK:   nvvm.cp.async.commit.group
 //           CHECK:   llvm.br
-//   CHECK-COUNT-2:   llvm.store {{.*}} : !llvm.ptr<vector<4xf32>, 3>
+//           CHECK:   nvvm.cp.async.wait.group 0
 //   CHECK-COUNT-4:   nvvm.wmma.load{{.*}} : (!llvm.ptr<f32, 3>) -> !llvm.struct<(i32, i32, i32, i32)
 //   CHECK-COUNT-2:   nvvm.wmma.mma
-//   CHECK-COUNT-2:   llvm.load {{.*}} : !llvm.ptr<vector<4xf32>>
+//   CHECK-COUNT-2:   nvvm.cp.async.shared.global {{.*}}, {{.*}}, 16
+//           CHECK:   nvvm.cp.async.commit.group
 //           CHECK:   llvm.br
-//   CHECK-COUNT-2:   llvm.store {{.*}} : !llvm.ptr<vector<4xf32>, 3>
+//           CHECK:   nvvm.cp.async.wait.group 0
 //   CHECK-COUNT-4:   nvvm.wmma.load{{.*}} : (!llvm.ptr<f32, 3>) -> !llvm.struct<(i32, i32, i32, i32)
 //   CHECK-COUNT-2:   nvvm.wmma.mma
 //   CHECK-COUNT-1:   nvvm.wmma.store {{.*}} : !llvm.ptr<f32>, f32, f32, f32, f32, f32, f32, f32, f32
+
+// case with larger pipeline depth
+//     CHECKP-LABEL: hal.executable public @large_dot_general_dispatch_0
+//           CHECKP:   hal.executable.variant public @cuda
+//       CHECKP-NOT:   llvm.store
+//   CHECKP-COUNT-2:   nvvm.cp.async.shared.global {{.*}}, {{.*}}, 16
+//           CHECKP:   nvvm.cp.async.commit.group
+//   CHECKP-COUNT-2:   nvvm.cp.async.shared.global {{.*}}, {{.*}}, 16
+//           CHECKP:   nvvm.cp.async.commit.group
+//   CHECKP-COUNT-2:   nvvm.cp.async.shared.global {{.*}}, {{.*}}, 16
+//           CHECKP:   nvvm.cp.async.commit.group
+//   CHECKP-COUNT-2:   nvvm.cp.async.shared.global {{.*}}, {{.*}}, 16
+//           CHECKP:   nvvm.cp.async.commit.group
+//           CHECKP:   llvm.br
+//           CHECKP:   nvvm.cp.async.wait.group 3
+//   CHECKP-COUNT-4:   nvvm.wmma.load{{.*}} : (!llvm.ptr<f32, 3>) -> !llvm.struct<(i32, i32, i32, i32)
+//   CHECKP-COUNT-2:   nvvm.wmma.mma
+//   CHECKP-COUNT-2:   nvvm.cp.async.shared.global {{.*}}, {{.*}}, 16
+//           CHECKP:   nvvm.cp.async.commit.group
+//           CHECKP:   llvm.br
+//           CHECKP:   nvvm.cp.async.wait.group 3
+//   CHECKP-COUNT-4:   nvvm.wmma.load{{.*}} : (!llvm.ptr<f32, 3>) -> !llvm.struct<(i32, i32, i32, i32)
+//   CHECKP-COUNT-2:   nvvm.wmma.mma
+//           CHECKP:   nvvm.cp.async.wait.group 2
+//   CHECKP-COUNT-4:   nvvm.wmma.load{{.*}} : (!llvm.ptr<f32, 3>) -> !llvm.struct<(i32, i32, i32, i32)
+//   CHECKP-COUNT-2:   nvvm.wmma.mma
+//           CHECKP:   nvvm.cp.async.wait.group 1
+//   CHECKP-COUNT-4:   nvvm.wmma.load{{.*}} : (!llvm.ptr<f32, 3>) -> !llvm.struct<(i32, i32, i32, i32)
+//   CHECKP-COUNT-2:   nvvm.wmma.mma
+//           CHECKP:   nvvm.cp.async.wait.group 0
+//   CHECKP-COUNT-4:   nvvm.wmma.load{{.*}} : (!llvm.ptr<f32, 3>) -> !llvm.struct<(i32, i32, i32, i32)
+//   CHECKP-COUNT-2:   nvvm.wmma.mma
+//   CHECKP-COUNT-1:   nvvm.wmma.store {{.*}} : !llvm.ptr<f32>, f32, f32, f32, f32, f32, f32, f32, f32

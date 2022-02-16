@@ -51,6 +51,10 @@ struct ConvertToNVVMPass : public ConvertToNVVMBase<ConvertToNVVMPass> {
     converter.addConversion([&](gpu::MMAMatrixType type) -> Type {
       return convertMMAToLLVMType(type);
     });
+    // Convert dummy tokens.
+    converter.addConversion([&](gpu::DeviceAsyncTokenType type) -> Type {
+      return converter.convertType(IntegerType::get(type.getContext(), 32));
+    });
     // Apply in-dialect lowering first. In-dialect lowering will replace ops
     // which need to be lowered further, which is not supported by a single
     // conversion pass.

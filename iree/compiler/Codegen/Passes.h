@@ -295,7 +295,15 @@ std::unique_ptr<OperationPass<FuncOp>>
 createLLVMGPUDistributeSharedMemoryCopy();
 
 /// Apply software pipelining.
-std::unique_ptr<OperationPass<FuncOp>> createLLVMGPUPipeliningPass();
+std::unique_ptr<OperationPass<FuncOp>> createLLVMGPUPipeliningPass(
+    unsigned depth = 1);
+
+/// Apply multi-buffering transformation.
+std::unique_ptr<OperationPass<FuncOp>> createLLVMGPUMultiBuffering(
+    unsigned numBuffers = 5);
+
+/// Converts vector ops to gpu dialect.
+std::unique_ptr<OperationPass<FuncOp>> createLLVMGPUVectorToGPU();
 
 //------------------------------------------------------------------------------
 // SPIR-V Passes

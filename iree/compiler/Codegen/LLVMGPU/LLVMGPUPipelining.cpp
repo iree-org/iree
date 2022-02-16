@@ -7,6 +7,7 @@
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
+#include "mlir/Dialect/GPU/GPUDialect.h"
 #include "mlir/Dialect/GPU/Passes.h"
 #include "mlir/Dialect/SCF/Transforms.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
@@ -35,8 +36,9 @@ static void addDepOps(llvm::SmallDenseSet<Operation*>& dep, Operation* op,
 
 /// Assign stages to the loop ops. Simple logic for now, put load from global
 /// memory in stage 0 and the rest in stage 1.
-static void getPipelineStages(
-    scf::ForOp forOp, std::vector<std::pair<Operation*, unsigned>>& ops) {
+static void getPipelineStages(scf::ForOp forOp,
+                              std::vector<std::pair<Operation*, unsigned>>& ops,
+                              unsigned depth) {
   if (!forOp->hasAttr(kPipeliningLoopMarker)) return;
 
   // Track dependencies of the global memory load.
@@ -48,20 +50,42 @@ static void getPipelineStages(
   }
   // Create a modulo schedule with loads from global memory and the operations
   // it depends on in stage 0. Store to shared memory and computation are in
-  // stage 1. In order to have a correct scheduling even with back edges we
-  // order stages in decreasing order.
+  // stage `maxDepth`. In order to have a correct scheduling even with back
+  // edges we order stages in decreasing order.
   for (Operation& op : forOp.getBody()->getOperations()) {
     if (!loadDep.count(&op) && !isa<scf::YieldOp>(op))
-      ops.push_back(std::make_pair(&op, 1));
+      ops.push_back(std::make_pair(&op, depth));
   }
   for (Operation& op : forOp.getBody()->getOperations()) {
     if (loadDep.count(&op)) ops.push_back(std::make_pair(&op, 0));
   }
 }
 
+static void setAsyncAnnotations(Operation* op,
+                                scf::PipeliningOption::PipelinerPart part,
+                                unsigned iteration, unsigned depth) {
+  auto waitOp = dyn_cast<gpu::DeviceAsyncWaitOp>(op);
+  if (!waitOp || waitOp.numGroups()) return;
+  int numGroupInFlight = 0;
+  if (part == scf::PipeliningOption::PipelinerPart::Kernel) {
+    numGroupInFlight = depth - 1;
+  } else {
+    // By construction there should be no wait op in the prologue as all the
+    // wait should be in the last stage.
+    assert(part == scf::PipeliningOption::PipelinerPart::Epilogue);
+    // Based on the schedule we pick we know how many groups are in flight for
+    // each iteration of the epilogue.
+    numGroupInFlight = depth - 1 - iteration;
+  }
+  OpBuilder b(op);
+  waitOp->setAttr(waitOp.numGroupsAttrName(),
+                  b.getI32IntegerAttr(numGroupInFlight));
+}
+
 namespace {
 struct LLVMGPUPipeliningPass
     : public LLVMGPUPipeliningBase<LLVMGPUPipeliningPass> {
+  LLVMGPUPipeliningPass(unsigned depth) : depth(depth) {}
   void runOnOperation() override {
     auto funcOp = getOperation();
     MLIRContext* context = &getContext();
@@ -69,9 +93,23 @@ struct LLVMGPUPipeliningPass
     funcOp.walk([](scf::ForOp forOp) {
       bool copyToWorkgroupMemory = false;
       OpBuilder builder(forOp.getContext());
+      SmallVector<Operation*> barriers;
       for (Operation& op : forOp.getBody()->getOperations()) {
         // Pipeline the most inner for op that should be a flat region.
         if (op.getNumRegions() > 0) return;
+        if (isa<gpu::BarrierOp>(op)) {
+          barriers.push_back(&op);
+        }
+        if (isa<gpu::DeviceAsyncCopyOp, gpu::DeviceAsyncCreateGroupOp>(op)) {
+          copyToWorkgroupMemory = true;
+          op.setAttr(kPipeliningGlobalLoad, builder.getUnitAttr());
+          // async copy ops need to be moved along with previous barrier.
+          for (Operation* barrier : barriers) {
+            barrier->setAttr(kPipeliningGlobalLoad, builder.getUnitAttr());
+          }
+          barriers.clear();
+          continue;
+        }
         auto ld = dyn_cast<vector::TransferReadOp>(op);
         if (!ld) continue;
         unsigned ldAddSpace =
@@ -91,7 +129,19 @@ struct LLVMGPUPipeliningPass
       }
     });
     scf::PipeliningOption options;
-    options.getScheduleFn = getPipelineStages;
+    unsigned maxDepth = depth;
+    auto getSchedule = [maxDepth](
+                           scf::ForOp forOp,
+                           std::vector<std::pair<Operation*, unsigned>>& ops) {
+      return getPipelineStages(forOp, ops, maxDepth);
+    };
+    auto setAnnotation = [maxDepth](Operation* op,
+                                    scf::PipeliningOption::PipelinerPart part,
+                                    unsigned iteration) {
+      return setAsyncAnnotations(op, part, iteration, maxDepth);
+    };
+    options.getScheduleFn = getSchedule;
+    options.annotateFn = setAnnotation;
     RewritePatternSet pipeliningPatterns(context);
     scf::populateSCFLoopPipeliningPatterns(pipeliningPatterns, options);
     if (failed(applyPatternsAndFoldGreedily(funcOp,
@@ -99,11 +149,15 @@ struct LLVMGPUPipeliningPass
       return signalPassFailure();
     }
   }
+
+ private:
+  unsigned depth;
 };
 }  // namespace
 
-std::unique_ptr<OperationPass<FuncOp>> createLLVMGPUPipeliningPass() {
-  return std::make_unique<LLVMGPUPipeliningPass>();
+std::unique_ptr<OperationPass<FuncOp>> createLLVMGPUPipeliningPass(
+    unsigned depth) {
+  return std::make_unique<LLVMGPUPipeliningPass>(depth);
 }
 
 }  // namespace iree_compiler
