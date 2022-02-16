@@ -348,14 +348,12 @@ static iree_status_t iree_hal_cuda_graph_command_buffer_update_buffer(
 
   CUdeviceptr target_device_buffer = iree_hal_cuda_buffer_device_pointer(
       iree_hal_buffer_allocated_buffer(target_buffer));
-  CUdeviceptr dst = target_device_buffer +
-                    iree_hal_buffer_byte_offset(target_buffer) + target_offset;
   CUDA_MEMCPY3D params = {
       .srcMemoryType = CU_MEMORYTYPE_HOST,
       .srcHost = storage,
       .dstMemoryType = CU_MEMORYTYPE_DEVICE,
       .dstDevice = target_device_buffer,
-      .dstXInBytes = target_offset,
+      .dstXInBytes = iree_hal_buffer_byte_offset(target_buffer) + target_offset,
       .WidthInBytes = length,
       .Height = 1,
       .Depth = 1,
