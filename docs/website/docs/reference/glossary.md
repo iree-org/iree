@@ -23,10 +23,10 @@ For general discussion on MLIR see the project's
 ## LinAlg
 
 [Linalg](https://mlir.llvm.org/docs/Dialects/Linalg/) is an MLIR dialect
-that defines how Linalg Algebra operations can be described in a
-generalized fashion, including a set of commonly used linear algebra
-operations. IREE's codegen defines tensor operations using the Linalg
-dialect, and is used to generate the loop structures for the CPU and
+that defines how Linear Algebra operations can be described in a
+generalized fashion, including a set of commonly used operations.
+IREE's code generation defines tensor operations using the Linalg
+dialect, then uses it to generate the loop structures for the CPU and
 GPU backends.
 
 ## SPIR-V
