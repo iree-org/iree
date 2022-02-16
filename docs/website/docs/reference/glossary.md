@@ -39,18 +39,17 @@ shipping platform agnostic binaries to run on GPUs.
 
 ## TOSA
 
-[TOSA](https://developer.mlplatform.org/w/tosa/) defines a set of common
-tensor operations to most machine learning frameworks. TOSA's defines
-a simple intermediate representation for ingesting ML models. This simplifies
-model compilation by targetting multiple front-end languages to TOSA's
-intermediate IR which guarantees efficient execution across multiple device
-types.
+The [TOSA](https://developer.mlplatform.org/w/tosa/) specification defines a
+set of common tensor operations to most machine learning frameworks.
+This simplifies model compilation as separate front-end frameworks can target
+TOSA's intermediate representation without compromising on the ability to
+achieve efficient execution across multiple device types.
 
-IREE uses TOSA as a prioritized ingestion dialect, transforming multiple
-ML-platform ingestion formats into a TOSA compatible set of operations.
-Changes to the TOSA specification require submitting a proposal on
-TOSA's platform development
-[page](https://developer.mlplatform.org/w/tosa/#:~:text=Specification%20Contributions)
+IREE uses the TOSA MLIR dialect as a prioritized ingestion format, transforming
+multiple ML-platform ingestion formats into a TOSA compatible set of operations.
+
+Changes to the TOSA specification require submitting a proposal on TOSA's
+[platform development page](https://developer.mlplatform.org/w/tosa/#:~:text=Specification%20Contributions)
 
 ## TFLite
 
