@@ -149,6 +149,10 @@ void addIREEComprehensiveBufferizePasses(
   passManager.addPass(memref::createResolveShapedTypeResultDimsPass());
   passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
   passManager.addNestedPass<FuncOp>(createCSEPass());
+  // There are redundant memcpy (with linalg.generic form) ops created, which
+  // can be deleted by canonicalizer. We have to run it again because the
+  // memrefs are unified in CSE pass, so we can truely remove redundant memcpy.
+  passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
   passManager.addNestedPass<FuncOp>(createCleanupBufferAllocViewPass());
 }
 
