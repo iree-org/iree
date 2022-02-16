@@ -54,6 +54,7 @@ cc_library(
         "TypePropagationPass.cpp",
         "VectorizeConv.cpp",
         "VectorizeMMT4d.cpp",
+        "VectorizePad.cpp",
     ],
     hdrs = [
         "BufferizationAnalysis.h",

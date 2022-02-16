@@ -46,6 +46,7 @@ iree_cc_library(
     "TypePropagationPass.cpp"
     "VectorizeConv.cpp"
     "VectorizeMMT4d.cpp"
+    "VectorizePad.cpp"
   DEPS
     IREELinalgExtDialect
     IREELinalgExtPasses

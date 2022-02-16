@@ -37,6 +37,7 @@ iree_lit_test_suite(
             "type_propagation.mlir",
             "vectorize_linalg_conv.mlir",
             "vectorize_linalg_mmt4d.mlir",
+            "vectorize_tensor_pad.mlir",
         ],
         include = ["*.mlir"],
     ),
