@@ -92,7 +92,7 @@ static LogicalResult verifyEntryPoint(
         return verifyLoweringConfiguration(moduleOp, translationInfo,
                                            workgroupSizes,
                                            verifyGPUMatmulTensorCorePipeline);
-      break;
+        break;
       default:;
     }
   }

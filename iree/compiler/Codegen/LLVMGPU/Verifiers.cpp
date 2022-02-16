@@ -1,19 +1,13 @@
-#include "iree-dialects/Dialect/LinalgExt/Transforms/Passes.h"
+// Copyright 2022 The IREE Authors
+//
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
 #include "iree/compiler/Codegen/LLVMGPU/LLVMGPUUtils.h"
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
-#include "mlir/Conversion/AffineToStandard/AffineToStandard.h"
-#include "mlir/Conversion/GPUToNVVM/GPUToNVVMPass.h"
-#include "mlir/Conversion/SCFToControlFlow/SCFToControlFlow.h"
-#include "mlir/Conversion/VectorToGPU/VectorToGPU.h"
-#include "mlir/Dialect/Arithmetic/Transforms/Passes.h"
 #include "mlir/Dialect/Linalg/Passes.h"
-#include "mlir/Dialect/MemRef/Transforms/Passes.h"
-#include "mlir/Dialect/StandardOps/Transforms/Passes.h"
-#include "mlir/Pass/PassManager.h"
-#include "mlir/Pass/PassOptions.h"
-#include "mlir/Pass/PassRegistry.h"
-#include "mlir/Transforms/Passes.h"
 
 namespace mlir {
 namespace iree_compiler {
@@ -38,12 +32,6 @@ LogicalResult verifyGPUMatmulSimtPassPipeline(
   if (totalWorkgroupSize > 1024) {
     return op->emitOpError("expected workgroup size to be <=1024 for ")
            << pipelineName << ", got " << totalWorkgroupSize;
-  }
-
-  // Verify that the workgroup X dimension is 32 aligned
-  if (workgroupSize[0] % 32 != 0) {
-    return op->emitOpError("workgroup size is not 32 aligned for ")
-           << pipelineName << ", got " << workgroupSize[0];
   }
 
   // Verify the workgroup.z component should always be 1
@@ -134,6 +122,21 @@ LogicalResult verifyGPUMatmulTensorCorePipeline(
   // inputs A [M x K] & B [K x N]
   linalg::MatmulOp matmulOp = dyn_cast<linalg::MatmulOp>(op);
   if (matmulOp) {
+    MemRefType type =
+        matmulOp.getInputOperand(0)->get().getType().cast<mlir::MemRefType>();
+    unsigned bytesSize = type.getElementType().getIntOrFloatBitWidth() / 8;
+
+    // Input shape sizes: A [ M x K],  B [ K x N]
+    unsigned totalSharedMemSizeBytes =
+        (firstLevelTileSizes[0] * firstLevelTileSizes[2] +
+         firstLevelTileSizes[1] * firstLevelTileSizes[2]) *
+        bytesSize;
+
+    if (totalSharedMemSizeBytes > kSharedMemSizeBytes) {
+      return op->emitOpError("expected shared memory usage <= 64Kb for ")
+             << pipelineName << ", got " << totalSharedMemSizeBytes;
+    }
+
     ArrayRef<int64_t> lhsShape =
         getUntiledShape(matmulOp.getInputOperand(0)->get());
     ArrayRef<int64_t> rhsShape =
