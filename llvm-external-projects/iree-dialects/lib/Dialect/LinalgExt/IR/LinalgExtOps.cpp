@@ -148,7 +148,8 @@ static LogicalResult verifyScatterOp(ScatterOp op) {
         "index depth and update value does not cover rank of original value");
   }
 
-  // Validate the non-indexed update dims are
+  // Validate the non-indexed update dims covier the full slice size of the
+  // original tensor.
   int64_t fullSliceDims = originalType.getRank() - indexDepth;
   for (auto it :
        llvm::zip(llvm::seq<unsigned>(indexDepth, originalType.getRank()),
