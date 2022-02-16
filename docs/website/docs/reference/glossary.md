@@ -6,9 +6,9 @@ of these projects with the problems they instend to address.
 
 ## JAX
 
-[JAX](https://github.com/google/jax) is a ML front-end for writing and
-executing Machine Learning models, specifically focusing on Google's
-TPUs.
+[JAX](https://github.com/google/jax) is a front-end for writing and
+executing Machine Learning models, including support for Google
+Cloud TPUs.
 
 ## MLIR
 
