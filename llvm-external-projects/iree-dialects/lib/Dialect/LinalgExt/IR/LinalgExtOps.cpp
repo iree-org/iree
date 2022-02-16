@@ -136,20 +136,50 @@ static LogicalResult verifyScatterOp(ScatterOp op) {
         "mismatch in shape of indices and update value at dim#0");
   }
   auto originalType = op.getOriginalType();
-  // indexDepth + update dims should match to original dims. The first dim of
-  // update is the number of updates.
-  if (originalType.getRank() != indexDepth + updateType.getRank() - 1) {
+  if (updateType.getRank() - 1 > originalType.getRank()) {
     return op.emitOpError(
-        "mismatch in rank of update value, index depth and original value");
+        "update value rank exceeds the rank of the original value");
   }
-  for (auto dim : llvm::seq<unsigned>(indexDepth, originalType.getRank())) {
-    // Offset one because the first dim is the number of updates.
-    if (updateType.getDimSize(1 + dim - indexDepth) !=
-        originalType.getDimSize(dim)) {
+
+  // indexDepth + update dims should cover the original dims. The first dim of
+  // update is the number of updates.
+  if (originalType.getRank() > indexDepth + updateType.getRank() - 1) {
+    return op.emitOpError(
+        "index depth and update value does not cover rank of original value");
+  }
+
+  // Validate the non-indexed update dims covier the full slice size of the
+  // original tensor.
+  int64_t fullSliceDims = originalType.getRank() - indexDepth;
+  for (auto it :
+       llvm::zip(llvm::seq<unsigned>(indexDepth, originalType.getRank()),
+                 llvm::seq<unsigned>(updateType.getRank() - fullSliceDims,
+                                     updateType.getRank()))) {
+    int64_t originalDim = std::get<0>(it);
+    int64_t updateDim = std::get<1>(it);
+    if (updateType.getDimSize(updateDim) !=
+        originalType.getDimSize(originalDim)) {
       return op.emitOpError("mismatch in shape of update value dim#")
-             << (1 + dim - indexDepth) << " and original value at dim#" << dim;
+             << updateDim << " and original value at dim#" << originalDim;
     }
   }
+
+  // Check that the remaining update indices do not exceed the update length.
+  int64_t insertDims = originalType.getRank() - updateType.getRank() + 1;
+  for (auto it : llvm::zip(
+           llvm::seq<unsigned>(insertDims, indexDepth),
+           llvm::seq<unsigned>(1, updateType.getRank() - fullSliceDims))) {
+    int64_t originalDim = std::get<0>(it);
+    int64_t updateDim = std::get<1>(it);
+    if (updateType.getDimSize(updateDim) >
+        originalType.getDimSize(originalDim)) {
+      return op.emitOpError("indexed shape of update value dim#")
+             << updateDim << " exceeds original value at dim#" << originalDim
+             << " " << updateType.getDimSize(updateDim) << " "
+             << originalType.getDimSize(originalDim);
+    }
+  }
+
   Region &region = op.region();
   Block *body = &region.front();
   if (body->getNumArguments() != 2) {
@@ -279,12 +309,26 @@ LogicalResult ScatterOp::generateScalarImplementation(OpBuilder &b,
   SmallVector<Value> loadIndices;
   loadIndices.push_back(ivs.front());
   loadIndices.push_back(Value());
+
+  // Populate with empty values.
+  auto originalTy = original().getType().cast<ShapedType>();
+  starts.resize(originalTy.getRank(), Value());
+  auto updateIvs = ivs.drop_front(1);
+
+  int64_t offset = starts.size() - updateIvs.size();
+  for (auto it : llvm::enumerate(updateIvs)) {
+    starts[it.index() + offset] = it.value();
+  }
+
   for (auto i : llvm::seq<unsigned>(0, indexDepth)) {
     loadIndices.back() = b.create<arith::ConstantIndexOp>(loc, i);
     Value idx = b.create<memref::LoadOp>(loc, indices(), loadIndices);
-    starts.push_back(b.create<arith::IndexCastOp>(loc, b.getIndexType(), idx));
+    Value cast = b.create<arith::IndexCastOp>(loc, b.getIndexType(), idx);
+
+    if (starts[i]) cast = b.create<arith::AddIOp>(loc, cast, starts[i]);
+    starts[i] = cast;
   }
-  starts.append(std::next(ivs.begin()), ivs.end());
+
   Value init = b.create<memref::LoadOp>(loc, original(), starts);
 
   BlockAndValueMapping bvm;

@@ -199,11 +199,11 @@ func @scatter_dim_mismatch(
 // -----
 
 func @scatter_dim_mismatch(
-    %update : tensor<?x?x?xf32>, %indices : tensor<?x1xi32>,
+    %update : tensor<?x?x?x?xf32>, %indices : tensor<?x1xi32>,
     %original : tensor<?x?xf32>) -> tensor<?x?xf32> {
-  // expected-error @+1 {{mismatch in rank of update value, index depth and original value}}
+  // expected-error @+1 {{op update value rank exceeds the rank of the original value}}
   %0 = iree_linalg_ext.scatter
-    ins(%update, %indices : tensor<?x?x?xf32>, tensor<?x1xi32>)
+    ins(%update, %indices : tensor<?x?x?x?xf32>, tensor<?x1xi32>)
     outs(%original : tensor<?x?xf32>) {
     ^bb0(%arg1: f32, %arg2: f32):
       %1 = arith.addf %arg1, %arg2 : f32
@@ -367,11 +367,11 @@ func @scatter_index_depth_dynamic(
 // -----
 
 func @scatter_original_rank_mismatch(
-    %update : tensor<?x?xi64>, %indices : tensor<?x2xi32>,
+    %update : tensor<?xi64>, %indices : tensor<?x1xi32>,
     %original : tensor<?x?xi64>) -> tensor<?x?xi64> {
-  // expected-error @+1 {{mismatch in rank of update value, index depth and original value}}
+  // expected-error @+1 {{op index depth and update value does not cover rank of original value}}
   %0 = iree_linalg_ext.scatter
-    ins(%update, %indices : tensor<?x?xi64>, tensor<?x2xi32>)
+    ins(%update, %indices : tensor<?xi64>, tensor<?x1xi32>)
     outs(%original : tensor<?x?xi64>) {
     ^bb0(%arg1: i64, %arg2: i64):
       %1 = arith.addi %arg1, %arg2 : i64
