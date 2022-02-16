@@ -128,6 +128,49 @@ class command_buffer_test : public CtsTestBase {
     return actual_data;
   }
 
+  std::vector<uint8_t> RunUpdateBufferSubspanTest(
+      const void* source_buffer, iree_host_size_t source_offset,
+      iree_device_size_t full_buffer_size, iree_device_size_t subspan_offset,
+      iree_device_size_t target_offset, iree_device_size_t length) {
+    iree_hal_command_buffer_t* command_buffer;
+    IREE_CHECK_OK(iree_hal_command_buffer_create(
+        device_, IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT,
+        IREE_HAL_COMMAND_CATEGORY_ANY, IREE_HAL_QUEUE_AFFINITY_ANY,
+        &command_buffer));
+    IREE_CHECK_OK(iree_hal_command_buffer_begin(command_buffer));
+
+    iree_hal_buffer_t* full_device_buffer;
+    CreateZeroedDeviceBuffer(command_buffer, full_buffer_size,
+                             &full_device_buffer);
+
+    // Slice out a subspan of the full buffer.
+    iree_device_size_t subspan_length = full_buffer_size - subspan_offset;
+    iree_hal_buffer_t* subspan_buffer;
+    IREE_CHECK_OK(iree_hal_buffer_subspan(full_device_buffer, subspan_offset,
+                                          subspan_length, &subspan_buffer));
+
+    // Issue the update_buffer command onto the subspan buffer.
+    IREE_CHECK_OK(iree_hal_command_buffer_update_buffer(
+        command_buffer, source_buffer, source_offset, subspan_buffer,
+        target_offset, length));
+    IREE_CHECK_OK(iree_hal_command_buffer_end(command_buffer));
+    IREE_CHECK_OK(SubmitCommandBufferAndWait(IREE_HAL_COMMAND_CATEGORY_ANY,
+                                             command_buffer));
+
+    // Read data for returning.
+    std::vector<uint8_t> actual_data(subspan_length);
+    IREE_CHECK_OK(
+        iree_hal_buffer_read_data(subspan_buffer, /*source_offset=*/0,
+                                  /*target_buffer=*/actual_data.data(),
+                                  /*data_length=*/subspan_length));
+
+    // Cleanup and return.
+    iree_hal_command_buffer_release(command_buffer);
+    iree_hal_buffer_release(subspan_buffer);
+    iree_hal_buffer_release(full_device_buffer);
+    return actual_data;
+  }
+
   static constexpr iree_device_size_t kBufferSize = 4096;
 };
 
@@ -532,6 +575,52 @@ TEST_P(command_buffer_test, UpdateBuffer_sourceoffset4_targetoffset4) {
   std::vector<uint8_t> actual_buffer =
       RunUpdateBufferTest(source_buffer.data(), source_offset,
                           target_buffer_size, target_offset, length);
+  EXPECT_THAT(actual_buffer, ContainerEq(reference_target_buffer));
+}
+
+// TODO(scotttodd): fix test failures here, maybe iree_hal_buffer_read_data
+//                  isn't respecting subspan buffer offsets?
+TEST_P(command_buffer_test,
+       DISABLED_UpdateBuffer_sourceoffset0_targetoffset0_subspan4) {
+  iree_host_size_t source_offset = 0;
+  iree_device_size_t target_offset = 0;
+  iree_device_size_t subspan_offset = 4;
+  iree_device_size_t length = 4;
+  std::vector<uint8_t> source_buffer{
+      0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08,  //
+      0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18};
+
+  iree_device_size_t full_buffer_size = 16;
+  std::vector<uint8_t> reference_target_buffer{0x01, 0x02, 0x03, 0x04,
+                                               0x00, 0x00, 0x00, 0x00,  //
+                                               0x00, 0x00, 0x00, 0x00};
+
+  std::vector<uint8_t> actual_buffer = RunUpdateBufferSubspanTest(
+      source_buffer.data(), source_offset, full_buffer_size, target_offset,
+      subspan_offset, length);
+  EXPECT_THAT(actual_buffer, ContainerEq(reference_target_buffer));
+}
+
+// TODO(scotttodd): fix test failures here, maybe iree_hal_buffer_read_data
+//                  isn't respecting subspan buffer offsets?
+TEST_P(command_buffer_test,
+       DISABLED_UpdateBuffer_sourceoffset0_targetoffset4_subspan4) {
+  iree_host_size_t source_offset = 0;
+  iree_device_size_t target_offset = 4;
+  iree_device_size_t subspan_offset = 4;
+  iree_device_size_t length = 4;
+  std::vector<uint8_t> source_buffer{
+      0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08,  //
+      0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18};
+
+  iree_device_size_t full_buffer_size = 16;
+  std::vector<uint8_t> reference_target_buffer{0x00, 0x00, 0x00, 0x00,
+                                               0x01, 0x02, 0x03, 0x04,  //
+                                               0x00, 0x00, 0x00, 0x00};
+
+  std::vector<uint8_t> actual_buffer = RunUpdateBufferSubspanTest(
+      source_buffer.data(), source_offset, full_buffer_size, target_offset,
+      subspan_offset, length);
   EXPECT_THAT(actual_buffer, ContainerEq(reference_target_buffer));
 }
 
