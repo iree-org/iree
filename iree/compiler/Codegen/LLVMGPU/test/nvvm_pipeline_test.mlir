@@ -593,19 +593,15 @@ hal.executable @mma_fused {
   }
 //     CHECK-LABEL: hal.executable public @large_dot_general_dispatch_0
 //           CHECK:   hal.executable.variant public @cuda
-//  CHECK-COUNT-16:   llvm.store {{.*}} : !llvm.ptr<vector<16xf32>>
+//       CHECK-NOT:   llvm.store
 //   CHECK-COUNT-2:   llvm.load {{.*}} : !llvm.ptr<vector<4xf32>>
 //           CHECK:   llvm.br
 //   CHECK-COUNT-2:   llvm.store {{.*}} : !llvm.ptr<vector<4xf32>, 3>
 //   CHECK-COUNT-4:   nvvm.wmma.load{{.*}} : (!llvm.ptr<f32, 3>) -> !llvm.struct<(i32, i32, i32, i32)
-//           CHECK:   nvvm.wmma.load{{.*}} : (!llvm.ptr<f32>) -> !llvm.struct<(f32, f32, f32, f32, f32, f32, f32, f32)
 //   CHECK-COUNT-2:   nvvm.wmma.mma
-//           CHECK:   nvvm.wmma.store {{.*}} : !llvm.ptr<f32>, f32, f32, f32, f32, f32, f32, f32, f32
 //   CHECK-COUNT-2:   llvm.load {{.*}} : !llvm.ptr<vector<4xf32>>
 //           CHECK:   llvm.br
 //   CHECK-COUNT-2:   llvm.store {{.*}} : !llvm.ptr<vector<4xf32>, 3>
 //   CHECK-COUNT-4:   nvvm.wmma.load{{.*}} : (!llvm.ptr<f32, 3>) -> !llvm.struct<(i32, i32, i32, i32)
-//           CHECK:   nvvm.wmma.load{{.*}} : (!llvm.ptr<f32>) -> !llvm.struct<(f32, f32, f32, f32, f32, f32, f32, f32)
 //   CHECK-COUNT-2:   nvvm.wmma.mma
-//       CHECK-NOT:   llvm.fadd
 //   CHECK-COUNT-1:   nvvm.wmma.store {{.*}} : !llvm.ptr<f32>, f32, f32, f32, f32, f32, f32, f32, f32
