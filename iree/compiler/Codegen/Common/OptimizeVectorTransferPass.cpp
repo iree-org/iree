@@ -93,15 +93,17 @@ struct OptimizeVectorTransferPass
     // Generate vector.shape_cast for dropping leading one dimensions in vector
     // ops. This increases the chance that we can forward more transfer writes
     // to transfer reads.
-    RewritePatternSet patterns(&getContext());
-    mlir::vector::populateVectorTransferDropUnitDimsPatterns(patterns);
-    mlir::vector::populateFlattenVectorTransferPatterns(patterns);
-    mlir::vector::populateCastAwayVectorLeadingOneDimPatterns(patterns);
-    patterns.add<TransposeUnitDimToShapeCast>(&getContext());
-    mlir::vector::populateVectorTransferCollapseInnerMostContiguousDimsPatterns(
-        patterns);
-    if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
-      return signalPassFailure();
+    {
+      RewritePatternSet patterns(&getContext());
+      mlir::vector::populateCastAwayVectorLeadingOneDimPatterns(patterns);
+      vector::ExtractOp::getCanonicalizationPatterns(patterns, &getContext());
+      patterns.add<TransposeUnitDimToShapeCast>(&getContext());
+      mlir::vector::
+          populateVectorTransferCollapseInnerMostContiguousDimsPatterns(
+              patterns);
+      if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
+        return signalPassFailure();
+      }
     }
     // Workaround, run loop invariant code motion before hoist redudant vector
     // transfer to workaround a bug upstream.
@@ -109,6 +111,16 @@ struct OptimizeVectorTransferPass
     loopInvariantCodeMotion(funcOp);
     linalg::hoistRedundantVectorTransfers(funcOp);
     vector::transferOpflowOpt(funcOp);
+
+    // Second stage of patterns to flatten transfer ops.
+    {
+      RewritePatternSet patterns(&getContext());
+      mlir::vector::populateVectorTransferDropUnitDimsPatterns(patterns);
+      mlir::vector::populateFlattenVectorTransferPatterns(patterns);
+      if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
+        return signalPassFailure();
+      }
+    }
     // Delete potential dead alloc and associated ops after store to load
     // forwarding.
     eraseDeadAllocAndStores(funcOp);
