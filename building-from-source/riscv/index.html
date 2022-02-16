@@ -1241,7 +1241,7 @@ as a reference of how to set up the cmake configuration.</p>
 <h4 id="risc-v-64-bit-linux-target">RISC-V 64-bit Linux target<a class="headerlink" href="#risc-v-64-bit-linux-target" title="Permanent link">&para;</a></h4>
 <div class="highlight"><pre><span></span><code>cmake -GNinja -B ../iree-build-riscv/ <span class="se">\</span>
   -DCMAKE_TOOLCHAIN_FILE<span class="o">=</span><span class="s2">&quot;./build_tools/cmake/riscv.toolchain.cmake&quot;</span> <span class="se">\</span>
-  -DIREE_HOST_BINARY_ROOT<span class="o">=</span><span class="k">$(</span>realpath ../iree-build-host/install<span class="k">)</span> <span class="se">\</span>
+  -DIREE_HOST_BINARY_ROOT<span class="o">=</span><span class="k">$(</span>realpath ../iree-build/install<span class="k">)</span> <span class="se">\</span>
   -DRISCV_CPU<span class="o">=</span>rv64 <span class="se">\</span>
   -DIREE_BUILD_COMPILER<span class="o">=</span>OFF <span class="se">\</span>
   -DRISCV_TOOLCHAIN_ROOT<span class="o">=</span><span class="si">${</span><span class="nv">RISCV_TOOLCHAIN_ROOT</span><span class="si">}</span> <span class="se">\</span>
