@@ -148,14 +148,16 @@ static LogicalResult verifyScatterOp(ScatterOp op) {
         "index depth and update value does not cover rank of original value");
   }
 
-  // Validate the non-indexed update dims are 
+  // Validate the non-indexed update dims are
   int64_t fullSliceDims = originalType.getRank() - indexDepth;
-  for (auto it : llvm::zip(
-        llvm::seq<unsigned>(indexDepth, originalType.getRank()),
-        llvm::seq<unsigned>(updateType.getRank() - fullSliceDims, updateType.getRank()))) {
+  for (auto it :
+       llvm::zip(llvm::seq<unsigned>(indexDepth, originalType.getRank()),
+                 llvm::seq<unsigned>(updateType.getRank() - fullSliceDims,
+                                     updateType.getRank()))) {
     int64_t originalDim = std::get<0>(it);
     int64_t updateDim = std::get<1>(it);
-    if (updateType.getDimSize(updateDim) != originalType.getDimSize(originalDim)) {
+    if (updateType.getDimSize(updateDim) !=
+        originalType.getDimSize(originalDim)) {
       return op.emitOpError("mismatch in shape of update value dim#")
              << updateDim << " and original value at dim#" << originalDim;
     }
@@ -164,14 +166,16 @@ static LogicalResult verifyScatterOp(ScatterOp op) {
   // Check that the remaining update indices do not exceed the update length.
   int64_t insertDims = originalType.getRank() - updateType.getRank() + 1;
   for (auto it : llvm::zip(
-        llvm::seq<unsigned>(insertDims, indexDepth),
-        llvm::seq<unsigned>(1, updateType.getRank() - fullSliceDims))) {
+           llvm::seq<unsigned>(insertDims, indexDepth),
+           llvm::seq<unsigned>(1, updateType.getRank() - fullSliceDims))) {
     int64_t originalDim = std::get<0>(it);
     int64_t updateDim = std::get<1>(it);
-    if (updateType.getDimSize(updateDim) > originalType.getDimSize(originalDim)) {
+    if (updateType.getDimSize(updateDim) >
+        originalType.getDimSize(originalDim)) {
       return op.emitOpError("indexed shape of update value dim#")
              << updateDim << " exceeds original value at dim#" << originalDim
-             << " " << updateType.getDimSize(updateDim) << " " << originalType.getDimSize(originalDim);
+             << " " << updateType.getDimSize(updateDim) << " "
+             << originalType.getDimSize(originalDim);
     }
   }
 
@@ -323,7 +327,7 @@ LogicalResult ScatterOp::generateScalarImplementation(OpBuilder &b,
     if (starts[i]) cast = b.create<arith::AddIOp>(loc, cast, starts[i]);
     starts[i] = cast;
   }
-  
+
   Value init = b.create<memref::LoadOp>(loc, original(), starts);
 
   BlockAndValueMapping bvm;
