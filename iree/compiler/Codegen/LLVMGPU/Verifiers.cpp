@@ -122,8 +122,13 @@ LogicalResult verifyGPUMatmulTensorCorePipeline(
   // inputs A [M x K] & B [K x N]
   linalg::MatmulOp matmulOp = dyn_cast<linalg::MatmulOp>(op);
   if (matmulOp) {
-    MemRefType type =
-        matmulOp.getInputOperand(0)->get().getType().cast<mlir::MemRefType>();
+    MemRefType type = matmulOp.getInputOperand(0)
+                          ->get()
+                          .getType()
+                          .dyn_cast<mlir::MemRefType>();
+    if (!type) {
+      return success();
+    }
     unsigned bytesSize = type.getElementType().getIntOrFloatBitWidth() / 8;
 
     // Input shape sizes: A [ M x K],  B [ K x N]
