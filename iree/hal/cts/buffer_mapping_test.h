@@ -174,6 +174,42 @@ TEST_P(buffer_mapping_test, FillOffset) {
   iree_hal_buffer_release(buffer);
 }
 
+TEST_P(buffer_mapping_test, ReadData) {
+  iree_device_size_t buffer_size = 16;
+  iree_hal_buffer_t* buffer = NULL;
+  AllocateUninitializedBuffer(buffer_size, &buffer);
+
+  // Zero the first half, fill the second half.
+  IREE_ASSERT_OK(
+      iree_hal_buffer_zero(buffer, /*byte_offset=*/0, /*byte_length=*/8));
+  uint8_t fill_value = 0xFF;
+  IREE_ASSERT_OK(iree_hal_buffer_fill(buffer, /*byte_offset=*/8,
+                                      /*byte_length=*/8,
+                                      /*pattern=*/&fill_value,
+                                      /*pattern_length=*/sizeof(fill_value)));
+
+  // Read the entire buffer.
+  std::vector<uint8_t> actual_data(buffer_size);
+  IREE_ASSERT_OK(iree_hal_buffer_read_data(
+      buffer, /*source_offset=*/0, actual_data.data(), actual_data.size()));
+  std::vector<uint8_t> reference_buffer{0x00, 0x00, 0x00, 0x00,  //
+                                        0x00, 0x00, 0x00, 0x00,  //
+                                        0xFF, 0xFF, 0xFF, 0xFF,  //
+                                        0xFF, 0xFF, 0xFF, 0xFF};
+  EXPECT_THAT(actual_data, ContainerEq(reference_buffer));
+
+  // Read only a segment of the buffer.
+  std::vector<uint8_t> actual_data_offset(8);
+  IREE_ASSERT_OK(iree_hal_buffer_read_data(buffer, /*source_offset=*/4,
+                                           actual_data_offset.data(),
+                                           /*data_length=*/8));
+  std::vector<uint8_t> reference_buffer_offset{0x00, 0x00, 0x00, 0x00,  //
+                                               0xFF, 0xFF, 0xFF, 0xFF};
+  EXPECT_THAT(actual_data_offset, ContainerEq(reference_buffer_offset));
+
+  iree_hal_buffer_release(buffer);
+}
+
 TEST_P(buffer_mapping_test, WriteData) {
   iree_hal_buffer_t* buffer = NULL;
   AllocateUninitializedBuffer(kDefaultAllocationSize, &buffer);
