@@ -154,7 +154,8 @@ LogicalResult convertFuncOp(IREE::VM::FuncOp funcOp,
   std::string moduleTypeName = (moduleOp.getName() + "_t*").str();
   std::string moduleStateTypeName = (moduleOp.getName() + "_state_t*").str();
 
-  Type stackType = emitc::OpaqueType::get(ctx, "iree_vm_stack_t*");
+  Type stackType =
+      emitc::PointerType::get(emitc::OpaqueType::get(ctx, "iree_vm_stack_t"));
   Type moduleType = emitc::OpaqueType::get(ctx, moduleTypeName);
   Type moduleStateType = emitc::OpaqueType::get(ctx, moduleStateTypeName);
 
@@ -1512,7 +1513,8 @@ class ExportOpConversion : public OpConversionPattern<IREE::VM::ExportOp> {
 
     std::string newFuncName = (funcOp.getName() + "_export_shim").str();
 
-    Type stackType = emitc::OpaqueType::get(ctx, "iree_vm_stack_t*");
+    Type stackType =
+        emitc::PointerType::get(emitc::OpaqueType::get(ctx, "iree_vm_stack_t"));
     Type callType = emitc::OpaqueType::get(ctx, "iree_vm_function_call_t*");
     Type moduleType =
         emitc::PointerType::get(emitc::OpaqueType::get(ctx, "void"));
@@ -2153,7 +2155,8 @@ class ImportOpConversion : public OpConversionPattern<IREE::VM::ImportOp> {
                                         Location loc) const {
     auto ctx = rewriter.getContext();
 
-    Type stackType = emitc::OpaqueType::get(ctx, "iree_vm_stack_t*");
+    Type stackType =
+        emitc::PointerType::get(emitc::OpaqueType::get(ctx, "iree_vm_stack_t"));
     Type funcType = emitc::OpaqueType::get(ctx, "iree_vm_function_t*");
 
     SmallVector<Type> types{stackType, funcType};
