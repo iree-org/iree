@@ -24,14 +24,24 @@ using ::testing::ContainerEq;
 
 namespace {
 
-constexpr iree_device_size_t kAllocationSize = 1024;
+constexpr iree_device_size_t kDefaultAllocationSize = 64;
 
 }  // namespace
 
-class buffer_mapping_test : public CtsTestBase {};
+class buffer_mapping_test : public CtsTestBase {
+ protected:
+  void AllocateUninitializedBuffer(iree_device_size_t buffer_size,
+                                   iree_hal_buffer_t** out_buffer) {
+    iree_hal_buffer_t* device_buffer = NULL;
+    IREE_CHECK_OK(iree_hal_allocator_allocate_buffer(
+        iree_hal_device_allocator(device_),
+        IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL | IREE_HAL_MEMORY_TYPE_HOST_VISIBLE,
+        IREE_HAL_BUFFER_USAGE_MAPPING, buffer_size,
+        iree_const_byte_span_empty(), &device_buffer));
+    *out_buffer = device_buffer;
+  }
+};
 
-// TODO(scotttodd): move this check to SetUp() and skip tests if not supported
-//   or add general support for optional features/tests into the CTS framework?
 TEST_P(buffer_mapping_test, AllocatorSupportsBufferMapping) {
   iree_hal_memory_type_t memory_type = IREE_HAL_MEMORY_TYPE_HOST_VISIBLE;
   iree_hal_buffer_usage_t buffer_usage = IREE_HAL_BUFFER_USAGE_MAPPING;
@@ -40,152 +50,168 @@ TEST_P(buffer_mapping_test, AllocatorSupportsBufferMapping) {
       iree_hal_allocator_query_buffer_compatibility(
           device_allocator_, memory_type,
           /*allowed_usage=*/buffer_usage,
-          /*intended_usage=*/buffer_usage, kAllocationSize);
+          /*intended_usage=*/buffer_usage, kDefaultAllocationSize);
   EXPECT_TRUE(iree_all_bits_set(compatibility,
                                 IREE_HAL_BUFFER_COMPATIBILITY_ALLOCATABLE));
 
-  iree_hal_buffer_t* buffer;
-  IREE_ASSERT_OK(iree_hal_allocator_allocate_buffer(
-      device_allocator_, memory_type, buffer_usage, kAllocationSize,
-      iree_const_byte_span_empty(), &buffer));
+  iree_hal_buffer_t* buffer = NULL;
+  AllocateUninitializedBuffer(kDefaultAllocationSize, &buffer);
 
   EXPECT_TRUE(
       iree_all_bits_set(iree_hal_buffer_memory_type(buffer), memory_type));
   EXPECT_TRUE(
       iree_all_bits_set(iree_hal_buffer_allowed_usage(buffer), buffer_usage));
-  EXPECT_GE(iree_hal_buffer_allocation_size(buffer), kAllocationSize);
+  EXPECT_GE(iree_hal_buffer_allocation_size(buffer), kDefaultAllocationSize);
 
   iree_hal_buffer_release(buffer);
 }
 
 TEST_P(buffer_mapping_test, Zero) {
-  iree_hal_memory_type_t memory_type = IREE_HAL_MEMORY_TYPE_HOST_VISIBLE;
-  iree_hal_buffer_usage_t buffer_usage = IREE_HAL_BUFFER_USAGE_MAPPING;
+  iree_device_size_t buffer_size = 16;
+  iree_hal_buffer_t* buffer = NULL;
+  AllocateUninitializedBuffer(buffer_size, &buffer);
+  std::vector<uint8_t> actual_data(buffer_size);
 
-  iree_hal_buffer_t* buffer;
-  IREE_ASSERT_OK(iree_hal_allocator_allocate_buffer(
-      device_allocator_, memory_type, buffer_usage, kAllocationSize,
-      iree_const_byte_span_empty(), &buffer));
-
-  IREE_ASSERT_OK(iree_hal_buffer_zero(buffer, /*byte_offset=*/0,
-                                      /*byte_length=*/kAllocationSize));
-
-  std::vector<uint8_t> reference_buffer(kAllocationSize);
-  std::memset(reference_buffer.data(), 0, kAllocationSize);
-
-  std::vector<uint8_t> actual_data(kAllocationSize);
+  // Zero the entire buffer.
+  IREE_ASSERT_OK(
+      iree_hal_buffer_zero(buffer, /*byte_offset=*/0, IREE_WHOLE_BUFFER));
+  // Check that the contents match what we expect.
   IREE_ASSERT_OK(iree_hal_buffer_read_data(
       buffer, /*source_offset=*/0, actual_data.data(), actual_data.size()));
-  EXPECT_THAT(actual_data, ContainerEq(reference_buffer));
+  std::vector<uint8_t> reference_zero_buffer{0x00, 0x00, 0x00, 0x00,  //
+                                             0x00, 0x00, 0x00, 0x00,  //
+                                             0x00, 0x00, 0x00, 0x00,  //
+                                             0x00, 0x00, 0x00, 0x00};
+  EXPECT_THAT(actual_data, ContainerEq(reference_zero_buffer));
+
+  // Fill the entire buffer then zero only a segment of it.
+  uint8_t fill_value = 0xFF;
+  IREE_ASSERT_OK(iree_hal_buffer_fill(buffer, /*byte_offset=*/0,
+                                      IREE_WHOLE_BUFFER, &fill_value,
+                                      sizeof(fill_value)));
+  IREE_ASSERT_OK(
+      iree_hal_buffer_zero(buffer, /*byte_offset=*/4, /*byte_length=*/8));
+  // Check that the contents match what we expect.
+  IREE_ASSERT_OK(iree_hal_buffer_read_data(
+      buffer, /*source_offset=*/0, actual_data.data(), actual_data.size()));
+  std::vector<uint8_t> reference_offset_buffer{0xFF, 0xFF, 0xFF, 0xFF,  //
+                                               0x00, 0x00, 0x00, 0x00,  //
+                                               0x00, 0x00, 0x00, 0x00,  //
+                                               0xFF, 0xFF, 0xFF, 0xFF};
+  EXPECT_THAT(actual_data, ContainerEq(reference_offset_buffer));
 
   iree_hal_buffer_release(buffer);
 }
 
 TEST_P(buffer_mapping_test, FillEmpty) {
-  iree_hal_memory_type_t memory_type = IREE_HAL_MEMORY_TYPE_HOST_VISIBLE;
-  iree_hal_buffer_usage_t buffer_usage = IREE_HAL_BUFFER_USAGE_MAPPING;
+  iree_hal_buffer_t* buffer = NULL;
+  AllocateUninitializedBuffer(kDefaultAllocationSize, &buffer);
 
-  iree_hal_buffer_t* buffer;
-  IREE_ASSERT_OK(iree_hal_allocator_allocate_buffer(
-      device_allocator_, memory_type, buffer_usage, kAllocationSize,
-      iree_const_byte_span_empty(), &buffer));
-
-  IREE_ASSERT_OK(iree_hal_buffer_zero(buffer, /*byte_offset=*/0,
-                                      /*byte_length=*/kAllocationSize));
-  uint8_t fill_value = 0x07;
+  // Zero the whole buffer then "fill" 0 bytes with a different pattern.
+  IREE_ASSERT_OK(iree_hal_buffer_zero(buffer, 0, IREE_WHOLE_BUFFER));
+  uint8_t fill_value = 0xFF;
   IREE_ASSERT_OK(iree_hal_buffer_fill(buffer, /*byte_offset=*/0,
                                       /*byte_length=*/0,  // <---- empty!
                                       /*pattern=*/&fill_value,
                                       /*pattern_length=*/sizeof(fill_value)));
 
-  // Note: reference is all zeros, since fill byte length is 0!
-  std::vector<uint8_t> reference_buffer(kAllocationSize);
-  std::memset(reference_buffer.data(), 0, kAllocationSize);
-
-  std::vector<uint8_t> actual_data(kAllocationSize);
+  // Check that the buffer is still all zeroes.
+  std::vector<uint8_t> actual_data(kDefaultAllocationSize);
   IREE_ASSERT_OK(iree_hal_buffer_read_data(
       buffer, /*source_offset=*/0, actual_data.data(), actual_data.size()));
+  std::vector<uint8_t> reference_buffer(kDefaultAllocationSize);
+  std::memset(reference_buffer.data(), 0, kDefaultAllocationSize);
   EXPECT_THAT(actual_data, ContainerEq(reference_buffer));
 
   iree_hal_buffer_release(buffer);
 }
 
-TEST_P(buffer_mapping_test, Fill) {
-  iree_hal_memory_type_t memory_type = IREE_HAL_MEMORY_TYPE_HOST_VISIBLE;
-  iree_hal_buffer_usage_t buffer_usage = IREE_HAL_BUFFER_USAGE_MAPPING;
+TEST_P(buffer_mapping_test, FillWhole) {
+  iree_hal_buffer_t* buffer = NULL;
+  AllocateUninitializedBuffer(kDefaultAllocationSize, &buffer);
 
-  iree_hal_buffer_t* buffer;
-  IREE_ASSERT_OK(iree_hal_allocator_allocate_buffer(
-      device_allocator_, memory_type, buffer_usage, kAllocationSize,
-      iree_const_byte_span_empty(), &buffer));
-
-  uint8_t fill_value = 0x07;
+  uint8_t fill_value = 0xFF;
   IREE_ASSERT_OK(iree_hal_buffer_fill(buffer, /*byte_offset=*/0,
-                                      /*byte_length=*/kAllocationSize,
+                                      /*byte_length=*/IREE_WHOLE_BUFFER,
                                       /*pattern=*/&fill_value,
                                       /*pattern_length=*/sizeof(fill_value)));
 
-  std::vector<uint8_t> reference_buffer(kAllocationSize);
-  std::memset(reference_buffer.data(), fill_value, kAllocationSize);
-
-  std::vector<uint8_t> actual_data(kAllocationSize);
+  // Check that the buffer is filled with the pattern.
+  std::vector<uint8_t> actual_data(kDefaultAllocationSize);
   IREE_ASSERT_OK(iree_hal_buffer_read_data(
       buffer, /*source_offset=*/0, actual_data.data(), actual_data.size()));
+  std::vector<uint8_t> reference_buffer(kDefaultAllocationSize);
+  std::memset(reference_buffer.data(), fill_value, kDefaultAllocationSize);
   EXPECT_THAT(actual_data, ContainerEq(reference_buffer));
 
   iree_hal_buffer_release(buffer);
 }
 
-TEST_P(buffer_mapping_test, Write) {
-  iree_hal_memory_type_t memory_type = IREE_HAL_MEMORY_TYPE_HOST_VISIBLE;
-  iree_hal_buffer_usage_t buffer_usage = IREE_HAL_BUFFER_USAGE_MAPPING;
+TEST_P(buffer_mapping_test, FillOffset) {
+  iree_device_size_t buffer_size = 16;
+  iree_hal_buffer_t* buffer = NULL;
+  AllocateUninitializedBuffer(buffer_size, &buffer);
 
-  iree_hal_buffer_t* buffer;
-  IREE_ASSERT_OK(iree_hal_allocator_allocate_buffer(
-      device_allocator_, memory_type, buffer_usage, kAllocationSize,
-      iree_const_byte_span_empty(), &buffer));
+  // Zero the entire buffer then fill only a segment of it.
+  IREE_ASSERT_OK(
+      iree_hal_buffer_zero(buffer, /*byte_offset=*/0, IREE_WHOLE_BUFFER));
+  uint8_t fill_value = 0xFF;
+  IREE_ASSERT_OK(iree_hal_buffer_fill(buffer, /*byte_offset=*/4,
+                                      /*byte_length=*/8,
+                                      /*pattern=*/&fill_value,
+                                      /*pattern_length=*/sizeof(fill_value)));
+
+  // Check that only the segment of the buffer is filled with the pattern.
+  std::vector<uint8_t> actual_data(buffer_size);
+  IREE_ASSERT_OK(iree_hal_buffer_read_data(
+      buffer, /*source_offset=*/0, actual_data.data(), actual_data.size()));
+  std::vector<uint8_t> reference_offset_buffer{0x00, 0x00, 0x00, 0x00,  //
+                                               0xFF, 0xFF, 0xFF, 0xFF,  //
+                                               0xFF, 0xFF, 0xFF, 0xFF,  //
+                                               0x00, 0x00, 0x00, 0x00};
+  EXPECT_THAT(actual_data, ContainerEq(reference_offset_buffer));
+
+  iree_hal_buffer_release(buffer);
+}
+
+TEST_P(buffer_mapping_test, WriteData) {
+  iree_hal_buffer_t* buffer = NULL;
+  AllocateUninitializedBuffer(kDefaultAllocationSize, &buffer);
 
   uint8_t fill_value = 0x07;
-  std::vector<uint8_t> reference_buffer(kAllocationSize);
-  std::memset(reference_buffer.data(), fill_value, kAllocationSize);
+  std::vector<uint8_t> reference_buffer(kDefaultAllocationSize);
+  std::memset(reference_buffer.data(), fill_value, kDefaultAllocationSize);
   IREE_ASSERT_OK(iree_hal_buffer_write_data(buffer, /*target_offset=*/0,
                                             reference_buffer.data(),
                                             reference_buffer.size()));
 
-  std::vector<uint8_t> actual_data(kAllocationSize);
+  std::vector<uint8_t> actual_data(kDefaultAllocationSize);
   IREE_ASSERT_OK(iree_hal_buffer_read_data(
       buffer, /*source_offset=*/0, actual_data.data(), actual_data.size()));
   EXPECT_THAT(actual_data, ContainerEq(reference_buffer));
 
   iree_hal_buffer_release(buffer);
 }
-TEST_P(buffer_mapping_test, Copy) {
-  iree_hal_memory_type_t memory_type = IREE_HAL_MEMORY_TYPE_HOST_VISIBLE;
-  iree_hal_buffer_usage_t buffer_usage = IREE_HAL_BUFFER_USAGE_MAPPING;
-
+TEST_P(buffer_mapping_test, CopyData) {
   iree_hal_buffer_t* buffer_a;
   iree_hal_buffer_t* buffer_b;
-  IREE_ASSERT_OK(iree_hal_allocator_allocate_buffer(
-      device_allocator_, memory_type, buffer_usage, kAllocationSize,
-      iree_const_byte_span_empty(), &buffer_a));
-  IREE_ASSERT_OK(iree_hal_allocator_allocate_buffer(
-      device_allocator_, memory_type, buffer_usage, kAllocationSize,
-      iree_const_byte_span_empty(), &buffer_b));
+  AllocateUninitializedBuffer(kDefaultAllocationSize, &buffer_a);
+  AllocateUninitializedBuffer(kDefaultAllocationSize, &buffer_b);
 
   uint8_t fill_value = 0x07;
   IREE_ASSERT_OK(iree_hal_buffer_fill(buffer_a, /*byte_offset=*/0,
-                                      /*byte_length=*/kAllocationSize,
+                                      /*byte_length=*/kDefaultAllocationSize,
                                       /*pattern=*/&fill_value,
                                       /*pattern_length=*/sizeof(fill_value)));
   IREE_ASSERT_OK(iree_hal_buffer_copy_data(
       /*source_buffer=*/buffer_a,
       /*source_offset=*/0, /*target_buffer=*/buffer_b, /*target_offset=*/0,
-      /*data_length=*/kAllocationSize));
+      /*data_length=*/kDefaultAllocationSize));
 
-  std::vector<uint8_t> reference_buffer(kAllocationSize);
-  std::memset(reference_buffer.data(), fill_value, kAllocationSize);
+  std::vector<uint8_t> reference_buffer(kDefaultAllocationSize);
+  std::memset(reference_buffer.data(), fill_value, kDefaultAllocationSize);
 
-  std::vector<uint8_t> actual_data(kAllocationSize);
+  std::vector<uint8_t> actual_data(kDefaultAllocationSize);
   IREE_ASSERT_OK(iree_hal_buffer_read_data(
       buffer_b, /*source_offset=*/0, actual_data.data(), actual_data.size()));
   EXPECT_THAT(actual_data, ContainerEq(reference_buffer));
