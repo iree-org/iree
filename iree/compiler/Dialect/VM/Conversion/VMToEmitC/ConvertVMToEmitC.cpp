@@ -4149,7 +4149,8 @@ class ListOpConversion : public OpConversionPattern<SrcOpTy> {
     auto listDerefOp = failListNull(
         /*rewriter=*/rewriter,
         /*location=*/loc,
-        /*type=*/emitc::OpaqueType::get(ctx, "iree_vm_list_t*"),
+        /*type=*/
+        emitc::PointerType::get(emitc::OpaqueType::get(ctx, "iree_vm_list_t")),
         /*callee=*/StringAttr::get(ctx, "iree_vm_list_deref"),
         /*args=*/ArrayAttr{},
         /*templateArgs=*/ArrayAttr{},
@@ -4233,12 +4234,15 @@ class ListAllocOpConversion
 
     auto listOp = rewriter.create<emitc::ConstantOp>(
         /*location=*/loc,
-        /*resultType=*/emitc::OpaqueType::get(ctx, "iree_vm_list_t*"),
+        /*resultType=*/
+        emitc::PointerType::get(emitc::OpaqueType::get(ctx, "iree_vm_list_t")),
         /*value=*/emitc::OpaqueAttr::get(ctx, "NULL"));
 
     auto listPtrOp = rewriter.create<emitc::ApplyOp>(
         /*location=*/loc,
-        /*result=*/emitc::OpaqueType::get(ctx, "iree_vm_list_t**"),
+        /*result=*/
+        emitc::PointerType::get(emitc::PointerType::get(
+            emitc::OpaqueType::get(ctx, "iree_vm_list_t"))),
         /*applicableOperator=*/StringAttr::get(ctx, "&"),
         /*operand=*/listOp.getResult());
 
@@ -4355,7 +4359,8 @@ class ListGetOpConversion : public OpConversionPattern<GetOpTy> {
     auto listDerefOp = failListNull(
         /*rewriter=*/rewriter,
         /*location=*/loc,
-        /*type=*/emitc::OpaqueType::get(ctx, "iree_vm_list_t*"),
+        /*type=*/
+        emitc::PointerType::get(emitc::OpaqueType::get(ctx, "iree_vm_list_t")),
         /*callee=*/StringAttr::get(ctx, "iree_vm_list_deref"),
         /*args=*/ArrayAttr{},
         /*templateArgs=*/ArrayAttr{},
@@ -4413,7 +4418,8 @@ class ListGetRefOpConversion
     auto listDerefOp = failListNull(
         /*rewriter=*/rewriter,
         /*location=*/loc,
-        /*type=*/emitc::OpaqueType::get(ctx, "iree_vm_list_t*"),
+        /*type=*/
+        emitc::PointerType::get(emitc::OpaqueType::get(ctx, "iree_vm_list_t")),
         /*callee=*/StringAttr::get(ctx, "iree_vm_list_deref"),
         /*args=*/ArrayAttr{},
         /*templateArgs=*/ArrayAttr{},
