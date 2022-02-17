@@ -137,18 +137,13 @@ function(iree_cc_test)
 
     # Define a custom target for pushing and running the test on Android device.
     set(_NAME_PATH ${_NAME_PATH}_on_android_device)
-    set(_COMMAND
-      "${CMAKE_SOURCE_DIR}/build_tools/cmake/run_android_test.${IREE_HOST_SCRIPT_EXT}"
-      "${_ANDROID_REL_DIR}/$<TARGET_FILE_NAME:${_NAME}>"
-    )
-    if(_RULE_ARGS)
-      list(APPEND _COMMAND ${_RULE_ARGS})
-    endif()
     add_test(
       NAME
         ${_NAME_PATH}
       COMMAND
-        ${_COMMAND}
+        "${CMAKE_SOURCE_DIR}/build_tools/cmake/run_android_test.${IREE_HOST_SCRIPT_EXT}"
+        "${_ANDROID_REL_DIR}/$<TARGET_FILE_NAME:${_NAME}>"
+        ${_RULE_ARGS}
     )
     # Use environment variables to instruct the script to push artifacts
     # onto the Android device before running the test. This needs to match
@@ -161,20 +156,15 @@ function(iree_cc_test)
     )
     set_property(TEST ${_NAME_PATH} PROPERTY ENVIRONMENT ${_ENVIRONMENT_VARS})
   else(ANDROID)
-    set(_COMMAND
-      # We run all our tests through a custom test runner to allow temp
-      # directory cleanup upon test completion.
-      "${CMAKE_SOURCE_DIR}/build_tools/cmake/run_test.${IREE_HOST_SCRIPT_EXT}"
-      "$<TARGET_FILE:${_NAME}>"
-    )
-    if(_RULE_ARGS)
-      list(APPEND _COMMAND ${_RULE_ARGS})
-    endif()
     add_test(
       NAME
         ${_NAME_PATH}
       COMMAND
-        ${_COMMAND}
+        # We run all our tests through a custom test runner to allow temp
+        # directory cleanup upon test completion.
+        "${CMAKE_SOURCE_DIR}/build_tools/cmake/run_test.${IREE_HOST_SCRIPT_EXT}"
+        "$<TARGET_FILE:${_NAME}>"
+        ${_RULE_ARGS}
       )
     set_property(TEST ${_NAME_PATH} PROPERTY ENVIRONMENT "TEST_TMPDIR=${IREE_BINARY_DIR}/tmp/${_NAME}_test_tmpdir")
     iree_add_test_environment_properties(${_NAME_PATH})
