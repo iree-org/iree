@@ -77,12 +77,14 @@ def IREELinalgExt_ScatterOp : IREELinalgExt_Op<"scatter",
   }];
   let arguments = (ins
       Variadic<AnyRankedTensorOrMemRefType>:$inputs,
-      Variadic<AnyRankedTensorOrMemRefType>:$outputs
+      Variadic<AnyRankedTensorOrMemRefType>:$outputs,
+      DefaultValuedAttr<BoolAttr, "false">:$unique_indices
   );
   let results = (outs Variadic<AnyRankedTensor>:$results);
   let regions = (region AnyRegion:$region);
   let assemblyFormat = [{
-    attr-dict (`ins` `(` $inputs^ `:` type($inputs) `)`)?
+    `unique_indices` `(` $unique_indices `)`
+    attr-dict(`ins` `(` $inputs^ `:` type($inputs) `)`)?
     `outs` `(` $outputs `:` type($outputs) `)`
     $region (`->` type($results)^)?
   }];

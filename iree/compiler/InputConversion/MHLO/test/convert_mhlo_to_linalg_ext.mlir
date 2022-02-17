@@ -230,7 +230,7 @@ func @scatter_update_scalar_1D(%arg0: tensor<8xi32>, %arg1: tensor<4x1xi32>,
       scatter_dims_to_operand_dims = [0],
       index_vector_dim = 1,
     >,
-    unique_indices = false
+    unique_indices = true
   } : (tensor<8xi32>, tensor<4x1xi32>, tensor<4xi32>) -> tensor<8xi32>
   return %0 : tensor<8xi32>
 }
@@ -239,6 +239,7 @@ func @scatter_update_scalar_1D(%arg0: tensor<8xi32>, %arg1: tensor<4x1xi32>,
 // CHECK:         %[[ARG1:[a-zA-Z0-9]+]]
 // CHECK:         %[[ARG2:[a-zA-Z0-9]+]]
 // CHECK:         %[[SCATTER:.+]] = iree_linalg_ext.scatter
+// CHECK-SAME:      unique_indices(true)
 // CHECK-SAME:      ins(%[[ARG2]], %[[ARG1]] : tensor<4xi32>, tensor<4x1xi32>)
 // CHECK-SAME:      outs(%[[ARG0]] : tensor<8xi32>)
 // CHECK:           ^bb0(%[[V1:.+]]: i32, %[[V2:.+]]: i32):
@@ -258,7 +259,7 @@ func @scatter_update_scalar_2D(%arg0: tensor<4x3xi32>, %arg1: tensor<3x2xi32>,
         scatter_dims_to_operand_dims = [0, 1],
         index_vector_dim = 1,
       >,
-      unique_indices = false
+      unique_indices = true
   } : (tensor<4x3xi32>, tensor<3x2xi32>, tensor<3xi32>) -> tensor<4x3xi32>
   return %0 : tensor<4x3xi32>
 }
@@ -267,6 +268,7 @@ func @scatter_update_scalar_2D(%arg0: tensor<4x3xi32>, %arg1: tensor<3x2xi32>,
 // CHECK:         %[[ARG1:[a-zA-Z0-9]+]]
 // CHECK:         %[[ARG2:[a-zA-Z0-9]+]]
 // CHECK:         %[[SCATTER:.+]] = iree_linalg_ext.scatter
+// CHECK-SAME:      unique_indices(true)
 // CHECK-SAME:      ins(%[[ARG2]], %[[ARG1]] : tensor<3xi32>, tensor<3x2xi32>)
 // CHECK-SAME:      outs(%[[ARG0]] : tensor<4x3xi32>)
 // CHECK:           ^bb0(%[[V1:.+]]: i32, %[[V2:.+]]: i32):
@@ -288,7 +290,7 @@ func @scatter_update_slice_2D(%arg0: tensor<6x3xi32>, %arg1: tensor<2x1xi32>,
       scatter_dims_to_operand_dims = [0],
       index_vector_dim = 1,
     >,
-    unique_indices = false
+    unique_indices = true
   } : (tensor<6x3xi32>, tensor<2x1xi32>, tensor<2x3xi32>) -> tensor<6x3xi32>
   return %0 : tensor<6x3xi32>
 }
@@ -297,6 +299,7 @@ func @scatter_update_slice_2D(%arg0: tensor<6x3xi32>, %arg1: tensor<2x1xi32>,
 // CHECK:         %[[ARG1:[a-zA-Z0-9]+]]
 // CHECK:         %[[ARG2:[a-zA-Z0-9]+]]
 // CHECK:         %[[SCATTER:.+]] = iree_linalg_ext.scatter
+// CHECK-SAME:      unique_indices(true)
 // CHECK-SAME:      ins(%[[ARG2]], %[[ARG1]] : tensor<2x3xi32>, tensor<2x1xi32>)
 // CHECK-SAME:      outs(%[[ARG0]] : tensor<6x3xi32>)
 // CHECK:           ^bb0(%[[V1:.+]]: i32, %[[V2:.+]]: i32):
@@ -328,6 +331,7 @@ func @scatter_add_slice_2D(%arg0: tensor<6x3xi32>, %arg1: tensor<2x1xi32>,
 // CHECK:         %[[ARG1:[a-zA-Z0-9]+]]
 // CHECK:         %[[ARG2:[a-zA-Z0-9]+]]
 // CHECK:         %[[SCATTER:.+]] = iree_linalg_ext.scatter
+// CHECK-SAME:      unique_indices(false)
 // CHECK-SAME:      ins(%[[ARG2]], %[[ARG1]] : tensor<2x3xi32>, tensor<2x1xi32>)
 // CHECK-SAME:      outs(%[[ARG0]] : tensor<6x3xi32>)
 // CHECK:           ^bb0(%[[V1:.+]]: i32, %[[V2:.+]]: i32):
@@ -364,6 +368,7 @@ func @scatter_update_batch_scalar_1D(%arg0: tensor<8xi32>,
 // CHECK:         %[[COLLAPSED_UPDATES:.+]] = tensor.collapse_shape
 // CHECK-SAME:        %[[ARG2]] {{\[}}[0, 1]] : tensor<3x4xi32> into tensor<12xi32>
 // CHECK:         %[[SCATTER:.+]] = iree_linalg_ext.scatter
+// CHECK-SAME:       unique_indices(false)
 // CHECK-SAME:       ins(%[[COLLAPSED_UPDATES]], %[[COLLAPSED_INDICES]] : tensor<12xi32>, tensor<12x1xi32>)
 // CHECK-SAME:       outs(%[[ARG0]] : tensor<8xi32>)
 // CHECK:            ^bb0(%[[V1:.+]]: i32, %[[V2:.+]]: i32):
@@ -384,7 +389,7 @@ func @scatter_update_batch_slice_3D_dynamic(%arg0: tensor<1x24x512xi32>,
         scatter_dims_to_operand_dims = [0, 1],
         index_vector_dim = 2,
       >,
-      unique_indices = false
+      unique_indices = true
   } : (tensor<1x24x512xi32>, tensor<?x3x2xi32>, tensor<?x3x512xi32>) -> tensor<1x24x512xi32>
   return %0 : tensor<1x24x512xi32>
 }
@@ -397,6 +402,7 @@ func @scatter_update_batch_slice_3D_dynamic(%arg0: tensor<1x24x512xi32>,
 // CHECK:         %[[COLLAPSED_UPDATES:.+]] = tensor.collapse_shape
 // CHECK-SAME:        %[[ARG2]] {{\[}}[0, 1], [2]] : tensor<?x3x512xi32> into tensor<?x512xi32>
 // CHECK:         %[[SCATTER:.+]] = iree_linalg_ext.scatter
+// CHECK-SAME:        unique_indices(true)
 // CHECK-SAME:        ins(%[[COLLAPSED_UPDATES]], %[[COLLAPSED_INDICES]] : tensor<?x512xi32>, tensor<?x2xi32>)
 // CHECK-SAME:        outs(%[[ARG0]] : tensor<1x24x512xi32>)
 // CHECK:             ^bb0(%[[V1:.+]]: i32, %[[V2:.+]]: i32):

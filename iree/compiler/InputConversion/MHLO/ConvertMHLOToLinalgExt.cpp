@@ -296,7 +296,7 @@ struct ScatterOpConversion : public OpConversionPattern<mhlo::ScatterOp> {
     }
     auto scatterOp = rewriter.create<IREE::LinalgExt::ScatterOp>(
         op.getLoc(), op->getResultTypes(), ValueRange{updates, indices},
-        ValueRange{original});
+        ValueRange{original}, op.unique_indices());
 
     rewriter.inlineRegionBefore(op.update_computation(), scatterOp.region(),
                                 scatterOp.region().begin());
