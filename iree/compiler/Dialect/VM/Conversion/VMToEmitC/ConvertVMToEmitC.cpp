@@ -1793,7 +1793,7 @@ class ExportOpConversion : public OpConversionPattern<IREE::VM::ExportOp> {
       // arguments.data
       auto argumentsData = rewriter.create<emitc::CallOp>(
           /*location=*/loc,
-          /*type=*/emitc::OpaqueType::get(ctx, "uint8_t*"),
+          /*type=*/emitc::PointerType::get(rewriter.getIntegerType(8, false)),
           /*callee=*/StringAttr::get(ctx, "EMITC_STRUCT_MEMBER"),
           /*args=*/
           ArrayAttr::get(ctx, {rewriter.getIndexAttr(0),
@@ -1833,7 +1833,7 @@ class ExportOpConversion : public OpConversionPattern<IREE::VM::ExportOp> {
       // results.data
       auto resultsData = rewriter.create<emitc::CallOp>(
           /*location=*/loc,
-          /*type=*/emitc::OpaqueType::get(ctx, "uint8_t*"),
+          /*type=*/emitc::PointerType::get(rewriter.getIntegerType(8, false)),
           /*callee=*/StringAttr::get(ctx, "EMITC_STRUCT_MEMBER"),
           /*args=*/
           ArrayAttr::get(ctx, {rewriter.getIndexAttr(0),
@@ -2316,7 +2316,7 @@ class ImportOpConversion : public OpConversionPattern<IREE::VM::ImportOp> {
             .getResult(0);
 
     // uint8_t *byteSpan_data = (uint8_t*)byteSpan_data_void;
-    Type bytePtr = emitc::OpaqueType::get(ctx, "uint8_t*");
+    Type bytePtr = emitc::PointerType::get(rewriter.getIntegerType(8, false));
     auto byteSpanData = rewriter
                             .create<emitc::CallOp>(
                                 /*location=*/loc,
@@ -2389,7 +2389,8 @@ class ImportOpConversion : public OpConversionPattern<IREE::VM::ImportOp> {
                 /*operands=*/ArrayRef<Value>{call})
             .getResult(0);
 
-    Type bytePtrType = emitc::OpaqueType::get(ctx, "uint8_t*");
+    Type bytePtrType =
+        emitc::PointerType::get(rewriter.getIntegerType(8, false));
     Value uint8Ptr =
         rewriter
             .create<emitc::CallOp>(
@@ -2511,7 +2512,8 @@ class ImportOpConversion : public OpConversionPattern<IREE::VM::ImportOp> {
                 /*operands=*/ArrayRef<Value>{call})
             .getResult(0);
 
-    Type bytePtrType = emitc::OpaqueType::get(ctx, "uint8_t*");
+    Type bytePtrType =
+        emitc::PointerType::get(rewriter.getIntegerType(8, false));
     Value uint8Ptr =
         rewriter
             .create<emitc::CallOp>(
