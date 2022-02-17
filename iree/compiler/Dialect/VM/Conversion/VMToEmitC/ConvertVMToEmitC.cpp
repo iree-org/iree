@@ -817,7 +817,9 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
 
     auto voidPtr = builder.create<emitc::CallOp>(
         /*location=*/loc,
-        /*type=*/emitc::OpaqueType::get(ctx, "void**"),
+        /*type=*/
+        emitc::PointerType::get(
+            emitc::PointerType::get(emitc::OpaqueType::get(ctx, "void"))),
         /*callee=*/StringAttr::get(ctx, "EMITC_CAST"),
         /*args=*/
         ArrayAttr::get(ctx, {builder.getIndexAttr(0),
@@ -1232,7 +1234,9 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
 
     auto voidPtr = builder.create<emitc::CallOp>(
         /*location=*/loc,
-        /*type=*/emitc::OpaqueType::get(ctx, "void**"),
+        /*type=*/
+        emitc::PointerType::get(
+            emitc::PointerType::get(emitc::OpaqueType::get(ctx, "void"))),
         /*callee=*/StringAttr::get(ctx, "EMITC_CAST"),
         /*args=*/
         ArrayAttr::get(ctx, {builder.getIndexAttr(0),
