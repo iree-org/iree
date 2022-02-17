@@ -4594,7 +4594,8 @@ class ListSetRefOpConversion
     auto listDerefOp = failListNull(
         /*rewriter=*/rewriter,
         /*location=*/loc,
-        /*type=*/emitc::OpaqueType::get(ctx, "iree_vm_list_t*"),
+        /*type=*/
+        emitc::PointerType::get(emitc::OpaqueType::get(ctx, "iree_vm_list_t")),
         /*callee=*/StringAttr::get(ctx, "iree_vm_list_deref"),
         /*args=*/ArrayAttr{},
         /*templateArgs=*/ArrayAttr{},
