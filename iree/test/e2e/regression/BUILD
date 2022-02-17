@@ -68,6 +68,7 @@ iree_lit_test_suite(
 iree_check_single_backend_test_suite(
     name = "check_regression_dylib-llvm-aot",
     srcs = [
+        "linalg_quantized_matmul_vs_linalg_matmul.mlir",
         "lowering_config.mlir",
     ] + BACKEND_TESTS,
     compiler_flags = ["-iree-input-type=mhlo"],
