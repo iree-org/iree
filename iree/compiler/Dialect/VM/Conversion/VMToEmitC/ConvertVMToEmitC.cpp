@@ -3837,7 +3837,7 @@ class GlobalLoadOpConversion : public OpConversionPattern<LoadOpTy> {
     BlockArgument stateArg = funcOp.getArgument(2);
     auto rwDataPtr = rewriter.create<emitc::CallOp>(
         /*location=*/loc,
-        /*type=*/emitc::OpaqueType::get(ctx, "uint8_t*"),
+        /*type=*/emitc::PointerType::get(rewriter.getIntegerType(8, false)),
         /*callee=*/StringAttr::get(ctx, "EMITC_STRUCT_PTR_MEMBER"),
         /*args=*/
         ArrayAttr::get(ctx, {rewriter.getIndexAttr(0),
