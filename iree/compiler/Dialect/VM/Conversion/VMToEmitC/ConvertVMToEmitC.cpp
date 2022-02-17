@@ -1535,7 +1535,8 @@ class ExportOpConversion : public OpConversionPattern<IREE::VM::ExportOp> {
 
     Type stackType =
         emitc::PointerType::get(emitc::OpaqueType::get(ctx, "iree_vm_stack_t"));
-    Type callType = emitc::OpaqueType::get(ctx, "iree_vm_function_call_t*");
+    Type callType = emitc::PointerType::get(
+        emitc::OpaqueType::get(ctx, "iree_vm_function_call_t"));
     Type moduleType =
         emitc::PointerType::get(emitc::OpaqueType::get(ctx, "void"));
     Type moduleStateType =
@@ -2669,15 +2670,15 @@ class ImportOpConversion : public OpConversionPattern<IREE::VM::ImportOp> {
                 /*templateArgs=*/ArrayAttr{},
                 /*operands=*/ArrayRef<Value>{import})
             .getResult(0);
-    auto callPtr =
-        rewriter
-            .create<emitc::ApplyOp>(
-                /*location=*/loc,
-                /*result=*/
-                emitc::OpaqueType::get(ctx, "iree_vm_function_call_t*"),
-                /*applicableOperator=*/StringAttr::get(ctx, "&"),
-                /*operand=*/call)
-            .getResult();
+    auto callPtr = rewriter
+                       .create<emitc::ApplyOp>(
+                           /*location=*/loc,
+                           /*result=*/
+                           emitc::PointerType::get(emitc::OpaqueType::get(
+                               ctx, "iree_vm_function_call_t")),
+                           /*applicableOperator=*/StringAttr::get(ctx, "&"),
+                           /*operand=*/call)
+                       .getResult();
     auto executionResultPtr =
         rewriter
             .create<emitc::ApplyOp>(
