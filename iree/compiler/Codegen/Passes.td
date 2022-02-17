@@ -253,6 +253,18 @@ def LLVMGPUPipelining :
   let constructor = "mlir::iree_compiler::createLLVMGPUPipeliningPass()";
 }
 
+def LLVMGPUMultiBuffering :
+    Pass<"iree-llvmgpu-multi-buffering", "FuncOp"> {
+  let summary = "Pass to do multi buffering.";
+  let constructor = "mlir::iree_compiler::createLLVMGPUMultiBuffering()";
+}
+
+def LLVMGPUVectorToGPU :
+    Pass<"iree-llvmgpu-vector-to-gpu", "FuncOp"> {
+  let summary = "Pass to convert vector to gpu.";
+  let constructor = "mlir::iree_compiler::createLLVMGPUVectorToGPU()";
+}
+
 //------------------------------------------------------------------------------
 // SPIR-V
 //------------------------------------------------------------------------------

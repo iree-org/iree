@@ -24,6 +24,11 @@
 namespace mlir {
 namespace iree_compiler {
 
+// TODO(thomasraoux): Add a new optional attribute to translate info.
+static llvm::cl::opt<unsigned> pipelineDepth("iree-codegen-cuda-pipeline-depth",
+                                             llvm::cl::desc("Pipeline depth"),
+                                             llvm::cl::init(4));
+
 static Value gpuAllocationFunction(OpBuilder &builder, Location loc,
                                    ArrayRef<int64_t> staticShape,
                                    Type elementType,
@@ -119,6 +124,8 @@ void addGPUMatmulTensorCorePassPipeline(OpPassManager &pm) {
   // Distribute linalg onto warps within the workgroup.
   pm.addNestedPass<FuncOp>(
       createLLVMGPUTileAndDistribute(/*distributeToWarp=*/true));
+  if (pipelineDepth > 1)
+    pm.addNestedPass<FuncOp>(createLLVMGPUMultiBuffering(pipelineDepth));
   pm.addNestedPass<FuncOp>(createLLVMGPUDistributeSharedMemoryCopy());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
@@ -133,12 +140,12 @@ void addGPUMatmulTensorCorePassPipeline(OpPassManager &pm) {
 
   // Vector -> MMA ops
   pm.addNestedPass<FuncOp>(memref::createFoldSubViewOpsPass());
-  pm.addNestedPass<FuncOp>(createConvertVectorToGPUPass());
+  pm.addNestedPass<FuncOp>(createLLVMGPUVectorToGPU());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
   // Pipeline memory operations.
-  pm.addNestedPass<FuncOp>(createLLVMGPUPipeliningPass());
+  pm.addNestedPass<FuncOp>(createLLVMGPUPipeliningPass(pipelineDepth));
 }
 
 void addGPUSimpleDistributePassPipeline(OpPassManager &pm) {

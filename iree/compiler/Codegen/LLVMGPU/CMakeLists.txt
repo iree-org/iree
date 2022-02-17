@@ -24,11 +24,13 @@ iree_cc_library(
     "KernelConfig.cpp"
     "LLVMGPUDistributeSharedMemoryCopy.cpp"
     "LLVMGPULowerExecutableTarget.cpp"
+    "LLVMGPUMultiBuffering.cpp"
     "LLVMGPUPipelining.cpp"
     "LLVMGPUTensorCoreVectorization.cpp"
     "LLVMGPUTileAndDistribute.cpp"
     "LLVMGPUUtils.cpp"
     "LLVMGPUVectorLowering.cpp"
+    "LLVMGPUVectorToGPU.cpp"
     "LLVMGPUVectorization.cpp"
     "Passes.cpp"
   DEPS
@@ -50,6 +52,7 @@ iree_cc_library(
     MLIRLinalgTransforms
     MLIRMath
     MLIRMathToLLVM
+    MLIRMemRef
     MLIRMemRefToLLVM
     MLIRMemRefTransforms
     MLIRNVVMIR
