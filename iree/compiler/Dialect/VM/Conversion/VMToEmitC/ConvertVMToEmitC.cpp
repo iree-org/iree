@@ -3760,7 +3760,8 @@ class FailOpConversion : public OpConversionPattern<IREE::VM::FailOp> {
 
       auto messageDataOp = rewriter.create<emitc::CallOp>(
           /*location=*/loc,
-          /*type=*/emitc::OpaqueType::get(ctx, "const char*"),
+          /*type=*/
+          emitc::PointerType::get(emitc::OpaqueType::get(ctx, "const char")),
           /*callee=*/StringAttr::get(ctx, "EMITC_STRUCT_MEMBER"),
           /*args=*/
           ArrayAttr::get(ctx, {rewriter.getIndexAttr(0),
