@@ -1541,8 +1541,8 @@ class ExportOpConversion : public OpConversionPattern<IREE::VM::ExportOp> {
         emitc::PointerType::get(emitc::OpaqueType::get(ctx, "void"));
     Type moduleStateType =
         emitc::PointerType::get(emitc::OpaqueType::get(ctx, "void"));
-    Type executionResultType =
-        emitc::OpaqueType::get(ctx, "iree_vm_execution_result_t*");
+    Type executionResultType = emitc::PointerType::get(
+        emitc::OpaqueType::get(ctx, "iree_vm_execution_result_t"));
 
     SmallVector<Type, 5> inputTypes = {stackType, callType, moduleType,
                                        moduleStateType, executionResultType};
@@ -2684,7 +2684,8 @@ class ImportOpConversion : public OpConversionPattern<IREE::VM::ImportOp> {
             .create<emitc::ApplyOp>(
                 /*location=*/loc,
                 /*result=*/
-                emitc::OpaqueType::get(ctx, "iree_vm_execution_result_t*"),
+                emitc::PointerType::get(
+                    emitc::OpaqueType::get(ctx, "iree_vm_execution_result_t")),
                 /*applicableOperator=*/StringAttr::get(ctx, "&"),
                 /*operand=*/executionResult)
             .getResult();
