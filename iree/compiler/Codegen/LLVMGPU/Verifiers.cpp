@@ -122,26 +122,6 @@ LogicalResult verifyGPUMatmulTensorCorePipeline(
   // inputs A [M x K] & B [K x N]
   linalg::MatmulOp matmulOp = dyn_cast<linalg::MatmulOp>(op);
   if (matmulOp) {
-    MemRefType type = matmulOp.getInputOperand(0)
-                          ->get()
-                          .getType()
-                          .dyn_cast<mlir::MemRefType>();
-    if (!type) {
-      return success();
-    }
-    unsigned bytesSize = type.getElementType().getIntOrFloatBitWidth() / 8;
-
-    // Input shape sizes: A [ M x K],  B [ K x N]
-    unsigned totalSharedMemSizeBytes =
-        (firstLevelTileSizes[0] * firstLevelTileSizes[2] +
-         firstLevelTileSizes[1] * firstLevelTileSizes[2]) *
-        bytesSize;
-
-    if (totalSharedMemSizeBytes > kSharedMemSizeBytes) {
-      return op->emitOpError("expected shared memory usage <= 64Kb for ")
-             << pipelineName << ", got " << totalSharedMemSizeBytes;
-    }
-
     ArrayRef<int64_t> lhsShape =
         getUntiledShape(matmulOp.getInputOperand(0)->get());
     ArrayRef<int64_t> rhsShape =
@@ -159,6 +139,38 @@ LogicalResult verifyGPUMatmulTensorCorePipeline(
       return op->emitOpError(
                  "rhsShape doesn't factor into first level tile size for ")
              << pipelineName;
+    }
+
+    unsigned bytesSize;
+    if (MemRefType type = matmulOp.getInputOperand(0)
+                              ->get()
+                              .getType()
+                              .dyn_cast<mlir::MemRefType>()) {
+      bytesSize = type.getElementType().getIntOrFloatBitWidth() / 8;
+    } else if (RankedTensorType type = matmulOp.getInputOperand(0)
+                                           ->get()
+                                           .getType()
+                                           .dyn_cast<RankedTensorType>()) {
+      bytesSize = type.getElementType().getIntOrFloatBitWidth() / 8;
+    } else if (UnrankedTensorType type = matmulOp.getInputOperand(0)
+                                             ->get()
+                                             .getType()
+                                             .dyn_cast<UnrankedTensorType>()) {
+      bytesSize = type.getElementType().getIntOrFloatBitWidth() / 8;
+    } else {
+      // Unable to determine type, skip rest of verification.
+      return success();
+    }
+
+    // Input shape sizes: A [ M x K],  B [ K x N]
+    unsigned totalSharedMemSizeBytes =
+        (firstLevelTileSizes[0] * firstLevelTileSizes[2] +
+         firstLevelTileSizes[1] * firstLevelTileSizes[2]) *
+        bytesSize;
+
+    if (totalSharedMemSizeBytes > kSharedMemSizeBytes) {
+      return op->emitOpError("expected shared memory usage <= 64Kb for ")
+             << pipelineName << ", got " << totalSharedMemSizeBytes;
     }
   }
   return success();
