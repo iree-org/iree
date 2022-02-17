@@ -720,7 +720,8 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
     OpBuilder::InsertionGuard guard(builder);
 
     auto funcType = mlir::FunctionType::get(
-        ctx, {emitc::OpaqueType::get(ctx, "void*")}, {});
+        ctx, {emitc::PointerType::get(emitc::OpaqueType::get(ctx, "void"))},
+        {});
 
     auto funcOp =
         builder.create<mlir::FuncOp>(loc, moduleName + "_destroy", funcType);
@@ -774,7 +775,7 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
 
     auto funcType = mlir::FunctionType::get(
         ctx,
-        {emitc::OpaqueType::get(ctx, "void*"),
+        {emitc::PointerType::get(emitc::OpaqueType::get(ctx, "void")),
          emitc::OpaqueType::get(ctx, "iree_allocator_t"),
          emitc::OpaqueType::get(ctx, "iree_vm_module_state_t**")},
         {emitc::OpaqueType::get(ctx, "iree_status_t")});
@@ -861,7 +862,7 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
 
       auto bufferVoid = builder.create<emitc::CallOp>(
           /*location=*/loc,
-          /*type=*/emitc::OpaqueType::get(ctx, "void*"),
+          /*type=*/emitc::PointerType::get(emitc::OpaqueType::get(ctx, "void")),
           /*callee=*/StringAttr::get(ctx, "EMITC_CAST"),
           /*args=*/
           ArrayAttr::get(ctx, {emitc::OpaqueAttr::get(ctx, bufferName),
@@ -1008,7 +1009,7 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
 
     auto funcType = mlir::FunctionType::get(
         ctx,
-        {emitc::OpaqueType::get(ctx, "void*"),
+        {emitc::PointerType::get(emitc::OpaqueType::get(ctx, "void")),
          emitc::OpaqueType::get(ctx, "iree_vm_module_state_t*")},
         {});
 
@@ -1107,7 +1108,7 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
     auto funcType = mlir::FunctionType::get(
         ctx,
         {
-            emitc::OpaqueType::get(ctx, "void*"),
+            emitc::PointerType::get(emitc::OpaqueType::get(ctx, "void")),
             emitc::OpaqueType::get(ctx, "iree_vm_module_state_t*"),
             emitc::OpaqueType::get(ctx, "iree_host_size_t"),
             emitc::OpaqueType::get(ctx, "const iree_vm_function_t*"),
@@ -1509,8 +1510,10 @@ class ExportOpConversion : public OpConversionPattern<IREE::VM::ExportOp> {
 
     Type stackType = emitc::OpaqueType::get(ctx, "iree_vm_stack_t*");
     Type callType = emitc::OpaqueType::get(ctx, "iree_vm_function_call_t*");
-    Type moduleType = emitc::OpaqueType::get(ctx, "void*");
-    Type moduleStateType = emitc::OpaqueType::get(ctx, "void*");
+    Type moduleType =
+        emitc::PointerType::get(emitc::OpaqueType::get(ctx, "void"));
+    Type moduleStateType =
+        emitc::PointerType::get(emitc::OpaqueType::get(ctx, "void"));
     Type executionResultType =
         emitc::OpaqueType::get(ctx, "iree_vm_execution_result_t*");
 
@@ -2300,7 +2303,8 @@ class ImportOpConversion : public OpConversionPattern<IREE::VM::ImportOp> {
         rewriter
             .create<emitc::CallOp>(
                 /*location=*/loc,
-                /*type=*/emitc::OpaqueType::get(ctx, "void*"),
+                /*type=*/
+                emitc::PointerType::get(emitc::OpaqueType::get(ctx, "void")),
                 /*callee=*/StringAttr::get(ctx, "iree_alloca"),
                 /*args=*/ArrayAttr{},
                 /*templateArgs=*/ArrayAttr{},
