@@ -55,7 +55,6 @@ struct ConvertToROCDLPass : public ConvertToROCDLBase<ConvertToROCDLPass> {
       RewritePatternSet patterns(&getContext());
       populateScalarizeMathOps(patterns);
       populateConvertSharedMemoryAllocOps(patterns);
-      populateLowerHALInterfaceOp(patterns);
       vector::populateVectorToVectorCanonicalizationPatterns(patterns);
       vector::populateVectorBroadcastLoweringPatterns(patterns);
       vector::populateVectorContractLoweringPatterns(
@@ -79,6 +78,7 @@ struct ConvertToROCDLPass : public ConvertToROCDLBase<ConvertToROCDLPass> {
     }
     {
       RewritePatternSet llvmPatterns(&getContext());
+      populateLowerHALInterfaceOp(llvmPatterns);
       populateLLVMConversionPatterns(&getContext(), llvmPatterns, converter);
       populateMathToLLVMConversionPatterns(converter, llvmPatterns);
       populateMemRefToLLVMConversionPatterns(converter, llvmPatterns);
