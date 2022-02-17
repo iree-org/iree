@@ -910,7 +910,9 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
 
       auto buffers = builder.create<emitc::CallOp>(
           /*location=*/loc,
-          /*type=*/emitc::OpaqueType::get(ctx, "iree_vm_buffer_t*"),
+          /*type=*/
+          emitc::PointerType::get(
+              emitc::OpaqueType::get(ctx, "iree_vm_buffer_t")),
           /*callee=*/StringAttr::get(ctx, "EMITC_STRUCT_PTR_MEMBER"),
           /*args=*/
           ArrayAttr::get(ctx, {builder.getIndexAttr(0),
@@ -920,7 +922,9 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
 
       auto buffer = builder.create<emitc::CallOp>(
           /*location=*/loc,
-          /*type=*/emitc::OpaqueType::get(ctx, "iree_vm_buffer_t*"),
+          /*type=*/
+          emitc::PointerType::get(
+              emitc::OpaqueType::get(ctx, "iree_vm_buffer_t")),
           /*callee=*/StringAttr::get(ctx, "EMITC_ARRAY_ELEMENT_ADDRESS"),
           /*args=*/
           ArrayAttr::get(ctx, {builder.getIndexAttr(0),
@@ -3304,7 +3308,9 @@ class ConstRefRodataOpConversion
     BlockArgument stateArg = funcOp.getArgument(2);
     auto rodataBuffersPtr = rewriter.create<emitc::CallOp>(
         /*location=*/loc,
-        /*type=*/emitc::OpaqueType::get(ctx, "iree_vm_buffer_t*"),
+        /*type=*/
+        emitc::PointerType::get(
+            emitc::OpaqueType::get(ctx, "iree_vm_buffer_t")),
         /*callee=*/StringAttr::get(ctx, "EMITC_STRUCT_PTR_MEMBER"),
         /*args=*/
         ArrayAttr::get(ctx, {rewriter.getIndexAttr(0),
@@ -3314,7 +3320,9 @@ class ConstRefRodataOpConversion
 
     auto byteBufferPtrOp = rewriter.create<emitc::CallOp>(
         /*location=*/loc,
-        /*type=*/emitc::OpaqueType::get(ctx, "iree_vm_buffer_t*"),
+        /*type=*/
+        emitc::PointerType::get(
+            emitc::OpaqueType::get(ctx, "iree_vm_buffer_t")),
         /*callee=*/StringAttr::get(ctx, "EMITC_ARRAY_ELEMENT_ADDRESS"),
         /*args=*/
         ArrayAttr::get(ctx,
