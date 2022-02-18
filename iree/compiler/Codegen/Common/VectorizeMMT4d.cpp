@@ -130,7 +130,7 @@ struct VectorizeMMT4DOp : public OpRewritePattern<linalg::Mmt4DOp> {
         rewriter
             .create<vector::TransferWriteOp>(loc, contractResult, dst2D,
                                              ValueRange{c0, c0}, identityMap2D)
-            .getResult(0);
+            .getResult();
     Value insertSlice = tensor::createCanonicalRankReducingInsertSliceOp(
         rewriter, loc, contractResultTensor, dst);
     rewriter.replaceOp(mmt4DOp, insertSlice);

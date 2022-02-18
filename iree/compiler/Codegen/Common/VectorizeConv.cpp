@@ -201,7 +201,7 @@ struct VectorizeLinalgConv : OpRewritePattern<linalg::Conv2DNhwcHwcfOp> {
           // Write out the output vector.
           auto writeOp = rewriter.create<vector::TransferWriteOp>(
               loc, outputVector, outputWrite, outputIndices);
-          if (hasTensorSemantics) outputWrite = writeOp.getResult(0);
+          if (hasTensorSemantics) outputWrite = writeOp.getResult();
         }
       }
     }
@@ -343,7 +343,7 @@ struct VectorizeLinalgDepthwiseConv
           // Write out the output vector.
           auto writeOp = rewriter.create<vector::TransferWriteOp>(
               loc, outputVector, outputWrite, outputIndices);
-          if (hasTensorSemantics) outputWrite = writeOp.getResult(0);
+          if (hasTensorSemantics) outputWrite = writeOp.getResult();
         }
       }
     }
