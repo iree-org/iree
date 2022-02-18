@@ -259,8 +259,9 @@ func @sort_1d(%arg0: tensor<?xi32>) -> tensor<?xi32> {
 // -----
 
 func @sort_2d(%arg0: tensor<?x?xi32>) -> tensor<?x?xi32> {
-  %0 = iree_linalg_ext.sort dimension(1)
+  %0 = iree_linalg_ext.sort
        {__internal_linalg_transform__ = "inner_reduce_input"}
+       dimension(1)
        outs(%arg0 : tensor<?x?xi32>) {
        ^bb0(%arg2: i32, %arg3: i32):  // no predecessors
          %0 = arith.cmpi sgt, %arg2, %arg3 : i32
@@ -292,8 +293,9 @@ func @sort_2d(%arg0: tensor<?x?xi32>) -> tensor<?x?xi32> {
 // -----
 
 func @sort_2d_inner_parallel(%arg0: tensor<?x?xi32>) -> tensor<?x?xi32> {
-  %0 = iree_linalg_ext.sort dimension(0)
+  %0 = iree_linalg_ext.sort
        {__internal_linalg_transform__ = "outer_reduce_input"}
+       dimension(0)
        outs(%arg0 : tensor<?x?xi32>) {
        ^bb0(%arg2: i32, %arg3: i32):  // no predecessors
          %0 = arith.cmpi sgt, %arg2, %arg3 : i32
@@ -327,8 +329,9 @@ func @sort_2d_inner_parallel(%arg0: tensor<?x?xi32>) -> tensor<?x?xi32> {
 func @sort_2d_multi_result(
     %arg0: tensor<?x?xi32>, %arg1: tensor<?x?xf32>)
     -> (tensor<?x?xi32>, tensor<?x?xf32>) {
-  %0:2 = iree_linalg_ext.sort dimension(1)
+  %0:2 = iree_linalg_ext.sort
        {__internal_linalg_transform__ = "inner_reduce_input"}
+       dimension(1)
        outs(%arg0, %arg1 : tensor<?x?xi32>, tensor<?x?xf32>) {
        ^bb0(%arg2: i32, %arg3: i32, %arg4 : f32, %arg5 : f32):  // no predecessors
          %1 = arith.cmpf ogt, %arg4, %arg5 : f32
@@ -366,8 +369,9 @@ func @sort_2d_multi_result(
 
 func @sort_2d_multi_result_memref(
     %arg0: memref<?x?xi32>, %arg1: memref<?x?xf32>) {
-  iree_linalg_ext.sort dimension(0)
+  iree_linalg_ext.sort
      {__internal_linalg_transform__ = "outer_reduce_input"}
+     dimension(0)
      outs(%arg0, %arg1 : memref<?x?xi32>, memref<?x?xf32>) {
      ^bb0(%arg2: i32, %arg3: i32, %arg4 : f32, %arg5 : f32):  // no predecessors
        %0 = arith.cmpf ogt, %arg4, %arg5 : f32
@@ -399,8 +403,9 @@ func @sort_2d_multi_result_memref(
 func @sort_3d_multi_result_distribute(
   %arg0: tensor<?x?x?xi32>, %arg1 : tensor<?x?x?xf32>)
   -> (tensor<?x?x?xi32>, tensor<?x?x?xf32>) {
-  %0, %1 = iree_linalg_ext.sort dimension(1)
+  %0, %1 = iree_linalg_ext.sort
       {__internal_linalg_transform__ = "distribute_input"}
+      dimension(1)
       outs(%arg0, %arg1 : tensor<?x?x?xi32>, tensor<?x?x?xf32>) {
       ^bb0(%arg2: i32, %arg3: i32, %arg4 : f32, %arg5 : f32):  // no predecessors
         %2 = arith.cmpf ogt, %arg4, %arg5 : f32
@@ -456,8 +461,9 @@ func @sort_3d_multi_result_distribute(
 
 func @sort_3d_multi_result_distribute_memref(
   %arg0: memref<?x?x?xi32>, %arg1 : memref<?x?x?xf32>) {
-  iree_linalg_ext.sort dimension(1)
+  iree_linalg_ext.sort
       {__internal_linalg_transform__ = "distribute_input"}
+      dimension(1)
       outs(%arg0, %arg1 : memref<?x?x?xi32>, memref<?x?x?xf32>) {
       ^bb0(%arg2: i32, %arg3: i32, %arg4 : f32, %arg5 : f32):  // no predecessors
         %0 = arith.cmpf ogt, %arg4, %arg5 : f32
@@ -676,8 +682,8 @@ func @fft_1d_stage_5_memref(%arg0: memref<1024xf32>, %arg1: memref<1024xf32>,
 
 func @reverse_memref(%arg0: memref<?xi32>, %arg1: memref<?xi32>) {
   iree_linalg_ext.reverse
-    dimensions(dense<0> : tensor<1xi64>)
     {__internal_linalg_transform__ = "tiling_input"}
+    dimensions(dense<0> : tensor<1xi64>)
     ins(%arg0: memref<?xi32>)
     outs(%arg1: memref<?xi32>)
   return
@@ -698,8 +704,8 @@ func @reverse_memref(%arg0: memref<?xi32>, %arg1: memref<?xi32>) {
 // CHECK:          %[[IDX:.+]] = affine.apply #[[MAP2]]()[%[[T0]], %[[I]], %[[SIZE]]]
 // CHECK:          %[[SUB_OUT:.+]] = memref.subview %[[ARG1]][%[[IDX]]] [%[[SIZE]]] [1]
 // CHECK:          iree_linalg_ext.reverse
-// CHECK-SAME:       dimensions(dense<0> : tensor<1xi64>)
 // CHECK-SAME:       {__internal_linalg_transform__ = "tiling_output"}
+// CHECK-SAME:       dimensions(dense<0> : tensor<1xi64>)
 // CHECK-SAME:       ins(%[[SUB_IN]]
 // CHECK-SAME:       outs(%[[SUB_OUT]]
 
@@ -712,8 +718,8 @@ func @reverse_tensor_multi_dim(%arg0: tensor<?x?xi32>) -> tensor<?x?xi32> {
   %d1 = tensor.dim %arg0, %c1 : tensor<?x?xi32>
   %init = linalg.init_tensor [%d0, %d1] : tensor<?x?xi32>
   %0 = iree_linalg_ext.reverse
-         dimensions(dense<[0, 1]> : tensor<2xi64>)
          {__internal_linalg_transform__ = "tiling_input"}
+         dimensions(dense<[0, 1]> : tensor<2xi64>)
          ins(%arg0: tensor<?x?xi32>)
          outs(%init: tensor<?x?xi32>) : tensor<?x?xi32>
   return %0 : tensor<?x?xi32>
@@ -747,8 +753,8 @@ func @reverse_tensor_multi_dim(%arg0: tensor<?x?xi32>) -> tensor<?x?xi32> {
 // CHECK:            %[[SUB_INIT:.+]] = tensor.extract_slice
 // CHECK-SAME:         %[[INIT]][%[[IDX0]], %[[IDX1]]] [%[[SIZE_I]], %[[SIZE_J]]] [1, 1]
 // CHECK:            %[[REV:.+]] = iree_linalg_ext.reverse
-// CHECK-SAME:          dimensions(dense<[0, 1]> : tensor<2xi64>)
 // CHECK-SAME:          {__internal_linalg_transform__ = "tiling_output"}
+// CHECK-SAME:          dimensions(dense<[0, 1]> : tensor<2xi64>)
 // CHECK-SAME:          ins(%[[SUB_IN]]
 // CHECK-SAME:          outs(%[[SUB_INIT]]
 // CHECK:            %[[RES3:.+]] = tensor.insert_slice %[[REV]] into
@@ -1247,8 +1253,8 @@ func @scan_1d(%0: tensor<128xi32>) -> tensor<128xi32> {
   %c0 = linalg.init_tensor [] : tensor<i32>
   %1 = linalg.init_tensor [128] : tensor<128xi32>
   %2:2 = iree_linalg_ext.scan
-    dimension(0) inclusive(true)
     {__internal_linalg_transform__ = "outer_reduce_input"}
+    dimension(0) inclusive(true)
     ins(%0 : tensor<128xi32>) outs(%1, %c0 : tensor<128xi32>, tensor<i32>) {
     ^bb0(%arg0 : i32, %arg1 : i32):
       %sum = arith.addi %arg0, %arg1 : i32
@@ -1272,8 +1278,8 @@ func @scan_2d(%0: tensor<16x32xi32>) -> tensor<16x32xi32> {
   %c0 = linalg.init_tensor [32] : tensor<32xi32>
   %1 = linalg.init_tensor [16, 32] : tensor<16x32xi32>
   %2:2 = iree_linalg_ext.scan
-    dimension(0) inclusive(true)
     {__internal_linalg_transform__ = "outer_reduce_input"}
+    dimension(0) inclusive(true)
     ins(%0 : tensor<16x32xi32>) outs(%1, %c0 : tensor<16x32xi32>, tensor<32xi32>) {
     ^bb0(%arg0 : i32, %arg1 : i32):
       %sum = arith.addi %arg0, %arg1 : i32
@@ -1297,8 +1303,8 @@ func @scan_2d(%0: tensor<16x32xi32>) -> tensor<16x32xi32> {
 //      CHECK:      %[[UPDATE_SLICE_OUT:.+]] = tensor.extract_slice %[[ARG2]][0, %[[I]]] [%[[C16]], %[[SIZE]]]
 //      CHECK:      %[[UPDATE_SLICE_ACC:.+]] = tensor.extract_slice %[[ARG3]][%[[I]]] [%[[SIZE]]]
 //      CHECK:      %[[SCAN_TILE:.+]]:2 = iree_linalg_ext.scan
-// CHECK-SAME:       dimension(0) inclusive(true)
 // CHECK-SAME:       {__internal_linalg_transform__ = "outer_reduce_output"}
+// CHECK-SAME:       dimension(0) inclusive(true)
 // CHECK-SAME:       ins(%[[UPDATE_SLICE_IN]]
 // CHECK-SAME:       outs(%[[UPDATE_SLICE_OUT]], %[[UPDATE_SLICE_ACC]]
 //      CHECK:       %[[YIELD:.+]] = tensor.insert_slice %[[SCAN_TILE]]#0 into %[[ARG2]][0, %[[I]]]
@@ -1313,8 +1319,8 @@ func @scan_2d(%0: tensor<16x32xi32>) -> tensor<16x32xi32> {
 func @scan_2d_memref(%0: memref<16x32xi32>, %1: memref<16x32xi32>) {
   %c0 = memref.alloc() : memref<32xi32>
   iree_linalg_ext.scan
-    dimension(0) inclusive(true)
     {__internal_linalg_transform__ = "outer_reduce_input"}
+    dimension(0) inclusive(true)
     ins(%0 : memref<16x32xi32>) outs(%1, %c0 : memref<16x32xi32>, memref<32xi32>) {
     ^bb0(%arg0 : i32, %arg1 : i32):
       %sum = arith.addi %arg0, %arg1 : i32
@@ -1338,8 +1344,8 @@ func @scan_2d_memref(%0: memref<16x32xi32>, %1: memref<16x32xi32>) {
 //      CHECK:      %[[UPDATE_SLICE_OUT:.+]] = memref.subview %[[ARG1]][0, %[[I]]] [%[[C16]], %[[SIZE]]]
 //      CHECK:      %[[UPDATE_SLICE_ACC:.+]] = memref.subview %[[ACC]][%[[I]]] [%[[SIZE]]]
 //      CHECK:      iree_linalg_ext.scan
-// CHECK-SAME:       dimension(0) inclusive(true)
 // CHECK-SAME:       {__internal_linalg_transform__ = "outer_reduce_output"}
+// CHECK-SAME:       dimension(0) inclusive(true)
 // CHECK-SAME:       ins(%[[UPDATE_SLICE_IN]]
 // CHECK-SAME:       outs(%[[UPDATE_SLICE_OUT]], %[[UPDATE_SLICE_ACC]]
 //      CHECK:   return

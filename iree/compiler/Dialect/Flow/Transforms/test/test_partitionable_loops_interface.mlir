@@ -145,8 +145,9 @@ func @mmt4d_unit_dim(%lhs : tensor<1x?x?x?xf32>, %rhs : tensor<?x?x?x?xf32>,
 // -----
 
 func @sort(%arg0 : tensor<?x?xf32>) -> tensor<?x?xf32> {
-  %0 = iree_linalg_ext.sort dimension(0)
+  %0 = iree_linalg_ext.sort
       {__test_interface__ = true}
+      dimension(0)
       outs(%arg0 : tensor<?x?xf32>) {
         ^bb0(%arg1 : f32, %arg2 : f32):
           %1  = arith.cmpf ogt, %arg1, %arg2 : f32
@@ -160,8 +161,9 @@ func @sort(%arg0 : tensor<?x?xf32>) -> tensor<?x?xf32> {
 // -----
 
 func @sort_unit_dim(%arg0 : tensor<?x1xf32>) -> tensor<?x1xf32> {
-  %0 = iree_linalg_ext.sort dimension(0)
+  %0 = iree_linalg_ext.sort
       {__test_interface__ = true}
+      dimension(0)
       outs(%arg0 : tensor<?x1xf32>) {
         ^bb0(%arg1 : f32, %arg2 : f32):
           %1  = arith.cmpf ogt, %arg1, %arg2 : f32
