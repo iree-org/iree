@@ -228,6 +228,9 @@ def iree_generated_trace_runner_test(
     processed_opt_flags = [flag.replace("#pass_options_variant#", "") for flag in opt_flags]
     processsed_compiler_flags = [flag.replace("#pass_options_variant#", "") for flag in compiler_flags]
     for backend, driver in target_backends_and_drivers:
+        # CUDA backend/driver not supported by Bazel build.
+        if backend == "cuda" or driver == "cuda":
+            continue
         suite_entry_name = "_".join([name, backend, driver])
         iree_single_backend_generated_trace_runner_test(
             name = suite_entry_name,
