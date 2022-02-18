@@ -160,8 +160,8 @@ def IREELinalgExt_SortOp : IREELinalgExt_Op<"sort",
   let results = (outs Variadic<AnyRankedTensor>:$results);
   let regions = (region AnyRegion:$region);
   let assemblyFormat = [{
-    (`dimension` `(` $dimension^ `)`)?
-    attr-dict (`ins` `(` $inputs^ `:` type($inputs) `)`)?
+    attr-dict (`dimension` `(` $dimension^ `)`)?
+    (`ins` `(` $inputs^ `:` type($inputs) `)`)?
     `outs` `(` $outputs `:` type($outputs) `)`
     $region (`->` type($results)^)?
   }];
@@ -279,9 +279,9 @@ def IREELinalgExt_ScanOp : IREELinalgExt_Op<"scan",
   let regions = (region AnyRegion:$region);
   let hasFolder = 1;
   let assemblyFormat = [{
+    attr-dict
     `dimension` `(` $dimension `)`
     `inclusive` `(` $inclusive `)`
-    attr-dict
     `ins` `(` $inputs `:` type($inputs) `)`
     `outs` `(` $outputs `:` type($outputs) `)`
     $region (`->` type($results)^)?
@@ -327,8 +327,8 @@ def IREELinalgExt_ReverseOp : IREELinalgExt_Op<"reverse", [
   );
   let results = (outs Variadic<AnyRankedTensor>:$results);
   let assemblyFormat = [{
-    `dimensions` `(` $dimensions `)`
-    attr-dict (`ins` `(` $inputs^ `:` type($inputs) `)`)?
+    attr-dict `dimensions` `(` $dimensions `)`
+    (`ins` `(` $inputs^ `:` type($inputs) `)`)?
     (`outs` `(` $outputs^ `:` type($outputs) `)`)?
     (`:` type($results)^)?
   }];

@@ -19,7 +19,7 @@ hal.executable private @static_1d_sort {
         %c0 = arith.constant 0 : index
         %0 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : !flow.dispatch.tensor<readwrite:1000xi32>
         %1 = flow.dispatch.tensor.load %0, offsets = [0], sizes = [1000], strides = [1] : !flow.dispatch.tensor<readwrite:1000xi32> -> tensor<1000xi32>
-        %2 = iree_linalg_ext.sort dimension(0) {__internal_linalg_transform__ = "workgroup"} outs(%1 : tensor<1000xi32>)  {
+        %2 = iree_linalg_ext.sort {__internal_linalg_transform__ = "workgroup"} dimension(0) outs(%1 : tensor<1000xi32>)  {
         ^bb0(%arg0: i32, %arg1: i32):  // no predecessors
           %3 = arith.cmpi slt, %arg0, %arg1 : i32
           iree_linalg_ext.yield %3 : i1
@@ -92,7 +92,7 @@ hal.executable private @static_3d_sort {
               ^bb0(%arg4: i32, %s: i32):  // no predecessors
                 linalg.yield %arg4 : i32
             }
-            iree_linalg_ext.sort dimension(1) {__internal_linalg_transform__ = "workgroup"} outs(%10 : memref<?x32x?xi32, affine_map<(d0, d1, d2)[s0] -> (d0 * 4096 + s0 + d1 * 128 + d2)>>)  {
+            iree_linalg_ext.sort {__internal_linalg_transform__ = "workgroup"} dimension(1) outs(%10 : memref<?x32x?xi32, affine_map<(d0, d1, d2)[s0] -> (d0 * 4096 + s0 + d1 * 128 + d2)>>)  {
             ^bb0(%arg2: i32, %arg3: i32):  // no predecessors
               %11 = arith.cmpi slt, %arg2, %arg3 : i32
               iree_linalg_ext.yield %11 : i1

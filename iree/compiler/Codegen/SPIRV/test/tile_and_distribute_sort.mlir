@@ -34,12 +34,12 @@ hal.executable private @static_3d_sort  {
             %6 = memref.subview %1[%arg0, 0, %arg1] [1, 32, 16] [1, 1, 1] : memref<64x32x128xi32> to memref<1x32x16xi32, affine_map<(d0, d1, d2)[s0] -> (d0 * 4096 + s0 + d1 * 128 + d2)>>
             %7 = memref.cast %6 : memref<1x32x16xi32, affine_map<(d0, d1, d2)[s0] -> (d0 * 4096 + s0 + d1 * 128 + d2)>> to memref<?x32x?xi32, affine_map<(d0, d1, d2)[s0] -> (d0 * 4096 + s0 + d1 * 128 + d2)>>
             linalg.generic {lowering.config = #config, indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1, d2)>], iterator_types = ["parallel", "parallel", "parallel"]}
-              ins(%5 : memref<?x?x?xi32>) 
+              ins(%5 : memref<?x?x?xi32>)
               outs(%6 : memref<1x32x16xi32, affine_map<(d0, d1, d2)[s0] -> (d0 * 4096 + s0 + d1 * 128 + d2)>>) {
               ^bb0(%arg4: i32, %s: i32):  // no predecessors
                 linalg.yield %arg4 : i32
             }
-            iree_linalg_ext.sort dimension(1) {lowering.config = #config} outs(%7 : memref<?x32x?xi32, affine_map<(d0, d1, d2)[s0] -> (d0 * 4096 + s0 + d1 * 128 + d2)>>)  {
+            iree_linalg_ext.sort {lowering.config = #config} dimension(1) outs(%7 : memref<?x32x?xi32, affine_map<(d0, d1, d2)[s0] -> (d0 * 4096 + s0 + d1 * 128 + d2)>>)  {
             ^bb0(%arg2: i32, %arg3: i32):  // no predecessors
               %8 = arith.cmpi slt, %arg2, %arg3 : i32
               iree_linalg_ext.yield %8 : i1
@@ -73,5 +73,6 @@ hal.executable private @static_3d_sort  {
 //       CHECK:       scf.for %[[IV_X:.+]] = %[[TID_X]] to %{{.+}} step %[[DIM_X]]
 //       CHECK:         %[[COPY_DEST:.+]] = memref.subview %[[WG_OUTPUT]][%[[IV_Y]], 0, %[[IV_X]]]
 //       CHECK:         %[[T_OUTPUT_CAST:.+]] = memref.cast %[[COPY_DEST]]
-//       CHECK:         iree_linalg_ext.sort dimension(1)
+//       CHECK:         iree_linalg_ext.sort
+//  CHECK-SAME:           dimension(1)
 //  CHECK-SAME:           outs(%[[T_OUTPUT_CAST]]
