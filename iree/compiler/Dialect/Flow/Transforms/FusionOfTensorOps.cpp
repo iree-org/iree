@@ -19,11 +19,6 @@
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
-static llvm::cl::opt<bool> clEnableFusionWithReductionOps(
-    "iree-enable-fusion-with-reduction-ops",
-    llvm::cl::desc("Allow fusing generic ops with reductions"),
-    llvm::cl::init(true));
-
 namespace mlir {
 namespace iree_compiler {
 namespace IREE {
@@ -54,16 +49,6 @@ struct FusionOfTensorOpsPass
         [](const OpResult &producerResult, OpOperand &consumerOperand) {
           Operation *producer = producerResult.getOwner();
           Operation *consumer = consumerOperand.getOwner();
-
-          // TODO(#5611): Enable fusion with reduction consumer for all targets.
-          // Currently vectorization doesn't handle generic ops with reduction
-          // iterators we will disable for now to allow vectorizing producer
-          // pointwise ops to avoid performance regressions on CPU.
-          if (!clEnableFusionWithReductionOps) {
-            if (auto genericOp = dyn_cast<linalg::GenericOp>(consumer)) {
-              if (genericOp.getNumReductionLoops()) return false;
-            }
-          }
 
           // Limit the number of operands. We have hard limit (32) of bindings
           // passing down to HAL. Set the number to be as same as the limit --
