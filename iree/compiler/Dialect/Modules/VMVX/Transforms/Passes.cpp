@@ -30,6 +30,10 @@ namespace VMVX {
 static void buildVectorVMVXTransformPassPipeline(OpPassManager &passManager) {
   passManager.nest<ModuleOp>().nest<FuncOp>().addPass(
       createTypePropagationPass());
+  passManager.nest<ModuleOp>().nest<FuncOp>().addPass(
+      createTileAndDistributeToWorkgroupsPass());
+  passManager.addPass(createCanonicalizerPass());
+  passManager.addPass(createCSEPass());
   passManager.addPass(createLLVMCPULowerExecutableTargetPass());
 
   OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
