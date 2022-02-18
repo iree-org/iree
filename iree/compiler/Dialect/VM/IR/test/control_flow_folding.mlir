@@ -7,7 +7,7 @@ vm.module @cond_br_folds {
   // CHECK-LABEL: @const_cond_br_true
   vm.func @const_cond_br_true(%arg0 : i32, %arg1 : i32) -> i32 {
     // CHECK-NEXT: vm.return %arg0 : i32
-    %c1 = vm.const.i32 1 : i32
+    %c1 = vm.const.i32 1
     vm.cond_br %c1, ^bb1(%arg0 : i32), ^bb2(%arg1 : i32)
   ^bb1(%0 : i32):
     vm.return %0 : i32
@@ -18,7 +18,7 @@ vm.module @cond_br_folds {
   // CHECK-LABEL: @const_cond_br_false
   vm.func @const_cond_br_false(%arg0 : i32, %arg1 : i32) -> i32 {
     // CHECK-NEXT: vm.return %arg1 : i32
-    %zero = vm.const.i32.zero : i32
+    %zero = vm.const.i32.zero
     vm.cond_br %zero, ^bb1(%arg0 : i32), ^bb2(%arg1 : i32)
   ^bb1(%0 : i32):
     vm.return %0 : i32
@@ -47,7 +47,7 @@ vm.module @cond_br_folds {
   // // DISABLED-LABEL: @swap_inverted_cond_br
   // vm.func @swap_inverted_cond_br(%arg0 : i32, %arg1 : i32, %arg2 : i32) -> i32 {
   //   // DISABLED-NEXT: vm.cond_br %arg0, ^bb2(%arg1 : i32), ^bb1(%arg0 : i32)
-  //   %c1 = vm.const.i32 1 : i32
+  //   %c1 = vm.const.i32 1
   //   %inv = vm.xor.i32 %arg0, %c1 : i32
   //   vm.cond_br %inv, ^bb1(%arg0 : i32), ^bb2(%arg1 : i32)
   // ^bb1(%0 : i32):

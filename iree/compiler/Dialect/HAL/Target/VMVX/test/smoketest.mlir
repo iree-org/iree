@@ -47,11 +47,11 @@ stream.executable public @add_dispatch_0 {
 //  CHECK-NEXT:         vm.func private @add_dispatch_0(
 //  CHECK-SAME:             %[[SCRATCHPAD:.+]]: !vm.buffer, %[[CONSTANTS:.+]]: !vm.buffer,
 //  CHECK-SAME:             %[[BINDINGS:.+]]: !vm.list<!vm.buffer>
-//   CHECK-DAG:           %c16 = vm.const.i32 16 : i32
-//   CHECK-DAG:           %zero = vm.const.i32.zero : i32
-//   CHECK-DAG:           %c1 = vm.const.i32 1 : i32
-//   CHECK-DAG:           %c2 = vm.const.i32 2 : i32
-//   CHECK-DAG:           %c4 = vm.const.i32 4 : i32
+//   CHECK-DAG:           %c16 = vm.const.i32 16
+//   CHECK-DAG:           %zero = vm.const.i32.zero
+//   CHECK-DAG:           %c1 = vm.const.i32 1
+//   CHECK-DAG:           %c2 = vm.const.i32 2
+//   CHECK-DAG:           %c4 = vm.const.i32 4
 //  CHECK-NEXT:           %[[LHS_BUF:.+]] = vm.list.get.ref %[[BINDINGS]], %zero : (!vm.list<!vm.buffer>, i32) -> !vm.buffer
 //  CHECK-NEXT:           %[[RHS_BUF:.+]] = vm.list.get.ref %[[BINDINGS]], %c1 : (!vm.list<!vm.buffer>, i32) -> !vm.buffer
 //  CHECK-NEXT:           %[[RET_BUF:.+]] = vm.list.get.ref %[[BINDINGS]], %c2 : (!vm.list<!vm.buffer>, i32) -> !vm.buffer

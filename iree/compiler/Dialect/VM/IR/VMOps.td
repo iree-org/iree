@@ -360,8 +360,6 @@ class VM_GlobalOp<string mnemonic, Attr attr_type, list<Trait> traits = []> :
     Optional<IntegerAttr> getOrdinalAttr() { return ordinalAttr(); }
   }];
 
-  let parser = [{ return parseGlobalOp(parser, &result); }];
-  let printer = [{ return printGlobalOp(p, *this); }];
   let verifier = [{ return verifyGlobalOp(*this); }];
 }
 
@@ -790,9 +788,7 @@ class VM_ConstantPrimitiveOp<Type type, int width, string mnemonic,
     VM_EncResult<"result">,
   ];
 
-  let hasCustomAssemblyFormat = 0;
-  let parser = [{ return parseConstOp<$cppClass>(parser, result); }];
-  let printer = [{ return printConstOp<$cppClass>(p, *this); }];
+  let assemblyFormat = "$value attr-dict";
 }
 
 def VM_ConstI32Op :
@@ -855,7 +851,7 @@ class VM_ConstantPrimitiveZeroOp<Type type, string mnemonic, VM_OPC opcode,
     type:$result
   );
 
-  let assemblyFormat = "`:` type($result) attr-dict";
+  let assemblyFormat = "attr-dict";
 
   let encoding = [
     VM_EncOpcode<opcode>,
@@ -3654,7 +3650,7 @@ def VM_FailOp : VM_Op<"fail", [
     or pending when the failure occurs will complete.
 
     ```
-    %statusCode = vm.const.i32 9 : i32
+    %statusCode = vm.const.i32 9
     vm.fail %statusCode, "oh no!"
     ```
   }];
@@ -3708,7 +3704,7 @@ def VM_CondFailOp : VM_Op<"cond_fail", [
 
     ```
     %nz = vm.cmp.nz.i32 %value : i32
-    %statusCode = vm.const.i32 9 : i32
+    %statusCode = vm.const.i32 9
     vm.cond_fail %nz, %statusCode, "expected non-zero"
     ```
   }];

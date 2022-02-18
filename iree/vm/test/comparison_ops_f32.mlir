@@ -6,24 +6,24 @@ vm.module @comparison_ops_f32 {
 
   vm.export @test_cmp_lt_0_f32
   vm.func @test_cmp_lt_0_f32() {
-    %lhs = vm.const.f32 4.0 : f32
+    %lhs = vm.const.f32 4.0
     %lhs_dno = util.do_not_optimize(%lhs) : f32
-    %rhs = vm.const.f32 -4.0 : f32
+    %rhs = vm.const.f32 -4.0
     %rhs_dno = util.do_not_optimize(%rhs) : f32
     %actual = vm.cmp.lt.f32.o %lhs_dno, %rhs_dno : f32
-    %expected = vm.const.i32 0 : i32
+    %expected = vm.const.i32 0
     vm.check.eq %actual, %expected, "4.0 < -4.0" : i32
     vm.return
   }
 
   vm.export @test_cmp_lt_1_f32
   vm.func @test_cmp_lt_1_f32() {
-    %lhs = vm.const.f32 -4.0 : f32
+    %lhs = vm.const.f32 -4.0
     %lhs_dno = util.do_not_optimize(%lhs) : f32
-    %rhs = vm.const.f32 4.0 : f32
+    %rhs = vm.const.f32 4.0
     %rhs_dno = util.do_not_optimize(%rhs) : f32
     %actual = vm.cmp.lt.f32.o %lhs_dno, %rhs_dno : f32
-    %expected = vm.const.i32 1 : i32
+    %expected = vm.const.i32 1
     vm.check.eq %actual, %expected, "-4.0 < 4.0" : i32
     vm.return
   }
@@ -37,12 +37,12 @@ vm.module @comparison_ops_f32 {
 
   vm.export @test_cmp_lte_f32
   vm.func @test_cmp_lte_f32() {
-    %true = vm.const.i32 1 : i32
-    %false = vm.const.i32 0 : i32
+    %true = vm.const.i32 1
+    %false = vm.const.i32 0
 
-    %cn2 = vm.const.f32 -2.0 : f32
+    %cn2 = vm.const.f32 -2.0
     %cn2_dno = util.do_not_optimize(%cn2) : f32
-    %c2 = vm.const.f32 2.0 : f32
+    %c2 = vm.const.f32 2.0
     %c2_dno = util.do_not_optimize(%c2) : f32
 
     %cmp_0 = vm.cmp.lte.f32.o %cn2_dno, %c2_dno : f32
@@ -57,12 +57,12 @@ vm.module @comparison_ops_f32 {
 
   vm.export @test_cmp_gt_f32
   vm.func @test_cmp_gt_f32() {
-    %true = vm.const.i32 1 : i32
-    %false = vm.const.i32 0 : i32
+    %true = vm.const.i32 1
+    %false = vm.const.i32 0
 
-    %cn2 = vm.const.f32 -2.0 : f32
+    %cn2 = vm.const.f32 -2.0
     %cn2_dno = util.do_not_optimize(%cn2) : f32
-    %c2 = vm.const.f32 2.0 : f32
+    %c2 = vm.const.f32 2.0
     %c2_dno = util.do_not_optimize(%c2) : f32
 
     %cmp_0 = vm.cmp.gt.f32.o %cn2_dno, %c2_dno : f32
@@ -77,12 +77,12 @@ vm.module @comparison_ops_f32 {
 
   vm.export @test_cmp_gte_f32
   vm.func @test_cmp_gte_f32() {
-    %true = vm.const.i32 1 : i32
-    %false = vm.const.i32 0 : i32
+    %true = vm.const.i32 1
+    %false = vm.const.i32 0
 
-    %cn2 = vm.const.f32 -2.0 : f32
+    %cn2 = vm.const.f32 -2.0
     %cn2_dno = util.do_not_optimize(%cn2) : f32
-    %c2 = vm.const.f32 2.0 : f32
+    %c2 = vm.const.f32 2.0
     %c2_dno = util.do_not_optimize(%c2) : f32
 
     %cmp_0 = vm.cmp.gte.f32.o %cn2_dno, %c2_dno : f32

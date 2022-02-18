@@ -49,7 +49,7 @@ vm.module @constant_ops {
     // CHECK: int32_t [[CONST:[^ ]*]];
     // CHECK-NOT: [[CONST]] = 4294967292;
     // CHECK: [[CONST]] = -4;
-    %c-4_i32 = vm.const.i32 -4 : i32
+    %c-4_i32 = vm.const.i32 -4
     vm.return %c-4_i32 : i32
   }
 }

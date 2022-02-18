@@ -6,13 +6,13 @@ vm.module @list_variant_ops {
 
   vm.export @test_listception
   vm.func @test_listception() {
-    %c0 = vm.const.i32 0 : i32
-    %c1 = vm.const.i32 1 : i32
-    %c2 = vm.const.i32 2 : i32
-    %c3 = vm.const.i32 3 : i32
-    %c100 = vm.const.i32 100 : i32
-    %c101 = vm.const.i32 101 : i32
-    %c102 = vm.const.i32 102 : i32
+    %c0 = vm.const.i32 0
+    %c1 = vm.const.i32 1
+    %c2 = vm.const.i32 2
+    %c3 = vm.const.i32 3
+    %c100 = vm.const.i32 100
+    %c101 = vm.const.i32 101
+    %c102 = vm.const.i32 102
 
     // [100, 101, 102]
     %inner0 = vm.list.alloc %c3 : (i32) -> !vm.list<i32>
@@ -29,7 +29,7 @@ vm.module @list_variant_ops {
     vm.list.set.i32 %inner1, %c2, %c100 : (!vm.list<i32>, i32, i32)
 
     // [ [100, 101, 102], [102, 101, 100] ]
-    %capacity = vm.const.i32 8 : i32
+    %capacity = vm.const.i32 8
     %outer = vm.list.alloc %capacity : (i32) -> !vm.list<!vm.list<i32>>
     vm.list.resize %outer, %c2 : (!vm.list<!vm.list<i32>>, i32)
     vm.list.set.ref %outer, %c0, %inner0 : (!vm.list<!vm.list<i32>>, i32, !vm.list<i32>)
@@ -56,25 +56,25 @@ vm.module @list_variant_ops {
 
   vm.export @test_variant
   vm.func @test_variant() {
-    %capacity = vm.const.i32 42 : i32
+    %capacity = vm.const.i32 42
     %list = vm.list.alloc %capacity : (i32) -> !vm.list<?>
     vm.list.resize %list, %capacity : (!vm.list<?>, i32)
 
     // Access element 10 as an i32.
-    %c10 = vm.const.i32 10 : i32
-    %v10_i32 = vm.const.i32 1234 : i32
+    %c10 = vm.const.i32 10
+    %v10_i32 = vm.const.i32 1234
     vm.list.set.i32 %list, %c10, %v10_i32 : (!vm.list<?>, i32, i32)
     %e10_i32 = vm.list.get.i32 %list, %c10 : (!vm.list<?>, i32) -> i32
     vm.check.eq %e10_i32, %v10_i32 : i32
 
     // Access element 10 as an i64.
-    %v10_i64 = vm.const.i64 1234 : i64
+    %v10_i64 = vm.const.i64 1234
     vm.list.set.i64 %list, %c10, %v10_i64 : (!vm.list<?>, i32, i64)
     %e10_i64 = vm.list.get.i64 %list, %c10 : (!vm.list<?>, i32) -> i64
     vm.check.eq %e10_i64, %v10_i64 : i64
 
     // Access element 11 as a ref object.
-    %c11 = vm.const.i32 11 : i32
+    %c11 = vm.const.i32 11
     %v11_buf = vm.const.ref.rodata @byte_buffer : !vm.buffer
     vm.list.set.ref %list, %c11, %v11_buf : (!vm.list<?>, i32, !vm.buffer)
     %e11_buf = vm.list.get.ref %list, %c11 : (!vm.list<?>, i32) -> !vm.buffer
@@ -95,8 +95,8 @@ vm.module @list_variant_ops {
 
   vm.export @fail_uninitialized_access
   vm.func @fail_uninitialized_access() {
-    %c0 = vm.const.i32 0 : i32
-    %c1 = vm.const.i32 1 : i32
+    %c0 = vm.const.i32 0
+    %c1 = vm.const.i32 1
 
     %ref = vm.const.ref.rodata @byte_buffer : !vm.buffer
     %list = vm.list.alloc %c1 : (i32) -> !vm.list<?>
@@ -107,7 +107,7 @@ vm.module @list_variant_ops {
 
   vm.export @fail_out_of_bounds_read
   vm.func @fail_out_of_bounds_read() {
-    %c1 = vm.const.i32 1 : i32
+    %c1 = vm.const.i32 1
 
     %list = vm.list.alloc %c1 : (i32) -> !vm.list<?>
     vm.list.resize %list, %c1 : (!vm.list<?>, i32)
@@ -119,8 +119,8 @@ vm.module @list_variant_ops {
 
   vm.export @fail_out_of_bounds_write
   vm.func @fail_out_of_bounds_write() {
-    %c0 = vm.const.i32 0 : i32
-    %c1 = vm.const.i32 1 : i32
+    %c0 = vm.const.i32 0
+    %c1 = vm.const.i32 1
 
     %ref = vm.const.ref.rodata @byte_buffer : !vm.buffer
     %list = vm.list.alloc %c1 : (i32) -> !vm.list<?>
@@ -132,14 +132,14 @@ vm.module @list_variant_ops {
 
   vm.export @fail_variant_slot_change
   vm.func @fail_variant_slot_change() {
-    %capacity = vm.const.i32 42 : i32
+    %capacity = vm.const.i32 42
     %list = vm.list.alloc %capacity : (i32) -> !vm.list<?>
     vm.list.resize %list, %capacity : (!vm.list<?>, i32)
 
-    %c10 = vm.const.i32 10 : i32
+    %c10 = vm.const.i32 10
 
     // Access element 10 as an i32.
-    %v10_i32 = vm.const.i32 1234 : i32
+    %v10_i32 = vm.const.i32 1234
     vm.list.set.i32 %list, %c10, %v10_i32 : (!vm.list<?>, i32, i32)
     %e10_i32 = vm.list.get.i32 %list, %c10 : (!vm.list<?>, i32) -> i32
     vm.check.eq %e10_i32, %v10_i32 : i32
@@ -154,7 +154,7 @@ vm.module @list_variant_ops {
     // TODO(benvanik): support type queries and/or make this silently return 0.
     %e10_any = vm.list.get.i32 %list, %c10 : (!vm.list<?>, i32) -> i32
     // -- FAILURE HERE --
-    %zero = vm.const.i32.zero : i32
+    %zero = vm.const.i32.zero
     vm.check.eq %e10_any, %zero : i32
 
     vm.return

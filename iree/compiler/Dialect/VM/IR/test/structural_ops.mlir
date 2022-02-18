@@ -86,8 +86,8 @@ vm.module @initializers {
 
   // CHECK-NEXT: vm.initializer {
   vm.initializer {
-    // CHECK-NEXT: %zero = vm.const.i32 0 : i32
-    %zero = vm.const.i32 0 : i32
+    // CHECK-NEXT: %zero = vm.const.i32 0
+    %zero = vm.const.i32 0
     // CHECK-NEXT:   vm.br ^bb1(%zero : i32)
     vm.br ^bb1(%zero: i32)
     // CHECK-NEXT: ^bb1(%0: i32):

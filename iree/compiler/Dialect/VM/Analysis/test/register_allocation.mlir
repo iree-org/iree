@@ -19,7 +19,7 @@ vm.module @module {
     // CHECK: vm.const.i32.zero
     // CHECK-SAME: block_registers = ["i0", "i1"]
     // CHECK-SAME: result_registers = ["i0"]
-    %zero = vm.const.i32.zero : i32
+    %zero = vm.const.i32.zero
     vm.return %zero : i32
   }
 
@@ -28,7 +28,7 @@ vm.module @module {
     // CHECK: vm.const.i32 5
     // CHECK-SAME: block_registers = ["i0", "i1"]
     // CHECK-SAME: result_registers = ["i2"]
-    %c5 = vm.const.i32 5 : i32
+    %c5 = vm.const.i32 5
     // CHECK: vm.cond_br
     // CHECK-SAME: remap_registers = [
     // CHECK-SAME:   [], ["i1->i3"]
@@ -187,13 +187,13 @@ vm.module @module {
     // CHECK: vm.const.i32
     // CHECK-SAME: block_registers = []
     // CHECK-SAME: result_registers = ["i0"]
-    %c1 = vm.const.i32 1 : i32
+    %c1 = vm.const.i32 1
     // CHECK: vm.const.i32
     // CHECK-SAME: result_registers = ["i1"]
-    %c5 = vm.const.i32 5 : i32
+    %c5 = vm.const.i32 5
     // CHECK: vm.const.i32.zero
     // CHECK-SAME: result_registers = ["i2"]
-    %i0 = vm.const.i32.zero : i32
+    %i0 = vm.const.i32.zero
     // CHECK: vm.br
     // CHECK-SAME: remap_registers = [
     // CHECK-SAME:   []

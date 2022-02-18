@@ -27,10 +27,10 @@ vm.module @my_module {
 // CHECK-LABEL: @switch_i32
 vm.module @my_module {
   vm.func @switch_i32(%arg0 : i32) -> i32 {
-    %c5 = vm.const.i32 5 : i32
-    %c100 = vm.const.i32 100 : i32
-    %c200 = vm.const.i32 200 : i32
-    %c300 = vm.const.i32 300 : i32
+    %c5 = vm.const.i32 5
+    %c100 = vm.const.i32 100
+    %c200 = vm.const.i32 200
+    %c300 = vm.const.i32 300
     // CHECK: vm.switch.i32 %arg0[%c100, %c200, %c300] else %c5 : i32
     %0 = vm.switch.i32 %arg0[%c100, %c200, %c300] else %c5 : i32
     vm.return %0 : i32

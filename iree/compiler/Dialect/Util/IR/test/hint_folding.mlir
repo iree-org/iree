@@ -13,8 +13,8 @@ func @no_fold_constant() -> (i32) {
 
 // CHECK-LABEL: @no_fold_add
 func @no_fold_add() -> (i32) {
-  // CHECK-NEXT: %[[C1:.+]] = vm.const.i32 1 : i32
-  %c1 = vm.const.i32 1 : i32
+  // CHECK-NEXT: %[[C1:.+]] = vm.const.i32 1
+  %c1 = vm.const.i32 1
   // CHECK-NEXT: %[[R1:.+]] = util.do_not_optimize(%[[C1]])
   %0 = util.do_not_optimize(%c1) : i32
   // CHECK-NEXT: %[[R2:.+]] = vm.add.i32 %[[R1]], %[[R1]]
@@ -30,7 +30,7 @@ func @no_fold_add() -> (i32) {
 func @fold_add() -> (i32) {
   // CHECK-NEXT: %[[C2:.+]] = vm.const.i32 2
   // CHECK-NEXT: return %[[C2]]
-  %c1 = vm.const.i32 1 : i32
+  %c1 = vm.const.i32 1
   %0 = vm.add.i32 %c1, %c1 : i32
   return %0 : i32
 }

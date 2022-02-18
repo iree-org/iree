@@ -66,8 +66,8 @@ vm.module @bytecode_module_benchmark {
   // Measures the cost of a simple for-loop.
   vm.export @loop_sum
   vm.func @loop_sum(%count : i32) -> i32 {
-    %c1 = vm.const.i32 1 : i32
-    %i0 = vm.const.i32.zero : i32
+    %c1 = vm.const.i32 1
+    %i0 = vm.const.i32.zero
     vm.br ^loop(%i0 : i32)
   ^loop(%i : i32):
     %in = vm.add.i32 %i, %c1 : i32
@@ -80,9 +80,9 @@ vm.module @bytecode_module_benchmark {
   // Measures the cost of lots of buffer loads.
   vm.export @buffer_reduce
   vm.func @buffer_reduce(%count : i32) -> i32 {
-    %c0 = vm.const.i32.zero : i32
-    %c1 = vm.const.i32 1 : i32
-    %c4 = vm.const.i32 4 : i32
+    %c0 = vm.const.i32.zero
+    %c1 = vm.const.i32 1
+    %c4 = vm.const.i32 4
     %max = vm.mul.i32 %count, %c4 : i32
     %buf = vm.buffer.alloc %max : !vm.buffer
     vm.buffer.fill.i32 %buf, %c0, %max, %c1 : i32 -> !vm.buffer
@@ -101,9 +101,9 @@ vm.module @bytecode_module_benchmark {
   // NOTE: unrolled 8x, requires %count to be % 8 = 0.
   vm.export @buffer_reduce_unrolled
   vm.func @buffer_reduce_unrolled(%count : i32) -> i32 {
-    %c0 = vm.const.i32.zero : i32
-    %c1 = vm.const.i32 1 : i32
-    %c4 = vm.const.i32 4 : i32
+    %c0 = vm.const.i32.zero
+    %c1 = vm.const.i32 1
+    %c4 = vm.const.i32 4
     %max = vm.mul.i32 %count, %c4 : i32
     %buf = vm.buffer.alloc %max : !vm.buffer
     vm.buffer.fill.i32 %buf, %c0, %max, %c1 : i32 -> !vm.buffer

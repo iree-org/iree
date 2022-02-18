@@ -43,7 +43,7 @@ func @command_buffer_fill_buffer_i8(
 ) {
   %c100 = arith.constant 100 : index
   %c200 = arith.constant 200 : index
-  // CHECK-DAG: %[[PATTERN_LENGTH:.+]] = vm.const.i32 1 : i32
+  // CHECK-DAG: %[[PATTERN_LENGTH:.+]] = vm.const.i32 1
   // CHECK-DAG: %[[EXTEND:.+]] = vm.ext.i8.i32.u %arg2 : i32 -> i32
   // CHECK: vm.call @hal.command_buffer.fill_buffer(%arg0, %arg1, %c100, %c200, %[[EXTEND]], %[[PATTERN_LENGTH]]) : (!vm.ref<!hal.command_buffer>, !vm.ref<!hal.buffer>, i32, i32, i32, i32) -> ()
   hal.command_buffer.fill_buffer<%arg0 : !hal.command_buffer>
@@ -62,7 +62,7 @@ func @command_buffer_fill_buffer_i16(
 ) {
   %c100 = arith.constant 100 : index
   %c200 = arith.constant 200 : index
-  // CHECK-DAG: %[[PATTERN_LENGTH:.+]] = vm.const.i32 2 : i32
+  // CHECK-DAG: %[[PATTERN_LENGTH:.+]] = vm.const.i32 2
   // CHECK-DAG: %[[EXTEND:.+]] = vm.ext.i16.i32.u %arg2 : i32 -> i32
   // CHECK: vm.call @hal.command_buffer.fill_buffer(%arg0, %arg1, %c100, %c200, %[[EXTEND]], %[[PATTERN_LENGTH]]) : (!vm.ref<!hal.command_buffer>, !vm.ref<!hal.buffer>, i32, i32, i32, i32) -> ()
   hal.command_buffer.fill_buffer<%arg0 : !hal.command_buffer>
@@ -81,7 +81,7 @@ func @command_buffer_fill_buffer_i32(
 ) {
   %c100 = arith.constant 100 : index
   %c200 = arith.constant 200 : index
-  // CHECK-DAG: %[[PATTERN_LENGTH:.+]] = vm.const.i32 4 : i32
+  // CHECK-DAG: %[[PATTERN_LENGTH:.+]] = vm.const.i32 4
   // CHECK: vm.call @hal.command_buffer.fill_buffer(%arg0, %arg1, %c100, %c200, %arg2, %[[PATTERN_LENGTH]]) : (!vm.ref<!hal.command_buffer>, !vm.ref<!hal.buffer>, i32, i32, i32, i32) -> ()
   hal.command_buffer.fill_buffer<%arg0 : !hal.command_buffer>
       target(%arg1 : !hal.buffer)[%c100, %c200]

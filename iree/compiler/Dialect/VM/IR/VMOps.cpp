@@ -511,34 +511,6 @@ static LogicalResult verifyGlobalStoreOp(Operation *op) {
 // Constants
 //===----------------------------------------------------------------------===//
 
-template <typename T>
-static ParseResult parseConstOp(OpAsmParser &parser, OperationState &result) {
-  Attribute valueAttr;
-  NamedAttrList dummyAttrs;
-  if (failed(parser.parseAttribute(valueAttr, "value", dummyAttrs))) {
-    return parser.emitError(parser.getCurrentLocation())
-           << "Invalid attribute encoding";
-  }
-  if (!T::isBuildableWith(valueAttr, valueAttr.getType())) {
-    return parser.emitError(parser.getCurrentLocation())
-           << "Incompatible type or invalid type value formatting";
-  }
-  valueAttr = T::convertConstValue(valueAttr);
-  result.addAttribute("value", valueAttr);
-  if (failed(parser.parseOptionalAttrDict(result.attributes))) {
-    return parser.emitError(parser.getCurrentLocation())
-           << "Failed to parse optional attribute dict";
-  }
-  return parser.addTypeToList(valueAttr.getType(), result.types);
-}
-
-template <typename T>
-static void printConstOp(OpAsmPrinter &p, T &op) {
-  p << ' ';
-  p.printAttribute(op.value());
-  p.printOptionalAttrDict(op->getAttrs(), /*elidedAttrs=*/{"value"});
-}
-
 template <int SZ>
 static bool isConstIntegerBuildableWith(Attribute value, Type type) {
   // FlatSymbolRefAttr can only be used with a function type.
