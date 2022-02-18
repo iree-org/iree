@@ -343,6 +343,12 @@ void TiledOpInterfaceTilingPass::runOnOperation() {
           StringAttr::get(context, "tiling_2d_stage5_fft_input"),
           StringAttr::get(context, "tiling_2d_stage5_fft_output")));
 
+  patterns.add<TiledOpInterfaceTilingPattern>(
+      context, linalg::LinalgTilingOptions().setTileSizes({0, 20}),
+      linalg::LinalgTransformationFilter(
+          StringAttr::get(context, "tiling_repeated_indices_scatter_input"),
+          StringAttr::get(context, "tiling_repeated_indices_scatter_output")));
+
   if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
     return signalPassFailure();
   }

@@ -100,7 +100,7 @@ func @sort_multi(%arg0: memref<128xf32>, %arg1: memref<128xi32>) {
 func @scatter_update_scalar_1D(
     %original: memref<8xi32>, %indices: memref<3x1xi32>,
     %updates: memref<3xi32>) {
-  iree_linalg_ext.scatter
+  iree_linalg_ext.scatter unique_indices(true)
     ins(%updates, %indices : memref<3xi32>, memref<3x1xi32>)
     outs(%original : memref<8xi32>)  {
   ^bb0(%arg0: i32, %arg1: i32):  // no predecessors
@@ -126,7 +126,7 @@ func @scatter_update_scalar_1D(
 func @scatter_add_scalar_2D(
     %original: memref<4x3xi32>, %indices: memref<3x2xi32>,
     %updates: memref<3xi32>) {
-  iree_linalg_ext.scatter
+  iree_linalg_ext.scatter unique_indices(true)
     ins(%updates, %indices : memref<3xi32>, memref<3x2xi32>)
     outs(%original : memref<4x3xi32>)  {
   ^bb0(%arg0: i32, %arg1: i32):  // no predecessors
@@ -157,7 +157,7 @@ func @scatter_add_scalar_2D(
 func @scatter_update_slice_2D(
     %original: memref<4x3xi32>, %indices: memref<2x1xi32>,
     %updates: memref<2x3xi32>) {
-  iree_linalg_ext.scatter
+  iree_linalg_ext.scatter unique_indices(true)
     ins(%updates, %indices : memref<2x3xi32>, memref<2x1xi32>)
     outs(%original : memref<4x3xi32>)  {
   ^bb0(%arg0: i32, %arg1: i32):  // no predecessors
@@ -187,7 +187,7 @@ func @scatter_update_slice_2D(
 func @scatter_add_scalar_1D(
     %original: memref<8xi32>, %indices: memref<3x1xi32>,
     %updates: memref<3xi32>) {
-  iree_linalg_ext.scatter
+  iree_linalg_ext.scatter unique_indices(true)
     ins(%updates, %indices : memref<3xi32>, memref<3x1xi32>)
     outs(%original : memref<8xi32>)  {
   ^bb0(%arg0: i32, %arg1: i32):  // no predecessors
@@ -216,7 +216,7 @@ func @scatter_add_scalar_1D(
 func @scatter_add_slice_2D(
     %original: memref<4x3xi32>, %indices: memref<2x1xi32>,
     %updates: memref<2x3xi32>) {
-  iree_linalg_ext.scatter
+  iree_linalg_ext.scatter unique_indices(true)
     ins(%updates, %indices : memref<2x3xi32>, memref<2x1xi32>)
     outs(%original : memref<4x3xi32>)  {
   ^bb0(%arg0: i32, %arg1: i32):  // no predecessors
@@ -246,7 +246,7 @@ func @scatter_add_slice_2D(
 func @scatter_update_scalar_dynamic_1D(
     %original: memref<?xi32>, %indices: memref<?x1xi32>,
     %updates: memref<?xi32>) {
-  iree_linalg_ext.scatter
+  iree_linalg_ext.scatter unique_indices(true)
     ins(%updates, %indices : memref<?xi32>, memref<?x1xi32>)
     outs(%original : memref<?xi32>)  {
   ^bb0(%arg0: i32, %arg1: i32):  // no predecessors
@@ -272,7 +272,7 @@ func @scatter_update_scalar_dynamic_1D(
 func @scatter_add_scalar_dynamic_2D(
     %original: memref<?x?xi32>, %indices: memref<?x2xi32>,
     %updates: memref<?xi32>) {
-  iree_linalg_ext.scatter
+  iree_linalg_ext.scatter unique_indices(true)
     ins(%updates, %indices : memref<?xi32>, memref<?x2xi32>)
     outs(%original : memref<?x?xi32>)  {
   ^bb0(%arg0: i32, %arg1: i32):  // no predecessors
@@ -303,7 +303,7 @@ func @scatter_add_scalar_dynamic_2D(
 func @scatter_update_slice_dynamic_2D(
     %original: memref<?x?xi32>, %indices: memref<?x1xi32>,
     %updates: memref<?x?xi32>) {
-  iree_linalg_ext.scatter
+  iree_linalg_ext.scatter unique_indices(true)
     ins(%updates, %indices : memref<?x?xi32>, memref<?x1xi32>)
     outs(%original : memref<?x?xi32>)  {
   ^bb0(%arg0: i32, %arg1: i32):  // no predecessors
@@ -325,6 +325,41 @@ func @scatter_update_slice_dynamic_2D(
 // CHECK:             %[[INDEXVAL:.+]] = memref.load %[[INDICES]][%[[I]], %[[C0]]]
 // CHECK:             %[[INDEX:.+]] = arith.index_cast %[[INDEXVAL]] : i32 to index
 // CHECK:             memref.store %[[UPDATEVAL]], %[[ORIGINAL]][%[[INDEX]], %[[J]]]
+
+// -----
+
+func @scatter_partial_slices(%arg0: memref<2x64x12xf32>, %arg1: memref<2x3xi32>, %arg2: memref<2x1x12xf32>) {
+  iree_linalg_ext.scatter
+    unique_indices(true)
+    ins(%arg2, %arg1 : memref<2x1x12xf32>, memref<2x3xi32>)
+    outs(%arg0 : memref<2x64x12xf32>) {
+  ^bb0(%arg3: f32, %arg4: f32):
+    iree_linalg_ext.yield %arg4 : f32
+  }
+  return
+}
+
+// CHECK-LABEL: @scatter_partial_slices
+// CHECK-SAME:    %[[ARG0:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[ARG1:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[ARG2:[a-zA-Z0-9]+]]
+// CHECK-DAG: %[[C0:.+]] = arith.constant
+// CHECK-DAG: %[[C1:.+]] = arith.constant
+// CHECK-DAG: %[[C2:.+]] = arith.constant
+// CHECK-DAG: %[[C12:.+]] = arith.constant
+// CHECK:     scf.for %[[ARG3:.+]] = %[[C0]] to %[[C2]] step %[[C1]] {
+// CHECK-NEXT:   scf.for %[[ARG4:.+]] = %[[C0]] to %[[C1]] step %[[C1]] {
+// CHECK-NEXT:     scf.for %[[ARG5:.+]] = %[[C0]] to %[[C12]] step %[[C1]] {
+// CHECK-NEXT:       %[[LOAD0:.+]] = memref.load %[[ARG1]][%[[ARG3]], %[[C0]]] : memref<2x3xi32>
+// CHECK-NEXT:       %[[CAST0:.+]] = arith.index_cast %[[LOAD0]] : i32 to index
+// CHECK-NEXT:       %[[LOAD1:.+]] = memref.load %[[ARG1]][%[[ARG3]], %[[C1]]] : memref<2x3xi32>
+// CHECK-NEXT:       %[[CAST1:.+]] = arith.index_cast %[[LOAD1]] : i32 to index
+// CHECK-NEXT:       %[[ADD1:.+]] = arith.addi %[[CAST1]], %[[ARG4]] : index
+// CHECK-NEXT:       %[[LOAD2:.+]] = memref.load %[[ARG1]][%[[ARG3]], %[[C2]]] : memref<2x3xi32>
+// CHECK-NEXT:       %[[CAST2:.+]] = arith.index_cast %[[LOAD2]] : i32 to index
+// CHECK-NEXT:       %[[ADD2:.+]] = arith.addi %[[CAST2]], %[[ARG5]] : index
+// CHECK-NEXT:       %[[LOAD3:.+]] = memref.load %[[ARG0]][%[[CAST0]], %[[ADD1]], %[[ADD2]]] : memref<2x64x12xf32>
+// CHECK-NEXT:       memref.store %[[LOAD3]], %[[ARG0]][%[[CAST0]], %[[ADD1]], %[[ADD2]]] : memref<2x64x12xf32>
 
 // -----
 

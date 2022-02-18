@@ -220,6 +220,9 @@ static LogicalResult verifyScatterOp(ScatterOp op) {
 SmallVector<StringRef> ScatterOp::getLoopIteratorTypes() {
   SmallVector<StringRef> iteratorTypes(getUpdateType().getRank(),
                                        getParallelIteratorTypeName());
+  if (!unique_indices()) {
+    iteratorTypes[0] = getReductionIteratorTypeName();
+  }
   return iteratorTypes;
 }
 

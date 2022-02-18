@@ -429,6 +429,7 @@ func @scatter() {
   %update = flow.dispatch.tensor.load %update_binding, offsets = [0, 0], sizes = [%d2, %d1], strides = [1, 1]
       : !flow.dispatch.tensor<writeonly:?x?xf32>{%d2, %d1} -> tensor<?x?xf32>
   %result = iree_linalg_ext.scatter
+      unique_indices(true)
       ins(%original, %indices : tensor<?x?xf32>, tensor<?x1xi32>)
       outs(%update : tensor<?x?xf32>) {
       ^bb0(%arg0: f32, %arg1: f32):
@@ -681,3 +682,36 @@ func @unit_dim_generic_op() {
 //       CHECK:         %[[GENERIC_TILE:.+]] = linalg.generic
 //  CHECK-SAME:             ins(%[[INPUT_TILE]] :
 //       CHECK:         flow.dispatch.tensor.store %[[GENERIC_TILE]], %[[OUTPUT]]
+
+// -----
+
+func @repeated_indices_scatter_update_slice_2D() {
+  %c0 = arith.constant 0 : index
+  %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(32) : !flow.dispatch.tensor<readonly:2x3xi32>
+  %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(32) : !flow.dispatch.tensor<readonly:2x1xi32>
+  %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) offset(%c0) alignment(32) : !flow.dispatch.tensor<readwrite:6x3xi32>
+  %3 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [2, 3], strides = [1, 1] : !flow.dispatch.tensor<readonly:2x3xi32> -> tensor<2x3xi32>
+  %4 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [2, 1], strides = [1, 1] : !flow.dispatch.tensor<readonly:2x1xi32> -> tensor<2x1xi32>
+  %5 = flow.dispatch.tensor.load %2, offsets = [0, 0], sizes = [6, 3], strides = [1, 1] : !flow.dispatch.tensor<readwrite:6x3xi32> -> tensor<6x3xi32>
+  %6 = iree_linalg_ext.scatter
+    unique_indices(false)
+    ins(%3, %4 : tensor<2x3xi32>, tensor<2x1xi32>)
+    outs(%5 : tensor<6x3xi32>) {
+  ^bb0(%arg0: i32, %arg1: i32):
+    iree_linalg_ext.yield %arg0 : i32
+  } -> tensor<6x3xi32>
+  flow.dispatch.tensor.store %6, %2, offsets = [0, 0], sizes = [6, 3], strides = [1, 1] : tensor<6x3xi32> -> !flow.dispatch.tensor<readwrite:6x3xi32>
+  return
+}
+//      CHECK: func @repeated_indices_scatter_update_slice_2D
+//  CHECK-DAG:   %[[ARG0_CAPTURE:[a-zA-Z0-9_]+]] = {{.+}} !flow.dispatch.tensor<readonly:2x3xi32>
+//  CHECK-DAG:   %[[ARG1_CAPTURE:[a-zA-Z0-9_]+]] = {{.+}} !flow.dispatch.tensor<readonly:2x1xi32>
+//  CHECK-DAG:   %[[ARG2_CAPTURE:[a-zA-Z0-9_]+]] = {{.+}} !flow.dispatch.tensor<readwrite:6x3xi32>
+//  CHECK-DAG:   %[[UPDATE:.+]] = flow.dispatch.tensor.load %[[ARG0_CAPTURE]], offsets = [0, 0]
+//  CHECK-DAG:   %[[INDICES:.+]] = flow.dispatch.tensor.load %[[ARG1_CAPTURE]], offsets = [0, 0]
+//  CHECK-DAG:   %[[ORIGINAL:.+]] = flow.dispatch.tensor.load %[[ARG2_CAPTURE]], offsets = [0, 0]
+//  CHECK-DAG:   %[[SCATTER:.+]] = iree_linalg_ext.scatter
+// CHECK-SAME:       unique_indices(false)
+// CHECK-SAME:       ins(%[[UPDATE]], %[[INDICES]] : tensor<2x3xi32>, tensor<2x1xi32>)
+// CHECK-SAME:       outs(%[[ORIGINAL]] : tensor<6x3xi32>)
+//      CHECK:   flow.dispatch.tensor.store %[[SCATTER]], %[[ARG2_CAPTURE]], offsets = [0, 0]

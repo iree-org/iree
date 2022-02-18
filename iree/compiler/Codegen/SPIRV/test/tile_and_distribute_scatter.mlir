@@ -37,7 +37,7 @@ hal.executable private @static_scatter_update_slice  {
             %8 = memref.subview %1[%arg0, 0] [1, 1] [1, 1] : memref<40x1xi32> to memref<1x1xi32, affine_map<(d0, d1)[s0] -> (d0 + s0 + d1)>>
             %9 = memref.cast %8 : memref<1x1xi32, affine_map<(d0, d1)[s0] -> (d0 + s0 + d1)>> to memref<?x1xi32, affine_map<(d0, d1)[s0] -> (d0 + s0 + d1)>>
             %10 = memref.subview %2[0, %arg1] [100, %5] [1, 1] : memref<100x500xi32> to memref<100x?xi32, affine_map<(d0, d1)[s0] -> (d0 * 500 + s0 + d1)>>
-            iree_linalg_ext.scatter {lowering.config = #config} ins(%7, %9 : memref<?x?xi32, affine_map<(d0, d1)[s0] -> (d0 * 500 + s0 + d1)>>, memref<?x1xi32, affine_map<(d0, d1)[s0] -> (d0 + s0 + d1)>>) outs(%10 : memref<100x?xi32, affine_map<(d0, d1)[s0] -> (d0 * 500 + s0 + d1)>>)  {
+            iree_linalg_ext.scatter {lowering.config = #config} unique_indices(true) ins(%7, %9 : memref<?x?xi32, affine_map<(d0, d1)[s0] -> (d0 * 500 + s0 + d1)>>, memref<?x1xi32, affine_map<(d0, d1)[s0] -> (d0 + s0 + d1)>>) outs(%10 : memref<100x?xi32, affine_map<(d0, d1)[s0] -> (d0 * 500 + s0 + d1)>>)  {
             ^bb0(%arg2: i32, %arg3: i32):  // no predecessors
               iree_linalg_ext.yield %arg2 : i32
             }
@@ -70,5 +70,6 @@ hal.executable private @static_scatter_update_slice  {
 //       CHECK:         %[[T_TARGET:.+]] = memref.subview %[[WG_TARGET]][0, %[[IV_X]]] [100, 1] [1, 1]
 //       CHECK:         %[[T_TARGET_CAST:.+]] = memref.cast %[[T_TARGET]]
 //       CHECK:         iree_linalg_ext.scatter
+//  CHECK-SAME:           unique_indices(true)
 //  CHECK-SAME:           ins(%[[T_UPDATE_CAST]], %[[T_INDEX]]
 //  CHECK-SAME:           outs(%[[T_TARGET_CAST]]

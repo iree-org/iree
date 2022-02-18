@@ -12,9 +12,29 @@ func @scatter_update_scalar_1D() {
       scatter_dims_to_operand_dims = [0],
       index_vector_dim = 1,
     >,
-    unique_indices = false
+    unique_indices = true
   } : (tensor<8xi32>, tensor<4x1xi32>, tensor<4xi32>) -> tensor<8xi32>
   check.expect_eq_const(%0, dense<[0, 9, 0, 10, 11, 0, 0, 12]> : tensor<8xi32>) : tensor<8xi32>
+  return
+}
+
+func @scatter_repeated_update_scalar_1D() {
+  %arg0 = util.unfoldable_constant dense<0> : tensor<8xi32>
+  %arg1 = util.unfoldable_constant dense<[[1], [1], [7], [7]]> : tensor<4x1xi32>
+  %arg2 = util.unfoldable_constant dense<[9, 10, 11, 12]> : tensor<4xi32>
+  %0 = "mhlo.scatter"(%arg0, %arg1, %arg2) ( {
+  ^bb0(%arg3: tensor<i32>, %arg4: tensor<i32>):  // no predecessors
+    "mhlo.return"(%arg4) : (tensor<i32>) -> ()
+  }) {
+    indices_are_sorted = false,
+    scatter_dimension_numbers = #mhlo.scatter<
+      inserted_window_dims = [0],
+      scatter_dims_to_operand_dims = [0],
+      index_vector_dim = 1,
+    >,
+    unique_indices = true
+  } : (tensor<8xi32>, tensor<4x1xi32>, tensor<4xi32>) -> tensor<8xi32>
+  check.expect_eq_const(%0, dense<[0, 10, 0, 0, 0, 0, 0, 12]> : tensor<8xi32>) : tensor<8xi32>
   return
 }
 
@@ -31,7 +51,7 @@ func @scatter_update_scalar_2D() {
         scatter_dims_to_operand_dims = [0, 1],
         index_vector_dim = 1
       >,
-      unique_indices = false
+      unique_indices = true
   } : (tensor<4x3xi32>, tensor<3x2xi32>, tensor<3xi32>) -> tensor<4x3xi32>
   check.expect_eq_const(%0, dense<[[1, 0, 0],
                                    [0, 2, 0],
@@ -56,7 +76,7 @@ func @scatter_update_slice_2D() {
       scatter_dims_to_operand_dims = [0],
       index_vector_dim = 1,
     >,
-    unique_indices = false
+    unique_indices = true
   } : (tensor<6x3xi32>, tensor<2x1xi32>, tensor<2x3xi32>) -> tensor<6x3xi32>
   check.expect_eq_const(%0, dense<[[0, 0, 0],
                                    [0, 0, 0],
@@ -84,7 +104,7 @@ func @scatter_add_slice_2D() {
       scatter_dims_to_operand_dims = [0],
       index_vector_dim = 1,
     >,
-    unique_indices = false
+    unique_indices = true
   } : (tensor<6x3xi32>, tensor<2x1xi32>, tensor<2x3xi32>) -> tensor<6x3xi32>
   check.expect_eq_const(%0, dense<[[1, 1, 1],
                                    [1, 1, 1],
@@ -148,7 +168,7 @@ func @scatter_1D_large() {
       scatter_dims_to_operand_dims = [0],
       index_vector_dim = 1,
     >,
-    unique_indices = false
+    unique_indices = true
   } : (tensor<1400xi32>, tensor<1400x1xi32>, tensor<1400xi32>) -> tensor<1400xi32>
   check.expect_eq_const(%result, dense<2> : tensor<1400xi32>) : tensor<1400xi32>
   return
@@ -180,7 +200,7 @@ func @scatter_2D_large() {
       scatter_dims_to_operand_dims = [0],
       index_vector_dim = 1,
     >,
-    unique_indices = false
+    unique_indices = true
   } : (tensor<200x300xi32>, tensor<200x1xi32>, tensor<200x300xi32>) -> tensor<200x300xi32>
   check.expect_eq_const(%result, dense<2> : tensor<200x300xi32>) : tensor<200x300xi32>
   return

@@ -65,9 +65,15 @@ def IREELinalgExt_ScatterOp : IREELinalgExt_Op<"scatter",
     The first dim of `updates` and `indices` is identical, since they represent
     the number of updates.
 
-    The rank of the `original`/`result` is `index_depth + rank(%updates) - 1`.
-    The first `index_depth` indices are derived from `indices` and the shape of
-    update value must match the rest shape of `original`.
+    The rank of the `original`/`result` is at least
+    `index_depth + rank(%updates) - 1`. The first `index_depth` indices are
+    derived from `indices` and the shape of update value has the last
+    rank(%original) - index_depth values match %(originals) last dimensions,
+    with the previous dims extending from the index offsets.
+
+    The unique_indices attribute carries the information whether all the indices
+    are unique. If there are repeated indices, the first iteration loop will be
+    marked as reduction.
 
     The shapes definition follows tensorflow operations execept that it force
     batch dims to be 1D. See more information in
@@ -75,12 +81,14 @@ def IREELinalgExt_ScatterOp : IREELinalgExt_Op<"scatter",
   }];
   let arguments = (ins
       Variadic<AnyRankedTensorOrMemRefType>:$inputs,
-      Variadic<AnyRankedTensorOrMemRefType>:$outputs
+      Variadic<AnyRankedTensorOrMemRefType>:$outputs,
+      DefaultValuedAttr<BoolAttr, "true">:$unique_indices
   );
   let results = (outs Variadic<AnyRankedTensor>:$results);
   let regions = (region AnyRegion:$region);
   let assemblyFormat = [{
-    attr-dict (`ins` `(` $inputs^ `:` type($inputs) `)`)?
+    attr-dict `unique_indices` `(` $unique_indices `)`
+    (`ins` `(` $inputs^ `:` type($inputs) `)`)?
     `outs` `(` $outputs `:` type($outputs) `)`
     $region (`->` type($results)^)?
   }];
