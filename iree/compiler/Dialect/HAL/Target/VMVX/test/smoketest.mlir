@@ -55,12 +55,12 @@ stream.executable public @add_dispatch_0 {
 //  CHECK-NEXT:           %[[LHS_BUF:.+]] = vm.list.get.ref %[[BINDINGS]], %zero : (!vm.list<!vm.buffer>, i32) -> !vm.buffer
 //  CHECK-NEXT:           %[[RHS_BUF:.+]] = vm.list.get.ref %[[BINDINGS]], %c1 : (!vm.list<!vm.buffer>, i32) -> !vm.buffer
 //  CHECK-NEXT:           %[[RET_BUF:.+]] = vm.list.get.ref %[[BINDINGS]], %c2 : (!vm.list<!vm.buffer>, i32) -> !vm.buffer
-//  CHECK-NEXT:           vm.br ^bb1(%zero : i32)
+//       CHECK:           vm.br ^bb1(%zero : i32)
 //  CHECK-NEXT:         ^bb1(%[[IDX:.+]]: i32):  // 2 preds: ^bb0, ^bb2
-//  CHECK-NEXT:           %slt = vm.cmp.lt.i32.s %[[IDX]], %c16 : i32
+//  CHECK-NEXT:           %slt = vm.cmp.lt.i32.s %[[IDX]], %{{.+}} : i32
 //  CHECK-NEXT:           vm.cond_br %slt, ^bb2, ^bb3
 //  CHECK-NEXT:         ^bb2:  // pred: ^bb1
-//  CHECK-NEXT:           %[[BYTE_OFFSET:.+]] = vm.mul.i32 %[[IDX]], %c4 : i32
+//       CHECK:           %[[BYTE_OFFSET:.+]] = vm.mul.i32 %{{.+}}, %c4 : i32
 //  CHECK-NEXT:           %[[LHS:.+]] = vm.buffer.load.f32 %[[LHS_BUF]][%[[BYTE_OFFSET]]] : !vm.buffer -> f32
 //  CHECK-NEXT:           %[[RHS:.+]] = vm.buffer.load.f32 %[[RHS_BUF]][%[[BYTE_OFFSET]]] : !vm.buffer -> f32
 //  CHECK-NEXT:           %[[RET:.+]] = vm.add.f32 %[[LHS]], %[[RHS]] : f32
