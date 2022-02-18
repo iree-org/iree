@@ -22,7 +22,7 @@
 static llvm::cl::opt<bool> clEnableFusionWithReductionOps(
     "iree-enable-fusion-with-reduction-ops",
     llvm::cl::desc("Allow fusing generic ops with reductions"),
-    llvm::cl::init(false));
+    llvm::cl::init(true));
 
 namespace mlir {
 namespace iree_compiler {
