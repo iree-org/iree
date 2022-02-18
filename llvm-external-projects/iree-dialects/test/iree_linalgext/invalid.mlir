@@ -371,7 +371,7 @@ func @scatter_original_rank_mismatch(
     %original : tensor<?x?xi64>) -> tensor<?x?xi64> {
   // expected-error @+1 {{op index depth and update value does not cover rank of original value}}
   %0 = iree_linalg_ext.scatter unique_indices(true)
-    ins(%update, %indices : tensor<?x?xi64>, tensor<?x2xi32>)
+    ins(%update, %indices : tensor<?xi64>, tensor<?x1xi32>)
     outs(%original : tensor<?x?xi64>) {
     ^bb0(%arg1: i64, %arg2: i64):
       %1 = arith.addi %arg1, %arg2 : i64

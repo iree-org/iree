@@ -3,8 +3,9 @@
 func @scatter_tiling(
     %original: tensor<?x?xf32>, %indices: tensor<?x1xi32>,
     %update : tensor<?x?xf32>) -> tensor<?x?xf32> {
-  %0 = iree_linalg_ext.scatter unique_indices(true)
+  %0 = iree_linalg_ext.scatter
     {__internal_linalg_transform__ = "tiling_input"}
+    unique_indices(true)
     ins(%update, %indices : tensor<?x?xf32>, tensor<?x1xi32>)
     outs(%original : tensor<?x?xf32>) {
     ^bb0(%arg1: f32, %arg2: f32):
@@ -39,8 +40,8 @@ func @scatter_tiling(
 //       CHECK:       %[[ORIGINAL_SLICE:.+]] = tensor.extract_slice %[[INITX]][0, %[[IV1]]]
 //  CHECK-SAME:           [%[[SCATTER_DIM]], %[[USED_TILESIZEX]]]
 //       CHECK:       %[[SCATTER_TILE:.+]] = iree_linalg_ext.scatter
-//  CHECK-SAME:           unique_indices(true)
 //  CHECK-SAME:           __internal_linalg_transform__ = "tiling_output"
+//  CHECK-SAME:           unique_indices(true)
 //  CHECK-SAME:           ins(%[[UPDATE_SLICE]], %[[INDEX_SLICE]]
 //  CHECK-SAME:           outs(%[[ORIGINAL_SLICE]]
 //       CHECK:       %[[YIELD:.+]] = tensor.insert_slice %[[SCATTER_TILE]] into %[[INITX]][0, %[[IV1]]]
@@ -54,8 +55,9 @@ func @scatter_tiling(
 func @scatter_tiling_memref(
     %original: memref<?x?xf32>, %indices: memref<?x1xi32>,
     %update : memref<?x?xf32>) {
-  iree_linalg_ext.scatter unique_indices(true)
+  iree_linalg_ext.scatter
     {__internal_linalg_transform__ = "tiling_input"}
+    unique_indices(true)
     ins(%update, %indices : memref<?x?xf32>, memref<?x1xi32>)
     outs(%original : memref<?x?xf32>) {
     ^bb0(%arg1: f32, %arg2: f32):
@@ -88,8 +90,8 @@ func @scatter_tiling_memref(
 //       CHECK:       %[[ORIGINAL_SLICE:.+]] = memref.subview %[[ORIGINAL]][0, %[[IV1]]
 //  CHECK-SAME:           [%[[SCATTER_DIM]], %[[USED_TILESIZEX]]]
 //       CHECK:       iree_linalg_ext.scatter
-//  CHECK-SAME:           unique_indices(true)
 //  CHECK-SAME:           __internal_linalg_transform__ = "tiling_output"
+//  CHECK-SAME:           unique_indices(true)
 //  CHECK-SAME:           ins(%[[UPDATE_SLICE]], %[[INDEX_SLICE]]
 //  CHECK-SAME:           outs(%[[ORIGINAL_SLICE]]
 
@@ -98,8 +100,9 @@ func @scatter_tiling_memref(
 func @scatter_tiling_distribution(
     %original: tensor<?x?xf32>, %indices: tensor<?x1xi32>,
     %update : tensor<?x?xf32>) -> tensor<?x?xf32> {
-  %0 = iree_linalg_ext.scatter unique_indices(true)
+  %0 = iree_linalg_ext.scatter
     {__internal_linalg_transform__ = "distribute_input"}
+    unique_indices(true)
     ins(%update, %indices : tensor<?x?xf32>, tensor<?x1xi32>)
     outs(%original : tensor<?x?xf32>) {
     ^bb0(%arg1: f32, %arg2: f32):
@@ -134,8 +137,8 @@ func @scatter_tiling_distribution(
 //       CHECK:     %[[ORIGINAL_SLICE:.+]] = tensor.extract_slice %[[INIT]][0, 0]
 //  CHECK-SAME:         [%[[D2]], %[[D1]]]
 //       CHECK:     %[[SCATTER_TILE:.+]] = iree_linalg_ext.scatter
-//  CHECK-SAME:        unique_indices(true)
 //  CHECK-SAME:        __internal_linalg_transform__ = "distribute_output"
+//  CHECK-SAME:        unique_indices(true)
 //  CHECK-SAME:        ins(%[[UPDATE_SLICE]], %[[INDEX_SLICE]]
 //  CHECK-SAME:        outs(%[[ORIGINAL_SLICE]]
 //       CHECK:     %[[YIELD:.+]] = tensor.insert_slice %[[SCATTER_TILE]] into %[[INIT]][0, 0]
@@ -147,8 +150,9 @@ func @scatter_tiling_distribution(
 func @scatter_no_tiling(
     %original: tensor<?x?xf32>, %indices: tensor<?x1xi32>,
     %update : tensor<?x?xf32>) -> tensor<?x?xf32> {
-  %0 = iree_linalg_ext.scatter unique_indices(true)
+  %0 = iree_linalg_ext.scatter
     {__internal_linalg_transform__ = "no_tiling_input"}
+    unique_indices(true)
     ins(%update, %indices : tensor<?x?xf32>, tensor<?x1xi32>)
     outs(%original : tensor<?x?xf32>) {
     ^bb0(%arg1: f32, %arg2: f32):
@@ -162,8 +166,8 @@ func @scatter_no_tiling(
 //  CHECK-SAME:   %[[INDICES:[a-zA-Z0-9_]+]]: tensor<?x1xi32>
 //  CHECK-SAME:   %[[UPDATES:[a-zA-Z0-9_]+]]: tensor<?x?xf32>
 //       CHECK:   %[[RESULT:.+]] = iree_linalg_ext.scatter
-//  CHECK-SAME:       unique_indices(true)
 //  CHECK-SAME:       __internal_linalg_transform__ = "no_tiling_output"
+//  CHECK-SAME:       unique_indices(true)
 //  CHECK-SAME:       ins(%[[UPDATES]], %[[INDICES]]
 //  CHECK-SAME:       outs(%[[ORIGINAL]]
 //       CHECK:   return %[[RESULT]]

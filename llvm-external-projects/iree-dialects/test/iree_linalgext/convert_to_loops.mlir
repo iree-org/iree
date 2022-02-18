@@ -329,7 +329,10 @@ func @scatter_update_slice_dynamic_2D(
 // -----
 
 func @scatter_partial_slices(%arg0: memref<2x64x12xf32>, %arg1: memref<2x3xi32>, %arg2: memref<2x1x12xf32>) {
-  iree_linalg_ext.scatter ins(%arg2, %arg1 : memref<2x1x12xf32>, memref<2x3xi32>) outs(%arg0 : memref<2x64x12xf32>) {
+  iree_linalg_ext.scatter
+    unique_indices(true)
+    ins(%arg2, %arg1 : memref<2x1x12xf32>, memref<2x3xi32>)
+    outs(%arg0 : memref<2x64x12xf32>) {
   ^bb0(%arg3: f32, %arg4: f32):
     iree_linalg_ext.yield %arg4 : f32
   }
