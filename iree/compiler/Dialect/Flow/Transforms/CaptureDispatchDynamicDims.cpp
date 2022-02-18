@@ -61,6 +61,18 @@ static void captureDims(IREE::Flow::DispatchWorkgroupsOp dispatchOp) {
         externalValue, dispatchOp->getBlock(), Block::iterator(dispatchOp));
     if (!dynamicDims.hasValue()) return;
 
+    // Find the insertion position. All extra arguments need to be added before
+    // "writeonly" tensors corresponding to the result.
+    unsigned insertionPosition = entryBlock->getNumArguments();
+    for (auto argType : llvm::reverse(entryBlock->getArgumentTypes())) {
+      auto flowTensorType = argType.dyn_cast<IREE::Flow::DispatchTensorType>();
+      if (!flowTensorType ||
+          flowTensorType.getAccess() != IREE::Flow::TensorAccess::WriteOnly) {
+        break;
+      }
+      insertionPosition--;
+    }
+
     // Capture the dynamic dimensions as args in the region.
     SmallVector<Value> capturedDims;
     for (auto dynamicDim : *dynamicDims) {
@@ -70,8 +82,8 @@ static void captureDims(IREE::Flow::DispatchWorkgroupsOp dispatchOp) {
         capturedDims.push_back(existing->second);
       } else {
         // Capture the dimension.
-        auto arg =
-            entryBlock->addArgument(dynamicDim.getType(), dynamicDim.getLoc());
+        auto arg = entryBlock->insertArgument(
+            insertionPosition++, dynamicDim.getType(), dynamicDim.getLoc());
         dispatchOp.operandsMutable().append(dynamicDim);
         capturedDims.push_back(arg);
         outerToInnerMap[dynamicDim] = arg;
