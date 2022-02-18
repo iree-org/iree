@@ -6,19 +6,19 @@
 vm.module @const_i32_folds {
   // CHECK-LABEL: @cse
   vm.func @cse() -> (i32, i32) {
-    // CHECK-NEXT: %c1 = vm.const.i32 1 : i32
+    // CHECK-NEXT: %c1 = vm.const.i32 1
     // CHECK-NEXT: vm.return %c1, %c1 : i32, i32
-    %0 = vm.const.i32 1 : i32
-    %1 = vm.const.i32 1 : i32
+    %0 = vm.const.i32 1
+    %1 = vm.const.i32 1
     vm.return %0, %1 : i32, i32
   }
 
   // CHECK-LABEL: @cse_zero
   vm.func @cse_zero() -> (i32, i32) {
-    // CHECK-NEXT: %zero = vm.const.i32.zero : i32
+    // CHECK-NEXT: %zero = vm.const.i32.zero
     // CHECK-NEXT: vm.return %zero, %zero : i32, i32
-    %0 = vm.const.i32 0 : i32
-    %1 = vm.const.i32 0 : i32
+    %0 = vm.const.i32 0
+    %1 = vm.const.i32 0
     vm.return %0, %1 : i32, i32
   }
 }

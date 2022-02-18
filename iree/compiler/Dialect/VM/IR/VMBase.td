@@ -368,14 +368,10 @@ def VM_PrimitiveType : AnyTypeOf<[
   FloatOfWidths<[16, 32, 64]>,
 ]>;
 
-class VM_ConstantIntegerValueAttr<I type> : Attr<
-    Or<[
-      SignlessIntegerAttrBase<type,
-                              type.bitwidth # "-bit integer value">.predicate,
-      SignlessIntElementsAttr<type.bitwidth>.predicate,
-    ]>> {
-  let storageType = "Attribute";
-  let returnType = "Attribute";
+class VM_ConstantIntegerValueAttr<I type> : SignlessIntegerAttrBase<type,
+                              type.bitwidth # "-bit integer value"> {
+  let storageType = "IntegerAttr";
+  let returnType = "IntegerAttr";
   let convertFromStorage = "$_self";
   let constBuilderCall = "$0";
 }

@@ -6,9 +6,9 @@ vm.module @list_ops_i64 {
 
   vm.export @test_i64
   vm.func @test_i64() {
-    %capacity = vm.const.i32 42 : i32
-    %index = vm.const.i32 41 : i32
-    %max_int_plus_1 = vm.const.i64 2147483648 : i64
+    %capacity = vm.const.i32 42
+    %index = vm.const.i32 41
+    %max_int_plus_1 = vm.const.i64 2147483648
     %list = vm.list.alloc %capacity : (i32) -> !vm.list<i64>
     %sz = vm.list.size %list : (!vm.list<i64>) -> i32
     vm.list.resize %list, %capacity : (!vm.list<i64>, i32)

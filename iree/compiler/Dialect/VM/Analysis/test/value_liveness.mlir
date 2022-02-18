@@ -27,7 +27,7 @@ vm.module @module {
     // CHECK-SAME: block_live_in = []
     // CHECK-SAME: block_live_out = []
     // CHECK-SAME: live = ["%arg0", "%arg1", "%zero"]
-    %zero = vm.const.i32.zero : i32
+    %zero = vm.const.i32.zero
     // CHECK: vm.return
     // CHECK-SAME: live = ["%zero"]
     vm.return %zero : i32
@@ -41,7 +41,7 @@ vm.module @module {
     // CHECK-SAME: block_live_in = []
     // CHECK-SAME: block_live_out = ["%arg1", "%zero"]
     // CHECK-SAME: live = ["%arg0", "%arg1", "%zero"]
-    %c4 = vm.const.i32.zero : i32
+    %c4 = vm.const.i32.zero
     // CHECK: vm.br
     // CHECK-SAME: live = ["%arg0", "%arg1", "%zero"]
     vm.br ^bb1(%arg0 : i32)
@@ -115,13 +115,13 @@ vm.module @module {
     // CHECK-SAME: block_live_in = []
     // CHECK-SAME: block_live_out = ["%c1", "%c5"]
     // CHECK-SAME: live = ["%c1"]
-    %c1 = vm.const.i32 1 : i32
+    %c1 = vm.const.i32 1
     // CHECK: vm.const.i32
     // CHECK-SAME: live = ["%c1", "%c5"]
-    %c5 = vm.const.i32 5 : i32
+    %c5 = vm.const.i32 5
     // CHECK: vm.const.i32.zero
     // CHECK-SAME: live = ["%c1", "%c5", "%zero"]
-    %i0 = vm.const.i32.zero : i32
+    %i0 = vm.const.i32.zero
     // CHECK: vm.br
     // CHECK-SAME: live = ["%c1", "%c5", "%zero"]
     vm.br ^loop(%i0 : i32)

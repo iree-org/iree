@@ -37,7 +37,7 @@ vm.module @global_ops {
     // CHECK-NEXT: int32_t v8;
     // CHECK-NEXT: iree_status_t v9;
     // CHECK-NEXT: v5 = 17;
-    %c17 = vm.const.i32 17 : i32
+    %c17 = vm.const.i32 17
     // CHECK-NEXT: v6 = EMITC_STRUCT_PTR_MEMBER(v3, rwdata);
     // CHECK-NEXT: vm_global_store_i32(v6, 4, v5);
     vm.global.store.i32 %c17, @c107_mut : i32

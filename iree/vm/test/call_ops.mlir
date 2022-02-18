@@ -10,7 +10,7 @@ vm.module @call_ops {
 
   vm.export @test_call_i_v
   vm.func @test_call_i_v() {
-    %c1 = vm.const.i32 1 : i32
+    %c1 = vm.const.i32 1
     vm.call @_i_v(%c1) : (i32) -> ()
     vm.return
   }
@@ -52,7 +52,7 @@ vm.module @call_ops {
 
   vm.export @test_call_v_i
   vm.func @test_call_v_i() {
-    %c1 = vm.const.i32 1 : i32
+    %c1 = vm.const.i32 1
     %0 = vm.call @_v_i() : () -> (i32)
     vm.check.eq %0, %c1, "_v_i()=1" : i32
     vm.return
@@ -69,8 +69,8 @@ vm.module @call_ops {
 
   vm.export @test_call_v_ii
   vm.func @test_call_v_ii() {
-    %c1 = vm.const.i32 1 : i32
-    %c2 = vm.const.i32 2 : i32
+    %c1 = vm.const.i32 1
+    %c2 = vm.const.i32 2
     %0:2 = vm.call @_v_ii() : () -> (i32, i32)
     vm.check.eq %0#0, %c1, "_v_ii()#0=1" : i32
     vm.check.eq %0#1, %c2, "_v_ii()#1=2" : i32
@@ -84,7 +84,7 @@ vm.module @call_ops {
   }
 
   vm.func @_i_v(%arg : i32) attributes {noinline} {
-    %c1 = vm.const.i32 1 : i32
+    %c1 = vm.const.i32 1
     vm.check.eq %arg, %c1, "Expected %arg to be 1" : i32
     vm.return
   }
@@ -112,7 +112,7 @@ vm.module @call_ops {
   }
 
   vm.func @_v_i() -> i32 attributes {noinline} {
-    %c1 = vm.const.i32 1 : i32
+    %c1 = vm.const.i32 1
     vm.return %c1 : i32
   }
 
@@ -122,8 +122,8 @@ vm.module @call_ops {
   }
 
   vm.func @_v_ii() -> (i32, i32) attributes {noinline} {
-    %c1 = vm.const.i32 1 : i32
-    %c2 = vm.const.i32 2 : i32
+    %c1 = vm.const.i32 1
+    %c2 = vm.const.i32 2
     vm.return %c1, %c2 : i32, i32
   }
 
@@ -132,7 +132,7 @@ vm.module @call_ops {
   }
 
   vm.func @_v_v_fail() attributes {noinline} {
-    %c2 = vm.const.i32 2 : i32
+    %c2 = vm.const.i32 2
     vm.fail %c2
   }
 

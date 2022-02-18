@@ -19,9 +19,9 @@ vm.module @initI32 {
   vm.global.i32 private @g2 = 123 : i32
 
   // CHECK: vm.func private @__init() {
-  // CHECK-NEXT:   %c123 = vm.const.i32 123 : i32
+  // CHECK-NEXT:   %c123 = vm.const.i32 123
   // CHECK-NEXT:   vm.global.store.i32 %c123, @g1
-  // CHECK-NEXT:   %c123_0 = vm.const.i32 123 : i32
+  // CHECK-NEXT:   %c123_0 = vm.const.i32 123
   // CHECK-NEXT:   vm.global.store.i32 %c123_0, @g2
   // CHECK-NEXT:   vm.return
   // CHECK-NEXT: }
@@ -51,7 +51,7 @@ vm.module @initializers {
   vm.global.i32 private @g0 : i32
   // CHECK-NOT: vm.initializer
   vm.initializer {
-    %c123 = vm.const.i32 123 : i32
+    %c123 = vm.const.i32 123
     vm.global.store.i32 %c123, @g0 : i32
     vm.return
   }
@@ -75,7 +75,7 @@ vm.module @initializers {
   }
 
   //      CHECK: vm.func private @__init() {
-  // CHECK-NEXT:   %c123 = vm.const.i32 123 : i32
+  // CHECK-NEXT:   %c123 = vm.const.i32 123
   // CHECK-NEXT:   vm.global.store.i32 %c123, @g0 : i32
   // CHECK-NEXT:   %null = vm.const.ref.zero : !vm.ref<?>
   // CHECK-NEXT:   vm.global.store.ref %null, @g1 : !vm.ref<?>
