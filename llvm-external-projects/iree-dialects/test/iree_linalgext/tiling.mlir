@@ -174,6 +174,71 @@ func @scatter_no_tiling(
 
 // -----
 
+func @scatter_repeated_indices_tiling(
+    %original: tensor<?x?xf32>, %indices: tensor<?x1xi32>,
+    %update : tensor<?x?xf32>) -> tensor<?x?xf32> {
+  %0 = iree_linalg_ext.scatter
+    {__internal_linalg_transform__ = "tiling_repeated_indices_scatter_input"}
+    unique_indices(false)
+    ins(%update, %indices : tensor<?x?xf32>, tensor<?x1xi32>)
+    outs(%original : tensor<?x?xf32>) {
+    ^bb0(%arg1: f32, %arg2: f32):
+      %1 = arith.addf %arg1, %arg2 : f32
+      iree_linalg_ext.yield %1 : f32
+    } -> tensor<?x?xf32>
+  return %0 : tensor<?x?xf32>
+}
+
+//   CHECK-DAG: #[[MAP:.+]] = affine_map<(d0)[s0, s1] -> (20, -d0 + s1)>
+//       CHECK: func @scatter_repeated_indices_tiling
+//  CHECK-SAME:   %[[ORIGINAL:[a-zA-Z0-9_]+]]: tensor<?x?xf32>
+//  CHECK-SAME:   %[[INDICES:[a-zA-Z0-9_]+]]: tensor<?x1xi32>
+//  CHECK-SAME:   %[[UPDATES:[a-zA-Z0-9_]+]]: tensor<?x?xf32>
+//   CHECK-DAG:   %[[TILESIZE:.+]] = arith.constant 20 : index
+//   CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
+//   CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
+//   CHECK-DAG:   %[[D0:.+]] = tensor.dim %[[UPDATES]], %[[C0]]
+//   CHECK-DAG:   %[[D1:.+]] = tensor.dim %[[UPDATES]], %[[C1]]
+//       CHECK:   %[[RESULT:.+]] = scf.for %[[I:.+]] = %[[C0]] to %[[D1]] step %[[TILESIZE]]
+//  CHECK-SAME:       iter_args(%[[ITER:.+]] = %[[ORIGINAL]])
+//       CHECK:     %[[SZ:.+]] = affine.min #[[MAP]](%[[I]])[%[[TILESIZE]], %[[D1]]]
+//       CHECK:       %[[UPDATES_TILE:.+]] = tensor.extract_slice
+//  CHECK-SAME:         %[[UPDATES]][0, %[[I]]] [%[[D0]], %[[SZ]]] [1, 1]
+//       CHECK:       %[[INDICES_TILE:.+]] = tensor.extract_slice
+//  CHECK-SAME:         %[[INDICES]][0, 0] [%[[D0]], 1] [1, 1]
+//       CHECK:       %[[ORIGINAL_D0:.+]] = tensor.dim %[[ORIGINAL]], %[[C0]]
+//       CHECK:       %[[ORIGINAL_TILE:.+]] = tensor.extract_slice
+//  CHECK-SAME:         %[[ITER]][0, %[[I]]] [%[[ORIGINAL_D0]], %[[SZ]]] [1, 1]
+//       CHECK:       %[[SCATTER:.+]] = iree_linalg_ext.scatter
+//  CHECK-SAME:         __internal_linalg_transform__ = "tiling_repeated_indices_scatter_output"
+//  CHECK-SAME:         unique_indices(false)
+//  CHECK-SAME:         ins(%[[UPDATES_TILE]], %[[INDICES_TILE]]
+//  CHECK-SAME:         outs(%[[ORIGINAL_TILE]]
+//       CHECK:       %[[RES:.+]] = tensor.insert_slice %[[SCATTER]] into
+//  CHECK-SAME:         %[[ITER]][0, %[[I]]] [%[[ORIGINAL_D0]], %[[SZ]]] [1, 1]
+//       CHECK:       scf.yield %[[RES]]
+//       CHECK:   return %[[RESULT]]
+
+// -----
+
+func @scatter_repeated_indices_no_tiling(
+    %original: tensor<?x?xf32>, %indices: tensor<?x1xi32>,
+    %update : tensor<?x?xf32>) -> tensor<?x?xf32> {
+  // expected-error @+1 {{unimplemented tiling of non-parallel loop iterator type}}
+  %0 = iree_linalg_ext.scatter
+    {__internal_linalg_transform__ = "tiling_input"}
+    unique_indices(false)
+    ins(%update, %indices : tensor<?x?xf32>, tensor<?x1xi32>)
+    outs(%original : tensor<?x?xf32>) {
+    ^bb0(%arg1: f32, %arg2: f32):
+      %1 = arith.addf %arg1, %arg2 : f32
+      iree_linalg_ext.yield %1 : f32
+    } -> tensor<?x?xf32>
+  return %0 : tensor<?x?xf32>
+}
+
+// -----
+
 func @sort_1d(%arg0: tensor<?xi32>) -> tensor<?xi32> {
   %0 = iree_linalg_ext.sort
        {__internal_linalg_transform__ = "outer_reduce_input"}
