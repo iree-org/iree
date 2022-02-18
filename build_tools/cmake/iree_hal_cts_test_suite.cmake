@@ -165,7 +165,12 @@ function(iree_hal_cts_test_suite)
     # Note: driver names may contain dashes and other special characters. We
     # could sanitize for file and target names, but passing through directly
     # may be more intuitive.
-    set(_TEST_SOURCE_NAME "${_RULE_DRIVER_NAME}${_RULE_VARIANT_SUFFIX}_${_TEST_NAME}_test.cc")
+    if(DEFINED _RULE_VARIANT_SUFFIX)
+      set(_TEST_TARGET_NAME "${_RULE_DRIVER_NAME}_${_RULE_VARIANT_SUFFIX}_${_TEST_NAME}_test")
+    else()
+      set(_TEST_TARGET_NAME "${_RULE_DRIVER_NAME}_${_TEST_NAME}_test")
+    endif()
+    set(_TEST_SOURCE_NAME "${_TEST_TARGET_NAME}.cc")
     set(_TEST_LIBRARY_DEP "iree::hal::cts::${_TEST_NAME}_test_library")
 
     # Generate the source file for this [test x driver] pair.
@@ -187,7 +192,7 @@ function(iree_hal_cts_test_suite)
 
     iree_cc_test(
       NAME
-        ${_RULE_DRIVER_NAME}${_RULE_VARIANT_SUFFIX}_${_TEST_NAME}_test
+        ${_TEST_TARGET_NAME}
       ARGS
         ${_RULE_ARGS}
       SRCS
