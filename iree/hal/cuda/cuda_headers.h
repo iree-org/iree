@@ -9,4 +9,8 @@
 
 #include "cuda.h"  // IWYU pragma: export
 
+#if IREE_ENABLE_CUPTI  // CUPTI is only used for tracing
+#include "cupti.h"
+#endif  // IREE_ENABLE_CUPTI
+
 #endif  // IREE_HAL_CUDA_CUDA_HEADERS_H_

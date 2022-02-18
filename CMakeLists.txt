@@ -332,6 +332,7 @@ set(IREE_CUDA_LIBDEVICE_PATH "" CACHE STRING "Absolute path to an appropriate li
 # If any CUDA features are being built, try to locate a CUDA SDK. We will fall
 # back to this as needed for specific features.
 if(IREE_TARGET_BACKEND_CUDA OR IREE_HAL_DRIVER_CUDA)
+  enable_language(CUDA )# Enables the CUDAToolkit_LIBRARY_ROOT variable from CUDAToolkit as well as the CUDA::cupti target if it exists.
   find_package(CUDAToolkit)
 endif()
 
@@ -381,6 +382,25 @@ if(IREE_HAL_DRIVER_CUDA)
     message(SEND_ERROR "Cannot build IREE runtime CUDA components (-DIREE_HAL_DRIVER_CUDA=ON) because a CUDA SDK was not found. Consult CMake docs for your version: https://cmake.org/cmake/help/latest/module/FindCUDAToolkit.html")
   endif()
 endif()
+
+if(IREE_HAL_DRIVER_CUDA AND IREE_ENABLE_RUNTIME_TRACING)
+  find_path(
+    CUPTI_INCLUDE_DIR
+    NAMES
+      "cupti.h"
+    PATHS ${CUDAToolkit_LIBRARY_ROOT}
+    PATH_SUFFIXES extras/CUPTI/include
+  )
+  if(CUPTI_INCLUDE_DIR)
+    set(CUPTIToolkit_INCLUDE_DIRS "${CUPTI_INCLUDE_DIR}")
+    message(STATUS "Using CUPTI INCLUDE_DIRS from found SDK: ${CUPTIToolkit_INCLUDE_DIRS}")
+  else()
+    set(CUPTIToolkit_INCLUDE_DIRS "")
+    message(STATUS "Unable to locate CUPTI. CUDA tracy disabled.")
+  endif(CUPTI_INCLUDE_DIR)
+else()
+  set(CUPTIToolkit_INCLUDE_DIRS "")
+endif(IREE_HAL_DRIVER_CUDA AND IREE_ENABLE_RUNTIME_TRACING)
 
 #-------------------------------------------------------------------------------
 # MLIR/LLVM Dependency

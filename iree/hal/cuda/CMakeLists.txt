@@ -12,6 +12,12 @@ if(NOT CUDAToolkit_INCLUDE_DIRS)
   message(FATAL_ERROR "No CUDA SDK includes found: should have been set globally")
 endif()
 
+if (CUPTIToolkit_INCLUDE_DIRS)
+  set(_IREE_CUDA_HEADERS_DEFINES "IREE_ENABLE_CUPTI")
+else()
+  set(_IREE_CUDA_HEADERS_DEFINES "")
+endif (CUPTIToolkit_INCLUDE_DIRS)
+
 iree_add_all_subdirs()
 
 iree_cc_library(
@@ -61,6 +67,8 @@ iree_cc_library(
     iree::hal::utils::deferred_command_buffer
     iree::hal::utils::resource_set
     iree::schemas::cuda_executable_def_c_fbs
+  DEFINES
+    ${_IREE_CUDA_HEADERS_DEFINES}
   PUBLIC
 )
 
@@ -70,16 +78,20 @@ iree_cc_library(
   HDRS
     "dynamic_symbols.h"
   TEXTUAL_HDRS
+    "dynamic_cupti_tables.h"
     "dynamic_symbol_tables.h"
   SRCS
     "cuda_headers.h"
     "dynamic_symbols.c"
   INCLUDES
     ${CUDAToolkit_INCLUDE_DIRS}
+    ${CUPTIToolkit_INCLUDE_DIRS}
   DEPS
     iree::base::core_headers
     iree::base::internal::dynamic_library
     iree::base::tracing
+  DEFINES
+    ${_IREE_CUDA_HEADERS_DEFINES}
   PUBLIC
 )
 
@@ -96,3 +108,19 @@ iree_cc_test(
   LABELS
     "driver=cuda"
 )
+
+if (CUPTIToolkit_INCLUDE_DIRS)
+iree_cc_test(
+  NAME
+    dynamic_cupti_test
+  SRCS
+    "dynamic_cupti_test.cc"
+  DEPS
+    ::dynamic_symbols
+    iree::base
+    iree::testing::gtest
+    iree::testing::gtest_main
+  LABELS
+    "driver=cuda"
+)
+endif(CUPTIToolkit_INCLUDE_DIRS)

@@ -20,6 +20,16 @@ static const char* kCUDALoaderSearchNames[] = {
 #endif
 };
 
+#if IREE_ENABLE_CUPTI
+static const char* kCUPTILoaderSearchNames[] = {
+#if defined(IREE_PLATFORM_WINDOWS)
+    "cupti64_2021.2.0.dll"
+#else  // IREE_PLATFORM_WINDOWS
+    "libcupti.so"
+#endif
+};
+#endif  // IREE_ENABLE_CUPTI
+
 #define concat(A, B) A B
 
 // Load CUDA entry points, prefer _v2 version if it exists.
@@ -37,6 +47,22 @@ static iree_status_t iree_hal_cuda_dynamic_symbols_resolve_all(
   }
 #include "iree/hal/cuda/dynamic_symbol_tables.h"  // IWYU pragma: keep
 #undef CU_PFN_DECL
+
+#if IREE_ENABLE_CUPTI
+#define CUPTI_PFN_DECL(cuptiSymbolName, ...)                                  \
+  {                                                                           \
+    static const char* kName = #cuptiSymbolName;                              \
+    IREE_RETURN_IF_ERROR(iree_dynamic_library_lookup_symbol(                  \
+        syms->cupti_library, kName, (void**)&syms->cuptiSymbolName));         \
+    static const char* kNameV2 = concat(#cuptiSymbolName, "_v2");             \
+    void* funV2;                                                              \
+    iree_dynamic_library_lookup_symbol(syms->cupti_library, kNameV2, &funV2); \
+    if (funV2) syms->cuptiSymbolName = funV2;                                 \
+  }
+#include "iree/hal/cuda/dynamic_cupti_tables.h"  // IWYU pragma: keep
+#undef CUPTI_PFN_DECL
+#endif  // IREE_ENABLE_CUPTI
+
   return iree_ok_status();
 }
 
@@ -53,6 +79,19 @@ iree_status_t iree_hal_cuda_dynamic_symbols_initialize(
         IREE_STATUS_UNAVAILABLE,
         "CUDA runtime library not available; ensure installed and on path");
   }
+
+#if IREE_ENABLE_CUPTI
+  status = iree_dynamic_library_load_from_files(
+      IREE_ARRAYSIZE(kCUPTILoaderSearchNames), kCUPTILoaderSearchNames,
+      IREE_DYNAMIC_LIBRARY_FLAG_NONE, allocator, &out_syms->cupti_library);
+  if (iree_status_is_not_found(status)) {
+    iree_status_ignore(status);
+    return iree_make_status(
+        IREE_STATUS_UNAVAILABLE,
+        "CUPTI runtime library not available; ensure installed and on path");
+  }
+#endif  // IREE_ENABLE_CUPTI
+
   if (iree_status_is_ok(status)) {
     status = iree_hal_cuda_dynamic_symbols_resolve_all(out_syms);
   }
@@ -67,6 +106,7 @@ void iree_hal_cuda_dynamic_symbols_deinitialize(
     iree_hal_cuda_dynamic_symbols_t* syms) {
   IREE_TRACE_ZONE_BEGIN(z0);
   iree_dynamic_library_release(syms->loader_library);
+  iree_dynamic_library_release(syms->cupti_library);
   memset(syms, 0, sizeof(*syms));
   IREE_TRACE_ZONE_END(z0);
 }
