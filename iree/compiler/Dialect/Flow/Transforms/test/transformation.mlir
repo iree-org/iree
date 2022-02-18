@@ -52,11 +52,12 @@ func @interleavedDot(%arg0 : tensor<4x4xf32>) -> tensor<4x4xf32> {
 //       CHECK:       %{{.+}} = linalg.matmul
 //       CHECK:       %{{.+}} = linalg.generic
 //       CHECK:         %{{.+}} = arith.mulf %{{.+}}, %{{.+}} : f32
-//       CHECK: func @interleavedDot(%arg0: tensor<4x4xf32>) -> tensor<4x4xf32> {
+//       CHECK: func @interleavedDot(
+//  CHECK-SAME:   %[[ARG0:.+]]: tensor<4x4xf32>) -> tensor<4x4xf32> {
 //   CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
 //   CHECK-DAG:   %[[C4:.+]] = arith.constant 4 : index
-//  CHECK-NEXT:   %0 = flow.dispatch @interleavedDot_dispatch_0::@interleavedDot_dispatch_0[%[[C4]], %[[C4]], %[[C1]]](%arg0) : (tensor<4x4xf32>) -> tensor<4x4xf32>
-//  CHECK-NEXT:   %1 = flow.dispatch @interleavedDot_dispatch_1::@interleavedDot_dispatch_1[%[[C4]], %[[C4]], %[[C1]]](%arg0, %0) : (tensor<4x4xf32>, tensor<4x4xf32>) -> tensor<4x4xf32>
+//  CHECK-NEXT:   %[[DISPATCH1:.+]] = flow.dispatch @interleavedDot_dispatch_0::@interleavedDot_dispatch_0[%[[C4]], %[[C4]], %[[C1]]](%[[ARG0]]) : (tensor<4x4xf32>) -> tensor<4x4xf32>
+//  CHECK-NEXT:   %1 = flow.dispatch @interleavedDot_dispatch_1::@interleavedDot_dispatch_1[%[[C4]], %[[C4]], %[[C1]]](%[[DISPATCH1:.+]], %[[ARG0]]) : (tensor<4x4xf32>, tensor<4x4xf32>) -> tensor<4x4xf32>
 //  CHECK-NEXT:   return %1 : tensor<4x4xf32>
 //  CHECK-NEXT: }
 

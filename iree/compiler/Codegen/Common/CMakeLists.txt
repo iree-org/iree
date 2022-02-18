@@ -24,11 +24,13 @@ iree_cc_library(
     Common
   HDRS
     "BufferizationAnalysis.h"
+    "DestructiveUpdateUtils.h"
   SRCS
     "BufferizationAnalysis.cpp"
     "CleanupBufferAllocViewPass.cpp"
     "ConvertToDestinationPassingStylePass.cpp"
     "DemoteF32ToF16.cpp"
+    "DestructiveUpdateUtils.cpp"
     "FlattenMemRefSubspanPass.cpp"
     "FoldAffineMinInDistributedLoops.cpp"
     "FoldTensorExtractOpPass.cpp"
@@ -40,6 +42,7 @@ iree_cc_library(
     "PolynomialApproximationPass.cpp"
     "RemoveTrivialLoops.cpp"
     "SetNumWorkgroupsPass.cpp"
+    "TileAndDistributeToWorkgroupsPass.cpp"
     "TypePropagationPass.cpp"
     "VectorizeConv.cpp"
     "VectorizeMMT4d.cpp"
@@ -84,6 +87,7 @@ iree_cc_library(
     iree::compiler::Codegen::Transforms
     iree::compiler::Codegen::Utils
     iree::compiler::Dialect::Flow::IR
+    iree::compiler::Dialect::Flow::IR::PartitionableLoopsInterface
     iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::Util::IR
   PUBLIC

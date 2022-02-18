@@ -23,7 +23,6 @@ iree_cc_library(
   NAME
     Transforms
   HDRS
-    "DestructiveUpdateUtils.h"
     "Passes.h"
     "Passes.h.inc"
     "TypeConverter.h"
@@ -35,7 +34,6 @@ iree_cc_library(
     "ConvertLinalgMatmulToMmt4D.cpp"
     "ConvertToFlow.cpp"
     "DeduplicateExecutables.cpp"
-    "DestructiveUpdateUtils.cpp"
     "DispatchLinalgOnTensors.cpp"
     "ExportBenchmarkFuncs.cpp"
     "FusionOfTensorOps.cpp"

@@ -22,7 +22,6 @@ iree_lit_test_suite(
     "convert_linalg_tensor_ops_before.mlir"
     "deduplicate_executables.mlir"
     "dispatch_linalg_on_tensors.mlir"
-    "dispatch_linalg_on_tensors_elementwise.mlir"
     "dispatch_linalg_on_tensors_fusion.mlir"
     "export_benchmark_funcs.mlir"
     "infer_numeric_narrowing.mlir"

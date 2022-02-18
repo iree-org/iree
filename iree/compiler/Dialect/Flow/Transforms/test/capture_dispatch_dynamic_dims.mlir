@@ -9,7 +9,7 @@ func @captureDims(%arg0: tensor<?x?xf32>, %arg0_dim0: index, %arg0_dim1: index, 
   %c1 = arith.constant 1 : index
   // CHECK: flow.dispatch.workgroups[%c1, %c1, %c1](%[[ARG0]], %[[ARG0_DIM0]], %[[RET0_DIM0]], %[[ARG0_DIM1]], %[[RET0_DIM1]])
   %0 = flow.dispatch.workgroups[%c1, %c1, %c1](%arg0, %arg0_dim0, %ret0_dim0) : (tensor<?x?xf32>{%arg0_dim0, %arg0_dim1}, index, index) -> tensor<?x?xf32>{%ret0_dim0, %ret0_dim1} =
-      // CHECK-NEXT: (%[[ARG0_CAPTURE:.+]]: !flow.dispatch.tensor<readonly:?x?xf32>, %[[ARG0_DIM0_CAPTURE:.+]]: index, %[[RET0_DIM0_CAPTURE:.+]]: index, %[[RET0_CAPTURE:.+]]: !flow.dispatch.tensor<writeonly:?x?xf32>, %[[ARG0_DIM1_CAPTURE:.+]]: index, %[[RET0_DIM1_CAPTURE:.+]]: index)
+      // CHECK-NEXT: (%[[ARG0_CAPTURE:.+]]: !flow.dispatch.tensor<readonly:?x?xf32>, %[[ARG0_DIM0_CAPTURE:.+]]: index, %[[RET0_DIM0_CAPTURE:.+]]: index, %[[ARG0_DIM1_CAPTURE:.+]]: index, %[[RET0_DIM1_CAPTURE:.+]]: index, %[[RET0_CAPTURE:.+]]: !flow.dispatch.tensor<writeonly:?x?xf32>)
       (%arg0_capture: !flow.dispatch.tensor<readonly:?x?xf32>, %arg0_dim0_capture: index, %ret0_dim0_capture: index, %ret0_capture: !flow.dispatch.tensor<writeonly:?x?xf32>) {
     // CHECK-DAG: = flow.dispatch.tie_shape %[[ARG0_CAPTURE]] : !flow.dispatch.tensor<readonly:?x?xf32>{%[[ARG0_DIM0_CAPTURE]], %[[ARG0_DIM1_CAPTURE]]}
     // CHECK-DAG: = flow.dispatch.tie_shape %[[RET0_CAPTURE]] : !flow.dispatch.tensor<writeonly:?x?xf32>{%[[RET0_DIM0_CAPTURE]], %[[RET0_DIM1_CAPTURE]]}
