@@ -69,6 +69,7 @@ hal.executable private @static_scatter_update_slice  {
 //       CHECK:         %[[T_INDEX:.+]] = memref.cast %[[WG_INDEX]]
 //       CHECK:         %[[T_TARGET:.+]] = memref.subview %[[WG_TARGET]][0, %[[IV_X]]] [100, 1] [1, 1]
 //       CHECK:         %[[T_TARGET_CAST:.+]] = memref.cast %[[T_TARGET]]
-//       CHECK:         iree_linalg_ext.scatter unique_indices(true)
+//       CHECK:         iree_linalg_ext.scatter
+//  CHECK-SAME:           unique_indices(true)
 //  CHECK-SAME:           ins(%[[T_UPDATE_CAST]], %[[T_INDEX]]
 //  CHECK-SAME:           outs(%[[T_TARGET_CAST]]
