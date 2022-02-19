@@ -32,7 +32,7 @@ func @scatter_repeated_update_scalar_1D() {
       scatter_dims_to_operand_dims = [0],
       index_vector_dim = 1,
     >,
-    unique_indices = true
+    unique_indices = false
   } : (tensor<8xi32>, tensor<4x1xi32>, tensor<4xi32>) -> tensor<8xi32>
   check.expect_eq_const(%0, dense<[0, 10, 0, 0, 0, 0, 0, 12]> : tensor<8xi32>) : tensor<8xi32>
   return
