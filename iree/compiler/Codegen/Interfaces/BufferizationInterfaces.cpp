@@ -259,6 +259,11 @@ static LogicalResult createSubSpanBuffers(Operation *op,
           subspanOp->getLoc(), memRefType, subspanOp.set(), subspanOp.binding(),
           subspanOp.type(), subspanOp.byte_offset(), subspanOp.dynamic_dims(),
           subspanOp.alignmentAttr());
+      if (subspanOp.alignment()) {
+        rewriter.create<memref::AssumeAlignmentOp>(
+            subspanOp->getLoc(), baseBuffer,
+            subspanOp.alignment()->getZExtValue());
+      }
       flowState.subspan_to_buffer[tensor] = baseBuffer;
     }
 
