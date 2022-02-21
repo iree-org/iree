@@ -20,10 +20,11 @@ EmitCTypeConverter::EmitCTypeConverter() {
   addConversion([](emitc::OpaqueType type) { return type; });
 
   addConversion([](IREE::VM::RefType type) {
-    return emitc::OpaqueType::get(type.getContext(), "iree_vm_ref_t*");
+    return emitc::PointerType::get(
+        emitc::OpaqueType::get(type.getContext(), "iree_vm_ref_t"));
   });
 
-  addTargetMaterialization([this](OpBuilder &builder, emitc::OpaqueType type,
+  addTargetMaterialization([this](OpBuilder &builder, emitc::PointerType type,
                                   ValueRange inputs, Location loc) -> Value {
     assert(inputs.size() == 1);
     assert(inputs[0].getType().isa<IREE::VM::RefType>());
@@ -47,7 +48,7 @@ EmitCTypeConverter::EmitCTypeConverter() {
   addSourceMaterialization([this](OpBuilder &builder, IREE::VM::RefType type,
                                   ValueRange inputs, Location loc) -> Value {
     assert(inputs.size() == 1);
-    assert(inputs[0].getType().isa<emitc::OpaqueType>());
+    assert(inputs[0].getType().isa<emitc::PointerType>());
 
     Type objectType = IREE::VM::OpaqueType::get(builder.getContext());
     Type refType = IREE::VM::RefType::get(objectType);
@@ -102,7 +103,8 @@ Optional<Value> EmitCTypeConverter::materializeRef(Value ref) {
   for (BlockArgument arg : funcOp.getArguments()) {
     assert(!arg.getType().isa<IREE::VM::RefType>());
 
-    if (arg.getType() == emitc::OpaqueType::get(ctx, "iree_vm_ref_t*")) {
+    if (arg.getType() ==
+        emitc::PointerType::get(emitc::OpaqueType::get(ctx, "iree_vm_ref_t"))) {
       if (ordinal == refArgCounter++) {
         return arg;
       }
