@@ -179,8 +179,13 @@ LogicalResult convertFuncOp(IREE::VM::FuncOp funcOp,
     }
     // We pass refs as iree_vm_ref_t* regardless of whether it is an in or out
     // parameter
-    std::string cPtrType = cType.getValue() + std::string("*");
-    Type type = emitc::OpaqueType::get(ctx, cPtrType);
+    std::string cPtrType = cType.getValue();
+    Type type;
+    if (resultType.isa<IREE::VM::RefType>()) {
+      type = emitc::OpaqueType::get(ctx, cPtrType + "*");
+    } else {
+      type = emitc::PointerType::get(emitc::OpaqueType::get(ctx, cPtrType));
+    }
     inputTypes.push_back(type);
     outputTypes.push_back(type);
   }
@@ -2009,34 +2014,24 @@ class ExportOpConversion : public OpConversionPattern<IREE::VM::ExportOp> {
       assert(resultStruct.value.hasValue());
       auto value = resultStruct.value.getValue();
 
+      auto cType = getCType(result.value()).getValue();
+      Type ptrType;
       if (result.value().isa<IREE::VM::RefType>()) {
-        Type ptrType = emitc::OpaqueType::get(ctx, "iree_vm_ref_t*");
-        std::string memberName = "res" + std::to_string(result.index());
-        auto memberPtr = rewriter.create<emitc::CallOp>(
-            /*location=*/loc,
-            /*type=*/ptrType,
-            /*callee=*/StringAttr::get(ctx, "EMITC_STRUCT_PTR_MEMBER_ADDRESS"),
-            /*args=*/
-            ArrayAttr::get(ctx, {rewriter.getIndexAttr(0),
-                                 emitc::OpaqueAttr::get(ctx, memberName)}),
-            /*templateArgs=*/ArrayAttr{},
-            /*operands=*/ArrayRef<Value>{value});
-        resultStruct.callArguments.push_back(memberPtr.getResult(0));
+        ptrType = emitc::OpaqueType::get(ctx, "iree_vm_ref_t*");
       } else {
-        auto cType = getCType(result.value()).getValue() + "*";
-        Type ptrType = emitc::OpaqueType::get(ctx, cType);
-        std::string memberName = "res" + std::to_string(result.index());
-        auto memberPtr = rewriter.create<emitc::CallOp>(
-            /*location=*/loc,
-            /*type=*/ptrType,
-            /*callee=*/StringAttr::get(ctx, "EMITC_STRUCT_PTR_MEMBER_ADDRESS"),
-            /*args=*/
-            ArrayAttr::get(ctx, {rewriter.getIndexAttr(0),
-                                 emitc::OpaqueAttr::get(ctx, memberName)}),
-            /*templateArgs=*/ArrayAttr{},
-            /*operands=*/ArrayRef<Value>{value});
-        resultStruct.callArguments.push_back(memberPtr.getResult(0));
+        ptrType = emitc::PointerType::get(emitc::OpaqueType::get(ctx, cType));
       }
+      std::string memberName = "res" + std::to_string(result.index());
+      auto memberPtr = rewriter.create<emitc::CallOp>(
+          /*location=*/loc,
+          /*type=*/ptrType,
+          /*callee=*/StringAttr::get(ctx, "EMITC_STRUCT_PTR_MEMBER_ADDRESS"),
+          /*args=*/
+          ArrayAttr::get(ctx, {rewriter.getIndexAttr(0),
+                               emitc::OpaqueAttr::get(ctx, memberName)}),
+          /*templateArgs=*/ArrayAttr{},
+          /*operands=*/ArrayRef<Value>{value});
+      resultStruct.callArguments.push_back(memberPtr.getResult(0));
     }
 
     return success();
@@ -2240,8 +2235,9 @@ class ImportOpConversion : public OpConversionPattern<IREE::VM::ImportOp> {
       }
       // We pass refs as iree_vm_ref_t* regardless of whether it is an in or out
       // parameter
-      std::string cPtrType = cType.getValue() + std::string("*");
-      Type type = emitc::OpaqueType::get(ctx, cPtrType);
+      std::string cPtrType = cType.getValue();
+      Type type =
+          emitc::PointerType::get(emitc::OpaqueType::get(ctx, cPtrType));
       types.push_back(type);
     }
 
@@ -3066,10 +3062,11 @@ class CallOpConversion : public OpConversionPattern<CallOpTy> {
           return op->emitError() << "unable to emit C type";
         }
 
-        std::string cPtrType = cType.getValue() + std::string("*");
+        std::string cPtrType = cType.getValue();
         auto resultPtrOp = rewriter.create<emitc::ApplyOp>(
             /*location=*/loc,
-            /*type=*/emitc::OpaqueType::get(ctx, cPtrType),
+            /*type=*/
+            emitc::PointerType::get(emitc::OpaqueType::get(ctx, cPtrType)),
             /*applicableOperator=*/StringAttr::get(ctx, "&"),
             /*operand=*/resultOp.getResult());
 
