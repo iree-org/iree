@@ -62,8 +62,7 @@ Optional<std::string> getCType(Type type) {
 }
 
 /// Create a call to memset to clear a struct
-LogicalResult clearStruct(OpBuilder builder, Value structValue,
-                          bool isPointer) {
+LogicalResult clearStruct(OpBuilder builder, Value structValue) {
   auto ctx = structValue.getContext();
   auto loc = structValue.getLoc();
 
@@ -247,8 +246,7 @@ LogicalResult convertFuncOp(IREE::VM::FuncOp funcOp,
     // the first slots.
     vmAnalysis.getValue().get().cacheLocalRef(i + numRefArgs, refPtrOp);
 
-    if (failed(
-            clearStruct(builder, refPtrOp.getResult(), /*isPointer=*/true))) {
+    if (failed(clearStruct(builder, refPtrOp.getResult()))) {
       return failure();
     }
   }
@@ -359,8 +357,7 @@ Optional<emitc::ApplyOp> createVmTypeDefPtr(ConversionPatternRewriter &rewriter,
       /*resultType=*/emitc::OpaqueType::get(ctx, "iree_vm_type_def_t"),
       /*value=*/emitc::OpaqueAttr::get(ctx, ""));
 
-  if (failed(clearStruct(rewriter, elementTypeOp.getResult(),
-                         /*isPointer=*/false))) {
+  if (failed(clearStruct(rewriter, elementTypeOp.getResult()))) {
     return None;
   }
 
@@ -964,8 +961,7 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
             /*templateArgs=*/ArrayAttr{},
             /*operands=*/ArrayRef<Value>{refs.getResult(0)});
 
-        if (failed(clearStruct(builder, refPtrOp.getResult(0),
-                               /*isPointer=*/true))) {
+        if (failed(clearStruct(builder, refPtrOp.getResult(0)))) {
           return failure();
         }
       }
@@ -2652,7 +2648,7 @@ class ImportOpConversion : public OpConversionPattern<IREE::VM::ImportOp> {
             .getResult();
 
     // memset(&result, 0, sizeof(result));
-    if (failed(clearStruct(rewriter, executionResult, false))) {
+    if (failed(clearStruct(rewriter, executionResult))) {
       emitError(loc) << "failed to clear struct";
       return failure();
     }
@@ -2999,8 +2995,7 @@ class CallOpConversion : public OpConversionPattern<CallOpTy> {
             /*applicableOperator=*/StringAttr::get(ctx, "&"),
             /*operand=*/refOp.getResult());
 
-        if (failed(clearStruct(rewriter, refPtrOp.getResult(),
-                               /*isPointer=*/true))) {
+        if (failed(clearStruct(rewriter, refPtrOp.getResult()))) {
           return failure();
         }
 
@@ -3669,8 +3664,7 @@ class ReturnOpConversion : public OpConversionPattern<IREE::VM::ReturnOp> {
             /*applicableOperator=*/StringAttr::get(ctx, "&"),
             /*operand=*/refOp.getResult());
 
-        if (failed(clearStruct(rewriter, refPtrOp.getResult(),
-                               /*isPointer=*/true))) {
+        if (failed(clearStruct(rewriter, refPtrOp.getResult()))) {
           return failure();
         }
 
