@@ -62,7 +62,7 @@ static bool isMatrixTimesMatrixTransposed(vector::ContractionOp contractionOp) {
   const int NIter = parallel_iterators[1];
   const int KIter = reduction_iterators[0];
   // Check that there are 3 indexing maps.
-  auto indexingMaps = contractionOp.indexing_maps().getValue();
+  auto indexingMaps = contractionOp.indexing_maps();
   if (indexingMaps.size() != 3) {
     return false;
   }
@@ -70,7 +70,7 @@ static bool isMatrixTimesMatrixTransposed(vector::ContractionOp contractionOp) {
   const int expectedMapResults[3][2] = {
       {MIter, KIter}, {NIter, KIter}, {MIter, NIter}};
   for (int m = 0; m < 3; ++m) {
-    auto map = indexingMaps[m].cast<AffineMapAttr>().getValue();
+    auto map = indexingMaps[m];
     if (map.getNumDims() != 3 || map.getNumResults() != 2) {
       return false;
     }

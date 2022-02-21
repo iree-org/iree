@@ -132,7 +132,7 @@ struct ConvertVectorContractOp final
 
     // Column major matmuls should have been lowered to transpose + contract
     // by this point. Transpose can be handled by load/store operations.
-    if (!isRowMajorMatmul(contractOp.indexing_maps())) return failure();
+    if (!isRowMajorMatmul(contractOp.indexing_mapsAttr())) return failure();
 
     rewriter.replaceOpWithNewOp<spirv::CooperativeMatrixMulAddNVOp>(
         contractOp, operands.acc().getType(), operands.lhs(), operands.rhs(),
