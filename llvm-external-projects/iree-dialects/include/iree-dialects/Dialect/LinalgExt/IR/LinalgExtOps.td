@@ -149,18 +149,15 @@ def IREELinalgExt_SortOp : IREELinalgExt_Op<"sort",
     See https://www.tensorflow.org/xla/operation_semantics#sort.
   }];
 
-  // Define arguments and results like linalg.generic op. The attribute has the
-  // same definition as mhlo.sort::dimension. If the rank is greater than 1,
-  // the attribute must be set. If the rank is exacatly 1, the dimension is
-  // optional.
   let arguments = (ins Variadic<AnyType>:$inputs,
                        Variadic<AnyShaped>:$outputs,
-                       OptionalAttr<I64Attr>:$dimension
+                       I64Attr:$dimension
   );
   let results = (outs Variadic<AnyRankedTensor>:$results);
   let regions = (region AnyRegion:$region);
   let assemblyFormat = [{
-    attr-dict (`dimension` `(` $dimension^ `)`)?
+    attr-dict
+    `dimension` `(` $dimension `)`
     (`ins` `(` $inputs^ `:` type($inputs) `)`)?
     `outs` `(` $outputs `:` type($outputs) `)`
     $region (`->` type($results)^)?
@@ -177,13 +174,6 @@ def IREELinalgExt_SortOp : IREELinalgExt_Op<"sort",
     }
     ArrayRef<int64_t> getOperandShape() {
       return getOperandType(0).getShape();
-    }
-    uint64_t getSortedDimension() {
-      uint64_t sortedDim = 0;
-      if (auto setSortedDim = dimension()) {
-        sortedDim = *setSortedDim;
-      }
-      return sortedDim;
     }
   }];
 }

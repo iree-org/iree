@@ -369,18 +369,12 @@ static LogicalResult verifySortOp(SortOp op) {
   }
 
   int64_t rank = op.getOperandRank();
-  ArrayRef<int64_t> shape = op.getOperandShape();
-  if (rank > 1 && !op.dimensionAttr()) {
-    return op.emitOpError("dimension must be specified if rank > 1");
-  }
-  int dimension = 0;
-  if (op.dimensionAttr()) {
-    dimension = op.dimension().getValue();
-  }
-  if (dimension < 0 || dimension >= rank) {
+  int sortDim = op.dimension();
+  if (sortDim < 0 || sortDim >= rank) {
     return op.emitOpError("dimension must be within (0, ") << rank << "]";
   }
 
+  ArrayRef<int64_t> shape = op.getOperandShape();
   for (auto indexedOperand : llvm::enumerate(op.outputs())) {
     int index = indexedOperand.index();
     auto operandType = op.getOperandType(index);
@@ -419,7 +413,7 @@ SmallVector<StringRef> SortOp::getLoopIteratorTypes() {
   // All loops except the dimension to sort along are parallel.
   SmallVector<StringRef> iteratorTypes(getOperandRank(),
                                        getParallelIteratorTypeName());
-  iteratorTypes[getSortedDimension()] = getReductionIteratorTypeName();
+  iteratorTypes[dimension()] = getReductionIteratorTypeName();
   return iteratorTypes;
 }
 
@@ -442,8 +436,7 @@ SmallVector<unsigned> SortOp::getPartitionableLoops(
     unsigned maxNumParallelDims) {
   auto range = llvm::seq<unsigned>(0, getOperandRank());
   SmallVector<unsigned> partitionableLoops(range.begin(), range.end());
-  partitionableLoops.erase(
-      std::next(partitionableLoops.begin(), getSortedDimension()));
+  partitionableLoops.erase(std::next(partitionableLoops.begin(), dimension()));
   if (partitionableLoops.size() > maxNumParallelDims) {
     partitionableLoops.erase(
         partitionableLoops.begin(),
@@ -488,7 +481,7 @@ Operation *SortOp::getTiledImplementation(OpBuilder &builder,
 
 LogicalResult SortOp::generateScalarImplementation(OpBuilder &b, Location loc,
                                                    ValueRange ivs) {
-  auto sortDim = getSortedDimension();
+  auto sortDim = dimension();
   SmallVector<Value> indices, sortBlkArgs;
   indices.append(ivs.begin(), ivs.end());
   // Bubble sort innermost loop.

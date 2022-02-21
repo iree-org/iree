@@ -242,6 +242,7 @@ func @scatter_repeated_indices_no_tiling(
 func @sort_1d(%arg0: tensor<?xi32>) -> tensor<?xi32> {
   %0 = iree_linalg_ext.sort
        {__internal_linalg_transform__ = "outer_reduce_input"}
+       dimension(0)
        outs(%arg0 : tensor<?xi32>) {
        ^bb0(%arg2: i32, %arg3: i32):  // no predecessors
          %0 = arith.cmpi sgt, %arg2, %arg3 : i32

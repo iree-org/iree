@@ -2,10 +2,12 @@
 
 // CHECK-LABEL: func @sort_tensor
 // CHECK:         iree_linalg_ext.sort
+// CHECK-SAME:      dimension(0)
 // CHECK-SAME:      outs({{.*}})
 // CHECK:           iree_linalg_ext.yield
 func @sort_tensor(%arg0: tensor<128xi32>) -> tensor<128xi32> {
   %0 = iree_linalg_ext.sort
+    dimension(0)
     outs(%arg0 : tensor<128xi32>) {
   ^bb0(%arg1: i32, %arg2: i32):  // no predecessors
     %1 = arith.cmpi sgt, %arg1, %arg2 : i32
@@ -18,6 +20,7 @@ func @sort_tensor(%arg0: tensor<128xi32>) -> tensor<128xi32> {
 
 // CHECK-LABEL: func @sort_memref
 // CHECK:         iree_linalg_ext.sort
+// CHECK-SAME:      dimension(0)
 // CHECK-SAME:      outs({{.*}})
 // CHECK:           iree_linalg_ext.yield
 func @sort_memref(%arg0: memref<128xi32>) {

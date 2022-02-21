@@ -64,6 +64,7 @@ func @sort_2d(%arg0: memref<16x32xi32>) {
 
 func @sort_multi(%arg0: memref<128xf32>, %arg1: memref<128xi32>) {
   iree_linalg_ext.sort
+    dimension(0)
     outs(%arg0, %arg1 : memref<128xf32>, memref<128xi32>) {
   ^bb0(%arg2: f32, %arg3: f32, %arg4: i32, %arg5: i32):  // no predecessors
     %0 = arith.cmpf ogt, %arg2, %arg3 : f32
