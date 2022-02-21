@@ -31,7 +31,7 @@ namespace iree_compiler {
 namespace {
 
 // TODO(simon-camp/marbre): Use this function throughout the conversions.
-Optional<std::string> getCType(Type type, bool refAsPointer = true) {
+Optional<std::string> getCType(Type type) {
   if (auto iType = type.dyn_cast<IntegerType>()) {
     switch (iType.getWidth()) {
       case 32:
@@ -55,8 +55,7 @@ Optional<std::string> getCType(Type type, bool refAsPointer = true) {
   }
 
   if (type.isa<IREE::VM::RefType>()) {
-    return refAsPointer ? std::string("iree_vm_ref_t*")
-                        : std::string("iree_vm_ref_t");
+    return std::string("iree_vm_ref_t");
   }
 
   return None;
@@ -74,7 +73,7 @@ LogicalResult clearStruct(OpBuilder builder, Value structValue,
     return failure();
   }
 
-  Optional<std::string> cType = getCType(type, false);
+  Optional<std::string> cType = getCType(type);
   if (!cType.hasValue()) {
     return failure();
   }
@@ -174,7 +173,7 @@ LogicalResult convertFuncOp(IREE::VM::FuncOp funcOp,
   }
 
   for (auto &resultType : funcType.getResults()) {
-    Optional<std::string> cType = getCType(resultType, false);
+    Optional<std::string> cType = getCType(resultType);
     if (!cType.hasValue()) {
       return funcOp.emitError() << "unable to emit C type";
     }
@@ -1750,7 +1749,7 @@ class ExportOpConversion : public OpConversionPattern<IREE::VM::ExportOp> {
       std::string structBody;
 
       for (auto pair : llvm::enumerate(types)) {
-        Optional<std::string> cType = getCType(pair.value(), false);
+        Optional<std::string> cType = getCType(pair.value());
         if (!cType.hasValue()) {
           funcOp.emitError() << "unable to map function argument type to "
                                 "c type in argument struct declaration.";
@@ -2024,7 +2023,7 @@ class ExportOpConversion : public OpConversionPattern<IREE::VM::ExportOp> {
             /*operands=*/ArrayRef<Value>{value});
         resultStruct.callArguments.push_back(memberPtr.getResult(0));
       } else {
-        auto cType = getCType(result.value(), false).getValue() + "*";
+        auto cType = getCType(result.value()).getValue() + "*";
         Type ptrType = emitc::OpaqueType::get(ctx, cType);
         std::string memberName = "res" + std::to_string(result.index());
         auto memberPtr = rewriter.create<emitc::CallOp>(
@@ -2234,7 +2233,7 @@ class ImportOpConversion : public OpConversionPattern<IREE::VM::ImportOp> {
     }
 
     for (auto &resultType : functionType.getResults()) {
-      Optional<std::string> cType = getCType(resultType, false);
+      Optional<std::string> cType = getCType(resultType);
       if (!cType.hasValue()) {
         emitError(loc) << "unable to emit C type";
         return failure();
@@ -2269,7 +2268,7 @@ class ImportOpConversion : public OpConversionPattern<IREE::VM::ImportOp> {
     // TODO(simon-camp): Test if neccesary
     Type dummyType = rewriter.getI32Type();
     for (Type type : types.size() > 0 ? types : ArrayRef<Type>(dummyType)) {
-      auto cType = getCType(type, /*refAsPointer=*/false);
+      auto cType = getCType(type);
 
       if (!cType.hasValue()) {
         emitError(loc) << "Unable to emit C type.";
@@ -2472,7 +2471,7 @@ class ImportOpConversion : public OpConversionPattern<IREE::VM::ImportOp> {
       BlockArgument arg = funcOp.getArgument(i + inputOffset);
       assert(!arg.getType().isa<IREE::VM::RefType>());
 
-      auto cType = getCType(inputType, /*refAsPointer=*/false);
+      auto cType = getCType(inputType);
 
       if (!cType.hasValue()) {
         emitError(loc) << "unable to build C type in argument packing for `"
@@ -2596,7 +2595,7 @@ class ImportOpConversion : public OpConversionPattern<IREE::VM::ImportOp> {
       BlockArgument arg = funcOp.getArgument(i + resultOffset);
       assert(!arg.getType().isa<IREE::VM::RefType>());
 
-      auto cType = getCType(resultType, /*refAsPointer=*/false);
+      auto cType = getCType(resultType);
 
       if (!cType.hasValue()) {
         emitError(loc) << "unable to build C type in result unpacking";
@@ -3062,7 +3061,7 @@ class CallOpConversion : public OpConversionPattern<CallOpTy> {
             /*resultType=*/result.getType(),
             /*value=*/emitc::OpaqueAttr::get(ctx, ""));
 
-        Optional<std::string> cType = getCType(resultOp.getType(), false);
+        Optional<std::string> cType = getCType(resultOp.getType());
         if (!cType.hasValue()) {
           return op->emitError() << "unable to emit C type";
         }
