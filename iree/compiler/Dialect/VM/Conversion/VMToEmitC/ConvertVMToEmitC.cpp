@@ -751,7 +751,8 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
         /*args=*/
         ArrayAttr::get(ctx,
                        {builder.getIndexAttr(0),
-                        emitc::OpaqueAttr::get(ctx, moduleTypeName + "*")}),
+                        TypeAttr::get(emitc::PointerType::get(
+                            emitc::OpaqueType::get(ctx, moduleTypeName)))}),
         /*templateArgs=*/ArrayAttr{},
         /*operands=*/ArrayRef<Value>{funcOp.getArgument(0)});
 
@@ -835,8 +836,10 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
             emitc::PointerType::get(emitc::OpaqueType::get(ctx, "void"))),
         /*callee=*/StringAttr::get(ctx, "EMITC_CAST"),
         /*args=*/
-        ArrayAttr::get(ctx, {builder.getIndexAttr(0),
-                             emitc::OpaqueAttr::get(ctx, "void**")}),
+        ArrayAttr::get(
+            ctx, {builder.getIndexAttr(0),
+                  TypeAttr::get(emitc::PointerType::get(emitc::PointerType::get(
+                      emitc::OpaqueType::get(ctx, "void"))))}),
         /*templateArgs=*/ArrayAttr{},
         /*operands=*/ArrayRef<Value>{statePtr.getResult()});
 
@@ -881,7 +884,8 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
           /*callee=*/StringAttr::get(ctx, "EMITC_CAST"),
           /*args=*/
           ArrayAttr::get(ctx, {emitc::OpaqueAttr::get(ctx, bufferName),
-                               emitc::OpaqueAttr::get(ctx, "void*")}),
+                               TypeAttr::get(emitc::PointerType::get(
+                                   emitc::OpaqueType::get(ctx, "void")))}),
           /*templateArgs=*/ArrayAttr{},
           /*operands=*/ArrayRef<Value>{});
 
@@ -1000,7 +1004,8 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
         /*args=*/
         ArrayAttr::get(
             ctx, {builder.getIndexAttr(0),
-                  emitc::OpaqueAttr::get(ctx, "iree_vm_module_state_t*")}),
+                  TypeAttr::get(emitc::PointerType::get(
+                      emitc::OpaqueType::get(ctx, "iree_vm_module_state_t")))}),
         /*templateArgs=*/ArrayAttr{},
         /*operands=*/ArrayRef<Value>{stateOp.getResult()});
 
@@ -1058,7 +1063,8 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
         /*args=*/
         ArrayAttr::get(
             ctx, {builder.getIndexAttr(0),
-                  emitc::OpaqueAttr::get(ctx, moduleStateTypeName + "*")}),
+                  TypeAttr::get(emitc::PointerType::get(
+                      emitc::OpaqueType::get(ctx, moduleStateTypeName)))}),
         /*templateArgs=*/ArrayAttr{},
         /*operands=*/ArrayRef<Value>{funcOp.getArgument(1)});
 
@@ -1167,7 +1173,8 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
         /*args=*/
         ArrayAttr::get(
             ctx, {builder.getIndexAttr(0),
-                  emitc::OpaqueAttr::get(ctx, moduleStateTypeName + "*")}),
+                  TypeAttr::get(emitc::PointerType::get(
+                      emitc::OpaqueType::get(ctx, moduleStateTypeName)))}),
         /*templateArgs=*/ArrayAttr{},
         /*operands=*/ArrayRef<Value>{funcOp.getArgument(1)});
 
@@ -1276,8 +1283,10 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
             emitc::PointerType::get(emitc::OpaqueType::get(ctx, "void"))),
         /*callee=*/StringAttr::get(ctx, "EMITC_CAST"),
         /*args=*/
-        ArrayAttr::get(ctx, {builder.getIndexAttr(0),
-                             emitc::OpaqueAttr::get(ctx, "void**")}),
+        ArrayAttr::get(
+            ctx, {builder.getIndexAttr(0),
+                  TypeAttr::get(emitc::PointerType::get(emitc::PointerType::get(
+                      emitc::OpaqueType::get(ctx, "void"))))}),
         /*templateArgs=*/ArrayAttr{},
         /*operands=*/ArrayRef<Value>{modulePtr.getResult()});
 
@@ -1695,7 +1704,8 @@ class ExportOpConversion : public OpConversionPattern<IREE::VM::ExportOp> {
         /*args=*/
         ArrayAttr::get(ctx,
                        {rewriter.getIndexAttr(0),
-                        emitc::OpaqueAttr::get(ctx, moduleTypeName + "*")}),
+                        TypeAttr::get(emitc::PointerType::get(
+                            emitc::OpaqueType::get(ctx, moduleTypeName)))}),
         /*templateArgs=*/ArrayAttr{},
         /*operands=*/ArrayRef<Value>{module});
 
@@ -1708,7 +1718,8 @@ class ExportOpConversion : public OpConversionPattern<IREE::VM::ExportOp> {
         /*args=*/
         ArrayAttr::get(
             ctx, {rewriter.getIndexAttr(0),
-                  emitc::OpaqueAttr::get(ctx, moduleStateTypeName + "*")}),
+                  TypeAttr::get(emitc::PointerType::get(
+                      emitc::OpaqueType::get(ctx, moduleStateTypeName)))}),
         /*templateArgs=*/ArrayAttr{},
         /*operands=*/ArrayRef<Value>{moduleState});
 
@@ -1857,7 +1868,8 @@ class ExportOpConversion : public OpConversionPattern<IREE::VM::ExportOp> {
           /*args=*/
           ArrayAttr::get(ctx,
                          {rewriter.getIndexAttr(0),
-                          emitc::OpaqueAttr::get(ctx, argumentsType + "*")}),
+                          TypeAttr::get(emitc::PointerType::get(
+                              emitc::OpaqueType::get(ctx, argumentsType)))}),
           /*templateArgs=*/ArrayAttr{},
           /*operands=*/ArrayRef<Value>{argumentsData.getResult(0)});
 
@@ -1898,7 +1910,8 @@ class ExportOpConversion : public OpConversionPattern<IREE::VM::ExportOp> {
           /*callee=*/StringAttr::get(ctx, "EMITC_CAST"),
           /*args=*/
           ArrayAttr::get(ctx, {rewriter.getIndexAttr(0),
-                               emitc::OpaqueAttr::get(ctx, resultType + "*")}),
+                               TypeAttr::get(emitc::PointerType::get(
+                                   emitc::OpaqueType::get(ctx, resultType)))}),
           /*templateArgs=*/ArrayAttr{},
           /*operands=*/ArrayRef<Value>{resultsData.getResult(0)});
 
