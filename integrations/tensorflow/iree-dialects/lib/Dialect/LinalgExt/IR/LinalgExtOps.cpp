@@ -436,8 +436,7 @@ SmallVector<unsigned> SortOp::getPartitionableLoops(
     unsigned maxNumParallelDims) {
   auto range = llvm::seq<unsigned>(0, getOperandRank());
   SmallVector<unsigned> partitionableLoops(range.begin(), range.end());
-  partitionableLoops.erase(
-      std::next(partitionableLoops.begin(), dimension()));
+  partitionableLoops.erase(std::next(partitionableLoops.begin(), dimension()));
   if (partitionableLoops.size() > maxNumParallelDims) {
     partitionableLoops.erase(
         partitionableLoops.begin(),
