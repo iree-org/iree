@@ -125,6 +125,8 @@ void buildIREEVMTransformPassPipeline(
   // and must run before generating bindings.
   // After input processing, there should only be IREE legal types in
   // signatures.
+  buildCommonInputConversionPassPipeline(passManager);
+
   switch (inputOptions.type) {
     case InputDialectOptions::Type::none:
       break;
@@ -139,7 +141,6 @@ void buildIREEVMTransformPassPipeline(
       MHLO::buildMHLOInputConversionPassPipeline(passManager);
       break;
   }
-  buildCommonInputConversionPassPipeline(passManager);
 
   // Now that inputs are legalized, generate wrapper for entry functions.
   if (bindingOptions.native) {
