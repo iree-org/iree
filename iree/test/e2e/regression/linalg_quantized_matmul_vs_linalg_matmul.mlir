@@ -45,7 +45,6 @@ func private @quantized_matmul_as_matmul_3x4x5(%lhs : tensor<3x4xi8>, %rhs : ten
 
   // add all the terms together.
   %init_acc_uninitialized =  linalg.init_tensor [3, 5] : tensor<3x5xi32>
-  %zero_acc = linalg.fill(%c_0, %init_acc_uninitialized) : i32, tensor<3x5xi32> -> tensor<3x5xi32>
   %quantized_matmul_from_matmul_result = linalg.generic {
       indexing_maps = [
         affine_map<(d0, d1) -> (d0, d1)>,
@@ -57,7 +56,7 @@ func private @quantized_matmul_as_matmul_3x4x5(%lhs : tensor<3x4xi8>, %rhs : ten
         affine_map<(d0, d1) -> (d0, d1)>],
       iterator_types = ["parallel", "parallel"]}
       ins(%matmul_result, %lhs_sums, %rhs_sums, %lhs_zp, %rhs_zp, %k_size : tensor<3x5xi32>, tensor<3xi32>, tensor<5xi32>, i32, i32, i32)
-      outs(%zero_acc : tensor<3x5xi32>) {
+      outs(%init_acc_uninitialized : tensor<3x5xi32>) {
       ^bb0(%matmul_result_val : i32, %lhs_sums_val: i32, %rhs_sums_val: i32, %lhs_zp_val: i32, %rhs_zp_val: i32, %k : i32, %acc_val: i32) :
           %linear_term_in_rhs_zp = arith.muli %lhs_sums_val, %rhs_zp_val : i32
           %linear_term_in_lhs_zp = arith.muli %rhs_sums_val, %lhs_zp_val : i32
@@ -66,8 +65,7 @@ func private @quantized_matmul_as_matmul_3x4x5(%lhs : tensor<3x4xi8>, %rhs : ten
           %quadratic_term = arith.muli %k, %product_of_zp : i32
           %corrected_for_linear_term = arith.subi %matmul_result_val, %linear_term : i32
           %corrected = arith.addi %corrected_for_linear_term, %quadratic_term : i32
-          %final_acc = arith.addi %acc_val, %corrected : i32
-          linalg.yield %final_acc : i32
+          linalg.yield %corrected : i32
       } -> tensor<3x5xi32>
   return %quantized_matmul_from_matmul_result : tensor<3x5xi32>
 }
