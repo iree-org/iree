@@ -12,6 +12,11 @@ include(CMakeParseArguments)
 #
 # Parameters:
 # NAME: name of target. This name is used for the generated executable and
+#     CTest target.
+# ARGS: List of command line arguments to pass to the test binary.
+#     Note: flag passing is only enforced through CTest, so manually running
+#     the test binaries (such as under a debugger) will _not_ pass any
+#     arguments without extra setup.
 # SRCS: List of source files for the binary
 # DATA: List of other targets and files required for this binary
 # DEPS: List of other libraries to be linked in to the binary targets
@@ -55,7 +60,7 @@ function(iree_cc_test)
     _RULE
     ""
     "NAME"
-    "SRCS;COPTS;DEFINES;LINKOPTS;DATA;DEPS;LABELS"
+    "ARGS;SRCS;COPTS;DEFINES;LINKOPTS;DATA;DEPS;LABELS"
     ${ARGN}
   )
 
@@ -138,6 +143,7 @@ function(iree_cc_test)
       COMMAND
         "${CMAKE_SOURCE_DIR}/build_tools/cmake/run_android_test.${IREE_HOST_SCRIPT_EXT}"
         "${_ANDROID_REL_DIR}/$<TARGET_FILE_NAME:${_NAME}>"
+        ${_RULE_ARGS}
     )
     # Use environment variables to instruct the script to push artifacts
     # onto the Android device before running the test. This needs to match
@@ -158,6 +164,7 @@ function(iree_cc_test)
         # directory cleanup upon test completion.
         "${CMAKE_SOURCE_DIR}/build_tools/cmake/run_test.${IREE_HOST_SCRIPT_EXT}"
         "$<TARGET_FILE:${_NAME}>"
+        ${_RULE_ARGS}
       )
     set_property(TEST ${_NAME_PATH} PROPERTY ENVIRONMENT "TEST_TMPDIR=${IREE_BINARY_DIR}/tmp/${_NAME}_test_tmpdir")
     iree_add_test_environment_properties(${_NAME_PATH})

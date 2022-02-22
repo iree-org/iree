@@ -14,6 +14,9 @@ include(CMakeParseArguments)
 # Parameters:
 #   DRIVER_NAME: The name of the driver to test. Used for both target names and
 #       for `iree_hal_driver_registry_try_create_by_name()` within test code.
+#   VARIANT_SUFFIX: Suffix to add to the test names, separate from the driver
+#       name. Useful when specifying multiple configurations using `ARGS` or
+#       other parameters.
 #   DRIVER_REGISTRATION_HDR: The C #include path for `DRIVER_REGISTRATION_FN`.
 #   DRIVER_REGISTRATION_FN: The C function which registers `DRIVER_NAME`.
 #   COMPILER_TARGET_BACKEND: Optional target backend name to pass to the
@@ -25,10 +28,13 @@ include(CMakeParseArguments)
 #       Examples:
 #           "\"vmvx-bytecode-fb\"" -> "vmvx-bytecode-fb"
 #           "\"embedded-elf-\" IREE_ARCH" -> "embedded-elf-x86_64"
+#   ARGS: List of command line arguments to pass to test binaries.
 #   DEPS: List of other libraries to link in to the binary targets (typically
 #       the dependency for `DRIVER_REGISTRATION_HDR`).
-#   EXCLUDED_TESTS: List of test names from `IREE_ALL_CTS_TESTS` to
-#       exclude from the test suite for this driver.
+#   INCLUDED_TESTS: List of test names to include from the test suite.
+#       Defaults to `IREE_ALL_CTS_TESTS`.
+#   EXCLUDED_TESTS: List of test names to exclude from the test suite for this
+#       driver. Generally set either this _or_ `INCLUDED_TESTS`.
 #   LABELS: Additional labels to forward to `iree_cc_test`. The package path
 #     and "driver=${DRIVER}" are added automatically.
 function(iree_hal_cts_test_suite)
@@ -39,8 +45,8 @@ function(iree_hal_cts_test_suite)
   cmake_parse_arguments(
     _RULE
     ""
-    "DRIVER_NAME;DRIVER_REGISTRATION_HDR;DRIVER_REGISTRATION_FN;COMPILER_TARGET_BACKEND;EXECUTABLE_FORMAT"
-    "DEPS;EXCLUDED_TESTS;LABELS"
+    "DRIVER_NAME;VARIANT_SUFFIX;DRIVER_REGISTRATION_HDR;DRIVER_REGISTRATION_FN;COMPILER_TARGET_BACKEND;EXECUTABLE_FORMAT"
+    "DEPS;ARGS;INCLUDED_TESTS;EXCLUDED_TESTS;LABELS"
     ${ARGN}
   )
 
@@ -141,7 +147,13 @@ function(iree_hal_cts_test_suite)
     )
   endif()
 
-  foreach(_TEST_NAME ${IREE_ALL_CTS_TESTS})
+  if(_RULE_INCLUDED_TESTS)
+    set(_INCLUDED_TESTS ${_RULE_INCLUDED_TESTS})
+  else()
+    set(_INCLUDED_TESTS ${IREE_ALL_CTS_TESTS})
+  endif()
+
+  foreach(_TEST_NAME ${_INCLUDED_TESTS})
     if("${_TEST_NAME}" IN_LIST _RULE_EXCLUDED_TESTS)
       continue()
     endif()
@@ -167,7 +179,12 @@ function(iree_hal_cts_test_suite)
     # Note: driver names may contain dashes and other special characters. We
     # could sanitize for file and target names, but passing through directly
     # may be more intuitive.
-    set(_TEST_SOURCE_NAME "${_TEST_NAME}_${_RULE_DRIVER_NAME}_test.cc")
+    if(DEFINED _RULE_VARIANT_SUFFIX)
+      set(_TEST_TARGET_NAME "${_RULE_DRIVER_NAME}_${_RULE_VARIANT_SUFFIX}_${_TEST_NAME}_test")
+    else()
+      set(_TEST_TARGET_NAME "${_RULE_DRIVER_NAME}_${_TEST_NAME}_test")
+    endif()
+    set(_TEST_SOURCE_NAME "${_TEST_TARGET_NAME}.cc")
     set(_TEST_LIBRARY_DEP "iree::hal::cts::${_TEST_NAME}_test_library")
 
     # Generate the source file for this [test x driver] pair.
@@ -185,7 +202,9 @@ function(iree_hal_cts_test_suite)
 
     iree_cc_test(
       NAME
-        ${_RULE_DRIVER_NAME}_${_TEST_NAME}_test
+        ${_TEST_TARGET_NAME}
+      ARGS
+        ${_RULE_ARGS}
       SRCS
         "${CMAKE_CURRENT_BINARY_DIR}/${_TEST_SOURCE_NAME}"
       DEPS

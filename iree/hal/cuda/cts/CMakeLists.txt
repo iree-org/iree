@@ -27,3 +27,28 @@ iree_hal_cts_test_suite(
     "semaphore_submission"
     "semaphore"
 )
+
+# Variant test suite using graph command buffers (--cuda_use_streams=0)
+iree_hal_cts_test_suite(
+  DRIVER_NAME
+    cuda
+  VARIANT_SUFFIX
+    graph
+  DRIVER_REGISTRATION_HDR
+    "iree/hal/cuda/registration/driver_module.h"
+  DRIVER_REGISTRATION_FN
+    "iree_hal_cuda_driver_module_register"
+  COMPILER_TARGET_BACKEND
+    "cuda"
+  EXECUTABLE_FORMAT
+    "\"PTXE\""
+  ARGS
+    "--cuda_use_streams=0"
+  DEPS
+    iree::hal::cuda::registration
+  INCLUDED_TESTS
+    "command_buffer"
+    # This test depends on iree_hal_cuda_stream_command_buffer_update_buffer
+    # via iree_hal_buffer_view_allocate_buffer, which is not implemented yet.
+    # "command_buffer_dispatch"
+)
