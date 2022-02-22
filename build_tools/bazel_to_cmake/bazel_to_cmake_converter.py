@@ -333,6 +333,7 @@ class BuildFileFunctions(object):
               defines=None,
               data=None,
               deps=None,
+              args=None,
               tags=None,
               **kwargs):
     name_block = _convert_string_arg_block("NAME", name, quote=False)
@@ -342,6 +343,7 @@ class BuildFileFunctions(object):
     defines_block = _convert_string_list_block("DEFINES", defines)
     data_block = _convert_target_list_block("DATA", data)
     deps_block = _convert_target_list_block("DEPS", deps)
+    args_block = _convert_string_list_block("ARGS", args)
     labels_block = _convert_string_list_block("LABELS", tags)
 
     self.converter.body += (f"iree_cc_test(\n"
@@ -352,6 +354,7 @@ class BuildFileFunctions(object):
                             f"{defines_block}"
                             f"{data_block}"
                             f"{deps_block}"
+                            f"{args_block}"
                             f"{labels_block}"
                             f")\n\n")
 
