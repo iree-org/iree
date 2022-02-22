@@ -598,11 +598,9 @@ static iree_status_t iree_hal_vulkan_device_create_internal(
 
   // Create the device memory allocator that will service all buffer
   // allocation requests.
-  VmaRecordSettings vma_record_settings;
-  memset(&vma_record_settings, 0, sizeof(vma_record_settings));
   iree_status_t status = iree_hal_vulkan_vma_allocator_create(
       instance, physical_device, logical_device, (iree_hal_device_t*)device,
-      vma_record_settings, &device->device_allocator);
+      &device->device_allocator);
 
   // Create command pools for each queue family. If we don't have a transfer
   // queue then we'll ignore that one and just use the dispatch pool.
