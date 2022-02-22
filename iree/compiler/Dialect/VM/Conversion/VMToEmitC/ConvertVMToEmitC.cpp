@@ -297,19 +297,6 @@ LogicalResult removeBlockArguments(
     assert(blockArg.use_empty());
     Block *block = blockArg.getOwner();
 
-    for (auto pred : block->getPredecessors()) {
-      auto terminator = pred->getTerminator();
-      if (auto branchOp = dyn_cast<mlir::cf::BranchOp>(terminator)) {
-        branchOp.eraseOperand(blockArg.getArgNumber());
-      } else if (auto condBranchOp =
-                     dyn_cast<mlir::cf::CondBranchOp>(terminator)) {
-        if (condBranchOp.getTrueDest() == block) {
-          condBranchOp.eraseTrueOperand(blockArg.getArgNumber());
-        } else {
-          condBranchOp.eraseFalseOperand(blockArg.getArgNumber());
-        }
-      }
-    }
     block->eraseArgument(blockArg.getArgNumber());
   }
 
@@ -3468,7 +3455,7 @@ class BranchOpConversion : public OpConversionPattern<IREE::VM::BranchOp> {
             /*operands=*/
             ArrayRef<Value>{operandRef.getValue(), blockArgRef.getValue()});
       }
-      rewriter.create<mlir::cf::BranchOp>(loc, op.dest(), op.getOperands());
+      rewriter.create<mlir::cf::BranchOp>(loc, op.dest(), nonRefOperands);
     }
 
     rewriter.replaceOpWithNewOp<mlir::cf::BranchOp>(op, destDispatch);
@@ -3597,7 +3584,8 @@ class CondBranchOpConversion
             /*operands=*/
             ArrayRef<Value>{operandRef.getValue(), blockArgRef.getValue()});
       }
-      rewriter.create<mlir::cf::BranchOp>(loc, op.trueDest(),
+      // Let the BranchOpConversion handle ref block arguments.
+      rewriter.create<IREE::VM::BranchOp>(loc, op.trueDest(),
                                           op.getTrueOperands());
     }
 
@@ -3638,7 +3626,8 @@ class CondBranchOpConversion
             /*operands=*/
             ArrayRef<Value>{operandRef.getValue(), blockArgRef.getValue()});
       }
-      rewriter.create<mlir::cf::BranchOp>(loc, op.falseDest(),
+      // Let the BranchOpConversion handle ref block arguments.
+      rewriter.create<IREE::VM::BranchOp>(loc, op.falseDest(),
                                           op.getFalseOperands());
     }
 
