@@ -2236,8 +2236,13 @@ class ImportOpConversion : public OpConversionPattern<IREE::VM::ImportOp> {
       // We pass refs as iree_vm_ref_t* regardless of whether it is an in or out
       // parameter
       std::string cPtrType = cType.getValue();
-      Type type =
-          emitc::PointerType::get(emitc::OpaqueType::get(ctx, cPtrType));
+      Type type;
+      if (resultType.isa<IREE::VM::RefType>()) {
+        type = emitc::OpaqueType::get(ctx, cPtrType + "*");
+      } else {
+        type = emitc::PointerType::get(emitc::OpaqueType::get(ctx, cPtrType));
+      }
+
       types.push_back(type);
     }
 
