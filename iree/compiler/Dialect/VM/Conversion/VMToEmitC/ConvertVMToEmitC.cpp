@@ -74,17 +74,23 @@ LogicalResult clearStruct(OpBuilder builder, Value structValue,
     return failure();
   }
 
-  Optional<std::string> cType = getCType(type);
-
+  Optional<std::string> cType = getCType(type, false);
   if (!cType.hasValue()) {
     return failure();
   }
+  std::string cPtrType = cType.getValue();
 
   Value structPointerValue;
   Value sizeValue;
 
   if (isPointer) {
-    std::string pointerType = cType.getValue();
+    std::string pointerType;
+    if (type.isa<IREE::VM::RefType>()) {
+      pointerType = cPtrType + "*";
+    } else {
+      pointerType = cPtrType;
+    }
+
     if (pointerType.back() != '*') {
       return failure();
     }
@@ -103,11 +109,10 @@ LogicalResult clearStruct(OpBuilder builder, Value structValue,
     structPointerValue = structValue;
     sizeValue = size.getResult(0);
   } else {
-    std::string cPtrType = cType.getValue() + "*";
-
     auto structPointer = builder.create<emitc::ApplyOp>(
         /*location=*/loc,
-        /*result=*/emitc::OpaqueType::get(ctx, cPtrType),
+        /*result=*/
+        emitc::PointerType::get(emitc::OpaqueType::get(ctx, cPtrType)),
         /*applicableOperator=*/StringAttr::get(ctx, "&"),
         /*operand=*/structValue);
 
@@ -169,18 +174,13 @@ LogicalResult convertFuncOp(IREE::VM::FuncOp funcOp,
   }
 
   for (auto &resultType : funcType.getResults()) {
-    Optional<std::string> cType = getCType(resultType);
+    Optional<std::string> cType = getCType(resultType, false);
     if (!cType.hasValue()) {
       return funcOp.emitError() << "unable to emit C type";
     }
-    std::string cPtrType;
     // We pass refs as iree_vm_ref_t* regardless of whether it is an in or out
     // parameter
-    if (resultType.isa<IREE::VM::RefType>()) {
-      cPtrType = cType.getValue();
-    } else {
-      cPtrType = cType.getValue() + std::string("*");
-    }
+    std::string cPtrType = cType.getValue() + std::string("*");
     Type type = emitc::OpaqueType::get(ctx, cPtrType);
     inputTypes.push_back(type);
     outputTypes.push_back(type);
@@ -2024,7 +2024,7 @@ class ExportOpConversion : public OpConversionPattern<IREE::VM::ExportOp> {
             /*operands=*/ArrayRef<Value>{value});
         resultStruct.callArguments.push_back(memberPtr.getResult(0));
       } else {
-        auto cType = getCType(result.value()).getValue() + "*";
+        auto cType = getCType(result.value(), false).getValue() + "*";
         Type ptrType = emitc::OpaqueType::get(ctx, cType);
         std::string memberName = "res" + std::to_string(result.index());
         auto memberPtr = rewriter.create<emitc::CallOp>(
@@ -2234,19 +2234,14 @@ class ImportOpConversion : public OpConversionPattern<IREE::VM::ImportOp> {
     }
 
     for (auto &resultType : functionType.getResults()) {
-      Optional<std::string> cType = getCType(resultType);
+      Optional<std::string> cType = getCType(resultType, false);
       if (!cType.hasValue()) {
         emitError(loc) << "unable to emit C type";
         return failure();
       }
-      std::string cPtrType;
       // We pass refs as iree_vm_ref_t* regardless of whether it is an in or out
       // parameter
-      if (resultType.isa<IREE::VM::RefType>()) {
-        cPtrType = cType.getValue();
-      } else {
-        cPtrType = cType.getValue() + std::string("*");
-      }
+      std::string cPtrType = cType.getValue() + std::string("*");
       Type type = emitc::OpaqueType::get(ctx, cPtrType);
       types.push_back(type);
     }
@@ -2520,14 +2515,15 @@ class ImportOpConversion : public OpConversionPattern<IREE::VM::ImportOp> {
             /*templateArgs=*/ArrayAttr{},
             /*operands=*/ArrayRef<Value>{arg, refPtr});
       } else {
-        auto cPtrType = cType.getValue() + "*";
+        auto cPtrType = cType.getValue();
 
         // memcpy(uint8Ptr, &arg, size);
         Value argPtr = rewriter
                            .create<emitc::ApplyOp>(
                                /*location=*/loc,
                                /*result=*/
-                               emitc::OpaqueType::get(ctx, cPtrType),
+                               emitc::PointerType::get(
+                                   emitc::OpaqueType::get(ctx, cPtrType)),
                                /*applicableOperator=*/StringAttr::get(ctx, "&"),
                                /*operand=*/arg)
                            .getResult();
@@ -2642,8 +2638,6 @@ class ImportOpConversion : public OpConversionPattern<IREE::VM::ImportOp> {
             /*templateArgs=*/ArrayAttr{},
             /*operands=*/ArrayRef<Value>{refPtr, arg});
       } else {
-        auto cPtrType = cType.getValue() + "*";
-
         // memcpy(arg, uint8Ptr, size);
         rewriter.create<emitc::CallOp>(
             /*location=*/loc,
@@ -3068,7 +3062,7 @@ class CallOpConversion : public OpConversionPattern<CallOpTy> {
             /*resultType=*/result.getType(),
             /*value=*/emitc::OpaqueAttr::get(ctx, ""));
 
-        Optional<std::string> cType = getCType(resultOp.getType());
+        Optional<std::string> cType = getCType(resultOp.getType(), false);
         if (!cType.hasValue()) {
           return op->emitError() << "unable to emit C type";
         }
