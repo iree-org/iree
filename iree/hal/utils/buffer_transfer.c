@@ -74,11 +74,13 @@ IREE_API_EXPORT iree_status_t iree_hal_device_submit_transfer_range_and_wait(
     // allocation/copy.
     // TODO(benvanik): make this device-local + host-visible? can be better for
     // uploads as we know we are never going to read it back.
+    const iree_hal_buffer_params_t source_params = {
+        .type = IREE_HAL_MEMORY_TYPE_HOST_LOCAL |
+                IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE,
+        .usage = IREE_HAL_BUFFER_USAGE_TRANSFER | IREE_HAL_BUFFER_USAGE_MAPPING,
+    };
     status = iree_hal_allocator_allocate_buffer(
-        iree_hal_device_allocator(device),
-        IREE_HAL_MEMORY_TYPE_HOST_LOCAL | IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE,
-        IREE_HAL_BUFFER_USAGE_TRANSFER | IREE_HAL_BUFFER_USAGE_MAPPING,
-        data_length,
+        iree_hal_device_allocator(device), source_params, data_length,
         iree_make_const_byte_span(source.host_buffer.data + source_offset,
                                   data_length),
         &source_buffer);
@@ -92,11 +94,14 @@ IREE_API_EXPORT iree_status_t iree_hal_device_submit_transfer_range_and_wait(
     // We only allocate enough for the portion we are transfering.
     // TODO(benvanik): use wrap_buffer if supported to avoid the
     // allocation/copy.
+    const iree_hal_buffer_params_t target_params = {
+        .type = IREE_HAL_MEMORY_TYPE_HOST_LOCAL |
+                IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE,
+        .usage = IREE_HAL_BUFFER_USAGE_TRANSFER | IREE_HAL_BUFFER_USAGE_MAPPING,
+    };
     status = iree_hal_allocator_allocate_buffer(
-        iree_hal_device_allocator(device),
-        IREE_HAL_MEMORY_TYPE_HOST_LOCAL | IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE,
-        IREE_HAL_BUFFER_USAGE_TRANSFER | IREE_HAL_BUFFER_USAGE_MAPPING,
-        data_length, iree_const_byte_span_empty(), &target_buffer);
+        iree_hal_device_allocator(device), target_params, data_length,
+        iree_const_byte_span_empty(), &target_buffer);
     target_offset = 0;
   }
 
@@ -263,8 +268,12 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_emulated_map_range(
   // Allocate the buffer we'll be using to stage our copy of the device memory.
   // All devices should be able to satisfy this host-local + mapping request.
   iree_status_t status = iree_hal_allocator_allocate_buffer(
-      device_allocator, IREE_HAL_MEMORY_TYPE_HOST_LOCAL,
-      IREE_HAL_BUFFER_USAGE_TRANSFER | IREE_HAL_BUFFER_USAGE_MAPPING,
+      device_allocator,
+      (iree_hal_buffer_params_t){
+          .type = IREE_HAL_MEMORY_TYPE_HOST_LOCAL,
+          .usage =
+              IREE_HAL_BUFFER_USAGE_TRANSFER | IREE_HAL_BUFFER_USAGE_MAPPING,
+      },
       local_byte_length, iree_const_byte_span_empty(),
       &emulation_state->host_local_buffer);
 

@@ -478,8 +478,12 @@ static iree_status_t allocate_buffer_like(iree_hal_allocator_t* hal_allocator,
       iree_hal_buffer_view_shape_rank(src),
       iree_hal_buffer_view_element_type(src),
       iree_hal_buffer_view_encoding_type(src),
-      IREE_HAL_MEMORY_TYPE_HOST_LOCAL | IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE,
-      IREE_HAL_BUFFER_USAGE_ALL, iree_const_byte_span_empty(), dst);
+      (iree_hal_buffer_params_t){
+          .type = IREE_HAL_MEMORY_TYPE_HOST_LOCAL |
+                  IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE,
+          .usage = IREE_HAL_BUFFER_USAGE_ALL,
+      },
+      iree_const_byte_span_empty(), dst);
 }
 
 // Performs a deep copy of |src| into |dst|. Takes care of allocating |dst|.
@@ -500,8 +504,12 @@ static iree_status_t copy_buffer(iree_hal_allocator_t* hal_allocator,
       iree_hal_buffer_view_shape_rank(src),
       iree_hal_buffer_view_element_type(src),
       iree_hal_buffer_view_encoding_type(src),
-      IREE_HAL_MEMORY_TYPE_HOST_LOCAL | IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE,
-      IREE_HAL_BUFFER_USAGE_ALL, src_span, dst);
+      (iree_hal_buffer_params_t){
+          .type = IREE_HAL_MEMORY_TYPE_HOST_LOCAL |
+                  IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE,
+          .usage = IREE_HAL_BUFFER_USAGE_ALL,
+      },
+      src_span, dst);
 }
 
 static iree_status_t copy_list_of_buffer_views(

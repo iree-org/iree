@@ -97,14 +97,17 @@ py::object HalAllocator::AllocateBufferCopy(
   }
   PyBufferReleaser py_view_releaser(py_view);
 
-  iree_hal_buffer_t* hal_buffer;
+  iree_hal_buffer_params_t params = {0};
   // TODO: Should not require host visible :(
-  iree_status_t status;
+  params.type = memory_type | IREE_HAL_MEMORY_TYPE_HOST_VISIBLE;
+  params.usage = allowed_usage;
+
+  iree_hal_buffer_t* hal_buffer = nullptr;
+  iree_status_t status = iree_ok_status();
   {
     py::gil_scoped_release release;
     status = iree_hal_allocator_allocate_buffer(
-        raw_ptr(), memory_type | IREE_HAL_MEMORY_TYPE_HOST_VISIBLE,
-        allowed_usage, py_view.len,
+        raw_ptr(), params, py_view.len,
         iree_make_const_byte_span(py_view.buf, py_view.len), &hal_buffer);
   }
   CheckApiStatus(status, "Failed to allocate device visible buffer");
@@ -425,12 +428,14 @@ void SetupHalBindings(pybind11::module m) {
       .def_property_readonly("formatted_statistics",
                              &HalAllocator::FormattedStatistics)
       .def(
-          "query_buffer_compatibility",
+          "query_compatibility",
           [](HalAllocator& self, int memory_type, int allowed_usage,
              int intended_usage, iree_device_size_t allocation_size) -> int {
-            return iree_hal_allocator_query_buffer_compatibility(
-                self.raw_ptr(), memory_type, allowed_usage, intended_usage,
-                allocation_size);
+            iree_hal_buffer_params_t params = {0};
+            params.type = memory_type;
+            params.usage = allowed_usage & intended_usage;
+            return iree_hal_allocator_query_compatibility(
+                self.raw_ptr(), params, allocation_size);
           },
           py::arg("memory_type"), py::arg("allowed_usage"),
           py::arg("intended_usage"), py::arg("allocation_size"))
@@ -438,12 +443,14 @@ void SetupHalBindings(pybind11::module m) {
           "allocate_buffer",
           [](HalAllocator& self, int memory_type, int allowed_usage,
              iree_host_size_t allocation_size) {
-            iree_hal_buffer_t* buffer;
+            iree_hal_buffer_params_t params = {0};
+            params.type = memory_type;
+            params.usage = allowed_usage;
+            iree_hal_buffer_t* buffer = nullptr;
             iree_const_byte_span_t empty_initial_data{nullptr, 0};
-
             CheckApiStatus(iree_hal_allocator_allocate_buffer(
-                               self.raw_ptr(), memory_type, allowed_usage,
-                               allocation_size, empty_initial_data, &buffer),
+                               self.raw_ptr(), params, allocation_size,
+                               empty_initial_data, &buffer),
                            "could not allocate buffer");
             return HalBuffer::StealFromRawPtr(buffer);
           },

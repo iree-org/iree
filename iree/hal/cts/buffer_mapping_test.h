@@ -45,25 +45,26 @@ class buffer_mapping_test : public CtsTestBase {
  protected:
   void AllocateUninitializedBuffer(iree_device_size_t buffer_size,
                                    iree_hal_buffer_t** out_buffer) {
+    iree_hal_buffer_params_t params = {0};
+    params.type =
+        IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL | IREE_HAL_MEMORY_TYPE_HOST_VISIBLE;
+    params.usage =
+        IREE_HAL_BUFFER_USAGE_TRANSFER | IREE_HAL_BUFFER_USAGE_MAPPING;
     iree_hal_buffer_t* device_buffer = NULL;
     IREE_CHECK_OK(iree_hal_allocator_allocate_buffer(
-        iree_hal_device_allocator(device_),
-        IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL | IREE_HAL_MEMORY_TYPE_HOST_VISIBLE,
-        IREE_HAL_BUFFER_USAGE_TRANSFER | IREE_HAL_BUFFER_USAGE_MAPPING,
-        buffer_size, iree_const_byte_span_empty(), &device_buffer));
+        iree_hal_device_allocator(device_), params, buffer_size,
+        iree_const_byte_span_empty(), &device_buffer));
     *out_buffer = device_buffer;
   }
 };
 
 TEST_P(buffer_mapping_test, AllocatorSupportsBufferMapping) {
-  iree_hal_memory_type_t memory_type = IREE_HAL_MEMORY_TYPE_HOST_VISIBLE;
-  iree_hal_buffer_usage_t buffer_usage = IREE_HAL_BUFFER_USAGE_MAPPING;
-
+  iree_hal_buffer_params_t params = {0};
+  params.type = IREE_HAL_MEMORY_TYPE_HOST_VISIBLE;
+  params.usage = IREE_HAL_BUFFER_USAGE_MAPPING;
   iree_hal_buffer_compatibility_t compatibility =
-      iree_hal_allocator_query_buffer_compatibility(
-          device_allocator_, memory_type,
-          /*allowed_usage=*/buffer_usage,
-          /*intended_usage=*/buffer_usage, kDefaultAllocationSize);
+      iree_hal_allocator_query_compatibility(device_allocator_, params,
+                                             kDefaultAllocationSize);
   EXPECT_TRUE(iree_all_bits_set(compatibility,
                                 IREE_HAL_BUFFER_COMPATIBILITY_ALLOCATABLE));
 
@@ -71,9 +72,9 @@ TEST_P(buffer_mapping_test, AllocatorSupportsBufferMapping) {
   AllocateUninitializedBuffer(kDefaultAllocationSize, &buffer);
 
   EXPECT_TRUE(
-      iree_all_bits_set(iree_hal_buffer_memory_type(buffer), memory_type));
+      iree_all_bits_set(iree_hal_buffer_memory_type(buffer), params.type));
   EXPECT_TRUE(
-      iree_all_bits_set(iree_hal_buffer_allowed_usage(buffer), buffer_usage));
+      iree_all_bits_set(iree_hal_buffer_allowed_usage(buffer), params.usage));
   EXPECT_GE(iree_hal_buffer_allocation_size(buffer), kDefaultAllocationSize);
 
   iree_hal_buffer_release(buffer);

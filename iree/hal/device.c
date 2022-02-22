@@ -92,9 +92,12 @@ static iree_status_t iree_hal_device_transfer_buffer(
   iree_hal_buffer_t* target_buffer = NULL;
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0, iree_hal_allocator_allocate_buffer(
-              iree_hal_device_allocator(device), memory_type,
-              allowed_usage | IREE_HAL_BUFFER_USAGE_TRANSFER, allocation_size,
-              iree_const_byte_span_empty(), &target_buffer));
+              iree_hal_device_allocator(device),
+              (iree_hal_buffer_params_t){
+                  .type = memory_type,
+                  .usage = allowed_usage | IREE_HAL_BUFFER_USAGE_TRANSFER,
+              },
+              allocation_size, iree_const_byte_span_empty(), &target_buffer));
 
   // Perform the transfer and wait for it to complete.
   const iree_hal_transfer_command_t transfer_command = {

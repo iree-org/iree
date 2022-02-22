@@ -57,10 +57,12 @@ static iree_status_t iree_hal_command_buffer_validate_buffer_compatibility(
     iree_hal_buffer_compatibility_t required_compatibility,
     iree_hal_buffer_usage_t intended_usage) {
   iree_hal_buffer_compatibility_t allowed_compatibility =
-      iree_hal_allocator_query_buffer_compatibility(
+      iree_hal_allocator_query_compatibility(
           iree_hal_device_allocator(VALIDATION_STATE(command_buffer)->device),
-          iree_hal_buffer_memory_type(buffer),
-          iree_hal_buffer_allowed_usage(buffer), intended_usage,
+          (iree_hal_buffer_params_t){
+              .type = iree_hal_buffer_memory_type(buffer),
+              .usage = iree_hal_buffer_allowed_usage(buffer) & intended_usage,
+          },
           iree_hal_buffer_allocation_size(buffer));
   if (!iree_all_bits_set(allowed_compatibility, required_compatibility)) {
     // Buffer cannot be used on the queue for the given usage.

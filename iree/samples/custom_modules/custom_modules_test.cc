@@ -133,12 +133,15 @@ TEST_F(CustomModulesTest, PrintTensor) {
   static iree_hal_dim_t kShape[] = {2, 4};
   static float kBufferContents[2 * 4] = {0.0f, 1.0f, 2.0f, 3.0f,
                                          4.0f, 5.0f, 6.0f, 7.0f};
+  iree_hal_buffer_params_t params = {0};
+  params.type =
+      IREE_HAL_MEMORY_TYPE_HOST_LOCAL | IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE;
+  params.usage = IREE_HAL_BUFFER_USAGE_ALL;
   iree_hal_buffer_view_t* buffer_view = nullptr;
   IREE_ASSERT_OK(iree_hal_buffer_view_wrap_or_clone_heap_buffer(
       hal_allocator_, kShape, IREE_ARRAYSIZE(kShape),
       IREE_HAL_ELEMENT_TYPE_FLOAT_32, IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR,
-      IREE_HAL_MEMORY_TYPE_HOST_LOCAL | IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE,
-      IREE_HAL_MEMORY_ACCESS_ALL, IREE_HAL_BUFFER_USAGE_ALL,
+      params,
       iree_make_byte_span((void*)kBufferContents, sizeof(kBufferContents)),
       iree_allocator_null(), &buffer_view));
 
@@ -178,12 +181,15 @@ TEST_F(CustomModulesTest, RoundTripTensor) {
   static iree_hal_dim_t kShape[] = {2, 4};
   static float kBufferContents[2 * 4] = {0.0f, 1.0f, 2.0f, 3.0f,
                                          4.0f, 5.0f, 6.0f, 7.0f};
+  iree_hal_buffer_params_t params = {0};
+  params.type =
+      IREE_HAL_MEMORY_TYPE_HOST_LOCAL | IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE;
+  params.usage = IREE_HAL_BUFFER_USAGE_ALL;
   iree_hal_buffer_view_t* buffer_view = nullptr;
   IREE_ASSERT_OK(iree_hal_buffer_view_wrap_or_clone_heap_buffer(
       hal_allocator_, kShape, IREE_ARRAYSIZE(kShape),
       IREE_HAL_ELEMENT_TYPE_FLOAT_32, IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR,
-      IREE_HAL_MEMORY_TYPE_HOST_LOCAL | IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE,
-      IREE_HAL_MEMORY_ACCESS_ALL, IREE_HAL_BUFFER_USAGE_ALL,
+      params,
       iree_make_byte_span((void*)kBufferContents, sizeof(kBufferContents)),
       iree_allocator_null(), &buffer_view));
 

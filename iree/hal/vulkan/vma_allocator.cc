@@ -170,7 +170,7 @@ iree_status_t iree_hal_vulkan_vma_allocator_create(
 }
 
 static void iree_hal_vulkan_vma_allocator_destroy(
-    iree_hal_allocator_t* base_allocator) {
+    iree_hal_allocator_t* IREE_RESTRICT base_allocator) {
   iree_hal_vulkan_vma_allocator_t* allocator =
       iree_hal_vulkan_vma_allocator_cast(base_allocator);
   iree_allocator_t host_allocator = allocator->host_allocator;
@@ -183,20 +183,20 @@ static void iree_hal_vulkan_vma_allocator_destroy(
 }
 
 static iree_allocator_t iree_hal_vulkan_vma_allocator_host_allocator(
-    const iree_hal_allocator_t* base_allocator) {
+    const iree_hal_allocator_t* IREE_RESTRICT base_allocator) {
   iree_hal_vulkan_vma_allocator_t* allocator =
       (iree_hal_vulkan_vma_allocator_t*)base_allocator;
   return allocator->host_allocator;
 }
 
 static iree_status_t iree_hal_vulkan_vma_allocator_trim(
-    iree_hal_allocator_t* base_allocator) {
+    iree_hal_allocator_t* IREE_RESTRICT base_allocator) {
   return iree_ok_status();
 }
 
 static void iree_hal_vulkan_vma_allocator_query_statistics(
-    iree_hal_allocator_t* base_allocator,
-    iree_hal_allocator_statistics_t* out_statistics) {
+    iree_hal_allocator_t* IREE_RESTRICT base_allocator,
+    iree_hal_allocator_statistics_t* IREE_RESTRICT out_statistics) {
   IREE_STATISTICS({
     iree_hal_vulkan_vma_allocator_t* allocator =
         iree_hal_vulkan_vma_allocator_cast(base_allocator);
@@ -205,30 +205,24 @@ static void iree_hal_vulkan_vma_allocator_query_statistics(
 }
 
 static iree_hal_buffer_compatibility_t
-iree_hal_vulkan_vma_allocator_query_buffer_compatibility(
-    iree_hal_allocator_t* base_allocator, iree_hal_memory_type_t memory_type,
-    iree_hal_buffer_usage_t allowed_usage,
-    iree_hal_buffer_usage_t intended_usage,
+iree_hal_vulkan_vma_allocator_query_compatibility(
+    iree_hal_allocator_t* IREE_RESTRICT base_allocator,
+    const iree_hal_buffer_params_t* IREE_RESTRICT params,
     iree_device_size_t allocation_size) {
   // TODO(benvanik): check to ensure the allocator can serve the memory type.
-
-  // Disallow usage not permitted by the buffer itself. Since we then use this
-  // to determine compatibility below we'll naturally set the right compat flags
-  // based on what's both allowed and intended.
-  intended_usage &= allowed_usage;
 
   // All buffers can be allocated on the heap.
   iree_hal_buffer_compatibility_t compatibility =
       IREE_HAL_BUFFER_COMPATIBILITY_ALLOCATABLE;
 
   // All buffers can be used as transfer source/dest.
-  if (iree_all_bits_set(intended_usage, IREE_HAL_BUFFER_USAGE_TRANSFER)) {
+  if (iree_all_bits_set(params->usage, IREE_HAL_BUFFER_USAGE_TRANSFER)) {
     compatibility |= IREE_HAL_BUFFER_COMPATIBILITY_QUEUE_TRANSFER;
   }
 
   // Buffers can only be used on the queue if they are device visible.
-  if (iree_all_bits_set(memory_type, IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE)) {
-    if (iree_all_bits_set(intended_usage, IREE_HAL_BUFFER_USAGE_DISPATCH)) {
+  if (iree_all_bits_set(params->type, IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE)) {
+    if (iree_all_bits_set(params->usage, IREE_HAL_BUFFER_USAGE_DISPATCH)) {
       compatibility |= IREE_HAL_BUFFER_COMPATIBILITY_QUEUE_DISPATCH;
     }
   }
@@ -236,19 +230,12 @@ iree_hal_vulkan_vma_allocator_query_buffer_compatibility(
   return compatibility;
 }
 
-static iree_status_t iree_hal_vulkan_vma_allocator_make_compatible(
-    iree_hal_memory_type_t* memory_type,
-    iree_hal_memory_access_t* allowed_access,
-    iree_hal_buffer_usage_t* allowed_usage) {
-  return iree_ok_status();
-}
-
 static iree_status_t iree_hal_vulkan_vma_allocator_allocate_internal(
-    iree_hal_vulkan_vma_allocator_t* allocator,
-    iree_hal_memory_type_t memory_type, iree_hal_buffer_usage_t allowed_usage,
-    iree_hal_memory_access_t allowed_access, iree_host_size_t allocation_size,
-    iree_const_byte_span_t initial_data, VmaAllocationCreateFlags flags,
-    iree_hal_buffer_t** out_buffer) {
+    iree_hal_vulkan_vma_allocator_t* IREE_RESTRICT allocator,
+    const iree_hal_buffer_params_t* IREE_RESTRICT params,
+    iree_host_size_t allocation_size, iree_const_byte_span_t initial_data,
+    VmaAllocationCreateFlags flags,
+    iree_hal_buffer_t** IREE_RESTRICT out_buffer) {
   // Guard against the corner case where the requested buffer size is 0. The
   // application is unlikely to do anything when requesting a 0-byte buffer; but
   // it can happen in real world use cases. So we should at least not crash.
@@ -263,11 +250,11 @@ static iree_status_t iree_hal_vulkan_vma_allocator_allocate_internal(
   buffer_create_info.flags = 0;
   buffer_create_info.size = allocation_size;
   buffer_create_info.usage = 0;
-  if (iree_all_bits_set(allowed_usage, IREE_HAL_BUFFER_USAGE_TRANSFER)) {
+  if (iree_all_bits_set(params->usage, IREE_HAL_BUFFER_USAGE_TRANSFER)) {
     buffer_create_info.usage |= VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
     buffer_create_info.usage |= VK_BUFFER_USAGE_TRANSFER_DST_BIT;
   }
-  if (iree_all_bits_set(allowed_usage, IREE_HAL_BUFFER_USAGE_DISPATCH)) {
+  if (iree_all_bits_set(params->usage, IREE_HAL_BUFFER_USAGE_DISPATCH)) {
     buffer_create_info.usage |= VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
     buffer_create_info.usage |= VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
     buffer_create_info.usage |= VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT;
@@ -284,8 +271,8 @@ static iree_status_t iree_hal_vulkan_vma_allocator_allocate_internal(
   allocation_create_info.memoryTypeBits = 0;  // Automatic selection.
   allocation_create_info.pool = VK_NULL_HANDLE;
   allocation_create_info.pUserData = NULL;
-  if (iree_all_bits_set(memory_type, IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL)) {
-    if (iree_all_bits_set(memory_type, IREE_HAL_MEMORY_TYPE_HOST_VISIBLE)) {
+  if (iree_all_bits_set(params->type, IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL)) {
+    if (iree_all_bits_set(params->type, IREE_HAL_MEMORY_TYPE_HOST_VISIBLE)) {
       // Device-local, host-visible.
       allocation_create_info.usage = VMA_MEMORY_USAGE_CPU_TO_GPU;
       allocation_create_info.preferredFlags |=
@@ -297,7 +284,7 @@ static iree_status_t iree_hal_vulkan_vma_allocator_allocate_internal(
           VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
     }
   } else {
-    if (iree_all_bits_set(memory_type, IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE)) {
+    if (iree_all_bits_set(params->type, IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE)) {
       // Host-local, device-visible.
       allocation_create_info.usage = VMA_MEMORY_USAGE_GPU_TO_CPU;
     } else {
@@ -305,18 +292,18 @@ static iree_status_t iree_hal_vulkan_vma_allocator_allocate_internal(
       allocation_create_info.usage = VMA_MEMORY_USAGE_CPU_ONLY;
     }
   }
-  if (iree_all_bits_set(memory_type, IREE_HAL_MEMORY_TYPE_HOST_CACHED)) {
+  if (iree_all_bits_set(params->type, IREE_HAL_MEMORY_TYPE_HOST_CACHED)) {
     allocation_create_info.requiredFlags |= VK_MEMORY_PROPERTY_HOST_CACHED_BIT;
   }
-  if (iree_all_bits_set(memory_type, IREE_HAL_MEMORY_TYPE_HOST_COHERENT)) {
+  if (iree_all_bits_set(params->type, IREE_HAL_MEMORY_TYPE_HOST_COHERENT)) {
     allocation_create_info.requiredFlags |=
         VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
   }
-  if (iree_all_bits_set(memory_type, IREE_HAL_MEMORY_TYPE_TRANSIENT)) {
+  if (iree_all_bits_set(params->type, IREE_HAL_MEMORY_TYPE_TRANSIENT)) {
     allocation_create_info.preferredFlags |=
         VK_MEMORY_PROPERTY_LAZILY_ALLOCATED_BIT;
   }
-  if (iree_all_bits_set(allowed_usage, IREE_HAL_BUFFER_USAGE_MAPPING)) {
+  if (iree_all_bits_set(params->usage, IREE_HAL_BUFFER_USAGE_MAPPING)) {
     allocation_create_info.requiredFlags |= VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
   }
 
@@ -333,8 +320,8 @@ static iree_status_t iree_hal_vulkan_vma_allocator_allocate_internal(
 
   iree_hal_buffer_t* buffer = NULL;
   iree_status_t status = iree_hal_vulkan_vma_buffer_wrap(
-      (iree_hal_allocator_t*)allocator, memory_type, allowed_access,
-      allowed_usage, allocation_size,
+      (iree_hal_allocator_t*)allocator, params->type, params->access,
+      params->usage, allocation_size,
       /*byte_offset=*/0,
       /*byte_length=*/allocation_size, allocator->vma, handle, allocation,
       allocation_info, &buffer);
@@ -364,54 +351,49 @@ static iree_status_t iree_hal_vulkan_vma_allocator_allocate_internal(
 }
 
 static iree_status_t iree_hal_vulkan_vma_allocator_allocate_buffer(
-    iree_hal_allocator_t* base_allocator, iree_hal_memory_type_t memory_type,
-    iree_hal_buffer_usage_t allowed_usage, iree_host_size_t allocation_size,
-    iree_const_byte_span_t initial_data, iree_hal_buffer_t** out_buffer) {
+    iree_hal_allocator_t* IREE_RESTRICT base_allocator,
+    const iree_hal_buffer_params_t* IREE_RESTRICT params,
+    iree_host_size_t allocation_size, iree_const_byte_span_t initial_data,
+    iree_hal_buffer_t** IREE_RESTRICT out_buffer) {
   iree_hal_vulkan_vma_allocator_t* allocator =
       iree_hal_vulkan_vma_allocator_cast(base_allocator);
-
-  // Coerce options into those required for use by VMA.
-  iree_hal_memory_access_t allowed_access = IREE_HAL_MEMORY_ACCESS_ALL;
-  IREE_RETURN_IF_ERROR(iree_hal_vulkan_vma_allocator_make_compatible(
-      &memory_type, &allowed_access, &allowed_usage));
-
   return iree_hal_vulkan_vma_allocator_allocate_internal(
-      allocator, memory_type, allowed_usage, allowed_access, allocation_size,
-      initial_data,
+      allocator, params, allocation_size, initial_data,
       /*flags=*/0, out_buffer);
 }
 
 static void iree_hal_vulkan_vma_allocator_deallocate_buffer(
-    iree_hal_allocator_t* base_allocator, iree_hal_buffer_t* base_buffer) {
+    iree_hal_allocator_t* IREE_RESTRICT base_allocator,
+    iree_hal_buffer_t* IREE_RESTRICT base_buffer) {
   // VMA does the pooling for us so we don't need anything special.
   iree_hal_buffer_destroy(base_buffer);
 }
 
 static iree_status_t iree_hal_vulkan_vma_allocator_wrap_buffer(
-    iree_hal_allocator_t* base_allocator, iree_hal_memory_type_t memory_type,
-    iree_hal_memory_access_t allowed_access,
-    iree_hal_buffer_usage_t allowed_usage, iree_byte_span_t data,
-    iree_allocator_t data_allocator, iree_hal_buffer_t** out_buffer) {
+    iree_hal_allocator_t* IREE_RESTRICT base_allocator,
+    const iree_hal_buffer_params_t* IREE_RESTRICT params, iree_byte_span_t data,
+    iree_allocator_t data_allocator,
+    iree_hal_buffer_t** IREE_RESTRICT out_buffer) {
   // TODO(#7242): use VK_EXT_external_memory_host to import memory.
   return iree_make_status(IREE_STATUS_UNAVAILABLE,
                           "wrapping of external buffers not supported");
 }
 
 static iree_status_t iree_hal_vulkan_vma_allocator_import_buffer(
-    iree_hal_allocator_t* base_allocator, iree_hal_memory_type_t memory_type,
-    iree_hal_memory_access_t allowed_access,
-    iree_hal_buffer_usage_t allowed_usage,
-    iree_hal_external_buffer_t* external_buffer,
-    iree_hal_buffer_t** out_buffer) {
+    iree_hal_allocator_t* IREE_RESTRICT base_allocator,
+    const iree_hal_buffer_params_t* IREE_RESTRICT params,
+    iree_hal_external_buffer_t* IREE_RESTRICT external_buffer,
+    iree_hal_buffer_t** IREE_RESTRICT out_buffer) {
   return iree_make_status(IREE_STATUS_UNAVAILABLE,
                           "importing from external buffers not supported");
 }
 
 static iree_status_t iree_hal_vulkan_vma_allocator_export_buffer(
-    iree_hal_allocator_t* base_allocator, iree_hal_buffer_t* buffer,
+    iree_hal_allocator_t* IREE_RESTRICT base_allocator,
+    iree_hal_buffer_t* IREE_RESTRICT buffer,
     iree_hal_external_buffer_type_t requested_type,
     iree_hal_external_buffer_flags_t requested_flags,
-    iree_hal_external_buffer_t* out_external_buffer) {
+    iree_hal_external_buffer_t* IREE_RESTRICT out_external_buffer) {
   return iree_make_status(IREE_STATUS_UNAVAILABLE,
                           "exporting to external buffers not supported");
 }
@@ -422,8 +404,8 @@ const iree_hal_allocator_vtable_t iree_hal_vulkan_vma_allocator_vtable = {
     /*.host_allocator=*/iree_hal_vulkan_vma_allocator_host_allocator,
     /*.trim=*/iree_hal_vulkan_vma_allocator_trim,
     /*.query_statistics=*/iree_hal_vulkan_vma_allocator_query_statistics,
-    /*.query_buffer_compatibility=*/
-    iree_hal_vulkan_vma_allocator_query_buffer_compatibility,
+    /*.query_compatibility=*/
+    iree_hal_vulkan_vma_allocator_query_compatibility,
     /*.allocate_buffer=*/iree_hal_vulkan_vma_allocator_allocate_buffer,
     /*.deallocate_buffer=*/iree_hal_vulkan_vma_allocator_deallocate_buffer,
     /*.wrap_buffer=*/iree_hal_vulkan_vma_allocator_wrap_buffer,
