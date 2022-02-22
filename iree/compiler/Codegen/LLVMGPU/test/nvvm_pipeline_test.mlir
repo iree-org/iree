@@ -487,14 +487,14 @@ hal.executable @mma_fused {
           %9 = affine.min affine_map<(d0)[s0] -> (s0, -d0 + 512)>(%arg1)[%workgroup_size_x]
           %10 = memref.subview %1[0, %arg1] [1024, %9] [1, 1] : memref<1024x512xf32> to memref<1024x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 512 + s0 + d1)>>
           %11 = memref.subview %2[%arg0, %arg1] [%7, %9] [1, 1] : memref<2048x512xf32> to memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 512 + s0 + d1)>>
-          linalg.fill(%cst, %11) : f32, memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 512 + s0 + d1)>> 
+          linalg.fill(%cst, %11) : f32, memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 512 + s0 + d1)>>
           linalg.matmul ins(%8, %10 : memref<?x1024xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>, memref<1024x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 512 + s0 + d1)>>) outs(%11 : memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 512 + s0 + d1)>>)
           linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>],
               iterator_types = ["parallel", "parallel"]} ins(%11, %11 : memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 512 + s0 + d1)>>, memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 512 + s0 + d1)>>) outs(%11 : memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 512 + s0 + d1)>>) {
             ^bb0(%arg3: f32, %arg4: f32, %arg5: f32):  // no predecessors
               %19 = arith.addf %arg3, %arg4 : f32
              linalg.yield %19 : f32
-            }     
+            }
         }
       }
       return
@@ -559,8 +559,8 @@ hal.executable @mma_fused {
 
 #executable_layout = #hal.executable.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
-    #hal.descriptor_set.binding<0, storage_buffer>, 
-    #hal.descriptor_set.binding<1, storage_buffer>, 
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>,
     #hal.descriptor_set.binding<2, storage_buffer>
   ]>
 ]>
@@ -612,7 +612,7 @@ hal.executable @mma_fused {
                 %15 = affine.min #map5(%arg1)[%workgroup_size_y]
                 %16 = affine.min #map6(%arg2)[%workgroup_size_x]
                 %17 = linalg.init_tensor [%14, %15, %16] : tensor<?x?x?xf32>
-                %18 = linalg.fill(%cst, %17) : f32, tensor<?x?x?xf32> -> tensor<?x?x?xf32> 
+                %18 = linalg.fill(%cst, %17) : f32, tensor<?x?x?xf32> -> tensor<?x?x?xf32>
                 %19 = linalg.batch_matmul ins(%11, %13 : tensor<?x?x1024xf32>, tensor<?x1024x?xf32>) outs(%18 : tensor<?x?x?xf32>) -> tensor<?x?x?xf32>
                 flow.dispatch.tensor.store %19, %2, offsets = [%arg0, %arg1, %arg2], sizes = [%9, %10, %12], strides = [1, 1, 1] : tensor<?x?x?xf32> -> !flow.dispatch.tensor<writeonly:4x32x64xf32>
               }

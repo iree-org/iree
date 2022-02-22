@@ -254,10 +254,14 @@ void addGPUVectorizationPassPipeline(OpPassManager &pm);
 LogicalResult verifyGPUMatmulSimtPassPipeline(
     Operation *op, IREE::Codegen::LoweringConfigAttr loweringConfig,
     IREE::Codegen::TranslationInfoAttr translationInfo,
-    ArrayRef<int64_t> workgroupSize = {});
+    ArrayRef<int64_t> workgroupSize);
 void addGPUMatmulSimtPassPipeline(OpPassManager &pm);
 
 /// Lowering using tensorcore operations.
+LogicalResult verifyGPUMatmulTensorCorePipeline(
+    Operation *op, IREE::Codegen::LoweringConfigAttr loweringConfig,
+    IREE::Codegen::TranslationInfoAttr translationInfo,
+    ArrayRef<int64_t> workgroupSize);
 void addGPUMatmulTensorCorePassPipeline(OpPassManager &pm);
 
 /// Simple lowering only distributute linalg ops on blocks and threads. This

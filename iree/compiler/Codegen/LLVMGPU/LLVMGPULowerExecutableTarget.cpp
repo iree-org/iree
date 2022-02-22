@@ -88,6 +88,11 @@ static LogicalResult verifyEntryPoint(
                                            workgroupSizes,
                                            verifyGPUMatmulSimtPassPipeline);
         break;
+      case IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUMatmulTensorCore:
+        return verifyLoweringConfiguration(moduleOp, translationInfo,
+                                           workgroupSizes,
+                                           verifyGPUMatmulTensorCorePipeline);
+        break;
       default:;
     }
   }

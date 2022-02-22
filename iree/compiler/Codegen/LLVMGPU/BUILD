@@ -28,6 +28,7 @@ cc_library(
         "LLVMGPUVectorToGPU.cpp",
         "LLVMGPUVectorization.cpp",
         "Passes.cpp",
+        "Verifiers.cpp",
     ],
     hdrs = [
         "ConvertToLLVM.h",
