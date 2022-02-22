@@ -25,9 +25,25 @@ LogicalResult verifyGPUMatmulSimtPassPipeline(
   if (workgroupSize.empty()) {
     return op->emitOpError("expected workgroup size for GPU pipelines");
   }
-  linalg::MatmulOp matmulOp = dyn_cast<linalg::MatmulOp>(op);
-  if (!matmulOp) {
-    return success(); // Only verify matmul.
+
+  if (!isa<linalg::MatmulOp, linalg::BatchMatmulOp>(op)) {
+    return success();  // Only verify batched and unbatched matmul.
+  }
+
+  Type inputType = op->getOperand(0).getType();
+  SmallVector<int64_t> firstLevelTileSizes =
+      loweringConfig.getTileSizeVals(kWorkgroupTileLevel);
+
+  if (linalg::BatchMatmulOp batchMatmulOp =
+          dyn_cast<linalg::BatchMatmulOp>(op)) {
+    // First tile dimensions should be 1 for batched, use remaining dimensions
+    // for comparisons.
+    if (firstLevelTileSizes[0] != 1) {
+      op->emitError("Received first tile dimension of ")
+          << firstLevelTileSizes[0] << " instead of 1 for " << pipelineName;
+    }
+    firstLevelTileSizes = {firstLevelTileSizes[1], firstLevelTileSizes[2],
+                           firstLevelTileSizes[3]};
   }
 
   // Verify the total workgroup size is <= 1024
@@ -44,13 +60,20 @@ LogicalResult verifyGPUMatmulSimtPassPipeline(
            << pipelineName << ", got " << workgroupSize[2];
   }
 
-  // Verify shared memory usage of operands after tiling
-  // requires <= 64Kb combined space.
-  SmallVector<int64_t> firstLevelTileSizes =
-      loweringConfig.getTileSizeVals(kWorkgroupTileLevel);
-  MemRefType type =
-      matmulOp.getInputOperand(0)->get().getType().cast<mlir::MemRefType>();
-  unsigned bytesSize = type.getElementType().getIntOrFloatBitWidth() / 8;
+  // Verify shared memory usage of operands after tiling requires <= 64Kb
+  // combined space.
+  unsigned bytesSize;
+  if (MemRefType type = inputType.dyn_cast<mlir::MemRefType>()) {
+    bytesSize = type.getElementType().getIntOrFloatBitWidth() / 8;
+  } else if (RankedTensorType type = inputType.dyn_cast<RankedTensorType>()) {
+    bytesSize = type.getElementType().getIntOrFloatBitWidth() / 8;
+  } else if (UnrankedTensorType type =
+                 inputType.dyn_cast<UnrankedTensorType>()) {
+    bytesSize = type.getElementType().getIntOrFloatBitWidth() / 8;
+  } else {
+    // Unable to determine type, skip rest of verification.
+    return success();
+  }
 
   // Input shape sizes: A [ M x K],  B [ K x N]
   unsigned totalSharedMemSizeBytes =
@@ -77,36 +100,30 @@ LogicalResult verifyGPUMatmulTensorCorePipeline(
     return op->emitOpError("expected workgroup size for GPU pipelines");
   }
 
-  ArrayRef<int64_t> lhsShape;
-  ArrayRef<int64_t> rhsShape;
-  Type inputType;
-  SmallVector<int64_t> firstLevelTileSizes;
-  if (linalg::MatmulOp matmulOp = dyn_cast<linalg::MatmulOp>(op)) {
-    inputType = matmulOp.getInputOperand(0)->get().getType();
-    lhsShape = getUntiledShape(matmulOp.getInputOperand(0)->get());
-    rhsShape = getUntiledShape(matmulOp.getInputOperand(1)->get());
-    firstLevelTileSizes = loweringConfig.getTileSizeVals(kWorkgroupTileLevel);
-  } else if (linalg::BatchMatmulOp batchMatmulOp =
-                 dyn_cast<linalg::BatchMatmulOp>(op)) {
-    inputType = batchMatmulOp.getInputOperand(0)->get().getType();
+  if (!isa<linalg::MatmulOp, linalg::BatchMatmulOp>(op)) {
+    return success();  // Only verify batched and unbatched matmul.
+  }
 
+  Type inputType = op->getOperand(0).getType();
+  ArrayRef<int64_t> lhsShape = getUntiledShape(op->getOperand(0));
+  ArrayRef<int64_t> rhsShape = getUntiledShape(op->getOperand(1));
+  SmallVector<int64_t> firstLevelTileSizes =
+      loweringConfig.getTileSizeVals(kWorkgroupTileLevel);
+
+  if (linalg::BatchMatmulOp batchMatmulOp =
+          dyn_cast<linalg::BatchMatmulOp>(op)) {
     // First dimension is the batch dimension. We don't check the shape batch.
-    lhsShape =
-        getUntiledShape(batchMatmulOp.getInputOperand(0)->get()).drop_front(1);
-    rhsShape =
-        getUntiledShape(batchMatmulOp.getInputOperand(1)->get()).drop_front(1);
+    lhsShape = lhsShape.drop_front(1);
+    rhsShape = rhsShape.drop_front(1);
 
     // First tile dimensions should be 1 for batched, use remaining dimensions
     // for comparisons.
-    firstLevelTileSizes = loweringConfig.getTileSizeVals(kWorkgroupTileLevel);
     if (firstLevelTileSizes[0] != 1) {
       op->emitError("Received first tile dimension of ")
           << firstLevelTileSizes[0] << " instead of 1 for " << pipelineName;
     }
     firstLevelTileSizes = {firstLevelTileSizes[1], firstLevelTileSizes[2],
                            firstLevelTileSizes[3]};
-  } else {
-    return success(); // Only verify batched and unbatched matmul.
   }
 
   // Verify the total workgroup size is <= 1024
