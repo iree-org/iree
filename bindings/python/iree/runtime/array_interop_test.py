@@ -87,6 +87,16 @@ class DeviceHalTest(unittest.TestCase):
     for index, value in enumerate(ary):
       self.assertEqual(index, value)
 
+  def testSubscriptable(self):
+    init_ary = np.array([0, 1, 2, 3, 4, 5])
+    ary = iree.runtime.asdevicearray(self.device,
+                                     init_ary,
+                                     implicit_host_transfer=True)
+
+    for index in range(0, 6):
+      value = ary[index]
+      self.assertEqual(index, value)
+
   def testReshape(self):
     init_ary = np.zeros([3, 4], dtype=np.float32) + 2
     ary = iree.runtime.asdevicearray(self.device,
