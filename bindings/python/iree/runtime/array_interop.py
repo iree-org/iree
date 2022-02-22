@@ -143,6 +143,12 @@ class DeviceArray(numpy.lib.mixins.NDArrayOperatorsMixin):
     host_ary = self.to_host()
     return host_ary.astype(dtype, casting=casting, copy=copy)
 
+  def reshape(self, *args):
+    # TODO(scotttodd): add a native impl with a new buffer_view of the same data
+    # TODO(scotttodd): return DeviceArray instead of host ndarray?
+    host_ary = self.to_host()
+    return host_ary.reshape(*args)
+
   def __reduce__(self):
     # Since this is used for making deep copies and pickling, we map
     # separately from any interactive state. We just reduce to the actual

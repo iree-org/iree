@@ -78,6 +78,14 @@ class DeviceHalTest(unittest.TestCase):
     f = np.isfinite(ary)
     self.assertTrue(f.all())
 
+  def testReshape(self):
+    init_ary = np.zeros([3, 4], dtype=np.float32) + 2
+    ary = iree.runtime.asdevicearray(self.device,
+                                     init_ary,
+                                     implicit_host_transfer=True)
+    reshaped = ary.reshape((4, 3))
+    self.assertEqual((4, 3), reshaped.shape)
+
   def testDeepcopy(self):
     init_ary = np.zeros([3, 4], dtype=np.float32) + 2
     orig_ary = iree.runtime.asdevicearray(self.device,
