@@ -135,7 +135,7 @@ def IREECodegen_LoweringConfigAttr :
     TileSizesListType getTileSizeVals();
 
     // Returns the tile sizes for a level set for the op.
-    SmallVector<int64_t> getTileSizeVals(unsigned level = 0);
+    SmallVector<int64_t> getTileSizeVals(unsigned level);
 
     // Returns the native vector size to use.
     SmallVector<int64_t> getNativeVectorSizeVals();

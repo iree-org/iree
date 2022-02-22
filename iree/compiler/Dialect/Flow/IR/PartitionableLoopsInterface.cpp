@@ -10,10 +10,14 @@
 #include "iree-dialects/Dialect/LinalgExt/IR/TiledOpInterface.h"
 #include "llvm/ADT/SmallVector.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/IR/BuiltinTypes.h"
 
 // clang-format off
 #include "iree/compiler/Dialect/Flow/IR/PartitionableLoopsInterface.cpp.inc"  // IWYU pragma: export
 // clang-format on
+
+namespace mlir {
+namespace iree_compiler {
 
 /// Filters out dimensions in `parallelLoops` that have unit range in
 /// `loopRanges`.
@@ -27,7 +31,7 @@ static llvm::SmallVector<unsigned> pruneUnitTripParallelLoops(
 
 /// Returns the partitionable loops for all Linalg ops.
 llvm::SmallVector<unsigned> getPartitionableLoopsImpl(
-    mlir::linalg::LinalgOp linalgOp, unsigned maxNumPartitionedLoops) {
+    linalg::LinalgOp linalgOp, unsigned maxNumPartitionedLoops) {
   llvm::SmallVector<unsigned> parallelLoops;
   linalgOp.getParallelDims(parallelLoops);
   // Get the static loop ranges.
@@ -46,8 +50,13 @@ llvm::SmallVector<unsigned> getPartitionableLoopsImpl(
   return parallelLoops;
 }
 
-namespace mlir {
-namespace iree_compiler {
+static llvm::SmallVector<llvm::StringRef> getIteratorTypesFromAttr(
+    ArrayAttr iteratorTypesAttr) {
+  return llvm::to_vector(llvm::map_range(iteratorTypesAttr, [](Attribute attr) {
+    return attr.cast<StringAttr>().getValue();
+  }));
+}
+
 namespace IREE {
 namespace Flow {
 
@@ -65,6 +74,11 @@ struct LinalgOpPartitionableLoops
     auto linalgOp = cast<linalg::LinalgOp>(op);
     return getPartitionableLoopsImpl(linalgOp, maxNumPartitionedLoops);
   }
+
+  llvm::SmallVector<llvm::StringRef> getIteratorTypes(Operation *op) const {
+    return getIteratorTypesFromAttr(
+        cast<linalg::LinalgOp>(op).iterator_types());
+  }
 };
 
 /// External model implementation for linalg::Mmt4DOp.
@@ -79,6 +93,11 @@ struct Mmt4DOpPartitionableLoops
   llvm::SmallVector<unsigned> getPartitionableLoops(
       Operation *op, unsigned maxNumPartitionedLoops) const {
     return {0, 1};
+  }
+
+  llvm::SmallVector<StringRef> getIteratorTypes(Operation *op) const {
+    return getIteratorTypesFromAttr(
+        cast<linalg::LinalgOp>(op).iterator_types());
   }
 };
 
@@ -100,6 +119,11 @@ struct TiledOpInterfacePartitionableLoops
     // loops.
     auto tiledOp = cast<LinalgExt::TiledOpInterface>(op);
     return tiledOp.getPartitionableLoops(maxNumPartitionedLoops);
+  }
+
+  llvm::SmallVector<StringRef> getIteratorTypes(Operation *op) const {
+    auto tiledOp = cast<LinalgExt::TiledOpInterface>(op);
+    return tiledOp.getLoopIteratorTypes();
   }
 };
 

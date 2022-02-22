@@ -16,8 +16,10 @@
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree-dialects/Dialect/LinalgExt/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Common/DestructiveUpdateUtils.h"
+#include "iree/compiler/Codegen/Dialect/LoweringConfig.h"
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
+#include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/Flow/IR/PartitionableLoopsInterface.h"
@@ -35,6 +37,109 @@ namespace iree_compiler {
 //===---------------------------------------------------------------------===//
 // Patterns and methods for tile and distribute of Linalg ops to workgroups.
 //===---------------------------------------------------------------------===//
+
+// Get the lowering configuration for the operation within the dispatch.
+// This looks for tile sizes by looking for lowering configuration.
+static FailureOr<SmallVector<int64_t>> getTileSizesFromLoweringConfig(
+    ArrayRef<Operation *> computeOps, MLIRContext *context) {
+  if (computeOps.empty()) return SmallVector<int64_t>{};
+
+  Optional<SmallVector<int64_t>> distributedTileSizes;
+  for (auto op : computeOps) {
+    auto partitionbleLoopInterface =
+        dyn_cast<IREE::Flow::PartitionableLoopsInterface>(op);
+    if (!partitionbleLoopInterface) continue;
+    IREE::Codegen::LoweringConfigAttr currLoweringConfig =
+        getLoweringConfig(op);
+    if (!currLoweringConfig) continue;
+    SmallVector<unsigned> partitionableLoops =
+        partitionbleLoopInterface.getPartitionableLoops(kNumMaxParallelDims);
+    SmallVector<int64_t> tileSizes = currLoweringConfig.getTileSizeVals(0);
+    SmallVector<int64_t> currDistributedTileSizes;
+    for (auto loopID : partitionableLoops) {
+      // If there is a tile size for this loop, use that value, or use zero to
+      // specify untiled loop.
+      if (loopID < tileSizes.size()) {
+        currDistributedTileSizes.push_back(tileSizes[loopID]);
+      } else {
+        currDistributedTileSizes.push_back(0);
+      }
+    }
+    if (distributedTileSizes) {
+      if (currDistributedTileSizes != distributedTileSizes) {
+        // Inconsistent distributed tile sizes. Abort.
+        return static_cast<LogicalResult>(
+            computeOps.front()->emitOpError("inconsistent distribution of ops "
+                                            "for first level of distribution"));
+      }
+    } else {
+      distributedTileSizes = currDistributedTileSizes;
+    }
+  }
+  if (distributedTileSizes) {
+    return distributedTileSizes.getValue();
+  }
+  return SmallVector<int64_t>{};
+}
+
+/// Defines the workgroup count region if the tile size for the distributed
+/// loops are known.
+static LogicalResult defineWorkgroupCountRegion(
+    FuncOp entryPointFn, ArrayRef<int64_t> distributedLoopTileSizes) {
+  if (distributedLoopTileSizes.size() > kNumMaxParallelDims) {
+    // For now error out here.
+    return entryPointFn.emitOpError(
+               "expected number of distributed loop tile sizes to be less than "
+               "or equal to ")
+           << kNumMaxParallelDims;
+  }
+  WorkgroupCountRegionBuilder regionBuilder =
+      [&distributedLoopTileSizes](
+          OpBuilder &b, Location loc,
+          std::array<Value, 3> workload) -> std::array<Value, 3> {
+    Value one = b.create<arith::ConstantIndexOp>(loc, 1);
+    std::array<Value, 3> numWorkgroups = {one, one, one};
+    for (auto it : llvm::enumerate(llvm::reverse(distributedLoopTileSizes))) {
+      // If tile size is 0, it implies this isnt tiled, and the number of
+      // workgroups is 1, i.e. the default.
+      if (it.value() == 0) continue;
+      numWorkgroups[it.index()] = applyMapToValues(
+          b, loc,
+          AffineMap::get(0, 1, b.getAffineSymbolExpr(0).ceilDiv(it.value())),
+          workload[it.index()])[0];
+    }
+    return numWorkgroups;
+  };
+  OpBuilder builder(entryPointFn.getContext());
+  return defineWorkgroupCountRegion(builder, entryPointFn, regionBuilder);
+}
+
+/// Update the workload_per_wg value on the TranslationInfoAttr.
+// TODO(ravishankarm): The workload_per_wg field should be deprecated. This
+// is just transition before all dependencies on it can be removed.
+static LogicalResult updateTranslationInfoAttr(
+    FuncOp entryPointFn, ArrayRef<int64_t> distributedLoopTileSizes) {
+  auto entryPointOp = getEntryPoint(entryPointFn);
+  if (!entryPointOp) {
+    return entryPointFn.emitOpError("expected entry point function");
+  }
+  IREE::Codegen::DispatchLoweringPassPipeline passPipeline =
+      IREE::Codegen::DispatchLoweringPassPipeline::CPUDefault;
+  if (auto translationInfo = getTranslationInfo(entryPointOp)) {
+    // Expect the `workload_per_wg` to be empty.
+    if (!translationInfo.getWorkloadPerWorkgroupVals().empty()) {
+      return entryPointFn.emitOpError(
+          "expected workload_per_wg to be empty at this stage");
+    }
+    passPipeline = translationInfo.getDispatchLoweringPassPipeline();
+  }
+  SmallVector<int64_t> workloadPerWorkgroup =
+      llvm::to_vector(llvm::reverse(distributedLoopTileSizes));
+  auto newTranslationInfoAttr = IREE::Codegen::TranslationInfoAttr::get(
+      entryPointFn.getContext(), passPipeline, workloadPerWorkgroup);
+  setTranslationInfo(entryPointOp, newTranslationInfoAttr);
+  return success();
+}
 
 // Pull in producers into the tiled operation.
 static void pullInProducers(linalg::LinalgOp tiledOp,
@@ -125,6 +230,18 @@ void TileAndDistributeToWorkgroupsPass::runOnOperation() {
     return;
   }
 
+  // Get the tile sizes to use from lowering configuration if set.
+  FailureOr<SmallVector<int64_t>> configTileSizes =
+      getTileSizesFromLoweringConfig(computeOps, context);
+  if (failed(configTileSizes)) {
+    return signalPassFailure();
+  }
+
+  if (failed(defineWorkgroupCountRegion(funcOp, configTileSizes.getValue())) ||
+      failed(updateTranslationInfoAttr(funcOp, configTileSizes.getValue()))) {
+    return signalPassFailure();
+  }
+
   // Add a marker to the last operation in the list.
   auto marker = StringAttr::get(context, "__workgroup_tiling__");
   computeOps.back()->setAttr(linalg::LinalgTransforms::kLinalgTransformMarker,
@@ -151,17 +268,22 @@ void TileAndDistributeToWorkgroupsPass::runOnOperation() {
       DenseMap<StringRef,
                std::function<linalg::ProcInfo(OpBuilder &, Location)>>()};
 
-  // Tile size selection function. Sets the tile size now to
-  // hal.interface.workgroup.size op, with 0 for the innermost parallel loop
-  // partitioned, 1 for the next outermost loop partitioned and so on.  Use the
-  // workgroup size as a proxy for tile size here. At the flow level this
-  // represents the "workload" per processors and is not necessarily tied to the
-  // workgroup size.
-
-  // TODO(#...): Refactor this pass to directly take the tile sizes from lower
-  // configuration for the first level of tiling.
+  // Tile size selection function.
   auto tileSizeFn = [&](OpBuilder &builder,
                         Operation *op) -> SmallVector<Value, 4> {
+    // Check if tile sizes are deduced from the configuration. If so use those.
+    if (getLoweringConfig(op)) {
+      return getTileSizes(builder, op, 0);
+    }
+
+    // TODO(ravishankarm): This part needs to be deleted once all backends
+    // configure on untiled ops. By default set the tile size to
+    // hal.interface.workgroup.size op, with 0 for the innermost parallel loop
+    // partitioned, 1 for the next outermost loop partitioned and so on.  Use
+    // the workgroup size as a proxy for tile size here. At the flow level this
+    // represents the "workload" per processors and is not necessarily tied to
+    // the workgroup size.auto interfaceOp =
+    // dyn_cast<IREE::Flow::PartitionableLoopsInterface>(op);
     auto interfaceOp = dyn_cast<IREE::Flow::PartitionableLoopsInterface>(op);
     if (!interfaceOp) return {};
     SmallVector<unsigned> partitionedLoops =

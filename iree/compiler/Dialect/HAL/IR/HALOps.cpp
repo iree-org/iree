@@ -684,7 +684,7 @@ ParseResult ExecutableEntryPointOp::parse(OpAsmParser &parser,
   if (failed(parser.parseKeyword("layout")) || failed(parser.parseLParen()) ||
       failed(parser.parseAttribute(layoutAttr)) ||
       failed(parser.parseRParen()) ||
-      failed(parser.parseOptionalAttrDictWithKeyword(result.attributes))) {
+      failed(parser.parseOptionalAttrDict(result.attributes))) {
     return failure();
   }
   result.addAttribute("layout", layoutAttr);

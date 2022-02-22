@@ -109,11 +109,16 @@ SmallVector<Value, 4> getTileSizes(OpBuilder &b, Operation *op, unsigned level);
 void setLoweringConfig(Operation *op, IREE::Codegen::LoweringConfigAttr config);
 
 /// Sets translation for the entry-point function based on op configuration.
-LogicalResult setOpConfigAndEntryPointFnTranslation(
+inline LogicalResult setOpConfigAndEntryPointFnTranslation(
     FuncOp entryPointFn, Operation *op,
     IREE::Codegen::LoweringConfigAttr config,
     IREE::Codegen::DispatchLoweringPassPipeline passPipeline,
-    ArrayRef<int64_t> workgroupSize = {});
+    ArrayRef<int64_t> workgroupSize = {}) {
+  auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
+      entryPointFn->getContext(), passPipeline, ArrayRef<int64_t>{});
+  setTranslationInfo(entryPointFn, translationInfo, workgroupSize);
+  return success();
+}
 inline LogicalResult setOpConfigAndEntryPointFnTranslation(
     FuncOp entryPointFn, Operation *op, TileSizesListTypeRef tileSizes,
     ArrayRef<int64_t> nativeVectorSize,

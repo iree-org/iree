@@ -92,77 +92,30 @@ LogicalResult verifyDoubleTilingExpertPassPipelineConfig(
            << pipelineName;
   }
 
+  // Verify that the workload per workgroup is not set.
+  // TODO(ravishankarm): Remove workload_per_wg eventually.
+  SmallVector<int64_t> workloadPerWorkgroup =
+      translationInfo.getWorkloadPerWorkgroupVals();
+  if (!workloadPerWorkgroup.empty()) {
+    return op->emitOpError(
+               "workload_per_wg expected to be empty since its internal "
+               "compiler implementation detail")
+           << kNumMaxParallelDims;
+  }
+
   if (loweringConfig.getTileSizes().size() != 3) {
     return op->emitOpError("expected three tiling sizes for ")
            << pipelineName << ", got " << loweringConfig.getTileSizes().size();
   }
 
-  // Verify that the workload per workgroup is set and is non-zero.
-  SmallVector<int64_t> workloadPerWorkgroup =
-      translationInfo.getWorkloadPerWorkgroupVals();
-  if (workloadPerWorkgroup.size() > kNumMaxParallelDims) {
-    return op->emitOpError(
-               "workload_per_wg size should be less than or equal to ")
-           << kNumMaxParallelDims;
-  }
-  if (llvm::any_of(workloadPerWorkgroup,
-                   [](int64_t val) { return val == 0; })) {
-    return op->emitOpError("invalid to use 0 in workload_per_wg");
-  }
-
   IREE::Flow::PartitionableLoopsInterface interfaceOp =
       dyn_cast_or_null<IREE::Flow::PartitionableLoopsInterface>(op);
   if (interfaceOp) {
-    SmallVector<unsigned> partitionedLoops =
-        interfaceOp.getPartitionableLoops(kNumMaxParallelDims);
-    // TODO(hanchung): Allow empty workloadPerWorkgroup for now. We're going to
-    // defer tile and distribution which may affect this.
-    if (!workloadPerWorkgroup.empty() &&
-        workloadPerWorkgroup.size() != partitionedLoops.size()) {
-      return op->emitOpError("expected ")
-             << partitionedLoops.size()
-             << " entries for workload_per_wg, but got "
-             << workloadPerWorkgroup.size();
-    }
-    SmallVector<int64_t> firstLevelTileSizes = loweringConfig.getTileSizeVals(
-        static_cast<unsigned>(TilingLevel::WorkGroupTiles));
-
-    if (!firstLevelTileSizes.empty()) {
-      // Verify that if the first-level tile sizes are set, they are the same as
-      // workload_per_wg for the partitioned loops.
-      SmallVector<unsigned> partitionedLoops =
-          interfaceOp.getPartitionableLoops(kNumMaxParallelDims);
-      size_t minElements =
-          (partitionedLoops.empty() ? 0 : partitionedLoops.back() + 1);
-      if (firstLevelTileSizes.size() < minElements) {
-        return op->emitOpError("expected at least ")
-               << minElements
-               << " size for first level tiling to get the distribution fully "
-                  "specified.";
-      }
-      llvm::SmallDenseSet<unsigned> partitionedLoopsSet;
-      partitionedLoopsSet.insert(partitionedLoops.begin(),
-                                 partitionedLoops.end());
-      SmallVector<int64_t> partitionedTileSizes;
-      for (auto tileSize : llvm::enumerate(firstLevelTileSizes)) {
-        if (!partitionedLoopsSet.count(tileSize.index())) {
-          continue;
-        }
-        partitionedTileSizes.push_back(tileSize.value());
-      }
-      for (auto val : llvm::enumerate(llvm::reverse(workloadPerWorkgroup))) {
-        if (val.value() != partitionedTileSizes[val.index()]) {
-          return op->emitOpError("mismatch in distributed tile size value ")
-                 << partitionedTileSizes[val.index()] << " at position "
-                 << val.index() << " and workload_per_wg value " << val.value();
-        }
-      }
-    }
-
     llvm::SmallDenseSet<unsigned> pLoopsSet;
-    for (auto i : interfaceOp.getPartitionableLoops(
-             /*maxNumPartitionedLoops=*/std::numeric_limits<unsigned>::max())) {
-      pLoopsSet.insert(i);
+    for (auto iteratorType : llvm::enumerate(interfaceOp.getIteratorTypes())) {
+      if (iteratorType.value() == getParallelIteratorTypeName()) {
+        pLoopsSet.insert(iteratorType.index());
+      }
     }
 
     SmallVector<int64_t> secondLevelTileSizes = loweringConfig.getTileSizeVals(
@@ -170,7 +123,7 @@ LogicalResult verifyDoubleTilingExpertPassPipelineConfig(
     for (auto en : llvm::enumerate(secondLevelTileSizes)) {
       if (en.value() != 0 && !pLoopsSet.contains(en.index())) {
         return op->emitOpError(
-                   "expected only non-unit parallel dims can be set in the "
+                   "expected only parallel dims to be set in the "
                    "second tiling sizes, got ")
                << en.index() << "-th tile size set";
       }
@@ -181,7 +134,7 @@ LogicalResult verifyDoubleTilingExpertPassPipelineConfig(
     for (auto en : llvm::enumerate(thirdLevelTileSizes)) {
       if (en.value() != 0 && pLoopsSet.contains(en.index())) {
         return op->emitOpError(
-                   "expected only reduction dims can be set in the third "
+                   "expected only reduction dims to be set in the third "
                    "tiling sizes, got ")
                << en.index() << "-th tile size set";
       }
@@ -208,6 +161,11 @@ LogicalResult verifyDoubleTilingExpertPassPipelineConfig(
 //===---------------------------------------------------------------------===//
 
 void addSingleTilingExpertPassPipeline(OpPassManager &passManager) {
+  // Do first level of tiling and distribution.
+  passManager.addNestedPass<FuncOp>(createTileAndDistributeToWorkgroupsPass());
+  passManager.addPass(createCanonicalizerPass());
+  passManager.addPass(createCSEPass());
+
   passManager.addNestedPass<FuncOp>(
       createConvertToDestinationPassingStylePass());
   passManager.addPass(createCanonicalizerPass());
@@ -239,6 +197,11 @@ void addSingleTilingExpertPassPipeline(OpPassManager &passManager) {
 }
 
 void addDoubleTilingExpertPassPipeline(OpPassManager &passManager) {
+  // Do first level of tiling and distribution.
+  passManager.addNestedPass<FuncOp>(createTileAndDistributeToWorkgroupsPass());
+  passManager.addPass(createCanonicalizerPass());
+  passManager.addPass(createCSEPass());
+
   passManager.addNestedPass<FuncOp>(
       createConvertToDestinationPassingStylePass());
 
@@ -298,7 +261,10 @@ void addDoubleTilingExpertPassPipeline(OpPassManager &passManager) {
 
 void addTileFuseAndVectorizePassPipeline(OpPassManager &passManager,
                                          bool lowerToVectors) {
+  // Do first level of tile and distribute to workgroups.
+  passManager.addNestedPass<FuncOp>(createTileAndDistributeToWorkgroupsPass());
   passManager.addPass(createCanonicalizerPass());
+  passManager.addPass(createCSEPass());
 
   // Tile and vectorize linalg ops on tensors.
   passManager.addNestedPass<FuncOp>(
@@ -327,7 +293,10 @@ void addTileFuseAndVectorizePassPipeline(OpPassManager &passManager,
 }
 
 void addCPUDefaultPassPipeline(OpPassManager &passManager) {
+  // Do first level of tile and distribute to workgroups.
+  passManager.addNestedPass<FuncOp>(createTileAndDistributeToWorkgroupsPass());
   passManager.addPass(createCanonicalizerPass());
+  passManager.addPass(createCSEPass());
   // Use stack allocation on CPU side.
   addLinalgBufferizePasses(passManager, cpuAllocationFunction);
 }
@@ -375,10 +344,6 @@ static void addLowerToLLVMPasses(OpPassManager &passManager) {
 void buildLLVMCPUCodegenPassPipeline(OpPassManager &passManager) {
   passManager.nest<ModuleOp>().nest<FuncOp>().addPass(
       createTypePropagationPass());
-  passManager.nest<ModuleOp>().nest<FuncOp>().addPass(
-      createTileAndDistributeToWorkgroupsPass());
-  passManager.addPass(createCanonicalizerPass());
-  passManager.addPass(createCSEPass());
   passManager.addPass(createLLVMCPULowerExecutableTargetPass());
   OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
   addLowerToLLVMPasses(nestedModulePM);

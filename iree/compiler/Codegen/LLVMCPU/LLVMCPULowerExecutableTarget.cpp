@@ -164,8 +164,6 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
         return signalPassFailure();
       }
 
-      executableLoweringPipeline.addPass(createSetNumWorkgroupsPass());
-      executableLoweringPipeline.addPass(createCanonicalizerPass());
       bool lowerToVectors = !isVMVXBackend(variantOp);
       if (!testLoweringConfiguration) {
         OpPassManager &nestedModulePM =
