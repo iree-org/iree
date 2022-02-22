@@ -149,6 +149,10 @@ class DeviceArray(numpy.lib.mixins.NDArrayOperatorsMixin):
     host_ary = self.to_host()
     return host_ary.reshape(*args)
 
+  def __iter__(self):
+    host_ary = self.to_host()
+    return host_ary.__iter__()
+
   def __reduce__(self):
     # Since this is used for making deep copies and pickling, we map
     # separately from any interactive state. We just reduce to the actual

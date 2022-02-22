@@ -78,6 +78,15 @@ class DeviceHalTest(unittest.TestCase):
     f = np.isfinite(ary)
     self.assertTrue(f.all())
 
+  def testIteration(self):
+    init_ary = np.array([0, 1, 2, 3, 4, 5])
+    ary = iree.runtime.asdevicearray(self.device,
+                                     init_ary,
+                                     implicit_host_transfer=True)
+
+    for index, value in enumerate(ary):
+      self.assertEqual(index, value)
+
   def testReshape(self):
     init_ary = np.zeros([3, 4], dtype=np.float32) + 2
     ary = iree.runtime.asdevicearray(self.device,
