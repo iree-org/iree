@@ -80,8 +80,8 @@ function(iree_hal_cts_test_suite)
   endif()
 
   # Generate testdata if executable tests are enabled.
+  set(_EXECUTABLE_DEPS "")
   if(_ENABLE_EXECUTABLE_TESTS)
-
     set(_EXECUTABLES_TESTDATA_NAME "${_RULE_COMPILER_TARGET_BACKEND}_executables")
 
     set(_TRANSLATE_FLAGS
@@ -136,7 +136,7 @@ function(iree_hal_cts_test_suite)
 
     endif()
 
-    list(APPEND _RULE_DEPS
+    list(APPEND _EXECUTABLE_DEPS
       ::${_EXECUTABLES_TESTDATA_NAME}_c
     )
   endif()
@@ -146,8 +146,22 @@ function(iree_hal_cts_test_suite)
       continue()
     endif()
 
-    if("${_TEST_NAME}" IN_LIST IREE_EXECUTABLE_CTS_TESTS AND NOT _ENABLE_EXECUTABLE_TESTS)
-      continue()
+    # Set vars (and possibly skip) based on if this test uses executables.
+    if("${_TEST_NAME}" IN_LIST IREE_EXECUTABLE_CTS_TESTS)
+      if(NOT _ENABLE_EXECUTABLE_TESTS)
+        continue()
+      endif()
+
+      set(_TEST_DEPS
+        "${_RULE_DEPS}"
+        "${_EXECUTABLE_DEPS}"
+      )
+      set(IREE_CTS_EXECUTABLE_FORMAT "${_RULE_EXECUTABLE_FORMAT}")
+      set(IREE_CTS_EXECUTABLES_TESTDATA_HDR "${_EXECUTABLES_TESTDATA_NAME}_c.h")
+    else()
+      set(_TEST_DEPS "${_RULE_DEPS}" )
+      set(IREE_CTS_EXECUTABLE_FORMAT "")
+      set(IREE_CTS_EXECUTABLES_TESTDATA_HDR "")
     endif()
 
     # Note: driver names may contain dashes and other special characters. We
@@ -163,10 +177,6 @@ function(iree_hal_cts_test_suite)
     set(IREE_CTS_DRIVER_REGISTRATION_FN "${_RULE_DRIVER_REGISTRATION_FN}")
     set(IREE_CTS_TEST_CLASS_NAME "${_TEST_NAME}_test")
     set(IREE_CTS_DRIVER_NAME "${_RULE_DRIVER_NAME}")
-    set(IREE_CTS_EXECUTABLE_FORMAT "${_RULE_EXECUTABLE_FORMAT}")
-    if(_ENABLE_EXECUTABLE_TESTS)
-      set(IREE_CTS_EXECUTABLES_TESTDATA_HDR "${_EXECUTABLES_TESTDATA_NAME}_c.h")
-    endif()
 
     configure_file(
       "${IREE_ROOT_DIR}/iree/hal/cts/cts_test_template.cc.in"
@@ -179,7 +189,7 @@ function(iree_hal_cts_test_suite)
       SRCS
         "${CMAKE_CURRENT_BINARY_DIR}/${_TEST_SOURCE_NAME}"
       DEPS
-        ${_RULE_DEPS}
+        ${_TEST_DEPS}
         ${_TEST_LIBRARY_DEP}
         iree::base
         iree::hal
