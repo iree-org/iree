@@ -75,6 +75,78 @@ func private @quantized_matmul_as_matmul_3x4x5(%lhs : tensor<3x4xi8>, %rhs : ten
   return %quantized_matmul_from_matmul_result : tensor<3x5xi32>
 }
 
+// Equivalent to linalg.quantized_matmul, but not using linalg.quantized_matmul
+func private @quantized_matmul_as_matmul_dynamic(%lhs : tensor<?x?xi8>, %rhs : tensor<?x?xi8>,  %lhs_zp : i32, %rhs_zp : i32, %acc : tensor<?x?xi32>) -> tensor<?x?xi32> {
+  // compute the matmul itself, which would be the end result already in the case
+  // where both zero-point values %lhs_zp and %rhs_zp are zero.
+  %matmul_result = linalg.matmul ins(%lhs, %rhs : tensor<?x?xi8>, tensor<?x?xi8>) outs(%acc : tensor<?x?xi32>) -> tensor<?x?xi32>
+
+  %c_0_index = arith.constant 0 : index
+  %c_1_index = arith.constant 1 : index
+  %m_size = tensor.dim %lhs, %c_0_index : tensor<?x?xi8>
+  %k_size = tensor.dim %lhs, %c_1_index : tensor<?x?xi8>
+  %n_size = tensor.dim %rhs, %c_1_index : tensor<?x?xi8>
+  %k_size_i32 = arith.index_cast %k_size : index to i32
+
+  %c_0 = arith.constant 0 : i32
+
+  // compute the sums along rows of %lhs.
+  %lhs_i32 = arith.extsi %lhs : tensor<?x?xi8> to tensor<?x?xi32>
+  %init_lhs_sums_uninitialized = linalg.init_tensor [%m_size] : tensor<?xi32>
+  %zero_lhs_sums = linalg.fill(%c_0, %init_lhs_sums_uninitialized) : i32, tensor<?xi32> -> tensor<?xi32>
+  %lhs_sums = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+                       affine_map<(d0, d1) -> (d0)>],
+      iterator_types = ["parallel", "reduction"]}
+      ins(%lhs_i32 : tensor<?x?xi32>)
+      outs(%zero_lhs_sums : tensor<?xi32>) {
+      ^bb0(%arg0: i32, %arg1: i32) :
+          %1 = arith.addi %arg0, %arg1 : i32
+          linalg.yield %1 : i32
+      } -> tensor<?xi32>
+
+  // compute the sums along columns of %rhs.
+  %rhs_i32 = arith.extsi %rhs : tensor<?x?xi8> to tensor<?x?xi32>
+  %init_rhs_sums_uninitialized = linalg.init_tensor [%n_size] : tensor<?xi32>
+  %zero_rhs_sums = linalg.fill(%c_0, %init_rhs_sums_uninitialized) : i32, tensor<?xi32> -> tensor<?xi32>
+  %rhs_sums = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+                       affine_map<(d0, d1) -> (d1)>],
+      iterator_types = ["reduction", "parallel"]}
+      ins(%rhs_i32 : tensor<?x?xi32>)
+      outs(%zero_rhs_sums : tensor<?xi32>) {
+      ^bb0(%arg0: i32, %arg1: i32) :
+          %1 = arith.addi %arg0, %arg1 : i32
+          linalg.yield %1 : i32
+      } -> tensor<?xi32>
+
+  // add all the terms together.
+  %init_acc_uninitialized =  linalg.init_tensor [%m_size, %n_size] : tensor<?x?xi32>
+  %quantized_matmul_from_matmul_result = linalg.generic {
+      indexing_maps = [
+        affine_map<(d0, d1) -> (d0, d1)>,
+        affine_map<(d0, d1) -> (d0)>,
+        affine_map<(d0, d1) -> (d1)>,
+        affine_map<(d0, d1) -> ()>,
+        affine_map<(d0, d1) -> ()>,
+        affine_map<(d0, d1) -> ()>,
+        affine_map<(d0, d1) -> (d0, d1)>],
+      iterator_types = ["parallel", "parallel"]}
+      ins(%matmul_result, %lhs_sums, %rhs_sums, %lhs_zp, %rhs_zp, %k_size_i32 : tensor<?x?xi32>, tensor<?xi32>, tensor<?xi32>, i32, i32, i32)
+      outs(%init_acc_uninitialized : tensor<?x?xi32>) {
+      ^bb0(%matmul_result_val : i32, %lhs_sums_val: i32, %rhs_sums_val: i32, %lhs_zp_val: i32, %rhs_zp_val: i32, %k : i32, %acc_val: i32) :
+          %linear_term_in_rhs_zp = arith.muli %lhs_sums_val, %rhs_zp_val : i32
+          %linear_term_in_lhs_zp = arith.muli %rhs_sums_val, %lhs_zp_val : i32
+          %linear_term = arith.addi %linear_term_in_rhs_zp, %linear_term_in_lhs_zp : i32
+          %product_of_zp = arith.muli %lhs_zp_val, %rhs_zp_val : i32
+          %quadratic_term = arith.muli %k, %product_of_zp : i32
+          %corrected_for_linear_term = arith.subi %matmul_result_val, %linear_term : i32
+          %corrected = arith.addi %corrected_for_linear_term, %quadratic_term : i32
+          linalg.yield %corrected : i32
+      } -> tensor<?x?xi32>
+  return %quantized_matmul_from_matmul_result : tensor<?x?xi32>
+}
+
 // Checks that linalg.quantized_matmul agrees with @quantized_matmul_as_matmul_3x4x5
 func private @check_one_quantized_matmul_as_matmul_3x4x5(%lhs : tensor<3x4xi8>, %rhs : tensor<4x5xi8>, %lhs_zp : i32, %rhs_zp : i32, %acc : tensor<3x5xi32>) {
     %result_of_quantized_matmul = linalg.quantized_matmul ins(%lhs, %rhs, %lhs_zp, %rhs_zp : tensor<3x4xi8>, tensor<4x5xi8>, i32, i32) outs(%acc : tensor<3x5xi32>) -> tensor<3x5xi32>
@@ -83,7 +155,15 @@ func private @check_one_quantized_matmul_as_matmul_3x4x5(%lhs : tensor<3x4xi8>, 
     return
 }
 
-func @test_quantized_matmul_as_matmul_3x4x5() {
+// Checks that linalg.quantized_matmul agrees with @quantized_matmul_as_matmul_dynamic
+func private @check_one_quantized_matmul_as_matmul_dynamic(%lhs : tensor<?x?xi8>, %rhs : tensor<?x?xi8>, %lhs_zp : i32, %rhs_zp : i32, %acc : tensor<?x?xi32>) {
+    %result_of_quantized_matmul = linalg.quantized_matmul ins(%lhs, %rhs, %lhs_zp, %rhs_zp : tensor<?x?xi8>, tensor<?x?xi8>, i32, i32) outs(%acc : tensor<?x?xi32>) -> tensor<?x?xi32>
+    %result_of_quantized_matmul_as_matmul = call @quantized_matmul_as_matmul_dynamic(%lhs, %rhs, %lhs_zp, %rhs_zp, %acc) : (tensor<?x?xi8>, tensor<?x?xi8>, i32, i32, tensor<?x?xi32>) -> tensor<?x?xi32>
+    check.expect_eq(%result_of_quantized_matmul, %result_of_quantized_matmul_as_matmul) : tensor<?x?xi32>
+    return
+}
+
+func @test_quantized_matmul_as_matmul() {
   %lhs_3x4_1 = util.unfoldable_constant dense<[
       [1, 2, 3, 4],
       [5, 6, 7, 8],
@@ -122,5 +202,11 @@ func @test_quantized_matmul_as_matmul_3x4x5() {
   call @check_one_quantized_matmul_as_matmul_3x4x5(%lhs_3x4_1, %rhs_4x5_1, %c_minus2, %c_plus3, %zero_acc) : (tensor<3x4xi8>, tensor<4x5xi8>, i32, i32, tensor<3x5xi32>) -> ()
   call @check_one_quantized_matmul_as_matmul_3x4x5(%lhs_3x4_2, %rhs_4x5_2, %c_plus41, %c_minus57, %zero_acc) : (tensor<3x4xi8>, tensor<4x5xi8>, i32, i32, tensor<3x5xi32>) -> ()
   call @check_one_quantized_matmul_as_matmul_3x4x5(%lhs_3x4_2, %rhs_4x5_2, %c_minus128, %c_plus127, %zero_acc) : (tensor<3x4xi8>, tensor<4x5xi8>, i32, i32, tensor<3x5xi32>) -> ()
+
+  %lhs_3x4_dynamic = tensor.cast %lhs_3x4_1 : tensor<3x4xi8> to tensor<?x?xi8>
+  %rhs_4x5_dynamic = tensor.cast %rhs_4x5_1 : tensor<4x5xi8> to tensor<?x?xi8>
+  %zero_acc_dynamic = tensor.cast %zero_acc : tensor<3x5xi32> to tensor<?x?xi32>
+  call @check_one_quantized_matmul_as_matmul_dynamic(%lhs_3x4_dynamic, %rhs_4x5_dynamic, %c_minus128, %c_plus127, %zero_acc_dynamic) : (tensor<?x?xi8>, tensor<?x?xi8>, i32, i32, tensor<?x?xi32>) -> ()
+
   return
 }
