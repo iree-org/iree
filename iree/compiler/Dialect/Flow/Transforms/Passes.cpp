@@ -152,33 +152,40 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
       // Pad tensors.
       .addPass(IREE::Flow::createPadTensorToSubTensorInsertPass)
 
-      // Elementwise, fusion, tiling and distribution.
+      // Preprocess the input to a form more amenable for fusion
+      // - Convert all elementwise ops to Linalg
+      // - Remove unit-extent dimensions.
       .addPass(mlir::createConvertElementwiseToLinalgPass)
       .addPass(mlir::createLinalgFoldUnitExtentDimsPass)
-      .addPass(IREE::Flow::createInterchangeGenericOpsPass)
-      .addPass(mlir::createCanonicalizerPass)
+      .addPass(createInterchangeGenericOpsPass)
       .addPass(memref::createResolveShapedTypeResultDimsPass)
-
-      // Fusion.
-      .addPass(IREE::Flow::createFusionOfTensorOpsPass)
+      .addPass(mlir::createCanonicalizerPass)
       .addPass(mlir::createCSEPass)
+
+      // Elementwise fusion.
+      .addPass(createFusionOfTensorOpsPass)
       .addPredicatedPass(clEnableLinalgDetensorize,
                          mlir::createLinalgDetensorizePass)
 
-      // Dispatch region formation.
-      .addPass(IREE::Flow::createConvertToFlowBeforeDispatchFormation)
       .addPass(mlir::createCanonicalizerPass)
-      .addPass(IREE::Flow::createDispatchLinalgOnTensorsPass)
-      .addPass(memref::createResolveShapedTypeResultDimsPass)
-      .addPass(IREE::Flow::createCaptureDispatchDynamicDimsPass)
-      .addPass(IREE::Flow::createConvertToFlowAfterDispatchFormation)
-      .addPass(mlir::createCanonicalizerPass)
-      .addPass(memref::createResolveShapedTypeResultDimsPass)
+      .addPass(mlir::createCSEPass)
 
-      // NOTE: required because the current dispatch-linalg-on-tensors pass
-      // creates a lot of dead IR that needs to be cleaned up.
-      .addPass(IREE::Flow::createConvertToFlowAfterDispatchFormation)
-      .addPass(mlir::createCanonicalizerPass);
+      // Dispatch region formation.
+      // TODO(ravishankarm): Fold ConvertToFlowBefore/ConvertToFlowAfter into
+      // dispatch region formation pass.
+      .addPass(createConvertToFlowBeforeDispatchFormation)
+      .addPass(mlir::createCanonicalizerPass)
+      .addPass(mlir::createCSEPass)
+      .addPass(createDispatchLinalgOnTensorsPass)
+      .addPass(createCaptureDispatchDynamicDimsPass)
+      .addPass(mlir::createCanonicalizerPass)
+      .addPass(createCSEPass)
+
+      // Convert remaining ops to Flow ops, after this stage no Linalg ops
+      // should remain.
+      .addPass(createConvertToFlowAfterDispatchFormation)
+      .addPass(mlir::createCanonicalizerPass)
+      .addPass(mlir::createCSEPass);
 
   // Module pass to outline the dispatch regions into their own functions
   // wrapped in executables.

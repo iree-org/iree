@@ -11,6 +11,7 @@
 #include "iree/compiler/Dialect/Flow/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/Dialect/MemRef/Transforms/Passes.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/PatternMatch.h"
@@ -113,6 +114,7 @@ struct ConvertToFlowBeforeDispatchFormation
                 LinalgTensorReshapeToFlowTensorReshape<tensor::ExpandShapeOp>>(
             context);
     populateTensorToFlowPatternsBeforeDispatchFormation(context, patterns);
+    memref::populateResolveRankedShapeTypeResultDimsPatterns(patterns);
     IREE::Flow::TensorReshapeOp::getCanonicalizationPatterns(patterns, context);
 
     if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
@@ -137,6 +139,7 @@ struct ConvertToFlowAfterDispatchFormation
 
     patterns.insert<LinalgFillToFlowTensorSplat>(context);
     populateTensorToFlowPatternsAfterDispatchFormation(context, patterns);
+    memref::populateResolveRankedShapeTypeResultDimsPatterns(patterns);
     IREE::Flow::TensorReshapeOp::getCanonicalizationPatterns(patterns, context);
 
     if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
