@@ -683,8 +683,8 @@ class MulCastOfBool : public OpRewritePattern<mhlo::MulOp> {
   // Traverse upward past common operations to see if the value came from a
   // boolean tensor.
   static bool IsFromBool(Value val) {
-    while(true) {
-      Operation* op = val.getDefiningOp();
+    while (true) {
+      Operation *op = val.getDefiningOp();
       if (!op) return false;
 
       if (auto convertOp = dyn_cast<mhlo::ConvertOp>(op)) {
@@ -697,8 +697,7 @@ class MulCastOfBool : public OpRewritePattern<mhlo::MulOp> {
       }
 
       if (isa<mhlo::DynamicBroadcastInDimOp>(op) ||
-          isa<mhlo::BroadcastInDimOp>(op) ||
-          isa<mhlo::BroadcastOp>(op)) {
+          isa<mhlo::BroadcastInDimOp>(op) || isa<mhlo::BroadcastOp>(op)) {
         val = op->getOperand(0);
         continue;
       }
@@ -723,29 +722,29 @@ class MulCastOfBool : public OpRewritePattern<mhlo::MulOp> {
     Type eType = resultTy.getElementType();
     ShapedType lhsTy = lhs.getType().cast<ShapedType>();
     Value lhsBool = rewriter.create<mhlo::ConvertOp>(
-      op.getLoc(), lhsTy.clone(rewriter.getIntegerType(1)), lhs);
+        op.getLoc(), lhsTy.clone(rewriter.getIntegerType(1)), lhs);
     Value zero = rewriter.create<mhlo::ConstOp>(
-      op.getLoc(), DenseElementsAttr::get(
-        RankedTensorType::get({}, eType), rewriter.getZeroAttr(eType)));
+        op.getLoc(), DenseElementsAttr::get(RankedTensorType::get({}, eType),
+                                            rewriter.getZeroAttr(eType)));
 
     auto lhsShape = rewriter.create<shape::ShapeOfOp>(
-      op.getLoc(), RankedTensorType::get({lhsTy.getRank()},
-      rewriter.getIndexType()), lhs);
+        op.getLoc(),
+        RankedTensorType::get({lhsTy.getRank()}, rewriter.getIndexType()), lhs);
 
     auto broadcast = [&](Value value) -> Value {
       auto valueTy = value.getType().cast<ShapedType>();
       auto dimensions = llvm::to_vector<4>(
           llvm::seq<int64_t>(resultRank - valueTy.getRank(), resultRank));
       return rewriter.create<mhlo::DynamicBroadcastInDimOp>(
-          op.getLoc(), RankedTensorType::get(resultTy.getShape(),
-          valueTy.getElementType()), value, lhsShape,
-          rewriter.getI64TensorAttr(dimensions));
+          op.getLoc(),
+          RankedTensorType::get(resultTy.getShape(), valueTy.getElementType()),
+          value, lhsShape, rewriter.getI64TensorAttr(dimensions));
     };
 
     zero = broadcast(zero);
 
-    rewriter.replaceOpWithNewOp<mhlo::SelectOp>(
-      op, resultTy, lhsBool, rhs, zero);
+    rewriter.replaceOpWithNewOp<mhlo::SelectOp>(op, resultTy, lhsBool, rhs,
+                                                zero);
     return success();
   }
 };
@@ -935,11 +934,9 @@ struct MHLOToMHLOPreprocessingPass
     mhlo::PopulateUnfuseBatchNormPatterns(context, &patterns);
     mhlo::PopulateComplexLoweringPatterns(context, &patterns);
     mhlo::PopulateGatherToTorchIndexSelectPatterns(context, &patterns);
-    patterns
-        .insert<ExtractReduceWindowOpPaddingAttributes,
-                AdjustDepthwiseFilterShape, ScatterRank0Value, ExpandRngNormal,
-                MulCastOfBool>(
-            context);
+    patterns.insert<ExtractReduceWindowOpPaddingAttributes,
+                    AdjustDepthwiseFilterShape, ScatterRank0Value,
+                    ExpandRngNormal, MulCastOfBool>(context);
 
     // dot_general canoncalization patterns.
     mhlo::PopulateGeneralDotOpLoweringPatterns(&patterns, context);
