@@ -1,8 +1,8 @@
 # Dynamic Web Sample
 
 This experimental sample demonstrates one way to target the web platform with
-IREE. The output artifact is a web page that loads a separately provided IREE
-`.vmfb` (compiled ML model) and tests calling functions on it.
+IREE. The output artifact is a web page that loads separately provided IREE
+`.vmfb` (compiled ML model) files and allows for calling functions on them.
 
 ## Quickstart
 
