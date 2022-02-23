@@ -175,6 +175,11 @@ def _(arr: DeviceArray):
   return arr._buffer_view.shape
 
 
+@_device_implements(np.reshape)
+def _(arr: DeviceArray, *args):
+  return arr.reshape(*args)
+
+
 def asdevicearray(device: HalDevice,
                   a,
                   dtype=None,

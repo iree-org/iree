@@ -105,6 +105,9 @@ class DeviceHalTest(unittest.TestCase):
     reshaped = ary.reshape((4, 3))
     self.assertEqual((4, 3), reshaped.shape)
 
+    np_reshaped = np.reshape(ary, (2, 2, 3))
+    self.assertEqual((2, 2, 3), np_reshaped.shape)
+
   def testDeepcopy(self):
     init_ary = np.zeros([3, 4], dtype=np.float32) + 2
     orig_ary = iree.runtime.asdevicearray(self.device,
