@@ -14,6 +14,12 @@ def CaptureDispatchDynamicDims : Pass<"iree-flow-capture-dispatch-dynamic-dims",
   let constructor = "mlir::iree_compiler::IREE::Flow::createCaptureDispatchDynamicDimsPass()";
 }
 
+def CleanupTensorShapes :
+    Pass<"iree-flow-cleanup-tensor-shapes", ""> {
+  let summary = "Cleans up any remaining tensor shape metadata after lowering.";
+  let constructor = "mlir::iree_compiler::IREE::Flow::createCleanupTensorShapesPass()";
+}
+
 def CleanupNumericNarrowing :
     Pass<"iree-flow-cleanup-numeric-narrowing", ""> {
   let summary = "Cleans up any numeric narrowing ops inserted by iree-flow-infer-numeric-narrowing";
@@ -54,6 +60,12 @@ def DispatchLinalgOnTensors :
     Pass<"iree-flow-dispatch-linalg-on-tensors-pass", ""> {
   let summary = "Dispatch Linalg operations on tensors by using tile and distribute";
   let constructor = "mlir::iree_compiler::IREE::Flow::createDispatchLinalgOnTensorsPass()";
+}
+
+def ExpandTensorShapes :
+    Pass<"iree-flow-expand-tensor-shapes", "mlir::ModuleOp"> {
+  let summary = "Expands tensor shape dimensions into SSA values across the program.";
+  let constructor = "mlir::iree_compiler::IREE::Flow::createExpandTensorShapesPass()";
 }
 
 def ExportBenchmarkFuncs :
