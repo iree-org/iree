@@ -145,6 +145,10 @@ void iree_wait_set_free(iree_wait_set_t* set) {
   IREE_TRACE_ZONE_END(z0);
 }
 
+bool iree_wait_set_is_empty(const iree_wait_set_t* set) {
+  return set->handle_count != 0;
+}
+
 iree_status_t iree_wait_set_insert(iree_wait_set_t* set,
                                    iree_wait_handle_t handle) {
   if (set->total_handle_count + 1 > set->capacity) {
@@ -177,10 +181,8 @@ iree_status_t iree_wait_set_insert(iree_wait_set_t* set,
   ++set->total_handle_count;
   iree_host_size_t index = set->handle_count++;
   iree_wait_handle_t* stored_handle = &set->handles[index];
-  // NOTE: can't fail with LOCAL_FUTEX.
-  IREE_IGNORE_ERROR(iree_wait_handle_wrap_primitive(handle.type, handle.value,
-                                                    stored_handle));
-  stored_handle->set_internal.dupe_count = 0;  // just us so far
+  iree_wait_handle_wrap_primitive(handle.type, handle.value, stored_handle);
+  user_handle->set_internal.dupe_count = 0;  // just us so far
 
   return iree_ok_status();
 }

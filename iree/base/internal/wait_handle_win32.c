@@ -53,8 +53,9 @@ static iree_status_t iree_wait_primitive_clone(
         iree_status_code_from_win32_error(GetLastError()),
         "unable to duplicate HANDLE; possibly out of process handles");
   }
-  return iree_wait_handle_wrap_primitive(IREE_WAIT_PRIMITIVE_TYPE_WIN32_HANDLE,
-                                         value, out_target_handle);
+  iree_wait_handle_wrap_primitive(IREE_WAIT_PRIMITIVE_TYPE_WIN32_HANDLE, value,
+                                  out_target_handle);
+  return iree_ok_status();
 }
 
 // Closes an existing handle that was either created manually or via
@@ -179,6 +180,10 @@ void iree_wait_set_free(iree_wait_set_t* set) {
   IREE_TRACE_ZONE_END(z0);
 }
 
+bool iree_wait_set_is_empty(const iree_wait_set_t* set) {
+  return set->handle_count != 0;
+}
+
 iree_status_t iree_wait_set_insert(iree_wait_set_t* set,
                                    iree_wait_handle_t handle) {
   if (set->total_handle_count + 1 > set->handle_capacity) {
@@ -235,8 +240,7 @@ iree_status_t iree_wait_set_insert(iree_wait_set_t* set,
   ++set->total_handle_count;
   iree_host_size_t index = set->handle_count++;
   iree_wait_handle_t* user_handle = &set->user_handles[index];
-  IREE_IGNORE_ERROR(
-      iree_wait_handle_wrap_primitive(handle.type, handle.value, user_handle));
+  iree_wait_handle_wrap_primitive(handle.type, handle.value, user_handle);
   user_handle->set_internal.dupe_count = 0;  // just us so far
   set->native_handles[index] = native_handle;
 
@@ -442,8 +446,9 @@ iree_status_t iree_event_initialize(bool initial_state,
     return iree_make_status(iree_status_code_from_win32_error(GetLastError()),
                             "unable to create event");
   }
-  return iree_wait_handle_wrap_primitive(IREE_WAIT_PRIMITIVE_TYPE_WIN32_HANDLE,
-                                         value, out_event);
+  iree_wait_handle_wrap_primitive(IREE_WAIT_PRIMITIVE_TYPE_WIN32_HANDLE, value,
+                                  out_event);
+  return iree_ok_status();
 }
 
 void iree_event_deinitialize(iree_event_t* event) {

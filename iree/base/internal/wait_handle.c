@@ -12,14 +12,13 @@
 // iree_wait_handle_t
 //===----------------------------------------------------------------------===//
 
-iree_status_t iree_wait_handle_wrap_primitive(
+void iree_wait_handle_wrap_primitive(
     iree_wait_primitive_type_t primitive_type,
     iree_wait_primitive_value_t primitive_value,
     iree_wait_handle_t* out_handle) {
   memset(out_handle, 0, sizeof(*out_handle));
   out_handle->type = primitive_type;
   out_handle->value = primitive_value;
-  return iree_ok_status();
 }
 
 void iree_wait_handle_deinitialize(iree_wait_handle_t* handle) {
@@ -84,8 +83,8 @@ IREE_API_EXPORT iree_status_t iree_wait_source_import(
   } else {
     iree_wait_handle_t* wait_handle =
         (iree_wait_handle_t*)out_wait_source->storage;
-    IREE_RETURN_IF_ERROR(iree_wait_handle_wrap_primitive(
-        wait_primitive.type, wait_primitive.value, wait_handle));
+    iree_wait_handle_wrap_primitive(wait_primitive.type, wait_primitive.value,
+                                    wait_handle);
     out_wait_source->ctl = iree_wait_handle_ctl;
   }
   return iree_ok_status();

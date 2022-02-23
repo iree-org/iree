@@ -178,6 +178,10 @@ void iree_wait_set_free(iree_wait_set_t* set) {
   IREE_TRACE_ZONE_END(z0);
 }
 
+bool iree_wait_set_is_empty(const iree_wait_set_t* set) {
+  return set->handle_count != 0;
+}
+
 iree_status_t iree_wait_set_insert(iree_wait_set_t* set,
                                    iree_wait_handle_t handle) {
   if (set->handle_count + 1 > set->handle_capacity) {
@@ -188,8 +192,7 @@ iree_status_t iree_wait_set_insert(iree_wait_set_t* set,
   iree_host_size_t index = set->handle_count++;
 
   iree_wait_handle_t* user_handle = &set->user_handles[index];
-  IREE_IGNORE_ERROR(
-      iree_wait_handle_wrap_primitive(handle.type, handle.value, user_handle));
+  iree_wait_handle_wrap_primitive(handle.type, handle.value, user_handle);
 
   // NOTE: poll will ignore any negative fds.
   struct pollfd* poll_fd = &set->poll_fds[index];
