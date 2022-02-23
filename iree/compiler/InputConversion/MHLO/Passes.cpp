@@ -43,6 +43,9 @@ void buildMHLOInputConversionPassPipeline(OpPassManager &passManager) {
   // and cfg compatible.
   passManager.addNestedPass<FuncOp>(createTopLevelSCFToCFGPass());
 
+  passManager.addNestedPass<FuncOp>(createMHLOToMHLOPreprocessingPass());
+  passManager.addNestedPass<FuncOp>(mlir::createCanonicalizerPass());
+
   // Various shape functions may have been materialized in the `shape.shape_of`
   // style of treating shapes as tensors. We prefer to legalize these to
   // scalar ops as early as possible to avoid having them persist as tensor
@@ -54,8 +57,6 @@ void buildMHLOInputConversionPassPipeline(OpPassManager &passManager) {
   // We also don't handle calls well on the old codepath; until we remove the
   // use of the CFG we can continue inlining.
   passManager.addPass(mlir::createInlinerPass());
-
-  passManager.addNestedPass<FuncOp>(createMHLOToMHLOPreprocessingPass());
 
   // Legalize input types. We do this after flattening tuples so that we don't
   // have to deal with them.
