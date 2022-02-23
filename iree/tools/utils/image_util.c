@@ -138,8 +138,12 @@ iree_status_t iree_tools_utils_buffer_view_from_image(
     result = iree_hal_buffer_view_wrap_or_clone_heap_buffer(
         allocator, shape, shape_rank, element_type,
         IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR,
-        IREE_HAL_MEMORY_TYPE_HOST_LOCAL | IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE,
-        IREE_HAL_MEMORY_ACCESS_READ, IREE_HAL_BUFFER_USAGE_ALL,
+        (iree_hal_buffer_params_t){
+            .type = IREE_HAL_MEMORY_TYPE_HOST_LOCAL |
+                    IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE,
+            .access = IREE_HAL_MEMORY_ACCESS_READ,
+            .usage = IREE_HAL_BUFFER_USAGE_ALL,
+        },
         iree_make_byte_span((void*)pixel_data, element_byte * buffer_length),
         iree_allocator_null(), out_buffer_view);
   }
@@ -200,9 +204,13 @@ iree_status_t iree_tools_utils_buffer_view_from_image_rescaled(
   };
   iree_status_t status = iree_hal_buffer_view_generate_buffer(
       allocator, shape, shape_rank, element_type, encoding_type,
-      IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL | IREE_HAL_MEMORY_TYPE_HOST_VISIBLE,
-      IREE_HAL_BUFFER_USAGE_DISPATCH | IREE_HAL_BUFFER_USAGE_TRANSFER |
-          IREE_HAL_BUFFER_USAGE_MAPPING,
+      (iree_hal_buffer_params_t){
+          .type = IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL |
+                  IREE_HAL_MEMORY_TYPE_HOST_VISIBLE,
+          .usage = IREE_HAL_BUFFER_USAGE_DISPATCH |
+                   IREE_HAL_BUFFER_USAGE_TRANSFER |
+                   IREE_HAL_BUFFER_USAGE_MAPPING,
+      },
       iree_tools_utils_buffer_view_load_image_rescaled, &params,
       out_buffer_view);
 

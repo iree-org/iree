@@ -25,8 +25,11 @@ iree_status_t reduce_sum_1d(iree_runtime_session_t* session, const int* values,
         iree_runtime_session_device_allocator(session), arg0_shape,
         IREE_ARRAYSIZE(arg0_shape), IREE_HAL_ELEMENT_TYPE_SINT_32,
         IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR,
-        IREE_HAL_MEMORY_TYPE_HOST_LOCAL | IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE,
-        IREE_HAL_BUFFER_USAGE_ALL,
+        (iree_hal_buffer_params_t){
+            .type = IREE_HAL_MEMORY_TYPE_HOST_LOCAL |
+                    IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE,
+            .usage = IREE_HAL_BUFFER_USAGE_ALL,
+        },
         iree_make_const_byte_span((void*)values, sizeof(int) * values_length),
         &arg0);
   }
@@ -71,8 +74,11 @@ iree_status_t reduce_sum_2d(iree_runtime_session_t* session, const int* values,
         iree_runtime_session_device_allocator(session), arg0_shape,
         IREE_ARRAYSIZE(arg0_shape), IREE_HAL_ELEMENT_TYPE_SINT_32,
         IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR,
-        IREE_HAL_MEMORY_TYPE_HOST_LOCAL | IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE,
-        IREE_HAL_BUFFER_USAGE_ALL,
+        (iree_hal_buffer_params_t){
+            .type = IREE_HAL_MEMORY_TYPE_HOST_LOCAL |
+                    IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE,
+            .usage = IREE_HAL_BUFFER_USAGE_ALL,
+        },
         iree_make_const_byte_span((void*)values, sizeof(int) * values_length),
         &arg0);
   }
@@ -111,8 +117,11 @@ iree_status_t add_one(iree_runtime_session_t* session, const int* values,
         iree_runtime_session_device_allocator(session), arg0_shape,
         IREE_ARRAYSIZE(arg0_shape), IREE_HAL_ELEMENT_TYPE_SINT_32,
         IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR,
-        IREE_HAL_MEMORY_TYPE_HOST_LOCAL | IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE,
-        IREE_HAL_BUFFER_USAGE_ALL,
+        (iree_hal_buffer_params_t){
+            .type = IREE_HAL_MEMORY_TYPE_HOST_LOCAL |
+                    IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE,
+            .usage = IREE_HAL_BUFFER_USAGE_ALL,
+        },
         iree_make_const_byte_span((void*)values, sizeof(int) * values_length),
         &arg0);
   }

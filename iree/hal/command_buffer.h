@@ -11,6 +11,7 @@
 #include <stdint.h>
 
 #include "iree/base/api.h"
+#include "iree/hal/allocator.h"
 #include "iree/hal/buffer.h"
 #include "iree/hal/descriptor_set.h"
 #include "iree/hal/descriptor_set_layout.h"
@@ -83,22 +84,6 @@ enum iree_hal_command_category_bits_t {
       IREE_HAL_COMMAND_CATEGORY_TRANSFER | IREE_HAL_COMMAND_CATEGORY_DISPATCH,
 };
 typedef uint32_t iree_hal_command_category_t;
-
-// A bitmask indicating affinity for a submission to use a particular set of
-// queues.
-//
-// Upon submission the queue is selected based on the flags set in
-// |command_categories| and the |queue_affinity|. As the number of available
-// queues can vary the |queue_affinity| is used to hash into the available
-// queues for the required categories. For example if 2 queues support transfer
-// commands and the affinity is 5 the resulting queue could be index hash(5)=1.
-// The affinity can thus be treated as just a way to indicate whether two
-// submissions must be placed on to the same queue. Note that the exact hashing
-// function is implementation dependent.
-typedef uint64_t iree_hal_queue_affinity_t;
-
-// Specifies that any queue may be selected.
-#define IREE_HAL_QUEUE_AFFINITY_ANY ((iree_hal_queue_affinity_t)(-1))
 
 // Bitfield specifying which execution stage a barrier should start/end at.
 //
