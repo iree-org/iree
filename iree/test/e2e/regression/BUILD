@@ -53,6 +53,7 @@ iree_lit_test_suite(
             "dynamic_linalg_matmul_on_tensors_fuse_0.mlir",
             "dynamic_linalg_matmul_on_tensors_fuse_1.mlir",
             "dynamic_linalg_matmul_on_tensors_fuse_2.mlir",
+            "linalg_quantized_matmul_vs_linalg_matmul.mlir",
             "lowering_config.mlir",
         ] + BACKEND_TESTS,
     ),
@@ -68,6 +69,7 @@ iree_lit_test_suite(
 iree_check_single_backend_test_suite(
     name = "check_regression_dylib-llvm-aot",
     srcs = [
+        "linalg_quantized_matmul_vs_linalg_matmul.mlir",
         "lowering_config.mlir",
     ] + BACKEND_TESTS,
     compiler_flags = ["-iree-input-type=mhlo"],

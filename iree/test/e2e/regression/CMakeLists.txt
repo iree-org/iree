@@ -43,6 +43,7 @@ iree_check_single_backend_test_suite(
     "dynamic_torch_index_select_vector.mlir"
     "linalg_ext_ops.mlir"
     "linalg_ops.mlir"
+    "linalg_quantized_matmul_vs_linalg_matmul.mlir"
     "lowering_config.mlir"
   TARGET_BACKEND
     "dylib-llvm-aot"
