@@ -64,3 +64,25 @@ func @wrappedAlready(%arg0: !hal.buffer_view) -> !hal.buffer_view attributes {ir
   return %arg0 : !hal.buffer_view
 }
 // CHECK-NOT: func @_wrappedAlready
+
+// -----
+
+// Tests that a function calling an exported function is redirected to the
+// original unwrapped call.
+
+// CHECK: func @exportA(%arg0: !hal.buffer_view) -> !hal.buffer_view
+// CHECK:   call @_exportA
+// CHECK: func private @_exportA(%arg0: tensor<?x?xi32>) -> tensor<?x?xi32>
+// CHECK:   return %arg0
+func @exportA(%arg0: tensor<?x?xi32>) -> tensor<?x?xi32> {
+  return %arg0 : tensor<?x?xi32>
+}
+
+// CHECK: func @exportB(%arg0: !hal.buffer_view) -> !hal.buffer_view
+// CHECK:   call @_exportB
+// CHECK: func private @_exportB(%arg0: tensor<?x?xi32>) -> tensor<?x?xi32>
+// CHECK:   call @_exportA
+func @exportB(%arg0: tensor<?x?xi32>) -> tensor<?x?xi32> {
+    %0 = call @exportA(%arg0) : (tensor<?x?xi32>) -> tensor<?x?xi32>
+    return %0 : tensor<?x?xi32>
+}
