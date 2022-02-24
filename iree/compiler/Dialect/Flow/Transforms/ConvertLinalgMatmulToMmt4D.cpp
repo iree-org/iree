@@ -158,26 +158,26 @@ static Value pad(Location loc, PatternRewriter &rewriter, Value input,
       auto rem = [&](Value a, Value b) {
         return rewriter.create<arith::RemSIOp>(loc, a, b);
       };
-      // Compare to the plainer distance_to_next_multiple_of in the static
+      // Compare to the plainer distanceToNextMultipleOf in the static
       // dimension case below.
-      auto distance_to_next_multiple_of = [&](Value a, Value b) {
+      auto distanceToNextMultipleOf = [&](Value a, Value b) {
         Value one = rewriter.create<arith::ConstantIndexOp>(loc, 1);
-        Value b_minus_one = sub(b, one);
-        return sub(b_minus_one, rem(add(a, b_minus_one), b));
+        Value bMinusOne = sub(b, one);
+        return sub(bMinusOne, rem(add(a, bMinusOne), b));
       };
       Value inputDim = rewriter.create<tensor::DimOp>(loc, input, i);
       Value tileDim =
           rewriter.create<arith::ConstantIndexOp>(loc, tileShape[i]);
-      Value padding = distance_to_next_multiple_of(inputDim, tileDim);
+      Value padding = distanceToNextMultipleOf(inputDim, tileDim);
       highPadding.push_back(padding);
     } else {
-      auto distance_to_next_multiple_of = [=](int64_t a, int64_t b) {
-        int64_t b_minus_one = b - 1;
-        return b_minus_one - ((a + b_minus_one) % b);
+      auto distanceToNextMultipleOf = [=](int64_t a, int64_t b) {
+        int64_t bMinusOne = b - 1;
+        return bMinusOne - ((a + bMinusOne) % b);
       };
       int64_t inputDim = inputShape[i];
       int64_t tileDim = tileShape[i];
-      int64_t padding = distance_to_next_multiple_of(inputDim, tileDim);
+      int64_t padding = distanceToNextMultipleOf(inputDim, tileDim);
       resultTypeShape.push_back(inputDim + padding);
       highPadding.push_back(rewriter.getIndexAttr(padding));
     }
@@ -242,11 +242,11 @@ class LinalgMatmulOpToLinalgMmt4DOpPattern
     : public OpRewritePattern<linalg::MatmulOp> {
  public:
   LinalgMatmulOpToLinalgMmt4DOpPattern(
-      MLIRContext *context, const CustomKernelsTargetInfo &target_info,
-      bool enable_generic_slow)
+      MLIRContext *context, const CustomKernelsTargetInfo &targetInfo,
+      bool enableGenericSlow)
       : OpRewritePattern<linalg::MatmulOp>(context),
-        target_info(target_info),
-        enable_generic_slow(enable_generic_slow) {}
+        targetInfo(targetInfo),
+        enableGenericSlow(enableGenericSlow) {}
 
   LogicalResult matchAndRewrite(linalg::MatmulOp matmulOp,
                                 PatternRewriter &rewriter) const override {
@@ -269,21 +269,21 @@ class LinalgMatmulOpToLinalgMmt4DOpPattern
       return failure();
     }
 
-    const auto &maybe_tile_params = chooseTileParams(lhs, rhs, acc);
-    if (!maybe_tile_params) {
+    const auto &maybeTileParams = chooseTileParams(lhs, rhs, acc);
+    if (!maybeTileParams) {
       // No good tiling is known for the given problem shape, and the slow
       // generic fallback (for tests) is not enabled.
       return failure();
     }
-    const Mmt4DTileParams &tile_params = maybe_tile_params.getValue();
+    const Mmt4DTileParams &tileParams = maybeTileParams.getValue();
 
-    Value paddedLhs = pad(loc, rewriter, lhs, tile_params.lhs());
-    Value paddedRhs = pad(loc, rewriter, rhs, tile_params.rhs());
-    Value paddedAcc = pad(loc, rewriter, acc, tile_params.acc());
+    Value paddedLhs = pad(loc, rewriter, lhs, tileParams.lhs());
+    Value paddedRhs = pad(loc, rewriter, rhs, tileParams.rhs());
+    Value paddedAcc = pad(loc, rewriter, acc, tileParams.acc());
 
-    Value lhs4D = expandTo4D(loc, rewriter, paddedLhs, tile_params.lhs());
-    Value rhs4D = expandTo4D(loc, rewriter, paddedRhs, tile_params.rhs());
-    Value acc4D = expandTo4D(loc, rewriter, paddedAcc, tile_params.acc());
+    Value lhs4D = expandTo4D(loc, rewriter, paddedLhs, tileParams.lhs());
+    Value rhs4D = expandTo4D(loc, rewriter, paddedRhs, tileParams.rhs());
+    Value acc4D = expandTo4D(loc, rewriter, paddedAcc, tileParams.acc());
 
     Value lhs4DT = transpose(loc, rewriter, lhs4D, {0, 2, 1, 3});
     Value rhs4DT = transpose(loc, rewriter, rhs4D, {2, 0, 3, 1});
@@ -292,7 +292,7 @@ class LinalgMatmulOpToLinalgMmt4DOpPattern
     auto mmt4d = rewriter.create<linalg::Mmt4DOp>(
         loc, acc4DT.getType(), ValueRange{lhs4DT, rhs4DT}, ValueRange{acc4DT});
     mmt4d->setAttr(StringAttr::get(getContext(), "comment"),
-                   StringAttr::get(getContext(), tile_params.getComment()));
+                   StringAttr::get(getContext(), tileParams.getComment()));
 
     Value mmt4dResultTransposed =
         transpose(loc, rewriter, mmt4d.getResult(0), {0, 2, 1, 3});
@@ -313,8 +313,8 @@ class LinalgMatmulOpToLinalgMmt4DOpPattern
   llvm::Optional<Mmt4DTileParams> chooseTileParams(Value lhs, Value rhs,
                                                    Value acc) const;
 
-  CustomKernelsTargetInfo target_info;
-  bool enable_generic_slow;
+  CustomKernelsTargetInfo targetInfo;
+  bool enableGenericSlow;
 };
 
 llvm::Optional<Mmt4DTileParams>
@@ -345,10 +345,10 @@ LinalgMatmulOpToLinalgMmt4DOpPattern::chooseTileParams(Value lhs, Value rhs,
       return Mmt4DTileParams(m0k0n0, comment);
     }
   };
-  if (target_info.is(CustomKernelTargetArch::Aarch64)) {
+  if (targetInfo.is(CustomKernelTargetArch::Aarch64)) {
     if (lhsElemType.isSignlessInteger(8) && rhsElemType.isSignlessInteger(8) &&
         accElemType.isSignlessInteger(32)) {
-      if (target_info.has(CustomKernelTargetFeature::Aarch64Dotprod)) {
+      if (targetInfo.has(CustomKernelTargetFeature::Aarch64Dotprod)) {
         return chooseMatMulOrMatVec({8, 4, 8}, {8, 4, 1},
                                     "i8*i8->i32, aarch64 +dotprod");
       } else {
@@ -361,9 +361,9 @@ LinalgMatmulOpToLinalgMmt4DOpPattern::chooseTileParams(Value lhs, Value rhs,
                                   "f32*f32->f32, aarch64");
     }
   }
-  // enable_generic_slow is meant for tests only. It's just a way to get some
+  // enableGenericSlow is meant for tests only. It's just a way to get some
   // test coverage for Mmt4d where we do not currently have kernels.
-  if (enable_generic_slow) {
+  if (enableGenericSlow) {
     return chooseMatMulOrMatVec(
         {8, 2, 4}, {8, 2, 1},  // arbitrary values.
         "generic tiling parameters, as no known kernel was "
@@ -425,7 +425,7 @@ class ConvertLinalgMatmulToMmt4DPass final
 
   LogicalResult initializeOptions(StringRef options) override {
     if (failed(Pass::initializeOptions(options))) return failure();
-    return ParseCustomKernelsTargetInfo(arch, features, target_info);
+    return ParseCustomKernelsTargetInfo(arch, features, targetInfo);
   }
 
   void runOnOperation() override {
@@ -433,8 +433,8 @@ class ConvertLinalgMatmulToMmt4DPass final
     // Main pattern.
     {
       RewritePatternSet patterns(&getContext());
-      patterns.insert<LinalgMatmulOpToLinalgMmt4DOpPattern>(
-          context, target_info, enable_generic_slow);
+      patterns.insert<LinalgMatmulOpToLinalgMmt4DOpPattern>(context, targetInfo,
+                                                            enableGenericSlow);
       if (failed(applyPatternsAndFoldGreedily(getOperation(),
                                               std::move(patterns)))) {
         return signalPassFailure();
@@ -455,7 +455,7 @@ class ConvertLinalgMatmulToMmt4DPass final
   }
 
  private:
-  CustomKernelsTargetInfo target_info;
+  CustomKernelsTargetInfo targetInfo;
 };
 }  // namespace
 

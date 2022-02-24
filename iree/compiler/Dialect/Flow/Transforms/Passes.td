@@ -115,7 +115,7 @@ def ConvertLinalgMatmulToMmt4D :
     Option<"features", "features", "std::string",
            /*default=*/"",
            "Additional CPU feature flags, e.g. +dotprod">,
-    Option<"enable_generic_slow", "enable_generic_slow", "bool",
+    Option<"enableGenericSlow", "enable_generic_slow", "bool",
            /*default=*/"false",
            "For tests only. Use mmt4d even for cases that are not expected to compile to efficient code by using some arbitrary generic tile shape.">,
   ];
