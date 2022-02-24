@@ -1,14 +1,14 @@
-// RUN: iree-opt -split-input-file --iree-flow-convert-linalg-matmul-to-mmt4d=enableGenericSlow %s | FileCheck %s
+// RUN: iree-opt -split-input-file --iree-flow-convert-linalg-matmul-to-mmt4d=enable_generic_slow %s | FileCheck %s
 // RUN: iree-opt -split-input-file --iree-flow-convert-linalg-matmul-to-mmt4d='arch=aarch64' %s | FileCheck %s -check-prefix=AARCH64-BASELINE
 // RUN: iree-opt -split-input-file --iree-flow-convert-linalg-matmul-to-mmt4d='arch=aarch64 features=+dotprod' %s | FileCheck %s -check-prefix=AARCH64-DOTPROD
 
 // There are two parts to this test: the "deep" part and the "wide part".
 
 //////////////////////////////////////////////////////////////////////////////
-// The "deep part": test a few cases in depth. For that, we use enableGenericSlow,
+// The "deep part": test a few cases in depth. For that, we use enable_generic_slow,
 // meaning that the mmt4d tile shapes that we exercise are not tied to a particular
 // target. That's partly to convey intent and partly so we can change the actual
-// target-optimized kernel shapes without rewriting this test. Also, the enableGenericSlow
+// target-optimized kernel shapes without rewriting this test. Also, the enable_generic_slow
 // shape is picked specifically so that M0, K0 and N0 are 3 distinct value, which
 // is not always the case in real kernels. That helps catch mixing-up-dims bugs.
 //////////////////////////////////////////////////////////////////////////////
