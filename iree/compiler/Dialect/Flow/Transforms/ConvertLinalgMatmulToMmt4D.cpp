@@ -433,8 +433,8 @@ class ConvertLinalgMatmulToMmt4DPass final
     // Main pattern.
     {
       RewritePatternSet patterns(&getContext());
-      patterns.insert<LinalgMatmulOpToLinalgMmt4DOpPattern>(
-          context, targetInfo, enableGenericSlow);
+      patterns.insert<LinalgMatmulOpToLinalgMmt4DOpPattern>(context, targetInfo,
+                                                            enableGenericSlow);
       if (failed(applyPatternsAndFoldGreedily(getOperation(),
                                               std::move(patterns)))) {
         return signalPassFailure();
