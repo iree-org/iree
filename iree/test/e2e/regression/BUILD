@@ -134,13 +134,13 @@ py_binary(
 # Test asm
 [iree_generated_trace_runner_test(
     name = "e2e_matmul_mmt4d_%s_small" % lhs_rhs_type,
+    compiler_flags = [
+        "--iree-flow-mmt4d-target-options=enable_generic_slow #pass_options_variant#",
+    ],
     generator = ":generate_e2e_matmul_tests",
     generator_args = [
         "--lhs_rhs_type=%s" % lhs_rhs_type,
         "--shapes=small",
-    ],
-    opt_flags = [
-        "--iree-flow-convert-linalg-matmul-to-mmt4d=enable_generic_slow #pass_options_variant#",
     ],
     target_backends_and_drivers = [
         ("dylib-llvm-aot", "dylib"),
@@ -155,13 +155,13 @@ py_binary(
 
 [iree_generated_trace_runner_test(
     name = "e2e_matmul_mmt4d_%s_large" % lhs_rhs_type,
+    compiler_flags = [
+        "--iree-flow-mmt4d-target-options=enable_generic_slow #pass_options_variant#",
+    ],
     generator = ":generate_e2e_matmul_tests",
     generator_args = [
         "--lhs_rhs_type=%s" % lhs_rhs_type,
         "--shapes=large",
-    ],
-    opt_flags = [
-        "--iree-flow-convert-linalg-matmul-to-mmt4d=enable_generic_slow #pass_options_variant#",
     ],
     target_backends_and_drivers = [
         ("dylib-llvm-aot", "dylib"),
@@ -179,14 +179,14 @@ py_binary(
 # tests in ways that are orthogonal to problem sizes.
 [iree_generated_trace_runner_test(
     name = "e2e_matmul_mmt4d_%s_intrinsics_%s" % (lhs_rhs_type, size),
-    compiler_flags = ["--iree-codegen-mmt4d-use-intrinsics"],
+    compiler_flags = [
+        "--iree-codegen-mmt4d-use-intrinsics",
+        "--iree-flow-mmt4d-target-options=enable_generic_slow #pass_options_variant#",
+    ],
     generator = ":generate_e2e_matmul_tests",
     generator_args = [
         "--lhs_rhs_type=%s" % lhs_rhs_type,
         "--shapes=%s" % size,
-    ],
-    opt_flags = [
-        "--iree-flow-convert-linalg-matmul-to-mmt4d=enable_generic_slow #pass_options_variant#",
     ],
     target_backends_and_drivers = [
         ("dylib-llvm-aot", "dylib"),
