@@ -105,7 +105,7 @@ def PadLinalgOps :
 }
 
 def ConvertLinalgMatmulToMmt4D :
-    Pass<"iree-flow-convert-linalg-matmul-to-mmt4d", "FuncOp"> {
+    Pass<"iree-flow-convert-linalg-matmul-to-mmt4d", ""> {
   let summary = "Convert linalg.matmul to linalg.mmt4d";
   let constructor = "mlir::iree_compiler::IREE::Flow::createConvertLinalgMatmulToMmt4DPass()";
   let options = [

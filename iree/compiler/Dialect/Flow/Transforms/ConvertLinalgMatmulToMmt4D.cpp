@@ -419,6 +419,8 @@ class ConvertLinalgMatmulToMmt4DPass final
     : public ConvertLinalgMatmulToMmt4DBase<ConvertLinalgMatmulToMmt4DPass> {
  public:
   ConvertLinalgMatmulToMmt4DPass() {}
+  explicit ConvertLinalgMatmulToMmt4DPass(CustomKernelsTargetInfo targetInfo)
+      : targetInfo(targetInfo) {}
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<linalg::LinalgDialect>();
   }
@@ -459,8 +461,27 @@ class ConvertLinalgMatmulToMmt4DPass final
 };
 }  // namespace
 
-std::unique_ptr<OperationPass<FuncOp>> createConvertLinalgMatmulToMmt4DPass() {
+std::unique_ptr<Pass> createConvertLinalgMatmulToMmt4DPass() {
   return std::make_unique<ConvertLinalgMatmulToMmt4DPass>();
+}
+
+std::unique_ptr<Pass> createConvertLinalgMatmulToMmt4DPass(
+    CustomKernelsTargetInfo targetInfo) {
+  return std::make_unique<ConvertLinalgMatmulToMmt4DPass>(targetInfo);
+}
+
+std::unique_ptr<Pass> createConvertLinalgMatmulToMmt4DPass(StringRef options) {
+  auto pass = std::make_unique<ConvertLinalgMatmulToMmt4DPass>();
+  // Unfortunately, we have to throw away the parse error here. These methods
+  // can't return a LogicalResult. Even if we could extract the parsing out of
+  // this function and require passing in a targetInfo using the function above
+  // the place this is called tops out at a pass pipeline registration, which
+  // also can't report failure. So we'd need to go all the way to the top level
+  // and reinvent the option parsing as an llvm::cl::parser.
+  LogicalResult result = pass->initializeOptions(options);
+  assert(result.succeeded() && "parsing pass options failed");
+  (void)result;
+  return pass;
 }
 
 }  // namespace Flow

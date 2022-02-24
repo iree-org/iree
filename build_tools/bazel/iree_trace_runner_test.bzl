@@ -226,6 +226,7 @@ def iree_generated_trace_runner_test(
 
     tests = []
     processed_opt_flags = [flag.replace("#pass_options_variant#", "") for flag in opt_flags]
+    processsed_compiler_flags = [flag.replace("#pass_options_variant#", "") for flag in compiler_flags]
     for backend, driver in target_backends_and_drivers:
         suite_entry_name = "_".join([name, backend, driver])
         iree_single_backend_generated_trace_runner_test(
@@ -235,7 +236,7 @@ def iree_generated_trace_runner_test(
             driver = driver,
             target_backend = backend,
             generator_args = generator_args,
-            compiler_flags = compiler_flags,
+            compiler_flags = processsed_compiler_flags,
             runner_args = runner_args,
             opt_tool = opt_tool,
             opt_flags = processed_opt_flags,
