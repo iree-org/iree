@@ -262,6 +262,7 @@ void addDoubleTilingExpertPassPipeline(OpPassManager &passManager) {
     // does not work in IREE cases. It's fine to not have it, since it's already
     // generating the IR as same as sandbox.
     LinalgSingleTilingExpertPassOptions options;
+    options.decomposeToLowerDimOp = true;
     options.vectorize = true;
     options.vectorizePadding = true;
     // TODO(#8228): Enable the padding once we know how to deal with fusion. For

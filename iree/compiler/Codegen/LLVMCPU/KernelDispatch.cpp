@@ -71,6 +71,30 @@ static bool isVMVX(FuncOp entryPointFn) {
   return targetAttr && targetAttr.getBackend().getValue() == "vmvx";
 }
 
+static void splitParallelAndReductionTileSizes(
+    linalg::LinalgOp op, ArrayRef<int64_t> tileSizes,
+    SmallVectorImpl<int64_t> &parallelTileSizes,
+    SmallVectorImpl<int64_t> &reductionTileSizes) {
+  auto interfaceOp =
+      cast<IREE::Flow::PartitionableLoopsInterface>(op.getOperation());
+  llvm::SmallDenseSet<unsigned> pLoopsSet;
+  for (auto i : interfaceOp.getPartitionableLoops(
+           /*maxNumPartitionedLoops=*/std::numeric_limits<unsigned>::max())) {
+    pLoopsSet.insert(i);
+  }
+
+  parallelTileSizes.assign(tileSizes.begin(), tileSizes.end());
+  for (auto i : llvm::seq<unsigned>(0, parallelTileSizes.size())) {
+    // This excludes unit parallel dims.
+    if (!pLoopsSet.contains(i)) parallelTileSizes[i] = 0;
+  }
+
+  SmallVector<unsigned> parallelDims;
+  op.getParallelDims(parallelDims);
+  reductionTileSizes.assign(tileSizes.begin(), tileSizes.end());
+  for (auto d : parallelDims) reductionTileSizes[d] = 0;
+}
+
 /// Looks for the `native_vector_size` attribute in the hal.executable.variant
 /// op.
 static Optional<int64_t> getNativeVectorSizeInBytes(FuncOp entryPointFn) {
@@ -603,23 +627,9 @@ static LogicalResult setRootConfig(
                      workloadPerWorkgroup,
                      /*workgroupSize=*/ArrayRef<int64_t>{});
 
-  llvm::SmallDenseSet<unsigned> pLoopsSet;
-  for (auto i : interfaceOp.getPartitionableLoops(
-           /*maxNumPartitionedLoops=*/std::numeric_limits<unsigned>::max())) {
-    pLoopsSet.insert(i);
-  }
-
-  SmallVector<int64_t> l1TileSizes = nativeVectorSize;
-  SmallVector<int64_t> vectorTileSizes = nativeVectorSize;
-  for (auto i : llvm::seq<unsigned>(0, l1TileSizes.size())) {
-    // This excludes unit parallel dims.
-    if (!pLoopsSet.contains(i)) l1TileSizes[i] = 0;
-  }
-  {
-    SmallVector<unsigned> parallelDims;
-    genericOp.getParallelDims(parallelDims);
-    for (auto d : parallelDims) vectorTileSizes[d] = 0;
-  }
+  SmallVector<int64_t> l1TileSizes, vectorTileSizes;
+  splitParallelAndReductionTileSizes(genericOp, nativeVectorSize, l1TileSizes,
+                                     vectorTileSizes);
 
   TileSizesListType tileSizes;
   tileSizes.push_back({});  // Empty since nothing to do for first level tiling.
@@ -628,6 +638,57 @@ static LogicalResult setRootConfig(
   auto config = IREE::Codegen::LoweringConfigAttr::get(
       entryPointFn.getContext(), tileSizes, {});
   setLoweringConfig(genericOp, config);
+
+  return success();
+}
+
+/// Sets the lowering configuration for linalg.conv* operations.
+/// For now only testing linalg.conv_2d_nhwc_hwcf.
+static LogicalResult setRootConfig(
+    FuncOp entryPointFn, linalg::Conv2DNhwcHwcfOp convOp,
+    ArrayRef<LoopTilingAndDistributionInfo> tiledLoops) {
+  // If there is already a set configuration do nothing.
+  if (getLoweringConfig(convOp)) return success();
+
+  // For VMVX, do not use vectorization. Just lower to default.
+  if (isVMVXBackend(entryPointFn)) return success();
+
+  auto inputType = convOp.inputs()[0].getType().cast<ShapedType>();
+  Type elementType = inputType.getElementType();
+  if (!elementType.isIntOrFloat()) return success();
+  unsigned byteWidth = elementType.getIntOrFloatBitWidth() / 8;
+  int64_t vectorSize;
+  if (Optional<int64_t> nativeVectorSizeVal =
+          getNativeVectorSizeInBytes(entryPointFn)) {
+    vectorSize = nativeVectorSizeVal.getValue() / byteWidth;
+  } else {
+    vectorSize = clNativeVectorSizeInBytes;
+  }
+  SmallVector<int64_t> vectorSizeVals(tiledLoops.size(), 1);
+  vectorSizeVals.back() = vectorSize;
+
+  SmallVector<int64_t> workloadPerWorkgroup = getDefaultWorkloadPerWorkgroup(
+      tiledLoops, ArrayRef<int64_t>(vectorSizeVals));
+
+  // Set the translation info.
+  setTranslationInfo(
+      entryPointFn,
+      IREE::Codegen::DispatchLoweringPassPipeline::CPUDoubleTilingExpert,
+      workloadPerWorkgroup, /*workgroupSize=*/ArrayRef<int64_t>{});
+
+  // For now hard-wire the same parameters used in iree-llvm-sandbox.
+  SmallVector<int64_t> l1TileSizes, vectorTileSizes;
+  splitParallelAndReductionTileSizes(convOp,
+                                     ArrayRef<int64_t>{1, 1, 8, 32, 1, 1, 8},
+                                     l1TileSizes, vectorTileSizes);
+
+  TileSizesListType tileSizes;
+  tileSizes.push_back({});
+  tileSizes.emplace_back(std::move(l1TileSizes));
+  tileSizes.emplace_back(std::move(vectorTileSizes));
+  auto config = IREE::Codegen::LoweringConfigAttr::get(
+      entryPointFn.getContext(), tileSizes, {});
+  setLoweringConfig(convOp, config);
 
   return success();
 }
@@ -642,7 +703,7 @@ static LogicalResult setRootConfigImpl(
   auto setRootConfigFn = [&](Operation *op) -> LogicalResult {
     return TypeSwitch<Operation *, LogicalResult>(op)
         .Case<linalg::Mmt4DOp, linalg::ContractionOpInterface,
-              IREE::LinalgExt::FftOp>([&](auto op) {
+              linalg::Conv2DNhwcHwcfOp, IREE::LinalgExt::FftOp>([&](auto op) {
           return setRootConfig(entryPointFn, op, tiledLoops);
         })
         .Case<linalg::GenericOp>([&](auto genericOp) {
