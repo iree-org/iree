@@ -98,7 +98,7 @@ echo "***** clang-format *****"
 disable_update_ret
 if exists git-clang-format; then
   enable_update_ret
-  git-clang-format --style=file
+  git-clang-format --style=file main
   git diff --exit-code
 else
   enable_update_ret
