@@ -35,7 +35,6 @@ iree_cc_library(
     MLIRArithmeticTransforms
     MLIRBufferization
     MLIRBufferizationTransforms
-#    MLIRLinalgBufferizableOpInterfaceImpl
     MLIRMemRef
     MLIRModuleBufferization
     MLIRSCFTransforms
