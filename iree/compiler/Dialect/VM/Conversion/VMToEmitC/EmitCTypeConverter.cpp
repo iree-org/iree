@@ -23,6 +23,22 @@ EmitCTypeConverter::EmitCTypeConverter() {
     return emitc::OpaqueType::get(type.getContext(), "iree_vm_ref_t*");
   });
 
+  addTargetMaterialization([this](OpBuilder &builder, emitc::OpaqueType type,
+                                  ValueRange inputs, Location loc) -> Value {
+    assert(inputs.size() == 1);
+    assert(inputs[0].getType().isa<IREE::VM::RefType>());
+
+    Value ref = inputs[0];
+
+    Optional<Value> result = materializeRef(ref);
+
+    if (!result.hasValue()) {
+      return {};
+    }
+
+    return result.getValue();
+  });
+
   // We need a source materialization for refs because after running
   // `applyFullConversion` there would be references to the original
   // IREE::VM::Ref values in unused basic block arguments. As these are unused

@@ -10,9 +10,6 @@ if(NOT ${IREE_TARGET_BACKEND_DYLIB_LLVM_AOT}
   return()
 endif()
 
-# TODO: Re-enable once bug fixed (https://github.com/google/iree/issues/8380)
-return()
-
 # Set iree-translate binary.
 set(_TRANSLATE_TOOL_EXECUTABLE $<TARGET_FILE:iree_tools_iree-translate>)
 
