@@ -61,6 +61,12 @@ static llvm::cl::opt<bool> clEnableLinalgDetensorize(
     llvm::cl::desc("Enable detensorizing linalg ops to operate on primitives"),
     llvm::cl::init(false));
 
+static llvm::cl::opt<std::string> clConvertLinalgMatmulToMmt4d(
+    "iree-flow-mmt4d-target-options",
+    llvm::cl::desc("Convert linalg.matmul ops to MMT4D ops targetting the "
+                   "given architecture"),
+    llvm::cl::init(""));
+
 namespace mlir {
 namespace iree_compiler {
 namespace IREE {
@@ -119,21 +125,24 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
       .addPass(createConvertConv2D1x1ToMatmulPass)
       .addPredicatedPass(clEnableConvToImg2Col,
                          createConvertConv2DToImg2ColPass)
-      // Pad linalg op
-      .addPredicatedPass(clEnablePaddingLinalgOps,
+      // Input should now be legal.
+      .addPass(createVerifyInputLegalityPass)
+      // Catch matmul ops before we do anything else with them.
+      .addPredicatedPass(clConvertLinalgMatmulToMmt4d != "",
                          []() {
-                           return createPadLinalgOpsToIntegerMultiplePass(
-                               clLinalgOpsPaddingSize);
+                           return createConvertLinalgMatmulToMmt4DPass(
+                               clConvertLinalgMatmulToMmt4d);
                          })
 
-      // Input should now be legal.
-      .addPass(createVerifyInputLegalityPass);
-
+      // Pad linalg op
+      .addPredicatedPass(clEnablePaddingLinalgOps, []() {
+        return createPadLinalgOpsToIntegerMultiplePass(clLinalgOpsPaddingSize);
+      });
   passManager.addPass(mlir::createLinalgNamedOpConversionPass());
   buildGlobalOptimizationPassPipeline(passManager, transformOptions);
 
-  // Perform cleanup after variable simplification as more canonicalizers may be
-  // able to kick in.
+  // Perform cleanup after variable simplification as more canonicalizers may
+  // be able to kick in.
   FunctionLikeNest(passManager)
       // Pad tensors.
       .addPass(createPadTensorToSubTensorInsertPass)
