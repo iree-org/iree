@@ -19,7 +19,7 @@ namespace mlir {
 namespace iree_compiler {
 
 LogicalResult InferCustomKernelsTargetInfoFromParent(
-    FuncOp entryPointFn, CustomKernelsTargetInfo &target_info);
+    FuncOp entryPointFn, CustomKernelsTargetInfo &targetInfo);
 
 }  // namespace iree_compiler
 }  // namespace mlir

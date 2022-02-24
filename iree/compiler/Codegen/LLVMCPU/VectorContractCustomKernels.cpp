@@ -43,24 +43,24 @@ static bool isMatrixTimesMatrixTransposed(vector::ContractionOp contractionOp) {
   if (iteratorTypes.size() != 3) {
     return false;
   }
-  SmallVector<int, 3> parallel_iterators;
-  SmallVector<int, 3> reduction_iterators;
+  SmallVector<int, 3> parallelIterators;
+  SmallVector<int, 3> reductionIterators;
   for (int i = 0; i < 3; i++) {
     if (isParallelIterator(iteratorTypes[i])) {
-      parallel_iterators.push_back(i);
+      parallelIterators.push_back(i);
     } else if (isReductionIterator(iteratorTypes[i])) {
-      reduction_iterators.push_back(i);
+      reductionIterators.push_back(i);
     } else {
       return false;
     }
   }
-  if (parallel_iterators.size() != 2 || reduction_iterators.size() != 1) {
+  if (parallelIterators.size() != 2 || reductionIterators.size() != 1) {
     return false;
   }
   // Give the found iterators some idiomatic names.
-  const int MIter = parallel_iterators[0];
-  const int NIter = parallel_iterators[1];
-  const int KIter = reduction_iterators[0];
+  const int MIter = parallelIterators[0];
+  const int NIter = parallelIterators[1];
+  const int KIter = reductionIterators[0];
   // Check that there are 3 indexing maps.
   auto indexingMaps = contractionOp.indexing_maps();
   if (indexingMaps.size() != 3) {
@@ -1012,7 +1012,7 @@ class VectorContractCustomKernelsPass
  public:
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<vector::VectorDialect, LLVM::LLVMDialect>();
-    if (target_info.has(CustomKernelTargetFeature::Intrinsics)) {
+    if (targetInfo.has(CustomKernelTargetFeature::Intrinsics)) {
       registry.insert<arm_neon::ArmNeonDialect>();
     }
   }
@@ -1020,20 +1020,20 @@ class VectorContractCustomKernelsPass
     if (failed(Pass::initializeOptions(options))) {
       return failure();
     }
-    if (failed(ParseCustomKernelsTargetInfo(arch, features, target_info))) {
+    if (failed(ParseCustomKernelsTargetInfo(arch, features, targetInfo))) {
       llvm::errs() << "Bad options `" << options << "` for pass `"
                    << getArgument() << "`\n";
       return failure();
     }
     if (intrinsics) {
-      target_info.add(CustomKernelTargetFeature::Intrinsics);
+      targetInfo.add(CustomKernelTargetFeature::Intrinsics);
     }
     return success();
   }
   void runOnOperation() override {
     MLIRContext *context = &getContext();
     RewritePatternSet patterns(context);
-    populateVectorContractCustomKernelsPatterns(target_info, patterns);
+    populateVectorContractCustomKernelsPatterns(targetInfo, patterns);
     if (failed(applyPatternsAndFoldGreedily(getOperation(),
                                             std::move(patterns)))) {
       signalPassFailure();
@@ -1041,15 +1041,15 @@ class VectorContractCustomKernelsPass
   }
 
  private:
-  CustomKernelsTargetInfo target_info;
+  CustomKernelsTargetInfo targetInfo;
 };
 
 }  // namespace
 
 void populateVectorContractCustomKernelsPatterns(
-    const CustomKernelsTargetInfo &target_info, RewritePatternSet &patterns) {
+    const CustomKernelsTargetInfo &targetInfo, RewritePatternSet &patterns) {
   MLIRContext *context = patterns.getContext();
-  if (target_info.is(CustomKernelTargetArch::Aarch64)) {
+  if (targetInfo.is(CustomKernelTargetArch::Aarch64)) {
     // TODO: add a "kernel benefit" system whereby if two kernels are available
     // for the same shape and same data types, the fastest one (ie the one
     // using the most powerful available SIMD instructions) is selected.
@@ -1063,8 +1063,8 @@ void populateVectorContractCustomKernelsPatterns(
         context, MMTKernel_8x1x8_i8i8i32_Aarch64_Baseline_InlineAsm());
     patterns.add<MMTCustomKernelPattern>(
         context, MMTKernel_8x8x1_i8i8i32_Aarch64_Baseline_InlineAsm());
-    if (target_info.has(CustomKernelTargetFeature::Aarch64Dotprod)) {
-      if (target_info.has(CustomKernelTargetFeature::Intrinsics)) {
+    if (targetInfo.has(CustomKernelTargetFeature::Aarch64Dotprod)) {
+      if (targetInfo.has(CustomKernelTargetFeature::Intrinsics)) {
         patterns.add<MMT_8x4x8_i8i8i32_Aarch64Dotprod_Intrinsics>(context);
       } else {
         patterns.add<MMTCustomKernelPattern>(

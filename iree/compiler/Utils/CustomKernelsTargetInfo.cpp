@@ -15,13 +15,13 @@ namespace iree_compiler {
 
 LogicalResult ParseCustomKernelTargetFeaturesForAarch64(
     const llvm::SmallVector<llvm::StringRef> &features,
-    CustomKernelsTargetInfo &target_info) {
+    CustomKernelsTargetInfo &targetInfo) {
   for (auto f : features) {
     if (f.empty()) {
       continue;
     }
     if (f == "+dotprod") {
-      target_info.add(CustomKernelTargetFeature::Aarch64Dotprod);
+      targetInfo.add(CustomKernelTargetFeature::Aarch64Dotprod);
     } else {
       llvm::errs() << "Unhandled aarch64 CPU feature: " << f << "\n";
       return failure();
@@ -32,10 +32,10 @@ LogicalResult ParseCustomKernelTargetFeaturesForAarch64(
 
 LogicalResult ParseCustomKernelsTargetInfo(
     llvm::StringRef archStr, llvm::StringRef featuresStr,
-    CustomKernelsTargetInfo &target_info) {
+    CustomKernelsTargetInfo &targetInfo) {
   // Set the out-value to defaults early so that early returns produce
   // consistent results and so that we can write simpler code below.
-  target_info = CustomKernelsTargetInfo();
+  targetInfo = CustomKernelsTargetInfo();
 
   if (archStr.empty()) {
     return success();
@@ -45,8 +45,8 @@ LogicalResult ParseCustomKernelsTargetInfo(
   featuresStr.split(features, ',');
 
   if (archStr == "aarch64") {
-    target_info.init(CustomKernelTargetArch::Aarch64);
-    return ParseCustomKernelTargetFeaturesForAarch64(features, target_info);
+    targetInfo.init(CustomKernelTargetArch::Aarch64);
+    return ParseCustomKernelTargetFeaturesForAarch64(features, targetInfo);
   }
 
   // Currently, on unknown arch, we return success as long as no features

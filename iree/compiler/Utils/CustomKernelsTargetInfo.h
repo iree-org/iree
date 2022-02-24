@@ -79,7 +79,7 @@ class CustomKernelsTargetInfo {
 
 LogicalResult ParseCustomKernelsTargetInfo(
     llvm::StringRef archStr, llvm::StringRef featuresStr,
-    CustomKernelsTargetInfo &target_info);
+    CustomKernelsTargetInfo &targetInfo);
 
 }  // namespace iree_compiler
 }  // namespace mlir
