@@ -61,7 +61,7 @@ static llvm::cl::opt<bool> clEnableLinalgDetensorize(
     llvm::cl::desc("Enable detensorizing linalg ops to operate on primitives"),
     llvm::cl::init(false));
 
-static llvm::cl::opt<std::string> clConvertLinalgMatmulToMmt4d(
+static llvm::cl::opt<std::string> clMmt4dTargetOptions(
     "iree-flow-mmt4d-target-options",
     llvm::cl::desc("Convert linalg.matmul ops to MMT4D ops targetting the "
                    "given architecture"),
@@ -126,18 +126,20 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
       .addPredicatedPass(clEnableConvToImg2Col,
                          createConvertConv2DToImg2ColPass)
       // Input should now be legal.
-      .addPass(createVerifyInputLegalityPass)
-      // Catch matmul ops before we do anything else with them.
-      .addPredicatedPass(clConvertLinalgMatmulToMmt4d != "",
-                         []() {
-                           return createConvertLinalgMatmulToMmt4DPass(
-                               clConvertLinalgMatmulToMmt4d);
-                         })
+      .addPass(createVerifyInputLegalityPass);
 
-      // Pad linalg op
-      .addPredicatedPass(clEnablePaddingLinalgOps, []() {
-        return createPadLinalgOpsToIntegerMultiplePass(clLinalgOpsPaddingSize);
-      });
+  // FunctionLikeNest isn't working here, for some reason.
+  // Catch matmul ops before we do anything else with them.
+  if (clMmt4dTargetOptions != "") {
+    passManager.addNestedPass<FuncOp>(
+        createConvertLinalgMatmulToMmt4DPass(clMmt4dTargetOptions));
+  }
+
+  // Pad linalg op
+  if (clEnablePaddingLinalgOps) {
+    passManager.addNestedPass<FuncOp>(
+        createPadLinalgOpsToIntegerMultiplePass(clLinalgOpsPaddingSize));
+  }
   passManager.addPass(mlir::createLinalgNamedOpConversionPass());
   buildGlobalOptimizationPassPipeline(passManager, transformOptions);
 
