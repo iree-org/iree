@@ -461,17 +461,16 @@ class ConvertLinalgMatmulToMmt4DPass final
 };
 }  // namespace
 
-std::unique_ptr<OperationPass<FuncOp>> createConvertLinalgMatmulToMmt4DPass() {
+std::unique_ptr<Pass> createConvertLinalgMatmulToMmt4DPass() {
   return std::make_unique<ConvertLinalgMatmulToMmt4DPass>();
 }
 
-std::unique_ptr<OperationPass<FuncOp>> createConvertLinalgMatmulToMmt4DPass(
+std::unique_ptr<Pass> createConvertLinalgMatmulToMmt4DPass(
     CustomKernelsTargetInfo targetInfo) {
   return std::make_unique<ConvertLinalgMatmulToMmt4DPass>(targetInfo);
 }
 
-std::unique_ptr<OperationPass<FuncOp>> createConvertLinalgMatmulToMmt4DPass(
-    StringRef options) {
+std::unique_ptr<Pass> createConvertLinalgMatmulToMmt4DPass(StringRef options) {
   auto pass = std::make_unique<ConvertLinalgMatmulToMmt4DPass>();
   // Unfortunately, we have to throw away the parse error here. These methods
   // can't return a LogicalResult. Even if we could extract the parsing out of

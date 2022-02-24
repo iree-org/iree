@@ -126,20 +126,18 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
       .addPredicatedPass(clEnableConvToImg2Col,
                          createConvertConv2DToImg2ColPass)
       // Input should now be legal.
-      .addPass(createVerifyInputLegalityPass);
+      .addPass(createVerifyInputLegalityPass)
+      // Catch matmul ops before we do anything else with them.
+      .addPredicatedPass(
+          !clMmt4dTargetOptions.empty(),
+          []() {
+            return createConvertLinalgMatmulToMmt4DPass(clMmt4dTargetOptions);
+          })
+      // Pad linalg ops
+      .addPredicatedPass(clEnablePaddingLinalgOps, []() {
+        return createPadLinalgOpsToIntegerMultiplePass(clLinalgOpsPaddingSize);
+      });
 
-  // FunctionLikeNest isn't working here, for some reason.
-  // Catch matmul ops before we do anything else with them.
-  if (clMmt4dTargetOptions != "") {
-    passManager.addNestedPass<FuncOp>(
-        createConvertLinalgMatmulToMmt4DPass(clMmt4dTargetOptions));
-  }
-
-  // Pad linalg op
-  if (clEnablePaddingLinalgOps) {
-    passManager.addNestedPass<FuncOp>(
-        createPadLinalgOpsToIntegerMultiplePass(clLinalgOpsPaddingSize));
-  }
   passManager.addPass(mlir::createLinalgNamedOpConversionPass());
   buildGlobalOptimizationPassPipeline(passManager, transformOptions);
 
