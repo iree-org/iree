@@ -21,4 +21,11 @@ def IREEImportPublic :
   let constructor = "mlir::iree_compiler::createIREEImportPublicPass()";
 }
 
+def LinalgQuantizedMatmulToMatmulPass
+    : Pass<"iree-linalg-quantized-matmul-to-matmul", "FuncOp"> {
+  let summary = "lower quantized_matmul to matmul";
+  let constructor = "mlir::iree_compiler::createLinalgQuantizedMatmulToMatmulPass()";
+  // let dependentDialects = ["mlir::linalg::LinalgDialect"];
+}
+
 #endif // IREE_COMPILER_INPUTCONVERSION_COMMON_PASSES

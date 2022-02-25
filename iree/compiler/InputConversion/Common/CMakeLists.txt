@@ -41,6 +41,7 @@ iree_cc_library(
   SRCS
     "IREEImportPublic.cpp"
     "Passes.cpp"
+    "QuantizedMatmulToMatmul.cpp"
     "TopLevelSCFToCFG.cpp"
   DEPS
     ::PassHeaders

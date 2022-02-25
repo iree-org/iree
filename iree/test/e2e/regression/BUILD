@@ -69,10 +69,22 @@ iree_lit_test_suite(
 iree_check_single_backend_test_suite(
     name = "check_regression_dylib-llvm-aot",
     srcs = [
-        "linalg_quantized_matmul_vs_linalg_matmul.mlir",
         "lowering_config.mlir",
     ] + BACKEND_TESTS,
     compiler_flags = ["-iree-input-type=mhlo"],
+    driver = "dylib",
+    target_backend = "dylib-llvm-aot",
+)
+
+iree_check_single_backend_test_suite(
+    name = "check_regression_tosa_dylib-llvm-aot",
+    srcs = [
+        # -iree-input-type=tosa is interesting for this test because
+        # it includes the -iree-linalg-quantized-matmul-to-matmul pass,
+        # so this tests provides e2e coverage for that pass.
+        "linalg_quantized_matmul_vs_linalg_matmul.mlir",
+    ],
+    compiler_flags = ["-iree-input-type=tosa"],
     driver = "dylib",
     target_backend = "dylib-llvm-aot",
 )
