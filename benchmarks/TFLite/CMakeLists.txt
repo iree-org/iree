@@ -381,7 +381,6 @@ iree_benchmark_suite(
     "CPU-ARM64-v8A"
   TRANSLATION_FLAGS
     ${ANDROID_CPU_TRANSLATION_FLAGS}
-    "--iree-llvm-loop-unrolling=true"
   BENCHMARK_TOOL
     iree-benchmark-module
   DRIVER
@@ -410,7 +409,6 @@ iree_benchmark_suite(
     "CPU-ARM64-v8A"
   TRANSLATION_FLAGS
     ${ANDROID_CPU_TRANSLATION_FLAGS}
-    "--iree-llvm-loop-unrolling=true"
   BENCHMARK_TOOL
     iree-benchmark-module
   DRIVER
@@ -439,7 +437,6 @@ iree_benchmark_suite(
 #     "CPU-ARM64-v8A"
 #   TRANSLATION_FLAGS
 #     ${ANDROID_CPU_TRANSLATION_FLAGS}
-#     "--iree-llvm-loop-unrolling=true"
 #   BENCHMARK_TOOL
 #     iree-benchmark-module
 #   DRIVER
@@ -466,7 +463,6 @@ iree_benchmark_suite(
 #     "CPU-ARM64-v8A"
 #   TRANSLATION_FLAGS
 #     ${ANDROID_CPU_TRANSLATION_FLAGS}
-#     "--iree-llvm-loop-unrolling=true"
 #   BENCHMARK_TOOL
 #     iree-benchmark-module
 #   DRIVER
@@ -493,7 +489,6 @@ iree_benchmark_suite(
     "CPU-ARM64-v8A"
   TRANSLATION_FLAGS
     ${ANDROID_CPU_TRANSLATION_FLAGS}
-    "--iree-llvm-loop-unrolling=true"
   BENCHMARK_TOOL
     iree-benchmark-module
   DRIVER
