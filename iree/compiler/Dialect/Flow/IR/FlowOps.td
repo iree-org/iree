@@ -674,6 +674,41 @@ def FLOW_TensorConstantOp : FLOW_Op<"tensor.constant"> {
   let hasCanonicalizer = 1;
 }
 
+def FLOW_TensorTieShapeOp : FLOW_PureOp<"tensor.tie_shape", [
+  AllTypesMatch<["operand", "result"]>,
+  DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>,
+  Util_ShapeAwareOp,
+]> {
+  let summary = [{ties a runtime shape to a tensor value}];
+  let description = [{
+    Metadata op used to tie tensors with their runtime-computed dynamic
+    dimensions. This only exists transiently in the IR as a witness to shape
+    calculations and is removed during lowering. 
+  }];
+
+  let arguments = (ins
+    FLOW_Tensor:$operand,
+    FLOW_ShapeDynamicDims:$dynamic_dims
+  );
+  let results = (outs
+    FLOW_Tensor:$result
+  );
+
+  let assemblyFormat = [{
+    $operand attr-dict
+    `:` type($result) (`{` $dynamic_dims^ `}`)?
+  }];
+
+  let extraClassDeclaration = [{
+    ValueRange getOperandDynamicDims(unsigned idx) { return dynamic_dims(); }
+    ValueRange getResultDynamicDims(unsigned idx) { return dynamic_dims(); }
+  }];
+
+  let verifier = [{ return verifyTensorTieShapeOp(*this); }];
+
+  let hasFolder = 1;
+}
+
 def FLOW_TensorReshapeOp : FLOW_PureOp<"tensor.reshape", [
   FLOW_StreamableOp,
   AllElementTypesMatch<["source", "result"]>,

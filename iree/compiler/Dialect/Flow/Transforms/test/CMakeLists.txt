@@ -16,6 +16,7 @@ iree_lit_test_suite(
   SRCS
     "capture_dispatch_dynamic_dims.mlir"
     "cleanup_numeric_narrowing.mlir"
+    "cleanup_tensor_shapes.mlir"
     "conv1x1_to_matmul.mlir"
     "conv2d_to_img2col.mlir"
     "convert_linalg_tensor_ops_after.mlir"
@@ -23,6 +24,7 @@ iree_lit_test_suite(
     "deduplicate_executables.mlir"
     "dispatch_linalg_on_tensors.mlir"
     "dispatch_linalg_on_tensors_fusion.mlir"
+    "expand_tensor_shapes.mlir"
     "export_benchmark_funcs.mlir"
     "infer_numeric_narrowing.mlir"
     "inject_dispatch_tracing.mlir"
