@@ -64,13 +64,6 @@ static llvm::cl::opt<int> defaultWorkgroupTileSize(
 
 using IREE::Codegen::DispatchLoweringPassPipeline;
 
-static bool isVMVX(FuncOp entryPointFn) {
-  auto variantOp =
-      entryPointFn->getParentOfType<IREE::HAL::ExecutableVariantOp>();
-  IREE::HAL::ExecutableTargetAttr targetAttr = variantOp.target();
-  return targetAttr && targetAttr.getBackend().getValue() == "vmvx";
-}
-
 /// Looks for the `native_vector_size` attribute in the hal.executable.variant
 /// op.
 static Optional<int64_t> getNativeVectorSizeInBytes(FuncOp entryPointFn) {
