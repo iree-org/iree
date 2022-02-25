@@ -61,6 +61,12 @@ void registerFlowTransformPassPipeline();
 // Input canonicalization and legalization
 //===----------------------------------------------------------------------===//
 
+// Expands tensor shape dimensions into SSA values across the program.
+std::unique_ptr<OperationPass<mlir::ModuleOp>> createExpandTensorShapesPass();
+
+// Cleans up any remaining shape metadata ops after lowering.
+std::unique_ptr<Pass> createCleanupTensorShapesPass();
+
 // Cleans up any numeric narrowing ops inserted by
 // iree-flow-infer-numeric-narrowing.
 std::unique_ptr<Pass> createCleanupNumericNarrowingPass();

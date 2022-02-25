@@ -15,8 +15,8 @@
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/Bufferization/Transforms/OneShotAnalysis.h"
 #include "mlir/Dialect/Linalg/ComprehensiveBufferize/AffineInterfaceImpl.h"
-#include "mlir/Dialect/Linalg/ComprehensiveBufferize/LinalgInterfaceImpl.h"
 #include "mlir/Dialect/Linalg/ComprehensiveBufferize/ModuleBufferization.h"
+#include "mlir/Dialect/Linalg/Transforms/BufferizableOpInterfaceImpl.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/BufferizableOpInterfaceImpl.h"
 #include "mlir/Dialect/Tensor/Transforms/BufferizableOpInterfaceImpl.h"
@@ -32,7 +32,7 @@ using mlir::bufferization::createMemCpy;
 using mlir::bufferization::DialectBufferizationState;
 using mlir::bufferization::PostAnalysisStepFn;
 using mlir::bufferization::replaceOpWithNewBufferizedOp;
-using mlir::linalg::comprehensive_bufferize::linalg_ext::eliminateInitTensors;
+using mlir::linalg::eliminateInitTensors;
 
 namespace mlir {
 namespace iree_compiler {
@@ -272,8 +272,7 @@ void registerBufferizationInterfaces(DialectRegistry &registry) {
   linalg::comprehensive_bufferize::affine_ext::
       registerBufferizableOpInterfaceExternalModels(registry);
   arith::registerBufferizableOpInterfaceExternalModels(registry);
-  linalg::comprehensive_bufferize::linalg_ext::
-      registerBufferizableOpInterfaceExternalModels(registry);
+  linalg::registerBufferizableOpInterfaceExternalModels(registry);
   scf::registerBufferizableOpInterfaceExternalModels(registry);
   linalg::comprehensive_bufferize::std_ext::
       registerModuleBufferizationExternalModels(registry);

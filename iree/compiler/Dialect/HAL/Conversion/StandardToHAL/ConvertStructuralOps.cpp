@@ -84,6 +84,18 @@ class CallOpConversion : public OpConversionPattern<mlir::CallOp> {
   }
 };
 
+class ReturnOpConversion : public OpConversionPattern<mlir::ReturnOp> {
+ public:
+  using OpConversionPattern::OpConversionPattern;
+
+  LogicalResult matchAndRewrite(
+      mlir::ReturnOp returnOp, OpAdaptor adaptor,
+      ConversionPatternRewriter &rewriter) const override {
+    rewriter.replaceOpWithNewOp<mlir::ReturnOp>(returnOp, adaptor.operands());
+    return success();
+  }
+};
+
 class BranchOpConversion : public OpConversionPattern<mlir::cf::BranchOp> {
  public:
   using OpConversionPattern::OpConversionPattern;
@@ -109,18 +121,6 @@ class CondBranchOpConversion
         op, adaptor.getCondition(), op.getTrueDest(),
         adaptor.getTrueDestOperands(), op.getFalseDest(),
         adaptor.getFalseDestOperands());
-    return success();
-  }
-};
-
-class ReturnOpConversion : public OpConversionPattern<mlir::ReturnOp> {
- public:
-  using OpConversionPattern::OpConversionPattern;
-
-  LogicalResult matchAndRewrite(
-      mlir::ReturnOp returnOp, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
-    rewriter.replaceOpWithNewOp<mlir::ReturnOp>(returnOp, adaptor.operands());
     return success();
   }
 };
@@ -190,8 +190,8 @@ void populateStandardStructuralToHALPatterns(MLIRContext *context,
   });
 
   patterns
-      .insert<FuncOpSignatureConversion, CallOpConversion, BranchOpConversion,
-              CondBranchOpConversion, ReturnOpConversion, SelectOpConversion>(
+      .insert<FuncOpSignatureConversion, CallOpConversion, ReturnOpConversion,
+              BranchOpConversion, CondBranchOpConversion, SelectOpConversion>(
           typeConverter, context);
 
   // TODO(benvanik): move to general utils conversion.

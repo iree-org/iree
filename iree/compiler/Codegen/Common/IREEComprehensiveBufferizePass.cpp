@@ -96,15 +96,14 @@ static bool isaTensor(Type t) { return t.isa<TensorType>(); };
 /// Run comprehensive bufferize.
 void IREEComprehensiveBufferizePass::runOnOperation() {
   ModuleOp moduleOp = getOperation();
-  auto options = std::make_unique<AnalysisBufferizationOptions>();
-  options->allocationFn = allocationFn;
-  options->deallocationFn = deallocationFn;
-  options->memCpyFn = memCpyFn;
-  options->testAnalysisOnly = false;
-  addPostAnalysisTransformations(*options);
+  AnalysisBufferizationOptions options;
+  options.allocationFn = allocationFn;
+  options.deallocationFn = deallocationFn;
+  options.memCpyFn = memCpyFn;
+  options.testAnalysisOnly = false;
+  addPostAnalysisTransformations(options);
 
-  if (failed(
-          bufferization::runOneShotBufferize(moduleOp, std::move(options)))) {
+  if (failed(bufferization::runOneShotBufferize(moduleOp, options))) {
     return signalPassFailure();
   }
 }

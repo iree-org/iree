@@ -122,62 +122,67 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
                                     const TransformOptions &transformOptions) {
   // Special case peephole optimizations.
   FunctionLikeNest(passManager)
-      .addPass(createConvertConv2D1x1ToMatmulPass)
+      .addPass(IREE::Flow::createConvertConv2D1x1ToMatmulPass)
       .addPredicatedPass(clEnableConvToImg2Col,
-                         createConvertConv2DToImg2ColPass)
+                         IREE::Flow::createConvertConv2DToImg2ColPass)
       // Input should now be legal.
-      .addPass(createVerifyInputLegalityPass)
+      .addPass(IREE::Flow::createVerifyInputLegalityPass)
       // Catch matmul ops before we do anything else with them.
       .addPredicatedPass(
           !clMmt4dTargetOptions.empty(),
           []() {
-            return createConvertLinalgMatmulToMmt4DPass(clMmt4dTargetOptions);
+            return IREE::Flow::createConvertLinalgMatmulToMmt4DPass(
+                clMmt4dTargetOptions);
           })
       // Pad linalg ops
       .addPredicatedPass(clEnablePaddingLinalgOps, []() {
-        return createPadLinalgOpsToIntegerMultiplePass(clLinalgOpsPaddingSize);
+        return IREE::Flow::createPadLinalgOpsToIntegerMultiplePass(
+            clLinalgOpsPaddingSize);
       });
 
   passManager.addPass(mlir::createLinalgNamedOpConversionPass());
+
+  // Expand tensor shapes into SSA values and optimize the whole program.
+  // The more we are able to equate shape dimensions at this level the better
+  // our fusions will be.
+  passManager.addPass(IREE::Flow::createExpandTensorShapesPass());
   buildGlobalOptimizationPassPipeline(passManager, transformOptions);
 
-  // Perform cleanup after variable simplification as more canonicalizers may
-  // be able to kick in.
   FunctionLikeNest(passManager)
       // Pad tensors.
-      .addPass(createPadTensorToSubTensorInsertPass)
+      .addPass(IREE::Flow::createPadTensorToSubTensorInsertPass)
 
       // Elementwise, fusion, tiling and distribution.
       .addPass(mlir::createConvertElementwiseToLinalgPass)
       .addPass(mlir::createLinalgFoldUnitExtentDimsPass)
-      .addPass(createInterchangeGenericOpsPass)
+      .addPass(IREE::Flow::createInterchangeGenericOpsPass)
       .addPass(mlir::createCanonicalizerPass)
       .addPass(memref::createResolveShapedTypeResultDimsPass)
 
       // Fusion.
-      .addPass(createFusionOfTensorOpsPass)
+      .addPass(IREE::Flow::createFusionOfTensorOpsPass)
       .addPass(mlir::createCSEPass)
       .addPredicatedPass(clEnableLinalgDetensorize,
                          mlir::createLinalgDetensorizePass)
+
       // Dispatch region formation.
-      .addPass(createConvertToFlowBeforeDispatchFormation)
+      .addPass(IREE::Flow::createConvertToFlowBeforeDispatchFormation)
       .addPass(mlir::createCanonicalizerPass)
-      .addPass(createDispatchLinalgOnTensorsPass)
+      .addPass(IREE::Flow::createDispatchLinalgOnTensorsPass)
       .addPass(memref::createResolveShapedTypeResultDimsPass)
-      .addPass(createCaptureDispatchDynamicDimsPass)
-      .addPass(createConvertToFlowAfterDispatchFormation)
+      .addPass(IREE::Flow::createCaptureDispatchDynamicDimsPass)
+      .addPass(IREE::Flow::createConvertToFlowAfterDispatchFormation)
       .addPass(mlir::createCanonicalizerPass)
       .addPass(memref::createResolveShapedTypeResultDimsPass)
 
-      // Cleanup again?
-      .addPass(createConvertToFlowAfterDispatchFormation)
       // NOTE: required because the current dispatch-linalg-on-tensors pass
       // creates a lot of dead IR that needs to be cleaned up.
+      .addPass(IREE::Flow::createConvertToFlowAfterDispatchFormation)
       .addPass(mlir::createCanonicalizerPass);
 
   // Module pass to outline the dispatch regions into their own functions
   // wrapped in executables.
-  passManager.addPass(createOutlineDispatchRegionsPass());
+  passManager.addPass(IREE::Flow::createOutlineDispatchRegionsPass());
 
   // Strip assertions from executables. We could support them with a bunch of
   // work but our generated executables are designed to be safe in the face of
@@ -192,7 +197,7 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
   // Note: this only deduplicates equivalent executables. We could in addition
   // generalize executables to prune further (e.g. by promoting a dimension to
   // an argument if two executables differ only in that one dimension).
-  passManager.addPass(createDeduplicateExecutablesPass());
+  passManager.addPass(IREE::Flow::createDeduplicateExecutablesPass());
 
   // Create one function per remaining flow.executable that can be used with
   // iree-benchmark-module to benchmark each dispatch individually, as well as
@@ -208,6 +213,7 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
       .addPredicatedPass(clTraceDispatchTensors,
                          IREE::Flow::createInjectDispatchTracingPass)
       // Cleanup the IR after we are done.
+      .addPass(IREE::Flow::createCleanupTensorShapesPass)
       .addPass(mlir::createCanonicalizerPass)
       .addPass(mlir::createCSEPass);
 

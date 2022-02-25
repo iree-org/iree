@@ -29,12 +29,14 @@ iree_cc_library(
   SRCS
     "CaptureDispatchDynamicDims.cpp"
     "CleanupNumericNarrowing.cpp"
+    "CleanupTensorShapes.cpp"
     "ConvertConv2D1x1ToMatmulPass.cpp"
     "ConvertConv2DToImg2ColPass.cpp"
     "ConvertLinalgMatmulToMmt4D.cpp"
     "ConvertToFlow.cpp"
     "DeduplicateExecutables.cpp"
     "DispatchLinalgOnTensors.cpp"
+    "ExpandTensorShapes.cpp"
     "ExportBenchmarkFuncs.cpp"
     "FusionOfTensorOps.cpp"
     "InferNumericNarrowing.cpp"
@@ -58,6 +60,7 @@ iree_cc_library(
     LLVMSupport
     MLIRAffine
     MLIRArithmetic
+    MLIRControlFlow
     MLIRIR
     MLIRLinalg
     MLIRLinalgTransforms
