@@ -13,6 +13,7 @@
 #include "mlir/Dialect/Linalg/Passes.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
+#include "mlir/Dialect/MemRef/Transforms/Passes.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/AffineExpr.h"
 #include "mlir/IR/AffineMap.h"
@@ -134,8 +135,7 @@ struct QuantizedMatmulToMatmul
     AffineMap mapToNone = AffineMap::get(2, 0, context);
     AffineMap mapToRowDim = AffineMap::get(2, 0, m, context);
     AffineMap mapToColumnDim = AffineMap::get(2, 0, n, context);
-    AffineMap mapIdentity =
-        AffineMap::get(2, 0, ArrayRef<AffineExpr>{m, n}, context);
+    AffineMap mapIdentity = AffineMap::get(2, 0, {m, n}, context);
     SmallVector<AffineMap> indexingMaps;
     SmallVector<Value> ins;
     auto addInput = [&](Value val, AffineMap map) -> int {
@@ -221,6 +221,7 @@ struct LinalgQuantizedMatmulToMatmulPass
     MLIRContext *context = op->getContext();
     RewritePatternSet patterns(context);
     patterns.add<QuantizedMatmulToMatmul>(context);
+    memref::populateResolveRankedShapeTypeResultDimsPatterns(patterns);
     (void)applyPatternsAndFoldGreedily(op, std::move(patterns));
   }
 };
