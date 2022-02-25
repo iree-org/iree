@@ -303,7 +303,9 @@ static void expandGlobalLoadOp(IREE::Util::GlobalLoadOp op,
   builder.setInsertionPointAfter(op);
   auto resultSize = IREE::Util::SizeAwareTypeInterface::queryValueSize(
       op.getLoc(), op.result(), builder);
-  if (!resultSize) {
+  if (resultSize) {
+    replacementExceptions.insert(resultSize.getDefiningOp());
+  } else {
     auto sizeOp =
         builder.create<IREE::Stream::ResourceSizeOp>(op.getLoc(), op.result());
     replacementExceptions.insert(sizeOp);
