@@ -73,7 +73,7 @@ class WindowsLinkerTool : public LinkerTool {
       func->setCallingConv(llvm::CallingConv::X86_StdCall);
       func->setDLLStorageClass(
           llvm::GlobalValue::DLLStorageClassTypes::DLLExportStorageClass);
-      func->addFnAttr(llvm::Attribute::UWTable);
+      func->setUWTableKind(llvm::UWTableKind::Default);
     }
 
     return success();
