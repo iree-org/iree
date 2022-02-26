@@ -96,6 +96,7 @@ iree_cc_library(
     "cpu_features.c"
   DEPS
     iree::base
+    iree::base::target_platform
   PUBLIC
 )
 
