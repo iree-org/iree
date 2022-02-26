@@ -28,8 +28,8 @@ func @quantized_matmul_lhs_zp_0_dynamic(%lhs : tensor<?x?xi8>, %rhs : tensor<?x?
 // CHECK-SAME:    %[[ACC:.+]]: tensor<?x?xi32>
 // CHECK:       %[[C0_I32:.+]] = arith.constant 0 : i32
 // CHECK:       %[[MATMUL:.+]] = linalg.matmul ins(%[[LHS]], %[[RHS]] : tensor<?x?xi8>, tensor<?x?xi8>) outs(%[[ACC]] : tensor<?x?xi32>)
-// CHECK:       %[[INIT_RESULT:.+]] = linalg.init_tensor
-// CHECK:       %[[INIT_LHS_SUMS_ACC:.+]] = linalg.init_tensor
+// CHECK-DAG:   %[[INIT_RESULT:.+]] = linalg.init_tensor
+// CHECK-DAG:   %[[INIT_LHS_SUMS_ACC:.+]] = linalg.init_tensor
 // CHECK:       %[[ZERO_LHS_SUMS_ACC:.+]] = linalg.fill(%[[C0_I32]], %[[INIT_LHS_SUMS_ACC]])
 // CHECK:       %[[LHS_SUMS:.+]] = linalg.generic
 // CHECK-SAME:    "parallel", "reduction"
@@ -38,6 +38,7 @@ func @quantized_matmul_lhs_zp_0_dynamic(%lhs : tensor<?x?xi8>, %rhs : tensor<?x?
 // CHECK:       %[[RESULT:.+]] = linalg.generic
 // CHECK-SAME:    "parallel", "parallel"
 // CHECK-SAME:    ins(%[[MATMUL]], %[[LHS_SUMS]], %[[RHS_ZP]] : tensor<?x?xi32>, tensor<?xi32>, i32)
+// CHECK-SAME:    outs(%[[INIT_RESULT]] : tensor<?x?xi32>)
 // CHECK:       return %[[RESULT]]
 // -----
 
@@ -52,8 +53,8 @@ func @quantized_matmul_rhs_zp_0_dynamic(%lhs : tensor<?x?xi8>, %rhs : tensor<?x?
 // CHECK-SAME:    %[[ACC:.+]]: tensor<?x?xi32>
 // CHECK:       %[[C0_I32:.+]] = arith.constant 0 : i32
 // CHECK:       %[[MATMUL:.+]] = linalg.matmul ins(%[[LHS]], %[[RHS]] : tensor<?x?xi8>, tensor<?x?xi8>) outs(%[[ACC]] : tensor<?x?xi32>)
-// CHECK:       %[[INIT_RESULT:.+]] = linalg.init_tensor
-// CHECK:       %[[INIT_RHS_SUMS_ACC:.+]] = linalg.init_tensor
+// CHECK-DAG:   %[[INIT_RESULT:.+]] = linalg.init_tensor
+// CHECK-DAG:   %[[INIT_RHS_SUMS_ACC:.+]] = linalg.init_tensor
 // CHECK:       %[[ZERO_RHS_SUMS_ACC:.+]] = linalg.fill(%[[C0_I32]], %[[INIT_RHS_SUMS_ACC]])
 // CHECK:       %[[RHS_SUMS:.+]] = linalg.generic
 // CHECK-SAME:    "reduction", "parallel"
@@ -62,6 +63,7 @@ func @quantized_matmul_rhs_zp_0_dynamic(%lhs : tensor<?x?xi8>, %rhs : tensor<?x?
 // CHECK:       %[[RESULT:.+]] = linalg.generic
 // CHECK-SAME:    "parallel", "parallel"
 // CHECK-SAME:    ins(%[[MATMUL]], %[[RHS_SUMS]], %[[LHS_ZP]] : tensor<?x?xi32>, tensor<?xi32>, i32)
+// CHECK-SAME:    outs(%[[INIT_RESULT]] : tensor<?x?xi32>)
 // CHECK:       return %[[RESULT]]
 // -----
 
@@ -76,8 +78,8 @@ func @quantized_matmul_neither_zp_0_dynamic(%lhs : tensor<?x?xi8>, %rhs : tensor
 // CHECK-DAG:   %[[C1_INDEX:.+]] = arith.constant 1 : index
 // CHECK-DAG:   %[[C0_I32:.+]] = arith.constant 0 : i32
 // CHECK:       %[[MATMUL:.+]] = linalg.matmul ins(%[[LHS]], %[[RHS]] : tensor<?x?xi8>, tensor<?x?xi8>) outs(%[[ACC]] : tensor<?x?xi32>)
-// CHECK:       %[[INIT_RESULT:.+]] = linalg.init_tensor
-// CHECK:       %[[INIT_LHS_SUMS_ACC:.+]] = linalg.init_tensor
+// CHECK-DAG:   %[[INIT_RESULT:.+]] = linalg.init_tensor
+// CHECK-DAG:   %[[INIT_LHS_SUMS_ACC:.+]] = linalg.init_tensor
 // CHECK:       %[[ZERO_LHS_SUMS_ACC:.+]] = linalg.fill(%[[C0_I32]], %[[INIT_LHS_SUMS_ACC]])
 // CHECK:       %[[LHS_SUMS:.+]] = linalg.generic
 // CHECK-SAME:    "parallel", "reduction"
@@ -96,6 +98,7 @@ func @quantized_matmul_neither_zp_0_dynamic(%lhs : tensor<?x?xi8>, %rhs : tensor
 // CHECK:       %[[RESULT:.+]] = linalg.generic
 // CHECK-SAME:    "parallel", "parallel"
 // CHECK-SAME:    ins(%[[MATMUL]], %[[LHS_SUMS]], %[[RHS_ZP]], %[[RHS_SUMS]], %[[LHS_ZP]], %[[PRODUCT_TERM]] : tensor<?x?xi32>, tensor<?xi32>, i32, tensor<?xi32>, i32, i32)
+// CHECK-SAME:    outs(%[[INIT_RESULT]] : tensor<?x?xi32>)
 // CHECK:       return %[[RESULT]]
 // -----
 
@@ -110,8 +113,8 @@ func @quantized_matmul_neither_zp_0_3x4x5(%lhs : tensor<3x4xi8>, %rhs : tensor<4
 // CHECK-DAG:   %[[C0_I32:.+]] = arith.constant 0 : i32
 // CHECK-DAG:   %[[C4_I32:.+]] = arith.constant 4 : i32
 // CHECK:       %[[MATMUL:.+]] = linalg.matmul ins(%[[LHS]], %[[RHS]] : tensor<3x4xi8>, tensor<4x5xi8>) outs(%[[ACC]] : tensor<3x5xi32>)
-// CHECK:       %[[INIT_RESULT:.+]] = linalg.init_tensor
-// CHECK:       %[[INIT_LHS_SUMS_ACC:.+]] = linalg.init_tensor
+// CHECK-DAG:   %[[INIT_RESULT:.+]] = linalg.init_tensor
+// CHECK-DAG:   %[[INIT_LHS_SUMS_ACC:.+]] = linalg.init_tensor
 // CHECK:       %[[ZERO_LHS_SUMS_ACC:.+]] = linalg.fill(%[[C0_I32]], %[[INIT_LHS_SUMS_ACC]])
 // CHECK:       %[[LHS_SUMS:.+]] = linalg.generic
 // CHECK-SAME:    "parallel", "reduction"
@@ -128,5 +131,6 @@ func @quantized_matmul_neither_zp_0_3x4x5(%lhs : tensor<3x4xi8>, %rhs : tensor<4
 // CHECK:       %[[RESULT:.+]] = linalg.generic
 // CHECK-SAME:    "parallel", "parallel"
 // CHECK-SAME:    ins(%[[MATMUL]], %[[LHS_SUMS]], %[[RHS_ZP]], %[[RHS_SUMS]], %[[LHS_ZP]], %[[PRODUCT_TERM]] : tensor<3x5xi32>, tensor<3xi32>, i32, tensor<5xi32>, i32, i32)
+// CHECK-SAME:    outs(%[[INIT_RESULT]] : tensor<3x5xi32>)
 // CHECK:       return %[[RESULT]]
 // -----

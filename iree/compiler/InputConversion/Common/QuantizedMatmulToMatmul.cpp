@@ -6,11 +6,8 @@
 
 #include "iree/compiler/InputConversion/Common/PassDetail.h"
 #include "iree/compiler/InputConversion/Common/Passes.h"
-#include "llvm/Support/CommandLine.h"
-#include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
-#include "mlir/Dialect/Linalg/Passes.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
@@ -222,7 +219,9 @@ struct LinalgQuantizedMatmulToMatmulPass
     RewritePatternSet patterns(context);
     patterns.add<QuantizedMatmulToMatmul>(context);
     memref::populateResolveRankedShapeTypeResultDimsPatterns(patterns);
-    (void)applyPatternsAndFoldGreedily(op, std::move(patterns));
+    if (failed(applyPatternsAndFoldGreedily(op, std::move(patterns)))) {
+      signalPassFailure();
+    }
   }
 };
 

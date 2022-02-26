@@ -47,6 +47,7 @@ iree_cc_library(
     ::PassHeaders
     ::PassesIncGen
     IREEInputDialect
+    MLIRArithmetic
     MLIRIR
     MLIRLinalg
     MLIRPass
