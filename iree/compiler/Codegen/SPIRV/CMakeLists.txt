@@ -25,6 +25,7 @@ iree_cc_library(
     "NVIDIAConfig.cpp"
     "Passes.cpp"
     "SPIRVDistribute.cpp"
+    "SPIRVExpandIfRegion.cpp"
     "SPIRVInitConfigPass.cpp"
     "SPIRVLowerExecutableTargetPass.cpp"
     "SPIRVTile.cpp"
@@ -40,6 +41,7 @@ iree_cc_library(
     IREELinalgExtPasses
     LLVMSupport
     MLIRAffine
+    MLIRAffineAnalysis
     MLIRAffineToStandard
     MLIRAffineUtils
     MLIRAnalysis
@@ -66,6 +68,7 @@ iree_cc_library(
     MLIRSCFToGPU
     MLIRSCFToSPIRV
     MLIRSCFTransforms
+    MLIRSCFUtils
     MLIRSPIRV
     MLIRSPIRVConversion
     MLIRSPIRVTransforms
