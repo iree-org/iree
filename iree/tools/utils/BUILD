@@ -96,6 +96,6 @@ cc_library(
     hdrs = ["cpu_features.h"],
     deps = [
         "//iree/base",
-        "//iree/base:target_platform"
+        "//iree/base:target_platform",
     ],
 )
