@@ -133,13 +133,13 @@ struct iree_cpu_features_t {
 #endif  // defined(IREE_ARCH_ARM_64)
 
 iree_status_t iree_cpu_features_allocate(iree_allocator_t allocator,
-                                       iree_cpu_features_t** cpu_features) {
+                                         iree_cpu_features_t** cpu_features) {
   return iree_allocator_malloc(allocator, sizeof(iree_cpu_features_t),
                                (void**)cpu_features);
 }
 
 void iree_cpu_features_free(iree_allocator_t allocator,
-                               iree_cpu_features_t* cpu_features) {
+                            iree_cpu_features_t* cpu_features) {
   iree_allocator_free(allocator, cpu_features);
 }
 

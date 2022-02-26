@@ -27,11 +27,12 @@ typedef struct iree_cpu_features_t iree_cpu_features_t;
 // On success, *features is a new iree_cpu_features_t.
 // Must be destroyed by iree_cpu_features_free.
 iree_status_t iree_cpu_features_allocate(iree_allocator_t allocator,
-                                       iree_cpu_features_t** cpu_features);
+                                         iree_cpu_features_t** cpu_features);
 
-// Destroys a iree_cpu_features_t that was created by iree_cpu_features_allocate.
+// Destroys a iree_cpu_features_t that was created by
+// iree_cpu_features_allocate.
 void iree_cpu_features_free(iree_allocator_t allocator,
-                               iree_cpu_features_t* cpu_features);
+                            iree_cpu_features_t* cpu_features);
 
 // On success, *result contains true if and only if the named feature is
 // supported by the CPU. cpu_features must have been previously created by
