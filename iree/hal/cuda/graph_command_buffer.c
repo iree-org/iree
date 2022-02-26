@@ -508,8 +508,11 @@ static iree_status_t iree_hal_cuda_graph_command_buffer_dispatch(
         command_buffer->push_constant[i];
   }
   int32_t block_size_x, block_size_y, block_size_z;
+  int32_t shared_memory_size;
   IREE_RETURN_IF_ERROR(iree_hal_cuda_native_executable_block_size(
       executable, entry_point, &block_size_x, &block_size_y, &block_size_z));
+  IREE_RETURN_IF_ERROR(iree_hal_cuda_native_executable_shared_memory_size(
+      executable, entry_point, &shared_memory_size));
   CUDA_KERNEL_NODE_PARAMS params = {
       .func = iree_hal_cuda_native_executable_for_entry_point(executable,
                                                               entry_point),
@@ -520,6 +523,7 @@ static iree_status_t iree_hal_cuda_graph_command_buffer_dispatch(
       .gridDimY = workgroup_y,
       .gridDimZ = workgroup_z,
       .kernelParams = command_buffer->current_descriptor,
+      .sharedMemBytes = shared_memory_size,
   };
   // Serialize all the nodes for now.
   CUgraphNode dep[] = {command_buffer->last_node};

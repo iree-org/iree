@@ -24,6 +24,71 @@
 namespace mlir {
 namespace iree_compiler {
 
+void ConvertToDynamicSharedMemory(ModuleOp moduleOp) {
+  // Collect all the adressOfOps to static shared memory globals.
+  SmallVector<LLVM::AddressOfOp> addressOfOps;
+  moduleOp.walk([&](LLVM::AddressOfOp addressOfOp) {
+    // Check that the global associated with this addressOfOp has shared memory
+    // space.
+    if (addressOfOp.getGlobal().getAddrSpace() == 3)
+      addressOfOps.push_back(addressOfOp);
+  });
+  if (addressOfOps.size() == 0) return;
+  OpBuilder builder(moduleOp);
+  builder.setInsertionPoint(&moduleOp.front());
+  auto type =
+      LLVM::LLVMArrayType::get(IntegerType::get(builder.getContext(), 8), 0);
+  LLVM::GlobalOp global = builder.create<LLVM::GlobalOp>(
+      moduleOp.getLoc(), type, /*isConstant=*/false, LLVM::Linkage::External,
+      "__dynamic_shared_memory__", Attribute(),
+      /*alignment=*/16, /*addr_space=*/3);
+  uint32_t numberOfBytes = 0;
+  // Replace the addressOfOps with correctly offseted pointers to dynamic
+  // shared memory.
+  llvm::SmallDenseMap<LLVM::GlobalOp, uint32_t> globalMemoryOffsetMap;
+  for (auto addressOfOpsIt : llvm::enumerate(addressOfOps)) {
+    uint32_t offset = 0;
+    auto addressOfOp = addressOfOpsIt.value();
+    auto globalOp = addressOfOp.getGlobal();
+    if (globalMemoryOffsetMap.count(globalOp)) {
+      offset = globalMemoryOffsetMap[globalOp];
+    } else {
+      offset = numberOfBytes;
+      globalMemoryOffsetMap[globalOp] = offset;
+      auto thisarray = globalOp.getType();
+      DataLayout dataLayout = DataLayout::closest(addressOfOp);
+      numberOfBytes += dataLayout.getTypeSizeInBits(thisarray) / 8;
+    }
+    auto loc = addressOfOp.getLoc();
+    builder.setInsertionPoint(addressOfOp);
+    LLVM::AddressOfOp globalPtr =
+        builder.create<LLVM::AddressOfOp>(loc, global);
+    Value zero = builder.create<LLVM::ConstantOp>(
+        loc, IntegerType::get(builder.getContext(), 64),
+        builder.getI64IntegerAttr(0));
+    Value offsetValue = builder.create<LLVM::ConstantOp>(
+        loc, IntegerType::get(builder.getContext(), 64),
+        builder.getI64IntegerAttr(offset));
+    Value shiftedPtr = builder.create<LLVM::GEPOp>(
+        loc, globalPtr.getType(), globalPtr, ValueRange({zero, offsetValue}));
+    Value castPtr = builder.create<LLVM::BitcastOp>(
+        loc,
+        LLVM::LLVMPointerType::get(globalOp.getType(), global.getAddrSpace()),
+        shiftedPtr);
+    addressOfOp.replaceAllUsesWith(castPtr);
+    addressOfOp.erase();
+  }
+  // Add the amount of shared memory required as an attribute.
+  auto variantOp = moduleOp->getParentOfType<IREE::HAL::ExecutableVariantOp>();
+  if (variantOp != nullptr) {
+    for (auto entryPointOp :
+         variantOp.getOps<IREE::HAL::ExecutableEntryPointOp>()) {
+      entryPointOp->setAttr(entryPointOp.workgroup_local_memoryAttrName(),
+                            builder.getIndexAttr(numberOfBytes));
+    }
+  }
+}
+
 namespace {
 
 /// Scalarize math ops. It is needed to lower vector operation that don't have
@@ -180,7 +245,7 @@ class ConvertFunc : public ConvertToLLVMPattern {
     });
     llvmInputTypes.resize(argMapping.size() + numConstants,
                           rewriter.getI32Type());
-    signatureConverter.addInputs(llvmInputTypes);
+    if (!llvmInputTypes.empty()) signatureConverter.addInputs(llvmInputTypes);
 
     // Construct newFunc with all attributes except return type & symbol name.
     SmallVector<NamedAttribute, 4> funcAttrs;
