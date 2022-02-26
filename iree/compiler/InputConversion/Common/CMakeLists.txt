@@ -50,6 +50,7 @@ iree_cc_library(
     MLIRArithmetic
     MLIRIR
     MLIRLinalg
+    MLIRLinalgTransforms
     MLIRPass
     MLIRSCF
     MLIRSCFToControlFlow
