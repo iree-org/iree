@@ -2,6 +2,11 @@
 // computation where the matmul part itself is done by linalg.matmul and the
 // zero-points are handled by additional linalg.generic ops.
 //
+// It is meant to be compiled with IREE's TOSA input pipeline, which includes
+// the -iree-linalg-quantized-matmul-to-matmul pass, which performs a similar
+// transformation of quantized_matmul, so that it acts as an end-to-end
+// correctness test for it.
+//
 // Reference: Section 2.3 of https://arxiv.org/abs/1712.05877.
 
 // Equivalent to linalg.quantized_matmul, but not using linalg.quantized_matmul

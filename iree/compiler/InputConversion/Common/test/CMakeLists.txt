@@ -15,6 +15,7 @@ iree_lit_test_suite(
     lit
   SRCS
     "iree_import_public.mlir"
+    "linalg_quantized_matmul_to_matmul.mlir"
     "top_level_scf_to_cfg.mlir"
   TOOLS
     FileCheck

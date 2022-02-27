@@ -46,6 +46,7 @@ cc_library(
     srcs = [
         "IREEImportPublic.cpp",
         "Passes.cpp",
+        "QuantizedMatmulToMatmul.cpp",
         "TopLevelSCFToCFG.cpp",
     ],
     hdrs = [
@@ -58,8 +59,11 @@ cc_library(
         "//iree/compiler/Dialect/HAL/IR",
         "//iree/compiler/Dialect/Util/IR",
         "//llvm-external-projects/iree-dialects:IREEInputDialect",
+        "@llvm-project//mlir:ArithmeticDialect",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:LinalgOps",
+        "@llvm-project//mlir:LinalgTransforms",
+        "@llvm-project//mlir:MemRefTransforms",
         "@llvm-project//mlir:Pass",
         "@llvm-project//mlir:SCFDialect",
         "@llvm-project//mlir:SCFToControlFlow",
