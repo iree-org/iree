@@ -338,3 +338,44 @@ func @scatter_rank0(%arg0: tensor<5x5xi32>, %arg1: tensor<2xi32>, %arg2: tensor<
 // CHECK-DAG: %[[RE_U:.+]] = "mhlo.reshape"(%arg2) : (tensor<i32>) -> tensor<1xi32>
 // CHECK:     %[[SCATTER:.+]] = "mhlo.scatter"(%arg0, %[[RE_I]], %[[RE_U]])
 // CHECK:       "mhlo.return"(%arg4)
+
+// -----
+
+func @mul_float_bool_cast(%arg0 : tensor<?xi1>, %arg1 : tensor<?xf32>) -> tensor<?xf32> {
+  %0 = "mhlo.convert"(%arg0) : (tensor<?xi1>) -> tensor<?xf32>
+  %1 = "mhlo.multiply"(%0, %arg1) : (tensor<?xf32>, tensor<?xf32>) -> tensor<?xf32>
+  return %1 : tensor<?xf32>
+}
+
+// CHECK-LABEL: @mul_float_bool_cast
+// CHECK: %[[ZERO:.+]] = mhlo.constant dense<0.000000e+00> : tensor<f32>
+// CHECK: %[[BTOF:.+]] = "mhlo.convert"(%arg0) : (tensor<?xi1>) -> tensor<?xf32>
+// CHECK: %[[FTOB:.+]] = "mhlo.convert"(%[[BTOF]]) : (tensor<?xf32>) -> tensor<?xi1>
+// CHECK: %[[SHP:.+]] = shape.shape_of %[[BTOF]] : tensor<?xf32> -> tensor<1xindex>
+// CHECK: %[[BROADCAST:.+]] = "mhlo.dynamic_broadcast_in_dim"(%[[ZERO]], %[[SHP]]) {broadcast_dimensions = dense<> : tensor<0xi64>}
+// CHECK: %[[SELECT:.+]] = "mhlo.select"(%[[FTOB]], %arg1, %[[BROADCAST]])
+
+// -----
+
+func @mul_float_bool_cast_broadcast(%arg0: tensor<5xi1>, %arg1: tensor<5x6xf32>) -> tensor<5x6xf32> {
+  %0 = "mhlo.convert"(%arg0) : (tensor<5xi1>) -> tensor<5xf32>
+  %1 = "mhlo.broadcast_in_dim"(%0) {broadcast_dimensions = dense<0> : tensor<1xi64>} : (tensor<5xf32>) -> tensor<5x6xf32>
+  %2 = mhlo.multiply %1, %arg1 : tensor<5x6xf32>
+  return %2 : tensor<5x6xf32>
+}
+
+// CHECK-LABEL: @mul_float_bool_cast_broadcast
+// CHECK: mhlo.select
+
+// -----
+
+func @mul_float_bool_cast_dyn_broadcast(%arg0: tensor<?xi1>, %arg1: tensor<?x?xf32>) -> tensor<?x?xf32> {
+    %0 = "mhlo.convert"(%arg0) : (tensor<?xi1>) -> tensor<?xf32>
+    %1 = shape.shape_of %arg1 : tensor<?x?xf32> -> tensor<2xindex>
+    %2 = "mhlo.dynamic_broadcast_in_dim"(%0, %1) {broadcast_dimensions = dense<0> : tensor<1xi64>} : (tensor<?xf32>, tensor<2xindex>) -> tensor<?x?xf32>
+    %3 = mhlo.multiply %2, %arg1 : tensor<?x?xf32>
+    return %3 : tensor<?x?xf32>
+}
+
+// CHECK-LABEL: @mul_float_bool_cast_dyn_broadcast
+// CHECK: mhlo.select
