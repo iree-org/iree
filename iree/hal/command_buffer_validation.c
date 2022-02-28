@@ -35,10 +35,11 @@ static iree_status_t iree_hal_command_buffer_validate_categories(
     iree_hal_command_category_t required_categories) {
   if (!iree_all_bits_set(command_buffer->allowed_categories,
                          required_categories)) {
+#if IREE_STATUS_MODE
     iree_bitfield_string_temp_t temp0, temp1;
-    iree_string_view_t required_categories_str IREE_ATTRIBUTE_UNUSED =
+    iree_string_view_t required_categories_str =
         iree_hal_command_category_format(required_categories, &temp0);
-    iree_string_view_t allowed_categories_str IREE_ATTRIBUTE_UNUSED =
+    iree_string_view_t allowed_categories_str =
         iree_hal_command_category_format(command_buffer->allowed_categories,
                                          &temp1);
     return iree_make_status(
@@ -47,6 +48,9 @@ static iree_status_t iree_hal_command_buffer_validate_categories(
         "%.*s",
         (int)required_categories_str.size, required_categories_str.data,
         (int)allowed_categories_str.size, allowed_categories_str.data);
+#else
+    return iree_status_from_code(IREE_STATUS_FAILED_PRECONDITION);
+#endif  // IREE_STATUS_MODE
   }
   return iree_ok_status();
 }
@@ -65,12 +69,12 @@ static iree_status_t iree_hal_command_buffer_validate_buffer_compatibility(
           },
           iree_hal_buffer_allocation_size(buffer));
   if (!iree_all_bits_set(allowed_compatibility, required_compatibility)) {
+#if IREE_STATUS_MODE
     // Buffer cannot be used on the queue for the given usage.
     iree_bitfield_string_temp_t temp0, temp1;
-    iree_string_view_t allowed_usage_str IREE_ATTRIBUTE_UNUSED =
-        iree_hal_buffer_usage_format(iree_hal_buffer_allowed_usage(buffer),
-                                     &temp0);
-    iree_string_view_t intended_usage_str IREE_ATTRIBUTE_UNUSED =
+    iree_string_view_t allowed_usage_str = iree_hal_buffer_usage_format(
+        iree_hal_buffer_allowed_usage(buffer), &temp0);
+    iree_string_view_t intended_usage_str =
         iree_hal_buffer_usage_format(intended_usage, &temp1);
     return iree_make_status(
         IREE_STATUS_PERMISSION_DENIED,
@@ -79,6 +83,9 @@ static iree_status_t iree_hal_command_buffer_validate_buffer_compatibility(
         "mismatch)",
         (int)allowed_usage_str.size, allowed_usage_str.data,
         (int)intended_usage_str.size, intended_usage_str.data);
+#else
+    return iree_status_from_code(IREE_STATUS_PERMISSION_DENIED);
+#endif  // IREE_STATUS_MODE
   }
   return iree_ok_status();
 }
@@ -315,19 +322,21 @@ iree_status_t iree_hal_command_buffer_copy_buffer_validation(
                         IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE) &&
       !iree_any_bit_set(iree_hal_buffer_memory_type(target_buffer),
                         IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE)) {
+#if IREE_STATUS_MODE
     iree_bitfield_string_temp_t temp0, temp1;
-    iree_string_view_t source_memory_type_str IREE_ATTRIBUTE_UNUSED =
-        iree_hal_memory_type_format(iree_hal_buffer_memory_type(source_buffer),
-                                    &temp0);
-    iree_string_view_t target_memory_type_str IREE_ATTRIBUTE_UNUSED =
-        iree_hal_memory_type_format(iree_hal_buffer_memory_type(target_buffer),
-                                    &temp1);
+    iree_string_view_t source_memory_type_str = iree_hal_memory_type_format(
+        iree_hal_buffer_memory_type(source_buffer), &temp0);
+    iree_string_view_t target_memory_type_str = iree_hal_memory_type_format(
+        iree_hal_buffer_memory_type(target_buffer), &temp1);
     return iree_make_status(
         IREE_STATUS_PERMISSION_DENIED,
         "at least one buffer must be device-visible for a copy; "
         "source_buffer=%.*s, target_buffer=%.*s",
         (int)source_memory_type_str.size, source_memory_type_str.data,
         (int)target_memory_type_str.size, target_memory_type_str.data);
+#else
+    return iree_status_from_code(IREE_STATUS_PERMISSION_DENIED);
+#endif  // IREE_STATUS_MODE
   }
 
   // Check for overlap - just like memcpy we don't handle that.
