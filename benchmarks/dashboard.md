@@ -44,12 +44,7 @@ The following subsections explain possible choices in each field.
 
 This field specifies the original model source:
 
-```
-├── TensorFlow
-│     * models authored in TensorFlow and imported with `iree-import-tf`
-└── TFLite
-      * models converted to TensorFlow Lite and imported with `iree-import-tflite`
-```
+* `TFLite`: Models originally in TensorFlow Lite Flatbuffer format.
 
 ### Model name
 
@@ -58,16 +53,16 @@ This field specifies the input model:
 * `DeepLabV3` [[source](https://tfhub.dev/tensorflow/lite-model/deeplabv3/1/default/1)]:
   Vision model for semantic image segmentation.
   Characteristics: convolution, feedforward NN.
-* `MobileBERT` [[source](https://github.com/google-research/google-research/tree/master/mobilebert)]:
+* `MobileBERT` [[source](https://tfhub.dev/tensorflow/lite-model/mobilebert/1/default/1)]:
   NLP for Q&A.
   Characteristics: matmul, attention, feedforward NN.
-* `MobileNetV2` [[source](https://www.tensorflow.org/api_docs/python/tf/keras/applications/MobileNetV2)]:
+* `MobileNetV2` [[source](https://github.com/tensorflow/tflite-support/blob/master/tensorflow_lite_support/metadata/python/tests/testdata/image_classifier/mobilenet_v2_1.0_224.tflite)]:
   Vision model for image classification.
   Characteristics: convolution, feedforward NN
-* `MobileNetV3Small` [[source](https://www.tensorflow.org/api_docs/python/tf/keras/applications/MobileNetV3Small)]:
+* `MobileNetV3Small` [[source](https://tfhub.dev/google/imagenet/mobilenet_v3_small_100_224/classification/5)]:
   Vision model for image classification.
   Characteristics: convolution, feedforward NN.
-* `MobileSSD` [[source](https://www.tensorflow.org/lite/performance/gpu#demo_app_tutorials)]:
+* `MobileSSD` [[source](https://storage.googleapis.com/download.tensorflow.org/models/tflite/gpu/mobile_ssd_v2_float_coco.tflite)]:
   Vision model for object detection.
   Characteristics: convolution, feedforward NN.
 * `PoseNet` [[source](https://tfhub.dev/tensorflow/lite-model/posenet/mobilenet/float/075/1/default/1)]:
@@ -113,6 +108,9 @@ Right now there are two Android devices:
 * `Pixel-4`: Google Pixel 4 running Android 11. The SoC is
   [Snapdragon 855](https://www.qualcomm.com/products/snapdragon-855-plus-and-860-mobile-platform),
   with 1+3+4 ARMv8.2 CPU cores and Adreno 640 GPU.
+* `Pixel-6`: Google Pixel 6 running Android 12. The SoC is
+  [Google Tensor](https://blog.google/products/pixel/introducing-google-tensor/),
+  with 2+2+4 ARMv8 CPU cores and Mali G78 GPU.
 * `SM-G980F`: Samsung Galaxy S20 running Android 11. The SoC is
   [Exynos 990](https://www.samsung.com/semiconductor/minisite/exynos/products/mobileprocessor/exynos-990/),
   with 2+2+4 ARMv8.2 CPU cores and Mali G77 MP11 GPU.
@@ -122,6 +120,7 @@ Therefore the target architectures are:
 * `CPU-CPU-ARMv8.2-A`: can benchmark all CPU-based IREE backends and drivers.
 * `GPU-Adreno-640`: can benchmark IREE Vulkan with Adreno target triples.
 * `GPU-Mali-G77`: can benchmark IREE Vulkan with Mali target triples.
+* `GPU-Mali-G78`: can benchmark IREE Vulkan with Mali target triples.
 
 ### Benchmark mode
 
