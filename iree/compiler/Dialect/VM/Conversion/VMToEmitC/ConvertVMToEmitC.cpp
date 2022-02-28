@@ -5149,7 +5149,7 @@ class ConvertVMToEmitCPass
       }
       // Remove dead basic block arguments
       if (materializations.contains(op)) {
-        assert(isa<emitc::ConstantOp>(op));
+        assert(isa<emitc::VariableOp>(op));
         assert(op->use_empty());
 
         materializations.remove(op);

@@ -54,7 +54,7 @@ EmitCTypeConverter::EmitCTypeConverter() {
     Type refType = IREE::VM::RefType::get(objectType);
 
     auto ctx = builder.getContext();
-    auto op = builder.create<emitc::ConstantOp>(
+    auto op = builder.create<emitc::VariableOp>(
         /*location=*/loc,
         /*resultType=*/refType,
         /*value=*/emitc::OpaqueAttr::get(ctx, ""));
