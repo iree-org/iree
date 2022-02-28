@@ -13,19 +13,19 @@
 
 #include "iree/base/tracing.h"
 
-// Size of each iree_vm_value_type_t in bytes.
-static const iree_host_size_t kValueTypeSizes[7] = {
-    0,  // IREE_VM_VALUE_TYPE_NONE
-    1,  // IREE_VM_VALUE_TYPE_I8
-    2,  // IREE_VM_VALUE_TYPE_I16
-    4,  // IREE_VM_VALUE_TYPE_I32
-    8,  // IREE_VM_VALUE_TYPE_I64
-    4,  // IREE_VM_VALUE_TYPE_F32
-    8,  // IREE_VM_VALUE_TYPE_F64
-};
-static_assert(IREE_VM_VALUE_TYPE_COUNT ==
-                  (sizeof(kValueTypeSizes) / sizeof(kValueTypeSizes[0])),
-              "Enum mismatch");
+static uint8_t iree_vm_value_type_size(iree_vm_value_type_t type) {
+  // Size of each iree_vm_value_type_t in bytes. We bitpack these so that we
+  // can do a simple shift and mask to get the size.
+  const uint32_t kValueTypeSizes = (0u << 0) |   // IREE_VM_VALUE_TYPE_NONE
+                                   (1u << 4) |   // IREE_VM_VALUE_TYPE_I8
+                                   (2u << 8) |   // IREE_VM_VALUE_TYPE_I16
+                                   (4u << 12) |  // IREE_VM_VALUE_TYPE_I32
+                                   (8u << 16) |  // IREE_VM_VALUE_TYPE_I64
+                                   (4u << 20) |  // IREE_VM_VALUE_TYPE_F32
+                                   (8u << 24) |  // IREE_VM_VALUE_TYPE_F64
+                                   (0u << 28);   // unused
+  return (kValueTypeSizes >> ((type & 0x7) * 4)) & 0xF;
+}
 
 // Defines how the iree_vm_list_t storage is allocated and what elements are
 // interpreted as.
@@ -102,7 +102,7 @@ IREE_API_EXPORT iree_host_size_t iree_vm_list_storage_size(
   iree_host_size_t element_size = sizeof(iree_vm_variant_t);
   if (element_type) {
     if (iree_vm_type_def_is_value(element_type)) {
-      element_size = kValueTypeSizes[element_type->value_type];
+      element_size = iree_vm_value_type_size(element_type->value_type);
     } else if (iree_vm_type_def_is_ref(element_type)) {
       element_size = sizeof(iree_vm_ref_t);
     } else {
@@ -123,7 +123,7 @@ IREE_API_EXPORT iree_status_t iree_vm_list_initialize(
   if (element_type) {
     if (iree_vm_type_def_is_value(element_type)) {
       storage_mode = IREE_VM_LIST_STORAGE_MODE_VALUE;
-      element_size = kValueTypeSizes[element_type->value_type];
+      element_size = iree_vm_value_type_size(element_type->value_type);
     } else if (iree_vm_type_def_is_ref(element_type)) {
       storage_mode = IREE_VM_LIST_STORAGE_MODE_REF;
       element_size = sizeof(iree_vm_ref_t);
@@ -188,7 +188,7 @@ IREE_API_EXPORT iree_status_t iree_vm_list_create(
 
   if (iree_vm_type_def_is_value(&list->element_type) && element_type) {
     list->storage_mode = IREE_VM_LIST_STORAGE_MODE_VALUE;
-    list->element_size = kValueTypeSizes[element_type->value_type];
+    list->element_size = iree_vm_value_type_size(element_type->value_type);
   } else if (iree_vm_type_def_is_ref(&list->element_type)) {
     list->storage_mode = IREE_VM_LIST_STORAGE_MODE_REF;
     list->element_size = sizeof(iree_vm_ref_t);
