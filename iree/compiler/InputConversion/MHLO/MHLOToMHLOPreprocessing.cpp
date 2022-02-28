@@ -674,37 +674,37 @@ class ScatterRank0Value : public OpRewritePattern<mhlo::ScatterOp> {
   }
 };
 
+// Traverse upward past common operations to see if the value came from a
+// boolean tensor.
+bool isFromBool(Value val) {
+  while (true) {
+    Operation *op = val.getDefiningOp();
+    if (!op) return false;
+
+    if (auto convertOp = dyn_cast<mhlo::ConvertOp>(op)) {
+      auto inTy = convertOp.operand().getType().cast<ShapedType>();
+      if (inTy.getElementType().isInteger(1)) {
+        return true;
+      }
+      val = convertOp.operand();
+      continue;
+    }
+
+    if (isa<mhlo::DynamicBroadcastInDimOp>(op) ||
+        isa<mhlo::BroadcastInDimOp>(op) || isa<mhlo::BroadcastOp>(op)) {
+      val = op->getOperand(0);
+      continue;
+    }
+
+    return false;
+  }
+}
+
 // Mhlo of non-finite values (e.g. NaN, inf) and 0.0 produce 0.0 for XLA. For
 // linalg we need to conver these to select operations.
 class MulCastOfBool : public OpRewritePattern<mhlo::MulOp> {
  public:
   using OpRewritePattern<mhlo::MulOp>::OpRewritePattern;
-
-  // Traverse upward past common operations to see if the value came from a
-  // boolean tensor.
-  static bool IsFromBool(Value val) {
-    while (true) {
-      Operation *op = val.getDefiningOp();
-      if (!op) return false;
-
-      if (auto convertOp = dyn_cast<mhlo::ConvertOp>(op)) {
-        auto inTy = convertOp.operand().getType().cast<ShapedType>();
-        if (inTy.getElementType().isInteger(1)) {
-          return true;
-        }
-        val = convertOp.operand();
-        continue;
-      }
-
-      if (isa<mhlo::DynamicBroadcastInDimOp>(op) ||
-          isa<mhlo::BroadcastInDimOp>(op) || isa<mhlo::BroadcastOp>(op)) {
-        val = op->getOperand(0);
-        continue;
-      }
-
-      return false;
-    }
-  }
 
   LogicalResult matchAndRewrite(mhlo::MulOp op,
                                 PatternRewriter &rewriter) const override {
@@ -712,15 +712,14 @@ class MulCastOfBool : public OpRewritePattern<mhlo::MulOp> {
     if (!resultTy.getElementType().isa<FloatType>()) return failure();
     Value lhs = op.lhs();
     Value rhs = op.rhs();
-    bool lhsIsBool = IsFromBool(lhs);
-    bool rhsIsBool = IsFromBool(rhs);
-    int64_t resultRank = resultTy.getRank();
+    bool lhsIsBool = isFromBool(lhs);
+    bool rhsIsBool = isFromBool(rhs);
 
     if (lhsIsBool == rhsIsBool) return failure();
     if (rhsIsBool) std::swap(lhs, rhs);
 
     Type eType = resultTy.getElementType();
-    ShapedType lhsTy = lhs.getType().cast<ShapedType>();
+    auto lhsTy = lhs.getType().cast<ShapedType>();
     Value lhsBool = rewriter.create<mhlo::ConvertOp>(
         op.getLoc(), lhsTy.clone(rewriter.getIntegerType(1)), lhs);
     Value zero = rewriter.create<mhlo::ConstOp>(
@@ -731,14 +730,17 @@ class MulCastOfBool : public OpRewritePattern<mhlo::MulOp> {
         op.getLoc(),
         RankedTensorType::get({lhsTy.getRank()}, rewriter.getIndexType()), lhs);
 
+    int64_t resultRank = resultTy.getRank();
     auto broadcast = [&](Value value) -> Value {
       auto valueTy = value.getType().cast<ShapedType>();
+      auto newTy =
+          RankedTensorType::get(resultTy.getShape(), valueTy.getElementType());
+      if (valueTy == newTy) return value;
       auto dimensions = llvm::to_vector<4>(
           llvm::seq<int64_t>(resultRank - valueTy.getRank(), resultRank));
       return rewriter.create<mhlo::DynamicBroadcastInDimOp>(
-          op.getLoc(),
-          RankedTensorType::get(resultTy.getShape(), valueTy.getElementType()),
-          value, lhsShape, rewriter.getI64TensorAttr(dimensions));
+          op.getLoc(), newTy, value, lhsShape,
+          rewriter.getI64TensorAttr(dimensions));
     };
 
     zero = broadcast(zero);
