@@ -149,8 +149,8 @@ TEST_F(TaskWaitTest, WaitAll) {
     EXPECT_FALSE(has_signaled);
     iree_event_set(&event_a);
     std::this_thread::sleep_for(std::chrono::milliseconds(50));
-    iree_event_set(&event_b);
     has_signaled = true;
+    iree_event_set(&event_b);
   });
 
   EXPECT_FALSE(has_signaled);
@@ -239,8 +239,8 @@ TEST_F(TaskWaitTest, WaitAny) {
     // NOTE: we only signal event_a - event_b remains unsignaled.
     std::this_thread::sleep_for(std::chrono::milliseconds(50));
     EXPECT_FALSE(has_signaled);
-    iree_event_set(&event_a);
     has_signaled = true;
+    iree_event_set(&event_a);
   });
 
   EXPECT_FALSE(has_signaled);
