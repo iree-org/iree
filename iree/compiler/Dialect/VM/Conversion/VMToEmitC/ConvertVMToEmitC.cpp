@@ -4711,304 +4711,301 @@ void populateVMToEmitCPatterns(ConversionTarget &conversionTarget,
                                  patterns);
 
   // CFG
-  patterns.insert<BranchOpConversion>(typeConverter, context);
-  patterns.insert<CallOpConversion<IREE::VM::CallOp>>(typeConverter, context);
-  patterns.insert<CallOpConversion<IREE::VM::CallVariadicOp>>(typeConverter,
-                                                              context);
-  patterns.insert<CondBranchOpConversion>(typeConverter, context);
-  patterns.insert<FailOpConversion>(typeConverter, context);
-  patterns.insert<FuncOpConversion>(typeConverter, context);
-  patterns.insert<ExportOpConversion>(typeConverter, context, visitedExports);
-  patterns.insert<ImportOpConversion>(typeConverter, context, importShims);
-  patterns.insert<ReturnOpConversion>(typeConverter, context);
+  patterns.add<BranchOpConversion>(typeConverter, context);
+  patterns.add<CallOpConversion<IREE::VM::CallOp>>(typeConverter, context);
+  patterns.add<CallOpConversion<IREE::VM::CallVariadicOp>>(typeConverter,
+                                                           context);
+  patterns.add<CondBranchOpConversion>(typeConverter, context);
+  patterns.add<FailOpConversion>(typeConverter, context);
+  patterns.add<FuncOpConversion>(typeConverter, context);
+  patterns.add<ExportOpConversion>(typeConverter, context, visitedExports);
+  patterns.add<ImportOpConversion>(typeConverter, context, importShims);
+  patterns.add<ReturnOpConversion>(typeConverter, context);
 
   // Globals
-  patterns.insert<
+  patterns.add<
       GlobalLoadOpConversion<IREE::VM::GlobalLoadI32Op, IREE::VM::GlobalI32Op>>(
       typeConverter, context, "vm_global_load_i32");
-  patterns.insert<GlobalStoreOpConversion<IREE::VM::GlobalStoreI32Op,
-                                          IREE::VM::GlobalI32Op>>(
+  patterns.add<GlobalStoreOpConversion<IREE::VM::GlobalStoreI32Op,
+                                       IREE::VM::GlobalI32Op>>(
       typeConverter, context, "vm_global_store_i32");
 
-  patterns.insert<GlobalLoadStoreRefOpConversion<IREE::VM::GlobalLoadRefOp>>(
+  patterns.add<GlobalLoadStoreRefOpConversion<IREE::VM::GlobalLoadRefOp>>(
       typeConverter, context);
-  patterns.insert<GlobalLoadStoreRefOpConversion<IREE::VM::GlobalStoreRefOp>>(
+  patterns.add<GlobalLoadStoreRefOpConversion<IREE::VM::GlobalStoreRefOp>>(
       typeConverter, context);
 
   // Constants
-  patterns.insert<ConstOpConversion<IREE::VM::ConstI32Op>>(typeConverter,
-                                                           context);
-  patterns.insert<ConstZeroOpConversion<IREE::VM::ConstI32ZeroOp>>(
-      typeConverter, context);
-  patterns.insert<ConstRefZeroOpConversion>(typeConverter, context);
-  patterns.insert<ConstRefRodataOpConversion>(typeConverter, context);
+  patterns.add<ConstOpConversion<IREE::VM::ConstI32Op>>(typeConverter, context);
+  patterns.add<ConstZeroOpConversion<IREE::VM::ConstI32ZeroOp>>(typeConverter,
+                                                                context);
+  patterns.add<ConstRefZeroOpConversion>(typeConverter, context);
+  patterns.add<ConstRefRodataOpConversion>(typeConverter, context);
 
   // List ops
-  patterns.insert<ListAllocOpConversion>(typeConverter, context);
-  patterns.insert<ListOpConversion<IREE::VM::ListReserveOp>>(
+  patterns.add<ListAllocOpConversion>(typeConverter, context);
+  patterns.add<ListOpConversion<IREE::VM::ListReserveOp>>(
       typeConverter, context, "iree_vm_list_reserve", 0, true);
-  patterns.insert<ListOpConversion<IREE::VM::ListResizeOp>>(
+  patterns.add<ListOpConversion<IREE::VM::ListResizeOp>>(
       typeConverter, context, "iree_vm_list_resize", 0, true);
-  patterns.insert<ListOpConversion<IREE::VM::ListSizeOp>>(
+  patterns.add<ListOpConversion<IREE::VM::ListSizeOp>>(
       typeConverter, context, "iree_vm_list_size", 0, false);
-  patterns.insert<ListGetOpConversion<IREE::VM::ListGetI32Op>>(typeConverter,
-                                                               context);
-  patterns.insert<ListGetRefOpConversion>(typeConverter, context);
-  patterns.insert<ListSetOpConversion<IREE::VM::ListSetI32Op>>(typeConverter,
-                                                               context);
-  patterns.insert<ListSetRefOpConversion>(typeConverter, context);
+  patterns.add<ListGetOpConversion<IREE::VM::ListGetI32Op>>(typeConverter,
+                                                            context);
+  patterns.add<ListGetRefOpConversion>(typeConverter, context);
+  patterns.add<ListSetOpConversion<IREE::VM::ListSetI32Op>>(typeConverter,
+                                                            context);
+  patterns.add<ListSetRefOpConversion>(typeConverter, context);
 
   // Conditional assignment ops
-  patterns.insert<GenericOpConversion<IREE::VM::SelectI32Op>>(
+  patterns.add<GenericOpConversion<IREE::VM::SelectI32Op>>(
       typeConverter, context, "vm_select_i32");
 
   // Native integer arithmetic ops
-  patterns.insert<GenericOpConversion<IREE::VM::AddI32Op>>(
-      typeConverter, context, "vm_add_i32");
-  patterns.insert<GenericOpConversion<IREE::VM::SubI32Op>>(
-      typeConverter, context, "vm_sub_i32");
-  patterns.insert<GenericOpConversion<IREE::VM::MulI32Op>>(
-      typeConverter, context, "vm_mul_i32");
-  patterns.insert<GenericOpConversion<IREE::VM::DivI32SOp>>(
-      typeConverter, context, "vm_div_i32s");
-  patterns.insert<GenericOpConversion<IREE::VM::DivI32UOp>>(
-      typeConverter, context, "vm_div_i32u");
-  patterns.insert<GenericOpConversion<IREE::VM::RemI32SOp>>(
-      typeConverter, context, "vm_rem_i32s");
-  patterns.insert<GenericOpConversion<IREE::VM::RemI32UOp>>(
-      typeConverter, context, "vm_rem_i32u");
-  patterns.insert<GenericOpConversion<IREE::VM::FMAI32Op>>(
-      typeConverter, context, "vm_fma_i32");
-  patterns.insert<GenericOpConversion<IREE::VM::NotI32Op>>(
-      typeConverter, context, "vm_not_i32");
-  patterns.insert<GenericOpConversion<IREE::VM::AndI32Op>>(
-      typeConverter, context, "vm_and_i32");
-  patterns.insert<GenericOpConversion<IREE::VM::OrI32Op>>(typeConverter,
-                                                          context, "vm_or_i32");
-  patterns.insert<GenericOpConversion<IREE::VM::XorI32Op>>(
-      typeConverter, context, "vm_xor_i32");
+  patterns.add<GenericOpConversion<IREE::VM::AddI32Op>>(typeConverter, context,
+                                                        "vm_add_i32");
+  patterns.add<GenericOpConversion<IREE::VM::SubI32Op>>(typeConverter, context,
+                                                        "vm_sub_i32");
+  patterns.add<GenericOpConversion<IREE::VM::MulI32Op>>(typeConverter, context,
+                                                        "vm_mul_i32");
+  patterns.add<GenericOpConversion<IREE::VM::DivI32SOp>>(typeConverter, context,
+                                                         "vm_div_i32s");
+  patterns.add<GenericOpConversion<IREE::VM::DivI32UOp>>(typeConverter, context,
+                                                         "vm_div_i32u");
+  patterns.add<GenericOpConversion<IREE::VM::RemI32SOp>>(typeConverter, context,
+                                                         "vm_rem_i32s");
+  patterns.add<GenericOpConversion<IREE::VM::RemI32UOp>>(typeConverter, context,
+                                                         "vm_rem_i32u");
+  patterns.add<GenericOpConversion<IREE::VM::FMAI32Op>>(typeConverter, context,
+                                                        "vm_fma_i32");
+  patterns.add<GenericOpConversion<IREE::VM::NotI32Op>>(typeConverter, context,
+                                                        "vm_not_i32");
+  patterns.add<GenericOpConversion<IREE::VM::AndI32Op>>(typeConverter, context,
+                                                        "vm_and_i32");
+  patterns.add<GenericOpConversion<IREE::VM::OrI32Op>>(typeConverter, context,
+                                                       "vm_or_i32");
+  patterns.add<GenericOpConversion<IREE::VM::XorI32Op>>(typeConverter, context,
+                                                        "vm_xor_i32");
 
   // Casting and type conversion/emulation ops
-  patterns.insert<GenericOpConversion<IREE::VM::TruncI32I8Op>>(
+  patterns.add<GenericOpConversion<IREE::VM::TruncI32I8Op>>(
       typeConverter, context, "vm_trunc_i32i8");
-  patterns.insert<GenericOpConversion<IREE::VM::TruncI32I16Op>>(
+  patterns.add<GenericOpConversion<IREE::VM::TruncI32I16Op>>(
       typeConverter, context, "vm_trunc_i32i16");
-  patterns.insert<GenericOpConversion<IREE::VM::ExtI8I32SOp>>(
+  patterns.add<GenericOpConversion<IREE::VM::ExtI8I32SOp>>(
       typeConverter, context, "vm_ext_i8i32s");
-  patterns.insert<GenericOpConversion<IREE::VM::ExtI8I32UOp>>(
+  patterns.add<GenericOpConversion<IREE::VM::ExtI8I32UOp>>(
       typeConverter, context, "vm_ext_i8i32u");
-  patterns.insert<GenericOpConversion<IREE::VM::ExtI16I32SOp>>(
+  patterns.add<GenericOpConversion<IREE::VM::ExtI16I32SOp>>(
       typeConverter, context, "vm_ext_i16i32s");
-  patterns.insert<GenericOpConversion<IREE::VM::ExtI16I32UOp>>(
+  patterns.add<GenericOpConversion<IREE::VM::ExtI16I32UOp>>(
       typeConverter, context, "vm_ext_i16i32u");
 
   // Native bitwise shift and rotate ops
-  patterns.insert<GenericOpConversion<IREE::VM::ShlI32Op>>(
-      typeConverter, context, "vm_shl_i32");
-  patterns.insert<GenericOpConversion<IREE::VM::ShrI32SOp>>(
-      typeConverter, context, "vm_shr_i32s");
-  patterns.insert<GenericOpConversion<IREE::VM::ShrI32UOp>>(
-      typeConverter, context, "vm_shr_i32u");
+  patterns.add<GenericOpConversion<IREE::VM::ShlI32Op>>(typeConverter, context,
+                                                        "vm_shl_i32");
+  patterns.add<GenericOpConversion<IREE::VM::ShrI32SOp>>(typeConverter, context,
+                                                         "vm_shr_i32s");
+  patterns.add<GenericOpConversion<IREE::VM::ShrI32UOp>>(typeConverter, context,
+                                                         "vm_shr_i32u");
 
   // Comparison ops
-  patterns.insert<GenericOpConversion<IREE::VM::CmpEQI32Op>>(
+  patterns.add<GenericOpConversion<IREE::VM::CmpEQI32Op>>(
       typeConverter, context, "vm_cmp_eq_i32");
-  patterns.insert<GenericOpConversion<IREE::VM::CmpNEI32Op>>(
+  patterns.add<GenericOpConversion<IREE::VM::CmpNEI32Op>>(
       typeConverter, context, "vm_cmp_ne_i32");
-  patterns.insert<GenericOpConversion<IREE::VM::CmpLTI32SOp>>(
+  patterns.add<GenericOpConversion<IREE::VM::CmpLTI32SOp>>(
       typeConverter, context, "vm_cmp_lt_i32s");
-  patterns.insert<GenericOpConversion<IREE::VM::CmpLTI32UOp>>(
+  patterns.add<GenericOpConversion<IREE::VM::CmpLTI32UOp>>(
       typeConverter, context, "vm_cmp_lt_i32u");
-  patterns.insert<GenericOpConversion<IREE::VM::CmpNZI32Op>>(
+  patterns.add<GenericOpConversion<IREE::VM::CmpNZI32Op>>(
       typeConverter, context, "vm_cmp_nz_i32");
-  patterns.insert<CompareRefOpConversion<IREE::VM::CmpEQRefOp>>(
+  patterns.add<CompareRefOpConversion<IREE::VM::CmpEQRefOp>>(
       typeConverter, context, "vm_cmp_eq_ref");
-  patterns.insert<CompareRefOpConversion<IREE::VM::CmpNERefOp>>(
+  patterns.add<CompareRefOpConversion<IREE::VM::CmpNERefOp>>(
       typeConverter, context, "vm_cmp_ne_ref");
-  patterns.insert<CompareRefNotZeroOpConversion>(typeConverter, context);
+  patterns.add<CompareRefNotZeroOpConversion>(typeConverter, context);
 
   // ExtF32: Globals
-  patterns.insert<
+  patterns.add<
       GlobalLoadOpConversion<IREE::VM::GlobalLoadF32Op, IREE::VM::GlobalF32Op>>(
       typeConverter, context, "vm_global_load_f32");
-  patterns.insert<GlobalStoreOpConversion<IREE::VM::GlobalStoreF32Op,
-                                          IREE::VM::GlobalF32Op>>(
+  patterns.add<GlobalStoreOpConversion<IREE::VM::GlobalStoreF32Op,
+                                       IREE::VM::GlobalF32Op>>(
       typeConverter, context, "vm_global_store_f32");
 
   // ExtF32: Native floating-point constants
-  patterns.insert<ConstOpConversion<IREE::VM::ConstF32Op>>(typeConverter,
-                                                           context);
-  patterns.insert<ConstZeroOpConversion<IREE::VM::ConstF32ZeroOp>>(
-      typeConverter, context);
+  patterns.add<ConstOpConversion<IREE::VM::ConstF32Op>>(typeConverter, context);
+  patterns.add<ConstZeroOpConversion<IREE::VM::ConstF32ZeroOp>>(typeConverter,
+                                                                context);
 
   // ExtF32: Conditional assignment
-  patterns.insert<GenericOpConversion<IREE::VM::SelectF32Op>>(
+  patterns.add<GenericOpConversion<IREE::VM::SelectF32Op>>(
       typeConverter, context, "vm_select_f32");
 
   // ExtF32: Native floating-point arithmetic
-  patterns.insert<GenericOpConversion<IREE::VM::AddF32Op>>(
-      typeConverter, context, "vm_add_f32");
-  patterns.insert<GenericOpConversion<IREE::VM::SubF32Op>>(
-      typeConverter, context, "vm_sub_f32");
-  patterns.insert<GenericOpConversion<IREE::VM::MulF32Op>>(
-      typeConverter, context, "vm_mul_f32");
-  patterns.insert<GenericOpConversion<IREE::VM::DivF32Op>>(
-      typeConverter, context, "vm_div_f32");
-  patterns.insert<GenericOpConversion<IREE::VM::RemF32Op>>(
-      typeConverter, context, "vm_rem_f32");
-  patterns.insert<GenericOpConversion<IREE::VM::FMAF32Op>>(
-      typeConverter, context, "vm_fma_f32");
-  patterns.insert<GenericOpConversion<IREE::VM::AbsF32Op>>(
-      typeConverter, context, "vm_abs_f32");
-  patterns.insert<GenericOpConversion<IREE::VM::NegF32Op>>(
-      typeConverter, context, "vm_neg_f32");
-  patterns.insert<GenericOpConversion<IREE::VM::CeilF32Op>>(
-      typeConverter, context, "vm_ceil_f32");
-  patterns.insert<GenericOpConversion<IREE::VM::FloorF32Op>>(
+  patterns.add<GenericOpConversion<IREE::VM::AddF32Op>>(typeConverter, context,
+                                                        "vm_add_f32");
+  patterns.add<GenericOpConversion<IREE::VM::SubF32Op>>(typeConverter, context,
+                                                        "vm_sub_f32");
+  patterns.add<GenericOpConversion<IREE::VM::MulF32Op>>(typeConverter, context,
+                                                        "vm_mul_f32");
+  patterns.add<GenericOpConversion<IREE::VM::DivF32Op>>(typeConverter, context,
+                                                        "vm_div_f32");
+  patterns.add<GenericOpConversion<IREE::VM::RemF32Op>>(typeConverter, context,
+                                                        "vm_rem_f32");
+  patterns.add<GenericOpConversion<IREE::VM::FMAF32Op>>(typeConverter, context,
+                                                        "vm_fma_f32");
+  patterns.add<GenericOpConversion<IREE::VM::AbsF32Op>>(typeConverter, context,
+                                                        "vm_abs_f32");
+  patterns.add<GenericOpConversion<IREE::VM::NegF32Op>>(typeConverter, context,
+                                                        "vm_neg_f32");
+  patterns.add<GenericOpConversion<IREE::VM::CeilF32Op>>(typeConverter, context,
+                                                         "vm_ceil_f32");
+  patterns.add<GenericOpConversion<IREE::VM::FloorF32Op>>(
       typeConverter, context, "vm_floor_f32");
 
-  patterns.insert<GenericOpConversion<IREE::VM::AtanF32Op>>(
-      typeConverter, context, "vm_atan_f32");
-  patterns.insert<GenericOpConversion<IREE::VM::Atan2F32Op>>(
+  patterns.add<GenericOpConversion<IREE::VM::AtanF32Op>>(typeConverter, context,
+                                                         "vm_atan_f32");
+  patterns.add<GenericOpConversion<IREE::VM::Atan2F32Op>>(
       typeConverter, context, "vm_atan2_f32");
-  patterns.insert<GenericOpConversion<IREE::VM::CosF32Op>>(
-      typeConverter, context, "vm_cos_f32");
-  patterns.insert<GenericOpConversion<IREE::VM::SinF32Op>>(
-      typeConverter, context, "vm_sin_f32");
-  patterns.insert<GenericOpConversion<IREE::VM::ExpF32Op>>(
-      typeConverter, context, "vm_exp_f32");
-  patterns.insert<GenericOpConversion<IREE::VM::Exp2F32Op>>(
-      typeConverter, context, "vm_exp2_f32");
-  patterns.insert<GenericOpConversion<IREE::VM::ExpM1F32Op>>(
+  patterns.add<GenericOpConversion<IREE::VM::CosF32Op>>(typeConverter, context,
+                                                        "vm_cos_f32");
+  patterns.add<GenericOpConversion<IREE::VM::SinF32Op>>(typeConverter, context,
+                                                        "vm_sin_f32");
+  patterns.add<GenericOpConversion<IREE::VM::ExpF32Op>>(typeConverter, context,
+                                                        "vm_exp_f32");
+  patterns.add<GenericOpConversion<IREE::VM::Exp2F32Op>>(typeConverter, context,
+                                                         "vm_exp2_f32");
+  patterns.add<GenericOpConversion<IREE::VM::ExpM1F32Op>>(
       typeConverter, context, "vm_expm1_f32");
-  patterns.insert<GenericOpConversion<IREE::VM::LogF32Op>>(
-      typeConverter, context, "vm_log_f32");
-  patterns.insert<GenericOpConversion<IREE::VM::Log10F32Op>>(
+  patterns.add<GenericOpConversion<IREE::VM::LogF32Op>>(typeConverter, context,
+                                                        "vm_log_f32");
+  patterns.add<GenericOpConversion<IREE::VM::Log10F32Op>>(
       typeConverter, context, "vm_log10_f32");
-  patterns.insert<GenericOpConversion<IREE::VM::Log1pF32Op>>(
+  patterns.add<GenericOpConversion<IREE::VM::Log1pF32Op>>(
       typeConverter, context, "vm_log1p_f32");
-  patterns.insert<GenericOpConversion<IREE::VM::Log2F32Op>>(
-      typeConverter, context, "vm_log2_f32");
-  patterns.insert<GenericOpConversion<IREE::VM::PowF32Op>>(
-      typeConverter, context, "vm_pow_f32");
-  patterns.insert<GenericOpConversion<IREE::VM::RsqrtF32Op>>(
+  patterns.add<GenericOpConversion<IREE::VM::Log2F32Op>>(typeConverter, context,
+                                                         "vm_log2_f32");
+  patterns.add<GenericOpConversion<IREE::VM::PowF32Op>>(typeConverter, context,
+                                                        "vm_pow_f32");
+  patterns.add<GenericOpConversion<IREE::VM::RsqrtF32Op>>(
       typeConverter, context, "vm_rsqrt_f32");
-  patterns.insert<GenericOpConversion<IREE::VM::SqrtF32Op>>(
-      typeConverter, context, "vm_sqrt_f32");
-  patterns.insert<GenericOpConversion<IREE::VM::TanhF32Op>>(
-      typeConverter, context, "vm_tanh_f32");
-  patterns.insert<GenericOpConversion<IREE::VM::ErfF32Op>>(
-      typeConverter, context, "vm_erf_f32");
+  patterns.add<GenericOpConversion<IREE::VM::SqrtF32Op>>(typeConverter, context,
+                                                         "vm_sqrt_f32");
+  patterns.add<GenericOpConversion<IREE::VM::TanhF32Op>>(typeConverter, context,
+                                                         "vm_tanh_f32");
+  patterns.add<GenericOpConversion<IREE::VM::ErfF32Op>>(typeConverter, context,
+                                                        "vm_erf_f32");
 
   // ExtF32: Casting and type conversion/emulation
-  patterns.insert<GenericOpConversion<IREE::VM::CastSI32F32Op>>(
+  patterns.add<GenericOpConversion<IREE::VM::CastSI32F32Op>>(
       typeConverter, context, "vm_cast_si32f32");
-  patterns.insert<GenericOpConversion<IREE::VM::CastUI32F32Op>>(
+  patterns.add<GenericOpConversion<IREE::VM::CastUI32F32Op>>(
       typeConverter, context, "vm_cast_ui32f32");
-  patterns.insert<GenericOpConversion<IREE::VM::CastF32SI32Op>>(
+  patterns.add<GenericOpConversion<IREE::VM::CastF32SI32Op>>(
       typeConverter, context, "vm_cast_f32si32");
-  patterns.insert<GenericOpConversion<IREE::VM::CastF32UI32Op>>(
+  patterns.add<GenericOpConversion<IREE::VM::CastF32UI32Op>>(
       typeConverter, context, "vm_cast_f32ui32");
-  patterns.insert<GenericOpConversion<IREE::VM::BitcastI32F32Op>>(
+  patterns.add<GenericOpConversion<IREE::VM::BitcastI32F32Op>>(
       typeConverter, context, "vm_bitcast_i32f32");
-  patterns.insert<GenericOpConversion<IREE::VM::BitcastF32I32Op>>(
+  patterns.add<GenericOpConversion<IREE::VM::BitcastF32I32Op>>(
       typeConverter, context, "vm_bitcast_f32i32");
 
   // ExtF32: Comparison ops
-  patterns.insert<GenericOpConversion<IREE::VM::CmpEQF32OOp>>(
+  patterns.add<GenericOpConversion<IREE::VM::CmpEQF32OOp>>(
       typeConverter, context, "vm_cmp_eq_f32o");
-  patterns.insert<GenericOpConversion<IREE::VM::CmpEQF32UOp>>(
+  patterns.add<GenericOpConversion<IREE::VM::CmpEQF32UOp>>(
       typeConverter, context, "vm_cmp_eq_f32u");
-  patterns.insert<GenericOpConversion<IREE::VM::CmpNEF32OOp>>(
+  patterns.add<GenericOpConversion<IREE::VM::CmpNEF32OOp>>(
       typeConverter, context, "vm_cmp_ne_f32o");
-  patterns.insert<GenericOpConversion<IREE::VM::CmpNEF32UOp>>(
+  patterns.add<GenericOpConversion<IREE::VM::CmpNEF32UOp>>(
       typeConverter, context, "vm_cmp_ne_f32u");
-  patterns.insert<GenericOpConversion<IREE::VM::CmpLTF32OOp>>(
+  patterns.add<GenericOpConversion<IREE::VM::CmpLTF32OOp>>(
       typeConverter, context, "vm_cmp_lt_f32o");
-  patterns.insert<GenericOpConversion<IREE::VM::CmpLTF32UOp>>(
+  patterns.add<GenericOpConversion<IREE::VM::CmpLTF32UOp>>(
       typeConverter, context, "vm_cmp_lt_f32u");
-  patterns.insert<GenericOpConversion<IREE::VM::CmpLTEF32OOp>>(
+  patterns.add<GenericOpConversion<IREE::VM::CmpLTEF32OOp>>(
       typeConverter, context, "vm_cmp_lte_f32o");
-  patterns.insert<GenericOpConversion<IREE::VM::CmpLTEF32UOp>>(
+  patterns.add<GenericOpConversion<IREE::VM::CmpLTEF32UOp>>(
       typeConverter, context, "vm_cmp_lte_f32u");
-  patterns.insert<GenericOpConversion<IREE::VM::CmpNaNF32Op>>(
+  patterns.add<GenericOpConversion<IREE::VM::CmpNaNF32Op>>(
       typeConverter, context, "vm_cmp_nan_f32");
 
   // ExtI64: Globals
-  patterns.insert<
+  patterns.add<
       GlobalLoadOpConversion<IREE::VM::GlobalLoadI64Op, IREE::VM::GlobalI64Op>>(
       typeConverter, context, "vm_global_load_i64");
-  patterns.insert<GlobalStoreOpConversion<IREE::VM::GlobalStoreI64Op,
-                                          IREE::VM::GlobalI64Op>>(
+  patterns.add<GlobalStoreOpConversion<IREE::VM::GlobalStoreI64Op,
+                                       IREE::VM::GlobalI64Op>>(
       typeConverter, context, "vm_global_store_i64");
 
   // ExtI64: Constants
-  patterns.insert<ConstOpConversion<IREE::VM::ConstI64Op>>(typeConverter,
-                                                           context);
-  patterns.insert<ConstZeroOpConversion<IREE::VM::ConstI64ZeroOp>>(
-      typeConverter, context);
+  patterns.add<ConstOpConversion<IREE::VM::ConstI64Op>>(typeConverter, context);
+  patterns.add<ConstZeroOpConversion<IREE::VM::ConstI64ZeroOp>>(typeConverter,
+                                                                context);
 
   // ExtI64: List ops
-  patterns.insert<ListGetOpConversion<IREE::VM::ListGetI64Op>>(typeConverter,
-                                                               context);
-  patterns.insert<ListSetOpConversion<IREE::VM::ListSetI64Op>>(typeConverter,
-                                                               context);
+  patterns.add<ListGetOpConversion<IREE::VM::ListGetI64Op>>(typeConverter,
+                                                            context);
+  patterns.add<ListSetOpConversion<IREE::VM::ListSetI64Op>>(typeConverter,
+                                                            context);
 
   // ExtI64: Conditional assignment ops
-  patterns.insert<GenericOpConversion<IREE::VM::SelectI64Op>>(
+  patterns.add<GenericOpConversion<IREE::VM::SelectI64Op>>(
       typeConverter, context, "vm_select_i64");
   // ExtI64: Native integer arithmetic ops
-  patterns.insert<GenericOpConversion<IREE::VM::AddI64Op>>(
-      typeConverter, context, "vm_add_i64");
-  patterns.insert<GenericOpConversion<IREE::VM::SubI64Op>>(
-      typeConverter, context, "vm_sub_i64");
-  patterns.insert<GenericOpConversion<IREE::VM::MulI64Op>>(
-      typeConverter, context, "vm_mul_i64");
-  patterns.insert<GenericOpConversion<IREE::VM::DivI64SOp>>(
-      typeConverter, context, "vm_div_i64s");
-  patterns.insert<GenericOpConversion<IREE::VM::DivI64UOp>>(
-      typeConverter, context, "vm_div_i64u");
-  patterns.insert<GenericOpConversion<IREE::VM::RemI64SOp>>(
-      typeConverter, context, "vm_rem_i64s");
-  patterns.insert<GenericOpConversion<IREE::VM::RemI64UOp>>(
-      typeConverter, context, "vm_rem_i64u");
-  patterns.insert<GenericOpConversion<IREE::VM::FMAI64Op>>(
-      typeConverter, context, "vm_fma_i64");
-  patterns.insert<GenericOpConversion<IREE::VM::NotI64Op>>(
-      typeConverter, context, "vm_not_i64");
-  patterns.insert<GenericOpConversion<IREE::VM::AndI64Op>>(
-      typeConverter, context, "vm_and_i64");
-  patterns.insert<GenericOpConversion<IREE::VM::OrI64Op>>(typeConverter,
-                                                          context, "vm_or_i64");
-  patterns.insert<GenericOpConversion<IREE::VM::XorI64Op>>(
-      typeConverter, context, "vm_xor_i64");
+  patterns.add<GenericOpConversion<IREE::VM::AddI64Op>>(typeConverter, context,
+                                                        "vm_add_i64");
+  patterns.add<GenericOpConversion<IREE::VM::SubI64Op>>(typeConverter, context,
+                                                        "vm_sub_i64");
+  patterns.add<GenericOpConversion<IREE::VM::MulI64Op>>(typeConverter, context,
+                                                        "vm_mul_i64");
+  patterns.add<GenericOpConversion<IREE::VM::DivI64SOp>>(typeConverter, context,
+                                                         "vm_div_i64s");
+  patterns.add<GenericOpConversion<IREE::VM::DivI64UOp>>(typeConverter, context,
+                                                         "vm_div_i64u");
+  patterns.add<GenericOpConversion<IREE::VM::RemI64SOp>>(typeConverter, context,
+                                                         "vm_rem_i64s");
+  patterns.add<GenericOpConversion<IREE::VM::RemI64UOp>>(typeConverter, context,
+                                                         "vm_rem_i64u");
+  patterns.add<GenericOpConversion<IREE::VM::FMAI64Op>>(typeConverter, context,
+                                                        "vm_fma_i64");
+  patterns.add<GenericOpConversion<IREE::VM::NotI64Op>>(typeConverter, context,
+                                                        "vm_not_i64");
+  patterns.add<GenericOpConversion<IREE::VM::AndI64Op>>(typeConverter, context,
+                                                        "vm_and_i64");
+  patterns.add<GenericOpConversion<IREE::VM::OrI64Op>>(typeConverter, context,
+                                                       "vm_or_i64");
+  patterns.add<GenericOpConversion<IREE::VM::XorI64Op>>(typeConverter, context,
+                                                        "vm_xor_i64");
 
   // ExtI64: Casting and type conversion/emulation ops
-  patterns.insert<GenericOpConversion<IREE::VM::TruncI64I32Op>>(
+  patterns.add<GenericOpConversion<IREE::VM::TruncI64I32Op>>(
       typeConverter, context, "vm_trunc_i64i32");
-  patterns.insert<GenericOpConversion<IREE::VM::ExtI32I64SOp>>(
+  patterns.add<GenericOpConversion<IREE::VM::ExtI32I64SOp>>(
       typeConverter, context, "vm_ext_i32i64s");
-  patterns.insert<GenericOpConversion<IREE::VM::ExtI32I64UOp>>(
+  patterns.add<GenericOpConversion<IREE::VM::ExtI32I64UOp>>(
       typeConverter, context, "vm_ext_i32i64u");
 
   // ExtI64: Native bitwise shift and rotate ops
-  patterns.insert<GenericOpConversion<IREE::VM::ShlI64Op>>(
-      typeConverter, context, "vm_shl_i64");
-  patterns.insert<GenericOpConversion<IREE::VM::ShrI64SOp>>(
-      typeConverter, context, "vm_shr_i64s");
-  patterns.insert<GenericOpConversion<IREE::VM::ShrI64UOp>>(
-      typeConverter, context, "vm_shr_i64u");
+  patterns.add<GenericOpConversion<IREE::VM::ShlI64Op>>(typeConverter, context,
+                                                        "vm_shl_i64");
+  patterns.add<GenericOpConversion<IREE::VM::ShrI64SOp>>(typeConverter, context,
+                                                         "vm_shr_i64s");
+  patterns.add<GenericOpConversion<IREE::VM::ShrI64UOp>>(typeConverter, context,
+                                                         "vm_shr_i64u");
 
   // ExtI64: Comparison ops
-  patterns.insert<GenericOpConversion<IREE::VM::CmpEQI64Op>>(
+  patterns.add<GenericOpConversion<IREE::VM::CmpEQI64Op>>(
       typeConverter, context, "vm_cmp_eq_i64");
-  patterns.insert<GenericOpConversion<IREE::VM::CmpNEI64Op>>(
+  patterns.add<GenericOpConversion<IREE::VM::CmpNEI64Op>>(
       typeConverter, context, "vm_cmp_ne_i64");
-  patterns.insert<GenericOpConversion<IREE::VM::CmpLTI64SOp>>(
+  patterns.add<GenericOpConversion<IREE::VM::CmpLTI64SOp>>(
       typeConverter, context, "vm_cmp_lt_i64s");
-  patterns.insert<GenericOpConversion<IREE::VM::CmpLTI64UOp>>(
+  patterns.add<GenericOpConversion<IREE::VM::CmpLTI64UOp>>(
       typeConverter, context, "vm_cmp_lt_i64u");
-  patterns.insert<GenericOpConversion<IREE::VM::CmpNZI64Op>>(
+  patterns.add<GenericOpConversion<IREE::VM::CmpNZI64Op>>(
       typeConverter, context, "vm_cmp_nz_i64");
 }
 
