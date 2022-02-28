@@ -22,6 +22,8 @@ LogicalResult ParseCustomKernelTargetFeaturesForAarch64(
     }
     if (f == "+dotprod") {
       targetInfo.add(CustomKernelTargetFeature::Aarch64Dotprod);
+    } else if (f == "+i8mm") {
+      targetInfo.add(CustomKernelTargetFeature::Aarch64I8mm);
     } else {
       llvm::errs() << "Unhandled aarch64 CPU feature: " << f << "\n";
       return failure();

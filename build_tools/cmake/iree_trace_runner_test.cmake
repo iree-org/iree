@@ -129,6 +129,8 @@ endfunction()
 #         --output_code=${CMAKE_CURRENT_BINARY_DIR}/name.mlir
 #         --output_trace=${CMAKE_CURRENT_BINARY_DIR}/name.yaml
 #         --module_path=${CMAKE_CURRENT_BINARY_DIR}/name.vmfb
+#       and if TARGET_CPU_FEATURES is not empty:
+#         --requirements=${TARGET_CPU_FEATURES}
 #   GENERATOR_ARGS: additional args to pass to the generator program.
 #   TARGET_BACKEND: target backend to compile for.
 #   DRIVER: driver to run the module with.
@@ -208,6 +210,9 @@ function(iree_single_backend_generated_trace_runner_test)
   list(APPEND _GENERATOR_STANDARD_FLAGS "--output_code=${_SRC}")
   list(APPEND _GENERATOR_STANDARD_FLAGS "--output_trace=${_TRACE}")
   list(APPEND _GENERATOR_STANDARD_FLAGS "--module_path=${_MODULE_FILE_NAME}")
+  if (_RULE_TARGET_CPU_FEATURES)
+    list(APPEND _GENERATOR_STANDARD_FLAGS "--requirements=${_RULE_TARGET_CPU_FEATURES}")
+  endif()
   list(APPEND _GENERATOR_OUTPUT "${_TRACE}")
 
   add_custom_command(

@@ -192,6 +192,7 @@ iree_generated_trace_runner_test(
   TARGET_CPU_FEATURES_VARIANTS
     "default"
     "aarch64:+dotprod"
+    "aarch64:+i8mm"
 )
 
 iree_generated_trace_runner_test(
@@ -233,6 +234,7 @@ iree_generated_trace_runner_test(
   TARGET_CPU_FEATURES_VARIANTS
     "default"
     "aarch64:+dotprod"
+    "aarch64:+i8mm"
 )
 
 iree_generated_trace_runner_test(
@@ -275,6 +277,7 @@ iree_generated_trace_runner_test(
   TARGET_CPU_FEATURES_VARIANTS
     "default"
     "aarch64:+dotprod"
+    "aarch64:+i8mm"
 )
 
 iree_generated_trace_runner_test(

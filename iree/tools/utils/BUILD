@@ -89,3 +89,13 @@ cc_library(
         "@com_github_yaml_libyaml//:yaml",
     ],
 )
+
+cc_library(
+    name = "cpu_features",
+    srcs = ["cpu_features.c"],
+    hdrs = ["cpu_features.h"],
+    deps = [
+        "//iree/base",
+        "//iree/base:target_platform",
+    ],
+)

@@ -475,6 +475,121 @@ MMTKernel MMTKernel_8x4x1_i8i8i32_Aarch64Dotprod_InlineAsm() {
   return kernel;
 }
 
+// i8*i8->i32 kernel for Aarch64 NEON +i8mm
+//
+// This kernel is needed because: at the moment, codegen doesn't know how to
+// make use of i8mm instructions.
+MMTKernel MMTKernel_8x8x8_i8i8i32_Aarch64I8mm_InlineAsm() {
+  MMTKernel kernel;
+  kernel.arch = CustomKernelTargetArch::Aarch64;
+  kernel.lhsType = MMTKernel::ScalarType::I8;
+  kernel.rhsType = MMTKernel::ScalarType::I8;
+  kernel.accType = MMTKernel::ScalarType::I32;
+  kernel.m0 = 8;  // shape: 8x8x8. We would have enough registers to widen this
+  kernel.k0 = 8;  // to 12x8x8 if needed.
+  kernel.n0 = 8;
+  kernel.lhsRegSize = 16;  // LHS NEON register type: int8x16
+  kernel.rhsRegSize = 16;  // RHS NEON register type: int8x16
+  kernel.accRegSize = 4;   // Accum NEON register type: int32x4
+  kernel.lhsRegs = 4;      // = 8x8/16 for 8x4 LHS elems, 16 per register
+  kernel.rhsRegs = 4;      // = 8x8/16 for 8x4 RHS elems, 16 per register
+  kernel.accRegs = 16;     // = 8x8/4 for 8x8 Accum elems, 4 per register
+  kernel.asmImpl = R"ASM(
+      // What's with the horrendous shuffles (zip, uzp instructions) ?
+      // The smmla instruction works with a 2x2 accumulator tile.
+      // So at the moment, given the MMT vector.contract representation of
+      // the basic block, we have to perform this re-tiling to 2x2 tiles.
+      //
+      // This is not really optimized -- just provided to help shape the next
+      // stage of the discussion, which will be how we change the abstractions
+      // to resolve this.
+      //
+      // For instance, if we compiled a whole loop at once, we would only need
+      // to do so at the start and at the end of the loop. Or even without
+      // handing the whole loop to asm, we could make the vector.contract
+      // higher-dimensional to allow representing this nested tiled layout.
+      // One thing that we should keep in mind though is that this unusual
+      // 2x2 tiled layout is specific to matrix multiplication instructions.
+      // If the matmul kernel were fused into consumer ops, those would probably
+      // prefer not to deal with a 2x2 tiled layout.
+      //
+      // We also can't easily generalize from this to what will be ARMv9+SME.
+      // There, the matmul instruction will also produce a 2D matrix tile,
+      // but that will be much wider, 16x16, and itself row-major, so that when
+      // store it back to NEON/SVE registers, each of those will be contained
+      // within one row. Even if we put multiple such 16x16 tiles side-by-side
+      // in the overall kernel, that will still be at a scale larger than
+      // individual NEON/SVE registers.
+      // 
+      // Rows 0-1 of the 8x8 accumulator tile
+      zip1 v28.2d, $(acc:0).2d, $(acc:2).2d
+      zip2 v29.2d, $(acc:0).2d, $(acc:2).2d
+      zip1 v30.2d, $(acc:1).2d, $(acc:3).2d
+      zip2 v31.2d, $(acc:1).2d, $(acc:3).2d
+      smmla v28.4s, $(lhs:0).16b, $(rhs:0).16b
+      smmla v29.4s, $(lhs:0).16b, $(rhs:1).16b
+      smmla v30.4s, $(lhs:0).16b, $(rhs:2).16b
+      smmla v31.4s, $(lhs:0).16b, $(rhs:3).16b
+      uzp1 $(acc:0).2d, v28.2d, v29.2d
+      uzp1 $(acc:1).2d, v30.2d, v31.2d
+      uzp2 $(acc:2).2d, v28.2d, v29.2d
+      uzp2 $(acc:3).2d, v30.2d, v31.2d
+      // Rows 2-3 of the 8x8 accumulator tile
+      zip1 v28.2d, $(acc:4).2d, $(acc:6).2d
+      zip2 v29.2d, $(acc:4).2d, $(acc:6).2d
+      zip1 v30.2d, $(acc:5).2d, $(acc:7).2d
+      zip2 v31.2d, $(acc:5).2d, $(acc:7).2d
+      smmla v28.4s, $(lhs:1).16b, $(rhs:0).16b
+      smmla v29.4s, $(lhs:1).16b, $(rhs:1).16b
+      smmla v30.4s, $(lhs:1).16b, $(rhs:2).16b
+      smmla v31.4s, $(lhs:1).16b, $(rhs:3).16b
+      uzp1 $(acc:4).2d, v28.2d, v29.2d
+      uzp1 $(acc:5).2d, v30.2d, v31.2d
+      uzp2 $(acc:6).2d, v28.2d, v29.2d
+      uzp2 $(acc:7).2d, v30.2d, v31.2d
+      // Rows 4-5 of the 8x8 accumulator tile
+      zip1 v28.2d, $(acc:8).2d, $(acc:10).2d
+      zip2 v29.2d, $(acc:8).2d, $(acc:10).2d
+      zip1 v30.2d, $(acc:9).2d, $(acc:11).2d
+      zip2 v31.2d, $(acc:9).2d, $(acc:11).2d
+      smmla v28.4s, $(lhs:2).16b, $(rhs:0).16b
+      smmla v29.4s, $(lhs:2).16b, $(rhs:1).16b
+      smmla v30.4s, $(lhs:2).16b, $(rhs:2).16b
+      smmla v31.4s, $(lhs:2).16b, $(rhs:3).16b
+      uzp1 $(acc:8).2d, v28.2d, v29.2d
+      uzp1 $(acc:9).2d, v30.2d, v31.2d
+      uzp2 $(acc:10).2d, v28.2d, v29.2d
+      uzp2 $(acc:11).2d, v30.2d, v31.2d
+      // Rows 6-7 of the 8x8 accumulator tile
+      zip1 v28.2d, $(acc:12).2d, $(acc:14).2d
+      zip2 v29.2d, $(acc:12).2d, $(acc:14).2d
+      zip1 v30.2d, $(acc:13).2d, $(acc:15).2d
+      zip2 v31.2d, $(acc:13).2d, $(acc:15).2d
+      smmla v28.4s, $(lhs:3).16b, $(rhs:0).16b
+      smmla v29.4s, $(lhs:3).16b, $(rhs:1).16b
+      smmla v30.4s, $(lhs:3).16b, $(rhs:2).16b
+      smmla v31.4s, $(lhs:3).16b, $(rhs:3).16b
+      uzp1 $(acc:12).2d, v28.2d, v29.2d
+      uzp1 $(acc:13).2d, v30.2d, v31.2d
+      uzp2 $(acc:14).2d, v28.2d, v29.2d
+      uzp2 $(acc:15).2d, v30.2d, v31.2d
+    )ASM";
+  kernel.asmClobbers = "v28,v29,v30,v31";
+  return kernel;
+}
+
+// TODO:
+// i8*i8->i32 kernel for Aarch64 NEON +i8mm, matrix*vector:
+// Not implemented yet. Due to the shape of the smmla instruction, such a kernel
+// would utilize only 50%. It would still be somewhat faster than the dotprod
+// matrix*vector kernel at the moment because reading 64bits into a NEON
+// register is faster than reading 32bits twice. That's a shallow advantage that
+// might vanish once the vector.contract abstraction layer above kernels is
+// improved. Another reason why it's not implemented yet is it would have shape
+// 8x8x1, same as the aarch64 baseline matrix*vector i8 kernel, so we would need
+// a "kernel benefit" system to cleanly express the preference for the i8mm
+// kernel.
+
 // f32*f32->f32 kernel for Aarch64 NEON
 //
 // Note: this asm kernel isn't needed. The default vector.contract
@@ -1072,6 +1187,10 @@ void populateVectorContractCustomKernelsPatterns(
         patterns.add<MMTCustomKernelPattern>(
             context, MMTKernel_8x4x1_i8i8i32_Aarch64Dotprod_InlineAsm());
       }
+    }
+    if (targetInfo.has(CustomKernelTargetFeature::Aarch64I8mm)) {
+      patterns.add<MMTCustomKernelPattern>(
+          context, MMTKernel_8x8x8_i8i8i32_Aarch64I8mm_InlineAsm());
     }
   }
 }

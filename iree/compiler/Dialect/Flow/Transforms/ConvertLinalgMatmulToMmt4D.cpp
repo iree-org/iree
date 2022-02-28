@@ -348,7 +348,10 @@ LinalgMatmulOpToLinalgMmt4DOpPattern::chooseTileParams(Value lhs, Value rhs,
   if (targetInfo.is(CustomKernelTargetArch::Aarch64)) {
     if (lhsElemType.isSignlessInteger(8) && rhsElemType.isSignlessInteger(8) &&
         accElemType.isSignlessInteger(32)) {
-      if (targetInfo.has(CustomKernelTargetFeature::Aarch64Dotprod)) {
+      if (targetInfo.has(CustomKernelTargetFeature::Aarch64I8mm)) {
+        return chooseMatMulOrMatVec({8, 8, 8}, {8, 8, 1},
+                                    "i8*i8->i32, aarch64 +i8mm");
+      } else if (targetInfo.has(CustomKernelTargetFeature::Aarch64Dotprod)) {
         return chooseMatMulOrMatVec({8, 4, 8}, {8, 4, 1},
                                     "i8*i8->i32, aarch64 +dotprod");
       } else {
