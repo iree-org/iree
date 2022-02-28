@@ -75,11 +75,6 @@ typedef struct iree_vm_stack_frame_t {
   // Function that the stack frame is within.
   iree_vm_function_t function;
 
-  // Depth of the frame within the stack.
-  // As stack frame pointers are not stable this can be used instead to detect
-  // stack enter/leave balance issues.
-  int32_t depth;
-
   // Cached module state pointer for the module containing |function|.
   // This removes the need to lookup the module state when control returns to
   // the function during continuation or from a return instruction.
@@ -90,6 +85,11 @@ typedef struct iree_vm_stack_frame_t {
   // offset (such as in the case of VM bytecode), a block identifier (compiled
   // code), etc.
   iree_vm_source_offset_t pc;
+
+  // Depth of the frame within the stack.
+  // As stack frame pointers are not stable this can be used instead to detect
+  // stack enter/leave balance issues.
+  int32_t depth;
 
   IREE_TRACE(iree_zone_id_t trace_zone;)
 } iree_vm_stack_frame_t;
