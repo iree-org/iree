@@ -4,7 +4,7 @@ set(_OPTIONAL_SOURCES)
 set(_OPTIONAL_LINK_LIBS)
 if(TARGET lld)
   list(APPEND _OPTIONAL_SOURCES Lld.cpp)
-  set(APPEND _OPTIONAL_LINK_LIBS
+  list(APPEND _OPTIONAL_LINK_LIBS
     lldCommon
     lldCOFF
     lldELF
