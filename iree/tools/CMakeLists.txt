@@ -12,6 +12,17 @@ if(NOT ${IREE_ENABLE_THREADING})
   return()
 endif()
 
+# Depending on which target backends are enabled, we may or may not have built
+# LLD.
+if(IREE_LLD_TARGET)
+  # lld install - required by the compiler to link codegen executables.
+  install(
+    TARGETS lld
+    COMPONENT Compiler
+    RUNTIME DESTINATION bin
+  )
+endif()
+
 add_subdirectory(android)
 add_subdirectory(test)
 add_subdirectory(utils)
@@ -403,7 +414,7 @@ if(${IREE_BUILD_COMPILER})
     DEPS
       ::iree_translate_lib
     DATA
-      lld
+      ${IREE_LLD_TARGET}
     HOSTONLY
   )
 
@@ -413,7 +424,7 @@ if(${IREE_BUILD_COMPILER})
     DEPS
       ::iree_opt_main
     DATA
-      lld
+      ${IREE_LLD_TARGET}
     HOSTONLY
   )
 
@@ -461,7 +472,7 @@ if(${IREE_BUILD_COMPILER})
       iree::vm::bytecode_module
       iree::vm::cc
     DATA
-      lld
+      ${IREE_LLD_TARGET}
     HOSTONLY
   )
 
@@ -470,13 +481,6 @@ if(${IREE_BUILD_COMPILER})
   # Limiting this to when IREE_BUILD_TESTS is set prevents the installation
   # below, which we use for cross-platform testing.
   set_target_properties(FileCheck PROPERTIES EXCLUDE_FROM_ALL OFF)
-
-  # lld install - required by the compiler to link codegen executables.
-  install(
-    TARGETS lld
-    COMPONENT Compiler
-    RUNTIME DESTINATION bin
-  )
 
   # Bundle the FileCheck binary from LLVM into our tests/bin directory so
   # installed FileCheck tests are hermetic.

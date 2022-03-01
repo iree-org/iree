@@ -728,19 +728,15 @@ void registerLLVMAOTTargetBackends(
     std::function<LLVMTargetOptions()> queryOptions) {
   getLLVMTargetOptionsFromFlags();
 
-#define INIT_LLVM_TARGET(TargetName)        \
-  LLVMInitialize##TargetName##Target();     \
-  LLVMInitialize##TargetName##TargetMC();   \
-  LLVMInitialize##TargetName##TargetInfo(); \
-  LLVMInitialize##TargetName##AsmPrinter(); \
-  LLVMInitialize##TargetName##AsmParser();
+  #define LLVM_TARGET(TargetName) \
+    LLVMInitialize##TargetName##Target();     \
+    LLVMInitialize##TargetName##TargetMC();   \
+    LLVMInitialize##TargetName##TargetInfo(); \
+    LLVMInitialize##TargetName##AsmPrinter(); \
+    LLVMInitialize##TargetName##AsmParser();
 
   auto backendFactory = [=]() {
-    INIT_LLVM_TARGET(X86)
-    INIT_LLVM_TARGET(ARM)
-    INIT_LLVM_TARGET(AArch64)
-    INIT_LLVM_TARGET(RISCV)
-    INIT_LLVM_TARGET(WebAssembly)
+    #include "llvm/Config/Targets.def"
     return std::make_shared<LLVMAOTTargetBackend>(queryOptions());
   };
 

@@ -21,10 +21,10 @@ iree_lit_test_suite(
     "trace_dispatch_tensors.mlir"
     "unused_args.mlir"
   TOOLS
+    ${IREE_LLD_TARGET}
     FileCheck
     iree::tools::iree-opt
     iree::tools::iree-run-mlir
-    lld
   LABELS
     "hostonly"
 )

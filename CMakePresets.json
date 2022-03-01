@@ -1,0 +1,65 @@
+{
+  "version": 3,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 21,
+    "patch": 0
+  },
+  "configurePresets": [
+    {
+      "name": "minimal",
+      "displayName": "Minimal compiler+runtime build (all optional compiler features disabled)",
+      "cacheVariables": {
+        "IREE_TARGET_BACKEND_DEFAULTS": {
+          "type": "BOOL",
+          "value": "OFF"
+        },
+        "IREE_CPU_LLVM_TARGETS_DEFAULTS": {
+          "type": "BOOL",
+          "value": "OFF"
+        },
+        "IREE_BUILD_SAMPLES": {
+          "type": "BOOL",
+          "value": "OFF"
+        }
+      }
+    },
+    {
+      "name": "clang-dev",
+      "displayName": "Reasonable defaults for developing with ninja/clang/lld/ccache",
+      "generator": "Ninja",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo",
+        "IREE_ENABLE_ASSERTIONS": {
+          "type": "BOOL",
+          "value": "ON"
+        },
+        "CMAKE_C_COMPILER": "clang",
+        "CMAKE_CXX_COMPILER": "clang++",
+        "IREE_ENABLE_LLD": {
+          "type": "BOOL",
+          "value": "ON"
+        },
+        "CMAKE_C_COMPILER_LAUNCHER": "ccache",
+        "CMAKE_CXX_COMPILER_LAUNCHER": "ccache"
+      }
+    },
+    {
+      "name": "minimal-clang-dev",
+      "displayName": "Minimal compiler+runtime build with ninja/clang/lld/ccache (all optional compiler features disabled)",
+      "inherits": ["clang-dev", "minimal"]
+    },
+    {
+      "name": "x86-clang-dev",
+      "displayName": "Enables X86 CPU compilation",
+      "inherits": ["clang-dev", "minimal"],
+      "cacheVariables": {
+        "IREE_CPU_LLVM_TARGETS": "X86",
+        "IREE_TARGET_BACKEND_DYLIB_LLVM_AOT": {
+          "type": "BOOL",
+          "value": "ON"
+        }
+      }
+    }
+  ]
+}

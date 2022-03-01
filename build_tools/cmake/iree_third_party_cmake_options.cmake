@@ -29,11 +29,12 @@ macro(iree_set_llvm_cmake_options)
   set(LLVM_APPEND_VC_REV OFF CACHE BOOL "" FORCE)
   set(LLVM_ENABLE_IDE ON CACHE BOOL "" FORCE)
 
-  # TODO(ataei): Use optional build time targets selection for LLVMAOT.
-  set(LLVM_TARGETS_TO_BUILD "WebAssembly;X86;ARM;AArch64;RISCV;NVPTX;AMDGPU"
-      CACHE STRING "" FORCE)
+  # Configure LLVM to build the required targets detected from the top-level
+  # CMake file.
+  set(LLVM_TARGETS_TO_BUILD "${IREE_REQUIRED_LLVM_TARGETS}" CACHE STRING "" FORCE)
 
-  set(LLVM_ENABLE_PROJECTS "mlir;lld" CACHE STRING "" FORCE)
+  # Configure LLVM to build projects required by the top-level CMake file.
+  set(LLVM_ENABLE_PROJECTS "${IREE_REQUIRED_LLVM_PROJECTS}" CACHE STRING "" FORCE)
   set(LLVM_ENABLE_BINDINGS OFF CACHE BOOL "" FORCE)
 endmacro()
 
