@@ -101,6 +101,7 @@ void IREEComprehensiveBufferizePass::runOnOperation() {
   options.deallocationFn = deallocationFn;
   options.memCpyFn = memCpyFn;
   options.testAnalysisOnly = false;
+  options.alwaysAliasingWithDest = false;
   addPostAnalysisTransformations(options);
 
   if (failed(bufferization::runOneShotBufferize(moduleOp, options))) {

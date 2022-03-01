@@ -80,7 +80,7 @@ class SPIRVTilePass final : public SPIRVTileBase<SPIRVTilePass> {
 
       FailureOr<linalg::TileLoopNest> loopNest =
           linalg::tileConsumerAndFuseProducers(builder, consumerOp, tileSizes,
-                                               identityLoopOrder);
+                                               identityLoopOrder, llvm::None);
       if (failed(loopNest)) return signalPassFailure();
 
       consumerOp->replaceAllUsesWith(loopNest->getRootOpReplacementResults());
