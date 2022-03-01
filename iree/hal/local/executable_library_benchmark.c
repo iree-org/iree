@@ -300,8 +300,7 @@ static iree_status_t iree_hal_executable_library_run(
       .binding_count = dispatch_params.binding_count,
       .binding_ptrs = binding_ptrs,
       .binding_lengths = binding_lengths,
-      .import_thunk = NULL,  // not yet implemented
-      .imports = NULL,       // not yet implemented
+      .environment = &local_executable->environment,
   };
 
   // Execute benchmark the workgroup invocation.

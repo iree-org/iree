@@ -111,13 +111,18 @@ iree_task_dispatch_shard_t* iree_task_dispatch_shard_allocate(
 // May block the caller for an indeterminate amount of time and should only be
 // called from threads owned by or donated to the executor.
 //
+// |processor_id| is a guess as to which logical processor the shard is
+// executing on. It may be out of date or 0 if the processor could not be
+// queried.
+//
 // |worker_local_memory| is a block of memory exclusively available to the shard
 // during execution. Contents are undefined both before and after execution.
 //
 // Errors are propagated to the parent scope and the dispatch will fail once
 // all shards have completed.
 void iree_task_dispatch_shard_execute(
-    iree_task_dispatch_shard_t* task, iree_byte_span_t worker_local_memory,
+    iree_task_dispatch_shard_t* task, iree_cpu_processor_id_t processor_id,
+    iree_byte_span_t worker_local_memory,
     iree_task_submission_t* pending_submission);
 
 #ifdef __cplusplus

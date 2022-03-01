@@ -10,6 +10,7 @@
 #include <string.h>
 
 #include "iree/base/api.h"
+#include "iree/hal/local/executable_environment.h"
 #include "iree/hal/local/executable_library_demo.h"
 
 // Demonstration of the HAL-side of the iree_hal_executable_library_t ABI.
@@ -27,6 +28,11 @@
 //
 // See iree/hal/local/executable_library.h for more information.
 int main(int argc, char** argv) {
+  // Default environment.
+  iree_hal_executable_environment_v0_t environment;
+  iree_hal_executable_environment_initialize(iree_allocator_system(),
+                                             &environment);
+
   // Query the library header at the requested version.
   // The query call in this example is going into the handwritten demo code
   // but could be targeted at generated files or runtime-loaded shared objects.
@@ -35,7 +41,7 @@ int main(int argc, char** argv) {
     const iree_hal_executable_library_v0_t* v0;
   } library;
   library.header = demo_executable_library_query(
-      IREE_HAL_EXECUTABLE_LIBRARY_LATEST_VERSION, /*reserved=*/NULL);
+      IREE_HAL_EXECUTABLE_LIBRARY_LATEST_VERSION, &environment);
   const iree_hal_executable_library_header_t* header = *library.header;
   IREE_ASSERT_NE(header, NULL, "version may not have matched");
   IREE_ASSERT_LE(
@@ -82,8 +88,8 @@ int main(int argc, char** argv) {
       .binding_count = IREE_ARRAYSIZE(binding_ptrs),
       .binding_ptrs = binding_ptrs,
       .binding_lengths = binding_lengths,
-      .import_thunk = NULL,  // not yet implemented
-      .imports = NULL,       // not yet implemented
+      .processor_id = iree_cpu_query_processor_id(),
+      .environment = &environment,
   };
   for (uint32_t z = 0; z < dispatch_state.workgroup_count.z; ++z) {
     for (uint32_t y = 0; y < dispatch_state.workgroup_count.y; ++y) {

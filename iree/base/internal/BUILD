@@ -103,6 +103,16 @@ cc_test(
 )
 
 cc_library(
+    name = "cpu",
+    srcs = ["cpu.c"],
+    hdrs = ["cpu.h"],
+    deps = [
+        "//iree/base",
+        "//iree/base:core_headers",
+    ],
+)
+
+cc_library(
     name = "dynamic_library",
     srcs = [
         "dynamic_library_posix.c",

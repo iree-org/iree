@@ -17,6 +17,19 @@ package(
 )
 
 cc_library(
+    name = "executable_environment",
+    srcs = ["executable_environment.c"],
+    hdrs = ["executable_environment.h"],
+    deps = [
+        ":executable_library",
+        "//iree/base",
+        "//iree/base:tracing",
+        "//iree/base/internal:cpu",
+        "//iree/hal",
+    ],
+)
+
+cc_library(
     name = "executable_library",
     hdrs = ["executable_library.h"],
 )
@@ -25,6 +38,7 @@ cc_binary_benchmark(
     name = "executable_library_benchmark",
     srcs = ["executable_library_benchmark.c"],
     deps = [
+        ":executable_environment",
         ":executable_library",
         ":local",
         "//iree/base",
@@ -44,9 +58,10 @@ cc_test(
         "executable_library_test.c",
     ],
     deps = [
+        ":executable_environment",
+        ":executable_library",
         "//iree/base",
         "//iree/base:core_headers",
-        "//iree/hal/local:executable_library",
     ],
 )
 
@@ -71,6 +86,7 @@ cc_library(
         "local_executable_layout.h",
     ],
     deps = [
+        ":executable_environment",
         ":executable_library",
         "//iree/base",
         "//iree/base:core_headers",
@@ -145,6 +161,7 @@ cc_library(
         "task_semaphore.h",
     ],
     deps = [
+        ":executable_environment",
         ":executable_library",
         ":local",
         "//iree/base",

@@ -55,6 +55,16 @@ static llvm::StructType *makeImportTableType(llvm::LLVMContext &context) {
   return type;
 }
 
+// %struct.iree_hal_executable_environment_v0_t = type {
+//   ...
+// }
+static llvm::StructType *makeEnvironmentType(llvm::LLVMContext &context) {
+  auto *type = llvm::StructType::getTypeByName(
+      context, "iree_hal_executable_environment_v0_t");
+  assert(type && "environment type must be defined by ConvertToLLVM");
+  return type;
+}
+
 // %struct.anon = type { i32, i32, i32 }
 // %union.iree_hal_vec3_t = type { %struct.anon }
 static llvm::StructType *makeVec3Type(llvm::LLVMContext &context) {
@@ -75,14 +85,7 @@ static llvm::StructType *makeVec3Type(llvm::LLVMContext &context) {
 }
 
 // %struct.iree_hal_executable_dispatch_state_v0_t = type {
-//   %union.iree_hal_vec3_t,
-//   %union.iree_hal_vec3_t,
-//   i64,
-//   i32*,
-//   i64,
-//   i8**,
-//   i64*,
-//   %struct.iree_hal_executable_import_table_v0_t*
+//   ...
 // }
 static llvm::StructType *makeDispatchStateType(llvm::LLVMContext &context) {
   auto *type = llvm::StructType::getTypeByName(
@@ -241,16 +244,16 @@ static llvm::Constant *getStringConstant(StringRef value,
 llvm::Function *LibraryBuilder::build(StringRef queryFuncName) {
   auto &context = module->getContext();
   auto *i32Type = llvm::IntegerType::getInt32Ty(context);
-  auto *ptrType = llvm::Type::getInt8PtrTy(context);
+  auto *environmentType = makeEnvironmentType(context)->getPointerTo();
   auto *libraryHeaderType = makeLibraryHeaderType(context);
 
   // %struct.iree_hal_executable_library_header_t**
-  // @iree_hal_library_query(i32, void*)
+  // @iree_hal_library_query(i32, %struct.iree_hal_executable_environment_v0_t*)
   auto *queryFuncType =
       llvm::FunctionType::get(libraryHeaderType->getPointerTo(),
                               {
                                   i32Type,
-                                  ptrType,
+                                  environmentType,
                               },
                               /*isVarArg=*/false);
   auto *func =

@@ -7,6 +7,7 @@
 #include "iree/base/api.h"
 #include "iree/base/target_platform.h"
 #include "iree/hal/local/elf/elf_module.h"
+#include "iree/hal/local/executable_environment.h"
 #include "iree/hal/local/executable_library.h"
 
 // ELF modules for various platforms embedded in the binary:
@@ -60,6 +61,10 @@ static iree_status_t run_test() {
   IREE_RETURN_IF_ERROR(iree_elf_module_initialize_from_memory(
       file_data, &import_table, iree_allocator_system(), &module));
 
+  iree_hal_executable_environment_v0_t environment;
+  iree_hal_executable_environment_initialize(iree_allocator_system(),
+                                             &environment);
+
   void* query_fn_ptr = NULL;
   IREE_RETURN_IF_ERROR(iree_elf_module_lookup_export(
       &module, IREE_HAL_EXECUTABLE_LIBRARY_EXPORT_NAME, &query_fn_ptr));
@@ -71,7 +76,7 @@ static iree_status_t run_test() {
   library.header =
       (const iree_hal_executable_library_header_t**)iree_elf_call_p_ip(
           query_fn_ptr, IREE_HAL_EXECUTABLE_LIBRARY_LATEST_VERSION,
-          /*reserved=*/NULL);
+          &environment);
   if (library.header == NULL) {
     return iree_make_status(IREE_STATUS_NOT_FOUND, "library header is empty");
   }
@@ -117,6 +122,8 @@ static iree_status_t run_test() {
   dispatch_state.binding_count = 1;
   dispatch_state.binding_lengths = binding_lengths;
   dispatch_state.binding_ptrs = binding_ptrs;
+  dispatch_state.processor_id = iree_cpu_query_processor_id();
+  dispatch_state.environment = &environment;
   iree_hal_vec3_t workgroup_id = {{0, 0, 0}};
   void* local_memory = NULL;
   int ret = iree_elf_call_i_ppp((const void*)library.v0->exports.ptrs[0],

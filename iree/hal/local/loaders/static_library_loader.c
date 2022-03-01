@@ -13,6 +13,7 @@
 
 #include "iree/base/tracing.h"
 #include "iree/hal/api.h"
+#include "iree/hal/local/executable_environment.h"
 #include "iree/hal/local/local_executable.h"
 #include "iree/hal/local/local_executable_layout.h"
 
@@ -166,29 +167,14 @@ static const iree_hal_executable_loader_vtable_t
 
 iree_status_t iree_hal_static_library_loader_create(
     iree_host_size_t library_count,
-    const iree_hal_executable_library_header_t** const* libraries,
+    const iree_hal_executable_library_query_fn_t* library_query_fns,
     iree_hal_executable_import_provider_t import_provider,
     iree_allocator_t host_allocator,
     iree_hal_executable_loader_t** out_executable_loader) {
+  IREE_ASSERT_ARGUMENT(!library_count || library_query_fns);
   IREE_ASSERT_ARGUMENT(out_executable_loader);
   *out_executable_loader = NULL;
   IREE_TRACE_ZONE_BEGIN(z0);
-
-  // Verify the libraries provided all match our expected version.
-  // It's rare they won't, however static libraries generated with a newer
-  // version of the IREE compiler that are then linked with an older version of
-  // the runtime are difficult to spot otherwise.
-  for (iree_host_size_t i = 0; i < library_count; ++i) {
-    const iree_hal_executable_library_header_t* header = *libraries[i];
-    if (header->version > IREE_HAL_EXECUTABLE_LIBRARY_LATEST_VERSION) {
-      IREE_TRACE_ZONE_END(z0);
-      return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
-                              "executable does not support this version of the "
-                              "runtime (executable: %d, runtime: %d)",
-                              header->version,
-                              IREE_HAL_EXECUTABLE_LIBRARY_LATEST_VERSION);
-    }
-  }
 
   iree_hal_static_library_loader_t* executable_loader = NULL;
   iree_host_size_t total_size =
@@ -202,9 +188,45 @@ iree_status_t iree_hal_static_library_loader_create(
         &executable_loader->base);
     executable_loader->host_allocator = host_allocator;
     executable_loader->library_count = library_count;
-    memcpy((void*)executable_loader->libraries, libraries,
-           sizeof(libraries[0]) * library_count);
+
+    // Default environment to enable initialization.
+    iree_hal_executable_environment_v0_t environment;
+    iree_hal_executable_environment_initialize(host_allocator, &environment);
+
+    // Query and verify the libraries provided all match our expected version.
+    // It's rare they won't, however static libraries generated with a newer
+    // version of the IREE compiler that are then linked with an older version
+    // of the runtime are difficult to spot otherwise.
+    for (iree_host_size_t i = 0; i < library_count; ++i) {
+      const iree_hal_executable_library_header_t* const* header_ptr =
+          library_query_fns[i](IREE_HAL_EXECUTABLE_LIBRARY_LATEST_VERSION,
+                               &environment);
+      if (!header_ptr) {
+        status = iree_make_status(
+            IREE_STATUS_UNAVAILABLE,
+            "failed to query library header for runtime version %d",
+            IREE_HAL_EXECUTABLE_LIBRARY_LATEST_VERSION);
+        break;
+      }
+      const iree_hal_executable_library_header_t* header = *header_ptr;
+      IREE_TRACE_ZONE_APPEND_TEXT(z0, header->name);
+      if (header->version > IREE_HAL_EXECUTABLE_LIBRARY_LATEST_VERSION) {
+        status = iree_make_status(
+            IREE_STATUS_FAILED_PRECONDITION,
+            "executable does not support this version of the "
+            "runtime (executable: %d, runtime: %d)",
+            header->version, IREE_HAL_EXECUTABLE_LIBRARY_LATEST_VERSION);
+        break;
+      }
+      memcpy((void*)&executable_loader->libraries[i], &header_ptr,
+             sizeof(header_ptr));
+    }
+  }
+
+  if (iree_status_is_ok(status)) {
     *out_executable_loader = (iree_hal_executable_loader_t*)executable_loader;
+  } else {
+    iree_allocator_free(host_allocator, executable_loader);
   }
 
   IREE_TRACE_ZONE_END(z0);
