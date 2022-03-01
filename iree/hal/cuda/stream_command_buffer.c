@@ -359,15 +359,19 @@ static iree_status_t iree_hal_cuda_stream_command_buffer_dispatch(
   }
 
   int32_t block_size_x, block_size_y, block_size_z;
+  int32_t shared_memory_size;
   IREE_RETURN_IF_ERROR(iree_hal_cuda_native_executable_block_size(
       executable, entry_point, &block_size_x, &block_size_y, &block_size_z));
+  IREE_RETURN_IF_ERROR(iree_hal_cuda_native_executable_shared_memory_size(
+      executable, entry_point, &shared_memory_size));
   CUfunction func =
       iree_hal_cuda_native_executable_for_entry_point(executable, entry_point);
   CUDA_RETURN_IF_ERROR(
       command_buffer->context->syms,
       cuLaunchKernel(func, workgroup_x, workgroup_y, workgroup_z, block_size_x,
-                     block_size_y, block_size_z, 0, command_buffer->stream,
-                     command_buffer->current_descriptor, NULL),
+                     block_size_y, block_size_z, shared_memory_size,
+                     command_buffer->stream, command_buffer->current_descriptor,
+                     NULL),
       "cuLaunchKernel");
   return iree_ok_status();
 }

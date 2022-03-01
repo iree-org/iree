@@ -129,3 +129,36 @@ func @mixed_type() {
 //       CHECK:   llvm.insertvalue %[[PTR]], %{{.*}}[1] : !llvm.struct<(ptr<f32>, ptr<f32>, i64, array<1 x i64>, array<1 x i64>)>
 //       CHECK:   nvvm.read.ptx.sreg.tid.x
 //       CHECK:   llvm.fadd
+  
+// -----
+
+func @shared_memory_lowering() {
+  %c0 = arith.constant 0 : index
+  %cst = arith.constant dense<0.000000e+00> : vector<4xf32>
+  %0 = memref.alloc() : memref<1x16x32xf32, 3>
+  %1 = memref.alloc() : memref<1x32x16xf32, 3>
+  %2 = memref.alloc() : memref<1x8x16xf32, 3> 
+  vector.store %cst, %1[%c0, %c0, %c0] : memref<1x32x16xf32, 3>, vector<4xf32>
+  vector.store %cst, %2[%c0, %c0, %c0] : memref<1x8x16xf32, 3>, vector<4xf32>
+  vector.store %cst, %0[%c0, %c0, %c0] : memref<1x16x32xf32, 3>, vector<4xf32>
+  return
+}
+
+// CHECK-LABEL: llvm.mlir.global external @__dynamic_shared_memory__() {addr_space = 3 : i32, alignment = 16 : i64} : !llvm.array<0 x i8>
+// CHECK-LABEL: llvm.func @shared_memory_lowering() {
+//       CHECK: %{{.*}} = llvm.mlir.addressof @__dynamic_shared_memory__ : !llvm.ptr<array<0 x i8>, 3>
+//  CHECK-NEXT: %{{.*}} = llvm.mlir.constant(0 : i64) : i64
+//  CHECK-NEXT: %{{.*}} = llvm.mlir.constant(0 : i64) : i64
+//  CHECK-NEXT: %{{.*}} = llvm.getelementptr %{{.*}} : (!llvm.ptr<array<0 x i8>, 3>, i64, i64) -> !llvm.ptr<array<0 x i8>, 3>
+//  CHECK-NEXT: %{{.*}} = llvm.bitcast %{{.*}} : !llvm.ptr<array<0 x i8>, 3> to !llvm.ptr<array<1 x array<16 x array<32 x f32>>>, 3>
+//       CHECK: %{{.*}} = llvm.mlir.addressof @__dynamic_shared_memory__ : !llvm.ptr<array<0 x i8>, 3>
+//  CHECK-NEXT: %{{.*}} = llvm.mlir.constant(0 : i64) : i64
+//  CHECK-NEXT: %{{.*}} = llvm.mlir.constant(2048 : i64) : i64
+//  CHECK-NEXT: %{{.*}} = llvm.getelementptr %{{.*}} : (!llvm.ptr<array<0 x i8>, 3>, i64, i64) -> !llvm.ptr<array<0 x i8>, 3>
+//  CHECK-NEXT: %{{.*}} = llvm.bitcast %{{.*}} : !llvm.ptr<array<0 x i8>, 3> to !llvm.ptr<array<1 x array<32 x array<16 x f32>>>, 3>
+//       CHECK: %{{.*}} = llvm.mlir.addressof @__dynamic_shared_memory__ : !llvm.ptr<array<0 x i8>, 3>
+//  CHECK-NEXT: %{{.*}} = llvm.mlir.constant(0 : i64) : i64
+//  CHECK-NEXT: %{{.*}} = llvm.mlir.constant(4096 : i64) : i64
+//  CHECK-NEXT: %{{.*}} = llvm.getelementptr %{{.*}} : (!llvm.ptr<array<0 x i8>, 3>, i64, i64) -> !llvm.ptr<array<0 x i8>, 3>
+//  CHECK-NEXT: %{{.*}} = llvm.bitcast %{{.*}} : !llvm.ptr<array<0 x i8>, 3> to !llvm.ptr<array<1 x array<8 x array<16 x f32>>>, 3>
+

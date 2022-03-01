@@ -54,6 +54,19 @@ iree_check_single_backend_test_suite(
 
 iree_check_single_backend_test_suite(
   NAME
+    check_regression_tosa_dylib-llvm-aot
+  SRCS
+    "linalg_quantized_matmul_vs_linalg_matmul.mlir"
+  TARGET_BACKEND
+    "dylib-llvm-aot"
+  DRIVER
+    "dylib"
+  COMPILER_FLAGS
+    "-iree-input-type=tosa"
+)
+
+iree_check_single_backend_test_suite(
+  NAME
     check_regression_vmvx
   SRCS
     "dynamic_abs.mlir"
@@ -174,11 +187,12 @@ iree_generated_trace_runner_test(
     "dylib-llvm-aot"
   DRIVERS
     "dylib"
-  OPT_FLAGS
-    "--iree-flow-convert-linalg-matmul-to-mmt4d=enable_generic_slow #pass_options_variant#"
+  COMPILER_FLAGS
+    "--iree-flow-mmt4d-target-options=enable_generic_slow #pass_options_variant#"
   TARGET_CPU_FEATURES_VARIANTS
     "default"
     "aarch64:+dotprod"
+    "aarch64:+i8mm"
 )
 
 iree_generated_trace_runner_test(
@@ -195,8 +209,8 @@ iree_generated_trace_runner_test(
     "dylib-llvm-aot"
   DRIVERS
     "dylib"
-  OPT_FLAGS
-    "--iree-flow-convert-linalg-matmul-to-mmt4d=enable_generic_slow #pass_options_variant#"
+  COMPILER_FLAGS
+    "--iree-flow-mmt4d-target-options=enable_generic_slow #pass_options_variant#"
   TARGET_CPU_FEATURES_VARIANTS
     "default"
 )
@@ -215,11 +229,12 @@ iree_generated_trace_runner_test(
     "dylib-llvm-aot"
   DRIVERS
     "dylib"
-  OPT_FLAGS
-    "--iree-flow-convert-linalg-matmul-to-mmt4d=enable_generic_slow #pass_options_variant#"
+  COMPILER_FLAGS
+    "--iree-flow-mmt4d-target-options=enable_generic_slow #pass_options_variant#"
   TARGET_CPU_FEATURES_VARIANTS
     "default"
     "aarch64:+dotprod"
+    "aarch64:+i8mm"
 )
 
 iree_generated_trace_runner_test(
@@ -236,8 +251,8 @@ iree_generated_trace_runner_test(
     "dylib-llvm-aot"
   DRIVERS
     "dylib"
-  OPT_FLAGS
-    "--iree-flow-convert-linalg-matmul-to-mmt4d=enable_generic_slow #pass_options_variant#"
+  COMPILER_FLAGS
+    "--iree-flow-mmt4d-target-options=enable_generic_slow #pass_options_variant#"
   TARGET_CPU_FEATURES_VARIANTS
     "default"
 )
@@ -258,11 +273,11 @@ iree_generated_trace_runner_test(
     "dylib"
   COMPILER_FLAGS
     "--iree-codegen-mmt4d-use-intrinsics"
-  OPT_FLAGS
-    "--iree-flow-convert-linalg-matmul-to-mmt4d=enable_generic_slow #pass_options_variant#"
+    "--iree-flow-mmt4d-target-options=enable_generic_slow #pass_options_variant#"
   TARGET_CPU_FEATURES_VARIANTS
     "default"
     "aarch64:+dotprod"
+    "aarch64:+i8mm"
 )
 
 iree_generated_trace_runner_test(
@@ -281,8 +296,7 @@ iree_generated_trace_runner_test(
     "dylib"
   COMPILER_FLAGS
     "--iree-codegen-mmt4d-use-intrinsics"
-  OPT_FLAGS
-    "--iree-flow-convert-linalg-matmul-to-mmt4d=enable_generic_slow #pass_options_variant#"
+    "--iree-flow-mmt4d-target-options=enable_generic_slow #pass_options_variant#"
   TARGET_CPU_FEATURES_VARIANTS
     "default"
 )

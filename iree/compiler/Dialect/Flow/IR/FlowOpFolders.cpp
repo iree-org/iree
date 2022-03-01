@@ -383,6 +383,13 @@ void TensorConstantOp::getCanonicalizationPatterns(RewritePatternSet &results,
   results.insert<ExpandDynamicShapeConstant>(context);
 }
 
+OpFoldResult TensorTieShapeOp::fold(ArrayRef<Attribute> operands) {
+  if (dynamic_dims().empty()) {
+    return operand();
+  }
+  return {};
+}
+
 OpFoldResult TensorReshapeOp::fold(ArrayRef<Attribute> operands) {
   auto sourceType = source().getType().cast<ShapedType>();
   auto resultType = result().getType().cast<ShapedType>();

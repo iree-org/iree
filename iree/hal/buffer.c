@@ -219,11 +219,12 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_validate_memory_type(
     iree_hal_memory_type_t expected_memory_type) {
   if (IREE_UNLIKELY(
           !iree_all_bits_set(actual_memory_type, expected_memory_type))) {
+#if IREE_STATUS_MODE
     // Missing one or more bits.
     iree_bitfield_string_temp_t temp0, temp1;
-    iree_string_view_t actual_memory_type_str IREE_ATTRIBUTE_UNUSED =
+    iree_string_view_t actual_memory_type_str =
         iree_hal_memory_type_format(actual_memory_type, &temp0);
-    iree_string_view_t expected_memory_type_str IREE_ATTRIBUTE_UNUSED =
+    iree_string_view_t expected_memory_type_str =
         iree_hal_memory_type_format(expected_memory_type, &temp1);
     return iree_make_status(
         IREE_STATUS_PERMISSION_DENIED,
@@ -231,6 +232,9 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_validate_memory_type(
         "buffer has %.*s, operation requires %.*s",
         (int)actual_memory_type_str.size, actual_memory_type_str.data,
         (int)expected_memory_type_str.size, expected_memory_type_str.data);
+#else
+    return iree_status_from_code(IREE_STATUS_PERMISSION_DENIED);
+#endif  // IREE_STATUS_MODE
   }
   return iree_ok_status();
 }
@@ -250,11 +254,12 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_validate_access(
         "memory access must specify one or more of _READ or _WRITE");
   } else if (IREE_UNLIKELY(!iree_all_bits_set(allowed_memory_access,
                                               required_memory_access))) {
+#if IREE_STATUS_MODE
     // Bits must match exactly.
     iree_bitfield_string_temp_t temp0, temp1;
-    iree_string_view_t allowed_memory_access_str IREE_ATTRIBUTE_UNUSED =
+    iree_string_view_t allowed_memory_access_str =
         iree_hal_memory_access_format(allowed_memory_access, &temp0);
-    iree_string_view_t required_memory_access_str IREE_ATTRIBUTE_UNUSED =
+    iree_string_view_t required_memory_access_str =
         iree_hal_memory_access_format(required_memory_access, &temp1);
     return iree_make_status(
         IREE_STATUS_PERMISSION_DENIED,
@@ -262,6 +267,9 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_validate_access(
         "type; buffer allows %.*s, operation requires %.*s",
         (int)allowed_memory_access_str.size, allowed_memory_access_str.data,
         (int)required_memory_access_str.size, required_memory_access_str.data);
+#else
+    return iree_status_from_code(IREE_STATUS_PERMISSION_DENIED);
+#endif  // IREE_STATUS_MODE
   }
   return iree_ok_status();
 }
@@ -270,11 +278,12 @@ IREE_API_EXPORT iree_status_t
 iree_hal_buffer_validate_usage(iree_hal_buffer_usage_t allowed_usage,
                                iree_hal_buffer_usage_t required_usage) {
   if (IREE_UNLIKELY(!iree_all_bits_set(allowed_usage, required_usage))) {
+#if IREE_STATUS_MODE
     // Missing one or more bits.
     iree_bitfield_string_temp_t temp0, temp1;
-    iree_string_view_t allowed_usage_str IREE_ATTRIBUTE_UNUSED =
+    iree_string_view_t allowed_usage_str =
         iree_hal_buffer_usage_format(allowed_usage, &temp0);
-    iree_string_view_t required_usage_str IREE_ATTRIBUTE_UNUSED =
+    iree_string_view_t required_usage_str =
         iree_hal_buffer_usage_format(required_usage, &temp1);
     return iree_make_status(
         IREE_STATUS_PERMISSION_DENIED,
@@ -282,6 +291,9 @@ iree_hal_buffer_validate_usage(iree_hal_buffer_usage_t allowed_usage,
         "buffer allows %.*s, operation requires %.*s",
         (int)allowed_usage_str.size, allowed_usage_str.data,
         (int)required_usage_str.size, required_usage_str.data);
+#else
+    return iree_status_from_code(IREE_STATUS_PERMISSION_DENIED);
+#endif  // IREE_STATUS_MODE
   }
   return iree_ok_status();
 }

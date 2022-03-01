@@ -141,7 +141,8 @@ void LLVMCPUTileFuseAndVectorizePass::runOnOperation() {
           llvm::to_vector<4>(llvm::seq<int64_t>(0, consumerTileSizes.size()));
       FailureOr<linalg::TileLoopNest> tileLoopNest =
           linalg::tileConsumerAndFuseProducers(
-              builder, consumerOp, consumerTileSizes, identityIndicesOrder);
+              builder, consumerOp, consumerTileSizes, identityIndicesOrder,
+              llvm::None);
       if (failed(tileLoopNest)) return signalPassFailure();
       consumerOp->replaceAllUsesWith(
           tileLoopNest->getRootOpReplacementResults());

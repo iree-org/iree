@@ -130,8 +130,18 @@ static inline iree_timeout_t iree_make_deadline(iree_time_t deadline_ns) {
 }
 
 // Defines a relative timeout with the given time in nanoseconds.
-static inline iree_timeout_t iree_make_timeout(iree_duration_t timeout_ns) {
+static inline iree_timeout_t iree_make_timeout_ns(iree_duration_t timeout_ns) {
   iree_timeout_t timeout = {IREE_TIMEOUT_RELATIVE, timeout_ns};
+  return timeout;
+}
+
+// Defines a relative timeout with the given time in milliseconds.
+static inline iree_timeout_t iree_make_timeout_ms(iree_duration_t timeout_ms) {
+  iree_timeout_t timeout = {
+      IREE_TIMEOUT_RELATIVE,
+      timeout_ms == IREE_DURATION_INFINITE ? IREE_DURATION_INFINITE
+                                           : timeout_ms * 1000000,
+  };
   return timeout;
 }
 

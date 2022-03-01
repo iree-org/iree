@@ -27,6 +27,8 @@ table CUDAExecutableDef {
   // Currently the thread group size/block size is decided during code gen but
   // in CUDA it is set by the runtime.
   block_sizes:[CUDABlockSizeDef];
+  // Size of dynamic shared memory.
+  shared_memory_size:[uint32];
 
   // PTX string of the module.
   ptx_image:string;

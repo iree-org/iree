@@ -124,13 +124,15 @@ iree_status_t Run() {
   float kFloat4[] = {4.0f, 4.0f, 4.0f, 4.0f};
   float kFloat2[] = {2.0f, 2.0f, 2.0f, 2.0f};
 
-  iree_hal_memory_type_t input_memory_type =
-      IREE_HAL_MEMORY_TYPE_HOST_LOCAL | IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE;
   if (iree_status_is_ok(status)) {
     status = iree_hal_buffer_view_allocate_buffer(
         iree_hal_device_allocator(device), shape, IREE_ARRAYSIZE(shape),
         IREE_HAL_ELEMENT_TYPE_FLOAT_32, IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR,
-        input_memory_type, IREE_HAL_BUFFER_USAGE_ALL,
+        (iree_hal_buffer_params_t){
+            .type = IREE_HAL_MEMORY_TYPE_HOST_LOCAL |
+                    IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE,
+            .usage = IREE_HAL_BUFFER_USAGE_ALL,
+        },
         iree_make_const_byte_span((void*)kFloat4,
                                   sizeof(float) * kElementCount),
         &arg0_buffer_view);
@@ -139,7 +141,11 @@ iree_status_t Run() {
     status = iree_hal_buffer_view_allocate_buffer(
         iree_hal_device_allocator(device), shape, IREE_ARRAYSIZE(shape),
         IREE_HAL_ELEMENT_TYPE_FLOAT_32, IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR,
-        input_memory_type, IREE_HAL_BUFFER_USAGE_ALL,
+        (iree_hal_buffer_params_t){
+            .type = IREE_HAL_MEMORY_TYPE_HOST_LOCAL |
+                    IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE,
+            .usage = IREE_HAL_BUFFER_USAGE_ALL,
+        },
         iree_make_const_byte_span((void*)kFloat2,
                                   sizeof(float) * kElementCount),
         &arg1_buffer_view);

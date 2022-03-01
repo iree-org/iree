@@ -21,10 +21,14 @@ allowing them to be patched out of band. These repositories are:
 
 By the time you read this, they may be on a cron to advance automatically, but
 even so, it is a good idea to advance them prior to any integrate activities
-so that you have freshest commits available. Each fork repository has an
-action named `Advance Mainline Branch`. Just select `Run Workflow` on that
-action and give it a minute. You should see the corresponding `main` branch
-move forward.
+so that you have freshest commits available. Iree repository has an
+action named [Advance Upstream Forks](https://github.com/google/iree/actions/workflows/advance_upstream_forks.yml)
+to update llvm fork. Just select `Run Workflow` on that action and give it a
+minute. You should see the fork repository `main` branch move forward.
+This currently doesn't update mhlo repository. You need to use the equivalent
+[action](https://github.com/google/iree-mhlo-fork/actions/workflows/advance_mainline.yaml)
+in mhlo fork to update this repository.
+
 
 
 ## Bumping LLVM and Dependent Projects

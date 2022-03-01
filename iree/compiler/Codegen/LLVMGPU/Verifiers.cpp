@@ -62,18 +62,8 @@ LogicalResult verifyGPUMatmulSimtPassPipeline(
 
   // Verify shared memory usage of operands after tiling requires <= 64Kb
   // combined space.
-  unsigned bytesSize;
-  if (MemRefType type = inputType.dyn_cast<mlir::MemRefType>()) {
-    bytesSize = type.getElementType().getIntOrFloatBitWidth() / 8;
-  } else if (RankedTensorType type = inputType.dyn_cast<RankedTensorType>()) {
-    bytesSize = type.getElementType().getIntOrFloatBitWidth() / 8;
-  } else if (UnrankedTensorType type =
-                 inputType.dyn_cast<UnrankedTensorType>()) {
-    bytesSize = type.getElementType().getIntOrFloatBitWidth() / 8;
-  } else {
-    // Unable to determine type, skip rest of verification.
-    return success();
-  }
+  unsigned bytesSize =
+      inputType.cast<ShapedType>().getElementType().getIntOrFloatBitWidth() / 8;
 
   // Input shape sizes: A [ M x K],  B [ K x N]
   unsigned totalSharedMemSizeBytes =
@@ -186,18 +176,8 @@ LogicalResult verifyGPUMatmulTensorCorePipeline(
 
   // Verify shared memory usage of operands after tiling requires <= 64Kb
   // combined space.
-  unsigned bytesSize;
-  if (MemRefType type = inputType.dyn_cast<mlir::MemRefType>()) {
-    bytesSize = type.getElementType().getIntOrFloatBitWidth() / 8;
-  } else if (RankedTensorType type = inputType.dyn_cast<RankedTensorType>()) {
-    bytesSize = type.getElementType().getIntOrFloatBitWidth() / 8;
-  } else if (UnrankedTensorType type =
-                 inputType.dyn_cast<UnrankedTensorType>()) {
-    bytesSize = type.getElementType().getIntOrFloatBitWidth() / 8;
-  } else {
-    // Unable to determine type, skip rest of verification.
-    return success();
-  }
+  unsigned bytesSize =
+      inputType.cast<ShapedType>().getElementType().getIntOrFloatBitWidth() / 8;
 
   // Input shape sizes: A [ M x K],  B [ K x N]
   unsigned totalSharedMemSizeBytes =

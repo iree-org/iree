@@ -41,13 +41,17 @@ iree_cc_library(
   SRCS
     "IREEImportPublic.cpp"
     "Passes.cpp"
+    "QuantizedMatmulToMatmul.cpp"
     "TopLevelSCFToCFG.cpp"
   DEPS
     ::PassHeaders
     ::PassesIncGen
     IREEInputDialect
+    MLIRArithmetic
     MLIRIR
     MLIRLinalg
+    MLIRLinalgTransforms
+    MLIRMemRefTransforms
     MLIRPass
     MLIRSCF
     MLIRSCFToControlFlow

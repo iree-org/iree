@@ -252,10 +252,14 @@ IREE_VM_ABI_EXPORT(iree_hal_module_allocator_allocate,  //
   iree_hal_buffer_usage_t buffer_usage = (iree_hal_buffer_usage_t)args->i2;
   iree_vm_size_t allocation_size = (iree_vm_size_t)args->i3;
 
+  const iree_hal_buffer_params_t params = {
+      .type = memory_types,
+      .usage = buffer_usage,
+  };
   iree_hal_buffer_t* buffer = NULL;
   IREE_RETURN_IF_ERROR(iree_hal_allocator_allocate_buffer(
-      allocator, memory_types, buffer_usage, allocation_size,
-      iree_const_byte_span_empty(), &buffer));
+      allocator, params, allocation_size, iree_const_byte_span_empty(),
+      &buffer));
   rets->r0 = iree_hal_buffer_move_ref(buffer);
   return iree_ok_status();
 }
@@ -320,13 +324,18 @@ IREE_VM_ABI_EXPORT(iree_hal_module_allocator_map_byte_buffer,  //
   // Try mapping - note that this may fail if the target device cannot map the
   // memory into the given type (for example, mapping a host buffer into
   // device-local memory is only going to work on unified memory systems).
+  const iree_hal_buffer_params_t params = {
+      .type = memory_types,
+      .usage = buffer_usage,
+      .access = allowed_access,
+  };
   iree_allocator_t buffer_deref_allocator = {
       .self = source,
       .ctl = iree_hal_module_map_data_ctl,
   };
   iree_hal_buffer_t* buffer = NULL;
   iree_status_t status = iree_hal_allocator_wrap_buffer(
-      allocator, memory_types, allowed_access, buffer_usage,
+      allocator, params,
       iree_make_byte_span(source->data.data + offset, length),
       buffer_deref_allocator, &buffer);
   if (iree_status_is_ok(status)) {
@@ -372,10 +381,14 @@ IREE_VM_ABI_EXPORT(iree_hal_module_allocator_wrap_byte_buffer,  //
         (offset + length - 1), buffer_length);
   }
 
+  const iree_hal_buffer_params_t params = {
+      .type = memory_types,
+      .usage = buffer_usage,
+  };
   iree_hal_buffer_t* buffer = NULL;
   IREE_RETURN_IF_ERROR(
       iree_hal_allocator_allocate_buffer(
-          allocator, memory_types, buffer_usage, length,
+          allocator, params, length,
           iree_make_const_byte_span(source->data.data + offset, length),
           &buffer),
       "failed to allocate buffer of length %d", length);

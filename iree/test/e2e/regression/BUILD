@@ -53,6 +53,7 @@ iree_lit_test_suite(
             "dynamic_linalg_matmul_on_tensors_fuse_0.mlir",
             "dynamic_linalg_matmul_on_tensors_fuse_1.mlir",
             "dynamic_linalg_matmul_on_tensors_fuse_2.mlir",
+            "linalg_quantized_matmul_vs_linalg_matmul.mlir",
             "lowering_config.mlir",
         ] + BACKEND_TESTS,
     ),
@@ -71,6 +72,19 @@ iree_check_single_backend_test_suite(
         "lowering_config.mlir",
     ] + BACKEND_TESTS,
     compiler_flags = ["-iree-input-type=mhlo"],
+    driver = "dylib",
+    target_backend = "dylib-llvm-aot",
+)
+
+iree_check_single_backend_test_suite(
+    name = "check_regression_tosa_dylib-llvm-aot",
+    srcs = [
+        # -iree-input-type=tosa is interesting for this test because
+        # it includes the -iree-linalg-quantized-matmul-to-matmul pass,
+        # so this tests provides e2e coverage for that pass.
+        "linalg_quantized_matmul_vs_linalg_matmul.mlir",
+    ],
+    compiler_flags = ["-iree-input-type=tosa"],
     driver = "dylib",
     target_backend = "dylib-llvm-aot",
 )
@@ -132,19 +146,22 @@ py_binary(
 # Test asm
 [iree_generated_trace_runner_test(
     name = "e2e_matmul_mmt4d_%s_small" % lhs_rhs_type,
+    compiler_flags = [
+        "--iree-flow-mmt4d-target-options=enable_generic_slow #pass_options_variant#",
+    ],
     generator = ":generate_e2e_matmul_tests",
     generator_args = [
         "--lhs_rhs_type=%s" % lhs_rhs_type,
         "--shapes=small",
     ],
-    opt_flags = [
-        "--iree-flow-convert-linalg-matmul-to-mmt4d=enable_generic_slow #pass_options_variant#",
-    ],
     target_backends_and_drivers = [
         ("dylib-llvm-aot", "dylib"),
     ],
     target_cpu_features_variants = ["default"] +
-                                   (["aarch64:+dotprod"] if lhs_rhs_type == "i8" else []),
+                                   ([
+                                       "aarch64:+dotprod",
+                                       "aarch64:+i8mm",
+                                   ] if lhs_rhs_type == "i8" else []),
     trace_runner = "//iree/tools:iree-e2e-matmul-test",
 ) for lhs_rhs_type in [
     "i8",
@@ -153,19 +170,22 @@ py_binary(
 
 [iree_generated_trace_runner_test(
     name = "e2e_matmul_mmt4d_%s_large" % lhs_rhs_type,
+    compiler_flags = [
+        "--iree-flow-mmt4d-target-options=enable_generic_slow #pass_options_variant#",
+    ],
     generator = ":generate_e2e_matmul_tests",
     generator_args = [
         "--lhs_rhs_type=%s" % lhs_rhs_type,
         "--shapes=large",
     ],
-    opt_flags = [
-        "--iree-flow-convert-linalg-matmul-to-mmt4d=enable_generic_slow #pass_options_variant#",
-    ],
     target_backends_and_drivers = [
         ("dylib-llvm-aot", "dylib"),
     ],
     target_cpu_features_variants = ["default"] +
-                                   (["aarch64:+dotprod"] if lhs_rhs_type == "i8" else []),
+                                   ([
+                                       "aarch64:+dotprod",
+                                       "aarch64:+i8mm",
+                                   ] if lhs_rhs_type == "i8" else []),
     trace_runner = "//iree/tools:iree-e2e-matmul-test",
 ) for lhs_rhs_type in [
     "i8",
@@ -177,20 +197,23 @@ py_binary(
 # tests in ways that are orthogonal to problem sizes.
 [iree_generated_trace_runner_test(
     name = "e2e_matmul_mmt4d_%s_intrinsics_%s" % (lhs_rhs_type, size),
-    compiler_flags = ["--iree-codegen-mmt4d-use-intrinsics"],
+    compiler_flags = [
+        "--iree-codegen-mmt4d-use-intrinsics",
+        "--iree-flow-mmt4d-target-options=enable_generic_slow #pass_options_variant#",
+    ],
     generator = ":generate_e2e_matmul_tests",
     generator_args = [
         "--lhs_rhs_type=%s" % lhs_rhs_type,
         "--shapes=%s" % size,
     ],
-    opt_flags = [
-        "--iree-flow-convert-linalg-matmul-to-mmt4d=enable_generic_slow #pass_options_variant#",
-    ],
     target_backends_and_drivers = [
         ("dylib-llvm-aot", "dylib"),
     ],
     target_cpu_features_variants = ["default"] +
-                                   (["aarch64:+dotprod"] if lhs_rhs_type == "i8" else []),
+                                   ([
+                                       "aarch64:+dotprod",
+                                       "aarch64:+i8mm",
+                                   ] if lhs_rhs_type == "i8" else []),
     trace_runner = "//iree/tools:iree-e2e-matmul-test",
 ) for lhs_rhs_type in [
     "i8",

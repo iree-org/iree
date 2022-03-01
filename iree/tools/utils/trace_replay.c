@@ -710,9 +710,12 @@ static iree_status_t iree_trace_replay_parse_hal_buffer(
   iree_hal_buffer_t* buffer = NULL;
   IREE_RETURN_IF_ERROR(iree_hal_allocator_allocate_buffer(
       iree_hal_device_allocator(replay->device),
-      IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL | IREE_HAL_MEMORY_TYPE_HOST_VISIBLE,
-      IREE_HAL_BUFFER_USAGE_ALL, allocation_size, iree_const_byte_span_empty(),
-      &buffer));
+      (iree_hal_buffer_params_t){
+          .type = IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL |
+                  IREE_HAL_MEMORY_TYPE_HOST_VISIBLE,
+          .usage = IREE_HAL_BUFFER_USAGE_ALL,
+      },
+      allocation_size, iree_const_byte_span_empty(), &buffer));
 
   iree_vm_ref_t buffer_ref = iree_hal_buffer_move_ref(buffer);
   iree_status_t status = iree_vm_list_push_ref_move(target_list, &buffer_ref);
@@ -786,17 +789,25 @@ static iree_status_t iree_trace_replay_parse_hal_buffer_view(
     IREE_RETURN_IF_ERROR(iree_hal_buffer_view_generate_buffer(
         iree_hal_device_allocator(replay->device), shape, shape_rank,
         element_type, encoding_type,
-        IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL | IREE_HAL_MEMORY_TYPE_HOST_VISIBLE,
-        IREE_HAL_BUFFER_USAGE_DISPATCH | IREE_HAL_BUFFER_USAGE_TRANSFER |
-            IREE_HAL_BUFFER_USAGE_MAPPING,
+        (iree_hal_buffer_params_t){
+            .type = IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL |
+                    IREE_HAL_MEMORY_TYPE_HOST_VISIBLE,
+            .usage = IREE_HAL_BUFFER_USAGE_DISPATCH |
+                     IREE_HAL_BUFFER_USAGE_TRANSFER |
+                     IREE_HAL_BUFFER_USAGE_MAPPING,
+        },
         iree_trace_replay_generate_hal_buffer_callback, &params, &buffer_view));
   } else {
     IREE_RETURN_IF_ERROR(iree_hal_buffer_view_allocate_buffer(
         iree_hal_device_allocator(replay->device), shape, shape_rank,
         element_type, encoding_type,
-        IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL | IREE_HAL_MEMORY_TYPE_HOST_VISIBLE,
-        IREE_HAL_BUFFER_USAGE_DISPATCH | IREE_HAL_BUFFER_USAGE_TRANSFER |
-            IREE_HAL_BUFFER_USAGE_MAPPING,
+        (iree_hal_buffer_params_t){
+            .type = IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL |
+                    IREE_HAL_MEMORY_TYPE_HOST_VISIBLE,
+            .usage = IREE_HAL_BUFFER_USAGE_DISPATCH |
+                     IREE_HAL_BUFFER_USAGE_TRANSFER |
+                     IREE_HAL_BUFFER_USAGE_MAPPING,
+        },
         iree_const_byte_span_empty(), &buffer_view));
   }
 

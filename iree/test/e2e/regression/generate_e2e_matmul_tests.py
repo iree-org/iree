@@ -115,9 +115,9 @@ def get_test_shapes(shapes_id: ShapesId):
         TestShape(m=10000, k=1, n=1),
         TestShape(m=1, k=10000, n=1),
         TestShape(m=1, k=1, n=10000),
-        #TestShape(m=1, k=1000, n=1000),
-        #TestShape(m=1000, k=1, n=1000),
-        #TestShape(m=1000, k=1000, n=1),
+        TestShape(m=1, k=1000, n=1000),
+        # TestShape(m=1000, k=1, n=1000),
+        TestShape(m=1000, k=1000, n=1),
         # Medium sizes, involving other very small dimensions just above 1
         TestShape(m=1300, k=1300, n=2),
         #TestShape(m=1300, k=1300, n=3),
@@ -460,7 +460,12 @@ def parse_arguments():
       help=
       "Module path (typically .vmfb) to be referenced in the output trace. Should match the output path of the iree-translate command generating the module.",
       required=True)
-
+  parser.add_argument(
+      "--requirements",
+      type=str,
+      help=
+      "Target requirements for this module. Comma-separated. As in -iree-llvm-target-cpu-features. If the target device does not meet all of the requirements, the test will be skipped.",
+      required=False)
   return parser.parse_args()
 
 
@@ -470,10 +475,14 @@ def write_code_file(function_definitions, filename):
       file.write(function_definitions[funcname] + "\n")
 
 
-def write_trace_file(traces, filename, module_path):
+def write_trace_file(traces, filename, module_path, requirements):
   yaml_documents = [
       {
           "type": "context_load",
+      },
+      {
+          "type": "requirements",
+          "target_features": requirements.split(",") if requirements else [],
       },
       {
           "type": "module_load",
@@ -526,7 +535,8 @@ def main(args):
   shapes_id = ShapesId(args.shapes)
   (function_definitions, traces) = generate(lhs_rhs_type, acc_type, shapes_id)
   write_code_file(function_definitions, args.output_code)
-  write_trace_file(traces, args.output_trace, args.module_path)
+  write_trace_file(traces, args.output_trace, args.module_path,
+                   args.requirements)
 
 
 if __name__ == "__main__":

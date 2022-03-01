@@ -129,6 +129,8 @@ endfunction()
 #         --output_code=${CMAKE_CURRENT_BINARY_DIR}/name.mlir
 #         --output_trace=${CMAKE_CURRENT_BINARY_DIR}/name.yaml
 #         --module_path=${CMAKE_CURRENT_BINARY_DIR}/name.vmfb
+#       and if TARGET_CPU_FEATURES is not empty:
+#         --requirements=${TARGET_CPU_FEATURES}
 #   GENERATOR_ARGS: additional args to pass to the generator program.
 #   TARGET_BACKEND: target backend to compile for.
 #   DRIVER: driver to run the module with.
@@ -208,6 +210,9 @@ function(iree_single_backend_generated_trace_runner_test)
   list(APPEND _GENERATOR_STANDARD_FLAGS "--output_code=${_SRC}")
   list(APPEND _GENERATOR_STANDARD_FLAGS "--output_trace=${_TRACE}")
   list(APPEND _GENERATOR_STANDARD_FLAGS "--module_path=${_MODULE_FILE_NAME}")
+  if (_RULE_TARGET_CPU_FEATURES)
+    list(APPEND _GENERATOR_STANDARD_FLAGS "--requirements=${_RULE_TARGET_CPU_FEATURES}")
+  endif()
   list(APPEND _GENERATOR_OUTPUT "${_TRACE}")
 
   add_custom_command(
@@ -344,6 +349,7 @@ function(iree_generated_trace_runner_test)
     foreach(_TARGET_CPU_FEATURES_LIST_ELEM IN LISTS _TARGET_CPU_FEATURES_VARIANTS)
       process_target_cpu_features("${_TARGET_CPU_FEATURES_LIST_ELEM}" _ENABLED _TARGET_CPU_FEATURES _TARGET_CPU_FEATURES_SUFFIX _TARGET_PASS_OPTIONS)
       string(REPLACE "#pass_options_variant#" "${_TARGET_PASS_OPTIONS}" _PROCESSED_OPT_FLAGS "${_RULE_OPT_FLAGS}")
+      string(REPLACE "#pass_options_variant#" "${_TARGET_PASS_OPTIONS}" _PROCESSED_COMPILER_FLAGS "${_RULE_COMPILER_FLAGS}")
       if (NOT _ENABLED)
         # The current entry is disabled on the target CPU architecture.
         continue()
@@ -362,7 +368,7 @@ function(iree_generated_trace_runner_test)
         DRIVER
           ${_DRIVER}
         COMPILER_FLAGS
-          ${_RULE_COMPILER_FLAGS}
+          ${_PROCESSED_COMPILER_FLAGS}
         RUNNER_ARGS
           ${_RULE_RUNNER_ARGS}
         LABELS

@@ -202,50 +202,6 @@ static SmallVector<Value> expandOperands(Location loc, ValueRange operands,
 static void expandSubviews(Operation *op, ExpandedGlobalMap &globalMap,
                            IndexSet &indexSet, SubviewMap &subviewMap);
 
-// Finds the size of a block argument resource or materializes a size if needed.
-// The returned SSA value will be valid at the insertion point (by way of clones
-// or other trickery required to make it so).
-static Value makeBlockArgResourceSize(Location loc, Value resourceValue,
-                                      OpBuilder &builder) {
-  // We can take any implicitly captured SSA values.
-  if (auto sizeAwareOp = dyn_cast_or_null<IREE::Util::SizeAwareOpInterface>(
-          resourceValue.getDefiningOp())) {
-    auto sizeValue = sizeAwareOp.getResultSizeFromValue(resourceValue);
-    if (sizeValue) return sizeValue;
-  }
-
-  // Try first to scan uses in the IR. Since we carry the shape in most ops we
-  // are likely to find at least some SSA value we can inspect.
-  for (auto &use : resourceValue.getUses()) {
-    auto sizeAwareOp =
-        dyn_cast<IREE::Util::SizeAwareOpInterface>(use.getOwner());
-    if (!sizeAwareOp) continue;
-    auto sizeValue = sizeAwareOp.getOperandSize(use.getOperandNumber());
-    if (!sizeValue) continue;
-    if (sizeValue.getParentRegion()->isProperAncestor(
-            builder.getInsertionBlock()->getParent())) {
-      // Size value found and implicitly captured; we can reuse (could be
-      // a parent block argument, a constant, computed, etc).
-      return sizeValue;
-    } else if (auto blockArg = sizeValue.dyn_cast<BlockArgument>()) {
-      if (blockArg.getParentBlock()->isEntryBlock()) {
-        // Dynamic dimension passed in to the entry block; safe to use.
-        return sizeValue;
-      }
-    } else if (sizeValue.getDefiningOp() &&
-               sizeValue.getDefiningOp()->hasTrait<OpTrait::ConstantLike>()) {
-      // Constant op - duplicate at the builder location so we don't have to
-      // worry about SSA dominance issues. CSE will clean up the dupes later.
-      return builder.clone(*sizeValue.getDefiningOp())->getResult(0);
-    }
-    // Uninspectable value.
-  }
-
-  // If we couldn't find anything we could use we'll insert the size query. The
-  // hope is that more program analysis could take care of this for us.
-  return builder.create<IREE::Stream::ResourceSizeOp>(loc, resourceValue);
-}
-
 // Recursively expands resources into (resource, size, offset, length) tuples
 // within the given |region|. All branches, ops, and nested regions will be
 // processed.

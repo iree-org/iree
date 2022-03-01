@@ -13,7 +13,6 @@ package(
 cc_library(
     name = "Transforms",
     srcs = [
-        "AffineMinCanonicalization.cpp",
         "AffineMinDistributedSCFCanonicalization.cpp",
         "RemoveSingleIterationLoop.cpp",
         "Transforms.cpp",

@@ -80,7 +80,7 @@ class DeviceHalTest(unittest.TestCase):
       self.assertIn("HOST_LOCAL", stats_str)
 
   def testQueryCompatibility(self):
-    compat = self.allocator.query_buffer_compatibility(
+    compat = self.allocator.query_compatibility(
         memory_type=iree.runtime.MemoryType.DEVICE_LOCAL,
         allowed_usage=iree.runtime.BufferUsage.CONSTANT,
         intended_usage=iree.runtime.BufferUsage.CONSTANT |

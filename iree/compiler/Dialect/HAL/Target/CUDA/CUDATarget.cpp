@@ -213,6 +213,8 @@ class CUDATargetBackend final : public TargetBackend {
     }
     std::vector<std::array<int32_t, 3>> workgroupSizes;
     std::vector<std::string> entryPointNames;
+    std::vector<uint32_t> workgroupLocalMemories;
+
     for (auto func : innerModuleOp.getOps<LLVM::LLVMFuncOp>()) {
       auto *llvmFunc = llvmModule->getFunction(func.getName());
       if (llvmFunc->isDeclaration()) continue;
@@ -220,7 +222,13 @@ class CUDATargetBackend final : public TargetBackend {
       llvmFunc->setName(sanitizeNameForCuda(func.getName()));
       entryPointNames.emplace_back(llvmFunc->getName());
       std::array<int32_t, 3> workgroup_size;
+      uint32_t workgroupLocalMemory = 0;
       auto entryPointOp = entryPointOps[func.getName()];
+      if (auto workgroupLocalMemoryAttr =
+              entryPointOp.workgroup_local_memory()) {
+        workgroupLocalMemory =
+            workgroupLocalMemoryAttr.getValue().getSExtValue();
+      }
       if (Optional<ArrayAttr> workgroupSizeAttr =
               entryPointOp.workgroup_size()) {
         for (auto it : llvm::enumerate(workgroupSizeAttr.getValue())) {
@@ -229,6 +237,7 @@ class CUDATargetBackend final : public TargetBackend {
       } else {
         workgroup_size = {1, 1, 1};
       }
+      workgroupLocalMemories.push_back(workgroupLocalMemory);
       workgroupSizes.push_back(workgroup_size);
       llvm::Metadata *llvmMetadata[] = {
           llvm::ValueAsMetadata::get(llvmFunc),
@@ -277,6 +286,8 @@ class CUDATargetBackend final : public TargetBackend {
         targetISA.size());
 
     auto entryPointsRef = builder.createStringVec(entryPointNames);
+    auto workgroupLocalMemoriesRef =
+        builder.createInt32Vec(workgroupLocalMemories);
 
     iree_CUDABlockSizeDef_vec_start(builder);
     auto blockSizes = workgroupSizes.begin();
@@ -288,6 +299,8 @@ class CUDATargetBackend final : public TargetBackend {
     auto blockSizesRef = iree_CUDABlockSizeDef_vec_end(builder);
 
     iree_CUDAExecutableDef_entry_points_add(builder, entryPointsRef);
+    iree_CUDAExecutableDef_shared_memory_size_add(builder,
+                                                  workgroupLocalMemoriesRef);
     iree_CUDAExecutableDef_block_sizes_add(builder, blockSizesRef);
     iree_CUDAExecutableDef_ptx_image_add(builder, ptxCudeRef);
     iree_CUDAExecutableDef_end_as_root(builder);

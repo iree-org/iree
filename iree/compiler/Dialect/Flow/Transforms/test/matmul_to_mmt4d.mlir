@@ -1,6 +1,7 @@
 // RUN: iree-opt -split-input-file --iree-flow-convert-linalg-matmul-to-mmt4d=enable_generic_slow %s | FileCheck %s
 // RUN: iree-opt -split-input-file --iree-flow-convert-linalg-matmul-to-mmt4d='arch=aarch64' %s | FileCheck %s -check-prefix=AARCH64-BASELINE
 // RUN: iree-opt -split-input-file --iree-flow-convert-linalg-matmul-to-mmt4d='arch=aarch64 features=+dotprod' %s | FileCheck %s -check-prefix=AARCH64-DOTPROD
+// RUN: iree-opt -split-input-file --iree-flow-convert-linalg-matmul-to-mmt4d='arch=aarch64 features=+i8mm' %s | FileCheck %s -check-prefix=AARCH64-I8MM
 
 // There are two parts to this test: the "deep" part and the "wide part".
 
@@ -192,6 +193,11 @@ func @check_target_specific_mmt4d_i8_dynamic(%arg0: tensor<?x?xi8>, %arg1: tenso
 // AARCH64-DOTPROD:        linalg.mmt4d
 // AARCH64-DOTPROD-SAME:     {comment = "i8*i8->i32, aarch64 +dotprod"}
 // AARCH64-DOTPROD-SAME:     ins({{.*}} : tensor<?x?x8x4xi8>, tensor<?x?x8x4xi8>) outs({{.*}} : tensor<?x?x8x8xi32>) -> tensor<?x?x8x8xi32>
+
+// AARCH64-I8MM-LABEL:  @check_target_specific_mmt4d_i8_dynamic(
+// AARCH64-I8MM:        linalg.mmt4d
+// AARCH64-I8MM-SAME:     {comment = "i8*i8->i32, aarch64 +i8mm"}
+// AARCH64-I8MM-SAME:     ins({{.*}} : tensor<?x?x8x8xi8>, tensor<?x?x8x8xi8>) outs({{.*}} : tensor<?x?x8x8xi32>) -> tensor<?x?x8x8xi32>
 
 // -----
 func @check_target_specific_mmt4d_i8_dynamic_matvec(%arg0: tensor<?x?xi8>, %arg1: tensor<?x1xi8>, %arg2: tensor<?x1xi32>) -> tensor<?x1xi32> {

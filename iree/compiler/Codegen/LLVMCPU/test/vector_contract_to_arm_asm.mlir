@@ -1,5 +1,6 @@
 // RUN: iree-opt -iree-llvmcpu-vector-contract-custom-kernels='arch=aarch64' %s | FileCheck %s -check-prefix=AARCH64-BASELINE
 // RUN: iree-opt -iree-llvmcpu-vector-contract-custom-kernels='arch=aarch64 features=+dotprod' %s | FileCheck %s -check-prefix=AARCH64-DOTPROD
+// RUN: iree-opt -iree-llvmcpu-vector-contract-custom-kernels='arch=aarch64 features=+i8mm' %s | FileCheck %s -check-prefix=AARCH64-I8MM
 
 // There are two parts to this test: the "deep" part and the "wide part".
 
@@ -297,3 +298,25 @@ func @mmt_1x4x8_i8i8i32_vecmat(
 // AARCH64-DOTPROD-SAME:      {{((.*sdot){2})}}
 // AARCH64-DOTPROD-SAME:      "{{(\=w,){2}(w,){3}0,1}}"
 // AARCH64-DOTPROD-SAME:      {{\((vector<16xi8>, ){2}(vector<4xi8>, ){1}(vector<4xi32>(, )?){2}\)}}
+
+// -----
+func @mmt_8x8x8_i8i8i32(
+    %lhs: vector<8x8xi8>,
+    %rhs: vector<8x8xi8>,
+    %acc: vector<8x8xi32>) -> vector<8x8xi32> {
+  %lhs_wide = arith.extsi %lhs : vector<8x8xi8> to vector<8x8xi32>
+  %rhs_wide = arith.extsi %rhs : vector<8x8xi8> to vector<8x8xi32>
+  %res = vector.contract {
+      indexing_maps = [
+          affine_map<(d0, d1, d2) -> (d0, d2)>,
+          affine_map<(d0, d1, d2) -> (d1, d2)>,
+          affine_map<(d0, d1, d2) -> (d0, d1)>
+      ], iterator_types = ["parallel", "parallel", "reduction"], kind = #vector.kind<add>
+  } %lhs_wide, %rhs_wide, %acc : vector<8x8xi32>, vector<8x8xi32> into vector<8x8xi32>
+  return %res : vector<8x8xi32>
+}
+// AARCH64-I8MM-LABEL:  @mmt_8x8x8_i8i8i32(
+// AARCH64-I8MM:     llvm.inline_asm
+// AARCH64-I8MM-SAME:      {{((.*smmla){16})}}
+// AARCH64-I8MM-SAME:      "{{(\=w,){16}(w,){8}0,1,.*,15}},~{v28},~{v29},~{v30},~{v31}"
+// AARCH64-I8MM-SAME:      {{\((vector<16xi8>, ){8}(vector<4xi32>(, )?){16}\)}}

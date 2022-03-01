@@ -14,11 +14,11 @@ namespace mlir {
 namespace iree_compiler {
 
 LogicalResult InferCustomKernelsTargetInfoFromParent(
-    FuncOp entryPointFn, CustomKernelsTargetInfo &target_info) {
+    FuncOp entryPointFn, CustomKernelsTargetInfo &targetInfo) {
   // Set the out-value to defaults early so that early returns produce
   // consistent results and so that we can write simpler code below
   // (for loop OR-ing booleans, assuming initial 'false' value).
-  target_info = CustomKernelsTargetInfo();
+  targetInfo = CustomKernelsTargetInfo();
 
   // Try to find the parent ExecutableVariantOp and its relevant attributes.
   auto variantOp =
@@ -47,7 +47,7 @@ LogicalResult InferCustomKernelsTargetInfoFromParent(
   // parsing work of constructing a llvm::Triple from a string.
   llvm::StringRef archName(tripleAttr.getValue().split('-').first);
   llvm::StringRef featuresStr(cpuFeaturesAttr.getValue());
-  return ParseCustomKernelsTargetInfo(archName, featuresStr, target_info);
+  return ParseCustomKernelsTargetInfo(archName, featuresStr, targetInfo);
 }
 
 }  // namespace iree_compiler

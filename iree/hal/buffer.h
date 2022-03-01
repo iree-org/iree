@@ -566,16 +566,17 @@ static_assert(offsetof(iree_hal_buffer_vtable_t, recycle) == 0,
               "to recycle instead");
 
 struct iree_hal_buffer_t {
-  iree_hal_resource_t resource;
-
-  iree_allocator_t host_allocator;
-  iree_hal_allocator_t* device_allocator;
-
+  // Frequently accessed:
+  iree_hal_resource_t resource;  // must be at 0
   iree_hal_buffer_t* allocated_buffer;
   iree_device_size_t allocation_size;
   iree_device_size_t byte_offset;
   iree_device_size_t byte_length;
 
+  // Rarely accessed:
+  iree_allocator_t host_allocator;
+  iree_hal_allocator_t* device_allocator;
+  // TODO(benvanik): bit pack these; could be ~4 bytes vs 12.
   iree_hal_memory_type_t memory_type;
   iree_hal_memory_access_t allowed_access;
   iree_hal_buffer_usage_t allowed_usage;

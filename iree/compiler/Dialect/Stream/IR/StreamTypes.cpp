@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Dialect/Stream/IR/StreamTypes.h"
 
+#include "iree/compiler/Dialect/Stream/IR/StreamOps.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/CommandLine.h"
@@ -299,6 +300,12 @@ bool ResourceType::isAccessStorageCompatible(Type accessType) const {
     return accessType == resourceType;
   }
   return accessType.isa<ShapedType>();
+}
+
+Value ResourceType::inferSizeFromValue(Location loc, Value value,
+                                       OpBuilder &builder) const {
+  return builder.createOrFold<IREE::Stream::ResourceSizeOp>(
+      loc, builder.getIndexType(), value);
 }
 
 //===----------------------------------------------------------------------===//

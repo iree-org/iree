@@ -10,6 +10,7 @@
 #include <functional>
 
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
+#include "iree/compiler/Utils/CustomKernelsTargetInfo.h"
 #include "llvm/ADT/StringMap.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/Pass/Pass.h"
@@ -60,6 +61,12 @@ void registerFlowTransformPassPipeline();
 // Input canonicalization and legalization
 //===----------------------------------------------------------------------===//
 
+// Expands tensor shape dimensions into SSA values across the program.
+std::unique_ptr<OperationPass<mlir::ModuleOp>> createExpandTensorShapesPass();
+
+// Cleans up any remaining shape metadata ops after lowering.
+std::unique_ptr<Pass> createCleanupTensorShapesPass();
+
 // Cleans up any numeric narrowing ops inserted by
 // iree-flow-infer-numeric-narrowing.
 std::unique_ptr<Pass> createCleanupNumericNarrowingPass();
@@ -78,7 +85,10 @@ std::unique_ptr<Pass> createPadTensorToSubTensorInsertPass();
 
 // Pass to convert a linalg.matmul into linalg.mmt4d given some target ISA
 // information currently passed as pass options.
-std::unique_ptr<OperationPass<FuncOp>> createConvertLinalgMatmulToMmt4DPass();
+std::unique_ptr<Pass> createConvertLinalgMatmulToMmt4DPass();
+std::unique_ptr<Pass> createConvertLinalgMatmulToMmt4DPass(
+    CustomKernelsTargetInfo targetInfo);
+std::unique_ptr<Pass> createConvertLinalgMatmulToMmt4DPass(StringRef options);
 
 // Creates a pass to fuse Linalg operations on tensors.
 std::unique_ptr<Pass> createFusionOfTensorOpsPass();

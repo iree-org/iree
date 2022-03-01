@@ -16,7 +16,6 @@ iree_cc_library(
   HDRS
     "Transforms.h"
   SRCS
-    "AffineMinCanonicalization.cpp"
     "AffineMinDistributedSCFCanonicalization.cpp"
     "RemoveSingleIterationLoop.cpp"
     "Transforms.cpp"

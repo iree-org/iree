@@ -33,18 +33,22 @@ class allocator_test : public CtsTestBase {};
 //   IREE_HAL_BUFFER_USAGE_MAPPING
 TEST_P(allocator_test, BaselineBufferCompatibility) {
   // Need at least one way to get data between the host and device.
+  iree_hal_buffer_params_t host_local_params = {0};
+  host_local_params.type =
+      IREE_HAL_MEMORY_TYPE_HOST_LOCAL | IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE;
+  host_local_params.usage = IREE_HAL_BUFFER_USAGE_TRANSFER;
   iree_hal_buffer_compatibility_t transfer_compatibility_host =
-      iree_hal_allocator_query_buffer_compatibility(
-          device_allocator_,
-          IREE_HAL_MEMORY_TYPE_HOST_LOCAL | IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE,
-          /*allowed_usage=*/IREE_HAL_BUFFER_USAGE_TRANSFER,
-          /*intended_usage=*/IREE_HAL_BUFFER_USAGE_TRANSFER, kAllocationSize);
+      iree_hal_allocator_query_compatibility(
+          device_allocator_, host_local_params, kAllocationSize);
+
+  iree_hal_buffer_params_t device_local_params = {0};
+  device_local_params.type =
+      IREE_HAL_MEMORY_TYPE_HOST_VISIBLE | IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL;
+  device_local_params.usage = IREE_HAL_BUFFER_USAGE_TRANSFER;
   iree_hal_buffer_compatibility_t transfer_compatibility_device =
-      iree_hal_allocator_query_buffer_compatibility(
-          device_allocator_,
-          IREE_HAL_MEMORY_TYPE_HOST_VISIBLE | IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL,
-          /*allowed_usage=*/IREE_HAL_BUFFER_USAGE_TRANSFER,
-          /*intended_usage=*/IREE_HAL_BUFFER_USAGE_TRANSFER, kAllocationSize);
+      iree_hal_allocator_query_compatibility(
+          device_allocator_, device_local_params, kAllocationSize);
+
   iree_hal_buffer_compatibility_t required_transfer_compatibility =
       IREE_HAL_BUFFER_COMPATIBILITY_ALLOCATABLE |
       IREE_HAL_BUFFER_COMPATIBILITY_QUEUE_TRANSFER;
@@ -54,46 +58,34 @@ TEST_P(allocator_test, BaselineBufferCompatibility) {
                                 required_transfer_compatibility));
 
   // Need to be able to use some type of buffer as dispatch inputs or outputs.
+  iree_hal_buffer_params_t dispatch_params = {0};
+  dispatch_params.type =
+      IREE_HAL_MEMORY_TYPE_HOST_LOCAL | IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE;
+  dispatch_params.usage = IREE_HAL_BUFFER_USAGE_DISPATCH;
   iree_hal_buffer_compatibility_t dispatch_compatibility =
-      iree_hal_allocator_query_buffer_compatibility(
-          device_allocator_, IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE,
-          /*allowed_usage=*/IREE_HAL_BUFFER_USAGE_DISPATCH,
-          /*intended_usage=*/IREE_HAL_BUFFER_USAGE_DISPATCH, kAllocationSize);
+      iree_hal_allocator_query_compatibility(device_allocator_, dispatch_params,
+                                             kAllocationSize);
   EXPECT_TRUE(
       iree_all_bits_set(dispatch_compatibility,
                         IREE_HAL_BUFFER_COMPATIBILITY_ALLOCATABLE |
                             IREE_HAL_BUFFER_COMPATIBILITY_QUEUE_DISPATCH));
 }
 
-TEST_P(allocator_test, BufferAllowedUsageDeterminesCompatibility) {
-  iree_hal_buffer_compatibility_t compatibility =
-      iree_hal_allocator_query_buffer_compatibility(
-          device_allocator_, IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE,
-          /*allowed_usage=*/IREE_HAL_BUFFER_USAGE_NONE,
-          /*intended_usage=*/IREE_HAL_BUFFER_USAGE_ALL, kAllocationSize);
-  EXPECT_TRUE(iree_all_bits_set(compatibility,
-                                IREE_HAL_BUFFER_COMPATIBILITY_ALLOCATABLE));
-  EXPECT_FALSE(iree_all_bits_set(compatibility,
-                                 IREE_HAL_BUFFER_COMPATIBILITY_QUEUE_TRANSFER));
-  EXPECT_FALSE(iree_all_bits_set(compatibility,
-                                 IREE_HAL_BUFFER_COMPATIBILITY_QUEUE_DISPATCH));
-}
-
 TEST_P(allocator_test, AllocateBuffer) {
-  iree_hal_memory_type_t memory_type = IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE;
-  iree_hal_buffer_usage_t buffer_usage = IREE_HAL_BUFFER_USAGE_TRANSFER;
-
-  iree_hal_buffer_t* buffer;
+  iree_hal_buffer_params_t params = {0};
+  params.type = IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE;
+  params.usage = IREE_HAL_BUFFER_USAGE_TRANSFER;
+  iree_hal_buffer_t* buffer = nullptr;
   IREE_ASSERT_OK(iree_hal_allocator_allocate_buffer(
-      device_allocator_, memory_type, buffer_usage, kAllocationSize,
-      iree_const_byte_span_empty(), &buffer));
+      device_allocator_, params, kAllocationSize, iree_const_byte_span_empty(),
+      &buffer));
 
   // At a mimimum, the requested memory type should be respected.
   // Additional bits may be optionally set depending on the allocator.
   EXPECT_TRUE(
-      iree_all_bits_set(iree_hal_buffer_memory_type(buffer), memory_type));
+      iree_all_bits_set(iree_hal_buffer_memory_type(buffer), params.type));
   EXPECT_TRUE(
-      iree_all_bits_set(iree_hal_buffer_allowed_usage(buffer), buffer_usage));
+      iree_all_bits_set(iree_hal_buffer_allowed_usage(buffer), params.usage));
   EXPECT_GE(iree_hal_buffer_allocation_size(buffer),
             kAllocationSize);  // Larger is okay.
 
@@ -103,12 +95,12 @@ TEST_P(allocator_test, AllocateBuffer) {
 // While empty allocations aren't particularly useful, they can occur in
 // practice so we should at least be able to create them without errors.
 TEST_P(allocator_test, AllocateEmptyBuffer) {
-  iree_hal_memory_type_t memory_type = IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE;
-  iree_hal_buffer_usage_t buffer_usage = IREE_HAL_BUFFER_USAGE_TRANSFER;
-
-  iree_hal_buffer_t* buffer;
+  iree_hal_buffer_params_t params = {0};
+  params.type = IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE;
+  params.usage = IREE_HAL_BUFFER_USAGE_TRANSFER;
+  iree_hal_buffer_t* buffer = nullptr;
   IREE_ASSERT_OK(iree_hal_allocator_allocate_buffer(
-      device_allocator_, memory_type, buffer_usage, /*allocation_size=*/0,
+      device_allocator_, params, /*allocation_size=*/0,
       iree_const_byte_span_empty(), &buffer));
 
   iree_hal_buffer_release(buffer);

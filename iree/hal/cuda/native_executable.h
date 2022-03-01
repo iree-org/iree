@@ -33,6 +33,12 @@ iree_status_t iree_hal_cuda_native_executable_block_size(
     iree_hal_executable_t* executable, int32_t entry_point, uint32_t* x,
     uint32_t* y, uint32_t* z);
 
+// Return the shared memory size of the given |entry_point| within the
+// executable.
+iree_status_t iree_hal_cuda_native_executable_shared_memory_size(
+    iree_hal_executable_t* executable, int32_t entry_point,
+    uint32_t* shared_memory_size);
+
 /// Return the layout associated with the entry point.
 iree_hal_executable_layout_t* iree_hal_cuda_executable_get_layout(
     iree_hal_executable_t* executable, int32_t entry_point);

@@ -53,14 +53,22 @@ class WrapEntryPointsPass
       }
     }
 
+    SymbolTable symbolTable(moduleOp);
+
     // Create a wrapper function for each entry point.
     for (auto entryFuncOp : entryFuncOps) {
       // Rename the original function so that our wrapper can use the original
       // name in its public definition.
       auto publicName = entryFuncOp.getName().str();
       auto privateName = "_" + publicName;
-      mlir::StringAttr privateNameAttr =
+      auto privateNameAttr =
           mlir::StringAttr::get(entryFuncOp.getContext(), privateName);
+      if (failed(symbolTable.replaceAllSymbolUses(entryFuncOp, privateNameAttr,
+                                                  moduleOp))) {
+        entryFuncOp.emitError() << "unknown symbol table op encountered; "
+                                   "cannot fix up symbol names";
+        return signalPassFailure();
+      }
       entryFuncOp.setName(privateNameAttr);
       entryFuncOp.setPrivate();
 

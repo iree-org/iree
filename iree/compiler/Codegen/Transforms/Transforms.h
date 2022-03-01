@@ -55,11 +55,6 @@ using GetMinMaxExprFn =
 /// |getMinMaxFn| for some know values.
 void populateRemoveSingleIterationLoopPattern(RewritePatternSet &patterns,
                                               GetMinMaxExprFn getMinMaxFn);
-
-/// Insert pattern to fold chains of `affine.min` operations.
-// TODO: It is not clear what this pattern is doing and should be deprecated.
-void populateAffineMinCanonicalizationPattern(RewritePatternSet &patterns);
-
 }  // namespace iree_compiler
 }  // namespace mlir
 

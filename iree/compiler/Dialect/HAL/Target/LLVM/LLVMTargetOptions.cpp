@@ -84,7 +84,7 @@ LLVMTargetOptions getLLVMTargetOptionsFromFlags() {
       "iree-llvm-loop-vectorization", llvm::cl::init(true),
       llvm::cl::desc("Enable LLVM loop vectorization opt"));
   static llvm::cl::opt<bool> llvmLoopUnrolling(
-      "iree-llvm-loop-unrolling", llvm::cl::init(false),
+      "iree-llvm-loop-unrolling", llvm::cl::init(true),
       llvm::cl::desc("Enable LLVM loop unrolling opt"));
   static llvm::cl::opt<bool> llvmSLPVectorization(
       "iree-llvm-slp-vectorization", llvm::cl::init(false),

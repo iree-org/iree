@@ -105,18 +105,18 @@ func @scatter_mixed_tensor_memref(
 
 // -----
 
-func @scatter_mixed_tensor_memref(
+func @scatter_output_type_mismatch(
     %update : tensor<?x?xf32>, %indices : tensor<?x1xi32>,
-    %original : tensor<?x?xf32>) -> memref<?x?xf32> {
-  // expected-error @+1 {{expected type of `outs` operand #0 'tensor<?x?xf32>' to be same as result type 'memref<?x?xf32>'}}
+    %original : tensor<?x?xf32>) -> tensor<4x?xf32> {
+  // expected-error @+1 {{expected type of `outs` operand #0 'tensor<?x?xf32>' to be same as result type 'tensor<4x?xf32>'}}
   %0 = iree_linalg_ext.scatter unique_indices(true)
       ins(%update, %indices : tensor<?x?xf32>, tensor<?x1xi32>)
       outs(%original : tensor<?x?xf32>) {
       ^bb0(%arg1: f32, %arg2: f32):
         %1 = arith.addf %arg1, %arg2 : f32
         iree_linalg_ext.yield %1 : f32
-      } -> memref<?x?xf32>
-  return %0 : memref<?x?xf32>
+      } -> tensor<4x?xf32>
+  return %0 : tensor<4x?xf32>
 }
 
 // -----

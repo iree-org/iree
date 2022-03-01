@@ -206,7 +206,7 @@ TEST(NotificationTest, Timeout) {
       +[](void* entry_arg) -> bool {
         return false;  // condition is never true
       },
-      NULL, iree_make_timeout(100 * 1000000)));
+      NULL, iree_make_timeout_ms(100)));
 
   iree_duration_t delta_ns = iree_time_now() - start_ns;
   iree_duration_t delta_ms = delta_ns / 1000000;

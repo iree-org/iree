@@ -18,6 +18,10 @@ iree_cc_library(
     "assert.h"
     "bitfield.c"
     "bitfield.h"
+    "loop.c"
+    "loop.h"
+    "loop_inline.c"
+    "loop_inline.h"
     "status.c"
     "status.h"
     "string_builder.c"
@@ -68,6 +72,35 @@ iree_cc_test(
     ::base
     iree::testing::gtest
     iree::testing::gtest_main
+)
+
+iree_cc_test(
+  NAME
+    loop_inline_test
+  SRCS
+    "loop_inline_test.cc"
+  DEPS
+    ::base
+    ::cc
+    ::loop_test_hdrs
+    ::tracing
+    iree::testing::gtest
+    iree::testing::gtest_main
+)
+
+iree_cc_library(
+  NAME
+    loop_test_hdrs
+  HDRS
+    "loop_test.h"
+  DEPS
+    ::base
+    ::cc
+    ::tracing
+    iree::base::internal::wait_handle
+    iree::testing::gtest
+  TESTONLY
+  PUBLIC
 )
 
 iree_cc_test(
@@ -124,6 +157,36 @@ iree_cc_library(
     ::tracing
     iree::base::internal::flags
   PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    loop_sync
+  HDRS
+    "loop_sync.h"
+  SRCS
+    "loop_sync.c"
+  DEPS
+    ::base
+    ::tracing
+    iree::base::internal
+    iree::base::internal::wait_handle
+  PUBLIC
+)
+
+iree_cc_test(
+  NAME
+    loop_sync_test
+  SRCS
+    "loop_sync_test.cc"
+  DEPS
+    ::base
+    ::cc
+    ::loop_sync
+    ::loop_test_hdrs
+    ::tracing
+    iree::testing::gtest
+    iree::testing::gtest_main
 )
 
 # TODO(benvanik): evaluate if we want this as part of the API. Could restrict it

@@ -366,6 +366,9 @@ def Stream_Resource : TypeDef<Stream_Dialect, "Resource", [
   DeclareTypeInterfaceMethods<Util_GlobalTypeInterface, [
     "isAccessStorageCompatible",
   ]>,
+  DeclareTypeInterfaceMethods<Util_InferTypeSize, [
+    "inferSizeFromValue",
+  ]>,
 ]> {
   let mnemonic = "resource";
 

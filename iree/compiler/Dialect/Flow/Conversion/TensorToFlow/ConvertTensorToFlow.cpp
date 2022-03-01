@@ -331,7 +331,8 @@ void populateTensorToFlowPatternsBeforeDispatchFormation(
 
 void populateTensorToFlowPatternsAfterDispatchFormation(
     MLIRContext *context, RewritePatternSet &patterns) {
-  patterns.insert<ConvertTensorExtractPattern>(context);
+  patterns.insert<ConvertTensorExtractPattern, ConvertTensorCastPattern>(
+      context);
 }
 
 }  // namespace Flow

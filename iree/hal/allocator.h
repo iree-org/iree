@@ -22,6 +22,95 @@ extern "C" {
 // Types and Enums
 //===----------------------------------------------------------------------===//
 
+// A bitmap indicating logical device queue affinity.
+// Used to direct submissions to specific device queues or locate memory nearby
+// where it will be used. The meaning of the bits in the bitmap is
+// implementation-specific: a bit may represent a logical queue in an underlying
+// API such as a VkQueue or a physical queue such as a discrete virtual device.
+//
+// Bitwise operations can be performed on affinities; for example AND'ing two
+// affinities will produce the intersection and OR'ing will produce the union.
+// This enables just-in-time selection as a command buffer could be made
+// available to some set of queues when recorded and then AND'ed with an actual
+// set of queues to execute on during submission.
+typedef uint64_t iree_hal_queue_affinity_t;
+
+// Specifies that any queue may be selected.
+#define IREE_HAL_QUEUE_AFFINITY_ANY ((iree_hal_queue_affinity_t)(-1))
+
+// Parameters defining how a buffer should be allocated.
+//
+// Designed to be zero-initialized: any field with a 0 value will be assigned
+// a default as indicated in the field description.
+//
+// For ergonomics when used from C++ w/o named initializers the first field is
+// the most commonly used so that it can be initialized by location:
+//    some_fn(..., {IREE_HAL_BUFFER_USAGE_FOO}, ...)
+typedef struct iree_hal_buffer_params_t {
+  // Specifies the usage allowed by HAL APIs and aids in memory placement.
+  // Devices may have different memory types for different usage and require
+  // the intended usage to be declared upon allocation. It's always best to
+  // limit the allowed usage bits to precisely what the actual usage will be to
+  // avoid additional copies, synchronization, and expensive emulation.
+  //
+  // If 0 then the usage will be set as IREE_HAL_BUFFER_USAGE_ALL.
+  iree_hal_buffer_usage_t usage;
+
+  // Specifies the access allowed to the memory via the HAL APIs.
+  // For example, if the IREE_HAL_MEMORY_ACCESS_WRITE bit is not set then any
+  // API call that would write to the memory will fail (such as
+  // iree_hal_command_buffer_update_buffer). This does not limit any untrusted
+  // dispatch or external use of the buffer and should not be treated as a
+  // memory protection mechanism.
+  //
+  // If 0 then the access will be set as IREE_HAL_MEMORY_ACCESS_ALL.
+  iree_hal_memory_access_t access;
+
+  // Specifies the memory type properties used for selecting a memory space.
+  // This should often be IREE_HAL_MEMORY_TYPE_OPTIMAL to allow the allocator
+  // to place the allocation based on usage bits but can be specified if the
+  // exact memory type must be used for compatibility with external code.
+  //
+  // If 0 then the type will be set as IREE_HAL_MEMORY_TYPE_OPTIMAL.
+  iree_hal_memory_type_t type;
+
+  // Queue affinity bitmap indicating which queues may access this buffer.
+  // For NUMA devices this can be used to more tightly scope the allocation to
+  // particular device memory and provide better pool placement. When a device
+  // supports peering or replication the affinity bitmap will be used to choose
+  // which subdevices require configuration.
+  //
+  // If 0 then the buffer will be available on any queue as if
+  // IREE_HAL_QUEUE_AFFINITY_ANY was specified.
+  iree_hal_queue_affinity_t queue_affinity;
+
+  // Minimum alignment, in bytes, of the resulting allocation.
+  // The actual alignment may be any value greater-than-or-equal-to this value.
+  //
+  // If 0 then the alignment will be decided by the allocator based on optimal
+  // device parameters.
+  iree_device_size_t min_alignment;
+} iree_hal_buffer_params_t;
+
+// Canonicalizes |params| fields when zero initialization is used.
+static inline void iree_hal_buffer_params_canonicalize(
+    iree_hal_buffer_params_t* params) {
+  if (!params->usage) params->usage = IREE_HAL_BUFFER_USAGE_ALL;
+  if (!params->access) params->access = IREE_HAL_MEMORY_ACCESS_ALL;
+  if (!params->queue_affinity) {
+    params->queue_affinity = IREE_HAL_QUEUE_AFFINITY_ANY;
+  }
+}
+
+// Returns |params| with the given |usage| bits OR'ed in.
+static inline iree_hal_buffer_params_t iree_hal_buffer_params_with_usage(
+    const iree_hal_buffer_params_t params, iree_hal_buffer_usage_t usage) {
+  iree_hal_buffer_params_t result = params;
+  if (!result.usage) result.usage = IREE_HAL_BUFFER_USAGE_ALL;
+  result.usage |= usage;
+  return result;
+}
+
 // A bitfield indicating compatible behavior for buffers in an allocator.
 enum iree_hal_buffer_compatibility_bits_t {
   // Indicates (in the absence of other bits) the buffer is not compatible with
@@ -199,12 +288,13 @@ IREE_API_EXPORT void iree_hal_allocator_release(
     iree_hal_allocator_t* allocator);
 
 // Returns the host allocator used for allocating host objects.
-IREE_API_EXPORT iree_allocator_t
-iree_hal_allocator_host_allocator(const iree_hal_allocator_t* allocator);
+IREE_API_EXPORT iree_allocator_t iree_hal_allocator_host_allocator(
+    const iree_hal_allocator_t* IREE_RESTRICT allocator);
 
 // Trims cached/unused pooled buffers, if any.
 IREE_API_EXPORT
-iree_status_t iree_hal_allocator_trim(iree_hal_allocator_t* allocator);
+iree_status_t iree_hal_allocator_trim(
+    iree_hal_allocator_t* IREE_RESTRICT allocator);
 
 // Queries the aggregate statistics from the allocator since creation.
 // Thread-safe; statistics are captured at the time the call is made.
@@ -212,13 +302,13 @@ iree_status_t iree_hal_allocator_trim(iree_hal_allocator_t* allocator);
 // NOTE: statistics may be compiled out in some configurations and this call
 // will become a memset(0).
 IREE_API_EXPORT void iree_hal_allocator_query_statistics(
-    iree_hal_allocator_t* allocator,
-    iree_hal_allocator_statistics_t* out_statistics);
+    iree_hal_allocator_t* IREE_RESTRICT allocator,
+    iree_hal_allocator_statistics_t* IREE_RESTRICT out_statistics);
 
 // Prints the current allocation statistics of |allocator| to |file|.
 // No-op if statistics are not enabled (IREE_STATISTICS_ENABLE).
 IREE_API_EXPORT iree_status_t iree_hal_allocator_statistics_fprint(
-    FILE* file, iree_hal_allocator_t* allocator);
+    FILE* file, iree_hal_allocator_t* IREE_RESTRICT allocator);
 
 // Returns a bitmask indicating what operations with buffers of the given type
 // are available on the allocator.
@@ -231,18 +321,14 @@ IREE_API_EXPORT iree_status_t iree_hal_allocator_statistics_fprint(
 // be transferred externally into a buffer compatible with the device the
 // allocator services.
 IREE_API_EXPORT iree_hal_buffer_compatibility_t
-iree_hal_allocator_query_buffer_compatibility(
-    iree_hal_allocator_t* allocator, iree_hal_memory_type_t memory_type,
-    iree_hal_buffer_usage_t allowed_usage,
-    iree_hal_buffer_usage_t intended_usage, iree_device_size_t allocation_size);
+iree_hal_allocator_query_compatibility(
+    iree_hal_allocator_t* IREE_RESTRICT allocator,
+    iree_hal_buffer_params_t params, iree_device_size_t allocation_size);
 
 // Allocates a buffer from the allocator.
 // If |initial_data| is provided then the bytes will be copied into the device
 // buffer. To avoid the copy when constant data is used prefer
 // iree_hal_allocator_wrap_buffer when available.
-// Fails if the memory type requested for the given usage cannot be serviced.
-// Callers can use iree_hal_allocator_can_allocate to decide their memory use
-// strategy.
 //
 // The memory type of the buffer returned may differ from the requested value
 // if the device can provide more functionality; for example, if requesting
@@ -251,17 +337,18 @@ iree_hal_allocator_query_buffer_compatibility(
 // IREE_HAL_MEMORY_TYPE_HOST_CACHED. The only requirement is that the buffer
 // satisfy the required bits.
 //
-// Fails if it is not possible to allocate and satisfy all placements for the
-// requested |allowed_usage|.
 // |out_buffer| must be released by the caller.
+// Fails if the memory type requested for the given usage cannot be serviced.
+// Callers can use iree_hal_allocator_query_compatibility to decide their memory
+// use strategy.
 IREE_API_EXPORT iree_status_t iree_hal_allocator_allocate_buffer(
-    iree_hal_allocator_t* allocator, iree_hal_memory_type_t memory_type,
-    iree_hal_buffer_usage_t allowed_usage, iree_host_size_t allocation_size,
+    iree_hal_allocator_t* IREE_RESTRICT allocator,
+    iree_hal_buffer_params_t params, iree_host_size_t allocation_size,
     iree_const_byte_span_t initial_data, iree_hal_buffer_t** out_buffer);
 
 // Wraps an existing host allocation in a buffer.
 //
-// iree_hal_allocator_query_buffer_compatibility can be used to query whether a
+// iree_hal_allocator_query_compatibility can be used to query whether a
 // buffer can be wrapped when using the given memory type and usage. A
 // compatibility result containing IREE_HAL_BUFFER_COMPATIBILITY_IMPORTABLE
 // means the wrap may succeed however if the pointer/page range is not in a
@@ -271,12 +358,11 @@ IREE_API_EXPORT iree_status_t iree_hal_allocator_allocate_buffer(
 // destroyed. iree_allocator_null() can be passed to indicate the buffer does
 // not own the data.
 //
-// Fails if the allocator cannot access host memory in this way.
 // |out_buffer| must be released by the caller.
+// Fails if the allocator cannot access host memory in this way.
 IREE_API_EXPORT iree_status_t iree_hal_allocator_wrap_buffer(
-    iree_hal_allocator_t* allocator, iree_hal_memory_type_t memory_type,
-    iree_hal_memory_access_t allowed_access,
-    iree_hal_buffer_usage_t allowed_usage, iree_byte_span_t data,
+    iree_hal_allocator_t* IREE_RESTRICT allocator,
+    iree_hal_buffer_params_t params, iree_byte_span_t data,
     iree_allocator_t data_allocator, iree_hal_buffer_t** out_buffer);
 
 // TODO(benvanik): iree_hal_allocator_query_external_buffer_compatibility to
@@ -291,14 +377,14 @@ IREE_API_EXPORT iree_status_t iree_hal_allocator_wrap_buffer(
 // iree_hal_buffer_t. The returned external buffer may only be usable with the
 // same driver/device.
 //
+// |out_buffer| must be released by the caller.
 // Fails with IREE_STATUS_UNAVAILABLE if the allocator cannot import the buffer
 // into the given memory type. This may be due to unavailable device/platform
 // capabilities or the memory type the external buffer was allocated with.
 IREE_API_EXPORT iree_status_t iree_hal_allocator_import_buffer(
-    iree_hal_allocator_t* allocator, iree_hal_memory_type_t memory_type,
-    iree_hal_memory_access_t allowed_access,
-    iree_hal_buffer_usage_t allowed_usage,
-    iree_hal_external_buffer_t* external_buffer,
+    iree_hal_allocator_t* IREE_RESTRICT allocator,
+    iree_hal_buffer_params_t params,
+    iree_hal_external_buffer_t* IREE_RESTRICT external_buffer,
     iree_hal_buffer_t** out_buffer);
 
 // Exports an allocator-owned |buffer| to an external buffer handle.
@@ -312,10 +398,11 @@ IREE_API_EXPORT iree_status_t iree_hal_allocator_import_buffer(
 // into the external type. This may be due to unavailable device/platform
 // capabilities or the memory type the buffer was allocated with.
 IREE_API_EXPORT iree_status_t iree_hal_allocator_export_buffer(
-    iree_hal_allocator_t* allocator, iree_hal_buffer_t* buffer,
+    iree_hal_allocator_t* IREE_RESTRICT allocator,
+    iree_hal_buffer_t* IREE_RESTRICT buffer,
     iree_hal_external_buffer_type_t requested_type,
     iree_hal_external_buffer_flags_t requested_flags,
-    iree_hal_external_buffer_t* out_external_buffer);
+    iree_hal_external_buffer_t* IREE_RESTRICT out_external_buffer);
 
 //===----------------------------------------------------------------------===//
 // iree_hal_heap_allocator_t
@@ -339,57 +426,60 @@ IREE_API_EXPORT iree_status_t iree_hal_allocator_create_heap(
 //===----------------------------------------------------------------------===//
 
 typedef struct iree_hal_allocator_vtable_t {
-  void(IREE_API_PTR* destroy)(iree_hal_allocator_t* allocator);
+  void(IREE_API_PTR* destroy)(iree_hal_allocator_t* IREE_RESTRICT allocator);
 
   iree_allocator_t(IREE_API_PTR* host_allocator)(
-      const iree_hal_allocator_t* allocator);
+      const iree_hal_allocator_t* IREE_RESTRICT allocator);
 
-  iree_status_t(IREE_API_PTR* trim)(iree_hal_allocator_t* allocator);
+  iree_status_t(IREE_API_PTR* trim)(
+      iree_hal_allocator_t* IREE_RESTRICT allocator);
 
   void(IREE_API_PTR* query_statistics)(
-      iree_hal_allocator_t* allocator,
-      iree_hal_allocator_statistics_t* out_statistics);
+      iree_hal_allocator_t* IREE_RESTRICT allocator,
+      iree_hal_allocator_statistics_t* IREE_RESTRICT out_statistics);
 
-  iree_hal_buffer_compatibility_t(IREE_API_PTR* query_buffer_compatibility)(
-      iree_hal_allocator_t* allocator, iree_hal_memory_type_t memory_type,
-      iree_hal_buffer_usage_t allowed_usage,
-      iree_hal_buffer_usage_t intended_usage,
+  iree_hal_buffer_compatibility_t(IREE_API_PTR* query_compatibility)(
+      iree_hal_allocator_t* IREE_RESTRICT allocator,
+      const iree_hal_buffer_params_t* IREE_RESTRICT params,
       iree_device_size_t allocation_size);
 
   iree_status_t(IREE_API_PTR* allocate_buffer)(
-      iree_hal_allocator_t* allocator, iree_hal_memory_type_t memory_type,
-      iree_hal_buffer_usage_t allowed_usage, iree_host_size_t allocation_size,
-      iree_const_byte_span_t initial_data, iree_hal_buffer_t** out_buffer);
+      iree_hal_allocator_t* IREE_RESTRICT allocator,
+      const iree_hal_buffer_params_t* IREE_RESTRICT params,
+      iree_host_size_t allocation_size, iree_const_byte_span_t initial_data,
+      iree_hal_buffer_t** IREE_RESTRICT out_buffer);
 
-  void(IREE_API_PTR* deallocate_buffer)(iree_hal_allocator_t* allocator,
-                                        iree_hal_buffer_t* buffer);
+  void(IREE_API_PTR* deallocate_buffer)(
+      iree_hal_allocator_t* IREE_RESTRICT allocator,
+      iree_hal_buffer_t* IREE_RESTRICT buffer);
 
   iree_status_t(IREE_API_PTR* wrap_buffer)(
-      iree_hal_allocator_t* allocator, iree_hal_memory_type_t memory_type,
-      iree_hal_memory_access_t allowed_access,
-      iree_hal_buffer_usage_t allowed_usage, iree_byte_span_t data,
-      iree_allocator_t data_allocator, iree_hal_buffer_t** out_buffer);
+      iree_hal_allocator_t* IREE_RESTRICT allocator,
+      const iree_hal_buffer_params_t* IREE_RESTRICT params,
+      iree_byte_span_t data, iree_allocator_t data_allocator,
+      iree_hal_buffer_t** IREE_RESTRICT out_buffer);
 
   iree_status_t(IREE_API_PTR* import_buffer)(
-      iree_hal_allocator_t* allocator, iree_hal_memory_type_t memory_type,
-      iree_hal_memory_access_t allowed_access,
-      iree_hal_buffer_usage_t allowed_usage,
-      iree_hal_external_buffer_t* external_buffer,
-      iree_hal_buffer_t** out_buffer);
+      iree_hal_allocator_t* IREE_RESTRICT allocator,
+      const iree_hal_buffer_params_t* IREE_RESTRICT params,
+      iree_hal_external_buffer_t* IREE_RESTRICT external_buffer,
+      iree_hal_buffer_t** IREE_RESTRICT out_buffer);
 
   iree_status_t(IREE_API_PTR* export_buffer)(
-      iree_hal_allocator_t* allocator, iree_hal_buffer_t* buffer,
+      iree_hal_allocator_t* IREE_RESTRICT allocator,
+      iree_hal_buffer_t* IREE_RESTRICT buffer,
       iree_hal_external_buffer_type_t requested_type,
       iree_hal_external_buffer_flags_t requested_flags,
-      iree_hal_external_buffer_t* out_external_buffer);
+      iree_hal_external_buffer_t* IREE_RESTRICT out_external_buffer);
 } iree_hal_allocator_vtable_t;
 IREE_HAL_ASSERT_VTABLE_LAYOUT(iree_hal_allocator_vtable_t);
 
 IREE_API_EXPORT void iree_hal_allocator_destroy(
-    iree_hal_allocator_t* allocator);
+    iree_hal_allocator_t* IREE_RESTRICT allocator);
 
 IREE_API_EXPORT void iree_hal_allocator_deallocate_buffer(
-    iree_hal_allocator_t* allocator, iree_hal_buffer_t* buffer);
+    iree_hal_allocator_t* IREE_RESTRICT allocator,
+    iree_hal_buffer_t* IREE_RESTRICT buffer);
 
 #if IREE_STATISTICS_ENABLE
 

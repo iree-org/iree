@@ -59,7 +59,7 @@ cc_library(
         "@llvm-project//mlir:ArithmeticTransforms",
         "@llvm-project//mlir:BufferizationDialect",
         "@llvm-project//mlir:BufferizationTransforms",
-        "@llvm-project//mlir:LinalgBufferizableOpInterfaceImpl",
+        "@llvm-project//mlir:LinalgTransforms",
         "@llvm-project//mlir:MemRefDialect",
         "@llvm-project//mlir:ModuleBufferization",
         "@llvm-project//mlir:SCFTransforms",

@@ -193,7 +193,7 @@ std::unique_ptr<OperationPass<FuncOp>> createVectorContractCustomKernelsPass();
 /// Populates `patterns` to convert certain vector.contract ops to special
 /// "kernels" written either in SIMD intrinsics or inline assembly.
 void populateVectorContractCustomKernelsPatterns(
-    const CustomKernelsTargetInfo &target_info, RewritePatternSet &patterns);
+    const CustomKernelsTargetInfo &targetInfo, RewritePatternSet &patterns);
 
 void populateUnfusedFMAOpsPassPatterns(MLIRContext *context,
                                        RewritePatternSet &patterns);

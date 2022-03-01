@@ -30,6 +30,7 @@ iree_lit_test_suite(
     "const_ops.mlir"
     "const_ops_f32.mlir"
     "const_ops_i64.mlir"
+    "control_flow_ops.mlir"
     "conversion_ops.mlir"
     "conversion_ops_f32.mlir"
     "conversion_ops_i64.mlir"
