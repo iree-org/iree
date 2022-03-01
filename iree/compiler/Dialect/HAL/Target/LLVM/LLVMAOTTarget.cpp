@@ -728,15 +728,15 @@ void registerLLVMAOTTargetBackends(
     std::function<LLVMTargetOptions()> queryOptions) {
   getLLVMTargetOptionsFromFlags();
 
-  #define LLVM_TARGET(TargetName) \
-    LLVMInitialize##TargetName##Target();     \
-    LLVMInitialize##TargetName##TargetMC();   \
-    LLVMInitialize##TargetName##TargetInfo(); \
-    LLVMInitialize##TargetName##AsmPrinter(); \
-    LLVMInitialize##TargetName##AsmParser();
+#define LLVM_TARGET(TargetName)             \
+  LLVMInitialize##TargetName##Target();     \
+  LLVMInitialize##TargetName##TargetMC();   \
+  LLVMInitialize##TargetName##TargetInfo(); \
+  LLVMInitialize##TargetName##AsmPrinter(); \
+  LLVMInitialize##TargetName##AsmParser();
 
   auto backendFactory = [=]() {
-    #include "llvm/Config/Targets.def"
+#include "llvm/Config/Targets.def"
     return std::make_shared<LLVMAOTTargetBackend>(queryOptions());
   };
 

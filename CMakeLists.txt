@@ -131,7 +131,11 @@ set(IREE_LLVM_TARGET_DEPS)
 
 option(IREE_TARGET_BACKEND_DEFAULTS "Sets the default value for all compiler target backends" ON)
 option(IREE_CPU_LLVM_TARGETS_DEFAULTS "Enables building of default LLVM CPU targets" ON)
-cmake_dependent_option(IREE_CPU_LLVM_TARGETS "CPU targets to enable" "X86;ARM;AArch64;RISCV" ${IREE_CPU_LLVM_TARGETS_DEFAULTS} "")
+if(IREE_CPU_LLVM_TARGETS_DEFAULTS)
+  set(IREE_REQUIRED_LLVM_TARGETS "X86;ARM;AArch64;RISCV" CACHE STRING "CPU targets to enable")
+else()
+  set(IREE_REQUIRED_LLVM_TARGETS "" CACHE STRING "CPU targets to enable")
+endif()
 
 # The VMVX backend is always enabled.
 cmake_dependent_option(IREE_TARGET_BACKEND_VMVX "Enables the 'vmvx' compiler target backend" ON ${IREE_BUILD_COMPILER} OFF)
@@ -190,6 +194,7 @@ endif()
 
 list(REMOVE_DUPLICATES IREE_REQUIRED_LLVM_PROJECTS)
 list(REMOVE_DUPLICATES IREE_REQUIRED_LLVM_TARGETS)
+message(STATUS "Building Required LLVM Targets: ${IREE_REQUIRED_LLVM_TARGETS}")
 
 #-------------------------------------------------------------------------------
 # IREE compilation toolchain configuration
