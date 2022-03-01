@@ -124,14 +124,8 @@ endif()
 # further controlled by the IREE_CPU_LLVM_TARGETS option.
 #-------------------------------------------------------------------------------
 
-set(IREE_REQUIRED_LLVM_TARGETS)
-set(IREE_REQUIRED_LLVM_PROJECTS "mlir")
-set(IREE_LLD_TARGET)
-set(IREE_LLVM_TARGET_DEPS)
-
-option(IREE_TARGET_BACKEND_DEFAULTS "Sets the default value for all compiler target backends" ON)
-set(IREE_CPU_LLVM_TARGETS_DEFAULTS "X86;ARM;AArch64;RISCV" CACHE STRING "Initialization value for default LLVM CPU targets (used by presets)")
-set(IREE_REQUIRED_LLVM_TARGETS "${IREE_CPU_LLVM_TARGETS_DEFAULTS}" CACHE STRING "CPU targets to enable")
+option(IREE_TARGET_BACKEND_DEFAULTS
+       "Sets the default value for all compiler target backends" ON)
 
 # The VMVX backend is always enabled.
 cmake_dependent_option(IREE_TARGET_BACKEND_VMVX "Enables the 'vmvx' compiler target backend" ON ${IREE_BUILD_COMPILER} OFF)
@@ -148,49 +142,6 @@ cmake_dependent_option(IREE_TARGET_BACKEND_CUDA "Enables the 'cuda' compiler tar
 cmake_dependent_option(IREE_TARGET_BACKEND_ROCM "Enables the 'rocm' compiler target backend" OFF ${IREE_BUILD_COMPILER} OFF)
 # Disable WebGPU by default - it has complex deps and is under development.
 cmake_dependent_option(IREE_TARGET_BACKEND_WEBGPU "Enables the 'webgpu' compiler target backend" OFF ${IREE_BUILD_COMPILER} OFF)
-
-message(STATUS "IREE compiler target backends:")
-if(IREE_TARGET_BACKEND_CUDA)
-  message(STATUS "  - cuda")
-  list(APPEND IREE_REQUIRED_LLVM_TARGETS NVPTX)
-endif()
-if(IREE_TARGET_BACKEND_DYLIB_LLVM_AOT)
-  message(STATUS "  - dylib-llvm-aot")
-  if(NOT IREE_CPU_LLVM_TARGETS)
-    message(STATUS "NO CPU LLVM TARGETS CONFIGURED: Override with -DIREE_CPU_LLVM_TARGETS=X86 (for example)")
-  endif()
-  list(APPEND IREE_REQUIRED_LLVM_TARGETS "${IREE_CPU_LLVM_TARGETS}")
-  set(IREE_LLD_TARGET lld)
-endif()
-if(IREE_TARGET_BACKEND_WASM_LLVM_AOT)
-  message(STATUS "  - wasm-llvm-aot")
-  list(APPEND IREE_REQUIRED_LLVM_TARGETS WebAssembly)
-  set(IREE_LLD_TARGET lld)
-endif()
-if(IREE_TARGET_BACKEND_METAL_SPIRV)
-  message(STATUS "  - metal-spirv")
-endif()
-if(IREE_TARGET_BACKEND_ROCM)
-  message(STATUS "  - rocm")
-  list(APPEND IREE_REQUIRED_LLVM_TARGETS AMDGPU)
-endif()
-if(IREE_TARGET_BACKEND_VULKAN_SPIRV)
-  message(STATUS "  - vulkan-spirv")
-endif()
-if(IREE_TARGET_BACKEND_VMVX)
-  message(STATUS "  - vmvx")
-endif()
-if(IREE_TARGET_BACKEND_WEBGPU)
-  message(STATUS "  - webgpu")
-endif()
-
-if(IREE_LLD_TARGET)
-  list(APPEND IREE_REQUIRED_LLVM_PROJECTS lld)
-endif()
-
-list(REMOVE_DUPLICATES IREE_REQUIRED_LLVM_PROJECTS)
-list(REMOVE_DUPLICATES IREE_REQUIRED_LLVM_TARGETS)
-message(STATUS "Building Required LLVM Targets: ${IREE_REQUIRED_LLVM_TARGETS}")
 
 #-------------------------------------------------------------------------------
 # IREE compilation toolchain configuration
@@ -473,12 +424,12 @@ else()
 
   # Enable MLIR Python bindings if IREE Python bindings enabled.
   if(IREE_BUILD_PYTHON_BINDINGS)
-    set(MLIR_ENABLE_BINDINGS_PYTHON ON CACHE BOOL "" FORCE)
-    set(MHLO_ENABLE_BINDINGS_PYTHON ON CACHE BOOL "" FORCE)
+    set(MLIR_ENABLE_BINDINGS_PYTHON ON)
+    set(MHLO_ENABLE_BINDINGS_PYTHON ON)
   endif()
 
   # Disable LLVM's warnings.
-  set(LLVM_ENABLE_WARNINGS OFF CACHE BOOL "don't use global flags /facepalm")
+  set(LLVM_ENABLE_WARNINGS OFF)
 
   # Stash cmake build type in case LLVM messes with it.
   set(_CMAKE_BUILD_TYPE "${CMAKE_BUILD_TYPE}")
@@ -490,7 +441,7 @@ else()
   add_subdirectory("third_party/llvm-project/llvm" EXCLUDE_FROM_ALL)
 
   # Reset CMAKE_BUILD_TYPE to its previous setting.
-  set(CMAKE_BUILD_TYPE "${_CMAKE_BUILD_TYPE}" CACHE STRING "Build type (default ${DEFAULT_CMAKE_BUILD_TYPE})" FORCE)
+  set(CMAKE_BUILD_TYPE "${_CMAKE_BUILD_TYPE}" )
 
   # Extend module path to allow submodules to use LLVM and MLIR CMake modules.
   list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_BINARY_DIR}/lib/cmake/mlir")

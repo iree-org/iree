@@ -23,19 +23,76 @@ macro(iree_set_googletest_cmake_options)
 endmacro()
 
 macro(iree_set_llvm_cmake_options)
-  set(LLVM_INCLUDE_EXAMPLES OFF CACHE BOOL "" FORCE)
-  set(LLVM_INCLUDE_TESTS OFF CACHE BOOL "" FORCE)
-  set(LLVM_INCLUDE_BENCHMARKS OFF CACHE BOOL "" FORCE)
-  set(LLVM_APPEND_VC_REV OFF CACHE BOOL "" FORCE)
-  set(LLVM_ENABLE_IDE ON CACHE BOOL "" FORCE)
+  # When enabling an IREE CPU backend, automatically enable these targets.
+  set(IREE_DEFAULT_CPU_LLVM_TARGETS "X86;ARM;AArch64;RISCV"
+      CACHE STRING "Initialization value for default LLVM CPU targets.")
 
-  # Configure LLVM to build the required targets detected from the top-level
-  # CMake file.
-  set(LLVM_TARGETS_TO_BUILD "${IREE_REQUIRED_LLVM_TARGETS}" CACHE STRING "" FORCE)
+  # These defaults are moderately important to us, but the user *can*
+  # override them (enabling some of these brings in deps that will conflict,
+  # so ymmv).
+  set(LLVM_INCLUDE_EXAMPLES OFF CACHE BOOL "")
+  set(LLVM_INCLUDE_TESTS OFF CACHE BOOL "")
+  set(LLVM_INCLUDE_BENCHMARKS OFF CACHE BOOL "")
+  set(LLVM_APPEND_VC_REV OFF CACHE BOOL "")
+  set(LLVM_ENABLE_IDE ON CACHE BOOL "")
+  set(LLVM_ENABLE_BINDINGS OFF CACHE BOOL "")
 
-  # Configure LLVM to build projects required by the top-level CMake file.
-  set(LLVM_ENABLE_PROJECTS "${IREE_REQUIRED_LLVM_PROJECTS}" CACHE STRING "" FORCE)
-  set(LLVM_ENABLE_BINDINGS OFF CACHE BOOL "" FORCE)
+  # LLVM defaults to building all targets. We always enable targets that we need
+  # as we need them, so default to none. The user can override this as needed,
+  # which is fine.
+  set(LLVM_TARGETS_TO_BUILD "" CACHE STRING "")
+
+  # We enable LLVM projects as needed. The user can override this.
+  set(LLVM_ENABLE_PROJECTS "" CACHE STRING "")
+  set(LLVM_EXTERNAL_PROJECTS "" CACHE STRING "")
+
+  # If we are building LLD, this will be the target. Otherwise, empty.
+  set(IREE_LLD_TARGET)
+
+  # Unconditionally enable mlir.
+  list(APPEND LLVM_ENABLE_PROJECTS mlir)
+
+  # Configure LLVM based on enabled IREE target backends.
+  message(STATUS "IREE compiler target backends:")
+  if(IREE_TARGET_BACKEND_CUDA)
+    message(STATUS "  - cuda")
+    list(APPEND LLVM_TARGETS_TO_BUILD NVPTX)
+  endif()
+  if(IREE_TARGET_BACKEND_DYLIB_LLVM_AOT)
+    message(STATUS "  - dylib-llvm-aot")
+    list(APPEND LLVM_TARGETS_TO_BUILD "${IREE_DEFAULT_CPU_LLVM_TARGETS}")
+    set(IREE_LLD_TARGET lld)
+  endif()
+  if(IREE_TARGET_BACKEND_WASM_LLVM_AOT)
+    message(STATUS "  - wasm-llvm-aot")
+    list(APPEND LLVM_TARGETS_TO_BUILD WebAssembly)
+    set(IREE_LLD_TARGET lld)
+  endif()
+  if(IREE_TARGET_BACKEND_METAL_SPIRV)
+    message(STATUS "  - metal-spirv")
+  endif()
+  if(IREE_TARGET_BACKEND_ROCM)
+    message(STATUS "  - rocm")
+    list(APPEND LLVM_TARGETS_TO_BUILD AMDGPU)
+  endif()
+  if(IREE_TARGET_BACKEND_VULKAN_SPIRV)
+    message(STATUS "  - vulkan-spirv")
+  endif()
+  if(IREE_TARGET_BACKEND_VMVX)
+    message(STATUS "  - vmvx")
+  endif()
+  if(IREE_TARGET_BACKEND_WEBGPU)
+    message(STATUS "  - webgpu")
+  endif()
+
+  if(IREE_LLD_TARGET)
+    list(APPEND LLVM_ENABLE_PROJECTS lld)
+  endif()
+
+  list(REMOVE_DUPLICATES LLVM_ENABLE_PROJECTS)
+  list(REMOVE_DUPLICATES LLVM_TARGETS_TO_BUILD)
+  message(VERBOSE "Building LLVM Targets: ${LLVM_TARGETS_TO_BUILD}")
+  message(VERBOSE "Building LLVM Projects: ${LLVM_ENABLE_PROJECTS}")
 endmacro()
 
 macro(iree_add_llvm_external_project name identifier location)
@@ -45,8 +102,7 @@ macro(iree_add_llvm_external_project name identifier location)
   endif()
   list(APPEND LLVM_EXTERNAL_PROJECTS ${name})
   list(REMOVE_DUPLICATES LLVM_EXTERNAL_PROJECTS)
-  set(LLVM_EXTERNAL_${identifier}_SOURCE_DIR ${location} CACHE STRING "" FORCE)
-  set(LLVM_EXTERNAL_PROJECTS ${LLVM_EXTERNAL_PROJECTS} CACHE STRING "" FORCE)
+  set(LLVM_EXTERNAL_${identifier}_SOURCE_DIR ${location})
 endmacro()
 
 macro(iree_set_spirv_headers_cmake_options)

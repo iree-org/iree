@@ -27,6 +27,7 @@ build-*/
 configured.bazelrc
 user.bazelrc
 version_info.json
+CMakeUserPresets.json
 
 # Dear ImGui Ini files
 imgui.ini
