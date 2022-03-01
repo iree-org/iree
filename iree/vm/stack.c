@@ -417,9 +417,9 @@ IREE_API_EXPORT iree_status_t iree_vm_stack_function_enter(
 
   iree_vm_stack_frame_t* callee_frame = &frame_header->frame;
   callee_frame->function = *function;
-  callee_frame->depth = caller_frame ? caller_frame->depth + 1 : 0;
   callee_frame->module_state = module_state;
   callee_frame->pc = 0;
+  callee_frame->depth = caller_frame ? caller_frame->depth + 1 : 0;
 
   stack->frame_storage_size = new_top;
   stack->top = frame_header;

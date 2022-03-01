@@ -786,7 +786,7 @@ IREE_API_EXPORT void iree_status_fprint(FILE* file, iree_status_t status) {
     fprintf(file, "%.*s\n", (int)status_buffer_length, status_buffer);
     iree_allocator_free(allocator, status_buffer);
   } else {
-    fprintf(file, "(failed to format status)\n");
+    fprintf(file, "(?)\n");
   }
   fflush(file);
 }
