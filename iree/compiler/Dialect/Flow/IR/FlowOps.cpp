@@ -13,6 +13,7 @@
 #include "llvm/ADT/SmallBitVector.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/CommandLine.h"
+#include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Dialect/Arithmetic/Utils/Utils.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/Attributes.h"
@@ -537,6 +538,16 @@ IREE::Util::ValueAccess DispatchWorkgroupsOp::getResultAccess(
   }
 }
 
+// Recursively erases all users of |arg|.
+// Assumes that it's possible to erase them all.
+static void eraseArgUseTree(BlockArgument arg, PatternRewriter &rewriter) {
+  SetVector<Operation *> deadOps;
+  mlir::getForwardSlice(arg, &deadOps);
+  for (auto deadOp : llvm::reverse(deadOps)) {
+    rewriter.eraseOp(deadOp);
+  }
+}
+
 IREE::Util::ClosureOpInterface
 DispatchWorkgroupsOp::cloneReplacementExcludingOperandsAndResults(
     ArrayRef<unsigned> excludedOperandIndices,
@@ -577,25 +588,21 @@ DispatchWorkgroupsOp::cloneReplacementExcludingOperandsAndResults(
       getOperation()->getAttrs());
   auto &newBody = newOp.getClosureBodyRegion();
   newBody.takeBody(getClosureBodyRegion());
-  // Use old index when erasing ops.
-  unsigned baseResultIndex = operands().size();
+
   // For dropped results, erase all the store-op uses. It is a pre-requisite
   // that the result can be dropped only if it is written within the dispatch
   // region op.
+  unsigned baseResultIndex = operands().size();  // old index
   auto erasedArguments = llvm::to_vector<4>(excludedOperandIndices);
   for (unsigned i = baseResultIndex, e = newBody.getNumArguments(); i != e;
        ++i) {
     if (!is_contained(excludedResultIndices, i - baseResultIndex)) continue;
     auto arg = newBody.front().getArgument(i);
-    for (OpOperand &user : llvm::make_early_inc_range(arg.getUses())) {
-      auto storeOp = dyn_cast<DispatchTensorStoreOp>(user.getOwner());
-      if (storeOp && storeOp.target() == user.get()) {
-        rewriter.eraseOp(storeOp);
-      }
-    }
+    eraseArgUseTree(arg, rewriter);
     erasedArguments.push_back(i);
   }
   newBody.front().eraseArguments(erasedArguments);
+
   return newOp;
 }
 
