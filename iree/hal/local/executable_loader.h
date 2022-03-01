@@ -107,12 +107,12 @@ bool iree_hal_query_any_executable_loader_support(
     iree_hal_executable_caching_mode_t caching_mode,
     iree_string_view_t executable_format);
 
-// Tries loading the |executable_data| provided in the given
-// |executable_format|. May fail even if the executable is valid if it requires
-// features not supported by the current host or runtime (such as available
-// architectures, imports, etc).
+// Tries loading the executable data provided in the given format.
+// May fail even if the executable is valid if it requires features not
+// supported by the current host or runtime (such as available architectures,
+// imports, etc).
 //
-// Depending on loader ability the |caching_mode| is used to enable certain
+// Depending on loader ability the caching_mode is used to enable certain
 // features such as instrumented profiling. Not all formats support these
 // features and cooperation of both the compiler producing the executables and
 // the runtime loader and system are required.

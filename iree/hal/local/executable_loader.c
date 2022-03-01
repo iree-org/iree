@@ -6,8 +6,6 @@
 
 #include "iree/hal/local/executable_loader.h"
 
-#include "iree/base/api.h"
-
 iree_status_t iree_hal_executable_import_provider_resolve(
     const iree_hal_executable_import_provider_t import_provider,
     iree_string_view_t symbol_name, void** out_fn_ptr) {

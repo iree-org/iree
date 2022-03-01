@@ -14,7 +14,8 @@
 
 extern const iree_hal_executable_library_header_t**
 simple_mul_dispatch_0_library_query(
-    iree_hal_executable_library_version_t max_version, void* reserved);
+    iree_hal_executable_library_version_t max_version,
+    const iree_hal_executable_environment_v0_t* environment);
 // A function to create the bytecode or C module.
 extern iree_status_t create_module(iree_vm_module_t** module);
 
@@ -25,25 +26,19 @@ extern void print_success();
 // released by the caller.
 iree_status_t create_device_with_static_loader(iree_allocator_t host_allocator,
                                                iree_hal_device_t** out_device) {
-  iree_status_t status = iree_ok_status();
-
   // Set paramters for the device created in the next step.
   iree_hal_sync_device_params_t params;
   iree_hal_sync_device_params_initialize(&params);
 
-  // Load the statically embedded library
-  const iree_hal_executable_library_header_t** static_library =
-      simple_mul_dispatch_0_library_query(
-          IREE_HAL_EXECUTABLE_LIBRARY_LATEST_VERSION, /*reserved=*/NULL);
-  const iree_hal_executable_library_header_t** libraries[1] = {static_library};
-
+  // Register the statically linked executable library.
+  const iree_hal_executable_library_query_fn_t libraries[] = {
+      simple_mul_dispatch_0_library_query,
+  };
   iree_hal_executable_loader_t* library_loader = NULL;
-  if (iree_status_is_ok(status)) {
-    status = iree_hal_static_library_loader_create(
-        IREE_ARRAYSIZE(libraries), libraries,
-        iree_hal_executable_import_provider_null(), host_allocator,
-        &library_loader);
-  }
+  iree_status_t status = iree_hal_static_library_loader_create(
+      IREE_ARRAYSIZE(libraries), libraries,
+      iree_hal_executable_import_provider_null(), host_allocator,
+      &library_loader);
 
   // Use the default host allocator for buffer allocations.
   iree_string_view_t identifier = iree_make_cstring_view("sync");

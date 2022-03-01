@@ -28,12 +28,8 @@ typedef struct iree_hal_local_executable_t {
   // of memory required by the function.
   const iree_hal_executable_dispatch_attrs_v0_t* dispatch_attrs;
 
-  // Thunk function for calling imports. All calls must be made through this.
-  iree_hal_executable_import_thunk_v0_t import_thunk;
-  // Optional imported functions available for use within the executable.
-  // Contains one entry per imported function. If an import was marked as weak
-  // then the corresponding entry may be NULL.
-  const iree_hal_executable_import_v0_t* imports;
+  // Execution environment.
+  iree_hal_executable_environment_v0_t environment;
 } iree_hal_local_executable_t;
 
 typedef struct iree_hal_local_executable_vtable_t {

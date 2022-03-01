@@ -105,7 +105,8 @@ static const iree_hal_executable_library_v0_t library = {
 // example, an executable may want to swap out a few entry points to an
 // architecture-specific version.
 const iree_hal_executable_library_header_t** demo_executable_library_query(
-    iree_hal_executable_library_version_t max_version, void* reserved) {
+    iree_hal_executable_library_version_t max_version,
+    const iree_hal_executable_environment_v0_t* environment) {
   return max_version <= 0
              ? (const iree_hal_executable_library_header_t**)&library
              : NULL;

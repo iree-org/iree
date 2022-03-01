@@ -8,7 +8,7 @@
 #define IREE_HAL_LOCAL_EXECUTABLE_LIBRARY_H_
 
 // NOTE: this file is designed to be a standalone header: it is embedded in the
-// compiler and must not take any dependences on the runtime HAL code.
+// compiler and must not take any dependencies on the runtime HAL code.
 // Changes here will require changes to the compiler and must be versioned as if
 // this was a schema: backwards-incompatible changes require version bumps or
 // the ability to feature-detect at runtime.
@@ -75,6 +75,9 @@ typedef enum iree_hal_executable_library_sanitizer_kind_e {
 // Versioning and interface querying
 //===----------------------------------------------------------------------===//
 
+typedef struct iree_hal_executable_environment_v0_t
+    iree_hal_executable_environment_v0_t;
+
 // Known valid version values.
 typedef enum iree_hal_executable_library_version_e {
   // iree_hal_executable_library_v0_t is used as the API communication
@@ -110,12 +113,21 @@ typedef struct iree_hal_executable_library_header_t {
 } iree_hal_executable_library_header_t;
 
 // Exported function from dynamic libraries for querying library information.
+//
 // The provided |max_version| is the maximum version the caller supports;
 // callees must return NULL if their lowest available version is greater
 // than the max version supported by the caller.
+//
+// The provided |environment| field contains information about the hosting
+// execution environment that the executable may use to specialize its
+// implementation, such as using specific imports or exporting
+// architecture-specific dispatch routines. Some environmental properties may
+// change per-invocation such as the CPU info when performing dispatches on
+// heterogenous processors that may change over the lifetime of the program.
 typedef const iree_hal_executable_library_header_t** (
     *iree_hal_executable_library_query_fn_t)(
-    iree_hal_executable_library_version_t max_version, void* reserved);
+    iree_hal_executable_library_version_t max_version,
+    const iree_hal_executable_environment_v0_t* environment);
 
 // Function name exported from dynamic libraries (pass to dlsym).
 #define IREE_HAL_EXECUTABLE_LIBRARY_EXPORT_NAME \
@@ -194,6 +206,57 @@ typedef struct iree_hal_executable_import_table_v0_t {
   const char* const* symbols;
 } iree_hal_executable_import_table_v0_t;
 
+// Maximum number of data fields in iree_hal_processor_v0_t.
+#define IREE_HAL_PROCESSOR_DATA_CAPACITY_V0 8
+
+// Architecture-specific CPU information available to executables.
+// This encodes zero or more fields of opaque processor data.
+// The intent is that this structure can be put in .rodata when there are no
+// runtime features that need to be queried.
+//
+// The format of the data is architecture-specific as by construction no value
+// will ever be used in a compiled binary from another architecture. This
+// allows us to simplify this interface as we can't for example load the same
+// executable library for both aarch64 on riscv32 and don't need to normalize
+// any of the fields across them both.
+typedef struct iree_hal_processor_v0_t {
+  // Opaque architecture-specific encoding in 64-bit words.
+  // This may represent a fixed-length data structure, a series of hardware
+  // registers, or key-value pairs.
+  //
+  // The contents are opaque here as to support out-of-tree architectures. The
+  // runtime code deriving the identifier/flags and providing it here is losely
+  // coupled with the compiler code emitting checks based on the identifier and
+  // only those two places ever need to change.
+  uint64_t data[IREE_HAL_PROCESSOR_DATA_CAPACITY_V0];
+} iree_hal_processor_v0_t;
+static_assert(sizeof(iree_hal_processor_v0_t) % sizeof(uint64_t) == 0,
+              "8-byte alignment required");
+
+// Defines the environment in which the executable is being used.
+// Executables only have access to the information in this structure and must
+// make all decisions based on it; this ensures executables are portable across
+// operating environments (Linux, Mac, bare-metal, web, etc) by not having
+// platform-specific syscalls and register query emulation.
+typedef struct iree_hal_executable_environment_v0_t {
+  // Specialization constants available to the executable, if any.
+  // Contains as many as declared in the library header.
+  const uint32_t* constants;
+
+  // Thunk function for calling imports. All calls must be made through this.
+  iree_hal_executable_import_thunk_v0_t import_thunk;
+  // Optional imported functions available for use within the executable.
+  // Contains one entry per imported function. If an import was marked as weak
+  // then the corresponding entry may be NULL.
+  const iree_hal_executable_import_v0_t* imports;
+
+  // Optional architecture-specific CPU information.
+  // In heterogenous processors this may represent any of the subarchitecture
+  // types as it is derived from the core the calling thread is scheduled on.
+  // Will be all zeros if unavailable.
+  iree_hal_processor_v0_t processor;
+} iree_hal_executable_environment_v0_t;
+
 typedef union iree_hal_vec3_t {
   struct {
     uint32_t x;
@@ -227,12 +290,12 @@ typedef struct iree_hal_executable_dispatch_state_v0_t {
   // The length of each binding in bytes, 1:1 with |binding_ptrs|.
   const size_t* binding_lengths;
 
-  // Thunk function for calling imports. All calls must be made through this.
-  iree_hal_executable_import_thunk_v0_t import_thunk;
-  // Optional imported functions available for use within the executable.
-  // Contains one entry per imported function. If an import was marked as weak
-  // then the corresponding entry may be NULL.
-  const iree_hal_executable_import_v0_t* imports;
+  // Logical processor identifier used to index into processor info fields.
+  // Depending on the implementation this may be an ordinal, a bitfield, or an
+  // opaque unique identifier.
+  uint32_t processor_id;
+  // Optional executable environment information.
+  const iree_hal_executable_environment_v0_t* environment;
 } iree_hal_executable_dispatch_state_v0_t;
 
 // Function signature of exported executable entry points.
