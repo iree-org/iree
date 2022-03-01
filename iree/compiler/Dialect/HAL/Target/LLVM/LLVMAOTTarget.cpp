@@ -728,14 +728,20 @@ void registerLLVMAOTTargetBackends(
     std::function<LLVMTargetOptions()> queryOptions) {
   getLLVMTargetOptionsFromFlags();
 
-#define LLVM_TARGET(TargetName)             \
-  LLVMInitialize##TargetName##Target();     \
-  LLVMInitialize##TargetName##TargetMC();   \
-  LLVMInitialize##TargetName##TargetInfo(); \
-  LLVMInitialize##TargetName##AsmPrinter(); \
-  LLVMInitialize##TargetName##AsmParser();
+// TODO: Do something fancier here that lets us conditionally link to only
+// the targets we care about.
+#define LLVM_TARGET(TargetName)           \
+  LLVMInitialize##TargetName##Target();   \
+  LLVMInitialize##TargetName##TargetMC(); \
+  LLVMInitialize##TargetName##TargetInfo();
+
+#define LLVM_ASM_PRINTER(TargetName) LLVMInitialize##TargetName##AsmPrinter();
+
+#define LLVM_ASM_PARSER(TargetName) LLVMInitialize##TargetName##AsmParser();
 
   auto backendFactory = [=]() {
+#include "llvm/Config/AsmParsers.def"
+#include "llvm/Config/AsmPrinters.def"
 #include "llvm/Config/Targets.def"
     return std::make_shared<LLVMAOTTargetBackend>(queryOptions());
   };

@@ -43,6 +43,7 @@ EXPLICIT_TARGET_MAPPING = {
     "@llvm-project//llvm:X86CodeGen": ["IREELLVMCPUTargetDeps"],
 
     # LLVM
+    "@llvm-project//llvm:config": [],
     "@llvm-project//llvm:IPO": ["LLVMipo"],
     "@llvm-project//lld": ["${IREE_LLD_TARGET}"],
     "@llvm-project//llvm:FileCheck": ["FileCheck"],
