@@ -4,8 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#ifndef IREE_COMPILER_CODEGEN_LLVMGPU_LLVMGPUUTILS_H_
-#define IREE_COMPILER_CODEGEN_LLVMGPU_LLVMGPUUTILS_H_
+#ifndef IREE_COMPILER_CODEGEN_COMMON_GPUUTILS_H_
+#define IREE_COMPILER_CODEGEN_COMMON_GPUUTILS_H_
 
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
@@ -29,9 +29,26 @@ llvm::SmallVector<mlir::linalg::ProcInfo, 2> getSubgroupIdsAndCounts(
     mlir::OpBuilder &builder, mlir::Location loc, unsigned numDims,
     llvm::ArrayRef<int64_t> numSubgroups);
 
-/// return the workgroup size associated to the funcOp entry point.
+/// Return the workgroup size associated to the funcOp entry point.
 std::array<int64_t, 3> getWorkgroupSize(mlir::func::FuncOp funcOp);
+
+/// Return true if we can use all threads to perform vectorized load/store of
+/// the given `shape`.
+bool canPerformVectorAccessUsingAllThreads(ArrayRef<int64_t> shape,
+                                           int64_t threadCount,
+                                           int64_t vectorSize);
+
+/// Allocate GPU workgroup memory matching the given `subview`. If there are
+/// dynamic dimensions, the bounds are in `sizeBounds`.
+Optional<Value> allocateWorkgroupMemory(OpBuilder &builder,
+                                        memref::SubViewOp subview,
+                                        ArrayRef<Value> sizeBounds,
+                                        DataLayout &);
+
+/// Deallocate GPU workgroup memory behind `buffer`.
+LogicalResult deallocateWorkgroupMemory(OpBuilder &, Value buffer);
 
 }  // namespace iree_compiler
 }  // namespace mlir
-#endif  // IREE_COMPILER_CODEGEN_LLVMGPU_LLVMGPUUTILS_H_
+
+#endif  // IREE_COMPILER_CODEGEN_COMMON_GPUUTILS_H_

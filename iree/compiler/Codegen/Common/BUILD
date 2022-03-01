@@ -43,6 +43,9 @@ cc_library(
         "FoldAffineMinInDistributedLoops.cpp",
         "FoldTensorExtractOpPass.cpp",
         "ForOpCanonicalizationPass.cpp",
+        "GPUDistributeSharedMemoryCopy.cpp",
+        "GPUPipelining.cpp",
+        "GPUUtils.cpp",
         "IREEComprehensiveBufferizePass.cpp",
         "InsertDistributionInfoPass.cpp",
         "LinalgBufferizePass.cpp",
@@ -61,6 +64,7 @@ cc_library(
     hdrs = [
         "BufferizationAnalysis.h",
         "DestructiveUpdateUtils.h",
+        "GPUUtils.h",
     ],
     deps = [
         "//iree/compiler/Codegen:PassHeaders",

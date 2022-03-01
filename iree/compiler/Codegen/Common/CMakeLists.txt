@@ -25,6 +25,7 @@ iree_cc_library(
   HDRS
     "BufferizationAnalysis.h"
     "DestructiveUpdateUtils.h"
+    "GPUUtils.h"
   SRCS
     "BufferizationAnalysis.cpp"
     "BufferizeCopyOnlyDispatchesPass.cpp"
@@ -35,6 +36,9 @@ iree_cc_library(
     "FoldAffineMinInDistributedLoops.cpp"
     "FoldTensorExtractOpPass.cpp"
     "ForOpCanonicalizationPass.cpp"
+    "GPUDistributeSharedMemoryCopy.cpp"
+    "GPUPipelining.cpp"
+    "GPUUtils.cpp"
     "IREEComprehensiveBufferizePass.cpp"
     "InsertDistributionInfoPass.cpp"
     "LinalgBufferizePass.cpp"

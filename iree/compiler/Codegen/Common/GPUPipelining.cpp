@@ -83,9 +83,8 @@ static void setAsyncAnnotations(Operation* op,
 }
 
 namespace {
-struct LLVMGPUPipeliningPass
-    : public LLVMGPUPipeliningBase<LLVMGPUPipeliningPass> {
-  LLVMGPUPipeliningPass(unsigned depth) : depth(depth) {}
+struct GPUPipeliningPass : public GPUPipeliningBase<GPUPipeliningPass> {
+  GPUPipeliningPass(unsigned depth) : depth(depth) {}
   void runOnOperation() override {
     auto funcOp = getOperation();
     MLIRContext* context = &getContext();
@@ -155,9 +154,9 @@ struct LLVMGPUPipeliningPass
 };
 }  // namespace
 
-std::unique_ptr<OperationPass<func::FuncOp>> createLLVMGPUPipeliningPass(
+std::unique_ptr<OperationPass<func::FuncOp>> createGPUPipeliningPass(
     unsigned depth) {
-  return std::make_unique<LLVMGPUPipeliningPass>(depth);
+  return std::make_unique<GPUPipeliningPass>(depth);
 }
 
 }  // namespace iree_compiler

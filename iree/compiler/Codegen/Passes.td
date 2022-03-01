@@ -172,6 +172,18 @@ def MemrefCopyToLinalgPass :
   let constructor =
       "mlir::iree_compiler::createMemrefCopyToLinalgPass()";
 }
+
+def GPUDistributeSharedMemoryCopy :
+    Pass<"iree-codegen-gpu-distribute-shared-memory-copy", "func::FuncOp"> {
+  let summary = "Pass to distribute shared memory copies to threads.";
+  let constructor = "mlir::iree_compiler::createGPUDistributeSharedMemoryCopy()";
+}
+
+def GPUPipelining : Pass<"iree-codegen-gpu-pipelining", "func::FuncOp"> {
+  let summary = "Pass to do software pipelining.";
+  let constructor = "mlir::iree_compiler::createGPUPipeliningPass()";
+}
+
 //------------------------------------------------------------------------------
 // LLVMCPU
 //------------------------------------------------------------------------------
@@ -291,18 +303,6 @@ def LLVMGPUVectorLowering :
   let constructor = "mlir::iree_compiler::createLLVMGPUVectorLoweringPass()";
 }
 
-def LLVMGPUDistributeSharedMemoryCopy :
-    Pass<"iree-llvmgpu-distribute-shared-memory-copy", "func::FuncOp"> {
-  let summary = "Pass to distribute shared memory copies to threads.";
-  let constructor = "mlir::iree_compiler::createLLVMGPUDistributeSharedMemoryCopy()";
-}
-
-def LLVMGPUPipelining :
-    Pass<"iree-llvmgpu-pipelining", "func::FuncOp"> {
-  let summary = "Pass to do software pipelining.";
-  let constructor = "mlir::iree_compiler::createLLVMGPUPipeliningPass()";
-}
-
 def LLVMGPUMultiBuffering :
     Pass<"iree-llvmgpu-multi-buffering", "func::FuncOp"> {
   let summary = "Pass to do multi buffering.";
@@ -362,6 +362,13 @@ def SPIRVTileAndVectorizeToCooperativeOps : Pass<
                 "cooperative ops";
   let constructor =
     "mlir::iree_compiler::createSPIRVTileAndVectorizeToCooperativeOpsPass()";
+}
+
+def SPIRVTileAndPromote : Pass<"iree-spirv-tile-and-promote", "func::FuncOp"> {
+  let summary = "Promote tiled Linalg ops with buffer semantics to use "
+                "workgroup memory and then tile to invocations";
+  let constructor =
+    "mlir::iree_compiler::createSPIRVTileAndPromotePass()";
 }
 
 def SPIRVVectorize : Pass<"iree-spirv-vectorize", "func::FuncOp"> {

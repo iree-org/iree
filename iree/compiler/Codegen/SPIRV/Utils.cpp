@@ -22,6 +22,8 @@
 namespace mlir {
 namespace iree_compiler {
 
+static constexpr int kNumGPUDims = 3;
+
 const char *getSPIRVDistributeAttrName() { return "iree.spirv.distribute_dim"; }
 
 spirv::TargetEnvAttr getSPIRVTargetEnvAttr(Operation *op) {

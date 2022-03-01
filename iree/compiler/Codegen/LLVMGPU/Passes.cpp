@@ -84,7 +84,7 @@ void addGPUMatmulSimtPassPipeline(OpPassManager &pm) {
   // Distribute linalg onto threads within the workgroup.
   pm.addNestedPass<func::FuncOp>(createLLVMGPUTileAndDistribute());
   pm.addNestedPass<func::FuncOp>(createMemrefCopyToLinalgPass());
-  pm.addNestedPass<func::FuncOp>(createLLVMGPUDistributeSharedMemoryCopy());
+  pm.addNestedPass<func::FuncOp>(createGPUDistributeSharedMemoryCopy());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
@@ -99,7 +99,7 @@ void addGPUMatmulSimtPassPipeline(OpPassManager &pm) {
   pm.addNestedPass<func::FuncOp>(createOptimizeVectorTransferPass());
 
   // Pipeline memory operations.
-  pm.addNestedPass<func::FuncOp>(createLLVMGPUPipeliningPass());
+  pm.addNestedPass<func::FuncOp>(createGPUPipeliningPass());
 }
 
 void addGPUMatmulTensorCorePassPipeline(OpPassManager &pm) {
@@ -111,7 +111,7 @@ void addGPUMatmulTensorCorePassPipeline(OpPassManager &pm) {
   if (pipelineDepth > 1)
     pm.addNestedPass<func::FuncOp>(createLLVMGPUMultiBuffering(pipelineDepth));
   pm.addNestedPass<func::FuncOp>(createMemrefCopyToLinalgPass());
-  pm.addNestedPass<func::FuncOp>(createLLVMGPUDistributeSharedMemoryCopy());
+  pm.addNestedPass<func::FuncOp>(createGPUDistributeSharedMemoryCopy());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
@@ -132,7 +132,7 @@ void addGPUMatmulTensorCorePassPipeline(OpPassManager &pm) {
   pm.addPass(createCSEPass());
 
   // Pipeline memory operations.
-  pm.addNestedPass<func::FuncOp>(createLLVMGPUPipeliningPass(pipelineDepth));
+  pm.addNestedPass<func::FuncOp>(createGPUPipeliningPass(pipelineDepth));
 }
 
 void addGPUSimpleDistributePassPipeline(OpPassManager &pm) {
