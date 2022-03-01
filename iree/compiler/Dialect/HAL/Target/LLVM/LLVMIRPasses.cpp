@@ -96,8 +96,6 @@ LogicalResult runLLVMIRPasses(const LLVMTargetOptions &options,
                                           llvm::Module>());
             modulePassManager.addPass(llvm::ModuleAddressSanitizerPass(
                 Opts, moduleUseAfterScope, useOdrIndicator));
-            modulePassManager.addPass(createModuleToFunctionPassAdaptor(
-                llvm::AddressSanitizerPass(Opts)));
           });
     } break;
   }
