@@ -94,6 +94,19 @@ iree_cc_test(
 
 iree_cc_library(
   NAME
+    cpu
+  HDRS
+    "cpu.h"
+  SRCS
+    "cpu.c"
+  DEPS
+    iree::base
+    iree::base::core_headers
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
     dynamic_library
   HDRS
     "dynamic_library.h"

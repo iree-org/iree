@@ -37,6 +37,7 @@ iree_cc_binary(
     iree::base
     iree::base::core_headers
     iree::hal::local::elf::testdata::elementwise_mul
+    iree::hal::local::executable_environment
     iree::hal::local::executable_library
 )
 

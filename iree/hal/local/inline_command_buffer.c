@@ -14,6 +14,7 @@
 #include "iree/base/internal/fpu_state.h"
 #include "iree/base/internal/math.h"
 #include "iree/base/tracing.h"
+#include "iree/hal/local/executable_environment.h"
 #include "iree/hal/local/executable_library.h"
 #include "iree/hal/local/local_descriptor_set_layout.h"
 #include "iree/hal/local/local_executable.h"
@@ -56,6 +57,9 @@ typedef struct iree_hal_inline_command_buffer_t {
     // Individual dispatches must populate the dynamically changing fields like
     // push_constant_count and binding_count.
     iree_hal_executable_dispatch_state_v0_t dispatch_state;
+
+    // An opaque tag used to reduce the cost of processor ID queries.
+    iree_cpu_processor_tag_t processor_tag;
   } state;
 } iree_hal_inline_command_buffer_t;
 
@@ -153,11 +157,23 @@ static void* iree_hal_inline_command_buffer_dyn_cast(
 static iree_status_t iree_hal_inline_command_buffer_flush_tasks(
     iree_hal_inline_command_buffer_t* command_buffer);
 
+// Updates the cached processor ID field in the command buffer.
+static void iree_hal_inline_command_buffer_update_processor_id(
+    iree_hal_inline_command_buffer_t* command_buffer) {
+  iree_cpu_requery_processor_id(
+      &command_buffer->state.processor_tag,
+      &command_buffer->state.dispatch_state.processor_id);
+}
+
 static iree_status_t iree_hal_inline_command_buffer_begin(
     iree_hal_command_buffer_t* base_command_buffer) {
   iree_hal_inline_command_buffer_t* command_buffer =
       iree_hal_inline_command_buffer_cast(base_command_buffer);
   iree_hal_inline_command_buffer_reset(command_buffer);
+
+  // Query the processor ID we start out on. We may update it during execution.
+  iree_hal_inline_command_buffer_update_processor_id(command_buffer);
+
   return iree_ok_status();
 }
 
@@ -395,10 +411,16 @@ static iree_status_t iree_hal_inline_command_buffer_dispatch(
                 IREE_HAL_WORKGROUP_LOCAL_MEMORY_PAGE_SIZE
           : 0;
 
+  // Update the ID of the processor we are running on.
+  // We don't know how much time has passed since we last updated as we are
+  // running inline with the user program; if we knew we were going to be
+  // handling a batch of dispatches we could reduce the amount of times we call
+  // this - but that's what the task system is for.
+  iree_hal_inline_command_buffer_update_processor_id(command_buffer);
+
   iree_hal_executable_dispatch_state_v0_t* dispatch_state =
       &command_buffer->state.dispatch_state;
-  dispatch_state->import_thunk = local_executable->import_thunk;
-  dispatch_state->imports = local_executable->imports;
+  dispatch_state->environment = &local_executable->environment;
 
   // TODO(benvanik): expose on API or keep fixed on executable.
   dispatch_state->workgroup_size.x = 1;

@@ -37,6 +37,8 @@ iree_status_t iree_task_worker_initialize(
   iree_prng_minilcg128_initialize(iree_prng_splitmix64_next(seed_prng),
                                   &out_worker->theft_prng);
   out_worker->local_memory = local_memory;
+  out_worker->processor_id = 0;
+  out_worker->processor_tag = 0;
 
   iree_task_worker_state_t initial_state = IREE_TASK_WORKER_STATE_RUNNING;
   if (executor->scheduling_mode &
@@ -186,9 +188,9 @@ static void iree_task_worker_execute(
       break;
     }
     case IREE_TASK_TYPE_DISPATCH_SHARD: {
-      iree_task_dispatch_shard_execute((iree_task_dispatch_shard_t*)task,
-                                       worker->local_memory,
-                                       pending_submission);
+      iree_task_dispatch_shard_execute(
+          (iree_task_dispatch_shard_t*)task, worker->processor_id,
+          worker->local_memory, pending_submission);
       break;
     }
     default:
@@ -251,10 +253,20 @@ static bool iree_task_worker_pump_once(
   return true;  // try again
 }
 
+// Updates the cached processor ID field in the worker.
+static void iree_task_worker_update_processor_id(iree_task_worker_t* worker) {
+  iree_cpu_requery_processor_id(&worker->processor_tag, &worker->processor_id);
+}
+
 // Alternates between pumping ready tasks in the worker queue and waiting
 // for more tasks to arrive. Only returns when the worker has been asked by
 // the executor to exit.
 static void iree_task_worker_pump_until_exit(iree_task_worker_t* worker) {
+  // Initial processor ID assignment. We normally refresh this upon waking from
+  // a wait but it's possible that there's already work pending and we want to
+  // be able to process it with the proper processor ID immediately.
+  iree_task_worker_update_processor_id(worker);
+
   // Pump the thread loop to process more tasks.
   while (true) {
     // If we fail to find any work to do we'll wait at the end of this loop.
@@ -276,6 +288,9 @@ static void iree_task_worker_pump_until_exit(iree_task_worker_t* worker) {
       // TODO(benvanik): complete tasks before exiting?
       break;
     }
+
+    // TODO(benvanik): we could try to update the processor ID here before we
+    // begin a new batch of work - assuming it's not too expensive.
 
     iree_task_submission_t pending_submission;
     iree_task_submission_initialize(&pending_submission);
@@ -321,6 +336,10 @@ static void iree_task_worker_pump_until_exit(iree_task_worker_t* worker) {
       iree_notification_commit_wait(&worker->wake_notification, wait_token,
                                     IREE_TIME_INFINITE_FUTURE);
       IREE_TRACE_ZONE_END(z_wait);
+
+      // Woke from a wait - query the processor ID in case we migrated during
+      // the sleep.
+      iree_task_worker_update_processor_id(worker);
     }
 
     // Wait completed.

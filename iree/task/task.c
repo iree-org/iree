@@ -706,7 +706,8 @@ iree_task_dispatch_shard_t* iree_task_dispatch_shard_allocate(
 }
 
 void iree_task_dispatch_shard_execute(
-    iree_task_dispatch_shard_t* task, iree_byte_span_t worker_local_memory,
+    iree_task_dispatch_shard_t* task, iree_cpu_processor_id_t processor_id,
+    iree_byte_span_t worker_local_memory,
     iree_task_submission_t* pending_submission) {
   IREE_TRACE_ZONE_BEGIN(z0);
 
@@ -750,6 +751,9 @@ void iree_task_dispatch_shard_execute(
   iree_task_dispatch_statistics_t shard_statistics;
   memset(&shard_statistics, 0, sizeof(shard_statistics));
   tile_context.statistics = &shard_statistics;
+
+  // Hint as to which processor we are running on.
+  tile_context.processor_id = processor_id;
 
   // Loop over all tiles until they are all processed.
   const uint32_t tile_count = dispatch_task->tile_count;
