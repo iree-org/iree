@@ -69,7 +69,7 @@ typedef struct iree_program_state_t {
 extern iree_status_t create_device_with_wasm_loader(
     iree_allocator_t host_allocator, iree_hal_device_t** out_device);
 
-void inspect_module(iree_vm_module_t* module) {
+static void inspect_module(iree_vm_module_t* module) {
   fprintf(stdout, "=== module properties ===\n");
 
   iree_string_view_t module_name = iree_vm_module_name(module);
@@ -90,8 +90,13 @@ void inspect_module(iree_vm_module_t* module) {
   for (iree_host_size_t i = 0; i < module_signature.export_function_count;
        ++i) {
     iree_vm_function_t function;
-    IREE_IGNORE_ERROR(iree_vm_module_lookup_function_by_ordinal(
-        module, IREE_VM_FUNCTION_LINKAGE_EXPORT, i, &function));
+    iree_status_t status = iree_vm_module_lookup_function_by_ordinal(
+        module, IREE_VM_FUNCTION_LINKAGE_EXPORT, i, &function);
+    if (!iree_status_is_ok(status)) {
+      iree_status_fprint(stderr, status);
+      iree_status_free(status);
+      continue;
+    }
 
     iree_string_view_t function_name = iree_vm_function_name(&function);
     iree_vm_function_signature_t function_signature =
@@ -193,9 +198,9 @@ void unload_program(iree_program_state_t* program_state) {
   free(program_state);
 }
 
-iree_status_t parse_input_into_call(iree_runtime_call_t* call,
-                                    iree_hal_allocator_t* device_allocator,
-                                    iree_string_view_t input) {
+static iree_status_t parse_input_into_call(
+    iree_runtime_call_t* call, iree_hal_allocator_t* device_allocator,
+    iree_string_view_t input) {
   bool has_equal =
       iree_string_view_find_char(input, '=', 0) != IREE_STRING_VIEW_NPOS;
   bool has_x =
@@ -250,9 +255,9 @@ iree_status_t parse_input_into_call(iree_runtime_call_t* call,
                           "Unhandled function input (unreachable?)");
 }
 
-iree_status_t parse_inputs_into_call(iree_runtime_call_t* call,
-                                     iree_hal_allocator_t* device_allocator,
-                                     iree_string_view_t inputs) {
+static iree_status_t parse_inputs_into_call(
+    iree_runtime_call_t* call, iree_hal_allocator_t* device_allocator,
+    iree_string_view_t inputs) {
   if (inputs.size == 0) return iree_ok_status();
 
   // Inputs are provided in a semicolon-delimited list.
@@ -270,8 +275,8 @@ iree_status_t parse_inputs_into_call(iree_runtime_call_t* call,
   return iree_ok_status();
 }
 
-iree_status_t print_outputs_from_call(iree_runtime_call_t* call,
-                                      iree_string_builder_t* outputs_builder) {
+static iree_status_t print_outputs_from_call(
+    iree_runtime_call_t* call, iree_string_builder_t* outputs_builder) {
   iree_vm_list_t* variants_list = iree_runtime_call_outputs(call);
   for (iree_host_size_t i = 0; i < iree_vm_list_size(variants_list); ++i) {
     iree_vm_variant_t variant = iree_vm_variant_empty();
