@@ -229,7 +229,7 @@ LogicalResult convertFuncOp(IREE::VM::FuncOp funcOp,
   vmAnalysis.getValue().get().numRefArguments = numRefArgs;
 
   for (int i = 0; i < numLocalRefs; i++) {
-    auto refOp = builder.create<emitc::ConstantOp>(
+    auto refOp = builder.create<emitc::VariableOp>(
         /*location=*/loc,
         /*resultType=*/emitc::OpaqueType::get(ctx, "iree_vm_ref_t"),
         /*value=*/emitc::OpaqueAttr::get(ctx, ""));
@@ -352,7 +352,7 @@ Optional<emitc::ApplyOp> createVmTypeDefPtr(ConversionPatternRewriter &rewriter,
        {"IREE_VM_VALUE_TYPE_NONE", "IREE_VM_REF_TYPE_NULL"}},
   };
 
-  auto elementTypeOp = rewriter.create<emitc::ConstantOp>(
+  auto elementTypeOp = rewriter.create<emitc::VariableOp>(
       /*location=*/loc,
       /*resultType=*/emitc::OpaqueType::get(ctx, "iree_vm_type_def_t"),
       /*value=*/emitc::OpaqueAttr::get(ctx, ""));
@@ -774,7 +774,7 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
 
     std::string moduleStateTypeName = moduleName + "_state_t";
 
-    auto stateOp = builder.create<emitc::ConstantOp>(
+    auto stateOp = builder.create<emitc::VariableOp>(
         /*location=*/loc,
         /*resultType=*/
         emitc::PointerType::get(
@@ -1228,7 +1228,7 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
 
     std::string moduleTypeName = moduleName + "_t";
 
-    auto module = builder.create<emitc::ConstantOp>(
+    auto module = builder.create<emitc::VariableOp>(
         /*location=*/loc,
         /*resultType=*/
         emitc::PointerType::get(emitc::OpaqueType::get(ctx, moduleTypeName)),
@@ -1294,7 +1294,7 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
         /*operands=*/
         ArrayRef<Value>{module.getResult(), funcOp.getArgument(0)});
 
-    auto vmModule = builder.create<emitc::ConstantOp>(
+    auto vmModule = builder.create<emitc::VariableOp>(
         /*location=*/loc,
         /*resultType=*/emitc::OpaqueType::get(ctx, "iree_vm_module_t"),
         /*value=*/emitc::OpaqueAttr::get(ctx, ""));
@@ -2640,7 +2640,7 @@ class ImportOpConversion : public OpConversionPattern<IREE::VM::ImportOp> {
     // iree_vm_execution_result_t result;
     auto executionResult =
         rewriter
-            .create<emitc::ConstantOp>(
+            .create<emitc::VariableOp>(
                 /*location=*/loc,
                 /*resultType=*/
                 emitc::OpaqueType::get(ctx, "iree_vm_execution_result_t"),
@@ -2982,7 +2982,7 @@ class CallOpConversion : public OpConversionPattern<CallOpTy> {
           return op->emitError() << "local ref not found";
         }
 
-        auto refOp = rewriter.create<emitc::ConstantOp>(
+        auto refOp = rewriter.create<emitc::VariableOp>(
             /*location=*/loc,
             /*resultType=*/emitc::OpaqueType::get(ctx, "iree_vm_ref_t"),
             /*value=*/emitc::OpaqueAttr::get(ctx, ""));
@@ -3027,7 +3027,7 @@ class CallOpConversion : public OpConversionPattern<CallOpTy> {
         resultOperands.push_back(ref.getValue());
         updatedOperands.push_back(ref.getValue());
       } else {
-        auto resultOp = rewriter.create<emitc::ConstantOp>(
+        auto resultOp = rewriter.create<emitc::VariableOp>(
             /*location=*/loc,
             /*resultType=*/result.getType(),
             /*value=*/emitc::OpaqueAttr::get(ctx, ""));
@@ -3651,7 +3651,7 @@ class ReturnOpConversion : public OpConversionPattern<IREE::VM::ReturnOp> {
           return op->emitError() << "local ref not found";
         }
 
-        auto refOp = rewriter.create<emitc::ConstantOp>(
+        auto refOp = rewriter.create<emitc::VariableOp>(
             /*location=*/loc,
             /*resultType=*/emitc::OpaqueType::get(ctx, "iree_vm_ref_t"),
             /*value=*/emitc::OpaqueAttr::get(ctx, ""));
@@ -4225,7 +4225,7 @@ class ListAllocOpConversion
       return allocOp.emitError() << "generating iree_vm_type_def_t* failed";
     }
 
-    auto listOp = rewriter.create<emitc::ConstantOp>(
+    auto listOp = rewriter.create<emitc::VariableOp>(
         /*location=*/loc,
         /*resultType=*/
         emitc::PointerType::get(emitc::OpaqueType::get(ctx, "iree_vm_list_t")),
@@ -4329,7 +4329,7 @@ class ListGetOpConversion : public OpConversionPattern<GetOpTy> {
       return getOp.emitOpError() << "element type not handled";
     }
 
-    auto valueOp = rewriter.create<emitc::ConstantOp>(
+    auto valueOp = rewriter.create<emitc::VariableOp>(
         /*location=*/loc,
         /*resultType=*/emitc::OpaqueType::get(ctx, "iree_vm_value_t"),
         /*value=*/emitc::OpaqueAttr::get(ctx, ""));
@@ -5149,7 +5149,7 @@ class ConvertVMToEmitCPass
       }
       // Remove dead basic block arguments
       if (materializations.contains(op)) {
-        assert(isa<emitc::ConstantOp>(op));
+        assert(isa<emitc::VariableOp>(op));
         assert(op->use_empty());
 
         materializations.remove(op);

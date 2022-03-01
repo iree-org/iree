@@ -319,6 +319,7 @@ static LogicalResult canonicalizeModule(
   modulePasses.addPass(createConvertVMToEmitCPass());
 
   modulePasses.addPass(IREE::Util::createDropCompilerHintsPass());
+  modulePasses.addPass(mlir::createCanonicalizerPass());
 
   if (failed(passManager.run(moduleOp->getParentOfType<mlir::ModuleOp>()))) {
     return moduleOp.emitError() << "failed during transform passes";
