@@ -35,18 +35,23 @@ mkdir -p ${BINARY_DIR}
 INSTALL_ROOT="D:\dev\projects\iree-build\install\bin"
 TRANSLATE_TOOL="${INSTALL_ROOT?}/iree-translate.exe"
 EMBED_DATA_TOOL="${INSTALL_ROOT?}/generate_embed_data.exe"
-INPUT_NAME="simple_abs"
-INPUT_PATH="${ROOT_DIR?}/iree/samples/models/simple_abs.mlir"
 
-echo "=== Translating MLIR to Wasm VM flatbuffer output (.vmfb) ==="
-${TRANSLATE_TOOL?} ${INPUT_PATH} \
-  --iree-mlir-to-vm-bytecode-module \
-  --iree-input-type=mhlo \
-  --iree-hal-target-backends=llvm \
-  --iree-llvm-target-triple=wasm32-unknown-emscripten \
-  --iree-llvm-target-cpu-features=+atomics,+bulk-memory,+simd128 \
-  --iree-llvm-link-embedded=false \
-  --o ${BINARY_DIR}/${INPUT_NAME}.vmfb
+translate_sample() {
+  echo "  Translating '$1' sample..."
+  ${TRANSLATE_TOOL?} $2 \
+    --iree-mlir-to-vm-bytecode-module \
+    --iree-input-type=mhlo \
+    --iree-hal-target-backends=llvm \
+    --iree-llvm-target-triple=wasm32-unknown-emscripten \
+    --iree-llvm-target-cpu-features=+atomics,+bulk-memory,+simd128 \
+    --iree-llvm-link-embedded=false \
+    --o ${BINARY_DIR}/$1.vmfb
+}
+
+echo "=== Translating sample MLIR files to VM flatbuffer outputs (.vmfb) ==="
+translate_sample "simple_abs"     "${ROOT_DIR?}/iree/samples/models/simple_abs.mlir"
+translate_sample "fullyconnected" "${ROOT_DIR?}/iree/test/e2e/models/fullyconnected.mlir"
+translate_sample "collatz"        "${ROOT_DIR?}/iree/test/e2e/models/collatz.mlir"
 
 ###############################################################################
 # Build the web artifacts using Emscripten                                    #
