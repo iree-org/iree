@@ -14,10 +14,7 @@
           "type": "BOOL",
           "value": "OFF"
         },
-        "IREE_CPU_LLVM_TARGETS_DEFAULTS": {
-          "type": "BOOL",
-          "value": "OFF"
-        },
+        "IREE_CPU_LLVM_TARGETS_DEFAULTS": "",
         "IREE_BUILD_SAMPLES": {
           "type": "BOOL",
           "value": "OFF"
