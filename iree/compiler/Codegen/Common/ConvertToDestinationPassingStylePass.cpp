@@ -368,8 +368,7 @@ struct AdaptLinalgInputOperandToOutputOperand
     // Repair the payload entry block.
     Block &payload = newOp.region().front();
     payload.getArgument(operand->getOperandNumber())
-        .replaceAllUsesWith(
-            payload.getArgument(op.getNumInputs()));
+        .replaceAllUsesWith(payload.getArgument(op.getNumInputs()));
     payload.eraseArgument(operand->getOperandNumber());
 
     rewriter.replaceOp(op, newOp.getResults());
