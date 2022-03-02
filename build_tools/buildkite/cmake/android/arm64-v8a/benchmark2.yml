@@ -36,7 +36,7 @@ steps:
     if: "build.pull_request.id == null || (build.pull_request.labels includes 'buildkite:benchmark')"
     agents:
       - "android-soc=snapdragon-855"
-      - "android-version=11"
+      - "android-version=12"
       - "queue=benchmark-android"
     artifact_paths:
       - "benchmark-results-pixel-4-${BUILDKITE_BUILD_NUMBER}.json"
