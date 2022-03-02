@@ -28,7 +28,6 @@ if [ -x "$(command -v ninja)" ]; then
   export CMAKE_GENERATOR=Ninja
 fi
 $PYTHON -m pip wheel "${repo_root}" \
-  --use-feature=in-tree-build \
   -w "$wheelhouse" -v
 
 echo "---- INSTALLING iree-compiler ----"

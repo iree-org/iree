@@ -114,36 +114,6 @@ if(IREE_HAL_DRIVER_VULKAN)
 endif()
 
 #-------------------------------------------------------------------------------
-# Compiler Target Options
-# By default, all compiler target backends which are supported/mature and do
-# not require external dependencies are enabled by default. This can be changed
-# with:
-#   -DIREE_TARGET_BACKEND_DEFAULTS=OFF
-#
-# Each backend can enable required LLVM targets. In the case of CPU, these are
-# further controlled by the IREE_CPU_LLVM_TARGETS option.
-#-------------------------------------------------------------------------------
-
-option(IREE_TARGET_BACKEND_DEFAULTS
-       "Sets the default value for all compiler target backends" ON)
-
-# The VMVX backend is always enabled.
-cmake_dependent_option(IREE_TARGET_BACKEND_VMVX "Enables the 'vmvx' compiler target backend" ON ${IREE_BUILD_COMPILER} OFF)
-
-# Supported default target backends.
-cmake_dependent_option(IREE_TARGET_BACKEND_DYLIB_LLVM_AOT "Enables the 'dylib-llvm-aot' compiler target backend" ${IREE_TARGET_BACKEND_DEFAULTS} ${IREE_BUILD_COMPILER} OFF)
-cmake_dependent_option(IREE_TARGET_BACKEND_METAL_SPIRV "Enables the 'metal-spirv' compiler target backend" ${IREE_TARGET_BACKEND_DEFAULTS} ${IREE_BUILD_COMPILER} OFF)
-cmake_dependent_option(IREE_TARGET_BACKEND_WASM_LLVM_AOT "Enables the 'wasm-llvm-aot' compiler target backend" ${IREE_TARGET_BACKEND_DEFAULTS} ${IREE_BUILD_COMPILER} OFF)
-cmake_dependent_option(IREE_TARGET_BACKEND_VULKAN_SPIRV "Enables the 'vulkan-spirv' compiler target backend" ${IREE_TARGET_BACKEND_DEFAULTS} ${IREE_BUILD_COMPILER} OFF)
-
-# Non-default target backends either have additional dependencies or are
-# experimental/niche in some fashion.
-cmake_dependent_option(IREE_TARGET_BACKEND_CUDA "Enables the 'cuda' compiler target backend" OFF ${IREE_BUILD_COMPILER} OFF)
-cmake_dependent_option(IREE_TARGET_BACKEND_ROCM "Enables the 'rocm' compiler target backend" OFF ${IREE_BUILD_COMPILER} OFF)
-# Disable WebGPU by default - it has complex deps and is under development.
-cmake_dependent_option(IREE_TARGET_BACKEND_WEBGPU "Enables the 'webgpu' compiler target backend" OFF ${IREE_BUILD_COMPILER} OFF)
-
-#-------------------------------------------------------------------------------
 # IREE compilation toolchain configuration
 #-------------------------------------------------------------------------------
 
@@ -227,9 +197,9 @@ include(sanitizers)
 include(iree_cc_binary)
 include(iree_cc_library)
 include(iree_cc_test)
+include(iree_external_cmake_options)
 include(iree_tablegen_library)
 include(iree_tablegen_doc)
-include(iree_third_party_cmake_options)
 include(iree_c_embed_data)
 include(iree_bytecode_module)
 include(iree_c_module)
@@ -250,6 +220,12 @@ if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
 endif()
 
 set(CMAKE_POSITION_INDEPENDENT_CODE TRUE)
+
+#-------------------------------------------------------------------------------
+# Core external options initialization
+#-------------------------------------------------------------------------------
+
+iree_set_compiler_cmake_options()
 
 #-------------------------------------------------------------------------------
 # IREE compilation flags
