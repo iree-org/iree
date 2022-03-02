@@ -26,6 +26,7 @@
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/EquivalenceClasses.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/StringSet.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
@@ -38,6 +39,7 @@
 #include "mlir/IR/Value.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
+#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "mlir/Transforms/Passes.h"
 
 namespace mlir {
@@ -49,6 +51,10 @@ class ConvertToDestinationPassingStylePass
           ConvertToDestinationPassingStylePass> {
  public:
   ConvertToDestinationPassingStylePass() = default;
+
+  void getDependentDialects(DialectRegistry &registry) const override {
+    registry.insert<linalg::LinalgDialect>();
+  }
   void runOnOperation() override;
 };
 }  // namespace
@@ -305,9 +311,84 @@ static LogicalResult duplicateInitTensorOps(OpBuilder &b,
   return success();
 }
 
+namespace {
+SmallVector<NamedAttribute> PruneAttributeList(linalg::GenericOp op) {
+  auto opAttributes = op.getAttributeNames();
+  llvm::StringSet<> elidedAttrs;
+  elidedAttrs.insert(opAttributes.begin(), opAttributes.end());
+  SmallVector<NamedAttribute> preservedAttrs;
+  for (auto attr : op->getAttrs()) {
+    if (elidedAttrs.count(attr.getName())) continue;
+    preservedAttrs.push_back(attr);
+  }
+  return preservedAttrs;
+}
+
+/// Adapts Linalg ops input operand to output operand if
+///   1. All the loops are parallel loops.
+///   2. There is only one result tensor.
+///   3. The output tensor is unused in the body computation.
+///   4. There is an input tensor that has the same indexing map and type.
+struct AdaptLinalgInputOperandToOutputOperand
+    : public OpRewritePattern<linalg::GenericOp> {
+  using OpRewritePattern<linalg::GenericOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(linalg::GenericOp op,
+                                PatternRewriter &rewriter) const override {
+    if (op.getNumLoops() != op.getNumParallelLoops()) return failure();
+    if (op->getNumResults() != 1) return failure();
+    if (!op.getRegionOutputArgs()[0].use_empty()) return failure();
+
+    OpOperand *operand = nullptr;
+    auto outputOperand = op.getOutputOperand(0);
+    SmallVector<Value> newOperands;
+    SmallVector<AffineMap> maps;
+    for (auto in : op.getInputOperands()) {
+      if (!operand &&
+          op.getTiedIndexingMap(in) == op.getTiedIndexingMap(outputOperand) &&
+          in->get().getType() == outputOperand->get().getType()) {
+        operand = in;
+      } else {
+        newOperands.push_back(in->get());
+        maps.push_back(op.getTiedIndexingMap(in));
+      }
+    }
+    if (!operand) return failure();
+    maps.push_back(op.getTiedIndexingMap(operand));
+
+    Location loc = op.getLoc();
+    SmallVector<StringRef> iterTypes(op.getNumLoops(),
+                                     getParallelIteratorTypeName());
+    auto newOp = rewriter.create<linalg::GenericOp>(
+        loc, op.getResultTypes(), newOperands, operand->get(), maps, iterTypes,
+        /*bodyBuild=*/nullptr, PruneAttributeList(op));
+    rewriter.inlineRegionBefore(op.region(), newOp.region(),
+                                newOp.region().begin());
+
+    // Repair the payload entry block.
+    Block &payload = newOp.region().front();
+    payload.getArgument(operand->getOperandNumber())
+        .replaceAllUsesWith(
+            payload.getArgument(op.getNumInputs()));
+    payload.eraseArgument(operand->getOperandNumber());
+
+    rewriter.replaceOp(op, newOp.getResults());
+    return success();
+  }
+};
+}  // namespace
+
 void ConvertToDestinationPassingStylePass::runOnOperation() {
   FuncOp funcOp = getOperation();
   MLIRContext *context = &getContext();
+
+  {
+    RewritePatternSet patterns(context);
+    patterns.insert<AdaptLinalgInputOperandToOutputOperand>(context);
+    if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
+      return signalPassFailure();
+    }
+  }
 
   OpBuilder b(context);
   SmallVector<linalg::InitTensorOp> initTensorOps;
