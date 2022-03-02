@@ -91,6 +91,7 @@ LLVMTargetOptions getLLVMTargetOptionsFromFlags() {
       llvm::cl::desc("Enable LLVM SLP Vectorization opt"));
 
   targetOptions.targetTriple = clTargetTriple;
+  llvm::Triple targetTriple(targetOptions.targetTriple);
   if (clTargetCPU != "host") {
     targetOptions.targetCPU = clTargetCPU;
   }
@@ -156,6 +157,18 @@ LLVMTargetOptions getLLVMTargetOptionsFromFlags() {
                      "by the embedded IREE ELF loader"),
       llvm::cl::init(targetOptions.linkEmbedded));
   targetOptions.linkEmbedded = clLinkEmbedded;
+  if (targetTriple.isWasm()) {
+    // The embedded ELF loader is not supported on WebAssembly, so force it off.
+    targetOptions.linkEmbedded = false;
+  }
+  if (targetOptions.linkEmbedded) {
+    // Force the triple to something compatible with embedded linking.
+    targetTriple.setVendor(llvm::Triple::VendorType::UnknownVendor);
+    targetTriple.setEnvironment(llvm::Triple::EnvironmentType::EABI);
+    targetTriple.setOS(llvm::Triple::OSType::UnknownOS);
+    targetTriple.setObjectFormat(llvm::Triple::ObjectFormatType::ELF);
+    targetOptions.targetTriple = targetTriple.str();
+  }
 
   static llvm::cl::opt<bool> clLinkStatic(
       "iree-llvm-link-static",
@@ -188,17 +201,6 @@ LLVMTargetOptions getLLVMTargetOptionsFromFlags() {
   if (clListTargets) {
     llvm::TargetRegistry::printRegisteredTargetsForVersion(llvm::outs());
     exit(0);
-  }
-
-  // Force the triple to something compatible with embedded linking when
-  // enabled.
-  if (targetOptions.linkEmbedded) {
-    llvm::Triple triple(targetOptions.targetTriple);
-    triple.setVendor(llvm::Triple::VendorType::UnknownVendor);
-    triple.setEnvironment(llvm::Triple::EnvironmentType::EABI);
-    triple.setOS(llvm::Triple::OSType::UnknownOS);
-    triple.setObjectFormat(llvm::Triple::ObjectFormatType::ELF);
-    targetOptions.targetTriple = triple.str();
   }
 
   return targetOptions;
