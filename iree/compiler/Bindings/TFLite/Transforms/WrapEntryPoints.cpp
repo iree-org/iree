@@ -621,23 +621,21 @@ class WrapEntryPointsPass
   NamedAttribute buildIONamesAttr(mlir::FuncOp entryFuncOp) {
     SmallVector<std::string, 4> pieces;
     for (int i = 0; i < entryFuncOp.getNumArguments(); ++i) {
-      StringRef identifier =
-          entryFuncOp.getArgAttrOfType<StringAttr>(i, "iree.identifier")
-              .getValue();
-      if (identifier.empty()) {
+      auto identifierAttr =
+          entryFuncOp.getArgAttrOfType<StringAttr>(i, "iree.identifier");
+      if (!identifierAttr || identifierAttr.getValue().empty()) {
         pieces.push_back("arg" + std::to_string(i));
       } else {
-        pieces.push_back(identifier.str());
+        pieces.push_back(identifierAttr.getValue().str());
       }
     }
     for (int i = 0; i < entryFuncOp.getNumResults(); ++i) {
-      StringRef identifier =
-          entryFuncOp.getResultAttrOfType<StringAttr>(i, "iree.identifier")
-              .getValue();
-      if (identifier.empty()) {
+      auto identifierAttr =
+          entryFuncOp.getResultAttrOfType<StringAttr>(i, "iree.identifier");
+      if (!identifierAttr || identifierAttr.getValue().empty()) {
         pieces.push_back("ret" + std::to_string(i));
       } else {
-        pieces.push_back(identifier.str());
+        pieces.push_back(identifierAttr.getValue().str());
       }
     }
     return NamedAttribute{

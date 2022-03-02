@@ -207,3 +207,33 @@ func @dynamicEntry(
   // CHECK: return
   return %0, %1 : tensor<?x8x8x3xf32>, tensor<?x8x8x3xf32>
 }
+
+// -----
+
+// CHECK-LABEL: func @_tflite_main(
+//  CHECK-SAME:   %[[IN0_BUFFER:.+]]: !hal.buffer,
+//  CHECK-SAME:   %[[IN1_BUFFER:.+]]: !hal.buffer)
+//  CHECK-SAME: -> (
+//  CHECK-SAME:   !hal.buffer,
+//  CHECK-SAME:   !hal.buffer
+//  CHECK-SAME: ) attributes {
+//  CHECK-SAME:   iree.abi.stub,
+//  CHECK-SAME:   iree.reflection = {
+//  CHECK-SAME:     tfl.io.names = "arg0;arg1;ret0;ret1"
+//  CHECK-SAME:   }
+//  CHECK-SAME: } {
+
+func @dynamicEntryWithoutIdentifiers(
+  %arg0: tensor<?x8x8x3xf32>,
+  %arg1: tensor<?x8x8x3xf32>
+) -> (
+  tensor<?x8x8x3xf32>,
+  tensor<?x8x8x3xf32>
+) {
+  // CHECK: = mhlo.add
+  %0 = mhlo.add %arg0, %arg1 : tensor<?x8x8x3xf32>
+  // CHECK: = mhlo.add
+  %1 = mhlo.add %0, %arg0 : tensor<?x8x8x3xf32>
+  // CHECK: return
+  return %0, %1 : tensor<?x8x8x3xf32>, tensor<?x8x8x3xf32>
+}
