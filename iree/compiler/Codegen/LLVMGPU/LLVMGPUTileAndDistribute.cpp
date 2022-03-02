@@ -87,7 +87,8 @@ static SmallVector<Value, 4> calculateDistributedTileSize(
   for (unsigned depth : partitionedLoops) {
     if (depth >= blockTileSize.size()) continue;
     tileSizesVal[depth] = builder.create<arith::ConstantIndexOp>(
-        operation->getLoc(), blockTileSize[depth] / distributedDim[idIdx++]);
+        operation->getLoc(),
+        llvm::divideCeil(blockTileSize[depth], distributedDim[idIdx++]));
     if (idIdx == kNumMaxParallelDims) break;
   }
   return tileSizesVal;

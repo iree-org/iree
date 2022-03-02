@@ -79,7 +79,7 @@ hal.executable private @dot_dispatch_0  {
 //         CHECK:      scf.for %[[IND1:.+]] = %{{.*}} to %[[C256]] step %[[C256]] {
 //     CHECK-DAG:        %[[A:.+]] = memref.subview %[[BUFFER1]][%[[IND0]], 0] [2, 4] [1, 1] : memref<2x4xf32, 3> to memref<2x4xf32, #{{.*}}, 3>
 //     CHECK-DAG:        %[[B:.+]] = memref.subview %[[BUFFER0]][0, %[[IND1]]] [4, 4] [1, 1] : memref<4x256xf32, 3> to memref<4x4xf32, #{{.*}}, 3>
-//     CHECK-DAG:        %[[C:.+]] = memref.subview %11[%[[IND0]], %[[IND1]]] [2, 4] [1, 1] : memref<2x256xf32, #{{.*}}> to memref<2x4xf32, #{{.*}}>
+//     CHECK-DAG:        %[[C:.+]] = memref.subview %{{.*}}[%[[IND0]], %[[IND1]]] [2, 4] [1, 1] : memref<2x256xf32, #{{.*}}> to memref<2x4xf32, #{{.*}}>
 //         CHECK:        linalg.matmul {__internal_linalg_transform__ = "vectorize", {{.*}}} ins(%[[A]], %[[B]] : memref<2x4xf32, #{{.*}}, 3>, memref<4x4xf32, #{{.*}}, 3>) outs(%[[C]] : memref<2x4xf32, #{{.*}}>)
 //         CHECK:    }
 //         CHECK:  }
@@ -157,6 +157,95 @@ builtin.module {
 //         CHECK:       linalg.batch_matmul {__internal_linalg_transform__ = "vectorize", {{.*}}} ins(%{{.*}}, %{{.*}} : memref<1x1x32xf32, #{{.*}}, 3>, memref<1x32x4xf32, #{{.*}}, 3>) outs(%{{.*}} : memref<1x1x4xf32, #{{.*}}>)
 //         CHECK:    }
 //         CHECK:  }
+
+// -----
+
+#config = #iree_codegen.lowering.config<tile_sizes = [[2, 32, 4]], native_vector_size = []>
+#translation = #iree_codegen.translation.info<"LLVMGPUMatmulSimt", workload_per_wg = [32, 2]>
+#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb">
+#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>,
+    #hal.descriptor_set.binding<2, storage_buffer>
+  ]>
+]>
+#map0 = affine_map<()[s0] -> (s0 * 2)>
+#map1 = affine_map<()[s0] -> (s0 * 32)>
+#map2 = affine_map<(d0) -> (2, -d0 + 1024)>
+#map3 = affine_map<(d0) -> (32, -d0 + 1024)>
+#map4 = affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>
+hal.executable private @dot_dispatch_0  {
+  hal.executable.variant @cuda, target = #executable_target_cuda_nvptx_fb {
+    hal.executable.entry_point @dot_dispatch_0 layout(#executable_layout) attributes {
+      translation.info = #translation,
+      workgroup_size = [64 : index, 8 : index, 1 : index]
+    }
+    builtin.module {
+      builtin.func @dot_dispatch_0() {
+        %cst = arith.constant 0.000000e+00 : f32
+        %c0 = arith.constant 0 : index
+        %c1024 = arith.constant 1024 : index
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<1024x1024xf32>
+        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<1024x1024xf32>
+        %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : memref<1024x1024xf32>
+        %workgroup_size_x = hal.interface.workgroup.size[0] : index
+        %workgroup_size_y = hal.interface.workgroup.size[1] : index
+        %workgroup_id_x = hal.interface.workgroup.id[0] : index
+        %workgroup_count_x = hal.interface.workgroup.count[0] : index
+        %workgroup_id_y = hal.interface.workgroup.id[1] : index
+        %workgroup_count_y = hal.interface.workgroup.count[1] : index
+        %3 = affine.apply #map0()[%workgroup_id_y]
+        %4 = affine.apply #map0()[%workgroup_count_y]
+        scf.for %arg0 = %3 to %c1024 step %4 {
+          %5 = affine.apply #map1()[%workgroup_id_x]
+          %6 = affine.apply #map1()[%workgroup_count_x]
+          scf.for %arg1 = %5 to %c1024 step %6 {
+            %8 = memref.subview %0[%arg0, 0] [2, 1024] [1, 1]
+                : memref<1024x1024xf32> to memref<2x1024xf32, #map4>
+            %10 = memref.subview %1[0, %arg1] [1024, 32] [1, 1]
+                : memref<1024x1024xf32> to memref<1024x32xf32, #map4>
+            %11 = memref.subview %2[%arg0, %arg1] [2, 32] [1, 1]
+                : memref<1024x1024xf32> to memref<2x32xf32, #map4>
+            linalg.fill(%cst, %11) {lowering.config = #config}
+                : f32, memref<2x32xf32, #map4>
+            linalg.matmul {lowering.config = #config}
+                ins(%8, %10 : memref<2x1024xf32, #map4>, memref<1024x32xf32, #map4>)
+                outs(%11 : memref<2x32xf32, #map4>)
+          }
+        }
+        return
+      }
+    }
+  }
+}
+
+//   CHECK-LABEL: hal.executable private @dot_dispatch_0
+//         CHECK:   hal.executable.variant public @cuda
+//     CHECK-DAG:  %[[C0:.+]] = arith.constant 0 : index
+//     CHECK-DAG:  %[[C2:.+]] = arith.constant 2 : index
+//     CHECK-DAG:  %[[C4:.+]] = arith.constant 4 : index
+//     CHECK-DAG:  %[[C8:.+]] = arith.constant 8 : index
+//     CHECK-DAG:  %[[C32:.+]] = arith.constant 32 : index
+//     CHECK-DAG:  %[[C64:.+]] = arith.constant 64 : index
+//     CHECK-DAG:  %[[C1024:.+]] = arith.constant 1024 : index
+//     CHECK-DAG:  %[[BUFFER0:.+]] = memref.alloc() : memref<4x32xf32, 3>
+//     CHECK-DAG:  %[[BUFFER1:.+]] = memref.alloc() : memref<2x4xf32, 3>
+//         CHECK:  scf.for %[[K:.+]] = %[[C0]] to %[[C1024]] step %[[C4]] {
+//         CHECK:    gpu.barrier
+//         CHECK:    linalg.generic {{.*}} ins(%{{.*}} : memref<2x4xf32, #{{.*}}>) outs(%{{.*}} : memref<2x4xf32, 3>) attrs = {__internal_linalg_transform__ = "copy_to_workgroup_memory"}
+//     CHECK-NOT:    gpu.barrier
+//         CHECK:    linalg.generic {{.*}} ins(%{{.*}} : memref<4x32xf32, #{{.*}}>) outs(%{{.*}} : memref<4x32xf32, 3>) attrs = {__internal_linalg_transform__ = "copy_to_workgroup_memory"}
+//         CHECK:    gpu.barrier
+//         CHECK:    scf.for %[[IND0:.+]] = %{{.*}} to %[[C2]] step %[[C8]] {
+//         CHECK:      scf.for %[[IND1:.+]] = %{{.*}} to %[[C32]] step %[[C64]] {
+//     CHECK-DAG:        %[[A:.+]] = memref.subview %[[BUFFER1]][%[[IND0]], 0] [1, 4] [1, 1] : memref<2x4xf32, 3> to memref<1x4xf32, #{{.*}}, 3>
+//     CHECK-DAG:        %[[B:.+]] = memref.subview %[[BUFFER0]][0, %[[IND1]]] [4, 1] [1, 1] : memref<4x32xf32, 3> to memref<4x1xf32, #{{.*}}, 3>
+//     CHECK-DAG:        %[[C:.+]] = memref.subview %{{.*}}[%[[IND0]], %[[IND1]]] [1, 1] [1, 1] : memref<2x32xf32, #{{.*}}> to memref<1x1xf32, #{{.*}}>
+//         CHECK:        linalg.matmul {__internal_linalg_transform__ = "vectorize", {{.*}}} ins(%[[A]], %[[B]] : memref<1x4xf32, #{{.*}}, 3>, memref<4x1xf32, #{{.*}}, 3>) outs(%[[C]] : memref<1x1xf32, #{{.*}}>)
+//         CHECK:    }
+//         CHECK:  }
+
 
 // -----
 
