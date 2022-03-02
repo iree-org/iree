@@ -44,7 +44,6 @@ translate_sample() {
     --iree-hal-target-backends=llvm \
     --iree-llvm-target-triple=wasm32-unknown-emscripten \
     --iree-llvm-target-cpu-features=+atomics,+bulk-memory,+simd128 \
-    --iree-llvm-link-embedded=false \
     --o ${BINARY_DIR}/$1.vmfb
 }
 

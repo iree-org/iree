@@ -49,6 +49,8 @@ struct LLVMTargetOptions {
   std::string embeddedLinkerPath;
 
   // Build for the IREE embedded platform-agnostic ELF loader.
+  // Note: this is ignored for target machines that do not support the ELF
+  // loader, such as WebAssembly.
   bool linkEmbedded = true;
 
   // Link any required runtime libraries into the produced binaries statically.

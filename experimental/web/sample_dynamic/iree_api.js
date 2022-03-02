@@ -77,7 +77,6 @@ function ireeInitializeWorker() {
 // configuration, such as with these flags:
 //     --iree-hal-target-backends=llvm
 //     --iree-llvm-target-triple=wasm32-unknown-emscripten
-//     --iree-llvm-link-embedded=false
 //
 // Resolves with an opaque pointer to the program state on success.
 function ireeLoadProgram(vmfbPathOrBuffer) {
