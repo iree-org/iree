@@ -57,6 +57,7 @@ cc_library(
         "@llvm-project//llvm:WebAssemblyCodeGen",
         "@llvm-project//llvm:X86AsmParser",
         "@llvm-project//llvm:X86CodeGen",
+        "@llvm-project//llvm:config",
         "@llvm-project//mlir:ArmNeon",
         "@llvm-project//mlir:LLVMDialect",
         "@llvm-project//mlir:LLVMToLLVMIRTranslation",

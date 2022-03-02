@@ -728,19 +728,51 @@ void registerLLVMAOTTargetBackends(
     std::function<LLVMTargetOptions()> queryOptions) {
   getLLVMTargetOptionsFromFlags();
 
-#define INIT_LLVM_TARGET(TargetName)        \
+// Dynamically do preprocessor dispatch to initialize only targets that we
+// care about if they are enabled. Unfortunately, the way the LLVM macros
+// for this are set up and the inability to do a conditional within a macro
+// means that we have to syntactically have a macro for every possible
+// target we care about. There are more robust ways to do this but they all
+// require build support, which is a pain to manage across platforms.
+//
+// See comments below.
+#define LLVM_INITIALIZE_GENERIC(TargetName) \
   LLVMInitialize##TargetName##Target();     \
   LLVMInitialize##TargetName##TargetMC();   \
   LLVMInitialize##TargetName##TargetInfo(); \
   LLVMInitialize##TargetName##AsmPrinter(); \
   LLVMInitialize##TargetName##AsmParser();
 
+// CPU targets that we care about and have hard-linked against are here.
+// They delegate to the generic initialize above. These must all be added
+// to the build file or you will get undefined symbol errors at link time.
+#define LLVM_INITIALIZE_TARGET_AArch64() LLVM_INITIALIZE_GENERIC(AArch64)
+#define LLVM_INITIALIZE_TARGET_ARM() LLVM_INITIALIZE_GENERIC(ARM)
+#define LLVM_INITIALIZE_TARGET_RISCV() LLVM_INITIALIZE_GENERIC(RISCV)
+#define LLVM_INITIALIZE_TARGET_X86() LLVM_INITIALIZE_GENERIC(X86)
+#define LLVM_INITIALIZE_TARGET_WebAssembly() \
+  LLVM_INITIALIZE_GENERIC(WebAssembly)
+
+// We must no-op the name of each target we don't care about. This is annoying,
+// but targets aren't created every day and isn't the end of the world. The
+// error messages when missing are quite clear and you just add a line here.
+#define LLVM_INITIALIZE_TARGET_AMDGPU()
+#define LLVM_INITIALIZE_TARGET_AVR()
+#define LLVM_INITIALIZE_TARGET_BPF()
+#define LLVM_INITIALIZE_TARGET_Hexagon()
+#define LLVM_INITIALIZE_TARGET_Lanai()
+#define LLVM_INITIALIZE_TARGET_Mips()
+#define LLVM_INITIALIZE_TARGET_MSP430()
+#define LLVM_INITIALIZE_TARGET_NVPTX()
+#define LLVM_INITIALIZE_TARGET_PowerPC()
+#define LLVM_INITIALIZE_TARGET_Sparc()
+#define LLVM_INITIALIZE_TARGET_SystemZ()
+#define LLVM_INITIALIZE_TARGET_XCore()
+
+#define LLVM_TARGET(TargetName) LLVM_INITIALIZE_TARGET_##TargetName()
+#include "llvm/Config/Targets.def"
+
   auto backendFactory = [=]() {
-    INIT_LLVM_TARGET(X86)
-    INIT_LLVM_TARGET(ARM)
-    INIT_LLVM_TARGET(AArch64)
-    INIT_LLVM_TARGET(RISCV)
-    INIT_LLVM_TARGET(WebAssembly)
     return std::make_shared<LLVMAOTTargetBackend>(queryOptions());
   };
 
@@ -753,8 +785,6 @@ void registerLLVMAOTTargetBackends(
   static TargetBackendRegistration registration2("dylib", backendFactory);
   static TargetBackendRegistration registration3("dylib-llvm-aot",
                                                  backendFactory);
-
-#undef INIT_LLVM_TARGET
 }
 
 }  // namespace HAL

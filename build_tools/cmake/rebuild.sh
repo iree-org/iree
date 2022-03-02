@@ -51,4 +51,10 @@ CMAKE_ARGS=(
 )
 
 "$CMAKE_BIN" "${CMAKE_ARGS[@]?}" "$@" ..
+echo "Building all"
+echo "------------"
 "$CMAKE_BIN" --build . -- -k 0
+
+echo "Building test deps"
+echo "------------------"
+"$CMAKE_BIN" --build . --target iree-test-deps -- -k 0

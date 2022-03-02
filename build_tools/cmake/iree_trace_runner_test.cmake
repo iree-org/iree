@@ -96,6 +96,8 @@ function(iree_trace_runner_test)
     "${_RULE_TRACE_RUNNER}"
   )
 
+  add_dependencies(iree-test-deps "${_NAME}")
+
   iree_native_test(
     NAME
       "${_RULE_NAME}"

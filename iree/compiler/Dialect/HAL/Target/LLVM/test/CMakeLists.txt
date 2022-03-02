@@ -16,9 +16,9 @@ iree_lit_test_suite(
   SRCS
     "smoketest.mlir"
   TOOLS
+    ${IREE_LLD_TARGET}
     FileCheck
     iree::tools::iree-opt
-    lld
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

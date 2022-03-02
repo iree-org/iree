@@ -29,9 +29,23 @@ EXPLICIT_TARGET_MAPPING = {
         "IREEPyDMPasses"
     ],
 
+    # Disable all hard-coded codegen targets (they are expanded dynamically
+    # in CMake).
+    "@llvm-project//llvm:AArch64AsmParser": ["IREELLVMCPUTargetDeps"],
+    "@llvm-project//llvm:AArch64CodeGen": ["IREELLVMCPUTargetDeps"],
+    "@llvm-project//llvm:ARMAsmParser": ["IREELLVMCPUTargetDeps"],
+    "@llvm-project//llvm:ARMCodeGen": ["IREELLVMCPUTargetDeps"],
+    "@llvm-project//llvm:RISCVAsmParser": ["IREELLVMCPUTargetDeps"],
+    "@llvm-project//llvm:RISCVCodeGen": ["IREELLVMCPUTargetDeps"],
+    "@llvm-project//llvm:WebAssemblyAsmParser": ["IREELLVMCPUTargetDeps"],
+    "@llvm-project//llvm:WebAssemblyCodeGen": ["IREELLVMCPUTargetDeps"],
+    "@llvm-project//llvm:X86AsmParser": ["IREELLVMCPUTargetDeps"],
+    "@llvm-project//llvm:X86CodeGen": ["IREELLVMCPUTargetDeps"],
+
     # LLVM
+    "@llvm-project//llvm:config": [],
     "@llvm-project//llvm:IPO": ["LLVMipo"],
-    "@llvm-project//lld": ["lld"],
+    "@llvm-project//lld": ["${IREE_LLD_TARGET}"],
     "@llvm-project//llvm:FileCheck": ["FileCheck"],
     # MLIR
     "@llvm-project//mlir:AllPassesAndDialects": ["MLIRAllDialects"],

@@ -100,7 +100,6 @@ function(iree_bytecode_module)
   endif()
 
   iree_get_executable_path(_TRANSLATE_TOOL_EXECUTABLE ${_TRANSLATE_TOOL})
-  iree_get_executable_path(_EMBEDDED_LINKER_TOOL_EXECUTABLE "lld")
 
   set(_ARGS "${_RULE_FLAGS}")
 
@@ -108,7 +107,12 @@ function(iree_bytecode_module)
   list(APPEND _ARGS "${_TRANSLATE_SRC_PATH}")
   list(APPEND _ARGS "-o")
   list(APPEND _ARGS "${_MODULE_FILE_NAME}")
-  list(APPEND _ARGS "-iree-llvm-embedded-linker-path=\"${_EMBEDDED_LINKER_TOOL_EXECUTABLE}\"")
+
+  # If an LLVM CPU backend is enabled, supply the linker tool.
+  if(IREE_LLD_TARGET)
+    iree_get_executable_path(_EMBEDDED_LINKER_TOOL_EXECUTABLE "lld")
+    list(APPEND _ARGS "-iree-llvm-embedded-linker-path=\"${_EMBEDDED_LINKER_TOOL_EXECUTABLE}\"")
+  endif()
 
   # Depending on the binary instead of the target here given we might not have
   # a target in this CMake invocation when cross-compiling.

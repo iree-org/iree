@@ -28,21 +28,12 @@ iree_cc_library(
     ::LLVMTargetOptions
     ::LinkerTool
     ::StaticLibraryGenerator
-    LLVMAArch64AsmParser
-    LLVMAArch64CodeGen
-    LLVMARMAsmParser
-    LLVMARMCodeGen
+    IREELLVMCPUTargetDeps
     LLVMBitReader
     LLVMBitWriter
     LLVMCore
     LLVMLinker
-    LLVMRISCVAsmParser
-    LLVMRISCVCodeGen
     LLVMSupport
-    LLVMWebAssemblyAsmParser
-    LLVMWebAssemblyCodeGen
-    LLVMX86AsmParser
-    LLVMX86CodeGen
     MLIRArmNeon
     MLIRLLVMIR
     MLIRLLVMToLLVMIRTranslation
@@ -131,3 +122,22 @@ iree_cc_library(
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
+
+add_library(IREELLVMCPUTargetDeps INTERFACE)
+
+function(_add_optional_llvm_dep dep)
+  if(TARGET ${dep})
+    target_link_libraries(IREELLVMCPUTargetDeps INTERFACE ${dep})
+  endif()
+endfunction()
+
+_add_optional_llvm_dep(LLVMAArch64AsmParser)
+_add_optional_llvm_dep(LLVMAArch64CodeGen)
+_add_optional_llvm_dep(LLVMARMAsmParser)
+_add_optional_llvm_dep(LLVMARMCodeGen)
+_add_optional_llvm_dep(LLVMRISCVAsmParser)
+_add_optional_llvm_dep(LLVMRISCVCodeGen)
+_add_optional_llvm_dep(LLVMWebAssemblyAsmParser)
+_add_optional_llvm_dep(LLVMWebAssemblyCodeGen)
+_add_optional_llvm_dep(LLVMX86AsmParser)
+_add_optional_llvm_dep(LLVMX86CodeGen)
