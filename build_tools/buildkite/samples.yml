@@ -20,3 +20,8 @@ steps:
       IREE_DOCKER_WORKDIR: "/usr/src/github/iree"
     agents:
       - "queue=build"
+
+# Notify rotation on postsubmit failures.
+notify:
+  - email: "bdi-build-cop+buildkite@grotations.appspotmail.com"
+    if: "build.state == 'failed' && build.pull_request.id == null"
