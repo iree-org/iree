@@ -66,6 +66,7 @@ set(MLIR_MAIN_SRC_DIR ${LLVM_MAIN_SRC_DIR}/../mlir)
 set(MLIR_MAIN_BINARY_DIR "${LLVM_MAIN_BINARY_DIR}/tools/mlir")
 
 # Configuration includes.
+include(${IREE_SOURCE_DIR}/build_tools/cmake/iree_cmake_options.cmake)
 include(${IREE_SOURCE_DIR}/build_tools/cmake/iree_external_cmake_options.cmake)
 
 # CMake settings.

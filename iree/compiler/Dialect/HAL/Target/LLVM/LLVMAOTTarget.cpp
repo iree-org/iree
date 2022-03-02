@@ -750,6 +750,8 @@ void registerLLVMAOTTargetBackends(
 #define LLVM_INITIALIZE_TARGET_ARM() LLVM_INITIALIZE_GENERIC(ARM)
 #define LLVM_INITIALIZE_TARGET_RISCV() LLVM_INITIALIZE_GENERIC(RISCV)
 #define LLVM_INITIALIZE_TARGET_X86() LLVM_INITIALIZE_GENERIC(X86)
+#define LLVM_INITIALIZE_TARGET_WebAssembly() \
+  LLVM_INITIALIZE_GENERIC(WebAssembly)
 
 // We must no-op the name of each target we don't care about. This is annoying,
 // but targets aren't created every day and isn't the end of the world. The
@@ -763,7 +765,6 @@ void registerLLVMAOTTargetBackends(
 #define LLVM_INITIALIZE_TARGET_MSP430()
 #define LLVM_INITIALIZE_TARGET_NVPTX()
 #define LLVM_INITIALIZE_TARGET_PowerPC()
-#define LLVM_INITIALIZE_TARGET_WebAssembly()
 #define LLVM_INITIALIZE_TARGET_Sparc()
 #define LLVM_INITIALIZE_TARGET_SystemZ()
 #define LLVM_INITIALIZE_TARGET_XCore()

@@ -29,6 +29,7 @@ include(CMakeDependentOption)
 
 #-------------------------------------------------------------------------------
 # Project component configuration
+# See also: build_tools/cmake/iree_cmake_options.cmake
 #-------------------------------------------------------------------------------
 
 option(IREE_ENABLE_RUNTIME_TRACING "Enables instrumented runtime tracing." OFF)
@@ -197,6 +198,7 @@ include(sanitizers)
 include(iree_cc_binary)
 include(iree_cc_library)
 include(iree_cc_test)
+include(iree_cmake_options)
 include(iree_external_cmake_options)
 include(iree_tablegen_library)
 include(iree_tablegen_doc)
@@ -222,7 +224,8 @@ endif()
 set(CMAKE_POSITION_INDEPENDENT_CODE TRUE)
 
 #-------------------------------------------------------------------------------
-# Core external options initialization
+# Core options initialization (for options defined in macros in
+# iree_cmake_options.cmake).
 #-------------------------------------------------------------------------------
 
 iree_set_compiler_cmake_options()
@@ -549,6 +552,7 @@ add_subdirectory(iree/runtime)
 add_subdirectory(iree/schemas)
 add_subdirectory(iree/task)
 add_subdirectory(iree/testing)
+# Note: Test deps are not built as part of all (use the iree-test-deps target).
 add_subdirectory(iree/test EXCLUDE_FROM_ALL)
 add_subdirectory(iree/vm)
 
