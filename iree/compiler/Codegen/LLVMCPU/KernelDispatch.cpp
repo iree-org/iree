@@ -764,7 +764,6 @@ static LogicalResult setRootConfig(
     setTranslationInfo(entryPointFn, DispatchLoweringPassPipeline::CPUDefault,
                        /*workloadPerWorkgroup=*/ArrayRef<int64_t>{},
                        /*workgroupSize=*/ArrayRef<int64_t>{});
-    ;
   }
   return success();
 }

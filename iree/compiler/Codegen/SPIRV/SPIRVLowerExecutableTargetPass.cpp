@@ -93,13 +93,6 @@ void SPIRVLowerExecutableTargetPass::runOnOperation() {
     }
   }
 
-  if (*passPipeline !=
-      IREE::Codegen::DispatchLoweringPassPipeline::SPIRVDistributeCopy) {
-    // SPIRVDistributeCopy handles these passes by itself.
-    executableLoweringPipeline.addPass(createSetNumWorkgroupsPass());
-    executableLoweringPipeline.addPass(createCanonicalizerPass());
-  }
-
   if (!testLoweringConfiguration && passPipeline.hasValue()) {
     OpPassManager &nestedModulePM = executableLoweringPipeline.nest<ModuleOp>();
     switch (*passPipeline) {
@@ -107,7 +100,7 @@ void SPIRVLowerExecutableTargetPass::runOnOperation() {
         addSPIRVTileAndDistributePassPipeline(nestedModulePM);
         break;
       case IREE::Codegen::DispatchLoweringPassPipeline::SPIRVDistributeCopy:
-        addSPIRVTileAndDistributeCopyPassPipeline(executableLoweringPipeline);
+        addSPIRVTileAndDistributeCopyPassPipeline(nestedModulePM);
         break;
       case IREE::Codegen::DispatchLoweringPassPipeline::SPIRVVectorize:
         addSPIRVTileAndVectorizePassPipeline(nestedModulePM);

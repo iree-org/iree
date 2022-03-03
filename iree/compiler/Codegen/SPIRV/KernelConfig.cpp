@@ -364,27 +364,6 @@ static LogicalResult setDefaultOpConfig(spirv::ResourceLimitsAttr limits,
   // 1) distributing to as many threads as possible, and 2) avoid assigning too
   // many threads to handle out-of-bound elements (thus idle).
 
-  SmallVector<LoopTilingAndDistributionInfo> tiledLoopInfo =
-      getTiledAndDistributedLoopInfo(funcOp);
-  // The number of linalg implicit loops to partition and tiled loops
-  // surrounding the op should match. Otherwise, something is incorrect.
-  assert(partitionedLoops.size() == tiledLoopInfo.size());
-
-  // The upper bound for each implicit loop: 0 - untiled, negative - dynamic.
-  SmallVector<int64_t> loopBounds(loopDepth, 0);
-  // tiledLoopInfo uses the reverse order of partitionedLoops.
-  for (auto pair : llvm::zip(llvm::reverse(partitionedLoops), tiledLoopInfo)) {
-    unsigned loopIndex = std::get<0>(pair);
-    const LoopTilingAndDistributionInfo &loopInfo = std::get<1>(pair);
-    Optional<int64_t> attrValue =
-        getConstantIntValue(loopInfo.untiledUpperBound);
-    if (attrValue) {
-      loopBounds[loopIndex] = *attrValue;
-    } else {
-      loopBounds[loopIndex] = ShapedType::kDynamicSize;
-    }
-  }
-
   // Returns true if the given `operand` has 32-bit element type.
   auto has32BitElementType = [](Value operand) {
     auto shapedType = operand.getType().dyn_cast<ShapedType>();
@@ -394,7 +373,7 @@ static LogicalResult setDefaultOpConfig(spirv::ResourceLimitsAttr limits,
   };
 
   // Whether we can try to use the vectorization pipeline.
-  auto untiledResultShape = getUntiledResultShape(linalgOp, 0);
+  Optional<SmallVector<int64_t, 4>> loopBounds = linalgOp.getStaticLoopRanges();
   bool vectorizable =
       !linalgOp.hasIndexSemantics() &&
       // Skip vectorization for non-minor identity inputs as it generates
@@ -407,16 +386,7 @@ static LogicalResult setDefaultOpConfig(spirv::ResourceLimitsAttr limits,
       // TODO: Lowering of integers other than i32 may require emulation.
       // This is currently not supported for vector operation.
       llvm::all_of(linalgOp->getOperands(), has32BitElementType) &&
-      !untiledResultShape.empty() &&
-      llvm::none_of(untiledResultShape, ShapedType::isDynamic);
-
-  LLVM_DEBUG({
-    llvm::dbgs() << "Linalg op " << linalgOp << "\n  partitioned loops: [";
-    llvm::interleaveComma(partitionedLoops, llvm::dbgs());
-    llvm::dbgs() << "]\n  loop bounds: [";
-    llvm::interleaveComma(loopBounds, llvm::dbgs());
-    llvm::dbgs() << "]\n";
-  });
+      loopBounds && llvm::none_of(loopBounds.getValue(), ShapedType::isDynamic);
 
   // Distribute workload to the given `numThreads` by allowing a potental loss.
   auto distributeToThreads = [&](int64_t numThreads,
@@ -426,19 +396,11 @@ static LogicalResult setDefaultOpConfig(spirv::ResourceLimitsAttr limits,
 
     // Scan from the innermost shape dimension and try to deduce the
     // configuration for the corresponding GPU workgroup dimension.
-    for (auto p : llvm::zip(llvm::reverse(partitionedLoops), tiledLoopInfo)) {
-      int shapeDim = std::get<0>(p);
-      int wgDim = std::get<1>(p).processorDistributionDim;
-      LLVM_DEBUG({
-        llvm::dbgs() << "Remaining threads: " << numThreads << "\n";
-        llvm::dbgs() << "Shape dim #" << shapeDim << "=";
-        llvm::dbgs() << loopBounds[shapeDim] << "\n"
-                     << "Workgroup dim #" << wgDim << "\n";
-      });
-
+    int64_t wgDim = 0;
+    for (auto shapeDim : llvm::reverse(partitionedLoops)) {
       // Skip untiled or dynamic dimensions.
       // TODO: Skip size-1 dimensions in Flow level tiling and distribution.
-      if (loopBounds[shapeDim] <= 0) continue;
+      if (loopBounds.getValue()[shapeDim] <= 0) continue;
 
       // Try to find some power of two that can devide the current shape dim
       // size. This vector keeps the candidate tile sizes.
@@ -460,10 +422,11 @@ static LogicalResult setDefaultOpConfig(spirv::ResourceLimitsAttr limits,
       });
 
       for (int64_t candidate : candidates) {
-        if (loopBounds[shapeDim] % candidate != 0) {
+        if (loopBounds.getValue()[shapeDim] % candidate != 0) {
           if (!lossFactor) continue;
           // Skip this candidate if it causes many threads to be idle.
-          int64_t idleThreads = candidate - (loopBounds[shapeDim] % candidate);
+          int64_t idleThreads =
+              candidate - (loopBounds.getValue()[shapeDim] % candidate);
           if (idleThreads > candidate / *lossFactor) continue;
         }
         LLVM_DEBUG(llvm::dbgs() << "Chosen Candiate " << candidate << "\n");
@@ -473,13 +436,13 @@ static LogicalResult setDefaultOpConfig(spirv::ResourceLimitsAttr limits,
         workgroupTileSizes[shapeDim] = candidate;
         if (vectorizable && wgDim == 0 && !lossFactor && candidate % 4 == 0) {
           threadTileSizes[shapeDim] = 4;
-          workgroupSize[wgDim++] = candidate / 4;
+          workgroupSize[wgDim] = candidate / 4;
           assert(numThreads % (candidate / 4) == 0);
           numThreads /= candidate / 4;
         } else {
           if (wgDim == 0) vectorizable = false;
           threadTileSizes[shapeDim] = 1;
-          workgroupSize[wgDim++] = candidate;
+          workgroupSize[wgDim] = candidate;
           assert(numThreads % candidate == 0);
           numThreads /= candidate;
         }
@@ -489,6 +452,7 @@ static LogicalResult setDefaultOpConfig(spirv::ResourceLimitsAttr limits,
 
       // Stop if we have distributed all threads.
       if (numThreads == 1) break;
+      wgDim++;
     }
     return numThreads;
   };
@@ -656,19 +620,9 @@ LogicalResult initSPIRVLaunchConfig(ModuleOp module) {
       // a copy). For now just treat the tiled loops not being empty as an
       // indicator of that. Need a better way of information flow from flow
       // dialect to hal.
-      if (!tiledLoops.empty()) {
-        // These configuration parameters will be overwritten by the
-        // SPIRVDistributeCopy pipeline later.
-        const int64_t subgroupSize =
-            limits.subgroup_size().getValue().getSExtValue();
-        std::array<int64_t, 3> workgroupSize = {subgroupSize, 1, 1};
-        SmallVector<int64_t> workloadPerWorkgroup(tiledLoops.size(), 1);
-        workloadPerWorkgroup.front() = subgroupSize;
-        setTranslationInfo(
-            funcOp,
-            IREE::Codegen::DispatchLoweringPassPipeline::SPIRVDistributeCopy,
-            workloadPerWorkgroup, workgroupSize);
-        return success();
+      if (computeOps.size() == 1 &&
+          isa<tensor::ExtractSliceOp, tensor::InsertSliceOp>(computeOps[0])) {
+        return setDefaultOpConfig(limits, computeOps[0]);
       }
       return funcOp.emitError("contains no root Linalg operation");
     }
