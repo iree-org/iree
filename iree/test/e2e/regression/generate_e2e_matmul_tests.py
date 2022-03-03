@@ -89,17 +89,18 @@ def get_test_shapes(shapes_id: ShapesId):
         # this will often be the smallest value that exercises something above
         # the kernel's size.
         TestShape(m=9, k=9, n=9),
-        # slightly rectangular matrices
-        TestShape(m=5, k=4, n=3),
-        TestShape(m=15, k=16, n=17),
+        # rectangular matrices.
+        # >= 2x differences between M/N/K dims may exercise tiling corner cases
+        # not exercised by nearly-square matrices.
+        TestShape(m=6, k=13, n=3),
+        TestShape(m=15, k=37, n=7),
+        TestShape(m=81, k=19, n=41),
         # shapes involving vectors (i.e. most rectangular cases)
         # This is particularly relevant because we have dedicated kernels for
         # the matrix*vector / vector*matrix case.
         TestShape(m=1, k=10, n=10),  # vector*matrix
         TestShape(m=10, k=1, n=10),  # outer-product
         TestShape(m=10, k=10, n=1),  # matrix*vector
-        # something not so small
-        TestShape(m=61, k=65, n=67),
     ]
   if shapes_id == ShapesId.LARGE:
     return [
