@@ -32,6 +32,16 @@ class MatrixElemTypeId(enum.Enum):
 class ShapesId(enum.Enum):
   SMALL = "small"
   LARGE = "large"
+  GPU_LARGE = "gpu_large"
+
+
+# Enumerates of the collections of compilation info that we can generate tests
+# for. The values are the accepted values for the --compilation_info= flag.
+@enum.unique
+class CompilationInfoId(enum.Enum):
+  NONE = ""
+  LLVMGPUMatmulSimt = "LLVMGPUMatmulSimt"
+  LLVMGPUMatmulTensorCore = "LLVMGPUMatmulTensorCore"
 
 
 # Enumerates ways to construct MLIR tensor types.
@@ -68,6 +78,24 @@ class TestGenerator:
   rhs: MatrixGenerator
   acc: MatrixGenerator
   dynamicity: Dynamicity
+
+
+# Describes how to construct compilation info for the testcase.
+@dataclasses.dataclass
+class CompilationInfo:
+  # Lowering Config
+  tile_sizes: typing.List[int]
+  native_vector_size: typing.List[int]
+  # Translation Info
+  dispatch_lowering_pass_pipeline: str
+  workload_per_wg: typing.List[int]
+  # Compilation info
+  workgroup_size: typing.List[int]
+
+  # Prints the workgroup size as 'index' types
+  def workgroup_size_str(self):
+    return "[" + ", ".join([f"{size} : index" for size in self.workgroup_size
+                           ]) + "]"
 
 
 # Returns the list of TestShape's to use for the collection of shapes
@@ -116,6 +144,8 @@ def get_test_shapes(shapes_id: ShapesId):
         # running on fewer backends/drivers or with fewer generators
         # (see get_test_generators).
     ]
+  if shapes_id == ShapesId.GPU_LARGE:
+    return [TestShape(m=256, k=128, n=512)]
   raise ValueError(shapes_id)
 
 
@@ -172,7 +202,56 @@ def get_test_generators(shapes_id: ShapesId):
                       acc=MatrixGenerator.RANDOM,
                       dynamicity=Dynamicity.STATIC),
     ]
+  if shapes_id == ShapesId.GPU_LARGE:
+    return [
+        TestGenerator(lhs=MatrixGenerator.IDENTITY,
+                      rhs=MatrixGenerator.IDENTITY,
+                      acc=MatrixGenerator.ZERO,
+                      dynamicity=Dynamicity.STATIC),
+        TestGenerator(lhs=MatrixGenerator.RANDOM,
+                      rhs=MatrixGenerator.RANDOM,
+                      acc=MatrixGenerator.RANDOM,
+                      dynamicity=Dynamicity.STATIC),
+    ]
   raise ValueError(shapes_id)
+
+
+@dataclasses.dataclass
+class TileWorkgroupSizePair:
+  tile_size: typing.List[int]
+  workgroup_size: typing.List[int]
+
+
+# Returns the list of CompilationInfo's to use for the CompilationInfoId.
+def get_test_compilation_infos(
+    compilation_info_id: CompilationInfoId) -> typing.List[CompilationInfo]:
+  if compilation_info_id == CompilationInfoId.LLVMGPUMatmulSimt:
+    tile_workgroup_size_pairs = [
+        TileWorkgroupSizePair([32, 128, 32], [32, 8, 1]),
+        TileWorkgroupSizePair([128, 64, 8], [16, 8, 1]),
+        TileWorkgroupSizePair([16, 256, 32], [64, 2, 1]),
+        TileWorkgroupSizePair([8, 32, 32], [8, 8, 1]),
+        TileWorkgroupSizePair([8, 128, 4], [32, 1, 1]),
+        TileWorkgroupSizePair([16, 64, 4], [16, 2, 1]),
+        TileWorkgroupSizePair([1, 128, 8], [32, 1, 1]),
+    ]
+  elif compilation_info_id == CompilationInfoId.LLVMGPUMatmulTensorCore:
+    tile_workgroup_size_pairs = [
+        TileWorkgroupSizePair([32, 32, 16], [64, 2, 1]),
+    ]
+
+  compilation_infos = []
+  for tile_workgroup_size_pair in tile_workgroup_size_pairs:
+    compilation_infos.append(
+        CompilationInfo(
+            tile_sizes=tile_workgroup_size_pair.tile_size,
+            native_vector_size=[],
+            dispatch_lowering_pass_pipeline=compilation_info_id.value,
+            workload_per_wg=[
+                a for a in reversed(tile_workgroup_size_pair.tile_size[0:2])
+            ],
+            workgroup_size=tile_workgroup_size_pair.workgroup_size))
+  return compilation_infos
 
 
 # Intentionally fixed seed! We want full reproducibility here, both across runs
@@ -277,9 +356,11 @@ def generate_shapes(shape: TestShape, dynamicity: Dynamicity):
 
 # Helper for generate_function.
 # Generates a name for a test function in the generated MLIR code.
-def generate_function_name(lhs_rhs_type: MatrixElemTypeId,
-                           acc_type: MatrixElemTypeId,
-                           shapes: TestInputMatricesShapes):
+def generate_function_name(
+    lhs_rhs_type: MatrixElemTypeId,
+    acc_type: MatrixElemTypeId,
+    shapes: TestInputMatricesShapes,
+    compilation_info: typing.Optional[CompilationInfo] = None):
   input_t = lhs_rhs_type.value
   acc_t = acc_type.value
   lhs_m = int_or_DYN(shapes.lhs_rows)
@@ -288,7 +369,15 @@ def generate_function_name(lhs_rhs_type: MatrixElemTypeId,
   rhs_n = int_or_DYN(shapes.rhs_cols)
   acc_m = int_or_DYN(shapes.acc_rows)
   acc_n = int_or_DYN(shapes.acc_cols)
-  return f"matmul_{lhs_m}x{lhs_k}x{input_t}_times_{rhs_k}x{rhs_n}x{input_t}_into_{acc_m}x{acc_n}x{acc_t}"
+
+  info = ""
+  if compilation_info:
+    tile_workgroup_key = "_".join([
+        str(a) for a in compilation_info.tile_sizes
+    ]) + "_" + "_".join([str(a) for a in compilation_info.workgroup_size])
+    info = f"_for_{compilation_info.dispatch_lowering_pass_pipeline}_{tile_workgroup_key}"
+
+  return f"matmul_{lhs_m}x{lhs_k}x{input_t}_times_{rhs_k}x{rhs_n}x{input_t}_into_{acc_m}x{acc_n}x{acc_t}{info}"
 
 
 # Represents a generated test function.
@@ -301,11 +390,15 @@ class MLIRFunction:
 # Generates a test function in the generated MLIR code.
 # The generated function will take the same arguments as linalg.matmul and
 # will just call linalg.matmul with them, returning its result.
-def generate_function(lhs_rhs_type: MatrixElemTypeId,
-                      acc_type: MatrixElemTypeId, shape: TestShape,
-                      dynamicity: Dynamicity):
+def generate_function(
+    lhs_rhs_type: MatrixElemTypeId,
+    acc_type: MatrixElemTypeId,
+    shape: TestShape,
+    dynamicity: Dynamicity,
+    compilation_info: typing.Optional[CompilationInfo] = None):
   shapes = generate_shapes(shape, dynamicity)
-  func_name = generate_function_name(lhs_rhs_type, acc_type, shapes)
+  func_name = generate_function_name(lhs_rhs_type, acc_type, shapes,
+                                     compilation_info)
   lhs_m = int_or_question_mark(shapes.lhs_rows)
   lhs_k = int_or_question_mark(shapes.lhs_cols)
   rhs_k = int_or_question_mark(shapes.rhs_rows)
@@ -315,9 +408,23 @@ def generate_function(lhs_rhs_type: MatrixElemTypeId,
   lhs_tensor_type = f"tensor<{lhs_m}x{lhs_k}x{lhs_rhs_type.value}>"
   rhs_tensor_type = f"tensor<{rhs_k}x{rhs_n}x{lhs_rhs_type.value}>"
   acc_tensor_type = f"tensor<{acc_m}x{acc_n}x{acc_type.value}>"
-  func_definition = (
+
+  # Compilation info is optional; prints empty string by default.
+  func_definition = ""
+  compilation_info_attr = ""
+  if compilation_info:
+    compilation_info_string = (
+        f"#compilation{generate_function.compilation_index} = #iree_codegen.compilation.info<\n"
+        f"  #iree_codegen.lowering.config<tile_sizes = [{compilation_info.tile_sizes}], native_vector_size = {compilation_info.native_vector_size}>,\n"
+        f"  #iree_codegen.translation.info<\"{compilation_info.dispatch_lowering_pass_pipeline}\", workload_per_wg = {compilation_info.workload_per_wg}>,\n"
+        f"  workgroup_size = {compilation_info.workgroup_size_str()}>\n")
+    compilation_info_attr = f"{{compilation.info = #compilation{generate_function.compilation_index}}} "
+    func_definition = func_definition + compilation_info_string
+    generate_function.compilation_index += 1
+
+  func_definition = func_definition + (
       f"func @{func_name}(%lhs: {lhs_tensor_type}, %rhs: {rhs_tensor_type}, %acc: {acc_tensor_type}) -> {acc_tensor_type} {{\n"
-      f"  %result = linalg.matmul ins(%lhs, %rhs: {lhs_tensor_type}, {rhs_tensor_type}) outs(%acc: {acc_tensor_type}) -> {acc_tensor_type}\n"
+      f"  %result = linalg.matmul {compilation_info_attr}ins(%lhs, %rhs: {lhs_tensor_type}, {rhs_tensor_type}) outs(%acc: {acc_tensor_type}) -> {acc_tensor_type}\n"
       f"  return %result: {acc_tensor_type}\n"
       f"}}\n")
   return MLIRFunction(
@@ -325,6 +432,9 @@ def generate_function(lhs_rhs_type: MatrixElemTypeId,
       definition=func_definition,
   )
 
+
+# Counter for producing unique complation info attrs
+generate_function.compilation_index = 0
 
 # Intentionally fixed seed! We want full reproducibility here, both across runs
 # and across machines.
@@ -386,8 +496,8 @@ def generate_trace(func_name: str, lhs_rhs_type: MatrixElemTypeId,
 
 
 # Generates all output files' contents as strings.
-def generate(lhs_rhs_type: MatrixElemTypeId, acc_type: MatrixElemTypeId,
-             shapes_id: ShapesId):
+def generate_default(lhs_rhs_type: MatrixElemTypeId, acc_type: MatrixElemTypeId,
+                     shapes_id: ShapesId):
   function_definitions = {}
   traces = []
   for shape in get_test_shapes(shapes_id):
@@ -403,6 +513,31 @@ def generate(lhs_rhs_type: MatrixElemTypeId, acc_type: MatrixElemTypeId,
         function_definitions[function.name] = function.definition
       traces.append(
           generate_trace(function.name, lhs_rhs_type, acc_type, shape, gen))
+  return (function_definitions, traces)
+
+
+# Generates all output files' contents as strings.
+def generate_gpu(lhs_rhs_type: MatrixElemTypeId, acc_type: MatrixElemTypeId,
+                 shapes_id: ShapesId, compilation_info_id: CompilationInfoId):
+  function_definitions = {}
+  traces = []
+
+  for compilation_info in get_test_compilation_infos(compilation_info_id):
+    for shape in get_test_shapes(shapes_id):
+      for gen in get_test_generators(shapes_id):
+
+        function = generate_function(lhs_rhs_type, acc_type, shape,
+                                     gen.dynamicity, compilation_info)
+        # Different testcases may differ only by runtime parameters but
+        # share the same code. For example, dynamic-shapes testcases
+        # share the same code involing tensor<?x?xf32> even though the runtime
+        # value in the trace are different. That's why we append conditionally
+        # to traces, but unconditionally to function_definitions.
+        if function.name not in function_definitions:
+          function_definitions[function.name] = function.definition
+        traces.append(
+            generate_trace(function.name, lhs_rhs_type, acc_type, shape, gen))
+
   return (function_definitions, traces)
 
 
@@ -426,6 +561,13 @@ def parse_arguments():
                       choices=[s.value for s in ShapesId],
                       help="Collection of matrix shapes to test",
                       required=True)
+  parser.add_argument("--compilation_info",
+                      type=str,
+                      choices=[i.value for i in CompilationInfoId],
+                      help="Collection of compilation info setups to test",
+                      default="",
+                      required=False)
+
   parser.add_argument(
       "--module_path",
       type=str,
@@ -505,7 +647,17 @@ def main(args):
   lhs_rhs_type = MatrixElemTypeId(args.lhs_rhs_type)
   acc_type = infer_acc_type(lhs_rhs_type)
   shapes_id = ShapesId(args.shapes)
-  (function_definitions, traces) = generate(lhs_rhs_type, acc_type, shapes_id)
+  compilation_info_id = CompilationInfoId(args.compilation_info)
+  if compilation_info_id == CompilationInfoId.NONE:
+    (function_definitions, traces) = generate_default(lhs_rhs_type, acc_type,
+                                                      shapes_id)
+  elif compilation_info_id == CompilationInfoId.LLVMGPUMatmulSimt or compilation_info_id == CompilationInfoId.LLVMGPUMatmulTensorCore:
+    (function_definitions, traces) = generate_gpu(lhs_rhs_type, acc_type,
+                                                  shapes_id,
+                                                  compilation_info_id)
+  else:
+    raise ValueError(compilation_info_id)
+
   write_code_file(function_definitions, args.output_code)
   write_trace_file(traces, args.output_trace, args.module_path,
                    args.requirements)
