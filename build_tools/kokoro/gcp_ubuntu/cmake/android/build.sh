@@ -103,4 +103,11 @@ cd build-android
   -DIREE_BUILD_COMPILER=OFF \
   -DIREE_BUILD_TESTS=ON \
   -DIREE_BUILD_SAMPLES=OFF
+
+echo "Building all for device"
+echo "------------"
 "${CMAKE_BIN}" --build . -- -k 0
+
+echo "Building test deps for device"
+echo "------------------"
+"$CMAKE_BIN" --build . --target iree-test-deps -- -k 0
