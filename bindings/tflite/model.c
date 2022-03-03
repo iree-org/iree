@@ -123,6 +123,7 @@ TFL_CAPI_EXPORT extern TfLiteModel* TfLiteModelCreate(const void* model_data,
   status =
       _TfLiteModelInitializeModule(model_data, model_size, allocator, model);
   if (!iree_status_is_ok(iree_status_consume_code(status))) {
+    iree_allocator_free(allocator, model);
     IREE_TRACE_ZONE_END(z0);
     return NULL;
   }

@@ -427,6 +427,7 @@ TFL_CAPI_EXPORT extern void TfLiteInterpreterDelete(
   iree_vm_module_release(interpreter->hal_module);
   iree_vm_module_release(interpreter->user_module);
   iree_vm_instance_release(interpreter->instance);
+  iree_hal_driver_release((iree_hal_driver_t*)interpreter->driver);
 
   _TfLiteModelRelease(interpreter->model);
   iree_allocator_free(interpreter->allocator, interpreter);
