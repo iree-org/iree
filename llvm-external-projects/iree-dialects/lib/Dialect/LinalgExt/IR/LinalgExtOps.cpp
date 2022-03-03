@@ -758,8 +758,6 @@ LogicalResult FftOp::generateScalarImplementation(OpBuilder &b, Location loc,
   return success();
 }
 
-bool FftOp::payloadUsesValueFromOperand(OpOperand *) { return false; }
-
 SmallVector<unsigned> FftOp::getPartitionableLoops(
     unsigned maxNumParallelDims) {
   auto range = llvm::seq<unsigned>(0, getOperandRank());
@@ -1085,8 +1083,6 @@ static LogicalResult verifyReverseOp(ReverseOp op) {
 
   return success();
 }
-
-bool ReverseOp::payloadUsesValueFromOperand(OpOperand *) { return false; }
 
 SmallVector<StringRef> ReverseOp::getLoopIteratorTypes() {
   SmallVector<StringRef> iteratorTypes(getOperandRank(),
