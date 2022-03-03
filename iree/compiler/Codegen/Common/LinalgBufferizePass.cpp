@@ -710,9 +710,11 @@ static LogicalResult convertAnyLinalgOp(
     OpOperand *outOperand = std::get<1>(it);
     Value outTensor = outOperand->get();
     Value outBuffer = bvm.lookupOrNull(outTensor);
-    if (outBuffer && !plan.isEquivalent(outTensor, resultTensor) &&
-        op.payloadUsesValueFromOperand(outOperand)) {
-      createLinalgCopyOp(b, loc, outBuffer, resultBuffer);
+    if (outBuffer && !plan.isEquivalent(outTensor, resultTensor)) {
+      auto linalgOp = dyn_cast<linalg::LinalgOp>(op.getOperation());
+      if (!linalgOp || linalgOp.payloadUsesValueFromOperand(outOperand)) {
+        createLinalgCopyOp(b, loc, outBuffer, resultBuffer);
+      }
     }
     newOutputBuffers.push_back(resultBuffer);
   }

@@ -303,8 +303,7 @@ def LinalgExtInterface : OpInterface<"LinalgExtOp"> {
                "manually defined named Linalg op?)");
         Block &block = this->getOperation()->getRegion(0).front();
         // Init tensors have uses.
-        return bbArgNumber < block.getNumArguments() &&
-               !block.getArgument(bbArgNumber).use_empty();
+        return !block.getArgument(bbArgNumber).use_empty();
       }]
     >,
     InterfaceMethod<
