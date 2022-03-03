@@ -9,7 +9,7 @@
 #include "iree/compiler/InputConversion/MHLO/Rewriters.h"
 #include "mlir-hlo/Dialect/mhlo/IR/chlo_ops.h"
 #include "mlir-hlo/Dialect/mhlo/IR/hlo_ops.h"
-#include "mlir/Dialect/StandardOps/IR/Ops.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Transforms/DialectConversion.h"
 
 namespace mlir {
@@ -389,8 +389,7 @@ struct TestMHLOConvertComplexToRealPass
 
     target.addLegalDialect<mhlo::MhloDialect>();
     target.addLegalDialect<chlo::HloClientDialect>();
-    target
-        .addLegalDialect<StandardOpsDialect, mlir::arith::ArithmeticDialect>();
+    target.addLegalDialect<func::FuncDialect, mlir::arith::ArithmeticDialect>();
 
     // For the test, require that casts fully convert.
     target.addIllegalOp<mhlo::ComplexOp>();

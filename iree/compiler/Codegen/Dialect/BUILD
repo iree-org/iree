@@ -58,9 +58,9 @@ cc_library(
         "//iree/compiler/Codegen/Utils",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:DialectUtils",
+        "@llvm-project//mlir:FuncDialect",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:Parser",
-        "@llvm-project//mlir:StandardOps",
     ],
 )
 

@@ -40,8 +40,8 @@ cc_library(
     deps = [
         ":check_ops_gen",
         "//iree/compiler/Dialect/HAL/IR",
+        "@llvm-project//mlir:FuncDialect",
         "@llvm-project//mlir:IR",
-        "@llvm-project//mlir:StandardOps",
     ],
 )
 

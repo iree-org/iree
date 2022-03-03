@@ -43,11 +43,11 @@ iree_cc_library(
     ::HALStructsGen
     ::HALTypesGen
     LLVMSupport
+    MLIRFunc
     MLIRIR
     MLIRMemRef
     MLIRParser
     MLIRSideEffectInterfaces
-    MLIRStandard
     MLIRSupport
     MLIRTransformUtils
     MLIRViewLikeInterface
@@ -65,10 +65,10 @@ iree_cc_library(
   DEPS
     ::IR
     LLVMSupport
+    MLIRFunc
     MLIRIR
     MLIRMemRef
     MLIRParser
-    MLIRStandard
     MLIRTransformUtils
     iree::compiler::Dialect::HAL::Conversion::HALToVM
     iree::compiler::Dialect::HAL::hal_imports

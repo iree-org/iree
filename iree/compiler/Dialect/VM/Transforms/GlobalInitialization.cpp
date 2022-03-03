@@ -8,6 +8,7 @@
 #include "iree/compiler/Dialect/VM/Transforms/Passes.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "mlir/Dialect/Affine/Utils.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/BlockAndValueMapping.h"
 #include "mlir/IR/MLIRContext.h"

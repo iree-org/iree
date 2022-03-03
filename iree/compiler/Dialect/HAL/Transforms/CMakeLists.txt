@@ -37,9 +37,9 @@ iree_cc_library(
     MLIRArithmetic
     MLIRBufferization
     MLIRControlFlow
+    MLIRFunc
     MLIRIR
     MLIRPass
-    MLIRStandard
     MLIRSupport
     MLIRTransforms
     iree::compiler::Dialect::Flow::IR

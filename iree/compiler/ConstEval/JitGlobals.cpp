@@ -19,7 +19,7 @@
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
-#include "mlir/Dialect/StandardOps/IR/Ops.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/BlockAndValueMapping.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinOps.h"
@@ -56,7 +56,7 @@ struct ProgramExtractor {
     OpBuilder funcBuilder = OpBuilder::atBlockEnd(entryBlock);
     Value loadValue =
         funcBuilder.create<IREE::Util::GlobalLoadOp>(loc, globalOp);
-    funcBuilder.create<ReturnOp>(loc, ValueRange{loadValue});
+    funcBuilder.create<func::ReturnOp>(loc, ValueRange{loadValue});
     return funcSymbolName;
   }
 

@@ -22,7 +22,7 @@ add_mlir_library(IREELinalgExtDialect
   MLIRSideEffectInterfaces
   MLIRSupport
   MLIRSCF
-  MLIRStandard
+  MLIRFunc
   MLIRTensor
   MLIRViewLikeInterface
 )

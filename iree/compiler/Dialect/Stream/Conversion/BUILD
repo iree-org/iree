@@ -20,8 +20,8 @@ cc_library(
     ],
     deps = [
         "//iree/compiler/Dialect/Stream/IR",
+        "@llvm-project//mlir:FuncDialect",
         "@llvm-project//mlir:IR",
-        "@llvm-project//mlir:StandardOps",
         "@llvm-project//mlir:Transforms",
     ],
 )

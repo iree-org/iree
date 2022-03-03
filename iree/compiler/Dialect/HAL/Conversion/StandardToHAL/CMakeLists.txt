@@ -22,11 +22,11 @@ iree_cc_library(
   DEPS
     LLVMSupport
     MLIRControlFlow
+    MLIRFunc
     MLIRIR
     MLIRPass
     MLIRSCF
     MLIRShape
-    MLIRStandard
     MLIRTensor
     MLIRTransforms
     iree::compiler::Dialect::HAL::Conversion

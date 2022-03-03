@@ -70,7 +70,7 @@ class ConversionPass
 
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<IREE::Util::UtilDialect, IREE::VM::VMDialect,
-                    StandardOpsDialect, mlir::arith::ArithmeticDialect,
+                    func::FuncDialect, mlir::arith::ArithmeticDialect,
                     math::MathDialect, AffineDialect, memref::MemRefDialect>();
   }
 
@@ -126,8 +126,8 @@ class ConversionPass
                                conversionPatterns);
     populateAffineToStdConversionPatterns(conversionPatterns);
 
-    conversionTarget.addIllegalDialect<StandardOpsDialect,
-                                       mlir::arith::ArithmeticDialect>();
+    conversionTarget
+        .addIllegalDialect<func::FuncDialect, mlir::arith::ArithmeticDialect>();
     conversionTarget.addIllegalDialect<AffineDialect>();
     conversionTarget.addIllegalDialect<math::MathDialect>();
 

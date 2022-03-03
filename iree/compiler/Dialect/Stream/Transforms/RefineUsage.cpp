@@ -15,7 +15,7 @@
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Debug.h"
-#include "mlir/Dialect/StandardOps/IR/Ops.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinTypes.h"
@@ -231,7 +231,7 @@ struct ApplyFuncOp : public UsageRefinementPattern<mlir::FuncOp> {
 
     // Results:
     SmallVector<Type> newOutputs;
-    auto anyReturnOp = *op.getOps<mlir::ReturnOp>().begin();
+    auto anyReturnOp = *op.getOps<mlir::func::ReturnOp>().begin();
     for (auto outputType : llvm::enumerate(op.getType().getResults())) {
       auto oldType = outputType.value().dyn_cast<IREE::Stream::ResourceType>();
       if (!oldType) {
@@ -329,7 +329,7 @@ static void insertUsageRefinementPatterns(MLIRContext *context,
   patterns.insert<ApplyInitializerOp, ApplyFuncOp>(context, analysis);
   patterns.insert<ApplyGenericOp<IREE::Util::DoNotOptimizeOp>,
                   ApplyGenericOp<mlir::arith::SelectOp>,
-                  ApplyGenericOp<mlir::CallOp>>(context, analysis);
+                  ApplyGenericOp<mlir::func::CallOp>>(context, analysis);
   patterns.insert<ApplyStreamableOp<IREE::Stream::TensorImportOp>,
                   ApplyStreamableOp<IREE::Stream::TensorExportOp>,
                   ApplyStreamableOp<IREE::Stream::AsyncAllocaOp>,
@@ -359,7 +359,7 @@ class RefineUsagePass : public RefineUsageBase<RefineUsagePass> {
   RefineUsagePass() = default;
 
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<mlir::StandardOpsDialect>();
+    registry.insert<mlir::func::FuncDialect>();
     registry.insert<IREE::Stream::StreamDialect>();
     registry.insert<IREE::Util::UtilDialect>();
   }

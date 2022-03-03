@@ -23,11 +23,11 @@ iree_cc_library(
     LLVMSupport
     MLIRArithmetic
     MLIRControlFlow
+    MLIRFunc
     MLIRIR
     MLIRMemRef
     MLIRPass
     MLIRShape
-    MLIRStandard
     MLIRTensor
     MLIRTransforms
     iree::compiler::Dialect::Stream::Conversion

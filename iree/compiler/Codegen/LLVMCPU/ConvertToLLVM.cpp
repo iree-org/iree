@@ -33,12 +33,12 @@
 #include "mlir/Conversion/VectorToLLVM/ConvertVectorToLLVM.h"
 #include "mlir/Conversion/VectorToSCF/VectorToSCF.h"
 #include "mlir/Dialect/ArmNeon/ArmNeonDialect.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/Dialect/Func/Transforms/Passes.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/LLVMIR/LLVMTypes.h"
 #include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/Math/Transforms/Passes.h"
-#include "mlir/Dialect/StandardOps/IR/Ops.h"
-#include "mlir/Dialect/StandardOps/Transforms/Passes.h"
 #include "mlir/Dialect/Tosa/IR/TosaOps.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/IR/BuiltinAttributes.h"
@@ -459,12 +459,12 @@ class ConvertHALEntryPointFuncOp : public ConvertToLLVMPattern {
     // Add default zero return value.
     // TODO(ataei): do something meaningful with the return value; non-zero will
     // have the runtime bail out with an error.
-    for (auto returnOp :
-         llvm::make_early_inc_range(llvmFuncOp.getOps<mlir::ReturnOp>())) {
+    for (auto returnOp : llvm::make_early_inc_range(
+             llvmFuncOp.getOps<mlir::func::ReturnOp>())) {
       rewriter.setInsertionPoint(returnOp);
       auto returnValue = rewriter.createOrFold<mlir::arith::ConstantIntOp>(
           returnOp.getLoc(), 0, 32);
-      rewriter.replaceOpWithNewOp<mlir::ReturnOp>(returnOp, returnValue);
+      rewriter.replaceOpWithNewOp<mlir::func::ReturnOp>(returnOp, returnValue);
     }
 
     rewriter.eraseOp(stdFuncOp);
@@ -738,7 +738,7 @@ void ConvertToLLVMPass::runOnOperation() {
 
   LLVMConversionTarget target(getContext());
   target.addLegalOp<ModuleOp>();
-  target.addIllegalDialect<StandardOpsDialect, mlir::arith::ArithmeticDialect,
+  target.addIllegalDialect<func::FuncDialect, mlir::arith::ArithmeticDialect,
                            IREE::Util::UtilDialect, IREE::HAL::HALDialect,
                            math::MathDialect, tosa::TosaDialect>();
   target.addIllegalOp<UnrealizedConversionCastOp>();
@@ -748,7 +748,7 @@ void ConvertToLLVMPass::runOnOperation() {
     if (isEntryPoint(funcOp)) return false;
     return true;
   });
-  target.addDynamicallyLegalDialect<StandardOpsDialect, mlir::math::MathDialect,
+  target.addDynamicallyLegalDialect<func::FuncDialect, mlir::math::MathDialect,
                                     mlir::arith::ArithmeticDialect,
                                     IREE::Util::UtilDialect,
                                     IREE::HAL::HALDialect, math::MathDialect>(

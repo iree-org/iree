@@ -16,7 +16,7 @@
 #include "llvm/ADT/BitVector.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Analysis/Liveness.h"
-#include "mlir/Dialect/StandardOps/IR/Ops.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/AsmState.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/BlockAndValueMapping.h"
@@ -1399,7 +1399,7 @@ class ScheduleAllocationPass
     : public ScheduleAllocationBase<ScheduleAllocationPass> {
  public:
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<mlir::StandardOpsDialect>();
+    registry.insert<mlir::func::FuncDialect>();
     registry.insert<mlir::arith::ArithmeticDialect>();
     registry.insert<IREE::Stream::StreamDialect>();
     registry.insert<IREE::Util::UtilDialect>();

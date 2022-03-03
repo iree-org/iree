@@ -21,7 +21,7 @@
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Util/Transforms/Patterns.h"
-#include "mlir/Dialect/StandardOps/IR/Ops.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
@@ -181,7 +181,7 @@ struct GenericResourcePattern : public ConversionPattern {
 class ConvertToStreamPass : public ConvertToStreamBase<ConvertToStreamPass> {
  public:
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<mlir::StandardOpsDialect>();
+    registry.insert<mlir::func::FuncDialect>();
     registry.insert<mlir::arith::ArithmeticDialect>();
     registry.insert<mlir::tensor::TensorDialect>();
     registry.insert<IREE::Stream::StreamDialect>();

@@ -20,8 +20,8 @@ cc_library(
     ],
     deps = [
         "//iree/compiler/Dialect/Flow/IR",
+        "@llvm-project//mlir:FuncDialect",
         "@llvm-project//mlir:IR",
-        "@llvm-project//mlir:StandardOps",
         "@llvm-project//mlir:TensorDialect",
     ],
 )

@@ -67,7 +67,7 @@ EXPLICIT_TARGET_MAPPING = {
     "@llvm-project//mlir:MemRefDialect": ["MLIRMemRef"],
     "@llvm-project//mlir:SCFToGPUPass": ["MLIRSCFToGPU"],
     "@llvm-project//mlir:SCFDialect": ["MLIRSCF"],
-    "@llvm-project//mlir:StandardOps": ["MLIRStandard"],
+    "@llvm-project//mlir:FuncDialect": ["MLIRFunc"],
     "@llvm-project//mlir:ShapeTransforms": ["MLIRShapeOpsTransforms"],
     "@llvm-project//mlir:SideEffects": ["MLIRSideEffectInterfaces"],
     "@llvm-project//mlir:SPIRVDialect": ["MLIRSPIRV"],

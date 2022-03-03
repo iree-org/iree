@@ -65,7 +65,7 @@ int main(int argc, char **argv) {
   registry.insert<mlir::TFL::TensorFlowLiteDialect>();
   registry.insert<mlir::tosa::TosaDialect>();
   registry.insert<quant::QuantizationDialect>();
-  registry.insert<StandardOpsDialect, mlir::arith::ArithmeticDialect>();
+  registry.insert<func::FuncDialect, mlir::arith::ArithmeticDialect>();
 
   RegisterAllTensorFlowDialects(registry);
 

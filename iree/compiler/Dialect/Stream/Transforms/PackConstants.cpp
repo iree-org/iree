@@ -14,8 +14,8 @@
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "iree/compiler/Utils/IndexSet.h"
 #include "llvm/Support/Debug.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/SCF/SCF.h"
-#include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/AsmState.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/BlockAndValueMapping.h"
@@ -445,7 +445,7 @@ static UploadResult buildTryMapConstantResources(
 class PackConstantsPass : public PackConstantsBase<PackConstantsPass> {
  public:
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<mlir::StandardOpsDialect>();
+    registry.insert<mlir::func::FuncDialect>();
     registry.insert<mlir::arith::ArithmeticDialect>();
     registry.insert<mlir::scf::SCFDialect>();
     registry.insert<IREE::Stream::StreamDialect>();

@@ -46,9 +46,9 @@ iree_cc_library(
     ::PassesIncGen
     ::Runtime
     LLVMSupport
+    MLIRFunc
     MLIRIR
     MLIRPass
-    MLIRStandard
     iree::compiler::Bindings::Native::Transforms
     iree::compiler::Dialect::Flow::Transforms
     iree::compiler::Dialect::HAL::Transforms

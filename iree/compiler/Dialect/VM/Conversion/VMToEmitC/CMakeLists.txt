@@ -30,10 +30,10 @@ iree_cc_library(
     LLVMSupport
     MLIRControlFlow
     MLIREmitC
+    MLIRFunc
     MLIRIR
     MLIRMath
     MLIRPass
-    MLIRStandard
     MLIRTransforms
     iree::compiler::Dialect::Util::Conversion
     iree::compiler::Dialect::Util::IR

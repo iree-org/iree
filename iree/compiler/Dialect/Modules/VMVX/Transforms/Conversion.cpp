@@ -15,8 +15,8 @@
 #include "llvm/ADT/STLExtras.h"
 #include "mlir/Conversion/TosaToStandard/TosaToStandard.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
-#include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/PatternMatch.h"
@@ -67,7 +67,7 @@ class ConversionPass
     conversionTarget.addIllegalDialect<tensor::TensorDialect>();
     conversionTarget.addLegalDialect<IREE::Util::UtilDialect>();
     conversionTarget.addLegalDialect<IREE::VMVX::VMVXDialect>();
-    conversionTarget.addLegalDialect<mlir::StandardOpsDialect,
+    conversionTarget.addLegalDialect<mlir::func::FuncDialect,
                                      mlir::arith::ArithmeticDialect>();
     conversionTarget.addLegalDialect<mlir::AffineDialect>();
     conversionTarget.addLegalDialect<memref::MemRefDialect>();

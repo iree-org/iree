@@ -7,7 +7,7 @@
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
-#include "mlir/Dialect/StandardOps/IR/Ops.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Pass/Pass.h"
 
 namespace mlir {
@@ -24,7 +24,7 @@ class BenchmarkBatchDispatchesPass
       : repeatCount_(repeatCount) {}
 
   void getDependentDialects(DialectRegistry& registry) const override {
-    registry.insert<HALDialect, StandardOpsDialect,
+    registry.insert<HALDialect, func::FuncDialect,
                     mlir::arith::ArithmeticDialect>();
   }
 

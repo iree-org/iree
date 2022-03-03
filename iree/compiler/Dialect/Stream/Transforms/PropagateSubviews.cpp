@@ -18,7 +18,7 @@
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
-#include "mlir/Dialect/StandardOps/IR/Ops.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/BlockAndValueMapping.h"
 #include "mlir/IR/Builders.h"
@@ -383,7 +383,7 @@ static void expandFuncOp(mlir::FuncOp op, ExpandedGlobalMap &globalMap,
 //  ->
 //  %r, %rsz, %ro, %rl = call @foo(%0, %sz, %o, %l)
 //  %2 = stream.resource.subview %r[%ro] : {%rsz} -> {%rl}
-static void expandCallOp(mlir::CallOp op, IndexSet &indexSet,
+static void expandCallOp(mlir::func::CallOp op, IndexSet &indexSet,
                          SubviewMap &subviewMap) {
   if (!usesResources(op)) return;
 
@@ -392,8 +392,8 @@ static void expandCallOp(mlir::CallOp op, IndexSet &indexSet,
   auto operands =
       expandOperands(op.getLoc(), op.operands(), subviewMap, indexSet, builder);
   auto resultTypes = expandTypes(op.getResultTypes());
-  auto newOp = builder.create<mlir::CallOp>(op.getLoc(), op.getCallee(),
-                                            resultTypes, operands);
+  auto newOp = builder.create<mlir::func::CallOp>(op.getLoc(), op.getCallee(),
+                                                  resultTypes, operands);
 
   // Insert subviews on results that we are sinking across the call edge.
   // The hope is that by moving the subviews here we can fold with uses inside
@@ -431,13 +431,13 @@ static void expandCallOp(mlir::CallOp op, IndexSet &indexSet,
 //  return %1
 //  ->
 //  return %0, %sz, %o, %l
-static void expandReturnOp(mlir::ReturnOp op, IndexSet &indexSet,
+static void expandReturnOp(mlir::func::ReturnOp op, IndexSet &indexSet,
                            SubviewMap &subviewMap) {
   if (!usesResources(op)) return;
   OpBuilder builder(op);
   auto operands =
       expandOperands(op.getLoc(), op.operands(), subviewMap, indexSet, builder);
-  builder.create<mlir::ReturnOp>(op.getLoc(), operands);
+  builder.create<mlir::func::ReturnOp>(op.getLoc(), operands);
   op.erase();
 }
 
@@ -486,9 +486,9 @@ static void expandSubviews(Operation *op, ExpandedGlobalMap &globalMap,
     expandInitializerOp(initializerOp, globalMap, indexSet, subviewMap);
   } else if (auto funcOp = dyn_cast<mlir::FuncOp>(op)) {
     expandFuncOp(funcOp, globalMap, indexSet, subviewMap);
-  } else if (auto callOp = dyn_cast<mlir::CallOp>(op)) {
+  } else if (auto callOp = dyn_cast<mlir::func::CallOp>(op)) {
     expandCallOp(callOp, indexSet, subviewMap);
-  } else if (auto returnOp = dyn_cast<mlir::ReturnOp>(op)) {
+  } else if (auto returnOp = dyn_cast<mlir::func::ReturnOp>(op)) {
     expandReturnOp(returnOp, indexSet, subviewMap);
   } else if (auto branchOp = dyn_cast<mlir::cf::BranchOp>(op)) {
     expandBranchOp(branchOp, indexSet, subviewMap);
@@ -515,7 +515,7 @@ class PropagateSubviewsPass
   PropagateSubviewsPass() = default;
 
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<mlir::StandardOpsDialect>();
+    registry.insert<mlir::func::FuncDialect>();
     registry.insert<mlir::arith::ArithmeticDialect>();
     registry.insert<IREE::Stream::StreamDialect>();
     registry.insert<IREE::Util::UtilDialect>();

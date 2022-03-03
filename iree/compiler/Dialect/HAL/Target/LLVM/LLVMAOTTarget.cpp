@@ -17,6 +17,7 @@
 #include "iree/compiler/Dialect/HAL/Target/LLVM/LinkerTool.h"
 #include "iree/compiler/Dialect/HAL/Target/LLVM/StaticLibraryGenerator.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
+#include "llvm/Analysis/TargetTransformInfo.h"
 #include "llvm/Bitcode/BitcodeReader.h"
 #include "llvm/Bitcode/BitcodeWriter.h"
 #include "llvm/IR/LLVMContext.h"

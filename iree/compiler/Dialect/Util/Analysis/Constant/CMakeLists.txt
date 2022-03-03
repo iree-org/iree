@@ -22,9 +22,9 @@ iree_cc_library(
   DEPS
     LLVMSupport
     MLIRArithmetic
+    MLIRFunc
     MLIRIR
     MLIRLinalg
-    MLIRStandard
     MLIRSupport
     MLIRTensor
     iree::compiler::Dialect::Util::Analysis

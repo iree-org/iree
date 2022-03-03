@@ -14,9 +14,9 @@
 #include "mlir-hlo/Dialect/mhlo/IR/chlo_ops.h"
 #include "mlir-hlo/Dialect/mhlo/IR/hlo_ops.h"
 #include "mlir-hlo/Dialect/mhlo/transforms/rewriters.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/Shape/IR/Shape.h"
-#include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/BuiltinTypes.h"
@@ -922,7 +922,7 @@ struct MHLOToMHLOPreprocessingPass
     // chlo::PopulateLegalizeChloToHloPatterns(context, &conversionPatterns);
     conversionTarget.addLegalDialect<
         shape::ShapeDialect, chlo::HloClientDialect, mhlo::MhloDialect,
-        math::MathDialect, mlir::StandardOpsDialect,
+        math::MathDialect, mlir::func::FuncDialect,
         mlir::arith::ArithmeticDialect, mlir::tensor::TensorDialect>();
     // conversionTarget.addIllegalDialect<chlo::HloClientDialect>();
     if (failed(applyPartialConversion(getOperation(), conversionTarget,

@@ -19,9 +19,9 @@ iree_cc_library(
     "ConvertStreamToHAL.cpp"
   DEPS
     LLVMSupport
+    MLIRFunc
     MLIRIR
     MLIRPass
-    MLIRStandard
     MLIRTransforms
     iree::compiler::Dialect::HAL::Conversion
     iree::compiler::Dialect::HAL::IR

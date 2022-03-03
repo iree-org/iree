@@ -31,9 +31,9 @@ iree_cc_library(
     ::VMVXOpInterfaceGen
     ::VMVXOpsGen
     LLVMSupport
+    MLIRFunc
     MLIRIR
     MLIRSideEffectInterfaces
-    MLIRStandard
     MLIRSupport
     MLIRTransformUtils
     MLIRTranslation
@@ -52,9 +52,9 @@ iree_cc_library(
   DEPS
     ::IR
     LLVMSupport
+    MLIRFunc
     MLIRIR
     MLIRParser
-    MLIRStandard
     MLIRSupport
     MLIRTransformUtils
     iree::compiler::Dialect::Modules::VMVX::Conversion::VMVXToVM

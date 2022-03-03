@@ -18,7 +18,7 @@ add_mlir_library(IREELinalgExtPasses
   MLIRMemRef
   MLIRPass
   MLIRSCF
-  MLIRStandard
+  MLIRFunc
   MLIRSupport
   MLIRTensor
   MLIRTransforms

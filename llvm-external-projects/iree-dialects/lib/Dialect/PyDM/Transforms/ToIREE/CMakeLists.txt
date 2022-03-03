@@ -13,7 +13,7 @@ add_mlir_library(IREEPyDMToIREEPasses
   MLIRControlFlow
   MLIRIR
   MLIRMath
-  MLIRStandard
+  MLIRFunc
   MLIRTransformUtils
 )
 

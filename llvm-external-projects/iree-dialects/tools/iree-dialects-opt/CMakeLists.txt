@@ -7,7 +7,7 @@ set(LIBS
   MLIROptLib
   MLIRSCF
   MLIRSCFTransforms
-  MLIRStandard
+  MLIRFunc
   MLIRTensor
   MLIRTransforms
   IREEInputDialect

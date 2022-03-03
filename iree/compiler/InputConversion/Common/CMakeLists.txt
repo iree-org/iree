@@ -48,6 +48,7 @@ iree_cc_library(
     ::PassesIncGen
     IREEInputDialect
     MLIRArithmetic
+    MLIRFunc
     MLIRIR
     MLIRLinalg
     MLIRLinalgTransforms
@@ -55,7 +56,6 @@ iree_cc_library(
     MLIRPass
     MLIRSCF
     MLIRSCFToControlFlow
-    MLIRStandard
     MLIRTransforms
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::HAL::IR

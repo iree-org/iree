@@ -35,11 +35,11 @@ iree_cc_library(
     MLIRArithmeticTransforms
     MLIRBufferization
     MLIRBufferizationTransforms
+    MLIRFuncTransforms
     MLIRLinalgTransforms
     MLIRMemRef
     MLIRModuleBufferization
     MLIRSCFTransforms
-    MLIRStandardOpsTransforms
     MLIRSupport
     MLIRTensorTransforms
     MLIRVectorTransforms

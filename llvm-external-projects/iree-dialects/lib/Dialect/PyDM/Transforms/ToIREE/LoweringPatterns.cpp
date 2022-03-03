@@ -9,8 +9,8 @@
 #include "iree-dialects/Dialect/PyDM/Transforms/ToIREE/Patterns.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Math/IR/Math.h"
-#include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Support/LLVM.h"
@@ -463,8 +463,8 @@ class CallOpConversion : public OpConversionPattern<PYDM::CallOp> {
       return rewriter.notifyMatchFailure(srcOp,
                                          "result types could not be converted");
     }
-    rewriter.replaceOpWithNewOp<mlir::CallOp>(srcOp, srcOp.callee(),
-                                              resultTypes, adaptor.operands());
+    rewriter.replaceOpWithNewOp<mlir::func::CallOp>(
+        srcOp, srcOp.callee(), resultTypes, adaptor.operands());
     return success();
   }
 };
@@ -856,7 +856,8 @@ class RaiseOnFailureOpConversion
     // Raise and return block.
     rewriter.setInsertionPointToEnd(raiseAndReturnBlock);
     auto nullReturnValue = getNullValue(loc, rewriter, convertedReturnType);
-    rewriter.create<mlir::ReturnOp>(loc, ValueRange{status, nullReturnValue});
+    rewriter.create<mlir::func::ReturnOp>(loc,
+                                          ValueRange{status, nullReturnValue});
     return success();
   }
 };
@@ -871,7 +872,7 @@ class ReturnOpConversion : public OpConversionPattern<PYDM::ReturnOp> {
     auto loc = srcOp.getLoc();
     auto zeroResult =
         rewriter.create<arith::ConstantOp>(loc, rewriter.getI32IntegerAttr(0));
-    rewriter.replaceOpWithNewOp<mlir::ReturnOp>(
+    rewriter.replaceOpWithNewOp<mlir::func::ReturnOp>(
         srcOp, ValueRange{zeroResult, adaptor.getOperands()[0]});
     return success();
   }

@@ -4,7 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-//===- IREEComprehensiveBufferizePass.cpp.cpp - -------------------------===//
+//===- IREEComprehensiveBufferizePass.cpp - -------------------------===//
 //
 // Wrapper pass to use MLIRs ComprehensiveBufferization pass.
 //
@@ -33,6 +33,7 @@
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/Bufferization/Transforms/BufferUtils.h"
 #include "mlir/Dialect/Bufferization/Transforms/OneShotAnalysis.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/ComprehensiveBufferize/ModuleBufferization.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
@@ -77,8 +78,8 @@ class IREEComprehensiveBufferizePass
     registry
         .insert<arith::ArithmeticDialect, IREE::Util::UtilDialect,
                 linalg::LinalgDialect, memref::MemRefDialect, scf::SCFDialect,
-                StandardOpsDialect, tensor::TensorDialect,
-                vector::VectorDialect, AffineDialect, IREE::Flow::FlowDialect,
+                func::FuncDialect, tensor::TensorDialect, vector::VectorDialect,
+                AffineDialect, IREE::Flow::FlowDialect,
                 bufferization::BufferizationDialect>();
   }
 
