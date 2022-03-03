@@ -105,9 +105,6 @@ label_exclude_regex="($(IFS="|" ; echo "${label_exclude_args[*]?}"))"
 # These tests currently have asan failures
 # TODO(#5715): Fix these
 declare -a excluded_tests=(
-  "iree/base/internal/file_io_test"
-  "bindings/tflite/smoke_test"
-  "iree/modules/check/check_test"
   "iree/samples/simple_embedding/simple_embedding_vulkan_test"
 )
 
