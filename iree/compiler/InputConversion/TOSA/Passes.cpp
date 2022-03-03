@@ -16,6 +16,12 @@
 #include "mlir/Pass/PassRegistry.h"
 #include "mlir/Transforms/Passes.h"
 
+static llvm::cl::opt<bool> clDisableTosaDecompositions(
+  "iree-disable-tosa-decompositions",
+  llvm::cl::desc(
+      "Disables tosa canonicalizations used for optimization."),
+  llvm::cl::init(false));
+
 namespace mlir {
 namespace iree_compiler {
 
@@ -44,7 +50,7 @@ void buildTOSAInputConversionPassPipeline(OpPassManager &passManager) {
   passManager.addNestedPass<FuncOp>(tosa::createTosaToStandard());
   passManager.addNestedPass<FuncOp>(mlir::createCanonicalizerPass());
 
-  tosa::addTosaToLinalgPasses(passManager);
+  tosa::addTosaToLinalgPasses(passManager, clDisableTosaDecompositions);
   passManager.addNestedPass<FuncOp>(tosa::createTosaToStandard());
 
   passManager.addNestedPass<FuncOp>(IREE::Flow::createStripSignednessPass());
