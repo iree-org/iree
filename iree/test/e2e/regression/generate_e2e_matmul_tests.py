@@ -39,7 +39,7 @@ class ShapesId(enum.Enum):
 # for. The values are the accepted values for the --compilation_info= flag.
 @enum.unique
 class CompilationInfoId(enum.Enum):
-  NONE = "none"
+  NONE = ""
   LLVMGPUMatmulSimt = "LLVMGPUMatmulSimt"
   LLVMGPUMatmulTensorCore = "LLVMGPUMatmulTensorCore"
 
@@ -173,7 +173,7 @@ def get_test_shapes(shapes_id: ShapesId):
         # (see get_test_generators).
     ]
   if shapes_id == ShapesId.GPU_LARGE:
-    return [TestShape(m=512, k=512, n=512)]
+    return [TestShape(m=256, k=128, n=512)]
   raise ValueError(shapes_id)
 
 
@@ -460,6 +460,7 @@ def generate_function(
       definition=func_definition,
   )
 
+
 # Counter for producing unique complation info attrs
 generate_function.compilation_index = 0
 
@@ -592,8 +593,8 @@ def parse_arguments():
                       type=str,
                       choices=[i.value for i in CompilationInfoId],
                       help="Collection of compilation info setups to test",
-                      default="none",
-                      required=True)
+                      default="",
+                      required=False)
 
   parser.add_argument(
       "--module_path",
@@ -675,13 +676,15 @@ def main(args):
   acc_type = infer_acc_type(lhs_rhs_type)
   shapes_id = ShapesId(args.shapes)
   compilation_info_id = CompilationInfoId(args.compilation_info)
-  if compilation_info_id == CompilationInfoId.LLVMGPUMatmulSimt or compilation_info_id == CompilationInfoId.LLVMGPUMatmulTensorCore:
+  if compilation_info_id == CompilationInfoId.NONE:
+    (function_definitions, traces) = generate_default(lhs_rhs_type, acc_type,
+                                                      shapes_id)
+  elif compilation_info_id == CompilationInfoId.LLVMGPUMatmulSimt or compilation_info_id == CompilationInfoId.LLVMGPUMatmulTensorCore:
     (function_definitions, traces) = generate_gpu(lhs_rhs_type, acc_type,
                                                   shapes_id,
                                                   compilation_info_id)
   else:
-    (function_definitions, traces) = generate_default(lhs_rhs_type, acc_type,
-                                                      shapes_id)
+    raise ValueError(compilation_info_id)
 
   write_code_file(function_definitions, args.output_code)
   write_trace_file(traces, args.output_trace, args.module_path,
