@@ -17,10 +17,9 @@
 #include "mlir/Transforms/Passes.h"
 
 static llvm::cl::opt<bool> clDisableTosaDecompositions(
-  "iree-disable-tosa-decompositions",
-  llvm::cl::desc(
-      "Disables tosa canonicalizations used for optimization."),
-  llvm::cl::init(false));
+    "iree-disable-tosa-decompositions",
+    llvm::cl::desc("Disables tosa canonicalizations used for optimization."),
+    llvm::cl::init(false));
 
 namespace mlir {
 namespace iree_compiler {
