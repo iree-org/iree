@@ -49,7 +49,9 @@ TEST(FileIO, ReadWriteContents) {
   auto path = GetUniquePath(kUniqueName);
 
   // File must not exist.
-  IREE_EXPECT_STATUS_IS(IREE_STATUS_NOT_FOUND, iree_file_exists(path.c_str()));
+  iree_status_t status = iree_file_exists(path.c_str());
+  IREE_EXPECT_STATUS_IS(IREE_STATUS_NOT_FOUND, status);
+  iree_status_free(status);
 
   // Generate file contents.
   auto write_contents = GetUniqueContents(kUniqueName);
