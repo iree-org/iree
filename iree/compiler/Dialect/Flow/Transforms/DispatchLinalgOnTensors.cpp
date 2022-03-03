@@ -15,6 +15,7 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/CommandLine.h"
+#include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
@@ -923,6 +924,8 @@ LogicalResult createDispatchRegionsFromRootOps(mlir::Operation *funcOp) {
     RewritePatternSet canonicalizationPatterns(context);
     linalg::populateLinalgTilingCanonicalizationPatterns(
         canonicalizationPatterns);
+    memref::populateResolveRankedShapeTypeResultDimsPatterns(
+        canonicalizationPatterns);
     if (failed(applyPatternsAndFoldGreedily(
             funcOp, std::move(canonicalizationPatterns)))) {
       return failure();
@@ -934,24 +937,6 @@ LogicalResult createDispatchRegionsFromRootOps(mlir::Operation *funcOp) {
     funcOp->print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
     llvm::dbgs() << "\n\n";
   });
-
-  // Run necessary canonicalization patterns before rewrite destructive updates.
-  {
-    RewritePatternSet patterns(context);
-    // Resolve `tensor.dim` of result of operations into operations on its
-    // operands using the `ReifyRankedShapedTypeOpInterface`.
-    memref::populateResolveRankedShapeTypeResultDimsPatterns(patterns);
-    // This is needed because tiling and distribution may create
-    // subtensor_insert ops whose source operands come from tensor.cast ops.
-    // Those tensor.cast ops cast tensors into a more dynamic shape, in order
-    // to guarantee type match during transformation. Later in destructive
-    // update subtensor_insert ops will be turned into flow dispatch output
-    // store ops.
-    tensor::InsertSliceOp::getCanonicalizationPatterns(patterns, context);
-    if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
-      return failure();
-    }
-  }
 
   // After outlining in dispatch region we can rewrite the dispatch ops with
   // proper captures to make it isolated from above.
