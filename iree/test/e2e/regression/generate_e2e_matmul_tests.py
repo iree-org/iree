@@ -82,62 +82,34 @@ def get_test_shapes(shapes_id: ShapesId):
   #    disabled to improve the trade-off between test coverage and build
   #    latency.
   if shapes_id == ShapesId.SMALL:
-    return [  # Small sizes, square matrices
-        # was range(1, 40) before trimming. The choice of 18 is so that we
-        # exercise a case just above 16, as 16 will be a common kernel width.
-        TestShape(m=x, k=x, n=x) for x in range(1, 18)
-    ] + [
-        # Small sizes, slightly rectangular matrices
-        TestShape(m=2, k=3, n=4),
-        #TestShape(m=8, k=7, n=6),
-        #TestShape(m=15, k=16, n=17),
-        # Exactly the mmt4d kernel size
-        TestShape(m=8, k=4, n=8),
-        TestShape(m=14, k=19, n=23),
-        #TestShape(m=31, k=33, n=32),
-        TestShape(m=25, k=41, n=35),
-        # Small sizes, involving vectors (i.e. most rectangular cases)
-        TestShape(m=10, k=1, n=1),
-        TestShape(m=1, k=10, n=1),
-        TestShape(m=1, k=1, n=10),
-        #TestShape(m=1, k=10, n=10),
-        #TestShape(m=10, k=1, n=10),
-        #TestShape(m=10, k=10, n=1),
-        # Small sizes, involving other very small dimensions just above 1
-        TestShape(m=13, k=14, n=2),
-        TestShape(m=3, k=17, n=12),
-        TestShape(m=21, k=4, n=18),
-        # Medium sizes, square matrices
-        #TestShape(m=100, k=100, n=100),
-        # Medium sizes, slightly rectangular matrices
-        TestShape(m=101, k=102, n=103),
-        # Medium sizes, involving vectors (i.e. most rectangular cases)
-        TestShape(m=10000, k=1, n=1),
-        TestShape(m=1, k=10000, n=1),
-        TestShape(m=1, k=1, n=10000),
-        TestShape(m=1, k=1000, n=1000),
-        # TestShape(m=1000, k=1, n=1000),
-        TestShape(m=1000, k=1000, n=1),
-        # Medium sizes, involving other very small dimensions just above 1
-        TestShape(m=1300, k=1300, n=2),
-        #TestShape(m=1300, k=1300, n=3),
-        #TestShape(m=1300, k=1300, n=4),
+    return [
+        # square matrices. Start by the simplest case of 1x1x1.
+        TestShape(m=1, k=1, n=1),
+        # test 9x9x9 because as many kernel M0/K0/N0 dims are equal to 8,
+        # this will often be the smallest value that exercises something above
+        # the kernel's size.
+        TestShape(m=9, k=9, n=9),
+        # rectangular matrices.
+        # >= 2x differences between M/N/K dims may exercise tiling corner cases
+        # not exercised by nearly-square matrices.
+        TestShape(m=6, k=13, n=3),
+        TestShape(m=15, k=37, n=7),
+        TestShape(m=81, k=19, n=41),
+        # shapes involving vectors (i.e. most rectangular cases)
+        # This is particularly relevant because we have dedicated kernels for
+        # the matrix*vector / vector*matrix case.
+        TestShape(m=1, k=10, n=10),  # vector*matrix
+        TestShape(m=10, k=1, n=10),  # outer-product
+        TestShape(m=10, k=10, n=1),  # matrix*vector
     ]
   if shapes_id == ShapesId.LARGE:
     return [
-        # Large sizes, powers of two
-        TestShape(m=256, k=256, n=512),
-        #TestShape(m=512, k=512, n=128),
-        #TestShape(m=1024, k=512, n=512),
-        #TestShape(m=512, k=1024, n=512),
-        # Large sizes, powers of two minus one
-        TestShape(m=127, k=63, n=511),
-        # Large sizes, powers of two plus one
-        TestShape(m=129, k=65, n=513),
-        # Large sizes, misc.
-        #TestShape(m=200, k=300, n=400),
+        # some random large sizes
         TestShape(m=123, k=456, n=789),
-        #TestShape(m=500, k=500, n=50),
+        TestShape(m=654, k=321, n=234),
+        # shapes involving vectors (i.e. most rectangular cases)
+        TestShape(m=1, k=1000, n=1000),  # large vector*matrix
+        TestShape(m=1000, k=1000, n=1),  # large matrix*vector
         # Be conservative in adding larger shapes. They can result in
         # high latency tests. If you have to, consider splitting them
         # out in a way that constrains the latency impact, e.g. by
