@@ -64,13 +64,7 @@ hal.executable private @call_dispatch_2  {
 }
 hal.executable private @call_dispatch_3  {
   hal.executable.variant @vulkan_spirv_fb, target = #executable_target_vulkan_spirv_fb {
-    hal.executable.entry_point @call_dispatch_3 ordinal(0) layout(#executable_layout_1) {
-    ^bb0(%arg0: index, %arg1: index, %arg2: index):  // no predecessors
-      %c1 = arith.constant 1 : index
-      %c56 = arith.constant 56 : index
-      %c56_0 = arith.constant 56 : index
-      hal.return %c1, %c56, %c56_0 : index, index, index
-    }
+    hal.executable.entry_point @call_dispatch_3 ordinal(0) layout(#executable_layout_1)
     builtin.module {
       spv.module Logical GLSL450 requires #spv.vce<v1.0, [Shader], [SPV_KHR_storage_buffer_storage_class]> {
         spv.func @call_dispatch_3() "None" {
