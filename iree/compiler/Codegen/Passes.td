@@ -121,6 +121,14 @@ def LinalgToVectorVectorizeMMT4d :
       "mlir::iree_compiler::createLinalgToVectorVectorizeMMT4dPass()";
 }
 
+def TensorToVectorVectorizePad :
+    Pass<"iree-codegen-vectorize-tensor-pad", "FuncOp"> {
+  let summary = "Vectorize a very specific form of tensor.pad with "
+                "control flows";
+  let constructor =
+      "mlir::iree_compiler::createVectorizePadPass()";
+}
+
 def PolynomialApproximationPass :
     Pass<"iree-codegen-polynomial-approximation", ""> {
   let summary = "Convert math operations to their polynomial approximation";

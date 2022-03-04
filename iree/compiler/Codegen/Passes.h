@@ -112,6 +112,10 @@ std::unique_ptr<OperationPass<FuncOp>> createLinalgToVectorVectorizeConvPass();
 /// Creates a pass to vectorize a very specific form of linalg.conv ops.
 std::unique_ptr<OperationPass<FuncOp>> createLinalgToVectorVectorizeMMT4dPass();
 
+/// Creates a pass to vectorize a very specific form of tensor.pad ops with
+/// control flows.
+std::unique_ptr<OperationPass<FuncOp>> createVectorizePadPass();
+
 /// Pass to optimize vector transfer_read and transfer_write.
 std::unique_ptr<OperationPass<FuncOp>> createOptimizeVectorTransferPass();
 
@@ -135,6 +139,7 @@ std::unique_ptr<OperationPass<>> createPolynomialApproximationPass();
 
 /// Creates a pass to convert memref.copy to linalg op.
 std::unique_ptr<OperationPass<FuncOp>> createMemrefCopyToLinalgPass();
+
 //----------------------------------------------------------------------------//
 // Common codegen patterns.
 //----------------------------------------------------------------------------//
@@ -154,6 +159,17 @@ void populateLinalgToVectorVectorizeConvPatterns(MLIRContext *context,
 /// Populates `patterns` to convert linalg.mmt4d to vector.contract.
 void populateLinalgToVectorVectorizeMMT4dPatterns(MLIRContext *context,
                                                   RewritePatternSet &patterns);
+
+/// Populates `patterns` with patterns that vectorize tensor.pad with static
+/// result shape by generating control flows to guard against vector transfer
+/// read ops to make sure they are in bounds.
+///
+/// Such conversions are needed for correctness when the tensor.pad op has
+/// dynamic low padding values and also beneficial for eventually lowering to
+/// hardware targets without native support for vector transfer read ops with
+/// out of bound semantics.
+void populateVectorizePadPatterns(RewritePatternSet &patterns,
+                                  PatternBenefit baseBenefit = 1);
 
 //------------------------------------------------------------------------------
 // LLVMCPU

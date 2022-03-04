@@ -33,6 +33,7 @@ iree_cc_library(
     "SPIRVVectorToCooperativeOps.cpp"
     "SPIRVVectorize.cpp"
     "SPIRVVectorizeLoadStore.cpp"
+    "SPIRVVectorizePad.cpp"
     "Utils.cpp"
   DEPS
     IREELinalgExtDialect

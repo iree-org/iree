@@ -28,6 +28,7 @@ cc_library(
         "SPIRVVectorToCooperativeOps.cpp",
         "SPIRVVectorize.cpp",
         "SPIRVVectorizeLoadStore.cpp",
+        "SPIRVVectorizePad.cpp",
         "Utils.cpp",
     ],
     hdrs = [
