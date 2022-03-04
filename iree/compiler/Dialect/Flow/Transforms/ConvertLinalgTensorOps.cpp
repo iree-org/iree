@@ -133,7 +133,6 @@ struct ConvertLinalgTensorOpsPass
   void runOnOperation() override {
     auto funcOp = getOperation();
     MLIRContext *context = funcOp->getContext();
-    context->allowUnregisteredDialects(true);
     RewritePatternSet patterns(&getContext());
     if (runBeforeDispatchRegionFormation) {
       patterns.insert<

@@ -106,7 +106,6 @@ struct ConvertToFlowBeforeDispatchFormation
   void runOnOperation() override {
     auto funcOp = getOperation();
     MLIRContext *context = funcOp->getContext();
-    context->allowUnregisteredDialects(true);
     RewritePatternSet patterns(&getContext());
 
     patterns
@@ -134,7 +133,6 @@ struct ConvertToFlowAfterDispatchFormation
   void runOnOperation() override {
     auto funcOp = getOperation();
     MLIRContext *context = funcOp->getContext();
-    context->allowUnregisteredDialects(true);
     RewritePatternSet patterns(&getContext());
 
     patterns.insert<LinalgFillToFlowTensorSplat>(context);
