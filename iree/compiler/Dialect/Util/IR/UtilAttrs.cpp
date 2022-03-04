@@ -462,6 +462,11 @@ LogicalResult CompositeAttr::serializeToStream(llvm::support::endianness endian,
                                                llvm::raw_ostream &os) const {
   for (auto valueAttr : getValues()) {
     auto serializableAttr = valueAttr.dyn_cast<SerializableAttrInterface>();
+    if (!serializableAttr) {
+      llvm::errs() << "unable to serialize a non-serializable attribute: "
+                   << valueAttr.getType() << "\n";
+      return failure();
+    }
     if (failed(serializableAttr.serializeToStream(endian, os))) {
       return failure();
     }
