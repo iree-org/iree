@@ -62,11 +62,11 @@ set(_source_components
   MLIRPythonSources.Dialects.arith
   MLIRPythonSources.Dialects.builtin
   MLIRPythonSources.Dialects.cf
+  MLIRPythonSources.Dialects.func
   MLIRPythonSources.Dialects.linalg
   MLIRPythonSources.Dialects.math
   MLIRPythonSources.Dialects.memref
   MLIRPythonSources.Dialects.shape
-  MLIRPythonSources.Dialects.std
   MLIRPythonSources.Dialects.tensor
   MLIRPythonSources.Dialects.tosa
   MLIRPythonSources.Dialects.vector
