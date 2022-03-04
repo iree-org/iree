@@ -177,7 +177,7 @@ builtin.module {
 #map4 = affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>
 hal.executable private @dot_dispatch_0  {
   hal.executable.variant @cuda, target = #executable_target_cuda_nvptx_fb {
-    hal.executable.entry_point @dot_dispatch_0 layout(#executable_layout) attributes {
+    hal.executable.entry_point @dot_dispatch_0 layout(#executable_layout) {
       translation.info = #translation,
       workgroup_size = [64 : index, 8 : index, 1 : index]
     }
