@@ -47,6 +47,7 @@ module @hal_usage {
 // CHECK: "full_name": "hal.command_buffer.dispatch"
 // CHECK: "exported_functions":
 // CHECK: "local_name": "hloElementwiseOps"
+// CHECK: "local_name": "__init"
 func @hloElementwiseOps(%arg0 : tensor<4xf32>) -> tensor<4xf32> {
   %0 = mhlo.add %arg0, %arg0 : tensor<4xf32>
   %1 = mhlo.subtract %0, %arg0 : tensor<4xf32>
