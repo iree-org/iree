@@ -184,10 +184,7 @@ def IREELinalgExt_FftOp : IREELinalgExt_Op<"fft", [
                               "getPartitionableLoops", "getTiledImplementation",
                               "generateScalarImplementation"
                             ]>,
-  DeclareOpInterfaceMethods<LinalgExtInterface,
-                            // FftOp does not have a region, so we have to
-                            // overwrite the method.
-                            ["payloadUsesValueFromOperand"]>
+  DeclareOpInterfaceMethods<LinalgExtInterface>
 ]> {
   let summary = "Fft operator";
   let description = [{
@@ -300,10 +297,7 @@ def IREELinalgExt_ReverseOp : IREELinalgExt_Op<"reverse", [
   DeclareOpInterfaceMethods<
       TiledOpInterface,
       ["generateScalarImplementation", "getTiledImplementation"]>,
-  DeclareOpInterfaceMethods<LinalgExtInterface,
-                            // ReverseOp does not have a region, so we have to
-                            // overwrite the method.
-                            ["payloadUsesValueFromOperand"]>]> {
+  DeclareOpInterfaceMethods<LinalgExtInterface>]> {
   let summary = "Reverse operator";
   let description = [{
     A temporary solution for lowering reverse ops into IREE, allowing IREE to
