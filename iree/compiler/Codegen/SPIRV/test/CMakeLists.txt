@@ -38,6 +38,7 @@ iree_lit_test_suite(
     "vectorize_elementwise_ops.mlir"
     "vectorize_load_store.mlir"
     "vectorize_matmul.mlir"
+    "vectorize_tensor_pad.mlir"
   TOOLS
     FileCheck
     iree::tools::iree-opt

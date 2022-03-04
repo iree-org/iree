@@ -126,7 +126,7 @@ def TensorToVectorVectorizePad :
   let summary = "Vectorize a very specific form of tensor.pad with "
                 "control flows";
   let constructor =
-      "mlir::iree_compiler::createTensorToVectorVectorizePadPass()";
+      "mlir::iree_compiler::createVectorizePadPass()";
 }
 
 def PolynomialApproximationPass :

@@ -114,7 +114,7 @@ std::unique_ptr<OperationPass<FuncOp>> createLinalgToVectorVectorizeMMT4dPass();
 
 /// Creates a pass to vectorize a very specific form of tensor.pad ops with
 /// control flows.
-std::unique_ptr<OperationPass<FuncOp>> createTensorToVectorVectorizePadPass();
+std::unique_ptr<OperationPass<FuncOp>> createVectorizePadPass();
 
 /// Pass to optimize vector transfer_read and transfer_write.
 std::unique_ptr<OperationPass<FuncOp>> createOptimizeVectorTransferPass();
@@ -168,8 +168,8 @@ void populateLinalgToVectorVectorizeMMT4dPatterns(MLIRContext *context,
 /// dynamic low padding values and also beneficial for eventually lowering to
 /// hardware targets without native support for vector transfer read ops with
 /// out of bound semantics.
-void populateTensorToVectorVectorizePadPatterns(RewritePatternSet &patterns,
-                                                PatternBenefit baseBenefit = 1);
+void populateVectorizePadPatterns(RewritePatternSet &patterns,
+                                  PatternBenefit baseBenefit = 1);
 
 //------------------------------------------------------------------------------
 // LLVMCPU

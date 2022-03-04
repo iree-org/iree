@@ -43,6 +43,7 @@ iree_lit_test_suite(
             "vectorize_elementwise_ops.mlir",
             "vectorize_matmul.mlir",
             "vectorize_load_store.mlir",
+            "vectorize_tensor_pad.mlir",
         ],
         include = ["*.mlir"],
         # TODO(b/203528778) reenable

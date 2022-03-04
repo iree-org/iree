@@ -36,8 +36,7 @@ static Value getAsIndexValue(OpFoldResult attrOrValue, OpBuilder &builder,
   } else {
     attr = attrOrValue.get<Attribute>().cast<IntegerAttr>();
   }
-  return builder.createOrFold<arith::ConstantIndexOp>(
-      loc, attr.getValue().getSExtValue());
+  return builder.createOrFold<arith::ConstantIndexOp>(loc, attr.getInt());
 }
 
 /// Drops leading one dimensions from the given `shape`.
@@ -232,7 +231,7 @@ struct TensorToVectorVectorizePadPass
   void runOnOperation() override {
     MLIRContext *context = &getContext();
     RewritePatternSet patterns(context);
-    populateTensorToVectorVectorizePadPatterns(patterns);
+    populateVectorizePadPatterns(patterns);
     if (failed(applyPatternsAndFoldGreedily(getOperation(),
                                             std::move(patterns)))) {
       return signalPassFailure();
@@ -242,12 +241,12 @@ struct TensorToVectorVectorizePadPass
 
 }  // namespace
 
-void populateTensorToVectorVectorizePadPatterns(RewritePatternSet &patterns,
-                                                PatternBenefit baseBenefit) {
+void populateVectorizePadPatterns(RewritePatternSet &patterns,
+                                  PatternBenefit baseBenefit) {
   patterns.add<VectorizePadWithConditions>(patterns.getContext(), baseBenefit);
 }
 
-std::unique_ptr<OperationPass<FuncOp>> createTensorToVectorVectorizePadPass() {
+std::unique_ptr<OperationPass<FuncOp>> createVectorizePadPass() {
   return std::make_unique<TensorToVectorVectorizePadPass>();
 }
 
