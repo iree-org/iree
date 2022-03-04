@@ -62,32 +62,16 @@ hal.executable @dot_dispatch_0 {
         %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<readonly:1024x1024xf32>
         %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : !flow.dispatch.tensor<readonly:1024x1024xf32>
         %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : !flow.dispatch.tensor<writeonly:1024x1024xf32>
-        %workgroup_size_x = hal.interface.workgroup.size[0] : index
-        %workgroup_size_y = hal.interface.workgroup.size[1] : index
-        %workgroup_id_x = hal.interface.workgroup.id[0] : index
-        %workgroup_count_x = hal.interface.workgroup.count[0] : index
-        %workgroup_id_y = hal.interface.workgroup.id[1] : index
-        %workgroup_count_y = hal.interface.workgroup.count[1] : index
-        %3 = affine.apply #map0()[%workgroup_id_y, %workgroup_size_y]
-        %4 = affine.apply #map0()[%workgroup_count_y, %workgroup_size_y]
-        scf.for %arg0 = %3 to %c1024 step %4 {
-          %5 = affine.apply #map0()[%workgroup_id_x, %workgroup_size_x]
-          %6 = affine.apply #map0()[%workgroup_count_x, %workgroup_size_x]
-          scf.for %arg1 = %5 to %c1024 step %6 {
-            %7 = affine.min #map1(%arg0)[%workgroup_size_y]
-            %8 = flow.dispatch.tensor.load %0, offsets = [%arg0, %c0], sizes = [%7, %c1024], strides = [%c1, %c1] : !flow.dispatch.tensor<readonly:1024x1024xf32> -> tensor<?x1024xf32>
-            %9 = affine.min #map1(%arg1)[%workgroup_size_x]
-            %10 = flow.dispatch.tensor.load %1, offsets = [%c0, %arg1], sizes = [%c1024, %9], strides = [%c1, %c1] : !flow.dispatch.tensor<readonly:1024x1024xf32> -> tensor<1024x?xf32>
-            %11 = affine.min #map1(%arg0)[%workgroup_size_y]
-            %12 = affine.min #map1(%arg1)[%workgroup_size_x]
-            %13 = affine.min #map2(%arg0)[%workgroup_size_y]
-            %14 = affine.min #map2(%arg1)[%workgroup_size_x]
-            %15 = linalg.init_tensor [%13, %14] : tensor<?x?xf32>
-            %16 = linalg.fill(%cst, %15) : f32, tensor<?x?xf32> -> tensor<?x?xf32>
-            %17 = linalg.matmul ins(%8, %10 : tensor<?x1024xf32>, tensor<1024x?xf32>) outs(%16 : tensor<?x?xf32>) -> tensor<?x?xf32>
-            flow.dispatch.tensor.store %17, %2, offsets = [%arg0, %arg1], sizes = [%11, %12], strides = [%c1, %c1] : tensor<?x?xf32> -> !flow.dispatch.tensor<writeonly:1024x1024xf32>
-          }
-        }
+        %8 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [1024, 1024], strides = [1, 1]
+            : !flow.dispatch.tensor<readonly:1024x1024xf32> -> tensor<1024x1024xf32>
+        %10 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [1024, 1024], strides = [1, 1]
+            : !flow.dispatch.tensor<readonly:1024x1024xf32> -> tensor<1024x1024xf32>
+        %15 = linalg.init_tensor [1024, 1024] : tensor<1024x1024xf32>
+        %16 = linalg.fill(%cst, %15) : f32, tensor<1024x1024xf32> -> tensor<1024x1024xf32>
+        %17 = linalg.matmul ins(%8, %10 : tensor<1024x1024xf32>, tensor<1024x1024xf32>)
+            outs(%16 : tensor<1024x1024xf32>) -> tensor<1024x1024xf32>
+        flow.dispatch.tensor.store %17, %2, offsets = [0, 0], sizes = [1024, 1024], strides = [1, 1]
+            : tensor<1024x1024xf32> -> !flow.dispatch.tensor<writeonly:1024x1024xf32>
         return
       }
     }
