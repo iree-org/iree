@@ -11,25 +11,20 @@ management scripts in the repository being managed, and we don't have an
 immediately better place. In this guide, we reference this location as
 `$SCRIPTS`.
 
-## Advancing the `mainline` branch in forks
+## Advancing the mainline branch in forks
 
 The IREE team maintains fork repositories for both llvm-project and mlir-hlo,
 allowing them to be patched out of band. These repositories are:
 
 * https://github.com/google/iree-llvm-fork (`main` branch)
-* https://github.com/google/iree-mhlo-fork (`mainline` branch - TODO fix this)
+* https://github.com/google/iree-mhlo-fork (`master` branch)
 
 By the time you read this, they may be on a cron to advance automatically, but
 even so, it is a good idea to advance them prior to any integrate activities
 so that you have freshest commits available. Iree repository has an
 action named [Advance Upstream Forks](https://github.com/google/iree/actions/workflows/advance_upstream_forks.yml)
-to update llvm fork. Just select `Run Workflow` on that action and give it a
-minute. You should see the fork repository `main` branch move forward.
-This currently doesn't update mhlo repository. You need to use the equivalent
-[action](https://github.com/google/iree-mhlo-fork/actions/workflows/advance_mainline.yaml)
-in mhlo fork to update this repository.
-
-
+to update the forks. Just select `Run Workflow` on that action and give it a
+minute. You should see the fork repository mainline branch move forward.
 
 ## Bumping LLVM and Dependent Projects
 

@@ -25,7 +25,7 @@ jobs:
           repository: google/iree-llvm-fork
           ref: main
 
-      - name: Pull upstream main
+      - name: Pull from upstream
         run: |
           git remote add upstream https://github.com/llvm/llvm-project.git
           git pull --ff-only upstream main
@@ -35,3 +35,25 @@ jobs:
           github_token: ${{ secrets.WRITE_ACCESS_TOKEN }}
           branch: main
           repository: google/iree-llvm-fork
+
+  advance_iree-mhlo-fork:
+    name: "Advance iree-mhlo-fork"
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Checking out repository
+        uses: actions/checkout@v2
+        with:
+          token: ${{ secrets.WRITE_ACCESS_TOKEN }}
+          repository: google/iree-mhlo-fork
+          ref: master
+
+      - name: Pull from upstream
+        run: |
+          git remote add upstream https://github.com/tensorflow/mlir-hlo.git
+          git pull --ff-only upstream master
+      - name: Pushing changes
+        uses: ad-m/github-push-action@v0.6.0
+        with:
+          github_token: ${{ secrets.WRITE_ACCESS_TOKEN }}
+          branch: master
+          repository: google/iree-mhlo-fork
