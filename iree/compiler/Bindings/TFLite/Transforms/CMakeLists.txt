@@ -22,6 +22,7 @@ iree_cc_library(
     LLVMSupport
     MLIRAffineUtils
     MLIRControlFlow
+    MLIRFunc
     MLIRIR
     MLIRPass
     MLIRShape
