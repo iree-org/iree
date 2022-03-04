@@ -378,20 +378,16 @@ func @fft_1D(%real: memref<16xf32>, %imag: memref<16xf32>) {
 // CHECK-SAME:    %[[IMAG:[a-zA-Z0-9]+]]
 // CHECK-DAG:     %[[C0:.+]] = arith.constant 0 : index
 // CHECK-DAG:     %[[C1:.+]] = arith.constant 1 : index
+// CHECK-DAG:     %[[C2:.+]] = arith.constant 2 : index
 // CHECK-DAG:     %[[C16:.+]] = arith.constant 16 : index
-// CHECK-DAG:     %[[SCALE:.+]] = arith.constant -6.28318548 : f32
-// CHECK-DAG:     %[[NODE_RNG:.+]] = arith.shli %[[C1]], %[[C1]] : index
-// CHECK:         scf.for %[[K:.+]] = %[[C0]] to %[[C16]] step %[[NODE_RNG]]
-// CHECK-DAG:       %[[M:.+]] = arith.shli %[[C1]], %[[C1]] : index
-// CHECK-DAG:       %[[HM:.+]] = arith.shrsi %[[M]], %[[C1]] : index
+// CHECK-DAG:     %[[COEFF:.+]] = arith.constant -3.14159274 : f32
+// CHECK:         scf.for %[[K:.+]] = %[[C0]] to %[[C16]] step %[[C2]]
+// CHECK-DAG:       %[[HM:.+]] = arith.shrsi %[[C2]], %[[C1]] : index
 // CHECK:           %[[L_REAL_SLICE:.+]] = memref.subview %[[REAL]][%[[K]]] [%[[HM]]] [1]
 // CHECK:           %[[L_IMAG_SLICE:.+]] = memref.subview %[[IMAG]][%[[K]]] [%[[HM]]] [1]
 // CHECK:           %[[R_OFFSET:.+]] = arith.addi %[[K]], %[[HM]] : index
 // CHECK:           %[[R_REAL_SLICE:.+]] = memref.subview %[[REAL]][%[[R_OFFSET]]] [%[[HM]]] [1]
 // CHECK:           %[[R_IMAG_SLICE:.+]] = memref.subview %[[IMAG]][%[[R_OFFSET]]] [%[[HM]]] [1]
-// CHECK:           %[[M_I32:.+]] = arith.index_cast %[[M]] : index to i32
-// CHECK:           %[[M_F32:.+]] = arith.sitofp %[[M_I32]] : i32 to f32
-// CHECK:           %[[COEFF:.+]] = arith.divf %[[SCALE]], %[[M_F32]]
 // CHECK:           linalg.generic
 // CHECK-SAME:        indexing_maps = [#[[MAP1]], #[[MAP1]], #[[MAP1]], #[[MAP1]]]
 // CHECK-SAME:        iterator_types = ["parallel"]
@@ -402,7 +398,7 @@ func @fft_1D(%real: memref<16xf32>, %imag: memref<16xf32>) {
 // CHECK:             %[[J_IDX:.+]] = linalg.index 0 : index
 // CHECK:             %[[J_I32:.+]] = arith.index_cast %[[J_IDX]] : index to i32
 // CHECK:             %[[J_F32:.+]] = arith.sitofp %[[J_I32]] : i32 to f32
-// CHECK:             %[[EXP_COEF:.+]] = arith.mulf %[[COEFF]], %[[J_F32]] : f32
+// CHECK:             %[[EXP_COEF:.+]] = arith.mulf %[[J_F32]], %[[COEFF]] : f32
 // CHECK:             %[[W_REAL:.+]] = math.cos %[[EXP_COEF]]
 // CHECK:             %[[W_IMAG:.+]] = math.sin %[[EXP_COEF]]
 //
@@ -436,18 +432,16 @@ func @fft_2D(%real: memref<?x16xf32>, %imag: memref<?x16xf32>) {
 }
 // CHECK-DAG:   #[[MAP0:.+]] = affine_map<(d0, d1)[s0] -> (d0 * 16 + s0 + d1)>
 // CHECK-DAG:   #[[MAP1:.+]] = affine_map<(d0, d1) -> (d0, d1)>
-// CHECK:       func @fft_2D
+// CHECK:       func @fft_2D(
 // CHECK-SAME:    %[[REAL:[a-zA-Z0-9]+]]
 // CHECK-SAME:    %[[IMAG:[a-zA-Z0-9]+]]
 // CHECK-DAG:     %[[C0:.+]] = arith.constant 0 : index
 // CHECK-DAG:     %[[C1:.+]] = arith.constant 1 : index
-// CHECK-DAG:     %[[C2:.+]] = arith.constant 2 : index
+// CHECK-DAG:     %[[C4:.+]] = arith.constant 4 : index
 // CHECK-DAG:     %[[D0:.+]] = memref.dim %[[REAL]], %[[C0]] : memref<?x16xf32>
-// CHECK-DAG:     %[[NODE_RNG:.+]] = arith.shli %[[C1]], %[[C2]] : index
 // CHECK:         scf.for %[[I:.+]] = %[[C0]] to %[[D0]] step %[[C1]]
-// CHECK:           scf.for %[[K:.+]] = %[[C0]] to %[[C16]] step %[[NODE_RNG]]
-// CHECK-DAG:         %[[M:.+]] = arith.shli %[[C1]], %[[C2]] : index
-// CHECK-DAG:         %[[HM:.+]] = arith.shrsi %[[M]], %[[C1]] : index
+// CHECK:           scf.for %[[K:.+]] = %[[C0]] to %[[C16]] step %[[C4]]
+// CHECK-DAG:         %[[HM:.+]] = arith.shrsi %[[C4]], %[[C1]] : index
 // CHECK:             %[[L_REAL_SLICE:.+]] = memref.subview %[[REAL]][%[[I]], %[[K]]] [1, %[[HM]]] [1, 1]
 // CHECK:             %[[L_IMAG_SLICE:.+]] = memref.subview %[[IMAG]][%[[I]], %[[K]]] [1, %[[HM]]] [1, 1]
 // CHECK:             %[[R_OFFSET:.+]] = arith.addi %[[K]], %[[HM]] : index
@@ -483,11 +477,9 @@ func @fft_2D_coef_buf(%real: memref<?x16xf32>, %imag: memref<?x16xf32>,
 // CHECK-DAG:     %[[C0:.+]] = arith.constant 0 : index
 // CHECK-DAG:     %[[C1:.+]] = arith.constant 1 : index
 // CHECK-DAG:     %[[D0:.+]] = memref.dim %[[REAL]], %[[C0]] : memref<?x16xf32>
-// CHECK-DAG:     %[[NODE_RNG:.+]] = arith.shli %[[C1]], %[[C1]] : index
 // CHECK:         scf.for %[[I:.+]] = %[[C0]] to %[[D0]] step %[[C1]]
-// CHECK:           scf.for %[[K:.+]] = %[[C0]] to %[[C16]] step %[[NODE_RNG]]
-// CHECK-DAG:         %[[M:.+]] = arith.shli %[[C1]], %[[C1]] : index
-// CHECK-DAG:         %[[HM:.+]] = arith.shrsi %[[M]], %[[C1]] : index
+// CHECK:           scf.for %[[K:.+]] = %[[C0]] to %[[C16]] step %[[C2]]
+// CHECK-DAG:         %[[HM:.+]] = arith.shrsi %[[C2]], %[[C1]] : index
 // CHECK:             %[[L_REAL_SLICE:.+]] = memref.subview %[[REAL]][%[[I]], %[[K]]] [1, %[[HM]]] [1, 1]
 // CHECK:             %[[L_IMAG_SLICE:.+]] = memref.subview %[[IMAG]][%[[I]], %[[K]]] [1, %[[HM]]] [1, 1]
 // CHECK:             %[[R_OFFSET:.+]] = arith.addi %[[K]], %[[HM]] : index
