@@ -18,6 +18,7 @@ iree_cc_library(
   SRCS
     "Conversion.cpp"
     "DeduplicateRodata.cpp"
+    "DropEmptyModuleInitializers.cpp"
     "GlobalInitialization.cpp"
     "HoistInlinedRodata.cpp"
     "OrdinalAllocation.cpp"

@@ -1,6 +1,6 @@
 // Tests folding and canonicalization of casting/conversion ops.
 
-// RUN: iree-opt -split-input-file -pass-pipeline='vm.module(canonicalize)' %s | FileCheck %s
+// RUN: iree-opt -split-input-file -pass-pipeline="vm.module(canonicalize)" %s | FileCheck %s
 
 // CHECK-LABEL: @trunc_folds
 vm.module @trunc_folds {

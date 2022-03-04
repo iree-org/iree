@@ -483,6 +483,14 @@ static LogicalResult verifyGlobalLoadOp(Operation *op) {
   return success();
 }
 
+// Returns true if |op| is nested within an initializer function.
+static bool isParentInitializer(Operation *op) {
+  auto initializerOp = op->getParentOfType<IREE::VM::InitializerOp>();
+  if (initializerOp) return true;
+  auto funcOp = op->getParentOfType<IREE::VM::FuncOp>();
+  return funcOp.getName() == "__init" || funcOp.getName() == "__deinit";
+}
+
 static LogicalResult verifyGlobalStoreOp(Operation *op) {
   auto globalAttr = op->getAttrOfType<FlatSymbolRefAttr>("global");
   auto *globalOp =
@@ -499,7 +507,7 @@ static LogicalResult verifyGlobalStoreOp(Operation *op) {
   }
   if (!globalOp->getAttrOfType<UnitAttr>("is_mutable")) {
     // Allow stores to immutable globals in initializers.
-    if (!op->getParentOfType<IREE::VM::InitializerOp>()) {
+    if (!isParentInitializer(op)) {
       return op->emitOpError() << "global " << globalAttr
                                << " is not mutable and cannot be stored to";
     }

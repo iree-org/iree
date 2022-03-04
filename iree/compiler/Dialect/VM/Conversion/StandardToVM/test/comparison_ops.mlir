@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -pass-pipeline='test-iree-convert-std-to-vm' %s | FileCheck %s
+// RUN: iree-opt -split-input-file -pass-pipeline="test-iree-convert-std-to-vm" %s | FileCheck %s
 
 // -----
 // CHECK-LABEL: @t001_cmp_eq_i32

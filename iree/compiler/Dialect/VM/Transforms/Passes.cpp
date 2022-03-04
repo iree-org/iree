@@ -44,6 +44,12 @@ void buildVMTransformPassPipeline(OpPassManager &passManager,
   passManager.addPass(createCanonicalizerPass());
   passManager.addPass(createCSEPass());
 
+  // Now that we've inlined/canonicalized/etc the initializers we can remove
+  // them if they are empty to save a few bytes in the binary and avoid a
+  // runtime initialization call.
+  passManager.addNestedPass<IREE::VM::ModuleOp>(
+      createDropEmptyModuleInitializersPass());
+
   passManager.addPass(createSymbolDCEPass());
   if (targetOptions.optimizeForStackSize) {
     passManager.addNestedPass<IREE::VM::ModuleOp>(createSinkDefiningOpsPass());
