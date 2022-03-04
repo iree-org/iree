@@ -24,7 +24,7 @@ class semaphore_test : public CtsTestBase {};
 
 // Tests that a semaphore that is unused properly cleans itself up.
 TEST_P(semaphore_test, NoOp) {
-  iree_hal_semaphore_t* semaphore;
+  iree_hal_semaphore_t* semaphore = NULL;
   IREE_ASSERT_OK(iree_hal_semaphore_create(device_, 123ull, &semaphore));
 
   uint64_t value;
@@ -36,7 +36,7 @@ TEST_P(semaphore_test, NoOp) {
 
 // Tests that a semaphore will accept new values as it is signaled.
 TEST_P(semaphore_test, NormalSignaling) {
-  iree_hal_semaphore_t* semaphore;
+  iree_hal_semaphore_t* semaphore = NULL;
   IREE_ASSERT_OK(iree_hal_semaphore_create(device_, 2ull, &semaphore));
 
   uint64_t value;
@@ -58,7 +58,7 @@ TEST_P(semaphore_test, NormalSignaling) {
 
 // Tests semaphore failure handling.
 TEST_P(semaphore_test, Failure) {
-  iree_hal_semaphore_t* semaphore;
+  iree_hal_semaphore_t* semaphore = NULL;
   IREE_ASSERT_OK(iree_hal_semaphore_create(device_, 2ull, &semaphore));
 
   IREE_ASSERT_OK(iree_hal_semaphore_signal(semaphore, 3ull));
@@ -97,7 +97,7 @@ TEST_P(semaphore_test, EmptyWait) {
 // Tests waiting on a semaphore that has already been signaled.
 // **Never completes when using SwiftShader**
 TEST_P(semaphore_test, DISABLED_WaitAlreadySignaled) {
-  iree_hal_semaphore_t* semaphore;
+  iree_hal_semaphore_t* semaphore = NULL;
   IREE_ASSERT_OK(iree_hal_semaphore_create(device_, 2ull, &semaphore));
 
   // Test both previous and current values.
@@ -116,7 +116,7 @@ TEST_P(semaphore_test, DISABLED_WaitAlreadySignaled) {
 
 // Tests waiting on a semaphore that has not been signaled.
 TEST_P(semaphore_test, WaitUnsignaled) {
-  iree_hal_semaphore_t* semaphore;
+  iree_hal_semaphore_t* semaphore = NULL;
   IREE_ASSERT_OK(iree_hal_semaphore_create(device_, 2ull, &semaphore));
 
   // NOTE: we don't actually block here because otherwise we'd lock up.
@@ -133,8 +133,8 @@ TEST_P(semaphore_test, WaitUnsignaled) {
 
 // Tests IREE_HAL_WAIT_MODE_ALL when not all are signaled.
 TEST_P(semaphore_test, WaitAllButNotAllSignaled) {
-  iree_hal_semaphore_t* semaphore_a;
-  iree_hal_semaphore_t* semaphore_b;
+  iree_hal_semaphore_t* semaphore_a = NULL;
+  iree_hal_semaphore_t* semaphore_b = NULL;
   IREE_ASSERT_OK(iree_hal_semaphore_create(device_, 0ull, &semaphore_a));
   IREE_ASSERT_OK(iree_hal_semaphore_create(device_, 1ull, &semaphore_b));
 
@@ -158,8 +158,8 @@ TEST_P(semaphore_test, WaitAllButNotAllSignaled) {
 
 // Tests IREE_HAL_WAIT_MODE_ALL when all are signaled.
 TEST_P(semaphore_test, WaitAllAndAllSignaled) {
-  iree_hal_semaphore_t* semaphore_a;
-  iree_hal_semaphore_t* semaphore_b;
+  iree_hal_semaphore_t* semaphore_a = NULL;
+  iree_hal_semaphore_t* semaphore_b = NULL;
   IREE_ASSERT_OK(iree_hal_semaphore_create(device_, 1ull, &semaphore_a));
   IREE_ASSERT_OK(iree_hal_semaphore_create(device_, 1ull, &semaphore_b));
 
@@ -184,8 +184,8 @@ TEST_P(semaphore_test, WaitAllAndAllSignaled) {
 // Tests IREE_HAL_WAIT_MODE_ANY.
 // **Fails using timeline semaphore emulation**
 TEST_P(semaphore_test, DISABLED_WaitAny) {
-  iree_hal_semaphore_t* semaphore_a;
-  iree_hal_semaphore_t* semaphore_b;
+  iree_hal_semaphore_t* semaphore_a = NULL;
+  iree_hal_semaphore_t* semaphore_b = NULL;
   IREE_ASSERT_OK(iree_hal_semaphore_create(device_, 0ull, &semaphore_a));
   IREE_ASSERT_OK(iree_hal_semaphore_create(device_, 1ull, &semaphore_b));
 
@@ -207,8 +207,8 @@ TEST_P(semaphore_test, DISABLED_WaitAny) {
 // Tests threading behavior by ping-ponging between the test main thread and
 // a little thread.
 TEST_P(semaphore_test, PingPong) {
-  iree_hal_semaphore_t* a2b;
-  iree_hal_semaphore_t* b2a;
+  iree_hal_semaphore_t* a2b = NULL;
+  iree_hal_semaphore_t* b2a = NULL;
   IREE_ASSERT_OK(iree_hal_semaphore_create(device_, 0ull, &a2b));
   IREE_ASSERT_OK(iree_hal_semaphore_create(device_, 0ull, &b2a));
   std::thread thread([&]() {

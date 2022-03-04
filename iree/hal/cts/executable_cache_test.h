@@ -21,7 +21,7 @@ namespace cts {
 class executable_cache_test : public CtsTestBase {};
 
 TEST_P(executable_cache_test, Create) {
-  iree_hal_executable_cache_t* executable_cache;
+  iree_hal_executable_cache_t* executable_cache = NULL;
   IREE_ASSERT_OK(iree_hal_executable_cache_create(
       device_, iree_make_cstring_view("default"), &executable_cache));
 
@@ -29,7 +29,7 @@ TEST_P(executable_cache_test, Create) {
 }
 
 TEST_P(executable_cache_test, CantPrepareUnknownFormat) {
-  iree_hal_executable_cache_t* executable_cache;
+  iree_hal_executable_cache_t* executable_cache = NULL;
   IREE_ASSERT_OK(iree_hal_executable_cache_create(
       device_, iree_make_cstring_view("default"), &executable_cache));
 
@@ -40,12 +40,12 @@ TEST_P(executable_cache_test, CantPrepareUnknownFormat) {
 }
 
 TEST_P(executable_cache_test, PrepareExecutable) {
-  iree_hal_executable_cache_t* executable_cache;
+  iree_hal_executable_cache_t* executable_cache = NULL;
   IREE_ASSERT_OK(iree_hal_executable_cache_create(
       device_, iree_make_cstring_view("default"), &executable_cache));
 
   // Note: this layout must match the testdata executable.
-  iree_hal_descriptor_set_layout_t* descriptor_set_layout;
+  iree_hal_descriptor_set_layout_t* descriptor_set_layout = NULL;
   iree_hal_descriptor_set_layout_binding_t descriptor_set_layout_bindings[] = {
       {0, IREE_HAL_DESCRIPTOR_TYPE_STORAGE_BUFFER},
       {1, IREE_HAL_DESCRIPTOR_TYPE_STORAGE_BUFFER},
@@ -69,7 +69,7 @@ TEST_P(executable_cache_test, PrepareExecutable) {
   executable_spec.executable_layout_count = 1;
   executable_spec.executable_layouts = &executable_layout;
 
-  iree_hal_executable_t* executable;
+  iree_hal_executable_t* executable = NULL;
   IREE_ASSERT_OK(iree_hal_executable_cache_prepare_executable(
       executable_cache, &executable_spec, &executable));
 

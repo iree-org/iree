@@ -451,8 +451,8 @@ TEST_P(buffer_mapping_test, WriteDataSubspan) {
 }
 
 TEST_P(buffer_mapping_test, CopyData) {
-  iree_hal_buffer_t* buffer_a;
-  iree_hal_buffer_t* buffer_b;
+  iree_hal_buffer_t* buffer_a = NULL;
+  iree_hal_buffer_t* buffer_b = NULL;
   AllocateUninitializedBuffer(kDefaultAllocationSize, &buffer_a);
   AllocateUninitializedBuffer(kDefaultAllocationSize, &buffer_b);
 
