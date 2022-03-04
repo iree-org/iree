@@ -61,6 +61,7 @@ iree_cc_library(
     MLIRAffine
     MLIRArithmetic
     MLIRControlFlow
+    MLIRFunc
     MLIRIR
     MLIRLinalg
     MLIRLinalgTransforms
@@ -68,7 +69,6 @@ iree_cc_library(
     MLIRMemRefTransforms
     MLIRPass
     MLIRSCF
-    MLIRStandard
     MLIRSupport
     MLIRTensor
     MLIRTensorUtils

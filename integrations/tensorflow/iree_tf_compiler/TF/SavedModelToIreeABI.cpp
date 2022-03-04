@@ -22,6 +22,7 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/JSON.h"
 #include "mlir/Dialect/Affine/Utils.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/MLIRContext.h"
@@ -510,8 +511,8 @@ LogicalResult materializeABIWrapper(ModuleOp module, FuncOp internalFunc,
   // Emit the call to the internal func.
   ResultRange internalResults =
       builder
-          .create<CallOp>(loc, internalFunc.getType().getResults(),
-                          internalFunc.getName(), callArgs)
+          .create<func::CallOp>(loc, internalFunc.getType().getResults(),
+                                internalFunc.getName(), callArgs)
           .getResults();
 
   // And then unflatten the results for return from the wrapper.
@@ -540,7 +541,7 @@ LogicalResult materializeABIWrapper(ModuleOp module, FuncOp internalFunc,
 
   assert(llvm::all_of(wrapperReturns, [](Value v) { return v != nullptr; }) &&
          "not all call returns mapped");
-  builder.create<ReturnOp>(loc, wrapperReturns);
+  builder.create<func::ReturnOp>(loc, wrapperReturns);
 
   // Add ABI attribute.
   {

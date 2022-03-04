@@ -62,7 +62,7 @@ set(_source_components
   # build burden by ~5x. Make it stop.
   MLIRPythonSources.Core
   MLIRPythonSources.Dialects.builtin
-  MLIRPythonSources.Dialects.std
+  MLIRPythonSources.Dialects.func
   MLIRPythonSources.Passes
   IREEDialectsPythonSources
   IREEDialectsPythonExtensions

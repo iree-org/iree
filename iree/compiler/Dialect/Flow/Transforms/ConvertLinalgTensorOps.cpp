@@ -9,8 +9,8 @@
 #include "iree/compiler/Dialect/Flow/IR/FlowTypes.h"
 #include "iree/compiler/Dialect/Flow/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
-#include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Interfaces/InferTypeOpInterface.h"
@@ -93,9 +93,10 @@ struct LinalgFillToFlowTensorSplat final
   }
 };
 
-struct ConvertSplatConstantOp : public OpRewritePattern<mlir::ConstantOp> {
+struct ConvertSplatConstantOp
+    : public OpRewritePattern<mlir::func::ConstantOp> {
   using OpRewritePattern::OpRewritePattern;
-  LogicalResult matchAndRewrite(mlir::ConstantOp op,
+  LogicalResult matchAndRewrite(mlir::func::ConstantOp op,
                                 PatternRewriter &rewriter) const override {
     if (op->getParentOfType<IREE::Flow::DispatchWorkgroupsOp>()) {
       return rewriter.notifyMatchFailure(op, "ignoring dispatch ops");
@@ -105,7 +106,7 @@ struct ConvertSplatConstantOp : public OpRewritePattern<mlir::ConstantOp> {
       return rewriter.notifyMatchFailure(op, "only looking for splats");
     }
     auto tensorType = op.getType().cast<TensorType>();
-    auto elementValue = rewriter.createOrFold<mlir::ConstantOp>(
+    auto elementValue = rewriter.createOrFold<mlir::func::ConstantOp>(
         op.getLoc(), tensorType.getElementType(),
         splatAttr.getSplatValue<Attribute>());
     rewriter.replaceOpWithNewOp<IREE::Flow::TensorSplatOp>(
@@ -126,7 +127,7 @@ struct ConvertLinalgTensorOpsPass
 
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<IREE::Flow::FlowDialect, tensor::TensorDialect,
-                    linalg::LinalgDialect, mlir::StandardOpsDialect,
+                    linalg::LinalgDialect, mlir::func::FuncDialect,
                     mlir::arith::ArithmeticDialect, mlir::math::MathDialect>();
   }
   void runOnOperation() override {

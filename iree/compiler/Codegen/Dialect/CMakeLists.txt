@@ -30,9 +30,9 @@ iree_cc_library(
     ::IREECodegenDialectGen
     ::LoweringConfigGen
     LLVMSupport
+    MLIRFunc
     MLIRIR
     MLIRParser
-    MLIRStandard
     iree::compiler::Codegen::Utils
   PUBLIC
 )

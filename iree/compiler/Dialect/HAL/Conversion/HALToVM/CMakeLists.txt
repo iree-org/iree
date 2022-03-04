@@ -27,9 +27,9 @@ iree_cc_library(
     "ConvertSemaphoreOps.cpp"
   DEPS
     LLVMSupport
+    MLIRFunc
     MLIRIR
     MLIRPass
-    MLIRStandard
     MLIRTransforms
     iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::HAL::Utils

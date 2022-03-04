@@ -10,7 +10,7 @@
 #include "iree/compiler/Dialect/Stream/IR/StreamTypes.h"
 #include "llvm/ADT/DenseMap.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
-#include "mlir/Dialect/StandardOps/IR/Ops.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/BlockAndValueMapping.h"
 #include "mlir/IR/Builders.h"
@@ -83,10 +83,10 @@ static SmallVector<Value> expandResourceOperands(
   return expandedOperands;
 }
 
-struct CallOpConversion : public OpConversionPattern<mlir::CallOp> {
+struct CallOpConversion : public OpConversionPattern<mlir::func::CallOp> {
   using OpConversionPattern::OpConversionPattern;
   LogicalResult matchAndRewrite(
-      mlir::CallOp op, OpAdaptor adaptor,
+      mlir::func::CallOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     // Expand any resource operands to resource + size.
     auto expandedOperands =
@@ -115,7 +115,7 @@ struct CallOpConversion : public OpConversionPattern<mlir::CallOp> {
     // Create a new call that takes the expanded input operands and returns the
     // expanded output results. We can't directly replace the original call as
     // the result counts differ.
-    auto callOp = rewriter.create<mlir::CallOp>(
+    auto callOp = rewriter.create<mlir::func::CallOp>(
         op.getLoc(), expandedTypes, op.getCallee(), expandedOperands);
 
     // Tie all resource results together so we end up with 1:1 results with the
@@ -141,15 +141,15 @@ struct CallOpConversion : public OpConversionPattern<mlir::CallOp> {
   }
 };
 
-struct ReturnOpConversion : public OpConversionPattern<mlir::ReturnOp> {
+struct ReturnOpConversion : public OpConversionPattern<mlir::func::ReturnOp> {
   using OpConversionPattern::OpConversionPattern;
   LogicalResult matchAndRewrite(
-      mlir::ReturnOp op, OpAdaptor adaptor,
+      mlir::func::ReturnOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     // Expand any resource operands to resource + size.
     auto expandedOperands =
         expandResourceOperands(op.getLoc(), adaptor.getOperands(), rewriter);
-    rewriter.replaceOpWithNewOp<mlir::ReturnOp>(op, expandedOperands);
+    rewriter.replaceOpWithNewOp<mlir::func::ReturnOp>(op, expandedOperands);
     return success();
   }
 };
@@ -225,15 +225,17 @@ void populateStandardStructuralToStreamPatterns(
     return typeConverter.isSignatureLegal(op.getType()) &&
            typeConverter.isLegal(&op.getBody());
   });
-  conversionTarget.addDynamicallyLegalOp<mlir::CallOp>([&](mlir::CallOp op) {
-    return llvm::all_of(
-               op.getOperandTypes(),
-               [&](Type type) { return typeConverter.isLegal(type); }) &&
-           llvm::all_of(op.getResultTypes(),
-                        [&](Type type) { return typeConverter.isLegal(type); });
-  });
-  conversionTarget.addDynamicallyLegalOp<mlir::ReturnOp>(
-      [&](mlir::ReturnOp op) {
+  conversionTarget.addDynamicallyLegalOp<mlir::func::CallOp>(
+      [&](mlir::func::CallOp op) {
+        return llvm::all_of(
+                   op.getOperandTypes(),
+                   [&](Type type) { return typeConverter.isLegal(type); }) &&
+               llvm::all_of(op.getResultTypes(), [&](Type type) {
+                 return typeConverter.isLegal(type);
+               });
+      });
+  conversionTarget.addDynamicallyLegalOp<mlir::func::ReturnOp>(
+      [&](mlir::func::ReturnOp op) {
         return llvm::all_of(op.getOperandTypes(), [&](Type type) {
           return typeConverter.isLegal(type);
         });

@@ -13,10 +13,10 @@
 #include "iree-dialects/Dialect/LinalgExt/Transforms/Transforms.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/SCF.h"
-#include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/IR/Matchers.h"
@@ -262,7 +262,7 @@ struct TiledOpInterfaceTilingPass
     registry.insert<
         AffineDialect, IREE::Input::IREEInputDialect, linalg::LinalgDialect,
         IREE::LinalgExt::IREELinalgExtDialect, memref::MemRefDialect,
-        StandardOpsDialect, mlir::arith::ArithmeticDialect, math::MathDialect,
+        func::FuncDialect, mlir::arith::ArithmeticDialect, math::MathDialect,
         tensor::TensorDialect, scf::SCFDialect>();
   }
   void runOnOperation() override;

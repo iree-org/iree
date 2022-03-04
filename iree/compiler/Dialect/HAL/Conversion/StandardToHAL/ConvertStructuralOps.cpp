@@ -10,8 +10,8 @@
 #include "iree/compiler/Dialect/Util/Conversion/ConversionPatterns.h"
 #include "llvm/ADT/DenseMap.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/SCF/SCF.h"
-#include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/BlockAndValueMapping.h"
 #include "mlir/IR/Builders.h"
@@ -66,32 +66,33 @@ class FuncOpSignatureConversion : public OpConversionPattern<mlir::FuncOp> {
   }
 };
 
-class CallOpConversion : public OpConversionPattern<mlir::CallOp> {
+class CallOpConversion : public OpConversionPattern<mlir::func::CallOp> {
  public:
   using OpConversionPattern::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      mlir::CallOp op, OpAdaptor adaptor,
+      mlir::func::CallOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     SmallVector<Type, 4> resultTypes;
     if (failed(getTypeConverter()->convertTypes(op.getResultTypes(),
                                                 resultTypes))) {
       return rewriter.notifyMatchFailure(op, "unable to convert result types");
     }
-    rewriter.replaceOpWithNewOp<mlir::CallOp>(op, resultTypes, op.getCallee(),
-                                              adaptor.operands());
+    rewriter.replaceOpWithNewOp<mlir::func::CallOp>(
+        op, resultTypes, op.getCallee(), adaptor.operands());
     return success();
   }
 };
 
-class ReturnOpConversion : public OpConversionPattern<mlir::ReturnOp> {
+class ReturnOpConversion : public OpConversionPattern<mlir::func::ReturnOp> {
  public:
   using OpConversionPattern::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      mlir::ReturnOp returnOp, OpAdaptor adaptor,
+      mlir::func::ReturnOp returnOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    rewriter.replaceOpWithNewOp<mlir::ReturnOp>(returnOp, adaptor.operands());
+    rewriter.replaceOpWithNewOp<mlir::func::ReturnOp>(returnOp,
+                                                      adaptor.operands());
     return success();
   }
 };

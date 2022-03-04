@@ -10,7 +10,7 @@
 #include "iree/compiler/Dialect/Stream/IR/StreamTypes.h"
 #include "llvm/Support/SourceMgr.h"
 #include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
-#include "mlir/Dialect/StandardOps/IR/Ops.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/DialectImplementation.h"
@@ -111,9 +111,9 @@ void StreamDialect::getCanonicalizationPatterns(
 Operation *StreamDialect::materializeConstant(OpBuilder &builder,
                                               Attribute value, Type type,
                                               Location loc) {
-  if (mlir::ConstantOp::isBuildableWith(value, type)) {
-    return builder.create<mlir::ConstantOp>(loc, type,
-                                            value.cast<FlatSymbolRefAttr>());
+  if (mlir::func::ConstantOp::isBuildableWith(value, type)) {
+    return builder.create<mlir::func::ConstantOp>(
+        loc, type, value.cast<FlatSymbolRefAttr>());
   } else if (arith::ConstantOp::isBuildableWith(value, type)) {
     return builder.create<arith::ConstantOp>(loc, type, value);
   } else if (value.isa<IREE::Stream::TimepointAttr>()) {

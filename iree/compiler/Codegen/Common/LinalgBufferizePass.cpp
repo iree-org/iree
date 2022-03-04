@@ -52,6 +52,7 @@
 #include "llvm/ADT/TypeSwitch.h"
 #include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
@@ -978,7 +979,7 @@ class LinalgBufferizePass : public LinalgBufferizeBase<LinalgBufferizePass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<mlir::bufferization::BufferizationDialect,
                     IREE::Util::UtilDialect, linalg::LinalgDialect,
-                    memref::MemRefDialect, scf::SCFDialect, StandardOpsDialect,
+                    memref::MemRefDialect, scf::SCFDialect, func::FuncDialect,
                     mlir::math::MathDialect, mlir::arith::ArithmeticDialect>();
   }
   void runOnOperation() override;

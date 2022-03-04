@@ -30,9 +30,9 @@ cc_library(
         "//iree/compiler/Dialect/VM/IR",
         "//iree/compiler/Utils",
         "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:FuncDialect",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:Parser",
-        "@llvm-project//mlir:StandardOps",
         "@llvm-project//mlir:Transforms",
     ],
 )

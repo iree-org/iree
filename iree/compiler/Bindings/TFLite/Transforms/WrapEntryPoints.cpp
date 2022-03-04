@@ -12,6 +12,7 @@
 #include "llvm/ADT/StringExtras.h"
 #include "mlir/Dialect/Affine/Utils.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/MLIRContext.h"
@@ -48,7 +49,7 @@ class WrapEntryPointsPass
     : public PassWrapper<WrapEntryPointsPass, OperationPass<ModuleOp>> {
  public:
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<mlir::StandardOpsDialect, mlir::arith::ArithmeticDialect,
+    registry.insert<mlir::func::FuncDialect, mlir::arith::ArithmeticDialect,
                     mlir::tensor::TensorDialect, IREE::HAL::HALDialect,
                     IREE::Util::UtilDialect>();
   }
@@ -239,7 +240,7 @@ class WrapEntryPointsPass
     // Replace each exit from the function with a storage back to the shape
     // variables.
     for (auto returnOp :
-         llvm::to_vector<4>(calcFuncOp.getOps<mlir::ReturnOp>())) {
+         llvm::to_vector<4>(calcFuncOp.getOps<mlir::func::ReturnOp>())) {
       auto exitLoc = returnOp.getLoc();
       OpBuilder exitBuilder(returnOp);
 
@@ -265,11 +266,11 @@ class WrapEntryPointsPass
           exitBuilder.createOrFold<arith::ConstantIntOp>(exitLoc, 0, 1);
       exitBuilder.create<IREE::Util::GlobalStoreOp>(
           exitLoc, falseValue, dirtyGlobalOp.getSymbolName());
-      exitBuilder.create<mlir::ReturnOp>(exitLoc);
+      exitBuilder.create<mlir::func::ReturnOp>(exitLoc);
       returnOp.erase();
     }
 
-    OpBuilder::atBlockBegin(returnBlock).create<mlir::ReturnOp>(loc);
+    OpBuilder::atBlockBegin(returnBlock).create<mlir::func::ReturnOp>(loc);
 
     return calcFuncOp;
   }
@@ -385,7 +386,7 @@ class WrapEntryPointsPass
         entryBuilder);
 
     auto exitBuilder = OpBuilder::atBlockBegin(exitBlock);
-    exitBuilder.create<mlir::ReturnOp>(loc);
+    exitBuilder.create<mlir::func::ReturnOp>(loc);
   }
 
   // Creates a function to resize |inputGlobalOps| and sets the |dirtyGlobalOp|
@@ -422,7 +423,7 @@ class WrapEntryPointsPass
     auto trueValue = exitBuilder.createOrFold<arith::ConstantIntOp>(loc, 1, 1);
     exitBuilder.create<IREE::Util::GlobalStoreOp>(loc, trueValue,
                                                   dirtyGlobalOp.getName());
-    exitBuilder.create<mlir::ReturnOp>(loc);
+    exitBuilder.create<mlir::func::ReturnOp>(loc);
   }
 
   // Creates a function to query the |outputGlobalOps| at runtime by the
@@ -449,7 +450,7 @@ class WrapEntryPointsPass
 
     // Always call the recalculation function - it checks for whether it needs
     // to run based on the dirty flag value.
-    entryBuilder.create<mlir::CallOp>(loc, calculateShapeFuncOp);
+    entryBuilder.create<mlir::func::CallOp>(loc, calculateShapeFuncOp);
 
     auto *exitBlock = buildSwitch(
         loc, entryBlock->getArgument(0), outputDynamicDims.size(),
@@ -459,7 +460,7 @@ class WrapEntryPointsPass
         entryBuilder);
 
     auto exitBuilder = OpBuilder::atBlockBegin(exitBlock);
-    exitBuilder.create<mlir::ReturnOp>(loc);
+    exitBuilder.create<mlir::func::ReturnOp>(loc);
   }
 
   // Creates the corresponding wrapper function for the given entry point.
@@ -528,8 +529,8 @@ class WrapEntryPointsPass
           arg.getLoc(), inputDynamicDims.tensorType, arg,
           TypeAttr::get(inputDynamicDims.tensorType), dynamicDims));
     }
-    auto callOp = entryBuilder.create<mlir::CallOp>(entryFuncOp.getLoc(),
-                                                    entryFuncOp, callOperands);
+    auto callOp = entryBuilder.create<mlir::func::CallOp>(
+        entryFuncOp.getLoc(), entryFuncOp, callOperands);
     SmallVector<Value> callResults;
     for (auto output : llvm::zip(callOp.getResults(), outputDynamicDims)) {
       auto result = std::get<0>(output);
@@ -558,7 +559,8 @@ class WrapEntryPointsPass
         entryBuilder.create<arith::ConstantIntOp>(entryFuncOp.getLoc(), 0, 1),
         dirtyGlobalOp.getSymbolName());
 
-    entryBuilder.create<mlir::ReturnOp>(entryFuncOp.getLoc(), callResults);
+    entryBuilder.create<mlir::func::ReturnOp>(entryFuncOp.getLoc(),
+                                              callResults);
   }
 
   void wrapEntryPoint(mlir::FuncOp funcOp) {

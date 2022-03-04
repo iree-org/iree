@@ -8,7 +8,7 @@
 
 #include "iree/compiler/Codegen/Dialect/IREECodegenDialect.h"
 #include "llvm/ADT/TypeSwitch.h"
-#include "mlir/Dialect/StandardOps/IR/Ops.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/DialectImplementation.h"
 
 #define GET_ATTRDEF_CLASSES

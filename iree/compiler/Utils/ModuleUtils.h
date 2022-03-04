@@ -7,7 +7,7 @@
 #ifndef IREE_COMPILER_UTILS_MODULEUTILS_H_
 #define IREE_COMPILER_UTILS_MODULEUTILS_H_
 
-#include "mlir/Dialect/StandardOps/IR/Ops.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/Operation.h"
 #include "mlir/IR/SymbolTable.h"

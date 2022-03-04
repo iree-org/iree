@@ -42,10 +42,10 @@ cc_library(
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:ControlFlowOps",
         "@llvm-project//mlir:EmitC",
+        "@llvm-project//mlir:FuncDialect",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:MathDialect",
         "@llvm-project//mlir:Pass",
-        "@llvm-project//mlir:StandardOps",
         "@llvm-project//mlir:Transforms",
     ],
 )

@@ -11,11 +11,11 @@
 #include "iree-dialects/Dialect/PyDM/IR/PyDMDialect.h"
 #include "iree-dialects/Dialect/PyDM/Transforms/Passes.h"
 #include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/Passes.h"
 #include "mlir/Dialect/SCF/SCF.h"
-#include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/AsmState.h"
 #include "mlir/IR/Dialect.h"
@@ -44,7 +44,7 @@ int main(int argc, char **argv) {
       mlir::iree_compiler::IREE::PYDM::IREEPyDMDialect,
       // Upstream dialects
       mlir::arith::ArithmeticDialect, mlir::linalg::LinalgDialect,
-      mlir::memref::MemRefDialect, mlir::StandardOpsDialect,
+      mlir::memref::MemRefDialect, mlir::func::FuncDialect,
       mlir::scf::SCFDialect, mlir::tensor::TensorDialect>();
 
   IREE::LinalgExt::registerTiledOpInterfaceExternalModels(registry);

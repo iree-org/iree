@@ -18,8 +18,8 @@ iree_cc_library(
   SRCS
     "ConvertUtilToHAL.cpp"
   DEPS
+    MLIRFunc
     MLIRIR
-    MLIRStandard
     MLIRTransforms
     iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::Util::Conversion

@@ -10,9 +10,9 @@
 #include "iree/compiler/Dialect/Flow/IR/FlowTypes.h"
 #include "iree/compiler/Dialect/Flow/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
-#include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
@@ -100,7 +100,7 @@ struct ConvertToFlowBeforeDispatchFormation
           ConvertToFlowBeforeDispatchFormation> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<IREE::Flow::FlowDialect, tensor::TensorDialect,
-                    linalg::LinalgDialect, mlir::StandardOpsDialect,
+                    linalg::LinalgDialect, mlir::func::FuncDialect,
                     mlir::arith::ArithmeticDialect, mlir::math::MathDialect>();
   }
   void runOnOperation() override {
@@ -128,7 +128,7 @@ struct ConvertToFlowAfterDispatchFormation
           ConvertToFlowAfterDispatchFormation> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<IREE::Flow::FlowDialect, tensor::TensorDialect,
-                    linalg::LinalgDialect, mlir::StandardOpsDialect,
+                    linalg::LinalgDialect, mlir::func::FuncDialect,
                     mlir::arith::ArithmeticDialect, mlir::math::MathDialect>();
   }
   void runOnOperation() override {

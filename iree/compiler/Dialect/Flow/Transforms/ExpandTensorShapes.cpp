@@ -17,7 +17,7 @@
 #include "llvm/ADT/BreadthFirstIterator.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
-#include "mlir/Dialect/StandardOps/IR/Ops.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/BlockAndValueMapping.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinTypes.h"
@@ -342,7 +342,7 @@ static void expandFuncOp(mlir::FuncOp op, ExpandedGlobalMap &globalMap,
 //  ->
 //  %r, %rd = call @foo(%a, %ad)
 //  %2 = flow.tensor.tie_shape %r : tensor<?xf32>{%rd}
-static void expandCallOp(mlir::CallOp op, IndexSet &indexSet,
+static void expandCallOp(mlir::func::CallOp op, IndexSet &indexSet,
                          TensorDimMap &tensorDimMap) {
   if (!usesDynamicTensors(op)) return;
 
@@ -351,8 +351,8 @@ static void expandCallOp(mlir::CallOp op, IndexSet &indexSet,
   auto operands = expandOperands(op.getLoc(), op.operands(), tensorDimMap,
                                  indexSet, builder);
   auto resultTypes = expandTypes(op.getResultTypes());
-  auto newOp = builder.create<mlir::CallOp>(op.getLoc(), op.getCallee(),
-                                            resultTypes, operands);
+  auto newOp = builder.create<mlir::func::CallOp>(op.getLoc(), op.getCallee(),
+                                                  resultTypes, operands);
 
   // Insert shape ties on results that we are sinking across the call edge.
   // The hope is that by moving the ties here we can fold with queries inside of
@@ -390,13 +390,13 @@ static void expandCallOp(mlir::CallOp op, IndexSet &indexSet,
 //  return %1
 //  ->
 //  return %0, %d
-static void expandReturnOp(mlir::ReturnOp op, IndexSet &indexSet,
+static void expandReturnOp(mlir::func::ReturnOp op, IndexSet &indexSet,
                            TensorDimMap &tensorDimMap) {
   if (!usesDynamicTensors(op)) return;
   OpBuilder builder(op);
   auto operands = expandOperands(op.getLoc(), op.operands(), tensorDimMap,
                                  indexSet, builder);
-  builder.create<mlir::ReturnOp>(op.getLoc(), operands);
+  builder.create<mlir::func::ReturnOp>(op.getLoc(), operands);
   op.erase();
 }
 
@@ -484,9 +484,9 @@ static void expandTensorDims(Operation *op, ExpandedGlobalMap &globalMap,
     expandInitializerOp(initializerOp, globalMap, indexSet, tensorDimMap);
   } else if (auto funcOp = dyn_cast<mlir::FuncOp>(op)) {
     expandFuncOp(funcOp, globalMap, indexSet, tensorDimMap);
-  } else if (auto callOp = dyn_cast<mlir::CallOp>(op)) {
+  } else if (auto callOp = dyn_cast<mlir::func::CallOp>(op)) {
     expandCallOp(callOp, indexSet, tensorDimMap);
-  } else if (auto returnOp = dyn_cast<mlir::ReturnOp>(op)) {
+  } else if (auto returnOp = dyn_cast<mlir::func::ReturnOp>(op)) {
     expandReturnOp(returnOp, indexSet, tensorDimMap);
   } else if (auto branchOp = dyn_cast<mlir::cf::BranchOp>(op)) {
     expandBranchOp(branchOp, indexSet, tensorDimMap);
@@ -515,7 +515,7 @@ class ExpandTensorShapesPass
   ExpandTensorShapesPass() = default;
 
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<mlir::StandardOpsDialect>();
+    registry.insert<mlir::func::FuncDialect>();
     registry.insert<mlir::arith::ArithmeticDialect>();
     registry.insert<IREE::Flow::FlowDialect>();
     registry.insert<IREE::Util::UtilDialect>();

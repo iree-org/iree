@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Dialect/HAL/Target/LLVM/LinkerTool.h"
 
+#include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Process.h"
 
 #define DEBUG_TYPE "llvmaot-linker"

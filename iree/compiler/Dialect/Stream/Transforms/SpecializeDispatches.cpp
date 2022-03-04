@@ -13,7 +13,7 @@
 #include "iree/compiler/Utils/IndexSet.h"
 #include "llvm/ADT/BitVector.h"
 #include "llvm/Support/Debug.h"
-#include "mlir/Dialect/StandardOps/IR/Ops.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/AsmState.h"
 #include "mlir/IR/Attributes.h"
