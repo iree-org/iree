@@ -32,9 +32,9 @@ cc_library(
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:ControlFlowOps",
         "@llvm-project//mlir:EmitC",
+        "@llvm-project//mlir:FuncDialect",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:SCFDialect",
-        "@llvm-project//mlir:StandardOps",
         "@llvm-project//mlir:Support",
     ],
 )

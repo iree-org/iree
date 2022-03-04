@@ -19,8 +19,8 @@ iree_cc_library(
     "ConversionPatterns.cpp"
   DEPS
     LLVMSupport
+    MLIRFunc
     MLIRIR
-    MLIRStandard
     MLIRSupport
     MLIRTransforms
     iree::compiler::Dialect::Util::IR

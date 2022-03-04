@@ -237,6 +237,7 @@ TEST_F(CheckTest, ExpectAllTrueSuccess) {
   ASSERT_NO_FATAL_FAILURE(
       CreateInt32BufferView(contents, shape, &input_buffer_view));
   IREE_ASSERT_OK(Invoke("expect_all_true", {input_buffer_view}));
+  iree_hal_buffer_view_release(input_buffer_view.get());
 }
 
 TEST_F(CheckTest, ExpectAllTrue3DTrueSuccess) {
@@ -246,6 +247,7 @@ TEST_F(CheckTest, ExpectAllTrue3DTrueSuccess) {
   ASSERT_NO_FATAL_FAILURE(
       CreateInt32BufferView(contents, shape, &input_buffer_view));
   IREE_ASSERT_OK(Invoke("expect_all_true", {input_buffer_view}));
+  iree_hal_buffer_view_release(input_buffer_view.get());
 }
 
 TEST_F(CheckTest, ExpectAllTrueFailure) {
@@ -256,6 +258,7 @@ TEST_F(CheckTest, ExpectAllTrueFailure) {
       CreateInt32BufferView(contents, shape, &input_buffer_view));
   EXPECT_NONFATAL_FAILURE(
       IREE_ASSERT_OK(Invoke("expect_all_true", {input_buffer_view})), "0");
+  iree_hal_buffer_view_release(input_buffer_view.get());
 }
 
 TEST_F(CheckTest, ExpectAllTrueSingleElementFailure) {
@@ -267,6 +270,7 @@ TEST_F(CheckTest, ExpectAllTrueSingleElementFailure) {
   EXPECT_NONFATAL_FAILURE(
       IREE_ASSERT_OK(Invoke("expect_all_true", {input_buffer_view})),
       "1, 2, 3, 0, 4");
+  iree_hal_buffer_view_release(input_buffer_view.get());
 }
 
 TEST_F(CheckTest, ExpectAllTrue3DSingleElementFailure) {
@@ -278,6 +282,7 @@ TEST_F(CheckTest, ExpectAllTrue3DSingleElementFailure) {
   EXPECT_NONFATAL_FAILURE(
       IREE_ASSERT_OK(Invoke("expect_all_true", {input_buffer_view})),
       "1, 2, 3, 4, 5, 6, 0, 8");
+  iree_hal_buffer_view_release(input_buffer_view.get());
 }
 
 TEST_F(CheckTest, ExpectEqSameBufferSuccess) {
@@ -287,6 +292,8 @@ TEST_F(CheckTest, ExpectEqSameBufferSuccess) {
   ASSERT_NO_FATAL_FAILURE(
       CreateInt32BufferView(contents, shape, &input_buffer_view));
   IREE_ASSERT_OK(Invoke("expect_eq", {input_buffer_view, input_buffer_view}));
+  iree_hal_buffer_view_release(input_buffer_view.get());
+  iree_hal_buffer_view_release(input_buffer_view.get());
 }
 
 TEST_F(CheckTest, ExpectEqIdenticalBufferSuccess) {
@@ -297,6 +304,8 @@ TEST_F(CheckTest, ExpectEqIdenticalBufferSuccess) {
   ASSERT_NO_FATAL_FAILURE(CreateInt32BufferView(contents, shape, &lhs));
   ASSERT_NO_FATAL_FAILURE(CreateInt32BufferView(contents, shape, &rhs));
   IREE_ASSERT_OK(Invoke("expect_eq", {lhs, rhs}));
+  iree_hal_buffer_view_release(lhs.get());
+  iree_hal_buffer_view_release(rhs.get());
 }
 
 TEST_F(CheckTest, ExpectEqIdentical3DBufferSuccess) {
@@ -307,6 +316,8 @@ TEST_F(CheckTest, ExpectEqIdentical3DBufferSuccess) {
   ASSERT_NO_FATAL_FAILURE(CreateInt32BufferView(contents, shape, &lhs));
   ASSERT_NO_FATAL_FAILURE(CreateInt32BufferView(contents, shape, &rhs));
   IREE_ASSERT_OK(Invoke("expect_eq", {lhs, rhs}));
+  iree_hal_buffer_view_release(lhs.get());
+  iree_hal_buffer_view_release(rhs.get());
 }
 
 TEST_F(CheckTest, ExpectEqDifferentShapeFailure) {
@@ -319,6 +330,8 @@ TEST_F(CheckTest, ExpectEqDifferentShapeFailure) {
   ASSERT_NO_FATAL_FAILURE(CreateInt32BufferView(contents, rhs_shape, &rhs));
   EXPECT_NONFATAL_FAILURE(IREE_ASSERT_OK(Invoke("expect_eq", {lhs, rhs})),
                           "Shapes do not match");
+  iree_hal_buffer_view_release(lhs.get());
+  iree_hal_buffer_view_release(rhs.get());
 }
 
 TEST_F(CheckTest, ExpectEqDifferentElementTypeFailure) {
@@ -331,6 +344,8 @@ TEST_F(CheckTest, ExpectEqDifferentElementTypeFailure) {
   ASSERT_NO_FATAL_FAILURE(CreateFloat32BufferView(rhs_contents, shape, &rhs));
   EXPECT_NONFATAL_FAILURE(IREE_ASSERT_OK(Invoke("expect_eq", {lhs, rhs})),
                           "Element types do not match");
+  iree_hal_buffer_view_release(lhs.get());
+  iree_hal_buffer_view_release(rhs.get());
 }
 
 TEST_F(CheckTest, ExpectEqDifferentContentsFailure) {
@@ -343,6 +358,8 @@ TEST_F(CheckTest, ExpectEqDifferentContentsFailure) {
   ASSERT_NO_FATAL_FAILURE(CreateInt32BufferView(rhs_contents, shape, &rhs));
   EXPECT_NONFATAL_FAILURE(IREE_ASSERT_OK(Invoke("expect_eq", {lhs, rhs})),
                           "Contents does not match");
+  iree_hal_buffer_view_release(lhs.get());
+  iree_hal_buffer_view_release(rhs.get());
 }
 
 TEST_F(CheckTest, ExpectEqDifferentEverythingFullMessageFailure) {
@@ -363,6 +380,8 @@ TEST_F(CheckTest, ExpectEqDifferentEverythingFullMessageFailure) {
       "    2x3xi32=[1 2 3][4 5 6]\n"
       "  rhs:\n"
       "    2x2xf32=[1 2][3 42]");
+  iree_hal_buffer_view_release(lhs.get());
+  iree_hal_buffer_view_release(rhs.get());
 }
 
 TEST_F(CheckTest, ExpectEqDifferentContents3DFullMessageFailure) {
@@ -380,6 +399,8 @@ TEST_F(CheckTest, ExpectEqDifferentContents3DFullMessageFailure) {
       "    2x2x2xi32=[[1 2][3 4]][[5 6][7 8]]\n"
       "  rhs:\n"
       "    2x2x2xi32=[[1 2][3 42]][[5 6][7 8]]");
+  iree_hal_buffer_view_release(lhs.get());
+  iree_hal_buffer_view_release(rhs.get());
 }
 
 TEST_F(CheckTest, ExpectAlmostEqSameBufferSuccess) {
@@ -390,6 +411,8 @@ TEST_F(CheckTest, ExpectAlmostEqSameBufferSuccess) {
       CreateFloat32BufferView(contents, shape, &input_buffer_view));
   IREE_ASSERT_OK(
       Invoke("expect_almost_eq", {input_buffer_view, input_buffer_view}));
+  iree_hal_buffer_view_release(input_buffer_view.get());
+  iree_hal_buffer_view_release(input_buffer_view.get());
 }
 
 TEST_F(CheckTest, ExpectAlmostEqIdenticalBufferSuccess) {
@@ -400,6 +423,8 @@ TEST_F(CheckTest, ExpectAlmostEqIdenticalBufferSuccess) {
   ASSERT_NO_FATAL_FAILURE(CreateFloat32BufferView(contents, shape, &lhs));
   ASSERT_NO_FATAL_FAILURE(CreateFloat32BufferView(contents, shape, &rhs));
   IREE_ASSERT_OK(Invoke("expect_almost_eq", {lhs, rhs}));
+  iree_hal_buffer_view_release(lhs.get());
+  iree_hal_buffer_view_release(rhs.get());
 }
 
 TEST_F(CheckTest, ExpectAlmostEqNearIdenticalBufferSuccess) {
@@ -411,6 +436,8 @@ TEST_F(CheckTest, ExpectAlmostEqNearIdenticalBufferSuccess) {
   ASSERT_NO_FATAL_FAILURE(CreateFloat32BufferView(lhs_contents, shape, &lhs));
   ASSERT_NO_FATAL_FAILURE(CreateFloat32BufferView(rhs_contents, shape, &rhs));
   IREE_ASSERT_OK(Invoke("expect_almost_eq", {lhs, rhs}));
+  iree_hal_buffer_view_release(lhs.get());
+  iree_hal_buffer_view_release(rhs.get());
 }
 
 TEST_F(CheckTest, ExpectAlmostEqIdentical3DBufferSuccess) {
@@ -421,6 +448,8 @@ TEST_F(CheckTest, ExpectAlmostEqIdentical3DBufferSuccess) {
   ASSERT_NO_FATAL_FAILURE(CreateFloat32BufferView(contents, shape, &lhs));
   ASSERT_NO_FATAL_FAILURE(CreateFloat32BufferView(contents, shape, &rhs));
   IREE_ASSERT_OK(Invoke("expect_almost_eq", {lhs, rhs}));
+  iree_hal_buffer_view_release(lhs.get());
+  iree_hal_buffer_view_release(rhs.get());
 }
 
 TEST_F(CheckTest, ExpectAlmostEqDifferentShapeFailure) {
@@ -434,6 +463,8 @@ TEST_F(CheckTest, ExpectAlmostEqDifferentShapeFailure) {
   EXPECT_NONFATAL_FAILURE(
       IREE_ASSERT_OK(Invoke("expect_almost_eq", {lhs, rhs})),
       "Shapes do not match");
+  iree_hal_buffer_view_release(lhs.get());
+  iree_hal_buffer_view_release(rhs.get());
 }
 
 TEST_F(CheckTest, ExpectAlmostEqSmallerLhsElementCountFailure) {
@@ -450,6 +481,8 @@ TEST_F(CheckTest, ExpectAlmostEqSmallerLhsElementCountFailure) {
   EXPECT_NONFATAL_FAILURE(
       IREE_ASSERT_OK(Invoke("expect_almost_eq", {smaller, bigger})),
       "Shapes do not match");
+  iree_hal_buffer_view_release(smaller.get());
+  iree_hal_buffer_view_release(bigger.get());
 }
 
 TEST_F(CheckTest, ExpectAlmostEqSmallerRhsElementCountFailure) {
@@ -466,6 +499,8 @@ TEST_F(CheckTest, ExpectAlmostEqSmallerRhsElementCountFailure) {
   EXPECT_NONFATAL_FAILURE(
       IREE_ASSERT_OK(Invoke("expect_almost_eq", {bigger, smaller})),
       "Shapes do not match");
+  iree_hal_buffer_view_release(smaller.get());
+  iree_hal_buffer_view_release(bigger.get());
 }
 
 TEST_F(CheckTest, ExpectAlmostEqDifferentElementTypeFailure) {
@@ -479,6 +514,8 @@ TEST_F(CheckTest, ExpectAlmostEqDifferentElementTypeFailure) {
   EXPECT_NONFATAL_FAILURE(
       IREE_ASSERT_OK(Invoke("expect_almost_eq", {lhs, rhs})),
       "Element types do not match");
+  iree_hal_buffer_view_release(lhs.get());
+  iree_hal_buffer_view_release(rhs.get());
 }
 
 TEST_F(CheckTest, ExpectAlmostEqDifferentContentsFailure) {
@@ -492,6 +529,8 @@ TEST_F(CheckTest, ExpectAlmostEqDifferentContentsFailure) {
   EXPECT_NONFATAL_FAILURE(
       IREE_ASSERT_OK(Invoke("expect_almost_eq", {lhs, rhs})),
       "Contents does not match");
+  iree_hal_buffer_view_release(lhs.get());
+  iree_hal_buffer_view_release(rhs.get());
 }
 
 TEST_F(CheckTest, ExpectAlmostEqDifferentEverythingFullMessageFailure) {
@@ -515,6 +554,8 @@ TEST_F(CheckTest, ExpectAlmostEqDifferentEverythingFullMessageFailure) {
       "    2x3xf64=[1 2 3][4 5 6]\n"
       "  rhs:\n"
       "    2x2xf32=[1 2][3 42]");
+  iree_hal_buffer_view_release(lhs.get());
+  iree_hal_buffer_view_release(rhs.get());
 }
 
 TEST_F(CheckTest, ExpectAlmostEqDifferentContents3DFullMessageFailure) {
@@ -532,6 +573,8 @@ TEST_F(CheckTest, ExpectAlmostEqDifferentContents3DFullMessageFailure) {
       "    2x2x2xf32=[[1 2][3 4]][[5 6][7 8]]\n"
       "  rhs:\n"
       "    2x2x2xf32=[[1 2][3 42]][[5 6][7 8]]");
+  iree_hal_buffer_view_release(lhs.get());
+  iree_hal_buffer_view_release(rhs.get());
 }
 
 TEST_F(CheckTest, ExpectAlmostEqIdenticalBufferF16Success) {
@@ -542,6 +585,8 @@ TEST_F(CheckTest, ExpectAlmostEqIdenticalBufferF16Success) {
   ASSERT_NO_FATAL_FAILURE(CreateFloat16BufferView(contents, shape, &lhs));
   ASSERT_NO_FATAL_FAILURE(CreateFloat16BufferView(contents, shape, &rhs));
   IREE_ASSERT_OK(Invoke("expect_almost_eq", {lhs, rhs}));
+  iree_hal_buffer_view_release(lhs.get());
+  iree_hal_buffer_view_release(rhs.get());
 }
 
 TEST_F(CheckTest, ExpectAlmostEqNearIdenticalBufferF16Success) {
@@ -557,6 +602,8 @@ TEST_F(CheckTest, ExpectAlmostEqNearIdenticalBufferF16Success) {
   ASSERT_NO_FATAL_FAILURE(CreateFloat16BufferView(lhs_contents, shape, &lhs));
   ASSERT_NO_FATAL_FAILURE(CreateFloat16BufferView(rhs_contents, shape, &rhs));
   IREE_ASSERT_OK(Invoke("expect_almost_eq", {lhs, rhs}));
+  iree_hal_buffer_view_release(lhs.get());
+  iree_hal_buffer_view_release(rhs.get());
 }
 
 TEST_F(CheckTest, ExpectAlmostEqDifferentContentsF16Failure) {
@@ -570,6 +617,8 @@ TEST_F(CheckTest, ExpectAlmostEqDifferentContentsF16Failure) {
   EXPECT_NONFATAL_FAILURE(
       IREE_ASSERT_OK(Invoke("expect_almost_eq", {lhs, rhs})),
       "Contents does not match");
+  iree_hal_buffer_view_release(lhs.get());
+  iree_hal_buffer_view_release(rhs.get());
 }
 }  // namespace
 }  // namespace iree

@@ -12,8 +12,8 @@
 #include "iree/compiler/Dialect/VM/Conversion/TypeConverter.h"
 #include "iree/compiler/Dialect/VM/IR/VMOps.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Math/IR/Math.h"
-#include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinOps.h"
@@ -134,10 +134,10 @@ class FuncOpConversion : public OpConversionPattern<FuncOp> {
   }
 };
 
-class ReturnOpConversion : public OpConversionPattern<mlir::ReturnOp> {
+class ReturnOpConversion : public OpConversionPattern<mlir::func::ReturnOp> {
   using OpConversionPattern::OpConversionPattern;
   LogicalResult matchAndRewrite(
-      mlir::ReturnOp srcOp, OpAdaptor adaptor,
+      mlir::func::ReturnOp srcOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     rewriter.replaceOpWithNewOp<IREE::VM::ReturnOp>(srcOp,
                                                     adaptor.getOperands());
@@ -799,10 +799,10 @@ class CondBranchOpConversion : public OpConversionPattern<cf::CondBranchOp> {
   }
 };
 
-class CallOpConversion : public OpConversionPattern<CallOp> {
+class CallOpConversion : public OpConversionPattern<func::CallOp> {
   using OpConversionPattern::OpConversionPattern;
   LogicalResult matchAndRewrite(
-      CallOp srcOp, OpAdaptor adaptor,
+      func::CallOp srcOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     // Convert function result types. The conversion framework will ensure
     // that the callee has been equivalently converted.

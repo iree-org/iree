@@ -24,10 +24,10 @@
 #include "mlir-hlo/Dialect/mhlo/transforms/rewriters.h"
 #include "mlir/Dialect/Complex/IR/Complex.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
-#include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
@@ -322,9 +322,9 @@ struct ConvertMHLOToLinalgOnTensorsPass
 
     // Structural patterns (functions, cfg, terminators).
     patterns.insert<BuiltinFuncOpPattern>(*typeConverter, context);
-    patterns.insert<GenericTypeConvert>(ReturnOp::getOperationName(),
+    patterns.insert<GenericTypeConvert>(func::ReturnOp::getOperationName(),
                                         *typeConverter, context);
-    patterns.insert<GenericTypeConvert>(CallOp::getOperationName(),
+    patterns.insert<GenericTypeConvert>(func::CallOp::getOperationName(),
                                         *typeConverter, context);
     patterns.insert<GenericTypeConvert>(cf::CondBranchOp::getOperationName(),
                                         *typeConverter, context);

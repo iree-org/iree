@@ -45,7 +45,7 @@ void buildTFLImportPassPipeline(OpPassManager &pm) {
   //----------------------------------------------------------------------------
 
   pm.addPass(createConvertModuleMetadataPass());
-  pm.nest<ModuleOp>().addPass(createConvertFunctionMetadataPass());
+  pm.nest<FuncOp>().addPass(createConvertFunctionMetadataPass());
 
   //----------------------------------------------------------------------------
   // Convert all TFL ops to TOSA ops

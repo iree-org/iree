@@ -9,7 +9,7 @@
 #include "iree-dialects/Dialect/Input/InputOps.h"
 #include "iree-dialects/Dialect/PyDM/IR/PyDMOps.h"
 #include "iree-dialects/Dialect/PyDM/Transforms/Passes.h"
-#include "mlir/Dialect/StandardOps/IR/Ops.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/BuiltinDialect.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
@@ -222,7 +222,7 @@ struct LowerIREEPyDMToRTLPass
     : public LowerIREEPyDMToRTLBase<LowerIREEPyDMToRTLPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<mlir::iree_compiler::IREE::Input::IREEInputDialect,
-                    BuiltinDialect, StandardOpsDialect>();
+                    BuiltinDialect, func::FuncDialect>();
   }
 
   void runOnOperation() override {

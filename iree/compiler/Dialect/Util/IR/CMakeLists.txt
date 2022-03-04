@@ -45,11 +45,11 @@ iree_cc_library(
     MLIRArithmetic
     MLIRControlFlow
     MLIRControlFlowInterfaces
+    MLIRFunc
     MLIRIR
     MLIRMemRef
     MLIRParser
     MLIRSideEffectInterfaces
-    MLIRStandard
     MLIRSupport
     MLIRTensor
     MLIRTransforms

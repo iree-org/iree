@@ -3,7 +3,7 @@
 # that make up the IREE compiler input surface area. As a standalone
 # project intended for direct distribution, it hard-codes a number of important
 # CMake settings for producing optimal binaries and packages.
-cmake_minimum_required(VERSION 3.16.3)
+cmake_minimum_required(VERSION 3.17...3.22)
 
 if(POLICY CMP0068)
   cmake_policy(SET CMP0068 NEW)
@@ -66,10 +66,11 @@ set(MLIR_MAIN_SRC_DIR ${LLVM_MAIN_SRC_DIR}/../mlir)
 set(MLIR_MAIN_BINARY_DIR "${LLVM_MAIN_BINARY_DIR}/tools/mlir")
 
 # Configuration includes.
-include(${IREE_SOURCE_DIR}/build_tools/cmake/iree_third_party_cmake_options.cmake)
+include(${IREE_SOURCE_DIR}/build_tools/cmake/iree_cmake_options.cmake)
+include(${IREE_SOURCE_DIR}/build_tools/cmake/iree_external_cmake_options.cmake)
 
 # CMake settings.
-set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
+set(BUILD_SHARED_LIBS OFF)
 set(CMAKE_PLATFORM_NO_VERSIONED_SONAME ON)
 set(CMAKE_VISIBILITY_INLINES_HIDDEN ON)
 set(CMAKE_C_VISIBILITY_PRESET "hidden")
@@ -119,29 +120,19 @@ mlir_configure_python_dev_packages()
 
 # Include IREE and LLVM if building standalone.
 if(IREE_COMPILER_API_STANDALONE)
-  # Required MLIR settings.
-  # TODO: We require an ordering of mlir-dependent external projects to be
-  # loaded after mlir. We take advantage of the lexical ordering here by
-  # prefixing, which feels gross but is stable. Investigate a better mechanism
-  # upstream.
+  iree_set_compiler_cmake_options()
   iree_set_llvm_cmake_options()
   iree_add_llvm_external_project(mlir-iree-dialects MLIR_IREE_DIALECTS ${LLVM_EXTERNAL_MLIR_IREE_DIALECTS_SOURCE_DIR})
   iree_add_llvm_external_project(mlir-hlo MLIR_HLO ${LLVM_EXTERNAL_MLIR_HLO_SOURCE_DIR})
-  set(MLIR_ENABLE_BINDINGS_PYTHON ON CACHE BOOL "" FORCE)
-  set(MLIR_BINDINGS_PYTHON_LOCK_VERSION OFF CACHE BOOL "" FORCE)
-  # TODO: Conflicting gtest.
-  set(LLVM_INCLUDE_TESTS OFF CACHE BOOL "" FORCE)
-  # TODO: Conflicting benchmark.
-  set(LLVM_INCLUDE_BENCHMARKS OFF CACHE BOOL "" FORCE)
+  set(MLIR_ENABLE_BINDINGS_PYTHON ON)
 
   # Required mlir-hlo settings.
   # TODO: Consider removing this upstream and just using the main
   # MLIR_ENABLE_BINDINGS_PYTHON option.
-  set(MHLO_ENABLE_BINDINGS_PYTHON ON CACHE BOOL "" FORCE)
+  set(MHLO_ENABLE_BINDINGS_PYTHON ON)
 
   # Required IREE settings.
-  set(IREE_BUILD_PYTHON_BINDINGS ON CACHE BOOL "" FORCE)
-  set(IREE_BUILD_OLD_PYTHON_COMPILER_API OFF CACHE BOOL "" FORCE)
+  set(IREE_BUILD_PYTHON_BINDINGS ON)
 
   # Include LLVM.
   message(STATUS "Configuring LLVM from (${LLVM_MAIN_SRC_DIR} into ${LLVM_MAIN_BINARY_DIR})...")

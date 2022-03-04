@@ -41,10 +41,10 @@ iree_cc_library(
     ::VMStructsGen
     LLVMSupport
     MLIRControlFlowInterfaces
+    MLIRFunc
     MLIRIR
     MLIRParser
     MLIRSideEffectInterfaces
-    MLIRStandard
     MLIRSupport
     MLIRTransformUtils
     iree::compiler::Dialect::Util::IR

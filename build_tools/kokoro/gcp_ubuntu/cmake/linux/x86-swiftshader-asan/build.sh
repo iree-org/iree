@@ -41,8 +41,13 @@ CMAKE_ARGS=(
 echo "Configuring CMake"
 "${CMAKE_BIN?}" "${CMAKE_ARGS[@]?}"
 
-echo "Building with CMake"
+echo "Building all"
+echo "------------"
 "${CMAKE_BIN?}" --build "${CMAKE_BUILD_DIR?}" -- -k 0
+
+echo "Building test deps"
+echo "------------------"
+"${CMAKE_BIN?}" --build "${CMAKE_BUILD_DIR?}" --target iree-test-deps -- -k 0
 
 # Respect the user setting, but default to as many jobs as we have cores.
 export CTEST_PARALLEL_LEVEL=${CTEST_PARALLEL_LEVEL:-$(nproc)}
@@ -100,9 +105,6 @@ label_exclude_regex="($(IFS="|" ; echo "${label_exclude_args[*]?}"))"
 # These tests currently have asan failures
 # TODO(#5715): Fix these
 declare -a excluded_tests=(
-  "iree/base/internal/file_io_test"
-  "bindings/tflite/smoke_test"
-  "iree/modules/check/check_test"
   "iree/samples/simple_embedding/simple_embedding_vulkan_test"
 )
 

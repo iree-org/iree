@@ -11,7 +11,7 @@
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "llvm/Support/Debug.h"
-#include "mlir/Dialect/StandardOps/IR/Ops.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/BlockAndValueMapping.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinTypes.h"
@@ -102,7 +102,7 @@ static mlir::FuncOp createWorkgroupFunc(Location loc, StringRef functionName,
   for (auto &block : funcOp.getBlocks()) {
     if (auto returnOp = dyn_cast<IREE::Flow::ReturnOp>(block.back())) {
       OpBuilder builder(returnOp);
-      builder.create<mlir::ReturnOp>(
+      builder.create<mlir::func::ReturnOp>(
           returnOp.getLoc(), llvm::to_vector<4>(returnOp.getOperands()));
       returnOp.erase();
     }

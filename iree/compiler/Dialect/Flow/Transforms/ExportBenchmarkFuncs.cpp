@@ -9,7 +9,7 @@
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
-#include "mlir/Dialect/StandardOps/IR/Ops.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/BlockAndValueMapping.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinTypes.h"
@@ -105,14 +105,15 @@ class ExportBenchmarkFuncsPass
       args.push_back(blockBuilder.createOrFold<IREE::Util::GlobalLoadOp>(
           loc, dummyInputVariableOps[i]));
     }
-    auto callOp = blockBuilder.create<mlir::CallOp>(loc, entryFuncOp, args);
+    auto callOp =
+        blockBuilder.create<mlir::func::CallOp>(loc, entryFuncOp, args);
 
     // Sink all results with do_not_optimize to ensure that DCE does not
     // remove the call.
     for (auto result : callOp.getResults()) {
       blockBuilder.create<IREE::Util::DoNotOptimizeOp>(loc, result);
     }
-    blockBuilder.create<mlir::ReturnOp>(loc);
+    blockBuilder.create<mlir::func::ReturnOp>(loc);
 
     // Ensure the original function is not exported and not inlined.
     entryFuncOp->setAttr("noinline", moduleBuilder.getUnitAttr());

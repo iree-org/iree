@@ -18,7 +18,7 @@
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Debug.h"
-#include "mlir/Dialect/StandardOps/IR/Ops.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinTypes.h"
@@ -422,7 +422,7 @@ class ValueResourceUsage : public AbstractResourceUsage<DFX::ValueElement> {
                 return WalkResult::advance();
               });
         })
-        .Case([&](mlir::ReturnOp op) {
+        .Case([&](mlir::func::ReturnOp op) {
           auto operandUsage = solver.getElementFor<ValueResourceUsage>(
               *this, Position::forValue(op.getOperand(operandIdx)),
               DFX::Resolution::REQUIRED);

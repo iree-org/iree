@@ -8,7 +8,7 @@
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/Flow/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
-#include "mlir/Dialect/StandardOps/IR/Ops.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/PatternMatch.h"
@@ -68,7 +68,7 @@ class PromoteTensorLoadsPass
  public:
   void getDependentDialects(DialectRegistry &registry) const override {
     registry
-        .insert<FlowDialect, StandardOpsDialect, mlir::arith::ArithmeticDialect,
+        .insert<FlowDialect, func::FuncDialect, mlir::arith::ArithmeticDialect,
                 mlir::math::MathDialect, tensor::TensorDialect>();
   }
 
@@ -79,7 +79,7 @@ class PromoteTensorLoadsPass
 
     conversionTarget.addLegalDialect<IREE::Flow::FlowDialect>();
     conversionTarget
-        .addLegalDialect<StandardOpsDialect, mlir::arith::ArithmeticDialect,
+        .addLegalDialect<func::FuncDialect, mlir::arith::ArithmeticDialect,
                          mlir::math::MathDialect>();
     setupStandardToFlowTensorLoadLegality(context, conversionTarget);
     populateStandardToFlowTensorLoadPatterns(context, conversionPatterns);

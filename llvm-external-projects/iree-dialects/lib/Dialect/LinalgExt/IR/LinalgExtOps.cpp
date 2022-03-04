@@ -14,11 +14,11 @@
 #include "llvm/Support/SMLoc.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arithmetic/Utils/Utils.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/SCF.h"
-#include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Utils/StructuredOpsUtils.h"
 #include "mlir/IR/Attributes.h"
@@ -758,8 +758,6 @@ LogicalResult FftOp::generateScalarImplementation(OpBuilder &b, Location loc,
   return success();
 }
 
-bool FftOp::payloadUsesValueFromOperand(OpOperand *) { return false; }
-
 SmallVector<unsigned> FftOp::getPartitionableLoops(
     unsigned maxNumParallelDims) {
   auto range = llvm::seq<unsigned>(0, getOperandRank());
@@ -1085,8 +1083,6 @@ static LogicalResult verifyReverseOp(ReverseOp op) {
 
   return success();
 }
-
-bool ReverseOp::payloadUsesValueFromOperand(OpOperand *) { return false; }
 
 SmallVector<StringRef> ReverseOp::getLoopIteratorTypes() {
   SmallVector<StringRef> iteratorTypes(getOperandRank(),

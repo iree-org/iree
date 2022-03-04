@@ -18,8 +18,8 @@
 #include "iree/compiler/InputConversion/Common/PassDetail.h"
 #include "iree/compiler/InputConversion/Common/Passes.h"
 #include "mlir/Conversion/SCFToControlFlow/SCFToControlFlow.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/SCF/SCF.h"
-#include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/BuiltinDialect.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/Pass/Pass.h"
@@ -44,7 +44,7 @@ struct IREEImportPublicPass
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<IREE::Input::IREEInputDialect, IREE::Flow::FlowDialect,
                     IREE::HAL::HALDialect, IREE::Util::UtilDialect,
-                    mlir::StandardOpsDialect, mlir::arith::ArithmeticDialect>();
+                    mlir::func::FuncDialect, mlir::arith::ArithmeticDialect>();
   }
   void runOnOperation() override;
 };
@@ -213,7 +213,7 @@ class GlobalOpPattern : public OpConversionPattern<IREE::Input::GlobalOp> {
           rewriter.create<IREE::Util::InitializerOp>(srcOp.getLoc());
       auto ip = rewriter.saveInsertionPoint();
       rewriter.setInsertionPointToStart(initializerOp.addEntryBlock());
-      auto callOp = rewriter.create<mlir::CallOp>(
+      auto callOp = rewriter.create<mlir::func::CallOp>(
           srcOp.getLoc(), srcOp.initializerAttr(), TypeRange{newType});
       rewriter.create<IREE::Util::GlobalStoreOp>(
           srcOp.getLoc(), callOp.getResult(0), srcOp.getName());

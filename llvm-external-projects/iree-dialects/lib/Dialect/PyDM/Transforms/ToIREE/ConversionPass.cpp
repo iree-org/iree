@@ -13,8 +13,8 @@
 #include "iree-dialects/Dialect/PyDM/Transforms/ToIREE/TypeConverter.h"
 #include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Math/IR/Math.h"
-#include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/BuiltinDialect.h"
 
 using namespace mlir;
@@ -27,7 +27,7 @@ struct ConvertIREEPyDMToIREEPass
     : public ConvertIREEPyDMToIREEBase<ConvertIREEPyDMToIREEPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<mlir::iree_compiler::IREE::Input::IREEInputDialect,
-                    BuiltinDialect, StandardOpsDialect, math::MathDialect>();
+                    BuiltinDialect, func::FuncDialect, math::MathDialect>();
   }
 
   void runOnOperation() override {
@@ -44,7 +44,7 @@ struct ConvertIREEPyDMToIREEPass
         .addLegalDialect<mlir::iree_compiler::IREE::Input::IREEInputDialect>();
     target.addLegalDialect<mlir::arith::ArithmeticDialect>();
     target.addLegalDialect<mlir::math::MathDialect>();
-    target.addLegalDialect<mlir::StandardOpsDialect>();
+    target.addLegalDialect<mlir::func::FuncDialect>();
 
     // Some CFG ops can be present in the original pydm program. Need to
     // verify legality based on types.

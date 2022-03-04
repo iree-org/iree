@@ -362,6 +362,9 @@ extern "C" int iree_main(int argc, char** argv) {
         iree_hal_buffer_usage_t input_buffer_usage =
             static_cast<iree_hal_buffer_usage_t>(
                 IREE_HAL_BUFFER_USAGE_ALL | IREE_HAL_BUFFER_USAGE_CONSTANT);
+        iree_hal_buffer_params_t buffer_params;
+        buffer_params.type = input_memory_type;
+        buffer_params.usage = input_buffer_usage;
         // Wrap input buffers in buffer views.
         iree_hal_buffer_view_t* input0_buffer_view = nullptr;
         iree_hal_buffer_view_t* input1_buffer_view = nullptr;
@@ -369,16 +372,14 @@ extern "C" int iree_main(int argc, char** argv) {
             allocator,
             /*shape=*/&kElementCount, /*shape_rank=*/1,
             IREE_HAL_ELEMENT_TYPE_FLOAT_32,
-            IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR, input_memory_type,
-            input_buffer_usage,
+            IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR, buffer_params,
             iree_make_const_byte_span(&input_x, sizeof(input_x)),
             &input0_buffer_view));
         IREE_CHECK_OK(iree_hal_buffer_view_allocate_buffer(
             allocator,
             /*shape=*/&kElementCount, /*shape_rank=*/1,
             IREE_HAL_ELEMENT_TYPE_FLOAT_32,
-            IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR, input_memory_type,
-            input_buffer_usage,
+            IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR, buffer_params,
             iree_make_const_byte_span(&input_y, sizeof(input_y)),
             &input1_buffer_view));
         // Marshal inputs through a VM variant list.

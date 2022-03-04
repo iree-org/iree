@@ -12,8 +12,8 @@
 
 #include "iree_tf_compiler/TFL/Passes.h"
 #include "llvm/Support/InitLLVM.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Quant/QuantOps.h"
-#include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/Dialect/Tosa/IR/TosaOps.h"
 #include "mlir/IR/Dialect.h"
 #include "mlir/Support/MlirOptMain.h"
@@ -29,7 +29,7 @@ int main(int argc, char **argv) {
   registry.insert<mlir::quant::QuantizationDialect>();
   registry.insert<mlir::TF::TensorFlowDialect>();
   registry.insert<mlir::TFL::TensorFlowLiteDialect>();
-  registry.insert<mlir::StandardOpsDialect>();
+  registry.insert<mlir::func::FuncDialect>();
   registry.insert<mlir::tosa::TosaDialect>();
 
   RegisterAllTensorFlowDialects(registry);

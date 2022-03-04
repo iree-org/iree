@@ -178,6 +178,8 @@ function(iree_check_test)
     "${_RUNNER_TARGET}"
   )
 
+  add_dependencies(iree-test-deps "${_NAME}")
+
   iree_native_test(
     NAME
       "${_RULE_NAME}"

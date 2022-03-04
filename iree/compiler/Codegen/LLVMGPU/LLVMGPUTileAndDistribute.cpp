@@ -16,9 +16,9 @@
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "mlir/Conversion/GPUToNVVM/GPUToNVVMPass.h"
 #include "mlir/Conversion/StandardToLLVM/ConvertStandardToLLVM.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/GPU/Passes.h"
 #include "mlir/Dialect/LLVMIR/NVVMDialect.h"
-#include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/Support/MathExtras.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -87,7 +87,8 @@ static SmallVector<Value, 4> calculateDistributedTileSize(
   for (unsigned depth : partitionedLoops) {
     if (depth >= blockTileSize.size()) continue;
     tileSizesVal[depth] = builder.create<arith::ConstantIndexOp>(
-        operation->getLoc(), blockTileSize[depth] / distributedDim[idIdx++]);
+        operation->getLoc(),
+        llvm::divideCeil(blockTileSize[depth], distributedDim[idIdx++]));
     if (idIdx == kNumMaxParallelDims) break;
   }
   return tileSizesVal;

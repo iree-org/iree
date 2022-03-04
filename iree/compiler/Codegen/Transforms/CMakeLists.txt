@@ -23,11 +23,11 @@ iree_cc_library(
     LLVMSupport
     MLIRAffine
     MLIRAffineUtils
+    MLIRFunc
     MLIRIR
     MLIRLinalg
     MLIRMemRef
     MLIRPass
-    MLIRStandard
     MLIRSupport
     MLIRTransforms
     MLIRVector

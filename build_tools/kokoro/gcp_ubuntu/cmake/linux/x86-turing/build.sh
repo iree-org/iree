@@ -63,8 +63,16 @@ CMAKE_ARGS=(
   "-DIREE_HAL_DRIVER_CUDA=ON"
 )
 
+echo "Configuring CMake"
 "$CMAKE_BIN" "${CMAKE_ARGS[@]?}" "$@" ..
+
+echo "Building all"
+echo "------------"
 "$CMAKE_BIN" --build . -- -k 0
+
+echo "Building test deps"
+echo "------------------"
+"$CMAKE_BIN" --build . --target iree-test-deps -- -k 0
 
 cd ${ROOT_DIR?}
 

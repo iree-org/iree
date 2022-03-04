@@ -8,9 +8,9 @@
 #include "mlir-hlo/Dialect/mhlo/IR/chlo_ops.h"
 #include "mlir-hlo/Dialect/mhlo/IR/hlo_ops.h"
 #include "mlir-hlo/Dialect/mhlo/transforms/rewriters.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Shape/IR/Shape.h"
-#include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/Pass/Pass.h"
@@ -40,7 +40,7 @@ class ConvertToMHLOPass
                 mlir::tf_device::TensorFlowDeviceDialect,
                 mlir::tf_saved_model::TensorFlowSavedModelDialect,
                 chlo::HloClientDialect, mhlo::MhloDialect, shape::ShapeDialect,
-                mlir::arith::ArithmeticDialect, StandardOpsDialect>();
+                mlir::arith::ArithmeticDialect, func::FuncDialect>();
   }
 
   StringRef getArgument() const override { return "iree-tf-convert-to-mhlo"; }
@@ -91,11 +91,11 @@ class ConvertToMHLOPass
     target.addLegalDialect<chlo::HloClientDialect>();
     target.addLegalDialect<linalg::LinalgDialect>();
     target.addLegalDialect<mhlo::MhloDialect>();
-    target.addLegalDialect<mlir::StandardOpsDialect,
+    target.addLegalDialect<mlir::func::FuncDialect,
                            mlir::arith::ArithmeticDialect>();
     target.addLegalDialect<shape::ShapeDialect>();
     target.addLegalDialect<tensor::TensorDialect>();
-    target.addLegalOp<mlir::CallOp>();
+    target.addLegalOp<mlir::func::CallOp>();
     target.addLegalOp<mlir::tensor::CastOp>();
     target.addLegalOp<mlir::tensor::DimOp>();
 

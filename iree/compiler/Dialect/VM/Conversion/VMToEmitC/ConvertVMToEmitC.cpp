@@ -15,8 +15,8 @@
 #include "llvm/ADT/TypeSwitch.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
 #include "mlir/Dialect/EmitC/IR/EmitC.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Math/IR/Math.h"
-#include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/BlockAndValueMapping.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinDialect.h"
@@ -571,7 +571,7 @@ emitc::CallOp returnIfError(OpBuilder &builder, Location location,
 
     releaseRefs(builder, location, funcOp, typeConverter);
 
-    builder.create<mlir::ReturnOp>(location, callOp.getResult(0));
+    builder.create<mlir::func::ReturnOp>(location, callOp.getResult(0));
   };
 
   auto ctx = builder.getContext();
@@ -603,7 +603,7 @@ emitc::CallOp failListNull(OpBuilder &builder, Location location, Type type,
         /*templateArgs=*/ArrayAttr{},
         /*operands=*/ArrayRef<Value>{});
 
-    builder.create<mlir::ReturnOp>(location, statusOp.getResult(0));
+    builder.create<mlir::func::ReturnOp>(location, statusOp.getResult(0));
   };
 
   return failableCall(builder, location, type, callee, args, templateArgs,
@@ -614,14 +614,14 @@ emitc::CallOp failListNull(OpBuilder &builder, Location location, Type type,
 /// continuation and failure block based on the truthiness of the result
 /// value, i.e. a truthy value branches to the continuation block when
 /// `negateCondition` is false.
-mlir::CallOp failableCall(
+mlir::func::CallOp failableCall(
     OpBuilder &builder, Location location, mlir::FuncOp &callee,
     ArrayRef<Value> operands,
-    const std::function<void(mlir::CallOp &)> &failureBlockBuilder,
+    const std::function<void(mlir::func::CallOp &)> &failureBlockBuilder,
     bool negateCondition = false) {
   auto ctx = builder.getContext();
 
-  auto callOp = builder.create<mlir::CallOp>(
+  auto callOp = builder.create<mlir::func::CallOp>(
       /*location=*/location,
       /*callee=*/callee,
       /*operands=*/operands);
@@ -664,17 +664,17 @@ mlir::CallOp failableCall(
   return callOp;
 }
 
-mlir::CallOp returnIfError(OpBuilder &builder, Location location,
-                           mlir::FuncOp &callee, ArrayRef<Value> operands,
-                           IREE::VM::EmitCTypeConverter &typeConverter) {
+mlir::func::CallOp returnIfError(OpBuilder &builder, Location location,
+                                 mlir::FuncOp &callee, ArrayRef<Value> operands,
+                                 IREE::VM::EmitCTypeConverter &typeConverter) {
   auto blockBuilder = [&builder, &location,
-                       &typeConverter](mlir::CallOp &callOp) {
+                       &typeConverter](mlir::func::CallOp &callOp) {
     Block *block = builder.getBlock();
     mlir::FuncOp funcOp = cast<mlir::FuncOp>(block->getParentOp());
 
     releaseRefs(builder, location, funcOp, typeConverter);
 
-    builder.create<mlir::ReturnOp>(location, callOp.getResult(0));
+    builder.create<mlir::func::ReturnOp>(location, callOp.getResult(0));
   };
 
   return failableCall(builder, location, callee, operands, blockBuilder,
@@ -745,7 +745,7 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
         /*operands=*/
         ArrayRef<Value>{allocatorOp.getResult(0), castedModuleOp.getResult(0)});
 
-    builder.create<mlir::ReturnOp>(loc);
+    builder.create<mlir::func::ReturnOp>(loc);
   }
 
   // alloc_state
@@ -998,7 +998,7 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
         /*templateArgs=*/ArrayAttr{},
         /*operands=*/ArrayRef<Value>{});
 
-    builder.create<mlir::ReturnOp>(loc, status.getResult(0));
+    builder.create<mlir::func::ReturnOp>(loc, status.getResult(0));
   }
 
   // free_state
@@ -1104,7 +1104,7 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
         /*operands=*/
         ArrayRef<Value>{allocatorOp.getResult(0), stateOp.getResult(0)});
 
-    builder.create<mlir::ReturnOp>(loc);
+    builder.create<mlir::func::ReturnOp>(loc);
   }
 
   // resolve_import
@@ -1193,7 +1193,7 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
         /*templateArgs=*/ArrayAttr{},
         /*operands=*/ArrayRef<Value>{});
 
-    builder.create<mlir::ReturnOp>(loc, status.getResult(0));
+    builder.create<mlir::func::ReturnOp>(loc, status.getResult(0));
   }
 
   // create
@@ -1349,7 +1349,8 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
           /*operands=*/
           ArrayRef<Value>{funcOp.getArgument(0), module.getResult()});
 
-      builder.create<mlir::ReturnOp>(loc, vmInitializeStatus.getResult(0));
+      builder.create<mlir::func::ReturnOp>(loc,
+                                           vmInitializeStatus.getResult(0));
     }
 
     builder.setInsertionPointToEnd(condBlock);
@@ -1391,7 +1392,7 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
         ArrayRef<Value>{vmModulePtr.getResult(), funcOp.getArgument(0),
                         funcOp.getArgument(1)});
 
-    builder.create<mlir::ReturnOp>(loc, status.getResult(0));
+    builder.create<mlir::func::ReturnOp>(loc, status.getResult(0));
   }
 
   return success();
@@ -1646,7 +1647,7 @@ class ExportOpConversion : public OpConversionPattern<IREE::VM::ExportOp> {
           /*templateArgs=*/ArrayAttr{},
           /*operands=*/ArrayRef<Value>{});
 
-      rewriter.create<mlir::ReturnOp>(loc, status.getResult(0));
+      rewriter.create<mlir::func::ReturnOp>(loc, status.getResult(0));
     }
 
     exportOp.function_refAttr(FlatSymbolRefAttr::get(newFuncOp.getOperation()));
@@ -2165,7 +2166,7 @@ class ImportOpConversion : public OpConversionPattern<IREE::VM::ImportOp> {
           /*templateArgs=*/ArrayAttr{},
           /*operands=*/ArrayRef<Value>{});
 
-      rewriter.create<mlir::ReturnOp>(loc, status.getResult(0));
+      rewriter.create<mlir::func::ReturnOp>(loc, status.getResult(0));
     }
 
     return success();
@@ -3730,7 +3731,7 @@ class ReturnOpConversion : public OpConversionPattern<IREE::VM::ReturnOp> {
         /*templateArgs=*/ArrayAttr{},
         /*operands=*/ArrayRef<Value>{});
 
-    rewriter.replaceOpWithNewOp<mlir::ReturnOp>(op, status.getResult(0));
+    rewriter.replaceOpWithNewOp<mlir::func::ReturnOp>(op, status.getResult(0));
 
     return success();
   }
@@ -3768,7 +3769,7 @@ class FailOpConversion : public OpConversionPattern<IREE::VM::FailOp> {
           /*templateArgs=*/ArrayAttr{},
           /*operands=*/ArrayRef<Value>{});
 
-      rewriter.create<mlir::ReturnOp>(loc, status.getResult(0));
+      rewriter.create<mlir::func::ReturnOp>(loc, status.getResult(0));
     }
     Block *failureBlock;
     {
@@ -3842,7 +3843,7 @@ class FailOpConversion : public OpConversionPattern<IREE::VM::FailOp> {
           ArrayRef<Value>{messageSizeIntOp.getResult(0),
                           messageDataOp.getResult(0)});
 
-      rewriter.create<mlir::ReturnOp>(loc, status.getResult(0));
+      rewriter.create<mlir::func::ReturnOp>(loc, status.getResult(0));
     }
 
     Type boolType = rewriter.getIntegerType(1);
@@ -5042,7 +5043,7 @@ class ConvertVMToEmitCPass
                          OperationPass<IREE::VM::ModuleOp>> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<mlir::emitc::EmitCDialect, mlir::BuiltinDialect,
-                    mlir::StandardOpsDialect, mlir::arith::ArithmeticDialect,
+                    mlir::func::FuncDialect, mlir::arith::ArithmeticDialect,
                     mlir::math::MathDialect, IREE::Util::UtilDialect>();
   }
 
@@ -5092,7 +5093,7 @@ class ConvertVMToEmitCPass
 
     target.addLegalDialect<
         emitc::EmitCDialect, mlir::BuiltinDialect, mlir::cf::ControlFlowDialect,
-        mlir::StandardOpsDialect, mlir::arith::ArithmeticDialect,
+        mlir::func::FuncDialect, mlir::arith::ArithmeticDialect,
         mlir::math::MathDialect>();
 
     target.addDynamicallyLegalOp<mlir::FuncOp>([&](mlir::FuncOp op) {

@@ -12,6 +12,7 @@
 #include "mlir-hlo/Dialect/mhlo/IR/hlo_ops.h"
 #include "mlir/Dialect/Affine/Utils.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/BlockAndValueMapping.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinTypes.h"
@@ -117,7 +118,7 @@ bool untupleAndLookupValues(T values, llvm::SmallVectorImpl<Value> *newValues,
   return false;
 }
 
-bool convertReturnOp(mlir::ReturnOp *op, OpBuilder &builder,
+bool convertReturnOp(mlir::func::ReturnOp *op, OpBuilder &builder,
                      BlockAndValueMapping *mapping) {
   llvm::SmallVector<Value, 10> newOperands;
   if (untupleAndLookupValues(op->getOperands(), &newOperands, builder,
@@ -125,11 +126,11 @@ bool convertReturnOp(mlir::ReturnOp *op, OpBuilder &builder,
     return true;
   }
 
-  builder.create<mlir::ReturnOp>(op->getLoc(), newOperands);
+  builder.create<mlir::func::ReturnOp>(op->getLoc(), newOperands);
   return false;
 }
 
-bool convertCallOp(CallOp *oldOp, OpBuilder &builder,
+bool convertCallOp(func::CallOp *oldOp, OpBuilder &builder,
                    BlockAndValueMapping *mapping) {
   llvm::SmallVector<Value, 4> newArgs;
   if (untupleAndLookupValues(oldOp->getOperands(), &newArgs, builder,
@@ -139,8 +140,8 @@ bool convertCallOp(CallOp *oldOp, OpBuilder &builder,
 
   SmallVector<Type, 4> resultTypes;
   untupleTypes(oldOp->getOperation()->getResultTypes(), &resultTypes);
-  auto newOp = builder.create<CallOp>(oldOp->getLoc(), oldOp->getCallee(),
-                                      resultTypes, newArgs);
+  auto newOp = builder.create<func::CallOp>(oldOp->getLoc(), oldOp->getCallee(),
+                                            resultTypes, newArgs);
   copyOperationAttrs(oldOp->getOperation(), newOp.getOperation());
 
   auto newResults = newOp.getResults();
@@ -154,7 +155,7 @@ bool convertCallOp(CallOp *oldOp, OpBuilder &builder,
   return false;
 }
 
-bool convertIndirectCallOp(CallIndirectOp *oldOp, OpBuilder &builder,
+bool convertIndirectCallOp(func::CallIndirectOp *oldOp, OpBuilder &builder,
                            BlockAndValueMapping *mapping) {
   llvm::SmallVector<Value, 4> newArgs;
   if (untupleAndLookupValues(oldOp->getOperands(), &newArgs, builder,
@@ -162,8 +163,8 @@ bool convertIndirectCallOp(CallIndirectOp *oldOp, OpBuilder &builder,
     return true;
   }
 
-  auto newOp = builder.create<CallIndirectOp>(oldOp->getLoc(),
-                                              oldOp->getCallee(), newArgs);
+  auto newOp = builder.create<func::CallIndirectOp>(
+      oldOp->getLoc(), oldOp->getCallee(), newArgs);
   copyOperationAttrs(oldOp->getOperation(), newOp.getOperation());
 
   for (int i = 0; i < newOp.getNumResults(); ++i) {
@@ -217,11 +218,11 @@ bool convertCondBranchOp(cf::CondBranchOp *oldOp, OpBuilder &builder,
 
 bool convertOperation(Operation *op, OpBuilder &builder,
                       BlockAndValueMapping *mapping) {
-  if (auto returnOp = dyn_cast<mlir::ReturnOp>(op)) {
+  if (auto returnOp = dyn_cast<mlir::func::ReturnOp>(op)) {
     return convertReturnOp(&returnOp, builder, mapping);
-  } else if (auto callOp = dyn_cast<CallOp>(op)) {
+  } else if (auto callOp = dyn_cast<func::CallOp>(op)) {
     return convertCallOp(&callOp, builder, mapping);
-  } else if (auto callIndirectOp = dyn_cast<CallIndirectOp>(op)) {
+  } else if (auto callIndirectOp = dyn_cast<func::CallIndirectOp>(op)) {
     return convertIndirectCallOp(&callIndirectOp, builder, mapping);
   } else if (auto branchOp = dyn_cast<cf::BranchOp>(op)) {
     return convertBranchOp(&branchOp, builder, mapping);

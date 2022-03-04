@@ -16,7 +16,7 @@
 #include "llvm/ADT/EquivalenceClasses.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/Debug.h"
-#include "mlir/Dialect/StandardOps/IR/Ops.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
@@ -253,9 +253,9 @@ static Value tryMaterializeConstant(Location loc, Type type, Attribute attr,
   if (arith::ConstantOp::isBuildableWith(attr, type)) {
     // Common case fast-path.
     return builder.create<arith::ConstantOp>(loc, type, attr);
-  } else if (mlir::ConstantOp::isBuildableWith(attr, type)) {
-    return builder.create<mlir::ConstantOp>(loc, type,
-                                            attr.cast<FlatSymbolRefAttr>());
+  } else if (mlir::func::ConstantOp::isBuildableWith(attr, type)) {
+    return builder.create<mlir::func::ConstantOp>(
+        loc, type, attr.cast<FlatSymbolRefAttr>());
   }
   // Fallback that asks a dialect to materialize things. This may fail!
   auto *op = attr.getDialect().materializeConstant(builder, attr, type, loc);
@@ -395,7 +395,7 @@ class FoldGlobalsPass
   }
 
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<mlir::StandardOpsDialect>();
+    registry.insert<mlir::func::FuncDialect>();
     registry.insert<mlir::arith::ArithmeticDialect>();
     registry.insert<IREE::Util::UtilDialect>();
   }

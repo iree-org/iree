@@ -14,9 +14,9 @@
 
 #include "iree/compiler/Dialect/Flow/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
-#include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/Pass/Pass.h"
@@ -102,9 +102,9 @@ struct PadTensorOpConversion : public OpRewritePattern<tensor::PadOp> {
 struct PadTensorToSubTensorInsertPass
     : public PadTensorToSubTensorInsertBase<PadTensorToSubTensorInsertPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<linalg::LinalgDialect, memref::MemRefDialect,
-                    StandardOpsDialect, mlir::math::MathDialect,
-                    mlir::arith::ArithmeticDialect>();
+    registry
+        .insert<linalg::LinalgDialect, memref::MemRefDialect, func::FuncDialect,
+                mlir::math::MathDialect, mlir::arith::ArithmeticDialect>();
   }
 
   void runOnOperation() override {

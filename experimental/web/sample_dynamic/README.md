@@ -1,8 +1,8 @@
 # Dynamic Web Sample
 
 This experimental sample demonstrates one way to target the web platform with
-IREE. The output artifact is a web page that loads a separately provided IREE
-`.vmfb` (compiled ML model) and tests calling functions on it.
+IREE. The output artifact is a web page that loads separately provided IREE
+`.vmfb` (compiled ML model) files and allows for calling functions on them.
 
 ## Quickstart
 
@@ -24,10 +24,9 @@ to compile the runtime into WebAssembly and JavaScript files.
 
 Any supported IREE program, such as
 [simple_abs.mlir](../../../iree/samples/models/simple_abs.mlir), is compiled using
-the "system library" linking mode (i.e. `--iree-llvm-link-embedded=false`).
-This creates a shared object (typically .so/.dll, .wasm in this case). When the
-runtime attempts to load this file using `dlopen()` and `dlsym()`, Emscripten
-makes use of its
+the "system library" linking mode. This creates a shared object (typically
+.so/.dll, .wasm in this case). When the runtime attempts to load this file
+using `dlopen()` and `dlsym()`, Emscripten makes use of its
 [runtime dynamic linking support](https://emscripten.org/docs/compiling/Dynamic-Linking.html#runtime-dynamic-linking-with-dlopen)
 to instantiate a new `WebAssembly.Instance` which shares memory with the main
 runtime then resolve each export provided by the new Wasm module.

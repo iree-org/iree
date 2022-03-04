@@ -124,6 +124,35 @@ func @remove_unused_result(%arg0 : tensor<9xi32>, %arg1 : tensor<9xi32>) -> (ten
 
 // -----
 
+// CHECK-LABEL: func @remove_unused_dynamic_result
+func @remove_unused_dynamic_result(%dim: index) -> (tensor<i32>) {
+  %c1 = arith.constant 1 : index
+  //      CHECK: flow.dispatch.workgroups[%c1, %c1, %c1]() : () -> tensor<i32> =
+  // CHECK-NEXT:   (%{{.+}}: !flow.dispatch.tensor<writeonly:i32>)
+  //  CHECK-NOT: flow.dispatch.tie_shape
+  //      CHECK: flow.dispatch.tensor.store
+  //  CHECK-NOT: flow.dispatch.tensor.store
+  %0:2 = flow.dispatch.workgroups[%c1, %c1, %c1](%dim) : (index) -> (tensor<i32>, tensor<?xi32>{%dim}) =
+      (%dim: index, %ret0: !flow.dispatch.tensor<writeonly:i32>, %ret1: !flow.dispatch.tensor<writeonly:?xi32>) {
+    // Used as a result; should remain after canonicalization.
+    %c-2147483648_i32 = arith.constant -2147483648 : i32
+    %ret0_init = linalg.init_tensor [] : tensor<i32>
+    %ret0_value = linalg.fill(%c-2147483648_i32, %ret0_init) : i32, tensor<i32> -> tensor<i32>
+    flow.dispatch.tensor.store %ret0_value, %ret0, offsets = [], sizes = [], strides = [] : tensor<i32> -> !flow.dispatch.tensor<writeonly:i32>
+
+    // Unused as a result; should be stripped entirely.
+    %c0_i32 = arith.constant 0 : i32
+    %ret1_shaped = flow.dispatch.tie_shape %ret1 : !flow.dispatch.tensor<writeonly:?xi32>{%dim}
+    %ret1_init = linalg.init_tensor [%dim] : tensor<?xi32>
+    %ret1_value = linalg.fill(%c0_i32, %ret1_init) : i32, tensor<?xi32> -> tensor<?xi32>
+    flow.dispatch.tensor.store %ret1_value, %ret1_shaped, offsets = [0], sizes = [%dim], strides = [1] : tensor<?xi32> -> !flow.dispatch.tensor<writeonly:?xi32>{%dim}
+    flow.return
+  }
+  return %0#0 : tensor<i32>
+}
+
+// -----
+
 // CHECK-LABEL: func @remove_unused_read_write_result
 func @remove_unused_read_write_result(%arg0 : tensor<9xi32>, %arg1 : tensor<9xi32>) -> (tensor<i32>) {
   %c1 = arith.constant 1 : index

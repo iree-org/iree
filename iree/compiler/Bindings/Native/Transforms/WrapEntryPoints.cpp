@@ -8,7 +8,7 @@
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "llvm/ADT/STLExtras.h"
 #include "mlir/Dialect/Affine/Utils.h"
-#include "mlir/Dialect/StandardOps/IR/Ops.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/MLIRContext.h"
@@ -29,7 +29,7 @@ class WrapEntryPointsPass
     : public PassWrapper<WrapEntryPointsPass, OperationPass<ModuleOp>> {
  public:
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<StandardOpsDialect, mlir::arith::ArithmeticDialect,
+    registry.insert<func::FuncDialect, mlir::arith::ArithmeticDialect,
                     mlir::tensor::TensorDialect, IREE::HAL::HALDialect>();
   }
 
@@ -170,8 +170,8 @@ class WrapEntryPointsPass
     }
 
     // Make the call with the original types.
-    auto callOp = entryBuilder.create<CallOp>(entryFuncOp.getLoc(), entryFuncOp,
-                                              arguments);
+    auto callOp = entryBuilder.create<func::CallOp>(entryFuncOp.getLoc(),
+                                                    entryFuncOp, arguments);
 
     // Marshal results.
     SmallVector<Value> results;
@@ -189,7 +189,7 @@ class WrapEntryPointsPass
         results.push_back(result.value());
       }
     }
-    entryBuilder.create<ReturnOp>(entryFuncOp.getLoc(), results);
+    entryBuilder.create<func::ReturnOp>(entryFuncOp.getLoc(), results);
 
     return wrapperFuncOp;
   }

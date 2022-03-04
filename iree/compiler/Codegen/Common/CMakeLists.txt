@@ -59,6 +59,7 @@ iree_cc_library(
     MLIRArithmeticTransforms
     MLIRBufferization
     MLIRBufferizationTransforms
+    MLIRFunc
     MLIRGPUOps
     MLIRIR
     MLIRLLVMCommonConversion
@@ -74,7 +75,6 @@ iree_cc_library(
     MLIRSCFToControlFlow
     MLIRSCFTransforms
     MLIRSideEffectInterfaces
-    MLIRStandard
     MLIRSupport
     MLIRTensor
     MLIRTransforms

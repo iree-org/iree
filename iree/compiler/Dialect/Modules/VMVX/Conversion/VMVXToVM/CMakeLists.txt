@@ -18,9 +18,9 @@ iree_cc_library(
   SRCS
     "ConvertVMVXToVM.cpp"
   DEPS
+    MLIRFunc
     MLIRIR
     MLIRPass
-    MLIRStandard
     MLIRTransforms
     iree::compiler::Dialect::Modules::VMVX::IR
     iree::compiler::Dialect::Util::IR

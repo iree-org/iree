@@ -62,11 +62,11 @@ set(_source_components
   MLIRPythonSources.Dialects.arith
   MLIRPythonSources.Dialects.builtin
   MLIRPythonSources.Dialects.cf
+  MLIRPythonSources.Dialects.func
   MLIRPythonSources.Dialects.linalg
   MLIRPythonSources.Dialects.math
   MLIRPythonSources.Dialects.memref
   MLIRPythonSources.Dialects.shape
-  MLIRPythonSources.Dialects.std
   MLIRPythonSources.Dialects.tensor
   MLIRPythonSources.Dialects.tosa
   MLIRPythonSources.Dialects.vector
@@ -132,9 +132,11 @@ add_iree_compiler_busybox_tool(
     IREECTool.c
 )
 
-add_iree_compiler_busybox_tool(
-  IREECompilerLldTool
-  OUTPUT_NAME iree-lld
-  SRCS
-    LldTool.c
-)
+if(TARGET lld)
+  add_iree_compiler_busybox_tool(
+    IREECompilerLldTool
+    OUTPUT_NAME iree-lld
+    SRCS
+      LldTool.c
+  )
+endif()

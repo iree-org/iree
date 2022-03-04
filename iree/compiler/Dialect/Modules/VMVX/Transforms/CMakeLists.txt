@@ -25,6 +25,8 @@ iree_cc_library(
     MLIRAffineToStandard
     MLIRAffineTransforms
     MLIRArithmeticTransforms
+    MLIRFunc
+    MLIRFuncTransforms
     MLIRIR
     MLIRLinalg
     MLIRLinalgTransforms
@@ -35,8 +37,6 @@ iree_cc_library(
     MLIRPass
     MLIRSCF
     MLIRSCFToControlFlow
-    MLIRStandard
-    MLIRStandardOpsTransforms
     MLIRSupport
     MLIRTensor
     MLIRTosaToStandard

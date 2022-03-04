@@ -52,6 +52,7 @@
 #include "llvm/ADT/TypeSwitch.h"
 #include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
@@ -159,6 +160,10 @@ static MemRefType getMemrefTypeForTensor(TensorType tensorType,
 /// that implements the `ShapeAwareOpInterface` (like
 /// `hal.interface.binding.subspan`) then we can use that to check dynamic
 /// equality.
+/// Note: This could be written as a canonicalizer, but the subview formed
+/// when there are dynamic shapes involved will have affine maps
+/// that shouldnt be there. Resolving that is a pain. So dont generate the
+/// subview to begin with.
 static bool generatesNoOpSubView(Value src, ArrayRef<OpFoldResult> offsets,
                                  ArrayRef<OpFoldResult> sizes,
                                  ArrayRef<OpFoldResult> strides) {
@@ -223,11 +228,12 @@ static Value createSubviewOp(OpBuilder &b, Location loc, unsigned resultRank,
                              Value src, ArrayRef<OpFoldResult> offsets,
                              ArrayRef<OpFoldResult> sizes,
                              ArrayRef<OpFoldResult> strides) {
-  if (generatesNoOpSubView(src, offsets, sizes, strides)) {
+  MemRefType srcType = src.getType().cast<MemRefType>();
+  if (srcType.getRank() == resultRank &&
+      generatesNoOpSubView(src, offsets, sizes, strides)) {
     return src;
   }
   MemRefType resultType;
-  MemRefType srcType = src.getType().cast<MemRefType>();
   if (srcType.getRank() != resultRank) {
     resultType = memref::SubViewOp::inferRankReducedResultType(
                      resultRank, srcType, offsets, sizes, strides)
@@ -705,9 +711,11 @@ static LogicalResult convertAnyLinalgOp(
     OpOperand *outOperand = std::get<1>(it);
     Value outTensor = outOperand->get();
     Value outBuffer = bvm.lookupOrNull(outTensor);
-    if (outBuffer && !plan.isEquivalent(outTensor, resultTensor) &&
-        op.payloadUsesValueFromOperand(outOperand)) {
-      createLinalgCopyOp(b, loc, outBuffer, resultBuffer);
+    if (outBuffer && !plan.isEquivalent(outTensor, resultTensor)) {
+      auto linalgOp = dyn_cast<linalg::LinalgOp>(op.getOperation());
+      if (!linalgOp || linalgOp.payloadUsesValueFromOperand(outOperand)) {
+        createLinalgCopyOp(b, loc, outBuffer, resultBuffer);
+      }
     }
     newOutputBuffers.push_back(resultBuffer);
   }
@@ -971,7 +979,7 @@ class LinalgBufferizePass : public LinalgBufferizeBase<LinalgBufferizePass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<mlir::bufferization::BufferizationDialect,
                     IREE::Util::UtilDialect, linalg::LinalgDialect,
-                    memref::MemRefDialect, scf::SCFDialect, StandardOpsDialect,
+                    memref::MemRefDialect, scf::SCFDialect, func::FuncDialect,
                     mlir::math::MathDialect, mlir::arith::ArithmeticDialect>();
   }
   void runOnOperation() override;

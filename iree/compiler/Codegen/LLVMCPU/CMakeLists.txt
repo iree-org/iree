@@ -36,6 +36,8 @@ iree_cc_library(
     MLIRArmNeon
     MLIRArmNeon2dToIntr
     MLIRControlFlowToLLVM
+    MLIRFunc
+    MLIRFuncTransforms
     MLIRIR
     MLIRLLVMCommonConversion
     MLIRLLVMIR
@@ -53,8 +55,6 @@ iree_cc_library(
     MLIRSCF
     MLIRSCFToControlFlow
     MLIRSCFTransforms
-    MLIRStandard
-    MLIRStandardOpsTransforms
     MLIRStandardToLLVM
     MLIRTensor
     MLIRTosa

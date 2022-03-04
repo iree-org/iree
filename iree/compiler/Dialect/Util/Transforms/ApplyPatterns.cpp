@@ -10,7 +10,7 @@
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Util/Transforms/Patterns.h"
-#include "mlir/Dialect/StandardOps/IR/Ops.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/BuiltinDialect.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -31,7 +31,7 @@ class ApplyPatternsPass
 
   void getDependentDialects(DialectRegistry &registry) const override {
     registry
-        .insert<BuiltinDialect, StandardOpsDialect, IREE::Util::UtilDialect>();
+        .insert<BuiltinDialect, func::FuncDialect, IREE::Util::UtilDialect>();
   }
 
   void runOnOperation() override {

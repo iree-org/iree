@@ -47,12 +47,12 @@ iree_cc_library(
     MLIRAnalysis
     MLIRArithmetic
     MLIRControlFlow
+    MLIRFunc
     MLIRIR
     MLIRLinalg
     MLIRMemRef
     MLIRPass
     MLIRSCF
-    MLIRStandard
     MLIRSupport
     MLIRTensor
     MLIRTransformUtils

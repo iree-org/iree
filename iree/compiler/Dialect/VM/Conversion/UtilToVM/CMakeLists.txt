@@ -22,9 +22,9 @@ iree_cc_library(
     "ConvertStatusOps.cpp"
     "ConvertUtilToVM.cpp"
   DEPS
+    MLIRFunc
     MLIRIR
     MLIRPass
-    MLIRStandard
     MLIRTransformUtils
     MLIRTransforms
     iree::compiler::Dialect::Util::IR

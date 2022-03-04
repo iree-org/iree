@@ -25,9 +25,9 @@ iree_cc_library(
     LLVMSupport
     MLIRControlFlow
     MLIREmitC
+    MLIRFunc
     MLIRIR
     MLIRSCF
-    MLIRStandard
     MLIRSupport
   PUBLIC
 )

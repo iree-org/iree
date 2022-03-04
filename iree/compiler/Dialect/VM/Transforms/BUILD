@@ -38,6 +38,7 @@ cc_library(
         "@llvm-project//mlir:AffineToStandardTransforms",
         "@llvm-project//mlir:AffineTransforms",
         "@llvm-project//mlir:AffineUtils",
+        "@llvm-project//mlir:FuncDialect",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:MathDialect",
         "@llvm-project//mlir:MemRefDialect",

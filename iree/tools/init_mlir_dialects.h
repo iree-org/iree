@@ -16,6 +16,7 @@
 #include "mlir/Dialect/ArmNeon/ArmNeonDialect.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/GPU/GPUDialect.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
@@ -25,7 +26,6 @@
 #include "mlir/Dialect/SCF/SCF.h"
 #include "mlir/Dialect/SPIRV/IR/SPIRVDialect.h"
 #include "mlir/Dialect/Shape/IR/Shape.h"
-#include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Tensor/IR/TensorInferTypeOpInterfaceImpl.h"
 #include "mlir/Dialect/Tosa/IR/TosaOps.h"
@@ -53,7 +53,7 @@ inline void registerMlirDialects(DialectRegistry &registry) {
                   quant::QuantizationDialect,
                   spirv::SPIRVDialect,
                   arm_neon::ArmNeonDialect,
-                  StandardOpsDialect,
+                  func::FuncDialect,
                   mlir::arith::ArithmeticDialect,
                   vector::VectorDialect,
                   tensor::TensorDialect,

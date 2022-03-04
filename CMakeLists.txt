@@ -29,6 +29,7 @@ include(CMakeDependentOption)
 
 #-------------------------------------------------------------------------------
 # Project component configuration
+# See also: build_tools/cmake/iree_cmake_options.cmake
 #-------------------------------------------------------------------------------
 
 option(IREE_ENABLE_RUNTIME_TRACING "Enables instrumented runtime tracing." OFF)
@@ -68,12 +69,13 @@ option(IREE_HAL_DRIVER_EXPERIMENTAL_ROCM "Builds the experimental ROCm Backend."
 cmake_dependent_option(IREE_ENABLE_EMITC "Enables MLIR EmitC dependencies." ON ${IREE_BUILD_COMPILER} OFF)
 
 #-------------------------------------------------------------------------------
-# Target and backend configuration
+# Runtime HAL Driver Options
+# By default, all runtime drivers supported by the current platform which do
+# not require external deps are enabled by default. This can be changed with:
+#   -DIREE_HAL_DRIVER_DEFAULTS=OFF
 #-------------------------------------------------------------------------------
 
 option(IREE_HAL_DRIVER_DEFAULTS "Sets the default value for all runtime HAL drivers" ON)
-option(IREE_TARGET_BACKEND_DEFAULTS "Sets the default value for all compiler target backends" ${IREE_BUILD_COMPILER})
-
 # CUDA support must be explicitly enabled.
 set(IREE_HAL_DRIVER_CUDA_DEFAULT OFF)
 
@@ -92,31 +94,25 @@ option(IREE_HAL_DRIVER_VMVX "Enables the 'vmvx' runtime HAL driver" ${IREE_HAL_D
 option(IREE_HAL_DRIVER_VMVX_SYNC "Enables the 'vmvx-sync' runtime HAL driver" ${IREE_HAL_DRIVER_DEFAULTS})
 option(IREE_HAL_DRIVER_VULKAN "Enables the 'vulkan' runtime HAL driver" ${IREE_HAL_DRIVER_VULKAN_DEFAULT})
 
-cmake_dependent_option(IREE_TARGET_BACKEND_CUDA "Enables the 'cuda' compiler target backend" OFF ${IREE_BUILD_COMPILER} OFF)
-cmake_dependent_option(IREE_TARGET_BACKEND_DYLIB_LLVM_AOT "Enables the 'dylib-llvm-aot' compiler target backend" ON ${IREE_BUILD_COMPILER} OFF)
-cmake_dependent_option(IREE_TARGET_BACKEND_METAL_SPIRV "Enables the 'metal-spirv' compiler target backend" ON ${IREE_BUILD_COMPILER} OFF)
-cmake_dependent_option(IREE_TARGET_BACKEND_ROCM "Enables the 'rocm' compiler target backend" ON ${IREE_BUILD_COMPILER} OFF)
-cmake_dependent_option(IREE_TARGET_BACKEND_VMVX "Enables the 'vmvx' compiler target backend" ON ${IREE_BUILD_COMPILER} OFF)
-cmake_dependent_option(IREE_TARGET_BACKEND_VULKAN_SPIRV "Enables the 'vulkan-spirv' compiler target backend" ON ${IREE_BUILD_COMPILER} OFF)
-cmake_dependent_option(IREE_TARGET_BACKEND_WASM_LLVM_AOT "Enables the 'wasm-llvm-aot' compiler target backend" ON ${IREE_BUILD_COMPILER} OFF)
-# Disable WebGPU by default - it has complex deps and is under development.
-cmake_dependent_option(IREE_TARGET_BACKEND_WEBGPU "Enables the 'webgpu' compiler target backend" OFF ${IREE_BUILD_COMPILER} OFF)
-
-message(VERBOSE "IREE build runtime HAL driver 'cuda': ${IREE_HAL_DRIVER_CUDA}")
-message(VERBOSE "IREE build runtime HAL driver 'dylib': ${IREE_HAL_DRIVER_DYLIB}")
-message(VERBOSE "IREE build runtime HAL driver 'dylib-sync': ${IREE_HAL_DRIVER_DYLIB_SYNC}")
-message(VERBOSE "IREE build runtime HAL driver 'vmvx': ${IREE_HAL_DRIVER_VMVX}")
-message(VERBOSE "IREE build runtime HAL driver 'vmvx-sync': ${IREE_HAL_DRIVER_VMVX_SYNC}")
-message(VERBOSE "IREE build runtime HAL driver 'vulkan': ${IREE_HAL_DRIVER_VULKAN}")
-
-message(VERBOSE "IREE build compiler target backend 'cuda': ${IREE_TARGET_BACKEND_CUDA}")
-message(VERBOSE "IREE build compiler target backend 'dylib-llvm-aot': ${IREE_TARGET_BACKEND_DYLIB_LLVM_AOT}")
-message(VERBOSE "IREE build compiler target backend 'wasm-llvm-aot': ${IREE_TARGET_BACKEND_WASM_LLVM_AOT}")
-message(VERBOSE "IREE build compiler target backend 'metal-spirv': ${IREE_TARGET_BACKEND_METAL_SPIRV}")
-message(VERBOSE "IREE build compiler target backend 'rocm': ${IREE_TARGET_BACKEND_ROCM}")
-message(VERBOSE "IREE build compiler target backend 'vulkan-spirv': ${IREE_TARGET_BACKEND_VULKAN_SPIRV}")
-message(VERBOSE "IREE build compiler target backend 'vmvx': ${IREE_TARGET_BACKEND_VMVX}")
-message(VERBOSE "IREE build compiler target backend 'webgpu': ${IREE_TARGET_BACKEND_WEBGPU}")
+message(STATUS "IREE runtime drivers:")
+if(IREE_HAL_DRIVER_CUDA)
+  message(STATUS "  - cuda")
+endif()
+if(IREE_HAL_DRIVER_DYLIB)
+  message(STATUS "  - dylib")
+endif()
+if(IREE_HAL_DRIVER_DYLIB_SYNC)
+  message(STATUS "  - dylib-sync")
+endif()
+if(IREE_HAL_DRIVER_VMVX)
+  message(STATUS "  - vmvx")
+endif()
+if(IREE_HAL_DRIVER_VMVX_SYNC)
+  message(STATUS "  - vmvx-sync")
+endif()
+if(IREE_HAL_DRIVER_VULKAN)
+  message(STATUS "  - vulkan")
+endif()
 
 #-------------------------------------------------------------------------------
 # IREE compilation toolchain configuration
@@ -202,9 +198,10 @@ include(sanitizers)
 include(iree_cc_binary)
 include(iree_cc_library)
 include(iree_cc_test)
+include(iree_cmake_options)
+include(iree_external_cmake_options)
 include(iree_tablegen_library)
 include(iree_tablegen_doc)
-include(iree_third_party_cmake_options)
 include(iree_c_embed_data)
 include(iree_bytecode_module)
 include(iree_c_module)
@@ -225,6 +222,13 @@ if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
 endif()
 
 set(CMAKE_POSITION_INDEPENDENT_CODE TRUE)
+
+#-------------------------------------------------------------------------------
+# Core options initialization (for options defined in macros in
+# iree_cmake_options.cmake).
+#-------------------------------------------------------------------------------
+
+iree_set_compiler_cmake_options()
 
 #-------------------------------------------------------------------------------
 # IREE compilation flags
@@ -399,12 +403,12 @@ else()
 
   # Enable MLIR Python bindings if IREE Python bindings enabled.
   if(IREE_BUILD_PYTHON_BINDINGS)
-    set(MLIR_ENABLE_BINDINGS_PYTHON ON CACHE BOOL "" FORCE)
-    set(MHLO_ENABLE_BINDINGS_PYTHON ON CACHE BOOL "" FORCE)
+    set(MLIR_ENABLE_BINDINGS_PYTHON ON)
+    set(MHLO_ENABLE_BINDINGS_PYTHON ON)
   endif()
 
   # Disable LLVM's warnings.
-  set(LLVM_ENABLE_WARNINGS OFF CACHE BOOL "don't use global flags /facepalm")
+  set(LLVM_ENABLE_WARNINGS OFF)
 
   # Stash cmake build type in case LLVM messes with it.
   set(_CMAKE_BUILD_TYPE "${CMAKE_BUILD_TYPE}")
@@ -416,7 +420,7 @@ else()
   add_subdirectory("third_party/llvm-project/llvm" EXCLUDE_FROM_ALL)
 
   # Reset CMAKE_BUILD_TYPE to its previous setting.
-  set(CMAKE_BUILD_TYPE "${_CMAKE_BUILD_TYPE}" CACHE STRING "Build type (default ${DEFAULT_CMAKE_BUILD_TYPE})" FORCE)
+  set(CMAKE_BUILD_TYPE "${_CMAKE_BUILD_TYPE}" )
 
   # Extend module path to allow submodules to use LLVM and MLIR CMake modules.
   list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_BINARY_DIR}/lib/cmake/mlir")
@@ -530,6 +534,10 @@ if(${IREE_BUILD_DOCS})
   add_custom_target(iree-doc ALL)
 endif()
 
+# Testing rules that require generation will add dependencies to this target.
+# This allows them to be EXCLUDE_FROM_ALL but still invokable.
+add_custom_target(iree-test-deps COMMENT "Building IREE test deps")
+
 #-------------------------------------------------------------------------------
 # IREE top-level libraries
 #-------------------------------------------------------------------------------
@@ -544,7 +552,8 @@ add_subdirectory(iree/runtime)
 add_subdirectory(iree/schemas)
 add_subdirectory(iree/task)
 add_subdirectory(iree/testing)
-add_subdirectory(iree/test)
+# Note: Test deps are not built as part of all (use the iree-test-deps target).
+add_subdirectory(iree/test EXCLUDE_FROM_ALL)
 add_subdirectory(iree/vm)
 
 if(${IREE_BUILD_BENCHMARKS})
@@ -637,10 +646,5 @@ if(IREE_BUILD_COMPILER AND IREE_BUILD_PYTHON_BINDINGS)
     file(GENERATE OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/.env"
       CONTENT "${_pythonpath_env}"
     )
-
-    # TODO: Remove this after about Dec-2021
-    if(EXISTS "${CMAKE_CURRENT_BINARY_DIR}/bindings/python/iree/compiler")
-      message(FATAL_ERROR "You are running in a build directory which needs some manual cleanup. Please delete the directory ${CMAKE_CURRENT_BINARY_DIR}/bindings/python/iree/compiler")
-    endif()
   endif()
 endif()

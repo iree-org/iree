@@ -2654,3 +2654,76 @@ func @dispatch() {
   flow.dispatch.tensor.store %5, %2, offsets = [0], sizes = [4], strides = [1] : tensor<?xf32> -> !flow.dispatch.tensor<writeonly:4xf32>
   return
 }
+
+// -----
+
+func @no_op_subview() {
+  %c0 = arith.constant 0 : index
+  %d0 = hal.interface.constant.load[0] : index
+  %d1 = hal.interface.constant.load[1] : index
+  %src_binding = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(32) : !flow.dispatch.tensor<readonly:?x?xf32>{%d0, %d1}
+  %dest_binding = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(32) : !flow.dispatch.tensor<writeonly:?x?xf32>{%d0, %d1}
+  %src = flow.dispatch.tensor.load %src_binding, offsets = [0, 0], sizes = [%d0, %d1], strides = [1, 1]
+      : !flow.dispatch.tensor<readonly:?x?xf32>{%d0, %d1} -> tensor<?x?xf32>
+  %slice = tensor.extract_slice %src[0, 0] [%d0, %d1] [1, 1] : tensor<?x?xf32> to tensor<?x?xf32>
+  flow.dispatch.tensor.store %slice, %dest_binding, offsets = [0, 0], sizes = [%d0, %d1], strides = [1, 1]
+      : tensor<?x?xf32> -> !flow.dispatch.tensor<writeonly:?x?xf32>{%d0, %d1}
+  return
+}
+// CHECK-LABEL: func @no_op_subview()
+//   CHECK-DAG:   %[[SRC:.+]] = hal.interface.binding.subspan set(0) binding(0)
+//   CHECK-DAG:   %[[DEST:.+]] = hal.interface.binding.subspan set(0) binding(1)
+//       CHECK:   linalg.generic
+//  CHECK-SAME:       ins(%[[SRC]] :
+//  CHECK-SAME:       outs(%[[DEST]] :
+
+// -----
+
+func @rank_reducing_no_op_subview() {
+  %c0 = arith.constant 0 : index
+  %d0 = hal.interface.constant.load[0] : index
+  %src_binding = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(32) : !flow.dispatch.tensor<readonly:1x?xf32>{%d0}
+  %dest_binding = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(32) : !flow.dispatch.tensor<writeonly:?xf32>{%d0}
+  %src = flow.dispatch.tensor.load %src_binding, offsets = [0, 0], sizes = [1, %d0], strides = [1, 1]
+      : !flow.dispatch.tensor<readonly:1x?xf32>{%d0} -> tensor<1x?xf32>
+  %slice = tensor.extract_slice %src[0, 0] [1, %d0] [1, 1] : tensor<1x?xf32> to tensor<?xf32>
+  flow.dispatch.tensor.store %slice, %dest_binding, offsets = [0], sizes = [%d0], strides = [1]
+      : tensor<?xf32> -> !flow.dispatch.tensor<writeonly:?xf32>{%d0}
+  return
+}
+// CHECK-LABEL: func @rank_reducing_no_op_subview()
+//   CHECK-DAG:   %[[SRC:.+]] = hal.interface.binding.subspan set(0) binding(0)
+//   CHECK-DAG:   %[[DEST:.+]] = hal.interface.binding.subspan set(0) binding(1)
+//       CHECK:   %[[SUBVIEW:.+]] = memref.subview %[[SRC]][0, 0] [1, %{{.+}}]
+//       CHECK:   linalg.generic
+//  CHECK-SAME:       ins(%[[SUBVIEW]] :
+//  CHECK-SAME:       outs(%[[DEST]] :
+
+// -----
+
+// CHECK-LABEL: func @dispatch_scatter()
+func @dispatch_scatter() {
+  %c1 = arith.constant 1 : index
+  %c0 = arith.constant 0 : index
+  %cst = arith.constant dense<0> : tensor<1x1xi32>
+  %cst_0 = arith.constant dense<0> : tensor<1x2xi32>
+  %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(32) : !flow.dispatch.tensor<readonly:1xi32>
+  %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(32) : !flow.dispatch.tensor<writeonly:1x1xi32>
+  %workgroup_size_x = hal.interface.workgroup.size[0] : index
+  %workgroup_id_x = hal.interface.workgroup.id[0] : index
+  %workgroup_count_x = hal.interface.workgroup.count[0] : index
+  %2 = affine.apply affine_map<()[s0, s1] -> (s1 * s0)>()[%workgroup_size_x, %workgroup_id_x]
+  %3 = affine.apply affine_map<()[s0, s1] -> (s1 * s0)>()[%workgroup_size_x, %workgroup_count_x]
+  scf.for %arg0 = %2 to %c1 step %3 {
+    %4 = affine.min affine_map<(d0)[s0] -> (s0, -d0 + 1)>(%arg0)[%workgroup_size_x]
+    %5 = flow.dispatch.tensor.load %0, offsets = [%arg0], sizes = [%4], strides = [1] : !flow.dispatch.tensor<readonly:1xi32> -> tensor<?xi32>
+    %6 = tensor.extract_slice %cst_0[%arg0, 0] [%4, 2] [1, 1] : tensor<1x2xi32> to tensor<?x2xi32>
+    // CHECK: iree_linalg_ext.scatter unique_indices(true) ins(%{{.*}}, %{{.*}} : memref<?xi32, #{{.*}}>, memref<?x2xi32, #{{.*}}>) outs(%{{.*}} : memref<1x1xi32>)
+    %7 = iree_linalg_ext.scatter unique_indices(true) ins(%5, %6 : tensor<?xi32>, tensor<?x2xi32>) outs(%cst : tensor<1x1xi32>) {
+    ^bb0(%arg1: i32, %arg2: i32):
+      iree_linalg_ext.yield %arg1 : i32
+    } -> tensor<1x1xi32>
+    flow.dispatch.tensor.store %7, %1, offsets = [0, 0], sizes = [1, 1], strides = [1, 1] : tensor<1x1xi32> -> !flow.dispatch.tensor<writeonly:1x1xi32>
+  }
+  return
+}

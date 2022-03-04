@@ -45,7 +45,6 @@ ${TRANSLATE_TOOL?} ${INPUT_PATH} \
   --iree-hal-target-backends=llvm \
   --iree-llvm-target-triple=wasm32-unknown-unknown \
   --iree-llvm-target-cpu-features=+simd128 \
-  --iree-llvm-link-embedded=false \
   --iree-llvm-link-static \
   --iree-llvm-static-library-output-path=${BINARY_DIR}/${INPUT_NAME}_static.o \
   --o ${BINARY_DIR}/${INPUT_NAME}.vmfb

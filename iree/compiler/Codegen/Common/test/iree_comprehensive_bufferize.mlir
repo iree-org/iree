@@ -79,7 +79,7 @@ func @matmul_fill() {
   %m = hal.interface.constant.load[0] : index
   %n = hal.interface.constant.load[1] : index
   %k = hal.interface.constant.load[2] : index
-  %lhs = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<readonly:?x?xf32>{%m, %k}
+  %lhs = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(32) : !flow.dispatch.tensor<readonly:?x?xf32>{%m, %k}
   %rhs = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : !flow.dispatch.tensor<readonly:?x?xf32>{%k, %n}
   %result = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : !flow.dispatch.tensor<readwrite:?x?xf32>{%m, %n}
   %wg_id_y = hal.interface.workgroup.id[1] : index
@@ -114,7 +114,8 @@ func @matmul_fill() {
 //  CHECK-DAG:   %[[M:.+]] = hal.interface.constant.load[0]
 //  CHECK-DAG:   %[[N:.+]] = hal.interface.constant.load[1]
 //  CHECK-DAG:   %[[K:.+]] = hal.interface.constant.load[2]
-//  CHECK-DAG:   %[[LHS:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer)
+//  CHECK-DAG:   %[[LHS:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(32)
+//  CHECK-DAG:   memref.assume_alignment %[[LHS]], 32
 //  CHECK-DAG:   %[[RHS:.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer)
 //  CHECK-DAG:   %[[RESULT:.+]] = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer)
 //  CHECK-DAG:   %[[WG_ID_Y:.+]] = hal.interface.workgroup.id[1]

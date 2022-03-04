@@ -38,10 +38,10 @@ iree_cc_library(
   DEPS
     LLVMSupport
     MLIRArithmetic
+    MLIRFunc
     MLIRIR
     MLIRParser
     MLIRPass
-    MLIRStandard
     MLIRSupport
     MLIRTransformUtils
     MLIRTransforms

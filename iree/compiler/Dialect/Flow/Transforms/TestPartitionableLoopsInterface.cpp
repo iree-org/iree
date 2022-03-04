@@ -7,7 +7,7 @@
 #include "iree/compiler/Dialect/Flow/IR/PartitionableLoopsInterface.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
-#include "mlir/Dialect/StandardOps/IR/Ops.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 static const char kAttributeName[] = "__test_interface__";

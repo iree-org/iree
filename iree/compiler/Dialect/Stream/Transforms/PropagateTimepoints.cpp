@@ -17,7 +17,7 @@
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
-#include "mlir/Dialect/StandardOps/IR/Ops.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/BlockAndValueMapping.h"
 #include "mlir/IR/Builders.h"
@@ -387,7 +387,7 @@ static void expandFuncOp(mlir::FuncOp op, ExpandedGlobalMap &globalMap,
 //  ->
 //  %rt, %r = call @foo(%t, %0)
 //  stream.timepoint.await %rt, %t
-static void expandCallOp(mlir::CallOp op,
+static void expandCallOp(mlir::func::CallOp op,
                          BlockAndValueMapping &resourceTimepointMap) {
   if (!usesResources(op)) return;
 
@@ -396,8 +396,8 @@ static void expandCallOp(mlir::CallOp op,
   auto operands =
       expandOperands(op.getLoc(), op.operands(), resourceTimepointMap, builder);
   auto resultTypes = expandTypes(op.getResultTypes());
-  auto newOp = builder.create<mlir::CallOp>(op.getLoc(), op.getCallee(),
-                                            resultTypes, operands);
+  auto newOp = builder.create<mlir::func::CallOp>(op.getLoc(), op.getCallee(),
+                                                  resultTypes, operands);
 
   // Insert awaits on results that we are sinking across the call edge.
   // The hope is that by moving the awaits here we can fold with uses inside
@@ -434,13 +434,13 @@ static void expandCallOp(mlir::CallOp op,
 //  return %1
 //  ->
 //  return %t, %0
-static void expandReturnOp(mlir::ReturnOp op,
+static void expandReturnOp(mlir::func::ReturnOp op,
                            BlockAndValueMapping &resourceTimepointMap) {
   if (!usesResources(op)) return;
   OpBuilder builder(op);
   auto operands =
       expandOperands(op.getLoc(), op.operands(), resourceTimepointMap, builder);
-  builder.create<mlir::ReturnOp>(op.getLoc(), operands);
+  builder.create<mlir::func::ReturnOp>(op.getLoc(), operands);
   op.erase();
 }
 
@@ -547,9 +547,9 @@ static void expandTimepoints(Operation *op, ExpandedGlobalMap &globalMap,
     expandInitializerOp(initializerOp, globalMap, resourceTimepointMap);
   } else if (auto funcOp = dyn_cast<mlir::FuncOp>(op)) {
     expandFuncOp(funcOp, globalMap, resourceTimepointMap);
-  } else if (auto callOp = dyn_cast<mlir::CallOp>(op)) {
+  } else if (auto callOp = dyn_cast<mlir::func::CallOp>(op)) {
     expandCallOp(callOp, resourceTimepointMap);
-  } else if (auto returnOp = dyn_cast<mlir::ReturnOp>(op)) {
+  } else if (auto returnOp = dyn_cast<mlir::func::ReturnOp>(op)) {
     expandReturnOp(returnOp, resourceTimepointMap);
   } else if (auto branchOp = dyn_cast<mlir::cf::BranchOp>(op)) {
     expandBranchOp(branchOp, resourceTimepointMap);
@@ -582,7 +582,7 @@ class PropagateTimepointsPass
   PropagateTimepointsPass() = default;
 
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<mlir::StandardOpsDialect>();
+    registry.insert<mlir::func::FuncDialect>();
     registry.insert<mlir::cf::ControlFlowDialect>();
     registry.insert<IREE::Stream::StreamDialect>();
     registry.insert<IREE::Util::UtilDialect>();

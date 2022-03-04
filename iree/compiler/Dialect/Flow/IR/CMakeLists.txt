@@ -38,14 +38,15 @@ iree_cc_library(
     ::FlowOpsGen
     ::FlowTypesGen
     LLVMSupport
+    MLIRAnalysis
     MLIRArithmeticUtils
     MLIRControlFlowInterfaces
+    MLIRFunc
     MLIRIR
     MLIRInferTypeOpInterface
     MLIRMemRef
     MLIRParser
     MLIRSideEffectInterfaces
-    MLIRStandard
     MLIRSupport
     MLIRTensor
     MLIRTransformUtils

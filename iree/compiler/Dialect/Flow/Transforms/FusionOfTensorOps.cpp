@@ -17,6 +17,7 @@
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
+#include "mlir/Dialect/MemRef/Transforms/Passes.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 namespace mlir {
@@ -122,6 +123,7 @@ struct FusionOfTensorOpsPass
         linalg::LinalgElementwiseFusionOptions()
             .setControlFoldingReshapes(foldReshapeBetweenLinalgFn)
             .setControlElementwiseOpsFusionFn(controlFn));
+    memref::populateResolveRankedShapeTypeResultDimsPatterns(fusionPatterns);
 
     if (failed(applyPatternsAndFoldGreedily(op->getRegions(),
                                             std::move(fusionPatterns)))) {
@@ -139,6 +141,7 @@ struct FusionOfTensorOpsPass
                                                       context);
     linalg::FillOp::getCanonicalizationPatterns(reshapeCanonicalizations,
                                                 context);
+    memref::populateResolveRankedShapeTypeResultDimsPatterns(fusionPatterns);
     if (failed(applyPatternsAndFoldGreedily(
             op->getRegions(), std::move(reshapeCanonicalizations)))) {
       return signalPassFailure();
@@ -154,6 +157,7 @@ struct FusionOfTensorOpsPass
     linalg::InitTensorOp::getCanonicalizationPatterns(pushReshapePatterns,
                                                       context);
     linalg::FillOp::getCanonicalizationPatterns(pushReshapePatterns, context);
+    memref::populateResolveRankedShapeTypeResultDimsPatterns(fusionPatterns);
     if (failed(applyPatternsAndFoldGreedily(op->getRegions(),
                                             std::move(pushReshapePatterns)))) {
       return signalPassFailure();
