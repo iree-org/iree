@@ -663,6 +663,7 @@ static LogicalResult setRootConfig(
                               iterationDomain);
 }
 
+/// Redirects to methods that set the configuration based on operation type.
 static LogicalResult setRootConfigImpl(
     FuncOp entryPointFn, Operation *op,
     ArrayRef<LoopTilingAndDistributionInfo> tiledLoops) {
@@ -672,80 +673,88 @@ static LogicalResult setRootConfigImpl(
   // Redirect to individual operations.
   auto setRootConfigFn = [&](Operation *op) -> LogicalResult {
     return TypeSwitch<Operation *, LogicalResult>(op)
-        .Case<linalg::Mmt4DOp, linalg::ContractionOpInterface,
-              IREE::LinalgExt::FftOp>([&](auto op) {
+        .Case<IREE::LinalgExt::FftOp, linalg::GenericOp, linalg::Mmt4DOp>(
+            [&](auto op) {
+              return setRootConfig(entryPointFn, op, tiledLoops);
+            })
+        .Case<linalg::ContractionOpInterface>([&](auto op) {
           return setRootConfig(entryPointFn, op, tiledLoops);
         })
-        .Case<linalg::GenericOp>([&](auto genericOp) {
-          if (genericOp.getNumLoops() == genericOp.getNumParallelLoops()) {
-            // Ignore parallel elementwise operations now. They will be set as
-            // roots ops if there are no other ops that can be treated as a
-            // root op.
-            return success();
-          }
-          return setRootConfig(entryPointFn, genericOp, tiledLoops);
-        })
-        .Case<linalg::LinalgOp>([&](auto linalgOp) {
-          // Ignore generic ops.
-          if (isa<linalg::GenericOp, linalg::FillOp>(linalgOp.getOperation()))
-            return success();
-          return setRootConfig(entryPointFn, linalgOp, tiledLoops);
-        })
-        .Case<IREE::LinalgExt::TiledOpInterface>([&](auto tiledInterfaceOp) {
-          // TODO(ravishankarm): For now
-          // `tensor.extract_slice`/`tensor.insert_slice` implement the
-          // `tiledInterfaceOp`. With tile + distribute moved out of Flow
-          // dialect, this doesnt work anymore. Remove this when the external
-          // model implementation of
-          // `tensor.extract_slice`/`tensor.insert_slice` are dropped.
-          if (isa<tensor::ExtractSliceOp, tensor::InsertSliceOp>(
-                  tiledInterfaceOp.getOperation())) {
-            return success();
-          }
-          return setRootConfig(entryPointFn, tiledInterfaceOp, tiledLoops);
-        })
+        .Case<linalg::LinalgOp, IREE::LinalgExt::TiledOpInterface>(
+            [&](auto op) {
+              return setRootConfig(entryPointFn, op, tiledLoops);
+            })
         .Default([&](Operation *op) { return success(); });
   };
   return setRootConfigFn(op);
 }
 
-/// Finds the root operation in the given list of Linalg operations and sets
-/// its configuration. Returns error for multiple root operations.
-static LogicalResult setRootConfig(
-    FuncOp entryPointFn, ArrayRef<Operation *> computeOps,
+/// Redirects to methods that set the configuration based on operation type for
+/// VMVX backend.
+static LogicalResult setVMVXRootConfigImpl(
+    FuncOp entryPointFn, Operation *op,
     ArrayRef<LoopTilingAndDistributionInfo> tiledLoops) {
-  Operation *rootOp = nullptr;
-  for (auto computeOp : computeOps) {
-    if (failed(setRootConfigImpl(entryPointFn, computeOp, tiledLoops))) {
-      return failure();
-    }
-    if (getLoweringConfig(computeOp)) {
-      if (rootOp) {
-        return computeOp->emitOpError(
-            "unhandled multiple roots in dispatch region");
-      }
-      rootOp = computeOp;
-    }
-  }
-  if (rootOp) return success();
+  if (getLoweringConfig(op)) return success();
 
-  // If there are no root ops, then check for a single `linalg.generic` op. Make
-  // this the root, and vectorize the operation.
-  for (auto computeOp : computeOps) {
-    if (auto genericOp = dyn_cast<linalg::GenericOp>(computeOp)) {
-      if (failed(setRootConfig(entryPointFn, genericOp, tiledLoops))) {
-        return failure();
-      }
-      if (getLoweringConfig(computeOp)) {
-        if (rootOp) {
-          return computeOp->emitOpError(
-              "unhanlded multiple parallel generic ops within a dispatch");
-        }
-        rootOp = computeOp;
-      }
+  // Redirect to individual operations.
+  auto setRootConfigFn = [&](Operation *op) -> LogicalResult {
+    return TypeSwitch<Operation *, LogicalResult>(op)
+        .Case<linalg::LinalgOp, IREE::LinalgExt::TiledOpInterface>(
+            [&](auto op) {
+              return setRootConfig(entryPointFn, op, tiledLoops);
+            })
+        .Default([&](Operation *op) { return success(); });
+  };
+  return setRootConfigFn(op);
+}
+
+/// Find the root operation for the dispatch region.
+static FailureOr<Operation *> getRootOperation(
+    ArrayRef<Operation *> computeOps) {
+  Operation *rootOperation = nullptr;
+  auto updateRootOperation = [&](Operation *op) -> LogicalResult {
+    if (rootOperation) {
+      return op->emitOpError(
+          "unhandled multiple root operations in dispatch region");
+    }
+    rootOperation = op;
+    return success();
+  };
+  for (auto op : computeOps) {
+    if (auto linalgOp = dyn_cast<linalg::LinalgOp>(op)) {
+      // Do not not treat linalg ops that are all parallel as root operations in
+      // this sweep.
+      if (linalgOp.getNumLoops() == linalgOp.getNumParallelLoops()) continue;
+
+      // All other linalg ops are root ops.
+      if (failed(updateRootOperation(op))) return failure();
+      continue;
+    }
+
+    if (auto tiledOpInterfaceOp =
+            dyn_cast<IREE::LinalgExt::TiledOpInterface>(op)) {
+      // TODO(ravishankarm): For now
+      // `tensor.extract_slice`/`tensor.insert_slice` implement the
+      // `tiledInterfaceOp`. With tile + distribute moved out of Flow
+      // dialect, this doesnt work anymore. Remove this when the external
+      // model implementation of
+      // `tensor.extract_slice`/`tensor.insert_slice` are dropped.
+      if (isa<tensor::ExtractSliceOp, tensor::InsertSliceOp>(op)) continue;
+
+      // All other operations that implement this interface are root ops.
+      if (failed(updateRootOperation(op))) return failure();
+      continue;
     }
   }
-  if (rootOp) return success();
+  if (rootOperation) return rootOperation;
+
+  // If no root operation is found yet. Look for linalg generic ops.
+  for (auto op : computeOps) {
+    if (isa<linalg::GenericOp>(op)) {
+      if (failed(updateRootOperation(op))) return failure();
+    }
+  }
+  if (rootOperation) return rootOperation;
 
   // TODO(ravishankarm): Currently there is a corner case of a dispatch region
   // with just a `tensor.extract_slice`/`tensor.insert_slice`. Those need to be
@@ -753,19 +762,46 @@ static LogicalResult setRootConfig(
   // respectively. This should go hand-in-hand with dropping the external model
   // implementation of the `TiledOpInterface` for these ops. Till we cross that
   // bridge, handle that case.
+  // Throw in linalg.fill here as well, though that should never happen either.
   if (computeOps.size() == 1 &&
-      isa<tensor::ExtractSliceOp, tensor::InsertSliceOp>(computeOps[0])) {
-    rootOp = computeOps.front();
-    return setRootConfig(entryPointFn,
-                         cast<IREE::LinalgExt::TiledOpInterface>(computeOps[0]),
-                         tiledLoops);
+      isa<linalg::FillOp, tensor::ExtractSliceOp, tensor::InsertSliceOp>(
+          computeOps[0])) {
+    rootOperation = computeOps[0];
   }
-  // Fall back, just set the translation to CPUDefault.
-  if (!rootOp) {
+  return rootOperation;
+}
+
+/// Finds the root operation in the given list of Linalg operations and sets
+/// its configuration. Returns error for multiple root operations.
+static LogicalResult setRootConfig(
+    FuncOp entryPointFn, ArrayRef<Operation *> computeOps,
+    ArrayRef<LoopTilingAndDistributionInfo> tiledLoops) {
+  FailureOr<Operation *> rootOp = getRootOperation(computeOps);
+  if (failed(rootOp)) {
+    return failure();
+  }
+  Operation *rootOperation = rootOp.getValue();
+
+  if (rootOperation) {
+    if (isVMVXBackend(entryPointFn)) {
+      if (failed(
+              setVMVXRootConfigImpl(entryPointFn, rootOperation, tiledLoops))) {
+        return failure();
+      }
+    } else {
+      if (failed(setRootConfigImpl(entryPointFn, rootOperation, tiledLoops))) {
+        return failure();
+      }
+    }
+  }
+
+  if (!getTranslationInfo(entryPointFn)) {
+    // Fall back, just set the translation to CPUDefault.
     setTranslationInfo(entryPointFn, DispatchLoweringPassPipeline::CPUDefault,
                        /*workloadPerWorkgroup=*/ArrayRef<int64_t>{},
                        /*workgroupSize=*/ArrayRef<int64_t>{});
   }
+
   return success();
 }
 
@@ -794,20 +830,7 @@ static LogicalResult setTranslationInfoAndRootConfig(
   }
 
   // Next set the configuration of the operations.
-  // For VMVX, do not use vectorization. Just lower as default.
-  if (!isVMVXBackend(entryPointFn)) {
-    if (failed(setRootConfig(entryPointFn, computeOps, tiledLoops))) {
-      return failure();
-    }
-  }
-
-  // Check if the translation info for the entry point is already set.
-  if (!getTranslationInfo(entryPointFn)) {
-    setTranslationInfo(entryPointFn, DispatchLoweringPassPipeline::CPUDefault,
-                       /*workloadPerWorkgroup=*/ArrayRef<int64_t>{},
-                       /*workgroupSize=*/ArrayRef<int64_t>{});
-  }
-  return success();
+  return setRootConfig(entryPointFn, computeOps, tiledLoops);
 }
 
 LogicalResult initCPULaunchConfig(ModuleOp moduleOp) {

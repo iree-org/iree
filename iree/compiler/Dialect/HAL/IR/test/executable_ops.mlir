@@ -1,7 +1,7 @@
 // RUN: iree-opt -split-input-file %s | FileCheck %s
 
-#executable_target_format = #hal.executable.target<"backend", "format">
 
+#executable_target_format = #hal.executable.target<"backend", "format">
 // CHECK-LABEL: @ex
 hal.executable @ex {
   // CHECK: hal.executable.variant public @backend, target = #executable_target_format
@@ -13,7 +13,7 @@ hal.executable @ex {
         #hal.descriptor_set.binding<0, storage_buffer>,
         #hal.descriptor_set.binding<1, storage_buffer>
       ]>
-    ]>) attributes {
+    ]>) {
       workgroup_size = [4 : index, 1 : index, 1 : index]
     }
   }
@@ -41,7 +41,7 @@ hal.executable @ex_with_workgroup_count_region {
         #hal.descriptor_set.binding<0, storage_buffer>,
         #hal.descriptor_set.binding<1, storage_buffer>
       ]>
-    ]>) attributes {
+    ]>) {
       workgroup_size = [4 : index, 1 : index, 1 : index]
     } {
     ^bb0(%arg0: index, %arg1: index, %arg2: index):
