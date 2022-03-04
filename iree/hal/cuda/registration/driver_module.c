@@ -26,6 +26,8 @@ IREE_FLAG(bool, cuda_allow_inline_execution, false,
           "Allow command buffers to execute inline against CUDA streams when "
           "possible.");
 
+IREE_FLAG(int32_t, cuda_default_index, 0, "Index of the default CUDA device.");
+
 static iree_status_t iree_hal_cuda_driver_factory_enumerate(
     void* self, const iree_hal_driver_info_t** out_driver_infos,
     iree_host_size_t* out_driver_info_count) {
@@ -63,6 +65,7 @@ static iree_status_t iree_hal_cuda_driver_factory_try_create(
 
   iree_hal_cuda_driver_options_t driver_options;
   iree_hal_cuda_driver_options_initialize(&driver_options);
+  driver_options.default_device_index = FLAG_cuda_default_index;
 
   iree_string_view_t identifier = iree_make_cstring_view("cuda");
   iree_status_t status = iree_hal_cuda_driver_create(
