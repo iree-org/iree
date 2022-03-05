@@ -31,7 +31,7 @@ typedef struct iree_hal_vulkan_source_location_t {
 iree_status_t iree_hal_vulkan_native_executable_create(
     iree::hal::vulkan::VkDeviceHandle* logical_device,
     VkPipelineCache pipeline_cache,
-    const iree_hal_executable_spec_t* executable_spec,
+    const iree_hal_executable_params_t* executable_params,
     iree_hal_executable_t** out_executable);
 
 // Returns the source location for the given entry point. May be empty if not

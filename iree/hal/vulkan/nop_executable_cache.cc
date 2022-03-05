@@ -80,13 +80,13 @@ static bool iree_hal_vulkan_nop_executable_cache_can_prepare_format(
 
 static iree_status_t iree_hal_vulkan_nop_executable_cache_prepare_executable(
     iree_hal_executable_cache_t* base_executable_cache,
-    const iree_hal_executable_spec_t* executable_spec,
+    const iree_hal_executable_params_t* executable_params,
     iree_hal_executable_t** out_executable) {
   iree_hal_vulkan_nop_executable_cache_t* executable_cache =
       iree_hal_vulkan_nop_executable_cache_cast(base_executable_cache);
   return iree_hal_vulkan_native_executable_create(
       executable_cache->logical_device,
-      /*pipeline_cache=*/VK_NULL_HANDLE, executable_spec, out_executable);
+      /*pipeline_cache=*/VK_NULL_HANDLE, executable_params, out_executable);
 }
 
 namespace {

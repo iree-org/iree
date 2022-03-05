@@ -255,15 +255,15 @@ static bool iree_hal_static_library_loader_query_support(
 
 static iree_status_t iree_hal_static_library_loader_try_load(
     iree_hal_executable_loader_t* base_executable_loader,
-    const iree_hal_executable_spec_t* executable_spec,
+    const iree_hal_executable_params_t* executable_params,
     iree_hal_executable_t** out_executable) {
   iree_hal_static_library_loader_t* executable_loader =
       (iree_hal_static_library_loader_t*)base_executable_loader;
 
   // The executable data is just the name of the library.
-  iree_string_view_t library_name =
-      iree_make_string_view((const char*)executable_spec->executable_data.data,
-                            executable_spec->executable_data.data_length);
+  iree_string_view_t library_name = iree_make_string_view(
+      (const char*)executable_params->executable_data.data,
+      executable_params->executable_data.data_length);
 
   // Linear scan of the registered libraries; there's usually only one per
   // module (aka source model) and as such it's a small list and probably not
@@ -277,8 +277,8 @@ static iree_status_t iree_hal_static_library_loader_try_load(
                                iree_make_cstring_view(header->name))) {
       return iree_hal_static_executable_create(
           executable_loader->libraries[i],
-          executable_spec->executable_layout_count,
-          executable_spec->executable_layouts,
+          executable_params->executable_layout_count,
+          executable_params->executable_layouts,
           base_executable_loader->import_provider,
           executable_loader->host_allocator, out_executable);
     }
