@@ -46,10 +46,10 @@ static iree_hal_rocm_native_executable_t* iree_hal_rocm_native_executable_cast(
 
 iree_status_t iree_hal_rocm_native_executable_create(
     iree_hal_rocm_context_wrapper_t* context,
-    const iree_hal_executable_spec_t* executable_spec,
+    const iree_hal_executable_params_t* executable_params,
     iree_hal_executable_t** out_executable) {
   IREE_ASSERT_ARGUMENT(context);
-  IREE_ASSERT_ARGUMENT(executable_spec);
+  IREE_ASSERT_ARGUMENT(executable_params);
   IREE_ASSERT_ARGUMENT(out_executable);
   *out_executable = NULL;
   IREE_TRACE_ZONE_BEGIN(z0);
@@ -58,7 +58,7 @@ iree_status_t iree_hal_rocm_native_executable_create(
 
   // TODO: Verify the flat buffer.
   iree_ROCMExecutableDef_table_t executable_def =
-      iree_ROCMExecutableDef_as_root(executable_spec->executable_data.data);
+      iree_ROCMExecutableDef_as_root(executable_params->executable_data.data);
 
   // Create the kernel module.
   flatbuffers_string_t hsaco_image =
@@ -96,8 +96,9 @@ iree_status_t iree_hal_rocm_native_executable_create(
       executable->entry_functions[i].block_size_y = block_sizes_vec[i].y;
       executable->entry_functions[i].block_size_z = block_sizes_vec[i].z;
       executable->executable_layouts[i] =
-          executable_spec->executable_layouts[i];
-      iree_hal_executable_layout_retain(executable_spec->executable_layouts[i]);
+          executable_params->executable_layouts[i];
+      iree_hal_executable_layout_retain(
+          executable_params->executable_layouts[i]);
     }
   }
 
