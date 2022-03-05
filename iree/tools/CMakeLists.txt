@@ -288,7 +288,7 @@ if(${IREE_BUILD_COMPILER})
       MLIRSPIRVTransforms
       MLIRShape
       MLIRFunc
-      MLIRStandardToSPIRV
+      MLIRFuncToSPIRV
       MLIRTensorInferTypeOpInterfaceImpl
       MLIRTosa
       MLIRTosaTransforms

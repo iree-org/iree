@@ -82,7 +82,8 @@ inline void registerMlirPasses() {
   // SPIR-V
   spirv::registerSPIRVLowerABIAttributesPass();
   registerConvertGPUToSPIRVPass();
-  registerConvertStandardToSPIRVPass();
+  registerConvertControlFlowToSPIRVPass();
+  registerConvertFuncToSPIRVPass();
   registerConvertLinalgToSPIRVPass();
 
   // TOSA.
