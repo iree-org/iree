@@ -22,7 +22,7 @@ extern "C" {
 // kernels that can be extracted along with the associated block size.
 iree_status_t iree_hal_cuda_native_executable_create(
     iree_hal_cuda_context_wrapper_t* context,
-    const iree_hal_executable_spec_t* executable_spec,
+    const iree_hal_executable_params_t* executable_params,
     iree_hal_executable_t** out_executable);
 
 CUfunction iree_hal_cuda_native_executable_for_entry_point(

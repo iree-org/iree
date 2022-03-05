@@ -121,7 +121,7 @@ bool iree_hal_query_any_executable_loader_support(
 // given format.
 iree_status_t iree_hal_executable_loader_try_load(
     iree_hal_executable_loader_t* executable_loader,
-    const iree_hal_executable_spec_t* executable_spec,
+    const iree_hal_executable_params_t* executable_params,
     iree_hal_executable_t** out_executable);
 
 //===----------------------------------------------------------------------===//
@@ -138,7 +138,7 @@ typedef struct iree_hal_executable_loader_vtable_t {
 
   iree_status_t(IREE_API_PTR* try_load)(
       iree_hal_executable_loader_t* executable_loader,
-      const iree_hal_executable_spec_t* executable_spec,
+      const iree_hal_executable_params_t* executable_params,
       iree_hal_executable_t** out_executable);
 } iree_hal_executable_loader_vtable_t;
 

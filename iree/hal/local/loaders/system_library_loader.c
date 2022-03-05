@@ -438,7 +438,7 @@ static bool iree_hal_system_library_loader_query_support(
 
 static iree_status_t iree_hal_system_library_loader_try_load(
     iree_hal_executable_loader_t* base_executable_loader,
-    const iree_hal_executable_spec_t* executable_spec,
+    const iree_hal_executable_params_t* executable_params,
     iree_hal_executable_t** out_executable) {
   iree_hal_system_library_loader_t* executable_loader =
       (iree_hal_system_library_loader_t*)base_executable_loader;
@@ -447,9 +447,9 @@ static iree_status_t iree_hal_system_library_loader_try_load(
   // Perform the load (and requisite disgusting hackery).
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0, iree_hal_system_executable_create(
-              executable_spec->executable_data,
-              executable_spec->executable_layout_count,
-              executable_spec->executable_layouts,
+              executable_params->executable_data,
+              executable_params->executable_layout_count,
+              executable_params->executable_layouts,
               base_executable_loader->import_provider,
               executable_loader->host_allocator, out_executable));
 
