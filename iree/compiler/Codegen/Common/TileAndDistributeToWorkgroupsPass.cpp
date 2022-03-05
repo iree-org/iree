@@ -56,13 +56,12 @@ static FailureOr<SmallVector<int64_t>> getTileSizesFromLoweringConfig(
         partitionbleLoopInterface.getPartitionableLoops(kNumMaxParallelDims);
     SmallVector<int64_t> tileSizes = currLoweringConfig.getTileSizeVals(0);
     SmallVector<int64_t> currDistributedTileSizes;
+    if (!partitionableLoops.empty()) {
+      currDistributedTileSizes.resize(partitionableLoops.back() + 1, 0);
+    }
     for (auto loopID : partitionableLoops) {
-      // If there is a tile size for this loop, use that value, or use zero to
-      // specify untiled loop.
       if (loopID < tileSizes.size()) {
-        currDistributedTileSizes.push_back(tileSizes[loopID]);
-      } else {
-        currDistributedTileSizes.push_back(0);
+        currDistributedTileSizes[loopID] = tileSizes[loopID];
       }
     }
     if (distributedTileSizes) {
@@ -82,24 +81,40 @@ static FailureOr<SmallVector<int64_t>> getTileSizesFromLoweringConfig(
   return SmallVector<int64_t>{};
 }
 
+/// Compute the workload per workgroup to use based on the tile sizes passed.
+static SmallVector<int64_t> getWorkloadPerWorkgroup(
+    ArrayRef<int64_t> distributedLoopTileSizes) {
+  // TODO(ravishankarm): This for now assumes that we can just drop all the
+  // zero-dim tile sizes. We need to eventually change this so that we dont have
+  // to do this. It is implicity linked to the dispatch region workload having
+  // the consistent information. That needs to be changed to take the entire
+  // iteration domain size as the argument, and then we can use the distribute
+  // loop tile sizes directly.
+  SmallVector<int64_t> nonZeroTileSizes;
+  for (auto tileSizes : distributedLoopTileSizes) {
+    if (!tileSizes) continue;
+    nonZeroTileSizes.push_back(tileSizes);
+  }
+  return llvm::to_vector(llvm::reverse(nonZeroTileSizes));
+}
+
 /// Defines the workgroup count region if the tile size for the distributed
 /// loops are known.
 static LogicalResult defineWorkgroupCountRegion(
-    FuncOp entryPointFn, ArrayRef<int64_t> distributedLoopTileSizes) {
-  if (distributedLoopTileSizes.size() > kNumMaxParallelDims) {
+    FuncOp entryPointFn, ArrayRef<int64_t> workloadPerWorkgroup) {
+  if (workloadPerWorkgroup.size() > kNumMaxParallelDims) {
     // For now error out here.
     return entryPointFn.emitOpError(
-               "expected number of distributed loop tile sizes to be less than "
-               "or equal to ")
+               "expected workload per workgroup to be less than or equal to ")
            << kNumMaxParallelDims;
   }
   WorkgroupCountRegionBuilder regionBuilder =
-      [&distributedLoopTileSizes](
+      [&workloadPerWorkgroup](
           OpBuilder &b, Location loc,
           std::array<Value, 3> workload) -> std::array<Value, 3> {
     Value one = b.create<arith::ConstantIndexOp>(loc, 1);
     std::array<Value, 3> numWorkgroups = {one, one, one};
-    for (auto it : llvm::enumerate(llvm::reverse(distributedLoopTileSizes))) {
+    for (auto it : llvm::enumerate(workloadPerWorkgroup)) {
       // If tile size is 0, it implies this isnt tiled, and the number of
       // workgroups is 1, i.e. the default.
       if (it.value() == 0) continue;
@@ -118,7 +133,7 @@ static LogicalResult defineWorkgroupCountRegion(
 // TODO(ravishankarm): The workload_per_wg field should be deprecated. This
 // is just transition before all dependencies on it can be removed.
 static LogicalResult updateTranslationInfoAttr(
-    FuncOp entryPointFn, ArrayRef<int64_t> distributedLoopTileSizes) {
+    FuncOp entryPointFn, ArrayRef<int64_t> workloadPerWorkgroup) {
   auto entryPointOp = getEntryPoint(entryPointFn);
   if (!entryPointOp) {
     return entryPointFn.emitOpError("expected entry point function");
@@ -133,8 +148,6 @@ static LogicalResult updateTranslationInfoAttr(
     }
     passPipeline = translationInfo.getDispatchLoweringPassPipeline();
   }
-  SmallVector<int64_t> workloadPerWorkgroup =
-      llvm::to_vector(llvm::reverse(distributedLoopTileSizes));
   auto newTranslationInfoAttr = IREE::Codegen::TranslationInfoAttr::get(
       entryPointFn.getContext(), passPipeline, workloadPerWorkgroup);
   setTranslationInfo(entryPointOp, newTranslationInfoAttr);
@@ -236,9 +249,12 @@ void TileAndDistributeToWorkgroupsPass::runOnOperation() {
   if (failed(configTileSizes)) {
     return signalPassFailure();
   }
+  ArrayRef<int64_t> configTileSizesRef(configTileSizes.getValue());
 
-  if (failed(defineWorkgroupCountRegion(funcOp, configTileSizes.getValue())) ||
-      failed(updateTranslationInfoAttr(funcOp, configTileSizes.getValue()))) {
+  SmallVector<int64_t> workloadPerWorkroup =
+      getWorkloadPerWorkgroup(configTileSizesRef);
+  if (failed(defineWorkgroupCountRegion(funcOp, workloadPerWorkroup)) ||
+      failed(updateTranslationInfoAttr(funcOp, workloadPerWorkroup))) {
     return signalPassFailure();
   }
 
@@ -272,41 +288,10 @@ void TileAndDistributeToWorkgroupsPass::runOnOperation() {
   auto tileSizeFn = [&](OpBuilder &builder,
                         Operation *op) -> SmallVector<Value, 4> {
     // Check if tile sizes are deduced from the configuration. If so use those.
-    if (getLoweringConfig(op)) {
-      return getTileSizes(builder, op, 0);
-    }
-
-    // TODO(ravishankarm): This part needs to be deleted once all backends
-    // configure on untiled ops. By default set the tile size to
-    // hal.interface.workgroup.size op, with 0 for the innermost parallel loop
-    // partitioned, 1 for the next outermost loop partitioned and so on.  Use
-    // the workgroup size as a proxy for tile size here. At the flow level this
-    // represents the "workload" per processors and is not necessarily tied to
-    // the workgroup size.auto interfaceOp =
-    // dyn_cast<IREE::Flow::PartitionableLoopsInterface>(op);
-    auto interfaceOp = dyn_cast<IREE::Flow::PartitionableLoopsInterface>(op);
-    if (!interfaceOp) return {};
-    SmallVector<unsigned> partitionedLoops =
-        interfaceOp.getPartitionableLoops(kNumMaxParallelDims);
-    if (partitionedLoops.empty()) return {};
-    unsigned maxDepth = partitionedLoops.back() + 1;
-
-    // Set all loops not partitioned to tile size 0. and those partitioned to
-    // `flow.workgroup.size`.
-    auto zero = builder.create<arith::ConstantIndexOp>(op->getLoc(), 0);
-    SmallVector<Value, 4> useTileSizes(maxDepth, zero);
-    llvm::DenseSet<unsigned> partitionedLoopsSet;
-    partitionedLoopsSet.insert(partitionedLoops.begin(),
-                               partitionedLoops.end());
-    unsigned currFlowDim = 0;
-    for (size_t dim = maxDepth; dim > 0; dim--) {
-      if (partitionedLoopsSet.count(dim - 1)) {
-        useTileSizes[dim - 1] =
-            buildHALWorkgroupInfoOp<IREE::HAL::InterfaceWorkgroupSizeOp>(
-                builder, currFlowDim++);
-      }
-    }
-    return useTileSizes;
+    return llvm::to_vector<4>(
+        llvm::map_range(configTileSizesRef, [&](int64_t ts) -> Value {
+          return builder.create<arith::ConstantIndexOp>(op->getLoc(), ts);
+        }));
   };
 
   auto linalgTilingOptions =
