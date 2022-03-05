@@ -287,6 +287,7 @@ cc_library(
     ],
     deps = [
         ":internal",
+        "//build_tools:default_linkopts",
         "//iree/base",
         "//iree/base:core_headers",
         "//iree/base:tracing",
