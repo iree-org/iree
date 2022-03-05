@@ -314,7 +314,7 @@ static void prettyPrintExecutableExportInfo(
       os);
   os << "// ";
   prettyPrintOpBreadcrumb(funcOp, os);
-  os << "//\n";
+  os << "\n";
   os << "//\n";
 
   // TODO(benvanik): interface and usage stats:
