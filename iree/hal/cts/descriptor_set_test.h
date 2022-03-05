@@ -19,8 +19,27 @@ namespace cts {
 
 class descriptor_set_test : public CtsTestBase {};
 
+TEST_P(descriptor_set_test, CreateWithNoBindings) {
+  iree_hal_descriptor_set_layout_t* descriptor_set_layout = NULL;
+  IREE_ASSERT_OK(iree_hal_descriptor_set_layout_create(
+      device_, IREE_HAL_DESCRIPTOR_SET_LAYOUT_USAGE_TYPE_IMMUTABLE,
+      /*binding_count=*/0,
+      /*bindings=*/NULL, &descriptor_set_layout));
+
+  iree_hal_descriptor_set_t* descriptor_set = NULL;
+  IREE_ASSERT_OK(iree_hal_descriptor_set_create(
+      device_, descriptor_set_layout, /*binding_count=*/0,
+      /*bindings=*/NULL, &descriptor_set));
+
+  // The descriptor set struct is an opaque handle. We can't test for much more
+  // than successful creation.
+
+  iree_hal_descriptor_set_release(descriptor_set);
+  iree_hal_descriptor_set_layout_release(descriptor_set_layout);
+}
+
 TEST_P(descriptor_set_test, CreateWithTwoBindings) {
-  iree_hal_descriptor_set_layout_t* descriptor_set_layout;
+  iree_hal_descriptor_set_layout_t* descriptor_set_layout = NULL;
   iree_hal_descriptor_set_layout_binding_t descriptor_set_layout_bindings[] = {
       {/*binding=*/0, /*type=*/IREE_HAL_DESCRIPTOR_TYPE_STORAGE_BUFFER},
       {/*binding=*/1, /*type=*/IREE_HAL_DESCRIPTOR_TYPE_STORAGE_BUFFER},
@@ -34,11 +53,13 @@ TEST_P(descriptor_set_test, CreateWithTwoBindings) {
       {/*binding=*/0, /*buffer=*/NULL, /*offset=*/0, /*length=*/0},
       {/*binding=*/1, /*buffer=*/NULL, /*offset=*/0, /*length=*/0},
   };
-
-  iree_hal_descriptor_set_t* descriptor_set;
+  iree_hal_descriptor_set_t* descriptor_set = NULL;
   IREE_ASSERT_OK(iree_hal_descriptor_set_create(
       device_, descriptor_set_layout, IREE_ARRAYSIZE(descriptor_set_bindings),
       descriptor_set_bindings, &descriptor_set));
+
+  // The descriptor set struct is an opaque handle. We can't test for much more
+  // than successful creation.
 
   iree_hal_descriptor_set_release(descriptor_set);
   iree_hal_descriptor_set_layout_release(descriptor_set_layout);

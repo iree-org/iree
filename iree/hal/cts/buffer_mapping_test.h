@@ -36,7 +36,8 @@ constexpr iree_device_size_t kDefaultAllocationSize = 1024;
 // failures may indicate issues in either the code doing the writing or the
 // code doing the reading.
 //
-// Tests for each function are organized in increasing order of complexity:
+// Where applicable, tests for each function are organized in increasing order
+// of complexity, such as:
 //   * write to full buffer
 //   * write with an offset and length
 //   * write into a subspan of a buffer
@@ -451,8 +452,8 @@ TEST_P(buffer_mapping_test, WriteDataSubspan) {
 }
 
 TEST_P(buffer_mapping_test, CopyData) {
-  iree_hal_buffer_t* buffer_a;
-  iree_hal_buffer_t* buffer_b;
+  iree_hal_buffer_t* buffer_a = NULL;
+  iree_hal_buffer_t* buffer_b = NULL;
   AllocateUninitializedBuffer(kDefaultAllocationSize, &buffer_a);
   AllocateUninitializedBuffer(kDefaultAllocationSize, &buffer_b);
 
@@ -478,9 +479,69 @@ TEST_P(buffer_mapping_test, CopyData) {
   iree_hal_buffer_release(buffer_b);
 }
 
+// Maps a buffer range for reading from device -> host.
+// This is roughly what iree_hal_buffer_read_data does internally.
+TEST_P(buffer_mapping_test, MapRangeRead) {
+  iree_device_size_t buffer_size = 16;
+  iree_hal_buffer_t* buffer = NULL;
+  AllocateUninitializedBuffer(buffer_size, &buffer);
+
+  uint8_t fill_value = 0xEF;
+  IREE_ASSERT_OK(iree_hal_buffer_fill(buffer, /*byte_offset=*/0,
+                                      IREE_WHOLE_BUFFER, &fill_value,
+                                      sizeof(fill_value)));
+
+  iree_hal_buffer_mapping_t mapping;
+  IREE_ASSERT_OK(iree_hal_buffer_map_range(
+      buffer, IREE_HAL_MAPPING_MODE_SCOPED, IREE_HAL_MEMORY_ACCESS_READ,
+      /*byte_offset=*/0, /*byte_length=*/buffer_size, &mapping));
+  EXPECT_EQ(buffer, mapping.buffer);
+  EXPECT_GE(mapping.contents.data_length, (iree_host_size_t)buffer_size);
+
+  std::vector<uint8_t> reference_buffer(buffer_size);
+  std::memset(reference_buffer.data(), fill_value, buffer_size);
+  std::vector<uint8_t> mapping_data(
+      mapping.contents.data,
+      mapping.contents.data + mapping.contents.data_length);
+  EXPECT_THAT(mapping_data, ContainerEq(reference_buffer));
+
+  iree_hal_buffer_unmap_range(&mapping);
+  iree_hal_buffer_release(buffer);
+}
+
+// Maps a buffer range for writing from host -> device.
+// This is roughly what iree_hal_buffer_write_data does internally.
+TEST_P(buffer_mapping_test, MapRangeWrite) {
+  iree_device_size_t buffer_size = 16;
+  iree_hal_buffer_t* buffer = NULL;
+  AllocateUninitializedBuffer(buffer_size, &buffer);
+
+  iree_hal_buffer_mapping_t mapping;
+  IREE_ASSERT_OK(iree_hal_buffer_map_range(
+      buffer, IREE_HAL_MAPPING_MODE_SCOPED,
+      IREE_HAL_MEMORY_ACCESS_DISCARD_WRITE,
+      /*byte_offset=*/0, /*byte_length=*/buffer_size, &mapping));
+  EXPECT_EQ(buffer, mapping.buffer);
+  EXPECT_GE(mapping.contents.data_length, (iree_host_size_t)buffer_size);
+
+  // Write into the mapped memory, flush for device access, then read back.
+  uint8_t fill_value = 0x12;
+  std::memset(mapping.contents.data, fill_value, buffer_size);
+  IREE_ASSERT_OK(iree_hal_buffer_flush_range(&mapping, /*byte_offset=*/0,
+                                             /*byte_length=*/buffer_size));
+  std::vector<uint8_t> actual_data(buffer_size);
+  IREE_ASSERT_OK(iree_hal_buffer_read_data(
+      buffer, /*source_offset=*/0, actual_data.data(), actual_data.size()));
+  std::vector<uint8_t> reference_buffer(buffer_size);
+  std::memset(reference_buffer.data(), fill_value, buffer_size);
+  EXPECT_THAT(actual_data, ContainerEq(reference_buffer));
+
+  iree_hal_buffer_unmap_range(&mapping);
+  iree_hal_buffer_release(buffer);
+}
+
 // TODO(scotttodd): iree_hal_allocator_wrap_buffer
 // TODO(scotttodd): iree_hal_heap_buffer_wrap
-// TODO(scotttodd): iree_hal_buffer_map_range
 
 }  // namespace cts
 }  // namespace hal

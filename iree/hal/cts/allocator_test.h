@@ -75,7 +75,7 @@ TEST_P(allocator_test, AllocateBuffer) {
   iree_hal_buffer_params_t params = {0};
   params.type = IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE;
   params.usage = IREE_HAL_BUFFER_USAGE_TRANSFER;
-  iree_hal_buffer_t* buffer = nullptr;
+  iree_hal_buffer_t* buffer = NULL;
   IREE_ASSERT_OK(iree_hal_allocator_allocate_buffer(
       device_allocator_, params, kAllocationSize, iree_const_byte_span_empty(),
       &buffer));
@@ -98,7 +98,7 @@ TEST_P(allocator_test, AllocateEmptyBuffer) {
   iree_hal_buffer_params_t params = {0};
   params.type = IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE;
   params.usage = IREE_HAL_BUFFER_USAGE_TRANSFER;
-  iree_hal_buffer_t* buffer = nullptr;
+  iree_hal_buffer_t* buffer = NULL;
   IREE_ASSERT_OK(iree_hal_allocator_allocate_buffer(
       device_allocator_, params, /*allocation_size=*/0,
       iree_const_byte_span_empty(), &buffer));

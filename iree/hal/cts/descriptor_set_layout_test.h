@@ -22,7 +22,7 @@ class descriptor_set_layout_test : public CtsTestBase {};
 // Note: bindingCount == 0 is valid in VkDescriptorSetLayoutCreateInfo:
 // https://www.khronos.org/registry/vulkan/specs/1.2-extensions/man/html/VkDescriptorSetLayoutCreateInfo.html
 TEST_P(descriptor_set_layout_test, CreateWithNoBindings) {
-  iree_hal_descriptor_set_layout_t* descriptor_set_layout;
+  iree_hal_descriptor_set_layout_t* descriptor_set_layout = NULL;
   IREE_ASSERT_OK(iree_hal_descriptor_set_layout_create(
       device_, IREE_HAL_DESCRIPTOR_SET_LAYOUT_USAGE_TYPE_IMMUTABLE,
       /*binding_count=*/0,
@@ -31,7 +31,7 @@ TEST_P(descriptor_set_layout_test, CreateWithNoBindings) {
 }
 
 TEST_P(descriptor_set_layout_test, CreateWithOneBinding) {
-  iree_hal_descriptor_set_layout_t* descriptor_set_layout;
+  iree_hal_descriptor_set_layout_t* descriptor_set_layout = NULL;
   iree_hal_descriptor_set_layout_binding_t descriptor_set_layout_bindings[] = {
       {/*binding=*/0, /*type=*/IREE_HAL_DESCRIPTOR_TYPE_STORAGE_BUFFER},
   };
@@ -43,7 +43,7 @@ TEST_P(descriptor_set_layout_test, CreateWithOneBinding) {
 }
 
 TEST_P(descriptor_set_layout_test, CreateWithTwoBindings) {
-  iree_hal_descriptor_set_layout_t* descriptor_set_layout;
+  iree_hal_descriptor_set_layout_t* descriptor_set_layout = NULL;
   iree_hal_descriptor_set_layout_binding_t descriptor_set_layout_bindings[] = {
       {/*binding=*/0, /*type=*/IREE_HAL_DESCRIPTOR_TYPE_STORAGE_BUFFER},
       {/*binding=*/1, /*type=*/IREE_HAL_DESCRIPTOR_TYPE_STORAGE_BUFFER},
@@ -56,7 +56,7 @@ TEST_P(descriptor_set_layout_test, CreateWithTwoBindings) {
 }
 
 TEST_P(descriptor_set_layout_test, CreateWithPushDescriptorType) {
-  iree_hal_descriptor_set_layout_t* descriptor_set_layout;
+  iree_hal_descriptor_set_layout_t* descriptor_set_layout = NULL;
   iree_hal_descriptor_set_layout_binding_t descriptor_set_layout_bindings[] = {
       {/*binding=*/0, /*type=*/IREE_HAL_DESCRIPTOR_TYPE_STORAGE_BUFFER},
       {/*binding=*/1, /*type=*/IREE_HAL_DESCRIPTOR_TYPE_STORAGE_BUFFER},

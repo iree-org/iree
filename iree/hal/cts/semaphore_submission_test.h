@@ -29,7 +29,7 @@ TEST_P(semaphore_submission_test, SubmitWithNoCommandBuffers) {
   submission_batch.wait_semaphores.payload_values = NULL;
   submission_batch.command_buffer_count = 0;
   submission_batch.command_buffers = NULL;
-  iree_hal_semaphore_t* signal_semaphore;
+  iree_hal_semaphore_t* signal_semaphore = NULL;
   IREE_ASSERT_OK(iree_hal_semaphore_create(device_, 0ull, &signal_semaphore));
   iree_hal_semaphore_t* signal_semaphore_ptrs[] = {signal_semaphore};
   submission_batch.signal_semaphores.count =
@@ -49,7 +49,7 @@ TEST_P(semaphore_submission_test, SubmitWithNoCommandBuffers) {
 }
 
 TEST_P(semaphore_submission_test, SubmitAndSignal) {
-  iree_hal_command_buffer_t* command_buffer;
+  iree_hal_command_buffer_t* command_buffer = NULL;
   IREE_ASSERT_OK(iree_hal_command_buffer_create(
       device_, IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT,
       IREE_HAL_COMMAND_CATEGORY_DISPATCH, IREE_HAL_QUEUE_AFFINITY_ANY,
@@ -65,7 +65,7 @@ TEST_P(semaphore_submission_test, SubmitAndSignal) {
   submission_batch.wait_semaphores.payload_values = NULL;
   submission_batch.command_buffer_count = 1;
   submission_batch.command_buffers = &command_buffer;
-  iree_hal_semaphore_t* signal_semaphore;
+  iree_hal_semaphore_t* signal_semaphore = NULL;
   IREE_ASSERT_OK(iree_hal_semaphore_create(device_, 0ull, &signal_semaphore));
   iree_hal_semaphore_t* signal_semaphore_ptrs[] = {signal_semaphore};
   submission_batch.signal_semaphores.count =
@@ -87,7 +87,7 @@ TEST_P(semaphore_submission_test, SubmitAndSignal) {
 
 TEST_P(semaphore_submission_test, SubmitWithWait) {
   // Empty command buffer.
-  iree_hal_command_buffer_t* command_buffer;
+  iree_hal_command_buffer_t* command_buffer = NULL;
   IREE_ASSERT_OK(iree_hal_command_buffer_create(
       device_, IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT,
       IREE_HAL_COMMAND_CATEGORY_DISPATCH, IREE_HAL_QUEUE_AFFINITY_ANY,
@@ -97,8 +97,8 @@ TEST_P(semaphore_submission_test, SubmitWithWait) {
 
   // One wait and one signal semaphore.
   iree_hal_submission_batch_t submission_batch;
-  iree_hal_semaphore_t* wait_semaphore;
-  iree_hal_semaphore_t* signal_semaphore;
+  iree_hal_semaphore_t* wait_semaphore = NULL;
+  iree_hal_semaphore_t* signal_semaphore = NULL;
   IREE_ASSERT_OK(iree_hal_semaphore_create(device_, 0ull, &wait_semaphore));
   IREE_ASSERT_OK(iree_hal_semaphore_create(device_, 100ull, &signal_semaphore));
   iree_hal_semaphore_t* wait_semaphore_ptrs[] = {wait_semaphore};
@@ -136,7 +136,7 @@ TEST_P(semaphore_submission_test, SubmitWithWait) {
 }
 
 TEST_P(semaphore_submission_test, SubmitWithMultipleSemaphores) {
-  iree_hal_command_buffer_t* command_buffer;
+  iree_hal_command_buffer_t* command_buffer = NULL;
   IREE_ASSERT_OK(iree_hal_command_buffer_create(
       device_, IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT,
       IREE_HAL_COMMAND_CATEGORY_DISPATCH, IREE_HAL_QUEUE_AFFINITY_ANY,
@@ -146,10 +146,10 @@ TEST_P(semaphore_submission_test, SubmitWithMultipleSemaphores) {
   IREE_ASSERT_OK(iree_hal_command_buffer_end(command_buffer));
 
   iree_hal_submission_batch_t submission_batch;
-  iree_hal_semaphore_t* wait_semaphore_1;
-  iree_hal_semaphore_t* wait_semaphore_2;
-  iree_hal_semaphore_t* signal_semaphore_1;
-  iree_hal_semaphore_t* signal_semaphore_2;
+  iree_hal_semaphore_t* wait_semaphore_1 = NULL;
+  iree_hal_semaphore_t* wait_semaphore_2 = NULL;
+  iree_hal_semaphore_t* signal_semaphore_1 = NULL;
+  iree_hal_semaphore_t* signal_semaphore_2 = NULL;
   IREE_ASSERT_OK(iree_hal_semaphore_create(device_, 0ull, &wait_semaphore_1));
   IREE_ASSERT_OK(iree_hal_semaphore_create(device_, 0ull, &wait_semaphore_2));
   IREE_ASSERT_OK(iree_hal_semaphore_create(device_, 0ull, &signal_semaphore_1));

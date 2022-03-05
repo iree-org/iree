@@ -44,7 +44,7 @@ class CtsTestBase : public ::testing::TestWithParam<std::string> {
 
     // Get driver with the given name and create its default device.
     // Skip drivers that are (gracefully) unavailable, fail if creation fails.
-    iree_hal_driver_t* driver;
+    iree_hal_driver_t* driver = NULL;
     iree_status_t status = TryGetDriver(driver_name, &driver);
     if (iree_status_is_unavailable(status)) {
       iree_status_free(status);
@@ -56,7 +56,7 @@ class CtsTestBase : public ::testing::TestWithParam<std::string> {
     IREE_ASSERT_OK(status);
     driver_ = driver;
 
-    iree_hal_device_t* device;
+    iree_hal_device_t* device = NULL;
     status = iree_hal_driver_create_default_device(
         driver_, iree_allocator_system(), &device);
     if (iree_status_is_unavailable(status)) {

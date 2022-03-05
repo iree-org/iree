@@ -67,7 +67,7 @@ class command_buffer_dispatch_test : public CtsTestBase {
 TEST_P(command_buffer_dispatch_test, DispatchAbs) {
   PrepareAbsExecutable();
 
-  iree_hal_command_buffer_t* command_buffer;
+  iree_hal_command_buffer_t* command_buffer = NULL;
   IREE_ASSERT_OK(iree_hal_command_buffer_create(
       device_,
       IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT |

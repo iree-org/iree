@@ -22,16 +22,16 @@ namespace cts {
 class event_test : public CtsTestBase {};
 
 TEST_P(event_test, Create) {
-  iree_hal_event_t* event;
+  iree_hal_event_t* event = NULL;
   IREE_ASSERT_OK(iree_hal_event_create(device_, &event));
   iree_hal_event_release(event);
 }
 
 TEST_P(event_test, SignalAndReset) {
-  iree_hal_event_t* event;
+  iree_hal_event_t* event = NULL;
   IREE_ASSERT_OK(iree_hal_event_create(device_, &event));
 
-  iree_hal_command_buffer_t* command_buffer;
+  iree_hal_command_buffer_t* command_buffer = NULL;
   IREE_ASSERT_OK(iree_hal_command_buffer_create(
       device_, IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT,
       IREE_HAL_COMMAND_CATEGORY_DISPATCH, IREE_HAL_QUEUE_AFFINITY_ANY,
@@ -52,11 +52,11 @@ TEST_P(event_test, SignalAndReset) {
 }
 
 TEST_P(event_test, SubmitWithChainedCommandBuffers) {
-  iree_hal_event_t* event;
+  iree_hal_event_t* event = NULL;
   IREE_ASSERT_OK(iree_hal_event_create(device_, &event));
 
-  iree_hal_command_buffer_t* command_buffer_1;
-  iree_hal_command_buffer_t* command_buffer_2;
+  iree_hal_command_buffer_t* command_buffer_1 = NULL;
+  iree_hal_command_buffer_t* command_buffer_2 = NULL;
   IREE_ASSERT_OK(iree_hal_command_buffer_create(
       device_, IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT,
       IREE_HAL_COMMAND_CATEGORY_DISPATCH, IREE_HAL_QUEUE_AFFINITY_ANY,
