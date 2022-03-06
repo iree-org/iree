@@ -80,18 +80,26 @@ class ExecutableCreateOpConversion
         importOp.getType().getInput(1), rewriter);
     assert(executableFormatString.hasValue() &&
            executableFormatString.getValue().size() == 1);
+    auto executableRodata =
+        rewriter.createOrFold<IREE::VM::ConstRefRodataOp>(loc, rodataOp);
 
-    SmallVector<int16_t, 4> segmentSizes = {
+    // Pack constants, if any.
+    auto constantBuffer =
+        createConstantBuffer(createOp.getLoc(), adaptor.constants(), rewriter);
+
+    SmallVector<int16_t, 5> segmentSizes = {
         /*device=*/-1,
         /*executable_format=*/-1,
         /*executable_data=*/-1,
+        /*constants=*/-1,
         /*executable_layouts=*/
         static_cast<int16_t>(llvm::size(adaptor.layouts())),
     };
     SmallVector<Value, 8> callOperands = {
         adaptor.device(),
         executableFormatString.getValue().front(),
-        rewriter.createOrFold<IREE::VM::ConstRefRodataOp>(loc, rodataOp),
+        executableRodata,
+        constantBuffer,
     };
     callOperands.append(adaptor.layouts().begin(), adaptor.layouts().end());
 
@@ -102,6 +110,51 @@ class ExecutableCreateOpConversion
     copyImportAttrs(importOp, callOp);
 
     return success();
+  }
+
+  // Creates a !vm.buffer containing all of the |constantValues|.
+  // TODO(benvanik): if there are a decent number of actual constant values we
+  // should create a rodata buffer that we can clone and then poke in the
+  // dynamic values; currently we require a lot of IR in order to store each
+  // value and it's very wasteful (think potentially KB of binary size) in order
+  // to do this all dynamically.
+  static Value createConstantBuffer(Location loc, ValueRange constantValues,
+                                    PatternRewriter &rewriter) {
+    auto bufferRefType =
+        IREE::VM::RefType::get(rewriter.getType<IREE::VM::BufferType>());
+    size_t constantCount = constantValues.size();
+    if (constantValues.empty()) {
+      // No constants; pass a null buffer.
+      return rewriter.create<IREE::VM::ConstRefZeroOp>(loc, bufferRefType);
+    }
+
+    // Create the constant storage buffer.
+    SmallVector<Location> constantLocs;
+    constantLocs.reserve(constantCount);
+    for (auto constantValue : constantValues) {
+      constantLocs.push_back(constantValue.getLoc());
+    }
+    auto constantBufferLoc = rewriter.getFusedLoc(constantLocs);
+    auto constantBuffer = rewriter.create<IREE::VM::BufferAllocOp>(
+        constantBufferLoc, bufferRefType,
+        rewriter.create<IREE::VM::ConstI32Op>(
+            constantBufferLoc, constantCount * sizeof(uint32_t)));
+
+    // Store each constant into it.
+    // TODO(#8477): better ops for this pattern; this creates a lot of
+    // extra IR for the indices. We should batch them up and append in one go.
+    for (auto constantValue : llvm::enumerate(constantValues)) {
+      // Buffer is zero-initialized so we can skip zero values.
+      if (mlir::matchPattern(constantValue.value(), m_Zero())) continue;
+      auto constantLoc = constantValue.value().getLoc();
+      rewriter.create<IREE::VM::BufferStoreI32Op>(
+          constantLoc, constantBuffer,
+          rewriter.create<IREE::VM::ConstI32Op>(constantLoc,
+                                                constantValue.index()),
+          constantValue.value());
+    }
+
+    return constantBuffer;
   }
 
  private:

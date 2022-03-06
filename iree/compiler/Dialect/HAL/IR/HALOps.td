@@ -1678,6 +1678,7 @@ def HAL_ExecutableBinaryOp : HAL_Op<"executable.binary", [
 
 def HAL_ExecutableCreateOp : HAL_PureOp<"executable.create", [
     DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
+    AttrSizedOperandSegments,
   ]> {
   let summary = [{creates an executable}];
   let description = [{
@@ -1689,12 +1690,16 @@ def HAL_ExecutableCreateOp : HAL_PureOp<"executable.create", [
     (such as when JITing/etc). As the cache is internally synchronized callers
     can issue preparation requests from multiple threads - even for the same
     executables - and calls will block until preparation completes.
+
+    Optional constants provide for specialization of the executable based on
+    runtime-derived parameters.
   }];
 
   let arguments = (ins
     HAL_Device:$device,
     SymbolRefAttr:$executable_target,
-    Variadic<HAL_ExecutableLayout>:$layouts
+    Variadic<HAL_ExecutableLayout>:$layouts,
+    Variadic<I32>:$constants
   );
   let results = (outs
     HAL_Executable:$result
@@ -1704,6 +1709,7 @@ def HAL_ExecutableCreateOp : HAL_PureOp<"executable.create", [
     `device` `(` $device `:` type($device) `)`
     `target` `(` $executable_target `)`
     `layouts` `(` `[` $layouts `]` `)`
+    (`constants` `(` `[` $constants^ `]` `)`)?
     `:` type($result)
     attr-dict-with-keyword
   }];

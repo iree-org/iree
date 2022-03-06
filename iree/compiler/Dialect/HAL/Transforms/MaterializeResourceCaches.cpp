@@ -216,12 +216,18 @@ class MaterializeResourceCachesPass
                 executableLayoutGlobalOp.sym_name()));
       }
 
+      // Inline constant initializer from the variant.
+      // We want these to all happen inside of this device switch case; they'll
+      // get deduplicated/hoisted if possible in future canonicalization passes.
+      // TODO(benvanik): define how constants are exposed on variants.
+      SmallVector<Value> constantValues;
+
       auto executableValue = caseBuilder.createOrFold<ExecutableCreateOp>(
           loc, ExecutableType::get(loc.getContext()), deviceValue,
           SymbolRefAttr::get(
               executableOp.sym_nameAttr(),
               {SymbolRefAttr::get(executableVariantOp.sym_nameAttr())}),
-          executableLayoutValues);
+          executableLayoutValues, constantValues);
 
       caseBuilder.create<IREE::HAL::ReturnOp>(loc, executableValue);
     }

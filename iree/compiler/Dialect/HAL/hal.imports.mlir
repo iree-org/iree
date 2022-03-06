@@ -323,6 +323,7 @@ vm.import @executable.create(
   %device : !vm.ref<!hal.device>,
   %executable_format : !vm.buffer,
   %executable_data : !vm.buffer,
+  %constants : !vm.buffer,
   %executable_layouts : !vm.ref<!hal.executable_layout>...
 ) -> !vm.ref<!hal.executable>
 attributes {nosideeffects}
