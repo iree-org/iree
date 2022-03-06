@@ -363,6 +363,14 @@ typedef struct iree_hal_executable_export_table_v0_t {
   const char* const* tags;
 } iree_hal_executable_export_table_v0_t;
 
+// A table declaring the executable-level constants that can be used to
+// specialize the executable behavior.
+typedef struct iree_hal_executable_constant_table_v0_t {
+  // Total number of constants in the table.
+  uint32_t count;
+  // We could add more metadata here if we wanted to enable reflection.
+} iree_hal_executable_constant_table_v0_t;
+
 // Structure used for v0 library interfaces.
 // The entire structure is designed to be read-only and able to live embedded in
 // the binary .rdata section.
@@ -383,6 +391,9 @@ typedef struct iree_hal_executable_library_v0_t {
 
   // Table of exported functions from the executable.
   iree_hal_executable_export_table_v0_t exports;
+
+  // Table of executable-level constants.
+  iree_hal_executable_constant_table_v0_t constants;
 } iree_hal_executable_library_v0_t;
 
 #endif  // IREE_HAL_LOCAL_EXECUTABLE_LIBRARY_H_
