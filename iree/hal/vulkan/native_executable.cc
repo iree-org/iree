@@ -181,14 +181,6 @@ static iree_status_t iree_hal_spirv_executable_flatbuffer_verify(
                             "executable SPIR-V code is missing/empty");
   }
 
-  // TODO(benvanik): pull PopulateSpecializationInfo from history and update.
-  // For now the compiler isn't generating them, and we don't use them.
-  if (iree_SpirVExecutableDef_specialization_info_is_present(executable_def)) {
-    return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                            "executable uses SPIR-V specialization constants; "
-                            "they need to be revived");
-  }
-
   return iree_ok_status();
 }
 
