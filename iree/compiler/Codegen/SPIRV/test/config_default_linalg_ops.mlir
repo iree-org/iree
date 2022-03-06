@@ -1,54 +1,5 @@
 // RUN: iree-opt -split-input-file -pass-pipeline='hal.executable(hal.executable.variant(iree-spirv-lower-executable-target-pass{test-lowering-configuration=true}))' %s | FileCheck %s
 
-#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
-  #hal.descriptor_set.layout<0, bindings = [
-    #hal.descriptor_set.binding<0, storage_buffer>,
-    #hal.descriptor_set.binding<1, storage_buffer>
-  ]>
-]>
-hal.executable @tensor_insert {
-  hal.executable.variant @vulkan_spirv_fb, target = <"vulkan-spirv", "vulkan-spirv-fb", {
-      spv.target_env = #spv.target_env<#spv.vce<v1.4, [Shader], []>, Unknown:IntegratedGPU, {
-        max_compute_shared_memory_size = 32768 : i32,
-        max_compute_workgroup_invocations = 512 : i32,
-        max_compute_workgroup_size = dense<512> : vector<3xi32>,
-        subgroup_size = 16 : i32}>
-    }> {
-    hal.executable.entry_point @tensor_insert_slice layout(#executable_layout)
-    builtin.module {
-      builtin.func @tensor_insert_slice() {
-        %c0 = arith.constant 0 : index
-        %size_y = hal.interface.constant.load[0] : index
-        %size_x = hal.interface.constant.load[1] : index
-        %dest_size_y = hal.interface.constant.load[2] : index
-        %dest_size_x = hal.interface.constant.load[3] : index
-        %offset_y = hal.interface.constant.load[4] : index
-        %offset_x = hal.interface.constant.load[5] : index
-        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<readonly:?x?xi32>{%size_y, %size_x}
-        %3 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : !flow.dispatch.tensor<readwrite:?x?xi32>{%dest_size_y, %dest_size_x}
-        %10 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [%size_y, %size_x], strides = [1, 1]
-            : !flow.dispatch.tensor<readonly:?x?xi32>{%size_y, %size_x} -> tensor<?x?xi32>
-        %11 = flow.dispatch.tensor.load %3, offsets = [0, 0], sizes = [%dest_size_y, %dest_size_x], strides = [1, 1]
-            : !flow.dispatch.tensor<readwrite:?x?xi32>{%dest_size_y, %dest_size_x} -> tensor<?x?xi32>
-        %12 = tensor.insert_slice %10 into %11[%offset_y, %offset_x] [%size_y, %size_x] [1, 1]
-            : tensor<?x?xi32> into tensor<?x?xi32>
-        flow.dispatch.tensor.store %10, %3, offsets = [0, 0], sizes = [%dest_size_y, %dest_size_x], strides = [1, 1]
-            : tensor<?x?xi32> -> !flow.dispatch.tensor<readwrite:?x?xi32>{%dest_size_y, %dest_size_x}
-        return
-      }
-    }
-  }
-}
-
-//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering.config<tile_sizes = {{\[}}[1, 16], [1, 1]{{\]}}, native_vector_size = []>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"SPIRVDistribute", workload_per_wg = []>
-//      CHECK: hal.executable.entry_point public @tensor_insert_slice
-// CHECK-SAME:     translation.info = #[[TRANSLATION]]
-//      CHECK: tensor.insert_slice
-// CHECK-SAME:     lowering.config = #[[CONFIG]]
-
-// -----
-
 #executable_layout = #hal.executable.layout<push_constants = 2, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,

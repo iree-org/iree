@@ -215,11 +215,10 @@ void addSPIRVTileAndDistributePassPipeline(OpPassManager &pm) {
 // still perform bufferization first to expose a linalg.copy op, from which we
 // can deduce the configuration.
 void addSPIRVTileAndDistributeCopyPassPipeline(OpPassManager &pm) {
-  pm.addNestedPass<FuncOp>(createTileAndDistributeToWorkgroupsPass());
-  pm.addPass(createCanonicalizerPass());
-  pm.addPass(createCSEPass());
-
   addLinalgBufferizePasses(pm, gpuAllocationFunction);
+  pm.addPass(createSPIRVInitConfigPass());
+
+  pm.addNestedPass<FuncOp>(createTileAndDistributeToWorkgroupsPass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 

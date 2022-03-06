@@ -371,8 +371,7 @@ std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
 createSPIRVLowerExecutableTargetPass();
 
 /// Initializes CodeGen configuration for the given dispatch region.
-std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
-createSPIRVInitConfigPass();
+std::unique_ptr<OperationPass<ModuleOp>> createSPIRVInitConfigPass();
 
 /// Pass to tile and distribute Linalg ops with buffer semantics to invocations.
 std::unique_ptr<OperationPass<FuncOp>> createSPIRVTileAndDistributePass();

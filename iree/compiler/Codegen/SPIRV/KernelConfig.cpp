@@ -581,6 +581,11 @@ LogicalResult initSPIRVLaunchConfig(ModuleOp module) {
       return funcOp.emitOpError("failed to get compute ops");
     }
 
+    if (computeOps.empty()) {
+      return funcOp.emitOpError(
+          "unhandled translation of function without compute ops");
+    }
+
     Operation *rootOperation = nullptr;
     // Try to find a configuration according to a matmul/convolution op and use
     // it as the root op.
@@ -599,7 +604,27 @@ LogicalResult initSPIRVLaunchConfig(ModuleOp module) {
 
     // If there are still no root op, check for any linalg.generic op.
     if (!rootOperation) {
-      for (Operation *computeOp : reverse(computeOps)) {
+      Operation *computeOp = computeOps.back();
+
+      // Handle the case of compute op being a
+      // `tensor.extract_slice`/`tensor.insert_slice`. That needs bufferization
+      // to run before configuration can be set again. Just set the translation
+      // to use the `SPIRVDistributeAndCopy` pipeline. The configuration will be
+      // set again after bufferization.
+      //
+      // TODO(ravishankarm): This is a awkward.
+      // `tensor.extract_slice`/`tensor.insert_slice` will be dropped from
+      // `TiledOpInterface` soon, and will not be compute op. At that time, they
+      // will be folded with `flow.tensor.load` and `flow.tensor.store`
+      // operations. Then this case will degenerate to having no compute ops.
+      // Rework this at that stage to run bufferization early.
+      if (isa<tensor::ExtractSliceOp, tensor::InsertSliceOp>(computeOp)) {
+        setTranslationInfo(
+            funcOp,
+            IREE::Codegen::DispatchLoweringPassPipeline::SPIRVDistributeCopy,
+            /*workloadPerWorkgroup=*/ArrayRef<int64_t>{},
+            /*workgroupSize=*/ArrayRef<int64_t>{});
+      } else {
         if (failed(setDefaultOpConfig(limits, computeOp))) return failure();
 
         // Check if the op configuration was set.
@@ -608,23 +633,8 @@ LogicalResult initSPIRVLaunchConfig(ModuleOp module) {
               "without known roots, the last compute operation in the tiled "
               "loop body is expected to be set as root");
         }
-        rootOperation = computeOp;
-        break;
       }
-    }
-
-    if (!rootOperation) {
-      // If the tiled loops are not empty then this could be a corner case of
-      // tensor.insert_slice being tiled and distributed, that just shows up as
-      // a `flow.dispatch.tensor.load` and a `flow.dispatch.tensor.store` (or as
-      // a copy). For now just treat the tiled loops not being empty as an
-      // indicator of that. Need a better way of information flow from flow
-      // dialect to hal.
-      if (computeOps.size() == 1 &&
-          isa<tensor::ExtractSliceOp, tensor::InsertSliceOp>(computeOps[0])) {
-        return setDefaultOpConfig(limits, computeOps[0]);
-      }
-      return funcOp.emitError("contains no root Linalg operation");
+      rootOperation = computeOp;
     }
 
     // Propogate the `lowering.config` attribute to the other ops.
