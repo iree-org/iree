@@ -1194,7 +1194,7 @@ IREE_VM_ABI_EXPORT(iree_hal_module_device_query_i32,  //
 
 IREE_VM_ABI_EXPORT(iree_hal_module_executable_create,  //
                    iree_hal_module_state_t,            //
-                   rrrCrD, r) {
+                   rrrrCrD, r) {
   iree_hal_device_t* device = NULL;
   IREE_RETURN_IF_ERROR(iree_hal_device_check_deref(args->r0, &device));
   iree_vm_buffer_t* executable_format = NULL;
@@ -1204,7 +1204,22 @@ IREE_VM_ABI_EXPORT(iree_hal_module_executable_create,  //
       iree_vm_buffer_as_string(executable_format);
   iree_vm_buffer_t* executable_data = NULL;
   IREE_RETURN_IF_ERROR(iree_vm_buffer_check_deref(args->r2, &executable_data));
-  iree_host_size_t executable_layout_count = args->a3_count;
+  iree_host_size_t constant_count = 0;
+  const uint32_t* constants = NULL;
+  if (iree_vm_buffer_isa(args->r3)) {
+    iree_vm_buffer_t* constant_buffer = NULL;
+    IREE_RETURN_IF_ERROR(
+        iree_vm_buffer_check_deref(args->r3, &constant_buffer));
+    if (constant_buffer->data.data_length % 4 != 0) {
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                              "constant buffer data must contain 4-byte "
+                              "elements but data length is %" PRIhsz,
+                              constant_buffer->data.data_length);
+    }
+    constant_count = constant_buffer->data.data_length / sizeof(uint32_t);
+    constants = (const uint32_t*)constant_buffer->data.data;
+  }
+  iree_host_size_t executable_layout_count = args->a4_count;
   iree_hal_executable_layout_t** executable_layouts = NULL;
   IREE_RETURN_IF_ERROR(iree_allocator_malloc(
       state->host_allocator,
@@ -1212,7 +1227,7 @@ IREE_VM_ABI_EXPORT(iree_hal_module_executable_create,  //
       (void**)&executable_layouts));
   iree_status_t status = iree_ok_status();
   for (iree_host_size_t i = 0; i < executable_layout_count; ++i) {
-    status = iree_hal_executable_layout_check_deref(args->a3[i].r0,
+    status = iree_hal_executable_layout_check_deref(args->a4[i].r0,
                                                     &executable_layouts[i]);
     if (!iree_status_is_ok(status)) break;
   }
@@ -1230,6 +1245,8 @@ IREE_VM_ABI_EXPORT(iree_hal_module_executable_create,  //
         executable_data->data.data, executable_data->data.data_length);
     executable_params.executable_layout_count = executable_layout_count;
     executable_params.executable_layouts = executable_layouts;
+    executable_params.constant_count = constant_count;
+    executable_params.constants = constants;
     status = iree_hal_executable_cache_prepare_executable(
         state->executable_cache, &executable_params, &executable);
   }
