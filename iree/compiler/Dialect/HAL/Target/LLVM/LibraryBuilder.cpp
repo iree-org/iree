@@ -163,6 +163,25 @@ static llvm::StructType *makeExportTableType(llvm::LLVMContext &context) {
   return type;
 }
 
+// %struct.iree_hal_executable_constant_table_v0_t = type {
+//   i32
+// }
+static llvm::StructType *makeConstantTableType(llvm::LLVMContext &context) {
+  if (auto *existingType = llvm::StructType::getTypeByName(
+          context, "iree_hal_executable_constant_table_v0_t")) {
+    return existingType;
+  }
+  auto *i32Type = llvm::IntegerType::getInt32Ty(context);
+  auto *type =
+      llvm::StructType::create(context,
+                               {
+                                   i32Type,
+                               },
+                               "iree_hal_executable_constant_table_v0_t",
+                               /*isPacked=*/false);
+  return type;
+}
+
 // %struct.iree_hal_executable_library_header_t = type {
 //   i32,
 //   i8*,
@@ -201,11 +220,13 @@ static llvm::StructType *makeLibraryType(llvm::StructType *libraryHeaderType) {
   }
   auto *importTableType = makeImportTableType(context);
   auto *exportTableType = makeExportTableType(context);
+  auto *constantTableType = makeConstantTableType(context);
   auto *type = llvm::StructType::create(context,
                                         {
                                             libraryHeaderType->getPointerTo(),
                                             importTableType,
                                             exportTableType,
+                                            constantTableType,
                                         },
                                         "iree_hal_executable_library_v0_t",
                                         /*isPacked=*/false);
@@ -430,6 +451,19 @@ llvm::Constant *LibraryBuilder::buildLibraryV0ExportTable(
                        });
 }
 
+llvm::Constant *LibraryBuilder::buildLibraryV0ConstantTable(
+    std::string libraryName) {
+  auto &context = module->getContext();
+  auto *constantTableType = makeConstantTableType(context);
+  auto *i32Type = llvm::IntegerType::getInt32Ty(context);
+
+  return llvm::ConstantStruct::get(
+      constantTableType, {
+                             // count=
+                             llvm::ConstantInt::get(i32Type, constantCount),
+                         });
+}
+
 llvm::Constant *LibraryBuilder::buildLibraryV0(std::string libraryName) {
   auto &context = module->getContext();
   auto *libraryHeaderType = makeLibraryHeaderType(context);
@@ -471,6 +505,8 @@ llvm::Constant *LibraryBuilder::buildLibraryV0(std::string libraryName) {
                                     buildLibraryV0ImportTable(libraryName),
                                     // exports=
                                     buildLibraryV0ExportTable(libraryName),
+                                    // constants=
+                                    buildLibraryV0ConstantTable(libraryName),
                                 }),
       /*Name=*/libraryName);
   // TODO(benvanik): force alignment (8? natural pointer width?)
