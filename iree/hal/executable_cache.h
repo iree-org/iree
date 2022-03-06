@@ -98,6 +98,22 @@ typedef struct iree_hal_executable_params_t {
   // executable layout objects.
   iree_host_size_t executable_layout_count;
   iree_hal_executable_layout_t* const* executable_layouts;
+
+  // Executable-level constants table used to perform runtime specialization
+  // when information is not available statically during compilation. The
+  // compiler defines the contents of the table, how they are populated, and
+  // their usage in the executable.
+  //
+  // For targets that natively support specialization these directly map down:
+  //   Metal: function constants
+  //   WGSL: pipeline overrides
+  //   Vulkan/SPIR-V: specialization constants
+  // Other targets may present these as constant tables or uniform buffers.
+  // Since the values cannot change after initialization targets that JIT may
+  // perform substitution during initialization to inline the values
+  // immediately (via CUDA PTX linking, etc).
+  iree_host_size_t constant_count;
+  const uint32_t* constants;
 } iree_hal_executable_params_t;
 
 // Initializes |out_executable_params| to the default values for normal
