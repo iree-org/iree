@@ -117,6 +117,8 @@ static void addSPIRVLoweringPasses(OpPassManager &pm) {
   pm.addPass(createCSEPass());
 
   pm.addPass(createLowerAffinePass());
+  pm.addPass(createCanonicalizerPass());
+  pm.addPass(createCSEPass());
 
   pm.addPass(createConvertToSPIRVPass());
 
