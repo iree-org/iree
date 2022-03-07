@@ -324,23 +324,25 @@ SmallVector<NamedAttribute> PruneAttributeList(linalg::GenericOp op) {
   return preservedAttrs;
 }
 
-/// Adapts Linalg ops input operand to output operand if
-///   1. All the loops are parallel loops.
-///   2. There is only one result tensor.
-///   3. The output tensor is unused in the body computation.
-///   4. There is an input tensor that has the same indexing map and type.
+/// Adapts Linalg ops input operand to output operand. This is required for not
+/// creating extra alloca ops. For more details, see
+/// https://github.com/google/iree/issues/8303
 struct AdaptLinalgInputOperandToOutputOperand
     : public OpRewritePattern<linalg::GenericOp> {
   using OpRewritePattern<linalg::GenericOp>::OpRewritePattern;
 
   LogicalResult matchAndRewrite(linalg::GenericOp op,
                                 PatternRewriter &rewriter) const override {
+    // All the loops should be parallel loops.
     if (op.getNumLoops() != op.getNumParallelLoops()) return failure();
+    // There is only one result tensor.
     if (op->getNumResults() != 1) return failure();
-    if (!op.getRegionOutputArgs()[0].use_empty()) return failure();
-
-    OpOperand *operand = nullptr;
+    // The output tensor is unused in the body computation.
     auto outputOperand = op.getOutputOperand(0);
+    if (op.payloadUsesValueFromOperand(outputOperand)) return failure();
+
+    // Find an input operand that has the same indexing map and type.
+    OpOperand *operand = nullptr;
     SmallVector<Value> newOperands;
     SmallVector<AffineMap> maps;
     for (auto in : op.getInputOperands()) {
