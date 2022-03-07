@@ -252,6 +252,7 @@ if(${IREE_BUILD_COMPILER})
       iree::compiler::Dialect::Vulkan::IR
       iree::compiler::InputConversion::Common
       iree::compiler::InputConversion::MHLO
+      iree::compiler::InputConversion::TMTensor
       iree::compiler::InputConversion::TOSA
       iree::compiler::ConstEval
       iree::compiler::Translation::HALExecutable

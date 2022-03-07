@@ -27,6 +27,7 @@
 #include "iree/compiler/Dialect/VM/Transforms/Passes.h"
 #include "iree/compiler/InputConversion/Common/Passes.h"
 #include "iree/compiler/InputConversion/MHLO/Passes.h"
+#include "iree/compiler/InputConversion/TMTensor/Passes.h"
 #include "iree/compiler/InputConversion/TOSA/Passes.h"
 #include "iree/compiler/Translation/IREEVM.h"
 
@@ -43,6 +44,7 @@ inline void registerAllIreePasses() {
 
   registerCommonInputConversionPasses();
   MHLO::registerMHLOConversionPasses();
+  TMTensor::registerTMTensorConversionPasses();
   registerTOSAConversionPasses();
   ConstEval::registerConstEvalPasses();
 

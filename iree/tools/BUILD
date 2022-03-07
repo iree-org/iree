@@ -114,6 +114,7 @@ cc_library(
         "//iree/compiler/Dialect/Vulkan/IR",
         "//iree/compiler/InputConversion/Common",
         "//iree/compiler/InputConversion/MHLO",
+        "//iree/compiler/InputConversion/TMTensor",
         "//iree/compiler/InputConversion/TOSA",
         "//iree/compiler/Translation:HALExecutable",
         "//iree/compiler/Translation:IREEVM",
