@@ -437,8 +437,8 @@ def filter_and_run_benchmarks(
     benchmark_category_dir = os.path.join(root_benchmark_dir, directory)
     matched_benchmarks = filter_benchmarks_for_category(
         benchmark_category_dir=benchmark_category_dir,
-        cpu_target_arch=cpu_target_arch,
-        gpu_target_arch=gpu_target_arch,
+        cpu_target_arch_filter=cpu_target_arch,
+        gpu_target_arch_filter=gpu_target_arch,
         driver_filter=driver_filter,
         verbose=verbose)
     run_results, run_errors = run_benchmarks_for_category(
@@ -525,10 +525,11 @@ def parse_arguments():
                       default=None,
                       help="Path to the tool for collecting captured traces")
   parser.add_argument(
-      "--driver",
+      "--driver-filter-regex",
+      "--driver_filter_regex",
       type=str,
       default=None,
-      help="Only run benchmarks for a specific driver, e.g., 'vulkan'")
+      help="Only run benchmarks matching the given driver regex")
   parser.add_argument("--output",
                       "-o",
                       default=None,
@@ -655,7 +656,7 @@ def main(args):
   benchmarks, captures, errors = filter_and_run_benchmarks(
       device_info=device_info,
       root_build_dir=args.build_dir,
-      driver_filter=args.driver,
+      driver_filter=args.driver_filter_regex,
       tmp_dir=args.tmp_dir,
       normal_benchmark_tool_dir=os.path.realpath(
           args.normal_benchmark_tool_dir),
