@@ -129,4 +129,4 @@ jobs:
         # We have to explicitly fetch the base branch as well
         run: git fetch --no-tags --prune --depth=1 origin "${GITHUB_BASE_REF?}:${GITHUB_BASE_REF?}"
       - name: yamllint
-        run: ./scripts/run_yamllint.sh
+        run: ./scripts/run_yamllint.sh "${GITHUB_BASE_REF?}"
