@@ -51,30 +51,8 @@ inline bool isVMVXBackend(FuncOp entryPointFn) {
 }
 
 //===----------------------------------------------------------------------===//
-// Utility functions to get untiled op shapes
-//===----------------------------------------------------------------------===//
-
-/// Returns the untiled type of a tiled view for both tensor and memref
-/// types. Either walks the `ViewOpInterface` chain (for memrefs) or the
-/// extract/load op chain (for tensors).
-ArrayRef<int64_t> getUntiledShape(Value tiledView);
-
-/// Returns the untiled result shape for the given Linalg `op` by inspecting
-/// the subview chain or the tiled and distributed loop nests around it.
-SmallVector<int64_t> getUntiledResultShape(linalg::LinalgOp linalgOp,
-                                           unsigned resultNum);
-
-//===----------------------------------------------------------------------===//
 // Utility functions to set configurations
 //===----------------------------------------------------------------------===//
-
-/// Return the tile sizes to use for the Flow partitioned loops given the
-/// workload per workgroup. The tile sizes for the partitioned loops are
-/// obtained from the workload per workgroup. The other loops are returned as
-/// zero.
-SmallVector<int64_t> getDistributedTileSizes(
-    IREE::Flow::PartitionableLoopsInterface interfaceOp,
-    ArrayRef<int64_t> workloadPerWorkgroup);
 
 /// Information about a tiled and distributed loop.
 ///

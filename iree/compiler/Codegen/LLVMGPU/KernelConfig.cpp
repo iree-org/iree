@@ -123,8 +123,10 @@ static LogicalResult setContractConfig(FuncOp entryPoint, linalg::LinalgOp op) {
             /*nativeVectorSizes=*/ArrayRef<int64_t>{}, pipeline, workgroupSize);
       };
   // Infer the MxN size of the matmul based on operands and indexing maps.
-  auto lhsShape = getUntiledShape(op.getInputOperand(0)->get());
-  auto rhsShape = getUntiledShape(op.getInputOperand(1)->get());
+  auto lhsShape =
+      op.getInputOperand(0)->get().getType().cast<ShapedType>().getShape();
+  auto rhsShape =
+      op.getInputOperand(1)->get().getType().cast<ShapedType>().getShape();
   int64_t sizeM = ShapedType::kDynamicSize;
   int64_t sizeN = ShapedType::kDynamicSize;
   int64_t sizeK = ShapedType::kDynamicSize;
@@ -311,8 +313,12 @@ static LogicalResult setRootDefaultConfig(FuncOp entryPoint, Operation *op) {
         vectorSize = 1;
         break;
       }
-      SmallVector<int64_t> shape = getUntiledResultShape(
-          cast<linalg::LinalgOp>(op), outputOperand.index());
+      ArrayRef<int64_t> shape = cast<linalg::LinalgOp>(op)
+                                    .getOutputOperand(outputOperand.index())
+                                    ->get()
+                                    .getType()
+                                    .cast<ShapedType>()
+                                    .getShape();
       if (llvm::any_of(shape, ShapedType::isDynamic)) {
         vectorSize = 1;
         break;

@@ -476,8 +476,8 @@ static LogicalResult setRootConfig(
   };
 
   auto getL1TileSizes = [&]() -> SmallVector<int64_t> {
-    auto lhsShape = getUntiledShape(mmt4dOp.inputs()[0]);
-    auto rhsShape = getUntiledShape(mmt4dOp.inputs()[1]);
+    auto lhsShape = mmt4dOp.inputs()[0].getType().cast<ShapedType>().getShape();
+    auto rhsShape = mmt4dOp.inputs()[1].getType().cast<ShapedType>().getShape();
     int M0 = lhsShape[2];
     int N0 = rhsShape[2];
     int K0 = lhsShape[3];
@@ -489,8 +489,8 @@ static LogicalResult setRootConfig(
   };
 
   auto getVectorSizes = [&]() -> SmallVector<int64_t> {
-    auto lhsShape = getUntiledShape(mmt4dOp.inputs()[0]);
-    auto rhsShape = getUntiledShape(mmt4dOp.inputs()[1]);
+    auto lhsShape = mmt4dOp.inputs()[0].getType().cast<ShapedType>().getShape();
+    auto rhsShape = mmt4dOp.inputs()[1].getType().cast<ShapedType>().getShape();
     int M0 = lhsShape[2];
     int N0 = rhsShape[2];
     int K0 = lhsShape[3];

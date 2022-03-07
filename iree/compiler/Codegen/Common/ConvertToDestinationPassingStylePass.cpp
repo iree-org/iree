@@ -294,7 +294,8 @@ static LogicalResult duplicateInitTensorOps(OpBuilder &b,
                                             linalg::InitTensorOp initTensorOp) {
   OpBuilder::InsertionGuard g(b);
   b.setInsertionPoint(initTensorOp);
-  SmallVector<OpOperand *> uses = llvm::to_vector(llvm::map_range(initTensorOp->getUses(), [](OpOperand &use) { return &use;}));
+  SmallVector<OpOperand *> uses = llvm::to_vector(llvm::map_range(
+      initTensorOp->getUses(), [](OpOperand &use) { return &use; }));
   for (auto use : llvm::make_range(std::next(uses.begin()), uses.end())) {
     auto newOp =
         cast<linalg::InitTensorOp>(b.clone(*initTensorOp.getOperation()));

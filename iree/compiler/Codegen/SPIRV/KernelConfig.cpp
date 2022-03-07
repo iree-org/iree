@@ -36,8 +36,16 @@ namespace detail {
 LogicalResult setConvOpConfig(linalg::LinalgOp linalgOp,
                               const int64_t subgroupSize,
                               const int64_t bestTilingFactor) {
-  ArrayRef<int64_t> inputShape = getUntiledShape(linalgOp.inputs()[0]);
-  SmallVector<int64_t> outputShape = getUntiledResultShape(linalgOp, 0);
+  ArrayRef<int64_t> inputShape = linalgOp.getInputOperand(0)
+                                     ->get()
+                                     .getType()
+                                     .cast<ShapedType>()
+                                     .getShape();
+  ArrayRef<int64_t> outputShape = linalgOp.getOutputOperand(0)
+                                      ->get()
+                                      .getType()
+                                      .cast<ShapedType>()
+                                      .getShape();
   if (llvm::any_of(inputShape, ShapedType::isDynamic)) return success();
   if (llvm::any_of(outputShape, ShapedType::isDynamic)) return success();
 
@@ -163,8 +171,10 @@ LogicalResult setMatmulOpConfig(linalg::LinalgOp op,
   auto elementBits = lhsType.getElementType().getIntOrFloatBitWidth();
   if (elementBits != 16 && elementBits != 32) return success();
 
-  ArrayRef<int64_t> lhsShape = getUntiledShape(op.inputs()[0]);
-  ArrayRef<int64_t> rhsShape = getUntiledShape(op.inputs()[1]);
+  ArrayRef<int64_t> lhsShape =
+      op.getInputOperand(0)->get().getType().cast<ShapedType>().getShape();
+  ArrayRef<int64_t> rhsShape =
+      op.getInputOperand(1)->get().getType().cast<ShapedType>().getShape();
   if (llvm::any_of(lhsShape, ShapedType::isDynamic)) return success();
   if (llvm::any_of(rhsShape, ShapedType::isDynamic)) return success();
 
