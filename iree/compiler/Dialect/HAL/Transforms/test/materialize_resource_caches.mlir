@@ -122,13 +122,13 @@ module attributes {hal.device.targets = [#hal.device.target<"cpu">]} {
 //   - If there is no matching hal.executable.variant then the executable will not be cached
 hal.executable @exe {
   hal.executable.variant @vmvx, target = <"vmvx", "vmvx-bytecode-fb"> {
-    hal.executable.entry_point @entry0 ordinal(0) layout(#executable_layout_0) attributes {
+    hal.executable.entry_point @entry0 ordinal(0) layout(#executable_layout_0) {
       workgroup_size = [32 : index, 1 : index, 1 : index]
     }
-    hal.executable.entry_point @entry0_alias ordinal(0) layout(#executable_layout_0) attributes {
+    hal.executable.entry_point @entry0_alias ordinal(0) layout(#executable_layout_0) {
       workgroup_size = [32 : index, 1 : index, 1 : index]
     }
-    hal.executable.entry_point @entry1 ordinal(1) layout(#executable_layout_1) attributes {
+    hal.executable.entry_point @entry1 ordinal(1) layout(#executable_layout_1) {
       workgroup_size = [32 : index, 1 : index, 1 : index]
     }
   }

@@ -306,8 +306,7 @@ def SPIRVLowerExecutableTarget :
 }
 
 def SPIRVInitConfig :
-    Pass<"iree-spirv-init-config-pass",
-         "mlir::iree_compiler::IREE::HAL::ExecutableVariantOp"> {
+    Pass<"iree-spirv-init-config-pass", "ModuleOp"> {
   let summary = "Initialize CodeGen configuration for a given dispatch region";
   let constructor = "mlir::iree_compiler::createSPIRVInitConfigPass()";
 }

@@ -37,17 +37,23 @@ static Value gpuAllocationFunction(OpBuilder &builder, Location loc,
   return builder.create<memref::AllocOp>(loc, allocType, dynamicSizes);
 }
 
+static void tileAndBufferize(OpPassManager &pm) {
+  pm.addNestedPass<FuncOp>(createTileAndDistributeToWorkgroupsPass());
+  pm.addPass(createCanonicalizerPass());
+  pm.addPass(createCSEPass());
+
+  addLinalgBufferizePasses(pm, gpuAllocationFunction);
+
+  pm.addPass(createCanonicalizerPass());
+  pm.addPass(createCSEPass());
+}
 
 //===---------------------------------------------------------------------===//
 // Codegen pipelines.
 //===---------------------------------------------------------------------===//
 
 void addGPUVectorizationPassPipeline(OpPassManager &pm) {
-  //===--------------------------------------------------------------------===//
-  // Initial clean up.
-  //===--------------------------------------------------------------------===//
-  pm.addPass(createCanonicalizerPass());
-  pm.addPass(createCSEPass());
+  tileAndBufferize(pm);
 
   // Distribute linalg onto threads within the workgroup.
   pm.addNestedPass<FuncOp>(createLLVMGPUTileAndDistribute());
@@ -64,9 +70,12 @@ void addGPUVectorizationPassPipeline(OpPassManager &pm) {
 }
 
 void addGPUMatmulSimtPassPipeline(OpPassManager &pm) {
-  //===--------------------------------------------------------------------===//
-  // Initial clean up.
-  //===--------------------------------------------------------------------===//
+  pm.addNestedPass<FuncOp>(createTileAndDistributeToWorkgroupsPass());
+  pm.addPass(createCanonicalizerPass());
+  pm.addPass(createCSEPass());
+
+  addLinalgBufferizePasses(pm, gpuAllocationFunction);
+
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
@@ -89,11 +98,7 @@ void addGPUMatmulSimtPassPipeline(OpPassManager &pm) {
 }
 
 void addGPUMatmulTensorCorePassPipeline(OpPassManager &pm) {
-  //===--------------------------------------------------------------------===//
-  // Initial clean up.
-  //===--------------------------------------------------------------------===//
-  pm.addPass(createCanonicalizerPass());
-  pm.addPass(createCSEPass());
+  tileAndBufferize(pm);
 
   // Distribute linalg onto warps within the workgroup.
   pm.addNestedPass<FuncOp>(
@@ -123,11 +128,7 @@ void addGPUMatmulTensorCorePassPipeline(OpPassManager &pm) {
 }
 
 void addGPUSimpleDistributePassPipeline(OpPassManager &pm) {
-  //===--------------------------------------------------------------------===//
-  // Initial clean up.
-  //===--------------------------------------------------------------------===//
-  pm.addPass(createCanonicalizerPass());
-  pm.addPass(createCSEPass());
+  tileAndBufferize(pm);
 
   // Distribute linalg onto threads within the workgroup.
   pm.addNestedPass<FuncOp>(createLLVMGPUTileAndDistribute());
@@ -183,13 +184,6 @@ static void addLowerToLLVMGPUPasses(OpPassManager &pm, bool useROCM) {
 
 void buildLLVMGPUTransformPassPipeline(OpPassManager &pm, bool useROCM) {
   pm.nest<ModuleOp>().nest<FuncOp>().addPass(createTypePropagationPass());
-  pm.nest<ModuleOp>().nest<FuncOp>().addPass(
-      createTileAndDistributeToWorkgroupsPass());
-  pm.addPass(createCanonicalizerPass());
-  pm.addPass(createCSEPass());
-
-  OpPassManager &bufferizePassPM = pm.nest<ModuleOp>();
-  addLinalgBufferizePasses(bufferizePassPM, gpuAllocationFunction);
   pm.addPass(createLLVMGPULowerExecutableTargetPass());
   OpPassManager &nestedModulePM = pm.nest<ModuleOp>();
   //===--------------------------------------------------------------------===//

@@ -29,16 +29,14 @@ class SPIRVInitConfigPass : public SPIRVInitConfigBase<SPIRVInitConfigPass> {
   }
 
   void runOnOperation() override {
-    IREE::HAL::ExecutableVariantOp variantOp = getOperation();
-    ModuleOp moduleOp = variantOp.getInnerModule();
+    ModuleOp moduleOp = getOperation();
     if (failed(initSPIRVLaunchConfig(moduleOp))) return signalPassFailure();
   }
 };
 
 }  // namespace
 
-std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
-createSPIRVInitConfigPass() {
+std::unique_ptr<OperationPass<ModuleOp>> createSPIRVInitConfigPass() {
   return std::make_unique<SPIRVInitConfigPass>();
 }
 

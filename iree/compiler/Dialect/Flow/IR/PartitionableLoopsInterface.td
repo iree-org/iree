@@ -37,6 +37,13 @@ def FLOW_PartitionableLoopsInterface : OpInterface<"PartitionableLoopsInterface"
       /*retTy=*/"llvm::SmallVector<unsigned>",
       /*methodName=*/"getPartitionableLoops",
       /*args=*/(ins "unsigned":$maxNumPartitionedLoops)
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Returns the iterator types for all the loops of the op.
+      }],
+      /*retTy=*/"llvm::SmallVector<llvm::StringRef>",
+      /*methodName=*/"getIteratorTypes"
     >
   ];
 }

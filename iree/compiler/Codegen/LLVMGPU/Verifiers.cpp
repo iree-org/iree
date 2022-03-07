@@ -95,8 +95,10 @@ LogicalResult verifyGPUMatmulTensorCorePipeline(
   }
 
   Type inputType = op->getOperand(0).getType();
-  ArrayRef<int64_t> lhsShape = getUntiledShape(op->getOperand(0));
-  ArrayRef<int64_t> rhsShape = getUntiledShape(op->getOperand(1));
+  ArrayRef<int64_t> lhsShape =
+      op->getOperand(0).getType().cast<ShapedType>().getShape();
+  ArrayRef<int64_t> rhsShape =
+      op->getOperand(1).getType().cast<ShapedType>().getShape();
   SmallVector<int64_t> firstLevelTileSizes =
       loweringConfig.getTileSizeVals(kWorkgroupTileLevel);
 

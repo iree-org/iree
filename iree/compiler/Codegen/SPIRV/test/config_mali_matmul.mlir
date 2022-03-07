@@ -27,32 +27,14 @@ hal.executable @matmul_1024x2048x512 {
         %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<readonly:1024x512xf32>
         %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : !flow.dispatch.tensor<readonly:512x2048xf32>
         %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : !flow.dispatch.tensor<writeonly:1024x2048xf32>
-        %workgroup_size_x = hal.interface.workgroup.size[0] : index
-        %workgroup_size_y = hal.interface.workgroup.size[1] : index
-        %workgroup_id_x = hal.interface.workgroup.id[0] : index
-        %workgroup_count_x = hal.interface.workgroup.count[0] : index
-        %workgroup_id_y = hal.interface.workgroup.id[1] : index
-        %workgroup_count_y = hal.interface.workgroup.count[1] : index
-        %3 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_id_y, %workgroup_size_y]
-        %4 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_count_y, %workgroup_size_y]
-        scf.for %arg0 = %3 to %c1024 step %4 {
-          %5 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_id_x, %workgroup_size_x]
-          %6 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_count_x, %workgroup_size_x]
-          scf.for %arg1 = %5 to %c2048 step %6 {
-            %7 = affine.min affine_map<(d0)[s0] -> (s0, -d0 + 1024)>(%arg0)[%workgroup_size_y]
-            %8 = flow.dispatch.tensor.load %0, offsets = [%arg0, 0], sizes = [%7, 512], strides = [1, 1] : !flow.dispatch.tensor<readonly:1024x512xf32> -> tensor<?x512xf32>
-            %9 = affine.min affine_map<(d0)[s0] -> (s0, -d0 + 2048)>(%arg1)[%workgroup_size_x]
-            %10 = flow.dispatch.tensor.load %1, offsets = [0, %arg1], sizes = [512, %9], strides = [1, 1] : !flow.dispatch.tensor<readonly:512x2048xf32> -> tensor<512x?xf32>
-            %11 = affine.min affine_map<(d0)[s0] -> (s0, -d0 + 1024)>(%arg0)[%workgroup_size_y]
-            %12 = affine.min affine_map<(d0)[s0] -> (s0, -d0 + 2048)>(%arg1)[%workgroup_size_x]
-            %13 = affine.min affine_map<(d0)[s0] -> (-d0 + 1024, s0)>(%arg0)[%workgroup_size_y]
-            %14 = affine.min affine_map<(d0)[s0] -> (-d0 + 2048, s0)>(%arg1)[%workgroup_size_x]
-            %15 = linalg.init_tensor [%13, %14] : tensor<?x?xf32>
-            %16 = linalg.fill(%cst, %15) : f32, tensor<?x?xf32> -> tensor<?x?xf32>
-            %17 = linalg.matmul {__internal_linalg_transform__ = "workgroup"} ins(%8, %10 : tensor<?x512xf32>, tensor<512x?xf32>) outs(%16 : tensor<?x?xf32>) -> tensor<?x?xf32>
-            flow.dispatch.tensor.store %17, %2, offsets = [%arg0, %arg1], sizes = [%11, %12], strides = [1, 1] : tensor<?x?xf32> -> !flow.dispatch.tensor<writeonly:1024x2048xf32>
-          }
-        }
+        %8 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [1024, 512], strides = [1, 1] : !flow.dispatch.tensor<readonly:1024x512xf32> -> tensor<1024x512xf32>
+        %10 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [512, 2048], strides = [1, 1] : !flow.dispatch.tensor<readonly:512x2048xf32> -> tensor<512x2048xf32>
+        %15 = linalg.init_tensor [1024, 2048] : tensor<1024x2048xf32>
+        %16 = linalg.fill(%cst, %15) : f32, tensor<1024x2048xf32> -> tensor<1024x2048xf32>
+        %17 = linalg.matmul {__internal_linalg_transform__ = "workgroup"}
+            ins(%8, %10 : tensor<1024x512xf32>, tensor<512x2048xf32>) outs(%16 : tensor<1024x2048xf32>) -> tensor<1024x2048xf32>
+        flow.dispatch.tensor.store %17, %2, offsets = [0, 0], sizes = [1024, 2048], strides = [1, 1]
+            : tensor<1024x2048xf32> -> !flow.dispatch.tensor<writeonly:1024x2048xf32>
         return
       }
     }
@@ -60,18 +42,10 @@ hal.executable @matmul_1024x2048x512 {
 }
 
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering.config<tile_sizes = {{\[}}[8, 32], [4, 4], [0, 0, 4]{{\]}}, native_vector_size = []>
-//  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 32)>
-//  CHECK-DAG: #[[MAP1:.+]] = affine_map<()[s0] -> (s0 ceildiv 8)>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"SPIRVVectorize", workload_per_wg = [32, 8]>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"SPIRVVectorize", workload_per_wg = []>
 //      CHECK: hal.executable.entry_point public @matmul_1024x2048x512
 // CHECK-SAME:   translation.info = #[[TRANSLATION]]
 // CHECK-SAME:   workgroup_size = [8 : index, 2 : index, 1 : index]
-// CHECK-NEXT: ^{{.+}}(%[[X:.+]]: index, %[[Y:.+]]: index, %{{.+}}: index):
-// CHECK-NEXT:   %[[ONE:.+]] = arith.constant 1 : index
-// CHECK-NEXT:   %[[X_COUNT:.+]] = affine.apply #[[MAP0]]()[%[[X]]]
-// CHECK-NEXT:   %[[Y_COUNT:.+]] = affine.apply #[[MAP1]]()[%[[Y]]]
-// CHECK-NEXT:   hal.return %[[X_COUNT]], %[[Y_COUNT]], %[[ONE]]
-
 //      CHECK: func @matmul_1024x2048x512()
 //      CHECK:   linalg.matmul
 // CHECK-SAME:     lowering.config = #[[CONFIG]]
@@ -105,32 +79,15 @@ hal.executable @matmul_3136x24x96 {
         %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<readonly:3136x96xf32>
         %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : !flow.dispatch.tensor<readonly:96x24xf32>
         %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : !flow.dispatch.tensor<writeonly:3136x24xf32>
-        %workgroup_size_x = hal.interface.workgroup.size[0] : index
-        %workgroup_size_y = hal.interface.workgroup.size[1] : index
-        %workgroup_id_x = hal.interface.workgroup.id[0] : index
-        %workgroup_count_x = hal.interface.workgroup.count[0] : index
-        %workgroup_id_y = hal.interface.workgroup.id[1] : index
-        %workgroup_count_y = hal.interface.workgroup.count[1] : index
-        %3 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_id_y, %workgroup_size_y]
-        %4 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_count_y, %workgroup_size_y]
-        scf.for %arg0 = %3 to %c3136 step %4 {
-          %5 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_id_x, %workgroup_size_x]
-          %6 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_count_x, %workgroup_size_x]
-          scf.for %arg1 = %5 to %c24 step %6 {
-            %7 = affine.min affine_map<(d0)[s0] -> (s0, -d0 + 3136)>(%arg0)[%workgroup_size_y]
-            %8 = flow.dispatch.tensor.load %0, offsets = [%arg0, 0], sizes = [%7, 96], strides = [1, 1] : !flow.dispatch.tensor<readonly:3136x96xf32> -> tensor<?x96xf32>
-            %9 = affine.min affine_map<(d0)[s0] -> (s0, -d0 + 24)>(%arg1)[%workgroup_size_x]
-            %10 = flow.dispatch.tensor.load %1, offsets = [0, %arg1], sizes = [96, %9], strides = [1, 1] : !flow.dispatch.tensor<readonly:96x24xf32> -> tensor<96x?xf32>
-            %11 = affine.min affine_map<(d0)[s0] -> (s0, -d0 + 3136)>(%arg0)[%workgroup_size_y]
-            %12 = affine.min affine_map<(d0)[s0] -> (s0, -d0 + 24)>(%arg1)[%workgroup_size_x]
-            %13 = affine.min affine_map<(d0)[s0] -> (-d0 + 3136, s0)>(%arg0)[%workgroup_size_y]
-            %14 = affine.min affine_map<(d0)[s0] -> (-d0 + 24, s0)>(%arg1)[%workgroup_size_x]
-            %15 = linalg.init_tensor [%13, %14] : tensor<?x?xf32>
-            %16 = linalg.fill(%cst, %15) : f32, tensor<?x?xf32> -> tensor<?x?xf32>
-            %17 = linalg.matmul {__internal_linalg_transform__ = "workgroup"} ins(%8, %10 : tensor<?x96xf32>, tensor<96x?xf32>) outs(%16 : tensor<?x?xf32>) -> tensor<?x?xf32>
-            flow.dispatch.tensor.store %17, %2, offsets = [%arg0, %arg1], sizes = [%11, %12], strides = [1, 1] : tensor<?x?xf32> -> !flow.dispatch.tensor<writeonly:3136x24xf32>
-          }
-        }
+        %8 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [3136, 96], strides = [1, 1] : !flow.dispatch.tensor<readonly:3136x96xf32> -> tensor<3136x96xf32>
+        %10 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [96, 24], strides = [1, 1] : !flow.dispatch.tensor<readonly:96x24xf32> -> tensor<96x24xf32>
+        %15 = linalg.init_tensor [3136, 24] : tensor<3136x24xf32>
+        %16 = linalg.fill(%cst, %15) : f32, tensor<3136x24xf32> -> tensor<3136x24xf32>
+        %17 = linalg.matmul {__internal_linalg_transform__ = "workgroup"}
+            ins(%8, %10 : tensor<3136x96xf32>, tensor<96x24xf32>)
+            outs(%16 : tensor<3136x24xf32>) -> tensor<3136x24xf32>
+        flow.dispatch.tensor.store %17, %2, offsets = [0, 0], sizes = [3136, 24], strides = [1, 1]
+            : tensor<3136x24xf32> -> !flow.dispatch.tensor<writeonly:3136x24xf32>
         return
       }
     }
@@ -138,18 +95,10 @@ hal.executable @matmul_3136x24x96 {
 }
 
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering.config<tile_sizes = {{\[}}[32, 8], [4, 4], [0, 0, 4]{{\]}}, native_vector_size = []>
-//  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 8)>
-//  CHECK-DAG: #[[MAP1:.+]] = affine_map<()[s0] -> (s0 ceildiv 32)>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"SPIRVVectorize", workload_per_wg = [8, 32]>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"SPIRVVectorize", workload_per_wg = []>
 //      CHECK: hal.executable.entry_point public @matmul_3136x24x96
 // CHECK-SAME:   translation.info = #[[TRANSLATION]]
 // CHECK-SAME:   workgroup_size = [2 : index, 8 : index, 1 : index]
-// CHECK-NEXT: ^{{.+}}(%[[X:.+]]: index, %[[Y:.+]]: index, %{{.+}}: index):
-// CHECK-NEXT:   %[[ONE:.+]] = arith.constant 1 : index
-// CHECK-NEXT:   %[[X_COUNT:.+]] = affine.apply #[[MAP0]]()[%[[X]]]
-// CHECK-NEXT:   %[[Y_COUNT:.+]] = affine.apply #[[MAP1]]()[%[[Y]]]
-// CHECK-NEXT:   hal.return %[[X_COUNT]], %[[Y_COUNT]], %[[ONE]]
-
 //      CHECK: func @matmul_3136x24x96()
 //      CHECK:   linalg.matmul
 // CHECK-SAME:     lowering.config = #[[CONFIG]]
@@ -183,32 +132,16 @@ hal.executable @matmul_196x64x192 {
         %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<readonly:196x192xf32>
         %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : !flow.dispatch.tensor<readonly:192x64xf32>
         %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : !flow.dispatch.tensor<writeonly:196x64xf32>
-        %workgroup_size_x = hal.interface.workgroup.size[0] : index
-        %workgroup_size_y = hal.interface.workgroup.size[1] : index
-        %workgroup_id_x = hal.interface.workgroup.id[0] : index
-        %workgroup_count_x = hal.interface.workgroup.count[0] : index
-        %workgroup_id_y = hal.interface.workgroup.id[1] : index
-        %workgroup_count_y = hal.interface.workgroup.count[1] : index
-        %3 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_id_y, %workgroup_size_y]
-        %4 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_count_y, %workgroup_size_y]
-        scf.for %arg0 = %3 to %c196 step %4 {
-          %5 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_id_x, %workgroup_size_x]
-          %6 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_count_x, %workgroup_size_x]
-          scf.for %arg1 = %5 to %c64 step %6 {
-            %7 = affine.min affine_map<(d0)[s0] -> (s0, -d0 + 196)>(%arg0)[%workgroup_size_y]
-            %8 = flow.dispatch.tensor.load %0, offsets = [%arg0, 0], sizes = [%7, 192], strides = [1, 1] : !flow.dispatch.tensor<readonly:196x192xf32> -> tensor<?x192xf32>
-            %9 = affine.min affine_map<(d0)[s0] -> (s0, -d0 + 64)>(%arg1)[%workgroup_size_x]
-            %10 = flow.dispatch.tensor.load %1, offsets = [0, %arg1], sizes = [192, %9], strides = [1, 1] : !flow.dispatch.tensor<readonly:192x64xf32> -> tensor<192x?xf32>
-            %11 = affine.min affine_map<(d0)[s0] -> (s0, -d0 + 196)>(%arg0)[%workgroup_size_y]
-            %12 = affine.min affine_map<(d0)[s0] -> (s0, -d0 + 64)>(%arg1)[%workgroup_size_x]
-            %13 = affine.min affine_map<(d0)[s0] -> (-d0 + 196, s0)>(%arg0)[%workgroup_size_y]
-            %14 = affine.min affine_map<(d0)[s0] -> (-d0 + 64, s0)>(%arg1)[%workgroup_size_x]
-            %15 = linalg.init_tensor [%13, %14] : tensor<?x?xf32>
-            %16 = linalg.fill(%cst, %15) : f32, tensor<?x?xf32> -> tensor<?x?xf32>
-            %17 = linalg.matmul {__internal_linalg_transform__ = "workgroup"} ins(%8, %10 : tensor<?x192xf32>, tensor<192x?xf32>) outs(%16 : tensor<?x?xf32>) -> tensor<?x?xf32>
-            flow.dispatch.tensor.store %17, %2, offsets = [%arg0, %arg1], sizes = [%11, %12], strides = [1, 1] : tensor<?x?xf32> -> !flow.dispatch.tensor<writeonly:196x64xf32>
-          }
-        }
+        %8 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [196, 192], strides = [1, 1]
+            : !flow.dispatch.tensor<readonly:196x192xf32> -> tensor<196x192xf32>
+        %10 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [192, 64], strides = [1, 1]
+            : !flow.dispatch.tensor<readonly:192x64xf32> -> tensor<192x64xf32>
+        %15 = linalg.init_tensor [196, 64] : tensor<196x64xf32>
+        %16 = linalg.fill(%cst, %15) : f32, tensor<196x64xf32> -> tensor<196x64xf32>
+        %17 = linalg.matmul {__internal_linalg_transform__ = "workgroup"}
+            ins(%8, %10 : tensor<196x192xf32>, tensor<192x64xf32>) outs(%16 : tensor<196x64xf32>) -> tensor<196x64xf32>
+        flow.dispatch.tensor.store %17, %2, offsets = [0, 0], sizes = [196, 64], strides = [1, 1]
+            : tensor<196x64xf32> -> !flow.dispatch.tensor<writeonly:196x64xf32>
         return
       }
     }
@@ -216,18 +149,10 @@ hal.executable @matmul_196x64x192 {
 }
 
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering.config<tile_sizes = {{\[}}[4, 32], [2, 4], [0, 0, 8]{{\]}}, native_vector_size = []>
-//  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 32)>
-//  CHECK-DAG: #[[MAP1:.+]] = affine_map<()[s0] -> (s0 ceildiv 4)>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"SPIRVVectorize", workload_per_wg = [32, 4]>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"SPIRVVectorize", workload_per_wg = []>
 //      CHECK: hal.executable.entry_point public @matmul_196x64x192
 // CHECK-SAME:   translation.info = #[[TRANSLATION]]
 // CHECK-SAME:   workgroup_size = [8 : index, 2 : index, 1 : index]
-// CHECK-NEXT: ^{{.+}}(%[[X:.+]]: index, %[[Y:.+]]: index, %{{.+}}: index):
-// CHECK-NEXT:   %[[ONE:.+]] = arith.constant 1 : index
-// CHECK-NEXT:   %[[X_COUNT:.+]] = affine.apply #[[MAP0]]()[%[[X]]]
-// CHECK-NEXT:   %[[Y_COUNT:.+]] = affine.apply #[[MAP1]]()[%[[Y]]]
-// CHECK-NEXT:   hal.return %[[X_COUNT]], %[[Y_COUNT]], %[[ONE]]
-
 //      CHECK: func @matmul_196x64x192()
 //      CHECK:   linalg.matmul
 // CHECK-SAME:      lowering.config = #[[CONFIG]]
@@ -261,27 +186,9 @@ hal.executable @matmul_12544x96x16 {
         %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<12544x16xf32>
         %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<16x96xf32>
         %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : memref<12544x96xf32>
-        %workgroup_size_x = hal.interface.workgroup.size[0] : index
-        %workgroup_size_y = hal.interface.workgroup.size[1] : index
-        %workgroup_id_x = hal.interface.workgroup.id[0] : index
-        %workgroup_count_x = hal.interface.workgroup.count[0] : index
-        %workgroup_id_y = hal.interface.workgroup.id[1] : index
-        %workgroup_count_y = hal.interface.workgroup.count[1] : index
-        %3 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_id_y, %workgroup_size_y]
-        %4 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_count_y, %workgroup_size_y]
-        scf.for %arg0 = %3 to %c12544 step %4 {
-          %5 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_id_x, %workgroup_size_x]
-          %6 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_count_x, %workgroup_size_x]
-          scf.for %arg1 = %5 to %c96 step %6 {
-            %7 = affine.min affine_map<(d0)[s0] -> (s0, -d0 + 12544)>(%arg0)[%workgroup_size_y]
-            %8 = memref.subview %0[%arg0, 0] [%7, 16] [1, 1] : memref<12544x16xf32> to memref<?x16xf32, affine_map<(d0, d1)[s0] -> (d0 * 16 + s0 + d1)>>
-            %9 = affine.min affine_map<(d0)[s0] -> (s0, -d0 + 96)>(%arg1)[%workgroup_size_x]
-            %10 = memref.subview %1[0, %arg1] [16, %9] [1, 1] : memref<16x96xf32> to memref<16x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 96 + s0 + d1)>>
-            %11 = memref.subview %2[%arg0, %arg1] [%7, %9] [1, 1] : memref<12544x96xf32> to memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 96 + s0 + d1)>>
-            linalg.fill(%cst, %11) : f32, memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 96 + s0 + d1)>>
-            linalg.matmul {__internal_linalg_transform__ = "workgroup"} ins(%8, %10 : memref<?x16xf32, affine_map<(d0, d1)[s0] -> (d0 * 16 + s0 + d1)>>, memref<16x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 96 + s0 + d1)>>) outs(%11 : memref<?x?xf32, affine_map<(d0, d1)[s0] -> (d0 * 96 + s0 + d1)>>)
-          }
-        }
+        linalg.fill(%cst, %2) : f32, memref<12544x96xf32>
+        linalg.matmul {__internal_linalg_transform__ = "workgroup"}
+            ins(%0, %1 : memref<12544x16xf32>, memref<16x96xf32>) outs(%2 : memref<12544x96xf32>)
         return
       }
     }
@@ -289,18 +196,10 @@ hal.executable @matmul_12544x96x16 {
 }
 
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering.config<tile_sizes = {{\[}}[8, 32], [4, 4], [0, 0, 4]{{\]}}, native_vector_size = []>
-//  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 32)>
-//  CHECK-DAG: #[[MAP1:.+]] = affine_map<()[s0] -> (s0 ceildiv 8)>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"SPIRVVectorize", workload_per_wg = [32, 8]>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"SPIRVVectorize", workload_per_wg = []>
 //      CHECK: hal.executable.entry_point public @matmul_12544x96x16
 // CHECK-SAME:   translation.info = #[[TRANSLATION]]
 // CHECK-SAME:   workgroup_size = [8 : index, 2 : index, 1 : index]
-// CHECK-NEXT: ^{{.+}}(%[[X:.+]]: index, %[[Y:.+]]: index, %{{.+}}: index):
-// CHECK-NEXT:   %[[ONE:.+]] = arith.constant 1 : index
-// CHECK-NEXT:   %[[X_COUNT:.+]] = affine.apply #[[MAP0]]()[%[[X]]]
-// CHECK-NEXT:   %[[Y_COUNT:.+]] = affine.apply #[[MAP1]]()[%[[Y]]]
-// CHECK-NEXT:   hal.return %[[X_COUNT]], %[[Y_COUNT]], %[[ONE]]
-
 //      CHECK: func @matmul_12544x96x16()
 //      CHECK:   linalg.matmul
 // CHECK-SAME:     lowering.config = #[[CONFIG]]
@@ -334,32 +233,16 @@ hal.executable @matmul_49x160x576 {
         %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<readonly:49x576xf32>
         %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : !flow.dispatch.tensor<readonly:576x160xf32>
         %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : !flow.dispatch.tensor<writeonly:49x160xf32>
-        %workgroup_size_x = hal.interface.workgroup.size[0] : index
-        %workgroup_size_y = hal.interface.workgroup.size[1] : index
-        %workgroup_id_x = hal.interface.workgroup.id[0] : index
-        %workgroup_count_x = hal.interface.workgroup.count[0] : index
-        %workgroup_id_y = hal.interface.workgroup.id[1] : index
-        %workgroup_count_y = hal.interface.workgroup.count[1] : index
-        %3 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_id_y, %workgroup_size_y]
-        %4 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_count_y, %workgroup_size_y]
-        scf.for %arg0 = %3 to %c49 step %4 {
-          %5 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_id_x, %workgroup_size_x]
-          %6 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_count_x, %workgroup_size_x]
-          scf.for %arg1 = %5 to %c160 step %6 {
-            %7 = affine.min affine_map<(d0)[s0] -> (s0, -d0 + 49)>(%arg0)[%workgroup_size_y]
-            %8 = flow.dispatch.tensor.load %0, offsets = [%arg0, 0], sizes = [%7, 576], strides = [1, 1] : !flow.dispatch.tensor<readonly:49x576xf32> -> tensor<?x576xf32>
-            %9 = affine.min affine_map<(d0)[s0] -> (s0, -d0 + 160)>(%arg1)[%workgroup_size_x]
-            %10 = flow.dispatch.tensor.load %1, offsets = [0, %arg1], sizes = [576, %9], strides = [1, 1] : !flow.dispatch.tensor<readonly:576x160xf32> -> tensor<576x?xf32>
-            %11 = affine.min affine_map<(d0)[s0] -> (s0, -d0 + 49)>(%arg0)[%workgroup_size_y]
-            %12 = affine.min affine_map<(d0)[s0] -> (s0, -d0 + 160)>(%arg1)[%workgroup_size_x]
-            %13 = affine.min affine_map<(d0)[s0] -> (-d0 + 49, s0)>(%arg0)[%workgroup_size_y]
-            %14 = affine.min affine_map<(d0)[s0] -> (-d0 + 160, s0)>(%arg1)[%workgroup_size_x]
-            %15 = linalg.init_tensor [%13, %14] : tensor<?x?xf32>
-            %16 = linalg.fill(%cst, %15) : f32, tensor<?x?xf32> -> tensor<?x?xf32>
-            %17 = linalg.matmul {__internal_linalg_transform__ = "workgroup"} ins(%8, %10 : tensor<?x576xf32>, tensor<576x?xf32>) outs(%16 : tensor<?x?xf32>) -> tensor<?x?xf32>
-            flow.dispatch.tensor.store %17, %2, offsets = [%arg0, %arg1], sizes = [%11, %12], strides = [1, 1] : tensor<?x?xf32> -> !flow.dispatch.tensor<writeonly:49x160xf32>
-          }
-        }
+        %8 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [49, 576], strides = [1, 1]
+            : !flow.dispatch.tensor<readonly:49x576xf32> -> tensor<49x576xf32>
+        %10 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [576, 160], strides = [1, 1]
+            : !flow.dispatch.tensor<readonly:576x160xf32> -> tensor<576x160xf32>
+        %15 = linalg.init_tensor [49, 160] : tensor<49x160xf32>
+        %16 = linalg.fill(%cst, %15) : f32, tensor<49x160xf32> -> tensor<49x160xf32>
+        %17 = linalg.matmul {__internal_linalg_transform__ = "workgroup"}
+            ins(%8, %10 : tensor<49x576xf32>, tensor<576x160xf32>) outs(%16 : tensor<49x160xf32>) -> tensor<49x160xf32>
+        flow.dispatch.tensor.store %17, %2, offsets = [0, 0], sizes = [49, 160], strides = [1, 1]
+            : tensor<49x160xf32> -> !flow.dispatch.tensor<writeonly:49x160xf32>
         return
       }
     }
@@ -367,16 +250,10 @@ hal.executable @matmul_49x160x576 {
 }
 
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering.config<tile_sizes = {{\[}}[1, 32], [1, 4], [0, 0, 8]{{\]}}, native_vector_size = []>
-//  CHECK-DAG: #[[MAP:.+]] = affine_map<()[s0] -> (s0 ceildiv 32)>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"SPIRVVectorize", workload_per_wg = [32, 1]>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"SPIRVVectorize", workload_per_wg = []>
 //      CHECK: hal.executable.entry_point public @matmul_49x160x576
 // CHECK-SAME:   translation.info = #[[TRANSLATION]]
 // CHECK-SAME:   workgroup_size = [8 : index, 1 : index, 1 : index]
-// CHECK-NEXT: ^{{.+}}(%[[X:.+]]: index, %[[Y:.+]]: index, %{{.+}}: index):
-// CHECK-NEXT:   %[[ONE:.+]] = arith.constant 1 : index
-// CHECK-NEXT:   %[[X_COUNT:.+]] = affine.apply #[[MAP]]()[%[[X]]]
-// CHECK-NEXT:   hal.return %[[X_COUNT]], %[[Y]], %[[ONE]]
-
 //      CHECK: func @matmul_49x160x576()
 //      CHECK:   linalg.matmul
 // CHECK-SAME:     lowering.config = #[[CONFIG]]
@@ -410,43 +287,17 @@ hal.executable @batch_matmul_4x384x384 {
         %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<readonly:4x384x32xf32>
         %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : !flow.dispatch.tensor<readonly:4x32x384xf32>
         %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : !flow.dispatch.tensor<writeonly:4x384x384xf32>
-        %workgroup_size_x = hal.interface.workgroup.size[0] : index
-        %workgroup_size_y = hal.interface.workgroup.size[1] : index
-        %workgroup_size_z = hal.interface.workgroup.size[2] : index
-        %workgroup_id_x = hal.interface.workgroup.id[0] : index
-        %workgroup_count_x = hal.interface.workgroup.count[0] : index
-        %workgroup_id_y = hal.interface.workgroup.id[1] : index
-        %workgroup_count_y = hal.interface.workgroup.count[1] : index
-        %workgroup_id_z = hal.interface.workgroup.id[2] : index
-        %workgroup_count_z = hal.interface.workgroup.count[2] : index
-        %3 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_id_z, %workgroup_size_z]
-        %4 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_count_z, %workgroup_size_z]
-        scf.for %arg0 = %3 to %c4 step %4 {
-          %5 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_id_y, %workgroup_size_y]
-          %6 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_count_y, %workgroup_size_y]
-          scf.for %arg1 = %5 to %c384 step %6 {
-            %7 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_id_x, %workgroup_size_x]
-            %8 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_count_x, %workgroup_size_x]
-            scf.for %arg2 = %7 to %c384 step %8 {
-              %9 = affine.min affine_map<(d0)[s0] -> (s0, -d0 + 4)>(%arg0)[%workgroup_size_z]
-              %10 = affine.min affine_map<(d0)[s0] -> (s0, -d0 + 384)>(%arg1)[%workgroup_size_y]
-              %11 = flow.dispatch.tensor.load %0, offsets = [%arg0, %arg1, 0], sizes = [%9, %10, 32], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:4x384x32xf32> -> tensor<?x?x32xf32>
-              %12 = affine.min affine_map<(d0)[s0] -> (s0, -d0 + 4)>(%arg0)[%workgroup_size_z]
-              %13 = affine.min affine_map<(d0)[s0] -> (s0, -d0 + 384)>(%arg2)[%workgroup_size_x]
-              %14 = flow.dispatch.tensor.load %1, offsets = [%arg0, 0, %arg2], sizes = [%12, 32, %13], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:4x32x384xf32> -> tensor<?x32x?xf32>
-              %15 = affine.min affine_map<(d0)[s0] -> (s0, -d0 + 4)>(%arg0)[%workgroup_size_z]
-              %16 = affine.min affine_map<(d0)[s0] -> (s0, -d0 + 384)>(%arg1)[%workgroup_size_y]
-              %17 = affine.min affine_map<(d0)[s0] -> (s0, -d0 + 384)>(%arg2)[%workgroup_size_x]
-              %18 = affine.min affine_map<(d0)[s0] -> (-d0 + 4, s0)>(%arg0)[%workgroup_size_z]
-              %19 = affine.min affine_map<(d0)[s0] -> (-d0 + 384, s0)>(%arg1)[%workgroup_size_y]
-              %20 = affine.min affine_map<(d0)[s0] -> (-d0 + 384, s0)>(%arg2)[%workgroup_size_x]
-              %21 = linalg.init_tensor [%18, %19, %20] : tensor<?x?x?xf32>
-              %22 = linalg.fill(%cst, %21) : f32, tensor<?x?x?xf32> -> tensor<?x?x?xf32>
-              %23 = linalg.batch_matmul {__internal_linalg_transform__ = "workgroup"} ins(%11, %14 : tensor<?x?x32xf32>, tensor<?x32x?xf32>) outs(%22 : tensor<?x?x?xf32>) -> tensor<?x?x?xf32>
-              flow.dispatch.tensor.store %23, %2, offsets = [%arg0, %arg1, %arg2], sizes = [%15, %16, %17], strides = [1, 1, 1] : tensor<?x?x?xf32> -> !flow.dispatch.tensor<writeonly:4x384x384xf32>
-            }
-          }
-        }
+        %11 = flow.dispatch.tensor.load %0, offsets = [0, 0, 0], sizes = [4, 384, 32], strides = [1, 1, 1]
+            : !flow.dispatch.tensor<readonly:4x384x32xf32> -> tensor<4x384x32xf32>
+        %14 = flow.dispatch.tensor.load %1, offsets = [0, 0, 0], sizes = [4, 32, 384], strides = [1, 1, 1]
+            : !flow.dispatch.tensor<readonly:4x32x384xf32> -> tensor<4x32x384xf32>
+        %21 = linalg.init_tensor [4, 384, 384] : tensor<4x384x384xf32>
+        %22 = linalg.fill(%cst, %21) : f32, tensor<4x384x384xf32> -> tensor<4x384x384xf32>
+        %23 = linalg.batch_matmul {__internal_linalg_transform__ = "workgroup"}
+            ins(%11, %14 : tensor<4x384x32xf32>, tensor<4x32x384xf32>)
+            outs(%22 : tensor<4x384x384xf32>) -> tensor<4x384x384xf32>
+        flow.dispatch.tensor.store %23, %2, offsets = [0, 0, 0], sizes = [4, 384, 384], strides = [1, 1, 1]
+            : tensor<4x384x384xf32> -> !flow.dispatch.tensor<writeonly:4x384x384xf32>
         return
       }
     }
@@ -454,17 +305,10 @@ hal.executable @batch_matmul_4x384x384 {
 }
 
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering.config<tile_sizes = {{\[}}[1, 12, 32], [1, 6, 4], [0, 0, 0, 4]{{\]}}, native_vector_size = []>
-//  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 32)>
-//  CHECK-DAG: #[[MAP1:.+]] = affine_map<()[s0] -> (s0 ceildiv 12)>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"SPIRVVectorize", workload_per_wg = [32, 12, 1]>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"SPIRVVectorize", workload_per_wg = []>
 //      CHECK: hal.executable.entry_point public @batch_matmul_4x384x384
 // CHECK-SAME:   translation.info = #[[TRANSLATION]]
 // CHECK-SAME:   workgroup_size = [8 : index, 2 : index, 1 : index]
-// CHECK-NEXT: ^{{.+}}(%[[X:.+]]: index, %[[Y:.+]]: index, %[[Z:.+]]: index):
-// CHECK-NEXT:   %[[X_COUNT:.+]] = affine.apply #[[MAP0]]()[%[[X]]]
-// CHECK-NEXT:   %[[Y_COUNT:.+]] = affine.apply #[[MAP1]]()[%[[Y]]]
-// CHECK-NEXT:   hal.return %[[X_COUNT]], %[[Y_COUNT]], %[[Z]]
-
 //      CHECK: func @batch_matmul_4x384x384()
 //      CHECK:   linalg.batch_matmul
 // CHECK-SAME:     lowering.config = #[[CONFIG]]
@@ -499,43 +343,16 @@ hal.executable @batch_matmul_4x2x8 {
         %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<readonly:4x2x32xf32>
         %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : !flow.dispatch.tensor<readonly:4x32x8xf32>
         %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : !flow.dispatch.tensor<writeonly:4x2x8xf32>
-        %workgroup_size_x = hal.interface.workgroup.size[0] : index
-        %workgroup_size_y = hal.interface.workgroup.size[1] : index
-        %workgroup_size_z = hal.interface.workgroup.size[2] : index
-        %workgroup_id_x = hal.interface.workgroup.id[0] : index
-        %workgroup_count_x = hal.interface.workgroup.count[0] : index
-        %workgroup_id_y = hal.interface.workgroup.id[1] : index
-        %workgroup_count_y = hal.interface.workgroup.count[1] : index
-        %workgroup_id_z = hal.interface.workgroup.id[2] : index
-        %workgroup_count_z = hal.interface.workgroup.count[2] : index
-        %3 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_id_z, %workgroup_size_z]
-        %4 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_count_z, %workgroup_size_z]
-        scf.for %arg0 = %3 to %c4 step %4 {
-          %5 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_id_y, %workgroup_size_y]
-          %6 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_count_y, %workgroup_size_y]
-          scf.for %arg1 = %5 to %c2 step %6 {
-            %7 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_id_x, %workgroup_size_x]
-            %8 = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%workgroup_count_x, %workgroup_size_x]
-            scf.for %arg2 = %7 to %c8 step %8 {
-              %9 = affine.min affine_map<(d0)[s0] -> (s0, -d0 + 4)>(%arg0)[%workgroup_size_z]
-              %10 = affine.min affine_map<(d0)[s0] -> (s0, -d0 + 2)>(%arg1)[%workgroup_size_y]
-              %11 = flow.dispatch.tensor.load %0, offsets = [%arg0, %arg1, 0], sizes = [%9, %10, 32], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:4x2x32xf32> -> tensor<?x?x32xf32>
-              %12 = affine.min affine_map<(d0)[s0] -> (s0, -d0 + 4)>(%arg0)[%workgroup_size_z]
-              %13 = affine.min affine_map<(d0)[s0] -> (s0, -d0 + 8)>(%arg2)[%workgroup_size_x]
-              %14 = flow.dispatch.tensor.load %1, offsets = [%arg0, 0, %arg2], sizes = [%12, 32, %13], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:4x32x8xf32> -> tensor<?x32x?xf32>
-              %15 = affine.min affine_map<(d0)[s0] -> (s0, -d0 + 4)>(%arg0)[%workgroup_size_z]
-              %16 = affine.min affine_map<(d0)[s0] -> (s0, -d0 + 2)>(%arg1)[%workgroup_size_y]
-              %17 = affine.min affine_map<(d0)[s0] -> (s0, -d0 + 8)>(%arg2)[%workgroup_size_x]
-              %18 = affine.min affine_map<(d0)[s0] -> (-d0 + 4, s0)>(%arg0)[%workgroup_size_z]
-              %19 = affine.min affine_map<(d0)[s0] -> (-d0 + 2, s0)>(%arg1)[%workgroup_size_y]
-              %20 = affine.min affine_map<(d0)[s0] -> (-d0 + 8, s0)>(%arg2)[%workgroup_size_x]
-              %21 = linalg.init_tensor [%18, %19, %20] : tensor<?x?x?xf32>
-              %22 = linalg.fill(%cst, %21) : f32, tensor<?x?x?xf32> -> tensor<?x?x?xf32>
-              %23 = linalg.batch_matmul {__internal_linalg_transform__ = "workgroup"} ins(%11, %14 : tensor<?x?x32xf32>, tensor<?x32x?xf32>) outs(%22 : tensor<?x?x?xf32>) -> tensor<?x?x?xf32>
-              flow.dispatch.tensor.store %23, %2, offsets = [%arg0, %arg1, %arg2], sizes = [%15, %16, %17], strides = [1, 1, 1] : tensor<?x?x?xf32> -> !flow.dispatch.tensor<writeonly:4x2x8xf32>
-            }
-          }
-        }
+        %11 = flow.dispatch.tensor.load %0, offsets = [0, 0, 0], sizes = [4, 2, 32], strides = [1, 1, 1]
+            : !flow.dispatch.tensor<readonly:4x2x32xf32> -> tensor<4x2x32xf32>
+        %14 = flow.dispatch.tensor.load %1, offsets = [0, 0, 0], sizes = [4, 32, 8], strides = [1, 1, 1]
+            : !flow.dispatch.tensor<readonly:4x32x8xf32> -> tensor<4x32x8xf32>
+        %21 = linalg.init_tensor [4, 2, 8] : tensor<4x2x8xf32>
+        %22 = linalg.fill(%cst, %21) : f32, tensor<4x2x8xf32> -> tensor<4x2x8xf32>
+        %23 = linalg.batch_matmul {__internal_linalg_transform__ = "workgroup"}
+            ins(%11, %14 : tensor<4x2x32xf32>, tensor<4x32x8xf32>) outs(%22 : tensor<4x2x8xf32>) -> tensor<4x2x8xf32>
+        flow.dispatch.tensor.store %23, %2, offsets = [0, 0, 0], sizes = [4, 2, 8], strides = [1, 1, 1]
+            : tensor<4x2x8xf32> -> !flow.dispatch.tensor<writeonly:4x2x8xf32>
         return
       }
     }
@@ -543,17 +360,10 @@ hal.executable @batch_matmul_4x2x8 {
 }
 
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering.config<tile_sizes = {{\[}}[1, 2, 8], [1, 1, 4], [0, 0, 0, 8]{{\]}}, native_vector_size = []>
-//  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 8)>
-//  CHECK-DAG: #[[MAP1:.+]] = affine_map<()[s0] -> (s0 ceildiv 2)>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"SPIRVVectorize", workload_per_wg = [8, 2, 1]>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"SPIRVVectorize", workload_per_wg = []>
 //      CHECK: hal.executable.entry_point public @batch_matmul_4x2x8
 // CHECK-SAME:   translation.info = #[[TRANSLATION]]
 // CHECK-SAME:   workgroup_size = [2 : index, 2 : index, 1 : index]
-// CHECK-NEXT: ^{{.+}}(%[[X:.+]]: index, %[[Y:.+]]: index, %[[Z:.+]]: index):
-// CHECK-NEXT:   %[[X_COUNT:.+]] = affine.apply #[[MAP0]]()[%[[X]]]
-// CHECK-NEXT:   %[[Y_COUNT:.+]] = affine.apply #[[MAP1]]()[%[[Y]]]
-// CHECK-NEXT:   hal.return %[[X_COUNT]], %[[Y_COUNT]], %[[Z]]
-
 //      CHECK: func @batch_matmul_4x2x8()
 //      CHECK:   linalg.batch_matmul
 // CHECK-SAME:     lowering.config = #[[CONFIG]]

@@ -416,7 +416,7 @@ def generate_function(
     compilation_info_string = (
         f"#compilation{generate_function.compilation_index} = #iree_codegen.compilation.info<\n"
         f"  #iree_codegen.lowering.config<tile_sizes = [{compilation_info.tile_sizes}], native_vector_size = {compilation_info.native_vector_size}>,\n"
-        f"  #iree_codegen.translation.info<\"{compilation_info.dispatch_lowering_pass_pipeline}\", workload_per_wg = {compilation_info.workload_per_wg}>,\n"
+        f"  #iree_codegen.translation.info<\"{compilation_info.dispatch_lowering_pass_pipeline}\", workload_per_wg = []>,\n"
         f"  workgroup_size = {compilation_info.workgroup_size_str()}>\n")
     compilation_info_attr = f"{{compilation.info = #compilation{generate_function.compilation_index}}} "
     func_definition = func_definition + compilation_info_string
