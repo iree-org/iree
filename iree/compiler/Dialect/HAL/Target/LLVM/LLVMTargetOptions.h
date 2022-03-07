@@ -20,6 +20,7 @@ namespace HAL {
 enum class SanitizerKind {
   kNone = 0,
   kAddress,
+  kThread,
 };
 
 struct LLVMTargetOptions {

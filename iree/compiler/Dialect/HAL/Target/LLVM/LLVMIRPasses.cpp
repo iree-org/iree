@@ -20,6 +20,7 @@
 #include "llvm/Support/Host.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/Instrumentation/AddressSanitizer.h"
+#include "llvm/Transforms/Instrumentation/ThreadSanitizer.h"
 
 namespace mlir {
 namespace iree_compiler {
@@ -98,9 +99,19 @@ LogicalResult runLLVMIRPasses(const LLVMTargetOptions &options,
                 Opts, moduleUseAfterScope, useOdrIndicator));
           });
     } break;
+    case SanitizerKind::kThread: {
+      passBuilder.registerOptimizerLastEPCallback(
+          [](llvm::ModulePassManager &modulePassManager,
+             llvm::OptimizationLevel Level) {
+            modulePassManager.addPass(llvm::ModuleThreadSanitizerPass());
+            modulePassManager.addPass(llvm::createModuleToFunctionPassAdaptor(
+                llvm::ThreadSanitizerPass()));
+          });
+    } break;
   }
 
-  if (options.optLevel != llvm::OptimizationLevel::O0) {
+  if (options.optLevel != llvm::OptimizationLevel::O0 ||
+      options.sanitizerKind != SanitizerKind::kNone) {
     llvm::ModulePassManager modulePassManager;
     modulePassManager =
         passBuilder.buildPerModuleDefaultPipeline(options.optLevel);
