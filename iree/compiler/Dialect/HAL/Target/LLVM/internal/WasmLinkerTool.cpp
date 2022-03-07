@@ -43,7 +43,8 @@ class WasmLinkerTool : public LinkerTool {
     if (!toolPath.empty()) return toolPath;
 
     // No explicit linker specified, search the environment for common tools.
-    toolPath = findToolInEnvironment({"wasm-ld"});
+    toolPath = findToolInEnvironment(
+        {"wasm-ld", "iree-lld", "lld", "ld.lld", "lld-link"});
     if (!toolPath.empty()) return toolPath;
 
     llvm::errs() << "No Wasm linker tool specified or discovered\n";
@@ -79,6 +80,12 @@ class WasmLinkerTool : public LinkerTool {
 
     SmallVector<std::string, 8> flags = {
         getSystemToolPath(),
+
+        // Forces LLD to act like wasm ld and produce WebAssembly files.
+        // If not specified then lld tries to figure out what it is by progname
+        // (ld, ld64, link, etc).
+        // NOTE: must be first because lld sniffs argv[1]/argv[2].
+        "-flavor wasm",
 
         // entry symbol not defined (pass --no-entry to suppress): _start
         "--no-entry",
