@@ -80,10 +80,6 @@ emcmake "${CMAKE_BIN?}" -G Ninja .. \
 
 popd
 
-###############################################################################
-# Serve the sample using a local webserver                                    #
-###############################################################################
-
 echo "=== Copying static files to the build directory ==="
 
 cp ${SOURCE_DIR}/index.html ${BINARY_DIR}
@@ -93,7 +89,3 @@ cp ${SOURCE_DIR}/iree_worker.js ${BINARY_DIR}
 EASELJS_LIBRARY=${BINARY_DIR}/easeljs.min.js
 test -f ${EASELJS_LIBRARY} || \
     wget https://code.createjs.com/1.0.0/easeljs.min.js -O ${EASELJS_LIBRARY}
-
-echo "=== Running local webserver, open at http://localhost:8000/ ==="
-
-python3 ${ROOT_DIR?}/scripts/local_web_server.py --directory ${BINARY_DIR}

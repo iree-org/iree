@@ -75,16 +75,8 @@ emcmake "${CMAKE_BIN?}" -G Ninja .. \
 
 popd
 
-###############################################################################
-# Serve the sample using a local webserver                                    #
-###############################################################################
-
 echo "=== Copying static files (.html, .js) to the build directory ==="
 
 cp ${SOURCE_DIR?}/index.html ${BINARY_DIR}
 cp ${SOURCE_DIR?}/iree_api.js ${BINARY_DIR}
 cp ${SOURCE_DIR?}/iree_worker.js ${BINARY_DIR}
-
-echo "=== Running local webserver, open at http://localhost:8000/ ==="
-
-python3 ${ROOT_DIR?}/scripts/local_web_server.py --directory ${BINARY_DIR}
