@@ -84,16 +84,16 @@ def compose_info_object(device_info: AndroidDeviceInfo,
 
 
 def filter_benchmarks_for_category(benchmark_category_dir: str,
-                                   cpu_target_arch: str,
-                                   gpu_target_arch: str,
+                                   cpu_target_arch_filter: str,
+                                   gpu_target_arch_filter: str,
                                    driver_filter: Optional[str],
                                    verbose: bool = False) -> Sequence[str]:
   """Filters benchmarks in a specific category for the given device.
   Args:
     benchmark_category_dir: the directory to a specific benchmark category.
-    cpu_target_arch: CPU target architecture.
-    gpu_target_arch: GPU target architecture.
-    driver_filter: only run benchmarks for the given driver if not None.
+    cpu_target_arch_filter: CPU target architecture filter regex.
+    gpu_target_arch_filter: GPU target architecture filter regex.
+    driver_filter: driver filter regex.
     verbose: whether to print additional debug info.
   Returns:
     A list containing all matched benchmark cases' directories.
@@ -119,9 +119,9 @@ def filter_benchmarks_for_category(benchmark_category_dir: str,
     # We can choose this benchmark if it matches the driver and CPU/GPU
     # architecture.
     matched_driver = (driver_filter is None or
-                      iree_driver == driver_filter.lower())
-    matched_arch = (target_arch == cpu_target_arch or
-                    target_arch == gpu_target_arch)
+                      re.match(driver_filter, iree_driver) is not None)
+    matched_arch = (re.match(cpu_target_arch_filter, target_arch) is not None or
+                    re.match(gpu_target_arch_filter, target_arch) is not None)
     should_choose = matched_driver and matched_arch
     if should_choose:
       matched_benchmarks.append(root)
