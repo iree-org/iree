@@ -72,6 +72,7 @@ void addGPUMatmulSimtPassPipeline(OpPassManager &pm) {
 
   // Distribute linalg onto threads within the workgroup.
   pm.addNestedPass<FuncOp>(createLLVMGPUTileAndDistribute());
+  pm.addNestedPass<FuncOp>(createMemrefCopyToLinalgPass());
   pm.addNestedPass<FuncOp>(createLLVMGPUDistributeSharedMemoryCopy());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
@@ -100,6 +101,7 @@ void addGPUMatmulTensorCorePassPipeline(OpPassManager &pm) {
       createLLVMGPUTileAndDistribute(/*distributeToWarp=*/true));
   if (pipelineDepth > 1)
     pm.addNestedPass<FuncOp>(createLLVMGPUMultiBuffering(pipelineDepth));
+  pm.addNestedPass<FuncOp>(createMemrefCopyToLinalgPass());
   pm.addNestedPass<FuncOp>(createLLVMGPUDistributeSharedMemoryCopy());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
