@@ -7,7 +7,7 @@
 steps:
   - label: "Test Colab notebooks"
     commands:
-      - "docker run --user=$(id -u):$(id -g) --volume=\\$PWD:\\$IREE_DOCKER_WORKDIR --workdir=\\$IREE_DOCKER_WORKDIR --rm gcr.io/iree-oss/samples@sha256:4b382911b10c72729563da7b1017cd2ac309edc8d7630b3f4d38911b51aa8813 python3 colab/test_notebooks.py"
+      - "docker run --user=$(id -u):$(id -g) --volume=\\$PWD:\\$IREE_DOCKER_WORKDIR --workdir=\\$IREE_DOCKER_WORKDIR --rm gcr.io/iree-oss/samples@sha256:4b382911b10c72729563da7b1017cd2ac309edc8d7630b3f4d38911b51aa8813 python3 ./colab/test_notebooks.py"
     env:
       IREE_DOCKER_WORKDIR: "/usr/src/github/iree"
     agents:
@@ -15,7 +15,35 @@ steps:
 
   - label: "Test Samples"
     commands:
-      - "docker run --user=$(id -u):$(id -g) --volume=\\$PWD:\\$IREE_DOCKER_WORKDIR --workdir=\\$IREE_DOCKER_WORKDIR --rm gcr.io/iree-oss/samples@sha256:4b382911b10c72729563da7b1017cd2ac309edc8d7630b3f4d38911b51aa8813 build_tools/testing/test_samples.sh"
+      - "docker run --user=$(id -u):$(id -g) --volume=\\$PWD:\\$IREE_DOCKER_WORKDIR --workdir=\\$IREE_DOCKER_WORKDIR --rm gcr.io/iree-oss/samples@sha256:4b382911b10c72729563da7b1017cd2ac309edc8d7630b3f4d38911b51aa8813 ./build_tools/testing/test_samples.sh"
+    env:
+      IREE_DOCKER_WORKDIR: "/usr/src/github/iree"
+    agents:
+      - "queue=build"
+
+  # A host tools install is required for the WebAssembly build.
+  # We _could_ instead download from the latest GitHub release, but all of our
+  # releases are marked as "draft"s, so the convenient
+  # https://github.com/google/iree/releases/latest does not actually work :/
+  - label: ":linux: Build host install"
+    key: "build-host-install"
+    commands:
+      - "git submodule sync && git submodule update --init --jobs 8 --depth 1"
+      - "docker run --user=$(id -u):$(id -g) --volume=\\$PWD:\\$IREE_DOCKER_WORKDIR --workdir=\\$IREE_DOCKER_WORKDIR --rm gcr.io/iree-oss/base@sha256:1e551dda4cfdc8f92dc13c4c2c8e5f5b79d3103a4534bcc002ef5cc02ee9dd4f ./build_tools/cmake/build_host_install.sh"
+      - "tar -czvf build-artifacts.tgz build-host/install"
+    artifact_paths: "build-artifacts.tgz"
+    env:
+      IREE_DOCKER_WORKDIR: "/usr/src/github/iree"
+    agents:
+      - "queue=build"
+
+  - label: ":webassembly: Build experimental web samples"
+    depends_on: "build-host-install"
+    commands:
+      - "buildkite-agent artifact download --step build-host-install build-artifacts.tgz ./"
+      - "tar xzf build-artifacts.tgz"
+      - "git submodule update --init --jobs 8 --depth 1"
+      - "docker run --user=$(id -u):$(id -g) --volume=\\$PWD:\\$IREE_DOCKER_WORKDIR --workdir=\\$IREE_DOCKER_WORKDIR --rm gcr.io/iree-oss/emscripten@sha256:b43e63599a136d905f9a8c791cb7c7fcfb54a9e30b757fb14a494f202eec1c45 ./experimental/web/test_samples.sh"
     env:
       IREE_DOCKER_WORKDIR: "/usr/src/github/iree"
     agents:
