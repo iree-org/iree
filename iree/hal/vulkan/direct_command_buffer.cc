@@ -178,7 +178,7 @@ static void iree_hal_vulkan_direct_command_buffer_destroy(
   command_buffer->descriptor_set_group.~DescriptorSetGroup();
   command_buffer->descriptor_set_arena.~DescriptorSetArena();
 
-  iree_hal_resource_set_reset(command_buffer->resource_set);
+  iree_hal_resource_set_free(command_buffer->resource_set);
   iree_allocator_free(host_allocator, command_buffer);
 
   IREE_TRACE_ZONE_END(z0);
