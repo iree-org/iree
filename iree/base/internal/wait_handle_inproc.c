@@ -182,7 +182,7 @@ iree_status_t iree_wait_set_insert(iree_wait_set_t* set,
   iree_host_size_t index = set->handle_count++;
   iree_wait_handle_t* stored_handle = &set->handles[index];
   iree_wait_handle_wrap_primitive(handle.type, handle.value, stored_handle);
-  user_handle->set_internal.dupe_count = 0;  // just us so far
+  stored_handle->set_internal.dupe_count = 0;  // just us so far
 
   return iree_ok_status();
 }
