@@ -78,26 +78,24 @@ typedef enum iree_hal_executable_library_sanitizer_kind_e {
 typedef struct iree_hal_executable_environment_v0_t
     iree_hal_executable_environment_v0_t;
 
-// Known valid version values.
-typedef enum iree_hal_executable_library_version_e {
-  // iree_hal_executable_library_v0_t is used as the API communication
-  // structure.
-  IREE_HAL_EXECUTABLE_LIBRARY_VERSION_0 = 0,
-
-  IREE_HAL_EXECUTABLE_LIBRARY_VERSION_MAX_ENUM = INT32_MAX,
-} iree_hal_executable_library_version_t;
-static_assert(sizeof(iree_hal_executable_library_version_t) == 4, "uint32_t");
+// Version code indicating the minimum required runtime structures.
+// Runtimes cannot load executables with newer versions but may be able to load
+// older versions if backward compatibility is enabled.
+//
+// NOTE: until we hit v0 the versioning scheme here is not set in stone.
+// We may want to make this major release number, date codes (0x20220307),
+// or some semantic versioning we track in whatever spec we end up having.
+typedef uint32_t iree_hal_executable_library_version_t;
 
 // The latest version of the library API; can be used to populate the
 // iree_hal_executable_library_header_t::version when building libraries.
-#define IREE_HAL_EXECUTABLE_LIBRARY_LATEST_VERSION \
-  IREE_HAL_EXECUTABLE_LIBRARY_VERSION_0
+#define IREE_HAL_EXECUTABLE_LIBRARY_VERSION_LATEST 0x00000001u
 
 // A header present at the top of all versions of the library API used by the
 // runtime to ensure version compatibility.
 typedef struct iree_hal_executable_library_header_t {
   // Version of the API this library was built with, which was likely the value
-  // of IREE_HAL_EXECUTABLE_LIBRARY_LATEST_VERSION.
+  // of IREE_HAL_EXECUTABLE_LIBRARY_VERSION_LATEST.
   iree_hal_executable_library_version_t version;
 
   // Name used for logging/diagnostics.

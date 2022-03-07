@@ -46,7 +46,7 @@ static const iree_hal_executable_library_header_t header = {
     // Declares what library version is present: newer runtimes may support
     // loading older executables but newer executables cannot load on older
     // runtimes.
-    .version = IREE_HAL_EXECUTABLE_LIBRARY_LATEST_VERSION,
+    .version = IREE_HAL_EXECUTABLE_LIBRARY_VERSION_LATEST,
     // Name used for logging/diagnostics and rendezvous.
     .name = "demo_library",
     .features = IREE_HAL_EXECUTABLE_LIBRARY_FEATURE_NONE,

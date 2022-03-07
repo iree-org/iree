@@ -480,7 +480,7 @@ llvm::Constant *LibraryBuilder::buildLibraryV0(std::string libraryName) {
           {
               // version=
               llvm::ConstantInt::get(i32Type,
-                                     static_cast<int64_t>(Version::V_0)),
+                                     static_cast<int64_t>(Version::LATEST)),
               // name=
               getStringConstant(module->getName(), module),
               // features=

@@ -262,7 +262,7 @@ class LLVMAOTTargetBackend final : public TargetBackend {
         options_.debugSymbols ? LibraryBuilder::Mode::INCLUDE_REFLECTION_ATTRS
                               : LibraryBuilder::Mode::NONE;
     LibraryBuilder libraryBuilder(llvmModule.get(), libraryBuilderMode,
-                                  LibraryBuilder::Version::V_0);
+                                  LibraryBuilder::Version::LATEST);
     switch (options_.sanitizerKind) {
       case SanitizerKind::kNone: {
         libraryBuilder.setSanitizerKind(LibraryBuilder::SanitizerKind::NONE);
