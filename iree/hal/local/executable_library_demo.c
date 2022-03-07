@@ -46,7 +46,7 @@ static const iree_hal_executable_library_header_t header = {
     // Declares what library version is present: newer runtimes may support
     // loading older executables but newer executables cannot load on older
     // runtimes.
-    .version = IREE_HAL_EXECUTABLE_LIBRARY_LATEST_VERSION,
+    .version = IREE_HAL_EXECUTABLE_LIBRARY_VERSION_LATEST,
     // Name used for logging/diagnostics and rendezvous.
     .name = "demo_library",
     .features = IREE_HAL_EXECUTABLE_LIBRARY_FEATURE_NONE,
@@ -93,6 +93,10 @@ static const iree_hal_executable_library_v0_t library = {
             .names = entry_point_names,
             .tags = entry_point_tags,
         },
+    .constants =
+        {
+            .count = 0,
+        },
 };
 
 // The primary access point to the executable: in a static library this is
@@ -107,7 +111,7 @@ static const iree_hal_executable_library_v0_t library = {
 const iree_hal_executable_library_header_t** demo_executable_library_query(
     iree_hal_executable_library_version_t max_version,
     const iree_hal_executable_environment_v0_t* environment) {
-  return max_version <= 0
+  return max_version <= IREE_HAL_EXECUTABLE_LIBRARY_VERSION_LATEST
              ? (const iree_hal_executable_library_header_t**)&library
              : NULL;
 }

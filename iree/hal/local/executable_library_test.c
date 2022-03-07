@@ -41,11 +41,12 @@ int main(int argc, char** argv) {
     const iree_hal_executable_library_v0_t* v0;
   } library;
   library.header = demo_executable_library_query(
-      IREE_HAL_EXECUTABLE_LIBRARY_LATEST_VERSION, &environment);
+      IREE_HAL_EXECUTABLE_LIBRARY_VERSION_LATEST, &environment);
+  IREE_ASSERT_NE(library.header, NULL, "version may not have matched");
   const iree_hal_executable_library_header_t* header = *library.header;
   IREE_ASSERT_NE(header, NULL, "version may not have matched");
   IREE_ASSERT_LE(
-      header->version, IREE_HAL_EXECUTABLE_LIBRARY_LATEST_VERSION,
+      header->version, IREE_HAL_EXECUTABLE_LIBRARY_VERSION_LATEST,
       "expecting the library to have the same or older version as us");
   IREE_ASSERT(strcmp(header->name, "demo_library") == 0,
               "library name can be used to rendezvous in a registry");

@@ -289,7 +289,9 @@ llvm::Function *LibraryBuilder::build(StringRef queryFuncName) {
   //   return max_version == 0 ? &library : NULL;
   auto *v0 = buildLibraryV0((queryFuncName + "_v0").str());
   builder.CreateRet(builder.CreateSelect(
-      builder.CreateICmpEQ(func->getArg(0), llvm::ConstantInt::get(i32Type, 0)),
+      builder.CreateICmpEQ(func->getArg(0),
+                           llvm::ConstantInt::get(
+                               i32Type, static_cast<int64_t>(Version::V_0_1))),
       builder.CreatePointerCast(v0, libraryHeaderType->getPointerTo()),
       llvm::ConstantPointerNull::get(libraryHeaderType->getPointerTo())));
 
@@ -480,7 +482,7 @@ llvm::Constant *LibraryBuilder::buildLibraryV0(std::string libraryName) {
           {
               // version=
               llvm::ConstantInt::get(i32Type,
-                                     static_cast<int64_t>(Version::V_0)),
+                                     static_cast<int64_t>(Version::LATEST)),
               // name=
               getStringConstant(module->getName(), module),
               // features=
