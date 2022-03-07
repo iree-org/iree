@@ -85,7 +85,8 @@ namespace {
 static void BenchmarkFunction(const std::string& benchmark_name, int batch_size,
                               iree_vm_context_t* context,
                               iree_vm_function_t function,
-                              iree_vm_list_t* inputs, benchmark::State& state) {
+                              iree_vm_list_t* inputs, iree_hal_device_t* device,
+                              benchmark::State& state) {
   IREE_TRACE_SCOPE_DYNAMIC(benchmark_name.c_str());
   IREE_TRACE_FRAME_MARK();
 
@@ -100,21 +101,25 @@ static void BenchmarkFunction(const std::string& benchmark_name, int batch_size,
         context, function, IREE_VM_INVOCATION_FLAG_NONE, /*policy=*/nullptr,
         inputs, outputs.get(), iree_allocator_system()));
   }
+
+  // Force a full flush and get the device back to an idle state.
+  IREE_CHECK_OK(iree_hal_device_wait_idle(device, iree_infinite_timeout()));
 }
 
 void RegisterModuleBenchmarks(const std::string& function_name,
                               iree_vm_context_t* context,
                               iree_vm_function_t function,
-                              iree_vm_list_t* inputs) {
+                              iree_vm_list_t* inputs,
+                              iree_hal_device_t* device) {
   auto benchmark_name = "BM_" + function_name;
   int batch_size = FLAG_batch_size;
-  benchmark::RegisterBenchmark(benchmark_name.c_str(),
-                               [benchmark_name, batch_size, context, function,
-                                inputs](benchmark::State& state) -> void {
-                                 BenchmarkFunction(benchmark_name, batch_size,
-                                                   context, function, inputs,
-                                                   state);
-                               })
+  benchmark::RegisterBenchmark(
+      benchmark_name.c_str(),
+      [benchmark_name, batch_size, context, function, inputs,
+       device](benchmark::State& state) -> void {
+        BenchmarkFunction(benchmark_name, batch_size, context, function, inputs,
+                          device, state);
+      })
       // By default only the main thread is included in CPU time. Include all
       // the threads instead.
       ->MeasureProcessCPUTime()
@@ -229,7 +234,8 @@ class IREEBenchmark {
         iree::span<const std::string>{FLAG_function_inputs.data(),
                                       FLAG_function_inputs.size()},
         &inputs_));
-    RegisterModuleBenchmarks(function_name, context_, function, inputs_.get());
+    RegisterModuleBenchmarks(function_name, context_, function, inputs_.get(),
+                             device_);
     return iree_ok_status();
   }
 
@@ -272,7 +278,7 @@ class IREEBenchmark {
       iree::RegisterModuleBenchmarks(
           std::string(function_name.data, function_name.size), context_,
           function,
-          /*inputs=*/nullptr);
+          /*inputs=*/nullptr, device_);
     }
     return iree_ok_status();
   }
