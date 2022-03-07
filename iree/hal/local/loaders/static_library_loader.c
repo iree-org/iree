@@ -217,23 +217,23 @@ iree_status_t iree_hal_static_library_loader_create(
     // of the runtime are difficult to spot otherwise.
     for (iree_host_size_t i = 0; i < library_count; ++i) {
       const iree_hal_executable_library_header_t* const* header_ptr =
-          library_query_fns[i](IREE_HAL_EXECUTABLE_LIBRARY_LATEST_VERSION,
+          library_query_fns[i](IREE_HAL_EXECUTABLE_LIBRARY_VERSION_LATEST,
                                &environment);
       if (!header_ptr) {
         status = iree_make_status(
             IREE_STATUS_UNAVAILABLE,
             "failed to query library header for runtime version %d",
-            IREE_HAL_EXECUTABLE_LIBRARY_LATEST_VERSION);
+            IREE_HAL_EXECUTABLE_LIBRARY_VERSION_LATEST);
         break;
       }
       const iree_hal_executable_library_header_t* header = *header_ptr;
       IREE_TRACE_ZONE_APPEND_TEXT(z0, header->name);
-      if (header->version > IREE_HAL_EXECUTABLE_LIBRARY_LATEST_VERSION) {
+      if (header->version > IREE_HAL_EXECUTABLE_LIBRARY_VERSION_LATEST) {
         status = iree_make_status(
             IREE_STATUS_FAILED_PRECONDITION,
             "executable does not support this version of the "
             "runtime (executable: %d, runtime: %d)",
-            header->version, IREE_HAL_EXECUTABLE_LIBRARY_LATEST_VERSION);
+            header->version, IREE_HAL_EXECUTABLE_LIBRARY_VERSION_LATEST);
         break;
       }
       memcpy((void*)&executable_loader->libraries[i], &header_ptr,

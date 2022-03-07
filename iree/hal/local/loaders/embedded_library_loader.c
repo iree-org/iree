@@ -52,13 +52,13 @@ static iree_status_t iree_hal_elf_executable_query_library(
   // Query for a compatible version of the library.
   executable->library.header =
       (const iree_hal_executable_library_header_t**)iree_elf_call_p_ip(
-          query_fn, IREE_HAL_EXECUTABLE_LIBRARY_LATEST_VERSION,
+          query_fn, IREE_HAL_EXECUTABLE_LIBRARY_VERSION_LATEST,
           &executable->base.environment);
   if (!executable->library.header) {
     return iree_make_status(
         IREE_STATUS_FAILED_PRECONDITION,
-        "executable does not support this version of the runtime (%d)",
-        IREE_HAL_EXECUTABLE_LIBRARY_LATEST_VERSION);
+        "executable does not support this version of the runtime (%08X)",
+        IREE_HAL_EXECUTABLE_LIBRARY_VERSION_LATEST);
   }
   const iree_hal_executable_library_header_t* header =
       *executable->library.header;

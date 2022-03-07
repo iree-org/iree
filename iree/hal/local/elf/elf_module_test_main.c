@@ -75,14 +75,14 @@ static iree_status_t run_test() {
   } library;
   library.header =
       (const iree_hal_executable_library_header_t**)iree_elf_call_p_ip(
-          query_fn_ptr, IREE_HAL_EXECUTABLE_LIBRARY_LATEST_VERSION,
+          query_fn_ptr, IREE_HAL_EXECUTABLE_LIBRARY_VERSION_LATEST,
           &environment);
   if (library.header == NULL) {
     return iree_make_status(IREE_STATUS_NOT_FOUND, "library header is empty");
   }
 
   const iree_hal_executable_library_header_t* header = *library.header;
-  if (header->version != IREE_HAL_EXECUTABLE_LIBRARY_VERSION_0) {
+  if (header->version != IREE_HAL_EXECUTABLE_LIBRARY_VERSION_LATEST) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                             "library version error");
   }
