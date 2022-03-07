@@ -59,7 +59,8 @@ static iree_status_t _TfLiteModelInitializeModule(const void* flatbuffer_data,
       iree_vm_module_lookup_function_by_name(
           model->module, IREE_VM_FUNCTION_LINKAGE_EXPORT,
           iree_make_cstring_view("_tflite_main"), &model->exports._main),
-      "unable to find '_tflite_main' export in module");
+      "unable to find '_tflite_main' export in module, module must be compiled "
+      "with tflite bindings support");
 
   // Get the input and output counts of the function; this is useful for being
   // able to preallocate storage when creating interpreters.
@@ -122,7 +123,9 @@ TFL_CAPI_EXPORT extern TfLiteModel* TfLiteModelCreate(const void* model_data,
 
   status =
       _TfLiteModelInitializeModule(model_data, model_size, allocator, model);
-  if (!iree_status_is_ok(iree_status_consume_code(status))) {
+  if (!iree_status_is_ok(status)) {
+    iree_status_fprint(stderr, status);
+    iree_status_free(status);
     iree_allocator_free(allocator, model);
     IREE_TRACE_ZONE_END(z0);
     return NULL;
