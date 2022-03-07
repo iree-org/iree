@@ -59,8 +59,8 @@ static iree_status_t _TfLiteModelInitializeModule(const void* flatbuffer_data,
       iree_vm_module_lookup_function_by_name(
           model->module, IREE_VM_FUNCTION_LINKAGE_EXPORT,
           iree_make_cstring_view("_tflite_main"), &model->exports._main),
-      "unable to find '_tflite_main' export in module, ensure the "
-      "`-iree-tflite-bindings-support` flag was set when compiling your model");
+      "unable to find '_tflite_main' export in module, module must be compiled "
+      "with tflite bindings support");
 
   // Get the input and output counts of the function; this is useful for being
   // able to preallocate storage when creating interpreters.
