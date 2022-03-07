@@ -101,7 +101,8 @@ void IREEComprehensiveBufferizePass::runOnOperation() {
   options.allocationFn = allocationFn;
   options.deallocationFn = deallocationFn;
   options.memCpyFn = memCpyFn;
-  options.testAnalysisOnly = false;
+  options.testAnalysisOnly = testAnalysisOnly;
+  options.printConflicts = printConflicts;
   options.alwaysAliasingWithDest = false;
   addPostAnalysisTransformations(options);
 
