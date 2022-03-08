@@ -192,12 +192,10 @@ func @reshape_fused_source() {
 //      CHECK: func @reshape_fused_source()
 //  CHECK-DAG:   %[[ARG0:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer)
 //  CHECK-DAG:   %[[RET0:.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer)
-//      CHECK:   %[[TARGET:.+]] = flow.dispatch.tensor.load %[[RET0]]
 //      CHECK:   %[[SOURCE:.+]] = flow.dispatch.tensor.load %[[ARG0]]
 //      CHECK:   %[[RESHAPE:.+]] = tensor.expand_shape %[[SOURCE]]
 //      CHECK:   %[[GENERIC:.+]] = linalg.generic
-// CHECK-SAME:       ins(%[[RESHAPE]]
-// CHECK-SAME:       outs(%[[TARGET]]
+// CHECK-SAME:       outs(%[[RESHAPE]]
 //      CHECK:   flow.dispatch.tensor.store %[[GENERIC]], %[[RET0]]
 
 // -----
@@ -229,13 +227,11 @@ func @reshape_fused_source_and_copyout() {
 //      CHECK: func @reshape_fused_source_and_copyout()
 //  CHECK-DAG:   %[[ARG0:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer)
 //  CHECK-DAG:   %[[RET0:.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer)
-//  CHECK-DAG:   %[[TARGET:.+]] = flow.dispatch.tensor.load %[[RET0]]
 //  CHECK-DAG:   %[[RET1:.+]] = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer)
 //      CHECK:   %[[SOURCE:.+]] = flow.dispatch.tensor.load %[[ARG0]]
 //      CHECK:   %[[RESHAPE:.+]] = tensor.expand_shape %[[SOURCE]]
 //      CHECK:   %[[GENERIC:.+]] = linalg.generic
-// CHECK-SAME:       ins(%[[RESHAPE]]
-// CHECK-SAME:       outs(%[[TARGET]]
+// CHECK-SAME:       outs(%[[RESHAPE]]
 //      CHECK:   flow.dispatch.tensor.store %[[GENERIC]], %[[RET0]]
 //      CHECK:   flow.dispatch.tensor.store %[[RESHAPE]], %[[RET1]]
 
@@ -267,11 +263,8 @@ func @reshape_fused_target() {
 //  CHECK-DAG:   %[[ARG0:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer)
 //  CHECK-DAG:   %[[RET0:.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer)
 //  CHECK-DAG:   %[[SOURCE:.+]] = flow.dispatch.tensor.load %[[ARG0]]
-//  CHECK-DAG:   %[[TARGET:.+]] = flow.dispatch.tensor.load %[[RET0]]
-//  CHECK-DAG:   %[[RESHAPE_EXPAND:.+]] = tensor.expand_shape %[[TARGET]] {{\[}}[0, 1]{{\]}}
 //      CHECK:   %[[GENERIC:.+]] = linalg.generic
-// CHECK-SAME:       ins(%[[SOURCE]]
-// CHECK-SAME:       outs(%[[RESHAPE_EXPAND]]
+// CHECK-SAME:       outs(%[[SOURCE]]
 //      CHECK:   %[[RESHAPE_COLLAPSE:.+]] = tensor.collapse_shape %[[GENERIC]] {{\[}}[0, 1]{{\]}}
 //      CHECK:   flow.dispatch.tensor.store %[[RESHAPE_COLLAPSE]], %[[RET0]]
 
@@ -463,14 +456,11 @@ func @unused_ins_operand() {
 //   CHECK-DAG:   %[[IN:.+]] = hal.interface.binding.subspan set(0) binding(0)
 //   CHECK-DAG:   %[[OUT:.+]] = hal.interface.binding.subspan set(0) binding(2)
 //   CHECK-DAG:   %[[IN_VIEW:.+]] = flow.dispatch.tensor.load %[[IN]]
-//   CHECK-DAG:   %[[OUT_VIEW:.+]] = flow.dispatch.tensor.load %[[OUT]]
 //   CHECK-DAG:   %[[INIT:.+]] = linalg.init_tensor
 //       CHECK:   linalg.generic
-//  CHECK-SAME:       ins(%[[IN_VIEW]], %[[INIT]]
-//  CHECK-SAME:       outs(%[[OUT_VIEW]]
-
+//  CHECK-SAME:       ins(%[[INIT]]
+//  CHECK-SAME:       outs(%[[IN_VIEW]]
 // -----
-
 func @three_init_tensor_uses() {
   %c6400 = arith.constant 6400 : index
   %c64 = arith.constant 64 : index
@@ -523,7 +513,53 @@ func @three_init_tensor_uses() {
 //       CHECK:   %[[LOAD:.+]] = flow.dispatch.tensor.load %[[OUTPUT]]
 //   CHECK-NOT:   linalg.init_tensor
 //       CHECK:   linalg.fill(%{{.+}}, %[[LOAD]])
+//       CHECK:   %[[MATMUL:.+]] = linalg.matmul
+//       CHECK:   %[[GENERIC:.+]] = linalg.generic
+//  CHECK-SAME:       outs(%[[MATMUL]] :
 //       CHECK:   linalg.generic
-//  CHECK-SAME:       outs(%[[LOAD]] :
+//  CHECK-SAME:       outs(%[[GENERIC]] :
+
+// -----
+
+func @fill_matmul_exp() {
+  %cst = arith.constant 0.000000e+00 : f32
+  %c0 = arith.constant 0 : index
+  %c33 = arith.constant 33 : index
+  %c49 = arith.constant 49 : index
+  %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(32) : !flow.dispatch.tensor<readonly:33x16xf32>
+  %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(32) : !flow.dispatch.tensor<readonly:16x49xf32>
+  %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) offset(%c0) alignment(32) : !flow.dispatch.tensor<writeonly:33x49xf32>
+  %workgroup_id_x = hal.interface.workgroup.id[0] : index
+  %workgroup_count_x = hal.interface.workgroup.count[0] : index
+  %workgroup_id_y = hal.interface.workgroup.id[1] : index
+  %workgroup_count_y = hal.interface.workgroup.count[1] : index
+  %3 = affine.apply affine_map<()[s0] -> (s0 * 16)>()[%workgroup_id_y]
+  %4 = affine.apply affine_map<()[s0] -> (s0 * 16)>()[%workgroup_count_y]
+  scf.for %arg0 = %3 to %c33 step %4 {
+    %5 = affine.apply affine_map<()[s0] -> (s0 * 16)>()[%workgroup_id_x]
+    %6 = affine.apply affine_map<()[s0] -> (s0 * 16)>()[%workgroup_count_x]
+    scf.for %arg1 = %5 to %c49 step %6 {
+      %7 = affine.min affine_map<(d0) -> (16, -d0 + 33)>(%arg0)
+      %8 = affine.min affine_map<(d0) -> (16, -d0 + 49)>(%arg1)
+      %9 = linalg.init_tensor [%7, %8] : tensor<?x?xf32>
+      %10 = affine.min affine_map<(d0) -> (-d0 + 33, 16)>(%arg0)
+      %11 = flow.dispatch.tensor.load %0, offsets = [%arg0, 0], sizes = [%10, 16], strides = [1, 1] : !flow.dispatch.tensor<readonly:33x16xf32> -> tensor<?x16xf32>
+      %12 = affine.min affine_map<(d0) -> (-d0 + 49, 16)>(%arg1)
+      %13 = flow.dispatch.tensor.load %1, offsets = [0, %arg1], sizes = [16, %12], strides = [1, 1] : !flow.dispatch.tensor<readonly:16x49xf32> -> tensor<16x?xf32>
+      %14 = linalg.init_tensor [%10, %12] : tensor<?x?xf32>
+      %15 = linalg.fill(%cst, %14) : f32, tensor<?x?xf32> -> tensor<?x?xf32>
+      %16 = linalg.matmul {lowering.config = #iree_codegen.lowering.config<tile_sizes = [[], [8, 0, 0], [0, 0, 16]], native_vector_size = []>} ins(%11, %13 : tensor<?x16xf32>, tensor<16x?xf32>) outs(%15 : tensor<?x?xf32>) -> tensor<?x?xf32>
+      %17 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]} ins(%16 : tensor<?x?xf32>) outs(%9 : tensor<?x?xf32>) {
+      ^bb0(%arg2: f32, %arg3: f32):
+        %18 = math.exp %arg2 : f32
+        linalg.yield %18 : f32
+      } -> tensor<?x?xf32>
+      flow.dispatch.tensor.store %17, %2, offsets = [%arg0, %arg1], sizes = [%7, %8], strides = [1, 1] : tensor<?x?xf32> -> !flow.dispatch.tensor<writeonly:33x49xf32>
+    }
+  }
+  return
+}
+// CHECK-LABEL: func @fill_matmul_exp()
+//       CHECK:   %[[MATMUL:.+]] = linalg.matmul
 //       CHECK:   linalg.generic
-//  CHECK-SAME:       outs(%[[LOAD]] :
+//  CHECK-SAME:       outs(%[[MATMUL]]
