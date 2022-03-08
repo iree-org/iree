@@ -17,7 +17,7 @@
 // Total number of queries the per-queue query pool will contain. This
 // translates to the maximum number of outstanding queries before collection is
 // required.
-#define IREE_HAL_VULKAN_TRACING_DEFAULT_QUERY_CAPACITY (16 * 1024)
+#define IREE_HAL_VULKAN_TRACING_DEFAULT_QUERY_CAPACITY (32 * 1024)
 
 // Total number of queries that can be read back from the API in a single
 // collection.
