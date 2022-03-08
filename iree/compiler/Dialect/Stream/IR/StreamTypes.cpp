@@ -107,10 +107,14 @@ ResourceConfigAttr ResourceConfigAttr::intersectBufferConstraints(
 ResourceConfigAttr ResourceConfigAttr::getDefaultHostConstraints(
     MLIRContext *context) {
   // Picked to represent what we kind of want on CPU today.
+  // TODO(#8484): properly choose this value based on target devices. We don't
+  // yet have the device information up in stream and thus for targets that have
+  // high alignment requirements (128/256/etc) we are not picking the right
+  // value here.
   uint64_t maxAllocationSize = UINT32_MAX;
-  uint64_t minBufferOffsetAlignment = 32ull;
+  uint64_t minBufferOffsetAlignment = 64ull;
   uint64_t maxBufferRange = UINT32_MAX;
-  uint64_t minBufferRangeAlignment = 32ull;
+  uint64_t minBufferRangeAlignment = 64ull;
   return ResourceConfigAttr::get(context, maxAllocationSize,
                                  minBufferOffsetAlignment, maxBufferRange,
                                  minBufferRangeAlignment);
