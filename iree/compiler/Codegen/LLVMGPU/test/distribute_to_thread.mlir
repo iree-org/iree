@@ -71,9 +71,9 @@ hal.executable private @dot_dispatch_0  {
 //     CHECK-DAG:  %[[BUFFER1:.+]] = memref.alloc() : memref<2x4xf32, 3>
 //         CHECK:  scf.for %[[K:.+]] = %[[C0]] to %[[C1024]] step %[[C4]] {
 //         CHECK:    gpu.barrier
-//         CHECK:    linalg.generic {{.*}} ins(%{{.*}} : memref<2x4xf32, #{{.*}}>) outs(%{{.*}} : memref<2x4xf32, 3>) attrs = {__internal_linalg_transform__ = "copy_to_workgroup_memory"}
+//         CHECK:    memref.copy {{.*}}, {{.*}} {__internal_linalg_transform__ = "copy_to_workgroup_memory"} : memref<2x4xf32, #{{.*}}> to memref<2x4xf32, 3>
 //     CHECK-NOT:    gpu.barrier
-//         CHECK:    linalg.generic {{.*}} ins(%{{.*}} : memref<4x256xf32, #{{.*}}>) outs(%{{.*}} : memref<4x256xf32, 3>) attrs = {__internal_linalg_transform__ = "copy_to_workgroup_memory"}
+//         CHECK:    memref.copy {{.*}}, {{.*}} {__internal_linalg_transform__ = "copy_to_workgroup_memory"} : memref<4x256xf32, #{{.*}}> to memref<4x256xf32, 3>
 //         CHECK:    gpu.barrier
 //         CHECK:    scf.for %[[IND0:.+]] = %{{.*}} to %[[C2]] step %[[C2]] {
 //         CHECK:      scf.for %[[IND1:.+]] = %{{.*}} to %[[C256]] step %[[C256]] {
@@ -233,9 +233,9 @@ hal.executable private @dot_dispatch_0  {
 //     CHECK-DAG:  %[[BUFFER1:.+]] = memref.alloc() : memref<2x4xf32, 3>
 //         CHECK:  scf.for %[[K:.+]] = %[[C0]] to %[[C1024]] step %[[C4]] {
 //         CHECK:    gpu.barrier
-//         CHECK:    linalg.generic {{.*}} ins(%{{.*}} : memref<2x4xf32, #{{.*}}>) outs(%{{.*}} : memref<2x4xf32, 3>) attrs = {__internal_linalg_transform__ = "copy_to_workgroup_memory"}
+//         CHECK:    memref.copy {{.*}}, {{.*}} {__internal_linalg_transform__ = "copy_to_workgroup_memory"} : memref<2x4xf32, #{{.*}}> to memref<2x4xf32, 3>
 //     CHECK-NOT:    gpu.barrier
-//         CHECK:    linalg.generic {{.*}} ins(%{{.*}} : memref<4x32xf32, #{{.*}}>) outs(%{{.*}} : memref<4x32xf32, 3>) attrs = {__internal_linalg_transform__ = "copy_to_workgroup_memory"}
+//         CHECK:    memref.copy {{.*}}, {{.*}} {__internal_linalg_transform__ = "copy_to_workgroup_memory"} : memref<4x32xf32, #{{.*}}> to memref<4x32xf32, 3>
 //         CHECK:    gpu.barrier
 //         CHECK:    scf.for %[[IND0:.+]] = %{{.*}} to %[[C2]] step %[[C8]] {
 //         CHECK:      scf.for %[[IND1:.+]] = %{{.*}} to %[[C32]] step %[[C64]] {

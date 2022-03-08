@@ -178,7 +178,7 @@ static void populateTilingToInvocationPatterns(
 }
 
 static LogicalResult copyToWorkgroupMemory(OpBuilder &b, Value src, Value dst) {
-  Operation *copyOp = createLinalgCopyOp(b, src.getLoc(), src, dst);
+  Operation *copyOp = b.create<memref::CopyOp>(src.getLoc(), src, dst);
   setMarker(copyOp, getCopyToWorkgroupMemoryMarker());
   return success();
 }
@@ -293,7 +293,7 @@ struct LLVMGPUTileAndDistributePass
       // Insert barriers before and after copies to workgroup memory and skip
       // insert barriers between back to back copy to workgroup memory.
       OpBuilder builder(&getContext());
-      funcOp.walk([&builder](linalg::GenericOp copyOp) {
+      funcOp.walk([&builder](memref::CopyOp copyOp) {
         if (hasMarker(copyOp, getCopyToWorkgroupMemoryMarker())) {
           Operation *prevOp = copyOp->getPrevNode();
           if (!prevOp || !hasMarker(prevOp, getCopyToWorkgroupMemoryMarker())) {

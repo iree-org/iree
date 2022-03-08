@@ -485,8 +485,8 @@ SmallVector<LoopTilingAndDistributionInfo> getTiledAndDistributedLoopInfo(
 /// Create a linalg::GenericOp version of an n-D copy that can further tile,
 /// lower to loops or vectorize, unlike the current implementation of
 /// memref::CopyOp.
-Operation *createLinalgCopyOp(OpBuilder &b, Location loc, Value from,
-                              Value to) {
+Operation *createLinalgCopyOp(OpBuilder &b, Location loc, Value from, Value to,
+                              ArrayRef<NamedAttribute> attributes) {
   auto memrefTypeFrom = from.getType().cast<MemRefType>();
   auto memrefTypeTo = to.getType().cast<MemRefType>();
   (void)memrefTypeFrom;
@@ -504,7 +504,8 @@ Operation *createLinalgCopyOp(OpBuilder &b, Location loc, Value from,
       /*iteratorTypes=*/iteratorTypes,
       [](OpBuilder &b, Location loc, ValueRange args) {
         b.create<linalg::YieldOp>(loc, args.front());
-      });
+      },
+      attributes);
 }
 
 }  // namespace iree_compiler

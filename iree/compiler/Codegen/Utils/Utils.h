@@ -135,7 +135,8 @@ Optional<LoopTilingAndDistributionInfo> isTiledAndDistributedLoop(
 SmallVector<LoopTilingAndDistributionInfo> getTiledAndDistributedLoopInfo(
     FuncOp funcOp);
 
-Operation *createLinalgCopyOp(OpBuilder &b, Location loc, Value from, Value to);
+Operation *createLinalgCopyOp(OpBuilder &b, Location loc, Value from, Value to,
+                              ArrayRef<NamedAttribute> attributes = {});
 }  // namespace iree_compiler
 }  // namespace mlir
 
