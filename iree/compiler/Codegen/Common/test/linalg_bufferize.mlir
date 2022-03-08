@@ -1756,9 +1756,9 @@ func @multi_result_reduce() {
     %7 = flow.dispatch.tensor.load %0, offsets = [0, %arg0], sizes = [%d0, %6], strides = [1, 1] : !flow.dispatch.tensor<readonly:?x?xi32>{%d0, %d1} -> tensor<?x?xi32>
     %9 = flow.dispatch.tensor.load %1, offsets = [0, %arg0], sizes = [%d0, %6], strides = [1, 1] : !flow.dispatch.tensor<readonly:?x?xi32>{%d0, %d1} -> tensor<?x?xi32>
     %13 = linalg.init_tensor [%6] : tensor<?xi32>
-    %14 = linalg.fill(%c-2147483648_i32, %13) {__internal_linalg_transform__ = "workgroup", lowering.config = {tileSizes = [[128]]}} : i32, tensor<?xi32> -> tensor<?xi32>
-    %17 = linalg.fill(%c0_i32, %13) {__internal_linalg_transform__ = "workgroup", lowering.config = {tileSizes = [[128]]}} : i32, tensor<?xi32> -> tensor<?xi32>
-    %18:2 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d1, d0)>, affine_map<(d0, d1) -> (d1, d0)>, affine_map<(d0, d1) -> (d0)>, affine_map<(d0, d1) -> (d0)>], iterator_types = ["parallel", "reduction"]} ins(%7, %9 : tensor<?x?xi32>, tensor<?x?xi32>) outs(%14, %17 : tensor<?xi32>, tensor<?xi32>) attrs =  {__internal_linalg_transform__ = "workgroup", lowering.config = {tileSizes = [[128]]}} {
+    %14 = linalg.fill(%c-2147483648_i32, %13) {__internal_linalg_transform__ = "workgroup", lowering_config = {tileSizes = [[128]]}} : i32, tensor<?xi32> -> tensor<?xi32>
+    %17 = linalg.fill(%c0_i32, %13) {__internal_linalg_transform__ = "workgroup", lowering_config = {tileSizes = [[128]]}} : i32, tensor<?xi32> -> tensor<?xi32>
+    %18:2 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d1, d0)>, affine_map<(d0, d1) -> (d1, d0)>, affine_map<(d0, d1) -> (d0)>, affine_map<(d0, d1) -> (d0)>], iterator_types = ["parallel", "reduction"]} ins(%7, %9 : tensor<?x?xi32>, tensor<?x?xi32>) outs(%14, %17 : tensor<?xi32>, tensor<?xi32>) attrs =  {__internal_linalg_transform__ = "workgroup", lowering_config = {tileSizes = [[128]]}} {
     ^bb0(%arg1: i32, %arg2: i32, %arg3: i32, %arg4: i32):  // no predecessors
       %19 = arith.cmpi sge, %arg1, %arg3 : i32
       %20 = arith.select %19, %arg1, %arg3 : i32
@@ -1843,7 +1843,7 @@ func @l1_tiled_matmul_no_fill() {
             %23 = tensor.dim %arg7, %c1 : tensor<?x?xf32>
             %24 = affine.min #map6(%23, %arg4)
             %25 = tensor.extract_slice %arg7[%arg2, %arg4] [%22, %24] [1, 1] : tensor<?x?xf32> to tensor<?x?xf32>
-            %26 = linalg.matmul {__internal_linalg_transform__ = "workgroup_l1_tile", lowering.config = #config1} ins(%18, %20 : tensor<?x?xf32>, tensor<?x?xf32>) outs(%25 : tensor<?x?xf32>) -> tensor<?x?xf32>
+            %26 = linalg.matmul {__internal_linalg_transform__ = "workgroup_l1_tile", lowering_config = #config1} ins(%18, %20 : tensor<?x?xf32>, tensor<?x?xf32>) outs(%25 : tensor<?x?xf32>) -> tensor<?x?xf32>
             %27 = tensor.insert_slice %26 into %arg7[%arg2, %arg4] [%22, %24] [1, 1] : tensor<?x?xf32> into tensor<?x?xf32>
             scf.yield %27 : tensor<?x?xf32>
           }
@@ -1940,7 +1940,7 @@ func @l1_tiled_matmul_no_fill_readwrite() {
             %23 = tensor.dim %arg7, %c1 : tensor<?x?xf32>
             %24 = affine.min #map6(%23, %arg4)
             %25 = tensor.extract_slice %arg7[%arg2, %arg4] [%22, %24] [1, 1] : tensor<?x?xf32> to tensor<?x?xf32>
-            %26 = linalg.matmul {__internal_linalg_transform__ = "workgroup_l1_tile", lowering.config = #config1} ins(%18, %20 : tensor<?x?xf32>, tensor<?x?xf32>) outs(%25 : tensor<?x?xf32>) -> tensor<?x?xf32>
+            %26 = linalg.matmul {__internal_linalg_transform__ = "workgroup_l1_tile", lowering_config = #config1} ins(%18, %20 : tensor<?x?xf32>, tensor<?x?xf32>) outs(%25 : tensor<?x?xf32>) -> tensor<?x?xf32>
             %27 = tensor.insert_slice %26 into %arg7[%arg2, %arg4] [%22, %24] [1, 1] : tensor<?x?xf32> into tensor<?x?xf32>
             scf.yield %27 : tensor<?x?xf32>
           }
@@ -2020,7 +2020,7 @@ func @l1_tiled_matmul() {
       %9 = affine.min #map2(%arg1)
       %10 = flow.dispatch.tensor.load %1, offsets = [0, %arg1], sizes = [144, %9], strides = [1, 1] : !flow.dispatch.tensor<readonly:144x370xf32> -> tensor<144x?xf32>
       %11 = linalg.init_tensor [%7, %9] : tensor<?x?xf32>
-      %12 = linalg.fill(%cst, %11) {__internal_linalg_transform__ = "workgroup", lowering.config = #config0} : f32, tensor<?x?xf32> -> tensor<?x?xf32>
+      %12 = linalg.fill(%cst, %11) {__internal_linalg_transform__ = "workgroup", lowering_config = #config0} : f32, tensor<?x?xf32> -> tensor<?x?xf32>
       %13 = scf.for %arg2 = %c0 to %c250 step %c32 iter_args(%arg3 = %12) -> (tensor<?x?xf32>) {
         %14 = scf.for %arg4 = %c0 to %c370 step %c32 iter_args(%arg5 = %arg3) -> (tensor<?x?xf32>) {
           %15 = scf.for %arg6 = %c0 to %c144 step %c24 iter_args(%arg7 = %arg5) -> (tensor<?x?xf32>) {
@@ -2034,7 +2034,7 @@ func @l1_tiled_matmul() {
             %23 = tensor.dim %arg7, %c1 : tensor<?x?xf32>
             %24 = affine.min #map6(%23, %arg4)
             %25 = tensor.extract_slice %arg7[%arg2, %arg4] [%22, %24] [1, 1] : tensor<?x?xf32> to tensor<?x?xf32>
-            %26 = linalg.matmul {__internal_linalg_transform__ = "workgroup_l1_tile", lowering.config = #config1} ins(%18, %20 : tensor<?x?xf32>, tensor<?x?xf32>) outs(%25 : tensor<?x?xf32>) -> tensor<?x?xf32>
+            %26 = linalg.matmul {__internal_linalg_transform__ = "workgroup_l1_tile", lowering_config = #config1} ins(%18, %20 : tensor<?x?xf32>, tensor<?x?xf32>) outs(%25 : tensor<?x?xf32>) -> tensor<?x?xf32>
             %27 = tensor.insert_slice %26 into %arg7[%arg2, %arg4] [%22, %24] [1, 1] : tensor<?x?xf32> into tensor<?x?xf32>
             scf.yield %27 : tensor<?x?xf32>
           }
@@ -2324,7 +2324,7 @@ func @multi_level_tile_fuse() {
               %31 = affine.apply affine_map<(d0, d1) -> (d0 + d1)>(%arg8, %arg4)
               %32 = tensor.extract_slice %15[0, %31] [%k, %30] [1, 1] : tensor<?x?xf32> to tensor<?x?xf32>
               %33 = tensor.extract_slice %arg9[%arg6, %arg8] [%27, %30] [1, 1] : tensor<?x?xf32> to tensor<?x?xf32>
-              %34 = linalg.matmul {__internal_linalg_transform__ = "vectorize", lowering.config = {nativeVectorSize = [4, 4, 4], tileSizes = [[], [4, 4, 4], [4, 4, 4]]}} ins(%29, %32 : tensor<?x?xf32>, tensor<?x?xf32>) outs(%33 : tensor<?x?xf32>) -> tensor<?x?xf32>
+              %34 = linalg.matmul {__internal_linalg_transform__ = "vectorize", lowering_config = {nativeVectorSize = [4, 4, 4], tileSizes = [[], [4, 4, 4], [4, 4, 4]]}} ins(%29, %32 : tensor<?x?xf32>, tensor<?x?xf32>) outs(%33 : tensor<?x?xf32>) -> tensor<?x?xf32>
               %35 = tensor.insert_slice %34 into %arg9[%arg6, %arg8] [%27, %30] [1, 1] : tensor<?x?xf32> into tensor<?x?xf32>
               scf.yield %35 : tensor<?x?xf32>
             }

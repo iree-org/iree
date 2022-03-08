@@ -1,7 +1,7 @@
 // RUN: iree-opt -split-input-file -pass-pipeline='hal.executable(hal.executable.variant(iree-set-num-workgroups,builtin.module(builtin.func(iree-spirv-tile,iree-spirv-vectorize))))' %s | FileCheck %s
 
-#config = #iree_codegen.lowering.config<tile_sizes = [[0, 4, 4, 16], [0, 4, 1, 4], [0, 0, 0, 0, 1, 1, 4]], native_vector_size = []>
-#translation = #iree_codegen.translation.info<"SPIRVVectorize", workload_per_wg = [16, 4, 4]>
+#config = #iree_codegen.lowering_config<tile_sizes = [[0, 4, 4, 16], [0, 4, 1, 4], [0, 0, 0, 0, 1, 1, 4]]>
+#translation = #iree_codegen.translation_info<SPIRVVectorize, workload_per_wg = [16, 4, 4]>
 #executable_layout = #hal.executable.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
@@ -13,7 +13,7 @@ hal.executable private @conv_static_shape_f32 {
   hal.executable.variant @vulkan, target = <"vulkan-spirv", "vulkan-spirv-fb"> {
     hal.executable.entry_point @conv_static_shape_f32 layout(#executable_layout) {
       workgroup_size = [4: index, 4: index, 1: index],
-      translation.info = #translation
+      translation_info = #translation
     }
     builtin.module  {
       func @conv_static_shape_f32() {
@@ -56,7 +56,7 @@ hal.executable private @conv_static_shape_f32 {
               %20 = affine.min affine_map<(d0)[s0] -> (-d0 + 16, s0)>(%arg2)[%workgroup_size_x]
               %21 = linalg.init_tensor [1, %18, %19, %20] : tensor<1x?x?x?xf32>
               %22 = linalg.fill(%cst, %21) : f32, tensor<1x?x?x?xf32> -> tensor<1x?x?x?xf32>
-              %23 = linalg.conv_2d_nhwc_hwcf {lowering.config = #config, dilations = dense<1> : tensor<2xi64>, strides = dense<2> : tensor<2xi64>}
+              %23 = linalg.conv_2d_nhwc_hwcf {lowering_config = #config, dilations = dense<1> : tensor<2xi64>, strides = dense<2> : tensor<2xi64>}
                 ins(%13, %15 : tensor<1x?x?x8xf32>, tensor<3x3x8x?xf32>)
                 outs(%22 : tensor<1x?x?x?xf32>) -> tensor<1x?x?x?xf32>
               flow.dispatch.tensor.store %23, %2, offsets = [0, %arg0, %arg1, %arg2], sizes = [1, %16, %17, %14], strides = [1, 1, 1, 1] : tensor<1x?x?x?xf32> -> !flow.dispatch.tensor<writeonly:1x112x112x16xf32>
@@ -91,8 +91,8 @@ hal.executable private @conv_static_shape_f32 {
 
 // -----
 
-#config = #iree_codegen.lowering.config<tile_sizes = [[0, 4, 4, 16], [0, 1, 1, 4], [0, 0, 0, 0, 1, 1]], native_vector_size = []>
-#translation = #iree_codegen.translation.info<"SPIRVVectorize", workload_per_wg = [16, 4, 4]>
+#config = #iree_codegen.lowering_config<tile_sizes = [[0, 4, 4, 16], [0, 1, 1, 4], [0, 0, 0, 0, 1, 1]]>
+#translation = #iree_codegen.translation_info<SPIRVVectorize, workload_per_wg = [16, 4, 4]>
 #executable_layout = #hal.executable.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
@@ -104,7 +104,7 @@ hal.executable private @depthwise_conv_static_shape_f32 {
   hal.executable.variant @vulkan, target = <"vulkan-spirv", "vulkan-spirv-fb"> {
     hal.executable.entry_point @depthwise_conv_static_shape_f32 layout(#executable_layout) {
       workgroup_size = [4: index, 4: index, 4: index],
-      translation.info = #translation
+      translation_info = #translation
     }
     builtin.module  {
       func @depthwise_conv_static_shape_f32() {
@@ -147,7 +147,7 @@ hal.executable private @depthwise_conv_static_shape_f32 {
               %20 = affine.min affine_map<(d0)[s0] -> (-d0 + 96, s0)>(%arg2)[%workgroup_size_x]
               %21 = linalg.init_tensor [1, %18, %19, %20] : tensor<1x?x?x?xf32>
               %22 = linalg.fill(%cst, %21) : f32, tensor<1x?x?x?xf32> -> tensor<1x?x?x?xf32>
-              %23 = linalg.depthwise_conv_2d_nhwc_hwc {lowering.config = #config, dilations = dense<1> : tensor<2xi64>, strides = dense<2> : tensor<2xi64>}
+              %23 = linalg.depthwise_conv_2d_nhwc_hwc {lowering_config = #config, dilations = dense<1> : tensor<2xi64>, strides = dense<2> : tensor<2xi64>}
                 ins(%14, %15 : tensor<1x?x?x?xf32>, tensor<3x3x?xf32>)
                 outs(%22 : tensor<1x?x?x?xf32>) -> tensor<1x?x?x?xf32>
               flow.dispatch.tensor.store %23, %2, offsets = [0, %arg0, %arg1, %arg2], sizes = [1, %16, %17, %13], strides = [1, 1, 1, 1] : tensor<1x?x?x?xf32> -> !flow.dispatch.tensor<writeonly:1x56x56x96xf32>

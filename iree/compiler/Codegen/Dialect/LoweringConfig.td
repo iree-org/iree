@@ -8,43 +8,44 @@
 #define IREE_COMPILER_CODEGEN_DIALECT_LOWERINGCONFIG
 
 include "iree/compiler/Codegen/Dialect/IREECodegenDialect.td"
+include "mlir/IR/EnumAttr.td"
 
 // List of pre-existing pipelines for translating executables.
 def CPU_Default
-    : StrEnumAttrCase<"CPUDefault">;
+    : I32EnumAttrCase<"CPUDefault", 0>;
 def CPU_SingleTilingExpert
-    : StrEnumAttrCase<"CPUSingleTilingExpert">;
+    : I32EnumAttrCase<"CPUSingleTilingExpert", 1>;
 def CPU_DoubleTilingExpert
-    : StrEnumAttrCase<"CPUDoubleTilingExpert">;
+    : I32EnumAttrCase<"CPUDoubleTilingExpert", 2>;
 def CPU_ConvTileAndDecomposeExpert
-    : StrEnumAttrCase<"CPUConvTileAndDecomposeExpert">;
+    : I32EnumAttrCase<"CPUConvTileAndDecomposeExpert", 3>;
 def CPU_TileFuseAndVectorize
-    : StrEnumAttrCase<"CPUTileFuseAndVectorize">;
+    : I32EnumAttrCase<"CPUTileFuseAndVectorize", 4>;
 
 def LLVMGPU_SimpleDistribute
-    : StrEnumAttrCase<"LLVMGPUDistribute">;
+    : I32EnumAttrCase<"LLVMGPUDistribute", 5>;
 def LLVMGPU_Vectorize
-    : StrEnumAttrCase<"LLVMGPUVectorize">;
+    : I32EnumAttrCase<"LLVMGPUVectorize", 6>;
 def LLVMGPU_MatmulSimt
-    : StrEnumAttrCase<"LLVMGPUMatmulSimt">;
+    : I32EnumAttrCase<"LLVMGPUMatmulSimt", 7>;
 def LLVMGPU_MatmulTensorCore
-    : StrEnumAttrCase<"LLVMGPUMatmulTensorCore">;
+    : I32EnumAttrCase<"LLVMGPUMatmulTensorCore", 8>;
 
 def SPIRV_Distribute
-    : StrEnumAttrCase<"SPIRVDistribute">;
+    : I32EnumAttrCase<"SPIRVDistribute", 9>;
 def SPIRV_DistributeCopy
-    : StrEnumAttrCase<"SPIRVDistributeCopy">;
+    : I32EnumAttrCase<"SPIRVDistributeCopy", 10>;
 def SPIRV_Vectorize
-    : StrEnumAttrCase<"SPIRVVectorize">;
+    : I32EnumAttrCase<"SPIRVVectorize", 11>;
 def SPIRV_VectorizeToCooperativeOps
-    : StrEnumAttrCase<"SPIRVVectorizeToCooperativeOps">;
+    : I32EnumAttrCase<"SPIRVVectorizeToCooperativeOps", 12>;
 
 def None
-    : StrEnumAttrCase<"None">;
+    : I32EnumAttrCase<"None", 13>;
 
 // EnumAttrCase for all known lowerings for ops within dispatch region
 // to scalar/native-vector code.
-def DispatchLoweringPassPipelineEnum : StrEnumAttr<
+def DispatchLoweringPassPipelineEnum : I32EnumAttr<
     "DispatchLoweringPassPipeline",
     "identifier for pass pipeline use to lower dispatch region",
     [CPU_Default, CPU_SingleTilingExpert, CPU_DoubleTilingExpert,
@@ -54,11 +55,20 @@ def DispatchLoweringPassPipelineEnum : StrEnumAttr<
      SPIRV_Vectorize, SPIRV_VectorizeToCooperativeOps,
      None]> {
   let cppNamespace = "::mlir::iree_compiler::IREE::Codegen";
+  // Don't generate a C++ class! We want to use the AttrDef
+  let genSpecializedAttr = 0;
 }
+
+// Define the AttrDef
+def DispatchLoweringPassPipelineAttr :
+    EnumAttr<IREECodegen_Dialect, DispatchLoweringPassPipelineEnum, ""> {
+  let assemblyFormat = "``$value";
+}
+
 
 def IREECodegen_TranslationInfoAttr :
     AttrDef<IREECodegen_Dialect, "TranslationInfo", []> {
-  let mnemonic = "translation.info";
+  let mnemonic = "translation_info";
   let summary = [{drive dispatch entry point lowering}];
   let description = [{
     Specifies the information that is used to drive the translation of
@@ -67,7 +77,7 @@ def IREECodegen_TranslationInfoAttr :
     `hal.executable.entry_point` operation.
 
     If this operation is already set on the root operation (as part of
-    `iree_codegen.compilation.info`) that drives the compilation of a
+    `iree_codegen.compilation_info`) that drives the compilation of a
     dispatch region (like `linalg.matmul`/`linalg.*conv*`), this
     attribute gets propagated to the entry point function.
 
@@ -81,12 +91,14 @@ def IREECodegen_TranslationInfoAttr :
   }];
 
   let assemblyFormat = [{
-    `<` $passPipeline `,` `workload_per_wg` `=` $workloadPerWorkgroup `>`
+    `<` `` $passPipeline (`,` `workload_per_wg` `=` $workloadPerWorkgroup^)? `>`
   }];
 
   let parameters = (ins
-    AttrParameter<"StringAttr", "">:$passPipeline,
-    AttrParameter<"ArrayAttr", "">:$workloadPerWorkgroup
+    AttrParameter<"IREE::Codegen::DispatchLoweringPassPipelineAttr",
+        "Name of the pipeline to be invoked on the translation unit.">:$passPipeline,
+    DefaultValuedParameter<"ArrayAttr", "ArrayAttr::get($_ctx, {})",
+        "The workload mapped to a single workgroup">:$workloadPerWorkgroup
   );
   let builders = [
     AttrBuilder<(ins "DispatchLoweringPassPipeline":$passPipeline,
@@ -104,7 +116,7 @@ def IREECodegen_TranslationInfoAttr :
 
 def IREECodegen_LoweringConfigAttr :
     AttrDef<IREECodegen_Dialect, "LoweringConfig", []> {
-  let mnemonic = "lowering.config";
+  let mnemonic = "lowering_config";
   let summary = [{drive lowering of an operation within dispatch region}];
   let description = [{
     Specifies the information that is used by backend compiler to
@@ -122,12 +134,14 @@ def IREECodegen_LoweringConfigAttr :
   }];
 
   let assemblyFormat = [{
-    `<` `tile_sizes` `=` $tileSizes `,` `native_vector_size` `=` $nativeVectorSize `>`
+    `<` `tile_sizes` `=` $tileSizes (`,` `native_vector_size` `=` $nativeVectorSize^)? `>`
   }];
 
   let parameters = (ins
-    AttrParameter<"ArrayAttr", "">:$tileSizes,
-    AttrParameter<"ArrayAttr", "">:$nativeVectorSize
+    AttrParameter<"ArrayAttr",
+        "The tile sizes to use for different levels of tiling">:$tileSizes,
+    DefaultValuedParameter<"ArrayAttr", "ArrayAttr::get($_ctx, {})",
+        "The native vector size to use for the given operation">:$nativeVectorSize
   );
   let builders = [
     AttrBuilder<(ins "TileSizesListTypeRef":$tileSizes,
@@ -148,7 +162,7 @@ def IREECodegen_LoweringConfigAttr :
 
 def IREECodegen_CompilationInfoAttr :
     AttrDef<IREECodegen_Dialect, "CompilationInfo", []> {
-  let mnemonic = "compilation.info";
+  let mnemonic = "compilation_info";
   let summary = [{drive lowering of an operation from input dialect}];
   let description = [{
     Specifies the information that allows controlling the compilation
@@ -171,11 +185,13 @@ def IREECodegen_CompilationInfoAttr :
   let parameters = (ins
     AttrParameter<"LoweringConfigAttr", "">:$loweringConfig,
     AttrParameter<"TranslationInfoAttr", "">:$translationInfo,
-    AttrParameter<"ArrayAttr", "">:$workgroupSize
+    DefaultValuedParameter<"ArrayAttr", "ArrayAttr::get($_ctx, {})",
+        "The workgroup size to use during translation.">:$workgroupSize
   );
 
   let assemblyFormat = [{
-    `<` $loweringConfig `,` $translationInfo `,` `workgroup_size` `=` $workgroupSize `>`
+    `<` `lowering_config` `=` $loweringConfig `,` `translation_info` `=` $translationInfo
+    (`,` `workgroup_size` `=` $workgroupSize^)? `>`
   }];
 
   let builders = [

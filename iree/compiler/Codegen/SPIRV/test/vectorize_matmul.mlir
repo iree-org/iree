@@ -1,6 +1,6 @@
 // RUN: iree-opt -split-input-file -iree-spirv-vectorize %s | FileCheck %s
 
-#config = #iree_codegen.lowering.config<tile_sizes = [[2, 128], [1, 4], [0, 0, 4]], native_vector_size = []>
+#config = #iree_codegen.lowering_config<tile_sizes = [[2, 128], [1, 4], [0, 0, 4]]>
 
 func @matmul_2x128x4() {
   %c1 = arith.constant 1 : index
@@ -28,10 +28,10 @@ func @matmul_2x128x4() {
       %10 = scf.for %arg2 = %c0 to %c2 step %c1 iter_args(%arg3 = %9) -> (tensor<2x128xf32>) {
         %11 = scf.for %arg4 = %c0 to %c128 step %c4 iter_args(%arg5 = %arg3) -> (tensor<2x128xf32>) {
           %12 = tensor.extract_slice %arg5[%arg2, %arg4] [1, 4] [1, 1] : tensor<2x128xf32> to tensor<1x4xf32>
-          %13 = linalg.fill(%cst, %12) {lowering.config = #config} : f32, tensor<1x4xf32> -> tensor<1x4xf32>
+          %13 = linalg.fill(%cst, %12) {lowering_config = #config} : f32, tensor<1x4xf32> -> tensor<1x4xf32>
           %14 = tensor.extract_slice %7[%arg2, 0] [1, 4] [1, 1] : tensor<2x4xf32> to tensor<1x4xf32>
           %15 = tensor.extract_slice %8[0, %arg4] [4, 4] [1, 1] : tensor<4x128xf32> to tensor<4x4xf32>
-          %16 = linalg.matmul {lowering.config = #config} ins(%14, %15 : tensor<1x4xf32>, tensor<4x4xf32>) outs(%13 : tensor<1x4xf32>) -> tensor<1x4xf32>
+          %16 = linalg.matmul {lowering_config = #config} ins(%14, %15 : tensor<1x4xf32>, tensor<4x4xf32>) outs(%13 : tensor<1x4xf32>) -> tensor<1x4xf32>
           %17 = tensor.insert_slice %16 into %arg5[%arg2, %arg4] [1, 4] [1, 1] : tensor<1x4xf32> into tensor<2x128xf32>
           scf.yield %17 : tensor<2x128xf32>
         } {iree.spirv.distribute_dim = 0 : index}

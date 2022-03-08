@@ -1,7 +1,7 @@
 // RUN: iree-opt -split-input-file -pass-pipeline='hal.executable(hal.executable.variant(builtin.module(builtin.func(iree-spirv-tile-and-vectorize-to-cooperative-ops))))' %s | FileCheck %s
 
-#config = #iree_codegen.lowering.config<tile_sizes = [[16, 16, 16], [16, 16, 16]], native_vector_size = []>
-#translation = #iree_codegen.translation.info<"SPIRVVectorizeToCooperativeOps", workload_per_wg = [16, 16]>
+#config = #iree_codegen.lowering_config<tile_sizes = [[16, 16, 16], [16, 16, 16]]>
+#translation = #iree_codegen.translation_info<SPIRVVectorizeToCooperativeOps, workload_per_wg = [16, 16]>
 #executable_layout = #hal.executable.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
@@ -31,7 +31,7 @@ hal.executable public @matmul_256x1024x128_div_sub {
            max_compute_workgroup_size = dense<[2147483647, 65535, 65535]> : vector<3xi32>,
            subgroup_size = 32 : i32}>}> {
     hal.executable.entry_point public @matmul_256x1024x128_div_sub layout(#executable_layout) {
-      translation.info = #translation,
+      translation_info = #translation,
       workgroup_size = [32 : index, 1 : index, 1 : index]
     } {
     ^bb0(%arg0: index, %arg1: index, %arg2: index):  // no predecessors
@@ -66,14 +66,14 @@ hal.executable public @matmul_256x1024x128_div_sub {
             %11 = memref.subview %2[%arg0, 0] [16, 128] [1, 1] : memref<256x128xf16> to memref<16x128xf16, affine_map<(d0, d1)[s0] -> (d0 * 128 + s0 + d1)>>
             %12 = memref.subview %3[0, %arg1] [128, 16] [1, 1] : memref<128x1024xf16> to memref<128x16xf16, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
             %13 = memref.subview %4[%arg0, %arg1] [16, 16] [1, 1] : memref<256x1024xf16> to memref<16x16xf16, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
-            linalg.fill(%cst, %13) {lowering.config = #config} : f16, memref<16x16xf16, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
-            linalg.matmul {lowering.config = #config}
+            linalg.fill(%cst, %13) {lowering_config = #config} : f16, memref<16x16xf16, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
+            linalg.matmul {lowering_config = #config}
               ins(%11, %12 : memref<16x128xf16, affine_map<(d0, d1)[s0] -> (d0 * 128 + s0 + d1)>>, memref<128x16xf16, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>)
               outs(%13 : memref<16x16xf16, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>)
             linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]}
               ins(%13, %9, %10 : memref<16x16xf16, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>, memref<16x16xf16, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>, memref<16x16xf16, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>)
               outs(%13 : memref<16x16xf16, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>)
-              attrs =  {lowering.config = #config} {
+              attrs =  {lowering_config = #config} {
             ^bb0(%arg2: f16, %arg3: f16, %arg4: f16, %arg5: f16):  // no predecessors
               %14 = arith.divf %arg2, %arg3 : f16
               %15 = arith.subf %14, %arg4 : f16

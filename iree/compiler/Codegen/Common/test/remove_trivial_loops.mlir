@@ -54,11 +54,11 @@ hal.executable private @dispatch_0  {
 ]>
 
 // CHECK-LABEL: func @workgroup_tile_loop()
-#translation = #iree_codegen.translation.info<"LLVMGPUDistribute", workload_per_wg = [32]>
+#translation = #iree_codegen.translation_info<LLVMGPUDistribute, workload_per_wg = [32]>
 hal.executable private @workgroup_tile_loop  {
   hal.executable.variant @cuda, target = #hal.executable.target<"cuda", "cuda-nvptx-fb"> {
     hal.executable.entry_point @workgroup_tile_loop layout(#executable_layout) {
-      translation.info = #translation
+      translation_info = #translation
     }
     builtin.module {
       builtin.func @workgroup_tile_loop() {
@@ -88,11 +88,11 @@ hal.executable private @workgroup_tile_loop  {
 ]>
 
 // CHECK-LABEL: func @workgroup_tile_loop_negative()
-#translation = #iree_codegen.translation.info<"LLVMGPUDistribute", workload_per_wg = [16]>
+#translation = #iree_codegen.translation_info<LLVMGPUDistribute, workload_per_wg = [16]>
 hal.executable private @workgroup_tile_loop_negative  {
   hal.executable.variant @cuda, target = #hal.executable.target<"cuda", "cuda-nvptx-fb"> {
     hal.executable.entry_point @workgroup_tile_loop_negative layout(#executable_layout)  {
-      translation.info = #translation
+      translation_info = #translation
     }
     builtin.module {
       builtin.func @workgroup_tile_loop_negative() {
@@ -124,11 +124,11 @@ hal.executable private @workgroup_tile_loop_negative  {
 // CHECK-LABEL: func @both_workgroup_and_workitem()
 //   CHECK-NOT:   scf.for
 //       CHECK:   gpu.barrier
-#translation = #iree_codegen.translation.info<"LLVMGPUDistribute", workload_per_wg = [32, 8, 1]>
+#translation = #iree_codegen.translation_info<LLVMGPUDistribute, workload_per_wg = [32, 8, 1]>
 hal.executable private @both_workgroup_and_workitem  {
   hal.executable.variant @cuda, target = #hal.executable.target<"cuda", "cuda-nvptx-fb"> {
     hal.executable.entry_point @both_workgroup_and_workitem layout(#executable_layout)  {
-      translation.info = #translation,
+      translation_info = #translation,
       workgroup_size = [8: index, 2: index, 1: index]
     }
     builtin.module {

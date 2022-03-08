@@ -88,7 +88,7 @@ LogicalResult verifyDoubleTilingExpertPassPipelineConfig(
       IREE::Codegen::DispatchLoweringPassPipeline::CPUDoubleTilingExpert;
   StringRef pipelineName = stringifyEnum(pipeline);
   if (translationInfo.getDispatchLoweringPassPipeline() != pipeline) {
-    return op->emitOpError("expected pipeline in translation.info to be ")
+    return op->emitOpError("expected pipeline in translation_info to be ")
            << pipelineName;
   }
 

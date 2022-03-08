@@ -1,7 +1,7 @@
 // RUN: iree-opt -split-input-file -pass-pipeline='hal.executable(hal.executable.variant(iree-set-num-workgroups,builtin.module(builtin.func(iree-spirv-tile,iree-spirv-vectorize))))' %s | FileCheck %s
 
-#config = #iree_codegen.lowering.config<tile_sizes = [[8, 64], [8, 4], [0, 0, 4]], native_vector_size = []>
-#translation = #iree_codegen.translation.info<"SPIRVVectorize", workload_per_wg = [64, 8]>
+#config = #iree_codegen.lowering_config<tile_sizes = [[8, 64], [8, 4], [0, 0, 4]]>
+#translation = #iree_codegen.translation_info<SPIRVVectorize, workload_per_wg = [64, 8]>
 #executable_layout = #hal.executable.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
@@ -13,7 +13,7 @@ hal.executable private @matmul_static_shape_f16 {
   hal.executable.variant @vulkan, target = <"vulkan-spirv", "vulkan-spirv-fb"> {
     hal.executable.entry_point @matmul_static_shape_f16 layout(#executable_layout) {
       workgroup_size = [16: index, 1: index, 1: index],
-      translation.info = #translation
+      translation_info = #translation
     }
     builtin.module  {
       func @matmul_static_shape_f16() {
@@ -43,7 +43,7 @@ hal.executable private @matmul_static_shape_f16 {
             %12 = affine.min affine_map<(d0)[s0] -> (-d0 + 4096, s0)>(%arg1)[%workgroup_size_x]
             %13 = linalg.init_tensor [%11, %12] : tensor<?x?xf16>
             %14 = linalg.fill(%cst, %13) : f16, tensor<?x?xf16> -> tensor<?x?xf16>
-            %15 = linalg.matmul {lowering.config = #config} ins(%8, %10 : tensor<?x4096xf16>, tensor<4096x?xf16>) outs(%14 : tensor<?x?xf16>) -> tensor<?x?xf16>
+            %15 = linalg.matmul {lowering_config = #config} ins(%8, %10 : tensor<?x4096xf16>, tensor<4096x?xf16>) outs(%14 : tensor<?x?xf16>) -> tensor<?x?xf16>
             flow.dispatch.tensor.store %15, %2, offsets = [%arg0, %arg1], sizes = [%7, %9], strides = [1, 1] : tensor<?x?xf16> -> !flow.dispatch.tensor<writeonly:4096x4096xf16>
           }
         }
@@ -64,8 +64,8 @@ hal.executable private @matmul_static_shape_f16 {
 
 // -----
 
-#config = #iree_codegen.lowering.config<tile_sizes = [[8, 64], [8, 4], [0, 0, 4]], native_vector_size = []>
-#translation = #iree_codegen.translation.info<"SPIRVVectorize", workload_per_wg = [64, 8]>
+#config = #iree_codegen.lowering_config<tile_sizes = [[8, 64], [8, 4], [0, 0, 4]]>
+#translation = #iree_codegen.translation_info<SPIRVVectorize, workload_per_wg = [64, 8]>
 #executable_layout = #hal.executable.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
@@ -77,7 +77,7 @@ hal.executable private @matmul_static_shape_f32 {
   hal.executable.variant @vulkan, target = <"vulkan-spirv", "vulkan-spirv-fb"> {
     hal.executable.entry_point @matmul_static_shape_f32 layout(#executable_layout) {
       workgroup_size = [16: index, 1: index, 1: index],
-      translation.info = #translation
+      translation_info = #translation
     }
     builtin.module  {
       func @matmul_static_shape_f32() {
@@ -107,7 +107,7 @@ hal.executable private @matmul_static_shape_f32 {
             %12 = affine.min affine_map<(d0)[s0] -> (-d0 + 4096, s0)>(%arg1)[%workgroup_size_x]
             %13 = linalg.init_tensor [%11, %12] : tensor<?x?xf32>
             %14 = linalg.fill(%cst, %13) : f32, tensor<?x?xf32> -> tensor<?x?xf32>
-            %15 = linalg.matmul {lowering.config = #config} ins(%8, %10 : tensor<?x4096xf32>, tensor<4096x?xf32>) outs(%14 : tensor<?x?xf32>) -> tensor<?x?xf32>
+            %15 = linalg.matmul {lowering_config = #config} ins(%8, %10 : tensor<?x4096xf32>, tensor<4096x?xf32>) outs(%14 : tensor<?x?xf32>) -> tensor<?x?xf32>
             flow.dispatch.tensor.store %15, %2, offsets = [%arg0, %arg1], sizes = [%7, %9], strides = [1, 1] : tensor<?x?xf32> -> !flow.dispatch.tensor<writeonly:4096x4096xf32>
           }
         }

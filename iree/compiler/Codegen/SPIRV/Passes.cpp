@@ -210,7 +210,7 @@ void addSPIRVTileAndDistributePassPipeline(OpPassManager &pm) {
 // In the former path for CodeGen, we perform bufferization first, which will
 // turn padding/copy (via flow.dispatch.tensor.load/store pairs) into
 // linalg.generic ops. Then we deduce CodeGen configuration from the linalg.copy
-// op and use a `lowering.config` attribute on it to drive transformations.
+// op and use a `lowering_config` attribute on it to drive transformations.
 //
 // In the latter path for CodeGen, we will see linalg.pad_tensor directly.
 // However, properly tiling and distributing it is an ongoing work. So for now

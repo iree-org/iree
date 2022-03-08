@@ -1,7 +1,7 @@
 // RUN: iree-opt -split-input-file -pass-pipeline='hal.executable(hal.executable.variant(iree-set-num-workgroups,builtin.module(builtin.func(iree-spirv-tile,iree-spirv-vectorize))))' -cse %s | FileCheck %s
 
-#config = #iree_codegen.lowering.config<tile_sizes = [[1, 8, 64], [1, 8, 4], [0, 0, 0, 4]], native_vector_size = []>
-#translation = #iree_codegen.translation.info<"SPIRVVectorize", workload_per_wg = [64, 8, 1]>
+#config = #iree_codegen.lowering_config<tile_sizes = [[1, 8, 64], [1, 8, 4], [0, 0, 0, 4]]>
+#translation = #iree_codegen.translation_info<SPIRVVectorize, workload_per_wg = [64, 8, 1]>
 #executable_layout = #hal.executable.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
@@ -13,7 +13,7 @@ hal.executable private @fused_fill_batch_matmul {
   hal.executable.variant @vulkan, target = <"vulkan-spirv", "vulkan-spirv-fb"> {
     hal.executable.entry_point @fused_fill_batch_matmul layout(#executable_layout) {
       workgroup_size = [16: index, 1: index, 1: index],
-      translation.info = #translation
+      translation_info = #translation
     }
     builtin.module  {
       func @fused_fill_batch_matmul() {
@@ -52,7 +52,7 @@ hal.executable private @fused_fill_batch_matmul {
               %16 = affine.min affine_map<(d0)[s0] -> (-d0 + 1024, s0)>(%arg2)[%workgroup_size_x]
               %17 = linalg.init_tensor [%14, %15, %16] : tensor<?x?x?xf32>
               %18 = linalg.fill(%cst, %17) : f32, tensor<?x?x?xf32> -> tensor<?x?x?xf32>
-              %19 = linalg.batch_matmul {lowering.config = #config} ins(%11, %13 : tensor<?x?x1024xf32>, tensor<?x1024x?xf32>) outs(%18 : tensor<?x?x?xf32>) -> tensor<?x?x?xf32>
+              %19 = linalg.batch_matmul {lowering_config = #config} ins(%11, %13 : tensor<?x?x1024xf32>, tensor<?x1024x?xf32>) outs(%18 : tensor<?x?x?xf32>) -> tensor<?x?x?xf32>
               flow.dispatch.tensor.store %19, %2, offsets = [%arg0, %arg1, %arg2], sizes = [%9, %10, %12], strides = [1, 1, 1] : tensor<?x?x?xf32> -> !flow.dispatch.tensor<writeonly:4x1024x1024xf32>
             }
           }
