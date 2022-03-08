@@ -77,6 +77,7 @@ EXPLICIT_TARGET_MAPPING = {
     "@llvm-project//mlir:mlir-translate": ["mlir-translate"],
     "@llvm-project//mlir:MlirTableGenMain": ["MLIRTableGen"],
     "@llvm-project//mlir:MlirOptLib": ["MLIROptLib"],
+    "@llvm-project//mlir:Translation": ["MLIRTranslateLib"],
     "@llvm-project//mlir:VectorOps": ["MLIRVector"],
     "@llvm-project//mlir:TensorDialect": ["MLIRTensor"],
     "@llvm-project//mlir:NVVMDialect": ["MLIRNVVMIR"],
