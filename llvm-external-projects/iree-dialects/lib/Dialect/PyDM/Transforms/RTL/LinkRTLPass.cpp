@@ -15,7 +15,7 @@
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/OwningOpRef.h"
 #include "mlir/IR/SymbolTable.h"
-#include "mlir/Parser.h"
+#include "mlir/Parser/Parser.h"
 
 #define DEBUG_TYPE "iree_pydm"
 
