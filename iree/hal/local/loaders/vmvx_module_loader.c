@@ -407,21 +407,21 @@ static bool iree_hal_vmvx_module_loader_query_support(
 
 static iree_status_t iree_hal_vmvx_module_loader_try_load(
     iree_hal_executable_loader_t* base_executable_loader,
-    const iree_hal_executable_spec_t* executable_spec,
+    const iree_hal_executable_params_t* executable_params,
     iree_hal_executable_t** out_executable) {
   iree_hal_vmvx_module_loader_t* executable_loader =
       (iree_hal_vmvx_module_loader_t*)base_executable_loader;
   IREE_TRACE_ZONE_BEGIN(z0);
 
   iree_const_byte_span_t bytecode_module_data =
-      executable_spec->executable_data;
+      executable_params->executable_data;
 
   // If the caching mode allows for aliasing the existing flatbuffer data then
   // we avoid allocations and just pass the pointer on through. The caller
   // ensures that the data remains valid for the duration the executable is
   // loaded. Otherwise, we clone it and let the bytecode module take ownership.
   iree_allocator_t bytecode_module_allocator;
-  if (iree_all_bits_set(executable_spec->caching_mode,
+  if (iree_all_bits_set(executable_params->caching_mode,
                         IREE_HAL_EXECUTABLE_CACHING_MODE_ALIAS_PROVIDED_DATA)) {
     // Zero-copy route.
     bytecode_module_allocator = iree_allocator_null();
@@ -429,7 +429,7 @@ static iree_status_t iree_hal_vmvx_module_loader_try_load(
     bytecode_module_allocator = executable_loader->host_allocator;
     IREE_RETURN_AND_END_ZONE_IF_ERROR(
         z0, iree_allocator_clone(executable_loader->host_allocator,
-                                 executable_spec->executable_data,
+                                 executable_params->executable_data,
                                  (void**)&bytecode_module_data.data));
   }
 
@@ -437,7 +437,7 @@ static iree_status_t iree_hal_vmvx_module_loader_try_load(
   // we have it) to the module to manage.
   iree_vm_module_t* bytecode_module = NULL;
   iree_status_t status = iree_vm_bytecode_module_create(
-      executable_spec->executable_data, bytecode_module_allocator,
+      executable_params->executable_data, bytecode_module_allocator,
       executable_loader->host_allocator, &bytecode_module);
 
   // Create the context tying together the shared VMVX module and the
@@ -458,9 +458,9 @@ static iree_status_t iree_hal_vmvx_module_loader_try_load(
   // module, which itself may own the underlying allocation).
   if (iree_status_is_ok(status)) {
     status = iree_hal_vmvx_executable_create(
-        context, bytecode_module, executable_spec->executable_layout_count,
-        executable_spec->executable_layouts, executable_loader->host_allocator,
-        out_executable);
+        context, bytecode_module, executable_params->executable_layout_count,
+        executable_params->executable_layouts,
+        executable_loader->host_allocator, out_executable);
   }
 
   iree_vm_context_release(context);

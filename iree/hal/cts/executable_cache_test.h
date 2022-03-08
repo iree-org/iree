@@ -59,19 +59,19 @@ TEST_P(executable_cache_test, PrepareExecutable) {
       device_, /*push_constants=*/0, /*set_layout_count=*/1,
       &descriptor_set_layout, &executable_layout));
 
-  iree_hal_executable_spec_t executable_spec;
-  executable_spec.caching_mode =
+  iree_hal_executable_params_t executable_params;
+  executable_params.caching_mode =
       IREE_HAL_EXECUTABLE_CACHING_MODE_ALIAS_PROVIDED_DATA;
-  executable_spec.executable_format =
+  executable_params.executable_format =
       iree_make_cstring_view(get_test_executable_format());
-  executable_spec.executable_data = get_test_executable_data(
+  executable_params.executable_data = get_test_executable_data(
       iree_make_cstring_view("executable_cache_test.bin"));
-  executable_spec.executable_layout_count = 1;
-  executable_spec.executable_layouts = &executable_layout;
+  executable_params.executable_layout_count = 1;
+  executable_params.executable_layouts = &executable_layout;
 
   iree_hal_executable_t* executable = NULL;
   IREE_ASSERT_OK(iree_hal_executable_cache_prepare_executable(
-      executable_cache, &executable_spec, &executable));
+      executable_cache, &executable_params, &executable));
 
   iree_hal_executable_release(executable);
   iree_hal_executable_layout_release(executable_layout);

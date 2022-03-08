@@ -6,8 +6,6 @@
 
 #include "iree/hal/local/executable_loader.h"
 
-#include "iree/base/api.h"
-
 iree_status_t iree_hal_executable_import_provider_resolve(
     const iree_hal_executable_import_provider_t import_provider,
     iree_string_view_t symbol_name, void** out_fn_ptr) {
@@ -88,15 +86,15 @@ bool iree_hal_query_any_executable_loader_support(
 
 iree_status_t iree_hal_executable_loader_try_load(
     iree_hal_executable_loader_t* executable_loader,
-    const iree_hal_executable_spec_t* executable_spec,
+    const iree_hal_executable_params_t* executable_params,
     iree_hal_executable_t** out_executable) {
   IREE_ASSERT_ARGUMENT(executable_loader);
-  IREE_ASSERT_ARGUMENT(executable_spec);
-  IREE_ASSERT_ARGUMENT(!executable_spec->executable_layout_count ||
-                       executable_spec->executable_layouts);
-  IREE_ASSERT_ARGUMENT(!executable_spec->executable_data.data_length ||
-                       executable_spec->executable_data.data);
+  IREE_ASSERT_ARGUMENT(executable_params);
+  IREE_ASSERT_ARGUMENT(!executable_params->executable_layout_count ||
+                       executable_params->executable_layouts);
+  IREE_ASSERT_ARGUMENT(!executable_params->executable_data.data_length ||
+                       executable_params->executable_data.data);
   IREE_ASSERT_ARGUMENT(out_executable);
-  return executable_loader->vtable->try_load(executable_loader, executable_spec,
-                                             out_executable);
+  return executable_loader->vtable->try_load(executable_loader,
+                                             executable_params, out_executable);
 }

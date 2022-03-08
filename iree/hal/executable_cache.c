@@ -14,9 +14,10 @@
 #include "iree/hal/device.h"
 #include "iree/hal/resource.h"
 
-void iree_hal_executable_spec_initialize(iree_hal_executable_spec_t* out_spec) {
-  memset(out_spec, 0, sizeof(*out_spec));
-  out_spec->caching_mode =
+void iree_hal_executable_params_initialize(
+    iree_hal_executable_params_t* out_executable_params) {
+  memset(out_executable_params, 0, sizeof(*out_executable_params));
+  out_executable_params->caching_mode =
       IREE_HAL_EXECUTABLE_CACHING_MODE_ALLOW_PERSISTENT_CACHING |
       IREE_HAL_EXECUTABLE_CACHING_MODE_ALLOW_OPTIMIZATION;
 }
@@ -52,17 +53,17 @@ IREE_API_EXPORT bool iree_hal_executable_cache_can_prepare_format(
 
 IREE_API_EXPORT iree_status_t iree_hal_executable_cache_prepare_executable(
     iree_hal_executable_cache_t* executable_cache,
-    const iree_hal_executable_spec_t* executable_spec,
+    const iree_hal_executable_params_t* executable_params,
     iree_hal_executable_t** out_executable) {
   IREE_ASSERT_ARGUMENT(executable_cache);
-  IREE_ASSERT_ARGUMENT(executable_spec);
-  IREE_ASSERT_ARGUMENT(!executable_spec->executable_layout_count ||
-                       executable_spec->executable_layouts);
+  IREE_ASSERT_ARGUMENT(executable_params);
+  IREE_ASSERT_ARGUMENT(!executable_params->executable_layout_count ||
+                       executable_params->executable_layouts);
   IREE_ASSERT_ARGUMENT(out_executable);
   *out_executable = NULL;
   IREE_TRACE_ZONE_BEGIN(z0);
   iree_status_t status = _VTABLE_DISPATCH(executable_cache, prepare_executable)(
-      executable_cache, executable_spec, out_executable);
+      executable_cache, executable_params, out_executable);
   IREE_TRACE_ZONE_END(z0);
   return status;
 }

@@ -97,14 +97,14 @@ static bool iree_hal_local_executable_cache_can_prepare_format(
 
 static iree_status_t iree_hal_local_executable_cache_prepare_executable(
     iree_hal_executable_cache_t* base_executable_cache,
-    const iree_hal_executable_spec_t* executable_spec,
+    const iree_hal_executable_params_t* executable_params,
     iree_hal_executable_t** out_executable) {
   iree_hal_local_executable_cache_t* executable_cache =
       iree_hal_local_executable_cache_cast(base_executable_cache);
   for (iree_host_size_t i = 0; i < executable_cache->loader_count; ++i) {
     if (!iree_hal_executable_loader_query_support(
-            executable_cache->loaders[i], executable_spec->caching_mode,
-            executable_spec->executable_format)) {
+            executable_cache->loaders[i], executable_params->caching_mode,
+            executable_params->executable_format)) {
       // Loader definitely can't handle the executable; no use trying so skip.
       continue;
     }
@@ -112,7 +112,7 @@ static iree_status_t iree_hal_local_executable_cache_prepare_executable(
     // supported then the try will fail with IREE_STATUS_CANCELLED and we should
     // continue trying other loaders.
     iree_status_t status = iree_hal_executable_loader_try_load(
-        executable_cache->loaders[i], executable_spec, out_executable);
+        executable_cache->loaders[i], executable_params, out_executable);
     if (iree_status_is_ok(status)) {
       // Executable was successfully loaded.
       return status;
@@ -125,8 +125,8 @@ static iree_status_t iree_hal_local_executable_cache_prepare_executable(
   return iree_make_status(
       IREE_STATUS_NOT_FOUND,
       "no executable loader registered for the given executable format '%.*s'",
-      (int)executable_spec->executable_format.size,
-      executable_spec->executable_format.data);
+      (int)executable_params->executable_format.size,
+      executable_params->executable_format.data);
 }
 
 static const iree_hal_executable_cache_vtable_t

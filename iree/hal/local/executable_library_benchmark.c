@@ -216,31 +216,31 @@ static iree_status_t iree_hal_executable_library_run(
   // Setup the specification used to perform the executable load.
   // This information is normally used to select the appropriate loader but in
   // this benchmark we only have a single one.
-  iree_hal_executable_spec_t executable_spec;
-  iree_hal_executable_spec_initialize(&executable_spec);
-  executable_spec.caching_mode =
+  iree_hal_executable_params_t executable_params;
+  iree_hal_executable_params_initialize(&executable_params);
+  executable_params.caching_mode =
       IREE_HAL_EXECUTABLE_CACHING_MODE_ALLOW_OPTIMIZATION |
       IREE_HAL_EXECUTABLE_CACHING_MODE_ALIAS_PROVIDED_DATA |
       IREE_HAL_EXECUTABLE_CACHING_MODE_DISABLE_VERIFICATION;
-  executable_spec.executable_format =
+  executable_params.executable_format =
       iree_make_cstring_view(FLAG_executable_format);
 
   // Load the executable data.
   IREE_RETURN_IF_ERROR(iree_file_read_contents(
       FLAG_executable_file, host_allocator,
-      (iree_byte_span_t*)&executable_spec.executable_data));
+      (iree_byte_span_t*)&executable_params.executable_data));
 
   // Setup the layouts defining how each entry point is interpreted.
   // NOTE: we know for the embedded library loader that this is not required.
   // Other loaders may need it in which case it'll have to be provided.
-  executable_spec.executable_layout_count = 0;
-  executable_spec.executable_layouts = NULL;
+  executable_params.executable_layout_count = 0;
+  executable_params.executable_layouts = NULL;
 
   // Perform the load, which will fail if the executable cannot be loaded or
   // there was an issue with the layouts.
   iree_hal_executable_t* executable = NULL;
   IREE_RETURN_IF_ERROR(iree_hal_executable_loader_try_load(
-      executable_loader, &executable_spec, &executable));
+      executable_loader, &executable_params, &executable));
   iree_hal_local_executable_t* local_executable =
       iree_hal_local_executable_cast(executable);
 
@@ -300,8 +300,7 @@ static iree_status_t iree_hal_executable_library_run(
       .binding_count = dispatch_params.binding_count,
       .binding_ptrs = binding_ptrs,
       .binding_lengths = binding_lengths,
-      .import_thunk = NULL,  // not yet implemented
-      .imports = NULL,       // not yet implemented
+      .environment = &local_executable->environment,
   };
 
   // Execute benchmark the workgroup invocation.
@@ -332,7 +331,7 @@ static iree_status_t iree_hal_executable_library_run(
 
   // Unload.
   iree_allocator_free(host_allocator,
-                      (void*)executable_spec.executable_data.data);
+                      (void*)executable_params.executable_data.data);
   iree_hal_executable_release(executable);
   iree_hal_executable_loader_release(executable_loader);
 

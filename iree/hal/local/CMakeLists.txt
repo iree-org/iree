@@ -12,6 +12,22 @@ iree_add_all_subdirs()
 
 iree_cc_library(
   NAME
+    executable_environment
+  HDRS
+    "executable_environment.h"
+  SRCS
+    "executable_environment.c"
+  DEPS
+    ::executable_library
+    iree::base
+    iree::base::internal::cpu
+    iree::base::tracing
+    iree::hal
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
     executable_library
   HDRS
     "executable_library.h"
@@ -24,6 +40,7 @@ iree_cc_binary_benchmark(
   SRCS
     "executable_library_benchmark.c"
   DEPS
+    ::executable_environment
     ::executable_library
     ::local
     iree::base
@@ -43,9 +60,10 @@ iree_cc_test(
     "executable_library_demo.h"
     "executable_library_test.c"
   DEPS
+    ::executable_environment
+    ::executable_library
     iree::base
     iree::base::core_headers
-    iree::hal::local::executable_library
 )
 
 iree_cc_library(
@@ -68,6 +86,7 @@ iree_cc_library(
     "local_executable_cache.c"
     "local_executable_layout.c"
   DEPS
+    ::executable_environment
     ::executable_library
     iree::base
     iree::base::core_headers
@@ -131,6 +150,7 @@ iree_cc_library(
     "task_queue_state.c"
     "task_semaphore.c"
   DEPS
+    ::executable_environment
     ::executable_library
     ::local
     iree::base

@@ -42,6 +42,7 @@ iree_cc_library(
     iree::base::tracing
     iree::hal
     iree::hal::local
+    iree::hal::local::executable_environment
     iree::hal::local::executable_library
   DEFINES
     "IREE_HAL_HAVE_STATIC_LIBRARY_LOADER=1"

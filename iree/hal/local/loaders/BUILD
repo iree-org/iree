@@ -45,6 +45,7 @@ cc_library(
         "//iree/base:tracing",
         "//iree/hal",
         "//iree/hal/local",
+        "//iree/hal/local:executable_environment",
         "//iree/hal/local:executable_library",
     ],
 )
