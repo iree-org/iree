@@ -439,6 +439,8 @@ if(${IREE_BUILD_COMPILER})
       MLIRSupport
     PUBLIC
   )
+  set_target_properties(iree_tools_iree-mlir-lsp-server
+    PROPERTIES EXCLUDE_FROM_ALL ON)
 
   iree_cc_binary(
     NAME
