@@ -81,6 +81,7 @@ cmake -GNinja -B ../iree-build-riscv/ \
   -DIREE_BUILD_COMPILER=OFF \
   -DRISCV_TOOLCHAIN_ROOT=${RISCV_TOOLCHAIN_ROOT} \
   .
+cmake --build ../iree-build-riscv/
 ```
 
 ## Running IREE bytecode modules on the RISC-V system
