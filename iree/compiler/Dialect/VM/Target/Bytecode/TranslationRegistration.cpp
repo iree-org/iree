@@ -7,7 +7,7 @@
 #include "iree/compiler/Dialect/VM/Target/Bytecode/BytecodeModuleTarget.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/Visitors.h"
-#include "mlir/Translation.h"
+#include "mlir/Tools/mlir-translate/Translation.h"
 
 namespace mlir {
 namespace iree_compiler {

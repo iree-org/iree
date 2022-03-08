@@ -37,7 +37,7 @@
 #include "mlir/Transforms/DialectConversion.h"
 #include "mlir/Transforms/LocationSnapshot.h"
 #include "mlir/Transforms/Passes.h"
-#include "mlir/Translation.h"
+#include "mlir/Tools/mlir-translate/Translation.h"
 
 namespace mlir {
 namespace iree_compiler {
