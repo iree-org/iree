@@ -74,8 +74,9 @@ def aggregate_all_benchmarks_and_statistics(
 
         # Make sure each statistic has a unique name.
         name = str(statistic_case.statistic_info)
-        if name in statistic_results:
-          raise ValueError(f"Duplicated statistics: {name}")
+        if (name in statistic_results) and (
+            statistic_results[name] != StatisticData(statistic_case.value)):
+          raise ValueError(f"Inconsistent statistic values for '{name}'")
 
         statistic_results[name] = StatisticData(statistic_case.value)
     else:

@@ -167,6 +167,8 @@ iree_benchmark_suite(
     iree-benchmark-module
   DRIVER
     "dylib-sync"
+
+  COLLECT_COMPILATION_STATISTICS
 )
 
 # CPU, Dylib, 1 through 4 threads, big/little-core, full-inference.
@@ -194,6 +196,8 @@ iree_benchmark_suite(
     "dylib"
   RUNTIME_FLAGS
     "--task_topology_group_count=1"
+
+  COLLECT_COMPILATION_STATISTICS
 )
 
 # TODO(#7792): Re-enable these when we are able to run different benchmarks
@@ -222,6 +226,8 @@ iree_benchmark_suite(
 #     "dylib"
 #   RUNTIME_FLAGS
 #     "--task_topology_group_count=2"
+#
+#  COLLECT_COMPILATION_STATISTICS
 # )
 
 # iree_benchmark_suite(
@@ -248,6 +254,8 @@ iree_benchmark_suite(
 #     "dylib"
 #   RUNTIME_FLAGS
 #     "--task_topology_group_count=3"
+#
+#  COLLECT_COMPILATION_STATISTICS
 # )
 
 iree_benchmark_suite(
@@ -274,6 +282,8 @@ iree_benchmark_suite(
     "dylib"
   RUNTIME_FLAGS
     "--task_topology_group_count=4"
+
+  COLLECT_COMPILATION_STATISTICS
 )
 
 # GPU, Vulkan, Adreno, full-inference
@@ -324,6 +334,8 @@ iree_benchmark_suite(
     iree-benchmark-module
   DRIVER
     "vulkan"
+
+  COLLECT_COMPILATION_STATISTICS
 )
 
 # GPU, Vulkan, Mali, full-inference
@@ -346,6 +358,8 @@ iree_benchmark_suite(
     iree-benchmark-module
   DRIVER
     "vulkan"
+
+  COLLECT_COMPILATION_STATISTICS
 )
 
 ################################################################################
@@ -388,6 +402,8 @@ iree_benchmark_suite(
     iree-benchmark-module
   DRIVER
     "dylib-sync"
+
+  COLLECT_COMPILATION_STATISTICS
 )
 
 # TODO(#7792): Consider re-enabling little-core experimental-flags if we start
@@ -419,6 +435,8 @@ iree_benchmark_suite(
     "dylib"
   RUNTIME_FLAGS
     "--task_topology_group_count=1"
+
+  COLLECT_COMPILATION_STATISTICS
 )
 
 # TODO(#7792): Re-enable these when we are able to run different benchmarks
@@ -448,6 +466,8 @@ iree_benchmark_suite(
 #     "dylib"
 #   RUNTIME_FLAGS
 #     "--task_topology_group_count=2"
+#
+#  COLLECT_COMPILATION_STATISTICS
 # )
 
 # iree_benchmark_suite(
@@ -475,6 +495,8 @@ iree_benchmark_suite(
 #     "dylib"
 #   RUNTIME_FLAGS
 #     "--task_topology_group_count=3"
+#
+#  COLLECT_COMPILATION_STATISTICS
 # )
 
 iree_benchmark_suite(
@@ -502,6 +524,8 @@ iree_benchmark_suite(
     "dylib"
   RUNTIME_FLAGS
     "--task_topology_group_count=4"
+
+  COLLECT_COMPILATION_STATISTICS
 )
 
 
@@ -529,6 +553,8 @@ iree_benchmark_suite(
     "vmvx"
   RUNTIME_FLAGS
     "--task_topology_group_count=4"
+
+  COLLECT_COMPILATION_STATISTICS
 )
 
 
@@ -554,6 +580,8 @@ iree_benchmark_suite(
     iree-benchmark-module
   DRIVER
     "vulkan"
+
+  COLLECT_COMPILATION_STATISTICS
 )
 
 # GPU, Vulkan, Mali, full-inference
@@ -578,6 +606,8 @@ iree_benchmark_suite(
     iree-benchmark-module
   DRIVER
     "vulkan"
+
+  COLLECT_COMPILATION_STATISTICS
 )
 
 iree_benchmark_suite(
@@ -598,6 +628,8 @@ iree_benchmark_suite(
     iree-benchmark-module
   DRIVER
     "vulkan"
+
+  COLLECT_COMPILATION_STATISTICS
 )
 
 # kernel-execution
@@ -637,6 +669,8 @@ iree_benchmark_suite(
     "vulkan"
   RUNTIME_FLAGS
     "--batch_size=16"
+
+  COLLECT_COMPILATION_STATISTICS
 )
 
 # GPU, Vulkan, Mali, kernel-execution
@@ -664,6 +698,8 @@ iree_benchmark_suite(
     "vulkan"
   RUNTIME_FLAGS
     "--batch_size=32"
+
+  COLLECT_COMPILATION_STATISTICS
 )
 
 iree_benchmark_suite(
@@ -687,4 +723,6 @@ iree_benchmark_suite(
     "vulkan"
   RUNTIME_FLAGS
     "--batch_size=32"
+
+  COLLECT_COMPILATION_STATISTICS
 )
