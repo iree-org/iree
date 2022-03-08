@@ -329,7 +329,7 @@ func @scatter_rank0(%arg0: tensor<5x5xi32>, %arg1: tensor<2xi32>, %arg2: tensor<
   %0 = "mhlo.scatter"(%arg0, %arg1, %arg2) ({
   ^bb0(%arg3: tensor<i32>, %arg4: tensor<i32>):
     "mhlo.return"(%arg4) : (tensor<i32>) -> ()
-  }) {indices_are_sorted = true, scatter_dimension_numbers = #mhlo.scatter<inserted_window_dims = [0], scatter_dims_to_operand_dims = [0]>, unique_indices = true} : (tensor<5x5xi32>, tensor<2xi32>, tensor<i32>) -> tensor<5x5xi32>
+  }) {indices_are_sorted = true, scatter_dimension_numbers = #mhlo.scatter<inserted_window_dims = [0, 1], scatter_dims_to_operand_dims = [0, 1]>, unique_indices = true} : (tensor<5x5xi32>, tensor<2xi32>, tensor<i32>) -> tensor<5x5xi32>
   return %0 : tensor<5x5xi32>
 }
 
