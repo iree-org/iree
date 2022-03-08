@@ -12,7 +12,7 @@ import json
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Dict, List, Sequence
+from typing import Any, Dict, List, Optional, Sequence
 
 from common.benchmark_definition import (BenchmarkOrStatisticInfo,
                                          StatisticInstance, StatisticResults,
@@ -33,21 +33,17 @@ class Stat:
   # Hierarchical description of the current statistic.
   breadcrumb: Sequence[str]
   # Traits of the current statistic.
-  trait: StatisticTrait
+  trait: Optional[StatisticTrait] = None
 
 
 # A list controlling which statistics to collect and publish.
 # This also serves as another level of control in case name changes. If so
 # we can turn this into a map to make sure they still match the old ones.
 KNOWN_STATISTICS = [
-    Stat(("stream-aggregate", "synchronization", "await-count"),
-         StatisticTrait.DRIVER_AGONISTIC),
-    Stat(("stream-aggregate", "execution", "transient-memory-size"),
-         StatisticTrait.DRIVER_AGONISTIC),
-    Stat(("stream-aggregate", "execution", "dispatch-count"),
-         StatisticTrait.DRIVER_AGONISTIC),
-    Stat(("stream-aggregate", "executable", "executable-count"),
-         StatisticTrait.DRIVER_AGONISTIC),
+    Stat(("stream-aggregate", "synchronization", "await-count")),
+    Stat(("stream-aggregate", "execution", "transient-memory-size")),
+    Stat(("stream-aggregate", "execution", "dispatch-count")),
+    Stat(("stream-aggregate", "executable", "executable-count")),
 ]
 
 
