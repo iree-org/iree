@@ -24,20 +24,23 @@
 // This is a simple scalar addition:
 //    binding[1] = binding[0] + push_constant[0]
 static int dispatch_tile_a(
+    const iree_hal_executable_environment_v0_t* environment,
     const iree_hal_executable_dispatch_state_v0_t* dispatch_state,
-    const iree_hal_vec3_t* workgroup_id, void* local_memory) {
+    const iree_hal_executable_workgroup_state_v0_t* workgroup_state) {
   const dispatch_tile_a_push_constants_t* push_constants =
       (const dispatch_tile_a_push_constants_t*)dispatch_state->push_constants;
   const float* src = ((const float*)dispatch_state->binding_ptrs[0]);
   float* dst = ((float*)dispatch_state->binding_ptrs[1]);
-  dst[workgroup_id->x] = src[workgroup_id->x] + push_constants->f0;
+  const uint32_t x = workgroup_state->workgroup_id_x;
+  dst[x] = src[x] + push_constants->f0;
   return 0;
 }
 
 // Just another entry point.
 static int dispatch_tile_b(
+    const iree_hal_executable_environment_v0_t* environment,
     const iree_hal_executable_dispatch_state_v0_t* dispatch_state,
-    const iree_hal_vec3_t* workgroup_id, void* local_memory) {
+    const iree_hal_executable_workgroup_state_v0_t* workgroup_state) {
   return 0;
 }
 

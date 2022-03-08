@@ -275,12 +275,26 @@ class LLVMAOTTargetBackend final : public TargetBackend {
         }
       } break;
     }
+    auto align16 = llvm::Attribute::getWithAlignment(context, llvm::Align(16));
     for (auto entryPointOp :
          variantOp.getBlock().getOps<ExecutableEntryPointOp>()) {
       // Find the matching function in the LLVM module.
       auto *llvmFunc = llvmModule->getFunction(entryPointOp.getName());
       llvmFunc->setLinkage(llvm::GlobalValue::LinkageTypes::InternalLinkage);
       llvmFunc->setDSOLocal(true);
+
+      // Tag the function parameters in case they got removed during conversion.
+      // (%arg0: environment, %arg1: dispatch_state, %arg2: workgroup_state)
+      for (unsigned i = 0; i <= 2; ++i) {
+        llvmFunc->addParamAttr(
+            i, llvm::Attribute::getWithByRefType(
+                   context, llvmFunc->getArg(i)
+                                ->getType()
+                                ->getNonOpaquePointerElementType()));
+        llvmFunc->addParamAttr(i, llvm::Attribute::NonNull);
+        llvmFunc->addParamAttr(i, llvm::Attribute::NoAlias);
+        llvmFunc->addParamAttr(i, align16);
+      }
 
       // Optionally entry points may specify that they require workgroup local
       // memory. We fetch that value here and plumb it through so the runtime

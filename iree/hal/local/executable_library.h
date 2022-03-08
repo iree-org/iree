@@ -258,56 +258,96 @@ typedef struct iree_hal_executable_environment_v0_t {
   iree_hal_processor_v0_t processor;
 } iree_hal_executable_environment_v0_t;
 
-typedef union iree_hal_vec3_t {
-  struct {
-    uint32_t x;
-    uint32_t y;
-    uint32_t z;
-  };
-  uint32_t value[3];
-} iree_hal_vec3_t;
-
 // Read-only per-dispatch state passed to each workgroup in a dispatch.
+//
+// We layout to try to fit everything commonly used into the first cache line
+// (on archs with 64-bit pointers; 32-bit fits in a single line).
+//
+// For workgroup dimensions we allow the full 32-bit range on X and Y as those
+// are the primary distribution dimensions. Z is the coarsest control and is
+// usually in the 1-16 range; any higher and it can pessimize scheduling. Almost
+// all GPUs also have this limitation (max Z of 65K) for the same reason.
 typedef struct iree_hal_executable_dispatch_state_v0_t {
+  // Workgroup size chosen for the dispatch. For compilation modes where the
+  // workgroup size is constant this may be ignored.
+  uint32_t workgroup_size_x;
+  uint32_t workgroup_size_y;
+  uint16_t workgroup_size_z;
+
+  // Total number of available 4 byte push constant values in |push_constants|.
+  uint16_t push_constant_count;
+
   // Total workgroup count for the dispatch. This is sourced from either the
   // original dispatch call (for iree_hal_command_buffer_dispatch) or the
   // indirection buffer (for iree_hal_command_buffer_dispatch_indirect).
-  iree_hal_vec3_t workgroup_count;
-  // Workgroup size chosen for the dispatch. For compilation modes where the
-  // workgroup size is constant this may be ignored.
-  iree_hal_vec3_t workgroup_size;
-
-  // Total number of available 4 byte push constant values in |push_constants|.
-  size_t push_constant_count;
-  // |push_constant_count| values.
-  const uint32_t* push_constants;
+  uint32_t workgroup_count_x;
+  uint32_t workgroup_count_y;
+  uint16_t workgroup_count_z;
 
   // Total number of binding base pointers in |binding_ptrs| and
   // |binding_lengths|. The set is packed densely based on which bindings are
   // used (known at compile-time).
-  size_t binding_count;
+  uint16_t binding_count;
+
+  // |push_constant_count| values.
+  const uint32_t* push_constants;
   // Base pointers to each binding buffer.
   void* const* binding_ptrs;
   // The length of each binding in bytes, 1:1 with |binding_ptrs|.
   const size_t* binding_lengths;
 
+  // NOTE: the above fields are frequently accessed and should be kept together
+  // to ensure cache-friendly behavior. The first instructions every dispatch
+  // executes are loads from the fields and we want to avoid a cascade of
+  // cache misses. Less-frequently used fields can follow.
+} iree_hal_executable_dispatch_state_v0_t;
+static_assert(sizeof(iree_hal_executable_dispatch_state_v0_t) <= 64,
+              "try keeping dispatch state small enough to fit in a cache line");
+
+// Read-only per-workgroup state passed to each workgroup in a dispatch.
+//
+// We layout to try to fit everything commonly used into the first cache line
+// (on archs with 64-bit pointers; 32-bit fits in a single line).
+typedef struct iree_hal_executable_workgroup_state_v0_t {
+  // Workgroup ID of the currently executing workgroup.
+  // This is in the range of 0-workgroup_count and each unique workgroup is to
+  // perform workgroup_size invocations.
+  uint32_t workgroup_id_x;
+  uint32_t workgroup_id_y;
+  uint16_t workgroup_id_z;
+
+  // Reserved for future use.
+  uint16_t reserved;
+
   // Logical processor identifier used to index into processor info fields.
   // Depending on the implementation this may be an ordinal, a bitfield, or an
   // opaque unique identifier.
+  //
+  // NOTE: we could steal bits from the |processor_id| if needed; today the ID
+  // is the global ID but it really only needs to be within the current node
+  // (8-bits, or 16-bit for single-node thousand-core future proofing).
   uint32_t processor_id;
-  // Optional executable environment information.
-  const iree_hal_executable_environment_v0_t* environment;
-} iree_hal_executable_dispatch_state_v0_t;
+
+  // Scratch memory available for use by the workgroup.
+  // Requires a non-zero value to be specified for |local_memory_pages|; at
+  // least the size specified will be available. This memory is transient and
+  // exclusive to the workgroup. The provided pointer may be NULL if no
+  // workgroup local memory was requested.
+  void* local_memory;
+  // Total number of bytes available in |local_memory|. This may be larger than
+  // the requested amount.
+  uint32_t local_memory_size;
+
+  // +4 trailing bytes of free space
+} iree_hal_executable_workgroup_state_v0_t;
+static_assert(
+    sizeof(iree_hal_executable_workgroup_state_v0_t) <= 64,
+    "try keeping workgroup state small enough to fit in a cache line");
 
 // Function signature of exported executable entry points.
-// The same |dispatch_state| is passed to all workgroups in a dispatch while
-// |workgroup_id| and |local_memory| will vary for each workgroup.
-//
-// If a non-zero value was specified for |local_memory_page| then scratch memory
-// will be available for use by the invocation of at least the size specified.
-// This memory is transient and exclusive to the workgroup. The provided pointer
-// may be NULL if no workgroup local memory was requested and otherwise will
-// point to memory of the size specified.
+// The same |environment| is passed to all dispatches.
+// The same |dispatch_state| is passed to all workgroups within a dispatch.
+// A unique |workgroup_state| is passed to every workgroup within a dispatch.
 //
 // Returns 0 on success and non-zero on failure. Failures will cause device loss
 // and should only be used to communicate serious issues that should abort all
@@ -316,8 +356,9 @@ typedef struct iree_hal_executable_dispatch_state_v0_t {
 // caught and only that they are not harmful - clamping byte ranges and never
 // returning a failure is sufficient.
 typedef int (*iree_hal_executable_dispatch_v0_t)(
+    const iree_hal_executable_environment_v0_t* environment,
     const iree_hal_executable_dispatch_state_v0_t* dispatch_state,
-    const iree_hal_vec3_t* workgroup_id, void* local_memory);
+    const iree_hal_executable_workgroup_state_v0_t* workgroup_state);
 
 // Bytes per page of workgroup local memory.
 // This is chosen to match the common page size of devices.

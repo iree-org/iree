@@ -81,24 +81,30 @@ int main(int argc, char** argv) {
       library.v0->exports.ptrs[0];
 
   // Dispatch each workgroup with the same state.
-  iree_hal_executable_dispatch_state_v0_t dispatch_state = {
-      .workgroup_count = {{4, 1, 1}},
-      .workgroup_size = {{1, 1, 1}},
+  const iree_hal_executable_dispatch_state_v0_t dispatch_state = {
+      .workgroup_count_x = 4,
+      .workgroup_count_y = 1,
+      .workgroup_count_z = 1,
+      .workgroup_size_x = 1,
+      .workgroup_size_y = 1,
+      .workgroup_size_z = 1,
       .push_constant_count = IREE_ARRAYSIZE(push_constants.values),
       .push_constants = push_constants.values,
       .binding_count = IREE_ARRAYSIZE(binding_ptrs),
       .binding_ptrs = binding_ptrs,
       .binding_lengths = binding_lengths,
-      .processor_id = iree_cpu_query_processor_id(),
-      .environment = &environment,
   };
-  for (uint32_t z = 0; z < dispatch_state.workgroup_count.z; ++z) {
-    for (uint32_t y = 0; y < dispatch_state.workgroup_count.y; ++y) {
-      for (uint32_t x = 0; x < dispatch_state.workgroup_count.x; ++x) {
+  iree_hal_executable_workgroup_state_v0_t workgroup_state = {
+      .processor_id = iree_cpu_query_processor_id(),
+  };
+  for (uint32_t z = 0; z < dispatch_state.workgroup_count_z; ++z) {
+    workgroup_state.workgroup_id_z = z;
+    for (uint32_t y = 0; y < dispatch_state.workgroup_count_y; ++y) {
+      workgroup_state.workgroup_id_y = y;
+      for (uint32_t x = 0; x < dispatch_state.workgroup_count_x; ++x) {
+        workgroup_state.workgroup_id_x = x;
         // Invoke the workgroup (x, y, z).
-        iree_hal_vec3_t workgroup_id = {{x, y, z}};
-        int ret = entry_fn_ptr(&dispatch_state, &workgroup_id,
-                               /*local_memory=*/NULL);
+        int ret = entry_fn_ptr(&environment, &dispatch_state, &workgroup_state);
         IREE_ASSERT_EQ(
             ret, 0,
             "if we have bounds checking enabled the executable will signal "

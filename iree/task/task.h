@@ -532,6 +532,10 @@ typedef iree_alignas(iree_max_align_t) struct {
   // TODO(benvanik): workgroup index to amortize calculating linear offsets.
   // (like gl_GlobalInvocationID)
 
+  // Opaque ID of the processor executing the tile.
+  // May be slightly out of date or 0 if the processor could not be queried.
+  iree_cpu_processor_id_t processor_id;
+
   // Tile-local memory that is pinned to each worker ensuring no cache
   // thrashing. Aligned to at least the natural pointer size of the machine.
   // Contents are (today) undefined upon entry.
@@ -539,10 +543,6 @@ typedef iree_alignas(iree_max_align_t) struct {
 
   // Shared statistics counters for the dispatch shard.
   iree_task_dispatch_statistics_t* statistics;
-
-  // Opaque ID of the processor executing the tile.
-  // May be slightly out of date or 0 if the processor could not be queried.
-  iree_cpu_processor_id_t processor_id;
 } iree_task_tile_context_t;
 
 typedef struct iree_task_dispatch_t iree_task_dispatch_t;
