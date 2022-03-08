@@ -36,11 +36,22 @@ LogicalResult verifyGPUMatmulSimtPassPipeline(
 
   if (linalg::BatchMatmulOp batchMatmulOp =
           dyn_cast<linalg::BatchMatmulOp>(op)) {
-    // First tile dimensions should be 1 for batched, use remaining dimensions
-    // for comparisons.
-    if (firstLevelTileSizes[0] != 1) {
-      op->emitError("Received first tile dimension of ")
-          << firstLevelTileSizes[0] << " instead of 1 for " << pipelineName;
+    // Inspect first tile dimensions separately for batched. It should be 1 for
+    // parallelizable loops and 0 for non-parallelizable. Continue with other
+    // dimensions for remaining comparisons.
+    if (cast<IREE::Flow::PartitionableLoopsInterface>(op).getPartitionableLoops(
+            kNumMaxParallelDims)[0] == 0) {  // The first dimension is
+      if (firstLevelTileSizes[0] > 1) {
+        return op->emitError("Received first tile dimension of ")
+               << firstLevelTileSizes[0] << " instead of 1 or 0 for "
+               << pipelineName;
+      }
+    } else {
+      if (firstLevelTileSizes[0] != 0) {
+        return op->emitError("Received first tile dimension of ")
+               << firstLevelTileSizes[0] << " instead of 0 for "
+               << pipelineName;
+      }
     }
     firstLevelTileSizes = {firstLevelTileSizes[1], firstLevelTileSizes[2],
                            firstLevelTileSizes[3]};
@@ -108,11 +119,22 @@ LogicalResult verifyGPUMatmulTensorCorePipeline(
     lhsShape = lhsShape.drop_front(1);
     rhsShape = rhsShape.drop_front(1);
 
-    // First tile dimensions should be 1 for batched, use remaining dimensions
-    // for comparisons.
-    if (firstLevelTileSizes[0] != 1) {
-      op->emitError("Received first tile dimension of ")
-          << firstLevelTileSizes[0] << " instead of 1 for " << pipelineName;
+    // Inspect first tile dimensions separately for batched. It should be 1 for
+    // parallelizable loops and 0 for non-parallelizable. Continue with other
+    // dimensions for remaining comparisons.
+    if (cast<IREE::Flow::PartitionableLoopsInterface>(op).getPartitionableLoops(
+            kNumMaxParallelDims)[0] == 0) {  // The first dimension is
+      if (firstLevelTileSizes[0] > 1) {
+        return op->emitError("Received first tile dimension of ")
+               << firstLevelTileSizes[0] << " instead of 1 or 0 for "
+               << pipelineName;
+      }
+    } else {
+      if (firstLevelTileSizes[0] != 0) {
+        return op->emitError("Received first tile dimension of ")
+               << firstLevelTileSizes[0] << " instead of 0 for "
+               << pipelineName;
+      }
     }
     firstLevelTileSizes = {firstLevelTileSizes[1], firstLevelTileSizes[2],
                            firstLevelTileSizes[3]};
