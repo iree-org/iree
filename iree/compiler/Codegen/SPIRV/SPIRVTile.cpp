@@ -169,52 +169,10 @@ class SPIRVTilePass final : public SPIRVTileBase<SPIRVTilePass> {
     MLIRContext *context = &getContext();
     FuncOp funcOp = getOperation();
 
-    // If there are `tensor.pad` ops in this region, try to split it into two
-    // cases: one for inner tiles without the need of padding, the other for
-    // boundary tiles with the need of padding.
-    {
-      RewritePatternSet patterns(context);
-      tensor::populateSplitPaddingPatterns(patterns);
-      (void)applyPatternsAndFoldGreedily(funcOp, std::move(patterns));
-
-      LLVM_DEBUG({
-        llvm::dbgs() << "--- After splitting padding cases ---\n";
-        funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
-        llvm::dbgs() << "\n\n";
-      });
-    }
-
-    // If the above step succeeded, we will have an `scf.if` op generated for
-    // different padding cases. For such cases, expand the both `scf.if` regions
-    // to include ops before and after it so that we have the full "computation"
-    // in both regions. This helps for future transformations.
-    {
-      SmallVector<scf::IfOp> ifOps;
-      funcOp.walk([&](scf::IfOp ifOp) { ifOps.push_back(ifOp); });
-      if (ifOps.size() > 1) {
-        funcOp.emitError("expected to contain no more than one scf.if ops");
-        return signalPassFailure();
-      }
-      if (ifOps.size() == 1) {
-        RewritePatternSet patterns(funcOp.getContext());
-        populateSPIRVExpandIfRegionPatterns(
-            patterns, /*canMoveToRegion=*/[](Operation *op) { return true; });
-        FrozenRewritePatternSet frozenPatterns(std::move(patterns));
-        // Apply transforms per op to avoid recursive behavior.
-        (void)applyOpPatternsAndFold(ifOps.front(), frozenPatterns,
-                                     /*erased=*/nullptr);
-      }
-
-      LLVM_DEBUG({
-        llvm::dbgs() << "--- After expand scf.if regions ---\n";
-        funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
-        llvm::dbgs() << "\n\n";
-      });
-    }
-
-    // Now try to find computation ops which we will use as anchor to tile and
-    // fuse again. If there are `scf.if` ops, we need to scan both regions to
-    // discover such computation ops so that we can tile and fuse both regions.
+    // Try to find computation ops which we will use as anchor to tile and fuse
+    // again. If there are `scf.if` ops, we have both a fast and slow paths for
+    // padding handling. Then we need to scan both regions to discover such
+    // computation ops so that we can tile and fuse both regions.
     SmallVector<Operation *> computeOps;
     SmallVector<scf::IfOp, 1> ifOps;
     funcOp.walk([&ifOps](scf::IfOp ifOp) { ifOps.push_back(ifOp); });

@@ -146,6 +146,7 @@ void addSPIRVTileAndVectorizePassPipeline(OpPassManager &pm) {
   pm.addPass(createCSEPass());
 
   // Tile to GPU invocations and vectorize.
+  pm.addNestedPass<FuncOp>(createSPIRVCreateFastSlowPathPass());
   pm.addNestedPass<FuncOp>(createSPIRVTilePass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());

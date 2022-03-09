@@ -354,11 +354,10 @@ def SPIRVVectorizeLoadStore :
   let constructor = "mlir::iree_compiler::createSPIRVVectorizeLoadStore()";
 }
 
-def SPIRVExpandIfRegion :
-    Pass<"iree-spirv-expand-if-region", "FuncOp"> {
-  let summary = "Expand scf.if's regions by pulling in ops before and after "
-                "the scf.if op into both regions of the scf.if op";
-  let constructor = "mlir::iree_compiler::createSPIRVExpandIfRegionPass()";
+def SPIRVCreateFastSlowPath :
+    Pass<"iree-spirv-create-fast-slow-path", "FuncOp"> {
+  let summary = "Create separate fast and slow paths to handle padding";
+  let constructor = "mlir::iree_compiler::createSPIRVCreateFastSlowPathPass()";
 }
 
 //------------------------------------------------------------------------------

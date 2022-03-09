@@ -403,12 +403,10 @@ std::unique_ptr<OperationPass<FuncOp>> createSPIRVVectorizePass();
 /// having pointer bitcast.
 std::unique_ptr<OperationPass<ModuleOp>> createSPIRVVectorizeLoadStore();
 
-/// Expands scf.if's regions by pulling in ops before and after the scf.if op
-/// into both regions of the scf.if op.
-void populateSPIRVExpandIfRegionPatterns(
-    RewritePatternSet &patterns,
-    function_ref<bool(Operation *)> canMoveToRegion);
-std::unique_ptr<OperationPass<FuncOp>> createSPIRVExpandIfRegionPass();
+// Uses `tensor.pad` ops as anchors to create separate fast and slow paths
+// inside the kernel. The fast path is for inner tiles where we don't need
+// padding, while the slow path is for boundary tiles where we do need padding.
+std::unique_ptr<OperationPass<FuncOp>> createSPIRVCreateFastSlowPathPass();
 
 //----------------------------------------------------------------------------//
 // SPIRV Codegen Pass Pipelines.
