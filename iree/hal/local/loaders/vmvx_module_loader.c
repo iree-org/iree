@@ -249,7 +249,7 @@ static void iree_hal_vmvx_executable_destroy(
 static iree_status_t iree_hal_vmvx_executable_issue_call(
     iree_hal_local_executable_t* base_executable, iree_host_size_t ordinal,
     const iree_hal_executable_dispatch_state_v0_t* dispatch_state,
-    const iree_hal_vec3_t* workgroup_id, iree_byte_span_t local_memory) {
+    const iree_hal_executable_workgroup_state_v0_t* workgroup_state) {
   iree_hal_vmvx_executable_t* executable =
       (iree_hal_vmvx_executable_t*)base_executable;
 
@@ -313,7 +313,9 @@ static iree_status_t iree_hal_vmvx_executable_issue_call(
   iree_vm_buffer_t local_memory_buffer;
   iree_vm_buffer_initialize(
       IREE_VM_BUFFER_ACCESS_MUTABLE | IREE_VM_BUFFER_ACCESS_ORIGIN_HOST,
-      local_memory, iree_allocator_null(), &local_memory_buffer);
+      iree_make_byte_span(workgroup_state->local_memory,
+                          workgroup_state->local_memory_size),
+      iree_allocator_null(), &local_memory_buffer);
   iree_vm_buffer_retain(&local_memory_buffer);  // for call
 
   // Map the push constant memory directly from the dispatch state.
@@ -333,9 +335,9 @@ static iree_status_t iree_hal_vmvx_executable_issue_call(
   //       %local_memory: !vmvx.buffer,
   //       %constants: !vmvx.buffer,
   //       %bindings: !util.list<!vmvx.buffer>,
-  //       %workgroup_x: index,
-  //       %workgroup_y: index,
-  //       %workgroup_z: index,
+  //       %workgroup_id_x: index,
+  //       %workgroup_id_y: index,
+  //       %workgroup_id_z: index,
   //       %workgroup_size_x: index,
   //       %workgroup_size_y: index,
   //       %workgroup_size_z: index,
@@ -350,9 +352,9 @@ static iree_status_t iree_hal_vmvx_executable_issue_call(
     iree_vm_ref_t local_memory;
     iree_vm_ref_t constants;
     iree_vm_ref_t bindings;
-    uint32_t workgroup_x;
-    uint32_t workgroup_y;
-    uint32_t workgroup_z;
+    uint32_t workgroup_id_x;
+    uint32_t workgroup_id_y;
+    uint32_t workgroup_id_z;
     uint32_t workgroup_size_x;
     uint32_t workgroup_size_y;
     uint32_t workgroup_size_z;
@@ -378,15 +380,15 @@ static iree_status_t iree_hal_vmvx_executable_issue_call(
               .ptr = binding_list,
               .offsetof_counter = 0,
           },
-      .workgroup_x = workgroup_id->x,
-      .workgroup_y = workgroup_id->y,
-      .workgroup_z = workgroup_id->z,
-      .workgroup_size_x = dispatch_state->workgroup_size.x,
-      .workgroup_size_y = dispatch_state->workgroup_size.y,
-      .workgroup_size_z = dispatch_state->workgroup_size.z,
-      .workgroup_count_x = dispatch_state->workgroup_count.x,
-      .workgroup_count_y = dispatch_state->workgroup_count.y,
-      .workgroup_count_z = dispatch_state->workgroup_count.z,
+      .workgroup_id_x = workgroup_state->workgroup_id_x,
+      .workgroup_id_y = workgroup_state->workgroup_id_y,
+      .workgroup_id_z = workgroup_state->workgroup_id_z,
+      .workgroup_size_x = dispatch_state->workgroup_size_x,
+      .workgroup_size_y = dispatch_state->workgroup_size_y,
+      .workgroup_size_z = dispatch_state->workgroup_size_z,
+      .workgroup_count_x = dispatch_state->workgroup_count_x,
+      .workgroup_count_y = dispatch_state->workgroup_count_y,
+      .workgroup_count_z = dispatch_state->workgroup_count_z,
   };
 
   // On-stack stack. We really do abuse the stack too much here.

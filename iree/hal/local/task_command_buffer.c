@@ -820,32 +820,41 @@ static iree_status_t iree_hal_cmd_dispatch_tile(
       (const iree_hal_cmd_dispatch_t*)user_context;
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  iree_hal_executable_dispatch_state_v0_t state;
-  memset(&state, 0, sizeof(state));
-  memcpy(state.workgroup_count.value, tile_context->workgroup_count,
-         sizeof(state.workgroup_count));
-  memcpy(state.workgroup_size.value, tile_context->workgroup_size,
-         sizeof(state.workgroup_size));
-
+  // We could share this across all workgroups in a dispatch and reduce cache
+  // pressure as all cores would be hitting the same hot read-only cache line.
+  // It'd grow the size of iree_hal_cmd_dispatch_t by a few dozen bytes, though,
+  // and so we'd need some profiling to see if it's worth it (fixed command
+  // buffer cost vs potential for saving a cache miss or two).
+  iree_alignas(64) iree_hal_executable_dispatch_state_v0_t dispatch_state = {
+      .workgroup_size_x = tile_context->workgroup_size[0],
+      .workgroup_size_y = tile_context->workgroup_size[1],
+      .workgroup_size_z = tile_context->workgroup_size[2],
+      .push_constant_count = cmd->push_constant_count,
+      .workgroup_count_x = tile_context->workgroup_count[0],
+      .workgroup_count_y = tile_context->workgroup_count[1],
+      .workgroup_count_z = tile_context->workgroup_count[2],
+      .binding_count = cmd->binding_count,
+  };
   uint8_t* cmd_ptr = (uint8_t*)cmd + sizeof(*cmd);
+  dispatch_state.push_constants = (uint32_t*)cmd_ptr;
+  cmd_ptr += cmd->push_constant_count * sizeof(*dispatch_state.push_constants);
+  dispatch_state.binding_ptrs = (void**)cmd_ptr;
+  cmd_ptr += cmd->binding_count * sizeof(*dispatch_state.binding_ptrs);
+  dispatch_state.binding_lengths = (size_t*)cmd_ptr;
+  cmd_ptr += cmd->binding_count * sizeof(*dispatch_state.binding_lengths);
 
-  state.push_constant_count = cmd->push_constant_count;
-  state.push_constants = (uint32_t*)cmd_ptr;
-  cmd_ptr += cmd->push_constant_count * sizeof(*state.push_constants);
-
-  state.binding_count = cmd->binding_count;
-  state.binding_ptrs = (void**)cmd_ptr;
-  cmd_ptr += cmd->binding_count * sizeof(*state.binding_ptrs);
-  state.binding_lengths = (size_t*)cmd_ptr;
-  cmd_ptr += cmd->binding_count * sizeof(*state.binding_lengths);
-
-  state.processor_id = tile_context->processor_id;
-  state.environment = &cmd->executable->environment;
-
+  const iree_alignas(64)
+      iree_hal_executable_workgroup_state_v0_t workgroup_state = {
+          .workgroup_id_x = tile_context->workgroup_xyz[0],
+          .workgroup_id_y = tile_context->workgroup_xyz[1],
+          .workgroup_id_z = tile_context->workgroup_xyz[2],
+          .reserved = 0,
+          .processor_id = tile_context->processor_id,
+          .local_memory = tile_context->local_memory.data,
+          .local_memory_size = (size_t)tile_context->local_memory.data_length,
+      };
   iree_status_t status = iree_hal_local_executable_issue_call(
-      cmd->executable, cmd->ordinal, &state,
-      (const iree_hal_vec3_t*)tile_context->workgroup_xyz,
-      tile_context->local_memory);
+      cmd->executable, cmd->ordinal, &dispatch_state, &workgroup_state);
 
   IREE_TRACE_ZONE_END(z0);
   return status;

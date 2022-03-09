@@ -65,25 +65,6 @@ static llvm::StructType *makeEnvironmentType(llvm::LLVMContext &context) {
   return type;
 }
 
-// %struct.anon = type { i32, i32, i32 }
-// %union.iree_hal_vec3_t = type { %struct.anon }
-static llvm::StructType *makeVec3Type(llvm::LLVMContext &context) {
-  if (auto *existingType =
-          llvm::StructType::getTypeByName(context, "iree_hal_vec3_t")) {
-    return existingType;
-  }
-  auto *i32Type = llvm::IntegerType::getInt32Ty(context);
-  auto *type = llvm::StructType::create(context,
-                                        {
-                                            i32Type,
-                                            i32Type,
-                                            i32Type,
-                                        },
-                                        "iree_hal_vec3_t",
-                                        /*isPacked=*/false);
-  return type;
-}
-
 // %struct.iree_hal_executable_dispatch_state_v0_t = type {
 //   ...
 // }
@@ -94,20 +75,30 @@ static llvm::StructType *makeDispatchStateType(llvm::LLVMContext &context) {
   return type;
 }
 
-// i32 (%struct.iree_hal_executable_dispatch_state_v0_t*,
-//      %union.iree_hal_vec3_t*,
+// %struct.iree_hal_executable_workgroup_state_v0_t = type {
+//   ...
+// }
+static llvm::StructType *makeWorkgroupStateType(llvm::LLVMContext &context) {
+  auto *type = llvm::StructType::getTypeByName(
+      context, "iree_hal_executable_workgroup_state_v0_t");
+  assert(type && "state type must be defined by ConvertToLLVM");
+  return type;
+}
+
+// i32 (%struct.iree_hal_executable_environment_v0_t*,
+//      %struct.iree_hal_executable_dispatch_state_v0_t*,
 //      i8*)
 static llvm::FunctionType *makeDispatchFunctionType(
     llvm::LLVMContext &context) {
+  auto *environmentType = makeEnvironmentType(context);
   auto *dispatchStateType = makeDispatchStateType(context);
-  auto *i8Type = llvm::IntegerType::getInt8Ty(context);
+  auto *workgroupStateType = makeWorkgroupStateType(context);
   auto *i32Type = llvm::IntegerType::getInt32Ty(context);
-  auto *vec3Type = llvm::ArrayType::get(i32Type, 3);
   return llvm::FunctionType::get(i32Type,
                                  {
+                                     environmentType->getPointerTo(),
                                      dispatchStateType->getPointerTo(),
-                                     vec3Type->getPointerTo(),
-                                     i8Type->getPointerTo(),
+                                     workgroupStateType->getPointerTo(),
                                  },
                                  /*isVarArg=*/false);
 }

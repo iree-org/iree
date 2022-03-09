@@ -354,7 +354,7 @@ static void iree_hal_system_executable_destroy(
 static iree_status_t iree_hal_system_executable_issue_call(
     iree_hal_local_executable_t* base_executable, iree_host_size_t ordinal,
     const iree_hal_executable_dispatch_state_v0_t* dispatch_state,
-    const iree_hal_vec3_t* workgroup_id, iree_byte_span_t local_memory) {
+    const iree_hal_executable_workgroup_state_v0_t* workgroup_state) {
   iree_hal_system_executable_t* executable =
       (iree_hal_system_executable_t*)base_executable;
   const iree_hal_executable_library_v0_t* library = executable->library.v0;
@@ -383,8 +383,8 @@ static iree_status_t iree_hal_system_executable_issue_call(
   }
 #endif  // IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
 
-  int ret = library->exports.ptrs[ordinal](dispatch_state, workgroup_id,
-                                           local_memory.data);
+  int ret = library->exports.ptrs[ordinal](&base_executable->environment,
+                                           dispatch_state, workgroup_state);
 
   IREE_TRACE_ZONE_END(z0);
 
