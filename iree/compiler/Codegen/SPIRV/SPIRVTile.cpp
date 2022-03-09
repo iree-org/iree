@@ -169,6 +169,9 @@ class SPIRVTilePass final : public SPIRVTileBase<SPIRVTilePass> {
     MLIRContext *context = &getContext();
     FuncOp funcOp = getOperation();
 
+    // If there are `tensor.pad` ops in this region, try to split it into two
+    // cases: one for inner tiles without the need of padding, the other for
+    // boundary tiles with the need of padding.
     {
       RewritePatternSet patterns(context);
       tensor::populateSplitPaddingPatterns(patterns);
@@ -181,6 +184,10 @@ class SPIRVTilePass final : public SPIRVTileBase<SPIRVTilePass> {
       });
     }
 
+    // If the above step succeeded, we will have an `scf.if` op generated for
+    // different padding cases. For such cases, expand the both `scf.if` regions
+    // to include ops before and after it so that we have the full "computation"
+    // in both regions. This helps for future transformations.
     {
       SmallVector<scf::IfOp> ifOps;
       funcOp.walk([&](scf::IfOp ifOp) { ifOps.push_back(ifOp); });
@@ -205,6 +212,9 @@ class SPIRVTilePass final : public SPIRVTileBase<SPIRVTilePass> {
       });
     }
 
+    // Now try to find computation ops which we will use as anchor to tile and
+    // fuse again. If there are `scf.if` ops, we need to scan both regions to
+    // discover such computation ops so that we can tile and fuse both regions.
     SmallVector<Operation *> computeOps;
     SmallVector<scf::IfOp, 1> ifOps;
     funcOp.walk([&ifOps](scf::IfOp ifOp) { ifOps.push_back(ifOp); });
@@ -237,7 +247,9 @@ class SPIRVTilePass final : public SPIRVTileBase<SPIRVTilePass> {
     }
     assert(computeOps.size() <= 2);
 
-    for (Operation *computeOp : computeOps) {  // Tile to invocations.
+    // Now tile the last computation op to invocations and fuse all operand
+    // computation ops into the materialized loop nest.
+    for (Operation *computeOp : computeOps) {
       auto consumerOp = dyn_cast<linalg::LinalgOp>(computeOp);
 
       OpBuilder builder(context);
@@ -269,7 +281,7 @@ class SPIRVTilePass final : public SPIRVTileBase<SPIRVTilePass> {
       llvm::dbgs() << "\n\n";
     });
 
-    {
+    {  // Fuse `tensor.pad` op inside the materalized loop nest too.
       RewritePatternSet patterns(context);
       patterns.insert<linalg::ExtractSliceOfPadTensorSwapPattern>(
           context, [](tensor::ExtractSliceOp) { return false; });
@@ -282,7 +294,7 @@ class SPIRVTilePass final : public SPIRVTileBase<SPIRVTilePass> {
       });
     }
 
-    {
+    {  // Canonicalize.
       RewritePatternSet patterns =
           linalg::getLinalgTilingCanonicalizationPatterns(context);
       // Pulling in upstream scf.for and affine.min canonicalization patterns.
@@ -291,10 +303,10 @@ class SPIRVTilePass final : public SPIRVTileBase<SPIRVTilePass> {
       // Pulling in IREE scf.for and affine.min canonicalization patterns.
       // They work on tiled and distributed loops.
       populateFoldAffineMinInDistributedLoopsPatterns(patterns);
-      // Pulling in flow.dispatch.tensor.load/store op canonicalization
-      // patterns. Tiling can generate dim ops taking them as operands.
-      IREE::Flow::populateFlowDispatchCanonicalizationPatterns(patterns,
-                                                               context);
+      // Pulling in flow.dispatch.tensor.load op canonicalization patterns.
+      // Tiling can generate dim ops taking them as operands.
+      IREE::Flow::DispatchTensorLoadOp::getCanonicalizationPatterns(patterns,
+                                                                    context);
       patterns.add<ConcretizePadResultShape>(context);
       (void)applyPatternsAndFoldGreedily(funcOp, std::move(patterns));
 
@@ -305,14 +317,13 @@ class SPIRVTilePass final : public SPIRVTileBase<SPIRVTilePass> {
       });
     }
 
-    {
-      // Set markers to drive tiling reduction dimensions.
+    {  // Set markers to drive tiling reduction dimensions.
       OpBuilder builder(context);
       auto marker = builder.getStringAttr(getTileReductionMarker());
       funcOp.walk([&](linalg::LinalgOp op) {
         if (isa<linalg::ContractionOpInterface>(*op) ||
             isa<linalg::ConvolutionOpInterface>(*op)) {
-          op->setAttr("__internal_linalg_transform__", marker);
+          op->setAttr(linalg::LinalgTransforms::kLinalgTransformMarker, marker);
         }
       });
     }
@@ -332,7 +343,7 @@ class SPIRVTilePass final : public SPIRVTileBase<SPIRVTilePass> {
       });
     }
 
-    {
+    {  // Fuse `tensor.pad` op inside the materalized loop nest too.
       RewritePatternSet patterns(context);
       patterns.insert<linalg::ExtractSliceOfPadTensorSwapPattern>(
           context, [](tensor::ExtractSliceOp) { return false; });
@@ -345,17 +356,17 @@ class SPIRVTilePass final : public SPIRVTileBase<SPIRVTilePass> {
       });
     }
 
-    {
+    {  // Canonicalize.
       RewritePatternSet patterns =
           linalg::getLinalgTilingCanonicalizationPatterns(context);
       // Pulling in upstream scf.for and affine.min canonicalization patterns.
       // They work on tiled (but not distributed) loops. We only tiled reduction
       // loops previously so this should be fine.
       scf::populateSCFForLoopCanonicalizationPatterns(patterns);
-      // Pulling in flow.dispatch.tensor.load/store op canonicalization
-      // patterns. Tiling can generate dim ops taking them as operands.
-      IREE::Flow::populateFlowDispatchCanonicalizationPatterns(patterns,
-                                                               context);
+      // Pulling in flow.dispatch.tensor.load op canonicalization patterns.
+      // Tiling can generate dim ops taking them as operands.
+      IREE::Flow::DispatchTensorLoadOp::getCanonicalizationPatterns(patterns,
+                                                                    context);
       patterns.add<ConcretizePadResultShape>(context);
       (void)applyPatternsAndFoldGreedily(funcOp, std::move(patterns));
 

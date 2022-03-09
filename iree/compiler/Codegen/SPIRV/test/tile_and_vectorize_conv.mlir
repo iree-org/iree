@@ -193,7 +193,7 @@ hal.executable private @depthwise_conv_static_shape_f32 {
 
 hal.executable private @low_padded_conv {
   hal.executable.variant @vulkan, target = <"vulkan-spirv", "vulkan-spirv-fb"> {
-    hal.executable.entry_point @low_padded_conv layout(#executable_layout) attributes {
+    hal.executable.entry_point @low_padded_conv layout(#executable_layout) {
       workgroup_size = [8: index, 2: index, 1: index],
       translation.info = #translation
     }
@@ -314,7 +314,7 @@ hal.executable private @low_padded_conv {
 
 hal.executable private @low_high_padded_depthwise_conv {
   hal.executable.variant @vulkan, target = <"vulkan-spirv", "vulkan-spirv-fb"> {
-    hal.executable.entry_point @low_high_padded_depthwise_conv layout(#executable_layout) attributes {
+    hal.executable.entry_point @low_high_padded_depthwise_conv layout(#executable_layout) {
       workgroup_size = [8: index, 2: index, 1: index],
       translation.info = #translation
     }
