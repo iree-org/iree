@@ -44,8 +44,14 @@ class LibraryBuilder {
 
   // iree_hal_executable_library_version_t
   enum class Version : uint32_t {
-    // IREE_HAL_EXECUTABLE_LIBRARY_VERSION_0
-    V_0 = 0u,
+    // NOTE: until we hit v1 the versioning scheme here is not set in stone.
+    // We may want to make this major release number, date codes (0x20220307),
+    // or some semantic versioning we track in whatever spec we end up having.
+    V_0_1 = 0x0000'0001u,  // v0.1 - ~2022-03-07
+
+    // Pinned to the latest version.
+    // Requires that the runtime be compiled with the same version.
+    LATEST = V_0_1,
   };
 
   // iree_hal_executable_library_features_t
@@ -81,7 +87,7 @@ class LibraryBuilder {
   };
 
   LibraryBuilder(llvm::Module *module, Mode mode,
-                 Version version = Version::V_0)
+                 Version version = Version::LATEST)
       : module(module), mode(mode), version(version) {}
 
   // Adds a new required feature flag bit. The runtime must support the feature
@@ -111,6 +117,8 @@ class LibraryBuilder {
     exports.push_back({name.str(), tag.str(), attrs, func});
   }
 
+  // TODO(benvanik): addConstant for registering constant values.
+
   // Builds a `iree_hal_executable_library_query_fn_t` with the given
   // |queryFuncName| that will return the current library metadata.
   //
@@ -126,10 +134,11 @@ class LibraryBuilder {
   llvm::Constant *buildLibraryV0(std::string libraryName);
   llvm::Constant *buildLibraryV0ImportTable(std::string libraryName);
   llvm::Constant *buildLibraryV0ExportTable(std::string libraryName);
+  llvm::Constant *buildLibraryV0ConstantTable(std::string libraryName);
 
   llvm::Module *module = nullptr;
   Mode mode = Mode::INCLUDE_REFLECTION_ATTRS;
-  Version version = Version::V_0;
+  Version version = Version::LATEST;
   Features features = Features::NONE;
   SanitizerKind sanitizerKind = SanitizerKind::NONE;
 
@@ -146,6 +155,8 @@ class LibraryBuilder {
     llvm::Function *func;
   };
   SmallVector<Dispatch> exports;
+
+  size_t constantCount = 0;
 };
 
 }  // namespace HAL

@@ -78,26 +78,27 @@ typedef enum iree_hal_executable_library_sanitizer_kind_e {
 typedef struct iree_hal_executable_environment_v0_t
     iree_hal_executable_environment_v0_t;
 
-// Known valid version values.
-typedef enum iree_hal_executable_library_version_e {
-  // iree_hal_executable_library_v0_t is used as the API communication
-  // structure.
-  IREE_HAL_EXECUTABLE_LIBRARY_VERSION_0 = 0,
+// Version code indicating the minimum required runtime structures.
+// Runtimes cannot load executables with newer versions but may be able to load
+// older versions if backward compatibility is enabled.
+//
+// NOTE: until we hit v1 the versioning scheme here is not set in stone.
+// We may want to make this major release number, date codes (0x20220307),
+// or some semantic versioning we track in whatever spec we end up having.
+typedef uint32_t iree_hal_executable_library_version_t;
 
-  IREE_HAL_EXECUTABLE_LIBRARY_VERSION_MAX_ENUM = INT32_MAX,
-} iree_hal_executable_library_version_t;
-static_assert(sizeof(iree_hal_executable_library_version_t) == 4, "uint32_t");
+#define IREE_HAL_EXECUTABLE_LIBRARY_VERSION_0_1 0x00000001u
 
 // The latest version of the library API; can be used to populate the
 // iree_hal_executable_library_header_t::version when building libraries.
-#define IREE_HAL_EXECUTABLE_LIBRARY_LATEST_VERSION \
-  IREE_HAL_EXECUTABLE_LIBRARY_VERSION_0
+#define IREE_HAL_EXECUTABLE_LIBRARY_VERSION_LATEST \
+  IREE_HAL_EXECUTABLE_LIBRARY_VERSION_0_1
 
 // A header present at the top of all versions of the library API used by the
 // runtime to ensure version compatibility.
 typedef struct iree_hal_executable_library_header_t {
   // Version of the API this library was built with, which was likely the value
-  // of IREE_HAL_EXECUTABLE_LIBRARY_LATEST_VERSION.
+  // of IREE_HAL_EXECUTABLE_LIBRARY_VERSION_LATEST.
   iree_hal_executable_library_version_t version;
 
   // Name used for logging/diagnostics.
@@ -134,7 +135,7 @@ typedef const iree_hal_executable_library_header_t** (
   "iree_hal_executable_library_query"
 
 //===----------------------------------------------------------------------===//
-// IREE_HAL_EXECUTABLE_LIBRARY_VERSION_0
+// IREE_HAL_EXECUTABLE_LIBRARY_VERSION_0_*
 //===----------------------------------------------------------------------===//
 
 // Function signature of imported functions for use in the executable.
@@ -257,56 +258,96 @@ typedef struct iree_hal_executable_environment_v0_t {
   iree_hal_processor_v0_t processor;
 } iree_hal_executable_environment_v0_t;
 
-typedef union iree_hal_vec3_t {
-  struct {
-    uint32_t x;
-    uint32_t y;
-    uint32_t z;
-  };
-  uint32_t value[3];
-} iree_hal_vec3_t;
-
 // Read-only per-dispatch state passed to each workgroup in a dispatch.
+//
+// We layout to try to fit everything commonly used into the first cache line
+// (on archs with 64-bit pointers; 32-bit fits in a single line).
+//
+// For workgroup dimensions we allow the full 32-bit range on X and Y as those
+// are the primary distribution dimensions. Z is the coarsest control and is
+// usually in the 1-16 range; any higher and it can pessimize scheduling. Almost
+// all GPUs also have this limitation (max Z of 65K) for the same reason.
 typedef struct iree_hal_executable_dispatch_state_v0_t {
+  // Workgroup size chosen for the dispatch. For compilation modes where the
+  // workgroup size is constant this may be ignored.
+  uint32_t workgroup_size_x;
+  uint32_t workgroup_size_y;
+  uint16_t workgroup_size_z;
+
+  // Total number of available 4 byte push constant values in |push_constants|.
+  uint16_t push_constant_count;
+
   // Total workgroup count for the dispatch. This is sourced from either the
   // original dispatch call (for iree_hal_command_buffer_dispatch) or the
   // indirection buffer (for iree_hal_command_buffer_dispatch_indirect).
-  iree_hal_vec3_t workgroup_count;
-  // Workgroup size chosen for the dispatch. For compilation modes where the
-  // workgroup size is constant this may be ignored.
-  iree_hal_vec3_t workgroup_size;
-
-  // Total number of available 4 byte push constant values in |push_constants|.
-  size_t push_constant_count;
-  // |push_constant_count| values.
-  const uint32_t* push_constants;
+  uint32_t workgroup_count_x;
+  uint32_t workgroup_count_y;
+  uint16_t workgroup_count_z;
 
   // Total number of binding base pointers in |binding_ptrs| and
   // |binding_lengths|. The set is packed densely based on which bindings are
   // used (known at compile-time).
-  size_t binding_count;
+  uint16_t binding_count;
+
+  // |push_constant_count| values.
+  const uint32_t* push_constants;
   // Base pointers to each binding buffer.
   void* const* binding_ptrs;
   // The length of each binding in bytes, 1:1 with |binding_ptrs|.
   const size_t* binding_lengths;
 
+  // NOTE: the above fields are frequently accessed and should be kept together
+  // to ensure cache-friendly behavior. The first instructions every dispatch
+  // executes are loads from the fields and we want to avoid a cascade of
+  // cache misses. Less-frequently used fields can follow.
+} iree_hal_executable_dispatch_state_v0_t;
+static_assert(sizeof(iree_hal_executable_dispatch_state_v0_t) <= 64,
+              "try keeping dispatch state small enough to fit in a cache line");
+
+// Read-only per-workgroup state passed to each workgroup in a dispatch.
+//
+// We layout to try to fit everything commonly used into the first cache line
+// (on archs with 64-bit pointers; 32-bit fits in a single line).
+typedef struct iree_hal_executable_workgroup_state_v0_t {
+  // Workgroup ID of the currently executing workgroup.
+  // This is in the range of 0-workgroup_count and each unique workgroup is to
+  // perform workgroup_size invocations.
+  uint32_t workgroup_id_x;
+  uint32_t workgroup_id_y;
+  uint16_t workgroup_id_z;
+
+  // Reserved for future use.
+  uint16_t reserved;
+
   // Logical processor identifier used to index into processor info fields.
   // Depending on the implementation this may be an ordinal, a bitfield, or an
   // opaque unique identifier.
+  //
+  // NOTE: we could steal bits from the |processor_id| if needed; today the ID
+  // is the global ID but it really only needs to be within the current node
+  // (8-bits, or 16-bit for single-node thousand-core future proofing).
   uint32_t processor_id;
-  // Optional executable environment information.
-  const iree_hal_executable_environment_v0_t* environment;
-} iree_hal_executable_dispatch_state_v0_t;
+
+  // Scratch memory available for use by the workgroup.
+  // Requires a non-zero value to be specified for |local_memory_pages|; at
+  // least the size specified will be available. This memory is transient and
+  // exclusive to the workgroup. The provided pointer may be NULL if no
+  // workgroup local memory was requested.
+  void* local_memory;
+  // Total number of bytes available in |local_memory|. This may be larger than
+  // the requested amount.
+  uint32_t local_memory_size;
+
+  // +4 trailing bytes of free space
+} iree_hal_executable_workgroup_state_v0_t;
+static_assert(
+    sizeof(iree_hal_executable_workgroup_state_v0_t) <= 64,
+    "try keeping workgroup state small enough to fit in a cache line");
 
 // Function signature of exported executable entry points.
-// The same |dispatch_state| is passed to all workgroups in a dispatch while
-// |workgroup_id| and |local_memory| will vary for each workgroup.
-//
-// If a non-zero value was specified for |local_memory_page| then scratch memory
-// will be available for use by the invocation of at least the size specified.
-// This memory is transient and exclusive to the workgroup. The provided pointer
-// may be NULL if no workgroup local memory was requested and otherwise will
-// point to memory of the size specified.
+// The same |environment| is passed to all dispatches.
+// The same |dispatch_state| is passed to all workgroups within a dispatch.
+// A unique |workgroup_state| is passed to every workgroup within a dispatch.
 //
 // Returns 0 on success and non-zero on failure. Failures will cause device loss
 // and should only be used to communicate serious issues that should abort all
@@ -315,8 +356,9 @@ typedef struct iree_hal_executable_dispatch_state_v0_t {
 // caught and only that they are not harmful - clamping byte ranges and never
 // returning a failure is sufficient.
 typedef int (*iree_hal_executable_dispatch_v0_t)(
+    const iree_hal_executable_environment_v0_t* environment,
     const iree_hal_executable_dispatch_state_v0_t* dispatch_state,
-    const iree_hal_vec3_t* workgroup_id, void* local_memory);
+    const iree_hal_executable_workgroup_state_v0_t* workgroup_state);
 
 // Bytes per page of workgroup local memory.
 // This is chosen to match the common page size of devices.
@@ -363,6 +405,14 @@ typedef struct iree_hal_executable_export_table_v0_t {
   const char* const* tags;
 } iree_hal_executable_export_table_v0_t;
 
+// A table declaring the executable-level constants that can be used to
+// specialize the executable behavior.
+typedef struct iree_hal_executable_constant_table_v0_t {
+  // Total number of constants in the table.
+  uint32_t count;
+  // We could add more metadata here if we wanted to enable reflection.
+} iree_hal_executable_constant_table_v0_t;
+
 // Structure used for v0 library interfaces.
 // The entire structure is designed to be read-only and able to live embedded in
 // the binary .rdata section.
@@ -375,7 +425,7 @@ typedef struct iree_hal_executable_export_table_v0_t {
 // available.
 typedef struct iree_hal_executable_library_v0_t {
   // Version/metadata header.
-  // Will have a version of IREE_HAL_EXECUTABLE_LIBRARY_VERSION_0.
+  // Will have a version of IREE_HAL_EXECUTABLE_LIBRARY_VERSION_*.
   const iree_hal_executable_library_header_t* header;
 
   // Table of imported functions available to functions in the executable.
@@ -383,6 +433,9 @@ typedef struct iree_hal_executable_library_v0_t {
 
   // Table of exported functions from the executable.
   iree_hal_executable_export_table_v0_t exports;
+
+  // Table of executable-level constants.
+  iree_hal_executable_constant_table_v0_t constants;
 } iree_hal_executable_library_v0_t;
 
 #endif  // IREE_HAL_LOCAL_EXECUTABLE_LIBRARY_H_

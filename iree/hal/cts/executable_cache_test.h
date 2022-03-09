@@ -60,6 +60,7 @@ TEST_P(executable_cache_test, PrepareExecutable) {
       &descriptor_set_layout, &executable_layout));
 
   iree_hal_executable_params_t executable_params;
+  iree_hal_executable_params_initialize(&executable_params);
   executable_params.caching_mode =
       IREE_HAL_EXECUTABLE_CACHING_MODE_ALIAS_PROVIDED_DATA;
   executable_params.executable_format =

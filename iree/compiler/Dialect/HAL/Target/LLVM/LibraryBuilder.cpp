@@ -65,25 +65,6 @@ static llvm::StructType *makeEnvironmentType(llvm::LLVMContext &context) {
   return type;
 }
 
-// %struct.anon = type { i32, i32, i32 }
-// %union.iree_hal_vec3_t = type { %struct.anon }
-static llvm::StructType *makeVec3Type(llvm::LLVMContext &context) {
-  if (auto *existingType =
-          llvm::StructType::getTypeByName(context, "iree_hal_vec3_t")) {
-    return existingType;
-  }
-  auto *i32Type = llvm::IntegerType::getInt32Ty(context);
-  auto *type = llvm::StructType::create(context,
-                                        {
-                                            i32Type,
-                                            i32Type,
-                                            i32Type,
-                                        },
-                                        "iree_hal_vec3_t",
-                                        /*isPacked=*/false);
-  return type;
-}
-
 // %struct.iree_hal_executable_dispatch_state_v0_t = type {
 //   ...
 // }
@@ -94,20 +75,30 @@ static llvm::StructType *makeDispatchStateType(llvm::LLVMContext &context) {
   return type;
 }
 
-// i32 (%struct.iree_hal_executable_dispatch_state_v0_t*,
-//      %union.iree_hal_vec3_t*,
+// %struct.iree_hal_executable_workgroup_state_v0_t = type {
+//   ...
+// }
+static llvm::StructType *makeWorkgroupStateType(llvm::LLVMContext &context) {
+  auto *type = llvm::StructType::getTypeByName(
+      context, "iree_hal_executable_workgroup_state_v0_t");
+  assert(type && "state type must be defined by ConvertToLLVM");
+  return type;
+}
+
+// i32 (%struct.iree_hal_executable_environment_v0_t*,
+//      %struct.iree_hal_executable_dispatch_state_v0_t*,
 //      i8*)
 static llvm::FunctionType *makeDispatchFunctionType(
     llvm::LLVMContext &context) {
+  auto *environmentType = makeEnvironmentType(context);
   auto *dispatchStateType = makeDispatchStateType(context);
-  auto *i8Type = llvm::IntegerType::getInt8Ty(context);
+  auto *workgroupStateType = makeWorkgroupStateType(context);
   auto *i32Type = llvm::IntegerType::getInt32Ty(context);
-  auto *vec3Type = llvm::ArrayType::get(i32Type, 3);
   return llvm::FunctionType::get(i32Type,
                                  {
+                                     environmentType->getPointerTo(),
                                      dispatchStateType->getPointerTo(),
-                                     vec3Type->getPointerTo(),
-                                     i8Type->getPointerTo(),
+                                     workgroupStateType->getPointerTo(),
                                  },
                                  /*isVarArg=*/false);
 }
@@ -163,6 +154,25 @@ static llvm::StructType *makeExportTableType(llvm::LLVMContext &context) {
   return type;
 }
 
+// %struct.iree_hal_executable_constant_table_v0_t = type {
+//   i32
+// }
+static llvm::StructType *makeConstantTableType(llvm::LLVMContext &context) {
+  if (auto *existingType = llvm::StructType::getTypeByName(
+          context, "iree_hal_executable_constant_table_v0_t")) {
+    return existingType;
+  }
+  auto *i32Type = llvm::IntegerType::getInt32Ty(context);
+  auto *type =
+      llvm::StructType::create(context,
+                               {
+                                   i32Type,
+                               },
+                               "iree_hal_executable_constant_table_v0_t",
+                               /*isPacked=*/false);
+  return type;
+}
+
 // %struct.iree_hal_executable_library_header_t = type {
 //   i32,
 //   i8*,
@@ -201,11 +211,13 @@ static llvm::StructType *makeLibraryType(llvm::StructType *libraryHeaderType) {
   }
   auto *importTableType = makeImportTableType(context);
   auto *exportTableType = makeExportTableType(context);
+  auto *constantTableType = makeConstantTableType(context);
   auto *type = llvm::StructType::create(context,
                                         {
                                             libraryHeaderType->getPointerTo(),
                                             importTableType,
                                             exportTableType,
+                                            constantTableType,
                                         },
                                         "iree_hal_executable_library_v0_t",
                                         /*isPacked=*/false);
@@ -268,7 +280,9 @@ llvm::Function *LibraryBuilder::build(StringRef queryFuncName) {
   //   return max_version == 0 ? &library : NULL;
   auto *v0 = buildLibraryV0((queryFuncName + "_v0").str());
   builder.CreateRet(builder.CreateSelect(
-      builder.CreateICmpEQ(func->getArg(0), llvm::ConstantInt::get(i32Type, 0)),
+      builder.CreateICmpEQ(func->getArg(0),
+                           llvm::ConstantInt::get(
+                               i32Type, static_cast<int64_t>(Version::V_0_1))),
       builder.CreatePointerCast(v0, libraryHeaderType->getPointerTo()),
       llvm::ConstantPointerNull::get(libraryHeaderType->getPointerTo())));
 
@@ -430,6 +444,19 @@ llvm::Constant *LibraryBuilder::buildLibraryV0ExportTable(
                        });
 }
 
+llvm::Constant *LibraryBuilder::buildLibraryV0ConstantTable(
+    std::string libraryName) {
+  auto &context = module->getContext();
+  auto *constantTableType = makeConstantTableType(context);
+  auto *i32Type = llvm::IntegerType::getInt32Ty(context);
+
+  return llvm::ConstantStruct::get(
+      constantTableType, {
+                             // count=
+                             llvm::ConstantInt::get(i32Type, constantCount),
+                         });
+}
+
 llvm::Constant *LibraryBuilder::buildLibraryV0(std::string libraryName) {
   auto &context = module->getContext();
   auto *libraryHeaderType = makeLibraryHeaderType(context);
@@ -446,7 +473,7 @@ llvm::Constant *LibraryBuilder::buildLibraryV0(std::string libraryName) {
           {
               // version=
               llvm::ConstantInt::get(i32Type,
-                                     static_cast<int64_t>(Version::V_0)),
+                                     static_cast<int64_t>(Version::LATEST)),
               // name=
               getStringConstant(module->getName(), module),
               // features=
@@ -471,6 +498,8 @@ llvm::Constant *LibraryBuilder::buildLibraryV0(std::string libraryName) {
                                     buildLibraryV0ImportTable(libraryName),
                                     // exports=
                                     buildLibraryV0ExportTable(libraryName),
+                                    // constants=
+                                    buildLibraryV0ConstantTable(libraryName),
                                 }),
       /*Name=*/libraryName);
   // TODO(benvanik): force alignment (8? natural pointer width?)
