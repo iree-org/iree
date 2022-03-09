@@ -82,7 +82,7 @@ iree_check_single_backend_test_suite(
         ],
         include = ["*.mlir"],
         exclude = [
-            "round.mlir",
+            "round.mlir",  # TODO(#7618): Enable once supported.
         ],
     ),
     compiler_flags = ["-iree-input-type=mhlo"],
@@ -99,7 +99,7 @@ iree_check_single_backend_test_suite(
     target_backend = "cuda",
 )
 
-# # Run cuda tests using stream command buffer
+# Run cuda tests using stream command buffer
 iree_check_single_backend_test_suite(
     name = "check_cuda_streams",
     srcs = enforce_glob(
@@ -163,7 +163,7 @@ iree_check_single_backend_test_suite(
         ],
         include = ["*.mlir"],
         exclude = [
-            "round.mlir",
+            "round.mlir",  # TODO(#7618): Enable once supported.
         ],
     ),
     compiler_flags = ["-iree-input-type=mhlo"],
@@ -243,9 +243,7 @@ iree_check_single_backend_test_suite(
         ],
         include = ["*.mlir"],
         exclude = [
-            #TODO(#7415): Enable this after failures with bazel bot
-            #and cmake-swiftshared bot are addressed
-            "round.mlir",
+            "round.mlir",  # TODO(#7618): Enable once supported.
         ],
     ),
     compiler_flags = ["-iree-input-type=mhlo"],
@@ -313,8 +311,8 @@ iree_check_single_backend_test_suite(
         include = ["*.mlir"],
         exclude = [
             "exponential_fp16.mlir",
-            "fft.mlir",  # TODO(#6601): Eanble the test.
-            "round.mlir",
+            "fft.mlir",  # TODO(#6601): Enable the test.
+            "round.mlir",  # TODO(#7618): Enable once supported.
             "rng_uniform.mlir",  # TODO(#6995): Enable the test.
             "rng_normal.mlir",  # TODO(#6995): Enable the test.
         ],
@@ -387,7 +385,7 @@ iree_check_single_backend_test_suite(
         exclude = [
             "bitcast_convert.mlir",
             "exponential_fp16.mlir",
-            "round.mlir",
+            "round.mlir",  # TODO(#7618): Enable once supported.
         ],
     ),
     compiler_flags = ["-iree-input-type=mhlo"],
