@@ -329,12 +329,8 @@ static bool isFromReadOnlyTensor(Value v) {
           [&](arith::ConstantOp constantOp) { return true; })
       .Case<tensor::CollapseShapeOp, tensor::ExpandShapeOp>(
           [&](auto op) { return isFromReadOnlyTensor(op.src()); })
-      .Case<tensor::ExtractSliceOp>([&](tensor::ExtractSliceOp sliceOp) {
-        return isFromReadOnlyTensor(sliceOp.source());
-      })
-      .Case<tensor::CastOp>([&](tensor::CastOp castOp) {
-        return isFromReadOnlyTensor(castOp.source());
-      })
+      .Case<tensor::CastOp, tensor::ExtractSliceOp>(
+          [&](auto op) { return isFromReadOnlyTensor(op.source()); })
       .Case<IREE::Flow::DispatchTensorLoadOp>(
           [&](IREE::Flow::DispatchTensorLoadOp loadOp) {
             return loadOp.source()
