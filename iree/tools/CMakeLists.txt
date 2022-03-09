@@ -440,7 +440,7 @@ if(${IREE_BUILD_COMPILER})
     PUBLIC
     EXCLUDE_FROM_ALL
   )
-  
+
   iree_cc_binary(
     NAME
       iree-run-mlir
