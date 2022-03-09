@@ -181,14 +181,18 @@ void registerPartitionableLoopsInterfaceModels(DialectRegistry &registry) {
   ::mlir::linalg::Conv2DOp,
   ::mlir::linalg::Conv3DNdhwcDhwcfOp,
   ::mlir::linalg::Conv3DOp,
+  ::mlir::linalg::CopyOp,
   ::mlir::linalg::DepthwiseConv1DNwcWcOp,
   ::mlir::linalg::DepthwiseConv2DNhwcHwcOp,
   ::mlir::linalg::DepthwiseConv2DNhwcHwcQOp,
   ::mlir::linalg::DepthwiseConv2DNhwcHwcmOp,
   ::mlir::linalg::DepthwiseConv2DNhwcHwcmQOp,
   ::mlir::linalg::DotOp,
+  ::mlir::linalg::ElemwiseBinaryOp,
+  ::mlir::linalg::ElemwiseUnaryOp,
   ::mlir::linalg::FillOp,
   ::mlir::linalg::FillRng2DOp,
+  ::mlir::linalg::FillTensorOp,
   ::mlir::linalg::GenericOp,
   ::mlir::linalg::MatmulOp,
   ::mlir::linalg::MatmulUnsignedOp,
@@ -205,7 +209,6 @@ void registerPartitionableLoopsInterfaceModels(DialectRegistry &registry) {
   ::mlir::linalg::PoolingNhwcSumOp,
   ::mlir::linalg::QuantizedBatchMatmulOp,
   ::mlir::linalg::QuantizedMatmulOp,
-  ::mlir::linalg::SoftPlus2DOp,
   ::mlir::linalg::VecmatOp
   >(registry);
   // clang-format on
