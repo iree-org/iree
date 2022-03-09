@@ -62,17 +62,17 @@ TEST(FileIO, ReadWriteContents) {
       iree_make_const_byte_span(write_contents.data(), write_contents.size())));
 
   // Read the contents from disk.
-  iree_byte_span_t read_contents;
+  iree_file_contents_t* read_contents = NULL;
   IREE_ASSERT_OK(iree_file_read_contents(path.c_str(), iree_allocator_system(),
                                          &read_contents));
 
   // Expect the contents are equal.
-  EXPECT_EQ(write_contents.size(), read_contents.data_length);
-  EXPECT_EQ(memcmp(write_contents.data(), read_contents.data,
-                   read_contents.data_length),
+  EXPECT_EQ(write_contents.size(), read_contents->const_buffer.data_length);
+  EXPECT_EQ(memcmp(write_contents.data(), read_contents->const_buffer.data,
+                   read_contents->const_buffer.data_length),
             0);
 
-  iree_allocator_free(iree_allocator_system(), read_contents.data);
+  iree_file_contents_free(read_contents);
 }
 
 }  // namespace

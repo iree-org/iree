@@ -10,7 +10,7 @@
 #include "iree/compiler/Utils/TracingUtils.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/Pass/PassManager.h"
-#include "mlir/Translation.h"
+#include "mlir/Tools/mlir-translate/Translation.h"
 
 namespace mlir {
 namespace iree_compiler {

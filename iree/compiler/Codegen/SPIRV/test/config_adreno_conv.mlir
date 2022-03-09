@@ -43,14 +43,14 @@ hal.executable @conv_112x112x512 {
   }
 }
 
-//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering.config<tile_sizes = {{\[}}[0, 1, 8, 256], [0, 1, 8, 4], [0, 0, 0, 0, 1, 1, 4]{{\]}}, native_vector_size = []>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"SPIRVVectorize", workload_per_wg = []>
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[0, 1, 8, 256], [0, 1, 8, 4], [0, 0, 0, 0, 1, 1, 4]{{\]}}>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVVectorize>
 //      CHECK: hal.executable.entry_point public @conv_112x112x512
-// CHECK-SAME:   translation.info = #[[TRANSLATION]]
+// CHECK-SAME:   translation_info = #[[TRANSLATION]]
 // CHECK-SAME:   workgroup_size = [64 : index, 1 : index, 1 : index]
 //      CHECK: func @conv_112x112x512()
 //      CHECK:   linalg.conv_2d_nhwc_hwcf
-// CHECK-SAME:     lowering.config = #[[CONFIG]]
+// CHECK-SAME:     lowering_config = #[[CONFIG]]
 
 // -----
 
@@ -97,14 +97,14 @@ hal.executable @conv_112x112x32 {
   }
 }
 
-//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering.config<tile_sizes = {{\[}}[0, 4, 16, 32], [0, 4, 2, 4], [0, 0, 0, 0, 1, 1, 4]{{\]}}, native_vector_size = []>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"SPIRVVectorize", workload_per_wg = []>
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[0, 4, 16, 32], [0, 4, 2, 4], [0, 0, 0, 0, 1, 1, 4]{{\]}}>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVVectorize>
 //      CHECK: hal.executable.entry_point public @conv_112x112x32
-// CHECK-SAME:   translation.info = #[[TRANSLATION]]
+// CHECK-SAME:   translation_info = #[[TRANSLATION]]
 // CHECK-SAME:   workgroup_size = [8 : index, 8 : index, 1 : index]
 //      CHECK: func @conv_112x112x32()
 //      CHECK:   linalg.conv_2d_nhwc_hwcf
-// CHECK-SAME:     lowering.config = #[[CONFIG]]
+// CHECK-SAME:     lowering_config = #[[CONFIG]]
 
 // -----
 
@@ -150,15 +150,15 @@ hal.executable @conv_16x16x16 {
   }
 }
 
-//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering.config<tile_sizes = {{\[}}[0, 8, 8, 16], [0, 2, 2, 4], [0, 0, 0, 0, 1, 1, 4]{{\]}}, native_vector_size = []>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"SPIRVVectorize", workload_per_wg = []>
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[0, 8, 8, 16], [0, 2, 2, 4], [0, 0, 0, 0, 1, 1, 4]{{\]}}>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVVectorize>
 //      CHECK: hal.executable.entry_point public @conv_16x16x16
-// CHECK-SAME:   translation.info = #[[TRANSLATION]]
+// CHECK-SAME:   translation_info = #[[TRANSLATION]]
 // CHECK-SAME:   workgroup_size = [4 : index, 4 : index, 4 : index]
 
 //      CHECK: func @conv_16x16x16()
 //      CHECK:   linalg.conv_2d_nhwc_hwcf
-// CHECK-SAME:     lowering.config = #[[CONFIG]]
+// CHECK-SAME:     lowering_config = #[[CONFIG]]
 
 // -----
 
@@ -205,14 +205,14 @@ hal.executable @dwconv_28x28x144 {
   }
 }
 
-//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering.config<tile_sizes = {{\[}}[0, 4, 4, 16], [0, 1, 1, 4], [0, 0, 0, 0, 1, 1]{{\]}}, native_vector_size = []>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"SPIRVVectorize", workload_per_wg = []>
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[0, 4, 4, 16], [0, 1, 1, 4], [0, 0, 0, 0, 1, 1]{{\]}}>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVVectorize>
 //      CHECK: hal.executable.entry_point public @dwconv_28x28x144
-// CHECK-SAME:   translation.info = #[[TRANSLATION]]
+// CHECK-SAME:   translation_info = #[[TRANSLATION]]
 // CHECK-SAME:   workgroup_size = [4 : index, 4 : index, 4 : index]
 //      CHECK: func @dwconv_28x28x144()
 //      CHECK:   linalg.depthwise_conv_2d_nhwc_hwc
-// CHECK-SAME:     lowering.config = #[[CONFIG]]
+// CHECK-SAME:     lowering_config = #[[CONFIG]]
 
 // -----
 
@@ -258,11 +258,11 @@ hal.executable @dwconv_4x4x8 {
     }
   }
 }
-//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering.config<tile_sizes = {{\[}}[0, 4, 4, 8], [0, 1, 1, 4], [0, 0, 0, 0, 1, 1]{{\]}}, native_vector_size = []>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"SPIRVVectorize", workload_per_wg = []>
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[0, 4, 4, 8], [0, 1, 1, 4], [0, 0, 0, 0, 1, 1]{{\]}}>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVVectorize>
 //      CHECK: hal.executable.entry_point public @dwconv_4x4x8
-// CHECK-SAME:   translation.info = #[[TRANSLATION]]
+// CHECK-SAME:   translation_info = #[[TRANSLATION]]
 // CHECK-SAME:   workgroup_size = [2 : index, 4 : index, 4 : index]
 //      CHECK: func @dwconv_4x4x8()
 //      CHECK:   linalg.depthwise_conv_2d_nhwc_hwc
-// CHECK-SAME:     lowering.config = #[[CONFIG]]
+// CHECK-SAME:     lowering_config = #[[CONFIG]]

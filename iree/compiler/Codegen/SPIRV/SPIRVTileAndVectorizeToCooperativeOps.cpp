@@ -51,7 +51,7 @@ static SmallVector<int64_t> getTargetCooperativeOpSize(linalg::LinalgOp op) {
 
 /// Deduces required subgroup counts along all workgroup tiled dimensions.
 ///
-/// `op` should be an operation with a `lowering.config` attribute to specify
+/// `op` should be an operation with a `lowering_config` attribute to specify
 /// tiling sizes for the workgroup and subgroup.
 static SmallVector<int64_t> deduceSubgroupCounts(linalg::LinalgOp op) {
   SmallVector<int64_t> workgroupTileSizes = getTileSizes(op, 0);
@@ -293,7 +293,7 @@ class SPIRVTileAndVectorizeToCooperativeOpsPass final
     if (!rootOp) {
       funcOp.emitError(
           "expected a linalg::ContractionOpInterface op with "
-          "lowering.config attribute");
+          "lowering_config attribute");
       return signalPassFailure();
     }
 

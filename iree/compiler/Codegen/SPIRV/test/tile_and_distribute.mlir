@@ -8,8 +8,8 @@
 #map5 = affine_map<(d0, d1, d2) -> (d2, d1)>
 #map6 = affine_map<(d0, d1, d2) -> (d0, d1)>
 
-#config = #iree_codegen.lowering.config<tile_sizes = [[8, 16], [1, 1], [0, 0, 1]], native_vector_size = []>
-#translation = #iree_codegen.translation.info<"SPIRVDistribute", workload_per_wg = [8, 16]>
+#config = #iree_codegen.lowering_config<tile_sizes = [[8, 16], [1, 1], [0, 0, 1]]>
+#translation = #iree_codegen.translation_info<SPIRVDistribute, workload_per_wg = [8, 16]>
 #executable_layout = #hal.executable.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
@@ -21,7 +21,7 @@ hal.executable private @matmul {
   hal.executable.variant @vulkan, target = <"vulkan-spirv", "vulkan-spirv-fb"> {
     hal.executable.entry_point @matmul layout(#executable_layout) {
       workgroup_size = [16: index, 8: index, 1: index],
-      translation.info = #translation
+      translation_info = #translation
     }
     builtin.module {
       func @matmul() {
@@ -54,7 +54,7 @@ hal.executable private @matmul {
           %16 = memref.dim %arg2, %c1 : memref<?x?xf32>
           %17 = affine.min #map1()[%1, %16]
           %18 = memref.subview %arg2[%3, %10] [%15, %17] [1, 1]  : memref<?x?xf32> to memref<?x?xf32, #map3>
-          linalg.matmul {lowering.config = #config}
+          linalg.matmul {lowering_config = #config}
             ins(%7, %13 : memref<?x?xf32, #map3>, memref<?x?xf32, #map3>)
             outs(%18 : memref<?x?xf32, #map3>)
         }
@@ -78,8 +78,8 @@ hal.executable private @matmul {
 
 // -----
 
-#config = #iree_codegen.lowering.config<tile_sizes = [[1, 4, 32], [1, 1, 1]], native_vector_size = []>
-#translation = #iree_codegen.translation.info<"SPIRVDistribute", workload_per_wg = [32, 4, 1]>
+#config = #iree_codegen.lowering_config<tile_sizes = [[1, 4, 32], [1, 1, 1]]>
+#translation = #iree_codegen.translation_info<SPIRVDistribute, workload_per_wg = [32, 4, 1]>
 #executable_layout = #hal.executable.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
@@ -91,7 +91,7 @@ hal.executable private @conv_1d {
   hal.executable.variant @vulkan, target = <"vulkan-spirv", "vulkan-spirv-fb"> {
     hal.executable.entry_point @conv_1d layout(#executable_layout) {
       workgroup_size = [32: index, 4: index, 1: index],
-      translation.info = #translation
+      translation_info = #translation
     }
     builtin.module {
       func @conv_1d() {
@@ -115,7 +115,7 @@ hal.executable private @conv_1d {
         %15 = affine.min affine_map<()[s0] -> (32, s0 * -32 + 1)>()[%3]
         %16 = memref.subview %0[%5, %12, %14] [1, %13, %15] [1, 1, 1] : memref<3x6x1xf32> to memref<1x?x?xf32, affine_map<(d0, d1, d2)[s0] -> (d0 * 6 + s0 + d1 + d2)>>
         %17 = memref.subview %0[%5, %12, %9] [1, %13, %10] [1, 1, 1] : memref<3x6x1xf32> to memref<1x?x?xf32, affine_map<(d0, d1, d2)[s0] -> (d0 * 6 + s0 + d1 + d2)>>
-        linalg.conv_1d_nwc_wcf {lowering.config = #config, dilations = dense<1> : tensor<1xi64>, strides = dense<1> : tensor<1xi64>}
+        linalg.conv_1d_nwc_wcf {lowering_config = #config, dilations = dense<1> : tensor<1xi64>, strides = dense<1> : tensor<1xi64>}
           ins(%8, %11 : memref<1x?x1xf32, affine_map<(d0, d1, d2)[s0] -> (d0 * 8 + s0 + d1 + d2)>>, memref<3x1x?xf32, affine_map<(d0, d1, d2)[s0] -> (d0 + s0 + d1 + d2)>>)
           outs(%16 : memref<1x?x?xf32, affine_map<(d0, d1, d2)[s0] -> (d0 * 6 + s0 + d1 + d2)>>)
         return
@@ -158,8 +158,8 @@ hal.executable private @conv_1d {
 #map6 = affine_map<(d0)[s0] -> (4, -d0 + s0)>
 #map7 = affine_map<(d0)[s0] -> (32, -d0 + s0)>
 
-#config = #iree_codegen.lowering.config<tile_sizes = [[0, 1, 4, 32], [0, 1, 1, 1], [0, 0, 0, 0, 1, 1, 4]], native_vector_size = []>
-#translation = #iree_codegen.translation.info<"SPIRVDistribute", workload_per_wg = [32, 4, 1]>
+#config = #iree_codegen.lowering_config<tile_sizes = [[0, 1, 4, 32], [0, 1, 1, 1], [0, 0, 0, 0, 1, 1, 4]]>
+#translation = #iree_codegen.translation_info<SPIRVDistribute, workload_per_wg = [32, 4, 1]>
 #executable_layout = #hal.executable.layout<push_constants = 9, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
@@ -171,7 +171,7 @@ hal.executable private @conv_2d {
   hal.executable.variant @vulkan, target = <"vulkan-spirv", "vulkan-spirv-fb"> {
     hal.executable.entry_point @conv_2d layout(#executable_layout) {
       workgroup_size = [32: index, 4: index, 1: index],
-      translation.info = #translation
+      translation_info = #translation
     }
     builtin.module {
       func @conv_2d() {
@@ -225,7 +225,7 @@ hal.executable private @conv_2d {
               %27 = memref.subview %arg2[%arg3, %arg4, %arg5, 0] [%23, %24, %25, %26] [1, 1, 1, 1]
                       : memref<?x?x?x?xf32> to memref<?x?x?x?xf32, #map5>
               linalg.conv_2d_nhwc_hwcf {
-                lowering.config = #config,
+                lowering_config = #config,
                 dilations = dense<1> : tensor<2xi64>,
                 strides = dense<2> : tensor<2xi64>}
                  ins(%21, %arg0 : memref<?x?x?x?xf32, #map5>, memref<?x?x?x?xf32>)
@@ -273,8 +273,8 @@ hal.executable private @conv_2d {
 
 // -----
 
-#config = #iree_codegen.lowering.config<tile_sizes = [[0, 0, 1, 4, 32], [0, 0, 1, 1, 1]], native_vector_size = []>
-#translation = #iree_codegen.translation.info<"SPIRVDistribute", workload_per_wg = [32, 4, 1]>
+#config = #iree_codegen.lowering_config<tile_sizes = [[0, 0, 1, 4, 32], [0, 0, 1, 1, 1]]>
+#translation = #iree_codegen.translation_info<SPIRVDistribute, workload_per_wg = [32, 4, 1]>
 #executable_layout = #hal.executable.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
@@ -286,7 +286,7 @@ hal.executable private @conv_3d {
   hal.executable.variant @vulkan, target = <"vulkan-spirv", "vulkan-spirv-fb"> {
     hal.executable.entry_point @conv_3d layout(#executable_layout) {
       workgroup_size = [32: index, 4: index, 1: index],
-      translation.info = #translation
+      translation_info = #translation
     }
     builtin.module {
       func @conv_3d() {
@@ -309,7 +309,7 @@ hal.executable private @conv_3d {
         %14 = affine.min affine_map<()[s0] -> (32, s0 * -32 + 7)>()[%3]
         %15 = memref.subview %0[%5, %11, %13, 0, 0] [1, %12, %14, 7, 2] [1, 1, 1, 1, 1] : memref<2x7x7x7x2xf32> to memref<1x?x?x7x2xf32, affine_map<(d0, d1, d2, d3, d4)[s0] -> (d0 * 686 + s0 + d1 * 98 + d2 * 14 + d3 * 2 + d4)>>
         %16 = memref.subview %0[%5, %11, %13, 0, 0] [1, %12, %14, 7, 2] [1, 1, 1, 1, 1] : memref<2x7x7x7x2xf32> to memref<1x?x?x7x2xf32, affine_map<(d0, d1, d2, d3, d4)[s0] -> (d0 * 686 + s0 + d1 * 98 + d2 * 14 + d3 * 2 + d4)>>
-        linalg.conv_3d_ndhwc_dhwcf {lowering.config = #config, dilations = dense<1> : tensor<3xi64>, strides = dense<1> : tensor<3xi64>}
+        linalg.conv_3d_ndhwc_dhwcf {lowering_config = #config, dilations = dense<1> : tensor<3xi64>, strides = dense<1> : tensor<3xi64>}
           ins(%10, %2 : memref<1x?x?x8x3xf32, affine_map<(d0, d1, d2, d3, d4)[s0] -> (d0 * 1536 + s0 + d1 * 192 + d2 * 24 + d3 * 3 + d4)>>, memref<2x2x2x3x2xf32>)
           outs(%15 : memref<1x?x?x7x2xf32, affine_map<(d0, d1, d2, d3, d4)[s0] -> (d0 * 686 + s0 + d1 * 98 + d2 * 14 + d3 * 2 + d4)>>)
         return
@@ -343,8 +343,8 @@ hal.executable private @conv_3d {
 #map6 = affine_map<()[s0] -> (32, s0 * -32 + 13)>
 #map7 = affine_map<(d0, d1, d2, d3)[s0] -> (d0 * 1092 + s0 + d1 * 78 + d2 * 6 + d3)>
 
-#config = #iree_codegen.lowering.config<tile_sizes = [[1, 4, 32], [1, 1, 1]], native_vector_size = []>
-#translation = #iree_codegen.translation.info<"SPIRVDistribute", workload_per_wg = [32, 4, 1]>
+#config = #iree_codegen.lowering_config<tile_sizes = [[1, 4, 32], [1, 1, 1]]>
+#translation = #iree_codegen.translation_info<SPIRVDistribute, workload_per_wg = [32, 4, 1]>
 #executable_layout = #hal.executable.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
@@ -357,7 +357,7 @@ module  {
     hal.executable.variant @vulkan, target = <"vulkan-spirv", "vulkan-spirv-fb"> {
       hal.executable.entry_point @pooling_nhwc_max layout(#executable_layout) {
         workgroup_size = [32: index, 4: index, 1: index],
-        translation.info = #translation
+        translation_info = #translation
       }
       builtin.module {
         func @pooling_nhwc_max() {
@@ -375,7 +375,7 @@ module  {
           %10 = affine.min #map5()[%4]
           %11 = affine.min #map6()[%3]
           %12 = memref.subview %2[0, %5, %7, 0] [2, %10, %11, 6] [1, 1, 1, 1] : memref<2x14x13x6xf32> to memref<2x?x?x6xf32, #map7>
-          linalg.pooling_nhwc_max {lowering.config = #config, dilations = dense<1> : vector<2xi64>, strides = dense<1> : vector<2xi64>}
+          linalg.pooling_nhwc_max {lowering_config = #config, dilations = dense<1> : vector<2xi64>, strides = dense<1> : vector<2xi64>}
             ins(%9, %1 : memref<2x?x?x6xf32, #map4>, memref<3x4xf32>)
             outs(%12 : memref<2x?x?x6xf32, #map7>)
           return

@@ -21,7 +21,7 @@
 #include "iree/compiler/Utils/TracingUtils.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/Pass/PassManager.h"
-#include "mlir/Translation.h"
+#include "mlir/Tools/mlir-translate/Translation.h"
 
 #ifdef IREE_HAVE_EMITC_DIALECT
 #include "iree/compiler/Dialect/VM/Target/C/CModuleTarget.h"

@@ -1368,7 +1368,6 @@ void AsyncExecuteOp::build(OpBuilder &builder, OperationState &state,
 
 LogicalResult AsyncExecuteOp::verify() {
   AsyncExecuteOp op = *this;
-  if (failed(RegionBranchOpInterface::verifyTypes(op))) return failure();
   if (failed(verifyOpValueSizes(op, op.operands(), op.operand_sizes())) ||
       failed(verifyOpValueSizes(op, op.results(), op.result_sizes()))) {
     return failure();
@@ -1484,7 +1483,6 @@ void AsyncConcurrentOp::build(OpBuilder &builder, OperationState &state,
 
 LogicalResult AsyncConcurrentOp::verify() {
   AsyncConcurrentOp op = *this;
-  if (failed(RegionBranchOpInterface::verifyTypes(op))) return failure();
   if (failed(verifyOpValueSizes(op, op.operands(), op.operand_sizes())) ||
       failed(verifyOpValueSizes(op, op.results(), op.result_sizes()))) {
     return failure();
@@ -1809,7 +1807,6 @@ static LogicalResult verifyCmdOp(Operation *op) {
 
 LogicalResult CmdExecuteOp::verify() {
   CmdExecuteOp op = *this;
-  if (failed(RegionBranchOpInterface::verifyTypes(op))) return failure();
   if (failed(verifyOpValueSizes(op, op.operands(), op.operand_sizes()))) {
     return failure();
   }

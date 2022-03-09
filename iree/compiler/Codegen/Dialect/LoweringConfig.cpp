@@ -15,9 +15,9 @@
 #include "iree/compiler/Codegen/Dialect/LoweringConfig.cpp.inc"
 #include "iree/compiler/Codegen/Dialect/LoweringConfigEnums.cpp.inc"
 
-static const char kConfigAttrName[] = "lowering.config";
-static const char kTranslationInfoAttrName[] = "translation.info";
-static const char kCompilationInfoAttrName[] = "compilation.info";
+static const char kConfigAttrName[] = "lowering_config";
+static const char kTranslationInfoAttrName[] = "translation_info";
+static const char kCompilationInfoAttrName[] = "compilation_info";
 
 namespace mlir {
 namespace iree_compiler {
@@ -69,13 +69,14 @@ namespace IREE {
 namespace Codegen {
 
 //===----------------------------------------------------------------------===//
-// iree_codegen.translation.info
+// iree_codegen.translation_info
 //===----------------------------------------------------------------------===//
 
 TranslationInfoAttr TranslationInfoAttr::get(
     MLIRContext *context, DispatchLoweringPassPipeline passPipeline,
     ArrayRef<int64_t> workloadPerWorkgroup) {
-  auto pipelineAttr = StringAttr::get(context, stringifyEnum(passPipeline));
+  auto pipelineAttr =
+      DispatchLoweringPassPipelineAttr::get(context, passPipeline);
   ArrayAttr workloadPerWorkgroupAttr =
       getI64IntegerArrayAttr(context, workloadPerWorkgroup);
   return get(context, pipelineAttr, workloadPerWorkgroupAttr);
@@ -83,9 +84,7 @@ TranslationInfoAttr TranslationInfoAttr::get(
 
 DispatchLoweringPassPipeline
 TranslationInfoAttr::getDispatchLoweringPassPipeline() {
-  Optional<DispatchLoweringPassPipeline> passPipeline =
-      symbolizeEnum<DispatchLoweringPassPipeline>(getPassPipeline().getValue());
-  return passPipeline.getValue();
+  return getPassPipeline().getValue();
 }
 
 SmallVector<int64_t> TranslationInfoAttr::getWorkloadPerWorkgroupVals() {
@@ -93,30 +92,22 @@ SmallVector<int64_t> TranslationInfoAttr::getWorkloadPerWorkgroupVals() {
 }
 
 LogicalResult TranslationInfoAttr::verify(
-    function_ref<InFlightDiagnostic()> emitError, StringAttr passPipeline,
+    function_ref<InFlightDiagnostic()> emitError,
+    IREE::Codegen::DispatchLoweringPassPipelineAttr passPipeline,
     ArrayAttr workloadPerWorkgroup) {
   if (!passPipeline) {
     return emitError() << "missing pass pipeline specification";
   }
-  auto passPipelineValue =
-      symbolizeEnum<IREE::Codegen::DispatchLoweringPassPipeline>(
-          passPipeline.getValue());
-  if (!passPipelineValue) {
+  auto passPipelineValue = passPipeline.getValue();
+  if (passPipelineValue > IREE::Codegen::DispatchLoweringPassPipeline::None) {
     return emitError() << "invalid pass pipeline value : "
-                       << passPipeline.getValue();
-  }
-  if (!workloadPerWorkgroup) {
-    return emitError() << "expected workload_per_wg to be specified (even if "
-                          "specified as empty)";
-  }
-  if (!checkIntegerArrayAttr(workloadPerWorkgroup)) {
-    return emitError() << "expected workload_per_wg to be an IntegerAttr list";
+                       << stringifyEnum(passPipeline.getValue());
   }
   return success();
 }
 
 //===----------------------------------------------------------------------===//
-// iree_codegen.lowering.config
+// iree_codegen.lowering_config
 //===----------------------------------------------------------------------===//
 
 LoweringConfigAttr LoweringConfigAttr::get(MLIRContext *context,
@@ -169,19 +160,17 @@ LogicalResult LoweringConfigAttr::verify(
     return emitError()
            << "expected all elements of tile_sizes to be a list of integers";
   }
-  if (!nativeVectorSize) {
-    return emitError() << "expected native_vector_size to be specified (even "
-                          "if specified as empty)";
-  }
-  if (!checkIntegerArrayAttr(nativeVectorSize)) {
-    return emitError()
-           << "expected native_vector_size to be a list of integer values";
+  if (nativeVectorSize) {
+    if (!checkIntegerArrayAttr(nativeVectorSize)) {
+      return emitError()
+             << "expected native_vector_size to be a list of integer values";
+    }
   }
   return success();
 }
 
 //===----------------------------------------------------------------------===//
-// iree.compilation.info
+// iree.compilation_info
 //===----------------------------------------------------------------------===//
 
 CompilationInfoAttr CompilationInfoAttr::get(MLIRContext *context,
@@ -229,12 +218,10 @@ LogicalResult CompilationInfoAttr::verify(
           translationInfo.getWorkloadPerWorkgroup()))) {
     return failure();
   }
-  if (!workgroupSize) {
-    return emitError() << "expected workgroup_size to be specified (even if "
-                          "specified empty)";
-  }
-  if (!checkIntegerArrayAttr(workgroupSize)) {
-    return emitError() << "expected workgroup_size to be a list of integers";
+  if (workgroupSize) {
+    if (!checkIntegerArrayAttr(workgroupSize)) {
+      return emitError() << "expected workgroup_size to be a list of integers";
+    }
   }
   return success();
 }
@@ -271,7 +258,7 @@ LogicalResult IREECodegenDialect::printCodegenAttrs(
 }  // namespace IREE
 
 //===----------------------------------------------------------------------===//
-// Helpers for getting/setting iree_codegen.translation.info attribute on the
+// Helpers for getting/setting iree_codegen.translation_info attribute on the
 // `hal.executable.entry_point`
 // ===----------------------------------------------------------------------===//
 
@@ -303,7 +290,7 @@ void setTranslationInfo(IREE::HAL::ExecutableEntryPointOp entryPointOp,
 }
 
 //===----------------------------------------------------------------------===//
-// Helpers for getting/setting `iree_codegen.lowering.config` attribute on root
+// Helpers for getting/setting `iree_codegen.lowering_config` attribute on root
 // operations.
 // ===----------------------------------------------------------------------===//
 
@@ -330,7 +317,7 @@ void setLoweringConfig(Operation *op,
 }
 
 //===----------------------------------------------------------------------===//
-// Helpers for getting/setting `iree_codegen.compilation.info` attribute on root
+// Helpers for getting/setting `iree_codegen.compilation_info` attribute on root
 // operations to override IREEs default compilation.
 // ===----------------------------------------------------------------------===//
 

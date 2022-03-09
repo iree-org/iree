@@ -12,7 +12,7 @@
 #include "iree/compiler/Dialect/Modules/Check/check.imports.h"
 #include "iree/compiler/Dialect/VM/Conversion/ConversionDialectInterface.h"
 #include "mlir/IR/PatternMatch.h"
-#include "mlir/Parser.h"
+#include "mlir/Parser/Parser.h"
 #include "mlir/Transforms/DialectConversion.h"
 
 namespace mlir {

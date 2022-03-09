@@ -25,7 +25,7 @@ iree_cc_library(
     MLIRIR
     MLIRPass
     MLIRSupport
-    MLIRTranslation
+    MLIRTranslateLib
     iree::compiler::Dialect::HAL::Target
     iree::compiler::Dialect::HAL::Transforms
     iree::compiler::Utils
@@ -44,7 +44,7 @@ iree_cc_library(
     MLIRIR
     MLIRPass
     MLIRSupport
-    MLIRTranslation
+    MLIRTranslateLib
     iree::compiler::Bindings::Native::Transforms
     iree::compiler::Bindings::TFLite::Transforms
     iree::compiler::ConstEval

@@ -442,8 +442,7 @@ void DynamicBinaryPromoteOp::getCanonicalizationPatterns(
 static LogicalResult verify(FunctionalIfOp op) {
   if (op.getNumResults() != 0 && op.elseRegion().empty())
     return op.emitOpError("must have an else block if defining values");
-
-  return RegionBranchOpInterface::verifyTypes(op);
+  return success();
 }
 
 static ParseResult parseFunctionalIfOp(OpAsmParser &parser,

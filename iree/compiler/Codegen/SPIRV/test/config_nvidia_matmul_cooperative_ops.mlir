@@ -76,14 +76,14 @@ hal.executable public @matmul_256x1024x128_div_sub {
   }
 }
 
-//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering.config<tile_sizes = {{\[}}[16, 16, 16], [16, 16, 16]{{\]}}, native_vector_size = []>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"SPIRVVectorizeToCooperativeOps", workload_per_wg = []>
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[16, 16, 16], [16, 16, 16]{{\]}}>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVVectorizeToCooperativeOps>
 //      CHECK: hal.executable.entry_point public @matmul_256x1024x128_div_sub
-// CHECK-SAME:   translation.info = #[[TRANSLATION]]
+// CHECK-SAME:   translation_info = #[[TRANSLATION]]
 // CHECK-SAME:   workgroup_size = [32 : index, 1 : index, 1 : index]
 //      CHECK: func @matmul_256x1024x128_div_sub()
 //      CHECK:   linalg.matmul
-// CHECK-SAME:     lowering.config = #[[CONFIG]]
+// CHECK-SAME:     lowering_config = #[[CONFIG]]
 
 // -----
 
@@ -144,6 +144,6 @@ hal.executable public @matmul_256x1024x8 {
   }
 }
 
-//   CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"SPIRVVectorize"
+//   CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVVectorize
 //       CHECK: hal.executable.entry_point public @matmul_256x1024x8
-//  CHECK-SAME:   translation.info = #[[TRANSLATION]]
+//  CHECK-SAME:   translation_info = #[[TRANSLATION]]

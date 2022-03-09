@@ -49,7 +49,7 @@ include(CMakeParseArguments)
 function(iree_cc_binary)
   cmake_parse_arguments(
     _RULE
-    "HOSTONLY;TESTONLY"
+    "EXCLUDE_FROM_ALL;HOSTONLY;TESTONLY"
     "NAME"
     "SRCS;COPTS;DEFINES;LINKOPTS;DATA;DEPS"
     ${ARGN}
@@ -134,8 +134,17 @@ function(iree_cc_binary)
   set_property(TARGET ${_NAME} PROPERTY CXX_STANDARD ${IREE_CXX_STANDARD})
   set_property(TARGET ${_NAME} PROPERTY CXX_STANDARD_REQUIRED ON)
 
-  install(TARGETS ${_NAME}
-          RENAME ${_RULE_NAME}
-          COMPONENT ${_RULE_NAME}
-          RUNTIME DESTINATION bin)
+  if(_RULE_EXCLUDE_FROM_ALL)
+    set_property(TARGET ${_NAME} PROPERTY EXCLUDE_FROM_ALL ON)
+    install(TARGETS ${_NAME}
+            RENAME ${_RULE_NAME}
+            COMPONENT ${_RULE_NAME}
+            RUNTIME DESTINATION bin
+            EXCLUDE_FROM_ALL)
+  else()
+    install(TARGETS ${_NAME}
+      RENAME ${_RULE_NAME}
+      COMPONENT ${_RULE_NAME}
+      RUNTIME DESTINATION bin)
+  endif()
 endfunction()

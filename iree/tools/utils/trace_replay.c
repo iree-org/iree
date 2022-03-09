@@ -126,29 +126,31 @@ static iree_status_t iree_trace_replay_load_bytecode_module(
       document, module_node, iree_make_cstring_view("path"), &path_node));
 
   // Load bytecode file (or stdin) contents into memory.
-  iree_byte_span_t flatbuffer_data;
+  iree_file_contents_t* flatbuffer_contents = NULL;
   iree_status_t status = iree_ok_status();
   if (iree_yaml_string_equal(path_node, iree_make_cstring_view("<stdin>"))) {
-    status = iree_stdin_read_contents(replay->host_allocator, &flatbuffer_data);
+    status =
+        iree_stdin_read_contents(replay->host_allocator, &flatbuffer_contents);
   } else {
     char* full_path = NULL;
     IREE_RETURN_IF_ERROR(iree_file_path_join(
         replay->root_path, iree_yaml_node_as_string(path_node),
         replay->host_allocator, &full_path));
     status = iree_file_read_contents(full_path, replay->host_allocator,
-                                     &flatbuffer_data);
+                                     &flatbuffer_contents);
     iree_allocator_free(replay->host_allocator, full_path);
   }
 
   // Load and verify the bytecode module.
   iree_vm_module_t* module = NULL;
   if (iree_status_is_ok(status)) {
-    status = iree_vm_bytecode_module_create(
-        iree_make_const_byte_span(flatbuffer_data.data,
-                                  flatbuffer_data.data_length),
-        replay->host_allocator, replay->host_allocator, &module);
+    iree_allocator_t flatbuffer_deallocator =
+        iree_file_contents_deallocator(flatbuffer_contents);
+    status = iree_vm_bytecode_module_create(flatbuffer_contents->const_buffer,
+                                            flatbuffer_deallocator,
+                                            replay->host_allocator, &module);
     if (!iree_status_is_ok(status)) {
-      iree_allocator_free(replay->host_allocator, flatbuffer_data.data);
+      iree_file_contents_free(flatbuffer_contents);
     }
   }
 

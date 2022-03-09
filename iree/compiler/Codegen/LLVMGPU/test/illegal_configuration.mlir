@@ -1,7 +1,7 @@
 // RUN: iree-opt -pass-pipeline='hal.executable(hal.executable.variant(iree-llvmgpu-lower-executable-target-pass{test-lowering-configuration=true}))' -verify-diagnostics -split-input-file %s
 
-#config = #iree_codegen.lowering.config<tile_sizes = [], native_vector_size = []>
-#translation = #iree_codegen.translation.info<"LLVMGPUMatmulSimt", workload_per_wg = []>
+#config = #iree_codegen.lowering_config<tile_sizes = []>
+#translation = #iree_codegen.translation_info<LLVMGPUMatmulSimt>
 #executable_layout = #hal.executable.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
@@ -12,7 +12,7 @@
 hal.executable private @matmul_tensors {
   hal.executable.variant @cuda, target = #hal.executable.target<"cuda", "cuda-nvptx-fb"> {
     hal.executable.entry_point @illegal layout(#executable_layout) {
-      translation.info = #translation,
+      translation_info = #translation,
       workgroup_size = [32 : index, 8 : index, 8 : index]
     }
     builtin.module {
@@ -22,7 +22,7 @@ hal.executable private @matmul_tensors {
         %rhs = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<8x16xf32>
         %result = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : memref<4x16xf32>
         // expected-error @+1 {{expected workgroup size to be <=1024 for LLVMGPUMatmulSimt, got 2048}}
-        linalg.matmul {lowering.config = #config} ins(%lhs, %rhs : memref<4x8xf32>, memref<8x16xf32>)
+        linalg.matmul {lowering_config = #config} ins(%lhs, %rhs : memref<4x8xf32>, memref<8x16xf32>)
           outs(%result: memref<4x16xf32>)
         return
       }
@@ -32,8 +32,8 @@ hal.executable private @matmul_tensors {
 
 // -----
 
-#config = #iree_codegen.lowering.config<tile_sizes = [], native_vector_size = []>
-#translation = #iree_codegen.translation.info<"LLVMGPUMatmulSimt", workload_per_wg = []>
+#config = #iree_codegen.lowering_config<tile_sizes = []>
+#translation = #iree_codegen.translation_info<LLVMGPUMatmulSimt>
 #executable_layout = #hal.executable.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
@@ -44,7 +44,7 @@ hal.executable private @matmul_tensors {
 hal.executable private @matmul_tensors {
   hal.executable.variant @cuda, target = #hal.executable.target<"cuda", "cuda-nvptx-fb"> {
     hal.executable.entry_point @illegal layout(#executable_layout) {
-      translation.info = #translation,
+      translation_info = #translation,
       workgroup_size = [32 : index, 8 : index, 2 : index]
     }
     builtin.module {
@@ -54,7 +54,7 @@ hal.executable private @matmul_tensors {
         %rhs = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<8x16xf32>
         %result = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : memref<4x16xf32>
         // expected-error @+1 {{expected workgroup z component to be 1 for LLVMGPUMatmulSimt, got 2}}
-        linalg.matmul {lowering.config = #config} ins(%lhs, %rhs : memref<4x8xf32>, memref<8x16xf32>)
+        linalg.matmul {lowering_config = #config} ins(%lhs, %rhs : memref<4x8xf32>, memref<8x16xf32>)
           outs(%result: memref<4x16xf32>)
         return
       }
@@ -64,8 +64,8 @@ hal.executable private @matmul_tensors {
 
 // -----
 
-#config = #iree_codegen.lowering.config<tile_sizes = [[32, 32, 16]], native_vector_size = []>
-#translation = #iree_codegen.translation.info<"LLVMGPUMatmulTensorCore", workload_per_wg = []>
+#config = #iree_codegen.lowering_config<tile_sizes = [[32, 32, 16]]>
+#translation = #iree_codegen.translation_info<LLVMGPUMatmulTensorCore>
 #executable_layout = #hal.executable.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
@@ -76,7 +76,7 @@ hal.executable private @matmul_tensors {
 hal.executable private @matmul_tensors {
   hal.executable.variant @cuda, target = #hal.executable.target<"cuda", "cuda-nvptx-fb"> {
     hal.executable.entry_point @illegal layout(#executable_layout) {
-      translation.info = #translation,
+      translation_info = #translation,
       workgroup_size = [64 : index, 2 : index, 10 : index]
     }
     builtin.module {
@@ -86,7 +86,7 @@ hal.executable private @matmul_tensors {
         %rhs = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<16x32xf32>
         %result = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : memref<32x32xf32>
         // expected-error @+1 {{expected workgroup size to be <=1024 for LLVMGPUMatmulTensorCore, got 1280}}
-        linalg.matmul {lowering.config = #config} ins(%lhs, %rhs : memref<32x16xf32>, memref<16x32xf32>)
+        linalg.matmul {lowering_config = #config} ins(%lhs, %rhs : memref<32x16xf32>, memref<16x32xf32>)
           outs(%result: memref<32x32xf32>)
         return
       }
@@ -96,8 +96,8 @@ hal.executable private @matmul_tensors {
 
 // -----
 
-#config = #iree_codegen.lowering.config<tile_sizes = [[32, 32, 16]], native_vector_size = []>
-#translation = #iree_codegen.translation.info<"LLVMGPUMatmulTensorCore", workload_per_wg = []>
+#config = #iree_codegen.lowering_config<tile_sizes = [[32, 32, 16]]>
+#translation = #iree_codegen.translation_info<LLVMGPUMatmulTensorCore>
 #executable_layout = #hal.executable.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
@@ -108,7 +108,7 @@ hal.executable private @matmul_tensors {
 hal.executable private @matmul_tensors {
   hal.executable.variant @cuda, target = #hal.executable.target<"cuda", "cuda-nvptx-fb"> {
     hal.executable.entry_point @illegal layout(#executable_layout) {
-      translation.info = #translation,
+      translation_info = #translation,
       workgroup_size = [48 : index, 2 : index, 1 : index]
     }
     builtin.module {
@@ -118,7 +118,7 @@ hal.executable private @matmul_tensors {
         %rhs = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<16x32xf32>
         %result = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : memref<32x32xf32>
         // expected-error @+1 {{workgroup size is not 32 aligned for LLVMGPUMatmulTensorCore, got 48}}
-        linalg.matmul {lowering.config = #config} ins(%lhs, %rhs : memref<32x16xf32>, memref<16x32xf32>)
+        linalg.matmul {lowering_config = #config} ins(%lhs, %rhs : memref<32x16xf32>, memref<16x32xf32>)
           outs(%result: memref<32x32xf32>)
         return
       }
@@ -128,8 +128,8 @@ hal.executable private @matmul_tensors {
 
 // -----
 
-#config = #iree_codegen.lowering.config<tile_sizes = [[32, 32, 16]], native_vector_size = []>
-#translation = #iree_codegen.translation.info<"LLVMGPUMatmulTensorCore", workload_per_wg = []>
+#config = #iree_codegen.lowering_config<tile_sizes = [[32, 32, 16]]>
+#translation = #iree_codegen.translation_info<LLVMGPUMatmulTensorCore>
 #executable_layout = #hal.executable.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
@@ -140,7 +140,7 @@ hal.executable private @matmul_tensors {
 hal.executable private @matmul_tensors {
   hal.executable.variant @cuda, target = #hal.executable.target<"cuda", "cuda-nvptx-fb"> {
     hal.executable.entry_point @illegal layout(#executable_layout) {
-      translation.info = #translation,
+      translation_info = #translation,
       workgroup_size = [64 : index, 2 : index, 2 : index]
     }
     builtin.module {
@@ -150,7 +150,7 @@ hal.executable private @matmul_tensors {
         %rhs = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<16x32xf32>
         %result = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : memref<32x32xf32>
         // expected-error @+1 {{expected workgroup z component to be 1 for LLVMGPUMatmulTensorCore, got 2}}
-        linalg.matmul {lowering.config = #config} ins(%lhs, %rhs : memref<32x16xf32>, memref<16x32xf32>)
+        linalg.matmul {lowering_config = #config} ins(%lhs, %rhs : memref<32x16xf32>, memref<16x32xf32>)
           outs(%result: memref<32x32xf32>)
         return
       }
@@ -160,8 +160,8 @@ hal.executable private @matmul_tensors {
 
 // -----
 
-#config = #iree_codegen.lowering.config<tile_sizes = [[32, 32, 20]], native_vector_size = []>
-#translation = #iree_codegen.translation.info<"LLVMGPUMatmulTensorCore", workload_per_wg = []>
+#config = #iree_codegen.lowering_config<tile_sizes = [[32, 32, 20]]>
+#translation = #iree_codegen.translation_info<LLVMGPUMatmulTensorCore>
 #executable_layout = #hal.executable.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
@@ -172,7 +172,7 @@ hal.executable private @matmul_tensors {
 hal.executable private @matmul_tensors {
   hal.executable.variant @cuda, target = #hal.executable.target<"cuda", "cuda-nvptx-fb"> {
     hal.executable.entry_point @illegal layout(#executable_layout) {
-      translation.info = #translation,
+      translation_info = #translation,
       workgroup_size = [64 : index, 2 : index, 1 : index]
     }
     builtin.module {
@@ -182,7 +182,7 @@ hal.executable private @matmul_tensors {
         %rhs = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<16x32xf32>
         %result = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : memref<32x32xf32>
         // expected-error @+1 {{tensorcore size doesn't factor into second level tile size for LLVMGPUMatmulTensorCore}}
-        linalg.matmul {lowering.config = #config} ins(%lhs, %rhs : memref<32x16xf32>, memref<16x32xf32>)
+        linalg.matmul {lowering_config = #config} ins(%lhs, %rhs : memref<32x16xf32>, memref<16x32xf32>)
           outs(%result: memref<32x32xf32>)
         return
       }
@@ -192,8 +192,8 @@ hal.executable private @matmul_tensors {
 
 // -----
 
-#config = #iree_codegen.lowering.config<tile_sizes = [[32, 32, 16]], native_vector_size = []>
-#translation = #iree_codegen.translation.info<"LLVMGPUMatmulTensorCore", workload_per_wg = []>
+#config = #iree_codegen.lowering_config<tile_sizes = [[32, 32, 16]]>
+#translation = #iree_codegen.translation_info<LLVMGPUMatmulTensorCore>
 #executable_layout = #hal.executable.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
@@ -204,7 +204,7 @@ hal.executable private @matmul_tensors {
 hal.executable private @matmul_tensors {
   hal.executable.variant @cuda, target = #hal.executable.target<"cuda", "cuda-nvptx-fb"> {
     hal.executable.entry_point @illegal layout(#executable_layout) {
-      translation.info = #translation,
+      translation_info = #translation,
       workgroup_size = [64 : index, 2 : index, 1 : index]
     }
     builtin.module {
@@ -214,7 +214,7 @@ hal.executable private @matmul_tensors {
         %rhs = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<16x32xf32>
         %result = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : memref<48x32xf32>
         // expected-error @+1 {{lhsShape doesn't factor into first level tile size for LLVMGPUMatmulTensorCore}}
-        linalg.matmul {lowering.config = #config} ins(%lhs, %rhs : memref<48x16xf32>, memref<16x32xf32>)
+        linalg.matmul {lowering_config = #config} ins(%lhs, %rhs : memref<48x16xf32>, memref<16x32xf32>)
           outs(%result: memref<48x32xf32>)
         return
       }
@@ -224,8 +224,8 @@ hal.executable private @matmul_tensors {
 
 // -----
 
-#config = #iree_codegen.lowering.config<tile_sizes = [[32, 32, 16]], native_vector_size = []>
-#translation = #iree_codegen.translation.info<"LLVMGPUMatmulTensorCore", workload_per_wg = []>
+#config = #iree_codegen.lowering_config<tile_sizes = [[32, 32, 16]]>
+#translation = #iree_codegen.translation_info<LLVMGPUMatmulTensorCore>
 #executable_layout = #hal.executable.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
@@ -236,7 +236,7 @@ hal.executable private @matmul_tensors {
 hal.executable private @matmul_tensors {
   hal.executable.variant @cuda, target = #hal.executable.target<"cuda", "cuda-nvptx-fb"> {
     hal.executable.entry_point @illegal layout(#executable_layout) {
-      translation.info = #translation,
+      translation_info = #translation,
       workgroup_size = [64 : index, 2 : index, 1 : index]
     }
     builtin.module {
@@ -246,7 +246,7 @@ hal.executable private @matmul_tensors {
         %rhs = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<16x48xf32>
         %result = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : memref<32x48xf32>
         // expected-error @+1 {{rhsShape doesn't factor into first level tile size for LLVMGPUMatmulTensorCore}}
-        linalg.matmul {lowering.config = #config} ins(%lhs, %rhs : memref<32x16xf32>, memref<16x48xf32>)
+        linalg.matmul {lowering_config = #config} ins(%lhs, %rhs : memref<32x16xf32>, memref<16x48xf32>)
           outs(%result: memref<32x48xf32>)
         return
       }
@@ -256,8 +256,8 @@ hal.executable private @matmul_tensors {
 
 // -----
 
-#config = #iree_codegen.lowering.config<tile_sizes = [[2, 32, 32, 16]], native_vector_size = []>
-#translation = #iree_codegen.translation.info<"LLVMGPUMatmulTensorCore", workload_per_wg = [32, 8, 1]>
+#config = #iree_codegen.lowering_config<tile_sizes = [[2, 32, 32, 16]]>
+#translation = #iree_codegen.translation_info<LLVMGPUMatmulTensorCore, workload_per_wg = [32, 8, 1]>
 #executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb">
 #executable_layout = #hal.executable.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
@@ -269,7 +269,7 @@ hal.executable private @matmul_tensors {
 hal.executable private @batch_matmul_func  {
   hal.executable.variant @cuda, target = #executable_target_cuda_nvptx_fb {
     hal.executable.entry_point @illegal layout(#executable_layout) {
-      translation.info = #translation,
+      translation_info = #translation,
       workgroup_size = [64 : index, 2 : index, 1 : index]
     }
 builtin.module {
@@ -301,9 +301,9 @@ builtin.module {
           %7 = memref.subview %0[%arg0, %arg1, 0] [1, 8, 1024] [1, 1, 1] : memref<4x32x1024xf32> to memref<1x8x1024xf32, affine_map<(d0, d1, d2)[s0] -> (d0 * 32768 + s0 + d1 * 1024 + d2)>>
           %8 = memref.subview %1[%arg0, 0, %arg2] [1, 1024, 32] [1, 1, 1] : memref<4x1024x64xf32> to memref<1x1024x32xf32, affine_map<(d0, d1, d2)[s0] -> (d0 * 65536 + s0 + d1 * 64 + d2)>>
           %9 = memref.subview %2[%arg0, %arg1, %arg2] [1, 8, 32] [1, 1, 1] : memref<4x32x64xf32> to memref<1x8x32xf32, affine_map<(d0, d1, d2)[s0] -> (d0 * 2048 + s0 + d1 * 64 + d2)>>
-          linalg.fill(%cst, %9) {lowering.config = #config} : f32, memref<1x8x32xf32, affine_map<(d0, d1, d2)[s0] -> (d0 * 2048 + s0 + d1 * 64 + d2)>>
+          linalg.fill(%cst, %9) {lowering_config = #config} : f32, memref<1x8x32xf32, affine_map<(d0, d1, d2)[s0] -> (d0 * 2048 + s0 + d1 * 64 + d2)>>
           // expected-error @+1 {{Received first tile dimension of 2 instead of 0 for LLVMGPUMatmulTensorCore}}
-          linalg.batch_matmul {lowering.config = #config} ins(%7, %8 : memref<1x8x1024xf32, affine_map<(d0, d1, d2)[s0] -> (d0 * 32768 + s0 + d1 * 1024 + d2)>>, memref<1x1024x32xf32, affine_map<(d0, d1, d2)[s0] -> (d0 * 65536 + s0 + d1 * 64 + d2)>>) outs(%9 : memref<1x8x32xf32, affine_map<(d0, d1, d2)[s0] -> (d0 * 2048 + s0 + d1 * 64 + d2)>>)
+          linalg.batch_matmul {lowering_config = #config} ins(%7, %8 : memref<1x8x1024xf32, affine_map<(d0, d1, d2)[s0] -> (d0 * 32768 + s0 + d1 * 1024 + d2)>>, memref<1x1024x32xf32, affine_map<(d0, d1, d2)[s0] -> (d0 * 65536 + s0 + d1 * 64 + d2)>>) outs(%9 : memref<1x8x32xf32, affine_map<(d0, d1, d2)[s0] -> (d0 * 2048 + s0 + d1 * 64 + d2)>>)
         }
       }
     }

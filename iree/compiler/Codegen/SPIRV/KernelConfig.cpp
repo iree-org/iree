@@ -157,7 +157,7 @@ LogicalResult setConvOpConfig(linalg::LinalgOp linalgOp,
   }
 
   auto funcOp = linalgOp->getParentOfType<FuncOp>();
-  return setOpConfigAndEntryPointFnTranslation(funcOp, linalgOp, tileSizes, {},
+  return setOpConfigAndEntryPointFnTranslation(funcOp, linalgOp, tileSizes,
                                                pipeline, workgroupSize);
 }
 
@@ -266,9 +266,8 @@ LogicalResult setMatmulOpConfig(linalg::LinalgOp op,
   tileSizes.push_back(workgroupTileSizes);
   tileSizes.push_back(invocationTileSizes);
   tileSizes.push_back(reductionTileSizes);
-  return setOpConfigAndEntryPointFnTranslation(op->getParentOfType<FuncOp>(),
-                                               op, tileSizes, {}, pipeline,
-                                               workgroupSize);
+  return setOpConfigAndEntryPointFnTranslation(
+      op->getParentOfType<FuncOp>(), op, tileSizes, pipeline, workgroupSize);
 }
 
 }  // namespace detail
@@ -306,9 +305,8 @@ static LogicalResult setFftOpConfig(spirv::ResourceLimitsAttr limits,
     }
   }
   TileSizesListType tileSizes = {workgroupTileSize};
-  return setOpConfigAndEntryPointFnTranslation(op->getParentOfType<FuncOp>(),
-                                               op, tileSizes, {}, pipeline,
-                                               workgroupSize);
+  return setOpConfigAndEntryPointFnTranslation(
+      op->getParentOfType<FuncOp>(), op, tileSizes, pipeline, workgroupSize);
 }
 
 //===----------------------------------------------------------------------===//
@@ -330,7 +328,7 @@ static LogicalResult setDefaultOpConfig(spirv::ResourceLimitsAttr limits,
     auto pipeline =
         IREE::Codegen::DispatchLoweringPassPipeline::SPIRVDistribute;
     std::array<int64_t, 3> workgroupSize = {1, 1, 1};
-    return setOpConfigAndEntryPointFnTranslation(funcOp, op, {}, {}, pipeline,
+    return setOpConfigAndEntryPointFnTranslation(funcOp, op, {}, pipeline,
                                                  workgroupSize);
   }
 
@@ -368,7 +366,7 @@ static LogicalResult setDefaultOpConfig(spirv::ResourceLimitsAttr limits,
     tileSizes.push_back(workgroupTileSizes);
     tileSizes.push_back(threadTileSizes);
 
-    return setOpConfigAndEntryPointFnTranslation(funcOp, op, tileSizes, {},
+    return setOpConfigAndEntryPointFnTranslation(funcOp, op, tileSizes,
                                                  pipeline, workgroupSize);
   }
 
@@ -495,8 +493,8 @@ static LogicalResult setDefaultOpConfig(spirv::ResourceLimitsAttr limits,
   tileSizes.push_back(workgroupTileSizes);
   tileSizes.push_back(threadTileSizes);
 
-  return setOpConfigAndEntryPointFnTranslation(funcOp, op, tileSizes, {},
-                                               pipeline, workgroupSize);
+  return setOpConfigAndEntryPointFnTranslation(funcOp, op, tileSizes, pipeline,
+                                               workgroupSize);
 }
 
 //===----------------------------------------------------------------------===//
@@ -652,7 +650,7 @@ LogicalResult initSPIRVLaunchConfig(ModuleOp module) {
       rootOperation = computeOp;
     }
 
-    // Propogate the `lowering.config` attribute to the other ops.
+    // Propogate the `lowering_config` attribute to the other ops.
     // TODO(ravishankarm, antiagainst): This is a very specific use (and
     // fragile). In general, this should not be needed. Things are already tiled
     // and distributed. The rest of the compilation must be structured to either

@@ -135,14 +135,13 @@ iree_cc_binary(
   NAME
     iree-dump-module
   SRCS
-    "iree-dump-module-main.cc"
+    "iree-dump-module-main.c"
   DEPS
     flatcc::runtime
     iree::base
     iree::base::internal::file_io
     iree::base::internal::flatcc::debugging
     iree::schemas::bytecode_module_def_c_fbs
-    iree::tools::utils::vm_util
 )
 
 iree_cc_binary(
@@ -397,7 +396,7 @@ if(${IREE_BUILD_COMPILER})
       MLIRPass
       MLIRSupport
       MLIRTargetLLVMIRExport
-      MLIRTranslation
+      MLIRTranslateLib
       iree::compiler::Codegen::Codegen
       iree::compiler::Dialect::VM::Target::Bytecode
       iree::compiler::Dialect::VM::Target::init_targets
@@ -439,6 +438,7 @@ if(${IREE_BUILD_COMPILER})
       MLIRLspServerLib
       MLIRSupport
     PUBLIC
+    EXCLUDE_FROM_ALL
   )
 
   iree_cc_binary(

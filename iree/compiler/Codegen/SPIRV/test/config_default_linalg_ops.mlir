@@ -35,12 +35,12 @@ hal.executable @copy_as_generic {
   }
 }
 
-//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering.config<tile_sizes = {{\[}}[1, 16], [1, 1]{{\]}}, native_vector_size = []>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"SPIRVDistribute", workload_per_wg = []>
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 16], [1, 1]{{\]}}>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVDistribute>
 //      CHECK: hal.executable.entry_point public @copy_as_generic
-// CHECK-SAME:   translation.info = #[[TRANSLATION]]
+// CHECK-SAME:   translation_info = #[[TRANSLATION]]
 //      CHECK:   linalg.generic
-// CHECK-SAME:     lowering.config = #[[CONFIG]]
+// CHECK-SAME:     lowering_config = #[[CONFIG]]
 
 // -----
 
@@ -79,12 +79,12 @@ hal.executable @tensor_insert {
   }
 }
 
-//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering.config<tile_sizes = {{\[}}[0, 2, 32, 1], [0, 1, 1, 1]{{\]}}, native_vector_size = []>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"SPIRVDistribute", workload_per_wg = []>
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[0, 2, 32, 1], [0, 1, 1, 1]{{\]}}>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVDistribute>
 //      CHECK: hal.executable.entry_point public @copy
-// CHECK-SAME:   translation.info = #[[TRANSLATION]]
+// CHECK-SAME:   translation_info = #[[TRANSLATION]]
 //      CHECK:   linalg.generic
-// CHECK-SAME:     lowering.config = #[[CONFIG]]
+// CHECK-SAME:     lowering_config = #[[CONFIG]]
 
 // -----
 
@@ -129,12 +129,12 @@ hal.executable @avg_pool {
   }
 }
 
-//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering.config<tile_sizes = {{\[}}[0, 2, 2, 8], [0, 1, 1, 1]{{\]}}, native_vector_size = []>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"SPIRVDistribute", workload_per_wg = []>
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[0, 2, 2, 8], [0, 1, 1, 1]{{\]}}>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVDistribute>
 //      CHECK: hal.executable.entry_point public @avg_pool
-// CHECK-SAME:   translation.info = #[[TRANSLATION]]
+// CHECK-SAME:   translation_info = #[[TRANSLATION]]
 //      CHECK:   linalg.pooling_nhwc_sum
-// CHECK-SAME:     lowering.config = #[[CONFIG]]
+// CHECK-SAME:     lowering_config = #[[CONFIG]]
 
 // -----
 
@@ -180,13 +180,13 @@ hal.executable @max_pool {
   }
 }
 
-//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering.config<tile_sizes = {{\[}}[0, 32], [0, 1]{{\]}}, native_vector_size = []>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"SPIRVDistribute", workload_per_wg = []>
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[0, 32], [0, 1]{{\]}}>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVDistribute>
 //      CHECK: hal.executable.entry_point public @max_pool
-// CHECK-SAME:   translation.info = #[[TRANSLATION]]
+// CHECK-SAME:   translation_info = #[[TRANSLATION]]
 // CHECK-SAME:   workgroup_size = [32 : index, 1 : index, 1 : index]
 //      CHECK:   linalg.pooling_nhwc_max
-// CHECK-SAME:     lowering.config = #[[CONFIG]]
+// CHECK-SAME:     lowering_config = #[[CONFIG]]
 
 // -----
 
@@ -237,9 +237,9 @@ hal.executable @elementwise {
   }
 }
 
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"SPIRVDistribute", workload_per_wg = []>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVDistribute>
 //      CHECK: hal.executable.entry_point public @elementwise
-// CHECK-SAME:   translation.info = #[[TRANSLATION]]
+// CHECK-SAME:   translation_info = #[[TRANSLATION]]
 
 // -----
 
@@ -297,9 +297,9 @@ hal.executable @dwconv_elementwise {
   }
 }
 
-//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering.config<tile_sizes = {{\[}}[0, 4, 2, 0, 4], [0, 1, 1, 0, 1]{{\]}}, native_vector_size = []>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"SPIRVDistribute", workload_per_wg = []>
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[0, 4, 2, 0, 4], [0, 1, 1, 0, 1]{{\]}}>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVDistribute>
 //      CHECK: hal.executable.entry_point public @dwconv_elementwise
-// CHECK-SAME:   translation.info = #[[TRANSLATION]]
+// CHECK-SAME:   translation_info = #[[TRANSLATION]]
 //      CHECK:   linalg.generic
-// CHECK-SAME:     lowering.config = #[[CONFIG]]
+// CHECK-SAME:     lowering_config = #[[CONFIG]]

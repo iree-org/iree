@@ -38,7 +38,7 @@
 #include "mlir/Support/ToolUtilities.h"
 #include "mlir/Target/LLVMIR/Dialect/ArmNeon/ArmNeonToLLVMIRTranslation.h"
 #include "mlir/Target/LLVMIR/Dialect/LLVMIR/LLVMToLLVMIRTranslation.h"
-#include "mlir/Translation.h"
+#include "mlir/Tools/mlir-translate/Translation.h"
 
 int mlir::iree_compiler::runIreeTranslateMain(int argc, char **argv) {
   llvm::InitLLVM y(argc, argv);

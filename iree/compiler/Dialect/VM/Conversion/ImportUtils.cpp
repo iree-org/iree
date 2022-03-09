@@ -13,7 +13,7 @@
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/Matchers.h"
-#include "mlir/Parser.h"
+#include "mlir/Parser/Parser.h"
 
 namespace mlir {
 namespace iree_compiler {

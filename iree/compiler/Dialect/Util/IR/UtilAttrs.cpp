@@ -16,7 +16,7 @@
 #include "mlir/IR/OpImplementation.h"
 #include "mlir/IR/TypeSupport.h"
 #include "mlir/Interfaces/CastInterfaces.h"
-#include "mlir/Parser.h"
+#include "mlir/Parser/Parser.h"
 
 // clang-format off: must be included after all LLVM/MLIR headers.
 #define GET_ATTRDEF_CLASSES

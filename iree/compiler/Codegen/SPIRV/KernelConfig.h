@@ -42,8 +42,8 @@ LogicalResult setMatmulOpConfig(linalg::LinalgOp linalgOp,
 /// Sets CodeGen configuration for GPUs from a specific vendor.
 ///
 /// If the given `rootOp` has known good CodeGen configuration, attaches a
-/// `translation.info` attribute to the entry point containing `rootOp` and a
-/// `lowering.config` attribute to `rootOp`.
+/// `translation_info` attribute to the entry point containing `rootOp` and a
+/// `lowering_config` attribute to `rootOp`.
 ///
 /// Returns success when either no configuration is found or a configuration is
 /// successfullly attached as attribute. Returns failure only when there is an
@@ -58,8 +58,8 @@ LogicalResult setNVIDIACodeGenConfig(const spirv::TargetEnv &targetEnv,
 
 }  // namespace detail
 
-/// Attaches the `translation.info` attribute to entry points in `moduleOp` and
-/// `lowering.config` attributes to all root ops in `moduleOp`'s region.
+/// Attaches the `translation_info` attribute to entry points in `moduleOp` and
+/// `lowering_config` attributes to all root ops in `moduleOp`'s region.
 /// These attributes are used to drive the CodeGen pipeline.
 LogicalResult initSPIRVLaunchConfig(ModuleOp moduleOp);
 

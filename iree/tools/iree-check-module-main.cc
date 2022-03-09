@@ -95,19 +95,21 @@ iree_status_t Run(std::string module_file_path, int* out_exit_code) {
       iree_vm_instance_create(iree_allocator_system(), &instance),
       "creating instance");
 
-  std::string module_data;
+  iree_file_contents_t* flatbuffer_contents = NULL;
   if (module_file_path == "-") {
-    module_data = std::string{std::istreambuf_iterator<char>(std::cin),
-                              std::istreambuf_iterator<char>()};
+    IREE_RETURN_IF_ERROR(iree_stdin_read_contents(iree_allocator_system(),
+                                                  &flatbuffer_contents));
   } else {
-    IREE_RETURN_IF_ERROR(
-        GetFileContents(module_file_path.c_str(), &module_data));
+    IREE_RETURN_IF_ERROR(iree_file_read_contents(module_file_path.c_str(),
+                                                 iree_allocator_system(),
+                                                 &flatbuffer_contents));
   }
 
   iree_vm_module_t* input_module = nullptr;
   IREE_RETURN_IF_ERROR(iree_vm_bytecode_module_create(
-      iree_make_const_byte_span((void*)module_data.data(), module_data.size()),
-      iree_allocator_null(), iree_allocator_system(), &input_module));
+      flatbuffer_contents->const_buffer,
+      iree_file_contents_deallocator(flatbuffer_contents),
+      iree_allocator_system(), &input_module));
 
   iree_hal_device_t* device = nullptr;
   IREE_RETURN_IF_ERROR(CreateDevice(FLAG_driver, &device));

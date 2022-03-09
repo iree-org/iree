@@ -1,7 +1,7 @@
 // RUN: iree-opt -split-input-file -pass-pipeline='hal.executable(hal.executable.variant(builtin.module(builtin.func(iree-llvmgpu-tile-and-distribute))))' %s | FileCheck %s
 
-#config = #iree_codegen.lowering.config<tile_sizes = [[2, 256, 4]], native_vector_size = []>
-#translation = #iree_codegen.translation.info<"LLVMGPUMatmulSimt", workload_per_wg = [256, 2]>
+#config = #iree_codegen.lowering_config<tile_sizes = [[2, 256, 4]]>
+#translation = #iree_codegen.translation_info<LLVMGPUMatmulSimt, workload_per_wg = [256, 2]>
 #executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb">
 #executable_layout = #hal.executable.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
@@ -18,7 +18,7 @@
 hal.executable private @dot_dispatch_0  {
   hal.executable.variant @cuda, target = #executable_target_cuda_nvptx_fb {
     hal.executable.entry_point @dot_dispatch_0 layout(#executable_layout) {
-      translation.info = #translation,
+      translation_info = #translation,
       workgroup_size = [64 : index, 1 : index, 1 : index]
     }
     builtin.module {
@@ -47,9 +47,9 @@ hal.executable private @dot_dispatch_0  {
                 : memref<1024x1024xf32> to memref<1024x256xf32, #map4>
             %11 = memref.subview %2[%arg0, %arg1] [2, 256] [1, 1]
                 : memref<1024x1024xf32> to memref<2x256xf32, #map4>
-            linalg.fill(%cst, %11) {lowering.config = #config}
+            linalg.fill(%cst, %11) {lowering_config = #config}
                 : f32, memref<2x256xf32, #map4>
-            linalg.matmul {lowering.config = #config}
+            linalg.matmul {lowering_config = #config}
                 ins(%8, %10 : memref<2x1024xf32, #map4>, memref<1024x256xf32, #map4>)
                 outs(%11 : memref<2x256xf32, #map4>)
           }
@@ -86,7 +86,7 @@ hal.executable private @dot_dispatch_0  {
 
 // -----
 
-#translation = #iree_codegen.translation.info<"LLVMGPUMatmulSimt", workload_per_wg = [32, 8, 1]>
+#translation = #iree_codegen.translation_info<LLVMGPUMatmulSimt, workload_per_wg = [32, 8, 1]>
 #executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb">
 #executable_layout = #hal.executable.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
@@ -98,7 +98,7 @@ hal.executable private @dot_dispatch_0  {
 hal.executable private @batch_matmul_func  {
   hal.executable.variant @cuda, target = #executable_target_cuda_nvptx_fb {
     hal.executable.entry_point @batch_matmul_func layout(#executable_layout) {
-      translation.info = #translation,
+      translation_info = #translation,
       workgroup_size = [8 : index, 8 : index, 1 : index]
     }
 builtin.module {
@@ -130,8 +130,8 @@ builtin.module {
           %7 = memref.subview %0[%arg0, %arg1, 0] [1, 8, 1024] [1, 1, 1] : memref<4x32x1024xf32> to memref<1x8x1024xf32, affine_map<(d0, d1, d2)[s0] -> (d0 * 32768 + s0 + d1 * 1024 + d2)>>
           %8 = memref.subview %1[%arg0, 0, %arg2] [1, 1024, 32] [1, 1, 1] : memref<4x1024x64xf32> to memref<1x1024x32xf32, affine_map<(d0, d1, d2)[s0] -> (d0 * 65536 + s0 + d1 * 64 + d2)>>
           %9 = memref.subview %2[%arg0, %arg1, %arg2] [1, 8, 32] [1, 1, 1] : memref<4x32x64xf32> to memref<1x8x32xf32, affine_map<(d0, d1, d2)[s0] -> (d0 * 2048 + s0 + d1 * 64 + d2)>> 
-          linalg.fill(%cst, %9) {lowering.config = #iree_codegen.lowering.config<tile_sizes = [[1, 8, 32, 32]], native_vector_size = []>} : f32, memref<1x8x32xf32, affine_map<(d0, d1, d2)[s0] -> (d0 * 2048 + s0 + d1 * 64 + d2)>>  
-          linalg.batch_matmul {lowering.config = #iree_codegen.lowering.config<tile_sizes = [[1, 8, 32, 32]], native_vector_size = []>} ins(%7, %8 : memref<1x8x1024xf32, affine_map<(d0, d1, d2)[s0] -> (d0 * 32768 + s0 + d1 * 1024 + d2)>>, memref<1x1024x32xf32, affine_map<(d0, d1, d2)[s0] -> (d0 * 65536 + s0 + d1 * 64 + d2)>>) outs(%9 : memref<1x8x32xf32, affine_map<(d0, d1, d2)[s0] -> (d0 * 2048 + s0 + d1 * 64 + d2)>>)
+          linalg.fill(%cst, %9) {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[1, 8, 32, 32]]>} : f32, memref<1x8x32xf32, affine_map<(d0, d1, d2)[s0] -> (d0 * 2048 + s0 + d1 * 64 + d2)>>  
+          linalg.batch_matmul {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[1, 8, 32, 32]]>} ins(%7, %8 : memref<1x8x1024xf32, affine_map<(d0, d1, d2)[s0] -> (d0 * 32768 + s0 + d1 * 1024 + d2)>>, memref<1x1024x32xf32, affine_map<(d0, d1, d2)[s0] -> (d0 * 65536 + s0 + d1 * 64 + d2)>>) outs(%9 : memref<1x8x32xf32, affine_map<(d0, d1, d2)[s0] -> (d0 * 2048 + s0 + d1 * 64 + d2)>>)
         }
       }
     }
@@ -160,8 +160,8 @@ builtin.module {
 
 // -----
 
-#config = #iree_codegen.lowering.config<tile_sizes = [[2, 32, 4]], native_vector_size = []>
-#translation = #iree_codegen.translation.info<"LLVMGPUMatmulSimt", workload_per_wg = [32, 2]>
+#config = #iree_codegen.lowering_config<tile_sizes = [[2, 32, 4]]>
+#translation = #iree_codegen.translation_info<LLVMGPUMatmulSimt, workload_per_wg = [32, 2]>
 #executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb">
 #executable_layout = #hal.executable.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
@@ -178,7 +178,7 @@ builtin.module {
 hal.executable private @dot_dispatch_0  {
   hal.executable.variant @cuda, target = #executable_target_cuda_nvptx_fb {
     hal.executable.entry_point @dot_dispatch_0 layout(#executable_layout) {
-      translation.info = #translation,
+      translation_info = #translation,
       workgroup_size = [64 : index, 8 : index, 1 : index]
     }
     builtin.module {
@@ -207,9 +207,9 @@ hal.executable private @dot_dispatch_0  {
                 : memref<1024x1024xf32> to memref<1024x32xf32, #map4>
             %11 = memref.subview %2[%arg0, %arg1] [2, 32] [1, 1]
                 : memref<1024x1024xf32> to memref<2x32xf32, #map4>
-            linalg.fill(%cst, %11) {lowering.config = #config}
+            linalg.fill(%cst, %11) {lowering_config = #config}
                 : f32, memref<2x32xf32, #map4>
-            linalg.matmul {lowering.config = #config}
+            linalg.matmul {lowering_config = #config}
                 ins(%8, %10 : memref<2x1024xf32, #map4>, memref<1024x32xf32, #map4>)
                 outs(%11 : memref<2x32xf32, #map4>)
           }
@@ -249,8 +249,8 @@ hal.executable private @dot_dispatch_0  {
 
 // -----
 
-#config = #iree_codegen.lowering.config<tile_sizes = [[]], native_vector_size = []>
-#translation = #iree_codegen.translation.info<"LLVMGPUVectorize", workload_per_wg = []>
+#config = #iree_codegen.lowering_config<tile_sizes = [[]]>
+#translation = #iree_codegen.translation_info<LLVMGPUVectorize>
 #executable_layout = #hal.executable.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
@@ -261,7 +261,7 @@ hal.executable private @dot_dispatch_0  {
 hal.executable @reduction_dispatch {
   hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
     hal.executable.entry_point @predict_dispatch_153 layout(#executable_layout) {
-      translation.info = #translation,
+      translation_info = #translation,
       workgroup_size = [1: index, 1: index, 1: index]
     }
     builtin.module {
@@ -271,8 +271,8 @@ hal.executable @reduction_dispatch {
         %cst_0 = arith.constant 0xFF800000 : f32
         %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<1000xf32>
         %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<f32>
-        linalg.fill(%cst_0, %1) {lowering.config = #config}  : f32, memref<f32>
-        linalg.generic {indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> ()>], iterator_types = ["reduction"]} ins(%0 : memref<1000xf32>) outs(%1 : memref<f32>) attrs = {lowering.config = #config} {
+        linalg.fill(%cst_0, %1) {lowering_config = #config}  : f32, memref<f32>
+        linalg.generic {indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> ()>], iterator_types = ["reduction"]} ins(%0 : memref<1000xf32>) outs(%1 : memref<f32>) attrs = {lowering_config = #config} {
         ^bb0(%arg0: f32, %arg1: f32):  // no predecessors
           %2 = arith.cmpf ogt, %arg0, %arg1 : f32
           %3 = arith.select %2, %arg0, %arg1 : f32
@@ -286,10 +286,10 @@ hal.executable @reduction_dispatch {
   }
 }
 
-//      CHECK: #[[CONFIG:.+]] = #iree_codegen.lowering.config<tile_sizes = {{\[}}[]{{\]}}, native_vector_size = []>
+//      CHECK: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[]{{\]}}>
 //      CHECK: hal.executable public @reduction_dispatch
 //      CHECK: linalg.fill
-// CHECK-SAME:     lowering.config = #[[CONFIG]]
+// CHECK-SAME:     lowering_config = #[[CONFIG]]
 //      CHECK: linalg.generic
 // CHECK-SAME:     ins(%{{.*}} : memref<1000xf32>) outs(%{{.*}} : memref<f32>)
-// CHECK-SAME:     lowering.config = #[[CONFIG]]
+// CHECK-SAME:     lowering_config = #[[CONFIG]]

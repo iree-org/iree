@@ -78,16 +78,15 @@ IREE_FLAG_CALLBACK(
 namespace iree {
 namespace {
 
-iree_status_t GetModuleContentsFromFlags(std::string* out_contents) {
+iree_status_t GetModuleContentsFromFlags(iree_file_contents_t** out_contents) {
   IREE_TRACE_SCOPE0("GetModuleContentsFromFlags");
   auto module_file = std::string(FLAG_module_file);
   if (module_file == "-") {
-    *out_contents = std::string{std::istreambuf_iterator<char>(std::cin),
-                                std::istreambuf_iterator<char>()};
+    return iree_stdin_read_contents(iree_allocator_system(), out_contents);
   } else {
-    IREE_RETURN_IF_ERROR(GetFileContents(module_file.c_str(), out_contents));
+    return iree_file_read_contents(module_file.c_str(), iree_allocator_system(),
+                                   out_contents);
   }
-  return iree_ok_status();
 }
 
 iree_status_t Run() {
@@ -100,12 +99,13 @@ iree_status_t Run() {
       iree_vm_instance_create(iree_allocator_system(), &instance),
       "creating instance");
 
-  std::string module_data;
-  IREE_RETURN_IF_ERROR(GetModuleContentsFromFlags(&module_data));
+  iree_file_contents_t* flatbuffer_contents = NULL;
+  IREE_RETURN_IF_ERROR(GetModuleContentsFromFlags(&flatbuffer_contents));
   iree_vm_module_t* input_module = nullptr;
   IREE_RETURN_IF_ERROR(iree_vm_bytecode_module_create(
-      iree_make_const_byte_span((void*)module_data.data(), module_data.size()),
-      iree_allocator_null(), iree_allocator_system(), &input_module));
+      flatbuffer_contents->const_buffer,
+      iree_file_contents_deallocator(flatbuffer_contents),
+      iree_allocator_system(), &input_module));
 
   iree_hal_device_t* device = nullptr;
   IREE_RETURN_IF_ERROR(CreateDevice(FLAG_driver, &device));
@@ -139,7 +139,7 @@ iree_status_t Run() {
   }
 
   vm::ref<iree_vm_list_t> inputs;
-  IREE_CHECK_OK(ParseToVariantList(
+  IREE_RETURN_IF_ERROR(ParseToVariantList(
       iree_hal_device_allocator(device),
       iree::span<const std::string>{FLAG_function_inputs.data(),
                                     FLAG_function_inputs.size()},

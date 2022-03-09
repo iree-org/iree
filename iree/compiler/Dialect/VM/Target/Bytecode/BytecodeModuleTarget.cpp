@@ -34,10 +34,10 @@
 #include "mlir/IR/Visitors.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
+#include "mlir/Tools/mlir-translate/Translation.h"
 #include "mlir/Transforms/DialectConversion.h"
 #include "mlir/Transforms/LocationSnapshot.h"
 #include "mlir/Transforms/Passes.h"
-#include "mlir/Translation.h"
 
 namespace mlir {
 namespace iree_compiler {
