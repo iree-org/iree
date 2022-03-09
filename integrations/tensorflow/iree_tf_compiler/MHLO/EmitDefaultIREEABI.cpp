@@ -41,7 +41,8 @@ class EmitDefaultIREEABIPass
     }
 
     json::Array refArgs;
-    for (Type t : funcOp.getArgumentTypes()) {
+    SmallVector<Type> argTypes = flattenTypes(funcOp.getArgumentTypes());
+    for (Type t : argTypes) {
       auto descriptor = mapTypeToJsonTypeRecord(t);
       if (!descriptor) {
         funcOp.emitWarning()
@@ -53,7 +54,8 @@ class EmitDefaultIREEABIPass
     }
 
     json::Array refReturns;
-    for (Type t : funcOp.getCallableResults()) {
+    SmallVector<Type> resultTypes = flattenTypes(funcOp.getCallableResults());
+    for (Type t : resultTypes) {
       auto descriptor = mapTypeToJsonTypeRecord(t);
       if (!descriptor) {
         funcOp.emitWarning()
@@ -74,6 +76,22 @@ class EmitDefaultIREEABIPass
     refOut << refDictValue;
     refOut.flush();
     funcOp->setAttr("iree.abi", builder.getStringAttr(refStr));
+  }
+
+  SmallVector<Type> flattenTypes(ArrayRef<Type> types) {
+    SmallVector<Type> flattened;
+    std::function<void(ArrayRef<Type>)> helper =
+        [&](ArrayRef<Type> types) -> void {
+      for (Type t : types) {
+        if (auto tt = t.dyn_cast<TupleType>()) {
+          helper(tt.getTypes());
+        } else {
+          flattened.push_back(t);
+        }
+      }
+    };
+    helper(types);
+    return flattened;
   }
 
   llvm::Optional<json::Value> mapTypeToJsonTypeRecord(Type type) {
