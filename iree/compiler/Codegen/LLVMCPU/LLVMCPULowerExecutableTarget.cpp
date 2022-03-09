@@ -164,8 +164,6 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
         return signalPassFailure();
       }
 
-      executableLoweringPipeline.addPass(createSetNumWorkgroupsPass());
-      executableLoweringPipeline.addPass(createCanonicalizerPass());
       bool lowerToVectors = !isVMVXBackend(variantOp);
       if (!testLoweringConfiguration) {
         OpPassManager &nestedModulePM =
@@ -182,6 +180,10 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
           case IREE::Codegen::DispatchLoweringPassPipeline::
               CPUDoubleTilingExpert:
             addDoubleTilingExpertPassPipeline(nestedModulePM);
+            break;
+          case IREE::Codegen::DispatchLoweringPassPipeline::
+              CPUConvTileAndDecomposeExpert:
+            addConvTileAndDecomposeExpertPassPipeline(nestedModulePM);
             break;
           case IREE::Codegen::DispatchLoweringPassPipeline::
               CPUTileFuseAndVectorize:

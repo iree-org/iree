@@ -14,6 +14,7 @@
 #include "iree/base/api.h"
 #include "iree/base/internal/atomic_slist.h"
 #include "iree/base/internal/atomics.h"
+#include "iree/base/internal/cpu.h"
 #include "iree/base/internal/synchronization.h"
 #include "iree/task/affinity_set.h"
 
@@ -539,8 +540,9 @@ typedef iree_alignas(iree_max_align_t) struct {
   // Shared statistics counters for the dispatch shard.
   iree_task_dispatch_statistics_t* statistics;
 
-  // TODO(benvanik): cpuid uarch.
-  // TODO(benvanik): per-tile coroutine storage.
+  // Opaque ID of the processor executing the tile.
+  // May be slightly out of date or 0 if the processor could not be queried.
+  iree_cpu_processor_id_t processor_id;
 } iree_task_tile_context_t;
 
 typedef struct iree_task_dispatch_t iree_task_dispatch_t;

@@ -99,53 +99,34 @@ static LogicalResult setContractConfig(FuncOp entryPoint, linalg::LinalgOp op) {
                          llvm::ArrayRef<int64_t> workgroupSize,
                          IREE::Codegen::DispatchLoweringPassPipeline pipeline) {
         TileSizesListType tileSizes;
-        SmallVector<int64_t> ts;
+        unsigned numParallelLoops = op.getNumParallelLoops();
+        SmallVector<int64_t> workgroupTileSizes(numParallelLoops - 2, 1);
+        workgroupTileSizes.append({tileX, tileY});
+        workgroupTileSizes.append(op.getNumReductionLoops(), tileK);
+
         SmallVector<unsigned> partitionedLoops =
             cast<IREE::Flow::PartitionableLoopsInterface>(op.getOperation())
                 .getPartitionableLoops(kNumMaxParallelDims);
-        unsigned index = 0;
-        // Tile all the higher parallel dimension with a size of 1 and the 2
-        // most inner dimension with the tileX/tileY size.
-        for (auto loopNum :
-             llvm::seq<unsigned>(0, op.getNumParallelLoops() - 2)) {
-          int64_t tileSize = 0;
-          if (index < partitionedLoops.size() &&
-              partitionedLoops[index] == loopNum) {
-            tileSize = 1;
-            index++;
+        llvm::SmallDenseSet<unsigned, 4> partitionedLoopsSet;
+        partitionedLoopsSet.insert(partitionedLoops.begin(),
+                                   partitionedLoops.end());
+        for (auto loopID : llvm::seq<unsigned>(0, numParallelLoops)) {
+          if (!partitionedLoopsSet.count(loopID)) {
+            workgroupTileSizes[loopID] = 0;
           }
-          ts.push_back(tileSize);
         }
 
-        // Check for M loop being partitioned.
-        if (index < partitionedLoops.size() &&
-            partitionedLoops[index] == op.getNumParallelLoops() - 2) {
-          index++;
-        } else {
-          // M dim isnt partitioned.
-          tileX = 0;
-        }
-
-        // Check for N loop being partitioned.
-        if (index < partitionedLoops.size() &&
-            partitionedLoops[index] == op.getNumParallelLoops() - 1) {
-          index++;
-        } else {
-          // N dim isnt partitioned.
-          tileY = 0;
-        }
-
-        ts.append({tileX, tileY});
-        // Tile all the reduction dimensions.
-        ts.append(op.getNumReductionLoops(), tileK);
-        tileSizes.push_back(ts);  // Workgroup level.
+        tileSizes.emplace_back(
+            std::move(workgroupTileSizes));  // Workgroup level.
         return setOpConfigAndEntryPointFnTranslation(
             entryPoint, op, tileSizes,
             /*nativeVectorSizes=*/ArrayRef<int64_t>{}, pipeline, workgroupSize);
       };
   // Infer the MxN size of the matmul based on operands and indexing maps.
-  auto lhsShape = getUntiledShape(op.getInputOperand(0)->get());
-  auto rhsShape = getUntiledShape(op.getInputOperand(1)->get());
+  auto lhsShape =
+      op.getInputOperand(0)->get().getType().cast<ShapedType>().getShape();
+  auto rhsShape =
+      op.getInputOperand(1)->get().getType().cast<ShapedType>().getShape();
   int64_t sizeM = ShapedType::kDynamicSize;
   int64_t sizeN = ShapedType::kDynamicSize;
   int64_t sizeK = ShapedType::kDynamicSize;
@@ -332,8 +313,12 @@ static LogicalResult setRootDefaultConfig(FuncOp entryPoint, Operation *op) {
         vectorSize = 1;
         break;
       }
-      SmallVector<int64_t> shape = getUntiledResultShape(
-          cast<linalg::LinalgOp>(op), outputOperand.index());
+      ArrayRef<int64_t> shape = cast<linalg::LinalgOp>(op)
+                                    .getOutputOperand(outputOperand.index())
+                                    ->get()
+                                    .getType()
+                                    .cast<ShapedType>()
+                                    .getShape();
       if (llvm::any_of(shape, ShapedType::isDynamic)) {
         vectorSize = 1;
         break;
@@ -428,29 +413,6 @@ LogicalResult initGPULaunchConfig(ModuleOp moduleOp) {
       return funcOp.emitOpError("failed to get compute ops");
     }
 
-    if (computeOps.empty()) {
-      std::array<int64_t, 3> workgroupSize = {1, 1, 1};
-      SmallVector<int64_t> workloadPerWorkgroup;
-      if (!tiledLoops.empty()) {
-        // If the tiled loops are not empty then this could be a corner case of
-        // tensor.insert_slice being tiled and distributed, that just shows up
-        // as a `flow.dispatch.tensor.load` and a `flow.dispatch.tensor.store`.
-        // For now just treat the tiled loops not being empty as an indicator of
-        // that. Need a better way of information flow from flow dialect to hal.
-        workgroupSize[0] = cudaWarpSize;
-        workloadPerWorkgroup.resize(tiledLoops.size(), 1);
-        workloadPerWorkgroup.front() = cudaWarpSize * 4;
-      }
-      // TODO(ravishankarm): Maybe this should just return without setting
-      // anything. Without any compute ops, this shouldnt be using tile and
-      // distribute.
-      setTranslationInfo(
-          funcOp,
-          IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUDistribute,
-          workloadPerWorkgroup, workgroupSize);
-      continue;
-    }
-
     Operation *rootOperation = nullptr;
     // Find the root operation. linalg.generic and linalg.fill are not root
     // operations if there are other compute operations present.
@@ -478,14 +440,26 @@ LogicalResult initGPULaunchConfig(ModuleOp moduleOp) {
     }
 
     if (!rootOperation) {
-      // TODO(ravishankarm): Maybe this should just return without setting
-      // anything. Without any compute ops, this shouldnt be using tile and
-      // distribute.
-      setTranslationInfo(
-          funcOp,
-          IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUDistribute,
-          /*workloadPerWorkgroup=*/{}, {1, 1, 1});
-      continue;
+      // TODO(ravishankarm): Currently you could have dispatches with a single
+      // tensor.insert_slice or a tensor.extract_slice. Those are handled by
+      // tile + distribute as well since these ops have an external model
+      // implementing the `TiledOpInterface`. This is legacy. These ops shouldnt
+      // implement this interface, and backends must be able to handle a
+      // dispatch with flow.dispatch.tensor.load -> flow.dispatch.tensor.store.
+      // Till this is cleaned up, set a configuration for this.
+      if (computeOps.size() == 1 &&
+          isa<tensor::ExtractSliceOp, tensor::InsertSliceOp>(computeOps[0])) {
+        rootOperation = computeOps[0];
+      }
+    }
+
+    if (!rootOperation) {
+      // setTranslationInfo(
+      //    funcOp,
+      //    IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUDistribute,
+      //    /*workloadPerWorkgroup=*/{}, {1, 1, 1});
+      // continue;
+      return funcOp.emitOpError("unable to find root operation");
     }
     if (failed(setRootConfig(funcOp, rootOperation))) continue;
 

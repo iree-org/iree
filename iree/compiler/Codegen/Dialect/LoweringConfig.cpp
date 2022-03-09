@@ -329,48 +329,6 @@ void setLoweringConfig(Operation *op,
   op->setAttr(kConfigAttrName, config);
 }
 
-LogicalResult setOpConfigAndEntryPointFnTranslation(
-    FuncOp entryPointFn, Operation *op,
-    IREE::Codegen::LoweringConfigAttr config,
-    IREE::Codegen::DispatchLoweringPassPipeline passPipeline,
-    ArrayRef<int64_t> workgroupSize) {
-  auto interfaceOp = cast<IREE::Flow::PartitionableLoopsInterface>(*op);
-  auto partitionedLoops =
-      interfaceOp.getPartitionableLoops(kNumMaxParallelDims);
-  SmallVector<int64_t, 3> workloadPerWorkgroup;
-  auto tileSizes = config.getTileSizeVals(0);
-  if (!tileSizes.empty() && !partitionedLoops.empty()) {
-    for (unsigned depth : partitionedLoops) {
-      if (depth >= tileSizes.size()) {
-        return op->emitOpError(
-                   "illegal configuration for lowering op, expect first level "
-                   "tile size to contain at least ")
-               << partitionedLoops.back() << " elements";
-      }
-      if (tileSizes[depth] == 0) {
-        return op->emitOpError("illegal to set tilesize of loop ")
-               << depth
-               << " to zero since it is set to be partitioned at the flow "
-                  "level";
-      }
-      workloadPerWorkgroup.push_back(tileSizes[depth]);
-    }
-    if (!workloadPerWorkgroup.empty()) {
-      workloadPerWorkgroup =
-          llvm::to_vector<3>(llvm::reverse(workloadPerWorkgroup));
-    }
-  }
-  auto entryPointOp = getEntryPoint(entryPointFn);
-  if (!entryPointOp) {
-    return entryPointFn.emitOpError(
-        "unable to find entry point op for entry point function");
-  }
-  auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
-      entryPointOp->getContext(), passPipeline, workloadPerWorkgroup);
-  setTranslationInfo(entryPointOp, translationInfo, workgroupSize);
-  return success();
-}
-
 //===----------------------------------------------------------------------===//
 // Helpers for getting/setting `iree_codegen.compilation.info` attribute on root
 // operations to override IREEs default compilation.

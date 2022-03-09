@@ -17,7 +17,7 @@
 #map4 = affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>
 hal.executable private @dot_dispatch_0  {
   hal.executable.variant @cuda, target = #executable_target_cuda_nvptx_fb {
-    hal.executable.entry_point @dot_dispatch_0 layout(#executable_layout) attributes {
+    hal.executable.entry_point @dot_dispatch_0 layout(#executable_layout) {
       translation.info = #translation,
       workgroup_size = [64 : index, 1 : index, 1 : index]
     }
@@ -71,9 +71,9 @@ hal.executable private @dot_dispatch_0  {
 //     CHECK-DAG:  %[[BUFFER1:.+]] = memref.alloc() : memref<2x4xf32, 3>
 //         CHECK:  scf.for %[[K:.+]] = %[[C0]] to %[[C1024]] step %[[C4]] {
 //         CHECK:    gpu.barrier
-//         CHECK:    linalg.generic {{.*}} ins(%{{.*}} : memref<2x4xf32, #{{.*}}>) outs(%{{.*}} : memref<2x4xf32, 3>) attrs = {__internal_linalg_transform__ = "copy_to_workgroup_memory"}
+//         CHECK:    memref.copy {{.*}}, {{.*}} {__internal_linalg_transform__ = "copy_to_workgroup_memory"} : memref<2x4xf32, #{{.*}}> to memref<2x4xf32, 3>
 //     CHECK-NOT:    gpu.barrier
-//         CHECK:    linalg.generic {{.*}} ins(%{{.*}} : memref<4x256xf32, #{{.*}}>) outs(%{{.*}} : memref<4x256xf32, 3>) attrs = {__internal_linalg_transform__ = "copy_to_workgroup_memory"}
+//         CHECK:    memref.copy {{.*}}, {{.*}} {__internal_linalg_transform__ = "copy_to_workgroup_memory"} : memref<4x256xf32, #{{.*}}> to memref<4x256xf32, 3>
 //         CHECK:    gpu.barrier
 //         CHECK:    scf.for %[[IND0:.+]] = %{{.*}} to %[[C2]] step %[[C2]] {
 //         CHECK:      scf.for %[[IND1:.+]] = %{{.*}} to %[[C256]] step %[[C256]] {
@@ -97,7 +97,7 @@ hal.executable private @dot_dispatch_0  {
 ]>
 hal.executable private @batch_matmul_func  {
   hal.executable.variant @cuda, target = #executable_target_cuda_nvptx_fb {
-    hal.executable.entry_point @batch_matmul_func layout(#executable_layout) attributes {
+    hal.executable.entry_point @batch_matmul_func layout(#executable_layout) {
       translation.info = #translation,
       workgroup_size = [8 : index, 8 : index, 1 : index]
     }
@@ -177,7 +177,7 @@ builtin.module {
 #map4 = affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>
 hal.executable private @dot_dispatch_0  {
   hal.executable.variant @cuda, target = #executable_target_cuda_nvptx_fb {
-    hal.executable.entry_point @dot_dispatch_0 layout(#executable_layout) attributes {
+    hal.executable.entry_point @dot_dispatch_0 layout(#executable_layout) {
       translation.info = #translation,
       workgroup_size = [64 : index, 8 : index, 1 : index]
     }
@@ -233,9 +233,9 @@ hal.executable private @dot_dispatch_0  {
 //     CHECK-DAG:  %[[BUFFER1:.+]] = memref.alloc() : memref<2x4xf32, 3>
 //         CHECK:  scf.for %[[K:.+]] = %[[C0]] to %[[C1024]] step %[[C4]] {
 //         CHECK:    gpu.barrier
-//         CHECK:    linalg.generic {{.*}} ins(%{{.*}} : memref<2x4xf32, #{{.*}}>) outs(%{{.*}} : memref<2x4xf32, 3>) attrs = {__internal_linalg_transform__ = "copy_to_workgroup_memory"}
+//         CHECK:    memref.copy {{.*}}, {{.*}} {__internal_linalg_transform__ = "copy_to_workgroup_memory"} : memref<2x4xf32, #{{.*}}> to memref<2x4xf32, 3>
 //     CHECK-NOT:    gpu.barrier
-//         CHECK:    linalg.generic {{.*}} ins(%{{.*}} : memref<4x32xf32, #{{.*}}>) outs(%{{.*}} : memref<4x32xf32, 3>) attrs = {__internal_linalg_transform__ = "copy_to_workgroup_memory"}
+//         CHECK:    memref.copy {{.*}}, {{.*}} {__internal_linalg_transform__ = "copy_to_workgroup_memory"} : memref<4x32xf32, #{{.*}}> to memref<4x32xf32, 3>
 //         CHECK:    gpu.barrier
 //         CHECK:    scf.for %[[IND0:.+]] = %{{.*}} to %[[C2]] step %[[C8]] {
 //         CHECK:      scf.for %[[IND1:.+]] = %{{.*}} to %[[C32]] step %[[C64]] {
@@ -260,7 +260,7 @@ hal.executable private @dot_dispatch_0  {
 // Pure reducion case, skip tiling.
 hal.executable @reduction_dispatch {
   hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
-    hal.executable.entry_point @predict_dispatch_153 layout(#executable_layout) attributes {
+    hal.executable.entry_point @predict_dispatch_153 layout(#executable_layout) {
       translation.info = #translation,
       workgroup_size = [1: index, 1: index, 1: index]
     }

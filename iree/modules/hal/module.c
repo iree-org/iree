@@ -1219,19 +1219,19 @@ IREE_VM_ABI_EXPORT(iree_hal_module_executable_create,  //
 
   iree_hal_executable_t* executable = NULL;
   if (iree_status_is_ok(status)) {
-    iree_hal_executable_spec_t spec;
-    iree_hal_executable_spec_initialize(&spec);
-    spec.caching_mode |=
+    iree_hal_executable_params_t executable_params;
+    iree_hal_executable_params_initialize(&executable_params);
+    executable_params.caching_mode |=
         executable_data->access == IREE_VM_BUFFER_ACCESS_ORIGIN_MODULE
             ? IREE_HAL_EXECUTABLE_CACHING_MODE_ALIAS_PROVIDED_DATA
             : 0;
-    spec.executable_format = executable_format_str;
-    spec.executable_data = iree_make_const_byte_span(
+    executable_params.executable_format = executable_format_str;
+    executable_params.executable_data = iree_make_const_byte_span(
         executable_data->data.data, executable_data->data.data_length);
-    spec.executable_layout_count = executable_layout_count;
-    spec.executable_layouts = executable_layouts;
+    executable_params.executable_layout_count = executable_layout_count;
+    executable_params.executable_layouts = executable_layouts;
     status = iree_hal_executable_cache_prepare_executable(
-        state->executable_cache, &spec, &executable);
+        state->executable_cache, &executable_params, &executable);
   }
 
   iree_allocator_free(state->host_allocator, executable_layouts);

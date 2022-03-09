@@ -26,6 +26,7 @@
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/EquivalenceClasses.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/StringSet.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
@@ -38,6 +39,7 @@
 #include "mlir/IR/Value.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
+#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "mlir/Transforms/Passes.h"
 
 namespace mlir {
@@ -49,6 +51,10 @@ class ConvertToDestinationPassingStylePass
           ConvertToDestinationPassingStylePass> {
  public:
   ConvertToDestinationPassingStylePass() = default;
+
+  void getDependentDialects(DialectRegistry &registry) const override {
+    registry.insert<linalg::LinalgDialect>();
+  }
   void runOnOperation() override;
 };
 }  // namespace
@@ -294,19 +300,116 @@ static LogicalResult duplicateInitTensorOps(OpBuilder &b,
                                             linalg::InitTensorOp initTensorOp) {
   OpBuilder::InsertionGuard g(b);
   b.setInsertionPoint(initTensorOp);
-  for (auto &use : llvm::make_range(std::next(initTensorOp->use_begin()),
-                                    initTensorOp->use_end())) {
+  SmallVector<OpOperand *> uses = llvm::to_vector(llvm::map_range(
+      initTensorOp->getUses(), [](OpOperand &use) { return &use; }));
+  for (auto use : llvm::make_range(std::next(uses.begin()), uses.end())) {
     auto newOp =
         cast<linalg::InitTensorOp>(b.clone(*initTensorOp.getOperation()));
-    Operation *user = use.getOwner();
-    user->setOperand(use.getOperandNumber(), newOp);
+    Operation *user = use->getOwner();
+    user->setOperand(use->getOperandNumber(), newOp);
   }
   return success();
 }
 
+static SmallVector<NamedAttribute> PruneAttributeList(linalg::GenericOp op) {
+  auto opAttributes = op.getAttributeNames();
+  llvm::StringSet<> elidedAttrs;
+  elidedAttrs.insert(opAttributes.begin(), opAttributes.end());
+  SmallVector<NamedAttribute> preservedAttrs;
+  for (auto attr : op->getAttrs()) {
+    if (elidedAttrs.count(attr.getName())) continue;
+    preservedAttrs.push_back(attr);
+  }
+  return preservedAttrs;
+}
+
+static bool isFromReadOnlyTensor(Value v) {
+  return TypeSwitch<Operation *, bool>(v.getDefiningOp())
+      .Case<arith::ConstantOp>(
+          [&](arith::ConstantOp constantOp) { return true; })
+      .Case<tensor::CollapseShapeOp, tensor::ExpandShapeOp>(
+          [&](auto op) { return isFromReadOnlyTensor(op.src()); })
+      .Case<tensor::CastOp, tensor::ExtractSliceOp>(
+          [&](auto op) { return isFromReadOnlyTensor(op.source()); })
+      .Case<IREE::Flow::DispatchTensorLoadOp>(
+          [&](IREE::Flow::DispatchTensorLoadOp loadOp) {
+            return loadOp.source()
+                       .getType()
+                       .cast<IREE::Flow::DispatchTensorType>()
+                       .getAccess() == IREE::Flow::TensorAccess::ReadOnly;
+          })
+      .Default([&](Operation *op) { return false; });
+}
+
+namespace {
+/// Adapts Linalg ops input operand to output operand. This is required for not
+/// creating extra alloca ops. For more details, see
+/// https://github.com/google/iree/issues/8303
+struct AdaptLinalgInputOperandToOutputOperand
+    : public OpRewritePattern<linalg::GenericOp> {
+  using OpRewritePattern<linalg::GenericOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(linalg::GenericOp op,
+                                PatternRewriter &rewriter) const override {
+    // All the loops should be parallel loops.
+    if (op.getNumLoops() != op.getNumParallelLoops()) return failure();
+    // There is only one result tensor.
+    if (op->getNumResults() != 1) return failure();
+    // The output tensor is unused in the body computation.
+    auto outputOperand = op.getOutputOperand(0);
+    if (op.payloadUsesValueFromOperand(outputOperand)) return failure();
+
+    // Find an input operand which meets:
+    //   1. It has the same indexing map and type.
+    //   2. It is not from a readonly tensor.
+    OpOperand *operand = nullptr;
+    SmallVector<Value> newOperands;
+    SmallVector<AffineMap> maps;
+    for (auto in : op.getInputOperands()) {
+      if (!operand && !isFromReadOnlyTensor(in->get()) &&
+          op.getTiedIndexingMap(in) == op.getTiedIndexingMap(outputOperand) &&
+          in->get().getType() == outputOperand->get().getType()) {
+        operand = in;
+      } else {
+        newOperands.push_back(in->get());
+        maps.push_back(op.getTiedIndexingMap(in));
+      }
+    }
+    if (!operand) return failure();
+    maps.push_back(op.getTiedIndexingMap(operand));
+
+    Location loc = op.getLoc();
+    SmallVector<StringRef> iterTypes(op.getNumLoops(),
+                                     getParallelIteratorTypeName());
+    auto newOp = rewriter.create<linalg::GenericOp>(
+        loc, op.getResultTypes(), newOperands, operand->get(), maps, iterTypes,
+        /*bodyBuild=*/nullptr, PruneAttributeList(op));
+    rewriter.inlineRegionBefore(op.region(), newOp.region(),
+                                newOp.region().begin());
+
+    // Repair the payload entry block.
+    Block &payload = newOp.region().front();
+    payload.getArgument(operand->getOperandNumber())
+        .replaceAllUsesWith(payload.getArgument(op.getNumInputs()));
+    payload.eraseArgument(operand->getOperandNumber());
+
+    rewriter.replaceOp(op, newOp.getResults());
+    return success();
+  }
+};
+}  // namespace
+
 void ConvertToDestinationPassingStylePass::runOnOperation() {
   FuncOp funcOp = getOperation();
   MLIRContext *context = &getContext();
+
+  {
+    RewritePatternSet patterns(context);
+    patterns.insert<AdaptLinalgInputOperandToOutputOperand>(context);
+    if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
+      return signalPassFailure();
+    }
+  }
 
   OpBuilder b(context);
   SmallVector<linalg::InitTensorOp> initTensorOps;

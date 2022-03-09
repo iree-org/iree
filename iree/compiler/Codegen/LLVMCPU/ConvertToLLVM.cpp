@@ -63,6 +63,81 @@ namespace {
 // versions in the same compiled output.
 class HALDispatchABI {
  public:
+  // Matches the field order in iree_hal_processor_v0_t.
+  enum class ProcessorField {
+    data = 0,
+  };
+
+  // Matches IREE_HAL_PROCESSOR_DATA_CAPACITY_V0.
+  static constexpr int ProcessorDataCapacity = 8;
+
+  // Returns a Type representing iree_hal_processor_v0_t.
+  static LLVM::LLVMStructType getProcessorType(
+      MLIRContext *context, LLVMTypeConverter *typeConverter) {
+    auto structType =
+        LLVM::LLVMStructType::getIdentified(context, "iree_hal_processor_v0_t");
+    if (structType.isInitialized()) return structType;
+
+    auto uint64Type = IntegerType::get(context, 64);
+    SmallVector<Type> fieldTypes;
+
+    // uint64_t data[IREE_HAL_PROCESSOR_DATA_CAPACITY_V0];
+    fieldTypes.push_back(
+        LLVM::LLVMArrayType::get(uint64Type, ProcessorDataCapacity));
+
+    LogicalResult bodySet = structType.setBody(fieldTypes, /*isPacked=*/false);
+    assert(succeeded(bodySet) &&
+           "could not set the body of an identified struct");
+    (void)bodySet;
+
+    return structType;
+  }
+
+  // Matches the field order in iree_hal_executable_environment_v0_t.
+  enum class EnvironmentField {
+    constants = 0,
+    import_thunk = 1,
+    imports = 2,
+    processor = 3,
+  };
+
+  // Returns a Type representing iree_hal_executable_environment_v0_t.
+  static LLVM::LLVMStructType getEnvironmentType(
+      MLIRContext *context, LLVMTypeConverter *typeConverter,
+      LLVM::LLVMStructType processorType) {
+    auto structType = LLVM::LLVMStructType::getIdentified(
+        context, "iree_hal_executable_environment_v0_t");
+    if (structType.isInitialized()) return structType;
+
+    auto int8Type = IntegerType::get(context, 8);
+    auto uint32Type = IntegerType::get(context, 32);
+    auto int8PtrType = LLVM::LLVMPointerType::get(int8Type);
+    auto uint32PtrType = LLVM::LLVMPointerType::get(uint32Type);
+    SmallVector<Type, 4> fieldTypes;
+
+    // const uint32_t* constants;
+    fieldTypes.push_back(uint32PtrType);
+
+    // iree_hal_executable_import_thunk_v0_t import_thunk;
+    // const iree_hal_executable_import_v0_t* imports;
+    auto importType = LLVM::LLVMFunctionType::get(uint32Type, int8PtrType);
+    auto importPtrType = LLVM::LLVMPointerType::get(importType);
+    auto importThunkType =
+        LLVM::LLVMFunctionType::get(uint32Type, {importPtrType, int8PtrType});
+    fieldTypes.push_back(LLVM::LLVMPointerType::get(importThunkType));
+    fieldTypes.push_back(LLVM::LLVMPointerType::get(importPtrType));
+
+    // iree_hal_processor_v0_t processor;
+    fieldTypes.push_back(processorType);
+
+    LogicalResult bodySet = structType.setBody(fieldTypes, /*isPacked=*/false);
+    assert(succeeded(bodySet) &&
+           "could not set the body of an identified struct");
+    (void)bodySet;
+
+    return structType;
+  }
+
   // Returns a Type representing iree_hal_vec3_t.
   static Type getVec3Type(MLIRContext *context) {
     auto uint32Type = IntegerType::get(context, 32);
@@ -70,7 +145,7 @@ class HALDispatchABI {
   }
 
   // Matches the field order in iree_hal_executable_dispatch_state_v0_t.
-  enum class Field {
+  enum class StateField {
     workgroup_count = 0,
     workgroup_size = 1,
     push_constant_count = 2,
@@ -78,13 +153,14 @@ class HALDispatchABI {
     binding_count = 4,
     binding_ptrs = 5,
     binding_lengths = 6,
-    import_thunk = 7,
-    imports = 8,
+    processor_id = 7,
+    environment = 8,
   };
 
   // Returns a Type representing iree_hal_executable_dispatch_state_v0_t.
   static LLVM::LLVMStructType getDispatchStateType(
-      MLIRContext *context, LLVMTypeConverter *typeConverter) {
+      MLIRContext *context, LLVMTypeConverter *typeConverter,
+      LLVM::LLVMStructType environmentType) {
     auto structType = LLVM::LLVMStructType::getIdentified(
         context, "iree_hal_executable_dispatch_state_v0_t");
     if (structType.isInitialized()) return structType;
@@ -114,14 +190,11 @@ class HALDispatchABI {
     fieldTypes.push_back(LLVM::LLVMPointerType::get(int8PtrType));
     fieldTypes.push_back(LLVM::LLVMPointerType::get(indexType));
 
-    // iree_hal_executable_import_thunk_v0_t import_thunk;
-    // const iree_hal_executable_import_v0_t* imports;
-    auto importType = LLVM::LLVMFunctionType::get(uint32Type, int8PtrType);
-    auto importPtrType = LLVM::LLVMPointerType::get(importType);
-    auto importThunkType =
-        LLVM::LLVMFunctionType::get(uint32Type, {importPtrType, int8PtrType});
-    fieldTypes.push_back(LLVM::LLVMPointerType::get(importThunkType));
-    fieldTypes.push_back(LLVM::LLVMPointerType::get(importPtrType));
+    // uint32_t processor_id;
+    fieldTypes.push_back(uint32Type);
+
+    // const iree_hal_executable_environment_v0_t* environment;
+    fieldTypes.push_back(LLVM::LLVMPointerType::get(environmentType));
 
     LogicalResult bodySet = structType.setBody(fieldTypes, /*isPacked=*/false);
     assert(succeeded(bodySet) &&
@@ -136,11 +209,14 @@ class HALDispatchABI {
   // `iree/hal/local/executable_library.h`.
   static SmallVector<Type, 5> getInputTypes(MLIRContext *context,
                                             LLVMTypeConverter *typeConverter) {
+    auto dispatchStateType = LLVM::LLVMStructType::getIdentified(
+        context, "iree_hal_executable_dispatch_state_v0_t");
+    assert(dispatchStateType &&
+           "dispatch state type must be defined by ConvertToLLVM");
     return SmallVector<Type, 5>{
         // const iree_hal_executable_dispatch_state_v0_t* IREE_RESTRICT
         //   dispatch_state
-        LLVM::LLVMPointerType::get(
-            getDispatchStateType(context, typeConverter)),
+        LLVM::LLVMPointerType::get(dispatchStateType),
         // const iree_hal_vec3_t* IREE_RESTRICT workgroup_id
         LLVM::LLVMPointerType::get(getVec3Type(context)),
         // void* IREE_RESTRICT local_memory
@@ -152,8 +228,11 @@ class HALDispatchABI {
                           LLVMTypeConverter *typeConverter)
       : funcOp(funcOp),
         typeConverter(typeConverter),
-        dispatchStateType(
-            getDispatchStateType(funcOp.getContext(), typeConverter)) {}
+        processorType(getProcessorType(funcOp.getContext(), typeConverter)),
+        environmentType(getEnvironmentType(funcOp.getContext(), typeConverter,
+                                           processorType)),
+        dispatchStateType(getDispatchStateType(
+            funcOp.getContext(), typeConverter, environmentType)) {}
 
   LLVM::LLVMFuncOp getFuncOp() { return funcOp; }
 
@@ -173,7 +252,7 @@ class HALDispatchABI {
   Value loadWorkgroupCount(Location loc, int32_t dim, Type resultType,
                            OpBuilder &builder) {
     auto workgroupCountValue =
-        loadFieldValue(loc, Field::workgroup_count, builder);
+        loadFieldValue(loc, StateField::workgroup_count, builder);
     auto dimValue = builder.createOrFold<LLVM::ExtractValueOp>(
         loc, builder.getIntegerType(32), workgroupCountValue,
         builder.getI64ArrayAttr(dim));
@@ -184,7 +263,7 @@ class HALDispatchABI {
   Value loadWorkgroupSize(Location loc, int32_t dim, Type resultType,
                           OpBuilder &builder) {
     auto workgroupSizeValue =
-        loadFieldValue(loc, Field::workgroup_size, builder);
+        loadFieldValue(loc, StateField::workgroup_size, builder);
     auto dimValue = builder.createOrFold<LLVM::ExtractValueOp>(
         loc, builder.getIntegerType(32), workgroupSizeValue,
         builder.getI64ArrayAttr(dim));
@@ -199,7 +278,7 @@ class HALDispatchABI {
 
   // Returns the total push constant count as an index-converted type.
   Value loadPushConstantCount(Location loc, OpBuilder &builder) {
-    auto value = loadFieldValue(loc, Field::push_constant_count, builder);
+    auto value = loadFieldValue(loc, StateField::push_constant_count, builder);
     return castValueToType(loc, value,
                            typeConverter->convertType(builder.getIndexType()),
                            builder);
@@ -209,7 +288,7 @@ class HALDispatchABI {
   Value loadPushConstant(Location loc, int64_t offset, Type resultType,
                          OpBuilder &builder) {
     auto constantsPtrValue =
-        loadFieldValue(loc, Field::push_constants, builder);
+        loadFieldValue(loc, StateField::push_constants, builder);
     auto offsetValue = getIndexValue(loc, offset, builder);
     Value constantPtrValue = builder.create<LLVM::GEPOp>(
         loc, constantsPtrValue.getType(), constantsPtrValue, offsetValue);
@@ -219,7 +298,7 @@ class HALDispatchABI {
 
   // Returns the total binding count as an index-converted type.
   Value loadBindingCount(Location loc, OpBuilder &builder) {
-    auto value = loadFieldValue(loc, Field::binding_count, builder);
+    auto value = loadFieldValue(loc, StateField::binding_count, builder);
     return castValueToType(loc, value,
                            typeConverter->convertType(builder.getIndexType()),
                            builder);
@@ -229,7 +308,7 @@ class HALDispatchABI {
   // Equivalent to:
   //   int8_t** base_ptr = &state->binding_ptrs[ordinal];
   Value loadBindingPtr(Location loc, int64_t ordinal, OpBuilder &builder) {
-    auto ptrsPtrValue = loadFieldValue(loc, Field::binding_ptrs, builder);
+    auto ptrsPtrValue = loadFieldValue(loc, StateField::binding_ptrs, builder);
     auto ordinalValue = getIndexValue(loc, ordinal, builder);
     auto elementPtrValue = builder.createOrFold<LLVM::GEPOp>(
         loc, ptrsPtrValue.getType(), ptrsPtrValue, ordinalValue);
@@ -238,7 +317,8 @@ class HALDispatchABI {
 
   // Loads the byte length of the binding |ordinal| as an index-converted type.
   Value loadBindingLength(Location loc, int64_t ordinal, OpBuilder &builder) {
-    auto lengthsPtrValue = loadFieldValue(loc, Field::binding_lengths, builder);
+    auto lengthsPtrValue =
+        loadFieldValue(loc, StateField::binding_lengths, builder);
     auto ordinalValue = getIndexValue(loc, ordinal, builder);
     auto elementPtrValue = builder.createOrFold<LLVM::GEPOp>(
         loc, lengthsPtrValue.getType(), lengthsPtrValue, ordinalValue);
@@ -313,11 +393,43 @@ class HALDispatchABI {
     }
   }
 
+  // Loads the processor ID the code is (most likely) being run on.
+  // Equivalent to:
+  //   uint32_t processor_id = state->processor_id;
+  Value loadProcessorID(Location loc, OpBuilder &builder) {
+    return loadFieldValue(loc, StateField::processor_id, builder);
+  }
+
+  // Loads a processor information data field at the given index.
+  // May be 0 if the field is not available.
+  Value loadProcessorData(Location loc, int64_t index, OpBuilder &builder) {
+    // Load the value; it should always be in bounds.
+    Value dataArrayValue = loadFieldValue(loc, ProcessorField::data, builder);
+    Type elementType =
+        dataArrayValue.getType().cast<LLVM::LLVMArrayType>().getElementType();
+    Value dataValue = builder.create<LLVM::ExtractValueOp>(
+        loc, elementType, dataArrayValue, builder.getI64ArrayAttr(index));
+    return dataValue;
+  }
+
+  // Loads an executable constant at |index| and casts it to |resultType|.
+  Value loadExecutableConstant(Location loc, int64_t index, Type resultType,
+                               OpBuilder &builder) {
+    auto constantsPtrValue =
+        loadFieldValue(loc, EnvironmentField::constants, builder);
+    auto indexValue = getIndexValue(loc, index, builder);
+    Value constantPtrValue = builder.create<LLVM::GEPOp>(
+        loc, constantsPtrValue.getType(), constantsPtrValue, indexValue);
+    Value constantValue = builder.create<LLVM::LoadOp>(loc, constantPtrValue);
+    return castValueToType(loc, constantValue, resultType, builder);
+  }
+
   // Loads the import function pointer of the import |ordinal|.
   // Equivalent to:
   //   iree_hal_executable_import_v0_t func_ptr = state->imports[ordinal];
   Value loadImportFuncPtr(Location loc, int64_t ordinal, OpBuilder &builder) {
-    auto importsPtrValue = loadFieldValue(loc, Field::imports, builder);
+    auto importsPtrValue =
+        loadFieldValue(loc, EnvironmentField::imports, builder);
     auto ordinalValue = getIndexValue(loc, ordinal, builder);
     auto elementPtrValue = builder.createOrFold<LLVM::GEPOp>(
         loc, importsPtrValue.getType(), importsPtrValue, ordinalValue);
@@ -343,7 +455,8 @@ class HALDispatchABI {
   // Returns 0 on success and non-zero otherwise.
   Value callImport(Location loc, unsigned importOrdinal, Value params,
                    OpBuilder &builder) {
-    auto thunkPtrValue = loadFieldValue(loc, Field::import_thunk, builder);
+    auto thunkPtrValue =
+        loadFieldValue(loc, EnvironmentField::import_thunk, builder);
     auto importPtrValue = loadImportFuncPtr(loc, importOrdinal, builder);
     auto callOp =
         builder.create<LLVM::CallOp>(loc, TypeRange{builder.getI32Type()},
@@ -356,12 +469,31 @@ class HALDispatchABI {
   }
 
  private:
-  Value loadFieldValue(Location loc, Field field, OpBuilder &builder) {
-    auto statePtrValue = funcOp.getArgument(0);
-    auto stateValue = builder.createOrFold<LLVM::LoadOp>(loc, statePtrValue);
-    auto fieldType = dispatchStateType.getBody()[(int)field];
+  Value loadFieldValue(Location loc, StateField field, OpBuilder &builder) {
+    Value statePtrValue = funcOp.getArgument(0);
+    Value stateValue = builder.createOrFold<LLVM::LoadOp>(loc, statePtrValue);
+    Type fieldType = dispatchStateType.getBody()[(int)field];
     return builder.createOrFold<LLVM::ExtractValueOp>(
         loc, fieldType, stateValue, builder.getI64ArrayAttr((int)field));
+  }
+
+  Value loadFieldValue(Location loc, EnvironmentField field,
+                       OpBuilder &builder) {
+    Value environmentPtrValue =
+        loadFieldValue(loc, StateField::environment, builder);
+    Value environmentValue =
+        builder.create<LLVM::LoadOp>(loc, environmentPtrValue);
+    Type fieldType = environmentType.getBody()[(int)field];
+    return builder.createOrFold<LLVM::ExtractValueOp>(
+        loc, fieldType, environmentValue, builder.getI64ArrayAttr((int)field));
+  }
+
+  Value loadFieldValue(Location loc, ProcessorField field, OpBuilder &builder) {
+    Value processorValue =
+        loadFieldValue(loc, EnvironmentField::processor, builder);
+    Type fieldType = processorType.getBody()[(int)field];
+    return builder.createOrFold<LLVM::ExtractValueOp>(
+        loc, fieldType, processorValue, builder.getI64ArrayAttr((int)field));
   }
 
   Value getIndexValue(Location loc, int64_t value, OpBuilder &builder) {
@@ -379,6 +511,8 @@ class HALDispatchABI {
 
   LLVM::LLVMFuncOp funcOp;
   LLVMTypeConverter *typeConverter;
+  LLVM::LLVMStructType processorType;
+  LLVM::LLVMStructType environmentType;
   LLVM::LLVMStructType dispatchStateType;
 };
 

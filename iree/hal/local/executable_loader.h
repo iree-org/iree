@@ -107,12 +107,12 @@ bool iree_hal_query_any_executable_loader_support(
     iree_hal_executable_caching_mode_t caching_mode,
     iree_string_view_t executable_format);
 
-// Tries loading the |executable_data| provided in the given
-// |executable_format|. May fail even if the executable is valid if it requires
-// features not supported by the current host or runtime (such as available
-// architectures, imports, etc).
+// Tries loading the executable data provided in the given format.
+// May fail even if the executable is valid if it requires features not
+// supported by the current host or runtime (such as available architectures,
+// imports, etc).
 //
-// Depending on loader ability the |caching_mode| is used to enable certain
+// Depending on loader ability the caching_mode is used to enable certain
 // features such as instrumented profiling. Not all formats support these
 // features and cooperation of both the compiler producing the executables and
 // the runtime loader and system are required.
@@ -121,7 +121,7 @@ bool iree_hal_query_any_executable_loader_support(
 // given format.
 iree_status_t iree_hal_executable_loader_try_load(
     iree_hal_executable_loader_t* executable_loader,
-    const iree_hal_executable_spec_t* executable_spec,
+    const iree_hal_executable_params_t* executable_params,
     iree_hal_executable_t** out_executable);
 
 //===----------------------------------------------------------------------===//
@@ -138,7 +138,7 @@ typedef struct iree_hal_executable_loader_vtable_t {
 
   iree_status_t(IREE_API_PTR* try_load)(
       iree_hal_executable_loader_t* executable_loader,
-      const iree_hal_executable_spec_t* executable_spec,
+      const iree_hal_executable_params_t* executable_params,
       iree_hal_executable_t** out_executable);
 } iree_hal_executable_loader_vtable_t;
 

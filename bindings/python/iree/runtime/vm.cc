@@ -115,11 +115,14 @@ void VmContext::RegisterModules(std::vector<VmModule*> modules) {
 
 void VmContext::Invoke(iree_vm_function_t f, VmVariantList& inputs,
                        VmVariantList& outputs) {
-  py::gil_scoped_release release;
-  CheckApiStatus(iree_vm_invoke(raw_ptr(), f, IREE_VM_INVOCATION_FLAG_NONE,
-                                nullptr, inputs.raw_ptr(), outputs.raw_ptr(),
-                                iree_allocator_system()),
-                 "Error invoking function");
+  iree_status_t status;
+  {
+    py::gil_scoped_release release;
+    status = iree_vm_invoke(raw_ptr(), f, IREE_VM_INVOCATION_FLAG_NONE, nullptr,
+                            inputs.raw_ptr(), outputs.raw_ptr(),
+                            iree_allocator_system());
+  }
+  CheckApiStatus(status, "Error invoking function");
 }
 
 //------------------------------------------------------------------------------

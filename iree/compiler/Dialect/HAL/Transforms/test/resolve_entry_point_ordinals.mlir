@@ -7,7 +7,7 @@ hal.executable @exe {
         #hal.descriptor_set.binding<0, storage_buffer>,
         #hal.descriptor_set.binding<1, storage_buffer>
       ]>
-    ]>) attributes {
+    ]>) {
       workgroup_size = [32 : index, 1 : index, 1 : index]
     }
   }
@@ -62,7 +62,7 @@ hal.executable @exe {
         #hal.descriptor_set.binding<0, storage_buffer>,
         #hal.descriptor_set.binding<1, storage_buffer>
       ]>
-    ]>) attributes {
+    ]>) {
       workgroup_size = [32 : index, 1 : index, 1 : index]
     }
   }

@@ -7,6 +7,7 @@
 #include "iree/hal/local/local_executable.h"
 
 #include "iree/base/tracing.h"
+#include "iree/hal/local/executable_environment.h"
 
 void iree_hal_local_executable_initialize(
     const iree_hal_local_executable_vtable_t* vtable,
@@ -29,9 +30,9 @@ void iree_hal_local_executable_initialize(
   // Function attributes are optional and populated by the parent type.
   out_base_executable->dispatch_attrs = NULL;
 
-  // Imports will be provided by the parent type, if needed.
-  out_base_executable->import_thunk = NULL;
-  out_base_executable->imports = NULL;
+  // Default environment with no imports assigned.
+  iree_hal_executable_environment_initialize(host_allocator,
+                                             &out_base_executable->environment);
 }
 
 void iree_hal_local_executable_deinitialize(

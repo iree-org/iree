@@ -147,7 +147,8 @@ static iree_status_t iree_hal_system_executable_query_library(
 
   // Query for a compatible version of the library.
   executable->library.header =
-      query_fn(IREE_HAL_EXECUTABLE_LIBRARY_LATEST_VERSION, /*reserved=*/NULL);
+      query_fn(IREE_HAL_EXECUTABLE_LIBRARY_LATEST_VERSION,
+               &executable->base.environment);
   if (!executable->library.header) {
     return iree_make_status(
         IREE_STATUS_FAILED_PRECONDITION,
@@ -209,14 +210,16 @@ static iree_status_t iree_hal_system_executable_resolve_imports(
   IREE_TRACE_ZONE_BEGIN(z0);
 
   // Pass all imports right through.
-  executable->base.import_thunk = iree_hal_system_executable_import_thunk_v0;
+  executable->base.environment.import_thunk =
+      iree_hal_system_executable_import_thunk_v0;
 
   // Allocate storage for the imports.
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_allocator_malloc(
-              executable->base.host_allocator,
-              import_table->count * sizeof(*executable->base.imports),
-              (void**)&executable->base.imports));
+      z0,
+      iree_allocator_malloc(
+          executable->base.host_allocator,
+          import_table->count * sizeof(*executable->base.environment.imports),
+          (void**)&executable->base.environment.imports));
 
   // Try to resolve each import.
   // NOTE: imports are sorted alphabetically and if we cared we could use this
@@ -227,7 +230,7 @@ static iree_status_t iree_hal_system_executable_resolve_imports(
         z0,
         iree_hal_executable_import_provider_resolve(
             import_provider, iree_make_cstring_view(import_table->symbols[i]),
-            (void**)&executable->base.imports[i]));
+            (void**)&executable->base.environment.imports[i]));
   }
 
   IREE_TRACE_ZONE_END(z0);
@@ -301,6 +304,11 @@ static void iree_hal_system_executable_destroy(
   IREE_TRACE_ZONE_BEGIN(z0);
 
   iree_dynamic_library_release(executable->handle);
+
+  if (executable->base.environment.imports != NULL) {
+    iree_allocator_free(host_allocator,
+                        (void*)executable->base.environment.imports);
+  }
 
   iree_hal_local_executable_deinitialize(
       (iree_hal_local_executable_t*)base_executable);
@@ -430,7 +438,7 @@ static bool iree_hal_system_library_loader_query_support(
 
 static iree_status_t iree_hal_system_library_loader_try_load(
     iree_hal_executable_loader_t* base_executable_loader,
-    const iree_hal_executable_spec_t* executable_spec,
+    const iree_hal_executable_params_t* executable_params,
     iree_hal_executable_t** out_executable) {
   iree_hal_system_library_loader_t* executable_loader =
       (iree_hal_system_library_loader_t*)base_executable_loader;
@@ -439,9 +447,9 @@ static iree_status_t iree_hal_system_library_loader_try_load(
   // Perform the load (and requisite disgusting hackery).
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0, iree_hal_system_executable_create(
-              executable_spec->executable_data,
-              executable_spec->executable_layout_count,
-              executable_spec->executable_layouts,
+              executable_params->executable_data,
+              executable_params->executable_layout_count,
+              executable_params->executable_layouts,
               base_executable_loader->import_provider,
               executable_loader->host_allocator, out_executable));
 

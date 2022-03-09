@@ -135,6 +135,13 @@ static void addSPIRVLoweringPasses(OpPassManager &pm) {
 //===----------------------------------------------------------------------===//
 
 void addSPIRVTileAndVectorizePassPipeline(OpPassManager &pm) {
+  pm.addNestedPass<FuncOp>(createTileAndDistributeToWorkgroupsPass());
+  pm.addPass(createCanonicalizerPass());
+  pm.addPass(createCSEPass());
+
+  pm.addNestedPass<FuncOp>(createFoldAffineMinInDistributedLoopsPass());
+  pm.addPass(memref::createResolveShapedTypeResultDimsPass());
+
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
@@ -159,6 +166,10 @@ void addSPIRVTileAndVectorizePassPipeline(OpPassManager &pm) {
 }
 
 void addSPIRVTileAndVectorizeToCooperativeOpsPassPipeline(OpPassManager &pm) {
+  pm.addNestedPass<FuncOp>(createTileAndDistributeToWorkgroupsPass());
+  pm.addPass(createCanonicalizerPass());
+  pm.addPass(createCSEPass());
+
   addLinalgBufferizePasses(pm, gpuAllocationFunction);
 
   pm.addPass(createCanonicalizerPass());
@@ -181,6 +192,10 @@ void addSPIRVTileAndVectorizeToCooperativeOpsPassPipeline(OpPassManager &pm) {
 }
 
 void addSPIRVTileAndDistributePassPipeline(OpPassManager &pm) {
+  pm.addNestedPass<FuncOp>(createTileAndDistributeToWorkgroupsPass());
+  pm.addPass(createCanonicalizerPass());
+  pm.addPass(createCSEPass());
+
   addLinalgBufferizePasses(pm, gpuAllocationFunction);
 
   pm.addPass(createCanonicalizerPass());
@@ -208,25 +223,19 @@ void addSPIRVTileAndDistributePassPipeline(OpPassManager &pm) {
 // still perform bufferization first to expose a linalg.copy op, from which we
 // can deduce the configuration.
 void addSPIRVTileAndDistributeCopyPassPipeline(OpPassManager &pm) {
-  addLinalgBufferizePasses(pm.nest<ModuleOp>(), gpuAllocationFunction);
-
-  // Rerun CodeGen configuration deduction after bufferization. This enables
-  // us to find a better configuration for linalg.copy ops and attach the
-  // `lowering.config` attribute properly to drive transformations.
+  addLinalgBufferizePasses(pm, gpuAllocationFunction);
   pm.addPass(createSPIRVInitConfigPass());
-  pm.addPass(createSetNumWorkgroupsPass());
 
-  OpPassManager &modulePM = pm.nest<ModuleOp>();
-
-  modulePM.addPass(createCanonicalizerPass());
-  modulePM.addPass(createCSEPass());
+  pm.addNestedPass<FuncOp>(createTileAndDistributeToWorkgroupsPass());
+  pm.addPass(createCanonicalizerPass());
+  pm.addPass(createCSEPass());
 
   // Tile and distribute to GPU invocations.
-  modulePM.addNestedPass<FuncOp>(createSPIRVTileAndDistributePass());
-  modulePM.addPass(createCanonicalizerPass());
-  modulePM.addPass(createCSEPass());
+  pm.addNestedPass<FuncOp>(createSPIRVTileAndDistributePass());
+  pm.addPass(createCanonicalizerPass());
+  pm.addPass(createCSEPass());
 
-  addLoopMaterializationPasses(modulePM);
+  addLoopMaterializationPasses(pm);
 }
 
 //===----------------------------------------------------------------------===//
@@ -235,10 +244,7 @@ void addSPIRVTileAndDistributeCopyPassPipeline(OpPassManager &pm) {
 
 void buildSPIRVCodegenPassPipeline(OpPassManager &pm) {
   pm.nest<ModuleOp>().nest<FuncOp>().addPass(createTypePropagationPass());
-  pm.nest<ModuleOp>().nest<FuncOp>().addPass(
-      createTileAndDistributeToWorkgroupsPass());
-  pm.addPass(createCanonicalizerPass());
-  pm.addPass(createCSEPass());
+
   pm.addPass(createSPIRVLowerExecutableTargetPass());
 
   addMemRefLoweringPasses(pm.nest<ModuleOp>());

@@ -139,8 +139,6 @@ void LLVMGPULowerExecutableTargetPass::runOnOperation() {
     }
   }
 
-  executableLoweringPipeline.addPass(createSetNumWorkgroupsPass());
-  executableLoweringPipeline.addPass(createCanonicalizerPass());
   if (!testLoweringConfiguration && translationInfo.hasValue()) {
     OpPassManager &nestedModulePM = executableLoweringPipeline.nest<ModuleOp>();
     switch (translationInfo.getValue().getDispatchLoweringPassPipeline()) {

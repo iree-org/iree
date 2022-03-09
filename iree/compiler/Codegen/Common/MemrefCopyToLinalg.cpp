@@ -21,8 +21,9 @@ struct MemrefCopyOpToLinalg : public OpRewritePattern<memref::CopyOp> {
 
   LogicalResult matchAndRewrite(memref::CopyOp copyOp,
                                 PatternRewriter &rewriter) const override {
-    Operation *linalgCopy = createLinalgCopyOp(
-        rewriter, copyOp.getLoc(), copyOp.source(), copyOp.target());
+    Operation *linalgCopy =
+        createLinalgCopyOp(rewriter, copyOp.getLoc(), copyOp.source(),
+                           copyOp.target(), copyOp->getAttrs());
     rewriter.replaceOp(copyOp, linalgCopy->getResults());
     return success();
   }

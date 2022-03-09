@@ -63,8 +63,8 @@ static LogicalResult setOpConfig(const spirv::TargetEnv &targetEnv,
 
   Value lhs = op.inputs()[0], rhs = op.inputs()[1], init = op.outputs()[0];
 
-  ArrayRef<int64_t> lhsShape = getUntiledShape(lhs);
-  ArrayRef<int64_t> rhsShape = getUntiledShape(rhs);
+  ArrayRef<int64_t> lhsShape = lhs.getType().cast<ShapedType>().getShape();
+  ArrayRef<int64_t> rhsShape = rhs.getType().cast<ShapedType>().getShape();
   if (llvm::any_of(lhsShape, ShapedType::isDynamic)) return success();
   if (llvm::any_of(rhsShape, ShapedType::isDynamic)) return success();
 

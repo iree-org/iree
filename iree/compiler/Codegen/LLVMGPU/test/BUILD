@@ -28,7 +28,6 @@ iree_lit_test_suite(
             "rocdl_pipeline_test.mlir",
             "illegal_configuration.mlir",
             "legalize.mlir",
-            "multibuffer.mlir",
             "tensorcore_vectorization.mlir",
             "vector_to_gpu.mlir",
             "vectorization.mlir",

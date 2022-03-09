@@ -13,6 +13,7 @@
 
 #include "iree/base/api.h"
 #include "iree/base/tracing.h"
+#include "iree/hal/local/executable_environment.h"
 #include "iree/hal/local/executable_library.h"
 #include "iree/hal/local/local_descriptor_set_layout.h"
 #include "iree/hal/local/local_executable.h"
@@ -838,11 +839,8 @@ static iree_status_t iree_hal_cmd_dispatch_tile(
   state.binding_lengths = (size_t*)cmd_ptr;
   cmd_ptr += cmd->binding_count * sizeof(*state.binding_lengths);
 
-  // When we support imports we can populate those here based on what the
-  // executable declared (as each executable may import a unique set of
-  // functions).
-  state.import_thunk = cmd->executable->import_thunk;
-  state.imports = cmd->executable->imports;
+  state.processor_id = tile_context->processor_id;
+  state.environment = &cmd->executable->environment;
 
   iree_status_t status = iree_hal_local_executable_issue_call(
       cmd->executable, cmd->ordinal, &state,

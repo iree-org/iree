@@ -69,6 +69,14 @@ def IREEComprehensiveBufferize :
     Pass<"iree-codegen-iree-comprehensive-bufferize", "ModuleOp"> {
   let summary = "Convert from to Linalg ops on tensors to buffers";
   let constructor = "mlir::iree_compiler::createIREEComprehensiveBufferizePass()";
+  let options = [
+    Option<"testAnalysisOnly", "test-analysis-only", "bool",
+            /*default=*/"false",
+           "Only runs inplaceability analysis (for testing purposes only)">,
+    Option<"printConflicts", "print-conflicts", "bool",
+            /*default=*/"false",
+           "Annotates IR with RaW conflicts. Requires test-analysis-only.">,
+  ];
 }
 
 def OptimizeVectorTransfer :
@@ -298,8 +306,7 @@ def SPIRVLowerExecutableTarget :
 }
 
 def SPIRVInitConfig :
-    Pass<"iree-spirv-init-config-pass",
-         "mlir::iree_compiler::IREE::HAL::ExecutableVariantOp"> {
+    Pass<"iree-spirv-init-config-pass", "ModuleOp"> {
   let summary = "Initialize CodeGen configuration for a given dispatch region";
   let constructor = "mlir::iree_compiler::createSPIRVInitConfigPass()";
 }

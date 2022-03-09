@@ -37,18 +37,18 @@ class command_buffer_dispatch_test : public CtsTestBase {
         device_, /*push_constants=*/0, /*set_layout_count=*/1,
         &descriptor_set_layout_, &executable_layout_));
 
-    iree_hal_executable_spec_t executable_spec;
-    executable_spec.caching_mode =
+    iree_hal_executable_params_t executable_params;
+    executable_params.caching_mode =
         IREE_HAL_EXECUTABLE_CACHING_MODE_ALIAS_PROVIDED_DATA;
-    executable_spec.executable_format =
+    executable_params.executable_format =
         iree_make_cstring_view(get_test_executable_format());
-    executable_spec.executable_data = get_test_executable_data(
+    executable_params.executable_data = get_test_executable_data(
         iree_make_cstring_view("command_buffer_dispatch_test.bin"));
-    executable_spec.executable_layout_count = 1;
-    executable_spec.executable_layouts = &executable_layout_;
+    executable_params.executable_layout_count = 1;
+    executable_params.executable_layouts = &executable_layout_;
 
     IREE_ASSERT_OK(iree_hal_executable_cache_prepare_executable(
-        executable_cache_, &executable_spec, &executable_));
+        executable_cache_, &executable_params, &executable_));
   }
 
   void CleanupExecutable() {

@@ -48,6 +48,8 @@ void buildTOSAInputConversionPassPipeline(OpPassManager &passManager) {
   passManager.addNestedPass<FuncOp>(tosa::createTosaToStandard());
 
   passManager.addNestedPass<FuncOp>(IREE::Flow::createStripSignednessPass());
+  passManager.addNestedPass<FuncOp>(mlir::createCanonicalizerPass());
+
   passManager.addNestedPass<FuncOp>(createLinalgQuantizedMatmulToMatmulPass());
   passManager.addNestedPass<FuncOp>(mlir::createCanonicalizerPass());
 

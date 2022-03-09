@@ -244,6 +244,10 @@ LogicalResult verifyDoubleTilingExpertPassPipelineConfig(
     ArrayRef<int64_t> workgroupSize = {});
 void addDoubleTilingExpertPassPipeline(OpPassManager &passManager);
 
+// Populates the passes needed to do tiling, decomposing, and vectorizing the
+// convolution ops using the Codegen drivers from sandbox.
+void addConvTileAndDecomposeExpertPassPipeline(OpPassManager &passManager);
+
 /// Populates the passes needed to multi level tile, fuse and vectorize lowering
 /// of linalg ops on tensors to vectors operations.
 void addTileFuseAndVectorizePassPipeline(OpPassManager &passManager,
@@ -371,8 +375,7 @@ std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
 createSPIRVLowerExecutableTargetPass();
 
 /// Initializes CodeGen configuration for the given dispatch region.
-std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
-createSPIRVInitConfigPass();
+std::unique_ptr<OperationPass<ModuleOp>> createSPIRVInitConfigPass();
 
 /// Pass to tile and distribute Linalg ops with buffer semantics to invocations.
 std::unique_ptr<OperationPass<FuncOp>> createSPIRVTileAndDistributePass();

@@ -213,10 +213,10 @@ iree_hal_vulkan_native_executable_cast(iree_hal_executable_t* base_value) {
 iree_status_t iree_hal_vulkan_native_executable_create(
     iree::hal::vulkan::VkDeviceHandle* logical_device,
     VkPipelineCache pipeline_cache,
-    const iree_hal_executable_spec_t* executable_spec,
+    const iree_hal_executable_params_t* executable_params,
     iree_hal_executable_t** out_executable) {
   IREE_ASSERT_ARGUMENT(logical_device);
-  IREE_ASSERT_ARGUMENT(executable_spec);
+  IREE_ASSERT_ARGUMENT(executable_params);
   IREE_ASSERT_ARGUMENT(out_executable);
   *out_executable = NULL;
   IREE_TRACE_ZONE_BEGIN(z0);
@@ -224,10 +224,10 @@ iree_status_t iree_hal_vulkan_native_executable_create(
   // Verify and fetch the executable flatbuffer wrapper.
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0, iree_hal_spirv_executable_flatbuffer_verify(
-              executable_spec->executable_data,
-              executable_spec->executable_layout_count));
+              executable_params->executable_data,
+              executable_params->executable_layout_count));
   iree_SpirVExecutableDef_table_t executable_def =
-      iree_SpirVExecutableDef_as_root(executable_spec->executable_data.data);
+      iree_SpirVExecutableDef_as_root(executable_params->executable_data.data);
 
   // Create the shader module.
   flatbuffers_uint32_vec_t code_vec =
@@ -263,9 +263,10 @@ iree_status_t iree_hal_vulkan_native_executable_create(
   }
   if (iree_status_is_ok(status)) {
     status = iree_hal_vulkan_create_pipelines(
-        logical_device, pipeline_cache, executable_spec->caching_mode,
-        executable_def, shader_module, executable_spec->executable_layout_count,
-        executable_spec->executable_layouts, executable->entry_point_count,
+        logical_device, pipeline_cache, executable_params->caching_mode,
+        executable_def, shader_module,
+        executable_params->executable_layout_count,
+        executable_params->executable_layouts, executable->entry_point_count,
         executable->entry_points);
   }
   iree_hal_vulkan_destroy_shader_module(logical_device, shader_module);

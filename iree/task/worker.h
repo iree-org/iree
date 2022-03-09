@@ -110,6 +110,15 @@ typedef struct iree_task_worker_t {
   // remain valid so that the executor can query its state.
   iree_thread_t* thread;
 
+  // Guess at the current processor ID.
+  // This is updated infrequently as it can be semi-expensive to determine
+  // (on some platforms at least 1 syscall involved). We always update it upon
+  // waking as idle waits are the most likely place the worker will be migrated
+  // across processors.
+  iree_cpu_processor_id_t processor_id;
+  // An opaque tag used to reduce the cost of processor ID queries.
+  iree_cpu_processor_tag_t processor_tag;
+
   // Destructive interference padding between the mailbox and local task queue
   // to ensure that the worker - who is pounding on local_task_queue - doesn't
   // contend with submissions or coordinators dropping new tasks in the mailbox.

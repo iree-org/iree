@@ -54,7 +54,8 @@ static void generateQueryFunction(llvm::raw_ostream &os,
                                   const std::string &query_function_name) {
   os << "const iree_hal_executable_library_header_t**\n"
      << query_function_name << "(\n"
-     << "iree_hal_executable_library_version_t max_version, void* reserved);\n";
+     << "iree_hal_executable_library_version_t max_version, const "
+        "iree_hal_executable_environment_v0_t* environment);\n";
 }
 
 static void generateSuffix(llvm::raw_ostream &os,
