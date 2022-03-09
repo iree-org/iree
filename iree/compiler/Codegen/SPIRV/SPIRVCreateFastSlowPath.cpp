@@ -139,9 +139,8 @@ struct SPIRVCreateFastSlowPathPass final
     MLIRContext *context = &getContext();
     RewritePatternSet patterns(context);
     patterns.add<CreateFastSlowPath>(context);
-    if (failed(
-            applyPatternsAndFoldGreedily(getOperation(), std::move(patterns))))
-      return signalPassFailure();
+    scf::IfOp::getCanonicalizationPatterns(patterns, context);
+    (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
   }
 };
 

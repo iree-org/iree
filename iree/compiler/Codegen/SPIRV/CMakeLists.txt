@@ -48,6 +48,7 @@ iree_cc_library(
     MLIRArithmetic
     MLIRArithmeticToSPIRV
     MLIRArithmeticTransforms
+    MLIRArithmeticUtils
     MLIRBufferization
     MLIRControlFlowToSPIRV
     MLIRFunc
@@ -74,6 +75,7 @@ iree_cc_library(
     MLIRSPIRVTransforms
     MLIRSideEffectInterfaces
     MLIRSupport
+    MLIRTensor
     MLIRTensorToSPIRV
     MLIRTensorTransforms
     MLIRTosa
