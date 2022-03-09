@@ -135,16 +135,15 @@ void RegisterModuleBenchmarks(const std::string& function_name,
       ->Unit(benchmark::kMillisecond);
 }
 
-iree_status_t GetModuleContentsFromFlags(std::string* out_contents) {
+iree_status_t GetModuleContentsFromFlags(iree_file_contents_t** out_contents) {
   IREE_TRACE_SCOPE0("GetModuleContentsFromFlags");
   auto module_file = std::string(FLAG_module_file);
   if (module_file == "-") {
-    *out_contents = std::string{std::istreambuf_iterator<char>(std::cin),
-                                std::istreambuf_iterator<char>()};
+    return iree_stdin_read_contents(iree_allocator_system(), out_contents);
   } else {
-    IREE_RETURN_IF_ERROR(GetFileContents(module_file.c_str(), out_contents));
+    return iree_file_read_contents(module_file.c_str(), iree_allocator_system(),
+                                   out_contents);
   }
-  return iree_ok_status();
 }
 
 // TODO(hanchung): Consider to refactor this out and reuse in iree-run-module.
@@ -194,7 +193,9 @@ class IREEBenchmark {
     IREE_TRACE_SCOPE0("IREEBenchmark::Init");
     IREE_TRACE_FRAME_MARK_BEGIN_NAMED("init");
 
-    IREE_RETURN_IF_ERROR(GetModuleContentsFromFlags(&module_data_));
+    iree_file_contents_t* flatbuffer_contents = NULL;
+    IREE_RETURN_IF_ERROR(
+        iree::GetModuleContentsFromFlags(&flatbuffer_contents));
 
     IREE_RETURN_IF_ERROR(iree_hal_module_register_types());
     IREE_RETURN_IF_ERROR(
@@ -205,9 +206,9 @@ class IREEBenchmark {
     IREE_RETURN_IF_ERROR(
         iree_hal_module_create(device_, iree_allocator_system(), &hal_module_));
     IREE_RETURN_IF_ERROR(iree_vm_bytecode_module_create(
-        iree_make_const_byte_span((void*)module_data_.data(),
-                                  module_data_.size()),
-        iree_allocator_null(), iree_allocator_system(), &input_module_));
+        flatbuffer_contents->const_buffer,
+        iree_file_contents_deallocator(flatbuffer_contents),
+        iree_allocator_system(), &input_module_));
 
     // Order matters. The input module will likely be dependent on the hal
     // module.
@@ -283,7 +284,6 @@ class IREEBenchmark {
     return iree_ok_status();
   }
 
-  std::string module_data_;
   iree_vm_instance_t* instance_ = nullptr;
   iree_hal_device_t* device_ = nullptr;
   iree_vm_module_t* hal_module_ = nullptr;

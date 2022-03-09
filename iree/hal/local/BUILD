@@ -43,6 +43,7 @@ cc_binary_benchmark(
         ":local",
         "//iree/base",
         "//iree/base:tracing",
+        "//iree/base/internal:file_io",
         "//iree/base/internal:flags",
         "//iree/hal",
         "//iree/hal/local/loaders:embedded_library_loader",

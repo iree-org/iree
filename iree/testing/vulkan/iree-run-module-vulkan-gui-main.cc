@@ -94,15 +94,15 @@ void CleanupVulkanWindow() {
                                   g_Allocator);
 }
 
-Status GetModuleContentsFromFlags(std::string* out_contents) {
+iree_status_t GetModuleContentsFromFlags(iree_file_contents_t** out_contents) {
+  IREE_TRACE_SCOPE0("GetModuleContentsFromFlags");
   auto module_file = std::string(FLAG_module_file);
   if (module_file == "-") {
-    *out_contents = std::string{std::istreambuf_iterator<char>(std::cin),
-                                std::istreambuf_iterator<char>()};
+    return iree_stdin_read_contents(iree_allocator_system(), out_contents);
   } else {
-    IREE_RETURN_IF_ERROR(GetFileContents(module_file.c_str(), out_contents));
+    return iree_file_read_contents(module_file.c_str(), iree_allocator_system(),
+                                   out_contents);
   }
-  return OkStatus();
 }
 
 // Runs the current IREE bytecode module and renders its result to a window
@@ -307,14 +307,13 @@ extern "C" int iree_main(int argc, char** argv) {
 
   // Load bytecode module from embedded data.
   IREE_LOG(INFO) << "Loading IREE byecode module...";
-  std::string module_file;
-  IREE_CHECK_OK(iree::GetModuleContentsFromFlags(&module_file));
+  iree_file_contents_t* flatbuffer_contents = NULL;
+  IREE_CHECK_OK(iree::GetModuleContentsFromFlags(&flatbuffer_contents));
   iree_vm_module_t* bytecode_module = nullptr;
   IREE_CHECK_OK(iree_vm_bytecode_module_create(
-      iree_const_byte_span_t{
-          reinterpret_cast<const uint8_t*>(module_file.data()),
-          module_file.size()},
-      iree_allocator_null(), iree_allocator_system(), &bytecode_module));
+      flatbuffer_contents->const_buffer,
+      iree_file_contents_deallocator(flatbuffer_contents),
+      iree_allocator_system(), &bytecode_module));
 
   // Allocate a context that will hold the module state across invocations.
   iree_vm_context_t* iree_context = nullptr;
