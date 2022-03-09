@@ -20,14 +20,30 @@ extern "C" {
 // Returns IREE_STATUS_NOT_FOUND if the file does not exist.
 iree_status_t iree_file_exists(const char* path);
 
+// Loaded file contents.
+typedef struct iree_file_contents_t {
+  iree_allocator_t allocator;
+  union {
+    iree_byte_span_t buffer;
+    iree_const_byte_span_t const_buffer;
+  };
+} iree_file_contents_t;
+
+// Returns an allocator that deallocates the |contents|.
+// This can be passed to functions that require a deallocation mechanism.
+iree_allocator_t iree_file_contents_deallocator(iree_file_contents_t* contents);
+
+// Frees memory associated with |contents|.
+void iree_file_contents_free(iree_file_contents_t* contents);
+
 // Synchronously reads a file's contents into memory.
 //
 // Returns the contents of the file in |out_contents|.
-// |allocator| is used to allocate the memory and the caller must use the same
-// allocator when freeing it.
+// |allocator| is used to allocate the memory and the caller must use
+// iree_file_contents_free to release the memory.
 iree_status_t iree_file_read_contents(const char* path,
                                       iree_allocator_t allocator,
-                                      iree_byte_span_t* out_contents);
+                                      iree_file_contents_t** out_contents);
 
 // Synchronously writes a byte buffer into a file.
 // Existing contents are overwritten.
@@ -40,10 +56,10 @@ iree_status_t iree_file_write_contents(const char* path,
 // don't contain NUL).
 //
 // Returns the contents of the file in |out_contents|.
-// |allocator| is used to allocate the memory and the caller must use the same
-// allocator when freeing it.
+// |allocator| is used to allocate the memory and the caller must use
+// iree_file_contents_free to release the memory.
 iree_status_t iree_stdin_read_contents(iree_allocator_t allocator,
-                                       iree_byte_span_t* out_contents);
+                                       iree_file_contents_t** out_contents);
 
 #ifdef __cplusplus
 }  // extern "C"

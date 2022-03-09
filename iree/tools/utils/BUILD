@@ -40,7 +40,6 @@ cc_library(
         "//iree/base:cc",
         "//iree/base:logging",
         "//iree/base:tracing",
-        "//iree/base/internal:file_io",
         "//iree/base/internal:span",
         "//iree/hal",
         "//iree/modules/hal",

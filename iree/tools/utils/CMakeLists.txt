@@ -41,7 +41,6 @@ iree_cc_library(
   DEPS
     iree::base
     iree::base::cc
-    iree::base::internal::file_io
     iree::base::internal::span
     iree::base::logging
     iree::base::tracing

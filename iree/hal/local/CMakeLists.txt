@@ -44,6 +44,7 @@ iree_cc_binary_benchmark(
     ::executable_library
     ::local
     iree::base
+    iree::base::internal::file_io
     iree::base::internal::flags
     iree::base::tracing
     iree::hal

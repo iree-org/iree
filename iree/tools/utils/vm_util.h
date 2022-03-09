@@ -20,10 +20,8 @@
 
 namespace iree {
 
-// TODO(benvanik) Update these when we can use RAII with the C API.
-
-// Synchronously reads a file's contents into a string.
-Status GetFileContents(const char* path, std::string* out_contents);
+// NOTE: this file is not best-practice and needs to be rewritten; consider this
+// appropriate only for test code.
 
 // Parses |input_strings| into a variant list of VM scalars and buffers.
 // Scalars should be in the format:

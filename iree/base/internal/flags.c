@@ -449,15 +449,16 @@ static iree_status_t iree_flags_parse_file(iree_string_view_t file_path) {
   // NOTE: safe to use file_path.data here as it will always have a NUL
   // terminator.
   iree_allocator_t allocator = iree_flags_leaky_allocator();
-  iree_byte_span_t file_contents;
+  iree_file_contents_t* file_contents = NULL;
   IREE_RETURN_IF_ERROR(
       iree_file_read_contents(file_path.data, allocator, &file_contents),
       "while trying to parse flagfile");
 
   // Run through the file line-by-line.
   int line_number = 0;
-  iree_string_view_t contents = iree_make_string_view(
-      (const char*)file_contents.data, file_contents.data_length);
+  iree_string_view_t contents =
+      iree_make_string_view((const char*)file_contents->buffer.data,
+                            file_contents->buffer.data_length);
   while (!iree_string_view_is_empty(contents)) {
     // Split into a single line and the entire rest of the file contents.
     iree_string_view_t line;

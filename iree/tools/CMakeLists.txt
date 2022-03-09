@@ -135,14 +135,13 @@ iree_cc_binary(
   NAME
     iree-dump-module
   SRCS
-    "iree-dump-module-main.cc"
+    "iree-dump-module-main.c"
   DEPS
     flatcc::runtime
     iree::base
     iree::base::internal::file_io
     iree::base::internal::flatcc::debugging
     iree::schemas::bytecode_module_def_c_fbs
-    iree::tools::utils::vm_util
 )
 
 iree_cc_binary(
