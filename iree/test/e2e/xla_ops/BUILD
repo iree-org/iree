@@ -393,6 +393,80 @@ iree_check_single_backend_test_suite(
     target_backend = "vulkan-spirv",
 )
 
+iree_check_single_backend_test_suite(
+    name = "check_wasm-llvm-aot",
+    srcs = enforce_glob(
+        # keep sorted
+        [
+            "abs.mlir",
+            "add.mlir",
+            "batch_norm_inference.mlir",
+            "bitcast_convert.mlir",
+            "broadcast.mlir",
+            "broadcast_add.mlir",
+            "broadcast_in_dim.mlir",
+            "clamp.mlir",
+            "compare.mlir",
+            "concatenate.mlir",
+            "constant.mlir",
+            "convert.mlir",
+            "convolution.mlir",
+            "cosine.mlir",
+            "divide.mlir",
+            "dot.mlir",
+            "dot_general.mlir",
+            "dynamic_slice.mlir",
+            "dynamic_update_slice.mlir",
+            "exponential.mlir",
+            "exponential_fp16.mlir",
+            "exponential_minus_one.mlir",
+            "fft.mlir",
+            "finite.mlir",
+            "floor.mlir",
+            "gather.mlir",
+            "iota.mlir",
+            "log.mlir",
+            "log_plus_one.mlir",
+            "multiply.mlir",
+            "negate.mlir",
+            "pad.mlir",
+            "pow.mlir",
+            "reduce.mlir",
+            "reduce_window.mlir",
+            "reshape.mlir",
+            "reverse.mlir",
+            "rng_normal.mlir",
+            "rng_uniform.mlir",
+            "rsqrt.mlir",
+            "scatter.mlir",
+            "scatter_dynamic.mlir",
+            "select.mlir",
+            "sine.mlir",
+            "slice.mlir",
+            "sort.mlir",
+            "sqrt.mlir",
+            "subtract.mlir",
+            "tanh.mlir",
+            "torch_index_select.mlir",
+            "transpose.mlir",
+            "while.mlir",
+        ],
+        include = ["*.mlir"],
+        exclude = [
+            "round.mlir",  # TODO(#7618): Enable once supported.
+            "maximum.mlir",  # TODO(#8514): Fix compiler crash.
+            "minimum.mlir",  # TODO(#8514): Fix compiler crash.
+            "remainder.mlir",  # TODO(#8514): Fix compiler crash.
+        ],
+    ),
+    compiler_flags = [
+        "-iree-input-type=mhlo",
+        "-iree-llvm-target-triple=wasm32-unknown-emscripten",
+    ],
+    # driver = "wasm",  # No driver yet, only test compilation.
+    target_backend = "dylib-llvm-aot",
+)
+
 test_suite(
     name = "check",
     tests = [
