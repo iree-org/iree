@@ -311,8 +311,7 @@ static LogicalResult duplicateInitTensorOps(OpBuilder &b,
   return success();
 }
 
-namespace {
-SmallVector<NamedAttribute> PruneAttributeList(linalg::GenericOp op) {
+static SmallVector<NamedAttribute> PruneAttributeList(linalg::GenericOp op) {
   auto opAttributes = op.getAttributeNames();
   llvm::StringSet<> elidedAttrs;
   elidedAttrs.insert(opAttributes.begin(), opAttributes.end());
@@ -324,6 +323,25 @@ SmallVector<NamedAttribute> PruneAttributeList(linalg::GenericOp op) {
   return preservedAttrs;
 }
 
+static bool isFromReadOnlyTensor(Value v) {
+  return TypeSwitch<Operation *, bool>(v.getDefiningOp())
+      .Case<arith::ConstantOp>(
+          [&](arith::ConstantOp constantOp) { return true; })
+      .Case<tensor::CollapseShapeOp, tensor::ExpandShapeOp>(
+          [&](auto op) { return isFromReadOnlyTensor(op.src()); })
+      .Case<tensor::CastOp, tensor::ExtractSliceOp>(
+          [&](auto op) { return isFromReadOnlyTensor(op.source()); })
+      .Case<IREE::Flow::DispatchTensorLoadOp>(
+          [&](IREE::Flow::DispatchTensorLoadOp loadOp) {
+            return loadOp.source()
+                       .getType()
+                       .cast<IREE::Flow::DispatchTensorType>()
+                       .getAccess() == IREE::Flow::TensorAccess::ReadOnly;
+          })
+      .Default([&](Operation *op) { return false; });
+}
+
+namespace {
 /// Adapts Linalg ops input operand to output operand. This is required for not
 /// creating extra alloca ops. For more details, see
 /// https://github.com/google/iree/issues/8303
@@ -341,12 +359,14 @@ struct AdaptLinalgInputOperandToOutputOperand
     auto outputOperand = op.getOutputOperand(0);
     if (op.payloadUsesValueFromOperand(outputOperand)) return failure();
 
-    // Find an input operand that has the same indexing map and type.
+    // Find an input operand which meets:
+    //   1. It has the same indexing map and type.
+    //   2. It is not from a readonly tensor.
     OpOperand *operand = nullptr;
     SmallVector<Value> newOperands;
     SmallVector<AffineMap> maps;
     for (auto in : op.getInputOperands()) {
-      if (!operand &&
+      if (!operand && !isFromReadOnlyTensor(in->get()) &&
           op.getTiedIndexingMap(in) == op.getTiedIndexingMap(outputOperand) &&
           in->get().getType() == outputOperand->get().getType()) {
         operand = in;

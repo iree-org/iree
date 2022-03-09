@@ -192,10 +192,12 @@ func @reshape_fused_source() {
 //      CHECK: func @reshape_fused_source()
 //  CHECK-DAG:   %[[ARG0:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer)
 //  CHECK-DAG:   %[[RET0:.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer)
+//      CHECK:   %[[TARGET:.+]] = flow.dispatch.tensor.load %[[RET0]]
 //      CHECK:   %[[SOURCE:.+]] = flow.dispatch.tensor.load %[[ARG0]]
 //      CHECK:   %[[RESHAPE:.+]] = tensor.expand_shape %[[SOURCE]]
 //      CHECK:   %[[GENERIC:.+]] = linalg.generic
-// CHECK-SAME:       outs(%[[RESHAPE]]
+// CHECK-SAME:       ins(%[[RESHAPE]]
+// CHECK-SAME:       outs(%[[TARGET]]
 //      CHECK:   flow.dispatch.tensor.store %[[GENERIC]], %[[RET0]]
 
 // -----
@@ -228,10 +230,12 @@ func @reshape_fused_source_and_copyout() {
 //  CHECK-DAG:   %[[ARG0:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer)
 //  CHECK-DAG:   %[[RET0:.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer)
 //  CHECK-DAG:   %[[RET1:.+]] = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer)
+//  CHECK-DAG:   %[[TARGET:.+]] = flow.dispatch.tensor.load %[[RET0]]
 //      CHECK:   %[[SOURCE:.+]] = flow.dispatch.tensor.load %[[ARG0]]
 //      CHECK:   %[[RESHAPE:.+]] = tensor.expand_shape %[[SOURCE]]
 //      CHECK:   %[[GENERIC:.+]] = linalg.generic
-// CHECK-SAME:       outs(%[[RESHAPE]]
+// CHECK-SAME:       ins(%[[RESHAPE]]
+// CHECK-SAME:       outs(%[[TARGET]]
 //      CHECK:   flow.dispatch.tensor.store %[[GENERIC]], %[[RET0]]
 //      CHECK:   flow.dispatch.tensor.store %[[RESHAPE]], %[[RET1]]
 
@@ -263,8 +267,11 @@ func @reshape_fused_target() {
 //  CHECK-DAG:   %[[ARG0:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer)
 //  CHECK-DAG:   %[[RET0:.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer)
 //  CHECK-DAG:   %[[SOURCE:.+]] = flow.dispatch.tensor.load %[[ARG0]]
+//  CHECK-DAG:   %[[TARGET:.+]] = flow.dispatch.tensor.load %[[RET0]]
+//  CHECK-DAG:   %[[RESHAPE_EXPAND:.+]] = tensor.expand_shape %[[TARGET]] {{\[}}[0, 1]{{\]}}
 //      CHECK:   %[[GENERIC:.+]] = linalg.generic
-// CHECK-SAME:       outs(%[[SOURCE]]
+// CHECK-SAME:       ins(%[[SOURCE]]
+// CHECK-SAME:       outs(%[[RESHAPE_EXPAND]]
 //      CHECK:   %[[RESHAPE_COLLAPSE:.+]] = tensor.collapse_shape %[[GENERIC]] {{\[}}[0, 1]{{\]}}
 //      CHECK:   flow.dispatch.tensor.store %[[RESHAPE_COLLAPSE]], %[[RET0]]
 
@@ -456,11 +463,14 @@ func @unused_ins_operand() {
 //   CHECK-DAG:   %[[IN:.+]] = hal.interface.binding.subspan set(0) binding(0)
 //   CHECK-DAG:   %[[OUT:.+]] = hal.interface.binding.subspan set(0) binding(2)
 //   CHECK-DAG:   %[[IN_VIEW:.+]] = flow.dispatch.tensor.load %[[IN]]
+//  CHECK-DAG:    %[[OUT_VIEW:.+]] = flow.dispatch.tensor.load %[[OUT]]
 //   CHECK-DAG:   %[[INIT:.+]] = linalg.init_tensor
 //       CHECK:   linalg.generic
-//  CHECK-SAME:       ins(%[[INIT]]
-//  CHECK-SAME:       outs(%[[IN_VIEW]]
+//  CHECK-SAME:     ins(%[[IN_VIEW]], %[[INIT]]
+//  CHECK-SAME:     outs(%[[OUT_VIEW]]
+
 // -----
+
 func @three_init_tensor_uses() {
   %c6400 = arith.constant 6400 : index
   %c64 = arith.constant 64 : index
