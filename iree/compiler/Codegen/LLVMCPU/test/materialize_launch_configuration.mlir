@@ -577,7 +577,7 @@ hal.executable private @conv_static {
     }
   }
 }
-//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering.config<tile_sizes = {{\[}}[0, 28, 28, 16, 0, 0, 0], [1, 1, 7, 8, 0, 0, 0], [0, 0, 0, 0, 1, 1, 3]], native_vector_size = []>
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering.config<tile_sizes = {{\[}}[0, 28, 28, 16, 0, 0, 0], [1, 1, 4, 8, 0, 0, 0], [0, 0, 0, 0, 1, 1, 3]], native_vector_size = []>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"CPUConvTileAndDecomposeExpert", workload_per_wg = []>
 //      CHECK: hal.executable.entry_point public @conv
 // CHECK-SAME:     translation.info = #[[TRANSLATION]]
