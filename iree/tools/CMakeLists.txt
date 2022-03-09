@@ -438,6 +438,7 @@ if(${IREE_BUILD_COMPILER})
       MLIRLspServerLib
       MLIRSupport
     PUBLIC
+    EXCLUDE_FROM_ALL
   )
 
   iree_cc_binary(
