@@ -8,7 +8,7 @@
 
 #include "llvm/Support/FormatVariadic.h"
 #include "mlir/IR/Operation.h"
-#include "mlir/Parser.h"
+#include "mlir/Parser/Parser.h"
 #include "mlir/Support/LLVM.h"
 
 namespace mlir {

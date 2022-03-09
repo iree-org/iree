@@ -36,7 +36,7 @@ iree_cc_library(
     MLIRSideEffectInterfaces
     MLIRSupport
     MLIRTransformUtils
-    MLIRTranslation
+    MLIRTranslateLib
     iree::compiler::Dialect::Util::IR
     iree::compiler::Dialect::VM::IR
   PUBLIC

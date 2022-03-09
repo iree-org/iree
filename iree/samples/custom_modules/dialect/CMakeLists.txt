@@ -100,7 +100,7 @@ iree_cc_binary(
     MLIRPass
     MLIRSCFTransforms
     MLIRSupport
-    MLIRTranslation
+    MLIRTranslateLib
     iree::compiler::Dialect::VM::Target::Bytecode
     iree::compiler::Dialect::VM::Target::init_targets
     iree::compiler::Translation::IREEVM

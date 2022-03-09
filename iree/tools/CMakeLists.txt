@@ -396,7 +396,7 @@ if(${IREE_BUILD_COMPILER})
       MLIRPass
       MLIRSupport
       MLIRTargetLLVMIRExport
-      MLIRTranslation
+      MLIRTranslateLib
       iree::compiler::Codegen::Codegen
       iree::compiler::Dialect::VM::Target::Bytecode
       iree::compiler::Dialect::VM::Target::init_targets

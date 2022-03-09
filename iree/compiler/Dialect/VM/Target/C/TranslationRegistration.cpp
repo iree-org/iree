@@ -6,7 +6,7 @@
 
 #include "iree/compiler/Dialect/VM/Target/C/CModuleTarget.h"
 #include "iree/compiler/Dialect/VM/Target/C/TranslationFlags.h"
-#include "mlir/Translation.h"
+#include "mlir/Tools/mlir-translate/Translation.h"
 
 namespace mlir {
 namespace iree_compiler {

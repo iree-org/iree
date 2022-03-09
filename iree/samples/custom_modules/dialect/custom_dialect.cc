@@ -13,7 +13,7 @@
 #include "llvm/ADT/StringSwitch.h"
 #include "mlir/IR/DialectImplementation.h"
 #include "mlir/IR/SymbolTable.h"
-#include "mlir/Parser.h"
+#include "mlir/Parser/Parser.h"
 #include "mlir/Transforms/DialectConversion.h"
 
 namespace mlir {
