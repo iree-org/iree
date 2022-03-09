@@ -19,7 +19,7 @@ def iree_check_test(
         name,
         src,
         target_backend,
-        driver,
+        driver = None,
         compiler_flags = [],
         runner_args = [],
         opt_tool = "//iree/tools:iree-opt",
@@ -67,6 +67,9 @@ def iree_check_test(
         visibility = ["//visibility:private"],
     )
 
+    if not driver:
+      return
+
     native_test(
         name = name,
         args = [
@@ -84,7 +87,7 @@ def iree_check_single_backend_test_suite(
         name,
         srcs,
         target_backend,
-        driver,
+        driver = None,
         compiler_flags = [],
         runner_args = [],
         opt_tool = "//iree/tools:iree-opt",

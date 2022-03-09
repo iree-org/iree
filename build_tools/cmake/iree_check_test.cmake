@@ -180,6 +180,10 @@ function(iree_check_test)
 
   add_dependencies(iree-test-deps "${_NAME}")
 
+  if(NOT DEFINED _RULE_DRIVER)
+    return()
+  endif()
+
   iree_native_test(
     NAME
       "${_RULE_NAME}"
@@ -241,13 +245,15 @@ function(iree_check_single_backend_test_suite)
 
   # Omit tests for which the specified driver or target backend is not enabled.
   # This overlaps with directory exclusions and other filtering mechanisms.
-  string(TOUPPER ${_RULE_DRIVER} _UPPERCASE_DRIVER)
-  string(REPLACE "-" "_" _NORMALIZED_DRIVER ${_UPPERCASE_DRIVER})
-  if(NOT DEFINED IREE_HAL_DRIVER_${_NORMALIZED_DRIVER})
-    message(SEND_ERROR "Unknown driver '${_RULE_DRIVER}'. Check IREE_HAL_DRIVER_* options.")
-  endif()
-  if(NOT IREE_HAL_DRIVER_${_NORMALIZED_DRIVER})
-    return()
+  if(DEFINED _RULE_DRIVER)
+    string(TOUPPER ${_RULE_DRIVER} _UPPERCASE_DRIVER)
+    string(REPLACE "-" "_" _NORMALIZED_DRIVER ${_UPPERCASE_DRIVER})
+    if(NOT DEFINED IREE_HAL_DRIVER_${_NORMALIZED_DRIVER})
+      message(SEND_ERROR "Unknown driver '${_RULE_DRIVER}'. Check IREE_HAL_DRIVER_* options.")
+    endif()
+    if(NOT IREE_HAL_DRIVER_${_NORMALIZED_DRIVER})
+      return()
+    endif()
   endif()
   string(TOUPPER ${_RULE_TARGET_BACKEND} _UPPERCASE_TARGET_BACKEND)
   string(REPLACE "-" "_" _NORMALIZED_TARGET_BACKEND ${_UPPERCASE_TARGET_BACKEND})
