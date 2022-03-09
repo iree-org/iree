@@ -44,6 +44,7 @@ iree_cc_library(
     MLIRArithmeticTransforms
     MLIRControlFlowToLLVM
     MLIRFunc
+    MLIRFuncToLLVM
     MLIRFuncTransforms
     MLIRGPUOps
     MLIRGPUToNVVMTransforms
@@ -64,7 +65,6 @@ iree_cc_library(
     MLIRSCF
     MLIRSCFToControlFlow
     MLIRSCFTransforms
-    MLIRStandardToLLVM
     MLIRSupport
     MLIRTransforms
     MLIRVector
