@@ -536,12 +536,11 @@ hal.executable private @conv {
   }
 }
 
-//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering.config<tile_sizes = {{\[}}[0, 64, 64, 64, 0, 0, 0]{{\]}}, native_vector_size = []>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"CPUDefault", workload_per_wg = []>
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering.config<tile_sizes = {{\[}}[0, 64, 64, 64, 0, 0, 0], [1, 1, 8, 8, 0, 0, 0], [0, 0, 0, 0, 1, 1, 8]], native_vector_size = []>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"CPUConvTileAndDecomposeExpert", workload_per_wg = []>
 //      CHECK: hal.executable.entry_point public @conv
 // CHECK-SAME:     translation.info = #[[TRANSLATION]]
 //      CHECK:     linalg.conv_2d_nhwc_hwcf
-//      CHECK:         lowering.config = #[[CONFIG]]
 
 // -----
 
@@ -561,6 +560,48 @@ hal.executable private @conv_static {
     hal.executable.entry_point public @conv_static layout(#executable_layout)
     builtin.module {
       func @conv_static() {
+        %cst = arith.constant 0.000000e+00 : f32
+        %c0 = arith.constant 0 : index
+        %c607520 = arith.constant 607520 : index
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(32) : !flow.dispatch.tensor<readonly:1x225x225x3xf32>
+        %1 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c607520) alignment(32) : !flow.dispatch.tensor<readonly:3x3x3x16xf32>
+        %2 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(32) : !flow.dispatch.tensor<writeonly:1x112x112x16xf32>
+        %3 = flow.dispatch.tensor.load %0, offsets = [0, 0, 0, 0], sizes = [1, 225, 225, 3], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:1x225x225x3xf32> -> tensor<1x225x225x3xf32>
+        %4 = flow.dispatch.tensor.load %1, offsets = [0, 0, 0, 0], sizes = [3, 3, 3, 16], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:3x3x3x16xf32> -> tensor<3x3x3x16xf32>
+        %5 = linalg.init_tensor [1, 112, 112, 16] : tensor<1x112x112x16xf32>
+        %6 = linalg.fill(%cst, %5) : f32, tensor<1x112x112x16xf32> -> tensor<1x112x112x16xf32>
+        %7 = linalg.conv_2d_nhwc_hwcf {dilations = dense<1> : tensor<2xi64>, strides = dense<2> : tensor<2xi64>} ins(%3, %4 : tensor<1x225x225x3xf32>, tensor<3x3x3x16xf32>) outs(%6 : tensor<1x112x112x16xf32>) -> tensor<1x112x112x16xf32>
+        flow.dispatch.tensor.store %7, %2, offsets = [0, 0, 0, 0], sizes = [1, 112, 112, 16], strides = [1, 1, 1, 1] : tensor<1x112x112x16xf32> -> !flow.dispatch.tensor<writeonly:1x112x112x16xf32>
+        return
+      }
+    }
+  }
+}
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering.config<tile_sizes = {{\[}}[0, 28, 28, 16, 0, 0, 0], [1, 1, 4, 8, 0, 0, 0], [0, 0, 0, 0, 1, 1, 3]], native_vector_size = []>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"CPUConvTileAndDecomposeExpert", workload_per_wg = []>
+//      CHECK: hal.executable.entry_point public @conv
+// CHECK-SAME:     translation.info = #[[TRANSLATION]]
+//      CHECK:     linalg.conv_2d_nhwc_hwcf
+
+
+// -----
+
+#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>,
+    #hal.descriptor_set.binding<2, storage_buffer>
+  ]>
+]>
+hal.executable private @depthwise_conv_static {
+  hal.executable.variant public @system_elf_x86_64, target = <"llvm", "system-elf-x86_64", {
+    data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
+    native_vector_size = 16 : index,
+    target_triple = "x86_64-unknown-linux-gnu"
+  }> {
+    hal.executable.entry_point public @depthwise_conv_static layout(#executable_layout)
+    builtin.module {
+      func @depthwise_conv_static() {
         %cst = arith.constant 0.0 : f32
         %input_binding = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer)
             : !flow.dispatch.tensor<readonly:1x161x161x96xf32>
@@ -585,7 +626,7 @@ hal.executable private @conv_static {
 }
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering.config<tile_sizes = {{\[}}[0, 20, 40, 48, 0, 0]{{\]}}, native_vector_size = []>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"CPUDefault", workload_per_wg = []>
-//      CHECK: hal.executable.entry_point public @conv_static
+//      CHECK: hal.executable.entry_point public @depthwise_conv_static
 // CHECK-SAME:     translation.info = #[[TRANSLATION]]
 //      CHECK:     linalg.depthwise_conv_2d_nhwc_hwc
 // CHECK-SAME:       lowering.config  = #[[CONFIG]]

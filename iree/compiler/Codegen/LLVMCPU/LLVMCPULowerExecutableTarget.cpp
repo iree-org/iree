@@ -182,6 +182,10 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
             addDoubleTilingExpertPassPipeline(nestedModulePM);
             break;
           case IREE::Codegen::DispatchLoweringPassPipeline::
+              CPUConvTileAndDecomposeExpert:
+            addConvTileAndDecomposeExpertPassPipeline(nestedModulePM);
+            break;
+          case IREE::Codegen::DispatchLoweringPassPipeline::
               CPUTileFuseAndVectorize:
             addTileFuseAndVectorizePassPipeline(nestedModulePM, lowerToVectors);
             break;

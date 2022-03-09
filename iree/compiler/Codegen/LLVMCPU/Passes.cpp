@@ -259,6 +259,62 @@ void addDoubleTilingExpertPassPipeline(OpPassManager &passManager) {
   }
 }
 
+void addConvTileAndDecomposeExpertPassPipeline(OpPassManager &passManager) {
+  // Do first level of tiling and distribution.
+  passManager.addNestedPass<FuncOp>(createTileAndDistributeToWorkgroupsPass());
+  passManager.addPass(createCanonicalizerPass());
+  passManager.addPass(createCSEPass());
+
+  passManager.addNestedPass<FuncOp>(
+      createConvertToDestinationPassingStylePass());
+
+  passManager.addPass(createCanonicalizerPass());
+
+  // Run LinalgFusePass firstly in case that we have fill + conv + generic
+  // ops. At this stage, we do not apply vectorization. The reduction dim won't
+  // get tiled if the case is conv + generic op. In this case, we have to tile
+  // along reduction dim again, which needs them to be Linalg ops form.
+  {
+    LinalgFusePassOptions options;
+    options.tilingLevel = static_cast<int64_t>(TilingLevel::L1Tiles);
+    passManager.addNestedPass<FuncOp>(createLinalgFusePass(options));
+    passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
+    passManager.addNestedPass<FuncOp>(createCSEPass());
+  }
+
+  // Add the sandbox single tiling expert to tile and vectorize.
+  {
+    LinalgSingleTilingExpertPassOptions options;
+    options.decomposeToLowerDimOp = true;
+    options.vectorize = true;
+    options.vectorizePadding = true;
+    options.tilingLevel = static_cast<int64_t>(TilingLevel::VectorTiles);
+    passManager.addNestedPass<FuncOp>(
+        createLinalgSingleTilingExpertPass(options));
+    passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
+    passManager.addNestedPass<FuncOp>(createCSEPass());
+  }
+
+  BufferizationOptions::AllocationFn allocationFn =
+      cpuComprehensiveBufferizeAllocationFn;
+  BufferizationOptions::DeallocationFn deallocationFn =
+      cpuComprehensiveBufferizeDeallocationFn;
+  BufferizationOptions::MemCpyFn memcpyFn = cpuComprehensiveBufferizeCopyFn;
+  addIREEComprehensiveBufferizePasses(passManager, allocationFn, deallocationFn,
+                                      memcpyFn);
+
+  // Run IREE specific passes before vector lowering expert.
+  passManager.addNestedPass<FuncOp>(createRemoveSingleIterationLoopPass());
+
+  // Add the vector lowering expert.
+  {
+    OpPassManager &nestedFuncPassManager = passManager.nest<FuncOp>();
+    LinalgVectorLoweringPassOptions options;
+    options.splitVectorTransfersTo = "shuffle";
+    addLowerToVectorTransforms(nestedFuncPassManager, options);
+  }
+}
+
 void addTileFuseAndVectorizePassPipeline(OpPassManager &passManager,
                                          bool lowerToVectors) {
   // Do first level of tile and distribute to workgroups.
