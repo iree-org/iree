@@ -43,7 +43,7 @@ def LinalgFuse : Pass<"linalg-fuse", "FuncOp"> {
 
     // IREE specific options
     Option<"tilingLevel", "tiling-level", "int64_t", /*default=*/"-1",
-      "Use default tiling level used to retrieve the configuration from lowering.config">
+      "Use default tiling level used to retrieve the configuration from lowering_config">
   ];
   let dependentDialects = [
     "::mlir::arith::ArithmeticDialect", "::mlir::AffineDialect",
@@ -109,7 +109,7 @@ def LinalgSingleTilingExpert
 
     // IREE specific options
     Option<"tilingLevel", "tiling-level", "int64_t", /*default=*/"-1",
-      "Use default tiling level used to retrieve the configuration from lowering.config">
+      "Use default tiling level used to retrieve the configuration from lowering_config">
   ];
   let dependentDialects = [
     "::mlir::arith::ArithmeticDialect", "::mlir::AffineDialect",

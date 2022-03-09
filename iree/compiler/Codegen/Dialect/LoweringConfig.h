@@ -39,13 +39,13 @@ using TileSizesListTypeRef = ArrayRef<SmallVector<int64_t>>;
 namespace mlir {
 namespace iree_compiler {
 //===----------------------------------------------------------------------===//
-// Helpers for getting/setting iree_codegen.translation.info attribute on the
+// Helpers for getting/setting iree_codegen.translation_info attribute on the
 // `hal.executable.entry_point`
 // ===----------------------------------------------------------------------===//
 
 /// Gets the translate executable info attribute value associated with
 /// `entryPointOp`. It expects that the attribute is stored using the identifier
-/// `translation.info`.
+/// `translation_info`.
 IREE::Codegen::TranslationInfoAttr getTranslationInfo(
     IREE::HAL::ExecutableEntryPointOp entryPointOp);
 /// Returns the translation info for the `funcOp` (by looking at the entry
@@ -91,54 +91,47 @@ inline void setTranslationInfo(
 }
 
 //===----------------------------------------------------------------------===//
-// Helpers for getting/setting `iree_codegen.lowering.config` attribute on root
+// Helpers for getting/setting `iree_codegen.lowering_config` attribute on root
 // operations.
 // ===----------------------------------------------------------------------===//
 
 /// Returns the lowering configuration set for an operation. Returns `nullptr`
 /// if no value is set.  It expects that the attribute is stored using the
-/// identifier `lowering.config`.
+/// identifier `lowering_config`.
 IREE::Codegen::LoweringConfigAttr getLoweringConfig(Operation *op);
 
 /// Returns the tile sizes for a particular operation if the
-/// `iree_codegen.lowering.config` attribute is set on it.
+/// `iree_codegen.lowering_config` attribute is set on it.
 SmallVector<int64_t> getTileSizes(Operation *op, unsigned level);
 SmallVector<Value, 4> getTileSizes(OpBuilder &b, Operation *op, unsigned level);
 
 /// Sets the lowering configuration, overwriting existing attribute values.
 void setLoweringConfig(Operation *op, IREE::Codegen::LoweringConfigAttr config);
 
-/// Sets translation for the entry-point function based on op configuration.
-inline LogicalResult setOpConfigAndEntryPointFnTranslation(
-    FuncOp entryPointFn, Operation *op,
-    IREE::Codegen::LoweringConfigAttr config,
-    IREE::Codegen::DispatchLoweringPassPipeline passPipeline,
-    ArrayRef<int64_t> workgroupSize = {}) {
-  auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
-      entryPointFn->getContext(), passPipeline, ArrayRef<int64_t>{});
-  setTranslationInfo(entryPointFn, translationInfo, workgroupSize);
-  return success();
-}
+/// Convenience function that sets the lowering configuration on the operation
+/// and translation info on the entry point op for the common case of specifying
+/// tile sizes to use for the operation, and pass pipeline to use for the
+/// translation.
 inline LogicalResult setOpConfigAndEntryPointFnTranslation(
     FuncOp entryPointFn, Operation *op, TileSizesListTypeRef tileSizes,
-    ArrayRef<int64_t> nativeVectorSize,
     IREE::Codegen::DispatchLoweringPassPipeline passPipeline,
     ArrayRef<int64_t> workgroupSize = {}) {
   MLIRContext *context = entryPointFn.getContext();
-  auto config = IREE::Codegen::LoweringConfigAttr::get(context, tileSizes,
-                                                       nativeVectorSize);
+  auto config = IREE::Codegen::LoweringConfigAttr::get(context, tileSizes);
   setLoweringConfig(op, config);
-  return setOpConfigAndEntryPointFnTranslation(entryPointFn, op, config,
-                                               passPipeline, workgroupSize);
+  auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
+      entryPointFn->getContext(), passPipeline);
+  setTranslationInfo(entryPointFn, translationInfo, workgroupSize);
+  return success();
 }
 
 //===----------------------------------------------------------------------===//
-// Helpers for getting/setting `iree_codegen.compilation.info` attribute on root
+// Helpers for getting/setting `iree_codegen.compilation_info` attribute on root
 // operations to override IREEs default compilation.
 // ===----------------------------------------------------------------------===//
 
-/// Returns the `#iree_codegen.compilation.info` set on the operation. Assumes
-/// that the identifier used is `compilation.info`.
+/// Returns the `#iree_codegen.compilation_info` set on the operation. Assumes
+/// that the identifier used is `compilation_info`.
 IREE::Codegen::CompilationInfoAttr getCompilationInfo(Operation *op);
 
 /// Sets the `config` to use for compiling the operation. If `op` is the root
@@ -147,7 +140,7 @@ IREE::Codegen::CompilationInfoAttr getCompilationInfo(Operation *op);
 void setCompilationInfo(Operation *op,
                         IREE::Codegen::CompilationInfoAttr config);
 
-/// Removes the `#iree_codegen.compilation.info` attribute that is set on the
+/// Removes the `#iree_codegen.compilation_info` attribute that is set on the
 /// operation.
 void eraseCompilationInfo(Operation *op);
 

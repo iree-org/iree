@@ -328,7 +328,6 @@ static LogicalResult setDefaultRootConfig(
   tileSizes.emplace_back(std::move(flowTileSizes));
   return setOpConfigAndEntryPointFnTranslation(
       entryPointFn, partitionableLoopsInterfaceOp, tileSizes,
-      /*nativeVectorSize=*/ArrayRef<int64_t>{},
       DispatchLoweringPassPipeline::CPUDefault);
 }
 
@@ -357,7 +356,7 @@ static LogicalResult setX86SandboxRootConfig(FuncOp entryPointFn,
   tileSizes.push_back(vectorTileSizes);
 
   return setOpConfigAndEntryPointFnTranslation(
-      entryPointFn, op, tileSizes, /*nativeVectorSize=*/ArrayRef<int64_t>{},
+      entryPointFn, op, tileSizes,
       DispatchLoweringPassPipeline::CPUDoubleTilingExpert);
 }
 
@@ -388,7 +387,7 @@ static LogicalResult setX86TileFuseAndVectorizeRootConfig(
   tileSizes.push_back(vectorTileSizes);
 
   return setOpConfigAndEntryPointFnTranslation(
-      entryPointFn, op, tileSizes, vectorTileSizes,
+      entryPointFn, op, tileSizes,
       DispatchLoweringPassPipeline::CPUTileFuseAndVectorize);
 }
 
@@ -421,7 +420,7 @@ static LogicalResult setARMRootConfig(FuncOp entryPointFn,
   tileSizes.push_back(vectorTileSizes);
 
   return setOpConfigAndEntryPointFnTranslation(
-      entryPointFn, op, tileSizes, vectorTileSizes,
+      entryPointFn, op, tileSizes,
       DispatchLoweringPassPipeline::CPUTileFuseAndVectorize);
 }
 
@@ -524,7 +523,7 @@ static LogicalResult setRootConfig(
                                  nativeVectorSize};
 
   return setOpConfigAndEntryPointFnTranslation(
-      entryPointFn, mmt4dOp, tileSizes, nativeVectorSize,
+      entryPointFn, mmt4dOp, tileSizes,
       DispatchLoweringPassPipeline::CPUTileFuseAndVectorize);
 }
 
@@ -558,8 +557,7 @@ static LogicalResult setRootConfig(
   }
   TileSizesListType tileSizes = {workgroupTileSizes};
   return setOpConfigAndEntryPointFnTranslation(
-      entryPointFn, fftOp, tileSizes, /*nativeVectorSize=*/ArrayRef<int64_t>{},
-      DispatchLoweringPassPipeline::CPUDefault);
+      entryPointFn, fftOp, tileSizes, DispatchLoweringPassPipeline::CPUDefault);
 }
 
 /// Sets the lowering configuration for a generic op to use DoubleTilingExpert.
@@ -633,7 +631,6 @@ static LogicalResult setRootConfig(
   tileSizes.push_back(vectorTileSizes);
   return setOpConfigAndEntryPointFnTranslation(
       entryPointFn, genericOp, tileSizes,
-      /*nativeVectorSize=*/ArrayRef<int64_t>{},
       DispatchLoweringPassPipeline::CPUDoubleTilingExpert);
 }
 
@@ -684,7 +681,6 @@ static LogicalResult setRootConfig(
   tileSizes.push_back(vectorTileSizes);
   return setOpConfigAndEntryPointFnTranslation(
       entryPointFn, convOp, tileSizes,
-      /*nativeVectorSize=*/ArrayRef<int64_t>{},
       DispatchLoweringPassPipeline::CPUConvTileAndDecomposeExpert);
 }
 

@@ -62,11 +62,11 @@ hal.executable private @conv_pointwise_112x112x32 {
   }
 }
 
-//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering.config<tile_sizes = {{\[}}[0, 4, 4, 32], [0, 2, 2, 4], [0, 0, 0, 0, 1, 1, 4]{{\]}}, native_vector_size = []>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"SPIRVVectorize", workload_per_wg = []>
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[0, 4, 4, 32], [0, 2, 2, 4], [0, 0, 0, 0, 1, 1, 4]{{\]}}>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVVectorize>
 //      CHECK: hal.executable.entry_point public @conv_pointwise_112x112x32
-// CHECK-SAME:   translation.info = #[[TRANSLATION]]
+// CHECK-SAME:   translation_info = #[[TRANSLATION]]
 // CHECK-SAME:   workgroup_size = [8 : index, 2 : index, 2 : index]
 //      CHECK: func @conv_pointwise_112x112x32()
 //      CHECK:   linalg.conv_2d_nhwc_hwcf
-// CHECK-SAME:     lowering.config = #[[CONFIG]]
+// CHECK-SAME:     lowering_config = #[[CONFIG]]

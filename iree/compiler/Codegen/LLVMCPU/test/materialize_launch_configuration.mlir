@@ -44,12 +44,12 @@ hal.executable private @matmul_tensors  {
     }
   }
 }
-//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering.config<tile_sizes = {{\[}}[64, 64, 0], [16, 4, 64], [4, 4, 4]{{\]}}, native_vector_size = [4, 4, 4]>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"CPUTileFuseAndVectorize", workload_per_wg = []>
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[64, 64, 0], [16, 4, 64], [4, 4, 4]{{\]}}>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUTileFuseAndVectorize>
 //      CHECK: hal.executable.entry_point public @matmul_tensors
-// CHECK-SAME:     translation.info = #[[TRANSLATION]]
+// CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK: linalg.matmul
-// CHECK-SAME:     lowering.config = #[[CONFIG]]
+// CHECK-SAME:     lowering_config = #[[CONFIG]]
 
 // -----
 
@@ -94,12 +94,12 @@ hal.executable private @add {
     }
   }
 }
-//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering.config<tile_sizes = {{\[}}[64, 64], [1, 4], [0, 0]], native_vector_size = []>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"CPUDoubleTilingExpert", workload_per_wg = []>
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[64, 64], [1, 4], [0, 0]]>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert>
 //      CHECK: hal.executable.entry_point public @add
-// CHECK-SAME:     translation.info = #[[TRANSLATION]]
+// CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK: linalg.generic
-// CHECK-SAME:     lowering.config = #[[CONFIG]]
+// CHECK-SAME:     lowering_config = #[[CONFIG]]
 
 // -----
 
@@ -152,12 +152,12 @@ hal.executable private @add4D  {
   }
 }
 
-//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering.config<tile_sizes = {{\[}}[0, 64, 64, 64], [1, 1, 1, 4], [0, 0, 0, 0]], native_vector_size = []>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"CPUDoubleTilingExpert", workload_per_wg = []>
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[0, 64, 64, 64], [1, 1, 1, 4], [0, 0, 0, 0]]>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert>
 //      CHECK: hal.executable.entry_point public @add4D
-// CHECK-SAME:     translation.info = #[[TRANSLATION]]
+// CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK: linalg.generic
-// CHECK-SAME:     lowering.config = #[[CONFIG]]
+// CHECK-SAME:     lowering_config = #[[CONFIG]]
 
 // -----
 
@@ -203,18 +203,18 @@ hal.executable private @batch_matmul_tensors {
     }
   }
 }
-//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering.config<tile_sizes = {{\[}}[1, 64, 64, 0], [1, 16, 4, 64], [1, 4, 4, 4]{{\]}}, native_vector_size = [1, 4, 4, 4]>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"CPUTileFuseAndVectorize", workload_per_wg = []>
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 64, 64, 0], [1, 16, 4, 64], [1, 4, 4, 4]{{\]}}>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUTileFuseAndVectorize>
 //      CHECK: hal.executable.entry_point public @batch_matmul_tensors
-// CHECK-SAME:     translation.info = #[[TRANSLATION]]
+// CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK:  linalg.batch_matmul
-// CHECK-SAME:     lowering.config = #[[CONFIG]]
+// CHECK-SAME:     lowering_config = #[[CONFIG]]
 
 // -----
 
-#compilation = #iree_codegen.compilation.info<
-    #iree_codegen.lowering.config<tile_sizes = [[64, 64, 0], [32, 32, 0], [0, 0, 32]], native_vector_size = []>,
-    #iree_codegen.translation.info<"CPUDoubleTilingExpert", workload_per_wg = []>,
+#compilation = #iree_codegen.compilation_info<
+    lowering_config = <tile_sizes = [[64, 64, 0], [32, 32, 0], [0, 0, 32]]>,
+    translation_info  = <CPUDoubleTilingExpert>,
     workgroup_size = []>
 #executable_layout = #hal.executable.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
@@ -241,7 +241,7 @@ hal.executable private @preset_config_matmul_tensors  {
             : !flow.dispatch.tensor<readonly:256x512xf32> -> tensor<256x512xf32>
         %init = linalg.init_tensor [128, 512] : tensor<128x512xf32>
         %fill = linalg.fill(%cst, %init) : f32, tensor<128x512xf32> -> tensor<128x512xf32>
-        %gemm = linalg.matmul {compilation.info = #compilation}
+        %gemm = linalg.matmul {compilation_info = #compilation}
             ins(%lhs, %rhs : tensor<128x256xf32>, tensor<256x512xf32>)
             outs(%fill : tensor<128x512xf32>) -> tensor<128x512xf32>
         flow.dispatch.tensor.store %gemm, %result_binding, offsets = [0, 0], sizes = [128, 512], strides = [1, 1]
@@ -252,13 +252,13 @@ hal.executable private @preset_config_matmul_tensors  {
   }
 }
 
-//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering.config<tile_sizes = {{\[}}[64, 64, 0], [32, 32, 0], [0, 0, 32]], native_vector_size = []>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"CPUDoubleTilingExpert", workload_per_wg = []>
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[64, 64, 0], [32, 32, 0], [0, 0, 32]]>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert>
 //      CHECK: hal.executable.entry_point
-// CHECK-SAME:     translation.info = #[[TRANSLATION]]
+// CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK: func @preset_config
 //      CHECK:   linalg.matmul
-// CHECK-SAME:       lowering.config = #[[CONFIG]]
+// CHECK-SAME:       lowering_config = #[[CONFIG]]
 
 // -----
 
@@ -296,12 +296,12 @@ hal.executable @tensor_insert {
   }
 }
 
-//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering.config<tile_sizes = {{\[}}[64, 64]{{\]}}, native_vector_size = []>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"CPUDefault", workload_per_wg = []>
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[64, 64]{{\]}}>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDefault>
 //      CHECK: hal.executable.entry_point public @tensor_insert_slice
-// CHECK-SAME:     translation.info = #[[TRANSLATION]]
+// CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK: tensor.insert_slice
-// CHECK-SAME:     lowering.config = #[[CONFIG]]
+// CHECK-SAME:     lowering_config = #[[CONFIG]]
 
 // -----
 
@@ -339,12 +339,12 @@ hal.executable @extract_slice {
   }
 }
 
-//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering.config<tile_sizes = {{\[}}[64, 64]{{\]}}, native_vector_size = []>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"CPUDefault", workload_per_wg = []>
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[64, 64]{{\]}}>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDefault>
 //      CHECK: hal.executable.entry_point public @extract_slice
-// CHECK-SAME:     translation.info = #[[TRANSLATION]]
+// CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK: tensor.extract_slice
-// CHECK-SAME:     lowering.config = #[[CONFIG]]
+// CHECK-SAME:     lowering_config = #[[CONFIG]]
 
 
 // -----
@@ -377,13 +377,13 @@ hal.executable private @static_1d_fft_stage2  {
   }
 }
 
-//   CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering.config<tile_sizes = {{\[}}[64]{{\]}}, native_vector_size = []>
-//   CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"CPUDefault", workload_per_wg = []>
+//   CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[64]{{\]}}>
+//   CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDefault>
 //       CHECK: hal.executable.entry_point public @static_1d_fft_stage2
-//  CHECK-SAME:     translation.info = #[[TRANSLATION]]
+//  CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //       CHECK: func @static_1d_fft_stage2()
 //       CHECK:   iree_linalg_ext.fft
-//  CHECK-SAME:       lowering.config = #[[CONFIG]]
+//  CHECK-SAME:       lowering_config = #[[CONFIG]]
 
 // -----
 
@@ -414,13 +414,13 @@ hal.executable private @static_3d_fft_stage3  {
   }
 }
 
-//   CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering.config<tile_sizes = {{\[}}[64, 64, 64]{{\]}}, native_vector_size = []>
-//   CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"CPUDefault", workload_per_wg = []>
+//   CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[64, 64, 64]{{\]}}>
+//   CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDefault>
 //       CHECK: hal.executable.entry_point public @static_3d_fft_stage3
-//  CHECK-SAME:     translation.info = #[[TRANSLATION]]
+//  CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //       CHECK: func @static_3d_fft_stage3()
 //       CHECK:   iree_linalg_ext.fft
-//  CHECK-SAME:       lowering.config = #[[CONFIG]]
+//  CHECK-SAME:       lowering_config = #[[CONFIG]]
 
 // -----
 
@@ -476,15 +476,15 @@ hal.executable private @outs_fusion {
     }
   }
 }
-//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering.config<tile_sizes = {{\[}}[64, 64, 0], [1, 4, 0], [0, 0, 4]{{\]}}, native_vector_size = []>
-//      CHECK: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"CPUDoubleTilingExpert", workload_per_wg = []>
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[64, 64, 0], [1, 4, 0], [0, 0, 4]{{\]}}>
+//      CHECK: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert>
 //      CHECK: hal.executable.entry_point public @outs_fusion_fn
-// CHECK-SAME:   translation.info = #[[TRANSLATION]]
+// CHECK-SAME:   translation_info = #[[TRANSLATION]]
 //      CHECK: func @outs_fusion_fn()
 //      CHECK:   linalg.generic
-//  CHECK-NOT:   lowering.config
+//  CHECK-NOT:   lowering_config
 //      CHECK:   linalg.generic
-// CHECK-SAME:       lowering.config = #[[CONFIG]]
+// CHECK-SAME:       lowering_config = #[[CONFIG]]
 
 // -----
 
@@ -536,11 +536,12 @@ hal.executable private @conv {
   }
 }
 
-//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering.config<tile_sizes = {{\[}}[0, 64, 64, 64, 0, 0, 0], [1, 1, 8, 8, 0, 0, 0], [0, 0, 0, 0, 1, 1, 8]], native_vector_size = []>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"CPUConvTileAndDecomposeExpert", workload_per_wg = []>
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[0, 64, 64, 64, 0, 0, 0], [1, 1, 8, 8, 0, 0, 0], [0, 0, 0, 0, 1, 1, 8]]>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUConvTileAndDecomposeExpert>
 //      CHECK: hal.executable.entry_point public @conv
-// CHECK-SAME:     translation.info = #[[TRANSLATION]]
+// CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK:     linalg.conv_2d_nhwc_hwcf
+//      CHECK:         lowering_config = #[[CONFIG]]
 
 // -----
 
@@ -577,10 +578,10 @@ hal.executable private @conv_static {
     }
   }
 }
-//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering.config<tile_sizes = {{\[}}[0, 28, 28, 16, 0, 0, 0], [1, 1, 4, 8, 0, 0, 0], [0, 0, 0, 0, 1, 1, 3]], native_vector_size = []>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"CPUConvTileAndDecomposeExpert", workload_per_wg = []>
-//      CHECK: hal.executable.entry_point public @conv
-// CHECK-SAME:     translation.info = #[[TRANSLATION]]
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[0, 28, 28, 16, 0, 0, 0], [1, 1, 4, 8, 0, 0, 0], [0, 0, 0, 0, 1, 1, 3]]>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUConvTileAndDecomposeExpert>
+//      CHECK: hal.executable.entry_point public @conv_static
+// CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK:     linalg.conv_2d_nhwc_hwcf
 
 
@@ -624,12 +625,12 @@ hal.executable private @depthwise_conv_static {
     }
   }
 }
-//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering.config<tile_sizes = {{\[}}[0, 20, 40, 48, 0, 0]{{\]}}, native_vector_size = []>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"CPUDefault", workload_per_wg = []>
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[0, 20, 40, 48, 0, 0]{{\]}}>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDefault>
 //      CHECK: hal.executable.entry_point public @depthwise_conv_static
-// CHECK-SAME:     translation.info = #[[TRANSLATION]]
+// CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK:     linalg.depthwise_conv_2d_nhwc_hwc
-// CHECK-SAME:       lowering.config  = #[[CONFIG]]
+// CHECK-SAME:       lowering_config  = #[[CONFIG]]
 
 // -----
 
@@ -669,12 +670,12 @@ hal.executable private @generic_static {
     }
   }
 }
-//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering.config<tile_sizes = {{\[}}[16, 32], [16, 16], [0, 0]], native_vector_size = []>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"CPUDoubleTilingExpert", workload_per_wg = []>
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[16, 32], [16, 16], [0, 0]]>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert>
 //      CHECK: hal.executable.entry_point public @generic_static
-// CHECK-SAME:     translation.info = #[[TRANSLATION]]
+// CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK:   linalg.generic
-//      CHECK:       lowering.config = #[[CONFIG]]
+//      CHECK:       lowering_config = #[[CONFIG]]
 
 // -----
 
@@ -717,12 +718,12 @@ hal.executable private @matmul_static {
   }
 }
 
-//   CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering.config<tile_sizes = {{\[}}[28, 8, 0], [4, 4, 60], [4, 4, 4]{{\]}}, native_vector_size = [4, 4, 4]>
-//   CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"CPUTileFuseAndVectorize", workload_per_wg = []>
+//   CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[28, 8, 0], [4, 4, 60], [4, 4, 4]{{\]}}>
+//   CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUTileFuseAndVectorize>
 //       CHECK: hal.executable.entry_point public @matmul_static
-//  CHECK-SAME:     translation.info = #[[TRANSLATION]]
+//  CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //       CHECK: linalg.matmul
-//  CHECK-SAME:     lowering.config = #[[CONFIG]]
+//  CHECK-SAME:     lowering_config = #[[CONFIG]]
 
 // -----
 
@@ -765,12 +766,12 @@ hal.executable private @restrict_num_workgroups {
     }
   }
 }
-//   CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering.config<tile_sizes = {{\[}}[0, 1, 7, 64, 0, 0]{{\]}}, native_vector_size = []>
-//   CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"CPUDefault", workload_per_wg = []>
+//   CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[0, 1, 7, 64, 0, 0]{{\]}}>
+//   CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDefault>
 //       CHECK: hal.executable.entry_point public @restrict_num_workgroups
-//  CHECK-SAME:     translation.info = #[[TRANSLATION]]
+//  CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //       CHECK: linalg.depthwise_conv_2d_nhwc_hwc
-//  CHECK-SAME:     lowering.config = #[[CONFIG]]
+//  CHECK-SAME:     lowering_config = #[[CONFIG]]
 
 
 // -----
@@ -813,12 +814,12 @@ hal.executable private @matmul_x86  {
   }
 }
 
-//  CHECK-DAG: #[[CONFIG:.+]] =  #iree_codegen.lowering.config<tile_sizes = {{\[}}[64, 64, 0], [8, 32, 0], [0, 0, 16]{{\]}}, native_vector_size = []>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"CPUDoubleTilingExpert", workload_per_wg = []>
+//  CHECK-DAG: #[[CONFIG:.+]] =  #iree_codegen.lowering_config<tile_sizes = {{\[}}[64, 64, 0], [8, 32, 0], [0, 0, 16]{{\]}}>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert>
 //      CHECK: hal.executable.entry_point public @matmul_x86
-// CHECK-SAME:     translation.info = #[[TRANSLATION]]
+// CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK: linalg.matmul
-// CHECK-SAME:     lowering.config = #[[CONFIG]]
+// CHECK-SAME:     lowering_config = #[[CONFIG]]
 
 // -----
 
@@ -871,12 +872,12 @@ hal.executable private @reduction {
     }
   }
 }
-//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering.config<tile_sizes = {{\[}}[4, 0, 0], [4, 0, 0], [0, 1, 4]{{\]}}, native_vector_size = []>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"CPUDoubleTilingExpert", workload_per_wg = []>
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[4, 0, 0], [4, 0, 0], [0, 1, 4]{{\]}}>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert>
 //      CHECK: hal.executable.entry_point public @predict_dispatch_86
-// CHECK-SAME:     translation.info = #[[TRANSLATION]]
+// CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK: linalg.generic {indexing_maps = [#{{.+}}, #{{.+}}], iterator_types = ["parallel", "reduction", "reduction"]}
-// CHECK-SAME:     lowering.config = #[[CONFIG]]
+// CHECK-SAME:     lowering_config = #[[CONFIG]]
 
 // -----
 
@@ -923,12 +924,12 @@ hal.executable private @matmul_i8_i8_i32  {
   }
 }
 
-//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering.config<tile_sizes = {{\[}}[64, 64, 0], [8, 8, 8], [1, 4, 4]{{\]}}, native_vector_size = [1, 4, 4]>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"CPUTileFuseAndVectorize", workload_per_wg = []>
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[64, 64, 0], [8, 8, 8], [1, 4, 4]{{\]}}>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUTileFuseAndVectorize>
 //      CHECK: hal.executable.entry_point public @matmul_i8_i8_i32
-// CHECK-SAME:     translation.info = #[[TRANSLATION]]
+// CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK:   linalg.matmul
-// CHECK-SAME:       lowering.config = #[[CONFIG]]
+// CHECK-SAME:       lowering_config = #[[CONFIG]]
 
 // -----
 
@@ -976,12 +977,12 @@ hal.executable private @gemm_unit_N {
     }
   }
 }
-//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering.config<tile_sizes = {{\[}}[64, 0, 0], [8, 0, 0], [0, 0, 16]], native_vector_size = []>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"CPUDoubleTilingExpert", workload_per_wg = []>
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[64, 0, 0], [8, 0, 0], [0, 0, 16]]>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert>
 //      CHECK: hal.executable.entry_point public @gemm_unit_N
-// CHECK-SAME:       translation.info = #[[TRANSLATION]]
+// CHECK-SAME:       translation_info = #[[TRANSLATION]]
 //      CHECK:   linalg.matmul
-// CHECK-SAME:       lowering.config = #[[CONFIG]]
+// CHECK-SAME:       lowering_config = #[[CONFIG]]
 
 // -----
 
@@ -1023,12 +1024,12 @@ hal.executable private @gemm_unit_M_unit_N {
     }
   }
 }
-//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering.config<tile_sizes = {{\[}}[0, 0, 0], [0, 0, 0], [0, 0, 16]], native_vector_size = []>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"CPUDoubleTilingExpert", workload_per_wg = []>
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[0, 0, 0], [0, 0, 0], [0, 0, 16]]>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert>
 //      CHECK: hal.executable.entry_point public @gemm_unit_M_unit_N
-// CHECK-SAME:       translation.info = #[[TRANSLATION]]
+// CHECK-SAME:       translation_info = #[[TRANSLATION]]
 //      CHECK:   linalg.matmul
-// CHECK-SAME:       lowering.config = #[[CONFIG]]
+// CHECK-SAME:       lowering_config = #[[CONFIG]]
 
 // -----
 
@@ -1078,12 +1079,12 @@ hal.executable private @generic_unit_dims {
     }
   }
 }
-//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering.config<tile_sizes = {{\[}}[0, 0, 0, 0, 64, 64, 0, 64], [0, 1, 0, 0, 1, 1, 0, 4], [0, 0, 0, 0, 0, 0, 0, 0]{{\]}}, native_vector_size = []>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"CPUDoubleTilingExpert", workload_per_wg = []>
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[0, 0, 0, 0, 64, 64, 0, 64], [0, 1, 0, 0, 1, 1, 0, 4], [0, 0, 0, 0, 0, 0, 0, 0]{{\]}}>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert>
 //      CHECK: hal.executable.entry_point public @generic_unit_dim
-// CHECK-SAME:     translation.info = #[[TRANSLATION]]
+// CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK: linalg.generic
-// CHECK-SAME:     lowering.config = #[[CONFIG]]
+// CHECK-SAME:     lowering_config = #[[CONFIG]]
 
 // -----
 
@@ -1123,12 +1124,12 @@ hal.executable private @reduce_to_scalar {
     }
   }
 }
-//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering.config<tile_sizes = {{\[}}[0], [0], [4]{{\]}}, native_vector_size = []>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"CPUDoubleTilingExpert", workload_per_wg = []>
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[0], [0], [4]{{\]}}>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert>
 //      CHECK: hal.executable.entry_point public @reduce_to_scalar
-// CHECK-SAME:     translation.info = #[[TRANSLATION]]
+// CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK: linalg.generic
-// CHECK-SAME:     lowering.config = #[[CONFIG]]
+// CHECK-SAME:     lowering_config = #[[CONFIG]]
 
 // -----
 
@@ -1168,6 +1169,6 @@ hal.executable private @scalar {
     }
   }
 }
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"CPUDefault", workload_per_wg = []>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDefault>
 //      CHECK: hal.executable.entry_point public @scalar
-// CHECK-SAME:     translation.info = #[[TRANSLATION]]
+// CHECK-SAME:     translation_info = #[[TRANSLATION]]

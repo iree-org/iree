@@ -118,9 +118,8 @@ static LogicalResult setContractConfig(FuncOp entryPoint, linalg::LinalgOp op) {
 
         tileSizes.emplace_back(
             std::move(workgroupTileSizes));  // Workgroup level.
-        return setOpConfigAndEntryPointFnTranslation(
-            entryPoint, op, tileSizes,
-            /*nativeVectorSizes=*/ArrayRef<int64_t>{}, pipeline, workgroupSize);
+        return setOpConfigAndEntryPointFnTranslation(entryPoint, op, tileSizes,
+                                                     pipeline, workgroupSize);
       };
   // Infer the MxN size of the matmul based on operands and indexing maps.
   auto lhsShape =
@@ -233,7 +232,7 @@ static LogicalResult setFftConfig(FuncOp entryPoint,
   }
   TileSizesListType tileSizes = {workgroupTileSize};
   return setOpConfigAndEntryPointFnTranslation(
-      entryPoint, op, tileSizes, /*nativeVectorSizes=*/ArrayRef<int64_t>{},
+      entryPoint, op, tileSizes,
       IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUDistribute,
       workgroupSize);
 }
@@ -246,7 +245,7 @@ static LogicalResult setSortConfig(FuncOp entryPoint, Operation *op) {
   if (partitionedLoops.empty()) {
     tileSizes.push_back({});
     return setOpConfigAndEntryPointFnTranslation(
-        entryPoint, op, tileSizes, /*nativeVectorSizes=*/ArrayRef<int64_t>{},
+        entryPoint, op, tileSizes,
         IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUDistribute,
         {1, 1, 1});
   }
@@ -272,7 +271,7 @@ static LogicalResult setSortConfig(FuncOp entryPoint, Operation *op) {
   }
   tileSizes.emplace_back(std::move(workgroupTileSizes));  // Workgroup level
   return setOpConfigAndEntryPointFnTranslation(
-      entryPoint, op, tileSizes, /*nativeVectorSizes=*/ArrayRef<int64_t>{},
+      entryPoint, op, tileSizes,
       IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUDistribute,
       workgroupSize);
 }
@@ -287,9 +286,8 @@ static LogicalResult setRootDefaultConfig(FuncOp entryPoint, Operation *op) {
       interfaceOp.getPartitionableLoops(kNumMaxParallelDims);
   if (partitionedLoops.empty()) {
     tileSizes.push_back({});
-    return setOpConfigAndEntryPointFnTranslation(
-        entryPoint, op, tileSizes, /*nativeVectorSizes=*/ArrayRef<int64_t>{},
-        passPipeline, {1, 1, 1});
+    return setOpConfigAndEntryPointFnTranslation(entryPoint, op, tileSizes,
+                                                 passPipeline, {1, 1, 1});
   }
 
   size_t numLoops = partitionedLoops.back() + 1;
@@ -351,7 +349,7 @@ static LogicalResult setRootDefaultConfig(FuncOp entryPoint, Operation *op) {
   }
   tileSizes.emplace_back(std::move(workgroupTileSizes));  // Workgroup level
   return setOpConfigAndEntryPointFnTranslation(
-      entryPoint, op, tileSizes, /*nativeVectorSizes=*/ArrayRef<int64_t>{},
+      entryPoint, op, tileSizes,
       IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUVectorize,
       workgroupSize);
 }

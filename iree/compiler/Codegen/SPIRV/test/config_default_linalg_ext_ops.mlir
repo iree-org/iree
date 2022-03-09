@@ -33,14 +33,14 @@ hal.executable private @static_1d_sort {
 
 // Check that the workgroup count and size are (1, 1, 1) for serializing the computation.
 
-//   CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering.config<tile_sizes = [], native_vector_size = []>
-//   CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"SPIRVDistribute", workload_per_wg = []>
+//   CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = []>
+//   CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVDistribute>
 //       CHECK: hal.executable.entry_point public @static_1d_sort
-//  CHECK-SAME:   translation.info = #[[TRANSLATION]]
+//  CHECK-SAME:   translation_info = #[[TRANSLATION]]
 //  CHECK-SAME:   workgroup_size = [1 : index, 1 : index, 1 : index]
 //       CHECK: func @static_1d_sort()
 //       CHECK:   iree_linalg_ext.sort
-//  CHECK-SAME:     lowering.config = #[[CONFIG]]
+//  CHECK-SAME:     lowering_config = #[[CONFIG]]
 
 // -----
 
@@ -82,14 +82,14 @@ hal.executable private @static_3d_sort {
   }
 }
 
-//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering.config<tile_sizes = {{\[}}[1, 0, 16], [1, 0, 1]{{\]}}, native_vector_size = []>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"SPIRVDistribute", workload_per_wg = []>
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 0, 16], [1, 0, 1]{{\]}}>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVDistribute>
 //      CHECK: hal.executable.entry_point public @static_3d_sort
-// CHECK-SAME:   translation.info = #[[TRANSLATION]]
+// CHECK-SAME:   translation_info = #[[TRANSLATION]]
 // CHECK-SAME:   workgroup_size = [16 : index, 1 : index, 1 : index]
 //      CHECK: func @static_3d_sort()
 //      CHECK:   iree_linalg_ext.sort
-// CHECK-SAME:     lowering.config = #[[CONFIG]]
+// CHECK-SAME:     lowering_config = #[[CONFIG]]
 
 // -----
 
@@ -127,14 +127,14 @@ hal.executable private @static_1d_fft_stage2 {
   }
 }
 
-//   CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering.config<tile_sizes = {{\[}}[4]{{\]}}, native_vector_size = []>
-//   CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"SPIRVDistribute", workload_per_wg = []>
+//   CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[4]{{\]}}>
+//   CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVDistribute>
 //       CHECK: hal.executable.entry_point public @static_1d_fft_stage2
-//  CHECK-SAME:   translation.info = #[[TRANSLATION]]
+//  CHECK-SAME:   translation_info = #[[TRANSLATION]]
 //  CHECK-SAME:   workgroup_size = [16 : index, 1 : index, 1 : index]
 //       CHECK: func @static_1d_fft_stage2()
 //       CHECK:   iree_linalg_ext.fft
-//  CHECK-SAME:     lowering.config = #[[CONFIG]]
+//  CHECK-SAME:     lowering_config = #[[CONFIG]]
 
 // -----
 
@@ -176,14 +176,14 @@ hal.executable private @static_3d_fft_stage3 {
 }
 
 
-//   CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering.config<tile_sizes = {{\[}}[1, 1, 8]{{\]}}, native_vector_size = []>
-//   CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"SPIRVDistribute", workload_per_wg = []>
+//   CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 1, 8]{{\]}}>
+//   CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVDistribute>
 //       CHECK: hal.executable.entry_point public @static_3d_fft_stage3
-//  CHECK-SAME:   translation.info = #[[TRANSLATION]]
+//  CHECK-SAME:   translation_info = #[[TRANSLATION]]
 //  CHECK-SAME:   workgroup_size = [16 : index, 1 : index, 1 : index]
 //       CHECK: func @static_3d_fft_stage3()
 //       CHECK:   iree_linalg_ext.fft
-//  CHECK-SAME:     lowering.config = #[[CONFIG]]
+//  CHECK-SAME:     lowering_config = #[[CONFIG]]
 
 // -----
 
@@ -229,9 +229,9 @@ hal.executable private @tensor_insert {
 }
 // Check that the pipeline is set to `SPIRVDistributeAndCopy`
 
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"SPIRVDistributeCopy", workload_per_wg = []>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVDistributeCopy>
 //      CHECK: tensor.insert_slice
-//  CHECK-NOT:     lowering.config
+//  CHECK-NOT:     lowering_config
 
 // -----
 
@@ -273,6 +273,6 @@ hal.executable private @tensor_extract {
     }
   }
 }
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation.info<"SPIRVDistributeCopy", workload_per_wg = []>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVDistributeCopy>
 //      CHECK: tensor.extract_slice
-//  CHECK-NOT:     lowering.config
+//  CHECK-NOT:     lowering_config
