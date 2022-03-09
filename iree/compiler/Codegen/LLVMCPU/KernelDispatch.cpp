@@ -277,12 +277,12 @@ static SmallVector<int64_t> getDefaultDistributedLevelTileSizes(
   return distributedLevelTileSizes;
 }
 
+/// Splits the tile sizes in parallelSizes into reductionSizes for the reduction
+/// loops.
 static void splitParallelAndReductionTiles(
-    linalg::LinalgOp op, ArrayRef<int64_t> tileSizes,
-    SmallVectorImpl<int64_t> &parallelSizes,
+    linalg::LinalgOp op, SmallVectorImpl<int64_t> &parallelSizes,
     SmallVectorImpl<int64_t> &reductionSizes) {
-  parallelSizes.assign(tileSizes.begin(), tileSizes.end());
-  reductionSizes.assign(tileSizes.begin(), tileSizes.end());
+  reductionSizes.assign(parallelSizes.begin(), parallelSizes.end());
   for (auto iteratorType : llvm::enumerate(op.iterator_types())) {
     if (iteratorType.value().cast<StringAttr>().getValue() ==
         getParallelIteratorTypeName()) {
@@ -625,8 +625,7 @@ static LogicalResult setRootConfig(
     }
   }
   SmallVector<int64_t> vectorTileSizes;
-  splitParallelAndReductionTiles(linalgOp, l1TileSizes, l1TileSizes,
-                                 vectorTileSizes);
+  splitParallelAndReductionTiles(linalgOp, l1TileSizes, vectorTileSizes);
 
   TileSizesListType tileSizes;
   tileSizes.push_back(flowTileSizes);
@@ -677,8 +676,7 @@ static LogicalResult setRootConfig(
     }
   }
   SmallVector<int64_t> vectorTileSizes;
-  splitParallelAndReductionTiles(linalgOp, l1TileSizes, l1TileSizes,
-                                 vectorTileSizes);
+  splitParallelAndReductionTiles(linalgOp, l1TileSizes, vectorTileSizes);
 
   TileSizesListType tileSizes;
   tileSizes.push_back(flowTileSizes);
