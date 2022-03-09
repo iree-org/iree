@@ -360,7 +360,9 @@ struct AdaptLinalgInputOperandToOutputOperand
     auto outputOperand = op.getOutputOperand(0);
     if (op.payloadUsesValueFromOperand(outputOperand)) return failure();
 
-    // Find an input operand that has the same indexing map and type.
+    // Find an input operand which meets:
+    //   1. It has the same indexing map and type.
+    //   2. It is not from a readonly tensor.
     OpOperand *operand = nullptr;
     SmallVector<Value> newOperands;
     SmallVector<AffineMap> maps;
