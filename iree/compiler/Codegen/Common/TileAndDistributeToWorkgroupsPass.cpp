@@ -304,8 +304,6 @@ void TileAndDistributeToWorkgroupsPass::runOnOperation() {
   patterns.insert<TileAndDistributeLinalgOpsPattern,
                   IREE::LinalgExt::TiledOpInterfaceTilingPattern>(
       context, linalgTilingOptions, linalg::LinalgTransformationFilter(marker));
-  patterns.insert<linalg::ExtractSliceOfPadTensorSwapPattern>(
-      context, [](tensor::ExtractSliceOp) { return false; });
   if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
     return signalPassFailure();
   }

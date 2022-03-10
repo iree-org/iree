@@ -136,6 +136,7 @@ static void addSPIRVLoweringPasses(OpPassManager &pm) {
 
 void addSPIRVTileAndVectorizePassPipeline(OpPassManager &pm) {
   pm.addNestedPass<FuncOp>(createTileAndDistributeToWorkgroupsPass());
+  pm.addNestedPass<FuncOp>(createSPIRVFuseTensorPadWithConsumerPass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 

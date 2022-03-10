@@ -26,6 +26,7 @@ iree_cc_library(
     "Passes.cpp"
     "SPIRVCreateFastSlowPath.cpp"
     "SPIRVDistribute.cpp"
+    "SPIRVFuseTensorPadWithConsumer.cpp"
     "SPIRVInitConfigPass.cpp"
     "SPIRVLowerExecutableTargetPass.cpp"
     "SPIRVTile.cpp"

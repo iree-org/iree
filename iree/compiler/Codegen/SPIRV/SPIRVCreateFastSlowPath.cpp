@@ -112,7 +112,7 @@ struct CreateFastSlowPath final : public OpRewritePattern<scf::ForOp> {
       for (Operation *op : cloneOps) {
         if (op == padOp.getOperation()) {
           // We can elide the tensor.pad op. Just use its source.
-          bvm.map(padOp.getResult(), bvm.lookup(padOp.source()));
+          bvm.map(padOp.getResult(), bvm.lookupOrDefault(padOp.source()));
         } else {
           builder.clone(*op, bvm);
         }
@@ -137,10 +137,26 @@ struct SPIRVCreateFastSlowPathPass final
     : public SPIRVCreateFastSlowPathBase<SPIRVCreateFastSlowPathPass> {
   void runOnOperation() override {
     MLIRContext *context = &getContext();
-    RewritePatternSet patterns(context);
-    patterns.add<CreateFastSlowPath>(context);
-    scf::IfOp::getCanonicalizationPatterns(patterns, context);
-    (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
+    FuncOp funcOp = getOperation();
+
+    {
+      RewritePatternSet patterns(context);
+      patterns.add<CreateFastSlowPath>(context);
+      if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
+        return signalPassFailure();
+      }
+    }
+
+    // Canonicalize the generated scf.if ops. We might have trivially dead
+    // branches, in which the sizes might be incorrect due to eliding the
+    // tensor.pad op.
+    {
+      RewritePatternSet patterns(context);
+      scf::IfOp::getCanonicalizationPatterns(patterns, context);
+      if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
+        return signalPassFailure();
+      }
+    }
   }
 };
 
