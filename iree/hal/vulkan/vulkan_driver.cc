@@ -241,6 +241,15 @@ IREE_API_EXPORT iree_status_t iree_hal_vulkan_driver_create(
   create_info.enabledExtensionCount = enabled_extensions.count;
   create_info.ppEnabledExtensionNames = enabled_extensions.values;
 
+  IREE_LOG(INFO) << "Enabled layers:";
+  for (int i = 0; i < create_info.enabledLayerCount; ++i) {
+    IREE_LOG(INFO) << "  " << create_info.ppEnabledLayerNames[i];
+  }
+  IREE_LOG(INFO) << "Enabled extensions:";
+  for (int i = 0; i < create_info.enabledExtensionCount; ++i) {
+    IREE_LOG(INFO) << "  " << create_info.ppEnabledExtensionNames[i];
+  }
+
   VkInstance instance = VK_NULL_HANDLE;
   VK_RETURN_IF_ERROR(instance_syms->vkCreateInstance(
                          &create_info, /*pAllocator=*/NULL, &instance),
@@ -424,7 +433,12 @@ static iree_status_t iree_hal_vulkan_driver_select_default_device(
                               "default device %d not found (of %d enumerated)",
                               default_device_index, physical_device_count);
   } else {
+    VkPhysicalDeviceProperties physical_device_properties;
     *out_physical_device = physical_devices[default_device_index];
+    instance_syms->vkGetPhysicalDeviceProperties(*out_physical_device,
+                                                 &physical_device_properties);
+    IREE_LOG(INFO) << "Selected vulkan device: "
+                   << physical_device_properties.deviceName;
   }
   iree_allocator_free(host_allocator, physical_devices);
   return status;
