@@ -872,7 +872,7 @@ hal.executable private @reduction {
     }
   }
 }
-//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[4, 0, 0], [4, 0, 0], [0, 1, 4]{{\]}}>
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 0, 0], [1, 0, 0], [0, 1, 4]{{\]}}>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert>
 //      CHECK: hal.executable.entry_point public @predict_dispatch_86
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
@@ -1027,6 +1027,52 @@ hal.executable private @gemm_unit_M_unit_N {
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[0, 0, 0], [0, 0, 0], [0, 0, 16]]>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert>
 //      CHECK: hal.executable.entry_point public @gemm_unit_M_unit_N
+// CHECK-SAME:       translation_info = #[[TRANSLATION]]
+//      CHECK:   linalg.matmul
+// CHECK-SAME:       lowering_config = #[[CONFIG]]
+
+// -----
+
+#executable_layout = #hal.executable.layout<push_constants = 4, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>,
+    #hal.descriptor_set.binding<2, storage_buffer>
+  ]>
+]>
+#executable_target_embedded_elf_x86_64_ = #hal.executable.target<
+  "llvm", "embedded-elf-x86_64", {
+    data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
+    native_vector_size = 16 : index,
+    target_triple = "x86_64-unknown-unknown-eabi-elf"
+  }
+>
+hal.executable private @matmul_odd {
+  hal.executable.variant public @embedded_elf_x86_64, target = #executable_target_embedded_elf_x86_64_ {
+    hal.executable.entry_point public @matmul_odd ordinal(0) layout(#executable_layout)
+    builtin.module {
+      func @matmul_odd() {
+        %cst = arith.constant 0.000000e+00 : f32
+        %c0 = arith.constant 0 : index
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(32) : !flow.dispatch.tensor<readonly:33x16xf32>
+        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(32) : !flow.dispatch.tensor<readonly:16x49xf32>
+        %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) offset(%c0) alignment(32) : !flow.dispatch.tensor<readonly:33x49xf32>
+        %3 = hal.interface.binding.subspan set(0) binding(3) type(storage_buffer) offset(%c0) alignment(32) : !flow.dispatch.tensor<writeonly:33x49xf32>
+        %4 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [33, 16], strides = [1, 1] : !flow.dispatch.tensor<readonly:33x16xf32> -> tensor<33x16xf32>
+        %5 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [16, 49], strides = [1, 1] : !flow.dispatch.tensor<readonly:16x49xf32> -> tensor<16x49xf32>
+        %6 = flow.dispatch.tensor.load %2, offsets = [0, 0], sizes = [33, 49], strides = [1, 1] : !flow.dispatch.tensor<readonly:33x49xf32> -> tensor<33x49xf32>
+        %7 = linalg.init_tensor [33, 49] : tensor<33x49xf32>
+        %8 = linalg.fill(%cst, %7) : f32, tensor<33x49xf32> -> tensor<33x49xf32>
+        %9 = linalg.matmul ins(%4, %5 : tensor<33x16xf32>, tensor<16x49xf32>) outs(%8 : tensor<33x49xf32>) -> tensor<33x49xf32>
+        flow.dispatch.tensor.store %9, %3, offsets = [0, 0], sizes = [33, 49], strides = [1, 1] : tensor<33x49xf32> -> !flow.dispatch.tensor<writeonly:33x49xf32>
+        return
+      }
+    }
+  }
+}
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[3, 7, 0], [3, 7, 0], [0, 0, 16]]>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert>
+//      CHECK: hal.executable.entry_point public @matmul_odd
 // CHECK-SAME:       translation_info = #[[TRANSLATION]]
 //      CHECK:   linalg.matmul
 // CHECK-SAME:       lowering_config = #[[CONFIG]]

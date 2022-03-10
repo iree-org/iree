@@ -198,8 +198,7 @@ static SmallVector<int64_t> getDefaultDistributedLoopTileSizes(
 /// Adjusts the workload per workgroup to be a multiple of vector size to ensure
 /// that the op vectorizes.
 static int64_t getMaxTileSize(int64_t lb, int64_t ub, int64_t maxSize,
-                              int64_t vectorSizeVal,
-                              Optional<int64_t> fallbackSizeVal = llvm::None) {
+                              int64_t vectorSizeVal) {
   if (ub == ShapedType::kDynamicSize || lb == ShapedType::kDynamicSize) {
     return maxSize;
   }
@@ -210,7 +209,16 @@ static int64_t getMaxTileSize(int64_t lb, int64_t ub, int64_t maxSize,
       return i;
     }
   }
-  return fallbackSizeVal ? fallbackSizeVal.getValue() : vectorSizeVal;
+  // If it can't be a multiple of vectorSizeVal, let's choose a factor of dim
+  // sizes heuristically.
+  int64_t start = std::min(maxSize, dim);
+  start = std::min(start, vectorSizeVal * 2);
+  for (int64_t i = start; i > 0; --i) {
+    if (dim % i == 0) {
+      return i;
+    }
+  }
+  return 1;
 }
 
 /// Returns the tile size to use for the Flow level of an operation that
@@ -340,15 +348,17 @@ static LogicalResult setX86SandboxRootConfig(FuncOp entryPointFn,
   SmallVector<int64_t> l1TileSizes;
   int64_t nLoops = cast<linalg::LinalgOp>(op.getOperation()).getNumLoops();
   l1TileSizes.append(nLoops - 3, 1);
-  l1TileSizes.push_back(getMaxTileSize(0, flowTileSizes[nLoops - 3], 8, 8));
-  l1TileSizes.push_back(getMaxTileSize(0, flowTileSizes[nLoops - 2], 32, 32));
+  l1TileSizes.push_back(
+      getMaxTileSize(0, flowTileSizes[nLoops - 3], 8, vectorSize));
+  l1TileSizes.push_back(
+      getMaxTileSize(0, flowTileSizes[nLoops - 2], 32, vectorSize));
   l1TileSizes.push_back(0);
 
   auto lhsShapedType = op.lhs().getType().cast<ShapedType>();
   int64_t K = lhsShapedType.getShape().back();
   SmallVector<int64_t> vectorTileSizes;
   vectorTileSizes.append(nLoops - 1, 0);
-  vectorTileSizes.push_back(getMaxTileSize(0, K, 16, 16));
+  vectorTileSizes.push_back(getMaxTileSize(0, K, 16, vectorSize));
 
   TileSizesListType tileSizes;
   tileSizes.emplace_back(flowTileSizes.begin(), flowTileSizes.end());
@@ -668,8 +678,7 @@ static LogicalResult setRootConfig(
     // If the tile size is intended to be 1, do not adjust it to `vectorSize`.
     // The ops will be decomposed to lower-rank named ops.
     if (l1TileSizes[i] != 1) {
-      l1TileSizes[i] = getMaxTileSize(0, tileSize, l1TileSizes[i], vectorSize,
-                                      /*fallbackTileSize=*/1);
+      l1TileSizes[i] = getMaxTileSize(0, tileSize, l1TileSizes[i], vectorSize);
     }
   }
   SmallVector<int64_t> vectorTileSizes;
