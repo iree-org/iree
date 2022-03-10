@@ -68,7 +68,7 @@ def iree_check_test(
     )
 
     if not driver:
-      return
+        return
 
     native_test(
         name = name,
