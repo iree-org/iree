@@ -23,7 +23,7 @@ function(iree_bytecode_module_for_iree_check_test_and_friends)
     ${ARGN}
   )
 
-  if(ANDROID)
+  if(ANDROID AND NOT _RULE_FLAGS MATCHES "iree-llvm-target-triple")
     # Android's CMake toolchain defines some variables that we can use to infer
     # the appropriate target triple from the configured settings:
     # https://developer.android.com/ndk/guides/cmake#android_platform
