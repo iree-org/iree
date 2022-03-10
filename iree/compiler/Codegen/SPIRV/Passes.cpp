@@ -136,15 +136,23 @@ static void addSPIRVLoweringPasses(OpPassManager &pm) {
 
 void addSPIRVTileAndVectorizePassPipeline(OpPassManager &pm) {
   pm.addNestedPass<FuncOp>(createTileAndDistributeToWorkgroupsPass());
+  pm.addNestedPass<FuncOp>(createSPIRVFuseTensorPadWithConsumerPass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
+
+  pm.addNestedPass<FuncOp>(createFoldAffineMinInDistributedLoopsPass());
+  pm.addPass(memref::createResolveShapedTypeResultDimsPass());
 
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
   // Tile to GPU invocations and vectorize.
+  pm.addNestedPass<FuncOp>(createSPIRVCreateFastSlowPathPass());
   pm.addNestedPass<FuncOp>(createSPIRVTilePass());
+  pm.addPass(createCanonicalizerPass());
+  pm.addPass(createCSEPass());
   pm.addNestedPass<FuncOp>(createSPIRVVectorizePass());
+  pm.addNestedPass<FuncOp>(createForOpCanonicalizationPass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
@@ -240,6 +248,7 @@ void buildSPIRVCodegenPassPipeline(OpPassManager &pm) {
   pm.nest<ModuleOp>().nest<FuncOp>().addPass(createTypePropagationPass());
 
   pm.addPass(createSPIRVLowerExecutableTargetPass());
+
   addMemRefLoweringPasses(pm.nest<ModuleOp>());
   addSPIRVLoweringPasses(pm.nest<ModuleOp>());
 

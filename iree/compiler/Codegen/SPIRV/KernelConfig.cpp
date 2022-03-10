@@ -46,8 +46,13 @@ LogicalResult setConvOpConfig(linalg::LinalgOp linalgOp,
                                       .getType()
                                       .cast<ShapedType>()
                                       .getShape();
-  if (llvm::any_of(inputShape, ShapedType::isDynamic)) return success();
-  if (llvm::any_of(outputShape, ShapedType::isDynamic)) return success();
+  if (isa<linalg::Conv2DNhwcHwcfOp>(*linalgOp) &&
+      ShapedType::isDynamic(inputShape[3])) {
+    return success();
+  }
+  if (llvm::any_of(outputShape.drop_front(), ShapedType::isDynamic)) {
+    return success();
+  }
 
   int64_t ic = inputShape[3];
   int64_t oh = outputShape[1], ow = outputShape[2], oc = outputShape[3];

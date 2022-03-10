@@ -403,6 +403,15 @@ std::unique_ptr<OperationPass<FuncOp>> createSPIRVVectorizePass();
 /// having pointer bitcast.
 std::unique_ptr<OperationPass<ModuleOp>> createSPIRVVectorizeLoadStore();
 
+/// Fuses tensor.pad ops into their consumer ops' tiled loop nests.
+std::unique_ptr<OperationPass<FuncOp>>
+createSPIRVFuseTensorPadWithConsumerPass();
+
+// Uses `tensor.pad` ops as anchors to create separate fast and slow paths
+// inside the kernel. The fast path is for inner tiles where we don't need
+// padding, while the slow path is for boundary tiles where we do need padding.
+std::unique_ptr<OperationPass<FuncOp>> createSPIRVCreateFastSlowPathPass();
+
 //----------------------------------------------------------------------------//
 // SPIRV Codegen Pass Pipelines.
 //----------------------------------------------------------------------------//

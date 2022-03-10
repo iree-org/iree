@@ -24,7 +24,9 @@ iree_cc_library(
     "MaliConfig.cpp"
     "NVIDIAConfig.cpp"
     "Passes.cpp"
+    "SPIRVCreateFastSlowPath.cpp"
     "SPIRVDistribute.cpp"
+    "SPIRVFuseTensorPadWithConsumer.cpp"
     "SPIRVInitConfigPass.cpp"
     "SPIRVLowerExecutableTargetPass.cpp"
     "SPIRVTile.cpp"
@@ -40,12 +42,14 @@ iree_cc_library(
     IREELinalgExtPasses
     LLVMSupport
     MLIRAffine
+    MLIRAffineAnalysis
     MLIRAffineToStandard
     MLIRAffineUtils
     MLIRAnalysis
     MLIRArithmetic
     MLIRArithmeticToSPIRV
     MLIRArithmeticTransforms
+    MLIRArithmeticUtils
     MLIRBufferization
     MLIRControlFlowToSPIRV
     MLIRFunc
@@ -66,12 +70,15 @@ iree_cc_library(
     MLIRSCFToGPU
     MLIRSCFToSPIRV
     MLIRSCFTransforms
+    MLIRSCFUtils
     MLIRSPIRV
     MLIRSPIRVConversion
     MLIRSPIRVTransforms
     MLIRSideEffectInterfaces
     MLIRSupport
+    MLIRTensor
     MLIRTensorToSPIRV
+    MLIRTensorTransforms
     MLIRTosa
     MLIRTosaToStandard
     MLIRTransforms

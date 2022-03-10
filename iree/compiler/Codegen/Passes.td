@@ -354,6 +354,18 @@ def SPIRVVectorizeLoadStore :
   let constructor = "mlir::iree_compiler::createSPIRVVectorizeLoadStore()";
 }
 
+def SPIRVFuseTensorPadWithConsumer :
+    Pass<"iree-spirv-fuse-tensor-pad-with-consumer", "FuncOp"> {
+  let summary = "Fuse tensor.pad op into its consumer op's tiled loop nest";
+  let constructor = "mlir::iree_compiler::createSPIRVFuseTensorPadWithConsumerPass()";
+}
+
+def SPIRVCreateFastSlowPath :
+    Pass<"iree-spirv-create-fast-slow-path", "FuncOp"> {
+  let summary = "Create separate fast and slow paths to handle padding";
+  let constructor = "mlir::iree_compiler::createSPIRVCreateFastSlowPathPass()";
+}
+
 //------------------------------------------------------------------------------
 // Test passes
 //------------------------------------------------------------------------------

@@ -41,12 +41,16 @@ LogicalResult setMaliCodeGenConfig(const spirv::TargetEnv &targetEnv,
         return setMatmulOpConfig(op, workgroupXY, threadMNK);
       })
       .Case<linalg::Conv2DNhwcHwcfOp>([subgroupSize](auto op) {
-        return setConvOpConfig(op, subgroupSize,
-                               /*bestTilingFactor=*/16);
+        bool hasPaddedInput =
+            op.image().template getDefiningOp<tensor::PadOp>();
+        int bestTilingFactor = hasPaddedInput ? 8 : 16;
+        return setConvOpConfig(op, subgroupSize, bestTilingFactor);
       })
       .Case<linalg::DepthwiseConv2DNhwcHwcOp>([subgroupSize](auto op) {
-        return setConvOpConfig(op, subgroupSize,
-                               /*bestTilingFactor=*/16);
+        bool hasPaddedInput =
+            op.image().template getDefiningOp<tensor::PadOp>();
+        int bestTilingFactor = hasPaddedInput ? 8 : 16;
+        return setConvOpConfig(op, subgroupSize, bestTilingFactor);
       })
       .Default([](Operation *) { return success(); });
 }

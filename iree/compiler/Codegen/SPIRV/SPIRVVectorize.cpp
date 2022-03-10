@@ -48,7 +48,8 @@ Optional<SmallVector<int64_t, 4>> getNativeVectorShape(Operation *op) {
   } else if (auto vtOp = dyn_cast<VectorTransferOpInterface>(op)) {
     auto vecType = vtOp.getVectorType();
     SmallVector<int64_t, 4> nativeSize(vecType.getRank(), 1);
-    for (auto dim : llvm::enumerate(vtOp.permutation_map().getResults())) {
+    for (const auto &dim :
+         llvm::enumerate(vtOp.permutation_map().getResults())) {
       if (auto dimExpr = dim.value().dyn_cast<AffineDimExpr>()) {
         if (dimExpr.getPosition() == vtOp.permutation_map().getNumDims() - 1) {
           nativeSize[dim.index()] =
@@ -59,7 +60,7 @@ Optional<SmallVector<int64_t, 4>> getNativeVectorShape(Operation *op) {
     return nativeSize;
   } else if (auto contractOp = dyn_cast<vector::ContractionOp>(op)) {
     unsigned lastParalleldim = 0;
-    for (auto it : llvm::enumerate(contractOp.iterator_types())) {
+    for (const auto &it : llvm::enumerate(contractOp.iterator_types())) {
       if (isParallelIterator(it.value())) lastParalleldim = it.index();
     }
     SmallVector<int64_t, 4> nativeSize(contractOp.iterator_types().size(), 1);
@@ -78,6 +79,7 @@ void populateVectorizationPatterns(RewritePatternSet &patterns) {
   patterns.add<linalg::LinalgVectorizationPattern>(
       patterns.getContext(), f.addOpFilter<linalg::ContractionOpInterface>(),
       opt);
+  populateVectorizePadPatterns(patterns);
   vector::populateVectorTransferPermutationMapLoweringPatterns(patterns);
   vector::populateVectorReductionToContractPatterns(patterns);
 }

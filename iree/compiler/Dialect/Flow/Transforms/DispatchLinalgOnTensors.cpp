@@ -314,12 +314,19 @@ static void pullInProducersInSameGroup(
       DEBUG_WITH_TYPE(DEBUG_TYPE,
                       llvm::dbgs() << "current producer: " << producer << "\n");
 
-      linalg::LinalgOp fusedProducer = rewriter.clone(*producer);
+      Operation *fusedProducer = rewriter.clone(*producer);
       rewriter.replaceOpWithinBlock(producer, fusedProducer->getResults(),
                                     &dispatchOp.getRegion().front());
       removeFusionGroupsAttribute(fusedProducer);
 
       pullInProducersInSameGroup(rewriter, dispatchOp, fusedProducer, groupNum);
+    } else if (auto producer = en.value().getDefiningOp<tensor::PadOp>()) {
+      DEBUG_WITH_TYPE(DEBUG_TYPE,
+                      llvm::dbgs() << "current producer: " << producer << "\n");
+
+      Operation *fusedProducer = rewriter.clone(*producer);
+      rewriter.replaceOpWithinBlock(producer, fusedProducer->getResults(),
+                                    &dispatchOp.getRegion().front());
     }
   }
 }
