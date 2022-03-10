@@ -25,6 +25,7 @@
 #include "iree/compiler/Dialect/Flow/IR/PartitionableLoopsInterface.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
+#include "llvm/Support/Debug.h"
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -308,16 +309,26 @@ void TileAndDistributeToWorkgroupsPass::runOnOperation() {
     return signalPassFailure();
   }
 
+  LLVM_DEBUG({
+    llvm::dbgs() << "--- After Tile + Distribute ---\n";
+    funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
+    llvm::dbgs() << "\n\n";
+  });
+
   // Apply linalg tiling optimization patterns.
   RewritePatternSet canonicalizationPatterns(context);
   linalg::populateLinalgTilingCanonicalizationPatterns(
-      canonicalizationPatterns);
-  memref::populateResolveRankedShapeTypeResultDimsPatterns(
       canonicalizationPatterns);
   if (failed(applyPatternsAndFoldGreedily(
           funcOp, std::move(canonicalizationPatterns)))) {
     return signalPassFailure();
   }
+
+  LLVM_DEBUG({
+    llvm::dbgs() << "--- After Canonicalize ---\n";
+    funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
+    llvm::dbgs() << "\n\n";
+  });
 
   // Rewrite destructive updates and ensure no remaining store remains to the
   // full output.
@@ -329,6 +340,20 @@ void TileAndDistributeToWorkgroupsPass::runOnOperation() {
   if (failed(rewriteLinalgDestructiveUpdates(funcOp))) {
     funcOp->emitError("Failed to rewrite destructive updates in:\n")
         << *funcOp.getOperation();
+    return signalPassFailure();
+  }
+
+  LLVM_DEBUG({
+    llvm::dbgs() << "--- After Rewriting destructive updates ---\n";
+    funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
+    llvm::dbgs() << "\n\n";
+  });
+
+  // After rewriting destructive updates, there might be uses of compute
+  // operations only in `tensor.dim` ops. Resolve these.
+  RewritePatternSet resolveDimOps(context);
+  memref::populateResolveRankedShapeTypeResultDimsPatterns(resolveDimOps);
+  if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(resolveDimOps)))) {
     return signalPassFailure();
   }
 }
