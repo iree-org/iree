@@ -775,6 +775,23 @@ LogicalResult TensorSizeOfOp::verify() {
 }
 
 //===----------------------------------------------------------------------===//
+// stream.tensor.empty
+//===----------------------------------------------------------------------===//
+
+void TensorEmptyOp::getAsmResultNames(mlir::OpAsmSetValueNameFn setNameFn) {
+  setNameFn(result(), "empty");
+}
+
+LogicalResult TensorEmptyOp::verify() {
+  TensorEmptyOp op = *this;
+  if (failed(verifyOpDynamicDims(op, op.result_encoding(),
+                                 op.result_encoding_dims()))) {
+    return failure();
+  }
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
 // stream.tensor.constant
 //===----------------------------------------------------------------------===//
 

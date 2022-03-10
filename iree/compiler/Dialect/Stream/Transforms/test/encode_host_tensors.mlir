@@ -11,6 +11,26 @@ func @denseTensorSizeOf(%arg0: index) -> index {
 
 // -----
 
+// CHECK-LABEL: @denseTensorSizeOfEmpty
+func @denseTensorSizeOfEmpty(%arg0: index) -> index {
+  // CHECK: %[[ZERO:.+]] = arith.constant 0 : index
+  %0 = stream.tensor.sizeof tensor<?x0xf32>{%arg0} : index
+  // CHECK: return %[[ZERO]]
+  return %0 : index
+}
+
+// -----
+
+// CHECK-LABEL: @denseTensorEmpty
+func @denseTensorEmpty(%arg0: index, %arg1: index) -> !stream.resource<*> {
+  // CHECK: %[[RET:.+]] = stream.resource.alloc : !stream.resource<*>{%c0}
+  %0 = stream.tensor.empty : tensor<?x1xf32>{%arg0} in !stream.resource<*>{%arg1}
+  // CHECK: return %[[RET]]
+  return %0 : !stream.resource<*>
+}
+
+// -----
+
 // CHECK-LABEL: @denseTensorConstant
 func @denseTensorConstant(%arg0: index) -> !stream.resource<constant> {
   // CHECK: %[[STATIC_SIZE:.+]] = arith.constant 1280 : index

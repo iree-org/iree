@@ -49,6 +49,26 @@ func @extractConstants(%timepoint: !stream.timepoint, %operand: !stream.resource
 
 // -----
 
+// Tests that explicit allocations are preserved.
+
+// CHECK-LABEL: @explicitAllocs
+// CHECK-SAME: (%[[SIZE:.+]]: index)
+func @explicitAllocs(%size: index) {
+  // CHECK: %[[ALLOC:.+]] = stream.resource.alloc : !stream.resource<external>{%[[SIZE]]}
+  %alloc = stream.resource.alloc : !stream.resource<external>{%size}
+  // CHECK: util.do_not_optimize(%[[ALLOC]])
+  util.do_not_optimize(%alloc) : !stream.resource<external>
+
+  %c0 = arith.constant 0 : index
+  // CHECK: %[[EMPTY:.+]] = stream.resource.alloc : !stream.resource<transient>{%c0}
+  %empty = stream.resource.alloc : !stream.resource<transient>{%c0}
+  // CHECK: util.do_not_optimize(%[[EMPTY]])
+  util.do_not_optimize(%empty) : !stream.resource<transient>
+  return
+}
+
+// -----
+
 // Tests operands that pass directly through to results.
 // These should be canonicalized away but are still valid.
 

@@ -29,6 +29,15 @@ func @tensorSizeOf(%arg0: index) -> index {
 
 // -----
 
+// CHECK-LABEL: @tensorEmpty
+func @tensorEmpty(%arg0: index, %arg1: index) -> !stream.resource<*> {
+  // CHECK: = stream.tensor.empty : tensor<?x0xf32>{%arg0} in !stream.resource<*>{%arg1}
+  %0 = stream.tensor.empty : tensor<?x0xf32>{%arg0} in !stream.resource<*>{%arg1}
+  return %0 : !stream.resource<*>
+}
+
+// -----
+
 // CHECK-LABEL: @tensorConstant
 func @tensorConstant(%arg0: index) -> !stream.resource<constant> {
   // CHECK: = stream.tensor.constant : tensor<?x5x64xf32>{%arg0} in !stream.resource<constant> = dense<0.000000e+00> : tensor<1x5x64xf32>

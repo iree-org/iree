@@ -161,3 +161,19 @@ func private @globalStore(%value: !stream.resource<*>, %size: index) {
   util.global.store %size, @variable__size : index
   return
 }
+
+// -----
+
+// Tests that explicit resource allocations are refined.
+
+// CHECK-LABEL: @explicitAlloc
+func @explicitAlloc() -> !hal.buffer_view {
+  %c0 = arith.constant 0 : index
+  // CHECK: %[[ALLOC:.+]] = stream.resource.alloc : !stream.resource<external>{%c0}
+  %0 = stream.resource.alloc : !stream.resource<*>{%c0}
+  // CHECK-NOT: stream.async.transfer
+  %1 = stream.async.transfer %0 : !stream.resource<*>{%c0} -> !stream.resource<external>{%c0}
+  // CHECK: stream.tensor.export %[[ALLOC]] : tensor<f32> in !stream.resource<external>{%c0} -> !hal.buffer_view
+  %2 = stream.tensor.export %1 : tensor<f32> in !stream.resource<external>{%c0} -> !hal.buffer_view
+  return %2 : !hal.buffer_view
+}

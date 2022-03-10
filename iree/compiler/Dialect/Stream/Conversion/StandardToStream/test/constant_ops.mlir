@@ -8,3 +8,12 @@ func @constantTensor() {
   %0 = arith.constant dense<[1, 2]> : tensor<2xi32>
   return
 }
+
+// -----
+
+// CHECK-LABEL: @emptyTensor
+func @emptyTensor() {
+  // CHECK: %[[CST:.+]] = stream.tensor.constant : tensor<2x0xi32> in !stream.resource<constant> = dense<> : tensor<2x0xi32>
+  %0 = arith.constant dense<> : tensor<2x0xi32>
+  return
+}
