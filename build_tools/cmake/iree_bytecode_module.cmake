@@ -110,8 +110,9 @@ function(iree_bytecode_module)
 
   # If an LLVM CPU backend is enabled, supply the linker tool.
   if(IREE_LLD_TARGET)
-    iree_get_executable_path(_EMBEDDED_LINKER_TOOL_EXECUTABLE "lld")
-    list(APPEND _ARGS "-iree-llvm-embedded-linker-path=\"${_EMBEDDED_LINKER_TOOL_EXECUTABLE}\"")
+    iree_get_executable_path(_LINKER_TOOL_EXECUTABLE "lld")
+    list(APPEND _ARGS "-iree-llvm-system-linker-path=\"${_LINKER_TOOL_EXECUTABLE}\"")
+    list(APPEND _ARGS "-iree-llvm-embedded-linker-path=\"${_LINKER_TOOL_EXECUTABLE}\"")
   endif()
 
   # Depending on the binary instead of the target here given we might not have
@@ -126,7 +127,7 @@ function(iree_bytecode_module)
     # trigger rebuilding.
     DEPENDS
       ${_TRANSLATE_TOOL_EXECUTABLE}
-      ${_EMBEDDED_LINKER_TOOL_EXECUTABLE}
+      ${_LINKER_TOOL_EXECUTABLE}
       ${_TRANSLATE_SRC}
     VERBATIM
   )
