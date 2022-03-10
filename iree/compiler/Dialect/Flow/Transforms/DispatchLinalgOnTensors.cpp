@@ -829,12 +829,7 @@ static bool canInsOperandTieWithOutsOperand(OpOperand *insOperand) {
     }
     // TODO(#8411): Until ops are vectorized (always), we need
     // to check that the elementtype matches for the operands to be tied.
-    // For now just doing this check for convolution ops since we expect
-    // contraction ops to be vectorized.
-    auto producerOp =
-        insOperand->get().getDefiningOp<linalg::ConvolutionOpInterface>();
-    if (producerOp &&
-        insOperand->get().getType().cast<ShapedType>().getElementType() !=
+    if (insOperand->get().getType().cast<ShapedType>().getElementType() !=
             outsOperand->get().getType().cast<ShapedType>().getElementType()) {
       return false;
     }
