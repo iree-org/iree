@@ -4,6 +4,9 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+// NOTE: must be first before _any_ system includes.
+#define _GNU_SOURCE
+
 #include "iree/base/internal/cpu.h"
 
 #include "iree/base/target_platform.h"
@@ -12,16 +15,9 @@
 // iree_cpu_*
 //===----------------------------------------------------------------------===//
 
-#if defined(IREE_PLATFORM_ANDROID) || defined(IREE_PLATFORM_EMSCRIPTEN) || \
-    defined(IREE_PLATFORM_LINUX)
+#if defined(IREE_PLATFORM_ANDROID) || defined(IREE_PLATFORM_LINUX)
 
 #include <sched.h>
-
-extern __attribute__((weak)) int sched_getcpu(void) {
-  // TODO(benvanik): emulate with syscall/vdso/etc.
-  errno = ENOSYS;
-  return -1;
-}
 
 iree_cpu_processor_id_t iree_cpu_query_processor_id(void) {
   // This path is relatively portable and should work on linux/bsd/etc-likes.

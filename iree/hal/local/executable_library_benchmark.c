@@ -233,23 +233,18 @@ static iree_status_t iree_hal_executable_library_run(
   }
 
   // Setup dispatch state.
-  iree_hal_executable_dispatch_state_v0_t dispatch_state = {
-      .workgroup_count = {{
-          .x = FLAG_workgroup_count_x,
-          .y = FLAG_workgroup_count_y,
-          .z = FLAG_workgroup_count_z,
-      }},
-      .workgroup_size = {{
-          .x = FLAG_workgroup_size_x,
-          .y = FLAG_workgroup_size_y,
-          .z = FLAG_workgroup_size_z,
-      }},
+  const iree_hal_executable_dispatch_state_v0_t dispatch_state = {
+      .workgroup_count_x = FLAG_workgroup_count_x,
+      .workgroup_count_y = FLAG_workgroup_count_y,
+      .workgroup_count_z = FLAG_workgroup_count_z,
+      .workgroup_size_x = FLAG_workgroup_size_x,
+      .workgroup_size_y = FLAG_workgroup_size_y,
+      .workgroup_size_z = FLAG_workgroup_size_z,
       .push_constant_count = dispatch_params.push_constant_count,
       .push_constants = &dispatch_params.push_constants[0].ui32,
       .binding_count = dispatch_params.binding_count,
       .binding_ptrs = binding_ptrs,
       .binding_lengths = binding_lengths,
-      .environment = &local_executable->environment,
   };
 
   // Execute benchmark the workgroup invocation.
@@ -260,7 +255,7 @@ static iree_status_t iree_hal_executable_library_run(
   int64_t dispatch_count = 0;
   while (iree_benchmark_keep_running(benchmark_state, /*batch_count=*/1)) {
     IREE_RETURN_IF_ERROR(iree_hal_local_executable_issue_dispatch_inline(
-        local_executable, FLAG_entry_point, &dispatch_state, local_memory));
+        local_executable, FLAG_entry_point, &dispatch_state, 0, local_memory));
     ++dispatch_count;
   }
 
@@ -268,8 +263,8 @@ static iree_status_t iree_hal_executable_library_run(
   // invocations dispatched. That gives us both total dispatch and single
   // invocation times in the reporter output.
   int64_t total_invocations =
-      dispatch_count * dispatch_state.workgroup_count.x *
-      dispatch_state.workgroup_count.y * dispatch_state.workgroup_count.z;
+      dispatch_count * dispatch_state.workgroup_count_x *
+      dispatch_state.workgroup_count_y * dispatch_state.workgroup_count_z;
   iree_benchmark_set_items_processed(benchmark_state, total_invocations);
 
   // Deallocate buffers.

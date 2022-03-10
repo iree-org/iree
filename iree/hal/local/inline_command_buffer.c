@@ -56,10 +56,12 @@ typedef struct iree_hal_inline_command_buffer_t {
     // Cached and initialized dispatch state reused for all dispatches.
     // Individual dispatches must populate the dynamically changing fields like
     // push_constant_count and binding_count.
-    iree_hal_executable_dispatch_state_v0_t dispatch_state;
+    iree_alignas(64) iree_hal_executable_dispatch_state_v0_t dispatch_state;
 
     // An opaque tag used to reduce the cost of processor ID queries.
     iree_cpu_processor_tag_t processor_tag;
+    // Guess at the current processor ID.
+    iree_cpu_processor_id_t processor_id;
   } state;
 } iree_hal_inline_command_buffer_t;
 
@@ -160,9 +162,8 @@ static iree_status_t iree_hal_inline_command_buffer_flush_tasks(
 // Updates the cached processor ID field in the command buffer.
 static void iree_hal_inline_command_buffer_update_processor_id(
     iree_hal_inline_command_buffer_t* command_buffer) {
-  iree_cpu_requery_processor_id(
-      &command_buffer->state.processor_tag,
-      &command_buffer->state.dispatch_state.processor_id);
+  iree_cpu_requery_processor_id(&command_buffer->state.processor_tag,
+                                &command_buffer->state.processor_id);
 }
 
 static iree_status_t iree_hal_inline_command_buffer_begin(
@@ -420,15 +421,14 @@ static iree_status_t iree_hal_inline_command_buffer_dispatch(
 
   iree_hal_executable_dispatch_state_v0_t* dispatch_state =
       &command_buffer->state.dispatch_state;
-  dispatch_state->environment = &local_executable->environment;
 
   // TODO(benvanik): expose on API or keep fixed on executable.
-  dispatch_state->workgroup_size.x = 1;
-  dispatch_state->workgroup_size.y = 1;
-  dispatch_state->workgroup_size.z = 1;
-  dispatch_state->workgroup_count.x = workgroup_x;
-  dispatch_state->workgroup_count.y = workgroup_y;
-  dispatch_state->workgroup_count.z = workgroup_z;
+  dispatch_state->workgroup_size_x = 1;
+  dispatch_state->workgroup_size_y = 1;
+  dispatch_state->workgroup_size_z = 1;
+  dispatch_state->workgroup_count_x = workgroup_x;
+  dispatch_state->workgroup_count_y = workgroup_y;
+  dispatch_state->workgroup_count_z = workgroup_z;
 
   // Push constants are pulled directly from the command buffer state, but we
   // only allow the dispatch to read what we know is initialized based on the
@@ -483,7 +483,8 @@ static iree_status_t iree_hal_inline_command_buffer_dispatch(
   iree_fpu_state_t fpu_state =
       iree_fpu_state_push(IREE_FPU_STATE_FLAG_FLUSH_DENORMALS_TO_ZERO);
   iree_status_t status = iree_hal_local_executable_issue_dispatch_inline(
-      local_executable, entry_point, dispatch_state, local_memory);
+      local_executable, entry_point, dispatch_state,
+      command_buffer->state.processor_id, local_memory);
   iree_fpu_state_pop(fpu_state);
 
   if (local_memory.data) {
@@ -491,6 +492,15 @@ static iree_status_t iree_hal_inline_command_buffer_dispatch(
   }
   return status;
 }
+
+typedef union iree_hal_vec3_t {
+  struct {
+    uint32_t x;
+    uint32_t y;
+    uint32_t z;
+  };
+  uint32_t value[3];
+} iree_hal_vec3_t;
 
 static iree_status_t iree_hal_inline_command_buffer_dispatch_indirect(
     iree_hal_command_buffer_t* base_command_buffer,

@@ -4,8 +4,8 @@ llvm.func @sink(i64)
 
 // CHECK-LABEL: llvm.func internal @constant_values
 func @constant_values() {
-  // CHECK: %[[STATE:.+]] = llvm.load %arg0 : !llvm.ptr<struct<"iree_hal_executable_dispatch_state_v0_t"
-  // CHECK: %[[PTR_BASE:.+]] = llvm.extractvalue %[[STATE]][3]
+  // CHECK: %[[STATE:.+]] = llvm.load %arg1 : !llvm.ptr<struct<"iree_hal_executable_dispatch_state_v0_t"
+  // CHECK: %[[PTR_BASE:.+]] = llvm.extractvalue %[[STATE]][8]
   // CHECK: %[[C1:.+]] = llvm.mlir.constant(1
   // CHECK: %[[VPTR:.+]] = llvm.getelementptr %[[PTR_BASE]][%[[C1]]] : (!llvm.ptr<i32>, i64) -> !llvm.ptr<i32>
   // CHECK: %[[V32:.+]] = llvm.load %[[VPTR]] : !llvm.ptr<i32>

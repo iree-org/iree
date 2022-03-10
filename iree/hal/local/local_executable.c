@@ -52,44 +52,52 @@ iree_hal_local_executable_t* iree_hal_local_executable_cast(
 iree_status_t iree_hal_local_executable_issue_call(
     iree_hal_local_executable_t* executable, iree_host_size_t ordinal,
     const iree_hal_executable_dispatch_state_v0_t* dispatch_state,
-    const iree_hal_vec3_t* workgroup_id, iree_byte_span_t local_memory) {
+    const iree_hal_executable_workgroup_state_v0_t* workgroup_state) {
   IREE_ASSERT_ARGUMENT(executable);
   IREE_ASSERT_ARGUMENT(dispatch_state);
-  IREE_ASSERT_ARGUMENT(workgroup_id);
+  IREE_ASSERT_ARGUMENT(workgroup_state);
   return ((const iree_hal_local_executable_vtable_t*)
               executable->resource.vtable)
-      ->issue_call(executable, ordinal, dispatch_state, workgroup_id,
-                   local_memory);
+      ->issue_call(executable, ordinal, dispatch_state, workgroup_state);
 }
 
 iree_status_t iree_hal_local_executable_issue_dispatch_inline(
     iree_hal_local_executable_t* executable, iree_host_size_t ordinal,
     const iree_hal_executable_dispatch_state_v0_t* dispatch_state,
-    iree_byte_span_t local_memory) {
+    uint32_t processor_id, iree_byte_span_t local_memory) {
   IREE_TRACE_ZONE_BEGIN(z0);
   // TODO(benvanik): annotate with executable name to calculate total time.
 
-  const iree_hal_vec3_t workgroup_count = dispatch_state->workgroup_count;
+  const uint32_t workgroup_count_x = dispatch_state->workgroup_count_x;
+  const uint32_t workgroup_count_y = dispatch_state->workgroup_count_y;
+  const uint32_t workgroup_count_z = dispatch_state->workgroup_count_z;
 
 #if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
   char xyz_string[32];
   int xyz_string_length =
       snprintf(xyz_string, IREE_ARRAYSIZE(xyz_string), "%ux%ux%u",
-               workgroup_count.x, workgroup_count.y, workgroup_count.z);
+               workgroup_count_x, workgroup_count_y, workgroup_count_z);
   IREE_TRACE_ZONE_APPEND_TEXT_STRING_VIEW(z0, xyz_string, xyz_string_length);
 #endif  // IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
 
   iree_status_t status = iree_ok_status();
 
-  iree_hal_vec3_t workgroup_id;
-  for (workgroup_id.z = 0; workgroup_id.z < workgroup_count.z;
-       ++workgroup_id.z) {
-    for (workgroup_id.y = 0; workgroup_id.y < workgroup_count.y;
-         ++workgroup_id.y) {
-      for (workgroup_id.x = 0; workgroup_id.x < workgroup_count.x;
-           ++workgroup_id.x) {
+  iree_alignas(64) iree_hal_executable_workgroup_state_v0_t workgroup_state = {
+      .workgroup_id_x = 0,
+      .workgroup_id_y = 0,
+      .workgroup_id_z = 0,
+      .processor_id = processor_id,
+      .local_memory = local_memory.data,
+      .local_memory_size = (size_t)local_memory.data_length,
+  };
+  for (uint32_t z = 0; z < workgroup_count_z; ++z) {
+    workgroup_state.workgroup_id_z = z;
+    for (uint32_t y = 0; y < workgroup_count_y; ++y) {
+      workgroup_state.workgroup_id_y = y;
+      for (uint32_t x = 0; x < workgroup_count_x; ++x) {
+        workgroup_state.workgroup_id_x = x;
         status = iree_hal_local_executable_issue_call(
-            executable, ordinal, dispatch_state, &workgroup_id, local_memory);
+            executable, ordinal, dispatch_state, &workgroup_state);
         if (!iree_status_is_ok(status)) break;
       }
     }

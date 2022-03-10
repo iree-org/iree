@@ -24,20 +24,23 @@
 // This is a simple scalar addition:
 //    binding[1] = binding[0] + push_constant[0]
 static int dispatch_tile_a(
+    const iree_hal_executable_environment_v0_t* environment,
     const iree_hal_executable_dispatch_state_v0_t* dispatch_state,
-    const iree_hal_vec3_t* workgroup_id, void* local_memory) {
+    const iree_hal_executable_workgroup_state_v0_t* workgroup_state) {
   const dispatch_tile_a_push_constants_t* push_constants =
       (const dispatch_tile_a_push_constants_t*)dispatch_state->push_constants;
   const float* src = ((const float*)dispatch_state->binding_ptrs[0]);
   float* dst = ((float*)dispatch_state->binding_ptrs[1]);
-  dst[workgroup_id->x] = src[workgroup_id->x] + push_constants->f0;
+  const uint32_t x = workgroup_state->workgroup_id_x;
+  dst[x] = src[x] + push_constants->f0;
   return 0;
 }
 
 // Just another entry point.
 static int dispatch_tile_b(
+    const iree_hal_executable_environment_v0_t* environment,
     const iree_hal_executable_dispatch_state_v0_t* dispatch_state,
-    const iree_hal_vec3_t* workgroup_id, void* local_memory) {
+    const iree_hal_executable_workgroup_state_v0_t* workgroup_state) {
   return 0;
 }
 
@@ -46,7 +49,7 @@ static const iree_hal_executable_library_header_t header = {
     // Declares what library version is present: newer runtimes may support
     // loading older executables but newer executables cannot load on older
     // runtimes.
-    .version = IREE_HAL_EXECUTABLE_LIBRARY_LATEST_VERSION,
+    .version = IREE_HAL_EXECUTABLE_LIBRARY_VERSION_LATEST,
     // Name used for logging/diagnostics and rendezvous.
     .name = "demo_library",
     .features = IREE_HAL_EXECUTABLE_LIBRARY_FEATURE_NONE,
@@ -93,6 +96,10 @@ static const iree_hal_executable_library_v0_t library = {
             .names = entry_point_names,
             .tags = entry_point_tags,
         },
+    .constants =
+        {
+            .count = 0,
+        },
 };
 
 // The primary access point to the executable: in a static library this is
@@ -107,7 +114,7 @@ static const iree_hal_executable_library_v0_t library = {
 const iree_hal_executable_library_header_t** demo_executable_library_query(
     iree_hal_executable_library_version_t max_version,
     const iree_hal_executable_environment_v0_t* environment) {
-  return max_version <= 0
+  return max_version <= IREE_HAL_EXECUTABLE_LIBRARY_VERSION_LATEST
              ? (const iree_hal_executable_library_header_t**)&library
              : NULL;
 }

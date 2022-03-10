@@ -38,6 +38,7 @@ class command_buffer_dispatch_test : public CtsTestBase {
         &descriptor_set_layout_, &executable_layout_));
 
     iree_hal_executable_params_t executable_params;
+    iree_hal_executable_params_initialize(&executable_params);
     executable_params.caching_mode =
         IREE_HAL_EXECUTABLE_CACHING_MODE_ALIAS_PROVIDED_DATA;
     executable_params.executable_format =
