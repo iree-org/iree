@@ -5,6 +5,16 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+# Builds the sample, running host tools, Emscripten, and CMake as needed.
+#
+# Prerequisites:
+#   * Environment must be configured for Emscripten
+#   * Host tools must be built (default at IREE_SOURCE_DIR/build-host/install).
+#     The build_tools/cmake/build_host_install.sh script can do this for you.
+#
+# Usage:
+#   build_sample.sh (optional install path) && serve_sample.sh
+
 set -e
 
 ###############################################################################
@@ -27,14 +37,14 @@ mkdir -p ${BUILD_DIR}
 BINARY_DIR=${BUILD_DIR}/experimental/web/sample_static/
 mkdir -p ${BINARY_DIR}
 
+INSTALL_ROOT="${1:-${ROOT_DIR}/build-host/install}"
+
 ###############################################################################
 # Compile from .mlir input to static C source files using host tools          #
 ###############################################################################
 
-# TODO(scotttodd): portable path ... discover from python install if on $PATH?
-INSTALL_ROOT="D:\dev\projects\iree-build\install\bin"
-TRANSLATE_TOOL="${INSTALL_ROOT?}/iree-translate.exe"
-EMBED_DATA_TOOL="${INSTALL_ROOT?}/generate_embed_data.exe"
+TRANSLATE_TOOL="${INSTALL_ROOT?}/bin/iree-translate"
+EMBED_DATA_TOOL="${INSTALL_ROOT?}/bin/generate_embed_data"
 INPUT_NAME="mnist"
 INPUT_PATH="${ROOT_DIR?}/iree/samples/models/mnist.mlir"
 
@@ -68,7 +78,7 @@ pushd ${BUILD_DIR}
 # Note: The sample creates a device directly, so no drivers are required.
 emcmake "${CMAKE_BIN?}" -G Ninja .. \
   -DCMAKE_BUILD_TYPE=RelWithDebInfo \
-  -DIREE_HOST_BINARY_ROOT=$PWD/../build-host/install \
+  -DIREE_HOST_BINARY_ROOT=${INSTALL_ROOT} \
   -DIREE_BUILD_EXPERIMENTAL_WEB_SAMPLES=ON \
   -DIREE_HAL_DRIVER_DEFAULTS=OFF \
   -DIREE_BUILD_COMPILER=OFF \
@@ -80,10 +90,6 @@ emcmake "${CMAKE_BIN?}" -G Ninja .. \
 
 popd
 
-###############################################################################
-# Serve the sample using a local webserver                                    #
-###############################################################################
-
 echo "=== Copying static files to the build directory ==="
 
 cp ${SOURCE_DIR}/index.html ${BINARY_DIR}
@@ -93,7 +99,3 @@ cp ${SOURCE_DIR}/iree_worker.js ${BINARY_DIR}
 EASELJS_LIBRARY=${BINARY_DIR}/easeljs.min.js
 test -f ${EASELJS_LIBRARY} || \
     wget https://code.createjs.com/1.0.0/easeljs.min.js -O ${EASELJS_LIBRARY}
-
-echo "=== Running local webserver, open at http://localhost:8000/ ==="
-
-python3 ${ROOT_DIR?}/scripts/local_web_server.py --directory ${BINARY_DIR}
