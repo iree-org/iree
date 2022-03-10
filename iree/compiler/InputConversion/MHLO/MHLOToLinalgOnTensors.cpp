@@ -166,7 +166,8 @@ Value createLinalgMatmulOnTensors(OpBuilder b, Location loc,
                                     ValueRange{zeroTensor})
           .getResult(0);
     default:
-      llvm_unreachable("unhandled matmul type");
+      assert(false && "unhandled matmul type");
+      return Value();
   }
 }
 

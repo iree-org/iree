@@ -203,7 +203,7 @@ class TargetBackend {
   // binary format (such as to the IREE VM) will fail.
   virtual LogicalResult serializeExecutable(
       IREE::HAL::ExecutableVariantOp variantOp, OpBuilder &executableBuilder) {
-    llvm_unreachable("unimplemented serializeExecutable");
+    assert(false && "unimplemented serializeExecutable");
     return failure();
   }
 

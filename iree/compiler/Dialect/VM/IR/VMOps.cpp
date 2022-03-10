@@ -584,7 +584,7 @@ static Attribute convertConstIntegerValue(Attribute value) {
           adjustedType, llvm::to_vector<4>(v.getValues<Attribute>()));
     }
   }
-  llvm_unreachable("unexpected attribute type");
+  assert(false && "unexpected attribute type");
   return Attribute();
 }
 
@@ -597,7 +597,7 @@ static FloatType getFloatType(int bitwidth, MLIRContext *context) {
     case 64:
       return FloatType::getF64(context);
     default:
-      llvm_unreachable("unhandled floating point type");
+      assert(false && "unhandled floating point type");
       return {};
   }
 }
@@ -621,7 +621,7 @@ static Attribute convertConstFloatValue(Attribute value) {
           adjustedType, llvm::to_vector<4>(v.getValues<Attribute>()));
     }
   }
-  llvm_unreachable("unexpected attribute type");
+  assert(false && "unexpected attribute type");
   return Attribute();
 }
 

@@ -64,7 +64,8 @@ Operation *IREEPyDMDialect::materializeConstant(OpBuilder &builder,
     return builder.create<PYDM::SuccessOp>(loc, type);
   }
 
-  llvm_unreachable("unhandled iree_pydm constant materialization");
+  assert(false && "unhandled iree_pydm constant materialization");
+  return nullptr;
 }
 
 //------------------------------------------------------------------------------
@@ -145,7 +146,8 @@ Optional<int> PYDM::IntegerType::getNumericSubTypeCode() const {
       stc = IntegerSubTypeCode::Integer64;
       break;
     default: {
-      llvm_unreachable("unsupported numeric bitwidth");
+      stc = IntegerSubTypeCode::Integer8;  // Arbitrarily picked value.
+      assert(false && "unsupported numeric bitwidth");
     }
   }
   return static_cast<int>(stc);
@@ -195,7 +197,7 @@ Type PYDM::ListType::getElementStorageType() const {
              "unboxed list should have uniform element type");
       return getUniformElementType();
     default:
-      llvm_unreachable("unsupported storage class");
+      assert(false && "unsupported storage class");
       return {};
   }
 }
@@ -251,7 +253,7 @@ Optional<int> PYDM::RealType::getNumericSubTypeCode() const {
           .Case([](Float32Type t) { return RealSubTypeCode::FP32; })
           .Case([](Float64Type t) { return RealSubTypeCode::FP64; })
           .Default([](Type t) {
-            llvm_unreachable("unsupported float type");
+            assert(false && "unsupported float type");
             return RealSubTypeCode::FP64;
           });
   return static_cast<int>(stc);

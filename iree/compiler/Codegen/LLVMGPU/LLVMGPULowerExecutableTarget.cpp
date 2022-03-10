@@ -155,7 +155,8 @@ void LLVMGPULowerExecutableTargetPass::runOnOperation() {
         addGPUMatmulTensorCorePassPipeline(nestedModulePM);
         break;
       default:
-        llvm_unreachable("Unsupported pipeline on GPU target.");
+        variantOp.emitOpError("Unsupported pipeline on GPU target.");
+        return signalPassFailure();
     }
   }
 

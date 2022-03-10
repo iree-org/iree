@@ -49,7 +49,7 @@ spirv::Vendor getVendor(const TargetTriple &triple) {
           return spirv::Vendor::Unknown;
       }
     default:
-      llvm_unreachable("unhandled vendor");
+      assert(false && "unhandled vendor");
       return spirv::Vendor::Unknown;
   }
 }
@@ -70,7 +70,7 @@ spirv::DeviceType getDeviceType(const TargetTriple &triple) {
     case TargetTripleArch::QC_Adreno:
       return spirv::DeviceType::IntegratedGPU;
     default:
-      llvm_unreachable("unhandled device type");
+      assert(false && "unhandled device type");
       return spirv::DeviceType::Unknown;
   }
 }

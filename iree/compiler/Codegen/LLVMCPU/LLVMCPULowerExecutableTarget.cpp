@@ -190,7 +190,8 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
             addTileFuseAndVectorizePassPipeline(nestedModulePM, lowerToVectors);
             break;
           default:
-            llvm_unreachable("Unsupported pipeline on CPU target.");
+            variantOp.emitOpError("Unsupported pipeline on CPU target.");
+            return signalPassFailure();
         }
       }
     }

@@ -88,7 +88,7 @@ class Verifier {
     auto wrapperFn = [=](Type baseType) { return fn(baseType.cast<TypeT>()); };
     if (typeVerifiers.insert({TypeID::get<TypeT>(), wrapperFn}).second ==
         false) {
-      llvm_unreachable("already registered for this type");
+      assert(false && "already registered for this type");
     }
   }
 

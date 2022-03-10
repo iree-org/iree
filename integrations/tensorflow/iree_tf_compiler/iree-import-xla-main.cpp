@@ -228,7 +228,7 @@ int main(int argc, char **argv) {
       break;
     }
     default:
-      llvm_unreachable("illegal XlaFormat");
+      assert(false && "illegal XlaFormat");
   }
 
   // Find the entry function and annotate it as exported.

@@ -207,7 +207,7 @@ void VulkanDialect::printAttribute(Attribute attr,
   if (auto targetEnv = attr.dyn_cast<TargetEnvAttr>())
     print(targetEnv, printer);
   else
-    llvm_unreachable("unhandled Vulkan attribute kind");
+    assert(false && "unhandled Vulkan attribute kind");
 }
 
 }  // namespace Vulkan

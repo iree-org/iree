@@ -112,7 +112,7 @@ class OutlineConstantsPass : public OutlineConstantsBase<OutlineConstantsPass> {
         // Directly replace constant with global constant value.
         replacement = loadOp.result();
       } else {
-        llvm_unreachable("unhandled constant op type");
+        assert(false && "unhandled constant op type");
       }
 
       originalOp->getResult(0).replaceAllUsesWith(replacement);

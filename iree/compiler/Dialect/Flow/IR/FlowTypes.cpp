@@ -143,7 +143,7 @@ static void printShapedType(DispatchTensorType &type, AsmPrinter &p) {
       p << "writeonly";
       break;
     default:
-      llvm_unreachable("unhandled access");
+      assert(false && "unhandled access");
   }
   p << ":";
   for (int64_t dim : type.getShape()) {
@@ -212,7 +212,7 @@ void FlowDialect::printType(Type type, DialectAsmPrinter &p) const {
   if (auto inputType = type.dyn_cast<DispatchTensorType>()) {
     IREE::Flow::printType(inputType, p);
   } else if (failed(generatedTypePrinter(type, p))) {
-    llvm_unreachable("unknown Flow type");
+    assert(false && "unknown Flow type");
   }
 }
 

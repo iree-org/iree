@@ -859,7 +859,7 @@ void HALDialect::printAttribute(Attribute attr, DialectAsmPrinter &p) const {
       })
       .Default([&](Attribute) {
         if (failed(generatedAttributePrinter(attr, p))) {
-          llvm_unreachable("unhandled HAL attribute kind");
+          assert(false && "unhandled HAL attribute kind");
         }
       });
 }
@@ -920,7 +920,7 @@ void HALDialect::printType(Type type, DialectAsmPrinter &p) const {
   } else if (type.isa<SemaphoreType>()) {
     p << "semaphore";
   } else {
-    llvm_unreachable("unknown HAL type");
+    assert(false && "unknown HAL type");
   }
 }
 

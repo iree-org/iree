@@ -91,7 +91,7 @@ void CustomDialect::printType(Type type, DialectAsmPrinter &p) const {
   if (type.isa<MessageType>()) {
     p << "message";
   } else {
-    llvm_unreachable("unknown type");
+    assert(false && "unknown type");
   }
 }
 
