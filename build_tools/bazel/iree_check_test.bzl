@@ -148,6 +148,10 @@ def iree_check_single_backend_test_suite(
             **kwargs
         )
         tests.append(test_name)
+
+    if not driver:
+        return
+
     native.test_suite(
         name = name,
         tests = tests,
