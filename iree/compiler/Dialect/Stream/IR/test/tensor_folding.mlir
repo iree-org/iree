@@ -29,13 +29,36 @@ func @FoldTensorExportOp(%arg0: !hal.buffer_view, %arg1: index) -> !hal.buffer_v
 
 // CHECK-LABEL: @KeepTensorExportOpWithDifferingEncodings
 func @KeepTensorExportOpWithDifferingEncodings(%arg0: !hal.buffer_view, %arg1: index) -> !hal.buffer_view {
-  // CHECK: %0 = stream.tensor.import %arg0 : !hal.buffer_view -> tensor<?x5xf32>{%arg1} in !stream.resource<external>{%c20}
-  // CHECK: %1 = stream.tensor.export %0 : tensor<1x?x5xf32>{%arg1} in !stream.resource<external>{%c20} -> !hal.buffer_view
-  // CHECK: return %1 : !hal.buffer_view
+  // CHECK: %[[IMPORT:.+]] = stream.tensor.import %arg0 : !hal.buffer_view -> tensor<?x5xf32>{%arg1} in !stream.resource<external>{%c20}
+  // CHECK: %[[EXPORT:.+]] = stream.tensor.export %[[IMPORT]] : tensor<1x?x5xf32>{%arg1} in !stream.resource<external>{%c20} -> !hal.buffer_view
+  // CHECK: return %[[EXPORT]] : !hal.buffer_view
   %c20 = arith.constant 20 : index
   %0 = stream.tensor.import %arg0 : !hal.buffer_view -> tensor<?x5xf32>{%arg1} in !stream.resource<external>{%c20}
   %1 = stream.tensor.export %0 : tensor<1x?x5xf32>{%arg1} in !stream.resource<external>{%c20} -> !hal.buffer_view
   return %1 : !hal.buffer_view
+}
+
+// -----
+
+// CHECK-LABEL: @TensorConstantToEmpty
+func @TensorConstantToEmpty(%arg0: index) -> !stream.resource<constant> {
+  // CHECK: %[[EMPTY:.+]] = stream.tensor.empty : tensor<2x0x?xf32>{%arg0} in !stream.resource<constant>
+  // CHECK: return %[[EMPTY]]
+  // CHECK-NOT: stream.tensor.constant
+  %cst = stream.tensor.constant : tensor<2x0x?xf32>{%arg0} in !stream.resource<constant> = dense<> : tensor<2x0x4xf32>
+  return %cst : !stream.resource<constant>
+}
+
+// -----
+
+// CHECK-LABEL: @TensorConstantToEmptyDynamic
+func @TensorConstantToEmptyDynamic() -> !stream.resource<constant> {
+  // CHECK: %[[EMPTY:.+]] = stream.tensor.empty : tensor<2x?xf32>{%c0} in !stream.resource<constant>
+  // CHECK: return %[[EMPTY]]
+  // CHECK-NOT: stream.tensor.constant
+  %c0 = arith.constant 0 : index
+  %cst = stream.tensor.constant : tensor<2x?xf32>{%c0} in !stream.resource<constant> = dense<> : tensor<2x0xf32>
+  return %cst : !stream.resource<constant>
 }
 
 // -----

@@ -46,6 +46,18 @@ func @tensorReshapeWithMultipleUses(%input: tensor<5x24x48xf32>)
 
 // -----
 
+// CHECK-LABEL: @tensorEmpty
+//  CHECK-SAME: (%[[DIM0:.+]]: index)
+func @tensorEmpty(%dim0: index) -> tensor<?x0xf32> {
+  // CHECK: %[[EMPTY_SIZE:.+]] = stream.tensor.sizeof tensor<?x0xf32>{%[[DIM0]]}
+  // CHECK: %[[EMPTY:.+]] = stream.tensor.empty : tensor<?x0xf32>{%[[DIM0]]} in !stream.resource<*>{%[[EMPTY_SIZE]]}
+  %0 = flow.tensor.empty : tensor<?x0xf32>{%dim0}
+  // CHECK: return %[[EMPTY]]
+  return %0 : tensor<?x0xf32>
+}
+
+// -----
+
 // CHECK-LABEL: @tensorSplat
 //  CHECK-SAME: (%[[VALUE:.+]]: i8, %[[DIM0:.+]]: index)
 func @tensorSplat(%value: i8, %dim0: index) -> tensor<?x128xi8> {

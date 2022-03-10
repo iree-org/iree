@@ -719,10 +719,54 @@ void TensorExportOp::getCanonicalizationPatterns(RewritePatternSet &results,
 //===----------------------------------------------------------------------===//
 
 //===----------------------------------------------------------------------===//
+// stream.tensor.empty
+//===----------------------------------------------------------------------===//
+
+//===----------------------------------------------------------------------===//
 // stream.tensor.constant
 //===----------------------------------------------------------------------===//
 
 namespace {
+
+struct TensorConstantToEmpty : public OpRewritePattern<TensorConstantOp> {
+  using OpRewritePattern::OpRewritePattern;
+  LogicalResult matchAndRewrite(TensorConstantOp constantOp,
+                                PatternRewriter &rewriter) const override {
+    auto shapedType = constantOp.result_encoding().dyn_cast<ShapedType>();
+    if (!shapedType) return failure();
+
+    // See if any dim (including dynamic ones) is known zero.
+    // It's still possible for empty tensors to slip through if their dynamic
+    // dimensions are unknowable (external to the program, data dependencies,
+    // etc) or can't be analyzed (complex global state, control flow, etc).
+    auto dynamicDims = constantOp.result_encoding_dims();
+    bool anyZeroDims = false;
+    for (int64_t i = 0, j = 0; i < shapedType.getRank(); ++i) {
+      if (shapedType.isDynamicDim(i)) {
+        auto dim = dynamicDims[j++];
+        if (matchPattern(dim, m_Zero())) {
+          anyZeroDims = true;
+          break;
+        }
+      } else if (shapedType.getDimSize(i) == 0) {
+        anyZeroDims = true;
+        break;
+      }
+    }
+    if (!anyZeroDims) return failure();
+
+    // Definitely empty if here.
+    auto resultSize = rewriter.createOrFold<IREE::Stream::TensorSizeOfOp>(
+        constantOp.getLoc(), rewriter.getIndexType(),
+        TypeAttr::get(constantOp.result_encoding()),
+        constantOp.result_encoding_dims(), constantOp.affinityAttr());
+    rewriter.replaceOpWithNewOp<TensorEmptyOp>(
+        constantOp, constantOp.result().getType(), constantOp.result_encoding(),
+        constantOp.result_encoding_dims(), resultSize,
+        constantOp.affinityAttr());
+    return success();
+  }
+};
 
 struct TensorConstantToSplat : public OpRewritePattern<TensorConstantOp> {
   using OpRewritePattern::OpRewritePattern;
@@ -742,15 +786,14 @@ struct TensorConstantToSplat : public OpRewritePattern<TensorConstantOp> {
     auto resultSize = rewriter.createOrFold<IREE::Stream::TensorSizeOfOp>(
         constantOp.getLoc(), rewriter.getIndexType(),
         TypeAttr::get(constantOp.result_encoding()),
-        constantOp.result_encoding_dims(), /*affinity=*/nullptr);
+        constantOp.result_encoding_dims(), constantOp.affinityAttr());
     auto splatOp = rewriter.create<TensorSplatOp>(
         constantOp.getLoc(), resultType, splatValue,
         constantOp.result_encoding(), constantOp.result_encoding_dims(),
-        resultSize,
-        /*affinity=*/nullptr);
+        resultSize, constantOp.affinityAttr());
     rewriter.replaceOpWithNewOp<AsyncTransferOp>(
         constantOp, constantOp.result().getType(), splatOp.result(), resultSize,
-        resultSize, /*source_affinity=*/nullptr,
+        resultSize, /*source_affinity=*/constantOp.affinityAttr(),
         /*result_affinity=*/nullptr);
     return success();
   }
@@ -760,8 +803,9 @@ struct TensorConstantToSplat : public OpRewritePattern<TensorConstantOp> {
 
 void TensorConstantOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                                    MLIRContext *context) {
-  // TODO(benvanik): if value is _mostly_ a splat, turn into splat + updates.
+  results.insert<TensorConstantToEmpty>(context);
   results.insert<TensorConstantToSplat>(context);
+  // TODO(benvanik): if value is _mostly_ a splat, turn into splat + updates.
 }
 
 //===----------------------------------------------------------------------===//

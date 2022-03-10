@@ -728,6 +728,50 @@ def Stream_TensorSizeOfOp : Stream_PureOp<"tensor.sizeof", [
   let hasVerifier = 1;
 }
 
+def Stream_TensorEmptyOp : Stream_PureOp<"tensor.empty", [
+  Stream_AffinityOp,
+  Stream_StreamableOp,
+  Stream_TensorPhaseOp,
+  Util_ShapeAwareOp,
+  Util_SizeAwareOp,
+  DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
+]> {
+  let summary = [{defines an empty tensor value}];
+  let description = [{
+    Returns a typed resource initialized with no contents. This still carries
+    shape metadata and may encode to a non-empty resource such as in cases
+    where the empty representation still has data (e.g. sparse tensors).
+  }];
+
+  let arguments = (ins
+    TypeAttr:$result_encoding,
+    Stream_ShapeDynamicDims:$result_encoding_dims,
+    Stream_Size:$result_size,
+    OptionalAttr<Stream_AffinityAttr>:$affinity
+  );
+  let results = (outs
+    Stream_AnyStreamResource:$result
+  );
+
+  let assemblyFormat = [{
+    (`on` `(` $affinity^ `)`)?
+    `:`
+    $result_encoding (`` `{` $result_encoding_dims^ `}`)?
+    `in`
+    type($result) `` `{` $result_size `}`
+    attr-dict-with-keyword
+  }];
+
+  let extraClassDeclaration = [{
+    ValueRange getOperandDynamicDims(unsigned idx) { return ValueRange{}; }
+    ValueRange getResultDynamicDims(unsigned idx) { return result_encoding_dims(); }
+    Value getOperandSize(unsigned idx) { return {}; }
+    Value getResultSize(unsigned idx) { return result_size(); }
+  }];
+
+  let hasVerifier = 1;
+}
+
 def Stream_TensorConstantOp : Stream_PureOp<"tensor.constant", [
   Stream_AffinityOp,
   Stream_StreamableOp,

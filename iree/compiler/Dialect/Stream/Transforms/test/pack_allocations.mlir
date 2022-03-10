@@ -23,3 +23,16 @@ func @packAllocations(%size_a: index, %size_b: index) {
   util.do_not_optimize(%0#1) : !stream.resource<transient>
   return
 }
+
+// -----
+
+// CHECK-LABEL: @packEmpty
+func @packEmpty() {
+  // CHECK: %[[ALLOC:.+]] = stream.resource.alloc : !stream.resource<transient>{%c0}
+  %c0 = arith.constant 0 : index
+  %0 = stream.resource.alloc : !stream.resource<transient>{%c0}
+
+  // CHECK: util.do_not_optimize(%[[ALLOC]])
+  util.do_not_optimize(%0) : !stream.resource<transient>
+  return
+}

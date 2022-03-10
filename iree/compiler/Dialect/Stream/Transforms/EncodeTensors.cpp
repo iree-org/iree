@@ -226,6 +226,32 @@ struct EncodeTensorSizeOfOp
 };
 
 //===----------------------------------------------------------------------===//
+// stream.tensor.empty
+//===----------------------------------------------------------------------===//
+
+struct EncodeTensorEmptyOp
+    : public OpRewritePattern<IREE::Stream::TensorEmptyOp> {
+  using OpRewritePattern::OpRewritePattern;
+  LogicalResult matchAndRewrite(IREE::Stream::TensorEmptyOp op,
+                                PatternRewriter &rewriter) const override {
+    auto resultType = op.result_encoding().cast<RankedTensorType>();
+    auto resultDims = op.result_encoding_dims();
+    if (failed(checkEncoding(op, resultType, resultDims, rewriter))) {
+      return failure();
+    }
+
+    // Dense:
+    auto resultSize =
+        rewriter.create<arith::ConstantIndexOp>(op.getLoc(), 0).getResult();
+    rewriter.replaceOpWithNewOp<IREE::Stream::ResourceAllocOp>(
+        op, op.result().getType(), resultSize, /*uninitialized=*/false,
+        op.affinityAttr());
+
+    return success();
+  }
+};
+
+//===----------------------------------------------------------------------===//
 // stream.tensor.constant
 //===----------------------------------------------------------------------===//
 
@@ -567,9 +593,10 @@ class EncodeHostTensorsPass
     RewritePatternSet patterns(&getContext());
     patterns.insert<
         EncodeTensorImportOp, EncodeTensorExportOp, EncodeTensorSizeOfOp,
-        EncodeTensorConstantOp, EncodeTensorSplatOp, EncodeTensorCloneOp,
-        EncodeTensorSliceOp, EncodeTensorFillOp, EncodeTensorUpdateOp,
-        EncodeTensorLoadOp, EncodeTensorStoreOp>(&getContext());
+        EncodeTensorEmptyOp, EncodeTensorConstantOp, EncodeTensorSplatOp,
+        EncodeTensorCloneOp, EncodeTensorSliceOp, EncodeTensorFillOp,
+        EncodeTensorUpdateOp, EncodeTensorLoadOp, EncodeTensorStoreOp>(
+        &getContext());
     FrozenRewritePatternSet frozenPatterns(std::move(patterns));
     if (failed(applyPatternsAndFoldGreedily(getOperation(), frozenPatterns))) {
       return signalPassFailure();

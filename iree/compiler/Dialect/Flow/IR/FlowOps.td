@@ -706,6 +706,7 @@ def FLOW_TensorTieShapeOp : FLOW_PureOp<"tensor.tie_shape", [
 
   let verifier = [{ return verifyTensorTieShapeOp(*this); }];
 
+  let hasCanonicalizer = 1;
   let hasFolder = 1;
 }
 
@@ -864,6 +865,38 @@ def FLOW_TensorStoreOp : FLOW_PureOp<"tensor.store", [
   let hasFolder = 1;
 }
 
+def FLOW_TensorEmptyOp : FLOW_PureOp<"tensor.empty", [
+  FLOW_StreamableOp,
+  Util_ShapeAwareOp,
+]> {
+  let summary = [{an empty tensor carrying metadata but no contents}];
+  let description = [{
+    Returns a tensor with no data.
+  }];
+
+  let arguments = (ins
+    FLOW_ShapeDynamicDims:$result_dims
+  );
+  let results = (outs
+    FLOW_Tensor:$result
+  );
+
+  let assemblyFormat = [{
+    `:` type($result) (`{` $result_dims^ `}`)?
+    attr-dict-with-keyword
+  }];
+
+  let extraClassDeclaration = [{
+    // StreamableOpInterface:
+    bool isTransfer() { return true; }
+
+    ValueRange getOperandDynamicDims(unsigned idx) { return ValueRange{}; }
+    ValueRange getResultDynamicDims(unsigned idx) { return result_dims(); }
+  }];
+
+  let hasCanonicalizer = 1;
+}
+
 def FLOW_TensorSplatOp : FLOW_PureOp<"tensor.splat", [
   FLOW_StreamableOp,
   TypesMatchWith<"value type matches element type of result",
@@ -941,7 +974,7 @@ def FLOW_TensorCloneOp : FLOW_PureOp<"tensor.clone", [
     ValueRange getResultDynamicDims(unsigned idx) { return operand_dims(); }
   }];
 
-  // TODO(benvanik): canonicalize away entirely in most cases.
+  let hasCanonicalizer = 1;
   let hasFolder = 1;
 }
 
@@ -983,7 +1016,7 @@ def FLOW_TensorSliceOp : FLOW_PureOp<"tensor.slice", [
     ValueRange getResultDynamicDims(unsigned idx) { return result_dims(); }
   }];
 
-  // TODO(benvanik): canonicalize multiple slices (traverse upward through ssa).
+  let hasCanonicalizer = 1;
   let hasFolder = 1;
 }
 

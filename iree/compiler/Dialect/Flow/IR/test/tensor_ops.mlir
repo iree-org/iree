@@ -73,6 +73,15 @@ func @tensorStoreDynamic(%arg0 : tensor<?x4xf32>, %arg1 : index, %arg2 : index, 
 
 // -----
 
+// CHECK-LABEL: @tensorEmpty
+func @tensorEmpty(%arg0: index) -> tensor<?x0x1xf32> {
+  // CHECK-NEXT: = flow.tensor.empty : tensor<?x0x1xf32>{%arg0}
+  %0 = flow.tensor.empty : tensor<?x0x1xf32>{%arg0}
+  return %0 : tensor<?x0x1xf32>
+}
+
+// -----
+
 // CHECK-LABEL: @tensorSplat
 func @tensorSplat(%arg0 : f32) -> tensor<4x4xf32> {
   // CHECK-NEXT: %0 = flow.tensor.splat %arg0 : tensor<4x4xf32>
