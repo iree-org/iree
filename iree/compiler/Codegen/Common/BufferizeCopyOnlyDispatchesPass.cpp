@@ -27,6 +27,7 @@
 namespace mlir {
 namespace iree_compiler {
 
+/// Adds to `OpFoldResult`s and returns the result as an `OpFoldResult`.
 static OpFoldResult add(OpBuilder &builder, Location loc, OpFoldResult lhs,
                         OpFoldResult rhs) {
   auto lhsAttr = lhs.dyn_cast<Attribute>();
@@ -56,8 +57,8 @@ static OpFoldResult add(OpBuilder &builder, Location loc, OpFoldResult lhs,
   return builder.create<AffineApplyOp>(loc, map, operands).getResult();
 }
 
-/// Pattern to fold `tensor.extract_slice` into `flow.dispatch.tensor.load`
-/// operation.
+/// Returns the offsets to use when combining two operations that implement the
+/// `OffsetSizeAndStrideOpInterface`. Also checks that the strides are 1.
 static FailureOr<SmallVector<OpFoldResult>> foldOffsetsSizesAndStrides(
     OpBuilder &builder, Location loc, OffsetSizeAndStrideOpInterface producer,
     OffsetSizeAndStrideOpInterface consumer) {
@@ -90,6 +91,7 @@ static FailureOr<SmallVector<OpFoldResult>> foldOffsetsSizesAndStrides(
       }));
 }
 
+/// Returns true if the `v` is from a `flow.dispatch.tensor.load` operation.
 static bool isDirectlyFromDispatchTensorLoad(Value v) {
   // Might eventually need to walk the use-def chain a bit, but for now,
   // just check for the value defined by a flow.dispatch.tensor.load.
@@ -161,6 +163,8 @@ struct FoldInsertSliceWithTensorStoreOp
   }
 };
 
+/// Pass to bufferize early copy-only dispatches. This allows backends
+/// to use the `linalg.generic` operation generated for lowering the dispatch.
 struct BufferizeCopyOnlyDispatchesPass
     : public BufferizeCopyOnlyDispatchesBase<BufferizeCopyOnlyDispatchesPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
@@ -178,7 +182,7 @@ void BufferizeCopyOnlyDispatchesPass::runOnOperation() {
   ModuleOp module = getOperation();
 
   /// First apply the `flow.dispatch.tensor.load` -> `tensor.extract_slice` and
-  /// `tensor.insert_slice` -> `flow.dispatch.tensor.store` operation.
+  /// `tensor.insert_slice` -> `flow.dispatch.tensor.store` patterns.
   RewritePatternSet patterns(context);
   patterns
       .insert<FoldInsertSliceWithTensorStoreOp, FoldTensorLoadWithExtractSlice>(
@@ -190,9 +194,9 @@ void BufferizeCopyOnlyDispatchesPass::runOnOperation() {
   SmallVector<Operation *> copyOnlyFunctions;
   auto funcOps = module.getOps<FuncOp>();
   for (auto funcOp : funcOps) {
-    /// Check if the dispatch has all flow.dispatch.tensor.store operations
-    /// coming from flow.dispatch.tensor.load operations. If so, this dispatch
-    /// is just a copy dispatch.
+    /// Check if the dispatch has all sources for `flow.dispatch.tensor.store`
+    /// operations coming from `flow.dispatch.tensor.load` operations. If so,
+    /// this dispatch is just a copy dispatch.
     auto walkResult = funcOp.walk(
         [&](IREE::Flow::DispatchTensorStoreOp storeOp) -> WalkResult {
           return success(isDirectlyFromDispatchTensorLoad(storeOp.value()));
@@ -217,7 +221,7 @@ void BufferizeCopyOnlyDispatchesPass::runOnOperation() {
     return signalPassFailure();
   }
 
-  // Create an apply the bufferization passes.
+  // Apply the bufferization passes.
   OpPassManager bufferizationPipeline(module.getOperationName());
   addLinalgBufferizePasses(bufferizationPipeline);
   if (failed(runPipeline(bufferizationPipeline, module))) {
