@@ -60,6 +60,12 @@ void addIREEComprehensiveBufferizePasses(
 /// allocations and view operations.
 std::unique_ptr<OperationPass<FuncOp>> createCleanupBufferAllocViewPass();
 
+/// Pass to bufferize dispatches that are copying from one interface to another.
+/// This will create a `linalg.generic` op which is a copy that can then be
+/// used by backends to handle appropriately.
+std::unique_ptr<OperationPass<ModuleOp>>
+createBufferizeCopyOnlyDispatchesPass();
+
 /// Create a pass to convert a model using f32 type to the equivalent one
 /// using f16.
 std::unique_ptr<OperationPass<ModuleOp>> createDemoteF32ToF16Pass();

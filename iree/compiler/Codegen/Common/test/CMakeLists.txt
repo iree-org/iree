@@ -15,6 +15,7 @@ iree_lit_test_suite(
     lit
   SRCS
     "affinemin_canonicalization.mlir"
+    "bufferize_copy_only_dispatches.mlir"
     "canonicalize_interface_load_store.mlir"
     "convert_to_destination_passing_style.mlir"
     "dead_alloc.mlir"

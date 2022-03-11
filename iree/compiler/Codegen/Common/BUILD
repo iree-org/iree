@@ -35,6 +35,7 @@ cc_library(
     name = "Common",
     srcs = [
         "BufferizationAnalysis.cpp",
+        "BufferizeCopyOnlyDispatchesPass.cpp",
         "CleanupBufferAllocViewPass.cpp",
         "ConvertToDestinationPassingStylePass.cpp",
         "DemoteF32ToF16.cpp",
