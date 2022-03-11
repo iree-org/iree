@@ -205,7 +205,6 @@ void registerPartitionableLoopsInterfaceModels(DialectRegistry &registry) {
   ::mlir::linalg::PoolingNhwcSumOp,
   ::mlir::linalg::QuantizedBatchMatmulOp,
   ::mlir::linalg::QuantizedMatmulOp,
-  ::mlir::linalg::SoftPlus2DOp,
   ::mlir::linalg::VecmatOp
   >(registry);
   // clang-format on

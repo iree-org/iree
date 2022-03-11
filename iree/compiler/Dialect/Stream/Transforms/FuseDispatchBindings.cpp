@@ -438,7 +438,7 @@ class FuseDispatchBindingsPass
     // as source material.
     MemoizedCmdZeros memoizedZeros;
     for (auto executableOp :
-         getOperation().body().getOps<IREE::Stream::ExecutableOp>()) {
+         getOperation().getBodyRegion().getOps<IREE::Stream::ExecutableOp>()) {
       for (auto exportOp :
            executableOp.getOps<IREE::Stream::ExecutableExportOp>()) {
         fuseDispatchBindings(executableOp, exportOp, entryDispatchMap[exportOp],

@@ -220,7 +220,7 @@ class LegalizeInputTypesPass
     FlowTypeConverter typeConverter;
 
     auto oldOps = llvm::to_vector<4>(llvm::map_range(
-        moduleOp.body().getOps(), [](Operation &op) { return &op; }));
+        moduleOp.getBodyRegion().getOps(), [](Operation &op) { return &op; }));
     for (auto *oldOp : oldOps) {
       OpBuilder moduleBuilder(moduleOp);
       moduleBuilder.setInsertionPoint(oldOp);
