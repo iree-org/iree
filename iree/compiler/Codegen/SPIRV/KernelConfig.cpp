@@ -616,39 +616,16 @@ LogicalResult initSPIRVLaunchConfig(ModuleOp module) {
     }
 
     // If there are still no root op, check for any linalg.generic op.
-    if (!rootOperation) {
-      Operation *computeOp = computeOps.back();
+    Operation *computeOp = computeOps.back();
+    if (failed(setDefaultOpConfig(limits, computeOp))) return failure();
 
-      // Handle the case of compute op being a
-      // `tensor.extract_slice`/`tensor.insert_slice`. That needs bufferization
-      // to run before configuration can be set again. Just set the translation
-      // to use the `SPIRVDistributeAndCopy` pipeline. The configuration will be
-      // set again after bufferization.
-      //
-      // TODO(ravishankarm): This is a awkward.
-      // `tensor.extract_slice`/`tensor.insert_slice` will be dropped from
-      // `TiledOpInterface` soon, and will not be compute op. At that time, they
-      // will be folded with `flow.tensor.load` and `flow.tensor.store`
-      // operations. Then this case will degenerate to having no compute ops.
-      // Rework this at that stage to run bufferization early.
-      if (isa<tensor::ExtractSliceOp, tensor::InsertSliceOp>(computeOp)) {
-        setTranslationInfo(
-            funcOp,
-            IREE::Codegen::DispatchLoweringPassPipeline::SPIRVDistributeCopy,
-            /*workloadPerWorkgroup=*/ArrayRef<int64_t>{},
-            /*workgroupSize=*/ArrayRef<int64_t>{});
-      } else {
-        if (failed(setDefaultOpConfig(limits, computeOp))) return failure();
-
-        // Check if the op configuration was set.
-        if (!getLoweringConfig(computeOp)) {
-          return computeOp->emitOpError(
-              "without known roots, the last compute operation in the tiled "
-              "loop body is expected to be set as root");
-        }
-      }
-      rootOperation = computeOp;
+    // Check if the op configuration was set.
+    if (!getLoweringConfig(computeOp)) {
+      return computeOp->emitOpError(
+          "without known roots, the last compute operation in the tiled "
+          "loop body is expected to be set as root");
     }
+    rootOperation = computeOp;
 
     // Propogate the `lowering_config` attribute to the other ops.
     // TODO(ravishankarm, antiagainst): This is a very specific use (and
