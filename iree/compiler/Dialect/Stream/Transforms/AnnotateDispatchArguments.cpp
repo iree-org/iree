@@ -540,7 +540,7 @@ class AnnotateDispatchArgumentsPass
 
     // Annotate the exported dispatch functions.
     for (auto executableOp :
-         getOperation().body().getOps<IREE::Stream::ExecutableOp>()) {
+         getOperation().getBodyRegion().getOps<IREE::Stream::ExecutableOp>()) {
       for (auto exportOp :
            executableOp.getOps<IREE::Stream::ExecutableExportOp>()) {
         annotateExport(executableOp, exportOp, analysis);

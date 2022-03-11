@@ -352,7 +352,7 @@ class SpecializeDispatchesPass
     // Optimize each dispatchable function and its dispatch sites.
     MemoizedCmdConstants memoizedConstants;
     for (auto executableOp :
-         getOperation().body().getOps<IREE::Stream::ExecutableOp>()) {
+         getOperation().getBodyRegion().getOps<IREE::Stream::ExecutableOp>()) {
       for (auto exportOp :
            executableOp.getOps<IREE::Stream::ExecutableExportOp>()) {
         specializeDispatches(executableOp, exportOp, entryDispatchMap[exportOp],
