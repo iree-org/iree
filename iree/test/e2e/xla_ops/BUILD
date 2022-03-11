@@ -393,6 +393,14 @@ iree_check_single_backend_test_suite(
     target_backend = "vulkan-spirv",
 )
 
+# Check WebAssembly compilation (LLVM backend with wasm target triple).
+# Note:
+#   * no 'driver' arg is set, so this does not test execution
+#   * the test suite name is missing "_driver" from "check_target_driver"
+#   * this isn't an "end to end" test suite in the same sense as the other
+#     test suites in this file, but the test coverage is still useful
+# Hopefully at some point we can build WebAssembly execution testing into our
+# infrastructure and this will no longer bend our testing definitions as much.
 iree_check_single_backend_test_suite(
     name = "check_wasm-llvm-aot",
     srcs = enforce_glob(

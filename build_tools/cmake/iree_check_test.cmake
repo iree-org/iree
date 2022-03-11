@@ -77,7 +77,9 @@ endfunction()
 #   NAME: Name of the target
 #   SRC: mlir source file to be compiled to an IREE module.
 #   TARGET_BACKEND: target backend to compile for.
-#   DRIVER: driver to run the module with.
+#   DRIVER: driver to run the module with. This can be omitted to test only
+#       compilation, but consider omiting the driver as a hacky abuse of the
+#       rule since compilation on its own not use iree-check-module.
 #   COMPILER_FLAGS: additional flags to pass to the compiler. Bytecode
 #       translation and backend flags are passed automatically.
 #   RUNNER_ARGS: additional args to pass to iree-check-module. The driver
@@ -212,7 +214,9 @@ endfunction()
 #   NAME: name of the generated test suite.
 #   SRCS: source mlir files containing the module.
 #   TARGET_BACKEND: target backend to compile for.
-#   DRIVER: driver to run the module with.
+#   DRIVER: driver to run the module with. This can be omitted to test only
+#       compilation, but consider omiting the driver as a hacky abuse of the
+#       rule since compilation on its own not use iree-check-module.
 #   COMPILER_FLAGS: additional flags to pass to the compiler. Bytecode
 #       translation and backend flags are passed automatically.
 #   RUNNER_ARGS: additional args to pass to the underlying iree-check-module
@@ -245,6 +249,9 @@ function(iree_check_single_backend_test_suite)
 
   # Omit tests for which the specified driver or target backend is not enabled.
   # This overlaps with directory exclusions and other filtering mechanisms.
+  #
+  # Note: omitting the DRIVER arg is allowed (though it is a hack). If it is
+  # omitted, we don't need to test for a driver being enabled.
   if(DEFINED _RULE_DRIVER)
     string(TOUPPER ${_RULE_DRIVER} _UPPERCASE_DRIVER)
     string(REPLACE "-" "_" _NORMALIZED_DRIVER ${_UPPERCASE_DRIVER})
