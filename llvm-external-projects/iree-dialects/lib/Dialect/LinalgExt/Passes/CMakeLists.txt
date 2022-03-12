@@ -5,7 +5,7 @@ add_mlir_library(IREELinalgExtPasses
   Tiling.cpp
 
   DEPENDS
-  IREELinalgExtTransformsPassesIncGen
+  IREELinalgExtPassesIncGen
 
   LINK_LIBS PUBLIC
   IREEInputDialect

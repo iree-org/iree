@@ -32,7 +32,7 @@ filegroup(
     srcs = glob([
         "include/iree-dialects/Dialect/Input/*.td",
         "include/iree-dialects/Dialect/LinalgExt/IR/*.td",
-        "include/iree-dialects/Dialect/LinalgExt/Transforms/*.td",
+        "include/iree-dialects/Dialect/LinalgExt/Passes/*.td",
         "include/iree-dialects/Dialect/PyDM/IR/*.td",
         "include/iree-dialects/Dialect/PyDM/Transforms/*.td",
     ]),
@@ -43,7 +43,7 @@ td_library(
     srcs = glob([
         "include/iree-dialects/Dialect/Input/*.td",
         "include/iree-dialects/Dialect/LinalgExt/IR/*.td",
-        "include/iree-dialects/Dialect/LinalgExt/Transforms/*.td",
+        "include/iree-dialects/Dialect/LinalgExt/Passes/*.td",
         "include/iree-dialects/Dialect/PyDM/IR/*.td",
         "python/iree/compiler/dialects/*.td",
     ]) + [
@@ -232,19 +232,19 @@ gentbl_cc_library(
     tbl_outs = [
         (
             ["-gen-pass-decls"],
-            "include/iree-dialects/Dialect/LinalgExt/Transforms/Passes.h.inc",
+            "include/iree-dialects/Dialect/LinalgExt/Passes/Passes.h.inc",
         ),
         (
             ["-gen-pass-capi-header"],
-            "include/iree-dialects/Dialect/LinalgExt/Transforms/Passes.capi.h.inc",
+            "include/iree-dialects/Dialect/LinalgExt/Passes/Passes.capi.h.inc",
         ),
         (
             ["-gen-pass-capi-impl"],
-            "include/iree-dialects/Dialect/LinalgExt/Transforms/Passes.capi.cpp.inc",
+            "include/iree-dialects/Dialect/LinalgExt/Passes/Passes.capi.cpp.inc",
         ),
     ],
     tblgen = "@llvm-project//mlir:mlir-tblgen",
-    td_file = "include/iree-dialects/Dialect/LinalgExt/Transforms/Passes.td",
+    td_file = "include/iree-dialects/Dialect/LinalgExt/Passes/Passes.td",
     deps = [
         ":TdFiles",
         "@llvm-project//mlir:PassBaseTdFiles",
@@ -286,12 +286,12 @@ cc_library(
 )
 
 cc_library(
-    name = "IREELinalgExtTransforms",
+    name = "IREELinalgExtPasses",
     srcs = glob([
-        "lib/Dialect/LinalgExt/Transforms/*.cpp",
+        "lib/Dialect/LinalgExt/Passes/*.cpp",
     ]),
     hdrs = glob([
-        "include/iree-dialects/Dialect/LinalgExt/Transforms/*.h",
+        "include/iree-dialects/Dialect/LinalgExt/Passes/*.h",
     ]),
     deps = [
         ":IREEInputDialect",
