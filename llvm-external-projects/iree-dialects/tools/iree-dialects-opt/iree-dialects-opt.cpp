@@ -7,7 +7,7 @@
 #include "iree-dialects/Dialect/Input/InputDialect.h"
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree-dialects/Dialect/LinalgExt/IR/TiledOpInterface.h"
-#include "iree-dialects/Dialect/LinalgExt/Transforms/Passes.h"
+#include "iree-dialects/Dialect/LinalgExt/Passes/Passes.h"
 #include "iree-dialects/Dialect/PyDM/IR/PyDMDialect.h"
 #include "iree-dialects/Dialect/PyDM/Transforms/Passes.h"
 #include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"

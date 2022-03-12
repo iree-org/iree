@@ -7,7 +7,7 @@
 #include "iree/compiler/Codegen/Passes.h"
 
 #include "iree-dialects/Dialect/LinalgExt/IR/TiledOpInterface.h"
-#include "iree-dialects/Dialect/LinalgExt/Transforms/Passes.h"
+#include "iree-dialects/Dialect/LinalgExt/Passes/Passes.h"
 #include "iree/compiler/Codegen/LLVMCPU/KernelDispatch.h"
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Sandbox/Passes.h"
