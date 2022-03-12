@@ -20,7 +20,7 @@ namespace LinalgExt {
 
 namespace detail {
 #define GEN_PASS_REGISTRATION
-#include "iree-dialects/Dialect/LinalgExt/Transforms/Passes.h.inc"  // IWYU pragma: export
+#include "iree-dialects/Dialect/LinalgExt/Passes/Passes.h.inc"  // IWYU pragma: export
 }  // namespace detail
 
 }  // namespace LinalgExt
