@@ -74,6 +74,26 @@ bool isRISCV(IREE::HAL::ExecutableVariantOp variantOp) {
   return triple && triple.getValue().isRISCV();
 }
 
+bool isReadOnly(Value v) {
+  Operation *definingOp = v.getDefiningOp();
+  if (!definingOp) return false;
+  return TypeSwitch<Operation *, bool>(definingOp)
+      .Case<arith::ConstantOp>(
+          [&](arith::ConstantOp constantOp) { return true; })
+      .Case<tensor::CollapseShapeOp, tensor::ExpandShapeOp>(
+          [&](auto op) { return isReadOnly(op.src()); })
+      .Case<tensor::CastOp, tensor::ExtractSliceOp>(
+          [&](auto op) { return isReadOnly(op.source()); })
+      .Case<IREE::Flow::DispatchTensorLoadOp>(
+          [&](IREE::Flow::DispatchTensorLoadOp loadOp) {
+            return loadOp.source()
+                       .getType()
+                       .cast<IREE::Flow::DispatchTensorType>()
+                       .getAccess() == IREE::Flow::TensorAccess::ReadOnly;
+          })
+      .Default([&](Operation *op) { return false; });
+}
+
 //===----------------------------------------------------------------------===//
 // Utility functions to set configurations
 //===----------------------------------------------------------------------===//
