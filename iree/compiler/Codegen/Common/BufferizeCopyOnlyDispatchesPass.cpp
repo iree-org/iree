@@ -16,6 +16,7 @@
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
+#include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
@@ -27,75 +28,101 @@
 namespace mlir {
 namespace iree_compiler {
 
-/// Adds to `OpFoldResult`s and returns the result as an `OpFoldResult`.
-static OpFoldResult add(OpBuilder &builder, Location loc, OpFoldResult lhs,
-                        OpFoldResult rhs) {
-  auto lhsAttr = lhs.dyn_cast<Attribute>();
-  auto rhsAttr = rhs.dyn_cast<Attribute>();
-  if (lhsAttr && rhsAttr) {
-    int64_t result = lhsAttr.cast<IntegerAttr>().getInt() +
-                     rhsAttr.cast<IntegerAttr>().getInt();
-    return builder.getIndexAttr(result);
+/// Helper function to create `AffineExpr` from `OpFoldResult`. If the
+/// `OpFoldResult` is a `Value`, creates a `AffineSymbolExpr` and appends it to
+/// `symbols`.
+static AffineExpr getAffineExpr(OpFoldResult ofr, SmallVector<Value> &symbols) {
+  if (auto attr = ofr.dyn_cast<Attribute>()) {
+    return getAffineConstantExpr(attr.cast<IntegerAttr>().getInt(),
+                                 attr.getContext());
   }
-  // Generate the affine.apply that computes the result
-  SmallVector<Value> operands;
-  AffineExpr resultExpr = nullptr;
-  auto addToResult = [&](OpFoldResult ofr) {
-    AffineExpr e;
-    if (auto attr = ofr.dyn_cast<Attribute>()) {
-      e = getAffineConstantExpr(attr.cast<IntegerAttr>().getInt(),
-                                builder.getContext());
-    } else {
-      e = getAffineSymbolExpr(operands.size(), builder.getContext());
-      operands.push_back(ofr.get<Value>());
-    }
-    resultExpr = resultExpr ? resultExpr + e : e;
-  };
-  addToResult(lhs);
-  addToResult(rhs);
-  AffineMap map = AffineMap::get(0, operands.size(), resultExpr);
-  return builder.create<AffineApplyOp>(loc, map, operands).getResult();
+  Value v = ofr.get<Value>();
+  AffineExpr expr = getAffineSymbolExpr(symbols.size(), v.getContext());
+  symbols.push_back(v);
+  return expr;
+}
+/// Converts an `AffineExpr` to `OpFoldResult` by generating an `affine.apply`
+/// operation.
+static OpFoldResult getOpFoldResult(OpBuilder &builder, Location loc,
+                                    AffineExpr expr,
+                                    SmallVector<Value> &symbols) {
+  AffineMap m = AffineMap::get(0, symbols.size(), expr);
+  return builder.create<AffineApplyOp>(loc, m, symbols).getResult();
+}
+
+/// Methods to build the Affine Expr for arithmetic operations.
+static AffineExpr add(AffineExpr expr, OpFoldResult ofr,
+                      SmallVector<Value> &symbols) {
+  return expr + getAffineExpr(ofr, symbols);
+}
+static AffineExpr add(OpFoldResult lhs, OpFoldResult rhs,
+                      SmallVector<Value> &symbols) {
+  return getAffineExpr(lhs, symbols) + getAffineExpr(rhs, symbols);
+}
+static AffineExpr mul(AffineExpr expr, OpFoldResult ofr,
+                      SmallVector<Value> &symbols) {
+  return expr * getAffineExpr(ofr, symbols);
+}
+static AffineExpr mul(OpFoldResult lhs, OpFoldResult rhs,
+                      SmallVector<Value> &symbols) {
+  return getAffineExpr(lhs, symbols) * getAffineExpr(rhs, symbols);
 }
 
 /// Returns the offsets to use when combining two operations that implement the
 /// `OffsetSizeAndStrideOpInterface`. Also checks that the strides are 1.
-static FailureOr<SmallVector<OpFoldResult>> foldOffsetsSizesAndStrides(
-    OpBuilder &builder, Location loc, OffsetSizeAndStrideOpInterface producer,
-    OffsetSizeAndStrideOpInterface consumer) {
-  auto checkOne = [](OpFoldResult ofr) -> bool {
-    auto attr = ofr.dyn_cast<Attribute>();
-    return attr && attr.cast<IntegerAttr>().getInt() == 1;
-  };
-  auto producerStrides = producer.getMixedStrides();
-  auto consumerStrides = consumer.getMixedStrides();
-  if (producerStrides.size() != consumerStrides.size()) {
-    return static_cast<LogicalResult>(producer->emitOpError(
-        "expected same number of offsets/sizes/strides for producer and "
-        "consumer"));
+static LogicalResult foldOffsetsSizesAndStrides(
+    PatternRewriter &rewriter, Location loc,
+    OffsetSizeAndStrideOpInterface producer,
+    OffsetSizeAndStrideOpInterface consumer,
+    SmallVector<OpFoldResult> &combinedOffsets,
+    SmallVector<OpFoldResult> &combinedSizes,
+    SmallVector<OpFoldResult> &combinedStrides) {
+  SmallVector<OpFoldResult> producerOffsets = producer.getMixedOffsets();
+  SmallVector<OpFoldResult> producerStrides = producer.getMixedStrides();
+  SmallVector<OpFoldResult> consumerOffsets = consumer.getMixedOffsets();
+  SmallVector<OpFoldResult> consumerStrides = consumer.getMixedStrides();
+  if (producerOffsets.size() != consumerOffsets.size()) {
+    return rewriter.notifyMatchFailure(
+        consumer,
+        "expected op and producer to have same number of offset values");
   }
 
-  if (!llvm::all_of(producer.getMixedStrides(), checkOne)) {
-    return static_cast<LogicalResult>(
-        producer->emitOpError("expected all strides to be 1"));
+  combinedOffsets.resize(producerOffsets.size());
+  combinedSizes.resize(producerOffsets.size());
+  combinedStrides.resize(producerOffsets.size());
+  for (auto i : llvm::seq<unsigned>(0, producerOffsets.size())) {
+    SmallVector<Value> offsetSymbols, strideSymbols;
+    // The combined offset is computed as
+    //    producer_offset + consumer_offset * producer_strides.
+    combinedOffsets[i] = getOpFoldResult(
+        rewriter, loc,
+        add(mul(consumerOffsets[i], producerStrides[i], offsetSymbols),
+            producerOffsets[i], offsetSymbols),
+        offsetSymbols);
+    // The combined stride is computed as
+    //    producer_stride * consumer_stride.
+    combinedStrides[i] = getOpFoldResult(
+        rewriter, loc,
+        mul(producerStrides[i], consumerStrides[i], strideSymbols),
+        strideSymbols);
   }
-  if (!llvm::all_of(consumer.getMixedStrides(), checkOne)) {
-    return static_cast<LogicalResult>(
-        consumer->emitOpError("expected all strides to be 1"));
-  }
-
-  // Combined offsets is the addition of the two offsets.
-  return llvm::to_vector(llvm::map_range(
-      llvm::zip(producer.getMixedOffsets(), consumer.getMixedOffsets()),
-      [&](std::tuple<OpFoldResult, OpFoldResult> t) {
-        return add(builder, loc, std::get<0>(t), std::get<1>(t));
-      }));
+  combinedSizes = consumer.getMixedSizes();
+  return success();
 }
 
-/// Returns true if the `v` is from a `flow.dispatch.tensor.load` operation.
-static bool isDirectlyFromDispatchTensorLoad(Value v) {
-  // Might eventually need to walk the use-def chain a bit, but for now,
-  // just check for the value defined by a flow.dispatch.tensor.load.
-  return v.getDefiningOp<IREE::Flow::DispatchTensorLoadOp>() != nullptr;
+/// Returns the `hal.interface.binding` a value comes from.
+static Optional<IREE::HAL::InterfaceBindingSubspanOp> getBindingSubspanOp(
+    Value v) {
+  Operation *definingOp = v.getDefiningOp();
+  if (!definingOp) return llvm::None;
+  if (auto interfaceOp =
+          dyn_cast<IREE::HAL::InterfaceBindingSubspanOp>(definingOp)) {
+    return interfaceOp;
+  }
+  if (auto loadOp = dyn_cast<IREE::Flow::DispatchTensorLoadOp>(definingOp)) {
+    return getBindingSubspanOp(loadOp.source());
+  }
+  return llvm::None;
 }
 
 namespace {
@@ -114,19 +141,16 @@ struct FoldTensorLoadWithExtractSlice
             .getDefiningOp<IREE::Flow::DispatchTensorLoadOp>();
     if (!dispatchTensorLoadOp) return failure();
 
-    FailureOr<SmallVector<OpFoldResult>> offsets =
-        foldOffsetsSizesAndStrides(rewriter, dispatchTensorLoadOp->getLoc(),
-                                   dispatchTensorLoadOp, extractSliceOp);
-    if (failed(offsets)) {
+    SmallVector<OpFoldResult> offsets, sizes, strides;
+    if (failed(foldOffsetsSizesAndStrides(
+            rewriter, dispatchTensorLoadOp->getLoc(), dispatchTensorLoadOp,
+            extractSliceOp, offsets, sizes, strides))) {
       return failure();
     }
 
-    SmallVector<OpFoldResult> strides(offsets->size(),
-                                      rewriter.getIndexAttr(1));
     rewriter.replaceOpWithNewOp<IREE::Flow::DispatchTensorLoadOp>(
         extractSliceOp, extractSliceOp.getType(), dispatchTensorLoadOp.source(),
-        dispatchTensorLoadOp.source_dims(), offsets.getValue(),
-        extractSliceOp.getMixedSizes(), strides);
+        dispatchTensorLoadOp.source_dims(), offsets, sizes, strides);
     return success();
   }
 };
@@ -146,19 +170,31 @@ struct FoldInsertSliceWithTensorStoreOp
         dispatchTensorStoreOp.value().getDefiningOp<tensor::InsertSliceOp>();
     if (!insertSliceOp) return failure();
 
-    FailureOr<SmallVector<OpFoldResult>> offsets =
-        foldOffsetsSizesAndStrides(rewriter, dispatchTensorStoreOp->getLoc(),
-                                   insertSliceOp, dispatchTensorStoreOp);
-    if (failed(offsets)) {
+    // Check that the `dest` of the `tensor.insert_slice` and target of the
+    // `flow.dispatch.tensor.store` are the same interface binding.
+    Optional<IREE::HAL::InterfaceBindingSubspanOp> destBinding =
+        getBindingSubspanOp(insertSliceOp.dest());
+    Optional<IREE::HAL::InterfaceBindingSubspanOp> targetBinding =
+        getBindingSubspanOp(dispatchTensorStoreOp.target());
+    if (!destBinding || !targetBinding ||
+        destBinding.getValue() != targetBinding.getValue()) {
       return failure();
     }
 
-    SmallVector<OpFoldResult> strides(offsets->size(),
-                                      rewriter.getIndexAttr(1));
+    SmallVector<OpFoldResult> offsets, sizes, strides;
+    // Treat the `flow.dispatch.tensor.store` as the producer and the
+    // `tensor.insert_slice` as the consumer since that would be the case for
+    // the final subview created.
+    if (failed(foldOffsetsSizesAndStrides(
+            rewriter, dispatchTensorStoreOp->getLoc(), dispatchTensorStoreOp,
+            insertSliceOp, offsets, sizes, strides))) {
+      return failure();
+    }
+
     rewriter.replaceOpWithNewOp<IREE::Flow::DispatchTensorStoreOp>(
         dispatchTensorStoreOp, insertSliceOp.source(),
         dispatchTensorStoreOp.target(), dispatchTensorStoreOp.target_dims(),
-        offsets.getValue(), insertSliceOp.getMixedSizes(), strides);
+        offsets, sizes, strides);
     return success();
   }
 };
@@ -168,9 +204,9 @@ struct FoldInsertSliceWithTensorStoreOp
 struct BufferizeCopyOnlyDispatchesPass
     : public BufferizeCopyOnlyDispatchesBase<BufferizeCopyOnlyDispatchesPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry
-        .insert<AffineDialect, IREE::Flow::FlowDialect, linalg::LinalgDialect,
-                memref::MemRefDialect, tensor::TensorDialect>();
+    registry.insert<AffineDialect, bufferization::BufferizationDialect,
+                    IREE::Flow::FlowDialect, linalg::LinalgDialect,
+                    memref::MemRefDialect, tensor::TensorDialect>();
   }
 
   void runOnOperation() override;
@@ -199,7 +235,7 @@ void BufferizeCopyOnlyDispatchesPass::runOnOperation() {
     /// this dispatch is just a copy dispatch.
     auto walkResult = funcOp.walk(
         [&](IREE::Flow::DispatchTensorStoreOp storeOp) -> WalkResult {
-          return success(isDirectlyFromDispatchTensorLoad(storeOp.value()));
+          return success(isReadOnly(storeOp.value()));
         });
     if (walkResult.wasInterrupted()) continue;
     // The function is just a copy.
