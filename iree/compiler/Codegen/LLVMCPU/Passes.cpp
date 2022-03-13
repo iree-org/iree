@@ -357,6 +357,21 @@ void addCPUDefaultPassPipeline(OpPassManager &passManager) {
   addLinalgBufferizePasses(passManager, cpuAllocationFunction);
 }
 
+void addSandboxCodegenPasses(OpPassManager &passManager) {
+  // Sets the number of workgroups to be {1, 1, 1} for now.
+  passManager.addPass(createSetNumWorkgroupsPass());
+
+  OpPassManager &modulePM = passManager.nest<ModuleOp>();
+  // Bufferize the dispatch.
+  BufferizationOptions::AllocationFn allocationFn =
+      cpuComprehensiveBufferizeAllocationFn;
+  BufferizationOptions::DeallocationFn deallocationFn =
+      cpuComprehensiveBufferizeDeallocationFn;
+  BufferizationOptions::MemCpyFn memcpyFn = cpuComprehensiveBufferizeCopyFn;
+  addIREEComprehensiveBufferizePasses(modulePM, allocationFn, deallocationFn,
+                                      memcpyFn);
+}
+
 static void addLowerToLLVMPasses(OpPassManager &passManager) {
   // LinalgExt -> SCF
   passManager.addNestedPass<FuncOp>(
