@@ -185,6 +185,9 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
               CPUConvTileAndDecomposeExpert:
             addConvTileAndDecomposeExpertPassPipeline(nestedModulePM);
             break;
+          case IREE::Codegen::DispatchLoweringPassPipeline::CPUSandboxCodegen:
+            addSandboxCodegenPasses(executableLoweringPipeline);
+            break;
           case IREE::Codegen::DispatchLoweringPassPipeline::
               CPUTileFuseAndVectorize:
             addTileFuseAndVectorizePassPipeline(nestedModulePM, lowerToVectors);
