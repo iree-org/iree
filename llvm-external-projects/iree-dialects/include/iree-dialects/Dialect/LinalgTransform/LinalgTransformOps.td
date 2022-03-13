@@ -88,7 +88,7 @@ def SequenceOp : Linalg_Transform_Operation<"sequence",
     static StringRef getDefaultDialect() { return "iree_linalg_transform"; }
   }];
 
-  let verifier = [{ return verifySequenceOp(*this); }];
+  let hasVerifier = 1;
 }
 
 //===----------------------------------------------------------------------===//

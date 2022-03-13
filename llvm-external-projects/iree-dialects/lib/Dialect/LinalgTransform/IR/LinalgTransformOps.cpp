@@ -38,7 +38,6 @@
 #include "mlir/Dialect/Bufferization/Transforms/Bufferize.h"
 #include "mlir/Dialect/Bufferization/Transforms/OneShotAnalysis.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
-#include "mlir/Dialect/Linalg/ComprehensiveBufferize/AffineInterfaceImpl.h"
 #include "mlir/Dialect/Linalg/ComprehensiveBufferize/ModuleBufferization.h"
 #include "mlir/Dialect/Linalg/Passes.h"
 #include "mlir/Dialect/Linalg/Transforms/Hoisting.h"
@@ -114,8 +113,8 @@ void transform::ScopeOp::getSuccessorRegions(
 // SequenceOp
 //===---------------------------------------------------------------------===//
 
-static LogicalResult verifySequenceOp(transform::SequenceOp op) {
-  WalkResult result = op.walk([](Operation *child) {
+LogicalResult transform::SequenceOp::verify() {
+  WalkResult result = this->walk([](Operation *child) {
     for (OpResult result : child->getResults()) {
       if (llvm::hasNItemsOrLess(result.getUses(), 1)) continue;
       InFlightDiagnostic diag = child->emitError()
@@ -559,7 +558,7 @@ LogicalResult transform::BufferizeOp::apply(transform::TransformResults &result,
                                             transform::TransformState &state) {
   PassManager pm(getContext());
 
-  bufferization::AnalysisBufferizationOptions options;
+  bufferization::OneShotBufferizationOptions options;
   options.memCpyFn = [](OpBuilder &builder, Location loc, Value from,
                         Value to) {
     return success(linalg::makeMemRefCopyOp(builder, loc, from, to));

@@ -27,6 +27,12 @@ MLIR_DECLARE_CAPI_DIALECT_REGISTRATION(IREEInput, iree_input);
 
 MLIR_DECLARE_CAPI_DIALECT_REGISTRATION(IREELinalgExt, iree_linalg_ext);
 
+//===--------------------------------------------------------------------===//
+// LinalgTransform
+//===--------------------------------------------------------------------===//
+
+MLIR_DECLARE_CAPI_DIALECT_REGISTRATION(LinalgTransform, iree_linalg_transform);
+
 //===----------------------------------------------------------------------===//
 // IREEPyDMDialect
 //===----------------------------------------------------------------------===//

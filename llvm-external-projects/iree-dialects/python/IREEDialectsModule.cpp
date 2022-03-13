@@ -105,6 +105,22 @@ PYBIND11_MODULE(_ireeDialects, m) {
       py::arg("context") = py::none(), py::arg("load") = true);
 
   //===--------------------------------------------------------------------===//
+  // LinalgTransform
+  //===--------------------------------------------------------------------===//
+  auto iree_linalg_transform_m = m.def_submodule("iree_linalg_transform");
+  iree_linalg_transform_m.def(
+      "register_dialect",
+      [](MlirContext context, bool load) {
+        MlirDialectHandle handle =
+            mlirGetDialectHandle__iree_linalg_transform__();
+        mlirDialectHandleRegisterDialect(handle, context);
+        if (load) {
+          mlirDialectHandleLoadDialect(handle, context);
+        }
+      },
+      py::arg("context") = py::none(), py::arg("load") = true);
+
+  //===--------------------------------------------------------------------===//
   // IREEPyDMDialect
   //===--------------------------------------------------------------------===//
   auto iree_pydm_m = m.def_submodule("iree_pydm");
