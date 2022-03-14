@@ -22,7 +22,7 @@ def CPU_ConvTileAndDecomposeExpert
 def CPU_TileFuseAndVectorize
     : I32EnumAttrCase<"CPUTileFuseAndVectorize", 4>;
 def CPU_SandboxCodegen
-    : I32EnumAttrCase<"CPUSandboxCodegen", 5>;
+    : I32EnumAttrCase<"LinalgTransformInterpCodegen", 5>;
 
 def LLVMGPU_SimpleDistribute
     : I32EnumAttrCase<"LLVMGPUDistribute",6>;
