@@ -461,23 +461,15 @@ static LogicalResult setRootConfig(
           contractionOp.getOperation()),
       minTileSizes, maxTileSizes);
 
-  if (isX86(entryPointFn)) {
+  // TODO(dcaballe): Find better configurations for RISC-V backends.
+  if (isX86(entryPointFn) || isRISCV(entryPointFn)) {
     // There is a tileInterchange option. If it needs to be configured, we can
     // only apply the pipeline to linalg.matmul. Because we don't know the
     // number of loops when adding the pass to pass manager.
     // TODO(hanchung): Embed options into attributes, so we can control options
     // more heuristically.
-    Type lhsElemType = getElementTypeOrSelf(contractionOp.lhs().getType());
-    Type rhsElemType = getElementTypeOrSelf(contractionOp.rhs().getType());
-    Type resElemType =
-        getElementTypeOrSelf(contractionOp->getResult(0).getType());
-    if (lhsElemType == rhsElemType && rhsElemType == resElemType) {
-      return setX86SandboxRootConfig(entryPointFn, contractionOp, flowTileSizes,
-                                     vectorSize);
-    } else {
-      return setX86TileFuseAndVectorizeRootConfig(entryPointFn, contractionOp,
-                                                  flowTileSizes, vectorSize);
-    }
+    return setX86SandboxRootConfig(entryPointFn, contractionOp, flowTileSizes,
+                                   vectorSize);
   }
 
   // Fall back to ARM configurations.
