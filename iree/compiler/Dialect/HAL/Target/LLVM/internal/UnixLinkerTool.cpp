@@ -28,7 +28,7 @@ class UnixLinkerTool : public LinkerTool {
     if (!toolPath.empty()) return toolPath;
 
     // No explicit linker specified, search the environment for common tools.
-    toolPath = findToolInEnvironment({"ld", "ld.gold", "ld.lld"});
+    toolPath = findToolInEnvironment({"ld.lld", "ld.gold", "ld"});
     if (!toolPath.empty()) return toolPath;
 
     llvm::errs() << "No Unix linker tool specified or discovered\n";
