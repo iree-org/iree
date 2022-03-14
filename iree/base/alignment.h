@@ -10,6 +10,7 @@
 #ifndef IREE_BASE_ALIGNMENT_H_
 #define IREE_BASE_ALIGNMENT_H_
 
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <string.h>
@@ -50,11 +51,23 @@ static inline iree_host_size_t iree_host_align(iree_host_size_t value,
   return (value + (alignment - 1)) & ~(alignment - 1);
 }
 
+// Returns true if |value| matches the given minimum |alignment|.
+static inline bool iree_host_size_has_alignment(iree_host_size_t value,
+                                                iree_host_size_t alignment) {
+  return iree_host_align(value, alignment) == value;
+}
+
 // Aligns |value| up to the given power-of-two |alignment| if required.
 // https://en.wikipedia.org/wiki/Data_structure_alignment#Computing_padding
 static inline iree_device_size_t iree_device_align(
     iree_device_size_t value, iree_device_size_t alignment) {
   return (value + (alignment - 1)) & ~(alignment - 1);
+}
+
+// Returns true if |value| matches the given minimum |alignment|.
+static inline bool iree_device_size_has_alignment(
+    iree_device_size_t value, iree_device_size_t alignment) {
+  return iree_device_align(value, alignment) == value;
 }
 
 // Returns the size of a struct padded out to iree_max_align_t.

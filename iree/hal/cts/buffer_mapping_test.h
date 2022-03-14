@@ -541,7 +541,6 @@ TEST_P(buffer_mapping_test, MapRangeWrite) {
 }
 
 // TODO(scotttodd): iree_hal_allocator_wrap_buffer
-// TODO(scotttodd): iree_hal_heap_buffer_wrap
 
 }  // namespace cts
 }  // namespace hal

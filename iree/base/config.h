@@ -155,6 +155,14 @@ typedef IREE_DEVICE_SIZE_T iree_device_size_t;
 // Enables optional HAL features. Each of these may add several KB to the final
 // binary when linked dynamically.
 
+#if !defined(IREE_HAL_HEAP_BUFFER_ALIGNMENT)
+// Power of two byte alignment required on all host heap buffers.
+// Executables are compiled with alignment expectations and the runtime
+// alignment must be greater than or equal to the alignment set in the compiler.
+// External buffers wrapped by HAL buffers must meet this alignment requirement.
+#define IREE_HAL_HEAP_BUFFER_ALIGNMENT 64
+#endif  // IREE_HAL_HEAP_BUFFER_ALIGNMENT
+
 #if !defined(IREE_HAL_COMMAND_BUFFER_VALIDATION_ENABLE)
 // Enables additional validation of commands issued against command buffers.
 // This adds small amounts of per-command overhead but in all but the most

@@ -10,6 +10,10 @@
 #include "iree/base/api.h"
 #include "iree/base/tracing.h"
 
+//===----------------------------------------------------------------------===//
+// iree_allocator_t (std::allocator-like interface)
+//===----------------------------------------------------------------------===//
+
 static iree_status_t iree_allocator_issue_alloc(
     iree_allocator_t allocator, iree_allocator_command_t command,
     iree_host_size_t byte_length, void** inout_ptr) {
@@ -65,7 +69,7 @@ static iree_status_t iree_allocator_system_alloc(
   IREE_ASSERT_ARGUMENT(params);
   IREE_ASSERT_ARGUMENT(inout_ptr);
   iree_host_size_t byte_length = params->byte_length;
-  if (byte_length == 0) {
+  if (IREE_UNLIKELY(byte_length == 0)) {
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                             "allocations must be >0 bytes");
   }
@@ -126,5 +130,132 @@ iree_allocator_system_ctl(void* self, iree_allocator_command_t command,
     default:
       return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
                               "unsupported system allocator command");
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// Aligned allocations via iree_allocator_t
+//===----------------------------------------------------------------------===//
+
+// Returns true if |alignment| is a power of two (or 0).
+static inline iree_host_size_t iree_alignment_is_pot(
+    iree_host_size_t alignment) {
+  return (alignment & (alignment - 1)) == 0;
+}
+
+// Returns a pointer into |unaligned_ptr| where |offset| matches |alignment|.
+static inline void* iree_aligned_ptr(void* unaligned_ptr,
+                                     iree_host_size_t alignment,
+                                     iree_host_size_t offset) {
+  return (void*)((((uintptr_t)unaligned_ptr + (alignment + sizeof(void*)) +
+                   offset) &
+                  ~(uintptr_t)(alignment - 1)) -
+                 offset);
+}
+
+// Returns the base unaligned pointer for |aligned_ptr|.
+static inline void* iree_aligned_ptr_get_base(void* aligned_ptr) {
+  void** ptr_ref =
+      (void**)((uintptr_t)aligned_ptr & ~(uintptr_t)(sizeof(void*) - 1));
+  return ptr_ref[-1];
+}
+
+// Sets the base unaligned pointer in |aligned_ptr|.
+static inline void iree_aligned_ptr_set_base(void* aligned_ptr,
+                                             void* base_ptr) {
+  void** ptr_ref =
+      (void**)((uintptr_t)aligned_ptr & ~(uintptr_t)(sizeof(void*) - 1));
+  ptr_ref[-1] = base_ptr;
+}
+
+IREE_API_EXPORT iree_status_t iree_allocator_malloc_aligned(
+    iree_allocator_t allocator, iree_host_size_t byte_length,
+    iree_host_size_t min_alignment, iree_host_size_t offset, void** out_ptr) {
+  IREE_ASSERT_ARGUMENT(out_ptr);
+  if (IREE_UNLIKELY(byte_length == 0)) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "allocations must be >0 bytes");
+  }
+  const iree_host_size_t alignment = iree_max(min_alignment, iree_max_align_t);
+  if (IREE_UNLIKELY(!iree_alignment_is_pot(alignment))) {
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "alignments must be powers of two (got %" PRIhsz ")", min_alignment);
+  }
+
+  // [base ptr] [padding...] [aligned data] [padding...]
+  const iree_host_size_t total_length =
+      sizeof(uintptr_t) + byte_length + alignment;
+  void* unaligned_ptr = NULL;
+  IREE_RETURN_IF_ERROR(
+      iree_allocator_malloc(allocator, total_length, (void**)&unaligned_ptr));
+  void* aligned_ptr = iree_aligned_ptr(unaligned_ptr, alignment, offset);
+
+  iree_aligned_ptr_set_base(aligned_ptr, unaligned_ptr);
+  *out_ptr = aligned_ptr;
+  return iree_ok_status();
+}
+
+IREE_API_EXPORT iree_status_t iree_allocator_realloc_aligned(
+    iree_allocator_t allocator, iree_host_size_t byte_length,
+    iree_host_size_t min_alignment, iree_host_size_t offset, void** inout_ptr) {
+  IREE_ASSERT_ARGUMENT(inout_ptr);
+  if (!*inout_ptr) {
+    return iree_allocator_malloc_aligned(allocator, byte_length, min_alignment,
+                                         offset, inout_ptr);
+  }
+  if (IREE_UNLIKELY(byte_length == 0)) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "allocations must be >0 bytes");
+  }
+  const iree_host_size_t alignment = iree_min(min_alignment, iree_max_align_t);
+  if (IREE_UNLIKELY(!iree_alignment_is_pot(alignment))) {
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "alignments must be powers of two (got %" PRIhsz ")", min_alignment);
+  }
+  void* aligned_ptr = *inout_ptr;
+  void* unaligned_ptr = iree_aligned_ptr_get_base(aligned_ptr);
+  if (IREE_UNLIKELY(aligned_ptr !=
+                    iree_aligned_ptr(unaligned_ptr, alignment, offset))) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "reallocation must have the same alignment as the "
+                            "original allocation (got %" PRIhsz ")",
+                            min_alignment);
+  }
+
+  // Since the reallocated memory block may have a different unaligned base to
+  // aligned offset we may need to move the data. Capture the original offset
+  // into the unaligned base where the valid data resides.
+  uintptr_t old_offset = (uintptr_t)aligned_ptr - (uintptr_t)unaligned_ptr;
+
+  // [base ptr] [padding...] [aligned data] [padding...]
+  const iree_host_size_t total_length =
+      sizeof(uintptr_t) + byte_length + alignment;
+  IREE_RETURN_IF_ERROR(
+      iree_allocator_realloc(allocator, total_length, (void**)&unaligned_ptr));
+  aligned_ptr = iree_aligned_ptr(unaligned_ptr, alignment, offset);
+
+  const uint8_t* old_data = (uint8_t*)unaligned_ptr + old_offset;
+  uint8_t* new_data = (uint8_t*)aligned_ptr;
+  if (old_data != new_data) {
+    // Alignment at offset changed; copy data to the new aligned offset.
+    // NOTE: this is copying up to the *new* byte length, as we don't store the
+    // old length and don't know how much to copy. Since we've already
+    // reallocated we know this will always be in-bounds, but it's inefficient.
+    // NOTE: memmove instead of memcpy as the regions may overlap.
+    memmove(new_data, old_data, byte_length);
+  }
+
+  iree_aligned_ptr_set_base(aligned_ptr, unaligned_ptr);
+  *inout_ptr = aligned_ptr;
+  return iree_ok_status();
+}
+
+IREE_API_EXPORT void iree_allocator_free_aligned(iree_allocator_t allocator,
+                                                 void* ptr) {
+  if (ptr) {
+    void* unaligned_ptr = iree_aligned_ptr_get_base(ptr);
+    iree_allocator_free(allocator, unaligned_ptr);
   }
 }
