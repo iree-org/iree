@@ -38,6 +38,26 @@ iree_status_t iree_hal_heap_buffer_create(
     iree_allocator_t data_allocator, iree_allocator_t host_allocator,
     iree_hal_buffer_t** out_buffer);
 
+// Wraps an existing host allocation in a buffer.
+// When the buffer is destroyed the provided |data_allocator| will be used to
+// free |data| using iree_allocator_free. Pass iree_allocator_null() to wrap
+// without ownership semantics.
+//
+// The buffer must be aligned to at least IREE_HAL_HEAP_BUFFER_ALIGNMENT.
+// Note that it will be freed as a normal unaligned allocation. If we find
+// ourselves wanting to wrap aligned allocations requiring
+// iree_allocator_free_aligned then we'll need a flag to indicate that.
+//
+// |out_buffer| must be released by the caller.
+iree_status_t iree_hal_heap_buffer_wrap(iree_hal_allocator_t* allocator,
+                                        iree_hal_memory_type_t memory_type,
+                                        iree_hal_memory_access_t allowed_access,
+                                        iree_hal_buffer_usage_t allowed_usage,
+                                        iree_device_size_t allocation_size,
+                                        iree_byte_span_t data,
+                                        iree_allocator_t data_allocator,
+                                        iree_hal_buffer_t** out_buffer);
+
 #ifdef __cplusplus
 }  // extern "C"
 #endif  // __cplusplus
