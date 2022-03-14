@@ -131,8 +131,8 @@ TEST_F(CustomModulesTest, ReverseAndPrint) {
 TEST_F(CustomModulesTest, PrintTensor) {
   // Allocate the buffer we'll be printing.
   static iree_hal_dim_t kShape[] = {2, 4};
-  static float kBufferContents[2 * 4] = {0.0f, 1.0f, 2.0f, 3.0f,
-                                         4.0f, 5.0f, 6.0f, 7.0f};
+  static float iree_alignas(IREE_HAL_HEAP_BUFFER_ALIGNMENT)
+      kBufferContents[2 * 4] = {0.0f, 1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f, 7.0f};
   iree_hal_buffer_params_t params = {0};
   params.type =
       IREE_HAL_MEMORY_TYPE_HOST_LOCAL | IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE;
@@ -179,8 +179,8 @@ TEST_F(CustomModulesTest, PrintTensor) {
 TEST_F(CustomModulesTest, RoundTripTensor) {
   // Allocate the buffer we'll be printing/parsing.
   static iree_hal_dim_t kShape[] = {2, 4};
-  static float kBufferContents[2 * 4] = {0.0f, 1.0f, 2.0f, 3.0f,
-                                         4.0f, 5.0f, 6.0f, 7.0f};
+  static float iree_alignas(IREE_HAL_HEAP_BUFFER_ALIGNMENT)
+      kBufferContents[2 * 4] = {0.0f, 1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f, 7.0f};
   iree_hal_buffer_params_t params = {0};
   params.type =
       IREE_HAL_MEMORY_TYPE_HOST_LOCAL | IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE;

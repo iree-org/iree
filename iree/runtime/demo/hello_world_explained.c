@@ -191,7 +191,8 @@ static iree_status_t iree_runtime_demo_perform_mul(
     iree_hal_buffer_view_t* arg0 = NULL;
     if (iree_status_is_ok(status)) {
       static const iree_hal_dim_t arg0_shape[1] = {4};
-      static const float arg0_data[4] = {1.0f, 1.1f, 1.2f, 1.3f};
+      static const float iree_alignas(64)
+          arg0_data[4] = {1.0f, 1.1f, 1.2f, 1.3f};
       status = iree_hal_buffer_view_wrap_or_clone_heap_buffer(
           device_allocator,
           // Shape dimensions and rank:
@@ -230,7 +231,8 @@ static iree_status_t iree_runtime_demo_perform_mul(
     iree_hal_buffer_view_t* arg1 = NULL;
     if (iree_status_is_ok(status)) {
       static const iree_hal_dim_t arg1_shape[1] = {4};
-      static const float arg1_data[4] = {10.0f, 100.0f, 1000.0f, 10000.0f};
+      static const float iree_alignas(64)
+          arg1_data[4] = {10.0f, 100.0f, 1000.0f, 10000.0f};
       status = iree_hal_buffer_view_wrap_or_clone_heap_buffer(
           device_allocator, arg1_shape, IREE_ARRAYSIZE(arg1_shape),
           IREE_HAL_ELEMENT_TYPE_FLOAT_32,
