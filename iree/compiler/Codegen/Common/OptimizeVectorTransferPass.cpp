@@ -75,15 +75,15 @@ class TransposeUnitDimToShapeCast
   }
 };
 
-static void loopInvariantCodeMotion(FuncOp funcOp) {
+static LogicalResult loopInvariantCodeMotion(FuncOp funcOp) {
   // Walk through all loops in a function in innermost-loop-first order. This
   // way, we first LICM from the inner loop, and place the ops in
   // the outer loop, which in turn can be further LICM'ed.
-  funcOp.walk([&](LoopLikeOpInterface loopLike) {
-    if (failed(moveLoopInvariantCode(loopLike))) {
-      llvm_unreachable("Unexpected failure to move invariant code out of loop");
-    }
-  });
+  auto walkResult =
+      funcOp.walk([&](LoopLikeOpInterface loopLike) -> WalkResult {
+        return moveLoopInvariantCode(loopLike);
+      });
+  return success(!walkResult.wasInterrupted());
 }
 
 struct OptimizeVectorTransferPass
@@ -108,7 +108,9 @@ struct OptimizeVectorTransferPass
     // Workaround, run loop invariant code motion before hoist redudant vector
     // transfer to workaround a bug upstream.
     // TODO(thomasraoux): Remove it once the fix is merged.
-    loopInvariantCodeMotion(funcOp);
+    if (failed(loopInvariantCodeMotion(funcOp))) {
+      return signalPassFailure();
+    }
     linalg::hoistRedundantVectorTransfers(funcOp);
     vector::transferOpflowOpt(funcOp);
 

@@ -23,10 +23,9 @@ static unsigned dimToIndex(gpu::Dimension dim) {
       return 1;
     case gpu::Dimension::z:
       return 2;
-    default:
-      llvm_unreachable("invalid dimension");
-      return 0;
   }
+  assert(false && "invalid dimension");
+  return 0;
 }
 
 struct ThreadIdOpInterface

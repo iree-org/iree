@@ -131,7 +131,8 @@ struct StructureLevel {
       return IREE::Input::ListType::get(variantType.getContext(), variantType);
     }
 
-    llvm_unreachable("Unknown LevelType");
+    assert(false && "Unknown LevelType");
+    return Type();
   }
 
   // For List/Dict/Tuple levels, returns the size of the list that is needed
@@ -147,7 +148,8 @@ struct StructureLevel {
       return children.size();
     }
 
-    llvm_unreachable("Unsupported LevelType for getNeededListSize");
+    assert(false && "Unsupported LevelType for getNeededListSize");
+    return 0;
   }
 
   // Creates a JSON reflection type record describing this entity.
@@ -190,7 +192,7 @@ struct StructureLevel {
         return json::Value(std::move(typeRecord));
       }
       default:
-        llvm_unreachable("Unsupported LevelType");
+        assert(false && "Unsupported LevelType");
     }
 
     return json::Value(nullptr);
@@ -233,7 +235,7 @@ struct StructureLevel {
       }
       return;
     }
-    llvm_unreachable("unhandled StructureLevel type");
+    assert(false && "unhandled StructureLevel type");
   }
 
   // Emits operations to recursively create this structure from the given
@@ -287,7 +289,8 @@ struct StructureLevel {
       }
       return listValue;
     }
-    llvm_unreachable("unhandled StructureLevel type");
+    assert(false && "unhandled StructureLevel type");
+    return Value();
   }
 
   // Emits operations to load this instance from a parent list value at the

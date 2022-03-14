@@ -37,9 +37,10 @@ ConvertedTensor consumeTensorOperand(Location loc, Value operand,
         castOp.getOperand(1),
     };
   }
-  llvm_unreachable(
-      "unexpected operand; should have either been converted from tensor or "
-      "not");
+  assert(false &&
+         "unexpected operand; expected either a IREE::Stream::ResourceType or "
+         "the result of a mlir::UnrealizedConversionCastOp");
+  return ConvertedTensor();
 }
 
 }  // namespace iree_compiler

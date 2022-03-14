@@ -57,7 +57,7 @@ struct ConstantSlice {
       return opaqueAttr.getNumElements() *
              opaqueAttr.getElementType().getIntOrFloatBitWidth();
     } else {
-      llvm_unreachable("invalid constant attr type");
+      assert(false && "invalid constant attr type");
       return 0;
     }
   }

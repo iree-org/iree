@@ -851,7 +851,7 @@ LogicalResult translateModuleToBytecode(IREE::VM::ModuleOp moduleOp,
       break;
     }
     default:
-      llvm_unreachable("unimplemented output format");
+      assert(false && "unimplemented output format");
   }
   output.flush();
 

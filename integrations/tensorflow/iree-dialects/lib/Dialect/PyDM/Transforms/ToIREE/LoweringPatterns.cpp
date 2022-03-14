@@ -1008,7 +1008,8 @@ class SequenceCloneBuiltinConversion
       return tupleType.getElementStorageType();
     }
 
-    llvm_unreachable("unsupported list type");
+    assert(false && "unsupported list type");
+    return Type();
   }
 };
 

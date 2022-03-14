@@ -210,7 +210,7 @@ int main(int argc, char **argv) {
                                   savedModelTags);
       break;
     default:
-      llvm_unreachable("unsupported import type enum");
+      assert(false && "unsupported import type enum");
   }
   if (!module) return 1;
 

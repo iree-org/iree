@@ -325,7 +325,7 @@ bool ValueLiveness::isLastValueUse(Value value, Operation *useOp,
       return operandIndex >= operand.getOperandNumber();
     }
   }
-  llvm_unreachable("value not used by operand");
+  assert(false && "value not used by operand");
   return false;
 }
 

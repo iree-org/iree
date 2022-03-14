@@ -189,7 +189,7 @@ void VMDialect::printAttribute(Attribute attr, DialectAsmPrinter &p) const {
         typedAttr.print(p);
       })
       .Default(
-          [](Attribute) { llvm_unreachable("unhandled VM attribute kind"); });
+          [](Attribute) { assert(false && "unhandled VM attribute kind"); });
 }
 
 //===----------------------------------------------------------------------===//
@@ -273,7 +273,7 @@ void VMDialect::printType(Type type, DialectAsmPrinter &os) const {
     }
     os << ">";
   } else {
-    llvm_unreachable("unhandled VM type");
+    assert(false && "unhandled VM type");
   }
 }
 

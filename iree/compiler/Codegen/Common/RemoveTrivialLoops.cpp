@@ -31,7 +31,7 @@ static unsigned dimToIndex(gpu::Dimension dim) {
     case gpu::Dimension::z:
       return 2;
     default:
-      llvm_unreachable("invalid dimension");
+      assert(false && "invalid dimension");
       return 0;
   }
 }

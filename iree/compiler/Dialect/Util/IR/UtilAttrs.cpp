@@ -170,7 +170,7 @@ static LogicalResult serializeSplatValue(Attribute splatAttr, int64_t count,
       return failure();
     }
   } else {
-    llvm_unreachable("unhandled serializable splat value");
+    assert(false && "unhandled serializable splat value");
     return failure();
   }
 

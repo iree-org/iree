@@ -627,7 +627,7 @@ void UtilDialect::printType(Type type, DialectAsmPrinter &os) const {
     }
     os << ">";
   } else {
-    llvm_unreachable("unhandled IREE type");
+    assert(false && "unhandled IREE type");
   }
 }
 

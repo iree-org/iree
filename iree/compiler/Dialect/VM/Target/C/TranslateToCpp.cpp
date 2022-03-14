@@ -529,7 +529,7 @@ bool CppEmitter::shouldMapToUnsigned(IntegerType::SignednessSemantics val) {
   case IntegerType::Unsigned:
     return true;
   default:
-    llvm_unreachable("unsupported IntegerType");
+    assert(false && "unsupported IntegerType");
   }
 }
 

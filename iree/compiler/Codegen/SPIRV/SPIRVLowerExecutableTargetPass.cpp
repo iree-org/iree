@@ -111,7 +111,8 @@ void SPIRVLowerExecutableTargetPass::runOnOperation() {
         addSPIRVTileAndVectorizeToCooperativeOpsPassPipeline(nestedModulePM);
         break;
       default:
-        llvm_unreachable("Unsupported pipeline on GPU target.");
+        variantOp.emitOpError("Unsupported pipeline on GPU target.");
+        return signalPassFailure();
     }
   }
 

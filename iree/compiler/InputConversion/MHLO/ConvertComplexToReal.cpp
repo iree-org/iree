@@ -36,7 +36,8 @@ Type convertComplexTensorTypeToReal(Type complexTensorType) {
   } else if (auto tt = complexTensorType.dyn_cast<UnrankedTensorType>()) {
     return UnrankedTensorType::get(newElementType);
   }
-  llvm_unreachable("unknown TensorType subclass");
+  assert(false && "unknown TensorType subclass");
+  return Type();
 }
 
 // Add and subtraction are elementwise and can be distributed across the real

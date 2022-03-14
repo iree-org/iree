@@ -63,7 +63,8 @@ Value castNumeric(Value origValue, Type toType, bool isSigned,
     // If we need int<->int and float<->float, implement those cases. Since
     // this is just needed for things in this file, it is ok to leave it
     // under implemented.
-    llvm_unreachable("unsupported numeric cast");
+    assert(false && "unsupported numeric cast");
+    return Value();
   }
 }
 
