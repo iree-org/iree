@@ -242,6 +242,43 @@ static inline bool iree_allocator_is_null(iree_allocator_t allocator) {
   return allocator.ctl == NULL;
 }
 
+//===----------------------------------------------------------------------===//
+// Aligned allocations via iree_allocator_t
+//===----------------------------------------------------------------------===//
+
+// Allocates memory of size |byte_length| where the byte starting at |offset|
+// has a minimum alignment of |min_alignment|. In many cases |offset| can be 0.
+//
+// The |offset| can be used to ensure the alignment-sensitive portion of a
+// combined allocation is aligned while any prefix metadata has system
+// alignment. For example:
+//   typedef struct {
+//     uint32_t some_metadata;
+//     uint8_t data[];
+//   } buffer_t;
+//   buffer_t* buffer = NULL;
+//   iree_allocator_malloc_aligned(allocator, sizeof(buffer_t) + length,
+//                                 4096, offsetof(buffer_t, data), &buffer);
+//   // `buffer` has system alignment, but the `data` will be aligned on at
+//   // least a 4096 boundary.
+//
+// The contents of the returned memory is guaranteed to be zeroed.
+IREE_API_EXPORT iree_status_t iree_allocator_malloc_aligned(
+    iree_allocator_t allocator, iree_host_size_t byte_length,
+    iree_host_size_t min_alignment, iree_host_size_t offset, void** out_ptr);
+
+// Reallocates memory to |byte_length|, growing or shrinking as needed.
+// Only valid on memory allocated with iree_allocator_malloc_aligned.
+// The newly reallocated memory will have the byte at |offset| aligned to at
+// least |min_alignment|.
+IREE_API_EXPORT iree_status_t iree_allocator_realloc_aligned(
+    iree_allocator_t allocator, iree_host_size_t byte_length,
+    iree_host_size_t min_alignment, iree_host_size_t offset, void** inout_ptr);
+
+// Frees a |ptr| previously returned from iree_allocator_malloc_aligned.
+IREE_API_EXPORT void iree_allocator_free_aligned(iree_allocator_t allocator,
+                                                 void* ptr);
+
 #ifdef __cplusplus
 }  // extern "C"
 #endif  // __cplusplus
