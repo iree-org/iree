@@ -23,7 +23,7 @@ function(iree_bytecode_module_for_iree_check_test_and_friends)
     ${ARGN}
   )
 
-  if(ANDROID)
+  if(ANDROID AND NOT _RULE_FLAGS MATCHES "iree-llvm-target-triple")
     # Android's CMake toolchain defines some variables that we can use to infer
     # the appropriate target triple from the configured settings:
     # https://developer.android.com/ndk/guides/cmake#android_platform
@@ -77,7 +77,9 @@ endfunction()
 #   NAME: Name of the target
 #   SRC: mlir source file to be compiled to an IREE module.
 #   TARGET_BACKEND: target backend to compile for.
-#   DRIVER: driver to run the module with.
+#   DRIVER: driver to run the module with. This can be omitted to test only
+#       compilation, but consider omiting the driver as a hacky abuse of the
+#       rule since compilation on its own not use iree-check-module.
 #   COMPILER_FLAGS: additional flags to pass to the compiler. Bytecode
 #       translation and backend flags are passed automatically.
 #   RUNNER_ARGS: additional args to pass to iree-check-module. The driver
@@ -180,6 +182,10 @@ function(iree_check_test)
 
   add_dependencies(iree-test-deps "${_NAME}")
 
+  if(NOT DEFINED _RULE_DRIVER)
+    return()
+  endif()
+
   iree_native_test(
     NAME
       "${_RULE_NAME}"
@@ -208,7 +214,9 @@ endfunction()
 #   NAME: name of the generated test suite.
 #   SRCS: source mlir files containing the module.
 #   TARGET_BACKEND: target backend to compile for.
-#   DRIVER: driver to run the module with.
+#   DRIVER: driver to run the module with. This can be omitted to test only
+#       compilation, but consider omiting the driver as a hacky abuse of the
+#       rule since compilation on its own not use iree-check-module.
 #   COMPILER_FLAGS: additional flags to pass to the compiler. Bytecode
 #       translation and backend flags are passed automatically.
 #   RUNNER_ARGS: additional args to pass to the underlying iree-check-module
@@ -241,13 +249,18 @@ function(iree_check_single_backend_test_suite)
 
   # Omit tests for which the specified driver or target backend is not enabled.
   # This overlaps with directory exclusions and other filtering mechanisms.
-  string(TOUPPER ${_RULE_DRIVER} _UPPERCASE_DRIVER)
-  string(REPLACE "-" "_" _NORMALIZED_DRIVER ${_UPPERCASE_DRIVER})
-  if(NOT DEFINED IREE_HAL_DRIVER_${_NORMALIZED_DRIVER})
-    message(SEND_ERROR "Unknown driver '${_RULE_DRIVER}'. Check IREE_HAL_DRIVER_* options.")
-  endif()
-  if(NOT IREE_HAL_DRIVER_${_NORMALIZED_DRIVER})
-    return()
+  #
+  # Note: omitting the DRIVER arg is allowed (though it is a hack). If it is
+  # omitted, we don't need to test for a driver being enabled.
+  if(DEFINED _RULE_DRIVER)
+    string(TOUPPER ${_RULE_DRIVER} _UPPERCASE_DRIVER)
+    string(REPLACE "-" "_" _NORMALIZED_DRIVER ${_UPPERCASE_DRIVER})
+    if(NOT DEFINED IREE_HAL_DRIVER_${_NORMALIZED_DRIVER})
+      message(SEND_ERROR "Unknown driver '${_RULE_DRIVER}'. Check IREE_HAL_DRIVER_* options.")
+    endif()
+    if(NOT IREE_HAL_DRIVER_${_NORMALIZED_DRIVER})
+      return()
+    endif()
   endif()
   string(TOUPPER ${_RULE_TARGET_BACKEND} _UPPERCASE_TARGET_BACKEND)
   string(REPLACE "-" "_" _NORMALIZED_TARGET_BACKEND ${_UPPERCASE_TARGET_BACKEND})

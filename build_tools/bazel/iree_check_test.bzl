@@ -19,7 +19,7 @@ def iree_check_test(
         name,
         src,
         target_backend,
-        driver,
+        driver = None,
         compiler_flags = [],
         runner_args = [],
         opt_tool = "//iree/tools:iree-opt",
@@ -34,7 +34,9 @@ def iree_check_test(
       name: name of the generated test.
       src: source mlir file containing the module.
       target_backend: target backend to compile for.
-      driver: driver to run the module with.
+      driver: driver to run the module with. This can be omitted to test only
+          compilation, but consider omiting the driver as a hacky abuse of the
+          rule since compilation on its own not use iree-check-module.
       compiler_flags: additional flags to pass to the compiler. Bytecode translation and backend
           flags are passed automatically.
       runner_args: additional runner_args to pass to iree-check-module. The driver and input file
@@ -67,6 +69,9 @@ def iree_check_test(
         visibility = ["//visibility:private"],
     )
 
+    if not driver:
+        return
+
     native_test(
         name = name,
         args = [
@@ -84,7 +89,7 @@ def iree_check_single_backend_test_suite(
         name,
         srcs,
         target_backend,
-        driver,
+        driver = None,
         compiler_flags = [],
         runner_args = [],
         opt_tool = "//iree/tools:iree-opt",
@@ -101,7 +106,9 @@ def iree_check_single_backend_test_suite(
       name: name of the generated test suite.
       srcs: source mlir files containing the module.
       target_backend: target backend to compile for.
-      driver: driver to run the module with.
+      driver: driver to run the module with. This can be omitted to test only
+          compilation, but consider omiting the driver as a hacky abuse of the
+          rule since compilation on its own not use iree-check-module.
       compiler_flags: additional flags to pass to the compiler. Bytecode translation and backend
           flags are passed automatically.
       runner_args: additional runner_args to pass to the underlying iree-check-module tests. The
@@ -145,6 +152,10 @@ def iree_check_single_backend_test_suite(
             **kwargs
         )
         tests.append(test_name)
+
+    if not driver:
+        return
+
     native.test_suite(
         name = name,
         tests = tests,

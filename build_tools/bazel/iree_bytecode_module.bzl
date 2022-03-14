@@ -16,7 +16,7 @@ def iree_bytecode_module(
         module = None,
         flags = ["-iree-mlir-to-vm-bytecode-module"],
         translate_tool = "//iree/tools:iree-translate",
-        embedded_linker_tool = "@llvm-project//lld:lld",
+        linker_tool = "@llvm-project//lld:lld",
         opt_tool = "//iree/tools:iree-opt",
         opt_flags = [],
         c_identifier = "",
@@ -30,7 +30,7 @@ def iree_bytecode_module(
             translation and backend flags are passed automatically.
         translate_tool: the compiler to use to generate the module.
             Defaults to iree-translate.
-        embedded_linker_tool: the embedded linker to use.
+        linker_tool: the linker to use.
             Defaults to the lld from the llvm-project directory.
         opt_tool: Defaulting to iree-opt. Tool used to preprocess the source file
             if opt_flags is specified.
@@ -74,12 +74,13 @@ def iree_bytecode_module(
             " ".join([
                 "$(location %s)" % (translate_tool),
                 " ".join(flags),
-                "-iree-llvm-embedded-linker-path=$(location %s)" % (embedded_linker_tool),
+                "-iree-llvm-embedded-linker-path=$(location %s)" % (linker_tool),
+                "-iree-llvm-system-linker-path=$(location %s)" % (linker_tool),
                 "-o $(location %s)" % (module),
                 "$(location %s)" % (translate_src),
             ]),
         ]),
-        tools = [translate_tool, embedded_linker_tool],
+        tools = [translate_tool, linker_tool],
         message = "Compiling IREE module %s..." % (name),
         output_to_bindir = 1,
         **kwargs

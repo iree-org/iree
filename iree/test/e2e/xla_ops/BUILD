@@ -82,7 +82,7 @@ iree_check_single_backend_test_suite(
         ],
         include = ["*.mlir"],
         exclude = [
-            "round.mlir",
+            "round.mlir",  # TODO(#7618): Enable once supported.
         ],
     ),
     compiler_flags = ["-iree-input-type=mhlo"],
@@ -99,7 +99,7 @@ iree_check_single_backend_test_suite(
     target_backend = "cuda",
 )
 
-# # Run cuda tests using stream command buffer
+# Run cuda tests using stream command buffer
 iree_check_single_backend_test_suite(
     name = "check_cuda_streams",
     srcs = enforce_glob(
@@ -163,7 +163,7 @@ iree_check_single_backend_test_suite(
         ],
         include = ["*.mlir"],
         exclude = [
-            "round.mlir",
+            "round.mlir",  # TODO(#7618): Enable once supported.
         ],
     ),
     compiler_flags = ["-iree-input-type=mhlo"],
@@ -243,9 +243,7 @@ iree_check_single_backend_test_suite(
         ],
         include = ["*.mlir"],
         exclude = [
-            #TODO(#7415): Enable this after failures with bazel bot
-            #and cmake-swiftshared bot are addressed
-            "round.mlir",
+            "round.mlir",  # TODO(#7618): Enable once supported.
         ],
     ),
     compiler_flags = ["-iree-input-type=mhlo"],
@@ -313,8 +311,8 @@ iree_check_single_backend_test_suite(
         include = ["*.mlir"],
         exclude = [
             "exponential_fp16.mlir",
-            "fft.mlir",  # TODO(#6601): Eanble the test.
-            "round.mlir",
+            "fft.mlir",  # TODO(#6601): Enable the test.
+            "round.mlir",  # TODO(#7618): Enable once supported.
             "rng_uniform.mlir",  # TODO(#6995): Enable the test.
             "rng_normal.mlir",  # TODO(#6995): Enable the test.
         ],
@@ -387,12 +385,94 @@ iree_check_single_backend_test_suite(
         exclude = [
             "bitcast_convert.mlir",
             "exponential_fp16.mlir",
-            "round.mlir",
+            "round.mlir",  # TODO(#7618): Enable once supported.
         ],
     ),
     compiler_flags = ["-iree-input-type=mhlo"],
     driver = "vulkan",
     target_backend = "vulkan-spirv",
+)
+
+# Check WebAssembly compilation (LLVM backend with wasm target triple).
+# Note:
+#   * no 'driver' arg is set, so this does not test execution
+#   * the test suite name is missing "_driver" from "check_target_driver"
+#   * this isn't an "end to end" test suite in the same sense as the other
+#     test suites in this file, but the test coverage is still useful
+# Hopefully at some point we can build WebAssembly execution testing into our
+# infrastructure and this will no longer bend our testing definitions as much.
+iree_check_single_backend_test_suite(
+    name = "check_wasm-llvm-aot",
+    srcs = enforce_glob(
+        # keep sorted
+        [
+            "abs.mlir",
+            "add.mlir",
+            "batch_norm_inference.mlir",
+            "bitcast_convert.mlir",
+            "broadcast.mlir",
+            "broadcast_add.mlir",
+            "broadcast_in_dim.mlir",
+            "clamp.mlir",
+            "compare.mlir",
+            "concatenate.mlir",
+            "constant.mlir",
+            "convert.mlir",
+            "convolution.mlir",
+            "cosine.mlir",
+            "divide.mlir",
+            "dot.mlir",
+            "dot_general.mlir",
+            "dynamic_slice.mlir",
+            "dynamic_update_slice.mlir",
+            "exponential.mlir",
+            "exponential_fp16.mlir",
+            "exponential_minus_one.mlir",
+            "fft.mlir",
+            "finite.mlir",
+            "floor.mlir",
+            "gather.mlir",
+            "iota.mlir",
+            "log.mlir",
+            "log_plus_one.mlir",
+            "multiply.mlir",
+            "negate.mlir",
+            "pad.mlir",
+            "pow.mlir",
+            "reduce.mlir",
+            "reduce_window.mlir",
+            "reshape.mlir",
+            "reverse.mlir",
+            "rng_normal.mlir",
+            "rng_uniform.mlir",
+            "rsqrt.mlir",
+            "scatter.mlir",
+            "scatter_dynamic.mlir",
+            "select.mlir",
+            "sine.mlir",
+            "slice.mlir",
+            "sort.mlir",
+            "sqrt.mlir",
+            "subtract.mlir",
+            "tanh.mlir",
+            "torch_index_select.mlir",
+            "transpose.mlir",
+            "while.mlir",
+        ],
+        include = ["*.mlir"],
+        exclude = [
+            "round.mlir",  # TODO(#7618): Enable once supported.
+            "maximum.mlir",  # TODO(#8514): Fix compiler crash.
+            "minimum.mlir",  # TODO(#8514): Fix compiler crash.
+            "remainder.mlir",  # TODO(#8514): Fix compiler crash.
+        ],
+    ),
+    compiler_flags = [
+        "-iree-input-type=mhlo",
+        "-iree-llvm-target-triple=wasm32-unknown-emscripten",
+    ],
+    # driver = "wasm",  # No driver yet, only test compilation.
+    target_backend = "dylib-llvm-aot",
 )
 
 test_suite(

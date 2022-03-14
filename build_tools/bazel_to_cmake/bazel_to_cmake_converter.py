@@ -536,7 +536,7 @@ class BuildFileFunctions(object):
                                            name,
                                            srcs,
                                            target_backend,
-                                           driver,
+                                           driver=None,
                                            compiler_flags=None,
                                            target_backends_and_drivers=None,
                                            runner_args=None,
