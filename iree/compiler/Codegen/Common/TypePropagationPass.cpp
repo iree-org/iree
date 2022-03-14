@@ -238,7 +238,7 @@ struct LinalgFillTypePropagation
     if (outputType == legalizedOutputType) {
       return rewriter.notifyMatchFailure(fillOp, "op already legal");
     }
-    Value value = adaptor.value();
+    Value value = adaptor.inputs().front();
     Optional<Type> legalizedElementType =
         getLegalizedElementType(value.getType());
     if (!legalizedElementType) {
@@ -246,8 +246,8 @@ struct LinalgFillTypePropagation
     }
     Value legalizedValue = convertElementType(
         rewriter, fillOp->getLoc(), legalizedElementType.getValue(), value);
-    rewriter.replaceOpWithNewOp<linalg::FillOp>(fillOp, legalizedValue,
-                                                adaptor.output());
+    rewriter.replaceOpWithNewOp<linalg::FillOp>(
+        fillOp, ValueRange{legalizedValue}, ValueRange{adaptor.outputs()});
     return success();
   }
 };
