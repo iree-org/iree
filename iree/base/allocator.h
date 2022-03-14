@@ -117,46 +117,6 @@ static bool iree_const_byte_span_is_empty(iree_const_byte_span_t span) {
 #endif  // IREE_COMPILER_MSVC
 
 //===----------------------------------------------------------------------===//
-// C11 aligned_alloc compatibility shim
-//===----------------------------------------------------------------------===//
-
-#if defined(IREE_PLATFORM_WINDOWS)
-// https://docs.microsoft.com/en-us/cpp/c-runtime-library/reference/aligned-malloc
-#define iree_aligned_alloc(alignment, size) _aligned_malloc(size, alignment)
-#define iree_aligned_free(p) _aligned_free(p)
-#elif defined(_ISOC11_SOURCE)
-// https://en.cppreference.com/w/c/memory/aligned_alloc
-#define iree_aligned_alloc(alignment, size) aligned_alloc(alignment, size)
-#define iree_aligned_free(p) free(p)
-#elif _POSIX_C_SOURCE >= 200112L
-// https://pubs.opengroup.org/onlinepubs/9699919799/functions/posix_memalign.html
-static inline void* iree_aligned_alloc(size_t alignment, size_t size) {
-  void* ptr = NULL;
-  return posix_memalign(&ptr, alignment, size) == 0 ? ptr : NULL;
-}
-#define iree_aligned_free(p) free(p)
-#else
-// Emulates alignment with normal malloc. We overallocate by at least the
-// alignment + the size of a pointer, store the base pointer at p[-1], and
-// return the aligned pointer. This lets us easily get the base pointer in free
-// to pass back to the system.
-static inline void* iree_aligned_alloc(size_t alignment, size_t size) {
-  void* base_ptr = malloc(size + alignment + sizeof(uintptr_t));
-  if (!base_ptr) return NULL;
-  uintptr_t* aligned_ptr = (uintptr_t*)iree_host_align(
-      (uintptr_t)base_ptr + sizeof(uintptr_t), alignment);
-  aligned_ptr[-1] = (uintptr_t)base_ptr;
-  return aligned_ptr;
-}
-static inline void iree_aligned_free(void* p) {
-  if (IREE_UNLIKELY(!p)) return;
-  uintptr_t* aligned_ptr = (uintptr_t*)p;
-  void* base_ptr = (void*)aligned_ptr[-1];
-  free(base_ptr);
-}
-#endif  // IREE_PLATFORM_WINDOWS
-
-//===----------------------------------------------------------------------===//
 // iree_allocator_t (std::allocator-like interface)
 //===----------------------------------------------------------------------===//
 
@@ -246,6 +206,7 @@ IREE_API_EXPORT iree_status_t iree_allocator_malloc_uninitialized(
 // If the reallocation fails then the original |inout_ptr| is unmodified.
 //
 // WARNING: when extending the newly allocated bytes are undefined.
+// TODO(benvanik): make them zeros; we should have an _uninitialized if needed.
 IREE_API_EXPORT iree_status_t iree_allocator_realloc(
     iree_allocator_t allocator, iree_host_size_t byte_length, void** inout_ptr);
 
