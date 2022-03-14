@@ -249,6 +249,25 @@ typedef struct iree_hal_external_buffer_t {
   } handle;
 } iree_hal_external_buffer_t;
 
+typedef void(IREE_API_PTR* iree_hal_buffer_release_fn_t)(
+    void* user_data, iree_hal_buffer_t* buffer);
+
+// A callback issued when a buffer is released.
+typedef struct {
+  // Callback function pointer.
+  iree_hal_buffer_release_fn_t fn;
+  // User data passed to the callback function. Unowned.
+  void* user_data;
+} iree_hal_buffer_release_callback_t;
+
+// Returns a no-op buffer release callback that implies that no cleanup is
+// required.
+static inline iree_hal_buffer_release_callback_t
+iree_hal_buffer_release_callback_null(void) {
+  iree_hal_buffer_release_callback_t callback = {NULL, NULL};
+  return callback;
+}
+
 //===----------------------------------------------------------------------===//
 // Statistics/reporting
 //===----------------------------------------------------------------------===//
@@ -327,8 +346,8 @@ iree_hal_allocator_query_compatibility(
 
 // Allocates a buffer from the allocator.
 // If |initial_data| is provided then the bytes will be copied into the device
-// buffer. To avoid the copy when constant data is used prefer
-// iree_hal_allocator_wrap_buffer when available.
+// buffer. To avoid the copy when device-accessible constant data is used prefer
+// iree_hal_allocator_import_buffer when available.
 //
 // The memory type of the buffer returned may differ from the requested value
 // if the device can provide more functionality; for example, if requesting
@@ -343,27 +362,8 @@ iree_hal_allocator_query_compatibility(
 // use strategy.
 IREE_API_EXPORT iree_status_t iree_hal_allocator_allocate_buffer(
     iree_hal_allocator_t* IREE_RESTRICT allocator,
-    iree_hal_buffer_params_t params, iree_host_size_t allocation_size,
+    iree_hal_buffer_params_t params, iree_device_size_t allocation_size,
     iree_const_byte_span_t initial_data, iree_hal_buffer_t** out_buffer);
-
-// Wraps an existing host allocation in a buffer.
-//
-// iree_hal_allocator_query_compatibility can be used to query whether a
-// buffer can be wrapped when using the given memory type and usage. A
-// compatibility result containing IREE_HAL_BUFFER_COMPATIBILITY_IMPORTABLE
-// means the wrap may succeed however if the pointer/page range is not in a
-// supported mode (no read access, etc) this call may still fail.
-//
-// |data_allocator| will be used to free the memory when the buffer is
-// destroyed. iree_allocator_null() can be passed to indicate the buffer does
-// not own the data.
-//
-// |out_buffer| must be released by the caller.
-// Fails if the allocator cannot access host memory in this way.
-IREE_API_EXPORT iree_status_t iree_hal_allocator_wrap_buffer(
-    iree_hal_allocator_t* IREE_RESTRICT allocator,
-    iree_hal_buffer_params_t params, iree_byte_span_t data,
-    iree_allocator_t data_allocator, iree_hal_buffer_t** out_buffer);
 
 // TODO(benvanik): iree_hal_allocator_query_external_buffer_compatibility to
 // check for support without needing an external buffer already. There's a few
@@ -377,6 +377,17 @@ IREE_API_EXPORT iree_status_t iree_hal_allocator_wrap_buffer(
 // iree_hal_buffer_t. The returned external buffer may only be usable with the
 // same driver/device.
 //
+// iree_hal_allocator_query_compatibility can be used to query whether a
+// buffer can be imported when using the given memory type and usage. A
+// compatibility result containing IREE_HAL_BUFFER_COMPATIBILITY_IMPORTABLE
+// means the import _may_ succeed however if the pointer/page range is not in a
+// supported mode (no read access, etc) this call will fail with
+// IREE_STATUS_OUT_OF_RANGE.
+//
+// An optional |release_callback| can be provided to allow the caller to listen
+// for when the underlying resource is no longer in use by the HAL. This can
+// be used to perform lifetime management or flushing.
+//
 // |out_buffer| must be released by the caller.
 // Fails with IREE_STATUS_UNAVAILABLE if the allocator cannot import the buffer
 // into the given memory type. This may be due to unavailable device/platform
@@ -385,6 +396,7 @@ IREE_API_EXPORT iree_status_t iree_hal_allocator_import_buffer(
     iree_hal_allocator_t* IREE_RESTRICT allocator,
     iree_hal_buffer_params_t params,
     iree_hal_external_buffer_t* IREE_RESTRICT external_buffer,
+    iree_hal_buffer_release_callback_t release_callback,
     iree_hal_buffer_t** out_buffer);
 
 // Exports an allocator-owned |buffer| to an external buffer handle.
@@ -446,23 +458,18 @@ typedef struct iree_hal_allocator_vtable_t {
   iree_status_t(IREE_API_PTR* allocate_buffer)(
       iree_hal_allocator_t* IREE_RESTRICT allocator,
       const iree_hal_buffer_params_t* IREE_RESTRICT params,
-      iree_host_size_t allocation_size, iree_const_byte_span_t initial_data,
+      iree_device_size_t allocation_size, iree_const_byte_span_t initial_data,
       iree_hal_buffer_t** IREE_RESTRICT out_buffer);
 
   void(IREE_API_PTR* deallocate_buffer)(
       iree_hal_allocator_t* IREE_RESTRICT allocator,
       iree_hal_buffer_t* IREE_RESTRICT buffer);
 
-  iree_status_t(IREE_API_PTR* wrap_buffer)(
-      iree_hal_allocator_t* IREE_RESTRICT allocator,
-      const iree_hal_buffer_params_t* IREE_RESTRICT params,
-      iree_byte_span_t data, iree_allocator_t data_allocator,
-      iree_hal_buffer_t** IREE_RESTRICT out_buffer);
-
   iree_status_t(IREE_API_PTR* import_buffer)(
       iree_hal_allocator_t* IREE_RESTRICT allocator,
       const iree_hal_buffer_params_t* IREE_RESTRICT params,
       iree_hal_external_buffer_t* IREE_RESTRICT external_buffer,
+      iree_hal_buffer_release_callback_t release_callback,
       iree_hal_buffer_t** IREE_RESTRICT out_buffer);
 
   iree_status_t(IREE_API_PTR* export_buffer)(

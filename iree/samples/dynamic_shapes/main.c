@@ -17,8 +17,6 @@ iree_status_t reduce_sum_1d(iree_runtime_session_t* session, const int* values,
   iree_hal_buffer_view_t* arg0 = NULL;
   const iree_hal_dim_t arg0_shape[1] = {values_length};
 
-  // TODO(scotttodd): use iree_hal_buffer_view_wrap_or_clone_heap_buffer
-  //   * debugging some apparent memory corruption with the stack-local value
   iree_status_t status = iree_ok_status();
   if (iree_status_is_ok(status)) {
     status = iree_hal_buffer_view_allocate_buffer(
@@ -66,8 +64,6 @@ iree_status_t reduce_sum_2d(iree_runtime_session_t* session, const int* values,
   iree_hal_buffer_view_t* arg0 = NULL;
   const iree_hal_dim_t arg0_shape[2] = {values_length / 3, 3};
 
-  // TODO(scotttodd): use iree_hal_buffer_view_wrap_or_clone_heap_buffer
-  //   * debugging some apparent memory corruption with the stack-local value
   iree_status_t status = iree_ok_status();
   if (iree_status_is_ok(status)) {
     status = iree_hal_buffer_view_allocate_buffer(
@@ -109,8 +105,6 @@ iree_status_t add_one(iree_runtime_session_t* session, const int* values,
   iree_hal_buffer_view_t* arg0 = NULL;
   const iree_hal_dim_t arg0_shape[1] = {values_length};
 
-  // TODO(scotttodd): use iree_hal_buffer_view_wrap_or_clone_heap_buffer
-  //   * debugging some apparent memory corruption with the stack-local value
   iree_status_t status = iree_ok_status();
   if (iree_status_is_ok(status)) {
     status = iree_hal_buffer_view_allocate_buffer(

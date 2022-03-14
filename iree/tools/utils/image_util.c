@@ -135,7 +135,7 @@ iree_status_t iree_tools_utils_buffer_view_from_image(
     iree_host_size_t element_byte =
         iree_hal_element_dense_byte_count(element_type);
     // SINT_8 and UINT_8 perform direct buffer wrap.
-    result = iree_hal_buffer_view_wrap_or_clone_heap_buffer(
+    result = iree_hal_buffer_view_allocate_buffer(
         allocator, shape, shape_rank, element_type,
         IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR,
         (iree_hal_buffer_params_t){
@@ -144,8 +144,8 @@ iree_status_t iree_tools_utils_buffer_view_from_image(
             .access = IREE_HAL_MEMORY_ACCESS_READ,
             .usage = IREE_HAL_BUFFER_USAGE_ALL,
         },
-        iree_make_byte_span((void*)pixel_data, element_byte * buffer_length),
-        iree_allocator_null(), out_buffer_view);
+        iree_make_const_byte_span(pixel_data, element_byte * buffer_length),
+        out_buffer_view);
   }
   stbi_image_free(pixel_data);
   IREE_TRACE_ZONE_END(z0);

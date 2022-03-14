@@ -264,16 +264,10 @@ IREE_VM_ABI_EXPORT(iree_hal_module_allocator_allocate,  //
   return iree_ok_status();
 }
 
-static iree_status_t iree_hal_module_map_data_ctl(
-    void* self, iree_allocator_command_t command, const void* params,
-    void** inout_ptr) {
-  IREE_ASSERT_EQ(command, IREE_ALLOCATOR_COMMAND_FREE);
-  if (IREE_UNLIKELY(command != IREE_ALLOCATOR_COMMAND_FREE)) {
-    return iree_make_status(IREE_STATUS_FAILED_PRECONDITION);
-  }
-  iree_vm_buffer_t* buffer = (iree_vm_buffer_t*)self;
-  iree_vm_buffer_release(buffer);
-  return iree_ok_status();
+static void iree_hal_module_mapped_buffer_release(void* user_data,
+                                                  iree_hal_buffer_t* buffer) {
+  iree_vm_buffer_t* backing_buffer = (iree_vm_buffer_t*)user_data;
+  iree_vm_buffer_release(backing_buffer);
 }
 
 IREE_VM_ABI_EXPORT(iree_hal_module_allocator_map_byte_buffer,  //
@@ -329,15 +323,19 @@ IREE_VM_ABI_EXPORT(iree_hal_module_allocator_map_byte_buffer,  //
       .usage = buffer_usage,
       .access = allowed_access,
   };
-  iree_allocator_t buffer_deref_allocator = {
-      .self = source,
-      .ctl = iree_hal_module_map_data_ctl,
+  iree_hal_external_buffer_t external_buffer = {
+      .type = IREE_HAL_EXTERNAL_BUFFER_TYPE_HOST_ALLOCATION,
+      .flags = IREE_HAL_EXTERNAL_BUFFER_FLAG_NONE,
+      .size = length,
+      .handle.host_allocation.ptr = source->data.data + offset,
+  };
+  iree_hal_buffer_release_callback_t release_callback = {
+      .fn = iree_hal_module_mapped_buffer_release,
+      .user_data = source,
   };
   iree_hal_buffer_t* buffer = NULL;
-  iree_status_t status = iree_hal_allocator_wrap_buffer(
-      allocator, params,
-      iree_make_byte_span(source->data.data + offset, length),
-      buffer_deref_allocator, &buffer);
+  iree_status_t status = iree_hal_allocator_import_buffer(
+      allocator, params, &external_buffer, release_callback, &buffer);
   if (iree_status_is_ok(status)) {
     // Mapping succeeded - retain the source buffer that'll be released by
     // iree_hal_module_map_data_ctl when the mapping is no longer used.

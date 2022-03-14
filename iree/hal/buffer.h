@@ -117,7 +117,7 @@ enum iree_hal_memory_access_bits_t {
                                IREE_HAL_MEMORY_ACCESS_WRITE |
                                IREE_HAL_MEMORY_ACCESS_DISCARD,
 };
-typedef uint32_t iree_hal_memory_access_t;
+typedef uint16_t iree_hal_memory_access_t;
 
 // Bitfield that defines how a buffer is intended to be used.
 // Usage allows the driver to appropriately place the buffer for more
@@ -562,8 +562,11 @@ struct iree_hal_buffer_t {
   iree_hal_allocator_t* device_allocator;
   // TODO(benvanik): bit pack these; could be ~4 bytes vs 12.
   iree_hal_memory_type_t memory_type;
-  iree_hal_memory_access_t allowed_access;
   iree_hal_buffer_usage_t allowed_usage;
+  iree_hal_memory_access_t allowed_access;
+
+  // Implementation-defined flags.
+  uint16_t flags;
 };
 
 IREE_API_EXPORT void iree_hal_buffer_initialize(
