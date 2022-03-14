@@ -370,37 +370,6 @@ static LogicalResult setX86SandboxRootConfig(FuncOp entryPointFn,
       DispatchLoweringPassPipeline::CPUDoubleTilingExpert);
 }
 
-static LogicalResult setX86TileFuseAndVectorizeRootConfig(
-    FuncOp entryPointFn, linalg::ContractionOpInterface op,
-    ArrayRef<int64_t> flowTileSizes, int vectorSize) {
-  // Hardcoded tile sizes, where v is the native vector size.
-  // L1 tile sizes are {1, 1, ..., 8, 2v, 2v}.
-  // Vector tile sizes are {1, ..., 1, v, v}
-  SmallVector<int64_t> l1TileSizes, vectorTileSizes;
-  int64_t nLoops = cast<linalg::LinalgOp>(op.getOperation()).getNumLoops();
-  l1TileSizes.append(nLoops - 3, 1);
-  l1TileSizes.push_back(
-      getMaxTileSize(0, flowTileSizes[nLoops - 3], 8, vectorSize));
-  l1TileSizes.push_back(
-      getMaxTileSize(0, flowTileSizes[nLoops - 2], 2 * vectorSize, vectorSize));
-  vectorTileSizes.append(nLoops - 2, 1);
-  vectorTileSizes.push_back(vectorSize);
-
-  // L1/vector tile size for k dimensions.
-  auto lhsShapedType = op.lhs().getType().cast<ShapedType>();
-  int64_t K = lhsShapedType.getShape().back();
-  l1TileSizes.push_back(getMaxTileSize(0, K, 2 * vectorSize, vectorSize));
-  vectorTileSizes.push_back(vectorSize);
-  TileSizesListType tileSizes;
-  tileSizes.emplace_back(flowTileSizes.begin(), flowTileSizes.end());
-  tileSizes.push_back(l1TileSizes);
-  tileSizes.push_back(vectorTileSizes);
-
-  return setOpConfigAndEntryPointFnTranslation(
-      entryPointFn, op, tileSizes,
-      DispatchLoweringPassPipeline::CPUTileFuseAndVectorize);
-}
-
 static LogicalResult setARMRootConfig(FuncOp entryPointFn,
                                       linalg::ContractionOpInterface op,
                                       ArrayRef<int64_t> flowTileSizes,
