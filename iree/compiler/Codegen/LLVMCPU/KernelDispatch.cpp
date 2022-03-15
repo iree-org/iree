@@ -605,15 +605,19 @@ static LogicalResult setRootConfig(
       DispatchLoweringPassPipeline::CPUDoubleTilingExpert);
 }
 
-/// Sets the lowering configuration for linalg.conv_2d_nhwc_hwcf operations.
-static LogicalResult setRootConfig(
-    FuncOp entryPointFn, linalg::Conv2DNhwcHwcfOp convOp,
-    ArrayRef<LoopTilingAndDistributionInfo> tiledLoops) {
-  auto linalgOp = cast<linalg::LinalgOp>(convOp.getOperation());
+/// Sets the lowering configuration for linalg.conv_2d_nhwc_hwcf and
+/// linalg.depthwise_conv_2d_nhwc_hwc operations.
+static LogicalResult setConvRootConfig(
+    FuncOp entryPointFn, linalg::LinalgOp convOp,
+    ArrayRef<LoopTilingAndDistributionInfo> tiledLoops,
+    ArrayRef<int64_t> targetL1TileSizes, int64_t vectorSize) {
+  if (!isa<linalg::Conv2DNhwcHwcfOp, linalg::DepthwiseConv2DNhwcHwcOp>(
+          convOp.getOperation())) {
+    return failure();
+  }
+
   // Use the default distribution for the matmul loops.
-  unsigned numLoops = linalgOp.getNumLoops();
-  int64_t vectorSize =
-      getVectorSize(entryPointFn, convOp.getResult(0).getType());
+  unsigned numLoops = convOp.getNumLoops();
   SmallVector<int64_t> minTileSizes(numLoops, 1);
   SmallVector<int64_t> maxTileSizes(numLoops, defaultWorkgroupTileSize);
 
@@ -621,19 +625,17 @@ static LogicalResult setRootConfig(
   OpBuilder builder(convOp.getContext());
   builder.setInsertionPoint(convOp);
   SmallVector<Range> iterationDomain =
-      linalgOp.createLoopRanges(builder, convOp.getLoc());
+      convOp.createLoopRanges(builder, convOp.getLoc());
   auto partitionableLoopsInterfaceOp =
       cast<IREE::Flow::PartitionableLoopsInterface>(convOp.getOperation());
   SmallVector<int64_t> flowTileSizes = getDefaultDistributedLevelTileSizes(
       iterationDomain, partitionableLoopsInterfaceOp, minTileSizes,
       maxTileSizes);
 
-  // Shapes of N, OH, OW, OC, KH, KW, IC
-  Optional<SmallVector<int64_t, 4>> shapes = linalgOp.getStaticLoopRanges();
-  assert(shapes.hasValue() &&
-         "something went wrong when inferring loop ranges");
-
-  SmallVector<int64_t> l1TileSizes = {1, 1, 8, vectorSize * 2, 1, 1, 8};
+  // Shapes of N, OH, OW, OC, KH, KW, (IC)
+  Optional<SmallVector<int64_t, 4>> shapes = convOp.getStaticLoopRanges();
+  SmallVector<int64_t> l1TileSizes(targetL1TileSizes.begin(),
+                                   targetL1TileSizes.end());
   for (auto i : llvm::seq<unsigned>(0, l1TileSizes.size())) {
     auto tileSize = flowTileSizes[i] ? flowTileSizes[i] : shapes.getValue()[i];
     // If the tile size is intended to be 1, do not adjust it to `vectorSize`.
@@ -643,7 +645,7 @@ static LogicalResult setRootConfig(
     }
   }
   SmallVector<int64_t> vectorTileSizes;
-  splitParallelAndReductionTiles(linalgOp, l1TileSizes, vectorTileSizes);
+  splitParallelAndReductionTiles(convOp, l1TileSizes, vectorTileSizes);
 
   TileSizesListType tileSizes;
   tileSizes.push_back(flowTileSizes);
@@ -652,6 +654,30 @@ static LogicalResult setRootConfig(
   return setOpConfigAndEntryPointFnTranslation(
       entryPointFn, convOp, tileSizes,
       DispatchLoweringPassPipeline::CPUConvTileAndDecomposeExpert);
+}
+
+static LogicalResult setRootConfig(
+    FuncOp entryPointFn, linalg::Conv2DNhwcHwcfOp convOp,
+    ArrayRef<LoopTilingAndDistributionInfo> tiledLoops) {
+  auto linalgOp = cast<linalg::LinalgOp>(convOp.getOperation());
+  int64_t vectorSize =
+      getVectorSize(entryPointFn, convOp.getResult(0).getType());
+  SmallVector<int64_t> l1TileSizes = {1, 1, 8, vectorSize * 2, 1, 1, 8};
+  return setConvRootConfig(entryPointFn, linalgOp, tiledLoops, l1TileSizes,
+                           vectorSize);
+}
+
+/// Sets the lowering configuration for linalg.depthwise_conv_2d_nhwc_hwc
+/// operations.
+static LogicalResult setRootConfig(
+    FuncOp entryPointFn, linalg::DepthwiseConv2DNhwcHwcOp convOp,
+    ArrayRef<LoopTilingAndDistributionInfo> tiledLoops) {
+  auto linalgOp = cast<linalg::LinalgOp>(convOp.getOperation());
+  int64_t vectorSize =
+      getVectorSize(entryPointFn, convOp.getResult(0).getType());
+  SmallVector<int64_t> l1TileSizes = {1, 1, 8, vectorSize * 2, 1, 3};
+  return setConvRootConfig(entryPointFn, linalgOp, tiledLoops, l1TileSizes,
+                           vectorSize);
 }
 
 /// Set default configuration for Linalg ops.
@@ -700,9 +726,10 @@ static LogicalResult setRootConfigImpl(
   auto setRootConfigFn = [&](Operation *op) -> LogicalResult {
     return TypeSwitch<Operation *, LogicalResult>(op)
         .Case<IREE::LinalgExt::FftOp, linalg::GenericOp, linalg::Mmt4DOp,
-              linalg::Conv2DNhwcHwcfOp>([&](auto op) {
-          return setRootConfig(entryPointFn, op, tiledLoops);
-        })
+              linalg::Conv2DNhwcHwcfOp, linalg::DepthwiseConv2DNhwcHwcOp>(
+            [&](auto op) {
+              return setRootConfig(entryPointFn, op, tiledLoops);
+            })
         .Case<linalg::ContractionOpInterface>([&](auto op) {
           return setRootConfig(entryPointFn, op, tiledLoops);
         })
