@@ -208,34 +208,6 @@ IREE_API_EXPORT iree_status_t iree_hal_device_query_i32(
     iree_hal_device_t* device, iree_string_view_t category,
     iree_string_view_t key, int32_t* out_value);
 
-// Synchronously transfers the given |source_buffer| to a device-local
-// buffer returned in |out_target_buffer|. Callers must release the target
-// buffer when no longer used. If the source buffer is already device-local it
-// will be returned without an allocation or copy occurring.
-//
-// This utility may incur signficant overhead and is present for simple tooling
-// and prototypes; when transfering multiple buffers users should always prefer
-// asynchronous command buffers submitted to device queues. Note too that the
-// entire buffer is transferred: if reading back smaller portions it is better
-// to perform these as ranged transfers to avoid the amount of data that needs
-// to be moved.
-IREE_API_EXPORT iree_status_t iree_hal_device_transfer_to_device(
-    iree_hal_device_t* device, iree_hal_buffer_t* source_buffer,
-    iree_hal_buffer_usage_t allowed_usage,
-    iree_hal_buffer_t** out_target_buffer);
-
-// Synchronously transfers the given |source_buffer| to a host-local
-// buffer returned in |out_target_buffer|. Callers must release the target
-// buffer when no longer used. If the source buffer is already host-local it
-// will be returned without an allocation or copy occurring.
-//
-// This utility may incur signficant overhead and is present for simple tooling
-// and prototypes; when transfering multiple buffers users should always prefer
-// asynchronous command buffers submitted to device queues.
-IREE_API_EXPORT iree_status_t iree_hal_device_transfer_to_host(
-    iree_hal_device_t* device, iree_hal_buffer_t* source_buffer,
-    iree_hal_buffer_t** out_target_buffer);
-
 // Synchronously copies data from |source| into |target|.
 //
 // Supports host->device, device->host, and device->device transfer,
