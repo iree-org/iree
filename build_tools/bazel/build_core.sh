@@ -13,7 +13,9 @@
 # Looks at environment variables and uses CI-friendly defaults if they are not
 # set.
 # IREE_LLVMAOT_DISABLE: Do not run tests that require LLVM-AOT. Default: 0
-# IREE_VULKAN_DISABLE: Do not run tests that require Vulkan. Default: 1
+# IREE_VULKAN_DISABLE: Do not run lit tests that require Vulkan. Default: 0
+# IREE_VULKAN_DISABLE_RUNTIME: Do not run runtime tests that require Vulkan.
+#   Default: 0
 # BUILD_TAG_FILTERS: Passed to bazel to filter targets to build.
 #   See https://docs.bazel.build/versions/master/command-line-reference.html#flag--build_tag_filters)
 #   Default: "-nokokoro"
@@ -30,6 +32,9 @@ if ! [[ -v IREE_LLVMAOT_DISABLE ]]; then
 fi
 if ! [[ -v IREE_VULKAN_DISABLE ]]; then
   IREE_VULKAN_DISABLE=0
+fi
+if ! [[ -v IREE_VULKAN_DISABLE_RUNTIME ]]; then
+  IREE_VULKAN_DISABLE_RUNTIME=0
 fi
 
 declare -a test_env_args=(
@@ -56,7 +61,7 @@ default_test_tag_filters+=("-vulkan_uses_vk_khr_shader_float16_int8")
 # CUDA CI testing disabled until we setup a target for it.
 default_test_tag_filters+=("-driver=cuda")
 
-if [[ "${IREE_VULKAN_DISABLE?}" == 1 ]]; then
+if [[ "${IREE_VULKAN_DISABLE_RUNTIME?}" == 1 ]]; then
   default_test_tag_filters+=("-driver=vulkan")
 fi
 if [[ "${IREE_LLVMAOT_DISABLE?}" == 1 ]]; then

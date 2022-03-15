@@ -20,6 +20,7 @@ export CTEST_PARALLEL_LEVEL=${CTEST_PARALLEL_LEVEL:-$(nproc)}
 
 # Respect the user setting, but default to turning on vulkan and llvmaot.
 export IREE_VULKAN_DISABLE=${IREE_VULKAN_DISABLE:-0}
+export IREE_VULKAN_DISABLE_RUNTIME=${IREE_VULKAN_DISABLE_RUNTIME:-0}
 export IREE_LLVMAOT_DISABLE=${IREE_LLVMAOT_DISABLE:-0}
 # CUDA is off by default.
 export IREE_CUDA_DISABLE=${IREE_CUDA_DISABLE:-1}
@@ -49,7 +50,7 @@ declare -a label_exclude_args=(
   #   ^bindings/
 )
 
-if [[ "${IREE_VULKAN_DISABLE?}" == 1 ]]; then
+if [[ "${IREE_VULKAN_DISABLE_RUNTIME?}" == 1 ]]; then
   label_exclude_args+=("^driver=vulkan$")
 fi
 if [[ "${IREE_LLVMAOT_DISABLE?}" == 1 ]]; then
