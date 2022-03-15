@@ -9,20 +9,16 @@ WORKDIR /install-swiftshader
 
 RUN apt-get update && apt-get install -y git
 
-ARG SWIFTSHADER_COMMIT=755b78dc66b2362621a78b6964a9df3af94e960c
+ARG SWIFTSHADER_COMMIT=c27e99245d423648fe5f0eafa73d49ce7b53d201
 
-# zlib is needed for compiling SwiftShader.
-RUN apt-get update && apt-get install -y zlib1g-dev
+# zlib and xcb/shm.h are needed for compiling SwiftShader.
+RUN apt-get update && apt-get install -y zlib1g-dev libxcb-shm0-dev
+
 RUN git clone https://github.com/google/swiftshader
 RUN cd swiftshader && git checkout "${SWIFTSHADER_COMMIT?}" && cd ..
 # Only build SwiftShader Vulkan ICD.
 RUN cmake -S swiftshader/ -B build-swiftshader/ \
            -GNinja \
-           -DSWIFTSHADER_BUILD_VULKAN=ON \
-           -DSWIFTSHADER_BUILD_EGL=OFF \
-           -DSWIFTSHADER_BUILD_GLESv2=OFF \
-           -DSWIFTSHADER_BUILD_GLES_CM=OFF \
-           -DSWIFTSHADER_BUILD_PVR=OFF \
            -DSWIFTSHADER_BUILD_TESTS=OFF
 RUN cmake --build build-swiftshader/ \
            --config Release \
