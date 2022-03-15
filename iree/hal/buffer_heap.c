@@ -15,42 +15,42 @@
 #include "iree/hal/buffer_heap_impl.h"
 #include "iree/hal/resource.h"
 
+typedef enum iree_hal_heap_buffer_storage_mode_e {
+  // Allocated as a [metadata, data] slab.
+  // The base metadata pointer must be freed with iree_allocator_free_aligned.
+  // The data storage is not freed.
+  IREE_HAL_HEAP_BUFFER_STORAGE_MODE_SLAB = 0u,
+  // Allocated as split [metadata] and [data].
+  // The base metadata pointer must be freed with iree_allocator_free.
+  // The data storage must be freed with iree_allocator_free_aligned.
+  IREE_HAL_HEAP_BUFFER_STORAGE_MODE_SPLIT = 1u,
+  // Allocated as split [metadata] and an externally-owned [data].
+  // The base metadata pointer must be freed with iree_allocator_free.
+  // A user-provided buffer release callback is notified that the buffer is no
+  // longer referencing the data.
+  IREE_HAL_HEAP_BUFFER_STORAGE_MODE_EXTERNAL = 2u,
+} iree_hal_heap_buffer_storage_mode_t;
+
 typedef struct iree_hal_heap_buffer_t {
+  // base.flags has the iree_hal_heap_buffer_storage_mode_t.
   iree_hal_buffer_t base;
 
   iree_byte_span_t data;
-  iree_allocator_t data_allocator;
+  union {
+    // Used for IREE_HAL_HEAP_BUFFER_STORAGE_MODE_SPLIT.
+    iree_allocator_t data_allocator;
+    // Used for IREE_HAL_HEAP_BUFFER_STORAGE_MODE_EXTERNAL.
+    iree_hal_buffer_release_callback_t release_callback;
+  };
 
   // Optional statistics shared with the allocator.
   IREE_STATISTICS(iree_hal_heap_allocator_statistics_t* statistics;)
 } iree_hal_heap_buffer_t;
+static_assert(sizeof(iree_hal_heap_buffer_t) <= 128,
+              "header should be <= the minimum buffer alignment so that we "
+              "don't introduce internal waste");
 
 static const iree_hal_buffer_vtable_t iree_hal_heap_buffer_vtable;
-
-enum {
-  IREE_HAL_HEAP_BUFFER_DATA_IS_ALIGNED = 1u << 0,
-  IREE_HAL_HEAP_BUFFER_METADATA_IS_ALIGNED = 1u << 1,
-  IREE_HAL_HEAP_BUFFER_FLAG_MASK = IREE_HAL_HEAP_BUFFER_DATA_IS_ALIGNED |
-                                   IREE_HAL_HEAP_BUFFER_METADATA_IS_ALIGNED,
-};
-
-static inline uint8_t* iree_hal_heap_buffer_ptr(
-    const iree_hal_heap_buffer_t* buffer) {
-  return (uint8_t*)((uintptr_t)buffer->data.data &
-                    ~IREE_HAL_HEAP_BUFFER_FLAG_MASK);
-}
-
-static inline bool iree_hal_heap_buffer_data_is_aligned(
-    const iree_hal_heap_buffer_t* buffer) {
-  return iree_any_bit_set((uintptr_t)buffer->data.data,
-                          IREE_HAL_HEAP_BUFFER_DATA_IS_ALIGNED);
-}
-
-static inline bool iree_hal_heap_buffer_metadata_is_aligned(
-    const iree_hal_heap_buffer_t* buffer) {
-  return iree_any_bit_set((uintptr_t)buffer->data.data,
-                          IREE_HAL_HEAP_BUFFER_METADATA_IS_ALIGNED);
-}
 
 // Allocates a buffer with the metadata and storage split.
 // This results in an additional host allocation but allows for user-overridden
@@ -62,14 +62,13 @@ static iree_status_t iree_hal_heap_buffer_allocate_split(
   // Try allocating the storage first as it's the most likely to fail if OOM.
   // It must be aligned to the minimum buffer alignment.
   out_data->data_length = allocation_size;
-  uintptr_t data_ptr = 0;
+  uint8_t* data_ptr = 0;
   IREE_RETURN_IF_ERROR(iree_allocator_malloc_aligned(
       data_allocator, allocation_size, IREE_HAL_HEAP_BUFFER_ALIGNMENT,
       /*offset=*/0, (void**)&data_ptr));
-  IREE_ASSERT_TRUE(
-      iree_host_size_has_alignment(data_ptr, IREE_HAL_HEAP_BUFFER_ALIGNMENT));
-  data_ptr |= IREE_HAL_HEAP_BUFFER_DATA_IS_ALIGNED;
-  out_data->data = (uint8_t*)data_ptr;
+  IREE_ASSERT_TRUE(iree_host_size_has_alignment(
+      (iree_host_size_t)data_ptr, IREE_HAL_HEAP_BUFFER_ALIGNMENT));
+  out_data->data = data_ptr;
 
   // Allocate the host metadata wrapper with natural alignment.
   iree_status_t status = iree_allocator_malloc(
@@ -104,11 +103,10 @@ static iree_status_t iree_hal_heap_buffer_allocate_slab(
 
   // Set bit indicating that we need to free the metadata with
   // iree_allocator_free_aligned.
-  uintptr_t data_ptr = (uintptr_t)buffer + header_size;
-  IREE_ASSERT_TRUE(
-      iree_host_size_has_alignment(data_ptr, IREE_HAL_HEAP_BUFFER_ALIGNMENT));
-  data_ptr |= IREE_HAL_HEAP_BUFFER_METADATA_IS_ALIGNED;
-  *out_data = iree_make_byte_span((uint8_t*)data_ptr, allocation_size);
+  uint8_t* data_ptr = (uint8_t*)buffer + header_size;
+  IREE_ASSERT_TRUE(iree_host_size_has_alignment(
+      (iree_host_size_t)data_ptr, IREE_HAL_HEAP_BUFFER_ALIGNMENT));
+  *out_data = iree_make_byte_span(data_ptr, allocation_size);
 
   return iree_ok_status();
 }
@@ -116,11 +114,11 @@ static iree_status_t iree_hal_heap_buffer_allocate_slab(
 iree_status_t iree_hal_heap_buffer_create(
     iree_hal_allocator_t* allocator,
     iree_hal_heap_allocator_statistics_t* statistics,
-    iree_hal_memory_type_t memory_type, iree_hal_memory_access_t allowed_access,
-    iree_hal_buffer_usage_t allowed_usage, iree_device_size_t allocation_size,
-    iree_allocator_t data_allocator, iree_allocator_t host_allocator,
-    iree_hal_buffer_t** out_buffer) {
+    const iree_hal_buffer_params_t* params, iree_device_size_t allocation_size,
+    iree_const_byte_span_t initial_data, iree_allocator_t data_allocator,
+    iree_allocator_t host_allocator, iree_hal_buffer_t** out_buffer) {
   IREE_ASSERT_ARGUMENT(allocator);
+  IREE_ASSERT_ARGUMENT(params);
   IREE_ASSERT_ARGUMENT(out_buffer);
   IREE_TRACE_ZONE_BEGIN(z0);
 
@@ -141,22 +139,34 @@ iree_status_t iree_hal_heap_buffer_create(
 
   if (iree_status_is_ok(status)) {
     iree_hal_buffer_initialize(host_allocator, allocator, &buffer->base,
-                               allocation_size, 0, allocation_size, memory_type,
-                               allowed_access, allowed_usage,
+                               allocation_size, 0, allocation_size,
+                               params->type, params->access, params->usage,
                                &iree_hal_heap_buffer_vtable, &buffer->base);
     buffer->data = data;
-    buffer->data_allocator =
-        same_allocator ? iree_allocator_null() : data_allocator;
+
+    if (same_allocator) {
+      buffer->base.flags = IREE_HAL_HEAP_BUFFER_STORAGE_MODE_SLAB;
+      buffer->data_allocator = iree_allocator_null();
+    } else {
+      buffer->base.flags = IREE_HAL_HEAP_BUFFER_STORAGE_MODE_SPLIT;
+      buffer->data_allocator = data_allocator;
+    }
 
     IREE_STATISTICS({
       if (statistics != NULL) {
         buffer->statistics = statistics;
         iree_slim_mutex_lock(&statistics->mutex);
         iree_hal_allocator_statistics_record_alloc(
-            &statistics->base, memory_type, allocation_size);
+            &statistics->base, params->type, allocation_size);
         iree_slim_mutex_unlock(&statistics->mutex);
       }
     });
+
+    if (!iree_const_byte_span_is_empty(initial_data)) {
+      const iree_device_size_t initial_length =
+          iree_min(initial_data.data_length, allocation_size);
+      memcpy(buffer->data.data, initial_data.data, initial_length);
+    }
 
     *out_buffer = &buffer->base;
   }
@@ -165,25 +175,23 @@ iree_status_t iree_hal_heap_buffer_create(
   return status;
 }
 
-iree_status_t iree_hal_heap_buffer_wrap(iree_hal_allocator_t* allocator,
-                                        iree_hal_memory_type_t memory_type,
-                                        iree_hal_memory_access_t allowed_access,
-                                        iree_hal_buffer_usage_t allowed_usage,
-                                        iree_device_size_t allocation_size,
-                                        iree_byte_span_t data,
-                                        iree_allocator_t data_allocator,
-                                        iree_hal_buffer_t** out_buffer) {
+iree_status_t iree_hal_heap_buffer_wrap(
+    iree_hal_allocator_t* allocator, iree_hal_memory_type_t memory_type,
+    iree_hal_memory_access_t allowed_access,
+    iree_hal_buffer_usage_t allowed_usage, iree_device_size_t allocation_size,
+    iree_byte_span_t data, iree_hal_buffer_release_callback_t release_callback,
+    iree_hal_buffer_t** out_buffer) {
   IREE_ASSERT_ARGUMENT(allocator);
   IREE_ASSERT_ARGUMENT(out_buffer);
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  uintptr_t data_ptr = (uintptr_t)data.data & ~IREE_HAL_HEAP_BUFFER_FLAG_MASK;
-  if (!iree_host_size_has_alignment(data_ptr, IREE_HAL_HEAP_BUFFER_ALIGNMENT)) {
+  if (!iree_host_size_has_alignment((uintptr_t)data.data,
+                                    IREE_HAL_HEAP_BUFFER_ALIGNMENT)) {
     IREE_TRACE_ZONE_END(z0);
     return iree_make_status(
-        IREE_STATUS_INVALID_ARGUMENT,
+        IREE_STATUS_OUT_OF_RANGE,
         "imported heap buffer data must be aligned to %d; got %p",
-        (int)IREE_HAL_HEAP_BUFFER_ALIGNMENT, (void*)data_ptr);
+        (int)IREE_HAL_HEAP_BUFFER_ALIGNMENT, data.data);
   }
 
   iree_allocator_t host_allocator =
@@ -197,7 +205,11 @@ iree_status_t iree_hal_heap_buffer_wrap(iree_hal_allocator_t* allocator,
                                memory_type, allowed_access, allowed_usage,
                                &iree_hal_heap_buffer_vtable, &buffer->base);
     buffer->data = data;
-    buffer->data_allocator = data_allocator;
+
+    // Notify the provided callback when the external data is no longer needed.
+    buffer->base.flags = IREE_HAL_HEAP_BUFFER_STORAGE_MODE_EXTERNAL;
+    buffer->release_callback = release_callback;
+
     *out_buffer = &buffer->base;
   }
 
@@ -220,15 +232,27 @@ static void iree_hal_heap_buffer_destroy(iree_hal_buffer_t* base_buffer) {
     }
   });
 
-  if (iree_hal_heap_buffer_data_is_aligned(buffer)) {
-    iree_allocator_free_aligned(buffer->data_allocator, buffer->data.data);
-  } else {
-    iree_allocator_free(buffer->data_allocator, buffer->data.data);
-  }
-  if (iree_hal_heap_buffer_metadata_is_aligned(buffer)) {
-    iree_allocator_free_aligned(host_allocator, buffer);
-  } else {
-    iree_allocator_free(host_allocator, buffer);
+  switch (buffer->base.flags) {
+    case IREE_HAL_HEAP_BUFFER_STORAGE_MODE_SLAB: {
+      iree_allocator_free_aligned(host_allocator, buffer);
+      break;
+    }
+    case IREE_HAL_HEAP_BUFFER_STORAGE_MODE_SPLIT: {
+      iree_allocator_free(buffer->data_allocator, buffer->data.data);
+      iree_allocator_free(host_allocator, buffer);
+      break;
+    }
+    case IREE_HAL_HEAP_BUFFER_STORAGE_MODE_EXTERNAL: {
+      if (buffer->release_callback.fn) {
+        buffer->release_callback.fn(buffer->release_callback.user_data,
+                                    base_buffer);
+      }
+      iree_allocator_free(host_allocator, buffer);
+      break;
+    }
+    default:
+      IREE_ASSERT_UNREACHABLE("unhandled buffer storage mode");
+      break;
   }
 
   IREE_TRACE_ZONE_END(z0);
@@ -240,8 +264,8 @@ static iree_status_t iree_hal_heap_buffer_map_range(
     iree_device_size_t local_byte_offset, iree_device_size_t local_byte_length,
     iree_hal_buffer_mapping_t* mapping) {
   iree_hal_heap_buffer_t* buffer = (iree_hal_heap_buffer_t*)base_buffer;
-  mapping->contents = iree_make_byte_span(
-      iree_hal_heap_buffer_ptr(buffer) + local_byte_offset, local_byte_length);
+  mapping->contents = iree_make_byte_span(buffer->data.data + local_byte_offset,
+                                          local_byte_length);
 
   // If we mapped for discard scribble over the bytes. This is not a mandated
   // behavior but it will make debugging issues easier. Alternatively for

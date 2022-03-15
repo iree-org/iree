@@ -123,7 +123,7 @@ static void iree_hal_rocm_buffer_free(iree_hal_rocm_context_wrapper_t* context,
 static iree_status_t iree_hal_rocm_allocator_allocate_buffer(
     iree_hal_allocator_t* IREE_RESTRICT base_allocator,
     const iree_hal_buffer_params_t* IREE_RESTRICT params,
-    iree_host_size_t allocation_size, iree_const_byte_span_t initial_data,
+    iree_device_size_t allocation_size, iree_const_byte_span_t initial_data,
     iree_hal_buffer_t** IREE_RESTRICT out_buffer) {
   iree_hal_rocm_allocator_t* allocator =
       iree_hal_rocm_allocator_cast(base_allocator);
@@ -216,19 +216,11 @@ static void iree_hal_rocm_allocator_deallocate_buffer(
   iree_hal_buffer_destroy(base_buffer);
 }
 
-static iree_status_t iree_hal_rocm_allocator_wrap_buffer(
-    iree_hal_allocator_t* IREE_RESTRICT base_allocator,
-    const iree_hal_buffer_params_t* IREE_RESTRICT params, iree_byte_span_t data,
-    iree_allocator_t data_allocator,
-    iree_hal_buffer_t** IREE_RESTRICT out_buffer) {
-  return iree_make_status(IREE_STATUS_UNAVAILABLE,
-                          "wrapping of external buffers not supported");
-}
-
 static iree_status_t iree_hal_rocm_allocator_import_buffer(
     iree_hal_allocator_t* IREE_RESTRICT base_allocator,
     const iree_hal_buffer_params_t* IREE_RESTRICT params,
     iree_hal_external_buffer_t* IREE_RESTRICT external_buffer,
+    iree_hal_buffer_release_callback_t release_callback,
     iree_hal_buffer_t** IREE_RESTRICT out_buffer) {
   return iree_make_status(IREE_STATUS_UNAVAILABLE,
                           "importing from external buffers not supported");
@@ -252,7 +244,6 @@ static const iree_hal_allocator_vtable_t iree_hal_rocm_allocator_vtable = {
     .query_compatibility = iree_hal_rocm_allocator_query_compatibility,
     .allocate_buffer = iree_hal_rocm_allocator_allocate_buffer,
     .deallocate_buffer = iree_hal_rocm_allocator_deallocate_buffer,
-    .wrap_buffer = iree_hal_rocm_allocator_wrap_buffer,
     .import_buffer = iree_hal_rocm_allocator_import_buffer,
     .export_buffer = iree_hal_rocm_allocator_export_buffer,
 };

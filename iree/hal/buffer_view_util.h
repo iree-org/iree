@@ -65,41 +65,6 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_view_allocate_buffer(
     iree_hal_buffer_params_t buffer_params, iree_const_byte_span_t initial_data,
     iree_hal_buffer_view_t** out_buffer_view);
 
-// Imports a host buffer using |allocator| and wraps it in a buffer view.
-//
-// This is equivalent to:
-//   1. iree_hal_allocator_wrap_buffer
-//   2. iree_hal_buffer_view_create
-//
-// NOTE: not all buffers can be imported and not all allocators support
-// importing. See iree_hal_allocator_wrap_buffer for more information.
-// Fails if the buffer cannot be imported.
-IREE_API_EXPORT iree_status_t iree_hal_buffer_view_wrap_heap_buffer(
-    iree_hal_allocator_t* allocator, const iree_hal_dim_t* shape,
-    iree_host_size_t shape_rank, iree_hal_element_type_t element_type,
-    iree_hal_encoding_type_t encoding_type,
-    iree_hal_buffer_params_t buffer_params, iree_byte_span_t data,
-    iree_allocator_t data_allocator, iree_hal_buffer_view_t** out_buffer_view);
-
-// Tries to import a host buffer using |allocator| and wrap it in a buffer view.
-// If the buffer cannot be imported then a new buffer will be allocated and the
-// source data will be copied into it.
-//
-// This is equivalent to:
-//   if iree_hal_allocator_query_compatibility ok:
-//     1. iree_hal_allocator_wrap_buffer
-//     2. iree_hal_buffer_view_create
-//   else:
-//     1. iree_hal_allocator_allocate_buffer
-//     2. iree_hal_buffer_write_data
-//     3. iree_hal_buffer_view_create
-IREE_API_EXPORT iree_status_t iree_hal_buffer_view_wrap_or_clone_heap_buffer(
-    iree_hal_allocator_t* allocator, const iree_hal_dim_t* shape,
-    iree_host_size_t shape_rank, iree_hal_element_type_t element_type,
-    iree_hal_encoding_type_t encoding_type,
-    iree_hal_buffer_params_t buffer_params, iree_byte_span_t data,
-    iree_allocator_t data_allocator, iree_hal_buffer_view_t** out_buffer_view);
-
 typedef iree_status_t(IREE_API_PTR* iree_hal_buffer_view_generator_callback_t)(
     iree_hal_buffer_mapping_t* mapping, void* user_data);
 

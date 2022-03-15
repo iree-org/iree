@@ -117,7 +117,7 @@ iree_hal_allocator_query_compatibility(
 
 IREE_API_EXPORT iree_status_t iree_hal_allocator_allocate_buffer(
     iree_hal_allocator_t* IREE_RESTRICT allocator,
-    iree_hal_buffer_params_t params, iree_host_size_t allocation_size,
+    iree_hal_buffer_params_t params, iree_device_size_t allocation_size,
     iree_const_byte_span_t initial_data,
     iree_hal_buffer_t** IREE_RESTRICT out_buffer) {
   IREE_ASSERT_ARGUMENT(allocator);
@@ -140,25 +140,11 @@ IREE_API_EXPORT void iree_hal_allocator_deallocate_buffer(
   IREE_TRACE_ZONE_END(z0);
 }
 
-IREE_API_EXPORT iree_status_t iree_hal_allocator_wrap_buffer(
-    iree_hal_allocator_t* IREE_RESTRICT allocator,
-    iree_hal_buffer_params_t params, iree_byte_span_t data,
-    iree_allocator_t data_allocator, iree_hal_buffer_t** out_buffer) {
-  IREE_ASSERT_ARGUMENT(allocator);
-  IREE_ASSERT_ARGUMENT(out_buffer);
-  *out_buffer = NULL;
-  IREE_TRACE_ZONE_BEGIN(z0);
-  iree_hal_buffer_params_canonicalize(&params);
-  iree_status_t status = _VTABLE_DISPATCH(allocator, wrap_buffer)(
-      allocator, &params, data, data_allocator, out_buffer);
-  IREE_TRACE_ZONE_END(z0);
-  return status;
-}
-
 IREE_API_EXPORT iree_status_t iree_hal_allocator_import_buffer(
     iree_hal_allocator_t* IREE_RESTRICT allocator,
     iree_hal_buffer_params_t params,
     iree_hal_external_buffer_t* IREE_RESTRICT external_buffer,
+    iree_hal_buffer_release_callback_t release_callback,
     iree_hal_buffer_t** IREE_RESTRICT out_buffer) {
   IREE_ASSERT_ARGUMENT(allocator);
   IREE_ASSERT_ARGUMENT(external_buffer);
@@ -167,7 +153,7 @@ IREE_API_EXPORT iree_status_t iree_hal_allocator_import_buffer(
   IREE_TRACE_ZONE_BEGIN(z0);
   iree_hal_buffer_params_canonicalize(&params);
   iree_status_t status = _VTABLE_DISPATCH(allocator, import_buffer)(
-      allocator, &params, external_buffer, out_buffer);
+      allocator, &params, external_buffer, release_callback, out_buffer);
   IREE_TRACE_ZONE_END(z0);
   return status;
 }

@@ -148,7 +148,7 @@ static iree_hal_buffer_params_t iree_hal_heap_allocator_make_compatible(
 static iree_status_t iree_hal_heap_allocator_allocate_buffer(
     iree_hal_allocator_t* IREE_RESTRICT base_allocator,
     const iree_hal_buffer_params_t* IREE_RESTRICT params,
-    iree_host_size_t allocation_size, iree_const_byte_span_t initial_data,
+    iree_device_size_t allocation_size, iree_const_byte_span_t initial_data,
     iree_hal_buffer_t** IREE_RESTRICT out_buffer) {
   iree_hal_heap_allocator_t* allocator =
       iree_hal_heap_allocator_cast(base_allocator);
@@ -162,22 +162,11 @@ static iree_status_t iree_hal_heap_allocator_allocate_buffer(
   IREE_STATISTICS(statistics = &allocator->statistics);
   iree_hal_buffer_t* buffer = NULL;
   IREE_RETURN_IF_ERROR(iree_hal_heap_buffer_create(
-      base_allocator, statistics, compat_params.type, compat_params.access,
-      compat_params.usage, allocation_size, allocator->data_allocator,
-      allocator->host_allocator, &buffer));
+      base_allocator, statistics, &compat_params, allocation_size, initial_data,
+      allocator->data_allocator, allocator->host_allocator, &buffer));
 
-  iree_status_t status = iree_ok_status();
-  if (!iree_const_byte_span_is_empty(initial_data)) {
-    status = iree_hal_buffer_write_data(buffer, 0, initial_data.data,
-                                        initial_data.data_length);
-  }
-
-  if (iree_status_is_ok(status)) {
-    *out_buffer = buffer;
-  } else {
-    iree_hal_buffer_release(buffer);
-  }
-  return status;
+  *out_buffer = buffer;
+  return iree_ok_status();
 }
 
 static void iree_hal_heap_allocator_deallocate_buffer(
@@ -188,23 +177,11 @@ static void iree_hal_heap_allocator_deallocate_buffer(
   iree_hal_buffer_destroy(base_buffer);
 }
 
-static iree_status_t iree_hal_heap_allocator_wrap_buffer(
-    iree_hal_allocator_t* IREE_RESTRICT base_allocator,
-    const iree_hal_buffer_params_t* IREE_RESTRICT params, iree_byte_span_t data,
-    iree_allocator_t data_allocator,
-    iree_hal_buffer_t** IREE_RESTRICT out_buffer) {
-  // Coerce options into those required for use by heap-based devices.
-  iree_hal_buffer_params_t compat_params =
-      iree_hal_heap_allocator_make_compatible(params);
-  return iree_hal_heap_buffer_wrap(
-      base_allocator, compat_params.type, compat_params.access,
-      compat_params.usage, data.data_length, data, data_allocator, out_buffer);
-}
-
 static iree_status_t iree_hal_heap_allocator_import_buffer(
     iree_hal_allocator_t* IREE_RESTRICT base_allocator,
     const iree_hal_buffer_params_t* IREE_RESTRICT params,
     iree_hal_external_buffer_t* IREE_RESTRICT external_buffer,
+    iree_hal_buffer_release_callback_t release_callback,
     iree_hal_buffer_t** IREE_RESTRICT out_buffer) {
   if (external_buffer->type != IREE_HAL_EXTERNAL_BUFFER_TYPE_HOST_ALLOCATION) {
     return iree_make_status(IREE_STATUS_UNAVAILABLE,
@@ -215,13 +192,12 @@ static iree_status_t iree_hal_heap_allocator_import_buffer(
   iree_hal_buffer_params_t compat_params =
       iree_hal_heap_allocator_make_compatible(params);
 
-  // Wrap; note that the host allocation is unowned.
   return iree_hal_heap_buffer_wrap(
       base_allocator, compat_params.type, compat_params.access,
       compat_params.usage, external_buffer->size,
       iree_make_byte_span(external_buffer->handle.host_allocation.ptr,
                           external_buffer->size),
-      iree_allocator_null(), out_buffer);
+      release_callback, out_buffer);
 }
 
 static iree_status_t iree_hal_heap_allocator_export_buffer(
@@ -257,7 +233,6 @@ static const iree_hal_allocator_vtable_t iree_hal_heap_allocator_vtable = {
     .query_compatibility = iree_hal_heap_allocator_query_compatibility,
     .allocate_buffer = iree_hal_heap_allocator_allocate_buffer,
     .deallocate_buffer = iree_hal_heap_allocator_deallocate_buffer,
-    .wrap_buffer = iree_hal_heap_allocator_wrap_buffer,
     .import_buffer = iree_hal_heap_allocator_import_buffer,
     .export_buffer = iree_hal_heap_allocator_export_buffer,
 };

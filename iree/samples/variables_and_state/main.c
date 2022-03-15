@@ -42,8 +42,6 @@ iree_status_t counter_set_value(iree_runtime_session_t* session,
   iree_hal_buffer_view_t* arg0 = NULL;
   int arg0_data[1] = {new_value};
 
-  // TODO(scotttodd): use iree_hal_buffer_view_wrap_or_clone_heap_buffer
-  //   * debugging some apparent memory corruption with the stack-local value
   iree_status_t status = iree_ok_status();
   if (iree_status_is_ok(status)) {
     status = iree_hal_buffer_view_allocate_buffer(
@@ -77,8 +75,6 @@ iree_status_t counter_add_to_value(iree_runtime_session_t* session, int x) {
   iree_hal_buffer_view_t* arg0 = NULL;
   int arg0_data[1] = {x};
 
-  // TODO(scotttodd): use iree_hal_buffer_view_wrap_or_clone_heap_buffer
-  //   * debugging some apparent memory corruption with the stack-local value
   iree_status_t status = iree_ok_status();
   if (iree_status_is_ok(status)) {
     status = iree_hal_buffer_view_allocate_buffer(

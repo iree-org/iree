@@ -442,7 +442,7 @@ void SetupHalBindings(pybind11::module m) {
       .def(
           "allocate_buffer",
           [](HalAllocator& self, int memory_type, int allowed_usage,
-             iree_host_size_t allocation_size) {
+             iree_device_size_t allocation_size) {
             iree_hal_buffer_params_t params = {0};
             params.type = memory_type;
             params.usage = allowed_usage;

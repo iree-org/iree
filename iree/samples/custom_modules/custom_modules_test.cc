@@ -131,19 +131,19 @@ TEST_F(CustomModulesTest, ReverseAndPrint) {
 TEST_F(CustomModulesTest, PrintTensor) {
   // Allocate the buffer we'll be printing.
   static iree_hal_dim_t kShape[] = {2, 4};
-  static float iree_alignas(IREE_HAL_HEAP_BUFFER_ALIGNMENT)
-      kBufferContents[2 * 4] = {0.0f, 1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f, 7.0f};
+  static const float kBufferContents[2 * 4] = {0.0f, 1.0f, 2.0f, 3.0f,
+                                               4.0f, 5.0f, 6.0f, 7.0f};
   iree_hal_buffer_params_t params = {0};
   params.type =
       IREE_HAL_MEMORY_TYPE_HOST_LOCAL | IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE;
   params.usage = IREE_HAL_BUFFER_USAGE_ALL;
   iree_hal_buffer_view_t* buffer_view = nullptr;
-  IREE_ASSERT_OK(iree_hal_buffer_view_wrap_or_clone_heap_buffer(
+  IREE_ASSERT_OK(iree_hal_buffer_view_allocate_buffer(
       hal_allocator_, kShape, IREE_ARRAYSIZE(kShape),
       IREE_HAL_ELEMENT_TYPE_FLOAT_32, IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR,
       params,
-      iree_make_byte_span((void*)kBufferContents, sizeof(kBufferContents)),
-      iree_allocator_null(), &buffer_view));
+      iree_make_const_byte_span(kBufferContents, sizeof(kBufferContents)),
+      &buffer_view));
 
   // Pass in the tensor as an expanded HAL buffer.
   iree::vm::ref<iree_vm_list_t> inputs;
@@ -179,19 +179,19 @@ TEST_F(CustomModulesTest, PrintTensor) {
 TEST_F(CustomModulesTest, RoundTripTensor) {
   // Allocate the buffer we'll be printing/parsing.
   static iree_hal_dim_t kShape[] = {2, 4};
-  static float iree_alignas(IREE_HAL_HEAP_BUFFER_ALIGNMENT)
-      kBufferContents[2 * 4] = {0.0f, 1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f, 7.0f};
+  static const float kBufferContents[2 * 4] = {0.0f, 1.0f, 2.0f, 3.0f,
+                                               4.0f, 5.0f, 6.0f, 7.0f};
   iree_hal_buffer_params_t params = {0};
   params.type =
       IREE_HAL_MEMORY_TYPE_HOST_LOCAL | IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE;
   params.usage = IREE_HAL_BUFFER_USAGE_ALL;
   iree_hal_buffer_view_t* buffer_view = nullptr;
-  IREE_ASSERT_OK(iree_hal_buffer_view_wrap_or_clone_heap_buffer(
+  IREE_ASSERT_OK(iree_hal_buffer_view_allocate_buffer(
       hal_allocator_, kShape, IREE_ARRAYSIZE(kShape),
       IREE_HAL_ELEMENT_TYPE_FLOAT_32, IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR,
       params,
-      iree_make_byte_span((void*)kBufferContents, sizeof(kBufferContents)),
-      iree_allocator_null(), &buffer_view));
+      iree_make_const_byte_span(kBufferContents, sizeof(kBufferContents)),
+      &buffer_view));
 
   // Pass in the tensor as an expanded HAL buffer.
   iree::vm::ref<iree_vm_list_t> inputs;
