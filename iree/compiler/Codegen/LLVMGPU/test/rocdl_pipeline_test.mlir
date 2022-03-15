@@ -67,7 +67,7 @@ hal.executable @dot_dispatch_0 {
         %10 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [1024, 1024], strides = [1, 1]
             : !flow.dispatch.tensor<readonly:1024x1024xf32> -> tensor<1024x1024xf32>
         %15 = linalg.init_tensor [1024, 1024] : tensor<1024x1024xf32>
-        %16 = linalg.fill(%cst, %15) : f32, tensor<1024x1024xf32> -> tensor<1024x1024xf32>
+        %16 = linalg.fill ins(%cst : f32) outs(%15 : tensor<1024x1024xf32>) -> tensor<1024x1024xf32>
         %17 = linalg.matmul ins(%8, %10 : tensor<1024x1024xf32>, tensor<1024x1024xf32>)
             outs(%16 : tensor<1024x1024xf32>) -> tensor<1024x1024xf32>
         flow.dispatch.tensor.store %17, %2, offsets = [0, 0], sizes = [1024, 1024], strides = [1, 1]

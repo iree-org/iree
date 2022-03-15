@@ -20,7 +20,7 @@ func @dot() {
   %10 = affine.apply affine_map<()[s0] -> (s0 * 32)>()[%9]
   %11 = affine.apply affine_map<(d0) -> ((d0 floordiv 32) * 32)>(%8)
   %12 = memref.subview %7[%10, %11] [32, 32] [1, 1] : memref<64x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 512 + s0 + d1)>> to memref<32x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 512 + s0 + d1)>>
-  linalg.fill(%cst, %12) {__internal_linalg_transform__ = "vectorize"} : f32, memref<32x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 512 + s0 + d1)>>
+  linalg.fill {__internal_linalg_transform__ = "vectorize"} ins(%cst : f32) outs(%12 : memref<32x32xf32, affine_map<(d0, d1)[s0] -> (d0 * 512 + s0 + d1)>>)
   scf.for %arg0 = %c0 to %c1024 step %c16 {
     %13 = memref.subview %5[0, %arg0] [64, 16] [1, 1] : memref<64x1024xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>> to memref<64x16xf32, affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>>
     %14 = memref.subview %6[%arg0, 0] [16, 64] [1, 1] : memref<1024x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 512 + s0 + d1)>> to memref<16x64xf32, affine_map<(d0, d1)[s0] -> (d0 * 512 + s0 + d1)>>

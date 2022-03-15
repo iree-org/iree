@@ -60,9 +60,9 @@ func @matmul_reject_gt_8bit(%arg0 : tensor<5x3xf32>, %arg1 : tensor<3x1xf32>, %a
 func @cast_fill(%arg0 : f32, %arg1 : tensor<3xf32>) -> tensor<3xi8> {
   // CHECK: %[[SCALAR:.*]] = arith.fptosi %arg0 : f32 to i8
   // CHECK: %[[INIT:.*]] = arith.fptosi %arg1 : tensor<3xf32> to tensor<3xi8>
-  // CHECK: %[[RESULT:.*]] = linalg.fill(%[[SCALAR]], %[[INIT]]) : i8, tensor<3xi8> -> tensor<3xi8>
+  // CHECK: %[[RESULT:.*]] = linalg.fill ins(%[[SCALAR]] : i8) outs(%[[INIT]] : tensor<3xi8>) -> tensor<3xi8>
   // CHECK: return %[[RESULT]]
-  %0 = linalg.fill(%arg0, %arg1) : f32, tensor<3xf32> -> tensor<3xf32>
+  %0 = linalg.fill ins(%arg0 : f32) outs(%arg1 : tensor<3xf32>) -> tensor<3xf32>
   %1 = arith.fptosi %0 : tensor<3xf32> to tensor<3xi8>
   return %1 : tensor<3xi8>
 }

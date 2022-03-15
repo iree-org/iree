@@ -736,7 +736,7 @@ func @dot_general_lowering() {
       %11 = affine.min affine_map<(d0)[s0] -> (s0, -d0 + 3)>(%arg1)[%workgroup_size_x]
       %12 = flow.dispatch.tensor.load %1, offsets = [%c0, %arg1], sizes = [%c2, %11], strides = [%c1, %c1] : !flow.dispatch.tensor<readonly:2x3xf32> -> tensor<2x?xf32>
       %13 = linalg.init_tensor [%9, %11] : tensor<?x?xf32>
-      %14 = linalg.fill(%cst, %13) : f32, tensor<?x?xf32> -> tensor<?x?xf32>
+      %14 = linalg.fill ins(%cst : f32) outs(%13 : tensor<?x?xf32>) -> tensor<?x?xf32>
       %15 = linalg.matmul {__internal_linalg_transform__ = "workgroup"} ins(%10, %12 : tensor<?x2xf32>, tensor<2x?xf32>) outs(%14 : tensor<?x?xf32>) -> tensor<?x?xf32>
       flow.dispatch.tensor.store %15, %2, offsets = [%arg0, %arg1], sizes = [%9, %11], strides = [%c1, %c1] : tensor<?x?xf32> -> !flow.dispatch.tensor<writeonly:1x3xf32>
     }
@@ -754,7 +754,8 @@ func @dot_general_lowering() {
 //   CHECK-DAG:       %[[LHS_TILE:.+]] = memref.subview %[[RESHAPE_LHS]][%[[IV0]], 0]
 //   CHECK-DAG:       %[[RESULT_TILE:.+]] = memref.subview %[[RETURN]][%[[IV0]], %[[IV1]]]
 //   CHECK-DAG:       %[[RHS_TILE:.+]] = memref.subview %[[RHS]][0, %[[IV1]]]
-//       CHECK:       linalg.fill(%{{.+}}, %[[RESULT_TILE]])
+//       CHECK:       linalg.fill
+//  CHECK-SAME:           outs(%[[RESULT_TILE]] :
 //       CHECK:       linalg.matmul
 //  CHECK-SAME:         ins(%[[LHS_TILE]], %[[RHS_TILE]]
 //  CHECK-SAME:         outs(%[[RESULT_TILE]]
@@ -920,7 +921,7 @@ func @tensor_extract() {
   %2 = linalg.init_tensor [3, 9] : tensor<3x9xi32>
   %3 = flow.dispatch.tensor.load %0, offsets = [], sizes = [], strides = []  : !flow.dispatch.tensor<readonly:i32> -> tensor<i32>
   %4 = tensor.extract %3[] : tensor<i32>
-  %5 = linalg.fill(%4, %2) : i32, tensor<3x9xi32> -> tensor<3x9xi32>
+  %5 = linalg.fill ins(%4 : i32) outs(%2 : tensor<3x9xi32>) -> tensor<3x9xi32>
   flow.dispatch.tensor.store %5, %1, offsets = [0, 0], sizes = [3, 9], strides = [1, 1] : tensor<3x9xi32> -> !flow.dispatch.tensor<writeonly:3x9xi32>
   return
 }
@@ -929,7 +930,9 @@ func @tensor_extract() {
 //   CHECK-DAG:   %[[ARG0:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer)
 //   CHECK-DAG:   %[[RET0:.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer)
 //       CHECK:   %[[LOAD:.+]] = memref.load %[[ARG0]]
-//       CHECK:   linalg.fill(%[[LOAD]], %[[RET0]])
+//       CHECK:   linalg.fill
+//  CHECK-SAME:       ins(%[[LOAD]] :
+//  CHECK-SAME:       outs(%[[RET0]] :
 
 // -----
 
@@ -992,7 +995,7 @@ func @rhs_non_splat_constant() {
       %10 = affine.min affine_map<(d0)[s0] -> (s0, -d0 + 5)>(%arg1)[%workgroup_size_x]
       %11 = tensor.extract_slice %cst[0, %arg1] [3, %10] [1, 1] : tensor<3x5xf32> to tensor<3x?xf32>
       %12 = linalg.init_tensor [%8, %10] : tensor<?x?xf32>
-      %13 = linalg.fill(%cst_0, %12) : f32, tensor<?x?xf32> -> tensor<?x?xf32>
+      %13 = linalg.fill ins(%cst_0 : f32) outs(%12 : tensor<?x?xf32>) -> tensor<?x?xf32>
       %14 = linalg.matmul {__internal_linalg_transform__ = "workgroup"} ins(%9, %11 : tensor<?x3xf32>, tensor<3x?xf32>) outs(%13 : tensor<?x?xf32>) -> tensor<?x?xf32>
       flow.dispatch.tensor.store %14, %1, offsets = [%arg0, %arg1], sizes = [%8, %10], strides = [%c1, %c1] : tensor<?x?xf32> -> !flow.dispatch.tensor<writeonly:5x5xf32>
     }
@@ -1011,7 +1014,8 @@ func @rhs_non_splat_constant() {
 //   CHECK-DAG:       %[[LHS_SUBVIEW:.+]] = memref.subview %[[LHS]][%[[IV0]], 0]
 //   CHECK-DAG:       %[[RHS_SUBVIEW:.+]] = memref.subview %[[RHS]][0, %[[IV1]]]
 //   CHECK-DAG:       %[[RESULT_SUBVIEW:.+]] = memref.subview %[[RETURN]][%[[IV0]], %[[IV1]]]
-//       CHECK:       linalg.fill(%{{.+}}, %[[RESULT_SUBVIEW]])
+//       CHECK:       linalg.fill
+//  CHECK-SAME:           outs(%[[RESULT_SUBVIEW]] :
 //       CHECK:       linalg.matmul
 //  CHECK-SAME:         ins(%[[LHS_SUBVIEW]], %[[RHS_SUBVIEW]]
 //  CHECK-SAME:         outs(%[[RESULT_SUBVIEW]]
@@ -1067,7 +1071,7 @@ func @pooling_nhwc_sum() {
   %5 = tensor.extract %4[] : tensor<f32>
   %6 = flow.dispatch.tensor.load %1, offsets = [0, 0, 0, 0], sizes = [1, 4, 6, 1], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:1x4x6x1xf32> -> tensor<1x4x6x1xf32>
   %7 = linalg.init_tensor [1, 2, 2, 1] : tensor<1x2x2x1xf32>
-  %8 = linalg.fill(%5, %7) : f32, tensor<1x2x2x1xf32> -> tensor<1x2x2x1xf32>
+  %8 = linalg.fill ins(%5 : f32) outs(%7 : tensor<1x2x2x1xf32>) -> tensor<1x2x2x1xf32>
   %9 = linalg.pooling_nhwc_sum {
     dilations = dense<1> : vector<2xi64>,
     strides = dense<[2, 3]> : vector<2xi64>
@@ -1083,7 +1087,9 @@ func @pooling_nhwc_sum() {
 //   CHECK-DAG:   %[[INPUT:.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<1x4x6x1xf32>
 //   CHECK-DAG:   %[[RET0:.+]] = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : memref<1x2x2x1xf32>
 //       CHECK:   %[[INIT_VAL:.+]] = memref.load %[[INIT]][] : memref<f32>
-//       CHECK:   linalg.fill(%[[INIT_VAL]], %[[RET0]]) : f32, memref<1x2x2x1xf32>
+//       CHECK:   linalg.fill
+//  CHECK-SAME:       ins(%[[INIT_VAL]] :
+//  CHECK-SAME:       outs(%[[RET0]] :
 //       CHECK:   linalg.pooling_nhwc_sum
 //  CHECK-SAME:     dilations = dense<1> : vector<2xi64>
 //  CHECK-SAME:     strides = dense<[2, 3]> : vector<2xi64>
@@ -1212,7 +1218,7 @@ func @use_buffer_for_operand_when_output_tensor_not_used() {
 
   %cst = arith.constant 0.0 : f32
   %0 = linalg.init_tensor [1, 112, 112, 32] : tensor<1x112x112x32xf32>
-  %1 = linalg.fill(%cst, %0) : f32, tensor<1x112x112x32xf32> -> tensor<1x112x112x32xf32>
+  %1 = linalg.fill ins(%cst : f32) outs(%0 : tensor<1x112x112x32xf32>) -> tensor<1x112x112x32xf32>
   %2 = linalg.conv_2d_nhwc_hwcf
          {dilations = dense<1> : tensor<2xi64>, strides = dense<2> : tensor<2xi64>}
          ins(%input, %filter : tensor<1x225x225x16xf32>, tensor<3x3x16x32xf32>)
@@ -1238,7 +1244,8 @@ func @use_buffer_for_operand_when_output_tensor_not_used() {
 
 //  CHECK-NOT: memref.alloc
 //      CHECK: %[[OUTPUT:.+]] = hal.interface.binding.subspan set(0) binding(3) type(storage_buffer)
-//      CHECK: linalg.fill(%{{.+}}, %[[OUTPUT]])
+//      CHECK: linalg.fill
+// CHECK-SAME:     outs(%[[OUTPUT]] :
 // CHECK-NEXT: linalg.conv_2d_nhwc_hwcf
 // CHECK-SAME:   outs(%[[OUTPUT]] : memref<1x112x112x32xf32>)
 // CHECK-NEXT: linalg.generic
@@ -1262,13 +1269,13 @@ func @dont_use_buffer_for_operand_when_output_tensor_used() {
   %cst0 = arith.constant 0.0 : f32
   %cst1 = arith.constant 1.0 : f32
   %0 = linalg.init_tensor [1, 112, 112, 32] : tensor<1x112x112x32xf32>
-  %1 = linalg.fill(%cst0, %0) : f32, tensor<1x112x112x32xf32> -> tensor<1x112x112x32xf32>
+  %1 = linalg.fill ins(%cst0 : f32) outs(%0 : tensor<1x112x112x32xf32>) -> tensor<1x112x112x32xf32>
   %2 = linalg.conv_2d_nhwc_hwcf
          {dilations = dense<1> : tensor<2xi64>, strides = dense<2> : tensor<2xi64>}
          ins(%input, %filter : tensor<1x225x225x16xf32>, tensor<3x3x16x32xf32>)
          outs(%1 : tensor<1x112x112x32xf32>)
          -> tensor<1x112x112x32xf32>
-  %3 = linalg.fill(%cst1, %0) : f32, tensor<1x112x112x32xf32> -> tensor<1x112x112x32xf32>
+  %3 = linalg.fill ins(%cst1 : f32) outs(%0 : tensor<1x112x112x32xf32>) -> tensor<1x112x112x32xf32>
   %4 = linalg.generic {
          indexing_maps = [
            affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>,
@@ -1289,10 +1296,12 @@ func @dont_use_buffer_for_operand_when_output_tensor_used() {
 // CHECK-LABEL: func @dont_use_buffer_for_operand_when_output_tensor_used()
 //      CHECK: %[[ALLOC:.+]] = memref.alloc
 //      CHECK: %[[OUTPUT:.+]] = hal.interface.binding.subspan set(0) binding(3) type(storage_buffer)
-//      CHECK: linalg.fill(%{{.+}}, %[[ALLOC]])
+//      CHECK: linalg.fill
+// CHECK-SAME:     outs(%[[ALLOC]] :
 // CHECK-NEXT: linalg.conv_2d_nhwc_hwcf
 // CHECK-SAME:   outs(%[[ALLOC]] : memref<1x112x112x32xf32>)
-// CHECK-NEXT: linalg.fill(%{{.+}}, %[[OUTPUT]])
+// CHECK-NEXT: linalg.fill
+// CHECK-SAME:     outs(%[[OUTPUT]] :
 // CHECK-NEXT: linalg.generic
 // CHECK-SAME:   ins(%[[ALLOC]], %{{.+}} : memref<1x112x112x32xf32>, memref<32xf32>)
 // CHECK-SAME:   outs(%[[OUTPUT]] : memref<1x112x112x32xf32>)
@@ -1365,7 +1374,7 @@ func @cast_follwed_by_store() {
         %7 = flow.dispatch.tensor.load %0, offsets = [%arg0, %arg1, 0], sizes = [%c1, %c32, 1024], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:4x32x1024xf32> -> tensor<?x?x1024xf32>
         %8 = flow.dispatch.tensor.load %1, offsets = [%arg0, 0, %arg2], sizes = [%c1, 1024, %c32], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:4x1024x64xf32> -> tensor<?x1024x?xf32>
         %9 = linalg.init_tensor [1, 32, 32] : tensor<1x32x32xf32>
-        %10 = linalg.fill(%cst, %9) {__internal_linalg_transform__ = "workgroup"} : f32, tensor<1x32x32xf32> -> tensor<1x32x32xf32>
+        %10 = linalg.fill {__internal_linalg_transform__ = "workgroup"} ins(%cst : f32) outs(%9 : tensor<1x32x32xf32>) -> tensor<1x32x32xf32>
         %11 = linalg.batch_matmul {__internal_linalg_transform__ = "workgroup", is_root_op} ins(%7, %8 : tensor<?x?x1024xf32>, tensor<?x1024x?xf32>) outs(%10 : tensor<1x32x32xf32>) -> tensor<1x32x32xf32>
         %12 = tensor.cast %11 : tensor<1x32x32xf32> to tensor<?x?x?xf32>
         flow.dispatch.tensor.store %12, %2, offsets = [%arg0, %arg1, %arg2], sizes = [%c1, %c32, %c32], strides = [1, 1, 1] : tensor<?x?x?xf32> -> !flow.dispatch.tensor<writeonly:4x32x64xf32>
@@ -1383,7 +1392,9 @@ func @cast_follwed_by_store() {
 //       CHECK: %[[LHSV:.+]] = memref.subview %[[LHS]]
 //       CHECK: %[[RHSV:.+]] = memref.subview %[[RHS]]
 //       CHECK: %[[RESULTV:.+]] = memref.subview %[[RESULT]]
-//        CHECK: linalg.fill(%[[ZERO]], %[[RESULTV]])
+//        CHECK: linalg.fill
+//   CHECK-SAME:     ins(%[[ZERO]] :
+//   CHECK-SAME:     outs(%[[RESULTV]] :
 //        CHECK: linalg.batch_matmul {{.*}} ins(%[[LHSV]], %[[RHSV]] : {{.*}}) outs(%[[RESULTV]]
 
 // -----
@@ -1621,7 +1632,7 @@ func @padded_matmul() {
       %7 = flow.dispatch.tensor.load %0, offsets = [%arg0, 0], sizes = [64, 27], strides = [1, 1] : !flow.dispatch.tensor<readonly:12544x27xf32> -> tensor<64x27xf32>
       %8 = flow.dispatch.tensor.load %1, offsets = [0, %arg1], sizes = [27, 16], strides = [1, 1] : !flow.dispatch.tensor<readonly:27x16xf32> -> tensor<27x16xf32>
       %9 = linalg.init_tensor [64, 16] : tensor<64x16xf32>
-      %10 = linalg.fill(%cst, %9) {__internal_linalg_transform__ = "workgroup"} : f32, tensor<64x16xf32> -> tensor<64x16xf32>
+      %10 = linalg.fill  {__internal_linalg_transform__ = "workgroup"} ins(%cst : f32) outs(%9 : tensor<64x16xf32>) -> tensor<64x16xf32>
       %11 = tensor.pad %7 low[0, 0] high[0, 5]  {
       ^bb0(%arg2: index, %arg3: index):  // no predecessors
         tensor.yield %cst : f32
@@ -1639,23 +1650,29 @@ func @padded_matmul() {
 }
 
 // CHECK-LABEL: func @padded_matmul()
-// CHECK-DAG: %[[LHS_PADDED:.+]] = memref.alloc() : memref<64x32xf32>
-// CHECK-DAG: %[[RHS_PADDED:.+]] = memref.alloc() : memref<32x16xf32>
-// CHECK-DAG: %[[C0:.+]] = arith.constant 0.000000e+00 : f32
-// CHECK-DAG: %[[LHS:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<12544x27xf32>
-// CHECK-DAG: %[[RHS:.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<27x16xf32>
-// CHECK-DAG: %[[DST:.+]] = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : memref<12544x16xf32>
-// CHECK-DAG: %[[LHS_V:.+]] = memref.subview %[[LHS]][%{{.*}}, 0] [64, 27] [1, 1]
-// CHECK-DAG: %[[RHS_V:.+]] = memref.subview %[[RHS]][0, %{{.*}}] [27, 16] [1, 1]
-// CHECK-DAG: %[[DST_V:.+]] = memref.subview %[[DST]][%{{.*}}, %{{.*}}] [64, 16] [1, 1]
-//     CHECK: linalg.fill(%[[C0]], %[[DST_V]])
-//     CHECK: linalg.fill(%[[C0]], %[[LHS_PADDED]]) : f32, memref<64x32xf32>
-//     CHECK: %[[LHS_PADDED_INTER:.+]] = memref.subview %[[LHS_PADDED]][0, 0] [64, 27] [1, 1]
-//     CHECK: linalg.generic {{.*}} ins(%[[LHS_V]] {{.*}} outs(%[[LHS_PADDED_INTER]]
-//     CHECK: linalg.fill(%[[C0]], %[[RHS_PADDED]]) : f32, memref<32x16xf32>
-//     CHECK: %[[RHS_PADDED_INTER:.+]] = memref.subview %[[RHS_PADDED]][0, 0] [27, 16] [1, 1]
-//     CHECK: linalg.generic {{.*}} ins(%[[RHS_V]] {{.*}} outs(%[[RHS_PADDED_INTER]]
-//     CHECK: linalg.matmul ins(%[[LHS_PADDED]], %[[RHS_PADDED]] : memref<64x32xf32>, memref<32x16xf32>)
+//   CHECK-DAG: %[[LHS_PADDED:.+]] = memref.alloc() : memref<64x32xf32>
+//   CHECK-DAG: %[[RHS_PADDED:.+]] = memref.alloc() : memref<32x16xf32>
+//   CHECK-DAG: %[[C0:.+]] = arith.constant 0.000000e+00 : f32
+//   CHECK-DAG: %[[LHS:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<12544x27xf32>
+//   CHECK-DAG: %[[RHS:.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<27x16xf32>
+//   CHECK-DAG: %[[DST:.+]] = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : memref<12544x16xf32>
+//   CHECK-DAG: %[[LHS_V:.+]] = memref.subview %[[LHS]][%{{.*}}, 0] [64, 27] [1, 1]
+//   CHECK-DAG: %[[RHS_V:.+]] = memref.subview %[[RHS]][0, %{{.*}}] [27, 16] [1, 1]
+//   CHECK-DAG: %[[DST_V:.+]] = memref.subview %[[DST]][%{{.*}}, %{{.*}}] [64, 16] [1, 1]
+//       CHECK: linalg.fill
+//  CHECK-SAME:     ins(%[[C0]] :
+//  CHECK-SAME:     outs(%[[DST_V]] :
+//       CHECK: linalg.fill
+//  CHECK-SAME:     ins(%[[C0]] :
+//  CHECK-SAME:     outs(%[[LHS_PADDED]] :
+//       CHECK: %[[LHS_PADDED_INTER:.+]] = memref.subview %[[LHS_PADDED]][0, 0] [64, 27] [1, 1]
+//       CHECK: linalg.generic {{.*}} ins(%[[LHS_V]] {{.*}} outs(%[[LHS_PADDED_INTER]]
+//       CHECK: linalg.fill
+//  CHECK-SAME:     ins(%[[C0]] :
+//  CHECK-SAME:     outs(%[[RHS_PADDED]] :
+//       CHECK: %[[RHS_PADDED_INTER:.+]] = memref.subview %[[RHS_PADDED]][0, 0] [27, 16] [1, 1]
+//       CHECK: linalg.generic {{.*}} ins(%[[RHS_V]] {{.*}} outs(%[[RHS_PADDED_INTER]]
+//       CHECK: linalg.matmul ins(%[[LHS_PADDED]], %[[RHS_PADDED]] : memref<64x32xf32>, memref<32x16xf32>)
 
 // -----
 
@@ -1695,7 +1712,7 @@ func @dot_general_padded() {
         tensor.yield %cst : f32
       } : tensor<2x?xf32> to tensor<4x4xf32>
       %15 = linalg.init_tensor [4, 4] : tensor<4x4xf32>
-      %16 = linalg.fill(%cst, %15) : f32, tensor<4x4xf32> -> tensor<4x4xf32>
+      %16 = linalg.fill ins(%cst : f32) outs(%15 : tensor<4x4xf32>) -> tensor<4x4xf32>
       %17 = linalg.matmul {__internal_linalg_transform__ = "workgroup"} ins(%13, %14 : tensor<4x4xf32>, tensor<4x4xf32>) outs(%16 : tensor<4x4xf32>) -> tensor<4x4xf32>
       %18 = tensor.extract_slice %17[0, 0] [%7, %9] [1, 1] : tensor<4x4xf32> to tensor<?x?xf32>
       flow.dispatch.tensor.store %18, %2, offsets = [%arg0, %arg1], sizes = [%11, %12], strides = [1, 1] : tensor<?x?xf32> -> !flow.dispatch.tensor<writeonly:?x?xf32>{%m, %n}
@@ -1720,12 +1737,15 @@ func @dot_general_padded() {
 //   CHECK-DAG:      %[[TILE_N:.+]] = affine.min #[[MAP1]](%[[IV1]])[%[[N]]]
 //   CHECK-DAG:      %[[ARG0_SV:.+]] = memref.subview %[[ARG0]]
 //   CHECK-DAG:      %[[ARG1_SV:.+]] = memref.subview %[[ARG1]]
-//       CHECK:       linalg.fill(%{{.*}}, %[[ALLOC_ARG0]]
+//       CHECK:      linalg.fill
+//  CHECK-SAME:          outs(%[[ALLOC_ARG0]] :
 //       CHECK:      %[[ALLOC_ARG0_SV:.+]] = memref.subview %[[ALLOC_ARG0]]
 //       CHECK:      linalg.generic {{.*}} ins(%[[ARG0_SV]] {{.*}} outs(%[[ALLOC_ARG0_SV]]
-//       CHECK:      linalg.fill(%{{.*}}, %[[ALLOC_ARG1]]
+//       CHECK:      linalg.fill
+//  CHECK-SAME:          outs(%[[ALLOC_ARG1]] :
 //       CHECK:      linalg.generic {{.*}} ins(%[[ARG1_SV]]
-//       CHECK:      linalg.fill(%{{.*}}, %[[ALLOC_RET0]]
+//       CHECK:      linalg.fill
+//  CHECK-SAME:          outs(%[[ALLOC_RET0]] :
 //       CHECK:      linalg.matmul
 //  CHECK-SAME:        ins(%[[ALLOC_ARG0]], %[[ALLOC_ARG1]]
 //  CHECK-SAME:        outs(%[[ALLOC_RET0]]
@@ -1756,8 +1776,8 @@ func @multi_result_reduce() {
     %7 = flow.dispatch.tensor.load %0, offsets = [0, %arg0], sizes = [%d0, %6], strides = [1, 1] : !flow.dispatch.tensor<readonly:?x?xi32>{%d0, %d1} -> tensor<?x?xi32>
     %9 = flow.dispatch.tensor.load %1, offsets = [0, %arg0], sizes = [%d0, %6], strides = [1, 1] : !flow.dispatch.tensor<readonly:?x?xi32>{%d0, %d1} -> tensor<?x?xi32>
     %13 = linalg.init_tensor [%6] : tensor<?xi32>
-    %14 = linalg.fill(%c-2147483648_i32, %13) {__internal_linalg_transform__ = "workgroup", lowering_config = {tileSizes = [[128]]}} : i32, tensor<?xi32> -> tensor<?xi32>
-    %17 = linalg.fill(%c0_i32, %13) {__internal_linalg_transform__ = "workgroup", lowering_config = {tileSizes = [[128]]}} : i32, tensor<?xi32> -> tensor<?xi32>
+    %14 = linalg.fill {__internal_linalg_transform__ = "workgroup", lowering_config = {tileSizes = [[128]]}} ins(%c-2147483648_i32 : i32) outs(%13 : tensor<?xi32>) -> tensor<?xi32>
+    %17 = linalg.fill  {__internal_linalg_transform__ = "workgroup", lowering_config = {tileSizes = [[128]]}} ins(%c0_i32 : i32) outs(%13 : tensor<?xi32>) -> tensor<?xi32>
     %18:2 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d1, d0)>, affine_map<(d0, d1) -> (d1, d0)>, affine_map<(d0, d1) -> (d0)>, affine_map<(d0, d1) -> (d0)>], iterator_types = ["parallel", "reduction"]} ins(%7, %9 : tensor<?x?xi32>, tensor<?x?xi32>) outs(%14, %17 : tensor<?xi32>, tensor<?xi32>) attrs =  {__internal_linalg_transform__ = "workgroup", lowering_config = {tileSizes = [[128]]}} {
     ^bb0(%arg1: i32, %arg2: i32, %arg3: i32, %arg4: i32):  // no predecessors
       %19 = arith.cmpi sge, %arg1, %arg3 : i32
@@ -1784,9 +1804,11 @@ func @multi_result_reduce() {
 //   CHECK-DAG:     %[[ARG0_SV:.+]] = memref.subview %[[ARG0]]
 //   CHECK-DAG:     %[[ARG1_SV:.+]] = memref.subview %[[ARG1]]
 //   CHECK-DAG:     %[[RET0_SV:.+]] = memref.subview %[[RET0]]
-//   CHECK-DAG:     linalg.fill(%{{.*}}, %[[RET0_SV]]
+//   CHECK-DAG:     linalg.fill
+//  CHECK-SAME:         outs(%[[RET0_SV]] :
 //   CHECK-DAG:     %[[RET1_SV:.+]] = memref.subview %[[RET1]]
-//   CHECK-DAG:     linalg.fill(%{{.*}}, %[[RET1_SV]]
+//   CHECK-DAG:     linalg.fill
+//  CHECK-SAME:         outs(%[[RET1_SV]] :
 //       CHECK:     linalg.generic
 //  CHECK-SAME:       ins(%[[ARG0_SV]], %[[ARG1_SV]]
 //  CHECK-SAME:       outs(%[[RET0_SV]], %[[RET1_SV]]
@@ -2020,7 +2042,7 @@ func @l1_tiled_matmul() {
       %9 = affine.min #map2(%arg1)
       %10 = flow.dispatch.tensor.load %1, offsets = [0, %arg1], sizes = [144, %9], strides = [1, 1] : !flow.dispatch.tensor<readonly:144x370xf32> -> tensor<144x?xf32>
       %11 = linalg.init_tensor [%7, %9] : tensor<?x?xf32>
-      %12 = linalg.fill(%cst, %11) {__internal_linalg_transform__ = "workgroup", lowering_config = #config0} : f32, tensor<?x?xf32> -> tensor<?x?xf32>
+      %12 = linalg.fill  {__internal_linalg_transform__ = "workgroup", lowering_config = #config0}  ins(%cst : f32) outs(%11 : tensor<?x?xf32>) -> tensor<?x?xf32>
       %13 = scf.for %arg2 = %c0 to %c250 step %c32 iter_args(%arg3 = %12) -> (tensor<?x?xf32>) {
         %14 = scf.for %arg4 = %c0 to %c370 step %c32 iter_args(%arg5 = %arg3) -> (tensor<?x?xf32>) {
           %15 = scf.for %arg6 = %c0 to %c144 step %c24 iter_args(%arg7 = %arg5) -> (tensor<?x?xf32>) {
@@ -2309,7 +2331,7 @@ func @multi_level_tile_fuse() {
       %13 = flow.dispatch.tensor.load %0, offsets = [%arg0, 0], sizes = [%9, %k], strides = [1, 1] : !flow.dispatch.tensor<readonly:?x?xf32>{%m, %k} -> tensor<?x?xf32>
       %15 = flow.dispatch.tensor.load %1, offsets = [0, %arg1], sizes = [%k, %10], strides = [1, 1] : !flow.dispatch.tensor<readonly:?x?xf32>{%k, %n} -> tensor<?x?xf32>
       %16 = linalg.init_tensor [%9, %10] : tensor<?x?xf32>
-      %17 = linalg.fill(%cst, %16) {__internal_linalg_transform__ = "workgroup"} : f32, tensor<?x?xf32> -> tensor<?x?xf32>
+      %17 = linalg.fill  {__internal_linalg_transform__ = "workgroup"} ins(%cst : f32) outs(%16 : tensor<?x?xf32>) -> tensor<?x?xf32>
       %18 = scf.for %arg2 = %c0 to %9 step %c4 iter_args(%arg3 = %17) -> (tensor<?x?xf32>) {
         %20 = scf.for %arg4 = %c0 to %10 step %c4 iter_args(%arg5 = %arg3) -> (tensor<?x?xf32>) {
           %21 = affine.min affine_map<(d0, d1) -> (4, d0 - d1)>(%9, %arg2)
@@ -2360,7 +2382,8 @@ func @multi_level_tile_fuse() {
 //   CHECK-DAG:       %[[LHS_SUBVIEW1:.+]] = memref.subview %[[LHS]]
 //   CHECK-DAG:       %[[RHS_SUBVIEW1:.+]] = memref.subview %[[RHS]]
 //   CHECK-DAG:       %[[OUT_SUBVIEW1:.+]] = memref.subview %[[OUT]]
-//       CHECK:       linalg.fill(%{{.+}}, %[[OUT_SUBVIEW1]])
+//       CHECK:       linalg.fill
+//  CHECK-SAME:           outs(%[[OUT_SUBVIEW1]] :
 //       CHECK:       scf.for
 //       CHECK:         scf.for
 //       CHECK:           %[[OUT_SUBVIEW2:.+]] = memref.subview %[[OUT_SUBVIEW1]]
@@ -2410,7 +2433,7 @@ func @operand_fusion() {
       %14 = affine.min affine_map<(d0) -> (-d0 + 1, 4)>(%arg1)
       %15 = flow.dispatch.tensor.load %1, offsets = [0, %arg1], sizes = [3, %14], strides = [1, 1] : !flow.dispatch.tensor<readonly:?x?xf32>{%k, %n} -> tensor<?x?xf32>
       %16 = linalg.init_tensor [%12, %14] : tensor<?x?xf32>
-      %17 = linalg.fill(%cst, %16) {__internal_linalg_transform__ = "workgroup"} : f32, tensor<?x?xf32> -> tensor<?x?xf32>
+      %17 = linalg.fill  {__internal_linalg_transform__ = "workgroup"} ins(%cst : f32) outs(%16 : tensor<?x?xf32>) -> tensor<?x?xf32>
       %18 = linalg.matmul {__internal_linalg_transform__ = "workgroup"}
           ins(%13, %15 : tensor<?x?xf32>, tensor<?x?xf32>)
           outs(%17: tensor<?x?xf32>) -> tensor<?x?xf32>
@@ -2438,7 +2461,8 @@ func @operand_fusion() {
 //   CHECK-DAG:       %[[LHS_SUBVIEW1:.+]] = memref.subview %[[LHS]]
 //   CHECK-DAG:       %[[RHS_SUBVIEW1:.+]] = memref.subview %[[RHS]]
 //   CHECK-DAG:       %[[OUT_SUBVIEW1:.+]] = memref.subview %[[OUT]]
-//       CHECK:       linalg.fill(%{{.+}}, %[[OUT_SUBVIEW1]])
+//       CHECK:       linalg.fill
+//  CHECK-SAME:           outs(%[[OUT_SUBVIEW1]] :
 //       CHECK:       linalg.matmul
 //  CHECK-SAME:           ins(%[[LHS_SUBVIEW1]], %[[RHS_SUBVIEW1]] :
 //  CHECK-SAME:           outs(%[[OUT_SUBVIEW1]] :
@@ -2486,7 +2510,7 @@ func @two_level_tile_and_fuse() {
           %ts_2_m = affine.min #map_min(%iv2)[%c16, %ts_m]
           %ts_2_n = affine.min #map_min(%iv3)[%c8, %ts_n]
           %tile_init_2 = linalg.init_tensor [%ts_2_m, %ts_2_n] : tensor<?x?xf32>
-          %fill_tile_2 = linalg.fill(%cst, %tile_init_2) : f32, tensor<?x?xf32> -> tensor<?x?xf32>
+          %fill_tile_2 = linalg.fill ins(%cst : f32) outs(%tile_init_2 : tensor<?x?xf32>) -> tensor<?x?xf32>
           %lhs_tile_2 = tensor.extract_slice %lhs_tile[%iv2, 0] [%ts_2_m, %k] [1, 1] : tensor<?x?xf32> to tensor<?x?xf32>
           %rhs_tile_2 = tensor.extract_slice %rhs_tile[0, %iv3] [%k, %ts_2_n] [1, 1] : tensor<?x?xf32> to tensor<?x?xf32>
           %matmul_tile_2 = linalg.matmul
@@ -2528,7 +2552,8 @@ func @two_level_tile_and_fuse() {
 //       CHECK:       scf.for %[[IV2:[a-zA-Z0-9]+]] =
 //       CHECK:         scf.for %[[IV3:[a-zA-Z0-9]+]] =
 //       CHECK:           %[[RESULT_TILE_2:.+]] = memref.subview %[[RESULT_TILE]][%[[IV2]], %[[IV3]]]
-//       CHECK:           linalg.fill(%{{.+}}, %[[RESULT_TILE_2]])
+//       CHECK:           linalg.fill
+//  CHECK-SAME:               outs(%[[RESULT_TILE_2]] :
 //   CHECK-DAG:           %[[LHS_TILE_2:.+]] = memref.subview %[[LHS_TILE]][%[[IV2]], 0]
 //   CHECK-DAG:           %[[RHS_TILE_2:.+]] = memref.subview %[[RHS_TILE]][0, %[[IV3]]]
 //       CHECK:           linalg.matmul

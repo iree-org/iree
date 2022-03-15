@@ -225,7 +225,7 @@ func @fill_op() {
   %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<writeonly:?xi8>{%d}
   %1 = linalg.init_tensor [%d] : tensor<?xi1>
   %false = arith.constant false
-  %2 = linalg.fill(%false, %1) : i1, tensor<?xi1> -> tensor<?xi1>
+  %2 = linalg.fill ins(%false : i1) outs(%1 : tensor<?xi1>) -> tensor<?xi1>
   %3 = arith.extui %2 : tensor<?xi1> to tensor<?xi8>
   flow.dispatch.tensor.store %3, %0, offsets=[0], sizes=[%d], strides=[1] : tensor<?xi8> -> !flow.dispatch.tensor<writeonly:?xi8>{%d}
   return
@@ -235,5 +235,7 @@ func @fill_op() {
 //   CHECK-DAG:   %[[INIT:.+]] = linalg.init_tensor
 //   CHECK-DAG:   %[[FALSE:.+]] = arith.constant false
 //   CHECK-DAG:   %[[EXT_SCALAR:.+]] = arith.extui %[[FALSE]]
-//       CHECK:   %[[FILL:.+]] = linalg.fill(%[[EXT_SCALAR]], %[[INIT]])
+//       CHECK:   %[[FILL:.+]] = linalg.fill
+//  CHECK-SAME:       ins(%[[EXT_SCALAR]] :
+//  CHECK-SAME:       outs(%[[INIT]] :
 //       CHECK:   flow.dispatch.tensor.store %[[FILL]], %[[OUT]]

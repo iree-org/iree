@@ -51,7 +51,7 @@ hal.executable private @fused_fill_batch_matmul {
               %15 = affine.min affine_map<(d0)[s0] -> (-d0 + 1024, s0)>(%arg1)[%workgroup_size_y]
               %16 = affine.min affine_map<(d0)[s0] -> (-d0 + 1024, s0)>(%arg2)[%workgroup_size_x]
               %17 = linalg.init_tensor [%14, %15, %16] : tensor<?x?x?xf32>
-              %18 = linalg.fill(%cst, %17) : f32, tensor<?x?x?xf32> -> tensor<?x?x?xf32>
+              %18 = linalg.fill ins(%cst : f32) outs(%17 : tensor<?x?x?xf32>) -> tensor<?x?x?xf32>
               %19 = linalg.batch_matmul {lowering_config = #config} ins(%11, %13 : tensor<?x?x1024xf32>, tensor<?x1024x?xf32>) outs(%18 : tensor<?x?x?xf32>) -> tensor<?x?x?xf32>
               flow.dispatch.tensor.store %19, %2, offsets = [%arg0, %arg1, %arg2], sizes = [%9, %10, %12], strides = [1, 1, 1] : tensor<?x?x?xf32> -> !flow.dispatch.tensor<writeonly:4x1024x1024xf32>
             }
