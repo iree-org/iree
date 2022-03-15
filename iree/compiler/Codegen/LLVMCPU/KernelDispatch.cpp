@@ -409,10 +409,18 @@ static LogicalResult setRootConfig(
     FuncOp entryPointFn, linalg::ContractionOpInterface contractionOp,
     ArrayRef<LoopTilingAndDistributionInfo> tiledLoops) {
   auto linalgOp = cast<linalg::LinalgOp>(contractionOp.getOperation());
+  // Consider all element types and use the smallest vector size. The tiling
+  // sizes are chosen based on the vector size.
   auto lhsShapedType = contractionOp.lhs().getType().cast<ShapedType>();
+  auto rhsShapedType = contractionOp.rhs().getType().cast<ShapedType>();
+  auto resShapedType =
+      linalgOp.getOutputOperand(0)->get().getType().cast<ShapedType>();
+  int64_t vectorSize = getVectorSize(entryPointFn, lhsShapedType);
+  vectorSize = std::min(vectorSize, getVectorSize(entryPointFn, rhsShapedType));
+  vectorSize = std::min(vectorSize, getVectorSize(entryPointFn, resShapedType));
+
   // Use the default distribution for the matmul loops.
   unsigned numLoops = linalgOp.getNumLoops();
-  int64_t vectorSize = getVectorSize(entryPointFn, lhsShapedType);
   SmallVector<int64_t> minTileSizes(numLoops, vectorSize);
   SmallVector<int64_t> maxTileSizes(numLoops, defaultWorkgroupTileSize);
   if (numLoops > 3) {
