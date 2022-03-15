@@ -13,3 +13,4 @@ build --nocheck_visibility
 
 # Flags specific for working around tensorflow warnings.
 build:generic_clang --copt=-Wno-inconsistent-missing-override --host_copt=-Wno-inconsistent-missing-override
+build:generic_clang --copt=-Wno-c++11-narrowing --host_copt=-Wno-c++11-narrowing
