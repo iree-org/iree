@@ -52,8 +52,10 @@ echo "------------------"
 # Respect the user setting, but default to as many jobs as we have cores.
 export CTEST_PARALLEL_LEVEL=${CTEST_PARALLEL_LEVEL:-$(nproc)}
 
-# Respect the user setting, but default to turning on vulkan and llvmaot.
-export IREE_VULKAN_DISABLE=${IREE_VULKAN_DISABLE:-0}
+# Respect the user setting, but default to turning off the vulkan tests
+# and turning on the llvmaot ones.
+# TODO(#5716): Fix and enable Vulkan tests.
+export IREE_VULKAN_DISABLE=${IREE_VULKAN_DISABLE:-1}
 export IREE_LLVMAOT_DISABLE=${IREE_LLVMAOT_DISABLE:-0}
 # CUDA is off by default.
 export IREE_CUDA_DISABLE=${IREE_CUDA_DISABLE:-1}
@@ -103,11 +105,7 @@ label_exclude_regex="($(IFS="|" ; echo "${label_exclude_args[*]?}"))"
 # These tests currently have asan failures
 # TODO(#5715): Fix these
 declare -a excluded_tests=(
-  # Mysterious "LeakSanitizer has encountered a fatal error." crashes
   "iree/samples/simple_embedding/simple_embedding_vulkan_test"
-  "iree/tools/test/iree-benchmark-module.mlir.test"
-  "iree/tools/test/iree-run-module.mlir.test"
-  "iree/tools/test/multiple_exported_functions.mlir.test"
 )
 
 # Prefix with `^` anchor
@@ -122,5 +120,5 @@ cd ${CMAKE_BUILD_DIR?}
 
 echo "Testing with ctest"
 ctest --timeout 900 --output-on-failure \
-  --label-exclude "${label_exclude_regex}" \
+  --label-exclude "^driver=cuda$|^driver=vulkan$" \
   --exclude-regex "${excluded_tests_regex?}"

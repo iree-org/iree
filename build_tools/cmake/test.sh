@@ -18,7 +18,8 @@ fi
 # Respect the user setting, but default to as many jobs as we have cores.
 export CTEST_PARALLEL_LEVEL=${CTEST_PARALLEL_LEVEL:-$(nproc)}
 
-# Respect the user setting, but default to turning on vulkan and llvmaot.
+# Respect the user setting, but default to turning off the vulkan tests
+# and turning on the llvmaot ones.
 export IREE_VULKAN_DISABLE=${IREE_VULKAN_DISABLE:-0}
 export IREE_LLVMAOT_DISABLE=${IREE_LLVMAOT_DISABLE:-0}
 # CUDA is off by default.
