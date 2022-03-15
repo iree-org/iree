@@ -615,17 +615,19 @@ LogicalResult initSPIRVLaunchConfig(ModuleOp module) {
       rootOperation = computeOp;
     }
 
-    // If there are still no root op, check for any linalg.generic op.
-    Operation *computeOp = computeOps.back();
-    if (failed(setDefaultOpConfig(limits, computeOp))) return failure();
+    if (!rootOperation) {
+      // If there are still no root op, check for any linalg.generic op.
+      Operation *computeOp = computeOps.back();
+      if (failed(setDefaultOpConfig(limits, computeOp))) return failure();
 
-    // Check if the op configuration was set.
-    if (!getLoweringConfig(computeOp)) {
-      return computeOp->emitOpError(
-          "without known roots, the last compute operation in the tiled "
-          "loop body is expected to be set as root");
+      // Check if the op configuration was set.
+      if (!getLoweringConfig(computeOp)) {
+        return computeOp->emitOpError(
+            "without known roots, the last compute operation in the tiled "
+            "loop body is expected to be set as root");
+      }
+      rootOperation = computeOp;
     }
-    rootOperation = computeOp;
 
     // Propogate the `lowering_config` attribute to the other ops.
     // TODO(ravishankarm, antiagainst): This is a very specific use (and
