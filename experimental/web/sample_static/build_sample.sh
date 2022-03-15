@@ -24,7 +24,7 @@ set -e
 if ! command -v emcmake &> /dev/null
 then
   echo "'emcmake' not found, setup environment according to https://emscripten.org/docs/getting_started/downloads.html"
-  exit
+  exit 1
 fi
 
 CMAKE_BIN=${CMAKE_BIN:-$(which cmake)}
