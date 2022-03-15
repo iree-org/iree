@@ -13,7 +13,7 @@
 # Looks at environment variables and uses CI-friendly defaults if they are not
 # set.
 # IREE_LLVMAOT_DISABLE: Do not run tests that require LLVM-AOT. Default: 0
-# IREE_VULKAN_DISABLE: Do not run tests that require Vulkan. Default: 1
+# IREE_VULKAN_DISABLE: Do not run tests that require Vulkan. Default: 0
 # BUILD_TAG_FILTERS: Passed to bazel to filter targets to build.
 #   See https://docs.bazel.build/versions/master/command-line-reference.html#flag--build_tag_filters)
 #   Default: "-nokokoro"
