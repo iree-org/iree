@@ -24,8 +24,11 @@ iree_status_t counter_get_value(iree_runtime_session_t* session,
         iree_runtime_call_outputs_pop_front_buffer_view(&call, &buffer_view);
   }
   if (iree_status_is_ok(status)) {
-    status = iree_hal_buffer_read_data(iree_hal_buffer_view_buffer(buffer_view),
-                                       0, out_value, sizeof(*out_value));
+    status = iree_hal_device_transfer_d2h(
+        iree_runtime_session_device(session),
+        iree_hal_buffer_view_buffer(buffer_view), 0, out_value,
+        sizeof(*out_value), IREE_HAL_TRANSFER_BUFFER_FLAG_DEFAULT,
+        iree_infinite_timeout());
   }
   iree_hal_buffer_view_release(buffer_view);
 

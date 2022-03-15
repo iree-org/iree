@@ -67,10 +67,11 @@ class command_buffer_test : public CtsTestBase {
 
     // Read data for returning.
     std::vector<uint8_t> actual_data(buffer_size);
-    IREE_CHECK_OK(
-        iree_hal_buffer_read_data(device_buffer, /*source_offset=*/0,
-                                  /*target_buffer=*/actual_data.data(),
-                                  /*data_length=*/buffer_size));
+    IREE_CHECK_OK(iree_hal_device_transfer_d2h(
+        device_, device_buffer, /*source_offset=*/0,
+        /*target_buffer=*/actual_data.data(),
+        /*data_length=*/buffer_size, IREE_HAL_TRANSFER_BUFFER_FLAG_DEFAULT,
+        iree_infinite_timeout()));
 
     // Cleanup and return.
     iree_hal_command_buffer_release(command_buffer);
@@ -168,10 +169,11 @@ TEST_P(command_buffer_test, CopyWholeBuffer) {
 
   // Read the device buffer and compare.
   std::vector<uint8_t> actual_data(kDefaultAllocationSize);
-  IREE_ASSERT_OK(
-      iree_hal_buffer_read_data(device_buffer, /*source_offset=*/0,
-                                /*target_buffer=*/actual_data.data(),
-                                /*data_length=*/kDefaultAllocationSize));
+  IREE_ASSERT_OK(iree_hal_device_transfer_d2h(
+      device_, device_buffer, /*source_offset=*/0,
+      /*target_buffer=*/actual_data.data(),
+      /*data_length=*/kDefaultAllocationSize,
+      IREE_HAL_TRANSFER_BUFFER_FLAG_DEFAULT, iree_infinite_timeout()));
   EXPECT_THAT(actual_data, ContainerEq(reference_buffer));
 
   // Must release the command buffer before resources used by it.
@@ -237,10 +239,11 @@ TEST_P(command_buffer_test, CopySubBuffer) {
 
   // Read the device buffer and compare.
   std::vector<uint8_t> actual_data(kDefaultAllocationSize);
-  IREE_ASSERT_OK(
-      iree_hal_buffer_read_data(device_buffer, /*source_offset=*/0,
-                                /*target_buffer=*/actual_data.data(),
-                                /*data_length=*/kDefaultAllocationSize));
+  IREE_ASSERT_OK(iree_hal_device_transfer_d2h(
+      device_, device_buffer, /*source_offset=*/0,
+      /*target_buffer=*/actual_data.data(),
+      /*data_length=*/kDefaultAllocationSize,
+      IREE_HAL_TRANSFER_BUFFER_FLAG_DEFAULT, iree_infinite_timeout()));
   EXPECT_THAT(actual_data, ContainerEq(reference_buffer));
 
   // Must release the command buffer before resources used by it.
@@ -445,9 +448,10 @@ TEST_P(command_buffer_test, UpdateBufferWholeBuffer) {
 
   // Check that the contents match what we expect.
   std::vector<uint8_t> actual_data(target_buffer_size);
-  IREE_CHECK_OK(iree_hal_buffer_read_data(device_buffer, /*source_offset=*/0,
-                                          actual_data.data(),
-                                          actual_data.size()));
+  IREE_CHECK_OK(iree_hal_device_transfer_d2h(
+      device_, device_buffer, /*source_offset=*/0, actual_data.data(),
+      actual_data.size(), IREE_HAL_TRANSFER_BUFFER_FLAG_DEFAULT,
+      iree_infinite_timeout()));
   EXPECT_THAT(actual_data, ContainerEq(source_buffer));
 
   iree_hal_command_buffer_release(command_buffer);
@@ -481,9 +485,10 @@ TEST_P(command_buffer_test, UpdateBufferWithOffsets) {
 
   // Check that the contents match what we expect.
   std::vector<uint8_t> actual_data(target_buffer_size);
-  IREE_CHECK_OK(iree_hal_buffer_read_data(device_buffer, /*source_offset=*/0,
-                                          actual_data.data(),
-                                          actual_data.size()));
+  IREE_CHECK_OK(iree_hal_device_transfer_d2h(
+      device_, device_buffer, /*source_offset=*/0, actual_data.data(),
+      actual_data.size(), IREE_HAL_TRANSFER_BUFFER_FLAG_DEFAULT,
+      iree_infinite_timeout()));
   std::vector<uint8_t> reference_buffer{0x00, 0x00, 0x00, 0x00,  //
                                         0x05, 0x06, 0x07, 0x08,  //
                                         0xA1, 0xA2, 0xA3, 0xA4,  //
@@ -527,9 +532,10 @@ TEST_P(command_buffer_test, UpdateBufferSubspan) {
 
   // Check that the contents match what we expect.
   std::vector<uint8_t> actual_data(target_buffer_size);
-  IREE_ASSERT_OK(iree_hal_buffer_read_data(device_buffer, /*source_offset=*/0,
-                                           actual_data.data(),
-                                           actual_data.size()));
+  IREE_ASSERT_OK(iree_hal_device_transfer_d2h(
+      device_, device_buffer, /*source_offset=*/0, actual_data.data(),
+      actual_data.size(), IREE_HAL_TRANSFER_BUFFER_FLAG_DEFAULT,
+      iree_infinite_timeout()));
   std::vector<uint8_t> reference_buffer{0x00, 0x00, 0x00, 0x00,  //
                                         0x00, 0x00, 0x00, 0x00,  //
                                         0x05, 0x06, 0x07, 0x08,  //
@@ -537,9 +543,10 @@ TEST_P(command_buffer_test, UpdateBufferSubspan) {
   EXPECT_THAT(actual_data, ContainerEq(reference_buffer));
   // Also check the subspan.
   std::vector<uint8_t> actual_data_subspan(subspan_length);
-  IREE_ASSERT_OK(iree_hal_buffer_read_data(buffer_subspan, /*source_offset=*/0,
-                                           actual_data_subspan.data(),
-                                           actual_data_subspan.size()));
+  IREE_ASSERT_OK(iree_hal_device_transfer_d2h(
+      device_, buffer_subspan, /*source_offset=*/0, actual_data_subspan.data(),
+      actual_data_subspan.size(), IREE_HAL_TRANSFER_BUFFER_FLAG_DEFAULT,
+      iree_infinite_timeout()));
   std::vector<uint8_t> reference_buffer_subspan{0x00, 0x00, 0x00, 0x00,  //
                                                 0x05, 0x06, 0x07, 0x08};
   EXPECT_THAT(actual_data_subspan, ContainerEq(reference_buffer_subspan));

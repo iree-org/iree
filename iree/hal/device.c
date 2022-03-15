@@ -110,6 +110,39 @@ IREE_API_EXPORT iree_status_t iree_hal_device_transfer_range(
   return status;
 }
 
+IREE_API_EXPORT iree_status_t iree_hal_device_transfer_h2d(
+    iree_hal_device_t* device, const void* source, iree_hal_buffer_t* target,
+    iree_device_size_t target_offset, iree_device_size_t data_length,
+    iree_hal_transfer_buffer_flags_t flags, iree_timeout_t timeout) {
+  return iree_hal_device_transfer_range(
+      device,
+      iree_hal_make_host_transfer_buffer_span((void*)source, data_length), 0,
+      iree_hal_make_device_transfer_buffer(target), target_offset, data_length,
+      flags, timeout);
+}
+
+IREE_API_EXPORT iree_status_t iree_hal_device_transfer_d2h(
+    iree_hal_device_t* device, iree_hal_buffer_t* source,
+    iree_device_size_t source_offset, void* target,
+    iree_device_size_t data_length, iree_hal_transfer_buffer_flags_t flags,
+    iree_timeout_t timeout) {
+  return iree_hal_device_transfer_range(
+      device, iree_hal_make_device_transfer_buffer(source), source_offset,
+      iree_hal_make_host_transfer_buffer_span(target, data_length), 0,
+      data_length, flags, timeout);
+}
+
+IREE_API_EXPORT iree_status_t iree_hal_device_transfer_d2d(
+    iree_hal_device_t* device, iree_hal_buffer_t* source,
+    iree_device_size_t source_offset, iree_hal_buffer_t* target,
+    iree_device_size_t target_offset, iree_device_size_t data_length,
+    iree_hal_transfer_buffer_flags_t flags, iree_timeout_t timeout) {
+  return iree_hal_device_transfer_range(
+      device, iree_hal_make_device_transfer_buffer(source), source_offset,
+      iree_hal_make_device_transfer_buffer(target), target_offset, data_length,
+      flags, timeout);
+}
+
 IREE_API_EXPORT iree_status_t iree_hal_device_transfer_and_wait(
     iree_hal_device_t* device, iree_hal_semaphore_t* wait_semaphore,
     uint64_t wait_value, iree_host_size_t transfer_count,

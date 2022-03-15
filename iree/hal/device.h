@@ -230,6 +230,29 @@ IREE_API_EXPORT iree_status_t iree_hal_device_transfer_range(
     iree_device_size_t target_offset, iree_device_size_t data_length,
     iree_hal_transfer_buffer_flags_t flags, iree_timeout_t timeout);
 
+// Synchronously copies data from host |source| into device |target|.
+// Convience wrapper around iree_hal_device_transfer_range.
+IREE_API_EXPORT iree_status_t iree_hal_device_transfer_h2d(
+    iree_hal_device_t* device, const void* source, iree_hal_buffer_t* target,
+    iree_device_size_t target_offset, iree_device_size_t data_length,
+    iree_hal_transfer_buffer_flags_t flags, iree_timeout_t timeout);
+
+// Synchronously copies data from device |source| into host |target|.
+// Convience wrapper around iree_hal_device_transfer_range.
+IREE_API_EXPORT iree_status_t iree_hal_device_transfer_d2h(
+    iree_hal_device_t* device, iree_hal_buffer_t* source,
+    iree_device_size_t source_offset, void* target,
+    iree_device_size_t data_length, iree_hal_transfer_buffer_flags_t flags,
+    iree_timeout_t timeout);
+
+// Synchronously copies data from device |source| into device |target|.
+// Convience wrapper around iree_hal_device_transfer_range.
+IREE_API_EXPORT iree_status_t iree_hal_device_transfer_d2d(
+    iree_hal_device_t* device, iree_hal_buffer_t* source,
+    iree_device_size_t source_offset, iree_hal_buffer_t* target,
+    iree_device_size_t target_offset, iree_device_size_t data_length,
+    iree_hal_transfer_buffer_flags_t flags, iree_timeout_t timeout);
+
 // Synchronously executes one or more transfer operations against a queue.
 // All buffers must be compatible with |device| and ranges must not overlap
 // (same as with memcpy).

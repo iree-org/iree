@@ -132,10 +132,12 @@ TEST_P(command_buffer_dispatch_test, DispatchAbs) {
   IREE_ASSERT_OK(SubmitCommandBufferAndWait(IREE_HAL_COMMAND_CATEGORY_DISPATCH,
                                             command_buffer));
 
-  float out_value = 0.0f;
-  IREE_ASSERT_OK(iree_hal_buffer_read_data(output_buffer, /*source_offset=*/0,
-                                           &out_value, sizeof(out_value)));
-  EXPECT_EQ(2.5f, out_value);
+  float output_value = 0.0f;
+  IREE_ASSERT_OK(iree_hal_device_transfer_d2h(
+      device_, output_buffer,
+      /*source_offset=*/0, &output_value, sizeof(output_value),
+      IREE_HAL_TRANSFER_BUFFER_FLAG_DEFAULT, iree_infinite_timeout()));
+  EXPECT_EQ(2.5f, output_value);
 
   iree_hal_command_buffer_release(command_buffer);
   iree_hal_buffer_release(output_buffer);
