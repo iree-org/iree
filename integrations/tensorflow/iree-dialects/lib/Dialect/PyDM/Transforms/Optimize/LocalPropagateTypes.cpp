@@ -187,7 +187,7 @@ struct LocalPropagateTypesPass
   // cache, it is possible to refinements that include type cycles in the CFG.
   void permuteRefinedBlocks(PermutedTypePropagator &propagator) {
     SmallVector<Block *> blocks;
-    for (auto &block : getOperation().body()) {
+    for (auto &block : getOperation().getBodyRegion()) {
       blocks.push_back(&block);
     }
 
