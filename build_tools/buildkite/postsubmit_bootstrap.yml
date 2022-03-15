@@ -1,0 +1,17 @@
+# Copyright 2022 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+# Note that this file is *not* proccessed with "upload-pipeline" because then we
+# have infinite regress. For now, this is checked in here and then copy-pasted
+# into the Buildkite UI. Automatic updates to follow.
+
+steps:
+  - label: ":pipeline: Uploading postsubmit pipeline"
+    agents:
+      queue: "orchestration"
+      security: "submitted"
+    commands: |
+      buildkite-agent pipeline upload build_tools/buildkite/postsubmit.yml
