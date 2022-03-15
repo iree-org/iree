@@ -77,7 +77,7 @@ cmake_dependent_option(IREE_ENABLE_EMITC "Enables MLIR EmitC dependencies." ON $
 
 option(IREE_HAL_DRIVER_DEFAULTS "Sets the default value for all runtime HAL drivers" ON)
 # CUDA support must be explicitly enabled.
-set(IREE_HAL_DRIVER_CUDA_DEFAULT OFF)
+option(IREE_HAL_DRIVER_CUDA_DEFAULT OFF)
 
 # Vulkan is not natively supported on Apple platforms.
 # Metal should generally be used instead, though MoltenVK may also work.
