@@ -38,7 +38,8 @@ class command_buffer_test : public CtsTestBase {
     IREE_CHECK_OK(iree_hal_allocator_allocate_buffer(
         iree_hal_device_allocator(device_), params, buffer_size,
         iree_const_byte_span_empty(), &device_buffer));
-    IREE_ASSERT_OK(iree_hal_buffer_zero(device_buffer, 0, IREE_WHOLE_BUFFER));
+    IREE_ASSERT_OK(
+        iree_hal_buffer_map_zero(device_buffer, 0, IREE_WHOLE_BUFFER));
     *out_buffer = device_buffer;
   }
 

@@ -503,17 +503,17 @@ iree_hal_buffer_usage_t iree_hal_buffer_allowed_usage(
 // Transfer
 //===----------------------------------------------------------------------===//
 
-IREE_API_EXPORT iree_status_t
-iree_hal_buffer_zero(iree_hal_buffer_t* buffer, iree_device_size_t byte_offset,
-                     iree_device_size_t byte_length) {
+IREE_API_EXPORT iree_status_t iree_hal_buffer_map_zero(
+    iree_hal_buffer_t* buffer, iree_device_size_t byte_offset,
+    iree_device_size_t byte_length) {
   const uint8_t zero = 0;
-  return iree_hal_buffer_fill(buffer, byte_offset, byte_length, &zero, 1);
+  return iree_hal_buffer_map_fill(buffer, byte_offset, byte_length, &zero, 1);
 }
 
-IREE_API_EXPORT iree_status_t
-iree_hal_buffer_fill(iree_hal_buffer_t* buffer, iree_device_size_t byte_offset,
-                     iree_device_size_t byte_length, const void* pattern,
-                     iree_host_size_t pattern_length) {
+IREE_API_EXPORT iree_status_t iree_hal_buffer_map_fill(
+    iree_hal_buffer_t* buffer, iree_device_size_t byte_offset,
+    iree_device_size_t byte_length, const void* pattern,
+    iree_host_size_t pattern_length) {
   IREE_ASSERT_ARGUMENT(buffer);
   IREE_ASSERT_ARGUMENT(pattern);
 
@@ -600,7 +600,7 @@ iree_hal_buffer_fill(iree_hal_buffer_t* buffer, iree_device_size_t byte_offset,
   return status;
 }
 
-IREE_API_EXPORT iree_status_t iree_hal_buffer_read_data(
+IREE_API_EXPORT iree_status_t iree_hal_buffer_map_read(
     iree_hal_buffer_t* source_buffer, iree_device_size_t source_offset,
     void* target_buffer, iree_device_size_t data_length) {
   if (data_length == 0) {
@@ -624,7 +624,7 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_read_data(
   return iree_ok_status();
 }
 
-IREE_API_EXPORT iree_status_t iree_hal_buffer_write_data(
+IREE_API_EXPORT iree_status_t iree_hal_buffer_map_write(
     iree_hal_buffer_t* target_buffer, iree_device_size_t target_offset,
     const void* source_buffer, iree_device_size_t data_length) {
   if (data_length == 0) {
@@ -655,7 +655,7 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_write_data(
   return status;
 }
 
-IREE_API_EXPORT iree_status_t iree_hal_buffer_copy_data(
+IREE_API_EXPORT iree_status_t iree_hal_buffer_map_copy(
     iree_hal_buffer_t* source_buffer, iree_device_size_t source_offset,
     iree_hal_buffer_t* target_buffer, iree_device_size_t target_offset,
     iree_device_size_t data_length) {

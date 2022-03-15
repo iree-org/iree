@@ -123,8 +123,8 @@ IREE_API_EXPORT iree_status_t iree_hal_device_submit_transfer_range_and_wait(
 
   // Read back the staging buffer into memory, if needed.
   if (iree_status_is_ok(status) && !target.device_buffer) {
-    status = iree_hal_buffer_read_data(target_buffer, 0,
-                                       target.host_buffer.data, data_length);
+    status = iree_hal_buffer_map_read(target_buffer, 0, target.host_buffer.data,
+                                      data_length);
   }
 
   // Discard staging buffers, if they were required.

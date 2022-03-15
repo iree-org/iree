@@ -246,10 +246,10 @@ TFL_CAPI_EXPORT extern TfLiteStatus TfLiteTensorCopyFromBuffer(
   IREE_TRACE_ZONE_BEGIN(z0);
   IREE_TRACE_ZONE_APPEND_VALUE(z0, tensor->buffer_mapping.contents.data_length);
 
-  // NOTE: we could use a iree_hal_buffer_write_data here but we already have
-  // the buffer mapped. If we knew the user would never use TfLiteTensorData and
-  // could avoid mapping the buffer it would be more efficient and portable to
-  // do the iree_hal_buffer_copy_data.
+  // NOTE: we could use a iree_hal_buffer_map_write here but we already
+  // have the buffer mapped. If we knew the user would never use
+  // TfLiteTensorData and could avoid mapping the buffer it would be more
+  // efficient and portable to do the iree_hal_buffer_map_copy.
   memcpy(tensor->buffer_mapping.contents.data, input_data, input_data_size);
 
   IREE_TRACE_ZONE_END(z0);
@@ -266,7 +266,7 @@ TFL_CAPI_EXPORT extern TfLiteStatus TfLiteTensorCopyToBuffer(
   IREE_TRACE_ZONE_APPEND_VALUE(
       z0, output_tensor->buffer_mapping.contents.data_length);
 
-  // NOTE: as with above we should use an iree_hal_buffer_read_data here.
+  // NOTE: as with above we should use an iree_hal_buffer_map_read here.
   memcpy(output_data, output_tensor->buffer_mapping.contents.data,
          output_data_size);
 

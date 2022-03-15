@@ -516,7 +516,7 @@ static iree_status_t iree_hal_cmd_fill_tile(
       iree_min(length_per_slice, remaining_length);
   IREE_TRACE_ZONE_APPEND_VALUE(z0, (uint64_t)slice_length);
 
-  iree_status_t status = iree_hal_buffer_fill(
+  iree_status_t status = iree_hal_buffer_map_fill(
       cmd->target_buffer, cmd->target_offset + slice_offset, slice_length,
       cmd->pattern, cmd->pattern_length);
 
@@ -581,7 +581,7 @@ static iree_status_t iree_hal_cmd_update_buffer(
   const iree_hal_cmd_update_buffer_t* cmd =
       (const iree_hal_cmd_update_buffer_t*)user_context;
   IREE_TRACE_ZONE_BEGIN(z0);
-  iree_status_t status = iree_hal_buffer_write_data(
+  iree_status_t status = iree_hal_buffer_map_write(
       cmd->target_buffer, cmd->target_offset, cmd->source_buffer, cmd->length);
   IREE_TRACE_ZONE_END(z0);
   return status;
@@ -655,7 +655,7 @@ static iree_status_t iree_hal_cmd_copy_tile(
       iree_min(length_per_slice, remaining_length);
   IREE_TRACE_ZONE_APPEND_VALUE(z0, (uint64_t)slice_length);
 
-  iree_status_t status = iree_hal_buffer_copy_data(
+  iree_status_t status = iree_hal_buffer_map_copy(
       cmd->source_buffer, cmd->source_offset + slice_offset, cmd->target_buffer,
       cmd->target_offset + slice_offset, slice_length);
 

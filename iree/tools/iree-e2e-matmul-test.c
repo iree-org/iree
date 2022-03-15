@@ -492,8 +492,8 @@ static iree_status_t allocate_buffer_like(iree_hal_allocator_t* hal_allocator,
 static iree_status_t copy_buffer(iree_hal_allocator_t* hal_allocator,
                                  iree_hal_buffer_view_t* src,
                                  iree_hal_buffer_view_t** dst) {
-  // TODO(benvanik): change this to use iree_hal_buffer_copy_data. Or something.
-  // I can't understand what all this code is doing.
+  // TODO(benvanik): change this to use iree_hal_buffer_map_copy. Or
+  // something. I can't understand what all this code is doing.
   iree_hal_buffer_mapping_t src_mapping = {{0}};
   IREE_RETURN_IF_ERROR(iree_hal_buffer_map_range(
       iree_hal_buffer_view_buffer(src), IREE_HAL_MAPPING_MODE_PERSISTENT,

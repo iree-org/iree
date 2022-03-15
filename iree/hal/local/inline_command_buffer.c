@@ -278,8 +278,8 @@ static iree_status_t iree_hal_inline_command_buffer_fill_buffer(
     iree_hal_buffer_t* target_buffer, iree_device_size_t target_offset,
     iree_device_size_t length, const void* pattern,
     iree_host_size_t pattern_length) {
-  return iree_hal_buffer_fill(target_buffer, target_offset, length, pattern,
-                              pattern_length);
+  return iree_hal_buffer_map_fill(target_buffer, target_offset, length, pattern,
+                                  pattern_length);
 }
 
 //===----------------------------------------------------------------------===//
@@ -290,7 +290,7 @@ static iree_status_t iree_hal_inline_command_buffer_update_buffer(
     iree_hal_command_buffer_t* base_command_buffer, const void* source_buffer,
     iree_host_size_t source_offset, iree_hal_buffer_t* target_buffer,
     iree_device_size_t target_offset, iree_device_size_t length) {
-  return iree_hal_buffer_write_data(
+  return iree_hal_buffer_map_write(
       target_buffer, target_offset,
       (const uint8_t*)source_buffer + source_offset, length);
 }
@@ -304,8 +304,8 @@ static iree_status_t iree_hal_inline_command_buffer_copy_buffer(
     iree_hal_buffer_t* source_buffer, iree_device_size_t source_offset,
     iree_hal_buffer_t* target_buffer, iree_device_size_t target_offset,
     iree_device_size_t length) {
-  return iree_hal_buffer_copy_data(source_buffer, source_offset, target_buffer,
-                                   target_offset, length);
+  return iree_hal_buffer_map_copy(source_buffer, source_offset, target_buffer,
+                                  target_offset, length);
 }
 
 //===----------------------------------------------------------------------===//

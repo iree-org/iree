@@ -386,9 +386,9 @@ iree_hal_buffer_usage_t iree_hal_buffer_allowed_usage(
 // queues; using this synchronous function may incur additional cache flushes
 // and synchronous blocking behavior and is not supported on all buffer types.
 // See iree_hal_command_buffer_fill_buffer.
-IREE_API_EXPORT iree_status_t
-iree_hal_buffer_zero(iree_hal_buffer_t* buffer, iree_device_size_t byte_offset,
-                     iree_device_size_t byte_length);
+IREE_API_EXPORT iree_status_t iree_hal_buffer_map_zero(
+    iree_hal_buffer_t* buffer, iree_device_size_t byte_offset,
+    iree_device_size_t byte_length);
 
 // Sets a range of the buffer to the given value.
 // Only |pattern_length| values with 1, 2, or 4 bytes are supported.
@@ -400,10 +400,10 @@ iree_hal_buffer_zero(iree_hal_buffer_t* buffer, iree_device_size_t byte_offset,
 // queues; using this synchronous function may incur additional cache flushes
 // and synchronous blocking behavior and is not supported on all buffer types.
 // See iree_hal_command_buffer_fill_buffer.
-IREE_API_EXPORT iree_status_t
-iree_hal_buffer_fill(iree_hal_buffer_t* buffer, iree_device_size_t byte_offset,
-                     iree_device_size_t byte_length, const void* pattern,
-                     iree_host_size_t pattern_length);
+IREE_API_EXPORT iree_status_t iree_hal_buffer_map_fill(
+    iree_hal_buffer_t* buffer, iree_device_size_t byte_offset,
+    iree_device_size_t byte_length, const void* pattern,
+    iree_host_size_t pattern_length);
 
 // Reads a block of data from the buffer at the given offset.
 //
@@ -413,7 +413,7 @@ iree_hal_buffer_fill(iree_hal_buffer_t* buffer, iree_device_size_t byte_offset,
 // queues; using this synchronous function may incur additional cache flushes
 // and synchronous blocking behavior and is not supported on all buffer types.
 // See iree_hal_command_buffer_copy_buffer.
-IREE_API_EXPORT iree_status_t iree_hal_buffer_read_data(
+IREE_API_EXPORT iree_status_t iree_hal_buffer_map_read(
     iree_hal_buffer_t* source_buffer, iree_device_size_t source_offset,
     void* target_buffer, iree_device_size_t data_length);
 
@@ -427,7 +427,7 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_read_data(
 // and synchronous blocking behavior and is not supported on all buffer types.
 // See iree_hal_command_buffer_update_buffer and
 // iree_hal_command_buffer_copy_buffer.
-IREE_API_EXPORT iree_status_t iree_hal_buffer_write_data(
+IREE_API_EXPORT iree_status_t iree_hal_buffer_map_write(
     iree_hal_buffer_t* target_buffer, iree_device_size_t target_offset,
     const void* source_buffer, iree_device_size_t data_length);
 
@@ -441,7 +441,7 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_write_data(
 // queues; using this synchronous function may incur additional cache flushes
 // and synchronous blocking behavior and is not supported on all buffer types.
 // See iree_hal_command_buffer_copy_buffer.
-IREE_API_EXPORT iree_status_t iree_hal_buffer_copy_data(
+IREE_API_EXPORT iree_status_t iree_hal_buffer_map_copy(
     iree_hal_buffer_t* source_buffer, iree_device_size_t source_offset,
     iree_hal_buffer_t* target_buffer, iree_device_size_t target_offset,
     iree_device_size_t data_length);
