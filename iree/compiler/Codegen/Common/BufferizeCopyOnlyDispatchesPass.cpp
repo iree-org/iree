@@ -47,7 +47,7 @@ static OpFoldResult getOpFoldResult(OpBuilder &builder, Location loc,
                                     AffineExpr expr,
                                     SmallVector<Value> &symbols) {
   AffineMap m = AffineMap::get(0, symbols.size(), expr);
-  return builder.create<AffineApplyOp>(loc, m, symbols).getResult();
+  return applyMapToValues(builder, loc, m, symbols)[0];
 }
 
 /// Methods to build the Affine Expr for arithmetic operations.

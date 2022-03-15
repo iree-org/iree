@@ -130,50 +130,6 @@ hal.executable @reduction_dispatch {
     #hal.descriptor_set.binding<1, storage_buffer>
   ]>
 ]>
-hal.executable @tensor_insert_slice {
-  hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
-    hal.executable.entry_point @tensor_insert_slice layout(#executable_layout)
-    builtin.module {
-      func.func @tensor_insert_slice() {
-        %c0 = arith.constant 0 : index
-        %size_y = hal.interface.constant.load[0] : index
-        %size_x = hal.interface.constant.load[1] : index
-        %dest_size_y = hal.interface.constant.load[2] : index
-        %dest_size_x = hal.interface.constant.load[3] : index
-        %offset_y = hal.interface.constant.load[4] : index
-        %offset_x = hal.interface.constant.load[5] : index
-        %source_binding = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer)
-            : !flow.dispatch.tensor<readonly:?x?xi32>{%size_y, %size_x}
-        %dest_binding = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer)
-            : !flow.dispatch.tensor<readwrite:?x?xi32>{%dest_size_y, %dest_size_x}
-        %source = flow.dispatch.tensor.load %source_binding, offsets = [0, 0], sizes = [%size_y, %size_x], strides = [1, 1]
-            : !flow.dispatch.tensor<readonly:?x?xi32>{%size_y, %size_x} -> tensor<?x?xi32>
-        %dest = flow.dispatch.tensor.load %dest_binding, offsets = [0, 0], sizes = [%dest_size_y, %dest_size_x], strides = [1, 1]
-            : !flow.dispatch.tensor<readwrite:?x?xi32>{%dest_size_y, %dest_size_x} -> tensor<?x?xi32>
-        %result = tensor.insert_slice %source into %dest[%offset_y, %offset_x] [%size_y, %size_x] [1, 1]
-            : tensor<?x?xi32> into tensor<?x?xi32>
-        flow.dispatch.tensor.store %result, %dest_binding, offsets = [0, 0], sizes = [%dest_size_y, %dest_size_x], strides = [1, 1]
-            : tensor<?x?xi32> -> !flow.dispatch.tensor<readwrite:?x?xi32>{%dest_size_y, %dest_size_x}
-        return
-      }
-    }
-  }
-}
-//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 64]{{\]}}>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<LLVMGPUVectorize>
-//      CHECK: hal.executable.entry_point public @tensor_insert_slice
-// CHECK-SAME:     translation_info = #[[TRANSLATION]]
-//      CHECK: tensor.insert_slice
-// CHECK-SAME:     lowering_config = #[[CONFIG]]
-
-// -----
-
-#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
-  #hal.descriptor_set.layout<0, bindings = [
-    #hal.descriptor_set.binding<0, storage_buffer>,
-    #hal.descriptor_set.binding<1, storage_buffer>
-  ]>
-]>
 hal.executable @copy_as_generic {
   hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
     hal.executable.entry_point @copy_as_generic layout(#executable_layout)

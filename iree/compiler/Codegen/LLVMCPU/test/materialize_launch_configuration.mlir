@@ -282,13 +282,13 @@ hal.executable @copy_op {
         %source = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<?x?xi32>{%d0, %d1}
         %dest = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<?x?xi32>{%d2, %d3}
         %dest_view = memref.subview %dest[%o0, %o1] [%d0, %d1] [1, 1] : memref<?x?xi32> to memref<?x?xi32, offset : ?, strides : [?, ?]>
-              linalg.generic {
-                  indexing_maps = [affine_map<(d0, d1) -> (d0, d1)> , affine_map<(d0, d1) -> (d0, d1)>],
-                  iterator_types = ["parallel", "parallel"]}
-                  ins(%source : memref<?x?xi32>) outs(%dest_view : memref<?x?xi32, offset : ?, strides : [?, ?]>) {
-                ^bb0(%arg0 : i32, %arg1 : i32):
-                  linalg.yield %arg0 : i32
-                }
+        linalg.generic {
+            indexing_maps = [affine_map<(d0, d1) -> (d0, d1)> , affine_map<(d0, d1) -> (d0, d1)>],
+            iterator_types = ["parallel", "parallel"]}
+            ins(%source : memref<?x?xi32>) outs(%dest_view : memref<?x?xi32, offset : ?, strides : [?, ?]>) {
+          ^bb0(%arg0 : i32, %arg1 : i32):
+            linalg.yield %arg0 : i32
+          }
         return
       }
     }
@@ -296,7 +296,7 @@ hal.executable @copy_op {
 }
 
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[64, 64], [1, 4], [0, 0]{{\]}}>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUBufferOpsTileAndVectorize>
 //      CHECK: hal.executable.entry_point public @copy_op
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK:   linalg.generic
