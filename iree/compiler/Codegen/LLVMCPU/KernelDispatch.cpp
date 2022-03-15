@@ -628,9 +628,13 @@ static LogicalResult setRootConfig(
   tileSizes.push_back(parallelTileSizes);
   tileSizes.push_back(reductionTileSizes);
 
-  return setOpConfigAndEntryPointFnTranslation(
-      entryPointFn, genericOp, tileSizes,
-      DispatchLoweringPassPipeline::CPUDoubleTilingExpert);
+  // For non-tensor based ops use the Buffer ops pipeline.
+  auto passPipeline =
+      genericOp.hasTensorSemantics()
+          ? DispatchLoweringPassPipeline::CPUDoubleTilingExpert
+          : DispatchLoweringPassPipeline::CPUBufferOpsTileAndVectorize;
+  return setOpConfigAndEntryPointFnTranslation(entryPointFn, genericOp,
+                                               tileSizes, passPipeline);
 }
 
 /// Sets the lowering configuration for linalg.conv_2d_nhwc_hwcf and
