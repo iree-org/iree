@@ -79,71 +79,6 @@ static Value getF32Const(ImplicitLocOpBuilder b, ArrayRef<int64_t> shapes,
       .getResult();
 }
 
-class ExtractConvOpPaddingAttributes : public OpRewritePattern<mhlo::ConvOp> {
- public:
-  using OpRewritePattern<mhlo::ConvOp>::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(mhlo::ConvOp op,
-                                PatternRewriter &rewriter) const override {
-    if (!hasPadding(op)) return failure();
-    auto inputType = op.lhs().getType().cast<ShapedType>();
-    int rank = inputType.getRank();
-
-    // TODO(suderman): Add proper support for padding + dilation for codegen.
-    // We can't extract padding if the left hand side has dilation.
-    if (op.lhs_dilation().hasValue()) {
-      for (auto val : op.lhs_dilation().getValue().getValues<APInt>()) {
-        if (val != 1) {
-          return failure();
-        }
-      }
-    }
-
-    SmallVector<int64_t, 4> paddingLow, paddingHigh, interiorPadding, shape;
-    paddingLow.append(rank, 0);
-    paddingHigh.append(rank, 0);
-    interiorPadding.append(rank, 0);
-    for (auto iter :
-         llvm::enumerate(op.dimension_numbers().getInputSpatialDimensions())) {
-      unsigned idx = iter.index();
-      unsigned dim = iter.value();
-      paddingLow[dim] = op.paddingAttr().getValues<int64_t>()[{idx, 0}];
-      paddingHigh[dim] = op.paddingAttr().getValues<int64_t>()[{idx, 1}];
-    }
-    for (unsigned i = 0; i < rank; ++i) {
-      // mhlo.pad doesn't support dynamic shape.
-      if (inputType.isDynamicDim(i)) return failure();
-      int size = inputType.getShape()[i];
-      shape.push_back(size + paddingLow[i] + paddingHigh[i]);
-    }
-
-    auto toDenseAttr = [&rewriter](ArrayRef<int64_t> elements) {
-      return DenseIntElementsAttr::get(
-          RankedTensorType::get(elements.size(), rewriter.getIntegerType(64)),
-          elements);
-    };
-
-    auto loc = op.getLoc();
-    auto padResultType =
-        RankedTensorType::get(shape, inputType.getElementType());
-    Attribute zeroAttr = rewriter.getZeroAttr(
-        RankedTensorType::get({}, inputType.getElementType()));
-    auto zero = rewriter.create<arith::ConstantOp>(loc, zeroAttr);
-    auto padOp = rewriter.create<mhlo::PadOp>(
-        loc, padResultType, op.lhs(), zero, toDenseAttr(paddingLow),
-        toDenseAttr(paddingHigh), toDenseAttr(interiorPadding));
-    auto resultType = op.getResult().getType();
-    auto newOp = rewriter.create<mhlo::ConvOp>(
-        op.getLoc(), resultType, padOp.getResult(), op.rhs(),
-        op.window_stridesAttr(), /*padding=*/nullptr, op.lhs_dilationAttr(),
-        op.rhs_dilationAttr(), /*window_reversal=*/nullptr,
-        op.dimension_numbersAttr(), op.feature_group_countAttr(),
-        op.batch_group_countAttr(), op.precision_configAttr());
-    rewriter.replaceOp(op, newOp.getResult());
-    return success();
-  }
-};
-
 // Guarantee that the input dimensions are ordered batch, spatial_dims, feature
 // dim.
 class ReorderConvOpInputDimensions : public OpRewritePattern<mhlo::ConvOp> {
@@ -987,9 +922,6 @@ struct MHLOToMHLOPreprocessingPass
         ReorderBroadcastInDimOpAndElementwiseOp<mhlo::AndOp>,
         ReorderBroadcastInDimOpAndElementwiseOp<mhlo::OrOp>,
         ReorderBroadcastInDimOpAndElementwiseOp<mhlo::XorOp>>(context);
-    if (extractPadFromConv) {
-      patterns.insert<ExtractConvOpPaddingAttributes>(context);
-    }
     if (orderConvFeatures) {
       patterns.insert<ReorderConvOpInputDimensions>(context);
       patterns.insert<ReorderConvOpKernelDimensions>(context);
