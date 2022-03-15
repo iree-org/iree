@@ -97,6 +97,22 @@ EXPLICIT_TARGET_MAPPING = {
         "MhloDialect",
         "MLIRMhloUtils",
     ],
+    "@mlir-hlo//:hlo_legalize_shape_ops_to_standard": [
+        "tensorflow::external_mhlo_includes",
+        "MhloShapeOpsToStandard",
+    ],
+    "@mlir-hlo//:hlo_legalize_to_arithmetic": [
+        "tensorflow::external_mhlo_includes",
+        "MhloToArithmeticConversion",
+    ],
+    "@mlir-hlo//:hlo_legalize_to_lhlo": [
+        "tensorflow::external_mhlo_includes",
+        "MhloToLhloConversion",
+    ],
+    "@mlir-hlo//:hlo_legalize_to_memref": [
+        "tensorflow::external_mhlo_includes",
+        "MhloToMemrefConversion",
+    ],
     "@mlir-hlo//:legalize_control_flow": [
         "tensorflow::external_mhlo_includes",
         "MhloToStandard",
