@@ -561,7 +561,7 @@ LogicalResult createTensorEquivalenceClasses(func::FuncOp funcOp,
             })
         .Case<vector::TransferWriteOp>(
             [&](vector::TransferWriteOp transferWriteOp) {
-              if (!transferWriteOp.result().getType().isa<RankedTensorType>()) {
+              if (!transferWriteOp.source().getType().isa<RankedTensorType>()) {
                 return success();
               }
               return analyseDestructiveUpdateOp(transferWriteOp, nullptr,

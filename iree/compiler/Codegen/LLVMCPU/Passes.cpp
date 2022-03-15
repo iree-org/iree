@@ -198,6 +198,36 @@ void addSingleTilingExpertPassPipeline(OpPassManager &passManager) {
   }
 }
 
+void addCPUBufferOpsTileAndVectorizePipeline(OpPassManager &passManager) {
+  // Do first level of tiling and distribution.
+  passManager.addNestedPass<FuncOp>(createTileAndDistributeToWorkgroupsPass());
+  passManager.addPass(createCanonicalizerPass());
+  passManager.addPass(createCSEPass());
+
+  // Add the sandbox single tiling expert to tile and vectorize.
+  {
+    LinalgSingleTilingExpertPassOptions options;
+    options.vectorize = true;
+    options.vectorizePadding = true;
+    options.tilingLevel = static_cast<int64_t>(TilingLevel::L1Tiles);
+    passManager.addNestedPass<FuncOp>(
+        createLinalgSingleTilingExpertPass(options));
+    passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
+    passManager.addNestedPass<FuncOp>(createCSEPass());
+  }
+
+  // Run IREE specific passes before vector lowering expert.
+  passManager.addNestedPass<FuncOp>(createRemoveSingleIterationLoopPass());
+
+  // Add the vector lowering expert.
+  {
+    OpPassManager &nestedFuncPassManager = passManager.nest<FuncOp>();
+    LinalgVectorLoweringPassOptions options;
+    options.splitVectorTransfersTo = "linalg-copy";
+    addLowerToVectorTransforms(nestedFuncPassManager, options);
+  }
+}
+
 void addDoubleTilingExpertPassPipeline(OpPassManager &passManager) {
   // Do first level of tiling and distribution.
   passManager.addNestedPass<FuncOp>(createInsertDistributionInfoPass());

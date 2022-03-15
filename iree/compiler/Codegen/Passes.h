@@ -232,6 +232,11 @@ void populateUnfusedFMAOpsPassPatterns(MLIRContext *context,
 /// to memrefs
 void addCPUDefaultPassPipeline(OpPassManager &passManager);
 
+/// Populates the passes to lower linalg ops on buffers. Currenly this pipeline
+/// is only used for dispatches that just copy data from input interfaces to
+/// output interface.
+void addCPUBufferOpsTileAndVectorizePipeline(OpPassManager &passManager);
+
 /// Populates the passes needed to multi level tile and lowering of linalg ops
 /// on tensors to vectors operations.
 LogicalResult verifyTensorToVectorsPassPipelineConfig(
