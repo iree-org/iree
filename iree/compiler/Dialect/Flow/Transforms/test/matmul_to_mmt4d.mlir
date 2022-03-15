@@ -71,7 +71,7 @@ func @check_mmt4d_f32_static_nopad(%arg0: tensor<24x8xf32>, %arg1: tensor<8x32xf
 func @check_mmt4d_with_init_tensor_and_fill(%arg0: tensor<24x8xf32>, %arg1: tensor<8x32xf32>) -> tensor<24x32xf32> {
     %c0 = arith.constant 0.0 : f32
     %0 = linalg.init_tensor [24, 32] : tensor<24x32xf32>
-    %1 = linalg.fill(%c0, %0) : f32, tensor<24x32xf32> -> tensor<24x32xf32>
+    %1 = linalg.fill ins(%c0 : f32) outs(%0 : tensor<24x32xf32>) -> tensor<24x32xf32>
     %2 = linalg.matmul ins(%arg0, %arg1 : tensor<24x8xf32>, tensor<8x32xf32>) outs(%1 : tensor<24x32xf32>) -> tensor<24x32xf32>
     return %2 : tensor<24x32xf32>
 }
@@ -85,7 +85,8 @@ func @check_mmt4d_with_init_tensor_and_fill(%arg0: tensor<24x8xf32>, %arg1: tens
 //      CHECK: %[[RHS4D:.+]] = tensor.expand_shape %[[RHS]]
 // CHECK-SAME:   tensor<8x32xf32> into tensor<4x2x8x4xf32>
 //      CHECK: %[[DST_INIT:.+]] = linalg.init_tensor [3, 8, 8, 4] : tensor<3x8x8x4xf32>
-//      CHECK: [[DST:.+]] linalg.fill(%[[ZERO:.+]], %[[DST_INIT]])
+//      CHECK: [[DST:.+]] linalg.fill
+// CHECK-SAME:   outs(%[[DST_INIT]] :
 
 // -----
 func @check_mmt4d_i8_static_pad(%arg0: tensor<3x5xi8>, %arg1: tensor<5x2xi8>, %arg2: tensor<3x2xi32>) -> tensor<3x2xi32> {

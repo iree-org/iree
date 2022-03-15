@@ -7,7 +7,7 @@ func @matmul_bias_add(%arg0 : tensor<?x?xf32>, %arg1 : tensor<?x?xf32>, %arg2 : 
   %d0 = tensor.dim %arg0, %c0 : tensor<?x?xf32>
   %d1 = tensor.dim %arg1, %c1 : tensor<?x?xf32>
   %init = linalg.init_tensor [%d0, %d1] : tensor<?x?xf32>
-  %0 = linalg.fill(%cst, %init) : f32, tensor<?x?xf32> -> tensor<?x?xf32>
+  %0 = linalg.fill ins(%cst : f32) outs(%init : tensor<?x?xf32>) -> tensor<?x?xf32>
   %1 = linalg.matmul {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[10, 20, 30]]>}
       ins(%arg0, %arg1 : tensor<?x?xf32>, tensor<?x?xf32>)
       outs(%0 : tensor<?x?xf32>) -> tensor<?x?xf32>
@@ -40,7 +40,7 @@ func @matmul_bias_add_static(%arg0 : tensor<20x60xf32>, %arg1 : tensor<60x120xf3
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %init = linalg.init_tensor [20, 120] : tensor<20x120xf32>
-  %0 = linalg.fill(%cst, %init) : f32, tensor<20x120xf32> -> tensor<20x120xf32>
+  %0 = linalg.fill ins(%cst : f32) outs(%init : tensor<20x120xf32>) -> tensor<20x120xf32>
   %1 = linalg.matmul {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[10, 20, 30]]>}
       ins(%arg0, %arg1 : tensor<20x60xf32>, tensor<60x120xf32>)
       outs(%0 : tensor<20x120xf32>) -> tensor<20x120xf32>

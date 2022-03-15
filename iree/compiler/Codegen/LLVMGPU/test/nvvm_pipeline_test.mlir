@@ -68,7 +68,7 @@ hal.executable @dot_dispatch_0 {
         %10 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [1024, 1024], strides = [1, 1]
             : !flow.dispatch.tensor<readonly:1024x1024xf32> -> tensor<1024x1024xf32>
         %15 = linalg.init_tensor [1024, 1024] : tensor<1024x1024xf32>
-        %16 = linalg.fill(%cst, %15) : f32, tensor<1024x1024xf32> -> tensor<1024x1024xf32>
+        %16 = linalg.fill ins(%cst : f32) outs(%15 : tensor<1024x1024xf32>) -> tensor<1024x1024xf32>
         %17 = linalg.matmul ins(%8, %10 : tensor<1024x1024xf32>, tensor<1024x1024xf32>)
             outs(%16 : tensor<1024x1024xf32>) -> tensor<1024x1024xf32>
         flow.dispatch.tensor.store %17, %2, offsets = [0, 0], sizes = [1024, 1024], strides = [1, 1]
@@ -135,7 +135,7 @@ hal.executable @dot_dispatch_0 {
         %10 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [1024, 1024], strides = [1, 1]
             : !flow.dispatch.tensor<readonly:1024x1024xf32> -> tensor<1024x1024xf32>
         %15 = linalg.init_tensor [1024, 1024] : tensor<1024x1024xf32>
-        %16 = linalg.fill(%cst, %15) : f32, tensor<1024x1024xf32> -> tensor<1024x1024xf32>
+        %16 = linalg.fill ins(%cst : f32) outs(%15 : tensor<1024x1024xf32>) -> tensor<1024x1024xf32>
         %17 = linalg.generic #matmul_trait 
             ins(%8, %10 : tensor<1024x1024xf32>, tensor<1024x1024xf32>) outs(%16 : tensor<1024x1024xf32>)  {
           ^bb(%a: f32, %b: f32, %c: f32) :
@@ -185,7 +185,7 @@ hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
       %13 = flow.dispatch.tensor.load %1, offsets = [0, 0, 0, 0], sizes = [3, 2, 2, 1], strides = [1, 1, 1, 1]
           : !flow.dispatch.tensor<readonly:3x2x2x1xf32> -> tensor<3x2x2x1xf32>
       %20 = linalg.init_tensor [1, 2, 3, 1] : tensor<1x2x3x1xf32>
-      %21 = linalg.fill(%cst, %20) : f32, tensor<1x2x3x1xf32> -> tensor<1x2x3x1xf32>
+      %21 = linalg.fill ins(%cst : f32) outs(%20 : tensor<1x2x3x1xf32>) -> tensor<1x2x3x1xf32>
       %22 = linalg.conv_2d_nhwc_hwcf {dilations = dense<1> : tensor<2xi64>, strides = dense<1> : tensor<2xi64>}
           ins(%11, %13 : tensor<1x4x4x2xf32>, tensor<3x2x2x1xf32>) outs(%21 : tensor<1x2x3x1xf32>) -> tensor<1x2x3x1xf32>
       flow.dispatch.tensor.store %22, %2, offsets = [0, 0, 0, 0], sizes = [1, 2, 3, 1], strides = [1, 1, 1, 1]
@@ -260,7 +260,7 @@ hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
       %5 = flow.dispatch.tensor.load %0, offsets = [0, 0, 0], sizes = [14, 14, 96], strides = [1, 1, 1]
           : !flow.dispatch.tensor<readonly:14x14x96xf32> -> tensor<14x14x96xf32>
       %8 = linalg.init_tensor [96] : tensor<96xf32>
-      %9 = linalg.fill(%cst, %8) : f32, tensor<96xf32> -> tensor<96xf32>
+      %9 = linalg.fill ins(%cst : f32) outs(%8 : tensor<96xf32>) -> tensor<96xf32>
       %10 = linalg.generic {
             indexing_maps = [affine_map<(d0, d1, d2) -> (d1, d2, d0)>, affine_map<(d0, d1, d2) -> (d0)>],
             iterator_types = ["parallel", "reduction", "reduction"]}
@@ -352,7 +352,7 @@ hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
       %5 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [512, 16384], strides = [1, 1]
           : !flow.dispatch.tensor<readonly:512x16384xf32> -> tensor<512x16384xf32>
       %8 = linalg.init_tensor [16384] : tensor<16384xf32>
-      %9 = linalg.fill(%cst, %8) : f32, tensor<16384xf32> -> tensor<16384xf32>
+      %9 = linalg.fill ins(%cst : f32) outs(%8 : tensor<16384xf32>) -> tensor<16384xf32>
       %10 = linalg.generic {
           indexing_maps = [#map3, #map4], iterator_types = ["parallel", "reduction"]}
           ins(%5 : tensor<512x16384xf32>) outs(%9 : tensor<16384xf32>) {
@@ -402,7 +402,7 @@ hal.executable @mma_fused {
       %d = flow.dispatch.tensor.load %di, offsets = [0, 0], sizes = [2048, 512], strides = [1, 1]
           : !flow.dispatch.tensor<readonly:2048x512xf32> -> tensor<2048x512xf32>             
       %init = linalg.init_tensor [2048, 512] : tensor<2048x512xf32>
-      %f = linalg.fill(%cst, %init) : f32, tensor<2048x512xf32> -> tensor<2048x512xf32>
+      %f = linalg.fill ins(%cst : f32) outs(%init : tensor<2048x512xf32>) -> tensor<2048x512xf32>
       %m = linalg.matmul ins(%3, %4 : tensor<2048x1024xf32>, tensor<1024x512xf32>) outs(%f : tensor<2048x512xf32>) -> tensor<2048x512xf32>
       %init2 = linalg.init_tensor [2048, 512] : tensor<2048x512xf32>
       %a = linalg.generic {
@@ -511,7 +511,7 @@ hal.executable @mma_fused {
           %13 = flow.dispatch.tensor.load %1, offsets = [0, 0, 0], sizes = [4, 1024, 64], strides = [1, 1, 1]
               : !flow.dispatch.tensor<readonly:4x1024x64xf32> -> tensor<4x1024x64xf32>
           %17 = linalg.init_tensor [4, 32, 64] : tensor<4x32x64xf32>
-          %18 = linalg.fill(%cst, %17) : f32, tensor<4x32x64xf32> -> tensor<4x32x64xf32>
+          %18 = linalg.fill ins(%cst : f32) outs(%17 : tensor<4x32x64xf32>) -> tensor<4x32x64xf32>
           %19 = linalg.batch_matmul ins(%11, %13 : tensor<4x32x1024xf32>, tensor<4x1024x64xf32>)
               outs(%18 : tensor<4x32x64xf32>) -> tensor<4x32x64xf32>
           flow.dispatch.tensor.store %19, %2, offsets = [0, 0, 0], sizes = [4, 32, 64], strides = [1, 1, 1]

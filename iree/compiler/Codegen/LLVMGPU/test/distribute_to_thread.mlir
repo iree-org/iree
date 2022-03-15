@@ -47,8 +47,7 @@ hal.executable private @dot_dispatch_0  {
                 : memref<1024x1024xf32> to memref<1024x256xf32, #map4>
             %11 = memref.subview %2[%arg0, %arg1] [2, 256] [1, 1]
                 : memref<1024x1024xf32> to memref<2x256xf32, #map4>
-            linalg.fill(%cst, %11) {lowering_config = #config}
-                : f32, memref<2x256xf32, #map4>
+            linalg.fill {lowering_config = #config} ins(%cst : f32) outs(%11 : memref<2x256xf32, #map4>)
             linalg.matmul {lowering_config = #config}
                 ins(%8, %10 : memref<2x1024xf32, #map4>, memref<1024x256xf32, #map4>)
                 outs(%11 : memref<2x256xf32, #map4>)
@@ -130,7 +129,7 @@ builtin.module {
           %7 = memref.subview %0[%arg0, %arg1, 0] [1, 8, 1024] [1, 1, 1] : memref<4x32x1024xf32> to memref<1x8x1024xf32, affine_map<(d0, d1, d2)[s0] -> (d0 * 32768 + s0 + d1 * 1024 + d2)>>
           %8 = memref.subview %1[%arg0, 0, %arg2] [1, 1024, 32] [1, 1, 1] : memref<4x1024x64xf32> to memref<1x1024x32xf32, affine_map<(d0, d1, d2)[s0] -> (d0 * 65536 + s0 + d1 * 64 + d2)>>
           %9 = memref.subview %2[%arg0, %arg1, %arg2] [1, 8, 32] [1, 1, 1] : memref<4x32x64xf32> to memref<1x8x32xf32, affine_map<(d0, d1, d2)[s0] -> (d0 * 2048 + s0 + d1 * 64 + d2)>> 
-          linalg.fill(%cst, %9) {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[1, 8, 32, 32]]>} : f32, memref<1x8x32xf32, affine_map<(d0, d1, d2)[s0] -> (d0 * 2048 + s0 + d1 * 64 + d2)>>  
+          linalg.fill {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[1, 8, 32, 32]]>} ins(%cst : f32) outs(%9 : memref<1x8x32xf32, affine_map<(d0, d1, d2)[s0] -> (d0 * 2048 + s0 + d1 * 64 + d2)>>)
           linalg.batch_matmul {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[1, 8, 32, 32]]>} ins(%7, %8 : memref<1x8x1024xf32, affine_map<(d0, d1, d2)[s0] -> (d0 * 32768 + s0 + d1 * 1024 + d2)>>, memref<1x1024x32xf32, affine_map<(d0, d1, d2)[s0] -> (d0 * 65536 + s0 + d1 * 64 + d2)>>) outs(%9 : memref<1x8x32xf32, affine_map<(d0, d1, d2)[s0] -> (d0 * 2048 + s0 + d1 * 64 + d2)>>)
         }
       }
@@ -207,8 +206,7 @@ hal.executable private @dot_dispatch_0  {
                 : memref<1024x1024xf32> to memref<1024x32xf32, #map4>
             %11 = memref.subview %2[%arg0, %arg1] [2, 32] [1, 1]
                 : memref<1024x1024xf32> to memref<2x32xf32, #map4>
-            linalg.fill(%cst, %11) {lowering_config = #config}
-                : f32, memref<2x32xf32, #map4>
+            linalg.fill {lowering_config = #config} ins(%cst : f32) outs(%11 : memref<2x32xf32, #map4>)
             linalg.matmul {lowering_config = #config}
                 ins(%8, %10 : memref<2x1024xf32, #map4>, memref<1024x32xf32, #map4>)
                 outs(%11 : memref<2x32xf32, #map4>)
@@ -271,7 +269,7 @@ hal.executable @reduction_dispatch {
         %cst_0 = arith.constant 0xFF800000 : f32
         %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<1000xf32>
         %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<f32>
-        linalg.fill(%cst_0, %1) {lowering_config = #config}  : f32, memref<f32>
+        linalg.fill {lowering_config = #config} ins(%cst_0 : f32) outs(%1 : memref<f32>)
         linalg.generic {indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> ()>], iterator_types = ["reduction"]} ins(%0 : memref<1000xf32>) outs(%1 : memref<f32>) attrs = {lowering_config = #config} {
         ^bb0(%arg0: f32, %arg1: f32):  // no predecessors
           %2 = arith.cmpf ogt, %arg0, %arg1 : f32

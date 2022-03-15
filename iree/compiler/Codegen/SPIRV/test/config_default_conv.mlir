@@ -45,7 +45,7 @@ hal.executable private @conv_pointwise_112x112x32 {
         %21 = flow.dispatch.tensor.load %2, offsets = [0, 0, 0, 0], sizes = [3, 3, 3, 32], strides = [1, 1, 1, 1]
             : !flow.dispatch.tensor<readonly:3x3x3x32xf32> -> tensor<3x3x3x32xf32>
         %24 = linalg.init_tensor [1, 112, 112, 32] : tensor<1x112x112x32xf32>
-        %25 = linalg.fill(%cst, %24) : f32, tensor<1x112x112x32xf32> -> tensor<1x112x112x32xf32>
+        %25 = linalg.fill ins(%cst : f32) outs(%24 : tensor<1x112x112x32xf32>) -> tensor<1x112x112x32xf32>
         %26 = linalg.conv_2d_nhwc_hwcf {dilations = dense<1> : tensor<2xi64>, strides = dense<2> : tensor<2xi64>}
             ins(%19, %21 : tensor<1x225x225x3xf32>, tensor<3x3x3x32xf32>) outs(%25 : tensor<1x112x112x32xf32>) -> tensor<1x112x112x32xf32>
         %27 = linalg.generic {indexing_maps = [#map7, #map7, #map7], iterator_types = ["parallel", "parallel", "parallel", "parallel"]}

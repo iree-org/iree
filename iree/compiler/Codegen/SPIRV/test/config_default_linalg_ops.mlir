@@ -117,7 +117,7 @@ hal.executable @avg_pool {
         %14 = flow.dispatch.tensor.load %0, offsets = [0, 0, 0, 0], sizes = [1, 24, 24, 8], strides = [1, 1, 1, 1]
             : !flow.dispatch.tensor<readonly:1x24x24x8xf32> -> tensor<1x24x24x8xf32>
         %20 = linalg.init_tensor [1, 2, 2, 8] : tensor<1x2x2x8xf32>
-        %21 = linalg.fill(%cst, %20) : f32, tensor<1x2x2x8xf32> -> tensor<1x2x2x8xf32>
+        %21 = linalg.fill ins(%cst : f32) outs(%20 : tensor<1x2x2x8xf32>) -> tensor<1x2x2x8xf32>
         %22 = linalg.pooling_nhwc_sum {__internal_linalg_transform__ = "workgroup", dilations = dense<1> : vector<2xi64>, strides = dense<12> : vector<2xi64>}
             ins(%14, %2 : tensor<1x24x24x8xf32>, tensor<12x12xf32>)
             outs(%21 : tensor<1x2x2x8xf32>) -> tensor<1x2x2x8xf32>
@@ -168,7 +168,7 @@ hal.executable @max_pool {
         %13 = flow.dispatch.tensor.load %0, offsets = [0, 0, 0, 0], sizes = [1, 76, 1, 1], strides = [1, 1, 1, 1]
             : !flow.dispatch.tensor<readonly:1x76x1x1xf32> -> tensor<1x76x1x1xf32>
         %18 = linalg.init_tensor [1, 38, 1, 1] : tensor<1x38x1x1xf32>
-        %19 = linalg.fill(%cst, %18) : f32, tensor<1x38x1x1xf32> -> tensor<1x38x1x1xf32>
+        %19 = linalg.fill ins(%cst : f32) outs(%18 : tensor<1x38x1x1xf32>) -> tensor<1x38x1x1xf32>
         %20 = linalg.pooling_nhwc_max {dilations = dense<1> : vector<2xi64>, strides = dense<[2, 1]> : vector<2xi64>}
             ins(%13, %2 : tensor<1x76x1x1xf32>, tensor<2x1xf32>)
             outs(%19 : tensor<1x38x1x1xf32>) -> tensor<1x38x1x1xf32>
@@ -278,7 +278,7 @@ hal.executable @dwconv_elementwise {
         %14 = flow.dispatch.tensor.load %0, offsets = [0, 0, 0, 0], sizes = [1, 21, 20, 1], strides = [1, 1, 1, 1]
             : !flow.dispatch.tensor<readonly:1x21x20x1xf32> -> tensor<1x21x20x1xf32>
         %18 = linalg.init_tensor [1, 19, 18, 1, 4] : tensor<1x19x18x1x4xf32>
-        %19 = linalg.fill(%cst_9, %18) : f32, tensor<1x19x18x1x4xf32> -> tensor<1x19x18x1x4xf32>
+        %19 = linalg.fill ins(%cst_9 : f32) outs(%18 : tensor<1x19x18x1x4xf32>) -> tensor<1x19x18x1x4xf32>
         %20 = linalg.depthwise_conv_2d_nhwc_hwcm {dilations = dense<1> : tensor<2xi64>, strides = dense<1> : tensor<2xi64>}
             ins(%14, %cst : tensor<1x21x20x1xf32>, tensor<3x3x1x4xf32>) outs(%19 : tensor<1x19x18x1x4xf32>) -> tensor<1x19x18x1x4xf32>
         %21 = linalg.generic {

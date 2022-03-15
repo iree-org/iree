@@ -83,7 +83,11 @@ iree_cc_library(
     MLIRTransforms
     MhloDialect
     MhloPasses
+    MhloShapeOpsToStandard
+    MhloToArithmeticConversion
+    MhloToLhloConversion
     MhloToLinalg
+    MhloToMemrefConversion
     MhloToStandard
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::Flow::Transforms
