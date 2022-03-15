@@ -69,6 +69,11 @@ bool isX86(IREE::HAL::ExecutableVariantOp variantOp) {
   return triple && triple.getValue().isX86();
 }
 
+bool isRISCV(IREE::HAL::ExecutableVariantOp variantOp) {
+  Optional<llvm::Triple> triple = getTargetTriple(variantOp);
+  return triple && triple.getValue().isRISCV();
+}
+
 //===----------------------------------------------------------------------===//
 // Utility functions to set configurations
 //===----------------------------------------------------------------------===//

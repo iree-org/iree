@@ -41,6 +41,12 @@ inline bool isX86(FuncOp entryPointFn) {
       entryPointFn->getParentOfType<IREE::HAL::ExecutableVariantOp>();
   return isX86(variantOp);
 }
+bool isRISCV(IREE::HAL::ExecutableVariantOp variantOp);
+inline bool isRISCV(FuncOp entryPointFn) {
+  auto variantOp =
+      entryPointFn->getParentOfType<IREE::HAL::ExecutableVariantOp>();
+  return isRISCV(variantOp);
+}
 inline bool isVMVXBackend(IREE::HAL::ExecutableVariantOp variantOp) {
   return variantOp.target().getBackend().getValue() == "vmvx";
 }
