@@ -120,5 +120,5 @@ cd ${CMAKE_BUILD_DIR?}
 
 echo "Testing with ctest"
 ctest --timeout 900 --output-on-failure \
-  --label-exclude "^driver=cuda$|^driver=vulkan$" \
+  --label-exclude "${label_exclude_regex}" \
   --exclude-regex "${excluded_tests_regex?}"
