@@ -56,7 +56,7 @@ enum class OutputFormat {
   none,
   vm_asm,
   vm_bytecode,
-  c_module,
+  vm_c,
 };
 
 IREEVMPipelineHooks &getHooks() {
@@ -123,7 +123,7 @@ int mlir::iree_compiler::runIreecMain(int argc, char **argv) {
           clEnumValN(OutputFormat::vm_bytecode, "vm-bytecode",
                      "IREE VM Bytecode (default)"),
 #ifdef IREE_HAVE_EMITC_DIALECT
-          clEnumValN(OutputFormat::c_module, "c-module", "C source module"),
+          clEnumValN(OutputFormat::vm_c, "vm-c", "C source module"),
 #endif
           clEnumValN(OutputFormat::vm_asm, "vm-asm", "IREE VM MLIR Assembly")),
       llvm::cl::init(OutputFormat::none), llvm::cl::cat(mainOptions));
@@ -158,7 +158,7 @@ int mlir::iree_compiler::runIreecMain(int argc, char **argv) {
           << "Cannot specify --output-format= and --iree-mlir-to-vm-c-module\n";
       return 1;
     }
-    outputFormat = OutputFormat::c_module;
+    outputFormat = OutputFormat::vm_c;
   }
   if (legacyTranslateToVMBytecodeModule) {
     if (outputFormat != OutputFormat::none) {
