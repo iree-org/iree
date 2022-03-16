@@ -174,9 +174,10 @@ iree_status_t Run() {
   // Read back the results and ensure we got the right values.
   float results[] = {0.0f, 0.0f, 0.0f, 0.0f};
   if (iree_status_is_ok(status)) {
-    status =
-        iree_hal_buffer_read_data(iree_hal_buffer_view_buffer(ret_buffer_view),
-                                  0, results, sizeof(results));
+    status = iree_hal_device_transfer_d2h(
+        device, iree_hal_buffer_view_buffer(ret_buffer_view), 0, results,
+        sizeof(results), IREE_HAL_TRANSFER_BUFFER_FLAG_DEFAULT,
+        iree_infinite_timeout());
   }
   if (iree_status_is_ok(status)) {
     for (iree_host_size_t i = 0; i < IREE_ARRAYSIZE(results); ++i) {

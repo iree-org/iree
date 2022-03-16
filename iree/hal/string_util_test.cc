@@ -411,7 +411,7 @@ struct Buffer final : public Handle<iree_hal_buffer_t, iree_hal_buffer_retain,
     iree_device_size_t total_byte_length = byte_length();
     std::vector<T> result(total_byte_length / sizeof(T));
     iree_status_t status =
-        iree_hal_buffer_read_data(get(), 0, result.data(), total_byte_length);
+        iree_hal_buffer_map_read(get(), 0, result.data(), total_byte_length);
     IREE_RETURN_IF_ERROR(std::move(status));
     return std::move(result);
   }

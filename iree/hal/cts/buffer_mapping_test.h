@@ -31,9 +31,9 @@ constexpr iree_device_size_t kDefaultAllocationSize = 1024;
 //
 // Note that most of these tests first write into a buffer using one or more
 // functions then read the (possibly partial) contents of that buffer using
-// `iree_hal_buffer_read_data`. As the buffer read implementation is nontrivial,
-// particularly on implementations with complex host/device splits, test
-// failures may indicate issues in either the code doing the writing or the
+// `iree_hal_buffer_map_read`. As the buffer read implementation is
+// nontrivial, particularly on implementations with complex host/device splits,
+// test failures may indicate issues in either the code doing the writing or the
 // code doing the reading.
 //
 // Where applicable, tests for each function are organized in increasing order
@@ -87,11 +87,11 @@ TEST_P(buffer_mapping_test, ZeroWholeBuffer) {
 
   // Zero the entire buffer.
   IREE_ASSERT_OK(
-      iree_hal_buffer_zero(buffer, /*byte_offset=*/0, IREE_WHOLE_BUFFER));
+      iree_hal_buffer_map_zero(buffer, /*byte_offset=*/0, IREE_WHOLE_BUFFER));
 
   // Check that the contents match what we expect.
   std::vector<uint8_t> actual_data(kDefaultAllocationSize);
-  IREE_ASSERT_OK(iree_hal_buffer_read_data(
+  IREE_ASSERT_OK(iree_hal_buffer_map_read(
       buffer, /*source_offset=*/0, actual_data.data(), actual_data.size()));
   std::vector<uint8_t> reference_buffer(kDefaultAllocationSize);
   std::memset(reference_buffer.data(), 0, kDefaultAllocationSize);
@@ -107,15 +107,15 @@ TEST_P(buffer_mapping_test, ZeroWithOffset) {
 
   // Fill the entire buffer then zero only a segment of it.
   uint8_t fill_value = 0xFF;
-  IREE_ASSERT_OK(iree_hal_buffer_fill(buffer, /*byte_offset=*/0,
-                                      IREE_WHOLE_BUFFER, &fill_value,
-                                      sizeof(fill_value)));
+  IREE_ASSERT_OK(iree_hal_buffer_map_fill(buffer, /*byte_offset=*/0,
+                                          IREE_WHOLE_BUFFER, &fill_value,
+                                          sizeof(fill_value)));
   IREE_ASSERT_OK(
-      iree_hal_buffer_zero(buffer, /*byte_offset=*/4, /*byte_length=*/8));
+      iree_hal_buffer_map_zero(buffer, /*byte_offset=*/4, /*byte_length=*/8));
 
   // Check that the contents match what we expect.
   std::vector<uint8_t> actual_data(buffer_size);
-  IREE_ASSERT_OK(iree_hal_buffer_read_data(
+  IREE_ASSERT_OK(iree_hal_buffer_map_read(
       buffer, /*source_offset=*/0, actual_data.data(), actual_data.size()));
   std::vector<uint8_t> reference_buffer{0xFF, 0xFF, 0xFF, 0xFF,  //
                                         0x00, 0x00, 0x00, 0x00,  //
@@ -133,9 +133,9 @@ TEST_P(buffer_mapping_test, ZeroSubspan) {
 
   // Fill the entire buffer.
   uint8_t fill_value = 0xFF;
-  IREE_ASSERT_OK(iree_hal_buffer_fill(buffer, /*byte_offset=*/0,
-                                      IREE_WHOLE_BUFFER, &fill_value,
-                                      sizeof(fill_value)));
+  IREE_ASSERT_OK(iree_hal_buffer_map_fill(buffer, /*byte_offset=*/0,
+                                          IREE_WHOLE_BUFFER, &fill_value,
+                                          sizeof(fill_value)));
 
   // Create a subspan.
   iree_device_size_t subspan_length = 8;
@@ -144,12 +144,12 @@ TEST_P(buffer_mapping_test, ZeroSubspan) {
                                          subspan_length, &buffer_subspan));
 
   // Zero part of the subspan.
-  IREE_ASSERT_OK(iree_hal_buffer_zero(buffer_subspan, /*byte_offset=*/4,
-                                      /*byte_length=*/4));
+  IREE_ASSERT_OK(iree_hal_buffer_map_zero(buffer_subspan, /*byte_offset=*/4,
+                                          /*byte_length=*/4));
 
   // Check that the contents match what we expect.
   std::vector<uint8_t> actual_data(buffer_size);
-  IREE_ASSERT_OK(iree_hal_buffer_read_data(
+  IREE_ASSERT_OK(iree_hal_buffer_map_read(
       buffer, /*source_offset=*/0, actual_data.data(), actual_data.size()));
   std::vector<uint8_t> reference_buffer{0xFF, 0xFF, 0xFF, 0xFF,  //
                                         0xFF, 0xFF, 0xFF, 0xFF,  //
@@ -158,9 +158,9 @@ TEST_P(buffer_mapping_test, ZeroSubspan) {
   EXPECT_THAT(actual_data, ContainerEq(reference_buffer));
   // Also check the subspan.
   std::vector<uint8_t> actual_data_subspan(subspan_length);
-  IREE_ASSERT_OK(iree_hal_buffer_read_data(buffer_subspan, /*source_offset=*/0,
-                                           actual_data_subspan.data(),
-                                           actual_data_subspan.size()));
+  IREE_ASSERT_OK(iree_hal_buffer_map_read(buffer_subspan, /*source_offset=*/0,
+                                          actual_data_subspan.data(),
+                                          actual_data_subspan.size()));
   std::vector<uint8_t> reference_buffer_subspan{0xFF, 0xFF, 0xFF, 0xFF,  //
                                                 0x00, 0x00, 0x00, 0x00};
   EXPECT_THAT(actual_data_subspan, ContainerEq(reference_buffer_subspan));
@@ -174,16 +174,17 @@ TEST_P(buffer_mapping_test, FillEmpty) {
   AllocateUninitializedBuffer(kDefaultAllocationSize, &buffer);
 
   // Zero the whole buffer then "fill" 0 bytes with a different pattern.
-  IREE_ASSERT_OK(iree_hal_buffer_zero(buffer, 0, IREE_WHOLE_BUFFER));
+  IREE_ASSERT_OK(iree_hal_buffer_map_zero(buffer, 0, IREE_WHOLE_BUFFER));
   uint8_t fill_value = 0xFF;
-  IREE_ASSERT_OK(iree_hal_buffer_fill(buffer, /*byte_offset=*/0,
-                                      /*byte_length=*/0,  // <---- empty!
-                                      /*pattern=*/&fill_value,
-                                      /*pattern_length=*/sizeof(fill_value)));
+  IREE_ASSERT_OK(
+      iree_hal_buffer_map_fill(buffer, /*byte_offset=*/0,
+                               /*byte_length=*/0,  // <---- empty!
+                               /*pattern=*/&fill_value,
+                               /*pattern_length=*/sizeof(fill_value)));
 
   // Check that the buffer is still all zeroes.
   std::vector<uint8_t> actual_data(kDefaultAllocationSize);
-  IREE_ASSERT_OK(iree_hal_buffer_read_data(
+  IREE_ASSERT_OK(iree_hal_buffer_map_read(
       buffer, /*source_offset=*/0, actual_data.data(), actual_data.size()));
   std::vector<uint8_t> reference_buffer(kDefaultAllocationSize);
   std::memset(reference_buffer.data(), 0, kDefaultAllocationSize);
@@ -197,14 +198,15 @@ TEST_P(buffer_mapping_test, FillWholeBuffer) {
   AllocateUninitializedBuffer(kDefaultAllocationSize, &buffer);
 
   uint8_t fill_value = 0xFF;
-  IREE_ASSERT_OK(iree_hal_buffer_fill(buffer, /*byte_offset=*/0,
-                                      /*byte_length=*/IREE_WHOLE_BUFFER,
-                                      /*pattern=*/&fill_value,
-                                      /*pattern_length=*/sizeof(fill_value)));
+  IREE_ASSERT_OK(
+      iree_hal_buffer_map_fill(buffer, /*byte_offset=*/0,
+                               /*byte_length=*/IREE_WHOLE_BUFFER,
+                               /*pattern=*/&fill_value,
+                               /*pattern_length=*/sizeof(fill_value)));
 
   // Check that the buffer is filled with the pattern.
   std::vector<uint8_t> actual_data(kDefaultAllocationSize);
-  IREE_ASSERT_OK(iree_hal_buffer_read_data(
+  IREE_ASSERT_OK(iree_hal_buffer_map_read(
       buffer, /*source_offset=*/0, actual_data.data(), actual_data.size()));
   std::vector<uint8_t> reference_buffer(kDefaultAllocationSize);
   std::memset(reference_buffer.data(), fill_value, kDefaultAllocationSize);
@@ -219,16 +221,17 @@ TEST_P(buffer_mapping_test, FillWithOffset) {
   AllocateUninitializedBuffer(buffer_size, &buffer);
 
   // Zero the entire buffer then fill only a segment of it.
-  IREE_ASSERT_OK(iree_hal_buffer_zero(buffer, 0, IREE_WHOLE_BUFFER));
+  IREE_ASSERT_OK(iree_hal_buffer_map_zero(buffer, 0, IREE_WHOLE_BUFFER));
   uint8_t fill_value = 0xFF;
-  IREE_ASSERT_OK(iree_hal_buffer_fill(buffer, /*byte_offset=*/4,
-                                      /*byte_length=*/8,
-                                      /*pattern=*/&fill_value,
-                                      /*pattern_length=*/sizeof(fill_value)));
+  IREE_ASSERT_OK(
+      iree_hal_buffer_map_fill(buffer, /*byte_offset=*/4,
+                               /*byte_length=*/8,
+                               /*pattern=*/&fill_value,
+                               /*pattern_length=*/sizeof(fill_value)));
 
   // Check that only the segment of the buffer is filled with the pattern.
   std::vector<uint8_t> actual_data(buffer_size);
-  IREE_ASSERT_OK(iree_hal_buffer_read_data(
+  IREE_ASSERT_OK(iree_hal_buffer_map_read(
       buffer, /*source_offset=*/0, actual_data.data(), actual_data.size()));
   std::vector<uint8_t> reference_offset_buffer{0x00, 0x00, 0x00, 0x00,  //
                                                0xFF, 0xFF, 0xFF, 0xFF,  //
@@ -245,7 +248,7 @@ TEST_P(buffer_mapping_test, FillSubspan) {
   AllocateUninitializedBuffer(buffer_size, &buffer);
 
   // Zero the entire buffer.
-  IREE_ASSERT_OK(iree_hal_buffer_zero(buffer, 0, IREE_WHOLE_BUFFER));
+  IREE_ASSERT_OK(iree_hal_buffer_map_zero(buffer, 0, IREE_WHOLE_BUFFER));
 
   // Create a subspan.
   iree_device_size_t subspan_length = 8;
@@ -255,14 +258,15 @@ TEST_P(buffer_mapping_test, FillSubspan) {
 
   // Fill part of the subspan.
   uint8_t fill_value = 0xFF;
-  IREE_ASSERT_OK(iree_hal_buffer_fill(buffer_subspan, /*byte_offset=*/4,
-                                      /*byte_length=*/4,
-                                      /*pattern=*/&fill_value,
-                                      /*pattern_length=*/sizeof(fill_value)));
+  IREE_ASSERT_OK(
+      iree_hal_buffer_map_fill(buffer_subspan, /*byte_offset=*/4,
+                               /*byte_length=*/4,
+                               /*pattern=*/&fill_value,
+                               /*pattern_length=*/sizeof(fill_value)));
 
   // Check that the contents match what we expect.
   std::vector<uint8_t> actual_data(buffer_size);
-  IREE_ASSERT_OK(iree_hal_buffer_read_data(
+  IREE_ASSERT_OK(iree_hal_buffer_map_read(
       buffer, /*source_offset=*/0, actual_data.data(), actual_data.size()));
   std::vector<uint8_t> reference_buffer{0x00, 0x00, 0x00, 0x00,  //
                                         0x00, 0x00, 0x00, 0x00,  //
@@ -271,9 +275,9 @@ TEST_P(buffer_mapping_test, FillSubspan) {
   EXPECT_THAT(actual_data, ContainerEq(reference_buffer));
   // Also check the subspan.
   std::vector<uint8_t> actual_data_subspan(subspan_length);
-  IREE_ASSERT_OK(iree_hal_buffer_read_data(buffer_subspan, /*source_offset=*/0,
-                                           actual_data_subspan.data(),
-                                           actual_data_subspan.size()));
+  IREE_ASSERT_OK(iree_hal_buffer_map_read(buffer_subspan, /*source_offset=*/0,
+                                          actual_data_subspan.data(),
+                                          actual_data_subspan.size()));
   std::vector<uint8_t> reference_buffer_subspan{0x00, 0x00, 0x00, 0x00,  //
                                                 0xFF, 0xFF, 0xFF, 0xFF};
   EXPECT_THAT(actual_data_subspan, ContainerEq(reference_buffer_subspan));
@@ -289,16 +293,17 @@ TEST_P(buffer_mapping_test, ReadData) {
 
   // Zero the first half, fill the second half.
   IREE_ASSERT_OK(
-      iree_hal_buffer_zero(buffer, /*byte_offset=*/0, /*byte_length=*/8));
+      iree_hal_buffer_map_zero(buffer, /*byte_offset=*/0, /*byte_length=*/8));
   uint8_t fill_value = 0xFF;
-  IREE_ASSERT_OK(iree_hal_buffer_fill(buffer, /*byte_offset=*/8,
-                                      /*byte_length=*/8,
-                                      /*pattern=*/&fill_value,
-                                      /*pattern_length=*/sizeof(fill_value)));
+  IREE_ASSERT_OK(
+      iree_hal_buffer_map_fill(buffer, /*byte_offset=*/8,
+                               /*byte_length=*/8,
+                               /*pattern=*/&fill_value,
+                               /*pattern_length=*/sizeof(fill_value)));
 
   // Read the entire buffer.
   std::vector<uint8_t> actual_data(buffer_size);
-  IREE_ASSERT_OK(iree_hal_buffer_read_data(
+  IREE_ASSERT_OK(iree_hal_buffer_map_read(
       buffer, /*source_offset=*/0, actual_data.data(), actual_data.size()));
   std::vector<uint8_t> reference_buffer{0x00, 0x00, 0x00, 0x00,  //
                                         0x00, 0x00, 0x00, 0x00,  //
@@ -308,9 +313,9 @@ TEST_P(buffer_mapping_test, ReadData) {
 
   // Read only a segment of the buffer.
   std::vector<uint8_t> actual_data_offset(8);
-  IREE_ASSERT_OK(iree_hal_buffer_read_data(buffer, /*source_offset=*/4,
-                                           actual_data_offset.data(),
-                                           actual_data_offset.size()));
+  IREE_ASSERT_OK(iree_hal_buffer_map_read(buffer, /*source_offset=*/4,
+                                          actual_data_offset.data(),
+                                          actual_data_offset.size()));
   std::vector<uint8_t> reference_buffer_offset{0x00, 0x00, 0x00, 0x00,  //
                                                0xFF, 0xFF, 0xFF, 0xFF};
   EXPECT_THAT(actual_data_offset, ContainerEq(reference_buffer_offset));
@@ -325,13 +330,14 @@ TEST_P(buffer_mapping_test, ReadDataSubspan) {
 
   // Fill a few segments with distinct values.
   uint8_t value = 0xAA;
-  IREE_ASSERT_OK(iree_hal_buffer_fill(buffer, 0, 4, &value, sizeof(value)));
+  IREE_ASSERT_OK(iree_hal_buffer_map_fill(buffer, 0, 4, &value, sizeof(value)));
   value = 0xBB;
-  IREE_ASSERT_OK(iree_hal_buffer_fill(buffer, 4, 4, &value, sizeof(value)));
+  IREE_ASSERT_OK(iree_hal_buffer_map_fill(buffer, 4, 4, &value, sizeof(value)));
   value = 0xCC;
-  IREE_ASSERT_OK(iree_hal_buffer_fill(buffer, 8, 4, &value, sizeof(value)));
+  IREE_ASSERT_OK(iree_hal_buffer_map_fill(buffer, 8, 4, &value, sizeof(value)));
   value = 0xDD;
-  IREE_ASSERT_OK(iree_hal_buffer_fill(buffer, 12, 4, &value, sizeof(value)));
+  IREE_ASSERT_OK(
+      iree_hal_buffer_map_fill(buffer, 12, 4, &value, sizeof(value)));
 
   // Create a subspan.
   iree_device_size_t subspan_length = 8;
@@ -341,18 +347,18 @@ TEST_P(buffer_mapping_test, ReadDataSubspan) {
 
   // Read the entire buffer subspan.
   std::vector<uint8_t> actual_data(subspan_length);
-  IREE_ASSERT_OK(iree_hal_buffer_read_data(buffer_subspan, /*source_offset=*/0,
-                                           actual_data.data(),
-                                           actual_data.size()));
+  IREE_ASSERT_OK(iree_hal_buffer_map_read(buffer_subspan, /*source_offset=*/0,
+                                          actual_data.data(),
+                                          actual_data.size()));
   std::vector<uint8_t> reference_buffer{0xBB, 0xBB, 0xBB, 0xBB,  //
                                         0xCC, 0xCC, 0xCC, 0xCC};
   EXPECT_THAT(actual_data, ContainerEq(reference_buffer));
 
   // Read only a segment of the buffer.
   std::vector<uint8_t> actual_data_offset(4);
-  IREE_ASSERT_OK(iree_hal_buffer_read_data(buffer_subspan, /*source_offset=*/4,
-                                           actual_data_offset.data(),
-                                           actual_data_offset.size()));
+  IREE_ASSERT_OK(iree_hal_buffer_map_read(buffer_subspan, /*source_offset=*/4,
+                                          actual_data_offset.data(),
+                                          actual_data_offset.size()));
   std::vector<uint8_t> reference_buffer_offset{0xCC, 0xCC, 0xCC, 0xCC};
   EXPECT_THAT(actual_data_offset, ContainerEq(reference_buffer_offset));
 
@@ -369,13 +375,13 @@ TEST_P(buffer_mapping_test, WriteDataWholeBuffer) {
   uint8_t fill_value = 0xFF;
   std::vector<uint8_t> reference_buffer(buffer_size);
   std::memset(reference_buffer.data(), fill_value, buffer_size);
-  IREE_ASSERT_OK(iree_hal_buffer_write_data(buffer, /*target_offset=*/0,
-                                            reference_buffer.data(),
-                                            reference_buffer.size()));
+  IREE_ASSERT_OK(iree_hal_buffer_map_write(buffer, /*target_offset=*/0,
+                                           reference_buffer.data(),
+                                           reference_buffer.size()));
 
   // Check that entire buffer was written to.
   std::vector<uint8_t> actual_data(buffer_size);
-  IREE_ASSERT_OK(iree_hal_buffer_read_data(
+  IREE_ASSERT_OK(iree_hal_buffer_map_read(
       buffer, /*source_offset=*/0, actual_data.data(), actual_data.size()));
   EXPECT_THAT(actual_data, ContainerEq(reference_buffer));
 
@@ -388,17 +394,17 @@ TEST_P(buffer_mapping_test, WriteDataWithOffset) {
   AllocateUninitializedBuffer(buffer_size, &buffer);
 
   // Zero the entire buffer.
-  IREE_ASSERT_OK(iree_hal_buffer_zero(buffer, 0, IREE_WHOLE_BUFFER));
+  IREE_ASSERT_OK(iree_hal_buffer_map_zero(buffer, 0, IREE_WHOLE_BUFFER));
 
   // Write over part of the buffer.
   std::vector<uint8_t> fill_buffer{0x11, 0x22, 0x33, 0x44,  //
                                    0x55, 0x66, 0x77, 0x88};
-  IREE_ASSERT_OK(iree_hal_buffer_write_data(
+  IREE_ASSERT_OK(iree_hal_buffer_map_write(
       buffer, /*target_offset=*/4, fill_buffer.data(), fill_buffer.size()));
 
   // Check that the contents match what we expect.
   std::vector<uint8_t> actual_data(buffer_size);
-  IREE_ASSERT_OK(iree_hal_buffer_read_data(
+  IREE_ASSERT_OK(iree_hal_buffer_map_read(
       buffer, /*source_offset=*/0, actual_data.data(), actual_data.size()));
   std::vector<uint8_t> reference_buffer{0x00, 0x00, 0x00, 0x00,  //
                                         0x11, 0x22, 0x33, 0x44,  //
@@ -415,7 +421,7 @@ TEST_P(buffer_mapping_test, WriteDataSubspan) {
   AllocateUninitializedBuffer(buffer_size, &buffer);
 
   // Zero the entire buffer.
-  IREE_ASSERT_OK(iree_hal_buffer_zero(buffer, 0, IREE_WHOLE_BUFFER));
+  IREE_ASSERT_OK(iree_hal_buffer_map_zero(buffer, 0, IREE_WHOLE_BUFFER));
 
   // Create a subspan.
   iree_device_size_t subspan_length = 8;
@@ -425,13 +431,13 @@ TEST_P(buffer_mapping_test, WriteDataSubspan) {
 
   // Write over part of the subspan.
   std::vector<uint8_t> fill_buffer{0x11, 0x22, 0x33, 0x44};
-  IREE_ASSERT_OK(iree_hal_buffer_write_data(buffer_subspan, /*target_offset=*/4,
-                                            fill_buffer.data(),
-                                            fill_buffer.size()));
+  IREE_ASSERT_OK(iree_hal_buffer_map_write(buffer_subspan, /*target_offset=*/4,
+                                           fill_buffer.data(),
+                                           fill_buffer.size()));
 
   // Check that the contents match what we expect.
   std::vector<uint8_t> actual_data(buffer_size);
-  IREE_ASSERT_OK(iree_hal_buffer_read_data(
+  IREE_ASSERT_OK(iree_hal_buffer_map_read(
       buffer, /*source_offset=*/0, actual_data.data(), actual_data.size()));
   std::vector<uint8_t> reference_buffer{0x00, 0x00, 0x00, 0x00,  //
                                         0x00, 0x00, 0x00, 0x00,  //
@@ -440,9 +446,9 @@ TEST_P(buffer_mapping_test, WriteDataSubspan) {
   EXPECT_THAT(actual_data, ContainerEq(reference_buffer));
   // Also check the subspan.
   std::vector<uint8_t> actual_data_subspan(subspan_length);
-  IREE_ASSERT_OK(iree_hal_buffer_read_data(buffer_subspan, /*source_offset=*/0,
-                                           actual_data_subspan.data(),
-                                           actual_data_subspan.size()));
+  IREE_ASSERT_OK(iree_hal_buffer_map_read(buffer_subspan, /*source_offset=*/0,
+                                          actual_data_subspan.data(),
+                                          actual_data_subspan.size()));
   std::vector<uint8_t> reference_buffer_subspan{0x00, 0x00, 0x00, 0x00,  //
                                                 0x11, 0x22, 0x33, 0x44};
   EXPECT_THAT(actual_data_subspan, ContainerEq(reference_buffer_subspan));
@@ -458,11 +464,12 @@ TEST_P(buffer_mapping_test, CopyData) {
   AllocateUninitializedBuffer(kDefaultAllocationSize, &buffer_b);
 
   uint8_t fill_value = 0x07;
-  IREE_ASSERT_OK(iree_hal_buffer_fill(buffer_a, /*byte_offset=*/0,
-                                      /*byte_length=*/kDefaultAllocationSize,
-                                      /*pattern=*/&fill_value,
-                                      /*pattern_length=*/sizeof(fill_value)));
-  IREE_ASSERT_OK(iree_hal_buffer_copy_data(
+  IREE_ASSERT_OK(
+      iree_hal_buffer_map_fill(buffer_a, /*byte_offset=*/0,
+                               /*byte_length=*/kDefaultAllocationSize,
+                               /*pattern=*/&fill_value,
+                               /*pattern_length=*/sizeof(fill_value)));
+  IREE_ASSERT_OK(iree_hal_buffer_map_copy(
       /*source_buffer=*/buffer_a,
       /*source_offset=*/0, /*target_buffer=*/buffer_b, /*target_offset=*/0,
       /*data_length=*/kDefaultAllocationSize));
@@ -471,7 +478,7 @@ TEST_P(buffer_mapping_test, CopyData) {
   std::memset(reference_buffer.data(), fill_value, kDefaultAllocationSize);
 
   std::vector<uint8_t> actual_data(kDefaultAllocationSize);
-  IREE_ASSERT_OK(iree_hal_buffer_read_data(
+  IREE_ASSERT_OK(iree_hal_buffer_map_read(
       buffer_b, /*source_offset=*/0, actual_data.data(), actual_data.size()));
   EXPECT_THAT(actual_data, ContainerEq(reference_buffer));
 
@@ -480,16 +487,16 @@ TEST_P(buffer_mapping_test, CopyData) {
 }
 
 // Maps a buffer range for reading from device -> host.
-// This is roughly what iree_hal_buffer_read_data does internally.
+// This is roughly what iree_hal_buffer_map_read does internally.
 TEST_P(buffer_mapping_test, MapRangeRead) {
   iree_device_size_t buffer_size = 16;
   iree_hal_buffer_t* buffer = NULL;
   AllocateUninitializedBuffer(buffer_size, &buffer);
 
   uint8_t fill_value = 0xEF;
-  IREE_ASSERT_OK(iree_hal_buffer_fill(buffer, /*byte_offset=*/0,
-                                      IREE_WHOLE_BUFFER, &fill_value,
-                                      sizeof(fill_value)));
+  IREE_ASSERT_OK(iree_hal_buffer_map_fill(buffer, /*byte_offset=*/0,
+                                          IREE_WHOLE_BUFFER, &fill_value,
+                                          sizeof(fill_value)));
 
   iree_hal_buffer_mapping_t mapping;
   IREE_ASSERT_OK(iree_hal_buffer_map_range(
@@ -510,7 +517,7 @@ TEST_P(buffer_mapping_test, MapRangeRead) {
 }
 
 // Maps a buffer range for writing from host -> device.
-// This is roughly what iree_hal_buffer_write_data does internally.
+// This is roughly what iree_hal_buffer_map_write does internally.
 TEST_P(buffer_mapping_test, MapRangeWrite) {
   iree_device_size_t buffer_size = 16;
   iree_hal_buffer_t* buffer = NULL;
@@ -530,7 +537,7 @@ TEST_P(buffer_mapping_test, MapRangeWrite) {
   IREE_ASSERT_OK(iree_hal_buffer_flush_range(&mapping, /*byte_offset=*/0,
                                              /*byte_length=*/buffer_size));
   std::vector<uint8_t> actual_data(buffer_size);
-  IREE_ASSERT_OK(iree_hal_buffer_read_data(
+  IREE_ASSERT_OK(iree_hal_buffer_map_read(
       buffer, /*source_offset=*/0, actual_data.data(), actual_data.size()));
   std::vector<uint8_t> reference_buffer(buffer_size);
   std::memset(reference_buffer.data(), fill_value, buffer_size);

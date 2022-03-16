@@ -139,7 +139,7 @@ enum iree_hal_buffer_compatibility_bits_t {
   // Indicates that the buffer can be used as a transfer source or target on the
   // a device queue (such as being the source or target of a DMA operation,
   // etc). If not set then the buffer may still be usable for
-  // iree_hal_buffer_copy_data but not with queued operations.
+  // iree_hal_buffer_map_copy but not with queued operations.
   IREE_HAL_BUFFER_COMPATIBILITY_QUEUE_TRANSFER = 1u << 10,
 
   // Indicates that the buffer can be used as an input/output to a dispatch.

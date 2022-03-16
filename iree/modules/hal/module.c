@@ -534,8 +534,9 @@ IREE_VM_ABI_EXPORT(iree_hal_module_buffer_load,  //
                             "load length byte count %d exceeds max", length);
   }
 
-  IREE_RETURN_IF_ERROR(iree_hal_buffer_read_data(source_buffer, source_offset,
-                                                 &target_buffer, length));
+  IREE_RETURN_IF_ERROR(iree_hal_device_transfer_d2h(
+      state->shared_device, source_buffer, source_offset, &target_buffer,
+      length, IREE_HAL_TRANSFER_BUFFER_FLAG_DEFAULT, iree_infinite_timeout()));
 
   rets->i0 = target_buffer;
   return iree_ok_status();
@@ -562,8 +563,9 @@ IREE_VM_ABI_EXPORT(iree_hal_module_buffer_store,  //
         target_offset, length, iree_hal_buffer_byte_length(target_buffer));
   }
 
-  return iree_hal_buffer_write_data(target_buffer, target_offset, &value,
-                                    length);
+  return iree_hal_device_transfer_h2d(
+      state->shared_device, &value, target_buffer, target_offset, length,
+      IREE_HAL_TRANSFER_BUFFER_FLAG_DEFAULT, iree_infinite_timeout());
 }
 
 //===----------------------------------------------------------------------===//

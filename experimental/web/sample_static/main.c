@@ -154,9 +154,10 @@ int run_sample(iree_sample_state_t* state, float* image_data) {
   // confidence values for each digit in [0, 9].
   float predictions[1 * 10] = {0.0f};
   if (iree_status_is_ok(status)) {
-    status =
-        iree_hal_buffer_read_data(iree_hal_buffer_view_buffer(ret_buffer_view),
-                                  0, predictions, sizeof(predictions));
+    status = iree_hal_device_transfer_d2h(
+        state->device, iree_hal_buffer_view_buffer(ret_buffer_view), 0,
+        predictions, sizeof(predictions), IREE_HAL_TRANSFER_BUFFER_FLAG_DEFAULT,
+        iree_infinite_timeout());
   }
   iree_hal_buffer_view_release(ret_buffer_view);
 
