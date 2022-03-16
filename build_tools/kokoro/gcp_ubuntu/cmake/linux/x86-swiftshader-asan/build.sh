@@ -52,11 +52,9 @@ echo "------------------"
 # Respect the user setting, but default to as many jobs as we have cores.
 export CTEST_PARALLEL_LEVEL=${CTEST_PARALLEL_LEVEL:-$(nproc)}
 
-# Respect the user setting, but default to turning off the vulkan tests
-# and turning on the llvmaot ones.
+# Respect the user setting, but default to turning off the vulkan tests.
 # TODO(#5716): Fix and enable Vulkan tests.
 export IREE_VULKAN_DISABLE=${IREE_VULKAN_DISABLE:-1}
-export IREE_LLVMAOT_DISABLE=${IREE_LLVMAOT_DISABLE:-0}
 # CUDA is off by default.
 export IREE_CUDA_DISABLE=${IREE_CUDA_DISABLE:-1}
 # The VK_KHR_shader_float16_int8 extension is optional prior to Vulkan 1.2.
@@ -87,9 +85,6 @@ declare -a label_exclude_args=(
 
 if [[ "${IREE_VULKAN_DISABLE?}" == 1 ]]; then
   label_exclude_args+=("^driver=vulkan$")
-fi
-if [[ "${IREE_LLVMAOT_DISABLE?}" == 1 ]]; then
-  label_exclude_args+=("^driver=dylib$")
 fi
 if [[ "${IREE_CUDA_DISABLE?}" == 1 ]]; then
   label_exclude_args+=("^driver=cuda$")
