@@ -176,6 +176,7 @@ gentbl_cc_library(
         "@llvm-project//mlir:CallInterfacesTdFiles",
         "@llvm-project//mlir:ControlFlowInterfacesTdFiles",
         "@llvm-project//mlir:TilingInterfaceTdFiles",
+        "@llvm-project//mlir:ViewLikeInterfaceTdFiles",
     ],
 )
 
