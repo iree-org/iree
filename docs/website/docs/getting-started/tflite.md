@@ -15,7 +15,7 @@ python -m pip install \
   iree-tools-tflite
 ```
 
-## Command line
+## Importing and Compiling
 IREE's tooling is divided into two components: import and compilation.
 
 1. The import tool converts the TFLite flatbuffer to an IREE compatible form,
@@ -24,6 +24,7 @@ and IREE operations.
 2. The compilation stage generates the bytecode module for a list of targets, which can
 be executed by IREE.
 
+### Using Command Line Tools
 These two stages can be completed entirely via the command line.
 
 ```shell
@@ -48,7 +49,7 @@ iree-translate \
     -o ${MODULE_PATH}
 ```
 
-## Python
+### Using the Python API
 The example below demonstrates downloading, compiling, and executing a TFLite
 model using the Python API. This includes some initial setup to declare global
 variables, download the sample module, and download the sample inputs.
