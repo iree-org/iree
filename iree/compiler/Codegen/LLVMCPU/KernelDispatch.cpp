@@ -99,6 +99,33 @@ static int64_t getVectorSize(FuncOp entryPointFn, ShapedType shapedType) {
   return getVectorSize(entryPointFn, byteWidth);
 }
 
+/// Returns minimum tiling sizes for each dimension. One dimension is possible
+/// to access at different element types. It determines the tiling sizes by
+/// looking into all the operands.
+static SmallVector<int64_t> getMinTilingSizesForEachDim(FuncOp entryPointFn,
+                                                        linalg::LinalgOp op) {
+  unsigned numLoops = op.getNumLoops();
+  SmallVector<int64_t> minTileSizes(numLoops, 1);
+  auto inputOutputOpOperands = op.getInputAndOutputOperands();
+  for (auto map : llvm::enumerate(op.getIndexingMaps())) {
+    // Check the fastest varying dimension of the operand. Set the vector size
+    // of the corresponding loop to the vector size.
+    if (map.value().getNumResults() == 0) continue;
+    auto fastestVaryingDimExpr =
+        map.value().getResults().back().dyn_cast<AffineDimExpr>();
+    if (!fastestVaryingDimExpr) continue;
+    unsigned fastestVaryingDim = fastestVaryingDimExpr.getPosition();
+
+    // If the indexing map has result it has to be a shaped type.
+    auto operandType =
+        inputOutputOpOperands[map.index()]->get().getType().cast<ShapedType>();
+    minTileSizes[fastestVaryingDim] =
+        std::max<int64_t>(minTileSizes[fastestVaryingDim],
+                          getVectorSize(entryPointFn, operandType));
+  }
+  return minTileSizes;
+}
+
 /// Returns the type length in bytes. Looks through all the interface binding
 /// ops to see the ABI types and guess-timates the type size to use. This is
 /// used to convert the vector size in bytes to vector size in number of
@@ -409,11 +436,20 @@ static LogicalResult setRootConfig(
     FuncOp entryPointFn, linalg::ContractionOpInterface contractionOp,
     ArrayRef<LoopTilingAndDistributionInfo> tiledLoops) {
   auto linalgOp = cast<linalg::LinalgOp>(contractionOp.getOperation());
+  // Consider all element types and use the smallest vector size. The tiling
+  // sizes are chosen based on the vector size.
   auto lhsShapedType = contractionOp.lhs().getType().cast<ShapedType>();
+  auto rhsShapedType = contractionOp.rhs().getType().cast<ShapedType>();
+  auto resShapedType =
+      linalgOp.getOutputOperand(0)->get().getType().cast<ShapedType>();
+  int64_t vectorSize = getVectorSize(entryPointFn, lhsShapedType);
+  vectorSize = std::min(vectorSize, getVectorSize(entryPointFn, rhsShapedType));
+  vectorSize = std::min(vectorSize, getVectorSize(entryPointFn, resShapedType));
+
   // Use the default distribution for the matmul loops.
   unsigned numLoops = linalgOp.getNumLoops();
-  int64_t vectorSize = getVectorSize(entryPointFn, lhsShapedType);
-  SmallVector<int64_t> minTileSizes(numLoops, vectorSize);
+  SmallVector<int64_t> minTileSizes =
+      getMinTilingSizesForEachDim(entryPointFn, linalgOp);
   SmallVector<int64_t> maxTileSizes(numLoops, defaultWorkgroupTileSize);
   if (numLoops > 3) {
     minTileSizes[0] = 1;
@@ -539,25 +575,9 @@ static LogicalResult setRootConfig(
   unsigned numLoops = genericOp.getNumLoops();
   if (numLoops == 0) return success();
 
-  SmallVector<int64_t> minTileSizes(numLoops, 1),
-      maxTileSizes(numLoops, defaultWorkgroupTileSize);
-  auto inputOutputOpOperands = genericOp.getInputAndOutputOperands();
-  for (auto map : llvm::enumerate(genericOp.getIndexingMaps())) {
-    // Check the fastest varying dimension of the operand. Set the vector size
-    // of the corresponding loop to the vector size.
-    if (map.value().getNumResults() == 0) continue;
-    auto fastestVaryingDimExpr =
-        map.value().getResults().back().dyn_cast<AffineDimExpr>();
-    if (!fastestVaryingDimExpr) continue;
-    unsigned fastestVaryingDim = fastestVaryingDimExpr.getPosition();
-
-    // If the indexing map has result it has to be a shaped type.
-    auto operandType =
-        inputOutputOpOperands[map.index()]->get().getType().cast<ShapedType>();
-    minTileSizes[fastestVaryingDim] =
-        std::max<int64_t>(minTileSizes[fastestVaryingDim],
-                          getVectorSize(entryPointFn, operandType));
-  }
+  SmallVector<int64_t> minTileSizes =
+      getMinTilingSizesForEachDim(entryPointFn, genericOp);
+  SmallVector<int64_t> maxTileSizes(numLoops, defaultWorkgroupTileSize);
   if (llvm::all_of(minTileSizes, [](int64_t vs) { return vs == 1; })) {
     // Nothing to vectorize just lower to loops.
     return success();
