@@ -19,7 +19,7 @@ EXPLICIT_TARGET_MAPPING = {
     "//llvm-external-projects/iree-dialects:IREELinalgExtDialect": [
         "IREELinalgExtDialect"
     ],
-    "//llvm-external-projects/iree-dialects:IREELinalgExtTransforms": [
+    "//llvm-external-projects/iree-dialects:IREELinalgExtPasses": [
         "IREELinalgExtPasses"
     ],
     "//llvm-external-projects/iree-dialects:IREEPyDMDialect": [

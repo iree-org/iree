@@ -71,7 +71,7 @@ cc_library(
         "//iree/compiler/Dialect/HAL/IR",
         "//iree/compiler/Dialect/Util/IR",
         "//llvm-external-projects/iree-dialects:IREELinalgExtDialect",
-        "//llvm-external-projects/iree-dialects:IREELinalgExtTransforms",
+        "//llvm-external-projects/iree-dialects:IREELinalgExtPasses",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:Affine",
         "@llvm-project//mlir:AffineBufferizableOpInterfaceImpl",

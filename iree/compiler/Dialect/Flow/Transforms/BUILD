@@ -76,7 +76,7 @@ cc_library(
         "//iree/compiler/Dialect/Util/Transforms",
         "//iree/compiler/Utils",
         "//llvm-external-projects/iree-dialects:IREELinalgExtDialect",
-        "//llvm-external-projects/iree-dialects:IREELinalgExtTransforms",
+        "//llvm-external-projects/iree-dialects:IREELinalgExtPasses",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:Affine",
         "@llvm-project//mlir:ArithmeticDialect",
