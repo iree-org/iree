@@ -6,11 +6,12 @@
 
 #include "iree-compiler-c/Compiler.h"
 
+#include "iree/compiler/ConstEval/Passes.h"
 #include "iree/compiler/Dialect/VM/IR/VMOps.h"
 #include "iree/compiler/Dialect/VM/Target/Bytecode/BytecodeModuleTarget.h"
 #include "iree/compiler/InputConversion/MHLO/Passes.h"
 #include "iree/compiler/InputConversion/TOSA/Passes.h"
-#include "iree/compiler/Translation/IREEVM.h"
+#include "iree/compiler/Pipelines/Pipelines.h"
 #include "iree/compiler/Utils/OptionUtils.h"
 #include "iree/tools/init_targets.h"
 #include "mlir/CAPI/IR.h"
@@ -133,10 +134,13 @@ void ireeCompilerBuildIREEVMPassPipeline(IreeCompilerOptions options,
                                          MlirOpPassManager passManager) {
   auto *optionsCpp = unwrap(options);
   auto *passManagerCpp = unwrap(passManager);
+  IREEVMPipelineHooks hooks = {
+      // buildConstEvalPassPipelineCallback =
+      [](OpPassManager &pm) { pm.addPass(ConstEval::createJitGlobalsPass()); }};
   buildIREEVMTransformPassPipeline(
       optionsCpp->bindingOptions, optionsCpp->inputDialectOptions,
       optionsCpp->highLevelOptimizationOptions, optionsCpp->schedulingOptions,
-      optionsCpp->halTargetOptions, optionsCpp->vmTargetOptions,
+      optionsCpp->halTargetOptions, optionsCpp->vmTargetOptions, hooks,
       *passManagerCpp);
 }
 

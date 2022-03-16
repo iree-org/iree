@@ -40,6 +40,8 @@
 #include "mlir/Target/LLVMIR/Dialect/LLVMIR/LLVMToLLVMIRTranslation.h"
 #include "mlir/Tools/mlir-translate/Translation.h"
 
+// TODO: Once we are switched to runIreecMain, this can be slimmed down
+// substantially, since it will just be about testing actual translations.
 int mlir::iree_compiler::runIreeTranslateMain(int argc, char **argv) {
   llvm::InitLLVM y(argc, argv);
   mlir::DialectRegistry registry;
