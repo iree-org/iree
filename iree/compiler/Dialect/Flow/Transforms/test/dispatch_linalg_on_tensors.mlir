@@ -1147,3 +1147,33 @@ func @unit_dim_generic(%arg0 : tensor<1x?x1x1x?x?x1x?xf32>,
 //  CHECK-DAG:   %[[D7:.+]] = tensor.dim %[[ARG0]], %[[C7]]
 //      CHECK:   flow.dispatch.workgroups[%[[D7]], %[[D5]], %[[D4]]]
 // CHECK-SAME:       (%[[ARG0]], %[[D1]], %[[D4]], %[[D5]], %[[D7]]
+
+// -----
+
+func @no_fuse_quantized(%arg0 : tensor<?x113x113x64xi8>, %arg1 : tensor<3x3x64xi8>,
+    %arg2 : i32, %arg3 : i32) -> tensor<?x56x56x64xi8> {
+  %c0 = arith.constant 0 : index
+  %c0_i32 = arith.constant 0 : i32
+  %d0 = tensor.dim %arg0, %c0 : tensor<?x113x113x64xi8>
+  %0 = linalg.init_tensor [%d0, 56, 56, 64] : tensor<?x56x56x64xi32>
+  %1 = linalg.fill ins(%c0_i32 : i32) outs(%0 : tensor<?x56x56x64xi32>) -> tensor<?x56x56x64xi32>
+  %2 =  linalg.depthwise_conv_2d_nhwc_hwc_q {dilations = dense<1> : tensor<2xi64>, strides = dense<2> : tensor<2xi64>}
+      ins(%arg0, %arg1, %arg2, %arg3 : tensor<?x113x113x64xi8>, tensor<3x3x64xi8>, i32, i32)
+      outs(%1 : tensor<?x56x56x64xi32>) -> tensor<?x56x56x64xi32>
+  %3 = linalg.init_tensor [%d0, 56, 56, 64] : tensor<?x56x56x64xi8>
+  %4 = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>, affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>],
+      iterator_types = ["parallel", "parallel", "parallel", "parallel"]}
+      ins(%2 : tensor<?x56x56x64xi32>) outs(%3 : tensor<?x56x56x64xi8>) {
+    ^bb0(%b0: i32, %b1 : i8):
+      %5 = arith.trunci %b0 : i32 to i8
+      linalg.yield %5 : i8
+    } -> tensor<?x56x56x64xi8>
+  return %4 : tensor<?x56x56x64xi8>
+}
+//     CHECK: func @no_fuse_quantized
+//     CHECK:   flow.dispatch.workgroups
+//     CHECK:   linalg.depthwise_conv_2d_nhwc_hwc_q
+// CHECK-NOT:   linalg.generic
+//     CHECK:   flow.dispatch.workgroups
+//     CHECK:   linalg.generic
