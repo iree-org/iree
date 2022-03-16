@@ -502,6 +502,7 @@ cc_library(
     includes = ["include"],
     deps = [
         ":IREEInputDialect",
+        ":IREELinalgExtDialect",
         ":IREEPyDMDialect",
         ":IREEPyDMTransforms",
         "@llvm-project//mlir:CAPIIR",
