@@ -222,8 +222,8 @@ static iree_status_t iree_hal_cuda_allocator_allocate_buffer(
   iree_hal_buffer_t* buffer = NULL;
   if (iree_status_is_ok(status)) {
     status = iree_hal_cuda_buffer_wrap(
-        allocator->base_device, base_allocator, memory_type, params->access,
-        params->usage, allocation_size,
+        base_allocator, memory_type, params->access, params->usage,
+        allocation_size,
         /*byte_offset=*/0,
         /*byte_length=*/allocation_size, device_ptr, host_ptr, &buffer);
   }
