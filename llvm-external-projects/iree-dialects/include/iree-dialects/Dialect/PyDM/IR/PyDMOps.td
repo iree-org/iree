@@ -41,6 +41,7 @@ def IREEPyDM_AssignSubscriptOp : IREEPyDM_Op<"assign_subscript", [
     $lhs `[` $slice `]` `=` $rhs `:` type(operands) attr-dict
   }];
   let hasCanonicalizer = 1;
+  let hasVerifier = 0;
 }
 
 //===----------------------------------------------------------------------===//
@@ -182,6 +183,8 @@ def IREEPyDM_FuncOp : IREEPyDM_Op<"func", [
     }]>
   ];
 
+  // TODO: Enforce invariants.
+  let hasVerifier = 0;
   let hasCustomAssemblyFormat = 1;
 }
 
@@ -476,6 +479,7 @@ def IREEPyDM_MakeListOp : IREEPyDM_PureOp<"make_list", [
   let assemblyFormat = [{
     ($elements^ `:` type($elements))? `->` type(results) attr-dict
   }];
+  let hasVerifier = 1;
 }
 
 def IREEPyDM_MakeTupleOp : IREEPyDM_PureOp<"make_tuple"> {
@@ -606,6 +610,7 @@ def FunctionalIfOp : IREEPyDM_Op<"functional_if", [
   let results = (outs Variadic<AnyType>:$results);
   let regions = (region SizedRegion<1>:$thenRegion, AnyRegion:$elseRegion);
 
+  let hasVerifier = 1;
   let hasCustomAssemblyFormat = 1;
 }
 
