@@ -6,7 +6,7 @@ assume starting from the IREE root directory.
 1. First setup the python environment as described [here](https://google.github.io/iree/building-from-source/python-bindings-and-importers/#environment-setup).
 
 ```
-python -m iree.venv
+python -m venv iree.venv
 source iree.venv/bin/activate
 ```
 
