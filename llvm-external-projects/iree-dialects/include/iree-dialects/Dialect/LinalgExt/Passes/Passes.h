@@ -20,6 +20,8 @@ std::unique_ptr<OperationPass<FuncOp>> createLinalgExtToLoopsPass();
 
 std::unique_ptr<OperationPass<>> createPadContractionToBlockSizePass();
 
+void registerTilingInterfaceExternalModels(DialectRegistry &registry);
+
 void registerPasses();
 
 }  // namespace LinalgExt
