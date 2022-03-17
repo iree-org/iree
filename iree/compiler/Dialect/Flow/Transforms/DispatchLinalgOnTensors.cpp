@@ -812,6 +812,36 @@ struct CreateDispatchRegionOp : OpInterfaceRewritePattern<T> {
 // Heuristics for fusing dispatchble ops with root ops using tile + fuse.
 //===----------------------------------------------------------------------===//
 
+/// For the fusion of root op -> elementwise operation to be bufferized
+/// in-place without use of extra memory, the result of the root operation
+/// must be able to reuse the buffer for the result of the elementwise
+/// operation. This is possible if input and output are accessed using the same
+/// indexing map.
+// TODO: This restriction can go away if we can vectorize always, but that has
+// a long tail of tasks.
+static bool canInsOperandTieWithOutsOperand(OpOperand *insOperand) {
+  auto linalgOp = dyn_cast<linalg::LinalgOp>(insOperand->getOwner());
+  if (!linalgOp) return false;
+  AffineMap insOperandIndexingMap = linalgOp.getTiedIndexingMap(insOperand);
+  auto canTieWithOutsOperand = [&](OpOperand *outsOperand) {
+    if (linalgOp.getTiedIndexingMap(outsOperand) != insOperandIndexingMap) {
+      return false;
+    }
+    // TODO(#8411): Until ops are vectorized (always), we need
+    // to check that the elementtype matches for the operands to be tied.
+    // For now just doing this check for convolution ops since we expect
+    // contraction ops to be vectorized.
+    auto producerOp = insOperand->get().getDefiningOp();
+    if (isa<linalg::GenericOp, linalg::ConvolutionOpInterface>(producerOp) &&
+        insOperand->get().getType().cast<ShapedType>().getElementType() !=
+            outsOperand->get().getType().cast<ShapedType>().getElementType()) {
+      return false;
+    }
+    return true;
+  };
+  return llvm::any_of(linalgOp.getOutputOperands(), canTieWithOutsOperand);
+}
+
 /// Some heuristic is needed to fuse a dispatchble op with root operations using
 /// tile + fuse. Using some heuristic, each root operation is tagged with an ID
 /// (using an IntegerAttr with name `kRootOpAttr`) and all dispatchable ops to
@@ -877,11 +907,9 @@ static unsigned decideFusableLinalgOps(FunctionOpInterface funcOp) {
               consumerIndexingMap.getResults()) {
         continue;
       }
-      if (llvm::any_of(
-              consumer.getOutputOperands(), [&consumer](OpOperand *operand) {
-                return !consumer.getTiedIndexingMap(operand).isIdentity();
-              }))
+      if (!canInsOperandTieWithOutsOperand(&use)) {
         continue;
+      }
       int64_t rootNumber = getRootNumber(op);
       setRootAttribute(context, user, rootNumber);
       removeRootOpAttribute(op);
