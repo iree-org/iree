@@ -213,7 +213,6 @@ def main(args):
   build_number = get_build_number(build)
   state = bk.wait_for_build(build_number)
 
-  build_number = get_build_number(build)
   url = bk.get_url_for_build(build_number)
   if state != buildkite.BuildState.PASSED:
     print(f"Build was not successful: {url}")
