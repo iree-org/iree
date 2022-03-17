@@ -416,10 +416,3 @@ if(IREE_BUILD_COMPILER)
   # tools in LLVM.
   iree_get_executable_path(IREE_TABLEGEN_EXE iree-tblgen)
 endif()
-#-------------------------------------------------------------------------------
-# Third party: mlir-emitc
-#-------------------------------------------------------------------------------
-
-if(IREE_ENABLE_EMITC)
-  add_definitions(-DIREE_HAVE_EMITC_DIALECT)
-endif()
