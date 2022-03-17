@@ -42,8 +42,8 @@ static llvm::cl::opt<Favor> partitioningFavor(
 // TODO(#8506): remove the flag once the bug is fixed.
 static llvm::cl::opt<uint64_t> streamDefaultBufferAlignment(
     "iree-stream-default-buffer-alignment",
-    llvm::cl::desc("the default value of stream alignment"),
-    llvm::cl::init(64ull));
+    llvm::cl::desc("Default buffer alignment for stream buffer resources."),
+    llvm::cl::init(128ull));
 
 //===----------------------------------------------------------------------===//
 // #stream.resource_config<...>

@@ -160,7 +160,7 @@ typedef IREE_DEVICE_SIZE_T iree_device_size_t;
 // Executables are compiled with alignment expectations and the runtime
 // alignment must be greater than or equal to the alignment set in the compiler.
 // External buffers wrapped by HAL buffers must meet this alignment requirement.
-#define IREE_HAL_HEAP_BUFFER_ALIGNMENT 64
+#define IREE_HAL_HEAP_BUFFER_ALIGNMENT 128
 #endif  // IREE_HAL_HEAP_BUFFER_ALIGNMENT
 
 #if !defined(IREE_HAL_COMMAND_BUFFER_VALIDATION_ENABLE)
