@@ -526,7 +526,7 @@ cc_binary(
     deps = [
         ":IREEInputDialect",
         ":IREELinalgExtDialect",
-        ":IREELinalgExtTransforms",
+        ":IREELinalgExtPasses",
         ":IREEPyDMDialect",
         ":IREEPyDMTransforms",
         "@llvm-project//llvm:Support",
