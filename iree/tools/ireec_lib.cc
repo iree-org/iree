@@ -226,7 +226,7 @@ int mlir::iree_compiler::runIreecMain(int argc, char **argv) {
         return translateModuleToBytecode(module.get(), bytecodeTargetOptions,
                                          os);
 #ifdef IREE_HAVE_EMITC_DIALECT
-      case OutputFormat::c_module:
+      case OutputFormat::vm_c:
         return mlir::iree_compiler::IREE::VM::translateModuleToC(
             module.get(), cTargetOptions, os);
 #endif
