@@ -18,6 +18,7 @@ allowing them to be patched out of band. These repositories are:
 
 * https://github.com/google/iree-llvm-fork (`main` branch)
 * https://github.com/google/iree-mhlo-fork (`master` branch)
+* https://github.com/google/iree-tf-fork (`master` branch)
 
 By the time you read this, they may be on a cron to advance automatically, but
 even so, it is a good idea to advance them prior to any integrate activities
