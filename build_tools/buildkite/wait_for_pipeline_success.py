@@ -177,42 +177,42 @@ def parse_args():
   return parser.parse_args()
 
 
+def should_create_new_build(build, rebuild_option):
+  if not build:
+    print("Didn't find previous build for pipeline. Creating a new one.")
+    return True
+  state = buildkite.BuildState(build["state"])
+  build_number = get_build_number(build)
+  url = bk.get_url_for_build(build_number)
+  print(f"Found previous build with state '{state.name}': {url}")
+
+  if rebuild_option == "force":
+    print(f"Received `--rebuild=force`, so creating a new build")
+    return True
+  elif rebuild_option == "failed" and state == buildkite.BuildState.FAILED:
+    print(f"Previous build failed and received `--rebuild=failed`, so"
+          f" creating a new one.")
+    return True
+  elif rebuild_option == "bad" and state in (
+      buildkite.BuildState.FAILED,
+      buildkite.BuildState.CANCELED,
+      buildkite.BuildState.SKIPPED,
+      buildkite.BuildState.NOT_RUN,
+  ):
+    print(f"Previous build completed with state '{state.name}' and received"
+          f" `--rebuild=bad`, so creating a new one.")
+    return True
+
+  return False
+
 def main(args):
   bk = BuildkitePipelineManager.from_environ(args.pipeline)
   build = bk.get_latest_build()
-  create_new_build = True
 
-  if build:
-    create_new_build = False
-    state = buildkite.BuildState(build["state"])
-    build_number = get_build_number(build)
-    url = bk.get_url_for_build(build_number)
-    print(f"Found previous build with state '{state.name}': {url}")
-
-    if args.rebuild == "force":
-      print(f"Received `--rebuild=force`, so creating a new build")
-      create_new_build = True
-    elif args.rebuild == "failed" and state == buildkite.BuildState.FAILED:
-      print(f"Previous build failed and received `--rebuild=failed`, so"
-            f" creating a new one.")
-      create_new_build = True
-    elif args.rebuild == "bad" and state in (
-        buildkite.BuildState.FAILED,
-        buildkite.BuildState.CANCELED,
-        buildkite.BuildState.SKIPPED,
-        buildkite.BuildState.NOT_RUN,
-    ):
-      print(f"Previous build completed with state '{state.name}' and received"
-            f" `--rebuild=bad`, so creating a new one.")
-      create_new_build = True
-  else:
-    print("Didn't find previous build for pipeline. Creating a new one.")
-
-  if create_new_build:
+  if should_create_new_build(build, args.rebuild):
     build = bk.create_build()
   build_number = get_build_number(build)
   state = bk.wait_for_build(build_number)
-
   url = bk.get_url_for_build(build_number)
   if state != buildkite.BuildState.PASSED:
     print(f"Build was not successful: {url}")
