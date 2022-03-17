@@ -429,16 +429,20 @@ iree_check_single_backend_test_suite(
             "iota.mlir",
             "log.mlir",
             "log_plus_one.mlir",
+            "maximum.mlir",
+            "minimum.mlir",
             "multiply.mlir",
             "negate.mlir",
             "pad.mlir",
             "pow.mlir",
             "reduce.mlir",
             "reduce_window.mlir",
+            "remainder.mlir",
             "reshape.mlir",
             "reverse.mlir",
             "rng_normal.mlir",
             "rng_uniform.mlir",
+            "round.mlir",
             "rsqrt.mlir",
             "scatter.mlir",
             "scatter_dynamic.mlir",
@@ -454,12 +458,6 @@ iree_check_single_backend_test_suite(
             "while.mlir",
         ],
         include = ["*.mlir"],
-        exclude = [
-            "round.mlir",  # TODO(#8514): Fix compiler crash.
-            "maximum.mlir",  # TODO(#8514): Fix compiler crash.
-            "minimum.mlir",  # TODO(#8514): Fix compiler crash.
-            "remainder.mlir",  # TODO(#8514): Fix compiler crash.
-        ],
     ),
     compiler_flags = [
         "-iree-input-type=mhlo",
