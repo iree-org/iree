@@ -177,7 +177,7 @@ def parse_args():
   return parser.parse_args()
 
 
-def should_create_new_build(build, rebuild_option):
+def should_create_new_build(bk, build, rebuild_option):
   if not build:
     print("Didn't find previous build for pipeline. Creating a new one.")
     return True
@@ -205,11 +205,12 @@ def should_create_new_build(build, rebuild_option):
 
   return False
 
+
 def main(args):
   bk = BuildkitePipelineManager.from_environ(args.pipeline)
   build = bk.get_latest_build()
 
-  if should_create_new_build(build, args.rebuild):
+  if should_create_new_build(bk, build, args.rebuild):
     build = bk.create_build()
   build_number = get_build_number(build)
   state = bk.wait_for_build(build_number)
