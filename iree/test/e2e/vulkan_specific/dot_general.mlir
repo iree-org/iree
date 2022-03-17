@@ -48,19 +48,18 @@ func @dot_general_nontrivial_batching_dimension() {
   return
 }
 
-// TODO(#6070): Re-enable this after fixing wrong answer on Pixel 4.
-// func @large_dot_general2() {
-//   %lhs = util.unfoldable_constant dense<1.0> : tensor<4x32x1024xf32>
-//   %rhs = util.unfoldable_constant dense<0.4> : tensor<4x1024x64xf32>
-//   %res = "mhlo.dot_general"(%lhs, %rhs) {
-//            dot_dimension_numbers = {
-//              lhs_batching_dimensions = dense<0> : tensor<1xi64>,
-//              lhs_contracting_dimensions = dense<2> : tensor<1xi64>,
-//              rhs_batching_dimensions = dense<0> : tensor<1xi64>,
-//              rhs_contracting_dimensions = dense<1> : tensor<1xi64>
-//            },
-//            precision_config = ["DEFAULT", "DEFAULT"]
-//          } : (tensor<4x32x1024xf32>, tensor<4x1024x64xf32>) -> tensor<4x32x64xf32>
-//   check.expect_almost_eq_const(%res, dense<409.596> : tensor<4x32x64xf32>) : tensor<4x32x64xf32>
-//   return
-// }
+func @large_dot_general2() {
+  %lhs = util.unfoldable_constant dense<1.0> : tensor<4x32x1024xf32>
+  %rhs = util.unfoldable_constant dense<0.4> : tensor<4x1024x64xf32>
+  %res = "mhlo.dot_general"(%lhs, %rhs) {
+           dot_dimension_numbers = #mhlo.dot<
+             lhs_batching_dimensions = [0],
+             lhs_contracting_dimensions = [2],
+             rhs_batching_dimensions = [0],
+             rhs_contracting_dimensions = [1],
+           >,
+           precision_config = ["DEFAULT", "DEFAULT"]
+         } : (tensor<4x32x1024xf32>, tensor<4x1024x64xf32>) -> tensor<4x32x64xf32>
+  check.expect_almost_eq_const(%res, dense<409.596> : tensor<4x32x64xf32>) : tensor<4x32x64xf32>
+  return
+}
