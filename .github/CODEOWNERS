@@ -47,6 +47,7 @@
 
 # llvm-external-projects
 /llvm-external-projects/ @stellaraccident
+/llvm-external-projects/iree-dialects/ @MaheshRavishankar
 /llvm-external-projects/iree-dialects/**/Dialect/LinalgExt/ @hanhanW @MaheshRavishankar
 /llvm-external-projects/iree-dialects/test/iree_linalgext @hanhanW @MaheshRavishankar
 
@@ -65,10 +66,11 @@
 /iree/compiler/Codegen/Sandbox/ @hanhanW @MaheshRavishankar
 /iree/compiler/Codegen/SPIRV/ @antiagainst @MaheshRavishankar
 /iree/compiler/ConstEval/ @stellaraccident
+/iree/compiler/Dialect/Flow/ @MaheshRavishankar
 /iree/compiler/Dialect/Vulkan/ @antiagainst
 /iree/compiler/InputConversion/ @MaheshRavishankar @stellaraccident
 /iree/compiler/InputConversion/MHLO @hanhanW @MaheshRavishankar @rsuderman
-/iree/compiler/InputConversion/TOSA @rsuderman
+/iree/compiler/InputConversion/TOSA @MaheshRavishankar @rsuderman
 
 
 # Runtime
