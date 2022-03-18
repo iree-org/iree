@@ -42,8 +42,8 @@ class PackAllocationsPass : public PackAllocationsBase<PackAllocationsPass> {
   }
 
   void runOnOperation() override {
-    auto parentOp = dyn_cast<CallableOpInterface>(getOperation());
-    if (!parentOp || !parentOp.getCallableRegion() ||
+    auto parentOp = getOperation();
+    if (!parentOp.getCallableRegion() ||
         parentOp.getCallableRegion()->empty()) {
       return;
     }
@@ -109,7 +109,8 @@ class PackAllocationsPass : public PackAllocationsBase<PackAllocationsPass> {
 
 }  // namespace
 
-std::unique_ptr<OperationPass<>> createPackAllocationsPass() {
+std::unique_ptr<InterfacePass<CallableOpInterface>>
+createPackAllocationsPass() {
   return std::make_unique<PackAllocationsPass>();
 }
 

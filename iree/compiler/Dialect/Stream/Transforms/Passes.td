@@ -90,7 +90,7 @@ def RefineUsage :
 //===----------------------------------------------------------------------===//
 
 def ScheduleExecution :
-    Pass<"iree-stream-schedule-execution", ""> {
+    InterfacePass<"iree-stream-schedule-execution", "mlir::CallableOpInterface"> {
   let summary = "Identifies and groups asynchronous operations into executable regions within function-like regions.";
   let constructor = [{
     mlir::iree_compiler::IREE::Stream::createScheduleExecutionPass()
@@ -98,7 +98,7 @@ def ScheduleExecution :
 }
 
 def ScheduleConcurrency :
-    Pass<"iree-stream-schedule-concurrency", ""> {
+    InterfacePass<"iree-stream-schedule-concurrency", "mlir::CallableOpInterface"> {
   let summary = "Identifies and groups asynchronous operations within executable regions that can run concurrently and groups them into streams.";
   let constructor = [{
     mlir::iree_compiler::IREE::Stream::createScheduleConcurrencyPass()
@@ -118,7 +118,7 @@ def PropagateTimepoints :
 //===----------------------------------------------------------------------===//
 
 def ScheduleAllocation :
-    Pass<"iree-stream-schedule-allocation", ""> {
+    InterfacePass<"iree-stream-schedule-allocation", "mlir::CallableOpInterface"> {
   let summary = "Allocates resources and converts to explicit stream commands.";
   let constructor = [{
     mlir::iree_compiler::IREE::Stream::createScheduleAllocationPass()
@@ -126,7 +126,7 @@ def ScheduleAllocation :
 }
 
 def PackConstants :
-    Pass<"iree-stream-pack-constants", ""> {
+    InterfacePass<"iree-stream-pack-constants", "mlir::CallableOpInterface"> {
   let summary = "Packs and allocate backing storage for fused constant resources.";
   let constructor = [{
     mlir::iree_compiler::IREE::Stream::createPackConstantsPass()
@@ -134,7 +134,7 @@ def PackConstants :
 }
 
 def PackAllocations :
-    Pass<"iree-stream-pack-allocations", ""> {
+    InterfacePass<"iree-stream-pack-allocations", "mlir::CallableOpInterface"> {
   let summary = "Packs fused allocations based on lifetime.";
   let constructor = [{
     mlir::iree_compiler::IREE::Stream::createPackAllocationsPass()
@@ -142,7 +142,7 @@ def PackAllocations :
 }
 
 def LayoutSlices :
-    Pass<"iree-stream-layout-slices", ""> {
+    InterfacePass<"iree-stream-layout-slices", "mlir::CallableOpInterface"> {
   let summary = "Lays out packed slices and produces arithmetic required for all offsets.";
   let constructor = [{
     mlir::iree_compiler::IREE::Stream::createLayoutSlicesPass()

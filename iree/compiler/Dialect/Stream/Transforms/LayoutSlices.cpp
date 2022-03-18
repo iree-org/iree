@@ -254,8 +254,8 @@ class LayoutSlicesPass : public LayoutSlicesBase<LayoutSlicesPass> {
   }
 
   void runOnOperation() override {
-    auto parentOp = dyn_cast<CallableOpInterface>(getOperation());
-    if (!parentOp || !parentOp.getCallableRegion() ||
+    auto parentOp = getOperation();
+    if (!parentOp.getCallableRegion() ||
         parentOp.getCallableRegion()->empty()) {
       return;
     }
@@ -318,7 +318,7 @@ class LayoutSlicesPass : public LayoutSlicesBase<LayoutSlicesPass> {
 
 }  // namespace
 
-std::unique_ptr<OperationPass<>> createLayoutSlicesPass() {
+std::unique_ptr<InterfacePass<CallableOpInterface>> createLayoutSlicesPass() {
   return std::make_unique<LayoutSlicesPass>();
 }
 
