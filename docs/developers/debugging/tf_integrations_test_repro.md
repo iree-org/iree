@@ -22,10 +22,15 @@ python -m pip install iree-compiler iree-runtime iree-tools-tf iree-tools-tflite
 python -m pip install tf-nightly Pillow
 ```
 
-4. Run the python test command line (this can be obtained from the log of the failing test). For example,
+4. Run the python test command line. The command can be obtained from the run file. For example, if iree_tfl_tests/llvmaot_posenet_i8.run failed,
 
 ```
-cd integrations/tensorflow/test/python
+cd integrations/tensorflow/test/
+cat iree_tfl_tests/llvmaot_posenet_i8.run
+
+# REQUIRES: llvmaot
+# RUN: %PYTHON -m iree_tfl_tests.posenet_i8_test --target_backend=llvmaot -artifacts_dir=%t
+
 python -m iree_tfl_tests.posenet_i8_test -- target_backend=llvmaot -artifacts_dir=/tmp/posenet_i8_failure
 ```
 
