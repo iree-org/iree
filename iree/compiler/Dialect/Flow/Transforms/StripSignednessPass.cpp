@@ -114,8 +114,8 @@ void StripSignednessPass::runOnOperation() {
 
   RewritePatternSet patterns(&getContext());
   patterns.insert<GenericTypeConvert>(ctx, converter);
-  populateFunctionOpInterfaceTypeConversionPattern(getOperation().getName(),
-                                                   patterns, converter);
+  populateFunctionOpInterfaceTypeConversionPattern(
+      getOperation()->getName().getStringRef(), patterns, converter);
 
   if (failed(
           applyFullConversion(getOperation(), target, std::move(patterns)))) {
