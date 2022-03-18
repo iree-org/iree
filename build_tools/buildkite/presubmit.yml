@@ -1,0 +1,46 @@
+# Copyright 2022 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+# Note: this runs on "security: submitted" agents, since this pipeline itself is
+# submitted code and it fetches the scripts from the main branch.
+
+steps:
+  # TODO: Is there a better emoji here? Google logo (would have to add to
+  # Buildkite)?
+  - label: ":face_with_monocle: :admission_tickets: :raised_hand: Check CLA"
+    agents:
+      queue: "orchestration"
+      security: "submitted"
+    # We're not checking out from the PR and besides saving time, we really
+    # don't want to because we don't want unsubmitted code on these executors at
+    # all.
+    plugins:
+      - thedyrt/skip-checkout#0870506e0b5d4becc164c6e64dbc331938f0bdcf:
+          cd: /tmp/
+    commands: |
+      # TODO: Switch to main branch
+      curl \
+        https://raw.githubusercontent.com/GMNGeoffrey/iree/whole-new-world/build_tools/buildkite/check_cla.py \
+        | python3 - ${BUILDKITE_COMMIT} \
+      || curl \
+        https://raw.githubusercontent.com/GMNGeoffrey/iree/whole-new-world/build_tools/buildkite/cla_failure.yml \
+        | buildkite-agent pipeline upload
+
+  - wait
+
+  - label: "Execute gcmn-test-pipeline"
+    agents:
+      queue: "orchestration"
+      security: "submitted"
+    plugins:
+      - thedyrt/skip-checkout#0870506e0b5d4becc164c6e64dbc331938f0bdcf:
+          cd: /tmp/
+    commands: |
+      export BUILDKITE_ACCESS_TOKEN="$(gcloud secrets versions access latest --secret=iree-buildkite-presubmit-pipelines)"
+      # TODO: Switch to main branch
+      curl \
+        https://raw.githubusercontent.com/GMNGeoffrey/iree/whole-new-world/build_tools/buildkite/wait_for_pipeline_success.py \
+        | python3 - gcmn-test-pipeline
