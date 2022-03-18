@@ -10,7 +10,7 @@
 steps:
   # TODO: Is there a better emoji here? Google logo (would have to add to
   # Buildkite)?
-  - label: ":guardsman: :pouting_cat: :raised_hand: Check CLA"
+  - label: ":face_with_monocle: :admission_tickets: :raised_hand: Check CLA"
     agents:
       queue: "orchestration"
       security: "submitted"
@@ -24,7 +24,10 @@ steps:
       # TODO: Switch to main branch
       curl \
         https://raw.githubusercontent.com/GMNGeoffrey/iree/whole-new-world/build_tools/buildkite/check_cla.py \
-        | python3 - ${BUILDKITE_COMMIT}
+        | python3 - ${BUILDKITE_COMMIT} \
+      || curl \
+        https://raw.githubusercontent.com/GMNGeoffrey/iree/whole-new-world/build_tools/buildkite/cla_failure.yml \
+        | buildkite-agent pipeline upload
 
   - wait
 
