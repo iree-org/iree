@@ -137,12 +137,12 @@ LLVMTargetOptions getLLVMTargetOptionsFromFlags() {
       llvm::cl::init(targetOptions.debugSymbols));
   targetOptions.debugSymbols = clDebugSymbols;
 
-  static llvm::cl::opt<std::string> clLinkerPath(
+  static llvm::cl::opt<std::string> clSystemLinkerPath(
       "iree-llvm-system-linker-path",
       llvm::cl::desc("Tool used to link system shared libraries produced by "
                      "IREE (for -iree-llvm-link-embedded=false)."),
       llvm::cl::init(""));
-  targetOptions.linkerPath = clLinkerPath;
+  targetOptions.systemLinkerPath = clSystemLinkerPath;
 
   static llvm::cl::opt<std::string> clEmbeddedLinkerPath(
       "iree-llvm-embedded-linker-path",
@@ -150,6 +150,13 @@ LLVMTargetOptions getLLVMTargetOptionsFromFlags() {
                      "-iree-llvm-link-embedded=true)."),
       llvm::cl::init(""));
   targetOptions.embeddedLinkerPath = clEmbeddedLinkerPath;
+
+  static llvm::cl::opt<std::string> clWasmLinkerPath(
+      "iree-llvm-wasm-linker-path",
+      llvm::cl::desc("Tool used to link WebAssembly modules produced by "
+                     "IREE (for -iree-llvm-target-triple=wasm32-*)."),
+      llvm::cl::init(""));
+  targetOptions.wasmLinkerPath = clWasmLinkerPath;
 
   static llvm::cl::opt<bool> clLinkEmbedded(
       "iree-llvm-link-embedded",
