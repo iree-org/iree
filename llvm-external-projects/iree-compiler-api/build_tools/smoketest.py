@@ -62,4 +62,3 @@ print(f"REVISIONS={version.REVISIONS!r}")
 
 # Check console scripts.
 subprocess.check_output(["ireec", "-help"])
-subprocess.check_output(["iree-translate", "-help"])

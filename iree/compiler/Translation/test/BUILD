@@ -26,7 +26,7 @@ iree_lit_test_suite(
         include = ["*.mlir"],
     ),
     tools = [
-        "//iree/tools:iree-translate",
+        "//iree/tools:ireec",
         "@llvm-project//llvm:FileCheck",
     ],
 )

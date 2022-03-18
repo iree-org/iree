@@ -88,10 +88,10 @@ file using IREE's tools on your own machine.
 For example, to use IREE's `dylib-llvm-aot` target, which is optimized for CPU
 execution using LLVM, refer to the
 [documentation](https://google.github.io/iree/deployment-configurations/cpu-dylib/)
-and compile the imported `counter.mlir` file using `iree-translate`:
+and compile the imported `counter.mlir` file using `ireec`:
 
 ```
-../iree-build/iree/tools/iree-translate \
+../iree-build/iree/tools/ireec \
     -iree-mlir-to-vm-bytecode-module \
     -iree-hal-target-backends=dylib-llvm-aot \
     -iree-input-type=mhlo \

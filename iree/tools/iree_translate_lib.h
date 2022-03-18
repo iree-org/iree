@@ -13,7 +13,7 @@ namespace iree_compiler {
 int runIreeTranslateMain(int argc, char **argv);
 
 // NOTE: We are transitioning from the main compiler being based on
-// the MLIR translation library (i.e. iree-translate) to a dedicated tool
+// the MLIR translation library (i.e. ireec) to a dedicated tool
 // called ireec. When this is done, the above should go away and this file
 // should be renamed to ireec_lib.h.
 int runIreecMain(int argc, char **argv);

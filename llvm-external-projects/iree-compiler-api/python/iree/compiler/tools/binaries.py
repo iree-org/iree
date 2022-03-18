@@ -31,7 +31,6 @@ __all__ = [
 _BUILTIN_TOOLS = [
     "ireec",
     "iree-lld",
-    "iree-translate",
 ]
 
 # In normal distribution circumstances, each named tool is associated with
@@ -147,9 +146,6 @@ def find_tool(exe_name: str) -> str:
 
 
 def _get_builtin_tool(exe_name: str) -> Optional[str]:
-  # Transitional note: iree-translate is allowed and resolves to "ireec".
-  if exe_name == "iree-translate":
-    exe_name = "ireec"
   if platform.system() == "Windows":
     exe_name = exe_name + ".exe"
   this_path = os.path.dirname(__file__)

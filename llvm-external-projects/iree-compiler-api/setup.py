@@ -213,8 +213,6 @@ setup(
     entry_points={
         "console_scripts": [
             "ireec = iree.compiler.tools.scripts.ireec.__main__:main",
-            # Transitional note: iree-translate resolves to ireec.
-            "iree-translate = iree.compiler.tools.scripts.ireec.__main__:main",
         ],
     },
     install_requires=[

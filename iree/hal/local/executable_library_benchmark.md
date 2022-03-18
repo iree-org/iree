@@ -80,7 +80,7 @@ to many different formats/architectures.
 2. Translate the executable into the binary form consumed by the IREE loaders:
 
 ```
-iree-translate \
+ireec \
     -iree-mlir-to-hal-executable \
     iree/hal/local/testdata/elementwise_mul.mlir \
     -o=elementwise_mul.so \
@@ -113,7 +113,7 @@ inspect the IR to find the proper way to call their kernels.
 1. Build your module with the flags you want for your target architecture:
 
 ```
-iree-translate \
+ireec \
     -iree-mlir-to-vm-bytecode-module \
     -iree-input-type=mhlo \
     iree/samples/simple_embedding/simple_embedding_test.mlir \

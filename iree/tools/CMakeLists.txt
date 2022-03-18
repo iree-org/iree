@@ -432,8 +432,6 @@ if(${IREE_BUILD_COMPILER})
     DATA
       ${IREE_LLD_TARGET}
     HOSTONLY
-    # TODO: Enable when ready. Excluded for now to save build time for folks.
-    EXCLUDE_FROM_ALL
   )
 
   iree_cc_binary(
