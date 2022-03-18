@@ -49,10 +49,19 @@ def execute_cmd(args: Sequence[str],
   Raises:
     CalledProcessError if the command fails.
   """
+  cmd = " ".join(args)
   if verbose:
-    cmd = " ".join(args)
     print(f"cmd: {cmd}")
-  return subprocess.run(args, check=True, text=True, **kwargs)
+  try:
+    return subprocess.run(args, check=True, text=True, **kwargs)
+  except subprocess.CalledProcessError as exc:
+    print((f"\n\nThe following command failed:\n\n{cmd}"
+           f"\n\nReturn code: {exc.returncode}\n\n"))
+    if exc.stdout:
+      print(f"Stdout:\n\n{exc.stdout}\n\n")
+    if exc.stderr:
+      print(f"Stderr:\n\n{exc.stderr}\n\n")
+    raise exc
 
 
 def execute_cmd_and_get_output(args: Sequence[str],
