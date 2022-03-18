@@ -8,10 +8,6 @@
 # To disable autogeneration for this file entirely, delete this header.        #
 ################################################################################
 
-if(NOT "${IREE_ENABLE_EMITC}")
-  return()
-endif()
-
 iree_add_all_subdirs()
 
 iree_lit_test_suite(

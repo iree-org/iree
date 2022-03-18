@@ -63,12 +63,6 @@ option(IREE_BUILD_EXPERIMENTAL_WEB_SAMPLES "Builds experimental web samples." OF
 option(IREE_HAL_DRIVER_EXPERIMENTAL_ROCM "Builds the experimental ROCm Backend." OFF)
 
 #-------------------------------------------------------------------------------
-# Derived flags based on primary options
-#-------------------------------------------------------------------------------
-
-cmake_dependent_option(IREE_ENABLE_EMITC "Enables MLIR EmitC dependencies." ON ${IREE_BUILD_COMPILER} OFF)
-
-#-------------------------------------------------------------------------------
 # Runtime HAL Driver Options
 # By default, all runtime drivers supported by the current platform which do
 # not require external deps are enabled by default. This can be changed with:

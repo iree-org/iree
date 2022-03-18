@@ -7,16 +7,13 @@
 #include "iree/compiler/Translation/IREEVM.h"
 
 #include "iree/compiler/ConstEval/Passes.h"
+#include "iree/compiler/Dialect/VM/Target/C/CModuleTarget.h"
+#include "iree/compiler/Dialect/VM/Target/C/TranslationFlags.h"
 #include "iree/compiler/Pipelines/Pipelines.h"
 #include "iree/compiler/Utils/PassUtils.h"
 #include "iree/compiler/Utils/TracingUtils.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Tools/mlir-translate/Translation.h"
-
-#ifdef IREE_HAVE_EMITC_DIALECT
-#include "iree/compiler/Dialect/VM/Target/C/CModuleTarget.h"
-#include "iree/compiler/Dialect/VM/Target/C/TranslationFlags.h"
-#endif  // IREE_HAVE_EMITC_DIALECT
 
 namespace mlir {
 namespace iree_compiler {
@@ -103,7 +100,6 @@ static LogicalResult translateFromMLIRToVMBytecodeModuleWithFlags(
   return translateModuleToBytecode(moduleOp, bytecodeTargetOptions, output);
 }
 
-#ifdef IREE_HAVE_EMITC_DIALECT
 // Translates an MLIR module containing a set of supported IREE input dialects
 // to an IREE VM C module.
 //
@@ -129,7 +125,6 @@ static LogicalResult translateFromMLIRToVMCModuleWithFlags(
   return mlir::iree_compiler::IREE::VM::translateModuleToC(
       moduleOp, cTargetOptions, output);
 }
-#endif  // IREE_HAVE_EMITC_DIALECT
 
 void registerIREEVMTranslationFlags() {
   BindingOptions::FromFlags::get();
@@ -146,11 +141,8 @@ void registerIREEVMTranslation() {
   TranslateFromMLIRRegistration toVMBytecodeModuleWithFlags(
       "iree-mlir-to-vm-bytecode-module",
       translateFromMLIRToVMBytecodeModuleWithFlags);
-
-#ifdef IREE_HAVE_EMITC_DIALECT
   TranslateFromMLIRRegistration toVMCModuleWithFlags(
       "iree-mlir-to-vm-c-module", translateFromMLIRToVMCModuleWithFlags);
-#endif  // IREE_HAVE_EMITC_DIALECT
 }
 
 }  // namespace iree_compiler

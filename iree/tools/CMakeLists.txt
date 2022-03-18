@@ -261,15 +261,13 @@ if(${IREE_BUILD_COMPILER})
       "init_mlir_dialects.h"
       "init_mlir_passes.h"
     DEPS
-      # Sets IREE_HAVE_EMITC_DIALECT and transitively depends on MLIREmitC
-      # if enabled.
-      iree::compiler::Dialect::VM::Target::C::Enabled
       MLIRAffine
       MLIRAffineTransforms
       MLIRArmNeon
       MLIRArmNeon2dToIntr
       MLIRBufferization
       MLIRControlFlow
+      MLIREmitC
       MLIRGPUOps
       MLIRGPUToSPIRV
       MLIRIR

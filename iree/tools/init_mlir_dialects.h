@@ -16,6 +16,7 @@
 #include "mlir/Dialect/ArmNeon/ArmNeonDialect.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
+#include "mlir/Dialect/EmitC/IR/EmitC.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/GPU/GPUDialect.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
@@ -32,39 +33,32 @@
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/IR/Dialect.h"
 
-#ifdef IREE_HAVE_EMITC_DIALECT
-#include "mlir/Dialect/EmitC/IR/EmitC.h"
-#endif  // IREE_HAVE_EMITC_DIALECT
-
 namespace mlir {
 
 // Add all the MLIR dialects to the provided registry.
 inline void registerMlirDialects(DialectRegistry &registry) {
   // clang-format off
   registry.insert<AffineDialect,
-                  cf::ControlFlowDialect,
+                  arm_neon::ArmNeonDialect,
                   bufferization::BufferizationDialect,
+                  cf::ControlFlowDialect,
+                  emitc::EmitCDialect,
+                  func::FuncDialect,
                   gpu::GPUDialect,
-                  LLVM::LLVMDialect,
                   linalg::LinalgDialect,
+                  LLVM::LLVMDialect,
                   math::MathDialect,
                   memref::MemRefDialect,
-                  scf::SCFDialect,
-                  quant::QuantizationDialect,
-                  spirv::SPIRVDialect,
-                  arm_neon::ArmNeonDialect,
-                  func::FuncDialect,
                   mlir::arith::ArithmeticDialect,
-                  vector::VectorDialect,
+                  quant::QuantizationDialect,
+                  scf::SCFDialect,
+                  shape::ShapeDialect,
+                  spirv::SPIRVDialect,
                   tensor::TensorDialect,
                   tosa::TosaDialect,
-                  shape::ShapeDialect>();
+                  vector::VectorDialect>();
   // clang-format on
   tensor::registerInferTypeOpInterfaceExternalModels(registry);
-
-#ifdef IREE_HAVE_EMITC_DIALECT
-  registry.insert<emitc::EmitCDialect>();
-#endif  // IREE_HAVE_EMITC_DIALECT
 }
 
 }  // namespace mlir

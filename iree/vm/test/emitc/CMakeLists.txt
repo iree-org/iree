@@ -4,9 +4,11 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-iree_add_all_subdirs()
+# Note: These tests are not included under Bazel because the iree_c_module
+# function has not yet been implemented there. Once it is, we can generate this
+# file using bazel_to_cmake.
 
-if(${IREE_ENABLE_EMITC})
+iree_add_all_subdirs()
 
 iree_cc_test(
   NAME
@@ -296,5 +298,3 @@ iree_c_module(
   FLAGS
     "-iree-vm-ir-to-c-module"
 )
-
-endif()

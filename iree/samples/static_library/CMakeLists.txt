@@ -10,8 +10,7 @@ if(NOT ${IREE_TARGET_BACKEND_DYLIB_LLVM_AOT}
   return()
 endif()
 
-# Set iree-translate binary.
-set(_TRANSLATE_TOOL_EXECUTABLE $<TARGET_FILE:iree_tools_iree-translate>)
+iree_get_executable_path(_TRANSLATE_TOOL_EXECUTABLE "iree-translate")
 
 ## Example with VM bytecode module.
 # Setup args for iree-translate.
@@ -93,11 +92,6 @@ iree_lit_test(
   LABELS
     "hostonly"
 )
-
-
-if(NOT (${IREE_ENABLE_EMITC} OR DEFINED IREE_HOST_BINARY_ROOT))
-  return()
-endif()
 
 ## Example with VM C module.
 # Setup args for iree-translate.

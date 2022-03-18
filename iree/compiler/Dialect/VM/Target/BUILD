@@ -13,9 +13,6 @@ package(
 cc_library(
     name = "init_targets",
     hdrs = ["init_targets.h"],
-    defines = [
-        "IREE_HAVE_EMITC_DIALECT",
-    ],
     deps = [
         "//iree/compiler/Dialect/VM/Target/Bytecode",
         "//iree/compiler/Dialect/VM/Target/C",

@@ -10,6 +10,8 @@
 #include <type_traits>
 
 #include "iree/compiler/ConstEval/Passes.h"
+#include "iree/compiler/Dialect/VM/Target/C/CModuleTarget.h"
+#include "iree/compiler/Dialect/VM/Target/C/TranslationFlags.h"
 #include "iree/compiler/Dialect/VM/Target/init_targets.h"
 #include "iree/compiler/Pipelines/Pipelines.h"
 #include "iree/compiler/Utils/PassUtils.h"
@@ -41,11 +43,6 @@
 #include "mlir/Support/Timing.h"
 #include "mlir/Support/ToolUtilities.h"
 #include "mlir/Tools/mlir-translate/Translation.h"
-
-#ifdef IREE_HAVE_EMITC_DIALECT
-#include "iree/compiler/Dialect/VM/Target/C/CModuleTarget.h"
-#include "iree/compiler/Dialect/VM/Target/C/TranslationFlags.h"
-#endif  // IREE_HAVE_EMITC_DIALECT
 
 namespace mlir {
 namespace iree_compiler {
@@ -122,9 +119,7 @@ int mlir::iree_compiler::runIreecMain(int argc, char **argv) {
       llvm::cl::values(
           clEnumValN(OutputFormat::vm_bytecode, "vm-bytecode",
                      "IREE VM Bytecode (default)"),
-#ifdef IREE_HAVE_EMITC_DIALECT
           clEnumValN(OutputFormat::vm_c, "vm-c", "C source module"),
-#endif
           clEnumValN(OutputFormat::vm_asm, "vm-asm", "IREE VM MLIR Assembly")),
       llvm::cl::init(OutputFormat::none), llvm::cl::cat(mainOptions));
 
@@ -144,10 +139,8 @@ int mlir::iree_compiler::runIreecMain(int argc, char **argv) {
                      "process each chunk independently"),
       llvm::cl::init(false));
 
-// Optional output formats.
-#ifdef IREE_HAVE_EMITC_DIALECT
+  // Other output formats.
   auto cTargetOptions = IREE::VM::getCTargetOptionsFromFlags();
-#endif
 
   llvm::cl::ParseCommandLineOptions(argc, argv, "IREE compilation driver\n");
 
@@ -225,11 +218,9 @@ int mlir::iree_compiler::runIreecMain(int argc, char **argv) {
       case OutputFormat::vm_bytecode:
         return translateModuleToBytecode(module.get(), bytecodeTargetOptions,
                                          os);
-#ifdef IREE_HAVE_EMITC_DIALECT
       case OutputFormat::vm_c:
         return mlir::iree_compiler::IREE::VM::translateModuleToC(
             module.get(), cTargetOptions, os);
-#endif
       default:
         llvm::errs() << "INTERNAL ERROR: Unknown output format\n";
         return failure();
