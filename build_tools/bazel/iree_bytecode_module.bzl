@@ -76,7 +76,8 @@ def iree_bytecode_module(
                 "$(location %s)" % (translate_tool),
                 " ".join(flags),
                 "-iree-llvm-embedded-linker-path=$(location %s)" % (linker_tool),
-                "-iree-llvm-system-linker-path=$(location %s)" % (linker_tool),
+                "-iree-llvm-wasm-linker-path=$(location %s)" % (linker_tool),
+                # Note: -iree-llvm-system-linker-path is left unspecified.
                 "-o $(location %s)" % (module),
                 "$(location %s)" % (translate_src),
             ]),
