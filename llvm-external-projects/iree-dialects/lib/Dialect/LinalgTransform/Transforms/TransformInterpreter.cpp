@@ -35,18 +35,28 @@
 #include "mlir/Dialect/Tensor/Transforms/BufferizableOpInterfaceImpl.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/Dialect/Vector/Transforms/BufferizableOpInterfaceImpl.h"
+#include "mlir/Parser/Parser.h"
 #include "mlir/Pass/Pass.h"
+#include "mlir/Support/FileUtilities.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "mlir/Transforms/Passes.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/ScopeExit.h"
 #include "llvm/ADT/TypeSwitch.h"
+#include "llvm/Support/CommandLine.h"
+#include "llvm/Support/SourceMgr.h"
 
 #define DEBUG_TYPE "transform-interpreter"
 #define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE << "]: ")
 
 using namespace mlir;
 using namespace mlir::linalg;
+
+static llvm::cl::opt<std::string> clTransformFileName(
+    "linalg-transform-file-name",
+    llvm::cl::desc("mlir file containing a top-level module that specifies "
+                   "the transformations to apply."),
+    llvm::cl::init(""));
 
 //===----------------------------------------------------------------------===//
 // Linalg Interpreter Driver
@@ -90,16 +100,17 @@ static LogicalResult performEnablerTransformations(
   return eliminateCommonSubexpressionsWithTrackedOps(func, listener);
 }
 
-/// Run enabling transformations on the given model while preserving the
+/// Run enabling transformations on the given `containerOp` while preserving the
 /// operation tracking information.
 static LogicalResult performEnablerTransformations(
-    ModuleOp module, RewriteListener &listener,
+    Operation *containerOp, RewriteListener &listener,
     linalg::LinalgEnablingOptions options = linalg::LinalgEnablingOptions()) {
-  for (auto func : module.getOps<FuncOp>()) {
+  auto res = containerOp->walk([&](FuncOp func) {
     if (failed(performEnablerTransformations(func, listener, options)))
-      return failure();
-  }
-  return success();
+      return WalkResult::interrupt();
+    return WalkResult::advance();
+  });
+  return failure(res.wasInterrupted());
 }
 
 static LogicalResult executeTransform(Operation *operation,
@@ -128,8 +139,8 @@ static LogicalResult checkedListenerTransform(
 /// produced by previous transformations as indicated by SSA value flow in the
 /// Linalg Transform dialect.
 static LogicalResult executeSequence(linalg::transform::SequenceOp sequence,
-                                     ModuleOp module) {
-  MLIRContext *ctx = module->getContext();
+                                     Operation *containerOp) {
+  MLIRContext *ctx = containerOp->getContext();
   RewritePatternSet patternList(ctx);
   for (Dialect *dialect : ctx->getLoadedDialects())
     dialect->getCanonicalizationPatterns(patternList);
@@ -137,14 +148,14 @@ static LogicalResult executeSequence(linalg::transform::SequenceOp sequence,
     op.getCanonicalizationPatterns(patternList, ctx);
   FrozenRewritePatternSet patterns(std::move(patternList));
 
-  transform::TransformState state(module);
+  transform::TransformState state(containerOp);
   TrackingListener &listener = state.addExtension<TrackingListener>();
 
   // Run the canonicalizations upfront so we don't match and transform
   // operations only to drop them later.
   if (failed(checkedListenerTransform(
           [&](TrackingListener &listener) {
-            return eliminateCommonSubexpressionsWithTrackedOps(module,
+            return eliminateCommonSubexpressionsWithTrackedOps(containerOp,
                                                                listener);
           },
           listener))) {
@@ -153,7 +164,7 @@ static LogicalResult executeSequence(linalg::transform::SequenceOp sequence,
   }
   if (failed(checkedListenerTransform(
           [&](TrackingListener &listener) {
-            return applyPatternsTrackAndFoldGreedily(module, listener,
+            return applyPatternsTrackAndFoldGreedily(containerOp, listener,
                                                      patterns);
           },
           listener))) {
@@ -165,7 +176,7 @@ static LogicalResult executeSequence(linalg::transform::SequenceOp sequence,
     if (failed(executeTransform(&transform, state))) {
       std::string str;
       llvm::raw_string_ostream ss(str);
-      ss << "failed to apply: " << transform << "\nto module\n" << module;
+      ss << "failed to apply: " << transform << "\nto\n" << containerOp;
       ss.flush();
       return transform.emitError() << str;
     }
@@ -182,7 +193,7 @@ static LogicalResult executeSequence(linalg::transform::SequenceOp sequence,
     // we don't need all of enabler transformations after/before all passes.
     if (failed(checkedListenerTransform(
             [&](TrackingListener &listener) {
-              return eliminateCommonSubexpressionsWithTrackedOps(module,
+              return eliminateCommonSubexpressionsWithTrackedOps(containerOp,
                                                                  listener);
             },
             listener))) {
@@ -193,7 +204,7 @@ static LogicalResult executeSequence(linalg::transform::SequenceOp sequence,
     // TODO: this runs CSE internally, mostly redundant with the above.
     if (failed(checkedListenerTransform(
             [&](TrackingListener &listener) {
-              return performEnablerTransformations(module, listener);
+              return performEnablerTransformations(containerOp, listener);
             },
             listener))) {
       LLVM_DEBUG(DBGS() << "enabler transformations failed\n");
@@ -202,7 +213,7 @@ static LogicalResult executeSequence(linalg::transform::SequenceOp sequence,
 
     if (failed(checkedListenerTransform(
             [&](TrackingListener &listener) {
-              return applyPatternsTrackAndFoldGreedily(module, listener,
+              return applyPatternsTrackAndFoldGreedily(containerOp, listener,
                                                        patterns);
             },
             listener))) {
@@ -234,19 +245,20 @@ struct InterpreterPass : public PassWrapper<InterpreterPass, Pass> {
 
   void getDependentDialects(DialectRegistry &registry) const override {
     // clang-format off
-    registry.insert<arith::ArithmeticDialect, 
+    registry.insert<arith::ArithmeticDialect,
                     AffineDialect,
                     bufferization::BufferizationDialect,
                     func::FuncDialect,
-                    linalg::LinalgDialect, 
+                    linalg::LinalgDialect,
+                    linalg::transform::LinalgTransformDialect,
                     LLVM::LLVMDialect,
                     pdl::PDLDialect,
                     pdl_interp::PDLInterpDialect,
-                    scf::SCFDialect, 
+                    scf::SCFDialect,
                     tensor::TensorDialect,
                     vector::VectorDialect
-                    // clang-format on
-                    >();
+        // clang-format on
+        >();
 
     arith::registerBufferizableOpInterfaceExternalModels(registry);
     linalg::registerBufferizableOpInterfaceExternalModels(registry);
@@ -257,30 +269,54 @@ struct InterpreterPass : public PassWrapper<InterpreterPass, Pass> {
     vector::registerBufferizableOpInterfaceExternalModels(registry);
   }
 
-  void runOnOperation() override {
-    auto module = dyn_cast<ModuleOp>(getOperation());
+  void runTransformModuleOnOperation(ModuleOp module, Operation *op) {
     if (!module)
       return signalPassFailure();
 
-    auto result = module.walk([&](linalg::transform::SequenceOp sequenceOp) {
-      if (failed(executeSequence(sequenceOp, module)))
+    auto result = module->walk([&](linalg::transform::SequenceOp sequenceOp) {
+      if (failed(executeSequence(sequenceOp, op)))
         return WalkResult::interrupt();
       return WalkResult::advance();
     });
-
     if (result.wasInterrupted())
       signalPassFailure();
   }
+
+  void runOnOperation() override {
+    // If no transform file is specified, assume the transforms live in the
+    // same module as the IR. The considered ModuleOp is either `getOperation()`
+    // if it is already a ModuleOp, or the first parent ModuleOp.
+    if (clTransformFileName.empty()) {
+      ModuleOp module = dyn_cast<ModuleOp>(getOperation());
+      if (!module)
+        module = getOperation()->getParentOfType<ModuleOp>();
+      return runTransformModuleOnOperation(module, getOperation());
+    }
+
+    // If a transform file is specified, parse its content into a ModuleOp.
+    std::string errorMessage;
+    auto memoryBuffer = openInputFile(clTransformFileName, &errorMessage);
+    if (!memoryBuffer) {
+      llvm::errs() << errorMessage << "\n";
+      return signalPassFailure();
+    }
+    // Tell sourceMgr about this buffer, the parser will pick it up.
+    llvm::SourceMgr sourceMgr;
+    sourceMgr.AddNewSourceBuffer(std::move(memoryBuffer), llvm::SMLoc());
+    OwningOpRef<ModuleOp> module(
+        parseSourceFile<ModuleOp>(sourceMgr, &getContext()));
+    runTransformModuleOnOperation(module.get(), getOperation());
+  }
 };
 
-struct DropScheduleFromModulePass
-    : public PassWrapper<DropScheduleFromModulePass, Pass> {
+struct DropSchedulePass
+    : public PassWrapper<DropSchedulePass, Pass> {
   StringRef getArgument() const final {
-    return "linalg-drop-schedule-from-module";
+    return "linalg-drop-schedule";
   }
 
   StringRef getDescription() const final {
-    return "Drop the schedule from the module";
+    return "Drop the schedule from the operation";
   }
 
   bool canScheduleOn(RegisteredOperationName opName) const override {
@@ -288,11 +324,7 @@ struct DropScheduleFromModulePass
   }
 
   void runOnOperation() override {
-    auto module = dyn_cast<ModuleOp>(getOperation());
-    if (!module)
-      return signalPassFailure();
-
-    module.walk([&](Operation *nestedOp) {
+    getOperation()->walk([&](Operation *nestedOp) {
       if (isa<linalg::transform::SequenceOp>(nestedOp) ||
           isa<pdl::PatternOp>(nestedOp))
         nestedOp->erase();
@@ -307,8 +339,8 @@ std::unique_ptr<Pass> createLinalgTransformInterpreterPass() {
   return std::make_unique<InterpreterPass>();
 }
 /// Create a Linalg pass to drop the schedule from the module.
-std::unique_ptr<Pass> createDropScheduleFromModulePass() {
-  return std::make_unique<DropScheduleFromModulePass>();
+std::unique_ptr<Pass> createDropSchedulePass() {
+  return std::make_unique<DropSchedulePass>();
 }
 } // namespace mlir
 
@@ -318,6 +350,6 @@ void mlir::linalg::transform::registerLinalgTransformInterpreterPass() {
 }
 
 /// Registration hook for the Linalg drop schedule from module pass.
-void mlir::linalg::transform::registerDropScheduleFromModulePass() {
-  PassRegistration<DropScheduleFromModulePass>();
+void mlir::linalg::transform::registerDropSchedulePass() {
+  PassRegistration<DropSchedulePass>();
 }

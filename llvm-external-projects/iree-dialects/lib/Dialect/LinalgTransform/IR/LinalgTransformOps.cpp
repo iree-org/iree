@@ -45,6 +45,7 @@
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/Diagnostics.h"
 #include "mlir/IR/OpImplementation.h"
+#include "mlir/IR/SymbolTable.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "mlir/Transforms/InliningUtils.h"
@@ -138,8 +139,8 @@ LogicalResult transform::SequenceOp::verify() {
 
 LogicalResult transform::MatchOp::apply(TransformResults &results,
                                         TransformState &state) {
-  FailureOr<SmallVector<Operation *>> ops =
-      findMatchingOps(*this, cast<ModuleOp>(state.getTopLevel()));
+  Operation *topLevelOp = state.getTopLevel();
+  FailureOr<SmallVector<Operation *>> ops = findMatchingOps(*this, topLevelOp);
   if (failed(ops))
     return failure();
   LLVM_DEBUG(DBGS() << "matched " << ops->size() << " ops\n");

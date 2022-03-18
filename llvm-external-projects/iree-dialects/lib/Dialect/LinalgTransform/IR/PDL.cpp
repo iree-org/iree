@@ -12,6 +12,7 @@
 #include "mlir/Dialect/Arithmetic/Utils/Utils.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/PDL/IR/PDLOps.h"
+#include "mlir/IR/SymbolTable.h"
 #include "mlir/Rewrite/FrozenRewritePatternSet.h"
 #include "mlir/Rewrite/PatternApplicator.h"
 #include "llvm/ADT/ScopeExit.h"
@@ -297,11 +298,17 @@ static LogicalResult isDimDynamic(PDLValue value, ArrayAttr constantParams,
   return success(shapedType && shapedType.isDynamicDim(dim));
 }
 
-FailureOr<SmallVector<Operation *>>
-findMatchingOps(Operation *op, SymbolRefAttr pattern, ModuleOp module) {
-  auto patternOp = module.lookupSymbol<pdl::PatternOp>(pattern);
+FailureOr<SmallVector<Operation *>> findMatchingOps(transform::MatchOp matchOp,
+                                                    SymbolRefAttr pattern,
+                                                    Operation *containerOp) {
+  auto symbolTableOp = matchOp->getParentWithTrait<OpTrait::SymbolTable>();
+  if (!symbolTableOp)
+    return {symbolTableOp->emitError("no parent op with a SymbolTable")};
+  auto patternOp = dyn_cast_or_null<pdl::PatternOp>(
+      SymbolTable::lookupSymbolIn(symbolTableOp, pattern));
   if (!patternOp)
-    return {op->emitError("could not find a pattern named: ") << pattern};
+    return {symbolTableOp->emitError("could not find a pattern named: ")
+            << pattern};
 
   // Clone the pattern operation into the temporary module used by the driver
   // as it might be referenced multiple times.
@@ -319,7 +326,7 @@ findMatchingOps(Operation *op, SymbolRefAttr pattern, ModuleOp module) {
                                     noOpRewriter);
 
   RewritePatternSet patterns(std::move(pdlModule));
-  return getMatchingOps(module, std::move(patterns));
+  return getMatchingOps(containerOp, std::move(patterns));
 }
 
 } // namespace linalg

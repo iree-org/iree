@@ -1,6 +1,4 @@
-// RUN: iree-dialects-opt -linalg-interp-transforms %s 
-// TODO: enable once https://reviews.llvm.org/D121369 lands
-// | FileCheck %s
+// RUN: iree-dialects-opt -linalg-interp-transforms %s | FileCheck %s
 
 // This test is verifying that a non-trivial 2*tiling+padding+vectorization transformation completes successfully
 

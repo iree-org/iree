@@ -14,7 +14,7 @@ namespace transform {
 
 void registerLinalgTransformInterpreterPass();
 void registerLinalgTransformExpertExpansionPass();
-void registerDropScheduleFromModulePass();
+void registerDropSchedulePass();
 
 } // namespace transform
 } // namespace linalg
@@ -23,5 +23,5 @@ void registerDropScheduleFromModulePass();
 namespace mlir {
 class Pass;
 std::unique_ptr<Pass> createLinalgTransformInterpreterPass();
-std::unique_ptr<Pass> createDropScheduleFromModulePass();
+std::unique_ptr<Pass> createDropSchedulePass();
 } // namespace mlir
