@@ -19,6 +19,7 @@ iree_lit_test_suite(
     "streams.mlir"
   TOOLS
     FileCheck
+    iree::tools::iree-translate
     iree::tools::ireec
 )
 
