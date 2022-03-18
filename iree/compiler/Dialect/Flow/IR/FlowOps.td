@@ -183,7 +183,11 @@ def FLOW_DispatchWorkgroupIDOp : FLOW_PureOp<"dispatch.workgroup.id", [
   ];
   let assemblyFormat = "`[` $dimension `]` attr-dict `:` type($result)";
 
-  let hasVerifier = 1;
+  let extraClassDeclaration = [{
+    LogicalResult verify() {
+      return verifyDispatchWorkgroupInfoOp(getOperation(), dimension().getZExtValue());
+    }
+  }];
 }
 
 def FLOW_DispatchWorkgroupCountOp : FLOW_PureOp<"dispatch.workgroup.count", [
@@ -214,7 +218,11 @@ def FLOW_DispatchWorkgroupCountOp : FLOW_PureOp<"dispatch.workgroup.count", [
   ];
   let assemblyFormat = "`[` $dimension `]` attr-dict `:` type($result)";
 
-  let hasVerifier = 1;
+  let extraClassDeclaration = [{
+    LogicalResult verify() {
+      return verifyDispatchWorkgroupInfoOp(getOperation(), dimension().getZExtValue());
+    }
+  }];
 }
 
 def FLOW_DispatchWorkgroupSizeOp : FLOW_PureOp<"dispatch.workgroup.size", [
@@ -253,7 +261,11 @@ def FLOW_DispatchWorkgroupSizeOp : FLOW_PureOp<"dispatch.workgroup.size", [
 
   let assemblyFormat = "`[` $dimension `]` attr-dict `:` type($result)";
 
-  let hasVerifier = 1;
+  let extraClassDeclaration = [{
+    LogicalResult verify() {
+      return verifyDispatchWorkgroupInfoOp(getOperation(), dimension().getZExtValue());
+    }
+  }];
 }
 
 def FLOW_DispatchTieShapeOp : FLOW_PureOp<"dispatch.tie_shape", [
