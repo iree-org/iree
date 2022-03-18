@@ -385,6 +385,8 @@ def filter_and_run_benchmarks(
     device_info: AndroidDeviceInfo,
     root_build_dir: str,
     driver_filter: Optional[str],
+    model_name_filter: Optional[str],
+    mode_filter: Optional[str],
     tmp_dir: str,
     normal_benchmark_tool_dir: str,
     traced_benchmark_tool_dir: Optional[str],
@@ -400,8 +402,12 @@ def filter_and_run_benchmarks(
     device_info: an AndroidDeviceInfo object.
     root_build_dir: the root build directory containing the built benchmark
       suites.
-    driver_filter: filter benchmarks to those with the given driver (or all if
-      this is None).
+    driver_filter: filter benchmarks to those whose driver matches this regex
+      (or all if this is None).
+    model_name_filter: filter benchmarks to those whose model name matches this
+      regex (or all if this is None).
+    mode_filter: filter benchmarks to those whose benchmarking mode matches this
+      regex (or all if this is None).
     tmp_dir: path to temporary directory to which intermediate outputs should be
       stored. Separate "benchmark-results" and "captures" subdirectories will be
       created as necessary.
@@ -440,6 +446,9 @@ def filter_and_run_benchmarks(
         cpu_target_arch_filter=cpu_target_arch,
         gpu_target_arch_filter=gpu_target_arch,
         driver_filter=driver_filter,
+        model_name_filter=model_name_filter,
+        mode_filter=mode_filter,
+        available_drivers=available_drivers,
         verbose=verbose)
     run_results, run_errors = run_benchmarks_for_category(
         device_info=device_info,
@@ -530,6 +539,18 @@ def parse_arguments():
       type=str,
       default=None,
       help="Only run benchmarks matching the given driver regex")
+  parser.add_argument(
+      "--model-name-regex",
+      "--model_name_regex",
+      type=str,
+      default=None,
+      help="Only run benchmarks matching the given model name regex")
+  parser.add_argument(
+      "--mode-regex",
+      "--mode_regex",
+      type=str,
+      default=None,
+      help="Only run benchmarks matching the given benchmarking mode regex")
   parser.add_argument("--output",
                       "-o",
                       default=None,
@@ -657,6 +678,8 @@ def main(args):
       device_info=device_info,
       root_build_dir=args.build_dir,
       driver_filter=args.driver_filter_regex,
+      model_name_filter=args.model_name_regex,
+      mode_filter=args.mode_regex,
       tmp_dir=args.tmp_dir,
       normal_benchmark_tool_dir=os.path.realpath(
           args.normal_benchmark_tool_dir),
