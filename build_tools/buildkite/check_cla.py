@@ -110,5 +110,4 @@ def main(args):
 
 
 if __name__ == "__main__":
-  sys.exit(1)
   main(parse_args())
