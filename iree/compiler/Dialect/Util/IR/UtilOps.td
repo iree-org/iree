@@ -517,6 +517,7 @@ def Util_GlobalAddressOp : Util_PureOp<"global.address", [
   let extraClassDeclaration = [{
     IREE::Util::GlobalOp getGlobalOp();
   }];
+  let hasVerifier = 1;
 }
 
 def Util_GlobalLoadOp : Util_Op<"global.load", [

@@ -609,18 +609,19 @@ void DoNotOptimizeOp::print(OpAsmPrinter &p) {
 }
 
 LogicalResult DoNotOptimizeOp::verify() {
-  if (op.getNumOperands() != op.getNumResults()) {
-    return op.emitOpError()
+  Operation *op = getOperation();
+  if (op->getNumOperands() != op->getNumResults()) {
+    return op->emitOpError()
            << "must have same number of operands and results, but has "
-           << op.getNumOperands() << " and " << op.getNumResults()
+           << op->getNumOperands() << " and " << op->getNumResults()
            << ", respectively";
   }
 
-  for (int i = 0, e = op.getNumOperands(); i < e; ++i) {
-    if (op.getOperand(i).getType() != op.getResult(i).getType()) {
-      op.emitOpError() << "must have same operand and result types, but they "
-                          "differ at index "
-                       << i;
+  for (int i = 0, e = op->getNumOperands(); i < e; ++i) {
+    if (op->getOperand(i).getType() != op->getResult(i).getType()) {
+      op->emitOpError() << "must have same operand and result types, but they "
+                           "differ at index "
+                        << i;
     }
   }
 
@@ -771,13 +772,14 @@ void GlobalOp::build(OpBuilder &builder, OperationState &result, StringRef name,
 }
 
 LogicalResult GlobalOp::verify() {
-  if (op.initial_value().hasValue()) {
+  Operation *op = getOperation();
+  if (initial_value().hasValue()) {
     // Ensure the value is something we can convert to a const.
-    if (!isGlobalTypeCompatible(op.type(), op.initial_valueAttr().getType())) {
+    if (!isGlobalTypeCompatible(type(), initial_valueAttr().getType())) {
       return op->emitOpError()
-             << "initial value type mismatch; global " << op.getSymbolName()
-             << " is " << op.type() << " but initial value provided is "
-             << op.initial_valueAttr().getType();
+             << "initial value type mismatch; global " << getSymbolName()
+             << " is " << type() << " but initial value provided is "
+             << initial_valueAttr().getType();
     }
   }
   return success();
@@ -796,9 +798,10 @@ void GlobalAddressOp::getAsmResultNames(
 }
 
 LogicalResult GlobalAddressOp::verify() {
-  auto globalOp = op.getGlobalOp();
+  Operation *op = getOperation();
+  auto globalOp = getGlobalOp();
   if (!globalOp) {
-    return op.emitOpError() << "undefined global: " << op.global();
+    return op->emitOpError() << "undefined global: " << global();
   }
   return success();
 }
@@ -837,26 +840,28 @@ void GlobalLoadOp::getEffects(
 }
 
 LogicalResult GlobalLoadOp::verify() {
-  auto globalOp = op.getGlobalOp();
+  Operation *op = getOperation();
+  auto globalOp = getGlobalOp();
   if (!globalOp) {
-    return op->emitOpError() << "undefined global: " << op.global();
+    return op->emitOpError() << "undefined global: " << global();
   }
   auto loadType = op->getResult(0).getType();
   if (!isGlobalTypeCompatible(globalOp.type(), loadType)) {
     return op->emitOpError()
-           << "global type mismatch; global " << op.global() << " is "
+           << "global type mismatch; global " << global() << " is "
            << globalOp.type() << " but load is " << loadType;
   }
   return success();
 }
 
 LogicalResult GlobalLoadIndirectOp::verify() {
+  Operation *op = getOperation();
   auto globalType =
-      op.global().getType().cast<IREE::Util::PtrType>().getTargetType();
-  auto loadType = op.result().getType();
+      global().getType().cast<IREE::Util::PtrType>().getTargetType();
+  auto loadType = result().getType();
   if (!isGlobalTypeCompatible(globalType, loadType)) {
-    return op.emitOpError() << "global type mismatch; global pointer is "
-                            << globalType << " but load is " << loadType;
+    return op->emitOpError() << "global type mismatch; global pointer is "
+                             << globalType << " but load is " << loadType;
   }
   return success();
 }
@@ -869,20 +874,21 @@ IREE::Util::GlobalOp GlobalStoreOp::getGlobalOp() {
 FlatSymbolRefAttr GlobalStoreOp::getGlobalRefAttr() { return globalAttr(); }
 
 LogicalResult GlobalStoreOp::verify() {
-  auto globalOp = op.getGlobalOp();
+  Operation *op = getOperation();
+  auto globalOp = getGlobalOp();
   if (!globalOp) {
-    return op->emitOpError() << "undefined global: " << op.global();
+    return op->emitOpError() << "undefined global: " << global();
   }
   auto storeType = op->getOperand(0).getType();
   if (globalOp.type() != storeType) {
     return op->emitOpError()
-           << "global type mismatch; global " << op.global() << " is "
+           << "global type mismatch; global " << global() << " is "
            << globalOp.type() << " but store is " << storeType;
   }
   if (!globalOp.isMutable()) {
     // Allow stores to immutable globals in initializers.
     if (!op->getParentOfType<InitializerOp>()) {
-      return op->emitOpError() << "global " << op.global()
+      return op->emitOpError() << "global " << global()
                                << " is not mutable and cannot be stored to";
     }
   }
@@ -890,12 +896,13 @@ LogicalResult GlobalStoreOp::verify() {
 }
 
 LogicalResult GlobalStoreIndirectOp::verify() {
+  Operation *op = getOperation();
   auto globalType =
-      op.global().getType().cast<IREE::Util::PtrType>().getTargetType();
-  auto storeType = op.value().getType();
+      global().getType().cast<IREE::Util::PtrType>().getTargetType();
+  auto storeType = value().getType();
   if (!isGlobalTypeCompatible(globalType, storeType)) {
-    return op.emitOpError() << "global type mismatch; global pointer is "
-                            << globalType << " but store is " << storeType;
+    return op->emitOpError() << "global type mismatch; global pointer is "
+                             << globalType << " but store is " << storeType;
   }
   return success();
 }
@@ -976,23 +983,25 @@ static void printListTypeSet(OpAsmPrinter &printer, Operation *, Type listType,
 }
 
 LogicalResult ListGetOp::verify() {
-  auto listType = op.list().getType().cast<IREE::Util::ListType>();
+  Operation *op = getOperation();
+  auto listType = list().getType().cast<IREE::Util::ListType>();
   auto elementType = listType.getElementType();
-  auto resultType = op.result().getType();
+  auto resultType = result().getType();
   if (!ListType::canImplicitlyCast(elementType, resultType)) {
-    return op.emitError() << "list contains " << elementType
-                          << " and cannot be accessed as " << resultType;
+    return op->emitError() << "list contains " << elementType
+                           << " and cannot be accessed as " << resultType;
   }
   return success();
 }
 
 LogicalResult ListSetOp::verify() {
-  auto listType = op.list().getType().cast<IREE::Util::ListType>();
+  Operation *op = getOperation();
+  auto listType = list().getType().cast<IREE::Util::ListType>();
   auto elementType = listType.getElementType();
-  auto valueType = op.value().getType();
+  auto valueType = value().getType();
   if (!ListType::canImplicitlyCast(valueType, elementType)) {
-    return op.emitError() << "list contains " << elementType
-                          << " and cannot be mutated as " << valueType;
+    return op->emitError() << "list contains " << elementType
+                           << " and cannot be mutated as " << valueType;
   }
   return success();
 }

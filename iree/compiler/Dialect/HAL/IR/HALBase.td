@@ -576,6 +576,7 @@ def HAL_DeviceTargetAttr :
     static SmallVector<ExecutableTargetAttr, 4>
     lookupExecutableTargets(Operation *op);
   }];
+  let hasCustomAssemblyFormat = 1;
 }
 
 def HAL_ExecutableTargetAttr :
@@ -625,6 +626,7 @@ def HAL_ExecutableTargetAttr :
     // device that can load an executable of this target.
     Attribute getMatchExpression();
   }];
+  let hasCustomAssemblyFormat = 1;
 }
 
 //===----------------------------------------------------------------------===//
@@ -661,6 +663,7 @@ def HAL_MatchAnyAttr :
       return $_get(context, ArrayAttr::get(context, conditions));
     }]>,
   ];
+  let hasCustomAssemblyFormat = 1;
 }
 
 def HAL_MatchAllAttr :
@@ -680,6 +683,7 @@ def HAL_MatchAllAttr :
       return $_get(context, ArrayAttr::get(context, conditions));
     }]>,
   ];
+  let hasCustomAssemblyFormat = 1;
 }
 
 def HAL_DeviceMatchIDAttr :
@@ -705,6 +709,7 @@ def HAL_DeviceMatchIDAttr :
       return $_get(target.getContext(), target.getDeviceID());
     }]>,
   ];
+  let hasCustomAssemblyFormat = 1;
 }
 
 def HAL_DeviceMatchFeatureAttr :
@@ -728,6 +733,7 @@ def HAL_DeviceMatchFeatureAttr :
       return $_get(pattern.getContext(), pattern);
     }]>,
   ];
+  let hasCustomAssemblyFormat = 1;
 }
 
 def HAL_DeviceMatchArchitectureAttr :
@@ -751,6 +757,7 @@ def HAL_DeviceMatchArchitectureAttr :
       return $_get(pattern.getContext(), pattern);
     }]>,
   ];
+  let hasCustomAssemblyFormat = 1;
 }
 
 def HAL_DeviceMatchExecutableFormatAttr :
@@ -787,6 +794,8 @@ def HAL_DeviceMatchExecutableFormatAttr :
       return $_get(target.getContext(), target.getFormat());
     }]>,
   ];
+
+  let hasCustomAssemblyFormat = 1;
 }
 
 //===----------------------------------------------------------------------===//
