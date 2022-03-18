@@ -50,9 +50,6 @@ from common.benchmark_suite import (BENCHMARK_SUITE_REL_PATH,
                                     compose_info_object,
                                     filter_benchmarks_for_category)
 
-# VMFB files' relative path against a benchmark category directory.
-VMFB_REL_PATH = "vmfb"
-
 # The flagfile/toolfile's filename for compiled benchmark artifacts.
 MODEL_FLAGFILE_NAME = "flagfile"
 MODEL_TOOLFILE_NAME = "tool"
@@ -199,8 +196,35 @@ def adb_start_cmd(cmd_args: Sequence[str],
   return subprocess.Popen(cmd, stdout=subprocess.PIPE, universal_newlines=True)
 
 
+def get_vmfb_full_path_for_benchmark_case(benchmark_case_dir: str) -> str:
+  flagfile_path = os.path.join(benchmark_case_dir, MODEL_FLAGFILE_NAME)
+  flagfile = open(flagfile_path, "r")
+  flagfile_lines = flagfile.readlines()
+  for line in flagfile_lines:
+    flag_name, flag_value = line.strip().split("=")
+    if flag_name == "--module_file":
+      # Realpath canonicalization matters. The caller may rely on that to track
+      # which files it already pushed.
+      return os.path.realpath(os.path.join(benchmark_case_dir, flag_value))
+  raise ValueError(f"{flagfile_path} does not contain a --module_file flag")
+
+
+def push_vmfb_files(benchmark_case_dirs: Sequence[str], root_benchmark_dir: str,
+                    verbose: bool):
+  vmfb_files_already_pushed = set()
+  for case_dir in benchmark_case_dirs:
+    vmfb_path = get_vmfb_full_path_for_benchmark_case(case_dir)
+    if vmfb_path in vmfb_files_already_pushed:
+      continue
+    vmfb_dir = os.path.dirname(vmfb_path)
+    vmfb_rel_dir = os.path.relpath(vmfb_dir, root_benchmark_dir)
+    adb_push_to_tmp_dir(vmfb_path, relative_dir=vmfb_rel_dir, verbose=verbose)
+    vmfb_files_already_pushed.add(vmfb_path)
+
+
 def run_benchmarks_for_category(
     device_info: AndroidDeviceInfo,
+    root_benchmark_dir: str,
     benchmark_category_dir: str,
     benchmark_case_dirs: Sequence[str],
     tmp_dir: str,
@@ -217,6 +241,7 @@ def run_benchmarks_for_category(
 
   Args:
     device_info: an AndroidDeviceInfo object.
+    root_benchmark_dir: path to the benchmark suite within the root build dir
     benchmark_category_dir: the directory to a specific benchmark category.
     benchmark_case_dirs: a list of benchmark case directories.
     tmp_dir: path to temporary directory to which intermediate outputs should be
@@ -239,14 +264,12 @@ def run_benchmarks_for_category(
     A tuple with a list containing (benchmark-filename, capture-filename) tuples
     and a list containing raised exceptions (only if keep_going is true)
   """
-  # Push the benchmark vmfb and tool files to the Android device first.
-  adb_push_to_tmp_dir(os.path.join(benchmark_category_dir, VMFB_REL_PATH),
-                      relative_dir=os.path.basename(benchmark_category_dir),
-                      verbose=verbose)
-  for f in os.listdir(normal_benchmark_tool_dir):
-    f = os.path.join(normal_benchmark_tool_dir, f)
-    if os.path.isfile(f) and os.access(f, os.X_OK):
-      adb_push_to_tmp_dir(f, relative_dir=NORMAL_TOOL_REL_DIR, verbose=verbose)
+  push_vmfb_files(
+      benchmark_case_dirs=benchmark_case_dirs,
+      root_benchmark_dir=root_benchmark_dir,
+      verbose=verbose,
+  )
+
   # Create directories on the host to store results from each benchmark run.
   benchmark_results_dir = os.path.join(tmp_dir, "benchmark-results")
   os.makedirs(benchmark_results_dir, exist_ok=True)
@@ -255,12 +278,6 @@ def run_benchmarks_for_category(
   captures_dir = os.path.join(tmp_dir, "captures")
   if do_capture:
     os.makedirs(captures_dir, exist_ok=True)
-    for f in os.listdir(traced_benchmark_tool_dir):
-      f = os.path.join(traced_benchmark_tool_dir, f)
-      if os.path.isfile(f) and os.access(f, os.X_OK):
-        adb_push_to_tmp_dir(f,
-                            relative_dir=TRACED_TOOL_REL_DIR,
-                            verbose=verbose)
 
   results = []
   errors = []
@@ -273,6 +290,13 @@ def run_benchmarks_for_category(
     # Read the file specifying which tool should be used for benchmarking
     with open(os.path.join(benchmark_case_dir, MODEL_TOOLFILE_NAME)) as f:
       tool = f.read().strip()
+      adb_push_to_tmp_dir(os.path.join(normal_benchmark_tool_dir, tool),
+                          relative_dir=NORMAL_TOOL_REL_DIR,
+                          verbose=verbose)
+      if do_capture:
+        adb_push_to_tmp_dir(os.path.join(traced_benchmark_tool_dir, tool),
+                            relative_dir=TRACED_TOOL_REL_DIR,
+                            verbose=verbose)
 
     benchmark_info = compose_info_object(device_info, benchmark_category_dir,
                                          benchmark_case_dir)
@@ -452,6 +476,7 @@ def filter_and_run_benchmarks(
         verbose=verbose)
     run_results, run_errors = run_benchmarks_for_category(
         device_info=device_info,
+        root_benchmark_dir=root_benchmark_dir,
         benchmark_category_dir=benchmark_category_dir,
         benchmark_case_dirs=matched_benchmarks,
         tmp_dir=tmp_dir,
