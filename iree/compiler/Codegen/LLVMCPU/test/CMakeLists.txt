@@ -25,6 +25,7 @@ iree_lit_test_suite(
     "synchronize_symbol_visibility.mlir"
     "test_config_mmt4d.mlir"
     "tile_fuse_and_vectorize.mlir"
+    "transpose_avx2_lowering.mlir"
     "unfused_fma.mlir"
     "vector_contract_to_arm_asm.mlir"
     "vector_contract_to_arm_intrinsics.mlir"

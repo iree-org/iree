@@ -51,22 +51,49 @@ llvm::StringMap<IREE::HAL::ExecutableEntryPointOp> getAllEntryPoints(
   return entryPointOps;
 }
 
-/// Returns the LLVM Target triple associated with the `hal.executable.variant`
-/// operation if set.
-static Optional<llvm::Triple> getTargetTriple(
-    IREE::HAL::ExecutableVariantOp variantOp) {
+/// Returns the StringAttr with the name `stringAttr` in the configuration of
+/// `variantOp`, in found.
+static Optional<StringAttr> getConfigStringAttr(
+    IREE::HAL::ExecutableVariantOp variantOp, StringRef stringAttr) {
   IREE::HAL::ExecutableTargetAttr targetAttr = variantOp.target();
   if (!targetAttr) return llvm::None;
   auto config = targetAttr.getConfiguration();
   if (!config) return llvm::None;
-  auto triple = config.getAs<StringAttr>("target_triple");
+  auto attr = config.getAs<StringAttr>(stringAttr);
+  if (!attr) return llvm::None;
+  return attr;
+}
+
+/// Returns the LLVM Target triple associated with the `hal.executable.variant`
+/// operation if set.
+static Optional<llvm::Triple> getTargetTriple(
+    IREE::HAL::ExecutableVariantOp variantOp) {
+  auto triple = getConfigStringAttr(variantOp, "target_triple");
   if (!triple) return llvm::None;
   return llvm::Triple(triple.getValue().str());
+}
+
+/// Returns the CPU target features associated with the `hal.executable.variant`
+/// operation, if set.
+static Optional<StringRef> getCpuFeatures(
+    IREE::HAL::ExecutableVariantOp variantOp) {
+  auto cpuFeatures = getConfigStringAttr(variantOp, "cpu_features");
+  if (!cpuFeatures) return llvm::None;
+  return cpuFeatures->getValue();
 }
 
 bool isX86(IREE::HAL::ExecutableVariantOp variantOp) {
   Optional<llvm::Triple> triple = getTargetTriple(variantOp);
   return triple && triple.getValue().isX86();
+}
+
+// TODO(dcaballe): If we have to check for a significantly large number of
+// features in the future, we may want to consider keeping the TTI instance
+// alive and query subtarget features data structure.
+bool hasAVX2Features(IREE::HAL::ExecutableVariantOp variantOp) {
+  Optional<StringRef> features = getCpuFeatures(variantOp);
+  if (!features) return false;
+  return features->contains("+avx2");
 }
 
 bool isRISCV(IREE::HAL::ExecutableVariantOp variantOp) {
