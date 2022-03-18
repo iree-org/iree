@@ -993,8 +993,8 @@ LogicalResult createDispatchRegionsFromRootOps(mlir::Operation *funcOp) {
 }
 
 void DispatchLinalgOnTensorsPass::runOnOperation() {
-  auto funcOp = llvm::cast<FunctionOpInterface>(getOperation());
-  MLIRContext *context = funcOp->getContext();
+  auto funcOp = getOperation();
+  MLIRContext *context = &getContext();
   unsigned numRoots = decideFusableLinalgOps(funcOp);
 
   LLVM_DEBUG({

@@ -34,7 +34,7 @@ class InjectDispatchTracingPass
   InjectDispatchTracingPass() = default;
 
   void runOnOperation() override {
-    auto funcOp = llvm::cast<FunctionOpInterface>(getOperation());
+    auto funcOp = getOperation();
     for (auto dispatchOp : funcOp.getBody().getOps<DispatchOp>()) {
       std::string entryPointName =
           dispatchOp.entry_point().getRootReference().getValue().str();
