@@ -7,9 +7,9 @@
 name: Advance Upstream Forks
 
 on:
-  # TODO(gcmn): Enable cron once this is stable
-  # schedule:
-  #   - cron: '0 10 * * *'
+  schedule:
+    # Every hour
+    - cron: '0 * * * *'
 
   workflow_dispatch:
 
