@@ -376,7 +376,6 @@ static void addLowerToLLVMPasses(OpPassManager &passManager) {
   if (clCheckIRBeforeLLVMConversion) {
     passManager.addPass(createLLVMCPUCheckIRBeforeLLVMConversionPass());
   }
-
   // Handled tensor-type constants.
   passManager.addPass(arith::createConstantBufferizePass());
   passManager.addPass(createFoldTensorExtractOpPass());
