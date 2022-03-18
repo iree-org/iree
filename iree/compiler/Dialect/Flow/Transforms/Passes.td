@@ -140,7 +140,7 @@ def PadTensorToSubTensorInsert :
 }
 
 def StripSignedness :
-    Pass<"iree-flow-strip-signedness", "mlir::FuncOp"> {
+    InterfacePass<"iree-flow-strip-signedness", "mlir::FunctionOpInterface"> {
   let summary = "Legalizes ui tensors constants to uis";
   let constructor = "mlir::iree_compiler::IREE::Flow::createStripSignednessPass()";
 }

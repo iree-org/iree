@@ -1081,7 +1081,8 @@ void DispatchLinalgOnTensorsPass::runOnOperation() {
   });
 }
 
-std::unique_ptr<Pass> createDispatchLinalgOnTensorsPass() {
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
+createDispatchLinalgOnTensorsPass() {
   return std::make_unique<DispatchLinalgOnTensorsPass>();
 }
 
