@@ -63,7 +63,7 @@ steps:
       - "queue=test-android"
     env:
       IREE_DOCKER_WORKDIR: "/usr/src/github/iree"
-    timeout_in_minutes: "15"
+    timeout_in_minutes: "30"
 
 notify:
   - email: "bdi-build-cop+buildkite@grotations.appspotmail.com"
