@@ -54,8 +54,8 @@
 
 #define DEBUG_TYPE "iree-codegen-linalg-bufferize"
 
-using mlir::bufferization::AnalysisBufferizationOptions;
 using mlir::bufferization::BufferizationOptions;
+using mlir::bufferization::OneShotBufferizationOptions;
 
 namespace mlir {
 namespace iree_compiler {
@@ -97,7 +97,7 @@ static bool isaTensor(Type t) { return t.isa<TensorType>(); };
 /// Run comprehensive bufferize.
 void IREEComprehensiveBufferizePass::runOnOperation() {
   ModuleOp moduleOp = getOperation();
-  AnalysisBufferizationOptions options;
+  OneShotBufferizationOptions options;
   options.allocationFn = allocationFn;
   options.deallocationFn = deallocationFn;
   options.memCpyFn = memCpyFn;

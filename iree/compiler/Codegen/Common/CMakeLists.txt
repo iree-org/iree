@@ -51,7 +51,6 @@ iree_cc_library(
     IREELinalgExtPasses
     LLVMSupport
     MLIRAffine
-    MLIRAffineBufferizableOpInterfaceImpl
     MLIRAffineUtils
     MLIRAnalysis
     MLIRArithmetic

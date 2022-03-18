@@ -55,7 +55,6 @@ cc_library(
     deps = [
         "//iree/compiler/Dialect/Flow/IR",
         "//iree/compiler/Dialect/HAL/IR",
-        "@llvm-project//mlir:AffineBufferizableOpInterfaceImpl",
         "@llvm-project//mlir:ArithmeticTransforms",
         "@llvm-project//mlir:BufferizationDialect",
         "@llvm-project//mlir:BufferizationTransforms",

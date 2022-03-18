@@ -31,7 +31,6 @@ iree_cc_library(
   SRCS
     "BufferizationInterfaces.cpp"
   DEPS
-    MLIRAffineBufferizableOpInterfaceImpl
     MLIRArithmeticTransforms
     MLIRBufferization
     MLIRBufferizationTransforms
