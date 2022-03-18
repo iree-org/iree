@@ -416,6 +416,37 @@ def run_benchmarks_for_category(
   return (results, errors)
 
 
+def get_available_drivers(tool_dir: str, verbose: bool) -> Sequence[str]:
+  config_txt_file_path = os.path.join(tool_dir, "build_config.txt")
+  config_txt_file = open(config_txt_file_path, "r")
+  config_txt_file_lines = config_txt_file.readlines()
+  available_drivers = []
+  for line in config_txt_file_lines:
+    name, value = line.strip().split("=")
+    if value != "ON":
+      continue
+    if name == "IREE_HAL_DRIVER_CUDA":
+      available_drivers.append("cuda")
+    elif name == "IREE_HAL_DRIVER_DYLIB":
+      available_drivers.append("dylib")
+    elif name == "IREE_HAL_DRIVER_DYLIB_SYNC":
+      available_drivers.append("dylib-sync")
+    elif name == "IREE_HAL_DRIVER_EXPERIMENTAL_ROCM":
+      available_drivers.append("rocm")
+    elif name == "IREE_HAL_DRIVER_VMVX":
+      available_drivers.append("vmvx")
+    elif name == "IREE_HAL_DRIVER_VMVX_SYNC":
+      available_drivers.append("vmvx-sync")
+    elif name == "IREE_HAL_DRIVER_VULKAN":
+      available_drivers.append("vulkan")
+    else:
+      continue
+  if verbose:
+    available_drivers_str = ', '.join(available_drivers)
+    print(f"Available drivers: {available_drivers_str}")
+  return available_drivers
+
+
 def filter_and_run_benchmarks(
     device_info: AndroidDeviceInfo,
     root_build_dir: str,
@@ -480,6 +511,8 @@ def filter_and_run_benchmarks(
 
   for directory in sorted(os.listdir(root_benchmark_dir)):
     benchmark_category_dir = os.path.join(root_benchmark_dir, directory)
+    available_drivers = get_available_drivers(
+        tool_dir=normal_benchmark_tool_dir, verbose=verbose)
     matched_benchmarks = filter_benchmarks_for_category(
         benchmark_category_dir=benchmark_category_dir,
         cpu_target_arch_filter=cpu_target_arch,
