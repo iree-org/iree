@@ -32,7 +32,7 @@ static llvm::cl::opt<bool> clCheckIRBeforeLLVMConversion(
     "iree-codegen-check-ir-before-llvm-conversion",
     llvm::cl::desc("Runs the pass to check the IR generated from LLVMCPU "
                    "before conversion to LLVM IR"),
-    llvm::cl::init(true));
+    llvm::cl::init(false));
 
 //===---------------------------------------------------------------------===//
 // Default allocation functions for CPU backend
@@ -368,16 +368,14 @@ static void addLowerToLLVMPasses(OpPassManager &passManager) {
   passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
   passManager.addNestedPass<FuncOp>(createCSEPass());
 
-  // All the memref.alloca ops should be eliminated after all Linalg ops are
-  // lowered to SCF.
-  if (clCheckIRBeforeLLVMConversion) {
-    passManager.addPass(createLLVMCPUCheckIRBeforeLLVMConversionPass());
-  }
-
   // SCF -> STD
   passManager.addNestedPass<FuncOp>(createConvertSCFToCFPass());
   passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
   passManager.addNestedPass<FuncOp>(createCSEPass());
+
+  if (clCheckIRBeforeLLVMConversion) {
+    passManager.addPass(createLLVMCPUCheckIRBeforeLLVMConversionPass());
+  }
 
   // Handled tensor-type constants.
   passManager.addPass(arith::createConstantBufferizePass());
