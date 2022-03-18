@@ -154,7 +154,7 @@ class BuildkitePipelineManager():
       output_str = (
           f"Waiting for build {build_number} to complete. Waited {wait_time}"
           f" seconds. Currently in state '{state.name}':"
-          f" {self.get_url_for_build(build_number)}")
+          f" {linkify(self.get_url_for_build(build_number))}")
       min_line_length = max(min_line_length, len(output_str))
       print(output_str.ljust(min_line_length), "\r", end="", flush=True)
       # Yes, polling is unfortunately the best we can do here :-(
@@ -164,22 +164,13 @@ class BuildkitePipelineManager():
     return f"https://buildkite.com/{self._organization}/{self._pipeline}/builds/{build_number}"
 
 
-def parse_args():
-  parser = argparse.ArgumentParser(
-      description="Waits on the status of the last BuildKite build for a given"
-      " commit or creates such a build if none exists")
-  parser.add_argument(
-      "pipeline", help="The pipeline for which to create and wait for builds")
-  parser.add_argument(
-      "--rebuild",
-      help="Behavior for triggering a new build even if there is an existing"
-      " one. `force`: always rebuild without checking for existing build,"
-      " `failed`: rebuild on build finished in 'failed' state, `bad`: rebuild"
-      " on build finished in state other than 'passed'",
-      choices=["force", "failed", "bad"],
-  )
-  return parser.parse_args()
+# Make a link clickable using ANSI escape sequences. See
+# https://buildkite.com/docs/pipelines/links-and-images-in-log-output
+def linkify(url, text=None):
+  if text is None:
+    text = url
 
+  return f"\033]1339;url={url};content={text}\a"
 
 def should_create_new_build(bk, build, rebuild_option):
   if not build:
@@ -209,6 +200,21 @@ def should_create_new_build(bk, build, rebuild_option):
 
   return False
 
+def parse_args():
+  parser = argparse.ArgumentParser(
+      description="Waits on the status of the last BuildKite build for a given"
+      " commit or creates such a build if none exists")
+  parser.add_argument(
+      "pipeline", help="The pipeline for which to create and wait for builds")
+  parser.add_argument(
+      "--rebuild",
+      help="Behavior for triggering a new build even if there is an existing"
+      " one. `force`: always rebuild without checking for existing build,"
+      " `failed`: rebuild on build finished in 'failed' state, `bad`: rebuild"
+      " on build finished in state other than 'passed'",
+      choices=["force", "failed", "bad"],
+  )
+  return parser.parse_args()
 
 def main(args):
   bk = BuildkitePipelineManager.from_environ(args.pipeline)
@@ -218,12 +224,12 @@ def main(args):
     build = bk.create_build()
   build_number = get_build_number(build)
   url = bk.get_url_for_build(build_number)
-  print(f"Waiting on {url}")
+  print(f"Waiting on {linkify(url)}")
   state = bk.wait_for_build(build_number)
   if state != buildkite.BuildState.PASSED:
-    print(f"Build was not successful: {url}")
+    print(f"Build was not successful: {linkify(url)}")
     sys.exit(1)
-  print(f"Build completed successfully: {url}")
+  print(f"Build completed successfully: {linkify(url)}")
 
 
 if __name__ == "__main__":
