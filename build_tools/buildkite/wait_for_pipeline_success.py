@@ -172,6 +172,7 @@ def linkify(url, text=None):
 
   return f"\033]1339;url={url};content={text}\a"
 
+
 def should_create_new_build(bk, build, rebuild_option):
   if not build:
     print("Didn't find previous build for pipeline. Creating a new one.")
@@ -200,6 +201,7 @@ def should_create_new_build(bk, build, rebuild_option):
 
   return False
 
+
 def parse_args():
   parser = argparse.ArgumentParser(
       description="Waits on the status of the last BuildKite build for a given"
@@ -215,6 +217,7 @@ def parse_args():
       choices=["force", "failed", "bad"],
   )
   return parser.parse_args()
+
 
 def main(args):
   bk = BuildkitePipelineManager.from_environ(args.pipeline)
