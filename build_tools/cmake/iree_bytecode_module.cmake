@@ -108,10 +108,11 @@ function(iree_bytecode_module)
   list(APPEND _ARGS "-o")
   list(APPEND _ARGS "${_MODULE_FILE_NAME}")
 
-  # If an LLVM CPU backend is enabled, supply the linker tool.
+  # If an LLVM CPU backend is enabled, supply the embedded linker tool.
+  # Note: "lld" requires a -flavor flag. This is passed in
+  # EmbeddedLinkerTool.cpp.
   if(IREE_LLD_TARGET)
     iree_get_executable_path(_LINKER_TOOL_EXECUTABLE "lld")
-    list(APPEND _ARGS "-iree-llvm-system-linker-path=\"${_LINKER_TOOL_EXECUTABLE}\"")
     list(APPEND _ARGS "-iree-llvm-embedded-linker-path=\"${_LINKER_TOOL_EXECUTABLE}\"")
   endif()
 
