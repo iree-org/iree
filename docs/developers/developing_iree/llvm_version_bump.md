@@ -110,8 +110,8 @@ the main-project version should be copied over the integrations version.
 
 ```
 cd ~/src
-git clone https://github.com/tensorflow/tensorflow.git
-git clone https://github.com/tensorflow/mlir-hlo.git
+git clone --branch master https://github.com/google/iree-tf-fork.git
+git clone --branch master https://github.com/google/iree-mhlo-fork.git
 ```
 
 Get MHLO's published version:
