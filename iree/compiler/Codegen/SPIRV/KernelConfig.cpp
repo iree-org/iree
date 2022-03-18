@@ -357,7 +357,11 @@ static LogicalResult setDefaultOpConfig(spirv::ResourceLimitsAttr limits,
 
   // Special case for non-linalg ops.
   auto linalgOp = dyn_cast<linalg::LinalgOp>(op);
-  if (!linalgOp || linalgOp.getNumOutputs() != 1) {
+  // TODO(#8580): Ops with buffer semantics, like those created by copy-only
+  // dispatches can be vectorized too, but that code fails compilation. So
+  // disabling that for now.
+  if (!linalgOp || linalgOp.getNumOutputs() != 1 ||
+      linalgOp.hasBufferSemantics()) {
     auto pipeline =
         IREE::Codegen::DispatchLoweringPassPipeline::SPIRVDistribute;
 
