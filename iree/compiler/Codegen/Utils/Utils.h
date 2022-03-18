@@ -41,6 +41,7 @@ inline bool isX86(FuncOp entryPointFn) {
       entryPointFn->getParentOfType<IREE::HAL::ExecutableVariantOp>();
   return isX86(variantOp);
 }
+bool hasAVX2Features(IREE::HAL::ExecutableVariantOp variantOp);
 bool isRISCV(IREE::HAL::ExecutableVariantOp variantOp);
 inline bool isRISCV(FuncOp entryPointFn) {
   auto variantOp =

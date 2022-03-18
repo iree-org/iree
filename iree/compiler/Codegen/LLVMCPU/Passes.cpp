@@ -196,7 +196,8 @@ void addSingleTilingExpertPassPipeline(OpPassManager &passManager) {
   }
 }
 
-void addDoubleTilingExpertPassPipeline(OpPassManager &passManager) {
+void addDoubleTilingExpertPassPipeline(OpPassManager &passManager,
+                                       bool lowerToAVX2) {
   // Do first level of tiling and distribution.
   passManager.addNestedPass<FuncOp>(createTileAndDistributeToWorkgroupsPass());
   passManager.addPass(createCanonicalizerPass());
@@ -254,6 +255,7 @@ void addDoubleTilingExpertPassPipeline(OpPassManager &passManager) {
   {
     OpPassManager &nestedFuncPassManager = passManager.nest<FuncOp>();
     LinalgVectorLoweringPassOptions options;
+    options.lowerVectorTransposeToAVX2 = lowerToAVX2;
     options.splitVectorTransfersTo = "linalg-copy";
     addLowerToVectorTransforms(nestedFuncPassManager, options);
   }

@@ -4,6 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include <iree/compiler/Codegen/Utils/Utils.h>
+
 #include "iree/compiler/Codegen/Dialect/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/LLVMCPU/KernelDispatch.h"
 #include "iree/compiler/Codegen/PassDetail.h"
@@ -165,6 +167,7 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
       }
 
       bool lowerToVectors = !isVMVXBackend(variantOp);
+      bool lowerToAVX2 = hasAVX2Features(variantOp);
       if (!testLoweringConfiguration) {
         OpPassManager &nestedModulePM =
             executableLoweringPipeline.nest<ModuleOp>();
@@ -179,7 +182,7 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
             break;
           case IREE::Codegen::DispatchLoweringPassPipeline::
               CPUDoubleTilingExpert:
-            addDoubleTilingExpertPassPipeline(nestedModulePM);
+            addDoubleTilingExpertPassPipeline(nestedModulePM, lowerToAVX2);
             break;
           case IREE::Codegen::DispatchLoweringPassPipeline::
               CPUConvTileAndDecomposeExpert:
