@@ -104,7 +104,7 @@ OpFoldResult IREE::LinalgExt::getDim(OpBuilder &builder, Location loc, Value v,
 //===----------------------------------------------------------------------===//
 // ScatterOp
 //===----------------------------------------------------------------------===//
-static LogicalResult verifyScatterOp(ScatterOp op) {
+LogicalResult ScatterOp::verify() {
   if (op.inputs().size() != 2) {
     return op.emitOpError("expected two input operands");
   }
@@ -354,7 +354,7 @@ LogicalResult ScatterOp::generateScalarImplementation(OpBuilder &b,
 // SortOp
 //===----------------------------------------------------------------------===//
 
-static LogicalResult verifySortOp(SortOp op) {
+LogicalResult SortOp::verify() {
   if (op.getNumInputs()) {
     return op.emitOpError("does not expect to take any inputs");
   }
@@ -560,7 +560,7 @@ LogicalResult SortOp::generateScalarImplementation(OpBuilder &b, Location loc,
 // FftOp
 //===----------------------------------------------------------------------===//
 
-static LogicalResult verifyFftOp(FftOp op) {
+LogicalResult FftOp::verify() {
   auto length = op.getFftLength();
   // After tiling, it could be dynamic shape. (Because
   // subview/subtensor does not inference the type correctly
@@ -810,7 +810,7 @@ Operation *FftOp::getTiledImplementation(OpBuilder &builder, ValueRange outputs,
 // ScanOp
 //===----------------------------------------------------------------------===//
 
-static LogicalResult verifyScanOp(ScanOp op) {
+LogicalResult ScanOp::verify() {
   if (op.getNumInputs() != 1) {
     return op.emitOpError("expected one input operands");
   }
@@ -1042,7 +1042,7 @@ LogicalResult ScanOp::fold(ArrayRef<Attribute>,
 // ReverseOp
 //===----------------------------------------------------------------------===//
 
-static LogicalResult verifyReverseOp(ReverseOp op) {
+LogicalResult ReverseOp::verify() {
   if (op.getNumInputs() != 1) {
     return op.emitOpError("expected exactly one input");
   }

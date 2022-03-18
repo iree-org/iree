@@ -608,7 +608,7 @@ void DoNotOptimizeOp::print(OpAsmPrinter &p) {
   }
 }
 
-static LogicalResult verifyDoNotOptimizeOp(DoNotOptimizeOp op) {
+LogicalResult DoNotOptimizeOp::verify() {
   if (op.getNumOperands() != op.getNumResults()) {
     return op.emitOpError()
            << "must have same number of operands and results, but has "
@@ -770,7 +770,7 @@ void GlobalOp::build(OpBuilder &builder, OperationState &result, StringRef name,
   build(builder, result, name, isMutable, type, llvm::None, attrs);
 }
 
-static LogicalResult verifyGlobalOp(GlobalOp op) {
+LogicalResult GlobalOp::verify() {
   if (op.initial_value().hasValue()) {
     // Ensure the value is something we can convert to a const.
     if (!isGlobalTypeCompatible(op.type(), op.initial_valueAttr().getType())) {
@@ -795,7 +795,7 @@ void GlobalAddressOp::getAsmResultNames(
   setNameFn(result(), Twine("ptr_" + global()).str());
 }
 
-static LogicalResult verifyGlobalAddressOp(GlobalAddressOp op) {
+LogicalResult GlobalAddressOp::verify() {
   auto globalOp = op.getGlobalOp();
   if (!globalOp) {
     return op.emitOpError() << "undefined global: " << op.global();
@@ -836,7 +836,7 @@ void GlobalLoadOp::getEffects(
   }
 }
 
-static LogicalResult verifyGlobalLoadOp(GlobalLoadOp op) {
+LogicalResult GlobalLoadOp::verify() {
   auto globalOp = op.getGlobalOp();
   if (!globalOp) {
     return op->emitOpError() << "undefined global: " << op.global();
@@ -850,7 +850,7 @@ static LogicalResult verifyGlobalLoadOp(GlobalLoadOp op) {
   return success();
 }
 
-static LogicalResult verifyGlobalLoadIndirectOp(GlobalLoadIndirectOp &op) {
+LogicalResult GlobalLoadIndirectOp::verify() {
   auto globalType =
       op.global().getType().cast<IREE::Util::PtrType>().getTargetType();
   auto loadType = op.result().getType();
@@ -868,7 +868,7 @@ IREE::Util::GlobalOp GlobalStoreOp::getGlobalOp() {
 
 FlatSymbolRefAttr GlobalStoreOp::getGlobalRefAttr() { return globalAttr(); }
 
-static LogicalResult verifyGlobalStoreOp(GlobalStoreOp op) {
+LogicalResult GlobalStoreOp::verify() {
   auto globalOp = op.getGlobalOp();
   if (!globalOp) {
     return op->emitOpError() << "undefined global: " << op.global();
@@ -889,7 +889,7 @@ static LogicalResult verifyGlobalStoreOp(GlobalStoreOp op) {
   return success();
 }
 
-static LogicalResult verifyGlobalStoreIndirectOp(GlobalStoreIndirectOp &op) {
+LogicalResult GlobalStoreIndirectOp::verify() {
   auto globalType =
       op.global().getType().cast<IREE::Util::PtrType>().getTargetType();
   auto storeType = op.value().getType();
@@ -975,7 +975,7 @@ static void printListTypeSet(OpAsmPrinter &printer, Operation *, Type listType,
   }
 }
 
-static LogicalResult verifyListGetOp(ListGetOp &op) {
+LogicalResult ListGetOp::verify() {
   auto listType = op.list().getType().cast<IREE::Util::ListType>();
   auto elementType = listType.getElementType();
   auto resultType = op.result().getType();
@@ -986,7 +986,7 @@ static LogicalResult verifyListGetOp(ListGetOp &op) {
   return success();
 }
 
-static LogicalResult verifyListSetOp(ListSetOp &op) {
+LogicalResult ListSetOp::verify() {
   auto listType = op.list().getType().cast<IREE::Util::ListType>();
   auto elementType = listType.getElementType();
   auto valueType = op.value().getType();
