@@ -59,14 +59,8 @@ if(IREE_TARGET_BACKEND_ROCM)
   list(APPEND IREE_COMPILER_TARGET_COPTS "-DIREE_HAVE_ROCM_TARGET")
 endif()
 
-if(IREE_ENABLE_EMITC)
-  set(IREE_EMITC_CONDITIONAL_DEP
-    MLIREmitC
-  )
-endif()
-
 # Write some important CMake options to a file for convenient use from scripts.
-configure_file(build_config.txt.in build_config.txt)
+configure_file(build_config_template.txt.in build_config.txt)
 
 iree_cc_binary(
   NAME
