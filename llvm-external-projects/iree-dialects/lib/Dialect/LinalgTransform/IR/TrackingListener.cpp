@@ -8,11 +8,11 @@
 
 #include "iree-dialects/Dialect/LinalgTransform/TrackingListener.h"
 
-#include "llvm/ADT/TypeSwitch.h"
-#include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/Dialect/SCF/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "llvm/ADT/TypeSwitch.h"
+#include "llvm/Support/Debug.h"
 
 #define DEBUG_TYPE "tracking-listener"
 #define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE << "]: ")
@@ -98,11 +98,13 @@ TrackingListener::TrackingListener(transform::TransformState &state)
 void TrackingListener::notifyOperationReplaced(Operation *op,
                                                ValueRange newValues) {
   // Don't attempt to track in error state.
-  if (hadErrors) return;
+  if (hadErrors)
+    return;
 
   // Exit early if the op is not tracked.
   auto keyIt = trackedOperationKeys.find(op);
-  if (keyIt == trackedOperationKeys.end()) return;
+  if (keyIt == trackedOperationKeys.end())
+    return;
   Value key = keyIt->second;
 
   Operation *replacement = findSingleDefiningOp(op, newValues);
@@ -138,10 +140,12 @@ void TrackingListener::notifyOperationReplaced(Operation *op,
 
 void TrackingListener::notifyOperationRemoved(Operation *op) {
   // Don't attempt to track in error state.
-  if (hadErrors) return;
+  if (hadErrors)
+    return;
 
   auto keyIt = trackedOperationKeys.find(op);
-  if (keyIt == trackedOperationKeys.end()) return;
+  if (keyIt == trackedOperationKeys.end())
+    return;
   Value key = keyIt->second;
 
   LLVM_DEBUG(DBGS() << "removing tracked " << *op << " for " << key << "\n");
@@ -165,7 +169,8 @@ void TrackingListener::notifySetPayload(Value handle,
 
 void TrackingListener::notifyRemovePayload(Value handle,
                                            ArrayRef<Operation *> operations) {
-  for (Operation *op : operations) trackedOperationKeys.erase(op);
+  for (Operation *op : operations)
+    trackedOperationKeys.erase(op);
 }
 
 InFlightDiagnostic TrackingListener::emitError(Operation *op,
@@ -173,8 +178,8 @@ InFlightDiagnostic TrackingListener::emitError(Operation *op,
   hadErrors = true;
 #ifndef NDEBUG
   errorStateChecked = false;
-#endif  // NDEBUG
+#endif // NDEBUG
   return op->emitError(message);
 }
-}  // namespace linalg
-}  // namespace mlir
+} // namespace linalg
+} // namespace mlir

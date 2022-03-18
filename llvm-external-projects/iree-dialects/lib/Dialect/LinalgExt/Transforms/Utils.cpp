@@ -36,7 +36,8 @@ void mlir::iree_compiler::IREE::LinalgExt::completeOffsetsSizesAndStrides(
   offsets = SmallVector<Value>(leadingOffsets.begin(), leadingOffsets.end());
   sizes = SmallVector<Value>(leadingSizes.begin(), leadingSizes.end());
   strides = SmallVector<Value>(leadingStrides.begin(), leadingStrides.end());
-  if (leadingRank >= tensorRank) return;
+  if (leadingRank >= tensorRank)
+    return;
   Value zero = b.create<arith::ConstantIndexOp>(loc, 0);
   Value one = b.create<arith::ConstantIndexOp>(loc, 1);
   for (int64_t i = leadingRank, e = tensorRank; i < e; ++i) {

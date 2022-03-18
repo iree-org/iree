@@ -27,19 +27,21 @@ Operation *transform::TransformState::getTopLevel() const {
   return operations.lookup(kTopLevelValue).front();
 }
 
-ArrayRef<Operation *> transform::TransformState::getPayloadOps(
-    Value value) const {
+ArrayRef<Operation *>
+transform::TransformState::getPayloadOps(Value value) const {
   auto iter = operations.find(value);
   assert(iter != operations.end() && "unknown handle");
   return iter->getSecond();
 }
 
-LogicalResult transform::TransformState::setPayloadOps(
-    Value value, ArrayRef<Operation *> targets) {
+LogicalResult
+transform::TransformState::setPayloadOps(Value value,
+                                         ArrayRef<Operation *> targets) {
   assert(value != kTopLevelValue &&
          "attempting to reset the transformation root");
 
-  if (value.use_empty()) return success();
+  if (value.use_empty())
+    return success();
 
   SmallVector<Operation *> storedTargets(targets.begin(), targets.end());
   bool inserted = operations.insert({value, std::move(storedTargets)}).second;
@@ -51,7 +53,8 @@ LogicalResult transform::TransformState::setPayloadOps(
   llvm::SmallPtrSet<Operation *, 4> currentOperationSet(
       currentOperationList.begin(), currentOperationList.end());
   for (const auto &kvp : operations) {
-    if (kvp.getFirst() == value) continue;
+    if (kvp.getFirst() == value)
+      continue;
     for (Operation *trackedOp : kvp.getSecond()) {
       if (currentOperationSet.contains(trackedOp)) {
         InFlightDiagnostic diag = trackedOp->emitError()
@@ -71,7 +74,8 @@ LogicalResult transform::TransformState::setPayloadOps(
 
 void transform::TransformState::removePayloadOps(Value value) {
   auto it = operations.find(value);
-  if (it == operations.end()) return;
+  if (it == operations.end())
+    return;
 
   for (const auto &keyedExtension : extensions)
     keyedExtension.getSecond()->sendNotifyRemovePayload(value, it->getSecond());
@@ -88,7 +92,8 @@ void transform::TransformState::updatePayloadOps(
   updated.reserve(association.size());
 
   for (Operation *op : association)
-    if (Operation *updatedOp = callback(op)) updated.push_back(updatedOp);
+    if (Operation *updatedOp = callback(op))
+      updated.push_back(updatedOp);
 
   for (const auto &keyedExtension : extensions)
     keyedExtension.getSecond()->sendNotifyUpdatePayload(value, association,
@@ -97,12 +102,14 @@ void transform::TransformState::updatePayloadOps(
   std::swap(association, updated);
 }
 
-LogicalResult transform::TransformState::applyTransform(
-    TransformOpInterface transform) {
+LogicalResult
+transform::TransformState::applyTransform(TransformOpInterface transform) {
   transform::TransformResults results(transform->getNumResults());
-  if (failed(transform.apply(results, *this))) return failure();
+  if (failed(transform.apply(results, *this)))
+    return failure();
 
-  for (Value target : transform->getOperands()) removePayloadOps(target);
+  for (Value target : transform->getOperands())
+    removePayloadOps(target);
 
   for (auto en : llvm::enumerate(transform->getResults()))
     if (failed(setPayloadOps(en.value(), results.get(en.index()))))
@@ -135,8 +142,8 @@ void transform::TransformResults::set(OpResult value,
   segments[position] = makeArrayRef(operations).drop_front(start);
 }
 
-ArrayRef<Operation *> transform::TransformResults::get(
-    unsigned position) const {
+ArrayRef<Operation *>
+transform::TransformResults::get(unsigned position) const {
   assert(position < segments.size() &&
          "querying results for a non-existent handle");
   assert(segments[position].data() != nullptr && "querying unset results");

@@ -7,7 +7,6 @@
 #include "iree-dialects/Dialect/Input/InputOps.h"
 #include "iree-dialects/Dialect/PyDM/IR/PyDMOps.h"
 #include "iree-dialects/Dialect/PyDM/Transforms/ToIREE/Patterns.h"
-#include "llvm/ADT/TypeSwitch.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Math/IR/Math.h"
@@ -15,6 +14,7 @@
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Support/LLVM.h"
 #include "mlir/Transforms/DialectConversion.h"
+#include "llvm/ADT/TypeSwitch.h"
 
 using llvm::enumerate;
 using namespace mlir;
@@ -38,7 +38,7 @@ enum class ExceptionCode : int {
   UnboundLocalError = -10,
 };
 
-}  // namespace
+} // namespace
 
 static Type getVariantListType(Builder &builder) {
   return builder.getType<Input::ListType>(
@@ -117,8 +117,9 @@ static Value castIntegerValue(Location loc, Value input,
   }
 }
 
-static Optional<arith::CmpIPredicate> convertIntegerComparePredicate(
-    StringAttr dunderName, bool isSigned, Builder &builder) {
+static Optional<arith::CmpIPredicate>
+convertIntegerComparePredicate(StringAttr dunderName, bool isSigned,
+                               Builder &builder) {
   StringRef v = dunderName.getValue();
   if (v == "lt") {
     return isSigned ? arith::CmpIPredicate::slt : arith::CmpIPredicate::ult;
@@ -137,8 +138,8 @@ static Optional<arith::CmpIPredicate> convertIntegerComparePredicate(
   return {};
 }
 
-static Optional<arith::CmpFPredicate> convertFpComparePredicate(
-    StringAttr dunderName, Builder &builder) {
+static Optional<arith::CmpFPredicate>
+convertFpComparePredicate(StringAttr dunderName, Builder &builder) {
   StringRef v = dunderName.getValue();
   if (v == "lt") {
     return arith::CmpFPredicate::OLT;
@@ -164,9 +165,11 @@ static Optional<arith::CmpFPredicate> convertFpComparePredicate(
 /// Returns nullptr for unsupported cases, not emitting diagnostics.
 static Value boxConvertedValue(Location loc, Type pythonType,
                                Value convertedValue, OpBuilder &builder) {
-  if (pythonType.isa<PYDM::ObjectType>()) return convertedValue;
+  if (pythonType.isa<PYDM::ObjectType>())
+    return convertedValue;
   auto ptiType = pythonType.dyn_cast<PYDM::PythonTypeInterface>();
-  if (!ptiType) return {};
+  if (!ptiType)
+    return {};
   auto typeCode = ptiType.getTypeCode();
   auto list = createObjectList(loc, builder, static_cast<int>(typeCode),
                                convertedValue);
@@ -179,9 +182,9 @@ class AllocFreeVarOpConversion
     : public OpConversionPattern<PYDM::AllocFreeVarOp> {
   using OpConversionPattern::OpConversionPattern;
 
-  LogicalResult matchAndRewrite(
-      PYDM::AllocFreeVarOp srcOp, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(PYDM::AllocFreeVarOp srcOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     // TODO: We may want to initialize the list structurally in some way.
     // This will fail either way on read from unassigned variable, but we need
     // to see what works better for good runtime error messages.
@@ -196,9 +199,9 @@ class ApplyBinaryNumericConversion
     : public OpConversionPattern<PYDM::ApplyBinaryOp> {
   using OpConversionPattern::OpConversionPattern;
 
-  LogicalResult matchAndRewrite(
-      PYDM::ApplyBinaryOp srcOp, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(PYDM::ApplyBinaryOp srcOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     Type pyLeftType = srcOp.left().getType();
     Type pyRightType = srcOp.right().getType();
     Type leftType = adaptor.left().getType();
@@ -276,16 +279,16 @@ class ApplyCompareNumericConversion
     : public OpConversionPattern<PYDM::ApplyCompareOp> {
   using OpConversionPattern::OpConversionPattern;
 
-  LogicalResult matchAndRewrite(
-      PYDM::ApplyCompareOp srcOp, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(PYDM::ApplyCompareOp srcOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     Type leftType = adaptor.left().getType();
     Type rightType = adaptor.right().getType();
     if (leftType != rightType) {
       return rewriter.notifyMatchFailure(srcOp, "not same type operands");
     }
     if (leftType.isa<mlir::IntegerType>()) {
-      bool isSigned = true;  // TODO: Unsigned.
+      bool isSigned = true; // TODO: Unsigned.
       auto predicate = convertIntegerComparePredicate(adaptor.dunder_nameAttr(),
                                                       isSigned, rewriter);
       if (!predicate)
@@ -310,9 +313,9 @@ class ApplyCompareNumericConversion
 class AssignSubscriptListConversion
     : public OpConversionPattern<PYDM::AssignSubscriptOp> {
   using OpConversionPattern::OpConversionPattern;
-  LogicalResult matchAndRewrite(
-      PYDM::AssignSubscriptOp srcOp, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(PYDM::AssignSubscriptOp srcOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     auto pySequence = srcOp.lhs();
     if (!pySequence.getType().isa<PYDM::ListType>())
       return rewriter.notifyMatchFailure(srcOp, "not builtin sequence");
@@ -411,14 +414,14 @@ class AssignSubscriptListConversion
   Value boxIfNecessary(Location loc, PYDM::ListType listType, Type origRhsType,
                        Value rhs, ConversionPatternRewriter &rewriter) const {
     switch (listType.getStorageClass()) {
-      case CollectionStorageClass::Boxed:
-      case CollectionStorageClass::Empty: {
-        return boxConvertedValue(loc, origRhsType, rhs, rewriter);
-        break;
-      }
-      case CollectionStorageClass::Unboxed:
-        // TODO: Implement.
-        return nullptr;
+    case CollectionStorageClass::Boxed:
+    case CollectionStorageClass::Empty: {
+      return boxConvertedValue(loc, origRhsType, rhs, rewriter);
+      break;
+    }
+    case CollectionStorageClass::Unboxed:
+      // TODO: Implement.
+      return nullptr;
     }
   }
 };
@@ -426,9 +429,9 @@ class AssignSubscriptListConversion
 class BoolToPredConversion : public OpConversionPattern<PYDM::BoolToPredOp> {
   using OpConversionPattern::OpConversionPattern;
 
-  LogicalResult matchAndRewrite(
-      PYDM::BoolToPredOp srcOp, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(PYDM::BoolToPredOp srcOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     rewriter.replaceOp(srcOp, adaptor.value());
     return success();
   }
@@ -437,9 +440,9 @@ class BoolToPredConversion : public OpConversionPattern<PYDM::BoolToPredOp> {
 class BoxOpConversion : public OpConversionPattern<PYDM::BoxOp> {
   using OpConversionPattern::OpConversionPattern;
 
-  LogicalResult matchAndRewrite(
-      PYDM::BoxOp srcOp, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(PYDM::BoxOp srcOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     auto loc = srcOp.getLoc();
     Value boxedValue = boxConvertedValue(loc, srcOp.primitive().getType(),
                                          adaptor.primitive(), rewriter);
@@ -454,9 +457,9 @@ class BoxOpConversion : public OpConversionPattern<PYDM::BoxOp> {
 class CallOpConversion : public OpConversionPattern<PYDM::CallOp> {
   using OpConversionPattern::OpConversionPattern;
 
-  LogicalResult matchAndRewrite(
-      PYDM::CallOp srcOp, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(PYDM::CallOp srcOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     SmallVector<Type> resultTypes;
     if (failed(getTypeConverter()->convertTypes(srcOp.getResultTypes(),
                                                 resultTypes))) {
@@ -472,9 +475,9 @@ class CallOpConversion : public OpConversionPattern<PYDM::CallOp> {
 class ConstantOpConversion : public OpConversionPattern<PYDM::ConstantOp> {
   using OpConversionPattern::OpConversionPattern;
 
-  LogicalResult matchAndRewrite(
-      PYDM::ConstantOp srcOp, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(PYDM::ConstantOp srcOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     auto loc = srcOp.getLoc();
     Type resultType = typeConverter->convertType(srcOp.getResult().getType());
     if (!resultType)
@@ -522,9 +525,9 @@ class DynamicUnpackOpConversion
     : public OpConversionPattern<PYDM::DynamicUnpackOp> {
   using OpConversionPattern::OpConversionPattern;
 
-  LogicalResult matchAndRewrite(
-      PYDM::DynamicUnpackOp srcOp, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(PYDM::DynamicUnpackOp srcOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     auto loc = srcOp.getLoc();
     // Convert types.
     Type excResultType =
@@ -604,9 +607,9 @@ class DynamicUnpackOpConversion
 class ElideStaticInfoCast : public OpConversionPattern<PYDM::StaticInfoCastOp> {
   using OpConversionPattern::OpConversionPattern;
 
-  LogicalResult matchAndRewrite(
-      PYDM::StaticInfoCastOp srcOp, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(PYDM::StaticInfoCastOp srcOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     rewriter.replaceOp(srcOp, srcOp.value());
     return success();
   }
@@ -617,9 +620,9 @@ class ElideStaticInfoCast : public OpConversionPattern<PYDM::StaticInfoCastOp> {
 class FailureOpConversion : public OpConversionPattern<PYDM::FailureOp> {
   using OpConversionPattern::OpConversionPattern;
 
-  LogicalResult matchAndRewrite(
-      PYDM::FailureOp srcOp, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(PYDM::FailureOp srcOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     Type i32 = rewriter.getI32Type();
     // '-3' == RuntimeError
     rewriter.replaceOpWithNewOp<arith::ConstantOp>(
@@ -631,9 +634,9 @@ class FailureOpConversion : public OpConversionPattern<PYDM::FailureOp> {
 class FuncOpConversion : public OpConversionPattern<PYDM::FuncOp> {
   using OpConversionPattern::OpConversionPattern;
 
-  LogicalResult matchAndRewrite(
-      PYDM::FuncOp srcOp, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(PYDM::FuncOp srcOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     FunctionType srcFuncType = srcOp.getType();
     TypeConverter::SignatureConversion signatureConversion(
         srcOp.getNumArguments());
@@ -679,9 +682,9 @@ class FuncOpConversion : public OpConversionPattern<PYDM::FuncOp> {
 class GetTypeCodeConversion : public OpConversionPattern<PYDM::GetTypeCodeOp> {
   using OpConversionPattern::OpConversionPattern;
 
-  LogicalResult matchAndRewrite(
-      PYDM::GetTypeCodeOp srcOp, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(PYDM::GetTypeCodeOp srcOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     auto loc = srcOp.getLoc();
     // Gets the 0'th element of the object list, optionally casting it to the
     // converted integer type.
@@ -694,10 +697,10 @@ class GetTypeCodeConversion : public OpConversionPattern<PYDM::GetTypeCodeOp> {
         rewriter.create<arith::ConstantOp>(loc, rewriter.getIndexAttr(0));
     Value typeCode = rewriter.create<Input::ListGetOp>(loc, i32Type,
                                                        adaptor.value(), index0);
-    rewriter.replaceOp(
-        srcOp,
-        castIntegerValue(loc, typeCode, resultType.cast<mlir::IntegerType>(),
-                         rewriter));
+    rewriter.replaceOp(srcOp,
+                       castIntegerValue(loc, typeCode,
+                                        resultType.cast<mlir::IntegerType>(),
+                                        rewriter));
     return success();
   }
 };
@@ -705,9 +708,9 @@ class GetTypeCodeConversion : public OpConversionPattern<PYDM::GetTypeCodeOp> {
 class LoadVarOpConversion : public OpConversionPattern<PYDM::LoadVarOp> {
   using OpConversionPattern::OpConversionPattern;
 
-  LogicalResult matchAndRewrite(
-      PYDM::LoadVarOp srcOp, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(PYDM::LoadVarOp srcOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     auto loc = srcOp.getLoc();
     auto resultType =
         getTypeConverter()->convertType(srcOp.getResult().getType());
@@ -726,9 +729,9 @@ class LoadVarOpConversion : public OpConversionPattern<PYDM::LoadVarOp> {
 class MakeListOpBoxedConversion : public OpConversionPattern<PYDM::MakeListOp> {
   using OpConversionPattern::OpConversionPattern;
 
-  LogicalResult matchAndRewrite(
-      PYDM::MakeListOp srcOp, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(PYDM::MakeListOp srcOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     auto loc = srcOp.getLoc();
     auto listType = srcOp.list().getType().cast<PYDM::ListType>();
     if (listType.getStorageClass() != CollectionStorageClass::Boxed ||
@@ -759,9 +762,9 @@ class MakeListOpBoxedConversion : public OpConversionPattern<PYDM::MakeListOp> {
 class MakeTupleOpConversion : public OpConversionPattern<PYDM::MakeTupleOp> {
   using OpConversionPattern::OpConversionPattern;
 
-  LogicalResult matchAndRewrite(
-      PYDM::MakeTupleOp srcOp, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(PYDM::MakeTupleOp srcOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     auto loc = srcOp.getLoc();
     auto resultType = getTypeConverter()->convertType(srcOp.tuple().getType());
     if (!resultType)
@@ -788,9 +791,9 @@ class MakeTupleOpConversion : public OpConversionPattern<PYDM::MakeTupleOp> {
 /// Converts the `neg` op on integer operand/result to a corresponding sub.
 class NegIntegerOpConversion : public OpConversionPattern<PYDM::NegOp> {
   using OpConversionPattern::OpConversionPattern;
-  LogicalResult matchAndRewrite(
-      PYDM::NegOp srcOp, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(PYDM::NegOp srcOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     Type valueType = adaptor.value().getType();
     Type resultType = getTypeConverter()->convertType(srcOp.result().getType());
     if (!valueType.isa<mlir::IntegerType>() || valueType != resultType)
@@ -808,9 +811,9 @@ class NegIntegerOpConversion : public OpConversionPattern<PYDM::NegOp> {
 class NoneOpConversion : public OpConversionPattern<PYDM::NoneOp> {
   using OpConversionPattern::OpConversionPattern;
 
-  LogicalResult matchAndRewrite(
-      PYDM::NoneOp srcOp, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(PYDM::NoneOp srcOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     Type i32 = rewriter.getI32Type();
     rewriter.replaceOpWithNewOp<arith::ConstantOp>(
         srcOp, i32, rewriter.getIntegerAttr(i32, 0));
@@ -825,9 +828,9 @@ class RaiseOnFailureOpConversion
     : public OpConversionPattern<PYDM::RaiseOnFailureOp> {
   using OpConversionPattern::OpConversionPattern;
 
-  LogicalResult matchAndRewrite(
-      PYDM::RaiseOnFailureOp srcOp, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(PYDM::RaiseOnFailureOp srcOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     auto loc = srcOp.getLoc();
 
     Value status = adaptor.getOperands()[0];
@@ -866,9 +869,9 @@ class RaiseOnFailureOpConversion
 class ReturnOpConversion : public OpConversionPattern<PYDM::ReturnOp> {
   using OpConversionPattern::OpConversionPattern;
 
-  LogicalResult matchAndRewrite(
-      PYDM::ReturnOp srcOp, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(PYDM::ReturnOp srcOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     auto loc = srcOp.getLoc();
     auto zeroResult =
         rewriter.create<arith::ConstantOp>(loc, rewriter.getI32IntegerAttr(0));
@@ -883,12 +886,14 @@ class SequenceCloneBuiltinConversion
     : public OpConversionPattern<PYDM::SequenceCloneOp> {
   using OpConversionPattern::OpConversionPattern;
 
-  LogicalResult matchAndRewrite(
-      PYDM::SequenceCloneOp srcOp, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(PYDM::SequenceCloneOp srcOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     Type origListType = srcOp.sequence().getType();
-    if (!isSupportedList(origListType)) return failure();
-    if (origListType != srcOp.getResult().getType()) return failure();
+    if (!isSupportedList(origListType))
+      return failure();
+    if (origListType != srcOp.getResult().getType())
+      return failure();
     Type resultType = typeConverter->convertType(srcOp.getResult().getType());
     if (!resultType) {
       return rewriter.notifyMatchFailure(srcOp, "cannot convert result type");
@@ -1016,9 +1021,9 @@ class SequenceCloneBuiltinConversion
 class StoreVarOpConversion : public OpConversionPattern<PYDM::StoreVarOp> {
   using OpConversionPattern::OpConversionPattern;
 
-  LogicalResult matchAndRewrite(
-      PYDM::StoreVarOp srcOp, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(PYDM::StoreVarOp srcOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     auto loc = srcOp.getLoc();
 
     auto origStoreType =
@@ -1043,9 +1048,9 @@ class SubscriptOpBuiltinSequenceConversion
     : public OpConversionPattern<PYDM::SubscriptOp> {
   using OpConversionPattern::OpConversionPattern;
 
-  LogicalResult matchAndRewrite(
-      PYDM::SubscriptOp srcOp, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(PYDM::SubscriptOp srcOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     auto pySequence = srcOp.value();
     if (!pySequence.getType().isa<PYDM::ListType, PYDM::TupleType>())
       return rewriter.notifyMatchFailure(srcOp, "not builtin sequence");
@@ -1149,9 +1154,9 @@ class SubscriptOpBuiltinSequenceConversion
 class UnboxOpConversion : public OpConversionPattern<PYDM::UnboxOp> {
   using OpConversionPattern::OpConversionPattern;
 
-  LogicalResult matchAndRewrite(
-      PYDM::UnboxOp srcOp, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(PYDM::UnboxOp srcOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     auto loc = srcOp.getLoc();
     auto list = adaptor.getOperands()[0];
 
@@ -1234,9 +1239,9 @@ class UnboxOpConversion : public OpConversionPattern<PYDM::UnboxOp> {
 
 class BuiltinBranchConversion : public OpConversionPattern<mlir::cf::BranchOp> {
   using OpConversionPattern::OpConversionPattern;
-  LogicalResult matchAndRewrite(
-      mlir::cf::BranchOp srcOp, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(mlir::cf::BranchOp srcOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     rewriter.replaceOpWithNewOp<mlir::cf::BranchOp>(srcOp, srcOp.getDest(),
                                                     adaptor.getDestOperands());
     return success();
@@ -1246,9 +1251,9 @@ class BuiltinBranchConversion : public OpConversionPattern<mlir::cf::BranchOp> {
 class BuiltinCondBranchConversion
     : public OpConversionPattern<mlir::cf::CondBranchOp> {
   using OpConversionPattern::OpConversionPattern;
-  LogicalResult matchAndRewrite(
-      mlir::cf::CondBranchOp srcOp, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(mlir::cf::CondBranchOp srcOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     rewriter.replaceOpWithNewOp<mlir::cf::CondBranchOp>(
         srcOp, adaptor.getCondition(), srcOp.getTrueDest(),
         adaptor.getTrueDestOperands(), srcOp.getFalseDest(),
@@ -1260,9 +1265,9 @@ class BuiltinCondBranchConversion
 class BuiltinSelectConversion
     : public OpConversionPattern<mlir::arith::SelectOp> {
   using OpConversionPattern::OpConversionPattern;
-  LogicalResult matchAndRewrite(
-      mlir::arith::SelectOp srcOp, OpAdaptor adaptor,
-      ConversionPatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(mlir::arith::SelectOp srcOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     rewriter.replaceOpWithNewOp<mlir::arith::SelectOp>(
         srcOp, adaptor.getCondition(), adaptor.getTrueValue(),
         adaptor.getFalseValue());
@@ -1270,7 +1275,7 @@ class BuiltinSelectConversion
   }
 };
 
-}  // namespace
+} // namespace
 
 void PYDM::populatePyDMToIREELoweringPatterns(MLIRContext *context,
                                               TypeConverter &typeConverter,

@@ -19,9 +19,9 @@ namespace LinalgExt {
 
 void registerBufferizableOpInterfaceExternalModels(DialectRegistry &registry);
 
-}  // namespace LinalgExt
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace LinalgExt
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_DIALECTS_DIALECT_LINALGEXT_BUFFERIZATION_H_
+#endif // IREE_DIALECTS_DIALECT_LINALGEXT_BUFFERIZATION_H_

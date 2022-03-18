@@ -9,7 +9,6 @@
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree-dialects/Dialect/LinalgExt/Transforms/Transforms.h"
 #include "iree-dialects/Dialect/LinalgExt/Transforms/Utils.h"
-#include "llvm/ADT/STLExtras.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
@@ -21,6 +20,7 @@
 #include "mlir/IR/Operation.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+#include "llvm/ADT/STLExtras.h"
 
 using namespace mlir;
 using namespace mlir::iree_compiler::IREE::LinalgExt;
@@ -32,7 +32,7 @@ SmallVector<Value> getValuesToYield(PerformConcurrentlyOp op) {
       op.yieldingOps(), [](ParallelInsertSliceOp op) { return op.dest(); }));
 }
 
-}  // namespace
+} // namespace
 
 FailureOr<scf::ForOp> InParallelOpToScfForRewriter::returningMatchAndRewrite(
     InParallelOp inParallelOp, PatternRewriter &rewriter) const {
@@ -86,7 +86,8 @@ FailureOr<scf::ForOp> InParallelOpToScfForRewriter::returningMatchAndRewrite(
   for (Value toReplace : valuesToYield) {
     for (OpOperand &u : toReplace.getUses()) {
       Operation *op = u.getOwner();
-      if (!forOp->isProperAncestor(op)) continue;
+      if (!forOp->isProperAncestor(op))
+        continue;
       opsToReplace.push_back(op);
     }
   }

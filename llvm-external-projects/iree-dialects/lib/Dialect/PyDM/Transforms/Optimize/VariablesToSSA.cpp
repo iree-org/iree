@@ -7,12 +7,12 @@
 #include "../PassDetail.h"
 #include "iree-dialects/Dialect/PyDM/IR/PyDMOps.h"
 #include "iree-dialects/Dialect/PyDM/Transforms/Passes.h"
-#include "llvm/ADT/DenseMap.h"
-#include "llvm/Support/Debug.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/Dominance.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+#include "llvm/ADT/DenseMap.h"
+#include "llvm/Support/Debug.h"
 
 using namespace mlir;
 namespace PYDM = mlir::iree_compiler::IREE::PYDM;
@@ -53,7 +53,8 @@ struct VariablesToSSAPass : public VariablesToSSABase<VariablesToSSAPass> {
       changed = false;
       for (auto &block : getOperation().getBody().getBlocks()) {
         auto &info = blockAccessInfos[&block];
-        if (canonicalizeBlockVariableAccess(block, info)) changed = true;
+        if (canonicalizeBlockVariableAccess(block, info))
+          changed = true;
         hoistLoadsFromBlock(block, info);
 
         // Invalidate internal value map and re-initialize from block arg
@@ -62,7 +63,8 @@ struct VariablesToSSAPass : public VariablesToSSABase<VariablesToSSAPass> {
         info.variableValueMap = info.blockArgVariableValueMap;
       }
 
-      if (!changed) break;
+      if (!changed)
+        break;
     }
 
     // We should now have eliminated as many loads as possible, so we can
@@ -167,7 +169,8 @@ struct VariablesToSSAPass : public VariablesToSSABase<VariablesToSSAPass> {
   // legal form where all allocs are done in the entry block.
   void hoistLoadsFromBlock(Block &block, BlockAccessInfo &info) {
     // Entry block: nowhere to hoist.
-    if (block.isEntryBlock()) return;
+    if (block.isEntryBlock())
+      return;
 
     SmallVector<std::tuple<Location, Value, Type>> loadVarTypes;
     // Redirect each live load to a block argument.
@@ -211,7 +214,7 @@ struct VariablesToSSAPass : public VariablesToSSABase<VariablesToSSAPass> {
   }
 };
 
-}  // namespace
+} // namespace
 
 std::unique_ptr<OperationPass<PYDM::FuncOp>> PYDM::createVariablesToSSAPass() {
   return std::make_unique<VariablesToSSAPass>();

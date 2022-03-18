@@ -9,7 +9,6 @@
 #include "iree-dialects/Dialect/LinalgTransform/LinalgTransformOps.h"
 #include "iree-dialects/Dialect/LinalgTransform/Passes.h"
 #include "iree-dialects/Dialect/LinalgTransform/SimplePatternRewriter.h"
-#include "llvm/Support/Debug.h"
 #include "mlir/Dialect/PDL/IR/PDLOps.h"
 #include "mlir/Dialect/PDLInterp/IR/PDLInterp.h"
 #include "mlir/IR/BuiltinOps.h"
@@ -19,6 +18,7 @@
 #include "mlir/Pass/PassRegistry.h"
 #include "mlir/Rewrite/FrozenRewritePatternSet.h"
 #include "mlir/Rewrite/PatternApplicator.h"
+#include "llvm/Support/Debug.h"
 
 #define DEBUG_TYPE "expert-expansion"
 #define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE "]")
@@ -82,12 +82,14 @@ struct ExpertExpansion : public PassWrapper<ExpertExpansion, Pass> {
 
   void runOnOperation() override {
     auto module = dyn_cast<ModuleOp>(getOperation());
-    if (!module) return signalPassFailure();
+    if (!module)
+      return signalPassFailure();
 
     ModuleOp strategyModule = nullptr;
     for (auto nestedModule : module.getOps<ModuleOp>()) {
       Optional<StringRef> name = nestedModule.sym_name();
-      if (!name) continue;
+      if (!name)
+        continue;
 
       if (*name == strategyModuleName) {
         if (!strategyModule) {
@@ -110,7 +112,7 @@ struct ExpertExpansion : public PassWrapper<ExpertExpansion, Pass> {
     strategyModule->erase();
   }
 };
-}  // namespace
+} // namespace
 
 void mlir::linalg::transform::registerLinalgTransformExpertExpansionPass() {
   PassRegistration<ExpertExpansion>(

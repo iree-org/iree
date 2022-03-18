@@ -7,13 +7,15 @@
 //===----------------------------------------------------------------------===//
 
 #include "Transforms/ListenerCSE.h"
+
+#include <deque>
+
 #include "mlir/IR/Dominance.h"
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/Operation.h"
 #include "mlir/Interfaces/SideEffectInterfaces.h"
 #include "llvm/ADT/ScopedHashTable.h"
 #include "llvm/Support/RecyclingAllocator.h"
-#include <deque>
 
 using namespace mlir;
 
@@ -56,14 +58,14 @@ struct CSE {
   using ScopedMapTy = llvm::ScopedHashTable<Operation *, Operation *,
                                             SimpleOperationInfo, AllocatorTy>;
 
-//===----------------------------------------------------------------------===//
-// END copied from mlir/lib/Transforms/CSE.cpp
-//===----------------------------------------------------------------------===//
+  //===----------------------------------------------------------------------===//
+  // END copied from mlir/lib/Transforms/CSE.cpp
+  //===----------------------------------------------------------------------===//
   CSE(DominanceInfo *domInfo, RewriteListener *listener)
       : domInfo(domInfo), listener(listener) {}
-//===----------------------------------------------------------------------===//
-// BEGIN copied from mlir/lib/Transforms/CSE.cpp
-//===----------------------------------------------------------------------===//
+  //===----------------------------------------------------------------------===//
+  // BEGIN copied from mlir/lib/Transforms/CSE.cpp
+  //===----------------------------------------------------------------------===//
 
   /// Represents a single entry in the depth first traversal of a CFG.
   struct CFGStackNode {
@@ -96,14 +98,14 @@ private:
 
   /// The dominance info to use.
   DominanceInfo *domInfo;
-//===----------------------------------------------------------------------===//
-// END copied from mlir/lib/Transforms/CSE.cpp
-//===----------------------------------------------------------------------===//
+  //===----------------------------------------------------------------------===//
+  // END copied from mlir/lib/Transforms/CSE.cpp
+  //===----------------------------------------------------------------------===//
   /// An optional listener to notify of replaced or erased operations.
   RewriteListener *listener;
-//===----------------------------------------------------------------------===//
-// BEGIN copied from mlir/lib/Transforms/CSE.cpp
-//===----------------------------------------------------------------------===//
+  //===----------------------------------------------------------------------===//
+  // BEGIN copied from mlir/lib/Transforms/CSE.cpp
+  //===----------------------------------------------------------------------===//
 };
 
 } // namespace
@@ -134,21 +136,20 @@ LogicalResult CSE::simplifyOperation(ScopedMapTy &knownValues, Operation *op,
 
   // Look for an existing definition for the operation.
   if (auto *existing = knownValues.lookup(op)) {
-
     // If we find one then replace all uses of the current operation with the
     // existing one and mark it for deletion. We can only replace an operand in
     // an operation if it has not been visited yet.
     if (hasSSADominance) {
       // If the region has SSA dominance, then we are guaranteed to have not
       // visited any use of the current operation.
-//===----------------------------------------------------------------------===//
-// END copied from mlir/lib/Transforms/CSE.cpp
-//===----------------------------------------------------------------------===//
+      //===----------------------------------------------------------------------===//
+      // END copied from mlir/lib/Transforms/CSE.cpp
+      //===----------------------------------------------------------------------===//
       if (listener)
         listener->notifyOperationReplaced(op, existing->getResults());
-//===----------------------------------------------------------------------===//
-// BEGIN copied from mlir/lib/Transforms/CSE.cpp
-//===----------------------------------------------------------------------===//
+      //===----------------------------------------------------------------------===//
+      // BEGIN copied from mlir/lib/Transforms/CSE.cpp
+      //===----------------------------------------------------------------------===//
       op->replaceAllUsesWith(existing);
       opsToErase.push_back(op);
     } else {
@@ -273,14 +274,14 @@ unsigned CSE::simplify(Operation *rootOp) {
 
   /// Erase any operations that were marked as dead during simplification.
   for (auto *op : opsToErase) {
-//===----------------------------------------------------------------------===//
-// END copied from mlir/lib/Transforms/CSE.cpp
-//===----------------------------------------------------------------------===//
+    //===----------------------------------------------------------------------===//
+    // END copied from mlir/lib/Transforms/CSE.cpp
+    //===----------------------------------------------------------------------===//
     if (listener)
       listener->notifyOperationRemoved(op);
-//===----------------------------------------------------------------------===//
-// BEGIN copied from mlir/lib/Transforms/CSE.cpp
-//===----------------------------------------------------------------------===//
+    //===----------------------------------------------------------------------===//
+    // BEGIN copied from mlir/lib/Transforms/CSE.cpp
+    //===----------------------------------------------------------------------===//
     op->erase();
   }
 

@@ -35,8 +35,8 @@ namespace test_ext {
 /// Test passes, do not deserve an include.
 void registerTestLinalgTransformWrapScope();
 void registerTestListenerPasses();
-}  // namespace test_ext
-}  // namespace mlir
+} // namespace test_ext
+} // namespace mlir
 
 int main(int argc, char **argv) {
   registerAsmPrinterCLOptions();

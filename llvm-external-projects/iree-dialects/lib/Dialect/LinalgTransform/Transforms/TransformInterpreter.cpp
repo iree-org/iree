@@ -18,9 +18,6 @@
 #include "iree-dialects/Dialect/LinalgTransform/TrackingRewriteDriver.h"
 #include "iree-dialects/Dialect/LinalgTransform/TransformOpInterface.h"
 #include "iree-dialects/Dialect/LinalgTransform/TransformOpMapping.h"
-#include "llvm/ADT/STLExtras.h"
-#include "llvm/ADT/ScopeExit.h"
-#include "llvm/ADT/TypeSwitch.h"
 #include "mlir/Dialect/Affine/LoopUtils.h"
 #include "mlir/Dialect/Arithmetic/Transforms/BufferizableOpInterfaceImpl.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
@@ -41,6 +38,9 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "mlir/Transforms/Passes.h"
+#include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/ScopeExit.h"
+#include "llvm/ADT/TypeSwitch.h"
 
 #define DEBUG_TYPE "transform-interpreter"
 #define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE << "]: ")
@@ -71,7 +71,8 @@ static LogicalResult performEnablerTransformations(
         func->walk([](LoopLikeOpInterface loopLike) -> WalkResult {
           return moveLoopInvariantCode(loopLike);
         });
-    if (result.wasInterrupted()) return failure();
+    if (result.wasInterrupted())
+      return failure();
   }
 
   func.walk([](Operation *op) {
@@ -258,7 +259,8 @@ struct InterpreterPass : public PassWrapper<InterpreterPass, Pass> {
 
   void runOnOperation() override {
     auto module = dyn_cast<ModuleOp>(getOperation());
-    if (!module) return signalPassFailure();
+    if (!module)
+      return signalPassFailure();
 
     auto result = module.walk([&](linalg::transform::SequenceOp sequenceOp) {
       if (failed(executeSequence(sequenceOp, module)))
@@ -266,7 +268,8 @@ struct InterpreterPass : public PassWrapper<InterpreterPass, Pass> {
       return WalkResult::advance();
     });
 
-    if (result.wasInterrupted()) signalPassFailure();
+    if (result.wasInterrupted())
+      signalPassFailure();
   }
 };
 
@@ -286,7 +289,8 @@ struct DropScheduleFromModulePass
 
   void runOnOperation() override {
     auto module = dyn_cast<ModuleOp>(getOperation());
-    if (!module) return signalPassFailure();
+    if (!module)
+      return signalPassFailure();
 
     module.walk([&](Operation *nestedOp) {
       if (isa<linalg::transform::SequenceOp>(nestedOp) ||
@@ -295,7 +299,7 @@ struct DropScheduleFromModulePass
     });
   }
 };
-}  // namespace
+} // namespace
 
 namespace mlir {
 /// Create a Linalg Transform interpreter pass.
@@ -306,7 +310,7 @@ std::unique_ptr<Pass> createLinalgTransformInterpreterPass() {
 std::unique_ptr<Pass> createDropScheduleFromModulePass() {
   return std::make_unique<DropScheduleFromModulePass>();
 }
-}  // namespace mlir
+} // namespace mlir
 
 /// Registration hook for the Linalg Transform interpreter pass.
 void mlir::linalg::transform::registerLinalgTransformInterpreterPass() {

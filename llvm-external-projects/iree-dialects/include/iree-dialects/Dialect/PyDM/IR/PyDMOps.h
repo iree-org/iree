@@ -22,4 +22,4 @@
 #define GET_OP_CLASSES
 #include "iree-dialects/Dialect/PyDM/IR/PyDMOps.h.inc"
 
-#endif  // IREE_DIALECTS_IREEPYDM_IR_OPS_H
+#endif // IREE_DIALECTS_IREEPYDM_IR_OPS_H

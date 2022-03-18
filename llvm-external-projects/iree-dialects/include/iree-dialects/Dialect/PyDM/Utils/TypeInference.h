@@ -7,14 +7,14 @@
 #ifndef IREE_DIALECTS_DIALECT_IREEPYDM_UTILS_TYPE_INFERENCE_H
 #define IREE_DIALECTS_DIALECT_IREEPYDM_UTILS_TYPE_INFERENCE_H
 
-#include "llvm/ADT/DenseMap.h"
-#include "llvm/ADT/SmallVector.h"
-#include "llvm/Support/Allocator.h"
 #include "mlir/IR/Block.h"
 #include "mlir/IR/BlockAndValueMapping.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/Interfaces/ControlFlowInterfaces.h"
 #include "mlir/Support/LLVM.h"
+#include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/SmallVector.h"
+#include "llvm/Support/Allocator.h"
 
 namespace mlir {
 namespace iree_compiler {
@@ -27,7 +27,7 @@ namespace PYDM {
 /// generally, duplicating/permuting blocks or regions is preferred over
 /// unifying.
 class PermutedTypePropagator {
- public:
+public:
   PermutedTypePropagator(MLIRContext *context) : context(context) {}
 
   // ---------------------------------------------------------------------------
@@ -80,7 +80,7 @@ class PermutedTypePropagator {
                                 TypeRange newArgumentTypes,
                                 BlockPermuteCallback initializeCallback);
 
- private:
+private:
   MLIRContext *context;
   llvm::BumpPtrAllocator allocator;
 
@@ -90,9 +90,9 @@ class PermutedTypePropagator {
                                               Block *block);
 };
 
-}  // namespace PYDM
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace PYDM
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_DIALECTS_DIALECT_IREEPYDM_UTILS_TYPE_INFERENCE_H
+#endif // IREE_DIALECTS_DIALECT_IREEPYDM_UTILS_TYPE_INFERENCE_H

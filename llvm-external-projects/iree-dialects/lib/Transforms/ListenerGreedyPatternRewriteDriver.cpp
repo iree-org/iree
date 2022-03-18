@@ -7,6 +7,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "Transforms/ListenerGreedyPatternRewriteDriver.h"
+
 #include "Transforms/Listener.h"
 #include "mlir/Interfaces/SideEffectInterfaces.h"
 #include "mlir/Rewrite/PatternApplicator.h"
@@ -32,19 +33,20 @@ namespace {
 /// applies the locally optimal patterns in a roughly "bottom up" way.
 class GreedyPatternRewriteDriver : public RewriteListener {
 public:
-//===----------------------------------------------------------------------===//
-// BEGIN copied from mlir/lib/Transforms/Utils/GreedyPatternRewriteDriver.cpp
-//===----------------------------------------------------------------------===//
-  explicit GreedyPatternRewriteDriver(MLIRContext *ctx,
-                                      const FrozenRewritePatternSet &patterns,
-                                      const GreedyRewriteConfig &config,
-//===----------------------------------------------------------------------===//
-// END copied from mlir/lib/Transforms/Utils/GreedyPatternRewriteDriver.cpp
-//===----------------------------------------------------------------------===//
-                                      RewriteListener *listener);
-//===----------------------------------------------------------------------===//
-// BEGIN copied from mlir/lib/Transforms/Utils/GreedyPatternRewriteDriver.cpp
-//===----------------------------------------------------------------------===//
+  //===----------------------------------------------------------------------===//
+  // BEGIN copied from mlir/lib/Transforms/Utils/GreedyPatternRewriteDriver.cpp
+  //===----------------------------------------------------------------------===//
+  explicit GreedyPatternRewriteDriver(
+      MLIRContext *ctx, const FrozenRewritePatternSet &patterns,
+      const GreedyRewriteConfig &config,
+      //===----------------------------------------------------------------------===//
+      // END copied from
+      // mlir/lib/Transforms/Utils/GreedyPatternRewriteDriver.cpp
+      //===----------------------------------------------------------------------===//
+      RewriteListener *listener);
+  //===----------------------------------------------------------------------===//
+  // BEGIN copied from mlir/lib/Transforms/Utils/GreedyPatternRewriteDriver.cpp
+  //===----------------------------------------------------------------------===//
 
   /// Simplify the operations within the given regions.
   bool simplify(MutableArrayRef<Region> regions);
@@ -74,16 +76,16 @@ protected:
   // worklist anymore because we'd get dangling references to it.
   void notifyOperationRemoved(Operation *op) override;
 
-//===----------------------------------------------------------------------===//
-// END copied from mlir/lib/Transforms/Utils/GreedyPatternRewriteDriver.cpp
-//===----------------------------------------------------------------------===//
+  //===----------------------------------------------------------------------===//
+  // END copied from mlir/lib/Transforms/Utils/GreedyPatternRewriteDriver.cpp
+  //===----------------------------------------------------------------------===//
   // When the root of a pattern is about to be replaced, it can trigger
   // simplifications to its users - make sure to add them to the worklist
   // before the root is changed.
   void notifyOperationReplaced(Operation *op, ValueRange newValues) override;
-//===----------------------------------------------------------------------===//
-// BEGIN copied from mlir/lib/Transforms/Utils/GreedyPatternRewriteDriver.cpp
-//===----------------------------------------------------------------------===//
+  //===----------------------------------------------------------------------===//
+  // BEGIN copied from mlir/lib/Transforms/Utils/GreedyPatternRewriteDriver.cpp
+  //===----------------------------------------------------------------------===//
 
   /// PatternRewriter hook for notifying match failure reasons.
   void
@@ -107,14 +109,14 @@ private:
   /// Configuration information for how to simplify.
   GreedyRewriteConfig config;
 
-//===----------------------------------------------------------------------===//
-// END copied from mlir/lib/Transforms/Utils/GreedyPatternRewriteDriver.cpp
-//===----------------------------------------------------------------------===//
+  //===----------------------------------------------------------------------===//
+  // END copied from mlir/lib/Transforms/Utils/GreedyPatternRewriteDriver.cpp
+  //===----------------------------------------------------------------------===//
   /// The pattern rewriter to use.
   PatternRewriterListener rewriter;
-//===----------------------------------------------------------------------===//
-// BEGIN copied from mlir/lib/Transforms/Utils/GreedyPatternRewriteDriver.cpp
-//===----------------------------------------------------------------------===//
+  //===----------------------------------------------------------------------===//
+  // BEGIN copied from mlir/lib/Transforms/Utils/GreedyPatternRewriteDriver.cpp
+  //===----------------------------------------------------------------------===//
 
 #ifndef NDEBUG
   /// A logger used to emit information during the application process.
@@ -134,9 +136,9 @@ GreedyPatternRewriteDriver::GreedyPatternRewriteDriver(
   rewriter.addListener(this);
   if (listener)
     rewriter.addListener(listener);
-//===----------------------------------------------------------------------===//
-// BEGIN copied from mlir/lib/Transforms/Utils/GreedyPatternRewriteDriver.cpp
-//===----------------------------------------------------------------------===//
+  //===----------------------------------------------------------------------===//
+  // BEGIN copied from mlir/lib/Transforms/Utils/GreedyPatternRewriteDriver.cpp
+  //===----------------------------------------------------------------------===//
 
   worklist.reserve(64);
 
@@ -402,9 +404,9 @@ void GreedyPatternRewriteDriver::notifyMatchFailure(
 LogicalResult mlir::applyPatternsAndFoldGreedily(
     MutableArrayRef<Region> regions, const FrozenRewritePatternSet &patterns,
     const GreedyRewriteConfig &config, RewriteListener *listener) {
-//===----------------------------------------------------------------------===//
-// BEGIN copied from mlir/lib/Transforms/Utils/GreedyPatternRewriteDriver.cpp
-//===----------------------------------------------------------------------===//
+  //===----------------------------------------------------------------------===//
+  // BEGIN copied from mlir/lib/Transforms/Utils/GreedyPatternRewriteDriver.cpp
+  //===----------------------------------------------------------------------===//
   if (regions.empty())
     return success();
 
@@ -419,14 +421,14 @@ LogicalResult mlir::applyPatternsAndFoldGreedily(
          "patterns can only be applied to operations IsolatedFromAbove");
 
   // Start the pattern driver.
-//===----------------------------------------------------------------------===//
-// END copied from mlir/lib/Transforms/Utils/GreedyPatternRewriteDriver.cpp
-//===----------------------------------------------------------------------===//
+  //===----------------------------------------------------------------------===//
+  // END copied from mlir/lib/Transforms/Utils/GreedyPatternRewriteDriver.cpp
+  //===----------------------------------------------------------------------===//
   GreedyPatternRewriteDriver driver(regions[0].getContext(), patterns, config,
                                     listener);
-//===----------------------------------------------------------------------===//
-// BEGIN copied from mlir/lib/Transforms/Utils/GreedyPatternRewriteDriver.cpp
-//===----------------------------------------------------------------------===//
+  //===----------------------------------------------------------------------===//
+  // BEGIN copied from mlir/lib/Transforms/Utils/GreedyPatternRewriteDriver.cpp
+  //===----------------------------------------------------------------------===//
   bool converged = driver.simplify(regions);
   LLVM_DEBUG(if (!converged) {
     llvm::dbgs() << "The pattern rewrite doesn't converge after scanning "

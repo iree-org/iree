@@ -9,19 +9,19 @@
 #include "PDL.h"
 
 #include "Transforms/Functional.h"
-#include "llvm/ADT/ScopeExit.h"
 #include "mlir/Dialect/Arithmetic/Utils/Utils.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/PDL/IR/PDLOps.h"
 #include "mlir/Rewrite/FrozenRewritePatternSet.h"
 #include "mlir/Rewrite/PatternApplicator.h"
+#include "llvm/ADT/ScopeExit.h"
 
 namespace mlir {
 namespace linalg {
 
 /// Return ops that match any of the patterns.
-static SmallVector<Operation *> getMatchingOps(
-    Operation *parent, const FrozenRewritePatternSet &patterns) {
+static SmallVector<Operation *>
+getMatchingOps(Operation *parent, const FrozenRewritePatternSet &patterns) {
   PatternApplicator applicator(patterns);
   applicator.applyDefaultCostModel();
 
@@ -29,7 +29,8 @@ static SmallVector<Operation *> getMatchingOps(
   return functional::applyForEachIn(
       parent,
       [&](Operation *op, PatternRewriter &rewriter) -> FailureOr<Operation *> {
-        if (succeeded(applicator.matchAndRewrite(op, rewriter))) return op;
+        if (succeeded(applicator.matchAndRewrite(op, rewriter)))
+          return op;
         return failure();
       });
 }
@@ -75,7 +76,8 @@ static LogicalResult haveIdenticalBodiesImpl(LinalgOp linalgOp,
   unsigned idx = 0;
   WalkResult res = genericLinalgModelOp.getBlock()->walk([&](Operation *op) {
     Operation *linalgSubOp = linalgBodyOps[idx++];
-    if (op->getName() != linalgSubOp->getName()) return WalkResult::interrupt();
+    if (op->getName() != linalgSubOp->getName())
+      return WalkResult::interrupt();
     if (op->getAttrs() != linalgSubOp->getAttrs())
       return WalkResult::interrupt();
     for (auto it : llvm::zip(op->getOperands(), linalgSubOp->getOperands()))
@@ -148,19 +150,20 @@ static LogicalResult isEquivalentToOp(PDLValue value, ArrayAttr constantParams,
                                       PatternRewriter &rewriter) {
   auto *maybeOp = value.dyn_cast<Operation *>();
   if (!maybeOp)
-    return failure();  // TODO: notifyMatchFailure needs an Operation* handle.
+    return failure(); // TODO: notifyMatchFailure needs an Operation* handle.
   Operation *op = maybeOp;
 
   ArrayRef<Attribute> attrs = constantParams.getValue();
   if (attrs.size() != 1)
-    return failure();  // TODO: notifyMatchFailure needs an Operation* handle.
+    return failure(); // TODO: notifyMatchFailure needs an Operation* handle.
   auto modelOpNameAttr = attrs.front().dyn_cast<StringAttr>();
   if (!modelOpNameAttr)
-    return failure();  // TODO: notifyMatchFailure needs an Operation* handle.
+    return failure(); // TODO: notifyMatchFailure needs an Operation* handle.
   auto modelOpName = modelOpNameAttr.strref();
 
   // 1. If op has name `modelOpName`, the match is trivial.
-  if (op->getName().getStringRef() == modelOpName) return success();
+  if (op->getName().getStringRef() == modelOpName)
+    return success();
 
   // 2. Linalg vs Linalg.
   // Create op from `constantParams`.
@@ -190,35 +193,36 @@ static LogicalResult isDimMultipleOf(PDLValue value, ArrayAttr constantParams,
                                      PatternRewriter &rewriter) {
   auto maybeOperands = value.dyn_cast<ValueRange>();
   if (!maybeOperands)
-    return failure();  // TODO: notifyMatchFailure needs an Operation* handle.
+    return failure(); // TODO: notifyMatchFailure needs an Operation* handle.
   auto operands = *maybeOperands;
 
   auto dict = constantParams.begin()->dyn_cast<DictionaryAttr>();
   if (!dict)
-    return failure();  // TODO: notifyMatchFailure needs an Operation* handle.
+    return failure(); // TODO: notifyMatchFailure needs an Operation* handle.
 
   int64_t dim;
   auto dimAttr = dict.getAs<IntegerAttr>("dim");
   if (!dimAttr)
-    return failure();  // TODO: notifyMatchFailure needs an Operation* handle.
+    return failure(); // TODO: notifyMatchFailure needs an Operation* handle.
   dim = dimAttr.getInt();
 
   int64_t divisor;
   auto divisorAttr = dict.getAs<IntegerAttr>("divisor");
   if (!divisorAttr)
-    return failure();  // TODO: notifyMatchFailure needs an Operation* handle.
+    return failure(); // TODO: notifyMatchFailure needs an Operation* handle.
   divisor = divisorAttr.getInt();
 
   int64_t operandNumber;
   auto operandNumberAttr = dict.getAs<IntegerAttr>("operand_number");
   if (!operandNumberAttr)
-    return failure();  // TODO: notifyMatchFailure needs an Operation* handle.
+    return failure(); // TODO: notifyMatchFailure needs an Operation* handle.
   operandNumber = operandNumberAttr.getInt();
 
   ShapedType shapedType;
   if (static_cast<int64_t>(operands.size()) > operandNumber)
     shapedType = operands[operandNumber].getType().dyn_cast<ShapedType>();
-  if (!shapedType || shapedType.getRank() <= dim) return failure();
+  if (!shapedType || shapedType.getRank() <= dim)
+    return failure();
   return success(divisor == 0 || (shapedType.getShape()[dim] > 0 &&
                                   shapedType.getShape()[dim] % divisor == 0));
 }
@@ -233,23 +237,23 @@ static LogicalResult isDimStatic(PDLValue value, ArrayAttr constantParams,
                                  PatternRewriter &rewriter) {
   auto maybeOperands = value.dyn_cast<ValueRange>();
   if (!maybeOperands)
-    return failure();  // TODO: notifyMatchFailure needs an Operation* handle.
+    return failure(); // TODO: notifyMatchFailure needs an Operation* handle.
   auto operands = *maybeOperands;
 
   auto dict = constantParams.begin()->dyn_cast<DictionaryAttr>();
   if (!dict)
-    return failure();  // TODO: notifyMatchFailure needs an Operation* handle.
+    return failure(); // TODO: notifyMatchFailure needs an Operation* handle.
 
   int64_t dim;
   auto dimAttr = dict.getAs<IntegerAttr>("dim");
   if (!dimAttr)
-    return failure();  // TODO: notifyMatchFailure needs an Operation* handle.
+    return failure(); // TODO: notifyMatchFailure needs an Operation* handle.
   dim = dimAttr.getInt();
 
   int64_t operandNumber;
   auto operandNumberAttr = dict.getAs<IntegerAttr>("operand_number");
   if (!operandNumberAttr)
-    return failure();  // TODO: notifyMatchFailure needs an Operation* handle.
+    return failure(); // TODO: notifyMatchFailure needs an Operation* handle.
   operandNumber = operandNumberAttr.getInt();
 
   ShapedType shapedType;
@@ -268,23 +272,23 @@ static LogicalResult isDimDynamic(PDLValue value, ArrayAttr constantParams,
                                   PatternRewriter &rewriter) {
   auto maybeOperands = value.dyn_cast<ValueRange>();
   if (!maybeOperands)
-    return failure();  // TODO: notifyMatchFailure needs an Operation* handle.
+    return failure(); // TODO: notifyMatchFailure needs an Operation* handle.
   auto operands = *maybeOperands;
 
   auto dict = constantParams.begin()->dyn_cast<DictionaryAttr>();
   if (!dict)
-    return failure();  // TODO: notifyMatchFailure needs an Operation* handle.
+    return failure(); // TODO: notifyMatchFailure needs an Operation* handle.
 
   int64_t dim;
   auto dimAttr = dict.getAs<IntegerAttr>("dim");
   if (!dimAttr)
-    return failure();  // TODO: notifyMatchFailure needs an Operation* handle.
+    return failure(); // TODO: notifyMatchFailure needs an Operation* handle.
   dim = dimAttr.getInt();
 
   int64_t operandNumber;
   auto operandNumberAttr = dict.getAs<IntegerAttr>("operand_number");
   if (!operandNumberAttr)
-    return failure();  // TODO: notifyMatchFailure needs an Operation* handle.
+    return failure(); // TODO: notifyMatchFailure needs an Operation* handle.
   operandNumber = operandNumberAttr.getInt();
 
   ShapedType shapedType;
@@ -293,9 +297,8 @@ static LogicalResult isDimDynamic(PDLValue value, ArrayAttr constantParams,
   return success(shapedType && shapedType.isDynamicDim(dim));
 }
 
-FailureOr<SmallVector<Operation *>> findMatchingOps(Operation *op,
-                                                    SymbolRefAttr pattern,
-                                                    ModuleOp module) {
+FailureOr<SmallVector<Operation *>>
+findMatchingOps(Operation *op, SymbolRefAttr pattern, ModuleOp module) {
   auto patternOp = module.lookupSymbol<pdl::PatternOp>(pattern);
   if (!patternOp)
     return {op->emitError("could not find a pattern named: ") << pattern};
@@ -319,5 +322,5 @@ FailureOr<SmallVector<Operation *>> findMatchingOps(Operation *op,
   return getMatchingOps(module, std::move(patterns));
 }
 
-}  // namespace linalg
-}  // namespace mlir
+} // namespace linalg
+} // namespace mlir

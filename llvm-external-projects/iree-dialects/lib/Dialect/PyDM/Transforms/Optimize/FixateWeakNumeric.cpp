@@ -98,13 +98,14 @@ struct FixateWeakNumericPass
       }
     }
 
-    if (!modified) return ft;
+    if (!modified)
+      return ft;
 
     return FunctionType::get(ft.getContext(), inputs, results);
   }
 };
 
-}  // namespace
+} // namespace
 
 std::unique_ptr<OperationPass<>> PYDM::createFixateWeakNumericPass() {
   return std::make_unique<FixateWeakNumericPass>();

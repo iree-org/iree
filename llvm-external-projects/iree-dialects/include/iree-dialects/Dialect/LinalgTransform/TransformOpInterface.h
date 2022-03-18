@@ -32,7 +32,7 @@ class TransformOpInterface;
 /// corresponds to). Checks that transform IR values correspond to disjoint sets
 /// of payload IR ops throughout the transformation.
 class TransformState {
- public:
+public:
   /// Creates a state for the transformation rooted at the given op.
   explicit TransformState(Operation *root);
 
@@ -55,12 +55,12 @@ class TransformState {
   class Extension {
     friend class TransformState;
 
-   public:
+  public:
     // Out-of-line implementation to ensure vtable and metadata are emitted in
     // a single .o file.
     virtual ~Extension();
 
-   protected:
+  protected:
     Extension(TransformState &state) : state(state) {}
 
     /// Read-only access to the mapping between transform IR values and payload
@@ -117,7 +117,7 @@ class TransformState {
       propagatingUpdatePayload = false;
     }
 
-   private:
+  private:
     /// Flags indicating whether a notifiable event originates at this
     /// extension. If set, this extension is not notified about the event.
     bool propagatingSetPayload = false;
@@ -127,11 +127,13 @@ class TransformState {
     /// Sends notifications to about an event to the current extension. Expected
     /// to be called by the TransformState only.
     void sendNotifySetPayload(Value handle, ArrayRef<Operation *> operations) {
-      if (!propagatingSetPayload) notifySetPayload(handle, operations);
+      if (!propagatingSetPayload)
+        notifySetPayload(handle, operations);
     }
     void sendNotifyRemovePayload(Value handle,
                                  ArrayRef<Operation *> operations) {
-      if (!propagatingRemovePayload) notifyRemovePayload(handle, operations);
+      if (!propagatingRemovePayload)
+        notifyRemovePayload(handle, operations);
     }
     void sendNotifyUpdatePayload(Value handle, ArrayRef<Operation *> oldOps,
                                  ArrayRef<Operation *> newOps) {
@@ -180,7 +182,7 @@ class TransformState {
     extensions.erase(TypeID::get<Ty>());
   }
 
- private:
+private:
   /// Identifier for storing top-level value in the `operations` mapping.
   constexpr const static Value kTopLevelValue = Value();
 
@@ -213,13 +215,13 @@ class TransformState {
 class TransformResults {
   friend class TransformState;
 
- public:
+public:
   /// Indicates that the result of the transform IR op at the given position
   /// corresponds to the given list of payload IR ops. Each result must be set
   /// by the transformation exactly once.
   void set(OpResult value, ArrayRef<Operation *> ops);
 
- private:
+private:
   /// Creates an instance of TransformResults that expects mappings for
   /// `numSegments` values.
   explicit TransformResults(unsigned numSegments);
@@ -256,7 +258,7 @@ appendTransformResultToVector(Ty result,
       "Expected transform function to return operations");
   results.push_back(*result);
 }
-}  // namespace detail
+} // namespace detail
 
 /// Applies a one-to-one transform to each of the given targets. Puts the
 /// results of transforms, if any, in `results` in the same order. Fails if any
@@ -280,10 +282,12 @@ LogicalResult applyTransformToEach(ArrayRef<Operation *> targets,
   for (Operation *target : targets) {
     auto specificOp =
         functional::detail::IsaOr<TransformOpType>::dyn_cast(target);
-    if (!specificOp) return failure();
+    if (!specificOp)
+      return failure();
 
     auto result = transform(specificOp);
-    if (failed(result)) return failure();
+    if (failed(result))
+      return failure();
 
     detail::appendTransformResultToVector(result, results);
   }
@@ -303,7 +307,7 @@ LogicalResult applyTransformToEach(ArrayRef<Operation *> targets,
 template <typename OpTy>
 class TargetableSingleOperandOpTrait
     : public OpTrait::TraitBase<OpTy, TargetableSingleOperandOpTrait> {
- public:
+public:
   /// Applies the transformation to each op from the only target and sets the
   /// only result to correspond to the list of individual results.
   LogicalResult apply(TransformResults &transformResults,
@@ -337,10 +341,10 @@ class TargetableSingleOperandOpTrait
   }
 };
 
-}  // namespace transform
-}  // namespace linalg
-}  // namespace mlir
+} // namespace transform
+} // namespace linalg
+} // namespace mlir
 
 #include "iree-dialects/Dialect/LinalgTransform/TransformOpInterface.h.inc"
 
-#endif  // MLIR_DIALECT_LINALG_TRANSFORM_TRANSFORM_OP_INTERFACE_H
+#endif // MLIR_DIALECT_LINALG_TRANSFORM_TRANSFORM_OP_INTERFACE_H

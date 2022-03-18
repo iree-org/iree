@@ -16,7 +16,7 @@ namespace {
 struct Rewriter : public PatternRewriter {
   Rewriter(MLIRContext *ctx) : PatternRewriter(ctx) {}
 };
-}  // namespace
+} // namespace
 
 linalg::transform::ScopeOp linalg::transform::wrapInScope(Operation *op) {
   Rewriter rewriter(op->getContext());
@@ -68,10 +68,10 @@ struct ScopeInliner : public InlinerInterface {
       std::get<1>(value).replaceAllUsesWith(std::get<0>(value));
   }
 };
-}  // namespace
+} // namespace
 
-FailureOr<SmallVector<Operation *>> linalg::transform::unwrapScope(
-    linalg::transform::ScopeOp scope) {
+FailureOr<SmallVector<Operation *>>
+linalg::transform::unwrapScope(linalg::transform::ScopeOp scope) {
   ScopeInliner interface(scope->getContext());
   SmallVector<Operation *> ops;
   scope.body().walk([&](Operation *op) { ops.push_back(op); });

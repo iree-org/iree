@@ -19,7 +19,7 @@ namespace linalg {
 /// interpreter.
 class TrackingListener : public RewriteListener,
                          public transform::TransformState::Extension {
- public:
+public:
   TrackingListener(transform::TransformState &state);
   TrackingListener(TrackingListener &&other)
       : transform::TransformState::Extension(
@@ -34,7 +34,7 @@ class TrackingListener : public RewriteListener,
   ~TrackingListener() {
 #ifndef NDEBUG
     assert(errorStateChecked && "must check listener error state");
-#endif  // NDEBUG
+#endif // NDEBUG
   }
 
   /// When a tracked linalg operation is replaced, try to find a single linalg
@@ -62,20 +62,20 @@ class TrackingListener : public RewriteListener,
     LogicalResult result = failure(hadErrors);
 #ifndef NDEBUG
     errorStateChecked = true;
-#endif  // NDEBUG
+#endif // NDEBUG
     return result;
   }
 
- private:
+private:
   /// A map from a tracked operation (LinalgOp cannot be used as a key) to its
   /// key in the map.
   DenseMap<Operation *, Value> trackedOperationKeys;
   bool hadErrors = false;
 #ifndef NDEBUG
   bool errorStateChecked = false;
-#endif  // NDEBUG
+#endif // NDEBUG
 };
-}  // namespace linalg
-}  // namespace mlir
+} // namespace linalg
+} // namespace mlir
 
-#endif  // IREE_LLVM_SANDBOX_DIALECTS_LINALGTRANSFORM_TRANSFORMS_TRACKINGLISTENER_H
+#endif // IREE_LLVM_SANDBOX_DIALECTS_LINALGTRANSFORM_TRANSFORMS_TRACKINGLISTENER_H

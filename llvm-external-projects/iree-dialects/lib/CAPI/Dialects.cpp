@@ -61,12 +61,12 @@ bool mlirTypeIsAIREEPyDMPrimitiveType(MlirType type) {
   return unwrap(type).isa<PYDM::PrimitiveType>();
 }
 
-#define IREEPYDM_DEFINE_NULLARY_TYPE(Name)                \
-  bool mlirTypeIsAIREEPyDM##Name(MlirType type) {         \
-    return unwrap(type).isa<PYDM::Name##Type>();          \
-  }                                                       \
-  MlirType mlirIREEPyDM##Name##TypeGet(MlirContext ctx) { \
-    return wrap(PYDM::Name##Type::get(unwrap(ctx)));      \
+#define IREEPYDM_DEFINE_NULLARY_TYPE(Name)                                     \
+  bool mlirTypeIsAIREEPyDM##Name(MlirType type) {                              \
+    return unwrap(type).isa<PYDM::Name##Type>();                               \
+  }                                                                            \
+  MlirType mlirIREEPyDM##Name##TypeGet(MlirContext ctx) {                      \
+    return wrap(PYDM::Name##Type::get(unwrap(ctx)));                           \
   }
 
 IREEPYDM_DEFINE_NULLARY_TYPE(Bool)
@@ -106,8 +106,8 @@ MlirType mlirIREEPyDMObjectTypeGet(MlirContext ctx, MlirType primitive) {
   return wrap(PYDM::ObjectType::get(unwrap(ctx), cppType));
 }
 
-MLIR_CAPI_EXPORTED void mlirIREEPyDMBuildPostImportPassPipeline(
-    MlirOpPassManager passManager) {
+MLIR_CAPI_EXPORTED void
+mlirIREEPyDMBuildPostImportPassPipeline(MlirOpPassManager passManager) {
   auto *passManagerCpp = unwrap(passManager);
   PYDM::buildPostImportPassPipeline(*passManagerCpp);
 }

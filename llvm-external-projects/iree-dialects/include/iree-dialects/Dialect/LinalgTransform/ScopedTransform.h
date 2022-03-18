@@ -26,8 +26,8 @@ auto scoped(Operation *target, TransformT &&transform) {
     return decltype(result)(failure());
   return result;
 }
-}  // namespace transform
-}  // namespace linalg
-}  // namespace mlir
+} // namespace transform
+} // namespace linalg
+} // namespace mlir
 
-#endif  // IREE_LLVM_SANDBOX_DIALECTS_LINALGTRANSFORM_SCOPEDTRANSFORM_H
+#endif // IREE_LLVM_SANDBOX_DIALECTS_LINALGTRANSFORM_SCOPEDTRANSFORM_H

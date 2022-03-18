@@ -39,10 +39,10 @@ MLIR_DECLARE_CAPI_DIALECT_REGISTRATION(LinalgTransform, iree_linalg_transform);
 
 MLIR_DECLARE_CAPI_DIALECT_REGISTRATION(IREEPyDM, iree_pydm);
 
-#define DEFINE_C_API_STRUCT(name, storage) \
-  struct name {                            \
-    storage *ptr;                          \
-  };                                       \
+#define DEFINE_C_API_STRUCT(name, storage)                                     \
+  struct name {                                                                \
+    storage *ptr;                                                              \
+  };                                                                           \
   typedef struct name name
 
 DEFINE_C_API_STRUCT(IREEPyDMSourceBundle, void);
@@ -61,13 +61,13 @@ MLIR_CAPI_EXPORTED IREEPyDMSourceBundle
 ireePyDMSourceBundleCreateFile(MlirStringRef filePath);
 
 /// Destroys a created source bundle.
-MLIR_CAPI_EXPORTED void ireePyDMSourceBundleDestroy(
-    IREEPyDMSourceBundle bundle);
+MLIR_CAPI_EXPORTED void
+ireePyDMSourceBundleDestroy(IREEPyDMSourceBundle bundle);
 
 MLIR_CAPI_EXPORTED bool mlirTypeIsAIREEPyDMPrimitiveType(MlirType type);
 
-#define IREEPYDM_DECLARE_NULLARY_TYPE(Name)                         \
-  MLIR_CAPI_EXPORTED bool mlirTypeIsAIREEPyDM##Name(MlirType type); \
+#define IREEPYDM_DECLARE_NULLARY_TYPE(Name)                                    \
+  MLIR_CAPI_EXPORTED bool mlirTypeIsAIREEPyDM##Name(MlirType type);            \
   MLIR_CAPI_EXPORTED MlirType mlirIREEPyDM##Name##TypeGet(MlirContext ctx);
 
 IREEPYDM_DECLARE_NULLARY_TYPE(Bool)
@@ -102,25 +102,27 @@ MLIR_CAPI_EXPORTED MlirType mlirIREEPyDMObjectTypeGet(MlirContext context,
 MLIR_CAPI_EXPORTED IREEPyDMLoweringOptions ireePyDMLoweringOptionsCreate();
 
 /// Sets the RTL link source bundle to the lowering options.
-MLIR_CAPI_EXPORTED void ireePyDMLoweringOptionsLinkRtl(
-    IREEPyDMLoweringOptions options, IREEPyDMSourceBundle source);
+MLIR_CAPI_EXPORTED void
+ireePyDMLoweringOptionsLinkRtl(IREEPyDMLoweringOptions options,
+                               IREEPyDMSourceBundle source);
 
 /// Destroys a created lowering options struct.
-MLIR_CAPI_EXPORTED void ireePyDMLoweringOptionsDestroy(
-    IREEPyDMLoweringOptions options);
+MLIR_CAPI_EXPORTED void
+ireePyDMLoweringOptionsDestroy(IREEPyDMLoweringOptions options);
 
 /// Builds a pass pipeline which should be run immediately post import to
 /// perform non-local structural transformations not suitable at the AST level
 /// and do local type inference.
-MLIR_CAPI_EXPORTED void mlirIREEPyDMBuildPostImportPassPipeline(
-    MlirOpPassManager passManager);
+MLIR_CAPI_EXPORTED void
+mlirIREEPyDMBuildPostImportPassPipeline(MlirOpPassManager passManager);
 
 /// Builds a pass pipeline which lowers the iree_pydm dialect to IREE.
-MLIR_CAPI_EXPORTED void mlirIREEPyDMBuildLowerToIREEPassPipeline(
-    MlirOpPassManager passManager, IREEPyDMLoweringOptions options);
+MLIR_CAPI_EXPORTED void
+mlirIREEPyDMBuildLowerToIREEPassPipeline(MlirOpPassManager passManager,
+                                         IREEPyDMLoweringOptions options);
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif  // IREE_DIALECTS_C_DIALECTS_H
+#endif // IREE_DIALECTS_C_DIALECTS_H

@@ -142,16 +142,17 @@ namespace {
 struct OpTilingPattern : public OpInterfaceRewritePattern<TilingInterface> {
   OpTilingPattern(MLIRContext *context, linalg::LinalgTilingOptions opt,
                   linalg::LinalgTransformationFilter filt)
-      : OpInterfaceRewritePattern<TilingInterface>(context),
-        options(opt),
+      : OpInterfaceRewritePattern<TilingInterface>(context), options(opt),
         filter(filt) {}
 
   LogicalResult matchAndRewrite(TilingInterface op,
                                 PatternRewriter &rewriter) const override {
-    if (failed(filter.checkAndNotify(rewriter, op))) return failure();
+    if (failed(filter.checkAndNotify(rewriter, op)))
+      return failure();
 
     /// Currently only handle single result operations.
-    if (op->getNumResults() != 1) return failure();
+    if (op->getNumResults() != 1)
+      return failure();
 
     Location loc = op->getLoc();
     // Get rank and tile sizes.
@@ -178,7 +179,7 @@ struct OpTilingPattern : public OpInterfaceRewritePattern<TilingInterface> {
     return success();
   }
 
- private:
+private:
   linalg::LinalgTilingOptions options;
   linalg::LinalgTransformationFilter filter;
 };
@@ -190,14 +191,14 @@ struct SliceOpTiledOpSwapPattern
   SliceOpTiledOpSwapPattern(MLIRContext *context,
                             linalg::LinalgTilingOptions opt,
                             linalg::LinalgTransformationFilter filt)
-      : OpRewritePattern<tensor::ExtractSliceOp>(context),
-        options(opt),
+      : OpRewritePattern<tensor::ExtractSliceOp>(context), options(opt),
         filter(filt) {}
 
   LogicalResult matchAndRewrite(tensor::ExtractSliceOp sliceOp,
                                 PatternRewriter &rewriter) const override {
     auto sourceOp = sliceOp.source().getDefiningOp<TilingInterface>();
-    if (!sourceOp || !filter.hasReplacementFilter(sourceOp)) return failure();
+    if (!sourceOp || !filter.hasReplacementFilter(sourceOp))
+      return failure();
     SmallVector<Operation *> tiledOps = sourceOp.getTiledImplementation(
         rewriter, sourceOp.getDestinationOperands(rewriter),
         sliceOp.getMixedOffsets(), sliceOp.getMixedSizes(),
@@ -208,9 +209,9 @@ struct SliceOpTiledOpSwapPattern
     return success();
   }
 
- private:
+private:
   linalg::LinalgTilingOptions options;
   linalg::LinalgTransformationFilter filter;
 };
 
-}  // namespace
+} // namespace

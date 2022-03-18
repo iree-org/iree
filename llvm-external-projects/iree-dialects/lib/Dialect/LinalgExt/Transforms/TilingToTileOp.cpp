@@ -63,9 +63,10 @@ static TilingResult tileToTileOp(PatternRewriter &rewriter, TilingInterface op,
   return TilingResult{tileOp, tiledOp};
 }
 
-FailureOr<Operation *> mlir::iree_compiler::IREE::LinalgExt::
-    LinalgExtTilingPattern::returningMatchAndRewrite(
-        TilingInterface op, PatternRewriter &rewriter) const {
+FailureOr<Operation *>
+mlir::iree_compiler::IREE::LinalgExt::LinalgExtTilingPattern::
+    returningMatchAndRewrite(TilingInterface op,
+                             PatternRewriter &rewriter) const {
   /// Currently only handle single result operations.
   if (op->getNumResults() != 1)
     return rewriter.notifyMatchFailure(op, "Not a single result");
@@ -78,7 +79,8 @@ FailureOr<Operation *> mlir::iree_compiler::IREE::LinalgExt::
   int64_t dim = -1;
   for (auto en : llvm::enumerate(tileSizes)) {
     Optional<int64_t> maybeTileSize = getConstantIntValue(en.value());
-    if (maybeTileSize && *maybeTileSize == 0) continue;
+    if (maybeTileSize && *maybeTileSize == 0)
+      continue;
     if (maybeTileSize && *maybeTileSize < 0)
       return rewriter.notifyMatchFailure(op, "Negative tile size");
     if (dim >= 0)

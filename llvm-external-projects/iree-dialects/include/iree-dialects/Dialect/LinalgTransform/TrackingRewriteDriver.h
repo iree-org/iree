@@ -25,6 +25,6 @@ LogicalResult applyPatternsTrackAndFoldGreedily(
     Operation *root, RewriteListener &listener,
     const FrozenRewritePatternSet &patterns,
     GreedyRewriteConfig config = GreedyRewriteConfig());
-}  // namespace mlir
+} // namespace mlir
 
-#endif  // MLIR_DIALECT_LINALG_TRANSFORMS_TRACKINGREWRITEDRIVER_H
+#endif // MLIR_DIALECT_LINALG_TRANSFORMS_TRACKINGREWRITEDRIVER_H

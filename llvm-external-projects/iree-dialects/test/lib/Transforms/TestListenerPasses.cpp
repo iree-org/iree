@@ -42,7 +42,8 @@ struct TestListenerCanonicalizePass
   void runOnOperation() override {
     TestListener listener;
     RewriteListener *listenerToUse = nullptr;
-    if (withListener) listenerToUse = &listener;
+    if (withListener)
+      listenerToUse = &listener;
 
     RewritePatternSet patterns(&getContext());
     for (Dialect *dialect : getContext().getLoadedDialects())
@@ -74,7 +75,8 @@ struct TestListenerCSEPass : public PassWrapper<TestListenerCSEPass, Pass> {
   void runOnOperation() override {
     TestListener listener;
     RewriteListener *listenerToUse = nullptr;
-    if (withListener) listenerToUse = &listener;
+    if (withListener)
+      listenerToUse = &listener;
 
     if (failed(eliminateCommonSubexpressions(getOperation(),
                                              /*domInfo=*/nullptr,
@@ -87,7 +89,7 @@ struct TestListenerCSEPass : public PassWrapper<TestListenerCSEPass, Pass> {
       llvm::cl::init(false)};
 };
 
-}  // namespace
+} // namespace
 
 namespace mlir {
 namespace test_ext {
@@ -95,5 +97,5 @@ void registerTestListenerPasses() {
   PassRegistration<TestListenerCanonicalizePass>();
   PassRegistration<TestListenerCSEPass>();
 }
-}  // namespace test_ext
-}  // namespace mlir
+} // namespace test_ext
+} // namespace mlir

@@ -7,13 +7,13 @@
 //===----------------------------------------------------------------------===//
 
 #include "iree-dialects/Dialect/LinalgExt/Passes/Passes.h"
-#include "llvm/ADT/STLExtras.h"
-#include "llvm/ADT/SmallVector.h"
-#include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Interfaces/TilingInterface.h"
+#include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/SmallVector.h"
+#include "llvm/Support/Debug.h"
 
 #define DEBUG_TYPE "linalg-ext-tiling"
 
@@ -22,7 +22,8 @@ using namespace mlir::linalg;
 using namespace mlir::iree_compiler::IREE::LinalgExt;
 
 static Value getAsValue(OpBuilder &b, Location loc, OpFoldResult ofr) {
-  if (auto v = ofr.dyn_cast<Value>()) return v;
+  if (auto v = ofr.dyn_cast<Value>())
+    return v;
   return b.create<arith::ConstantIndexOp>(
       loc, ofr.get<Attribute>().cast<IntegerAttr>().getInt());
 }
@@ -30,16 +31,15 @@ static SmallVector<Value> getAsValues(OpBuilder &b, Location loc,
                                       ArrayRef<OpFoldResult> ofrs) {
   SmallVector<Value> vals;
   vals.reserve(ofrs.size());
-  for (auto ofr : ofrs) vals.push_back(getAsValue(b, loc, ofr));
+  for (auto ofr : ofrs)
+    vals.push_back(getAsValue(b, loc, ofr));
   return vals;
 }
 
-static SmallVector<Value, 4> makeTiledInputShapes(OpBuilder &b, Location loc,
-                                                  LinalgOp linalgOp,
-                                                  ArrayRef<Value> valuesToTile,
-                                                  ArrayRef<Value> ivsRef,
-                                                  ArrayRef<Value> tileSizesRef,
-                                                  ArrayRef<Value> sizeBounds) {
+static SmallVector<Value, 4>
+makeTiledInputShapes(OpBuilder &b, Location loc, LinalgOp linalgOp,
+                     ArrayRef<Value> valuesToTile, ArrayRef<Value> ivsRef,
+                     ArrayRef<Value> tileSizesRef, ArrayRef<Value> sizeBounds) {
   assert(static_cast<int64_t>(valuesToTile.size()) == linalgOp.getNumInputs() &&
          "expected one value to tile for every operand");
 
@@ -96,10 +96,11 @@ struct LinalgOpTilingInterface
     return linalgOp.createLoopRanges(b, op->getLoc());
   }
 
-  SmallVector<Operation *> getTiledImplementation(
-      Operation *op, OpBuilder &b, ValueRange tiledDest,
-      ArrayRef<OpFoldResult> offsets, ArrayRef<OpFoldResult> sizes,
-      bool tileDestOperands) const {
+  SmallVector<Operation *>
+  getTiledImplementation(Operation *op, OpBuilder &b, ValueRange tiledDest,
+                         ArrayRef<OpFoldResult> offsets,
+                         ArrayRef<OpFoldResult> sizes,
+                         bool tileDestOperands) const {
     LinalgOp linalgOp = cast<LinalgOp>(op);
     if (op->getNumResults() != 1) {
       // TODO: Need a failure message here, but `notifyMatchFailure` is only a
@@ -109,11 +110,13 @@ struct LinalgOpTilingInterface
     Location loc = op->getLoc();
     AffineMap shapeSizesToLoopsMap = linalgOp.getShapesToLoopsMap();
     auto allShapeSizes = linalgOp.createFlatListOfOperandDims(b, loc);
-    if (!shapeSizesToLoopsMap) return {};
+    if (!shapeSizesToLoopsMap)
+      return {};
 
     OpOperand *outOperand = linalgOp.getOutputOperand(0);
     AffineMap indexingMap = linalgOp.getTiedIndexingMap(outOperand);
-    if (!indexingMap.isProjectedPermutation()) return {};
+    if (!indexingMap.isProjectedPermutation())
+      return {};
 
     SmallVector<Value> offsetsVals = getAsValues(b, loc, offsets);
     SmallVector<Value> sizeVals = getAsValues(b, loc, sizes);
@@ -153,7 +156,7 @@ struct LinalgOpTilingInterface
     return {linalgOp.clone(b, loc, tiledDest.getTypes(), tiledOperands)};
   }
 };
-}  // namespace
+} // namespace
 
 template <typename OpType>
 void registerOne(DialectRegistry &registry) {
