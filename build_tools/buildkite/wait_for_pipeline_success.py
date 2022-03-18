@@ -52,20 +52,24 @@ class BuildkitePipelineManager():
 
   @staticmethod
   def from_environ(pipeline):
-    organization = os.environ["BUILDKITE_ORGANIZATION_SLUG"]
-    # This is not one of Buildkite's. We set it ourself by fetching the secret
-    # from secret manager (a human can set this to their own personal access
-    # token)
+    # A token for the Buildkite API. Needs read/write privileges on builds to
+    # watch and create builds. Within our pipelines we fetch this from secret
+    # manager: https://cloud.google.com/secret-manager. Users can create a
+    # personal token for running this script locally:
+    # https://buildkite.com/docs/apis/managing-api-tokens
     access_token = os.environ["BUILDKITE_ACCESS_TOKEN"]
+
+    # Buildkite sets these environment variables. See
+    # https://buildkite.com/docs/pipelines/environment-variables. If running
+    # locally you can set locally, you can use the simulate_buildkite.sh script.
+    organization = os.environ["BUILDKITE_ORGANIZATION_SLUG"]
     commit = os.environ["BUILDKITE_COMMIT"]
     branch = os.environ["BUILDKITE_BRANCH"]
-    author_name = os.environ["BUILDKITE_BUILD_AUTHOR"]
-    author_email = os.environ["BUILDKITE_BUILD_AUTHOR_EMAIL"]
-    # If this isn't set (most likely in a local run) Buildkite will populate it
-    # based on the commit, so it's not a problem if they're not set. It's still
-    # nice to set it if we can because Buildkite can only set it once the build
-    # is accepted by an agent and the git repository is checked out, so the
-    # build will otherwise be nameless until that point.
+
+    # These variables aren't strictly necessary. Just nice to have (and set by
+    # Buildkite).
+    author_name = os.environ.get("BUILDKITE_BUILD_AUTHOR")
+    author_email = os.environ.get("BUILDKITE_BUILD_AUTHOR_EMAIL")
     message = os.environ.get("BUILDKITE_MESSAGE")
     # These may not be set if build is not from a pull request
     pull_request_id = os.environ.get("BUILDKITE_PULL_REQUEST")
@@ -213,8 +217,9 @@ def main(args):
   if should_create_new_build(bk, build, args.rebuild):
     build = bk.create_build()
   build_number = get_build_number(build)
-  state = bk.wait_for_build(build_number)
   url = bk.get_url_for_build(build_number)
+  print(f"Waiting on {url}")
+  state = bk.wait_for_build(build_number)
   if state != buildkite.BuildState.PASSED:
     print(f"Build was not successful: {url}")
     sys.exit(1)
