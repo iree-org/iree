@@ -39,7 +39,6 @@ from .benchmark_definition import AndroidDeviceInfo, BenchmarkInfo
 # All benchmarks' relative path against root build directory.
 BENCHMARK_SUITE_REL_PATH = "benchmark_suites"
 
-
 def compose_info_object(device_info: AndroidDeviceInfo,
                         benchmark_category_dir: str,
                         benchmark_case_dir: str) -> BenchmarkInfo:
