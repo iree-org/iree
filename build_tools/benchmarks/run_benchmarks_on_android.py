@@ -235,6 +235,7 @@ def run_benchmarks_for_category(
     skip_captures: Optional[Set[str]] = None,
     do_capture: bool = False,
     keep_going: bool = False,
+    benchmark_min_time: float = 0,
     verbose: bool = False,
 ) -> Tuple[Sequence[Tuple[Optional[str], Optional[str]]], Sequence[Exception]]:
   """Runs all benchmarks on the Android device and reports results and captures.
@@ -258,6 +259,9 @@ def run_benchmarks_for_category(
     do_capture: whether captures should be collected.
     keep_going: whether to proceed if an individual run fails. Exceptions will
       logged and returned.
+    benchmark_min_time: min number of seconds to run the benchmark for, if
+      specified. Otherwise, the benchmark will be repeated a fixed number of
+      times.
     verbose: whether to print additional debug information.
 
   Returns:
@@ -319,7 +323,6 @@ def run_benchmarks_for_category(
 
       benchmark_result_filename = None
       if benchmark_key not in skip_benchmarks:
-        repetitions = get_benchmark_repetition_count(benchmark_info.runner)
         benchmark_results_basename = f"{benchmark_key}.json"
 
         cmd = [
@@ -330,11 +333,19 @@ def run_benchmarks_for_category(
         ]
         if tool == "iree-benchmark-module":
           cmd.extend([
-              f"--benchmark_repetitions={repetitions}",
               "--benchmark_format=json",
               "--benchmark_out_format=json",
               f"--benchmark_out='{benchmark_results_basename}'",
           ])
+          if benchmark_min_time:
+            cmd.extend([
+                f"--benchmark_min_time={benchmark_min_time}",
+            ])
+          else:
+            repetitions = get_benchmark_repetition_count(benchmark_info.runner)
+            cmd.extend([
+                f"--benchmark_repetitions={repetitions}",
+            ])
 
         result_json = adb_execute_and_get_output(cmd,
                                                  android_relative_dir,
@@ -419,6 +430,7 @@ def filter_and_run_benchmarks(
     skip_captures: Optional[Set[str]],
     do_capture: bool = False,
     keep_going: bool = False,
+    benchmark_min_time: float = 0,
     verbose: bool = False) -> Tuple[List[str], List[str], List[Exception]]:
   """Filters and runs benchmarks in all categories for the given device.
 
@@ -446,6 +458,9 @@ def filter_and_run_benchmarks(
     do_capture: whether captures should be collected.
     keep_going: whether to proceed if an individual run fails. Exceptions will
       logged and returned.
+    benchmark_min_time: min number of seconds to run the benchmark for, if
+      specified. Otherwise, the benchmark will be repeated a fixed number of
+      times.
     verbose: whether to print additional debug information.
 
   Returns:
@@ -486,6 +501,7 @@ def filter_and_run_benchmarks(
         trace_capture_tool=trace_capture_tool,
         do_capture=do_capture,
         keep_going=keep_going,
+        benchmark_min_time=benchmark_min_time,
         verbose=verbose)
     errors.extend(run_errors)
     for benchmark_filename, capture_filename in run_results:
@@ -622,6 +638,16 @@ def parse_arguments():
       " should be for the specific commit (not the general tmp-dir). Previous"
       " benchmark and capture results from here will not be rerun and will be"
       " combined with the new runs.")
+  parser.add_argument(
+      "--benchmark_min_time",
+      "--benchmark-min-time",
+      default=0,
+      type=float,
+      help="If specified, this will be passed as --benchmark_min_time to the"
+      "iree-benchmark-module (minimum number of seconds to repeat running "
+      "for). In that case, no --benchmark_repetitions flag will be passed."
+      " If not specified, a --benchmark_repetitions will be passed "
+      "instead.")
 
   args = parser.parse_args()
 
@@ -714,6 +740,7 @@ def main(args):
       skip_captures=previous_captures,
       do_capture=do_capture,
       keep_going=args.keep_going,
+      benchmark_min_time=args.benchmark_min_time,
       verbose=args.verbose)
 
   # Merge in previous benchmarks and captures.
