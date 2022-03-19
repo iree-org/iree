@@ -21,9 +21,8 @@ steps:
       - thedyrt/skip-checkout#0870506e0b5d4becc164c6e64dbc331938f0bdcf:
           cd: /tmp/
     commands: |
-      # TODO: Switch to main branch.
       # Piped rather than wget to avoid unnecessary intermediate files (that can
       # cause confusion if not handled properly)
       curl \
-        https://raw.githubusercontent.com/GMNGeoffrey/iree/whole-new-world/build_tools/buildkite/presubmit.yml \
+        https://raw.githubusercontent.com/google/iree/main/build_tools/buildkite/presubmit.yml \
         | buildkite-agent pipeline upload
