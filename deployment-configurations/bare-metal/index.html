@@ -1143,7 +1143,7 @@ to retrieve the IREE compiler.</p>
 <h2 id="compile-the-model-for-bare-metal">Compile the model for bare-metal<a class="headerlink" href="#compile-the-model-for-bare-metal" title="Permanent link">&para;</a></h2>
 <p>The model can be compiled with the following command from the IREE compiler
 build directory</p>
-<div class="highlight"><pre><span></span><code>iree/tools/iree-translate <span class="se">\</span>
+<div class="highlight"><pre><span></span><code>iree/tools/iree-compile <span class="se">\</span>
     -iree-mlir-to-vm-bytecode-module <span class="se">\</span>
     -iree-stream-partitioning-favor<span class="o">=</span>min-peak-memory <span class="se">\</span>
     -iree-hal-target-backends<span class="o">=</span>dylib-llvm-aot <span class="se">\</span>
@@ -1173,7 +1173,7 @@ for example command-line instructions of some common architectures</p>
 demo sample for an example and instructions on running a model with IREE's
 <code>static_library_loader</code>.</p>
 <p>By default, the demo targets the host machine when compiling. To produce a
-bare-metal compatible model, run <code>iree-translate</code> as in the previous example
+bare-metal compatible model, run <code>iree-compile</code> as in the previous example
 and add the additional <code>-iree-llvm-static-library-output-path=</code> flag to specify
 the static library destination. This will produce a <code>.h\.o</code> file to link
 directly into the target application.</p>

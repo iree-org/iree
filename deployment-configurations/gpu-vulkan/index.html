@@ -1362,7 +1362,7 @@ details. The core <code>iree-compiler</code> package includes the SPIR-V compile
 </code></pre></div>
 <div class="admonition tip">
 <p class="admonition-title">Tip</p>
-<p><code>iree-translate</code> is installed as <code>/path/to/python/site-packages/iree/tools/core/iree-translate</code>.
+<p><code>iree-compile</code> is installed as <code>/path/to/python/site-packages/iree/tools/core/iree-compile</code>.
 You can find out the full path to the <code>site-packages</code> directory via the
 <code>python -m site</code> command.</p>
 </div>
@@ -1386,7 +1386,7 @@ weights from <a href="https://tfhub.dev/google/tf2-preview/mobilenet_v2/classifi
 <a href="../../getting-started/tensorflow/">TensorFlow importer</a>. Then,</p>
 <h4 id="compile-using-the-command-line">Compile using the command-line<a class="headerlink" href="#compile-using-the-command-line" title="Permanent link">&para;</a></h4>
 <p>In the build directory, run the following command:</p>
-<p><div class="highlight"><pre><span></span><code>iree/tools/iree-translate <span class="se">\</span>
+<p><div class="highlight"><pre><span></span><code>iree/tools/iree-compile <span class="se">\</span>
     -iree-mlir-to-vm-bytecode-module <span class="se">\</span>
 <span class="hll">    -iree-hal-target-backends<span class="o">=</span>vulkan-spirv <span class="se">\</span>
 </span><span class="hll">    -iree-vulkan-target-triple<span class="o">=</span>&lt;...&gt; <span class="se">\</span>

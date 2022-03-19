@@ -978,7 +978,7 @@ wget <span class="si">${</span><span class="nv">TFLITE_URL</span><span class="si
 iree-import-tflite <span class="si">${</span><span class="nv">TFLITE_PATH</span><span class="si">}</span> -o <span class="si">${</span><span class="nv">IMPORT_PATH</span><span class="si">}</span>
 
 <span class="c1"># Compile for the CPU backend</span>
-iree-translate <span class="se">\</span>
+iree-compile <span class="se">\</span>
     --iree-mlir-to-vm-bytecode-module <span class="se">\</span>
     --iree-input-type<span class="o">=</span>tosa <span class="se">\</span>
     --iree-hal-target-backends<span class="o">=</span>dylib-llvm-aot <span class="se">\</span>
