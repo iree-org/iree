@@ -248,7 +248,7 @@ SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
       const functionName = functionNameInput.value;
       const functionArguments = functionArgumentsInput.value.split("\n");
 
-      iree-compileallFunction(loadedProgram, functionName, functionArguments)
+      ireeCallFunction(loadedProgram, functionName, functionArguments)
           .then((result) => {
             functionOutputsElement.value = result.replace(";", "\n");
           })

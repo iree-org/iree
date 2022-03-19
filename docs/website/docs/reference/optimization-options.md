@@ -10,7 +10,7 @@ These flags can be passed to the:
 * In-process Python compiler API
   `iree.compiler.transforms.iree-compile.CompilerOptions("--flag", "--flag2")`
   constructor
-* `iree-compileompilerOptionsSetFlags()` compiler C API function
+* `ireeCompilerOptionsSetFlags()` compiler C API function
 
 ## High level program optimizations
 

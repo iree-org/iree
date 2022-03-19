@@ -141,7 +141,6 @@ Translate a source MLIR into IREE module:
 ```shell
 # Assuming in IREE source root
 $ ../iree-build-host/install/bin/iree-compile \
-  -iree-mlir-to-vm-bytecode-module \
   -iree-hal-target-backends=vmvx \
   $PWD/iree/samples/models/simple_abs.mlir \
   -o /tmp/simple_abs_vmvx.vmfb
@@ -180,7 +179,6 @@ Translate a source MLIR into IREE module:
 
 ```shell
 $ ../iree-build-host/install/bin/iree-compile \
-    -iree-mlir-to-vm-bytecode-module \
     -iree-hal-target-backends=vulkan-spirv \
     $PWD/iree/samples/models/simple_abs.mlir \
     -o /tmp/simple_abs_vulkan.vmfb
@@ -257,7 +255,6 @@ Translate a source MLIR into an IREE module:
 
 ```shell
 $ ../iree-build-host/install/bin/iree-compile \
-  -iree-mlir-to-vm-bytecode-module \
   -iree-hal-target-backends=dylib-llvm-aot \
   -iree-llvm-target-triple=aarch64-linux-android \
   $PWD/iree/samples/models/simple_abs.mlir \
