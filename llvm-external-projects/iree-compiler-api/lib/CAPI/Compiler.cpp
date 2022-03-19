@@ -13,7 +13,6 @@
 #include "iree/compiler/InputConversion/TOSA/Passes.h"
 #include "iree/compiler/Pipelines/Pipelines.h"
 #include "iree/compiler/Utils/OptionUtils.h"
-#include "iree/tools/init_targets.h"
 #include "iree/tools/init_dialects.h"
 #include "iree/tools/init_passes.h"
 #include "iree/tools/init_targets.h"
@@ -68,13 +67,9 @@ void ireeCompilerRegisterAllDialects(MlirContext context) {
   unwrap(context)->appendDialectRegistry(registry);
 }
 
-void ireeCompilerRegisterAllPasses() {
-  registerAllPasses();
-}
+void ireeCompilerRegisterAllPasses() { registerAllPasses(); }
 
-void ireeCompilerRegisterTargetBackends() {
-  registerHALTargetBackends();
-}
+void ireeCompilerRegisterTargetBackends() { registerHALTargetBackends(); }
 
 IreeCompilerOptions ireeCompilerOptionsCreate() {
   auto options = new CompilerOptions;
