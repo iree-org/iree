@@ -8,6 +8,7 @@
 #define IREE_DIALECTS_DIALECT_PYDM_IR_PYDM_BASE_TD
 
 include "mlir/IR/OpBase.td"
+include "mlir/IR/AttrTypeBase.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 
 def IREEPyDM_Dialect : Dialect {
@@ -34,14 +35,12 @@ def IREEPyDM_Dialect : Dialect {
 }
 
 class IREEPyDM_Op<string mnemonic, list<Trait> traits = []> :
-    Op<IREEPyDM_Dialect, mnemonic, traits> {
-  let verifier = [{ return ::verify(*this); }];
-}
+    Op<IREEPyDM_Dialect, mnemonic, traits> {}
 
 class IREEPyDM_PureOp<string mnemonic, list<Trait> traits = []> :
-    Op<IREEPyDM_Dialect, mnemonic, !listconcat(traits, [NoSideEffect])> {
-  let verifier = [{ return ::verify(*this); }];
-}
-class IREEPyDM_TypeDef<string name, list<Trait> traits = []> : TypeDef<IREEPyDM_Dialect, name, traits>;
+    Op<IREEPyDM_Dialect, mnemonic, !listconcat(traits, [NoSideEffect])> {}
+
+class IREEPyDM_TypeDef<string name, list<Trait> traits = []> : 
+  TypeDef<IREEPyDM_Dialect, name, traits>;
 
 #endif // IREE_DIALECTS_DIALECT_PYDM_IR_PYDM_BASE_TD

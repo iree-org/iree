@@ -284,30 +284,6 @@ def LinalgExtInterface : OpInterface<"LinalgExtOp"> {
     >,
     InterfaceMethod<
       /*desc=*/[{
-        Return true if the payload uses the value loaded from `opOperand`. This
-        is useful to avoid loading from "write-only" memory that may be
-        uninitialized, as well as properly cloning "read-write" operands.
-      }],
-      /*retTy=*/"bool",
-      /*methodName=*/"payloadUsesValueFromOperand",
-      /*args=*/(ins "OpOperand *":$opOperand),
-      /*methodBody=*/"",
-      /*defaultImplementation=*/[{
-        unsigned bbArgNumber = opOperand->getOperandNumber();
-        // Safeguard against the named linalg ops that are manually defined and
-        // that only support buffer semantics: we should not be there.
-        // Such ops have an empty regionBuilder and are not constructed with a
-        // region for now. In the future they are slated to disappear.
-        assert(this->getOperation()->getNumRegions() == 1 && "unexpected "
-               "missing region (calling `payloadUsesValueFromOperand` on "
-               "manually defined named Linalg op?)");
-        Block &block = this->getOperation()->getRegion(0).front();
-        // Init tensors have uses.
-        return !block.getArgument(bbArgNumber).use_empty();
-      }]
-    >,
-    InterfaceMethod<
-      /*desc=*/[{
         Return true if `opOperand` is an input tensor.
       }],
       /*retTy=*/"bool",
@@ -336,21 +312,6 @@ def LinalgExtInterface : OpInterface<"LinalgExtOp"> {
         if (opOperand->getOperandNumber() >= $_op.getNumInputs())
           return true;
         return false;
-      }]
-    >,
-    InterfaceMethod<
-      /*desc=*/[{
-        Return true if `opOperand` is an init tensor. This is true when it is
-        an output tensor operand whose value is used in the payload region.
-      }],
-      /*retTy=*/"bool",
-      /*methodName=*/"isInitTensor",
-      /*args=*/(ins "OpOperand *":$opOperand),
-      /*methodBody=*/"",
-      /*defaultImplementation=*/[{
-        if (!$_op.isOutputTensor(opOperand))
-          return false;
-        return payloadUsesValueFromOperand(opOperand);
       }]
     >,
     InterfaceMethod<

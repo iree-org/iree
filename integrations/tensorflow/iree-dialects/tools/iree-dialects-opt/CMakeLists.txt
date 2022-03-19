@@ -1,5 +1,6 @@
 set(LIBS
   MLIRArithmetic
+  MLIRControlFlow
   MLIRDialect
   MLIRLinalg
   MLIRMemRef
@@ -12,6 +13,7 @@ set(LIBS
   IREEInputDialect
   IREELinalgExtDialect
   IREELinalgExtPasses
+  IREELinalgExtTransforms
   IREEPyDMDialect
   IREEPyDMPasses
 )
