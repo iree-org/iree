@@ -9,6 +9,11 @@
 //
 // Based on MLIR's InitAllTranslations but without translations we don't care
 // about.
+//
+// Note that this performs registration of named translations for the use of
+// iree-translate. This is different from "LLVM IR Translations", which are
+// registered on a context and provide hooks for populating LLVM IR for
+// certain dialects. See init_llvmir_translations.h.
 
 #ifndef IREE_TOOLS_INIT_TRANSLATIONS_H_
 #define IREE_TOOLS_INIT_TRANSLATIONS_H_

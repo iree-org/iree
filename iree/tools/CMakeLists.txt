@@ -314,6 +314,17 @@ if(${IREE_BUILD_COMPILER})
 
   iree_cc_library(
     NAME
+      init_llvmir_translations
+    HDRS
+      "init_llvmir_translations.h"
+    DEPS
+      MLIRArmNeonToLLVMIRTranslation
+      MLIRLLVMToLLVMIRTranslation
+    PUBLIC
+  )
+
+  iree_cc_library(
+    NAME
       init_compiler_modules
     HDRS
       "init_compiler_modules.h"
@@ -382,16 +393,12 @@ if(${IREE_BUILD_COMPILER})
       "iree_compile_lib.cc"
       "iree_translate_lib.cc"
     DEPS
-      ::init_compiler_modules
-      ::init_iree_passes_and_dialects
-      ::init_mlir_passes_and_dialects
+      ::init_llvmir_translations
+      ::init_passes_and_dialects
       ::init_targets
       ::init_translations
-      ::init_xla_dialects
       LLVMSupport
       MLIRIR
-      MLIRArmNeonToLLVMIRTranslation
-      MLIRLLVMToLLVMIRTranslation
       MLIRSCFTransforms
       MLIRParser
       MLIRPass
