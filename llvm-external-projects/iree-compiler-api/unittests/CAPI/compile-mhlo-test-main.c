@@ -54,6 +54,9 @@ static bool iree_compile_mlir_to_bytecode(iree_string_view_t mlir_source,
   // Create MLIR module from a chunk of text.
   MlirModule module = mlirModuleCreateParse(
       context, mlirStringRefCreate(mlir_source.data, mlir_source.size));
+  if (mlirModuleIsNull(module)) {
+    return false;
+  }
 
   // Prepare target backend flag.
   char target_buf[128];
