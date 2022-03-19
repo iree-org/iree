@@ -4,6 +4,9 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+# This block step is inserted when a contributor hasn't signed the CLA. A team
+# member will need to approve before builds can run on their PR.
+
 steps:
   - block: >
       :guardsman: :pouting_cat: :raised_hand: CLA Check failed.
