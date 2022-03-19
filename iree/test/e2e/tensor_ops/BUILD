@@ -28,8 +28,8 @@ iree_lit_test_suite(
     tags = ["hostonly"],
     tools = [
         "//iree/tools:iree-benchmark-module",
-        "//iree/tools:iree-run-mlir",
         "//iree/tools:iree-compile",
+        "//iree/tools:iree-run-mlir",
         "@llvm-project//llvm:FileCheck",
     ],
 )

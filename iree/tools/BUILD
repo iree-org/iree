@@ -380,8 +380,8 @@ cc_binary(
 cc_library(
     name = "iree_translate_lib",
     srcs = [
-        "iree_translate_lib.cc",
         "iree-compile_lib.cc",
+        "iree_translate_lib.cc",
     ],
     hdrs = ["iree_translate_lib.h"],
     deps = [
