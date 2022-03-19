@@ -212,6 +212,9 @@ setup(
     ],),
     entry_points={
         "console_scripts": [
+            "iree-compile = iree.compiler.tools.scripts.ireec.__main__:main",
+            # TODO: We have renamed to iree-compile on 2022-03-18. Remove
+            # this alias once no longer needed.
             "ireec = iree.compiler.tools.scripts.ireec.__main__:main",
         ],
     },

@@ -140,7 +140,7 @@ SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
     <p>
       Programs must be compiled for WebAssembly to run on this page, using
-      options to <code>ireec</code> such as:
+      options to <code>iree-compile</code> such as:
     </p>
 
     <textarea type="text" readonly spellcheck="false"
@@ -248,7 +248,7 @@ SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
       const functionName = functionNameInput.value;
       const functionArguments = functionArgumentsInput.value.split("\n");
 
-      ireeCallFunction(loadedProgram, functionName, functionArguments)
+      iree-compileallFunction(loadedProgram, functionName, functionArguments)
           .then((result) => {
             functionOutputsElement.value = result.replace(";", "\n");
           })

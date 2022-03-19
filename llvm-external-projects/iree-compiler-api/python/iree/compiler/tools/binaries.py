@@ -29,7 +29,7 @@ __all__ = [
 ]
 
 _BUILTIN_TOOLS = [
-    "ireec",
+    "iree-compile",
     "iree-lld",
 ]
 
@@ -37,10 +37,10 @@ _BUILTIN_TOOLS = [
 # a python module that provides a `get_tool` function for getting its absolute
 # path. This dictionary maps the tool name to the module.
 _TOOL_MODULE_MAP = {
-    # Note that ireec is builtin, but if not found, it can be resolved
+    # Note that iree-compile is builtin, but if not found, it can be resolved
     # in the external 'core' module. This is used for some outside packaging
     # options.
-    "ireec": "iree.tools.core",
+    "iree-compile": "iree.tools.core",
     "iree-lld": "iree.tools.core",
     "iree-import-tflite": "iree.tools.tflite",
     "iree-import-xla": "iree.tools.xla",

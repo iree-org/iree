@@ -29,7 +29,7 @@ iree_lit_test_suite(
     tools = [
         "//iree/tools:iree-benchmark-module",
         "//iree/tools:iree-run-mlir",
-        "//iree/tools:ireec",
+        "//iree/tools:iree-compile",
         "@llvm-project//llvm:FileCheck",
     ],
 )

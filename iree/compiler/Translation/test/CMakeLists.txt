@@ -20,7 +20,7 @@ iree_lit_test_suite(
   TOOLS
     FileCheck
     iree::tools::iree-translate
-    iree::tools::ireec
+    iree::tools::iree-compile
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

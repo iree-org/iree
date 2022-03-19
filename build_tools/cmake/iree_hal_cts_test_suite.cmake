@@ -20,7 +20,7 @@ include(CMakeParseArguments)
 #   DRIVER_REGISTRATION_HDR: The C #include path for `DRIVER_REGISTRATION_FN`.
 #   DRIVER_REGISTRATION_FN: The C function which registers `DRIVER_NAME`.
 #   COMPILER_TARGET_BACKEND: Optional target backend name to pass to the
-#       `-iree-hal-target-backends` option of `ireec` to use for
+#       `-iree-hal-target-backends` option of `iree-compile` to use for
 #       executable generation. If this is omitted, or the associated compiler
 #       target is not enabled, tests which use executables will be disabled.
 #   EXECUTABLE_FORMAT: Executable format identifier. Will be interpreted
@@ -105,7 +105,7 @@ function(iree_hal_cts_test_suite)
       set(_EMBED_DATA_SOURCES "")
       foreach(_FILE_NAME ${IREE_ALL_CTS_EXECUTABLE_SOURCES})
         # Note: this is an abuse of naming. We are not building a bytecode
-        # module, but this CMake rule already wraps ireec.
+        # module, but this CMake rule already wraps iree-compile.
         # We should add a new function like `iree_hal_executable()`.
         iree_bytecode_module(
           NAME

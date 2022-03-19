@@ -27,7 +27,7 @@ iree_lit_test_suite(
     ),
     tools = [
         "//iree/tools:iree-translate",
-        "//iree/tools:ireec",
+        "//iree/tools:iree-compile",
         "@llvm-project//llvm:FileCheck",
     ],
 )

@@ -12,11 +12,11 @@
 # happens every few months as we are not yet binary-stable but in the future
 # will be a bigger issue.
 #
-# To use, ensure ireec and your compiled ld.lld are on your PATH and
+# To use, ensure iree-compile and your compiled ld.lld are on your PATH and
 # run the script:
 #   $ ./iree/hal/local/elf/testdata/generate.sh
 
-# Uncomment to see the ireec commands issued:
+# Uncomment to see the iree-compile commands issued:
 # set -x
 set -e
 
@@ -24,7 +24,7 @@ ROOT_DIR=$(git rev-parse --show-toplevel)
 TESTDATA="${ROOT_DIR}/iree/hal/local/elf/testdata"
 
 # $1: file name ("foo_arm_32.so")
-# $2: list of ireec arguments for targeting
+# $2: list of iree-compile arguments for targeting
 function compile_and_extract_library() {
   local so_name=$1
   shift
@@ -33,7 +33,7 @@ function compile_and_extract_library() {
   echo "Updating ${TESTDATA}/${so_name}"
 
   CMD=(
-    ireec
+    iree-compile
       -iree-mlir-to-hal-executable
       ${TESTDATA}/elementwise_mul.mlir
       -o="${TESTDATA}/${so_name}"

@@ -171,7 +171,7 @@ def build_compile_command_line(input_file: str, tfs: TempFileSaver,
   Returns:
     List of strings of command line.
   """
-  iree_translate = find_tool("ireec")
+  iree_translate = find_tool("iree-compile")
   if not options.target_backends:
     raise ValueError("Expected a non-empty list for 'target_backends'")
 

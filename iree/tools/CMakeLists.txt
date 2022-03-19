@@ -379,7 +379,7 @@ if(${IREE_BUILD_COMPILER})
     HDRS
       "iree_translate_lib.h"
     SRCS
-      "ireec_lib.cc"
+      "iree_compile_lib.cc"
       "iree_translate_lib.cc"
     DEPS
       ::init_compiler_modules
@@ -424,9 +424,9 @@ if(${IREE_BUILD_COMPILER})
 
   iree_cc_binary(
     NAME
-      ireec
+      iree-compile
     SRCS
-      "ireec-main.cc"
+      "iree-compile-main.cc"
     DEPS
       ::iree_translate_lib
     DATA

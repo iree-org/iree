@@ -381,7 +381,7 @@ cc_library(
     name = "iree_translate_lib",
     srcs = [
         "iree_translate_lib.cc",
-        "ireec_lib.cc",
+        "iree-compile_lib.cc",
     ],
     hdrs = ["iree_translate_lib.h"],
     deps = [
@@ -424,8 +424,8 @@ cc_binary(
 )
 
 cc_binary(
-    name = "ireec",
-    srcs = ["ireec-main.cc"],
+    name = "iree-compile",
+    srcs = ["iree-compile-main.cc"],
     tags = ["hostonly"],
     deps = [
         ":iree_translate_lib",

@@ -103,9 +103,9 @@ Custom passes may also be layered on top of `iree-opt`, see
 [iree/samples/custom_modules/dialect](https://github.com/google/iree/blob/main/iree/samples/custom_modules/dialect)
 for a sample.
 
-### ireec
+### iree-compile
 
-`ireec` converts MLIR input into external formats like IREE modules. It
+`iree-compile` converts MLIR input into external formats like IREE modules. It
 is similar to
 [mlir-translate](https://github.com/llvm/llvm-project/tree/master/mlir/tools/mlir-translate),
 see "translation" in
@@ -115,14 +115,14 @@ for more information.
 For example, to translate `simple.mlir` to an IREE module:
 
 ```shell
-$ ../iree-build/iree/tools/ireec \
+$ ../iree-build/iree/tools/iree-compile \
   -iree-mlir-to-vm-bytecode-module \
   -iree-hal-target-backends=vmvx \
   $PWD/iree/samples/models/simple_abs.mlir \
   -o /tmp/simple_abs_vmvx.vmfb
 ```
 
-Custom translations may also be layered on top of `ireec`, see
+Custom translations may also be layered on top of `iree-compile`, see
 [iree/samples/custom_modules/dialect](https://github.com/google/iree/blob/main/iree/samples/custom_modules/dialect)
 for a sample.
 
@@ -131,7 +131,7 @@ for a sample.
 The `iree-run-module` program takes an already translated IREE module as input
 and executes an exported main function using the provided inputs.
 
-This program can be used in sequence with `ireec` to translate a
+This program can be used in sequence with `iree-compile` to translate a
 `.mlir` file to an IREE module and then execute it. Here is an example command
 that executes the simple `simple_abs_vmvx.vmfb` compiled from `simple_abs.mlir`
 above on IREE's VMVX driver:
@@ -153,7 +153,7 @@ runner for the IREE
 [check framework](https://github.com/google/iree/tree/main/docs/developing_iree/testing_guide.md#end-to-end-tests).
 
 ```shell
-$ ../iree-build/iree/tools/ireec \
+$ ../iree-build/iree/tools/iree-compile \
   -iree-input-type=mhlo \
   -iree-mlir-to-vm-bytecode-module \
   -iree-hal-target-backends=vmvx \
