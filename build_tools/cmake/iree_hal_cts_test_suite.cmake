@@ -117,7 +117,7 @@ function(iree_hal_cts_test_suite)
           FLAGS
             ${_TRANSLATE_FLAGS}
           TRANSLATE_TOOL
-            "iree_tools_iree-translate"
+            "iree-translate"
           PUBLIC
           TESTONLY
         )
