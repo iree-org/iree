@@ -1,0 +1,36 @@
+# Copyright 2022 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+agents:
+  queue: "orchestration"
+  security: "submitted"
+
+steps:
+  - label: ":hiking_boot: Bootstrapping postsubmit pipeline"
+    commands: |
+      ./build_tools/buildkite/scripts/bootstrap_pipeline.sh \
+          build_tools/buildkite/pipelines/postsubmit.yml
+
+  - wait
+
+  - label: "Checking for later builds of this pipeline"
+    commands: |
+      export BUILDKITE_ACCESS_TOKEN="$(gcloud secrets versions access latest \
+          --secret=iree-buildkite-privileged)"
+      # Note that dollar sign has to be escaped to avoid Buildkite trying to do
+      # a substitution.
+      ./build_tools/buildkite/scripts/check_for_later_build.py || ret=\$?
+      if (( ret == 2 )); then
+        buildkite-agent pipeline upload \
+            ./build_tools/buildkite/pipelines/update_pipelines.yml
+      fi
+      exit $ret
+
+  - label: "Executing gcmn-test-pipeline"
+    commands: |
+      export BUILDKITE_ACCESS_TOKEN="$(gcloud secrets versions access latest \
+          --secret=iree-buildkite-privileged)"
+      ./build_tools/buildkite/scripts/wait_for_pipeline_success.py gcmn-test-pipeline
