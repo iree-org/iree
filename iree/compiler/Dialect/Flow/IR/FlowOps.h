@@ -25,9 +25,6 @@
 #include "mlir/Interfaces/SideEffectInterfaces.h"
 #include "mlir/Interfaces/ViewLikeInterface.h"
 
-#define GET_OP_CLASSES
-#include "iree/compiler/Dialect/Flow/IR/FlowOps.h.inc"  // IWYU pragma: export
-
 namespace mlir {
 namespace iree_compiler {
 namespace IREE {
@@ -37,9 +34,15 @@ namespace Flow {
 void populateFlowDispatchCanonicalizationPatterns(
     ::mlir::RewritePatternSet &results, ::mlir::MLIRContext *context);
 
+// Verifies the flow.dispatch.workgroup.size/id/count operations.
+LogicalResult verifyDispatchWorkgroupInfoOp(Operation *op, uint64_t dimension);
+
 }  // namespace Flow
 }  // namespace IREE
 }  // namespace iree_compiler
 }  // namespace mlir
+
+#define GET_OP_CLASSES
+#include "iree/compiler/Dialect/Flow/IR/FlowOps.h.inc"  // IWYU pragma: export
 
 #endif  // IREE_COMPILER_DIALECT_FLOW_IR_FLOWOPS_H_

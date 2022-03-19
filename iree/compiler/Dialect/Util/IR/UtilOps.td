@@ -308,7 +308,7 @@ def Util_DoNotOptimizeOp : Util_Op<"do_not_optimize", [
   }];
   let arguments = (ins Variadic<AnyType>:$arguments);
   let results = (outs Variadic<AnyType>:$results);
-  let verifier = [{ return verify$cppClass(*this); }];
+  let hasVerifier = 1;
   let builders = [
     OpBuilder<(ins
       "ValueRange":$operands,
@@ -488,7 +488,7 @@ def Util_GlobalOp : Util_Op<"global", [
     void setInitialValue(Attribute attr) { (*this)->setAttr("initial_value", attr); }
   }];
 
-  let verifier = [{ return verifyGlobalOp(*this); }];
+  let hasVerifier = 1;
 
   let hasCanonicalizer = 1;
 }
@@ -517,6 +517,7 @@ def Util_GlobalAddressOp : Util_PureOp<"global.address", [
   let extraClassDeclaration = [{
     IREE::Util::GlobalOp getGlobalOp();
   }];
+  let hasVerifier = 1;
 }
 
 def Util_GlobalLoadOp : Util_Op<"global.load", [
@@ -553,7 +554,7 @@ def Util_GlobalLoadOp : Util_Op<"global.load", [
     bool isGlobalImmutable();
   }];
 
-  let verifier = [{ return verifyGlobalLoadOp(*this); }];
+  let hasVerifier = 1;
 }
 
 def Util_GlobalLoadIndirectOp : Util_Op<"global.load.indirect"> {
@@ -573,7 +574,7 @@ def Util_GlobalLoadIndirectOp : Util_Op<"global.load.indirect"> {
     $global attr-dict `:` type($global) `->` type($result)
   }];
 
-  let verifier = [{ return verifyGlobalLoadIndirectOp(*this); }];
+  let hasVerifier = 1;
 
   let hasCanonicalizer = 1;
 }
@@ -599,7 +600,7 @@ def Util_GlobalStoreOp : Util_Op<"global.store", [
     IREE::Util::GlobalOp getGlobalOp();
   }];
 
-  let verifier = [{ return verifyGlobalStoreOp(*this); }];
+  let hasVerifier = 1;
 
   let hasCanonicalizer = 1;
 }
@@ -619,7 +620,7 @@ def Util_GlobalStoreIndirectOp : Util_Op<"global.store.indirect"> {
     $value `,` $global attr-dict `:` type($value) `->` type($global)
   }];
 
-  let verifier = [{ return verifyGlobalStoreIndirectOp(*this); }];
+  let hasVerifier = 1;
 
   let hasCanonicalizer = 1;
 }
@@ -698,7 +699,7 @@ def Util_ListGetOp : Util_Op<"list.get", [MemoryEffects<[MemRead]>]> {
 
   let assemblyFormat = "$list `[` $index `]` attr-dict `:` custom<ListTypeGet>(type($list), type($result))";
 
-  let verifier = [{ return verify$cppClass(*this); }];
+  let hasVerifier = 1;
 }
 
 def Util_ListSetOp : Util_Op<"list.set", [MemoryEffects<[MemWrite]>]> {
@@ -715,7 +716,7 @@ def Util_ListSetOp : Util_Op<"list.set", [MemoryEffects<[MemWrite]>]> {
 
   let assemblyFormat = "$list `[` $index `]` `,` $value attr-dict `:` custom<ListTypeSet>(type($list), type($value))";
 
-  let verifier = [{ return verify$cppClass(*this); }];
+  let hasVerifier = 1;
 }
 
 //===----------------------------------------------------------------------===//

@@ -9,6 +9,7 @@
 
 include "iree/compiler/Dialect/Util/IR/UtilBase.td"
 include "iree/compiler/Dialect/Util/IR/UtilInterfaces.td"
+include "mlir/IR/AttrTypeBase.td"
 include "mlir/IR/OpBase.td"
 include "mlir/IR/SubElementInterfaces.td"
 
@@ -27,6 +28,8 @@ def Util_ByteRangeAttr : AttrDef<Util_Dialect, "ByteRange", []> {
     AttrParameter<"int64_t", "">:$offset,
     AttrParameter<"int64_t", "">:$length
   );
+
+  let hasCustomAssemblyFormat = 1;
 }
 
 def Util_CompositeAttr : AttrDef<Util_Dialect, "Composite", [
@@ -65,6 +68,8 @@ def Util_CompositeAttr : AttrDef<Util_Dialect, "Composite", [
   }];
 
   let genVerifyDecl = 1;
+
+  let hasCustomAssemblyFormat = 1;
 }
 
 #endif  // IREE_DIALECT_UTIL_IR_UTIL_ATTRS

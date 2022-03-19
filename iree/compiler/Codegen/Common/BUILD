@@ -74,7 +74,6 @@ cc_library(
         "//llvm-external-projects/iree-dialects:IREELinalgExtPasses",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:Affine",
-        "@llvm-project//mlir:AffineBufferizableOpInterfaceImpl",
         "@llvm-project//mlir:AffineUtils",
         "@llvm-project//mlir:Analysis",
         "@llvm-project//mlir:ArithmeticDialect",

@@ -10,6 +10,7 @@
 include "mlir/Dialect/Bufferization/IR/BufferizationOps.td"
 include "mlir/Dialect/MemRef/IR/MemRefOps.td"
 include "mlir/Dialect/Tensor/IR/TensorOps.td"
+include "mlir/IR/PatternBase.td"
 
 // Canonicalize unnecessary tensor_load when the load is used just for
 // an extract

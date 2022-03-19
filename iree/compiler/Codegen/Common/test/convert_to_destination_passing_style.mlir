@@ -466,10 +466,9 @@ func @unused_ins_operand() {
 //   CHECK-DAG:   %[[OUT:.+]] = hal.interface.binding.subspan set(0) binding(2)
 //   CHECK-DAG:   %[[IN_VIEW:.+]] = flow.dispatch.tensor.load %[[IN]]
 //  CHECK-DAG:    %[[OUT_VIEW:.+]] = flow.dispatch.tensor.load %[[OUT]]
-//   CHECK-DAG:   %[[INIT:.+]] = linalg.init_tensor
 //       CHECK:   linalg.generic
-//  CHECK-SAME:     ins(%[[IN_VIEW]], %[[INIT]]
-//  CHECK-SAME:     outs(%[[OUT_VIEW]]
+//  CHECK-SAME:     ins(%[[IN_VIEW]] :
+//  CHECK-SAME:     outs(%[[OUT_VIEW]] :
 
 // -----
 
