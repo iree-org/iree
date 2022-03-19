@@ -17,5 +17,6 @@ function(iree_compiler_api_py_test)
     ENVIRONMENT PYTHONPATH=${IREE_COMPILER_API_BINARY_DIR}/python_package)
 endfunction()
 
+add_subdirectory(CAPI)
 add_subdirectory(tools)
 add_subdirectory(transforms/ireec)
