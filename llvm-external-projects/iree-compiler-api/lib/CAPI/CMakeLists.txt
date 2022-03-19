@@ -32,6 +32,9 @@ add_mlir_public_c_api_library(IREECompilerAPICompilerCAPI
     iree::compiler::Dialect::VM::Target::Bytecode::Bytecode
     iree::compiler::Pipelines
 
+    # Passes and dialects.
+    iree::tools::init_passes_and_dialects
+
     # All HAL Targets.
     iree::tools::init_targets
 
