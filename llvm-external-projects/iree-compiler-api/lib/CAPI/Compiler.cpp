@@ -9,7 +9,6 @@
 #include "iree/compiler/ConstEval/Passes.h"
 #include "iree/compiler/Dialect/VM/IR/VMOps.h"
 #include "iree/compiler/Dialect/VM/Target/Bytecode/BytecodeModuleTarget.h"
-#include "iree/compiler/Dialect/VM/Target/init_targets.h"
 #include "iree/compiler/InputConversion/MHLO/Passes.h"
 #include "iree/compiler/InputConversion/TOSA/Passes.h"
 #include "iree/compiler/Pipelines/Pipelines.h"
@@ -18,7 +17,6 @@
 #include "iree/tools/init_dialects.h"
 #include "iree/tools/init_passes.h"
 #include "iree/tools/init_targets.h"
-#include "iree/tools/init_translations.h"
 #include "mlir/CAPI/IR.h"
 #include "mlir/CAPI/Pass.h"
 #include "mlir/CAPI/Support.h"
@@ -72,15 +70,6 @@ void ireeCompilerRegisterAllDialects(MlirContext context) {
 
 void ireeCompilerRegisterAllPasses() {
   registerAllPasses();
-}
-
-void ireeCompilerRegisterAllIREETranslations() {
-  registerMlirTranslations();
-  registerIreeTranslations();
-}
-
-void ireeCompilerRegisterVMTargets() {
-  registerVMTargets();
 }
 
 void ireeCompilerRegisterTargetBackends() {
