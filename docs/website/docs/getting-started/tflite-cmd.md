@@ -24,7 +24,7 @@ wget ${TFLITE_URL} -O ${TFLITE_PATH}
 iree-import-tflite ${TFLITE_PATH} -o ${IMPORT_PATH}
 
 # Compile for the CPU backend
-iree-translate \
+iree-compile \
     --iree-mlir-to-vm-bytecode-module \
     --iree-input-type=tosa \
     --iree-hal-target-backends=dylib-llvm-aot \

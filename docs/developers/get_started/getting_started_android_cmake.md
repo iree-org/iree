@@ -140,8 +140,7 @@ Translate a source MLIR into IREE module:
 
 ```shell
 # Assuming in IREE source root
-$ ../iree-build-host/install/bin/iree-translate \
-  -iree-mlir-to-vm-bytecode-module \
+$ ../iree-build-host/install/bin/iree-compile \
   -iree-hal-target-backends=vmvx \
   $PWD/iree/samples/models/simple_abs.mlir \
   -o /tmp/simple_abs_vmvx.vmfb
@@ -179,8 +178,7 @@ Android since 7, but Android 10 is our primary target at the moment.
 Translate a source MLIR into IREE module:
 
 ```shell
-$ ../iree-build-host/install/bin/iree-translate \
-    -iree-mlir-to-vm-bytecode-module \
+$ ../iree-build-host/install/bin/iree-compile \
     -iree-hal-target-backends=vulkan-spirv \
     $PWD/iree/samples/models/simple_abs.mlir \
     -o /tmp/simple_abs_vulkan.vmfb
@@ -256,8 +254,7 @@ $ adb shell ln -s /vendor/lib64/libGLES_mali.so /data/local/tmp/libvulkan.so
 Translate a source MLIR into an IREE module:
 
 ```shell
-$ ../iree-build-host/install/bin/iree-translate \
-  -iree-mlir-to-vm-bytecode-module \
+$ ../iree-build-host/install/bin/iree-compile \
   -iree-hal-target-backends=dylib-llvm-aot \
   -iree-llvm-target-triple=aarch64-linux-android \
   $PWD/iree/samples/models/simple_abs.mlir \

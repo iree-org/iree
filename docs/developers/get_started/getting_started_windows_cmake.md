@@ -94,7 +94,7 @@ Build all targets:
 ### LLVM AOT Backend
 
 `-iree-hal-target-backends=dylib-llvm-aot` can be used to generate modules with
-ahead-of-time compiled kernels stored in DLLs. Run the iree-opt/iree-translate
+ahead-of-time compiled kernels stored in DLLs. Run the iree-opt/iree-compile
 tools from a command prompt with `lld-link.exe` or `link.exe` tools on the
 `PATH` and the MSVC/Windows SDK environment variables; the easiest way to get
 this configured is to use the `vsvarsall.bat` or `vcvars64.bat` files to set
@@ -105,7 +105,7 @@ for details on configuring the toolchain.
 Translate a source MLIR file into an IREE module:
 
 ```powershell
-> ..\iree-build\iree\tools\iree-translate.exe \
+> ..\iree-build\iree\tools\iree-compile.exe \
   -iree-mlir-to-vm-bytecode-module \
   -iree-hal-target-backends=dylib-llvm-aot \
   iree/samples/models/simple_abs.mlir \
@@ -117,7 +117,7 @@ exact target triple and architecture can be specified with flags when
 cross-compiling:
 
 ```powershell
-> ..\iree-build\iree\tools\iree-translate.exe \
+> ..\iree-build\iree\tools\iree-compile.exe \
   -iree-mlir-to-vm-bytecode-module \
   -iree-hal-target-backends=dylib-llvm-aot \
   -iree-llvm-target-triple=x86_64-pc-windows-msvc \
@@ -135,7 +135,7 @@ Check out the contents of the 'tools' build directory:
 
 ```powershell
 > dir ..\iree-build\iree\tools
-> ..\iree-build\iree\tools\iree-translate.exe --help
+> ..\iree-build\iree\tools\iree-compile.exe --help
 ```
 
 Translate a

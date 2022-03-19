@@ -26,7 +26,7 @@ iree_lit_test_suite(
     tags = ["hostonly"],
     tools = [
         "//iree/tools:iree-check-module",
-        "//iree/tools:iree-translate",
+        "//iree/tools:iree-compile",
         "@llvm-project//llvm:FileCheck",
     ],
 )

@@ -14,12 +14,10 @@
 #include "iree/compiler/Pipelines/Pipelines.h"
 #include "iree/compiler/Utils/PassUtils.h"
 #include "iree/compiler/Utils/TracingUtils.h"
-#include "iree/tools/init_compiler_modules.h"
-#include "iree/tools/init_iree_dialects.h"
-#include "iree/tools/init_mlir_dialects.h"
+#include "iree/tools/init_dialects.h"
+#include "iree/tools/init_llvmir_translations.h"
 #include "iree/tools/init_passes.h"
 #include "iree/tools/init_targets.h"
-#include "iree/tools/init_xla_dialects.h"
 #include "iree/tools/iree_translate_lib.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/CommandLine.h"
@@ -73,17 +71,19 @@ IREEVMPipelineHooks &getHooks() {
 
 int mlir::iree_compiler::runIreecMain(int argc, char **argv) {
   llvm::InitLLVM y(argc, argv);
-  mlir::DialectRegistry registry;
   static llvm::cl::OptionCategory mainOptions("IREE Main Options");
 
-  mlir::registerMlirDialects(registry);
-  // TODO: Make this conditional?
-  mlir::registerXLADialects(registry);
+  // Global/static registrations.
+  // Allegedly need to register passes to get good reproducers
+  // TODO: Verify this (I think that this was fixed some time ago).
   mlir::iree_compiler::registerAllPasses();
-  mlir::iree_compiler::registerIreeDialects(registry);
-  mlir::iree_compiler::registerIreeCompilerModuleDialects(registry);
   mlir::iree_compiler::registerHALTargetBackends();
   mlir::iree_compiler::registerVMTargets();
+
+  // MLIRContext registration and hooks.
+  mlir::DialectRegistry registry;
+  mlir::iree_compiler::registerAllDialects(registry);
+  mlir::iree_compiler::registerLLVMIRTranslations(registry);
 
   // Register MLIRContext command-line options like
   // -mlir-print-op-on-diagnostic.

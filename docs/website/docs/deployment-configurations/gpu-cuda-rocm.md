@@ -57,7 +57,7 @@ to build IREE from source, then enable the CUDA HAL driver with the
     ```
 
     !!! tip
-        `iree-translate` is installed as `/path/to/python/site-packages/iree/tools/core/iree-translate`.
+        `iree-compile` is installed as `/path/to/python/site-packages/iree/tools/core/iree-compile`.
         You can find out the full path to the `site-packages` directory via the
         `python -m site` command.
 
@@ -95,7 +95,7 @@ IREE's TensorFlow importer. We can now compile them for each GPU by running the 
 === "Nvidia/CUDA"
 
     ``` shell hl_lines="3-5"
-    iree/tools/iree-translate \
+    iree/tools/iree-compile \
         -iree-mlir-to-vm-bytecode-module \
         -iree-hal-target-backends=cuda \
         -iree-cuda-llvm-target-arch=<...> \
@@ -117,7 +117,7 @@ IREE's TensorFlow importer. We can now compile them for each GPU by running the 
 === "AMD/ROCm"
 
     ``` shell hl_lines="3-6"
-    iree/tools/iree-translate \
+    iree/tools/iree-compile \
         -iree-mlir-to-vm-bytecode-module \
         -iree-hal-target-backends=rocm \
         -iree-rocm-target-chip=<...> \

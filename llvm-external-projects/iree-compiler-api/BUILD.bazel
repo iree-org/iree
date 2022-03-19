@@ -71,6 +71,7 @@ cc_library(
         "//iree/compiler/InputConversion/TOSA",
         "//iree/compiler/Pipelines",
         "//iree/compiler/Utils",
+        "//iree/tools:init_llvmir_translations",
         "//iree/tools:init_passes_and_dialects",
         "//iree/tools:init_targets",
         "//iree/tools:iree_translate_lib",

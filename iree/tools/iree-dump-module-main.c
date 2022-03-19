@@ -13,7 +13,7 @@
 // Today we just print to JSON. We could do something more useful (size
 // analysis, etc), but JSON should be enough.
 //
-// We could also move all of this into iree-translate (mlir -> vmfb -> json),
+// We could also move all of this into iree-compile (mlir -> vmfb -> json),
 // though having a tiny little tool not reliant on LLVM is nice (can run this
 // on a device).
 int main(int argc, char** argv) {

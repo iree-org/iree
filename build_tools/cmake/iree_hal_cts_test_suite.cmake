@@ -116,6 +116,8 @@ function(iree_hal_cts_test_suite)
             "${IREE_ROOT_DIR}/iree/hal/cts/testdata/${_FILE_NAME}.mlir"
           FLAGS
             ${_TRANSLATE_FLAGS}
+          TRANSLATE_TOOL
+            "iree-translate"
           PUBLIC
           TESTONLY
         )

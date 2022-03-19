@@ -5,7 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 // A example of static library loading in IREE. See the README.md for more info.
-// Note: this demo requires artifacts from iree-translate before it will run.
+// Note: this demo requires artifacts from iree-compile before it will run.
 
 #include "iree/hal/local/loaders/static_library_loader.h"
 #include "iree/hal/local/sync_device.h"

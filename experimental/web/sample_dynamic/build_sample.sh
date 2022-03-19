@@ -43,7 +43,7 @@ INSTALL_ROOT="${1:-${ROOT_DIR}/build-host/install}"
 # Compile from .mlir input to portable .vmfb file using host tools            #
 ###############################################################################
 
-TRANSLATE_TOOL="${INSTALL_ROOT?}/bin/iree-translate"
+TRANSLATE_TOOL="${INSTALL_ROOT?}/bin/iree-compile"
 EMBED_DATA_TOOL="${INSTALL_ROOT?}/bin/generate_embed_data"
 
 translate_sample() {

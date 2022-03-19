@@ -66,9 +66,9 @@ jobs:
       - name: Run iree-tblgen
         id: run_iree_tblgen
         run: ./bin/iree-tblgen --help
-      - name: Run iree-translate
-        id: run_iree_translate
-        run: ./bin/iree-translate --help
+      - name: Run iree-compile
+        id: run_iree-compile
+        run: ./bin/iree-compile --help
 
   publish_release:
     name: "Publish release"

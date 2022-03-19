@@ -239,6 +239,17 @@ cc_library(
 )
 
 cc_library(
+    name = "init_llvmir_translations",
+    hdrs = [
+        "init_llvmir_translations.h",
+    ],
+    deps = [
+        "@llvm-project//mlir:ArmNeonToLLVMIRTranslation",
+        "@llvm-project//mlir:ToLLVMIRTranslation",
+    ],
+)
+
+cc_library(
     name = "iree_opt_main",
     srcs = ["iree-opt-main.cc"],
     deps = [
@@ -380,18 +391,15 @@ cc_binary(
 cc_library(
     name = "iree_translate_lib",
     srcs = [
+        "iree_compile_lib.cc",
         "iree_translate_lib.cc",
-        "ireec_lib.cc",
     ],
     hdrs = ["iree_translate_lib.h"],
     deps = [
-        ":init_compiler_modules",
-        ":init_iree_passes_and_dialects",
-        ":init_mlir_passes_and_dialects",
+        ":init_llvmir_translations",
         ":init_passes_and_dialects",
         ":init_targets",
         ":init_translations",
-        ":init_xla_dialects",
         "//iree/compiler/Codegen",
         "//iree/compiler/ConstEval",
         "//iree/compiler/Dialect/VM/Target:init_targets",
@@ -402,14 +410,12 @@ cc_library(
         "//iree/compiler/Translation:IREEVM",
         "//iree/compiler/Utils",
         "@llvm-project//llvm:Support",
-        "@llvm-project//mlir:ArmNeonToLLVMIRTranslation",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:LLVMToLLVMIRTranslation",
         "@llvm-project//mlir:Parser",
         "@llvm-project//mlir:Pass",
         "@llvm-project//mlir:SCFTransforms",
         "@llvm-project//mlir:Support",
-        "@llvm-project//mlir:ToLLVMIRTranslation",
         "@llvm-project//mlir:Translation",
     ],
 )
@@ -424,8 +430,8 @@ cc_binary(
 )
 
 cc_binary(
-    name = "ireec",
-    srcs = ["ireec-main.cc"],
+    name = "iree-compile",
+    srcs = ["iree-compile-main.cc"],
     tags = ["hostonly"],
     deps = [
         ":iree_translate_lib",

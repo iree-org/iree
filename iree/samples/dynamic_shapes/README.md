@@ -67,21 +67,21 @@ them.
 1. Run the Colab notebook and download the `dynamic_shapes.mlir` file it
     generates
 
-2. Build the `iree-translate` tool (see
+2. Build the `iree-compile` tool (see
     [here](https://google.github.io/iree/building-from-source/getting-started/)
     for general instructions on building using CMake)
 
     ```
     cmake -B ../iree-build/ -DCMAKE_BUILD_TYPE=RelWithDebInfo .
-    cmake --build ../iree-build/ --target iree_tools_iree-translate
+    cmake --build ../iree-build/ --target iree_tools_iree-compile
     ```
 
-3. Compile the `dynamic_shapes.mlir` file using `iree-translate`. The
+3. Compile the `dynamic_shapes.mlir` file using `iree-compile`. The
     [dylib-llvm-aot](https://google.github.io/iree/deployment-configurations/cpu-dylib/)
     configuration has the best support for dynamic shapes:
 
     ```
-    ../iree-build/iree/tools/iree-translate \
+    ../iree-build/iree/tools/iree-compile \
         -iree-mlir-to-vm-bytecode-module \
         -iree-hal-target-backends=dylib-llvm-aot \
         -iree-input-type=mhlo \

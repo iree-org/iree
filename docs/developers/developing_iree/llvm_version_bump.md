@@ -65,7 +65,7 @@ It is usually reasonable to focus on build breaks first, and starting with
 Bazel can help, especially for catching nit-picky strict things:
 
 ```
-bazel build iree/tools:iree-translate
+bazel build iree/tools:iree-compile
 bazel test iree/compiler/...
 ```
 

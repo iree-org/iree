@@ -95,7 +95,7 @@ Check out the contents of the 'tools' build directory:
 
 ```shell
 $ ls ../iree-build/iree/tools
-$ ../iree-build/iree/tools/iree-translate --help
+$ ../iree-build/iree/tools/iree-compile --help
 ```
 
 Translate a
@@ -113,7 +113,7 @@ Translate a source MLIR into an IREE module:
 
 ```shell
 # Assuming in IREE source root
-$ ../iree-build/iree/tools/iree-translate \
+$ ../iree-build/iree/tools/iree-compile \
     -iree-mlir-to-vm-bytecode-module \
     -iree-llvm-target-triple=x86_64-linux-gnu \
     -iree-hal-target-backends=dylib-llvm-aot \

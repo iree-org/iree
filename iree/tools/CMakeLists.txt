@@ -314,6 +314,17 @@ if(${IREE_BUILD_COMPILER})
 
   iree_cc_library(
     NAME
+      init_llvmir_translations
+    HDRS
+      "init_llvmir_translations.h"
+    DEPS
+      MLIRArmNeonToLLVMIRTranslation
+      MLIRLLVMToLLVMIRTranslation
+    PUBLIC
+  )
+
+  iree_cc_library(
+    NAME
       init_compiler_modules
     HDRS
       "init_compiler_modules.h"
@@ -379,19 +390,15 @@ if(${IREE_BUILD_COMPILER})
     HDRS
       "iree_translate_lib.h"
     SRCS
-      "ireec_lib.cc"
+      "iree_compile_lib.cc"
       "iree_translate_lib.cc"
     DEPS
-      ::init_compiler_modules
-      ::init_iree_passes_and_dialects
-      ::init_mlir_passes_and_dialects
+      ::init_llvmir_translations
+      ::init_passes_and_dialects
       ::init_targets
       ::init_translations
-      ::init_xla_dialects
       LLVMSupport
       MLIRIR
-      MLIRArmNeonToLLVMIRTranslation
-      MLIRLLVMToLLVMIRTranslation
       MLIRSCFTransforms
       MLIRParser
       MLIRPass
@@ -424,16 +431,14 @@ if(${IREE_BUILD_COMPILER})
 
   iree_cc_binary(
     NAME
-      ireec
+      iree-compile
     SRCS
-      "ireec-main.cc"
+      "iree-compile-main.cc"
     DEPS
       ::iree_translate_lib
     DATA
       ${IREE_LLD_TARGET}
     HOSTONLY
-    # TODO: Enable when ready. Excluded for now to save build time for folks.
-    EXCLUDE_FROM_ALL
   )
 
   iree_cc_binary(

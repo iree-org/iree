@@ -34,9 +34,9 @@ cat iree_tfl_tests/llvmaot_posenet_i8.run
 python -m iree_tfl_tests.posenet_i8_test -- target_backend=llvmaot -artifacts_dir=/tmp/posenet_i8_failure
 ```
 
-5. This will create an `iree_input.mlir` in the temp directory specified. Those can then be fed into `iree-translate` (built locally to reproduce the error)
+5. This will create an `iree_input.mlir` in the temp directory specified. Those can then be fed into `iree-compile` (built locally to reproduce the error)
 
 ```
-iree-translate -iree-mlir-to-vm-bytecode-module -iree-hal-target-backends=dylib-llvm-aot -iree-input-type=mhlo iree_input.mlir
+iree-compile -iree-mlir-to-vm-bytecode-module -iree-hal-target-backends=dylib-llvm-aot -iree-input-type=mhlo iree_input.mlir
 ```
 

@@ -21,12 +21,12 @@ ${ROOT_DIR}/build_tools/testing/run_python_notebook.sh \
   ${ROOT_DIR}/iree/samples/dynamic_shapes/dynamic_shapes.ipynb
 test -f ${ARTIFACTS_DIR}/dynamic_shapes.mlir && echo "dynamic_shapes.mlir exists"
 
-# 2. Compile the `iree-translate` tool.
+# 2. Compile the `iree-compile` tool.
 cmake -B ${BUILD_DIR} -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo ${ROOT_DIR}
-cmake --build ${BUILD_DIR} --target iree_tools_iree-translate -- -k 0
+cmake --build ${BUILD_DIR} --target iree_tools_iree-compile -- -k 0
 
-# 3. Compile `dynamic_shapes.mlir` using `iree-translate`.
-${BUILD_DIR}/iree/tools/iree-translate \
+# 3. Compile `dynamic_shapes.mlir` using `iree-compile`.
+${BUILD_DIR}/iree/tools/iree-compile \
   -iree-mlir-to-vm-bytecode-module \
   -iree-hal-target-backends=dylib-llvm-aot \
   -iree-input-type=mhlo \

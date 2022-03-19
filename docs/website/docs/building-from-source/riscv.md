@@ -103,7 +103,7 @@ export QEMU_BIN=<path to qemu-riscv64 binary>
 Invoke the host compiler tools to produce a bytecode module flatbuffer:
 
 ``` shell
-../iree-build/install/bin/iree-translate \
+../iree-build/install/bin/iree-compile \
   -iree-mlir-to-vm-bytecode-module \
   -iree-hal-target-backends=vmvx \
   iree/samples/models/simple_abs.mlir \
@@ -145,7 +145,7 @@ The SIMD code can be generated following the
 with the additional command-line flags
 
 ```shell hl_lines="3 4 5 6 7 8"
-iree/tools/iree-translate \
+iree/tools/iree-compile \
   -iree-mlir-to-vm-bytecode-module \
   -iree-hal-target-backends=dylib-llvm-aot \
   -iree-llvm-target-triple=riscv64 \
