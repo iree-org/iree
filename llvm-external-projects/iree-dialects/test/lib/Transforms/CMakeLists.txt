@@ -9,5 +9,4 @@ add_mlir_library(IREETransformsTestPasses
   LINK_LIBS PUBLIC
   IREELinalgTransformDialect
   MLIRPass
-  MLIRTestDialect
   )
