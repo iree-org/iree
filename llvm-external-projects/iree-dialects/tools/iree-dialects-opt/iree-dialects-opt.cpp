@@ -72,7 +72,7 @@ int main(int argc, char **argv) {
   mlir::iree_compiler::IREE::LinalgExt::registerPasses();
   mlir::linalg::transform::registerLinalgTransformInterpreterPass();
   mlir::linalg::transform::registerLinalgTransformExpertExpansionPass();
-  mlir::linalg::transform::registerDropScheduleFromModulePass();
+  mlir::linalg::transform::registerDropSchedulePass();
   // Local test passes.
   mlir::test_ext::registerTestLinalgTransformWrapScope();
   mlir::test_ext::registerTestListenerPasses();

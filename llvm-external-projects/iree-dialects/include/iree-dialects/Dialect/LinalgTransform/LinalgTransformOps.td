@@ -250,7 +250,7 @@ def LowerToLLVMOp : Transform_Op<"lower_to_llvm"> {
   let description = [{Indicates that the entire module should be converted
   to the LLVM dialect. This is expected to be the last transformation in
   a sequence.}];
-  
+
   let arguments =
     (ins DefaultValuedAttr<BoolAttr, "false">:$reassociate_fp_reductions,
      DefaultValuedAttr<BoolAttr, "false">:$enable_index_optimizations,
@@ -321,19 +321,25 @@ def OutlineLoopOp : Linalg_Transform_Operation<"outline_loop", [
   }];
 }
 
+def PrintOp : Transform_Op<"print"> {
+  let arguments = (ins StrAttr:$name);
+  let description = [{Prints the module.}];
+  let assemblyFormat = "attr-dict";
+}
+
 //===----------------------------------------------------------------------===//
 // LinalgExt specific transforms
 //===----------------------------------------------------------------------===//
 
 def TileToLinalgExtTileOp : Linalg_Transform_Operation<"tile_to_iree_linalg_ext_tile_op",
     [TransformOpInterface, TargetableSingleOperandTransformOpTrait]> {
-  let description = [{Tile a linalg op with linalg_ext.tile op along a single 
+  let description = [{Tile a linalg op with linalg_ext.tile op along a single
   dimension.}];
-  
+
   let summary = [{
     0 should be used as a tile size to skip tiling a particular dimension.
     This is a commonly used convention in Linalg.
-    For the purpose of this transformation, a single non-zero positive tile 
+    For the purpose of this transformation, a single non-zero positive tile
     size is allowed.
     }];
 
@@ -349,16 +355,16 @@ def TileToLinalgExtTileOp : Linalg_Transform_Operation<"tile_to_iree_linalg_ext_
   }];
 }
 
-def RewriteLinalgExtTileToScfForOp : 
+def RewriteLinalgExtTileToScfForOp :
   Linalg_Transform_Operation<"rewrite_iree_linalg_ext_tile_to_scf_for",
     [TransformOpInterface, TargetableSingleOperandTransformOpTrait]> {
- 
+
   let description = [{Rewrite linalg_ext.tile op to scf.for.}];
   let arguments = (ins PDL_Operation:$target);
   let results = (outs PDL_Operation:$transformed);
- 
+
   let assemblyFormat = "$target attr-dict";
- 
+
   let extraClassDeclaration = [{
     ::mlir::FailureOr<::mlir::scf::ForOp> applyToOne(
         ::mlir::iree_compiler::IREE::LinalgExt::TileOp target);
@@ -402,27 +408,27 @@ def RewriteLinalgExtInParallelToScfForOp :
     [TransformOpInterface, TargetableSingleOperandTransformOpTrait]> {
 
   let description = [{Rewrite linalg_ext.in_parallel to a sequential scf.for.
-    
-    Warning: when the linalg_ext.in_parallel terminator operates on tensors, 
+
+    Warning: when the linalg_ext.in_parallel terminator operates on tensors,
     this is a potentially dangerous transformation under the current semantics.
     In order for this transformation to be semantics-preserving, 2 conditions need
     to come together that are currently not checked and the subject of future analyses:
-      1. The terminator of linalg_ext.in_parallel may compose the output tensor in 
-      potentially undefined ways: if the linalg_ext.parallel_insert_slice regions overlap, they 
+      1. The terminator of linalg_ext.in_parallel may compose the output tensor in
+      potentially undefined ways: if the linalg_ext.parallel_insert_slice regions overlap, they
       may occur in any order and the result is unspecified. A future overlap/intersection
       analysis will be needed to guard against this case.
-      2. Even when condition 1. has well-defined behavior, semantics altering behavior may 
-      still be introduced to simplify inplace bufferization. In the current implementation, 
+      2. Even when condition 1. has well-defined behavior, semantics altering behavior may
+      still be introduced to simplify inplace bufferization. In the current implementation,
       all linalg_ext.parallel_insert_slice dest operands are optimistically turned into scf.for
       iter_args. This is optimistic because any use of a tensor inside linalg_ext.in_parallel
-      is guaranteed to see the value before the start of the op; whereas the same use may 
+      is guaranteed to see the value before the start of the op; whereas the same use may
       see a partially updated sequential result in the scf.for op.
-      An extra analysis is needed to ensure that a particular read of a result tensor would 
-      see the initial value and not a partial update. This is guaranteed by construction when 
+      An extra analysis is needed to ensure that a particular read of a result tensor would
+      see the initial value and not a partial update. This is guaranteed by construction when
       the linalg_ext.in_parallel op is produced by lowering a linalg_ext.tile operation but
       is not something that is generally enforced in the IR.
       For the moment we perform the replacement of the use with the scf.for iter_arg to be
-      able to connect pieces inplace with bufferization. In the future an analysis will be 
+      able to connect pieces inplace with bufferization. In the future an analysis will be
       needed to ensure correctness of this lowering to sequential scf.for + iter_args.
   }];
   let arguments = (ins PDL_Operation:$target);

@@ -15,7 +15,6 @@
 #include "Transforms/Listener.h"
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree-dialects/Dialect/LinalgExt/Transforms/Transforms.h"
-#include "iree-dialects/Dialect/LinalgTransform/LinalgTransformOps.h"
 #include "iree-dialects/Dialect/LinalgTransform/ScopedTransform.h"
 #include "iree-dialects/Dialect/LinalgTransform/TrackingListener.h"
 #include "iree-dialects/Dialect/LinalgTransform/TrackingRewriteDriver.h"
@@ -790,6 +789,17 @@ transform::OutlineLoopOp::apply(transform::TransformResults &results,
   if (failed(res))
     return failure();
   results.set(getResult().cast<OpResult>(), resultVector);
+  return success();
+}
+
+//===---------------------------------------------------------------------===//
+// PrintOp
+//===---------------------------------------------------------------------===//
+
+LogicalResult transform::PrintOp::apply(transform::TransformResults &results,
+                                        transform::TransformState &state) {
+  llvm::outs() << "[[[ IR printer: " << name() << " ]]]\n";
+  state.getTopLevel()->dump();
   return success();
 }
 

@@ -325,6 +325,17 @@ class SequenceOp:
     self.body.blocks.append()
 
 
+class PrintOp:
+
+  def __init__(self,
+               *,
+               name: StringArg,
+               loc=None,
+               ip=None):
+    name = _ensure_string_attr(name)
+    super().__init__(name, loc=loc, ip=ip)
+
+
 ##===----------------------------------------------------------------------===##
 ## LinalgExt specific transforms
 ##===----------------------------------------------------------------------===##
