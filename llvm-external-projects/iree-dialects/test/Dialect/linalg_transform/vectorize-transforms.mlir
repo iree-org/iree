@@ -1,5 +1,5 @@
 // This test only checks the content of the file parses.
-// RUN: mlir-proto-opt %s
+// RUN: iree-dialects-opt %s
 
 pdl.pattern @pdl_target : benefit(1) {
   %args = operands
