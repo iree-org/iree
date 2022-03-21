@@ -704,6 +704,14 @@ def main(args):
         "At least one of --normal_benchmark_tool_dir or --traced_benchmark_tool_dir should be specified."
     )
 
+  do_capture = args.traced_benchmark_tool_dir is not None
+  if ((args.traced_benchmark_tool_dir is not None) != do_capture) or (
+      (args.trace_capture_tool is not None) != do_capture) or (
+          (args.capture_tarball is not None) != do_capture):
+    raise ValueError(
+        "The following 3 flags should be simultaneously all specified or all unspecified: --traced_benchmark_tool_dir, --trace_capture_tool, --capture_tarball"
+    )
+
   if device_info.cpu_abi.lower() not in CPU_ABI_TO_TARGET_ARCH_MAP:
     raise ValueError(f"Unrecognized CPU ABI: '{device_info.cpu_abi}'; "
                      "need to update the map")
@@ -720,9 +728,6 @@ def main(args):
 
   previous_benchmarks = None
   previous_captures = None
-
-  do_capture = (args.traced_benchmark_tool_dir is not None and
-                args.trace_capture_tool is not None)
 
   # Collect names of previous benchmarks and captures that should be skipped and
   # merged into the results.
