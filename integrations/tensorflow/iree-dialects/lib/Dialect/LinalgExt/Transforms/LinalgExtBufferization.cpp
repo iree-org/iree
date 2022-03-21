@@ -168,7 +168,7 @@ struct PerformConcurrentlyOpInterface
           PerformConcurrentlyOpInterface, PerformConcurrentlyOp> {
   LogicalResult bufferize(Operation *op, RewriterBase &b,
                           const BufferizationState &state) const {
-    llvm_unreachable("op does not have any tensor OpOperands / OpResults");
+    assert(false, "op does not have any tensor OpOperands / OpResults");
     return failure();
   }
 };
