@@ -32,7 +32,7 @@ cc_library(
         "//iree/compiler/Dialect/Util/IR",
         "//iree/compiler/Dialect/Util/Transforms",
         "//iree/compiler/Dialect/VM/IR",
-        "//llvm-external-projects/iree-dialects:IREELinalgExtTransforms",
+        "//llvm-external-projects/iree-dialects:IREELinalgExtPasses",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:Affine",
         "@llvm-project//mlir:AffineToStandardTransforms",

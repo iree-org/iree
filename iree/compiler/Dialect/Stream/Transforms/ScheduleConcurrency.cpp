@@ -176,8 +176,8 @@ class ScheduleConcurrencyPass
   }
 
   void runOnOperation() override {
-    auto parentOp = dyn_cast<CallableOpInterface>(getOperation());
-    if (!parentOp || !parentOp.getCallableRegion() ||
+    auto parentOp = getOperation();
+    if (!parentOp.getCallableRegion() ||
         parentOp.getCallableRegion()->empty()) {
       return;
     }
@@ -264,7 +264,8 @@ class ScheduleConcurrencyPass
 
 }  // namespace
 
-std::unique_ptr<OperationPass<>> createScheduleConcurrencyPass() {
+std::unique_ptr<InterfacePass<CallableOpInterface>>
+createScheduleConcurrencyPass() {
   return std::make_unique<ScheduleConcurrencyPass>();
 }
 

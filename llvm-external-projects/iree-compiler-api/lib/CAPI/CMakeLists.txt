@@ -25,11 +25,16 @@ add_mlir_public_c_api_library(IREECompilerAPICompilerCAPI
     Support
   LINK_LIBS PUBLIC
     MLIRIR
+    iree::compiler::ConstEval
     iree::compiler::InputConversion::MHLO::MHLO
     iree::compiler::InputConversion::TOSA::TOSA
     iree::compiler::Dialect::VM::IR::IR
     iree::compiler::Dialect::VM::Target::Bytecode::Bytecode
-    iree::compiler::Translation::IREEVM
+    iree::compiler::Pipelines
+
+    # Passes and dialects.
+    iree::tools::init_llvmir_translations
+    iree::tools::init_passes_and_dialects
 
     # All HAL Targets.
     iree::tools::init_targets

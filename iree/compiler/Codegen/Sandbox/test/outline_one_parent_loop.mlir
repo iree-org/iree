@@ -34,7 +34,7 @@ func @matmul(%arg0: tensor<24x48xf32> {linalg.buffer_layout = affine_map<(d0, d1
         %13 = affine.min affine_map<(d0, d1) -> (8, -d0 + d1)>(%arg7, %5)
         %14 = scf.for %arg9 = %c0 to %c16 step %c8 iter_args(%arg10 = %arg8) -> (tensor<?x16xf32>) {
           %15 = tensor.extract_slice %arg10[%arg7, %arg9] [%13, 8] [1, 1] : tensor<?x16xf32> to tensor<?x8xf32>
-          %16 = linalg.fill(%cst, %15) : f32, tensor<?x8xf32> -> tensor<?x8xf32> 
+          %16 = linalg.fill ins(%cst : f32) outs(%15 : tensor<?x8xf32>) -> tensor<?x8xf32> 
           %17 = tensor.insert_slice %16 into %arg10[%arg7, %arg9] [%13, 8] [1, 1] : tensor<?x8xf32> into tensor<?x16xf32>
           scf.yield %17 : tensor<?x16xf32>
         }

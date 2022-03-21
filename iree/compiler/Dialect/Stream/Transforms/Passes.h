@@ -118,8 +118,10 @@ std::unique_ptr<OperationPass<mlir::ModuleOp>> createRefineUsagePass();
 // Stream formation and scheduling
 //===----------------------------------------------------------------------===//
 
-std::unique_ptr<OperationPass<>> createScheduleExecutionPass();
-std::unique_ptr<OperationPass<>> createScheduleConcurrencyPass();
+std::unique_ptr<InterfacePass<CallableOpInterface>>
+createScheduleExecutionPass();
+std::unique_ptr<InterfacePass<CallableOpInterface>>
+createScheduleConcurrencyPass();
 
 std::unique_ptr<OperationPass<mlir::ModuleOp>> createPropagateTimepointsPass();
 
@@ -127,11 +129,12 @@ std::unique_ptr<OperationPass<mlir::ModuleOp>> createPropagateTimepointsPass();
 // Allocation and command issuing
 //===----------------------------------------------------------------------===//
 
-std::unique_ptr<OperationPass<>> createScheduleAllocationPass();
+std::unique_ptr<InterfacePass<CallableOpInterface>>
+createScheduleAllocationPass();
 
-std::unique_ptr<OperationPass<>> createPackConstantsPass();
-std::unique_ptr<OperationPass<>> createPackAllocationsPass();
-std::unique_ptr<OperationPass<>> createLayoutSlicesPass();
+std::unique_ptr<InterfacePass<CallableOpInterface>> createPackConstantsPass();
+std::unique_ptr<InterfacePass<CallableOpInterface>> createPackAllocationsPass();
+std::unique_ptr<InterfacePass<CallableOpInterface>> createLayoutSlicesPass();
 
 std::unique_ptr<OperationPass<mlir::ModuleOp>> createPropagateSubviewsPass();
 

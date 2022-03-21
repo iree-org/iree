@@ -110,15 +110,15 @@ test --test_env="VK_ICD_FILENAMES={PATH_TO_IREE}/build-swiftshader/Linux/vk_swif
 
 ### Compiling for the Vulkan HAL
 
-Pass the flag `-iree-hal-target-backends=vulkan-spirv` to `iree-translate`:
+Pass the flag `-iree-hal-target-backends=vulkan-spirv` to `iree-compile`:
 
 ```shell
 # -- CMake --
-$ cmake --build ../iree-build/ --target iree_tools_iree-translate
-$ ../iree-build/iree/tools/iree-translate -iree-mlir-to-vm-bytecode-module -iree-hal-target-backends=vulkan-spirv ./iree/samples/models/simple_abs.mlir -o /tmp/module.vmfb
+$ cmake --build ../iree-build/ --target iree_tools_iree-compile
+$ ../iree-build/iree/tools/iree-compile -iree-mlir-to-vm-bytecode-module -iree-hal-target-backends=vulkan-spirv ./iree/samples/models/simple_abs.mlir -o /tmp/module.vmfb
 
 # -- Bazel --
-$ bazel run iree/tools:iree-translate -- -iree-mlir-to-vm-bytecode-module -iree-hal-target-backends=vulkan-spirv $PWD/iree/samples/models/simple_abs.mlir -o /tmp/module.vmfb
+$ bazel run iree/tools:iree-compile -- -iree-mlir-to-vm-bytecode-module -iree-hal-target-backends=vulkan-spirv $PWD/iree/samples/models/simple_abs.mlir -o /tmp/module.vmfb
 ```
 
 > Tip:<br>

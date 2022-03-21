@@ -223,7 +223,8 @@ static bool rearrangeBlockGlobalAccesses(
 namespace {
 
 class SimplifyGlobalAccessesPass
-    : public PassWrapper<SimplifyGlobalAccessesPass, OperationPass<void>> {
+    : public PassWrapper<SimplifyGlobalAccessesPass,
+                         InterfacePass<CallableOpInterface>> {
  public:
   StringRef getArgument() const override {
     return "iree-util-simplify-global-accesses";
@@ -235,8 +236,8 @@ class SimplifyGlobalAccessesPass
   }
 
   void runOnOperation() override {
-    auto callableOp = dyn_cast<CallableOpInterface>(getOperation());
-    if (!callableOp || !callableOp.getCallableRegion() ||
+    auto callableOp = getOperation();
+    if (!callableOp.getCallableRegion() ||
         callableOp.getCallableRegion()->empty()) {
       return;
     }

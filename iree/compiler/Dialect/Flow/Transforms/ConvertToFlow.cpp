@@ -104,9 +104,8 @@ struct ConvertToFlowBeforeDispatchFormation
                     mlir::arith::ArithmeticDialect, mlir::math::MathDialect>();
   }
   void runOnOperation() override {
-    auto funcOp = getOperation();
-    MLIRContext *context = funcOp->getContext();
-    RewritePatternSet patterns(&getContext());
+    MLIRContext *context = &getContext();
+    RewritePatternSet patterns(context);
 
     patterns
         .insert<LinalgTensorReshapeToFlowTensorReshape<tensor::CollapseShapeOp>,
@@ -116,7 +115,8 @@ struct ConvertToFlowBeforeDispatchFormation
     memref::populateResolveRankedShapeTypeResultDimsPatterns(patterns);
     IREE::Flow::TensorReshapeOp::getCanonicalizationPatterns(patterns, context);
 
-    if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
+    if (failed(applyPatternsAndFoldGreedily(getOperation(),
+                                            std::move(patterns)))) {
       return signalPassFailure();
     }
   }
@@ -131,16 +131,16 @@ struct ConvertToFlowAfterDispatchFormation
                     mlir::arith::ArithmeticDialect, mlir::math::MathDialect>();
   }
   void runOnOperation() override {
-    auto funcOp = getOperation();
-    MLIRContext *context = funcOp->getContext();
-    RewritePatternSet patterns(&getContext());
+    MLIRContext *context = &getContext();
+    RewritePatternSet patterns(context);
 
     patterns.insert<LinalgFillToFlowTensorSplat>(context);
     populateTensorToFlowPatternsAfterDispatchFormation(context, patterns);
     memref::populateResolveRankedShapeTypeResultDimsPatterns(patterns);
     IREE::Flow::TensorReshapeOp::getCanonicalizationPatterns(patterns, context);
 
-    if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
+    if (failed(applyPatternsAndFoldGreedily(getOperation(),
+                                            std::move(patterns)))) {
       return signalPassFailure();
     }
   }

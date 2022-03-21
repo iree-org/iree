@@ -27,7 +27,7 @@ hal.executable private @fuse_and_vectorize_fill_matmul {
         %8 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [4096, 4096], strides = [1, 1] : !flow.dispatch.tensor<readonly:4096x4096xf32> -> tensor<4096x4096xf32>
         %10 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [4096, 4096], strides = [1, 1] : !flow.dispatch.tensor<readonly:4096x4096xf32> -> tensor<4096x4096xf32>
         %15 = linalg.init_tensor [4096, 4096] : tensor<4096x4096xf32>
-        %16 = linalg.fill(%cst, %15) : f32, tensor<4096x4096xf32> -> tensor<4096x4096xf32>
+        %16 = linalg.fill ins(%cst : f32) outs(%15 : tensor<4096x4096xf32>) -> tensor<4096x4096xf32>
         %17 = linalg.matmul ins(%8, %10 : tensor<4096x4096xf32>, tensor<4096x4096xf32>) outs(%16 : tensor<4096x4096xf32>) -> tensor<4096x4096xf32>
         flow.dispatch.tensor.store %17, %2, offsets = [0, 0], sizes = [4096, 4096], strides = [1, 1] : tensor<4096x4096xf32> -> !flow.dispatch.tensor<writeonly:4096x4096xf32>
         return
@@ -78,7 +78,7 @@ hal.executable private @fuse_and_vectorize_matmul_add {
         %15 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [1024, 512], strides = [1, 1] : !flow.dispatch.tensor<readonly:1024x512xf32> -> tensor<1024x512xf32>
         %17 = flow.dispatch.tensor.load %2, offsets = [0, 0], sizes = [512, 256], strides = [1, 1] : !flow.dispatch.tensor<readonly:512x256xf32> -> tensor<512x256xf32>
         %20 = linalg.init_tensor [1024, 256] : tensor<1024x256xf32>
-        %21 = linalg.fill(%cst, %20) : f32, tensor<1024x256xf32> -> tensor<1024x256xf32>
+        %21 = linalg.fill ins(%cst : f32) outs(%20 : tensor<1024x256xf32>) -> tensor<1024x256xf32>
         %22 = linalg.matmul ins(%15, %17 : tensor<1024x512xf32>, tensor<512x256xf32>) outs(%21 : tensor<1024x256xf32>) -> tensor<1024x256xf32>
         %23 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]} ins(%22, %10 : tensor<1024x256xf32>, tensor<1024x256xf32>) outs(%13 : tensor<1024x256xf32>) {
         ^bb0(%arg2: f32, %arg3: f32, %arg4: f32):

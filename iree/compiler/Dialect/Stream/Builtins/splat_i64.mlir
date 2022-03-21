@@ -21,7 +21,7 @@ stream.executable private @__builtin_splat_i64 {
       scf.for %i = %1 to %count step %2 {
         %3 = affine.min affine_map<(d0)[s0, s1] -> (s1, -d0 + s0)>(%i)[%count, %workgroup_size_0]
         %4 = linalg.init_tensor [%3] : tensor<?xi64>
-        %5 = linalg.fill(%value, %4) : i64, tensor<?xi64> -> tensor<?xi64>
+        %5 = linalg.fill ins(%value : i64) outs(%4 : tensor<?xi64>) -> tensor<?xi64>
         flow.dispatch.tensor.store %5, %out, offsets = [%i], sizes = [%3], strides = [1] : tensor<?xi64> -> !flow.dispatch.tensor<writeonly:?xi64>{%count}
       }
       return

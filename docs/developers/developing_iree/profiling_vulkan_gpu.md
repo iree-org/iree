@@ -35,7 +35,7 @@ func @dot(%lhs: tensor<2x4xf32>, %rhs: tensor<4x2xf32>) -> tensor<2x2xf32> {
 
 ```shell
 # First translate into a VM bytecode module
-$ /path/to/iree/build/iree/tools/iree-translate -- \
+$ /path/to/iree/build/iree/tools/iree-compile -- \
   -iree-input-type=mhlo \
   -iree-mlir-to-vm-bytecode-module \
   -iree-hal-target-backends=vulkan-spirv \

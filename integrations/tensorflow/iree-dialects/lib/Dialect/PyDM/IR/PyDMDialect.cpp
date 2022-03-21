@@ -33,7 +33,10 @@ using BuiltinIntegerType = mlir::IntegerType;
 using PyBoolType = PYDM::BoolType;
 using PyConstantOp = PYDM::ConstantOp;
 using PyIntegerType = PYDM::IntegerType;
+using PyListType = PYDM::ListType;
 using PyRealType = PYDM::RealType;
+using PyObjectType = PYDM::ObjectType;
+using PyUnionType = PYDM::UnionType;
 
 void IREEPyDMDialect::initialize() {
   addTypes<
@@ -115,6 +118,49 @@ LogicalResult PYDM::IntegerType::verify(
   return emitError() << "unsupported python integer bit width: " << w;
 }
 
+Type PyIntegerType::parse(mlir::AsmParser &parser) {
+  MLIRContext *ctxt = parser.getContext();
+  auto emitError = [&]() -> InFlightDiagnostic {
+    return parser.emitError(parser.getCurrentLocation());
+  };
+  // Weak
+  if (failed(parser.parseOptionalLess())) return get(ctxt);
+  // AP
+  if (succeeded(parser.parseOptionalStar())) {
+    if (failed(parser.parseGreater())) return Type();
+    return get(ctxt, None);
+  }
+
+  // Explicit
+  bool isSigned;
+  if (succeeded(parser.parseOptionalKeyword("unsigned"))) {
+    isSigned = false;
+  } else {
+    isSigned = true;
+  }
+
+  int width;
+  if (failed(parser.parseInteger(width))) return Type();
+  if (failed(parser.parseGreater())) return Type();
+  if (!isSigned) width = -width;
+  return getChecked(emitError, ctxt, width);
+}
+
+void PyIntegerType::print(mlir::AsmPrinter &printer) const {
+  auto w = getImpl()->bitWidth;
+  if (w) {
+    printer << "<";
+    if (*w == 0) {
+      printer << "*";
+    } else if (*w > 0) {
+      printer << *w;
+    } else {
+      printer << "unsigned " << (-*w);
+    }
+    printer << ">";
+  }
+}
+
 BuiltinTypeCode PYDM::IntegerType::getTypeCode() const {
   return static_cast<BuiltinTypeCode>(
       makeNumericTypeCode(*getNumericCategory(), *getNumericSubTypeCode()));
@@ -170,6 +216,57 @@ BuiltinTypeCode PYDM::ListType::getTypeCode() const {
 }
 
 // ListType
+void PyListType::print(mlir::AsmPrinter &printer) const {
+  if (getImpl()->uniformElementType ||
+      getImpl()->storageClass != CollectionStorageClass::Boxed) {
+    printer << "<";
+    switch (getImpl()->storageClass) {
+      case CollectionStorageClass::Boxed:
+        printer << "boxed";
+        break;
+      case CollectionStorageClass::Empty:
+        printer << "empty";
+        break;
+      case CollectionStorageClass::Unboxed:
+        printer << "unboxed";
+        break;
+    }
+
+    if (getImpl()->uniformElementType) {
+      printer << ",";
+      printer << getImpl()->uniformElementType;
+    }
+    printer << ">";
+  }
+}
+
+Type PyListType::parse(mlir::AsmParser &parser) {
+  MLIRContext *ctxt = parser.getContext();
+  if (parser.parseOptionalLess())
+    return get(ctxt, CollectionStorageClass::Boxed, nullptr);
+
+  Type t;
+  StringRef storageClassKeyword;
+  if (parser.parseKeyword(&storageClassKeyword)) return Type();
+  if (parser.parseComma()) return Type();
+  if (parser.parseType(t)) return Type();
+  if (parser.parseGreater()) return Type();
+
+  CollectionStorageClass storageClass;
+  if (storageClassKeyword == "boxed")
+    storageClass = CollectionStorageClass::Boxed;
+  else if (storageClassKeyword == "empty")
+    storageClass = CollectionStorageClass::Empty;
+  else if (storageClassKeyword == "unboxed")
+    storageClass = CollectionStorageClass::Unboxed;
+  else {
+    parser.emitError(parser.getCurrentLocation(),
+                     "expected one of 'boxed', 'empty', 'unboxed'");
+    return Type();
+  }
+  return get(ctxt, storageClass, t);
+}
+
 StringRef PYDM::ListType::getPythonTypeName() const { return "list"; }
 
 BuiltinTypeCode PYDM::NoneType::getTypeCode() const {
@@ -206,6 +303,26 @@ Type PYDM::ListType::getElementStorageType() const {
 StringRef PYDM::NoneType::getPythonTypeName() const { return "None"; }
 
 // ObjectType
+void PyObjectType::print(mlir::AsmPrinter &printer) const {
+  if (getImpl()->primitiveType)
+    printer << "<" << getImpl()->primitiveType << ">";
+}
+
+Type PyObjectType::parse(mlir::AsmParser &parser) {
+  MLIRContext *ctxt = parser.getContext();
+  if (parser.parseOptionalLess()) return get(ctxt, nullptr);
+
+  Type t;
+  if (parser.parseType(t)) return Type();
+  if (parser.parseGreater()) return Type();
+  if (auto primitiveType = t.dyn_cast<PrimitiveType>())
+    return get(ctxt, primitiveType);
+  else {
+    parser.emitError(parser.getNameLoc(), "expected a primitive type");
+    return Type();
+  }
+}
+
 BuiltinTypeCode PYDM::ObjectType::getTypeCode() const {
   return BuiltinTypeCode::Object;
 }
@@ -222,6 +339,26 @@ bool PYDM::ObjectType::isRefinable() const {
 }
 
 // RealType
+void PyRealType::print(mlir::AsmPrinter &printer) const {
+  auto ft = getImpl()->floatType;
+  if (ft) printer << "<" << ft << ">";
+}
+
+Type PyRealType::parse(mlir::AsmParser &parser) {
+  MLIRContext *ctxt = parser.getContext();
+
+  auto emitError = [&]() -> InFlightDiagnostic {
+    return parser.emitError(parser.getCurrentLocation());
+  };
+  // Weak
+  if (failed(parser.parseOptionalLess())) return get(ctxt);
+  // Explicit
+  FloatType subType;
+  if (failed(parser.parseType(subType))) return Type();
+  if (failed(parser.parseGreater())) return Type();
+  return getChecked(emitError, ctxt, subType);
+}
+
 LogicalResult PYDM::RealType::verify(
     function_ref<InFlightDiagnostic()> emitError, FloatType floatType) {
   if (!floatType) return success();
@@ -294,6 +431,26 @@ Type PYDM::TupleType::getElementStorageType() const {
 //------------------------------------------------------------------------------
 // Union type implementation
 //------------------------------------------------------------------------------
+
+void PyUnionType::print(mlir::AsmPrinter &printer) const {
+  llvm::interleaveComma(getAlternatives(), printer);
+}
+
+Type PyUnionType::parse(mlir::AsmParser &parser) {
+  MLIRContext *ctxt = parser.getContext();
+  if (parser.parseOptionalLess()) return get(ctxt, {});
+
+  SmallVector<::mlir::Type> alternatives;
+
+  do {
+    Type type;
+    if (parser.parseType(type)) return Type();
+    alternatives.push_back(type);
+  } while (succeeded(parser.parseOptionalComma()));
+
+  return getChecked([&]() { return parser.emitError(parser.getNameLoc()); },
+                    ctxt, alternatives);
+}
 
 LogicalResult PYDM::UnionType::verify(
     llvm::function_ref<InFlightDiagnostic()> emitError,

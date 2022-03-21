@@ -5,7 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
-#include "iree-dialects/Dialect/LinalgExt/Transforms/Transforms.h"
+#include "iree-dialects/Dialect/LinalgExt/Passes/Transforms.h"
 #include "iree/compiler/Codegen/Dialect/LoweringConfig.h"
 #include "iree/compiler/Codegen/LLVMGPU/KernelConfig.h"
 #include "iree/compiler/Codegen/LLVMGPU/LLVMGPUUtils.h"
@@ -167,13 +167,8 @@ static void populateTilingToInvocationPatterns(
      // FFT doesn't support second level of tiling yet.
      return success(!isa<IREE::LinalgExt::FftOp>(op));
    }).setMatchByDefault();
-  linalg::TilingPatterns<
-      linalg::MatmulOp, linalg::FillOp, linalg::BatchMatmulOp,
-      linalg::GenericOp, linalg::Conv2DNhwcHwcfOp,
-      linalg::DepthwiseConv2DNhwcHwcOp, linalg::DepthwiseConv2DNhwcHwcmOp,
-      linalg::PoolingNhwcMaxOp, linalg::PoolingNhwcMinOp,
-      linalg::PoolingNhwcSumOp>::insert(patterns, tilingOptions, f);
-  patterns.insert<IREE::LinalgExt::TiledOpInterfaceTilingPattern>(
+  patterns.insert<linalg::LinalgTilingPattern,
+                  IREE::LinalgExt::TiledOpInterfaceTilingPattern>(
       context, tilingOptions, f);
 }
 

@@ -24,7 +24,7 @@ libraries that can be resolved at runtime by name. This can be particularly
 useful on "bare metal" or embedded systems running IREE that lack operating
 systems or the ability to load shared libraries in binaries.
 
-When static library output is enabled, `iree-translate` produces a separate
+When static library output is enabled, `iree-compile` produces a separate
 static library to compile into the target program. At runtime bytecode module
 instructs the VM which static libraries to load exported functions from the
 model.

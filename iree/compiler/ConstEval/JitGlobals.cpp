@@ -4,17 +4,10 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Bindings/Native/Transforms/Passes.h"
 #include "iree/compiler/ConstEval/PassDetail.h"
 #include "iree/compiler/ConstEval/Passes.h"
 #include "iree/compiler/ConstEval/Runtime.h"
-#include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
-#include "iree/compiler/Dialect/HAL/Transforms/Passes.h"
-#include "iree/compiler/Dialect/Stream/Transforms/Passes.h"
-#include "iree/compiler/Dialect/Util/IR/UtilOps.h"
-#include "iree/compiler/Dialect/Util/Transforms/Passes.h"
-#include "iree/compiler/Dialect/VM/Target/Bytecode/BytecodeModuleTarget.h"
-#include "iree/compiler/Dialect/VM/Transforms/Passes.h"
+#include "iree/compiler/Pipelines/Pipelines.h"
 #include "iree/compiler/Utils/PassUtils.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/Support/Debug.h"
@@ -119,10 +112,13 @@ struct ProgramExtractor {
 // shared.
 // TODO: See if we can make them copyable?
 struct CompileOptions {
-  IREE::Flow::TransformOptions flowOptions;
+  BindingOptions bindingOptions;
+  InputDialectOptions inputOptions;
+  HighLevelOptimizationOptions highLevelOptimizationOptions;
+  SchedulingOptions schedulingOptions;
   IREE::HAL::TargetOptions executableOptions;
-  IREE::Stream::TransformOptions streamOptions;
   IREE::VM::TargetOptions targetOptions;
+  IREEVMPipelineHooks hooks;
 };
 
 struct JitGlobalsPass : public JitGlobalsBase<JitGlobalsPass> {
@@ -130,22 +126,16 @@ struct JitGlobalsPass : public JitGlobalsBase<JitGlobalsPass> {
       : options(std::make_shared<CompileOptions>()),
         compilePipeline("builtin.module") {
     // Invoke IREE compilation flow.
-    // TODO: Find a better place for this canonical list of passes?
-    // TODO: Something better?
     options->executableOptions.targets.push_back("vmvx");
     options->targetOptions.i64Extension = true;
     options->targetOptions.f32Extension = true;
     options->targetOptions.f64Extension = true;
 
-    IREE::ABI::buildTransformPassPipeline(compilePipeline);
-    IREE::Flow::buildFlowTransformPassPipeline(compilePipeline,
-                                               options->flowOptions);
-    IREE::Stream::buildStreamTransformPassPipeline(compilePipeline,
-                                                   options->streamOptions);
-    IREE::HAL::buildHALTransformPassPipeline(compilePipeline,
-                                             options->executableOptions);
-    IREE::VM::buildVMTransformPassPipeline(compilePipeline,
-                                           options->targetOptions);
+    buildIREEVMTransformPassPipeline(
+        options->bindingOptions, options->inputOptions,
+        options->highLevelOptimizationOptions, options->schedulingOptions,
+        options->executableOptions, options->targetOptions, options->hooks,
+        compilePipeline);
   }
 
   void getDependentDialects(DialectRegistry &registry) const override {

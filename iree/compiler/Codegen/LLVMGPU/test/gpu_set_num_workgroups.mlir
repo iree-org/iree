@@ -61,9 +61,9 @@ hal.executable private @dot_dispatch_1  {
         %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<2x3xf32>
         %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<3x4xf32>
         %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : memref<2x4xf32>
-              linalg.fill(%cst, %2) : f32, memref<2x4xf32>
-              linalg.matmul ins(%0, %1 : memref<2x3xf32>, memref<3x4xf32>) outs(%2 : memref<2x4xf32>)
-              return
+        linalg.fill ins(%cst : f32) outs(%2 : memref<2x4xf32>)
+        linalg.matmul ins(%0, %1 : memref<2x3xf32>, memref<3x4xf32>) outs(%2 : memref<2x4xf32>)
+        return
       }
     }
   }
@@ -98,7 +98,7 @@ hal.executable @reduction_dispatch {
         %cst_0 = arith.constant 0xFF800000 : f32
         %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<1000xf32>
         %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<f32>
-        linalg.fill(%cst_0, %1) : f32, memref<f32>
+        linalg.fill ins(%cst_0 : f32) outs(%1 : memref<f32>)
         linalg.generic {indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> ()>], iterator_types = ["reduction"]} ins(%0 : memref<1000xf32>) outs(%1 : memref<f32>) {
         ^bb0(%arg0: f32, %arg1: f32):  // no predecessors
           %2 = arith.cmpf ogt, %arg0, %arg1 : f32
@@ -309,7 +309,7 @@ hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb">
       %4 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [256, 1024], strides = [1, 1]
           : !flow.dispatch.tensor<readonly:256x1024xf32> -> tensor<256x1024xf32>
       %15 = linalg.init_tensor [128, 1024] : tensor<128x1024xf32>
-      %16 = linalg.fill(%cst, %15) : f32, tensor<128x1024xf32> -> tensor<128x1024xf32>
+      %16 = linalg.fill ins(%cst : f32) outs(%15 : tensor<128x1024xf32>) -> tensor<128x1024xf32>
       %17 = linalg.matmul {__internal_linalg_transform__ = "workgroup", compilation_info = #compilation}
           ins(%3, %4 : tensor<128x256xf32>, tensor<256x1024xf32>) outs(%16 : tensor<128x1024xf32>) -> tensor<128x1024xf32>
       flow.dispatch.tensor.store %17, %2, offsets = [0, 0], sizes = [128, 1024], strides = [1, 1] : tensor<128x1024xf32> -> !flow.dispatch.tensor<writeonly:128x1024xf32>

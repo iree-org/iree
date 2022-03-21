@@ -15,7 +15,7 @@ include(CMakeParseArguments)
 # SRC: Source file to compile into a bytecode module.
 # FLAGS: Flags to pass to the translation tool (list of strings).
 # TRANSLATE_TOOL: Translation tool to invoke (CMake target). The default
-#     tool is "iree-translate".
+#     tool is "iree-compile".
 # C_IDENTIFIER: Identifier to use for generate c embed code.
 #     If omitted then no C embed code will be generated.
 # PUBLIC: Add this so that this library will be exported under ${PACKAGE}::
@@ -45,7 +45,7 @@ function(iree_bytecode_module)
   if(DEFINED _RULE_TRANSLATE_TOOL)
     set(_TRANSLATE_TOOL ${_RULE_TRANSLATE_TOOL})
   else()
-    set(_TRANSLATE_TOOL "iree-translate")
+    set(_TRANSLATE_TOOL "iree-compile")
   endif()
 
   if(DEFINED _RULE_MODULE_FILE_NAME)

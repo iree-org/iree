@@ -126,10 +126,10 @@ function(add_iree_compiler_busybox_tool target)
 endfunction()
 
 add_iree_compiler_busybox_tool(
-  IREECompilerIREECTool
-  OUTPUT_NAME ireec
+  IREECompilerIREECompileTool
+  OUTPUT_NAME iree-compile
   SRCS
-    IREECTool.c
+    IREECompileTool.c
 )
 
 if(TARGET lld)

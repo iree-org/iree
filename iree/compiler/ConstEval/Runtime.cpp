@@ -230,7 +230,7 @@ Attribute CompiledBinary::convertVariantToAttribute(
       iree_hal_buffer_t* buffer = iree_hal_buffer_view_buffer(bufferView);
 
       // Map the memory and construct.
-      // TODO(benvanik): fallback to alloc + iree_hal_buffer_read_data if
+      // TODO(benvanik): fallback to alloc + iree_hal_device_transfer_range if
       // mapping is not available. Today with the CPU backends it's always
       // possible but would not work with accelerators.
       iree_hal_buffer_mapping_t mapping;

@@ -572,7 +572,7 @@ def parse_arguments():
       "--module_path",
       type=str,
       help=
-      "Module path (typically .vmfb) to be referenced in the output trace. Should match the output path of the iree-translate command generating the module.",
+      "Module path (typically .vmfb) to be referenced in the output trace. Should match the output path of the iree-compile command generating the module.",
       required=True)
   parser.add_argument(
       "--requirements",

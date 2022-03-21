@@ -13,6 +13,7 @@ set(LIBS
   IREEInputDialect
   IREELinalgExtDialect
   IREELinalgExtPasses
+  IREELinalgExtTransforms
   IREEPyDMDialect
   IREEPyDMPasses
 )

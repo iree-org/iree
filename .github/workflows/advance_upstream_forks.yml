@@ -7,14 +7,16 @@
 name: Advance Upstream Forks
 
 on:
-  # TODO(gcmn): Enable cron once this is stable
-  # schedule:
-  #   - cron: '0 10 * * *'
+  schedule:
+    # Every hour
+    - cron: '0 * * * *'
 
   workflow_dispatch:
 
 jobs:
   advance_iree-llvm-fork:
+    # Don't run this in everyone's forks.
+    if: github.repository == 'google/iree'
     name: "Advance iree-llvm-fork"
     runs-on: ubuntu-20.04
     steps:
@@ -37,6 +39,8 @@ jobs:
           repository: google/iree-llvm-fork
 
   advance_iree-mhlo-fork:
+    # Don't run this in everyone's forks.
+    if: github.repository == 'google/iree'
     name: "Advance iree-mhlo-fork"
     runs-on: ubuntu-20.04
     steps:
@@ -57,3 +61,27 @@ jobs:
           github_token: ${{ secrets.WRITE_ACCESS_TOKEN }}
           branch: master
           repository: google/iree-mhlo-fork
+
+  advance_iree-tf-fork:
+    # Don't run this in everyone's forks.
+    if: github.repository == 'google/iree'
+    name: "Advance iree-tf-fork"
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Checking out repository
+        uses: actions/checkout@v2
+        with:
+          token: ${{ secrets.WRITE_ACCESS_TOKEN }}
+          repository: google/iree-tf-fork
+          ref: master
+
+      - name: Pull from upstream
+        run: |
+          git remote add upstream https://github.com/tensorflow/tensorflow.git
+          git pull --ff-only upstream master
+      - name: Pushing changes
+        uses: ad-m/github-push-action@v0.6.0
+        with:
+          github_token: ${{ secrets.WRITE_ACCESS_TOKEN }}
+          branch: master
+          repository: google/iree-tf-fork

@@ -109,7 +109,7 @@ Check out what was built:
 
 ```shell
 $ ls bazel-bin/iree/tools/
-$ ./bazel-bin/iree/tools/iree-translate --help
+$ ./bazel-bin/iree/tools/iree-compile --help
 ```
 
 Translate a

@@ -29,3 +29,41 @@ void IREEInputDialect::initialize() {
 #include "iree-dialects/Dialect/Input/InputOps.cpp.inc"
       >();
 }
+
+namespace mlir {
+namespace iree_compiler {
+namespace IREE {
+namespace Input {
+
+// ListType
+Type ListType::parse(AsmParser &parser) {
+  MLIRContext *ctxt = parser.getContext();
+  Type elementType;
+  if (parser.parseLess() || parser.parseType(elementType) ||
+      parser.parseGreater())
+    return Type();
+  return get(ctxt, elementType);
+}
+
+void ListType::print(AsmPrinter &printer) const {
+  printer << "<" << getElementType() << ">";
+}
+
+// PtrType
+Type PtrType::parse(AsmParser &parser) {
+  MLIRContext *ctxt = parser.getContext();
+  Type targetType;
+  if (parser.parseLess() || parser.parseType(targetType) ||
+      parser.parseGreater())
+    return Type();
+  return get(ctxt, targetType);
+}
+
+void PtrType::print(AsmPrinter &printer) const {
+  printer << "<" << getTargetType() << ">";
+}
+
+}  // namespace Input
+}  // namespace IREE
+}  // namespace iree_compiler
+}  // namespace mlir

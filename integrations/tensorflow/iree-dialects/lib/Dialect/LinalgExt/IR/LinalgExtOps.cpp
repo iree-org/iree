@@ -24,6 +24,7 @@
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/Diagnostics.h"
+#include "mlir/IR/FunctionImplementation.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/OpImplementation.h"
 #include "mlir/IR/OperationSupport.h"
@@ -103,48 +104,49 @@ OpFoldResult IREE::LinalgExt::getDim(OpBuilder &builder, Location loc, Value v,
 //===----------------------------------------------------------------------===//
 // ScatterOp
 //===----------------------------------------------------------------------===//
-static LogicalResult verifyScatterOp(ScatterOp op) {
-  if (op.inputs().size() != 2) {
-    return op.emitOpError("expected two input operands");
+LogicalResult ScatterOp::verify() {
+  Operation *op = getOperation();
+  if (inputs().size() != 2) {
+    return op->emitOpError("expected two input operands");
   }
-  if (op.outputs().size() != 1) {
-    return op.emitOpError("expected one output operand");
+  if (outputs().size() != 1) {
+    return op->emitOpError("expected one output operand");
   }
   auto checkDimensionsMatch = [&](ShapedType t1, ShapedType t2, unsigned dim) {
     return t1.getShape()[dim] == t2.getShape()[dim];
   };
 
-  auto indicesType = op.getIndicesType();
+  auto indicesType = getIndicesType();
   if (indicesType.getRank() != 2 ||
       !indicesType.getElementType().isInteger(32)) {
-    return op.emitOpError(
+    return op->emitOpError(
         "expected indices to be of rank 2 of i32 element type");
   }
-  auto indexDepth = op.getIndexDepth();
+  auto indexDepth = getIndexDepth();
   if (indexDepth == ShapedType::kDynamicSize) {
-    return op.emitOpError("expected index depth is static");
+    return op->emitOpError("expected index depth is static");
   }
 
   // The first dimension of the indices should match the first dimension of the
   // output. They indicate to the number of updates.
-  auto updateType = op.getUpdateType();
+  auto updateType = getUpdateType();
   if (updateType.getRank() < 1) {
-    return op.emitOpError("expected update value to be at least rank 1");
+    return op->emitOpError("expected update value to be at least rank 1");
   }
   if (!checkDimensionsMatch(indicesType, updateType, 0)) {
-    return op.emitOpError(
+    return op->emitOpError(
         "mismatch in shape of indices and update value at dim#0");
   }
-  auto originalType = op.getOriginalType();
+  auto originalType = getOriginalType();
   if (updateType.getRank() - 1 > originalType.getRank()) {
-    return op.emitOpError(
+    return op->emitOpError(
         "update value rank exceeds the rank of the original value");
   }
 
   // indexDepth + update dims should cover the original dims. The first dim of
   // update is the number of updates.
   if (originalType.getRank() > indexDepth + updateType.getRank() - 1) {
-    return op.emitOpError(
+    return op->emitOpError(
         "index depth and update value does not cover rank of original value");
   }
 
@@ -159,7 +161,7 @@ static LogicalResult verifyScatterOp(ScatterOp op) {
     int64_t updateDim = std::get<1>(it);
     if (updateType.getDimSize(updateDim) !=
         originalType.getDimSize(originalDim)) {
-      return op.emitOpError("mismatch in shape of update value dim#")
+      return op->emitOpError("mismatch in shape of update value dim#")
              << updateDim << " and original value at dim#" << originalDim;
     }
   }
@@ -173,36 +175,36 @@ static LogicalResult verifyScatterOp(ScatterOp op) {
     int64_t updateDim = std::get<1>(it);
     if (updateType.getDimSize(updateDim) >
         originalType.getDimSize(originalDim)) {
-      return op.emitOpError("indexed shape of update value dim#")
+      return op->emitOpError("indexed shape of update value dim#")
              << updateDim << " exceeds original value at dim#" << originalDim
              << " " << updateType.getDimSize(updateDim) << " "
              << originalType.getDimSize(originalDim);
     }
   }
 
-  Region &region = op.region();
+  Region &region = this->region();
   Block *body = &region.front();
   if (body->getNumArguments() != 2) {
-    return op.emitOpError("expected region to have two arguments");
+    return op->emitOpError("expected region to have two arguments");
   }
   Type arg0Type = body->getArgument(0).getType();
   Type arg1Type = body->getArgument(1).getType();
   if (!arg0Type.isIntOrFloat() || !arg1Type.isIntOrFloat()) {
-    return op.emitOpError(
+    return op->emitOpError(
         "expected region to have scalar argument of integer or float types");
   }
   if (arg0Type != updateType.getElementType()) {
-    return op.emitOpError("mismatch in argument 0 of region ")
+    return op->emitOpError("mismatch in argument 0 of region ")
            << arg0Type << " and element type of update value "
            << updateType.getElementType();
   }
   if (arg1Type != originalType.getElementType()) {
-    return op.emitOpError("mismatch in argument 1 of region ")
+    return op->emitOpError("mismatch in argument 1 of region ")
            << arg1Type << " and element type of original value "
            << originalType.getElementType();
   }
   if (arg0Type != arg1Type) {
-    return op.emitOpError("mismatch in region argument types ")
+    return op->emitOpError("mismatch in region argument types ")
            << arg0Type << " and " << arg1Type;
   }
   auto yieldOp = cast<IREE::LinalgExt::YieldOp>(body->getTerminator());
@@ -353,44 +355,45 @@ LogicalResult ScatterOp::generateScalarImplementation(OpBuilder &b,
 // SortOp
 //===----------------------------------------------------------------------===//
 
-static LogicalResult verifySortOp(SortOp op) {
-  if (op.getNumInputs()) {
-    return op.emitOpError("does not expect to take any inputs");
+LogicalResult SortOp::verify() {
+  Operation *op = getOperation();
+  if (getNumInputs()) {
+    return op->emitOpError("does not expect to take any inputs");
   }
-  if (op.getNumOutputs() == 0) {
-    return op.emitOpError("expected at least one `outs` operand");
+  if (getNumOutputs() == 0) {
+    return op->emitOpError("expected at least one `outs` operand");
   }
 
-  Block &block = op.region().front();
-  size_t numOutputs = op.getNumOutputs();
+  Block &block = region().front();
+  size_t numOutputs = getNumOutputs();
   if (block.getNumArguments() != 2 * numOutputs) {
-    return op.emitOpError("region block should have ")
+    return op->emitOpError("region block should have ")
            << 2 * numOutputs << " arguments";
   }
 
-  int64_t rank = op.getOperandRank();
-  int sortDim = op.dimension();
+  int64_t rank = getOperandRank();
+  int sortDim = dimension();
   if (sortDim < 0 || sortDim >= rank) {
-    return op.emitOpError("dimension must be within (0, ") << rank << "]";
+    return op->emitOpError("dimension must be within (0, ") << rank << "]";
   }
 
-  ArrayRef<int64_t> shape = op.getOperandShape();
-  for (auto indexedOperand : llvm::enumerate(op.outputs())) {
+  ArrayRef<int64_t> shape = getOperandShape();
+  for (auto indexedOperand : llvm::enumerate(outputs())) {
     int index = indexedOperand.index();
-    auto operandType = op.getOperandType(index);
+    auto operandType = getOperandType(index);
     if (operandType.getRank() != rank) {
-      return op.emitOpError("expected operand ")
+      return op->emitOpError("expected operand ")
              << index << " to be rank " << rank << ", same as other operands";
     }
     if (operandType.getShape() != shape) {
-      return op.emitOpError("expected operand ")
+      return op->emitOpError("expected operand ")
              << index << " to have same shape as other operands";
     }
     Type elemType = operandType.getElementType();
     for (int i : {2 * index, 2 * index + 1}) {
       Type argType = block.getArgument(i).getType();
       if (argType != elemType) {
-        return op.emitOpError("region block argument #")
+        return op->emitOpError("region block argument #")
                << i << " should be of type " << elemType << " but got "
                << argType;
       }
@@ -399,11 +402,11 @@ static LogicalResult verifySortOp(SortOp op) {
 
   auto yieldOp = cast<YieldOp>(block.getTerminator());
   if (yieldOp.getNumOperands() != 1) {
-    return op.emitOpError("should yield exactly one operand");
+    return op->emitOpError("should yield exactly one operand");
   }
   auto ty = yieldOp.getOperand(0).getType().dyn_cast<IntegerType>();
   if (!ty || ty.getWidth() != 1) {
-    return op.emitOpError("should yield i1 type");
+    return op->emitOpError("should yield i1 type");
   }
 
   return success();
@@ -559,26 +562,28 @@ LogicalResult SortOp::generateScalarImplementation(OpBuilder &b, Location loc,
 // FftOp
 //===----------------------------------------------------------------------===//
 
-static LogicalResult verifyFftOp(FftOp op) {
-  auto length = op.getFftLength();
+LogicalResult FftOp::verify() {
+  Operation *op = getOperation();
+  auto length = getFftLength();
   // After tiling, it could be dynamic shape. (Because
   // subview/subtensor does not inference the type correctly
   // on (1 << x)) cases).
   if (length == ShapedType::kDynamicSize) return success();
   if (length & (length - 1)) {
-    return op.emitOpError("only powers of 2 are handled currently");
+    return op->emitOpError("only powers of 2 are handled currently");
   }
-  if (!op.getNumInputs() || !op.isScalar(op.getInputOperand(0))) {
-    return op.emitOpError("expected to carry `stage` input");
+  if (!getNumInputs() || !isScalar(getInputOperand(0))) {
+    return op->emitOpError("expected to carry `stage` input");
   }
-  if (op.getNumInputs() != 1) {
-    if (op.getNumInputs() != 3 || op.isScalar(op.getInputOperand(1)) ||
-        op.isScalar(op.getInputOperand(2))) {
-      return op.emitOpError("expected to carry real and imag coeff inputs");
+  if (getNumInputs() != 1) {
+    if (getNumInputs() != 3 || isScalar(getInputOperand(1)) ||
+        isScalar(getInputOperand(2))) {
+      return op->emitOpError("expected to carry real and imag coeff inputs");
     }
   }
-  if (op.getNumOutputs() != 2) {
-    return op.emitOpError("expected outputs to be real and imag tensor/memref");
+  if (getNumOutputs() != 2) {
+    return op->emitOpError(
+        "expected outputs to be real and imag tensor/memref");
   }
   return success();
 }
@@ -758,8 +763,6 @@ LogicalResult FftOp::generateScalarImplementation(OpBuilder &b, Location loc,
   return success();
 }
 
-bool FftOp::payloadUsesValueFromOperand(OpOperand *) { return false; }
-
 SmallVector<unsigned> FftOp::getPartitionableLoops(
     unsigned maxNumParallelDims) {
   auto range = llvm::seq<unsigned>(0, getOperandRank());
@@ -811,34 +814,35 @@ Operation *FftOp::getTiledImplementation(OpBuilder &builder, ValueRange outputs,
 // ScanOp
 //===----------------------------------------------------------------------===//
 
-static LogicalResult verifyScanOp(ScanOp op) {
-  if (op.getNumInputs() != 1) {
-    return op.emitOpError("expected one input operands");
+LogicalResult ScanOp::verify() {
+  Operation *op = getOperation();
+  if (getNumInputs() != 1) {
+    return op->emitOpError("expected one input operands");
   }
-  if (op.getNumOutputs() != 2) {
-    return op.emitOpError("expected two output operands");
+  if (getNumOutputs() != 2) {
+    return op->emitOpError("expected two output operands");
   }
-  if (!op.input().getType().isa<ShapedType>()) {
-    return op.emitOpError("expected first input element type to be shaped");
+  if (!input().getType().isa<ShapedType>()) {
+    return op->emitOpError("expected first input element type to be shaped");
   }
-  auto accumulatorType = op.accumulator().getType().cast<ShapedType>();
-  auto inputType = op.input().getType().cast<ShapedType>();
-  auto outputType = op.output().getType().cast<ShapedType>();
+  auto accumulatorType = accumulator().getType().cast<ShapedType>();
+  auto inputType = input().getType().cast<ShapedType>();
+  auto outputType = output().getType().cast<ShapedType>();
   ArrayRef<int64_t> inputShapes = inputType.getShape();
   ArrayRef<int64_t> outputShapes = outputType.getShape();
   if (accumulatorType.getElementType() != inputType.getElementType()) {
-    return op.emitOpError(
+    return op->emitOpError(
         "expected input/accumulator element types to be identical");
   }
   ArrayRef<int64_t> accumulatorShape = accumulatorType.getShape();
   int64_t accumulatorRank = accumulatorType.getRank();
   if (accumulatorRank != inputType.getRank() - 1) {
-    return op.emitOpError(
+    return op->emitOpError(
         "expected accumulator rank to be equal to input rank - 1");
   }
   SmallVector<int64_t> expectedAccumulatorShape;
   for (int i = 0; i < inputType.getRank(); i++) {
-    if (i != op.dimension()) expectedAccumulatorShape.push_back(inputShapes[i]);
+    if (i != dimension()) expectedAccumulatorShape.push_back(inputShapes[i]);
   }
   if (llvm::any_of(llvm::zip(expectedAccumulatorShape, accumulatorShape),
                    [](std::tuple<int64_t, int64_t> s) {
@@ -846,14 +850,14 @@ static LogicalResult verifyScanOp(ScanOp op) {
                             std::get<1>(s) != ShapedType::kDynamicSize &&
                             std::get<0>(s) != std::get<1>(s);
                    })) {
-    return op.emitOpError("incompatible input/accumulator shapes");
+    return op->emitOpError("incompatible input/accumulator shapes");
   }
   if (inputType.getElementType() != outputType.getElementType()) {
-    return op.emitOpError(
+    return op->emitOpError(
         "expected input/output element types to be identical");
   }
   if (inputShapes.size() != outputShapes.size()) {
-    return op.emitOpError("expected input/output to have identical ranks");
+    return op->emitOpError("expected input/output to have identical ranks");
   }
   if (llvm::any_of(llvm::zip(inputShapes, outputShapes),
                    [](std::tuple<int64_t, int64_t> s) {
@@ -861,7 +865,7 @@ static LogicalResult verifyScanOp(ScanOp op) {
                             std::get<1>(s) != ShapedType::kDynamicSize &&
                             std::get<0>(s) != std::get<1>(s);
                    })) {
-    return op.emitOpError("incompatible input/output shapes");
+    return op->emitOpError("incompatible input/output shapes");
   }
   return success();
 }
@@ -1043,23 +1047,24 @@ LogicalResult ScanOp::fold(ArrayRef<Attribute>,
 // ReverseOp
 //===----------------------------------------------------------------------===//
 
-static LogicalResult verifyReverseOp(ReverseOp op) {
-  if (op.getNumInputs() != 1) {
-    return op.emitOpError("expected exactly one input");
+LogicalResult ReverseOp::verify() {
+  Operation *op = getOperation();
+  if (getNumInputs() != 1) {
+    return op->emitOpError("expected exactly one input");
   }
-  if (op.getNumOutputs() != 1) {
-    return op.emitOpError("expected exactly one output");
+  if (getNumOutputs() != 1) {
+    return op->emitOpError("expected exactly one output");
   }
-  auto inputType = op.input().getType().cast<ShapedType>();
-  auto outputType = op.output().getType().cast<ShapedType>();
+  auto inputType = input().getType().cast<ShapedType>();
+  auto outputType = output().getType().cast<ShapedType>();
   if (inputType.getElementType() != outputType.getElementType()) {
-    return op.emitOpError(
+    return op->emitOpError(
         "expected input/output element types to be identical");
   }
   ArrayRef<int64_t> inputShapes = inputType.getShape();
   ArrayRef<int64_t> outputShapes = outputType.getShape();
   if (inputShapes.size() != outputShapes.size()) {
-    return op.emitOpError("expexted input/output to have identical ranks");
+    return op->emitOpError("expexted input/output to have identical ranks");
   }
   if (llvm::any_of(llvm::zip(inputShapes, outputShapes),
                    [](std::tuple<int64_t, int64_t> s) {
@@ -1067,26 +1072,24 @@ static LogicalResult verifyReverseOp(ReverseOp op) {
                             std::get<1>(s) != ShapedType::kDynamicSize &&
                             std::get<0>(s) != std::get<1>(s);
                    })) {
-    return op.emitOpError("incompatible input/output shapes");
+    return op->emitOpError("incompatible input/output shapes");
   }
 
-  int64_t rank = op.getOperandRank();
+  int64_t rank = getOperandRank();
   llvm::SmallSetVector<int64_t, 4> s;
-  for (auto dim : op.dims()) {
+  for (auto dim : dims()) {
     if (dim < 0 || dim >= rank) {
-      return op.emitOpError("all the dimensions must be within [0, ")
+      return op->emitOpError("all the dimensions must be within [0, ")
              << rank << ")";
     }
     if (s.contains(dim)) {
-      return op.emitOpError("expected dimensions numbers are all unique");
+      return op->emitOpError("expected dimensions numbers are all unique");
     }
     s.insert(dim);
   }
 
   return success();
 }
-
-bool ReverseOp::payloadUsesValueFromOperand(OpOperand *) { return false; }
 
 SmallVector<StringRef> ReverseOp::getLoopIteratorTypes() {
   SmallVector<StringRef> iteratorTypes(getOperandRank(),
@@ -1244,6 +1247,388 @@ struct FoldTensorCastOp : public OpInterfaceRewritePattern<LinalgExtOp> {
   }
 };
 }  // namespace
+
+//===----------------------------------------------------------------------===//
+// TileOp
+//===----------------------------------------------------------------------===//
+
+void TileOp::build(mlir::OpBuilder &builder, mlir::OperationState &result,
+                   Value tileSize, ValueRange outs, int64_t tiledDim,
+                   TileOp::TileOpBodyBuilderFn bodyBuilder) {
+  result.addOperands(tileSize);
+  result.addOperands(outs);
+  result.addAttribute(TileOp::getTiledDimAttrName(),
+                      builder.getI64IntegerAttr(tiledDim));
+  result.addTypes(outs.getType());
+
+  Region *bodyRegion = result.addRegion();
+  bodyRegion->push_back(new Block);
+  Block &bodyBlock = bodyRegion->front();
+  // TODO: Pass a better location here.
+  Location loc = tileSize.getLoc();
+  bodyBlock.addArgument(builder.getIndexType(), loc);
+  bodyBlock.addArgument(builder.getIndexType(), loc);
+  // Handle the sliced out types in a conservative fashion: all dimensions
+  // become dynamic and a later canonicalization is expected to recover static
+  // types.
+  // TODO: should we relax this and use something less strict?
+  auto dynamicTypes =
+      llvm::to_vector(llvm::map_range(outs.getTypes(), [](Type t) -> Type {
+        auto rankedTensorType = t.cast<RankedTensorType>();
+        RankedTensorType::Builder rttb(rankedTensorType);
+        SmallVector<int64_t> dynamicShape(rankedTensorType.getRank(),
+                                          ShapedType::kDynamicSize);
+        return rttb.setShape(dynamicShape);
+      }));
+  SmallVector<Location> locs(dynamicTypes.size(), loc);
+  bodyBlock.addArguments(dynamicTypes, locs);
+
+  OpBuilder::InsertionGuard guard(builder);
+  builder.setInsertionPointToStart(&bodyBlock);
+  bodyBuilder(builder, result.location, bodyBlock.getArgument(0),
+              bodyBlock.getArgument(1), bodyBlock.getArguments().drop_front(2));
+}
+
+void TileOp::build(mlir::OpBuilder &builder, mlir::OperationState &result,
+                   Value tileSize, ValueRange outs,
+                   TileOp::TileOpBodyBuilderFn bodyBuilder) {
+  TileOp::build(builder, result, tileSize, outs, 0, bodyBuilder);
+}
+
+// TODO(#81): Impl me.
+LogicalResult TileOp::verify() { return success(); }
+
+void TileOp::print(OpAsmPrinter &p) {
+  p << ' ' << tile_size() << ' ';
+  if (tiled_dim() > 0) p << "tiled_dim = " << tiled_dim() << ' ';
+  if (!outs().empty()) {
+    p << "outs(";
+    llvm::interleaveComma(outs(), p,
+                          [&p](Value v) { p << v << ": " << v.getType(); });
+    p << ')';
+  }
+  p << " -> (" << getResultTypes() << ") ";
+  p.printRegion(region(),
+                /*printEntryBlockArgs=*/true,
+                /*printBlockTerminators=*/true);
+  p.printOptionalAttrDict(getOperation()->getAttrs(),
+                          /*elidedAttrs=*/{TileOp::getTiledDimAttrName()});
+}
+
+ParseResult TileOp::parse(OpAsmParser &parser, OperationState &result) {
+  auto &builder = parser.getBuilder();
+
+  OpAsmParser::OperandType tileSizes;
+  // TODO: also allow tensor<..xindex> and figure out a good syntax.
+  // Type tensorOfIndexType =
+  //     RankedTensorType::get({ShapedType::kDynamicSize}, indexType);
+  Type tileSizesType = builder.getIndexType();
+  SmallVector<Type> outsTypes;
+  SmallVector<OpAsmParser::OperandType, 4> outsOperands;
+
+  llvm::SMLoc outputsOperandsLoc;
+  if (parser.parseOperand(tileSizes) ||
+      parser.resolveOperand(tileSizes, tileSizesType, result.operands))
+    return failure();
+
+  // Parse the `tiled_dim` attribute or set it to 0 implicitly when elided.
+  if (succeeded(parser.parseOptionalKeyword(TileOp::getTiledDimAttrName()))) {
+    outputsOperandsLoc = parser.getCurrentLocation();
+    Attribute valueAttr;
+    parser.parseAttribute(valueAttr, TileOp::getTiledDimAttrName(),
+                          result.attributes);
+  } else {
+    result.attributes.append(TileOp::getTiledDimAttrName(),
+                             parser.getBuilder().getI64IntegerAttr(0));
+  }
+
+  if (succeeded(parser.parseOptionalKeyword("outs"))) {
+    bool _1;
+    SmallVector<NamedAttrList> _2;
+    SmallVector<Location> _3;
+    outputsOperandsLoc = parser.getCurrentLocation();
+    if (mlir::function_interface_impl::parseFunctionArgumentList(
+            parser,
+            /*allowAttributes=*/false,
+            /*allowVariadic=*/false, outsOperands, outsTypes, /*argAttrs=*/_2,
+            /*argLocations=*/_3,
+            /*isVariadic=*/_1) ||
+        parser.resolveOperands(outsOperands, outsTypes, outputsOperandsLoc,
+                               result.operands))
+      return failure();
+  }
+  if (parser.parseArrowTypeList(result.types)) return failure();
+
+  SmallVector<OpAsmParser::OperandType, 8> regionOperands;
+  std::unique_ptr<Region> region = std::make_unique<Region>();
+  SmallVector<Type, 8> operandTypes, regionTypes;
+  if (parser.parseRegion(*region, regionOperands, regionTypes))
+    return failure();
+
+  // Parse the optional attribute list.
+  if (parser.parseOptionalAttrDict(result.attributes)) return failure();
+
+  TileOp::ensureTerminator(*region, builder, result.location);
+  result.addRegion(std::move(region));
+
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
+// InParallelOp
+//===----------------------------------------------------------------------===//
+
+LogicalResult InParallelOp::verify() {
+  // Check that the body defines as single block argument for the thread index.
+  auto *body = getBody();
+  if (body->getNumArguments() != 1)
+    return emitOpError("body expects exactly one argument");
+  if (!body->getArgument(0).getType().isIndex())
+    return emitOpError(
+        "expected body first argument to be an index argument for "
+        "the thread index");
+
+  // Verify consistency between the result types and the terminator.
+  auto terminatorTypes = getTerminator().yieldedTypes();
+  auto opResults = getResults();
+  if (opResults.size() != terminatorTypes.size())
+    return emitOpError("produces ")
+           << opResults.size() << " results, but its terminator yields "
+           << terminatorTypes.size() << " values";
+  unsigned i = 0;
+  for (auto e : llvm::zip(terminatorTypes, opResults)) {
+    if (std::get<0>(e) != std::get<1>(e).getType())
+      return emitOpError() << "type mismatch between " << i
+                           << "th result of in_parallel (" << std::get<0>(e)
+                           << ") and " << i << "th result yielded by its "
+                           << "terminator (" << std::get<1>(e).getType() << ")";
+    i++;
+  }
+
+  return success();
+}
+
+void InParallelOp::print(OpAsmPrinter &p) {
+  p << ' ' << num_threads() << ' ';
+  p << " -> (" << getResultTypes() << ") ";
+  p.printRegion(region(),
+                /*printEntryBlockArgs=*/true,
+                /*printBlockTerminators=*/true);
+  p.printOptionalAttrDict(getOperation()->getAttrs());
+}
+
+ParseResult InParallelOp::parse(OpAsmParser &parser, OperationState &result) {
+  auto &builder = parser.getBuilder();
+
+  OpAsmParser::OperandType numThreads;
+  Type indexType = builder.getIndexType();
+
+  if (parser.parseOperand(numThreads) ||
+      parser.resolveOperand(numThreads, indexType, result.operands))
+    return failure();
+  if (parser.parseArrowTypeList(result.types)) return failure();
+
+  SmallVector<OpAsmParser::OperandType, 8> regionOperands;
+  SmallVector<Type, 8> regionTypes;
+  std::unique_ptr<Region> region = std::make_unique<Region>();
+  if (parser.parseRegion(*region, regionOperands, regionTypes))
+    return failure();
+  InParallelOp::ensureTerminator(*region, builder, result.location);
+  result.addRegion(std::move(region));
+
+  // Parse the optional attribute list.
+  if (parser.parseOptionalAttrDict(result.attributes)) return failure();
+  return success();
+}
+
+// Bodyless builder, result types must be specified.
+void InParallelOp::build(mlir::OpBuilder &builder, mlir::OperationState &result,
+                         TypeRange resultTypes, Value numThreads) {
+  // TODO: Pass better location.
+  Location loc = numThreads.getLoc();
+  result.addOperands(numThreads);
+
+  Region *bodyRegion = result.addRegion();
+  bodyRegion->push_back(new Block);
+  Block &bodyBlock = bodyRegion->front();
+  bodyBlock.addArgument(builder.getIndexType(), loc);
+
+  // Create the default terminator if the builder is not provided and if the
+  // iteration arguments are not provided. Otherwise, leave this to the caller
+  // because we don't know which values to return from the loop.
+  InParallelOp::ensureTerminator(*bodyRegion, builder, result.location);
+  result.addTypes(resultTypes);
+}
+
+// Builder that takes a bodyBuilder lambda, result types are inferred from
+// the terminator.
+void InParallelOp::build(
+    mlir::OpBuilder &builder, mlir::OperationState &result, Value numThreads,
+    function_ref<void(OpBuilder &, Location, Value)> bodyBuilder) {
+  // TODO: Pass better location.
+  Location loc = numThreads.getLoc();
+  result.addOperands(numThreads);
+
+  Region *bodyRegion = result.addRegion();
+  bodyRegion->push_back(new Block);
+  Block &bodyBlock = bodyRegion->front();
+  bodyBlock.addArgument(builder.getIndexType(), loc);
+
+  OpBuilder::InsertionGuard guard(builder);
+  builder.setInsertionPointToStart(&bodyBlock);
+  bodyBuilder(builder, result.location, bodyBlock.getArgument(0));
+  auto terminator =
+      llvm::cast<PerformConcurrentlyOp>(bodyBlock.getTerminator());
+  result.addTypes(terminator.yieldedTypes());
+}
+
+// The ensureTerminator method generated by SingleBlockImplicitTerminator is
+// unaware of the fact that our terminator also needs a region to be well
+// formed. We override it here to ensure that we do the right thing.
+void InParallelOp::ensureTerminator(Region &region, Builder &builder,
+                                    Location loc) {
+  OpTrait::SingleBlockImplicitTerminator<PerformConcurrentlyOp>::Impl<
+      InParallelOp>::ensureTerminator(region, builder, loc);
+  auto terminator =
+      llvm::dyn_cast<PerformConcurrentlyOp>(region.front().getTerminator());
+  PerformConcurrentlyOp::ensureTerminator(terminator.getRegion(), builder, loc);
+}
+
+PerformConcurrentlyOp InParallelOp::getTerminator() {
+  return cast<PerformConcurrentlyOp>(getBody()->getTerminator());
+}
+
+//===----------------------------------------------------------------------===//
+// ParallelInsertSliceOp
+//===----------------------------------------------------------------------===//
+
+// Build a ParallelInsertSliceOp with mixed static and dynamic entries.
+void ParallelInsertSliceOp::build(OpBuilder &b, OperationState &result,
+                                  Value source, Value dest,
+                                  ArrayRef<OpFoldResult> offsets,
+                                  ArrayRef<OpFoldResult> sizes,
+                                  ArrayRef<OpFoldResult> strides,
+                                  ArrayRef<NamedAttribute> attrs) {
+  SmallVector<int64_t> staticOffsets, staticSizes, staticStrides;
+  SmallVector<Value> dynamicOffsets, dynamicSizes, dynamicStrides;
+  dispatchIndexOpFoldResults(offsets, dynamicOffsets, staticOffsets,
+                             ShapedType::kDynamicStrideOrOffset);
+  dispatchIndexOpFoldResults(sizes, dynamicSizes, staticSizes,
+                             ShapedType::kDynamicSize);
+  dispatchIndexOpFoldResults(strides, dynamicStrides, staticStrides,
+                             ShapedType::kDynamicStrideOrOffset);
+  build(b, result, {}, source, dest, dynamicOffsets, dynamicSizes,
+        dynamicStrides, b.getI64ArrayAttr(staticOffsets),
+        b.getI64ArrayAttr(staticSizes), b.getI64ArrayAttr(staticStrides));
+  result.addAttributes(attrs);
+}
+
+// Build a ParallelInsertSliceOp with dynamic entries.
+void ParallelInsertSliceOp::build(OpBuilder &b, OperationState &result,
+                                  Value source, Value dest, ValueRange offsets,
+                                  ValueRange sizes, ValueRange strides,
+                                  ArrayRef<NamedAttribute> attrs) {
+  SmallVector<OpFoldResult> offsetValues = llvm::to_vector<4>(
+      llvm::map_range(offsets, [](Value v) -> OpFoldResult { return v; }));
+  SmallVector<OpFoldResult> sizeValues = llvm::to_vector<4>(
+      llvm::map_range(sizes, [](Value v) -> OpFoldResult { return v; }));
+  SmallVector<OpFoldResult> strideValues = llvm::to_vector<4>(
+      llvm::map_range(strides, [](Value v) -> OpFoldResult { return v; }));
+  build(b, result, source, dest, offsetValues, sizeValues, strideValues);
+}
+
+namespace {
+/// Pattern to rewrite a parallel_insert_slice op with constant arguments.
+class ParallelInsertSliceOpConstantArgumentFolder final
+    : public OpRewritePattern<ParallelInsertSliceOp> {
+ public:
+  using OpRewritePattern<ParallelInsertSliceOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(ParallelInsertSliceOp insertSliceOp,
+                                PatternRewriter &rewriter) const override {
+    // No constant operand, just return.
+    if (llvm::none_of(insertSliceOp.getOperands(), [](Value operand) {
+          return matchPattern(operand, matchConstantIndex());
+        }))
+      return failure();
+
+    // At least one of offsets/sizes/strides is a new constant.
+    // Form the new list of operands and constant attributes from the
+    // existing.
+    SmallVector<OpFoldResult> mixedOffsets(insertSliceOp.getMixedOffsets());
+    SmallVector<OpFoldResult> mixedSizes(insertSliceOp.getMixedSizes());
+    SmallVector<OpFoldResult> mixedStrides(insertSliceOp.getMixedStrides());
+    canonicalizeSubViewPart(mixedOffsets, ShapedType::isDynamicStrideOrOffset);
+    canonicalizeSubViewPart(mixedSizes, ShapedType::isDynamic);
+    canonicalizeSubViewPart(mixedStrides, ShapedType::isDynamicStrideOrOffset);
+
+    // Create the new op in canonical form.
+    rewriter.replaceOpWithNewOp<ParallelInsertSliceOp>(
+        insertSliceOp, insertSliceOp.source(), insertSliceOp.dest(),
+        mixedOffsets, mixedSizes, mixedStrides);
+    return success();
+  }
+};
+}  // namespace
+
+void ParallelInsertSliceOp::getCanonicalizationPatterns(
+    RewritePatternSet &results, MLIRContext *context) {
+  results.add<ParallelInsertSliceOpConstantArgumentFolder>(context);
+}
+
+//===----------------------------------------------------------------------===//
+// PerformConcurrentlyOp
+//===----------------------------------------------------------------------===//
+
+// TODO(ntv,apaszke): Implement this
+LogicalResult PerformConcurrentlyOp::verify() { return success(); }
+
+void PerformConcurrentlyOp::print(OpAsmPrinter &p) {
+  p << " ";
+  p.printRegion(region(),
+                /*printEntryBlockArgs=*/false,
+                /*printBlockTerminators=*/false);
+  p.printOptionalAttrDict(getOperation()->getAttrs());
+}
+
+ParseResult PerformConcurrentlyOp::parse(OpAsmParser &parser,
+                                         OperationState &result) {
+  auto &builder = parser.getBuilder();
+
+  SmallVector<OpAsmParser::OperandType, 8> regionOperands;
+  SmallVector<Type, 8> regionTypes;
+  std::unique_ptr<Region> region = std::make_unique<Region>();
+  if (parser.parseRegion(*region, regionOperands, regionTypes))
+    return failure();
+  PerformConcurrentlyOp::ensureTerminator(*region, builder, result.location);
+  result.addRegion(std::move(region));
+
+  // Parse the optional attribute list.
+  if (parser.parseOptionalAttrDict(result.attributes)) return failure();
+  return success();
+}
+
+SmallVector<Type> PerformConcurrentlyOp::yieldedTypes() {
+  return llvm::to_vector(llvm::map_range(
+      this->yieldingOps(),
+      [](ParallelInsertSliceOp op) { return op.yieldedType(); }));
+}
+
+SmallVector<ParallelInsertSliceOp> PerformConcurrentlyOp::yieldingOps() {
+  SmallVector<ParallelInsertSliceOp> ret;
+  for (Operation &op : *getBody()) {
+    // TODO: interface when this grows up.
+    if (auto sliceOp = llvm::dyn_cast<ParallelInsertSliceOp>(op)) {
+      ret.push_back(sliceOp);
+      continue;
+    }
+    if (auto endPerformOp = llvm::dyn_cast<EndPerformConcurrentlyOp>(op)) {
+      continue;
+    }
+    llvm_unreachable("Unexpected operation in perform_concurrently");
+  }
+  return ret;
+}
 
 //===----------------------------------------------------------------------===//
 // LinalgExtDialect

@@ -53,7 +53,7 @@ python -m pip install iree-compiler
 ```
 
 !!! tip
-    `iree-translate` is installed as `/path/to/python/site-packages/iree/tools/core/iree-translate`.
+    `iree-compile` is installed as `/path/to/python/site-packages/iree/tools/core/iree-compile`.
     You can find out the full path to the `site-packages` directory via the
     `python -m site` command.
 
@@ -89,7 +89,7 @@ weights from [TensorFlow Hub][tf-hub-mobilenetv2] and convert it using IREE's
 In the build directory, run the following command:
 
 ``` shell hl_lines="3"
-iree/tools/iree-translate \
+iree/tools/iree-compile \
     -iree-mlir-to-vm-bytecode-module \
     -iree-hal-target-backends=dylib-llvm-aot \
     iree_input.mlir -o mobilenet-dylib.vmfb

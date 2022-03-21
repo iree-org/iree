@@ -29,8 +29,6 @@ using PyRealType = PYDM::RealType;
 using PyCallOp = PYDM::CallOp;
 using PyFuncOp = PYDM::FuncOp;
 
-static LogicalResult verify(Operation *) { return success(); }
-
 //===----------------------------------------------------------------------===//
 // Utilities
 //===----------------------------------------------------------------------===//
@@ -439,14 +437,13 @@ void DynamicBinaryPromoteOp::getCanonicalizationPatterns(
 
 ::llvm::StringRef FunctionalIfOp::getDefaultDialect() { return "iree_pydm"; }
 
-static LogicalResult verify(FunctionalIfOp op) {
-  if (op.getNumResults() != 0 && op.elseRegion().empty())
-    return op.emitOpError("must have an else block if defining values");
+LogicalResult FunctionalIfOp::verify() {
+  if (getNumResults() != 0 && elseRegion().empty())
+    return emitOpError("must have an else block if defining values");
   return success();
 }
 
-static ParseResult parseFunctionalIfOp(OpAsmParser &parser,
-                                       OperationState &result) {
+ParseResult FunctionalIfOp::parse(OpAsmParser &parser, OperationState &result) {
   // Create the regions for 'then'.
   result.regions.reserve(2);
   Region *thenRegion = result.addRegion();
@@ -478,7 +475,8 @@ static ParseResult parseFunctionalIfOp(OpAsmParser &parser,
   return success();
 }
 
-static void print(OpAsmPrinter &p, FunctionalIfOp op) {
+void FunctionalIfOp::print(OpAsmPrinter &p) {
+  FunctionalIfOp op = *this;
   bool printBlockTerminators = false;
 
   p << " " << op.condition();
@@ -546,7 +544,7 @@ LogicalResult PyFuncOp::verifyType() {
   return success();
 }
 
-static ParseResult parseFuncOp(OpAsmParser &parser, OperationState &result) {
+ParseResult PyFuncOp::parse(OpAsmParser &parser, OperationState &result) {
   auto buildFuncType =
       [](Builder &builder, ArrayRef<Type> argTypes, ArrayRef<Type> results,
          function_interface_impl::VariadicFlag,
@@ -556,45 +554,40 @@ static ParseResult parseFuncOp(OpAsmParser &parser, OperationState &result) {
       parser, result, /*allowVariadic=*/false, buildFuncType);
 }
 
-static void print(PyFuncOp op, OpAsmPrinter &p) {
-  FunctionType fnType = op.getType();
+void PyFuncOp::print(OpAsmPrinter &p) {
+  FunctionType fnType = getType();
   function_interface_impl::printFunctionOp(
-      p, op, fnType.getInputs(), /*isVariadic=*/false, fnType.getResults());
-}
-
-static LogicalResult verify(PyFuncOp op) {
-  // TODO: Enforce invariants.
-  return success();
+      p, *this, fnType.getInputs(), /*isVariadic=*/false, fnType.getResults());
 }
 
 //===----------------------------------------------------------------------===//
 // MakeListOp
 //===----------------------------------------------------------------------===//
 
-static LogicalResult verify(MakeListOp op) {
-  auto listType = op.list().getType().cast<ListType>();
+LogicalResult MakeListOp::verify() {
+  auto listType = list().getType().cast<ListType>();
   switch (listType.getStorageClass()) {
     case CollectionStorageClass::Boxed:
-      for (auto element : op.elements()) {
+      for (auto element : elements()) {
         if (!element.getType().isa<ObjectType>()) {
-          return op.emitOpError() << "making a list with boxed storage class "
-                                     "must have object elements. Got: "
-                                  << element.getType();
+          return emitOpError() << "making a list with boxed storage class "
+                                  "must have object elements. Got: "
+                               << element.getType();
         }
       }
       break;
     case CollectionStorageClass::Unboxed:
-      for (auto element : op.elements()) {
+      for (auto element : elements()) {
         if (element.getType().isa<ObjectType>()) {
-          return op.emitOpError() << "making a list with unboxed storage class "
-                                     "must not have object elements. Got: "
-                                  << element.getType();
+          return emitOpError() << "making a list with unboxed storage class "
+                                  "must not have object elements. Got: "
+                               << element.getType();
         }
       }
       break;
     case CollectionStorageClass::Empty:
-      if (!op.elements().empty()) {
-        return op.emitOpError()
+      if (!elements().empty()) {
+        return emitOpError()
                << "making a list with empty storage class must have zero "
                   "elements";
       }

@@ -47,7 +47,7 @@ hal.executable public @matmul_256x1024x128_div_sub {
         %19 = flow.dispatch.tensor.load %2, offsets = [0, 0], sizes = [256, 128], strides = [1, 1] : !flow.dispatch.tensor<readonly:256x128xf16> -> tensor<256x128xf16>
         %21 = flow.dispatch.tensor.load %3, offsets = [0, 0], sizes = [128, 1204], strides = [1, 1] : !flow.dispatch.tensor<readonly:128x1024xf16> -> tensor<128x1024xf16>
         %24 = linalg.init_tensor [256, 1024] : tensor<256x1024xf16>
-        %25 = linalg.fill(%cst, %24) : f16, tensor<256x1024xf16> -> tensor<256x1024xf16>
+        %25 = linalg.fill ins(%cst : f16) outs(%24 : tensor<256x1024xf16>) -> tensor<256x1024xf16>
         %26 = linalg.matmul ins(%19, %21 : tensor<256x128xf16>, tensor<128x1024xf16>) outs(%25 : tensor<256x1024xf16>) -> tensor<256x1024xf16>
         %27 = linalg.generic {
             indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>],

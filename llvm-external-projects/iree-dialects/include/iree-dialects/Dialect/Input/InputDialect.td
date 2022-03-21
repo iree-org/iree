@@ -61,17 +61,7 @@ def IREEInput_ListType : IREEInput_Type<"List"> {
 
   let parameters = (ins IREEInput_ElementTypeParameter:$elementType);
 
-  let printer = [{
-    $_printer << "<" << getElementType() << ">";
-  }];
-
-  let parser = [{
-    Type elementType;
-    if ($_parser.parseLess() || $_parser.parseType(elementType) ||
-        $_parser.parseGreater())
-      return Type();
-    return get($_ctxt, elementType);
-  }];
+  let hasCustomAssemblyFormat = 1;
 }
 
 def IREEInput_PtrType : IREEInput_Type<"Ptr"> {
@@ -80,17 +70,7 @@ def IREEInput_PtrType : IREEInput_Type<"Ptr"> {
   let summary = "Pointer to a concrete type";
   let parameters = (ins IREEInput_PtrTargetTypeParameter:$targetType);
 
-  let printer = [{
-    $_printer << "<" << getTargetType() << ">";
-  }];
-
-  let parser = [{
-    Type targetType;
-    if ($_parser.parseLess() || $_parser.parseType(targetType) ||
-        $_parser.parseGreater())
-      return Type();
-    return get($_ctxt, targetType);
-  }];
+  let hasCustomAssemblyFormat = 1;
 }
 
 #endif // IREE_DIALECTS_DIALECT_INPUT_DIALECT_TD

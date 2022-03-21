@@ -78,6 +78,6 @@ These steps help reproduce the failures in TFLite models.
    $ iree-import-tflite <tflite-file> -o <mlir-output-file>
    ```
 
-5. Then compile the input MLIR file with `iree-translate`. The exact flags used
+5. Then compile the input MLIR file with `iree-compile`. The exact flags used
    to compile and run the benchmarks can be found in
    [this CMakeLists.txt file](./TFLite/CMakeLists.txt).

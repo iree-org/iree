@@ -110,7 +110,7 @@ $ export RISCV_TOOLCHAIN_ROOT=<root directory of the RISC-V GNU toolchain>
 Translate a source MLIR into IREE module:
 
 ```shell
-$ ../iree-build-host/install/bin/iree-translate \
+$ ../iree-build-host/install/bin/iree-compile \
   -iree-mlir-to-vm-bytecode-module \
   -iree-hal-target-backends=vmvx \
   ${PWD}/iree/samples/models/simple_abs.mlir \
@@ -153,7 +153,7 @@ a RISC-V target we need to use the corresponding cross-compile toolchain.
 Translate a source MLIR into an IREE module:
 
 ```shell
-$ ../iree-build-host/install/bin/iree-translate \
+$ ../iree-build-host/install/bin/iree-compile \
   -iree-mlir-to-vm-bytecode-module \
   -iree-hal-target-backends=dylib-llvm-aot \
   -iree-llvm-target-triple=riscv64 \
@@ -189,7 +189,7 @@ Through IREE's vectorization pass and LLVM backend, we can generate RVV
 VLS(Vector Length Specific) style codes.
 
 ```shell
-$ ../iree-build-host/install/bin/iree-translate \
+$ ../iree-build-host/install/bin/iree-compile \
 -iree-mlir-to-vm-bytecode-module \
 -iree-hal-target-backends=dylib-llvm-aot \
 -iree-input-type=mhlo \

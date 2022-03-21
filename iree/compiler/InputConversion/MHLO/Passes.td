@@ -40,8 +40,6 @@ def MHLOToMHLOPreprocessing :
   let summary = "Apply mhlo to mhlo transformations for some mhlo ops";
   let constructor = "mlir::iree_compiler::MHLO::createMHLOToMHLOPreprocessingPass()";
   let options = [
-    Option<"extractPadFromConv", "extract-pad-from-conv", "bool", /*default=*/"true",
-           "Extract padding attributes from conv op">,
     Option<"orderConvFeatures", "order-conv-features", "bool", /*default=*/"true",
            "Guarantees input/output features ordered from conv kernel">
   ];

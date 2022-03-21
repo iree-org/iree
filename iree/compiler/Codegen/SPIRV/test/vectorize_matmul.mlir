@@ -28,7 +28,7 @@ func @matmul_2x128x4() {
       %10 = scf.for %arg2 = %c0 to %c2 step %c1 iter_args(%arg3 = %9) -> (tensor<2x128xf32>) {
         %11 = scf.for %arg4 = %c0 to %c128 step %c4 iter_args(%arg5 = %arg3) -> (tensor<2x128xf32>) {
           %12 = tensor.extract_slice %arg5[%arg2, %arg4] [1, 4] [1, 1] : tensor<2x128xf32> to tensor<1x4xf32>
-          %13 = linalg.fill(%cst, %12) {lowering_config = #config} : f32, tensor<1x4xf32> -> tensor<1x4xf32>
+          %13 = linalg.fill {lowering_config = #config} ins(%cst : f32) outs(%12 : tensor<1x4xf32>) -> tensor<1x4xf32>
           %14 = tensor.extract_slice %7[%arg2, 0] [1, 4] [1, 1] : tensor<2x4xf32> to tensor<1x4xf32>
           %15 = tensor.extract_slice %8[0, %arg4] [4, 4] [1, 1] : tensor<4x128xf32> to tensor<4x4xf32>
           %16 = linalg.matmul {lowering_config = #config} ins(%14, %15 : tensor<1x4xf32>, tensor<4x4xf32>) outs(%13 : tensor<1x4xf32>) -> tensor<1x4xf32>

@@ -84,7 +84,7 @@ struct ConcatenateOpConversion
           rewriter.createOrFold<arith::AddIOp>(loc, resultDimSize, size);
     }
     sizes[dim] = resultDimSize;
-    auto initTensor = rewriter.create<linalg::InitTensorOp>(
+    Value initTensor = rewriter.create<linalg::InitTensorOp>(
         loc, resultType.getShape(), resultType.getElementType());
     auto zeroAttr = rewriter.getZeroAttr(resultType.getElementType());
     Value zero = rewriter.create<arith::ConstantOp>(loc, zeroAttr);
@@ -146,7 +146,7 @@ Value createLinalgMatmulOnTensors(OpBuilder b, Location loc,
                                   Value rhs) {
   Value zero = b.create<arith::ConstantOp>(
       loc, b.getZeroAttr(resultType.getElementType()));
-  auto initTensor = b.create<linalg::InitTensorOp>(
+  Value initTensor = b.create<linalg::InitTensorOp>(
       loc, /*dyn_size=*/ValueRange{}, resultType.getShape(),
       resultType.getElementType());
   Value zeroTensor =

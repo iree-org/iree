@@ -19,7 +19,7 @@ EXPLICIT_TARGET_MAPPING = {
     "//llvm-external-projects/iree-dialects:IREELinalgExtDialect": [
         "IREELinalgExtDialect"
     ],
-    "//llvm-external-projects/iree-dialects:IREELinalgExtTransforms": [
+    "//llvm-external-projects/iree-dialects:IREELinalgExtPasses": [
         "IREELinalgExtPasses"
     ],
     "//llvm-external-projects/iree-dialects:IREEPyDMDialect": [
@@ -96,6 +96,22 @@ EXPLICIT_TARGET_MAPPING = {
         "ChloDialect",
         "MhloDialect",
         "MLIRMhloUtils",
+    ],
+    "@mlir-hlo//:hlo_legalize_shape_ops_to_standard": [
+        "tensorflow::external_mhlo_includes",
+        "MhloShapeOpsToStandard",
+    ],
+    "@mlir-hlo//:hlo_legalize_to_arithmetic": [
+        "tensorflow::external_mhlo_includes",
+        "MhloToArithmeticConversion",
+    ],
+    "@mlir-hlo//:hlo_legalize_to_lhlo": [
+        "tensorflow::external_mhlo_includes",
+        "MhloToLhloConversion",
+    ],
+    "@mlir-hlo//:hlo_legalize_to_memref": [
+        "tensorflow::external_mhlo_includes",
+        "MhloToMemrefConversion",
     ],
     "@mlir-hlo//:legalize_control_flow": [
         "tensorflow::external_mhlo_includes",

@@ -29,19 +29,18 @@ __all__ = [
 ]
 
 _BUILTIN_TOOLS = [
-    "ireec",
+    "iree-compile",
     "iree-lld",
-    "iree-translate",
 ]
 
 # In normal distribution circumstances, each named tool is associated with
 # a python module that provides a `get_tool` function for getting its absolute
 # path. This dictionary maps the tool name to the module.
 _TOOL_MODULE_MAP = {
-    # Note that ireec is builtin, but if not found, it can be resolved
+    # Note that iree-compile is builtin, but if not found, it can be resolved
     # in the external 'core' module. This is used for some outside packaging
     # options.
-    "ireec": "iree.tools.core",
+    "iree-compile": "iree.tools.core",
     "iree-lld": "iree.tools.core",
     "iree-import-tflite": "iree.tools.tflite",
     "iree-import-xla": "iree.tools.xla",
@@ -147,9 +146,6 @@ def find_tool(exe_name: str) -> str:
 
 
 def _get_builtin_tool(exe_name: str) -> Optional[str]:
-  # Transitional note: iree-translate is allowed and resolves to "ireec".
-  if exe_name == "iree-translate":
-    exe_name = "ireec"
   if platform.system() == "Windows":
     exe_name = exe_name + ".exe"
   this_path = os.path.dirname(__file__)

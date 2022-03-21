@@ -1,7 +1,7 @@
 // MNIST model with placeholder weights, for testing.
 
 // RUN: iree-run-mlir --iree-input-type=mhlo -iree-hal-target-backends=vmvx %s -function-input="1x28x28x1xf32" | FileCheck %s
-// RUN: [[ $IREE_LLVMAOT_DISABLE == 1 ]] || (iree-run-mlir --iree-input-type=mhlo -iree-hal-target-backends=dylib-llvm-aot %s -function-input="1x28x28x1xf32" | FileCheck %s)
+// RUN: iree-run-mlir --iree-input-type=mhlo -iree-hal-target-backends=dylib-llvm-aot %s -function-input="1x28x28x1xf32" | FileCheck %s
 // RUN: [[ $IREE_VULKAN_DISABLE == 1 ]] || (iree-run-mlir --iree-input-type=mhlo -iree-hal-target-backends=vulkan-spirv %s -function-input="1x28x28x1xf32" | FileCheck %s)
 
 module {
