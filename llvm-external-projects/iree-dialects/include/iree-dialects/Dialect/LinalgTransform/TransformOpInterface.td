@@ -1,15 +1,8 @@
-//===- TransformOpInterface.td - Interfaces for xform ops --*- tablegen -*-===//
+// Copyright 2021 The IREE Authors
 //
-// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
-//
-//===----------------------------------------------------------------------===//
-//
-// Defines interfaces and traits for operations representing controllable
-// transformations.
-//
-//===----------------------------------------------------------------------===//
 
 #ifndef TRANSFORM_OP_INTERFACE
 #define TRANSFORM_OP_INTERFACE

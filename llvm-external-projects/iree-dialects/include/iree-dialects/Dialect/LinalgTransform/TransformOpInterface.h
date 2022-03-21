@@ -1,10 +1,8 @@
-//===-- TransformOpInterface.h - Interface for transform ops ----*- C++ -*-===//
+// Copyright 2021 The IREE Authors
 //
-// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
-//
-//===----------------------------------------------------------------------===//
 
 #ifndef MLIR_DIALECT_LINALG_TRANSFORM_TRANSFORM_OP_INTERFACE_H
 #define MLIR_DIALECT_LINALG_TRANSFORM_TRANSFORM_OP_INTERFACE_H
@@ -152,7 +150,7 @@ public:
   /// a reference to TransformState as first argument, automatically supplied
   /// by this call.
   template <typename Ty, typename... Args>
-  Ty &addExtension(Args &&... args) {
+  Ty &addExtension(Args &&...args) {
     static_assert(
         std::is_base_of<Extension, Ty>::value,
         "only an class derived from TransformState::Extension is allowed here");
@@ -312,8 +310,8 @@ public:
   /// only result to correspond to the list of individual results.
   LogicalResult apply(TransformResults &transformResults,
                       TransformState &state) {
-    using TransformOpType = typename llvm::function_traits<decltype(
-        &OpTy::applyToOne)>::template arg_t<0>;
+    using TransformOpType = typename llvm::function_traits<
+        decltype(&OpTy::applyToOne)>::template arg_t<0>;
     ArrayRef<Operation *> targets =
         state.getPayloadOps(this->getOperation()->getOperand(0));
     SmallVector<Operation *> results;

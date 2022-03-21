@@ -1,16 +1,8 @@
-//===-- TransformInterpreter.cpp - Interpreter of Linalg transforms -------===//
+// Copyright 2021 The IREE Authors
 //
-// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
-//
-//===----------------------------------------------------------------------===//
-//
-// This files implements and interpreter pass for Linalg Transform dialect. This
-// pass reads a module consisting of transformable IR and transformation control
-// IR and applies the latter to the former.
-//
-//===----------------------------------------------------------------------===//
 
 #include "iree-dialects/Dialect/LinalgTransform/LinalgTransformOps.h"
 #include "iree-dialects/Dialect/LinalgTransform/Passes.h"

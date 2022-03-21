@@ -1,10 +1,8 @@
-//===-- FunctionalHelpers.h - Function rewrite helpers --------------------===//
+// Copyright 2021 The IREE Authors
 //
-// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
-//
-//===----------------------------------------------------------------------===//
 
 #include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/IR/PatternMatch.h"
@@ -31,10 +29,10 @@ struct ConvertOrForward<LinalgOp> {
 /// Wrap a call to a Linalg pattern where the input is a `LinalgOp` and the
 /// output is a `LinalgOp`.
 template <typename FunctionalLinalgPattern, typename... Args>
-auto callLinalgPattern(Args &&... args) {
+auto callLinalgPattern(Args &&...args) {
   FunctionalLinalgPattern pattern(std::forward<Args>(args)...);
-  using Traits = llvm::function_traits<decltype(
-      &FunctionalLinalgPattern::returningMatchAndRewrite)>;
+  using Traits = llvm::function_traits<
+      decltype(&FunctionalLinalgPattern::returningMatchAndRewrite)>;
   using OpT = typename Traits::template arg_t<0>;
   return
       [pattern = std::move(pattern)](

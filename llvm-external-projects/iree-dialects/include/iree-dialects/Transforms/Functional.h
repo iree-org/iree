@@ -1,10 +1,8 @@
-//===- Functional.h ---------------------------------------------*- C++ -*-===//
+// Copyright 2021 The IREE Authors
 //
-// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
-//
-//===----------------------------------------------------------------------===//
 
 #ifndef MLIR_REWRITE_FUNCTIONAL_H
 #define MLIR_REWRITE_FUNCTIONAL_H
@@ -64,7 +62,7 @@ public:
 /// the given arguments.
 template <typename OpT, typename PatternT, typename... Args,
           bool = PatternConcept<PatternT>::verify()>
-auto applyAt(OpT op, PatternT &&pattern, Args &&... args) {
+auto applyAt(OpT op, PatternT &&pattern, Args &&...args) {
   detail::SimpleRewriter rewriter(op->getContext());
   rewriter.setInsertionPoint(op);
   return pattern(op, rewriter, std::forward<Args>(args)...);
@@ -75,7 +73,7 @@ auto applyAt(OpT op, PatternT &&pattern, Args &&... args) {
 /// pattern rewriter.
 template <typename PatternT, typename... Args,
           bool = PatternConcept<PatternT>::verify()>
-auto applyOnceIn(Operation *scope, PatternT &&pattern, Args &&... args) {
+auto applyOnceIn(Operation *scope, PatternT &&pattern, Args &&...args) {
   assert(scope->hasTrait<OpTrait::IsIsolatedFromAbove>() &&
          "scope is not isolated from above");
   using Traits = llvm::function_traits<std::decay_t<PatternT>>;
@@ -116,7 +114,7 @@ struct UnpackFailureOr<FailureOr<NestedType>> {
 /// match at all.
 template <typename PatternT, typename... Args,
           bool = PatternConcept<PatternT>::verify()>
-auto applyForEachIn(Operation *scope, PatternT &&pattern, Args &&... args) {
+auto applyForEachIn(Operation *scope, PatternT &&pattern, Args &&...args) {
   using Traits = llvm::function_traits<std::decay_t<PatternT>>;
   using Unpack = detail::UnpackFailureOr<typename Traits::result_t>;
 
@@ -140,7 +138,7 @@ auto applyForEachIn(Operation *scope, PatternT &&pattern, Args &&... args) {
 /// Apply a pattern directly on an operation, for each operation in a list.
 template <typename ListT, typename PatternT, typename... Args,
           bool = PatternConcept<PatternT>::verify()>
-auto applyForEach(ListT &&list, PatternT &&pattern, Args &&... args) {
+auto applyForEach(ListT &&list, PatternT &&pattern, Args &&...args) {
   using Traits = llvm::function_traits<std::decay_t<PatternT>>;
   using Unpack = detail::UnpackFailureOr<typename Traits::result_t>;
 
@@ -280,8 +278,9 @@ struct GenericSequence : public std::tuple<UniqueFunctionTs...> {
 
       // The previous pattern succeeded. Unpack the results into a tuple to pass
       // as arguments to the next pattern.
-      auto args = UnpackIntoTuple<std::remove_reference_t<decltype(
-          *prevResult)>>::apply(std::move(*prevResult));
+      auto args =
+          UnpackIntoTuple<std::remove_reference_t<decltype(*prevResult)>>::
+              apply(std::move(*prevResult));
       // Grab the first result value as the operation.
       Operation *nextOp = std::get<0>(args);
       if (!detail::IsaOr<OpT>::apply(nextOp))
@@ -316,7 +315,7 @@ struct SequenceBuilder {
   /// caller and does not recurse.
   template <typename PatternT, typename... Args,
             bool = PatternConcept<PatternT>::verify()>
-  auto begin(PatternT &&pattern, Args &&... args) {
+  auto begin(PatternT &&pattern, Args &&...args) {
     using Traits = llvm::function_traits<std::decay_t<PatternT>>;
     using OpT = typename Traits::template arg_t<0>;
     using ResultT = typename Traits::result_t;
