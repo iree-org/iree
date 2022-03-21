@@ -126,8 +126,8 @@ static LogicalResult defaultDeallocationFn(OpBuilder &builder, Location loc,
 }
 static LogicalResult defaultMemCpyFn(OpBuilder &builder, Location loc,
                                      Value from, Value to) {
-  createLinalgCopyOp(builder, loc, from, to);
-  return success();
+  Operation *copyOp = createLinalgCopyOp(builder, loc, from, to);
+  return success(static_cast<bool>(copyOp));
 }
 
 std::unique_ptr<OperationPass<ModuleOp>> createIREEComprehensiveBufferizePass(

@@ -492,11 +492,15 @@ SmallVector<LoopTilingAndDistributionInfo> getTiledAndDistributedLoopInfo(
 /// memref::CopyOp.
 Operation *createLinalgCopyOp(OpBuilder &b, Location loc, Value from, Value to,
                               ArrayRef<NamedAttribute> attributes) {
-  auto memrefTypeFrom = from.getType().cast<MemRefType>();
-  auto memrefTypeTo = to.getType().cast<MemRefType>();
-  (void)memrefTypeFrom;
-  assert(memrefTypeFrom && memrefTypeTo &&
-         memrefTypeFrom.getRank() == memrefTypeTo.getRank());
+  auto memrefTypeFrom = from.getType().dyn_cast<MemRefType>();
+  auto memrefTypeTo = to.getType().dyn_cast<MemRefType>();
+  if (!memrefTypeFrom || !memrefTypeTo ||
+      memrefTypeFrom.getRank() != memrefTypeTo.getRank()) {
+    mlir::emitError(
+        loc, "unable to generate copy op within bufferization from type ")
+        << memrefTypeFrom << " to " << memrefTypeTo;
+    return nullptr;
+  }
   AffineMap id =
       AffineMap::getMultiDimIdentityMap(memrefTypeTo.getRank(), b.getContext());
   SmallVector<StringRef> iteratorTypes(memrefTypeTo.getRank(),
