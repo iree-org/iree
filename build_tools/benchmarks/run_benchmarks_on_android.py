@@ -687,6 +687,10 @@ def parse_arguments():
   return args
 
 
+def real_path_or_none(path: str) -> Optional[str]:
+  return os.path.realpath(path) if path else None
+
+
 def main(args):
   device_info = AndroidDeviceInfo.from_adb()
   if args.verbose:
@@ -743,13 +747,11 @@ def main(args):
   # Tracy client and server communicate over port 8086 by default. If we want
   # to capture traces along the way, forward port via adb.
   if do_capture:
-    execute_cmd_and_get_output(["adb", "forward", "tcp:8086", "tcp:8086"])
+    execute_cmd_and_get_output(["adb", "forward", "tcp:8086", "tcp:8086"],
+                               verbose=args.verbose)
     atexit.register(execute_cmd_and_get_output,
-                    ["adb", "forward", "--remove", "tcp:8086"])
-
-    args.traced_benchmark_tool_dir = os.path.realpath(
-        args.traced_benchmark_tool_dir)
-    args.trace_capture_tool = os.path.realpath(args.trace_capture_tool)
+                    ["adb", "forward", "--remove", "tcp:8086"],
+                    verbose=args.verbose)
 
   results = BenchmarkResults()
   commit = get_git_commit_hash("HEAD")
@@ -765,10 +767,10 @@ def main(args):
       model_name_filter=args.model_name_regex,
       mode_filter=args.mode_regex,
       tmp_dir=args.tmp_dir,
-      normal_benchmark_tool_dir=os.path.realpath(
+      normal_benchmark_tool_dir=real_path_or_none(
           args.normal_benchmark_tool_dir),
-      traced_benchmark_tool_dir=args.traced_benchmark_tool_dir,
-      trace_capture_tool=args.trace_capture_tool,
+      traced_benchmark_tool_dir=real_path_or_none(args.traced_benchmark_tool_dir),
+      trace_capture_tool=real_path_or_none(args.trace_capture_tool),
       skip_benchmarks=previous_benchmarks,
       skip_captures=previous_captures,
       do_capture=do_capture,
