@@ -2,6 +2,10 @@
 #  See https://llvm.org/LICENSE.txt for license information.
 #  SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+# Disable PyType, it does not seem to like the specialization pattern used in
+# MLIR.
+# pytype: skip-file
+
 try:
   from .. import ir
   from ..dialects import pdl
