@@ -228,7 +228,7 @@ def run_benchmarks_for_category(
     benchmark_category_dir: str,
     benchmark_case_dirs: Sequence[str],
     tmp_dir: str,
-    normal_benchmark_tool_dir: str,
+    normal_benchmark_tool_dir: Optional[str] = None,
     traced_benchmark_tool_dir: Optional[str] = None,
     trace_capture_tool: Optional[str] = None,
     skip_benchmarks: Optional[Set[str]] = None,
@@ -294,9 +294,10 @@ def run_benchmarks_for_category(
     # Read the file specifying which tool should be used for benchmarking
     with open(os.path.join(benchmark_case_dir, MODEL_TOOLFILE_NAME)) as f:
       tool = f.read().strip()
-      adb_push_to_tmp_dir(os.path.join(normal_benchmark_tool_dir, tool),
-                          relative_dir=NORMAL_TOOL_REL_DIR,
-                          verbose=verbose)
+      if normal_benchmark_tool_dir:
+        adb_push_to_tmp_dir(os.path.join(normal_benchmark_tool_dir, tool),
+                            relative_dir=NORMAL_TOOL_REL_DIR,
+                            verbose=verbose)
       if do_capture:
         adb_push_to_tmp_dir(os.path.join(traced_benchmark_tool_dir, tool),
                             relative_dir=TRACED_TOOL_REL_DIR,
@@ -322,7 +323,7 @@ def run_benchmarks_for_category(
                           verbose=verbose)
 
       benchmark_result_filename = None
-      if benchmark_key not in skip_benchmarks:
+      if normal_benchmark_tool_dir and benchmark_key not in skip_benchmarks:
         benchmark_results_basename = f"{benchmark_key}.json"
 
         cmd = [
@@ -454,7 +455,7 @@ def filter_and_run_benchmarks(
     model_name_filter: Optional[str],
     mode_filter: Optional[str],
     tmp_dir: str,
-    normal_benchmark_tool_dir: str,
+    normal_benchmark_tool_dir: Optional[str],
     traced_benchmark_tool_dir: Optional[str],
     trace_capture_tool: Optional[str],
     skip_benchmarks: Optional[Set[str]],
@@ -511,8 +512,9 @@ def filter_and_run_benchmarks(
 
   for directory in sorted(os.listdir(root_benchmark_dir)):
     benchmark_category_dir = os.path.join(root_benchmark_dir, directory)
-    available_drivers = get_available_drivers(
-        tool_dir=normal_benchmark_tool_dir, verbose=verbose)
+    any_tool_dir = normal_benchmark_tool_dir if normal_benchmark_tool_dir else traced_benchmark_tool_dir
+    available_drivers = get_available_drivers(tool_dir=any_tool_dir,
+                                              verbose=verbose)
     matched_benchmarks = filter_benchmarks_for_category(
         benchmark_category_dir=benchmark_category_dir,
         cpu_target_arch_filter=cpu_target_arch,
@@ -592,11 +594,12 @@ def parse_arguments():
       metavar="<build-dir>",
       type=check_dir_path,
       help="Path to the build directory containing benchmark suites")
-  parser.add_argument("--normal_benchmark_tool_dir",
-                      "--normal-benchmark-tool-dir",
-                      type=check_exe_path,
-                      required=True,
-                      help="Path to the normal iree tool directory")
+  parser.add_argument(
+      "--normal_benchmark_tool_dir",
+      "--normal-benchmark-tool-dir",
+      type=check_exe_path,
+      default=None,
+      help="Path to the normal (non-tracing) iree tool directory")
   parser.add_argument("--traced_benchmark_tool_dir",
                       "--traced-benchmark-tool-dir",
                       type=check_exe_path,
@@ -696,6 +699,11 @@ def main(args):
   if args.verbose:
     print(device_info)
 
+  if not args.normal_benchmark_tool_dir and not args.traced_benchmark_tool_dir:
+    raise ValueError(
+        "At least one of --normal_benchmark_tool_dir or --traced_benchmark_tool_dir should be specified."
+    )
+
   if device_info.cpu_abi.lower() not in CPU_ABI_TO_TARGET_ARCH_MAP:
     raise ValueError(f"Unrecognized CPU ABI: '{device_info.cpu_abi}'; "
                      "need to update the map")
@@ -769,7 +777,8 @@ def main(args):
       tmp_dir=args.tmp_dir,
       normal_benchmark_tool_dir=real_path_or_none(
           args.normal_benchmark_tool_dir),
-      traced_benchmark_tool_dir=real_path_or_none(args.traced_benchmark_tool_dir),
+      traced_benchmark_tool_dir=real_path_or_none(
+          args.traced_benchmark_tool_dir),
       trace_capture_tool=real_path_or_none(args.trace_capture_tool),
       skip_benchmarks=previous_benchmarks,
       skip_captures=previous_captures,
