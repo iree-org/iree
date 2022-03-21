@@ -8,7 +8,7 @@
 
 #include "iree-dialects/Dialect/LinalgTransform/TrackingCSE.h"
 
-#include "Transforms/ListenerCSE.h"
+#include "iree-dialects/Transforms/ListenerCSE.h"
 
 using namespace mlir;
 

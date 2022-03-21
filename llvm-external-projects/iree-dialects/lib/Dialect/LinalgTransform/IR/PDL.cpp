@@ -8,7 +8,7 @@
 
 #include "PDL.h"
 
-#include "Transforms/Functional.h"
+#include "iree-dialects/Transforms/Functional.h"
 #include "mlir/Dialect/Arithmetic/Utils/Utils.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/PDL/IR/PDLOps.h"

@@ -9,8 +9,8 @@
 #ifndef IREE_LLVM_SANDBOX_DIALECTS_LINALGTRANSFORM_TRANSFORMS_TRACKINGLISTENER_H
 #define IREE_LLVM_SANDBOX_DIALECTS_LINALGTRANSFORM_TRANSFORMS_TRACKINGLISTENER_H
 
-#include "Transforms/Listener.h"
 #include "iree-dialects/Dialect/LinalgTransform/TransformOpInterface.h"
+#include "iree-dialects/Transforms/Listener.h"
 
 namespace mlir {
 namespace linalg {

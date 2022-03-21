@@ -6,9 +6,9 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "Transforms/ListenerGreedyPatternRewriteDriver.h"
+#include "iree-dialects/Transforms/ListenerGreedyPatternRewriteDriver.h"
 
-#include "Transforms/Listener.h"
+#include "iree-dialects/Transforms/Listener.h"
 #include "mlir/Interfaces/SideEffectInterfaces.h"
 #include "mlir/Rewrite/PatternApplicator.h"
 #include "mlir/Transforms/FoldUtils.h"

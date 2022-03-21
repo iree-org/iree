@@ -13,8 +13,8 @@
 
 #include <type_traits>
 
-#include "Transforms/Functional.h"
 #include "iree-dialects/Dialect/LinalgTransform/TransformOpMapping.h"
+#include "iree-dialects/Transforms/Functional.h"
 
 namespace mlir {
 namespace linalg {
@@ -152,7 +152,7 @@ public:
   /// a reference to TransformState as first argument, automatically supplied
   /// by this call.
   template <typename Ty, typename... Args>
-  Ty &addExtension(Args &&... args) {
+  Ty &addExtension(Args &&...args) {
     static_assert(
         std::is_base_of<Extension, Ty>::value,
         "only an class derived from TransformState::Extension is allowed here");
@@ -312,8 +312,8 @@ public:
   /// only result to correspond to the list of individual results.
   LogicalResult apply(TransformResults &transformResults,
                       TransformState &state) {
-    using TransformOpType = typename llvm::function_traits<decltype(
-        &OpTy::applyToOne)>::template arg_t<0>;
+    using TransformOpType = typename llvm::function_traits<
+        decltype(&OpTy::applyToOne)>::template arg_t<0>;
     ArrayRef<Operation *> targets =
         state.getPayloadOps(this->getOperation()->getOperand(0));
     SmallVector<Operation *> results;

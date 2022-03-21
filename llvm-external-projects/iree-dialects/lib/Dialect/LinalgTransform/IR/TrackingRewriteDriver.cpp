@@ -8,7 +8,7 @@
 
 #include "iree-dialects/Dialect/LinalgTransform/TrackingRewriteDriver.h"
 
-#include "Transforms/ListenerGreedyPatternRewriteDriver.h"
+#include "iree-dialects/Transforms/ListenerGreedyPatternRewriteDriver.h"
 
 using namespace mlir;
 

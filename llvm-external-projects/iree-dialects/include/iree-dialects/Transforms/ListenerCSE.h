@@ -9,7 +9,7 @@
 #ifndef LLVM_IREE_SANDBOX_TRANSFORMS_LISTENERCSE_H
 #define LLVM_IREE_SANDBOX_TRANSFORMS_LISTENERCSE_H
 
-#include "Transforms/Listener.h"
+#include "iree-dialects/Transforms/Listener.h"
 
 namespace mlir {
 class DominanceInfo;

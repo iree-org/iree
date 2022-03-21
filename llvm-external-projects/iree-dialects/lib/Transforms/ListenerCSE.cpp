@@ -6,7 +6,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "Transforms/ListenerCSE.h"
+#include "iree-dialects/Transforms/ListenerCSE.h"
 
 #include <deque>
 

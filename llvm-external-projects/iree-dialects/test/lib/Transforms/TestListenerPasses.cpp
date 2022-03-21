@@ -6,9 +6,9 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "Transforms/Listener.h"
-#include "Transforms/ListenerCSE.h"
-#include "Transforms/ListenerGreedyPatternRewriteDriver.h"
+#include "iree-dialects/Transforms/Listener.h"
+#include "iree-dialects/Transforms/ListenerCSE.h"
+#include "iree-dialects/Transforms/ListenerGreedyPatternRewriteDriver.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
