@@ -29,10 +29,10 @@ struct ConvertOrForward<LinalgOp> {
 /// Wrap a call to a Linalg pattern where the input is a `LinalgOp` and the
 /// output is a `LinalgOp`.
 template <typename FunctionalLinalgPattern, typename... Args>
-auto callLinalgPattern(Args &&...args) {
+auto callLinalgPattern(Args &&... args) {
   FunctionalLinalgPattern pattern(std::forward<Args>(args)...);
-  using Traits = llvm::function_traits<
-      decltype(&FunctionalLinalgPattern::returningMatchAndRewrite)>;
+  using Traits = llvm::function_traits<decltype(
+      &FunctionalLinalgPattern::returningMatchAndRewrite)>;
   using OpT = typename Traits::template arg_t<0>;
   return
       [pattern = std::move(pattern)](
