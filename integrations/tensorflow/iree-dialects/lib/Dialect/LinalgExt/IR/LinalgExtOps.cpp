@@ -1625,7 +1625,7 @@ SmallVector<ParallelInsertSliceOp> PerformConcurrentlyOp::yieldingOps() {
     if (auto endPerformOp = llvm::dyn_cast<EndPerformConcurrentlyOp>(op)) {
       continue;
     }
-    llvm_unreachable("Unexpected operation in perform_concurrently");
+    assert(false, "Unexpected operation in perform_concurrently");
   }
   return ret;
 }

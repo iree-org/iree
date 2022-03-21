@@ -144,9 +144,9 @@ enum class BuiltinTypeCode : int {
   FirstCustom = 0x101,
 };
 
-}  // namespace PYDM
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace PYDM
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_DIALECTS_DIALECT_PYDM_IR_CONSTANTS_H
+#endif // IREE_DIALECTS_DIALECT_PYDM_IR_CONSTANTS_H

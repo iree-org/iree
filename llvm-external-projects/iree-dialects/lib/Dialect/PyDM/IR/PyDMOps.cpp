@@ -7,14 +7,14 @@
 #include "iree-dialects/Dialect/PyDM/IR/PyDMOps.h"
 
 #include "iree-dialects/Dialect/PyDM/IR/PyDMDialect.h"
-#include "llvm/ADT/SmallSet.h"
-#include "llvm/ADT/TypeSwitch.h"
-#include "llvm/Support/Debug.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/FunctionImplementation.h"
 #include "mlir/IR/OpImplementation.h"
 #include "mlir/IR/TypeUtilities.h"
+#include "llvm/ADT/SmallSet.h"
+#include "llvm/ADT/TypeSwitch.h"
+#include "llvm/Support/Debug.h"
 
 using namespace mlir;
 namespace PYDM = mlir::iree_compiler::IREE::PYDM;
@@ -50,7 +50,8 @@ struct UnboxOperands : public RewritePattern {
     for (int operandIndex = 0, e = operands.size(); operandIndex < e;
          ++operandIndex) {
       Value &operand = operands[operandIndex];
-      if (operandIndices && !operandIndices->contains(operandIndex)) continue;
+      if (operandIndices && !operandIndices->contains(operandIndex))
+        continue;
       if (auto objectType = operand.getType().dyn_cast<ObjectType>()) {
         Type primitiveType = objectType.getPrimitiveType();
         if (primitiveType) {
@@ -73,7 +74,7 @@ struct UnboxOperands : public RewritePattern {
   Optional<llvm::SmallSet<int, 4>> operandIndices;
 };
 
-}  // namespace
+} // namespace
 
 static Value getNumericZeroConstant(Location loc, Type numericType,
                                     OpBuilder &builder) {
@@ -132,7 +133,8 @@ struct ApplyBinaryToSequenceClone : public OpRewritePattern<ApplyBinaryOp> {
   using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(ApplyBinaryOp op,
                                 PatternRewriter &rewriter) const override {
-    if (op.dunder_name() != "mul") return failure();
+    if (op.dunder_name() != "mul")
+      return failure();
     Value listOperand;
     Value countOperand;
     if (isBuiltinSequence(op.left()) && isInteger(op.right())) {
@@ -157,7 +159,7 @@ struct ApplyBinaryToSequenceClone : public OpRewritePattern<ApplyBinaryOp> {
     return operand.getType().isa<PYDM::IntegerType>();
   }
 };
-}  // namespace
+} // namespace
 
 void ApplyBinaryOp::getCanonicalizationPatterns(RewritePatternSet &patterns,
                                                 MLIRContext *context) {
@@ -219,7 +221,7 @@ void ApplyCompareOp::getCanonicalizationPatterns(RewritePatternSet &patterns,
 
 namespace {
 struct FoldAsBoolFromBool : public OpRewritePattern<AsBoolOp> {
- public:
+public:
   using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(AsBoolOp op,
                                 PatternRewriter &rewriter) const override {
@@ -232,14 +234,16 @@ struct FoldAsBoolFromBool : public OpRewritePattern<AsBoolOp> {
 };
 
 struct FoldAsBoolFromNumeric : public OpRewritePattern<AsBoolOp> {
- public:
+public:
   using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(AsBoolOp op,
                                 PatternRewriter &rewriter) const override {
     auto loc = op.getLoc();
     auto ptType = op.value().getType().dyn_cast<PythonTypeInterface>();
-    if (!ptType) return failure();
-    if (!ptType.getNumericPromotionOrder()) return failure();
+    if (!ptType)
+      return failure();
+    if (!ptType.getNumericPromotionOrder())
+      return failure();
 
     auto boolType = rewriter.getType<BoolType>();
     Value zeroValue =
@@ -254,7 +258,7 @@ struct FoldAsBoolFromNumeric : public OpRewritePattern<AsBoolOp> {
   }
 };
 
-}  // namespace
+} // namespace
 
 void AsBoolOp::getCanonicalizationPatterns(RewritePatternSet &patterns,
                                            MLIRContext *context) {
@@ -288,7 +292,8 @@ void AssignSubscriptOp::getCanonicalizationPatterns(RewritePatternSet &patterns,
 //===----------------------------------------------------------------------===//
 
 OpFoldResult BoolToPredOp::fold(ArrayRef<Attribute> operands) {
-  if (!operands[0]) return {};
+  if (!operands[0])
+    return {};
   // Since both BoolType and I1 share the attribute form (an IntegerAttr of I1),
   // we can just return it.
   return operands[0];
@@ -351,7 +356,7 @@ namespace {
 /// or insert specific PromoteNumeric ops.
 struct ResolveNumericDynamicBinaryPromote
     : public OpRewritePattern<DynamicBinaryPromoteOp> {
- public:
+public:
   using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(DynamicBinaryPromoteOp op,
                                 PatternRewriter &rewriter) const override {
@@ -362,7 +367,8 @@ struct ResolveNumericDynamicBinaryPromote
     auto rightResultType = op.getResultTypes()[1];
     auto leftPt = leftType.dyn_cast<PythonTypeInterface>();
     auto rightPt = rightType.dyn_cast<PythonTypeInterface>();
-    if (!leftPt || !rightPt) return failure();
+    if (!leftPt || !rightPt)
+      return failure();
 
     Optional<int> leftOrder = leftPt.getNumericPromotionOrder();
     Optional<int> rightOrder = rightPt.getNumericPromotionOrder();
@@ -395,7 +401,7 @@ struct ResolveNumericDynamicBinaryPromote
 /// numeric type, then the op has no meaning and is elided.
 struct ElideNonNumericDynamicBinaryPromote
     : public OpRewritePattern<DynamicBinaryPromoteOp> {
- public:
+public:
   using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(DynamicBinaryPromoteOp op,
                                 PatternRewriter &rewriter) const override {
@@ -415,14 +421,16 @@ struct ElideNonNumericDynamicBinaryPromote
   }
 
   static bool isConcreteNonNumericType(Type t) {
-    if (t.isa<ObjectType>()) return false;
+    if (t.isa<ObjectType>())
+      return false;
     auto pt = t.dyn_cast<PythonTypeInterface>();
-    if (!pt || pt.getNumericPromotionOrder()) return false;
+    if (!pt || pt.getNumericPromotionOrder())
+      return false;
     return true;
   }
 };
 
-}  // namespace
+} // namespace
 
 void DynamicBinaryPromoteOp::getCanonicalizationPatterns(
     RewritePatternSet &patterns, MLIRContext *context) {
@@ -456,7 +464,8 @@ ParseResult FunctionalIfOp::parse(OpAsmParser &parser, OperationState &result) {
       parser.resolveOperand(cond, conditionType, result.operands))
     return failure();
   // Parse optional results type list.
-  if (parser.parseOptionalArrowTypeList(result.types)) return failure();
+  if (parser.parseOptionalArrowTypeList(result.types))
+    return failure();
   // Parse the 'then' region.
   if (parser.parseRegion(*thenRegion, /*arguments=*/{}, /*argTypes=*/{}))
     return failure();
@@ -471,7 +480,8 @@ ParseResult FunctionalIfOp::parse(OpAsmParser &parser, OperationState &result) {
   }
 
   // Parse the optional attribute list.
-  if (parser.parseOptionalAttrDict(result.attributes)) return failure();
+  if (parser.parseOptionalAttrDict(result.attributes))
+    return failure();
   return success();
 }
 
@@ -518,7 +528,8 @@ void FunctionalIfOp::getSuccessorRegions(
 
   // Don't consider the else region if it is empty.
   Region *elseRegion = &this->elseRegion();
-  if (elseRegion->empty()) elseRegion = nullptr;
+  if (elseRegion->empty())
+    elseRegion = nullptr;
 
   // Otherwise, the successor is dependent on the condition.
   if (auto condAttr = operands.front().dyn_cast_or_null<BoolAttr>()) {
@@ -529,7 +540,8 @@ void FunctionalIfOp::getSuccessorRegions(
     // If the condition isn't constant, both regions may be executed.
     regions.push_back(RegionSuccessor(&thenRegion()));
     // If the else region does not exist, it is not a viable successor.
-    if (elseRegion) regions.push_back(RegionSuccessor(elseRegion));
+    if (elseRegion)
+      regions.push_back(RegionSuccessor(elseRegion));
   }
 }
 
@@ -567,31 +579,31 @@ void PyFuncOp::print(OpAsmPrinter &p) {
 LogicalResult MakeListOp::verify() {
   auto listType = list().getType().cast<ListType>();
   switch (listType.getStorageClass()) {
-    case CollectionStorageClass::Boxed:
-      for (auto element : elements()) {
-        if (!element.getType().isa<ObjectType>()) {
-          return emitOpError() << "making a list with boxed storage class "
-                                  "must have object elements. Got: "
-                               << element.getType();
-        }
+  case CollectionStorageClass::Boxed:
+    for (auto element : elements()) {
+      if (!element.getType().isa<ObjectType>()) {
+        return emitOpError() << "making a list with boxed storage class "
+                                "must have object elements. Got: "
+                             << element.getType();
       }
-      break;
-    case CollectionStorageClass::Unboxed:
-      for (auto element : elements()) {
-        if (element.getType().isa<ObjectType>()) {
-          return emitOpError() << "making a list with unboxed storage class "
-                                  "must not have object elements. Got: "
-                               << element.getType();
-        }
+    }
+    break;
+  case CollectionStorageClass::Unboxed:
+    for (auto element : elements()) {
+      if (element.getType().isa<ObjectType>()) {
+        return emitOpError() << "making a list with unboxed storage class "
+                                "must not have object elements. Got: "
+                             << element.getType();
       }
-      break;
-    case CollectionStorageClass::Empty:
-      if (!elements().empty()) {
-        return emitOpError()
-               << "making a list with empty storage class must have zero "
-                  "elements";
-      }
-      break;
+    }
+    break;
+  case CollectionStorageClass::Empty:
+    if (!elements().empty()) {
+      return emitOpError()
+             << "making a list with empty storage class must have zero "
+                "elements";
+    }
+    break;
   }
   return success();
 }
@@ -617,8 +629,8 @@ bool NegOp::refineResultTypes() {
 // PatternMatchCallOp
 //===----------------------------------------------------------------------===//
 
-LogicalResult PatternMatchCallOp::verifySymbolUses(
-    SymbolTableCollection &symbolTable) {
+LogicalResult
+PatternMatchCallOp::verifySymbolUses(SymbolTableCollection &symbolTable) {
   auto verifySymbols = [&](ArrayAttr symbols) -> LogicalResult {
     for (auto symbolAttr : symbols) {
       auto symbol = symbolAttr.cast<FlatSymbolRefAttr>();
@@ -634,13 +646,15 @@ LogicalResult PatternMatchCallOp::verifySymbolUses(
   if (!genericsAttr)
     return emitOpError(
         "requires a 'generic_match' array of symbol reference attributes");
-  if (failed(verifySymbols(genericsAttr))) return failure();
+  if (failed(verifySymbols(genericsAttr)))
+    return failure();
 
   auto specificsAttr = (*this)->getAttrOfType<ArrayAttr>("specific_match");
   if (!specificsAttr)
     return emitOpError(
         "requires a 'specific_match' array of symbol reference attributes");
-  if (failed(verifySymbols(specificsAttr))) return failure();
+  if (failed(verifySymbols(specificsAttr)))
+    return failure();
 
   return success();
 }
@@ -650,7 +664,8 @@ LogicalResult PatternMatchCallOp::verifySymbolUses(
 //===----------------------------------------------------------------------===//
 
 OpFoldResult PromoteNumericOp::fold(ArrayRef<Attribute> operands) {
-  if (!operands[0]) return {};
+  if (!operands[0])
+    return {};
 
   Builder b(getContext());
   Attribute fromAttr = operands[0];
@@ -703,7 +718,8 @@ LogicalResult PYDM::RaiseOnFailureOp::canonicalize(RaiseOnFailureOp op,
 //===----------------------------------------------------------------------===//
 
 OpFoldResult SelectOp::fold(ArrayRef<Attribute> operands) {
-  if (!operands[0]) return {};
+  if (!operands[0])
+    return {};
 
   BoolAttr boolAttr = operands[0].cast<BoolAttr>();
   if (boolAttr.getValue())
@@ -783,8 +799,8 @@ FunctionType PyCallOp::getCalleeType() {
 // DynamicCallOp
 //===----------------------------------------------------------------------===//
 
-LogicalResult DynamicCallOp::verifySymbolUses(
-    SymbolTableCollection &symbolTable) {
+LogicalResult
+DynamicCallOp::verifySymbolUses(SymbolTableCollection &symbolTable) {
   // Check that the callee attribute was specified.
   auto fnAttr = (*this)->getAttrOfType<FlatSymbolRefAttr>("callee");
   if (!fnAttr)

@@ -8,7 +8,7 @@ func @pad_tensor(%arg0 : tensor<?x?xf32>, %arg1 : index, %arg2 : index,
   %0 = tensor.pad %arg0 low[%arg1, %arg2] high[%arg3, %arg4] {
     ^bb0(%arg6 : index, %arg7 : index):
       tensor.yield %arg5 : f32
-  } {__internal_linalg_transform__ = "tiling_input"}
+  } {__internal_iree_linalg_transform__ = "tiling_input"}
       :  tensor<?x?xf32> to tensor<?x?xf32>
   return %0 : tensor<?x?xf32>
 }

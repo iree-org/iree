@@ -19,12 +19,12 @@ namespace PYDM {
 
 enum class BuiltinTypeCode;
 
-}  // namespace PYDM
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace PYDM
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir
 
 #include "iree-dialects/Dialect/PyDM/IR/PyDMOpInterfaces.h.inc"
 #include "iree-dialects/Dialect/PyDM/IR/PyDMTypeInterfaces.h.inc"
 
-#endif  // IREE_DIALECTS_DIALECT_PYDM_IR_PYDM_INTERFACES_H
+#endif // IREE_DIALECTS_DIALECT_PYDM_IR_PYDM_INTERFACES_H

@@ -16,4 +16,4 @@
 #define GET_TYPEDEF_CLASSES
 #include "iree-dialects/Dialect/Input/InputTypes.h.inc"
 
-#endif  // IREE_DIALECTS_DIALECT_INPUT_DIALECT_H
+#endif // IREE_DIALECTS_DIALECT_INPUT_DIALECT_H

@@ -1,10 +1,8 @@
-//===- Utils.cpp - LinalgExt transform utils ------------------------------===//
+// Copyright 2021 The IREE Authors
 //
-// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
-//
-//===----------------------------------------------------------------------===//
 
 #include "iree-dialects/Dialect/LinalgExt/Transforms/Utils.h"
 
@@ -36,7 +34,8 @@ void mlir::iree_compiler::IREE::LinalgExt::completeOffsetsSizesAndStrides(
   offsets = SmallVector<Value>(leadingOffsets.begin(), leadingOffsets.end());
   sizes = SmallVector<Value>(leadingSizes.begin(), leadingSizes.end());
   strides = SmallVector<Value>(leadingStrides.begin(), leadingStrides.end());
-  if (leadingRank >= tensorRank) return;
+  if (leadingRank >= tensorRank)
+    return;
   Value zero = b.create<arith::ConstantIndexOp>(loc, 0);
   Value one = b.create<arith::ConstantIndexOp>(loc, 1);
   for (int64_t i = leadingRank, e = tensorRank; i < e; ++i) {
