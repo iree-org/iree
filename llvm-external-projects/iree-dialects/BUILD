@@ -148,6 +148,8 @@ cc_library(
     deps = [
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:Rewrite",
+        "@llvm-project//mlir:Transforms",
     ],
 )
 
@@ -353,6 +355,7 @@ cc_library(
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:Affine",
         "@llvm-project//mlir:ArithmeticDialect",
+        "@llvm-project//mlir:Async",
         "@llvm-project//mlir:BufferizationDialect",
         "@llvm-project//mlir:DialectUtils",
         "@llvm-project//mlir:FuncDialect",
@@ -655,6 +658,7 @@ cc_library(
         "@llvm-project//mlir:AsyncToLLVM",
         "@llvm-project//mlir:FuncToLLVM",
         "@llvm-project//mlir:LinalgToLLVM",
+        "@llvm-project//mlir:LinalgToStandard",
         "@llvm-project//mlir:MathToLLVM",
         "@llvm-project//mlir:MemRefToLLVM",
         "@llvm-project//mlir:SCFToControlFlow",
