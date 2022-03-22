@@ -298,7 +298,7 @@ static bool hasNonScfForControlFlow(func::FuncOp funcOp) {
   return funcOp
       ->walk([&](Operation *op) {
         if (isa<BranchOpInterface>(op) || isa<RegionBranchOpInterface>(op)) {
-          if (!isa<scf::ForOp, scf::IfOp>(op) &&
+          if (!isa<scf::ForOp, scf::IfOp>(op) && !isa<linalg::LinalgOp>(op) &&
               !isa<IREE::Flow::DispatchWorkgroupsOp>(op))
             return WalkResult::interrupt();
         }
