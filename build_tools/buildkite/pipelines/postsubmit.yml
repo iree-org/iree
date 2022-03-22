@@ -18,16 +18,22 @@ steps:
 
   - wait
 
-  - label: "Checking for later builds of this pipeline"
+  - label: "Checking if pipelines should be updated"
+    key: "update-pipelines"
     commands: |
       export BUILDKITE_ACCESS_TOKEN="$(gcloud secrets versions access latest \
           --secret=iree-buildkite-privileged)"
       # Note that dollar sign has to be escaped to avoid Buildkite trying to do
       # a substitution.
-      ./build_tools/buildkite/scripts/check_for_later_build.py || ret=\$?
+      ./build_tools/buildkite/scripts/check_for_later_completed_build.py || ret=\$?
       if (( ret == 2 )); then
+        # There is a later instance of this build running. Do nothing.
+        exit 0
+      elif (( ret == 0 )); then
+        # There is no later instance of this build that has completed
         buildkite-agent pipeline upload \
             ./build_tools/buildkite/pipelines/update_pipelines.yml
+        exit 0
       fi
       exit $ret
 
