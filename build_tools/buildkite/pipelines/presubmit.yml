@@ -10,12 +10,12 @@ agents:
   queue: "orchestration"
   security: "submitted"
 
-# We're not checking out from the PR and besides saving time, we really
-# don't want to because we don't want unsubmitted code on these executors at
-# all.
 plugins:
-  - thedyrt/skip-checkout#0870506e0b5d4becc164c6e64dbc331938f0bdcf:
-      cd: /tmp/
+  - https://github.com/GMNGeoffrey/smooth-checkout-buildkite-plugin#configurable-dirs
+      repos:
+        - config:
+          - url: ${BUILDKITE_REPO}
+            ref: ${BUILDKITE_PIPELINE_DEFAULT_BRANCH}
 
 # TODO: make it possible to test this pipeline on presubmit.
 
@@ -24,12 +24,9 @@ steps:
   # Buildkite)?
   - label: ":face_with_monocle: :admission_tickets: :raised_hand: Checking CLA"
     commands: |
-      curl \
-          https://raw.githubusercontent.com/google/iree/main/build_tools/buildkite/scripts/check_cla.py \
-          | python3 - ${BUILDKITE_COMMIT} \
-      || curl \
-          https://raw.githubusercontent.com/google/iree/main/build_tools/buildkite/pipelines/cla_failure.yml \
-          | buildkite-agent pipeline upload
+      ./build_tools/buildkite/scripts/check_cla.py ${BUILDKITE_COMMIT} \
+          || buildkite-agent pipeline upload \
+              build_tools/buildkite/pipelines/cla_failure.yml
 
   - wait
 
@@ -37,6 +34,4 @@ steps:
     commands: |
       export BUILDKITE_ACCESS_TOKEN="$(gcloud secrets versions access latest \
           --secret=iree-buildkite-presubmit-pipelines)"
-      curl \
-          https://raw.githubusercontent.com/google/iree/main/build_tools/buildkite/scripts/wait_for_pipeline_success.py \
-          | python3 - gcmn-test-pipeline
+      ./build_tools/buildkite/scripts/wait_for_pipeline_success.py gcmn-test-pipeline
