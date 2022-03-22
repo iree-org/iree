@@ -43,9 +43,8 @@ import sys
 from typing import Any, Dict, List, Optional, Sequence, Tuple, TextIO, Set
 
 from common.benchmark_definition import (
-    AndroidDeviceInfo, BenchmarkInfo, BenchmarkResults, BenchmarkRun,
-    execute_cmd, execute_cmd_and_get_output, get_android_device_model,
-    get_android_gpu_name, IREE_PRETTY_NAMES_TO_DRIVERS)
+    DeviceType, DeviceInfo, BenchmarkInfo, BenchmarkResults, BenchmarkRun,
+    execute_cmd, execute_cmd_and_get_output)
 from common.benchmark_suite import (BENCHMARK_SUITE_REL_PATH,
                                     compose_info_object,
                                     filter_benchmarks_for_category)
@@ -89,6 +88,50 @@ def get_git_commit_hash(commit: str) -> str:
   return execute_cmd_and_get_output(['git', 'rev-parse', commit],
                                     cwd=os.path.dirname(
                                         os.path.realpath(__file__)))
+
+
+def get_android_device_model(verbose: bool = False) -> str:
+  """Returns the Android device model."""
+  model = execute_cmd_and_get_output(
+      ["adb", "shell", "getprop", "ro.product.model"], verbose=verbose)
+  model = re.sub(r"\W+", "-", model)
+  return model
+
+
+def get_android_cpu_abi(verbose: bool = False) -> str:
+  """Returns the CPU ABI for the Android device."""
+  return execute_cmd_and_get_output(
+      ["adb", "shell", "getprop", "ro.product.cpu.abi"], verbose=verbose)
+
+
+def get_android_cpu_features(verbose: bool = False) -> Sequence[str]:
+  """Returns the CPU features for the Android device."""
+  cpuinfo = execute_cmd_and_get_output(["adb", "shell", "cat", "/proc/cpuinfo"],
+                                       verbose=verbose)
+  features = []
+  for line in cpuinfo.splitlines():
+    if line.startswith("Features"):
+      _, features = line.split(":")
+      return features.strip().split()
+  return features
+
+
+def get_android_gpu_name(verbose: bool = False) -> str:
+  """Returns the GPU name for the Android device."""
+  vkjson = execute_cmd_and_get_output(["adb", "shell", "cmd", "gpu", "vkjson"],
+                                      verbose=verbose)
+  vkjson = json.loads(vkjson)
+  name = vkjson["devices"][0]["properties"]["deviceName"]
+
+  # Perform some canonicalization:
+
+  # - Adreno GPUs have raw names like "Adreno (TM) 650".
+  name = name.replace("(TM)", "")
+
+  # Replace all consecutive non-word characters with a single hypen.
+  name = re.sub(r"\W+", "-", name)
+
+  return name
 
 
 def adb_push_to_tmp_dir(content: str,
@@ -223,7 +266,7 @@ def push_vmfb_files(benchmark_case_dirs: Sequence[str], root_benchmark_dir: str,
 
 
 def run_benchmarks_for_category(
-    device_info: AndroidDeviceInfo,
+    device_info: DeviceInfo,
     root_benchmark_dir: str,
     benchmark_category_dir: str,
     benchmark_case_dirs: Sequence[str],
@@ -241,7 +284,7 @@ def run_benchmarks_for_category(
   """Runs all benchmarks on the Android device and reports results and captures.
 
   Args:
-    device_info: an AndroidDeviceInfo object.
+    device_info: an DeviceInfo object.
     root_benchmark_dir: path to the benchmark suite within the root build dir
     benchmark_category_dir: the directory to a specific benchmark category.
     benchmark_case_dirs: a list of benchmark case directories.
@@ -449,7 +492,7 @@ def get_available_drivers(tool_dir: str, verbose: bool) -> Sequence[str]:
 
 
 def filter_and_run_benchmarks(
-    device_info: AndroidDeviceInfo,
+    device_info: DeviceInfo,
     root_build_dir: str,
     driver_filter: Optional[str],
     model_name_filter: Optional[str],
@@ -467,7 +510,7 @@ def filter_and_run_benchmarks(
   """Filters and runs benchmarks in all categories for the given device.
 
   Args:
-    device_info: an AndroidDeviceInfo object.
+    device_info: an DeviceInfo object.
     root_build_dir: the root build directory containing the built benchmark
       suites.
     driver_filter: filter benchmarks to those whose driver matches this regex
@@ -549,7 +592,8 @@ def filter_and_run_benchmarks(
 
 
 def set_cpu_frequency_scaling_governor(governor: str):
-  git_root = execute_cmd_and_get_output(["git", "rev-parse", "--show-toplevel"])
+  git_root = execute_cmd_and_get_output(
+      ["git", "rev-parse", "--show-toplevel"])
   cpu_script = os.path.join(git_root, "build_tools", "benchmarks",
                             "set_android_scaling_governor.sh")
   android_path = adb_push_to_tmp_dir(cpu_script)
@@ -557,7 +601,8 @@ def set_cpu_frequency_scaling_governor(governor: str):
 
 
 def set_gpu_frequency_scaling_policy(policy: str):
-  git_root = execute_cmd_and_get_output(["git", "rev-parse", "--show-toplevel"])
+  git_root = execute_cmd_and_get_output(
+      ["git", "rev-parse", "--show-toplevel"])
   device_model = get_android_device_model()
   gpu_name = get_android_gpu_name()
   if device_model == "Pixel-6" or device_model == "Pixel-6-Pro":
@@ -694,8 +739,16 @@ def real_path_or_none(path: str) -> Optional[str]:
   return os.path.realpath(path) if path else None
 
 
+def get_device_info_from_adb(verbose: bool = False):
+  return DeviceInfo(DeviceType.ANDROID,
+                    get_android_device_model(verbose),
+                    get_android_cpu_abi(verbose),
+                    get_android_cpu_features(verbose),
+                    get_android_gpu_name(verbose))
+
+
 def main(args):
-  device_info = AndroidDeviceInfo.from_adb()
+  device_info = get_device_info_from_adb()
   if args.verbose:
     print(device_info)
 
