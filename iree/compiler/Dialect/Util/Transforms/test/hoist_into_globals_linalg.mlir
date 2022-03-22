@@ -7,7 +7,7 @@
 module @compute_hoisted {
   // CHECK: util.global private @[[HOISTED:.*]] : tensor<5x6xf32>
   // CHECK: func @main
-  builtin.func @main() -> (tensor<5x6xf32>) {
+  func.func @main() -> (tensor<5x6xf32>) {
     %cst_0 = arith.constant dense<1.270000e+02> : tensor<f32>
 
     // A non-leaf broadcast.
@@ -42,7 +42,7 @@ module @compute_hoisted {
 module @broadcast_treated_as_leaf {
   // CHECK-NOT: util.global
   // CHECK: func @main
-  builtin.func @main() -> (tensor<5x6xf32>) {
+  func.func @main() -> (tensor<5x6xf32>) {
     %cst_0 = arith.constant dense<1.270000e+02> : tensor<f32>
     // CHECK: linalg.init_tensor
     %0 = linalg.init_tensor [5, 6] : tensor<5x6xf32>

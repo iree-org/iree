@@ -294,7 +294,7 @@ hal.executable @vector_add_dispatch {
 hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
   hal.executable.entry_point @vector_add_dispatch layout(#executable_layout)
   builtin.module {
-    builtin.func @vector_add_dispatch() {
+    func.func @vector_add_dispatch() {
       %c0 = arith.constant 0 : index
       %c16384 = arith.constant 16384 : index
       %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<readonly:16384xf32>
@@ -343,7 +343,7 @@ hal.executable @vector_reduction_dispatch {
 hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
   hal.executable.entry_point @vector_reduction_dispatch layout(#executable_layout)
   builtin.module {
-    builtin.func @vector_reduction_dispatch() {
+    func.func @vector_reduction_dispatch() {
       %c0 = arith.constant 0 : index
       %c16384 = arith.constant 16384 : index
       %cst = arith.constant 1.000000e+00 : f32

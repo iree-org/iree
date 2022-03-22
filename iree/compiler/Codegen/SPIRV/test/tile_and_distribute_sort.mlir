@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -pass-pipeline='hal.executable(hal.executable.variant(builtin.module(builtin.func(iree-spirv-tile-and-distribute, cse))))' %s | FileCheck %s
+// RUN: iree-opt -split-input-file -pass-pipeline='hal.executable(hal.executable.variant(builtin.module(func.func(iree-spirv-tile-and-distribute, cse))))' %s | FileCheck %s
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[1, 0, 16], [1, 0, 1]]>
 #translation = #iree_codegen.translation_info<SPIRVDistribute, workload_per_wg = [16, 1]>
@@ -15,7 +15,7 @@ hal.executable private @static_3d_sort  {
       workgroup_size = [16 : index, 1 : index, 1 : index]
     }
     builtin.module {
-      builtin.func @static_3d_sort() {
+      func.func @static_3d_sort() {
         %c64 = arith.constant 64 : index
         %c128 = arith.constant 128 : index
         %c0 = arith.constant 0 : index

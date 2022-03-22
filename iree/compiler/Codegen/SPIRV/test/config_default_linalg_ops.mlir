@@ -16,7 +16,7 @@ hal.executable @copy_as_generic {
     }> {
     hal.executable.entry_point @copy_as_generic layout(#executable_layout)
     builtin.module {
-      builtin.func @copy_as_generic() {
+      func.func @copy_as_generic() {
         %c0 = arith.constant 0 : index
         %d0 = hal.interface.constant.load[0] : index
         %d1 = hal.interface.constant.load[1] : index
@@ -60,7 +60,7 @@ hal.executable @tensor_insert {
     }> {
     hal.executable.entry_point @copy layout(#executable_layout)
     builtin.module {
-      builtin.func @copy() {
+      func.func @copy() {
         %c0 = arith.constant 0 : index
         %c224 = arith.constant 224 : index
         %c3 = arith.constant 3 : index

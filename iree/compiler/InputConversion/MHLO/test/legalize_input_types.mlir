@@ -88,7 +88,7 @@ func @tensorTypesF64(%arg0 : tensor<4x4xf64>) -> tensor<4x4xf64> {
 }
 
 // -----
-// expected-error@+1 {{'builtin.func' op unable to legalize type of input 0}}
+// expected-error@+1 {{'func.func' op unable to legalize type of input 0}}
 func @tensorUnrankedArg(%arg0 : tensor<*xi64>) -> tensor<*xi64> {
   return %arg0 : tensor<*xi64>
 }
@@ -161,7 +161,7 @@ func @linalg_non_structured_op(%arg0: tensor<9xi64>) -> tensor<1x9xi64> {
 // CHECK: util.global.load @[[VAR]]
 // CHECK: util.global.store %{{.+}}, @[[VAR]]
 util.global mutable @readwritevar = dense<0> : tensor<i64>
-builtin.func @foo(%arg0 : tensor<i64>) {
+func.func @foo(%arg0 : tensor<i64>) {
   %0 = util.global.load @readwritevar : tensor<i64>
   %1 = chlo.broadcast_add %0, %arg0 : (tensor<i64>, tensor<i64>) -> tensor<i64>
   util.global.store %1, @readwritevar : tensor<i64>
