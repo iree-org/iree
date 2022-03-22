@@ -40,8 +40,7 @@ from .benchmark_definition import DeviceInfo, BenchmarkInfo
 BENCHMARK_SUITE_REL_PATH = "benchmark_suites"
 
 
-def compose_info_object(device_info: DeviceInfo,
-                        benchmark_category_dir: str,
+def compose_info_object(device_info: DeviceInfo, benchmark_category_dir: str,
                         benchmark_case_dir: str) -> BenchmarkInfo:
   """Creates an BenchmarkInfo object to describe the benchmark.
   Args:

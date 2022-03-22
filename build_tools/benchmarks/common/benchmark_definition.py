@@ -11,15 +11,11 @@ shared between different stages of the same benchmark pipeline.
 """
 
 import json
-from lib2to3.pgen2 import driver
-import re
 import subprocess
 
 from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Dict, Sequence
-
-from cairo import Device
 
 __all__ = [
     "DeviceType", "DeviceInfo", "BenchmarkInfo", "BenchmarkResults",
@@ -142,10 +138,8 @@ class DeviceInfo:
 
   @staticmethod
   def from_json_object(json_object: Dict[str, Any]):
-    return DeviceInfo(json_object["device_type"],
-                      json_object["model"],
-                      json_object["cpu_abi"],
-                      json_object["cpu_features"],
+    return DeviceInfo(json_object["device_type"], json_object["model"],
+                      json_object["cpu_abi"], json_object["cpu_features"],
                       json_object["gpu_name"])
 
   def __get_arm_cpu_arch_revision(self) -> str:

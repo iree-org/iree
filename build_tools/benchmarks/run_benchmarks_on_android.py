@@ -42,9 +42,10 @@ import sys
 
 from typing import Any, Dict, List, Optional, Sequence, Tuple, TextIO, Set
 
-from common.benchmark_definition import (
-    DeviceType, DeviceInfo, BenchmarkInfo, BenchmarkResults, BenchmarkRun,
-    execute_cmd, execute_cmd_and_get_output)
+from common.benchmark_definition import (DeviceType, DeviceInfo, BenchmarkInfo,
+                                         BenchmarkResults, BenchmarkRun,
+                                         execute_cmd,
+                                         execute_cmd_and_get_output)
 from common.benchmark_suite import (BENCHMARK_SUITE_REL_PATH,
                                     compose_info_object,
                                     filter_benchmarks_for_category)
@@ -592,8 +593,7 @@ def filter_and_run_benchmarks(
 
 
 def set_cpu_frequency_scaling_governor(governor: str):
-  git_root = execute_cmd_and_get_output(
-      ["git", "rev-parse", "--show-toplevel"])
+  git_root = execute_cmd_and_get_output(["git", "rev-parse", "--show-toplevel"])
   cpu_script = os.path.join(git_root, "build_tools", "benchmarks",
                             "set_android_scaling_governor.sh")
   android_path = adb_push_to_tmp_dir(cpu_script)
@@ -601,8 +601,7 @@ def set_cpu_frequency_scaling_governor(governor: str):
 
 
 def set_gpu_frequency_scaling_policy(policy: str):
-  git_root = execute_cmd_and_get_output(
-      ["git", "rev-parse", "--show-toplevel"])
+  git_root = execute_cmd_and_get_output(["git", "rev-parse", "--show-toplevel"])
   device_model = get_android_device_model()
   gpu_name = get_android_gpu_name()
   if device_model == "Pixel-6" or device_model == "Pixel-6-Pro":
@@ -740,8 +739,7 @@ def real_path_or_none(path: str) -> Optional[str]:
 
 
 def get_device_info_from_adb(verbose: bool = False):
-  return DeviceInfo(DeviceType.ANDROID,
-                    get_android_device_model(verbose),
+  return DeviceInfo(DeviceType.ANDROID, get_android_device_model(verbose),
                     get_android_cpu_abi(verbose),
                     get_android_cpu_features(verbose),
                     get_android_gpu_name(verbose))
