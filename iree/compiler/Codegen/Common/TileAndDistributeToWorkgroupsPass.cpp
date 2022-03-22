@@ -147,11 +147,6 @@ struct TileAndDistributeToWorkgroupsPass
 };
 }  // namespace
 
-template <typename OpTy>
-static Value buildHALWorkgroupInfoOp(OpBuilder &b, unsigned dim) {
-  return b.template create<OpTy>(b.getInsertionPoint()->getLoc(), dim);
-}
-
 void TileAndDistributeToWorkgroupsPass::runOnOperation() {
   MLIRContext *context = &getContext();
   FuncOp funcOp = getOperation();
@@ -185,26 +180,6 @@ void TileAndDistributeToWorkgroupsPass::runOnOperation() {
                              marker);
 
   // Configure the linalg options.
-  // Distribute the ops using the flow workgroup ID/Count operations.
-  static linalg::LinalgLoopDistributionOptions workgroupDistributionOptions = {
-      [](OpBuilder &builder, Location loc, ArrayRef<Range> parallelLoopRanges) {
-        auto numParallelDims = parallelLoopRanges.size();
-
-        SmallVector<linalg::ProcInfo, 3> procInfo(numParallelDims);
-        for (size_t dim = 0; dim < numParallelDims; ++dim) {
-          procInfo[numParallelDims - dim - 1] = {
-              buildHALWorkgroupInfoOp<IREE::HAL::InterfaceWorkgroupIDOp>(
-                  builder, dim),
-              buildHALWorkgroupInfoOp<IREE::HAL::InterfaceWorkgroupCountOp>(
-                  builder, dim)};
-        }
-        return procInfo;
-      },
-      {linalg::DistributionMethod::Cyclic, linalg::DistributionMethod::Cyclic,
-       linalg::DistributionMethod::Cyclic},
-      DenseMap<StringRef,
-               std::function<linalg::ProcInfo(OpBuilder &, Location)>>()};
-
   // Tile size selection function.
   auto tileSizeFn = [&](OpBuilder &builder,
                         Operation *op) -> SmallVector<Value, 4> {
@@ -217,7 +192,7 @@ void TileAndDistributeToWorkgroupsPass::runOnOperation() {
 
   auto linalgTilingOptions =
       linalg::LinalgTilingOptions()
-          .setDistributionOptions(workgroupDistributionOptions)
+          .setDistributionOptions(getIREELinalgLoopDistributionOptions())
           .setLoopType(linalg::LinalgTilingLoopType::Loops)
           .setTileSizeComputationFunction(tileSizeFn);
 

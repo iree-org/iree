@@ -7,6 +7,7 @@
 #ifndef IREE_CODEGEN_SANDBOX_PASSES_H_
 #define IREE_CODEGEN_SANDBOX_PASSES_H_
 
+#include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Pass/Pass.h"
 
 namespace mlir {
@@ -24,6 +25,7 @@ struct LinalgFusePassOptions {
   bool vectorize = false;
   bool vectorizePadding = false;
   int64_t tilingLevel = -1;
+  bool doIREEDistribution = false;
 };
 
 /// Creates a pass to drive tile + fuse transformations of `LinalgOp`s.
