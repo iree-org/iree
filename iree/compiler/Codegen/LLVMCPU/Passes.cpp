@@ -162,6 +162,7 @@ LogicalResult verifyDoubleTilingExpertPassPipelineConfig(
 
 void addSingleTilingExpertPassPipeline(OpPassManager &passManager) {
   // Do first level of tiling and distribution.
+  passManager.addNestedPass<FuncOp>(createInsertDistributionInfoPass());
   passManager.addNestedPass<FuncOp>(createTileAndDistributeToWorkgroupsPass());
   passManager.addPass(createCanonicalizerPass());
   passManager.addPass(createCSEPass());
@@ -198,6 +199,7 @@ void addSingleTilingExpertPassPipeline(OpPassManager &passManager) {
 
 void addDoubleTilingExpertPassPipeline(OpPassManager &passManager) {
   // Do first level of tiling and distribution.
+  passManager.addNestedPass<FuncOp>(createInsertDistributionInfoPass());
   passManager.addNestedPass<FuncOp>(createTileAndDistributeToWorkgroupsPass());
   passManager.addPass(createCanonicalizerPass());
   passManager.addPass(createCSEPass());
@@ -261,6 +263,7 @@ void addDoubleTilingExpertPassPipeline(OpPassManager &passManager) {
 
 void addConvTileAndDecomposeExpertPassPipeline(OpPassManager &passManager) {
   // Do first level of tiling and distribution.
+  passManager.addNestedPass<FuncOp>(createInsertDistributionInfoPass());
   passManager.addNestedPass<FuncOp>(createTileAndDistributeToWorkgroupsPass());
   passManager.addPass(createCanonicalizerPass());
   passManager.addPass(createCSEPass());
@@ -318,6 +321,7 @@ void addConvTileAndDecomposeExpertPassPipeline(OpPassManager &passManager) {
 void addTileFuseAndVectorizePassPipeline(OpPassManager &passManager,
                                          bool lowerToVectors) {
   // Do first level of tile and distribute to workgroups.
+  passManager.addNestedPass<FuncOp>(createInsertDistributionInfoPass());
   passManager.addNestedPass<FuncOp>(createTileAndDistributeToWorkgroupsPass());
   passManager.addPass(createCanonicalizerPass());
   passManager.addPass(createCSEPass());
@@ -350,6 +354,7 @@ void addTileFuseAndVectorizePassPipeline(OpPassManager &passManager,
 
 void addCPUDefaultPassPipeline(OpPassManager &passManager) {
   // Do first level of tile and distribute to workgroups.
+  passManager.addNestedPass<FuncOp>(createInsertDistributionInfoPass());
   passManager.addNestedPass<FuncOp>(createTileAndDistributeToWorkgroupsPass());
   passManager.addPass(createCanonicalizerPass());
   passManager.addPass(createCSEPass());
