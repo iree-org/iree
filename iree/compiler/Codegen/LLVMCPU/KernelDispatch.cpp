@@ -474,11 +474,6 @@ static LogicalResult setRootConfig(
 
   // TODO(dcaballe): Find better configurations for RISC-V backends.
   if (isX86(entryPointFn) || isRISCV(entryPointFn)) {
-    // There is a tileInterchange option. If it needs to be configured, we can
-    // only apply the pipeline to linalg.matmul. Because we don't know the
-    // number of loops when adding the pass to pass manager.
-    // TODO(hanchung): Embed options into attributes, so we can control options
-    // more heuristically.
     return setX86SandboxRootConfig(entryPointFn, contractionOp, flowTileSizes,
                                    vectorSize);
   }

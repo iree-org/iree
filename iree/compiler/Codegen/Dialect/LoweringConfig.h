@@ -144,6 +144,16 @@ void setCompilationInfo(Operation *op,
 /// operation.
 void eraseCompilationInfo(Operation *op);
 
+struct IREETileConfig {
+  SmallVector<int64_t> tileSizes;
+  SmallVector<int64_t> interchange;
+};
+
+// Get the lowering configuration for the operation within the dispatch.
+// This looks for tile sizes by looking for lowering configuration.
+FailureOr<IREETileConfig> getTileConfigFromLoweringConfig(
+    ArrayRef<Operation *> computeOps, MLIRContext *context);
+
 }  // namespace iree_compiler
 }  // namespace mlir
 

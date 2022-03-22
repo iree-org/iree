@@ -75,6 +75,16 @@ static LogicalResult cpuComprehensiveBufferizeCopyFn(OpBuilder &builder,
 // Codegen configuration verifications.
 //===---------------------------------------------------------------------===//
 
+static bool isValidInterchange(ArrayRef<int64_t> interchange, int numLoops) {
+  if (interchange.empty()) return true;
+  llvm::SmallDenseSet<int64_t> s;
+  s.insert(interchange.begin(), interchange.end());
+  for (int i = 0; i < numLoops; ++i) {
+    if (!s.contains(i)) return false;
+  }
+  return true;
+}
+
 LogicalResult verifyDoubleTilingExpertPassPipelineConfig(
     Operation *op, IREE::Codegen::LoweringConfigAttr loweringConfig,
     IREE::Codegen::TranslationInfoAttr translationInfo,
@@ -113,7 +123,7 @@ LogicalResult verifyDoubleTilingExpertPassPipelineConfig(
       dyn_cast_or_null<IREE::Flow::PartitionableLoopsInterface>(op);
   if (interfaceOp) {
     SmallVector<int64_t> firstLevelTileSizes = loweringConfig.getTileSizeVals(
-        static_cast<unsigned>(TilingLevel::WorkGroupTiles));
+        static_cast<unsigned>(StrategyTilingLevel::WorkGroupTiles));
     // This is needed to fuse and distribute all ops together.
     if (firstLevelTileSizes.size() != interfaceOp.getNumLoops()) {
       return op->emitOpError(
@@ -146,6 +156,21 @@ LogicalResult verifyDoubleTilingExpertPassPipelineConfig(
                    "expected only reduction dims to be set in the third "
                    "tiling sizes, got ")
                << en.index() << "-th tile size set";
+      }
+    }
+  }
+
+  // Verify interchange
+  if (!loweringConfig.getTileInterchange().empty()) {
+    for (auto level : llvm::seq<unsigned>(
+             0, static_cast<unsigned>(
+                    loweringConfig.getTileInterchange().size()))) {
+      auto tileSizes = loweringConfig.getTileSizeVals(level);
+      auto interchange = loweringConfig.getTileInterchangeVals(level);
+      if (!isValidInterchange(interchange, tileSizes.size())) {
+        return op->emitOpError("expected [0, ")
+               << tileSizes.size()
+               << ") to be set exactly once in interchange #" << level;
       }
     }
   }
@@ -224,7 +249,8 @@ void addDoubleTilingExpertPassPipeline(OpPassManager &passManager) {
   passManager.addNestedPass<FuncOp>(createInsertDistributionInfoPass());
   {
     LinalgFusePassOptions options;
-    options.tilingLevel = static_cast<int64_t>(TilingLevel::WorkGroupTiles);
+    options.tilingLevel =
+        static_cast<int64_t>(StrategyTilingLevel::WorkGroupTiles);
     options.doIREEDistribution = true;
     passManager.addNestedPass<FuncOp>(createLinalgFusePass(options));
     passManager.addNestedPass<FuncOp>(createCanonicalizerPass());

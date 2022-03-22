@@ -26,62 +26,28 @@ namespace iree_compiler {
 // Patterns and methods for tile and distribute of Linalg ops to workgroups.
 //===---------------------------------------------------------------------===//
 
-// Get the lowering configuration for the operation within the dispatch.
-// This looks for tile sizes by looking for lowering configuration.
-static FailureOr<SmallVector<int64_t>> getTileSizesFromLoweringConfig(
-    ArrayRef<Operation *> computeOps, MLIRContext *context) {
-  if (computeOps.empty()) return SmallVector<int64_t>{};
-
-  Optional<SmallVector<int64_t>> distributedTileSizes;
-  for (auto op : computeOps) {
-    auto partitionbleLoopInterface =
-        dyn_cast<IREE::Flow::PartitionableLoopsInterface>(op);
-    if (!partitionbleLoopInterface) continue;
-    IREE::Codegen::LoweringConfigAttr currLoweringConfig =
-        getLoweringConfig(op);
-    if (!currLoweringConfig) continue;
-    SmallVector<unsigned> partitionableLoops =
-        partitionbleLoopInterface.getPartitionableLoops(kNumMaxParallelDims);
-    SmallVector<int64_t> tileSizes = currLoweringConfig.getTileSizeVals(0);
-    SmallVector<int64_t> currDistributedTileSizes;
-    if (!partitionableLoops.empty()) {
-      currDistributedTileSizes.resize(partitionableLoops.back() + 1, 0);
-    }
-    for (auto loopID : partitionableLoops) {
-      if (loopID < tileSizes.size()) {
-        currDistributedTileSizes[loopID] = tileSizes[loopID];
-      }
-    }
-    if (distributedTileSizes) {
-      if (currDistributedTileSizes != distributedTileSizes) {
-        // Inconsistent distributed tile sizes. Abort.
-        return static_cast<LogicalResult>(
-            computeOps.front()->emitOpError("inconsistent distribution of ops "
-                                            "for first level of distribution"));
-      }
-    } else {
-      distributedTileSizes = currDistributedTileSizes;
-    }
-  }
-  if (distributedTileSizes) {
-    return distributedTileSizes.getValue();
-  }
-  return SmallVector<int64_t>{};
-}
-
 /// Compute the workload per workgroup to use based on the tile sizes passed.
 static SmallVector<int64_t> getWorkloadPerWorkgroup(
-    ArrayRef<int64_t> distributedLoopTileSizes) {
+    const IREETileConfig &tileConfig) {
   // TODO(ravishankarm): This for now assumes that we can just drop all the
   // zero-dim tile sizes. We need to eventually change this so that we dont have
   // to do this. It is implicity linked to the dispatch region workload having
   // the consistent information. That needs to be changed to take the entire
   // iteration domain size as the argument, and then we can use the distribute
   // loop tile sizes directly.
+  SmallVector<int64_t> tileSizes;
+  if (tileConfig.interchange.empty()) {
+    tileSizes.assign(tileConfig.tileSizes);
+  } else {
+    tileSizes.resize(tileConfig.tileSizes.size());
+    for (auto en : llvm::enumerate(tileConfig.interchange)) {
+      tileSizes[en.index()] = tileConfig.tileSizes[en.value()];
+    }
+  }
   SmallVector<int64_t> nonZeroTileSizes;
-  for (auto tileSizes : distributedLoopTileSizes) {
-    if (!tileSizes) continue;
-    nonZeroTileSizes.push_back(tileSizes);
+  for (auto ts : tileSizes) {
+    if (!ts) continue;
+    nonZeroTileSizes.push_back(ts);
   }
   return llvm::to_vector(llvm::reverse(nonZeroTileSizes));
 }
@@ -174,15 +140,14 @@ void InsertDistributionInfoPass::runOnOperation() {
   }
 
   // Get the tile sizes to use from lowering configuration if set.
-  FailureOr<SmallVector<int64_t>> configTileSizes =
-      getTileSizesFromLoweringConfig(computeOps, context);
-  if (failed(configTileSizes)) {
+  FailureOr<IREETileConfig> tileConfig =
+      getTileConfigFromLoweringConfig(computeOps, context);
+  if (failed(tileConfig)) {
     return signalPassFailure();
   }
-  ArrayRef<int64_t> configTileSizesRef(configTileSizes.getValue());
 
   SmallVector<int64_t> workloadPerWorkroup =
-      getWorkloadPerWorkgroup(configTileSizesRef);
+      getWorkloadPerWorkgroup(tileConfig.getValue());
   if (failed(defineWorkgroupCountRegion(funcOp, workloadPerWorkroup)) ||
       failed(updateTranslationInfoAttr(funcOp, workloadPerWorkroup))) {
     return signalPassFailure();
