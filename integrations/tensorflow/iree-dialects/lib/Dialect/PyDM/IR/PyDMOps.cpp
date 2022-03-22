@@ -555,9 +555,7 @@ ParseResult PyFuncOp::parse(OpAsmParser &parser, OperationState &result) {
 }
 
 void PyFuncOp::print(OpAsmPrinter &p) {
-  FunctionType fnType = getType();
-  function_interface_impl::printFunctionOp(
-      p, *this, fnType.getInputs(), /*isVariadic=*/false, fnType.getResults());
+  function_interface_impl::printFunctionOp(p, *this, /*isVariadic=*/false);
 }
 
 //===----------------------------------------------------------------------===//

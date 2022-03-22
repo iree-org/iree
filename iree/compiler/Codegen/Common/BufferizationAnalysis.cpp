@@ -513,7 +513,7 @@ void BufferizationPlan::dump() {
   }
 }
 
-LogicalResult createTensorEquivalenceClasses(FuncOp funcOp,
+LogicalResult createTensorEquivalenceClasses(func::FuncOp funcOp,
                                              BufferizationPlan &plan) {
   auto bufferMappingFn = [&](Operation *op) -> WalkResult {
     return TypeSwitch<Operation *, LogicalResult>(op)

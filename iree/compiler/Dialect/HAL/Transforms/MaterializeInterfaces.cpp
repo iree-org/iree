@@ -98,8 +98,9 @@ static LogicalResult materializeExecutablesFromSourceOps(
 //===----------------------------------------------------------------------===//
 
 // Verifies that all types used with the given entry point are supportable.
-static LogicalResult verifyEntryPointTypes(mlir::FuncOp entryFuncOp) {
-  for (auto inputType : llvm::enumerate(entryFuncOp.getType().getInputs())) {
+static LogicalResult verifyEntryPointTypes(mlir::func::FuncOp entryFuncOp) {
+  for (auto inputType :
+       llvm::enumerate(entryFuncOp.getFunctionType().getInputs())) {
     if (inputType.value().isa<IREE::Stream::BindingType>() ||
         inputType.value().isInteger(32)) {
       // OK - directly translates to a HAL interface binding.
@@ -131,8 +132,9 @@ static IREE::HAL::ExecutableLayoutAttr makeExecutableLayoutAttr(
 }
 
 // Converts the usage of the given primitive |arg| to interface methods.
-static void convertOperandUsage(mlir::FuncOp sourceFuncOp, BlockArgument arg,
-                                unsigned pushConstantIdx, OpBuilder &builder) {
+static void convertOperandUsage(mlir::func::FuncOp sourceFuncOp,
+                                BlockArgument arg, unsigned pushConstantIdx,
+                                OpBuilder &builder) {
   auto alignmentAttr = sourceFuncOp.getArgAttrOfType<IntegerAttr>(
       arg.getArgNumber(), "stream.alignment");
   auto valuesAttr = sourceFuncOp.getArgAttrOfType<ArrayAttr>(arg.getArgNumber(),
@@ -145,7 +147,7 @@ static void convertOperandUsage(mlir::FuncOp sourceFuncOp, BlockArgument arg,
 
 // Converts the usage of the given !stream.binding |arg| to interface methods.
 static void convertBindingUsage(
-    mlir::FuncOp sourceFuncOp, BlockArgument arg,
+    mlir::func::FuncOp sourceFuncOp, BlockArgument arg,
     IREE::HAL::DescriptorSetLayoutAttr setLayoutAttr,
     IREE::HAL::DescriptorSetBindingAttr bindingAttr) {
   if (arg.use_empty()) return;  // no-op
@@ -166,8 +168,8 @@ static void convertBindingUsage(
 
 // Clones |sourceFuncOp| and updates its signature to match the |interfaceOp|
 // and use the HAL interface access primitives.
-static mlir::FuncOp cloneFuncWithInterface(
-    mlir::FuncOp sourceFuncOp, const ExecutableLayout &executableLayout,
+static mlir::func::FuncOp cloneFuncWithInterface(
+    mlir::func::FuncOp sourceFuncOp, const ExecutableLayout &executableLayout,
     IREE::HAL::ExecutableLayoutAttr layoutAttr) {
   // Clone so that we can do a bunch of unsafe in-place updates.
   auto clonedFuncOp = sourceFuncOp.clone();
@@ -231,7 +233,7 @@ static LogicalResult declareEntryPointOps(
        sourceExecutableOp.body().getOps<IREE::Stream::ExecutableExportOp>()) {
     int ordinal = nextOrdinal++;
     auto sourceFuncOp =
-        sourceExecutableOp.getInnerModule().lookupSymbol<mlir::FuncOp>(
+        sourceExecutableOp.getInnerModule().lookupSymbol<mlir::func::FuncOp>(
             exportOp.function_ref());
     if (failed(verifyEntryPointTypes(sourceFuncOp))) return failure();
 
@@ -296,7 +298,7 @@ struct InlineConstantWorkgroupSizePattern
   LogicalResult matchAndRewrite(IREE::HAL::InterfaceWorkgroupSizeOp sizeOp,
                                 PatternRewriter &rewriter) const override {
     // Lookup the entry point matching the parent.
-    auto funcOp = sizeOp->getParentOfType<mlir::FuncOp>();
+    auto funcOp = sizeOp->getParentOfType<mlir::func::FuncOp>();
     auto variantOp = funcOp->getParentOfType<IREE::HAL::ExecutableVariantOp>();
     auto entryPointOp = dyn_cast<IREE::HAL::ExecutableEntryPointOp>(
         SymbolTable::lookupSymbolIn(variantOp, funcOp.getName()));

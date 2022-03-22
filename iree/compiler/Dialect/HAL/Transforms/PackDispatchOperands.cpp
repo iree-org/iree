@@ -134,7 +134,7 @@ static void updateDispatchOp(IREE::Stream::CmdDispatchOp dispatchOp) {
 // that was applied to dispatch ops above.
 //
 // This is a mirror of updateDispatchOp; see that for more information.
-static void updateExportFuncOp(mlir::FuncOp funcOp) {
+static void updateExportFuncOp(mlir::func::FuncOp funcOp) {
   assert(!funcOp.empty() && "can't have empty exported functions");
   auto &entryBlock = funcOp.getBody().front();
   auto builder = OpBuilder::atBlockBegin(&entryBlock);
@@ -225,8 +225,8 @@ static void updateExportFuncOp(mlir::FuncOp funcOp) {
   }
   if (newArgTypes.size() != funcOp.getNumArguments()) {
     // Changed argument count; update signature.
-    funcOp.setType(
-        builder.getFunctionType(newArgTypes, funcOp.getType().getResults()));
+    funcOp.setType(builder.getFunctionType(
+        newArgTypes, funcOp.getFunctionType().getResults()));
     funcOp.setAllArgAttrs(newArgAttrs);
   }
 
@@ -289,8 +289,8 @@ static void updateExportFuncOp(mlir::FuncOp funcOp) {
 
     newArgTypes.push_back(builder.getI32Type());
   }
-  funcOp.setType(
-      builder.getFunctionType(newArgTypes, funcOp.getType().getResults()));
+  funcOp.setType(builder.getFunctionType(
+      newArgTypes, funcOp.getFunctionType().getResults()));
 }
 
 //===----------------------------------------------------------------------===//
@@ -319,7 +319,8 @@ class PackDispatchOperandsPass
     // Convert all public function signatures and manipulate the arguments.
     for (auto executableOp :
          getOperation().getOps<IREE::Stream::ExecutableOp>()) {
-      for (auto funcOp : executableOp.getInnerModule().getOps<mlir::FuncOp>()) {
+      for (auto funcOp :
+           executableOp.getInnerModule().getOps<mlir::func::FuncOp>()) {
         if (funcOp.isPublic()) {
           updateExportFuncOp(funcOp);
         }

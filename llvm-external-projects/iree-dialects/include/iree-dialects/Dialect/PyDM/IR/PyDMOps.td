@@ -143,21 +143,21 @@ def IREEPyDM_FuncOp : IREEPyDM_Op<"func", [
     }
 
     /// Returns the type of this function.
-    FunctionType getType() {
+    FunctionType getFunctionType() {
       return getOperation()->getAttrOfType<TypeAttr>(getTypeAttrName())
           .getValue()
           .cast<FunctionType>();
     }
 
     /// Returns the argument types of this function.
-    ArrayRef<Type> getArgumentTypes() { return getType().getInputs(); }
+    ArrayRef<Type> getArgumentTypes() { return getFunctionType().getInputs(); }
 
     /// Returns the result types of this function.
-    ArrayRef<Type> getResultTypes() { return getType().getResults(); }
+    ArrayRef<Type> getResultTypes() { return getFunctionType().getResults(); }
 
     /// Returns the python return type of the function (second return type).
     Type getPyReturnType() {
-      return getType().getResult(1);
+      return getFunctionType().getResult(1);
     }
 
     /// Hook for Trait::FunctionLike, called after verifying that the 'type'
@@ -167,7 +167,7 @@ def IREEPyDM_FuncOp : IREEPyDM_Op<"func", [
 
     Region *getCallableRegion() { return &body(); }
     ArrayRef<Type> getCallableResults() {
-      return getType().getResults();
+      return getFunctionType().getResults();
     }
 
     /// Defines SymbolOpInterface::isDeclaration().

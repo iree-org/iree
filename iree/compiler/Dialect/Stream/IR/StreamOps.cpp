@@ -1748,7 +1748,8 @@ static void printDispatchResources(OpAsmPrinter &p, Operation *op,
 // This is sloppy because the function has interleaved bindings and operands;
 // if we had our own op we could just reuse the map we have for operands.
 // static
-SmallVector<unsigned> CmdDispatchOp::makeOperandToArgMap(mlir::FuncOp funcOp) {
+SmallVector<unsigned> CmdDispatchOp::makeOperandToArgMap(
+    mlir::func::FuncOp funcOp) {
   unsigned operandCount = llvm::count_if(
       funcOp.getArgumentTypes(),
       [](Type type) { return !type.isa<IREE::Stream::BindingType>(); });
@@ -1765,7 +1766,8 @@ SmallVector<unsigned> CmdDispatchOp::makeOperandToArgMap(mlir::FuncOp funcOp) {
 }
 
 // static
-SmallVector<unsigned> CmdDispatchOp::makeResourceToArgMap(mlir::FuncOp funcOp) {
+SmallVector<unsigned> CmdDispatchOp::makeResourceToArgMap(
+    mlir::func::FuncOp funcOp) {
   unsigned operandCount = llvm::count_if(
       funcOp.getArgumentTypes(),
       [](Type type) { return type.isa<IREE::Stream::BindingType>(); });
@@ -2023,11 +2025,11 @@ void ExecutableExportOp::build(OpBuilder &builder, OperationState &state,
         builder.getStringAttr(sym_name), function_ref);
 }
 
-::mlir::FuncOp ExecutableExportOp::getFunctionRef() {
+::mlir::func::FuncOp ExecutableExportOp::getFunctionRef() {
   auto executableOp =
       this->getOperation()->getParentOfType<IREE::Stream::ExecutableOp>();
   if (!executableOp) return {};
-  return executableOp.getInnerModule().lookupSymbol<::mlir::FuncOp>(
+  return executableOp.getInnerModule().lookupSymbol<::mlir::func::FuncOp>(
       function_ref());
 }
 

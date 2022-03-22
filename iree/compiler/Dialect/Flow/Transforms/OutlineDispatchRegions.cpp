@@ -30,7 +30,7 @@ namespace {
 // Creates a flow.executable out of a set of functions, pulling in all other
 // functions reachable by the provided functions.
 static ExecutableOp createExecutable(Location loc, StringRef executableName,
-                                     ArrayRef<mlir::FuncOp> funcOps,
+                                     ArrayRef<mlir::func::FuncOp> funcOps,
                                      ModuleOp parentModuleOp) {
   assert(!funcOps.empty() && "must have at least one entry function");
 
@@ -86,14 +86,15 @@ static LogicalResult convertToDispatchOp(DispatchWorkgroupsOp regionOp,
 }
 
 // Converts a dispatch region body to a free-floating function.
-static mlir::FuncOp createWorkgroupFunc(Location loc, StringRef functionName,
-                                        Region &region) {
+static mlir::func::FuncOp createWorkgroupFunc(Location loc,
+                                              StringRef functionName,
+                                              Region &region) {
   // Build function type matching the region signature.
   auto functionType = FunctionType::get(
       region.getContext(), region.getArgumentTypes(), /*results=*/{});
 
   // Clone region into the function body.
-  auto funcOp = mlir::FuncOp::create(loc, functionName, functionType);
+  auto funcOp = mlir::func::FuncOp::create(loc, functionName, functionType);
   BlockAndValueMapping mapping;
   region.cloneInto(&funcOp.getBody(), mapping);
 
@@ -158,7 +159,7 @@ class OutlineDispatchRegionsPass
 
       // Generate a nice name if possible.
       std::string opName;
-      if (auto funcOp = llvm::dyn_cast<mlir::FuncOp>(operation)) {
+      if (auto funcOp = llvm::dyn_cast<mlir::func::FuncOp>(operation)) {
         opName = funcOp.getName().str();
       } else if (llvm::isa<IREE::Util::InitializerOp>(operation)) {
         opName =

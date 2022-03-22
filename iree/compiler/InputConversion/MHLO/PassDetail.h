@@ -7,6 +7,7 @@
 #ifndef IREE_COMPILER_INPUTCONVERSION_MHLO_PASSDETAIL_H_
 #define IREE_COMPILER_INPUTCONVERSION_MHLO_PASSDETAIL_H_
 
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Pass/Pass.h"
 
 namespace mlir {

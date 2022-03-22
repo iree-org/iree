@@ -2328,9 +2328,9 @@ def Stream_CmdDispatchOp : Stream_Op<"cmd.dispatch", [
     Value getResultSize(unsigned idx) { return {}; }
 
     // Builds a map of operand index to argument index.
-    static SmallVector<unsigned> makeOperandToArgMap(mlir::FuncOp funcOp);
+    static SmallVector<unsigned> makeOperandToArgMap(mlir::func::FuncOp funcOp);
     // Builds a map of resource to argument index of the corresponding binding.
-    static SmallVector<unsigned> makeResourceToArgMap(mlir::FuncOp funcOp);
+    static SmallVector<unsigned> makeResourceToArgMap(mlir::func::FuncOp funcOp);
   }];
 
   let hasVerifier = 1;
@@ -2805,7 +2805,7 @@ def Stream_ExecutableExportOp : Stream_Op<"executable.export", [
   ];
 
   let extraClassDeclaration = [{
-    ::mlir::FuncOp getFunctionRef();
+    ::mlir::func::FuncOp getFunctionRef();
   }];
 }
 

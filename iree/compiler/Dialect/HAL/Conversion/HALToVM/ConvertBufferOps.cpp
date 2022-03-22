@@ -25,7 +25,7 @@ class BufferLoadOpConversion
   LogicalResult matchAndRewrite(
       IREE::HAL::BufferLoadOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    auto importType = importOp.getType();
+    auto importType = importOp.getFunctionType();
 
     auto originalType = op.result().getType();
     auto targetType = typeConverter->convertType(op.result().getType());
@@ -105,7 +105,7 @@ class BufferStoreOpConversion
   LogicalResult matchAndRewrite(
       IREE::HAL::BufferStoreOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    auto importType = importOp.getType();
+    auto importType = importOp.getFunctionType();
 
     auto elementType = op.value().getType();
     int32_t validByteWidth =

@@ -16,6 +16,7 @@
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/DialectImplementation.h"
+#include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/OpImplementation.h"
@@ -159,14 +160,14 @@ struct GenericNumericCastExternalModel {
                                                      OpTy> {};
 
   template <typename OpTy>
-  static void add(DialectRegistry &registry) {
-    registry.addOpInterface<OpTy, ExternalModel<OpTy>>();
+  static void add(MLIRContext *ctx) {
+    OpTy::template attachInterface<ExternalModel<OpTy>>(*ctx);
   }
 
   template <typename OpTy1, typename OpTy2, typename... More>
-  static void add(DialectRegistry &registry) {
-    add<OpTy1>(registry);
-    add<OpTy2, More...>(registry);
+  static void add(MLIRContext *ctx) {
+    add<OpTy1>(ctx);
+    add<OpTy2, More...>(ctx);
   }
 };
 
@@ -176,10 +177,13 @@ void registerUtilExternalModels(DialectRegistry &registry) {
   // Must ensure that any dependent dialects are registered.
   registry.insert<arith::ArithmeticDialect>();
 
-  GenericNumericCastExternalModel::add<
-      arith::BitcastOp, arith::ExtFOp, arith::ExtUIOp, arith::ExtSIOp,
-      arith::FPToSIOp, arith::FPToUIOp, arith::IndexCastOp, arith::TruncFOp,
-      arith::TruncIOp, arith::SIToFPOp, arith::UIToFPOp>(registry);
+  registry.addExtension(+[](MLIRContext *ctx,
+                            arith::ArithmeticDialect *dialect) {
+    GenericNumericCastExternalModel::add<
+        arith::BitcastOp, arith::ExtFOp, arith::ExtUIOp, arith::ExtSIOp,
+        arith::FPToSIOp, arith::FPToUIOp, arith::IndexCastOp, arith::TruncFOp,
+        arith::TruncIOp, arith::SIToFPOp, arith::UIToFPOp>(ctx);
+  });
 }
 
 }  // namespace Util

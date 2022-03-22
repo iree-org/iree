@@ -29,9 +29,9 @@ namespace iree_compiler {
 // Utility functions to get entry points
 //===----------------------------------------------------------------------===//
 
-bool isEntryPoint(FuncOp func) { return func.isPublic(); }
+bool isEntryPoint(func::FuncOp func) { return func.isPublic(); }
 
-IREE::HAL::ExecutableEntryPointOp getEntryPoint(FuncOp funcOp) {
+IREE::HAL::ExecutableEntryPointOp getEntryPoint(func::FuncOp funcOp) {
   auto variantOp = funcOp->getParentOfType<IREE::HAL::ExecutableVariantOp>();
   for (auto op : variantOp.getOps<IREE::HAL::ExecutableEntryPointOp>()) {
     if (op.sym_name() == funcOp.getName()) {
@@ -436,10 +436,10 @@ Optional<LoopTilingAndDistributionInfo> isTiledAndDistributedLoop(
 }
 
 LogicalResult getFilteredOps(
-    FuncOp funcOp, RootOpFilteringFn filteringFn,
+    func::FuncOp funcOp, RootOpFilteringFn filteringFn,
     SmallVectorImpl<Operation *> &filteredOps,
     SmallVectorImpl<LoopTilingAndDistributionInfo> &tiledLoops) {
-  Region &region = funcOp.body();
+  Region &region = funcOp.getBody();
   if (!llvm::hasSingleElement(region)) {
     return funcOp.emitError("unable dispatch function with multiple blocks");
   }
@@ -463,7 +463,7 @@ LogicalResult getFilteredOps(
 }
 
 LogicalResult getComputeOps(
-    FuncOp funcOp, SmallVectorImpl<Operation *> &computeOps,
+    func::FuncOp funcOp, SmallVectorImpl<Operation *> &computeOps,
     SmallVectorImpl<LoopTilingAndDistributionInfo> &tiledLoops) {
   if (failed(getFilteredOps(
           funcOp,
@@ -477,7 +477,7 @@ LogicalResult getComputeOps(
 }
 
 SmallVector<LoopTilingAndDistributionInfo> getTiledAndDistributedLoopInfo(
-    FuncOp funcOp) {
+    func::FuncOp funcOp) {
   SmallVector<LoopTilingAndDistributionInfo> info;
   funcOp.walk([&](scf::ForOp forOp) {
     if (auto tiledLoopInfo = isTiledAndDistributedLoop(forOp)) {

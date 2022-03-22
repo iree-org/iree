@@ -279,10 +279,13 @@ void registerBufferizationInterfaces(DialectRegistry &registry) {
   vector::registerBufferizableOpInterfaceExternalModels(registry);
 
   // Register IREE operations.
-  registry.addOpInterface<IREE::Flow::DispatchTensorLoadOp,
-                          DispatchTensorLoadOpInterface>();
-  registry.addOpInterface<IREE::Flow::DispatchTensorStoreOp,
-                          DispatchTensorStoreOpInterface>();
+  registry.addExtension(
+      +[](MLIRContext *ctx, IREE::Flow::FlowDialect *dialect) {
+        IREE::Flow::DispatchTensorLoadOp::attachInterface<
+            DispatchTensorLoadOpInterface>(*ctx);
+        IREE::Flow::DispatchTensorStoreOp::attachInterface<
+            DispatchTensorStoreOpInterface>(*ctx);
+      });
 }
 
 void addPostAnalysisTransformations(OneShotBufferizationOptions &options) {

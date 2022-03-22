@@ -10,6 +10,7 @@
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetBackend.h"
 #include "llvm/ADT/StringMap.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
@@ -111,7 +112,7 @@ createSerializeTargetExecutablesPass(StringRef target);
 //===----------------------------------------------------------------------===//
 
 // Performs packing and materializes runtime packing code when required.
-std::unique_ptr<OperationPass<FuncOp>> createPackAllocationsPass();
+std::unique_ptr<OperationPass<func::FuncOp>> createPackAllocationsPass();
 
 // Finds all resource lookups (such as hal.executable.lookup), materializes
 // their cache storage and initialization, and rewrites the lookups to
@@ -121,14 +122,14 @@ std::unique_ptr<OperationPass<ModuleOp>> createMaterializeResourceCachesPass(
 
 // Eliminates redundant 'load's of variables within functions with no 'store'.
 // TODO(#1124): replace with memory side effects once supported upstream.
-std::unique_ptr<OperationPass<FuncOp>> createCSEVariableLoadsPass();
+std::unique_ptr<OperationPass<func::FuncOp>> createCSEVariableLoadsPass();
 
 // Elides stateful command buffer ops that set redundant state.
 std::unique_ptr<OperationPass<void>> createElideRedundantCommandsPass();
 
 // Repeats dispatches `iree-hal-repeat-dispatch-num` times, which is 1 by
 // default.
-std::unique_ptr<OperationPass<FuncOp>> createBenchmarkBatchDispatchesPass(
+std::unique_ptr<OperationPass<func::FuncOp>> createBenchmarkBatchDispatchesPass(
     unsigned repeatCount);
 
 //===----------------------------------------------------------------------===//

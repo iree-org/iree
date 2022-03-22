@@ -627,7 +627,7 @@ class ConvertHALEntryPointFuncOp : public ConvertToLLVMPattern {
  public:
   explicit ConvertHALEntryPointFuncOp(MLIRContext *context,
                                       LLVMTypeConverter &converter)
-      : ConvertToLLVMPattern(mlir::FuncOp::getOperationName(), context,
+      : ConvertToLLVMPattern(mlir::func::FuncOp::getOperationName(), context,
                              converter, 100) {}
 
   LogicalResult matchAndRewrite(
@@ -635,7 +635,7 @@ class ConvertHALEntryPointFuncOp : public ConvertToLLVMPattern {
       ConversionPatternRewriter &rewriter) const override {
     auto stdFuncOp = cast<FuncOp>(op);
     if (!stdFuncOp.isPublic()) return failure();
-    FunctionType fnType = stdFuncOp.getType();
+    FunctionType fnType = stdFuncOp.getFunctionType();
     if (fnType.getNumInputs() != 0 || fnType.getNumResults() != 0) {
       op->emitWarning() << "public functions on executables must be () -> ()";
       return failure();

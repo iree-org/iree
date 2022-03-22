@@ -10,13 +10,13 @@
 include "mlir/Pass/PassBase.td"
 
 def LinalgExtToLoops :
-    Pass<"iree-linalg-ext-to-loops", "FuncOp"> {
+    Pass<"iree-linalg-ext-to-loops", "func::FuncOp"> {
   let summary = "Convert LinalgExt ops to loops and Linalg ops.";
   let constructor = "mlir::iree_compiler::IREE::LinalgExt::createLinalgExtToLoopsPass()";
 }
 
 def TiledOpInterfaceTiling :
-    Pass<"iree-linalg-ext-tile", "FuncOp"> {
+    Pass<"iree-linalg-ext-tile", "func::FuncOp"> {
   let summary = "Test pass for tiling using TiledOpInterface";
   let constructor = "mlir::iree_compiler::IREE::LinalgExt::createTiledOpInterfaceTilingPass()";
 }

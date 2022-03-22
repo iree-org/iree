@@ -227,7 +227,7 @@ struct ConvertCompareOp : public OpConversionPattern<CompareOpTy> {
   ConvertCompareOp(TypeConverter &typeConverter, MLIRContext *context,
                    mhlo::ComparisonDirection direction)
       : OpConversionPattern<CompareOpTy>(typeConverter, context),
-        direction(mhlo::stringifyEnum(direction)) {}
+        direction(direction) {}
 
   LogicalResult matchAndRewrite(
       CompareOpTy op, typename CompareOpTy::Adaptor adaptor,
@@ -262,7 +262,7 @@ struct ConvertCompareOp : public OpConversionPattern<CompareOpTy> {
     return success();
   }
 
-  StringRef direction;
+  mhlo::ComparisonDirection direction;
 };
 
 struct ElideComplexPattern : public OpConversionPattern<mhlo::ComplexOp> {

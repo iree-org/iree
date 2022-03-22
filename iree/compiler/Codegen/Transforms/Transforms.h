@@ -30,7 +30,7 @@ namespace iree_compiler {
 using WorkgroupCountRegionBuilder = std::function<std::array<Value, 3>(
     OpBuilder &b, Location loc, std::array<Value, 3> workload)>;
 LogicalResult defineWorkgroupCountRegion(
-    OpBuilder &builder, FuncOp funcOp,
+    OpBuilder &builder, func::FuncOp funcOp,
     WorkgroupCountRegionBuilder regionBuilder);
 
 /// Insert patterns to perform folding of AffineMinOp by matching the pattern

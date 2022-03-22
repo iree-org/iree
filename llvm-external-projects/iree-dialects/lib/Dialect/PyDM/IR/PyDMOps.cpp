@@ -567,9 +567,7 @@ ParseResult PyFuncOp::parse(OpAsmParser &parser, OperationState &result) {
 }
 
 void PyFuncOp::print(OpAsmPrinter &p) {
-  FunctionType fnType = getType();
-  function_interface_impl::printFunctionOp(
-      p, *this, fnType.getInputs(), /*isVariadic=*/false, fnType.getResults());
+  function_interface_impl::printFunctionOp(p, *this, /*isVariadic=*/false);
 }
 
 //===----------------------------------------------------------------------===//
@@ -764,7 +762,7 @@ LogicalResult PyCallOp::verifySymbolUses(SymbolTableCollection &symbolTable) {
                          << "' does not reference a valid function";
 
   // Verify that the operand and result types match the callee.
-  auto fnType = fn.getType();
+  auto fnType = fn.getFunctionType();
   if (fnType.getNumInputs() != getNumOperands())
     return emitOpError("incorrect number of operands for callee");
 

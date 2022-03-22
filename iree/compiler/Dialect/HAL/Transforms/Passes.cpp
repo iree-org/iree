@@ -59,7 +59,7 @@ static void addCleanupPatterns(OpPassManager &passManager) {
   // redundant store-loads are removed.
   passManager.addNestedPass<IREE::Util::InitializerOp>(
       IREE::Util::createSimplifyGlobalAccessesPass());
-  passManager.addNestedPass<mlir::FuncOp>(
+  passManager.addNestedPass<mlir::func::FuncOp>(
       IREE::Util::createSimplifyGlobalAccessesPass());
 
   // Cleanup and canonicalization of util.global (and other util ops).
@@ -169,7 +169,8 @@ void buildHALTransformPassPipeline(OpPassManager &passManager,
   // better CSE/fold dispatch logic.
   passManager.addNestedPass<IREE::Util::InitializerOp>(
       createInlineDeviceSwitchesPass());
-  passManager.addNestedPass<mlir::FuncOp>(createInlineDeviceSwitchesPass());
+  passManager.addNestedPass<mlir::func::FuncOp>(
+      createInlineDeviceSwitchesPass());
 
   // Memoize device queries such that we don't need to repeatedly ask the same
   // information at runtime.
@@ -180,14 +181,15 @@ void buildHALTransformPassPipeline(OpPassManager &passManager,
 
   // HACK: repeat dispatch ops for benchmarks.
   if (benchmarkDispatchRepeatCount != 1) {
-    passManager.addNestedPass<mlir::FuncOp>(
+    passManager.addNestedPass<mlir::func::FuncOp>(
         createBenchmarkBatchDispatchesPass(benchmarkDispatchRepeatCount));
   }
 
   // Elide redundant command buffer state ops created during conversion.
   passManager.addNestedPass<IREE::Util::InitializerOp>(
       createElideRedundantCommandsPass());
-  passManager.addNestedPass<mlir::FuncOp>(createElideRedundantCommandsPass());
+  passManager.addNestedPass<mlir::func::FuncOp>(
+      createElideRedundantCommandsPass());
 
   // Fixup workgroup count calculations that may have used the affine dialect.
   // Kind of random here but can happen if the benchmarking code does things.

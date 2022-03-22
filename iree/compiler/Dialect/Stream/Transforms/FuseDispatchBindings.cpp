@@ -172,7 +172,7 @@ static SmallVector<Binding> findCorrelatedBindings(
 // Updates an executable function to use the new bindings.
 static void updateExecutableSignature(IREE::Stream::ExecutableOp executableOp,
                                       IREE::Stream::ExecutableExportOp exportOp,
-                                      mlir::FuncOp funcOp,
+                                      mlir::func::FuncOp funcOp,
                                       ArrayRef<Binding> bindings) {
   auto &entryBlock = funcOp.front();
 

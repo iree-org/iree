@@ -22,7 +22,7 @@ struct VMAnalysis {
     Operation *op = funcOp.getOperation();
     registerAllocation = RegisterAllocation(op);
     valueLiveness = ValueLiveness(op);
-    originalFunctionType = funcOp.getType();
+    originalFunctionType = funcOp.getFunctionType();
   }
 
   VMAnalysis(VMAnalysis &&) = default;
