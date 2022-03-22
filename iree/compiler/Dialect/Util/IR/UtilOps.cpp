@@ -688,15 +688,15 @@ NumericOptionalNarrowOp::getIntegerRange() {
 
 void InitializerOp::build(OpBuilder &builder, OperationState &result,
                           ArrayRef<NamedAttribute> attrs) {
-  result.addAttribute(
-      "type", TypeAttr::get(FunctionType::get(builder.getContext(), {}, {})));
+  result.addAttribute("function_type", TypeAttr::get(FunctionType::get(
+                                           builder.getContext(), {}, {})));
   result.addRegion();
   result.attributes.append(attrs.begin(), attrs.end());
 }
 
 ParseResult InitializerOp::parse(OpAsmParser &parser, OperationState &result) {
-  result.addAttribute(
-      "type", TypeAttr::get(FunctionType::get(result.getContext(), {}, {})));
+  result.addAttribute("function_type", TypeAttr::get(FunctionType::get(
+                                           result.getContext(), {}, {})));
   if (parser.parseOptionalAttrDictWithKeyword(result.attributes)) {
     return failure();
   }
@@ -709,7 +709,8 @@ ParseResult InitializerOp::parse(OpAsmParser &parser, OperationState &result) {
 
 void InitializerOp::print(OpAsmPrinter &p) {
   Operation *op = getOperation();
-  p.printOptionalAttrDictWithKeyword(op->getAttrs(), /*elidedAttrs=*/{"type"});
+  p.printOptionalAttrDictWithKeyword(op->getAttrs(),
+                                     /*elidedAttrs=*/{"function_type"});
   p << " ";
   p.printRegion(body());
 }

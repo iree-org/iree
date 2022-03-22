@@ -95,7 +95,7 @@ void FuncOp::build(OpBuilder &builder, OperationState &result, StringRef name,
   result.addRegion();
   result.addAttribute(SymbolTable::getSymbolAttrName(),
                       builder.getStringAttr(name));
-  result.addAttribute("type", TypeAttr::get(type));
+  result.addAttribute("function_type", TypeAttr::get(type));
   result.attributes.append(attrs.begin(), attrs.end());
   if (argAttrs.empty()) {
     return;
@@ -295,7 +295,7 @@ void ImportOp::build(OpBuilder &builder, OperationState &result, StringRef name,
                      ArrayRef<DictionaryAttr> argAttrs) {
   result.addAttribute(SymbolTable::getSymbolAttrName(),
                       builder.getStringAttr(name));
-  result.addAttribute("type", TypeAttr::get(type));
+  result.addAttribute("function_type", TypeAttr::get(type));
   result.attributes.append(attrs.begin(), attrs.end());
   if (argAttrs.empty()) {
     return;
@@ -318,15 +318,15 @@ LogicalResult ImportOp::verifyType() {
 
 void InitializerOp::build(OpBuilder &builder, OperationState &result,
                           ArrayRef<NamedAttribute> attrs) {
-  result.addAttribute(
-      "type", TypeAttr::get(FunctionType::get(builder.getContext(), {}, {})));
+  result.addAttribute("function_type", TypeAttr::get(FunctionType::get(
+                                           builder.getContext(), {}, {})));
   result.addRegion();
   result.attributes.append(attrs.begin(), attrs.end());
 }
 
 ParseResult InitializerOp::parse(OpAsmParser &parser, OperationState &result) {
-  result.addAttribute(
-      "type", TypeAttr::get(FunctionType::get(result.getContext(), {}, {})));
+  result.addAttribute("function_type", TypeAttr::get(FunctionType::get(
+                                           result.getContext(), {}, {})));
   if (parser.parseOptionalAttrDictWithKeyword(result.attributes)) {
     return failure();
   }
@@ -339,7 +339,8 @@ ParseResult InitializerOp::parse(OpAsmParser &parser, OperationState &result) {
 
 void InitializerOp::print(OpAsmPrinter &p) {
   Operation *op = getOperation();
-  p.printOptionalAttrDictWithKeyword(op->getAttrs(), /*elidedAttrs=*/{"type"});
+  p.printOptionalAttrDictWithKeyword(op->getAttrs(),
+                                     /*elidedAttrs=*/{"function_type"});
   p << " ";
   p.printRegion(body());
 }

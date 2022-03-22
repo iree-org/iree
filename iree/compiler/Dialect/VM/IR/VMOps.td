@@ -252,7 +252,7 @@ def VM_InitializerOp : VM_Op<"initializer", [
   }];
 
   let arguments = (ins
-    TypeAttr:$type
+    TypeAttr:$function_type
   );
 
   let regions = (region AnyRegion:$body);
