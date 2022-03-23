@@ -1,16 +1,12 @@
-//===- TileToInParallel.cpp.cpp - Rewrite TileOp as InParallel -----------===//
+// Copyright 2021 The IREE Authors
 //
-// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
-//
-//===----------------------------------------------------------------------===//
 
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree-dialects/Dialect/LinalgExt/Transforms/Transforms.h"
 #include "iree-dialects/Dialect/LinalgExt/Transforms/Utils.h"
-#include "llvm/ADT/STLExtras.h"
-#include "llvm/Support/raw_ostream.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
@@ -22,14 +18,16 @@
 #include "mlir/IR/Operation.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+#include "llvm/ADT/STLExtras.h"
+#include "llvm/Support/raw_ostream.h"
 
 using namespace mlir;
 using namespace mlir::iree_compiler::IREE::LinalgExt;
 
-FailureOr<iree_compiler::IREE::LinalgExt::InParallelOp> mlir::iree_compiler::
-    IREE::LinalgExt::TileOpToInParallelRewriter::returningMatchAndRewrite(
-        iree_compiler::IREE::LinalgExt::TileOp tileOp,
-        PatternRewriter &rewriter) const {
+FailureOr<iree_compiler::IREE::LinalgExt::InParallelOp>
+mlir::iree_compiler::IREE::LinalgExt::TileOpToInParallelRewriter::
+    returningMatchAndRewrite(iree_compiler::IREE::LinalgExt::TileOp tileOp,
+                             PatternRewriter &rewriter) const {
   // TODO: verifier.
   assert(tileOp.getNumResults() > 0 &&
          tileOp.outs().size() == tileOp.getNumResults());

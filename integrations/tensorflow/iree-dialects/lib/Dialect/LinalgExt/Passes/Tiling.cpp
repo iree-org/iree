@@ -11,7 +11,6 @@
 #include "iree-dialects/Dialect/LinalgExt/Passes/PassDetail.h"
 #include "iree-dialects/Dialect/LinalgExt/Passes/Passes.h"
 #include "iree-dialects/Dialect/LinalgExt/Passes/Transforms.h"
-#include "llvm/ADT/TypeSwitch.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
@@ -22,6 +21,7 @@
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+#include "llvm/ADT/TypeSwitch.h"
 
 using namespace mlir;
 namespace IREE = mlir::iree_compiler::IREE;
@@ -33,9 +33,9 @@ using namespace IREE::LinalgExt;
 //===----------------------------------------------------------------------===//
 
 /// Returns failure if the options are unsupported.
-static LogicalResult verifySupportedTilingOptions(
-    PatternRewriter &rewriter, Operation *op,
-    const linalg::LinalgTilingOptions &options) {
+static LogicalResult
+verifySupportedTilingOptions(PatternRewriter &rewriter, Operation *op,
+                             const linalg::LinalgTilingOptions &options) {
   if (!options.interchangeVector.empty()) {
     return rewriter.notifyMatchFailure(op,
                                        "unsupported interchange during tiling");
@@ -93,12 +93,13 @@ static bool isUntiledLoop(OpFoldResult valueOrAttr) {
 ///   distributed loops. It is a stack, and once an entry at the top of the
 ///   stack is used for distribution it is popped before processing the inner
 ///   loops.
-static FailureOr<TiledOp> tileInterfaceOpImpl(
-    OpBuilder &builder, TiledOpInterface tilableOp, ValueRange outputs,
-    MutableArrayRef<OpFoldResult> tileSizes, ArrayRef<StringRef> iteratorTypes,
-    ArrayRef<Range> loopBounds, unsigned loopDepth,
-    SmallVectorImpl<OpFoldResult> &offsets,
-    ArrayRef<linalg::ProcInfo> distributionInfo) {
+static FailureOr<TiledOp>
+tileInterfaceOpImpl(OpBuilder &builder, TiledOpInterface tilableOp,
+                    ValueRange outputs, MutableArrayRef<OpFoldResult> tileSizes,
+                    ArrayRef<StringRef> iteratorTypes,
+                    ArrayRef<Range> loopBounds, unsigned loopDepth,
+                    SmallVectorImpl<OpFoldResult> &offsets,
+                    ArrayRef<linalg::ProcInfo> distributionInfo) {
   Location loc = tilableOp.getLoc();
   // If this is the innermost loop, then generated the tiled implementation of
   // the op by invoking the TiledOpInterface methods.
@@ -166,7 +167,8 @@ static FailureOr<TiledOp> tileInterfaceOpImpl(
             tileInterfaceOpImpl(b, tilableOp, (isBufferTiling ? outputs : args),
                                 tileSizes, iteratorTypes, loopBounds,
                                 loopDepth + 1, offsets, distributionInfo);
-        if (failed(innerReturnValue)) return;
+        if (failed(innerReturnValue))
+          return;
         b.create<scf::YieldOp>(loc, innerReturnValue->results);
       });
   if (failed(innerReturnValue)) {
@@ -197,7 +199,8 @@ FailureOr<TiledOp> tileInterfaceOp(OpBuilder &b, TiledOpInterface tilableOp,
   auto tileSizes = getAsOpFoldResult(tileSizesVals);
   tileSizes.resize(iteratorTypes.size(), zeroAttr);
   for (auto en : llvm::enumerate(iteratorTypes)) {
-    if (en.value() == getParallelIteratorTypeName()) continue;
+    if (en.value() == getParallelIteratorTypeName())
+      continue;
     if (!isUntiledLoop(tileSizes[en.index()])) {
       return static_cast<LogicalResult>(tilableOp.emitOpError(
           "unimplemented tiling of non-parallel loop iterator type"));
@@ -219,8 +222,10 @@ FailureOr<TiledOp> tileInterfaceOp(OpBuilder &b, TiledOpInterface tilableOp,
   if (options.distribution) {
     SmallVector<Range> distributedLoopRange;
     for (auto i : llvm::seq<unsigned>(0, tileSizes.size())) {
-      if (isUntiledLoop(tileSizes[i])) continue;
-      if (iteratorTypes[i] != getParallelIteratorTypeName()) continue;
+      if (isUntiledLoop(tileSizes[i]))
+        continue;
+      if (iteratorTypes[i] != getParallelIteratorTypeName())
+        continue;
       distributedLoopRange.push_back(loopBounds[i]);
     }
     distributionInfo = options.distribution->procInfo(b, tilableOp.getLoc(),
@@ -243,7 +248,8 @@ LogicalResult TiledOpInterfaceBaseTilingPattern::matchAndRewriteBase(
   }
 
   FailureOr<TiledOp> res = tileInterfaceOp(rewriter, tilableOp, options);
-  if (failed(res)) return res;
+  if (failed(res))
+    return res;
   result = *res;
   if (result.op) {
     filter.replaceLinalgTransformationFilter(rewriter, result.op);
@@ -267,7 +273,7 @@ struct TiledOpInterfaceTilingPass
   }
   void runOnOperation() override;
 };
-}  // namespace
+} // namespace
 
 template <typename OpTy>
 static Value buildFlowWorkgroupInfoOp(OpBuilder &b, unsigned dim) {

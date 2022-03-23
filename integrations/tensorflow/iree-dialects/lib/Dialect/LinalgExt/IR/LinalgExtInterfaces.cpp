@@ -18,8 +18,8 @@ OpOperandVector::operator SmallVector<Value>() {
   return result;
 }
 
-LogicalResult IREE::LinalgExt::detail::verifyLinalgExtOpInterface(
-    Operation *op) {
+LogicalResult
+IREE::LinalgExt::detail::verifyLinalgExtOpInterface(Operation *op) {
   LinalgExtOp linalgExtOp = cast<LinalgExtOp>(op);
   if (op->getNumResults()) {
     if (!linalgExtOp.hasTensorSemantics()) {
@@ -48,4 +48,4 @@ LogicalResult IREE::LinalgExt::detail::verifyLinalgExtOpInterface(
   return success();
 }
 
-#include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOpInterfaces.cpp.inc"  // IWYU pragma: export
+#include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOpInterfaces.cpp.inc" // IWYU pragma: export

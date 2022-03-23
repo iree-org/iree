@@ -10,7 +10,7 @@
 include "mlir/Pass/PassBase.td"
 
 def ConvertFunctionMetadata :
-    Pass<"iree-tflite-convert-function-metadata", "mlir::FuncOp"> {
+    Pass<"iree-tflite-convert-function-metadata", "mlir::func::FuncOp"> {
   let summary = "Converts TFLite attributes to IREE attributes on functions.";
   let constructor = "mlir::iree_integrations::TFL::createConvertFunctionMetadataPass()";
 }
@@ -34,7 +34,7 @@ def RetainCallOnceFuncs :
 }
 
 def StripFunctionMetadata :
-    Pass<"iree-tflite-strip-function-metadata", "mlir::FuncOp"> {
+    Pass<"iree-tflite-strip-function-metadata", "mlir::func::FuncOp"> {
   let summary = "Guarantees that functions used by tfl.call_once are retained.";
   let constructor = "mlir::iree_integrations::TFL::createStripFunctionMetadataPass()";
 }
@@ -46,7 +46,7 @@ def StripModuleMetadata :
 }
 
 def VerifyFullyConverted :
-    Pass<"iree-tflite-verify-fully-converted", "mlir::FuncOp"> {
+    Pass<"iree-tflite-verify-fully-converted", "mlir::func::FuncOp"> {
   let summary = "Verifies that all TFLite frontend ops were converted and none remain.";
   let constructor = "mlir::iree_integrations::TFL::createVerifyFullyConvertedPass()";
 }

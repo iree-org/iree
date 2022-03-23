@@ -40,15 +40,14 @@ struct TiledOpInterfaceBaseTilingPattern
                                     linalg::LinalgTransformationFilter filter =
                                         linalg::LinalgTransformationFilter(),
                                     PatternBenefit benefit = 1)
-      : OpInterfaceRewritePattern(context, benefit),
-        filter(filter),
+      : OpInterfaceRewritePattern(context, benefit), filter(filter),
         options(options) {}
 
   LogicalResult matchAndRewriteBase(TiledOpInterface tilableOp,
                                     PatternRewriter &rewriter,
                                     TiledOp &result) const;
 
- private:
+private:
   /// LinalgTransformMarker handles special attribute manipulations.
   linalg::LinalgTransformationFilter filter;
   /// Options to control tiling;
@@ -73,7 +72,8 @@ struct TiledOpInterfaceTilingPattern
       return failure();
     }
     // Check for do-nothing case.
-    if (!tiledOp.op) return failure();
+    if (!tiledOp.op)
+      return failure();
     if (tiledOp.op != tilableOp) {
       if (tiledOp.results.empty()) {
         rewriter.eraseOp(tilableOp);
@@ -85,9 +85,9 @@ struct TiledOpInterfaceTilingPattern
   }
 };
 
-}  // namespace LinalgExt
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace LinalgExt
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_DIALECTS_DIALECT_LINALGEXT_TRANSFORMS_TRANSFORMS_H_
+#endif // IREE_DIALECTS_DIALECT_LINALGEXT_TRANSFORMS_TRANSFORMS_H_

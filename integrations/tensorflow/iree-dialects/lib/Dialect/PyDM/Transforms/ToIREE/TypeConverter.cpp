@@ -96,10 +96,10 @@ Type LoweringTypeConverter::getWeakIntegerType(Builder b) const {
 
 Type LoweringTypeConverter::getWeakFloatType(Builder b) const {
   switch (weakFloatType) {
-    case WeakFloatType::F32:
-      return b.getF32Type();
-    case WeakFloatType::F64:
-      return b.getF64Type();
+  case WeakFloatType::F32:
+    return b.getF32Type();
+  case WeakFloatType::F64:
+    return b.getF64Type();
   }
 }
 
@@ -110,7 +110,8 @@ bool LoweringTypeConverter::isTypeLegal(Type t) const {
 
 bool LoweringTypeConverter::areTypesLegal(TypeRange types) const {
   for (Type t : types) {
-    if (!isTypeLegal(t)) return false;
+    if (!isTypeLegal(t))
+      return false;
   }
   return true;
 }

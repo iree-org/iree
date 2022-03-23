@@ -29,11 +29,11 @@ class RetainCallOnceFuncsPass
     auto moduleOp = getOperation();
 
     llvm::DenseMap<StringRef, FuncOp> funcMap;
-    for (auto func : moduleOp.getOps<mlir::FuncOp>()) {
-      funcMap[func.sym_name()] = func;
+    for (auto func : moduleOp.getOps<mlir::func::FuncOp>()) {
+      funcMap[func.getSymName()] = func;
     }
 
-    for (auto func : moduleOp.getOps<mlir::FuncOp>()) {
+    for (auto func : moduleOp.getOps<mlir::func::FuncOp>()) {
       for (auto callOnce : func.getOps<mlir::TFL::CallOnceOp>()) {
         auto callFunc = funcMap[callOnce.session_init_function()];
         callOnce->setAttr("session_init_function_symbol",

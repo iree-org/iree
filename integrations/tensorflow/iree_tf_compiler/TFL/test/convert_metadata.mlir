@@ -1,4 +1,4 @@
-// RUN: iree-opt-tflite -split-input-file -pass-pipeline='iree-tflite-convert-module-metadata,builtin.func(iree-tflite-convert-function-metadata)' %s | FileCheck %s
+// RUN: iree-opt-tflite -split-input-file -pass-pipeline='iree-tflite-convert-module-metadata,func.func(iree-tflite-convert-function-metadata)' %s | FileCheck %s
 
 module attributes {tfl.schema_version = 3 : i32} {
   // CHECK: func @main(

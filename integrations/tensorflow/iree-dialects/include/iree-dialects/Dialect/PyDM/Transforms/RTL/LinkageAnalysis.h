@@ -19,7 +19,7 @@ namespace PYDM {
 
 /// An analysis of the external linkage which must be satisfied.
 class LinkageAnalysis {
- public:
+public:
   LinkageAnalysis(Operation *moduleOp);
 
   /// Whether there are any external functions that need resolution.
@@ -30,13 +30,13 @@ class LinkageAnalysis {
     return externFuncOps;
   }
 
- private:
+private:
   llvm::SmallVector<Operation *> externFuncOps;
 };
 
-}  // namespace PYDM
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace PYDM
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_DIALECTS_DIALECT_IREEPYDM_TRANSFORMS_RTL_LINKAGE_ANALYSIS_H
+#endif // IREE_DIALECTS_DIALECT_IREEPYDM_TRANSFORMS_RTL_LINKAGE_ANALYSIS_H

@@ -25,7 +25,7 @@ void buildMHLOImportPassPipeline(OpPassManager &pm) {
 
   // Import pipelines should end with canonicalization because they may have
   // access to dialects and patterns that the core compiler does not.
-  pm.addNestedPass<FuncOp>(mlir::createCanonicalizerPass());
+  pm.addNestedPass<func::FuncOp>(mlir::createCanonicalizerPass());
 }
 
 void registerMHLOImportPassPipeline() {
