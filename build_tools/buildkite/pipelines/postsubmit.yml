@@ -27,8 +27,8 @@ steps:
     steps:
       - label: "Updating presubmit pipeline configuration"
         concurrency: 1
-        concurrency_group: "update-pipelines/presubmit"
-        key: "update-pipelines/presubmit"
+        concurrency_group: "update-pipelines-presubmit"
+        key: "update-pipelines-presubmit"
         commands: |
           export BUILDKITE_ACCESS_TOKEN="$(gcloud secrets versions access latest \
               --secret=iree-buildkite-privileged)"
@@ -36,8 +36,8 @@ steps:
 
       - label: "Updating postsubmit pipeline configuration"
         concurrency: 1
-        concurrency_group: "update-pipelines/postsubmit"
-        key: "update-pipelines/postsubmit"
+        concurrency_group: "update-pipelines-postsubmit"
+        key: "update-pipelines-postsubmit"
         commands: |
           export BUILDKITE_ACCESS_TOKEN="$(gcloud secrets versions access latest \
               --secret=iree-buildkite-privileged)"
