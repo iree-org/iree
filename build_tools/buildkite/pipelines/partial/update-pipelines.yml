@@ -1,0 +1,35 @@
+# Copyright 2022 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+agents:
+  queue: "orchestration"
+  security: "submitted"
+
+steps:
+  # TODO genericize this
+  - group: "Updating pipelines"
+    # Each of these are different steps so they can succeed and fail separately,
+    # which means that step success status indicates whether the pipeline was
+    # successfully updated. That ties into how the update script checks for
+    # updates from later builds.
+    steps:
+      - label: "Updating presubmit pipeline configuration"
+        concurrency: 1
+        concurrency_group: "update-pipelines/presubmit"
+        key: "update-pipelines-presubmit"
+        commands: |
+          export BUILDKITE_ACCESS_TOKEN="$(gcloud secrets versions access latest \
+              --secret=iree-buildkite-privileged)"
+          build_tools/buildkite/scripts/update_pipeline_configuration.py presubmit
+
+      - label: "Updating postsubmit pipeline configuration"
+        concurrency: 1
+        concurrency_group: "update-pipelines/postsubmit"
+        key: "update-pipelines-postsubmit"
+        commands: |
+          export BUILDKITE_ACCESS_TOKEN="$(gcloud secrets versions access latest \
+              --secret=iree-buildkite-privileged)"
+          build_tools/buildkite/scripts/update_pipeline_configuration.py postsubmit
