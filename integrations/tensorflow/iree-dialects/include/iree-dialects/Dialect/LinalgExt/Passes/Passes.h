@@ -24,9 +24,9 @@ void registerTilingInterfaceExternalModels(DialectRegistry &registry);
 
 void registerPasses();
 
-}  // namespace LinalgExt
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace LinalgExt
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_DIALECTS_DIALECT_LINALGEXT_TRANSFORMS_PASSES_H_
+#endif // IREE_DIALECTS_DIALECT_LINALGEXT_TRANSFORMS_PASSES_H_

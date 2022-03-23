@@ -7,9 +7,9 @@
 #include "iree-dialects/Dialect/Input/InputDialect.h"
 
 #include "iree-dialects/Dialect/Input/InputOps.h"
-#include "llvm/ADT/TypeSwitch.h"
 #include "mlir/IR/DialectImplementation.h"
 #include "mlir/Support/LLVM.h"
+#include "llvm/ADT/TypeSwitch.h"
 
 using namespace mlir;
 using namespace mlir::iree_compiler::IREE::Input;
@@ -63,7 +63,7 @@ void PtrType::print(AsmPrinter &printer) const {
   printer << "<" << getTargetType() << ">";
 }
 
-}  // namespace Input
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace Input
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir

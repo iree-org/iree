@@ -77,7 +77,8 @@ static bool padTensor(Location loc, OpOperand *operand,
       needsPad = true;
     }
   }
-  if (!needsPad) return false;
+  if (!needsPad)
+    return false;
 
   auto resultType = RankedTensorType::get(newStaticDims, type.getElementType());
   Value zeroConstant = builder.create<arith::ConstantOp>(
@@ -132,7 +133,7 @@ struct PadContractionToBlockSizePass
     });
   }
 };
-}  // namespace
+} // namespace
 
 std::unique_ptr<OperationPass<>>
 IREE::LinalgExt::createPadContractionToBlockSizePass() {

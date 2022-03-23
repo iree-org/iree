@@ -20,15 +20,15 @@ namespace PYDM {
 
 /// Base class for all unboxed primitive types.
 class PrimitiveType : public mlir::Type {
- public:
+public:
   using mlir::Type::Type;
   static bool classof(Type type);
 };
 
-}  // namespace PYDM
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace PYDM
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir
 
 // Include generated dialect code (this comment blocks clang-format from
 // clobbering order).
@@ -48,9 +48,9 @@ inline bool PrimitiveType::classof(Type type) {
                   ListType, NoneType, RealType, StrType, TupleType, TypeType>();
 }
 
-}  // namespace PYDM
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace PYDM
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_DIALECTS_DIALECT_PYDM_IR_PYDM_DIALECT_H
+#endif // IREE_DIALECTS_DIALECT_PYDM_IR_PYDM_DIALECT_H

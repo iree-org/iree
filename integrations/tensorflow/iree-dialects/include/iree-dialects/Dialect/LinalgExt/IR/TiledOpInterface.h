@@ -25,9 +25,9 @@ namespace LinalgExt {
 /// Registers external models implemented for the `TiledOpInterface`.
 void registerTiledOpInterfaceExternalModels(DialectRegistry &registry);
 
-}  // namespace LinalgExt
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace LinalgExt
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_DIALECTS_DIALECT_LINALGEXT_IR_TILEDOPINTERFACE_H_
+#endif // IREE_DIALECTS_DIALECT_LINALGEXT_IR_TILEDOPINTERFACE_H_

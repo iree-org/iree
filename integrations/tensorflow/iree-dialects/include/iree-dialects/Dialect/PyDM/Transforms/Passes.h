@@ -41,20 +41,20 @@ std::unique_ptr<OperationPass<ModuleOp>> createConvertIREEPyDMToIREEPass();
 std::unique_ptr<OperationPass<FuncOp>> createLocalPropagateTypesPass();
 std::unique_ptr<OperationPass<FuncOp>> createVariablesToSSAPass();
 std::unique_ptr<OperationPass<>> createFixateWeakNumericPass();
-std::unique_ptr<OperationPass<ModuleOp>> createLinkIREEPyDMRTLPass(
-    Optional<SourceBundle> linkRtlSourceBundle = None);
+std::unique_ptr<OperationPass<ModuleOp>>
+createLinkIREEPyDMRTLPass(Optional<SourceBundle> linkRtlSourceBundle = None);
 std::unique_ptr<OperationPass<ModuleOp>> createLowerIREEPyDMToRTLPass();
 
-void buildPostImportPassPipeline(OpPassManager& passManager);
-void buildLowerToIREEPassPipeline(OpPassManager& passManager,
-                                  const LowerToIREEOptions& options);
+void buildPostImportPassPipeline(OpPassManager &passManager);
+void buildLowerToIREEPassPipeline(OpPassManager &passManager,
+                                  const LowerToIREEOptions &options);
 
 /// Register all passes and pass pipelines.
 void registerPasses();
 
-}  // namespace PYDM
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace PYDM
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_DIALECTS_DIALECT_IREEPYDM_TRANSFORMS_PASSES_H
+#endif // IREE_DIALECTS_DIALECT_IREEPYDM_TRANSFORMS_PASSES_H

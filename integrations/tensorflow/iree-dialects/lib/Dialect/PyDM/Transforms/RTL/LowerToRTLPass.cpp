@@ -20,7 +20,7 @@ using namespace PYDM;
 namespace {
 
 class RtlFunc {
- protected:
+protected:
   FunctionType makeRaisingSignature(Builder b, ArrayRef<Type> inputs,
                                     Type output) {
     return b.getType<FunctionType>(
@@ -33,7 +33,8 @@ Operation *importRtlFunc(SymbolTable &symbolTable, RtlFuncTy rtlFunc) {
   OpBuilder builder(symbolTable.getOp()->getContext());
   auto name = builder.getStringAttr(rtlFunc.getRtlName());
   auto *existing = symbolTable.lookup(name);
-  if (existing) return existing;
+  if (existing)
+    return existing;
 
   // Does not exist - create detached and insert.
   FunctionType signature = rtlFunc.getRtlSignature(builder);
@@ -66,7 +67,7 @@ struct DynamicBinaryPromoteFunc : public RtlFunc {
 
 /// pydmrtl$apply_binary_${dunderName} RTL func.
 class ApplyBinaryFunc : public RtlFunc {
- public:
+public:
   ApplyBinaryFunc(StringRef dunderName) : rtlName("pydmrtl$apply_binary_") {
     rtlName.append(dunderName.begin(), dunderName.end());
   }
@@ -76,13 +77,13 @@ class ApplyBinaryFunc : public RtlFunc {
     return makeRaisingSignature(b, {objectType, objectType}, objectType);
   }
 
- private:
+private:
   std::string rtlName;
 };
 
 /// pydmrtl$apply_compare_${dunderName} RTL func.
 class ApplyCompareFunc : public RtlFunc {
- public:
+public:
   ApplyCompareFunc(StringRef dunderName) : rtlName("pydmrtl$apply_compare_") {
     rtlName.append(dunderName.begin(), dunderName.end());
   }
@@ -93,19 +94,19 @@ class ApplyCompareFunc : public RtlFunc {
     return makeRaisingSignature(b, {objectType, objectType}, boolType);
   }
 
- private:
+private:
   std::string rtlName;
 };
 
 template <typename RtlFuncTy, typename OpTy>
 class EmitImportCallBase : public OpRewritePattern<OpTy> {
- public:
+public:
   EmitImportCallBase(SymbolTable &symbolTable, PatternBenefit benefit = 1)
       : OpRewritePattern<OpTy>::OpRewritePattern(
             symbolTable.getOp()->getContext(), benefit),
         symbolTable(symbolTable) {}
 
- protected:
+protected:
   Value emitImportCall(Location loc, ValueRange inputs, RtlFuncTy rtlFunc,
                        PatternRewriter &rewriter) const {
     auto rtlName = rtlFunc.getRtlName();
@@ -152,7 +153,7 @@ class EmitImportCallBase : public OpRewritePattern<OpTy> {
     }
   }
 
- private:
+private:
   SymbolTable &symbolTable;
 };
 
@@ -244,7 +245,7 @@ struct LowerIREEPyDMToRTLPass
   }
 };
 
-}  // namespace
+} // namespace
 
 std::unique_ptr<OperationPass<ModuleOp>> PYDM::createLowerIREEPyDMToRTLPass() {
   return std::make_unique<LowerIREEPyDMToRTLPass>();
