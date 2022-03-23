@@ -93,7 +93,7 @@ func private @Forward_o16DF3vQKaI__disable_call_shape_inference_true_.189(%arg0:
     slice_sizes = dense<[1, 1, 64]> : tensor<3xi64>
   } : (tensor<5x1x64xf32>, tensor<i64>) -> tensor<1x64xf32>
   %63 = "mhlo.concatenate"(%62, %49) {dimension = 1 : i64} : (tensor<1x64xf32>, tensor<1x10xf32>) -> tensor<1x74xf32>
-  %64 = "mhlo.dot"(%63, %46) {precision_config = ["DEFAULT", "DEFAULT"]} : (tensor<1x74xf32>, tensor<74x40xf32>) -> tensor<1x40xf32>
+  %64 = "mhlo.dot"(%63, %46) {precision_config = [#mhlo<"precision DEFAULT">, #mhlo<"precision DEFAULT">]} : (tensor<1x74xf32>, tensor<74x40xf32>) -> tensor<1x40xf32>
   %65 = "mhlo.reshape"(%44) : (tensor<40xf32>) -> tensor<1x40xf32>
   %66 = mhlo.add %64, %65 : tensor<1x40xf32>
   %67 = "mhlo.slice"(%66) {limit_indices = dense<[1, 30]> : tensor<2xi64>, start_indices = dense<[0, 20]> : tensor<2xi64>, strides = dense<1> : tensor<2xi64>} : (tensor<1x40xf32>) -> tensor<1x10xf32>

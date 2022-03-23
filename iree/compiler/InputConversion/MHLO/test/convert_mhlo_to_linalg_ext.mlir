@@ -413,7 +413,7 @@ func @scatter_update_batch_slice_3D_dynamic(%arg0: tensor<1x24x512xi32>,
 
 func @rfft_1d(%input: tensor<8xf32>) -> (tensor<5xf32>, tensor<5xf32>) {
   %0 = "mhlo.fft"(%input) {
-    fft_length = dense<8> : tensor<1xi64>, fft_type = "RFFT"
+    fft_length = dense<8> : tensor<1xi64>, fft_type = #mhlo<"fft_type RFFT">
   } : (tensor<8xf32>) -> tensor<5xcomplex<f32>>
   %1 = "mhlo.real"(%0) : (tensor<5xcomplex<f32>>) -> tensor<5xf32>
   %2 = "mhlo.imag"(%0) : (tensor<5xcomplex<f32>>) -> tensor<5xf32>
@@ -460,7 +460,7 @@ func @rfft_1d(%input: tensor<8xf32>) -> (tensor<5xf32>, tensor<5xf32>) {
 
 func @rfft_2d(%input: tensor<4x8xf32>) -> (tensor<4x5xf32>, tensor<4x5xf32>) {
   %0 = "mhlo.fft"(%input) {
-    fft_length = dense<8> : tensor<1xi64>, fft_type = "RFFT"
+    fft_length = dense<8> : tensor<1xi64>, fft_type = #mhlo<"fft_type RFFT">
   } : (tensor<4x8xf32>) -> tensor<4x5xcomplex<f32>>
   %1 = "mhlo.real"(%0) : (tensor<4x5xcomplex<f32>>) -> tensor<4x5xf32>
   %2 = "mhlo.imag"(%0) : (tensor<4x5xcomplex<f32>>) -> tensor<4x5xf32>
