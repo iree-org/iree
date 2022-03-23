@@ -20,6 +20,12 @@ steps:
 
   - label: "Checking if pipelines should be updated"
     key: "update-pipelines"
+    # Ensure that only one update operation runs at a time. See
+    # https://buildkite.com/docs/pipelines/controlling-concurrency
+    # It is still necessary to ensure that the build from an earlier commit
+    # doesn't override updates already made by a later
+    concurrency: 1
+    concurrency_group: pipeline-update
     commands: |
       export BUILDKITE_ACCESS_TOKEN="$(gcloud secrets versions access latest \
           --secret=iree-buildkite-privileged)"

@@ -10,10 +10,6 @@ agents:
 
 steps:
   - label: "Updating presubmit pipeline configuration"
-    # Ensure that only one update operation per pipeline runs at a time. See
-    # https://buildkite.com/docs/pipelines/controlling-concurrency
-    concurrency: 1
-    concurrency_group: pipeline-update/presubmit
     commands: |
       export BUILDKITE_ACCESS_TOKEN="$(gcloud secrets versions access latest \
           --secret=iree-buildkite-privileged)"
@@ -22,10 +18,6 @@ steps:
           --file build_tools/buildkite/pipelines/presubmit.yml
 
   - label: "Updating postsubmit pipeline configuration"
-    # Ensure that only one update operation per pipeline runs at a time. See
-    # https://buildkite.com/docs/pipelines/controlling-concurrency
-    concurrency: 1
-    concurrency_group: pipeline-update/postsubmit
     commands: |
       export BUILDKITE_ACCESS_TOKEN="$(gcloud secrets versions access latest \
           --secret=iree-buildkite-privileged)"
