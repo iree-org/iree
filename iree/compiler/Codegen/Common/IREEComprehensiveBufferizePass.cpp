@@ -104,6 +104,10 @@ void IREEComprehensiveBufferizePass::runOnOperation() {
   options.testAnalysisOnly = testAnalysisOnly;
   options.printConflicts = printConflicts;
   options.alwaysAliasingWithDest = true;
+  // TODO(hanchung): Revisit if we want to disable the flag. memref.alloca ops
+  // are created when the flag is enabled. There are no alloca ops when the flag
+  // is disable. It looks like an upstream bug.
+  options.createDeallocs = false;
   addPostAnalysisTransformations(options);
 
   if (failed(bufferization::runOneShotBufferize(moduleOp, options))) {
