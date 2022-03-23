@@ -220,9 +220,12 @@ void registerPartitionableLoopsInterfaceModels(DialectRegistry &registry) {
       +[](MLIRContext *ctx, LinalgExt::IREELinalgExtDialect *dialect) {
         registerInterfaceForTiledOpInterfaceOps<
             LinalgExt::FftOp, LinalgExt::ReverseOp, LinalgExt::ScanOp,
-            LinalgExt::ScatterOp, LinalgExt::SortOp, tensor::ExtractSliceOp,
-            tensor::InsertSliceOp>(ctx);
+            LinalgExt::ScatterOp, LinalgExt::SortOp>(ctx);
       });
+  registry.addExtension(+[](MLIRContext *ctx, tensor::TensorDialect *dialect) {
+    registerInterfaceForTiledOpInterfaceOps<tensor::ExtractSliceOp,
+                                            tensor::InsertSliceOp>(ctx);
+  });
 }
 
 }  // namespace Flow
