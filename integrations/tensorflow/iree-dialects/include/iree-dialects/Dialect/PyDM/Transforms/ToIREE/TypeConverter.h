@@ -16,7 +16,7 @@ namespace IREE {
 namespace PYDM {
 
 class LoweringTypeConverter : public mlir::TypeConverter {
- public:
+public:
   enum class WeakFloatType {
     F32,
     F64,
@@ -32,15 +32,15 @@ class LoweringTypeConverter : public mlir::TypeConverter {
   bool isTypeLegal(Type t) const;
   bool areTypesLegal(TypeRange types) const;
 
- private:
+private:
   bool boolBits = 32;
   int weakIntegerBits = 32;
   WeakFloatType weakFloatType = WeakFloatType::F32;
 };
 
-}  // namespace PYDM
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace PYDM
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_DIALECTS_DIALECT_IREEPYDM_TRANSFORMS_TOIREE_TYPECONVERTER_H
+#endif // IREE_DIALECTS_DIALECT_IREEPYDM_TRANSFORMS_TOIREE_TYPECONVERTER_H

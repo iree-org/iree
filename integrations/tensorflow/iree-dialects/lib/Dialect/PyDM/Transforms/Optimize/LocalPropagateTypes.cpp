@@ -8,9 +8,9 @@
 #include "iree-dialects/Dialect/PyDM/IR/PyDMOps.h"
 #include "iree-dialects/Dialect/PyDM/Transforms/Passes.h"
 #include "iree-dialects/Dialect/PyDM/Utils/TypeInference.h"
-#include "llvm/Support/Debug.h"
 #include "mlir/IR/BlockAndValueMapping.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+#include "llvm/Support/Debug.h"
 
 using namespace mlir;
 namespace PYDM = mlir::iree_compiler::IREE::PYDM;
@@ -59,10 +59,13 @@ struct LocalPropagateTypesPass
         return signalPassFailure();
       }
       changed = false;
-      if (sinkStaticInfoCasts()) changed = true;
-      if (refineResultTypes()) changed = true;
+      if (sinkStaticInfoCasts())
+        changed = true;
+      if (refineResultTypes())
+        changed = true;
       permuteRefinedBlocks(propagator);
-      if (!changed) break;
+      if (!changed)
+        break;
     }
 
     // Now that iteration is complete and we are no longer using the
@@ -142,7 +145,8 @@ struct LocalPropagateTypesPass
       Operation *refinableOp = refinable.getOperation();
       SmallVector<Type> originalResultTypes(refinableOp->getResultTypes());
       LLVM_DEBUG(dbgs() << "  refineResultTypes: " << *refinableOp << "\n");
-      if (!refinable.refineResultTypes()) return;
+      if (!refinable.refineResultTypes())
+        return;
       LLVM_DEBUG(dbgs() << "  refineResultTypes changed results: "
                         << *refinableOp << "\n");
       OpBuilder builder(refinableOp);
@@ -152,7 +156,8 @@ struct LocalPropagateTypesPass
         Type origType = std::get<0>(it);
         OpResult result = std::get<1>(it);
         Type newType = result.getType();
-        if (origType == newType) continue;
+        if (origType == newType)
+          continue;
         // Insert a static info cast.
         // In the future, we could further query the use for refinable
         // support and skip creating the op.
@@ -173,7 +178,8 @@ struct LocalPropagateTypesPass
         }
         auto casted = builder.create<StaticInfoCastOp>(refinableOp->getLoc(),
                                                        origType, newResult);
-        if (!replaceExcept) replaceExcept = casted;
+        if (!replaceExcept)
+          replaceExcept = casted;
         result.replaceAllUsesExcept(casted, replaceExcept);
         changed = true;
       }
@@ -195,7 +201,8 @@ struct LocalPropagateTypesPass
     for (auto *block : blocks) {
       auto mismatchedPredecessors =
           propagator.findMismatchedBlockPredecessors(block);
-      if (mismatchedPredecessors.empty()) continue;
+      if (mismatchedPredecessors.empty())
+        continue;
       LLVM_DEBUG(dbgs() << "  ++ Processing block " << block << " ("
                         << mismatchedPredecessors.size()
                         << " mismatched predecessors)\n");
@@ -244,7 +251,7 @@ struct LocalPropagateTypesPass
   }
 };
 
-}  // namespace
+} // namespace
 
 std::unique_ptr<OperationPass<PYDM::FuncOp>>
 PYDM::createLocalPropagateTypesPass() {

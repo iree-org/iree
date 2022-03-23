@@ -26,7 +26,8 @@ struct PyIREEPyDMSourceBundle {
   }
   PyIREEPyDMSourceBundle(const PyIREEPyDMSourceBundle &) = delete;
   ~PyIREEPyDMSourceBundle() {
-    if (wrapped.ptr) ireePyDMSourceBundleDestroy(wrapped);
+    if (wrapped.ptr)
+      ireePyDMSourceBundleDestroy(wrapped);
   }
   IREEPyDMSourceBundle wrapped;
 };
@@ -39,12 +40,13 @@ struct PyIREEPyDMLoweringOptions {
   }
   PyIREEPyDMLoweringOptions(const PyIREEPyDMLoweringOptions &) = delete;
   ~PyIREEPyDMLoweringOptions() {
-    if (wrapped.ptr) ireePyDMLoweringOptionsDestroy(wrapped);
+    if (wrapped.ptr)
+      ireePyDMLoweringOptionsDestroy(wrapped);
   }
   IREEPyDMLoweringOptions wrapped;
 };
 
-}  // namespace
+} // namespace
 
 PYBIND11_MODULE(_ireeDialects, m) {
   m.doc() = "iree-dialects main python extension";
@@ -97,6 +99,22 @@ PYBIND11_MODULE(_ireeDialects, m) {
       "register_dialect",
       [](MlirContext context, bool load) {
         MlirDialectHandle handle = mlirGetDialectHandle__iree_linalg_ext__();
+        mlirDialectHandleRegisterDialect(handle, context);
+        if (load) {
+          mlirDialectHandleLoadDialect(handle, context);
+        }
+      },
+      py::arg("context") = py::none(), py::arg("load") = true);
+
+  //===--------------------------------------------------------------------===//
+  // LinalgTransform
+  //===--------------------------------------------------------------------===//
+  auto iree_linalg_transform_m = m.def_submodule("iree_linalg_transform");
+  iree_linalg_transform_m.def(
+      "register_dialect",
+      [](MlirContext context, bool load) {
+        MlirDialectHandle handle =
+            mlirGetDialectHandle__iree_linalg_transform__();
         mlirDialectHandleRegisterDialect(handle, context);
         if (load) {
           mlirDialectHandleLoadDialect(handle, context);
@@ -171,14 +189,14 @@ PYBIND11_MODULE(_ireeDialects, m) {
       },
       py::arg("pass_manager"));
 
-#define DEFINE_IREEPYDM_NULLARY_TYPE(Name)                                 \
-  mlir_type_subclass(iree_pydm_m, #Name "Type", mlirTypeIsAIREEPyDM##Name, \
-                     typeClass)                                            \
-      .def_classmethod(                                                    \
-          "get",                                                           \
-          [](py::object cls, MlirContext context) {                        \
-            return cls(mlirIREEPyDM##Name##TypeGet(context));              \
-          },                                                               \
+#define DEFINE_IREEPYDM_NULLARY_TYPE(Name)                                     \
+  mlir_type_subclass(iree_pydm_m, #Name "Type", mlirTypeIsAIREEPyDM##Name,     \
+                     typeClass)                                                \
+      .def_classmethod(                                                        \
+          "get",                                                               \
+          [](py::object cls, MlirContext context) {                            \
+            return cls(mlirIREEPyDM##Name##TypeGet(context));                  \
+          },                                                                   \
           py::arg("cls"), py::arg("context") = py::none());
 
   DEFINE_IREEPYDM_NULLARY_TYPE(Bool)
