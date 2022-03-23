@@ -7,12 +7,14 @@
 #include "iree-dialects/Dialect/Input/InputDialect.h"
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree-dialects/Dialect/LinalgExt/IR/TiledOpInterface.h"
+#include "iree-dialects/Dialect/LinalgExt/LinalgExtBufferization.h"
 #include "iree-dialects/Dialect/LinalgExt/Passes/Passes.h"
 #include "iree-dialects/Dialect/LinalgTransform/LinalgTransformOps.h"
 #include "iree-dialects/Dialect/LinalgTransform/Passes.h"
 #include "iree-dialects/Dialect/PyDM/IR/PyDMDialect.h"
 #include "iree-dialects/Dialect/PyDM/Transforms/Passes.h"
 #include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
+#include "mlir/Dialect/Async/IR/Async.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlow.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
@@ -51,7 +53,8 @@ int main(int argc, char **argv) {
       mlir::iree_compiler::IREE::PYDM::IREEPyDMDialect,
       mlir::linalg::transform::LinalgTransformDialect,
       // Upstream dialects
-      mlir::arith::ArithmeticDialect, 
+      mlir::async::AsyncDialect,
+      mlir::arith::ArithmeticDialect,
       mlir::AffineDialect, 
       mlir::cf::ControlFlowDialect,
       mlir::func::FuncDialect, 
@@ -79,6 +82,8 @@ int main(int argc, char **argv) {
 
   // External models.
   IREE::LinalgExt::registerTiledOpInterfaceExternalModels(registry);
+  IREE::LinalgExt::registerTilingInterfaceExternalModels(registry);
+  IREE::LinalgExt::registerBufferizableOpInterfaceExternalModels(registry);
 
   return mlir::asMainReturnCode(
       mlir::MlirOptMain(argc, argv, "MLIR modular optimizer driver\n", registry,
