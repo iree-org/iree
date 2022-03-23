@@ -129,7 +129,7 @@ class DeviceInfo:
 
   def to_json_object(self) -> Dict[str, Any]:
     return {
-        "platform_type": self.platform_type,
+        "platform_type": self.platform_type.value,
         "model": self.model,
         "cpu_abi": self.cpu_abi,
         "cpu_features": self.cpu_features,
@@ -138,9 +138,9 @@ class DeviceInfo:
 
   @staticmethod
   def from_json_object(json_object: Dict[str, Any]):
-    return DeviceInfo(json_object["platform_type"], json_object["model"],
-                      json_object["cpu_abi"], json_object["cpu_features"],
-                      json_object["gpu_name"])
+    return DeviceInfo(PlatformType(json_object["platform_type"]),
+                      json_object["model"], json_object["cpu_abi"],
+                      json_object["cpu_features"], json_object["gpu_name"])
 
   def __get_arm_cpu_arch_revision(self) -> str:
     """Returns the ARM architecture revision."""
