@@ -669,6 +669,20 @@ LogicalResult transform::UnrollLoopOp::applyToOne(scf::ForOp loop) {
 }
 
 //===---------------------------------------------------------------------===//
+// PeelLoopOp
+//===---------------------------------------------------------------------===//
+
+FailureOr<scf::ForOp> transform::PeelLoopOp::applyToOne(scf::ForOp loop) {
+  scf::ForOp result;
+  IRRewriter rewriter(loop->getContext());
+  LogicalResult status =
+      scf::peelAndCanonicalizeForLoop(rewriter, loop, result);
+  if (failed(status))
+    return failure();
+  return result;
+}
+
+//===---------------------------------------------------------------------===//
 // PipelineLoopOp
 //===---------------------------------------------------------------------===//
 
