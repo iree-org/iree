@@ -18,7 +18,7 @@ from enum import Enum
 from typing import Any, Dict, Sequence
 
 __all__ = [
-    "DeviceType", "DeviceInfo", "BenchmarkInfo", "BenchmarkResults",
+    "PlatformType", "DeviceInfo", "BenchmarkInfo", "BenchmarkResults",
     "BenchmarkRun", "execute_cmd_and_get_output", "execute_cmd"
 ]
 
@@ -29,11 +29,11 @@ class DriverInfo:
 
   It includes the following characteristics:
   - pretty_name: the pretty name, e.g., 'IREE-DyLib'
-  - arch_type: the targeted architecture type, e.g., 'CPU'
+  - device_type: the targeted device type, e.g., 'CPU'
   """
 
   pretty_name: str
-  arch_type: str
+  device_type: str
 
 
 # A map for IREE driver names. This allows us to normalize driver names like
@@ -89,7 +89,7 @@ def execute_cmd_and_get_output(args: Sequence[str],
                      **kwargs).stdout.strip()
 
 
-class DeviceType(Enum):
+class PlatformType(Enum):
   ANDROID = "Android"
 
 
@@ -98,14 +98,14 @@ class DeviceInfo:
   """An object describing a device.
 
   It includes the following characteristics:
-  - device_type: the device type, e.g., 'Android'
+  - platform_type: the OS platform, e.g., 'Android'
   - model: the product model, e.g., 'Pixel-4'
   - cpu_abi: the CPU ABI, e.g., 'arm64-v8a'
   - cpu_features: the detailed CPU features, e.g., ['fphp', 'sve']
   - gpu_name: the GPU name, e.g., 'Mali-G77'
   """
 
-  device_type: str
+  platform_type: PlatformType
   model: str
   cpu_abi: str
   cpu_features: Sequence[str]
@@ -120,16 +120,16 @@ class DeviceInfo:
         f"cpu_features=[{features}]",
     ]
     params = ", ".join(params)
-    return f"{self.device_type} device <{params}>"
+    return f"{self.platform_type.value} device <{params}>"
 
   def get_cpu_arch_revision(self) -> str:
-    if self.device_type == DeviceType.ANDROID:
+    if self.cpu_abi == "arm64-v8a":
       return self.__get_arm_cpu_arch_revision()
-    raise ValueError(f"No defined revision for '{self.device_type}'")
+    raise ValueError("Unrecognized CPU ABI; need to update the list")
 
   def to_json_object(self) -> Dict[str, Any]:
     return {
-        "device_type": self.device_type,
+        "platform_type": self.platform_type,
         "model": self.model,
         "cpu_abi": self.cpu_abi,
         "cpu_features": self.cpu_features,
@@ -138,14 +138,12 @@ class DeviceInfo:
 
   @staticmethod
   def from_json_object(json_object: Dict[str, Any]):
-    return DeviceInfo(json_object["device_type"], json_object["model"],
+    return DeviceInfo(json_object["platform_type"], json_object["model"],
                       json_object["cpu_abi"], json_object["cpu_features"],
                       json_object["gpu_name"])
 
   def __get_arm_cpu_arch_revision(self) -> str:
     """Returns the ARM architecture revision."""
-    if self.cpu_abi != "arm64-v8a":
-      raise ValueError("Unrecognized ARM CPU ABI; need to update the list")
 
     # CPU features for ARMv8 revisions.
     # From https://en.wikichip.org/wiki/arm/armv8#ARMv8_Extensions_and_Processor_Features
@@ -192,14 +190,14 @@ class BenchmarkInfo:
           f"Unrecognized runner '{self.runner}'; need to update the list")
 
     target_arch = None
-    if driver_info.arch_type == 'GPU':
+    if driver_info.device_type == 'GPU':
       target_arch = "GPU-" + self.device_info.gpu_name
-    elif driver_info.arch_type == 'CPU':
+    elif driver_info.device_type == 'CPU':
       target_arch = "CPU-" + self.device_info.get_cpu_arch_revision()
     else:
       raise ValueError(
-          f"Unrecognized architecture '{driver_info.arch_type}' of the runner "
-          f"'{self.runner}'")
+          f"Unrecognized device type '{driver_info.device_type}' of the runner '{self.runner}'"
+      )
 
     if self.model_tags:
       tags = ",".join(self.model_tags)

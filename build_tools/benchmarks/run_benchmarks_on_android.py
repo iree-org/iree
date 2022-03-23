@@ -42,9 +42,9 @@ import sys
 
 from typing import Any, Dict, List, Optional, Sequence, Tuple, TextIO, Set
 
-from common.benchmark_definition import (DeviceType, DeviceInfo, BenchmarkInfo,
-                                         BenchmarkResults, BenchmarkRun,
-                                         execute_cmd,
+from common.benchmark_definition import (PlatformType, DeviceInfo,
+                                         BenchmarkInfo, BenchmarkResults,
+                                         BenchmarkRun, execute_cmd,
                                          execute_cmd_and_get_output)
 from common.benchmark_suite import (BENCHMARK_SUITE_REL_PATH,
                                     compose_info_object,
@@ -739,7 +739,7 @@ def real_path_or_none(path: str) -> Optional[str]:
 
 
 def get_device_info_from_adb(verbose: bool = False):
-  return DeviceInfo(DeviceType.ANDROID, get_android_device_model(verbose),
+  return DeviceInfo(PlatformType.ANDROID, get_android_device_model(verbose),
                     get_android_cpu_abi(verbose),
                     get_android_cpu_features(verbose),
                     get_android_gpu_name(verbose))
