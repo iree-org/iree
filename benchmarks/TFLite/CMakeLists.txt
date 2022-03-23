@@ -64,6 +64,7 @@ set(MOBILEBERT_FP32_MODULE
   TAGS
     "fp32"
   SOURCE
+    # Mirror of https://tfhub.dev/iree/lite-model/mobilebert/fp32/1
     "https://storage.googleapis.com/iree-model-artifacts/mobilebert-baseline-tf2-float.tflite"
   ENTRY_FUNCTION
     "main"
@@ -77,6 +78,7 @@ set(MOBILEBERT_INT8_MODULE
   TAGS
     "int8"
   SOURCE
+    # Mirror of https://tfhub.dev/iree/lite-model/mobilebert/int8/1
     "https://storage.googleapis.com/iree-model-artifacts/mobilebert-baseline-tf2-quant.tflite"
   ENTRY_FUNCTION
     "main"
