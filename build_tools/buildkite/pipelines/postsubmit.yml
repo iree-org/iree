@@ -25,7 +25,7 @@ steps:
           --secret=iree-buildkite-privileged)"
       # Note that dollar sign has to be escaped to avoid Buildkite trying to do
       # a substitution.
-      ./build_tools/buildkite/scripts/check_for_later_completed_build.py || ret=\$?
+      ./build_tools/buildkite/scripts/check_for_later_build.py || ret=\$?
       if (( ret == 2 )); then
         # There is a later instance of this build running. Do nothing.
         exit 0
