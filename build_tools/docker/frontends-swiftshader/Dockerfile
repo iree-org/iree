@@ -4,8 +4,8 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-FROM gcr.io/iree-oss/frontends@sha256:3eab65512589e7dabeced8aeb2c392e82f5bf1caafad7639e1b679be908ceb33
-COPY --from=gcr.io/iree-oss/swiftshader@sha256:cbb7bd12f095df6d2eabbd0317fca9d44c4edd130d7a6c83e8363142c3e7468c \
+FROM gcr.io/iree-oss/frontends@sha256:61a0b0ed212a53d39aa5f78da49c30ce37fc6132c72573e0bbdeb92cc3699803
+COPY --from=gcr.io/iree-oss/swiftshader@sha256:a99008c89a1ff024595d8f8a39046b670cdf6dfeac5a6972fdce2dd8934136fa \
   /swiftshader /swiftshader
 
 # Set VK_ICD_FILENAMES so Vulkan loader can find the SwiftShader ICD.
