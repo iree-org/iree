@@ -25,23 +25,23 @@ steps:
     # successfully updated. That ties into how the update script checks for
     # updates from later builds.
     steps:
-    - label: "Updating presubmit pipeline configuration"
-      concurrency: 1
-      concurrency_group: "update-pipelines/presubmit"
-      key: "update-pipelines/presubmit"
-      commands: |
-        export BUILDKITE_ACCESS_TOKEN="$(gcloud secrets versions access latest \
-            --secret=iree-buildkite-privileged)"
-        build_tools/buildkite/scripts/update_pipeline_configuration.py presubmit
+      - label: "Updating presubmit pipeline configuration"
+        concurrency: 1
+        concurrency_group: "update-pipelines/presubmit"
+        key: "update-pipelines/presubmit"
+        commands: |
+          export BUILDKITE_ACCESS_TOKEN="$(gcloud secrets versions access latest \
+              --secret=iree-buildkite-privileged)"
+          build_tools/buildkite/scripts/update_pipeline_configuration.py presubmit
 
-    - label: "Updating postsubmit pipeline configuration"
-      concurrency: 1
-      concurrency_group: "update-pipelines/postsubmit"
-      key: "update-pipelines/postsubmit"
-      commands: |
-        export BUILDKITE_ACCESS_TOKEN="$(gcloud secrets versions access latest \
-            --secret=iree-buildkite-privileged)"
-        build_tools/buildkite/scripts/update_pipeline_configuration.py postsubmit
+      - label: "Updating postsubmit pipeline configuration"
+        concurrency: 1
+        concurrency_group: "update-pipelines/postsubmit"
+        key: "update-pipelines/postsubmit"
+        commands: |
+          export BUILDKITE_ACCESS_TOKEN="$(gcloud secrets versions access latest \
+              --secret=iree-buildkite-privileged)"
+          build_tools/buildkite/scripts/update_pipeline_configuration.py postsubmit
 
 
   - label: "Executing gcmn-test-pipeline"
