@@ -1,5 +1,18 @@
 // RUN: iree-opt -split-input-file -pass-pipeline="vm.module(iree-vm-ordinal-allocation),vm.module(iree-convert-vm-to-emitc)" %s | FileCheck %s
 
+// CHECK-LABEL: @my_module_bitcast
+vm.module @my_module {
+  vm.func @bitcast(%arg0 : i32) -> i32 {
+    // CHECK-NEXT: %0 = emitc.call "vm_bitcast_i32f32"(%arg3) : (i32) -> f32
+    %0 = vm.bitcast.i32.f32 %arg0 : i32 -> f32
+    // CHECK-NEXT: %1 = emitc.call "vm_bitcast_f32i32"(%0) : (f32) -> i32
+    %1 = vm.bitcast.f32.i32 %0 : f32 -> i32
+    vm.return %1 : i32
+  }
+}
+
+// -----
+
 // CHECK-LABEL: @my_module_cast
 vm.module @my_module {
   vm.func @cast(%arg0 : i32) -> (i32, i32) {
