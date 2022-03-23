@@ -134,7 +134,7 @@ hal.executable @tensor_insert_slice {
   hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
     hal.executable.entry_point @tensor_insert_slice layout(#executable_layout)
     builtin.module {
-      builtin.func @tensor_insert_slice() {
+      func.func @tensor_insert_slice() {
         %c0 = arith.constant 0 : index
         %size_y = hal.interface.constant.load[0] : index
         %size_x = hal.interface.constant.load[1] : index
@@ -178,7 +178,7 @@ hal.executable @copy_as_generic {
   hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
     hal.executable.entry_point @copy_as_generic layout(#executable_layout)
     builtin.module {
-      builtin.func @copy_as_generic() {
+      func.func @copy_as_generic() {
         %c0 = arith.constant 0 : index
         %d0 = hal.interface.constant.load[0] : index
         %d1 = hal.interface.constant.load[1] : index
@@ -214,7 +214,7 @@ hal.executable private @static_1d_fft_stage2 {
   hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
     hal.executable.entry_point @static_1d_fft_stage2 layout(#executable_layout)
     builtin.module {
-      builtin.func @static_1d_fft_stage2() {
+      func.func @static_1d_fft_stage2() {
         %c0 = arith.constant 0 : index
         %c2 = arith.constant 2 : index
         %cst = arith.constant dense<[1.000000e+00, 6.12323426E-17]> : tensor<2xf32>
@@ -251,7 +251,7 @@ hal.executable private @static_3d_fft_stage3 {
   hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
     hal.executable.entry_point @static_3d_fft_stage3 layout(#executable_layout)
     builtin.module {
-      builtin.func @static_3d_fft_stage3() {
+      func.func @static_3d_fft_stage3() {
         %c0 = arith.constant 0 : index
         %c3 = arith.constant 3 : index
         %c64 = arith.constant 64 : index

@@ -22,16 +22,17 @@ namespace mlir {
 namespace iree_compiler {
 namespace {
 
-struct FuncOpSignatureConversion : public OpConversionPattern<mlir::FuncOp> {
+struct FuncOpSignatureConversion
+    : public OpConversionPattern<mlir::func::FuncOp> {
   using OpConversionPattern::OpConversionPattern;
   LogicalResult matchAndRewrite(
-      mlir::FuncOp funcOp, OpAdaptor adaptor,
+      mlir::func::FuncOp funcOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     auto &typeConverter = *getTypeConverter();
 
     // Convert the input signature types.
     // TODO(benvanik): dynamic shapes by passing in tensor dynamic dims.
-    auto originalType = funcOp.getType();
+    auto originalType = funcOp.getFunctionType();
     TypeConverter::SignatureConversion newSignature(
         originalType.getNumInputs());
     for (auto argType : llvm::enumerate(originalType.getInputs())) {
@@ -221,10 +222,11 @@ void populateStandardStructuralToStreamPatterns(
   // dynamic legality checker to force any ops using such types to run through
   // our patterns.
 
-  conversionTarget.addDynamicallyLegalOp<mlir::FuncOp>([&](mlir::FuncOp op) {
-    return typeConverter.isSignatureLegal(op.getType()) &&
-           typeConverter.isLegal(&op.getBody());
-  });
+  conversionTarget.addDynamicallyLegalOp<mlir::func::FuncOp>(
+      [&](mlir::func::FuncOp op) {
+        return typeConverter.isSignatureLegal(op.getFunctionType()) &&
+               typeConverter.isLegal(&op.getBody());
+      });
   conversionTarget.addDynamicallyLegalOp<mlir::func::CallOp>(
       [&](mlir::func::CallOp op) {
         return llvm::all_of(

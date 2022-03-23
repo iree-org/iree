@@ -114,17 +114,17 @@ def VM_FuncOp : VM_Op<"func", [
     }
 
     /// Returns the type of this function.
-    FunctionType getType() {
+    FunctionType getFunctionType() {
       return getOperation()->getAttrOfType<TypeAttr>(getTypeAttrName())
           .getValue()
           .cast<FunctionType>();
     }
 
     /// Returns the argument types of this function.
-    ArrayRef<Type> getArgumentTypes() { return getType().getInputs(); }
+    ArrayRef<Type> getArgumentTypes() { return getFunctionType().getInputs(); }
 
     /// Returns the result types of this function.
-    ArrayRef<Type> getResultTypes() { return getType().getResults(); }
+    ArrayRef<Type> getResultTypes() { return getFunctionType().getResults(); }
 
     /// Hook for OpTrait::FunctionLike, called after verifying that the 'type'
     /// attribute is present. This can check for preconditions of the
@@ -134,7 +134,7 @@ def VM_FuncOp : VM_Op<"func", [
     Region *getCallableRegion() { return &body(); }
     ArrayRef<Type> getCallableResults() {
       assert(!isExternal() && "invalid callable");
-      return getType().getResults();
+      return getFunctionType().getResults();
     }
 
     /// Adds or overrides a reflection attribute.
@@ -195,7 +195,7 @@ def VM_ImportOp : VM_Op<"import", [
 
   let extraClassDeclaration = [{
     /// Returns the type of this function.
-    FunctionType getType() {
+    FunctionType getFunctionType() {
       return getOperation()->getAttrOfType<TypeAttr>(getTypeAttrName())
           .getValue()
           .cast<FunctionType>();
@@ -220,10 +220,10 @@ def VM_ImportOp : VM_Op<"import", [
     }
 
     /// Returns the argument types of this function.
-    ArrayRef<Type> getArgumentTypes() { return getType().getInputs(); }
+    ArrayRef<Type> getArgumentTypes() { return getFunctionType().getInputs(); }
 
     /// Returns the result types of this function.
-    ArrayRef<Type> getResultTypes() { return getType().getResults(); }
+    ArrayRef<Type> getResultTypes() { return getFunctionType().getResults(); }
 
 
     /// Hook for OpTrait::FunctionLike, called after verifying that the 'type'
@@ -233,7 +233,7 @@ def VM_ImportOp : VM_Op<"import", [
 
     Region *getCallableRegion() { return nullptr; }
     ArrayRef<Type> getCallableResults() {
-      return getType().getResults();
+      return getFunctionType().getResults();
     }
   }];
 }
@@ -252,7 +252,7 @@ def VM_InitializerOp : VM_Op<"initializer", [
   }];
 
   let arguments = (ins
-    TypeAttr:$type
+    TypeAttr:$function_type
   );
 
   let regions = (region AnyRegion:$body);
@@ -270,8 +270,10 @@ def VM_InitializerOp : VM_Op<"initializer", [
     Block *addEntryBlock();
     Block *addBlock();
 
-    FunctionType getType() {
-      return getTypeAttr().getValue().cast<FunctionType>();
+    FunctionType getFunctionType() {
+      return getOperation()->getAttrOfType<TypeAttr>(getTypeAttrName())
+          .getValue()
+          .cast<FunctionType>();
     }
 
     /// Returns the argument types of this function.
@@ -3530,7 +3532,7 @@ def VM_CallOp : VM_CallBaseOp<"call"> {
     [{
       $_state.addOperands(operands);
       $_state.addAttribute("callee", mlir::SymbolRefAttr::get(callee));
-      $_state.addTypes(callee.getType().getResults());
+      $_state.addTypes(callee.getFunctionType().getResults());
     }]>,
     OpBuilder<(ins "FlatSymbolRefAttr":$callee,
       "ArrayRef<Type>":$resultTypes, CArg<"ValueRange", "{}">:$operands),

@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -pass-pipeline='builtin.func(iree-stream-pack-allocations)' %s | FileCheck %s
+// RUN: iree-opt -split-input-file -pass-pipeline='func.func(iree-stream-pack-allocations)' %s | FileCheck %s
 
 // CHECK-LABEL: @packAllocations
 // CHECK-SAME: (%[[SIZE_A:.+]]: index, %[[SIZE_B:.+]]: index)

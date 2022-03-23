@@ -1,5 +1,5 @@
 
-// RUN: iree-opt -split-input-file -pass-pipeline='builtin.func(iree-flow-strip-signedness)' %s | FileCheck %s
+// RUN: iree-opt -split-input-file -pass-pipeline='func.func(iree-flow-strip-signedness)' %s | FileCheck %s
 
 // CHECK-LABEL: @strip_signedness_arg
 // CHECK-SAME: tensor<4xi8>

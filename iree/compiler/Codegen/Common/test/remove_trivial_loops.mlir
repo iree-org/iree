@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -pass-pipeline='hal.executable(hal.executable.variant(builtin.module(builtin.func(iree-codegen-remove-single-iteration-loop))))' %s | FileCheck %s
+// RUN: iree-opt -split-input-file -pass-pipeline='hal.executable(hal.executable.variant(builtin.module(func.func(iree-codegen-remove-single-iteration-loop))))' %s | FileCheck %s
 
 #executable_layout = #hal.executable.layout<push_constants = 1, sets = [
   #hal.descriptor_set.layout<0, bindings = [
@@ -14,7 +14,7 @@ hal.executable private @dispatch_0  {
       workgroup_size = [64: index, 1: index, 1:index]
     }
     builtin.module {
-      builtin.func @dispatch_0() {
+      func.func @dispatch_0() {
         %c2 = arith.constant 2 : index
         %c256 = arith.constant 256 : index
         //     CHECK: %[[C250:.+]] = arith.constant 250 : index
@@ -61,7 +61,7 @@ hal.executable private @workgroup_tile_loop  {
       translation_info = #translation
     }
     builtin.module {
-      builtin.func @workgroup_tile_loop() {
+      func.func @workgroup_tile_loop() {
         %c2048 = arith.constant 2048 : index
         %workgroup_id_x = hal.interface.workgroup.id[0] : index
         %workgroup_count_x = hal.interface.workgroup.count[0] : index
@@ -95,7 +95,7 @@ hal.executable private @workgroup_tile_loop_negative  {
       translation_info = #translation
     }
     builtin.module {
-      builtin.func @workgroup_tile_loop_negative() {
+      func.func @workgroup_tile_loop_negative() {
         %c2048 = arith.constant 2048 : index
         %workgroup_id_x = hal.interface.workgroup.id[0] : index
         %workgroup_count_x = hal.interface.workgroup.count[0] : index
@@ -132,7 +132,7 @@ hal.executable private @both_workgroup_and_workitem  {
       workgroup_size = [8: index, 2: index, 1: index]
     }
     builtin.module {
-      builtin.func @both_workgroup_and_workitem() {
+      func.func @both_workgroup_and_workitem() {
         %c8 = arith.constant 8 : index
         %c32 = arith.constant 32 : index
         %c112 = arith.constant 112 : index

@@ -1,4 +1,4 @@
-// RUN: iree-opt -pass-pipeline="builtin.func(linalg-fuse{tiling-level=0 vectorize}), canonicalize, cse" -split-input-file %s | FileCheck %s
+// RUN: iree-opt -pass-pipeline="func.func(linalg-fuse{tiling-level=0 vectorize}), canonicalize, cse" -split-input-file %s | FileCheck %s
 
 func @matmul_bias_add(%arg0 : tensor<?x?xf32>, %arg1 : tensor<?x?xf32>, %arg2 : tensor<?xf32>) -> tensor<?x?xf32> {
   %cst = arith.constant 0.0 : f32

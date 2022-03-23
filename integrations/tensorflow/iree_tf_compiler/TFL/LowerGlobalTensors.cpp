@@ -37,7 +37,7 @@ class LowerGlobalTensorsPass
 
     DenseMap<StringRef, FuncOp> symNameToFunction;
     for (auto func : moduleOp.getOps<FuncOp>()) {
-      symNameToFunction[func.sym_name()] = func;
+      symNameToFunction[func.getSymName()] = func;
     }
 
     DenseMap<StringRef, DenseElementsAttr> sharedNameToConstant;

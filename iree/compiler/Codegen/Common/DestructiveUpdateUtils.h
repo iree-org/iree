@@ -7,6 +7,7 @@
 #ifndef IREE_COMPILER_CODEGEN_COMMON_DESTRUCTIVEUPDATEUTILS_H_
 #define IREE_COMPILER_CODEGEN_COMMON_DESTRUCTIVEUPDATEUTILS_H_
 
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/BuiltinOps.h"
 
 namespace mlir {
@@ -78,7 +79,7 @@ namespace iree_compiler {
 //     tensor<...> -> !flow.dispatch.tensor<writeonly:...>
 // ```
 // is elided.
-LogicalResult rewriteLinalgDestructiveUpdates(FuncOp parentOp);
+LogicalResult rewriteLinalgDestructiveUpdates(func::FuncOp parentOp);
 
 }  // namespace iree_compiler
 }  // namespace mlir

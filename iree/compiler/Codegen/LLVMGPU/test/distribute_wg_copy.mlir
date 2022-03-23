@@ -1,4 +1,4 @@
-// RUN: iree-opt -pass-pipeline='hal.executable(hal.executable.variant(builtin.module(builtin.func(iree-llvmgpu-distribute-shared-memory-copy))))' -cse %s | FileCheck %s
+// RUN: iree-opt -pass-pipeline='hal.executable(hal.executable.variant(builtin.module(func.func(iree-llvmgpu-distribute-shared-memory-copy))))' -cse %s | FileCheck %s
 
 // CHECK-DAG: #[[$MAP0:.*]] = affine_map<()[s0, s1, s2] -> (s1 * 8 + s2 * 32 + s0 floordiv 4)>
 // CHECK-DAG: #[[$MAP1:.*]] = affine_map<()[s0] -> (s0 * 4 - (s0 floordiv 4) * 16)>
@@ -25,7 +25,7 @@ hal.executable private @shared_mem_cpy  {
       memref.global "private" @__shared_memory___0 : memref<256x4xf32, 3>
       memref.global "private" @__shared_memory__ : memref<64x16xf32, 3>
     // CHECK-LABEL: @shared_mem_cpy(
-      builtin.func @shared_mem_cpy(
+      func.func @shared_mem_cpy(
         %m0 : memref<64x16xf32>, %m1 : memref<256x4xf32>, %m2 : memref<3x512xf32>) {
         %c0 = arith.constant 0 : index
 

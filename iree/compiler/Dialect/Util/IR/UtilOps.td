@@ -377,7 +377,7 @@ def Util_InitializerOp : Util_Op<"initializer", [
   }];
 
   let arguments = (ins
-    TypeAttr:$type
+    TypeAttr:$function_type
   );
 
   let regions = (region AnyRegion:$body);
@@ -395,8 +395,10 @@ def Util_InitializerOp : Util_Op<"initializer", [
     Block *addEntryBlock();
     Block *addBlock();
 
-    FunctionType getType() {
-      return getTypeAttr().getValue().cast<FunctionType>();
+    FunctionType getFunctionType() {
+      return getOperation()->getAttrOfType<TypeAttr>(getTypeAttrName())
+          .getValue()
+          .cast<FunctionType>();
     }
 
     /// Returns the argument types of this function.

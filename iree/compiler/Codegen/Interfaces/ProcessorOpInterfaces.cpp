@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Codegen/Interfaces/ProcessorOpInterfaces.h"
 
+#include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "mlir/Dialect/GPU/GPUDialect.h"
 
@@ -75,15 +76,19 @@ struct WorkgroupTileSizeOpInterface
 };
 
 void registerProcessorOpInterfaceExternalModels(DialectRegistry &registry) {
-  registry.addOpInterface<gpu::ThreadIdOp, ThreadIdOpInterface>();
-  registry.addOpInterface<gpu::BlockDimOp, BlockDimOpInterface>();
+  registry.addExtension(+[](MLIRContext *ctx, gpu::GPUDialect *dialect) {
+    gpu::ThreadIdOp::attachInterface<ThreadIdOpInterface>(*ctx);
+    gpu::BlockDimOp::attachInterface<BlockDimOpInterface>(*ctx);
+  });
 
-  registry.addOpInterface<IREE::HAL::InterfaceWorkgroupIDOp,
-                          WorkgroupIdOpInterface>();
-  registry.addOpInterface<IREE::HAL::InterfaceWorkgroupCountOp,
-                          WorkgroupCountOpInterface>();
-  registry.addOpInterface<IREE::HAL::InterfaceWorkgroupSizeOp,
-                          WorkgroupTileSizeOpInterface>();
+  registry.addExtension(+[](MLIRContext *ctx, IREE::HAL::HALDialect *dialect) {
+    IREE::HAL::InterfaceWorkgroupIDOp::attachInterface<WorkgroupIdOpInterface>(
+        *ctx);
+    IREE::HAL::InterfaceWorkgroupCountOp::attachInterface<
+        WorkgroupCountOpInterface>(*ctx);
+    IREE::HAL::InterfaceWorkgroupSizeOp::attachInterface<
+        WorkgroupTileSizeOpInterface>(*ctx);
+  });
 }
 
 }  // namespace iree_compiler

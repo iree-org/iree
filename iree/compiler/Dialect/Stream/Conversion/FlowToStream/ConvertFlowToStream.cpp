@@ -391,7 +391,7 @@ struct ConvertExecutableOp
     // Update the entry point signatures in the module.
     // Dispatch tensor arguments become bindings and all others are preserved as
     // adaptor. Note that we only touch public (exported) functions.
-    for (auto funcOp : moduleOp.getOps<mlir::FuncOp>()) {
+    for (auto funcOp : moduleOp.getOps<mlir::func::FuncOp>()) {
       if (!funcOp.isPublic()) continue;
 
       SmallVector<Type> newTypes;

@@ -7,6 +7,7 @@
 #ifndef IREE_DIALECTS_DIALECT_LINALGEXT_TRANSFORMS_PASSES_H_
 #define IREE_DIALECTS_DIALECT_LINALGEXT_TRANSFORMS_PASSES_H_
 
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Pass/Pass.h"
 
 namespace mlir {
@@ -14,9 +15,9 @@ namespace iree_compiler {
 namespace IREE {
 namespace LinalgExt {
 
-std::unique_ptr<OperationPass<FuncOp>> createTiledOpInterfaceTilingPass();
+std::unique_ptr<OperationPass<func::FuncOp>> createTiledOpInterfaceTilingPass();
 
-std::unique_ptr<OperationPass<FuncOp>> createLinalgExtToLoopsPass();
+std::unique_ptr<OperationPass<func::FuncOp>> createLinalgExtToLoopsPass();
 
 std::unique_ptr<OperationPass<>> createPadContractionToBlockSizePass();
 

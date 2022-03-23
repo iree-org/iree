@@ -7,6 +7,7 @@
 #ifndef IREE_COMPILER_INPUTCONVERSION_MHLO_PASSES_H_
 #define IREE_COMPILER_INPUTCONVERSION_MHLO_PASSES_H_
 
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Pass/Pass.h"
 
 namespace mlir {
@@ -52,15 +53,16 @@ std::unique_ptr<OperationPass<ModuleOp>> createFlattenTuplesInCFGPass();
 std::unique_ptr<OperationPass<ModuleOp>> createLegalizeInputTypesPass();
 
 /// Creates XLA-HLO to Linalg on tensors transformation pass.
-std::unique_ptr<OperationPass<FuncOp>> createMHLOToLinalgOnTensorsPass();
+std::unique_ptr<OperationPass<func::FuncOp>> createMHLOToLinalgOnTensorsPass();
 
 /// Creates XLA-HLO to LinalgExt pass.
-std::unique_ptr<OperationPass<FuncOp>> createConvertMHLOToLinalgExtPass();
+std::unique_ptr<OperationPass<func::FuncOp>> createConvertMHLOToLinalgExtPass();
 
 /// Creates XLA-HLO preprocessing transformation pass. In this pass we should
 /// have all mhlo -> mhlo transformations that are shared between all
 /// backends.
-std::unique_ptr<OperationPass<FuncOp>> createMHLOToMHLOPreprocessingPass();
+std::unique_ptr<OperationPass<func::FuncOp>>
+createMHLOToMHLOPreprocessingPass();
 
 // Verifies a module being input to the core compiler pipeline only contains
 // IR structures that are supported at that level.
@@ -71,7 +73,8 @@ createVerifyCompilerMHLOInputLegality();
 // Test passes
 //------------------------------------------------------------------------------
 
-std::unique_ptr<OperationPass<FuncOp>> createTestMHLOConvertComplexToRealPass();
+std::unique_ptr<OperationPass<func::FuncOp>>
+createTestMHLOConvertComplexToRealPass();
 
 //===----------------------------------------------------------------------===//
 // Register all Passes

@@ -128,7 +128,8 @@ static void populateVectorUnrollPatterns(RewritePatternSet &patterns,
 }
 
 /// Return a flattened Id Value by combining the 3D gpu thread IDs.
-static Value createFlatId(FuncOp funcOp, ArrayRef<int64_t> workgroupSize) {
+static Value createFlatId(func::FuncOp funcOp,
+                          ArrayRef<int64_t> workgroupSize) {
   OpBuilder b(funcOp.getBody());
   Type indexType = b.getIndexType();
   AffineExpr d0 = getAffineDimExpr(0, b.getContext());
@@ -148,7 +149,7 @@ static Value createFlatId(FuncOp funcOp, ArrayRef<int64_t> workgroupSize) {
 }
 
 /// Distribute a transfer read operations on the given thread ids.
-static void distributeTransferRead(FuncOp funcOp, Value flatThreadId,
+static void distributeTransferRead(func::FuncOp funcOp, Value flatThreadId,
                                    int64_t flatWorkgroupSize) {
   funcOp.walk([&](vector::TransferReadOp readOp) {
     OpBuilder b(readOp);

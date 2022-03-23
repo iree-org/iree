@@ -29,7 +29,7 @@ class CommandBufferFillBufferOpConversion
   LogicalResult matchAndRewrite(
       IREE::HAL::CommandBufferFillBufferOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    auto importType = importOp.getType();
+    auto importType = importOp.getFunctionType();
 
     SmallVector<Value, 8> callOperands = {
         adaptor.command_buffer(),
@@ -84,7 +84,7 @@ class CommandBufferPushDescriptorSetOpConversion
   LogicalResult matchAndRewrite(
       IREE::HAL::CommandBufferPushDescriptorSetOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    auto importType = importOp.getType();
+    auto importType = importOp.getFunctionType();
 
     SmallVector<Value, 8> callOperands = {
         adaptor.command_buffer(),

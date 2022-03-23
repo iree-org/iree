@@ -31,7 +31,7 @@ static void addCleanupPatterns(OpPassManager &passManager) {
   // redundant store-loads are removed.
   passManager.addNestedPass<IREE::Util::InitializerOp>(
       IREE::Util::createSimplifyGlobalAccessesPass());
-  passManager.addNestedPass<mlir::FuncOp>(
+  passManager.addNestedPass<mlir::func::FuncOp>(
       IREE::Util::createSimplifyGlobalAccessesPass());
 
   // Cleanup and canonicalization of util.global (and other util ops).
@@ -109,7 +109,7 @@ void buildStreamAsyncPassPipeline(OpPassManager &passManager,
   // affinity/configuration assigned during placement.
   passManager.addNestedPass<IREE::Util::InitializerOp>(
       IREE::Stream::createEncodeHostTensorsPass());
-  passManager.addNestedPass<mlir::FuncOp>(
+  passManager.addNestedPass<mlir::func::FuncOp>(
       IREE::Stream::createEncodeHostTensorsPass());
   passManager.addNestedPass<IREE::Stream::ExecutableOp>(
       IREE::Stream::createEncodeDeviceTensorsPass());
@@ -127,7 +127,7 @@ void buildStreamAsyncPassPipeline(OpPassManager &passManager,
   // (though it's critical enough that it is not optional).
   passManager.addNestedPass<IREE::Util::InitializerOp>(
       IREE::Stream::createMaterializeCopyOnWritePass());
-  passManager.addNestedPass<mlir::FuncOp>(
+  passManager.addNestedPass<mlir::func::FuncOp>(
       IREE::Stream::createMaterializeCopyOnWritePass());
   passManager.addPass(IREE::Stream::createElideAsyncCopiesPass());
 
@@ -144,13 +144,13 @@ void buildStreamAsyncPassPipeline(OpPassManager &passManager,
   // Combine async work into execution regions.
   passManager.addNestedPass<IREE::Util::InitializerOp>(
       IREE::Stream::createScheduleExecutionPass());
-  passManager.addNestedPass<mlir::FuncOp>(
+  passManager.addNestedPass<mlir::func::FuncOp>(
       IREE::Stream::createScheduleExecutionPass());
 
   // Group concurrently executable work into waves.
   passManager.addNestedPass<IREE::Util::InitializerOp>(
       IREE::Stream::createScheduleConcurrencyPass());
-  passManager.addNestedPass<mlir::FuncOp>(
+  passManager.addNestedPass<mlir::func::FuncOp>(
       IREE::Stream::createScheduleConcurrencyPass());
 
   // Materialize timepoints across the entire module. This simplifies scheduling
@@ -175,7 +175,7 @@ void buildStreamCmdPassPipeline(OpPassManager &passManager,
   // lifetime allocations.
   passManager.addNestedPass<IREE::Util::InitializerOp>(
       IREE::Stream::createScheduleAllocationPass());
-  passManager.addNestedPass<mlir::FuncOp>(
+  passManager.addNestedPass<mlir::func::FuncOp>(
       IREE::Stream::createScheduleAllocationPass());
 
   // TODO(benvanik): passes to convert alloc to alloca and thread through
@@ -187,13 +187,13 @@ void buildStreamCmdPassPipeline(OpPassManager &passManager,
   // buffers and upload logic.
   passManager.addNestedPass<IREE::Util::InitializerOp>(
       IREE::Stream::createPackConstantsPass());
-  passManager.addNestedPass<mlir::FuncOp>(
+  passManager.addNestedPass<mlir::func::FuncOp>(
       IREE::Stream::createPackConstantsPass());
 
   // Pack fused allocations based on lifetime.
   passManager.addNestedPass<IREE::Util::InitializerOp>(
       IREE::Stream::createPackAllocationsPass());
-  passManager.addNestedPass<mlir::FuncOp>(
+  passManager.addNestedPass<mlir::func::FuncOp>(
       IREE::Stream::createPackAllocationsPass());
 
   // Layout packed slices to emit the arithmetic required for all resource
@@ -201,7 +201,7 @@ void buildStreamCmdPassPipeline(OpPassManager &passManager,
   // below.
   passManager.addNestedPass<IREE::Util::InitializerOp>(
       IREE::Stream::createLayoutSlicesPass());
-  passManager.addNestedPass<mlir::FuncOp>(
+  passManager.addNestedPass<mlir::func::FuncOp>(
       IREE::Stream::createLayoutSlicesPass());
 
   // Propagate subviews throughout the program to unify resource storage access.

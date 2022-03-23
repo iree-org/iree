@@ -10,20 +10,20 @@ func @collatz() -> tensor<f32> {
   %3 = mhlo.constant dense<0.0> : tensor<f32>
   cf.br ^bb1(%3, %arg0 : tensor<f32>, tensor<f32>)
 ^bb1(%4: tensor<f32>, %5: tensor<f32>):
-  %6 = "mhlo.compare"(%5, %0) {comparison_direction = "GT"} : (tensor<f32>, tensor<f32>) -> tensor<i1>
+  %6 = "mhlo.compare"(%5, %0) {comparison_direction = #mhlo<"comparison_direction GT">} : (tensor<f32>, tensor<f32>) -> tensor<i1>
   %7 = tensor.extract %6[] : tensor<i1>
   cf.cond_br %7, ^bb2(%4, %5 : tensor<f32>, tensor<f32>), ^bb6(%4 : tensor<f32>)
 ^bb2(%8: tensor<f32>, %9: tensor<f32>):
   %10 = mhlo.add %8, %0 : tensor<f32>
   %11 = mhlo.remainder %9, %2 : tensor<f32>
-  %12 = "mhlo.compare"(%11, %3) {comparison_direction = "NE"} : (tensor<f32>, tensor<f32>) -> tensor<i1>
-  %13 = "mhlo.compare"(%2, %3) {comparison_direction = "LT"} : (tensor<f32>, tensor<f32>) -> tensor<i1>
-  %14 = "mhlo.compare"(%11, %3) {comparison_direction = "LT"} : (tensor<f32>, tensor<f32>) -> tensor<i1>
-  %15 = "mhlo.compare"(%13, %14) {comparison_direction = "NE"} : (tensor<i1>, tensor<i1>) -> tensor<i1>
+  %12 = "mhlo.compare"(%11, %3) {comparison_direction = #mhlo<"comparison_direction NE">} : (tensor<f32>, tensor<f32>) -> tensor<i1>
+  %13 = "mhlo.compare"(%2, %3) {comparison_direction = #mhlo<"comparison_direction LT">} : (tensor<f32>, tensor<f32>) -> tensor<i1>
+  %14 = "mhlo.compare"(%11, %3) {comparison_direction = #mhlo<"comparison_direction LT">} : (tensor<f32>, tensor<f32>) -> tensor<i1>
+  %15 = "mhlo.compare"(%13, %14) {comparison_direction = #mhlo<"comparison_direction NE">} : (tensor<i1>, tensor<i1>) -> tensor<i1>
   %16 = mhlo.and %12, %15 : tensor<i1>
   %17 = mhlo.add %11, %2 : tensor<f32>
   %18 = "mhlo.select"(%16, %17, %11) : (tensor<i1>, tensor<f32>, tensor<f32>) -> tensor<f32>
-  %19 = "mhlo.compare"(%18, %3) {comparison_direction = "GT"} : (tensor<f32>, tensor<f32>) -> tensor<i1>
+  %19 = "mhlo.compare"(%18, %3) {comparison_direction = #mhlo<"comparison_direction GT">} : (tensor<f32>, tensor<f32>) -> tensor<i1>
   %20 = tensor.extract %19[] : tensor<i1>
   cf.cond_br %20, ^bb3, ^bb4
 ^bb3: // pred: ^bb2

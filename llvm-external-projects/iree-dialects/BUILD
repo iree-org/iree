@@ -631,6 +631,7 @@ cc_library(
         "@llvm-project//mlir:ArithmeticDialect",
         "@llvm-project//mlir:BufferizationDialect",
         "@llvm-project//mlir:BufferizationTransforms",
+        "@llvm-project//mlir:FuncDialect",
         "@llvm-project//mlir:LinalgOps",
         "@llvm-project//mlir:LLVMDialect",
         "@llvm-project//mlir:PDLDialect",

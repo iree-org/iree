@@ -80,12 +80,12 @@ EmitCTypeConverter::lookupAnalysis(Operation *op) {
 Optional<Value> EmitCTypeConverter::materializeRef(Value ref) {
   assert(ref.getType().isa<IREE::VM::RefType>());
 
-  mlir::FuncOp funcOp;
+  mlir::func::FuncOp funcOp;
   if (auto definingOp = ref.getDefiningOp()) {
-    funcOp = definingOp->getParentOfType<mlir::FuncOp>();
+    funcOp = definingOp->getParentOfType<mlir::func::FuncOp>();
   } else {
     Operation *op = ref.cast<BlockArgument>().getOwner()->getParentOp();
-    funcOp = cast<mlir::FuncOp>(op);
+    funcOp = cast<mlir::func::FuncOp>(op);
   }
 
   auto vmAnalysis = lookupAnalysis(funcOp);

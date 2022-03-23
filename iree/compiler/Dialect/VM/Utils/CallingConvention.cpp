@@ -76,7 +76,7 @@ LogicalResult encodeVariadicCallingConventionType(Operation *op, Type type,
 
 Optional<std::string> makeImportCallingConventionString(
     IREE::VM::ImportOp importOp) {
-  auto functionType = importOp.getType();
+  auto functionType = importOp.getFunctionType();
   if (functionType.getNumInputs() == 0 && functionType.getNumResults() == 0) {
     return std::string("0v_v");  // Valid but empty.
   }
@@ -114,7 +114,7 @@ Optional<std::string> makeImportCallingConventionString(
 }
 
 Optional<std::string> makeCallingConventionString(IREE::VM::FuncOp funcOp) {
-  auto functionType = funcOp.getType();
+  auto functionType = funcOp.getFunctionType();
   if (functionType.getNumInputs() == 0 && functionType.getNumResults() == 0) {
     return std::string("0v_v");  // Valid but empty.
   }

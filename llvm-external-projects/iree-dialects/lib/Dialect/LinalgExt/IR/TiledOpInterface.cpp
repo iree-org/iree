@@ -305,9 +305,12 @@ void IREE::LinalgExt::registerTiledOpInterfaceExternalModels(
     DialectRegistry &registry) {
   LLVM_DEBUG(
       { llvm::dbgs() << "Adding external models of tiled op interface\n"; });
-  registry
-      .addOpInterface<tensor::ExtractSliceOp, ExtractSliceTiledOpInterface>();
-  registry.addOpInterface<tensor::InsertSliceOp, InsertSliceTiledOpInterface>();
+
+  registry.addExtension(+[](MLIRContext *ctx, tensor::TensorDialect *dialect) {
+    tensor::ExtractSliceOp::attachInterface<ExtractSliceTiledOpInterface>(*ctx);
+    tensor::InsertSliceOp::attachInterface<InsertSliceTiledOpInterface>(*ctx);
+  });
+
   // TODO(ravishankarm): Needs custom PadTiledOpInterface or equiv.
   // registry.addOpInterface<tensor::PadOp,
   //                         ForwardToTilingInterface<tensor::PadOp>>();

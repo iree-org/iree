@@ -637,7 +637,7 @@ class FuncOpConversion : public OpConversionPattern<PYDM::FuncOp> {
   LogicalResult
   matchAndRewrite(PYDM::FuncOp srcOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
-    FunctionType srcFuncType = srcOp.getType();
+    FunctionType srcFuncType = srcOp.getFunctionType();
     TypeConverter::SignatureConversion signatureConversion(
         srcOp.getNumArguments());
 
@@ -839,7 +839,7 @@ class RaiseOnFailureOpConversion
     auto parentFunc = srcOp->getParentOfType<mlir::FuncOp>();
     if (!parentFunc)
       return rewriter.notifyMatchFailure(srcOp, "not contained by a func");
-    Type convertedReturnType = parentFunc.getType().getResult(1);
+    Type convertedReturnType = parentFunc.getFunctionType().getResult(1);
 
     // Split the entry block.
     Block *entryBlock = rewriter.getInsertionBlock();

@@ -481,7 +481,7 @@ static iree_vm_FunctionSignatureDef_ref_t makeImportFunctionSignatureDef(
   // Generate the signature calling convention string based on types.
   auto cconv = makeImportCallingConventionString(importOp);
   if (!cconv.hasValue()) return {};
-  return createFunctionSignatureDef(importOp.getType(), typeTable,
+  return createFunctionSignatureDef(importOp.getFunctionType(), typeTable,
                                     cconv.getValue(), /*reflectionAttrsRef=*/0,
                                     fbb);
 }
@@ -514,7 +514,7 @@ static iree_vm_FunctionSignatureDef_ref_t makeExportFunctionSignatureDef(
         fbb, reflectionAttrRefs.data(), reflectionAttrRefs.size());
   }
 
-  return createFunctionSignatureDef(funcOp.getType(), typeTable,
+  return createFunctionSignatureDef(funcOp.getFunctionType(), typeTable,
                                     cconv.getValue(), reflectionAttrsRef, fbb);
 }
 
@@ -525,7 +525,7 @@ static iree_vm_FunctionSignatureDef_ref_t makeInternalFunctionSignatureDef(
   // Generate the signature calling convention string based on types.
   auto cconv = makeCallingConventionString(funcOp);
   if (!cconv.hasValue()) return {};
-  return createFunctionSignatureDef(funcOp.getType(), typeTable,
+  return createFunctionSignatureDef(funcOp.getFunctionType(), typeTable,
                                     cconv.getValue(), /*reflectionAttrsRef=*/0,
                                     fbb);
 }

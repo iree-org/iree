@@ -357,9 +357,9 @@ static void expandInitializerOp(IREE::Util::InitializerOp op,
 //  ->
 //  func @foo(%0: !stream.resource, %sz: index, %o: index, %l: index) {
 //    %1 = stream.resource.subview %0[%o] : {%sz} -> {%l}
-static void expandFuncOp(mlir::FuncOp op, ExpandedGlobalMap &globalMap,
+static void expandFuncOp(mlir::func::FuncOp op, ExpandedGlobalMap &globalMap,
                          IndexSet &indexSet, SubviewMap &subviewMap) {
-  auto oldType = op.getType();
+  auto oldType = op.getFunctionType();
   auto inputTypes = expandTypes(oldType.getInputs());
   auto resultTypes = expandTypes(oldType.getResults());
   auto newType = FunctionType::get(op.getContext(), inputTypes, resultTypes);
@@ -484,7 +484,7 @@ static void expandSubviews(Operation *op, ExpandedGlobalMap &globalMap,
     expandGlobalStoreOp(storeOp, globalMap, indexSet, subviewMap);
   } else if (auto initializerOp = dyn_cast<IREE::Util::InitializerOp>(op)) {
     expandInitializerOp(initializerOp, globalMap, indexSet, subviewMap);
-  } else if (auto funcOp = dyn_cast<mlir::FuncOp>(op)) {
+  } else if (auto funcOp = dyn_cast<mlir::func::FuncOp>(op)) {
     expandFuncOp(funcOp, globalMap, indexSet, subviewMap);
   } else if (auto callOp = dyn_cast<mlir::func::CallOp>(op)) {
     expandCallOp(callOp, indexSet, subviewMap);

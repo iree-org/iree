@@ -7,6 +7,7 @@
 #ifndef IREE_INTEGRATIONS_TENSORFLOW_IREE_TF_COMPILER_TFL_PASS_DETAIL_H_
 #define IREE_INTEGRATIONS_TENSORFLOW_IREE_TF_COMPILER_TFL_PASS_DETAIL_H_
 
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Pass/Pass.h"
 
 namespace mlir {

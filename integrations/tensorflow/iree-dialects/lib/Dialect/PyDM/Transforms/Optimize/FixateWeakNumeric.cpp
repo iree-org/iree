@@ -41,7 +41,7 @@ struct FixateWeakNumericPass
 
     // Special cases for operations.
     if (auto funcOp = llvm::dyn_cast<PYDM::FuncOp>(op)) {
-      FunctionType existingFt = funcOp.getType();
+      FunctionType existingFt = funcOp.getFunctionType();
       FunctionType newFt = convertFunctionType(existingFt);
       if (newFt != existingFt) {
         funcOp.setType(newFt);

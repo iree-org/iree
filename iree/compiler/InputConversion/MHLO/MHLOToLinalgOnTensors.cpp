@@ -178,7 +178,7 @@ struct FftOpConversion : public OpConversionPattern<mhlo::FftOp> {
   LogicalResult matchAndRewrite(
       mhlo::FftOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    if (op.fft_type() != "RFFT") {
+    if (op.fft_type() != mhlo::FftType::RFFT) {
       return rewriter.notifyMatchFailure(op,
                                          "non RFFT types are supported yet");
     }
@@ -222,7 +222,7 @@ class BuiltinFuncOpPattern : public OpConversionPattern<FuncOp> {
   LogicalResult matchAndRewrite(
       FuncOp srcOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    FunctionType srcFuncType = srcOp.getType();
+    FunctionType srcFuncType = srcOp.getFunctionType();
     TypeConverter::SignatureConversion signatureConversion(
         srcOp.getNumArguments());
 
@@ -349,13 +349,13 @@ struct ConvertMHLOToLinalgOnTensorsPass
 
     // Functions must have legal types.
     target.addDynamicallyLegalOp<FuncOp>([&](FuncOp funcOp) {
-      for (Type type : funcOp.getType().getInputs()) {
+      for (Type type : funcOp.getFunctionType().getInputs()) {
         if (isIllegalType(type)) return false;
       }
-      for (Type type : funcOp.getType().getResults()) {
+      for (Type type : funcOp.getFunctionType().getResults()) {
         if (isIllegalType(type)) return false;
       }
-      for (Block &block : funcOp.body()) {
+      for (Block &block : funcOp.getBody()) {
         for (Type type : block.getArgumentTypes()) {
           if (isIllegalType(type)) return false;
         }

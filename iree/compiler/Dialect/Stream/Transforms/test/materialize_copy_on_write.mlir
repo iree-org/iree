@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -pass-pipeline='builtin.func(iree-stream-materialize-copy-on-write)' %s | FileCheck %s
+// RUN: iree-opt -split-input-file -pass-pipeline='func.func(iree-stream-materialize-copy-on-write)' %s | FileCheck %s
 
 // Tests that block arguments (including function arguments) are always cloned.
 // Until a whole-program analysis runs we don't know their semantics.

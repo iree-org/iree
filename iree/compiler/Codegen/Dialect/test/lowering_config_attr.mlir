@@ -11,7 +11,7 @@ module {
 // -----
 
 module {
-  builtin.func @test() attributes {
+  func.func @test() attributes {
       translation_info = #iree_codegen.translation_info<CPUDefault>} {
     return
   }
@@ -21,7 +21,7 @@ module {
 // -----
 
 module {
-  builtin.func @test() attributes {
+  func.func @test() attributes {
       lowering_config = #iree_codegen.lowering_config<tile_sizes = []>} {
     return
   }

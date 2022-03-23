@@ -181,10 +181,10 @@ static LogicalResult convertRegion(Region &oldRegion, Region &newRegion,
   return success();
 }
 
-static LogicalResult convertFunc(mlir::FuncOp oldFuncOp,
+static LogicalResult convertFunc(mlir::func::FuncOp oldFuncOp,
                                  FlowTypeConverter &typeConverter,
                                  OpBuilder &moduleBuilder) {
-  auto oldType = oldFuncOp.getType();
+  auto oldType = oldFuncOp.getFunctionType();
   TypeConverter::SignatureConversion signature(oldType.getNumInputs());
   for (unsigned i = 0, e = oldType.getNumInputs(); i != e; ++i) {
     if (failed(typeConverter.convertSignatureArg(i, oldType.getInput(i),
@@ -224,7 +224,7 @@ class LegalizeInputTypesPass
     for (auto *oldOp : oldOps) {
       OpBuilder moduleBuilder(moduleOp);
       moduleBuilder.setInsertionPoint(oldOp);
-      if (auto oldFuncOp = dyn_cast<mlir::FuncOp>(oldOp)) {
+      if (auto oldFuncOp = dyn_cast<mlir::func::FuncOp>(oldOp)) {
         if (failed(convertFunc(oldFuncOp, typeConverter, moduleBuilder))) {
           return signalPassFailure();
         }

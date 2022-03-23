@@ -1,4 +1,4 @@
-// RUN: iree-opt -pass-pipeline="builtin.func(iree-verify-input-legality)" -verify-diagnostics %s -split-input-file
+// RUN: iree-opt -pass-pipeline="func.func(iree-verify-input-legality)" -verify-diagnostics %s -split-input-file
 
 // expected-error@below {{illegal operations still remain}}
 func @check_no_mhlo(%arg0: tensor<?x?xf32>, %arg1 : tensor<?x?xf32>) -> tensor<?x?xf32> {

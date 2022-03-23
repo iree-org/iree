@@ -133,19 +133,19 @@ struct DemoteF32ToF16Pass : public DemoteF32ToF16Base<DemoteF32ToF16Pass> {
     FloatTypeConverter converter;
     RewritePatternSet patterns(&getContext());
     patterns.insert<GenericTypeConvert>(context, converter);
-    populateFunctionOpInterfaceTypeConversionPattern<FuncOp>(patterns,
-                                                             converter);
+    populateFunctionOpInterfaceTypeConversionPattern<func::FuncOp>(patterns,
+                                                                   converter);
     ConversionTarget target(*context);
     // Operations are legal if they don't contain any illegal type.
     target.markUnknownOpDynamicallyLegal([](Operation *op) {
       if (auto globalOp = dyn_cast<IREE::Util::GlobalOp>(op)) {
         return !isIllegalType(globalOp.type());
       }
-      if (auto funcOp = dyn_cast<FuncOp>(op)) {
-        for (Type type : funcOp.getType().getInputs()) {
+      if (auto funcOp = dyn_cast<func::FuncOp>(op)) {
+        for (Type type : funcOp.getFunctionType().getInputs()) {
           if (isIllegalType(type)) return false;
         }
-        for (Type type : funcOp.getType().getResults()) {
+        for (Type type : funcOp.getFunctionType().getResults()) {
           if (isIllegalType(type)) return false;
         }
       }

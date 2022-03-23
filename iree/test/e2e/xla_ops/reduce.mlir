@@ -296,9 +296,9 @@ func @reducemulti_result() {
   %arg1 = util.unfoldable_constant dense<[[0, 1], [2, 3], [4, 5], [6, 7], [8, 9], [10, 11], [12, 13], [14, 15], [16, 17]]> : tensor<9x2xi32>
   %res0, %res1 = "mhlo.reduce"(%arg0, %arg1, %cst0, %cst1) ( {
   ^bb0(%arg2: tensor<i32>, %arg3: tensor<i32>, %arg4: tensor<i32>, %arg5: tensor<i32>):  // no predecessors
-    %0 = "mhlo.compare"(%arg2, %arg4) {comparison_direction = "GE"} : (tensor<i32>, tensor<i32>) -> tensor<i1>
+    %0 = "mhlo.compare"(%arg2, %arg4) {comparison_direction = #mhlo<"comparison_direction GE">} : (tensor<i32>, tensor<i32>) -> tensor<i1>
     %1 = "mhlo.select"(%0, %arg2, %arg4) : (tensor<i1>, tensor<i32>, tensor<i32>) -> tensor<i32>
-    %2 = "mhlo.compare"(%arg2, %arg4) {comparison_direction = "EQ"} : (tensor<i32>, tensor<i32>) -> tensor<i1>
+    %2 = "mhlo.compare"(%arg2, %arg4) {comparison_direction = #mhlo<"comparison_direction EQ">} : (tensor<i32>, tensor<i32>) -> tensor<i1>
     %3 = mhlo.minimum %arg3, %arg5 : tensor<i32>
     %4 = "mhlo.select"(%0, %arg3, %arg5) : (tensor<i1>, tensor<i32>, tensor<i32>) -> tensor<i32>
     %5 = "mhlo.select"(%2, %3, %4) : (tensor<i1>, tensor<i32>, tensor<i32>) -> tensor<i32>

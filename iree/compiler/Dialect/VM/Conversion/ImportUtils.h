@@ -57,7 +57,7 @@ Optional<SmallVector<Value>> rewriteToCall(
   state.addAttributes(llvm::to_vector<4>(operation->getDialectAttrs()));
   state.addAttribute("callee", SymbolRefAttr::get(importOp));
 
-  auto importType = importOp.getType();
+  auto importType = importOp.getFunctionType();
   for (auto resultType : operation->getResultTypes()) {
     if (failed(typeConverter.convertType(resultType, state.types))) {
       return None;

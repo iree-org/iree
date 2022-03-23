@@ -31,6 +31,7 @@
 #include "mlir/Dialect/Bufferization/IR/BufferizableOpInterface.h"
 #include "mlir/Dialect/Bufferization/Transforms/Bufferize.h"
 #include "mlir/Dialect/Bufferization/Transforms/OneShotAnalysis.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/Linalg/ComprehensiveBufferize/ModuleBufferization.h"
 #include "mlir/Dialect/Linalg/Passes.h"
@@ -581,7 +582,7 @@ LogicalResult transform::BufferizeOp::apply(transform::TransformResults &result,
 
   // Perform buffer-level hoistings.
   state.getTopLevel()->walk(
-      [&](FuncOp funcOp) { hoistRedundantVectorTransfers(funcOp); });
+      [&](func::FuncOp funcOp) { hoistRedundantVectorTransfers(funcOp); });
   return success();
 }
 
@@ -597,8 +598,8 @@ transform::LowerToLLVMOp::apply(transform::TransformResults &result,
   // the end. Keep module-level for now.
   PassManager pm(getContext());
 
-  pm.addNestedPass<FuncOp>(createConvertVectorToSCFPass());
-  pm.addNestedPass<FuncOp>(createConvertLinalgToLoopsPass());
+  pm.addNestedPass<func::FuncOp>(createConvertVectorToSCFPass());
+  pm.addNestedPass<func::FuncOp>(createConvertLinalgToLoopsPass());
   if (enable_async()) {
     pm.addPass(createAsyncToAsyncRuntimePass());
     pm.addPass(createAsyncRuntimeRefCountingPass());
@@ -618,7 +619,7 @@ transform::LowerToLLVMOp::apply(transform::TransformResults &result,
         .enableAMX(enable_amx())
         .enableX86Vector(enable_x86vector())));
   // clang-format on
-  pm.addNestedPass<FuncOp>(createConvertMathToLLVMPass());
+  pm.addNestedPass<func::FuncOp>(createConvertMathToLLVMPass());
   pm.addPass(createMemRefToLLVMPass());
   if (enable_async())
     pm.addPass(createConvertAsyncToLLVMPass());
@@ -631,7 +632,9 @@ transform::LowerToLLVMOp::apply(transform::TransformResults &result,
   // FIXME: this is a terrible hack!
   state.getTopLevel()->walk([](LLVM::LLVMFuncOp funcOp) {
     for (int64_t i = 0; i < funcOp.getNumArguments(); ++i) {
-      if (!funcOp.getType().getParamType(i).isa<LLVM::LLVMPointerType>())
+      if (!funcOp.getFunctionType()
+               .getParamType(i)
+               .isa<LLVM::LLVMPointerType>())
         continue;
       funcOp.setArgAttr(i, "llvm.noalias", UnitAttr::get(funcOp.getContext()));
     }
@@ -760,15 +763,15 @@ static scf::ExecuteRegionOp outlineInExecuteRegion(RewriterBase &b,
   return executeRegionOp;
 }
 
-static FailureOr<FuncOp> outlineLoop(scf::ForOp loop, StringRef funcName,
-                                     transform::TransformState &state) {
+static FailureOr<func::FuncOp> outlineLoop(scf::ForOp loop, StringRef funcName,
+                                           transform::TransformState &state) {
   PatternRewriterListener rewriter(loop->getContext());
   auto &listener = state.getExtension<TrackingListener>();
   rewriter.addListener(&listener);
   Location loc = loop.getLoc();
   scf::ExecuteRegionOp exec = outlineInExecuteRegion(rewriter, loop);
   assert(exec && "failed to produce execute_region");
-  FailureOr<FuncOp> outlined =
+  FailureOr<func::FuncOp> outlined =
       outlineSingleBlockRegion(rewriter, loc, exec.getRegion(), funcName);
   if (failed(listener.checkErrorState()))
     return failure();
@@ -781,7 +784,7 @@ transform::OutlineLoopOp::apply(transform::TransformResults &results,
   SmallVector<Operation *> resultVector;
   auto res =
       applyTransformToEach(state.getPayloadOps(target()), resultVector,
-                           [&](scf::ForOp loop) -> FailureOr<FuncOp> {
+                           [&](scf::ForOp loop) -> FailureOr<func::FuncOp> {
                              return outlineLoop(loop, func_name(), state);
                            });
   if (failed(res))

@@ -489,7 +489,7 @@ LogicalResult ProcessFunctionArgument::matchAndRewrite(
     FuncOp funcOp, OpAdaptor adaptor,
     ConversionPatternRewriter &rewriter) const {
   TypeConverter::SignatureConversion signatureConverter(
-      funcOp.getType().getNumInputs());
+      funcOp.getFunctionType().getNumInputs());
   for (const auto &arg : llvm::enumerate(funcOp.getArguments())) {
     if (memrefUsageAnalysis.shouldVectorizeMemRef(arg.value())) {
       if (auto memrefType = getVectorizedMemRefType(rewriter, arg.value())) {

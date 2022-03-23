@@ -157,23 +157,25 @@ struct LinalgOpTilingInterface
 } // namespace
 
 template <typename OpType>
-void registerOne(DialectRegistry &registry) {
-  registry.addOpInterface<OpType, LinalgOpTilingInterface<OpType>>();
+void registerOne(MLIRContext *ctx) {
+  OpType::template attachInterface<LinalgOpTilingInterface<OpType>>(*ctx);
 }
 
 /// Variadic helper function.
 template <typename... OpTypes>
-void registerAll(DialectRegistry &registry) {
+void registerAll(MLIRContext *ctx) {
   // FIXME: In c++17 this can be simplified by using 'fold expressions'.
-  (void)std::initializer_list<int>{0, (registerOne<OpTypes>(registry), 0)...};
+  (void)std::initializer_list<int>{0, (registerOne<OpTypes>(ctx), 0)...};
 }
 
 #define GET_OP_LIST
 
 void mlir::iree_compiler::IREE::LinalgExt::
     registerTilingInterfaceExternalModels(DialectRegistry &registry) {
-  registerOne<linalg::GenericOp>(registry);
-  registerAll<
+  registry.addExtension(+[](MLIRContext *ctx, linalg::LinalgDialect *dialect) {
+    registerOne<linalg::GenericOp>(ctx);
+    registerAll<
 #include "mlir/Dialect/Linalg/IR/LinalgStructuredOps.cpp.inc"
-      >(registry);
+        >(ctx);
+  });
 }

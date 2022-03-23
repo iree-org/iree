@@ -18,7 +18,7 @@ class FuncOp:
 
   @property
   def type(self):
-    return ir.FunctionType(ir.TypeAttr(self.attributes["type"]).value)
+    return ir.FunctionType(ir.TypeAttr(self.attributes["function_type"]).value)
 
   @property
   def py_return_type(self) -> ir.Type:
