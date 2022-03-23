@@ -13,7 +13,7 @@ func @main(%arg0: tensor<1x5xf32>, %arg1: tensor<1x5x3x1xf32>) -> tensor<5x1x5xf
   %6 = mhlo.multiply %4, %5 {name = "multiply.57"} : tensor<5x1x5xf32>
   %cst_0 = arith.constant  {name = "constant.58"} dense<0.000000e+00> : tensor<f32>
   %7 = "mhlo.broadcast_in_dim"(%cst_0) {broadcast_dimensions = dense<[]> : tensor<0xi64>, name = "broadcast.59"} : (tensor<f32>) -> tensor<5x1x5xf32>
-  %8 = "mhlo.compare"(%6, %7) {comparison_direction = "GT", name = "compare.60"} : (tensor<5x1x5xf32>, tensor<5x1x5xf32>) -> tensor<5x1x5xi1>
+  %8 = "mhlo.compare"(%6, %7) {comparison_direction = #mhlo<"comparison_direction GT">, name = "compare.60"} : (tensor<5x1x5xf32>, tensor<5x1x5xf32>) -> tensor<5x1x5xi1>
   %cst_1 = arith.constant  {name = "constant.24"} dense<0.000000e+00> : tensor<f32>
   %9 = "mhlo.broadcast_in_dim"(%cst_1) {broadcast_dimensions = dense<[]> : tensor<0xi64>, name = "broadcast.25"} : (tensor<f32>) -> tensor<5x1x5xf32>
   %cst_2 = arith.constant  {name = "constant.90"} dense<0.000000e+00> : tensor<f32>
@@ -25,7 +25,7 @@ func @main(%arg0: tensor<1x5xf32>, %arg1: tensor<1x5x3x1xf32>) -> tensor<5x1x5xf
   %14 = mhlo.multiply %12, %13 {name = "multiply.51"} : tensor<5x1x5xf32>
   %cst_4 = arith.constant  {name = "constant.52"} dense<0.000000e+00> : tensor<f32>
   %15 = "mhlo.broadcast_in_dim"(%cst_4) {broadcast_dimensions = dense<[]> : tensor<0xi64>, name = "broadcast.53"} : (tensor<f32>) -> tensor<5x1x5xf32>
-  %16 = "mhlo.compare"(%14, %15) {comparison_direction = "GT", name = "compare.54"} : (tensor<5x1x5xf32>, tensor<5x1x5xf32>) -> tensor<5x1x5xi1>
+  %16 = "mhlo.compare"(%14, %15) {comparison_direction = #mhlo<"comparison_direction GT">, name = "compare.54"} : (tensor<5x1x5xf32>, tensor<5x1x5xf32>) -> tensor<5x1x5xi1>
   %cst_5 = arith.constant  {name = "constant.17"} dense<0.000000e+00> : tensor<f32>
   %17 = "mhlo.broadcast_in_dim"(%cst_5) {broadcast_dimensions = dense<[]> : tensor<0xi64>, name = "broadcast.18"} : (tensor<f32>) -> tensor<5x1x5xf32>
   %cst_6 = arith.constant  {name = "constant.78"} dense<0.000000e+00> : tensor<f32>
@@ -37,7 +37,7 @@ func @main(%arg0: tensor<1x5xf32>, %arg1: tensor<1x5x3x1xf32>) -> tensor<5x1x5xf
   %22 = mhlo.multiply %20, %21 {name = "multiply.45"} : tensor<5x1x5xf32>
   %cst_8 = arith.constant  {name = "constant.46"} dense<0.000000e+00> : tensor<f32>
   %23 = "mhlo.broadcast_in_dim"(%cst_8) {broadcast_dimensions = dense<[]> : tensor<0xi64>, name = "broadcast.47"} : (tensor<f32>) -> tensor<5x1x5xf32>
-  %24 = "mhlo.compare"(%22, %23) {comparison_direction = "GT", name = "compare.48"} : (tensor<5x1x5xf32>, tensor<5x1x5xf32>) -> tensor<5x1x5xi1>
+  %24 = "mhlo.compare"(%22, %23) {comparison_direction = #mhlo<"comparison_direction GT">, name = "compare.48"} : (tensor<5x1x5xf32>, tensor<5x1x5xf32>) -> tensor<5x1x5xi1>
   %cst_9 = arith.constant  {name = "constant.10"} dense<0.000000e+00> : tensor<f32>
   %25 = "mhlo.broadcast_in_dim"(%cst_9) {broadcast_dimensions = dense<[]> : tensor<0xi64>, name = "broadcast.11"} : (tensor<f32>) -> tensor<5x1x5xf32>
   %cst_10 = arith.constant  {name = "constant.66"} dense<0.000000e+00> : tensor<f32>

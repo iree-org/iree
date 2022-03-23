@@ -5,7 +5,7 @@
 func @sort_1d(%arg0: tensor<128xi32>) -> (tensor<128xi32>) {
   %0 = "mhlo.sort"(%arg0) ( {
   ^bb0(%arg2: tensor<i32>, %arg3: tensor<i32>):
-    %1 = "mhlo.compare"(%arg2, %arg3) {comparison_direction = "GT"} : (tensor<i32>, tensor<i32>) -> tensor<i1>
+    %1 = "mhlo.compare"(%arg2, %arg3) {comparison_direction = #mhlo<"comparison_direction GT">} : (tensor<i32>, tensor<i32>) -> tensor<i1>
     "mhlo.return"(%1) : (tensor<i1>) -> ()
   }) {dimension = 0 : i64, is_stable = false} : (tensor<128xi32>) -> (tensor<128xi32>)
   return %0 : tensor<128xi32>
@@ -26,7 +26,7 @@ func @sort_1d(%arg0: tensor<128xi32>) -> (tensor<128xi32>) {
 func @sort_1d_ui(%arg0: tensor<128xui32>) -> (tensor<128xui32>) {
   %0 = "mhlo.sort"(%arg0) ( {
   ^bb0(%arg2: tensor<ui32>, %arg3: tensor<ui32>):  // no predecessors
-    %1 = "mhlo.compare"(%arg2, %arg3) {comparison_direction = "GT"} : (tensor<ui32>, tensor<ui32>) -> tensor<i1>
+    %1 = "mhlo.compare"(%arg2, %arg3) {comparison_direction = #mhlo<"comparison_direction GT">} : (tensor<ui32>, tensor<ui32>) -> tensor<i1>
     "mhlo.return"(%1) : (tensor<i1>) -> ()
   }) {dimension = 0 : i64, is_stable = false} : (tensor<128xui32>) -> (tensor<128xui32>)
   return %0 : tensor<128xui32>
@@ -50,7 +50,7 @@ func @sort_cst_capture(%arg0: tensor<1x10xi32>) -> tensor<1x10xi32> {
   %0 = mhlo.constant dense<0> : tensor<i32>
   %1 = "mhlo.sort"(%arg0) ( {
   ^bb0(%arg1: tensor<i32>, %arg3: tensor<i32>):
-    %2 = "mhlo.compare"(%arg1, %0) {comparison_direction = "LT"} : (tensor<i32>, tensor<i32>) -> tensor<i1>
+    %2 = "mhlo.compare"(%arg1, %0) {comparison_direction = #mhlo<"comparison_direction LT">} : (tensor<i32>, tensor<i32>) -> tensor<i1>
     "mhlo.return"(%2) : (tensor<i1>) -> ()
   }) {dimension = 1 : i64, is_stable = true} : (tensor<1x10xi32>) -> tensor<1x10xi32>
   return %1 : tensor<1x10xi32>
@@ -72,7 +72,7 @@ func @sort_cst_capture(%arg0: tensor<1x10xi32>) -> tensor<1x10xi32> {
 func @sort_argument_capture(%arg0: tensor<1x10xi32>, %arg1 : tensor<i32>) -> tensor<1x10xi32> {
   %1 = "mhlo.sort"(%arg0) ( {
   ^bb0(%arg2: tensor<i32>, %arg3: tensor<i32>):
-    %2 = "mhlo.compare"(%arg2, %arg1) {comparison_direction = "LT"} : (tensor<i32>, tensor<i32>) -> tensor<i1>
+    %2 = "mhlo.compare"(%arg2, %arg1) {comparison_direction = #mhlo<"comparison_direction LT">} : (tensor<i32>, tensor<i32>) -> tensor<i1>
     "mhlo.return"(%2) : (tensor<i1>) -> ()
   }) {dimension = 1 : i64, is_stable = true} : (tensor<1x10xi32>) -> tensor<1x10xi32>
   return %1 : tensor<1x10xi32>
@@ -95,7 +95,7 @@ func @sort_argument_capture(%arg0: tensor<1x10xi32>, %arg1 : tensor<i32>) -> ten
 func @sort_2d(%arg0: tensor<16x32xi32>) -> (tensor<16x32xi32>) {
   %0 = "mhlo.sort"(%arg0) ( {
   ^bb0(%arg2: tensor<i32>, %arg3: tensor<i32>):
-    %1 = "mhlo.compare"(%arg2, %arg3) {comparison_direction = "GT"} : (tensor<i32>, tensor<i32>) -> tensor<i1>
+    %1 = "mhlo.compare"(%arg2, %arg3) {comparison_direction = #mhlo<"comparison_direction GT">} : (tensor<i32>, tensor<i32>) -> tensor<i1>
     "mhlo.return"(%1) : (tensor<i1>) -> ()
   }) {dimension = 0 : i64, is_stable = false} : (tensor<16x32xi32>) -> (tensor<16x32xi32>)
   return %0 : tensor<16x32xi32>
@@ -118,7 +118,7 @@ func @sort_unsigned(%arg0: tensor<1x5xf32>) -> tensor<1x5xf32> {
   ^bb0(%arg1: tensor<f32>, %arg2: tensor<f32>):
     %2 = "mhlo.bitcast_convert"(%arg1) : (tensor<f32>) -> tensor<ui32>
     %3 = "mhlo.bitcast_convert"(%arg2) : (tensor<f32>) -> tensor<ui32>
-    %4 = "mhlo.compare"(%2, %3) {comparison_direction = "LT"} : (tensor<ui32>, tensor<ui32>) -> tensor<i1>
+    %4 = "mhlo.compare"(%2, %3) {comparison_direction = #mhlo<"comparison_direction LT">} : (tensor<ui32>, tensor<ui32>) -> tensor<i1>
     "mhlo.return"(%4) : (tensor<i1>) -> ()
   }) {dimension = 1 : i64, is_stable = true} : (tensor<1x5xf32>) -> tensor<1x5xf32>
   return %1 : tensor<1x5xf32>
@@ -144,7 +144,7 @@ func @sort_unsigned_cst_capture(%arg0: tensor<1x5xf32>) -> tensor<1x5xf32> {
   %1 = "mhlo.sort"(%arg0) ( {
   ^bb0(%arg1: tensor<f32>, %arg2: tensor<f32>):
     %2 = "mhlo.bitcast_convert"(%arg1) : (tensor<f32>) -> tensor<ui32>
-    %3 = "mhlo.compare"(%2, %ui32) {comparison_direction = "LT"} : (tensor<ui32>, tensor<ui32>) -> tensor<i1>
+    %3 = "mhlo.compare"(%2, %ui32) {comparison_direction = #mhlo<"comparison_direction LT">} : (tensor<ui32>, tensor<ui32>) -> tensor<i1>
     "mhlo.return"(%3) : (tensor<i1>) -> ()
   }) {dimension = 1 : i64, is_stable = true} : (tensor<1x5xf32>) -> tensor<1x5xf32>
   return %1 : tensor<1x5xf32>
@@ -176,7 +176,7 @@ func @sort_complex(%arg0: tensor<1x5xf32>, %arg1 : tensor<complex<f32>>) -> tens
     %3 = mhlo.add %2, %arg1 : tensor<complex<f32>>
     %4 = "mhlo.real"(%3) : (tensor<complex<f32>>) -> tensor<f32>
     %5 = "mhlo.imag"(%3) : (tensor<complex<f32>>) -> tensor<f32>
-    %6 = "mhlo.compare"(%4, %5) {comparison_direction = "LT"} : (tensor<f32>, tensor<f32>) -> tensor<i1>
+    %6 = "mhlo.compare"(%4, %5) {comparison_direction = #mhlo<"comparison_direction LT">} : (tensor<f32>, tensor<f32>) -> tensor<i1>
     "mhlo.return"(%6) : (tensor<i1>) -> ()
   }) {dimension = 1 : i64, is_stable = true} : (tensor<1x5xf32>) -> tensor<1x5xf32>
   return %1 : tensor<1x5xf32>
@@ -200,7 +200,7 @@ func @sort_complex(%arg0: tensor<1x5xf32>, %arg1 : tensor<complex<f32>>) -> tens
 func @topk(%arg0: tensor<128xi32>, %arg1: tensor<128xi32>) -> (tensor<128xi32>) {
   %0:2 = "mhlo.sort"(%arg0, %arg1) ( {
   ^bb0(%arg2: tensor<i32>, %arg3: tensor<i32>, %arg4: tensor<i32>, %arg5: tensor<i32>):
-    %1 = "mhlo.compare"(%arg2, %arg3) {comparison_direction = "GT"} : (tensor<i32>, tensor<i32>) -> tensor<i1>
+    %1 = "mhlo.compare"(%arg2, %arg3) {comparison_direction = #mhlo<"comparison_direction GT">} : (tensor<i32>, tensor<i32>) -> tensor<i1>
     "mhlo.return"(%1) : (tensor<i1>) -> ()
   }) {dimension = 0 : i64, is_stable = false} : (tensor<128xi32>, tensor<128xi32>) -> (tensor<128xi32>, tensor<128xi32>)
   return %0#0 : tensor<128xi32>
