@@ -83,6 +83,20 @@ struct InParallelOpToAsyncRewriter : public OpRewritePattern<InParallelOp> {
   }
 };
 
+/// Pattern to rewrite a InParallelOp to the HAL dialect.
+struct InParallelOpToHALRewriter : public OpRewritePattern<InParallelOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  FailureOr<SmallVector<Operation *>>
+  returningMatchAndRewrite(InParallelOp inParallelOp,
+                           PatternRewriter &rewriter) const;
+
+  LogicalResult matchAndRewrite(InParallelOp inParallelOp,
+                                PatternRewriter &rewriter) const override {
+    return returningMatchAndRewrite(inParallelOp, rewriter);
+  }
+};
+
 /// Pattern to rewrite a InParallelOp to an scf::ForOp.
 struct InParallelOpToScfForRewriter : public OpRewritePattern<InParallelOp> {
   using OpRewritePattern::OpRewritePattern;

@@ -844,6 +844,7 @@ transform::TileToLinalgExtTileOp::apply(transform::TransformResults &results,
     targets.front()->emitError("Cannot tile op: Not a TilingInterface");
     return failure();
   }
+
   FailureOr<iree_compiler::IREE::LinalgExt::TilingResult> result =
       functional::applyReturningPatternAt(pattern, tilingInterfaceOp);
   if (failed(result))
@@ -895,6 +896,14 @@ transform::RewriteLinalgExtInParallelToAsyncOp::applyToOne(
     return result;
   };
   return functional::applyAt(target, functionalRewrite);
+}
+
+LogicalResult transform::RewriteLinalgExtInParallelToHALOp::apply(
+    transform::TransformResults &results, transform::TransformState &state) {
+  LinalgExt::InParallelOpToHALRewriter pattern(this->getContext());
+  ArrayRef<Operation *> targets = state.getPayloadOps(target());
+  return functional::applyReturningPatternAt(
+      pattern, cast<LinalgExt::InParallelOp>(targets.front()));
 }
 
 FailureOr<scf::ForOp>
