@@ -12,6 +12,7 @@
 #include "iree/base/api.h"
 #include "iree/hal/local/executable_loader.h"
 #include "iree/hal/local/loaders/embedded_library_loader.h"
+#include "iree/hal/local/loaders/system_library_loader.h"
 #include "iree/hal/local/sync_device.h"
 #include "iree/hal/local/sync_driver.h"
 
@@ -50,11 +51,18 @@ static iree_status_t iree_hal_dylib_sync_driver_factory_try_create(
   iree_hal_sync_device_params_initialize(&default_params);
 
   iree_status_t status = iree_ok_status();
-  iree_hal_executable_loader_t* loaders[1] = {NULL};
+
+  iree_hal_executable_loader_t* loaders[2] = {NULL, NULL};
+  iree_host_size_t loader_count = 0;
   if (iree_status_is_ok(status)) {
     status = iree_hal_embedded_library_loader_create(
         iree_hal_executable_import_provider_null(), host_allocator,
-        &loaders[0]);
+        &loaders[loader_count++]);
+  }
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_system_library_loader_create(
+        iree_hal_executable_import_provider_null(), host_allocator,
+        &loaders[loader_count++]);
   }
 
   iree_hal_allocator_t* device_allocator = NULL;
@@ -66,12 +74,14 @@ static iree_status_t iree_hal_dylib_sync_driver_factory_try_create(
 
   if (iree_status_is_ok(status)) {
     status = iree_hal_sync_driver_create(
-        iree_make_cstring_view("cpu"), &default_params, IREE_ARRAYSIZE(loaders),
-        loaders, device_allocator, host_allocator, out_driver);
+        iree_make_cstring_view("cpu"), &default_params, loader_count, loaders,
+        device_allocator, host_allocator, out_driver);
   }
 
   iree_hal_allocator_release(device_allocator);
-  iree_hal_executable_loader_release(loaders[0]);
+  for (iree_host_size_t i = 0; i < loader_count; ++i) {
+    iree_hal_executable_loader_release(loaders[i]);
+  }
   return status;
 }
 
