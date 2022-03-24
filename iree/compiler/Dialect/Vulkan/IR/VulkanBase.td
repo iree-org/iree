@@ -109,18 +109,21 @@ def VK_TTA_CPU       : I32EnumAttrCase<"CPU", 1, "cpu">;
 // AMD GPU
 def VK_TTA_RDNAv1    : I32EnumAttrCase<"AMD_RDNAv1", 100, "rdna1">;
 def VK_TTA_RDNAv2    : I32EnumAttrCase<"AMD_RDNAv2", 101, "rdna2">;
+// Apple Silicon GPU
+def VK_TTA_M1        : I32EnumAttrCase<"Apple_M1", 200, "m1">;
 // ARM Mali GPU
-def VK_TTA_Valhall   : I32EnumAttrCase<"ARM_Valhall", 203, "valhall">;
+def VK_TTA_Valhall   : I32EnumAttrCase<"ARM_Valhall", 300, "valhall">;
 // NVIDIA GPU
-def VK_TTA_Turing    : I32EnumAttrCase<"NV_Turing", 301, "turing">;
-def VK_TTA_Ampere    : I32EnumAttrCase<"NV_Ampere", 302, "ampere">;
+def VK_TTA_Turing    : I32EnumAttrCase<"NV_Turing", 400, "turing">;
+def VK_TTA_Ampere    : I32EnumAttrCase<"NV_Ampere", 401, "ampere">;
 // Qualcomm Adreno GPU
-def VK_TTA_Adreno    : I32EnumAttrCase<"QC_Adreno", 400, "adreno">;
+def VK_TTA_Adreno    : I32EnumAttrCase<"QC_Adreno", 500, "adreno">;
 
 def VK_TargetArchAttr : VK_I32EnumAttr<
   "TargetTripleArch", "recognized target architecture", [
     VK_TTA_Unknown, VK_TTA_CPU, VK_TTA_RDNAv1, VK_TTA_RDNAv2,
-    VK_TTA_Valhall, VK_TTA_Turing, VK_TTA_Ampere, VK_TTA_Adreno,
+    VK_TTA_M1, VK_TTA_Valhall, VK_TTA_Turing, VK_TTA_Ampere,
+    VK_TTA_Adreno,
   ]>;
 
 def VK_TTP_Unknown     : I32EnumAttrCase<"Unknown", 0, "unknown">;
@@ -130,21 +133,26 @@ def VK_TTP_Adreno650   : I32EnumAttrCase<"Adreno_650", 101, "a650">;
 def VK_TTP_Adreno660   : I32EnumAttrCase<"Adreno_660", 102, "a660">;
 // Software emulated GPU
 def VK_TTP_SwiftShader : I32EnumAttrCase<"SwiftShader", 200, "swiftshader">;
+// Translation layers
+def VK_TTP_MoltenVK    : I32EnumAttrCase<"MoltenVK", 300, "moltenvk">;
 
 def VK_TargetProductAttr : VK_I32EnumAttr<
   "TargetTripleProduct", "recognized target product", [
     VK_TTP_Unknown, VK_TTP_Adreno650, VK_TTP_Adreno660, VK_TTP_SwiftShader,
+    VK_TTP_MoltenVK,
   ]>;
 
 def VK_TTOS_Unknown   : I32EnumAttrCase<"Unknown", 0, "unknown">;
 def VK_TTOS_Android11 : I32EnumAttrCase<"Android11", 2, "android11">;
-def VK_TTOS_Linux     : I32EnumAttrCase<"Linux", 3, "linux">;
-def VK_TTOS_Windows   : I32EnumAttrCase<"Windows", 4, "windows">;
+def VK_TTOS_iOS       : I32EnumAttrCase<"iOS", 3, "iOS">;
+def VK_TTOS_Linux     : I32EnumAttrCase<"Linux", 4, "linux">;
+def VK_TTOS_macOS     : I32EnumAttrCase<"macOS", 5, "macos">;
+def VK_TTOS_Windows   : I32EnumAttrCase<"Windows", 6, "windows">;
 
 def VK_TargetOSAttr : VK_I32EnumAttr<
   "TargetTripleOS", "recognized target operating system", [
-    VK_TTOS_Unknown, VK_TTOS_Android11, VK_TTOS_Linux,
-    VK_TTOS_Windows,
+    VK_TTOS_Unknown, VK_TTOS_Android11, VK_TTOS_iOS, VK_TTOS_Linux,
+    VK_TTOS_macOS, VK_TTOS_Windows,
   ]>;
 
 //===----------------------------------------------------------------------===//
