@@ -22,6 +22,7 @@ cc_library(
         "//iree/compiler/Dialect/Flow/IR",
         "@llvm-project//mlir:FuncDialect",
         "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:LinalgOps",
         "@llvm-project//mlir:TensorDialect",
     ],
 )

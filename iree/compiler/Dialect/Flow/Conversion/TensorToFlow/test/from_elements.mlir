@@ -1,4 +1,4 @@
-// RUN: iree-opt -allow-unregistered-dialect -split-input-file -iree-flow-convert-to-flow-before-dispatch-formation %s | FileCheck %s
+// RUN: iree-opt -allow-unregistered-dialect -split-input-file -iree-flow-convert-to-flow %s | FileCheck %s
 
 // CHECK: func @tensor.from_elements__to__flow.tensor.splat(%[[arg0:.*]]: i8)
 func @tensor.from_elements__to__flow.tensor.splat(%arg0: i8) -> (i8) {

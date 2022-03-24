@@ -19,8 +19,6 @@ iree_lit_test_suite(
     "cleanup_tensor_shapes.mlir"
     "conv1x1_to_matmul.mlir"
     "conv2d_to_img2col.mlir"
-    "convert_linalg_tensor_ops_after.mlir"
-    "convert_linalg_tensor_ops_before.mlir"
     "deduplicate_executables.mlir"
     "dispatch_linalg_on_tensors.mlir"
     "dispatch_linalg_on_tensors_fusion.mlir"

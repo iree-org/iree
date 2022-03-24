@@ -33,7 +33,6 @@ iree_cc_library(
     "ConvertConv2D1x1ToMatmulPass.cpp"
     "ConvertConv2DToImg2ColPass.cpp"
     "ConvertLinalgMatmulToMmt4D.cpp"
-    "ConvertToFlow.cpp"
     "DeduplicateExecutables.cpp"
     "DispatchLinalgOnTensors.cpp"
     "ExpandTensorShapes.cpp"

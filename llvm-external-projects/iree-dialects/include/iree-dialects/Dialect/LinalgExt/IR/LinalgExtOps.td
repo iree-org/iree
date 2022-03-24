@@ -11,6 +11,7 @@ include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtBase.td"
 include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtInterfaces.td"
 include "iree-dialects/Dialect/LinalgExt/IR/TiledOpInterface.td"
 include "mlir/Interfaces/ControlFlowInterfaces.td"
+include "mlir/Interfaces/InferTypeOpInterface.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/Interfaces/TilingInterface.td"
 include "mlir/Interfaces/ViewLikeInterface.td"
@@ -29,7 +30,8 @@ class IREELinalgExt_Op<string mnemonic, list<Trait> traits = []> :
         [AttrSizedOperandSegments,
          DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
          LinalgExtInterface,
-         SingleBlockImplicitTerminator<"::mlir::iree_compiler::IREE::LinalgExt::YieldOp">
+         SingleBlockImplicitTerminator<"::mlir::iree_compiler::IREE::LinalgExt::YieldOp">,
+         ReifyRankedShapedTypeOpInterface
   ])> {
   let hasVerifier = 1;
   let hasCustomAssemblyFormat = 1;
@@ -37,6 +39,12 @@ class IREELinalgExt_Op<string mnemonic, list<Trait> traits = []> :
     SmallVector<Value> getDestinationOperands(OpBuilder &b) {
       SmallVector<Value> dest(outputs().begin(), outputs().end());
       return dest;
+    }
+
+    LogicalResult reifyResultShapes(OpBuilder &b,
+        mlir::ReifiedRankedShapedTypeDims &reifiedReturnShapes) {
+      return llvm::cast<LinalgExtOp>(getOperation()).reifyResultShapes(b,
+          reifiedReturnShapes);
     }
   }];
 }

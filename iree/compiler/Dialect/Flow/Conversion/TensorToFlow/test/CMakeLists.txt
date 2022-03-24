@@ -17,8 +17,10 @@ iree_lit_test_suite(
     "cast.mlir"
     "extract.mlir"
     "extract_slice.mlir"
+    "fill.mlir"
     "from_elements.mlir"
     "insert_slice.mlir"
+    "reshape.mlir"
   TOOLS
     FileCheck
     iree::tools::iree-opt

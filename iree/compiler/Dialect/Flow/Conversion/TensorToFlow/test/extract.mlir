@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -iree-flow-convert-to-flow-after-dispatch-formation %s | FileCheck %s
+// RUN: iree-opt -split-input-file -iree-flow-convert-to-flow %s | FileCheck %s
 
 func @tensor_extract(%arg0 : tensor<1xi32>, %arg1 : index) -> i32 {
   // CHECK: %[[RESULT:.*]] = flow.tensor.load %arg0[%arg1] : tensor<1xi32>
