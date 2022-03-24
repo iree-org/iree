@@ -426,17 +426,17 @@ func @subtensor_insert(%arg0: tensor<?x?xf32>, %arg1: tensor<?x?xf32>,
 //  CHECK-DAG:   %[[ARG1_D0:.+]] = tensor.dim %[[ARG1]], %[[C0]]
 //  CHECK-DAG:   %[[ARG1_D1:.+]] = tensor.dim %[[ARG1]], %[[C1]]
 //      CHECK:   %[[RESULT:.+]] = flow.dispatch.workgroups[%[[ARG0_D1]], %[[ARG0_D0]], %[[C1]]]
-// CHECK-SAME:       (%[[ARG1]], %[[ARG1_D0]], %[[ARG1_D1]], %[[ARG0]], %[[ARG0_D0]], %[[ARG0_D1]],
+// CHECK-SAME:       (%[[ARG0]], %[[ARG0_D0]], %[[ARG0_D1]], %[[ARG1]], %[[ARG1_D0]], %[[ARG1_D1]],
 // CHECK-SAME:        %[[ARG2]], %[[ARG3]], %[[ARG4]], %[[ARG5]])
-// CHECK-SAME:       tensor<?x?xf32>{%[[ARG1_D0]], %[[ARG1_D1]]}
 // CHECK-SAME:       tensor<?x?xf32>{%[[ARG0_D0]], %[[ARG0_D1]]}
+// CHECK-SAME:       tensor<?x?xf32>{%[[ARG1_D0]], %[[ARG1_D1]]}
 // CHECK-SAME:       -> %[[ARG1]]{%[[ARG1_D0]], %[[ARG1_D1]]}
-// CHECK-NEXT:     %[[ARG1_CAPTURE:.+]]: !flow.dispatch.tensor<readwrite:?x?xf32>
-// CHECK-SAME:     %[[ARG1_D0_CAPTURE:[a-zA-Z0-9]+]]: index
-// CHECK-SAME:     %[[ARG1_D1_CAPTURE:[a-zA-Z0-9]+]]: index
-// CHECK-SAME:     %[[ARG0_CAPTURE:.+]]: !flow.dispatch.tensor<readonly:?x?xf32>
+// CHECK-NEXT:     %[[ARG0_CAPTURE:.+]]: !flow.dispatch.tensor<readonly:?x?xf32>
 // CHECK-SAME:     %[[ARG0_D0_CAPTURE:[a-zA-Z0-9]+]]: index
 // CHECK-SAME:     %[[ARG0_D1_CAPTURE:[a-zA-Z0-9]+]]: index
+// CHECK-SAME:     %[[ARG1_CAPTURE:.+]]: !flow.dispatch.tensor<readwrite:?x?xf32>
+// CHECK-SAME:     %[[ARG1_D0_CAPTURE:[a-zA-Z0-9]+]]: index
+// CHECK-SAME:     %[[ARG1_D1_CAPTURE:[a-zA-Z0-9]+]]: index
 // CHECK-SAME:     %[[ARG2_CAPTURE:[a-zA-Z0-9]+]]: index
 // CHECK-SAME:     %[[ARG3_CAPTURE:[a-zA-Z0-9]+]]: index
 // CHECK-SAME:     %[[ARG4_CAPTURE:[a-zA-Z0-9]+]]: index
@@ -998,10 +998,10 @@ func @dynamic_slice(%arg0 : i32, %arg1 : i32, %arg2 : tensor<?xi32>,
 //   CHECK-DAG:   %[[D1:.+]] = tensor.dim %[[ARG3]], %[[C0]]
 //   CHECK-DAG:   %[[D2:.+]] = tensor.dim %[[ARG3]], %[[C1]]
 //       CHECK:   flow.dispatch.workgroups[%[[D0]], %[[C1]], %[[C1]]]
-//  CHECK-SAME:       tensor<?x?xi32>{%[[D1]], %[[D2]]}
 //  CHECK-SAME:       tensor<?xi32>{%[[D0]]}
-//  CHECK-NEXT:     %[[ARG4:.+]]: !flow.dispatch.tensor<readwrite:?x?xi32>
-//  CHECK-SAME:     %[[ARG5:.+]]: !flow.dispatch.tensor<readonly:?xi32>
+//  CHECK-SAME:       tensor<?x?xi32>{%[[D1]], %[[D2]]}
+//  CHECK-NEXT:     !flow.dispatch.tensor<readonly:?xi32>
+//  CHECK-SAME:     !flow.dispatch.tensor<readwrite:?x?xi32>
 
 // -----
 
