@@ -413,6 +413,20 @@ def RewriteLinalgExtInParallelToAsyncOp :
   }];
 }
 
+def RewriteLinalgExtInParallelToHALOp :
+  Linalg_Transform_Operation<"rewrite_iree_linalg_ext_in_parallel_to_hal", [
+    DeclareOpInterfaceMethods<TransformOpInterface, ["apply"]>
+  ]> {
+
+  let description = [{Rewrite linalg_ext.in_parallel op to use HAL ops.}];
+  let arguments = (ins PDL_Operation:$target);
+  // TODO: Determine whether we want to return something here, the only natural
+  // results would be the resulting insertTensorOps.
+  // let results = (outs PDL_Operation:$transformed);
+
+  let assemblyFormat = "$target attr-dict";
+}
+
 def RewriteLinalgExtInParallelToScfForOp :
   Linalg_Transform_Operation<"rewrite_iree_linalg_ext_in_parallel_to_scf_for",
     [TransformOpInterface, TargetableSingleOperandTransformOpTrait]> {
