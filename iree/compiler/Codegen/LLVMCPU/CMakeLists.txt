@@ -28,6 +28,8 @@ iree_cc_library(
   DEPS
     IREELinalgExtDialect
     IREELinalgExtPasses
+    IREELinalgTransformDialect
+    IREELinalgTransformDialectTransforms
     LLVMSupport
     MLIRAffineToStandard
     MLIRAnalysis
@@ -35,6 +37,7 @@ iree_cc_library(
     MLIRArithmeticTransforms
     MLIRArmNeon
     MLIRArmNeon2dToIntr
+    MLIRBufferization
     MLIRControlFlowToLLVM
     MLIRFunc
     MLIRFuncToLLVM
@@ -51,6 +54,8 @@ iree_cc_library(
     MLIRMemRef
     MLIRMemRefToLLVM
     MLIRMemRefTransforms
+    MLIRPDL
+    MLIRPDLInterp
     MLIRPass
     MLIRReconcileUnrealizedCasts
     MLIRSCF
