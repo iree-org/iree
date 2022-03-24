@@ -23,8 +23,9 @@ def CPU_TileFuseAndVectorize
     : I32EnumAttrCase<"CPUTileFuseAndVectorize", 4>;
 def CPU_BufferOpsTileAndVectorize
     : I32EnumAttrCase<"CPUBufferOpsTileAndVectorize", 5>;
-def CPU_SandboxCodegen
-    : I32EnumAttrCase<"CPUSandboxCodegen", 6>;
+
+def Linalg_TransformInterpCodegen
+    : I32EnumAttrCase<"LinalgTransformInterpCodegen", 6>;
 
 def LLVMGPU_SimpleDistribute
     : I32EnumAttrCase<"LLVMGPUDistribute", 7>;
@@ -54,7 +55,7 @@ def DispatchLoweringPassPipelineEnum : I32EnumAttr<
     "identifier for pass pipeline use to lower dispatch region",
     [CPU_Default, CPU_SingleTilingExpert, CPU_DoubleTilingExpert,
      CPU_ConvTileAndDecomposeExpert, CPU_TileFuseAndVectorize,
-     CPU_BufferOpsTileAndVectorize, CPU_SandboxCodegen,
+     CPU_BufferOpsTileAndVectorize, Linalg_TransformInterpCodegen,
      LLVMGPU_SimpleDistribute, LLVMGPU_Vectorize, LLVMGPU_MatmulSimt,
      LLVMGPU_MatmulTensorCore, SPIRV_Distribute, SPIRV_DistributeCopy, SPIRV_Vectorize,
      SPIRV_VectorizeToCooperativeOps, None]> {
