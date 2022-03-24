@@ -4,6 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree-dialects/Dialect/LinalgTransform/LinalgTransformOps.h"
 #include "iree/compiler/Codegen/Dialect/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/LLVMCPU/KernelDispatch.h"
@@ -40,6 +41,7 @@ class LLVMCPULowerExecutableTargetPass
     // clang-format off
     registry.insert<IREE::Codegen::IREECodegenDialect,
                     IREE::HAL::HALDialect,
+                    IREE::LinalgExt::IREELinalgExtDialect,
                     bufferization::BufferizationDialect,
                     linalg::LinalgDialect,
                     linalg::transform::LinalgTransformDialect,

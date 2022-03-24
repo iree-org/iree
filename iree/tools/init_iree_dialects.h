@@ -15,7 +15,10 @@
 #include "iree-dialects/Dialect/Input/InputDialect.h"
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree-dialects/Dialect/LinalgExt/IR/TiledOpInterface.h"
+#include "iree-dialects/Dialect/LinalgExt/LinalgExtBufferization.h"
+#include "iree-dialects/Dialect/LinalgExt/Passes/Passes.h"
 #include "iree-dialects/Dialect/LinalgTransform/LinalgTransformOps.h"
+#include "iree-dialects/Dialect/LinalgTransform/Passes.h"
 #include "iree-dialects/Dialect/PyDM/IR/PyDMDialect.h"
 #include "iree/compiler/Codegen/Dialect/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/Interfaces/Interfaces.h"
@@ -48,8 +51,11 @@ inline void registerIreeDialects(DialectRegistry &registry) {
                   IREE::PYDM::IREEPyDMDialect>();
   // clang-format on
 
+  // External models.
   IREE::Flow::registerPartitionableLoopsInterfaceModels(registry);
+  IREE::LinalgExt::registerBufferizableOpInterfaceExternalModels(registry);
   IREE::LinalgExt::registerTiledOpInterfaceExternalModels(registry);
+  IREE::LinalgExt::registerTilingInterfaceExternalModels(registry);
   IREE::Util::registerUtilExternalModels(registry);
   registerCodegenInterfaces(registry);
 }

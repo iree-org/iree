@@ -4,6 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree-dialects/Dialect/LinalgTransform/LinalgTransformOps.h"
 #include "iree-dialects/Dialect/LinalgTransform/Passes.h"
 #include "iree-dialects/Dialect/LinalgTransform/TrackingCSE.h"
@@ -237,7 +238,8 @@ struct InterpreterPass : public PassWrapper<InterpreterPass, Pass> {
 
   void getDependentDialects(DialectRegistry &registry) const override {
     // clang-format off
-    registry.insert<arith::ArithmeticDialect,
+    registry.insert<mlir::iree_compiler::IREE::LinalgExt::IREELinalgExtDialect,
+                    arith::ArithmeticDialect,
                     AffineDialect,
                     bufferization::BufferizationDialect,
                     func::FuncDialect,

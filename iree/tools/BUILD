@@ -120,6 +120,8 @@ cc_library(
         "//llvm-external-projects/iree-dialects:IREEInputDialect",
         "//llvm-external-projects/iree-dialects:IREELinalgExtDialect",
         "//llvm-external-projects/iree-dialects:IREELinalgExtPasses",
+        "//llvm-external-projects/iree-dialects:IREELinalgTransformDialect",
+        "//llvm-external-projects/iree-dialects:IREELinalgTransformDialectTransforms",
         "//llvm-external-projects/iree-dialects:IREEPyDMDialect",
         "@llvm-project//mlir:IR",
     ],
