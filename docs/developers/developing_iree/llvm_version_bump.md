@@ -65,7 +65,7 @@ It is usually reasonable to focus on build breaks first, and starting with
 Bazel can help, especially for catching nit-picky strict things:
 
 ```
-bazel build iree/tools:iree-translate
+bazel build iree/tools:iree-compile
 bazel test iree/compiler/...
 ```
 
@@ -110,8 +110,8 @@ the main-project version should be copied over the integrations version.
 
 ```
 cd ~/src
-git clone https://github.com/tensorflow/tensorflow.git
-git clone https://github.com/tensorflow/mlir-hlo.git
+git clone --branch master https://github.com/google/iree-tf-fork.git
+git clone --branch master https://github.com/google/iree-mhlo-fork.git
 ```
 
 Get MHLO's published version:

@@ -30,7 +30,7 @@ llvm::SmallVector<mlir::linalg::ProcInfo, 2> getSubgroupIdsAndCounts(
     llvm::ArrayRef<int64_t> numSubgroups);
 
 /// return the workgroup size associated to the funcOp entry point.
-std::array<int64_t, 3> getWorkgroupSize(mlir::FuncOp funcOp);
+std::array<int64_t, 3> getWorkgroupSize(mlir::func::FuncOp funcOp);
 
 }  // namespace iree_compiler
 }  // namespace mlir

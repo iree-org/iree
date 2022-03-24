@@ -2,7 +2,7 @@
 
 // Tests that multiple initializers are combined in their module order.
 
-builtin.func private @extern() -> index
+func.func private @extern() -> index
 
 // CHECK: util.global private mutable @global0 : index
 util.global private mutable @global0 : index
@@ -32,7 +32,7 @@ util.initializer {
 // CHECK-NEXT: util.initializer.return
 
 // CHECK-LABEL: @orderedCombining
-builtin.func @orderedCombining(%arg0: index) -> (index, index, index) {
+func.func @orderedCombining(%arg0: index) -> (index, index, index) {
   util.global.store %arg0, @global0 : index
   %value0 = util.global.load @global0 : index
   %value1 = util.global.load @global1 : index

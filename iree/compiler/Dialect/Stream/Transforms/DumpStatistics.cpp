@@ -43,7 +43,7 @@ struct UsageInfo {
   // stream.executable ops mapped by name.
   llvm::MapVector<StringRef, IREE::Stream::ExecutableOp> executableOps;
   // stream.executable exported function -> dispatches to it.
-  llvm::MapVector<mlir::FuncOp, SmallVector<IREE::Stream::CmdDispatchOp>>
+  llvm::MapVector<mlir::func::FuncOp, SmallVector<IREE::Stream::CmdDispatchOp>>
       exportDispatchOps;
 
   // TODO(benvanik): resource allocations.

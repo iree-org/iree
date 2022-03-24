@@ -150,51 +150,7 @@ def IREEPyDM_IntegerType : IREEPyDM_PrimitiveTypeDef<"Integer", [
     bool isSigned() const;
   }];
 
-  let printer = [{
-    auto w = getImpl()->bitWidth;
-    if (w) {
-      $_printer << "<";
-      if (*w == 0) {
-        $_printer << "*";
-      } else if (*w > 0) {
-        $_printer << *w;
-      } else {
-        $_printer << "unsigned " << (-*w);
-      }
-      $_printer << ">";
-    }
-  }];
-
-  let parser = [{
-    auto emitError = [&]() -> InFlightDiagnostic{
-      return $_parser.emitError($_parser.getCurrentLocation());
-    };
-    // Weak
-    if (failed($_parser.parseOptionalLess()))
-      return get($_ctxt);
-    // AP
-    if (succeeded($_parser.parseOptionalStar())) {
-      if (failed($_parser.parseGreater()))
-        return Type();
-      return get($_ctxt, None);
-    }
-
-    // Explicit
-    bool isSigned;
-    if (succeeded($_parser.parseOptionalKeyword("unsigned"))) {
-      isSigned = false;
-    } else {
-      isSigned = true;
-    }
-
-    int width;
-    if (failed($_parser.parseInteger(width)))
-      return Type();
-    if (failed($_parser.parseGreater()))
-      return Type();
-    if (!isSigned) width = -width;
-    return getChecked(emitError, $_ctxt, width);
-  }];
+  let hasCustomAssemblyFormat = 1;
 }
 
 def IREEPyDM_ListType : IREEPyDM_PrimitiveTypeDef<"List", ["isRefinable"]> {
@@ -216,59 +172,7 @@ def IREEPyDM_ListType : IREEPyDM_PrimitiveTypeDef<"List", ["isRefinable"]> {
       return Base::get($_ctxt, CollectionStorageClass::Boxed, nullptr);
     }]>
   ];
-
-  let printer = [{
-    if (getImpl()->uniformElementType ||
-        getImpl()->storageClass != CollectionStorageClass::Boxed) {
-      $_printer << "<";
-      switch (getImpl()->storageClass) {
-        case CollectionStorageClass::Boxed:
-          $_printer << "boxed";
-          break;
-        case CollectionStorageClass::Empty:
-          $_printer << "empty";
-          break;
-        case CollectionStorageClass::Unboxed:
-          $_printer << "unboxed";
-          break;
-      }
-
-      if (getImpl()->uniformElementType) {
-        $_printer << ",";
-        $_printer << getImpl()->uniformElementType;
-      }
-      $_printer << ">";
-    }
-  }];
-
-  let parser = [{
-    if ($_parser.parseOptionalLess())
-      return get($_ctxt, CollectionStorageClass::Boxed, nullptr);
-
-    Type t;
-    StringRef storageClassKeyword;
-    if ($_parser.parseKeyword(&storageClassKeyword))
-      return Type();
-    if ($_parser.parseComma())
-      return Type();
-    if ($_parser.parseType(t))
-      return Type();
-    if ($_parser.parseGreater())
-      return Type();
-
-    CollectionStorageClass storageClass;
-    if (storageClassKeyword == "boxed")
-      storageClass = CollectionStorageClass::Boxed;
-    else if (storageClassKeyword == "empty")
-      storageClass = CollectionStorageClass::Empty;
-    else if (storageClassKeyword == "unboxed")
-      storageClass = CollectionStorageClass::Unboxed;
-    else {
-      $_parser.emitError($_parser.getCurrentLocation(), "expected one of 'boxed', 'empty', 'unboxed'");
-      return Type();
-    }
-    return get($_ctxt, storageClass, t);
-  }];
+  let hasCustomAssemblyFormat = 1;
 
   let extraClassDeclaration = [{
     /// Gets the type used to store elements in the backing list.
@@ -330,28 +234,7 @@ def IREEPyDM_RealType : IREEPyDM_PrimitiveTypeDef<"Real",
     bool isWeak() const;
     bool isExplicit() const { return !isWeak(); }
   }];
-
-  let printer = [{
-    auto ft = getImpl()->floatType;
-    if (ft)
-      $_printer << "<" << ft << ">";
-  }];
-
-  let parser = [{
-    auto emitError = [&]() -> InFlightDiagnostic{
-      return $_parser.emitError($_parser.getCurrentLocation());
-    };
-    // Weak
-    if (failed($_parser.parseOptionalLess()))
-      return get($_ctxt);
-    // Explicit
-    FloatType subType;
-    if (failed($_parser.parseType(subType)))
-      return Type();
-    if (failed($_parser.parseGreater()))
-      return Type();
-    return getChecked(emitError, $_ctxt, subType);
-  }];
+  let hasCustomAssemblyFormat = 1;
 }
 
 def IREEPyDM_StrType : IREEPyDM_PrimitiveTypeDef<"Str"> {
@@ -424,29 +307,7 @@ def IREEPyDM_ObjectType : IREEPyDM_TypeDef<
       return Base::get($_ctxt, nullptr);
     }]>
   ];
-
-  let printer = [{
-    if (getImpl()->primitiveType)
-      $_printer << "<" << getImpl()->primitiveType << ">";
-  }];
-
-  let parser = [{
-    if ($_parser.parseOptionalLess())
-      return get($_ctxt, nullptr);
-
-    Type t;
-    if ($_parser.parseType(t))
-      return Type();
-    if ($_parser.parseGreater())
-      return Type();
-    if (auto primitiveType = t.dyn_cast<PrimitiveType>())
-      return get($_ctxt, primitiveType);
-    else {
-      $_parser.emitError(
-          $_parser.getNameLoc(), "expected a primitive type");
-      return Type();
-    }
-  }];
+  let hasCustomAssemblyFormat = 1;
 
   let extraClassDeclaration = [{
     static bool isGenericObjectType(Type t) {
@@ -479,27 +340,7 @@ def IREEPyDM_UnionType : IREEPyDM_TypeDef<"Union"> {
   );
 
   let genVerifyDecl = 1;
-  let printer = [{
-    llvm::interleaveComma(getAlternatives(), $_printer);
-  }];
-
-  let parser = [{
-    if ($_parser.parseOptionalLess())
-      return get($_ctxt, {});
-
-    SmallVector<::mlir::Type> alternatives;
-
-    do {
-      Type type;
-      if ($_parser.parseType(type))
-        return Type();
-      alternatives.push_back(type);
-    } while (succeeded($_parser.parseOptionalComma()));
-
-    return getChecked([&]() {
-      return $_parser.emitError($_parser.getNameLoc());
-    }, $_ctxt, alternatives);
-  }];
+  let hasCustomAssemblyFormat = 1;
 }
 
 //===----------------------------------------------------------------------===//

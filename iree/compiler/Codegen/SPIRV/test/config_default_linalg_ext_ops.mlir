@@ -15,7 +15,7 @@ hal.executable private @static_1d_sort {
     }> {
     hal.executable.entry_point @static_1d_sort layout(#executable_layout)
     builtin.module {
-      builtin.func @static_1d_sort() {
+      func.func @static_1d_sort() {
         %c0 = arith.constant 0 : index
         %0 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : !flow.dispatch.tensor<readwrite:1000xi32>
         %1 = flow.dispatch.tensor.load %0, offsets = [0], sizes = [1000], strides = [1] : !flow.dispatch.tensor<readwrite:1000xi32> -> tensor<1000xi32>
@@ -60,7 +60,7 @@ hal.executable private @static_3d_sort {
     }> {
     hal.executable.entry_point @static_3d_sort layout(#executable_layout)
     builtin.module {
-      builtin.func @static_3d_sort() {
+      func.func @static_3d_sort() {
         %c64 = arith.constant 64 : index
         %c128 = arith.constant 128 : index
         %c0 = arith.constant 0 : index
@@ -109,7 +109,7 @@ hal.executable private @static_1d_fft_stage2 {
     }> {
     hal.executable.entry_point @static_1d_fft_stage2 layout(#executable_layout)
     builtin.module {
-      builtin.func @static_1d_fft_stage2() {
+      func.func @static_1d_fft_stage2() {
         %c0 = arith.constant 0 : index
         %c2 = arith.constant 2 : index
         %cst = arith.constant dense<[1.000000e+00, 6.12323426E-17]> : tensor<2xf32>
@@ -154,7 +154,7 @@ hal.executable private @static_3d_fft_stage3 {
     }> {
     hal.executable.entry_point @static_3d_fft_stage3 layout(#executable_layout)
     builtin.module {
-      builtin.func @static_3d_fft_stage3() {
+      func.func @static_3d_fft_stage3() {
         %c0 = arith.constant 0 : index
         %c3 = arith.constant 3 : index
         %c64 = arith.constant 64 : index
@@ -203,7 +203,7 @@ hal.executable private @tensor_insert {
     }> {
     hal.executable.entry_point @tensor_insert layout(#executable_layout)
     builtin.module {
-      builtin.func @tensor_insert() {
+      func.func @tensor_insert() {
         %offset_y = hal.interface.constant.load[0] : index
         %offset_x = hal.interface.constant.load[1] : index
         %source_size_y = hal.interface.constant.load[2] : index
@@ -251,7 +251,7 @@ hal.executable private @tensor_extract {
     }> {
     hal.executable.entry_point @tensor_extract layout(#executable_layout)
     builtin.module {
-      builtin.func @tensor_extract() {
+      func.func @tensor_extract() {
         %offset_y = hal.interface.constant.load[0] : index
         %offset_x = hal.interface.constant.load[1] : index
         %source_size_y = hal.interface.constant.load[2] : index

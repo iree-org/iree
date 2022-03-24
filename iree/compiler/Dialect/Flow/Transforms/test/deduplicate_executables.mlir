@@ -162,7 +162,7 @@ flow.executable @different_types_float_ex {
   flow.dispatch.entry @different_types_float_entry
   builtin.module {
     func @different_types_float_entry(%arg0: tensor<4xf32>) -> tensor<4xi1> {
-      %0 = "mhlo.compare"(%arg0, %arg0) {comparison_direction = "EQ"} : (tensor<4xf32>, tensor<4xf32>) -> tensor<4xi1>
+      %0 = "mhlo.compare"(%arg0, %arg0) {comparison_direction = #mhlo<"comparison_direction EQ">} : (tensor<4xf32>, tensor<4xf32>) -> tensor<4xi1>
       return %0 : tensor<4xi1>
     }
   }
@@ -172,7 +172,7 @@ flow.executable @different_types_int_ex {
   flow.dispatch.entry @different_types_int_entry
   builtin.module {
     func @different_types_int_entry(%arg0: tensor<4xi32>) -> tensor<4xi1> {
-      %0 = "mhlo.compare"(%arg0, %arg0) {comparison_direction = "EQ"} : (tensor<4xi32>, tensor<4xi32>) -> tensor<4xi1>
+      %0 = "mhlo.compare"(%arg0, %arg0) {comparison_direction = #mhlo<"comparison_direction EQ">} : (tensor<4xi32>, tensor<4xi32>) -> tensor<4xi1>
       return %0 : tensor<4xi1>
     }
   }

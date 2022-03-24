@@ -206,8 +206,8 @@ class ScheduleExecutionPass
 
   void runOnOperation() override {
     auto *context = &getContext();
-    auto parentOp = dyn_cast<CallableOpInterface>(getOperation());
-    if (!parentOp || !parentOp.getCallableRegion() ||
+    auto parentOp = getOperation();
+    if (!parentOp.getCallableRegion() ||
         parentOp.getCallableRegion()->empty()) {
       return;
     }
@@ -319,7 +319,8 @@ class ScheduleExecutionPass
 
 }  // namespace
 
-std::unique_ptr<OperationPass<>> createScheduleExecutionPass() {
+std::unique_ptr<InterfacePass<CallableOpInterface>>
+createScheduleExecutionPass() {
   return std::make_unique<ScheduleExecutionPass>();
 }
 

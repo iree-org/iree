@@ -227,7 +227,7 @@ hal.executable private @preset_config_matmul_tensors  {
   hal.executable.variant @system_elf_x86_64, target = <"llvm", "system-elf-x86_64"> {
     hal.executable.entry_point @preset_config layout(#executable_layout)
     builtin.module {
-      builtin.func @preset_config() {
+      func.func @preset_config() {
         %cst = arith.constant 0.000000e+00 : f32
         %lhs_binding = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer)
             : !flow.dispatch.tensor<readonly:128x256xf32>
@@ -272,7 +272,7 @@ hal.executable @tensor_insert {
   hal.executable.variant @system_elf_x86_64, target = <"llvm", "system-elf-x86_64"> {
     hal.executable.entry_point @tensor_insert_slice layout(#executable_layout)
     builtin.module {
-      builtin.func @tensor_insert_slice() {
+      func.func @tensor_insert_slice() {
         %d0 = hal.interface.constant.load[0] : index
         %d1 = hal.interface.constant.load[1] : index
         %d2 = hal.interface.constant.load[2] : index
@@ -315,7 +315,7 @@ hal.executable @extract_slice {
   hal.executable.variant @system_elf_x86_64, target = <"llvm", "system-elf-x86_64"> {
     hal.executable.entry_point @extract_slice layout(#executable_layout)
     builtin.module {
-      builtin.func @extract_slice() {
+      func.func @extract_slice() {
         %d0 = hal.interface.constant.load[0] : index
         %d1 = hal.interface.constant.load[1] : index
         %d2 = hal.interface.constant.load[2] : index
@@ -359,7 +359,7 @@ hal.executable private @static_1d_fft_stage2  {
   hal.executable.variant @system_elf_x86_64, target = <"llvm", "system-elf-x86_64"> {
     hal.executable.entry_point @static_1d_fft_stage2 layout(#executable_layout)
     builtin.module {
-      builtin.func @static_1d_fft_stage2() {
+      func.func @static_1d_fft_stage2() {
         %c0 = arith.constant 0 : index
         %c2 = arith.constant 2 : index
         %cst = arith.constant dense<[1.000000e+00, 6.12323426E-17]> : tensor<2xf32>
@@ -397,7 +397,7 @@ hal.executable private @static_3d_fft_stage3  {
   hal.executable.variant @system_elf_x86_64, target = <"llvm", "system-elf-x86_64"> {
     hal.executable.entry_point @static_3d_fft_stage3 layout(#executable_layout)
     builtin.module {
-      builtin.func @static_3d_fft_stage3() {
+      func.func @static_3d_fft_stage3() {
         %c3 = arith.constant 3 : index
         %cst = arith.constant dense<[1.000000e+00, 0.707106769, 6.12323426E-17, -0.707106769]> : tensor<4xf32>
         %cst_0 = arith.constant dense<[-0.000000e+00, -0.707106769, -1.000000e+00, -0.707106769]> : tensor<4xf32>
@@ -435,7 +435,7 @@ hal.executable private @outs_fusion {
   hal.executable.variant @system_elf_x86_64, target = <"llvm", "system-elf-x86_64"> {
     hal.executable.entry_point @outs_fusion_fn layout(#executable_layout)
     builtin.module {
-      builtin.func @outs_fusion_fn() {
+      func.func @outs_fusion_fn() {
         %cst = arith.constant 0.0 : f32
         %d0 = hal.interface.constant.load[0] : index
         %d1 = hal.interface.constant.load[1] : index

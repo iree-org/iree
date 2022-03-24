@@ -1,4 +1,4 @@
-// RUN: iree-tf-opt -split-input-file -verify-diagnostics -pass-pipeline='iree-tf-strip-module-metadata,builtin.func(iree-tf-strip-function-metadata)' %s | FileCheck %s
+// RUN: iree-tf-opt -split-input-file -verify-diagnostics -pass-pipeline='iree-tf-strip-module-metadata,func.func(iree-tf-strip-function-metadata)' %s | FileCheck %s
 
 // CHECK-LABEL: @tf_module
 // CHECK-NOT: attributes

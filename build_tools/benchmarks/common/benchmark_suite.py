@@ -39,7 +39,6 @@ from .benchmark_definition import AndroidDeviceInfo, BenchmarkInfo
 # All benchmarks' relative path against root build directory.
 BENCHMARK_SUITE_REL_PATH = "benchmark_suites"
 
-
 def compose_info_object(device_info: AndroidDeviceInfo,
                         benchmark_category_dir: str,
                         benchmark_case_dir: str) -> BenchmarkInfo:
@@ -86,14 +85,20 @@ def compose_info_object(device_info: AndroidDeviceInfo,
 def filter_benchmarks_for_category(benchmark_category_dir: str,
                                    cpu_target_arch_filter: str,
                                    gpu_target_arch_filter: str,
+                                   available_drivers: Sequence[str],
                                    driver_filter: Optional[str],
+                                   mode_filter: Optional[str],
+                                   model_name_filter: Optional[str],
                                    verbose: bool = False) -> Sequence[str]:
   """Filters benchmarks in a specific category for the given device.
   Args:
     benchmark_category_dir: the directory to a specific benchmark category.
     cpu_target_arch_filter: CPU target architecture filter regex.
     gpu_target_arch_filter: GPU target architecture filter regex.
+    available_drivers: list of drivers supported by the tools in this build dir.
     driver_filter: driver filter regex.
+    mode_filter: benchmark mode regex.
+    model_name_filter: model name regex.
     verbose: whether to print additional debug info.
   Returns:
     A list containing all matched benchmark cases' directories.
@@ -112,25 +117,34 @@ def filter_benchmarks_for_category(benchmark_category_dir: str,
     if len(segments) != 3 or not segments[0].startswith("iree-"):
       continue
 
+    model_name = os.path.relpath(root, benchmark_category_dir)
     iree_driver, target_arch, bench_mode = segments
     iree_driver = iree_driver[len("iree-"):].lower()
     target_arch = target_arch.lower()
 
     # We can choose this benchmark if it matches the driver and CPU/GPU
     # architecture.
-    matched_driver = (driver_filter is None or
-                      re.match(driver_filter, iree_driver) is not None)
+    matched_driver = (iree_driver in available_drivers) and (
+        driver_filter is None or
+        re.match(driver_filter, iree_driver) is not None)
     matched_arch = (re.match(cpu_target_arch_filter, target_arch) is not None or
                     re.match(gpu_target_arch_filter, target_arch) is not None)
-    should_choose = matched_driver and matched_arch
-    if should_choose:
+    matched_model_name = (model_name_filter is None or
+                          re.match(model_name_filter, model_name) is not None)
+    matched_mode = (mode_filter is None or
+                    re.match(mode_filter, bench_mode) is not None)
+
+    chosen = False
+    if matched_driver and matched_arch and matched_model_name and matched_mode:
       matched_benchmarks.append(root)
+      chosen = True
 
     if verbose:
       print(f"dir: {root}")
+      print(f"  model_name: {model_name}")
       print(f"  iree_driver: {iree_driver}")
       print(f"  target_arch: {target_arch}")
       print(f"  bench_mode: {bench_mode}")
-      print(f"  chosen: {should_choose}")
+      print(f"  chosen: {chosen}")
 
   return matched_benchmarks

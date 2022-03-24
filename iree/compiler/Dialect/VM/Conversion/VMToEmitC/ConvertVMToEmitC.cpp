@@ -135,7 +135,7 @@ LogicalResult convertFuncOp(IREE::VM::FuncOp funcOp,
 
   auto moduleOp = funcOp.getOperation()->getParentOfType<IREE::VM::ModuleOp>();
 
-  FunctionType funcType = funcOp.getType();
+  FunctionType funcType = funcOp.getFunctionType();
   std::string name =
       std::string(moduleOp.getName()) + "_" + std::string(funcOp.getName());
   std::string moduleTypeName = (moduleOp.getName() + "_t").str();
@@ -172,7 +172,7 @@ LogicalResult convertFuncOp(IREE::VM::FuncOp funcOp,
   auto newFuncType = mlir::FunctionType::get(
       ctx, {inputTypes}, {emitc::OpaqueType::get(ctx, "iree_status_t")});
 
-  auto newFuncOp = builder.create<mlir::FuncOp>(loc, name, newFuncType);
+  auto newFuncOp = builder.create<mlir::func::FuncOp>(loc, name, newFuncType);
 
   newFuncOp.getOperation()->setAttr("emitc.static", UnitAttr::get(ctx));
 
@@ -214,7 +214,7 @@ LogicalResult convertFuncOp(IREE::VM::FuncOp funcOp,
   vmAnalysis = typeConverter.lookupAnalysis(newFuncOp);
   if (failed(vmAnalysis)) {
     return funcOp.emitError()
-           << "newly created mlir::FuncOp not found in cache.";
+           << "newly created mlir::func::FuncOp not found in cache.";
   }
 
   // Add constant ops for local refs
@@ -458,7 +458,8 @@ Optional<emitc::ApplyOp> createVmTypeDefPtr(ConversionPatternRewriter &rewriter,
 }
 
 /// Releases refs which are local to the function as well as ref arguments.
-void releaseRefs(OpBuilder &builder, Location location, mlir::FuncOp funcOp,
+void releaseRefs(OpBuilder &builder, Location location,
+                 mlir::func::FuncOp funcOp,
                  IREE::VM::EmitCTypeConverter &typeConverter) {
   auto ctx = builder.getContext();
 
@@ -567,7 +568,7 @@ emitc::CallOp returnIfError(OpBuilder &builder, Location location,
   auto blockBuilder = [&builder, &location,
                        &typeConverter](emitc::CallOp &callOp) {
     Block *block = builder.getBlock();
-    mlir::FuncOp funcOp = cast<mlir::FuncOp>(block->getParentOp());
+    mlir::func::FuncOp funcOp = cast<mlir::func::FuncOp>(block->getParentOp());
 
     releaseRefs(builder, location, funcOp, typeConverter);
 
@@ -589,7 +590,7 @@ emitc::CallOp failListNull(OpBuilder &builder, Location location, Type type,
     auto ctx = builder.getContext();
 
     Block *block = builder.getBlock();
-    mlir::FuncOp funcOp = cast<mlir::FuncOp>(block->getParentOp());
+    mlir::func::FuncOp funcOp = cast<mlir::func::FuncOp>(block->getParentOp());
 
     releaseRefs(builder, location, funcOp, typeConverter);
 
@@ -615,7 +616,7 @@ emitc::CallOp failListNull(OpBuilder &builder, Location location, Type type,
 /// value, i.e. a truthy value branches to the continuation block when
 /// `negateCondition` is false.
 mlir::func::CallOp failableCall(
-    OpBuilder &builder, Location location, mlir::FuncOp &callee,
+    OpBuilder &builder, Location location, mlir::func::FuncOp &callee,
     ArrayRef<Value> operands,
     const std::function<void(mlir::func::CallOp &)> &failureBlockBuilder,
     bool negateCondition = false) {
@@ -665,12 +666,13 @@ mlir::func::CallOp failableCall(
 }
 
 mlir::func::CallOp returnIfError(OpBuilder &builder, Location location,
-                                 mlir::FuncOp &callee, ArrayRef<Value> operands,
+                                 mlir::func::FuncOp &callee,
+                                 ArrayRef<Value> operands,
                                  IREE::VM::EmitCTypeConverter &typeConverter) {
   auto blockBuilder = [&builder, &location,
                        &typeConverter](mlir::func::CallOp &callOp) {
     Block *block = builder.getBlock();
-    mlir::FuncOp funcOp = cast<mlir::FuncOp>(block->getParentOp());
+    mlir::func::FuncOp funcOp = cast<mlir::func::FuncOp>(block->getParentOp());
 
     releaseRefs(builder, location, funcOp, typeConverter);
 
@@ -699,8 +701,8 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
         ctx, {emitc::PointerType::get(emitc::OpaqueType::get(ctx, "void"))},
         {});
 
-    auto funcOp =
-        builder.create<mlir::FuncOp>(loc, moduleName + "_destroy", funcType);
+    auto funcOp = builder.create<mlir::func::FuncOp>(
+        loc, moduleName + "_destroy", funcType);
 
     typeConverter.analysisCache.insert(
         std::make_pair(funcOp.getOperation(), VMAnalysis()));
@@ -760,8 +762,8 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
              emitc::OpaqueType::get(ctx, "iree_vm_module_state_t")))},
         {emitc::OpaqueType::get(ctx, "iree_status_t")});
 
-    auto funcOp = builder.create<mlir::FuncOp>(loc, moduleName + "_alloc_state",
-                                               funcType);
+    auto funcOp = builder.create<mlir::func::FuncOp>(
+        loc, moduleName + "_alloc_state", funcType);
 
     typeConverter.analysisCache.insert(
         std::make_pair(funcOp.getOperation(), VMAnalysis()));
@@ -1012,8 +1014,8 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
              emitc::OpaqueType::get(ctx, "iree_vm_module_state_t"))},
         {});
 
-    auto funcOp =
-        builder.create<mlir::FuncOp>(loc, moduleName + "_free_state", funcType);
+    auto funcOp = builder.create<mlir::func::FuncOp>(
+        loc, moduleName + "_free_state", funcType);
 
     typeConverter.analysisCache.insert(
         std::make_pair(funcOp.getOperation(), VMAnalysis()));
@@ -1125,7 +1127,7 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
         },
         {emitc::OpaqueType::get(ctx, "iree_status_t")});
 
-    auto funcOp = builder.create<mlir::FuncOp>(
+    auto funcOp = builder.create<mlir::func::FuncOp>(
         loc, moduleName + "_resolve_import", funcType);
 
     typeConverter.analysisCache.insert(
@@ -1207,8 +1209,8 @@ LogicalResult createAPIFunctions(IREE::VM::ModuleOp moduleOp,
              emitc::OpaqueType::get(ctx, "iree_vm_module_t")))},
         {emitc::OpaqueType::get(ctx, "iree_status_t")});
 
-    auto funcOp =
-        builder.create<mlir::FuncOp>(loc, moduleName + "_create", funcType);
+    auto funcOp = builder.create<mlir::func::FuncOp>(
+        loc, moduleName + "_create", funcType);
 
     typeConverter.analysisCache.insert(
         std::make_pair(funcOp.getOperation(), VMAnalysis()));
@@ -1464,16 +1466,16 @@ class GenericOpConversion : public OpConversionPattern<SrcOpTy> {
   StringRef funcName;
 };
 
-class FuncOpConversion : public OpConversionPattern<mlir::FuncOp> {
+class FuncOpConversion : public OpConversionPattern<mlir::func::FuncOp> {
  public:
-  using OpConversionPattern<mlir::FuncOp>::OpConversionPattern;
+  using OpConversionPattern<mlir::func::FuncOp>::OpConversionPattern;
 
  private:
   LogicalResult matchAndRewrite(
-      mlir::FuncOp funcOp, OpAdaptor adaptor,
+      mlir::func::FuncOp funcOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     TypeConverter::SignatureConversion signatureConverter(
-        funcOp.getType().getNumInputs());
+        funcOp.getFunctionType().getNumInputs());
     TypeConverter typeConverter;
     for (const auto &arg : llvm::enumerate(funcOp.getArguments())) {
       Type convertedType =
@@ -1487,7 +1489,7 @@ class FuncOpConversion : public OpConversionPattern<mlir::FuncOp> {
     rewriter.updateRootInPlace(funcOp, [&] {
       funcOp.setType(
           rewriter.getFunctionType(signatureConverter.getConvertedTypes(),
-                                   funcOp.getType().getResults()));
+                                   funcOp.getFunctionType().getResults()));
     });
     return success();
   }
@@ -1520,8 +1522,8 @@ class ExportOpConversion : public OpConversionPattern<IREE::VM::ExportOp> {
 
     rewriter.startRootUpdate(exportOp.getOperation());
 
-    mlir::FuncOp funcOp =
-        lookupSymbolRef<mlir::FuncOp>(exportOp.getOperation(), "function_ref");
+    mlir::func::FuncOp funcOp = lookupSymbolRef<mlir::func::FuncOp>(
+        exportOp.getOperation(), "function_ref");
 
     auto vmAnalysis = typeConverter->lookupAnalysis(funcOp);
     if (failed(vmAnalysis)) {
@@ -1554,7 +1556,7 @@ class ExportOpConversion : public OpConversionPattern<IREE::VM::ExportOp> {
         ctx, {inputTypes}, {emitc::OpaqueType::get(ctx, "iree_status_t")});
 
     auto newFuncOp =
-        rewriter.create<mlir::FuncOp>(loc, newFuncName, newFuncType);
+        rewriter.create<mlir::func::FuncOp>(loc, newFuncName, newFuncType);
 
     VMAnalysis newVmAnalysis;
     newVmAnalysis.numRefArguments = numRefArgs;
@@ -1659,7 +1661,7 @@ class ExportOpConversion : public OpConversionPattern<IREE::VM::ExportOp> {
 
   FailureOr<std::pair<Value, Value>> castModuleAndStateStructs(
       ConversionPatternRewriter &rewriter, IREE::VM::ExportOp &exportOp,
-      mlir::FuncOp &newFuncOp) const {
+      mlir::func::FuncOp &newFuncOp) const {
     auto ctx = exportOp.getContext();
     auto loc = exportOp.getLoc();
 
@@ -1705,14 +1707,14 @@ class ExportOpConversion : public OpConversionPattern<IREE::VM::ExportOp> {
   FailureOr<std::pair<GeneratedStruct, GeneratedStruct>>
   typedefArgumentAndResultStructs(ConversionPatternRewriter &rewriter,
                                   IREE::VM::ExportOp &exportOp,
-                                  mlir::FuncOp &newFuncOp) const {
+                                  mlir::func::FuncOp &newFuncOp) const {
     auto loc = exportOp.getLoc();
 
     IREE::VM::EmitCTypeConverter *typeConverter =
         this->template getTypeConverter<IREE::VM::EmitCTypeConverter>();
 
-    mlir::FuncOp funcOp =
-        lookupSymbolRef<mlir::FuncOp>(exportOp.getOperation(), "function_ref");
+    mlir::func::FuncOp funcOp = lookupSymbolRef<mlir::func::FuncOp>(
+        exportOp.getOperation(), "function_ref");
 
     auto vmAnalysis = typeConverter->lookupAnalysis(funcOp);
     if (failed(vmAnalysis)) {
@@ -1802,7 +1804,7 @@ class ExportOpConversion : public OpConversionPattern<IREE::VM::ExportOp> {
 
   void castArgumentAndResultStructs(ConversionPatternRewriter &rewriter,
                                     IREE::VM::ExportOp &exportOp,
-                                    mlir::FuncOp &newFuncOp,
+                                    mlir::func::FuncOp &newFuncOp,
                                     GeneratedStruct &argumentStruct,
                                     GeneratedStruct &resultStruct) const {
     auto ctx = exportOp.getContext();
@@ -1909,8 +1911,8 @@ class ExportOpConversion : public OpConversionPattern<IREE::VM::ExportOp> {
     IREE::VM::EmitCTypeConverter *typeConverter =
         this->template getTypeConverter<IREE::VM::EmitCTypeConverter>();
 
-    mlir::FuncOp funcOp =
-        lookupSymbolRef<mlir::FuncOp>(exportOp.getOperation(), "function_ref");
+    mlir::func::FuncOp funcOp = lookupSymbolRef<mlir::func::FuncOp>(
+        exportOp.getOperation(), "function_ref");
 
     auto vmAnalysis = typeConverter->lookupAnalysis(funcOp);
     if (failed(vmAnalysis)) {
@@ -1972,8 +1974,8 @@ class ExportOpConversion : public OpConversionPattern<IREE::VM::ExportOp> {
     IREE::VM::EmitCTypeConverter *typeConverter =
         this->template getTypeConverter<IREE::VM::EmitCTypeConverter>();
 
-    mlir::FuncOp funcOp =
-        lookupSymbolRef<mlir::FuncOp>(exportOp.getOperation(), "function_ref");
+    mlir::func::FuncOp funcOp = lookupSymbolRef<mlir::func::FuncOp>(
+        exportOp.getOperation(), "function_ref");
 
     auto vmAnalysis = typeConverter->lookupAnalysis(funcOp);
     if (failed(vmAnalysis)) {
@@ -2038,13 +2040,13 @@ class ImportOpConversion : public OpConversionPattern<IREE::VM::ImportOp> {
     }
 
     if (importOp.isVariadic()) {
-      if (failed(createVariadicImportShims(importOp.getType(), importOp,
+      if (failed(createVariadicImportShims(importOp.getFunctionType(), importOp,
                                            rewriter))) {
         return failure();
       }
     } else {
-      if (failed(
-              createImportShim(importOp.getType(), importOp, -1, rewriter))) {
+      if (failed(createImportShim(importOp.getFunctionType(), importOp, -1,
+                                  rewriter))) {
         return failure();
       }
     }
@@ -2101,8 +2103,8 @@ class ImportOpConversion : public OpConversionPattern<IREE::VM::ImportOp> {
              << "Failed to build function type for wrapper";
     }
 
-    auto newFuncOp = rewriter.create<mlir::FuncOp>(loc, newFuncName.getValue(),
-                                                   newFuncType.getValue());
+    auto newFuncOp = rewriter.create<mlir::func::FuncOp>(
+        loc, newFuncName.getValue(), newFuncType.getValue());
 
     getTypeConverter<IREE::VM::EmitCTypeConverter>()->analysisCache.insert(
         std::make_pair(newFuncOp.getOperation(), VMAnalysis{}));
@@ -2115,7 +2117,7 @@ class ImportOpConversion : public OpConversionPattern<IREE::VM::ImportOp> {
       Block *block =
           rewriter.createBlock(&newFuncOp.getBody(), newFuncOp.getBody().end());
 
-      for (Type type : newFuncOp.getType().getInputs()) {
+      for (Type type : newFuncOp.getFunctionType().getInputs()) {
         block->addArgument(type, loc);
       }
 
@@ -2395,7 +2397,7 @@ class ImportOpConversion : public OpConversionPattern<IREE::VM::ImportOp> {
   }
 
   LogicalResult packArgumentBuffer(ArrayRef<Type> inputTypes,
-                                   mlir::FuncOp &funcOp, Value call,
+                                   mlir::func::FuncOp &funcOp, Value call,
                                    ConversionPatternRewriter &rewriter,
                                    Location loc) const {
     auto ctx = rewriter.getContext();
@@ -2520,7 +2522,7 @@ class ImportOpConversion : public OpConversionPattern<IREE::VM::ImportOp> {
   }
 
   LogicalResult unpackResultBuffer(ArrayRef<Type> resultTypes,
-                                   mlir::FuncOp &funcOp, Value call,
+                                   mlir::func::FuncOp &funcOp, Value call,
                                    ConversionPatternRewriter &rewriter,
                                    Location loc) const {
     auto ctx = rewriter.getContext();
@@ -2785,8 +2787,8 @@ class CallOpConversion : public OpConversionPattern<CallOpTy> {
   LogicalResult matchAndRewrite(
       CallOpTy op, Adaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    mlir::FuncOp funcOp =
-        lookupSymbolRef<mlir::FuncOp>(op.getOperation(), "callee");
+    mlir::func::FuncOp funcOp =
+        lookupSymbolRef<mlir::func::FuncOp>(op.getOperation(), "callee");
     IREE::VM::ImportOp importOp =
         lookupSymbolRef<IREE::VM::ImportOp>(op.getOperation(), "callee");
 
@@ -2806,13 +2808,13 @@ class CallOpConversion : public OpConversionPattern<CallOpTy> {
 
   LogicalResult rewriteInternalCall(Operation *op, Adaptor adaptor,
                                     ConversionPatternRewriter &rewriter,
-                                    mlir::FuncOp funcOp) const {
+                                    mlir::func::FuncOp funcOp) const {
     auto loc = op->getLoc();
 
     SmallVector<Value, 4> updatedOperands;
     SmallVector<Value, 4> resultOperands;
 
-    auto parentFuncOp = op->getParentOfType<mlir::FuncOp>();
+    auto parentFuncOp = op->getParentOfType<mlir::func::FuncOp>();
 
     BlockArgument stackArg = parentFuncOp.getArgument(0);
     BlockArgument moduleArg = parentFuncOp.getArgument(1);
@@ -2854,7 +2856,7 @@ class CallOpConversion : public OpConversionPattern<CallOpTy> {
 
     int importOrdinal = importOp.ordinal().getValue().getZExtValue();
 
-    auto funcOp = op->getParentOfType<mlir::FuncOp>();
+    auto funcOp = op->getParentOfType<mlir::func::FuncOp>();
     BlockArgument stackArg = funcOp.getArgument(0);
     BlockArgument stateArg = funcOp.getArgument(2);
 
@@ -2913,7 +2915,8 @@ class CallOpConversion : public OpConversionPattern<CallOpTy> {
     if (!funcName.hasValue())
       return op->emitError() << "Couldn't build name to imported function";
 
-    auto callee = moduleOp.lookupSymbol<mlir::FuncOp>(funcName.getValue());
+    auto callee =
+        moduleOp.lookupSymbol<mlir::func::FuncOp>(funcName.getValue());
     if (callee == nullptr) {
       return op->emitError() << "Couldn't find function with name `"
                              << funcName.getValue() << "`";
@@ -3086,7 +3089,7 @@ class CompareRefOpConversion : public OpConversionPattern<CmpOpTy> {
     auto loc = cmpOp.getLoc();
 
     auto funcOp =
-        cmpOp.getOperation()->template getParentOfType<mlir::FuncOp>();
+        cmpOp.getOperation()->template getParentOfType<mlir::func::FuncOp>();
     IREE::VM::EmitCTypeConverter *typeConverter =
         this->template getTypeConverter<IREE::VM::EmitCTypeConverter>();
 
@@ -3161,7 +3164,7 @@ class CompareRefNotZeroOpConversion
     auto ctx = cmpOp.getContext();
     auto loc = cmpOp.getLoc();
 
-    auto funcOp = cmpOp.getOperation()->getParentOfType<mlir::FuncOp>();
+    auto funcOp = cmpOp.getOperation()->getParentOfType<mlir::func::FuncOp>();
 
     IREE::VM::EmitCTypeConverter *typeConverter =
         this->template getTypeConverter<IREE::VM::EmitCTypeConverter>();
@@ -3296,7 +3299,7 @@ class ConstRefRodataOpConversion
     }
 
     auto funcOp =
-        constRefRodataOp.getOperation()->getParentOfType<mlir::FuncOp>();
+        constRefRodataOp.getOperation()->getParentOfType<mlir::func::FuncOp>();
 
     BlockArgument stateArg = funcOp.getArgument(2);
     auto rodataBuffersPtr = rewriter.create<emitc::CallOp>(
@@ -3393,7 +3396,7 @@ class BranchOpConversion : public OpConversionPattern<IREE::VM::BranchOp> {
       return success();
     }
 
-    auto funcOp = op.getOperation()->getParentOfType<mlir::FuncOp>();
+    auto funcOp = op.getOperation()->getParentOfType<mlir::func::FuncOp>();
 
     IREE::VM::EmitCTypeConverter *typeConverter =
         this->template getTypeConverter<IREE::VM::EmitCTypeConverter>();
@@ -3522,7 +3525,7 @@ class CondBranchOpConversion
       return success();
     }
 
-    auto funcOp = op.getOperation()->getParentOfType<mlir::FuncOp>();
+    auto funcOp = op.getOperation()->getParentOfType<mlir::func::FuncOp>();
     IREE::VM::EmitCTypeConverter *typeConverter =
         getTypeConverter<IREE::VM::EmitCTypeConverter>();
 
@@ -3632,7 +3635,7 @@ class ReturnOpConversion : public OpConversionPattern<IREE::VM::ReturnOp> {
     auto ctx = op.getContext();
     auto loc = op.getLoc();
 
-    auto funcOp = op.getOperation()->getParentOfType<mlir::FuncOp>();
+    auto funcOp = op.getOperation()->getParentOfType<mlir::func::FuncOp>();
     IREE::VM::EmitCTypeConverter *typeConverter =
         getTypeConverter<IREE::VM::EmitCTypeConverter>();
 
@@ -3755,7 +3758,7 @@ class FailOpConversion : public OpConversionPattern<IREE::VM::FailOp> {
       passthroughBlock =
           rewriter.createBlock(parentRegion, parentRegion->end());
 
-      auto funcOp = op.getOperation()->getParentOfType<mlir::FuncOp>();
+      auto funcOp = op.getOperation()->getParentOfType<mlir::func::FuncOp>();
       IREE::VM::EmitCTypeConverter *typeConverter =
           getTypeConverter<IREE::VM::EmitCTypeConverter>();
 
@@ -3776,7 +3779,7 @@ class FailOpConversion : public OpConversionPattern<IREE::VM::FailOp> {
       OpBuilder::InsertionGuard guard(rewriter);
       failureBlock = rewriter.createBlock(parentRegion, parentRegion->end());
 
-      auto funcOp = op.getOperation()->getParentOfType<mlir::FuncOp>();
+      auto funcOp = op.getOperation()->getParentOfType<mlir::func::FuncOp>();
       IREE::VM::EmitCTypeConverter *typeConverter =
           getTypeConverter<IREE::VM::EmitCTypeConverter>();
 
@@ -3889,7 +3892,7 @@ class GlobalLoadOpConversion : public OpConversionPattern<LoadOpTy> {
     }
 
     auto funcOp =
-        loadOp.getOperation()->template getParentOfType<mlir::FuncOp>();
+        loadOp.getOperation()->template getParentOfType<mlir::func::FuncOp>();
 
     BlockArgument stateArg = funcOp.getArgument(2);
     auto rwDataPtr = rewriter.create<emitc::CallOp>(
@@ -3955,7 +3958,7 @@ class GlobalLoadStoreRefOpConversion
 
     auto globalOrdinal = globalOp.ordinal().getValue().getZExtValue();
 
-    auto funcOp = op->getParentOfType<mlir::FuncOp>();
+    auto funcOp = op->getParentOfType<mlir::func::FuncOp>();
     IREE::VM::EmitCTypeConverter *typeConverter =
         this->template getTypeConverter<IREE::VM::EmitCTypeConverter>();
 
@@ -4069,7 +4072,7 @@ class GlobalStoreOpConversion : public OpConversionPattern<StoreOpTy> {
     }
 
     auto funcOp =
-        storeOp.getOperation()->template getParentOfType<mlir::FuncOp>();
+        storeOp.getOperation()->template getParentOfType<mlir::func::FuncOp>();
 
     BlockArgument stateArg = funcOp.getArgument(2);
     auto rwDataPtr = rewriter.create<emitc::CallOp>(
@@ -4240,7 +4243,7 @@ class ListAllocOpConversion
         /*applicableOperator=*/StringAttr::get(ctx, "&"),
         /*operand=*/listOp.getResult());
 
-    auto funcOp = allocOp.getOperation()->getParentOfType<mlir::FuncOp>();
+    auto funcOp = allocOp.getOperation()->getParentOfType<mlir::func::FuncOp>();
     IREE::VM::EmitCTypeConverter *typeConverter =
         getTypeConverter<IREE::VM::EmitCTypeConverter>();
 
@@ -4671,7 +4674,7 @@ class ListSetRefOpConversion
         /*operands=*/ArrayRef<Value>{refOp.getResult()},
         /*typeConverter=*/*typeConverter);
 
-    auto funcOp = setOp.getOperation()->getParentOfType<mlir::FuncOp>();
+    auto funcOp = setOp.getOperation()->getParentOfType<mlir::func::FuncOp>();
 
     auto vmAnalysis = typeConverter->lookupAnalysis(funcOp);
     if (failed(vmAnalysis)) {
@@ -5096,9 +5099,10 @@ class ConvertVMToEmitCPass
         mlir::func::FuncDialect, mlir::arith::ArithmeticDialect,
         mlir::math::MathDialect>();
 
-    target.addDynamicallyLegalOp<mlir::FuncOp>([&](mlir::FuncOp op) {
-      return typeConverter.isSignatureLegal(op.getType());
-    });
+    target.addDynamicallyLegalOp<mlir::func::FuncOp>(
+        [&](mlir::func::FuncOp op) {
+          return typeConverter.isSignatureLegal(op.getFunctionType());
+        });
 
     // Structural ops
     target.addLegalOp<IREE::VM::ModuleOp>();

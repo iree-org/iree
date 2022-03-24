@@ -9,5 +9,5 @@
 #include "iree/tools/iree_translate_lib.h"
 
 int ireeCompilerRunMain(int argc, char **argv) {
-  return mlir::iree_compiler::runIreeTranslateMain(argc, argv);
+  return mlir::iree_compiler::runIreecMain(argc, argv);
 }

@@ -23,6 +23,28 @@
 #include "mlir/Interfaces/ControlFlowInterfaces.h"
 #include "mlir/Interfaces/SideEffectInterfaces.h"
 
+namespace mlir {
+namespace iree_compiler {
+namespace IREE {
+namespace VM {
+
+/// Generic method for verifying VM fail ops.
+LogicalResult verifyFailOp(Operation *op, Value statusVal);
+
+/// Generic method for verifying VM global ops.
+LogicalResult verifyGlobalOp(Operation *op);
+
+/// Generic method for verifying VM global load ops.
+LogicalResult verifyGlobalLoadOp(Operation *op);
+
+/// Generic method for verifying VM global store ops.
+LogicalResult verifyGlobalStoreOp(Operation *op);
+
+}  // namespace VM
+}  // namespace IREE
+}  // namespace iree_compiler
+}  // namespace mlir
+
 #define GET_OP_CLASSES
 #include "iree/compiler/Dialect/VM/IR/VMOps.h.inc"  // IWYU pragma: export
 

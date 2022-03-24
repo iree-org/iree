@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -pass-pipeline='builtin.func(iree-stream-pack-constants)' %s | FileCheck %s
+// RUN: iree-opt -split-input-file -pass-pipeline='func.func(iree-stream-pack-constants)' %s | FileCheck %s
 
 // This is a high level test of the structure emitted by the pass.
 // Subsequent tests focus on individual components.

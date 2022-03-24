@@ -64,8 +64,9 @@ static LogicalResult verifyOpDynamicDims(Operation *op, ValueRange values,
 // flow.dispatch.tie_shape
 //===----------------------------------------------------------------------===//
 
-static LogicalResult verifyDispatchTieShapeOp(DispatchTieShapeOp op) {
-  if (failed(verifyOpDynamicDims(op, {op.operand()}, op.dynamic_dims()))) {
+LogicalResult DispatchTieShapeOp::verify() {
+  if (failed(
+          verifyOpDynamicDims(getOperation(), {operand()}, dynamic_dims()))) {
     return failure();
   }
   return success();
@@ -91,8 +92,8 @@ LogicalResult DispatchTieShapeOp::reifyResultShapes(
 // flow.dispatch.tensor.load
 //===----------------------------------------------------------------------===//
 
-static LogicalResult verifyDispatchTensorLoadOp(DispatchTensorLoadOp op) {
-  if (failed(verifyOpDynamicDims(op, {op.source()}, op.source_dims()))) {
+LogicalResult DispatchTensorLoadOp::verify() {
+  if (failed(verifyOpDynamicDims(getOperation(), {source()}, source_dims()))) {
     return failure();
   }
   return success();
@@ -271,8 +272,8 @@ LogicalResult DispatchTensorLoadOp::reifyResultShapes(
 // flow.dispatch.tensor.store
 //===----------------------------------------------------------------------===//
 
-static LogicalResult verifyDispatchTensorStoreOp(DispatchTensorStoreOp op) {
-  if (failed(verifyOpDynamicDims(op, {op.target()}, op.target_dims()))) {
+LogicalResult DispatchTensorStoreOp::verify() {
+  if (failed(verifyOpDynamicDims(getOperation(), {target()}, target_dims()))) {
     return failure();
   }
   return success();
@@ -425,30 +426,31 @@ static void printDispatchWorkgroupBody(OpAsmPrinter &p, Operation *op,
                 /*printBlockTerminators=*/true);
 }
 
-static LogicalResult verifyDispatchWorkgroupsOp(DispatchWorkgroupsOp op) {
-  if (op.workgroup_count().empty()) {
-    return op.emitOpError() << "at least one workgroup dimension is required";
+LogicalResult DispatchWorkgroupsOp::verify() {
+  Operation *op = getOperation();
+  if (workgroup_count().empty()) {
+    return op->emitOpError() << "at least one workgroup dimension is required";
   }
 
-  if (failed(verifyOpDynamicDims(op, op.operands(), op.operand_dims())) ||
-      failed(verifyOpDynamicDims(op, op.results(), op.result_dims()))) {
+  if (failed(verifyOpDynamicDims(getOperation(), operands(), operand_dims())) ||
+      failed(verifyOpDynamicDims(getOperation(), results(), result_dims()))) {
     return failure();
   }
 
   auto verifyIOType = [&](Type type) -> LogicalResult {
     if (auto shapedType = type.dyn_cast<ShapedType>()) {
       if (shapedType.getElementType().isIndex()) {
-        return op.emitOpError() << "I/O type " << type
-                                << " is invalid: index types must not cross "
-                                   "the dispatch boundary";
+        return op->emitOpError() << "I/O type " << type
+                                 << " is invalid: index types must not cross "
+                                    "the dispatch boundary";
       }
     }
     return success();
   };
-  for (auto type : op.getOperandTypes()) {
+  for (auto type : getOperandTypes()) {
     if (failed(verifyIOType(type))) return failure();
   }
-  for (auto type : op.getResultTypes()) {
+  for (auto type : getResultTypes()) {
     if (failed(verifyIOType(type))) return failure();
   }
 
@@ -644,15 +646,13 @@ void DispatchWorkgroupSizeOp::getAsmResultNames(
                                               result(), setNameFn);
 }
 
-template <typename T>
-static LogicalResult verifyDispatchWorkgroupInfoOp(T op) {
+LogicalResult verifyDispatchWorkgroupInfoOp(Operation *op, uint64_t dimension) {
   size_t dimCount = 0;
-  if (auto dispatchOp = op->template getParentOfType<DispatchWorkgroupsOp>()) {
+  if (auto dispatchOp = op->getParentOfType<DispatchWorkgroupsOp>()) {
     dimCount = dispatchOp.workgroup_count().size();
   }
-  uint64_t dimension = op.dimension().getZExtValue();
   if (dimCount != 0 && (dimension < 0 || dimension >= dimCount)) {
-    return op.emitOpError()
+    return op->emitOpError()
            << "dimension " << dimension
            << " out of bounds of dispatch dimensions; expected [0, "
            << (dimCount - 1) << ")";
@@ -671,7 +671,7 @@ void ExecutableOp::build(OpBuilder &builder, OperationState &state,
                      builder.getStringAttr(name));
 }
 
-static LogicalResult verifyExecutableOp(ExecutableOp op) {
+LogicalResult ExecutableOp::verify() {
   // TODO(benvanik): check export name conflicts.
   return success();
 }
@@ -778,12 +778,13 @@ FunctionType DispatchOp::getEntryPointType() {
   return FunctionType::get(getContext(), argTypes, getResultTypes());
 }
 
-static LogicalResult verifyDispatchOp(DispatchOp op) {
-  if (op.workgroup_count().empty()) {
-    return op.emitOpError() << "at least one workgroup dimension is required";
+LogicalResult DispatchOp::verify() {
+  Operation *op = getOperation();
+  if (workgroup_count().empty()) {
+    return op->emitOpError() << "at least one workgroup dimension is required";
   }
-  if (failed(verifyOpDynamicDims(op, op.operands(), op.operand_dims())) ||
-      failed(verifyOpDynamicDims(op, op.results(), op.result_dims()))) {
+  if (failed(verifyOpDynamicDims(op, operands(), operand_dims())) ||
+      failed(verifyOpDynamicDims(op, results(), result_dims()))) {
     return failure();
   }
   return success();
@@ -797,8 +798,9 @@ std::pair<unsigned, unsigned> DispatchOp::getTiedOperandsIndexAndLength() {
 // flow.tensor.tie_shape
 //===----------------------------------------------------------------------===//
 
-static LogicalResult verifyTensorTieShapeOp(TensorTieShapeOp op) {
-  if (failed(verifyOpDynamicDims(op, {op.operand()}, op.dynamic_dims()))) {
+LogicalResult TensorTieShapeOp::verify() {
+  if (failed(
+          verifyOpDynamicDims(getOperation(), {operand()}, dynamic_dims()))) {
     return failure();
   }
   return success();
@@ -852,9 +854,9 @@ void TensorUpdateOp::build(OpBuilder &builder, OperationState &state,
         update, updateDims, builder.getIndexArrayAttr({0}));
 }
 
-static LogicalResult verifyTensorUpdateOp(TensorUpdateOp op) {
-  if (failed(verifyOpDynamicDims(op, {op.update()}, op.update_dims())) ||
-      failed(verifyOpDynamicDims(op, {op.target()}, op.target_dims()))) {
+LogicalResult TensorUpdateOp::verify() {
+  if (failed(verifyOpDynamicDims(getOperation(), {update()}, update_dims())) ||
+      failed(verifyOpDynamicDims(getOperation(), {target()}, target_dims()))) {
     return failure();
   }
   return success();

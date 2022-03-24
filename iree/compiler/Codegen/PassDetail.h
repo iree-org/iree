@@ -8,6 +8,7 @@
 #define IREE_COMPILER_CONVERSIONS_PASS_DETAIL_H_
 
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Pass/Pass.h"
 
 namespace mlir {

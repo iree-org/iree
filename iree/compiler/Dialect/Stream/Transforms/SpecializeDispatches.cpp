@@ -55,7 +55,7 @@ struct ConstantTable {
 // Each dispatch gets a row in the table that can be selected based on the
 // dispatch ordinal.
 static ConstantTable buildConstantTable(
-    mlir::FuncOp funcOp,
+    mlir::func::FuncOp funcOp,
     SmallVector<IREE::Stream::CmdDispatchOp> &dispatchOps) {
   auto anyDispatchOp = dispatchOps.front();
   unsigned operandCount = anyDispatchOp.operands().size();
@@ -161,7 +161,7 @@ static Attribute buildConstantSetAttr(ConstantSet &set, OpBuilder &builder) {
 //
 // TODO(benvanik): maybe a dedicated lookup table op to make further combining
 // easier to do in a backend-generic way.
-static void insertConstantTableLookup(mlir::FuncOp funcOp,
+static void insertConstantTableLookup(mlir::func::FuncOp funcOp,
                                       ConstantTable &constantTable) {
   auto &entryBlock = funcOp.front();
   auto operandToArgMap =

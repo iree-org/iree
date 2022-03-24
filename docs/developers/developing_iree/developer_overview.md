@@ -103,24 +103,32 @@ Custom passes may also be layered on top of `iree-opt`, see
 [iree/samples/custom_modules/dialect](https://github.com/google/iree/blob/main/iree/samples/custom_modules/dialect)
 for a sample.
 
-### iree-translate
+### iree-compile
 
-`iree-translate` converts MLIR input into external formats like IREE modules. It
-is similar to
-[mlir-translate](https://github.com/llvm/llvm-project/tree/master/mlir/tools/mlir-translate),
-see "translation" in
-[MLIR's Glossary](https://mlir.llvm.org/getting_started/Glossary/#translation)
-for more information.
+`iree-compile` is IREE's main compiler driver for generating binaries from
+supported input MLIR assembly.
 
 For example, to translate `simple.mlir` to an IREE module:
 
 ```shell
-$ ../iree-build/iree/tools/iree-translate \
-  -iree-mlir-to-vm-bytecode-module \
+$ ../iree-build/iree/tools/iree-compile \
   -iree-hal-target-backends=vmvx \
   $PWD/iree/samples/models/simple_abs.mlir \
   -o /tmp/simple_abs_vmvx.vmfb
 ```
+
+# iree-translate
+
+This is the IREE equivalent of MLIR's translation tool, which is used for
+testing translations between supported formats. It is used by various unit
+tests which are testing these features in isolation (outside of the main
+compiler driver).
+
+See
+[mlir-translate](https://github.com/llvm/llvm-project/tree/master/mlir/tools/mlir-translate),
+see "translation" in
+[MLIR's Glossary](https://mlir.llvm.org/getting_started/Glossary/#translation)
+for more information.
 
 Custom translations may also be layered on top of `iree-translate`, see
 [iree/samples/custom_modules/dialect](https://github.com/google/iree/blob/main/iree/samples/custom_modules/dialect)
@@ -131,7 +139,7 @@ for a sample.
 The `iree-run-module` program takes an already translated IREE module as input
 and executes an exported main function using the provided inputs.
 
-This program can be used in sequence with `iree-translate` to translate a
+This program can be used in sequence with `iree-compile` to translate a
 `.mlir` file to an IREE module and then execute it. Here is an example command
 that executes the simple `simple_abs_vmvx.vmfb` compiled from `simple_abs.mlir`
 above on IREE's VMVX driver:
@@ -153,7 +161,7 @@ runner for the IREE
 [check framework](https://github.com/google/iree/tree/main/docs/developing_iree/testing_guide.md#end-to-end-tests).
 
 ```shell
-$ ../iree-build/iree/tools/iree-translate \
+$ ../iree-build/iree/tools/iree-compile \
   -iree-input-type=mhlo \
   -iree-mlir-to-vm-bytecode-module \
   -iree-hal-target-backends=vmvx \

@@ -207,13 +207,15 @@ bool areExecutablesEquivalent(ExecutableOp lhs, ExecutableOp rhs) {
   }
 
   // Walk all functions and ensure equivalent.
-  if (!compare_ranges(
-          lhsModule.getOps<mlir::FuncOp>(), rhsModule.getOps<mlir::FuncOp>(),
-          [](mlir::FuncOp lhs, mlir::FuncOp rhs) {
-            if (lhs.getType() != rhs.getType()) return false;
-            if (lhs->getAttrs() != rhs->getAttrs()) return false;
-            return isStructurallyEquivalentTo(lhs.getRegion(), rhs.getRegion());
-          })) {
+  if (!compare_ranges(lhsModule.getOps<mlir::func::FuncOp>(),
+                      rhsModule.getOps<mlir::func::FuncOp>(),
+                      [](mlir::func::FuncOp lhs, mlir::func::FuncOp rhs) {
+                        if (lhs.getFunctionType() != rhs.getFunctionType())
+                          return false;
+                        if (lhs->getAttrs() != rhs->getAttrs()) return false;
+                        return isStructurallyEquivalentTo(lhs.getRegion(),
+                                                          rhs.getRegion());
+                      })) {
     return false;  // dispatch entry mismatch
   }
 

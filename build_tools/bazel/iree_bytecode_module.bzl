@@ -15,7 +15,8 @@ def iree_bytecode_module(
         src,
         module = None,
         flags = ["-iree-mlir-to-vm-bytecode-module"],
-        translate_tool = "//iree/tools:iree-translate",
+        # TODO: Rename this to 'compile_tool'
+        translate_tool = "//iree/tools:iree-compile",
         linker_tool = "@llvm-project//lld:lld",
         opt_tool = "//iree/tools:iree-opt",
         opt_flags = [],
@@ -29,7 +30,7 @@ def iree_bytecode_module(
         flags: additional flags to pass to the compiler. Bytecode
             translation and backend flags are passed automatically.
         translate_tool: the compiler to use to generate the module.
-            Defaults to iree-translate.
+            Defaults to iree-compile.
         linker_tool: the linker to use.
             Defaults to the lld from the llvm-project directory.
         opt_tool: Defaulting to iree-opt. Tool used to preprocess the source file

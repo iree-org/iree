@@ -324,7 +324,7 @@ class ArgumentAnalysis {
       : explorer(rootOp, TraversalAction::SHALLOW),
         solver(explorer, allocator) {
     explorer.setOpAction<IREE::Util::InitializerOp>(TraversalAction::RECURSE);
-    explorer.setOpAction<mlir::FuncOp>(TraversalAction::RECURSE);
+    explorer.setOpAction<mlir::func::FuncOp>(TraversalAction::RECURSE);
     explorer.setDialectAction<IREE::Stream::StreamDialect>(
         TraversalAction::RECURSE);
     // Ignore the contents of executables (linalg goo, etc).

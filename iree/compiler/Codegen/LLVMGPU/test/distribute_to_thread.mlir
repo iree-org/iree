@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -pass-pipeline='hal.executable(hal.executable.variant(builtin.module(builtin.func(iree-llvmgpu-tile-and-distribute))))' %s | FileCheck %s
+// RUN: iree-opt -split-input-file -pass-pipeline='hal.executable(hal.executable.variant(builtin.module(func.func(iree-llvmgpu-tile-and-distribute))))' %s | FileCheck %s
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[2, 256, 4]]>
 #translation = #iree_codegen.translation_info<LLVMGPUMatmulSimt, workload_per_wg = [256, 2]>
@@ -22,7 +22,7 @@ hal.executable private @dot_dispatch_0  {
       workgroup_size = [64 : index, 1 : index, 1 : index]
     }
     builtin.module {
-      builtin.func @dot_dispatch_0() {
+      func.func @dot_dispatch_0() {
         %cst = arith.constant 0.000000e+00 : f32
         %c0 = arith.constant 0 : index
         %c1024 = arith.constant 1024 : index
@@ -181,7 +181,7 @@ hal.executable private @dot_dispatch_0  {
       workgroup_size = [64 : index, 8 : index, 1 : index]
     }
     builtin.module {
-      builtin.func @dot_dispatch_0() {
+      func.func @dot_dispatch_0() {
         %cst = arith.constant 0.000000e+00 : f32
         %c0 = arith.constant 0 : index
         %c1024 = arith.constant 1024 : index
@@ -263,7 +263,7 @@ hal.executable @reduction_dispatch {
       workgroup_size = [1: index, 1: index, 1: index]
     }
     builtin.module {
-      builtin.func @predict_dispatch_153() {
+      func.func @predict_dispatch_153() {
         %c0 = arith.constant 0 : index
         %cst = arith.constant 0x7FC00000 : f32
         %cst_0 = arith.constant 0xFF800000 : f32

@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Dialect/Flow/IR/PartitionableLoopsInterface.h"
 
+#include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree-dialects/Dialect/LinalgExt/IR/TiledOpInterface.h"
 #include "llvm/ADT/SmallVector.h"
@@ -131,40 +132,43 @@ struct TiledOpInterfacePartitionableLoops
 /// needs to be done on a op-by-op basis since registration is on an op-by-op
 /// basis.
 template <typename OpTy>
-static void registerInterfaceForLinalgOps(DialectRegistry &registry) {
-  registry.addOpInterface<OpTy, LinalgOpPartitionableLoops>();
+static void registerInterfaceForLinalgOps(MLIRContext *ctx) {
+  OpTy::template attachInterface<LinalgOpPartitionableLoops>(*ctx);
 }
 
 /// Specializations of the registration method to use a different external model
 /// instead of the generic external model for Linalg ops.
 template <>
-void registerInterfaceForLinalgOps<linalg::Mmt4DOp>(DialectRegistry &registry) {
-  registry.addOpInterface<linalg::Mmt4DOp, Mmt4DOpPartitionableLoops>();
+void registerInterfaceForLinalgOps<linalg::Mmt4DOp>(MLIRContext *ctx) {
+  linalg::Mmt4DOp::attachInterface<Mmt4DOpPartitionableLoops>(*ctx);
 }
 
 /// Registers the external models for all Linalg operations.
 template <typename OpTy1, typename OpTy2, typename... More>
-static void registerInterfaceForLinalgOps(DialectRegistry &registry) {
-  registerInterfaceForLinalgOps<OpTy1>(registry);
-  registerInterfaceForLinalgOps<OpTy2, More...>(registry);
+static void registerInterfaceForLinalgOps(MLIRContext *ctx) {
+  registerInterfaceForLinalgOps<OpTy1>(ctx);
+  registerInterfaceForLinalgOps<OpTy2, More...>(ctx);
 }
 
 /// Registers the `TiledOpInterfacePartitionableLoops` model for operations.
 template <typename OpTy>
-static void registerInterfaceForTiledOpInterfaceOps(DialectRegistry &registry) {
-  registry.addOpInterface<OpTy, TiledOpInterfacePartitionableLoops>();
+static void registerInterfaceForTiledOpInterfaceOps(MLIRContext *ctx) {
+  OpTy ::template attachInterface<TiledOpInterfacePartitionableLoops>(*ctx);
 }
 
 /// Registers the external models for all TiledOpInterface operations.
 template <typename OpTy1, typename OpTy2, typename... More>
-static void registerInterfaceForTiledOpInterfaceOps(DialectRegistry &registry) {
-  registerInterfaceForTiledOpInterfaceOps<OpTy1>(registry);
-  registerInterfaceForTiledOpInterfaceOps<OpTy2, More...>(registry);
+static void registerInterfaceForTiledOpInterfaceOps(MLIRContext *ctx) {
+  registerInterfaceForTiledOpInterfaceOps<OpTy1>(ctx);
+  registerInterfaceForTiledOpInterfaceOps<OpTy2, More...>(ctx);
 }
 
 void registerPartitionableLoopsInterfaceModels(DialectRegistry &registry) {
-  // clang-format off
-  registerInterfaceForLinalgOps<
+  registry.insert<linalg::LinalgDialect>();
+
+  registry.addExtension(+[](MLIRContext *ctx, linalg::LinalgDialect *dialect) {
+    registerInterfaceForLinalgOps<
+        // clang-format off
   
   // This is copy-pasted from LinalgStructuredOps.cpp.inc. In theory you could
   // just include that generated file here, but that cause errors with bazel. 
@@ -206,13 +210,22 @@ void registerPartitionableLoopsInterfaceModels(DialectRegistry &registry) {
   ::mlir::linalg::QuantizedBatchMatmulOp,
   ::mlir::linalg::QuantizedMatmulOp,
   ::mlir::linalg::VecmatOp
-  >(registry);
-  // clang-format on
+        // clang-format on
+        >(ctx);
+  });
 
-  registerInterfaceForTiledOpInterfaceOps<
-      LinalgExt::FftOp, LinalgExt::ReverseOp, LinalgExt::ScanOp,
-      LinalgExt::ScatterOp, LinalgExt::SortOp, tensor::ExtractSliceOp,
-      tensor::InsertSliceOp>(registry);
+  registry.insert<LinalgExt::IREELinalgExtDialect>();
+
+  registry.addExtension(
+      +[](MLIRContext *ctx, LinalgExt::IREELinalgExtDialect *dialect) {
+        registerInterfaceForTiledOpInterfaceOps<
+            LinalgExt::FftOp, LinalgExt::ReverseOp, LinalgExt::ScanOp,
+            LinalgExt::ScatterOp, LinalgExt::SortOp>(ctx);
+      });
+  registry.addExtension(+[](MLIRContext *ctx, tensor::TensorDialect *dialect) {
+    registerInterfaceForTiledOpInterfaceOps<tensor::ExtractSliceOp,
+                                            tensor::InsertSliceOp>(ctx);
+  });
 }
 
 }  // namespace Flow

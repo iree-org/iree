@@ -1406,8 +1406,8 @@ class ScheduleAllocationPass
   }
 
   void runOnOperation() override {
-    auto parentOp = dyn_cast<CallableOpInterface>(getOperation());
-    if (!parentOp || !parentOp.getCallableRegion() ||
+    auto parentOp = getOperation();
+    if (!parentOp.getCallableRegion() ||
         parentOp.getCallableRegion()->empty()) {
       return;
     }
@@ -1433,7 +1433,8 @@ class ScheduleAllocationPass
 
 }  // namespace
 
-std::unique_ptr<OperationPass<>> createScheduleAllocationPass() {
+std::unique_ptr<InterfacePass<CallableOpInterface>>
+createScheduleAllocationPass() {
   return std::make_unique<ScheduleAllocationPass>();
 }
 

@@ -61,7 +61,7 @@ def VM_ModuleOp : VM_Op<"module", [
     Block& getBlock() { return this->getOperation()->getRegion(0).front(); }
   }];
 
-  let verifier = [{ return verifyModuleOp(*this); }];
+  let hasVerifier = 1;
 }
 
 def VM_ModuleTerminatorOp : VM_Op<"module_terminator", [
@@ -114,17 +114,17 @@ def VM_FuncOp : VM_Op<"func", [
     }
 
     /// Returns the type of this function.
-    FunctionType getType() {
+    FunctionType getFunctionType() {
       return getOperation()->getAttrOfType<TypeAttr>(getTypeAttrName())
           .getValue()
           .cast<FunctionType>();
     }
 
     /// Returns the argument types of this function.
-    ArrayRef<Type> getArgumentTypes() { return getType().getInputs(); }
+    ArrayRef<Type> getArgumentTypes() { return getFunctionType().getInputs(); }
 
     /// Returns the result types of this function.
-    ArrayRef<Type> getResultTypes() { return getType().getResults(); }
+    ArrayRef<Type> getResultTypes() { return getFunctionType().getResults(); }
 
     /// Hook for OpTrait::FunctionLike, called after verifying that the 'type'
     /// attribute is present. This can check for preconditions of the
@@ -134,7 +134,7 @@ def VM_FuncOp : VM_Op<"func", [
     Region *getCallableRegion() { return &body(); }
     ArrayRef<Type> getCallableResults() {
       assert(!isExternal() && "invalid callable");
-      return getType().getResults();
+      return getFunctionType().getResults();
     }
 
     /// Adds or overrides a reflection attribute.
@@ -195,7 +195,7 @@ def VM_ImportOp : VM_Op<"import", [
 
   let extraClassDeclaration = [{
     /// Returns the type of this function.
-    FunctionType getType() {
+    FunctionType getFunctionType() {
       return getOperation()->getAttrOfType<TypeAttr>(getTypeAttrName())
           .getValue()
           .cast<FunctionType>();
@@ -220,10 +220,10 @@ def VM_ImportOp : VM_Op<"import", [
     }
 
     /// Returns the argument types of this function.
-    ArrayRef<Type> getArgumentTypes() { return getType().getInputs(); }
+    ArrayRef<Type> getArgumentTypes() { return getFunctionType().getInputs(); }
 
     /// Returns the result types of this function.
-    ArrayRef<Type> getResultTypes() { return getType().getResults(); }
+    ArrayRef<Type> getResultTypes() { return getFunctionType().getResults(); }
 
 
     /// Hook for OpTrait::FunctionLike, called after verifying that the 'type'
@@ -233,7 +233,7 @@ def VM_ImportOp : VM_Op<"import", [
 
     Region *getCallableRegion() { return nullptr; }
     ArrayRef<Type> getCallableResults() {
-      return getType().getResults();
+      return getFunctionType().getResults();
     }
   }];
 }
@@ -252,7 +252,7 @@ def VM_InitializerOp : VM_Op<"initializer", [
   }];
 
   let arguments = (ins
-    TypeAttr:$type
+    TypeAttr:$function_type
   );
 
   let regions = (region AnyRegion:$body);
@@ -270,8 +270,10 @@ def VM_InitializerOp : VM_Op<"initializer", [
     Block *addEntryBlock();
     Block *addBlock();
 
-    FunctionType getType() {
-      return getTypeAttr().getValue().cast<FunctionType>();
+    FunctionType getFunctionType() {
+      return getOperation()->getAttrOfType<TypeAttr>(getTypeAttrName())
+          .getValue()
+          .cast<FunctionType>();
     }
 
     /// Returns the argument types of this function.
@@ -358,9 +360,8 @@ class VM_GlobalOp<string mnemonic, Attr attr_type, list<Trait> traits = []> :
     void setInitialValue(Attribute value) { (*this)->setAttr("initial_value", (value)); }
     void clearInitialValue() { (*this)->removeAttr("initial_value"); }
     Optional<IntegerAttr> getOrdinalAttr() { return ordinalAttr(); }
+    LogicalResult verify() { return verifyGlobalOp(getOperation()); }
   }];
-
-  let verifier = [{ return verifyGlobalOp(*this); }];
 }
 
 def VM_GlobalI32Op : VM_GlobalOp<"global.i32",
@@ -438,7 +439,7 @@ def VM_GlobalAddressOp : VM_PureOp<"global.address"> {
 
   let assemblyFormat = "$global attr-dict `:` type($result)";
 
-  let verifier = [{ return verifyGlobalAddressOp(*this); }];
+  let hasVerifier = 1;
 }
 
 class VM_GlobalLoadOp<Type type, string mnemonic, list<Trait> traits = []> :
@@ -456,7 +457,11 @@ class VM_GlobalLoadOp<Type type, string mnemonic, list<Trait> traits = []> :
 
   let assemblyFormat = "$global attr-dict `:` type($value)";
 
-  let verifier = [{ return verifyGlobalLoadOp(*this); }];
+  let extraClassDeclaration = [{
+    LogicalResult verify() {
+      return verifyGlobalLoadOp(getOperation());
+    }
+  }];
 }
 
 class VM_GlobalLoadPrimitiveOp<Type type, string mnemonic, VM_OPC opcode,
@@ -484,7 +489,11 @@ class VM_GlobalStoreOp<Type type, string mnemonic, list<Trait> traits = []> :
 
   let assemblyFormat = "$value `,` $global attr-dict `:` type($value)";
 
-  let verifier = [{ return verifyGlobalStoreOp(*this); }];
+  let extraClassDeclaration = [{
+    LogicalResult verify() {
+      return verifyGlobalStoreOp(getOperation());
+    }
+  }];
 }
 
 class VM_GlobalStorePrimitiveOp<Type type, string mnemonic, VM_OPC opcode,
@@ -1010,7 +1019,7 @@ def VM_ConstRefRodataOp : VM_PureOp<"const.ref.rodata", [
       CArg<"ArrayRef<NamedAttribute>", "{}">:$attrs)>,
   ];
 
-  let verifier = [{ return verify$cppClass(*this); }];
+  let hasVerifier = 1;
 }
 
 def VM_RodataInlineOp : VM_PureOp<"rodata.inline", [
@@ -1616,7 +1625,7 @@ def VM_ListGetRefOp :
     VM_EncResult<"result">,
   ];
 
-  let verifier = [{ return verify$cppClass(*this); }];
+  let hasVerifier = 1;
 }
 
 def VM_ListSetRefOp :
@@ -1644,7 +1653,7 @@ def VM_ListSetRefOp :
     VM_EncOperand<"value", 2>,
   ];
 
-  let verifier = [{ return verify$cppClass(*this); }];
+  let hasVerifier = 1;
 }
 
 //===----------------------------------------------------------------------===//
@@ -3523,7 +3532,7 @@ def VM_CallOp : VM_CallBaseOp<"call"> {
     [{
       $_state.addOperands(operands);
       $_state.addAttribute("callee", mlir::SymbolRefAttr::get(callee));
-      $_state.addTypes(callee.getType().getResults());
+      $_state.addTypes(callee.getFunctionType().getResults());
     }]>,
     OpBuilder<(ins "FlatSymbolRefAttr":$callee,
       "ArrayRef<Type>":$resultTypes, CArg<"ValueRange", "{}">:$operands),
@@ -3679,7 +3688,11 @@ def VM_FailOp : VM_Op<"fail", [
     }]>,
   ];
 
-  let verifier = [{ return verifyFailOp(*this); }];
+  let extraClassDeclaration = [{
+    LogicalResult verify() {
+      return verifyFailOp(getOperation(), status());
+    }
+  }];
 }
 
 def VM_CondFailOp : VM_Op<"cond_fail", [
@@ -3729,7 +3742,11 @@ def VM_CondFailOp : VM_Op<"cond_fail", [
     }]>,
   ];
 
-  let verifier = [{ return verifyFailOp(*this); }];
+  let extraClassDeclaration = [{
+    LogicalResult verify() {
+      return verifyFailOp(getOperation(), status());
+    }
+  }];
 
   let hasCanonicalizer = 1;
 }

@@ -10,6 +10,7 @@
 
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
 #include "iree/compiler/Utils/PassUtils.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/Passes.h"
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
 #include "mlir/Pass/PassOptions.h"
@@ -79,7 +80,7 @@ namespace Flow {
 
 namespace {
 
-using FunctionLikeNest = MultiOpNest<FuncOp, IREE::Util::InitializerOp>;
+using FunctionLikeNest = MultiOpNest<func::FuncOp, IREE::Util::InitializerOp>;
 
 // Subset of the overall pass pipeline for optimizing globals and numerics.
 // We may ultimately break this out separately so creating a syntactic

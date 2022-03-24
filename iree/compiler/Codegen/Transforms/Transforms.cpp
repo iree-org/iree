@@ -30,7 +30,7 @@ namespace {
 }  // namespace
 
 LogicalResult defineWorkgroupCountRegion(
-    OpBuilder &builder, FuncOp funcOp,
+    OpBuilder &builder, func::FuncOp funcOp,
     WorkgroupCountRegionBuilder regionBuilder) {
   IREE::HAL::ExecutableEntryPointOp entryPointOp = getEntryPoint(funcOp);
   if (!entryPointOp) {

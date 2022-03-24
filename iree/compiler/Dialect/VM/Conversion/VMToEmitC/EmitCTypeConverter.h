@@ -10,6 +10,7 @@
 #include "iree/compiler/Dialect/VM/Conversion/VMToEmitC/VMAnalysis.h"
 #include "iree/compiler/Dialect/VM/IR/VMTypes.h"
 #include "mlir/Dialect/EmitC/IR/EmitC.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Transforms/DialectConversion.h"
 
 namespace mlir {
@@ -21,7 +22,7 @@ class EmitCTypeConverter : public mlir::TypeConverter {
  public:
   EmitCTypeConverter();
   FailureOr<std::reference_wrapper<VMAnalysis>> lookupAnalysis(
-      mlir::FuncOp &funcOp) {
+      mlir::func::FuncOp &funcOp) {
     return lookupAnalysis(funcOp.getOperation());
   }
   FailureOr<std::reference_wrapper<VMAnalysis>> lookupAnalysis(

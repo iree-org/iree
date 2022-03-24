@@ -2206,7 +2206,7 @@ func @iree_linalg_ext_sort_1d() {
 
 // -----
 
-builtin.func @tensor_insert_slice() {
+func.func @tensor_insert_slice() {
   %c0 = arith.constant 0 : index
   %1 = hal.interface.constant.load[0] : index
   %2 = hal.interface.constant.load[1] : index
@@ -2256,7 +2256,7 @@ builtin.func @tensor_insert_slice() {
 
 // -----
 
-builtin.func @dynamic_update_slice() {
+func.func @dynamic_update_slice() {
   %c0 = arith.constant 0 : index
   %c3 = arith.constant 3 : index
   %c0_i32 = arith.constant 0 : i32

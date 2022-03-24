@@ -18,8 +18,8 @@ iree_lit_test_suite(
   TOOLS
     FileCheck
     iree::tools::iree-benchmark-module
+    iree::tools::iree-compile
     iree::tools::iree-run-mlir
-    iree::tools::iree-translate
   LABELS
     "hostonly"
 )

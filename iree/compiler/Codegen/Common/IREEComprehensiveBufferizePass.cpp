@@ -54,8 +54,8 @@
 
 #define DEBUG_TYPE "iree-codegen-linalg-bufferize"
 
-using mlir::bufferization::AnalysisBufferizationOptions;
 using mlir::bufferization::BufferizationOptions;
+using mlir::bufferization::OneShotBufferizationOptions;
 
 namespace mlir {
 namespace iree_compiler {
@@ -97,13 +97,13 @@ static bool isaTensor(Type t) { return t.isa<TensorType>(); };
 /// Run comprehensive bufferize.
 void IREEComprehensiveBufferizePass::runOnOperation() {
   ModuleOp moduleOp = getOperation();
-  AnalysisBufferizationOptions options;
+  OneShotBufferizationOptions options;
   options.allocationFn = allocationFn;
   options.deallocationFn = deallocationFn;
   options.memCpyFn = memCpyFn;
   options.testAnalysisOnly = testAnalysisOnly;
   options.printConflicts = printConflicts;
-  options.alwaysAliasingWithDest = false;
+  options.alwaysAliasingWithDest = true;
   addPostAnalysisTransformations(options);
 
   if (failed(bufferization::runOneShotBufferize(moduleOp, options))) {
@@ -126,8 +126,8 @@ static LogicalResult defaultDeallocationFn(OpBuilder &builder, Location loc,
 }
 static LogicalResult defaultMemCpyFn(OpBuilder &builder, Location loc,
                                      Value from, Value to) {
-  createLinalgCopyOp(builder, loc, from, to);
-  return success();
+  Operation *copyOp = createLinalgCopyOp(builder, loc, from, to);
+  return success(static_cast<bool>(copyOp));
 }
 
 std::unique_ptr<OperationPass<ModuleOp>> createIREEComprehensiveBufferizePass(

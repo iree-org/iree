@@ -70,7 +70,7 @@ void ModuleOp::build(OpBuilder &builder, OperationState &result,
       mlir::SymbolTable::getSymbolAttrName(), builder.getStringAttr(name)));
 }
 
-static LogicalResult verifyModuleOp(ModuleOp op) {
+LogicalResult ModuleOp::verify() {
   // TODO(benvanik): check export name conflicts.
   return success();
 }
@@ -86,9 +86,7 @@ ParseResult FuncOp::parse(OpAsmParser &parser, OperationState &result) {
 
 void FuncOp::print(OpAsmPrinter &p) {
   Operation *op = getOperation();
-  FunctionType fnType = getType();
-  function_interface_impl::printFunctionOp(
-      p, op, fnType.getInputs(), /*isVariadic=*/false, fnType.getResults());
+  function_interface_impl::printFunctionOp(p, op, /*isVariadic=*/false);
 }
 
 void FuncOp::build(OpBuilder &builder, OperationState &result, StringRef name,
@@ -97,7 +95,7 @@ void FuncOp::build(OpBuilder &builder, OperationState &result, StringRef name,
   result.addRegion();
   result.addAttribute(SymbolTable::getSymbolAttrName(),
                       builder.getStringAttr(name));
-  result.addAttribute("type", TypeAttr::get(type));
+  result.addAttribute("function_type", TypeAttr::get(type));
   result.attributes.append(attrs.begin(), attrs.end());
   if (argAttrs.empty()) {
     return;
@@ -113,13 +111,14 @@ Block *FuncOp::addEntryBlock() {
   assert(empty() && "function already has an entry block");
   auto *entry = new Block();
   push_back(entry);
-  SmallVector<Location> locs(getType().getNumInputs(), getLoc());
-  entry->addArguments(getType().getInputs(), locs);
+  SmallVector<Location> locs(getFunctionType().getNumInputs(), getLoc());
+  entry->addArguments(getFunctionType().getInputs(), locs);
   return entry;
 }
 
 LogicalResult FuncOp::verifyType() {
-  auto type = getTypeAttr().getValue();
+  auto type =
+      getOperation()->getAttrOfType<TypeAttr>(getTypeAttrName()).getValue();
   if (!type.isa<FunctionType>())
     return emitOpError("requires '" + getTypeAttrName() +
                        "' attribute of function type");
@@ -268,7 +267,7 @@ void ImportOp::print(OpAsmPrinter &p) {
     if (auto name = getArgAttrOfType<StringAttr>(i, "vm.name")) {
       p << '%' << name.getValue() << " : ";
     }
-    p.printType(getType().getInput(i));
+    p.printType(getFunctionType().getInput(i));
     if (getArgAttrOfType<UnitAttr>(i, "vm.variadic")) {
       p << " ...";
     }
@@ -279,9 +278,9 @@ void ImportOp::print(OpAsmPrinter &p) {
   p << ")";
   if (getResultTypes().size() == 1) {
     p << " -> ";
-    p.printType(getType().getResult(0));
+    p.printType(getFunctionType().getResult(0));
   } else if (getResultTypes().size() > 1) {
-    p << " -> (" << getType().getResults() << ")";
+    p << " -> (" << getFunctionType().getResults() << ")";
   }
   mlir::function_interface_impl::printFunctionAttributes(
       p, op, getArgumentTypes().size(), getResultTypes().size(),
@@ -296,7 +295,7 @@ void ImportOp::build(OpBuilder &builder, OperationState &result, StringRef name,
                      ArrayRef<DictionaryAttr> argAttrs) {
   result.addAttribute(SymbolTable::getSymbolAttrName(),
                       builder.getStringAttr(name));
-  result.addAttribute("type", TypeAttr::get(type));
+  result.addAttribute("function_type", TypeAttr::get(type));
   result.attributes.append(attrs.begin(), attrs.end());
   if (argAttrs.empty()) {
     return;
@@ -309,7 +308,8 @@ void ImportOp::build(OpBuilder &builder, OperationState &result, StringRef name,
 }
 
 LogicalResult ImportOp::verifyType() {
-  auto type = getTypeAttr().getValue();
+  auto type =
+      getOperation()->getAttrOfType<TypeAttr>(getTypeAttrName()).getValue();
   if (!type.isa<FunctionType>())
     return emitOpError("requires '" + getTypeAttrName() +
                        "' attribute of function type");
@@ -318,15 +318,15 @@ LogicalResult ImportOp::verifyType() {
 
 void InitializerOp::build(OpBuilder &builder, OperationState &result,
                           ArrayRef<NamedAttribute> attrs) {
-  result.addAttribute(
-      "type", TypeAttr::get(FunctionType::get(builder.getContext(), {}, {})));
+  result.addAttribute("function_type", TypeAttr::get(FunctionType::get(
+                                           builder.getContext(), {}, {})));
   result.addRegion();
   result.attributes.append(attrs.begin(), attrs.end());
 }
 
 ParseResult InitializerOp::parse(OpAsmParser &parser, OperationState &result) {
-  result.addAttribute(
-      "type", TypeAttr::get(FunctionType::get(result.getContext(), {}, {})));
+  result.addAttribute("function_type", TypeAttr::get(FunctionType::get(
+                                           result.getContext(), {}, {})));
   if (parser.parseOptionalAttrDictWithKeyword(result.attributes)) {
     return failure();
   }
@@ -339,7 +339,8 @@ ParseResult InitializerOp::parse(OpAsmParser &parser, OperationState &result) {
 
 void InitializerOp::print(OpAsmPrinter &p) {
   Operation *op = getOperation();
-  p.printOptionalAttrDictWithKeyword(op->getAttrs(), /*elidedAttrs=*/{"type"});
+  p.printOptionalAttrDictWithKeyword(op->getAttrs(),
+                                     /*elidedAttrs=*/{"function_type"});
   p << " ";
   p.printRegion(body());
 }
@@ -361,7 +362,7 @@ Block *InitializerOp::addBlock() {
 // Globals
 //===----------------------------------------------------------------------===//
 
-static LogicalResult verifyGlobalOp(Operation *op) {
+LogicalResult verifyGlobalOp(Operation *op) {
   auto globalName =
       op->getAttrOfType<StringAttr>(SymbolTable::getSymbolAttrName());
   auto globalType = op->getAttrOfType<TypeAttr>("type");
@@ -378,13 +379,14 @@ static LogicalResult verifyGlobalOp(Operation *op) {
       return op->emitOpError()
              << "initializer function " << initializerAttr << " not found";
     }
-    if (initializer.getType().getNumInputs() != 0 ||
-        initializer.getType().getNumResults() != 1 ||
-        initializer.getType().getResult(0) != globalType.getValue()) {
+    if (initializer.getFunctionType().getNumInputs() != 0 ||
+        initializer.getFunctionType().getNumResults() != 1 ||
+        initializer.getFunctionType().getResult(0) != globalType.getValue()) {
       return op->emitOpError()
              << "initializer type mismatch; global " << globalName << " is "
              << globalType << " but initializer function "
-             << initializer.getName() << " is " << initializer.getType();
+             << initializer.getName() << " is "
+             << initializer.getFunctionType();
     }
   } else if (initialValueAttr) {
     // Ensure the value is something we can convert to a const.
@@ -398,11 +400,11 @@ static LogicalResult verifyGlobalOp(Operation *op) {
   return success();
 }
 
-static LogicalResult verifyGlobalAddressOp(GlobalAddressOp op) {
-  auto *globalOp =
-      op->getParentOfType<VM::ModuleOp>().lookupSymbol(op.global());
+LogicalResult GlobalAddressOp::verify() {
+  Operation *op = getOperation();
+  auto *globalOp = op->getParentOfType<VM::ModuleOp>().lookupSymbol(global());
   if (!globalOp) {
-    return op.emitOpError() << "Undefined global: " << op.global();
+    return op->emitOpError() << "Undefined global: " << global();
   }
   return success();
 }
@@ -466,7 +468,7 @@ void GlobalLoadRefOp::getAsmResultNames(OpAsmSetValueNameFn setNameFn) {
   setResultName(setNameFn, getResult(), global());
 }
 
-static LogicalResult verifyGlobalLoadOp(Operation *op) {
+LogicalResult verifyGlobalLoadOp(Operation *op) {
   auto globalAttr = op->getAttrOfType<FlatSymbolRefAttr>("global");
   auto *globalOp =
       op->getParentOfType<VM::ModuleOp>().lookupSymbol(globalAttr.getValue());
@@ -491,7 +493,7 @@ static bool isParentInitializer(Operation *op) {
   return funcOp.getName() == "__init" || funcOp.getName() == "__deinit";
 }
 
-static LogicalResult verifyGlobalStoreOp(Operation *op) {
+LogicalResult verifyGlobalStoreOp(Operation *op) {
   auto globalAttr = op->getAttrOfType<FlatSymbolRefAttr>("global");
   auto *globalOp =
       op->getParentOfType<VM::ModuleOp>().lookupSymbol(globalAttr.getValue());
@@ -769,11 +771,11 @@ void RodataOp::build(OpBuilder &builder, OperationState &result, StringRef name,
   result.addAttributes(attrs);
 }
 
-static LogicalResult verifyConstRefRodataOp(ConstRefRodataOp &op) {
-  auto *rodataOp =
-      op->getParentOfType<VM::ModuleOp>().lookupSymbol(op.rodata());
+LogicalResult ConstRefRodataOp::verify() {
+  Operation *op = getOperation();
+  auto *rodataOp = op->getParentOfType<VM::ModuleOp>().lookupSymbol(rodata());
   if (!rodataOp) {
-    return op.emitOpError() << "Undefined rodata section: " << op.rodata();
+    return op->emitOpError() << "Undefined rodata section: " << rodata();
   }
   return success();
 }
@@ -803,52 +805,55 @@ void ConstRefRodataOp::getAsmResultNames(OpAsmSetValueNameFn setNameFn) {
 // Lists
 //===----------------------------------------------------------------------===//
 
-static LogicalResult verifyListGetRefOp(ListGetRefOp &op) {
-  auto listType = op.list()
+LogicalResult ListGetRefOp::verify() {
+  Operation *op = getOperation();
+  auto listType = list()
                       .getType()
                       .cast<IREE::VM::RefType>()
                       .getObjectType()
                       .cast<IREE::VM::ListType>();
   auto elementType = listType.getElementType();
-  auto resultType = op.result().getType();
+  auto resultType = result().getType();
   if (!elementType.isa<IREE::VM::OpaqueType>()) {
     if (elementType.isa<IREE::VM::RefType>() !=
         resultType.isa<IREE::VM::RefType>()) {
       // Attempting to go between a primitive type and ref type.
-      return op.emitError() << "cannot convert between list type "
-                            << elementType << " and result type " << resultType;
+      return op->emitError()
+             << "cannot convert between list type " << elementType
+             << " and result type " << resultType;
     } else if (auto refType = elementType.dyn_cast<IREE::VM::RefType>()) {
       if (!refType.getObjectType().isa<IREE::VM::OpaqueType>() &&
           elementType != resultType) {
         // List has a concrete type, verify it matches.
-        return op.emitError() << "list contains " << elementType
-                              << " that cannot be accessed as " << resultType;
+        return op->emitError() << "list contains " << elementType
+                               << " that cannot be accessed as " << resultType;
       }
     }
   }
   return success();
 }
 
-static LogicalResult verifyListSetRefOp(ListSetRefOp &op) {
-  auto listType = op.list()
+LogicalResult ListSetRefOp::verify() {
+  Operation *op = getOperation();
+  auto listType = list()
                       .getType()
                       .cast<IREE::VM::RefType>()
                       .getObjectType()
                       .cast<IREE::VM::ListType>();
   auto elementType = listType.getElementType();
-  auto valueType = op.value().getType();
+  auto valueType = value().getType();
   if (!elementType.isa<IREE::VM::OpaqueType>()) {
     if (elementType.isa<IREE::VM::RefType>() !=
         valueType.isa<IREE::VM::RefType>()) {
       // Attempting to go between a primitive type and ref type.
-      return op.emitError() << "cannot convert between list type "
-                            << elementType << " and value type " << valueType;
+      return op->emitError() << "cannot convert between list type "
+                             << elementType << " and value type " << valueType;
     } else if (auto refType = elementType.dyn_cast<IREE::VM::RefType>()) {
       if (!refType.getObjectType().isa<IREE::VM::OpaqueType>() &&
           elementType != valueType) {
         // List has a concrete type, verify it matches.
-        return op.emitError() << "list contains " << elementType
-                              << " that cannot be mutated as " << valueType;
+        return op->emitError() << "list contains " << elementType
+                               << " that cannot be mutated as " << valueType;
       }
     }
   }
@@ -1259,12 +1264,11 @@ Optional<MutableOperandRange> CondBranchOp::getMutableSuccessorOperands(
                             : falseDestOperandsMutable();
 }
 
-template <typename T>
-static LogicalResult verifyFailOp(T op) {
+LogicalResult verifyFailOp(Operation *op, Value statusVal) {
   APInt status;
-  if (matchPattern(op.status(), m_ConstantInt(&status))) {
+  if (matchPattern(statusVal, m_ConstantInt(&status))) {
     if (status == 0) {
-      return op.emitOpError() << "status is 0; expected to not be OK";
+      return op->emitOpError() << "status is 0; expected to not be OK";
     }
   }
   return success();

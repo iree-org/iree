@@ -5,7 +5,7 @@ func @while() {
   %cst_1 = arith.constant dense<4> : tensor<i32>
   cf.br ^bb1(%start : tensor<i32>)
 ^bb1(%2: tensor<i32>):
-  %3 = "mhlo.compare"(%2, %bound) {comparison_direction = "LT"} : (tensor<i32>, tensor<i32>) -> tensor<i1>
+  %3 = "mhlo.compare"(%2, %bound) {comparison_direction = #mhlo<"comparison_direction LT">} : (tensor<i32>, tensor<i32>) -> tensor<i1>
   %4 = tensor.extract %3[] : tensor<i1>
   cf.cond_br %4, ^bb2(%2 : tensor<i32>), ^bb3(%2 : tensor<i32>)
 ^bb2(%5: tensor<i32>):

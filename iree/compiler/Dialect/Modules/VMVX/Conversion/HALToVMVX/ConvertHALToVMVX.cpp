@@ -65,7 +65,7 @@ enum EntryArgOrdinals {
 ///   )
 LogicalResult updateHALToVMVXEntryFuncOp(FuncOp funcOp,
                                          TypeConverter &typeConverter) {
-  auto originalType = funcOp.getType();
+  auto originalType = funcOp.getFunctionType();
   if (originalType.getNumInputs() != 0 || originalType.getNumResults() != 0) {
     return funcOp.emitError() << "exported functions must have no I/O";
   }
@@ -118,7 +118,7 @@ class ConvertHALInterfaceWorkgroupIDOp
     }
 
     // Get the argument to the function corresponding to the workgroup dim.
-    auto workgroupDim = op->getParentOfType<mlir::FuncOp>().getArgument(
+    auto workgroupDim = op->getParentOfType<mlir::func::FuncOp>().getArgument(
         kEntryArgWorkgroupX + dim);
     rewriter.replaceOp(op, workgroupDim);
     return success();
@@ -141,7 +141,7 @@ class ConvertHALInterfaceWorkgroupSizeOp
     }
 
     // Get the argument to the function corresponding to the workgroup dim.
-    auto workgroupDim = op->getParentOfType<mlir::FuncOp>().getArgument(
+    auto workgroupDim = op->getParentOfType<mlir::func::FuncOp>().getArgument(
         kEntryArgWorkgroupSizeX + dim);
     rewriter.replaceOp(op, workgroupDim);
     return success();
@@ -164,7 +164,7 @@ class ConvertHALInterfaceWorkgroupCountOp
     }
 
     // Get the argument to the function corresponding to the workgroup dim.
-    auto workgroupDim = op->getParentOfType<mlir::FuncOp>().getArgument(
+    auto workgroupDim = op->getParentOfType<mlir::func::FuncOp>().getArgument(
         kEntryArgWorkgroupCountX + dim);
     rewriter.replaceOp(op, workgroupDim);
     return success();
@@ -181,8 +181,8 @@ class ConvertHALInterfaceConstantLoadOp
       IREE::HAL::InterfaceConstantLoadOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     // Find the vmvx.interface argument to the function.
-    auto constantsArg =
-        op->getParentOfType<mlir::FuncOp>().getArgument(kEntryArgConstants);
+    auto constantsArg = op->getParentOfType<mlir::func::FuncOp>().getArgument(
+        kEntryArgConstants);
     assert(constantsArg && "entry point not conforming to requirements");
     auto constantType =
         constantsArg.getType().cast<MemRefType>().getElementType();
@@ -209,8 +209,8 @@ class ConvertHALInterfaceBindingSubspanOp
       IREE::HAL::InterfaceBindingSubspanOp op, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     // Find the vmvx.interface argument to the function.
-    auto bindingsArg =
-        op->getParentOfType<mlir::FuncOp>().getArgument(kEntryArgBindings);
+    auto bindingsArg = op->getParentOfType<mlir::func::FuncOp>().getArgument(
+        kEntryArgBindings);
     assert(bindingsArg && bindingsArg.getType().isa<IREE::Util::ListType>() &&
            "entry point not conforming to requirements");
 

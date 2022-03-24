@@ -27,6 +27,8 @@ DEFINE_C_API_STRUCT(IreeCompilerOptions, void);
 // Registration.
 //===----------------------------------------------------------------------===//
 
+MLIR_CAPI_EXPORTED void ireeCompilerRegisterAllDialects(MlirContext context);
+MLIR_CAPI_EXPORTED void ireeCompilerRegisterAllPasses();
 MLIR_CAPI_EXPORTED void ireeCompilerRegisterTargetBackends();
 
 //===----------------------------------------------------------------------===//

@@ -19,7 +19,7 @@ iree_lit_test_suite(
   TOOLS
     FileCheck
     iree::tools::iree-check-module
-    iree::tools::iree-translate
+    iree::tools::iree-compile
   LABELS
     "hostonly"
 )

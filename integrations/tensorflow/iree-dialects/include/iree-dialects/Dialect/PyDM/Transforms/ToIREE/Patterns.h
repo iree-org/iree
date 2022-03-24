@@ -23,9 +23,9 @@ void populatePyDMToIREELoweringPatterns(MLIRContext *context,
                                         TypeConverter &typeConverter,
                                         RewritePatternSet &patterns);
 
-}  // namespace PYDM
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace PYDM
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir
 
-#endif  // IREE_DIALECTS_DIALECT_IREEPYDM_TRANSFORMS_TOIREE_LOWERING_PATTERNS_H
+#endif // IREE_DIALECTS_DIALECT_IREEPYDM_TRANSFORMS_TOIREE_LOWERING_PATTERNS_H

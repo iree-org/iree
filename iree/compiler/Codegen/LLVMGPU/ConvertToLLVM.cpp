@@ -210,13 +210,13 @@ static llvm::SmallDenseMap<SetBinding, size_t> getKernelArgMapping(
 class ConvertFunc : public ConvertToLLVMPattern {
  public:
   explicit ConvertFunc(MLIRContext *context, LLVMTypeConverter &converter)
-      : ConvertToLLVMPattern(mlir::FuncOp::getOperationName(), context,
+      : ConvertToLLVMPattern(mlir::func::FuncOp::getOperationName(), context,
                              converter, 100) {}
   LogicalResult matchAndRewrite(
       Operation *op, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
-    auto funcOp = cast<FuncOp>(op);
-    FunctionType fnType = funcOp.getType();
+    auto funcOp = cast<func::FuncOp>(op);
+    FunctionType fnType = funcOp.getFunctionType();
     (void)fnType;
     if (!funcOp.isPublic()) return failure();
 

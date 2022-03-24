@@ -110,7 +110,7 @@ run the tests, then report the status back to your host machine.
 Invoke the host compiler tools to produce a bytecode module flatbuffer:
 
 ``` shell
-../iree-build/install/bin/iree-translate \
+../iree-build/install/bin/iree-compile \
   -iree-mlir-to-vm-bytecode-module \
   -iree-hal-target-backends=vmvx \
   iree/samples/models/simple_abs.mlir \

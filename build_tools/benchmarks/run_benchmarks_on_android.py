@@ -50,9 +50,6 @@ from common.benchmark_suite import (BENCHMARK_SUITE_REL_PATH,
                                     compose_info_object,
                                     filter_benchmarks_for_category)
 
-# VMFB files' relative path against a benchmark category directory.
-VMFB_REL_PATH = "vmfb"
-
 # The flagfile/toolfile's filename for compiled benchmark artifacts.
 MODEL_FLAGFILE_NAME = "flagfile"
 MODEL_TOOLFILE_NAME = "tool"
@@ -199,8 +196,35 @@ def adb_start_cmd(cmd_args: Sequence[str],
   return subprocess.Popen(cmd, stdout=subprocess.PIPE, universal_newlines=True)
 
 
+def get_vmfb_full_path_for_benchmark_case(benchmark_case_dir: str) -> str:
+  flagfile_path = os.path.join(benchmark_case_dir, MODEL_FLAGFILE_NAME)
+  flagfile = open(flagfile_path, "r")
+  flagfile_lines = flagfile.readlines()
+  for line in flagfile_lines:
+    flag_name, flag_value = line.strip().split("=")
+    if flag_name == "--module_file":
+      # Realpath canonicalization matters. The caller may rely on that to track
+      # which files it already pushed.
+      return os.path.realpath(os.path.join(benchmark_case_dir, flag_value))
+  raise ValueError(f"{flagfile_path} does not contain a --module_file flag")
+
+
+def push_vmfb_files(benchmark_case_dirs: Sequence[str], root_benchmark_dir: str,
+                    verbose: bool):
+  vmfb_files_already_pushed = set()
+  for case_dir in benchmark_case_dirs:
+    vmfb_path = get_vmfb_full_path_for_benchmark_case(case_dir)
+    if vmfb_path in vmfb_files_already_pushed:
+      continue
+    vmfb_dir = os.path.dirname(vmfb_path)
+    vmfb_rel_dir = os.path.relpath(vmfb_dir, root_benchmark_dir)
+    adb_push_to_tmp_dir(vmfb_path, relative_dir=vmfb_rel_dir, verbose=verbose)
+    vmfb_files_already_pushed.add(vmfb_path)
+
+
 def run_benchmarks_for_category(
     device_info: AndroidDeviceInfo,
+    root_benchmark_dir: str,
     benchmark_category_dir: str,
     benchmark_case_dirs: Sequence[str],
     tmp_dir: str,
@@ -211,12 +235,14 @@ def run_benchmarks_for_category(
     skip_captures: Optional[Set[str]] = None,
     do_capture: bool = False,
     keep_going: bool = False,
+    benchmark_min_time: float = 0,
     verbose: bool = False,
 ) -> Tuple[Sequence[Tuple[Optional[str], Optional[str]]], Sequence[Exception]]:
   """Runs all benchmarks on the Android device and reports results and captures.
 
   Args:
     device_info: an AndroidDeviceInfo object.
+    root_benchmark_dir: path to the benchmark suite within the root build dir
     benchmark_category_dir: the directory to a specific benchmark category.
     benchmark_case_dirs: a list of benchmark case directories.
     tmp_dir: path to temporary directory to which intermediate outputs should be
@@ -233,20 +259,21 @@ def run_benchmarks_for_category(
     do_capture: whether captures should be collected.
     keep_going: whether to proceed if an individual run fails. Exceptions will
       logged and returned.
+    benchmark_min_time: min number of seconds to run the benchmark for, if
+      specified. Otherwise, the benchmark will be repeated a fixed number of
+      times.
     verbose: whether to print additional debug information.
 
   Returns:
     A tuple with a list containing (benchmark-filename, capture-filename) tuples
     and a list containing raised exceptions (only if keep_going is true)
   """
-  # Push the benchmark vmfb and tool files to the Android device first.
-  adb_push_to_tmp_dir(os.path.join(benchmark_category_dir, VMFB_REL_PATH),
-                      relative_dir=os.path.basename(benchmark_category_dir),
-                      verbose=verbose)
-  for f in os.listdir(normal_benchmark_tool_dir):
-    f = os.path.join(normal_benchmark_tool_dir, f)
-    if os.path.isfile(f) and os.access(f, os.X_OK):
-      adb_push_to_tmp_dir(f, relative_dir=NORMAL_TOOL_REL_DIR, verbose=verbose)
+  push_vmfb_files(
+      benchmark_case_dirs=benchmark_case_dirs,
+      root_benchmark_dir=root_benchmark_dir,
+      verbose=verbose,
+  )
+
   # Create directories on the host to store results from each benchmark run.
   benchmark_results_dir = os.path.join(tmp_dir, "benchmark-results")
   os.makedirs(benchmark_results_dir, exist_ok=True)
@@ -255,12 +282,6 @@ def run_benchmarks_for_category(
   captures_dir = os.path.join(tmp_dir, "captures")
   if do_capture:
     os.makedirs(captures_dir, exist_ok=True)
-    for f in os.listdir(traced_benchmark_tool_dir):
-      f = os.path.join(traced_benchmark_tool_dir, f)
-      if os.path.isfile(f) and os.access(f, os.X_OK):
-        adb_push_to_tmp_dir(f,
-                            relative_dir=TRACED_TOOL_REL_DIR,
-                            verbose=verbose)
 
   results = []
   errors = []
@@ -273,6 +294,13 @@ def run_benchmarks_for_category(
     # Read the file specifying which tool should be used for benchmarking
     with open(os.path.join(benchmark_case_dir, MODEL_TOOLFILE_NAME)) as f:
       tool = f.read().strip()
+      adb_push_to_tmp_dir(os.path.join(normal_benchmark_tool_dir, tool),
+                          relative_dir=NORMAL_TOOL_REL_DIR,
+                          verbose=verbose)
+      if do_capture:
+        adb_push_to_tmp_dir(os.path.join(traced_benchmark_tool_dir, tool),
+                            relative_dir=TRACED_TOOL_REL_DIR,
+                            verbose=verbose)
 
     benchmark_info = compose_info_object(device_info, benchmark_category_dir,
                                          benchmark_case_dir)
@@ -295,7 +323,6 @@ def run_benchmarks_for_category(
 
       benchmark_result_filename = None
       if benchmark_key not in skip_benchmarks:
-        repetitions = get_benchmark_repetition_count(benchmark_info.runner)
         benchmark_results_basename = f"{benchmark_key}.json"
 
         cmd = [
@@ -306,11 +333,19 @@ def run_benchmarks_for_category(
         ]
         if tool == "iree-benchmark-module":
           cmd.extend([
-              f"--benchmark_repetitions={repetitions}",
               "--benchmark_format=json",
               "--benchmark_out_format=json",
               f"--benchmark_out='{benchmark_results_basename}'",
           ])
+          if benchmark_min_time:
+            cmd.extend([
+                f"--benchmark_min_time={benchmark_min_time}",
+            ])
+          else:
+            repetitions = get_benchmark_repetition_count(benchmark_info.runner)
+            cmd.extend([
+                f"--benchmark_repetitions={repetitions}",
+            ])
 
         result_json = adb_execute_and_get_output(cmd,
                                                  android_relative_dir,
@@ -381,10 +416,43 @@ def run_benchmarks_for_category(
   return (results, errors)
 
 
+def get_available_drivers(tool_dir: str, verbose: bool) -> Sequence[str]:
+  config_txt_file_path = os.path.join(tool_dir, "build_config.txt")
+  config_txt_file = open(config_txt_file_path, "r")
+  config_txt_file_lines = config_txt_file.readlines()
+  available_drivers = []
+  for line in config_txt_file_lines:
+    name, value = line.strip().split("=")
+    if value != "ON":
+      continue
+    if name == "IREE_HAL_DRIVER_CUDA":
+      available_drivers.append("cuda")
+    elif name == "IREE_HAL_DRIVER_DYLIB":
+      available_drivers.append("dylib")
+    elif name == "IREE_HAL_DRIVER_DYLIB_SYNC":
+      available_drivers.append("dylib-sync")
+    elif name == "IREE_HAL_DRIVER_EXPERIMENTAL_ROCM":
+      available_drivers.append("rocm")
+    elif name == "IREE_HAL_DRIVER_VMVX":
+      available_drivers.append("vmvx")
+    elif name == "IREE_HAL_DRIVER_VMVX_SYNC":
+      available_drivers.append("vmvx-sync")
+    elif name == "IREE_HAL_DRIVER_VULKAN":
+      available_drivers.append("vulkan")
+    else:
+      continue
+  if verbose:
+    available_drivers_str = ', '.join(available_drivers)
+    print(f"Available drivers: {available_drivers_str}")
+  return available_drivers
+
+
 def filter_and_run_benchmarks(
     device_info: AndroidDeviceInfo,
     root_build_dir: str,
     driver_filter: Optional[str],
+    model_name_filter: Optional[str],
+    mode_filter: Optional[str],
     tmp_dir: str,
     normal_benchmark_tool_dir: str,
     traced_benchmark_tool_dir: Optional[str],
@@ -393,6 +461,7 @@ def filter_and_run_benchmarks(
     skip_captures: Optional[Set[str]],
     do_capture: bool = False,
     keep_going: bool = False,
+    benchmark_min_time: float = 0,
     verbose: bool = False) -> Tuple[List[str], List[str], List[Exception]]:
   """Filters and runs benchmarks in all categories for the given device.
 
@@ -400,8 +469,12 @@ def filter_and_run_benchmarks(
     device_info: an AndroidDeviceInfo object.
     root_build_dir: the root build directory containing the built benchmark
       suites.
-    driver_filter: filter benchmarks to those with the given driver (or all if
-      this is None).
+    driver_filter: filter benchmarks to those whose driver matches this regex
+      (or all if this is None).
+    model_name_filter: filter benchmarks to those whose model name matches this
+      regex (or all if this is None).
+    mode_filter: filter benchmarks to those whose benchmarking mode matches this
+      regex (or all if this is None).
     tmp_dir: path to temporary directory to which intermediate outputs should be
       stored. Separate "benchmark-results" and "captures" subdirectories will be
       created as necessary.
@@ -416,6 +489,9 @@ def filter_and_run_benchmarks(
     do_capture: whether captures should be collected.
     keep_going: whether to proceed if an individual run fails. Exceptions will
       logged and returned.
+    benchmark_min_time: min number of seconds to run the benchmark for, if
+      specified. Otherwise, the benchmark will be repeated a fixed number of
+      times.
     verbose: whether to print additional debug information.
 
   Returns:
@@ -435,14 +511,20 @@ def filter_and_run_benchmarks(
 
   for directory in sorted(os.listdir(root_benchmark_dir)):
     benchmark_category_dir = os.path.join(root_benchmark_dir, directory)
+    available_drivers = get_available_drivers(
+        tool_dir=normal_benchmark_tool_dir, verbose=verbose)
     matched_benchmarks = filter_benchmarks_for_category(
         benchmark_category_dir=benchmark_category_dir,
         cpu_target_arch_filter=cpu_target_arch,
         gpu_target_arch_filter=gpu_target_arch,
         driver_filter=driver_filter,
+        model_name_filter=model_name_filter,
+        mode_filter=mode_filter,
+        available_drivers=available_drivers,
         verbose=verbose)
     run_results, run_errors = run_benchmarks_for_category(
         device_info=device_info,
+        root_benchmark_dir=root_benchmark_dir,
         benchmark_category_dir=benchmark_category_dir,
         benchmark_case_dirs=matched_benchmarks,
         tmp_dir=tmp_dir,
@@ -452,6 +534,7 @@ def filter_and_run_benchmarks(
         trace_capture_tool=trace_capture_tool,
         do_capture=do_capture,
         keep_going=keep_going,
+        benchmark_min_time=benchmark_min_time,
         verbose=verbose)
     errors.extend(run_errors)
     for benchmark_filename, capture_filename in run_results:
@@ -530,6 +613,18 @@ def parse_arguments():
       type=str,
       default=None,
       help="Only run benchmarks matching the given driver regex")
+  parser.add_argument(
+      "--model-name-regex",
+      "--model_name_regex",
+      type=str,
+      default=None,
+      help="Only run benchmarks matching the given model name regex")
+  parser.add_argument(
+      "--mode-regex",
+      "--mode_regex",
+      type=str,
+      default=None,
+      help="Only run benchmarks matching the given benchmarking mode regex")
   parser.add_argument("--output",
                       "-o",
                       default=None,
@@ -576,6 +671,16 @@ def parse_arguments():
       " should be for the specific commit (not the general tmp-dir). Previous"
       " benchmark and capture results from here will not be rerun and will be"
       " combined with the new runs.")
+  parser.add_argument(
+      "--benchmark_min_time",
+      "--benchmark-min-time",
+      default=0,
+      type=float,
+      help="If specified, this will be passed as --benchmark_min_time to the"
+      "iree-benchmark-module (minimum number of seconds to repeat running "
+      "for). In that case, no --benchmark_repetitions flag will be passed."
+      " If not specified, a --benchmark_repetitions will be passed "
+      "instead.")
 
   args = parser.parse_args()
 
@@ -657,6 +762,8 @@ def main(args):
       device_info=device_info,
       root_build_dir=args.build_dir,
       driver_filter=args.driver_filter_regex,
+      model_name_filter=args.model_name_regex,
+      mode_filter=args.mode_regex,
       tmp_dir=args.tmp_dir,
       normal_benchmark_tool_dir=os.path.realpath(
           args.normal_benchmark_tool_dir),
@@ -666,6 +773,7 @@ def main(args):
       skip_captures=previous_captures,
       do_capture=do_capture,
       keep_going=args.keep_going,
+      benchmark_min_time=args.benchmark_min_time,
       verbose=args.verbose)
 
   # Merge in previous benchmarks and captures.

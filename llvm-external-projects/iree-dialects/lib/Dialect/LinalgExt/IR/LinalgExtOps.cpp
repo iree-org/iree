@@ -7,11 +7,6 @@
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtDialect.h"
-#include "llvm/ADT/STLExtras.h"
-#include "llvm/ADT/SmallSet.h"
-#include "llvm/ADT/SmallVector.h"
-#include "llvm/ADT/TypeSwitch.h"
-#include "llvm/Support/SMLoc.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arithmetic/Utils/Utils.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -33,6 +28,11 @@
 #include "mlir/IR/Value.h"
 #include "mlir/Support/LLVM.h"
 #include "mlir/Support/LogicalResult.h"
+#include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/SmallSet.h"
+#include "llvm/ADT/SmallVector.h"
+#include "llvm/ADT/TypeSwitch.h"
+#include "llvm/Support/SMLoc.h"
 
 using namespace mlir;
 using namespace mlir::iree_compiler::IREE::LinalgExt;
@@ -104,48 +104,49 @@ OpFoldResult IREE::LinalgExt::getDim(OpBuilder &builder, Location loc, Value v,
 //===----------------------------------------------------------------------===//
 // ScatterOp
 //===----------------------------------------------------------------------===//
-static LogicalResult verifyScatterOp(ScatterOp op) {
-  if (op.inputs().size() != 2) {
-    return op.emitOpError("expected two input operands");
+LogicalResult ScatterOp::verify() {
+  Operation *op = getOperation();
+  if (inputs().size() != 2) {
+    return op->emitOpError("expected two input operands");
   }
-  if (op.outputs().size() != 1) {
-    return op.emitOpError("expected one output operand");
+  if (outputs().size() != 1) {
+    return op->emitOpError("expected one output operand");
   }
   auto checkDimensionsMatch = [&](ShapedType t1, ShapedType t2, unsigned dim) {
     return t1.getShape()[dim] == t2.getShape()[dim];
   };
 
-  auto indicesType = op.getIndicesType();
+  auto indicesType = getIndicesType();
   if (indicesType.getRank() != 2 ||
       !indicesType.getElementType().isInteger(32)) {
-    return op.emitOpError(
+    return op->emitOpError(
         "expected indices to be of rank 2 of i32 element type");
   }
-  auto indexDepth = op.getIndexDepth();
+  auto indexDepth = getIndexDepth();
   if (indexDepth == ShapedType::kDynamicSize) {
-    return op.emitOpError("expected index depth is static");
+    return op->emitOpError("expected index depth is static");
   }
 
   // The first dimension of the indices should match the first dimension of the
   // output. They indicate to the number of updates.
-  auto updateType = op.getUpdateType();
+  auto updateType = getUpdateType();
   if (updateType.getRank() < 1) {
-    return op.emitOpError("expected update value to be at least rank 1");
+    return op->emitOpError("expected update value to be at least rank 1");
   }
   if (!checkDimensionsMatch(indicesType, updateType, 0)) {
-    return op.emitOpError(
+    return op->emitOpError(
         "mismatch in shape of indices and update value at dim#0");
   }
-  auto originalType = op.getOriginalType();
+  auto originalType = getOriginalType();
   if (updateType.getRank() - 1 > originalType.getRank()) {
-    return op.emitOpError(
+    return op->emitOpError(
         "update value rank exceeds the rank of the original value");
   }
 
   // indexDepth + update dims should cover the original dims. The first dim of
   // update is the number of updates.
   if (originalType.getRank() > indexDepth + updateType.getRank() - 1) {
-    return op.emitOpError(
+    return op->emitOpError(
         "index depth and update value does not cover rank of original value");
   }
 
@@ -160,7 +161,7 @@ static LogicalResult verifyScatterOp(ScatterOp op) {
     int64_t updateDim = std::get<1>(it);
     if (updateType.getDimSize(updateDim) !=
         originalType.getDimSize(originalDim)) {
-      return op.emitOpError("mismatch in shape of update value dim#")
+      return op->emitOpError("mismatch in shape of update value dim#")
              << updateDim << " and original value at dim#" << originalDim;
     }
   }
@@ -174,36 +175,36 @@ static LogicalResult verifyScatterOp(ScatterOp op) {
     int64_t updateDim = std::get<1>(it);
     if (updateType.getDimSize(updateDim) >
         originalType.getDimSize(originalDim)) {
-      return op.emitOpError("indexed shape of update value dim#")
+      return op->emitOpError("indexed shape of update value dim#")
              << updateDim << " exceeds original value at dim#" << originalDim
              << " " << updateType.getDimSize(updateDim) << " "
              << originalType.getDimSize(originalDim);
     }
   }
 
-  Region &region = op.region();
+  Region &region = this->region();
   Block *body = &region.front();
   if (body->getNumArguments() != 2) {
-    return op.emitOpError("expected region to have two arguments");
+    return op->emitOpError("expected region to have two arguments");
   }
   Type arg0Type = body->getArgument(0).getType();
   Type arg1Type = body->getArgument(1).getType();
   if (!arg0Type.isIntOrFloat() || !arg1Type.isIntOrFloat()) {
-    return op.emitOpError(
+    return op->emitOpError(
         "expected region to have scalar argument of integer or float types");
   }
   if (arg0Type != updateType.getElementType()) {
-    return op.emitOpError("mismatch in argument 0 of region ")
+    return op->emitOpError("mismatch in argument 0 of region ")
            << arg0Type << " and element type of update value "
            << updateType.getElementType();
   }
   if (arg1Type != originalType.getElementType()) {
-    return op.emitOpError("mismatch in argument 1 of region ")
+    return op->emitOpError("mismatch in argument 1 of region ")
            << arg1Type << " and element type of original value "
            << originalType.getElementType();
   }
   if (arg0Type != arg1Type) {
-    return op.emitOpError("mismatch in region argument types ")
+    return op->emitOpError("mismatch in region argument types ")
            << arg0Type << " and " << arg1Type;
   }
   auto yieldOp = cast<IREE::LinalgExt::YieldOp>(body->getTerminator());
@@ -329,7 +330,8 @@ LogicalResult ScatterOp::generateScalarImplementation(OpBuilder &b,
     Value idx = b.create<memref::LoadOp>(loc, indices(), loadIndices);
     Value cast = b.create<arith::IndexCastOp>(loc, b.getIndexType(), idx);
 
-    if (starts[i]) cast = b.create<arith::AddIOp>(loc, cast, starts[i]);
+    if (starts[i])
+      cast = b.create<arith::AddIOp>(loc, cast, starts[i]);
     starts[i] = cast;
   }
 
@@ -354,44 +356,45 @@ LogicalResult ScatterOp::generateScalarImplementation(OpBuilder &b,
 // SortOp
 //===----------------------------------------------------------------------===//
 
-static LogicalResult verifySortOp(SortOp op) {
-  if (op.getNumInputs()) {
-    return op.emitOpError("does not expect to take any inputs");
+LogicalResult SortOp::verify() {
+  Operation *op = getOperation();
+  if (getNumInputs()) {
+    return op->emitOpError("does not expect to take any inputs");
   }
-  if (op.getNumOutputs() == 0) {
-    return op.emitOpError("expected at least one `outs` operand");
+  if (getNumOutputs() == 0) {
+    return op->emitOpError("expected at least one `outs` operand");
   }
 
-  Block &block = op.region().front();
-  size_t numOutputs = op.getNumOutputs();
+  Block &block = region().front();
+  size_t numOutputs = getNumOutputs();
   if (block.getNumArguments() != 2 * numOutputs) {
-    return op.emitOpError("region block should have ")
+    return op->emitOpError("region block should have ")
            << 2 * numOutputs << " arguments";
   }
 
-  int64_t rank = op.getOperandRank();
-  int sortDim = op.dimension();
+  int64_t rank = getOperandRank();
+  int sortDim = dimension();
   if (sortDim < 0 || sortDim >= rank) {
-    return op.emitOpError("dimension must be within (0, ") << rank << "]";
+    return op->emitOpError("dimension must be within (0, ") << rank << "]";
   }
 
-  ArrayRef<int64_t> shape = op.getOperandShape();
-  for (auto indexedOperand : llvm::enumerate(op.outputs())) {
+  ArrayRef<int64_t> shape = getOperandShape();
+  for (auto indexedOperand : llvm::enumerate(outputs())) {
     int index = indexedOperand.index();
-    auto operandType = op.getOperandType(index);
+    auto operandType = getOperandType(index);
     if (operandType.getRank() != rank) {
-      return op.emitOpError("expected operand ")
+      return op->emitOpError("expected operand ")
              << index << " to be rank " << rank << ", same as other operands";
     }
     if (operandType.getShape() != shape) {
-      return op.emitOpError("expected operand ")
+      return op->emitOpError("expected operand ")
              << index << " to have same shape as other operands";
     }
     Type elemType = operandType.getElementType();
     for (int i : {2 * index, 2 * index + 1}) {
       Type argType = block.getArgument(i).getType();
       if (argType != elemType) {
-        return op.emitOpError("region block argument #")
+        return op->emitOpError("region block argument #")
                << i << " should be of type " << elemType << " but got "
                << argType;
       }
@@ -400,11 +403,11 @@ static LogicalResult verifySortOp(SortOp op) {
 
   auto yieldOp = cast<YieldOp>(block.getTerminator());
   if (yieldOp.getNumOperands() != 1) {
-    return op.emitOpError("should yield exactly one operand");
+    return op->emitOpError("should yield exactly one operand");
   }
   auto ty = yieldOp.getOperand(0).getType().dyn_cast<IntegerType>();
   if (!ty || ty.getWidth() != 1) {
-    return op.emitOpError("should yield i1 type");
+    return op->emitOpError("should yield i1 type");
   }
 
   return success();
@@ -433,8 +436,8 @@ SmallVector<Range> SortOp::getIterationDomain(OpBuilder &builder) {
   return loopBounds;
 }
 
-SmallVector<unsigned> SortOp::getPartitionableLoops(
-    unsigned maxNumParallelDims) {
+SmallVector<unsigned>
+SortOp::getPartitionableLoops(unsigned maxNumParallelDims) {
   auto range = llvm::seq<unsigned>(0, getOperandRank());
   SmallVector<unsigned> partitionableLoops(range.begin(), range.end());
   partitionableLoops.erase(std::next(partitionableLoops.begin(), dimension()));
@@ -560,26 +563,29 @@ LogicalResult SortOp::generateScalarImplementation(OpBuilder &b, Location loc,
 // FftOp
 //===----------------------------------------------------------------------===//
 
-static LogicalResult verifyFftOp(FftOp op) {
-  auto length = op.getFftLength();
+LogicalResult FftOp::verify() {
+  Operation *op = getOperation();
+  auto length = getFftLength();
   // After tiling, it could be dynamic shape. (Because
   // subview/subtensor does not inference the type correctly
   // on (1 << x)) cases).
-  if (length == ShapedType::kDynamicSize) return success();
+  if (length == ShapedType::kDynamicSize)
+    return success();
   if (length & (length - 1)) {
-    return op.emitOpError("only powers of 2 are handled currently");
+    return op->emitOpError("only powers of 2 are handled currently");
   }
-  if (!op.getNumInputs() || !op.isScalar(op.getInputOperand(0))) {
-    return op.emitOpError("expected to carry `stage` input");
+  if (!getNumInputs() || !isScalar(getInputOperand(0))) {
+    return op->emitOpError("expected to carry `stage` input");
   }
-  if (op.getNumInputs() != 1) {
-    if (op.getNumInputs() != 3 || op.isScalar(op.getInputOperand(1)) ||
-        op.isScalar(op.getInputOperand(2))) {
-      return op.emitOpError("expected to carry real and imag coeff inputs");
+  if (getNumInputs() != 1) {
+    if (getNumInputs() != 3 || isScalar(getInputOperand(1)) ||
+        isScalar(getInputOperand(2))) {
+      return op->emitOpError("expected to carry real and imag coeff inputs");
     }
   }
-  if (op.getNumOutputs() != 2) {
-    return op.emitOpError("expected outputs to be real and imag tensor/memref");
+  if (getNumOutputs() != 2) {
+    return op->emitOpError(
+        "expected outputs to be real and imag tensor/memref");
   }
   return success();
 }
@@ -759,8 +765,8 @@ LogicalResult FftOp::generateScalarImplementation(OpBuilder &b, Location loc,
   return success();
 }
 
-SmallVector<unsigned> FftOp::getPartitionableLoops(
-    unsigned maxNumParallelDims) {
+SmallVector<unsigned>
+FftOp::getPartitionableLoops(unsigned maxNumParallelDims) {
   auto range = llvm::seq<unsigned>(0, getOperandRank());
   SmallVector<unsigned> partitionableLoops(range.begin(), range.end());
   // Indices matter for coeff computation.
@@ -810,34 +816,36 @@ Operation *FftOp::getTiledImplementation(OpBuilder &builder, ValueRange outputs,
 // ScanOp
 //===----------------------------------------------------------------------===//
 
-static LogicalResult verifyScanOp(ScanOp op) {
-  if (op.getNumInputs() != 1) {
-    return op.emitOpError("expected one input operands");
+LogicalResult ScanOp::verify() {
+  Operation *op = getOperation();
+  if (getNumInputs() != 1) {
+    return op->emitOpError("expected one input operands");
   }
-  if (op.getNumOutputs() != 2) {
-    return op.emitOpError("expected two output operands");
+  if (getNumOutputs() != 2) {
+    return op->emitOpError("expected two output operands");
   }
-  if (!op.input().getType().isa<ShapedType>()) {
-    return op.emitOpError("expected first input element type to be shaped");
+  if (!input().getType().isa<ShapedType>()) {
+    return op->emitOpError("expected first input element type to be shaped");
   }
-  auto accumulatorType = op.accumulator().getType().cast<ShapedType>();
-  auto inputType = op.input().getType().cast<ShapedType>();
-  auto outputType = op.output().getType().cast<ShapedType>();
+  auto accumulatorType = accumulator().getType().cast<ShapedType>();
+  auto inputType = input().getType().cast<ShapedType>();
+  auto outputType = output().getType().cast<ShapedType>();
   ArrayRef<int64_t> inputShapes = inputType.getShape();
   ArrayRef<int64_t> outputShapes = outputType.getShape();
   if (accumulatorType.getElementType() != inputType.getElementType()) {
-    return op.emitOpError(
+    return op->emitOpError(
         "expected input/accumulator element types to be identical");
   }
   ArrayRef<int64_t> accumulatorShape = accumulatorType.getShape();
   int64_t accumulatorRank = accumulatorType.getRank();
   if (accumulatorRank != inputType.getRank() - 1) {
-    return op.emitOpError(
+    return op->emitOpError(
         "expected accumulator rank to be equal to input rank - 1");
   }
   SmallVector<int64_t> expectedAccumulatorShape;
   for (int i = 0; i < inputType.getRank(); i++) {
-    if (i != op.dimension()) expectedAccumulatorShape.push_back(inputShapes[i]);
+    if (i != dimension())
+      expectedAccumulatorShape.push_back(inputShapes[i]);
   }
   if (llvm::any_of(llvm::zip(expectedAccumulatorShape, accumulatorShape),
                    [](std::tuple<int64_t, int64_t> s) {
@@ -845,14 +853,14 @@ static LogicalResult verifyScanOp(ScanOp op) {
                             std::get<1>(s) != ShapedType::kDynamicSize &&
                             std::get<0>(s) != std::get<1>(s);
                    })) {
-    return op.emitOpError("incompatible input/accumulator shapes");
+    return op->emitOpError("incompatible input/accumulator shapes");
   }
   if (inputType.getElementType() != outputType.getElementType()) {
-    return op.emitOpError(
+    return op->emitOpError(
         "expected input/output element types to be identical");
   }
   if (inputShapes.size() != outputShapes.size()) {
-    return op.emitOpError("expected input/output to have identical ranks");
+    return op->emitOpError("expected input/output to have identical ranks");
   }
   if (llvm::any_of(llvm::zip(inputShapes, outputShapes),
                    [](std::tuple<int64_t, int64_t> s) {
@@ -860,7 +868,7 @@ static LogicalResult verifyScanOp(ScanOp op) {
                             std::get<1>(s) != ShapedType::kDynamicSize &&
                             std::get<0>(s) != std::get<1>(s);
                    })) {
-    return op.emitOpError("incompatible input/output shapes");
+    return op->emitOpError("incompatible input/output shapes");
   }
   return success();
 }
@@ -887,8 +895,8 @@ SmallVector<StringRef> ScanOp::getLoopIteratorTypes() {
   return iteratorTypes;
 }
 
-SmallVector<unsigned> ScanOp::getPartitionableLoops(
-    unsigned maxNumParallelDims) {
+SmallVector<unsigned>
+ScanOp::getPartitionableLoops(unsigned maxNumParallelDims) {
   auto range = llvm::seq<unsigned>(0, getOperandRank());
   SmallVector<unsigned> partitionableLoops(range.begin(), range.end());
   partitionableLoops.erase(std::next(partitionableLoops.begin(), dimension()));
@@ -916,7 +924,8 @@ LogicalResult ScanOp::generateScalarImplementation(OpBuilder &b, Location loc,
   bool isInclusive = inclusive();
   SmallVector<Value> accIndices;
   for (int i = 0; i < indices.size(); i++) {
-    if (i != scanDim) accIndices.push_back(indices[i]);
+    if (i != scanDim)
+      accIndices.push_back(indices[i]);
   }
 
   auto scfIf = b.create<scf::IfOp>(
@@ -938,9 +947,11 @@ LogicalResult ScanOp::generateScalarImplementation(OpBuilder &b, Location loc,
         indices[scanDim] = ivMinusOne;
         scanBlkArgs.push_back(b.create<memref::LoadOp>(loc, output(), indices));
         Value i0;
-        if (!isInclusive) i0 = b.create<memref::LoadOp>(loc, input(), indices);
+        if (!isInclusive)
+          i0 = b.create<memref::LoadOp>(loc, input(), indices);
         indices[scanDim] = iv;
-        if (isInclusive) i0 = b.create<memref::LoadOp>(loc, input(), indices);
+        if (isInclusive)
+          i0 = b.create<memref::LoadOp>(loc, input(), indices);
         scanBlkArgs.push_back(i0);
       });
 
@@ -1042,23 +1053,24 @@ LogicalResult ScanOp::fold(ArrayRef<Attribute>,
 // ReverseOp
 //===----------------------------------------------------------------------===//
 
-static LogicalResult verifyReverseOp(ReverseOp op) {
-  if (op.getNumInputs() != 1) {
-    return op.emitOpError("expected exactly one input");
+LogicalResult ReverseOp::verify() {
+  Operation *op = getOperation();
+  if (getNumInputs() != 1) {
+    return op->emitOpError("expected exactly one input");
   }
-  if (op.getNumOutputs() != 1) {
-    return op.emitOpError("expected exactly one output");
+  if (getNumOutputs() != 1) {
+    return op->emitOpError("expected exactly one output");
   }
-  auto inputType = op.input().getType().cast<ShapedType>();
-  auto outputType = op.output().getType().cast<ShapedType>();
+  auto inputType = input().getType().cast<ShapedType>();
+  auto outputType = output().getType().cast<ShapedType>();
   if (inputType.getElementType() != outputType.getElementType()) {
-    return op.emitOpError(
+    return op->emitOpError(
         "expected input/output element types to be identical");
   }
   ArrayRef<int64_t> inputShapes = inputType.getShape();
   ArrayRef<int64_t> outputShapes = outputType.getShape();
   if (inputShapes.size() != outputShapes.size()) {
-    return op.emitOpError("expexted input/output to have identical ranks");
+    return op->emitOpError("expexted input/output to have identical ranks");
   }
   if (llvm::any_of(llvm::zip(inputShapes, outputShapes),
                    [](std::tuple<int64_t, int64_t> s) {
@@ -1066,18 +1078,18 @@ static LogicalResult verifyReverseOp(ReverseOp op) {
                             std::get<1>(s) != ShapedType::kDynamicSize &&
                             std::get<0>(s) != std::get<1>(s);
                    })) {
-    return op.emitOpError("incompatible input/output shapes");
+    return op->emitOpError("incompatible input/output shapes");
   }
 
-  int64_t rank = op.getOperandRank();
+  int64_t rank = getOperandRank();
   llvm::SmallSetVector<int64_t, 4> s;
-  for (auto dim : op.dims()) {
+  for (auto dim : dims()) {
     if (dim < 0 || dim >= rank) {
-      return op.emitOpError("all the dimensions must be within [0, ")
+      return op->emitOpError("all the dimensions must be within [0, ")
              << rank << ")";
     }
     if (s.contains(dim)) {
-      return op.emitOpError("expected dimensions numbers are all unique");
+      return op->emitOpError("expected dimensions numbers are all unique");
     }
     s.insert(dim);
   }
@@ -1168,14 +1180,14 @@ Operation *ReverseOp::getTiledImplementation(OpBuilder &builder,
   return tiledRevOp;
 }
 
-#define DEFINE_OP_GET_EFFECTS(OP_NAME)                                    \
-  void OP_NAME::getEffects(                                               \
-      SmallVectorImpl<SideEffects::EffectInstance<MemoryEffects::Effect>> \
-          &effects) {                                                     \
-    SmallVector<Value> inputBuffers = getInputBufferOperands();           \
-    SmallVector<Value> outputBuffers = getOutputBufferOperands();         \
-    getEffectsImpl(effects, getOperation()->getResults(), inputBuffers,   \
-                   outputBuffers);                                        \
+#define DEFINE_OP_GET_EFFECTS(OP_NAME)                                         \
+  void OP_NAME::getEffects(                                                    \
+      SmallVectorImpl<SideEffects::EffectInstance<MemoryEffects::Effect>>      \
+          &effects) {                                                          \
+    SmallVector<Value> inputBuffers = getInputBufferOperands();                \
+    SmallVector<Value> outputBuffers = getOutputBufferOperands();              \
+    getEffectsImpl(effects, getOperation()->getResults(), inputBuffers,        \
+                   outputBuffers);                                             \
   }
 
 DEFINE_OP_GET_EFFECTS(ScatterOp)
@@ -1195,11 +1207,13 @@ struct FoldTensorCastOp : public OpInterfaceRewritePattern<LinalgExtOp> {
     // If no operand comes from a tensor::CastOp and can be folded then fail.
     bool hasTensorCastOperand =
         llvm::any_of(op.getInputAndOutputOperands(), [&](OpOperand *opOperand) {
-          if (opOperand->get().isa<BlockArgument>()) return false;
+          if (opOperand->get().isa<BlockArgument>())
+            return false;
           auto castOp = opOperand->get().getDefiningOp<tensor::CastOp>();
           return castOp && canFoldIntoConsumerOp(castOp);
         });
-    if (!hasTensorCastOperand) return failure();
+    if (!hasTensorCastOperand)
+      return failure();
 
     SmallVector<Type, 4> newResultTypes;
     newResultTypes.reserve(op->getNumResults());
@@ -1240,7 +1254,7 @@ struct FoldTensorCastOp : public OpInterfaceRewritePattern<LinalgExtOp> {
     return success();
   }
 };
-}  // namespace
+} // namespace
 
 //===----------------------------------------------------------------------===//
 // TileOp
@@ -1294,7 +1308,8 @@ LogicalResult TileOp::verify() { return success(); }
 
 void TileOp::print(OpAsmPrinter &p) {
   p << ' ' << tile_size() << ' ';
-  if (tiled_dim() > 0) p << "tiled_dim = " << tiled_dim() << ' ';
+  if (tiled_dim() > 0)
+    p << "tiled_dim = " << tiled_dim() << ' ';
   if (!outs().empty()) {
     p << "outs(";
     llvm::interleaveComma(outs(), p,
@@ -1351,7 +1366,8 @@ ParseResult TileOp::parse(OpAsmParser &parser, OperationState &result) {
                                result.operands))
       return failure();
   }
-  if (parser.parseArrowTypeList(result.types)) return failure();
+  if (parser.parseArrowTypeList(result.types))
+    return failure();
 
   SmallVector<OpAsmParser::OperandType, 8> regionOperands;
   std::unique_ptr<Region> region = std::make_unique<Region>();
@@ -1360,7 +1376,8 @@ ParseResult TileOp::parse(OpAsmParser &parser, OperationState &result) {
     return failure();
 
   // Parse the optional attribute list.
-  if (parser.parseOptionalAttrDict(result.attributes)) return failure();
+  if (parser.parseOptionalAttrDict(result.attributes))
+    return failure();
 
   TileOp::ensureTerminator(*region, builder, result.location);
   result.addRegion(std::move(region));
@@ -1420,7 +1437,8 @@ ParseResult InParallelOp::parse(OpAsmParser &parser, OperationState &result) {
   if (parser.parseOperand(numThreads) ||
       parser.resolveOperand(numThreads, indexType, result.operands))
     return failure();
-  if (parser.parseArrowTypeList(result.types)) return failure();
+  if (parser.parseArrowTypeList(result.types))
+    return failure();
 
   SmallVector<OpAsmParser::OperandType, 8> regionOperands;
   SmallVector<Type, 8> regionTypes;
@@ -1431,7 +1449,8 @@ ParseResult InParallelOp::parse(OpAsmParser &parser, OperationState &result) {
   result.addRegion(std::move(region));
 
   // Parse the optional attribute list.
-  if (parser.parseOptionalAttrDict(result.attributes)) return failure();
+  if (parser.parseOptionalAttrDict(result.attributes))
+    return failure();
   return success();
 }
 
@@ -1535,7 +1554,7 @@ namespace {
 /// Pattern to rewrite a parallel_insert_slice op with constant arguments.
 class ParallelInsertSliceOpConstantArgumentFolder final
     : public OpRewritePattern<ParallelInsertSliceOp> {
- public:
+public:
   using OpRewritePattern<ParallelInsertSliceOp>::OpRewritePattern;
 
   LogicalResult matchAndRewrite(ParallelInsertSliceOp insertSliceOp,
@@ -1563,7 +1582,7 @@ class ParallelInsertSliceOpConstantArgumentFolder final
     return success();
   }
 };
-}  // namespace
+} // namespace
 
 void ParallelInsertSliceOp::getCanonicalizationPatterns(
     RewritePatternSet &results, MLIRContext *context) {
@@ -1598,14 +1617,16 @@ ParseResult PerformConcurrentlyOp::parse(OpAsmParser &parser,
   result.addRegion(std::move(region));
 
   // Parse the optional attribute list.
-  if (parser.parseOptionalAttrDict(result.attributes)) return failure();
+  if (parser.parseOptionalAttrDict(result.attributes))
+    return failure();
   return success();
 }
 
 SmallVector<Type> PerformConcurrentlyOp::yieldedTypes() {
-  return llvm::to_vector(llvm::map_range(
-      this->yieldingOps(),
-      [](ParallelInsertSliceOp op) { return op.yieldedType(); }));
+  return llvm::to_vector(
+      llvm::map_range(this->yieldingOps(), [](ParallelInsertSliceOp op) {
+        return op.yieldedType();
+      }));
 }
 
 SmallVector<ParallelInsertSliceOp> PerformConcurrentlyOp::yieldingOps() {
@@ -1619,7 +1640,7 @@ SmallVector<ParallelInsertSliceOp> PerformConcurrentlyOp::yieldingOps() {
     if (auto endPerformOp = llvm::dyn_cast<EndPerformConcurrentlyOp>(op)) {
       continue;
     }
-    llvm_unreachable("Unexpected operation in perform_concurrently");
+    assert(false && "Unexpected operation in perform_concurrently");
   }
   return ret;
 }

@@ -29,12 +29,12 @@ Value getDimValue(OpBuilder &builder, Location loc, Value v, int64_t dim);
 /// `dim`. If the shape is constant, returns the shape as an `IntegerAttr`.
 OpFoldResult getDim(OpBuilder &builder, Location loc, Value v, int64_t dim);
 
-}  // namespace LinalgExt
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
+} // namespace LinalgExt
+} // namespace IREE
+} // namespace iree_compiler
+} // namespace mlir
 
 #define GET_OP_CLASSES
-#include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h.inc"  // IWYU pragma: export
+#include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h.inc" // IWYU pragma: export
 
-#endif  // IREE_DIALECTS_DIALECT_LINALGEXT_IR_LINALGEXTOPS_H_
+#endif // IREE_DIALECTS_DIALECT_LINALGEXT_IR_LINALGEXTOPS_H_

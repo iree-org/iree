@@ -43,7 +43,7 @@ namespace {
 //   stream.cmd.dispatch @foo(%0, %1 : index, index)
 // + deduped arguments in the executable
 static void deduplicateOperands(
-    mlir::FuncOp funcOp,
+    mlir::func::FuncOp funcOp,
     SmallVector<IREE::Stream::CmdDispatchOp> &dispatchOps) {
   auto &entryBlock = funcOp.front();
   auto anyDispatchOp = dispatchOps.front();
@@ -115,7 +115,7 @@ static void deduplicateOperands(
   }
 
   LLVM_DEBUG({
-    llvm::dbgs() << "deduplicateOperands for " << funcOp.sym_name() << "\n";
+    llvm::dbgs() << "deduplicateOperands for " << funcOp.getSymName() << "\n";
     llvm::dbgs() << "  dead operands: ";
     llvm::interleaveComma(deadOperandsMap.set_bits(), llvm::dbgs());
     llvm::dbgs() << "\n";
@@ -165,7 +165,7 @@ static void deduplicateOperands(
 //   stream.cmd.dispatch @foo(%c101 : index)
 // + inlined %c1 in the executable
 static void inlineUniformConstants(
-    mlir::FuncOp funcOp,
+    mlir::func::FuncOp funcOp,
     SmallVector<IREE::Stream::CmdDispatchOp> &dispatchOps) {
   auto &entryBlock = funcOp.front();
   auto anyDispatchOp = dispatchOps.front();
@@ -204,7 +204,8 @@ static void inlineUniformConstants(
   }
 
   LLVM_DEBUG({
-    llvm::dbgs() << "inlineUniformConstants for " << funcOp.sym_name() << "\n";
+    llvm::dbgs() << "inlineUniformConstants for " << funcOp.getSymName()
+                 << "\n";
     for (unsigned i = 0; i < operandValues.size(); ++i) {
       if (!operandValues[i].hasValue()) continue;
       llvm::dbgs() << "  operand " << i << " = " << operandValues[i].getValue()

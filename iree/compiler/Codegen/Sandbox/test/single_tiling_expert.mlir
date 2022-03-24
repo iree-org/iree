@@ -1,4 +1,4 @@
-// RUN: iree-opt -pass-pipeline="builtin.func(linalg-single-tiling-expert-driver{tiling-level=0 vectorize})" -split-input-file %s | FileCheck %s
+// RUN: iree-opt -pass-pipeline="func.func(linalg-single-tiling-expert-driver{tiling-level=0 vectorize})" -split-input-file %s | FileCheck %s
 
 func @matmul(%arg0 : tensor<?x?xf32>, %arg1 : tensor<?x?xf32>, %arg2 : tensor<?x?xf32>) -> tensor<?x?xf32> {
   %0 = linalg.matmul {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[10, 20, 30]]>}

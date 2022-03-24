@@ -13,7 +13,7 @@ from iree.compiler.tools import binaries
 def main(args=None):
   if args is None:
     args = sys.argv[1:]
-  exe = binaries.find_tool("ireec")
+  exe = binaries.find_tool("iree-compile")
   return subprocess.call(args=[exe] + args)
 
 

@@ -69,7 +69,7 @@ class FuncOpConversion : public OpConversionPattern<FuncOp> {
   LogicalResult matchAndRewrite(
       FuncOp srcOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
-    FunctionType srcFuncType = srcOp.getType();
+    FunctionType srcFuncType = srcOp.getFunctionType();
     TypeConverter::SignatureConversion signatureConversion(
         srcOp.getNumArguments());
 

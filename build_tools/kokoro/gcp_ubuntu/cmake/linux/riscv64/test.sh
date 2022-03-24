@@ -14,7 +14,7 @@ set -x
 # Print the UTC time when set -x is on
 export PS4='[$(date -u "+%T %Z")] '
 
-# Environment variable used by the emulator and iree-translate for the
+# Environment variable used by the emulator and iree-compile for the
 # dylib-llvm-aot bytecode codegen.
 export RISCV_TOOLCHAIN_ROOT=${RISCV_RV64_LINUX_TOOLCHAIN_ROOT?}
 
@@ -53,7 +53,7 @@ function generate_dylib_vmfb {
       "${BUILD_RISCV_DIR?}/tosa.mlir"
     )
   fi
-  "${BUILD_HOST_DIR?}/install/bin/iree-translate" "${translate_arg[@]}" "$@"
+  "${BUILD_HOST_DIR?}/install/bin/iree-compile" "${translate_arg[@]}" "$@"
 }
 
 generate_dylib_vmfb mhlo \

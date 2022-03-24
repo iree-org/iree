@@ -13,8 +13,8 @@
 extern "C" {
 #endif
 
-/// Runs the IREE compiler main function. This is used to build ireec-like
-/// binaries that link against a common shared library.
+/// Runs the IREE compiler main function. This is used to build
+/// iree-compile-like binaries that link against a common shared library.
 MLIR_CAPI_EXPORTED int ireeCompilerRunMain(int argc, char **argv);
 
 /// Runs LLD in "generic" mode (i.e. as `lld`, requiring a -flavor command line

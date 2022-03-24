@@ -17,6 +17,9 @@ namespace {
 static bool isTFLAttr(NamedAttribute &namedAttr) {
   // NOTE: tflite mixes tf and tfl, for some reason.
   auto name = namedAttr.getName().strref();
+  // Don't trim attributes from tf_saved_model---they carry ABI information.
+  if (name.startswith("tf_saved_model.")) return false;
+
   if (name.startswith("tf.") || name.startswith("tf_") ||
       name.startswith("tfl.") || name.startswith("tfl_")) {
     return true;

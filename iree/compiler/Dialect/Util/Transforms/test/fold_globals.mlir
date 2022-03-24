@@ -2,13 +2,13 @@
 
 // CHECK: util.global public mutable @uniformConstants = 5 : index
 util.global public mutable @uniformConstants : index
-builtin.func @foo() {
+func.func @foo() {
   %c5 = arith.constant 5 : index
   // CHECK-NOT: util.global.store %c5, @uniformConstants : index
   util.global.store %c5, @uniformConstants : index
   return
 }
-builtin.func @bar() {
+func.func @bar() {
   %c5 = arith.constant 5 : index
   // CHECK-NOT: util.global.store %c5, @uniformConstants : index
   util.global.store %c5, @uniformConstants : index
@@ -19,13 +19,13 @@ builtin.func @bar() {
 
 // CHECK: util.global public mutable @nonuniformConstants : index
 util.global public mutable @nonuniformConstants : index
-builtin.func @foo() {
+func.func @foo() {
   %c5 = arith.constant 5 : index
   // CHECK: util.global.store %c5, @nonuniformConstants : index
   util.global.store %c5, @nonuniformConstants : index
   return
 }
-builtin.func @bar() {
+func.func @bar() {
   %c6 = arith.constant 6 : index
   // CHECK: util.global.store %c6, @nonuniformConstants : index
   util.global.store %c6, @nonuniformConstants : index
@@ -38,7 +38,7 @@ builtin.func @bar() {
 util.global private mutable @chained0 : index
 // CHECK-NOT: util.global private mutable @chained1 : index
 util.global private mutable @chained1 : index
-builtin.func @foo() -> index {
+func.func @foo() -> index {
   // CHECK: %[[VALUE:.+]] = util.global.load @chained0 : index
   %0 = util.global.load @chained0 : index
   // CHECK-NOT: util.global.store
@@ -53,14 +53,14 @@ builtin.func @foo() -> index {
 util.global public mutable @unchained0 : index
 // CHECK: util.global public mutable @unchained1 : index
 util.global public mutable @unchained1 : index
-builtin.func @foo() {
+func.func @foo() {
   // CHECK: %[[VALUE:.+]] = util.global.load @unchained0 : index
   %0 = util.global.load @unchained0 : index
   // CHECK: util.global.store %[[VALUE]], @unchained1 : index
   util.global.store %0, @unchained1 : index
   return
 }
-builtin.func @bar(%arg0: index) {
+func.func @bar(%arg0: index) {
   // CHECK: util.global.store %arg0, @unchained1 : index
   util.global.store %arg0, @unchained1 : index
   return
@@ -83,7 +83,7 @@ util.initializer {
   util.global.store %c6, @immutable1 : index
   util.initializer.return
 }
-builtin.func @foo(%arg0: index) -> (index, index, index) {
+func.func @foo(%arg0: index) -> (index, index, index) {
   // CHECK-DAG: %[[C5:.+]] = arith.constant 5
   %0 = util.global.load @immutable0 : index
   // CHECK-DAG: %[[C6:.+]] = arith.constant 6
@@ -102,7 +102,7 @@ builtin.func @foo(%arg0: index) -> (index, index, index) {
 util.global private mutable @used0 = 5 : index
 // CHECK: util.global private mutable @used1 : index
 util.global private mutable @used1 : index
-builtin.func @foo(%arg0: index, %arg1: index) -> (index, index) {
+func.func @foo(%arg0: index, %arg1: index) -> (index, index) {
   // CHECK: %[[VALUE0:.+]] = util.global.load @used0 : index
   %0 = util.global.load @used0 : index
   // CHECK: %[[VALUE1:.+]] = util.global.load @used1 : index
@@ -134,7 +134,7 @@ util.initializer {
 util.global private @dupeCst0 {noinline} = 5 : index
 // CHECK-NOT: util.global private @dupeCst1
 util.global private @dupeCst1 {noinline} = 5 : index
-builtin.func @foo() -> (index, index) {
+func.func @foo() -> (index, index) {
   // CHECK-DAG: %[[VALUE0:.+]] = util.global.load @dupeCst0
   %0 = util.global.load @dupeCst0 : index
   // CHECK-DAG: %[[VALUE1:.+]] = util.global.load @dupeCst0
@@ -155,7 +155,7 @@ util.initializer {
   util.global.store %c7, @nondupeCst1 : index
   util.initializer.return
 }
-builtin.func @foo() -> (index, index) {
+func.func @foo() -> (index, index) {
   // CHECK-DAG: %[[C6:.+]] = arith.constant 6 : index
   %0 = util.global.load @nondupeCst0 : index
   // CHECK-DAG: %[[C7:.+]] = arith.constant 7 : index

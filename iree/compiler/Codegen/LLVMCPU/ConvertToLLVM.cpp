@@ -12,6 +12,7 @@
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "llvm/ADT/Triple.h"
+#include "llvm/Support/Mutex.h"
 #include "llvm/Support/raw_ostream.h"
 #include "mlir/Analysis/DataLayoutAnalysis.h"
 #include "mlir/Conversion/AffineToStandard/AffineToStandard.h"
@@ -74,6 +75,8 @@ class HALDispatchABI {
   // Returns a Type representing iree_hal_processor_v0_t.
   static LLVM::LLVMStructType getProcessorType(
       MLIRContext *context, LLVMTypeConverter *typeConverter) {
+    static llvm::sys::Mutex mutex;
+    llvm::sys::ScopedLock lock(mutex);
     auto structType =
         LLVM::LLVMStructType::getIdentified(context, "iree_hal_processor_v0_t");
     if (structType.isInitialized()) return structType;
@@ -624,7 +627,7 @@ class ConvertHALEntryPointFuncOp : public ConvertToLLVMPattern {
  public:
   explicit ConvertHALEntryPointFuncOp(MLIRContext *context,
                                       LLVMTypeConverter &converter)
-      : ConvertToLLVMPattern(mlir::FuncOp::getOperationName(), context,
+      : ConvertToLLVMPattern(mlir::func::FuncOp::getOperationName(), context,
                              converter, 100) {}
 
   LogicalResult matchAndRewrite(
@@ -632,7 +635,7 @@ class ConvertHALEntryPointFuncOp : public ConvertToLLVMPattern {
       ConversionPatternRewriter &rewriter) const override {
     auto stdFuncOp = cast<FuncOp>(op);
     if (!stdFuncOp.isPublic()) return failure();
-    FunctionType fnType = stdFuncOp.getType();
+    FunctionType fnType = stdFuncOp.getFunctionType();
     if (fnType.getNumInputs() != 0 || fnType.getNumResults() != 0) {
       op->emitWarning() << "public functions on executables must be () -> ()";
       return failure();

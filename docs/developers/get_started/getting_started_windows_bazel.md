@@ -114,7 +114,7 @@ Check out what was built:
 
 ```powershell
 > dir bazel-bin\iree\tools\
-> .\bazel-bin\iree\tools\iree-translate.exe --help
+> .\bazel-bin\iree\tools\iree-compile.exe --help
 ```
 
 Translate a

@@ -8,11 +8,11 @@
 
 #include "iree-dialects/Dialect/PyDM/IR/PyDMInterfaces.h"
 #include "iree-dialects/Dialect/PyDM/IR/PyDMOps.h"
-#include "llvm/ADT/TypeSwitch.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/DialectImplementation.h"
 #include "mlir/Support/LLVM.h"
+#include "llvm/ADT/TypeSwitch.h"
 
 using namespace mlir;
 namespace PYDM = mlir::iree_compiler::IREE::PYDM;
@@ -33,7 +33,10 @@ using BuiltinIntegerType = mlir::IntegerType;
 using PyBoolType = PYDM::BoolType;
 using PyConstantOp = PYDM::ConstantOp;
 using PyIntegerType = PYDM::IntegerType;
+using PyListType = PYDM::ListType;
 using PyRealType = PYDM::RealType;
+using PyObjectType = PYDM::ObjectType;
+using PyUnionType = PYDM::UnionType;
 
 void IREEPyDMDialect::initialize() {
   addTypes<
@@ -107,12 +110,63 @@ StringRef PYDM::ExceptionResultType::getPythonTypeName() const {
 }
 
 // IntegerType
-LogicalResult PYDM::IntegerType::verify(
-    function_ref<InFlightDiagnostic()> emitError, Optional<int> bitWidth) {
-  if (!bitWidth) return success();
+LogicalResult
+PYDM::IntegerType::verify(function_ref<InFlightDiagnostic()> emitError,
+                          Optional<int> bitWidth) {
+  if (!bitWidth)
+    return success();
   int w = abs(*bitWidth);
-  if (w == 0 || w == 8 || w == 16 || w == 32 || w == 64) return success();
+  if (w == 0 || w == 8 || w == 16 || w == 32 || w == 64)
+    return success();
   return emitError() << "unsupported python integer bit width: " << w;
+}
+
+Type PyIntegerType::parse(mlir::AsmParser &parser) {
+  MLIRContext *ctxt = parser.getContext();
+  auto emitError = [&]() -> InFlightDiagnostic {
+    return parser.emitError(parser.getCurrentLocation());
+  };
+  // Weak
+  if (failed(parser.parseOptionalLess()))
+    return get(ctxt);
+  // AP
+  if (succeeded(parser.parseOptionalStar())) {
+    if (failed(parser.parseGreater()))
+      return Type();
+    return get(ctxt, None);
+  }
+
+  // Explicit
+  bool isSigned;
+  if (succeeded(parser.parseOptionalKeyword("unsigned"))) {
+    isSigned = false;
+  } else {
+    isSigned = true;
+  }
+
+  int width;
+  if (failed(parser.parseInteger(width)))
+    return Type();
+  if (failed(parser.parseGreater()))
+    return Type();
+  if (!isSigned)
+    width = -width;
+  return getChecked(emitError, ctxt, width);
+}
+
+void PyIntegerType::print(mlir::AsmPrinter &printer) const {
+  auto w = getImpl()->bitWidth;
+  if (w) {
+    printer << "<";
+    if (*w == 0) {
+      printer << "*";
+    } else if (*w > 0) {
+      printer << *w;
+    } else {
+      printer << "unsigned " << (-*w);
+    }
+    printer << ">";
+  }
 }
 
 BuiltinTypeCode PYDM::IntegerType::getTypeCode() const {
@@ -123,32 +177,36 @@ BuiltinTypeCode PYDM::IntegerType::getTypeCode() const {
 StringRef PYDM::IntegerType::getPythonTypeName() const { return "int"; }
 
 Optional<NumericCategory> PYDM::IntegerType::getNumericCategory() const {
-  if (isWeak()) return NumericCategory::WeakInteger;
-  if (getBitWidth() == 0) return NumericCategory::APSigned;
-  if (isSigned()) return NumericCategory::Signed;
+  if (isWeak())
+    return NumericCategory::WeakInteger;
+  if (getBitWidth() == 0)
+    return NumericCategory::APSigned;
+  if (isSigned())
+    return NumericCategory::Signed;
   return NumericCategory::Unsigned;
 }
 
 Optional<int> PYDM::IntegerType::getNumericSubTypeCode() const {
-  if (isWeak()) return 0;
+  if (isWeak())
+    return 0;
   IntegerSubTypeCode stc;
   switch (getBitWidth()) {
-    case 8:
-      stc = IntegerSubTypeCode::Integer8;
-      break;
-    case 16:
-      stc = IntegerSubTypeCode::Integer16;
-      break;
-    case 32:
-      stc = IntegerSubTypeCode::Integer32;
-      break;
-    case 64:
-      stc = IntegerSubTypeCode::Integer64;
-      break;
-    default: {
-      stc = IntegerSubTypeCode::Integer8;  // Arbitrarily picked value.
-      assert(false && "unsupported numeric bitwidth");
-    }
+  case 8:
+    stc = IntegerSubTypeCode::Integer8;
+    break;
+  case 16:
+    stc = IntegerSubTypeCode::Integer16;
+    break;
+  case 32:
+    stc = IntegerSubTypeCode::Integer32;
+    break;
+  case 64:
+    stc = IntegerSubTypeCode::Integer64;
+    break;
+  default: {
+    stc = IntegerSubTypeCode::Integer8; // Arbitrarily picked value.
+    assert(false && "unsupported numeric bitwidth");
+  }
   }
   return static_cast<int>(stc);
 }
@@ -170,6 +228,61 @@ BuiltinTypeCode PYDM::ListType::getTypeCode() const {
 }
 
 // ListType
+void PyListType::print(mlir::AsmPrinter &printer) const {
+  if (getImpl()->uniformElementType ||
+      getImpl()->storageClass != CollectionStorageClass::Boxed) {
+    printer << "<";
+    switch (getImpl()->storageClass) {
+    case CollectionStorageClass::Boxed:
+      printer << "boxed";
+      break;
+    case CollectionStorageClass::Empty:
+      printer << "empty";
+      break;
+    case CollectionStorageClass::Unboxed:
+      printer << "unboxed";
+      break;
+    }
+
+    if (getImpl()->uniformElementType) {
+      printer << ",";
+      printer << getImpl()->uniformElementType;
+    }
+    printer << ">";
+  }
+}
+
+Type PyListType::parse(mlir::AsmParser &parser) {
+  MLIRContext *ctxt = parser.getContext();
+  if (parser.parseOptionalLess())
+    return get(ctxt, CollectionStorageClass::Boxed, nullptr);
+
+  Type t;
+  StringRef storageClassKeyword;
+  if (parser.parseKeyword(&storageClassKeyword))
+    return Type();
+  if (parser.parseComma())
+    return Type();
+  if (parser.parseType(t))
+    return Type();
+  if (parser.parseGreater())
+    return Type();
+
+  CollectionStorageClass storageClass;
+  if (storageClassKeyword == "boxed")
+    storageClass = CollectionStorageClass::Boxed;
+  else if (storageClassKeyword == "empty")
+    storageClass = CollectionStorageClass::Empty;
+  else if (storageClassKeyword == "unboxed")
+    storageClass = CollectionStorageClass::Unboxed;
+  else {
+    parser.emitError(parser.getCurrentLocation(),
+                     "expected one of 'boxed', 'empty', 'unboxed'");
+    return Type();
+  }
+  return get(ctxt, storageClass, t);
+}
+
 StringRef PYDM::ListType::getPythonTypeName() const { return "list"; }
 
 BuiltinTypeCode PYDM::NoneType::getTypeCode() const {
@@ -177,9 +290,11 @@ BuiltinTypeCode PYDM::NoneType::getTypeCode() const {
 }
 
 bool PYDM::ListType::isRefinable() const {
-  if (getStorageClass() == CollectionStorageClass::Empty) return false;
+  if (getStorageClass() == CollectionStorageClass::Empty)
+    return false;
 
-  if (!getUniformElementType()) return true;
+  if (!getUniformElementType())
+    return true;
 
   if (auto pyType = getUniformElementType().dyn_cast<PythonTypeInterface>())
     return pyType.isRefinable();
@@ -189,16 +304,16 @@ bool PYDM::ListType::isRefinable() const {
 
 Type PYDM::ListType::getElementStorageType() const {
   switch (getStorageClass()) {
-    case CollectionStorageClass::Boxed:
-    case CollectionStorageClass::Empty:
-      return ObjectType::get(getContext());
-    case CollectionStorageClass::Unboxed:
-      assert(getUniformElementType() &&
-             "unboxed list should have uniform element type");
-      return getUniformElementType();
-    default:
-      assert(false && "unsupported storage class");
-      return {};
+  case CollectionStorageClass::Boxed:
+  case CollectionStorageClass::Empty:
+    return ObjectType::get(getContext());
+  case CollectionStorageClass::Unboxed:
+    assert(getUniformElementType() &&
+           "unboxed list should have uniform element type");
+    return getUniformElementType();
+  default:
+    assert(false && "unsupported storage class");
+    return {};
   }
 }
 
@@ -206,6 +321,29 @@ Type PYDM::ListType::getElementStorageType() const {
 StringRef PYDM::NoneType::getPythonTypeName() const { return "None"; }
 
 // ObjectType
+void PyObjectType::print(mlir::AsmPrinter &printer) const {
+  if (getImpl()->primitiveType)
+    printer << "<" << getImpl()->primitiveType << ">";
+}
+
+Type PyObjectType::parse(mlir::AsmParser &parser) {
+  MLIRContext *ctxt = parser.getContext();
+  if (parser.parseOptionalLess())
+    return get(ctxt, nullptr);
+
+  Type t;
+  if (parser.parseType(t))
+    return Type();
+  if (parser.parseGreater())
+    return Type();
+  if (auto primitiveType = t.dyn_cast<PrimitiveType>())
+    return get(ctxt, primitiveType);
+  else {
+    parser.emitError(parser.getNameLoc(), "expected a primitive type");
+    return Type();
+  }
+}
+
 BuiltinTypeCode PYDM::ObjectType::getTypeCode() const {
   return BuiltinTypeCode::Object;
 }
@@ -213,7 +351,8 @@ BuiltinTypeCode PYDM::ObjectType::getTypeCode() const {
 StringRef PYDM::ObjectType::getPythonTypeName() const { return "object"; }
 
 bool PYDM::ObjectType::isRefinable() const {
-  if (!getPrimitiveType()) return true;
+  if (!getPrimitiveType())
+    return true;
 
   if (auto pyType = getPrimitiveType().dyn_cast<PythonTypeInterface>())
     return pyType.isRefinable();
@@ -222,9 +361,35 @@ bool PYDM::ObjectType::isRefinable() const {
 }
 
 // RealType
-LogicalResult PYDM::RealType::verify(
-    function_ref<InFlightDiagnostic()> emitError, FloatType floatType) {
-  if (!floatType) return success();
+void PyRealType::print(mlir::AsmPrinter &printer) const {
+  auto ft = getImpl()->floatType;
+  if (ft)
+    printer << "<" << ft << ">";
+}
+
+Type PyRealType::parse(mlir::AsmParser &parser) {
+  MLIRContext *ctxt = parser.getContext();
+
+  auto emitError = [&]() -> InFlightDiagnostic {
+    return parser.emitError(parser.getCurrentLocation());
+  };
+  // Weak
+  if (failed(parser.parseOptionalLess()))
+    return get(ctxt);
+  // Explicit
+  FloatType subType;
+  if (failed(parser.parseType(subType)))
+    return Type();
+  if (failed(parser.parseGreater()))
+    return Type();
+  return getChecked(emitError, ctxt, subType);
+}
+
+LogicalResult
+PYDM::RealType::verify(function_ref<InFlightDiagnostic()> emitError,
+                       FloatType floatType) {
+  if (!floatType)
+    return success();
   if (!floatType.isa<BFloat16Type, Float16Type, Float32Type, Float64Type>()) {
     return emitError() << "unsupported Python floating point type: "
                        << floatType;
@@ -240,12 +405,14 @@ BuiltinTypeCode PYDM::RealType::getTypeCode() const {
 StringRef PYDM::RealType::getPythonTypeName() const { return "float"; }
 
 Optional<NumericCategory> PYDM::RealType::getNumericCategory() const {
-  if (isWeak()) return NumericCategory::WeakReal;
+  if (isWeak())
+    return NumericCategory::WeakReal;
   return NumericCategory::Real;
 }
 
 Optional<int> PYDM::RealType::getNumericSubTypeCode() const {
-  if (isWeak()) return 0;
+  if (isWeak())
+    return 0;
   RealSubTypeCode stc =
       TypeSwitch<Type, RealSubTypeCode>(getFloatType())
           .Case([](BFloat16Type t) { return RealSubTypeCode::BF16; })
@@ -295,9 +462,31 @@ Type PYDM::TupleType::getElementStorageType() const {
 // Union type implementation
 //------------------------------------------------------------------------------
 
-LogicalResult PYDM::UnionType::verify(
-    llvm::function_ref<InFlightDiagnostic()> emitError,
-    ArrayRef<Type> alternatives) {
+void PyUnionType::print(mlir::AsmPrinter &printer) const {
+  llvm::interleaveComma(getAlternatives(), printer);
+}
+
+Type PyUnionType::parse(mlir::AsmParser &parser) {
+  MLIRContext *ctxt = parser.getContext();
+  if (parser.parseOptionalLess())
+    return get(ctxt, {});
+
+  SmallVector<::mlir::Type> alternatives;
+
+  do {
+    Type type;
+    if (parser.parseType(type))
+      return Type();
+    alternatives.push_back(type);
+  } while (succeeded(parser.parseOptionalComma()));
+
+  return getChecked([&]() { return parser.emitError(parser.getNameLoc()); },
+                    ctxt, alternatives);
+}
+
+LogicalResult
+PYDM::UnionType::verify(llvm::function_ref<InFlightDiagnostic()> emitError,
+                        ArrayRef<Type> alternatives) {
   int lastTypeCode = 0;
   for (Type alternative : alternatives) {
     if (auto pythonType = alternative.dyn_cast<PYDM::PythonTypeInterface>()) {

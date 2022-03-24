@@ -13,6 +13,9 @@
 #include "iree/compiler/InputConversion/TOSA/Passes.h"
 #include "iree/compiler/Pipelines/Pipelines.h"
 #include "iree/compiler/Utils/OptionUtils.h"
+#include "iree/tools/init_dialects.h"
+#include "iree/tools/init_llvmir_translations.h"
+#include "iree/tools/init_passes.h"
 #include "iree/tools/init_targets.h"
 #include "mlir/CAPI/IR.h"
 #include "mlir/CAPI/Pass.h"
@@ -58,6 +61,15 @@ struct CompilerOptions {
 }  // namespace
 
 DEFINE_C_API_PTR_METHODS(IreeCompilerOptions, CompilerOptions)
+
+void ireeCompilerRegisterAllDialects(MlirContext context) {
+  DialectRegistry registry;
+  mlir::iree_compiler::registerAllDialects(registry);
+  mlir::iree_compiler::registerLLVMIRTranslations(registry);
+  unwrap(context)->appendDialectRegistry(registry);
+}
+
+void ireeCompilerRegisterAllPasses() { registerAllPasses(); }
 
 void ireeCompilerRegisterTargetBackends() { registerHALTargetBackends(); }
 

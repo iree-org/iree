@@ -113,8 +113,7 @@ inspect the IR to find the proper way to call their kernels.
 1. Build your module with the flags you want for your target architecture:
 
 ```
-iree-translate \
-    -iree-mlir-to-vm-bytecode-module \
+iree-compile \
     -iree-input-type=mhlo \
     iree/samples/simple_embedding/simple_embedding_test.mlir \
     -o=module.vmfb \

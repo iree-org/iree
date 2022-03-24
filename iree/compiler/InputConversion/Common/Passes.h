@@ -7,6 +7,7 @@
 #ifndef IREE_COMPILER_INPUTCONVERSION_COMMON_PASSES_H_
 #define IREE_COMPILER_INPUTCONVERSION_COMMON_PASSES_H_
 
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/DialectConversion.h"
 
@@ -25,9 +26,9 @@ void buildCommonInputConversionPassPipeline(OpPassManager &passManager);
 // Passes
 //===----------------------------------------------------------------------===//
 
-std::unique_ptr<OperationPass<FuncOp>> createTopLevelSCFToCFGPass();
+std::unique_ptr<OperationPass<func::FuncOp>> createTopLevelSCFToCFGPass();
 std::unique_ptr<OperationPass<ModuleOp>> createIREEImportPublicPass();
-std::unique_ptr<OperationPass<FuncOp>>
+std::unique_ptr<OperationPass<func::FuncOp>>
 createLinalgQuantizedMatmulToMatmulPass();
 
 //===----------------------------------------------------------------------===//

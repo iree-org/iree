@@ -288,7 +288,7 @@ class FlattenTuplesInCFGPass
     std::vector<std::pair<FuncOp, FuncOp>> convertedFunctions;
 
     for (auto oldFunction : module.getOps<FuncOp>()) {
-      auto oldFunctionType = oldFunction.getType();
+      auto oldFunctionType = oldFunction.getFunctionType();
       llvm::SmallVector<Type, 10> newInputTypes;
       untupleTypes(oldFunctionType.getInputs(), &newInputTypes);
 

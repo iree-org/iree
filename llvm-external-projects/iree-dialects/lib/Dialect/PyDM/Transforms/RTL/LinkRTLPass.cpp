@@ -10,12 +10,12 @@
 #include "iree-dialects/Dialect/PyDM/IR/PyDMOps.h"
 #include "iree-dialects/Dialect/PyDM/Transforms/Passes.h"
 #include "iree-dialects/Dialect/PyDM/Transforms/RTL/LinkageAnalysis.h"
-#include "llvm/ADT/SetVector.h"
-#include "llvm/Support/Debug.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/OwningOpRef.h"
 #include "mlir/IR/SymbolTable.h"
 #include "mlir/Parser/Parser.h"
+#include "llvm/ADT/SetVector.h"
+#include "llvm/Support/Debug.h"
 
 #define DEBUG_TYPE "iree_pydm"
 
@@ -34,12 +34,12 @@ static StringRef safeModuleName(Operation *op) {
 namespace {
 
 class LinkIREEPyDMRTLPass : public LinkIREEPyDMRTLBase<LinkIREEPyDMRTLPass> {
- public:
+public:
   LinkIREEPyDMRTLPass() = default;
   LinkIREEPyDMRTLPass(Optional<SourceBundle> linkRtlSourceBundle)
       : linkRtlSourceBundle(std::move(linkRtlSourceBundle)) {}
 
- private:
+private:
   LogicalResult initialize(MLIRContext *context) override {
     SourceBundle localSource;
     if (linkRtlSourceBundle) {
@@ -52,13 +52,15 @@ class LinkIREEPyDMRTLPass : public LinkIREEPyDMRTLBase<LinkIREEPyDMRTLPass> {
     if (localSource.asmBlob) {
       // Parse from inline asm.
       auto owningOp = parseSourceString(*localSource.asmBlob, context);
-      if (!owningOp) return failure();
+      if (!owningOp)
+        return failure();
       rtlModule = std::make_shared<mlir::OwningOpRef<mlir::ModuleOp>>(
           std::move(owningOp));
     } else if (localSource.asmFilePath) {
       // Parse from a file.
       auto owningOp = parseSourceFile(*localSource.asmFilePath, context);
-      if (!owningOp) return failure();
+      if (!owningOp)
+        return failure();
       rtlModule = std::make_shared<mlir::OwningOpRef<mlir::ModuleOp>>(
           std::move(owningOp));
     } else {
@@ -146,7 +148,8 @@ class LinkIREEPyDMRTLPass : public LinkIREEPyDMRTLBase<LinkIREEPyDMRTLPass> {
     LLVM_DEBUG(llvm::dbgs() << "+++ Inlining module\n";);
     auto result = importModule.getOp()->walk<WalkOrder::PreOrder>(
         [&](Operation *importOp) -> WalkResult {
-          if (importOp == importModule.getOp()) return WalkResult::advance();
+          if (importOp == importModule.getOp())
+            return WalkResult::advance();
           if (auto symbolImportOp = dyn_cast<SymbolOpInterface>(importOp)) {
             StringAttr name = symbolImportOp.getNameAttr();
             Operation *existing = programSymbolTable.lookup(name);
@@ -172,7 +175,8 @@ class LinkIREEPyDMRTLPass : public LinkIREEPyDMRTLBase<LinkIREEPyDMRTLPass> {
           }
           return WalkResult::skip();
         });
-    if (result.wasInterrupted()) return failure();
+    if (result.wasInterrupted())
+      return failure();
     LLVM_DEBUG(llvm::dbgs() << "--- Inlining complete\n";);
     return success();
   }
@@ -209,9 +213,9 @@ class LinkIREEPyDMRTLPass : public LinkIREEPyDMRTLBase<LinkIREEPyDMRTLPass> {
   Optional<SourceBundle> linkRtlSourceBundle;
 };
 
-}  // namespace
+} // namespace
 
-std::unique_ptr<OperationPass<ModuleOp>> PYDM::createLinkIREEPyDMRTLPass(
-    Optional<SourceBundle> linkRtlSourceBundle) {
+std::unique_ptr<OperationPass<ModuleOp>>
+PYDM::createLinkIREEPyDMRTLPass(Optional<SourceBundle> linkRtlSourceBundle) {
   return std::make_unique<LinkIREEPyDMRTLPass>(std::move(linkRtlSourceBundle));
 }

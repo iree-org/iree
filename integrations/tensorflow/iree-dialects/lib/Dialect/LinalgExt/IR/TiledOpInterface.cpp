@@ -6,13 +6,13 @@
 
 #include "iree-dialects/Dialect/LinalgExt/IR/TiledOpInterface.h"
 
-#include "llvm/ADT/SmallBitVector.h"
-#include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
+#include "llvm/ADT/SmallBitVector.h"
+#include "llvm/Support/Debug.h"
 
 #define DEBUG_TYPE "iree-tiled-op-interface"
 
@@ -299,15 +299,18 @@ struct ForwardToTilingInterface
   }
 };
 
-}  // namespace
+} // namespace
 
 void IREE::LinalgExt::registerTiledOpInterfaceExternalModels(
     DialectRegistry &registry) {
   LLVM_DEBUG(
       { llvm::dbgs() << "Adding external models of tiled op interface\n"; });
-  registry
-      .addOpInterface<tensor::ExtractSliceOp, ExtractSliceTiledOpInterface>();
-  registry.addOpInterface<tensor::InsertSliceOp, InsertSliceTiledOpInterface>();
+
+  registry.addExtension(+[](MLIRContext *ctx, tensor::TensorDialect *dialect) {
+    tensor::ExtractSliceOp::attachInterface<ExtractSliceTiledOpInterface>(*ctx);
+    tensor::InsertSliceOp::attachInterface<InsertSliceTiledOpInterface>(*ctx);
+  });
+
   // TODO(ravishankarm): Needs custom PadTiledOpInterface or equiv.
   // registry.addOpInterface<tensor::PadOp,
   //                         ForwardToTilingInterface<tensor::PadOp>>();

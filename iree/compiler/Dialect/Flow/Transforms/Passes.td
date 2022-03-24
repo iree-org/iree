@@ -57,7 +57,7 @@ def DeduplicateExecutables :
 }
 
 def DispatchLinalgOnTensors :
-    Pass<"iree-flow-dispatch-linalg-on-tensors-pass", ""> {
+    InterfacePass<"iree-flow-dispatch-linalg-on-tensors-pass", "mlir::FunctionOpInterface"> {
   let summary = "Dispatch Linalg operations on tensors by using tile and distribute";
   let constructor = "mlir::iree_compiler::IREE::Flow::createDispatchLinalgOnTensorsPass()";
 }
@@ -87,7 +87,7 @@ def InferNumericNarrowing :
 }
 
 def InjectDispatchTracing :
-    Pass<"iree-flow-inject-dispatch-tracing", ""> {
+    InterfacePass<"iree-flow-inject-dispatch-tracing", "mlir::FunctionOpInterface"> {
   let summary = "Injects dispatch region tracing.";
   let constructor = "mlir::iree_compiler::IREE::Flow::createInjectDispatchTracingPass()";
 }
@@ -140,7 +140,7 @@ def PadTensorToSubTensorInsert :
 }
 
 def StripSignedness :
-    Pass<"iree-flow-strip-signedness", "mlir::FuncOp"> {
+    InterfacePass<"iree-flow-strip-signedness", "mlir::FunctionOpInterface"> {
   let summary = "Legalizes ui tensors constants to uis";
   let constructor = "mlir::iree_compiler::IREE::Flow::createStripSignednessPass()";
 }

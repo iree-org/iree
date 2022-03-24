@@ -34,9 +34,9 @@ iree_lit_test_suite(
     ],
     tools = [
         "//iree/tools:iree-benchmark-module",
+        "//iree/tools:iree-compile",
         "//iree/tools:iree-run-mlir",
         "//iree/tools:iree-run-module",
-        "//iree/tools:iree-translate",
         "@llvm-project//lld",
         "@llvm-project//llvm:FileCheck",
     ],
@@ -50,7 +50,7 @@ iree_lit_test_suite(
     ],
     tools = [
         "//iree/tools:iree-benchmark-module",
-        "//iree/tools:iree-translate",
+        "//iree/tools:iree-compile",
         "@llvm-project//llvm:FileCheck",
     ],
 )

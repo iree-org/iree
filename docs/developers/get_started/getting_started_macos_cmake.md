@@ -95,7 +95,7 @@ Check out the contents of the 'tools' build directory:
 
 ```shell
 $ ls ../iree-build/iree/tools
-$ ../iree-build/iree/tools/iree-translate --help
+$ ../iree-build/iree/tools/iree-compile --help
 ```
 
 Translate a

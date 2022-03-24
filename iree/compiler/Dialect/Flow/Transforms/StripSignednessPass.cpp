@@ -6,8 +6,8 @@
 
 #include "iree/compiler/Dialect/Flow/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/IR/FunctionInterfaces.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -58,7 +58,7 @@ class GenericTypeConvert : public ConversionPattern {
       Operation* op, ArrayRef<Value> operands,
       ConversionPatternRewriter& rewriter) const override {
     llvm::SmallVector<Type, 4> newResults;
-    if (isa<FuncOp>(op)) {
+    if (isa<FunctionOpInterface>(op)) {
       return failure();
     }
 
@@ -93,11 +93,11 @@ void StripSignednessPass::runOnOperation() {
 
   // Operations are legal if they don't contain any illegal type.
   target.markUnknownOpDynamicallyLegal([](Operation* op) {
-    if (auto funcOp = dyn_cast<FuncOp>(op)) {
-      for (Type type : funcOp.getType().getInputs()) {
+    if (auto funcOp = dyn_cast<FunctionOpInterface>(op)) {
+      for (Type type : funcOp.getArgumentTypes()) {
         if (isIllegalType(type)) return false;
       }
-      for (Type type : funcOp.getType().getResults()) {
+      for (Type type : funcOp.getResultTypes()) {
         if (isIllegalType(type)) return false;
       }
     }
@@ -111,20 +111,22 @@ void StripSignednessPass::runOnOperation() {
   });
 
   auto* ctx = &getContext();
-  auto func = getOperation();
 
   RewritePatternSet patterns(&getContext());
   patterns.insert<GenericTypeConvert>(ctx, converter);
-  populateFunctionOpInterfaceTypeConversionPattern<FuncOp>(patterns, converter);
+  populateFunctionOpInterfaceTypeConversionPattern(
+      getOperation()->getName().getStringRef(), patterns, converter);
 
-  if (failed(applyFullConversion(func, target, std::move(patterns)))) {
+  if (failed(
+          applyFullConversion(getOperation(), target, std::move(patterns)))) {
     signalPassFailure();
   }
 }
 
 }  // namespace
 
-std::unique_ptr<OperationPass<mlir::FuncOp>> createStripSignednessPass() {
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
+createStripSignednessPass() {
   return std::make_unique<StripSignednessPass>();
 }
 

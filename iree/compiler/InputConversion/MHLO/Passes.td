@@ -10,13 +10,13 @@
 include "mlir/Pass/PassBase.td"
 
 def ConvertMHLOToLinalgOnTensors :
-    Pass<"iree-mhlo-to-linalg-on-tensors", "FuncOp"> {
+    Pass<"iree-mhlo-to-linalg-on-tensors", "func::FuncOp"> {
   let summary = "Convert from XLA-HLO ops to Linalg ops on tensors";
   let constructor = "mlir::iree_compiler::MHLO::createMHLOToLinalgOnTensorsPass()";
 }
 
 def ConvertMHLOToLinalgExt
-    : Pass<"iree-mhlo-to-linalg-ext", "FuncOp"> {
+    : Pass<"iree-mhlo-to-linalg-ext", "func::FuncOp"> {
   let summary =
       "Convert from XLA-HLO ops to LinalgExt ops and distribute to Flow ops";
   let constructor =
@@ -36,7 +36,7 @@ def FlattenTuplesInCFG :
 }
 
 def MHLOToMHLOPreprocessing :
-    Pass<"iree-mhlo-to-mhlo-preprocessing", "FuncOp"> {
+    Pass<"iree-mhlo-to-mhlo-preprocessing", "func::FuncOp"> {
   let summary = "Apply mhlo to mhlo transformations for some mhlo ops";
   let constructor = "mlir::iree_compiler::MHLO::createMHLOToMHLOPreprocessingPass()";
   let options = [
@@ -56,7 +56,7 @@ def VerifyCompilerMHLOInputLegality :
 //------------------------------------------------------------------------------
 
 def TestMHLOConvertComplexToReal :
-    Pass<"iree-test-mhlo-convert-complex-to-real", "FuncOp"> {
+    Pass<"iree-test-mhlo-convert-complex-to-real", "func::FuncOp"> {
   let summary = "Test pass that does an MHLO->MHLO conversion of just complex arithmetic ops.";
   let constructor = "mlir::iree_compiler::MHLO::createTestMHLOConvertComplexToRealPass()";
 }

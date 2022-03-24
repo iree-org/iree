@@ -13,7 +13,7 @@
 // some calls from @main and the call graphs of the removed callees.
 
 func private @ForwardLoopCond_gFAnjWGSoLs__.167(%arg0: tensor<i64>, %arg1: tensor<i64>, %arg2: tensor<40xf32>, %arg3: tensor<i64>, %arg4: tensor<74x40xf32>, %arg5: tensor<i64>, %arg6: tensor<1x10xf32>, %arg7: tensor<1x10xf32>, %arg8: tensor<5x1x64xf32>, %arg9: tensor<5x1x1xf32>, %arg10: tensor<5x1x1xf32>, %arg11: tensor<5xi64>, %arg12: tensor<5x1x10xf32>, %arg13: tensor<5x1x10xf32>) -> tensor<i1> {
-  %0 = "mhlo.compare"(%arg0, %arg1) {comparison_direction = "LT"} : (tensor<i64>, tensor<i64>) -> tensor<i1>
+  %0 = "mhlo.compare"(%arg0, %arg1) {comparison_direction = #mhlo<"comparison_direction LT">} : (tensor<i64>, tensor<i64>) -> tensor<i1>
   return %0 : tensor<i1>
 }
 func private @Forward_o16DF3vQKaI__disable_call_shape_inference_true_.189(%arg0: tensor<1x10xf32>, %arg1: tensor<1x10xf32>, %arg2: tensor<5x1x64xf32>, %arg3: tensor<5x1x1xf32>, %arg4: tensor<5x1x1xf32>) -> (tensor<i64>, tensor<5xi64>, tensor<5x1x10xf32>, tensor<5x1x10xf32>, tensor<i64>, tensor<1x10xf32>, tensor<1x10xf32>) {
@@ -39,7 +39,7 @@ func private @Forward_o16DF3vQKaI__disable_call_shape_inference_true_.189(%arg0:
     %115 = mhlo.minimum %arg5, %arg6 : tensor<f32>
     "mhlo.return"(%115) : (tensor<f32>) -> ()
   }) {dimensions = dense<[1, 2]> : tensor<2xi64>} : (tensor<5x1x1xf32>, tensor<f32>) -> tensor<5xf32>
-  %10 = "mhlo.compare"(%9, %0) {comparison_direction = "EQ"} : (tensor<5xf32>, tensor<5xf32>) -> tensor<5xi1>
+  %10 = "mhlo.compare"(%9, %0) {comparison_direction = #mhlo<"comparison_direction EQ">} : (tensor<5xf32>, tensor<5xf32>) -> tensor<5xi1>
   %11 = "mhlo.convert"(%10) : (tensor<5xi1>) -> tensor<5xi32>
   %12 = mhlo.multiply %11, %cst_0 : tensor<5xi32>
   %13 = "mhlo.reduce"(%12, %cst_1) ( {
@@ -48,9 +48,9 @@ func private @Forward_o16DF3vQKaI__disable_call_shape_inference_true_.189(%arg0:
     "mhlo.return"(%115) : (tensor<i32>) -> ()
   }) {dimensions = dense<0> : tensor<1xi64>} : (tensor<5xi32>, tensor<i32>) -> tensor<i32>
   %14 = mhlo.subtract %cst_2, %13 : tensor<i32>
-  %15 = "mhlo.compare"(%14, %cst_2) {comparison_direction = "EQ"} : (tensor<i32>, tensor<i32>) -> tensor<i1>
+  %15 = "mhlo.compare"(%14, %cst_2) {comparison_direction = #mhlo<"comparison_direction EQ">} : (tensor<i32>, tensor<i32>) -> tensor<i1>
   %16 = "mhlo.reverse"(%9) {dimensions = dense<0> : tensor<1xi64>} : (tensor<5xf32>) -> tensor<5xf32>
-  %17 = "mhlo.compare"(%16, %0) {comparison_direction = "EQ"} : (tensor<5xf32>, tensor<5xf32>) -> tensor<5xi1>
+  %17 = "mhlo.compare"(%16, %0) {comparison_direction = #mhlo<"comparison_direction EQ">} : (tensor<5xf32>, tensor<5xf32>) -> tensor<5xi1>
   %18 = "mhlo.convert"(%17) : (tensor<5xi1>) -> tensor<5xi32>
   %19 = mhlo.multiply %18, %cst_0 : tensor<5xi32>
   %20 = "mhlo.reduce"(%19, %cst_1) ( {
@@ -82,7 +82,7 @@ func private @Forward_o16DF3vQKaI__disable_call_shape_inference_true_.189(%arg0:
   %58 = "mhlo.reshape"(%57) : (tensor<1x1xf32>) -> tensor<1xf32>
   %59 = "mhlo.broadcast_in_dim"(%58) {broadcast_dimensions = dense<0> : tensor<1xi64>} : (tensor<1xf32>) -> tensor<1x10xf32>
   %60 = mhlo.multiply %59, %6 : tensor<1x10xf32>
-  %61 = "mhlo.compare"(%60, %7) {comparison_direction = "GT"} : (tensor<1x10xf32>, tensor<1x10xf32>) -> tensor<1x10xi1>
+  %61 = "mhlo.compare"(%60, %7) {comparison_direction = #mhlo<"comparison_direction GT">} : (tensor<1x10xf32>, tensor<1x10xf32>) -> tensor<1x10xi1>
   %62 = "mhlo.gather"(%50, %42) {
     dimension_numbers = #mhlo.gather<
       collapsed_slice_dims = [0],
@@ -93,7 +93,7 @@ func private @Forward_o16DF3vQKaI__disable_call_shape_inference_true_.189(%arg0:
     slice_sizes = dense<[1, 1, 64]> : tensor<3xi64>
   } : (tensor<5x1x64xf32>, tensor<i64>) -> tensor<1x64xf32>
   %63 = "mhlo.concatenate"(%62, %49) {dimension = 1 : i64} : (tensor<1x64xf32>, tensor<1x10xf32>) -> tensor<1x74xf32>
-  %64 = "mhlo.dot"(%63, %46) {precision_config = ["DEFAULT", "DEFAULT"]} : (tensor<1x74xf32>, tensor<74x40xf32>) -> tensor<1x40xf32>
+  %64 = "mhlo.dot"(%63, %46) {precision_config = [#mhlo<"precision DEFAULT">, #mhlo<"precision DEFAULT">]} : (tensor<1x74xf32>, tensor<74x40xf32>) -> tensor<1x40xf32>
   %65 = "mhlo.reshape"(%44) : (tensor<40xf32>) -> tensor<1x40xf32>
   %66 = mhlo.add %64, %65 : tensor<1x40xf32>
   %67 = "mhlo.slice"(%66) {limit_indices = dense<[1, 30]> : tensor<2xi64>, start_indices = dense<[0, 20]> : tensor<2xi64>, strides = dense<1> : tensor<2xi64>} : (tensor<1x40xf32>) -> tensor<1x10xf32>
@@ -117,7 +117,7 @@ func private @Forward_o16DF3vQKaI__disable_call_shape_inference_true_.189(%arg0:
   %85 = "mhlo.reshape"(%57) : (tensor<1x1xf32>) -> tensor<1xf32>
   %86 = "mhlo.broadcast_in_dim"(%85) {broadcast_dimensions = dense<0> : tensor<1xi64>} : (tensor<1xf32>) -> tensor<1x10xf32>
   %87 = mhlo.multiply %86, %6 : tensor<1x10xf32>
-  %88 = "mhlo.compare"(%87, %7) {comparison_direction = "GT"} : (tensor<1x10xf32>, tensor<1x10xf32>) -> tensor<1x10xi1>
+  %88 = "mhlo.compare"(%87, %7) {comparison_direction = #mhlo<"comparison_direction GT">} : (tensor<1x10xf32>, tensor<1x10xf32>) -> tensor<1x10xi1>
   %89 = "mhlo.slice"(%66) {limit_indices = dense<[1, 40]> : tensor<2xi64>, start_indices = dense<[0, 30]> : tensor<2xi64>, strides = dense<1> : tensor<2xi64>} : (tensor<1x40xf32>) -> tensor<1x10xf32>
   %90 = mhlo.multiply %89, %8 : tensor<1x10xf32>
   %91 = "mhlo.tanh"(%90) : (tensor<1x10xf32>) -> tensor<1x10xf32>

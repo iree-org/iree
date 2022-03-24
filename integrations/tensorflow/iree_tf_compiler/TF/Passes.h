@@ -7,6 +7,7 @@
 #ifndef IREE_INTEGRATIONS_TENSORFLOW_IREE_TF_COMPILER_TF_PASSES_H_
 #define IREE_INTEGRATIONS_TENSORFLOW_IREE_TF_COMPILER_TF_PASSES_H_
 
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Pass/Pass.h"
 
 namespace mlir {
@@ -48,14 +49,14 @@ std::unique_ptr<OperationPass<ModuleOp>> createPrettifyDebugInfoPass();
 std::unique_ptr<OperationPass<ModuleOp>> createPropagateResourceCastsPass();
 
 // Strips tf.Assert ops.
-std::unique_ptr<OperationPass<FuncOp>> createStripAssertsPass();
+std::unique_ptr<OperationPass<func::FuncOp>> createStripAssertsPass();
 
 // Strips all TF-related attributes; none are needed by IREE.
 std::unique_ptr<OperationPass<ModuleOp>> createStripModuleMetadataPass();
-std::unique_ptr<OperationPass<FuncOp>> createStripFunctionMetadataPass();
+std::unique_ptr<OperationPass<func::FuncOp>> createStripFunctionMetadataPass();
 
 // Validates whether any Tensorflow operations remain.
-std::unique_ptr<OperationPass<FuncOp>> createVerifyFullyConvertedPass();
+std::unique_ptr<OperationPass<func::FuncOp>> createVerifyFullyConvertedPass();
 
 //===----------------------------------------------------------------------===//
 // Patterns

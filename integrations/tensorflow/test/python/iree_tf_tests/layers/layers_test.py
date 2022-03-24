@@ -298,7 +298,7 @@ LAYERS_TO_UNIT_TEST_SPECS = {
     "Lambda":
         tf_test_utils.unit_test_specs_from_signatures(
             signature_shapes=UNARY_SIGNATURE_SHAPES,
-            kwargs_to_values=dict(function=[lambda x: x**2])),
+            kwargs_to_values=dict(function=[lambda x: x * x])),
     "LayerNormalization":
         tf_test_utils.unit_test_specs_from_signatures(UNARY_SIGNATURE_SHAPES),
     "LeakyReLU":

@@ -203,14 +203,14 @@ function(iree_benchmark_suite)
         add_custom_command(
           OUTPUT "${_VMFB_FILE}"
           COMMAND
-            "$<TARGET_FILE:iree::tools::iree-translate>"
+            "$<TARGET_FILE:iree::tools::iree-compile>"
               ${_TRANSLATION_ARGS}
               "--mlir-print-op-on-diagnostic=false"
               "${_MODULE_SOURCE}"
               -o "${_VMFB_FILE}"
           WORKING_DIRECTORY "${_VMFB_ARTIFACTS_DIR}"
           DEPENDS
-            iree::tools::iree-translate
+            iree::tools::iree-compile
             "${_MODULE_SOURCE_TARGET}"
             COMMENT "Generating VMFB for ${_COMMON_NAME_SEGMENTS}"
         )

@@ -31,9 +31,8 @@ class IREELinalgExt_Op<string mnemonic, list<Trait> traits = []> :
          LinalgExtInterface,
          SingleBlockImplicitTerminator<"::mlir::iree_compiler::IREE::LinalgExt::YieldOp">
   ])> {
-  let verifier = [{ return verify$cppClass(*this); }];
-  let printer = [{ return print$cppClass(p, *this); }];
-  let parser = [{ return parse$cppClass(parser, result); }];
+  let hasVerifier = 1;
+  let hasCustomAssemblyFormat = 1;
   code extraLinalgExtOpClassDeclaration = [{
     SmallVector<Value> getDestinationOperands(OpBuilder &b) {
       SmallVector<Value> dest(outputs().begin(), outputs().end());

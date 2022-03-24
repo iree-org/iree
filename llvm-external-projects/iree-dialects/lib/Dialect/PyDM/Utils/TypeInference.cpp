@@ -49,7 +49,8 @@ Block *PermutedTypePropagator::findBlockPermutation(ParentBlockInfo *parentInfo,
                                                     FunctionType signature) {
   for (PermutedBlockInfo *info = parentInfo->permutationHead; info;
        info = info->next) {
-    if (info->signature == signature) return info->permutedBlock;
+    if (info->signature == signature)
+      return info->permutedBlock;
   }
   return nullptr;
 }
@@ -57,7 +58,8 @@ Block *PermutedTypePropagator::findBlockPermutation(ParentBlockInfo *parentInfo,
 static bool checkAllBlockArgsMapped(Block *block,
                                     BlockAndValueMapping &mapping) {
   for (Value arg : block->getArguments()) {
-    if (!mapping.contains(arg)) return false;
+    if (!mapping.contains(arg))
+      return false;
   }
   return true;
 }
@@ -95,7 +97,8 @@ PermutedTypePropagator::findMismatchedBlockPredecessors(Block *block) {
     auto branchOp = llvm::cast<BranchOpInterface>(terminator);
     unsigned successorIndex = 0;
     for (Block *successor : terminator->getSuccessors()) {
-      if (successor == block) break;
+      if (successor == block)
+        break;
       successorIndex += 1;
     }
     auto successorOperands = branchOp.getSuccessorOperands(successorIndex);

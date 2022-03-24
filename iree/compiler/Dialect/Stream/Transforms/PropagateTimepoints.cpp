@@ -362,9 +362,9 @@ static void expandInitializerOp(IREE::Util::InitializerOp op,
 //  ->
 //  func @foo(%t: !stream.timepoint, %0: !stream.resource) {
 //    %1 = stream.timepoint.await %t, %0
-static void expandFuncOp(mlir::FuncOp op, ExpandedGlobalMap &globalMap,
+static void expandFuncOp(mlir::func::FuncOp op, ExpandedGlobalMap &globalMap,
                          BlockAndValueMapping &resourceTimepointMap) {
-  auto oldType = op.getType();
+  auto oldType = op.getFunctionType();
   auto inputTypes = expandTypes(oldType.getInputs());
   auto resultTypes = expandTypes(oldType.getResults());
   auto newType = FunctionType::get(op.getContext(), inputTypes, resultTypes);
@@ -545,7 +545,7 @@ static void expandTimepoints(Operation *op, ExpandedGlobalMap &globalMap,
     expandGlobalStoreOp(storeOp, globalMap, resourceTimepointMap);
   } else if (auto initializerOp = dyn_cast<IREE::Util::InitializerOp>(op)) {
     expandInitializerOp(initializerOp, globalMap, resourceTimepointMap);
-  } else if (auto funcOp = dyn_cast<mlir::FuncOp>(op)) {
+  } else if (auto funcOp = dyn_cast<mlir::func::FuncOp>(op)) {
     expandFuncOp(funcOp, globalMap, resourceTimepointMap);
   } else if (auto callOp = dyn_cast<mlir::func::CallOp>(op)) {
     expandCallOp(callOp, resourceTimepointMap);
