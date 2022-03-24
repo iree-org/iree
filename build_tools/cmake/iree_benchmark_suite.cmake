@@ -181,6 +181,11 @@ function(iree_benchmark_suite)
       # The full list of translation flags.
       set(_TRANSLATION_ARGS "--iree-mlir-to-vm-bytecode-module")
       list(APPEND _TRANSLATION_ARGS "--iree-hal-target-backends=${_RULE_TARGET_BACKEND}")
+      if (IREE_BYTECODE_MODULE_FORCE_SYSTEM_DYLIB_LINKER)
+        # Honor this option here --- it's only an accident that we're not
+        # currently using iree_bytecode_module here.
+        list(APPEND _TRANSLATION_ARGS "-iree-llvm-link-embedded=false")
+      endif()
       list(SORT _RULE_TRANSLATION_FLAGS)
       list(APPEND _TRANSLATION_ARGS ${_RULE_TRANSLATION_FLAGS})
 
