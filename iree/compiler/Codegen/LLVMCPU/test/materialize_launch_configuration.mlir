@@ -272,7 +272,7 @@ hal.executable @copy_op {
   hal.executable.variant @system_elf_x86_64, target = <"llvm", "system-elf-x86_64"> {
     hal.executable.entry_point @copy_op layout(#executable_layout)
     builtin.module {
-      func.func @tensor_insert_slice() {
+      func.func @copy_op() {
         %d0 = hal.interface.constant.load[0] : index
         %d1 = hal.interface.constant.load[1] : index
         %d2 = hal.interface.constant.load[2] : index
