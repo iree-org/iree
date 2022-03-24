@@ -8,6 +8,7 @@
 
 #include "iree-dialects/Dialect/LinalgExt/IR/TiledOpInterface.h"
 #include "iree-dialects/Dialect/LinalgExt/Passes/Passes.h"
+#include "iree-dialects/Dialect/LinalgTransform/Passes.h"
 #include "iree/compiler/Codegen/LLVMCPU/KernelDispatch.h"
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Sandbox/Passes.h"
@@ -355,6 +356,29 @@ void addCPUDefaultPassPipeline(OpPassManager &passManager) {
   passManager.addPass(createCSEPass());
   // Use stack allocation on CPU side.
   addLinalgBufferizePasses(passManager, cpuAllocationFunction);
+}
+
+void addLinalgTransformInterpPasses(OpPassManager &passManager) {
+  // Sets the number of workgroups to be {1, 1, 1} for now.
+  passManager.addPass(createSetNumWorkgroupsPass());
+
+  // Give control to the linalg_transform dialect.
+  passManager.addPass(createLinalgTransformInterpreterPass());
+  // Dropping the schedule is only needed if we want to embed the transform in
+  // the module: we should drop the schedule once applied.
+  // This pass does nothing in the case where we apply a separate policy
+  // through a file.
+  passManager.addPass(createDropSchedulePass());
+
+  OpPassManager &modulePM = passManager.nest<ModuleOp>();
+  // Bufferize the dispatch.
+  BufferizationOptions::AllocationFn allocationFn =
+      cpuComprehensiveBufferizeAllocationFn;
+  BufferizationOptions::DeallocationFn deallocationFn =
+      cpuComprehensiveBufferizeDeallocationFn;
+  BufferizationOptions::MemCpyFn memcpyFn = cpuComprehensiveBufferizeCopyFn;
+  addIREEComprehensiveBufferizePasses(modulePM, allocationFn, deallocationFn,
+                                      memcpyFn);
 }
 
 static void addLowerToLLVMPasses(OpPassManager &passManager) {

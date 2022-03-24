@@ -28,6 +28,11 @@ EXPLICIT_TARGET_MAPPING = {
     "//llvm-external-projects/iree-dialects:IREEPyDMTransforms": [
         "IREEPyDMPasses"
     ],
+    "//llvm-external-projects/iree-dialects:IREELinalgTransformDialect": [
+        "IREELinalgTransformDialect"
+    ],
+    "//llvm-external-projects/iree-dialects:IREELinalgTransformDialectTransforms":
+        ["IREELinalgTransformDialectTransforms"],
 
     # Disable all hard-coded codegen targets (they are expanded dynamically
     # in CMake).
@@ -82,6 +87,8 @@ EXPLICIT_TARGET_MAPPING = {
     "@llvm-project//mlir:TensorDialect": ["MLIRTensor"],
     "@llvm-project//mlir:NVVMDialect": ["MLIRNVVMIR"],
     "@llvm-project//mlir:ROCDLDialect": ["MLIRROCDLIR"],
+    "@llvm-project//mlir:PDLDialect": ["MLIRPDL"],
+    "@llvm-project//mlir:PDLInterpDialect": ["MLIRPDLInterp"],
     # MHLO.
     # TODO: Rework this upstream so that Bazel and CMake rules match up
     # better.
@@ -174,6 +181,7 @@ EXPLICIT_TARGET_MAPPING = {
     "@cpuinfo": ["cpuinfo"],
     "@vulkan_memory_allocator//:impl_header_only": ["vulkan_memory_allocator"],
 }
+
 
 def _convert_mlir_target(target):
   # Default to a pattern substitution approach.

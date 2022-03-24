@@ -63,6 +63,12 @@ static llvm::cl::opt<int> defaultWorkgroupTileSize(
         "linalg.generic and linalg.indexed_generic workgroup tile size"),
     llvm::cl::init(64));
 
+static llvm::cl::opt<bool> useLinalgTransformInterp(
+    "iree-codegen-use-linalg-transform-interp",
+    llvm::cl::desc(
+        "experimental path to use the linalg transform dialect interpreter"),
+    llvm::cl::init(false));
+
 using IREE::Codegen::DispatchLoweringPassPipeline;
 
 /// Looks for the `native_vector_size` attribute in the hal.executable.variant
@@ -913,6 +919,17 @@ LogicalResult initCPULaunchConfig(ModuleOp moduleOp) {
     auto entryPointOp = entryPointOps.lookup(funcOp.getName());
     if (!entryPointOp) continue;
     if (getTranslationInfo(entryPointOp)) continue;
+
+    // If using sandbox passes, currently set the workload_per_wg to be
+    // empty for single-threaded execution.
+    if (useLinalgTransformInterp) {
+      auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
+          moduleOp.getContext(), IREE::Codegen::DispatchLoweringPassPipeline::
+                                     LinalgTransformInterpCodegen);
+      setTranslationInfo(funcOp, translationInfo);
+      continue;
+    }
+
     SmallVector<Operation *> computeOps;
     SmallVector<LoopTilingAndDistributionInfo> tiledLoops;
 

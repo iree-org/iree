@@ -279,12 +279,16 @@ struct InterpreterPass : public PassWrapper<InterpreterPass, Pass> {
     // same module as the IR. The considered ModuleOp is either `getOperation()`
     // if it is already a ModuleOp, or the first parent ModuleOp.
     if (clTransformFileName.empty()) {
+      LLVM_DEBUG(DBGS() << getArgument()
+                        << " with transform embedded in module\n");
       ModuleOp module = dyn_cast<ModuleOp>(getOperation());
       if (!module)
         module = getOperation()->getParentOfType<ModuleOp>();
       return runTransformModuleOnOperation(module, getOperation());
     }
 
+    LLVM_DEBUG(DBGS() << getArgument() << " with transform "
+                      << clTransformFileName << "\n");
     // If a transform file is specified, parse its content into a ModuleOp.
     std::string errorMessage;
     auto memoryBuffer = openInputFile(clTransformFileName, &errorMessage);

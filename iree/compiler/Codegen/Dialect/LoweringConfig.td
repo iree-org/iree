@@ -21,27 +21,29 @@ def CPU_ConvTileAndDecomposeExpert
     : I32EnumAttrCase<"CPUConvTileAndDecomposeExpert", 3>;
 def CPU_TileFuseAndVectorize
     : I32EnumAttrCase<"CPUTileFuseAndVectorize", 4>;
+def CPU_SandboxCodegen
+    : I32EnumAttrCase<"LinalgTransformInterpCodegen", 5>;
 
 def LLVMGPU_SimpleDistribute
-    : I32EnumAttrCase<"LLVMGPUDistribute", 5>;
+    : I32EnumAttrCase<"LLVMGPUDistribute",6>;
 def LLVMGPU_Vectorize
-    : I32EnumAttrCase<"LLVMGPUVectorize", 6>;
+    : I32EnumAttrCase<"LLVMGPUVectorize", 7>;
 def LLVMGPU_MatmulSimt
-    : I32EnumAttrCase<"LLVMGPUMatmulSimt", 7>;
+    : I32EnumAttrCase<"LLVMGPUMatmulSimt", 8>;
 def LLVMGPU_MatmulTensorCore
-    : I32EnumAttrCase<"LLVMGPUMatmulTensorCore", 8>;
+    : I32EnumAttrCase<"LLVMGPUMatmulTensorCore", 9>;
 
 def SPIRV_Distribute
-    : I32EnumAttrCase<"SPIRVDistribute", 9>;
+    : I32EnumAttrCase<"SPIRVDistribute", 10>;
 def SPIRV_DistributeCopy
-    : I32EnumAttrCase<"SPIRVDistributeCopy", 10>;
+    : I32EnumAttrCase<"SPIRVDistributeCopy", 11>;
 def SPIRV_Vectorize
-    : I32EnumAttrCase<"SPIRVVectorize", 11>;
+    : I32EnumAttrCase<"SPIRVVectorize", 12>;
 def SPIRV_VectorizeToCooperativeOps
-    : I32EnumAttrCase<"SPIRVVectorizeToCooperativeOps", 12>;
+    : I32EnumAttrCase<"SPIRVVectorizeToCooperativeOps", 13>;
 
 def None
-    : I32EnumAttrCase<"None", 13>;
+    : I32EnumAttrCase<"None", 14>;
 
 // EnumAttrCase for all known lowerings for ops within dispatch region
 // to scalar/native-vector code.
@@ -50,9 +52,9 @@ def DispatchLoweringPassPipelineEnum : I32EnumAttr<
     "identifier for pass pipeline use to lower dispatch region",
     [CPU_Default, CPU_SingleTilingExpert, CPU_DoubleTilingExpert,
      CPU_ConvTileAndDecomposeExpert, CPU_TileFuseAndVectorize,
-     LLVMGPU_SimpleDistribute, LLVMGPU_Vectorize, LLVMGPU_MatmulSimt,
-     LLVMGPU_MatmulTensorCore, SPIRV_Distribute, SPIRV_DistributeCopy,
-     SPIRV_Vectorize, SPIRV_VectorizeToCooperativeOps,
+     CPU_SandboxCodegen, LLVMGPU_SimpleDistribute, LLVMGPU_Vectorize,
+     LLVMGPU_MatmulSimt, LLVMGPU_MatmulTensorCore, SPIRV_Distribute,
+     SPIRV_DistributeCopy, SPIRV_Vectorize, SPIRV_VectorizeToCooperativeOps,
      None]> {
   let cppNamespace = "::mlir::iree_compiler::IREE::Codegen";
   // Don't generate a C++ class! We want to use the AttrDef

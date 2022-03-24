@@ -25,6 +25,7 @@ iree_lit_test_suite(
             "hal_interface_constants.mlir",
             "hal_interface_workgroup_info.mlir",
             "illegal_configuration.mlir",
+            "linalg_transform.mlir",
             "materialize_launch_configuration.mlir",
             "synchronize_symbol_visibility.mlir",
             "test_config_mmt4d.mlir",
@@ -34,8 +35,13 @@ iree_lit_test_suite(
             "vector_contract_to_arm_intrinsics.mlir",
         ],
         include = ["*.mlir"],
+        # linalg_transform_spec is a an MLIR file that specifies a
+        # transformation, it needs to be included as data.
+        exclude = ["linalg_transform_spec.mlir"],
     ),
+    data = ["linalg_transform_spec.mlir"],
     tools = [
+        "//iree/tools:iree-compile",
         "//iree/tools:iree-opt",
         "@llvm-project//llvm:FileCheck",
     ],
