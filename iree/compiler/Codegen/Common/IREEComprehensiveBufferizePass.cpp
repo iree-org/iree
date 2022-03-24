@@ -75,12 +75,20 @@ class IREEComprehensiveBufferizePass
         memCpyFn(memCpyFn) {}
 
   void getDependentDialects(DialectRegistry &registry) const override {
+    // clang-format off
     registry
-        .insert<arith::ArithmeticDialect, IREE::Util::UtilDialect,
-                linalg::LinalgDialect, memref::MemRefDialect, scf::SCFDialect,
-                func::FuncDialect, tensor::TensorDialect, vector::VectorDialect,
-                AffineDialect, IREE::Flow::FlowDialect,
-                bufferization::BufferizationDialect>();
+        .insert<AffineDialect,
+                arith::ArithmeticDialect,
+                bufferization::BufferizationDialect,
+                func::FuncDialect,
+                IREE::Flow::FlowDialect,
+                IREE::Util::UtilDialect,
+                linalg::LinalgDialect,
+                memref::MemRefDialect,
+                scf::SCFDialect,
+                tensor::TensorDialect,
+                vector::VectorDialect>();
+    // clang-format on
   }
 
   void runOnOperation() override;

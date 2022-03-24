@@ -63,6 +63,12 @@ static llvm::cl::opt<int> defaultWorkgroupTileSize(
         "linalg.generic and linalg.indexed_generic workgroup tile size"),
     llvm::cl::init(64));
 
+static llvm::cl::opt<bool> useLinalgTransformInterp(
+    "iree-codegen-use-linalg-transform-interp",
+    llvm::cl::desc(
+        "experimental path to use the linalg transform dialect interpreter"),
+    llvm::cl::init(false));
+
 using IREE::Codegen::DispatchLoweringPassPipeline;
 
 /// Looks for the `native_vector_size` attribute in the hal.executable.variant
@@ -621,9 +627,14 @@ static LogicalResult setRootConfig(
   tileSizes.push_back(flowTileSizes);
   tileSizes.push_back(parallelTileSizes);
   tileSizes.push_back(reductionTileSizes);
-  return setOpConfigAndEntryPointFnTranslation(
-      entryPointFn, genericOp, tileSizes,
-      DispatchLoweringPassPipeline::CPUDoubleTilingExpert);
+
+  // For non-tensor based ops use the Buffer ops pipeline.
+  auto passPipeline =
+      genericOp.hasTensorSemantics()
+          ? DispatchLoweringPassPipeline::CPUDoubleTilingExpert
+          : DispatchLoweringPassPipeline::CPUBufferOpsTileAndVectorize;
+  return setOpConfigAndEntryPointFnTranslation(entryPointFn, genericOp,
+                                               tileSizes, passPipeline);
 }
 
 /// Sets the lowering configuration for linalg.conv_2d_nhwc_hwcf and
@@ -824,24 +835,10 @@ static FailureOr<Operation *> getRootOperation(
   if (rootOperation) return rootOperation;
 
   // If no root operation is found yet. Look for linalg generic ops.
-  for (auto op : computeOps) {
-    if (isa<linalg::GenericOp>(op)) {
+  for (auto op : llvm::reverse(computeOps)) {
+    if (isa<linalg::LinalgOp>(op)) {
       if (failed(updateRootOperation(op))) return failure();
     }
-  }
-  if (rootOperation) return rootOperation;
-
-  // TODO(ravishankarm): Currently there is a corner case of a dispatch region
-  // with just a `tensor.extract_slice`/`tensor.insert_slice`. Those need to be
-  // folded with `flow.dispatch.tensor.load`/`flow.dispatch.tensor.store` ops
-  // respectively. This should go hand-in-hand with dropping the external model
-  // implementation of the `TiledOpInterface` for these ops. Till we cross that
-  // bridge, handle that case.
-  // Throw in linalg.fill here as well, though that should never happen either.
-  if (computeOps.size() == 1 &&
-      isa<linalg::FillOp, tensor::ExtractSliceOp, tensor::InsertSliceOp>(
-          computeOps[0])) {
-    rootOperation = computeOps[0];
   }
   return rootOperation;
 }
@@ -915,6 +912,17 @@ LogicalResult initCPULaunchConfig(ModuleOp moduleOp) {
     auto entryPointOp = entryPointOps.lookup(funcOp.getName());
     if (!entryPointOp) continue;
     if (getTranslationInfo(entryPointOp)) continue;
+
+    // If using sandbox passes, currently set the workload_per_wg to be
+    // empty for single-threaded execution.
+    if (useLinalgTransformInterp) {
+      auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
+          moduleOp.getContext(), IREE::Codegen::DispatchLoweringPassPipeline::
+                                     LinalgTransformInterpCodegen);
+      setTranslationInfo(funcOp, translationInfo);
+      continue;
+    }
+
     SmallVector<Operation *> computeOps;
     SmallVector<LoopTilingAndDistributionInfo> tiledLoops;
 

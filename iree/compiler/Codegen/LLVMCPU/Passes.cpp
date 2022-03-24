@@ -8,6 +8,7 @@
 
 #include "iree-dialects/Dialect/LinalgExt/IR/TiledOpInterface.h"
 #include "iree-dialects/Dialect/LinalgExt/Passes/Passes.h"
+#include "iree-dialects/Dialect/LinalgTransform/Passes.h"
 #include "iree/compiler/Codegen/LLVMCPU/KernelDispatch.h"
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Sandbox/Passes.h"
@@ -156,6 +157,7 @@ LogicalResult verifyDoubleTilingExpertPassPipelineConfig(
 
 void addSingleTilingExpertPassPipeline(OpPassManager &passManager) {
   // Do first level of tiling and distribution.
+  passManager.addNestedPass<FuncOp>(createInsertDistributionInfoPass());
   passManager.addNestedPass<FuncOp>(createTileAndDistributeToWorkgroupsPass());
   passManager.addPass(createCanonicalizerPass());
   passManager.addPass(createCSEPass());
@@ -190,8 +192,22 @@ void addSingleTilingExpertPassPipeline(OpPassManager &passManager) {
   }
 }
 
+void addCPUBufferOpsTileAndVectorizePipeline(OpPassManager &passManager) {
+  // Do first level of tiling and distribution.
+  passManager.addNestedPass<FuncOp>(createTileAndDistributeToWorkgroupsPass());
+  passManager.addPass(createCanonicalizerPass());
+  passManager.addPass(createCSEPass());
+
+  // This pipeline should also vectorize these ops, but they arent today because
+  // of a correctness issue. See Issue #8579.
+
+  // Run IREE specific passes before vector lowering expert.
+  passManager.addNestedPass<FuncOp>(createRemoveSingleIterationLoopPass());
+}
+
 void addDoubleTilingExpertPassPipeline(OpPassManager &passManager) {
   // Do first level of tiling and distribution.
+  passManager.addNestedPass<FuncOp>(createInsertDistributionInfoPass());
   passManager.addNestedPass<FuncOp>(createTileAndDistributeToWorkgroupsPass());
   passManager.addPass(createCanonicalizerPass());
   passManager.addPass(createCSEPass());
@@ -257,6 +273,7 @@ void addDoubleTilingExpertPassPipeline(OpPassManager &passManager) {
 
 void addConvTileAndDecomposeExpertPassPipeline(OpPassManager &passManager) {
   // Do first level of tiling and distribution.
+  passManager.addNestedPass<FuncOp>(createInsertDistributionInfoPass());
   passManager.addNestedPass<FuncOp>(createTileAndDistributeToWorkgroupsPass());
   passManager.addPass(createCanonicalizerPass());
   passManager.addPass(createCSEPass());
@@ -316,6 +333,7 @@ void addConvTileAndDecomposeExpertPassPipeline(OpPassManager &passManager) {
 void addTileFuseAndVectorizePassPipeline(OpPassManager &passManager,
                                          bool lowerToVectors) {
   // Do first level of tile and distribute to workgroups.
+  passManager.addNestedPass<FuncOp>(createInsertDistributionInfoPass());
   passManager.addNestedPass<FuncOp>(createTileAndDistributeToWorkgroupsPass());
   passManager.addPass(createCanonicalizerPass());
   passManager.addPass(createCSEPass());
@@ -348,11 +366,35 @@ void addTileFuseAndVectorizePassPipeline(OpPassManager &passManager,
 
 void addCPUDefaultPassPipeline(OpPassManager &passManager) {
   // Do first level of tile and distribute to workgroups.
+  passManager.addNestedPass<FuncOp>(createInsertDistributionInfoPass());
   passManager.addNestedPass<FuncOp>(createTileAndDistributeToWorkgroupsPass());
   passManager.addPass(createCanonicalizerPass());
   passManager.addPass(createCSEPass());
   // Use stack allocation on CPU side.
   addLinalgBufferizePasses(passManager, cpuAllocationFunction);
+}
+
+void addLinalgTransformInterpPasses(OpPassManager &passManager) {
+  // Sets the number of workgroups to be {1, 1, 1} for now.
+  passManager.addPass(createSetNumWorkgroupsPass());
+
+  // Give control to the linalg_transform dialect.
+  passManager.addPass(createLinalgTransformInterpreterPass());
+  // Dropping the schedule is only needed if we want to embed the transform in
+  // the module: we should drop the schedule once applied.
+  // This pass does nothing in the case where we apply a separate policy
+  // through a file.
+  passManager.addPass(createDropSchedulePass());
+
+  OpPassManager &modulePM = passManager.nest<ModuleOp>();
+  // Bufferize the dispatch.
+  BufferizationOptions::AllocationFn allocationFn =
+      cpuComprehensiveBufferizeAllocationFn;
+  BufferizationOptions::DeallocationFn deallocationFn =
+      cpuComprehensiveBufferizeDeallocationFn;
+  BufferizationOptions::MemCpyFn memcpyFn = cpuComprehensiveBufferizeCopyFn;
+  addIREEComprehensiveBufferizePasses(modulePM, allocationFn, deallocationFn,
+                                      memcpyFn);
 }
 
 static void addLowerToLLVMPasses(OpPassManager &passManager) {
@@ -398,6 +440,7 @@ static void addLowerToLLVMPasses(OpPassManager &passManager) {
 void buildLLVMCPUCodegenPassPipeline(OpPassManager &passManager) {
   passManager.nest<ModuleOp>().nest<FuncOp>().addPass(
       createTypePropagationPass());
+  passManager.nest<ModuleOp>().addPass(createBufferizeCopyOnlyDispatchesPass());
   passManager.addPass(createLLVMCPULowerExecutableTargetPass());
   OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
   addLowerToLLVMPasses(nestedModulePM);

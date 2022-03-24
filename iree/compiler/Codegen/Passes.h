@@ -60,6 +60,12 @@ void addIREEComprehensiveBufferizePasses(
 /// allocations and view operations.
 std::unique_ptr<OperationPass<FuncOp>> createCleanupBufferAllocViewPass();
 
+/// Pass to bufferize dispatches that are copying from one interface to another.
+/// This will create a `linalg.generic` op which is a copy that can then be
+/// used by backends to handle appropriately.
+std::unique_ptr<OperationPass<ModuleOp>>
+createBufferizeCopyOnlyDispatchesPass();
+
 /// Create a pass to convert a model using f32 type to the equivalent one
 /// using f16.
 std::unique_ptr<OperationPass<ModuleOp>> createDemoteF32ToF16Pass();
@@ -118,6 +124,9 @@ std::unique_ptr<OperationPass<FuncOp>> createVectorizePadPass();
 
 /// Pass to optimize vector transfer_read and transfer_write.
 std::unique_ptr<OperationPass<FuncOp>> createOptimizeVectorTransferPass();
+
+/// Pass to insert workgroup count region and update translation info.
+std::unique_ptr<OperationPass<FuncOp>> createInsertDistributionInfoPass();
 
 /// Pass to tile and distribute to workgroups.
 std::unique_ptr<OperationPass<FuncOp>>
@@ -223,6 +232,11 @@ void populateUnfusedFMAOpsPassPatterns(MLIRContext *context,
 /// to memrefs
 void addCPUDefaultPassPipeline(OpPassManager &passManager);
 
+/// Populates the passes to lower linalg ops on buffers. Currenly this pipeline
+/// is only used for dispatches that just copy data from input interfaces to
+/// output interface.
+void addCPUBufferOpsTileAndVectorizePipeline(OpPassManager &passManager);
+
 /// Populates the passes needed to multi level tile and lowering of linalg ops
 /// on tensors to vectors operations.
 LogicalResult verifyTensorToVectorsPassPipelineConfig(
@@ -247,6 +261,11 @@ void addDoubleTilingExpertPassPipeline(OpPassManager &passManager);
 // Populates the passes needed to do tiling, decomposing, and vectorizing the
 // convolution ops using the Codegen drivers from sandbox.
 void addConvTileAndDecomposeExpertPassPipeline(OpPassManager &passManager);
+
+/// Populates the passes from Sandbox for testing transformations from sandbox.
+/// Unlike other pipelines this pass mangaer is nested at the
+/// `hal.executable.variant` op.
+void addLinalgTransformInterpPasses(OpPassManager &passManager);
 
 /// Populates the passes needed to multi level tile, fuse and vectorize lowering
 /// of linalg ops on tensors to vectors operations.

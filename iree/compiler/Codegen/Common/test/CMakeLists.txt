@@ -15,6 +15,7 @@ iree_lit_test_suite(
     lit
   SRCS
     "affinemin_canonicalization.mlir"
+    "bufferize_copy_only_dispatches.mlir"
     "canonicalize_interface_load_store.mlir"
     "convert_to_destination_passing_style.mlir"
     "dead_alloc.mlir"
@@ -23,6 +24,7 @@ iree_lit_test_suite(
     "fold_affine_min_in_distributed_loops.mlir"
     "fold_tensor_extract_op.mlir"
     "forop_canonicalization.mlir"
+    "insert_distribution_info.mlir"
     "iree_comprehensive_bufferize.mlir"
     "linalg_bufferize.mlir"
     "remove_dead_allocs.mlir"

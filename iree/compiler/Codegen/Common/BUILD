@@ -35,6 +35,7 @@ cc_library(
     name = "Common",
     srcs = [
         "BufferizationAnalysis.cpp",
+        "BufferizeCopyOnlyDispatchesPass.cpp",
         "CleanupBufferAllocViewPass.cpp",
         "ConvertToDestinationPassingStylePass.cpp",
         "DemoteF32ToF16.cpp",
@@ -44,6 +45,7 @@ cc_library(
         "FoldTensorExtractOpPass.cpp",
         "ForOpCanonicalizationPass.cpp",
         "IREEComprehensiveBufferizePass.cpp",
+        "InsertDistributionInfoPass.cpp",
         "LinalgBufferizePass.cpp",
         "MemrefCopyToLinalg.cpp",
         "OptimizeVectorTransferPass.cpp",
@@ -103,5 +105,6 @@ cc_library(
         "@llvm-project//mlir:Transforms",
         "@llvm-project//mlir:VectorOps",
         "@llvm-project//mlir:VectorTransforms",
+        "@llvm-project//mlir:ViewLikeInterface",
     ],
 )

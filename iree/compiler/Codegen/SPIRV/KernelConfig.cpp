@@ -357,7 +357,11 @@ static LogicalResult setDefaultOpConfig(spirv::ResourceLimitsAttr limits,
 
   // Special case for non-linalg ops.
   auto linalgOp = dyn_cast<linalg::LinalgOp>(op);
-  if (!linalgOp || linalgOp.getNumOutputs() != 1) {
+  // TODO(#8580): Ops with buffer semantics, like those created by copy-only
+  // dispatches can be vectorized too, but that code fails compilation. So
+  // disabling that for now.
+  if (!linalgOp || linalgOp.getNumOutputs() != 1 ||
+      linalgOp.hasBufferSemantics()) {
     auto pipeline =
         IREE::Codegen::DispatchLoweringPassPipeline::SPIRVDistribute;
 
@@ -615,37 +619,16 @@ LogicalResult initSPIRVLaunchConfig(ModuleOp module) {
       rootOperation = computeOp;
     }
 
-    // If there are still no root op, check for any linalg.generic op.
     if (!rootOperation) {
+      // If there are still no root op, check for any linalg.generic op.
       Operation *computeOp = computeOps.back();
+      if (failed(setDefaultOpConfig(limits, computeOp))) return failure();
 
-      // Handle the case of compute op being a
-      // `tensor.extract_slice`/`tensor.insert_slice`. That needs bufferization
-      // to run before configuration can be set again. Just set the translation
-      // to use the `SPIRVDistributeAndCopy` pipeline. The configuration will be
-      // set again after bufferization.
-      //
-      // TODO(ravishankarm): This is a awkward.
-      // `tensor.extract_slice`/`tensor.insert_slice` will be dropped from
-      // `TiledOpInterface` soon, and will not be compute op. At that time, they
-      // will be folded with `flow.tensor.load` and `flow.tensor.store`
-      // operations. Then this case will degenerate to having no compute ops.
-      // Rework this at that stage to run bufferization early.
-      if (isa<tensor::ExtractSliceOp, tensor::InsertSliceOp>(computeOp)) {
-        setTranslationInfo(
-            funcOp,
-            IREE::Codegen::DispatchLoweringPassPipeline::SPIRVDistributeCopy,
-            /*workloadPerWorkgroup=*/ArrayRef<int64_t>{},
-            /*workgroupSize=*/ArrayRef<int64_t>{});
-      } else {
-        if (failed(setDefaultOpConfig(limits, computeOp))) return failure();
-
-        // Check if the op configuration was set.
-        if (!getLoweringConfig(computeOp)) {
-          return computeOp->emitOpError(
-              "without known roots, the last compute operation in the tiled "
-              "loop body is expected to be set as root");
-        }
+      // Check if the op configuration was set.
+      if (!getLoweringConfig(computeOp)) {
+        return computeOp->emitOpError(
+            "without known roots, the last compute operation in the tiled "
+            "loop body is expected to be set as root");
       }
       rootOperation = computeOp;
     }

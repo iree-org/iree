@@ -82,79 +82,6 @@ static FailureOr<SmallVector<int64_t>> getTileSizesFromLoweringConfig(
   return SmallVector<int64_t>{};
 }
 
-/// Compute the workload per workgroup to use based on the tile sizes passed.
-static SmallVector<int64_t> getWorkloadPerWorkgroup(
-    ArrayRef<int64_t> distributedLoopTileSizes) {
-  // TODO(ravishankarm): This for now assumes that we can just drop all the
-  // zero-dim tile sizes. We need to eventually change this so that we dont have
-  // to do this. It is implicity linked to the dispatch region workload having
-  // the consistent information. That needs to be changed to take the entire
-  // iteration domain size as the argument, and then we can use the distribute
-  // loop tile sizes directly.
-  SmallVector<int64_t> nonZeroTileSizes;
-  for (auto tileSizes : distributedLoopTileSizes) {
-    if (!tileSizes) continue;
-    nonZeroTileSizes.push_back(tileSizes);
-  }
-  return llvm::to_vector(llvm::reverse(nonZeroTileSizes));
-}
-
-/// Defines the workgroup count region if the tile size for the distributed
-/// loops are known.
-static LogicalResult defineWorkgroupCountRegion(
-    FuncOp entryPointFn, ArrayRef<int64_t> workloadPerWorkgroup) {
-  if (workloadPerWorkgroup.size() > kNumMaxParallelDims) {
-    // For now error out here.
-    return entryPointFn.emitOpError(
-               "expected workload per workgroup to be less than or equal to ")
-           << kNumMaxParallelDims;
-  }
-  WorkgroupCountRegionBuilder regionBuilder =
-      [&workloadPerWorkgroup](
-          OpBuilder &b, Location loc,
-          std::array<Value, 3> workload) -> std::array<Value, 3> {
-    Value one = b.create<arith::ConstantIndexOp>(loc, 1);
-    std::array<Value, 3> numWorkgroups = {one, one, one};
-    for (auto it : llvm::enumerate(workloadPerWorkgroup)) {
-      // If tile size is 0, it implies this isnt tiled, and the number of
-      // workgroups is 1, i.e. the default.
-      if (it.value() == 0) continue;
-      numWorkgroups[it.index()] = applyMapToValues(
-          b, loc,
-          AffineMap::get(0, 1, b.getAffineSymbolExpr(0).ceilDiv(it.value())),
-          workload[it.index()])[0];
-    }
-    return numWorkgroups;
-  };
-  OpBuilder builder(entryPointFn.getContext());
-  return defineWorkgroupCountRegion(builder, entryPointFn, regionBuilder);
-}
-
-/// Update the workload_per_wg value on the TranslationInfoAttr.
-// TODO(ravishankarm): The workload_per_wg field should be deprecated. This
-// is just transition before all dependencies on it can be removed.
-static LogicalResult updateTranslationInfoAttr(
-    FuncOp entryPointFn, ArrayRef<int64_t> workloadPerWorkgroup) {
-  auto entryPointOp = getEntryPoint(entryPointFn);
-  if (!entryPointOp) {
-    return entryPointFn.emitOpError("expected entry point function");
-  }
-  IREE::Codegen::DispatchLoweringPassPipeline passPipeline =
-      IREE::Codegen::DispatchLoweringPassPipeline::CPUDefault;
-  if (auto translationInfo = getTranslationInfo(entryPointOp)) {
-    // Expect the `workload_per_wg` to be empty.
-    if (!translationInfo.getWorkloadPerWorkgroupVals().empty()) {
-      return entryPointFn.emitOpError(
-          "expected workload_per_wg to be empty at this stage");
-    }
-    passPipeline = translationInfo.getDispatchLoweringPassPipeline();
-  }
-  auto newTranslationInfoAttr = IREE::Codegen::TranslationInfoAttr::get(
-      entryPointFn.getContext(), passPipeline, workloadPerWorkgroup);
-  setTranslationInfo(entryPointOp, newTranslationInfoAttr);
-  return success();
-}
-
 // Pull in producers into the tiled operation.
 static void pullInProducers(linalg::LinalgOp tiledOp,
                             ValueRange untiledOperands,
@@ -251,13 +178,6 @@ void TileAndDistributeToWorkgroupsPass::runOnOperation() {
     return signalPassFailure();
   }
   ArrayRef<int64_t> configTileSizesRef(configTileSizes.getValue());
-
-  SmallVector<int64_t> workloadPerWorkroup =
-      getWorkloadPerWorkgroup(configTileSizesRef);
-  if (failed(defineWorkgroupCountRegion(funcOp, workloadPerWorkroup)) ||
-      failed(updateTranslationInfoAttr(funcOp, workloadPerWorkroup))) {
-    return signalPassFailure();
-  }
 
   // Add a marker to the last operation in the list.
   auto marker = StringAttr::get(context, "__workgroup_tiling__");

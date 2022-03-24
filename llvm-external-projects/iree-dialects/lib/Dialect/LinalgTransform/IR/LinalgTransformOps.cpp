@@ -669,6 +669,20 @@ LogicalResult transform::UnrollLoopOp::applyToOne(scf::ForOp loop) {
 }
 
 //===---------------------------------------------------------------------===//
+// PeelLoopOp
+//===---------------------------------------------------------------------===//
+
+FailureOr<scf::ForOp> transform::PeelLoopOp::applyToOne(scf::ForOp loop) {
+  scf::ForOp result;
+  IRRewriter rewriter(loop->getContext());
+  LogicalResult status =
+      scf::peelAndCanonicalizeForLoop(rewriter, loop, result);
+  if (failed(status))
+    return failure();
+  return result;
+}
+
+//===---------------------------------------------------------------------===//
 // PipelineLoopOp
 //===---------------------------------------------------------------------===//
 
@@ -809,7 +823,7 @@ LogicalResult transform::PrintOp::apply(transform::TransformResults &results,
 //===----------------------------------------------------------------------===//
 
 FailureOr<Operation *>
-transform::TileToLinalgExtTileOp::applyToOne(TilingInterface target) {
+transform::TileToLinalgExtTileOp::applyToOne(Operation *target) {
   LinalgTilingOptions tilingOptions;
   SmallVector<int64_t> tileSizes = extractI64Array(sizes());
   if (!tileSizes.empty())
@@ -817,12 +831,13 @@ transform::TileToLinalgExtTileOp::applyToOne(TilingInterface target) {
 
   LinalgExt::LinalgExtTilingPattern pattern(this->getContext(), tilingOptions);
   auto functionalTile =
-      [&](TilingInterface op,
-          PatternRewriter &rewriter) -> FailureOr<Operation *> {
-    auto result = pattern.returningMatchAndRewrite(op, rewriter);
-    if (failed(result))
+      [&](Operation *op, PatternRewriter &rewriter) -> FailureOr<Operation *> {
+    auto tilingInterfaceOp = dyn_cast<TilingInterface>(op);
+    if (!tilingInterfaceOp) {
+      op->emitError("Cannot tile op: Not a TilingInterface");
       return failure();
-    return result;
+    }
+    return pattern.returningMatchAndRewrite(tilingInterfaceOp, rewriter);
   };
 
   auto tileSeq = functional::SequenceBuilder().begin(std::move(functionalTile));

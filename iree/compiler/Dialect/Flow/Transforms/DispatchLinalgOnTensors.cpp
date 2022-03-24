@@ -214,29 +214,6 @@ buildOperandLessFlowDispatchWorkgroupOp(PatternRewriter &rewriter, Location loc,
   SmallVector<Value> operands, operandDims;
   SmallVector<int64_t> tiedOperands;
 
-  // TODO(#...) This special handling of `tensor.insert_slice` op does need to
-  // be here anymore. It can be moved to the same place as other ops where
-  // readwrite operands are computed.
-
-  if (auto insertSliceOp = dyn_cast<tensor::InsertSliceOp>(op)) {
-    // Handle tensor.insert_slice in a special manner. This op is actually two
-    // steps:
-    // 1) Copy over the dest tensor to the result,
-    // 2) Update the overwritten part of the result with the destination.
-    // To actually make this work, the dispatch region needs the `dest` and
-    // result to be tied operands. This is somehow special. It might fall out
-    // naturally, but not sure how. For now, just do it by construction.
-    operands.push_back(insertSliceOp.dest());
-    ReifiedRankedShapedTypeDims resultShapes;
-    (void)insertSliceOp.reifyResultShapes(rewriter, resultShapes);
-    auto destType = insertSliceOp.dest().getType().cast<ShapedType>();
-    for (auto shape : enumerate(destType.getShape())) {
-      if (shape.value() != ShapedType::kDynamicSize) continue;
-      operandDims.push_back(resultShapes[0][shape.index()]);
-    }
-    tiedOperands.push_back(0);
-  }
-
   auto dispatchOp = rewriter.create<IREE::Flow::DispatchWorkgroupsOp>(
       loc, count, op->getResultTypes(), resultDynamicDims, operands,
       operandDims, tiedOperands);
@@ -260,30 +237,6 @@ buildOperandLessFlowDispatchWorkgroupOp(PatternRewriter &rewriter, Location loc,
       dynamicDimIdx += resultType.getNumDynamicDims();
     }
     rewriter.create<IREE::Flow::ReturnOp>(loc);
-  }
-
-  // Handle read-write arguments. Need to insert a load of these as well to get
-  // the tensor type from the !flow.dispatch.tensor type.
-  {
-    OpBuilder::InsertionGuard g(rewriter);
-    rewriter.setInsertionPointToStart(block);
-    unsigned dynamicDimIdx = 0;
-    auto readWriteArgs = llvm::make_filter_range(
-        dispatchOp.body().getArguments(), [](BlockArgument arg) {
-          auto flowTensorType =
-              arg.getType().dyn_cast<IREE::Flow::DispatchTensorType>();
-          return flowTensorType && flowTensorType.getAccess() ==
-                                       IREE::Flow::TensorAccess::ReadWrite;
-        });
-    for (auto it : llvm::enumerate(readWriteArgs)) {
-      Value operand = dispatchOp.operands()[it.index()];
-      auto operandType = operand.getType().cast<RankedTensorType>();
-      auto dynamicDims = resultDynamicDims.slice(
-          dynamicDimIdx, operandType.getNumDynamicDims());
-      Value loadOp = rewriter.create<IREE::Flow::DispatchTensorLoadOp>(
-          loc, operandType, it.value(), dynamicDims);
-      clonedOp->replaceUsesOfWith(operand, loadOp);
-    }
   }
 
   LLVM_DEBUG(llvm::dbgs() << "Created dispatchOp shell \n"
