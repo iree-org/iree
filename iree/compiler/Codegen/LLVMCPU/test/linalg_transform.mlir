@@ -16,13 +16,14 @@ hal.executable private @pad_matmul_static_dispatch_0 {
         %3 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [250, 500], strides = [1, 1] : !flow.dispatch.tensor<readonly:250x500xf32> -> tensor<250x500xf32>
         %4 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [500, 1020], strides = [1, 1] : !flow.dispatch.tensor<readonly:500x1020xf32> -> tensor<500x1020xf32>
         %5 = flow.dispatch.tensor.load %2, offsets = [0, 0], sizes = [250, 1020], strides = [1, 1] : !flow.dispatch.tensor<readwrite:250x1020xf32> -> tensor<250x1020xf32>
+
+        //      CHECK: %[[C125:.*]] = arith.constant 125 : index
         //  CHECK-NOT: flow
-        //      CHECK: scf.for
-        // CHECK-NEXT:   subview
-        // CHECK-NEXT:   subview
-        // CHECK-NEXT:   matmul{{.*}}ins{{.*}}outs
-        // CHECK-NEXT: }
-        // CHECK-NEXT: return
+        //      CHECK: iree_linalg_ext.in_parallel %[[C125]] -> () {
+        //      CHECK:   subview
+        //      CHECK:   subview
+        //      CHECK:   matmul{{.*}}ins{{.*}}outs
+        //      CHECK: return
         %6 = linalg.matmul ins(%3, %4 : tensor<250x500xf32>, tensor<500x1020xf32>) outs(%5 : tensor<250x1020xf32>) -> tensor<250x1020xf32>
         flow.dispatch.tensor.store %6, %2, offsets = [0, 0], sizes = [250, 1020], strides = [1, 1] : tensor<250x1020xf32> -> !flow.dispatch.tensor<readwrite:250x1020xf32>
         return

@@ -28,7 +28,7 @@ module {
   }
   iree_linalg_transform.sequence {
     %0 = match @match_linalg_matmul
-    %1 = tile_to_iree_linalg_ext_tile_op %0 {sizes = [10]}
+    %1:2 = tile_to_iree_linalg_ext_tile_op %0 {sizes = [10]}
   }
 }
 
@@ -63,6 +63,6 @@ module {
   }
   iree_linalg_transform.sequence {
     %0 = match @match_linalg_matmul
-    %1 = tile_to_iree_linalg_ext_tile_op %0 {sizes = [10]}
+    %1:2 = tile_to_iree_linalg_ext_tile_op %0 {sizes = [10]}
   }
 }

@@ -679,6 +679,7 @@ cc_library(
     ],
     deps = [
         ":IREEDialectsTransforms",
+        ":IREELinalgExtDialect",
         ":IREELinalgTransformDialect",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:Affine",
