@@ -198,6 +198,19 @@ void addSingleTilingExpertPassPipeline(OpPassManager &passManager) {
   }
 }
 
+void addCPUBufferOpsTileAndVectorizePipeline(OpPassManager &passManager) {
+  // Do first level of tiling and distribution.
+  passManager.addNestedPass<FuncOp>(createTileAndDistributeToWorkgroupsPass());
+  passManager.addPass(createCanonicalizerPass());
+  passManager.addPass(createCSEPass());
+
+  // This pipeline should also vectorize these ops, but they arent today because
+  // of a correctness issue. See Issue #8579.
+
+  // Run IREE specific passes before vector lowering expert.
+  passManager.addNestedPass<FuncOp>(createRemoveSingleIterationLoopPass());
+}
+
 void addDoubleTilingExpertPassPipeline(OpPassManager &passManager) {
   // Do first level of tiling and distribution.
   passManager.addNestedPass<FuncOp>(createInsertDistributionInfoPass());
@@ -429,6 +442,7 @@ static void addLowerToLLVMPasses(OpPassManager &passManager) {
 void buildLLVMCPUCodegenPassPipeline(OpPassManager &passManager) {
   passManager.nest<ModuleOp>().nest<FuncOp>().addPass(
       createTypePropagationPass());
+  passManager.nest<ModuleOp>().addPass(createBufferizeCopyOnlyDispatchesPass());
   passManager.addPass(createLLVMCPULowerExecutableTargetPass());
   OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
   addLowerToLLVMPasses(nestedModulePM);

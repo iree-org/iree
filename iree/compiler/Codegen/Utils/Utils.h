@@ -57,6 +57,11 @@ inline bool isVMVXBackend(func::FuncOp entryPointFn) {
   return isVMVXBackend(variantOp);
 }
 
+/// Checks if a tensor value is generated from a read-only object, like
+/// and interface binding with read-only attribute or from an `arith.constant`
+/// operation.
+bool isReadOnly(Value v);
+
 //===----------------------------------------------------------------------===//
 // Utility functions to set configurations
 //===----------------------------------------------------------------------===//
