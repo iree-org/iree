@@ -105,5 +105,6 @@ cc_library(
         "@llvm-project//mlir:Transforms",
         "@llvm-project//mlir:VectorOps",
         "@llvm-project//mlir:VectorTransforms",
+        "@llvm-project//mlir:ViewLikeInterface",
     ],
 )
