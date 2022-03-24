@@ -9,6 +9,7 @@
 #include <string.h>
 
 #include "iree/base/internal/atomics.h"
+#include "iree/base/internal/call_once.h"
 #include "iree/base/internal/dynamic_library.h"
 #include "iree/base/internal/file_path.h"
 #include "iree/base/target_platform.h"
@@ -30,54 +31,6 @@ struct iree_dynamic_library_t {
   // dlopen shared object handle.
   void* handle;
 };
-
-// Holds information about where to store temporary dynamic library files, and
-// whether to preserve them or delete them.
-typedef struct {
-  const char* temp_dir;
-  bool preserve_temp_files;
-} iree_dynamic_library_temp_files_params_t;
-
-static iree_status_t iree_dynamic_library_get_temp_files_params(
-    iree_dynamic_library_temp_files_params_t* params) {
-  // Semantics of IREE_PRESERVE_DYLIB_TEMP_FILES:
-  // * If the environment variable is not set, temp files are not preserved.
-  // * If the environment variable is set to "1", temp files are preserved to
-  //   some default temp directory. The TMPDIR environment variable is used if
-  //   set, otherwise a hardcoded default path is used. Example:
-  //     $ IREE_PRESERVE_DYLIB_TEMP_FILES=1 iree-run-module ...
-  // * If the environment variable is set to any other string than "1", temp
-  // files
-  //   are preserved, and the value of the environment variable is interpreted
-  //   as the path of the temporary directory to use. Example:
-  //     $ IREE_PRESERVE_DYLIB_TEMP_FILES=/tmp/iree-benchmarks iree-run-module
-  //     ...
-  params->temp_dir = getenv("IREE_PRESERVE_DYLIB_TEMP_FILES");
-  params->preserve_temp_files = params->temp_dir != NULL;
-  if (!params->temp_dir || !strcmp(params->temp_dir, "1")) {
-    // TMPDIR is a unix semi-standard thing. It's even defined by default on
-    // Android for the regular shell user (but not root).
-    params->temp_dir = getenv("TMPDIR");
-    if (!params->temp_dir) {
-#ifdef __ANDROID__
-      params->temp_dir = "/data/local/tmp";
-#else
-      params->temp_dir = "/tmp";
-#endif  // __ANDROID__
-    }
-  }
-  // Validate that temp_dir it is the path of a directory. Could fail if it was
-  // user-provided, or on an Android device where /data/local/tmp hasn't been
-  // created yet.
-  struct stat s;
-  if (stat(params->temp_dir, &s) != 0 || (s.st_mode & S_IFMT) != S_IFDIR) {
-    return iree_make_status(
-        IREE_STATUS_INVALID_ARGUMENT,
-        "path of dylib temp files (%s) is not the path of a directory",
-        params->temp_dir);
-  }
-  return iree_ok_status();
-}
 
 // Allocate a new string from |allocator| returned in |out_file_path| containing
 // a path to a unique file on the filesystem.
@@ -221,6 +174,53 @@ iree_status_t iree_dynamic_library_load_from_files(
   return status;
 }
 
+static iree_once_flag iree_dynamic_library_temp_dir_init_once_flag_ =
+    IREE_ONCE_FLAG_INIT;
+static const char* iree_dynamic_library_temp_dir_path_;
+static bool iree_dynamic_library_temp_dir_valid_;
+static bool iree_dynamic_library_temp_dir_preserve_;
+
+static bool iree_dynamic_library_path_is_null_or_empty(const char* path) {
+  return path == NULL || path[0] == 0;
+}
+
+static void iree_dynamic_library_init_temp_dir(void) {
+  // Semantics of IREE_PRESERVE_DYLIB_TEMP_FILES:
+  // * If the environment variable is not set, temp files are not preserved.
+  // * If the environment variable is set to "1", temp files are preserved to
+  //   some default temp directory. The TMPDIR environment variable is used if
+  //   set, otherwise a hardcoded default path is used. Example:
+  //     $ IREE_PRESERVE_DYLIB_TEMP_FILES=1 iree-run-module ...
+  // * If the environment variable is set to any other string than "1", temp
+  // files
+  //   are preserved, and the value of the environment variable is interpreted
+  //   as the path of the temporary directory to use. Example:
+  //     $ IREE_PRESERVE_DYLIB_TEMP_FILES=/tmp/iree-benchmarks iree-run-module
+  //     ...
+  const char* path = getenv("IREE_PRESERVE_DYLIB_TEMP_FILES");
+  bool preserve = !iree_dynamic_library_path_is_null_or_empty(path);
+  if (!path || !strcmp(path, "1")) {
+    // TMPDIR is a unix semi-standard thing. It's even defined by default on
+    // Android for the regular shell user (but not root).
+    path = getenv("TMPDIR");
+    if (iree_dynamic_library_path_is_null_or_empty(path)) {
+#ifdef __ANDROID__
+      path = "/data/local/tmp";
+#else
+      path = "/tmp";
+#endif  // __ANDROID__
+    }
+  }
+  iree_dynamic_library_temp_dir_path_ = path;
+  iree_dynamic_library_temp_dir_preserve_ = preserve;
+  // Validate that temp_dir it is the path of a directory. Could fail if it was
+  // user-provided, or on an Android device where /data/local/tmp hasn't been
+  // created yet.
+  struct stat s;
+  iree_dynamic_library_temp_dir_valid_ =
+      stat(path, &s) == 0 && (s.st_mode & S_IFMT) == S_IFDIR;
+}
+
 // TODO(#3845): use dlopen on an fd with either dlopen(/proc/self/fd/NN),
 // fdlopen, or android_dlopen_ext to avoid needing to write the file to disk.
 // Can fallback to memfd_create + dlopen where available, and fallback from
@@ -233,16 +233,22 @@ iree_status_t iree_dynamic_library_load_from_memory(
   IREE_ASSERT_ARGUMENT(out_library);
   *out_library = NULL;
 
-  iree_dynamic_library_temp_files_params_t temp_files_params;
-  IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_dynamic_library_get_temp_files_params(&temp_files_params));
+  iree_call_once(&iree_dynamic_library_temp_dir_init_once_flag_,
+                 iree_dynamic_library_init_temp_dir);
+
+  if (!iree_dynamic_library_temp_dir_valid_) {
+    return iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "path of dylib temp files (%s) is not the path of a directory",
+        iree_dynamic_library_temp_dir_path_);
+  }
 
   // Extract the library to a temp file.
   char* temp_path = NULL;
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_dynamic_library_write_temp_file(buffer, "mem_", "so", allocator,
-                                               temp_files_params.temp_dir,
-                                               &temp_path));
+      z0, iree_dynamic_library_write_temp_file(
+              buffer, "mem_", "so", allocator,
+              iree_dynamic_library_temp_dir_path_, &temp_path));
 
   // Load using the normal load from file routine.
   iree_status_t status = iree_dynamic_library_load_from_file(
@@ -252,7 +258,7 @@ iree_status_t iree_dynamic_library_load_from_memory(
   // accessible to anyone else and will be deleted once the library is
   // unloaded. Note that we don't remove the file if the user requested we keep
   // it around for tooling to access.
-  if (!temp_files_params.preserve_temp_files) {
+  if (!iree_dynamic_library_temp_dir_preserve_) {
     remove(temp_path);
   }
   iree_allocator_free(allocator, temp_path);
