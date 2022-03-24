@@ -101,6 +101,14 @@ iree_status_t iree_hal_cuda_native_executable_create(
       status = CU_RESULT_TO_STATUS(
           context->syms, cuModuleGetFunction(&function, module, entry_name),
           "cuModuleGetFunction");
+      if (iree_status_is_ok(status)) {
+        status = CU_RESULT_TO_STATUS(
+            context->syms,
+            cuFuncSetAttribute(function,
+                               CU_FUNC_ATTRIBUTE_MAX_DYNAMIC_SHARED_SIZE_BYTES,
+                               shared_memory_sizes[i]),
+            "cuFuncSetAttribute");
+      }
       executable->entry_functions[i].cu_function = function;
       executable->entry_functions[i].block_size_x = block_sizes_vec[i].x;
       executable->entry_functions[i].block_size_y = block_sizes_vec[i].y;
