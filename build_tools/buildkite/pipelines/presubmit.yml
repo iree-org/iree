@@ -5,7 +5,7 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 # Note: this runs on "security: submitted" agents, since this pipeline itself is
-# submitted code and it fetches the scripts from the main branch.
+# submitted code and it fetches the scripts only from the main repository.
 agents:
   queue: "orchestration"
   security: "submitted"
@@ -28,7 +28,7 @@ steps:
   # Buildkite)?
   - label: ":face_with_monocle: :admission_tickets: :raised_hand: Checking CLA"
     plugins:
-      - https://github.com/GMNGeoffrey/smooth-checkout-buildkite-plugin#41cdffe:
+      - https://github.com/GMNGeoffrey/smooth-checkout-buildkite-plugin#4e353abe72:
           repos:
             - config:
                 - url: ${BUILDKITE_REPO}
@@ -42,7 +42,7 @@ steps:
 
   - label: "Executing gcmn-test-pipeline"
     plugins:
-      - https://github.com/GMNGeoffrey/smooth-checkout-buildkite-plugin#41cdffe:
+      - https://github.com/GMNGeoffrey/smooth-checkout-buildkite-plugin#4e353abe72:
           repos:
             - config:
                 - url: ${BUILDKITE_REPO}
