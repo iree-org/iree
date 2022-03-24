@@ -4,15 +4,21 @@
 # Licensed under the Apache License v2.0 with LLVM Exceptions.
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+"""Potentially triggers and then waits for a Buildkite pipeline.
 
-# Checks if the given pipeline is already running for the given commit, starts
-# it if not, and then waits for it to complete.
+Checks if the given pipeline is already running for the given commit, starts
+it if not, and then waits for it to complete. Exits successfully if the
+triggered (or pre-existing) build succeeds, otherwise fails.
+"""
 
 import argparse
 import os
 from pybuildkite import buildkite
 import sys
 import time
+
+# Fake build to return when running locally.
+FAKE_PASSED_BUILD = dict(number=42, state="passed")
 
 
 def get_build_number(build):
@@ -61,7 +67,7 @@ class BuildkitePipelineManager():
 
     # Buildkite sets these environment variables. See
     # https://buildkite.com/docs/pipelines/environment-variables. If running
-    # locally you can set locally, you can use the simulate_buildkite.sh script.
+    # locally you can set locally or use the simulate_buildkite.sh script.
     organization = os.environ["BUILDKITE_ORGANIZATION_SLUG"]
     commit = os.environ["BUILDKITE_COMMIT"]
     branch = os.environ["BUILDKITE_BRANCH"]
@@ -92,12 +98,22 @@ class BuildkitePipelineManager():
     )
 
   def get_builds(self):
+    # Avoid API calls when running locally. The local organization doesn't
+    # exist.
+    if self._organization == "local":
+      return [FAKE_PASSED_BUILD]
     return self._buildkite.builds().list_all_for_pipeline(
         organization=self._organization,
         pipeline=self._pipeline,
         commit=self._commit)
 
   def get_build_by_number(self, build_number):
+    # Avoid API calls when running locally. The local organization doesn't
+    # exist.
+    if (self._organization == "local" and
+        build_number == get_build_number(FAKE_PASSED_BUILD)):
+      print("Returning fake build because running locally")
+      return FAKE_PASSED_BUILD
     return self._buildkite.builds().get_build_by_number(self._organization,
                                                         self._pipeline,
                                                         build_number)
@@ -204,7 +220,7 @@ def should_create_new_build(bk, build, rebuild_option):
 
 def parse_args():
   parser = argparse.ArgumentParser(
-      description="Waits on the status of the last BuildKite build for a given"
+      description="Waits on the status of the last Buildkite build for a given"
       " commit or creates such a build if none exists")
   parser.add_argument(
       "pipeline", help="The pipeline for which to create and wait for builds")

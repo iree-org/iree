@@ -1,0 +1,53 @@
+# Copyright 2022 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+# Note: this runs on "security: submitted" agents, since this pipeline itself is
+# submitted code and it fetches the scripts only from the main repository.
+agents:
+  queue: "orchestration"
+  security: "submitted"
+
+steps:
+  - label: ":hiking_boot: Bootstrapping presubmit pipeline"
+    # If this PR is coming from the main repo we can use its configs. Otherwise
+    # we proceed with the configs from the main repo.
+    if: "!build.pull_request.repository.fork"
+    env:
+      CUSTOM_REF: ${BUILDKITE_COMMIT}
+      PIPELINE_BOOTSTRAPPED: ${PIPELINE_BOOTSTRAPPED:-false}
+    commands: |
+      ./build_tools/buildkite/scripts/bootstrap_pipeline.sh \
+          build_tools/buildkite/pipelines/presubmit.yml
+
+  - wait
+
+  # TODO: Is there a better emoji here? Google logo (would have to add to
+  # Buildkite)?
+  - label: ":face_with_monocle: :admission_tickets: :raised_hand: Checking CLA"
+    plugins:
+      - https://github.com/GMNGeoffrey/smooth-checkout-buildkite-plugin#4e353abe72:
+          repos:
+            - config:
+                - url: ${BUILDKITE_REPO}
+                  ref: ${CUSTOM_REF:-main}
+    commands: |
+      ./build_tools/buildkite/scripts/check_cla.py ${BUILDKITE_COMMIT} \
+          || buildkite-agent pipeline upload \
+              build_tools/buildkite/pipelines/include/cla-failure.yml
+
+  - wait
+
+  - label: "Executing gcmn-test-pipeline"
+    plugins:
+      - https://github.com/GMNGeoffrey/smooth-checkout-buildkite-plugin#4e353abe72:
+          repos:
+            - config:
+                - url: ${BUILDKITE_REPO}
+                  ref: ${CUSTOM_REF:-main}
+    commands: |
+      export BUILDKITE_ACCESS_TOKEN="$(gcloud secrets versions access latest \
+          --secret=iree-buildkite-presubmit-pipelines)"
+      ./build_tools/buildkite/scripts/wait_for_pipeline_success.py gcmn-test-pipeline
