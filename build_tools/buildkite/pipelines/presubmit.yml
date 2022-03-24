@@ -36,7 +36,7 @@ steps:
     commands: |
       ./build_tools/buildkite/scripts/check_cla.py ${BUILDKITE_COMMIT} \
           || buildkite-agent pipeline upload \
-              build_tools/buildkite/pipelines/partial/cla_failure.yml
+              build_tools/buildkite/pipelines/include/cla-failure.yml
 
   - wait
 

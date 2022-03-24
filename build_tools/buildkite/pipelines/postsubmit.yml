@@ -18,17 +18,13 @@ steps:
 
   - wait
 
-  # These need to be uploaded from a separate pipeline file because if they
-  # exist in the pipeline already, then when the bootstrap happens they get
-  # uploaded again, and even though they're replacing the pre-existing steps, we
-  # still get conflicts between step keys.
-  - group: "Updating pipelines"
-    steps:
-      - label: ":pipeline: Uploading pipeline update steps"
-        commands: |
-          buildkite-agent pipeline upload \
-              build_tools/buildkite/pipelines/partial/update-pipelines.yml
-
+  - label: "Updating pipelines"
+    concurrency: 1
+    concurrency_group: "update-pipelines"
+    commands: |
+      export BUILDKITE_ACCESS_TOKEN="$(gcloud secrets versions access latest \
+          --secret=iree-buildkite-privileged)"
+      build_tools/buildkite/scripts/update_pipeline_configuration.py
 
   - label: "Executing gcmn-test-pipeline"
     commands: |

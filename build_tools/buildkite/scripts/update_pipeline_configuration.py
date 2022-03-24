@@ -4,85 +4,140 @@
 # Licensed under the Apache License v2.0 with LLVM Exceptions.
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
-"""Updates the gievn pipelines with the Buildkite API.
+"""Updates all Buildkite pipelines with the Buildkite API.
 
-This overwrites the YAML steps of all the Buildkite pipeline. Pipelines should
-be updated this way, not in the UI. By default before updating, this checks if a
-later job with the same step key has already run successfully, in which case it
-skips the update. This is to avoid situations where an earlier build is for some
-reason running a step after a later build due to race conditions or a retry.
-Buildkite concurrency groups should be used to prevent builds from running this
-check simultaneously.
+This overwrites the configuration of all the Buildkite pipeline. Pipelines
+should be updated this way, not in the UI. Before updating, this checks for a
+specific header in the configuration stored in the API that indicates which
+Buildkite build previously updated it. If the updater was not this same pipeline
+the script fails. If it was a later build in this pipeline, it skips updating
+unless the `--force` flag is passed. This is to avoid situations where an
+earlier build is for some reason running a step after a later build due to race
+conditions or a retry. Buildkite concurrency groups should be used to prevent
+builds from trying to update pipelines simultaneously.
 """
 
 import argparse
+import glob
 import os
-from pybuildkite import buildkite
-import requests
+import subprocess
 import sys
+import urllib
+
+import requests
+from pybuildkite import buildkite
 
 PIPELINE_ROOT_PATH = "build_tools/buildkite/pipelines"
+BUILD_URL_PREAMBLE = "# Automatically updated by Buildkite pipeline"
+
+UPDATE_INFO_HEADER = f"""{BUILD_URL_PREAMBLE} {{build_url}}
+# from pipeline file {{pipeline_file_url}}
+# with script {{script_url}}
+
+"""
+
+
+def get_git_root():
+  return subprocess.run(["git", "rev-parse", "--show-toplevel"],
+                        check=True,
+                        stdout=subprocess.PIPE,
+                        text=True).stdout.strip()
+
+
+def should_update(bk, *, organization, pipeline_file, running_pipeline,
+                  running_build_number):
+  pipeline_to_update, _ = os.path.splitext(os.path.basename(pipeline_file))
+  previous_pipeline_configuration = bk.pipelines().get_pipeline(
+      organization, pipeline_to_update)["configuration"]
+
+  first_line, _ = previous_pipeline_configuration.split("\n", 1)
+  if not first_line.startswith(BUILD_URL_PREAMBLE):
+    print(f"Did not find build url preamble string '{BUILD_URL_PREAMBLE}' in"
+          f" pipeline configuration from Buildkite API. Aborting.")
+    sys.exit(3)
+
+  previous_build_url = first_line[len(BUILD_URL_PREAMBLE):].strip()
+
+  parsed_url = urllib.parse.urlparse(previous_build_url)
+  path_components = parsed_url.path.split("/")
+  # We're just going to be super picky here. If these invariants end up being a
+  # problem, it's easy to relax them.
+  if any((
+      parsed_url.scheme != "https",
+      parsed_url.netloc != "buildkite.com",
+      parsed_url.params != "",
+      parsed_url.query != "",
+      parsed_url.fragment != "",
+      len(path_components) != 5,
+      # Path starts with a slash, so the first component is empty
+      path_components[0] != "",
+      path_components[3] != "builds",
+  )):
+    print(f"URL of build that previously updated the pipeline is not in"
+          f" expected format. Got URL '{previous_build_url}'. Aborting")
+    sys.exit(4)
+  previous_organization = path_components[1]
+  previous_pipeline = path_components[2]
+  previous_build_number = int(path_components[4])
+
+  if previous_organization != organization:
+    print(f"Build was previously updated by a pipeline from a different"
+          f"organization '{previous_organization}' not current organization"
+          f" '{organization}'")
+    sys.exit(5)
+  if previous_pipeline != running_pipeline:
+    print(f"Build was previously updated by a pipeline from a different"
+          f"organization '{previous_pipeline}' not current organization"
+          f" '{running_pipeline}'")
+    sys.exit(5)
+
+  if previous_build_number > running_build_number:
+    print(f"Pipeline was already updated by later build"
+          f" ({previous_build_number}) of this pipeline. Skipping update.")
+    return False
+
+  return True
+
+
+def update_pipeline(bk, *, organization, pipeline_file, running_pipeline,
+                    running_build_number, running_commit):
+  pipeline_to_update, _ = os.path.splitext(os.path.basename(pipeline_file))
+
+  short_running_commit = running_commit[:10]
+  with open(pipeline_file) as f:
+    new_pipeline_configuration = f.read()
+
+  new_build_url = f"https://buildkite.com/{organization}/{running_pipeline}/builds/{running_build_number}"
+  script_relpath = os.path.relpath(__file__)
+  new_script_url = f"https://github.com/google/iree/blob/{short_running_commit}/{script_relpath}"
+  new_pipeline_file_url = f"https://github.com/google/iree/blob/{short_running_commit}/{pipeline_file}"
+
+  header = UPDATE_INFO_HEADER.format(build_url=new_build_url,
+                                     script_url=new_script_url,
+                                     pipeline_file_url=new_pipeline_file_url)
+  new_pipeline_configuration = header + new_pipeline_configuration
+
+  bk.pipelines().update_pipeline(organization=organization,
+                                 pipeline=pipeline_to_update,
+                                 configuration=new_pipeline_configuration)
 
 
 def parse_args():
   parser = argparse.ArgumentParser(
-      description="Updates the YAML steps of a Buildkite pipeline.")
+      description="Updates the configurations for all Buildkite pipeline.")
   parser.add_argument(
-      "pipeline",
-      help=(f"The slug of the pipeline to update. The steps are pulled from the"
-            f" file at {os.path.join(PIPELINE_ROOT_PATH, '<pipeline>.yml')}"))
+      "--force",
+      action="store_true",
+      default=False,
+      help=("Force updates for all pipelines without checking the existing"
+            " configuration. Use with caution."))
+  parser.add_argument(
+      "pipelines",
+      type=str,
+      nargs="*",
+      help="Pipelines to update. Default is all of them.",
+  )
   return parser.parse_args()
-
-
-def should_update(bk, organization, pipeline_to_update):
-  # Buildkite sets these environment variables. See
-  # https://buildkite.com/docs/pipelines/environment-variables. If running
-  # locally you can set locally or use the simulate_buildkite.sh script.
-  running_pipeline = os.environ["BUILDKITE_PIPELINE_SLUG"]
-  build_number = int(os.environ["BUILDKITE_BUILD_NUMBER"])
-  step_key = os.environ["BUILDKITE_STEP_KEY"]
-
-  next_build_number = build_number + 1
-  try:
-    build = bk.builds().get_build_by_number(organization, running_pipeline,
-                                            next_build_number)
-  except requests.exceptions.HTTPError as e:
-    if e.response.status_code == 404:
-      print(f"Did not find later run of '{pipeline_to_update}' with"
-            f" build number '{next_build_number}'. Proceeding with update.")
-      return True
-    else:
-      raise e
-
-  jobs = build["jobs"]
-  matching_job = next((j for j in jobs if j["step_key"] == step_key), None)
-  if matching_job is None:
-    return True
-
-  # See https://buildkite.com/docs/pipelines/notifications#job-states
-  # If the other job is "pending", "limiting", or "limited", it will be blocked
-  # from racing against this one by the Buildkite concurrency control. If it's
-  # in an active state, *this* build shouldn't be running due to Buildkite
-  # concurrency control.
-  # https://buildkite.com/docs/pipelines/controlling-concurrency#concurrency-groups
-  # If it completed unsuccessfully then we assume for now (based on current use
-  # cases) that it's ok for this build to proceed as if the other build was
-  # never scheduled because presumably if it failed, it also failed to complete
-  # the update, since that's the last thing it does.
-  state = matching_job["state"]
-  print(f"Found higher-numbered build ({next_build_number}) for pipeline"
-        f" '{pipeline_to_update}' in state '{state}'")
-
-  if state in ["passed"]:
-    print("Later build passed. Skipping update.")
-    return False
-
-  if state in ["scheduled", "assigned", "accepted", "running"]:
-    print("Later build is running at the same time as this one."
-          " You have a concurrency bug.")
-    sys.exit(2)
-
-  return True
 
 
 def main(args):
@@ -97,17 +152,48 @@ def main(args):
   # https://buildkite.com/docs/pipelines/environment-variables. If running
   # locally you can set locally or use the simulate_buildkite.sh script.
   organization = os.environ["BUILDKITE_ORGANIZATION_SLUG"]
+  running_pipeline = os.environ["BUILDKITE_PIPELINE_SLUG"]
+  running_build_number = int(os.environ["BUILDKITE_BUILD_NUMBER"])
+  running_commit = os.environ["BUILDKITE_COMMIT"]
 
   bk = buildkite.Buildkite()
   bk.set_access_token(access_token)
 
-  if should_update(bk, organization, args.pipeline):
-    pipeline_file = os.path.join(PIPELINE_ROOT_PATH, f"{args.pipeline}.yml")
-    with open(pipeline_file) as f:
-      current_pipeline_yaml = f.read()
-    bk.pipelines().update_pipeline(organization=organization,
-                                   pipeline=args.pipeline,
-                                   configuration=current_pipeline_yaml)
+  git_root = get_git_root()
+  os.chdir(git_root)
+  glob_pattern = os.path.join(PIPELINE_ROOT_PATH, "*.yml")
+
+  pipeline_files = ((
+      os.path.join(PIPELINE_ROOT_PATH, f"{p}.yml") for p in args.pipelines)
+                    if args.pipelines else glob.iglob(glob_pattern))
+  first_error = None
+  if args.force:
+    print("Was passed force, so not checking existing pipeline configurations.")
+  for pipeline_file in pipeline_files:
+    # TODO: Support creating a new pipeline.
+    print(f"Updating from: {pipeline_file}")
+    try:
+      if args.force or should_update(bk,
+                                     organization=organization,
+                                     pipeline_file=pipeline_file,
+                                     running_pipeline=running_pipeline,
+                                     running_build_number=running_build_number):
+        update_pipeline(
+            bk,
+            organization=organization,
+            pipeline_file=pipeline_file,
+            running_pipeline=running_pipeline,
+            running_build_number=running_build_number,
+            running_commit=running_commit,
+        )
+    except Exception as e:
+      if first_error is None:
+        first_error = e
+      print(e)
+
+  if first_error is not None:
+    print("Encountered errors. Stack of first error:")
+    raise first_error
 
 
 if __name__ == "__main__":
