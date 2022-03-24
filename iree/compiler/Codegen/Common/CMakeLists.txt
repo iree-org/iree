@@ -80,6 +80,7 @@ iree_cc_library(
     MLIRTransforms
     MLIRVector
     MLIRVectorTransforms
+    MLIRViewLikeInterface
     iree::compiler::Codegen::Common::FoldTensorExtractOpIncGen
     iree::compiler::Codegen::Dialect::IREECodegenDialect
     iree::compiler::Codegen::Interfaces::BufferizationInterfaces
