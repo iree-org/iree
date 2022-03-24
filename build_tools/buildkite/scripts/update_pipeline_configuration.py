@@ -92,7 +92,7 @@ def should_update(bk, *, organization, pipeline_file, running_pipeline,
     sys.exit(5)
 
   if previous_build_number > running_build_number:
-    print(f"Pipeline was already updated by later build"
+    print(f"...pipeline was already updated by later build"
           f" ({previous_build_number}) of this pipeline. Skipping update.")
     return False
 
@@ -120,7 +120,7 @@ def update_pipeline(bk, *, organization, pipeline_file, running_pipeline,
   bk.pipelines().update_pipeline(organization=organization,
                                  pipeline=pipeline_to_update,
                                  configuration=new_pipeline_configuration)
-
+  print("...updated successfully")
 
 def parse_args():
   parser = argparse.ArgumentParser(
@@ -171,7 +171,7 @@ def main(args):
     print("Was passed force, so not checking existing pipeline configurations.")
   for pipeline_file in pipeline_files:
     # TODO: Support creating a new pipeline.
-    print(f"Updating from: {pipeline_file}")
+    print(f"Updating from: '{pipeline_file}'...")
     try:
       if args.force or should_update(bk,
                                      organization=organization,
