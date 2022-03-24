@@ -192,7 +192,7 @@ hal.executable private @matmul_tensors {
 
 // -----
 
-#config = #iree_codegen.lowering_config<tile_sizes = [[32, 32, 16]]>
+#config = #iree_codegen.lowering_config<tile_sizes = [[64, 32, 16]]>
 #translation = #iree_codegen.translation_info<LLVMGPUMatmulTensorCore>
 #executable_layout = #hal.executable.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
