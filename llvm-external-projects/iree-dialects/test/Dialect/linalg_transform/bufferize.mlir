@@ -19,7 +19,6 @@ func @matmul_tensors(
 // CHECK: }
 }
 
-
 pdl.pattern @pdl_target : benefit(1) {
   %args = operands
   %results = types

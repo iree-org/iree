@@ -357,7 +357,7 @@ def TileToLinalgExtTileOp : Linalg_Transform_Operation<"tile_to_iree_linalg_ext_
 
   let extraClassDeclaration = [{
     ::mlir::FailureOr<Operation *> applyToOne(
-        ::mlir::TilingInterface target);
+        ::mlir::Operation *target);
   }];
 }
 

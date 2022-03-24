@@ -767,6 +767,7 @@ cc_binary(
     ],
     tags = ["hostonly"],
     deps = [
+        "IREELinalgExtTransforms",
         ":IREEDialectsTest",
         ":IREEInputDialect",
         ":IREELinalgExtDialect",
@@ -777,6 +778,7 @@ cc_binary(
         ":IREEPyDMTransforms",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:ArithmeticDialect",
+        "@llvm-project//mlir:Async",
         "@llvm-project//mlir:ControlFlowOps",
         "@llvm-project//mlir:FuncDialect",
         "@llvm-project//mlir:IR",
