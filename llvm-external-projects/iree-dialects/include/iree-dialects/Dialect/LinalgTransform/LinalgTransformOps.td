@@ -287,6 +287,19 @@ def UnrollLoopOp : Linalg_Transform_Operation<"unroll_loop", [
   }];
 }
 
+def PeelLoopOp : Linalg_Transform_Operation<"peel_loop", [
+    TransformOpInterface, TargetableSingleOperandTransformOpTrait]> {
+  let arguments = (ins PDL_Operation:$target);
+  let results = (outs PDL_Operation:$transformed);
+
+  let assemblyFormat = "$target attr-dict";
+
+  let extraClassDeclaration = [{
+    ::mlir::FailureOr<::mlir::scf::ForOp> applyToOne(::mlir::scf::ForOp loop);
+  }];
+}
+
+
 def PipelineLoopOp : Linalg_Transform_Operation<"pipeline_loop", [
     TransformOpInterface, TargetableSingleOperandTransformOpTrait]> {
   let arguments = (ins PDL_Operation:$target,
