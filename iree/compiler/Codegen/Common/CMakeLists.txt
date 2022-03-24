@@ -36,6 +36,7 @@ iree_cc_library(
     "FoldTensorExtractOpPass.cpp"
     "ForOpCanonicalizationPass.cpp"
     "IREEComprehensiveBufferizePass.cpp"
+    "InsertDistributionInfoPass.cpp"
     "LinalgBufferizePass.cpp"
     "MemrefCopyToLinalg.cpp"
     "OptimizeVectorTransferPass.cpp"

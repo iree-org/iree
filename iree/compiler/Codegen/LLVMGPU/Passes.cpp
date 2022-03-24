@@ -38,6 +38,7 @@ static Value gpuAllocationFunction(OpBuilder &builder, Location loc,
 }
 
 static void tileAndBufferize(OpPassManager &pm) {
+  pm.addNestedPass<FuncOp>(createInsertDistributionInfoPass());
   pm.addNestedPass<FuncOp>(createTileAndDistributeToWorkgroupsPass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
@@ -70,6 +71,7 @@ void addGPUVectorizationPassPipeline(OpPassManager &pm) {
 }
 
 void addGPUMatmulSimtPassPipeline(OpPassManager &pm) {
+  pm.addNestedPass<FuncOp>(createInsertDistributionInfoPass());
   pm.addNestedPass<FuncOp>(createTileAndDistributeToWorkgroupsPass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());

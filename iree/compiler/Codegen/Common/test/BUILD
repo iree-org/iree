@@ -28,6 +28,7 @@ iree_lit_test_suite(
             "fold_affine_min_in_distributed_loops.mlir",
             "fold_tensor_extract_op.mlir",
             "forop_canonicalization.mlir",
+            "insert_distribution_info.mlir",
             "iree_comprehensive_bufferize.mlir",
             "linalg_bufferize.mlir",
             "remove_dead_allocs.mlir",

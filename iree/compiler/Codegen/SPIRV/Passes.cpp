@@ -136,6 +136,7 @@ static void addSPIRVLoweringPasses(OpPassManager &pm) {
 //===----------------------------------------------------------------------===//
 
 void addSPIRVTileAndVectorizePassPipeline(OpPassManager &pm) {
+  pm.addNestedPass<FuncOp>(createInsertDistributionInfoPass());
   pm.addNestedPass<FuncOp>(createTileAndDistributeToWorkgroupsPass());
   pm.addNestedPass<FuncOp>(createSPIRVFuseTensorPadWithConsumerPass());
   pm.addPass(createCanonicalizerPass());
@@ -169,6 +170,7 @@ void addSPIRVTileAndVectorizePassPipeline(OpPassManager &pm) {
 }
 
 void addSPIRVTileAndVectorizeToCooperativeOpsPassPipeline(OpPassManager &pm) {
+  pm.addNestedPass<FuncOp>(createInsertDistributionInfoPass());
   pm.addNestedPass<FuncOp>(createTileAndDistributeToWorkgroupsPass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
@@ -195,6 +197,7 @@ void addSPIRVTileAndVectorizeToCooperativeOpsPassPipeline(OpPassManager &pm) {
 }
 
 void addSPIRVTileAndDistributePassPipeline(OpPassManager &pm) {
+  pm.addNestedPass<FuncOp>(createInsertDistributionInfoPass());
   pm.addNestedPass<FuncOp>(createTileAndDistributeToWorkgroupsPass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
@@ -229,6 +232,7 @@ void addSPIRVTileAndDistributeCopyPassPipeline(OpPassManager &pm) {
   addLinalgBufferizePasses(pm, gpuAllocationFunction);
   pm.addPass(createSPIRVInitConfigPass());
 
+  pm.addNestedPass<FuncOp>(createInsertDistributionInfoPass());
   pm.addNestedPass<FuncOp>(createTileAndDistributeToWorkgroupsPass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
