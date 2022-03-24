@@ -104,18 +104,32 @@ set(MOBILEBERT_FP16_MODULE
     "1x384xi32,1x384xi32,1x384xi32"
 )
 
-set(MOBILENET_V2_MODULE
+set(MOBILENET_V2_FP32_MODULE
   NAME
     "MobileNetV2"
   TAGS
     "fp32,imagenet"
   SOURCE
-    # Mirror https://github.com/tensorflow/tflite-support/blob/master/tensorflow_lite_support/metadata/python/tests/testdata/image_classifier/mobilenet_v2_1.0_224.tflite
-    "https://storage.googleapis.com/iree-model-artifacts/mobilenet_v2_1.0_224.tflite"
+    # Mirror https://tfhub.dev/iree/lite-model/mobilenet_v2_100_224/fp32/1
+    "https://storage.googleapis.com/iree-model-artifacts/mobilenet_v2_224_1.0_float.tflite"
   ENTRY_FUNCTION
     "main"
   FUNCTION_INPUTS
     "1x224x224x3xf32"
+)
+
+set(MOBILENET_V2_UINT8_MODULE
+  NAME
+    "MobileNetV2"
+  TAGS
+    "uint8,imagenet"
+  SOURCE
+    # Mirror https://tfhub.dev/iree/lite-model/mobilenet_v2_100_224/uint8/1
+    "https://storage.googleapis.com/iree-model-artifacts/mobilenet_v2_224_1.0_uint8.tflite"
+  ENTRY_FUNCTION
+    "main"
+  FUNCTION_INPUTS
+    "1x224x224x3xui8"
 )
 
 set(MOBILENET_V3SMALL_MODULE
@@ -170,7 +184,8 @@ iree_benchmark_suite(
     "${POSENET_FP32_MODULE}"
     "${MOBILEBERT_FP32_MODULE}"
     "${MOBILEBERT_INT8_MODULE}"
-    "${MOBILENET_V2_MODULE}"
+    "${MOBILENET_V2_FP32_MODULE}"
+    "${MOBILENET_V2_UINT8_MODULE}"
     "${MOBILENET_V3SMALL_MODULE}"
 
   BENCHMARK_MODES
@@ -196,7 +211,8 @@ iree_benchmark_suite(
     "${POSENET_FP32_MODULE}"
     "${MOBILEBERT_FP32_MODULE}"
     "${MOBILEBERT_INT8_MODULE}"
-    "${MOBILENET_V2_MODULE}"
+    "${MOBILENET_V2_FP32_MODULE}"
+    "${MOBILENET_V2_UINT8_MODULE}"
     "${MOBILENET_V3SMALL_MODULE}"
 
   BENCHMARK_MODES
@@ -224,7 +240,7 @@ iree_benchmark_suite(
 #     "${MOBILESSD_FP32_MODULE}"
 #     "${POSENET_FP32_MODULE}"
 #     "${MOBILEBERT_FP32_MODULE}"
-#     "${MOBILENET_V2_MODULE}"
+#     "${MOBILENET_V2_FP32_MODULE}"
 #     "${MOBILENET_V3SMALL_MODULE}"
 
 #   BENCHMARK_MODES
@@ -250,7 +266,7 @@ iree_benchmark_suite(
 #     "${MOBILESSD_FP32_MODULE}"
 #     "${POSENET_FP32_MODULE}"
 #     "${MOBILEBERT_FP32_MODULE}"
-#     "${MOBILENET_V2_MODULE}"
+#     "${MOBILENET_V2_FP32_MODULE}"
 #     "${MOBILENET_V3SMALL_MODULE}"
 
 #   BENCHMARK_MODES
@@ -277,7 +293,8 @@ iree_benchmark_suite(
     "${POSENET_FP32_MODULE}"
     "${MOBILEBERT_FP32_MODULE}"
     "${MOBILEBERT_INT8_MODULE}"
-    "${MOBILENET_V2_MODULE}"
+    "${MOBILENET_V2_FP32_MODULE}"
+    "${MOBILENET_V2_UINT8_MODULE}"
     "${MOBILENET_V3SMALL_MODULE}"
 
   BENCHMARK_MODES
@@ -304,7 +321,7 @@ iree_benchmark_suite(
     "${MOBILESSD_FP32_MODULE}"
     "${POSENET_FP32_MODULE}"
     "${MOBILEBERT_FP32_MODULE}"
-    "${MOBILENET_V2_MODULE}"
+    "${MOBILENET_V2_FP32_MODULE}"
     "${MOBILENET_V3SMALL_MODULE}"
 
   BENCHMARK_MODES
@@ -328,7 +345,7 @@ iree_benchmark_suite(
     "${MOBILESSD_FP32_MODULE}"
     "${POSENET_FP32_MODULE}"
     "${MOBILEBERT_FP32_MODULE}"
-    "${MOBILENET_V2_MODULE}"
+    "${MOBILENET_V2_FP32_MODULE}"
     "${MOBILENET_V3SMALL_MODULE}"
 
   BENCHMARK_MODES
@@ -393,7 +410,7 @@ iree_benchmark_suite(
     "${MOBILESSD_FP32_MODULE}"
     "${POSENET_FP32_MODULE}"
     "${MOBILEBERT_FP32_MODULE}"
-    "${MOBILENET_V2_MODULE}"
+    "${MOBILENET_V2_FP32_MODULE}"
     "${MOBILENET_V3SMALL_MODULE}"
 
   BENCHMARK_MODES
@@ -450,7 +467,7 @@ iree_benchmark_suite(
     "${MOBILESSD_FP32_MODULE}"
     "${POSENET_FP32_MODULE}"
     "${MOBILEBERT_FP32_MODULE}"
-    "${MOBILENET_V2_MODULE}"
+    "${MOBILENET_V2_FP32_MODULE}"
     "${MOBILENET_V3SMALL_MODULE}"
 
   BENCHMARK_MODES
@@ -506,7 +523,7 @@ iree_benchmark_suite(
 #     "${MOBILESSD_FP32_MODULE}"
 #     "${POSENET_FP32_MODULE}"
 #     "${MOBILEBERT_FP32_MODULE}"
-#     "${MOBILENET_V2_MODULE}"
+#     "${MOBILENET_V2_FP32_MODULE}"
 #     "${MOBILENET_V3SMALL_MODULE}"
 
 #   BENCHMARK_MODES
@@ -533,7 +550,7 @@ iree_benchmark_suite(
 #   "${MOBILESSD_FP32_MODULE}"
 #   "${POSENET_FP32_MODULE}"
 #   "${MOBILEBERT_FP32_MODULE}"
-#   "${MOBILENET_V2_MODULE}"
+#   "${MOBILENET_V2_FP32_MODULE}"
 #   "${MOBILENET_V3SMALL_MODULE}"
 
 #   BENCHMARK_MODES
@@ -564,7 +581,7 @@ iree_benchmark_suite(
     "${MOBILESSD_FP32_MODULE}"
     "${POSENET_FP32_MODULE}"
     "${MOBILEBERT_FP32_MODULE}"
-    "${MOBILENET_V2_MODULE}"
+    "${MOBILENET_V2_FP32_MODULE}"
     "${MOBILENET_V3SMALL_MODULE}"
 
   BENCHMARK_MODES
@@ -621,7 +638,7 @@ iree_benchmark_suite(
 # probably not a codegen issue).
 iree_benchmark_suite(
   MODULES
-    "${MOBILENET_V2_MODULE}"
+    "${MOBILENET_V2_FP32_MODULE}"
     "${MOBILENET_V3SMALL_MODULE}"
 
   BENCHMARK_MODES
@@ -648,7 +665,7 @@ iree_benchmark_suite(
     "${MOBILESSD_FP32_MODULE}"
     "${POSENET_FP32_MODULE}"
     "${MOBILEBERT_FP32_MODULE}"
-    "${MOBILENET_V2_MODULE}"
+    "${MOBILENET_V2_FP32_MODULE}"
     "${MOBILENET_V3SMALL_MODULE}"
 
   BENCHMARK_MODES
@@ -673,7 +690,7 @@ iree_benchmark_suite(
     "${MOBILESSD_FP32_MODULE}"
     "${POSENET_FP32_MODULE}"
     "${MOBILEBERT_FP32_MODULE}"
-    "${MOBILENET_V2_MODULE}"
+    "${MOBILENET_V2_FP32_MODULE}"
     "${MOBILENET_V3SMALL_MODULE}"
 
   BENCHMARK_MODES
@@ -731,7 +748,7 @@ iree_benchmark_suite(
   MODULES
     "${MOBILESSD_FP32_MODULE}"
     "${POSENET_FP32_MODULE}"
-    "${MOBILENET_V2_MODULE}"
+    "${MOBILENET_V2_FP32_MODULE}"
     "${MOBILENET_V3SMALL_MODULE}"
 
   BENCHMARK_MODES
@@ -759,7 +776,7 @@ iree_benchmark_suite(
     "${MOBILESSD_FP32_MODULE}"
     "${POSENET_FP32_MODULE}"
     "${MOBILEBERT_FP32_MODULE}"
-    "${MOBILENET_V2_MODULE}"
+    "${MOBILENET_V2_FP32_MODULE}"
     "${MOBILENET_V3SMALL_MODULE}"
 
   BENCHMARK_MODES
