@@ -122,6 +122,7 @@ def update_pipeline(bk, *, organization, pipeline_file, running_pipeline,
                                  configuration=new_pipeline_configuration)
   print("...updated successfully")
 
+
 def parse_args():
   parser = argparse.ArgumentParser(
       description="Updates the configurations for all Buildkite pipeline.")
