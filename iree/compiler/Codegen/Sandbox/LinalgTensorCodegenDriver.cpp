@@ -156,7 +156,6 @@ struct LinalgVectorLoweringPass
     this->splitVectorTransfersTo = options.splitVectorTransfersTo;
     this->lowerVectorTransposeTo = options.lowerVectorTransposeTo;
     this->lowerVectorTransposeToAVX2 = options.lowerVectorTransposeToAVX2;
-    llvm::dbgs() << "LVLP: " << this->lowerVectorTransposeToAVX2 << "\n";
     this->lowerVectorMultiReductionTo = options.lowerVectorMultiReductionTo;
     this->lowerVectorContractionTo = options.lowerVectorContractionTo;
     this->unrollVectorTransfers = options.unrollVectorTransfers;
