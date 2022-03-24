@@ -17,15 +17,10 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Dict, Sequence
 
-__all__ = [
-    "PlatformType", "DeviceInfo", "BenchmarkInfo", "BenchmarkResults",
-    "BenchmarkRun", "execute_cmd_and_get_output", "execute_cmd"
-]
-
 
 @dataclass
 class DriverInfo:
-  """An object describing a driver.
+  """An object describing a IREE HAL driver.
 
   It includes the following characteristics:
   - pretty_name: the pretty name, e.g., 'IREE-DyLib'

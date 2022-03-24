@@ -40,15 +40,17 @@ import time
 import shutil
 import sys
 
-from typing import Any, Dict, List, Optional, Sequence, Tuple, TextIO, Set
+from typing import List, Optional, Sequence, Tuple, Set
 
-from common.benchmark_definition import (PlatformType, DeviceInfo,
-                                         BenchmarkInfo, BenchmarkResults,
-                                         BenchmarkRun, execute_cmd,
+from common.benchmark_definition import (DeviceInfo, BenchmarkInfo,
+                                         BenchmarkResults, BenchmarkRun,
+                                         execute_cmd,
                                          execute_cmd_and_get_output)
 from common.benchmark_suite import (BENCHMARK_SUITE_REL_PATH,
                                     compose_info_object,
                                     filter_benchmarks_for_category)
+from common.android_utils import (get_android_device_model,
+                                  get_android_device_info, get_android_gpu_name)
 
 # The flagfile/toolfile's filename for compiled benchmark artifacts.
 MODEL_FLAGFILE_NAME = "flagfile"
@@ -89,50 +91,6 @@ def get_git_commit_hash(commit: str) -> str:
   return execute_cmd_and_get_output(['git', 'rev-parse', commit],
                                     cwd=os.path.dirname(
                                         os.path.realpath(__file__)))
-
-
-def get_android_device_model(verbose: bool = False) -> str:
-  """Returns the Android device model."""
-  model = execute_cmd_and_get_output(
-      ["adb", "shell", "getprop", "ro.product.model"], verbose=verbose)
-  model = re.sub(r"\W+", "-", model)
-  return model
-
-
-def get_android_cpu_abi(verbose: bool = False) -> str:
-  """Returns the CPU ABI for the Android device."""
-  return execute_cmd_and_get_output(
-      ["adb", "shell", "getprop", "ro.product.cpu.abi"], verbose=verbose)
-
-
-def get_android_cpu_features(verbose: bool = False) -> Sequence[str]:
-  """Returns the CPU features for the Android device."""
-  cpuinfo = execute_cmd_and_get_output(["adb", "shell", "cat", "/proc/cpuinfo"],
-                                       verbose=verbose)
-  features = []
-  for line in cpuinfo.splitlines():
-    if line.startswith("Features"):
-      _, features = line.split(":")
-      return features.strip().split()
-  return features
-
-
-def get_android_gpu_name(verbose: bool = False) -> str:
-  """Returns the GPU name for the Android device."""
-  vkjson = execute_cmd_and_get_output(["adb", "shell", "cmd", "gpu", "vkjson"],
-                                      verbose=verbose)
-  vkjson = json.loads(vkjson)
-  name = vkjson["devices"][0]["properties"]["deviceName"]
-
-  # Perform some canonicalization:
-
-  # - Adreno GPUs have raw names like "Adreno (TM) 650".
-  name = name.replace("(TM)", "")
-
-  # Replace all consecutive non-word characters with a single hypen.
-  name = re.sub(r"\W+", "-", name)
-
-  return name
 
 
 def adb_push_to_tmp_dir(content: str,
@@ -738,15 +696,8 @@ def real_path_or_none(path: str) -> Optional[str]:
   return os.path.realpath(path) if path else None
 
 
-def get_device_info_from_adb(verbose: bool = False):
-  return DeviceInfo(PlatformType.ANDROID, get_android_device_model(verbose),
-                    get_android_cpu_abi(verbose),
-                    get_android_cpu_features(verbose),
-                    get_android_gpu_name(verbose))
-
-
 def main(args):
-  device_info = get_device_info_from_adb()
+  device_info = get_android_device_info()
   if args.verbose:
     print(device_info)
 
