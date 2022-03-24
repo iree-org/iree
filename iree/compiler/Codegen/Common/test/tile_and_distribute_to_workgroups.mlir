@@ -388,8 +388,8 @@ hal.executable public @copy_op {
 //  CHECK-DAG:     %[[LB_X:.+]] = affine.apply #[[MAP1]]()[%[[WG_ID_X]]]
 //  CHECK-DAG:     %[[STEP_X:.+]] = affine.apply #[[MAP1]]()[%[[WG_COUNT_X]]]
 //      CHECK:     scf.for %[[IV1:.+]] = %[[LB_X]] to %[[SLICE_SIZE_X]] step %[[STEP_X]]
-//  CHECK-DAG:       %[[TILESIZE_Y:.+]] = affine.min #[[MAP2]](%[[ARG0]])[%[[SLICE_SIZE_Y]]]
-//  CHECK-DAG:       %[[TILESIZE_X:.+]] = affine.min #[[MAP2]](%[[ARG1]])[%[[SLICE_SIZE_X]]]
+//  CHECK-DAG:       %[[TILESIZE_Y:.+]] = affine.min #[[MAP2]](%[[IV0]])[%[[SLICE_SIZE_Y]]]
+//  CHECK-DAG:       %[[TILESIZE_X:.+]] = affine.min #[[MAP2]](%[[IV1]])[%[[SLICE_SIZE_X]]]
 //  CHECK-DAG:       %[[SOURCE_SUBVIEW:.+]] = memref.subview %[[SOURCE]][%[[IV0]], %[[IV1]]]
 //  CHECK-DAG:       %[[DEST_SUBVIEW:.+]] = memref.subview %[[DEST]][%[[IV0]], %[[IV1]]]
 //      CHECK:       linalg.generic
