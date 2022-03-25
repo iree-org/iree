@@ -756,6 +756,8 @@ def main(args):
     atexit.register(execute_cmd_and_get_output,
                     ["adb", "shell", "rm", "-rf", ANDROID_TMP_DIR],
                     verbose=args.verbose)
+    # Also clear temporary directory on the host device.
+    atexit.register(shutil.rmtree, args.tmp_dir)
 
   # Tracy client and server communicate over port 8086 by default. If we want
   # to capture traces along the way, forward port via adb.
@@ -823,10 +825,6 @@ def main(args):
     with tarfile.open(args.capture_tarball, "w:gz") as tar:
       for capture_filename in captures:
         tar.add(capture_filename)
-
-  # Delete all the temp files if everything completed successfully.
-  if not args.no_clean and not errors:
-    shutil.rmtree(args.tmp_dir)
 
   if errors:
     print("Benchmarking completed with errors", file=sys.stderr)
