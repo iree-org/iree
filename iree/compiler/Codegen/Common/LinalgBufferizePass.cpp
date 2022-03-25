@@ -1109,6 +1109,10 @@ void LinalgBufferizePass::runOnOperation() {
         })
         .Case<vector::TransferWriteOp>(
             [&](vector::TransferWriteOp transferWriteOp) {
+              if (!transferWriteOp.source().getType().isa<RankedTensorType>()) {
+                // Nothing to do when source is not a tensor.
+                return success();
+              }
               if (failed(getOrAllocateResultBuffers(b, transferWriteOp, bvm,
                                                     plan, allocationFn))) {
                 return failure();

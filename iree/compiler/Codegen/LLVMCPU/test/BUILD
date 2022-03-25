@@ -44,7 +44,6 @@ iree_lit_test_suite(
     tools = [
         "//iree/tools:iree-compile",
         "//iree/tools:iree-opt",
-        "//iree/tools:iree-translate",
         "@llvm-project//llvm:FileCheck",
     ],
 )

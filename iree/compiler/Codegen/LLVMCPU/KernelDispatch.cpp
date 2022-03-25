@@ -378,25 +378,25 @@ static LogicalResult setX86SandboxRootConfig(FuncOp entryPointFn,
                                              int vectorSize) {
   // Hardcoded tiling sizes {1, 1, ..., 8, 32, 16}.
   // The tiling for parallel dims and reduction dims should be separated.
-  SmallVector<int64_t> l1TileSizes;
+  SmallVector<int64_t> parallelTileSizes;
   int64_t nLoops = cast<linalg::LinalgOp>(op.getOperation()).getNumLoops();
-  l1TileSizes.append(nLoops - 3, 1);
-  l1TileSizes.push_back(
+  parallelTileSizes.append(nLoops - 3, 1);
+  parallelTileSizes.push_back(
       getMaxTileSize(0, flowTileSizes[nLoops - 3], 8, vectorSize));
-  l1TileSizes.push_back(
+  parallelTileSizes.push_back(
       getMaxTileSize(0, flowTileSizes[nLoops - 2], 32, vectorSize));
-  l1TileSizes.push_back(0);
+  parallelTileSizes.push_back(0);
 
   auto lhsShapedType = op.lhs().getType().cast<ShapedType>();
   int64_t K = lhsShapedType.getShape().back();
-  SmallVector<int64_t> vectorTileSizes;
-  vectorTileSizes.append(nLoops - 1, 0);
-  vectorTileSizes.push_back(getMaxTileSize(0, K, 16, vectorSize));
+  SmallVector<int64_t> reductionTileSizes;
+  reductionTileSizes.append(nLoops - 1, 0);
+  reductionTileSizes.push_back(getMaxTileSize(0, K, 16, vectorSize));
 
   TileSizesListType tileSizes;
   tileSizes.emplace_back(flowTileSizes.begin(), flowTileSizes.end());
-  tileSizes.push_back(l1TileSizes);
-  tileSizes.push_back(vectorTileSizes);
+  tileSizes.push_back(parallelTileSizes);
+  tileSizes.push_back(reductionTileSizes);
 
   return setOpConfigAndEntryPointFnTranslation(
       entryPointFn, op, tileSizes,
@@ -602,33 +602,39 @@ static LogicalResult setRootConfig(
       maxTileSizes);
 
   // Set the Next level tile sizes.
-  SmallVector<int64_t> l1TileSizes(numLoops, 0);
+  SmallVector<int64_t> parallelTileSizes(numLoops, 0);
   Optional<SmallVector<int64_t, 4>> staticLoopRanges =
       linalgOp.getStaticLoopRanges();
   for (auto loopNum : llvm::seq<unsigned>(0, numLoops)) {
     if (flowTileSizes[loopNum]) {
-      l1TileSizes[loopNum] =
+      parallelTileSizes[loopNum] =
           getMaxTileSize(0, flowTileSizes[loopNum], minTileSizes[loopNum],
                          minTileSizes[loopNum]);
     } else {
       // If the flow level tile size is zero, and static loop range is 0 as
       // well, set the tile sizes here to zero as well.
-      l1TileSizes[loopNum] =
+      parallelTileSizes[loopNum] =
           (staticLoopRanges && staticLoopRanges.getValue()[loopNum] == 1)
               ? 0
               : minTileSizes[loopNum];
     }
   }
-  SmallVector<int64_t> vectorTileSizes;
-  splitParallelAndReductionTiles(linalgOp, l1TileSizes, vectorTileSizes);
+  SmallVector<int64_t> reductionTileSizes;
+  splitParallelAndReductionTiles(linalgOp, parallelTileSizes,
+                                 reductionTileSizes);
 
   TileSizesListType tileSizes;
   tileSizes.push_back(flowTileSizes);
-  tileSizes.push_back(l1TileSizes);
-  tileSizes.push_back(vectorTileSizes);
-  return setOpConfigAndEntryPointFnTranslation(
-      entryPointFn, genericOp, tileSizes,
-      DispatchLoweringPassPipeline::CPUDoubleTilingExpert);
+  tileSizes.push_back(parallelTileSizes);
+  tileSizes.push_back(reductionTileSizes);
+
+  // For non-tensor based ops use the Buffer ops pipeline.
+  auto passPipeline =
+      genericOp.hasTensorSemantics()
+          ? DispatchLoweringPassPipeline::CPUDoubleTilingExpert
+          : DispatchLoweringPassPipeline::CPUBufferOpsTileAndVectorize;
+  return setOpConfigAndEntryPointFnTranslation(entryPointFn, genericOp,
+                                               tileSizes, passPipeline);
 }
 
 /// Sets the lowering configuration for linalg.conv_2d_nhwc_hwcf and
@@ -636,7 +642,7 @@ static LogicalResult setRootConfig(
 static LogicalResult setConvRootConfig(
     FuncOp entryPointFn, linalg::LinalgOp convOp,
     ArrayRef<LoopTilingAndDistributionInfo> tiledLoops,
-    ArrayRef<int64_t> targetL1TileSizes, int64_t vectorSize) {
+    ArrayRef<int64_t> targetTileSizes, int64_t vectorSize) {
   if (!isa<linalg::Conv2DNhwcHwcfOp, linalg::DepthwiseConv2DNhwcHwcOp>(
           convOp.getOperation())) {
     return failure();
@@ -660,23 +666,24 @@ static LogicalResult setConvRootConfig(
 
   // Shapes of N, OH, OW, OC, KH, KW, (IC)
   Optional<SmallVector<int64_t, 4>> shapes = convOp.getStaticLoopRanges();
-  SmallVector<int64_t> l1TileSizes(targetL1TileSizes.begin(),
-                                   targetL1TileSizes.end());
-  for (auto i : llvm::seq<unsigned>(0, l1TileSizes.size())) {
+  SmallVector<int64_t> parallelTileSizes(targetTileSizes.begin(),
+                                         targetTileSizes.end());
+  for (auto i : llvm::seq<unsigned>(0, parallelTileSizes.size())) {
     auto tileSize = flowTileSizes[i] ? flowTileSizes[i] : shapes.getValue()[i];
     // If the tile size is intended to be 1, do not adjust it to `vectorSize`.
     // The ops will be decomposed to lower-rank named ops.
-    if (l1TileSizes[i] != 1) {
-      l1TileSizes[i] = getMaxTileSize(0, tileSize, l1TileSizes[i], vectorSize);
+    if (parallelTileSizes[i] != 1) {
+      parallelTileSizes[i] =
+          getMaxTileSize(0, tileSize, parallelTileSizes[i], vectorSize);
     }
   }
-  SmallVector<int64_t> vectorTileSizes;
-  splitParallelAndReductionTiles(convOp, l1TileSizes, vectorTileSizes);
+  SmallVector<int64_t> reductionTileSizes;
+  splitParallelAndReductionTiles(convOp, parallelTileSizes, reductionTileSizes);
 
   TileSizesListType tileSizes;
   tileSizes.push_back(flowTileSizes);
-  tileSizes.push_back(l1TileSizes);
-  tileSizes.push_back(vectorTileSizes);
+  tileSizes.push_back(parallelTileSizes);
+  tileSizes.push_back(reductionTileSizes);
   return setOpConfigAndEntryPointFnTranslation(
       entryPointFn, convOp, tileSizes,
       DispatchLoweringPassPipeline::CPUConvTileAndDecomposeExpert);
@@ -688,8 +695,8 @@ static LogicalResult setRootConfig(
   auto linalgOp = cast<linalg::LinalgOp>(convOp.getOperation());
   int64_t vectorSize =
       getVectorSize(entryPointFn, convOp.getResult(0).getType());
-  SmallVector<int64_t> l1TileSizes = {1, 1, 8, vectorSize * 2, 1, 1, 8};
-  return setConvRootConfig(entryPointFn, linalgOp, tiledLoops, l1TileSizes,
+  SmallVector<int64_t> targetTileSizes = {1, 1, 8, vectorSize * 2, 1, 1, 8};
+  return setConvRootConfig(entryPointFn, linalgOp, tiledLoops, targetTileSizes,
                            vectorSize);
 }
 
@@ -701,8 +708,8 @@ static LogicalResult setRootConfig(
   auto linalgOp = cast<linalg::LinalgOp>(convOp.getOperation());
   int64_t vectorSize =
       getVectorSize(entryPointFn, convOp.getResult(0).getType());
-  SmallVector<int64_t> l1TileSizes = {1, 1, 8, vectorSize * 2, 1, 3};
-  return setConvRootConfig(entryPointFn, linalgOp, tiledLoops, l1TileSizes,
+  SmallVector<int64_t> targetTileSizes = {1, 1, 8, vectorSize * 2, 1, 3};
+  return setConvRootConfig(entryPointFn, linalgOp, tiledLoops, targetTileSizes,
                            vectorSize);
 }
 
@@ -828,24 +835,10 @@ static FailureOr<Operation *> getRootOperation(
   if (rootOperation) return rootOperation;
 
   // If no root operation is found yet. Look for linalg generic ops.
-  for (auto op : computeOps) {
-    if (isa<linalg::GenericOp>(op)) {
+  for (auto op : llvm::reverse(computeOps)) {
+    if (isa<linalg::LinalgOp>(op)) {
       if (failed(updateRootOperation(op))) return failure();
     }
-  }
-  if (rootOperation) return rootOperation;
-
-  // TODO(ravishankarm): Currently there is a corner case of a dispatch region
-  // with just a `tensor.extract_slice`/`tensor.insert_slice`. Those need to be
-  // folded with `flow.dispatch.tensor.load`/`flow.dispatch.tensor.store` ops
-  // respectively. This should go hand-in-hand with dropping the external model
-  // implementation of the `TiledOpInterface` for these ops. Till we cross that
-  // bridge, handle that case.
-  // Throw in linalg.fill here as well, though that should never happen either.
-  if (computeOps.size() == 1 &&
-      isa<linalg::FillOp, tensor::ExtractSliceOp, tensor::InsertSliceOp>(
-          computeOps[0])) {
-    rootOperation = computeOps[0];
   }
   return rootOperation;
 }

@@ -59,6 +59,13 @@ def ForOpCanonicalization :
   let constructor = "mlir::iree_compiler::createForOpCanonicalizationPass()";
 }
 
+def BufferizeCopyOnlyDispatches :
+  Pass<"iree-codegen-bufferize-copy-only-dispatches", "ModuleOp"> {
+  let summary =
+      "Bufferize dispatches that copy to/from interfaces to convert to a linalg.copy op";
+  let constructor = "mlir::iree_compiler::createBufferizeCopyOnlyDispatchesPass()";
+}
+
 def LinalgBufferize :
     Pass<"iree-codegen-linalg-bufferize", "func::FuncOp"> {
   let summary = "Convert from to Linalg ops on tensors to buffers";
@@ -84,6 +91,12 @@ def OptimizeVectorTransfer :
   let summary =
       "Run optimization transformations on vector transfer operations";
   let constructor = "mlir::iree_compiler::createOptimizeVectorTransferPass()";
+}
+
+def InsertDistributionInfo :
+    Pass<"iree-codegen-insert-distribution-info", "FuncOp"> {
+  let summary = "Insert the workgroup count region and translation info";
+  let constructor = "mlir::iree_compiler::createInsertDistributionInfoPass()";
 }
 
 def TileAndDistributeToWorkgroups :

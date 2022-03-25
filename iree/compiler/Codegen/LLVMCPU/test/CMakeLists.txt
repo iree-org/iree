@@ -32,7 +32,6 @@ iree_lit_test_suite(
     FileCheck
     iree::tools::iree-compile
     iree::tools::iree-opt
-    iree::tools::iree-translate
   DATA
     linalg_transform_spec.mlir
 )

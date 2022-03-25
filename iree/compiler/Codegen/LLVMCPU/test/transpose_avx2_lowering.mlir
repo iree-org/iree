@@ -1,5 +1,4 @@
-// RUN: iree-translate -split-input-file -iree-mlir-to-vm-bytecode-module --iree-hal-target-backends=dylib-llvm-aot -mlir-disable-threading --iree-llvm-target-cpu-features="+avx2" -print-ir-after='convert-scf-to-cf' %s 2>&1 | FileCheck %s --check-prefix=CHECK-AVX2
-// RUN: iree-translate -split-input-file -iree-mlir-to-vm-bytecode-module --iree-hal-target-backends=dylib-llvm-aot -mlir-disable-threading -print-ir-after='convert-scf-to-cf' %s 2>&1 | FileCheck %s --check-prefix=CHECK-NON-AVX2
+// RUN: iree-opt -pass-pipeline='hal.executable(hal.executable.variant(iree-llvmcpu-lower-executable-target{test-lowering-configuration=false}))' %s | FileCheck %s --check-prefix=CHECK-NON-AVX2
 
 
 // CHECK-AVX2: func @test_4x8_dispatch
