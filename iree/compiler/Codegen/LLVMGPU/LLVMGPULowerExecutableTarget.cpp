@@ -13,7 +13,6 @@
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "mlir/Dialect/GPU/GPUDialect.h"
-#include "mlir/Dialect/SCF/SCF.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Pass/PassRegistry.h"
@@ -37,7 +36,7 @@ class LLVMGPULowerExecutableTargetPass
     registry
         .insert<IREE::Codegen::IREECodegenDialect, IREE::HAL::HALDialect,
                 linalg::LinalgDialect, IREE::LinalgExt::IREELinalgExtDialect,
-                vector::VectorDialect, gpu::GPUDialect, scf::SCFDialect>();
+                vector::VectorDialect, gpu::GPUDialect>();
   }
 
   LLVMGPULowerExecutableTargetPass() = default;

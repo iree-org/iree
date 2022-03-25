@@ -59,13 +59,6 @@ def ForOpCanonicalization :
   let constructor = "mlir::iree_compiler::createForOpCanonicalizationPass()";
 }
 
-def BufferizeCopyOnlyDispatches :
-  Pass<"iree-codegen-bufferize-copy-only-dispatches", "ModuleOp"> {
-  let summary =
-      "Bufferize dispatches that copy to/from interfaces to convert to a linalg.copy op";
-  let constructor = "mlir::iree_compiler::createBufferizeCopyOnlyDispatchesPass()";
-}
-
 def LinalgBufferize :
     Pass<"iree-codegen-linalg-bufferize", "func::FuncOp"> {
   let summary = "Convert from to Linalg ops on tensors to buffers";

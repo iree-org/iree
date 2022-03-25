@@ -628,13 +628,9 @@ static LogicalResult setRootConfig(
   tileSizes.push_back(parallelTileSizes);
   tileSizes.push_back(reductionTileSizes);
 
-  // For non-tensor based ops use the Buffer ops pipeline.
-  auto passPipeline =
-      genericOp.hasTensorSemantics()
-          ? DispatchLoweringPassPipeline::CPUDoubleTilingExpert
-          : DispatchLoweringPassPipeline::CPUBufferOpsTileAndVectorize;
-  return setOpConfigAndEntryPointFnTranslation(entryPointFn, genericOp,
-                                               tileSizes, passPipeline);
+  return setOpConfigAndEntryPointFnTranslation(
+      entryPointFn, genericOp, tileSizes,
+      DispatchLoweringPassPipeline::CPUDoubleTilingExpert);
 }
 
 /// Sets the lowering configuration for linalg.conv_2d_nhwc_hwcf and
@@ -835,10 +831,24 @@ static FailureOr<Operation *> getRootOperation(
   if (rootOperation) return rootOperation;
 
   // If no root operation is found yet. Look for linalg generic ops.
-  for (auto op : llvm::reverse(computeOps)) {
-    if (isa<linalg::LinalgOp>(op)) {
+  for (auto op : computeOps) {
+    if (isa<linalg::GenericOp>(op)) {
       if (failed(updateRootOperation(op))) return failure();
     }
+  }
+  if (rootOperation) return rootOperation;
+
+  // TODO(ravishankarm): Currently there is a corner case of a dispatch region
+  // with just a `tensor.extract_slice`/`tensor.insert_slice`. Those need to be
+  // folded with `flow.dispatch.tensor.load`/`flow.dispatch.tensor.store` ops
+  // respectively. This should go hand-in-hand with dropping the external model
+  // implementation of the `TiledOpInterface` for these ops. Till we cross that
+  // bridge, handle that case.
+  // Throw in linalg.fill here as well, though that should never happen either.
+  if (computeOps.size() == 1 &&
+      isa<linalg::FillOp, tensor::ExtractSliceOp, tensor::InsertSliceOp>(
+          computeOps[0])) {
+    rootOperation = computeOps[0];
   }
   return rootOperation;
 }

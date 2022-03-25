@@ -438,6 +438,20 @@ LogicalResult initGPULaunchConfig(ModuleOp moduleOp) {
     }
 
     if (!rootOperation) {
+      // TODO(ravishankarm): Currently you could have dispatches with a single
+      // tensor.insert_slice or a tensor.extract_slice. Those are handled by
+      // tile + distribute as well since these ops have an external model
+      // implementing the `TiledOpInterface`. This is legacy. These ops shouldnt
+      // implement this interface, and backends must be able to handle a
+      // dispatch with flow.dispatch.tensor.load -> flow.dispatch.tensor.store.
+      // Till this is cleaned up, set a configuration for this.
+      if (computeOps.size() == 1 &&
+          isa<tensor::ExtractSliceOp, tensor::InsertSliceOp>(computeOps[0])) {
+        rootOperation = computeOps[0];
+      }
+    }
+
+    if (!rootOperation) {
       // setTranslationInfo(
       //    funcOp,
       //    IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUDistribute,
