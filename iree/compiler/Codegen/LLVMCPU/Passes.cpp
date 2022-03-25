@@ -194,6 +194,7 @@ void addSingleTilingExpertPassPipeline(OpPassManager &passManager) {
 
 void addCPUBufferOpsTileAndVectorizePipeline(OpPassManager &passManager) {
   // Do first level of tiling and distribution.
+  passManager.addNestedPass<FuncOp>(createInsertDistributionInfoPass());
   passManager.addNestedPass<FuncOp>(createTileAndDistributeToWorkgroupsPass());
   passManager.addPass(createCanonicalizerPass());
   passManager.addPass(createCSEPass());
