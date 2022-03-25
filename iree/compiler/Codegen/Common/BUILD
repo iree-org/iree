@@ -53,6 +53,7 @@ cc_library(
         "RemoveTrivialLoops.cpp",
         "RewriteLinalgDestructiveUpdatesPass.cpp",
         "SetNumWorkgroupsPass.cpp",
+        "SetNumWorkgroupsFromLinalgExtPass.cpp",
         "TileAndDistributeToWorkgroupsPass.cpp",
         "TypePropagationPass.cpp",
         "VectorizeConv.cpp",
