@@ -10,8 +10,8 @@ import json
 import re
 
 from typing import Sequence
-from benchmark_definition import (execute_cmd_and_get_output, DeviceInfo,
-                                  PlatformType)
+from .benchmark_definition import (execute_cmd_and_get_output, DeviceInfo,
+                                   PlatformType)
 
 
 def get_android_device_model(verbose: bool = False) -> str:
