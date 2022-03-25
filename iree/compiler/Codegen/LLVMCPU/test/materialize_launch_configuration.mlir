@@ -268,39 +268,84 @@ hal.executable private @preset_config_matmul_tensors  {
     #hal.descriptor_set.binding<1, storage_buffer>
   ]>
 ]>
-hal.executable @copy_op {
+hal.executable @tensor_insert {
   hal.executable.variant @system_elf_x86_64, target = <"llvm", "system-elf-x86_64"> {
-    hal.executable.entry_point @copy_op layout(#executable_layout)
+    hal.executable.entry_point @tensor_insert_slice layout(#executable_layout)
     builtin.module {
-      func.func @copy_op() {
+      func.func @tensor_insert_slice() {
         %d0 = hal.interface.constant.load[0] : index
         %d1 = hal.interface.constant.load[1] : index
         %d2 = hal.interface.constant.load[2] : index
         %d3 = hal.interface.constant.load[3] : index
         %o0 = hal.interface.constant.load[4] : index
         %o1 = hal.interface.constant.load[5] : index
-        %source = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<?x?xi32>{%d0, %d1}
-        %dest = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<?x?xi32>{%d2, %d3}
-        %dest_view = memref.subview %dest[%o0, %o1] [%d0, %d1] [1, 1] : memref<?x?xi32> to memref<?x?xi32, offset : ?, strides : [?, ?]>
-        linalg.generic {
-            indexing_maps = [affine_map<(d0, d1) -> (d0, d1)> , affine_map<(d0, d1) -> (d0, d1)>],
-            iterator_types = ["parallel", "parallel"]}
-            ins(%source : memref<?x?xi32>) outs(%dest_view : memref<?x?xi32, offset : ?, strides : [?, ?]>) {
-          ^bb0(%arg0 : i32, %arg1 : i32):
-            linalg.yield %arg0 : i32
-          }
+        %source_binding = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer)
+            : !flow.dispatch.tensor<readonly:?x?xi32>{%d0, %d1}
+        %dest_binding = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer)
+            : !flow.dispatch.tensor<readwrite:?x?xi32>{%d2, %d3}
+        %source = flow.dispatch.tensor.load %source_binding, offsets = [0, 0], sizes = [%d0, %d1], strides = [1, 1]
+            : !flow.dispatch.tensor<readonly:?x?xi32>{%d0, %d1} -> tensor<?x?xi32>
+        %dest = flow.dispatch.tensor.load %dest_binding, offsets = [0, 0], sizes = [%d0, %d1], strides = [1, 1]
+            : !flow.dispatch.tensor<readwrite:?x?xi32>{%d2, %d3} -> tensor<?x?xi32>
+        %result = tensor.insert_slice %source into %dest[%o0, %o1] [%d0, %d1] [1, 1] : tensor<?x?xi32> into tensor<?x?xi32>
+        flow.dispatch.tensor.store %result, %dest_binding, offsets = [0, 0], sizes = [%d2, %d3], strides = [1, 1]
+            : tensor<?x?xi32> -> !flow.dispatch.tensor<readwrite:?x?xi32>{%d2, %d3}
         return
       }
     }
   }
 }
 
-//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[64, 64], [1, 4], [0, 0]{{\]}}>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUBufferOpsTileAndVectorize>
-//      CHECK: hal.executable.entry_point public @copy_op
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[64, 64]{{\]}}>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDefault>
+//      CHECK: hal.executable.entry_point public @tensor_insert_slice
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
-//      CHECK:   linalg.generic
-// CHECK-SAME:       lowering_config = #[[CONFIG]]
+//      CHECK: tensor.insert_slice
+// CHECK-SAME:     lowering_config = #[[CONFIG]]
+
+// -----
+
+#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>
+  ]>
+]>
+hal.executable @extract_slice {
+  hal.executable.variant @system_elf_x86_64, target = <"llvm", "system-elf-x86_64"> {
+    hal.executable.entry_point @extract_slice layout(#executable_layout)
+    builtin.module {
+      func.func @extract_slice() {
+        %d0 = hal.interface.constant.load[0] : index
+        %d1 = hal.interface.constant.load[1] : index
+        %d2 = hal.interface.constant.load[2] : index
+        %d3 = hal.interface.constant.load[3] : index
+        %o0 = hal.interface.constant.load[4] : index
+        %o1 = hal.interface.constant.load[5] : index
+        %source_binding = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer)
+            : !flow.dispatch.tensor<readonly:?x?xi32>{%d0, %d1}
+        %dest_binding = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer)
+            : !flow.dispatch.tensor<writeonly:?x?xi32>{%d2, %d3}
+        %source = flow.dispatch.tensor.load %source_binding, offsets = [0, 0], sizes = [%d0, %d1], strides = [1, 1]
+            : !flow.dispatch.tensor<readonly:?x?xi32>{%d0, %d1} -> tensor<?x?xi32>
+        %dest = flow.dispatch.tensor.load %dest_binding, offsets = [0, 0], sizes = [%d0, %d1], strides = [1, 1]
+            : !flow.dispatch.tensor<writeonly:?x?xi32>{%d2, %d3} -> tensor<?x?xi32>
+        %result = tensor.extract_slice %source[%o0, %o1] [%d0, %d1] [1, 1] : tensor<?x?xi32> to tensor<?x?xi32>
+        flow.dispatch.tensor.store %result, %dest_binding, offsets = [0, 0], sizes = [%d2, %d3], strides = [1, 1]
+            : tensor<?x?xi32> -> !flow.dispatch.tensor<writeonly:?x?xi32>{%d2, %d3}
+        return
+      }
+    }
+  }
+}
+
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[64, 64]{{\]}}>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDefault>
+//      CHECK: hal.executable.entry_point public @extract_slice
+// CHECK-SAME:     translation_info = #[[TRANSLATION]]
+//      CHECK: tensor.extract_slice
+// CHECK-SAME:     lowering_config = #[[CONFIG]]
+
 
 // -----
 

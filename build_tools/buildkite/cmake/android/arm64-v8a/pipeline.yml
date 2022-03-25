@@ -21,6 +21,7 @@ steps:
   - label: "test on Pixel 6 (google-tensor, mali-g78)"
     commands:
       - "git clean -fdx"
+      - "adb shell rm -rf /data/local/tmp/iree"
       - "buildkite-agent artifact download --step build build-artifacts.tgz ./"
       - "tar xzf build-artifacts.tgz"
       - "find build-android/ -name '*.cmake' -exec sed -i \"s!\\$IREE_DOCKER_WORKDIR/!\\$PWD/!g\" {} \\;"
@@ -36,6 +37,7 @@ steps:
   - label: "test on Pixel 4 (snapdragon-855, adreno-640)"
     commands:
       - "git clean -fdx"
+      - "adb shell rm -rf /data/local/tmp/iree"
       - "buildkite-agent artifact download --step build build-artifacts.tgz ./"
       - "tar xzf build-artifacts.tgz"
       - "find build-android/ -name '*.cmake' -exec sed -i \"s!\\$IREE_DOCKER_WORKDIR/!\\$PWD/!g\" {} \\;"
@@ -53,6 +55,7 @@ steps:
   - label: "test on Moto Edge X30 (snapdragon-8gen1, adreno-730)"
     commands:
       - "git clean -fdx"
+      - "adb shell rm -rf /data/local/tmp/iree"
       - "buildkite-agent artifact download --step build build-artifacts.tgz ./"
       - "tar xzf build-artifacts.tgz"
       - "find build-android/ -name '*.cmake' -exec sed -i \"s!\\$IREE_DOCKER_WORKDIR/!\\$PWD/!g\" {} \\;"

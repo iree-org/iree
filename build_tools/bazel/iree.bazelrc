@@ -28,11 +28,15 @@ test --test_output=errors
 startup --windows_enable_symlinks
 build --enable_runfiles
 
-
 # TODO: Transition to the explicit init_py mechanism. See #2405
 # This is commented out while considering transition path but left as a
 # breadcrumb.
 # build --incompatible_default_to_explicit_init_py
+
+###############################################################################
+# Build settings flag aliases. See https://bazel.build/rules/config
+###############################################################################
+build --flag_alias=iree_drivers=//iree/hal/drivers:enabled_drivers
 
 ###############################################################################
 # Options for "generic_gcc" builds
