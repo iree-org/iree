@@ -14,11 +14,13 @@
 #include "iree/compiler/Codegen/Common/BufferizationAnalysis.h"
 
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
+#include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowTypes.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "mlir/Analysis/SliceAnalysis.h"
+#include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
@@ -66,7 +68,7 @@ static bool canUsersHandleSubviews(Operation *op) {
 
 /// Walks the use-def chain and see if this value comes from a read-only tensor.
 static bool isFromReadOnlyTensor(Value v, const BufferizationPlan &plan) {
-  auto definingOp = v.getDefiningOp();
+  Operation *definingOp = v.getDefiningOp();
   if (!definingOp) {
     auto arg = v.cast<BlockArgument>();
     return TypeSwitch<Operation *, bool>(arg.getOwner()->getParentOp())
@@ -79,22 +81,7 @@ static bool isFromReadOnlyTensor(Value v, const BufferizationPlan &plan) {
         })
         .Default([&](Operation *op) { return false; });
   }
-  return TypeSwitch<Operation *, bool>(definingOp)
-      .Case<arith::ConstantOp>(
-          [&](arith::ConstantOp constantOp) { return true; })
-      .Case<tensor::CollapseShapeOp, tensor::ExpandShapeOp>(
-          [&](auto op) { return isFromReadOnlyTensor(op.src(), plan); })
-      .Case<tensor::ExtractSliceOp>([&](tensor::ExtractSliceOp sliceOp) {
-        return isFromReadOnlyTensor(sliceOp.source(), plan);
-      })
-      .Case<IREE::Flow::DispatchTensorLoadOp>(
-          [&](IREE::Flow::DispatchTensorLoadOp loadOp) {
-            return loadOp.source()
-                       .getType()
-                       .cast<IREE::Flow::DispatchTensorType>()
-                       .getAccess() == IREE::Flow::TensorAccess::ReadOnly;
-          })
-      .Default([&](Operation *op) { return false; });
+  return isReadOnly(v);
 }
 
 /// Adds the result of `std.constant` to its set (there is nothing to tie to
@@ -574,7 +561,7 @@ LogicalResult createTensorEquivalenceClasses(func::FuncOp funcOp,
             })
         .Case<vector::TransferWriteOp>(
             [&](vector::TransferWriteOp transferWriteOp) {
-              if (!transferWriteOp.result().getType().isa<RankedTensorType>()) {
+              if (!transferWriteOp.source().getType().isa<RankedTensorType>()) {
                 return success();
               }
               return analyseDestructiveUpdateOp(transferWriteOp, nullptr,
@@ -586,7 +573,7 @@ LogicalResult createTensorEquivalenceClasses(func::FuncOp funcOp,
         .Case<scf::ForOp>(
             [&](scf::ForOp forOp) { return analyseScfForOp(forOp, plan); })
         .Case<scf::YieldOp, linalg::InitTensorOp, tensor::DimOp,
-              tensor::ExtractOp, tensor::PadOp>(
+              tensor::ExtractOp, tensor::PadOp, bufferization::ToMemrefOp>(
             [&](Operation *op) { return success(); })
         .Default([&](Operation *op) -> LogicalResult {
           if (llvm::any_of(op->getOperands(),

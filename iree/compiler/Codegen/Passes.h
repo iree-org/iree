@@ -60,6 +60,12 @@ void addIREEComprehensiveBufferizePasses(
 /// allocations and view operations.
 std::unique_ptr<OperationPass<FuncOp>> createCleanupBufferAllocViewPass();
 
+/// Pass to bufferize dispatches that are copying from one interface to another.
+/// This will create a `linalg.generic` op which is a copy that can then be
+/// used by backends to handle appropriately.
+std::unique_ptr<OperationPass<ModuleOp>>
+createBufferizeCopyOnlyDispatchesPass();
+
 /// Create a pass to convert a model using f32 type to the equivalent one
 /// using f16.
 std::unique_ptr<OperationPass<ModuleOp>> createDemoteF32ToF16Pass();
@@ -225,6 +231,11 @@ void populateUnfusedFMAOpsPassPatterns(MLIRContext *context,
 /// code-generation. This pipeline does not vectorize, but instead just converts
 /// to memrefs
 void addCPUDefaultPassPipeline(OpPassManager &passManager);
+
+/// Populates the passes to lower linalg ops on buffers. Currenly this pipeline
+/// is only used for dispatches that just copy data from input interfaces to
+/// output interface.
+void addCPUBufferOpsTileAndVectorizePipeline(OpPassManager &passManager);
 
 /// Populates the passes needed to multi level tile and lowering of linalg ops
 /// on tensors to vectors operations.

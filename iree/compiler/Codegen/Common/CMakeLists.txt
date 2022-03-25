@@ -27,6 +27,7 @@ iree_cc_library(
     "DestructiveUpdateUtils.h"
   SRCS
     "BufferizationAnalysis.cpp"
+    "BufferizeCopyOnlyDispatchesPass.cpp"
     "CleanupBufferAllocViewPass.cpp"
     "ConvertToDestinationPassingStylePass.cpp"
     "DemoteF32ToF16.cpp"
@@ -79,6 +80,7 @@ iree_cc_library(
     MLIRTransforms
     MLIRVector
     MLIRVectorTransforms
+    MLIRViewLikeInterface
     iree::compiler::Codegen::Common::FoldTensorExtractOpIncGen
     iree::compiler::Codegen::Dialect::IREECodegenDialect
     iree::compiler::Codegen::Interfaces::BufferizationInterfaces

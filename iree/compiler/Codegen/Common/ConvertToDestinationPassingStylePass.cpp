@@ -323,24 +323,6 @@ static SmallVector<NamedAttribute> PruneAttributeList(linalg::GenericOp op) {
   return preservedAttrs;
 }
 
-static bool isFromReadOnlyTensor(Value v) {
-  return TypeSwitch<Operation *, bool>(v.getDefiningOp())
-      .Case<arith::ConstantOp>(
-          [&](arith::ConstantOp constantOp) { return true; })
-      .Case<tensor::CollapseShapeOp, tensor::ExpandShapeOp>(
-          [&](auto op) { return isFromReadOnlyTensor(op.src()); })
-      .Case<tensor::CastOp, tensor::ExtractSliceOp>(
-          [&](auto op) { return isFromReadOnlyTensor(op.source()); })
-      .Case<IREE::Flow::DispatchTensorLoadOp>(
-          [&](IREE::Flow::DispatchTensorLoadOp loadOp) {
-            return loadOp.source()
-                       .getType()
-                       .cast<IREE::Flow::DispatchTensorType>()
-                       .getAccess() == IREE::Flow::TensorAccess::ReadOnly;
-          })
-      .Default([&](Operation *op) { return false; });
-}
-
 namespace {
 /// Adapts Linalg ops input operand to output operand. This is required for not
 /// creating extra alloca ops. For more details, see
@@ -366,7 +348,7 @@ struct AdaptLinalgInputOperandToOutputOperand
     SmallVector<Value> newOperands;
     SmallVector<AffineMap> maps;
     for (auto in : op.getInputOperands()) {
-      if (!operand && !isFromReadOnlyTensor(in->get()) &&
+      if (!operand && !isReadOnly(in->get()) &&
           op.getTiedIndexingMap(in) == op.getTiedIndexingMap(outputOperand) &&
           in->get().getType() == outputOperand->get().getType()) {
         operand = in;
