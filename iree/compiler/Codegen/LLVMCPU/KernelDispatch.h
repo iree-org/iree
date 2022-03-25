@@ -23,6 +23,16 @@ enum class TilingLevel : unsigned {
   NumTileLevels = 3
 };
 
+enum class StrategyTilingLevel : unsigned {
+  // Tile linalg operations to threads.
+  WorkGroupTiles = 0,
+  // Tile linalg operation on workgroup thread for parallel dims.
+  ParallelTiles = 1,
+  // Tile linalg operations on workgroup thread for reduction dims.
+  ReductionTiles = 2,
+  NumStrategyTileLevels = 3
+};
+
 LogicalResult initCPULaunchConfig(ModuleOp moduleOp);
 
 }  // namespace iree_compiler
