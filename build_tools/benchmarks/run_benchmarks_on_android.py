@@ -49,8 +49,9 @@ from common.benchmark_definition import (DeviceInfo, BenchmarkInfo,
 from common.benchmark_suite import (BENCHMARK_SUITE_REL_PATH,
                                     compose_info_object,
                                     filter_benchmarks_for_category)
-from common.android_utils import (get_android_device_model,
-                                  get_android_device_info, get_android_gpu_name)
+from common.android_device_utils import (get_android_device_model,
+                                         get_android_device_info,
+                                         get_android_gpu_name)
 
 # The flagfile/toolfile's filename for compiled benchmark artifacts.
 MODEL_FLAGFILE_NAME = "flagfile"
