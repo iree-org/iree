@@ -193,7 +193,7 @@ hal.executable private @static_3d_fft_stage3 {
     #hal.descriptor_set.binding<1, storage_buffer>
   ]>
 ]>
-hal.executable private @copy_op {
+hal.executable private @tensor_insert {
   hal.executable.variant @vulkan_spirv_fb, target = <"vulkan", "vulkan-spirvfb", {
       spv.target_env = #spv.target_env<#spv.vce<v1.4, [Shader], []>, Unknown:IntegratedGPU, {
         max_compute_shared_memory_size = 32768 : i32,
@@ -201,30 +201,78 @@ hal.executable private @copy_op {
         max_compute_workgroup_size = dense<512> : vector<3xi32>,
         subgroup_size = 16 : i32}>
     }> {
-    hal.executable.entry_point @copy_op layout(#executable_layout)
+    hal.executable.entry_point @tensor_insert layout(#executable_layout)
     builtin.module {
-      func.func @copy_op() {
+      func.func @tensor_insert() {
         %offset_y = hal.interface.constant.load[0] : index
         %offset_x = hal.interface.constant.load[1] : index
         %source_size_y = hal.interface.constant.load[2] : index
         %source_size_x = hal.interface.constant.load[3] : index
         %dest_size_y = hal.interface.constant.load[4] : index
         %dest_size_x = hal.interface.constant.load[5] : index
-        %source = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<?x?xf32>{%source_size_y, %source_size_x}
-        %dest = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<?x?xf32>{%dest_size_y, %dest_size_x}
-        linalg.generic {
-            indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>],
-            iterator_types = ["parallel", "parallel"]}
-            ins(%source : memref<?x?xf32>) outs(%dest : memref<?x?xf32>) {
-          ^bb0(%b0 : f32, %b1 : f32):
-            linalg.yield %b0 : f32
-          }
+        %source_binding = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer)
+            : !flow.dispatch.tensor<readonly:?x?xf32>{%source_size_y, %source_size_x}
+        %dest_binding = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer)
+            : !flow.dispatch.tensor<readwrite:?x?xf32>{%dest_size_y, %dest_size_x}
+        %source = flow.dispatch.tensor.load %source_binding, offsets = [0, 0], sizes = [%source_size_y, %source_size_y], strides = [1, 1]
+            : !flow.dispatch.tensor<readonly:?x?xf32>{%source_size_y, %source_size_x} -> tensor<?x?xf32>
+        %dest = flow.dispatch.tensor.load %dest_binding, offsets = [0, 0], sizes = [%dest_size_y, %dest_size_x], strides = [1, 1]
+            : !flow.dispatch.tensor<readwrite:?x?xf32>{%dest_size_y, %dest_size_x} -> tensor<?x?xf32>
+        %insert = tensor.insert_slice %source into %dest[%offset_y, %offset_x] [%source_size_y, %source_size_x] [1, 1]
+            : tensor<?x?xf32> into tensor<?x?xf32>
+        flow.dispatch.tensor.store %insert, %dest_binding, offsets = [0, 0], sizes = [%dest_size_y, %dest_size_x], strides = [1, 1]
+            : tensor<?x?xf32> -> !flow.dispatch.tensor<readwrite:?x?xf32>{%dest_size_y, %dest_size_x}
         return
       }
     }
   }
 }
-//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 16], [1, 1]{{\]}}>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVDistribute>
-//      CHECK: linalg.generic
-// CHECK-SAME:     lowering_config = #[[CONFIG]]
+// Check that the pipeline is set to `SPIRVDistributeAndCopy`
+
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVDistributeCopy>
+//      CHECK: tensor.insert_slice
+//  CHECK-NOT:     lowering_config
+
+// -----
+
+#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>
+  ]>
+]>
+hal.executable private @tensor_extract {
+  hal.executable.variant @vulkan_spirv_fb, target = <"vulkan", "vulkan-spirvfb", {
+      spv.target_env = #spv.target_env<#spv.vce<v1.4, [Shader], []>, Unknown:IntegratedGPU, {
+        max_compute_shared_memory_size = 32768 : i32,
+        max_compute_workgroup_invocations = 512 : i32,
+        max_compute_workgroup_size = dense<512> : vector<3xi32>,
+        subgroup_size = 16 : i32}>
+    }> {
+    hal.executable.entry_point @tensor_extract layout(#executable_layout)
+    builtin.module {
+      func.func @tensor_extract() {
+        %offset_y = hal.interface.constant.load[0] : index
+        %offset_x = hal.interface.constant.load[1] : index
+        %source_size_y = hal.interface.constant.load[2] : index
+        %source_size_x = hal.interface.constant.load[3] : index
+        %result_size_y = hal.interface.constant.load[4] : index
+        %result_size_x = hal.interface.constant.load[5] : index
+        %source_binding = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer)
+            : !flow.dispatch.tensor<readonly:?x?xf32>{%source_size_y, %source_size_x}
+        %result_binding = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer)
+            : !flow.dispatch.tensor<writeonly:?x?xf32>{%result_size_y, %result_size_x}
+        %source = flow.dispatch.tensor.load %source_binding, offsets = [0, 0], sizes = [%source_size_y, %source_size_y], strides = [1, 1]
+            : !flow.dispatch.tensor<readonly:?x?xf32>{%source_size_y, %source_size_x} -> tensor<?x?xf32>
+        %extract = tensor.extract_slice %source[%offset_y, %offset_x] [%result_size_y, %result_size_x] [1, 1]
+            : tensor<?x?xf32> to tensor<?x?xf32>
+        flow.dispatch.tensor.store %extract, %result_binding, offsets = [0, 0], sizes = [%result_size_y, %result_size_x], strides = [1, 1]
+            : tensor<?x?xf32> -> !flow.dispatch.tensor<writeonly:?x?xf32>{%result_size_y, %result_size_x}
+        return
+      }
+    }
+  }
+}
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVDistributeCopy>
+//      CHECK: tensor.extract_slice
+//  CHECK-NOT:     lowering_config

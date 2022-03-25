@@ -188,7 +188,6 @@ static void addLowerToLLVMGPUPasses(OpPassManager &pm, bool useROCM) {
 
 void buildLLVMGPUTransformPassPipeline(OpPassManager &pm, bool useROCM) {
   pm.nest<ModuleOp>().nest<FuncOp>().addPass(createTypePropagationPass());
-  pm.nest<ModuleOp>().addPass(createBufferizeCopyOnlyDispatchesPass());
   pm.addPass(createLLVMGPULowerExecutableTargetPass());
   OpPassManager &nestedModulePM = pm.nest<ModuleOp>();
   //===--------------------------------------------------------------------===//
