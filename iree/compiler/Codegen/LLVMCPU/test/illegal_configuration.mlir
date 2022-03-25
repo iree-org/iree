@@ -31,7 +31,7 @@ hal.executable private @matmul_tensors {
 
 // -----
 
-#config = #iree_codegen.lowering_config<tile_sizes = [[4, 8], [8, 8, 0], [0, 0, 8]], native_vector_size = [0, 0, 4]>
+#config = #iree_codegen.lowering_config<tile_sizes = [[4, 8, 0], [8, 8, 0], [0, 0, 8]], native_vector_size = [0, 0, 4]>
 #translation = #iree_codegen.translation_info<CPUDoubleTilingExpert>
 #executable_layout = #hal.executable.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
@@ -93,7 +93,7 @@ hal.executable private @matmul_tensors {
 
 // -----
 
-#config = #iree_codegen.lowering_config<tile_sizes = [[64, 64], [8, 0, 0], [0, 16, 16]]>
+#config = #iree_codegen.lowering_config<tile_sizes = [[64, 64, 0], [8, 0, 0], [0, 16, 16]]>
 #translation = #iree_codegen.translation_info<CPUDoubleTilingExpert>
 #executable_layout = #hal.executable.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
