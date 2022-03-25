@@ -28,7 +28,7 @@ steps:
   # Buildkite)?
   - label: ":face_with_monocle: :admission_tickets: :raised_hand: Checking CLA"
     plugins:
-      - https://github.com/GMNGeoffrey/smooth-checkout-buildkite-plugin#4e353abe72:
+      - https://github.com/GMNGeoffrey/smooth-checkout-buildkite-plugin#24e54e7729:
           repos:
             - config:
                 - url: ${BUILDKITE_REPO}
@@ -42,7 +42,7 @@ steps:
 
   - label: "Executing gcmn-test-pipeline"
     plugins:
-      - https://github.com/GMNGeoffrey/smooth-checkout-buildkite-plugin#4e353abe72:
+      - https://github.com/GMNGeoffrey/smooth-checkout-buildkite-plugin#24e54e7729:
           repos:
             - config:
                 - url: ${BUILDKITE_REPO}
