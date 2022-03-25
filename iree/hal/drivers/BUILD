@@ -4,7 +4,7 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-load("//iree:build_defs.oss.bzl", "IREE_CUDA_DEPS")
+load("@bazel_skylib//rules:common_settings.bzl", "string_list_flag")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -12,19 +12,65 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
+ALL_DRIVERS = [
+    "dylib",
+    "dylib-sync",
+    "vmvx",
+    "vmvx-sync",
+    "vulkan",
+    "cuda",
+]
+
+string_list_flag(
+    name = "enabled_drivers",
+    build_setting_default = [
+        "dylib",
+        "dylib-sync",
+        "vmvx",
+        "vmvx-sync",
+        "vulkan",
+    ],
+)
+
+[
+    config_setting(
+        name = "{}_enabled".format(driver),
+        flag_values = {
+            ":enabled_drivers": driver,
+        },
+    )
+    for driver in ALL_DRIVERS
+]
+
 cc_library(
     name = "drivers",
     srcs = ["init.c"],
     hdrs = ["init.h"],
     deps = [
-        "//iree/base",
-        "//iree/base:tracing",
-    ] + [
-        # TODO(*): select() and only pull in based on build configuration.
-        "//iree/hal/dylib/registration",
-        "//iree/hal/dylib/registration:sync",
-        "//iree/hal/vmvx/registration",
-        "//iree/hal/vmvx/registration:sync",
-        "//iree/hal/vulkan/registration",
-    ] + IREE_CUDA_DEPS,
+               "//iree/base",
+               "//iree/base:tracing",
+           ] + select({
+               ":dylib_enabled": ["//iree/hal/dylib/registration"],
+               "//conditions:default": [],
+           }) +
+           select({
+               ":dylib-sync_enabled": ["//iree/hal/dylib/registration:sync"],
+               "//conditions:default": [],
+           }) +
+           select({
+               ":vmvx_enabled": ["//iree/hal/vmvx/registration"],
+               "//conditions:default": [],
+           }) +
+           select({
+               ":vmvx-sync_enabled": ["//iree/hal/vmvx/registration:sync"],
+               "//conditions:default": [],
+           }) +
+           select({
+               ":vulkan_enabled": ["//iree/hal/vulkan/registration"],
+               "//conditions:default": [],
+           }) +
+           select({
+               ":cuda_enabled": ["//iree/hal/cuda/registration"],
+               "//conditions:default": [],
+           }),
 )
