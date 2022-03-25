@@ -34,17 +34,17 @@ import os
 
 from typing import List, Optional, Sequence
 
-from .benchmark_definition import AndroidDeviceInfo, BenchmarkInfo
+from .benchmark_definition import DeviceInfo, BenchmarkInfo
 
 # All benchmarks' relative path against root build directory.
 BENCHMARK_SUITE_REL_PATH = "benchmark_suites"
 
-def compose_info_object(device_info: AndroidDeviceInfo,
-                        benchmark_category_dir: str,
+
+def compose_info_object(device_info: DeviceInfo, benchmark_category_dir: str,
                         benchmark_case_dir: str) -> BenchmarkInfo:
   """Creates an BenchmarkInfo object to describe the benchmark.
   Args:
-    device_info: an AndroidDeviceInfo object.
+    device_info: an DeviceInfo object.
     benchmark_category_dir: the directory to a specific benchmark category.
     benchmark_case_dir: a directory containing the benchmark case.
   Returns:

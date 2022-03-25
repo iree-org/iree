@@ -40,15 +40,18 @@ import time
 import shutil
 import sys
 
-from typing import Any, Dict, List, Optional, Sequence, Tuple, TextIO, Set
+from typing import List, Optional, Sequence, Tuple, Set
 
-from common.benchmark_definition import (
-    AndroidDeviceInfo, BenchmarkInfo, BenchmarkResults, BenchmarkRun,
-    execute_cmd, execute_cmd_and_get_output, get_android_device_model,
-    get_android_gpu_name, IREE_PRETTY_NAMES_TO_DRIVERS)
+from common.benchmark_definition import (DeviceInfo, BenchmarkInfo,
+                                         BenchmarkResults, BenchmarkRun,
+                                         execute_cmd,
+                                         execute_cmd_and_get_output)
 from common.benchmark_suite import (BENCHMARK_SUITE_REL_PATH,
                                     compose_info_object,
                                     filter_benchmarks_for_category)
+from common.android_device_utils import (get_android_device_model,
+                                         get_android_device_info,
+                                         get_android_gpu_name)
 
 # The flagfile/toolfile's filename for compiled benchmark artifacts.
 MODEL_FLAGFILE_NAME = "flagfile"
@@ -223,7 +226,7 @@ def push_vmfb_files(benchmark_case_dirs: Sequence[str], root_benchmark_dir: str,
 
 
 def run_benchmarks_for_category(
-    device_info: AndroidDeviceInfo,
+    device_info: DeviceInfo,
     root_benchmark_dir: str,
     benchmark_category_dir: str,
     benchmark_case_dirs: Sequence[str],
@@ -241,7 +244,7 @@ def run_benchmarks_for_category(
   """Runs all benchmarks on the Android device and reports results and captures.
 
   Args:
-    device_info: an AndroidDeviceInfo object.
+    device_info: an DeviceInfo object.
     root_benchmark_dir: path to the benchmark suite within the root build dir
     benchmark_category_dir: the directory to a specific benchmark category.
     benchmark_case_dirs: a list of benchmark case directories.
@@ -449,7 +452,7 @@ def get_available_drivers(tool_dir: str, verbose: bool) -> Sequence[str]:
 
 
 def filter_and_run_benchmarks(
-    device_info: AndroidDeviceInfo,
+    device_info: DeviceInfo,
     root_build_dir: str,
     driver_filter: Optional[str],
     model_name_filter: Optional[str],
@@ -467,7 +470,7 @@ def filter_and_run_benchmarks(
   """Filters and runs benchmarks in all categories for the given device.
 
   Args:
-    device_info: an AndroidDeviceInfo object.
+    device_info: an DeviceInfo object.
     root_build_dir: the root build directory containing the built benchmark
       suites.
     driver_filter: filter benchmarks to those whose driver matches this regex
@@ -695,7 +698,7 @@ def real_path_or_none(path: str) -> Optional[str]:
 
 
 def main(args):
-  device_info = AndroidDeviceInfo.from_adb()
+  device_info = get_android_device_info()
   if args.verbose:
     print(device_info)
 

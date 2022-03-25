@@ -11,30 +11,39 @@ shared between different stages of the same benchmark pipeline.
 """
 
 import json
-import re
 import subprocess
 
 from dataclasses import dataclass
+from enum import Enum
 from typing import Any, Dict, Sequence
 
-__all__ = [
-    "AndroidDeviceInfo", "BenchmarkInfo", "BenchmarkResults", "BenchmarkRun",
-    "execute_cmd_and_get_output", "execute_cmd"
-]
+
+@dataclass
+class DriverInfo:
+  """An object describing a IREE HAL driver.
+
+  It includes the following characteristics:
+  - pretty_name: the pretty name, e.g., 'IREE-DyLib'
+  - device_type: the targeted device type, e.g., 'CPU'
+  """
+
+  pretty_name: str
+  device_type: str
+
 
 # A map for IREE driver names. This allows us to normalize driver names like
 # mapping to more friendly ones and detach to keep driver names used in
 # benchmark presentation stable.
-IREE_DRIVERS_TO_PRETTY_NAMES = {
-    "iree-dylib": "IREE-Dylib",
-    "iree-dylib-sync": "IREE-Dylib-Sync",
-    "iree-vmvx": "IREE-VMVX",
-    "iree-vmvx-sync": "IREE-VMVX-Sync",
-    "iree-vulkan": "IREE-Vulkan",
+IREE_DRIVERS_INFOS = {
+    "iree-dylib": DriverInfo("IREE-Dylib", "CPU"),
+    "iree-dylib-sync": DriverInfo("IREE-Dylib-Sync", "CPU"),
+    "iree-vmvx": DriverInfo("IREE-VMVX", "CPU"),
+    "iree-vmvx-sync": DriverInfo("IREE-VMVX-Sync", "CPU"),
+    "iree-vulkan": DriverInfo("IREE-Vulkan", "GPU"),
 }
 
 IREE_PRETTY_NAMES_TO_DRIVERS = {
-    v: k for k, v in IREE_DRIVERS_TO_PRETTY_NAMES.items()
+    v.pretty_name: k for k, v in IREE_DRIVERS_INFOS.items()
 }
 
 
@@ -75,61 +84,23 @@ def execute_cmd_and_get_output(args: Sequence[str],
                      **kwargs).stdout.strip()
 
 
-def get_android_device_model(verbose: bool = False) -> str:
-  """Returns the Android device model."""
-  model = execute_cmd_and_get_output(
-      ["adb", "shell", "getprop", "ro.product.model"], verbose=verbose)
-  model = re.sub(r"\W+", "-", model)
-  return model
-
-
-def get_android_cpu_abi(verbose: bool = False) -> str:
-  """Returns the CPU ABI for the Android device."""
-  return execute_cmd_and_get_output(
-      ["adb", "shell", "getprop", "ro.product.cpu.abi"], verbose=verbose)
-
-
-def get_android_cpu_features(verbose: bool = False) -> Sequence[str]:
-  """Returns the CPU features for the Android device."""
-  cpuinfo = execute_cmd_and_get_output(["adb", "shell", "cat", "/proc/cpuinfo"],
-                                       verbose=verbose)
-  features = []
-  for line in cpuinfo.splitlines():
-    if line.startswith("Features"):
-      _, features = line.split(":")
-      return features.strip().split()
-  return features
-
-
-def get_android_gpu_name(verbose: bool = False) -> str:
-  """Returns the GPU name for the Android device."""
-  vkjson = execute_cmd_and_get_output(["adb", "shell", "cmd", "gpu", "vkjson"],
-                                      verbose=verbose)
-  vkjson = json.loads(vkjson)
-  name = vkjson["devices"][0]["properties"]["deviceName"]
-
-  # Perform some canonicalization:
-
-  # - Adreno GPUs have raw names like "Adreno (TM) 650".
-  name = name.replace("(TM)", "")
-
-  # Replace all consecutive non-word characters with a single hypen.
-  name = re.sub(r"\W+", "-", name)
-
-  return name
+class PlatformType(Enum):
+  ANDROID = "Android"
 
 
 @dataclass
-class AndroidDeviceInfo:
-  """An object describing the current Android Device.
+class DeviceInfo:
+  """An object describing a device.
 
-  It includes the following phone characteristics:
+  It includes the following characteristics:
+  - platform_type: the OS platform, e.g., 'Android'
   - model: the product model, e.g., 'Pixel-4'
   - cpu_abi: the CPU ABI, e.g., 'arm64-v8a'
   - cpu_features: the detailed CPU features, e.g., ['fphp', 'sve']
   - gpu_name: the GPU name, e.g., 'Mali-G77'
   """
 
+  platform_type: PlatformType
   model: str
   cpu_abi: str
   cpu_features: Sequence[str]
@@ -144,12 +115,30 @@ class AndroidDeviceInfo:
         f"cpu_features=[{features}]",
     ]
     params = ", ".join(params)
-    return f"Android device <{params}>"
+    return f"{self.platform_type.value} device <{params}>"
 
-  def get_arm_arch_revision(self) -> str:
+  def get_cpu_arch_revision(self) -> str:
+    if self.cpu_abi == "arm64-v8a":
+      return self.__get_arm_cpu_arch_revision()
+    raise ValueError("Unrecognized CPU ABI; need to update the list")
+
+  def to_json_object(self) -> Dict[str, Any]:
+    return {
+        "platform_type": self.platform_type.value,
+        "model": self.model,
+        "cpu_abi": self.cpu_abi,
+        "cpu_features": self.cpu_features,
+        "gpu_name": self.gpu_name,
+    }
+
+  @staticmethod
+  def from_json_object(json_object: Dict[str, Any]):
+    return DeviceInfo(PlatformType(json_object["platform_type"]),
+                      json_object["model"], json_object["cpu_abi"],
+                      json_object["cpu_features"], json_object["gpu_name"])
+
+  def __get_arm_cpu_arch_revision(self) -> str:
     """Returns the ARM architecture revision."""
-    if self.cpu_abi != "arm64-v8a":
-      raise ValueError("Unrecognized ARM CPU ABI; need to update the list")
 
     # CPU features for ARMv8 revisions.
     # From https://en.wikichip.org/wiki/arm/armv8#ARMv8_Extensions_and_Processor_Features
@@ -165,27 +154,6 @@ class AndroidDeviceInfo:
       rev = "ARMv8.2-A"
     return rev
 
-  def to_json_object(self) -> Dict[str, Any]:
-    return {
-        "model": self.model,
-        "cpu_abi": self.cpu_abi,
-        "cpu_features": self.cpu_features,
-        "gpu_name": self.gpu_name,
-    }
-
-  @staticmethod
-  def from_json_object(json_object: Dict[str, Any]):
-    return AndroidDeviceInfo(json_object["model"], json_object["cpu_abi"],
-                             json_object["cpu_features"],
-                             json_object["gpu_name"])
-
-  @staticmethod
-  def from_adb(verbose: bool = False):
-    return AndroidDeviceInfo(get_android_device_model(verbose),
-                             get_android_cpu_abi(verbose),
-                             get_android_cpu_features(verbose),
-                             get_android_gpu_name(verbose))
-
 
 @dataclass
 class BenchmarkInfo:
@@ -199,8 +167,7 @@ class BenchmarkInfo:
   - bench_mode: a list of tags for benchmark mode,
       e.g., ['1-thread', 'big-core', 'full-inference']
   - runner: which runner is used for benchmarking, e.g., 'iree_vulkan', 'tflite'
-  - device_info: an AndroidDeviceInfo object describing the phone where
-      benchmarks run
+  - device_info: an DeviceInfo object describing the device where benchmarks run
   """
 
   model_name: str
@@ -208,35 +175,37 @@ class BenchmarkInfo:
   model_source: str
   bench_mode: Sequence[str]
   runner: str
-  device_info: AndroidDeviceInfo
+  device_info: DeviceInfo
 
   def __str__(self):
     # Get the target architecture and better driver name depending on the runner.
-    target_arch = ""
-    driver = ""
-    if self.runner == "iree-vulkan":
-      target_arch = "GPU-" + self.device_info.gpu_name
-      driver = IREE_DRIVERS_TO_PRETTY_NAMES[self.runner]
-    elif (self.runner == "iree-dylib" or self.runner == "iree-dylib-sync" or
-          self.runner == "iree-vmvx" or self.runner == "iree-vmvx-sync"):
-      target_arch = "CPU-" + self.device_info.get_arm_arch_revision()
-      driver = IREE_DRIVERS_TO_PRETTY_NAMES[self.runner]
-    else:
+    driver_info = IREE_DRIVERS_INFOS.get(self.runner)
+    if not driver_info:
       raise ValueError(
           f"Unrecognized runner '{self.runner}'; need to update the list")
+
+    target_arch = None
+    if driver_info.device_type == 'GPU':
+      target_arch = "GPU-" + self.device_info.gpu_name
+    elif driver_info.device_type == 'CPU':
+      target_arch = "CPU-" + self.device_info.get_cpu_arch_revision()
+    else:
+      raise ValueError(
+          f"Unrecognized device type '{driver_info.device_type}' of the runner '{self.runner}'"
+      )
 
     if self.model_tags:
       tags = ",".join(self.model_tags)
       model_part = f"{self.model_name} [{tags}] ({self.model_source})"
     else:
       model_part = f"{self.model_name} ({self.model_source})"
-    phone_part = f"{self.device_info.model} ({target_arch})"
+    device_part = f"{self.device_info.model} ({target_arch})"
     mode = ",".join(self.bench_mode)
 
-    return f"{model_part} {mode} with {driver} @ {phone_part}"
+    return f"{model_part} {mode} with {driver_info.pretty_name} @ {device_part}"
 
   @staticmethod
-  def from_device_info_and_name(device_info: AndroidDeviceInfo, name: str):
+  def from_device_info_and_name(device_info: DeviceInfo, name: str):
     (
         model_name,
         model_tags,
@@ -283,7 +252,7 @@ class BenchmarkInfo:
                          model_source=json_object["model_source"],
                          bench_mode=json_object["bench_mode"],
                          runner=json_object["runner"],
-                         device_info=AndroidDeviceInfo.from_json_object(
+                         device_info=DeviceInfo.from_json_object(
                              json_object["device_info"]))
 
 
