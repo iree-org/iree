@@ -204,7 +204,7 @@ FailureOr<LinalgOp> transform::FuseOp::applyToOne(LinalgOp target) {
 
 LogicalResult transform::FuseOp::verify() {
   SmallVector<int64_t> permutation = extractI64Array(tile_interchange());
-  auto sequence = llvm::seq<int64_t>(0, permutation.size());
+  auto sequence = llvm::to_vector(llvm::seq<int64_t>(0, permutation.size()));
   if (!std::is_permutation(sequence.begin(), sequence.end(),
                            permutation.begin(), permutation.end())) {
     return emitOpError() << "expects interchange to be a permutation, found "
@@ -242,7 +242,7 @@ FailureOr<LinalgOp> transform::InterchangeOp::applyToOne(LinalgOp target) {
 
 LogicalResult transform::InterchangeOp::verify() {
   SmallVector<unsigned> permutation = extractUIntArray(iterator_interchange());
-  auto sequence = llvm::seq<unsigned>(0, permutation.size());
+  auto sequence = llvm::to_vector(llvm::seq<unsigned>(0, permutation.size()));
   if (!std::is_permutation(sequence.begin(), sequence.end(),
                            permutation.begin(), permutation.end())) {
     return emitOpError()
@@ -316,7 +316,7 @@ LogicalResult transform::PadOp::verify() {
   ArrayAttr transposes = transpose_paddings();
   for (Attribute attr : transposes) {
     SmallVector<int64_t> transpose = extractFromI64ArrayAttr(attr);
-    auto sequence = llvm::seq<int64_t>(0, transpose.size());
+    auto sequence = llvm::to_vector(llvm::seq<int64_t>(0, transpose.size()));
     if (!std::is_permutation(sequence.begin(), sequence.end(),
                              transpose.begin(), transpose.end())) {
       return emitOpError()
