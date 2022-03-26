@@ -29,122 +29,348 @@ CMake target, which put them in the following directory structure:
         └── <compiled-iree-model>-<sha1>.vmfb
 """
 
-import re
-import os
-
-from typing import List, Optional, Sequence
+from argparse import Namespace
+from dataclasses import dataclass, field
+from typing import Optional, Sequence, Set
 
 from .benchmark_definition import DeviceInfo, BenchmarkInfo
+
+import os
+import re
 
 # All benchmarks' relative path against root build directory.
 BENCHMARK_SUITE_REL_PATH = "benchmark_suites"
 
+# The flagfile/toolfile's filename for compiled benchmark artifacts.
+MODEL_FLAGFILE_NAME = "flagfile"
+MODEL_TOOLFILE_NAME = "tool"
 
-def compose_info_object(device_info: DeviceInfo, benchmark_category_dir: str,
-                        benchmark_case_dir: str) -> BenchmarkInfo:
-  """Creates an BenchmarkInfo object to describe the benchmark.
-  Args:
-    device_info: an DeviceInfo object.
-    benchmark_category_dir: the directory to a specific benchmark category.
-    benchmark_case_dir: a directory containing the benchmark case.
-  Returns:
-    A BenchmarkInfo object.
+BENCHMARK_RESULTS_REL_PATH = "benchmark-results"
+CAPTURES_REL_PATH = "captures"
+
+
+@dataclass
+class BenchmarkConfig:
+  """Represents the settings to run benchmarks.
+
+    root_build_dir: the root build directory containing the built benchmark
+      suites.
+    driver_filter: filter benchmarks to those whose driver matches this regex
+      (or all if this is None).
+    model_name_filter: filter benchmarks to those whose model name matches this
+      regex (or all if this is None).
+    mode_filter: filter benchmarks to those whose benchmarking mode matches this
+      regex (or all if this is None).
+    tmp_dir: path to temporary directory to which intermediate outputs should be
+      stored. Separate "benchmark-results" and "captures" subdirectories will be
+      created as necessary.
+    normal_benchmark_tool_dir: the path to the normal benchmark tool directory.
+    traced_benchmark_tool_dir: the path to the tracing-enabled benchmark tool
+      directory.
+    trace_capture_tool: the path to the tool for collecting captured traces.
+    skip_benchmarks: names of benchmarks that should be skipped. Note that
+      captures will still be run for these benchmarks if do_capture is true and
+      they are not also in skip_captures.
+    skip_captures: names of benchmark captures that should be skipped.
+    do_capture: whether captures should be collected.
+    keep_going: whether to proceed if an individual run fails. Exceptions will
+      logged and returned.
+    benchmark_min_time: min number of seconds to run the benchmark for, if
+      specified. Otherwise, the benchmark will be repeated a fixed number of
+      times.
   """
-  # Extract the model name from the directory path. This uses the relative
-  # path under the root model directory. If there are multiple segments,
-  # additional ones will be placed in parentheses.
-  model_name = os.path.relpath(benchmark_case_dir, benchmark_category_dir)
-  # Now we have <model-name>/.../<iree-driver>__<target-arch>__<bench_mode>,
-  # Remove the last segment.
-  model_name = os.path.dirname(model_name)
-  main, rest = os.path.split(model_name)
-  if main:
-    # Tags coming from directory structure.
-    model_name = main
-    model_tags = [re.sub(r"\W+", "-", rest)]
-  else:
-    # Tags coming from the name itself.
-    model_name, rest = rest.split("-", 1)
-    model_tags = rest.split(",")
 
-  # Extract benchmark info from the directory path following convention:
-  #   <iree-driver>__<target-architecture>__<benchmark_mode>
-  root_immediate_dir = os.path.basename(benchmark_case_dir)
-  iree_driver, target_arch, bench_mode = root_immediate_dir.split("__")
+  tmp_dir: str
+  root_benchmark_dir: str
+  benchmark_results_dir: str
+  capture_dir: str
+  normal_benchmark_tool_dir: Optional[str] = None
+  traced_benchmark_tool_dir: Optional[str] = None
+  trace_capture_tool: Optional[str] = None
 
-  model_source = os.path.basename(benchmark_category_dir)
+  driver_filter: Optional[str] = None
+  model_name_filter: Optional[str] = None
+  mode_filter: Optional[str] = None
 
-  return BenchmarkInfo(model_name=model_name,
-                       model_tags=model_tags,
-                       model_source=model_source,
-                       bench_mode=bench_mode.split(","),
-                       runner=iree_driver,
-                       device_info=device_info)
+  skip_benchmarks: Set[str] = field(default_factory=set)
+  skip_captures: Set[str] = field(default_factory=set)
+
+  do_capture: bool = False
+  keep_going: bool = False
+  benchmark_min_time: float = 0
+
+  @staticmethod
+  def build(args: Namespace,
+            git_commit_hash: str,
+            skip_benchmarks: Set[str] = set(),
+            skip_captures: Set[str] = set()):
+    """Build config from command arguments and supplementary information."""
+
+    def real_path_or_none(path: str) -> Optional[str]:
+      return os.path.realpath(path) if path else None
+
+    if not args.normal_benchmark_tool_dir and not args.traced_benchmark_tool_dir:
+      raise ValueError(
+          "At least one of --normal_benchmark_tool_dir or --traced_benchmark_tool_dir should be specified."
+      )
+
+    do_capture = args.traced_benchmark_tool_dir is not None
+    if ((args.traced_benchmark_tool_dir is not None) != do_capture) or (
+        (args.trace_capture_tool is not None) != do_capture) or (
+            (args.capture_tarball is not None) != do_capture):
+      raise ValueError(
+          "The following 3 flags should be simultaneously all specified or all unspecified: --traced_benchmark_tool_dir, --trace_capture_tool, --capture_tarball"
+      )
+
+    build_dir = os.path.realpath(args.build_dir)
+    per_commit_tmp_dir = os.path.realpath(
+        os.path.join(args.tmp_dir, git_commit_hash))
+
+    return BenchmarkConfig(
+        tmp_dir=per_commit_tmp_dir,
+        root_benchmark_dir=os.path.join(build_dir, BENCHMARK_SUITE_REL_PATH),
+        benchmark_results_dir=os.path.join(per_commit_tmp_dir,
+                                           BENCHMARK_RESULTS_REL_PATH),
+        capture_dir=os.path.join(per_commit_tmp_dir, CAPTURES_REL_PATH),
+        normal_benchmark_tool_dir=real_path_or_none(
+            args.normal_benchmark_tool_dir),
+        traced_benchmark_tool_dir=real_path_or_none(
+            args.traced_benchmark_tool_dir),
+        trace_capture_tool=real_path_or_none(args.trace_capture_tool),
+        driver_filter=args.driver_filter_regex,
+        model_name_filter=args.model_name_regex,
+        mode_filter=args.mode_regex,
+        skip_benchmarks=skip_benchmarks,
+        skip_captures=skip_captures,
+        do_capture=do_capture,
+        keep_going=args.keep_going,
+        benchmark_min_time=args.benchmark_min_time)
 
 
-def filter_benchmarks_for_category(benchmark_category_dir: str,
-                                   cpu_target_arch_filter: str,
-                                   gpu_target_arch_filter: str,
-                                   available_drivers: Sequence[str],
-                                   driver_filter: Optional[str],
-                                   mode_filter: Optional[str],
-                                   model_name_filter: Optional[str],
-                                   verbose: bool = False) -> Sequence[str]:
-  """Filters benchmarks in a specific category for the given device.
-  Args:
-    benchmark_category_dir: the directory to a specific benchmark category.
-    cpu_target_arch_filter: CPU target architecture filter regex.
-    gpu_target_arch_filter: GPU target architecture filter regex.
-    available_drivers: list of drivers supported by the tools in this build dir.
-    driver_filter: driver filter regex.
-    mode_filter: benchmark mode regex.
-    model_name_filter: model name regex.
-    verbose: whether to print additional debug info.
-  Returns:
-    A list containing all matched benchmark cases' directories.
-  """
-  matched_benchmarks = []
+@dataclass
+class BenchmarkCase:
+  """Represents the information to run a benchmark."""
 
-  # Go over all benchmarks in the model directory to find those matching the
-  # current Android device's CPU/GPU architecture.
-  for root, dirs, _ in os.walk(benchmark_category_dir):
-    # Take the immediate directory name and try to see if it contains compiled
-    # models and flagfiles. This relies on the following directory naming
-    # convention:
-    #   <iree-driver>__<target-architecture>__<benchmark_mode>
-    root_immediate_dir = os.path.basename(root)
-    segments = root_immediate_dir.split("__")
-    if len(segments) != 3 or not segments[0].startswith("iree-"):
-      continue
+  benchmark_info: BenchmarkInfo
+  benchmark_key: str
+  benchmark_case_dir: str
+  normal_benchmark_tool_path: Optional[str]
+  traced_benchmark_tool_path: Optional[str]
+  flagfile_path: str
+  benchmark_results_filename: str
+  capture_filename: str
+  skip_normal_benchmark: bool
+  skip_traced_benchmark: bool
 
-    model_name = os.path.relpath(root, benchmark_category_dir)
-    iree_driver, target_arch, bench_mode = segments
-    iree_driver = iree_driver[len("iree-"):].lower()
-    target_arch = target_arch.lower()
 
-    # We can choose this benchmark if it matches the driver and CPU/GPU
-    # architecture.
-    matched_driver = (iree_driver in available_drivers) and (
-        driver_filter is None or
-        re.match(driver_filter, iree_driver) is not None)
-    matched_arch = (re.match(cpu_target_arch_filter, target_arch) is not None or
-                    re.match(gpu_target_arch_filter, target_arch) is not None)
-    matched_model_name = (model_name_filter is None or
-                          re.match(model_name_filter, model_name) is not None)
-    matched_mode = (mode_filter is None or
-                    re.match(mode_filter, bench_mode) is not None)
+class BenchmarkHelper(object):
+  """Helper to build benchmark cases."""
 
-    chosen = False
-    if matched_driver and matched_arch and matched_model_name and matched_mode:
-      matched_benchmarks.append(root)
-      chosen = True
+  def __init__(self, config: BenchmarkConfig, device_info: DeviceInfo):
+    self.config = config
+    self.device_info = device_info
 
+  def get_available_drivers(self, verbose: bool) -> Sequence[str]:
+    any_tool_dir = self.config.normal_benchmark_tool_dir if self.config.normal_benchmark_tool_dir else self.config.traced_benchmark_tool_dir
+    config_txt_file_path = os.path.join(any_tool_dir, "build_config.txt")
+    config_txt_file = open(config_txt_file_path, "r")
+    config_txt_file_lines = config_txt_file.readlines()
+    available_drivers = []
+    for line in config_txt_file_lines:
+      name, value = line.strip().split("=")
+      if value != "ON":
+        continue
+      if name == "IREE_HAL_DRIVER_CUDA":
+        available_drivers.append("cuda")
+      elif name == "IREE_HAL_DRIVER_DYLIB":
+        available_drivers.append("dylib")
+      elif name == "IREE_HAL_DRIVER_DYLIB_SYNC":
+        available_drivers.append("dylib-sync")
+      elif name == "IREE_HAL_DRIVER_EXPERIMENTAL_ROCM":
+        available_drivers.append("rocm")
+      elif name == "IREE_HAL_DRIVER_VMVX":
+        available_drivers.append("vmvx")
+      elif name == "IREE_HAL_DRIVER_VMVX_SYNC":
+        available_drivers.append("vmvx-sync")
+      elif name == "IREE_HAL_DRIVER_VULKAN":
+        available_drivers.append("vulkan")
+      else:
+        continue
     if verbose:
-      print(f"dir: {root}")
-      print(f"  model_name: {model_name}")
-      print(f"  iree_driver: {iree_driver}")
-      print(f"  target_arch: {target_arch}")
-      print(f"  bench_mode: {bench_mode}")
-      print(f"  chosen: {chosen}")
+      available_drivers_str = ', '.join(available_drivers)
+      print(f"Available drivers: {available_drivers_str}")
+    return available_drivers
 
-  return matched_benchmarks
+  def list_benchmark_categories(self) -> Sequence[str]:
+    return sorted(os.listdir(self.config.root_benchmark_dir))
+
+  def generate_benchmark_cases(
+      self,
+      category: str,
+      cpu_target_arch: str,
+      gpu_target_arch: str,
+      available_drivers: Sequence[str],
+      verbose: bool = False) -> Sequence[BenchmarkCase]:
+
+    benchmark_case_dirs = self.__filter_benchmarks_for_category(
+        category,
+        cpu_target_arch_filter=cpu_target_arch,
+        gpu_target_arch_filter=gpu_target_arch,
+        available_drivers=available_drivers,
+        verbose=verbose)
+
+    benchmark_cases = []
+    for benchmark_case_dir in benchmark_case_dirs:
+      benchmark_case = self.__get_benchmark_case(category, benchmark_case_dir)
+      if benchmark_case:
+        benchmark_cases.append(benchmark_case)
+
+    return benchmark_cases
+
+  def __get_benchmark_case(self, category: str,
+                           benchmark_case_dir: str) -> Optional[BenchmarkCase]:
+    benchmark_info = self.__compose_info_object(
+        category=category, benchmark_case_dir=benchmark_case_dir)
+    benchmark_key = str(benchmark_info)
+    skip_normal_benchmark = benchmark_key in self.config.skip_benchmarks
+    skip_traced_benchmark = not self.config.do_capture or benchmark_key in self.config.skip_captures
+    if skip_normal_benchmark and skip_traced_benchmark:
+      return None
+
+    normal_benchmark_tool_path = None
+    traced_benchmark_tool_path = None
+
+    # Read the file specifying which tool should be used for benchmarking
+    with open(os.path.join(benchmark_case_dir, MODEL_TOOLFILE_NAME)) as f:
+      tool = f.read().strip()
+      if self.config.normal_benchmark_tool_dir:
+        normal_benchmark_tool_path = os.path.join(
+            self.config.normal_benchmark_tool_dir, tool)
+
+      if self.config.do_capture:
+        traced_benchmark_tool_path = os.path.join(
+            self.config.traced_benchmark_tool_dir, tool)
+
+    return BenchmarkCase(
+        benchmark_info=benchmark_info,
+        benchmark_key=benchmark_key,
+        benchmark_case_dir=benchmark_case_dir,
+        normal_benchmark_tool_path=normal_benchmark_tool_path,
+        traced_benchmark_tool_path=traced_benchmark_tool_path,
+        flagfile_path=os.path.join(benchmark_case_dir, MODEL_FLAGFILE_NAME),
+        benchmark_results_filename=os.path.join(
+            self.config.benchmark_results_dir, f'{benchmark_key}.json'),
+        capture_filename=os.path.join(self.config.capture_dir,
+                                      f'{benchmark_key}.tracy'),
+        skip_normal_benchmark=skip_normal_benchmark,
+        skip_traced_benchmark=skip_traced_benchmark)
+
+  def __filter_benchmarks_for_category(self,
+                                       category: str,
+                                       cpu_target_arch_filter: str,
+                                       gpu_target_arch_filter: str,
+                                       available_drivers: Sequence[str],
+                                       verbose: bool = False) -> Sequence[str]:
+    """Filters benchmarks in a specific category for the given device.
+    Args:
+      benchmark_category_dir: the directory to a specific benchmark category.
+      cpu_target_arch_filter: CPU target architecture filter regex.
+      gpu_target_arch_filter: GPU target architecture filter regex.
+      available_drivers: list of drivers supported by the tools in this build dir.
+      verbose: whether to print additional debug info.
+    Returns:
+      A list containing all matched benchmark cases' directories.
+    """
+    matched_benchmarks = []
+    benchmark_category_dir = os.path.join(self.config.root_benchmark_dir,
+                                          category)
+    driver_filter = self.config.driver_filter
+    model_name_filter = self.config.model_name_filter
+    mode_filter = self.config.mode_filter
+
+    # Go over all benchmarks in the model directory to find those matching the
+    # current Android device's CPU/GPU architecture.
+    for root, _, _ in os.walk(benchmark_category_dir):
+      # Take the immediate directory name and try to see if it contains compiled
+      # models and flagfiles. This relies on the following directory naming
+      # convention:
+      #   <iree-driver>__<target-architecture>__<benchmark_mode>
+      root_immediate_dir = os.path.basename(root)
+      segments = root_immediate_dir.split("__")
+      if len(segments) != 3 or not segments[0].startswith("iree-"):
+        continue
+
+      model_name = os.path.relpath(root, benchmark_category_dir)
+      iree_driver, target_arch, bench_mode = segments
+      iree_driver = iree_driver[len("iree-"):].lower()
+      target_arch = target_arch.lower()
+
+      # We can choose this benchmark if it matches the driver and CPU/GPU
+      # architecture.
+      matched_driver = (iree_driver in available_drivers) and (
+          driver_filter is None or
+          re.match(driver_filter, iree_driver) is not None)
+      matched_arch = (re.match(cpu_target_arch_filter,
+                               target_arch) is not None or
+                      re.match(gpu_target_arch_filter, target_arch) is not None)
+      matched_model_name = (model_name_filter is None or
+                            re.match(model_name_filter, model_name) is not None)
+      matched_mode = (mode_filter is None or
+                      re.match(mode_filter, bench_mode) is not None)
+
+      chosen = False
+      if matched_driver and matched_arch and matched_model_name and matched_mode:
+        matched_benchmarks.append(root)
+        chosen = True
+
+      if verbose:
+        print(f"dir: {root}")
+        print(f"  model_name: {model_name}")
+        print(f"  iree_driver: {iree_driver}")
+        print(f"  target_arch: {target_arch}")
+        print(f"  bench_mode: {bench_mode}")
+        print(f"  chosen: {chosen}")
+
+    return matched_benchmarks
+
+  def __compose_info_object(self, category: str,
+                            benchmark_case_dir: str) -> BenchmarkInfo:
+    """Creates an BenchmarkInfo object to describe the benchmark.
+    Args:
+      benchmark_category_dir: the directory to a specific benchmark category.
+      benchmark_case_dir: a directory containing the benchmark case.
+    Returns:
+      A BenchmarkInfo object.
+    """
+    benchmark_category_dir = os.path.join(self.config.root_benchmark_dir,
+                                          category)
+    # Extract the model name from the directory path. This uses the relative
+    # path under the root model directory. If there are multiple segments,
+    # additional ones will be placed in parentheses.
+    model_name = os.path.relpath(benchmark_case_dir, benchmark_category_dir)
+    # Now we have <model-name>/.../<iree-driver>__<target-arch>__<bench_mode>,
+    # Remove the last segment.
+    model_name = os.path.dirname(model_name)
+    main, rest = os.path.split(model_name)
+    if main:
+      # Tags coming from directory structure.
+      model_name = main
+      model_tags = [re.sub(r"\W+", "-", rest)]
+    else:
+      # Tags coming from the name itself.
+      model_name, rest = rest.split("-", 1)
+      model_tags = rest.split(",")
+
+    # Extract benchmark info from the directory path following convention:
+    #   <iree-driver>__<target-architecture>__<benchmark_mode>
+    root_immediate_dir = os.path.basename(benchmark_case_dir)
+    iree_driver, _, bench_mode = root_immediate_dir.split("__")
+
+    model_source = os.path.basename(benchmark_category_dir)
+
+    return BenchmarkInfo(model_name=model_name,
+                         model_tags=model_tags,
+                         model_source=model_source,
+                         bench_mode=bench_mode.split(","),
+                         runner=iree_driver,
+                         device_info=self.device_info)
