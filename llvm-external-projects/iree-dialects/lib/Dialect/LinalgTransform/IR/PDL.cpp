@@ -10,6 +10,7 @@
 #include "mlir/Dialect/Arithmetic/Utils/Utils.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/PDL/IR/PDLOps.h"
+#include "mlir/IR/Attributes.h"
 #include "mlir/IR/SymbolTable.h"
 #include "mlir/Rewrite/FrozenRewritePatternSet.h"
 #include "mlir/Rewrite/PatternApplicator.h"
@@ -37,23 +38,25 @@ getMatchingOps(Operation *parent, const FrozenRewritePatternSet &patterns) {
 /// Hook for PDL driver to check if an operation (`value`) is directly nested in
 /// a function with the name provided as constant parameter.
 /// TODO: PDL needs user-defined "questions".
-static LogicalResult nestedInFunc(PDLValue value, ArrayAttr constantParams,
+static LogicalResult nestedInFunc(ArrayRef<PDLValue> values,
                                   PatternRewriter &rewriter) {
-  auto *operation = value.cast<Operation *>();
-  auto func = operation->getParentOfType<FuncOp>();
-  assert(constantParams.size() == 1 &&
-         "expected a constant param with function name");
-  auto functionSymbol = constantParams[0].dyn_cast<SymbolRefAttr>();
-  assert(functionSymbol && "expected a function name");
+  assert(values.size() == 2 && "expected two arguments");
+  auto *operation = values[0].cast<Operation *>();
+  auto attr = values[1].cast<Attribute>();
+
+  auto func = operation->getParentOfType<func::FuncOp>();
+  auto functionSymbol = attr.dyn_cast<SymbolRefAttr>();
 
   if (!func)
     return rewriter.notifyMatchFailure(operation, "not nested in a function");
+  if (!functionSymbol)
+    return rewriter.notifyMatchFailure(operation, "not a function identifier");
   return success(functionSymbol.getLeafReference() == func.getName());
 }
 
 /// PDL rewrite hook that does nothing.
-static void noOpRewriter(ArrayRef<PDLValue> args, ArrayAttr constantParams,
-                         PatternRewriter &rewriter, PDLResultList &results) {
+static void noOpRewriter(ArrayRef<PDLValue> args, PatternRewriter &rewriter,
+                         PDLResultList &results) {
   assert(args.size() == 1 && "expected one argument");
 #ifndef NDEBUG
   args.front().cast<Operation *>()->setAttr("iree_linalg_transform.matched",
@@ -130,32 +133,32 @@ static LogicalResult isEquivalentToOpImpl(LinalgOp linalgOp,
   return haveEquivalentBodies(linalgOp, linalgModelOp, rewriter);
 }
 
-/// Check whether the unique Operation* `op` stored in `value` (assumed) is
-/// equivalent to the unique StringRefAttr operation name passed in
-/// `constantParams`.
+/// Check whether the unique Operation* `op` stored in `value[0]` (assumed) is
+/// equivalent to the unique StringRefAttr `modelOpName` passed in `value[1]`.
 /// Equivalence is achieved when either:
-///   1. `op` has the name stored in `constantParams`.
-///   2. `op` and `constantParams` are both linalg ops and their structured
+///   1. `op` has the name stored in `modelOpName`.
+///   2. `op` and `modelOpName` are both linalg ops and their structured
 ///      interfaces as well as their bodies are equivalent.
 ///      Structured interfaces equivalence is a simple attribute level check.
 ///      Body equivalence is more involved and currently limited:
 ///        a. the current impl constructs an instance of the op whose name is
-///           specified in `constantParams` and checks for exact body equality.
+///           specified in `modelOpName` and checks for exact body equality.
 ///        b. a more advanced version would "subtract" the bodies and fold, cse
 ///           and canonicalize to fixed point. If the result is "all zeros",
 ///           then the bodies would be equivalent (really isomorphic).
 ///   3. other cases TBD (e.g. vector.generic when available).
-static LogicalResult isEquivalentToOp(PDLValue value, ArrayAttr constantParams,
+static LogicalResult isEquivalentToOp(ArrayRef<PDLValue> values,
                                       PatternRewriter &rewriter) {
-  auto *maybeOp = value.dyn_cast<Operation *>();
+  assert(values.size() == 2 && "expected two arguments");
+  auto *maybeOp = values[0].dyn_cast<Operation *>();
   if (!maybeOp)
     return failure(); // TODO: notifyMatchFailure needs an Operation* handle.
   Operation *op = maybeOp;
 
-  ArrayRef<Attribute> attrs = constantParams.getValue();
-  if (attrs.size() != 1)
-    return failure(); // TODO: notifyMatchFailure needs an Operation* handle.
-  auto modelOpNameAttr = attrs.front().dyn_cast<StringAttr>();
+  auto maybeAttr = values[1].dyn_cast<Attribute>();
+  if (!maybeAttr)
+    return failure();
+  auto modelOpNameAttr = maybeAttr->dyn_cast<StringAttr>();
   if (!modelOpNameAttr)
     return failure(); // TODO: notifyMatchFailure needs an Operation* handle.
   auto modelOpName = modelOpNameAttr.strref();
@@ -165,11 +168,13 @@ static LogicalResult isEquivalentToOp(PDLValue value, ArrayAttr constantParams,
     return success();
 
   // 2. Linalg vs Linalg.
+  // Create op from `modelOpName`.
+  // 2. Linalg vs Linalg.
   // Create op from `constantParams`.
   OperationState modelOpState(op->getLoc(), modelOpName, op->getOperands(),
                               op->getResultTypes(), op->getAttrs());
   modelOpState.addRegion();
-  Operation *modelOp = rewriter.createOperation(modelOpState);
+  Operation *modelOp = rewriter.create(modelOpState);
   auto g1 = llvm::make_scope_exit([&]() { rewriter.eraseOp(modelOp); });
   LinalgOp linalgOp = dyn_cast<LinalgOp>(op);
   LinalgOp linalgModelOp = dyn_cast<LinalgOp>(modelOp);
@@ -181,21 +186,25 @@ static LogicalResult isEquivalentToOp(PDLValue value, ArrayAttr constantParams,
 }
 
 /// Assume that:
-///   1. `value` is an operands range
-///   2. `constantParams` contains a DictAttr with `operand_number`, `dim` and
+///   1. `values[0]` is an operands range
+///   2. `values[1]` contains a DictAttr with `operand_number`, `dim` and
 ///      `divisor` IntegerAttr entries.
-/// Succeed if `value`[`operand_number`] is a ranked type whose `dim` is a
+/// Succeed if `operands`[`operand_number`] is a ranked type whose `dim` is a
 /// multiple of `divisor`.
 /// Note: 0 is the convention to express "do not tile", it is considered to
 /// divide everything.
-static LogicalResult isDimMultipleOf(PDLValue value, ArrayAttr constantParams,
+static LogicalResult isDimMultipleOf(ArrayRef<PDLValue> values,
                                      PatternRewriter &rewriter) {
-  auto maybeOperands = value.dyn_cast<ValueRange>();
+  assert(values.size() == 2 && "expected two arguments");
+  auto maybeOperands = values[0].dyn_cast<ValueRange>();
   if (!maybeOperands)
     return failure(); // TODO: notifyMatchFailure needs an Operation* handle.
   auto operands = *maybeOperands;
 
-  auto dict = constantParams.begin()->dyn_cast<DictionaryAttr>();
+  auto maybeAttr = values[1].dyn_cast<Attribute>();
+  if (!maybeAttr)
+    return failure();
+  auto dict = maybeAttr->dyn_cast<DictionaryAttr>();
   if (!dict)
     return failure(); // TODO: notifyMatchFailure needs an Operation* handle.
 
@@ -227,19 +236,23 @@ static LogicalResult isDimMultipleOf(PDLValue value, ArrayAttr constantParams,
 }
 
 /// Assume that:
-///   1. `value` is an operands range
-///   2. `constantParams` contains a DictAttr with `operand_number` and `dim`
+///   1. `values[0]` is an operands range
+///   2. `values[1]` contains a DictAttr with `operand_number` and `dim`
 ///       IntegerAttr entries.
 /// Succeed if `value`[`operand_number`] is a ranked type whose `dim` is
 /// dynamic.
-static LogicalResult isDimStatic(PDLValue value, ArrayAttr constantParams,
+static LogicalResult isDimStatic(ArrayRef<PDLValue> values,
                                  PatternRewriter &rewriter) {
-  auto maybeOperands = value.dyn_cast<ValueRange>();
+  assert(values.size() == 2 && "expected two arguments");
+  auto maybeOperands = values[0].dyn_cast<ValueRange>();
   if (!maybeOperands)
     return failure(); // TODO: notifyMatchFailure needs an Operation* handle.
   auto operands = *maybeOperands;
 
-  auto dict = constantParams.begin()->dyn_cast<DictionaryAttr>();
+  auto maybeAttr = values[1].dyn_cast<Attribute>();
+  if (!maybeAttr)
+    return failure();
+  auto dict = maybeAttr->dyn_cast<DictionaryAttr>();
   if (!dict)
     return failure(); // TODO: notifyMatchFailure needs an Operation* handle.
 
@@ -262,19 +275,24 @@ static LogicalResult isDimStatic(PDLValue value, ArrayAttr constantParams,
 }
 
 /// Assume that:
-///   1. `value` is an operands range
-///   2. `constantParams` contains a DictAttr with `operand_number` and `dim`
+///   1. `values[0]` is an operands range
+///   2. `values[1[` contains a DictAttr with `operand_number` and `dim`
 ///       IntegerAttr entries.
 /// Succeed if `value`[`operand_number`] is a ranked type whose `dim` is
 /// dynamic.
-static LogicalResult isDimDynamic(PDLValue value, ArrayAttr constantParams,
+static LogicalResult isDimDynamic(ArrayRef<PDLValue> values,
+
                                   PatternRewriter &rewriter) {
-  auto maybeOperands = value.dyn_cast<ValueRange>();
+  assert(values.size() == 2 && "expected two arguments");
+  auto maybeOperands = values[0].dyn_cast<ValueRange>();
   if (!maybeOperands)
     return failure(); // TODO: notifyMatchFailure needs an Operation* handle.
   auto operands = *maybeOperands;
 
-  auto dict = constantParams.begin()->dyn_cast<DictionaryAttr>();
+  auto maybeAttr = values[1].dyn_cast<Attribute>();
+  if (!maybeAttr)
+    return failure();
+  auto dict = maybeAttr->dyn_cast<DictionaryAttr>();
   if (!dict)
     return failure(); // TODO: notifyMatchFailure needs an Operation* handle.
 
