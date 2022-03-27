@@ -64,6 +64,42 @@ static const char *getNDKTargetPlatform(const Triple &targetTriple) {
 }
 
 // Android linker using the Android NDK toolchain.
+//
+// Specifically, using the clang drivers specific to a target architecture and
+// API version, e.g. aarch64-linux-android29-clang.
+//
+// Do we really need to bother using the NDK and using that specific clang
+// driver? What if we just used a standard ld driver --- what if we just used
+// UnixLinkerTool for Android too? At least when the host is Linux?
+// At first glance, that seems to just work, but the following suggests to
+// still bother with Android NDK clang drivers:
+//
+// While such drivers end up exec'ing just one standard clang driver, which in
+// turn ends up exec'ing just one standard ld driver, at each stage some
+// significant flags are passed, so it seems wise to rely on the NDK to set
+// all these flags for us.
+//
+// Example: with strace, we find that as of NDK r23, the driver
+//
+//   android-ndk-r23/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android29-clang
+//
+// execs
+//
+//   android-ndk-r23/toolchains/llvm/prebuilt/linux-x86_64/bin/clang
+//     --target=aarch64-linux-android29
+//
+// which in turn execs
+//
+//   android-ndk-r23/toolchains/llvm/prebuilt/linux-x86_64/bin/ld
+//     -pie -z noexecstack -EL --fix-cortex-a53-843419
+//     --warn-shared-textrel -z now -z relro -z max-page-size=4096
+//     --hash-style=gnu --enable-new-dtags --eh-frame-hdr
+//     -m aarch64linux -dynamic-linker /system/bin/linker64
+//
+// And that ld driver really is LLD:
+//
+//   $ android-ndk-r23/toolchains/llvm/prebuilt/linux-x86_64/bin/ld --version
+//   LLD 12.0.5 (/buildbot/src/android/llvm-toolchain/out/llvm-project/lld ...
 class AndroidLinkerTool : public LinkerTool {
  public:
   using LinkerTool::LinkerTool;
@@ -111,30 +147,73 @@ class AndroidLinkerTool : public LinkerTool {
     }
     artifacts.libraryFile.close();
 
-    SmallVector<std::string, 8> flags = {
+    SmallVector<std::string> flags = {
         getSystemToolPath(),
 
         // Avoids including any libc/startup files that initialize the CRT as
         // we don't use any of that. Our shared libraries must be freestanding.
+        //
+        // It matters that this flag isn't prefixed with --for-linker=. Doing so
+        // results in a dlopen error: 'cannot locate symbol "main" referenced by
+        // "iree_dylib_foo.so"'
         "-nostdlib",  // -nodefaultlibs + -nostartfiles
-
-        // Statically link all dependencies so we don't have any runtime deps.
-        // We cannot have any imports in the module we produce.
-        "-static",
 
         "-o " + artifacts.libraryFile.path,
     };
-
-    // Strip debug information (only, no relocations) when not requested.
-    if (!targetOptions.debugSymbols) {
-      flags.push_back("-Wl,--strip-debug");
-    }
 
     // Link all input objects. Note that we are not linking whole-archive as
     // we want to allow dropping of unused codegen outputs.
     for (auto &objectFile : objectFiles) {
       flags.push_back(objectFile.path);
     }
+
+    // Since we are using a clang driver, we need to prefix the flags that are
+    // meant to be only interpreted by the linker.
+    SmallVector<std::string> flagsToPrefixForLinker = {
+        // Statically link all dependencies so we don't have any runtime deps.
+        // We cannot have any imports in the module we produce.
+        "-static",
+
+        // Generate a dynamic library (ELF type: ET_DYN), otherwise dlopen()
+        // won't succeed on it. This is not incompatible with -static. The GNU
+        // man page for ld, `man ld`, says the following:
+        //
+        //   -static
+        //       Do not link against shared libraries. [...] This option can be
+        //       used with -shared. Doing so means that a shared library is
+        //       being created but that all of the library's external references
+        //       must be resolved by pulling in entries from static libraries.
+        //
+        // While that much is said in the GNU ld man page, the reality is that
+        // out of ld.bfd, ld.gold and ld.lld, only ld.lld actually implements
+        // that. Meanwhile, ld.bfd interprets -static -shared as just -static,
+        // and ld.gold rejects -static -shared outright as "incompatible".
+        //
+        // So here we are effectively relying on the linker being ld.lld, which
+        // is the case because we are using Android NDK clang, which execs
+        // Android NDK ld, which is ld.lld, see strace results mentioned in
+        // AndroidLinkerTool class comment.
+        "-shared",
+
+        // As seen in the strace results mentioned in the AndroidLinkerTool
+        // class comment, when Android NDK clang execs ld, it passes -pie to it.
+        // ld considers that to be incompatible with -shared (maybe simply
+        // because -pie stands for position independent EXECUTABLE and -shared
+        // means generate an ET_DYN, not an ET_EXEC?), so we have to pass
+        // this flag now to undo -pie.
+        "-no-pie",
+    };
+
+    // Strip debug information (only, no relocations) when not requested.
+    if (!targetOptions.debugSymbols) {
+      flagsToPrefixForLinker.push_back("--strip-debug");
+    }
+
+    // Prefix and fold flagsToPrefixForLinker into flags.
+    for (const auto &f : flagsToPrefixForLinker) {
+      flags.push_back("--for-linker=" + f);
+    }
+    flagsToPrefixForLinker.clear();
 
     auto commandLine = llvm::join(flags, " ");
     if (failed(runLinkCommand(commandLine))) return llvm::None;
