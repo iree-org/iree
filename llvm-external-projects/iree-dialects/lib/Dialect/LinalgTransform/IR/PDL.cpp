@@ -35,8 +35,8 @@ getMatchingOps(Operation *parent, const FrozenRewritePatternSet &patterns) {
       });
 }
 
-/// Hook for PDL driver to check if an operation (`value`) is directly nested in
-/// a function with the name provided as constant parameter.
+/// Hook for PDL driver to check if an operation (`values[0]`) is directly
+/// nested in a function with the name provided by an attribute (`values[1]`).
 /// TODO: PDL needs user-defined "questions".
 static LogicalResult nestedInFunc(ArrayRef<PDLValue> values,
                                   PatternRewriter &rewriter) {
@@ -133,16 +133,16 @@ static LogicalResult isEquivalentToOpImpl(LinalgOp linalgOp,
   return haveEquivalentBodies(linalgOp, linalgModelOp, rewriter);
 }
 
-/// Check whether the unique Operation* `op` stored in `value[0]` (assumed) is
-/// equivalent to the unique StringRefAttr `modelOpName` passed in `value[1]`.
+/// Check whether the unique Operation* stored in `values[0]` (assumed) is
+/// equivalent to the unique StringRefAttr passed in `values[1]` (assumed).
 /// Equivalence is achieved when either:
-///   1. `op` has the name stored in `modelOpName`.
-///   2. `op` and `modelOpName` are both linalg ops and their structured
+///   1. `values[0]` has the name stored in `values[1]`.
+///   2. `values[0]` and `values[1]` are both linalg ops and their structured
 ///      interfaces as well as their bodies are equivalent.
 ///      Structured interfaces equivalence is a simple attribute level check.
 ///      Body equivalence is more involved and currently limited:
 ///        a. the current impl constructs an instance of the op whose name is
-///           specified in `modelOpName` and checks for exact body equality.
+///           specified in `values[1]` and checks for exact body equality.
 ///        b. a more advanced version would "subtract" the bodies and fold, cse
 ///           and canonicalize to fixed point. If the result is "all zeros",
 ///           then the bodies would be equivalent (really isomorphic).
@@ -150,33 +150,27 @@ static LogicalResult isEquivalentToOpImpl(LinalgOp linalgOp,
 static LogicalResult isEquivalentToOp(ArrayRef<PDLValue> values,
                                       PatternRewriter &rewriter) {
   assert(values.size() == 2 && "expected two arguments");
-  auto *maybeOp = values[0].dyn_cast<Operation *>();
-  if (!maybeOp)
-    return failure(); // TODO: notifyMatchFailure needs an Operation* handle.
-  Operation *op = maybeOp;
+  auto *operation = values[0].cast<Operation *>();
+  auto attribute = values[1].cast<Attribute>();
 
-  auto maybeAttr = values[1].dyn_cast<Attribute>();
-  if (!maybeAttr)
-    return failure();
-  auto modelOpNameAttr = maybeAttr->dyn_cast<StringAttr>();
+  auto modelOpNameAttr = attribute.dyn_cast<StringAttr>();
   if (!modelOpNameAttr)
     return failure(); // TODO: notifyMatchFailure needs an Operation* handle.
   auto modelOpName = modelOpNameAttr.strref();
 
   // 1. If op has name `modelOpName`, the match is trivial.
-  if (op->getName().getStringRef() == modelOpName)
+  if (operation->getName().getStringRef() == modelOpName)
     return success();
 
   // 2. Linalg vs Linalg.
   // Create op from `modelOpName`.
-  // 2. Linalg vs Linalg.
-  // Create op from `constantParams`.
-  OperationState modelOpState(op->getLoc(), modelOpName, op->getOperands(),
-                              op->getResultTypes(), op->getAttrs());
+  OperationState modelOpState(
+      operation->getLoc(), modelOpName, operation->getOperands(),
+      operation->getResultTypes(), operation->getAttrs());
   modelOpState.addRegion();
   Operation *modelOp = rewriter.create(modelOpState);
   auto g1 = llvm::make_scope_exit([&]() { rewriter.eraseOp(modelOp); });
-  LinalgOp linalgOp = dyn_cast<LinalgOp>(op);
+  LinalgOp linalgOp = dyn_cast<LinalgOp>(operation);
   LinalgOp linalgModelOp = dyn_cast<LinalgOp>(modelOp);
   if (linalgOp && linalgModelOp)
     return isEquivalentToOpImpl(linalgOp, linalgModelOp, rewriter);
@@ -196,15 +190,10 @@ static LogicalResult isEquivalentToOp(ArrayRef<PDLValue> values,
 static LogicalResult isDimMultipleOf(ArrayRef<PDLValue> values,
                                      PatternRewriter &rewriter) {
   assert(values.size() == 2 && "expected two arguments");
-  auto maybeOperands = values[0].dyn_cast<ValueRange>();
-  if (!maybeOperands)
-    return failure(); // TODO: notifyMatchFailure needs an Operation* handle.
-  auto operands = *maybeOperands;
+  auto operands = values[0].cast<ValueRange>();
+  auto attribute = values[1].cast<Attribute>();
 
-  auto maybeAttr = values[1].dyn_cast<Attribute>();
-  if (!maybeAttr)
-    return failure();
-  auto dict = maybeAttr->dyn_cast<DictionaryAttr>();
+  auto dict = attribute.dyn_cast<DictionaryAttr>();
   if (!dict)
     return failure(); // TODO: notifyMatchFailure needs an Operation* handle.
 
@@ -244,15 +233,10 @@ static LogicalResult isDimMultipleOf(ArrayRef<PDLValue> values,
 static LogicalResult isDimStatic(ArrayRef<PDLValue> values,
                                  PatternRewriter &rewriter) {
   assert(values.size() == 2 && "expected two arguments");
-  auto maybeOperands = values[0].dyn_cast<ValueRange>();
-  if (!maybeOperands)
-    return failure(); // TODO: notifyMatchFailure needs an Operation* handle.
-  auto operands = *maybeOperands;
+  auto operands = values[0].cast<ValueRange>();
+  auto attribute = values[1].cast<Attribute>();
 
-  auto maybeAttr = values[1].dyn_cast<Attribute>();
-  if (!maybeAttr)
-    return failure();
-  auto dict = maybeAttr->dyn_cast<DictionaryAttr>();
+  auto dict = attribute.dyn_cast<DictionaryAttr>();
   if (!dict)
     return failure(); // TODO: notifyMatchFailure needs an Operation* handle.
 
@@ -276,23 +260,17 @@ static LogicalResult isDimStatic(ArrayRef<PDLValue> values,
 
 /// Assume that:
 ///   1. `values[0]` is an operands range
-///   2. `values[1[` contains a DictAttr with `operand_number` and `dim`
+///   2. `values[1]` contains a DictAttr with `operand_number` and `dim`
 ///       IntegerAttr entries.
 /// Succeed if `value`[`operand_number`] is a ranked type whose `dim` is
 /// dynamic.
 static LogicalResult isDimDynamic(ArrayRef<PDLValue> values,
-
                                   PatternRewriter &rewriter) {
   assert(values.size() == 2 && "expected two arguments");
-  auto maybeOperands = values[0].dyn_cast<ValueRange>();
-  if (!maybeOperands)
-    return failure(); // TODO: notifyMatchFailure needs an Operation* handle.
-  auto operands = *maybeOperands;
+  auto operands = values[0].cast<ValueRange>();
+  auto attribute = values[1].cast<Attribute>();
 
-  auto maybeAttr = values[1].dyn_cast<Attribute>();
-  if (!maybeAttr)
-    return failure();
-  auto dict = maybeAttr->dyn_cast<DictionaryAttr>();
+  auto dict = attribute.dyn_cast<DictionaryAttr>();
   if (!dict)
     return failure(); // TODO: notifyMatchFailure needs an Operation* handle.
 
