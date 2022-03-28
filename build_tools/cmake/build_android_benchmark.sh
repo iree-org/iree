@@ -64,7 +64,8 @@ cd build-host
   -DIREE_BUILD_COMPILER=ON \
   -DIREE_BUILD_TESTS=OFF \
   -DIREE_BUILD_BENCHMARKS=ON \
-  -DIREE_BUILD_SAMPLES=OFF
+  -DIREE_BUILD_SAMPLES=OFF \
+  -DIREE_USE_SYSTEM_LINKER_FOR_MODULES_IN_TESTS_AND_BENCHMARKS=ON
 
 "${CMAKE_BIN}" --build . --target install -- -k 0
 # Also generate artifacts for benchmarking on Android.
