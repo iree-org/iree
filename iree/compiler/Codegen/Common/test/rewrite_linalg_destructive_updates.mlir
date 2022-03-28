@@ -38,5 +38,5 @@ func @matmul() {
 // CHECK-LABEL: func @matmul
 // CHECK:         scf.for
 // CHECK:           scf.for
-// CHECK:             %[[MATMUL:.+]] = linalg.matul
+// CHECK:             %[[MATMUL:.+]] = linalg.matmul
 // CHECK:             flow.dispatch.tensor.store %[[MATMUL]]
