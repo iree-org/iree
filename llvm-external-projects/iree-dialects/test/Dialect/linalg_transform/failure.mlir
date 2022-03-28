@@ -118,7 +118,8 @@ pdl.pattern @pdl_target : benefit(1) {
   %args = operands
   %results = types
   %0 = operation "linalg.matmul"(%args : !pdl.range<value>) -> (%results : !pdl.range<type>)
-  apply_native_constraint "nestedInFunc"[@no_replacement](%0 : !pdl.operation)
+  %1 = pdl.attribute @no_replacement
+  apply_native_constraint "nestedInFunc"(%0, %1 : !pdl.operation, !pdl.attribute)
   // TODO: we don't want this, but it is the required terminator for pdl.pattern
   rewrite %0 with "iree_linalg_transform.apply"
 }
@@ -148,7 +149,8 @@ pdl.pattern @pdl_target1 : benefit(1) {
   %args = operands
   %results = types
   %0 = operation "linalg.matmul"(%args : !pdl.range<value>) -> (%results : !pdl.range<type>)
-  apply_native_constraint "nestedInFunc"[@repeated_match](%0 : !pdl.operation)
+  %1 = pdl.attribute @repeated_match
+  apply_native_constraint "nestedInFunc"(%0, %1 : !pdl.operation, !pdl.attribute)
   // TODO: we don't want this, but it is the required terminator for pdl.pattern
   rewrite %0 with "iree_linalg_transform.apply"
 }
@@ -158,7 +160,8 @@ pdl.pattern @pdl_target2 : benefit(1) {
   %args = operands
   %results = types
   %0 = operation "linalg.matmul"(%args : !pdl.range<value>) -> (%results : !pdl.range<type>)
-  apply_native_constraint "nestedInFunc"[@repeated_match](%0 : !pdl.operation)
+  %1 = pdl.attribute @repeated_match
+  apply_native_constraint "nestedInFunc"(%0, %1 : !pdl.operation, !pdl.attribute)
   // TODO: we don't want this, but it is the required terminator for pdl.pattern
   rewrite %0 with "iree_linalg_transform.apply"
 }
@@ -169,7 +172,7 @@ iree_linalg_transform.sequence {
   // expected-error @below {{failed to apply}}
   // expected-note @below {{handle}}
   %1 = match @pdl_target2
-  
+
   // Add references to handles produced by match so that they are not DCE'd.
   tile %0
   tile %1
