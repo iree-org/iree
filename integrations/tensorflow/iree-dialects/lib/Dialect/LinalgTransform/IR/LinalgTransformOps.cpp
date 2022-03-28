@@ -428,7 +428,7 @@ transform::VectorizeOp::apply(transform::TransformResults &results,
 ParseResult transform::VectorizeOp::parse(OpAsmParser &parser,
                                           OperationState &result) {
   auto operationType = pdl::OperationType::get(parser.getContext());
-  OpAsmParser::OperandType target;
+  OpAsmParser::UnresolvedOperand target;
   OptionalParseResult parseResult = parser.parseOptionalOperand(target);
   if (parseResult.hasValue()) {
     if (parseResult.getValue().failed() ||
