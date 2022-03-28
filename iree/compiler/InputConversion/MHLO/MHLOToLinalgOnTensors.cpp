@@ -290,7 +290,7 @@ class GenericTypeConvert : public ConversionPattern {
       }
       rewriter.applySignatureConversion(newRegion, result);
     }
-    Operation *newOp = rewriter.createOperation(state);
+    Operation *newOp = rewriter.create(state);
     rewriter.replaceOp(op, newOp->getResults());
     return success();
   }

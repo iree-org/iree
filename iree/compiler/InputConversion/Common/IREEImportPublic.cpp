@@ -75,7 +75,7 @@ class OneToOneConverionPattern : public ConversionPattern {
 
     OperationState state(srcOp->getLoc(), targetName, operands, resultTypes,
                          srcOp->getAttrs());
-    Operation *targetOp = rewriter.createOperation(state);
+    Operation *targetOp = rewriter.create(state);
     rewriter.replaceOp(srcOp, targetOp->getResults());
     return success();
   }
@@ -247,7 +247,7 @@ class GenericTypeConvert : public ConversionPattern {
           newRegion->getArgumentTypes(), result);
       rewriter.applySignatureConversion(newRegion, result);
     }
-    Operation *newOp = rewriter.createOperation(state);
+    Operation *newOp = rewriter.create(state);
     rewriter.replaceOp(op, newOp->getResults());
     return success();
   }

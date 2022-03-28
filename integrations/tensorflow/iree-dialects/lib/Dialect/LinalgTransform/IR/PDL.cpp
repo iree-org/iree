@@ -169,7 +169,7 @@ static LogicalResult isEquivalentToOp(PDLValue value, ArrayAttr constantParams,
   OperationState modelOpState(op->getLoc(), modelOpName, op->getOperands(),
                               op->getResultTypes(), op->getAttrs());
   modelOpState.addRegion();
-  Operation *modelOp = rewriter.createOperation(modelOpState);
+  Operation *modelOp = rewriter.create(modelOpState);
   auto g1 = llvm::make_scope_exit([&]() { rewriter.eraseOp(modelOp); });
   LinalgOp linalgOp = dyn_cast<LinalgOp>(op);
   LinalgOp linalgModelOp = dyn_cast<LinalgOp>(modelOp);

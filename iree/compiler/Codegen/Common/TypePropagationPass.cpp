@@ -312,7 +312,7 @@ struct LegalizeResultElementType : public ConversionPattern {
     for (unsigned i = 0, e = op->getNumRegions(); i != e; ++i) {
       state.addRegion();
     }
-    Operation *newOp = rewriter.createOperation(state);
+    Operation *newOp = rewriter.create(state);
 
     // Move all the regions from the old op to the new op and legalize its
     // signature.

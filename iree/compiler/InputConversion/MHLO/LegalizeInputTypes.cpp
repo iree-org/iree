@@ -127,7 +127,7 @@ static LogicalResult convertOperation(Operation *oldOp,
     }
   }
 
-  auto *newOp = builder.createOperation(state);
+  auto *newOp = builder.create(state);
 
   for (auto oldNewResult :
        llvm::zip(oldOp->getResults(), newOp->getResults())) {

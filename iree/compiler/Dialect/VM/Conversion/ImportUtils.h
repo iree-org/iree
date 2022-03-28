@@ -110,7 +110,7 @@ Optional<SmallVector<Value>> rewriteToCall(
                            }))));
   }
 
-  auto *callOp = rewriter.createOperation(state);
+  auto *callOp = rewriter.create(state);
   copyImportAttrs(importOp, callOp);
   return SmallVector<Value>(callOp->getResults());
 }
