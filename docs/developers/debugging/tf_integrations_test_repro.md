@@ -31,8 +31,11 @@ cat iree_tfl_tests/llvmaot_posenet_i8.run
 # REQUIRES: llvmaot
 # RUN: %PYTHON -m iree_tfl_tests.posenet_i8_test --target_backend=llvmaot -artifacts_dir=%t
 
+cd python/
 python -m iree_tfl_tests.posenet_i8_test -- target_backend=llvmaot -artifacts_dir=/tmp/posenet_i8_failure
 ```
+
+Note that the command can only be run under `integrations/tensorflow/test/python` directory.
 
 5. This will create an `iree_input.mlir` in the temp directory specified. Those can then be fed into `iree-compile` (built locally to reproduce the error)
 
