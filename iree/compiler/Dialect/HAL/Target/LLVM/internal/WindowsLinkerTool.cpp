@@ -26,8 +26,9 @@ class WindowsLinkerTool : public LinkerTool {
     auto toolPath = LinkerTool::getSystemToolPath();
     if (!toolPath.empty()) return toolPath;
 
-    // No explicit linker specified, search the environment for common tools.
-    toolPath = findToolInEnvironment({"lld-link"});
+    // No explicit linker specified, search the executable directory (i.e. our
+    // own build or install directories) for common tools.
+    toolPath = findToolFromExecutableDir({"lld-link"});
     if (!toolPath.empty()) return toolPath;
 
     llvm::errs() << "No Windows linker tool specified or discovered\n";
