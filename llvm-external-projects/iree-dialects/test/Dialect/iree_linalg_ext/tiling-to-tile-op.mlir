@@ -1,6 +1,6 @@
 // RUN: iree-dialects-opt %s -linalg-interp-transforms --split-input-file | FileCheck %s
 
-// CHECK: #[[$MAP:.+]] = affine_map<(d0, d1)[s0] -> (d0, -d1 + s0)>
+// CHECK: #[[$MAP:.+]] = affine_map<(d0, d1)[s0] -> (-d1 + s0, d0)>
 module {
 // CHECK-LABEL: matmul(
 //  CHECK-SAME:   %[[A:[0-9a-z]+]]: tensor<?x?xf32>
@@ -12,11 +12,11 @@ module {
   //      CHECK: ^bb0(%[[OFF:.*]]: index, %[[SZ:.*]]: index, %[[C_ITER:.*]]: tensor<?x?xf32>):
   //      CHECK:   %[[tA:.*]] = tensor.extract_slice %[[A]]{{.*}} : tensor<?x?xf32> to tensor<?x?xf32>
   //      CHECK:   %[[tB:.*]] = tensor.extract_slice %[[B]]{{.*}} : tensor<?x?xf32> to tensor<?x?xf32>
-  //      CHECK:   %[[RES:.*]] = linalg.matmul 
+  //      CHECK:   %[[RES:.*]] = linalg.matmul
   // CHECK-SAME:      ins(%[[tA]], %[[tB]] : tensor<?x?xf32>, tensor<?x?xf32>)
   // CHECK-SAME:     outs(%[[C_ITER]] : tensor<?x?xf32>) -> tensor<?x?xf32>
   //      CHECK:   iree_linalg_ext.tile_yield %[[RES]] : tensor<?x?xf32>
-    %0 = linalg.matmul ins(%A, %B : tensor<?x?xf32>, tensor<?x?xf32>) 
+    %0 = linalg.matmul ins(%A, %B : tensor<?x?xf32>, tensor<?x?xf32>)
                       outs(%C : tensor<?x?xf32>) -> (tensor<?x?xf32>)
     return %0 : tensor<?x?xf32>
   }
@@ -34,7 +34,7 @@ module {
 
 // -----
 
-// CHECK: #[[$MAP:.+]] = affine_map<(d0, d1) -> (d0, -d1 + 100)>
+// CHECK: #[[$MAP:.+]] = affine_map<(d0, d1) -> (-d1 + 100, d0)>
 module {
 // CHECK-LABEL: matmul_static(
 //  CHECK-SAME:   %[[A:[0-9a-z]+]]: tensor<100x200xf32>

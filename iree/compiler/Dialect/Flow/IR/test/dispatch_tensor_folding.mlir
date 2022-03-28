@@ -60,7 +60,7 @@ func @canonicalizeDimOfTensorTile(%arg0: !flow.dispatch.tensor<readonly:250x1024
   return
 }
 
-// CHECK: #[[MAP:.+]] = affine_map<()[s0] -> (64, -s0 + 250)>
+// CHECK: #[[MAP:.+]] = affine_map<()[s0] -> (-s0 + 250, 64)>
 // CHECK: @canonicalizeDimOfTensorTile
 // CHECK: %[[ARG0:.+]]: !flow.dispatch.tensor<readonly:250x1024xf32>, %[[ARG1:.+]]: index, %[[ARG2:.+]]: index
 // CHECK: %[[DIM:.+]] = affine.min #[[MAP]]()[%[[ARG1]]]

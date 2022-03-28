@@ -34,7 +34,7 @@ func @matmul() {
 }
 
 //  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0, s1] -> (s0 * s1)>
-//  CHECK-DAG: #[[MAP1:.+]] = affine_map<(d0)[s0, s1] -> (s0, -d0 + s1)>
+//  CHECK-DAG: #[[MAP1:.+]] = affine_map<(d0)[s0, s1] -> (-d0 + s1, s0)>
 //  CHECK-DAG: #[[MAP2:.+]] = affine_map<(d0, d1)[s0, s1] -> (d0 * s1 + s0 + d1)>
 //      CHECK: func @matmul()
 //  CHECK-DAG:   %[[M:.+]] = hal.interface.constant.load[0]
@@ -108,7 +108,7 @@ func @matmul_fill() {
 }
 
 //  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0, s1] -> (s0 * s1)>
-//  CHECK-DAG: #[[MAP1:.+]] = affine_map<(d0)[s0, s1] -> (s0, -d0 + s1)>
+//  CHECK-DAG: #[[MAP1:.+]] = affine_map<(d0)[s0, s1] -> (-d0 + s1, s0)>
 //      CHECK: func @matmul_fill()
 //  CHECK-DAG:   %[[CST:.+]] = arith.constant 0.000000e+00 : f32
 //  CHECK-DAG:   %[[M:.+]] = hal.interface.constant.load[0]
