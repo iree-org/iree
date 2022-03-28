@@ -215,6 +215,8 @@ void addDoubleTilingExpertPassPipeline(OpPassManager &passManager) {
     passManager.addNestedPass<FuncOp>(createLinalgFusePass(options));
     passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
     passManager.addNestedPass<FuncOp>(createCSEPass());
+    passManager.addNestedPass<FuncOp>(
+        createRewriteLinalgDestructiveUpdatesPass());
   }
 
   // Run LinalgFusePass firstly in case that we have fill + matmul + generic
@@ -286,6 +288,8 @@ void addConvTileAndDecomposeExpertPassPipeline(OpPassManager &passManager) {
     passManager.addNestedPass<FuncOp>(createLinalgFusePass(options));
     passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
     passManager.addNestedPass<FuncOp>(createCSEPass());
+    passManager.addNestedPass<FuncOp>(
+        createRewriteLinalgDestructiveUpdatesPass());
   }
 
   // Run LinalgFusePass firstly in case that we have fill + conv + generic
