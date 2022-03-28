@@ -61,7 +61,8 @@ static LogicalResult parseEnumAttr(OpAsmParser &parser, StringRef attrName,
 //===----------------------------------------------------------------------===//
 
 static ParseResult parseDescriptorSetBindings(
-    OpAsmParser &parser, SmallVectorImpl<OpAsmParser::UnresolvedOperand> &ordinals,
+    OpAsmParser &parser,
+    SmallVectorImpl<OpAsmParser::UnresolvedOperand> &ordinals,
     SmallVectorImpl<OpAsmParser::UnresolvedOperand> &buffers,
     SmallVectorImpl<Type> &bufferTypes,
     SmallVectorImpl<OpAsmParser::UnresolvedOperand> &bufferOffsets,

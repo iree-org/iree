@@ -150,9 +150,10 @@ void printTypeAlias(OpAsmPrinter &p, Operation *op, TypeAttr encodingTypeAttr,
 //===----------------------------------------------------------------------===//
 // [%offset for %length], [%offset for %length], ...
 
-ParseResult parseRangeList(OpAsmParser &parser,
-                           SmallVectorImpl<OpAsmParser::UnresolvedOperand> &offsets,
-                           SmallVectorImpl<OpAsmParser::UnresolvedOperand> &lengths) {
+ParseResult parseRangeList(
+    OpAsmParser &parser,
+    SmallVectorImpl<OpAsmParser::UnresolvedOperand> &offsets,
+    SmallVectorImpl<OpAsmParser::UnresolvedOperand> &lengths) {
   do {
     OpAsmParser::UnresolvedOperand offset;
     OpAsmParser::UnresolvedOperand length;
@@ -378,8 +379,9 @@ static ParseResult parseShapedOperandList(
 
 // Finds the operand index in |operands| that |tiedResult| references.
 // Returns TiedOpInterface::kUntiedIndex if no operand is found.
-static int64_t findTiedOperand(OpAsmParser::UnresolvedOperand tiedResult,
-                               ArrayRef<OpAsmParser::UnresolvedOperand> operands) {
+static int64_t findTiedOperand(
+    OpAsmParser::UnresolvedOperand tiedResult,
+    ArrayRef<OpAsmParser::UnresolvedOperand> operands) {
   int64_t operandIndex = IREE::Util::TiedOpInterface::kUntiedIndex;
   for (int64_t i = 0; i < operands.size(); ++i) {
     if (operands[i].name == tiedResult.name &&
@@ -393,7 +395,8 @@ static int64_t findTiedOperand(OpAsmParser::UnresolvedOperand tiedResult,
 
 ParseResult parseShapedResultList(
     OpAsmParser &parser, ArrayRef<OpAsmParser::UnresolvedOperand> operands,
-    TypeRange operandTypes, ArrayRef<OpAsmParser::UnresolvedOperand> operandDims,
+    TypeRange operandTypes,
+    ArrayRef<OpAsmParser::UnresolvedOperand> operandDims,
     SmallVectorImpl<Type> &resultTypes,
     SmallVectorImpl<OpAsmParser::UnresolvedOperand> &resultDims,
     ArrayAttr &tiedOperands) {

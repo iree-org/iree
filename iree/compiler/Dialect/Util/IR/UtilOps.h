@@ -111,8 +111,9 @@ void printSizeAwareTypeList(OpAsmPrinter &p, Operation *op, TypeRange types0,
 ParseResult parseShapedTiedResult(
     OpAsmParser &parser, Type &resultType,
     SmallVectorImpl<OpAsmParser::UnresolvedOperand> &resultDims);
-inline ParseResult parseShapedTiedResult(OpAsmParser &parser, Type &resultType,
-                                         OpAsmParser::UnresolvedOperand &resultDim) {
+inline ParseResult parseShapedTiedResult(
+    OpAsmParser &parser, Type &resultType,
+    OpAsmParser::UnresolvedOperand &resultDim) {
   SmallVector<OpAsmParser::UnresolvedOperand, 1> resultDims;
   if (failed(parseShapedTiedResult(parser, resultType, resultDims))) {
     return failure();
@@ -131,9 +132,9 @@ ParseResult parseShapedTiedResult(
 void printShapedTiedResult(OpAsmPrinter &p, Operation *op, Type resultType,
                            ValueRange resultDims, ArrayAttr tiedOperands);
 
-inline ParseResult parseShapedTiedResult(OpAsmParser &parser, Type &resultType,
-                                         OpAsmParser::UnresolvedOperand &resultDim,
-                                         ArrayAttr &tiedOperands) {
+inline ParseResult parseShapedTiedResult(
+    OpAsmParser &parser, Type &resultType,
+    OpAsmParser::UnresolvedOperand &resultDim, ArrayAttr &tiedOperands) {
   SmallVector<OpAsmParser::UnresolvedOperand> resultDims;
   if (failed(parseShapedTiedResult(parser, resultType, resultDims,
                                    tiedOperands))) {
@@ -151,7 +152,8 @@ inline void printShapedTiedResult(OpAsmPrinter &p, Operation *op,
 
 ParseResult parseShapedResultList(
     OpAsmParser &parser, ArrayRef<OpAsmParser::UnresolvedOperand> operands,
-    TypeRange operandTypes, ArrayRef<OpAsmParser::UnresolvedOperand> operandDims,
+    TypeRange operandTypes,
+    ArrayRef<OpAsmParser::UnresolvedOperand> operandDims,
     SmallVectorImpl<Type> &resultTypes,
     SmallVectorImpl<OpAsmParser::UnresolvedOperand> &resultDims,
     ArrayAttr &tiedOperands);

@@ -234,7 +234,8 @@ static void eraseStreamRegionResults(Region &region,
 //===----------------------------------------------------------------------===//
 
 static ParseResult parseResourceRegion(
-    OpAsmParser &parser, SmallVectorImpl<OpAsmParser::UnresolvedOperand> &operands,
+    OpAsmParser &parser,
+    SmallVectorImpl<OpAsmParser::UnresolvedOperand> &operands,
     SmallVectorImpl<Type> &operandTypes,
     SmallVectorImpl<OpAsmParser::UnresolvedOperand> &operandSizes,
     SmallVectorImpl<Type> &resultTypes,
@@ -327,9 +328,11 @@ static void printResourceRegion(OpAsmPrinter &p, Operation *op,
 //===----------------------------------------------------------------------===//
 
 static ParseResult parseExplicitResourceRegion(
-    OpAsmParser &parser, SmallVectorImpl<OpAsmParser::UnresolvedOperand> &operands,
+    OpAsmParser &parser,
+    SmallVectorImpl<OpAsmParser::UnresolvedOperand> &operands,
     SmallVectorImpl<Type> &operandTypes,
-    SmallVectorImpl<OpAsmParser::UnresolvedOperand> &operandSizes, Region &body) {
+    SmallVectorImpl<OpAsmParser::UnresolvedOperand> &operandSizes,
+    Region &body) {
   SmallVector<OpAsmParser::UnresolvedOperand, 16> regionArgs;
   if (failed(parser.parseLParen())) {
     return failure();
@@ -455,7 +458,8 @@ static void printPackSliceRanges(OpAsmPrinter &p, Operation *op,
 
 static ParseResult parseConstantValueList(
     OpAsmParser &parser, SmallVectorImpl<Type> &resultTypes,
-    SmallVectorImpl<OpAsmParser::UnresolvedOperand> &resultSizes, ArrayAttr &values) {
+    SmallVectorImpl<OpAsmParser::UnresolvedOperand> &resultSizes,
+    ArrayAttr &values) {
   SmallVector<Attribute> valueAttrs;
   do {
     Type resultType;
@@ -1660,7 +1664,8 @@ LogicalResult CmdDispatchOp::verify() {
 }
 
 static ParseResult parseDispatchResources(
-    OpAsmParser &parser, SmallVectorImpl<OpAsmParser::UnresolvedOperand> &resources,
+    OpAsmParser &parser,
+    SmallVectorImpl<OpAsmParser::UnresolvedOperand> &resources,
     SmallVectorImpl<Type> &resourceTypes,
     SmallVectorImpl<OpAsmParser::UnresolvedOperand> &resourceSizes,
     SmallVectorImpl<OpAsmParser::UnresolvedOperand> &resourceOffsets,
