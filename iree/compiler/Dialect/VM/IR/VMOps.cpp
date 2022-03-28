@@ -213,7 +213,7 @@ ParseResult ImportOp::parse(OpAsmParser &parser, OperationState &result) {
   SmallVector<DictionaryAttr, 8> argAttrs;
   SmallVector<Type, 8> argTypes;
   while (failed(parser.parseOptionalRParen())) {
-    OpAsmParser::OperandType operand;
+    OpAsmParser::UnresolvedOperand operand;
     Type operandType;
     auto operandLoc = parser.getCurrentLocation();
     if (failed(parser.parseOperand(operand)) ||
@@ -865,9 +865,9 @@ LogicalResult ListSetRefOp::verify() {
 //===----------------------------------------------------------------------===//
 
 static ParseResult parseSwitchOp(OpAsmParser &parser, OperationState &result) {
-  SmallVector<OpAsmParser::OperandType, 4> values;
-  OpAsmParser::OperandType index;
-  OpAsmParser::OperandType defaultValue;
+  SmallVector<OpAsmParser::UnresolvedOperand, 4> values;
+  OpAsmParser::UnresolvedOperand index;
+  OpAsmParser::UnresolvedOperand defaultValue;
   Type type;
   if (failed(parser.parseOperand(index)) ||
       failed(parser.parseOperandList(values, OpAsmParser::Delimiter::Square)) ||
@@ -1060,17 +1060,17 @@ ParseResult CallVariadicOp::parse(OpAsmParser &parser, OperationState &result) {
   // We'll instead parse each segment as a flat list so `[(%a, %b), (%c, %d)]`
   // parses as `[%a, %b, %c, %d]` and then do the accounting below when parsing
   // types.
-  SmallVector<OpAsmParser::OperandType, 4> flatOperands;
+  SmallVector<OpAsmParser::UnresolvedOperand, 4> flatOperands;
   SmallVector<int16_t, 4> flatSegmentSizes;
   while (failed(parser.parseOptionalRParen())) {
     if (succeeded(parser.parseOptionalLSquare())) {
       // Variadic list.
-      SmallVector<OpAsmParser::OperandType, 4> flatSegmentOperands;
+      SmallVector<OpAsmParser::UnresolvedOperand, 4> flatSegmentOperands;
       while (failed(parser.parseOptionalRSquare())) {
         if (succeeded(parser.parseOptionalLParen())) {
           // List contains tuples, so track the () and parse inside of it.
           while (failed(parser.parseOptionalRParen())) {
-            OpAsmParser::OperandType segmentOperand;
+            OpAsmParser::UnresolvedOperand segmentOperand;
             if (failed(parser.parseOperand(segmentOperand))) {
               return parser.emitError(parser.getCurrentLocation())
                      << "invalid operand";
@@ -1086,7 +1086,7 @@ ParseResult CallVariadicOp::parse(OpAsmParser &parser, OperationState &result) {
           }
         } else {
           // Flat list of operands.
-          OpAsmParser::OperandType segmentOperand;
+          OpAsmParser::UnresolvedOperand segmentOperand;
           if (failed(parser.parseOperand(segmentOperand))) {
             return parser.emitError(parser.getCurrentLocation())
                    << "invalid operand";
@@ -1106,7 +1106,7 @@ ParseResult CallVariadicOp::parse(OpAsmParser &parser, OperationState &result) {
                           flatSegmentOperands.end());
     } else {
       // Normal single operand.
-      OpAsmParser::OperandType operand;
+      OpAsmParser::UnresolvedOperand operand;
       if (failed(parser.parseOperand(operand))) {
         return parser.emitError(parser.getCurrentLocation())
                << "malformed non-variadic operand";
@@ -1276,7 +1276,7 @@ LogicalResult verifyFailOp(Operation *op, Value statusVal) {
 
 ParseResult CondFailOp::parse(OpAsmParser &parser, OperationState &result) {
   // First operand is either 'condition' or 'status', both i32.
-  OpAsmParser::OperandType condition;
+  OpAsmParser::UnresolvedOperand condition;
   if (failed(parser.parseOperand(condition))) {
     return failure();
   }
@@ -1284,7 +1284,7 @@ ParseResult CondFailOp::parse(OpAsmParser &parser, OperationState &result) {
   // First try looking for an operand after a comma. If no operand, keep track
   // of the already parsed comma to avoid checking for a comma later on.
   bool trailingComma = false;
-  OpAsmParser::OperandType status = condition;
+  OpAsmParser::UnresolvedOperand status = condition;
   if (succeeded(parser.parseOptionalComma()) &&
       !parser.parseOptionalOperand(status).hasValue()) {
     trailingComma = true;

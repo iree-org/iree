@@ -458,7 +458,7 @@ ParseResult FunctionalIfOp::parse(OpAsmParser &parser, OperationState &result) {
   Region *elseRegion = result.addRegion();
 
   auto &builder = parser.getBuilder();
-  OpAsmParser::OperandType cond;
+  OpAsmParser::UnresolvedOperand cond;
   Type conditionType = builder.getType<PyBoolType>();
   if (parser.parseOperand(cond) ||
       parser.resolveOperand(cond, conditionType, result.operands))

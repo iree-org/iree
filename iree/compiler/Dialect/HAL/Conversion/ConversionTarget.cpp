@@ -74,7 +74,7 @@ LogicalResult HALConversionTarget::applyDefaultBufferRewrite(
     }
   }
 
-  auto *dstOp = rewriter.createOperation(state);
+  auto *dstOp = rewriter.create(state);
   rewriter.replaceOp(srcOp, dstOp->getResults());
   return success();
 }

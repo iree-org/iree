@@ -61,17 +61,18 @@ static LogicalResult parseEnumAttr(OpAsmParser &parser, StringRef attrName,
 //===----------------------------------------------------------------------===//
 
 static ParseResult parseDescriptorSetBindings(
-    OpAsmParser &parser, SmallVectorImpl<OpAsmParser::OperandType> &ordinals,
-    SmallVectorImpl<OpAsmParser::OperandType> &buffers,
+    OpAsmParser &parser,
+    SmallVectorImpl<OpAsmParser::UnresolvedOperand> &ordinals,
+    SmallVectorImpl<OpAsmParser::UnresolvedOperand> &buffers,
     SmallVectorImpl<Type> &bufferTypes,
-    SmallVectorImpl<OpAsmParser::OperandType> &bufferOffsets,
-    SmallVectorImpl<OpAsmParser::OperandType> &bufferLengths) {
+    SmallVectorImpl<OpAsmParser::UnresolvedOperand> &bufferOffsets,
+    SmallVectorImpl<OpAsmParser::UnresolvedOperand> &bufferLengths) {
   do {
-    OpAsmParser::OperandType ordinal;
-    OpAsmParser::OperandType buffer;
+    OpAsmParser::UnresolvedOperand ordinal;
+    OpAsmParser::UnresolvedOperand buffer;
     Type bufferType;
-    OpAsmParser::OperandType bufferOffset;
-    OpAsmParser::OperandType bufferLength;
+    OpAsmParser::UnresolvedOperand bufferOffset;
+    OpAsmParser::UnresolvedOperand bufferLength;
     if (failed(parser.parseOperand(ordinal)) || failed(parser.parseEqual()) ||
         failed(parser.parseLParen()) || failed(parser.parseOperand(buffer)) ||
         failed(parser.parseColonType(bufferType)) ||
@@ -123,7 +124,7 @@ static void printDescriptorSetBindings(OpAsmPrinter &p, Operation *op,
 
 static ParseResult parsePackSliceRanges(
     OpAsmParser &parser, ArrayAttr &lifetimeIntervals,
-    SmallVectorImpl<OpAsmParser::OperandType> &dynamicSliceSizes,
+    SmallVectorImpl<OpAsmParser::UnresolvedOperand> &dynamicSliceSizes,
     SmallVectorImpl<Type> &packedOffsetTypes) {
   auto indexType = parser.getBuilder().getIndexType();
   SmallVector<Attribute> lifetimeRangeValues;
@@ -131,7 +132,7 @@ static ParseResult parsePackSliceRanges(
     if (failed(parser.parseOptionalLSquare())) break;
     IntegerAttr lifetimeStart;
     IntegerAttr lifetimeEnd;
-    OpAsmParser::OperandType dynamicSliceSize;
+    OpAsmParser::UnresolvedOperand dynamicSliceSize;
     if (failed(parser.parseAttribute(lifetimeStart, indexType)) ||
         failed(parser.parseComma()) ||
         failed(parser.parseAttribute(lifetimeEnd, indexType)) ||
@@ -547,7 +548,7 @@ void DeviceSwitchOp::build(OpBuilder &builder, OperationState &state,
 }
 
 ParseResult DeviceSwitchOp::parse(OpAsmParser &parser, OperationState &result) {
-  OpAsmParser::OperandType device;
+  OpAsmParser::UnresolvedOperand device;
   Type deviceType;
   if (failed(parser.parseLess()) || failed(parser.parseOperand(device)) ||
       failed(parser.parseColonType(deviceType)) ||
@@ -569,7 +570,7 @@ ParseResult DeviceSwitchOp::parse(OpAsmParser &parser, OperationState &result) {
       return failure();
     }
     conditionAttrs.push_back(conditionAttr);
-    SmallVector<OpAsmParser::OperandType> regionArgs;
+    SmallVector<OpAsmParser::UnresolvedOperand> regionArgs;
     SmallVector<Type> regionArgTypes;
     auto *regionBody = result.addRegion();
     if (failed(parser.parseRegion(*regionBody, regionArgs, regionArgTypes))) {
@@ -692,7 +693,7 @@ ParseResult ExecutableEntryPointOp::parse(OpAsmParser &parser,
   // For now assume that the workload is at max 3D. So arguments to the region
   // are workload along x, y and z.
   std::unique_ptr<Region> region;
-  SmallVector<OpAsmParser::OperandType, 4> regionOperands;
+  SmallVector<OpAsmParser::UnresolvedOperand, 4> regionOperands;
   SmallVector<Type, 4> regionTypes;
   OptionalParseResult parseResult =
       parser.parseOptionalRegion(region, regionOperands, regionTypes);

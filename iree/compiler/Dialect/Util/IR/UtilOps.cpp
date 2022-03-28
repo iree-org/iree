@@ -150,12 +150,13 @@ void printTypeAlias(OpAsmPrinter &p, Operation *op, TypeAttr encodingTypeAttr,
 //===----------------------------------------------------------------------===//
 // [%offset for %length], [%offset for %length], ...
 
-ParseResult parseRangeList(OpAsmParser &parser,
-                           SmallVectorImpl<OpAsmParser::OperandType> &offsets,
-                           SmallVectorImpl<OpAsmParser::OperandType> &lengths) {
+ParseResult parseRangeList(
+    OpAsmParser &parser,
+    SmallVectorImpl<OpAsmParser::UnresolvedOperand> &offsets,
+    SmallVectorImpl<OpAsmParser::UnresolvedOperand> &lengths) {
   do {
-    OpAsmParser::OperandType offset;
-    OpAsmParser::OperandType length;
+    OpAsmParser::UnresolvedOperand offset;
+    OpAsmParser::UnresolvedOperand length;
     if (failed(parser.parseLSquare()) || failed(parser.parseOperand(offset)) ||
         failed(parser.parseKeyword("for")) ||
         failed(parser.parseOperand(length)) || failed(parser.parseRSquare())) {
@@ -186,7 +187,7 @@ void printRangeList(OpAsmPrinter &p, Operation *op, OperandRange offsets,
 // type{%size}
 
 ParseResult parseSizeAwareType(OpAsmParser &parser, Type &type,
-                               OpAsmParser::OperandType &size) {
+                               OpAsmParser::UnresolvedOperand &size) {
   if (failed(parser.parseType(type)) || failed(parser.parseLBrace()) ||
       failed(parser.parseOperand(size)) || failed(parser.parseRBrace())) {
     return failure();
@@ -208,12 +209,12 @@ void printSizeAwareType(OpAsmPrinter &p, Operation *op, Type type, Value size) {
 
 ParseResult parseSizeAwareTypeList(
     OpAsmParser &parser, SmallVectorImpl<Type> &types,
-    SmallVectorImpl<OpAsmParser::OperandType> &sizes) {
+    SmallVectorImpl<OpAsmParser::UnresolvedOperand> &sizes) {
   do {
     Type type;
     if (failed(parser.parseType(type))) return failure();
     if (type.isa<IREE::Util::SizeAwareTypeInterface>()) {
-      OpAsmParser::OperandType size;
+      OpAsmParser::UnresolvedOperand size;
       if (failed(parser.parseLBrace()) || failed(parser.parseOperand(size)) ||
           failed(parser.parseRBrace())) {
         return failure();
@@ -241,7 +242,7 @@ void printSizeAwareTypeList(OpAsmPrinter &p, Operation *op, TypeRange types,
 ParseResult parseSizeAwareTypeList(
     OpAsmParser &parser, SmallVectorImpl<Type> &types0,
     SmallVectorImpl<Type> &types1,
-    SmallVectorImpl<OpAsmParser::OperandType> &sizes) {
+    SmallVectorImpl<OpAsmParser::UnresolvedOperand> &sizes) {
   if (failed(parseSizeAwareTypeList(parser, types0, sizes))) return failure();
   types1 = types0;
   return success();
@@ -260,16 +261,16 @@ void printSizeAwareTypeList(OpAsmPrinter &p, Operation *op, TypeRange types0,
 
 ParseResult parseShapedTiedResult(
     OpAsmParser &parser, Type &resultType,
-    SmallVectorImpl<OpAsmParser::OperandType> &resultDims) {
+    SmallVectorImpl<OpAsmParser::UnresolvedOperand> &resultDims) {
   ArrayAttr tiedOperands;
   return parseShapedTiedResult(parser, resultType, resultDims, tiedOperands);
 }
 
 ParseResult parseShapedTiedResult(
     OpAsmParser &parser, Type &resultType,
-    SmallVectorImpl<OpAsmParser::OperandType> &resultDims,
+    SmallVectorImpl<OpAsmParser::UnresolvedOperand> &resultDims,
     ArrayAttr &tiedOperands) {
-  OpAsmParser::OperandType tiedResult;
+  OpAsmParser::UnresolvedOperand tiedResult;
   auto res = parser.parseOptionalOperand(tiedResult);
   int64_t tiedOperandIndex = IREE::Util::TiedOpInterface::kUntiedIndex;
   if (res.hasValue() && succeeded(res.getValue())) {
@@ -279,7 +280,7 @@ ParseResult parseShapedTiedResult(
   if (failed(parser.parseType(resultType))) return failure();
   if (auto shapedType = resultType.dyn_cast<ShapedType>()) {
     if (!shapedType.hasStaticShape()) {
-      SmallVector<OpAsmParser::OperandType, 4> dynamicDims;
+      SmallVector<OpAsmParser::UnresolvedOperand, 4> dynamicDims;
       if (failed(parser.parseLBrace()) ||
           failed(parser.parseOperandList(dynamicDims,
                                          shapedType.getNumDynamicDims(),
@@ -291,7 +292,7 @@ ParseResult parseShapedTiedResult(
     }
   } else if (auto sizedType =
                  resultType.dyn_cast<IREE::Util::SizeAwareTypeInterface>()) {
-    OpAsmParser::OperandType size;
+    OpAsmParser::UnresolvedOperand size;
     if (failed(parser.parseLBrace()) || failed(parser.parseOperand(size)) ||
         failed(parser.parseRBrace())) {
       return failure();
@@ -346,13 +347,13 @@ void printShapedTiedResult(OpAsmPrinter &p, Operation *op, Type resultType,
 
 static ParseResult parseShapedOperandList(
     OpAsmParser &parser, SmallVectorImpl<Type> &types,
-    SmallVectorImpl<OpAsmParser::OperandType> &dims) {
+    SmallVectorImpl<OpAsmParser::UnresolvedOperand> &dims) {
   do {
     Type type;
     if (failed(parser.parseType(type))) return failure();
     if (auto shapedType = type.dyn_cast<ShapedType>()) {
       if (!shapedType.hasStaticShape()) {
-        SmallVector<OpAsmParser::OperandType, 4> dynamicDims;
+        SmallVector<OpAsmParser::UnresolvedOperand, 4> dynamicDims;
         if (failed(parser.parseLBrace()) ||
             failed(parser.parseOperandList(dynamicDims,
                                            shapedType.getNumDynamicDims(),
@@ -364,7 +365,7 @@ static ParseResult parseShapedOperandList(
       }
     } else if (auto sizedType =
                    type.dyn_cast<IREE::Util::SizeAwareTypeInterface>()) {
-      OpAsmParser::OperandType size;
+      OpAsmParser::UnresolvedOperand size;
       if (failed(parser.parseLBrace()) || failed(parser.parseOperand(size)) ||
           failed(parser.parseRBrace())) {
         return failure();
@@ -378,8 +379,9 @@ static ParseResult parseShapedOperandList(
 
 // Finds the operand index in |operands| that |tiedResult| references.
 // Returns TiedOpInterface::kUntiedIndex if no operand is found.
-static int64_t findTiedOperand(OpAsmParser::OperandType tiedResult,
-                               ArrayRef<OpAsmParser::OperandType> operands) {
+static int64_t findTiedOperand(
+    OpAsmParser::UnresolvedOperand tiedResult,
+    ArrayRef<OpAsmParser::UnresolvedOperand> operands) {
   int64_t operandIndex = IREE::Util::TiedOpInterface::kUntiedIndex;
   for (int64_t i = 0; i < operands.size(); ++i) {
     if (operands[i].name == tiedResult.name &&
@@ -392,14 +394,15 @@ static int64_t findTiedOperand(OpAsmParser::OperandType tiedResult,
 }
 
 ParseResult parseShapedResultList(
-    OpAsmParser &parser, ArrayRef<OpAsmParser::OperandType> operands,
-    TypeRange operandTypes, ArrayRef<OpAsmParser::OperandType> operandDims,
+    OpAsmParser &parser, ArrayRef<OpAsmParser::UnresolvedOperand> operands,
+    TypeRange operandTypes,
+    ArrayRef<OpAsmParser::UnresolvedOperand> operandDims,
     SmallVectorImpl<Type> &resultTypes,
-    SmallVectorImpl<OpAsmParser::OperandType> &resultDims,
+    SmallVectorImpl<OpAsmParser::UnresolvedOperand> &resultDims,
     ArrayAttr &tiedOperands) {
   SmallVector<int64_t, 4> tiedOperandIndices;
   do {
-    OpAsmParser::OperandType tiedResult;
+    OpAsmParser::UnresolvedOperand tiedResult;
     auto res = parser.parseOptionalOperand(tiedResult);
     Type type;
     int64_t tiedOperandIndex = IREE::Util::TiedOpInterface::kUntiedIndex;
@@ -422,7 +425,7 @@ ParseResult parseShapedResultList(
     }
     if (auto shapedType = type.dyn_cast<ShapedType>()) {
       if (!shapedType.hasStaticShape()) {
-        SmallVector<OpAsmParser::OperandType, 4> dynamicDims;
+        SmallVector<OpAsmParser::UnresolvedOperand, 4> dynamicDims;
         if (failed(parser.parseLBrace()) ||
             failed(parser.parseOperandList(dynamicDims,
                                            shapedType.getNumDynamicDims(),
@@ -434,7 +437,7 @@ ParseResult parseShapedResultList(
       }
     } else if (auto sizedType =
                    type.dyn_cast<IREE::Util::SizeAwareTypeInterface>()) {
-      OpAsmParser::OperandType size;
+      OpAsmParser::UnresolvedOperand size;
       if (failed(parser.parseLBrace()) || failed(parser.parseOperand(size)) ||
           failed(parser.parseRBrace())) {
         return failure();
@@ -497,11 +500,11 @@ void printShapedResultList(OpAsmPrinter &p, Operation *op, ValueRange operands,
 }
 
 ParseResult parseShapedFunctionType(
-    OpAsmParser &parser, ArrayRef<OpAsmParser::OperandType> operands,
+    OpAsmParser &parser, ArrayRef<OpAsmParser::UnresolvedOperand> operands,
     SmallVectorImpl<Type> &operandTypes,
-    SmallVectorImpl<OpAsmParser::OperandType> &operandDims,
+    SmallVectorImpl<OpAsmParser::UnresolvedOperand> &operandDims,
     SmallVectorImpl<Type> &resultTypes,
-    SmallVectorImpl<OpAsmParser::OperandType> &resultDims,
+    SmallVectorImpl<OpAsmParser::UnresolvedOperand> &resultDims,
     ArrayAttr &tiedOperands) {
   if (failed(parser.parseLParen())) return failure();
   if (failed(parser.parseOptionalRParen())) {
@@ -579,7 +582,7 @@ void DoNotOptimizeOp::build(OpBuilder &builder, OperationState &state,
 }
 
 ParseResult DoNotOptimizeOp::parse(OpAsmParser &parser, OperationState &state) {
-  SmallVector<OpAsmParser::OperandType, 2> args;
+  SmallVector<OpAsmParser::UnresolvedOperand, 2> args;
   // Operands and results have the same types.
   auto &operandTypes = state.types;
 

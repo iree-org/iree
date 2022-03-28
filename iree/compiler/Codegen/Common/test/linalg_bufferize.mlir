@@ -482,8 +482,8 @@ func @bufferize_dynamic() {
   return
 }
 
-//   CHECK-DAG: #[[MAP0:.+]] = affine_map<(d0)[s0, s1] -> (s1, -d0 + s0)>
-//   CHECK-DAG: #[[MAP2:.+]] = affine_map<(d0)[s0, s1] -> (s0, -d0 + s1)>
+//   CHECK-DAG: #[[MAP0:.+]] = affine_map<(d0)[s0, s1] -> (-d0 + s0, s1)>
+//   CHECK-DAG: #[[MAP2:.+]] = affine_map<(d0)[s0, s1] -> (-d0 + s1, s0)>
 //       CHECK: func @bufferize_dynamic()
 //       CHECK:   %[[DIM0:.+]] = hal.interface.constant.load[0] : index
 //       CHECK:   %[[DIM1:.+]] = hal.interface.constant.load[1] : index
@@ -554,8 +554,8 @@ func @bufferize_dynamic_inplace() {
   return
 }
 
-//   CHECK-DAG: #[[MAP0:.+]] = affine_map<(d0)[s0, s1] -> (s1, -d0 + s0)>
-//   CHECK-DAG: #[[MAP2:.+]] = affine_map<(d0)[s0, s1] -> (s0, -d0 + s1)>
+//   CHECK-DAG: #[[MAP0:.+]] = affine_map<(d0)[s0, s1] -> (-d0 + s0, s1)>
+//   CHECK-DAG: #[[MAP2:.+]] = affine_map<(d0)[s0, s1] -> (-d0 + s1, s0)>
 //       CHECK: func @bufferize_dynamic_inplace()
 //       CHECK:   %[[DIM0:.+]] = hal.interface.constant.load[0] : index
 //       CHECK:   %[[DIM1:.+]] = hal.interface.constant.load[1] : index
@@ -1721,7 +1721,7 @@ func @dot_general_padded() {
   return
 }
 
-//      CHECK: #[[MAP1:.+]] = affine_map<(d0)[s0] -> (4, -d0 + s0)>
+//      CHECK: #[[MAP1:.+]] = affine_map<(d0)[s0] -> (-d0 + s0, 4)>
 //      CHECK: func @dot_general_padded
 //   CHECK-DAG:      %[[ALLOC_RET0:.+]] = memref.alloc
 //   CHECK-DAG:      %[[ALLOC_ARG1:.+]] = memref.alloc

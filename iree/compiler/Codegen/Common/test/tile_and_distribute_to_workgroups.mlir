@@ -47,7 +47,7 @@ hal.executable private @matmul_tensors {
   }
 }
 //  CHECK-DAG: #[[MAP1:.+]] = affine_map<()[s0] -> (s0 * 64)>
-//  CHECK-DAG: #[[MAP2:.+]] = affine_map<(d0)[s0] -> (64, -d0 + s0)>
+//  CHECK-DAG: #[[MAP2:.+]] = affine_map<(d0)[s0] -> (-d0 + s0, 64)>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUTileFuseAndVectorize>
 //      CHECK: hal.executable.entry_point public @matmul_tensors
 // CHECK-SAME:   translation_info = #[[TRANSLATION]]
@@ -362,7 +362,7 @@ hal.executable public @copy_op {
   }
 }
 //  CHECK-DAG: #[[MAP1:.+]] = affine_map<()[s0] -> (s0 * 64)>
-//  CHECK-DAG: #[[MAP2:.+]] = affine_map<(d0)[s0] -> (64, -d0 + s0)>
+//  CHECK-DAG: #[[MAP2:.+]] = affine_map<(d0)[s0] -> (-d0 + s0, 64)>
 //      CHECK: func @copy_op()
 //  CHECK-DAG:   %[[SOURCE_SIZE_Y:.+]] = hal.interface.constant.load[0] : index
 //  CHECK-DAG:   %[[SOURCE_SIZE_X:.+]] = hal.interface.constant.load[1] : index
@@ -874,7 +874,6 @@ hal.executable private @reduction {
 // CHECK-SAME:  translation_info = #[[TRANSLATION]]
 //      CHECK: func @reduction
 //      CHECK:   scf.for %[[IV0:.+]] =
-//      CHECK:     %[[INIT0:.+]] = linalg.init_tensor
 //      CHECK:     %[[INIT:.+]] = linalg.init_tensor
 //      CHECK:     %[[FILL:.+]] = linalg.fill
 // CHECK-SAME:         outs(%[[INIT]] :

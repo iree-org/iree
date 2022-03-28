@@ -388,7 +388,7 @@ static ParseResult parseDispatchWorkgroupBody(OpAsmParser &parser,
                                               TypeRange operandTypes,
                                               TypeRange resultTypes,
                                               Region &body) {
-  SmallVector<OpAsmParser::OperandType> regionArgs;
+  SmallVector<OpAsmParser::UnresolvedOperand> regionArgs;
   SmallVector<Type> regionArgTypes;
   if (failed(parser.parseLParen())) {
     return failure();
