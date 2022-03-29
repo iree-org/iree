@@ -140,7 +140,7 @@ py_binary(
 ]]
 
 [iree_generated_trace_runner_test(
-    name = "e2e_matmul_direct_f32_large_split_k_%s" % lhs_rhs_type,
+    name = "e2e_matmul_direct_%s_large_split_k" % lhs_rhs_type,
     compiler_flags = [
         "-iree-flow-split-matmul-reduction=4",
     ],
