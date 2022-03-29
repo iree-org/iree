@@ -1,6 +1,6 @@
 // RUN: iree-opt -pass-pipeline='hal.executable(hal.executable.variant(builtin.module(func.func(iree-codegen-tile-and-distribute-to-workgroups)))), canonicalize, cse' -split-input-file %s | FileCheck %s
 
-#config = #iree_codegen.lowering_config<tile_sizes = [[64, 64, 0], [16, 4, 64], [4, 4, 4]], native_vector_size = [4, 4, 4]>
+#config = #iree_codegen.lowering_config<tile_sizes = [[64, 64, 0], [16, 4, 64], [4, 4, 4]]>
 #executable_layout = #hal.executable.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
@@ -208,7 +208,7 @@ hal.executable private @add4D {
 
 // -----
 
-#config = #iree_codegen.lowering_config<tile_sizes = [[1, 64, 64, 0], [1, 16, 4, 64], [1, 4, 4, 4]], native_vector_size = [1, 4, 4, 4]>
+#config = #iree_codegen.lowering_config<tile_sizes = [[1, 64, 64, 0], [1, 16, 4, 64], [1, 4, 4, 4]]>
 #executable_layout = #hal.executable.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
@@ -725,7 +725,7 @@ hal.executable private @generic_static {
 
 // -----
 
-#config = #iree_codegen.lowering_config<tile_sizes = [[28, 8, 0], [4, 4, 60], [4, 4, 4]], native_vector_size = [4, 4, 4]>
+#config = #iree_codegen.lowering_config<tile_sizes = [[28, 8, 0], [4, 4, 60], [4, 4, 4]]>
 #executable_layout = #hal.executable.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,

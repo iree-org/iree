@@ -1,6 +1,6 @@
 // RUN: iree-opt %s -iree-llvmcpu-tile-fuse-and-vectorize -cse -canonicalize -split-input-file | FileCheck %s
 
-#config = #iree_codegen.lowering_config<tile_sizes = [[], [16, 16, 32], [16, 16, 16]], native_vector_size = [16, 16, 16]>
+#config = #iree_codegen.lowering_config<tile_sizes = [[], [16, 16, 32], [16, 16, 16]]>
 #map0 = affine_map<()[s0] -> (s0 * 64)>
 #map1 = affine_map<(d0, d1) -> (d0, d1)>
 module  {
@@ -110,7 +110,7 @@ func @matmul_gather() {
       %15 = flow.dispatch.tensor.load %3, offsets = [0, %arg1], sizes = [384, 64], strides = [1, 1] : !flow.dispatch.tensor<readonly:384x512xf32> -> tensor<384x64xf32>
       %16 = linalg.init_tensor [64, 64] : tensor<64x64xf32>
       %17 = linalg.fill ins(%cst : f32) outs(%16 : tensor<64x64xf32>) -> tensor<64x64xf32>
-      %18 = linalg.matmul {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[], [32, 32, 32], [16, 16, 16]], native_vector_size = [16, 16, 16]>} ins(%14, %15 : tensor<64x384xf32>, tensor<384x64xf32>) outs(%17 : tensor<64x64xf32>) -> tensor<64x64xf32>
+      %18 = linalg.matmul {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[], [32, 32, 32], [16, 16, 16]]>} ins(%14, %15 : tensor<64x384xf32>, tensor<384x64xf32>) outs(%17 : tensor<64x64xf32>) -> tensor<64x64xf32>
       %19 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0)>, affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]} ins(%18, %11, %12 : tensor<64x64xf32>, tensor<64xi32>, tensor<64x64xf32>) outs(%13 : tensor<64x64xf32>) {
       ^bb0(%arg2: f32, %arg3: i32, %arg4: f32, %arg5: f32):  // no predecessors
         %20 = linalg.index 1 : index
@@ -179,7 +179,7 @@ func @nonvectorizable_matmul_and_vectorizable_generic() {
       %17 = flow.dispatch.tensor.load %5, offsets = [0, %arg1], sizes = [24, 49], strides = [1, 1] : !flow.dispatch.tensor<readonly:24x96xf32> -> tensor<24x49xf32>
       %18 = linalg.init_tensor [16, 49] : tensor<16x49xf32>
       %19 = linalg.fill ins(%cst : f32) outs(%18 : tensor<16x49xf32>) -> tensor<16x49xf32>
-      %20 = linalg.matmul {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[], [16, 16, 32], [16, 16, 16]], native_vector_size = [16, 16, 16]>} ins(%16, %17 : tensor<16x24xf32>, tensor<24x49xf32>) outs(%19 : tensor<16x49xf32>) -> tensor<16x49xf32>
+      %20 = linalg.matmul {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[], [16, 16, 32], [16, 16, 16]]>} ins(%16, %17 : tensor<16x24xf32>, tensor<24x49xf32>) outs(%19 : tensor<16x49xf32>) -> tensor<16x49xf32>
       %21 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d1)>, affine_map<(d0, d1) -> (d1)>, affine_map<(d0, d1) -> (d1)>, affine_map<(d0, d1) -> (d1)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]} ins(%20, %11, %12, %13, %14 : tensor<16x49xf32>, tensor<49xf32>, tensor<49xf32>, tensor<49xf32>, tensor<49xf32>) outs(%15 : tensor<16x49xf32>) {
       ^bb0(%arg2: f32, %arg3: f32, %arg4: f32, %arg5: f32, %arg6: f32, %arg7: f32):  // no predecessors
         %22 = arith.addf %arg5, %cst_0 : f32
