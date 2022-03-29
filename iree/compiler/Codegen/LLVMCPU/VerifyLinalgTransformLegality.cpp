@@ -16,8 +16,7 @@ namespace iree_compiler {
 
 namespace {
 struct VerifyLinalgTransformLegalityPass
-    : VerifyLinalgTransformLegalityBase<
-          VerifyLinalgTransformLegalityPass> {
+    : VerifyLinalgTransformLegalityBase<VerifyLinalgTransformLegalityPass> {
   void runOnOperation() override;
 };
 }  // namespace
