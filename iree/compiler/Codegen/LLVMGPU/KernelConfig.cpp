@@ -79,9 +79,11 @@ static bool supportsTensorCore(FuncOp entryPoint, linalg::LinalgOp op) {
     // we can map it to tensorcore ops. We should have only mulAdd in the region
     // and the output map should have no permutation and the last dimension
     // should be a reduce.
-    if (std::distance(op->getRegion(0).op_begin(), op->getRegion(0).op_end()) !=
-        3)
-      return false;
+    Region &body = op->getRegion(0);
+    Region::OpIterator it = body.op_begin();
+    if (it == body.op_end() || !isa<arith::MulFOp>(*(it++))) return false;
+    if (it == body.op_end() || !isa<arith::AddFOp>(*(it++))) return false;
+    if (it == body.op_end() || !isa<linalg::YieldOp>(*(it++))) return false;
     AffineMap outputMap = op.getTiedIndexingMap(op.getOutputOperand(0));
     if (outputMap.getNumResults() != outputMap.getNumDims() - 1) return false;
     OpBuilder b(op);
