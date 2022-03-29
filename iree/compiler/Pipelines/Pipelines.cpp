@@ -15,6 +15,7 @@
 #include "iree/compiler/Dialect/VM/Transforms/Passes.h"
 #include "iree/compiler/InputConversion/Common/Passes.h"
 #include "iree/compiler/InputConversion/MHLO/Passes.h"
+#include "iree/compiler/InputConversion/TMTensor/Passes.h"
 #include "iree/compiler/InputConversion/TOSA/Passes.h"
 
 namespace mlir {
@@ -40,11 +41,16 @@ void buildIREEVMTransformPassPipeline(
     case InputDialectOptions::Type::mhlo:
       MHLO::buildMHLOInputConversionPassPipeline(passManager);
       break;
+    case InputDialectOptions::Type::tmtensor:
+      passManager.addNestedPass<FuncOp>(
+          TMTensor::createConvertTMTensorToLinalgExtPass());
+      break;
     case InputDialectOptions::Type::xla:
       MHLO::buildXLACleanupPassPipeline(passManager);
       MHLO::buildMHLOInputConversionPassPipeline(passManager);
       break;
   }
+
   buildCommonInputConversionPassPipeline(passManager);
 
   // Now that inputs are legalized, generate wrapper for entry functions.

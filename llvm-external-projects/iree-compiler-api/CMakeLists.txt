@@ -42,6 +42,7 @@ else()
   set(LLVM_MAIN_SRC_DIR "${IREE_COMPILER_API_SOURCE_DIR}/../../third_party/llvm-project/llvm")
   set(LLVM_MAIN_BINARY_DIR "${CMAKE_CURRENT_BINARY_DIR}/llvm")
   set(LLVM_EXTERNAL_MLIR_HLO_SOURCE_DIR "${IREE_COMPILER_API_SOURCE_DIR}/../../third_party/mlir-hlo")
+  set(LLVM_EXTERNAL_TORCH_MLIR_DIALECTS_SOURCE_DIR "${IREE_COMPILER_API_SOURCE_DIR}/../../third_party/torch-mlir-dialects")
   # Resources generated on windows must have valid version numbers.
   # See set_windows_version_resource_properties.
   set(LLVM_VERSION_MAJOR 0)
@@ -100,6 +101,8 @@ add_system_include_hack(${LLVM_EXTERNAL_MLIR_IREE_DIALECTS_SOURCE_DIR}/include)
 add_system_include_hack(${LLVM_MAIN_BINARY_DIR}/tools/iree-dialects/include)
 add_system_include_hack(${LLVM_EXTERNAL_MLIR_HLO_SOURCE_DIR}/include)
 add_system_include_hack(${LLVM_MAIN_BINARY_DIR}/tools/mlir-hlo/include)
+add_system_include_hack(${LLVM_EXTERNAL_TORCH_MLIR_DIALECTS_SOURCE_DIR}/include)
+add_system_include_hack(${LLVM_MAIN_BINARY_DIR}/tools/torch-mlir-dialects/include)
 add_system_include_hack(${IREE_COMPILER_API_SOURCE_DIR}/include)
 
 function(iree_compiler_target_includes target)
@@ -124,6 +127,7 @@ if(IREE_COMPILER_API_STANDALONE)
   iree_set_llvm_cmake_options()
   iree_add_llvm_external_project(mlir-iree-dialects MLIR_IREE_DIALECTS ${LLVM_EXTERNAL_MLIR_IREE_DIALECTS_SOURCE_DIR})
   iree_add_llvm_external_project(mlir-hlo MLIR_HLO ${LLVM_EXTERNAL_MLIR_HLO_SOURCE_DIR})
+  iree_add_llvm_external_project(torch-mlir-dialects TORCH_MLIR_DIALECTS ${LLVM_EXTERNAL_TORCH_MLIR_DIALECTS_SOURCE_DIR})
   set(MLIR_ENABLE_BINDINGS_PYTHON ON)
 
   # Required mlir-hlo settings.
