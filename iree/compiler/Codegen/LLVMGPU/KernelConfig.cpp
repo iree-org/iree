@@ -74,6 +74,7 @@ static bool supportsTensorCore(FuncOp entryPoint, linalg::LinalgOp op) {
   // TODO(thomasraoux): Enable batchMatmul and generic contraction.
   if (getTargetArch(entryPoint) != "sm_80") return false;
   if (!(isa<linalg::MatmulOp>(op) || isa<linalg::BatchMatmulOp>(op))) {
+    assert(linalg::isaContractionOpInterface(op));
     // If this is not a named op matmul check some properties to make sure that
     // we can map it to tensorcore ops. We should have only mulAdd in the region
     // and the output map should have no permutation and the last dimension
