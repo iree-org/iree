@@ -143,8 +143,8 @@ static std::string normalizeToolNameForPlatform(const std::string &toolName) {
 #endif  // _MSC_VER
 }
 
-static std::string findToolAtPath(
-    SmallVector<std::string, 4> normalizedToolNames, const Twine &path) {
+static std::string findToolAtPath(SmallVector<std::string> normalizedToolNames,
+                                  const Twine &path) {
   LLVM_DEBUG(llvm::dbgs() << "Searching for tool at path '" << path << "'\n");
   for (auto toolName : normalizedToolNames) {
     SmallString<256> pathStorage;
@@ -181,21 +181,27 @@ LogicalResult LinkerTool::runLinkCommand(std::string commandLine,
   return failure();
 }
 
-std::string LinkerTool::findToolInEnvironment(
-    SmallVector<std::string, 4> toolNames) const {
-  SmallVector<std::string, 4> normalizedToolNames;
+static SmallVector<std::string> normalizeToolNames(
+    SmallVector<std::string> toolNames) {
+  SmallVector<std::string> normalizedToolNames;
   normalizedToolNames.reserve(toolNames.size());
   for (auto toolName : toolNames) {
     normalizedToolNames.push_back(normalizeToolNameForPlatform(toolName));
   }
-  LLVM_DEBUG(llvm::dbgs() << "Searching environment for one of these tools: [";
-             llvm::interleaveComma(normalizedToolNames, llvm::dbgs());
-             llvm::dbgs() << "]\n");
+  return normalizedToolNames;
+}
 
+std::string LinkerTool::findToolFromExecutableDir(
+    SmallVector<std::string> toolNames) const {
+  const auto &normalizedToolNames = normalizeToolNames(toolNames);
   std::string mainExecutablePath =
       llvm::sys::fs::getMainExecutable(nullptr, nullptr);
   SmallString<256> mainExecutableDir(mainExecutablePath);
   llvm::sys::path::remove_filename(mainExecutableDir);
+  LLVM_DEBUG(llvm::dbgs() << "Searching from the executable directory "
+                          << mainExecutableDir << " for one of these tools: [";
+             llvm::interleaveComma(normalizedToolNames, llvm::dbgs());
+             llvm::dbgs() << "]\n");
 
   // First search the current executable's directory. This should find tools
   // within the install directory (through CMake or binary distributions).
@@ -216,15 +222,27 @@ std::string LinkerTool::findToolInEnvironment(
     return toolPath;
   }
 
-  // Finally search the environment path.
+  LLVM_DEBUG(llvm::dbgs() << "Tool not found.\n");
+  return "";
+}
+
+std::string LinkerTool::findToolInEnvironment(
+    SmallVector<std::string> toolNames) const {
+  const auto &normalizedToolNames = normalizeToolNames(toolNames);
+  LLVM_DEBUG(
+      llvm::dbgs() << "Searching environment PATH for one of these tools: [";
+      llvm::interleaveComma(normalizedToolNames, llvm::dbgs());
+      llvm::dbgs() << "]\n");
+
   for (auto toolName : normalizedToolNames) {
     if (auto result = llvm::sys::Process::FindInEnvPath("PATH", toolName)) {
       LLVM_DEBUG(llvm::dbgs() << "Found tool on environment PATH at path "
-                              << toolPath << "\n");
+                              << result << "\n");
       return escapeCommandLineComponent(std::string(*result));
     }
   }
 
+  LLVM_DEBUG(llvm::dbgs() << "Tool not found.\n");
   return "";
 }
 

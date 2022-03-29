@@ -53,9 +53,16 @@ class EmbeddedLinkerTool : public LinkerTool {
     char *envVarPath = std::getenv("IREE_LLVMAOT_EMBEDDED_LINKER_PATH");
     if (envVarPath && envVarPath[0] != '\0') return std::string(envVarPath);
 
-    // No explicit linker specified, search the environment for common tools.
-    std::string environmentPath =
-        findToolInEnvironment({"iree-lld", "lld", "ld.lld", "lld-link"});
+    // No explicit linker specified, search the install or build dir.
+    const SmallVector<std::string> &toolNames{"iree-lld", "lld", "ld.lld",
+                                              "lld-link"};
+    std::string executableDirPath = findToolFromExecutableDir(toolNames);
+    if (!executableDirPath.empty()) return executableDirPath;
+
+    // Currently fall back on searching the environment. This shouldn't be
+    // needed as we are building lld in the LLVM submodule of IREE, but it
+    // currently required on a few of our CI bots.
+    std::string environmentPath = findToolInEnvironment(toolNames);
     if (!environmentPath.empty()) return environmentPath;
 
     llvm::errs()

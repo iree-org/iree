@@ -50,8 +50,9 @@ class WasmLinkerTool : public LinkerTool {
       return std::string(linkerPath);
     }
 
-    // No explicit linker specified, search the environment for common tools.
-    std::string toolPath = findToolInEnvironment(
+    // No explicit linker specified, search the environment (i.e. our own build
+    // or install directories) for common tools.
+    std::string toolPath = findToolFromExecutableDir(
         {"wasm-ld", "iree-lld", "lld", "ld.lld", "lld-link"});
     if (!toolPath.empty()) return toolPath;
 
