@@ -215,10 +215,11 @@ void addCPUBufferOpsTileAndVectorizePipeline(OpPassManager &passManager) {
 }
 
 void addDoubleTilingExpertPassPipeline(OpPassManager &passManager) {
+  // Run preprocessing and verification before starting Linalg transforms.
   passManager.addNestedPass<FuncOp>(
       createConvertToDestinationPassingStylePass());
-
   passManager.addPass(createCanonicalizerPass());
+  passManager.addPass(createVerifyLinalgTransformLegalityPass());
 
   // Do first level of tiling and distribution.
   passManager.addNestedPass<FuncOp>(createInsertDistributionInfoPass());
@@ -288,10 +289,11 @@ void addDoubleTilingExpertPassPipeline(OpPassManager &passManager) {
 }
 
 void addConvTileAndDecomposeExpertPassPipeline(OpPassManager &passManager) {
+  // Run preprocessing and verification before starting Linalg transforms.
   passManager.addNestedPass<FuncOp>(
       createConvertToDestinationPassingStylePass());
-
   passManager.addPass(createCanonicalizerPass());
+  passManager.addPass(createVerifyLinalgTransformLegalityPass());
 
   // Do first level of tiling and distribution.
   passManager.addNestedPass<FuncOp>(createInsertDistributionInfoPass());
