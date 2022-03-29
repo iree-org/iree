@@ -87,6 +87,30 @@ func @ksplitmatmul_4D(%a: memref<128x16x32x256xf32>) -> vector<16x1x1x8xf32> {
 
 // -----
 
+func @ksplitmatmul_4D_lower_rank_read(%a: memref<128x512x32x256xf32>) -> vector<16x1x8xf32> {
+  %cst = arith.constant 0.000000e+00 : f32
+  %c2 = arith.constant 2 : index
+  %c3 = arith.constant 3 : index
+  %c4 = arith.constant 4 : index
+  %c5 = arith.constant 5 : index
+  %0 = vector.transfer_read %a[%c2, %c3, %c4, %c5], %cst {in_bounds = [true, true, true]} : memref<128x512x32x256xf32>, vector<16x1x8xf32>
+  return %0 : vector<16x1x8xf32>
+}
+//   CHECK-DAG:#[[$MAP:.*]] = affine_map<(d0, d1) -> (d0 * 8192 + d1 + 8414213)>
+// CHECK-LABEL: func @ksplitmatmul_4D_lower_rank_read
+//   CHECK-DAG: %[[ID:.*]] = arith.constant 0 : index 
+//   CHECK-DAG: %[[CST:.*]] = arith.constant 0.000000e+00 : f32
+//       CHECK: %[[M:.*]] = memref.subview
+//  CHECK-SAME:[2, 3, 4, 5] [1, 16, 1, 8] [1, 1, 1, 1]
+//  CHECK-SAME: memref<128x512x32x256xf32> to memref<16x8xf32, #[[$MAP]]>
+//       CHECK: vector.transfer_read %[[M]][%[[ID]], %[[ID]]]
+//  CHECK-SAME: {in_bounds = [true, true]} :  memref<16x8xf32, #[[$MAP]]>, vector<16x8xf32>
+//       CHECK: vector.broadcast %{{.*}} : vector<16x8xf32> to vector<1x16x8xf32>
+//       CHECK: vector.transpose %{{.*}} [1, 0, 2] : vector<1x16x8xf32> to vector<16x1x8xf32>
+//       CHECK: return %{{.*}} : vector<16x1x8xf32>
+
+// -----
+
 func @ksplitmatmul_4D_negative(%a: memref<128x16x32x256xf32>) -> vector<16x1x8x1xf32> {
   %cst = arith.constant 0.000000e+00 : f32
   %c2 = arith.constant 2 : index

@@ -72,9 +72,21 @@ static bool supportsTensorCore(FuncOp entryPoint, linalg::LinalgOp op) {
   // Limit tensor core pipeline to matmul as not all combinations of transpose
   // are supported upstream.
   // TODO(thomasraoux): Enable batchMatmul and generic contraction.
-  if (getTargetArch(entryPoint) != "sm_80" ||
-      !(isa<linalg::MatmulOp>(op) || isa<linalg::BatchMatmulOp>(op))) {
-    return false;
+  if (getTargetArch(entryPoint) != "sm_80") return false;
+  if (!(isa<linalg::MatmulOp>(op) || isa<linalg::BatchMatmulOp>(op))) {
+    // If this is not a named op matmul check some properties to make sure that
+    // we can map it to tensorcore ops. We should have only mulAdd in the region
+    // and the output map should have no permutation and the last dimension
+    // should be a reduce.
+    if (std::distance(op->getRegion(0).op_begin(), op->getRegion(0).op_end()) !=
+        3)
+      return false;
+    AffineMap outputMap = op.getTiedIndexingMap(op.getOutputOperand(0));
+    if (outputMap.getNumResults() != outputMap.getNumDims() - 1) return false;
+    OpBuilder b(op);
+    for (unsigned i = 0, e = outputMap.getNumResults(); i < e - 1; i++) {
+      if (outputMap.getResult(i) != b.getAffineDimExpr(i)) return false;
+    }
   }
   // Check that we support converting any fused operation. When using the
   // tensorcore pipeline we need to be sure we can generate MMA ops otherwise

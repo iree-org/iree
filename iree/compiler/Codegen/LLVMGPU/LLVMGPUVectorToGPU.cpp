@@ -177,10 +177,12 @@ struct FlattenTransferReadOp : public OpRewritePattern<vector::TransferReadOp> {
         VectorType::get(vectorShapeBroadcast, vectorType.getElementType());
 
     SmallVector<OpFoldResult> subViewOffsets, subViewSizes, subViewStrides;
-    Value c0 = rewriter.create<arith::ConstantIndexOp>(loc, 0);
-    for (int i = 0; i < vectorType.getRank(); i++) {
+    subViewSizes.append(sourceType.getRank() - vectorType.getRank(),
+                        rewriter.getIndexAttr(1));
+    for (int64_t dim : vectorType.getShape())
+      subViewSizes.push_back(rewriter.getIndexAttr(dim));
+    for (int i = 0; i < sourceType.getRank(); i++) {
       subViewOffsets.push_back(transferReadOp.indices()[i]);
-      subViewSizes.push_back(rewriter.getIndexAttr(vectorType.getShape()[i]));
       subViewStrides.push_back(rewriter.getIndexAttr(1));
     }
     MemRefType resultType = memref::SubViewOp::inferRankReducedResultType(
@@ -189,6 +191,7 @@ struct FlattenTransferReadOp : public OpRewritePattern<vector::TransferReadOp> {
                                 .cast<MemRefType>();
     Value subView = rewriter.create<memref::SubViewOp>(
         loc, resultType, source, subViewOffsets, subViewSizes, subViewStrides);
+    Value c0 = rewriter.create<arith::ConstantIndexOp>(loc, 0);
     Value readCollapse = rewriter.create<vector::TransferReadOp>(
         loc, vectorTypeCollapse, subView, ValueRange{c0, c0}, newidentityMap,
         transferReadOp.padding(), transferReadOp.mask(), newInBoundsAttr);
