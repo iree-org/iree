@@ -21,6 +21,7 @@ iree_cc_library(
     MLIRFunc
     MLIRIR
     MLIRLinalg
+    MLIRMemRefTransforms
     MLIRTensor
     iree::compiler::Dialect::Flow::IR
   PUBLIC

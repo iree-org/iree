@@ -294,7 +294,7 @@ cc_library(
         "@llvm-project//mlir:DialectUtils",
         "@llvm-project//mlir:FuncDialect",
         "@llvm-project//mlir:IR",
-        "@llvm-project//mlir:InferTypeOpIntefaces",
+        "@llvm-project//mlir:InferTypeOpInterface",
         "@llvm-project//mlir:LinalgOps",
         "@llvm-project//mlir:MathDialect",
         "@llvm-project//mlir:MemRefDialect",
