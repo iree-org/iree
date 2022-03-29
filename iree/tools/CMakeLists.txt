@@ -311,6 +311,7 @@ if(${IREE_BUILD_COMPILER})
       ::init_compiler_modules
       ::init_iree_passes_and_dialects
       ::init_mlir_passes_and_dialects
+      ::init_torch_mlir_dialects
       ::init_xla_dialects
       iree::compiler::Codegen::Codegen
       iree::compiler::Dialect::HAL::Conversion::Passes
@@ -360,6 +361,16 @@ if(${IREE_BUILD_COMPILER})
       tensorflow::external_mhlo_includes
       ChloDialect
       MhloDialect
+    PUBLIC
+  )
+
+  iree_cc_library(
+    NAME
+      init_torch_mlir_dialects
+    HDRS
+      "init_torch_mlir_dialects.h"
+    DEPS
+      TorchMLIRTMTensorDialect
     PUBLIC
   )
 

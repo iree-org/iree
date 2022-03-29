@@ -1,11 +1,16 @@
-# Torch-MLIR Dialects Project
+The third_party/torch-mlir-dialects directory is used to import torch-mlir
+specific dialects. This is needed transitively to provide dialects interfaces
+to bridge between torch-mlir and IREE. After the related dialects are upstreamed
+to mlir core as planned, this directory should no longer be needed.
 
-Sources for torch-mlir's public dialects (containing ops/types/attributes that
-are unique to Torch-MLIR at the moment)
+## Upstream project link
+https://github.com/llvm/torch-mlir
 
-This project is intended to be used via LLVM's external projects setup:
-
-* `-DLLVM_EXTERNAL_PROJECTS=torch-mlir-dialects`
-* `-DLLVM_EXTERNAL_TORCH_MLIR_DIALECTS_SOURCE_DIR={this_directory}`
-
-It depends on the `mlir` project.
+## Update command:
+rsync -av --exclude=tools \
+  --exclude=test \
+  --exclude=lib/Dialect/TMTensor/Transforms \
+  --exclude=include/torch-mlir-dialects/Dialect/TMTensor/Transforms \
+  --exclude=README.md \
+  PATH_TO_TORCH_MLIR_REPO/external/llvm-external-projects/torch-mlir-dialects \
+  PATH_TO_IREE_REPO/third_party
