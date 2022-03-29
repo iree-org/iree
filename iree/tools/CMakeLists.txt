@@ -225,6 +225,11 @@ if(${IREE_BUILD_COMPILER})
       "init_iree_passes.h"
     DEPS
       IREEInputDialect
+      IREELinalgExtDialect
+      IREELinalgExtTransforms
+      IREELinalgExtOpInterfaceImpl
+      IREELinalgTransformDialect
+      IREELinalgTransformDialectTransforms
       IREEPyDMDialect
       MLIRIR
       iree::compiler::Bindings::Native::Transforms

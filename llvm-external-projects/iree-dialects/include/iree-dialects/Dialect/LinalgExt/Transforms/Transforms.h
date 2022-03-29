@@ -20,13 +20,18 @@ namespace iree_compiler {
 namespace IREE {
 namespace LinalgExt {
 
+struct TilingResult {
+  TileOp tileOp;
+  Operation *tiledOp;
+};
+
 /// Pattern to tile a TilingInterface op using a TileOp.
 struct LinalgExtTilingPattern
     : public OpInterfaceRewritePattern<TilingInterface> {
   LinalgExtTilingPattern(MLIRContext *context, linalg::LinalgTilingOptions opt)
       : OpInterfaceRewritePattern<TilingInterface>(context), options(opt) {}
 
-  FailureOr<Operation *>
+  FailureOr<TilingResult>
   returningMatchAndRewrite(TilingInterface op, PatternRewriter &rewriter) const;
 
   LogicalResult matchAndRewrite(TilingInterface op,
