@@ -17,9 +17,7 @@
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "iree/compiler/InputConversion/Common/PassDetail.h"
 #include "iree/compiler/InputConversion/Common/Passes.h"
-#include "mlir/Conversion/SCFToControlFlow/SCFToControlFlow.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
-#include "mlir/Dialect/SCF/SCF.h"
 #include "mlir/IR/BuiltinDialect.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/Pass/Pass.h"
@@ -325,33 +323,34 @@ void IREEImportPublicPass::runOnOperation() {
                                              specific_benefit);
   patterns.insert<GlobalOpPattern>(typeConverter, &getContext(), 0);
 
-#define ONETOONE(SrcOpTy, TargetOpTy)             \
+#define ONE_TO_ONE(SrcOpTy, TargetOpTy)           \
   patterns.insert<OneToOneConverionPattern>(      \
       typeConverter, SrcOpTy::getOperationName(), \
       TargetOpTy::getOperationName(), &getContext(), specific_benefit)
 
-  ONETOONE(IREE::Input::BufferViewRankOp, IREE::HAL::BufferViewRankOp);
-  ONETOONE(IREE::Input::BufferViewDimOp, IREE::HAL::BufferViewDimOp);
-  ONETOONE(IREE::Input::ListCreateOp, IREE::Util::ListCreateOp);
-  ONETOONE(IREE::Input::ListSizeOp, IREE::Util::ListSizeOp);
-  ONETOONE(IREE::Input::ListResizeOp, IREE::Util::ListResizeOp);
-  ONETOONE(IREE::Input::ListGetOp, IREE::Util::ListGetOp);
-  ONETOONE(IREE::Input::ListSetOp, IREE::Util::ListSetOp);
-  ONETOONE(IREE::Input::NullOp, IREE::Util::NullOp);
-  ONETOONE(IREE::Input::TensorCloneOp, IREE::Flow::TensorCloneOp);
-  ONETOONE(IREE::Input::TensorLoadOp, IREE::Flow::TensorLoadOp);
-  ONETOONE(IREE::Input::TensorReshapeOp, IREE::Flow::TensorReshapeOp);
-  ONETOONE(IREE::Input::TensorSliceOp, IREE::Flow::TensorSliceOp);
-  ONETOONE(IREE::Input::TensorSplatOp, IREE::Flow::TensorSplatOp);
-  ONETOONE(IREE::Input::TensorStoreOp, IREE::Flow::TensorStoreOp);
-  ONETOONE(IREE::Input::TensorUpdateOp, IREE::Flow::TensorUpdateOp);
-  ONETOONE(IREE::Input::TensorTraceOp, IREE::Flow::TensorTraceOp);
-  ONETOONE(IREE::Input::GlobalAddressOp, IREE::Util::GlobalAddressOp);
-  ONETOONE(IREE::Input::GlobalLoadOp, IREE::Util::GlobalLoadOp);
-  ONETOONE(IREE::Input::GlobalLoadIndirectOp, IREE::Util::GlobalLoadIndirectOp);
-  ONETOONE(IREE::Input::GlobalStoreOp, IREE::Util::GlobalStoreOp);
-  ONETOONE(IREE::Input::GlobalStoreIndirectOp,
-           IREE::Util::GlobalStoreIndirectOp);
+  ONE_TO_ONE(IREE::Input::BufferViewRankOp, IREE::HAL::BufferViewRankOp);
+  ONE_TO_ONE(IREE::Input::BufferViewDimOp, IREE::HAL::BufferViewDimOp);
+  ONE_TO_ONE(IREE::Input::ListCreateOp, IREE::Util::ListCreateOp);
+  ONE_TO_ONE(IREE::Input::ListSizeOp, IREE::Util::ListSizeOp);
+  ONE_TO_ONE(IREE::Input::ListResizeOp, IREE::Util::ListResizeOp);
+  ONE_TO_ONE(IREE::Input::ListGetOp, IREE::Util::ListGetOp);
+  ONE_TO_ONE(IREE::Input::ListSetOp, IREE::Util::ListSetOp);
+  ONE_TO_ONE(IREE::Input::NullOp, IREE::Util::NullOp);
+  ONE_TO_ONE(IREE::Input::TensorCloneOp, IREE::Flow::TensorCloneOp);
+  ONE_TO_ONE(IREE::Input::TensorLoadOp, IREE::Flow::TensorLoadOp);
+  ONE_TO_ONE(IREE::Input::TensorReshapeOp, IREE::Flow::TensorReshapeOp);
+  ONE_TO_ONE(IREE::Input::TensorSliceOp, IREE::Flow::TensorSliceOp);
+  ONE_TO_ONE(IREE::Input::TensorSplatOp, IREE::Flow::TensorSplatOp);
+  ONE_TO_ONE(IREE::Input::TensorStoreOp, IREE::Flow::TensorStoreOp);
+  ONE_TO_ONE(IREE::Input::TensorUpdateOp, IREE::Flow::TensorUpdateOp);
+  ONE_TO_ONE(IREE::Input::TensorTraceOp, IREE::Flow::TensorTraceOp);
+  ONE_TO_ONE(IREE::Input::GlobalAddressOp, IREE::Util::GlobalAddressOp);
+  ONE_TO_ONE(IREE::Input::GlobalLoadOp, IREE::Util::GlobalLoadOp);
+  ONE_TO_ONE(IREE::Input::GlobalLoadIndirectOp,
+             IREE::Util::GlobalLoadIndirectOp);
+  ONE_TO_ONE(IREE::Input::GlobalStoreOp, IREE::Util::GlobalStoreOp);
+  ONE_TO_ONE(IREE::Input::GlobalStoreIndirectOp,
+             IREE::Util::GlobalStoreIndirectOp);
 
   if (failed(applyFullConversion(getOperation(), target, std::move(patterns))))
     signalPassFailure();
