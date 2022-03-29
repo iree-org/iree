@@ -112,6 +112,14 @@ LogicalResult verifyDoubleTilingExpertPassPipelineConfig(
   IREE::Flow::PartitionableLoopsInterface interfaceOp =
       dyn_cast_or_null<IREE::Flow::PartitionableLoopsInterface>(op);
   if (interfaceOp) {
+    SmallVector<int64_t> firstLevelTileSizes = loweringConfig.getTileSizeVals(
+        static_cast<unsigned>(TilingLevel::WorkGroupTiles));
+    // This is needed to fuse and distribute all ops together.
+    if (firstLevelTileSizes.size() != interfaceOp.getNumLoops()) {
+      return op->emitOpError(
+          "mismatch between number of loops and first level of tiling");
+    }
+
     llvm::SmallDenseSet<unsigned> pLoopsSet;
     for (auto iteratorType : llvm::enumerate(interfaceOp.getIteratorTypes())) {
       if (iteratorType.value() == getParallelIteratorTypeName()) {
@@ -207,16 +215,23 @@ void addCPUBufferOpsTileAndVectorizePipeline(OpPassManager &passManager) {
 }
 
 void addDoubleTilingExpertPassPipeline(OpPassManager &passManager) {
-  // Do first level of tiling and distribution.
-  passManager.addNestedPass<FuncOp>(createInsertDistributionInfoPass());
-  passManager.addNestedPass<FuncOp>(createTileAndDistributeToWorkgroupsPass());
-  passManager.addPass(createCanonicalizerPass());
-  passManager.addPass(createCSEPass());
-
   passManager.addNestedPass<FuncOp>(
       createConvertToDestinationPassingStylePass());
 
   passManager.addPass(createCanonicalizerPass());
+
+  // Do first level of tiling and distribution.
+  passManager.addNestedPass<FuncOp>(createInsertDistributionInfoPass());
+  {
+    LinalgFusePassOptions options;
+    options.tilingLevel = static_cast<int64_t>(TilingLevel::WorkGroupTiles);
+    options.doIREEDistribution = true;
+    passManager.addNestedPass<FuncOp>(createLinalgFusePass(options));
+    passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
+    passManager.addNestedPass<FuncOp>(createCSEPass());
+    passManager.addNestedPass<FuncOp>(
+        createRewriteLinalgDestructiveUpdatesPass());
+  }
 
   // Run LinalgFusePass firstly in case that we have fill + matmul + generic
   // ops. At this stage, we do not apply vectorization. The reduction dim won't
@@ -273,16 +288,23 @@ void addDoubleTilingExpertPassPipeline(OpPassManager &passManager) {
 }
 
 void addConvTileAndDecomposeExpertPassPipeline(OpPassManager &passManager) {
-  // Do first level of tiling and distribution.
-  passManager.addNestedPass<FuncOp>(createInsertDistributionInfoPass());
-  passManager.addNestedPass<FuncOp>(createTileAndDistributeToWorkgroupsPass());
-  passManager.addPass(createCanonicalizerPass());
-  passManager.addPass(createCSEPass());
-
   passManager.addNestedPass<FuncOp>(
       createConvertToDestinationPassingStylePass());
 
   passManager.addPass(createCanonicalizerPass());
+
+  // Do first level of tiling and distribution.
+  passManager.addNestedPass<FuncOp>(createInsertDistributionInfoPass());
+  {
+    LinalgFusePassOptions options;
+    options.tilingLevel = static_cast<int64_t>(TilingLevel::WorkGroupTiles);
+    options.doIREEDistribution = true;
+    passManager.addNestedPass<FuncOp>(createLinalgFusePass(options));
+    passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
+    passManager.addNestedPass<FuncOp>(createCSEPass());
+    passManager.addNestedPass<FuncOp>(
+        createRewriteLinalgDestructiveUpdatesPass());
+  }
 
   // Run LinalgFusePass firstly in case that we have fill + conv + generic
   // ops. At this stage, we do not apply vectorization. The reduction dim won't

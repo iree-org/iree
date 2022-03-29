@@ -95,6 +95,12 @@ struct SplitReductionPass : public SplitReductionBase<SplitReductionPass> {
                                             std::move(patterns)))) {
       return signalPassFailure();
     }
+
+    // Remove all the markers at the end.
+    auto funcOp = getOperation();
+    funcOp->walk([&](linalg::LinalgOp op) {
+      op->removeAttr(linalg::LinalgTransforms::kLinalgTransformMarker);
+    });
   }
 };
 
