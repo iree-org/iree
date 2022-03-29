@@ -69,7 +69,6 @@ iree_sample_state_t* setup_sample() {
 
   iree_runtime_session_options_t session_options;
   iree_runtime_session_options_initialize(&session_options);
-  iree_runtime_session_t* session = NULL;
   if (iree_status_is_ok(status)) {
     status = iree_runtime_session_create_with_device(
         state->instance, &session_options, state->device,

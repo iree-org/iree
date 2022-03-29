@@ -36,6 +36,8 @@ target_sources(${_NAME}
 )
 set_target_properties(${_NAME} PROPERTIES OUTPUT_NAME "web-sample-static-sync")
 
+target_compile_options(${_NAME} PRIVATE ${IREE_DEFAULT_COPTS})
+
 # Note: we have to be very careful about dependencies here.
 #
 # The general purpose libraries link in multiple executable loaders and HAL
@@ -77,6 +79,8 @@ target_sources(${_NAME}
     ${CMAKE_CURRENT_BINARY_DIR}/mnist_bytecode.c
 )
 set_target_properties(${_NAME} PROPERTIES OUTPUT_NAME "web-sample-static-multithreaded")
+
+target_compile_options(${_NAME} PRIVATE ${IREE_DEFAULT_COPTS})
 
 # Note: we have to be very careful about dependencies here.
 #
