@@ -199,7 +199,7 @@ iree_generated_trace_runner_test(
 
 iree_generated_trace_runner_test(
   NAME
-    e2e_matmul_direct_f32_large_split_k_f32
+    e2e_matmul_direct_f32_large_split_k
   GENERATOR
     "generate_e2e_matmul_tests.py"
   GENERATOR_ARGS
