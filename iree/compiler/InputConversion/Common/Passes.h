@@ -29,6 +29,7 @@ void buildCommonInputConversionPassPipeline(OpPassManager &passManager);
 std::unique_ptr<OperationPass<ModuleOp>> createIREEImportPublicPass();
 std::unique_ptr<OperationPass<func::FuncOp>>
 createLinalgQuantizedMatmulToMatmulPass();
+std::unique_ptr<OperationPass<ModuleOp>> createSanitizeModuleNamesPass();
 std::unique_ptr<OperationPass<func::FuncOp>> createTopLevelSCFToCFGPass();
 
 //===----------------------------------------------------------------------===//
