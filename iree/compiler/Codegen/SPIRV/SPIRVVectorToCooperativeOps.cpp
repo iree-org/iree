@@ -86,8 +86,8 @@ struct ConvertVectorTransferOp final
       vector::TransferReadOp::Adaptor adaptor(operands,
                                               op->getAttrDictionary());
       Value bufferPtr = spirv::getElementPtr(
-          *getTypeConverter<SPIRVTypeConverter>(), memrefType, adaptor.source(),
-          adaptor.indices(), loc, rewriter);
+          *getTypeConverter<SPIRVTypeConverter>(), memrefType,
+          adaptor.getSource(), adaptor.getIndices(), loc, rewriter);
       rewriter.replaceOpWithNewOp<spirv::CooperativeMatrixLoadNVOp>(
           op, matType, bufferPtr, strideValue, coloumnMajor,
           spirv::MemoryAccessAttr());
@@ -98,10 +98,10 @@ struct ConvertVectorTransferOp final
       vector::TransferWriteOp::Adaptor adaptor(operands,
                                                op->getAttrDictionary());
       Value bufferPtr = spirv::getElementPtr(
-          *getTypeConverter<SPIRVTypeConverter>(), memrefType, adaptor.source(),
-          adaptor.indices(), loc, rewriter);
+          *getTypeConverter<SPIRVTypeConverter>(), memrefType,
+          adaptor.getSource(), adaptor.getIndices(), loc, rewriter);
       rewriter.create<spirv::CooperativeMatrixStoreNVOp>(
-          loc, bufferPtr, adaptor.vector(), strideValue, coloumnMajor,
+          loc, bufferPtr, adaptor.getVector(), strideValue, coloumnMajor,
           spirv::MemoryAccessAttr());
       rewriter.eraseOp(op);
       return success();
@@ -119,24 +119,24 @@ struct ConvertVectorContractOp final
   LogicalResult matchAndRewrite(
       vector::ContractionOp contractOp, OpAdaptor operands,
       ConversionPatternRewriter &rewriter) const override {
-    if (!llvm::empty(contractOp.masks())) return failure();
+    if (!llvm::empty(contractOp.getMasks())) return failure();
 
     // Check that this is a matmul operation.
-    auto iterators = contractOp.iterator_types().getValue();
+    auto iterators = contractOp.getIteratorTypes().getValue();
     if (iterators.size() != 3 || !isParallelIterator(iterators[0]) ||
         !isParallelIterator(iterators[1]) ||
         !isReductionIterator(iterators[2])) {
       return failure();
     }
-    if (contractOp.kind() != vector::CombiningKind::ADD) return failure();
+    if (contractOp.getKind() != vector::CombiningKind::ADD) return failure();
 
     // Column major matmuls should have been lowered to transpose + contract
     // by this point. Transpose can be handled by load/store operations.
-    if (!isRowMajorMatmul(contractOp.indexing_mapsAttr())) return failure();
+    if (!isRowMajorMatmul(contractOp.getIndexingMapsAttr())) return failure();
 
     rewriter.replaceOpWithNewOp<spirv::CooperativeMatrixMulAddNVOp>(
-        contractOp, operands.acc().getType(), operands.lhs(), operands.rhs(),
-        operands.acc());
+        contractOp, operands.getAcc().getType(), operands.getLhs(),
+        operands.getRhs(), operands.getAcc());
     return success();
   }
 };

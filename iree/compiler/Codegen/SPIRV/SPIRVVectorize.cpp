@@ -60,10 +60,10 @@ Optional<SmallVector<int64_t, 4>> getNativeVectorShape(Operation *op) {
     return nativeSize;
   } else if (auto contractOp = dyn_cast<vector::ContractionOp>(op)) {
     unsigned lastParalleldim = 0;
-    for (const auto &it : llvm::enumerate(contractOp.iterator_types())) {
+    for (const auto &it : llvm::enumerate(contractOp.getIteratorTypes())) {
       if (isParallelIterator(it.value())) lastParalleldim = it.index();
     }
-    SmallVector<int64_t, 4> nativeSize(contractOp.iterator_types().size(), 1);
+    SmallVector<int64_t, 4> nativeSize(contractOp.getIteratorTypes().size(), 1);
     nativeSize[lastParalleldim] = 4;  // Map to vec4 fma operations.
     return nativeSize;
   }

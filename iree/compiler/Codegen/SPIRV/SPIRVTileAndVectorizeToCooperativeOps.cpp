@@ -177,7 +177,7 @@ Optional<SmallVector<int64_t, 4>> getCooperativeOpVectorShape(
 
   if (auto writeOp = dyn_cast<vector::TransferWriteOp>(op)) {
     auto insert =
-        writeOp.vector().getDefiningOp<vector::InsertStridedSliceOp>();
+        writeOp.getVector().getDefiningOp<vector::InsertStridedSliceOp>();
     if (!insert) return llvm::None;
     return llvm::to_vector<4>(insert.getSourceVectorType().getShape());
   }
@@ -229,11 +229,11 @@ class CombineContractTranspose final
     MLIRContext *ctx = op.getContext();
     Location loc = op.getLoc();
     bool foundTranspose = false;
-    std::array<Value, 3> sources = {op.lhs(), op.rhs(), op.acc()};
+    std::array<Value, 3> sources = {op.getLhs(), op.getRhs(), op.getAcc()};
     SmallVector<AffineMap> newMaps;
     SmallVector<Value> newSources;
     for (auto source : llvm::enumerate(sources)) {
-      auto map = op.indexing_maps()[source.index()];
+      auto map = op.getIndexingMaps()[source.index()];
       auto tranposeOp = source.value().getDefiningOp<vector::TransposeOp>();
       if (!tranposeOp) {
         newSources.push_back(source.value());
@@ -248,14 +248,14 @@ class CombineContractTranspose final
       }
       newMaps.push_back(
           AffineMap::get(map.getNumDims(), map.getNumSymbols(), exprs, ctx));
-      newSources.push_back(tranposeOp.vector());
+      newSources.push_back(tranposeOp.getVector());
       foundTranspose = true;
     }
     if (!foundTranspose) return failure();
 
     Value res = rewriter.create<vector::ContractionOp>(
         loc, newSources[0], newSources[1], newSources[2],
-        rewriter.getAffineMapArrayAttr(newMaps), op.iterator_types());
+        rewriter.getAffineMapArrayAttr(newMaps), op.getIteratorTypes());
     rewriter.replaceOp(op, res);
     return success();
   }
