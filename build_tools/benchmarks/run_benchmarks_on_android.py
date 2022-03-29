@@ -372,10 +372,11 @@ def run_benchmarks_for_category(
       capture_filename = None
       if do_capture and benchmark_key not in skip_captures:
         run_cmd = [
-            "TRACY_NO_EXIT=1", "taskset",
+            "TRACY_NO_EXIT=1",
+            f"IREE_PRESERVE_DYLIB_TEMP_FILES={ANDROID_TMP_DIR}", "taskset",
             benchmark_info.deduce_taskset(),
-            os.path.join(ANDROID_TMP_DIR, TRACED_TOOL_REL_DIR, tool),
-            f"--flagfile={MODEL_FLAGFILE_NAME}"
+            os.path.join(ANDROID_TMP_DIR, TRACED_TOOL_REL_DIR,
+                         tool), f"--flagfile={MODEL_FLAGFILE_NAME}"
         ]
 
         # Just launch the traced benchmark tool with TRACY_NO_EXIT=1 without
