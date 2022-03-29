@@ -445,7 +445,7 @@ func @unused_ins_operand() {
         %25 = flow.dispatch.tensor.load %12, offsets = [%arg0, %arg1, %arg2], sizes = [%22, %23, %24], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:?x?x?xi32>{%6, %7, %8} -> tensor<?x?x?xi32>
         %26 = linalg.init_tensor [%22, %23] : tensor<?x?xi32>
         %27 = linalg.init_tensor [%22, %23, %24] : tensor<?x?x?xi32>
-        %28 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>, affine_map<(d0, d1, d2) -> (d0, d1, d2)>], iterator_types = ["parallel", "parallel", "parallel"]} ins(%25, %26 : tensor<?x?x?xi32>, tensor<?x?xi32>) outs(%27 : tensor<?x?x?xi32>) attrs =  {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[], [1, 4, 4]], native_vector_size = [1, 4, 4]>} {
+        %28 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>, affine_map<(d0, d1, d2) -> (d0, d1, d2)>], iterator_types = ["parallel", "parallel", "parallel"]} ins(%25, %26 : tensor<?x?x?xi32>, tensor<?x?xi32>) outs(%27 : tensor<?x?x?xi32>) attrs =  {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[], [1, 4, 4]]>} {
         ^bb0(%arg3: i32, %arg4: i32, %arg5: i32):  // no predecessors
           %29 = arith.index_cast %arg3 : i32 to index
           %30 = linalg.index 0 : index
