@@ -177,6 +177,12 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
       .addPass(mlir::createCanonicalizerPass)
       .addPass(mlir::createCSEPass)
 
+      // Split reduction operations into parallel and reduction.
+      .addPass(createSplitReductionPass)
+      // SplitReductionPass may create reduction dimension that are not the last
+      // dimension.
+      .addPass(createInterchangeGenericOpsPass)
+
       // Dispatch region formation.
       // TODO(ravishankarm): Fold ConvertToFlowBefore/ConvertToFlowAfter into
       // dispatch region formation pass.

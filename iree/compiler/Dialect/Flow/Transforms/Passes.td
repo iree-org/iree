@@ -139,6 +139,12 @@ def PadTensorToSubTensorInsert :
   let constructor = "mlir::iree_compiler::IREE::Flow::createPadTensorToSubTensorInsertPass()";
 }
 
+def SplitReduction :
+    Pass<"iree-flow-split-reduction-ops", ""> {
+  let summary = "Split reduction dimension to increase parallelism.";
+  let constructor = "mlir::iree_compiler::IREE::Flow::createSplitReductionPass()";
+}
+
 def StripSignedness :
     InterfacePass<"iree-flow-strip-signedness", "mlir::FunctionOpInterface"> {
   let summary = "Legalizes ui tensors constants to uis";
