@@ -36,6 +36,8 @@ spirv::Vendor getVendor(const TargetTriple &triple) {
       return spirv::Vendor::AMD;
     case TargetTripleArch::ARM_Valhall:
       return spirv::Vendor::ARM;
+    case TargetTripleArch::Apple_M1:
+      return spirv::Vendor::Apple;
     case TargetTripleArch::NV_Turing:
     case TargetTripleArch::NV_Ampere:
       return spirv::Vendor::NVIDIA;
@@ -66,6 +68,7 @@ spirv::DeviceType getDeviceType(const TargetTriple &triple) {
     case TargetTripleArch::NV_Turing:
     case TargetTripleArch::NV_Ampere:
       return spirv::DeviceType::DiscreteGPU;
+    case TargetTripleArch::Apple_M1:
     case TargetTripleArch::ARM_Valhall:
     case TargetTripleArch::QC_Adreno:
       return spirv::DeviceType::IntegratedGPU;
@@ -82,8 +85,9 @@ Vulkan::Version getVersion(const TargetTriple &triple) {
     return Version::V_1_1;
   }
 
-  // SwiftShader stays at Vulkan 1.1.
-  if (triple.getProduct() == TargetTripleProduct::SwiftShader) {
+  // SwiftShader and MoltenVK stays at Vulkan 1.1.
+  if (triple.getProduct() == TargetTripleProduct::SwiftShader ||
+      triple.getProduct() == TargetTripleProduct::MoltenVK) {
     return Version::V_1_1;
   }
 
@@ -102,6 +106,17 @@ void getExtensions(const TargetTriple &triple,
                    llvm::SmallVectorImpl<Vulkan::Extension> &extensions) {
   // Mobile GPUs need to take Android version into consideration.
   switch (triple.getArch()) {
+    case TargetTripleArch::Apple_M1: {
+      // Example: https://vulkan.gpuinfo.org/displayreport.php?id=14673
+      const std::array<Extension, 5> list = {
+          Extension::VK_KHR_16bit_storage,
+          Extension::VK_KHR_8bit_storage,
+          Extension::VK_KHR_shader_float16_int8,
+          Extension::VK_KHR_storage_buffer_storage_class,
+          Extension::VK_KHR_variable_pointers,
+      };
+      return extensions.append(list.begin(), list.end());
+    }
     case TargetTripleArch::ARM_Valhall: {
       // Example: https://vulkan.gpuinfo.org/displayreport.php?id=10312
       const std::array<Extension, 6> list = {
@@ -200,6 +215,30 @@ CapabilitiesAttr getCapabilities(const TargetTriple &triple,
                          SubgroupFeature::Clustered | SubgroupFeature::Quad;
 
       shaderFloat16 = shaderFloat64 = true;
+      shaderInt8 = shaderInt16 = shaderInt64 = true;
+
+      storageBuffer16BitAccess = storagePushConstant16 = true;
+      uniformAndStorageBuffer16BitAccess = true;
+      storageBuffer8BitAccess = true, storagePushConstant8 = true;
+      uniformAndStorageBuffer8BitAccess = true;
+
+      variablePointers = variablePointersStorageBuffer = true;
+      break;
+    case TargetTripleArch::Apple_M1:
+      // Example: https://vulkan.gpuinfo.org/displayreport.php?id=14673
+      maxComputeSharedMemorySize = 32768;
+      maxComputeWorkGroupInvocations = 1024;
+      maxComputeWorkGroupSize = {1024, 1024, 1024};
+
+      subgroupSize = 32;
+      subgroupFeatures = SubgroupFeature::Basic | SubgroupFeature::Vote |
+                         SubgroupFeature::Arithmetic | SubgroupFeature::Ballot |
+                         SubgroupFeature::Shuffle |
+                         SubgroupFeature::ShuffleRelative |
+                         SubgroupFeature::Quad;
+
+      shaderFloat16 = true;
+      shaderFloat64 = false;
       shaderInt8 = shaderInt16 = shaderInt64 = true;
 
       storageBuffer16BitAccess = storagePushConstant16 = true;
