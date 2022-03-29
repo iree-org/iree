@@ -112,11 +112,6 @@ class UnixLinkerTool : public LinkerTool {
       // out of ld.bfd, ld.gold and ld.lld, only ld.lld actually implements
       // that. Meanwhile, ld.bfd interprets -static -shared as just -static,
       // and ld.gold rejects -static -shared outright as "incompatible".
-      //
-      // So here we are effectively relying on the linker being ld.lld, which
-      // is the case because we are using Android NDK clang, which execs
-      // Android NDK ld, which is ld.lld, see strace results mentioned in
-      // AndroidLinkerTool class comment.
       flags.push_back("-shared");
     }
 
