@@ -123,6 +123,50 @@ hal.executable @reduction_dispatch {
 // CHECK-SAME:   lowering_config = #[[CONFIG]]
 
 // -----
+#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>
+  ]>
+]>
+hal.executable private @reduction_aligned2 {
+  hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb"> {
+    hal.executable.entry_point public @reduction_aligned2 ordinal(0) layout(#executable_layout)
+    builtin.module {
+      func @reduction_aligned2() {
+        %cst = arith.constant 0.000000e+00 : f32
+        %c0 = arith.constant 0 : index
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:4x128x384xf32>
+        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<writeonly:128x384xf32>
+        %2 = flow.dispatch.tensor.load %0, offsets = [0, 0, 0], sizes = [4, 128, 384], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:4x128x384xf32> -> tensor<4x128x384xf32>
+        %3 = linalg.init_tensor [128, 384] : tensor<128x384xf32>
+        %4 = linalg.fill ins(%cst : f32) outs(%3 : tensor<128x384xf32>) -> tensor<128x384xf32>
+        %5 = linalg.generic {
+          indexing_maps = [affine_map<(d0, d1, d2) -> (d2, d0, d1)>, 
+                           affine_map<(d0, d1, d2) -> (d0, d1)>],
+          iterator_types = ["parallel", "parallel", "reduction"]}
+          ins(%2 : tensor<4x128x384xf32>) outs(%4 : tensor<128x384xf32>) {
+        ^bb0(%arg0: f32, %arg1: f32):
+          %6 = arith.addf %arg0, %arg1 : f32
+          linalg.yield %6 : f32
+        } -> tensor<128x384xf32>
+        flow.dispatch.tensor.store %5, %1, offsets = [0, 0], sizes = [128, 384], strides = [1, 1] : tensor<128x384xf32> -> !flow.dispatch.tensor<writeonly:128x384xf32>
+        return
+      }
+    }
+  }
+}
+
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 128, 4]{{\]}}>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<LLVMGPUVectorize>
+//      CHECK: hal.executable.entry_point public @reduction_aligned2
+// CHECK-SAME:     translation_info = #[[TRANSLATION]]
+//      CHECK: linalg.fill
+// CHECK-SAME:   lowering_config = #[[CONFIG]]
+//      CHECK: linalg.generic
+// CHECK-SAME:   lowering_config = #[[CONFIG]]
+
+// -----
 
 #executable_layout = #hal.executable.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [

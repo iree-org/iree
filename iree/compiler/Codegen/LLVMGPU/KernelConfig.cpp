@@ -336,6 +336,12 @@ static LogicalResult setRootDefaultConfig(FuncOp entryPoint, Operation *op) {
         vectorSize = 1;
         break;
       }
+      // Since we vectorize along the most inner dimension, make sure if can be
+      // dividied by number of threads * vectorSize.
+      while (vectorSize > 1 &&
+             shape.back() % (workgroupSize[0] * vectorSize) != 0) {
+        vectorSize /= 2;
+      }
       int64_t problemSize = std::accumulate(
           shape.begin(), shape.end(), 1,
           [](const int64_t &a, const int64_t &b) { return a * b; });
