@@ -132,11 +132,6 @@ std::unique_ptr<OperationPass<FuncOp>> createInsertDistributionInfoPass();
 std::unique_ptr<OperationPass<FuncOp>>
 createTileAndDistributeToWorkgroupsPass();
 
-/// Pass to rewrite Linalg destructive updates, see DestructiveUpdateUtils.h for
-/// more details.
-std::unique_ptr<OperationPass<FuncOp>>
-createRewriteLinalgDestructiveUpdatesPass();
-
 /// Pass to propagate type to avoid generating load/stores of illegal types.
 std::unique_ptr<OperationPass<FuncOp>> createTypePropagationPass();
 
