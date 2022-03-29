@@ -213,7 +213,8 @@ static LogicalResult deallocateWorkgroupMemory(OpBuilder &b, Value buffer) {
 static void populatePromotionPatterns(MLIRContext *context,
                                       RewritePatternSet &patterns) {
   patterns.insert<linalg::LinalgPromotionPattern<linalg::MatmulOp>,
-                  linalg::LinalgPromotionPattern<linalg::BatchMatmulOp>>(
+                  linalg::LinalgPromotionPattern<linalg::BatchMatmulOp>,
+                  linalg::LinalgPromotionPattern<linalg::GenericOp>>(
       context,
       linalg::LinalgPromotionOptions()
           .setAllocationDeallocationFns(allocateWorkgroupMemory,
@@ -223,7 +224,13 @@ static void populatePromotionPatterns(MLIRContext *context,
           .setUseFullTileBuffers({false, false}),
       linalg::LinalgTransformationFilter(
           {StringAttr::get(context, getWorkgroupKTiledMarker())},
-          StringAttr::get(context, getWorkgroupMemoryMarker())));
+          StringAttr::get(context, getWorkgroupMemoryMarker()))
+          .addFilter([](Operation *op) {
+            auto linalgOp = dyn_cast<linalg::LinalgOp>(op);
+            if (!linalgOp) return failure();
+            return success(linalg::isaContractionOpInterface(op) &&
+                           linalgOp.getNumParallelLoops() >= 2);
+          }));
 }
 
 namespace {

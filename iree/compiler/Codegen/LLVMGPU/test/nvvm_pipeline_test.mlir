@@ -570,3 +570,66 @@ hal.executable @mma_fused {
 //   CHECKP-COUNT-4:   nvvm.wmma.load{{.*}} : (!llvm.ptr<f32, 3>) -> !llvm.struct<(i32, i32, i32, i32)
 //   CHECKP-COUNT-2:   nvvm.wmma.mma
 //   CHECKP-COUNT-1:   nvvm.wmma.store {{.*}} : !llvm.ptr<f32>, f32, f32, f32, f32, f32, f32, f32, f32
+
+// -----
+
+#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>,
+    #hal.descriptor_set.binding<2, storage_buffer>
+  ]>
+]>
+#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {target_arch = "sm_80"}>
+#map0 = affine_map<(d0, d1, d2, d3) -> (d1, d0, d3)>
+#map1 = affine_map<(d0, d1, d2, d3) -> (d0, d3, d2)>
+#map2 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
+#map3 = affine_map<(d0, d1, d2) -> (d0, d2)>
+#map4 = affine_map<(d0, d1, d2) -> (d2, d1)>
+#map5 = affine_map<(d0, d1, d2) -> (d0, d1)>
+#map6 = affine_map<(d0, d1, d2) -> (d2, d0, d1)>
+  hal.executable public @split_k_gemm {
+    hal.executable.variant public @cuda_nvptx_fb, target = #executable_target_cuda_nvptx_fb {
+      hal.executable.entry_point public @split_k_gemm ordinal(0) layout(#executable_layout)
+      builtin.module {
+        func @split_k_gemm() {
+          %cst = arith.constant 0.000000e+00 : f32
+          %c0 = arith.constant 0 : index
+          %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:2048x4x256xf32>
+          %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:4x256x512xf32>
+          %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<writeonly:4x2048x512xf32>
+          %3 = flow.dispatch.tensor.load %0, offsets = [0, 0, 0], sizes = [2048, 4, 256], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:2048x4x256xf32> -> tensor<2048x4x256xf32>
+          %4 = flow.dispatch.tensor.load %1, offsets = [0, 0, 0], sizes = [4, 256, 512], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:4x256x512xf32> -> tensor<4x256x512xf32>
+          %5 = linalg.init_tensor [4, 2048, 512] : tensor<4x2048x512xf32>
+          %6 = linalg.fill ins(%cst : f32) outs(%5 : tensor<4x2048x512xf32>) -> tensor<4x2048x512xf32>
+          %7 = linalg.generic {indexing_maps = [#map0, #map1, #map2],
+          iterator_types = ["parallel", "parallel", "parallel", "reduction"]}
+          ins(%3, %4 : tensor<2048x4x256xf32>, tensor<4x256x512xf32>)
+          outs(%6 : tensor<4x2048x512xf32>) {
+          ^bb0(%arg0: f32, %arg1: f32, %arg2: f32):
+            %8 = arith.mulf %arg0, %arg1 : f32
+            %9 = arith.addf %arg2, %8 : f32
+            linalg.yield %9 : f32
+          } -> tensor<4x2048x512xf32>
+          flow.dispatch.tensor.store %7, %2, offsets = [0, 0, 0], sizes = [4, 2048, 512], strides = [1, 1, 1] : tensor<4x2048x512xf32> -> !flow.dispatch.tensor<writeonly:4x2048x512xf32>
+          return
+        }
+      }
+    }
+  }
+//     CHECK-LABEL: hal.executable public @split_k_gemm
+//           CHECK:   hal.executable.variant public @cuda
+//       CHECK-NOT:   llvm.store
+//   CHECK-COUNT-2:   nvvm.cp.async.shared.global {{.*}}, {{.*}}, 16
+//           CHECK:   nvvm.cp.async.commit.group
+//           CHECK:   llvm.br
+//           CHECK:   nvvm.cp.async.wait.group 0
+//   CHECK-COUNT-4:   nvvm.wmma.load{{.*}} : (!llvm.ptr<f32, 3>) -> !llvm.struct<(i32, i32, i32, i32)
+//   CHECK-COUNT-2:   nvvm.wmma.mma
+//   CHECK-COUNT-2:   nvvm.cp.async.shared.global {{.*}}, {{.*}}, 16
+//           CHECK:   nvvm.cp.async.commit.group
+//           CHECK:   llvm.br
+//           CHECK:   nvvm.cp.async.wait.group 0
+//   CHECK-COUNT-4:   nvvm.wmma.load{{.*}} : (!llvm.ptr<f32, 3>) -> !llvm.struct<(i32, i32, i32, i32)
+//   CHECK-COUNT-2:   nvvm.wmma.mma
+//   CHECK-COUNT-1:   nvvm.wmma.store {{.*}} : !llvm.ptr<f32>, f32, f32, f32, f32, f32, f32, f32, f32
