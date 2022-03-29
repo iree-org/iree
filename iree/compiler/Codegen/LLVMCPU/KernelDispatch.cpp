@@ -318,8 +318,8 @@ static SmallVector<int64_t> getDefaultDistributedLevelTileSizes(
   return distributedLevelTileSizes;
 }
 
-/// Splits the tile sizes in parallelSizes into reductionSizes for the reduction
-/// loops.
+/// Splits the tile sizes in `parallelSizes` into `reductionSizes` for the
+/// reduction loops.
 static void splitParallelAndReductionTiles(
     linalg::LinalgOp op, SmallVectorImpl<int64_t> &parallelSizes,
     SmallVectorImpl<int64_t> &reductionSizes) {
@@ -573,7 +573,8 @@ static LogicalResult setRootConfig(
       entryPointFn, fftOp, tileSizes, DispatchLoweringPassPipeline::CPUDefault);
 }
 
-/// Sets the lowering configuration for a generic op to use DoubleTilingExpert.
+/// Sets the lowering configuration for a generic op to use
+/// CPUDoubleTilingExpert pipeline.
 static LogicalResult setRootConfig(
     FuncOp entryPointFn, linalg::GenericOp genericOp,
     ArrayRef<LoopTilingAndDistributionInfo> tiledLoops) {
@@ -648,7 +649,7 @@ static LogicalResult setConvRootConfig(
     return failure();
   }
 
-  // Use the default distribution for the matmul loops.
+  // Use the default distribution for the conv loops.
   unsigned numLoops = convOp.getNumLoops();
   SmallVector<int64_t> minTileSizes(numLoops, 1);
   SmallVector<int64_t> maxTileSizes(numLoops, defaultWorkgroupTileSize);
