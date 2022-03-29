@@ -104,7 +104,8 @@ LogicalResult verifyDoubleTilingExpertPassPipelineConfig(
            << kNumMaxParallelDims;
   }
 
-  if (loweringConfig.getTileSizes().size() != 3) {
+  if (loweringConfig.getTileSizes().size() !=
+      static_cast<unsigned>(StrategyTilingLevel::NumStrategyTileLevels)) {
     return op->emitOpError("expected three tiling sizes for ")
            << pipelineName << ", got " << loweringConfig.getTileSizes().size();
   }
@@ -113,7 +114,7 @@ LogicalResult verifyDoubleTilingExpertPassPipelineConfig(
       dyn_cast_or_null<IREE::Flow::PartitionableLoopsInterface>(op);
   if (interfaceOp) {
     SmallVector<int64_t> firstLevelTileSizes = loweringConfig.getTileSizeVals(
-        static_cast<unsigned>(TilingLevel::WorkGroupTiles));
+        static_cast<unsigned>(StrategyTilingLevel::WorkGroupTiles));
     // This is needed to fuse and distribute all ops together.
     if (firstLevelTileSizes.size() != interfaceOp.getNumLoops()) {
       return op->emitOpError(
@@ -224,7 +225,8 @@ void addDoubleTilingExpertPassPipeline(OpPassManager &passManager) {
   passManager.addNestedPass<FuncOp>(createInsertDistributionInfoPass());
   {
     LinalgFusePassOptions options;
-    options.tilingLevel = static_cast<int64_t>(TilingLevel::WorkGroupTiles);
+    options.tilingLevel =
+        static_cast<int64_t>(StrategyTilingLevel::WorkGroupTiles);
     options.doIREEDistribution = true;
     passManager.addNestedPass<FuncOp>(createLinalgFusePass(options));
     passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
@@ -297,7 +299,8 @@ void addConvTileAndDecomposeExpertPassPipeline(OpPassManager &passManager) {
   passManager.addNestedPass<FuncOp>(createInsertDistributionInfoPass());
   {
     LinalgFusePassOptions options;
-    options.tilingLevel = static_cast<int64_t>(TilingLevel::WorkGroupTiles);
+    options.tilingLevel =
+        static_cast<int64_t>(StrategyTilingLevel::WorkGroupTiles);
     options.doIREEDistribution = true;
     passManager.addNestedPass<FuncOp>(createLinalgFusePass(options));
     passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
