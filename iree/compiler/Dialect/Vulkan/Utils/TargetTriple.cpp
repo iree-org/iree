@@ -107,7 +107,7 @@ void getExtensions(const TargetTriple &triple,
   // Mobile GPUs need to take Android version into consideration.
   switch (triple.getArch()) {
     case TargetTripleArch::Apple_M1: {
-      // Example: https://vulkan.gpuinfo.org/displayreport.php?id=10312
+      // Example: https://vulkan.gpuinfo.org/displayreport.php?id=14673
       const std::array<Extension, 5> list = {
           Extension::VK_KHR_16bit_storage,
           Extension::VK_KHR_8bit_storage,
@@ -225,7 +225,7 @@ CapabilitiesAttr getCapabilities(const TargetTriple &triple,
       variablePointers = variablePointersStorageBuffer = true;
       break;
     case TargetTripleArch::Apple_M1:
-      // Example: https://vulkan.gpuinfo.org/displayreport.php?id=10312
+      // Example: https://vulkan.gpuinfo.org/displayreport.php?id=14673
       maxComputeSharedMemorySize = 32768;
       maxComputeWorkGroupInvocations = 1024;
       maxComputeWorkGroupSize = {1024, 1024, 1024};
