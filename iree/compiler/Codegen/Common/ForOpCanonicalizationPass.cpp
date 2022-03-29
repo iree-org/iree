@@ -58,14 +58,14 @@ struct CanonicalizeForOpInductionVarShape final
                      Operation* ivDef) const {
     if (auto shapeCast = dyn_cast<vector::ShapeCastOp>(ivUser)) {
       if (auto souceOp = dyn_cast<vector::ShapeCastOp>(ivDef)) {
-        if (shapeCast.getType() == souceOp.source().getType()) {
-          return souceOp.source();
+        if (shapeCast.getType() == souceOp.getSource().getType()) {
+          return souceOp.getSource();
         }
       }
     } else if (auto extractOp = dyn_cast<vector::ExtractOp>(ivUser)) {
       if (auto broadcastOp = dyn_cast<vector::BroadcastOp>(ivDef)) {
         if (extractOp.getType() == broadcastOp.getSourceType()) {
-          return broadcastOp.source();
+          return broadcastOp.getSource();
         }
       }
     } else if (auto targetOp = dyn_cast<UnrealizedConversionCastOp>(ivUser)) {
@@ -73,7 +73,7 @@ struct CanonicalizeForOpInductionVarShape final
         if (sourceOp->getNumOperands() == 1 && targetOp->getNumResults() == 1 &&
             sourceOp->getOperandTypes().front() ==
                 targetOp.getResultTypes().front()) {
-          return sourceOp.inputs().front();
+          return sourceOp.getInputs().front();
         }
       }
     }

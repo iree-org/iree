@@ -35,11 +35,11 @@ namespace {
 // iterator, say K, and the indexing maps are {{M, K}, {N, K}, {M, N}}.
 static bool isMatrixTimesMatrixTransposed(vector::ContractionOp contractionOp) {
   // Check that the reduction is additive.
-  if (contractionOp.kind() != vector::CombiningKind::ADD) {
+  if (contractionOp.getKind() != vector::CombiningKind::ADD) {
     return false;
   }
   // Check that there are 2 parallel and 1 reduction iterators.
-  auto iteratorTypes = contractionOp.iterator_types().getValue();
+  auto iteratorTypes = contractionOp.getIteratorTypes().getValue();
   if (iteratorTypes.size() != 3) {
     return false;
   }
@@ -62,7 +62,7 @@ static bool isMatrixTimesMatrixTransposed(vector::ContractionOp contractionOp) {
   const int NIter = parallelIterators[1];
   const int KIter = reductionIterators[0];
   // Check that there are 3 indexing maps.
-  auto indexingMaps = contractionOp.indexing_maps();
+  auto indexingMaps = contractionOp.getIndexingMaps();
   if (indexingMaps.size() != 3) {
     return false;
   }
@@ -114,8 +114,8 @@ static bool matchMMT(vector::ContractionOp contractionOp, int64_t mSize,
   if (!isMatrixTimesMatrixTransposed(contractionOp)) {
     return false;
   }
-  VectorType lhsType = contractionOp.lhs().getType().cast<VectorType>();
-  VectorType rhsType = contractionOp.rhs().getType().cast<VectorType>();
+  VectorType lhsType = contractionOp.getLhs().getType().cast<VectorType>();
+  VectorType rhsType = contractionOp.getRhs().getType().cast<VectorType>();
   auto lhsShape = lhsType.getShape();
   auto rhsShape = rhsType.getShape();
   if (lhsShape[1] != kSize || rhsShape[1] != kSize) {
@@ -931,14 +931,14 @@ class MMTCustomKernelPattern : public OpRewritePattern<vector::ContractionOp> {
     Type lhsElemType = generator.getLhsType();
     Type rhsElemType = generator.getRhsType();
     Type accElemType = generator.getAccType();
-    VectorType accType = contractionOp.acc().getType().cast<VectorType>();
+    VectorType accType = contractionOp.getAcc().getType().cast<VectorType>();
     if (accType.getElementType() != accElemType) {
       return failure();
     }
     Value unpromotedLhs =
-        getUnpromotedInput(lhsElemType, accElemType, contractionOp.lhs());
+        getUnpromotedInput(lhsElemType, accElemType, contractionOp.getLhs());
     Value unpromotedRhs =
-        getUnpromotedInput(rhsElemType, accElemType, contractionOp.rhs());
+        getUnpromotedInput(rhsElemType, accElemType, contractionOp.getRhs());
     if (!unpromotedLhs || !unpromotedRhs) {
       return failure();
     }
@@ -962,7 +962,7 @@ class MMTCustomKernelPattern : public OpRewritePattern<vector::ContractionOp> {
     // Flatten the inputs to 1D vectors.
     Value flatLhs = flatten(rewriter, loc, unpromotedLhs);
     Value flatRhs = flatten(rewriter, loc, unpromotedRhs);
-    Value flatAcc = flatten(rewriter, loc, contractionOp.acc());
+    Value flatAcc = flatten(rewriter, loc, contractionOp.getAcc());
     // Slice into SIMD-register-sized 1D input vectors ready to feed to the
     // target SIMD instructions.
     auto sliceIntoRegVectors = [&](int regsCount, VectorType regVectorType,
@@ -1037,9 +1037,9 @@ struct MMT_8x4x8_i8i8i32_Aarch64Dotprod_Intrinsics
     Type I8Type = rewriter.getIntegerType(8);
     Type I32Type = rewriter.getIntegerType(32);
 
-    auto acc = contractionOp.acc();
-    auto lhs = contractionOp.lhs();
-    auto rhs = contractionOp.rhs();
+    auto acc = contractionOp.getAcc();
+    auto lhs = contractionOp.getLhs();
+    auto rhs = contractionOp.getRhs();
     if (acc.getType().cast<VectorType>().getElementType() != I32Type) {
       return failure();
     }

@@ -42,8 +42,9 @@ struct CombineTransferReadOpBroadcast final
 
   LogicalResult matchAndRewrite(vector::BroadcastOp op,
                                 PatternRewriter &rewriter) const override {
-    auto transferReadOp = op.source().getDefiningOp<vector::TransferReadOp>();
-    if (!transferReadOp || transferReadOp.mask() ||
+    auto transferReadOp =
+        op.getSource().getDefiningOp<vector::TransferReadOp>();
+    if (!transferReadOp || transferReadOp.getMask() ||
         transferReadOp.hasOutOfBoundsDim()) {
       return failure();
     }
@@ -51,17 +52,18 @@ struct CombineTransferReadOpBroadcast final
         op.getVectorType().getRank() - transferReadOp.getVectorType().getRank();
     SmallVector<AffineExpr> exprs(rankDiff, rewriter.getAffineConstantExpr(0));
     ArrayRef<AffineExpr> originalExpr =
-        transferReadOp.permutation_map().getResults();
+        transferReadOp.getPermutationMap().getResults();
     exprs.append(originalExpr.begin(), originalExpr.end());
     AffineMap newMap =
-        AffineMap::get(transferReadOp.permutation_map().getNumDims(),
-                       transferReadOp.permutation_map().getNumSymbols(), exprs,
-                       op.getContext());
+        AffineMap::get(transferReadOp.getPermutationMap().getNumDims(),
+                       transferReadOp.getPermutationMap().getNumSymbols(),
+                       exprs, op.getContext());
     ArrayAttr inBounds = rewriter.getBoolArrayAttr(
         SmallVector<bool>(op.getVectorType().getRank(), true));
     rewriter.replaceOpWithNewOp<vector::TransferReadOp>(
-        op, op.getType(), transferReadOp.source(), transferReadOp.indices(),
-        newMap, transferReadOp.padding(), transferReadOp.mask(), inBounds);
+        op, op.getType(), transferReadOp.getSource(),
+        transferReadOp.getIndices(), newMap, transferReadOp.getPadding(),
+        transferReadOp.getMask(), inBounds);
     return success();
   }
 };
@@ -74,7 +76,8 @@ static Optional<SmallVector<int64_t, 4>> getGPUTCNativeVectorSize(
   int64_t n = 16;
   if (auto contract = dyn_cast<vector::ContractionOp>(op)) {
     int64_t k = contract.getLhsType().getElementType().isF16() ? 16 : 8;
-    SmallVector<int64_t, 4> nativeSize(contract.iterator_types().size() - 3, 1);
+    SmallVector<int64_t, 4> nativeSize(contract.getIteratorTypes().size() - 3,
+                                       1);
     nativeSize.append({m, n, k});
     return nativeSize;
   }
