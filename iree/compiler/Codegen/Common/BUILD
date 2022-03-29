@@ -51,6 +51,7 @@ cc_library(
         "OptimizeVectorTransferPass.cpp",
         "PolynomialApproximationPass.cpp",
         "RemoveTrivialLoops.cpp",
+        "RewriteLinalgDestructiveUpdatesPass.cpp",
         "SetNumWorkgroupsPass.cpp",
         "TileAndDistributeToWorkgroupsPass.cpp",
         "TypePropagationPass.cpp",

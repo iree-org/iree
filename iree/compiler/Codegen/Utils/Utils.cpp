@@ -537,5 +537,31 @@ Operation *createLinalgCopyOp(OpBuilder &b, Location loc, Value from, Value to,
       attributes);
 }
 
+template <typename OpTy>
+static Value buildHALWorkgroupInfoOp(OpBuilder &b, unsigned dim) {
+  return b.template create<OpTy>(b.getInsertionPoint()->getLoc(), dim);
+}
+
+linalg::LinalgLoopDistributionOptions getIREELinalgLoopDistributionOptions() {
+  return {
+      [](OpBuilder &builder, Location loc, ArrayRef<Range> parallelLoopRanges) {
+        auto numParallelDims = parallelLoopRanges.size();
+
+        SmallVector<linalg::ProcInfo, 3> procInfo(numParallelDims);
+        for (size_t dim = 0; dim < numParallelDims; ++dim) {
+          procInfo[numParallelDims - dim - 1] = {
+              buildHALWorkgroupInfoOp<IREE::HAL::InterfaceWorkgroupIDOp>(
+                  builder, dim),
+              buildHALWorkgroupInfoOp<IREE::HAL::InterfaceWorkgroupCountOp>(
+                  builder, dim)};
+        }
+        return procInfo;
+      },
+      {linalg::DistributionMethod::Cyclic, linalg::DistributionMethod::Cyclic,
+       linalg::DistributionMethod::Cyclic},
+      DenseMap<StringRef,
+               std::function<linalg::ProcInfo(OpBuilder &, Location)>>()};
+}
+
 }  // namespace iree_compiler
 }  // namespace mlir

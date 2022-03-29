@@ -105,6 +105,11 @@ def TileAndDistributeToWorkgroups :
   let constructor = "mlir::iree_compiler::createTileAndDistributeToWorkgroupsPass()";
 }
 
+def RewriteLinalgDestructiveUpdates :
+    Pass<"iree-codegen-rewrite-linalg-destructive-updates", "func::FuncOp"> {
+  let summary = "Rewrites Linalg destructive updates";
+  let constructor = "mlir::iree_compiler::createRewriteLinalgDestructiveUpdatesPass()";
+}
 def TypePropagation :
     Pass<"iree-codegen-type-propagation", "func::FuncOp"> {
   let summary = "Propogate the type of tensor to avoid load/stores of illegal bit widths";

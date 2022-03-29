@@ -1,9 +1,9 @@
 #compilation0 = #iree_codegen.compilation_info<
-    lowering_config = <tile_sizes = [[32, 32], [8, 8, 0], [0, 0, 8]]>,
+    lowering_config = <tile_sizes = [[32, 32, 0], [8, 8, 0], [0, 0, 8]]>,
     translation_info = <CPUDoubleTilingExpert>,
     workgroup_size = []>
 #compilation1 = #iree_codegen.compilation_info<
-    lowering_config = <tile_sizes = [[64, 64], [4, 4, 0], [0, 0, 4]]>,
+    lowering_config = <tile_sizes = [[64, 64, 0], [4, 4, 0], [0, 0, 4]]>,
     translation_info = <CPUDoubleTilingExpert>,
     workgroup_size = []>
 func @lowering_config_test() {
