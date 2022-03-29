@@ -13,7 +13,6 @@
 #include "llvm/ADT/Triple.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
-#include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/SCF/SCF.h"
 #include "mlir/IR/BuiltinOps.h"
 
@@ -150,10 +149,6 @@ SmallVector<LoopTilingAndDistributionInfo> getTiledAndDistributedLoopInfo(
 
 Operation *createLinalgCopyOp(OpBuilder &b, Location loc, Value from, Value to,
                               ArrayRef<NamedAttribute> attributes = {});
-
-/// Returns the option that distributes the ops using the flow workgroup
-/// ID/Count operations.
-linalg::LinalgLoopDistributionOptions getIREELinalgLoopDistributionOptions();
 }  // namespace iree_compiler
 }  // namespace mlir
 

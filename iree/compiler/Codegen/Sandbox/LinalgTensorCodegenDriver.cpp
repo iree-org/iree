@@ -112,7 +112,6 @@ struct LinalgFusePass : public LinalgFuseBase<LinalgFusePass> {
     this->vectorize = options.vectorize;
     this->vectorizePadding = options.vectorizePadding;
     this->tilingLevel = options.tilingLevel;
-    this->doIREEDistribution = options.doIREEDistribution;
   }
   void runOnOperation() override;
 };
@@ -217,10 +216,6 @@ void LinalgFusePass::runOnOperation() {
   }
   tilingOptions.tileInterchange = {tileInterchange.begin(),
                                    tileInterchange.end()};
-  if (doIREEDistribution) {
-    tilingOptions.setDistributionOptions(
-        ::mlir::iree_compiler::getIREELinalgLoopDistributionOptions());
-  }
 
   // Set up padding options.
   // TODO: Replace the lambdas by either functions defined in MLIR core or even
