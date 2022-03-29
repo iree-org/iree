@@ -288,8 +288,8 @@ func @dont_fuse_tensor_update_with_fill(
 }
 
 // CHECK: func @dont_fuse_tensor_update_with_fill
-// CHECK:   linalg.fill
-// CHECK:   flow.tensor.update
+// CHECK:   %[[SPLAT:.+]] = flow.tensor.splat
+// CHECK:   flow.tensor.update %{{.+}}, %[[SPLAT]]
 
 // -----
 
@@ -1221,3 +1221,77 @@ func @dont_fuse_tensor_insert_dest_producer(%arg0 : tensor<2x2xf32>) -> tensor<3
 //      CHECK:     tensor.insert_slice
 //      CHECK:     flow.return
 //      CHECK:   return %[[DISPATCH2]]
+
+// -----
+
+func @fill_op_alone(%arg0 : index, %arg1 : index) -> tensor<?x?xf32> {
+  %cst = arith.constant 42.0 : f32
+  %0 = linalg.init_tensor [%arg0, %arg1] : tensor<?x?xf32>
+  %1 = linalg.fill ins(%cst : f32) outs(%0 : tensor<?x?xf32>) -> tensor<?x?xf32>
+  return %1 : tensor<?x?xf32>
+}
+//      CHECK: func @fill_op_alone(
+// CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: index
+// CHECK-SAME:     %[[ARG1:[a-zA-Z0-9]+]]: index
+//      CHECK:   %[[SPLAT:.+]] = flow.tensor.splat %[[CST]] : tensor<?x?xf32>{%arg0, %arg1}
+//      CHECK:   return %[[SPLAT]]
+
+// -----
+
+// Reshapes cannot be fused until #8637 is fixed.
+func @dont_fuse_reshape(%lhs : tensor<?xf32>, %rhs1 : tensor<4x?xf32>, %rhs2 : tensor<4x?xf32>)
+  -> (tensor<?x?xf32>, tensor<?x?xf32>)
+{
+  %cst = arith.constant 0.0 : f32
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %0 = tensor.expand_shape %lhs [[0, 1]] : tensor<?xf32> into tensor<?x4xf32>
+  %m = tensor.dim %0, %c0 : tensor<?x4xf32>
+  %n1 = tensor.dim %rhs1, %c1 : tensor<4x?xf32>
+  %init1 = linalg.init_tensor [%m, %n1] : tensor<?x?xf32>
+  %fill1 = linalg.fill ins(%cst : f32) outs(%init1 : tensor<?x?xf32>) -> tensor<?x?xf32>
+  %1 = linalg.matmul
+    ins(%0, %rhs1 : tensor<?x4xf32>, tensor<4x?xf32>)
+    outs(%fill1 : tensor<?x?xf32>) -> tensor<?x?xf32>
+  %n2 = tensor.dim %rhs2, %c1 : tensor<4x?xf32>
+  %init2 = linalg.init_tensor [%m, %n2] : tensor<?x?xf32>
+  %fill2 = linalg.fill ins(%cst : f32) outs(%init2 : tensor<?x?xf32>) -> tensor<?x?xf32>
+  %2= linalg.matmul
+    ins(%0, %rhs2 : tensor<?x4xf32>, tensor<4x?xf32>)
+    outs(%fill2 : tensor<?x?xf32>) -> tensor<?x?xf32>
+  return %1, %2 : tensor<?x?xf32>, tensor<?x?xf32>
+}
+//      CHECK: func @dont_fuse_reshape(
+// CHECK-SAME:     %[[LHS:.+]]: tensor<?xf32>
+//  CHECK-DAG:   %[[RESHAPE:.+]] = flow.tensor.reshape %[[LHS]]
+//      CHECK:   %[[DISPATCH1:.+]] = flow.dispatch.workgroups
+// CHECK-SAME:       , %[[RESHAPE]]
+//  CHECK-NOT:     tensor.expand_shape
+//      CHECK:     linalg.fill
+//      CHECK:     linalg.matmul
+//      CHECK:     flow.return
+//      CHECK:   %[[DISPATCH2:.+]] = flow.dispatch.workgroups
+// CHECK-SAME:       , %[[RESHAPE]]
+//  CHECK-NOT:     tensor.expand_shape
+//      CHECK:     linalg.fill
+//      CHECK:     linalg.matmul
+//      CHECK:     flow.return
+//      CHECK:   return %[[DISPATCH1]], %[[DISPATCH2]]
+
+// -----
+
+func @concat_pattern(%src1 : tensor<2x40xf32>, %src2 : tensor<3x40xf32>,
+    %dest : tensor<5x40xf32>) -> tensor<5x40xf32> {
+  %0 = tensor.insert_slice %src1 into %dest[0, 0] [2, 40] [1, 1]
+      : tensor<2x40xf32> into tensor<5x40xf32>
+  %1 = tensor.insert_slice %src2 into %0[2, 0] [3, 40] [1, 1]
+      : tensor<3x40xf32> into tensor<5x40xf32>
+  return %1 : tensor<5x40xf32>
+}
+//      CHECK: func @concat_pattern
+// CHECK-SAME:     %[[SRC1:.+]]: tensor<2x40xf32>
+// CHECK-SAME:     %[[SRC2:.+]]: tensor<3x40xf32>
+// CHECK-SAME:     %[[DEST:.+]]: tensor<5x40xf32>
+//      CHECK:   %[[UPDATE1:.+]] = flow.tensor.update %[[SRC1]], %[[DEST]]
+//      CHECK:   %[[UPDATE2:.+]] = flow.tensor.update %[[SRC2]], %[[UPDATE1]]
+//      CHECK:   return %[[UPDATE2]]
