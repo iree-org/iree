@@ -48,6 +48,7 @@ iree_cc_library(
     "PadTensorToSubTensorInsert.cpp"
     "PassDetail.h"
     "Passes.cpp"
+    "SplitReduction.cpp"
     "StripAndSplatConstantVariables.cpp"
     "StripSignednessPass.cpp"
     "TestPartitionableLoopsInterface.cpp"

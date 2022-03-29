@@ -164,6 +164,9 @@ createOutlineLargeConstantsPass();
 std::unique_ptr<OperationPass<mlir::ModuleOp>>
 createDeduplicateExecutablesPass();
 
+// Create a pass to split reduction dimension.
+std::unique_ptr<Pass> createSplitReductionPass();
+
 //===----------------------------------------------------------------------===//
 // Module Analysis and Finalization
 //===----------------------------------------------------------------------===//

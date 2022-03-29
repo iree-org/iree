@@ -138,3 +138,30 @@ py_binary(
 ) for compilation_info in [
     "LLVMGPUMatmulSimt",
 ]]
+
+[iree_generated_trace_runner_test(
+    name = "e2e_matmul_direct_%s_large_split_k" % lhs_rhs_type,
+    compiler_flags = [
+        "-iree-flow-split-matmul-reduction=4",
+    ],
+    generator = ":generate_e2e_matmul_tests",
+    generator_args = [
+        "--lhs_rhs_type=%s" % lhs_rhs_type,
+        "--shapes=large",
+    ],
+    tags = [
+        # CUDA cuInit fails with sanitizer on.
+        "noasan",
+        "nomsan",
+        "notsan",
+        "noubsan",
+        "requires-gpu-nvidia",
+    ],
+    target_backends_and_drivers = [
+        ("cuda", "cuda"),
+        ("dylib-llvm-aot", "dylib"),
+    ],
+    trace_runner = "//iree/tools:iree-e2e-matmul-test",
+) for lhs_rhs_type in [
+    "f32",
+]]
