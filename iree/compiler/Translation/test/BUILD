@@ -31,6 +31,7 @@ iree_lit_test_suite(
     ),
     data = ["linalg_transform_spec.mlir"],
     tools = [
+        "//iree/tools:iree-check-module",
         "//iree/tools:iree-compile",
         "//iree/tools:iree-translate",
         "@llvm-project//llvm:FileCheck",

@@ -1,4 +1,6 @@
-// RUN: iree-compile %s -iree-mlir-to-vm-bytecode-module --iree-hal-target-backends=dylib-llvm-aot -iree-codegen-use-linalg-transform-interp -linalg-transform-file-name=%p/linalg_transform_spec.mlir | iree-check-module  --driver=dylib -
+// RUN: iree-compile %s -iree-mlir-to-vm-bytecode-module --iree-hal-target-backends=dylib-llvm-aot \
+// RUN:   -iree-codegen-use-linalg-transform-interp -linalg-transform-file-name=%p/linalg_transform_spec.mlir | \
+// RUN: iree-check-module  --driver=dylib -
 
 func @matmul_static() {
   %res = flow.tensor.constant dense<[
