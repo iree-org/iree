@@ -224,3 +224,12 @@ func @rank_reduced_slice() {
   }
   return
 }
+//      CHECK: func @rank_reduced_slice()
+//  CHECK-DAG:   %[[SRC_BINDING:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<1x40xf32>
+//  CHECK-DAG:   %[[DST_BINDING:.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<10xf32>
+//      CHECK:   scf.for %[[IV0:.+]] =
+//  CHECK-DAG:     %[[SRC_SUBVIEW:.+]] = memref.subview %[[SRC_BINDING]][0, %[[IV0]]] [1, 2] [1, 1] : memref<1x40xf32> to memref<2xf32
+//  CHECK-DAG:     %[[DST_SUBVIEW:.+]] = memref.subview %[[DST_BINDING]][%[[IV0]]] [2] [1] : memref<10xf32> to memref<2xf32
+//      CHECK:     linalg.generic
+// CHECK-SAME:         ins(%[[SRC_SUBVIEW]] :
+// CHECK-SAME:         outs(%[[DST_SUBVIEW]] :

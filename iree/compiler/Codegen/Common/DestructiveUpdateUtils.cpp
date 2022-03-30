@@ -194,7 +194,7 @@ static Value isADestructiveUpdatePattern(Value tensor,
 }
 
 /// Compute the offsets, sizes and strides for the Flow op from the Tensor op
-/// accounting for drooped dims.
+/// accounting for dropped dims.
 static void populateOffsetSizeAndStrides(
     IREE::Flow::DispatchTensorLoadOp flowOp, tensor::ExtractSliceOp sliceOp,
     SmallVector<OpFoldResult> &offsets, SmallVector<OpFoldResult> &sizes,
