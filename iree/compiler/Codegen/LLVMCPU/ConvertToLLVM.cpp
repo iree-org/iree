@@ -108,6 +108,8 @@ class HALDispatchABI {
   static LLVM::LLVMStructType getEnvironmentType(
       MLIRContext *context, LLVMTypeConverter *typeConverter,
       LLVM::LLVMStructType processorType) {
+    static llvm::sys::Mutex mutex;
+    llvm::sys::ScopedLock lock(mutex);
     auto structType = LLVM::LLVMStructType::getIdentified(
         context, "iree_hal_executable_environment_v0_t");
     if (structType.isInitialized()) return structType;
@@ -162,6 +164,8 @@ class HALDispatchABI {
   // Returns a Type representing iree_hal_executable_dispatch_state_v0_t.
   static LLVM::LLVMStructType getDispatchStateType(
       MLIRContext *context, LLVMTypeConverter *typeConverter) {
+    static llvm::sys::Mutex mutex;
+    llvm::sys::ScopedLock lock(mutex);
     auto structType = LLVM::LLVMStructType::getIdentified(
         context, "iree_hal_executable_dispatch_state_v0_t");
     if (structType.isInitialized()) return structType;
@@ -225,6 +229,8 @@ class HALDispatchABI {
   // Returns a Type representing iree_hal_executable_workgroup_state_v0_t.
   static LLVM::LLVMStructType getWorkgroupStateType(
       MLIRContext *context, LLVMTypeConverter *typeConverter) {
+    static llvm::sys::Mutex mutex;
+    llvm::sys::ScopedLock lock(mutex);
     auto structType = LLVM::LLVMStructType::getIdentified(
         context, "iree_hal_executable_workgroup_state_v0_t");
     if (structType.isInitialized()) return structType;
