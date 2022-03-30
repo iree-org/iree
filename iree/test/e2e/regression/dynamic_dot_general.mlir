@@ -6,7 +6,7 @@
 // testing dynamic shapes.
 
 // CHECK-LABEL: EXEC @basic_dot
-func @basic_dot(
+func.func @basic_dot(
   %lhs: tensor<?x?xf32>, %rhs: tensor<?x?xf32>,
   %unused0: tensor<?x?x?xf32>, %unused1: tensor<?x?x?xf32>) -> tensor<?x?xf32> {
   %0 = "mhlo.dot_general"(%lhs, %rhs) {dot_dimension_numbers={
@@ -21,7 +21,7 @@ func @basic_dot(
 // CHECK: 2x3xf32=[1 2 3][4 5 6]
 
 // CHECK-LABEL: EXEC @batch_dimension
-func @batch_dimension(
+func.func @batch_dimension(
   %unused0: tensor<?x?xf32>, %unused1: tensor<?x?xf32>,
   %lhs: tensor<?x?x?xf32>, %rhs: tensor<?x?x?xf32>) -> tensor<?x?x?xf32> {
   %0 = "mhlo.dot_general"(%lhs, %rhs) {dot_dimension_numbers={

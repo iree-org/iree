@@ -1,6 +1,6 @@
 // RUN: iree-opt %s -iree-codegen-cleanup-buffer-alloc-view -split-input-file | FileCheck %s
 
-func @alloc_remove(%arg0: index, %arg1: index) {
+func.func @alloc_remove(%arg0: index, %arg1: index) {
   %0 = memref.alloc(%arg0, %arg1) : memref<?x?xf32>
   return
 }
@@ -9,7 +9,7 @@ func @alloc_remove(%arg0: index, %arg1: index) {
 
 // -----
 
-func @alloc_keep(%arg0: index, %arg1: index) -> memref<?x?xf32> {
+func.func @alloc_keep(%arg0: index, %arg1: index) -> memref<?x?xf32> {
   %0 = memref.alloc(%arg0, %arg1) : memref<?x?xf32>
   return %0 : memref<?x?xf32>
 }

@@ -5,7 +5,7 @@ flow.executable @dispatch_ex {
   // CHECK: module {
   builtin.module {
     // CHECK: @dispatch0
-    func @dispatch0() {
+    func.func @dispatch0() {
       return
     }
   }

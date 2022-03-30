@@ -195,7 +195,8 @@ class WrapEntryPointsPass
   }
 
   // Populates attributes on |wrapperFuncOp| to support runtime reflection.
-  void populateReflectionAttrs(FuncOp entryFuncOp, FuncOp wrapperFuncOp) {
+  void populateReflectionAttrs(func::FuncOp entryFuncOp,
+                               func::FuncOp wrapperFuncOp) {
     SmallVector<NamedAttribute, 4> attrs;
     auto abiAttr = entryFuncOp->getAttr("iree.abi");
     if (abiAttr) {

@@ -1,4 +1,4 @@
-func @foo() {
+func.func @foo() {
   %input = util.unfoldable_constant dense<[
     [[01, 02, 03, 04, 05]],
     [[06, 07, 08, 09, 10]],
@@ -19,7 +19,7 @@ func @foo() {
   return
 }
 
-func @via_torch_index_select() {
+func.func @via_torch_index_select() {
   %input = util.unfoldable_constant dense<[
     [[01, 02, 03, 04, 05]],
     [[06, 07, 08, 09, 10]],
@@ -41,7 +41,7 @@ func @via_torch_index_select() {
 }
 
 
-func @general_but_just_index_select() {
+func.func @general_but_just_index_select() {
   %operand = util.unfoldable_constant dense<[[
     [ 0,  1,  2,  3,  4,  5,  6,  7],
     [ 8,  9, 10, 11, 12, 13, 14, 15],
@@ -78,7 +78,7 @@ func @general_but_just_index_select() {
   return
 }
 
-func @small_slices() {
+func.func @small_slices() {
   %operand = util.unfoldable_constant dense<[[
     [ 0,  1,  2,  3,  4,  5,  6,  7],
     [ 8,  9, 10, 11, 12, 13, 14, 15],
@@ -107,7 +107,7 @@ func @small_slices() {
   return
 }
 
-func @nonstandard_offset_dims() {
+func.func @nonstandard_offset_dims() {
   %operand = util.unfoldable_constant dense<[[
     [ 0,  1,  2,  3,  4,  5,  6,  7],
     [ 8,  9, 10, 11, 12, 13, 14, 15],
@@ -138,7 +138,7 @@ func @nonstandard_offset_dims() {
   return
 }
 
-func @reordered_start_index() {
+func.func @reordered_start_index() {
   %operand = util.unfoldable_constant dense<[[
     [[ 0,  1,  2,  3],
      [ 4,  5,  6,  7]],

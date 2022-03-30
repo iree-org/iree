@@ -47,7 +47,7 @@ hal.executable private @dispatch_2 {
     }
   }
 }
-func @basic_linking() -> () {
+func.func @basic_linking() -> () {
   %device = hal.ex.shared_device : !hal.device
   %cmd = hal.command_buffer.create device(%device : !hal.device) mode("OneShot") categories("Transfer|Dispatch") : !hal.command_buffer
   %c1 = arith.constant 1 : index

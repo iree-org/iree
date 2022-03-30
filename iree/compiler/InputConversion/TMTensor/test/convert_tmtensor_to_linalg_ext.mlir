@@ -1,7 +1,7 @@
 // RUN: iree-opt -split-input-file --iree-tmtensor-to-linalg-ext %s | FileCheck %s
 
 // -----
-func @scan(%in: tensor<128xi32>, %out: tensor<128xi32>, %acc: tensor<i32>) -> (tensor<128xi32>, tensor<i32>) {
+func.func @scan(%in: tensor<128xi32>, %out: tensor<128xi32>, %acc: tensor<i32>) -> (tensor<128xi32>, tensor<i32>) {
   %ret_out, %ret_acc = tm_tensor.scan dimension(0) inclusive(true)
     ins(%in : tensor<128xi32>) outs(%out, %acc: tensor<128xi32>, tensor<i32>) {
     ^bb0(%arg0 : i32, %arg1 : i32):
@@ -25,7 +25,7 @@ func @scan(%in: tensor<128xi32>, %out: tensor<128xi32>, %acc: tensor<i32>) -> (t
 // CHECK:           return %[[SCAN:.*]]#0, %[[SCAN]]#1 : tensor<128xi32>, tensor<i32>
 
 // -----
-func @scatter_update(
+func.func @scatter_update(
     %original: tensor<8xi32>, %indices: tensor<3x1xi32>,
     %updates: tensor<3xi32>) -> tensor<8xi32> {
   %0 = tm_tensor.scatter unique_indices(true)
@@ -50,7 +50,7 @@ func @scatter_update(
 // CHECK:           return %[[SCATTER:.*]] : tensor<8xi32>
 
 // -----
-func @scatter_add(
+func.func @scatter_add(
     %original: tensor<8xi32>, %indices: tensor<3x1xi32>,
     %updates: tensor<3xi32>) -> tensor<8xi32> {
   %0 = tm_tensor.scatter unique_indices(true)

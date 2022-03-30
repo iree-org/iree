@@ -2,6 +2,6 @@
 
 // TODO(#7277): add new streams->hal conversion tests.
 // CHECK: @todo
-func @todo() {
+func.func @todo() {
   return
 }

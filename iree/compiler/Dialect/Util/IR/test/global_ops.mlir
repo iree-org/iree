@@ -37,13 +37,13 @@ util.initializer {
   util.global.store %0, @v_initialized : tensor<4xi32>
   util.initializer.return
 }
-func private @initializer() -> tensor<4xi32>
+func.func private @initializer() -> tensor<4xi32>
 
 // -----
 
 util.global private @v_loaded : tensor<4xi32>
 // CHECK-LABEL: @loaded
-func @loaded() {
+func.func @loaded() {
   // CHECK-NEXT: = util.global.load @v_loaded : tensor<4xi32>
   %0 = util.global.load @v_loaded : tensor<4xi32>
   return
@@ -53,7 +53,7 @@ func @loaded() {
 
 util.global private mutable @v_stored : tensor<4xi32>
 // CHECK-LABEL: @stored
-func @stored() {
+func.func @stored() {
   // CHECK-NEXT: %[[VAL:.+]] = arith.constant
   %cst = arith.constant dense<5> : tensor<4xi32>
   // CHECK-NEXT: util.global.store %[[VAL]], @v_stored : tensor<4xi32>
@@ -65,7 +65,7 @@ func @stored() {
 
 util.global private @v_loaded : tensor<4xf32>
 // CHECK-LABEL: @loaded_indirect
-func @loaded_indirect() {
+func.func @loaded_indirect() {
   // CHECK-NEXT: %[[ADDR:.+]] = util.global.address @v_loaded
   %0 = util.global.address @v_loaded : !util.ptr<tensor<4xf32>>
   // CHECK-NEXT: = util.global.load.indirect %[[ADDR]]
@@ -78,7 +78,7 @@ func @loaded_indirect() {
 util.global private mutable @v_stored : tensor<4xf32>
 // CHECK-LABEL: @stored_indirect
 // CHECK-SAME: (%[[VALUE:.+]]: tensor<4xf32>)
-func @stored_indirect(%arg0: tensor<4xf32>) {
+func.func @stored_indirect(%arg0: tensor<4xf32>) {
   // CHECK-NEXT: %[[ADDR:.+]] = util.global.address @v_stored
   %0 = util.global.address @v_stored : !util.ptr<tensor<4xf32>>
   // CHECK-NEXT: util.global.store.indirect %[[VALUE]], %[[ADDR]]

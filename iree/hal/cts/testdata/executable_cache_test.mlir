@@ -1,6 +1,6 @@
 // Bootstrapped from this source IR:
 //
-// func @abs(%input : tensor<f32>) -> (tensor<f32>) {
+// func.func @abs(%input : tensor<f32>) -> (tensor<f32>) {
 //   %result = math.abs %input : tensor<f32>
 //   return %result : tensor<f32>
 // }
@@ -16,7 +16,7 @@ hal.executable.source public @executable {
   hal.executable.entry_point public @abs layout(#executable_layout)
 
   builtin.module {
-    func @abs() {
+    func.func @abs() {
       %c0 = arith.constant 0 : index
 
       %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(32) : !flow.dispatch.tensor<readonly:f32>

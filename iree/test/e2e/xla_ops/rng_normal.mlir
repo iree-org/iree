@@ -1,4 +1,4 @@
-func @rng_normal_2d() {
+func.func @rng_normal_2d() {
   %mu = util.unfoldable_constant dense<0.0> : tensor<f32>
   %sigma = util.unfoldable_constant dense<1.0> : tensor<f32>
   %shape = util.unfoldable_constant dense<[3, 5]>  : tensor<2xi64>

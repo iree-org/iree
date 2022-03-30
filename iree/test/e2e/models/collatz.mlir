@@ -2,7 +2,7 @@
 // RUN: [[ $IREE_VULKAN_DISABLE == 1 ]] || (iree-run-mlir --iree-input-type=mhlo %s -iree-hal-target-backends=vulkan-spirv | FileCheck %s)
 
 // CHECK-LABEL: EXEC @collatz
-func @collatz() -> tensor<f32> {
+func.func @collatz() -> tensor<f32> {
   %arg0 = util.unfoldable_constant dense<178.0> : tensor<f32>
   %0 = mhlo.constant dense<1.0> : tensor<f32>
   %1 = mhlo.constant dense<3.0> : tensor<f32>

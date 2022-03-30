@@ -1,6 +1,6 @@
 // RUN: iree-opt %s --iree-codegen-iree-comprehensive-bufferize -canonicalize -cse -canonicalize -split-input-file | FileCheck %s
 
-func @matmul() {
+func.func @matmul() {
   %c0 = arith.constant 0 : index
   %m = hal.interface.constant.load[0] : index
   %n = hal.interface.constant.load[1] : index
@@ -73,7 +73,7 @@ func @matmul() {
 
 // -----
 
-func @matmul_fill() {
+func.func @matmul_fill() {
   %cst = arith.constant 0.0 : f32
   %c0 = arith.constant 0 : index
   %m = hal.interface.constant.load[0] : index
@@ -145,7 +145,7 @@ func @matmul_fill() {
 
 // -----
 
-func @elementwise() {
+func.func @elementwise() {
   %c4 = arith.constant 4 : index
   %c0 = arith.constant 0 : index
   %cst = arith.constant opaque<"elided_large_const", "0xDEADBEEF"> : tensor<1x10xf32>
@@ -204,7 +204,7 @@ func @elementwise() {
 
 #map0 = affine_map<()[s0] -> (s0 * 2)>
 #map1 = affine_map<(d0) -> (d0)>
-func @rank_reduced_slice() {
+func.func @rank_reduced_slice() {
   %c10 = arith.constant 10 : index
   %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<readonly:1x40xf32>
   %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : !flow.dispatch.tensor<writeonly:10xf32>

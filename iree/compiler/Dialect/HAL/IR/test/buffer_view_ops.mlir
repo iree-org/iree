@@ -1,7 +1,7 @@
 // RUN: iree-opt -split-input-file %s | iree-opt -allow-unregistered-dialect -split-input-file | FileCheck %s
 
 // CHECK-LABEL: @buffer_view_create
-func @buffer_view_create(%arg0: !hal.buffer, %arg1: index, %arg2: index) -> !hal.buffer_view {
+func.func @buffer_view_create(%arg0: !hal.buffer, %arg1: index, %arg2: index) -> !hal.buffer_view {
   %c1 = arith.constant 1 : i32
   %c32 = arith.constant 32 : i32
   // CHECK: %view = hal.buffer_view.create
@@ -19,7 +19,7 @@ func @buffer_view_create(%arg0: !hal.buffer, %arg1: index, %arg2: index) -> !hal
 // -----
 
 // CHECK-LABEL: @buffer_view_buffer
-func @buffer_view_buffer(%arg0: !hal.buffer_view) -> !hal.buffer {
+func.func @buffer_view_buffer(%arg0: !hal.buffer_view) -> !hal.buffer {
   // CHECK: %buffer = hal.buffer_view.buffer<%arg0 : !hal.buffer_view> : !hal.buffer
   %buffer = hal.buffer_view.buffer<%arg0 : !hal.buffer_view> : !hal.buffer
   return %buffer : !hal.buffer
@@ -28,7 +28,7 @@ func @buffer_view_buffer(%arg0: !hal.buffer_view) -> !hal.buffer {
 // -----
 
 // CHECK-LABEL: @buffer_view_byte_length
-func @buffer_view_byte_length(%arg0: !hal.buffer_view) -> index {
+func.func @buffer_view_byte_length(%arg0: !hal.buffer_view) -> index {
   // CHECK: %len = hal.buffer_view.byte_length<%arg0 : !hal.buffer_view> : index
   %len = hal.buffer_view.byte_length<%arg0 : !hal.buffer_view> : index
   return %len : index
@@ -37,7 +37,7 @@ func @buffer_view_byte_length(%arg0: !hal.buffer_view) -> index {
 // -----
 
 // CHECK-LABEL: @buffer_view_shape_queries
-func @buffer_view_shape_queries(%arg0: !hal.buffer_view) -> (index, index, index, index) {
+func.func @buffer_view_shape_queries(%arg0: !hal.buffer_view) -> (index, index, index, index) {
   // CHECK: %{{.+}} = hal.buffer_view.rank<%arg0 : !hal.buffer_view> : index
   %0 = hal.buffer_view.rank<%arg0 : !hal.buffer_view> : index
   // CHECK: %{{.+}} = hal.buffer_view.dim<%arg0 : !hal.buffer_view>[0] : index

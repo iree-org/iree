@@ -247,7 +247,7 @@ builtin.module @globals {
 // CHECK-LABEL: module @global_load
 builtin.module @global_load {
   iree_input.global private @v_loaded : tensor<4xi32>
-  func @loaded() {
+  func.func @loaded() {
     // CHECK: util.global.load @v_loaded : tensor<4xi32>
     %0 = iree_input.global.load @v_loaded : tensor<4xi32>
     return
@@ -258,7 +258,7 @@ builtin.module @global_load {
 // CHECK-LABEL: module @global_store
 builtin.module @global_store {
   iree_input.global private mutable @v_stored : tensor<4xi32>
-  func @stored() {
+  func.func @stored() {
     // CHECK: %[[CST:.*]] = arith.constant
     %cst = arith.constant dense<5> : tensor<4xi32>
     // CHECK: util.global.store %[[CST]], @v_stored : tensor<4xi32>
@@ -271,7 +271,7 @@ builtin.module @global_store {
 // CHECK-LABEL: module @global_load_indirect
 builtin.module @global_load_indirect {
   iree_input.global private @v_loaded : tensor<4xf32>
-  func @loaded_indirect() {
+  func.func @loaded_indirect() {
     // CHECK: %[[ADDR:.*]] = util.global.address @v_loaded : !util.ptr<tensor<4xf32>>
     %0 = iree_input.global.address @v_loaded : !iree_input.ptr<tensor<4xf32>>
     // CHECK: util.global.load.indirect %[[ADDR]] : !util.ptr<tensor<4xf32>> -> tensor<4xf32>
@@ -284,7 +284,7 @@ builtin.module @global_load_indirect {
 // CHECK-LABEL: module @global_store_indirect
 builtin.module @global_store_indirect {
   iree_input.global private mutable @v_stored : tensor<4xf32>
-  func @stored_indirect(%arg0: tensor<4xf32>) {
+  func.func @stored_indirect(%arg0: tensor<4xf32>) {
     // CHECK: %[[ADDR:.*]] = util.global.address @v_stored : !util.ptr<tensor<4xf32>>
     %0 = iree_input.global.address @v_stored : !iree_input.ptr<tensor<4xf32>>
     // CHECK: util.global.store.indirect %arg0, %ptr_v_stored : tensor<4xf32> -> !util.ptr<tensor<4xf32>>

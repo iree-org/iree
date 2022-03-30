@@ -3,7 +3,7 @@
 // RUN: (iree-compile --iree-hal-target-backends=dylib-llvm-aot -iree-mlir-to-vm-bytecode-module %s | iree-run-module --driver=dylib --entry_function=abs --function_input=f32=-2) | FileCheck %s
 
 // CHECK-LABEL: EXEC @abs
-func @abs(%input : tensor<f32>) -> (tensor<f32>) {
+func.func @abs(%input : tensor<f32>) -> (tensor<f32>) {
   %result = math.abs %input : tensor<f32>
   return %result : tensor<f32>
 }

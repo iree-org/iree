@@ -1,7 +1,7 @@
 // RUN: iree-opt %s -allow-unregistered-dialect -iree-llvmgpu-vector-to-gpu -canonicalize -split-input-file | FileCheck %s
 
 // CHECK-LABEL: func @copies_to_asyncs
-func @copies_to_asyncs(%a: memref<1024x1024xf32>) {
+func.func @copies_to_asyncs(%a: memref<1024x1024xf32>) {
   %0 = memref.alloc() : memref<4x32x16xf32, 3>
   %c0 = arith.constant 0 : index
   %c4 = arith.constant 4 : index
@@ -21,7 +21,7 @@ func @copies_to_asyncs(%a: memref<1024x1024xf32>) {
 
 // -----
 
-func @ksplitmatmul_basic(%a: memref<128x16x256xf32>) -> vector<16x1x8xf32> {
+func.func @ksplitmatmul_basic(%a: memref<128x16x256xf32>) -> vector<16x1x8xf32> {
   %cst = arith.constant 0.000000e+00 : f32
   %c2 = arith.constant 2 : index
   %c3 = arith.constant 3 : index
@@ -44,7 +44,7 @@ func @ksplitmatmul_basic(%a: memref<128x16x256xf32>) -> vector<16x1x8xf32> {
 
 // -----
 
-func @ksplitmatmul_nounitdim(%a: memref<128x16x256xf32>) -> vector<16x2x8xf32> {
+func.func @ksplitmatmul_nounitdim(%a: memref<128x16x256xf32>) -> vector<16x2x8xf32> {
   %cst = arith.constant 0.000000e+00 : f32
   %c2 = arith.constant 2 : index
   %c3 = arith.constant 3 : index
@@ -63,7 +63,7 @@ func @ksplitmatmul_nounitdim(%a: memref<128x16x256xf32>) -> vector<16x2x8xf32> {
 
 // -----
 
-func @ksplitmatmul_4D(%a: memref<128x16x32x256xf32>) -> vector<16x1x1x8xf32> {
+func.func @ksplitmatmul_4D(%a: memref<128x16x32x256xf32>) -> vector<16x1x1x8xf32> {
   %cst = arith.constant 0.000000e+00 : f32
   %c2 = arith.constant 2 : index
   %c3 = arith.constant 3 : index
@@ -87,7 +87,7 @@ func @ksplitmatmul_4D(%a: memref<128x16x32x256xf32>) -> vector<16x1x1x8xf32> {
 
 // -----
 
-func @ksplitmatmul_4D_lower_rank_read(%a: memref<128x512x32x256xf32>) -> vector<16x1x8xf32> {
+func.func @ksplitmatmul_4D_lower_rank_read(%a: memref<128x512x32x256xf32>) -> vector<16x1x8xf32> {
   %cst = arith.constant 0.000000e+00 : f32
   %c2 = arith.constant 2 : index
   %c3 = arith.constant 3 : index
@@ -111,7 +111,7 @@ func @ksplitmatmul_4D_lower_rank_read(%a: memref<128x512x32x256xf32>) -> vector<
 
 // -----
 
-func @ksplitmatmul_4D_negative(%a: memref<128x16x32x256xf32>) -> vector<16x1x8x1xf32> {
+func.func @ksplitmatmul_4D_negative(%a: memref<128x16x32x256xf32>) -> vector<16x1x8x1xf32> {
   %cst = arith.constant 0.000000e+00 : f32
   %c2 = arith.constant 2 : index
   %c3 = arith.constant 3 : index
@@ -133,7 +133,7 @@ func @ksplitmatmul_4D_negative(%a: memref<128x16x32x256xf32>) -> vector<16x1x8x1
 
 // -----
 
-func @ksplitmatmul_4D_allone(%a: memref<128x16x32x256xf32>) -> vector<1x1x1x1xf32> {
+func.func @ksplitmatmul_4D_allone(%a: memref<128x16x32x256xf32>) -> vector<1x1x1x1xf32> {
   %cst = arith.constant 0.000000e+00 : f32
   %c2 = arith.constant 2 : index
   %c3 = arith.constant 3 : index

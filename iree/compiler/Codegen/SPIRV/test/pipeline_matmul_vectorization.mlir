@@ -17,7 +17,7 @@ hal.executable private @fuse_and_vectorize_fill_matmul {
     }> {
     hal.executable.entry_point @fuse_and_vectorize_fill_matmul layout(#executable_layout)
     builtin.module {
-      func @fuse_and_vectorize_fill_matmul() {
+      func.func @fuse_and_vectorize_fill_matmul() {
         %c0 = arith.constant 0 : index
         %cst = arith.constant 0.000000e+00 : f32
         %c4096 = arith.constant 4096 : index
@@ -64,7 +64,7 @@ hal.executable private @fuse_and_vectorize_matmul_add {
     }> {
     hal.executable.entry_point @fuse_and_vectorize_matmul_add layout(#executable_layout)
     builtin.module {
-      func @fuse_and_vectorize_matmul_add() {
+      func.func @fuse_and_vectorize_matmul_add() {
         %c0 = arith.constant 0 : index
         %cst = arith.constant 0.000000e+00 : f32
         %c1024 = arith.constant 1024 : index

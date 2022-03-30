@@ -1,6 +1,6 @@
 // RUN: iree-opt -split-input-file -iree-codegen-flatten-memref-subspan -canonicalize %s | FileCheck %s
 
-func @load_subspan_with_offset(%offset : index, %i0: index, %i1: index, %i2: index) -> f32 {
+func.func @load_subspan_with_offset(%offset : index, %i0: index, %i1: index, %i2: index) -> f32 {
   %subspan = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%offset) : memref<6x7x8xf32>
   %val = memref.load %subspan[%i0, %i1, %i2] : memref<6x7x8xf32>
   return %val: f32
@@ -18,7 +18,7 @@ func @load_subspan_with_offset(%offset : index, %i0: index, %i1: index, %i2: ind
 
 // -----
 
-func @store_subspan_with_offset(%value: f32, %offset : index, %i0: index, %i1: index, %i2: index) {
+func.func @store_subspan_with_offset(%value: f32, %offset : index, %i0: index, %i1: index, %i2: index) {
   %subspan = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%offset) : memref<2x3x4xf32>
   memref.store %value, %subspan[%i0, %i1, %i2] : memref<2x3x4xf32>
   return
@@ -35,7 +35,7 @@ func @store_subspan_with_offset(%value: f32, %offset : index, %i0: index, %i1: i
 
 // -----
 
-func @load_subspan_with_vector_element(%offset : index, %i0: index, %i1: index, %i2: index) -> vector<4xf32> {
+func.func @load_subspan_with_vector_element(%offset : index, %i0: index, %i1: index, %i2: index) -> vector<4xf32> {
   %subspan = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%offset) : memref<6x7x8xvector<4xf32>>
   %val = memref.load %subspan[%i0, %i1, %i2] : memref<6x7x8xvector<4xf32>>
   return %val: vector<4xf32>
@@ -47,7 +47,7 @@ func @load_subspan_with_vector_element(%offset : index, %i0: index, %i1: index, 
 
 // -----
 
-func @load_subspan_with_16bit_element(%offset : index, %i0: index, %i1: index, %i2: index) -> f16 {
+func.func @load_subspan_with_16bit_element(%offset : index, %i0: index, %i1: index, %i2: index) -> f16 {
   %subspan = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%offset) : memref<6x7x8xf16>
   %val = memref.load %subspan[%i0, %i1, %i2] : memref<6x7x8xf16>
   return %val: f16
@@ -59,7 +59,7 @@ func @load_subspan_with_16bit_element(%offset : index, %i0: index, %i1: index, %
 
 // -----
 
-func @store_subspan_with_leading_dynamic_dim(%value: f32, %offset : index, %i0: index, %i1: index, %i2: index) {
+func.func @store_subspan_with_leading_dynamic_dim(%value: f32, %offset : index, %i0: index, %i1: index, %i2: index) {
   %dim = hal.interface.constant.load[0] : index
   %subspan = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%offset) : memref<?x3x4xf32>{%dim}
   memref.store %value, %subspan[%i0, %i1, %i2] : memref<?x3x4xf32>
@@ -79,7 +79,7 @@ func @store_subspan_with_leading_dynamic_dim(%value: f32, %offset : index, %i0: 
 
 // -----
 
-func @store_subspan_with_all_dynamic_dim(%value: f32, %offset : index, %i0: index, %i1: index, %i2: index, %i3: index) {
+func.func @store_subspan_with_all_dynamic_dim(%value: f32, %offset : index, %i0: index, %i1: index, %i2: index, %i3: index) {
   %dim0 = hal.interface.constant.load[0] : index
   %dim1 = hal.interface.constant.load[1] : index
   %dim2 = hal.interface.constant.load[2] : index
@@ -105,7 +105,7 @@ func @store_subspan_with_all_dynamic_dim(%value: f32, %offset : index, %i0: inde
 
 // -----
 
-func @store_subspan_with_mixed_dynamic_dim(%value: f32, %offset : index, %i0: index, %i1: index, %i2: index, %i3: index) {
+func.func @store_subspan_with_mixed_dynamic_dim(%value: f32, %offset : index, %i0: index, %i1: index, %i2: index, %i3: index) {
   %dim0 = hal.interface.constant.load[0] : index
   %dim1 = hal.interface.constant.load[1] : index
   %subspan = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%offset) : memref<?x4x?x8xf32>{%dim0, %dim1}
@@ -127,7 +127,7 @@ func @store_subspan_with_mixed_dynamic_dim(%value: f32, %offset : index, %i0: in
 
 // -----
 
-func @store_subspan_with_flow_control(%value: f32, %offset : index, %i0: index, %i1: index, %i2: index) {
+func.func @store_subspan_with_flow_control(%value: f32, %offset : index, %i0: index, %i1: index, %i2: index) {
   %dim = hal.interface.constant.load[0] : index
   %subspan = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%offset) : memref<?x3x4xf32>{%dim}
   scf.for %i = %i0 to %i1 step %i2 {
@@ -150,7 +150,7 @@ func @store_subspan_with_flow_control(%value: f32, %offset : index, %i0: index, 
 
 // -----
 
-func @load_store_alloc_static(%value : f32, %i0: index, %i1 : index, %i2: index) -> f32 {
+func.func @load_store_alloc_static(%value : f32, %i0: index, %i1 : index, %i2: index) -> f32 {
   %alloc = memref.alloc() : memref<2x3x4xf32, 3>
   memref.store %value, %alloc[%i0, %i1, %i2] : memref<2x3x4xf32, 3>
   %val = memref.load %alloc[%i0, %i1, %i2] : memref<2x3x4xf32, 3>
@@ -169,7 +169,7 @@ func @load_store_alloc_static(%value : f32, %i0: index, %i1 : index, %i2: index)
 
 // -----
 
-func @load_store_alloca_dynamic(%value : f32, %dim0 : index, %dim1: index, %dim2: index, %i0: index, %i1 : index, %i2: index) -> f32 {
+func.func @load_store_alloca_dynamic(%value : f32, %dim0 : index, %dim1: index, %dim2: index, %i0: index, %i1 : index, %i2: index) -> f32 {
   %alloc = memref.alloca(%dim0, %dim1, %dim2) : memref<?x?x?xf32>
   memref.store %value, %alloc[%i0, %i1, %i2] : memref<?x?x?xf32>
   %val = memref.load %alloc[%i0, %i1, %i2] : memref<?x?x?xf32>
@@ -191,7 +191,7 @@ func @load_store_alloca_dynamic(%value : f32, %dim0 : index, %dim1: index, %dim2
 
 // -----
 
-func @use_subspan_with_unrealized_conversion_cast(%offset : index, %i: index) -> f32 {
+func.func @use_subspan_with_unrealized_conversion_cast(%offset : index, %i: index) -> f32 {
   %subspan = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%offset) : memref<6x7x8xf32>
   %use = builtin.unrealized_conversion_cast %subspan : memref<6x7x8xf32> to memref<?xf32>
   %val = memref.load %use[%i] : memref<?xf32>
@@ -209,7 +209,7 @@ func @use_subspan_with_unrealized_conversion_cast(%offset : index, %i: index) ->
 // -----
 
 memref.global "private" constant @constant_3x3x1x1xf32 : memref<3x3x1x1xf32> = dense<[[[[-1.000000e+00]], [[0.000000e+00]], [[1.000000e+00]]], [[[-2.000000e+00]], [[0.000000e+00]], [[2.000000e+00]]], [[[-1.000000e+00]], [[0.000000e+00]], [[1.000000e+00]]]]>
-func @load_global_with_offset(%i0: index, %i1: index, %i2: index, %i3: index) -> f32 {
+func.func @load_global_with_offset(%i0: index, %i1: index, %i2: index, %i3: index) -> f32 {
   %global = memref.get_global @constant_3x3x1x1xf32 : memref<3x3x1x1xf32>
   %val = memref.load %global[%i0, %i1, %i2, %i3] : memref<3x3x1x1xf32>
   return %val: f32
@@ -226,7 +226,7 @@ func @load_global_with_offset(%i0: index, %i1: index, %i2: index, %i3: index) ->
 
 // -----
 
-func @transfer_read_subspan_with_offset(
+func.func @transfer_read_subspan_with_offset(
     %arg0 : index, %arg1: index, %arg2: index, %arg3: index) -> vector<4xf32> {
   %subspan = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%arg0) : memref<6x7x8xf32>
   %cst = arith.constant 0.0 : f32
@@ -247,7 +247,7 @@ func @transfer_read_subspan_with_offset(
 
 // -----
 
-func @transfer_write_subspan_with_offset(
+func.func @transfer_write_subspan_with_offset(
     %arg0 : index, %arg1: index, %arg2: index, %arg3: index, %arg4 : vector<4xf32>) {
   %subspan = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%arg0) : memref<6x7x8xf32>
   vector.transfer_write %arg4, %subspan[%arg1, %arg2, %arg3] {in_bounds = [true]} :  vector<4xf32>, memref<6x7x8xf32>
@@ -267,7 +267,7 @@ func @transfer_write_subspan_with_offset(
 
 // -----
 
-func @load_store_rank_zero_subspan_with_offset(%offset : index) {
+func.func @load_store_rank_zero_subspan_with_offset(%offset : index) {
   %subspan0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%offset) : memref<f32>
   %subspan1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%offset) : memref<f32>
   %val = memref.load %subspan0[] : memref<f32>
@@ -289,7 +289,7 @@ func @load_store_rank_zero_subspan_with_offset(%offset : index) {
 
 // -----
 
-func @collapse_shape(%offset : index, %i0 : index, %i1 : index) -> f32 {
+func.func @collapse_shape(%offset : index, %i0 : index, %i1 : index) -> f32 {
   %subspan = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%offset) : memref<4x5x6x7xf32>
   %collapse = memref.collapse_shape %subspan[[0, 1], [2, 3]] : memref<4x5x6x7xf32> into memref<20x42xf32>
   %value = memref.load %collapse[%i0, %i1] : memref<20x42xf32>
@@ -307,7 +307,7 @@ func @collapse_shape(%offset : index, %i0 : index, %i1 : index) -> f32 {
 
 // -----
 
-func @expand_shape(%offset : index, %i0: index, %i1: index, %i2: index, %i3: index) -> f32 {
+func.func @expand_shape(%offset : index, %i0: index, %i1: index, %i2: index, %i3: index) -> f32 {
   %subspan = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%offset) : memref<20x42xf32>
   %expand = memref.expand_shape %subspan[[0, 1], [2, 3]] : memref<20x42xf32> into memref<4x5x6x7xf32>
   %value = memref.load %expand[%i0, %i1, %i2, %i3] : memref<4x5x6x7xf32>
@@ -325,7 +325,7 @@ func @expand_shape(%offset : index, %i0: index, %i1: index, %i2: index, %i3: ind
 
 // -----
 
-func @load_store_rank_one_static_size_subspan_with_offset(%offset : index, %i: index) {
+func.func @load_store_rank_one_static_size_subspan_with_offset(%offset : index, %i: index) {
   %subspan0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%offset) : memref<32xf32>
   %subspan1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%offset) : memref<32xf32>
   %val = memref.load %subspan0[%i] : memref<32xf32>

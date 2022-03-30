@@ -1,6 +1,6 @@
 // RUN: iree-opt -pass-pipeline="func.func(linalg-fuse{tiling-level=0 vectorize}), canonicalize, cse" -split-input-file %s | FileCheck %s
 
-func @matmul_bias_add(%arg0 : tensor<?x?xf32>, %arg1 : tensor<?x?xf32>, %arg2 : tensor<?xf32>) -> tensor<?x?xf32> {
+func.func @matmul_bias_add(%arg0 : tensor<?x?xf32>, %arg1 : tensor<?x?xf32>, %arg2 : tensor<?xf32>) -> tensor<?x?xf32> {
   %cst = arith.constant 0.0 : f32
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
@@ -35,7 +35,7 @@ func @matmul_bias_add(%arg0 : tensor<?x?xf32>, %arg1 : tensor<?x?xf32>, %arg2 : 
 
 // -----
 
-func @matmul_bias_add_static(%arg0 : tensor<20x60xf32>, %arg1 : tensor<60x120xf32>, %arg2 : tensor<120xf32>) -> tensor<20x120xf32> {
+func.func @matmul_bias_add_static(%arg0 : tensor<20x60xf32>, %arg1 : tensor<60x120xf32>, %arg2 : tensor<120xf32>) -> tensor<20x120xf32> {
   %cst = arith.constant 0.0 : f32
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index

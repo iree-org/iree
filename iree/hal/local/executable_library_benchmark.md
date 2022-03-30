@@ -181,7 +181,7 @@ If you want to provide real data then you can look for the `flow.executable`
 with the `!flow.dispatch.tensor` operands:
 
 ```mlir
-  func @simple_mul_dispatch_0(%arg0: !flow.dispatch.tensor<readonly:4xf32>,
+  func.func @simple_mul_dispatch_0(%arg0: !flow.dispatch.tensor<readonly:4xf32>,
                               %arg1: !flow.dispatch.tensor<readonly:4xf32>,
                               %arg2: !flow.dispatch.tensor<writeonly:4xf32>) {
 ```

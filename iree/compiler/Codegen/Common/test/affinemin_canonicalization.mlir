@@ -1,7 +1,7 @@
 // RUN: iree-opt -iree-codegen-affinemin-scf-canonicalization %s | FileCheck %s
 
 // CHECK-LABEL: scf_for_distributed
-func @scf_for_distributed(%A : memref<i64>, %id1 : index, %count1 : index,
+func.func @scf_for_distributed(%A : memref<i64>, %id1 : index, %count1 : index,
                       %id2 : index, %count2 : index) {
   %c1020 = arith.constant 1020 : index
   %c1024 = arith.constant 1024 : index

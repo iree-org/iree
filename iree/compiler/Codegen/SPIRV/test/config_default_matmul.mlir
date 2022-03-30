@@ -19,7 +19,7 @@ hal.executable @batch_matmul_1x3x32 {
     }> {
     hal.executable.entry_point public @batch_matmul_1x3x32 layout(#executable_layout)
     builtin.module {
-      func @batch_matmul_1x3x32() {
+      func.func @batch_matmul_1x3x32() {
         %c0 = arith.constant 0 : index
         %c32 = arith.constant 32 : index
         %c3 = arith.constant 3 : index
@@ -74,7 +74,7 @@ hal.executable private @matmul_64x16 {
   }> {
     hal.executable.entry_point public @matmul_64x16 layout(#executable_layout)
     builtin.module {
-      func @matmul_64x16() {
+      func.func @matmul_64x16() {
         %c0 = arith.constant 0 : index
         %c16 = arith.constant 16 : index
         %c64 = arith.constant 64 : index
@@ -128,7 +128,7 @@ hal.executable @matmul_400x273 {
     }> {
     hal.executable.entry_point public @matmul_400x273 layout(#executable_layout)
     builtin.module {
-      func @matmul_400x273() {
+      func.func @matmul_400x273() {
         %c0 = arith.constant 0 : index
         %c11775744 = arith.constant 11775744 : index
         %cst = arith.constant 0.000000e+00 : f32
@@ -193,7 +193,7 @@ hal.executable @matmul_25x546 {
   }> {
     hal.executable.entry_point public @matmul_25x546 layout(#executable_layout)
     builtin.module {
-      func @matmul_25x546() {
+      func.func @matmul_25x546() {
         %c0 = arith.constant 0 : index
         %c15842560 = arith.constant 15842560 : index
         %cst = arith.constant 0.000000e+00 : f32
@@ -267,7 +267,7 @@ hal.executable private @matmul_pointwise_256x1024 {
     }> {
     hal.executable.entry_point public @matmul_pointwise_256x1024 layout(#executable_layout)
     builtin.module {
-      func @matmul_pointwise_256x1024() {
+      func.func @matmul_pointwise_256x1024() {
         %c0 = arith.constant 0 : index
         %cst = arith.constant 0.000000e+00 : f16
         %c256 = arith.constant 256 : index

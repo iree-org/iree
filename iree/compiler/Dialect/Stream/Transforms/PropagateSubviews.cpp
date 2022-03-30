@@ -353,9 +353,9 @@ static void expandInitializerOp(IREE::Util::InitializerOp op,
 // sites don't need a wait.
 //
 // Example:
-//  func @foo(%0: !stream.resource)
+//  func.func @foo(%0: !stream.resource)
 //  ->
-//  func @foo(%0: !stream.resource, %sz: index, %o: index, %l: index) {
+//  func.func @foo(%0: !stream.resource, %sz: index, %o: index, %l: index) {
 //    %1 = stream.resource.subview %0[%o] : {%sz} -> {%l}
 static void expandFuncOp(mlir::func::FuncOp op, ExpandedGlobalMap &globalMap,
                          IndexSet &indexSet, SubviewMap &subviewMap) {

@@ -1,6 +1,6 @@
 // RUN: iree-opt -split-input-file -iree-spirv-distribute -mlir-print-local-scope %s | FileCheck %s
 
-func @distribute_to_x(%lb : index, %ub : index, %step: index, %output: memref<?xf32>) {
+func.func @distribute_to_x(%lb : index, %ub : index, %step: index, %output: memref<?xf32>) {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %c2 = arith.constant 2 : index
@@ -25,7 +25,7 @@ func @distribute_to_x(%lb : index, %ub : index, %step: index, %output: memref<?x
 
 // -----
 
-func @distribute_to_y(%lb : index, %ub : index, %step: index, %output: memref<?xf32>) {
+func.func @distribute_to_y(%lb : index, %ub : index, %step: index, %output: memref<?xf32>) {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %c2 = arith.constant 2 : index
@@ -50,7 +50,7 @@ func @distribute_to_y(%lb : index, %ub : index, %step: index, %output: memref<?x
 
 // -----
 
-func @distribute_to_z(%lb : index, %ub : index, %step: index, %output: memref<?xf32>) {
+func.func @distribute_to_z(%lb : index, %ub : index, %step: index, %output: memref<?xf32>) {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %c2 = arith.constant 2 : index
@@ -75,7 +75,7 @@ func @distribute_to_z(%lb : index, %ub : index, %step: index, %output: memref<?x
 
 // -----
 
-func @no_distribute_without_attr(%lb : index, %ub : index, %step: index, %output: memref<?xf32>) {
+func.func @no_distribute_without_attr(%lb : index, %ub : index, %step: index, %output: memref<?xf32>) {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %c2 = arith.constant 2 : index

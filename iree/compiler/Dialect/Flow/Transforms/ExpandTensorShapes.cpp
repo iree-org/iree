@@ -317,9 +317,9 @@ static void expandInitializerOp(IREE::Util::InitializerOp op,
 // Requires that the ExpandCallOp/ExpandReturnOp patterns handle passing dims.
 //
 // Example:
-//  func @foo(%0: tensor<?xf32>)
+//  func.func @foo(%0: tensor<?xf32>)
 //  ->
-//  func @foo(%0: tensor<?xf32>, %d: index) {
+//  func.func @foo(%0: tensor<?xf32>, %d: index) {
 //    %1 = flow.tensor.tie_shape %0 : tensor<?xf32>{%d}
 static void expandFuncOp(mlir::func::FuncOp op, ExpandedGlobalMap &globalMap,
                          IndexSet &indexSet, TensorDimMap &tensorDimMap) {

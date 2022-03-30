@@ -1,4 +1,4 @@
-func @scan_1d_dim0_inclusive_sum() {
+func.func @scan_1d_dim0_inclusive_sum() {
   %input = util.unfoldable_constant dense<[1.0, 2.0, 3.0, 4.0, 5.0, 6.0]> : tensor<6xf32>
 
   %init = linalg.init_tensor [6] : tensor<6xf32>
@@ -25,7 +25,7 @@ func @scan_1d_dim0_inclusive_sum() {
   return
 }
 
-func @scan_1d_dim0_exclusive_sum() {
+func.func @scan_1d_dim0_exclusive_sum() {
   %input = util.unfoldable_constant dense<[1.0, 2.0, 3.0, 4.0, 5.0, 6.0]> : tensor<6xf32>
 
   %init = linalg.init_tensor [6] : tensor<6xf32>
@@ -52,7 +52,7 @@ func @scan_1d_dim0_exclusive_sum() {
   return
 }
 
-func @scan_1d_dim0_inclusive_mul() {
+func.func @scan_1d_dim0_inclusive_mul() {
   %input = util.unfoldable_constant dense<[1, 2, 3, 4, 5, 6]> : tensor<6xi32>
 
   %init = linalg.init_tensor [6] : tensor<6xi32>
@@ -79,7 +79,7 @@ func @scan_1d_dim0_inclusive_mul() {
   return
 }
 
-func @scan_2d_dim0_inclusive_sum() {
+func.func @scan_2d_dim0_inclusive_sum() {
   %input = util.unfoldable_constant dense<[[1, 2, 3],
                                            [4, 5, 6]]> : tensor<2x3xi32>
 
@@ -107,7 +107,7 @@ func @scan_2d_dim0_inclusive_sum() {
   return
 }
 
-func @scan_2d_dim1_inclusive_sum() {
+func.func @scan_2d_dim1_inclusive_sum() {
   %input = util.unfoldable_constant dense<[[1, 2, 3],
                                            [4, 5, 6]]> : tensor<2x3xi32>
 

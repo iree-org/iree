@@ -4,7 +4,7 @@
 // If you move or delete it, please update the documentation accordingly.
 
 // CHECK-LABEL: @constant
-func @constant() -> i32 {
+func.func @constant() -> i32 {
   // CHECK-NEXT: %[[C1:.+]] = arith.constant 1
   %c1 = arith.constant 1 : i32
   %0 = util.do_not_optimize(%c1) : i32
@@ -15,7 +15,7 @@ func @constant() -> i32 {
 // -----
 
 // CHECK-LABEL: @multiple
-func @multiple() -> (i32, i32) {
+func.func @multiple() -> (i32, i32) {
   // CHECK-NEXT: %[[C1:.+]] = arith.constant 1
   %c1 = arith.constant 1 : i32
   %0 = util.do_not_optimize(%c1) : i32
@@ -31,7 +31,7 @@ func @multiple() -> (i32, i32) {
 // -----
 
 // CHECK-LABEL: @multiple_operands
-func @multiple_operands() -> (i32, i32) {
+func.func @multiple_operands() -> (i32, i32) {
   // CHECK-NEXT: %[[C1:.+]] = arith.constant 1
   %c1 = arith.constant 1 : i32
   // CHECK-NEXT: %[[C2:.+]] = arith.constant 2
@@ -44,7 +44,7 @@ func @multiple_operands() -> (i32, i32) {
 // -----
 
 // CHECK-LABEL: @no_fold_add
-func @no_fold_add() -> (i32) {
+func.func @no_fold_add() -> (i32) {
   // CHECK-NEXT: %[[C1:.+]] = arith.constant 1 : i32
   %c1 = arith.constant 1 : i32
   %0 = util.do_not_optimize(%c1) : i32
@@ -63,7 +63,7 @@ module @deeply_nested {
     // CHECK-LABEL: @inner
     module @inner {
       // CHECK-LABEL: @constant
-      func @constant() -> i32 {
+      func.func @constant() -> i32 {
         // CHECK-NEXT: %[[C1:.+]] = arith.constant 1
         %c1 = arith.constant 1 : i32
         %0 = util.do_not_optimize(%c1) : i32

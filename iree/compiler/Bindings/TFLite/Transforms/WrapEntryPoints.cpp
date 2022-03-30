@@ -360,7 +360,7 @@ class WrapEntryPointsPass
   // Creates a function to query the |inputGlobalOps| at runtime by the
   // bindings.
   //
-  // func @_query_input_shape(%index : index, %shape : !util.list<index>)
+  // func.func @_query_input_shape(%index : index, %shape : !util.list<index>)
   void createQueryInputShapeFunc(Location loc, StringRef namePrefix,
                                  ArrayRef<DynamicDims> inputDynamicDims,
                                  OpBuilder &moduleBuilder) {
@@ -392,7 +392,7 @@ class WrapEntryPointsPass
   // Creates a function to resize |inputGlobalOps| and sets the |dirtyGlobalOp|
   // flag.
   //
-  // func @_resize_input_shape(%index : index, %shape : !util.list<index>)
+  // func.func @_resize_input_shape(%index : index, %shape : !util.list<index>)
   void createResizeInputShapeFunc(Location loc, StringRef namePrefix,
                                   ArrayRef<DynamicDims> inputDynamicDims,
                                   IREE::Util::GlobalOp dirtyGlobalOp,
@@ -429,7 +429,7 @@ class WrapEntryPointsPass
   // Creates a function to query the |outputGlobalOps| at runtime by the
   // bindings.
   //
-  // func @_query_output_shape(%index : index, %shape : !util.list<index>)
+  // func.func @_query_output_shape(%index : index, %shape : !util.list<index>)
   void createQueryOutputShapeFunc(Location loc, StringRef namePrefix,
                                   ArrayRef<DynamicDims> outputDynamicDims,
                                   mlir::func::FuncOp calculateShapeFuncOp,

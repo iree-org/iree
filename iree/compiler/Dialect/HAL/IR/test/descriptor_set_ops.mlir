@@ -2,7 +2,7 @@
 
 // CHECK-LABEL: @descriptor_set_layout_create
 // CHECK-SAME: (%[[DEVICE:.+]]: !hal.device)
-func @descriptor_set_layout_create(%device: !hal.device) {
+func.func @descriptor_set_layout_create(%device: !hal.device) {
   //      CHECK: = hal.descriptor_set_layout.create
   // CHECK-SAME:     device(%[[DEVICE]] : !hal.device)
   // CHECK-SAME:     usage(push_only)

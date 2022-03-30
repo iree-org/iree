@@ -1,6 +1,6 @@
 // RUN: iree-opt %s --iree-codegen-linalg-bufferize -canonicalize -cse -split-input-file  -verify-diagnostics | FileCheck %s
 
-func @tile_from_tensor_load() {
+func.func @tile_from_tensor_load() {
   %c0 = arith.constant 0 : index
   %c2 = arith.constant 2 : index
   %c4 = arith.constant 4 : index
@@ -46,7 +46,7 @@ func @tile_from_tensor_load() {
 
 // -----
 
-func @tile_from_tensor_load_inplace() {
+func.func @tile_from_tensor_load_inplace() {
   %c0 = arith.constant 0 : index
   %c2 = arith.constant 2 : index
   %c4 = arith.constant 4 : index
@@ -87,7 +87,7 @@ func @tile_from_tensor_load_inplace() {
 
 // -----
 
-func @tile_from_tensor_load_inplace_and_copy() {
+func.func @tile_from_tensor_load_inplace_and_copy() {
   %c0 = arith.constant 0 : index
   %c2 = arith.constant 2 : index
   %c4 = arith.constant 4 : index
@@ -134,7 +134,7 @@ func @tile_from_tensor_load_inplace_and_copy() {
 // -----
 
 #map = affine_map<(d0, d1) -> (d0, d1)>
-func @tile_from_pointwise_lhs() {
+func.func @tile_from_pointwise_lhs() {
   %c0 = arith.constant 0 : index
   %c2 = arith.constant 2 : index
   %c4 = arith.constant 4 : index
@@ -190,7 +190,7 @@ func @tile_from_pointwise_lhs() {
 // -----
 
 #map = affine_map<(d0, d1) -> (d0, d1)>
-func @tile_from_pointwise_lhs_inplace() {
+func.func @tile_from_pointwise_lhs_inplace() {
   %c0 = arith.constant 0 : index
   %c2 = arith.constant 2 : index
   %c4 = arith.constant 4 : index
@@ -242,7 +242,7 @@ func @tile_from_pointwise_lhs_inplace() {
 // -----
 
 #map = affine_map<(d0, d1) -> (d0, d1)>
-func @tile_from_pointwise_outs() {
+func.func @tile_from_pointwise_outs() {
   %c0 = arith.constant 0 : index
   %c2 = arith.constant 2 : index
   %c4 = arith.constant 4 : index
@@ -296,7 +296,7 @@ func @tile_from_pointwise_outs() {
 // -----
 
 #map = affine_map<(d0, d1) -> (d0, d1)>
-func @tile_from_pointwise_outs_inplace() {
+func.func @tile_from_pointwise_outs_inplace() {
   %f1 = arith.constant 1.0 : f32
   %c0 = arith.constant 0 : index
   %c2 = arith.constant 2 : index
@@ -348,7 +348,7 @@ func @tile_from_pointwise_outs_inplace() {
 // -----
 
 #map = affine_map<(d0, d1) -> (d0, d1)>
-func @tile_from_matmul_outs() {
+func.func @tile_from_matmul_outs() {
   %c0 = arith.constant 0 : index
   %c2 = arith.constant 2 : index
   %c4 = arith.constant 4 : index
@@ -397,7 +397,7 @@ func @tile_from_matmul_outs() {
 // -----
 
 #map = affine_map<(d0, d1) -> (d0, d1)>
-func @tile_from_matmul_outs_inplace() {
+func.func @tile_from_matmul_outs_inplace() {
   %c0 = arith.constant 0 : index
   %c2 = arith.constant 2 : index
   %c4 = arith.constant 4 : index
@@ -441,7 +441,7 @@ func @tile_from_matmul_outs_inplace() {
 
 // -----
 
-func @bufferize_dynamic() {
+func.func @bufferize_dynamic() {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %4 = hal.interface.constant.load[0] : index
@@ -516,7 +516,7 @@ func @bufferize_dynamic() {
 
 // -----
 
-func @bufferize_dynamic_inplace() {
+func.func @bufferize_dynamic_inplace() {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %4 = hal.interface.constant.load[0] : index
@@ -583,7 +583,7 @@ func @bufferize_dynamic_inplace() {
 
 // -----
 
-func @reshape_simple() {
+func.func @reshape_simple() {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %c3 = arith.constant 3 : index
@@ -605,7 +605,7 @@ func @reshape_simple() {
 
 // -----
 
-func @reshape_fused_source() {
+func.func @reshape_fused_source() {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %c3 = arith.constant 3 : index
@@ -638,7 +638,7 @@ func @reshape_fused_source() {
 
 // -----
 
-func @reshape_fused_source_and_copyout() {
+func.func @reshape_fused_source_and_copyout() {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %c3 = arith.constant 3 : index
@@ -675,7 +675,7 @@ func @reshape_fused_source_and_copyout() {
 
 // -----
 
-func @reshape_fused_target() {
+func.func @reshape_fused_target() {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %c3 = arith.constant 3 : index
@@ -708,7 +708,7 @@ func @reshape_fused_target() {
 
 // -----
 
-func @dot_general_lowering() {
+func.func @dot_general_lowering() {
   %cst = arith.constant 0.000000e+00 : f32
   %c3 = arith.constant 3 : index
   %c0 = arith.constant 0 : index
@@ -762,7 +762,7 @@ func @dot_general_lowering() {
 
 // -----
 
-func @slice() {
+func.func @slice() {
   %c0 = arith.constant 0 : index
   %2 = hal.interface.constant.load[0] : index
   %3 = hal.interface.constant.load[1] : index
@@ -784,7 +784,7 @@ func @slice() {
 
 // -----
 
-func @slice_rank_reducing() {
+func.func @slice_rank_reducing() {
   %c0 = arith.constant 0 : index
   %2 = hal.interface.constant.load[0] : index
   %3 = hal.interface.constant.load[1] : index
@@ -807,7 +807,7 @@ func @slice_rank_reducing() {
 
 // -----
 
-func @slice_multiple_copy() {
+func.func @slice_multiple_copy() {
   %c0 = arith.constant 0 : index
   %3 = hal.interface.constant.load[0] : index
   %4 = hal.interface.constant.load[1] : index
@@ -842,7 +842,7 @@ func @slice_multiple_copy() {
 
 // -----
 
-func @slice_in_place() {
+func.func @slice_in_place() {
   %c0 = arith.constant 0 : index
   %2 = hal.interface.constant.load[0] : index
   %3 = hal.interface.constant.load[1] : index
@@ -858,7 +858,7 @@ func @slice_in_place() {
 
 // -----
 
-func @slice_whole_stride_dispatch_0() {
+func.func @slice_whole_stride_dispatch_0() {
   %c0 = arith.constant 0 : index
   %dim0 = hal.interface.constant.load[0] : index
   %dim1 = hal.interface.constant.load[1] : index
@@ -881,7 +881,7 @@ func @slice_whole_stride_dispatch_0() {
 
 // -----
 
-func @subtensor_insert() {
+func.func @subtensor_insert() {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %dim0 = hal.interface.constant.load[0] : index
@@ -914,7 +914,7 @@ func @subtensor_insert() {
 
 // -----
 
-func @tensor_extract() {
+func.func @tensor_extract() {
   %c0 = arith.constant 0 : index
   %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<readonly:i32>
   %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : !flow.dispatch.tensor<writeonly:3x9xi32>
@@ -936,7 +936,7 @@ func @tensor_extract() {
 
 // -----
 
-func @load_to_store() {
+func.func @load_to_store() {
   %c0 = arith.constant 0 : index
   %1 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<writeonly:3x4xi32>
   %2 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : !flow.dispatch.tensor<readonly:3x4xi32>
@@ -952,7 +952,7 @@ func @load_to_store() {
 
 // -----
 
-func @constant() {
+func.func @constant() {
   %c0 = arith.constant 0 : index
   %cst = arith.constant dense<[[[1, 2, 3], [4, 5, 6]], [[7, 8, 9], [10, 11, 12]]]> : tensor<2x2x3xi32>
   %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<writeonly:2x2x3xi32>
@@ -968,7 +968,7 @@ func @constant() {
 
 // -----
 
-func @rhs_non_splat_constant() {
+func.func @rhs_non_splat_constant() {
   %c0 = arith.constant 0 : index
   %cst = arith.constant dense<[[0.706495285, -0.567672312, 0.483717591, 0.522725761, 0.7563259], [-0.0899272263, -0.283501834, -0.350822538, -0.351515919, -0.337136656], [-0.451804549, 0.372324884, -0.620518147, 0.235451385, 0.851095855]]> : tensor<3x5xf32>
   %cst_0 = arith.constant 0.000000e+00 : f32
@@ -1022,7 +1022,7 @@ func @rhs_non_splat_constant() {
 
 // -----
 
-func @gather() {
+func.func @gather() {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %dim0 = hal.interface.constant.load[0] : index
@@ -1059,7 +1059,7 @@ func @gather() {
 
 // -----
 
-func @pooling_nhwc_sum() {
+func.func @pooling_nhwc_sum() {
   %c2 = arith.constant 2 : index
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
@@ -1098,7 +1098,7 @@ func @pooling_nhwc_sum() {
 
 // -----
 
-func @read_only_subtensor() {
+func.func @read_only_subtensor() {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %pc0 = hal.interface.constant.load[0] : index
@@ -1170,7 +1170,7 @@ func @read_only_subtensor() {
 
 // -----
 
-func @reshape_read_only() {
+func.func @reshape_read_only() {
   %c0 = arith.constant 0 : index
   %dim0 = hal.interface.constant.load[0] : index
   %dim1 = hal.interface.constant.load[1] : index
@@ -1204,7 +1204,7 @@ func @reshape_read_only() {
 
 // -----
 
-func @use_buffer_for_operand_when_output_tensor_not_used() {
+func.func @use_buffer_for_operand_when_output_tensor_not_used() {
   %c0 = arith.constant 0 : index
 
   %input_subspan = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<readonly:1x225x225x16xf32>
@@ -1254,7 +1254,7 @@ func @use_buffer_for_operand_when_output_tensor_not_used() {
 
 // -----
 
-func @dont_use_buffer_for_operand_when_output_tensor_used() {
+func.func @dont_use_buffer_for_operand_when_output_tensor_used() {
   %c0 = arith.constant 0 : index
 
   %input_subspan = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<readonly:1x225x225x16xf32>
@@ -1308,7 +1308,7 @@ func @dont_use_buffer_for_operand_when_output_tensor_used() {
 
 // -----
 
-func @bufferize_cst_output_tensor() {
+func.func @bufferize_cst_output_tensor() {
   %c0 = arith.constant 0 : index
   %cst1 = arith.constant dense<-2147483648> : tensor<i32>
   %zero = arith.constant 0.000000e+00 : f32
@@ -1348,7 +1348,7 @@ func @bufferize_cst_output_tensor() {
 
 // -----
 
-func @cast_follwed_by_store() {
+func.func @cast_follwed_by_store() {
   %c0 = arith.constant 0 : index
   %cst = arith.constant 0.000000e+00 : f32
   %c4 = arith.constant 4 : index
@@ -1399,7 +1399,7 @@ func @cast_follwed_by_store() {
 
 // -----
 
-func @rank_reduced_subtensor_insert() {
+func.func @rank_reduced_subtensor_insert() {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %c2 = arith.constant 2 : index
@@ -1430,7 +1430,7 @@ func @rank_reduced_subtensor_insert() {
 #map0 = affine_map<(d0, d1, d2) -> (d0, d2)>
 #map1 = affine_map<(d0, d1, d2) -> (d2, d1)>
 #map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
-func @bufferize_transfer_op() {
+func.func @bufferize_transfer_op() {
   %c3 = arith.constant 3 : index
   %cst = arith.constant 0.000000e+00 : f32
   %c0 = arith.constant 0 : index
@@ -1487,7 +1487,7 @@ func @bufferize_transfer_op() {
 #map0 = affine_map<(d0, d1, d2) -> (d0, d2)>
 #map1 = affine_map<(d0, d1, d2) -> (d2, d1)>
 #map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
-func @bufferize_transfer_op_inplace() {
+func.func @bufferize_transfer_op_inplace() {
   %c3 = arith.constant 3 : index
   %cst = arith.constant 0.000000e+00 : f32
   %c0 = arith.constant 0 : index
@@ -1539,7 +1539,7 @@ func @bufferize_transfer_op_inplace() {
 // -----
 
 #map = affine_map<(d0, d1) -> (d0, d1)>
-func @multi_result() {
+func.func @multi_result() {
   %c0 = arith.constant 0 : index
   %c2 = arith.constant 2 : index
   %c4 = arith.constant 4 : index
@@ -1610,7 +1610,7 @@ func @multi_result() {
 
 #map0 = affine_map<()[s0] -> (s0 * 64)>
 #map1 = affine_map<()[s0] -> (s0 * 16)>
-func @padded_matmul() {
+func.func @padded_matmul() {
   %c0 = arith.constant 0 : index
   %c12544 = arith.constant 12544 : index
   %c64 = arith.constant 64 : index
@@ -1676,7 +1676,7 @@ func @padded_matmul() {
 
 // -----
 
-func @dot_general_padded() {
+func.func @dot_general_padded() {
   %c0 = arith.constant 0 : index
   %c3 = arith.constant 3 : index
   %c1 = arith.constant 1 : index
@@ -1755,7 +1755,7 @@ func @dot_general_padded() {
 
 // -----
 
-func @multi_result_reduce() {
+func.func @multi_result_reduce() {
   %c0 = arith.constant 0 : index
   %c0_i32 = arith.constant 0 : i32
   %c-2147483648_i32 = arith.constant -2147483648 : i32
@@ -1824,7 +1824,7 @@ func @multi_result_reduce() {
 #map4 = affine_map<(d0) -> (24, -d0 + 144)>
 #map5 = affine_map<(d0) -> (32, -d0 + 370)>
 #map6 = affine_map<(d0, d1) -> (32, d0 - d1)>
-func @l1_tiled_matmul_no_fill() {
+func.func @l1_tiled_matmul_no_fill() {
   %cst = arith.constant 0.000000e+00 : f32
   %c32 = arith.constant 32 : index
   %c24 = arith.constant 24 : index
@@ -1922,7 +1922,7 @@ func @l1_tiled_matmul_no_fill() {
 #map4 = affine_map<(d0) -> (24, -d0 + 144)>
 #map5 = affine_map<(d0) -> (32, -d0 + 370)>
 #map6 = affine_map<(d0, d1) -> (32, d0 - d1)>
-func @l1_tiled_matmul_no_fill_readwrite() {
+func.func @l1_tiled_matmul_no_fill_readwrite() {
   %cst = arith.constant 0.000000e+00 : f32
   %c32 = arith.constant 32 : index
   %c24 = arith.constant 24 : index
@@ -2015,7 +2015,7 @@ func @l1_tiled_matmul_no_fill_readwrite() {
 #map4 = affine_map<(d0) -> (24, -d0 + 144)>
 #map5 = affine_map<(d0) -> (32, -d0 + 370)>
 #map6 = affine_map<(d0, d1) -> (32, d0 - d1)>
-func @l1_tiled_matmul() {
+func.func @l1_tiled_matmul() {
   %cst = arith.constant 0.000000e+00 : f32
   %c32 = arith.constant 32 : index
   %c24 = arith.constant 24 : index
@@ -2100,7 +2100,7 @@ func @l1_tiled_matmul() {
 
 // -----
 
-func @sort1D() {
+func.func @sort1D() {
   %c4 = arith.constant 4 : index
   %c3 = arith.constant 3 : index
   %c0 = arith.constant 0 : index
@@ -2144,7 +2144,7 @@ func @sort1D() {
 
 // -----
 
-func @sort1D_inplace() {
+func.func @sort1D_inplace() {
   %c4 = arith.constant 4 : index
   %c3 = arith.constant 3 : index
   %c0 = arith.constant 0 : index
@@ -2185,7 +2185,7 @@ func @sort1D_inplace() {
 
 // -----
 
-func @iree_linalg_ext_sort_1d() {
+func.func @iree_linalg_ext_sort_1d() {
   %c0 = arith.constant 0 : index
   %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<readwrite:128xi32>
   %1 = flow.dispatch.tensor.load %0, offsets = [0], sizes = [128], strides = [1] : !flow.dispatch.tensor<readwrite:128xi32> -> tensor<128xi32>
@@ -2299,7 +2299,7 @@ func.func @dynamic_update_slice() {
 
 // -----
 
-func @multi_level_tile_fuse() {
+func.func @multi_level_tile_fuse() {
   %c4 = arith.constant 4 : index
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
@@ -2401,7 +2401,7 @@ func @multi_level_tile_fuse() {
 
 // -----
 
-func @operand_fusion() {
+func.func @operand_fusion() {
   %c4 = arith.constant 4 : index
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
@@ -2475,7 +2475,7 @@ func @operand_fusion() {
 #map_dist = affine_map<()[s0, s1] -> (s0 * s1)>
 #map_min = affine_map<(d0)[s0, s1] -> (s0, -d0 + s1)>
 #map_indexing = affine_map<(d0, d1) -> (d0, d1)>
-func @two_level_tile_and_fuse() {
+func.func @two_level_tile_and_fuse() {
   %c0 = arith.constant 0 : index
   %c8 = arith.constant 8 : index
   %c16 = arith.constant 16 : index
@@ -2567,7 +2567,7 @@ func @two_level_tile_and_fuse() {
 // -----
 
 // This test is a repro from a failure. No checking needed.
-func @forward_dispatch_3() {
+func.func @forward_dispatch_3() {
   %c384 = arith.constant 384 : index
   %c512_i64 = arith.constant 512 : i64
   %c0_i64 = arith.constant 0 : i64
@@ -2617,7 +2617,7 @@ func @forward_dispatch_3() {
 
 // -----
 
-func @dot_general_nontrivial_batching_mutliple_parallel_dimension() {
+func.func @dot_general_nontrivial_batching_mutliple_parallel_dimension() {
   %cst = arith.constant dense<0.000000e+00> : vector<1x4x2xf32>
   %c1 = arith.constant 1 : index
   %c6 = arith.constant 6 : index
@@ -2667,7 +2667,7 @@ func @dot_general_nontrivial_batching_mutliple_parallel_dimension() {
 
 // -----
 
-func @dispatch() {
+func.func @dispatch() {
   %c0 = arith.constant 0 : index
   %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(32) : !flow.dispatch.tensor<readonly:4xf32>
   %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(32) : !flow.dispatch.tensor<readonly:4xf32>
@@ -2682,7 +2682,7 @@ func @dispatch() {
 
 // -----
 
-func @no_op_subview() {
+func.func @no_op_subview() {
   %c0 = arith.constant 0 : index
   %d0 = hal.interface.constant.load[0] : index
   %d1 = hal.interface.constant.load[1] : index
@@ -2704,7 +2704,7 @@ func @no_op_subview() {
 
 // -----
 
-func @rank_reducing_no_op_subview() {
+func.func @rank_reducing_no_op_subview() {
   %c0 = arith.constant 0 : index
   %d0 = hal.interface.constant.load[0] : index
   %src_binding = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(32) : !flow.dispatch.tensor<readonly:1x?xf32>{%d0}
@@ -2727,7 +2727,7 @@ func @rank_reducing_no_op_subview() {
 // -----
 
 // CHECK-LABEL: func @dispatch_scatter()
-func @dispatch_scatter() {
+func.func @dispatch_scatter() {
   %c1 = arith.constant 1 : index
   %c0 = arith.constant 0 : index
   %cst = arith.constant dense<0> : tensor<1x1xi32>

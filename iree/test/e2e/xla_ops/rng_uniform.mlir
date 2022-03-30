@@ -1,5 +1,5 @@
 // Note that they are stateless random generators, so they have fixed results.
-func @rng_uniform_1d() {
+func.func @rng_uniform_1d() {
     %min = util.unfoldable_constant dense<-10.0> : tensor<f32>
     %max = util.unfoldable_constant dense<10.0> : tensor<f32>
     %shape = util.unfoldable_constant dense<[10]>  : tensor<1xi32>
@@ -10,7 +10,7 @@ func @rng_uniform_1d() {
     return
 }
 
-func @rng_uniform_2d() {
+func.func @rng_uniform_2d() {
     %min = util.unfoldable_constant dense<-10.0> : tensor<f32>
     %max = util.unfoldable_constant dense<10.0> : tensor<f32>
     %shape = util.unfoldable_constant dense<[3, 3]>  : tensor<2xi32>
@@ -22,7 +22,7 @@ func @rng_uniform_2d() {
     return
 }
 
-func @rng_uniform_3d() {
+func.func @rng_uniform_3d() {
     %min = util.unfoldable_constant dense<-10.0> : tensor<f32>
     %max = util.unfoldable_constant dense<10.0> : tensor<f32>
     %shape = util.unfoldable_constant dense<[2, 2, 2]>  : tensor<3xi32>

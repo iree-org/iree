@@ -10,7 +10,7 @@
 // Reference: Section 2.3 of https://arxiv.org/abs/1712.05877.
 
 // Equivalent to linalg.quantized_matmul, but not using linalg.quantized_matmul
-func private @quantized_matmul_as_matmul_3x4x5(%lhs : tensor<3x4xi8>, %rhs : tensor<4x5xi8>,  %lhs_zp : i32, %rhs_zp : i32) -> tensor<3x5xi32> {
+func.func private @quantized_matmul_as_matmul_3x4x5(%lhs : tensor<3x4xi8>, %rhs : tensor<4x5xi8>,  %lhs_zp : i32, %rhs_zp : i32) -> tensor<3x5xi32> {
   %c_0 = arith.constant 0 : i32
   %init_acc_uninitialized =  linalg.init_tensor [3, 5] : tensor<3x5xi32>
   %zero_acc = linalg.fill ins(%c_0 : i32) outs(%init_acc_uninitialized : tensor<3x5xi32>) -> tensor<3x5xi32>
@@ -78,7 +78,7 @@ func private @quantized_matmul_as_matmul_3x4x5(%lhs : tensor<3x4xi8>, %rhs : ten
 }
 
 // Equivalent to linalg.quantized_matmul, but not using linalg.quantized_matmul
-func private @quantized_matmul_as_matmul_dynamic(%lhs : tensor<?x?xi8>, %rhs : tensor<?x?xi8>,  %lhs_zp : i32, %rhs_zp : i32) -> tensor<?x?xi32> {
+func.func private @quantized_matmul_as_matmul_dynamic(%lhs : tensor<?x?xi8>, %rhs : tensor<?x?xi8>,  %lhs_zp : i32, %rhs_zp : i32) -> tensor<?x?xi32> {
   %c_0_index = arith.constant 0 : index
   %c_1_index = arith.constant 1 : index
   %m_size = tensor.dim %lhs, %c_0_index : tensor<?x?xi8>
@@ -151,7 +151,7 @@ func private @quantized_matmul_as_matmul_dynamic(%lhs : tensor<?x?xi8>, %rhs : t
 }
 
 // Checks that linalg.quantized_matmul agrees with @quantized_matmul_as_matmul_3x4x5
-func private @check_one_quantized_matmul_as_matmul_3x4x5(%lhs : tensor<3x4xi8>, %rhs : tensor<4x5xi8>, %lhs_zp : i32, %rhs_zp : i32) {
+func.func private @check_one_quantized_matmul_as_matmul_3x4x5(%lhs : tensor<3x4xi8>, %rhs : tensor<4x5xi8>, %lhs_zp : i32, %rhs_zp : i32) {
     %c_0 = arith.constant 0 : i32
     %init_acc_uninitialized =  linalg.init_tensor [3, 5] : tensor<3x5xi32>
     %zero_acc = linalg.fill ins(%c_0 : i32) outs(%init_acc_uninitialized : tensor<3x5xi32>) -> tensor<3x5xi32>
@@ -162,7 +162,7 @@ func private @check_one_quantized_matmul_as_matmul_3x4x5(%lhs : tensor<3x4xi8>, 
 }
 
 // Checks that linalg.quantized_matmul agrees with @quantized_matmul_as_matmul_dynamic
-func private @check_one_quantized_matmul_as_matmul_dynamic(%lhs : tensor<?x?xi8>, %rhs : tensor<?x?xi8>, %lhs_zp : i32, %rhs_zp : i32) {
+func.func private @check_one_quantized_matmul_as_matmul_dynamic(%lhs : tensor<?x?xi8>, %rhs : tensor<?x?xi8>, %lhs_zp : i32, %rhs_zp : i32) {
     %c_0_index = arith.constant 0 : index
     %c_1_index = arith.constant 1 : index
     %m_size = tensor.dim %lhs, %c_0_index : tensor<?x?xi8>
@@ -178,7 +178,7 @@ func private @check_one_quantized_matmul_as_matmul_dynamic(%lhs : tensor<?x?xi8>
     return
 }
 
-func @test_quantized_matmul_as_matmul() {
+func.func @test_quantized_matmul_as_matmul() {
   %lhs_3x4_1 = util.unfoldable_constant dense<[
       [1, 2, 3, 4],
       [5, 6, 7, 8],

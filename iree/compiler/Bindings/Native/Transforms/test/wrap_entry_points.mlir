@@ -20,7 +20,7 @@
 //  CHECK-NEXT: }
 
 // CHECK-LABEL: func private @_dynamicEntry(
-func @dynamicEntry(%arg0: tensor<?x8x8x3xf32>, %arg1: tensor<?x8x8x3xf32>) ->
+func.func @dynamicEntry(%arg0: tensor<?x8x8x3xf32>, %arg1: tensor<?x8x8x3xf32>) ->
     (tensor<?x8x8x3xf32>, tensor<?x8x8x3xf32>) {
   %0 = "mhlo.add"(%arg0, %arg1) : (tensor<?x8x8x3xf32>, tensor<?x8x8x3xf32>) -> tensor<?x8x8x3xf32>
   %1 = "mhlo.add"(%0, %arg0) : (tensor<?x8x8x3xf32>, tensor<?x8x8x3xf32>) -> tensor<?x8x8x3xf32>
@@ -48,7 +48,7 @@ func @dynamicEntry(%arg0: tensor<?x8x8x3xf32>, %arg1: tensor<?x8x8x3xf32>) ->
 //  CHECK-NEXT: }
 
 // CHECK-LABEL: func private @_outputStorage(
-func @outputStorage(%arg0: tensor<?x8x8x3xf32>, %ret1: !hal.buffer {iree.abi.output = 1 : index}) ->
+func.func @outputStorage(%arg0: tensor<?x8x8x3xf32>, %ret1: !hal.buffer {iree.abi.output = 1 : index}) ->
     (tensor<?x8x8x3xf32>, tensor<?x8x8x3xf32>) {
   %0 = "mhlo.add"(%arg0, %arg0) : (tensor<?x8x8x3xf32>, tensor<?x8x8x3xf32>) -> tensor<?x8x8x3xf32>
   %1 = "mhlo.add"(%0, %arg0) : (tensor<?x8x8x3xf32>, tensor<?x8x8x3xf32>) -> tensor<?x8x8x3xf32>
@@ -60,7 +60,7 @@ func @outputStorage(%arg0: tensor<?x8x8x3xf32>, %ret1: !hal.buffer {iree.abi.out
 // CHECK-LABEL: func @wrappedAlready
 //  CHECK-SAME: (%arg0: !hal.buffer_view) -> !hal.buffer_view
 //  CHECK-SAME: attributes {iree.abi.stub}
-func @wrappedAlready(%arg0: !hal.buffer_view) -> !hal.buffer_view attributes {iree.abi.stub} {
+func.func @wrappedAlready(%arg0: !hal.buffer_view) -> !hal.buffer_view attributes {iree.abi.stub} {
   return %arg0 : !hal.buffer_view
 }
 // CHECK-NOT: func @_wrappedAlready
@@ -74,7 +74,7 @@ func @wrappedAlready(%arg0: !hal.buffer_view) -> !hal.buffer_view attributes {ir
 // CHECK:   call @_exportA
 // CHECK: func private @_exportA(%arg0: tensor<?x?xi32>) -> tensor<?x?xi32>
 // CHECK:   return %arg0
-func @exportA(%arg0: tensor<?x?xi32>) -> tensor<?x?xi32> {
+func.func @exportA(%arg0: tensor<?x?xi32>) -> tensor<?x?xi32> {
   return %arg0 : tensor<?x?xi32>
 }
 
@@ -82,7 +82,7 @@ func @exportA(%arg0: tensor<?x?xi32>) -> tensor<?x?xi32> {
 // CHECK:   call @_exportB
 // CHECK: func private @_exportB(%arg0: tensor<?x?xi32>) -> tensor<?x?xi32>
 // CHECK:   call @_exportA
-func @exportB(%arg0: tensor<?x?xi32>) -> tensor<?x?xi32> {
+func.func @exportB(%arg0: tensor<?x?xi32>) -> tensor<?x?xi32> {
     %0 = call @exportA(%arg0) : (tensor<?x?xi32>) -> tensor<?x?xi32>
     return %0 : tensor<?x?xi32>
 }

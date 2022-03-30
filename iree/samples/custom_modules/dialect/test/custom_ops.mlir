@@ -11,7 +11,7 @@
 // RUN: custom-opt -split-input-file %s | custom-opt -split-input-file | FileCheck %s
 
 // CHECK-LABEL: @printOp
-func @printOp(%arg0 : !custom.message) {
+func.func @printOp(%arg0 : !custom.message) {
   %c1_i32 = arith.constant 1 : i32
   // CHECK: "custom.print"(%arg0, %c1_i32) : (!custom.message, i32) -> ()
   "custom.print"(%arg0, %c1_i32) : (!custom.message, i32) -> ()
@@ -21,7 +21,7 @@ func @printOp(%arg0 : !custom.message) {
 // -----
 
 // CHECK-LABEL: @reverseOp
-func @reverseOp(%arg0 : !custom.message) -> !custom.message {
+func.func @reverseOp(%arg0 : !custom.message) -> !custom.message {
   // CHECK: %0 = "custom.reverse"(%arg0) : (!custom.message) -> !custom.message
   %0 = "custom.reverse"(%arg0) : (!custom.message) -> !custom.message
   return %0 : !custom.message
@@ -30,7 +30,7 @@ func @reverseOp(%arg0 : !custom.message) -> !custom.message {
 // -----
 
 // CHECK-LABEL: @getUniqueMessageOp
-func @getUniqueMessageOp() -> !custom.message {
+func.func @getUniqueMessageOp() -> !custom.message {
   // CHECK: %0 = "custom.get_unique_message"() : () -> !custom.message
   %0 = "custom.get_unique_message"() : () -> !custom.message
   return %0 : !custom.message

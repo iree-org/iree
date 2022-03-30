@@ -3,7 +3,7 @@
 // RUN: iree-run-mlir -iree-hal-target-backends=dylib-llvm-aot --function-input="f32=-2" %s | FileCheck %s
 
 // CHECK-LABEL: EXEC @abs
-func @abs(%input : tensor<f32>) -> (tensor<f32>) {
+func.func @abs(%input : tensor<f32>) -> (tensor<f32>) {
   %result = math.abs %input : tensor<f32>
   return %result : tensor<f32>
 }

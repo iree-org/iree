@@ -1,6 +1,6 @@
 // RUN: iree-opt -allow-unregistered-dialect -split-input-file -iree-flow-convert-to-flow %s | FileCheck %s
 
-func @insert_slice_convert
+func.func @insert_slice_convert
     (%arg0 : tensor<?x24x48xf32>, %arg1 : tensor<1x4x48xf32>) ->
     tensor<?x24x48xf32> {
   %c0 = arith.constant 0 : index
@@ -20,7 +20,7 @@ func @insert_slice_convert
 
 // -----
 
-func @insert_slice_convert_rank_reducing
+func.func @insert_slice_convert_rank_reducing
     (%arg0 : tensor<?x24x48xf32>, %arg1 : tensor<4x48xf32>) ->
     tensor<?x24x48xf32> {
   %c0 = arith.constant 0 : index
@@ -41,7 +41,7 @@ func @insert_slice_convert_rank_reducing
 
 // -----
 
-func @rank_reducing_insert_slice_trailing_unit_dims
+func.func @rank_reducing_insert_slice_trailing_unit_dims
    (%arg0 : tensor<49x20xf32>, %arg1 : tensor<1x50x20x1xf32>) -> tensor<1x50x20x1xf32> {
   %0 = tensor.insert_slice %arg0 into %arg1[0, 1, 0, 0] [1, 49, 20, 1] [1, 1, 1, 1] : tensor<49x20xf32> into tensor<1x50x20x1xf32>
   return %0 : tensor<1x50x20x1xf32>
@@ -55,7 +55,7 @@ func @rank_reducing_insert_slice_trailing_unit_dims
 
 // -----
 
-func @insert_slice_within_dispatch_workgroups_not_converted() -> tensor<f32> {
+func.func @insert_slice_within_dispatch_workgroups_not_converted() -> tensor<f32> {
   %x = arith.constant 100 : index
   %0 = flow.dispatch.workgroups[%x]() : () -> (tensor<f32>) = () {
     // CHECK: = tensor.insert_slice %[[source2:.+]] into %[[source1:.+]][4, 2, 0] [1, 4, 48] [1, 1, 1] : tensor<1x4x48xf32> into tensor<?x24x48xf32>

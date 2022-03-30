@@ -6,7 +6,7 @@
 
 // CHECK-LABEL: @partitioningForMinPeakMemory
 // CHECK-SAME: (%[[ARG0:.+]]: !stream.resource<external>, %[[ARG1:.+]]: !stream.resource<external>)
-func @partitioningForMinPeakMemory(%arg0: !stream.resource<external>, %arg1: !stream.resource<external>) -> !stream.resource<external>
+func.func @partitioningForMinPeakMemory(%arg0: !stream.resource<external>, %arg1: !stream.resource<external>) -> !stream.resource<external>
     attributes {stream.partitioning = #stream.partitioning_config<"min-peak-memory">} {
   %c1 = arith.constant 1 : index
   %c20 = arith.constant 20 : index
@@ -54,7 +54,7 @@ func @partitioningForMinPeakMemory(%arg0: !stream.resource<external>, %arg1: !st
 
 // CHECK-LABEL: @partitioningForMaxConcurrency
 // CHECK-SAME: (%[[ARG0:.+]]: !stream.resource<external>, %[[ARG1:.+]]: !stream.resource<external>)
-func @partitioningForMaxConcurrency(%arg0: !stream.resource<external>, %arg1: !stream.resource<external>) -> !stream.resource<external>
+func.func @partitioningForMaxConcurrency(%arg0: !stream.resource<external>, %arg1: !stream.resource<external>) -> !stream.resource<external>
     attributes {stream.partitioning = #stream.partitioning_config<"max-concurrency">} {
   %c1 = arith.constant 1 : index
   %c20 = arith.constant 20 : index

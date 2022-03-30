@@ -1,7 +1,7 @@
 // RUN: iree-opt -allow-unregistered-dialect -split-input-file -canonicalize %s | iree-opt -allow-unregistered-dialect -split-input-file | FileCheck %s
 
 // CHECK-LABEL: @workgroupRankFolding
-func @workgroupRankFolding(%arg0 : tensor<?x4xf32>) -> tensor<4x?xf32> {
+func.func @workgroupRankFolding(%arg0 : tensor<?x4xf32>) -> tensor<4x?xf32> {
   %c128 = arith.constant 128 : index
   %x = arith.constant 100 : index
   %y = arith.constant 50 : index
@@ -23,7 +23,7 @@ func @workgroupRankFolding(%arg0 : tensor<?x4xf32>) -> tensor<4x?xf32> {
 
 // CHECK-LABEL: @inlineWithTiedResults1
 // CHECK-SAME: (%[[ARG0:.+]]: tensor<1x4xf32>)
-func @inlineWithTiedResults1(%arg0: tensor<1x4xf32>) -> tensor<1x4xf32> {
+func.func @inlineWithTiedResults1(%arg0: tensor<1x4xf32>) -> tensor<1x4xf32> {
   // CHECK-NOT: constant 128
   %cst = arith.constant 128 : index
   // CHECK-DAG: %[[X:.+]] = arith.constant 100
@@ -50,7 +50,7 @@ func @inlineWithTiedResults1(%arg0: tensor<1x4xf32>) -> tensor<1x4xf32> {
 
 // CHECK-LABEL: @inlineWithTiedResults2
 // CHECK-SAME: (%[[ARG0:.+]]: tensor<1x4xf32>)
-func @inlineWithTiedResults2(%arg0: tensor<1x4xf32>) -> tensor<1x4xf32> {
+func.func @inlineWithTiedResults2(%arg0: tensor<1x4xf32>) -> tensor<1x4xf32> {
   // CHECK-NOT: constant 128
   %cst = arith.constant 128 : index
   // CHECK-DAG: %[[X:.+]] = arith.constant 100
@@ -77,7 +77,7 @@ func @inlineWithTiedResults2(%arg0: tensor<1x4xf32>) -> tensor<1x4xf32> {
 
 // CHECK-LABEL: func @dontInlineReadWrite
 // CHECK-SAME: (%[[ARG0:.+]]: tensor<1x4xf32>)
-func @dontInlineReadWrite(%arg0: tensor<1x4xf32>) -> tensor<4x8xf32> {
+func.func @dontInlineReadWrite(%arg0: tensor<1x4xf32>) -> tensor<4x8xf32> {
   // CHECK: %[[CST:.+]] = arith.constant dense<0.000000e+00> : tensor<4x8xf32>
   %cst = arith.constant dense<0.0> : tensor<4x8xf32>
   %x = arith.constant 100 : index
@@ -100,7 +100,7 @@ func @dontInlineReadWrite(%arg0: tensor<1x4xf32>) -> tensor<4x8xf32> {
 // -----
 
 // CHECK-LABEL: func @remove_unused_result
-func @remove_unused_result(%arg0 : tensor<9xi32>, %arg1 : tensor<9xi32>) -> (tensor<i32>) {
+func.func @remove_unused_result(%arg0 : tensor<9xi32>, %arg1 : tensor<9xi32>) -> (tensor<i32>) {
   %c1 = arith.constant 1 : index
   //      CHECK: flow.dispatch.workgroups[%c1, %c1, %c1]() : () -> tensor<i32> =
   // CHECK-NEXT:   (%{{.+}}: !flow.dispatch.tensor<writeonly:i32>)
@@ -125,7 +125,7 @@ func @remove_unused_result(%arg0 : tensor<9xi32>, %arg1 : tensor<9xi32>) -> (ten
 // -----
 
 // CHECK-LABEL: func @remove_unused_dynamic_result
-func @remove_unused_dynamic_result(%dim: index) -> (tensor<i32>) {
+func.func @remove_unused_dynamic_result(%dim: index) -> (tensor<i32>) {
   %c1 = arith.constant 1 : index
   //      CHECK: flow.dispatch.workgroups[%c1, %c1, %c1]() : () -> tensor<i32> =
   // CHECK-NEXT:   (%{{.+}}: !flow.dispatch.tensor<writeonly:i32>)
@@ -154,7 +154,7 @@ func @remove_unused_dynamic_result(%dim: index) -> (tensor<i32>) {
 // -----
 
 // CHECK-LABEL: func @remove_unused_read_write_result
-func @remove_unused_read_write_result(%arg0 : tensor<9xi32>, %arg1 : tensor<9xi32>) -> (tensor<i32>) {
+func.func @remove_unused_read_write_result(%arg0 : tensor<9xi32>, %arg1 : tensor<9xi32>) -> (tensor<i32>) {
   %c1 = arith.constant 1 : index
   //      CHECK: flow.dispatch.workgroups[%c1, %c1, %c1]() : () -> tensor<i32> =
   // CHECK-NEXT:   (%{{.+}}: !flow.dispatch.tensor<writeonly:i32>)
@@ -179,7 +179,7 @@ func @remove_unused_read_write_result(%arg0 : tensor<9xi32>, %arg1 : tensor<9xi3
 // -----
 
 // CHECK-LABEL: func @keep_used_read_write_result
-func @keep_used_read_write_result(%arg0 : tensor<9xi32>, %arg1 : tensor<9xi32>) -> (tensor<i32>) {
+func.func @keep_used_read_write_result(%arg0 : tensor<9xi32>, %arg1 : tensor<9xi32>) -> (tensor<i32>) {
   %c1 = arith.constant 1 : index
   //      CHECK: flow.dispatch.workgroups[%c1, %c1, %c1]() : () -> (tensor<i32>, tensor<i32>) =
   // CHECK-NEXT:   (%{{.+}}: !flow.dispatch.tensor<writeonly:i32>, %{{.+}}: !flow.dispatch.tensor<readwrite:i32>)

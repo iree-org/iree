@@ -5,7 +5,7 @@
 // expects us to clean up.
 
 // CHECK-LABEL: @multiUseTiedOperand
-func @multiUseTiedOperand(%size: index) -> (!stream.resource<*>, !stream.resource<*>) {
+func.func @multiUseTiedOperand(%size: index) -> (!stream.resource<*>, !stream.resource<*>) {
   %c0 = arith.constant 0 : index
   %c128 = arith.constant 128 : index
   %c256 = arith.constant 256 : index
@@ -34,7 +34,7 @@ func @multiUseTiedOperand(%size: index) -> (!stream.resource<*>, !stream.resourc
 
 // CHECK-LABEL: @argMoveCallee
 // CHECK-SAME: (%[[ARG0:.+]]: !stream.resource<*>
-func private @argMoveCallee(%arg: !stream.resource<*>, %size: index) -> !stream.resource<*> {
+func.func private @argMoveCallee(%arg: !stream.resource<*>, %size: index) -> !stream.resource<*> {
   %c0 = arith.constant 0 : index
   %c128 = arith.constant 128 : index
   %c123_i32 = arith.constant 123 : i32
@@ -46,7 +46,7 @@ func private @argMoveCallee(%arg: !stream.resource<*>, %size: index) -> !stream.
   return %fill : !stream.resource<*>
 }
 // CHECK: @argMoveCaller
-func @argMoveCaller(%size: index) -> !stream.resource<*> {
+func.func @argMoveCaller(%size: index) -> !stream.resource<*> {
   %c123_i32 = arith.constant 123 : i32
   // CHECK: stream.async.splat
   %splat = stream.async.splat %c123_i32 : i32 -> !stream.resource<*>{%size}
@@ -60,7 +60,7 @@ func @argMoveCaller(%size: index) -> !stream.resource<*> {
 // call and passed by const-reference.
 
 // CHECK-LABEL: @argCopyCallee
-func private @argCopyCallee(%arg: !stream.resource<*>, %size: index) -> !stream.resource<*> {
+func.func private @argCopyCallee(%arg: !stream.resource<*>, %size: index) -> !stream.resource<*> {
   %c0 = arith.constant 0 : index
   %c128 = arith.constant 128 : index
   %c123_i32 = arith.constant 123 : i32
@@ -71,7 +71,7 @@ func private @argCopyCallee(%arg: !stream.resource<*>, %size: index) -> !stream.
   return %fill : !stream.resource<*>
 }
 // CHECK: @argCopyCaller
-func @argCopyCaller(%size: index) -> (!stream.resource<*>, !stream.resource<*>) {
+func.func @argCopyCaller(%size: index) -> (!stream.resource<*>, !stream.resource<*>) {
   %c123_i32 = arith.constant 123 : i32
   // CHECK: stream.async.splat
   %splat = stream.async.splat %c123_i32 : i32 -> !stream.resource<*>{%size}
@@ -90,7 +90,7 @@ func @argCopyCaller(%size: index) -> (!stream.resource<*>, !stream.resource<*>) 
 
 // CHECK-LABEL: @blockArgMove
 // CHECK-SAME: (%[[COND:.+]]: i1
-func private @blockArgMove(%cond: i1, %size: index) -> (!stream.resource<*>, !stream.resource<*>) {
+func.func private @blockArgMove(%cond: i1, %size: index) -> (!stream.resource<*>, !stream.resource<*>) {
   %c0 = arith.constant 0 : index
   %c128 = arith.constant 128 : index
   %c123_i32 = arith.constant 123 : i32

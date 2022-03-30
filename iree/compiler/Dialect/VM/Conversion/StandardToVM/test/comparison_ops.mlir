@@ -8,7 +8,7 @@ module {
   // CHECK: vm.func private @my_fn
   // CHECK-SAME: %[[ARG0:[a-zA-Z0-9$._-]+]]
   // CHECK-SAME: %[[ARG1:[a-zA-Z0-9$._-]+]]
-  func @my_fn(%arg0: i32, %arg1 : i32) -> (i1) {
+  func.func @my_fn(%arg0: i32, %arg1 : i32) -> (i1) {
     // CHECK: vm.cmp.eq.i32 %[[ARG0]], %[[ARG1]] : i32
     %1 = arith.cmpi eq, %arg0, %arg1 : i32
     return %1 : i1
@@ -25,7 +25,7 @@ module {
   // CHECK: vm.func private @my_fn
   // CHECK-SAME: %[[ARG0:[a-zA-Z0-9$._-]+]]
   // CHECK-SAME: %[[ARG1:[a-zA-Z0-9$._-]+]]
-  func @my_fn(%arg0: i32, %arg1 : i32) -> (i1) {
+  func.func @my_fn(%arg0: i32, %arg1 : i32) -> (i1) {
     // CHECK: vm.cmp.ne.i32 %[[ARG0]], %[[ARG1]] : i32
     %1 = arith.cmpi ne, %arg0, %arg1 : i32
     return %1 : i1
@@ -42,7 +42,7 @@ module {
   // CHECK: vm.func private @my_fn
   // CHECK-SAME: %[[ARG0:[a-zA-Z0-9$._-]+]]
   // CHECK-SAME: %[[ARG1:[a-zA-Z0-9$._-]+]]
-  func @my_fn(%arg0: i32, %arg1 : i32) -> (i1) {
+  func.func @my_fn(%arg0: i32, %arg1 : i32) -> (i1) {
     // CHECK: vm.cmp.lt.i32.s %[[ARG0]], %[[ARG1]] : i32
     %1 = arith.cmpi slt, %arg0, %arg1 : i32
     return %1 : i1
@@ -59,7 +59,7 @@ module {
   // CHECK: vm.func private @my_fn
   // CHECK-SAME: %[[ARG0:[a-zA-Z0-9$._-]+]]
   // CHECK-SAME: %[[ARG1:[a-zA-Z0-9$._-]+]]
-  func @my_fn(%arg0: i32, %arg1 : i32) -> (i1) {
+  func.func @my_fn(%arg0: i32, %arg1 : i32) -> (i1) {
     // CHECK: vm.cmp.lte.i32.s %[[ARG0]], %[[ARG1]] : i32
     %1 = arith.cmpi sle, %arg0, %arg1 : i32
     return %1 : i1
@@ -76,7 +76,7 @@ module {
   // CHECK: vm.func private @my_fn
   // CHECK-SAME: %[[ARG0:[a-zA-Z0-9$._-]+]]
   // CHECK-SAME: %[[ARG1:[a-zA-Z0-9$._-]+]]
-  func @my_fn(%arg0: i32, %arg1 : i32) -> (i1) {
+  func.func @my_fn(%arg0: i32, %arg1 : i32) -> (i1) {
     // CHECK: vm.cmp.gt.i32.s %[[ARG0]], %[[ARG1]] : i32
     %1 = arith.cmpi sgt, %arg0, %arg1 : i32
     return %1 : i1
@@ -93,7 +93,7 @@ module {
   // CHECK: vm.func private @my_fn
   // CHECK-SAME: %[[ARG0:[a-zA-Z0-9$._-]+]]
   // CHECK-SAME: %[[ARG1:[a-zA-Z0-9$._-]+]]
-  func @my_fn(%arg0: i32, %arg1 : i32) -> (i1) {
+  func.func @my_fn(%arg0: i32, %arg1 : i32) -> (i1) {
     // CHECK: vm.cmp.gte.i32.s %[[ARG0]], %[[ARG1]] : i32
     %1 = arith.cmpi sge, %arg0, %arg1 : i32
     return %1 : i1
@@ -110,7 +110,7 @@ module {
   // CHECK: vm.func private @my_fn
   // CHECK-SAME: %[[ARG0:[a-zA-Z0-9$._-]+]]
   // CHECK-SAME: %[[ARG1:[a-zA-Z0-9$._-]+]]
-  func @my_fn(%arg0: i32, %arg1 : i32) -> (i1) {
+  func.func @my_fn(%arg0: i32, %arg1 : i32) -> (i1) {
     // CHECK: vm.cmp.lt.i32.u %[[ARG0]], %[[ARG1]] : i32
     %1 = arith.cmpi ult, %arg0, %arg1 : i32
     return %1 : i1
@@ -127,7 +127,7 @@ module {
   // CHECK: vm.func private @my_fn
   // CHECK-SAME: %[[ARG0:[a-zA-Z0-9$._-]+]]
   // CHECK-SAME: %[[ARG1:[a-zA-Z0-9$._-]+]]
-  func @my_fn(%arg0: i32, %arg1 : i32) -> (i1) {
+  func.func @my_fn(%arg0: i32, %arg1 : i32) -> (i1) {
     // CHECK: vm.cmp.lte.i32.u %[[ARG0]], %[[ARG1]] : i32
     %1 = arith.cmpi ule, %arg0, %arg1 : i32
     return %1 : i1
@@ -144,7 +144,7 @@ module {
   // CHECK: vm.func private @my_fn
   // CHECK-SAME: %[[ARG0:[a-zA-Z0-9$._-]+]]
   // CHECK-SAME: %[[ARG1:[a-zA-Z0-9$._-]+]]
-  func @my_fn(%arg0: i32, %arg1 : i32) -> (i1) {
+  func.func @my_fn(%arg0: i32, %arg1 : i32) -> (i1) {
     // CHECK: vm.cmp.gt.i32.u %[[ARG0]], %[[ARG1]] : i32
     %1 = arith.cmpi ugt, %arg0, %arg1 : i32
     return %1 : i1
@@ -161,7 +161,7 @@ module {
   // CHECK: vm.func private @my_fn
   // CHECK-SAME: %[[ARG0:[a-zA-Z0-9$._-]+]]
   // CHECK-SAME: %[[ARG1:[a-zA-Z0-9$._-]+]]
-  func @my_fn(%arg0: i32, %arg1 : i32) -> (i1) {
+  func.func @my_fn(%arg0: i32, %arg1 : i32) -> (i1) {
     // CHECK: vm.cmp.gte.i32.u %[[ARG0]], %[[ARG1]] : i32
     %1 = arith.cmpi uge, %arg0, %arg1 : i32
     return %1 : i1
@@ -178,7 +178,7 @@ module {
   // CHECK: vm.func private @my_fn
   // CHECK-SAME: %[[ARG0:[a-zA-Z0-9$._-]+]]
   // CHECK-SAME: %[[ARG1:[a-zA-Z0-9$._-]+]]
-  func @my_fn(%arg0: i64, %arg1 : i64) -> (i1) {
+  func.func @my_fn(%arg0: i64, %arg1 : i64) -> (i1) {
     // CHECK: vm.cmp.gte.i64.u %[[ARG0]], %[[ARG1]] : i64
     %1 = arith.cmpi uge, %arg0, %arg1 : i64
     return %1 : i1

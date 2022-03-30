@@ -1,7 +1,7 @@
 // RUN: iree-opt -pass-pipeline="func.func(iree-verify-input-legality)" -verify-diagnostics %s -split-input-file
 
 // expected-error@below {{illegal operations still remain}}
-func @check_no_mhlo(%arg0: tensor<?x?xf32>, %arg1 : tensor<?x?xf32>) -> tensor<?x?xf32> {
+func.func @check_no_mhlo(%arg0: tensor<?x?xf32>, %arg1 : tensor<?x?xf32>) -> tensor<?x?xf32> {
   // expected-error@+1 {{illegal op still exists}}
   %0 = "mhlo.add"(%arg0, %arg1) : (tensor<?x?xf32>, tensor<?x?xf32>) -> tensor<?x?xf32>
   return %0 : tensor<?x?xf32>
@@ -10,7 +10,7 @@ func @check_no_mhlo(%arg0: tensor<?x?xf32>, %arg1 : tensor<?x?xf32>) -> tensor<?
 // -----
 
 // expected-error@below {{illegal operations still remain}}
-func @check_no_tosa(%arg0: tensor<?x?xf32>, %arg1 : tensor<?x?xf32>) -> tensor<?x?xf32> {
+func.func @check_no_tosa(%arg0: tensor<?x?xf32>, %arg1 : tensor<?x?xf32>) -> tensor<?x?xf32> {
   // expected-error@+1 {{illegal op still exists}}
   %0 = "tosa.add"(%arg0, %arg1) : (tensor<?x?xf32>, tensor<?x?xf32>) -> tensor<?x?xf32>
   return %0 : tensor<?x?xf32>
@@ -21,7 +21,7 @@ func @check_no_tosa(%arg0: tensor<?x?xf32>, %arg1 : tensor<?x?xf32>) -> tensor<?
 // Note: checking that this is illegal even if the op could be folded. This pass
 // shouldn't be modifying the IR.
 // expected-error@below {{illegal operations still remain}}
-func @check_no_unrealized_cast(%arg0: tensor<?xf32>) -> tensor<?xf32> {
+func.func @check_no_unrealized_cast(%arg0: tensor<?xf32>) -> tensor<?xf32> {
   // expected-error@+1 {{illegal op still exists}}
   %0 = builtin.unrealized_conversion_cast %arg0 : tensor<?xf32> to memref<?xf32>
   // expected-error@+1 {{illegal op still exists}}
@@ -31,7 +31,7 @@ func @check_no_unrealized_cast(%arg0: tensor<?xf32>) -> tensor<?xf32> {
 
 // -----
 
-func @check_linalg_ok(%conv : tensor<1x112x112x16xf32>, %bias : tensor<16xf32>, %init : tensor<1x112x112x16xf32>) -> tensor<1x112x112x16xf32> {
+func.func @check_linalg_ok(%conv : tensor<1x112x112x16xf32>, %bias : tensor<16xf32>, %init : tensor<1x112x112x16xf32>) -> tensor<1x112x112x16xf32> {
   %result = linalg.generic {
       indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>,
                        affine_map<(d0, d1, d2, d3) -> (d3)>,

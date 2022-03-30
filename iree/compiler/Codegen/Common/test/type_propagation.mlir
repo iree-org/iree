@@ -1,6 +1,6 @@
 // RUN: iree-opt -iree-codegen-type-propagation -split-input-file %s | FileCheck %s
 
-func @generic_op_illegal_operand() {
+func.func @generic_op_illegal_operand() {
   %d = hal.interface.constant.load[0] : index
   %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<readonly:?xi8>{%d}
   %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : !flow.dispatch.tensor<writeonly:?xi8>{%d}
@@ -34,7 +34,7 @@ func @generic_op_illegal_operand() {
 
 // -----
 
-func @generic_op_illegal_operand_i7() {
+func.func @generic_op_illegal_operand_i7() {
   %d = hal.interface.constant.load[0] : index
   %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<readonly:?xi8>{%d}
   %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : !flow.dispatch.tensor<writeonly:?xi8>{%d}
@@ -68,7 +68,7 @@ func @generic_op_illegal_operand_i7() {
 
 // -----
 
-func @generic_op_illegal_operand_i33() {
+func.func @generic_op_illegal_operand_i33() {
   %d = hal.interface.constant.load[0] : index
   %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<readonly:?xi64>{%d}
   %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : !flow.dispatch.tensor<writeonly:?xi64>{%d}
@@ -103,7 +103,7 @@ func @generic_op_illegal_operand_i33() {
 
 // -----
 
-func @generic_op_illegal_result() {
+func.func @generic_op_illegal_result() {
   %d = hal.interface.constant.load[0] : index
   %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<readonly:?xi8>{%d}
   %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : !flow.dispatch.tensor<writeonly:?xi8>{%d}
@@ -137,7 +137,7 @@ func @generic_op_illegal_result() {
 
 // -----
 
-func @tensor_extract() {
+func.func @tensor_extract() {
   %d = hal.interface.constant.load[0] : index
   %offset = hal.interface.constant.load[1] : index
   %size = hal.interface.constant.load[2] : index
@@ -159,7 +159,7 @@ func @tensor_extract() {
 
 // -----
 
-func @tensor_insert() {
+func.func @tensor_insert() {
   %d = hal.interface.constant.load[0] : index
   %offset = hal.interface.constant.load[1] : index
   %size = hal.interface.constant.load[2] : index
@@ -186,7 +186,7 @@ func @tensor_insert() {
 
 // -----
 
-func @for_loop() {
+func.func @for_loop() {
   %d = hal.interface.constant.load[0] : index
   %lb = hal.interface.constant.load[1] : index
   %step = hal.interface.constant.load[2] : index
@@ -220,7 +220,7 @@ func @for_loop() {
 
 // -----
 
-func @fill_op() {
+func.func @fill_op() {
   %d = hal.interface.constant.load[0] : index
   %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<writeonly:?xi8>{%d}
   %1 = linalg.init_tensor [%d] : tensor<?xi1>

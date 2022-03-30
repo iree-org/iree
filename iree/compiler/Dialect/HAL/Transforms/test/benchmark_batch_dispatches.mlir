@@ -5,7 +5,7 @@ util.global @_executable : !hal.executable
 // CHECK-LABEL: @duplicate_dispatches
 //  CHECK-SAME: (%[[CMD1:.+]]: !hal.command_buffer,
 //  CHECK-SAME:  %[[CMD2:.+]]: !hal.command_buffer)
-func @duplicate_dispatches(%cmd1 : !hal.command_buffer, %cmd2 : !hal.command_buffer) {
+func.func @duplicate_dispatches(%cmd1 : !hal.command_buffer, %cmd2 : !hal.command_buffer) {
   // CHECK: %[[EXE:.+]] = util.global.load @_executable
   %exe = util.global.load @_executable : !hal.executable
 

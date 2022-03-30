@@ -1,4 +1,4 @@
-func @main() {
+func.func @main() {
   %lhs = flow.tensor.constant  dense<[[1.0,2.0,3.0,4.0],[-1.0,-2.0,-3.0,-4.0]]> : tensor<2x4xf32> -> tensor<?x4xf32>
   %rhs = flow.tensor.constant  dense<[[5.0,6.0,7.0,8.0],[-5.0,-6.0,-7.0,-8.0]]> : tensor<2x4xf32> -> tensor<?x4xf32>
   %2 = "mhlo.add"(%lhs, %rhs) : (tensor<?x4xf32>, tensor<?x4xf32>) -> tensor<?x4xf32>

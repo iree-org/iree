@@ -297,7 +297,7 @@ def int_or_question_mark(s: DimSize):
 
 
 # Stringification used for generating alphanumeric identifiers, e.g.
-# func @somefunction_DYNxDYNxf32, where we can't use "?" characters.
+# func.func @somefunction_DYNxDYNxf32, where we can't use "?" characters.
 def int_or_DYN(s: DimSize):
   return s.value or "DYN"
 

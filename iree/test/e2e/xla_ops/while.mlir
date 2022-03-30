@@ -1,5 +1,5 @@
 // NOTE: this has already been legalized to CFG form in the TF import tools.
-func @while() {
+func.func @while() {
   %start = util.unfoldable_constant dense<1> : tensor<i32>
   %bound = util.unfoldable_constant dense<3> : tensor<i32>
   %cst_1 = arith.constant dense<4> : tensor<i32>

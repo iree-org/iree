@@ -166,11 +166,11 @@ struct FoldBlockArgumentsPattern
 // all incoming edges and elides the arguments.
 //
 // Example:
-//  func @foo(%arg0: index) {
+//  func.func @foo(%arg0: index) {
 //    br ^bb1(%arg0 : index)
 //  ^bb1(%0: index):
 // ->
-//  func @foo(%arg0: index) {
+//  func.func @foo(%arg0: index) {
 //    br ^bb1
 //  ^bb1:  // %0 remapped to %arg0
 struct ElideBranchOperandsPattern

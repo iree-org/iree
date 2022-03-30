@@ -2,7 +2,7 @@
 
 // CHECK-LABEL: @allocator_allocate
 //  CHECK-SAME: (%[[ALLOCATOR:.+]]: !hal.allocator)
-func @allocator_allocate(%allocator: !hal.allocator) {
+func.func @allocator_allocate(%allocator: !hal.allocator) {
   // CHECK-DAG: %[[SIZE:.+]] = arith.constant 123
   %size = arith.constant 123 : index
   //      CHECK: %[[REF:.+]] = hal.allocator.allocate<%[[ALLOCATOR]] : !hal.allocator>
@@ -18,7 +18,7 @@ func @allocator_allocate(%allocator: !hal.allocator) {
 
 // CHECK-LABEL: @allocator_map_byte_buffer
 //  CHECK-SAME: %[[ALLOCATOR:.+]]: !hal.allocator
-func @allocator_map_byte_buffer(%allocator: !hal.allocator, %arg1: !util.byte_buffer) {
+func.func @allocator_map_byte_buffer(%allocator: !hal.allocator, %arg1: !util.byte_buffer) {
   // CHECK-DAG: %[[OFFSET:.+]] = arith.constant 100
   %offset = arith.constant 100 : index
   // CHECK-DAG: %[[LENGTH:.+]] = arith.constant 200

@@ -4,7 +4,7 @@
 
 module @no_uninitialized {
   util.global private @hoisted : tensor<5x6xf32> = dense<4.0> : tensor<5x6xf32>
-  func @main() -> tensor<5x6xf32> {
+  func.func @main() -> tensor<5x6xf32> {
     %hoisted = util.global.load @hoisted : tensor<5x6xf32>
     return %hoisted : tensor<5x6xf32>
   }
@@ -17,7 +17,7 @@ module @no_uninitialized {
 #map1 = affine_map<(d0, d1) -> (d0, d1)>
 module @linalg_tensor_jit {
   util.global private @hoisted : tensor<5x6xf32>
-  func @main() -> tensor<5x6xf32> {
+  func.func @main() -> tensor<5x6xf32> {
     %hoisted = util.global.load @hoisted : tensor<5x6xf32>
     return %hoisted : tensor<5x6xf32>
   }
@@ -45,7 +45,7 @@ module @linalg_tensor_jit {
 // CHECK: util.global private @{{.*}} = dense<2> : tensor<2xi32>
 module @eval_splat_detection {
   util.global private @hoisted : tensor<2xi32>
-  func @main() -> tensor<2xi32> {
+  func.func @main() -> tensor<2xi32> {
     %hoisted = util.global.load @hoisted : tensor<2xi32>
     return %hoisted : tensor<2xi32>
   }
@@ -63,7 +63,7 @@ module @eval_splat_detection {
 // CHECK: util.initializer
 module @eval_f16_tensor {
   util.global private @hoisted : tensor<5x6xf16>
-  func @main() -> tensor<5x6xf16> {
+  func.func @main() -> tensor<5x6xf16> {
     %hoisted = util.global.load @hoisted : tensor<5x6xf16>
     return %hoisted : tensor<5x6xf16>
   }
@@ -80,7 +80,7 @@ module @eval_f16_tensor {
 // CHECK: util.initializer
 module @eval_bf16_tensor {
   util.global private @hoisted : tensor<5x6xbf16>
-  func @main() -> tensor<5x6xbf16> {
+  func.func @main() -> tensor<5x6xbf16> {
     %hoisted = util.global.load @hoisted : tensor<5x6xbf16>
     return %hoisted : tensor<5x6xbf16>
   }
@@ -96,7 +96,7 @@ module @eval_bf16_tensor {
 // CHECK: util.global private @{{.*}} = dense<[2.000000e+02, 3.200000e+03]> : tensor<2xf32>
 module @eval_f32_tensor {
   util.global private @hoisted : tensor<2xf32>
-  func @main() -> tensor<2xf32> {
+  func.func @main() -> tensor<2xf32> {
     %hoisted = util.global.load @hoisted : tensor<2xf32>
     return %hoisted : tensor<2xf32>
   }
@@ -112,7 +112,7 @@ module @eval_f32_tensor {
 // CHECK: util.global private @{{.*}} = dense<[2.000000e+02, 3.200000e+03]> : tensor<2xf64>
 module @eval_f64_tensor {
   util.global private @hoisted : tensor<2xf64>
-  func @main() -> tensor<2xf64> {
+  func.func @main() -> tensor<2xf64> {
     %hoisted = util.global.load @hoisted : tensor<2xf64>
     return %hoisted : tensor<2xf64>
   }
@@ -128,7 +128,7 @@ module @eval_f64_tensor {
 // CHECK: util.global private @{{.*}} = dense<[false, true, false, true, true, false]> : tensor<6xi1>
 module @eval_i1_tensor {
   util.global private @hoisted : tensor<6xi1>
-  func @main() -> tensor<6xi1> {
+  func.func @main() -> tensor<6xi1> {
     %hoisted = util.global.load @hoisted : tensor<6xi1>
     return %hoisted : tensor<6xi1>
   }
@@ -147,7 +147,7 @@ module @eval_i1_tensor {
 // CHECK: util.initializer
 module @eval_i4_tensor {
   util.global private @hoisted : tensor<5x6xi4>
-  func @main() -> tensor<5x6xi4> {
+  func.func @main() -> tensor<5x6xi4> {
     %hoisted = util.global.load @hoisted : tensor<5x6xi4>
     return %hoisted : tensor<5x6xi4>
   }
@@ -163,7 +163,7 @@ module @eval_i4_tensor {
 // CHECK: util.global private @{{.*}} = dense<[2, 3]> : tensor<2xi8>
 module @eval_i8_tensor {
   util.global private @hoisted : tensor<2xi8>
-  func @main() -> tensor<2xi8> {
+  func.func @main() -> tensor<2xi8> {
     %hoisted = util.global.load @hoisted : tensor<2xi8>
     return %hoisted : tensor<2xi8>
   }
@@ -179,7 +179,7 @@ module @eval_i8_tensor {
 // CHECK: util.global private @{{.*}} = dense<[2, 3]> : tensor<2xi16>
 module @eval_i16_tensor {
   util.global private @hoisted : tensor<2xi16>
-  func @main() -> tensor<2xi16> {
+  func.func @main() -> tensor<2xi16> {
     %hoisted = util.global.load @hoisted : tensor<2xi16>
     return %hoisted : tensor<2xi16>
   }
@@ -195,7 +195,7 @@ module @eval_i16_tensor {
 // CHECK: util.global private @{{.*}} = dense<[2, 3]> : tensor<2xi32>
 module @eval_i32_tensor {
   util.global private @hoisted : tensor<2xi32>
-  func @main() -> tensor<2xi32> {
+  func.func @main() -> tensor<2xi32> {
     %hoisted = util.global.load @hoisted : tensor<2xi32>
     return %hoisted : tensor<2xi32>
   }
@@ -211,7 +211,7 @@ module @eval_i32_tensor {
 // CHECK: util.global private @{{.*}} = dense<[2, 3]> : tensor<2xi64>
 module @eval_i64_tensor {
   util.global private @hoisted : tensor<2xi64>
-  func @main() -> tensor<2xi64> {
+  func.func @main() -> tensor<2xi64> {
     %hoisted = util.global.load @hoisted : tensor<2xi64>
     return %hoisted : tensor<2xi64>
   }

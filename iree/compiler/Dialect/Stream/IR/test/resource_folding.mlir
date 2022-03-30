@@ -1,7 +1,7 @@
 // RUN: iree-opt -split-input-file -canonicalize %s | iree-opt -split-input-file | FileCheck %s
 
 // CHECK-LABEL: @FoldResourceSizeOp
-func @FoldResourceSizeOp(%arg0: !stream.resource<staging>, %arg1: index) -> (index, i32) {
+func.func @FoldResourceSizeOp(%arg0: !stream.resource<staging>, %arg1: index) -> (index, i32) {
   %c0 = arith.constant 0 : index
   // CHECK-NOT: stream.resource.size
   %0 = stream.resource.size %arg0 : !stream.resource<staging>
@@ -14,7 +14,7 @@ func @FoldResourceSizeOp(%arg0: !stream.resource<staging>, %arg1: index) -> (ind
 // -----
 
 // CHECK-LABEL: @SelectResourceSizeOp
-func @SelectResourceSizeOp(%arg0: !stream.resource<staging>, %arg1: index, %arg2: !stream.resource<staging>, %arg3: index, %arg4: i1) -> (!stream.resource<staging>, index) {
+func.func @SelectResourceSizeOp(%arg0: !stream.resource<staging>, %arg1: index, %arg2: !stream.resource<staging>, %arg3: index, %arg4: i1) -> (!stream.resource<staging>, index) {
   // CHECK: %[[ARG0_T:.+]] = stream.async.transfer %arg0 {{.+}} -> !stream.resource<*>{%[[ARG0_SZ:.+]]}
   %0 = stream.async.transfer %arg0 : !stream.resource<staging>{%arg1} -> !stream.resource<*>{%arg1}
   // CHECK: %[[ARG2_T:.+]] = stream.async.transfer %arg2 {{.+}} -> !stream.resource<*>{%[[ARG2_SZ:.+]]}
@@ -31,7 +31,7 @@ func @SelectResourceSizeOp(%arg0: !stream.resource<staging>, %arg1: index, %arg2
 // -----
 
 // CHECK-LABEL: @FoldSubviewIntoLoadOp
-func @FoldSubviewIntoLoadOp(%arg0: !stream.resource<staging>, %arg1: index) -> i32 {
+func.func @FoldSubviewIntoLoadOp(%arg0: !stream.resource<staging>, %arg1: index) -> i32 {
   %c64 = arith.constant 64 : index
   %c128 = arith.constant 128 : index
   %c256 = arith.constant 256 : index
@@ -45,7 +45,7 @@ func @FoldSubviewIntoLoadOp(%arg0: !stream.resource<staging>, %arg1: index) -> i
 // -----
 
 // CHECK-LABEL: @FoldSubviewIntoStoreOp
-func @FoldSubviewIntoStoreOp(%arg0: !stream.resource<staging>, %arg1: index) {
+func.func @FoldSubviewIntoStoreOp(%arg0: !stream.resource<staging>, %arg1: index) {
   %c64 = arith.constant 64 : index
   %c128 = arith.constant 128 : index
   %c256 = arith.constant 256 : index
@@ -62,7 +62,7 @@ func @FoldSubviewIntoStoreOp(%arg0: !stream.resource<staging>, %arg1: index) {
 // A pack with no slices folds to a zero-length slab.
 
 // CHECK-LABEL: @FoldResourcePackOpEmpty
-func @FoldResourcePackOpEmpty(%allocator: !hal.allocator) -> index {
+func.func @FoldResourcePackOpEmpty(%allocator: !hal.allocator) -> index {
   // CHECK-NEXT: %[[ZERO_LENGTH:.+]] = arith.constant 0
   %total_length = stream.resource.pack slices({}) : index
   // CHECK-NEXT: return %[[ZERO_LENGTH]]
@@ -76,7 +76,7 @@ func @FoldResourcePackOpEmpty(%allocator: !hal.allocator) -> index {
 // CHECK-LABEL: @FoldResourcePackOpOneSlice
 // CHECK-SAME: %[[OFFSET:.+]]: index,
 // CHECK-SAME: %[[SIZE:.+]]: index
-func @FoldResourcePackOpOneSlice(%offset: index, %size: index) -> (index, index) {
+func.func @FoldResourcePackOpOneSlice(%offset: index, %size: index) -> (index, index) {
   // CHECK-NOT: stream.resource.pack
   %total_length, %offset_0 =
       stream.resource.pack
@@ -93,7 +93,7 @@ func @FoldResourcePackOpOneSlice(%offset: index, %size: index) -> (index, index)
 // A constant zero offset operand gets dropped.
 
 // CHECK-LABEL: @PropagateResourcePackZeroOffset
-func @PropagateResourcePackZeroOffset(%size : index) -> (index, index, index) {
+func.func @PropagateResourcePackZeroOffset(%size : index) -> (index, index, index) {
   // CHECK-NOT: constant 0
   // CHECK-NEXT: = stream.resource.pack slices({
   %base_offset = arith.constant 0 : index
@@ -114,7 +114,7 @@ func @PropagateResourcePackZeroOffset(%size : index) -> (index, index, index) {
 // CHECK-LABEL: @PropagateResourcePackBaseOffset
 // CHECK-SAME: %[[BASE_OFFSET:.+]]: index,
 // CHECK-SAME: %[[SIZE:.+]]: index
-func @PropagateResourcePackBaseOffset(%base_offset: index, %size : index) -> (index, index, index) {
+func.func @PropagateResourcePackBaseOffset(%base_offset: index, %size : index) -> (index, index, index) {
   // CHECK-NEXT: %[[PACKED:.+]]:3 =
   %total_length, %offset_0, %offset_1 =
       // CHECK-SAME: stream.resource.pack slices({
@@ -136,7 +136,7 @@ func @PropagateResourcePackBaseOffset(%base_offset: index, %size : index) -> (in
 
 // CHECK-LABEL: @CanonicalizeResourcePackIntervals
 // CHECK-SAME: %[[SIZE:.+]]: index
-func @CanonicalizeResourcePackIntervals(%size : index) -> (index, index, index) {
+func.func @CanonicalizeResourcePackIntervals(%size : index) -> (index, index, index) {
   // CHECK-NEXT: %[[PACKED:.+]]:3 =
   %total_length, %offset_0, %offset_1 =
       // CHECK-SAME: stream.resource.pack slices({
@@ -154,7 +154,7 @@ func @CanonicalizeResourcePackIntervals(%size : index) -> (index, index, index) 
 // -----
 
 // CHECK-LABEL: @FoldResourceSubviewOp
-func @FoldResourceSubviewOp(%arg0: !stream.resource<*>, %arg1: index) -> !stream.resource<*> {
+func.func @FoldResourceSubviewOp(%arg0: !stream.resource<*>, %arg1: index) -> !stream.resource<*> {
   %c0 = arith.constant 0 : index
   // CHECK-NOT: stream.resource.subview
   %0 = stream.resource.subview %arg0[%c0] : !stream.resource<*>{%arg1} -> !stream.resource<*>{%arg1}
@@ -165,7 +165,7 @@ func @FoldResourceSubviewOp(%arg0: !stream.resource<*>, %arg1: index) -> !stream
 // -----
 
 // CHECK-LABEL: @FoldResourceSubviewOps
-func @FoldResourceSubviewOps(%arg0: !stream.resource<*>, %arg1: index) -> !stream.resource<*> {
+func.func @FoldResourceSubviewOps(%arg0: !stream.resource<*>, %arg1: index) -> !stream.resource<*> {
   %c100 = arith.constant 100 : index
   %c300 = arith.constant 300 : index
   %c400 = arith.constant 400 : index
@@ -181,7 +181,7 @@ func @FoldResourceSubviewOps(%arg0: !stream.resource<*>, %arg1: index) -> !strea
 // -----
 
 // CHECK-LABEL: @SinkSubviewAcrossSelectOps
-func @SinkSubviewAcrossSelectOps(%arg0: !stream.resource<*>, %arg1: i1) -> !stream.resource<*> {
+func.func @SinkSubviewAcrossSelectOps(%arg0: !stream.resource<*>, %arg1: i1) -> !stream.resource<*> {
   %c0 = arith.constant 0 : index
   %c128 = arith.constant 128 : index
   %c256 = arith.constant 256 : index
@@ -202,7 +202,7 @@ func @SinkSubviewAcrossSelectOps(%arg0: !stream.resource<*>, %arg1: i1) -> !stre
 
 // CHECK-LABEL: unrealizedCastCleanup
 // CHECK-SAME: (%[[ARG0:.+]]: !stream.resource<transient>, %[[ARG1:.+]]: index)
-func @unrealizedCastCleanup(%arg0: !stream.resource<transient>, %arg1: index) -> (!stream.resource<transient>, index) {
+func.func @unrealizedCastCleanup(%arg0: !stream.resource<transient>, %arg1: index) -> (!stream.resource<transient>, index) {
   %0 = builtin.unrealized_conversion_cast %arg0, %arg1 : !stream.resource<transient>, index to !stream.resource<transient>
   %1 = stream.resource.size %0 : !stream.resource<transient>
   // CHECK-NEXT: return %[[ARG0]], %[[ARG1]]

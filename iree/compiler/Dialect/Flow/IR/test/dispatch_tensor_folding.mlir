@@ -1,7 +1,7 @@
 // RUN: iree-opt -allow-unregistered-dialect -split-input-file -canonicalize %s | FileCheck %s
 
 // CHECK-LABEL: @ReuseDispatchTensorLoadShapeDims
-func @ReuseDispatchTensorLoadShapeDims(%arg0: !flow.dispatch.tensor<readonly:?x?xf32>, %arg1: index, %arg2: index, %arg3: index, %arg4: index) {
+func.func @ReuseDispatchTensorLoadShapeDims(%arg0: !flow.dispatch.tensor<readonly:?x?xf32>, %arg1: index, %arg2: index, %arg3: index, %arg4: index) {
   %arg0_tied = flow.dispatch.tie_shape %arg0 : !flow.dispatch.tensor<readonly:?x?xf32>{%arg1, %arg2}
   %c0 = arith.constant 0 : index
   // CHECK: flow.dispatch.tensor.load {{.+}} !flow.dispatch.tensor<readonly:?x?xf32>{%arg1, %arg2}
@@ -12,7 +12,7 @@ func @ReuseDispatchTensorLoadShapeDims(%arg0: !flow.dispatch.tensor<readonly:?x?
 
 // -----
 
-func @canonicalizeStaticOperands(%arg0: !flow.dispatch.tensor<readonly:4x4xf32>) {
+func.func @canonicalizeStaticOperands(%arg0: !flow.dispatch.tensor<readonly:4x4xf32>) {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %c2 = arith.constant 2 : index
@@ -31,7 +31,7 @@ func @canonicalizeStaticOperands(%arg0: !flow.dispatch.tensor<readonly:4x4xf32>)
 
 // -----
 
-func @canonicalizePartiallyStaticOperands(%arg0: !flow.dispatch.tensor<readonly:4x4xf32>, %offset: index, %size: index, %stride: index) {
+func.func @canonicalizePartiallyStaticOperands(%arg0: !flow.dispatch.tensor<readonly:4x4xf32>, %offset: index, %size: index, %stride: index) {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %c2 = arith.constant 2 : index
@@ -51,7 +51,7 @@ func @canonicalizePartiallyStaticOperands(%arg0: !flow.dispatch.tensor<readonly:
 
 // -----
 
-func @canonicalizeDimOfTensorTile(%arg0: !flow.dispatch.tensor<readonly:250x1024xf32>, %arg1 : index, %arg2: index) {
+func.func @canonicalizeDimOfTensorTile(%arg0: !flow.dispatch.tensor<readonly:250x1024xf32>, %arg1 : index, %arg2: index) {
   %c0 = arith.constant 0 : index
   %0 = affine.min affine_map<(d0) -> (64, -d0 + 250)>(%arg1)
   %1 = flow.dispatch.tensor.load %arg0, offsets = [%arg2, 0], sizes = [%0, 1024], strides = [1, 1] : !flow.dispatch.tensor<readonly:250x1024xf32> -> tensor<?x1024xf32>
