@@ -1,8 +1,6 @@
-// RUN: iree-compile %s -iree-mlir-to-vm-bytecode-module --iree-hal-target-backends=dylib-llvm-aot \
-// RUN:   -iree-codegen-use-linalg-transform-interp -linalg-transform-file-name=%p/linalg_transform_spec.mlir | \
-// RUN: iree-check-module  --driver=dylib -
+// RUN: iree-run-mlir %s --iree-hal-target-backends=dylib-llvm-aot -iree-codegen-use-linalg-transform-interp -linalg-transform-file-name=%p/linalg_transform_spec.mlir 
 
-func @matmul_static() {
+func @matmul_static() -> tensor<5x5xf32> {
   %res = flow.tensor.constant dense<[
     [0.0, 0.0, 0.0, 0.0, 0.0],
     [0.0, 0.0, 0.0, 0.0, 0.0],
@@ -30,11 +28,12 @@ func @matmul_static() {
       outs(%res_in : tensor<5x5xf32>) -> tensor<5x5xf32>
   %matmul_res = util.do_not_optimize(%matmul) : tensor<5x5xf32>
 
-  check.expect_almost_eq_const(%matmul_res,
-    dense<[[430.0, 388.0, 346.0, 304.0, 262.0],
-           [340.0, 307.0, 274.0, 241.0, 208.0],
-           [250.0, 226.0, 202.0, 178.0, 154.0],
-           [160.0, 145.0, 130.0, 115.0, 100.0],
-           [70.0, 64.0, 58.0, 52.0, 46.0]]> : tensor<5x5xf32>) : tensor<5x5xf32>
-  return
+  return %matmul_res : tensor<5x5xf32>
 }
+
+//      CHECK: 5x5xf32=
+// CHECK-SAME: [430 388 346 304 262]
+// CHECK-SAME: [340 307 274 241 208]
+// CHECK-SAME: [250 226 202 178 154]
+// CHECK-SAME: [160 145 130 115 100]
+// CHECK-SAME: [70 64 58 52 46]
