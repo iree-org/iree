@@ -2,7 +2,7 @@
 
 flow.executable @ex0 {
   builtin.module {
-    func @dispatch_fn(%cst : index, %arg0 : tensor<4xf32>) -> tensor<4xf32> {
+    func.func @dispatch_fn(%cst : index, %arg0 : tensor<4xf32>) -> tensor<4xf32> {
       return %arg0 : tensor<4xf32>
     }
   }
@@ -10,7 +10,7 @@ flow.executable @ex0 {
 }
 
 // CHECK-LABEL: @dispatch
-func @dispatch(%arg0 : tensor<4xf32>) -> tensor<4xf32> {
+func.func @dispatch(%arg0 : tensor<4xf32>) -> tensor<4xf32> {
   // CHECK: %[[CST:.+]] = arith.constant
   %cst = arith.constant 4 : index
   // CHECK: %0 = flow.dispatch @ex0::@dispatch_fn[%[[CST]]](%[[CST]], %arg0) : (index, tensor<4xf32>) -> tensor<4xf32>
@@ -21,7 +21,7 @@ func @dispatch(%arg0 : tensor<4xf32>) -> tensor<4xf32> {
 // -----
 
 // CHECK-LABEL: @inplaceDispatch
-func @inplaceDispatch(%arg0 : tensor<4xf32>, %arg1 : tensor<8xf32>) -> (tensor<4xf32>, tensor<8xf32>) {
+func.func @inplaceDispatch(%arg0 : tensor<4xf32>, %arg1 : tensor<8xf32>) -> (tensor<4xf32>, tensor<8xf32>) {
   // CHECK: %[[CST:.+]] = arith.constant
   %cst = arith.constant 4 : index
   // CHECK: %0:2 = flow.dispatch @ex0::@dispatch_fn[%[[CST]]](%[[CST]], %arg0, %arg1) : (index, tensor<4xf32>, tensor<8xf32>) -> (%arg0, %arg1)
@@ -32,7 +32,7 @@ func @inplaceDispatch(%arg0 : tensor<4xf32>, %arg1 : tensor<8xf32>) -> (tensor<4
 // -----
 
 // CHECK-LABEL: @inplaceDynamicDispatch
-func @inplaceDynamicDispatch(%arg0 : tensor<4x?xf32>, %arg1 : tensor<8x?xf32>) -> (tensor<4x?xf32>, tensor<8x?xf32>) {
+func.func @inplaceDynamicDispatch(%arg0 : tensor<4x?xf32>, %arg1 : tensor<8x?xf32>) -> (tensor<4x?xf32>, tensor<8x?xf32>) {
   // CHECK-DAG: %[[CST:.+]] = arith.constant 4
   %cst = arith.constant 4 : index
   // CHECK-DAG: %[[DIM0:.+]] = arith.constant 100
@@ -48,7 +48,7 @@ func @inplaceDynamicDispatch(%arg0 : tensor<4x?xf32>, %arg1 : tensor<8x?xf32>) -
 
 // CHECK-LABEL: @inplaceTypeChange
 // CHECK-SAME: (%[[ARG0:.+]]: tensor<4x?xf32>)
-func @inplaceTypeChange(%arg0: tensor<4x?xf32>) -> tensor<?x4xf32> {
+func.func @inplaceTypeChange(%arg0: tensor<4x?xf32>) -> tensor<?x4xf32> {
   // CHECK-DAG: %[[CST:.+]] = arith.constant 4
   %cst = arith.constant 4 : index
   // CHECK-DAG: %[[DIM0:.+]] = arith.constant 100

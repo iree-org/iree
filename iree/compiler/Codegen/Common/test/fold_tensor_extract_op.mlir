@@ -1,6 +1,6 @@
 // RUN: iree-opt -iree-codegen-fold-tensor-extract-op %s | FileCheck %s
 
-func @fold_tensor_extract(%arg0 : memref<2x3xi32>) -> i32
+func.func @fold_tensor_extract(%arg0 : memref<2x3xi32>) -> i32
 {
   %c1 = arith.constant 1 : index
   %c2 = arith.constant 2 : index

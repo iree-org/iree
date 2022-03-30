@@ -66,8 +66,8 @@ class WrapEntryPointsPass
   void runOnOperation() override {
     auto moduleOp = getOperation();
 
-    SmallVector<FuncOp, 4> entryFuncOps;
-    for (auto funcOp : moduleOp.getOps<FuncOp>()) {
+    SmallVector<func::FuncOp, 4> entryFuncOps;
+    for (auto funcOp : moduleOp.getOps<func::FuncOp>()) {
       if (funcOp.isPublic() && !funcOp->hasAttr("iree.abi.stub")) {
         entryFuncOps.push_back(funcOp);
       }
@@ -360,7 +360,7 @@ class WrapEntryPointsPass
   // Creates a function to query the |inputGlobalOps| at runtime by the
   // bindings.
   //
-  // func @_query_input_shape(%index : index, %shape : !util.list<index>)
+  // func.func @_query_input_shape(%index : index, %shape : !util.list<index>)
   void createQueryInputShapeFunc(Location loc, StringRef namePrefix,
                                  ArrayRef<DynamicDims> inputDynamicDims,
                                  OpBuilder &moduleBuilder) {
@@ -392,7 +392,7 @@ class WrapEntryPointsPass
   // Creates a function to resize |inputGlobalOps| and sets the |dirtyGlobalOp|
   // flag.
   //
-  // func @_resize_input_shape(%index : index, %shape : !util.list<index>)
+  // func.func @_resize_input_shape(%index : index, %shape : !util.list<index>)
   void createResizeInputShapeFunc(Location loc, StringRef namePrefix,
                                   ArrayRef<DynamicDims> inputDynamicDims,
                                   IREE::Util::GlobalOp dirtyGlobalOp,
@@ -429,12 +429,12 @@ class WrapEntryPointsPass
   // Creates a function to query the |outputGlobalOps| at runtime by the
   // bindings.
   //
-  // func @_query_output_shape(%index : index, %shape : !util.list<index>)
+  // func.func @_query_output_shape(%index : index, %shape : !util.list<index>)
   void createQueryOutputShapeFunc(Location loc, StringRef namePrefix,
                                   ArrayRef<DynamicDims> outputDynamicDims,
                                   mlir::func::FuncOp calculateShapeFuncOp,
                                   OpBuilder &moduleBuilder) {
-    auto queryFuncOp = moduleBuilder.create<FuncOp>(
+    auto queryFuncOp = moduleBuilder.create<func::FuncOp>(
         loc, namePrefix.str() + "_query_output_shape",
         moduleBuilder.getFunctionType(/*inputs=*/
                                       TypeRange{

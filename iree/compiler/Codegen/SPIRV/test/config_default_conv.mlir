@@ -28,7 +28,7 @@ hal.executable private @conv_pointwise_112x112x32 {
     }> {
     hal.executable.entry_point public @conv_pointwise_112x112x32 layout(#executable_layout)
     builtin.module {
-      func @conv_pointwise_112x112x32() {
+      func.func @conv_pointwise_112x112x32() {
         %c0 = arith.constant 0 : index
         %cst = arith.constant 0.000000e+00 : f32
         %c112 = arith.constant 112 : index

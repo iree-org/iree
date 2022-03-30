@@ -1195,7 +1195,8 @@ void populateVectorContractCustomKernelsPatterns(
   }
 }
 
-std::unique_ptr<OperationPass<FuncOp>> createVectorContractCustomKernelsPass() {
+std::unique_ptr<OperationPass<func::FuncOp>>
+createVectorContractCustomKernelsPass() {
   return std::make_unique<VectorContractCustomKernelsPass>();
 }
 

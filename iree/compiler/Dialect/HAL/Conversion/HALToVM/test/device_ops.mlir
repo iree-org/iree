@@ -2,7 +2,7 @@
 
 // CHECK-LABEL: @device_allocator
 // CHECK-SAME: (%[[DEVICE:.+]]: !vm.ref<!hal.device>)
-func @device_allocator(%device: !hal.device) -> !hal.allocator {
+func.func @device_allocator(%device: !hal.device) -> !hal.allocator {
   // CHECK: %ref = vm.call @hal.device.allocator(%[[DEVICE]]) {nosideeffects} : (!vm.ref<!hal.device>) -> !vm.ref<!hal.allocator>
   %allocator = hal.device.allocator<%device : !hal.device> : !hal.allocator
   return %allocator : !hal.allocator
@@ -12,7 +12,7 @@ func @device_allocator(%device: !hal.device) -> !hal.allocator {
 
 // CHECK-LABEL: @device_query_i32
 // CHECK-SAME: (%[[DEVICE:.+]]: !vm.ref<!hal.device>)
-func @device_query_i32(%device: !hal.device) -> (i1, i32) {
+func.func @device_query_i32(%device: !hal.device) -> (i1, i32) {
   // CHECK-DAG: %[[NS:.+]] = vm.rodata.inline "_utf8_sys_
   // CHECK-DAG: %[[KEY:.+]] = vm.rodata.inline "_utf8_foo_
   // CHECK: %[[RET:.+]]:2 = vm.call @hal.device.query.i32(%[[DEVICE]], %[[NS]], %[[KEY]]) {nosideeffects} : (!vm.ref<!hal.device>, !vm.buffer, !vm.buffer) -> (i32, i32)
@@ -25,7 +25,7 @@ func @device_query_i32(%device: !hal.device) -> (i1, i32) {
 
 // CHECK-LABEL: @device_query_i32_default
 // CHECK-SAME: (%[[DEVICE:.+]]: !vm.ref<!hal.device>)
-func @device_query_i32_default(%device: !hal.device) -> i32 {
+func.func @device_query_i32_default(%device: !hal.device) -> i32 {
   // CHECK-DAG: %[[NS:.+]] = vm.rodata.inline "_utf8_sys_
   // CHECK-DAG: %[[KEY:.+]] = vm.rodata.inline "_utf8_foo_
   // CHECK: %[[RET:.+]]:2 = vm.call @hal.device.query.i32(%[[DEVICE]], %[[NS]], %[[KEY]]) {nosideeffects} : (!vm.ref<!hal.device>, !vm.buffer, !vm.buffer) -> (i32, i32)
@@ -39,7 +39,7 @@ func @device_query_i32_default(%device: !hal.device) -> i32 {
 
 // CHECK-LABEL: @device_query_i1
 // CHECK-SAME: (%[[DEVICE:.+]]: !vm.ref<!hal.device>)
-func @device_query_i1(%device: !hal.device) -> (i1, i1) {
+func.func @device_query_i1(%device: !hal.device) -> (i1, i1) {
   // CHECK-DAG: %[[NS:.+]] = vm.rodata.inline "_utf8_sys_
   // CHECK-DAG: %[[KEY:.+]] = vm.rodata.inline "_utf8_foo_
   // CHECK: %[[RET:.+]]:2 = vm.call @hal.device.query.i32(%[[DEVICE]], %[[NS]], %[[KEY]]) {nosideeffects} : (!vm.ref<!hal.device>, !vm.buffer, !vm.buffer) -> (i32, i32)
@@ -53,7 +53,7 @@ func @device_query_i1(%device: !hal.device) -> (i1, i1) {
 
 // CHECK-LABEL: @device_query_i1_default
 // CHECK-SAME: (%[[DEVICE:.+]]: !vm.ref<!hal.device>)
-func @device_query_i1_default(%device: !hal.device) -> i1 {
+func.func @device_query_i1_default(%device: !hal.device) -> i1 {
   // CHECK-DAG: %[[NS:.+]] = vm.rodata.inline "_utf8_sys_
   // CHECK-DAG: %[[KEY:.+]] = vm.rodata.inline "_utf8_foo_
   // CHECK: %[[RET:.+]]:2 = vm.call @hal.device.query.i32(%[[DEVICE]], %[[NS]], %[[KEY]]) {nosideeffects} : (!vm.ref<!hal.device>, !vm.buffer, !vm.buffer) -> (i32, i32)

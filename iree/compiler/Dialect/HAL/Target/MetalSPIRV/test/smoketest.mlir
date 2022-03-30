@@ -15,7 +15,7 @@ module attributes {
 stream.executable public @reduce_dispatch {
   stream.executable.export @reduce_dispatch
   builtin.module {
-    func @reduce_dispatch(%arg0_binding: !stream.binding, %arg1_binding: !stream.binding) {
+    func.func @reduce_dispatch(%arg0_binding: !stream.binding, %arg1_binding: !stream.binding) {
       %c0 = arith.constant 0 : index
       %arg0 = stream.binding.subspan %arg0_binding[%c0] : !stream.binding -> !flow.dispatch.tensor<readonly:16xf32>
       %arg1 = stream.binding.subspan %arg1_binding[%c0] : !stream.binding -> !flow.dispatch.tensor<writeonly:f32>

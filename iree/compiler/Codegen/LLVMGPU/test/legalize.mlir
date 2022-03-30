@@ -1,7 +1,7 @@
 // RUN: iree-opt -iree-test-llvmgpu-legalize-ops -split-input-file %s | FileCheck %s
 
 // CHECK-LABEL: func @scalarize
-func @scalarize(
+func.func @scalarize(
   %arg0: vector<3x1x2xf32>,%arg1: vector<2xf32>, %arg2: vector<2xf32>)
   -> (vector<3x1x2xf32>, vector<2xf32>) {
 // CHECK: %[[E_0_0:.+]] = vector.extract %{{.*}}[0, 0, 0] : vector<3x1x2xf32>
@@ -41,7 +41,7 @@ func @scalarize(
 // CHECK: func @allocation
 // CHECK:   %[[A:.*]] = memref.get_global @__shared_memory__ : memref<16x16xf32, 3>
 // CHECK:   memref.store %{{.*}}, %[[A]][%{{.*}}, %{{.*}}] : memref<16x16xf32, 3>
-func @allocation(%arg0: f32) {
+func.func @allocation(%arg0: f32) {
   %0 = memref.alloc() : memref<16x16xf32, 3>
   %c0 = arith.constant 0 : index
   memref.store %arg0, %0[%c0, %c0] : memref<16x16xf32, 3>

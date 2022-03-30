@@ -108,6 +108,8 @@ class HALDispatchABI {
   static LLVM::LLVMStructType getEnvironmentType(
       MLIRContext *context, LLVMTypeConverter *typeConverter,
       LLVM::LLVMStructType processorType) {
+    static llvm::sys::Mutex mutex;
+    llvm::sys::ScopedLock lock(mutex);
     auto structType = LLVM::LLVMStructType::getIdentified(
         context, "iree_hal_executable_environment_v0_t");
     if (structType.isInitialized()) return structType;
@@ -162,6 +164,8 @@ class HALDispatchABI {
   // Returns a Type representing iree_hal_executable_dispatch_state_v0_t.
   static LLVM::LLVMStructType getDispatchStateType(
       MLIRContext *context, LLVMTypeConverter *typeConverter) {
+    static llvm::sys::Mutex mutex;
+    llvm::sys::ScopedLock lock(mutex);
     auto structType = LLVM::LLVMStructType::getIdentified(
         context, "iree_hal_executable_dispatch_state_v0_t");
     if (structType.isInitialized()) return structType;
@@ -225,6 +229,8 @@ class HALDispatchABI {
   // Returns a Type representing iree_hal_executable_workgroup_state_v0_t.
   static LLVM::LLVMStructType getWorkgroupStateType(
       MLIRContext *context, LLVMTypeConverter *typeConverter) {
+    static llvm::sys::Mutex mutex;
+    llvm::sys::ScopedLock lock(mutex);
     auto structType = LLVM::LLVMStructType::getIdentified(
         context, "iree_hal_executable_workgroup_state_v0_t");
     if (structType.isInitialized()) return structType;
@@ -605,7 +611,7 @@ class HALDispatchABI {
 /// Source function:
 ///
 /// ```
-/// func @foo() {
+/// func.func @foo() {
 ///   %0 = hal.interface.binding.subspan ...
 /// }
 /// ```
@@ -633,7 +639,7 @@ class ConvertHALEntryPointFuncOp : public ConvertToLLVMPattern {
   LogicalResult matchAndRewrite(
       Operation *op, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
-    auto stdFuncOp = cast<FuncOp>(op);
+    auto stdFuncOp = cast<func::FuncOp>(op);
     if (!stdFuncOp.isPublic()) return failure();
     FunctionType fnType = stdFuncOp.getFunctionType();
     if (fnType.getNumInputs() != 0 || fnType.getNumResults() != 0) {
@@ -971,7 +977,7 @@ void ConvertToLLVMPass::runOnOperation() {
   target.addIllegalOp<UnrealizedConversionCastOp>();
 
   // Don't apply patterns to private function (e.g num_workgroups func).
-  target.addDynamicallyLegalOp<FuncOp>([&](FuncOp funcOp) {
+  target.addDynamicallyLegalOp<func::FuncOp>([&](func::FuncOp funcOp) {
     if (isEntryPoint(funcOp)) return false;
     return true;
   });
@@ -980,7 +986,7 @@ void ConvertToLLVMPass::runOnOperation() {
                                     IREE::Util::UtilDialect,
                                     IREE::HAL::HALDialect, math::MathDialect>(
       [&](Operation *op) {
-        auto funcParent = op->getParentOfType<FuncOp>();
+        auto funcParent = op->getParentOfType<func::FuncOp>();
         if (!funcParent) return false;
         if (isEntryPoint(funcParent)) return false;
         return true;

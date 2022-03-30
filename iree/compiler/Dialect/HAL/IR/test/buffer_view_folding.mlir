@@ -2,7 +2,7 @@
 
 // CHECK-LABEL: func @skip_buffer_view_buffer
 // CHECK-SAME: %[[BUFFER:.+]]: !hal.buffer
-func @skip_buffer_view_buffer(%buffer : !hal.buffer) -> !hal.buffer {
+func.func @skip_buffer_view_buffer(%buffer : !hal.buffer) -> !hal.buffer {
   %c1 = arith.constant 1 : i32
   %c10 = arith.constant 10 : index
   %c11 = arith.constant 11 : index
@@ -20,7 +20,7 @@ func @skip_buffer_view_buffer(%buffer : !hal.buffer) -> !hal.buffer {
 
 // CHECK-LABEL: func @expand_buffer_view_dims
 // CHECK-SAME: %[[VIEW:.+]]: !hal.buffer_view
-func @expand_buffer_view_dims(%view : !hal.buffer_view) -> (index, index, index) {
+func.func @expand_buffer_view_dims(%view : !hal.buffer_view) -> (index, index, index) {
   // CHECK-DAG: %[[D0:.+]] = hal.buffer_view.dim<%[[VIEW]] : !hal.buffer_view>[0] : index
   // CHECK-DAG: %[[D1:.+]] = hal.buffer_view.dim<%[[VIEW]] : !hal.buffer_view>[1] : index
   // CHECK-DAG: %[[D2:.+]] = hal.buffer_view.dim<%[[VIEW]] : !hal.buffer_view>[2] : index

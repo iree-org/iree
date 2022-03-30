@@ -5,7 +5,7 @@ flow.executable private @rank_0_binding {
   flow.dispatch.entry public @dispatch
   builtin.module {
     // CHECK: func @dispatch(%[[INPUT:.+]]: !stream.binding)
-    func @dispatch(%input: !flow.dispatch.tensor<readonly:i64>) {
+    func.func @dispatch(%input: !flow.dispatch.tensor<readonly:i64>) {
       // CHECK: %[[SUBSPAN:.+]] = stream.binding.subspan %[[INPUT]][%c0] : !stream.binding -> !flow.dispatch.tensor<readonly:i64>
       // CHECK: = flow.dispatch.tensor.load %[[SUBSPAN]]
       %tied_input = flow.dispatch.tensor.load %input, offsets = [], sizes = [], strides = [] : !flow.dispatch.tensor<readonly:i64> -> tensor<i64>
@@ -22,7 +22,7 @@ flow.executable private @static_bindings {
   flow.dispatch.entry public @dispatch
   builtin.module {
     // CHECK: func @dispatch(%[[INPUT:.+]]: !stream.binding, %[[OUTPUT:.+]]: !stream.binding)
-    func @dispatch(%input: !flow.dispatch.tensor<readonly:1x4xf32>, %output: !flow.dispatch.tensor<writeonly:4xf32>) {
+    func.func @dispatch(%input: !flow.dispatch.tensor<readonly:1x4xf32>, %output: !flow.dispatch.tensor<writeonly:4xf32>) {
       // CHECK-DAG: %[[TIED_INPUT:.+]] = stream.binding.subspan %[[INPUT]][%c0] : !stream.binding -> !flow.dispatch.tensor<readonly:1x4xf32>
       // CHECK-DAG: %[[TIED_OUTPUT:.+]] = stream.binding.subspan %[[OUTPUT]][%c0] : !stream.binding -> !flow.dispatch.tensor<writeonly:4xf32>
       %tied_input = flow.dispatch.tie_shape %input : !flow.dispatch.tensor<readonly:1x4xf32>
@@ -44,7 +44,7 @@ flow.executable private @dynamic_bindings {
   flow.dispatch.entry public @dispatch
   builtin.module {
     // CHECK: func @dispatch(%[[DIM:.+]]: index, %[[INPUT:.+]]: !stream.binding, %[[OUTPUT:.+]]: !stream.binding)
-    func @dispatch(%dim: index, %input: !flow.dispatch.tensor<readonly:1x?xf32>, %output: !flow.dispatch.tensor<writeonly:?xf32>) {
+    func.func @dispatch(%dim: index, %input: !flow.dispatch.tensor<readonly:1x?xf32>, %output: !flow.dispatch.tensor<writeonly:?xf32>) {
       // CHECK-DAG: %[[TIED_INPUT:.+]] = stream.binding.subspan %[[INPUT]][%c0] : !stream.binding -> !flow.dispatch.tensor<readonly:1x?xf32>{%[[DIM]]}
       // CHECK-DAG: %[[TIED_OUTPUT:.+]] = stream.binding.subspan %[[OUTPUT]][%c0] : !stream.binding -> !flow.dispatch.tensor<writeonly:?xf32>{%[[DIM]]}
       %tied_input = flow.dispatch.tie_shape %input : !flow.dispatch.tensor<readonly:1x?xf32>{%dim}
@@ -66,7 +66,7 @@ flow.executable private @indirect_dynamic_bindings {
   flow.dispatch.entry public @dispatch
   builtin.module {
     // CHECK: func @dispatch(%[[DIM_TENSOR:.+]]: !stream.binding, %[[INPUT:.+]]: !stream.binding, %[[OUTPUT:.+]]: !stream.binding)
-    func @dispatch(%dim_tensor: !flow.dispatch.tensor<readonly:i64>, %input: !flow.dispatch.tensor<readonly:1x?xf32>, %output: !flow.dispatch.tensor<writeonly:?xf32>) {
+    func.func @dispatch(%dim_tensor: !flow.dispatch.tensor<readonly:i64>, %input: !flow.dispatch.tensor<readonly:1x?xf32>, %output: !flow.dispatch.tensor<writeonly:?xf32>) {
       // CHECK: %[[DIM_SUBSPAN:.+]] = stream.binding.subspan %[[DIM_TENSOR]][%c0] : !stream.binding -> !flow.dispatch.tensor<readonly:i64>
       // CHECK: %[[DIM_TILE:.+]] = flow.dispatch.tensor.load %[[DIM_SUBSPAN]]
       // CHECK: %[[DIM_I64:.+]] = tensor.extract %[[DIM_TILE]][] : tensor<i64>
@@ -96,7 +96,7 @@ flow.executable private @nested_bindings {
   flow.dispatch.entry public @dispatch
   builtin.module {
     // CHECK: func @dispatch(%[[DIM:.+]]: index, %[[INPUT:.+]]: !stream.binding, %[[OUTPUT:.+]]: !stream.binding)
-    func @dispatch(%dim: index, %input: !flow.dispatch.tensor<readonly:1x?xf32>, %output: !flow.dispatch.tensor<writeonly:?xf32>) {
+    func.func @dispatch(%dim: index, %input: !flow.dispatch.tensor<readonly:1x?xf32>, %output: !flow.dispatch.tensor<writeonly:?xf32>) {
       // CHECK-DAG: %[[TIED_INPUT:.+]] = stream.binding.subspan %[[INPUT]][%c0] : !stream.binding -> !flow.dispatch.tensor<readonly:1x?xf32>{%[[DIM]]}
       // CHECK-DAG: %[[TIED_OUTPUT:.+]] = stream.binding.subspan %[[OUTPUT]][%c0] : !stream.binding -> !flow.dispatch.tensor<writeonly:?xf32>{%[[DIM]]}
       %tied_input = flow.dispatch.tie_shape %input : !flow.dispatch.tensor<readonly:1x?xf32>{%dim}

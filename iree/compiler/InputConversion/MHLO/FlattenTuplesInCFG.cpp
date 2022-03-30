@@ -234,7 +234,7 @@ bool convertOperation(Operation *op, OpBuilder &builder,
   return false;
 }
 
-bool convertFunction(FuncOp oldFunction, FuncOp newFunction) {
+bool convertFunction(func::FuncOp oldFunction, func::FuncOp newFunction) {
   OpBuilder builder(newFunction.getBody());
   BlockAndValueMapping mapping;
 
@@ -285,9 +285,9 @@ class FlattenTuplesInCFGPass
     // Build a list of (oldFunction, newFunction) for all functions we need to
     // replace. This will ensure that when we go to convert function bodies we
     // have only new functions defined.
-    std::vector<std::pair<FuncOp, FuncOp>> convertedFunctions;
+    std::vector<std::pair<func::FuncOp, func::FuncOp>> convertedFunctions;
 
-    for (auto oldFunction : module.getOps<FuncOp>()) {
+    for (auto oldFunction : module.getOps<func::FuncOp>()) {
       auto oldFunctionType = oldFunction.getFunctionType();
       llvm::SmallVector<Type, 10> newInputTypes;
       untupleTypes(oldFunctionType.getInputs(), &newInputTypes);
@@ -298,8 +298,8 @@ class FlattenTuplesInCFGPass
       auto newFunctionType =
           builder.getFunctionType(newInputTypes, newResultTypes);
       auto newFunction =
-          FuncOp::create(oldFunction.getLoc(), oldFunction.getName(),
-                         newFunctionType, oldFunction->getDialectAttrs());
+          func::FuncOp::create(oldFunction.getLoc(), oldFunction.getName(),
+                               newFunctionType, oldFunction->getDialectAttrs());
       convertedFunctions.push_back({oldFunction, newFunction});
 
       // Perform the actual body conversion now that we have proper signatures.

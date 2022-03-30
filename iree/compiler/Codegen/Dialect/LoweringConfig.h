@@ -50,7 +50,8 @@ IREE::Codegen::TranslationInfoAttr getTranslationInfo(
     IREE::HAL::ExecutableEntryPointOp entryPointOp);
 /// Returns the translation info for the `funcOp` (by looking at the entry
 /// point). Returns `nullptr` on failure.
-inline IREE::Codegen::TranslationInfoAttr getTranslationInfo(FuncOp funcOp) {
+inline IREE::Codegen::TranslationInfoAttr getTranslationInfo(
+    func::FuncOp funcOp) {
   auto entryPointOp = getEntryPoint(funcOp);
   if (!entryPointOp) return nullptr;
   return getTranslationInfo(entryPointOp);
@@ -69,7 +70,8 @@ void setTranslationInfo(IREE::HAL::ExecutableEntryPointOp entryPointOp,
                         IREE::Codegen::TranslationInfoAttr translationInfo,
                         ArrayRef<int64_t> workgroupSize = {});
 inline void setTranslationInfo(
-    FuncOp entryPointFn, IREE::Codegen::TranslationInfoAttr translationInfo,
+    func::FuncOp entryPointFn,
+    IREE::Codegen::TranslationInfoAttr translationInfo,
     ArrayRef<int64_t> workgroupSize = {}) {
   auto entryPointOp = getEntryPoint(entryPointFn);
   return setTranslationInfo(entryPointOp, translationInfo, workgroupSize);
@@ -80,7 +82,7 @@ inline void setTranslationInfo(
 /// is already set on the entry point op and is incompatible with what is being
 /// set.
 inline void setTranslationInfo(
-    FuncOp entryPointFn,
+    func::FuncOp entryPointFn,
     IREE::Codegen::DispatchLoweringPassPipeline passPipeline,
     ArrayRef<int64_t> workloadPerWorkgroup, ArrayRef<int64_t> workgroupSize) {
   auto entryPointOp = getEntryPoint(entryPointFn);
@@ -113,7 +115,7 @@ void setLoweringConfig(Operation *op, IREE::Codegen::LoweringConfigAttr config);
 /// tile sizes to use for the operation, and pass pipeline to use for the
 /// translation.
 inline LogicalResult setOpConfigAndEntryPointFnTranslation(
-    FuncOp entryPointFn, Operation *op, TileSizesListTypeRef tileSizes,
+    func::FuncOp entryPointFn, Operation *op, TileSizesListTypeRef tileSizes,
     IREE::Codegen::DispatchLoweringPassPipeline passPipeline,
     ArrayRef<int64_t> workgroupSize = {}) {
   MLIRContext *context = entryPointFn.getContext();

@@ -100,7 +100,7 @@ struct ConvertToNVVMPass : public ConvertToNVVMBase<ConvertToNVVMPass> {
       LLVMConversionTarget target(getContext());
       populateFuncToLLVMFuncOpConversionPattern(converter, llvmPatterns);
       configureGpuToNVVMConversionLegality(target);
-      target.addDynamicallyLegalOp<FuncOp>([&](FuncOp funcOp) {
+      target.addDynamicallyLegalOp<func::FuncOp>([&](func::FuncOp funcOp) {
         if (isEntryPoint(funcOp)) return false;
         return true;
       });

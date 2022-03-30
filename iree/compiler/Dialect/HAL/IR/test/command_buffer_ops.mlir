@@ -2,7 +2,7 @@
 
 // CHECK-LABEL: @command_buffer_create
 //  CHECK-SAME: (%[[DEVICE:.+]]: !hal.device)
-func @command_buffer_create(%device: !hal.device) {
+func.func @command_buffer_create(%device: !hal.device) {
   //      CHECK: %cmd = hal.command_buffer.create
   // CHECK-SAME:   device(%[[DEVICE]] : !hal.device)
   // CHECK-SAME:   mode(OneShot)
@@ -17,7 +17,7 @@ func @command_buffer_create(%device: !hal.device) {
 
 // CHECK-LABEL: @command_buffer_begin_end
 //  CHECK-SAME: (%[[CMD:.+]]: !hal.command_buffer)
-func @command_buffer_begin_end(%cmd: !hal.command_buffer) {
+func.func @command_buffer_begin_end(%cmd: !hal.command_buffer) {
   // CHECK: hal.command_buffer.begin<%[[CMD]] : !hal.command_buffer>
   hal.command_buffer.begin<%cmd : !hal.command_buffer>
   // CHECK: hal.command_buffer.end<%[[CMD]] : !hal.command_buffer>
@@ -29,7 +29,7 @@ func @command_buffer_begin_end(%cmd: !hal.command_buffer) {
 
 // CHECK-LABEL: @command_buffer_device
 //  CHECK-SAME: (%[[CMD:.+]]: !hal.command_buffer)
-func @command_buffer_device(%cmd: !hal.command_buffer) {
+func.func @command_buffer_device(%cmd: !hal.command_buffer) {
   // CHECK: %0 = hal.command_buffer.device<%[[CMD]] : !hal.command_buffer> : !hal.device
   %0 = hal.command_buffer.device<%cmd : !hal.command_buffer> : !hal.device
   return
@@ -39,7 +39,7 @@ func @command_buffer_device(%cmd: !hal.command_buffer) {
 
 // CHECK-LABEL: @command_buffer_execution_barrier
 //  CHECK-SAME: (%[[CMD:.+]]: !hal.command_buffer)
-func @command_buffer_execution_barrier(%cmd: !hal.command_buffer) {
+func.func @command_buffer_execution_barrier(%cmd: !hal.command_buffer) {
   //      CHECK: hal.command_buffer.execution_barrier<%[[CMD]] : !hal.command_buffer>
   // CHECK-SAME:   source(CommandIssue)
   // CHECK-SAME:   target(CommandProcess)
@@ -58,7 +58,7 @@ func @command_buffer_execution_barrier(%cmd: !hal.command_buffer) {
 //  CHECK-SAME: %[[BUFFER:.+]]: !hal.buffer,
 //  CHECK-SAME: %[[OFFSET:.+]]: index, %[[LENGTH:.+]]: index,
 //  CHECK-SAME: %[[PATTERN:.+]]: i32)
-func @command_buffer_fill_buffer(
+func.func @command_buffer_fill_buffer(
     %cmd: !hal.command_buffer,
     %buffer: !hal.buffer,
     %offset: index,
@@ -81,7 +81,7 @@ func @command_buffer_fill_buffer(
 //  CHECK-SAME: %[[BUFFER:.+]]: !hal.buffer,
 //  CHECK-SAME: %[[SRC_OFFSET:.+]]: index, %[[DST_OFFSET:.+]]: index,
 //  CHECK-SAME: %[[LENGTH:.+]]: index)
-func @command_buffer_copy_buffer(
+func.func @command_buffer_copy_buffer(
     %cmd: !hal.command_buffer,
     %buffer: !hal.buffer,
     %src_offset: index,
@@ -106,7 +106,7 @@ func @command_buffer_copy_buffer(
 //  CHECK-SAME: %[[LAYOUT:.+]]: !hal.executable_layout,
 //  CHECK-SAME: %[[SET:.+]]: !hal.descriptor_set,
 //  CHECK-SAME: %[[OFFSET:.+]]: index)
-func @command_buffer_bind_descriptor_set(
+func.func @command_buffer_bind_descriptor_set(
     %cmd: !hal.command_buffer,
     %layout: !hal.executable_layout,
     %set: !hal.descriptor_set,
@@ -147,7 +147,7 @@ hal.executable @ex {
 // CHECK-LABEL: @command_buffer_dispatch
 //  CHECK-SAME: (%[[CMD:.+]]: !hal.command_buffer,
 //  CHECK-SAME: %[[X:.+]]: index, %[[Y:.+]]: index, %[[Z:.+]]: index)
-func @command_buffer_dispatch(
+func.func @command_buffer_dispatch(
     %cmd: !hal.command_buffer,
     %x: index,
     %y: index,
@@ -179,7 +179,7 @@ hal.executable @ex {
 //  CHECK-SAME: (%[[CMD:.+]]: !hal.command_buffer,
 //  CHECK-SAME: %[[BUFFER:.+]]: !hal.buffer,
 //  CHECK-SAME: %[[OFFSET:.+]]: index)
-func @command_buffer_dispatch_indirect(
+func.func @command_buffer_dispatch_indirect(
     %cmd: !hal.command_buffer,
     %buffer: !hal.buffer,
     %offset: index) {

@@ -27,7 +27,7 @@ module @e2e {
 stream.executable private @executable_0 {
   stream.executable.export public @dispatch
   builtin.module {
-    func @dispatch(%arg0: !stream.binding, %arg1: !stream.binding, %ret0: !stream.binding) {
+    func.func @dispatch(%arg0: !stream.binding, %arg1: !stream.binding, %ret0: !stream.binding) {
       %c0 = arith.constant 0 : index
       %0 = stream.binding.subspan %arg0[%c0] : !stream.binding -> !flow.dispatch.tensor<readonly:4xf32>
       %1 = stream.binding.subspan %arg1[%c0] : !stream.binding -> !flow.dispatch.tensor<readonly:4xf32>
@@ -55,7 +55,7 @@ stream.executable private @executable_0 {
   }
 }
 // CHECK: vm.func private @simple_mul
-func @simple_mul(%arg0: tensor<4xf32>, %arg1: tensor<4xf32>) -> tensor<4xf32> {
+func.func @simple_mul(%arg0: tensor<4xf32>, %arg1: tensor<4xf32>) -> tensor<4xf32> {
   %c1 = arith.constant 1 : index
   %c4 = arith.constant 4 : index
   // CHECK: vm.call @hal.command_buffer.dispatch
@@ -82,7 +82,7 @@ module @inplace {
 stream.executable private @executable_1 {
   stream.executable.export public @dispatch
   builtin.module {
-    func @dispatch(%arg0: !stream.binding, %arg1: !stream.binding) {
+    func.func @dispatch(%arg0: !stream.binding, %arg1: !stream.binding) {
       %c0 = arith.constant 0 : index
       %0 = stream.binding.subspan %arg0[%c0] : !stream.binding -> !flow.dispatch.tensor<readwrite:4xf32>
       %1 = stream.binding.subspan %arg1[%c0] : !stream.binding -> !flow.dispatch.tensor<readonly:4xf32>
@@ -109,7 +109,7 @@ stream.executable private @executable_1 {
   }
 }
 // CHECK: vm.func private @simple_mul_inplace
-func @simple_mul_inplace(%arg0: tensor<4xf32>, %arg1: tensor<4xf32>) -> tensor<4xf32> {
+func.func @simple_mul_inplace(%arg0: tensor<4xf32>, %arg1: tensor<4xf32>) -> tensor<4xf32> {
   %c1 = arith.constant 1 : index
   %c4 = arith.constant 4 : index
   // CHECK: vm.call @hal.command_buffer.dispatch
@@ -138,7 +138,7 @@ module @dynamic {
 stream.executable private @executable_2 {
   stream.executable.export public @dispatch
   builtin.module {
-    func @dispatch(%arg0: !stream.binding, %arg0_dim0: index, %arg1: !stream.binding, %arg1_dim0: index, %ret0: !stream.binding) {
+    func.func @dispatch(%arg0: !stream.binding, %arg0_dim0: index, %arg1: !stream.binding, %arg1_dim0: index, %ret0: !stream.binding) {
       %c0 = arith.constant 0 : index
       %0 = stream.binding.subspan %arg0[%c0] : !stream.binding -> !flow.dispatch.tensor<readonly:?xf32>{%arg0_dim0}
       %1 = stream.binding.subspan %arg1[%c0] : !stream.binding -> !flow.dispatch.tensor<readonly:?xf32>{%arg1_dim0}
@@ -165,7 +165,7 @@ stream.executable private @executable_2 {
   }
 }
 // CHECK: vm.func private @simple_mul_dynamic
-func @simple_mul_dynamic(%arg0: tensor<?xf32>, %arg1: tensor<?xf32>) -> tensor<?xf32> {
+func.func @simple_mul_dynamic(%arg0: tensor<?xf32>, %arg1: tensor<?xf32>) -> tensor<?xf32> {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   // CHECK: vm.call @hal.buffer_view.dim
@@ -190,7 +190,7 @@ module @untiled {
 stream.executable private @executable_3 {
   stream.executable.export public @dispatch
   builtin.module {
-    func @dispatch(%arg0: !stream.binding, %arg1: !stream.binding, %ret0: !stream.binding) {
+    func.func @dispatch(%arg0: !stream.binding, %arg1: !stream.binding, %ret0: !stream.binding) {
       %c0 = arith.constant 0 : index
       %0 = stream.binding.subspan %arg0[%c0] : !stream.binding -> !flow.dispatch.tensor<readonly:4xf32>
       %1 = stream.binding.subspan %arg1[%c0] : !stream.binding -> !flow.dispatch.tensor<readonly:4xf32>
@@ -209,7 +209,7 @@ stream.executable private @executable_3 {
   }
 }
 // CHECK: vm.func private @simple_mul_untiled
-func @simple_mul_untiled(%arg0: tensor<4xf32>, %arg1: tensor<4xf32>) -> tensor<4xf32> {
+func.func @simple_mul_untiled(%arg0: tensor<4xf32>, %arg1: tensor<4xf32>) -> tensor<4xf32> {
   %c1 = arith.constant 1 : index
   %ret0 = flow.dispatch @executable_3::@dispatch[%c1, %c1, %c1](%arg0, %arg1) : (tensor<4xf32>, tensor<4xf32>) -> tensor<4xf32>
   return %ret0 : tensor<4xf32>

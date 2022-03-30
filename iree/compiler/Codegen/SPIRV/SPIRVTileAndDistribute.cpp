@@ -174,7 +174,7 @@ class SPIRVTileAndDistributePass
 
 void SPIRVTileAndDistributePass::runOnOperation() {
   MLIRContext *context = &getContext();
-  FuncOp funcOp = getOperation();
+  func::FuncOp funcOp = getOperation();
   auto entryPointOp = getEntryPoint(funcOp);
   if (!entryPointOp) return;
 
@@ -248,7 +248,8 @@ void SPIRVTileAndDistributePass::runOnOperation() {
 // Pass entry point and registration
 //===----------------------------------------------------------------------===//
 
-std::unique_ptr<OperationPass<FuncOp>> createSPIRVTileAndDistributePass() {
+std::unique_ptr<OperationPass<func::FuncOp>>
+createSPIRVTileAndDistributePass() {
   return std::make_unique<SPIRVTileAndDistributePass>();
 }
 

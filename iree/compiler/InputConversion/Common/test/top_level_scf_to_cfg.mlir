@@ -6,7 +6,7 @@
 // The normal -convert-scf-to-std pass will produce an illegal linalg op
 // (multiple basic blocks). The -iree-top-level-scf-to-cfg should not touch it.
 #map = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
-func @generic_nested_for(%arg0: tensor<?x?x?x?xi32>, %arg1: tensor<?x?x?x?xi32>, %out0: tensor<?x?x?x?xi32>) -> tensor<?x?x?x?xi32> {
+func.func @generic_nested_for(%arg0: tensor<?x?x?x?xi32>, %arg1: tensor<?x?x?x?xi32>, %out0: tensor<?x?x?x?xi32>) -> tensor<?x?x?x?xi32> {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %c6 = arith.constant 6 : index

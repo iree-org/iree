@@ -9,7 +9,7 @@ stream.executable private @specializeEx {
   stream.executable.export public @dispatch
   builtin.module  {
     // CHECK: func @dispatch(%[[BINDING:.+]]: !stream.binding, %[[A:.+]]: i32, %[[SITE:.+]]: index)
-    func @dispatch(%binding: !stream.binding, %a: i32, %b: index, %c: i1, %d: i1) {
+    func.func @dispatch(%binding: !stream.binding, %a: i32, %b: index, %c: i1, %d: i1) {
       // CHECK-NEXT: %[[LUT_I32:.+]] = arith.constant dense<[
       // CHECK-SAME:   [20],
       // CHECK-SAME:   [40]
@@ -40,7 +40,7 @@ stream.executable private @specializeEx {
   }
 }
 // CHECK: func @specialize(%[[A:.+]]: i32)
-func @specialize(%a: i32) {
+func.func @specialize(%a: i32) {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %c20 = arith.constant 20 : index

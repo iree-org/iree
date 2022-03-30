@@ -103,7 +103,7 @@ class SPIRVVectorizePass : public SPIRVVectorizeBase<SPIRVVectorizePass> {
 
   void runOnOperation() override {
     MLIRContext *context = &getContext();
-    FuncOp funcOp = getOperation();
+    func::FuncOp funcOp = getOperation();
 
     {
       RewritePatternSet patterns(context);
@@ -202,7 +202,7 @@ class SPIRVVectorizePass : public SPIRVVectorizeBase<SPIRVVectorizePass> {
 
 }  // namespace
 
-std::unique_ptr<OperationPass<FuncOp>> createSPIRVVectorizePass() {
+std::unique_ptr<OperationPass<func::FuncOp>> createSPIRVVectorizePass() {
   return std::make_unique<SPIRVVectorizePass>();
 }
 

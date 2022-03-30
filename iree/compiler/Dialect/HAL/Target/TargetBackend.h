@@ -176,9 +176,9 @@ class TargetBackend {
   //       hal.executable.entry_point @main_dispatch_1 attributes { ... }
   //       hal.executable.entry_point @main_dispatch_2 attributes { ... }
   //       module {
-  //         func @main_0(...) { ... }
-  //         func @main_1(...) { ... }
-  //         func @main_2(...) { ... }
+  //         func.func @main_0(...) { ... }
+  //         func.func @main_1(...) { ... }
+  //         func.func @main_2(...) { ... }
   //       }
   //     }
   //   }

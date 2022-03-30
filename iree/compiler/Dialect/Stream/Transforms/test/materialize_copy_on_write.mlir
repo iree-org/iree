@@ -5,7 +5,7 @@
 
 // CHECK-LABEL: @blockArgsNeedCopies
 //  CHECK-SAME: (%[[SRC:.+]]: !stream.resource<*>, %[[SIZE:.+]]: index)
-func @blockArgsNeedCopies(%src: !stream.resource<*>, %size: index) -> !stream.resource<*> {
+func.func @blockArgsNeedCopies(%src: !stream.resource<*>, %size: index) -> !stream.resource<*> {
   %c0 = arith.constant 0 : index
   %c128 = arith.constant 128 : index
   %c123_i32 = arith.constant 123 : i32
@@ -22,7 +22,7 @@ func @blockArgsNeedCopies(%src: !stream.resource<*>, %size: index) -> !stream.re
 
 // CHECK-LABEL: @singleUseTiedOperand
 //  CHECK-SAME: (%[[SIZE:.+]]: index)
-func @singleUseTiedOperand(%size: index) -> !stream.resource<*> {
+func.func @singleUseTiedOperand(%size: index) -> !stream.resource<*> {
   %c0 = arith.constant 0 : index
   %c128 = arith.constant 128 : index
   %c256 = arith.constant 256 : index
@@ -48,7 +48,7 @@ func @singleUseTiedOperand(%size: index) -> !stream.resource<*> {
 
 // CHECK-LABEL: @multiUseTiedOperand
 //  CHECK-SAME: (%[[SIZE:.+]]: index)
-func @multiUseTiedOperand(%size: index) -> (!stream.resource<*>, !stream.resource<*>) {
+func.func @multiUseTiedOperand(%size: index) -> (!stream.resource<*>, !stream.resource<*>) {
   %c0 = arith.constant 0 : index
   %c128 = arith.constant 128 : index
   %c256 = arith.constant 256 : index
@@ -73,7 +73,7 @@ func @multiUseTiedOperand(%size: index) -> (!stream.resource<*>, !stream.resourc
 // original contents for use by @dispatch1.
 
 // CHECK-LABEL: @tiedDispatches
-func private @tiedDispatches() {
+func.func private @tiedDispatches() {
   %c0_i32 = arith.constant 0 : i32
   %c1_i32 = arith.constant 1 : i32
   %c1 = arith.constant 1 : index
@@ -103,7 +103,7 @@ func private @tiedDispatches() {
 // take care of them later.
 
 // CHECK-LABEL: @blockArgMove
-func @blockArgMove(%cond: i1, %size: index) -> (!stream.resource<*>, !stream.resource<*>) {
+func.func @blockArgMove(%cond: i1, %size: index) -> (!stream.resource<*>, !stream.resource<*>) {
   %c0 = arith.constant 0 : index
   %c128 = arith.constant 128 : index
   %c123_i32 = arith.constant 123 : i32

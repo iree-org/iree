@@ -1,6 +1,6 @@
 // RUN: iree-opt -iree-llvmgpu-vectorization %s | FileCheck %s
 
-func @add_dispatch_0(%arg0: memref<1x8x4xf32>, %arg1: memref<1x4x8xf32>, %arg2: memref<1x4x8xf32>)  {
+func.func @add_dispatch_0(%arg0: memref<1x8x4xf32>, %arg1: memref<1x4x8xf32>, %arg2: memref<1x4x8xf32>)  {
   linalg.generic {indexing_maps =
     [affine_map<(d0, d1, d2) -> (d0, d2, d1)>,
       affine_map<(d0, d1, d2) -> (d0, d1, d2)>,

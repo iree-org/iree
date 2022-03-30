@@ -2,7 +2,7 @@
 
 // CHECK-LABEL: @device_allocator
 // CHECK-SAME: (%[[DEVICE:.+]]: !hal.device)
-func @device_allocator(%device: !hal.device) -> !hal.allocator {
+func.func @device_allocator(%device: !hal.device) -> !hal.allocator {
   // CHECK: %allocator = hal.device.allocator<%[[DEVICE]] : !hal.device> : !hal.allocator
   %allocator = hal.device.allocator<%device : !hal.device> : !hal.allocator
   return %allocator : !hal.allocator
@@ -12,7 +12,7 @@ func @device_allocator(%device: !hal.device) -> !hal.allocator {
 
 // CHECK-LABEL: @device_switch
 // CHECK-SAME: (%[[DEVICE:.+]]: !hal.device)
-func @device_switch(%device: !hal.device) -> i32 {
+func.func @device_switch(%device: !hal.device) -> i32 {
   // CHECK-DAG: %[[C0:.+]] = arith.constant 0
   %c0 = arith.constant 0 : i32
   // CHECK-DAG: %[[C1:.+]] = arith.constant 1
@@ -46,7 +46,7 @@ func @device_switch(%device: !hal.device) -> i32 {
 
 // CHECK-LABEL: @device_query
 // CHECK-SAME: (%[[DEVICE:.+]]: !hal.device)
-func @device_query(%device : !hal.device) -> (i1, i32) {
+func.func @device_query(%device : !hal.device) -> (i1, i32) {
   // CHECK: = hal.device.query<%[[DEVICE]] : !hal.device> key("sys" :: "foo") : i1, i32
   %ok, %value = hal.device.query<%device : !hal.device> key("sys" :: "foo") : i1, i32
   return %ok, %value : i1, i32

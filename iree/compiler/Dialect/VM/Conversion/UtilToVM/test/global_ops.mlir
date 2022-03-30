@@ -28,7 +28,7 @@ func private @initializer() -> !hal.buffer
 // CHECK: vm.global.ref public @v_loaded : !vm.ref<!hal.buffer>
 util.global public @v_loaded : !hal.buffer
 // CHECK-LABEL: vm.func private @loaded
-func @loaded() {
+func.func @loaded() {
   // CHECK: %v_loaded = vm.global.load.ref @v_loaded : !vm.ref<!hal.buffer>
   %0 = util.global.load @v_loaded : !hal.buffer
   return
@@ -39,7 +39,7 @@ func @loaded() {
 // CHECK: vm.global.ref public mutable @v_stored : !vm.ref<!hal.buffer>
 util.global public mutable @v_stored : !hal.buffer
 // CHECK-LABEL: vm.func private @stored
-func @stored(%arg0 : !hal.buffer) {
+func.func @stored(%arg0 : !hal.buffer) {
   // CHECK: vm.global.store.ref %arg0, @v_stored : !vm.ref<!hal.buffer>
   util.global.store %arg0, @v_stored : !hal.buffer
   return
@@ -49,7 +49,7 @@ func @stored(%arg0 : !hal.buffer) {
 
 util.global @v_loaded : !hal.buffer
 // CHECK-LABEL: @loaded_indirect
-func @loaded_indirect() -> !hal.buffer {
+func.func @loaded_indirect() -> !hal.buffer {
   // CHECK-NEXT: %[[ADDR:.+]] = vm.global.address @v_loaded
   %0 = util.global.address @v_loaded : !util.ptr<!hal.buffer>
   // CHECK-NEXT: = vm.global.load.indirect.ref %[[ADDR]]
@@ -61,7 +61,7 @@ func @loaded_indirect() -> !hal.buffer {
 
 util.global mutable @v_stored : !hal.buffer
 // CHECK-LABEL: @stored_indirect
-func @stored_indirect(%arg0 : !hal.buffer) {
+func.func @stored_indirect(%arg0 : !hal.buffer) {
   // CHECK-NEXT: %[[ADDR:.+]] = vm.global.address @v_stored
   %0 = util.global.address @v_stored : !util.ptr<!hal.buffer>
   // CHECK-NEXT: vm.global.store.indirect.ref %arg0, %[[ADDR]]

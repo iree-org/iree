@@ -89,7 +89,7 @@ static SmallVector<int64_t> getWorkloadPerWorkgroup(
 /// Defines the workgroup count region if the tile size for the distributed
 /// loops are known.
 static LogicalResult defineWorkgroupCountRegion(
-    FuncOp entryPointFn, ArrayRef<int64_t> workloadPerWorkgroup) {
+    func::FuncOp entryPointFn, ArrayRef<int64_t> workloadPerWorkgroup) {
   if (workloadPerWorkgroup.size() > kNumMaxParallelDims) {
     // For now error out here.
     return entryPointFn.emitOpError(
@@ -121,7 +121,7 @@ static LogicalResult defineWorkgroupCountRegion(
 // TODO(ravishankarm): The workload_per_wg field should be deprecated. This
 // is just transition before all dependencies on it can be removed.
 static LogicalResult updateTranslationInfoAttr(
-    FuncOp entryPointFn, ArrayRef<int64_t> workloadPerWorkgroup) {
+    func::FuncOp entryPointFn, ArrayRef<int64_t> workloadPerWorkgroup) {
   auto entryPointOp = getEntryPoint(entryPointFn);
   if (!entryPointOp) {
     return entryPointFn.emitOpError("expected entry point function");
@@ -156,7 +156,7 @@ struct InsertDistributionInfoPass
 
 void InsertDistributionInfoPass::runOnOperation() {
   MLIRContext *context = &getContext();
-  FuncOp funcOp = getOperation();
+  func::FuncOp funcOp = getOperation();
   if (!isEntryPoint(funcOp)) return;
 
   SmallVector<Operation *> computeOps;
@@ -189,7 +189,8 @@ void InsertDistributionInfoPass::runOnOperation() {
   }
 }
 
-std::unique_ptr<OperationPass<FuncOp>> createInsertDistributionInfoPass() {
+std::unique_ptr<OperationPass<func::FuncOp>>
+createInsertDistributionInfoPass() {
   return std::make_unique<InsertDistributionInfoPass>();
 }
 

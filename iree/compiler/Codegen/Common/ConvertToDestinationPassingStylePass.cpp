@@ -271,7 +271,7 @@ static LogicalResult modifyResultToUseStoreBuffer(
 /// Main entry point to convert dispatch region to use destination passing
 /// style.
 static LogicalResult convertToDestinationPassingStyle(OpBuilder &b,
-                                                      FuncOp funcOp) {
+                                                      func::FuncOp funcOp) {
   BufferizationPlan plan;
   if (failed(createTensorEquivalenceClasses(funcOp, plan))) {
     return failure();
@@ -382,7 +382,7 @@ struct AdaptLinalgInputOperandToOutputOperand
 }  // namespace
 
 void ConvertToDestinationPassingStylePass::runOnOperation() {
-  FuncOp funcOp = getOperation();
+  func::FuncOp funcOp = getOperation();
   MLIRContext *context = &getContext();
 
   {
@@ -409,7 +409,7 @@ void ConvertToDestinationPassingStylePass::runOnOperation() {
   }
 }
 
-std::unique_ptr<OperationPass<FuncOp>>
+std::unique_ptr<OperationPass<func::FuncOp>>
 createConvertToDestinationPassingStylePass() {
   return std::make_unique<ConvertToDestinationPassingStylePass>();
 }

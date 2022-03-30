@@ -14,7 +14,7 @@ hal.executable @simpleMath_ex_dispatch_0 {
   hal.executable.variant @rocm, target = <"rocm", "rocm-hsaco-fb"> {
   hal.executable.entry_point @add_dispatch_0 layout(#executable_layout)
   builtin.module {
-    func @add_dispatch_0() {
+    func.func @add_dispatch_0() {
       %c0 = arith.constant 0 : index
       %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<readonly:16xf32>
       %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : !flow.dispatch.tensor<readonly:16xf32>
@@ -54,7 +54,7 @@ hal.executable @dot_dispatch_0 {
   hal.executable.variant @rocm, target = <"rocm", "rocm-hsaco-fb"> {
     hal.executable.entry_point @dot_dispatch_0 layout(#executable_layout)
     builtin.module {
-      func @dot_dispatch_0() {
+      func.func @dot_dispatch_0() {
         %cst = arith.constant 0.000000e+00 : f32
         %c0 = arith.constant 0 : index
         %c1024 = arith.constant 1024 : index

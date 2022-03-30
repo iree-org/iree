@@ -1,4 +1,4 @@
-func @f16() {
+func.func @f16() {
   %lhs = util.unfoldable_constant dense<[
     [15.0, 14.0, 13.0],
     [12.0, 11.0, 10.0],

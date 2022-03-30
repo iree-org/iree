@@ -1,4 +1,4 @@
-func @if_true_test() {
+func.func @if_true_test() {
   %0 = util.unfoldable_constant dense<true> : tensor<i1>
   %1 = util.unfoldable_constant dense<10> : tensor<i32>
   %path = util.unfoldable_constant 1 : i32
@@ -17,7 +17,7 @@ func @if_true_test() {
   return
 }
 
-func @if_false_test() {
+func.func @if_false_test() {
   %0 = util.unfoldable_constant dense<false> : tensor<i1>
   %1 = util.unfoldable_constant dense<10> : tensor<i32>
   %path = util.unfoldable_constant 0 : i32

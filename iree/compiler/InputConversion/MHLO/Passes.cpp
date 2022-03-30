@@ -41,18 +41,18 @@ void buildMHLOInputConversionPassPipeline(OpPassManager &passManager) {
   // Currently we don't handle SCF ops well and have to convert them all to CFG.
   // In the future it would be nice if we could have all of flow be both scf
   // and cfg compatible.
-  passManager.addNestedPass<FuncOp>(createTopLevelSCFToCFGPass());
+  passManager.addNestedPass<func::FuncOp>(createTopLevelSCFToCFGPass());
 
-  passManager.addNestedPass<FuncOp>(createMHLOToMHLOPreprocessingPass());
-  passManager.addNestedPass<FuncOp>(mlir::createCanonicalizerPass());
+  passManager.addNestedPass<func::FuncOp>(createMHLOToMHLOPreprocessingPass());
+  passManager.addNestedPass<func::FuncOp>(mlir::createCanonicalizerPass());
 
   // Various shape functions may have been materialized in the `shape.shape_of`
   // style of treating shapes as tensors. We prefer to legalize these to
   // scalar ops as early as possible to avoid having them persist as tensor
   // computations.
-  passManager.addNestedPass<FuncOp>(createShapeToShapeLowering());
+  passManager.addNestedPass<func::FuncOp>(createShapeToShapeLowering());
   passManager.addPass(createConvertShapeToStandardPass());
-  passManager.addNestedPass<FuncOp>(mlir::createCanonicalizerPass());
+  passManager.addNestedPass<func::FuncOp>(mlir::createCanonicalizerPass());
 
   // We also don't handle calls well on the old codepath; until we remove the
   // use of the CFG we can continue inlining.
@@ -67,18 +67,18 @@ void buildMHLOInputConversionPassPipeline(OpPassManager &passManager) {
 
   // Perform initial cleanup. createLegalizeInputTypes could rewrite types. In
   // this context, some operations could be folded away.
-  passManager.addNestedPass<FuncOp>(mlir::createCanonicalizerPass());
-  passManager.addNestedPass<FuncOp>(mlir::createCSEPass());
+  passManager.addNestedPass<func::FuncOp>(mlir::createCanonicalizerPass());
+  passManager.addNestedPass<func::FuncOp>(mlir::createCSEPass());
 
   // Convert to Linalg. After this point, MHLO will be eliminated.
-  passManager.addNestedPass<FuncOp>(createConvertMHLOToLinalgExtPass());
-  passManager.addNestedPass<FuncOp>(createMHLOToLinalgOnTensorsPass());
+  passManager.addNestedPass<func::FuncOp>(createConvertMHLOToLinalgExtPass());
+  passManager.addNestedPass<func::FuncOp>(createMHLOToLinalgOnTensorsPass());
   // Ensure conversion completed.
   passManager.addPass(createReconcileUnrealizedCastsPass());
 
   // Note that some MHLO ops are left by the above and must resolve via
   // canonicalization. See comments in the above pass and find a better way.
-  passManager.addNestedPass<FuncOp>(mlir::createCanonicalizerPass());
+  passManager.addNestedPass<func::FuncOp>(mlir::createCanonicalizerPass());
 
   //----------------------------------------------------------------------------
   // Entry dialect cleanup
@@ -87,9 +87,10 @@ void buildMHLOInputConversionPassPipeline(OpPassManager &passManager) {
 }
 
 void buildXLACleanupPassPipeline(OpPassManager &passManager) {
-  passManager.addNestedPass<FuncOp>(mhlo::createLegalizeControlFlowPass());
+  passManager.addNestedPass<func::FuncOp>(
+      mhlo::createLegalizeControlFlowPass());
   passManager.addPass(createFlattenTuplesInCFGPass());
-  passManager.addNestedPass<FuncOp>(mlir::createCanonicalizerPass());
+  passManager.addNestedPass<func::FuncOp>(mlir::createCanonicalizerPass());
 }
 
 namespace {

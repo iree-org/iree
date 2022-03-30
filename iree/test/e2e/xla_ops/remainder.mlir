@@ -1,4 +1,4 @@
-func @scalar() {
+func.func @scalar() {
   %input1 = util.unfoldable_constant dense<16.0> : tensor<f32>
   %input2 = util.unfoldable_constant dense<7.0> : tensor<f32>
   %result = "mhlo.remainder"(%input1, %input2) : (tensor<f32>, tensor<f32>) -> tensor<f32>
@@ -6,7 +6,7 @@ func @scalar() {
   return
 }
 
-func @tensor() {
+func.func @tensor() {
   %input1 = util.unfoldable_constant dense<[16.0, 17.0, 18.0]> : tensor<3xf32>
   %input2 = util.unfoldable_constant dense<[7.0, 8.0, 9.0]> : tensor<3xf32>
   %result = "mhlo.remainder"(%input1, %input2) : (tensor<3xf32>, tensor<3xf32>) -> tensor<3xf32>
@@ -14,7 +14,7 @@ func @tensor() {
   return
 }
 
-func @negative_den() {
+func.func @negative_den() {
   %input1 = util.unfoldable_constant dense<16.0> : tensor<f32>
   %input2 = util.unfoldable_constant dense<-7.0> : tensor<f32>
   %result = "mhlo.remainder"(%input1, %input2) : (tensor<f32>, tensor<f32>) -> tensor<f32>
@@ -22,7 +22,7 @@ func @negative_den() {
   return
 }
 
-func @negative_num() {
+func.func @negative_num() {
   %input1 = util.unfoldable_constant dense<-16.0> : tensor<f32>
   %input2 = util.unfoldable_constant dense<7.0> : tensor<f32>
   %result = "mhlo.remainder"(%input1, %input2) : (tensor<f32>, tensor<f32>) -> tensor<f32>
@@ -30,7 +30,7 @@ func @negative_num() {
   return
 }
 
-func @scalar_int() {
+func.func @scalar_int() {
   %input1 = util.unfoldable_constant dense<16> : tensor<i32>
   %input2 = util.unfoldable_constant dense<7> : tensor<i32>
   %result = "mhlo.remainder"(%input1, %input2) : (tensor<i32>, tensor<i32>) -> tensor<i32>
@@ -38,7 +38,7 @@ func @scalar_int() {
   return
 }
 
-func @tensor_int() {
+func.func @tensor_int() {
   %input1 = util.unfoldable_constant dense<[16, 17, 18]> : tensor<3xi32>
   %input2 = util.unfoldable_constant dense<[7, 8, 9]> : tensor<3xi32>
   %result = "mhlo.remainder"(%input1, %input2) : (tensor<3xi32>, tensor<3xi32>) -> tensor<3xi32>
@@ -46,7 +46,7 @@ func @tensor_int() {
   return
 }
 
-func @negative_den_int() {
+func.func @negative_den_int() {
   %input1 = util.unfoldable_constant dense<16> : tensor<i32>
   %input2 = util.unfoldable_constant dense<-7> : tensor<i32>
   %result = "mhlo.remainder"(%input1, %input2) : (tensor<i32>, tensor<i32>) -> tensor<i32>
@@ -54,7 +54,7 @@ func @negative_den_int() {
   return
 }
 
-func @negative_num_int() {
+func.func @negative_num_int() {
   %input1 = util.unfoldable_constant dense<-16> : tensor<i32>
   %input2 = util.unfoldable_constant dense<7> : tensor<i32>
   %result = "mhlo.remainder"(%input1, %input2) : (tensor<i32>, tensor<i32>) -> tensor<i32>

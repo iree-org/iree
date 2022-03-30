@@ -1,7 +1,7 @@
 // RUN: iree-opt -split-input-file -canonicalize %s | iree-opt -split-input-file | FileCheck %s
 
 // CHECK-LABEL: @skip_command_buffer_device
-func @skip_command_buffer_device() -> !hal.executable {
+func.func @skip_command_buffer_device() -> !hal.executable {
   // CHECK: %[[DEVICE:.+]] = hal.ex.shared_device
   %dev = hal.ex.shared_device : !hal.device
   %cmd = hal.command_buffer.create device(%dev : !hal.device)
@@ -23,7 +23,7 @@ func @skip_command_buffer_device() -> !hal.executable {
 // CHECK-LABEL: @fold_buffer_subspan_into_fill_buffer
 //  CHECK-SAME: %[[CMD:.+]]: !hal.command_buffer,
 //  CHECK-SAME: %[[BASE_BUFFER:.+]]: !hal.buffer
-func @fold_buffer_subspan_into_fill_buffer(
+func.func @fold_buffer_subspan_into_fill_buffer(
     %cmd: !hal.command_buffer,
     %buffer: !hal.buffer
   ) {
@@ -46,7 +46,7 @@ func @fold_buffer_subspan_into_fill_buffer(
 // CHECK-LABEL: @fold_buffer_subspan_into_copy_buffer
 //  CHECK-SAME: %[[CMD:.+]]: !hal.command_buffer,
 //  CHECK-SAME: %[[BASE_BUFFER:.+]]: !hal.buffer
-func @fold_buffer_subspan_into_copy_buffer(
+func.func @fold_buffer_subspan_into_copy_buffer(
     %cmd: !hal.command_buffer,
     %buffer: !hal.buffer
   ) {
@@ -73,7 +73,7 @@ func @fold_buffer_subspan_into_copy_buffer(
 //  CHECK-SAME: %[[CMD:.+]]: !hal.command_buffer,
 //  CHECK-SAME: %[[LAYOUT:.+]]: !hal.executable_layout,
 //  CHECK-SAME: %[[BASE_BUFFER:.+]]: !hal.buffer
-func @fold_buffer_subspan_into_push_descriptor_set(
+func.func @fold_buffer_subspan_into_push_descriptor_set(
     %cmd: !hal.command_buffer,
     %layout: !hal.executable_layout,
     %buffer: !hal.buffer

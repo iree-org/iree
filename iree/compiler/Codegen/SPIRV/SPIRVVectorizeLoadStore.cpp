@@ -149,7 +149,7 @@ class MemRefUsageAnalysis {
 MemRefUsageAnalysis::MemRefUsageAnalysis(mlir::Operation *op) {
   op->walk([&](Operation *op) {
     TypeSwitch<Operation *>(op)
-        .Case<FuncOp>([this](FuncOp funcOp) {
+        .Case<func::FuncOp>([this](func::FuncOp funcOp) {
           for (Value arg : funcOp.getArguments()) {
             analyzeMemRefValue(arg);
           }
@@ -181,12 +181,13 @@ class MemRefConversionPattern : public OpConversionPattern<OpTy> {
   const MemRefUsageAnalysis &memrefUsageAnalysis;
 };
 
-class ProcessFunctionArgument final : public MemRefConversionPattern<FuncOp> {
+class ProcessFunctionArgument final
+    : public MemRefConversionPattern<func::FuncOp> {
  public:
   using MemRefConversionPattern::MemRefConversionPattern;
 
   LogicalResult matchAndRewrite(
-      FuncOp funcOp, OpAdaptor adaptor,
+      func::FuncOp funcOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override;
 };
 
@@ -486,7 +487,7 @@ class SPIRVVectorizeLoadStorePass final
 }  // namespace
 
 LogicalResult ProcessFunctionArgument::matchAndRewrite(
-    FuncOp funcOp, OpAdaptor adaptor,
+    func::FuncOp funcOp, OpAdaptor adaptor,
     ConversionPatternRewriter &rewriter) const {
   TypeConverter::SignatureConversion signatureConverter(
       funcOp.getFunctionType().getNumInputs());
@@ -528,7 +529,7 @@ void SPIRVVectorizeLoadStorePass::runOnOperation() {
       context);
 
   ConversionTarget target(*context);
-  target.addDynamicallyLegalOp<FuncOp>([&](FuncOp op) {
+  target.addDynamicallyLegalOp<func::FuncOp>([&](func::FuncOp op) {
     return llvm::all_of(op.getArguments(), [&](Value arg) {
       return !memrefUsageAnalysis->shouldVectorizeMemRef(arg);
     });
@@ -553,7 +554,7 @@ void SPIRVVectorizeLoadStorePass::runOnOperation() {
                                     std::move(conversionPatterns))))
     return signalPassFailure();
 
-  for (FuncOp func : module.getOps<FuncOp>()) {
+  for (func::FuncOp func : module.getOps<func::FuncOp>()) {
     RewritePatternSet rewritingPatterns(context);
     rewritingPatterns
         .add<ScalarizeVectorTransferRead, ScalarizeVectorTransferWrite>(

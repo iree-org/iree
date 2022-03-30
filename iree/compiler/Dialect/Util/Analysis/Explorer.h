@@ -149,7 +149,7 @@ class Explorer {
   // Conservative: returns true if value usage cannot be tracked.
   //
   // Example:
-  //  func @root(%arg0: index) -> index {
+  //  func.func @root(%arg0: index) -> index {
   //    %0 = some.region(%arg0 as %innerArg : index) -> index {
   //      %1 = some.tied_op(%innerArg) : (index) -> %innerArg
   //      yield %1 : index
@@ -231,12 +231,12 @@ class Explorer {
   // only a partial walk could be performed due to incomplete information.
   //
   // Example:
-  //  func @root(%arg0: index) -> index
+  //  func.func @root(%arg0: index) -> index
   //    %0 = producer.a %arg0 : index
   //    %1 = call @some_user(%0) : (index) -> index
   //    return %1 : index
   //  }
-  //  func @some_user(%arg0: index) -> index {
+  //  func.func @some_user(%arg0: index) -> index {
   //    %2 = producer.b %arg0 : index
   //    return %2 : index
   //  }
@@ -254,12 +254,12 @@ class Explorer {
   // if only a partial walk could be performed due to incomplete information.
   //
   // Example:
-  //  func @root(%arg0: index) -> index
+  //  func.func @root(%arg0: index) -> index
   //    %0 = producer.a %arg0 : index
   //    %1 = call @some_user(%0) : (index) -> index
   //    return %1 : index
   //  }
-  //  func @some_user(%arg0: index) -> index {
+  //  func.func @some_user(%arg0: index) -> index {
   //    %2 = producer.b %arg0 : index
   //    return %2 : index
   //  }

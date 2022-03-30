@@ -4,7 +4,7 @@
 
 // CHECK-LABEL: @elideRedundantBarriers
 // CHECK-SAME: (%[[CMD:.+]]: !hal.command_buffer, %[[LAYOUT:.+]]: !hal.executable_layout)
-func @elideRedundantBarriers(%cmd: !hal.command_buffer, %executable_layout: !hal.executable_layout) {
+func.func @elideRedundantBarriers(%cmd: !hal.command_buffer, %executable_layout: !hal.executable_layout) {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %c42_i32 = arith.constant 42 : i32
@@ -23,7 +23,7 @@ func @elideRedundantBarriers(%cmd: !hal.command_buffer, %executable_layout: !hal
 // -----
 
 // CHECK-LABEL: @elidePushConstants
-func @elidePushConstants(%cmd: !hal.command_buffer, %executable_layout: !hal.executable_layout) {
+func.func @elidePushConstants(%cmd: !hal.command_buffer, %executable_layout: !hal.executable_layout) {
   // CHECK-DAG: %[[C0:.+]] = arith.constant 0
   %c0 = arith.constant 0 : i32
   // CHECK-DAG: %[[C1:.+]] = arith.constant 1
@@ -50,7 +50,7 @@ func @elidePushConstants(%cmd: !hal.command_buffer, %executable_layout: !hal.exe
 // -----
 
 // CHECK-LABEL: @elidePushConstantsPrefix
-func @elidePushConstantsPrefix(%cmd: !hal.command_buffer, %executable_layout: !hal.executable_layout) {
+func.func @elidePushConstantsPrefix(%cmd: !hal.command_buffer, %executable_layout: !hal.executable_layout) {
   // CHECK-DAG: %[[C0:.+]] = arith.constant 0
   %c0 = arith.constant 0 : i32
   // CHECK-DAG: %[[C1:.+]] = arith.constant 1
@@ -77,7 +77,7 @@ func @elidePushConstantsPrefix(%cmd: !hal.command_buffer, %executable_layout: !h
 // -----
 
 // CHECK-LABEL: @elidePushConstantsSuffix
-func @elidePushConstantsSuffix(%cmd: !hal.command_buffer, %executable_layout: !hal.executable_layout) {
+func.func @elidePushConstantsSuffix(%cmd: !hal.command_buffer, %executable_layout: !hal.executable_layout) {
   // CHECK-DAG: %[[C0:.+]] = arith.constant 0
   %c0 = arith.constant 0 : i32
   // CHECK-DAG: %[[C1:.+]] = arith.constant 1
@@ -104,7 +104,7 @@ func @elidePushConstantsSuffix(%cmd: !hal.command_buffer, %executable_layout: !h
 
 // CHECK-LABEL: @elidePushDescriptorSet
 // CHECK-SAME: (%[[CMD:.+]]: !hal.command_buffer, %[[LAYOUT:.+]]: !hal.executable_layout, %[[BUFFER0:.+]]: !hal.buffer, %[[BUFFER1:.+]]: !hal.buffer)
-func @elidePushDescriptorSet(%cmd: !hal.command_buffer, %executable_layout: !hal.executable_layout, %buffer0: !hal.buffer, %buffer1: !hal.buffer) {
+func.func @elidePushDescriptorSet(%cmd: !hal.command_buffer, %executable_layout: !hal.executable_layout, %buffer0: !hal.buffer, %buffer1: !hal.buffer) {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   // CHECK-DAG: %[[SIZE0:.+]] = arith.constant 100

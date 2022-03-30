@@ -4,7 +4,7 @@
 
 // CHECK: EXEC @main
 // CHECK: 2x4xf32=[985 982 979 976][985 982 979 976]
-func @main(%A: tensor<?x?xf32>, %B: tensor<?x?xf32>, %C: tensor<?x?xf32>)
+func.func @main(%A: tensor<?x?xf32>, %B: tensor<?x?xf32>, %C: tensor<?x?xf32>)
   -> tensor<?x?xf32> attributes {iree.module.export}
 {
   %AA = linalg.generic {

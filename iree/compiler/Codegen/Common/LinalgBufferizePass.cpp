@@ -133,7 +133,7 @@ static Value allocateBufferForResult(OpBuilder &b, Operation *op,
   // If its a static allocation hoist it all the way up at begining of the
   // function.
   if (dynamicDims.empty()) {
-    auto funcOp = op->getParentOfType<FuncOp>();
+    auto funcOp = op->getParentOfType<func::FuncOp>();
     OpBuilder::InsertionGuard g(b);
     b.setInsertionPointToStart(&funcOp.front());
     return allocationFn(b, loc, resultType.getShape(),
@@ -1005,7 +1005,7 @@ class LinalgBufferizePass : public LinalgBufferizeBase<LinalgBufferizePass> {
 
 void LinalgBufferizePass::runOnOperation() {
   BufferizationPlan plan;
-  FuncOp funcOp = getOperation();
+  func::FuncOp funcOp = getOperation();
   if (failed(createTensorEquivalenceClasses(funcOp, plan))) {
     return signalPassFailure();
   }
@@ -1193,7 +1193,7 @@ static Value defaultAllocationFn(OpBuilder &builder, Location loc,
   return builder.create<memref::AllocOp>(loc, allocationType, dynamicSizes);
 }
 
-std::unique_ptr<OperationPass<FuncOp>> createLinalgBufferizePass(
+std::unique_ptr<OperationPass<func::FuncOp>> createLinalgBufferizePass(
     WorkgroupMemoryAllocationFn allocationFn) {
   return std::make_unique<LinalgBufferizePass>(
       allocationFn ? allocationFn : defaultAllocationFn);
@@ -1201,11 +1201,12 @@ std::unique_ptr<OperationPass<FuncOp>> createLinalgBufferizePass(
 
 void addLinalgBufferizePasses(OpPassManager &passManager,
                               WorkgroupMemoryAllocationFn allocationFn) {
-  passManager.addNestedPass<FuncOp>(createLinalgBufferizePass(allocationFn));
+  passManager.addNestedPass<func::FuncOp>(
+      createLinalgBufferizePass(allocationFn));
   passManager.addPass(memref::createResolveShapedTypeResultDimsPass());
-  passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
-  passManager.addNestedPass<FuncOp>(createCSEPass());
-  passManager.addNestedPass<FuncOp>(createCleanupBufferAllocViewPass());
+  passManager.addNestedPass<func::FuncOp>(createCanonicalizerPass());
+  passManager.addNestedPass<func::FuncOp>(createCSEPass());
+  passManager.addNestedPass<func::FuncOp>(createCleanupBufferAllocViewPass());
   // passManager.addPass(createBufferHoistingPass());
   // TODO(nicolasvasilache): bug in buffer loop hoisting with
   // dynamic_linalg_matmul_on_tensors_fuse_0.mlir

@@ -1,5 +1,5 @@
 // Int sum values from [1, 10]
-func @reduce_sum_1x10xi32() {
+func.func @reduce_sum_1x10xi32() {
   %0 = util.unfoldable_constant dense<[[1, 2, 3, 4, 5, 6, 7, 8, 9, 10]]> : tensor<1x10xi32>
   %1 = util.unfoldable_constant dense<0> : tensor<i32>
   %res = "mhlo.reduce"(%0, %1) ( {
@@ -12,7 +12,7 @@ func @reduce_sum_1x10xi32() {
 }
 
 // Int max values from [1, 10]
-func @reduce_max_1x10xi32() {
+func.func @reduce_max_1x10xi32() {
   %0 = util.unfoldable_constant dense<[[1, 2, 3, 4, 5, 6, 7, 8, 9, 10]]> : tensor<1x10xi32>
   %1 = util.unfoldable_constant dense<0> : tensor<i32>
   %res = "mhlo.reduce"(%0, %1) ( {
@@ -25,7 +25,7 @@ func @reduce_max_1x10xi32() {
 }
 
 // Int min values, along multiple dimensions. Expected to just be a reshape in this case.
-func @reduce_min_5x1x1xi32() {
+func.func @reduce_min_5x1x1xi32() {
   %0 = util.unfoldable_constant dense<[[[1]],[[2]],[[3]],[[4]],[[5]]]> : tensor<5x1x1xi32>
   %1 = util.unfoldable_constant dense<999> : tensor<i32>
   %res = "mhlo.reduce"(%0, %1) ( {
@@ -41,7 +41,7 @@ func @reduce_min_5x1x1xi32() {
 // The following cases match the examples presented at
 // https://www.tensorflow.org/xla/operation_semantics#reduce
 
-func @reduce_sum_2x3xi32_dim0() {
+func.func @reduce_sum_2x3xi32_dim0() {
   %0 = util.unfoldable_constant dense<[
       [1, 2, 3],
       [4, 5, 6]]> : tensor<2x3xi32>
@@ -55,7 +55,7 @@ func @reduce_sum_2x3xi32_dim0() {
   return
 }
 
-func @reduce_sum_2x3xi32_dim1() {
+func.func @reduce_sum_2x3xi32_dim1() {
   %0 = util.unfoldable_constant dense<[
       [1, 2, 3],
       [4, 5, 6]]> : tensor<2x3xi32>
@@ -69,7 +69,7 @@ func @reduce_sum_2x3xi32_dim1() {
   return
 }
 
-func @reduce_sum_4x2x3xi32_dim0() {
+func.func @reduce_sum_4x2x3xi32_dim0() {
   %0 = util.unfoldable_constant dense<[
       [[1, 2, 3], [4, 5, 6]],
       [[1, 2, 3], [4, 5, 6]],
@@ -85,7 +85,7 @@ func @reduce_sum_4x2x3xi32_dim0() {
   return
 }
 
-func @reduce_sum_4x2x3xi32_dim2() {
+func.func @reduce_sum_4x2x3xi32_dim2() {
   %0 = util.unfoldable_constant dense<[
     [[1, 2, 3], [4, 5, 6]],
     [[1, 2, 3], [4, 5, 6]],
@@ -101,7 +101,7 @@ func @reduce_sum_4x2x3xi32_dim2() {
   return
 }
 
-func @reduce_sum_4x2x3xi32_dims_0_1() {
+func.func @reduce_sum_4x2x3xi32_dims_0_1() {
   %0 = util.unfoldable_constant dense<[
       [[1, 2, 3], [4, 5, 6]],
       [[1, 2, 3], [4, 5, 6]],
@@ -117,7 +117,7 @@ func @reduce_sum_4x2x3xi32_dims_0_1() {
   return
 }
 
-func @reduce_sum_4x2x3xi32_dims_0_1_2() {
+func.func @reduce_sum_4x2x3xi32_dims_0_1_2() {
   %0 = util.unfoldable_constant dense<[
       [[1, 2, 3], [4, 5, 6]],
       [[1, 2, 3], [4, 5, 6]],
@@ -134,7 +134,7 @@ func @reduce_sum_4x2x3xi32_dims_0_1_2() {
 }
 
 // Float sum values from [1.0, 10.0]
-func @reduce_sum_1x10xf32() {
+func.func @reduce_sum_1x10xf32() {
   %0 = util.unfoldable_constant dense<[[1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0]]> : tensor<1x10xf32>
   %1 = util.unfoldable_constant dense<0.0> : tensor<f32>
   %res = "mhlo.reduce"(%0, %1) ( {
@@ -147,7 +147,7 @@ func @reduce_sum_1x10xf32() {
 }
 
 // Float max values from [1.0, 10.0]
-func @reduce_max_1x10xf32() {
+func.func @reduce_max_1x10xf32() {
   %0 = util.unfoldable_constant dense<[[1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0]]> : tensor<1x10xf32>
   %1 = util.unfoldable_constant dense<0.0> : tensor<f32>
   %res = "mhlo.reduce"(%0, %1)
@@ -162,7 +162,7 @@ func @reduce_max_1x10xf32() {
 }
 
 // Float min values, along multiple dimensions. Expected to just be a reshape in this case.
-func @reduce_min_5x1x1xf32() {
+func.func @reduce_min_5x1x1xf32() {
   %0 = util.unfoldable_constant dense<[[[1.0]],[[2.0]],[[3.0]],[[4.0]],[[5.0]]]> : tensor<5x1x1xf32>
   %1 = util.unfoldable_constant dense<999.0> : tensor<f32>
   %res = "mhlo.reduce"(%0, %1) ( {
@@ -177,7 +177,7 @@ func @reduce_min_5x1x1xf32() {
 // The following cases match the examples presented at
 // https://www.tensorflow.org/xla/operation_semantics#reduce
 
-func @reduce_sum_2x3xf32_dim0() {
+func.func @reduce_sum_2x3xf32_dim0() {
   %0 = util.unfoldable_constant dense<[[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]]> : tensor<2x3xf32>
   %1 = util.unfoldable_constant dense<0.0> : tensor<f32>
   %res = "mhlo.reduce"(%0, %1) ( {
@@ -189,7 +189,7 @@ func @reduce_sum_2x3xf32_dim0() {
   return
 }
 
-func @reduce_sum_2x3xf32_dim1() {
+func.func @reduce_sum_2x3xf32_dim1() {
   %0 = util.unfoldable_constant dense<[[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]]> : tensor<2x3xf32>
   %1 = util.unfoldable_constant dense<0.0> : tensor<f32>
   %res = "mhlo.reduce"(%0, %1) ( {
@@ -201,7 +201,7 @@ func @reduce_sum_2x3xf32_dim1() {
   return
 }
 
-func @reduce_sum_4x2x3xf32_dim0() {
+func.func @reduce_sum_4x2x3xf32_dim0() {
   %0 = util.unfoldable_constant dense<[
       [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]],
       [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]],
@@ -217,7 +217,7 @@ func @reduce_sum_4x2x3xf32_dim0() {
   return
 }
 
-func @reduce_sum_4x2x3xf32_dim1() {
+func.func @reduce_sum_4x2x3xf32_dim1() {
   %0 = util.unfoldable_constant dense<[
       [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]],
       [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]],
@@ -237,7 +237,7 @@ func @reduce_sum_4x2x3xf32_dim1() {
   return
 }
 
-func @reduce_sum_4x2x3xf32_dim2() {
+func.func @reduce_sum_4x2x3xf32_dim2() {
   %0 = util.unfoldable_constant dense<[
       [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]],
       [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]],
@@ -257,7 +257,7 @@ func @reduce_sum_4x2x3xf32_dim2() {
   return
 }
 
-func @reduce_sum_4x2x3xf32_dims_0_1() {
+func.func @reduce_sum_4x2x3xf32_dims_0_1() {
   %0 = util.unfoldable_constant dense<[
       [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]],
       [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]],
@@ -273,7 +273,7 @@ func @reduce_sum_4x2x3xf32_dims_0_1() {
   return
 }
 
-func @reduce_sum_4x2x3xf32_dims_0_1_2() {
+func.func @reduce_sum_4x2x3xf32_dims_0_1_2() {
   %0 = util.unfoldable_constant dense<[
       [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]],
       [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]],
@@ -289,7 +289,7 @@ func @reduce_sum_4x2x3xf32_dims_0_1_2() {
   return
 }
 
-func @reducemulti_result() {
+func.func @reducemulti_result() {
   %cst0 = mhlo.constant dense<-2147483648> : tensor<i32>
   %cst1 = mhlo.constant dense<0> : tensor<i32>
   %arg0 = util.unfoldable_constant dense<[[1, 2], [3, 4], [5, 6], [7, 8], [9, 10], [11, 12], [13, 14], [15, 16], [17, 18]]> : tensor<9x2xi32>

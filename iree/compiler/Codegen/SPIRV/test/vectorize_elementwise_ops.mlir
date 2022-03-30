@@ -1,6 +1,6 @@
 // RUN: iree-opt -split-input-file -iree-spirv-vectorize %s | FileCheck %s
 
-func @add(%lhs: tensor<2x8xf32>, %rhs: tensor<2x8xf32>) -> tensor<2x8xf32> {
+func.func @add(%lhs: tensor<2x8xf32>, %rhs: tensor<2x8xf32>) -> tensor<2x8xf32> {
   %init = linalg.init_tensor [2, 8] : tensor<2x8xf32>
   %0 = linalg.generic {
     indexing_maps = [affine_map<(i, j) -> (i, j)>,
@@ -27,7 +27,7 @@ func @add(%lhs: tensor<2x8xf32>, %rhs: tensor<2x8xf32>) -> tensor<2x8xf32> {
 
 // -----
 
-func @transpose_add(%lhs: tensor<4x2xf32>, %rhs: tensor<2xf32>) -> tensor<2x4xf32> {
+func.func @transpose_add(%lhs: tensor<4x2xf32>, %rhs: tensor<2xf32>) -> tensor<2x4xf32> {
   %init = linalg.init_tensor [2, 4] : tensor<2x4xf32>
   %0 = linalg.generic {
     indexing_maps = [affine_map<(d0, d1) -> (d1, d0)>,

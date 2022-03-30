@@ -3,7 +3,7 @@
 // CHECK-LABEL: @simple_constants
 // CHECK-SAME: %[[DEVICE:.+]]: !hal.device
 // CHECK-SAME: %[[ARG:.+]]: i32
-func @simple_constants(%device : !hal.device, %arg : i32) -> i32 {
+func.func @simple_constants(%device : !hal.device, %arg : i32) -> i32 {
   // CHECK-DAG: %[[C0:.+]] = arith.constant 0
   %c0 = arith.constant 0 : i32
   // CHECK-DAG: %[[C1:.+]] = arith.constant 1
@@ -48,7 +48,7 @@ func @simple_constants(%device : !hal.device, %arg : i32) -> i32 {
 
 // CHECK-LABEL: @no_results
 // CHECK-SAME: %[[DEVICE:.+]]: !hal.device
-func @no_results(%device : !hal.device) {
+func.func @no_results(%device : !hal.device) {
   hal.device.switch<%device : !hal.device>
     // CHECK-NEXT:  %{{.+}}, %[[IS0:.+]] = hal.device.query<%[[DEVICE]] : !hal.device> key("hal.device.id" :: "vulkan-v1.?-*") : i1, i1 = false
     // CHECK-NEXT:  cf.cond_br %[[IS0]], ^bb1, ^bb2

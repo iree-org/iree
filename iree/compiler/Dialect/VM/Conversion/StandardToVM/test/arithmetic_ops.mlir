@@ -8,7 +8,7 @@ module {
   // CHECK: vm.func private @my_fn
   // CHECK-SAME: %[[ARG0:[a-zA-Z0-9$._-]+]]
   // CHECK-SAME: %[[ARG1:[a-zA-Z0-9$._-]+]]
-  func @my_fn(%arg0: i32, %arg1: i32) -> (i32) {
+  func.func @my_fn(%arg0: i32, %arg1: i32) -> (i32) {
     // CHECK: vm.add.i32 %[[ARG0]], %[[ARG1]]
     %0 = arith.addi %arg0, %arg1 : i32
     return %0 : i32
@@ -25,7 +25,7 @@ module {
   // CHECK: vm.func private @my_fn
   // CHECK-SAME: %[[ARG0:[a-zA-Z0-9$._-]+]]
   // CHECK-SAME: %[[ARG1:[a-zA-Z0-9$._-]+]]
-  func @my_fn(%arg0: i32, %arg1: i32) -> (i32) {
+  func.func @my_fn(%arg0: i32, %arg1: i32) -> (i32) {
     // CHECK: vm.div.i32.s %[[ARG0]], %[[ARG1]]
     %0 = arith.divsi %arg0, %arg1 : i32
     return %0 : i32
@@ -42,7 +42,7 @@ module {
   // CHECK: vm.func private @my_fn
   // CHECK-SAME: %[[ARG0:[a-zA-Z0-9$._-]+]]
   // CHECK-SAME: %[[ARG1:[a-zA-Z0-9$._-]+]]
-  func @my_fn(%arg0: i32, %arg1: i32) -> (i32) {
+  func.func @my_fn(%arg0: i32, %arg1: i32) -> (i32) {
     // CHECK: vm.div.i32.u %[[ARG0]], %[[ARG1]]
     %0 = arith.divui %arg0, %arg1 : i32
     return %0 : i32
@@ -59,7 +59,7 @@ module {
   // CHECK: vm.func private @my_fn
   // CHECK-SAME: %[[ARG0:[a-zA-Z0-9$._-]+]]
   // CHECK-SAME: %[[ARG1:[a-zA-Z0-9$._-]+]]
-  func @my_fn(%arg0: i32, %arg1: i32) -> (i32) {
+  func.func @my_fn(%arg0: i32, %arg1: i32) -> (i32) {
     // CHECK: vm.mul.i32 %[[ARG0]], %[[ARG1]]
     %0 = arith.muli %arg0, %arg1 : i32
     return %0 : i32
@@ -76,7 +76,7 @@ module {
   // CHECK: vm.func private @my_fn
   // CHECK-SAME: %[[ARG0:[a-zA-Z0-9$._-]+]]
   // CHECK-SAME: %[[ARG1:[a-zA-Z0-9$._-]+]]
-  func @my_fn(%arg0: i32, %arg1: i32) -> (i32) {
+  func.func @my_fn(%arg0: i32, %arg1: i32) -> (i32) {
     // CHECK: vm.rem.i32.s %[[ARG0]], %[[ARG1]]
     %0 = arith.remsi %arg0, %arg1 : i32
     return %0 : i32
@@ -93,7 +93,7 @@ module {
   // CHECK: vm.func private @my_fn
   // CHECK-SAME: %[[ARG0:[a-zA-Z0-9$._-]+]]
   // CHECK-SAME: %[[ARG1:[a-zA-Z0-9$._-]+]]
-  func @my_fn(%arg0: i32, %arg1: i32) -> (i32) {
+  func.func @my_fn(%arg0: i32, %arg1: i32) -> (i32) {
     // CHECK: vm.rem.i32.u %[[ARG0]], %[[ARG1]]
     %0 = arith.remui %arg0, %arg1 : i32
     return %0 : i32
@@ -110,7 +110,7 @@ module {
   // CHECK: vm.func private @my_fn
   // CHECK-SAME: %[[ARG0:[a-zA-Z0-9$._-]+]]
   // CHECK-SAME: %[[ARG1:[a-zA-Z0-9$._-]+]]
-  func @my_fn(%arg0: i32, %arg1: i32) -> (i32) {
+  func.func @my_fn(%arg0: i32, %arg1: i32) -> (i32) {
     // CHECK: vm.sub.i32 %[[ARG0]], %[[ARG1]]
     %0 = arith.subi %arg0, %arg1 : i32
     return %0 : i32
@@ -127,7 +127,7 @@ module {
   // CHECK: vm.func private @my_fn
   // CHECK-SAME: %[[ARG0:[a-zA-Z0-9$._-]+]]
   // CHECK-SAME: %[[ARG1:[a-zA-Z0-9$._-]+]]
-  func @my_fn(%arg0: i32, %arg1: i32) -> (i32) {
+  func.func @my_fn(%arg0: i32, %arg1: i32) -> (i32) {
     // CHECK: vm.and.i32 %[[ARG0]], %[[ARG1]]
     %0 = arith.andi %arg0, %arg1 : i32
     return %0 : i32
@@ -144,7 +144,7 @@ module {
   // CHECK: vm.func private @my_fn
   // CHECK-SAME: %[[ARG0:[a-zA-Z0-9$._-]+]]
   // CHECK-SAME: %[[ARG1:[a-zA-Z0-9$._-]+]]
-  func @my_fn(%arg0: i32, %arg1: i32) -> (i32) {
+  func.func @my_fn(%arg0: i32, %arg1: i32) -> (i32) {
     // CHECK: vm.or.i32 %[[ARG0]], %[[ARG1]]
     %0 = arith.ori %arg0, %arg1 : i32
     return %0 : i32
@@ -161,7 +161,7 @@ module {
   // CHECK: vm.func private @my_fn
   // CHECK-SAME: %[[ARG0:[a-zA-Z0-9$._-]+]]
   // CHECK-SAME: %[[ARG1:[a-zA-Z0-9$._-]+]]
-  func @my_fn(%arg0: i32, %arg1: i32) -> (i32) {
+  func.func @my_fn(%arg0: i32, %arg1: i32) -> (i32) {
     // CHECK: vm.xor.i32 %[[ARG0]], %[[ARG1]]
     %0 = arith.xori %arg0, %arg1 : i32
     return %0 : i32
@@ -177,7 +177,7 @@ module @t010_shift_left {
 module {
   // CHECK: vm.func private @my_fn
   // CHECK-SAME: %[[ARG0:[a-zA-Z0-9$._-]+]]
-  func @my_fn(%arg0: i32) -> (i32) {
+  func.func @my_fn(%arg0: i32) -> (i32) {
     %c3 = arith.constant 3 : i32
     // CHECK: vm.shl.i32 %[[ARG0]], %c3 : i32
     %1 = arith.shli %arg0, %c3 : i32
@@ -194,7 +194,7 @@ module @t011_shift_right {
 module {
   // CHECK: vm.func private @my_fn
   // CHECK-SAME: %[[ARG0:[a-zA-Z0-9$._-]+]]
-  func @my_fn(%arg0: i32) -> (i32) {
+  func.func @my_fn(%arg0: i32) -> (i32) {
     %c3 = arith.constant 3 : i32
     // CHECK: %[[T:.+]] = vm.shr.i32.s %[[ARG0]], %c3 : i32
     %1 = arith.shrsi %arg0, %c3 : i32

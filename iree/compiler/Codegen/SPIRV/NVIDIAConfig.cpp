@@ -105,7 +105,8 @@ static LogicalResult setOpConfig(const spirv::TargetEnv &targetEnv,
   tileSizes.push_back({coopMatSize->m, coopMatSize->n, coopMatSize->k});
 
   return setOpConfigAndEntryPointFnTranslation(
-      op->getParentOfType<FuncOp>(), op, tileSizes, pipeline, workgroupSize);
+      op->getParentOfType<func::FuncOp>(), op, tileSizes, pipeline,
+      workgroupSize);
 }
 
 LogicalResult setNVIDIACodeGenConfig(const spirv::TargetEnv &targetEnv,

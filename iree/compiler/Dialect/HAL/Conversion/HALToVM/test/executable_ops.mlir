@@ -14,7 +14,7 @@ hal.executable @exe {
 }
 
 // CHECK-LABEL: @executableCreate
-func @executableCreate(
+func.func @executableCreate(
     // CHECK-SAME: %[[DEV:.+]]: !vm.ref<!hal.device>
     %device: !hal.device,
     // CHECK-SAME: %[[LAYOUT0:.+]]: !vm.ref<!hal.executable_layout>,
@@ -61,7 +61,7 @@ hal.executable @exe2 {
 }
 
 // CHECK-LABEL: @multipleExecutables
-func @multipleExecutables(
+func.func @multipleExecutables(
     %device: !hal.device,
     %layout0: !hal.executable_layout,
     %layout1: !hal.executable_layout
@@ -86,7 +86,7 @@ hal.executable @exe {
 }
 
 // CHECK-LABEL: @executableConstants
-func @executableConstants(
+func.func @executableConstants(
     // CHECK-SAME: %[[DEV:.+]]: !vm.ref<!hal.device>
     %device: !hal.device,
     // CHECK-SAME: %[[LAYOUT:.+]]: !vm.ref<!hal.executable_layout>

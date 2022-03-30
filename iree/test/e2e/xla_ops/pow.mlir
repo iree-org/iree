@@ -1,4 +1,4 @@
-func @tensor() {
+func.func @tensor() {
   %cst = mhlo.constant dense<3.0e+00> : tensor<4xf32>
   %input = util.unfoldable_constant dense<[1.0, 2.0, 3.0, 4.0]> : tensor<4xf32>
   %result = "mhlo.power"(%input, %cst) : (tensor<4xf32>, tensor<4xf32>) -> tensor<4xf32>
@@ -6,7 +6,7 @@ func @tensor() {
   return
 }
 
-func @scalar() {
+func.func @scalar() {
   %cst = mhlo.constant dense<2.0e+00> : tensor<f32>
   %input = util.unfoldable_constant dense<16.0> : tensor<f32>
   %result = "mhlo.power"(%input, %cst) : (tensor<f32>, tensor<f32>) -> tensor<f32>

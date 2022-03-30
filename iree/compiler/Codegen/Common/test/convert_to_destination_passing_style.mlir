@@ -1,6 +1,6 @@
 // RUN: iree-opt %s -iree-codegen-convert-to-destination-passing-style -canonicalize -cse -split-input-file | FileCheck %s
 
-func @matmul() {
+func.func @matmul() {
   %m = hal.interface.constant.load[0] : index
   %n = hal.interface.constant.load[1] : index
   %k = hal.interface.constant.load[2] : index
@@ -48,7 +48,7 @@ func @matmul() {
 
 // -----
 
-func @matmul_fill() {
+func.func @matmul_fill() {
   %cst = arith.constant 0.0 : f32
   %c0 = arith.constant 0 : index
   %m = hal.interface.constant.load[0] : index
@@ -99,7 +99,7 @@ func @matmul_fill() {
 
 // -----
 
-func @matmul_inplace() {
+func.func @matmul_inplace() {
   %c0 = arith.constant 0 : index
   %m = hal.interface.constant.load[0] : index
   %n = hal.interface.constant.load[1] : index
@@ -146,7 +146,7 @@ func @matmul_inplace() {
 
 // -----
 
-func @reshape_simple() {
+func.func @reshape_simple() {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %c3 = arith.constant 3 : index
@@ -168,7 +168,7 @@ func @reshape_simple() {
 
 // -----
 
-func @reshape_fused_source() {
+func.func @reshape_fused_source() {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %c3 = arith.constant 3 : index
@@ -203,7 +203,7 @@ func @reshape_fused_source() {
 
 // -----
 
-func @reshape_fused_source_and_copyout() {
+func.func @reshape_fused_source_and_copyout() {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %c3 = arith.constant 3 : index
@@ -242,7 +242,7 @@ func @reshape_fused_source_and_copyout() {
 
 // -----
 
-func @reshape_fused_target() {
+func.func @reshape_fused_target() {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %c3 = arith.constant 3 : index
@@ -278,7 +278,7 @@ func @reshape_fused_target() {
 
 // -----
 
-func @cast_followed_by_store() {
+func.func @cast_followed_by_store() {
   %c0 = arith.constant 0 : index
   %cst = arith.constant 0.000000e+00 : f32
   %c4 = arith.constant 4 : index
@@ -332,7 +332,7 @@ func @cast_followed_by_store() {
 // -----
 
 #map = affine_map<(d0, d1) -> (d0, d1)>
-func @multi_result() {
+func.func @multi_result() {
   %c0 = arith.constant 0 : index
   %c2 = arith.constant 2 : index
   %c4 = arith.constant 4 : index
@@ -404,7 +404,7 @@ func @multi_result() {
 
 // -----
 
-func @unused_ins_operand() {
+func.func @unused_ins_operand() {
   %c64 = arith.constant 64 : index
   %c32 = arith.constant 32 : index
   %c0 = arith.constant 0 : index
@@ -472,7 +472,7 @@ func @unused_ins_operand() {
 
 // -----
 
-func @three_init_tensor_uses() {
+func.func @three_init_tensor_uses() {
   %c6400 = arith.constant 6400 : index
   %c64 = arith.constant 64 : index
   %c1654784 = arith.constant 1654784 : index
@@ -533,7 +533,7 @@ func @three_init_tensor_uses() {
 
 // -----
 
-func @fill_matmul_exp() {
+func.func @fill_matmul_exp() {
   %cst = arith.constant 0.000000e+00 : f32
   %c0 = arith.constant 0 : index
   %c33 = arith.constant 33 : index

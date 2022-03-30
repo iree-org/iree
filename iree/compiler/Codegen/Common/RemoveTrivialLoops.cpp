@@ -91,7 +91,7 @@ static bool isWorkgroupLoop(const LoopTilingAndDistributionInfo &info) {
 /// Infer the number of workgroups by looking at the tiled loop and the number
 /// of element per workgroups.
 static SmallVector<int64_t> getNumWorkgroup(
-    FuncOp funcOp, IREE::HAL::ExecutableEntryPointOp entryPointOp) {
+    func::FuncOp funcOp, IREE::HAL::ExecutableEntryPointOp entryPointOp) {
   auto allLoops = getTiledAndDistributedLoopInfo(funcOp);
   auto wgLoops =
       llvm::to_vector<3>(llvm::make_filter_range(allLoops, isWorkgroupLoop));
@@ -132,7 +132,7 @@ static SmallVector<int64_t> getNumWorkgroup(
   return numWorkgroups;
 }
 
-static LogicalResult removeOneTripTiledLoops(FuncOp funcOp,
+static LogicalResult removeOneTripTiledLoops(func::FuncOp funcOp,
                                              ArrayRef<int64_t> workgroupSize,
                                              ArrayRef<int64_t> numWorkgroups) {
   auto getWorkgroupRangeFn = [numWorkgroups, workgroupSize](
@@ -152,7 +152,7 @@ namespace {
 class RemoveSingleIterationLoopPass final
     : public RemoveSingleIterationLoopBase<RemoveSingleIterationLoopPass> {
   void runOnOperation() override {
-    FuncOp funcOp = getOperation();
+    func::FuncOp funcOp = getOperation();
     auto entryPointOp = getEntryPoint(funcOp);
     if (!entryPointOp) return;
 
@@ -166,7 +166,8 @@ class RemoveSingleIterationLoopPass final
 };
 }  // namespace
 
-std::unique_ptr<OperationPass<FuncOp>> createRemoveSingleIterationLoopPass() {
+std::unique_ptr<OperationPass<func::FuncOp>>
+createRemoveSingleIterationLoopPass() {
   return std::make_unique<RemoveSingleIterationLoopPass>();
 }
 

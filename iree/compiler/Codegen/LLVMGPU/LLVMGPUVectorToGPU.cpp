@@ -16,7 +16,7 @@ namespace iree_compiler {
 
 /// Helper to convert copy to shared memory to async copy. This creates groups
 /// of consecutive copies and emit wait operation right after.
-static void createAsyncGroups(FuncOp funcOp) {
+static void createAsyncGroups(func::FuncOp funcOp) {
   llvm::SmallSetVector<vector::TransferWriteOp, 16> copyToSharedMem;
   // Look for all the copy that can be converted to async copy ops.
   funcOp.walk([&](vector::TransferWriteOp writeOp) {
@@ -236,7 +236,7 @@ struct LLVMGPUVectorToGPUPass
 };
 }  // namespace
 
-std::unique_ptr<OperationPass<FuncOp>> createLLVMGPUVectorToGPU() {
+std::unique_ptr<OperationPass<func::FuncOp>> createLLVMGPUVectorToGPU() {
   return std::make_unique<LLVMGPUVectorToGPUPass>();
 }
 

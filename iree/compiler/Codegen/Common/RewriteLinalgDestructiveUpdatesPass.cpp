@@ -33,7 +33,7 @@ struct RewriteLinalgDestructiveUpdatesPass
 
 void RewriteLinalgDestructiveUpdatesPass::runOnOperation() {
   MLIRContext *context = &getContext();
-  FuncOp funcOp = getOperation();
+  func::FuncOp funcOp = getOperation();
   if (!isEntryPoint(funcOp)) return;
 
   // Rewrite destructive updates and ensure no remaining store remains to the
@@ -58,7 +58,7 @@ void RewriteLinalgDestructiveUpdatesPass::runOnOperation() {
   }
 }
 
-std::unique_ptr<OperationPass<FuncOp>>
+std::unique_ptr<OperationPass<func::FuncOp>>
 createRewriteLinalgDestructiveUpdatesPass() {
   return std::make_unique<RewriteLinalgDestructiveUpdatesPass>();
 }

@@ -1,6 +1,6 @@
 // RUN: iree-opt %s -split-input-file -iree-codegen-canonicalize-scf-for | FileCheck %s
 
-func @loop_carried_vector_shape_cast(%arg0: vector<4xf32>, %arg1: vector<4xf32>) -> (vector<4xf32>, vector<4xf32>) {
+func.func @loop_carried_vector_shape_cast(%arg0: vector<4xf32>, %arg1: vector<4xf32>) -> (vector<4xf32>, vector<4xf32>) {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %c10 = arith.constant 10 : index
@@ -31,7 +31,7 @@ func @loop_carried_vector_shape_cast(%arg0: vector<4xf32>, %arg1: vector<4xf32>)
 
 // -----
 
-func @loop_carried_unrealized_conversion_cast(%arg0: vector<4xf32>, %arg1: vector<4xf32>) -> (vector<4xf32>, vector<4xf32>) {
+func.func @loop_carried_unrealized_conversion_cast(%arg0: vector<4xf32>, %arg1: vector<4xf32>) -> (vector<4xf32>, vector<4xf32>) {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %c10 = arith.constant 10 : index
@@ -62,7 +62,7 @@ func @loop_carried_unrealized_conversion_cast(%arg0: vector<4xf32>, %arg1: vecto
 
 // -----
 
-func @loop_carried_extract(%arg0: f32) -> f32 {
+func.func @loop_carried_extract(%arg0: f32) -> f32 {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %c10 = arith.constant 10 : index
@@ -89,7 +89,7 @@ func @loop_carried_extract(%arg0: f32) -> f32 {
 
 // -----
 
-func @loop_pack_v8f16(%arg0: vector<8xf16>, %arg1: vector<8xf16>, %arg2: vector<4xf16>)
+func.func @loop_pack_v8f16(%arg0: vector<8xf16>, %arg1: vector<8xf16>, %arg2: vector<4xf16>)
                   -> (vector<8xf16>, vector<8xf16>, vector<4xf16>) {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index

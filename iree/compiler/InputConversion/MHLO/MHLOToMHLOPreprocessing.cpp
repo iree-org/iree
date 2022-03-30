@@ -871,7 +871,8 @@ struct MHLOToMHLOPreprocessingPass
 
 }  // namespace
 
-std::unique_ptr<OperationPass<FuncOp>> createMHLOToMHLOPreprocessingPass() {
+std::unique_ptr<OperationPass<func::FuncOp>>
+createMHLOToMHLOPreprocessingPass() {
   return std::make_unique<MHLOToMHLOPreprocessingPass>();
 }
 

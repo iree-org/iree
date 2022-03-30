@@ -14,7 +14,7 @@
 // is not always the case in real kernels. That helps catch mixing-up-dims bugs.
 //////////////////////////////////////////////////////////////////////////////
 
-func @check_mmt4d_f32_static_nopad(%arg0: tensor<24x8xf32>, %arg1: tensor<8x32xf32>, %arg2: tensor<24x32xf32>) -> tensor<24x32xf32> {
+func.func @check_mmt4d_f32_static_nopad(%arg0: tensor<24x8xf32>, %arg1: tensor<8x32xf32>, %arg2: tensor<24x32xf32>) -> tensor<24x32xf32> {
     %0 = linalg.matmul ins(%arg0, %arg1 : tensor<24x8xf32>, tensor<8x32xf32>) outs(%arg2 : tensor<24x32xf32>) -> tensor<24x32xf32>
     return %0 : tensor<24x32xf32>
 }
@@ -68,7 +68,7 @@ func @check_mmt4d_f32_static_nopad(%arg0: tensor<24x8xf32>, %arg1: tensor<8x32xf
 //      CHECK: return %[[RESULT]] : tensor<24x32xf32>
 
 // -----
-func @check_mmt4d_with_init_tensor_and_fill(%arg0: tensor<24x8xf32>, %arg1: tensor<8x32xf32>) -> tensor<24x32xf32> {
+func.func @check_mmt4d_with_init_tensor_and_fill(%arg0: tensor<24x8xf32>, %arg1: tensor<8x32xf32>) -> tensor<24x32xf32> {
     %c0 = arith.constant 0.0 : f32
     %0 = linalg.init_tensor [24, 32] : tensor<24x32xf32>
     %1 = linalg.fill ins(%c0 : f32) outs(%0 : tensor<24x32xf32>) -> tensor<24x32xf32>
@@ -89,7 +89,7 @@ func @check_mmt4d_with_init_tensor_and_fill(%arg0: tensor<24x8xf32>, %arg1: tens
 // CHECK-SAME:   outs(%[[DST_INIT]] :
 
 // -----
-func @check_mmt4d_i8_static_pad(%arg0: tensor<3x5xi8>, %arg1: tensor<5x2xi8>, %arg2: tensor<3x2xi32>) -> tensor<3x2xi32> {
+func.func @check_mmt4d_i8_static_pad(%arg0: tensor<3x5xi8>, %arg1: tensor<5x2xi8>, %arg2: tensor<3x2xi32>) -> tensor<3x2xi32> {
     %0 = linalg.matmul ins(%arg0, %arg1 : tensor<3x5xi8>, tensor<5x2xi8>) outs(%arg2 : tensor<3x2xi32>) -> tensor<3x2xi32>
     return %0 : tensor<3x2xi32>
 }
@@ -116,7 +116,7 @@ func @check_mmt4d_i8_static_pad(%arg0: tensor<3x5xi8>, %arg1: tensor<5x2xi8>, %a
 //      CHECK: return %[[RES]] : tensor<3x2xi32>
 
 // -----
-func @check_mmt4d_i8_dynamic(%arg0: tensor<?x?xi8>, %arg1: tensor<?x?xi8>, %arg2: tensor<?x?xi32>) -> tensor<?x?xi32> {
+func.func @check_mmt4d_i8_dynamic(%arg0: tensor<?x?xi8>, %arg1: tensor<?x?xi8>, %arg2: tensor<?x?xi32>) -> tensor<?x?xi32> {
     %0 = linalg.matmul ins(%arg0, %arg1 : tensor<?x?xi8>, tensor<?x?xi8>) outs(%arg2 : tensor<?x?xi32>) -> tensor<?x?xi32>
     return %0 : tensor<?x?xi32>
 }
@@ -151,7 +151,7 @@ func @check_mmt4d_i8_dynamic(%arg0: tensor<?x?xi8>, %arg1: tensor<?x?xi8>, %arg2
 //////////////////////////////////////////////////////////////////////////////
 
 // -----
-func @check_target_specific_mmt4d_f32_dynamic(%arg0: tensor<?x?xf32>, %arg1: tensor<?x?xf32>, %arg2: tensor<?x?xf32>) -> tensor<?x?xf32> {
+func.func @check_target_specific_mmt4d_f32_dynamic(%arg0: tensor<?x?xf32>, %arg1: tensor<?x?xf32>, %arg2: tensor<?x?xf32>) -> tensor<?x?xf32> {
     %0 = linalg.matmul ins(%arg0, %arg1 : tensor<?x?xf32>, tensor<?x?xf32>) outs(%arg2 : tensor<?x?xf32>) -> tensor<?x?xf32>
     return %0 : tensor<?x?xf32>
 }
@@ -161,7 +161,7 @@ func @check_target_specific_mmt4d_f32_dynamic(%arg0: tensor<?x?xf32>, %arg1: ten
 // AARCH64-BASELINE-SAME:     ins({{.*}} : tensor<?x?x8x1xf32>, tensor<?x?x8x1xf32>) outs({{.*}} : tensor<?x?x8x8xf32>) -> tensor<?x?x8x8xf32>
 
 // -----
-func @check_target_specific_mmt4d_f32_dynamic_matvec(%arg0: tensor<?x?xf32>, %arg1: tensor<?x1xf32>, %arg2: tensor<?x1xf32>) -> tensor<?x1xf32> {
+func.func @check_target_specific_mmt4d_f32_dynamic_matvec(%arg0: tensor<?x?xf32>, %arg1: tensor<?x1xf32>, %arg2: tensor<?x1xf32>) -> tensor<?x1xf32> {
     %0 = linalg.matmul ins(%arg0, %arg1 : tensor<?x?xf32>, tensor<?x1xf32>) outs(%arg2 : tensor<?x1xf32>) -> tensor<?x1xf32>
     return %0 : tensor<?x1xf32>
 }
@@ -171,7 +171,7 @@ func @check_target_specific_mmt4d_f32_dynamic_matvec(%arg0: tensor<?x?xf32>, %ar
 // AARCH64-BASELINE-SAME:     ins({{.*}} : tensor<?x?x8x1xf32>, tensor<1x?x1x1xf32>) outs({{.*}} : tensor<?x1x8x1xf32>) -> tensor<?x1x8x1xf32>
 
 // -----
-func @check_target_specific_mmt4d_f32_dynamic_vecmat(%arg0: tensor<1x?xf32>, %arg1: tensor<?x?xf32>, %arg2: tensor<1x?xf32>) -> tensor<1x?xf32> {
+func.func @check_target_specific_mmt4d_f32_dynamic_vecmat(%arg0: tensor<1x?xf32>, %arg1: tensor<?x?xf32>, %arg2: tensor<1x?xf32>) -> tensor<1x?xf32> {
     %0 = linalg.matmul ins(%arg0, %arg1 : tensor<1x?xf32>, tensor<?x?xf32>) outs(%arg2 : tensor<1x?xf32>) -> tensor<1x?xf32>
     return %0 : tensor<1x?xf32>
 }
@@ -181,7 +181,7 @@ func @check_target_specific_mmt4d_f32_dynamic_vecmat(%arg0: tensor<1x?xf32>, %ar
 // AARCH64-BASELINE-SAME:     ins({{.*}} : tensor<1x?x1x1xf32>, tensor<?x?x8x1xf32>) outs({{.*}} : tensor<1x?x1x8xf32>) -> tensor<1x?x1x8xf32>
 
 // -----
-func @check_target_specific_mmt4d_i8_dynamic(%arg0: tensor<?x?xi8>, %arg1: tensor<?x?xi8>, %arg2: tensor<?x?xi32>) -> tensor<?x?xi32> {
+func.func @check_target_specific_mmt4d_i8_dynamic(%arg0: tensor<?x?xi8>, %arg1: tensor<?x?xi8>, %arg2: tensor<?x?xi32>) -> tensor<?x?xi32> {
     %0 = linalg.matmul ins(%arg0, %arg1 : tensor<?x?xi8>, tensor<?x?xi8>) outs(%arg2 : tensor<?x?xi32>) -> tensor<?x?xi32>
     return %0 : tensor<?x?xi32>
 }
@@ -201,7 +201,7 @@ func @check_target_specific_mmt4d_i8_dynamic(%arg0: tensor<?x?xi8>, %arg1: tenso
 // AARCH64-I8MM-SAME:     ins({{.*}} : tensor<?x?x8x8xi8>, tensor<?x?x8x8xi8>) outs({{.*}} : tensor<?x?x8x8xi32>) -> tensor<?x?x8x8xi32>
 
 // -----
-func @check_target_specific_mmt4d_i8_dynamic_matvec(%arg0: tensor<?x?xi8>, %arg1: tensor<?x1xi8>, %arg2: tensor<?x1xi32>) -> tensor<?x1xi32> {
+func.func @check_target_specific_mmt4d_i8_dynamic_matvec(%arg0: tensor<?x?xi8>, %arg1: tensor<?x1xi8>, %arg2: tensor<?x1xi32>) -> tensor<?x1xi32> {
     %0 = linalg.matmul ins(%arg0, %arg1 : tensor<?x?xi8>, tensor<?x1xi8>) outs(%arg2 : tensor<?x1xi32>) -> tensor<?x1xi32>
     return %0 : tensor<?x1xi32>
 }
@@ -216,7 +216,7 @@ func @check_target_specific_mmt4d_i8_dynamic_matvec(%arg0: tensor<?x?xi8>, %arg1
 // AARCH64-DOTPROD-SAME:     ins({{.*}} : tensor<?x?x8x4xi8>, tensor<1x?x1x4xi8>) outs({{.*}} : tensor<?x1x8x1xi32>) -> tensor<?x1x8x1xi32>
 
 // -----
-func @check_target_specific_mmt4d_i8_dynamic_vecmat(%arg0: tensor<1x?xi8>, %arg1: tensor<?x?xi8>, %arg2: tensor<1x?xi32>) -> tensor<1x?xi32> {
+func.func @check_target_specific_mmt4d_i8_dynamic_vecmat(%arg0: tensor<1x?xi8>, %arg1: tensor<?x?xi8>, %arg2: tensor<1x?xi32>) -> tensor<1x?xi32> {
     %0 = linalg.matmul ins(%arg0, %arg1 : tensor<1x?xi8>, tensor<?x?xi8>) outs(%arg2 : tensor<1x?xi32>) -> tensor<1x?xi32>
     return %0 : tensor<1x?xi32>
 }

@@ -1,7 +1,7 @@
 // RUN: iree-opt -split-input-file -canonicalize %s | iree-opt -split-input-file | FileCheck %s
 
 // CHECK-LABEL: @FoldTensorImportOp
-func @FoldTensorImportOp(%arg0: !stream.resource<external>, %arg1: index) -> !stream.resource<external> {
+func.func @FoldTensorImportOp(%arg0: !stream.resource<external>, %arg1: index) -> !stream.resource<external> {
   // CHECK-NOT: stream.tensor.import
   // CHECK-NOT: stream.tensor.export
   // CHECK: return %arg0 : !stream.resource<external>
@@ -14,7 +14,7 @@ func @FoldTensorImportOp(%arg0: !stream.resource<external>, %arg1: index) -> !st
 // -----
 
 // CHECK-LABEL: @FoldTensorExportOp
-func @FoldTensorExportOp(%arg0: !hal.buffer_view, %arg1: index) -> !hal.buffer_view {
+func.func @FoldTensorExportOp(%arg0: !hal.buffer_view, %arg1: index) -> !hal.buffer_view {
   // CHECK-NOT: stream.tensor.import
   // CHECK-NOT: stream.tensor.export
   // CHECK: return %arg0 : !hal.buffer_view
@@ -28,7 +28,7 @@ func @FoldTensorExportOp(%arg0: !hal.buffer_view, %arg1: index) -> !hal.buffer_v
 // -----
 
 // CHECK-LABEL: @KeepTensorExportOpWithDifferingEncodings
-func @KeepTensorExportOpWithDifferingEncodings(%arg0: !hal.buffer_view, %arg1: index) -> !hal.buffer_view {
+func.func @KeepTensorExportOpWithDifferingEncodings(%arg0: !hal.buffer_view, %arg1: index) -> !hal.buffer_view {
   // CHECK: %[[IMPORT:.+]] = stream.tensor.import %arg0 : !hal.buffer_view -> tensor<?x5xf32>{%arg1} in !stream.resource<external>{%c20}
   // CHECK: %[[EXPORT:.+]] = stream.tensor.export %[[IMPORT]] : tensor<1x?x5xf32>{%arg1} in !stream.resource<external>{%c20} -> !hal.buffer_view
   // CHECK: return %[[EXPORT]] : !hal.buffer_view
@@ -41,7 +41,7 @@ func @KeepTensorExportOpWithDifferingEncodings(%arg0: !hal.buffer_view, %arg1: i
 // -----
 
 // CHECK-LABEL: @TensorConstantToEmpty
-func @TensorConstantToEmpty(%arg0: index) -> !stream.resource<constant> {
+func.func @TensorConstantToEmpty(%arg0: index) -> !stream.resource<constant> {
   // CHECK: %[[EMPTY:.+]] = stream.tensor.empty : tensor<2x0x?xf32>{%arg0} in !stream.resource<constant>
   // CHECK: return %[[EMPTY]]
   // CHECK-NOT: stream.tensor.constant
@@ -52,7 +52,7 @@ func @TensorConstantToEmpty(%arg0: index) -> !stream.resource<constant> {
 // -----
 
 // CHECK-LABEL: @TensorConstantToEmptyDynamic
-func @TensorConstantToEmptyDynamic() -> !stream.resource<constant> {
+func.func @TensorConstantToEmptyDynamic() -> !stream.resource<constant> {
   // CHECK: %[[EMPTY:.+]] = stream.tensor.empty : tensor<2x?xf32>{%c0} in !stream.resource<constant>
   // CHECK: return %[[EMPTY]]
   // CHECK-NOT: stream.tensor.constant
@@ -64,7 +64,7 @@ func @TensorConstantToEmptyDynamic() -> !stream.resource<constant> {
 // -----
 
 // CHECK-LABEL: @TensorConstantToSplat
-func @TensorConstantToSplat() -> !stream.resource<constant> {
+func.func @TensorConstantToSplat() -> !stream.resource<constant> {
   // CHECK-DAG: %[[CST:.+]] = arith.constant 1.000000e+00 : f32
   // CHECK-DAG: %[[SIZE:.+]] = stream.tensor.sizeof tensor<2x2xf32> : index
   // CHECK: = stream.tensor.splat %[[CST]] : f32 -> tensor<2x2xf32> in !stream.resource<*>{%[[SIZE]]}
@@ -75,7 +75,7 @@ func @TensorConstantToSplat() -> !stream.resource<constant> {
 // -----
 
 // CHECK-LABEL: @NarrowSplatPatternI32ToI8
-func @NarrowSplatPatternI32ToI8() -> !stream.resource<*> {
+func.func @NarrowSplatPatternI32ToI8() -> !stream.resource<*> {
   %c100 = arith.constant 100 : index
   %pattern = arith.constant 0xAAAAAAAA : i32
   // CHECK: stream.tensor.splat %c-86_i8 : i8
@@ -86,7 +86,7 @@ func @NarrowSplatPatternI32ToI8() -> !stream.resource<*> {
 // -----
 
 // CHECK-LABEL: @NarrowSplatPatternI32ToI16
-func @NarrowSplatPatternI32ToI16() -> !stream.resource<*> {
+func.func @NarrowSplatPatternI32ToI16() -> !stream.resource<*> {
   %c100 = arith.constant 100 : index
   %pattern = arith.constant 0xAABBAABB : i32
   // CHECK: stream.tensor.splat %c-21829_i16 : i16
@@ -97,7 +97,7 @@ func @NarrowSplatPatternI32ToI16() -> !stream.resource<*> {
 // -----
 
 // CHECK-LABEL: @NarrowSplatPatternI64ToI8
-func @NarrowSplatPatternI64ToI8() -> !stream.resource<*> {
+func.func @NarrowSplatPatternI64ToI8() -> !stream.resource<*> {
   %c100 = arith.constant 100 : index
   %pattern = arith.constant 0 : i64
   // CHECK: stream.tensor.splat %c0_i8 : i8
@@ -108,7 +108,7 @@ func @NarrowSplatPatternI64ToI8() -> !stream.resource<*> {
 // -----
 
 // CHECK-LABEL: @NarrowSplatPatternI64ToI16
-func @NarrowSplatPatternI64ToI16() -> !stream.resource<*> {
+func.func @NarrowSplatPatternI64ToI16() -> !stream.resource<*> {
   %c100 = arith.constant 100 : index
   %pattern = arith.constant 0xAABBAABBAABBAABB : i64
   // CHECK: stream.tensor.splat %c-21829_i16 : i16
@@ -119,7 +119,7 @@ func @NarrowSplatPatternI64ToI16() -> !stream.resource<*> {
 // -----
 
 // CHECK-LABEL: @NarrowSplatPatternI64ToI32
-func @NarrowSplatPatternI64ToI32() -> !stream.resource<*> {
+func.func @NarrowSplatPatternI64ToI32() -> !stream.resource<*> {
   %c100 = arith.constant 100 : index
   %pattern = arith.constant 0xAABBCCDDAABBCCDD : i64
   // CHECK: stream.tensor.splat %c12307677_i32
@@ -130,7 +130,7 @@ func @NarrowSplatPatternI64ToI32() -> !stream.resource<*> {
 // -----
 
 // CHECK-LABEL: @NarrowSplatPatternBF16
-func @NarrowSplatPatternBF16() -> !stream.resource<*> {
+func.func @NarrowSplatPatternBF16() -> !stream.resource<*> {
   %c100 = arith.constant 100 : index
   %pattern = arith.constant 0.0 : bf16
   // CHECK: stream.tensor.splat %c0_i8 : i8
@@ -141,7 +141,7 @@ func @NarrowSplatPatternBF16() -> !stream.resource<*> {
 // -----
 
 // CHECK-LABEL: @NarrowSplatPatternF32
-func @NarrowSplatPatternF32() -> !stream.resource<*> {
+func.func @NarrowSplatPatternF32() -> !stream.resource<*> {
   %c100 = arith.constant 100 : index
   %pattern = arith.constant 0.0 : f32
   // CHECK: stream.tensor.splat %c0_i8 : i8
@@ -152,7 +152,7 @@ func @NarrowSplatPatternF32() -> !stream.resource<*> {
 // -----
 
 // CHECK-LABEL: @FoldTensorCloneOp
-func @FoldTensorCloneOp(%arg0: !stream.resource<*>, %arg1: index) -> !stream.resource<*> {
+func.func @FoldTensorCloneOp(%arg0: !stream.resource<*>, %arg1: index) -> !stream.resource<*> {
   // CHECK-NOT: stream.tensor.clone
   %0 = stream.tensor.clone %arg0 : tensor<2x2xf32> in !stream.resource<*>{%arg1} -> tensor<2x2xf32> in !stream.resource<*>{%arg1}
   // CHECK: return %arg0
@@ -162,7 +162,7 @@ func @FoldTensorCloneOp(%arg0: !stream.resource<*>, %arg1: index) -> !stream.res
 // -----
 
 // CHECK-LABEL: @ElideUnneededTensorClones
-func @ElideUnneededTensorClones(%arg0: !stream.resource<*>, %arg1: index) -> f32 {
+func.func @ElideUnneededTensorClones(%arg0: !stream.resource<*>, %arg1: index) -> f32 {
   %c0 = arith.constant 0 : index
   // CHECK-NOT: stream.tensor.clone
   %0 = stream.tensor.clone %arg0 : tensor<2x2xf32> in !stream.resource<*>{%arg1} -> tensor<2x2xf32> in !stream.resource<*>{%arg1}

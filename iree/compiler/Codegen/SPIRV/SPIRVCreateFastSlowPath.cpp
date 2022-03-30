@@ -137,7 +137,7 @@ struct SPIRVCreateFastSlowPathPass final
     : public SPIRVCreateFastSlowPathBase<SPIRVCreateFastSlowPathPass> {
   void runOnOperation() override {
     MLIRContext *context = &getContext();
-    FuncOp funcOp = getOperation();
+    func::FuncOp funcOp = getOperation();
 
     {
       RewritePatternSet patterns(context);
@@ -162,7 +162,8 @@ struct SPIRVCreateFastSlowPathPass final
 
 }  // namespace
 
-std::unique_ptr<OperationPass<FuncOp>> createSPIRVCreateFastSlowPathPass() {
+std::unique_ptr<OperationPass<func::FuncOp>>
+createSPIRVCreateFastSlowPathPass() {
   return std::make_unique<SPIRVCreateFastSlowPathPass>();
 }
 

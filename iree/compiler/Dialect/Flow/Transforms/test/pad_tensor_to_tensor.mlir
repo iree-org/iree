@@ -1,7 +1,7 @@
 // RUN: iree-opt -split-input-file -iree-flow-pad-tensor-to-subtensor-insert -canonicalize %s | FileCheck %s
 
 module  {
-  func @pad_tensor(%arg0 : tensor<?x?xf32>, %arg1 : tensor<f32>, %arg2 : index, %arg3 : index) -> tensor<?x?xf32> {
+  func.func @pad_tensor(%arg0 : tensor<?x?xf32>, %arg1 : tensor<f32>, %arg2 : index, %arg3 : index) -> tensor<?x?xf32> {
     %c0 = arith.constant 0 : index
     %c4 = arith.constant 4 : index
     %c3 = arith.constant 3 : index
@@ -37,7 +37,7 @@ module  {
 // -----
 
 module  {
-  func @pad_tensor_static(%arg0: tensor<12x4xf32>, %arg1: tensor<f32>) -> tensor<18x12xf32> {
+  func.func @pad_tensor_static(%arg0: tensor<12x4xf32>, %arg1: tensor<f32>) -> tensor<18x12xf32> {
     %c4 = arith.constant 4 : index
     %c2 = arith.constant 2 : index
     %c5 = arith.constant 5 : index

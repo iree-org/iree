@@ -4,7 +4,7 @@ util.global private @varA = dense<1> : tensor<2xi32>
 util.global private @varB = dense<3> : tensor<2x4xi32>
 
 // CHECK-LABEL: @constants()
-func @constants() {
+func.func @constants() {
   // CHECK-DAG: constant 10
   %w = arith.constant 10 : index
   // CHECK-DAG: %[[VAR_A:.+]] = util.global.load @varA : tensor<2xi32>
@@ -24,7 +24,7 @@ util.global private @varA = 1 : i32
 util.global private @varB = 2 : i32
 
 // CHECK-LABEL: @constants_in_cfg
-func @constants_in_cfg(%start: i32, %bound: i32) -> i32 {
+func.func @constants_in_cfg(%start: i32, %bound: i32) -> i32 {
   // CHECK-NEXT: %[[VAR_A:.+]] = util.global.load @varA : i32
   // CHECK-NEXT: %[[VAR_B:.+]] = util.global.load @varB : i32
   // CHECK-NEXT: cf.br ^bb1
@@ -57,7 +57,7 @@ util.global private mutable @varA = dense<1> : tensor<2xi32>
 util.global private @varB = dense<3> : tensor<2x4xi32>
 
 // CHECK-LABEL: @mixed_mutability
-func @mixed_mutability() {
+func.func @mixed_mutability() {
   // CHECK-DAG: %[[VAR_A:.+]] = util.global.load @varA : tensor<2xi32>
   // CHECK-DAG: %[[VAR_B:.+]] = util.global.load @varB : tensor<2x4xi32>
   // CHECK-NEXT: constant 10
@@ -78,7 +78,7 @@ func @mixed_mutability() {
 util.global private mutable @varA = dense<1> : tensor<2xi32>
 
 // CHECK-LABEL: @raw
-func @raw() {
+func.func @raw() {
   // CHECK: %[[T:.+]] = util.global.load @varA {id = 0
   %varA_0 = util.global.load @varA {id = 0} : tensor<2xi32>
   util.global.store %varA_0, @varA {id = 0} : tensor<2xi32>
@@ -93,7 +93,7 @@ func @raw() {
 util.global private mutable @varA = dense<1> : tensor<2xi32>
 
 // CHECK-LABEL: @rar
-func @rar() -> (tensor<2xi32>, tensor<2xi32>) {
+func.func @rar() -> (tensor<2xi32>, tensor<2xi32>) {
   // CHECK: %[[T:.+]] = util.global.load @varA {id = 0
   %varA_0 = util.global.load @varA {id = 0} : tensor<2xi32>
   %varA_1 = util.global.load @varA {id = 1} : tensor<2xi32>
@@ -107,7 +107,7 @@ util.global private mutable @varA = dense<1> : tensor<2xi32>
 
 // CHECK-LABEL: @waw
 // CHECK-SAME: (%[[ARG0:.+]]: tensor<2xi32>, %[[ARG1:.+]]: tensor<2xi32>)
-func @waw(%varA_0: tensor<2xi32>, %varA_1: tensor<2xi32>) {
+func.func @waw(%varA_0: tensor<2xi32>, %varA_1: tensor<2xi32>) {
   util.global.store %varA_0, @varA : tensor<2xi32>
   // CHECK-NEXT: util.global.store %[[ARG1]], @varA
   util.global.store %varA_1, @varA : tensor<2xi32>
@@ -119,7 +119,7 @@ func @waw(%varA_0: tensor<2xi32>, %varA_1: tensor<2xi32>) {
 util.global private mutable @varA = dense<1> : tensor<2xi32>
 
 // CHECK-LABEL: @side_effects(
-func @side_effects() {
+func.func @side_effects() {
   // CHECK-NEXT: %[[T0:.+]] = util.global.load @varA
   %varA_0 = util.global.load @varA : tensor<2xi32>
   // CHECK-NEXT: util.global.store %[[T0]], @varA
@@ -133,4 +133,4 @@ func @side_effects() {
   return
 }
 
-func private @other_fn()
+func.func private @other_fn()

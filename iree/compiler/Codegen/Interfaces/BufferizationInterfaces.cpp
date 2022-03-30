@@ -105,8 +105,13 @@ struct DispatchTensorLoadOpInterface
         getSubspanBuffer(loadOp.source(), rewriter, state.getAnalysisState());
 
     // Bufferize to subview.
+    auto subviewMemRefType = memref::SubViewOp::inferRankReducedResultType(
+        loadOp.getType().getRank(), source.getType().cast<MemRefType>(),
+        loadOp.getMixedOffsets(), loadOp.getMixedSizes(),
+        loadOp.getMixedStrides());
     replaceOpWithNewBufferizedOp<memref::SubViewOp>(
-        rewriter, op, source, loadOp.getMixedOffsets(), loadOp.getMixedSizes(),
+        rewriter, op, subviewMemRefType.cast<MemRefType>(), source,
+        loadOp.getMixedOffsets(), loadOp.getMixedSizes(),
         loadOp.getMixedStrides());
 
     return success();

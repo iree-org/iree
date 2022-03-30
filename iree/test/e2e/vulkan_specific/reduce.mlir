@@ -1,4 +1,4 @@
-func @reduce_dim_1() {
+func.func @reduce_dim_1() {
   %0 = util.unfoldable_constant dense<[[1, 2, 3, 4, 5], [6, 7, 8, 9, 10]]> : tensor<2x5xi32>
   %1 = util.unfoldable_constant dense<10> : tensor<i32>
   %2 = "mhlo.reduce"(%0, %1) ( {
@@ -12,7 +12,7 @@ func @reduce_dim_1() {
 
 // Constants get folded in which linalg.indexed_generic ops. Check to
 // make sure this works as expected.
-func @reduce_dim_1_const() {
+func.func @reduce_dim_1_const() {
   %0 = util.unfoldable_constant dense<[[1, 2, 3, 4, 5], [6, 7, 8, 9, 10]]> : tensor<2x5xi32>
   %1 = arith.constant dense<10> : tensor<i32>
   %2 = "mhlo.reduce"(%0, %1) ( {
@@ -24,7 +24,7 @@ func @reduce_dim_1_const() {
   return
 }
 
-func @reduce_dim_0() {
+func.func @reduce_dim_0() {
   %0 = util.unfoldable_constant dense<[[1, 2, 3, 4, 5, 6, 7, 8, 9, 10]]> : tensor<1x10xi32>
   %1 = util.unfoldable_constant dense<10> : tensor<i32>
   %2 = "mhlo.reduce"(%0, %1) ( {
@@ -36,7 +36,7 @@ func @reduce_dim_0() {
   return
 }
 
-func @reduce_to_scalar() {
+func.func @reduce_to_scalar() {
   %0 = util.unfoldable_constant dense<[1, 2, 3, 4, 5, 6, 7, 8, 9, 10]> : tensor<10xi32>
   %1 = util.unfoldable_constant dense<10> : tensor<i32>
   %2 = "mhlo.reduce"(%0, %1) ( {

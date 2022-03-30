@@ -1,7 +1,7 @@
 // RUN: iree-opt -split-input-file -iree-vm-conversion -cse -iree-vm-target-extension-i64 %s | FileCheck %s
 
 // CHECK-LABEL: @utilAlign
-func @utilAlign(%arg0 : index, %arg1: index) ->  (index) {
+func.func @utilAlign(%arg0 : index, %arg1: index) ->  (index) {
   %result = util.align %arg0, %arg1 : index
   //CHECK-DAG: %c1 = vm.const.i32 1
   //CHECK-DAG: %0 = vm.sub.i32 %arg1, %c1 : i32
@@ -16,7 +16,7 @@ func @utilAlign(%arg0 : index, %arg1: index) ->  (index) {
 // -----
 
 // CHECK-LABEL: @utilAlignInt32
-func @utilAlignInt32(%arg0 : i32, %arg1: i32) ->  (i32) {
+func.func @utilAlignInt32(%arg0 : i32, %arg1: i32) ->  (i32) {
   %result = util.align %arg0, %arg1 : i32
   //CHECK-DAG: %c1 = vm.const.i32 1
   //CHECK-DAG: %0 = vm.sub.i32 %arg1, %c1 : i32
@@ -31,7 +31,7 @@ func @utilAlignInt32(%arg0 : i32, %arg1: i32) ->  (i32) {
 // -----
 
 // CHECK-LABEL: @utilAlignInt64
-func @utilAlignInt64(%arg0 : i64, %arg1: i64) ->  (i64) {
+func.func @utilAlignInt64(%arg0 : i64, %arg1: i64) ->  (i64) {
   %result = util.align %arg0, %arg1 : i64
   //CHECK-DAG: %c1 = vm.const.i64 1
   //CHECK-DAG: %0 = vm.sub.i64 %arg1, %c1 : i64

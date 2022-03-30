@@ -1,4 +1,4 @@
-func @f32() {
+func.func @f32() {
   %lhs = util.unfoldable_constant dense<[
     [15.0, 14.0, 13.0],
     [12.0, 11.0, 10.0],
@@ -19,7 +19,7 @@ func @f32() {
   return
 }
 
-func @i32i32.i32() {
+func.func @i32i32.i32() {
   %lhs = util.unfoldable_constant dense<3> : tensor<2x4xi32>
   %rhs = util.unfoldable_constant dense<2> : tensor<4x2xi32>
   %res = "mhlo.dot"(%lhs, %rhs) : (tensor<2x4xi32>, tensor<4x2xi32>) -> tensor<2x2xi32>
@@ -27,7 +27,7 @@ func @i32i32.i32() {
   return
 }
 
-func @i8i8.i32() {
+func.func @i8i8.i32() {
   %lhs = util.unfoldable_constant dense<3> : tensor<2x4xi8>
   %rhs = util.unfoldable_constant dense<2> : tensor<4x2xi8>
   %res = "mhlo.dot"(%lhs, %rhs) : (tensor<2x4xi8>, tensor<4x2xi8>) -> tensor<2x2xi32>
@@ -35,7 +35,7 @@ func @i8i8.i32() {
   return
 }
 
-func @i16i16.i32() {
+func.func @i16i16.i32() {
   %lhs = util.unfoldable_constant dense<3> : tensor<2x4xi16>
   %rhs = util.unfoldable_constant dense<2> : tensor<4x2xi16>
   %res = "mhlo.dot"(%lhs, %rhs) : (tensor<2x4xi16>, tensor<4x2xi16>) -> tensor<2x2xi32>
@@ -43,7 +43,7 @@ func @i16i16.i32() {
   return
 }
 
-func @large() {
+func.func @large() {
   %lhs = util.unfoldable_constant dense<1.0> : tensor<250x1024xf32>
   %rhs = util.unfoldable_constant dense<0.4> : tensor<1024x500xf32>
   %res = "mhlo.dot"(%lhs, %rhs) : (tensor<250x1024xf32>, tensor<1024x500xf32>) -> tensor<250x500xf32>

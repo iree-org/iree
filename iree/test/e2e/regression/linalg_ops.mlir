@@ -1,4 +1,4 @@
-func @multi_result() {
+func.func @multi_result() {
   %input1 = util.unfoldable_constant dense<[
       [1, 2, 3, 4],
       [5, 6, 7, 8],
@@ -32,7 +32,7 @@ func @multi_result() {
   return
 }
 
-func @operand_fusion() {
+func.func @operand_fusion() {
   %input = util.unfoldable_constant dense<1.0> : tensor<1x225x225x3xf32>
   %filter = util.unfoldable_constant dense<1.0> : tensor<3x3x3x16xf32>
   %bias = util.unfoldable_constant dense<1.0> : tensor<16xf32>

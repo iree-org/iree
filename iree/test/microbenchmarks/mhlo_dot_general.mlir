@@ -1,7 +1,7 @@
 // The following ops are sampled from mobile_bert
 // https://github.com/google/iree/blob/main/integrations/tensorflow/e2e/mobile_bert_squad_test.py
 
-func @dot_general_4x384x32x384() -> tensor<4x384x384xf32> {
+func.func @dot_general_4x384x32x384() -> tensor<4x384x384xf32> {
     %lhs = util.unfoldable_constant dense<1.0> : tensor<4x384x32xf32>
     %rhs = util.unfoldable_constant dense<1.0> : tensor<4x32x384xf32>
     %0 = "mhlo.dot_general"(%lhs, %rhs) {
@@ -15,7 +15,7 @@ func @dot_general_4x384x32x384() -> tensor<4x384x384xf32> {
     return %0 : tensor<4x384x384xf32>
 }
 
-func @dot_general_4x384x384x32() -> tensor<4x384x32xf32> {
+func.func @dot_general_4x384x384x32() -> tensor<4x384x32xf32> {
     %lhs = util.unfoldable_constant dense<1.0> : tensor<4x384x384xf32>
     %rhs = util.unfoldable_constant dense<1.0> : tensor<4x384x32xf32>
     %0 = "mhlo.dot_general"(%lhs, %rhs) {

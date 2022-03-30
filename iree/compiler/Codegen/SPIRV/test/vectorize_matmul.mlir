@@ -2,7 +2,7 @@
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[2, 128], [1, 4], [0, 0, 4]]>
 
-func @matmul_2x128x4() {
+func.func @matmul_2x128x4() {
   %c1 = arith.constant 1 : index
   %c4 = arith.constant 4 : index
   %c128 = arith.constant 128 : index
@@ -82,7 +82,7 @@ func @matmul_2x128x4() {
 
 // Check that we can vectorize shape dimensions not divisible by 4 but divisible by 2.
 
-func @matmul_8x8x2(%lhs: tensor<8x2xf32>, %rhs: tensor<2x8xf32>, %init: tensor<8x8xf32>) -> tensor<8x8xf32> {
+func.func @matmul_8x8x2(%lhs: tensor<8x2xf32>, %rhs: tensor<2x8xf32>, %init: tensor<8x8xf32>) -> tensor<8x8xf32> {
   %0 = linalg.matmul ins(%lhs, %rhs: tensor<8x2xf32>, tensor<2x8xf32>) outs(%init: tensor<8x8xf32>) -> tensor<8x8xf32>
   return %0 : tensor<8x8xf32>
 }
@@ -99,7 +99,7 @@ func @matmul_8x8x2(%lhs: tensor<8x2xf32>, %rhs: tensor<2x8xf32>, %init: tensor<8
 
 // Check that we can vectorize shape dimensions not divisible by 4/2 but divisible by 1.
 
-func @matmul_8x8x1(%lhs: tensor<8x1xf32>, %rhs: tensor<1x8xf32>, %init: tensor<8x8xf32>) -> tensor<8x8xf32> {
+func.func @matmul_8x8x1(%lhs: tensor<8x1xf32>, %rhs: tensor<1x8xf32>, %init: tensor<8x8xf32>) -> tensor<8x8xf32> {
   %0 = linalg.matmul ins(%lhs, %rhs: tensor<8x1xf32>, tensor<1x8xf32>) outs(%init: tensor<8x8xf32>) -> tensor<8x8xf32>
   return %0 : tensor<8x8xf32>
 }

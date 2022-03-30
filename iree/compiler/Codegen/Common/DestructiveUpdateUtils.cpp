@@ -193,7 +193,41 @@ static Value isADestructiveUpdatePattern(Value tensor,
   return nullptr;
 }
 
-/// Flos tensor.extract_slice ops on top of flow.dispatch.tensor.load ops into
+/// Compute the offsets, sizes and strides for the Flow op from the Tensor op
+/// accounting for dropped dims.
+static void populateOffsetSizeAndStrides(
+    IREE::Flow::DispatchTensorLoadOp flowOp, tensor::ExtractSliceOp sliceOp,
+    SmallVector<OpFoldResult> &offsets, SmallVector<OpFoldResult> &sizes,
+    SmallVector<OpFoldResult> &strides) {
+  SmallVector<OpFoldResult> flowOffsets = flowOp.getMixedOffsets();
+  SmallVector<OpFoldResult> flowSizes = flowOp.getMixedSizes();
+  SmallVector<OpFoldResult> flowStrides = flowOp.getMixedStrides();
+  SmallVector<OpFoldResult> sliceOffsets = sliceOp.getMixedOffsets();
+  SmallVector<OpFoldResult> sliceSizes = sliceOp.getMixedSizes();
+  SmallVector<OpFoldResult> sliceStrides = sliceOp.getMixedStrides();
+
+  auto flowDroppedDims = flowOp.getDroppedDims();
+  if (flowDroppedDims.empty()) {
+    offsets = std::move(sliceOffsets);
+    sizes = std::move(sliceSizes);
+    strides = std::move(sliceStrides);
+  } else {
+    offsets = std::move(flowOffsets);
+    sizes = std::move(flowSizes);
+    strides = std::move(flowStrides);
+    unsigned sliceOpDim = 0;
+    for (auto flowDim : llvm::seq<unsigned>(0, offsets.size())) {
+      if (!flowDroppedDims.test(flowDim)) {
+        offsets[flowDim] = sliceOffsets[sliceOpDim];
+        sizes[flowDim] = sliceSizes[sliceOpDim];
+        strides[flowDim] = sliceStrides[sliceOpDim];
+        sliceOpDim++;
+      }
+    }
+  }
+}
+
+/// Folds tensor.extract_slice ops on top of flow.dispatch.tensor.load ops into
 /// new flow.dispatch.tensor.load ops.
 static LogicalResult foldExtractSliceOp(OpBuilder &b,
                                         tensor::ExtractSliceOp op) {
@@ -214,10 +248,12 @@ static LogicalResult foldExtractSliceOp(OpBuilder &b,
   }
   if (!loadOp) return failure();
 
+  SmallVector<OpFoldResult> offsets, sizes, strides;
+  populateOffsetSizeAndStrides(loadOp, op, offsets, sizes, strides);
+
   Value loaded = b.create<IREE::Flow::DispatchTensorLoadOp>(
-      op.getLoc(), op.getResult().getType(), loadOp.source(),
-      loadOp.source_dims(), op.offsets(), op.sizes(), op.strides(),
-      op.static_offsets(), op.static_sizes(), op.static_strides());
+      op.getLoc(), op.getType(), loadOp.source(), loadOp.source_dims(), offsets,
+      sizes, strides);
 
   op.getResult().replaceAllUsesWith(loaded);
   op.erase();

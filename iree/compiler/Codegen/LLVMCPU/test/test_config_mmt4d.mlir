@@ -15,7 +15,7 @@ hal.executable private @mmt4d_384x384x512_4x1x4_dispatch_0 {
   hal.executable.variant public @embedded_elf_arm_64, target = #executable_target_embedded_elf_arm_64_ {
     hal.executable.entry_point public @mmt4d_384x384x512_4x1x4_dispatch_0 layout(#executable_layout)
     builtin.module  {
-      func @mmt4d_384x384x512_4x1x4_dispatch_0() {
+      func.func @mmt4d_384x384x512_4x1x4_dispatch_0() {
         %c0 = arith.constant 0 : index
         %c96 = arith.constant 96 : index
         %c128 = arith.constant 128 : index

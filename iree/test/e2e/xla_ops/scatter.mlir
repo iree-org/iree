@@ -1,4 +1,4 @@
-func @scatter_update_scalar_1D() {
+func.func @scatter_update_scalar_1D() {
   %arg0 = util.unfoldable_constant dense<0> : tensor<8xi32>
   %arg1 = util.unfoldable_constant dense<[[1], [3], [4], [7]]> : tensor<4x1xi32>
   %arg2 = util.unfoldable_constant dense<[9, 10, 11, 12]> : tensor<4xi32>
@@ -18,7 +18,7 @@ func @scatter_update_scalar_1D() {
   return
 }
 
-func @scatter_repeated_update_scalar_1D() {
+func.func @scatter_repeated_update_scalar_1D() {
   %arg0 = util.unfoldable_constant dense<0> : tensor<8xi32>
   %arg1 = util.unfoldable_constant dense<[[1], [1], [7], [7]]> : tensor<4x1xi32>
   %arg2 = util.unfoldable_constant dense<[9, 10, 11, 12]> : tensor<4xi32>
@@ -38,7 +38,7 @@ func @scatter_repeated_update_scalar_1D() {
   return
 }
 
-func @scatter_update_scalar_2D() {
+func.func @scatter_update_scalar_2D() {
   %arg0 = util.unfoldable_constant dense<0> : tensor<4x3xi32>
   %arg1 = util.unfoldable_constant dense<[[0, 0], [1, 1], [2, 2]]> : tensor<3x2xi32>
   %arg2 = util.unfoldable_constant dense<[1, 2, 3]> : tensor<3xi32>
@@ -60,7 +60,7 @@ func @scatter_update_scalar_2D() {
   return
 }
 
-func @scatter_update_slice_2D() {
+func.func @scatter_update_slice_2D() {
   %arg0 = util.unfoldable_constant dense<0> : tensor<6x3xi32>
   %arg1 = util.unfoldable_constant dense<[[2], [4]]> : tensor<2x1xi32>
   %arg2 = util.unfoldable_constant dense<[[1, 2, 3],
@@ -87,7 +87,7 @@ func @scatter_update_slice_2D() {
   return
 }
 
-func @scatter_add_slice_2D() {
+func.func @scatter_add_slice_2D() {
   %arg0 = util.unfoldable_constant dense<1> : tensor<6x3xi32>
   %arg1 = util.unfoldable_constant dense<[[2], [4]]> : tensor<2x1xi32>
   %arg2 = util.unfoldable_constant dense<[[1, 2, 3],
@@ -115,7 +115,7 @@ func @scatter_add_slice_2D() {
   return
 }
 
-func @scatter_1D_large() {
+func.func @scatter_1D_large() {
   %original = util.unfoldable_constant dense<1> : tensor<1400xi32>
   %update = util.unfoldable_constant dense<2> : tensor<1400xi32>
   %init = linalg.init_tensor [1400] : tensor<1400xi32>
@@ -146,7 +146,7 @@ func @scatter_1D_large() {
   return
 }
 
-func @scatter_2D_large() {
+func.func @scatter_2D_large() {
   %original = util.unfoldable_constant dense<1> : tensor<200x300xi32>
   %update = util.unfoldable_constant dense<2> : tensor<200x300xi32>
   %init = linalg.init_tensor [200] : tensor<200xi32>
