@@ -25,12 +25,6 @@
 using namespace mlir;
 using namespace mlir::iree_compiler::IREE::LinalgExt;
 
-static constexpr auto kFakeHALEntryPointRegionOpName =
-    "fake_hal_entry_point_region";
-static constexpr auto kFakeHALReturnOpName = "fake_hal_return";
-static constexpr auto kFakeHALWorkgroupIdOpName = "fake_hal_workgroup_id";
-static constexpr auto kFakeHALWorkgroupCountOpName = "fake_hal_workgroup_count";
-
 // TODO: This also needs to do the work of `SetNumWorkgroups` but we can't
 // depend on HAL atm.
 FailureOr<SmallVector<Operation *>> mlir::iree_compiler::IREE::LinalgExt::
@@ -56,8 +50,7 @@ FailureOr<SmallVector<Operation *>> mlir::iree_compiler::IREE::LinalgExt::
 
   // If inParallelOp.num_threads() is already a HAL op, stop applying.
   Operation *numThreadOp = inParallelOp.num_threads().getDefiningOp();
-  if (numThreadOp &&
-      numThreadOp->getName().getStringRef() == kFakeHALWorkgroupIdOpName)
+  if (numThreadOp && isa<HALInterfaceWorkgroupIDOp>(numThreadOp))
     return failure();
 
   // Rewriter-based RAUW operates on Operation* atm, bail if we can't get it.
@@ -68,53 +61,35 @@ FailureOr<SmallVector<Operation *>> mlir::iree_compiler::IREE::LinalgExt::
   Location loc = inParallelOp.getLoc();
 
   // Custom hal.executable.entry_point.
+  // TODO: getOrCreate at top-level when multiple InParallelOp are used and
+  // replace the corresponding return.
+  // TODO: pull in the proper dims as the bbArgs for dynamic sizes.
   auto region = std::make_unique<Region>();
-  Block &block = region->emplaceBlock();
+  auto entryPointOp = rewriter.create<HALExecutableEntryPointOp>(loc);
+  Block &block = entryPointOp.workgroup_count_region().emplaceBlock();
   {
-    // TODO: getOrCreate at top-level when multiple InParallelOp are used and
-    // replace the corresponding return.
     OpBuilder::InsertionGuard g(rewriter);
     rewriter.setInsertionPointToStart(&block);
     Value one = rewriter.create<arith::ConstantIndexOp>(loc, 1);
     Operation *op = rewriter.clone(*numThreadOp);
-    OperationState entryPointReturnOpState(
-        loc, kFakeHALReturnOpName, ValueRange{op->getResult(0), one, one},
-        TypeRange{}, ArrayRef<NamedAttribute>{}, BlockRange{}, {});
-    rewriter.create(entryPointReturnOpState);
+    rewriter.create<HALReturnOp>(loc, TypeRange{},
+                                 ValueRange{op->getResult(0), one, one});
   }
-  OperationState entryPointOpState(
-      loc, kFakeHALEntryPointRegionOpName, ValueRange{}, TypeRange{},
-      ArrayRef<NamedAttribute>{}, BlockRange{}, {region});
-  Operation *entryPointOp = rewriter.create(entryPointOpState);
-
-  // Custom hal.workgroup.id.
-  OperationState idOpState(
-      loc, kFakeHALWorkgroupIdOpName, ValueRange{},
-      TypeRange{rewriter.getIndexType()},
-      ArrayRef<NamedAttribute>{
-          NamedAttribute(rewriter.getStringAttr("idx"),
-                         rewriter.getIndexAttr(numEnclosingInParallelOps))});
-  Operation *idOp = rewriter.create(idOpState);
-
-  // Custom hal.workgroup.count.
-  OperationState countOpState(
-      loc, kFakeHALWorkgroupCountOpName, ValueRange{},
-      TypeRange{rewriter.getIndexType()},
-      ArrayRef<NamedAttribute>{
-          NamedAttribute(rewriter.getStringAttr("idx"),
-                         rewriter.getIndexAttr(numEnclosingInParallelOps))});
-  Operation *countOp = rewriter.create(countOpState);
+  auto idOp = rewriter.create<HALInterfaceWorkgroupIDOp>(
+      loc, numEnclosingInParallelOps);
+  auto countOp = rewriter.create<HALInterfaceWorkgroupCountOp>(
+      loc, numEnclosingInParallelOps);
 
   // Get a reference to the terminator that will subsequently be moved.
   PerformConcurrentlyOp performConcurrentlyOp = inParallelOp.getTerminator();
 
   // First, update the uses of num_threads() within the inParallelOp block.
-  rewriter.replaceOpWithinBlock(numThreadDefiningOp, countOp->getResult(0),
+  rewriter.replaceOpWithinBlock(numThreadDefiningOp, countOp.result(),
                                 &inParallelOp.region().front());
 
   // Steal the iree_compiler::IREE::LinalgExt::InParallel ops, right before the
   // inParallelOp. Replace the bbArg by the HAL id.
-  SmallVector<Value> bbArgsTranslated{idOp->getResult(0)};
+  SmallVector<Value> bbArgsTranslated{idOp.result()};
   rewriter.mergeBlockBefore(&inParallelOp.region().front(), inParallelOp,
                             bbArgsTranslated);
 
