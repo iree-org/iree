@@ -266,6 +266,8 @@ FailureOr<LinalgOp> transform::PadOp::applyToOne(LinalgOp target) {
   for (Attribute attr : this->transpose_paddings().cast<ArrayAttr>())
     transposePaddingVectors.push_back(extractI64Array(attr.cast<ArrayAttr>()));
 
+  // TODO: padding value should come from user
+  OpBuilder b(target.getContext());
   SmallVector<Attribute> paddingValueAttributes(
       packPaddings.size(), b.getZeroAttr(target->getResult(0)
                                              .getType()
