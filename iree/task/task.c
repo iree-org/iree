@@ -78,8 +78,9 @@ static void iree_task_cleanup(iree_task_t* task,
   // Call the (optional) cleanup function.
   // NOTE: this may free the memory of the task itself!
   iree_task_pool_t* pool = task->pool;
-  if (task->cleanup_fn) {
-    task->cleanup_fn(task, status_code);
+  iree_task_cleanup_fn_t cleanup_fn = task->cleanup_fn;
+  if (cleanup_fn) {
+    cleanup_fn(task, status_code);
   }
 
   // Return the task to the pool it was allocated from.
