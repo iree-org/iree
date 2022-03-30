@@ -26,7 +26,7 @@ void VerifyLinalgTransformLegalityPass::runOnOperation() {
   // For now only check that there are no Linalg transform markers.
   auto walkResult = moduleOp.walk([](linalg::LinalgOp op) -> WalkResult {
     if (op->hasAttr(linalg::LinalgTransforms::kLinalgTransformMarker)) {
-      return op.emitError("epxected no Linalg transform markers");
+      return op.emitError("expected no Linalg transform markers");
     }
     return WalkResult::advance();
   });
