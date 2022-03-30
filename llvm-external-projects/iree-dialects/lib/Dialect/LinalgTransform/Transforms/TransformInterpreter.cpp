@@ -70,12 +70,8 @@ static LogicalResult performEnablerTransformations(
 
   // This assumes LICM never removes operations so we don't need tracking.
   if (options.licm) {
-    WalkResult result =
-        func->walk([](LoopLikeOpInterface loopLike) -> WalkResult {
-          return moveLoopInvariantCode(loopLike);
-        });
-    if (result.wasInterrupted())
-      return failure();
+    func->walk(
+        [](LoopLikeOpInterface loopLike) { moveLoopInvariantCode(loopLike); });
   }
 
   func.walk([](Operation *op) {

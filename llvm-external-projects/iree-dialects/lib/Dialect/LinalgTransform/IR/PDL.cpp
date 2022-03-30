@@ -297,12 +297,13 @@ FailureOr<SmallVector<Operation *>> findMatchingOps(transform::MatchOp matchOp,
                                                     Operation *containerOp) {
   auto symbolTableOp = matchOp->getParentWithTrait<OpTrait::SymbolTable>();
   if (!symbolTableOp)
-    return {symbolTableOp->emitError("no parent op with a SymbolTable")};
+    symbolTableOp->emitError("no parent op with a SymbolTable");
   auto patternOp = dyn_cast_or_null<pdl::PatternOp>(
       SymbolTable::lookupSymbolIn(symbolTableOp, pattern));
-  if (!patternOp)
-    return {symbolTableOp->emitError("could not find a pattern named: ")
-            << pattern};
+  if (!patternOp) {
+    return symbolTableOp->emitError("could not find a pattern named: ")
+           << pattern;
+  }
 
   // Clone the pattern operation into the temporary module used by the driver
   // as it might be referenced multiple times.

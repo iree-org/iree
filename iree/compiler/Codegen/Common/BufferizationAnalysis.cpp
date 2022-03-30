@@ -97,7 +97,7 @@ static LogicalResult analyseConstantOp(arith::ConstantOp constantOp,
 /// equivalence class as the source.
 static LogicalResult analyseInterfaceLoadTensorOp(
     IREE::Flow::DispatchTensorLoadOp loadOp, BufferizationPlan &plan) {
-  plan.unionSets(loadOp.result(), loadOp.source());
+  plan.unionSets(loadOp.getResult(), loadOp.source());
   return success();
 }
 
@@ -188,7 +188,7 @@ static LogicalResult analyseInterfaceBindingSubspanOp(
 static LogicalResult analysePadTensorOp(tensor::PadOp padTensorOp,
                                         BufferizationPlan &plan) {
   plan.insert(padTensorOp.source());
-  plan.insert(padTensorOp.result());
+  plan.insert(padTensorOp.getResult());
   return success();
 }
 
@@ -279,11 +279,11 @@ static LogicalResult analyseSubTensorOp(tensor::ExtractSliceOp subTensorOp,
                                         BufferizationPlan &plan) {
   if (!canUsersHandleSubviews(subTensorOp)) {
     plan.insert(subTensorOp.source());
-    plan.insert(subTensorOp.result());
+    plan.insert(subTensorOp.getResult());
     return success();
   }
   return analyseSingleOperandResultOp(subTensorOp.source(),
-                                      subTensorOp.result(), plan);
+                                      subTensorOp.getResult(), plan);
 }
 
 /// Adds the `dest` and `result` tensor of a subtensor insert operation into the
@@ -366,7 +366,7 @@ static void hasDestructiveUpdatePattern(Value source, BufferizationPlan &plan) {
       return insertSliceOp.dest();
     }
     if (auto transferWriteOp = dyn_cast<vector::TransferWriteOp>(op)) {
-      return transferWriteOp.source();
+      return transferWriteOp.getSource();
     }
     return nullptr;
   };
@@ -375,7 +375,7 @@ static void hasDestructiveUpdatePattern(Value source, BufferizationPlan &plan) {
       return extractSliceOp.source();
     }
     if (auto transferReadOp = dyn_cast<vector::TransferReadOp>(op)) {
-      return transferReadOp.source();
+      return transferReadOp.getSource();
     }
     return nullptr;
   };
@@ -436,7 +436,7 @@ static void hasDestructiveUpdatePattern(Value source, BufferizationPlan &plan) {
   // - insert_slice value and dest
   for (Operation *user : source.getUsers()) {
     if (auto extractSliceOp = dyn_cast<tensor::ExtractSliceOp>(user)) {
-      plan.unionSets(extractSliceOp.source(), extractSliceOp.result());
+      plan.unionSets(extractSliceOp.source(), extractSliceOp.getResult());
       continue;
     }
     if (auto insertSliceOp = dyn_cast<tensor::InsertSliceOp>(user)) {
@@ -532,7 +532,7 @@ LogicalResult createTensorEquivalenceClasses(func::FuncOp funcOp,
         .Case<tensor::CollapseShapeOp, tensor::ExpandShapeOp>(
             [&](auto reshapeOp) {
               return analyseSingleOperandResultOp(reshapeOp.src(),
-                                                  reshapeOp.result(), plan);
+                                                  reshapeOp.getResult(), plan);
             })
         .Case<tensor::ExtractSliceOp>([&](tensor::ExtractSliceOp sliceOp) {
           return analyseSubTensorOp(sliceOp, plan);
@@ -541,7 +541,8 @@ LogicalResult createTensorEquivalenceClasses(func::FuncOp funcOp,
             [&](tensor::InsertSliceOp subTensorInsertOp) {
               return analyseDestructiveUpdateOp(
                   subTensorInsertOp, subTensorInsertOp.source(),
-                  subTensorInsertOp.dest(), subTensorInsertOp.result(), plan);
+                  subTensorInsertOp.dest(), subTensorInsertOp.getResult(),
+                  plan);
             })
         .Case<tensor::CastOp>([&](tensor::CastOp castOp) {
           return analyseSingleOperandResultOp(castOp.source(), castOp.dest(),
@@ -549,25 +550,25 @@ LogicalResult createTensorEquivalenceClasses(func::FuncOp funcOp,
         })
         .Case<tensor::InsertOp>([&](tensor::InsertOp insertOp) {
           return analyseDestructiveUpdateOp(insertOp, /*source =*/nullptr,
-                                            insertOp.dest(), insertOp.result(),
-                                            plan);
+                                            insertOp.dest(),
+                                            insertOp.getResult(), plan);
         })
-        .Case<vector::TransferReadOp>(
-            [&](vector::TransferReadOp transferReadOp) {
-              if (transferReadOp.source().getType().isa<RankedTensorType>()) {
-                plan.insert(transferReadOp.source());
-              }
-              return success();
-            })
-        .Case<vector::TransferWriteOp>(
-            [&](vector::TransferWriteOp transferWriteOp) {
-              if (!transferWriteOp.source().getType().isa<RankedTensorType>()) {
-                return success();
-              }
-              return analyseDestructiveUpdateOp(transferWriteOp, nullptr,
-                                                transferWriteOp.source(),
-                                                transferWriteOp.result(), plan);
-            })
+        .Case<vector::TransferReadOp>([&](vector::TransferReadOp
+                                              transferReadOp) {
+          if (transferReadOp.getSource().getType().isa<RankedTensorType>()) {
+            plan.insert(transferReadOp.getSource());
+          }
+          return success();
+        })
+        .Case<vector::TransferWriteOp>([&](vector::TransferWriteOp
+                                               transferWriteOp) {
+          if (!transferWriteOp.getSource().getType().isa<RankedTensorType>()) {
+            return success();
+          }
+          return analyseDestructiveUpdateOp(transferWriteOp, nullptr,
+                                            transferWriteOp.getSource(),
+                                            transferWriteOp.getResult(), plan);
+        })
         .Case<scf::IfOp>(
             [&](scf::IfOp ifOp) { return analyseScfIfOp(ifOp, plan); })
         .Case<scf::ForOp>(
@@ -601,8 +602,8 @@ LogicalResult createTensorEquivalenceClasses(func::FuncOp funcOp,
       return;
     }
     if (auto vectorWriteOp = dyn_cast<vector::TransferWriteOp>(updateOp)) {
-      if (vectorWriteOp.source().getType().isa<RankedTensorType>()) {
-        hasDestructiveUpdatePattern(vectorWriteOp.source(), plan);
+      if (vectorWriteOp.getSource().getType().isa<RankedTensorType>()) {
+        hasDestructiveUpdatePattern(vectorWriteOp.getSource(), plan);
       }
     }
   });

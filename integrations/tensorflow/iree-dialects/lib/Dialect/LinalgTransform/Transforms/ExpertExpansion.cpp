@@ -85,7 +85,7 @@ struct ExpertExpansion : public PassWrapper<ExpertExpansion, Pass> {
 
     ModuleOp strategyModule = nullptr;
     for (auto nestedModule : module.getOps<ModuleOp>()) {
-      Optional<StringRef> name = nestedModule.sym_name();
+      Optional<StringRef> name = nestedModule.getSymName();
       if (!name)
         continue;
 

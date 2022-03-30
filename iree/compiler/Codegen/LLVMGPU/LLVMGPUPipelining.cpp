@@ -113,13 +113,13 @@ struct LLVMGPUPipeliningPass
         auto ld = dyn_cast<vector::TransferReadOp>(op);
         if (!ld) continue;
         unsigned ldAddSpace =
-            ld.source().getType().cast<MemRefType>().getMemorySpaceAsInt();
+            ld.getSource().getType().cast<MemRefType>().getMemorySpaceAsInt();
         if (ldAddSpace != 0 || !ld->hasOneUse()) continue;
         auto st =
             dyn_cast<vector::TransferWriteOp>(ld->use_begin()->getOwner());
         if (!st) continue;
         unsigned stAddSpace =
-            st.source().getType().cast<MemRefType>().getMemorySpaceAsInt();
+            st.getSource().getType().cast<MemRefType>().getMemorySpaceAsInt();
         if (stAddSpace != 3) continue;
         copyToWorkgroupMemory = true;
         ld->setAttr(kPipeliningGlobalLoad, builder.getUnitAttr());

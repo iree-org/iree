@@ -125,7 +125,7 @@ static Value allocateBufferForResult(OpBuilder &b, Operation *op,
   } else if (auto subTensorInsertOp = dyn_cast<tensor::InsertSliceOp>(op)) {
     dynamicDims = getDynamicDims(b, loc, subTensorInsertOp.dest());
   } else if (auto transferWriteOp = dyn_cast<vector::TransferWriteOp>(op)) {
-    dynamicDims = getDynamicDims(b, loc, transferWriteOp.source());
+    dynamicDims = getDynamicDims(b, loc, transferWriteOp.getSource());
   } else {
     dynamicDims = getDynamicDims(b, loc, op->getResult(resultNum));
   }
@@ -847,25 +847,25 @@ static LogicalResult convertVectorTransferWriteOp(OpBuilder &b,
                                                   BlockAndValueMapping &bvm,
                                                   BufferizationPlan &plan) {
   Location loc = op.getLoc();
-  Value result = op.result();
+  Value result = op.getResult();
   RankedTensorType resultType = result.getType().dyn_cast<RankedTensorType>();
   if (!resultType) return success();
   Value resultBuffer = bvm.lookup(result);
 
-  if (!plan.isEquivalent(op.source(), result) &&
+  if (!plan.isEquivalent(op.getSource(), result) &&
       // If the source is linalg.init_tensor, then we don't care about the
       // initial value and can avoid the copy.
-      !op.source().getDefiningOp<linalg::InitTensorOp>()) {
-    Value destBuffer = bvm.lookup(op.source());
+      !op.getSource().getDefiningOp<linalg::InitTensorOp>()) {
+    Value destBuffer = bvm.lookup(op.getSource());
     if (!createLinalgCopyOp(b, loc, destBuffer, resultBuffer)) {
       return failure();
     }
   }
 
   // Create a new vector.transfer_write operation without a result value.
-  b.create<vector::TransferWriteOp>(loc, op.vector(), resultBuffer,
-                                    op.indices(), op.permutation_mapAttr(),
-                                    op.mask(), op.in_boundsAttr());
+  b.create<vector::TransferWriteOp>(loc, op.getVector(), resultBuffer,
+                                    op.getIndices(), op.getPermutationMapAttr(),
+                                    op.getMask(), op.getInBoundsAttr());
   return success();
 }
 
@@ -1109,7 +1109,9 @@ void LinalgBufferizePass::runOnOperation() {
         })
         .Case<vector::TransferWriteOp>(
             [&](vector::TransferWriteOp transferWriteOp) {
-              if (!transferWriteOp.source().getType().isa<RankedTensorType>()) {
+              if (!transferWriteOp.getSource()
+                       .getType()
+                       .isa<RankedTensorType>()) {
                 // Nothing to do when source is not a tensor.
                 return success();
               }
