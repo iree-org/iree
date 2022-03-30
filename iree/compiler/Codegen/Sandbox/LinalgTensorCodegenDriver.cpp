@@ -188,6 +188,18 @@ struct OutlineOneParentLoopPass
 };
 }  // namespace
 
+/// Disabled due to incompatibility with changes in
+/// https://github.com/llvm/llvm-project/commit/58d0da885ef46e3fdb5247295da7898b377c41e1
+///
+// /// Return the neutral element as a new Value.
+// /// For now, just assume it is the zero of type.
+// /// In the future, it should be the zero of type + op.
+// static Value getNeutralOfLinalgOp(OpBuilder &b, OpOperand &op) {
+//   auto t = getElementTypeOrSelf(op.get().getType());
+//   return b.create<arith::ConstantOp>(op.getOwner()->getLoc(), t,
+//                                      b.getZeroAttr(t));
+// }
+
 /// Collect all Linalg ops, they must all have tensor semantics.
 /// For now this just fuses everything.
 // TODO: finer control.
@@ -213,33 +225,49 @@ void LinalgFusePass::runOnOperation() {
         ::mlir::iree_compiler::getIREELinalgLoopDistributionOptions());
   }
 
-  // TODO: padding value should come from user
-  OpBuilder b(funcOp.getContext());
-  SmallVector<Attribute> paddingValueAttributes(packPaddings.size(),
-                                                b.getZeroAttr(b.getF32Type()));
-
-  // Parse the transpose vectors.
-  SmallVector<SmallVector<int64_t>> transposePaddingVectors;
-  for (const std::string &transposePadding : transposePaddings) {
-    SmallVector<int64_t> transposeVector = {};
-    SmallVector<StringRef> tokens;
-    StringRef(transposePadding).split(tokens, ':');
-    for (StringRef token : tokens)
-      transposeVector.push_back(std::stoi(token.str()));
-    transposePaddingVectors.push_back(transposeVector);
-  }
-
-  LinalgPaddingOptions paddingOptions;
-  paddingOptions.setPaddingValues(paddingValueAttributes);
-  paddingOptions.setPackPaddings(
-      SmallVector<bool>{packPaddings.begin(), packPaddings.end()});
-  paddingOptions.setHoistPaddings(
-      SmallVector<int64_t>{hoistPaddings.begin(), hoistPaddings.end()});
-  paddingOptions.setTransposePaddings(transposePaddingVectors);
+  // Disabled due to incompatibility with changes in
+  // https://github.com/llvm/llvm-project/commit/58d0da885ef46e3fdb5247295da7898b377c41e1
+  //
+  // Set up padding options.
+  // TODO: Replace the lambdas by either functions defined in MLIR core or even
+  // adapt the LinalgPaddingOptions to take the `hoistPaddings` and
+  // `packPaddings` arrays directly.
+  // auto packFunc = [&](OpOperand &opOperand) {
+  //   return opOperand.getOperandNumber() < packPaddings.size()
+  //              ? packPaddings[opOperand.getOperandNumber()]
+  //              : false;
+  // };
+  // auto hoistingFunc = [&](OpOperand &opOperand) {
+  //   return opOperand.getOperandNumber() < hoistPaddings.size()
+  //              ? hoistPaddings[opOperand.getOperandNumber()]
+  //              : 0;
+  // };
+  // auto transposeFunc = [&](OpOperand &opOperand) {
+  //   SmallVector<int64_t> transposeVector = {};
+  //   if (opOperand.getOperandNumber() >= transposePaddings.size())
+  //     return transposeVector;
+  //   SmallVector<StringRef> elems;
+  //   StringRef(transposePaddings[opOperand.getOperandNumber()])
+  //       .split(elems, ':');
+  //   for (StringRef elem : elems)
+  //     transposeVector.push_back(std::stoi(elem.str()));
+  //   return transposeVector;
+  // };
+  // LinalgPaddingOptions paddingOptions;
+  // Disabled due to incompatibility with changes in
+  // https://github.com/llvm/llvm-project/commit/58d0da885ef46e3fdb5247295da7898b377c41e1
+  //
+  // paddingOptions.setPaddingValueComputationFunction(getNeutralOfLinalgOp);
+  // paddingOptions.setPaddingNoFoldComputationFunction(packFunc);
+  // paddingOptions.setPaddingHoistComputationFunction(hoistingFunc);
+  // paddingOptions.setPaddingTransposeComputationFunction(transposeFunc);
 
   CodegenStrategy strategy;
-  strategy.tileAndFuseIf(doTiling, anchorOpName, tilingOptions)
-      .padIf(pad, "", paddingOptions)
+  strategy
+      .tileAndFuseIf(doTiling, anchorOpName, tilingOptions)
+      // Disabled due to incompatibility with changes in
+      // https://github.com/llvm/llvm-project/commit/58d0da885ef46e3fdb5247295da7898b377c41e1
+      // .padIf(pad, "", paddingOptions)
       .vectorizeIf(vectorize, "", nullptr, vectorizePadding);
 
   // Created a nested OpPassManager and run.
@@ -271,34 +299,49 @@ void LinalgSingleTilingExpertPass::runOnOperation() {
   }
   tilingOptions = tilingOptions.setPeeledLoops(peeledLoops);
 
-  // TODO: padding value should come from user
-  OpBuilder b(funcOp.getContext());
-  SmallVector<Attribute> paddingValueAttributes(packPaddings.size(),
-                                                b.getZeroAttr(b.getF32Type()));
-
-  // Parse the transpose vectors.
-  SmallVector<SmallVector<int64_t>> transposePaddingVectors;
-  for (const std::string &transposePadding : transposePaddings) {
-    SmallVector<int64_t> transposeVector = {};
-    SmallVector<StringRef> tokens;
-    StringRef(transposePadding).split(tokens, ':');
-    for (StringRef token : tokens)
-      transposeVector.push_back(std::stoi(token.str()));
-    transposePaddingVectors.push_back(transposeVector);
-  }
-
-  LinalgPaddingOptions paddingOptions;
-  paddingOptions.setPaddingValues(paddingValueAttributes);
-  paddingOptions.setPackPaddings(
-      SmallVector<bool>{packPaddings.begin(), packPaddings.end()});
-  paddingOptions.setHoistPaddings(
-      SmallVector<int64_t>{hoistPaddings.begin(), hoistPaddings.end()});
-  paddingOptions.setTransposePaddings(transposePaddingVectors);
+  // Disabled due to incompatibility with changes in
+  // https://github.com/llvm/llvm-project/commit/58d0da885ef46e3fdb5247295da7898b377c41e1
+  //
+  // // Set up padding options.
+  // // TODO: Replace the lambdas by either functions defined in MLIR core or
+  // even
+  // // adapt the LinalgPaddingOptions to take the `hoistPaddings` and
+  // // `packPaddings` arrays directly.
+  // auto packFunc = [&](OpOperand &opOperand) {
+  //   return opOperand.getOperandNumber() < packPaddings.size()
+  //              ? packPaddings[opOperand.getOperandNumber()]
+  //              : false;
+  // };
+  // auto hoistingFunc = [&](OpOperand &opOperand) {
+  //   return opOperand.getOperandNumber() < hoistPaddings.size()
+  //              ? hoistPaddings[opOperand.getOperandNumber()]
+  //              : 0;
+  // };
+  // auto transposeFunc = [&](OpOperand &opOperand) {
+  //   SmallVector<int64_t> transposeVector = {};
+  //   if (opOperand.getOperandNumber() >= transposePaddings.size())
+  //     return transposeVector;
+  //   SmallVector<StringRef> elems;
+  //   StringRef(transposePaddings[opOperand.getOperandNumber()])
+  //       .split(elems, ':');
+  //   for (StringRef elem : elems)
+  //     transposeVector.push_back(std::stoi(elem.str()));
+  //   return transposeVector;
+  // };
+  // LinalgPaddingOptions paddingOptions;
+  // paddingOptions.setPaddingValueComputationFunction(getNeutralOfLinalgOp);
+  // paddingOptions.setPaddingNoFoldComputationFunction(packFunc);
+  // paddingOptions.setPaddingHoistComputationFunction(hoistingFunc);
+  // paddingOptions.setPaddingTransposeComputationFunction(transposeFunc);
 
   CodegenStrategy strategy;
   StringRef genericOpName = GenericOp::getOperationName();
-  strategy.tileIf(doTiling, anchorOpName, tilingOptions)
-      .padIf(pad, anchorOpName, paddingOptions)
+  strategy
+      .tileIf(doTiling, anchorOpName, tilingOptions)
+      // Disabled due to incompatibility with changes in
+      // https://github.com/llvm/llvm-project/commit/58d0da885ef46e3fdb5247295da7898b377c41e1
+      //
+      // .padIf(pad, anchorOpName, paddingOptions)
       .decomposeIf(decomposeToLowerDimOp)
       .generalizeIf(generalize, anchorOpName)
       .interchangeIf(!iteratorInterchange.empty(), iteratorInterchange)
