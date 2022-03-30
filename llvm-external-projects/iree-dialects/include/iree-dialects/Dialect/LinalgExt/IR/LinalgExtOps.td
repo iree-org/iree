@@ -50,6 +50,118 @@ class IREELinalgExt_Op<string mnemonic, list<Trait> traits = []> :
 }
 
 //===----------------------------------------------------------------------===//
+// Temporary stripped-down copies of IREE HAL ops needed for composition.
+// These can be removed once dialects can register transformations with the 
+// transform dialect.
+//===----------------------------------------------------------------------===//
+def IREELinalgExt_Dim : TypeAlias<Index>;
+
+def IREELinalgExt_HALInterfaceWorkgroupIDOp : Op<IREELinalgExt_Dialect, "hal.interface.workgroup.id"> {
+  let summary = [{returns the index of the current workgroup in the grid}];
+  let description = [{
+    The global workgroup ID in the range of
+      `[0, iree_linalg_ext.hal.interface.workgroup.count)` along each XYZ dimension.
+
+    Corresponds to the `WorkgroupId` SPIR-V built-in and the `blockIdx` CUDA
+    built-in variable.
+
+    ```mlir
+    %x = iree_linalg_ext.hal.interface.workgroup.id[0] : index
+    %y = iree_linalg_ext.hal.interface.workgroup.id[1] : index
+    %z = iree_linalg_ext.hal.interface.workgroup.id[2] : index
+    ```
+  }];
+
+  let arguments = (ins IndexAttr:$dimension);
+  let results = (outs IREELinalgExt_Dim:$result);
+
+  let builders = [
+    OpBuilder<(ins "unsigned":$dim),
+    [{
+      build($_builder, $_state, $_builder.getIndexType(), $_builder.getIndexAttr(dim));
+    }]>,
+  ];
+
+  let assemblyFormat = [{
+    `[` $dimension `]` attr-dict `:` type($result)
+  }];
+}
+
+def IREELinalgExt_HALInterfaceWorkgroupCountOp : Op<IREELinalgExt_Dialect, "hal.interface.workgroup.count"> {
+  let summary = [{returns the total workgroup count of the grid}];
+  let description = [{
+    The total number of workgroups along each dimension in the dispatch grid.
+
+    Corresponds to the `NumWorkgroups` SPIR-V built-in and the `gridDim` CUDA
+    built-in variable.
+
+    ```mlir
+    %x = hal.interface.workgroup.count[0] : index
+    %y = hal.interface.workgroup.count[1] : index
+    %z = hal.interface.workgroup.count[2] : index
+    ```
+  }];
+
+  let arguments = (ins IndexAttr:$dimension);
+  let results = (outs IREELinalgExt_Dim:$result);
+
+  let builders = [
+    OpBuilder<(ins "unsigned":$dim),
+    [{
+      build($_builder, $_state, $_builder.getIndexType(), $_builder.getIndexAttr(dim));
+    }]>,
+  ];
+
+  let assemblyFormat = [{
+    `[` $dimension `]` attr-dict `:` type($result)
+  }];
+}
+
+// Stripped-down version of the HAL::ExecutableEntryPoint op. 
+// Using a custom op in generic form is not deemed acceptable but we should not 
+// either blindly take the complexity.
+def IREELinalgExt_HALExecutableEntryPointOp : Op<IREELinalgExt_Dialect, "hal.executable.entry_point", [
+    IsolatedFromAbove,
+  ]> {
+  let summary = [{executable entry point declaration}];
+  let description = [{
+    An entry point exported by the executable with statically-available
+    information describing the IO interface it uses and other dispatch metadata.
+
+    The `workgroup_count_region` region represents the
+    computation that returns the number of workgroups to use. 
+    It returns the number of workgroups along x, y, and z.
+
+    Note: this is a stripped-down of the HAL::ExecutableEntryPoint to only keep
+    the essential information needed to perform the transformation.
+    This is only used within the parent func of an IREELinalgExt_InParallelOp 
+    that is in the process of translating to the HAL abstraction.
+    This goes away once transform dialect ops can be registered from different
+    dialects. 
+  }];
+
+  // This op only propagates information to HAL, it inherits none of the design.
+  let arguments = (ins);
+  let regions = (region SizedRegion<1>:$workgroup_count_region);
+}
+
+
+def IREELinalgExt_HALReturnOp : Op<IREELinalgExt_Dialect, "hal.return", [Terminator]> {
+  let summary = [{return from a hal.executable.entry_point region}];
+  let description = [{
+    Returns the given values from the region and back to the host code.
+  }];
+
+  let arguments = (ins
+    Variadic<AnyType>:$operands
+  );
+
+  let assemblyFormat = [{
+    ($operands^ `:` type($operands))? attr-dict
+  }];
+}
+
+//===----------------------------------------------------------------------===//
 // Non-structured ops
 //===----------------------------------------------------------------------===//
 

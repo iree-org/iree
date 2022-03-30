@@ -408,9 +408,6 @@ void addCPUDefaultPassPipeline(OpPassManager &passManager) {
 }
 
 void addLinalgTransformInterpPasses(OpPassManager &passManager) {
-  // Sets the number of workgroups to be {1, 1, 1} for now.
-  passManager.addPass(createSetNumWorkgroupsPass());
-
   // Give control to the linalg_transform dialect.
   passManager.addPass(createLinalgTransformInterpreterPass());
   // Dropping the schedule is only needed if we want to embed the transform in
