@@ -256,42 +256,27 @@ LogicalResult transform::InterchangeOp::verify() {
 // PadOp
 //===---------------------------------------------------------------------===//
 
-/// Returns the neutral value for a Linalg operation that produces the given
-/// operand, construct using the provided builder. Currently assumes the
-/// reduction in the Linalg operation is an addition and, therefore, the neutral
-/// value is zero.
-static Value getNeutralOfLinalgOp(OpBuilder &b, OpOperand &op) {
-  auto t = getElementTypeOrSelf(op.get().getType());
-  return b.create<arith::ConstantOp>(op.getOwner()->getLoc(), t,
-                                     b.getZeroAttr(t));
-}
-
 FailureOr<LinalgOp> transform::PadOp::applyToOne(LinalgOp target) {
   // Copy the stack allocated options since the lambdas have a longer lifetime.
-  SmallVector<int64_t> packPaddings = extractI64Array(this->pack_paddings());
-  auto packFunc = [=](OpOperand &opOperand) {
-    return opOperand.getOperandNumber() < packPaddings.size()
-               ? packPaddings[opOperand.getOperandNumber()] != 0
-               : false;
-  };
+  SmallVector<bool> packPaddings;
+  for (int64_t pack : extractI64Array(this->pack_paddings()))
+    packPaddings.push_back(pack != 0);
   SmallVector<int64_t> hoistPaddings = extractI64Array(this->hoist_paddings());
-  auto hoistingFunc = [=](OpOperand &opOperand) {
-    return opOperand.getOperandNumber() < hoistPaddings.size()
-               ? hoistPaddings[opOperand.getOperandNumber()]
-               : 0;
-  };
-  ArrayAttr transposePaddings = this->transpose_paddings().cast<ArrayAttr>();
-  auto transposeFunc = [=](OpOperand &opOperand) {
-    if (opOperand.getOperandNumber() >= transposePaddings.size())
-      return SmallVector<int64_t>();
-    return extractI64Array(
-        transposePaddings[opOperand.getOperandNumber()].cast<ArrayAttr>());
-  };
+  SmallVector<SmallVector<int64_t>> transposePaddingVectors;
+  for (Attribute attr : this->transpose_paddings().cast<ArrayAttr>())
+    transposePaddingVectors.push_back(extractI64Array(attr.cast<ArrayAttr>()));
+
+  SmallVector<Attribute> paddingValueAttributes(
+      packPaddings.size(), b.getZeroAttr(target->getResult(0)
+                                             .getType()
+                                             .cast<RankedTensorType>()
+                                             .getElementType()));
+
   LinalgPaddingOptions paddingOptions;
-  paddingOptions.setPaddingValueComputationFunction(getNeutralOfLinalgOp);
-  paddingOptions.setPaddingNoFoldComputationFunction(packFunc);
-  paddingOptions.setPaddingHoistComputationFunction(hoistingFunc);
-  paddingOptions.setPaddingTransposeComputationFunction(transposeFunc);
+  // paddingOptions.setPaddingValues(paddingValueAttributes);
+  paddingOptions.setPackPaddings(packPaddings);
+  paddingOptions.setHoistPaddings(hoistPaddings);
+  paddingOptions.setTransposePaddings(transposePaddingVectors);
 
   return functional::applyAt(target, callLinalgPattern<LinalgPaddingPattern>(
                                          getContext(), paddingOptions));
