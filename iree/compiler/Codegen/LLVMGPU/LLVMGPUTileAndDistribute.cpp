@@ -182,7 +182,7 @@ static Optional<Value> allocateWorkgroupMemory(
     OpBuilder &b, memref::SubViewOp subview,
     ArrayRef<Value> boundingSubViewSize, DataLayout &layout) {
   OpBuilder::InsertionGuard guard(b);
-  FuncOp funcOp = subview->getParentOfType<FuncOp>();
+  func::FuncOp funcOp = subview->getParentOfType<func::FuncOp>();
   if (!funcOp) {
     subview.emitError("expected op to be within std.func");
     return llvm::None;
@@ -364,7 +364,7 @@ struct LLVMGPUTileAndDistributePass
 };
 }  // namespace
 
-std::unique_ptr<OperationPass<FuncOp>> createLLVMGPUTileAndDistribute(
+std::unique_ptr<OperationPass<func::FuncOp>> createLLVMGPUTileAndDistribute(
     bool distributeToWarp) {
   return std::make_unique<LLVMGPUTileAndDistributePass>(distributeToWarp);
 }

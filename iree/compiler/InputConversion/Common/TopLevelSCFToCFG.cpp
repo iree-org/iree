@@ -46,7 +46,7 @@ void TopLevelSCFToCFGPass::runOnOperation() {
     signalPassFailure();
 }
 
-std::unique_ptr<OperationPass<FuncOp>> createTopLevelSCFToCFGPass() {
+std::unique_ptr<OperationPass<func::FuncOp>> createTopLevelSCFToCFGPass() {
   return std::make_unique<TopLevelSCFToCFGPass>();
 }
 

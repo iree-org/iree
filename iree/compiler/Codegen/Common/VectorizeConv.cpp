@@ -381,7 +381,8 @@ void populateLinalgToVectorVectorizeConvPatterns(MLIRContext *context,
   patterns.insert<VectorizeLinalgConv, VectorizeLinalgDepthwiseConv>(context);
 }
 
-std::unique_ptr<OperationPass<FuncOp>> createLinalgToVectorVectorizeConvPass() {
+std::unique_ptr<OperationPass<func::FuncOp>>
+createLinalgToVectorVectorizeConvPass() {
   return std::make_unique<LinalgToVectorVectorizeConvPass>();
 }
 

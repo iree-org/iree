@@ -226,7 +226,7 @@ struct ForOpCanonicalizationPass
   }
 
   void runOnOperation() override {
-    FuncOp fn = getOperation();
+    func::FuncOp fn = getOperation();
     RewritePatternSet patterns(&getContext());
     patterns.insert<CanonicalizeForOpInductionVarShape,
                     PackForOpInductionVarVector>(fn.getContext());
@@ -238,7 +238,7 @@ struct ForOpCanonicalizationPass
 
 }  // namespace
 
-std::unique_ptr<OperationPass<FuncOp>> createForOpCanonicalizationPass() {
+std::unique_ptr<OperationPass<func::FuncOp>> createForOpCanonicalizationPass() {
   return std::make_unique<ForOpCanonicalizationPass>();
 }
 

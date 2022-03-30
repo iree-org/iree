@@ -129,7 +129,8 @@ struct CleanupBufferAllocViewPass
 
 }  // namespace
 
-std::unique_ptr<OperationPass<FuncOp>> createCleanupBufferAllocViewPass() {
+std::unique_ptr<OperationPass<func::FuncOp>>
+createCleanupBufferAllocViewPass() {
   return std::make_unique<CleanupBufferAllocViewPass>();
 }
 

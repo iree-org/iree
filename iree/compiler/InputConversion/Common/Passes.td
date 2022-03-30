@@ -16,7 +16,7 @@ def IREEImportPublic :
 }
 
 def LinalgQuantizedMatmulToMatmulPass
-    : Pass<"iree-linalg-quantized-matmul-to-matmul", "FuncOp"> {
+    : Pass<"iree-linalg-quantized-matmul-to-matmul", "func::FuncOp"> {
   let summary = "lower quantized_matmul to matmul";
   let constructor = "mlir::iree_compiler::createLinalgQuantizedMatmulToMatmulPass()";
   // let dependentDialects = ["mlir::linalg::LinalgDialect"];
@@ -29,7 +29,7 @@ def SanitizeModuleNames :
 }
 
 def TopLevelSCFToCFG :
-    Pass<"iree-top-level-scf-to-cfg", "FuncOp"> {
+    Pass<"iree-top-level-scf-to-cfg", "func::FuncOp"> {
   let summary = "Converts non-nested SCF constructs to CFG (not traversing into opaque operations).";
   let constructor = "mlir::iree_compiler::createTopLevelSCFToCFGPass()";
 }

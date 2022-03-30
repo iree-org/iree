@@ -66,8 +66,8 @@ class WrapEntryPointsPass
   void runOnOperation() override {
     auto moduleOp = getOperation();
 
-    SmallVector<FuncOp, 4> entryFuncOps;
-    for (auto funcOp : moduleOp.getOps<FuncOp>()) {
+    SmallVector<func::FuncOp, 4> entryFuncOps;
+    for (auto funcOp : moduleOp.getOps<func::FuncOp>()) {
       if (funcOp.isPublic() && !funcOp->hasAttr("iree.abi.stub")) {
         entryFuncOps.push_back(funcOp);
       }
@@ -434,7 +434,7 @@ class WrapEntryPointsPass
                                   ArrayRef<DynamicDims> outputDynamicDims,
                                   mlir::func::FuncOp calculateShapeFuncOp,
                                   OpBuilder &moduleBuilder) {
-    auto queryFuncOp = moduleBuilder.create<FuncOp>(
+    auto queryFuncOp = moduleBuilder.create<func::FuncOp>(
         loc, namePrefix.str() + "_query_output_shape",
         moduleBuilder.getFunctionType(/*inputs=*/
                                       TypeRange{

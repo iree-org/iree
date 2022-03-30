@@ -217,10 +217,10 @@ struct FftOpConversion : public OpConversionPattern<mhlo::FftOp> {
 };
 
 // We need to convert func ops in order to convert types.
-class BuiltinFuncOpPattern : public OpConversionPattern<FuncOp> {
-  using OpConversionPattern<FuncOp>::OpConversionPattern;
+class BuiltinFuncOpPattern : public OpConversionPattern<func::FuncOp> {
+  using OpConversionPattern<func::FuncOp>::OpConversionPattern;
   LogicalResult matchAndRewrite(
-      FuncOp srcOp, OpAdaptor adaptor,
+      func::FuncOp srcOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     FunctionType srcFuncType = srcOp.getFunctionType();
     TypeConverter::SignatureConversion signatureConversion(
@@ -348,7 +348,7 @@ struct ConvertMHLOToLinalgOnTensorsPass
     target.addIllegalDialect<mhlo::MhloDialect>();
 
     // Functions must have legal types.
-    target.addDynamicallyLegalOp<FuncOp>([&](FuncOp funcOp) {
+    target.addDynamicallyLegalOp<func::FuncOp>([&](func::FuncOp funcOp) {
       for (Type type : funcOp.getFunctionType().getInputs()) {
         if (isIllegalType(type)) return false;
       }
@@ -387,7 +387,7 @@ void populateMHLOToLinalgOnTensorsConversionPatterns(
       typeConverter, context, PatternBenefit(1000));
 }
 
-std::unique_ptr<OperationPass<FuncOp>> createMHLOToLinalgOnTensorsPass() {
+std::unique_ptr<OperationPass<func::FuncOp>> createMHLOToLinalgOnTensorsPass() {
   return std::make_unique<ConvertMHLOToLinalgOnTensorsPass>();
 }
 

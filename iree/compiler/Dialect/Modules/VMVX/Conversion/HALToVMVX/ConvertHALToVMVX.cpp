@@ -63,7 +63,7 @@ enum EntryArgOrdinals {
 ///       %workgroup_count_y: index,
 ///       %workgroup_count_z: index
 ///   )
-LogicalResult updateHALToVMVXEntryFuncOp(FuncOp funcOp,
+LogicalResult updateHALToVMVXEntryFuncOp(func::FuncOp funcOp,
                                          TypeConverter &typeConverter) {
   auto originalType = funcOp.getFunctionType();
   if (originalType.getNumInputs() != 0 || originalType.getNumResults() != 0) {

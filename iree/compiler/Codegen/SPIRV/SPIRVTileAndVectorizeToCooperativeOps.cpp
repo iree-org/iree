@@ -276,7 +276,7 @@ class SPIRVTileAndVectorizeToCooperativeOpsPass final
 
   void runOnOperation() override {
     MLIRContext *context = &getContext();
-    FuncOp funcOp = getOperation();
+    func::FuncOp funcOp = getOperation();
 
     // First we need to discover the CodeGen lowering configuration. It was
     // decided earlier and attached to a linalg op as an attribute.
@@ -411,7 +411,7 @@ class SPIRVTileAndVectorizeToCooperativeOpsPass final
 
 }  // namespace
 
-std::unique_ptr<OperationPass<FuncOp>>
+std::unique_ptr<OperationPass<func::FuncOp>>
 createSPIRVTileAndVectorizeToCooperativeOpsPass() {
   return std::make_unique<SPIRVTileAndVectorizeToCooperativeOpsPass>();
 }

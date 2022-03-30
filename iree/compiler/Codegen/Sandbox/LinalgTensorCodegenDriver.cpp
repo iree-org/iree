@@ -52,7 +52,7 @@ static bool getTilingOptionsFromConfig(int64_t tilingLevel,
 /// Default method to initialize the tiling options for fusion in IREE. These
 /// could be ovveridden by the command line options if specified.
 static FailureOr<LinalgTilingAndFusionOptions> getTileAndFuseOptionsFromConfig(
-    FuncOp funcOp, int64_t tilingLevel) {
+    func::FuncOp funcOp, int64_t tilingLevel) {
   SmallVector<Operation *> computeOps;
   SmallVector<mlir::iree_compiler::LoopTilingAndDistributionInfo> tiledLoops;
   mlir::iree_compiler::IREE::Codegen::LoweringConfigAttr loweringConfig;
@@ -201,7 +201,7 @@ static Value getNeutralOfLinalgOp(OpBuilder &b, OpOperand &op) {
 /// For now this just fuses everything.
 // TODO: finer control.
 void LinalgFusePass::runOnOperation() {
-  FuncOp funcOp = getOperation();
+  func::FuncOp funcOp = getOperation();
 
   // Set up tiling and vectorization options.
   FailureOr<LinalgTilingAndFusionOptions> defaultTilingOptions =
@@ -259,7 +259,7 @@ void LinalgFusePass::runOnOperation() {
       .vectorizeIf(vectorize, "", nullptr, vectorizePadding);
 
   // Created a nested OpPassManager and run.
-  OpPassManager dynamicPM(FuncOp::getOperationName());
+  OpPassManager dynamicPM(func::FuncOp::getOperationName());
   strategy.configurePassPipeline(dynamicPM, funcOp.getContext());
 
   if (failed(runPipeline(dynamicPM, funcOp))) {
@@ -268,7 +268,7 @@ void LinalgFusePass::runOnOperation() {
 }
 
 void LinalgSingleTilingExpertPass::runOnOperation() {
-  FuncOp funcOp = getOperation();
+  func::FuncOp funcOp = getOperation();
 
   // Set up tiling and vectorization options.
   LinalgTilingOptions tilingOptions;
@@ -329,7 +329,7 @@ void LinalgSingleTilingExpertPass::runOnOperation() {
                    nullptr, vectorizePadding);
 
   // Created a nested OpPassManager and run.
-  OpPassManager dynamicPM(FuncOp::getOperationName());
+  OpPassManager dynamicPM(func::FuncOp::getOperationName());
   strategy.configurePassPipeline(dynamicPM, funcOp.getContext());
   if (failed(runPipeline(dynamicPM, funcOp))) {
     return signalPassFailure();
@@ -410,8 +410,8 @@ void LinalgVectorLoweringPass::runOnOperation() {
   CodegenStrategy strategy;
   strategy.vectorLowering(vectorLoweringOptions);
   // Created a nested OpPassManager and run.
-  OpPassManager dynamicPM(FuncOp::getOperationName());
-  FuncOp funcOp = getOperation();
+  OpPassManager dynamicPM(func::FuncOp::getOperationName());
+  func::FuncOp funcOp = getOperation();
   strategy.configurePassPipeline(dynamicPM, funcOp.getContext());
   if (failed(runPipeline(dynamicPM, funcOp))) {
     return signalPassFailure();
@@ -500,41 +500,46 @@ void OutlineOneParentLoopPass::runOnOperation() {
   });
 }
 
-std::unique_ptr<OperationPass<FuncOp>> mlir::createLinalgFusePass() {
+std::unique_ptr<OperationPass<func::FuncOp>> mlir::createLinalgFusePass() {
   return std::make_unique<LinalgFusePass>();
 }
-std::unique_ptr<OperationPass<FuncOp>> mlir::createLinalgFusePass(
+std::unique_ptr<OperationPass<func::FuncOp>> mlir::createLinalgFusePass(
     const mlir::LinalgFusePassOptions &options) {
   return std::make_unique<LinalgFusePass>(options);
 }
 
-std::unique_ptr<OperationPass<FuncOp>>
+std::unique_ptr<OperationPass<func::FuncOp>>
 mlir::createLinalgSingleTilingExpertPass() {
   return std::make_unique<LinalgSingleTilingExpertPass>();
 }
-std::unique_ptr<OperationPass<FuncOp>> mlir::createLinalgSingleTilingExpertPass(
+std::unique_ptr<OperationPass<func::FuncOp>>
+mlir::createLinalgSingleTilingExpertPass(
     const LinalgSingleTilingExpertPassOptions &passOptions) {
   return std::make_unique<LinalgSingleTilingExpertPass>(passOptions);
 }
 
-std::unique_ptr<OperationPass<FuncOp>> mlir::createLinalgVectorLoweringPass(
-    int64_t vectorLoweringStage) {
+std::unique_ptr<OperationPass<func::FuncOp>>
+mlir::createLinalgVectorLoweringPass(int64_t vectorLoweringStage) {
   return std::make_unique<LinalgVectorLoweringPass>(vectorLoweringStage);
 }
-std::unique_ptr<OperationPass<FuncOp>> mlir::createLinalgVectorLoweringPass(
+std::unique_ptr<OperationPass<func::FuncOp>>
+mlir::createLinalgVectorLoweringPass(
     const LinalgVectorLoweringPassOptions &options) {
   return std::make_unique<LinalgVectorLoweringPass>(options);
 }
 
-std::unique_ptr<OperationPass<FuncOp>> mlir::createUnrollOneVectorOpPass() {
+std::unique_ptr<OperationPass<func::FuncOp>>
+mlir::createUnrollOneVectorOpPass() {
   return std::make_unique<UnrollOneVectorOpPass>();
 }
 
-std::unique_ptr<OperationPass<FuncOp>> mlir::createUnrollOneParentLoopPass() {
+std::unique_ptr<OperationPass<func::FuncOp>>
+mlir::createUnrollOneParentLoopPass() {
   return std::make_unique<UnrollOneParentLoopPass>();
 }
 
-std::unique_ptr<OperationPass<FuncOp>> mlir::createOutlineOneParentLoopPass() {
+std::unique_ptr<OperationPass<func::FuncOp>>
+mlir::createOutlineOneParentLoopPass() {
   return std::make_unique<OutlineOneParentLoopPass>();
 }
 
@@ -557,7 +562,7 @@ void mlir::addLowerToVectorTransforms(OpPassManager &passManager,
 // backend pipelines
 //===----------------------------------------------------------------------===//
 
-std::unique_ptr<OperationPass<FuncOp>>
+std::unique_ptr<OperationPass<func::FuncOp>>
 mlir::iree_compiler::createLinalgFusePass(int64_t tilingLevel, bool vectorize) {
   return std::make_unique<LinalgFusePass>(tilingLevel, vectorize);
 }

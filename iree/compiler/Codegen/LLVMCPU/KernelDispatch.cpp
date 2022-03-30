@@ -73,7 +73,7 @@ using IREE::Codegen::DispatchLoweringPassPipeline;
 
 /// Looks for the `native_vector_size` attribute in the hal.executable.variant
 /// op.
-static Optional<int64_t> getNativeVectorSizeInBytes(FuncOp entryPointFn) {
+static Optional<int64_t> getNativeVectorSizeInBytes(func::FuncOp entryPointFn) {
   auto variantOp =
       entryPointFn->getParentOfType<IREE::HAL::ExecutableVariantOp>();
   if (!variantOp) return llvm::None;
@@ -91,14 +91,14 @@ static Optional<int64_t> getNativeVectorSizeInBytes(FuncOp entryPointFn) {
 /// For a given `shapedType` or (`byteWidth` of element type) return the number
 /// of elements that correspond to the native vector size. Returns 1 as the
 /// fallback.
-static int64_t getVectorSize(FuncOp entryPointFn, unsigned byteWidth) {
+static int64_t getVectorSize(func::FuncOp entryPointFn, unsigned byteWidth) {
   if (Optional<int64_t> nativeVectorSize =
           getNativeVectorSizeInBytes(entryPointFn)) {
     return nativeVectorSize.getValue() / byteWidth;
   }
   return clNativeVectorSizeInBytes / byteWidth;
 }
-static int64_t getVectorSize(FuncOp entryPointFn, ShapedType shapedType) {
+static int64_t getVectorSize(func::FuncOp entryPointFn, ShapedType shapedType) {
   Type elementType = shapedType.getElementType();
   if (!elementType.isIntOrFloat()) return 1;
   unsigned byteWidth = IREE::Util::getRoundedElementByteWidth(elementType);
@@ -108,8 +108,8 @@ static int64_t getVectorSize(FuncOp entryPointFn, ShapedType shapedType) {
 /// Returns minimum tiling sizes for each dimension. One dimension is possible
 /// to access at different element types. It determines the tiling sizes by
 /// looking into all the operands.
-static SmallVector<int64_t> getMinTilingSizesForEachDim(FuncOp entryPointFn,
-                                                        linalg::LinalgOp op) {
+static SmallVector<int64_t> getMinTilingSizesForEachDim(
+    func::FuncOp entryPointFn, linalg::LinalgOp op) {
   unsigned numLoops = op.getNumLoops();
   SmallVector<int64_t> minTileSizes(numLoops, 1);
   auto inputOutputOpOperands = op.getInputAndOutputOperands();
@@ -136,7 +136,7 @@ static SmallVector<int64_t> getMinTilingSizesForEachDim(FuncOp entryPointFn,
 /// ops to see the ABI types and guess-timates the type size to use. This is
 /// used to convert the vector size in bytes to vector size in number of
 /// elements.
-static unsigned getReferenceTypeLengthInBytes(FuncOp entryPointFn) {
+static unsigned getReferenceTypeLengthInBytes(func::FuncOp entryPointFn) {
   unsigned referenceTypeLengthInBytes = 4;
   entryPointFn.walk([&](IREE::HAL::InterfaceBindingSubspanOp subSpanOp) {
     Type type = subSpanOp.getResult().getType();
@@ -337,7 +337,7 @@ static void splitParallelAndReductionTiles(
 /// Sets the default configuration to use for an operation that implements the
 /// `PartitionableLoopsInterface`, given the iteration domain of all the loops.
 static LogicalResult setDefaultRootConfig(
-    FuncOp entryPointFn,
+    func::FuncOp entryPointFn,
     IREE::Flow::PartitionableLoopsInterface partitionableLoopsInterfaceOp,
     ArrayRef<Range> iterationDomain) {
   if (getLoweringConfig(partitionableLoopsInterfaceOp)) return success();
@@ -372,7 +372,7 @@ static LogicalResult setDefaultRootConfig(
       DispatchLoweringPassPipeline::CPUDefault);
 }
 
-static LogicalResult setX86SandboxRootConfig(FuncOp entryPointFn,
+static LogicalResult setX86SandboxRootConfig(func::FuncOp entryPointFn,
                                              linalg::ContractionOpInterface op,
                                              ArrayRef<int64_t> flowTileSizes,
                                              int vectorSize) {
@@ -403,7 +403,7 @@ static LogicalResult setX86SandboxRootConfig(FuncOp entryPointFn,
       DispatchLoweringPassPipeline::CPUDoubleTilingExpert);
 }
 
-static LogicalResult setARMRootConfig(FuncOp entryPointFn,
+static LogicalResult setARMRootConfig(func::FuncOp entryPointFn,
                                       linalg::ContractionOpInterface op,
                                       ArrayRef<int64_t> flowTileSizes,
                                       int vectorSize) {
@@ -439,7 +439,7 @@ static LogicalResult setARMRootConfig(FuncOp entryPointFn,
 /// Sets the lowering configuration for dispatch region with root op that
 /// implements the contraction operation interface.
 static LogicalResult setRootConfig(
-    FuncOp entryPointFn, linalg::ContractionOpInterface contractionOp,
+    func::FuncOp entryPointFn, linalg::ContractionOpInterface contractionOp,
     ArrayRef<LoopTilingAndDistributionInfo> tiledLoops) {
   auto linalgOp = cast<linalg::LinalgOp>(contractionOp.getOperation());
   // Consider all element types and use the smallest vector size. The tiling
@@ -491,7 +491,7 @@ static LogicalResult setRootConfig(
 /// Sets the lowering configuration for dispatch region for linalg.mmt4d root
 /// op
 static LogicalResult setRootConfig(
-    FuncOp entryPointFn, linalg::Mmt4DOp mmt4dOp,
+    func::FuncOp entryPointFn, linalg::Mmt4DOp mmt4dOp,
     ArrayRef<LoopTilingAndDistributionInfo> tiledLoops) {
   // TODO(ataei): These are hand tuned for some performance benchmarks for
   // now, we want to adapt the same strategy as matmul that dynamically sets
@@ -543,7 +543,7 @@ static LogicalResult setRootConfig(
 /// Sets the lowering configuration for dispatch region for linalg_ext.fft
 /// root op.
 static LogicalResult setRootConfig(
-    FuncOp entryPointFn, IREE::LinalgExt::FftOp fftOp,
+    func::FuncOp entryPointFn, IREE::LinalgExt::FftOp fftOp,
     ArrayRef<LoopTilingAndDistributionInfo> tiledLoops) {
   unsigned numLoops = fftOp.getLoopIteratorTypes().size();
   auto partitionedLoops = fftOp.getPartitionableLoops(kNumMaxParallelDims);
@@ -576,7 +576,7 @@ static LogicalResult setRootConfig(
 /// Sets the lowering configuration for a generic op to use
 /// CPUDoubleTilingExpert pipeline.
 static LogicalResult setRootConfig(
-    FuncOp entryPointFn, linalg::GenericOp genericOp,
+    func::FuncOp entryPointFn, linalg::GenericOp genericOp,
     ArrayRef<LoopTilingAndDistributionInfo> tiledLoops) {
   // If there are no loops, there is nothing to do.
   unsigned numLoops = genericOp.getNumLoops();
@@ -641,7 +641,7 @@ static LogicalResult setRootConfig(
 /// Sets the lowering configuration for linalg.conv_2d_nhwc_hwcf and
 /// linalg.depthwise_conv_2d_nhwc_hwc operations.
 static LogicalResult setConvRootConfig(
-    FuncOp entryPointFn, linalg::LinalgOp convOp,
+    func::FuncOp entryPointFn, linalg::LinalgOp convOp,
     ArrayRef<LoopTilingAndDistributionInfo> tiledLoops,
     ArrayRef<int64_t> targetTileSizes, int64_t vectorSize) {
   if (!isa<linalg::Conv2DNhwcHwcfOp, linalg::DepthwiseConv2DNhwcHwcOp>(
@@ -691,7 +691,7 @@ static LogicalResult setConvRootConfig(
 }
 
 static LogicalResult setRootConfig(
-    FuncOp entryPointFn, linalg::Conv2DNhwcHwcfOp convOp,
+    func::FuncOp entryPointFn, linalg::Conv2DNhwcHwcfOp convOp,
     ArrayRef<LoopTilingAndDistributionInfo> tiledLoops) {
   auto linalgOp = cast<linalg::LinalgOp>(convOp.getOperation());
   int64_t vectorSize =
@@ -704,7 +704,7 @@ static LogicalResult setRootConfig(
 /// Sets the lowering configuration for linalg.depthwise_conv_2d_nhwc_hwc
 /// operations.
 static LogicalResult setRootConfig(
-    FuncOp entryPointFn, linalg::DepthwiseConv2DNhwcHwcOp convOp,
+    func::FuncOp entryPointFn, linalg::DepthwiseConv2DNhwcHwcOp convOp,
     ArrayRef<LoopTilingAndDistributionInfo> tiledLoops) {
   auto linalgOp = cast<linalg::LinalgOp>(convOp.getOperation());
   int64_t vectorSize =
@@ -716,7 +716,7 @@ static LogicalResult setRootConfig(
 
 /// Set default configuration for Linalg ops.
 static LogicalResult setRootConfig(
-    FuncOp entryPointFn, linalg::LinalgOp linalgOp,
+    func::FuncOp entryPointFn, linalg::LinalgOp linalgOp,
     ArrayRef<LoopTilingAndDistributionInfo> tiledLoops) {
   if (getLoweringConfig(linalgOp)) return success();
 
@@ -734,7 +734,8 @@ static LogicalResult setRootConfig(
 /// Set the default configuration for operations that implement the
 /// `TiledOpInterface`.
 static LogicalResult setRootConfig(
-    FuncOp entryPointFn, IREE::LinalgExt::TiledOpInterface tiledOpInterfaceOp,
+    func::FuncOp entryPointFn,
+    IREE::LinalgExt::TiledOpInterface tiledOpInterfaceOp,
     ArrayRef<LoopTilingAndDistributionInfo> tiledLoops) {
   if (getLoweringConfig(tiledOpInterfaceOp)) return success();
 
@@ -751,7 +752,7 @@ static LogicalResult setRootConfig(
 
 /// Redirects to methods that set the configuration based on operation type.
 static LogicalResult setRootConfigImpl(
-    FuncOp entryPointFn, Operation *op,
+    func::FuncOp entryPointFn, Operation *op,
     ArrayRef<LoopTilingAndDistributionInfo> tiledLoops) {
   // Do not overwrite default configuration.
   if (getLoweringConfig(op)) return success();
@@ -779,7 +780,7 @@ static LogicalResult setRootConfigImpl(
 /// Redirects to methods that set the configuration based on operation type for
 /// VMVX backend.
 static LogicalResult setVMVXRootConfigImpl(
-    FuncOp entryPointFn, Operation *op,
+    func::FuncOp entryPointFn, Operation *op,
     ArrayRef<LoopTilingAndDistributionInfo> tiledLoops) {
   if (getLoweringConfig(op)) return success();
 
@@ -847,7 +848,7 @@ static FailureOr<Operation *> getRootOperation(
 /// Finds the root operation in the given list of Linalg operations and sets
 /// its configuration. Returns error for multiple root operations.
 static LogicalResult setRootConfig(
-    FuncOp entryPointFn, ArrayRef<Operation *> computeOps,
+    func::FuncOp entryPointFn, ArrayRef<Operation *> computeOps,
     ArrayRef<LoopTilingAndDistributionInfo> tiledLoops) {
   FailureOr<Operation *> rootOp = getRootOperation(computeOps);
   if (failed(rootOp)) {
@@ -880,7 +881,7 @@ static LogicalResult setRootConfig(
 
 /// Sets the translation information to use for a dispatch region.
 static LogicalResult setTranslationInfoAndRootConfig(
-    FuncOp entryPointFn, ArrayRef<Operation *> computeOps,
+    func::FuncOp entryPointFn, ArrayRef<Operation *> computeOps,
     ArrayRef<LoopTilingAndDistributionInfo> tiledLoops) {
   // First check if the operations have a preset pipeline.
   for (auto computeOp : computeOps) {
@@ -909,7 +910,7 @@ static LogicalResult setTranslationInfoAndRootConfig(
 LogicalResult initCPULaunchConfig(ModuleOp moduleOp) {
   llvm::StringMap<IREE::HAL::ExecutableEntryPointOp> entryPointOps =
       getAllEntryPoints(moduleOp);
-  for (auto funcOp : moduleOp.getOps<FuncOp>()) {
+  for (auto funcOp : moduleOp.getOps<func::FuncOp>()) {
     auto entryPointOp = entryPointOps.lookup(funcOp.getName());
     if (!entryPointOp) continue;
     if (getTranslationInfo(entryPointOp)) continue;

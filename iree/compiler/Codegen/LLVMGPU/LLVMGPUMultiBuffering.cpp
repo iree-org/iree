@@ -41,7 +41,7 @@ struct LLVMGPUMultiBufferingPass
 };
 }  // namespace
 
-std::unique_ptr<OperationPass<FuncOp>> createLLVMGPUMultiBuffering(
+std::unique_ptr<OperationPass<func::FuncOp>> createLLVMGPUMultiBuffering(
     unsigned numBuffers) {
   return std::make_unique<LLVMGPUMultiBufferingPass>(numBuffers);
 }

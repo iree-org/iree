@@ -228,7 +228,7 @@ void BufferizeCopyOnlyDispatchesPass::runOnOperation() {
   }
 
   SmallVector<Operation *> copyOnlyFunctions;
-  auto funcOps = module.getOps<FuncOp>();
+  auto funcOps = module.getOps<func::FuncOp>();
   for (auto funcOp : funcOps) {
     /// Check if the dispatch has all sources for `flow.dispatch.tensor.store`
     /// operations coming from `flow.dispatch.tensor.load` operations. If so,

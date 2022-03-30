@@ -424,7 +424,7 @@ struct TestMHLOConvertComplexToRealPass
 
 }  // namespace
 
-std::unique_ptr<OperationPass<FuncOp>>
+std::unique_ptr<OperationPass<func::FuncOp>>
 createTestMHLOConvertComplexToRealPass() {
   return std::make_unique<TestMHLOConvertComplexToRealPass>();
 }

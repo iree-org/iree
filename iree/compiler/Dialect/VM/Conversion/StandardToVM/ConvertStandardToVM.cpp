@@ -64,10 +64,10 @@ constexpr const char *kRetainedAttributes[] = {
     "noinline",
 };
 
-class FuncOpConversion : public OpConversionPattern<FuncOp> {
+class FuncOpConversion : public OpConversionPattern<func::FuncOp> {
   using OpConversionPattern::OpConversionPattern;
   LogicalResult matchAndRewrite(
-      FuncOp srcOp, OpAdaptor adaptor,
+      func::FuncOp srcOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     FunctionType srcFuncType = srcOp.getFunctionType();
     TypeConverter::SignatureConversion signatureConversion(

@@ -155,7 +155,7 @@ struct LLVMGPUPipeliningPass
 };
 }  // namespace
 
-std::unique_ptr<OperationPass<FuncOp>> createLLVMGPUPipeliningPass(
+std::unique_ptr<OperationPass<func::FuncOp>> createLLVMGPUPipeliningPass(
     unsigned depth) {
   return std::make_unique<LLVMGPUPipeliningPass>(depth);
 }

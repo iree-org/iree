@@ -39,7 +39,7 @@ static bool allUsesAreStores(Operation* op, std::vector<Operation*>& uses) {
 
 // Track temporary allocations that are never read from. If this is the case
 // it means both the allocations and associated stores can be removed.
-static void eraseDeadAllocAndStores(FuncOp funcOp) {
+static void eraseDeadAllocAndStores(func::FuncOp funcOp) {
   std::vector<Operation*> opToErase;
   funcOp.walk([&](memref::AllocOp op) {
     if (allUsesAreStores(op, opToErase)) {
@@ -75,7 +75,7 @@ class TransposeUnitDimToShapeCast
   }
 };
 
-static LogicalResult loopInvariantCodeMotion(FuncOp funcOp) {
+static LogicalResult loopInvariantCodeMotion(func::FuncOp funcOp) {
   // Walk through all loops in a function in innermost-loop-first order. This
   // way, we first LICM from the inner loop, and place the ops in
   // the outer loop, which in turn can be further LICM'ed.
@@ -89,7 +89,7 @@ static LogicalResult loopInvariantCodeMotion(FuncOp funcOp) {
 struct OptimizeVectorTransferPass
     : public OptimizeVectorTransferBase<OptimizeVectorTransferPass> {
   void runOnOperation() override {
-    FuncOp funcOp = getOperation();
+    func::FuncOp funcOp = getOperation();
     // Generate vector.shape_cast for dropping leading one dimensions in vector
     // ops. This increases the chance that we can forward more transfer writes
     // to transfer reads.
@@ -131,7 +131,8 @@ struct OptimizeVectorTransferPass
 
 }  // namespace
 
-std::unique_ptr<OperationPass<FuncOp>> createOptimizeVectorTransferPass() {
+std::unique_ptr<OperationPass<func::FuncOp>>
+createOptimizeVectorTransferPass() {
   return std::make_unique<OptimizeVectorTransferPass>();
 }
 

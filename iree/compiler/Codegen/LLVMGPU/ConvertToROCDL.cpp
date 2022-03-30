@@ -92,7 +92,7 @@ struct ConvertToROCDLPass : public ConvertToROCDLBase<ConvertToROCDLPass> {
       LLVMConversionTarget target(getContext());
       populateFuncToLLVMFuncOpConversionPattern(converter, llvmPatterns);
       configureGpuToROCDLConversionLegality(target);
-      target.addDynamicallyLegalOp<FuncOp>([&](FuncOp funcOp) {
+      target.addDynamicallyLegalOp<func::FuncOp>([&](func::FuncOp funcOp) {
         if (isEntryPoint(funcOp)) return false;
         return true;
       });

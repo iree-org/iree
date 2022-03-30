@@ -167,7 +167,7 @@ class SPIRVTilePass final : public SPIRVTileBase<SPIRVTilePass> {
 
   void runOnOperation() override {
     MLIRContext *context = &getContext();
-    FuncOp funcOp = getOperation();
+    func::FuncOp funcOp = getOperation();
 
     // Try to find computation ops which we will use as anchor to tile and fuse
     // again. If there are `scf.if` ops, we have both a fast and slow paths for
@@ -338,7 +338,7 @@ class SPIRVTilePass final : public SPIRVTileBase<SPIRVTilePass> {
 };
 }  // namespace
 
-std::unique_ptr<OperationPass<FuncOp>> createSPIRVTilePass() {
+std::unique_ptr<OperationPass<func::FuncOp>> createSPIRVTilePass() {
   return std::make_unique<SPIRVTilePass>();
 }
 

@@ -55,7 +55,7 @@ static void getTensorCoreConfig(
   tileSizes.push_back(TileWorkgroupSizePair({{32, 32, 16}, {64, 2, 1}}));
 }
 
-static std::string getTargetArch(FuncOp entryPoint) {
+static std::string getTargetArch(func::FuncOp entryPoint) {
   if (auto variantOp =
           entryPoint->getParentOfType<IREE::HAL::ExecutableVariantOp>()) {
     IREE::HAL::ExecutableTargetAttr targetAttr = variantOp.target();
@@ -68,7 +68,7 @@ static std::string getTargetArch(FuncOp entryPoint) {
   return "";
 }
 
-static bool supportsTensorCore(FuncOp entryPoint, linalg::LinalgOp op) {
+static bool supportsTensorCore(func::FuncOp entryPoint, linalg::LinalgOp op) {
   // Limit tensor core pipeline to matmul as not all combinations of transpose
   // are supported upstream.
   // TODO(thomasraoux): Enable batchMatmul and generic contraction.
@@ -108,7 +108,8 @@ static bool supportsTensorCore(FuncOp entryPoint, linalg::LinalgOp op) {
   return true;
 }
 
-static LogicalResult setContractConfig(FuncOp entryPoint, linalg::LinalgOp op) {
+static LogicalResult setContractConfig(func::FuncOp entryPoint,
+                                       linalg::LinalgOp op) {
   auto setMatmulConfig =
       [&entryPoint, &op](int64_t tileX, int64_t tileY, int64_t tileK,
                          llvm::ArrayRef<int64_t> workgroupSize,
@@ -222,7 +223,7 @@ static LogicalResult setContractConfig(FuncOp entryPoint, linalg::LinalgOp op) {
       IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUMatmulSimt);
 }
 
-static LogicalResult setFftConfig(FuncOp entryPoint,
+static LogicalResult setFftConfig(func::FuncOp entryPoint,
                                   IREE::LinalgExt::FftOp op) {
   auto interfaceOp = cast<IREE::Flow::PartitionableLoopsInterface>(*op);
   auto partitionedLoops =
@@ -252,7 +253,7 @@ static LogicalResult setFftConfig(FuncOp entryPoint,
       workgroupSize);
 }
 
-static LogicalResult setSortConfig(FuncOp entryPoint, Operation *op) {
+static LogicalResult setSortConfig(func::FuncOp entryPoint, Operation *op) {
   TileSizesListType tileSizes;
   auto interfaceOp = cast<IREE::Flow::PartitionableLoopsInterface>(*op);
   auto partitionedLoops =
@@ -377,7 +378,7 @@ static LogicalResult setRootDefaultConfig(FuncOp entryPoint, Operation *op) {
 
 /// Propagate the configuration annotated in the incoming IR.
 static LogicalResult setUserConfig(
-    FuncOp entryPointFn, Operation *computeOp,
+    func::FuncOp entryPointFn, Operation *computeOp,
     IREE::Codegen::CompilationInfoAttr compilationInfo) {
   if (auto translationInfo = getTranslationInfo(entryPointFn)) {
     return computeOp->emitOpError(
@@ -388,12 +389,14 @@ static LogicalResult setUserConfig(
   SmallVector<int64_t> workgroupSize = compilationInfo.getWorkgroupSizeVals();
   setTranslationInfo(entryPointFn, compilationInfo.getTranslationInfo(),
                      workgroupSize);
+
   setLoweringConfig(computeOp, compilationInfo.getLoweringConfig());
   eraseCompilationInfo(computeOp);
   return success();
 }
 
-static LogicalResult setRootConfig(FuncOp entryPointFn, Operation *computeOp) {
+static LogicalResult setRootConfig(func::FuncOp entryPointFn,
+                                   Operation *computeOp) {
   if (IREE::Codegen::CompilationInfoAttr compilationInfo =
           getCompilationInfo(computeOp)) {
     // If the op already has a lowering config coming from the IR use this and
@@ -422,7 +425,7 @@ LogicalResult initGPULaunchConfig(ModuleOp moduleOp) {
   llvm::StringMap<IREE::HAL::ExecutableEntryPointOp> entryPointOps =
       getAllEntryPoints(moduleOp);
 
-  for (auto funcOp : moduleOp.getOps<FuncOp>()) {
+  for (auto funcOp : moduleOp.getOps<func::FuncOp>()) {
     auto entryPointOp = entryPointOps.lookup(funcOp.getName());
     if (!entryPointOp) continue;
     if (getTranslationInfo(entryPointOp)) continue;
