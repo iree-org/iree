@@ -42,6 +42,8 @@ cc_library(
         "//iree/compiler/Codegen/Utils",
         "//iree/compiler/Dialect/HAL/Target",
         "//iree/compiler/Dialect/HAL/Target/LLVM/Builtins",
+        "//llvm-external-projects/iree-dialects:IREELinalgExtDialect",
+        "//llvm-external-projects/iree-dialects:IREELinalgTransformDialect",
         "@llvm-project//llvm:AArch64AsmParser",
         "@llvm-project//llvm:AArch64CodeGen",
         "@llvm-project//llvm:ARMAsmParser",
@@ -62,6 +64,8 @@ cc_library(
         "@llvm-project//mlir:ArmNeon",
         "@llvm-project//mlir:LLVMDialect",
         "@llvm-project//mlir:LLVMToLLVMIRTranslation",
+        "@llvm-project//mlir:PDLDialect",
+        "@llvm-project//mlir:PDLInterpDialect",
         "@llvm-project//mlir:ToLLVMIRTranslation",
     ],
 )

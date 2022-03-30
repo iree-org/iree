@@ -16,11 +16,15 @@ iree_lit_test_suite(
   SRCS
     "hal_executable.mlir"
     "smoketest.mlir"
+    "smoketest_linalg_transform.mlir"
     "streams.mlir"
   TOOLS
     FileCheck
+    iree::tools::iree-check-module
     iree::tools::iree-compile
     iree::tools::iree-translate
+  DATA
+    linalg_transform_spec.mlir
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

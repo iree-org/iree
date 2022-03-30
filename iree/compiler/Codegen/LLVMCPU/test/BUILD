@@ -25,6 +25,7 @@ iree_lit_test_suite(
             "hal_interface_constants.mlir",
             "hal_interface_workgroup_info.mlir",
             "illegal_configuration.mlir",
+            "linalg_ext_hal_to_hal.mlir",
             "linalg_transform.mlir",
             "materialize_launch_configuration.mlir",
             "synchronize_symbol_visibility.mlir",

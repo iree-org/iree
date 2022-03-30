@@ -52,6 +52,7 @@ cc_library(
         "PolynomialApproximationPass.cpp",
         "RemoveTrivialLoops.cpp",
         "RewriteLinalgDestructiveUpdatesPass.cpp",
+        "SetNumWorkgroupsFromLinalgExtPass.cpp",
         "SetNumWorkgroupsPass.cpp",
         "TileAndDistributeToWorkgroupsPass.cpp",
         "TypePropagationPass.cpp",

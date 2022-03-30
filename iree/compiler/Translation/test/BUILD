@@ -21,11 +21,17 @@ iree_lit_test_suite(
         [
             "hal_executable.mlir",
             "smoketest.mlir",
+            "smoketest_linalg_transform.mlir",
             "streams.mlir",
         ],
         include = ["*.mlir"],
+        # linalg_transform_spec is a an MLIR file that specifies a
+        # transformation, it needs to be included as data.
+        exclude = ["linalg_transform_spec.mlir"],
     ),
+    data = ["linalg_transform_spec.mlir"],
     tools = [
+        "//iree/tools:iree-check-module",
         "//iree/tools:iree-compile",
         "//iree/tools:iree-translate",
         "@llvm-project//llvm:FileCheck",

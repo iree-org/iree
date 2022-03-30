@@ -416,6 +416,9 @@ void addLinalgTransformInterpPasses(OpPassManager &passManager) {
   // through a file.
   passManager.addPass(createDropSchedulePass());
 
+  // Sets the number of workgroups using kFakeHAL op information.
+  passManager.addPass(createSetNumWorkgroupsFromLinalgExtPass());
+
   OpPassManager &modulePM = passManager.nest<ModuleOp>();
   // Bufferize the dispatch.
   BufferizationOptions::AllocationFn allocationFn =

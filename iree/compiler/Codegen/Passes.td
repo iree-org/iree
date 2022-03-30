@@ -132,6 +132,16 @@ def SetNumWorkgroups :
   let constructor = "mlir::iree_compiler::createSetNumWorkgroupsPass()";
 }
 
+// TODO: Consider removing or moving to HAL/Transforms in order to avoid
+// polluting common pass declarations with HAL specific ops.
+def SetNumWorkgroupsFromLinalgExt :
+    Pass<"iree-set-num-workgroups-from-linalg-ext",
+         "mlir::iree_compiler::IREE::HAL::ExecutableVariantOp"> {
+  let summary =
+      "Propagate the number of workgroups for entry point functions";
+  let constructor = "mlir::iree_compiler::createSetNumWorkgroupsFromLinalgExtPass()";
+}
+
 // TODO: Rename argument to be fully qualified.
 def LinalgToVectorVectorizeConv :
     Pass<"iree-codegen-vectorize-linalg-conv", "func::FuncOp"> {

@@ -148,6 +148,11 @@ std::unique_ptr<OperationPass<func::FuncOp>> createTypePropagationPass();
 std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
 createSetNumWorkgroupsPass(ArrayRef<int64_t> workgroupSize = {});
 
+/// Propagates the number of workgroups to use for each entry point in the
+/// dispatch region.
+std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
+createSetNumWorkgroupsFromLinalgExtPass();
+
 /// Pass to optimize vector transfer_read and transfer_write.
 std::unique_ptr<OperationPass<func::FuncOp>> createOptimizeVectorTransferPass();
 
