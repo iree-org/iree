@@ -633,7 +633,7 @@ class ConvertHALEntryPointFuncOp : public ConvertToLLVMPattern {
   LogicalResult matchAndRewrite(
       Operation *op, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
-    auto stdFuncOp = cast<FuncOp>(op);
+    auto stdFuncOp = cast<func::FuncOp>(op);
     if (!stdFuncOp.isPublic()) return failure();
     FunctionType fnType = stdFuncOp.getFunctionType();
     if (fnType.getNumInputs() != 0 || fnType.getNumResults() != 0) {
@@ -971,7 +971,7 @@ void ConvertToLLVMPass::runOnOperation() {
   target.addIllegalOp<UnrealizedConversionCastOp>();
 
   // Don't apply patterns to private function (e.g num_workgroups func).
-  target.addDynamicallyLegalOp<FuncOp>([&](FuncOp funcOp) {
+  target.addDynamicallyLegalOp<func::FuncOp>([&](func::FuncOp funcOp) {
     if (isEntryPoint(funcOp)) return false;
     return true;
   });
@@ -980,7 +980,7 @@ void ConvertToLLVMPass::runOnOperation() {
                                     IREE::Util::UtilDialect,
                                     IREE::HAL::HALDialect, math::MathDialect>(
       [&](Operation *op) {
-        auto funcParent = op->getParentOfType<FuncOp>();
+        auto funcParent = op->getParentOfType<func::FuncOp>();
         if (!funcParent) return false;
         if (isEntryPoint(funcParent)) return false;
         return true;

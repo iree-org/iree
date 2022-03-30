@@ -74,7 +74,7 @@ struct LLVMCPUTileFuseAndVectorizePass
   bool lowerToVectors;
 };
 
-LogicalResult applyTileAndFuseCanonicalizationPatterns(FuncOp funcOp) {
+LogicalResult applyTileAndFuseCanonicalizationPatterns(func::FuncOp funcOp) {
   auto context = funcOp.getContext();
   RewritePatternSet patterns(context);
   linalg::populateLinalgTilingCanonicalizationPatterns(patterns);
@@ -395,8 +395,8 @@ void LLVMCPUTileFuseAndVectorizePass::runOnOperation() {
   }
 }
 
-std::unique_ptr<OperationPass<FuncOp>> createLLVMCPUTileFuseAndVectorizePass(
-    bool lowerToVectors) {
+std::unique_ptr<OperationPass<func::FuncOp>>
+createLLVMCPUTileFuseAndVectorizePass(bool lowerToVectors) {
   return std::make_unique<LLVMCPUTileFuseAndVectorizePass>(lowerToVectors);
 }
 

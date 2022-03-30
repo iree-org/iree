@@ -200,7 +200,7 @@ struct SPIRVVectorToCooperativeOpsPass final
     : public SPIRVVectorToCooperativeOpsBase<SPIRVVectorToCooperativeOpsPass> {
   void runOnOperation() override {
     MLIRContext *context = &getContext();
-    FuncOp funcOp = getOperation();
+    func::FuncOp funcOp = getOperation();
 
     spirv::TargetEnvAttr targetAttr = getSPIRVTargetEnvAttr(funcOp);
     SPIRVTypeConverter typeConverter(targetAttr);
@@ -280,7 +280,8 @@ struct SPIRVVectorToCooperativeOpsPass final
 
 }  // namespace
 
-std::unique_ptr<OperationPass<FuncOp>> createSPIRVVectorToCooperativeOpsPass() {
+std::unique_ptr<OperationPass<func::FuncOp>>
+createSPIRVVectorToCooperativeOpsPass() {
   return std::make_unique<SPIRVVectorToCooperativeOpsPass>();
 }
 

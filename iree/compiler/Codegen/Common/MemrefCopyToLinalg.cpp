@@ -49,7 +49,7 @@ struct MemrefCopyToLinalgPass
 
 }  // namespace
 
-std::unique_ptr<OperationPass<FuncOp>> createMemrefCopyToLinalgPass() {
+std::unique_ptr<OperationPass<func::FuncOp>> createMemrefCopyToLinalgPass() {
   return std::make_unique<MemrefCopyToLinalgPass>();
 }
 

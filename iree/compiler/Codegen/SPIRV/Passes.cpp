@@ -55,26 +55,27 @@ void addSPIRVBufferizePasses(OpPassManager &passManager,
   // becuase of dim op usage. This avoids bufferizing those compute ops just for
   // their shape dimensions.
   passManager.addPass(memref::createResolveShapedTypeResultDimsPass());
-  passManager.addNestedPass<FuncOp>(createLinalgBufferizePass(allocationFn));
+  passManager.addNestedPass<func::FuncOp>(
+      createLinalgBufferizePass(allocationFn));
   // Distribute immediately after bufferization to avoid losing attribute
   // annotations in subsequent transformations. This is a bit fragile right now
   // but we expect upstream for loops to eventually recognize distribution as a
   // first-class attribute then we don't need this.
-  passManager.addNestedPass<FuncOp>(createSPIRVDistributePass());
+  passManager.addNestedPass<func::FuncOp>(createSPIRVDistributePass());
   passManager.addPass(memref::createResolveShapedTypeResultDimsPass());
-  passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
-  passManager.addNestedPass<FuncOp>(createCSEPass());
-  passManager.addNestedPass<FuncOp>(createCleanupBufferAllocViewPass());
+  passManager.addNestedPass<func::FuncOp>(createCanonicalizerPass());
+  passManager.addNestedPass<func::FuncOp>(createCSEPass());
+  passManager.addNestedPass<func::FuncOp>(createCleanupBufferAllocViewPass());
 }
 
 /// Adds passes to materialize structured ops as loops. This replaces structured
 /// ops with loop nests containing payloads, so it should be invoked after
 /// tiling and vectorization and before buffer transformations.
 static void addLoopMaterializationPasses(OpPassManager &pm) {
-  pm.addNestedPass<FuncOp>(IREE::LinalgExt::createLinalgExtToLoopsPass());
-  pm.addNestedPass<FuncOp>(createMemrefCopyToLinalgPass());
-  pm.addNestedPass<FuncOp>(createConvertLinalgToLoopsPass());
-  pm.addNestedPass<FuncOp>(createRemoveSingleIterationLoopPass());
+  pm.addNestedPass<func::FuncOp>(IREE::LinalgExt::createLinalgExtToLoopsPass());
+  pm.addNestedPass<func::FuncOp>(createMemrefCopyToLinalgPass());
+  pm.addNestedPass<func::FuncOp>(createConvertLinalgToLoopsPass());
+  pm.addNestedPass<func::FuncOp>(createRemoveSingleIterationLoopPass());
 }
 
 /// Adds passes to lowering MemRefs. This folds MemRef subviews, flattens n-D
@@ -86,14 +87,14 @@ static void addMemRefLoweringPasses(OpPassManager &pm) {
   pm.addPass(createCSEPass());
 
   // math dialect elementry functions -> polynomial form.
-  pm.addNestedPass<FuncOp>(createPolynomialApproximationPass());
+  pm.addNestedPass<func::FuncOp>(createPolynomialApproximationPass());
 
   // Fold load/store from/to subview ops into the original memref when possible.
   // In SPIR-V we don't use memref descriptor so it's not possible to handle
   // subview ops.
   pm.addPass(memref::createFoldSubViewOpsPass());
-  pm.addNestedPass<FuncOp>(arith::createArithmeticExpandOpsPass());
-  pm.addNestedPass<FuncOp>(memref::createExpandOpsPass());
+  pm.addNestedPass<func::FuncOp>(arith::createArithmeticExpandOpsPass());
+  pm.addNestedPass<func::FuncOp>(memref::createExpandOpsPass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
@@ -102,7 +103,7 @@ static void addMemRefLoweringPasses(OpPassManager &pm) {
   pm.addPass(createSPIRVVectorizeLoadStore());
 
   // Perform optimizations that need to across the scf.for region boundary.
-  pm.addNestedPass<FuncOp>(createForOpCanonicalizationPass());
+  pm.addNestedPass<func::FuncOp>(createForOpCanonicalizationPass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
@@ -136,25 +137,25 @@ static void addSPIRVLoweringPasses(OpPassManager &pm) {
 //===----------------------------------------------------------------------===//
 
 void addSPIRVTileAndVectorizePassPipeline(OpPassManager &pm) {
-  pm.addNestedPass<FuncOp>(createInsertDistributionInfoPass());
-  pm.addNestedPass<FuncOp>(createTileAndDistributeToWorkgroupsPass());
-  pm.addNestedPass<FuncOp>(createSPIRVFuseTensorPadWithConsumerPass());
+  pm.addNestedPass<func::FuncOp>(createInsertDistributionInfoPass());
+  pm.addNestedPass<func::FuncOp>(createTileAndDistributeToWorkgroupsPass());
+  pm.addNestedPass<func::FuncOp>(createSPIRVFuseTensorPadWithConsumerPass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
-  pm.addNestedPass<FuncOp>(createFoldAffineMinInDistributedLoopsPass());
+  pm.addNestedPass<func::FuncOp>(createFoldAffineMinInDistributedLoopsPass());
   pm.addPass(memref::createResolveShapedTypeResultDimsPass());
 
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
   // Tile to GPU invocations and vectorize.
-  pm.addNestedPass<FuncOp>(createSPIRVCreateFastSlowPathPass());
-  pm.addNestedPass<FuncOp>(createSPIRVTilePass());
+  pm.addNestedPass<func::FuncOp>(createSPIRVCreateFastSlowPathPass());
+  pm.addNestedPass<func::FuncOp>(createSPIRVTilePass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
-  pm.addNestedPass<FuncOp>(createSPIRVVectorizePass());
-  pm.addNestedPass<FuncOp>(createForOpCanonicalizationPass());
+  pm.addNestedPass<func::FuncOp>(createSPIRVVectorizePass());
+  pm.addNestedPass<func::FuncOp>(createForOpCanonicalizationPass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
@@ -166,12 +167,12 @@ void addSPIRVTileAndVectorizePassPipeline(OpPassManager &pm) {
 
   // Perform various vector-level cross-op optimizations like load-store
   // forwarding, shape casting and casting op cancelling.
-  pm.addNestedPass<FuncOp>(createOptimizeVectorTransferPass());
+  pm.addNestedPass<func::FuncOp>(createOptimizeVectorTransferPass());
 }
 
 void addSPIRVTileAndVectorizeToCooperativeOpsPassPipeline(OpPassManager &pm) {
-  pm.addNestedPass<FuncOp>(createInsertDistributionInfoPass());
-  pm.addNestedPass<FuncOp>(createTileAndDistributeToWorkgroupsPass());
+  pm.addNestedPass<func::FuncOp>(createInsertDistributionInfoPass());
+  pm.addNestedPass<func::FuncOp>(createTileAndDistributeToWorkgroupsPass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
@@ -181,24 +182,25 @@ void addSPIRVTileAndVectorizeToCooperativeOpsPassPipeline(OpPassManager &pm) {
   pm.addPass(createCSEPass());
 
   // Tile and distribute to GPU subgroups and vectorize.
-  pm.addNestedPass<FuncOp>(createSPIRVTileAndVectorizeToCooperativeOpsPass());
+  pm.addNestedPass<func::FuncOp>(
+      createSPIRVTileAndVectorizeToCooperativeOpsPass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
   // Perform various vector-level cross-op optimizations like load-store
   // forwarding, shape casting and casting op cancelling.
-  pm.addNestedPass<FuncOp>(createOptimizeVectorTransferPass());
+  pm.addNestedPass<func::FuncOp>(createOptimizeVectorTransferPass());
 
   // Fold subview ops is reqiured for converting vector transfer ops into SPIR-V
   // cooperative ops in the next step.
   pm.addPass(memref::createFoldSubViewOpsPass());
 
-  pm.addNestedPass<FuncOp>(createSPIRVVectorToCooperativeOpsPass());
+  pm.addNestedPass<func::FuncOp>(createSPIRVVectorToCooperativeOpsPass());
 }
 
 void addSPIRVTileAndDistributePassPipeline(OpPassManager &pm) {
-  pm.addNestedPass<FuncOp>(createInsertDistributionInfoPass());
-  pm.addNestedPass<FuncOp>(createTileAndDistributeToWorkgroupsPass());
+  pm.addNestedPass<func::FuncOp>(createInsertDistributionInfoPass());
+  pm.addNestedPass<func::FuncOp>(createTileAndDistributeToWorkgroupsPass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
@@ -208,7 +210,7 @@ void addSPIRVTileAndDistributePassPipeline(OpPassManager &pm) {
   pm.addPass(createCSEPass());
 
   // Tile and distribute to GPU invocations.
-  pm.addNestedPass<FuncOp>(createSPIRVTileAndDistributePass());
+  pm.addNestedPass<func::FuncOp>(createSPIRVTileAndDistributePass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
@@ -232,13 +234,13 @@ void addSPIRVTileAndDistributeCopyPassPipeline(OpPassManager &pm) {
   addLinalgBufferizePasses(pm, gpuAllocationFunction);
   pm.addPass(createSPIRVInitConfigPass());
 
-  pm.addNestedPass<FuncOp>(createInsertDistributionInfoPass());
-  pm.addNestedPass<FuncOp>(createTileAndDistributeToWorkgroupsPass());
+  pm.addNestedPass<func::FuncOp>(createInsertDistributionInfoPass());
+  pm.addNestedPass<func::FuncOp>(createTileAndDistributeToWorkgroupsPass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
   // Tile and distribute to GPU invocations.
-  pm.addNestedPass<FuncOp>(createSPIRVTileAndDistributePass());
+  pm.addNestedPass<func::FuncOp>(createSPIRVTileAndDistributePass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
@@ -250,7 +252,7 @@ void addSPIRVTileAndDistributeCopyPassPipeline(OpPassManager &pm) {
 //===----------------------------------------------------------------------===//
 
 void buildSPIRVCodegenPassPipeline(OpPassManager &pm) {
-  pm.nest<ModuleOp>().nest<FuncOp>().addPass(createTypePropagationPass());
+  pm.nest<ModuleOp>().nest<func::FuncOp>().addPass(createTypePropagationPass());
   pm.nest<ModuleOp>().addPass(createBufferizeCopyOnlyDispatchesPass());
   pm.addPass(createSPIRVLowerExecutableTargetPass());
 

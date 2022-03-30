@@ -379,7 +379,7 @@ struct TypePropagationPass : public TypePropagationBase<TypePropagationPass> {
 };
 }  // namespace
 
-std::unique_ptr<OperationPass<FuncOp>> createTypePropagationPass() {
+std::unique_ptr<OperationPass<func::FuncOp>> createTypePropagationPass() {
   return std::make_unique<TypePropagationPass>();
 }
 

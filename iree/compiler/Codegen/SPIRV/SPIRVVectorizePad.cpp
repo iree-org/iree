@@ -246,7 +246,7 @@ void populateVectorizePadPatterns(RewritePatternSet &patterns,
   patterns.add<VectorizePadWithConditions>(patterns.getContext(), baseBenefit);
 }
 
-std::unique_ptr<OperationPass<FuncOp>> createVectorizePadPass() {
+std::unique_ptr<OperationPass<func::FuncOp>> createVectorizePadPass() {
   return std::make_unique<TensorToVectorVectorizePadPass>();
 }
 

@@ -137,10 +137,10 @@ class TensorToBufferViewPattern
   }
 };
 
-class BuiltinFuncOpPattern : public OpConversionPattern<FuncOp> {
-  using OpConversionPattern<FuncOp>::OpConversionPattern;
+class BuiltinFuncOpPattern : public OpConversionPattern<func::FuncOp> {
+  using OpConversionPattern<func::FuncOp>::OpConversionPattern;
   LogicalResult matchAndRewrite(
-      FuncOp srcOp, OpAdaptor adaptor,
+      func::FuncOp srcOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override {
     FunctionType srcFuncType = srcOp.getFunctionType();
     TypeConverter::SignatureConversion signatureConversion(
@@ -166,8 +166,8 @@ class BuiltinFuncOpPattern : public OpConversionPattern<FuncOp> {
     auto newFuncType = mlir::FunctionType::get(
         srcOp.getContext(), signatureConversion.getConvertedTypes(),
         convertedResultTypes);
-    auto newFuncOp =
-        rewriter.create<FuncOp>(srcOp.getLoc(), srcOp.getName(), newFuncType);
+    auto newFuncOp = rewriter.create<func::FuncOp>(
+        srcOp.getLoc(), srcOp.getName(), newFuncType);
     rewriter.inlineRegionBefore(srcOp.getBody(), newFuncOp.getBody(),
                                 newFuncOp.end());
 
@@ -296,7 +296,7 @@ void IREEImportPublicPass::runOnOperation() {
     return true;
   };
 
-  target.addDynamicallyLegalOp<FuncOp>([&](FuncOp funcOp) {
+  target.addDynamicallyLegalOp<func::FuncOp>([&](func::FuncOp funcOp) {
     for (Type type : funcOp.getFunctionType().getInputs()) {
       if (isIllegalType(type)) return false;
     }

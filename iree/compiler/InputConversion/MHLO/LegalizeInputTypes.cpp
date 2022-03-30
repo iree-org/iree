@@ -199,7 +199,8 @@ static LogicalResult convertFunc(mlir::func::FuncOp oldFuncOp,
     return oldFuncOp.emitOpError() << "unable to legalize result types";
   }
 
-  auto newFuncOp = cast<FuncOp>(moduleBuilder.cloneWithoutRegions(*oldFuncOp));
+  auto newFuncOp =
+      cast<func::FuncOp>(moduleBuilder.cloneWithoutRegions(*oldFuncOp));
   newFuncOp.setType(FunctionType::get(
       oldFuncOp.getContext(), signature.getConvertedTypes(), convertedResults));
 

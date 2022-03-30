@@ -53,7 +53,7 @@ class ConversionPass
     typeConverter.addConversion([](Type type) { return type; });
 
     // Run a pre-pass that updates the entry function signature.
-    for (auto funcOp : getOperation().getOps<FuncOp>()) {
+    for (auto funcOp : getOperation().getOps<func::FuncOp>()) {
       if (funcOp.isPublic()) {
         if (failed(updateHALToVMVXEntryFuncOp(funcOp, typeConverter))) {
           return signalPassFailure();

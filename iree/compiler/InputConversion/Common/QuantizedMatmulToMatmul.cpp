@@ -225,7 +225,7 @@ struct LinalgQuantizedMatmulToMatmulPass
 
 }  // namespace
 
-std::unique_ptr<OperationPass<FuncOp>>
+std::unique_ptr<OperationPass<func::FuncOp>>
 createLinalgQuantizedMatmulToMatmulPass() {
   return std::make_unique<LinalgQuantizedMatmulToMatmulPass>();
 }

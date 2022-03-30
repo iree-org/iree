@@ -84,7 +84,7 @@ struct SPIRVDistributePass final
 
 }  // namespace
 
-std::unique_ptr<OperationPass<FuncOp>> createSPIRVDistributePass() {
+std::unique_ptr<OperationPass<func::FuncOp>> createSPIRVDistributePass() {
   return std::make_unique<SPIRVDistributePass>();
 }
 

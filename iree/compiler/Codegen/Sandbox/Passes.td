@@ -9,7 +9,7 @@
 
 include "mlir/Pass/PassBase.td"
 
-def LinalgFuse : Pass<"linalg-fuse", "FuncOp"> {
+def LinalgFuse : Pass<"linalg-fuse", "func::FuncOp"> {
   let summary = "Pass to tile and fuse linalg operations.";
   let constructor = "mlir::createLinalgFusePass()";
   let options = [
@@ -56,7 +56,7 @@ def LinalgFuse : Pass<"linalg-fuse", "FuncOp"> {
 }
 
 def LinalgSingleTilingExpert
-    : Pass<"linalg-single-tiling-expert-driver", "FuncOp"> {
+    : Pass<"linalg-single-tiling-expert-driver", "func::FuncOp"> {
   let summary = "Pass to drive transformations on Linalg on tensors.";
   let constructor = "mlir::createLinalgSingleTilingExpertPass()";
   let options = [
@@ -121,7 +121,7 @@ def LinalgSingleTilingExpert
   ];
 }
 
-def LinalgVectorLowering : Pass<"linalg-vector-lowering", "FuncOp"> {
+def LinalgVectorLowering : Pass<"linalg-vector-lowering", "func::FuncOp"> {
   let summary = "Run transformations that lower high-level vectors.";
   let constructor = "mlir::createLinalgVectorLoweringPass()";
   let options = [
@@ -176,7 +176,7 @@ def LinalgVectorLowering : Pass<"linalg-vector-lowering", "FuncOp"> {
   ];
 }
 
-def UnrollOneVectorOp : Pass<"unroll-one-vector-op", "FuncOp"> {
+def UnrollOneVectorOp : Pass<"unroll-one-vector-op", "func::FuncOp"> {
   let summary = "Pass to unroll a vector op to a target size.";
   let constructor = "mlir::createUnrollOneVectorOpPass()";
   let options = [
@@ -199,7 +199,7 @@ def UnrollOneVectorOp : Pass<"unroll-one-vector-op", "FuncOp"> {
   ];
 }
 
-def UnrollOneParentLoop : Pass<"unroll-one-parent-loop", "FuncOp"> {
+def UnrollOneParentLoop : Pass<"unroll-one-parent-loop", "func::FuncOp"> {
   let summary = "Pass to unroll the k^th parent loop of an op by some amount.";
   let constructor = "mlir::createUnrollOneParentLoopPass()";
   let options = [
@@ -222,7 +222,7 @@ def UnrollOneParentLoop : Pass<"unroll-one-parent-loop", "FuncOp"> {
   ];
 }
 
-def OutlineOneParentLoop : Pass<"outline-one-parent-loop", "FuncOp"> {
+def OutlineOneParentLoop : Pass<"outline-one-parent-loop", "func::FuncOp"> {
   let summary = "Pass to outline the k^th parent loop of an op.";
   let constructor = "mlir::createOutlineOneParentLoopPass()";
   let options = [

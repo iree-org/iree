@@ -58,7 +58,7 @@ void addIREEComprehensiveBufferizePasses(
 
 /// Pass to perform canonicalizations/cleanups related to HAL interface/buffer
 /// allocations and view operations.
-std::unique_ptr<OperationPass<FuncOp>> createCleanupBufferAllocViewPass();
+std::unique_ptr<OperationPass<func::FuncOp>> createCleanupBufferAllocViewPass();
 
 /// Pass to bufferize dispatches that are copying from one interface to another.
 /// This will create a `linalg.generic` op which is a copy that can then be
@@ -76,7 +76,7 @@ std::unique_ptr<OperationPass<ModuleOp>> createDemoteF32ToF16Pass();
 std::unique_ptr<OperationPass<ModuleOp>> createFlattenMemRefSubspanPass();
 
 /// Creates a pass to to fold `affine.min` ops in tiled and distributed loops.
-std::unique_ptr<OperationPass<FuncOp>>
+std::unique_ptr<OperationPass<func::FuncOp>>
 createFoldAffineMinInDistributedLoopsPass();
 
 /// After running the upstream TensorConstantBufferize pass, remove tensor_loads
@@ -86,7 +86,7 @@ std::unique_ptr<OperationPass<>> createFoldTensorExtractOpPass();
 
 /// An ad-hoc pass to canonicalize selected loop carried dependencies on
 /// scf.for.
-std::unique_ptr<OperationPass<FuncOp>> createForOpCanonicalizationPass();
+std::unique_ptr<OperationPass<func::FuncOp>> createForOpCanonicalizationPass();
 
 /// Pass to perform linalg on tensor bufferization. The function passed into the
 /// pass through the `allocationFn` argument is invoked whenever a new buffer is
@@ -96,7 +96,7 @@ std::unique_ptr<OperationPass<FuncOp>> createForOpCanonicalizationPass();
 /// the default allocator generates an `std.alloc` instruction with the
 /// allocated MemRefType having no stride map (i.e. default row-major striding)
 /// and default memory space.
-std::unique_ptr<OperationPass<FuncOp>> createLinalgBufferizePass(
+std::unique_ptr<OperationPass<func::FuncOp>> createLinalgBufferizePass(
     WorkgroupMemoryAllocationFn allocationFn = nullptr);
 std::unique_ptr<OperationPass<ModuleOp>> createIREEComprehensiveBufferizePass(
     Optional<BufferizationOptions::AllocationFn> allocationFn = None,
@@ -104,41 +104,44 @@ std::unique_ptr<OperationPass<ModuleOp>> createIREEComprehensiveBufferizePass(
     Optional<BufferizationOptions::MemCpyFn> memCpyFn = None);
 
 /// Creates a pass to remove single iteration distributed loops.
-std::unique_ptr<OperationPass<FuncOp>> createRemoveSingleIterationLoopPass();
+std::unique_ptr<OperationPass<func::FuncOp>>
+createRemoveSingleIterationLoopPass();
 
 /// Converts entry point function within dispatch regions to use
 /// destination-passing style, which is better suited for the upstream
 /// comprehensive bufferization pass.
-std::unique_ptr<OperationPass<FuncOp>>
+std::unique_ptr<OperationPass<func::FuncOp>>
 createConvertToDestinationPassingStylePass();
 
 /// Creates a pass to vectorize a very specific form of linalg.conv ops.
-std::unique_ptr<OperationPass<FuncOp>> createLinalgToVectorVectorizeConvPass();
+std::unique_ptr<OperationPass<func::FuncOp>>
+createLinalgToVectorVectorizeConvPass();
 
 /// Creates a pass to vectorize a very specific form of linalg.conv ops.
-std::unique_ptr<OperationPass<FuncOp>> createLinalgToVectorVectorizeMMT4dPass();
+std::unique_ptr<OperationPass<func::FuncOp>>
+createLinalgToVectorVectorizeMMT4dPass();
 
 /// Creates a pass to vectorize a very specific form of tensor.pad ops with
 /// control flows.
-std::unique_ptr<OperationPass<FuncOp>> createVectorizePadPass();
+std::unique_ptr<OperationPass<func::FuncOp>> createVectorizePadPass();
 
 /// Pass to optimize vector transfer_read and transfer_write.
-std::unique_ptr<OperationPass<FuncOp>> createOptimizeVectorTransferPass();
+std::unique_ptr<OperationPass<func::FuncOp>> createOptimizeVectorTransferPass();
 
 /// Pass to insert workgroup count region and update translation info.
-std::unique_ptr<OperationPass<FuncOp>> createInsertDistributionInfoPass();
+std::unique_ptr<OperationPass<func::FuncOp>> createInsertDistributionInfoPass();
 
 /// Pass to tile and distribute to workgroups.
-std::unique_ptr<OperationPass<FuncOp>>
+std::unique_ptr<OperationPass<func::FuncOp>>
 createTileAndDistributeToWorkgroupsPass();
 
 /// Pass to rewrite Linalg destructive updates, see DestructiveUpdateUtils.h for
 /// more details.
-std::unique_ptr<OperationPass<FuncOp>>
+std::unique_ptr<OperationPass<func::FuncOp>>
 createRewriteLinalgDestructiveUpdatesPass();
 
 /// Pass to propagate type to avoid generating load/stores of illegal types.
-std::unique_ptr<OperationPass<FuncOp>> createTypePropagationPass();
+std::unique_ptr<OperationPass<func::FuncOp>> createTypePropagationPass();
 
 /// Sets the number of workgroups to use for each entry point in the dispatch
 /// region.
@@ -146,13 +149,13 @@ std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
 createSetNumWorkgroupsPass(ArrayRef<int64_t> workgroupSize = {});
 
 /// Pass to optimize vector transfer_read and transfer_write.
-std::unique_ptr<OperationPass<FuncOp>> createOptimizeVectorTransferPass();
+std::unique_ptr<OperationPass<func::FuncOp>> createOptimizeVectorTransferPass();
 
 /// Pass to convert math operations to their polynomial approximation.
 std::unique_ptr<OperationPass<>> createPolynomialApproximationPass();
 
 /// Creates a pass to convert memref.copy to linalg op.
-std::unique_ptr<OperationPass<FuncOp>> createMemrefCopyToLinalgPass();
+std::unique_ptr<OperationPass<func::FuncOp>> createMemrefCopyToLinalgPass();
 
 //----------------------------------------------------------------------------//
 // Common codegen patterns.
@@ -207,14 +210,15 @@ std::unique_ptr<OperationPass<ModuleOp>>
 createLLVMCPUSynchronizeSymbolVisibilityPass();
 
 /// Multi-level tiling, fusing and vectorization of linalg ops on tensors.
-std::unique_ptr<OperationPass<FuncOp>> createLLVMCPUTileFuseAndVectorizePass(
-    bool lowerToVectors = true);
+std::unique_ptr<OperationPass<func::FuncOp>>
+createLLVMCPUTileFuseAndVectorizePass(bool lowerToVectors = true);
 
 /// Replaces llvm.intr.fma with its unfused mul and add ops.
-std::unique_ptr<OperationPass<FuncOp>> createLLVMCPUUnfuseFMAOpsPass();
+std::unique_ptr<OperationPass<func::FuncOp>> createLLVMCPUUnfuseFMAOpsPass();
 
 /// A pass that converts certain vector.contract ops to custom kernels.
-std::unique_ptr<OperationPass<FuncOp>> createVectorContractCustomKernelsPass();
+std::unique_ptr<OperationPass<func::FuncOp>>
+createVectorContractCustomKernelsPass();
 
 //------------------------------------------------------------------------------
 // LLVMCPU Codegen specific patterns.
@@ -325,7 +329,7 @@ std::unique_ptr<OperationPass<ModuleOp>> createConvertToNVVMPass();
 std::unique_ptr<OperationPass<ModuleOp>> createConvertToROCDLPass();
 
 /// Perform tiling and distribution to threads.
-std::unique_ptr<OperationPass<FuncOp>> createLLVMGPUTileAndDistribute(
+std::unique_ptr<OperationPass<func::FuncOp>> createLLVMGPUTileAndDistribute(
     bool distributeToWarp = false);
 
 /// Create pass calling the dynamic pipeline for LLVMGPU.
@@ -333,29 +337,29 @@ std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
 createLLVMGPULowerExecutableTargetPass();
 
 /// Convert Linalg ops to Vector.
-std::unique_ptr<OperationPass<FuncOp>> createLLVMGPUVectorizationPass();
+std::unique_ptr<OperationPass<func::FuncOp>> createLLVMGPUVectorizationPass();
 
 /// Convert Linalg ops to Vector and prepare converstion to GPU MMA ops.
-std::unique_ptr<OperationPass<FuncOp>>
+std::unique_ptr<OperationPass<func::FuncOp>>
 createLLVMGPUTensorCoreVectorizationPass();
 
 /// Lower vector ops before convertion to LLVM.
-std::unique_ptr<OperationPass<FuncOp>> createLLVMGPUVectorLoweringPass();
+std::unique_ptr<OperationPass<func::FuncOp>> createLLVMGPUVectorLoweringPass();
 
 /// Convert shared memory copies to distributed transfer_read/transfer_write.
-std::unique_ptr<OperationPass<FuncOp>>
+std::unique_ptr<OperationPass<func::FuncOp>>
 createLLVMGPUDistributeSharedMemoryCopy();
 
 /// Apply software pipelining.
-std::unique_ptr<OperationPass<FuncOp>> createLLVMGPUPipeliningPass(
+std::unique_ptr<OperationPass<func::FuncOp>> createLLVMGPUPipeliningPass(
     unsigned depth = 1);
 
 /// Apply multi-buffering transformation.
-std::unique_ptr<OperationPass<FuncOp>> createLLVMGPUMultiBuffering(
+std::unique_ptr<OperationPass<func::FuncOp>> createLLVMGPUMultiBuffering(
     unsigned numBuffers = 5);
 
 /// Converts vector ops to gpu dialect.
-std::unique_ptr<OperationPass<FuncOp>> createLLVMGPUVectorToGPU();
+std::unique_ptr<OperationPass<func::FuncOp>> createLLVMGPUVectorToGPU();
 
 //------------------------------------------------------------------------------
 // SPIR-V Passes
@@ -390,7 +394,8 @@ void addSPIRVTileAndVectorizeToCooperativeOpsPassPipeline(OpPassManager &pm);
 std::unique_ptr<OperationPass<ModuleOp>> createConvertToSPIRVPass();
 
 /// Creates a pass to fold processor ID uses where possible.
-std::unique_ptr<OperationPass<FuncOp>> createSPIRVFoldProcessorIDUsesPass();
+std::unique_ptr<OperationPass<func::FuncOp>>
+createSPIRVFoldProcessorIDUsesPass();
 
 /// Main pass to lower executables to scalar + vector code on SPIR-V path.
 /// Invokes one of the pass pipelines that translate the executable to
@@ -402,25 +407,26 @@ createSPIRVLowerExecutableTargetPass();
 std::unique_ptr<OperationPass<ModuleOp>> createSPIRVInitConfigPass();
 
 /// Pass to tile and distribute Linalg ops with buffer semantics to invocations.
-std::unique_ptr<OperationPass<FuncOp>> createSPIRVTileAndDistributePass();
+std::unique_ptr<OperationPass<func::FuncOp>> createSPIRVTileAndDistributePass();
 
 /// Pass to tile Linalg ops with buffer semantics to subgroups and vectorize to
 /// vector ops suitable for lowering to SPIR-V cooperative ops.
-std::unique_ptr<OperationPass<FuncOp>>
+std::unique_ptr<OperationPass<func::FuncOp>>
 createSPIRVTileAndVectorizeToCooperativeOpsPass();
 
 /// Pass to convert vector read/write/arithmetic operations to the corresponding
 /// cooperative matrix ops when possible.
-std::unique_ptr<OperationPass<FuncOp>> createSPIRVVectorToCooperativeOpsPass();
+std::unique_ptr<OperationPass<func::FuncOp>>
+createSPIRVVectorToCooperativeOpsPass();
 
 /// Pass to tile Linalg ops with tensor semantics to invocations.
-std::unique_ptr<OperationPass<FuncOp>> createSPIRVTilePass();
+std::unique_ptr<OperationPass<func::FuncOp>> createSPIRVTilePass();
 
 /// Pass to distribute tiled loop nests to invocations.
-std::unique_ptr<OperationPass<FuncOp>> createSPIRVDistributePass();
+std::unique_ptr<OperationPass<func::FuncOp>> createSPIRVDistributePass();
 
 /// Pass to vectorize Linalg ops with buffer semantics.
-std::unique_ptr<OperationPass<FuncOp>> createSPIRVVectorizePass();
+std::unique_ptr<OperationPass<func::FuncOp>> createSPIRVVectorizePass();
 
 /// Converts memref of scalar to memref of vector of efficent size. This will
 /// allow to convert memory accesses to vector load/store in SPIR-V without
@@ -428,13 +434,14 @@ std::unique_ptr<OperationPass<FuncOp>> createSPIRVVectorizePass();
 std::unique_ptr<OperationPass<ModuleOp>> createSPIRVVectorizeLoadStore();
 
 /// Fuses tensor.pad ops into their consumer ops' tiled loop nests.
-std::unique_ptr<OperationPass<FuncOp>>
+std::unique_ptr<OperationPass<func::FuncOp>>
 createSPIRVFuseTensorPadWithConsumerPass();
 
 // Uses `tensor.pad` ops as anchors to create separate fast and slow paths
 // inside the kernel. The fast path is for inner tiles where we don't need
 // padding, while the slow path is for boundary tiles where we do need padding.
-std::unique_ptr<OperationPass<FuncOp>> createSPIRVCreateFastSlowPathPass();
+std::unique_ptr<OperationPass<func::FuncOp>>
+createSPIRVCreateFastSlowPathPass();
 
 //----------------------------------------------------------------------------//
 // SPIRV Codegen Pass Pipelines.
