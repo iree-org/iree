@@ -81,14 +81,25 @@ iree_cc_library(
 
 iree_cc_test(
   NAME
+    executor_demo
+  SRCS
+    "executor_demo.cc"
+  DEPS
+    ::task
+    iree::base
+    iree::base::internal::prng
+    iree::base::tracing
+    iree::task::testing::test_util
+)
+
+iree_cc_test(
+  NAME
     executor_test
   SRCS
     "executor_test.cc"
   DEPS
     ::task
     iree::base
-    iree::base::internal::prng
-    iree::base::tracing
     iree::task::testing::test_util
     iree::testing::gtest
     iree::testing::gtest_main

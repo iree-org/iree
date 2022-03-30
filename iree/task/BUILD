@@ -85,13 +85,23 @@ cc_library(
 )
 
 cc_test(
-    name = "executor_test",
-    srcs = ["executor_test.cc"],
+    name = "executor_demo",
+    srcs = ["executor_demo.cc"],
     deps = [
         ":task",
         "//iree/base",
         "//iree/base:tracing",
         "//iree/base/internal:prng",
+        "//iree/task/testing:test_util",
+    ],
+)
+
+cc_test(
+    name = "executor_test",
+    srcs = ["executor_test.cc"],
+    deps = [
+        ":task",
+        "//iree/base",
         "//iree/task/testing:test_util",
         "//iree/testing:gtest",
         "//iree/testing:gtest_main",
