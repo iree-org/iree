@@ -1,7 +1,7 @@
 // RUN: iree-opt -allow-unregistered-dialect -split-input-file %s | iree-opt -allow-unregistered-dialect -split-input-file | FileCheck %s
 
 // CHECK-LABEL: @complexWorkgroupsUsage
-func @complexWorkgroupsUsage(
+func.func @complexWorkgroupsUsage(
     // CHECK-SAME: %[[ARG0:.+]]: tensor<?x4xf32>
     %arg0 : tensor<?x4xf32>,
     // CHECK-SAME: %[[ARG1:.+]]: index
@@ -66,7 +66,7 @@ func @complexWorkgroupsUsage(
 // -----
 
 // CHECK-LABEL: @inplaceDispatch
-func @inplaceDispatch(
+func.func @inplaceDispatch(
     // CHECK-SAME: %[[ARG0:.+]]: tensor<?x4xf32>
     %arg0: tensor<?x4xf32>,
     // CHECK-SAME: %[[ARG1:.+]]: index

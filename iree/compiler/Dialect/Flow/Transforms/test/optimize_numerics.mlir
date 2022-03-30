@@ -1,7 +1,7 @@
 // RUN: iree-opt -iree-flow-optimize-numerics %s | FileCheck %s
 
 // CHECK-LABEL: @matmul_i8_i8_i32_unsigned
-func @matmul_i8_i8_i32_unsigned(%arg0 : tensor<5x3xf32>, %arg1 : tensor<3x1xf32>, %arg2 : tensor<5x1xf32>) -> tensor<5x1xf32> {
+func.func @matmul_i8_i8_i32_unsigned(%arg0 : tensor<5x3xf32>, %arg1 : tensor<3x1xf32>, %arg2 : tensor<5x1xf32>) -> tensor<5x1xf32> {
   // CHECK: %[[LHS:.*]] = arith.fptoui %arg0 : tensor<5x3xf32> to tensor<5x3xi8>
   // CHECK: %[[RHS:.*]] = arith.fptoui %arg1 : tensor<3x1xf32> to tensor<3x1xi8>
   // CHECK: %[[INIT:.*]] = arith.fptoui %arg2 : tensor<5x1xf32> to tensor<5x1xi32>
@@ -15,7 +15,7 @@ func @matmul_i8_i8_i32_unsigned(%arg0 : tensor<5x3xf32>, %arg1 : tensor<3x1xf32>
 }
 
 // CHECK-LABEL: @matmul_i8_i8_i32_signed
-func @matmul_i8_i8_i32_signed(%arg0 : tensor<5x3xf32>, %arg1 : tensor<3x1xf32>, %arg2 : tensor<5x1xf32>) -> tensor<5x1xf32> {
+func.func @matmul_i8_i8_i32_signed(%arg0 : tensor<5x3xf32>, %arg1 : tensor<3x1xf32>, %arg2 : tensor<5x1xf32>) -> tensor<5x1xf32> {
   // CHECK: %[[LHS:.*]] = arith.fptosi %arg0 : tensor<5x3xf32> to tensor<5x3xi8>
   // CHECK: %[[RHS:.*]] = arith.fptosi %arg1 : tensor<3x1xf32> to tensor<3x1xi8>
   // CHECK: %[[INIT:.*]] = arith.fptosi %arg2 : tensor<5x1xf32> to tensor<5x1xi32>
@@ -30,7 +30,7 @@ func @matmul_i8_i8_i32_signed(%arg0 : tensor<5x3xf32>, %arg1 : tensor<3x1xf32>, 
 
 // CHECK-LABEL: @matmul_i4_i4_i32_signed
 // For now we clamp this to i8
-func @matmul_i4_i4_i32_signed(%arg0 : tensor<5x3xf32>, %arg1 : tensor<3x1xf32>, %arg2 : tensor<5x1xf32>) -> tensor<5x1xf32> {
+func.func @matmul_i4_i4_i32_signed(%arg0 : tensor<5x3xf32>, %arg1 : tensor<3x1xf32>, %arg2 : tensor<5x1xf32>) -> tensor<5x1xf32> {
   // CHECK: %[[LHS:.*]] = arith.fptosi %arg0 : tensor<5x3xf32> to tensor<5x3xi8>
   // CHECK: %[[RHS:.*]] = arith.fptosi %arg1 : tensor<3x1xf32> to tensor<3x1xi8>
   // CHECK: %[[INIT:.*]] = arith.fptosi %arg2 : tensor<5x1xf32> to tensor<5x1xi32>
@@ -47,7 +47,7 @@ func @matmul_i4_i4_i32_signed(%arg0 : tensor<5x3xf32>, %arg1 : tensor<3x1xf32>, 
 // We may relax this restriction at some point but for right now we have it
 // because less analysis is needed to prove safety.
 // CHECK-NOT: fptosi
-func @matmul_reject_gt_8bit(%arg0 : tensor<5x3xf32>, %arg1 : tensor<3x1xf32>, %arg2 : tensor<5x1xf32>) -> tensor<5x1xf32> {
+func.func @matmul_reject_gt_8bit(%arg0 : tensor<5x3xf32>, %arg1 : tensor<3x1xf32>, %arg2 : tensor<5x1xf32>) -> tensor<5x1xf32> {
   %lhs = util.numeric.optional_narrow %arg0 : tensor<5x3xf32> as ui9 {max_value = 312 : ui9, min_value = 0 : ui9}
   %rhs = util.numeric.optional_narrow %arg1 : tensor<3x1xf32> as si8 {max_value = 127 : si8, min_value = -127 : si8}
   %init = util.numeric.optional_narrow %arg2 : tensor<5x1xf32> as ui0
@@ -57,7 +57,7 @@ func @matmul_reject_gt_8bit(%arg0 : tensor<5x3xf32>, %arg1 : tensor<3x1xf32>, %a
 }
 
 // CHECK-LABEL: @cast_fill
-func @cast_fill(%arg0 : f32, %arg1 : tensor<3xf32>) -> tensor<3xi8> {
+func.func @cast_fill(%arg0 : f32, %arg1 : tensor<3xf32>) -> tensor<3xi8> {
   // CHECK: %[[SCALAR:.*]] = arith.fptosi %arg0 : f32 to i8
   // CHECK: %[[INIT:.*]] = arith.fptosi %arg1 : tensor<3xf32> to tensor<3xi8>
   // CHECK: %[[RESULT:.*]] = linalg.fill ins(%[[SCALAR]] : i8) outs(%[[INIT]] : tensor<3xi8>) -> tensor<3xi8>
@@ -68,7 +68,7 @@ func @cast_fill(%arg0 : f32, %arg1 : tensor<3xf32>) -> tensor<3xi8> {
 }
 
 // CHECK-LABEL: @cast_init
-func @cast_init() -> tensor<5x9xi8> {
+func.func @cast_init() -> tensor<5x9xi8> {
   // CHECK: %[[RESULT:.*]] = linalg.init_tensor [5, 9] : tensor<5x9xi8>
   // CHECK: return %[[RESULT]]
   %0 = linalg.init_tensor [5, 9] : tensor<5x9xf32>

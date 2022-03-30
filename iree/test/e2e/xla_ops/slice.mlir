@@ -1,4 +1,4 @@
-func @slice_whole_buffer() {
+func.func @slice_whole_buffer() {
   %input = util.unfoldable_constant dense<[
     [01, 02, 03, 04],
     [05, 06, 07, 08],
@@ -15,7 +15,7 @@ func @slice_whole_buffer() {
   return
 }
 
-func @slice_whole_stride() {
+func.func @slice_whole_stride() {
   %input = util.unfoldable_constant dense<[
     [01, 02, 03, 04],
     [05, 06, 07, 08],
@@ -29,7 +29,7 @@ func @slice_whole_stride() {
   return
 }
 
-func @slice_stride_part() {
+func.func @slice_stride_part() {
   %input = util.unfoldable_constant dense<[
     [01, 02, 03, 04],
     [05, 06, 07, 08],
@@ -43,7 +43,7 @@ func @slice_stride_part() {
   return
 }
 
-func @slice_multi_stride() {
+func.func @slice_multi_stride() {
   %input = util.unfoldable_constant dense<[
     [01, 02, 03, 04],
     [05, 06, 07, 08],

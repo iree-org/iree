@@ -12,7 +12,7 @@ stream.executable private @deduplicateOperandsEx {
   stream.executable.export public @dispatch
   builtin.module  {
     // CHECK: func @dispatch(%[[BINDING:.+]]: !stream.binding, %[[A01:.+]]: i32, %[[B0:.+]]: index, %[[C:.+]]: i1, %[[B1:.+]]: index)
-    func @dispatch(%binding: !stream.binding, %a0: i32, %b0: index, %c: i1, %a1: i32, %b1: index) {
+    func.func @dispatch(%binding: !stream.binding, %a0: i32, %b0: index, %c: i1, %a1: i32, %b1: index) {
       // CHECK-NEXT: util.do_not_optimize(%[[BINDING]]) : !stream.binding
       util.do_not_optimize(%binding) : !stream.binding
       // CHECK-NEXT: util.do_not_optimize(%[[A01]]) : i32
@@ -30,7 +30,7 @@ stream.executable private @deduplicateOperandsEx {
   }
 }
 // CHECK: func @deduplicateOperands(%[[A:.+]]: i32, %[[B:.+]]: index, %[[C:.+]]: i1)
-func @deduplicateOperands(%a: i32, %b: index, %c: i1) {
+func.func @deduplicateOperands(%a: i32, %b: index, %c: i1) {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %c20 = arith.constant 20 : index
@@ -61,7 +61,7 @@ stream.executable private @inlineConstantOperandsEx {
   stream.executable.export public @dispatch
   builtin.module  {
     // CHECK: func @dispatch(%[[BINDING:.+]]: !stream.binding, %[[A:.+]]: i32, %[[C:.+]]: i1)
-    func @dispatch(%binding: !stream.binding, %a: i32, %b: index, %c: i1) {
+    func.func @dispatch(%binding: !stream.binding, %a: i32, %b: index, %c: i1) {
       // CHECK: %[[B:.+]] = arith.constant 20 : index
       // CHECK-NEXT: util.do_not_optimize(%[[BINDING]]) : !stream.binding
       util.do_not_optimize(%binding) : !stream.binding
@@ -76,7 +76,7 @@ stream.executable private @inlineConstantOperandsEx {
   }
 }
 // CHECK: func @inlineConstantOperands(%[[A:.+]]: i32)
-func @inlineConstantOperands(%a: i32) {
+func.func @inlineConstantOperands(%a: i32) {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %c20 = arith.constant 20 : index

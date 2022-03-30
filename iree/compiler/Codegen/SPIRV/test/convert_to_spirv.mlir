@@ -16,7 +16,7 @@ hal.executable private @push_constant {
       // CHECK-LABEL: spv.module
       // CHECK: spv.GlobalVariable @__push_constant_var__ : !spv.ptr<!spv.struct<(!spv.array<5 x i32, stride=4> [0])>, PushConstant>
       // CHECK: spv.func @push_constant()
-      func @push_constant() {
+      func.func @push_constant() {
         // CHECK-DAG: %[[INDEX_0:.+]] = spv.Constant 0 : i32
         // CHECK-DAG: %[[INDEX_1:.+]] = spv.Constant 2 : i32
         // CHECK: %[[ADDR:.+]] = spv.mlir.addressof @__push_constant_var__ : !spv.ptr<!spv.struct<(!spv.array<5 x i32, stride=4> [0])>, PushConstant>
@@ -53,7 +53,7 @@ hal.executable private @resource_bindings_in_same_func {
       // CHECK: spv.GlobalVariable @[[ARG1_1:.+]] bind(1, 3) {aliased} : !spv.ptr<!spv.struct<(!spv.array<4 x vector<4xf32>, stride=16> [0])>, StorageBuffer>
       // CHECK: spv.GlobalVariable @[[RET0:.+]] bind(3, 4) : !spv.ptr<!spv.struct<(!spv.array<16 x f32, stride=4> [0])>, StorageBuffer>
       // CHECK: spv.func @resource_bindings_in_same_entry_func()
-      func @resource_bindings_in_same_entry_func() {
+      func.func @resource_bindings_in_same_entry_func() {
         %c0 = arith.constant 0 : index
 
         // Same type
@@ -112,7 +112,7 @@ hal.executable private @resource_bindings_in_multi_entry_func {
       // CHECK: spv.GlobalVariable @[[FUNC2_RET:.+]] bind(3, 4) : !spv.ptr<!spv.struct<(!spv.array<16 x f32, stride=4> [0])>, StorageBuffer>
 
       // CHECK: spv.func @resource_bindings_in_entry_func1()
-      func @resource_bindings_in_entry_func1() {
+      func.func @resource_bindings_in_entry_func1() {
         // CHECK: spv.mlir.addressof @[[FUNC1_ARG]]
         // CHECK: spv.mlir.addressof @[[FUNC1_RET]]
         %c0 = arith.constant 0 : index
@@ -126,7 +126,7 @@ hal.executable private @resource_bindings_in_multi_entry_func {
       }
 
       // CHECK: spv.func @resource_bindings_in_entry_func2()
-      func @resource_bindings_in_entry_func2() {
+      func.func @resource_bindings_in_entry_func2() {
         // CHECK: spv.mlir.addressof @[[FUNC2_ARG]]
         // CHECK: spv.mlir.addressof @[[FUNC2_RET]]
         %c0 = arith.constant 0 : index
@@ -158,7 +158,7 @@ hal.executable private @interface_binding {
       workgroup_size = [32: index, 1: index, 1: index]
     }
     builtin.module {
-      func @interface_binding() {
+      func.func @interface_binding() {
         %c0 = arith.constant 0 : index
         %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<8x5xf32>
         %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<5xf32>
@@ -201,7 +201,7 @@ hal.executable private @interface_wg_id {
       workgroup_size = [32: index, 1: index, 1: index]
     }
     builtin.module {
-      func @interface_wg_id() {
+      func.func @interface_wg_id() {
         %0 = hal.interface.workgroup.id[0] : index
         %1 = hal.interface.workgroup.id[1] : index
         return
@@ -236,7 +236,7 @@ hal.executable private @interface_wg_count {
       workgroup_size = [32: index, 1: index, 1: index]
     }
     builtin.module {
-      func @interface_wg_count() {
+      func.func @interface_wg_count() {
         %0 = hal.interface.workgroup.count[0] : index
         %1 = hal.interface.workgroup.count[1] : index
         return

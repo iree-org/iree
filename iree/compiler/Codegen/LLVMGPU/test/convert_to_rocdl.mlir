@@ -1,7 +1,7 @@
 // RUN: iree-opt -iree-convert-to-rocdl %s | FileCheck %s
 
 // Test that that standard and GPU ops are converted to LLVM and NVVM.
-func @abs_ex_dispatch_0() {
+func.func @abs_ex_dispatch_0() {
   %c0 = arith.constant 0 : index
   %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<16xf32>
   %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<16xf32>

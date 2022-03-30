@@ -3,7 +3,7 @@
 module {
   // CHECK-LABEL: vm.func private @load_store
   // CHECK-SAME: (%[[BUFFER:.+]]: !vm.buffer, %[[IDX0:.+]]: i32, %[[IDX1:.+]]: i32) -> f32 {
-  func @load_store(%buffer: memref<?xf32>, %idx0: index, %idx1: index) -> f32 {
+  func.func @load_store(%buffer: memref<?xf32>, %idx0: index, %idx1: index) -> f32 {
     // CHECK-NEXT: %[[C4_0:.+]] = vm.const.i32 4
     // CHECK-NEXT: %[[OFFSET0:.+]] = vm.mul.i32 %[[IDX0]], %[[C4_0]] : i32
     // CHECK-NEXT: %[[VALUE:.+]] = vm.buffer.load.f32 %[[BUFFER]][%[[OFFSET0]]] : !vm.buffer -> f32
@@ -24,7 +24,7 @@ module {
   memref.global "private" constant @__constant : memref<2xf32> = dense<[0.0287729427, 0.0297581609]>
   // CHECK-LABEL: vm.func private @load_global
   // CHECK-SAME: (%[[IDX:.+]]: i32) -> f32 {
-  func @load_global(%idx: index) -> f32 {
+  func.func @load_global(%idx: index) -> f32 {
     // CHECK-NEXT: %[[BUFFER:.+]] = vm.const.ref.rodata @__constant : !vm.buffer
     %0 = memref.get_global @__constant : memref<2xf32>
     // CHECK-NEXT: %[[C4:.+]] = vm.const.i32 4

@@ -7,7 +7,7 @@
 
 // CHECK-LABEL: @propagateFuncCallee
 // CHECK-SAME: (%[[ARG:.+]]: !stream.resource<external>, %[[SIZE:.+]]: index) -> !stream.resource<external>
-func private @propagateFuncCallee(%arg: !stream.resource<*>, %size: index) -> !stream.resource<*> {
+func.func private @propagateFuncCallee(%arg: !stream.resource<*>, %size: index) -> !stream.resource<*> {
   %c0 = arith.constant 0 : index
   %c128 = arith.constant 128 : index
   %c123_i32 = arith.constant 123 : i32
@@ -18,7 +18,7 @@ func private @propagateFuncCallee(%arg: !stream.resource<*>, %size: index) -> !s
 }
 // CHECK: @propagateFuncCaller
 // CHECK-SAME: -> !stream.resource<external>
-func @propagateFuncCaller(%size: index) -> !stream.resource<*> {
+func.func @propagateFuncCaller(%size: index) -> !stream.resource<*> {
   %c123_i32 = arith.constant 123 : i32
   // CHECK: stream.async.splat {{.+}} -> !stream.resource<external>
   %splat = stream.async.splat %c123_i32 : i32 -> !stream.resource<*>{%size}
@@ -34,7 +34,7 @@ func @propagateFuncCaller(%size: index) -> !stream.resource<*> {
 // and the type changes we don't explode.
 
 // CHECK-LABEL: @transitionTypesAcrossTies
-func @transitionTypesAcrossTies() -> !hal.buffer_view {
+func.func @transitionTypesAcrossTies() -> !hal.buffer_view {
   %c4 = arith.constant 4 : index
   %c255_i32 = arith.constant 255 : i32
   // CHECK: %[[SPLAT:.+]] = stream.async.splat {{.+}} -> !stream.resource<external>
@@ -58,7 +58,7 @@ func @transitionTypesAcrossTies() -> !hal.buffer_view {
 
 // CHECK-LABEL: @propagateBlocks
 // CHECK-SAME: (%[[COND:.+]]: i1, {{.+}}) -> (!stream.resource<transient>, !stream.resource<external>)
-func private @propagateBlocks(%cond: i1, %size: index) -> (!stream.resource<*>, !stream.resource<external>) {
+func.func private @propagateBlocks(%cond: i1, %size: index) -> (!stream.resource<*>, !stream.resource<external>) {
   %c0 = arith.constant 0 : index
   %c128 = arith.constant 128 : index
   %c123_i32 = arith.constant 123 : i32
@@ -101,7 +101,7 @@ func private @propagateBlocks(%cond: i1, %size: index) -> (!stream.resource<*>, 
 // CHECK-LABEL: @conflictResolution
 // CHECK-SAME: (%[[COND:.+]]: i1, %[[ARG0:.+]]: !stream.resource<transient>, %[[ARG1:.+]]: !stream.resource<external>, %[[SIZE:.+]]: index)
 // CHECK-SAME: -> !stream.resource<external>
-func @conflictResolution(%cond: i1, %arg0: !stream.resource<transient>, %arg1: !stream.resource<external>, %size: index) -> !stream.resource<*> {
+func.func @conflictResolution(%cond: i1, %arg0: !stream.resource<transient>, %arg1: !stream.resource<external>, %size: index) -> !stream.resource<*> {
   // CHECK: %[[ARG0_EXT:.+]] = stream.async.transfer %[[ARG0]]
   %arg0_any = stream.async.transfer %arg0 : !stream.resource<transient>{%size} -> !stream.resource<*>{%size}
   // CHECK-NOT: stream.async.transfer %[[ARG1]]
@@ -122,7 +122,7 @@ func @conflictResolution(%cond: i1, %arg0: !stream.resource<transient>, %arg1: !
 // CHECK-LABEL: @transferResolution
 // CHECK-SAME: (%[[ARG0:.+]]: !stream.resource<constant>, %[[SIZE:.+]]: index)
 // CHECK-SAME: -> !stream.resource<external>
-func @transferResolution(%arg0: !stream.resource<constant>, %size: index) -> !stream.resource<*> {
+func.func @transferResolution(%arg0: !stream.resource<constant>, %size: index) -> !stream.resource<*> {
   %c1 = arith.constant 1 : index
   // CHECK: %[[ARG0_EXT:.+]] = stream.async.transfer %[[ARG0]] : !stream.resource<constant>{%[[SIZE]]} -> !stream.resource<external>{%[[SIZE]]}
   %arg0_any = stream.async.transfer %arg0 : !stream.resource<constant>{%size} -> !stream.resource<*>{%size}
@@ -141,7 +141,7 @@ util.global private mutable @variable__size : index
 
 // CHECK-LABEL: @globalLoad()
 // CHECK-SAME: -> !stream.resource<variable>
-func private @globalLoad() -> !stream.resource<*> {
+func.func private @globalLoad() -> !stream.resource<*> {
   // CHECK: %[[VALUE:.+]] = util.global.load @variable : !stream.resource<variable>
   %value = util.global.load @variable : !stream.resource<variable>
   %size = util.global.load @variable__size : index
@@ -153,7 +153,7 @@ func private @globalLoad() -> !stream.resource<*> {
 
 // CHECK-LABEL: @globalStore
 // CHECK-SAME: (%[[VALUE:.+]]: !stream.resource<variable>, %[[SIZE:.+]]: index)
-func private @globalStore(%value: !stream.resource<*>, %size: index) {
+func.func private @globalStore(%value: !stream.resource<*>, %size: index) {
   // CHECK-NOT: stream.async.transfer
   %0 = stream.async.transfer %value : !stream.resource<*>{%size} -> !stream.resource<variable>{%size}
   // CHECK: util.global.store %[[VALUE]], @variable : !stream.resource<variable>
@@ -167,7 +167,7 @@ func private @globalStore(%value: !stream.resource<*>, %size: index) {
 // Tests that explicit resource allocations are refined.
 
 // CHECK-LABEL: @explicitAlloc
-func @explicitAlloc() -> !hal.buffer_view {
+func.func @explicitAlloc() -> !hal.buffer_view {
   %c0 = arith.constant 0 : index
   // CHECK: %[[ALLOC:.+]] = stream.resource.alloc : !stream.resource<external>{%c0}
   %0 = stream.resource.alloc : !stream.resource<*>{%c0}

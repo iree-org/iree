@@ -1,4 +1,4 @@
-func @transpose_2d() {
+func.func @transpose_2d() {
   %input = util.unfoldable_constant dense<[[1, 2, 3],
                                            [4, 5, 6]]> : tensor<2x3xi32>
   %0 = "mhlo.transpose"(%input) {
@@ -10,7 +10,7 @@ func @transpose_2d() {
   return
 }
 
-func @transpose_3d() {
+func.func @transpose_3d() {
   %input = util.unfoldable_constant dense<[[[ 1,  2,  3],
                                             [ 4,  5,  6]],
                                            [[ 7,  8,  9],

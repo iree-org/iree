@@ -10,7 +10,7 @@ module @my_module {
   // CHECK-SAME: %[[ARG1:[a-zA-Z0-9$._-]+]]
   // CHECK-SAME: %[[ARG2:[a-zA-Z0-9$._-]+]]
   // CHECK-SAME: %[[ARG3:[a-zA-Z0-9$._-]+]]
-  func @my_fn(%arg0 : i32, %arg1 : i32, %arg2 : i32, %arg3 : i32) -> (i32) {
+  func.func @my_fn(%arg0 : i32, %arg1 : i32, %arg2 : i32, %arg3 : i32) -> (i32) {
     // Note that in std, cmp returns an i1 and this relies on the dialect
     // conversion framework promoting that to i32.
     // CHECK: %[[CMP:[a-zA-Z0-9$._-]+]] = vm.cmp.eq.i32
@@ -33,7 +33,7 @@ module @my_module {
   // CHECK-SAME: %[[ARG1:[a-zA-Z0-9$._-]+]]
   // CHECK-SAME: %[[ARG2:[a-zA-Z0-9$._-]+]]
   // CHECK-SAME: %[[ARG3:[a-zA-Z0-9$._-]+]]
-  func @my_fn(%arg0 : index, %arg1 : index, %arg2 : index, %arg3 : index) -> (index) {
+  func.func @my_fn(%arg0 : index, %arg1 : index, %arg2 : index, %arg3 : index) -> (index) {
     // Note that in std, cmp returns an i1 and this relies on the dialect
     // conversion framework promoting that to i32.
     // CHECK: %[[CMP:[a-zA-Z0-9$._-]+]] = vm.cmp.eq.i32

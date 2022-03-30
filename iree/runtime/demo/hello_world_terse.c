@@ -69,7 +69,8 @@ static void iree_runtime_demo_run_session(iree_runtime_instance_t* instance) {
 // 3. Call a function within a module with buffer views
 //===----------------------------------------------------------------------===//
 
-// func @simple_mul(%arg0: tensor<4xf32>, %arg1: tensor<4xf32>) -> tensor<4xf32>
+// func.func @simple_mul(%arg0: tensor<4xf32>, %arg1: tensor<4xf32>) ->
+// tensor<4xf32>
 static void iree_runtime_demo_perform_mul(iree_runtime_session_t* session) {
   iree_runtime_call_t call;
   IREE_CHECK_OK(iree_runtime_call_initialize_by_name(

@@ -2,7 +2,7 @@
 
 // CHECK-LABEL: func @singleDispatch
 // CHECK-SAME: (%[[ARG0:.+]]: tensor<4xf32>)
-func @singleDispatch(%arg0: tensor<4xf32>) -> tensor<4xf32> {
+func.func @singleDispatch(%arg0: tensor<4xf32>) -> tensor<4xf32> {
   %c4 = arith.constant 4 : index
   //      CHECK: flow.tensor.trace {key = "ex::entry0 inputs"} %[[ARG0]] : tensor<4xf32>
   // CHECK-NEXT: %[[RET0:.+]] = flow.dispatch @ex::@entry0[%c4](%[[ARG0]]) : (tensor<4xf32>) -> tensor<4xf32>
@@ -16,7 +16,7 @@ func @singleDispatch(%arg0: tensor<4xf32>) -> tensor<4xf32> {
 
 // CHECK-LABEL: func @multiDispatch
 // CHECK-SAME: (%[[ARG0:.+]]: tensor<4xf32>)
-func @multiDispatch(%arg0: tensor<4xf32>) -> tensor<4xf32> {
+func.func @multiDispatch(%arg0: tensor<4xf32>) -> tensor<4xf32> {
   %c4 = arith.constant 4 : index
 
   //     CHECK: flow.tensor.trace {key = "ex::entry0 inputs"} %[[ARG0]] : tensor<4xf32>

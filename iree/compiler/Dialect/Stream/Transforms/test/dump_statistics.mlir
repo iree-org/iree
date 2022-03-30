@@ -54,7 +54,7 @@ util.initializer {
 stream.executable private @func_a_ex_0 {
   stream.executable.export public @dispatch_0
   builtin.module {
-    func @dispatch_0(%arg0: !stream.binding {stream.alignment = 32 : index}, %arg1: !stream.binding {stream.alignment = 32 : index}, %arg2: !stream.binding {stream.alignment = 32 : index}) {
+    func.func @dispatch_0(%arg0: !stream.binding {stream.alignment = 32 : index}, %arg1: !stream.binding {stream.alignment = 32 : index}, %arg2: !stream.binding {stream.alignment = 32 : index}) {
       %c4 = arith.constant 4 : index
       %c0 = arith.constant 0 : index
       %0 = stream.binding.subspan %arg0[%c0] : !stream.binding -> !flow.dispatch.tensor<readonly:4xi32>
@@ -85,7 +85,7 @@ stream.executable private @func_a_ex_0 {
 stream.executable private @func_a_ex_1 {
   stream.executable.export public @dispatch_1
   builtin.module {
-    func @dispatch_1(%arg0: !stream.binding {stream.alignment = 32 : index}, %arg1: !stream.binding {stream.alignment = 32 : index}, %arg2: !stream.binding {stream.alignment = 32 : index}) {
+    func.func @dispatch_1(%arg0: !stream.binding {stream.alignment = 32 : index}, %arg1: !stream.binding {stream.alignment = 32 : index}, %arg2: !stream.binding {stream.alignment = 32 : index}) {
       %c3 = arith.constant 3 : index
       %c0 = arith.constant 0 : index
       %0 = stream.binding.subspan %arg0[%c0] : !stream.binding -> !flow.dispatch.tensor<readonly:3xi32>
@@ -113,7 +113,7 @@ stream.executable private @func_a_ex_1 {
   }
 }
 
-func public @func_a() -> (tensor<4xi32>, tensor<4xi32>) {
+func.func public @func_a() -> (tensor<4xi32>, tensor<4xi32>) {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %c4 = arith.constant 4 : index

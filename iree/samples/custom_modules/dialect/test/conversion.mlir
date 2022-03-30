@@ -11,7 +11,7 @@
 // RUN: custom-opt %s -iree-hal-conversion -iree-vm-conversion -split-input-file | FileCheck %s
 
 // CHECK-LABEL: @tensorToMessage
-func @tensorToMessage(%tensor : tensor<2x4xf32>) {
+func.func @tensorToMessage(%tensor : tensor<2x4xf32>) {
   // CHECK-NEXT: %[[MSG:.+]] = vm.call @custom.buffer_to_message(%arg0) {nosideeffects} : (!vm.ref<!hal.buffer_view>) -> !vm.ref<!custom.message>
   %0 = "custom.tensor_to_message"(%tensor) : (tensor<2x4xf32>) -> !custom.message
   %c1 = arith.constant 1 : i32
@@ -23,7 +23,7 @@ func @tensorToMessage(%tensor : tensor<2x4xf32>) {
 // -----
 
 // CHECK-LABEL: @dynamicTensorToMessage
-func @dynamicTensorToMessage(%arg0 : tensor<?x?xf32>) {
+func.func @dynamicTensorToMessage(%arg0 : tensor<?x?xf32>) {
   // CHECK: %[[MSG:.+]] = vm.call @custom.buffer_to_message(%arg0) {nosideeffects} : (!vm.ref<!hal.buffer_view>) -> !vm.ref<!custom.message>
   %0 = "custom.tensor_to_message"(%arg0) : (tensor<?x?xf32>) -> !custom.message
   %c1 = arith.constant 1 : i32
@@ -35,7 +35,7 @@ func @dynamicTensorToMessage(%arg0 : tensor<?x?xf32>) {
 // -----
 
 // CHECK-LABEL: @dynamicTensorToMessage2
-func @dynamicTensorToMessage2(%arg0 : tensor<?x?xf32>) {
+func.func @dynamicTensorToMessage2(%arg0 : tensor<?x?xf32>) {
   // CHECK: %[[MSG:.+]] = vm.call @custom.buffer_to_message(%arg0) {nosideeffects} : (!vm.ref<!hal.buffer_view>) -> !vm.ref<!custom.message>
   %0 = "custom.tensor_to_message"(%arg0) : (tensor<?x?xf32>) -> !custom.message
   %c1 = arith.constant 1 : i32
@@ -47,7 +47,7 @@ func @dynamicTensorToMessage2(%arg0 : tensor<?x?xf32>) {
 // -----
 
 // CHECK-LABEL: @messageToTensor
-func @messageToTensor(%arg0 : !custom.message) -> tensor<2x4xf32> {
+func.func @messageToTensor(%arg0 : !custom.message) -> tensor<2x4xf32> {
   // CHECK: %[[VIEW:.+]] = vm.call @custom.message_to_buffer(%arg0) {nosideeffects} : (!vm.ref<!custom.message>) -> !vm.ref<!hal.buffer_view>
   %0 = "custom.message_to_tensor"(%arg0) : (!custom.message) -> tensor<2x4xf32>
   // CHECK: vm.return %[[VIEW]]
@@ -57,7 +57,7 @@ func @messageToTensor(%arg0 : !custom.message) -> tensor<2x4xf32> {
 // -----
 
 // CHECK-LABEL: @messageToTensorReturnDim
-func @messageToTensorReturnDim(%arg0 : !custom.message) -> index {
+func.func @messageToTensorReturnDim(%arg0 : !custom.message) -> index {
   %0 = "custom.message_to_tensor"(%arg0) : (!custom.message) -> tensor<?x4xf32>
   %c0 = arith.constant 0 : index
   %1 = tensor.dim %0, %c0 : tensor<?x4xf32>
@@ -72,7 +72,7 @@ func @messageToTensorReturnDim(%arg0 : !custom.message) -> index {
 // -----
 
 // CHECK-LABEL: @messageToTensorReturnRank
-func @messageToTensorReturnRank(%arg0 : !custom.message) -> index {
+func.func @messageToTensorReturnRank(%arg0 : !custom.message) -> index {
   %0 = "custom.message_to_tensor"(%arg0) : (!custom.message) -> tensor<*xf32>
   %1 = tensor.rank %0 : tensor<*xf32>
   // CHECK-DAG: %[[VIEW:.+]] = vm.call @custom.message_to_buffer(%arg0) {nosideeffects} : (!vm.ref<!custom.message>) -> !vm.ref<!hal.buffer_view>
@@ -84,7 +84,7 @@ func @messageToTensorReturnRank(%arg0 : !custom.message) -> index {
 // -----
 
 // CHECK-LABEL: @printOp
-func @printOp(%arg0 : !custom.message) {
+func.func @printOp(%arg0 : !custom.message) {
   %c1_i32 = arith.constant 1 : i32
   // CHECK: vm.call @custom.print(%arg0, %c1) : (!vm.ref<!custom.message>, i32) -> ()
   "custom.print"(%arg0, %c1_i32) : (!custom.message, i32) -> ()
@@ -96,7 +96,7 @@ func @printOp(%arg0 : !custom.message) {
 // -----
 
 // CHECK-LABEL: @reverseOp
-func @reverseOp(%arg0 : !custom.message) -> !custom.message {
+func.func @reverseOp(%arg0 : !custom.message) -> !custom.message {
   // CHECK: %ref = vm.call @custom.reverse(%arg0) {nosideeffects} : (!vm.ref<!custom.message>) -> !vm.ref<!custom.message>
   %0 = "custom.reverse"(%arg0) : (!custom.message) -> !custom.message
   return %0 : !custom.message
@@ -108,7 +108,7 @@ func @reverseOp(%arg0 : !custom.message) -> !custom.message {
 
 // CHECK: vm.import @custom.get_unique_message
 // CHECK-LABEL: @getUniqueMessageOp
-func @getUniqueMessageOp() -> !custom.message {
+func.func @getUniqueMessageOp() -> !custom.message {
   // CHECK: %ref = vm.call @custom.get_unique_message() {nosideeffects} : () -> !vm.ref<!custom.message>
   %0 = "custom.get_unique_message"() : () -> !custom.message
   return %0 : !custom.message

@@ -1,4 +1,4 @@
-func @select() {
+func.func @select() {
   // TODO(b/132205704) support i1 in constants and function signatures.
   %input = util.unfoldable_constant dense<[1, 0, 1, 0]> : tensor<4xi32>
   %zeros = util.unfoldable_constant dense<0> : tensor<4xi32>

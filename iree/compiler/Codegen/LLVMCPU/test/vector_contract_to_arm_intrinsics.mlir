@@ -82,7 +82,7 @@
 // CHECK-DAG:       %[[RES_14:.*]]        = vector.insert_strided_slice %[[SDOT_CHUNK_14]], %[[RES_13]] {offsets = [7, 0]
 // CHECK-DAG:       %[[RES_15:.*]]        = vector.insert_strided_slice %[[SDOT_CHUNK_15]], %[[RES_14]] {offsets = [7, 4]
 // CHECK:           return %[[RES_15]]
-func @vector_i8i8i32matmul(
+func.func @vector_i8i8i32matmul(
     %lhs: vector<8x4xi8>,
     %rhs: vector<8x4xi8>,
     %acc: vector<8x8xi32>) -> vector<8x8xi32> {
@@ -101,7 +101,7 @@ func @vector_i8i8i32matmul(
 // -----
 
 // CHECK-LABEL: @vector_f32f32f32matmul(
-func @vector_f32f32f32matmul(
+func.func @vector_f32f32f32matmul(
     %lhs: vector<8x4xf32>,
     %rhs: vector<8x4xf32>,
     %acc: vector<8x8xf32>) -> vector<8x8xf32> {
@@ -120,7 +120,7 @@ func @vector_f32f32f32matmul(
 // -----
 
 // CHECK-LABEL: @vector_i32i32i32matmul(
-func @vector_i32i32i32matmul(
+func.func @vector_i32i32i32matmul(
     %lhs: vector<8x4xi32>,
     %rhs: vector<8x4xi32>,
     %acc: vector<8x8xi32>) -> vector<8x8xi32> {

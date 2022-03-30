@@ -2,7 +2,7 @@
 
 // CHECK-LABEL: @packAllocations
 // CHECK-SAME: (%[[SIZE_A:.+]]: index, %[[SIZE_B:.+]]: index)
-func @packAllocations(%size_a: index, %size_b: index) {
+func.func @packAllocations(%size_a: index, %size_b: index) {
   //      CHECK: %[[SLICES:.+]]:3 = stream.resource.pack slices({
   // CHECK-NEXT:   [0, 0] = %[[SIZE_A]],
   // CHECK-NEXT:   [0, 0] = %[[SIZE_B]]
@@ -27,7 +27,7 @@ func @packAllocations(%size_a: index, %size_b: index) {
 // -----
 
 // CHECK-LABEL: @packEmpty
-func @packEmpty() {
+func.func @packEmpty() {
   // CHECK: %[[ALLOC:.+]] = stream.resource.alloc : !stream.resource<transient>{%c0}
   %c0 = arith.constant 0 : index
   %0 = stream.resource.alloc : !stream.resource<transient>{%c0}

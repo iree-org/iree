@@ -8,7 +8,7 @@
 util.global private mutable @loadedGlobal : tensor<4x?x?x2xf32>
 
 // CHECK-LABEL: @globalLoad
-func @globalLoad() {
+func.func @globalLoad() {
   // CHECK-NEXT: %[[TENSOR:.+]] = util.global.load @loadedGlobal : tensor<4x?x?x2xf32>
   // CHECK-NEXT: %[[D1:.+]] = util.global.load @loadedGlobal__d1 : index
   // CHECK-NEXT: %[[D2:.+]] = util.global.load @loadedGlobal__d2 : index
@@ -30,7 +30,7 @@ util.global private mutable @storedGlobal : tensor<4x?x?x2xf32>
 
 // CHECK-LABEL: @globalStore
 // CHECK-SAME: (%[[ARG0:.+]]: tensor<4x?x?x2xf32>, %[[D1:.+]]: index, %[[D2:.+]]: index)
-func @globalStore(%arg0: tensor<4x?x?x2xf32>) {
+func.func @globalStore(%arg0: tensor<4x?x?x2xf32>) {
   // CHECK-NEXT: %[[TIED:.+]] = flow.tensor.tie_shape %[[ARG0]] : tensor<4x?x?x2xf32>{%[[D1]], %[[D2]]}
   // CHECK-NEXT: util.global.store %[[ARG0]], @storedGlobal : tensor<4x?x?x2xf32>
   // CHECK-NEXT: util.global.store %[[D1]], @storedGlobal__d1 : index
@@ -46,7 +46,7 @@ func @globalStore(%arg0: tensor<4x?x?x2xf32>) {
 // CHECK-LABEL: @funcArgs
 // CHECK-SAME: (%[[ARG0:.+]]: tensor<4x?x?x2xf32>, %[[ARG0_D1:.+]]: index, %[[ARG0_D2:.+]]: index,
 // CHECK-SAME:  %[[ARG1:.+]]: tensor<?xi32>, %[[ARG1_D0:.+]]: index)
-func @funcArgs(%arg0: tensor<4x?x?x2xf32>, %arg1: tensor<?xi32>) {
+func.func @funcArgs(%arg0: tensor<4x?x?x2xf32>, %arg1: tensor<?xi32>) {
   // CHECK-NEXT: %[[TIED_ARG0:.+]] = flow.tensor.tie_shape %[[ARG0]] : tensor<4x?x?x2xf32>{%[[ARG0_D1]], %[[ARG0_D2]]}
   // CHECK-NEXT: %[[TIED_ARG1:.+]] = flow.tensor.tie_shape %[[ARG1]] : tensor<?xi32>{%[[ARG1_D0]]}
 
@@ -65,7 +65,7 @@ func @funcArgs(%arg0: tensor<4x?x?x2xf32>, %arg1: tensor<?xi32>) {
 // CHECK-LABEL: @funcResults
 // CHECK-SAME: (%[[ARG0:.+]]: tensor<4x?x?x2xf32>, %[[ARG0_D1:.+]]: index, %[[ARG0_D2:.+]]: index,
 // CHECK-SAME:  %[[ARG1:.+]]: tensor<?xi32>, %[[ARG1_D0:.+]]: index)
-func @funcResults(%arg0: tensor<4x?x?x2xf32>, %arg1: tensor<?xi32>) -> (tensor<4x?x?x2xf32>, tensor<?xi32>) {
+func.func @funcResults(%arg0: tensor<4x?x?x2xf32>, %arg1: tensor<?xi32>) -> (tensor<4x?x?x2xf32>, tensor<?xi32>) {
   // CHECK-NEXT: %[[TIED_ARG0:.+]] = flow.tensor.tie_shape %[[ARG0]] : tensor<4x?x?x2xf32>{%[[ARG0_D1]], %[[ARG0_D2]]}
   // CHECK-NEXT: %[[TIED_ARG1:.+]] = flow.tensor.tie_shape %[[ARG1]] : tensor<?xi32>{%[[ARG1_D0]]}
 
@@ -82,7 +82,7 @@ func @funcResults(%arg0: tensor<4x?x?x2xf32>, %arg1: tensor<?xi32>) -> (tensor<4
 // CHECK-LABEL: @caller
 // CHECK-SAME: (%[[ARG0:.+]]: tensor<4x?x?x2xf32>, %[[ARG0_D1:.+]]: index, %[[ARG0_D2:.+]]: index,
 // CHECK-SAME:  %[[ARG1:.+]]: tensor<?xi32>, %[[ARG1_D0:.+]]: index)
-func @caller(%arg0: tensor<4x?x?x2xf32>, %arg1: tensor<?xi32>) {
+func.func @caller(%arg0: tensor<4x?x?x2xf32>, %arg1: tensor<?xi32>) {
   // CHECK-NEXT: %[[TIED_ARG0:.+]] = flow.tensor.tie_shape %[[ARG0]] : tensor<4x?x?x2xf32>{%[[ARG0_D1]], %[[ARG0_D2]]}
   // CHECK-NEXT: %[[TIED_ARG1:.+]] = flow.tensor.tie_shape %[[ARG1]] : tensor<?xi32>{%[[ARG1_D0]]}
 
@@ -101,7 +101,7 @@ func @caller(%arg0: tensor<4x?x?x2xf32>, %arg1: tensor<?xi32>) {
   return
 }
 
-func private @callee(%arg0: tensor<4x?x?x2xf32>, %arg1: tensor<?xi32>) -> (tensor<4x?x?x2xf32>, tensor<?xi32>)
+func.func private @callee(%arg0: tensor<4x?x?x2xf32>, %arg1: tensor<?xi32>) -> (tensor<4x?x?x2xf32>, tensor<?xi32>)
 
 // -----
 
@@ -110,7 +110,7 @@ func private @callee(%arg0: tensor<4x?x?x2xf32>, %arg1: tensor<?xi32>) -> (tenso
 // CHECK-LABEL: @br
 // CHECK-SAME: (%[[ARG0:.+]]: tensor<4x?x?x2xf32>, %[[ARG0_D1:.+]]: index, %[[ARG0_D2:.+]]: index,
 // CHECK-SAME:  %[[ARG1:.+]]: tensor<?xi32>, %[[ARG1_D0:.+]]: index)
-func @br(%arg0: tensor<4x?x?x2xf32>, %arg1: tensor<?xi32>) {
+func.func @br(%arg0: tensor<4x?x?x2xf32>, %arg1: tensor<?xi32>) {
   // CHECK-NEXT: %[[TIED_ARG0:.+]] = flow.tensor.tie_shape %[[ARG0]] : tensor<4x?x?x2xf32>{%[[ARG0_D1]], %[[ARG0_D2]]}
   // CHECK-NEXT: %[[TIED_ARG1:.+]] = flow.tensor.tie_shape %[[ARG1]] : tensor<?xi32>{%[[ARG1_D0]]}
 
@@ -138,7 +138,7 @@ func @br(%arg0: tensor<4x?x?x2xf32>, %arg1: tensor<?xi32>) {
 // CHECK-LABEL: @select
 // CHECK-SAME: (%[[COND:.+]]: i1,
 // CHECK-SAME:  %[[ARG0:.+]]: tensor<4x?x?x2xf32>, %[[ARG0_D1:.+]]: index, %[[ARG0_D2:.+]]: index, %[[ARG1:.+]]: tensor<4x?x?x2xf32>, %[[ARG1_D1:.+]]: index, %[[ARG1_D2:.+]]: index)
-func @select(%cond: i1, %arg0: tensor<4x?x?x2xf32>, %arg1: tensor<4x?x?x2xf32>) {
+func.func @select(%cond: i1, %arg0: tensor<4x?x?x2xf32>, %arg1: tensor<4x?x?x2xf32>) {
   // CHECK-NEXT: %[[TIED_ARG0:.+]] = flow.tensor.tie_shape %[[ARG0]] : tensor<4x?x?x2xf32>{%[[ARG0_D1]], %[[ARG0_D2]]}
   // CHECK-NEXT: %[[TIED_ARG1:.+]] = flow.tensor.tie_shape %[[ARG1]] : tensor<4x?x?x2xf32>{%[[ARG1_D1]], %[[ARG1_D2]]}
 

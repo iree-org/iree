@@ -1,4 +1,4 @@
-func @dot_general_trivial_batching_dimension() {
+func.func @dot_general_trivial_batching_dimension() {
   %lhs = util.unfoldable_constant  dense<[[[0.1, 0.2, 0.3], [0.4, 0.5, 0.6]]]> : tensor<1x2x3xf32>
   %rhs = util.unfoldable_constant dense<[[
     [1.0, 2.0, 3.0, 4.0],
@@ -17,7 +17,7 @@ func @dot_general_trivial_batching_dimension() {
   return
 }
 
-func @dot_general_nontrivial_batching_dimension() {
+func.func @dot_general_nontrivial_batching_dimension() {
   %lhs = util.unfoldable_constant dense<[
     [[0.1, 0.2, 0.3], [0.4, 0.5, 0.6]],
     [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]]]> : tensor<2x2x3xf32>
@@ -48,7 +48,7 @@ func @dot_general_nontrivial_batching_dimension() {
   return
 }
 
-func @large_dot_general2() {
+func.func @large_dot_general2() {
   %lhs = util.unfoldable_constant dense<1.0> : tensor<4x32x1024xf32>
   %rhs = util.unfoldable_constant dense<0.4> : tensor<4x1024x64xf32>
   %res = "mhlo.dot_general"(%lhs, %rhs) {

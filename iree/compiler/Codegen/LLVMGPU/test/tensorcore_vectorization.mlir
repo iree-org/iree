@@ -1,6 +1,6 @@
 // RUN: iree-opt -iree-llvmgpu-tensorcore-vectorization %s | FileCheck %s
 
-func @dot() {
+func.func @dot() {
   %c16 = arith.constant 16 : index
   %c1024 = arith.constant 1024 : index
   %cst = arith.constant 0.000000e+00 : f32

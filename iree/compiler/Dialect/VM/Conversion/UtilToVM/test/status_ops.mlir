@@ -1,7 +1,7 @@
 // RUN: iree-opt -split-input-file -iree-vm-conversion %s | FileCheck %s
 
 // CHECK-LABEL: vm.func private @status_check_ok
-func @status_check_ok() {
+func.func @status_check_ok() {
   // CHECK: %[[CODE:.+]] =
   %statusCode = arith.constant 1 : i32
   // CHECK: vm.cond_fail %[[CODE]]
@@ -12,7 +12,7 @@ func @status_check_ok() {
 // -----
 
 // CHECK-LABEL: vm.func private @status_check_ok_with_message
-func @status_check_ok_with_message() {
+func.func @status_check_ok_with_message() {
   // CHECK: %[[CODE:.+]] =
   %statusCode = arith.constant 1 : i32
   // CHECK: vm.cond_fail %[[CODE]], "failure message"

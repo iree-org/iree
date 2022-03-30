@@ -2,7 +2,7 @@
 // RUN: [[ $IREE_VULKAN_DISABLE == 1 ]] || (iree-run-mlir --iree-input-type=mhlo %s -iree-hal-target-backends=vulkan-spirv -function-input="1x5xf32=1,-2,-3,4,-5" -function-input="1x5x3x1xf32=15,14,13,12,11,10,9,8,7,6,5,4,3,2,1" | FileCheck %s)
 
 // CHECK-LABEL: EXEC @main
-func @main(%arg0: tensor<1x5xf32>, %arg1: tensor<1x5x3x1xf32>) -> tensor<5x1x5xf32> {
+func.func @main(%arg0: tensor<1x5xf32>, %arg1: tensor<1x5x3x1xf32>) -> tensor<5x1x5xf32> {
   %0 = "mhlo.reshape"(%arg0) {name = "reshape.3"} : (tensor<1x5xf32>) -> tensor<1x5xf32>
   %1 = "mhlo.transpose"(%0) {name = "transpose.41", permutation = dense<[1, 0]> : tensor<2xi64>} : (tensor<1x5xf32>) -> tensor<5x1xf32>
   %2 = "mhlo.reshape"(%1) {name = "reshape.42"} : (tensor<5x1xf32>) -> tensor<5x1x1xf32>

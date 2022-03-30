@@ -8,7 +8,7 @@
 }>
 
 // CHECK-LABEL: @layoutStatic
-func @layoutStatic() -> (index, index, index, index, index, index, index)
+func.func @layoutStatic() -> (index, index, index, index, index, index, index)
     attributes {stream.resources = #layoutStaticConfig} {
   %c100 = arith.constant 100 : index
   %c200 = arith.constant 200 : index
@@ -37,7 +37,7 @@ func @layoutStatic() -> (index, index, index, index, index, index, index)
 
 // CHECK-LABEL: @layoutDynamic
 // CHECK-SAME: (%[[SIZE_A:.+]]: index, %[[SIZE_B:.+]]: index)
-func @layoutDynamic(%size_a: index, %size_b: index) -> (index, index, index, index)
+func.func @layoutDynamic(%size_a: index, %size_b: index) -> (index, index, index, index)
     attributes {stream.resources = #layoutDynamicConfig} {
   %t:4 = stream.resource.pack slices({
     [0, 1] = %size_a,
@@ -67,7 +67,7 @@ func @layoutDynamic(%size_a: index, %size_b: index) -> (index, index, index, ind
 
 // CHECK-LABEL: @layoutMixedStaticDynamic
 // CHECK-SAME: (%[[SIZE_A:.+]]: index, %[[SIZE_B:.+]]: index)
-func @layoutMixedStaticDynamic(%size_a: index, %size_b: index) -> (index, index, index, index, index)
+func.func @layoutMixedStaticDynamic(%size_a: index, %size_b: index) -> (index, index, index, index, index)
     attributes {stream.resources = #layoutMixedStaticDynamicConfig} {
   %c100 = arith.constant 100 : index
   %c200 = arith.constant 200 : index

@@ -293,7 +293,8 @@ static LogicalResult setSortConfig(func::FuncOp entryPoint, Operation *op) {
 }
 
 // Basic default properties for linalg ops that haven't been tuned.
-static LogicalResult setRootDefaultConfig(FuncOp entryPoint, Operation *op) {
+static LogicalResult setRootDefaultConfig(func::FuncOp entryPoint,
+                                          Operation *op) {
   IREE::Codegen::DispatchLoweringPassPipeline passPipeline =
       IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUDistribute;
   TileSizesListType tileSizes;

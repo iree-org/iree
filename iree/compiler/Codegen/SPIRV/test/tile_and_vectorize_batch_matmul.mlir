@@ -16,7 +16,7 @@ hal.executable private @fused_fill_batch_matmul {
       translation_info = #translation
     }
     builtin.module  {
-      func @fused_fill_batch_matmul() {
+      func.func @fused_fill_batch_matmul() {
         %c0 = arith.constant 0 : index
         %cst = arith.constant 0.000000e+00 : f32
         %c4 = arith.constant 4 : index

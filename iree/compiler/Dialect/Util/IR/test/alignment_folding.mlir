@@ -2,7 +2,7 @@
 
 // CHECK-LABEL: @foldSameAlignment
 // CHECK-SAME: (%[[VALUE:.+]]: index, %[[ALIGNMENT:.+]]: index)
-func @foldSameAlignment(%value: index, %alignment: index) -> index {
+func.func @foldSameAlignment(%value: index, %alignment: index) -> index {
   // CHECK: %[[RET:.+]] = util.align %[[VALUE]], %[[ALIGNMENT]]
   %0 = util.align %value, %alignment : index
   // CHECK-NOT: util.align
@@ -15,7 +15,7 @@ func @foldSameAlignment(%value: index, %alignment: index) -> index {
 
 // CHECK-LABEL: @foldGreaterAlignment
 // CHECK-SAME: (%[[VALUE:.+]]: index)
-func @foldGreaterAlignment(%value: index) -> index {
+func.func @foldGreaterAlignment(%value: index) -> index {
   %c8 = arith.constant 8 : index
   %c16 = arith.constant 16 : index
   // CHECK: %[[RET:.+]] = util.align %[[VALUE]], %c16
@@ -30,7 +30,7 @@ func @foldGreaterAlignment(%value: index) -> index {
 
 // CHECK-LABEL: @dontFoldLesserAlignment
 // CHECK-SAME: (%[[VALUE:.+]]: index)
-func @dontFoldLesserAlignment(%value: index) -> index {
+func.func @dontFoldLesserAlignment(%value: index) -> index {
   %c8 = arith.constant 8 : index
   %c16 = arith.constant 16 : index
   // CHECK: %[[ALIGN16:.+]] = util.align %[[VALUE]], %c8
@@ -45,7 +45,7 @@ func @dontFoldLesserAlignment(%value: index) -> index {
 
 // CHECK-LABEL: @foldAlignmentRecursively
 // CHECK-SAME: (%[[VALUE:.+]]: index, %[[ALIGNMENT:.+]]: index)
-func @foldAlignmentRecursively(%value: index, %alignment: index) -> index {
+func.func @foldAlignmentRecursively(%value: index, %alignment: index) -> index {
   %c16 = arith.constant 16 : index
   // CHECK: %[[ALIGN16:.+]] = util.align %[[VALUE]], %c16
   %0 = util.align %value, %c16 : index
@@ -61,7 +61,7 @@ func @foldAlignmentRecursively(%value: index, %alignment: index) -> index {
 
 // CHECK-LABEL: @foldAddAlignment
 // CHECK-SAME: (%[[LHS:.+]]: index, %[[RHS:.+]]: index, %[[ALIGNMENT:.+]]: index)
-func @foldAddAlignment(%lhs: index, %rhs: index, %alignment: index) -> index {
+func.func @foldAddAlignment(%lhs: index, %rhs: index, %alignment: index) -> index {
   // CHECK: %[[LHS_ALIGNED:.+]] = util.align %[[LHS]], %[[ALIGNMENT]]
   %lhs_aligned = util.align %lhs, %alignment : index
   // CHECK: %[[RHS_ALIGNED:.+]] = util.align %[[RHS]], %[[ALIGNMENT]]
@@ -78,7 +78,7 @@ func @foldAddAlignment(%lhs: index, %rhs: index, %alignment: index) -> index {
 
 // CHECK-LABEL: @foldAddAlignmentConstant
 // CHECK-SAME: (%[[LHS:.+]]: index)
-func @foldAddAlignmentConstant(%lhs: index) -> index {
+func.func @foldAddAlignmentConstant(%lhs: index) -> index {
   %c16 = arith.constant 16 : index
   %c32 = arith.constant 32 : index
   %c64 = arith.constant 64 : index

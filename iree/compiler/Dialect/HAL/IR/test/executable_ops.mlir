@@ -63,7 +63,7 @@ hal.executable @ex_with_workgroup_count_region {
 // CHECK-SAME: %[[DEVICE:.+]]: !hal.device,
 // CHECK-SAME: %[[LAYOUT0:.+]]: !hal.executable_layout,
 // CHECK-SAME: %[[LAYOUT1:.+]]: !hal.executable_layout
-func @executable_create(%device: !hal.device,
+func.func @executable_create(%device: !hal.device,
                         %layout0: !hal.executable_layout,
                         %layout1: !hal.executable_layout) {
   //      CHECK: = hal.executable.create
@@ -82,7 +82,7 @@ func @executable_create(%device: !hal.device,
 // CHECK-SAME: %[[DEVICE:.+]]: !hal.device,
 // CHECK-SAME: %[[LAYOUT0:.+]]: !hal.descriptor_set_layout,
 // CHECK-SAME: %[[LAYOUT1:.+]]: !hal.descriptor_set_layout
-func @executable_layout_create(%device: !hal.device,
+func.func @executable_layout_create(%device: !hal.device,
                                %layout0: !hal.descriptor_set_layout,
                                %layout1: !hal.descriptor_set_layout) {
   // CHECK: hal.executable_layout.create

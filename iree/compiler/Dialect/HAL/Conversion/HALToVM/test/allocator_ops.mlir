@@ -1,7 +1,7 @@
 // RUN: iree-opt -split-input-file -canonicalize -iree-convert-hal-to-vm %s | FileCheck %s
 
 // CHECK-LABEL: vm.func private @allocatorAllocate
-func @allocatorAllocate(%arg0 : !hal.allocator) -> !hal.buffer {
+func.func @allocatorAllocate(%arg0 : !hal.allocator) -> !hal.buffer {
   %c1024 = arith.constant 1024 : index
   // CHECK: %ref = vm.call @hal.allocator.allocate(%arg0, %c6, %c14, %c1024) : (!vm.ref<!hal.allocator>, i32, i32, i32) -> !vm.ref<!hal.buffer>
   %0 = hal.allocator.allocate<%arg0 : !hal.allocator> type("HostLocal") usage("All") : !hal.buffer{%c1024}
@@ -11,7 +11,7 @@ func @allocatorAllocate(%arg0 : !hal.allocator) -> !hal.buffer {
 // -----
 
 // CHECK-LABEL: vm.func private @allocatorMapByteBuffer
-func @allocatorMapByteBuffer(%arg0 : !hal.allocator, %arg1 : !util.byte_buffer) -> !hal.buffer {
+func.func @allocatorMapByteBuffer(%arg0 : !hal.allocator, %arg1 : !util.byte_buffer) -> !hal.buffer {
   %offset = arith.constant 128 : index
   %length = arith.constant 256 : index
   // CHECK: = vm.call @hal.allocator.wrap.byte_buffer(%arg0, %c6, %c2, %arg1, %c128, %c256) : (!vm.ref<!hal.allocator>, i32, i32, !vm.buffer, i32, i32) -> !vm.ref<!hal.buffer>

@@ -19,7 +19,7 @@
 // CHECK: util.global private @_device_query_2
 
 // CHECK-LABEL: func @device_matchers
-func @device_matchers(%device : !hal.device) -> (i1, i1, i1, i1, i1, i1) {
+func.func @device_matchers(%device : !hal.device) -> (i1, i1, i1, i1, i1, i1) {
   // Same queries (same variables):
   // CHECK-NEXT: = util.global.load @_device_query_0_ok : i1
   // CHECK-NEXT: = util.global.load @_device_query_0 : i1

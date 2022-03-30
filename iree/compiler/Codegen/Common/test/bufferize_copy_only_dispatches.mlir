@@ -1,7 +1,7 @@
 // RUN: iree-opt -iree-codegen-bufferize-copy-only-dispatches -split-input-file %s | FileCheck %s
 
 builtin.module {
-  func @tensor_insert_slice() {
+  func.func @tensor_insert_slice() {
     %source_size_y = hal.interface.constant.load[0] : index
     %source_size_x = hal.interface.constant.load[1] : index
     %dest_size_y = hal.interface.constant.load[2] : index
@@ -62,7 +62,7 @@ builtin.module {
 // -----
 
 builtin.module {
-  func @tensor_extract_slice() {
+  func.func @tensor_extract_slice() {
     %source_size_y = hal.interface.constant.load[0] : index
     %source_size_x = hal.interface.constant.load[1] : index
     %dest_size_y = hal.interface.constant.load[2] : index
@@ -117,7 +117,7 @@ builtin.module {
 // -----
 
 builtin.module {
-  func @UpSampling1D() {
+  func.func @UpSampling1D() {
     %c0 = arith.constant 0 : index
     %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readwrite:2x16x3xf32>
     %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:2x8x3xf32>
@@ -141,7 +141,7 @@ builtin.module {
 // -----
 
 builtin.module {
-  func @concatenate_cst() {
+  func.func @concatenate_cst() {
     %cst = arith.constant dense<0> : tensor<2x3xi32>
     %c0 = arith.constant 0 : index
     %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readwrite:2x5xi32>

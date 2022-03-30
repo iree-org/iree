@@ -4,7 +4,7 @@
 // ops to linalg.matmul ops plus additional arithmetic to account for any
 // nonzero zero-point.
 
-func @quantized_matmul_both_zp_0_dynamic(%lhs : tensor<?x?xi8>, %rhs : tensor<?x?xi8>, %acc : tensor<?x?xi32>) -> tensor<?x?xi32> {
+func.func @quantized_matmul_both_zp_0_dynamic(%lhs : tensor<?x?xi8>, %rhs : tensor<?x?xi8>, %acc : tensor<?x?xi32>) -> tensor<?x?xi32> {
     %lhs_zp = arith.constant 0 : i32
     %rhs_zp = arith.constant 0 : i32
     %1 = linalg.quantized_matmul ins(%lhs, %rhs, %lhs_zp, %rhs_zp : tensor<?x?xi8>, tensor<?x?xi8>, i32, i32) outs(%acc : tensor<?x?xi32>) -> tensor<?x?xi32>
@@ -17,7 +17,7 @@ func @quantized_matmul_both_zp_0_dynamic(%lhs : tensor<?x?xi8>, %rhs : tensor<?x
 // CHECK:       return %[[MATMUL]]
 // -----
 
-func @quantized_matmul_lhs_zp_0_dynamic(%lhs : tensor<?x?xi8>, %rhs : tensor<?x?xi8>, %rhs_zp : i32, %acc : tensor<?x?xi32>) -> tensor<?x?xi32> {
+func.func @quantized_matmul_lhs_zp_0_dynamic(%lhs : tensor<?x?xi8>, %rhs : tensor<?x?xi8>, %rhs_zp : i32, %acc : tensor<?x?xi32>) -> tensor<?x?xi32> {
     %lhs_zp = arith.constant 0 : i32
     %1 = linalg.quantized_matmul ins(%lhs, %rhs, %lhs_zp, %rhs_zp : tensor<?x?xi8>, tensor<?x?xi8>, i32, i32) outs(%acc : tensor<?x?xi32>) -> tensor<?x?xi32>
     return %1 : tensor<?x?xi32>
@@ -44,7 +44,7 @@ func @quantized_matmul_lhs_zp_0_dynamic(%lhs : tensor<?x?xi8>, %rhs : tensor<?x?
 // CHECK:       return %[[RESULT]]
 // -----
 
-func @quantized_matmul_rhs_zp_0_dynamic(%lhs : tensor<?x?xi8>, %rhs : tensor<?x?xi8>, %lhs_zp : i32, %acc : tensor<?x?xi32>) -> tensor<?x?xi32> {
+func.func @quantized_matmul_rhs_zp_0_dynamic(%lhs : tensor<?x?xi8>, %rhs : tensor<?x?xi8>, %lhs_zp : i32, %acc : tensor<?x?xi32>) -> tensor<?x?xi32> {
     %rhs_zp = arith.constant 0 : i32
     %1 = linalg.quantized_matmul ins(%lhs, %rhs, %lhs_zp, %rhs_zp : tensor<?x?xi8>, tensor<?x?xi8>, i32, i32) outs(%acc : tensor<?x?xi32>) -> tensor<?x?xi32>
     return %1 : tensor<?x?xi32>
@@ -71,7 +71,7 @@ func @quantized_matmul_rhs_zp_0_dynamic(%lhs : tensor<?x?xi8>, %rhs : tensor<?x?
 // CHECK:       return %[[RESULT]]
 // -----
 
-func @quantized_matmul_neither_zp_0_dynamic(%lhs : tensor<?x?xi8>, %rhs : tensor<?x?xi8>, %lhs_zp : i32, %rhs_zp : i32, %acc : tensor<?x?xi32>) -> tensor<?x?xi32> {
+func.func @quantized_matmul_neither_zp_0_dynamic(%lhs : tensor<?x?xi8>, %rhs : tensor<?x?xi8>, %lhs_zp : i32, %rhs_zp : i32, %acc : tensor<?x?xi32>) -> tensor<?x?xi32> {
     %1 = linalg.quantized_matmul ins(%lhs, %rhs, %lhs_zp, %rhs_zp : tensor<?x?xi8>, tensor<?x?xi8>, i32, i32) outs(%acc : tensor<?x?xi32>) -> tensor<?x?xi32>
     return %1 : tensor<?x?xi32>
 }
@@ -110,7 +110,7 @@ func @quantized_matmul_neither_zp_0_dynamic(%lhs : tensor<?x?xi8>, %rhs : tensor
 // CHECK:       return %[[RESULT]]
 // -----
 
-func @quantized_matmul_neither_zp_0_3x4x5(%lhs : tensor<3x4xi8>, %rhs : tensor<4x5xi8>, %lhs_zp : i32, %rhs_zp : i32, %acc : tensor<3x5xi32>) -> tensor<3x5xi32> {
+func.func @quantized_matmul_neither_zp_0_3x4x5(%lhs : tensor<3x4xi8>, %rhs : tensor<4x5xi8>, %lhs_zp : i32, %rhs_zp : i32, %acc : tensor<3x5xi32>) -> tensor<3x5xi32> {
     %1 = linalg.quantized_matmul ins(%lhs, %rhs, %lhs_zp, %rhs_zp : tensor<3x4xi8>, tensor<4x5xi8>, i32, i32) outs(%acc : tensor<3x5xi32>) -> tensor<3x5xi32>
     return %1 : tensor<3x5xi32>
 }

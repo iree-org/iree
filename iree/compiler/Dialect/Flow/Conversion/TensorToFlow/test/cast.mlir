@@ -1,6 +1,6 @@
 // RUN: iree-opt -allow-unregistered-dialect -split-input-file -iree-flow-convert-to-flow %s | FileCheck %s
 
-func @static_tensor_cast_to_dynamic(%arg0: tensor<4x4xf32>) -> tensor<?x?xf32> {
+func.func @static_tensor_cast_to_dynamic(%arg0: tensor<4x4xf32>) -> tensor<?x?xf32> {
   // CHECK-DAG: %[[C4:.*]] = arith.constant 4 : index
   // CHECK-DAG: %[[RESULT:.*]] = flow.tensor.reshape %arg0 : tensor<4x4xf32> -> tensor<?x?xf32>{%[[C4]], %[[C4]]}
   // CHECK: return %[[RESULT]]
@@ -9,7 +9,7 @@ func @static_tensor_cast_to_dynamic(%arg0: tensor<4x4xf32>) -> tensor<?x?xf32> {
 }
 
 // -----
-func @dynamic_tensor_cast_to_static(%arg0: tensor<?xf32>) -> tensor<4xf32> {
+func.func @dynamic_tensor_cast_to_static(%arg0: tensor<?xf32>) -> tensor<4xf32> {
   // CHECK: %[[C4:.*]] = arith.constant 4 : index
   // CHECK: %[[RESULT:.*]] = flow.tensor.reshape %arg0 : tensor<?xf32>{%[[C4]]} -> tensor<4xf32>
   // CHECK: return %[[RESULT]]
@@ -18,7 +18,7 @@ func @dynamic_tensor_cast_to_static(%arg0: tensor<?xf32>) -> tensor<4xf32> {
 }
 
 // -----
-func @dynamic_tensor_cast_to_dynamic(%arg0: tensor<?x?xf32>) -> tensor<?x3xf32> {
+func.func @dynamic_tensor_cast_to_dynamic(%arg0: tensor<?x?xf32>) -> tensor<?x3xf32> {
   // CHECK-DAG: %[[C0:.*]] = arith.constant 0 : index
   // CHECK-DAG: %[[D0:.*]] = tensor.dim %arg0, %[[C0]] : tensor<?x?xf32>
   // CHECK-DAG: %[[C3:.*]] = arith.constant 3 : index
@@ -29,7 +29,7 @@ func @dynamic_tensor_cast_to_dynamic(%arg0: tensor<?x?xf32>) -> tensor<?x3xf32> 
 }
 
 // -----
-func @tensor_cast_within_dispatch_workgroups_not_converted() -> tensor<f32> {
+func.func @tensor_cast_within_dispatch_workgroups_not_converted() -> tensor<f32> {
   %x = arith.constant 100 : index
   %0 = flow.dispatch.workgroups[%x]() : () -> (tensor<f32>) = () {
     // CHECK: = tensor.cast %[[source:.+]] : tensor<4x4xf32> to tensor<?x?xf32>

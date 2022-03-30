@@ -1,7 +1,7 @@
 // RUN: iree-opt -split-input-file %s | iree-opt -split-input-file | FileCheck %s
 
 // CHECK-LABEL: @list_init_ops
-func @list_init_ops() {
+func.func @list_init_ops() {
   // CHECK: %[[CAPACITY:.+]] = arith.constant 5
   %capacity = arith.constant 5 : index
   // CHECK: = util.list.create %[[CAPACITY]] : !util.list<?>
@@ -22,7 +22,7 @@ func @list_init_ops() {
 
 // CHECK-LABEL: @list_access
 // CHECK-SAME: (%[[LIST:.+]]: !util.list<i32>)
-func @list_access(%list: !util.list<i32>) {
+func.func @list_access(%list: !util.list<i32>) {
   %c10 = arith.constant 10 : index
 
   // CHECK: = util.list.get %[[LIST]][%c10] : !util.list<i32>
@@ -42,7 +42,7 @@ func @list_access(%list: !util.list<i32>) {
 
 // CHECK-LABEL: @list_access_tensor
 // CHECK-SAME: (%[[LIST:.+]]: !util.list<tensor<*xf32>>)
-func @list_access_tensor(%list: !util.list<tensor<*xf32>>) {
+func.func @list_access_tensor(%list: !util.list<tensor<*xf32>>) {
   %c10 = arith.constant 10 : index
 
   // CHECK: = util.list.get %[[LIST]][%c10] : !util.list<tensor<*xf32>> -> tensor<?xf32>
@@ -60,7 +60,7 @@ func @list_access_tensor(%list: !util.list<tensor<*xf32>>) {
 
 // CHECK-LABEL: @list_access_variant
 // CHECK-SAME: (%[[LIST:.+]]: !util.list<?>)
-func @list_access_variant(%list: !util.list<?>) {
+func.func @list_access_variant(%list: !util.list<?>) {
   %c10 = arith.constant 10 : index
   %c11 = arith.constant 11 : index
 

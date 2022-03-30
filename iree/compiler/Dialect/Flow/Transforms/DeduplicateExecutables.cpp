@@ -47,12 +47,12 @@ static bool isStructurallyEquivalentTo(Operation &lhs, Operation &rhs,
 // have the same attributes and same use-def structure.
 //
 // Example:
-//   func @lhs(%arg0 : index) -> index {
+//   func.func @lhs(%arg0 : index) -> index {
 //     %c1 = arith.constant 1 : index
 //     %0 = add %arg0, %c1 : index
 //     return %0 : index
 //   }
-//   func @rhs(%arg0 : index) -> index {
+//   func.func @rhs(%arg0 : index) -> index {
 //     %c1 = arith.constant 1 : index
 //     %0 = add %arg0, %c1 : index
 //     return %0 : index

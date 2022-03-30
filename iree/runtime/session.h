@@ -175,7 +175,7 @@ iree_runtime_session_append_bytecode_module_from_file(
 // The function name matches the original MLIR module and function symbols.
 // Example:
 //   module @foo {
-//     func @bar()
+//     func.func @bar()
 //   }
 // The full name of '@bar' is 'foo.bar'.
 // By default modules have the name 'module'.

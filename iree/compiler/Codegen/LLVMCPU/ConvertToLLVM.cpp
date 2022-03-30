@@ -611,7 +611,7 @@ class HALDispatchABI {
 /// Source function:
 ///
 /// ```
-/// func @foo() {
+/// func.func @foo() {
 ///   %0 = hal.interface.binding.subspan ...
 /// }
 /// ```

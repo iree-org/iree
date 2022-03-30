@@ -1,4 +1,4 @@
-func @reverse_dim0() {
+func.func @reverse_dim0() {
   %input = util.unfoldable_constant dense<[[1.0, 2.0, 3.0],
                                            [4.0, 5.0, 6.0]]> : tensor<2x3xf32>
 
@@ -16,7 +16,7 @@ func @reverse_dim0() {
   return
 }
 
-func @reverse_dim1() {
+func.func @reverse_dim1() {
   %input = util.unfoldable_constant dense<[[1, 2, 3],
                                            [4, 5, 6]]> : tensor<2x3xi32>
 
@@ -34,7 +34,7 @@ func @reverse_dim1() {
   return
 }
 
-func @reverse_multi_dims() {
+func.func @reverse_multi_dims() {
   %input = util.unfoldable_constant dense<[[1, 2, 3],
                                            [4, 5, 6]]> : tensor<2x3xi32>
 

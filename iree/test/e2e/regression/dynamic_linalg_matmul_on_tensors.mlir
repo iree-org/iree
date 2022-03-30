@@ -4,7 +4,7 @@
 
 // CHECK: EXEC @main
 // CHECK: 2x4xf32=[1038 1044 1050 1056][1083 1098 1113 1128]
-func @main(%A: tensor<?x?xf32>, %B: tensor<?x?xf32>, %C: tensor<?x?xf32>)
+func.func @main(%A: tensor<?x?xf32>, %B: tensor<?x?xf32>, %C: tensor<?x?xf32>)
   -> tensor<?x?xf32> attributes {iree.module.export}
 {
   %D = linalg.matmul ins(%A, %B: tensor<?x?xf32>, tensor<?x?xf32>)

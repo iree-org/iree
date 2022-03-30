@@ -358,9 +358,9 @@ static void expandInitializerOp(IREE::Util::InitializerOp op,
 // don't need a wait.
 //
 // Example:
-//  func @foo(%0: !stream.resource)
+//  func.func @foo(%0: !stream.resource)
 //  ->
-//  func @foo(%t: !stream.timepoint, %0: !stream.resource) {
+//  func.func @foo(%t: !stream.timepoint, %0: !stream.resource) {
 //    %1 = stream.timepoint.await %t, %0
 static void expandFuncOp(mlir::func::FuncOp op, ExpandedGlobalMap &globalMap,
                          BlockAndValueMapping &resourceTimepointMap) {

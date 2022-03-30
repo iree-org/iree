@@ -166,7 +166,8 @@ static iree_status_t iree_runtime_demo_run_session(
 // per-call and throws them away.
 
 // Sets up and calls the simple_mul function and dumps the results:
-// func @simple_mul(%arg0: tensor<4xf32>, %arg1: tensor<4xf32>) -> tensor<4xf32>
+// func.func @simple_mul(%arg0: tensor<4xf32>, %arg1: tensor<4xf32>) ->
+// tensor<4xf32>
 //
 // NOTE: this is a demo and as such this performs no memoization; a real
 // application could reuse a lot of these structures and cache lookups of

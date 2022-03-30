@@ -4,7 +4,7 @@
 
 // CHECK-LABEL: @partitioning
 // CHECK-SAME: (%[[ARG0:.+]]: !stream.resource<external>, %[[ARG1:.+]]: !stream.resource<external>)
-func @partitioning(%arg0: !stream.resource<external>, %arg1: !stream.resource<external>) -> !stream.resource<external> {
+func.func @partitioning(%arg0: !stream.resource<external>, %arg1: !stream.resource<external>) -> !stream.resource<external> {
   %c1 = arith.constant 1 : index
   %c20 = arith.constant 20 : index
   %c80 = arith.constant 80 : index
@@ -38,7 +38,7 @@ func @partitioning(%arg0: !stream.resource<external>, %arg1: !stream.resource<ex
 // happen in-place on the splat and we expect the execution regions to be tied.
 
 // CHECK-LABEL: @partitionWithinBlocks
-func @partitionWithinBlocks(%cond: i1) -> !stream.resource<transient> {
+func.func @partitionWithinBlocks(%cond: i1) -> !stream.resource<transient> {
   %c1 = arith.constant 1 : index
   %c1280 = arith.constant 1280 : index
   %c255_i32 = arith.constant 255 : i32
@@ -74,7 +74,7 @@ func @partitionWithinBlocks(%cond: i1) -> !stream.resource<transient> {
 // single block and break the assumption that one block == one partition.
 
 // CHECK-LABEL: @deviceHostDevice
-func @deviceHostDevice() -> !stream.resource<transient> {
+func.func @deviceHostDevice() -> !stream.resource<transient> {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %c123_i8 = arith.constant 123 : i8
@@ -108,7 +108,7 @@ func @deviceHostDevice() -> !stream.resource<transient> {
 // Tests that partitioning does not hoist ops across cf.asserts.
 
 // CHECK-LABEL: @dontHoistPastAsserts
-func @dontHoistPastAsserts(%arg0: !stream.resource<external>, %arg1: !stream.resource<external>) -> !stream.resource<external> {
+func.func @dontHoistPastAsserts(%arg0: !stream.resource<external>, %arg1: !stream.resource<external>) -> !stream.resource<external> {
   %c1 = arith.constant 1 : index
   %c20 = arith.constant 20 : index
   %c80 = arith.constant 80 : index
@@ -148,7 +148,7 @@ func @dontHoistPastAsserts(%arg0: !stream.resource<external>, %arg1: !stream.res
 // correct partitions.
 
 // CHECK-LABEL: @cloneAcrossPartitions
-func @cloneAcrossPartitions(%cond: i1) -> (!stream.resource<external>) {
+func.func @cloneAcrossPartitions(%cond: i1) -> (!stream.resource<external>) {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %c123_i8 = arith.constant 123 : i8
@@ -188,7 +188,7 @@ func @cloneAcrossPartitions(%cond: i1) -> (!stream.resource<external>) {
 // tracking both the host and device hazards correctly.
 
 // CHECK-LABEL: @deviceHostDeviceCrossing
-func @deviceHostDeviceCrossing(%arg0: i1) -> !stream.resource<transient> {
+func.func @deviceHostDeviceCrossing(%arg0: i1) -> !stream.resource<transient> {
   %c1 = arith.constant 1 : index
   %c128 = arith.constant 128 : index
   %c255_i32 = arith.constant 255 : i32

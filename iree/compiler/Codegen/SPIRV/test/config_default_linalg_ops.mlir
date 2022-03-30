@@ -106,7 +106,7 @@ hal.executable @avg_pool {
     }> {
     hal.executable.entry_point public @avg_pool layout(#executable_layout)
     builtin.module {
-      func @avg_pool() {
+      func.func @avg_pool() {
         %c0 = arith.constant 0 : index
         %cst = arith.constant 0.000000e+00 : f32
         %c2 = arith.constant 2 : index
@@ -156,7 +156,7 @@ hal.executable @max_pool {
     }> {
     hal.executable.entry_point public @max_pool layout(#executable_layout)
     builtin.module  {
-      func @max_pool() {
+      func.func @max_pool() {
         %cst = arith.constant 0xFF800000 : f32
         %c38 = arith.constant 38 : index
         %c1 = arith.constant 1 : index
@@ -210,7 +210,7 @@ hal.executable @elementwise {
     }> {
     hal.executable.entry_point public @elementwise layout(#executable_layout)
     builtin.module {
-      func @elementwise() {
+      func.func @elementwise() {
         %c0 = arith.constant 0 : index
         %c1 = arith.constant 1 : index
         %c10 = arith.constant 10 : index
@@ -263,7 +263,7 @@ hal.executable @dwconv_elementwise {
     }> {
     hal.executable.entry_point public @dwconv_elementwise layout(#executable_layout)
     builtin.module  {
-      func @dwconv_elementwise() {
+      func.func @dwconv_elementwise() {
         %cst = arith.constant opaque<"_", "0xDEADBEEF"> : tensor<3x3x1x4xf32>
         %cst_8 = arith.constant 1.001000e+00 : f32
         %cst_9 = arith.constant 0.000000e+00 : f32

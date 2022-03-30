@@ -70,7 +70,8 @@ void setTranslationInfo(IREE::HAL::ExecutableEntryPointOp entryPointOp,
                         IREE::Codegen::TranslationInfoAttr translationInfo,
                         ArrayRef<int64_t> workgroupSize = {});
 inline void setTranslationInfo(
-    FuncOp entryPointFn, IREE::Codegen::TranslationInfoAttr translationInfo,
+    func::FuncOp entryPointFn,
+    IREE::Codegen::TranslationInfoAttr translationInfo,
     ArrayRef<int64_t> workgroupSize = {}) {
   auto entryPointOp = getEntryPoint(entryPointFn);
   return setTranslationInfo(entryPointOp, translationInfo, workgroupSize);

@@ -69,7 +69,7 @@ class BenchmarkBatchDispatchesPass
 
 }  // namespace
 
-std::unique_ptr<OperationPass<FuncOp>> createBenchmarkBatchDispatchesPass(
+std::unique_ptr<OperationPass<func::FuncOp>> createBenchmarkBatchDispatchesPass(
     unsigned repeatCount) {
   return std::make_unique<BenchmarkBatchDispatchesPass>(repeatCount);
 }

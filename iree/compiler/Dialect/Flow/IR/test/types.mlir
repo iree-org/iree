@@ -1,7 +1,7 @@
 // RUN: iree-opt -split-input-file %s | iree-opt -split-input-file | FileCheck %s
 
 // CHECK-LABEL: @dispatchTypes
-func @dispatchTypes(
+func.func @dispatchTypes(
     // CHECK-SAME: %arg0: !flow.dispatch.tensor<readonly:f32>
     %arg0: !flow.dispatch.tensor<readonly:f32>,
     // CHECK-SAME: %arg1: !flow.dispatch.tensor<readonly:4x4xf32>

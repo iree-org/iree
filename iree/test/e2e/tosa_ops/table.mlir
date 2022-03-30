@@ -1,4 +1,4 @@
-func @table() {
+func.func @table() {
   %input = arith.constant dense<[-5405, 15214, -14896, 22008, 12529, -13501]> : tensor<6xi16>
 
   // This generates [0, ... 512] for a constant value to avoid an excessively large constant.

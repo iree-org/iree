@@ -1,6 +1,6 @@
 // RUN: iree-opt -split-input-file -iree-flow-pad-linalg-ops %s | FileCheck %s
 
-func @matmul_f32_11x13x17(%lhs: tensor<11x17xf32>, %rhs: tensor<17x13xf32>, %init: tensor<11x13xf32>) -> tensor<11x13xf32> {
+func.func @matmul_f32_11x13x17(%lhs: tensor<11x17xf32>, %rhs: tensor<17x13xf32>, %init: tensor<11x13xf32>) -> tensor<11x13xf32> {
     %result = linalg.matmul ins(%lhs, %rhs : tensor<11x17xf32>, tensor<17x13xf32>) outs(%init : tensor<11x13xf32>) -> tensor<11x13xf32>
     return %result : tensor<11x13xf32>
 }
@@ -19,7 +19,7 @@ func @matmul_f32_11x13x17(%lhs: tensor<11x17xf32>, %rhs: tensor<17x13xf32>, %ini
 
 // -----
 
-func @matmul_f32_12x12x17(%lhs: tensor<12x17xf32>, %rhs: tensor<17x12xf32>, %init: tensor<12x12xf32>) -> tensor<12x12xf32> {
+func.func @matmul_f32_12x12x17(%lhs: tensor<12x17xf32>, %rhs: tensor<17x12xf32>, %init: tensor<12x12xf32>) -> tensor<12x12xf32> {
     %result = linalg.matmul ins(%lhs, %rhs : tensor<12x17xf32>, tensor<17x12xf32>) outs(%init : tensor<12x12xf32>) -> tensor<12x12xf32>
     return %result : tensor<12x12xf32>
 }
@@ -37,7 +37,7 @@ func @matmul_f32_12x12x17(%lhs: tensor<12x17xf32>, %rhs: tensor<17x12xf32>, %ini
 
 // -----
 
-func @matmul_i8_i8_i32_2x2x4(%lhs: tensor<2x4xi8>, %rhs: tensor<4x2xi8>, %dst: tensor<2x2xi32>) -> tensor<2x2xi32> {
+func.func @matmul_i8_i8_i32_2x2x4(%lhs: tensor<2x4xi8>, %rhs: tensor<4x2xi8>, %dst: tensor<2x2xi32>) -> tensor<2x2xi32> {
     %result = linalg.matmul ins(%lhs, %rhs : tensor<2x4xi8>, tensor<4x2xi8>) outs(%dst: tensor<2x2xi32>) -> tensor<2x2xi32>
     return %result : tensor<2x2xi32>
 }

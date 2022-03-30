@@ -16,7 +16,7 @@ hal.executable private @matmul_tensors {
       workgroup_size = [32 : index, 8 : index, 8 : index]
     }
     builtin.module {
-      func @illegal() {
+      func.func @illegal() {
         %c0 = arith.constant 0 : index
         %lhs = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<4x8xf32>
         %rhs = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<8x16xf32>
@@ -48,7 +48,7 @@ hal.executable private @matmul_tensors {
       workgroup_size = [32 : index, 8 : index, 2 : index]
     }
     builtin.module {
-      func @illegal() {
+      func.func @illegal() {
         %c0 = arith.constant 0 : index
         %lhs = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<4x8xf32>
         %rhs = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<8x16xf32>
@@ -80,7 +80,7 @@ hal.executable private @matmul_tensors {
       workgroup_size = [64 : index, 2 : index, 10 : index]
     }
     builtin.module {
-      func @illegal() {
+      func.func @illegal() {
         %c0 = arith.constant 0 : index
         %lhs = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<32x16xf32>
         %rhs = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<16x32xf32>
@@ -112,7 +112,7 @@ hal.executable private @matmul_tensors {
       workgroup_size = [48 : index, 2 : index, 1 : index]
     }
     builtin.module {
-      func @illegal() {
+      func.func @illegal() {
         %c0 = arith.constant 0 : index
         %lhs = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<32x16xf32>
         %rhs = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<16x32xf32>
@@ -144,7 +144,7 @@ hal.executable private @matmul_tensors {
       workgroup_size = [64 : index, 2 : index, 2 : index]
     }
     builtin.module {
-      func @illegal() {
+      func.func @illegal() {
         %c0 = arith.constant 0 : index
         %lhs = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<32x16xf32>
         %rhs = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<16x32xf32>
@@ -176,7 +176,7 @@ hal.executable private @matmul_tensors {
       workgroup_size = [64 : index, 2 : index, 1 : index]
     }
     builtin.module {
-      func @illegal() {
+      func.func @illegal() {
         %c0 = arith.constant 0 : index
         %lhs = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<32x16xf32>
         %rhs = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<16x32xf32>
@@ -208,7 +208,7 @@ hal.executable private @matmul_tensors {
       workgroup_size = [128 : index, 1 : index, 1 : index]
     }
     builtin.module {
-      func @illegal() {
+      func.func @illegal() {
         %c0 = arith.constant 0 : index
         %lhs = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<1024x512xf32>
         %rhs = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<512x256xf32>
@@ -240,7 +240,7 @@ hal.executable private @matmul_tensors {
       workgroup_size = [64 : index, 2 : index, 1 : index]
     }
     builtin.module {
-      func @illegal() {
+      func.func @illegal() {
         %c0 = arith.constant 0 : index
         %lhs = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<48x16xf32>
         %rhs = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<16x32xf32>
@@ -272,7 +272,7 @@ hal.executable private @matmul_tensors {
       workgroup_size = [64 : index, 2 : index, 1 : index]
     }
     builtin.module {
-      func @illegal() {
+      func.func @illegal() {
         %c0 = arith.constant 0 : index
         %lhs = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<32x16xf32>
         %rhs = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<16x48xf32>
@@ -305,7 +305,7 @@ hal.executable private @batch_matmul_func  {
       workgroup_size = [64 : index, 2 : index, 1 : index]
     }
 builtin.module {
-  func @illegal() {
+  func.func @illegal() {
     %c0 = arith.constant 0 : index
     %cst = arith.constant 0.000000e+00 : f32
     %c4 = arith.constant 4 : index

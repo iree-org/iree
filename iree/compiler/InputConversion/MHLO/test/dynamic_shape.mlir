@@ -1,6 +1,6 @@
 // RUN: iree-opt -split-input-file -iree-mhlo-to-linalg-on-tensors %s | FileCheck %s
 
-func @dynamic_shape(%operand: tensor<?x?xf32>) -> (tensor<?x?xf32>)
+func.func @dynamic_shape(%operand: tensor<?x?xf32>) -> (tensor<?x?xf32>)
 attributes {iree.dispatch_fn_name = ""} {
   %result = "mhlo.exponential"(%operand) : (tensor<?x?xf32>) -> tensor<?x?xf32>
   return %result : tensor<?x?xf32>

@@ -3,7 +3,7 @@
 // CHECK-LABEL: @parse_print_do_not_optimize
 // CHECK-SAME: %[[ARG0:[a-zA-Z0-9$._-]+]]
 // CHECK-SAME: %[[ARG1:[a-zA-Z0-9$._-]+]]
-func @parse_print_do_not_optimize(%arg0 : tensor<i32>, %arg1 : tensor<i32>) {
+func.func @parse_print_do_not_optimize(%arg0 : tensor<i32>, %arg1 : tensor<i32>) {
   // CHECK-NEXT: util.do_not_optimize(%[[ARG0]]) : tensor<i32>
   %1 = util.do_not_optimize(%arg0) : tensor<i32>
 
@@ -19,7 +19,7 @@ func @parse_print_do_not_optimize(%arg0 : tensor<i32>, %arg1 : tensor<i32>) {
 // -----
 
 // CHECK-LABEL: @parse_print_unfoldable_constant
-func @parse_print_unfoldable_constant(%arg0 : tensor<i32>, %arg1 : tensor<i32>) {
+func.func @parse_print_unfoldable_constant(%arg0 : tensor<i32>, %arg1 : tensor<i32>) {
   // CHECK-NEXT: util.unfoldable_constant 42
   %c42 = util.unfoldable_constant 42 : i32
 

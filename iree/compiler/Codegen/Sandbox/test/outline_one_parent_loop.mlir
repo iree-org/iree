@@ -3,7 +3,7 @@
 
 // CHECK-LABEL: func @foo
 // CHECK-LABEL: func @test
-func @test(%ub: index, %it: index) -> index {
+func.func @test(%ub: index, %it: index) -> index {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %res = scf.for %i = %c0 to %ub step %c1 iter_args(%bbit = %it) -> (index) {
@@ -14,7 +14,7 @@ func @test(%ub: index, %it: index) -> index {
 
 // MATMUL-LABEL: func @bar
 // MATMUL-LABEL: func @matmul
-func @matmul(%arg0: tensor<24x48xf32> {linalg.buffer_layout = affine_map<(d0, d1) -> (d0, d1)>, linalg.inplaceable = false}, %arg1: tensor<48x32xf32> {linalg.buffer_layout = affine_map<(d0, d1) -> (d0, d1)>, linalg.inplaceable = false}, %arg2: tensor<24x32xf32> {linalg.buffer_layout = affine_map<(d0, d1) -> (d0, d1)>, linalg.inplaceable = true}) -> tensor<24x32xf32> attributes {passthrough = ["noinline", ["target-cpu", "skylake-avx512"], ["prefer-vector-width", "512"]]} {
+func.func @matmul(%arg0: tensor<24x48xf32> {linalg.buffer_layout = affine_map<(d0, d1) -> (d0, d1)>, linalg.inplaceable = false}, %arg1: tensor<48x32xf32> {linalg.buffer_layout = affine_map<(d0, d1) -> (d0, d1)>, linalg.inplaceable = false}, %arg2: tensor<24x32xf32> {linalg.buffer_layout = affine_map<(d0, d1) -> (d0, d1)>, linalg.inplaceable = true}) -> tensor<24x32xf32> attributes {passthrough = ["noinline", ["target-cpu", "skylake-avx512"], ["prefer-vector-width", "512"]]} {
   %c0 = arith.constant 0 : index
   %c32 = arith.constant 32 : index
   %c24 = arith.constant 24 : index
@@ -94,8 +94,8 @@ func @matmul(%arg0: tensor<24x48xf32> {linalg.buffer_layout = affine_map<(d0, d1
   }
   return %4 : tensor<24x32xf32>
 }
-func private @nano_time() -> i64 attributes {llvm.emit_c_interface}
-func public @main(%arg0: tensor<24x48xf32> {linalg.buffer_layout = affine_map<(d0, d1) -> (d0, d1)>, linalg.inplaceable = false}, %arg1: tensor<48x32xf32> {linalg.buffer_layout = affine_map<(d0, d1) -> (d0, d1)>, linalg.inplaceable = false}, %arg2: tensor<24x32xf32> {linalg.buffer_layout = affine_map<(d0, d1) -> (d0, d1)>, linalg.inplaceable = true}, %arg3: memref<?xi64>) -> tensor<24x32xf32> attributes {llvm.emit_c_interface} {
+func.func private @nano_time() -> i64 attributes {llvm.emit_c_interface}
+func.func public @main(%arg0: tensor<24x48xf32> {linalg.buffer_layout = affine_map<(d0, d1) -> (d0, d1)>, linalg.inplaceable = false}, %arg1: tensor<48x32xf32> {linalg.buffer_layout = affine_map<(d0, d1) -> (d0, d1)>, linalg.inplaceable = false}, %arg2: tensor<24x32xf32> {linalg.buffer_layout = affine_map<(d0, d1) -> (d0, d1)>, linalg.inplaceable = true}, %arg3: memref<?xi64>) -> tensor<24x32xf32> attributes {llvm.emit_c_interface} {
   %c1 = arith.constant 1 : index
   %c0 = arith.constant 0 : index
   %0 = memref.dim %arg3, %c0 : memref<?xi64>

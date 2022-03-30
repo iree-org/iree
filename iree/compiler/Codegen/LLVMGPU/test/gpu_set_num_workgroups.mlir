@@ -11,7 +11,7 @@ hal.executable @add_dispatch_0 {
   hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
   hal.executable.entry_point @add_dispatch_0 layout(#executable_layout)
   builtin.module {
-    func @add_dispatch_0() {
+    func.func @add_dispatch_0() {
       %c0 = arith.constant 0 : index
       %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<readonly:16384xf32>
       %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : !flow.dispatch.tensor<readonly:16384xf32>
@@ -53,7 +53,7 @@ hal.executable private @dot_dispatch_1  {
   hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
     hal.executable.entry_point @dot_dispatch_1 layout(#executable_layout)
     builtin.module {
-      func @dot_dispatch_1() {
+      func.func @dot_dispatch_1() {
         %c0 = arith.constant 0 : index
         %c4 = arith.constant 4 : index
         %c2 = arith.constant 2 : index
@@ -92,7 +92,7 @@ hal.executable @reduction_dispatch {
   hal.executable.variant @cuda, target = <"cuda", "cuda-nvptx-fb"> {
     hal.executable.entry_point @predict_dispatch_153 layout(#executable_layout)
     builtin.module {
-      func @predict_dispatch_153() {
+      func.func @predict_dispatch_153() {
         %c0 = arith.constant 0 : index
         %cst = arith.constant 0x7FC00000 : f32
         %cst_0 = arith.constant 0xFF800000 : f32
@@ -133,7 +133,7 @@ hal.executable private @reduction_aligned2 {
   hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb"> {
     hal.executable.entry_point public @reduction_aligned2 ordinal(0) layout(#executable_layout)
     builtin.module {
-      func @reduction_aligned2() {
+      func.func @reduction_aligned2() {
         %cst = arith.constant 0.000000e+00 : f32
         %c0 = arith.constant 0 : index
         %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:4x128x384xf32>
@@ -296,7 +296,7 @@ hal.executable @user_config {
 hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb"> {
   hal.executable.entry_point public @_lowering_config_test_dispatch_1 layout(#executable_layout)
   builtin.module {
-    func @_lowering_config_test_dispatch_1() {
+    func.func @_lowering_config_test_dispatch_1() {
       %cst = arith.constant 0.000000e+00 : f32
       %c128 = arith.constant 128 : index
       %c1024 = arith.constant 1024 : index
@@ -343,7 +343,7 @@ hal.executable private @sort_op {
   hal.executable.variant public @cuda_nvptx_fb, target = <"cuda", "cuda-nvptx-fb", {target_arch = "sm_35"}> {
     hal.executable.entry_point public @sort_op layout(#executable_layout)
     builtin.module {
-      func @sort_op() {
+      func.func @sort_op() {
         %c1 = arith.constant 1 : index
         %c0 = arith.constant 0 : index
         %c2304000 = arith.constant 2304000 : index

@@ -1,4 +1,4 @@
-func @dynamic_dot() {
+func.func @dynamic_dot() {
   %lhs = flow.tensor.constant dense<[
     [15.0, 14.0, 13.0],
     [12.0, 11.0, 10.0],

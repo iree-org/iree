@@ -46,10 +46,10 @@ enum EntryArgOrdinals {
 /// workgroup ID. The runtime will provide these values during invocation.
 ///
 /// Source:
-///   func @entry()
+///   func.func @entry()
 ///
 /// Target:
-///   func @entry(
+///   func.func @entry(
 ///       %local_memory: !vmvx.buffer,
 ///       %constants: !vmvx.buffer,
 ///       %bindings: !util.list<!vmvx.buffer>,
