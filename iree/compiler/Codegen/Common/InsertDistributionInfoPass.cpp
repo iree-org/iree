@@ -41,7 +41,10 @@ static SmallVector<int64_t> getWorkloadPerWorkgroup(
   } else {
     tileSizes.resize(tileConfig.tileSizes.size());
     for (auto en : llvm::enumerate(tileConfig.interchange)) {
-      tileSizes[en.index()] = tileConfig.tileSizes[en.value()];
+      // The check is needed because only the distributable dims are set.
+      if (en.value() < tileConfig.tileSizes.size()) {
+        tileSizes[en.index()] = tileConfig.tileSizes[en.value()];
+      }
     }
   }
   SmallVector<int64_t> nonZeroTileSizes;
