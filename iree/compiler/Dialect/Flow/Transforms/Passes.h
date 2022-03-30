@@ -101,12 +101,10 @@ std::unique_ptr<Pass> createInferNumericNarrowingPass();
 // the most inner loops.
 std::unique_ptr<Pass> createInterchangeGenericOpsPass();
 
-// Convert operations to equivalent flow ops before dispatch region creation.
-std::unique_ptr<Pass> createConvertToFlowBeforeDispatchFormation();
-
-// Convert remaining operations that were left outside of dispatch regions to
-// equivalent flow ops.
-std::unique_ptr<Pass> createConvertToFlowAfterDispatchFormation();
+// Create a pass to convert operations to `flow` ops. This pass is currently
+// only used for testing, since the conversion to Flow ops happens within
+// dispatch region formation.
+std::unique_ptr<Pass> createConvertToFlowPass();
 
 // Optimizes numerics given annotations added via
 // iree-flow-infer-numeric-narrowing.

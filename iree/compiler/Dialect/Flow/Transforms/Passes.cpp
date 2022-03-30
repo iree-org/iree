@@ -173,7 +173,6 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
       .addPass(createFusionOfTensorOpsPass)
       .addPredicatedPass(clEnableLinalgDetensorize,
                          mlir::createLinalgDetensorizePass)
-
       .addPass(mlir::createCanonicalizerPass)
       .addPass(mlir::createCSEPass)
 
@@ -184,21 +183,10 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
       .addPass(createInterchangeGenericOpsPass)
 
       // Dispatch region formation.
-      // TODO(ravishankarm): Fold ConvertToFlowBefore/ConvertToFlowAfter into
-      // dispatch region formation pass.
-      .addPass(createConvertToFlowBeforeDispatchFormation)
-      .addPass(mlir::createCanonicalizerPass)
-      .addPass(mlir::createCSEPass)
       .addPass(createDispatchLinalgOnTensorsPass)
       .addPass(createCaptureDispatchDynamicDimsPass)
       .addPass(mlir::createCanonicalizerPass)
-      .addPass(createCSEPass)
-
-      // Convert remaining ops to Flow ops, after this stage no Linalg ops
-      // should remain.
-      .addPass(createConvertToFlowAfterDispatchFormation)
-      .addPass(mlir::createCanonicalizerPass)
-      .addPass(mlir::createCSEPass);
+      .addPass(createCSEPass);
 
   // Module pass to outline the dispatch regions into their own functions
   // wrapped in executables.

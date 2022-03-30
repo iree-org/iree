@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -verify-diagnostics -pass-pipeline="func.func(iree-flow-dispatch-linalg-on-tensors-pass, resolve-shaped-type-result-dims, cse, canonicalize, cse)" %s | FileCheck %s
+// RUN: iree-opt -split-input-file -verify-diagnostics -pass-pipeline="func.func(iree-flow-dispatch-linalg-on-tensors-pass), cse, canonicalize, cse" %s | FileCheck %s
 
 func @tile_matmul_alone(%arg0 : tensor<?x?xf32>, %arg1 : tensor<?x?xf32>,
              %arg2 : tensor<?x?xf32>) -> tensor<?x?xf32> {
@@ -37,7 +37,7 @@ func @tile_matmul_alone(%arg0 : tensor<?x?xf32>, %arg1 : tensor<?x?xf32>,
 // CHECK-SAME:         ins(%[[LHS]], %[[RHS]] :
 // CHECK-SAME:         outs(%[[OUT]] :
 //      CHECK:     flow.dispatch.tensor.store %[[GEMM]], %[[ARG9]]
-// CHECK-SAME:         offsets = [0, 0], sizes = [%[[ARG10]], %[[ARG11]]], strides = [1, 1]
+// CHECK-SAME:         offsets = [0, 0], sizes = [%[[ARG4]], %[[ARG8]]], strides = [1, 1]
 
 // -----
 
@@ -105,11 +105,12 @@ func @fuse_matmul_with_fill(%A : tensor<?x?xf32>, %B : tensor<?x?xf32>) -> tenso
 //   CHECK-DAG:     %[[ARG1_DIM0:.+]] = tensor.dim %[[ARG1]], %[[C0]]
 //   CHECK-DAG:     %[[ARG1_DIM1:.+]] = tensor.dim %[[ARG1]], %[[C1]]
 //  CHECK-NEXT:     flow.dispatch.workgroups[%[[ARG1_DIM1]], %[[ARG0_DIM0]], %[[C1]]]
-//  CHECK-SAME:       (%[[ARG0]], %[[ARG0_DIM0]], %[[ARG0_DIM1]], %[[ARG1]], %[[ARG1_DIM0]], %[[ARG1_DIM1]])
-//  CHECK-NEXT:       (%[[ARG0_CAPTURE:[a-zA-Z0-9_]+]]: !flow.dispatch.tensor<readonly:?x?xf32>,
-//  CHECK-SAME:        %[[ARG0_DIM0_CAPTURE:[a-zA-Z0-9_]+]]: index, %[[ARG0_DIM1_CAPTURE:[a-zA-Z0-9_]+]]: index,
+//  CHECK-SAME:       (%[[ARG0_DIM0]], %[[ARG1_DIM1]], %[[ARG0]], %[[ARG0_DIM1]], %[[ARG1]], %[[ARG1_DIM0]])
+//  CHECK-NEXT:       (%[[ARG0_DIM0_CAPTURE:[a-zA-Z0-9_]+]]: index, %[[ARG1_DIM1_CAPTURE:[a-zA-Z0-9_]+]]: index,
+//  CHECK-SAME:        %[[ARG0_CAPTURE:[a-zA-Z0-9_]+]]: !flow.dispatch.tensor<readonly:?x?xf32>,
+//  CHECK-SAME:        %[[ARG0_DIM1_CAPTURE:[a-zA-Z0-9_]+]]: index,
 //  CHECK-SAME:        %[[ARG1_CAPTURE:[a-zA-Z0-9_]+]]: !flow.dispatch.tensor<readonly:?x?xf32>,
-//  CHECK-SAME:        %[[ARG1_DIM0_CAPTURE:[a-zA-Z0-9_]+]]: index, %[[ARG1_DIM1_CAPTURE:[a-zA-Z0-9_]+]]: index,
+//  CHECK-SAME:        %[[ARG1_DIM0_CAPTURE:[a-zA-Z0-9_]+]]: index
 //  CHECK-SAME:        %[[RET0_CAPTURE:[a-zA-Z0-9_]+]]: !flow.dispatch.tensor<writeonly:?x?xf32>) {
 //       CHECK:        %[[ZERO:.+]] = arith.constant 0.000000e+00 : f32
 //   CHECK-DAG:        %[[LHS:.+]] = flow.dispatch.tensor.load %[[ARG0_CAPTURE]], {{.*}} : !flow.dispatch.tensor<readonly:?x?xf32>{%[[ARG0_DIM0_CAPTURE]], %[[ARG0_DIM1_CAPTURE]]}
@@ -222,15 +223,14 @@ func @tile_4d_generic_op_alone
 
 // -----
 
-func @always_fuse_reshape
-  (%lhs : tensor<?xf32>, %rhs1 : tensor<4x?xf32>, %rhs2 : tensor<4x?xf32>)
+func @always_fuse_cast
+  (%lhs : tensor<?x?xf32>, %rhs1 : tensor<4x?xf32>, %rhs2 : tensor<4x?xf32>)
   -> (tensor<?x?xf32>, tensor<?x?xf32>)
 {
   %cst = arith.constant 0.0 : f32
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
-  %0 = tensor.expand_shape %lhs [[0, 1]]
-    : tensor<?xf32> into tensor<?x4xf32>
+  %0 = tensor.cast %lhs : tensor<?x?xf32> to tensor<?x4xf32>
   %m = tensor.dim %0, %c0 : tensor<?x4xf32>
   %n1 = tensor.dim %rhs1, %c1 : tensor<4x?xf32>
   %init1 = linalg.init_tensor [%m, %n1] : tensor<?x?xf32>
@@ -247,21 +247,24 @@ func @always_fuse_reshape
   return %1, %2 : tensor<?x?xf32>, tensor<?x?xf32>
 }
 
-//  CHECK-DAG: #[[MAP:.+]] = affine_map<()[s0] -> (s0 floordiv 4)>
-//      CHECK: func @always_fuse_reshape(
-// CHECK-SAME:   %[[ARG0:[a-zA-Z0-9_]+]]: tensor<?xf32>
+//      CHECK: func @always_fuse_cast(
+// CHECK-SAME:   %[[ARG0:[a-zA-Z0-9_]+]]: tensor<?x?xf32>
 // CHECK-SAME:   %[[RHS1:[a-zA-Z0-9_]+]]: tensor<4x?xf32>
 // CHECK-SAME:   %[[RHS2:[a-zA-Z0-9_]+]]: tensor<4x?xf32>
 //  CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
 //  CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
-//      CHECK:   %[[D0:.+]] = tensor.dim %[[ARG0]], %[[C0]]
-//  CHECK-DAG:   %[[M:.+]] = affine.apply #[[MAP]]()[%[[D0]]]
+//      CHECK:   %[[M:.+]] = tensor.dim %[[ARG0]], %[[C0]]
 //  CHECK-DAG:   %[[N1:.+]] = tensor.dim %[[ARG1]], %[[C1]]
+//  CHECK-DAG:   %[[K:.+]] = tensor.dim %[[ARG0]], %[[C1]]
 //      CHECK:   %[[RESULT1:.+]] = flow.dispatch.workgroups[%[[N1]], %[[M]], %[[C1]]]
-// CHECK-SAME:     (%[[ARG0]], %[[D0]], %[[RHS1]], %[[N1]], %[[M]])
+// CHECK-SAME:     (%[[M]], %[[N1]], %[[ARG0]], %[[K]], %[[RHS1]])
+//      CHECK:     tensor.cast
+//      CHECK:     flow.return
 //      CHECK:   %[[N2:.+]] = tensor.dim %[[RHS2]], %[[C1]]
 //      CHECK:   %[[RESULT2:.+]] = flow.dispatch.workgroups[%[[N2]], %[[M]], %[[C1]]]
-// CHECK-SAME:     (%[[ARG0]], %[[D0]], %[[RHS2]], %[[N2]], %[[M]])
+// CHECK-SAME:     (%[[M]], %[[N2]], %[[ARG0]], %[[K]], %[[RHS2]])
+//      CHECK:     tensor.cast
+//      CHECK:     flow.return
 //      CHECK:   return %[[RESULT1]], %[[RESULT2]]
 
 // -----
@@ -285,8 +288,8 @@ func @dont_fuse_tensor_update_with_fill(
 }
 
 // CHECK: func @dont_fuse_tensor_update_with_fill
-// CHECK:   linalg.fill
-// CHECK:   flow.tensor.update
+// CHECK:   %[[SPLAT:.+]] = flow.tensor.splat
+// CHECK:   flow.tensor.update %{{.+}}, %[[SPLAT]]
 
 // -----
 
@@ -358,10 +361,11 @@ func @keep_original_producer_uses(%A: tensor<?x?xf32>, %B: tensor<?x?xf32>, %C: 
 //      CHECK:   %[[STOREVAL:.+]] = linalg.generic
 // CHECK-SAME:     outs(%[[LOAD]] : tensor<?x?xf32>)
 //      CHECK:   flow.dispatch.tensor.store %[[STOREVAL]], %[[ARG2_CAPTURE]], {{.*}}
+//      CHECK:   flow.return
 //  CHECK-NOT: linalg.generic
 //      CHECK: %[[D:.*]] = flow.dispatch.workgroups
-//      CHECK:     %[[CC:.*]] = linalg.generic
-//      CHECK:     linalg.matmul{{.*}} outs(%[[CC]]
+//      CHECK:     linalg.matmul
+//      CHECK:     flow.return
 //      CHECK: return %[[D]], %[[origCC]]
 
 // -----
@@ -487,26 +491,26 @@ func @fuse_non_tiled_reduction_fill(%input1: tensor<1000xf32>, %input2: tensor<1
 
 // -----
 
-#map0 = affine_map<(d0) -> ()>
-#map1 = affine_map<(d0) -> (d0)>
+#map0 = affine_map<(d0, d1) -> ()>
+#map1 = affine_map<(d0, d1) -> (d0, d1)>
 func @inline_dag_1(
-    %arg0: tensor<?xf32>, %arg1 : tensor<1x?xf32>, %arg2 : tensor<i32>,
-    %arg3 : index) -> tensor<?xf32> {
-  %0 = tensor.expand_shape %arg0 [[0, 1]] : tensor<?xf32> into tensor<1x?xf32>
+    %arg0: tensor<?x?xf32>, %arg1 : tensor<?x?xf32>, %arg2 : tensor<i32>,
+    %arg3 : index) -> tensor<1x?xf32> {
+  %0 = tensor.cast %arg0 : tensor<?x?xf32> to tensor<1x?xf32>
   %1 = tensor.extract_slice %0[0, 20] [1, %arg3] [1, 1] : tensor<1x?xf32> to tensor<1x?xf32>
-  %2 = tensor.collapse_shape %1 [[0, 1]] : tensor<1x?xf32> into tensor<?xf32>
-  %3 = tensor.collapse_shape %arg1 [[0, 1]] : tensor<1x?xf32> into tensor<?xf32>
+  %2 = tensor.cast %1 : tensor<1x?xf32> to tensor<?x?xf32>
+  %3 = tensor.cast %arg1 : tensor<?x?xf32> to tensor<1x?xf32>
   %4 = tensor.extract_slice %0[0, 10] [1, %arg3] [1, 1] : tensor<1x?xf32> to tensor<1x?xf32>
-  %5 = tensor.collapse_shape %4 [[0, 1]] : tensor<1x?xf32> into tensor<?xf32>
+  %5 = tensor.cast %4  : tensor<1x?xf32> to tensor<?x?xf32>
   %6 = tensor.extract_slice %0[0, 0] [1, %arg3] [1, 1] : tensor<1x?xf32> to tensor<1x?xf32>
-  %7 = tensor.collapse_shape %6 [[0, 1]] : tensor<1x?xf32> into tensor<?xf32>
-  %8 = linalg.init_tensor [%arg3] : tensor<?xf32>
+  %7 = tensor.cast %6 : tensor<1x?xf32> to tensor<?x?xf32>
+  %8 = linalg.init_tensor [1, %arg3] : tensor<1x?xf32>
   %9 = linalg.generic {
       indexing_maps = [#map0, #map1, #map1, #map1, #map1, #map1],
-      iterator_types = ["parallel"]}
-      ins(%arg2, %2, %3, %5, %7 : tensor<i32>, tensor<?xf32>,
-          tensor<?xf32>, tensor<?xf32>, tensor<?xf32>)
-      outs(%8 : tensor<?xf32>) {
+      iterator_types = ["parallel", "parallel"]}
+      ins(%arg2, %2, %3, %5, %7 : tensor<i32>, tensor<?x?xf32>,
+          tensor<1x?xf32>, tensor<?x?xf32>, tensor<?x?xf32>)
+      outs(%8 : tensor<1x?xf32>) {
       ^bb0(%arg4: i32, %arg5: f32, %arg6: f32, %arg7: f32, %arg8: f32, %arg9: f32):
         %10 = arith.addf %arg5, %arg6 : f32
         %11 = arith.addf %arg7, %arg8 : f32
@@ -514,53 +518,59 @@ func @inline_dag_1(
         %13 = arith.sitofp %arg4 : i32 to f32
         %14 = arith.addf %12, %13 : f32
         linalg.yield %14 : f32
-      } -> tensor<?xf32>
-  return %9 : tensor<?xf32>
+      } -> tensor<1x?xf32>
+  return %9 : tensor<1x?xf32>
 }
 // CHECK-LABEL: func @inline_dag_1
 //   CHECK-NOT:   linalg.
 //   CHECK-NOT:   tensor.extract_slice
 //       CHECK:   flow.dispatch.workgroups
 //  CHECK-NEXT:     %[[ARG4:[a-zA-Z0-9_]+]]: !flow.dispatch.tensor<readonly:i32>
-//  CHECK-SAME:     %[[ARG5:[a-zA-Z0-9_]+]]: !flow.dispatch.tensor<readonly:1x?xf32>
+//  CHECK-SAME:     %[[ARG5:[a-zA-Z0-9_]+]]: !flow.dispatch.tensor<readonly:?x?xf32>
 //  CHECK-SAME:     %[[ARG6:[a-zA-Z0-9_]+]]: index
-//  CHECK-SAME:     %[[ARG7:[a-zA-Z0-9_]+]]: !flow.dispatch.tensor<readonly:?xf32>
-//       CHECK:     %[[LEAF1:.+]] = flow.dispatch.tensor.load %[[ARG4]], {{.*}}
-//       CHECK:     %[[LEAF2:.+]] = flow.dispatch.tensor.load %[[ARG5]], {{.*}}
-//       CHECK:     %[[LEAF3:.+]] = flow.dispatch.tensor.load %[[ARG7]], {{.*}}
-//       CHECK:     %[[OP1:.+]] = tensor.expand_shape %[[LEAF3]]
-//       CHECK:     %[[OP2:.+]] = tensor.collapse_shape %[[LEAF2]]
+//  CHECK-SAME:     %[[ARG7:[a-zA-Z0-9_]+]]: index
+//  CHECK-SAME:     %[[ARG8:[a-zA-Z0-9_]+]]: !flow.dispatch.tensor<readonly:?x?xf32>
+//  CHECK-SAME:     %[[ARG9:[a-zA-Z0-9_]+]]: index
+//  CHECK-SAME:     %[[ARG10:[a-zA-Z0-9_]+]]: index
+//  CHECK-SAME:     %[[ARG11:[a-zA-Z0-9_]+]]: index
+//  CHECK-SAME:     %[[ARG12:[a-zA-Z0-9_]+]]: !flow.dispatch.tensor<writeonly:1x?xf32>
+//       CHECK:     %[[LEAF1:.+]] = flow.dispatch.tensor.load %[[ARG4]]
+//       CHECK:     %[[LEAF2:.+]] = flow.dispatch.tensor.load %[[ARG5]]
+//       CHECK:     %[[LEAF3:.+]] = flow.dispatch.tensor.load %[[ARG8]]
+//       CHECK:     %[[INIT:.+]] = linalg.init_tensor
+//       CHECK:     %[[OP1:.+]] = tensor.cast %[[LEAF3]]
+//       CHECK:     %[[OP2:.+]] = tensor.cast %[[LEAF2]]
 //       CHECK:     %[[OP3:.+]] = tensor.extract_slice %[[OP1]][0, 0]
 //       CHECK:     %[[OP4:.+]] = tensor.extract_slice %[[OP1]][0, 10]
 //       CHECK:     %[[OP5:.+]] = tensor.extract_slice %[[OP1]][0, 20]
-//       CHECK:     %[[OP6:.+]] = tensor.collapse_shape %[[OP3]]
-//       CHECK:     %[[OP7:.+]] = tensor.collapse_shape %[[OP4]]
-//       CHECK:     %[[OP8:.+]] = tensor.collapse_shape %[[OP5]]
+//       CHECK:     linalg.generic
+//  CHECK-SAME:         ins(%[[LEAF1]], %[[OP5]], %[[OP2]], %[[OP4]], %[[OP3]] :
+//  CHECK-SAME:         outs(%[[INIT]] :
 
 // -----
 
-#map0 = affine_map<(d0) -> ()>
-#map1 = affine_map<(d0) -> (d0)>
+#map0 = affine_map<(d0, d1) -> ()>
+#map1 = affine_map<(d0, d1) -> (d0, d1)>
 func @inline_dag_2(
-    %arg0: tensor<?xf32>, %arg1 : tensor<1x?xf32>, %arg2 : tensor<i32>,
-    %arg3 : index) -> tensor<?xf32> {
-  %0 = tensor.expand_shape %arg0 [[0, 1]] : tensor<?xf32> into tensor<1x?xf32>
+    %arg0: tensor<?x?xf32>, %arg1 : tensor<1x?xf32>, %arg2 : tensor<i32>,
+    %arg3 : index) -> tensor<1x?xf32> {
+  %0 = tensor.cast %arg0 : tensor<?x?xf32> to tensor<1x?xf32>
   %1 = tensor.extract_slice %0[0, 20] [1, %arg3] [1, 1] : tensor<1x?xf32> to tensor<1x?xf32>
-  %2 = tensor.collapse_shape %arg1 [[0, 1]] : tensor<1x?xf32> into tensor<?xf32>
+  %2 = tensor.cast %arg1 : tensor<1x?xf32> to tensor<?x?xf32>
   cf.br ^bb1
 ^bb1:
-  %3 = tensor.collapse_shape %1 [[0, 1]] : tensor<1x?xf32> into tensor<?xf32>
+  %3 = tensor.cast %1 : tensor<1x?xf32> to tensor<?x?xf32>
   %4 = tensor.extract_slice %0[0, 10] [1, %arg3] [1, 1] : tensor<1x?xf32> to tensor<1x?xf32>
-  %5 = tensor.collapse_shape %4 [[0, 1]] : tensor<1x?xf32> into tensor<?xf32>
+  %5 = tensor.cast %4 : tensor<1x?xf32> to tensor<?x?xf32>
   %6 = tensor.extract_slice %0[0, 0] [1, %arg3] [1, 1] : tensor<1x?xf32> to tensor<1x?xf32>
-  %7 = tensor.collapse_shape %6 [[0, 1]] : tensor<1x?xf32> into tensor<?xf32>
-  %8 = linalg.init_tensor [%arg3] : tensor<?xf32>
+  %7 = tensor.cast %6 : tensor<1x?xf32> to tensor<?x?xf32>
+  %8 = linalg.init_tensor [1, %arg3] : tensor<1x?xf32>
   %9 = linalg.generic {
       indexing_maps = [#map0, #map1, #map1, #map1, #map1, #map1],
-      iterator_types = ["parallel"]}
-      ins(%arg2, %3, %2, %5, %7 : tensor<i32>, tensor<?xf32>,
-          tensor<?xf32>, tensor<?xf32>, tensor<?xf32>)
-      outs(%8 : tensor<?xf32>) {
+      iterator_types = ["parallel", "parallel"]}
+      ins(%arg2, %3, %2, %5, %7 : tensor<i32>, tensor<?x?xf32>,
+          tensor<?x?xf32>, tensor<?x?xf32>, tensor<?x?xf32>)
+      outs(%8 : tensor<1x?xf32>) {
       ^bb0(%arg4: i32, %arg5: f32, %arg6: f32, %arg7: f32, %arg8: f32, %arg9: f32):
         %10 = arith.addf %arg5, %arg6 : f32
         %11 = arith.addf %arg7, %arg8 : f32
@@ -568,29 +578,32 @@ func @inline_dag_2(
         %13 = arith.sitofp %arg4 : i32 to f32
         %14 = arith.addf %12, %13 : f32
         linalg.yield %14 : f32
-      } -> tensor<?xf32>
-  return %9 : tensor<?xf32>
+      } -> tensor<1x?xf32>
+  return %9 : tensor<1x?xf32>
 }
 // CHECK-LABEL: func @inline_dag_2
-//  CHECK-SAME:   %[[ARG0:[a-zA-Z0-9_]+]]: tensor<?xf32>
+//  CHECK-SAME:   %[[ARG0:[a-zA-Z0-9_]+]]: tensor<?x?xf32>
 //  CHECK-SAME:   %[[ARG1:[a-zA-Z0-9_]+]]: tensor<1x?xf32>
 //       CHECK:   flow.dispatch.workgroups
 //  CHECK-NEXT:     %[[ARG4:[a-zA-Z0-9_]+]]: !flow.dispatch.tensor<readonly:i32>
 //  CHECK-SAME:     %[[ARG5:[a-zA-Z0-9_]+]]: !flow.dispatch.tensor<readonly:1x?xf32>
 //  CHECK-SAME:     %[[ARG6:[a-zA-Z0-9_]+]]: index
-//  CHECK-SAME:     %[[ARG7:[a-zA-Z0-9_]+]]: !flow.dispatch.tensor<readonly:?xf32>
-//  CHECK-SAME:     %[[ARG8:[a-zA-Z0-9_]+]]: !flow.dispatch.tensor<writeonly:?xf32>
+//  CHECK-SAME:     %[[ARG7:[a-zA-Z0-9_]+]]: !flow.dispatch.tensor<readonly:?x?xf32>
+//  CHECK-SAME:     %[[ARG8:[a-zA-Z0-9_]+]]: index
+//  CHECK-SAME:     %[[ARG9:[a-zA-Z0-9_]+]]: index
+//  CHECK-SAME:     %[[ARG10:[a-zA-Z0-9_]+]]: index
+//  CHECK-SAME:     %[[ARG11:[a-zA-Z0-9_]+]]: !flow.dispatch.tensor<writeonly:1x?xf32>
 //       CHECK:     %[[LEAF1:.+]] = flow.dispatch.tensor.load %[[ARG4]], {{.*}}
 //       CHECK:     %[[LEAF2:.+]] = flow.dispatch.tensor.load %[[ARG5]], {{.*}}
 //       CHECK:     %[[LEAF3:.+]] = flow.dispatch.tensor.load %[[ARG7]], {{.*}}
-//       CHECK:     %[[OP1:.+]] = tensor.expand_shape %[[LEAF3]]
-//       CHECK:     %[[OP2:.+]] = tensor.collapse_shape %[[LEAF2]]
+//       CHECK:     %[[INIT:.+]] = linalg.init_tensor
+//       CHECK:     %[[OP1:.+]] = tensor.cast %[[LEAF3]]
 //       CHECK:     %[[OP3:.+]] = tensor.extract_slice %[[OP1]][0, 0]
 //       CHECK:     %[[OP4:.+]] = tensor.extract_slice %[[OP1]][0, 10]
 //       CHECK:     %[[OP5:.+]] = tensor.extract_slice %[[OP1]][0, 20]
-//       CHECK:     %[[OP6:.+]] = tensor.collapse_shape %[[OP3]]
-//       CHECK:     %[[OP7:.+]] = tensor.collapse_shape %[[OP4]]
-//       CHECK:     %[[OP8:.+]] = tensor.collapse_shape %[[OP5]]
+//       CHECK:     linalg.generic
+//  CHECK-SAME:         ins(%[[LEAF1]], %[[OP5]], %[[LEAF2]], %[[OP4]], %[[OP3]] :
+//  CHECK-SAME:         outs(%[[INIT]] :
 
 // -----
 
@@ -762,11 +775,11 @@ func @dynamic_slice(%arg0: tensor<?x?xi32>, %arg1: tensor<i32>, %arg2: tensor<i3
 //  CHECK-SAME:   %[[ARG2:[a-zA-Z0-9_]+]]: tensor<i32>
 //  CHECK-SAME:   %[[ARG3:.+]]: index
 //       CHECK:   %[[C1:.+]] = arith.constant 1 : index
+//   CHECK-DAG:   flow.tensor.load %[[ARG1]]
+//   CHECK-DAG:   flow.tensor.load %[[ARG2]]
 //   CHECK-DAG:   %[[ARG0_D0:.+]] = tensor.dim %[[ARG0]], %c0
 //   CHECK-DAG:   %[[ARG0_D1:.+]] = tensor.dim %[[ARG0]], %c1
 //       CHECK:   %[[RESULT:.+]] = flow.dispatch.workgroups
-//   CHECK-DAG:     tensor.extract
-//   CHECK-DAG:     tensor.extract
 //   CHECK-DAG:     cmpi
 //   CHECK-DAG:     arith.select
 //   CHECK-DAG:     cmpi
@@ -1177,3 +1190,108 @@ func @no_fuse_quantized(%arg0 : tensor<?x113x113x64xi8>, %arg1 : tensor<3x3x64xi
 // CHECK-NOT:   linalg.generic
 //     CHECK:   flow.dispatch.workgroups
 //     CHECK:   linalg.generic
+
+// -----
+
+func @dont_fuse_tensor_insert_dest_producer(%arg0 : tensor<2x2xf32>) -> tensor<3x3xf32> {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %cst = arith.constant dense<0.0> : tensor<3x3xf32>
+  %init = linalg.init_tensor [2, 2] : tensor<2x2xf32>
+  %0 = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>],
+      iterator_types = ["parallel", "parallel"]}
+      ins(%arg0 : tensor<2x2xf32>) outs(%init : tensor<2x2xf32>) {
+    ^bb0(%b0 : f32, %b1 : f32) :
+      %1 = arith.addf %b0, %b0 : f32
+      linalg.yield %1 : f32
+    } -> tensor<2x2xf32>
+  %1 = tensor.insert_slice %0 into %cst[0, 0] [2, 2] [1, 1]
+      : tensor<2x2xf32> into tensor<3x3xf32>
+  return %1 : tensor<3x3xf32>
+}
+//      CHECK: func @dont_fuse_tensor_insert_dest_producer
+// CHECK-SAME:     %[[ARG0:.+]]: tensor<2x2xf32>
+//      CHECK:   %[[CST:.+]] = arith.constant {{.+}} : tensor<3x3xf32>
+//      CHECK:   %[[DISPATCH1:.+]] = flow.dispatch.workgroups
+//      CHECK:       linalg.generic
+//      CHECK:       flow.return
+//      CHECK:   %[[DISPATCH2:.+]] = flow.dispatch.workgroups
+// CHECK-SAME:       (%[[DISPATCH1]], %[[CST]])
+//      CHECK:     tensor.insert_slice
+//      CHECK:     flow.return
+//      CHECK:   return %[[DISPATCH2]]
+
+// -----
+
+func @fill_op_alone(%arg0 : index, %arg1 : index) -> tensor<?x?xf32> {
+  %cst = arith.constant 42.0 : f32
+  %0 = linalg.init_tensor [%arg0, %arg1] : tensor<?x?xf32>
+  %1 = linalg.fill ins(%cst : f32) outs(%0 : tensor<?x?xf32>) -> tensor<?x?xf32>
+  return %1 : tensor<?x?xf32>
+}
+//      CHECK: func @fill_op_alone(
+// CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: index
+// CHECK-SAME:     %[[ARG1:[a-zA-Z0-9]+]]: index
+//      CHECK:   %[[SPLAT:.+]] = flow.tensor.splat %[[CST]] : tensor<?x?xf32>{%arg0, %arg1}
+//      CHECK:   return %[[SPLAT]]
+
+// -----
+
+// Reshapes cannot be fused until #8637 is fixed.
+func @dont_fuse_reshape(%lhs : tensor<?xf32>, %rhs1 : tensor<4x?xf32>, %rhs2 : tensor<4x?xf32>)
+  -> (tensor<?x?xf32>, tensor<?x?xf32>)
+{
+  %cst = arith.constant 0.0 : f32
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %0 = tensor.expand_shape %lhs [[0, 1]] : tensor<?xf32> into tensor<?x4xf32>
+  %m = tensor.dim %0, %c0 : tensor<?x4xf32>
+  %n1 = tensor.dim %rhs1, %c1 : tensor<4x?xf32>
+  %init1 = linalg.init_tensor [%m, %n1] : tensor<?x?xf32>
+  %fill1 = linalg.fill ins(%cst : f32) outs(%init1 : tensor<?x?xf32>) -> tensor<?x?xf32>
+  %1 = linalg.matmul
+    ins(%0, %rhs1 : tensor<?x4xf32>, tensor<4x?xf32>)
+    outs(%fill1 : tensor<?x?xf32>) -> tensor<?x?xf32>
+  %n2 = tensor.dim %rhs2, %c1 : tensor<4x?xf32>
+  %init2 = linalg.init_tensor [%m, %n2] : tensor<?x?xf32>
+  %fill2 = linalg.fill ins(%cst : f32) outs(%init2 : tensor<?x?xf32>) -> tensor<?x?xf32>
+  %2= linalg.matmul
+    ins(%0, %rhs2 : tensor<?x4xf32>, tensor<4x?xf32>)
+    outs(%fill2 : tensor<?x?xf32>) -> tensor<?x?xf32>
+  return %1, %2 : tensor<?x?xf32>, tensor<?x?xf32>
+}
+//      CHECK: func @dont_fuse_reshape(
+// CHECK-SAME:     %[[LHS:.+]]: tensor<?xf32>
+//  CHECK-DAG:   %[[RESHAPE:.+]] = flow.tensor.reshape %[[LHS]]
+//      CHECK:   %[[DISPATCH1:.+]] = flow.dispatch.workgroups
+// CHECK-SAME:       , %[[RESHAPE]]
+//  CHECK-NOT:     tensor.expand_shape
+//      CHECK:     linalg.fill
+//      CHECK:     linalg.matmul
+//      CHECK:     flow.return
+//      CHECK:   %[[DISPATCH2:.+]] = flow.dispatch.workgroups
+// CHECK-SAME:       , %[[RESHAPE]]
+//  CHECK-NOT:     tensor.expand_shape
+//      CHECK:     linalg.fill
+//      CHECK:     linalg.matmul
+//      CHECK:     flow.return
+//      CHECK:   return %[[DISPATCH1]], %[[DISPATCH2]]
+
+// -----
+
+func @concat_pattern(%src1 : tensor<2x40xf32>, %src2 : tensor<3x40xf32>,
+    %dest : tensor<5x40xf32>) -> tensor<5x40xf32> {
+  %0 = tensor.insert_slice %src1 into %dest[0, 0] [2, 40] [1, 1]
+      : tensor<2x40xf32> into tensor<5x40xf32>
+  %1 = tensor.insert_slice %src2 into %0[2, 0] [3, 40] [1, 1]
+      : tensor<3x40xf32> into tensor<5x40xf32>
+  return %1 : tensor<5x40xf32>
+}
+//      CHECK: func @concat_pattern
+// CHECK-SAME:     %[[SRC1:.+]]: tensor<2x40xf32>
+// CHECK-SAME:     %[[SRC2:.+]]: tensor<3x40xf32>
+// CHECK-SAME:     %[[DEST:.+]]: tensor<5x40xf32>
+//      CHECK:   %[[UPDATE1:.+]] = flow.tensor.update %[[SRC1]], %[[DEST]]
+//      CHECK:   %[[UPDATE2:.+]] = flow.tensor.update %[[SRC2]], %[[UPDATE1]]
+//      CHECK:   return %[[UPDATE2]]

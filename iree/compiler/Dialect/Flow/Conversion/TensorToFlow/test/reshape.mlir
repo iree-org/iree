@@ -1,4 +1,4 @@
-// RUN: iree-opt -iree-flow-convert-to-flow-after-dispatch-formation -canonicalize -cse -split-input-file %s | FileCheck %s
+// RUN: iree-opt -iree-flow-convert-to-flow -split-input-file %s | FileCheck %s
 
 func @turn_fill_into_splat(%arg0: tensor<?x?xf32>, %arg1: tensor<f32>, %arg2: index, %arg3: index, %arg4: index, %arg5: index) -> tensor<?x?xf32> {
   %c0 = arith.constant 0 : index
@@ -14,7 +14,7 @@ func @turn_fill_into_splat(%arg0: tensor<?x?xf32>, %arg1: tensor<f32>, %arg2: in
   return %7 : tensor<?x?xf32>
 }
 
-//       CHECK: #[[MAP:.+]] = affine_map<()[s0, s1, s2] -> (s0 + s1 + s2)>
+//       CHECK: #[[MAP:.+]] = affine_map<(d0)[s0, s1] -> (d0 + s0 + s1)>
 //       CHECK: func @turn_fill_into_splat
 //  CHECK-SAME:   %[[ARG0:[a-zA-Z0-9]+]]: tensor<?x?xf32>
 //  CHECK-SAME:   %[[ARG1:[a-zA-Z0-9]+]]: tensor<f32>
@@ -27,7 +27,7 @@ func @turn_fill_into_splat(%arg0: tensor<?x?xf32>, %arg1: tensor<f32>, %arg2: in
 //       CHECK:   %[[VAL:.+]] = flow.tensor.load %[[ARG1]] : tensor<f32>
 //   CHECK-DAG:   %[[D0:.+]] = tensor.dim %[[ARG0]], %[[C0]]
 //   CHECK-DAG:   %[[D1:.+]] = tensor.dim %[[ARG0]], %[[C1]]
-//   CHECK-DAG:   %[[RD0:.+]] = affine.apply #[[MAP]]()[%[[ARG2]], %[[ARG4]], %[[D0]]]
-//   CHECK-DAG:   %[[RD1:.+]] = affine.apply #[[MAP]]()[%[[ARG3]], %[[ARG5]], %[[D1]]]
+//   CHECK-DAG:   %[[RD0:.+]] = affine.apply #[[MAP]](%[[D0]])[%[[ARG2]], %[[ARG4]]]
+//   CHECK-DAG:   %[[RD1:.+]] = affine.apply #[[MAP]](%[[D1]])[%[[ARG3]], %[[ARG5]]]
 //       CHECK:   %[[SPLAT:.+]] = flow.tensor.splat %[[VAL]] : tensor<?x?xf32>{%[[RD0]], %[[RD1]]}
 //       CHECK:   flow.tensor.update %[[ARG0]], %[[SPLAT]]

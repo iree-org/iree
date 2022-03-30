@@ -16,7 +16,7 @@ func @fuse_conv2d_elementwise(%input: tensor<1x225x225x16xf32>, %filter: tensor<
            affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>],
          iterator_types = ["parallel", "parallel", "parallel", "parallel"]}
          ins(%2, %offset: tensor<1x112x112x32xf32>, tensor<32xf32>)
-         outs(%1 : tensor<1x112x112x32xf32>) {
+         outs(%0 : tensor<1x112x112x32xf32>) {
          ^bb0(%a: f32, %b: f32, %c: f32):
             %sub = arith.subf %a, %b : f32
             linalg.yield %sub : f32
@@ -39,7 +39,7 @@ func @fuse_conv2d_elementwise(%input: tensor<1x225x225x16xf32>, %filter: tensor<
 // CHECK-SAME:     outs(%[[FILL]] :
 //      CHECK:   linalg.generic
 // CHECK-SAME:     ins(%[[CONV]], %{{.+}} : tensor<1x112x112x32xf32>, tensor<32xf32>)
-// CHECK-SAME:     outs(%[[FILL]] : tensor<1x112x112x32xf32>)
+// CHECK-SAME:     outs(%[[INIT]] : tensor<1x112x112x32xf32>)
 
 // -----
 

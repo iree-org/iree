@@ -6,6 +6,7 @@
 
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree-dialects/Dialect/LinalgExt/Passes/Transforms.h"
+#include "iree/compiler/Dialect/Flow/Conversion/TensorToFlow/ConvertTensorToFlow.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowTypes.h"
@@ -163,15 +164,17 @@ static bool isRootOp(Operation *op) {
     return !isa<linalg::FillOp>(op);
   }
   return isa<IREE::LinalgExt::TiledOpInterface>(op) &&
-         !isa<tensor::ExtractSliceOp>(op);
+         !isa<tensor::ExtractSliceOp, tensor::InsertSliceOp>(op);
 }
 
 /// Operations that are cloned into dispatch regions formed with other
 /// operations as roots.
 static bool isClonableIntoDispatchOp(Operation *op) {
-  if (isa<arith::IndexCastOp, linalg::InitTensorOp, tensor::CollapseShapeOp,
-          tensor::ExpandShapeOp, tensor::ExtractOp, tensor::ExtractSliceOp>(
-          op)) {
+  // TODO(#8637): `tensor.collapse_shape` and `tensor.expand_shape` are
+  // trivially clonable too, but they cause problems
+  // with bufferization. Make them clonable when fixed.
+  if (isa<arith::IndexCastOp, linalg::InitTensorOp, tensor::CastOp,
+          tensor::ExtractOp, tensor::ExtractSliceOp>(op)) {
     return true;
   }
   if (auto constantOp = dyn_cast<arith::ConstantOp>(op)) {
@@ -371,6 +374,23 @@ static SmallVector<Operation *> orderOperations(ArrayRef<Operation *> ops) {
   return orderedOps;
 }
 
+/// Checks if the `Value` has a use within the dispatch that is unfusable.
+static bool hasUnfusableUseInDispatch(
+    Value v, IREE::Flow::DispatchWorkgroupsOp dispatchOp) {
+  for (OpOperand &use : v.getUses()) {
+    Operation *user = use.getOwner();
+    // Ignore uses outside of dispatch workgroups op.
+    if (user->getParentOfType<IREE::Flow::DispatchWorkgroupsOp>() != dispatchOp)
+      continue;
+
+    // Cannot fuse producer of `dest` with `tensor.insert_slice`.
+    if (auto insertSliceUser = dyn_cast<tensor::InsertSliceOp>(user)) {
+      if (insertSliceUser.dest() == v) return true;
+    }
+  }
+  return false;
+}
+
 /// Computes the values that will eventually be used within the dispatch
 /// workgroup op but defined outside the op after all clonable operations are
 /// cloned into the region.
@@ -386,8 +406,10 @@ static void getUsedValuesDefinedAboveAfterCloningOps(
     Value outsideValue = worklist.pop_back_val();
     if (visited.count(outsideValue)) continue;
     visited.insert(outsideValue);
+
     Operation *definingOp = outsideValue.getDefiningOp();
-    if (!definingOp || !(isClonableIntoDispatchOp(definingOp))) {
+    if (!definingOp || !(isClonableIntoDispatchOp(definingOp)) ||
+        hasUnfusableUseInDispatch(outsideValue, dispatchOp)) {
       valuesDefinedAbove.insert(outsideValue);
       continue;
     }
@@ -655,19 +677,6 @@ static bool hasOnlyDimUses(Operation *op) {
   });
 }
 
-/// For a value `v` append to `dynamicDims` `Value`s that represent the shape of
-/// the dynamic dimensions.
-static void appendDynamicDims(OpBuilder &builder, Location loc, Value v,
-                              SmallVectorImpl<Value> &dynamicDims) {
-  auto shapedType = v.getType().dyn_cast<RankedTensorType>();
-  if (!shapedType) return;
-  for (auto shape : enumerate(shapedType.getShape())) {
-    if (shape.value() != ShapedType::kDynamicSize) continue;
-    Value dim = builder.createOrFold<tensor::DimOp>(loc, v, shape.index());
-    dynamicDims.push_back(dim);
-  }
-}
-
 //===----------------------------------------------------------------------===//
 // Patterns that create the dispatch region.
 //===----------------------------------------------------------------------===//
@@ -675,21 +684,12 @@ static void appendDynamicDims(OpBuilder &builder, Location loc, Value v,
 template <typename T>
 static SmallVector<Range> getLoopRanges(T operation, Location loc,
                                         PatternRewriter &rewriter);
-template <typename T>
-static SmallVector<Value> getDestinationOperands(T operation, OpBuilder &b);
 
 template <>
 SmallVector<Range> getLoopRanges<linalg::LinalgOp>(linalg::LinalgOp linalgOp,
                                                    Location loc,
                                                    PatternRewriter &rewriter) {
   return linalgOp.createLoopRanges(rewriter, loc);
-}
-template <>
-SmallVector<Value> getDestinationOperands<linalg::LinalgOp>(
-    linalg::LinalgOp linalgOp, OpBuilder &b) {
-  SmallVector<Value> outputs(linalgOp.outputs().begin(),
-                             linalgOp.outputs().end());
-  return outputs;
 }
 
 template <>
@@ -698,25 +698,53 @@ SmallVector<Range> getLoopRanges<IREE::LinalgExt::TiledOpInterface>(
     PatternRewriter &rewriter) {
   return tilableOp.getIterationDomain(rewriter);
 }
+
 template <>
-SmallVector<Value> getDestinationOperands<IREE::LinalgExt::TiledOpInterface>(
-    IREE::LinalgExt::TiledOpInterface tilableOp, OpBuilder &b) {
-  return tilableOp.getDestinationOperands(b);
+SmallVector<Range> getLoopRanges<tensor::InsertSliceOp>(
+    tensor::InsertSliceOp insertSliceOp, Location loc,
+    PatternRewriter &rewriter) {
+  Value zero = rewriter.create<arith::ConstantIndexOp>(loc, 0);
+  Value one = rewriter.create<arith::ConstantIndexOp>(loc, 1);
+  Value source = insertSliceOp.source();
+  SmallVector<Range> loopRanges(insertSliceOp.getSourceType().getRank(),
+                                Range{zero, one, one});
+  for (auto dim : llvm::seq<unsigned>(0, loopRanges.size())) {
+    loopRanges[dim].size = rewriter.create<tensor::DimOp>(loc, source, dim);
+  }
+  return loopRanges;
+}
+
+template <>
+SmallVector<Range> getLoopRanges<tensor::ExtractSliceOp>(
+    tensor::ExtractSliceOp sliceOp, Location loc, PatternRewriter &rewriter) {
+  Value zero = rewriter.create<arith::ConstantIndexOp>(loc, 0);
+  Value one = rewriter.create<arith::ConstantIndexOp>(loc, 1);
+  ReifiedRankedShapedTypeDims resultDims;
+  (void)sliceOp.reifyResultShapes(rewriter, resultDims);
+  return llvm::to_vector(llvm::map_range(resultDims[0], [&](Value v) {
+    return Range{zero, v, one};
+  }));
 }
 
 namespace {
-template <typename T>
-struct CreateDispatchRegionOp : OpInterfaceRewritePattern<T> {
-  using OpInterfaceRewritePattern<T>::OpInterfaceRewritePattern;
+template <typename OpType, template <typename> class Base>
+struct CreateDispatchRegionOp : Base<OpType> {
+  CreateDispatchRegionOp(MLIRContext *context,
+                         const linalg::LinalgTransformationFilter &filter,
+                         PatternBenefit benefit = 1)
+      : Base<OpType>(context, benefit), transformationFilter(filter) {}
 
-  LogicalResult matchAndRewrite(T rootOp,
+  LogicalResult matchAndRewrite(OpType rootOp,
                                 PatternRewriter &rewriter) const override {
     // TODO(ravishankarm): It is getting strange to track when to apply this
     // pattern and when not to. Need to revisit this, with dynamic shape cases
     // in mind.
     if (hasOnlyDimUses(rootOp)) return failure();
-    if (!hasRootOpAttribute(rootOp)) return failure();
     if (rootOp->template getParentOfType<IREE::Flow::DispatchWorkgroupsOp>()) {
+      return failure();
+    }
+
+    if (failed(transformationFilter.checkAndNotify(rewriter, rootOp))) {
       return failure();
     }
 
@@ -724,9 +752,18 @@ struct CreateDispatchRegionOp : OpInterfaceRewritePattern<T> {
     // of the outermost parallel loops that can be distributed.
     Location loc = rootOp->getLoc();
     SmallVector<Range> loopRanges = getLoopRanges(rootOp, loc, rewriter);
+
+    // TODO: The use of PartitionableLoopsInterface to get the loop bounds
+    // of the distributed loop is legacy. This can be controlled purely in the
+    // backend.
+    auto partitionableLoopsOp =
+        dyn_cast<PartitionableLoopsInterface>(rootOp.getOperation());
+    if (!partitionableLoopsOp) {
+      return rewriter.notifyMatchFailure(
+          rootOp, "expected op to implement ParitionableLoopsInterface");
+    }
     SmallVector<unsigned> partitionedLoops =
-        cast<PartitionableLoopsInterface>(rootOp.getOperation())
-            .getPartitionableLoops(kNumMaxParallelDims);
+        partitionableLoopsOp.getPartitionableLoops(kNumMaxParallelDims);
     SmallVector<Value> count;
     for (auto dim : partitionedLoops) {
       count.push_back(loopRanges[dim].size);
@@ -734,9 +771,28 @@ struct CreateDispatchRegionOp : OpInterfaceRewritePattern<T> {
     auto workload = convertToWorkload(rewriter, loc, count);
 
     // Capture dynamic result dimensions.
+    ReifiedRankedShapedTypeDims resultDims;
+    auto rankedShapedTypeOp =
+        dyn_cast<ReifyRankedShapedTypeOpInterface>(rootOp.getOperation());
+    if (!rankedShapedTypeOp) {
+      return rewriter.notifyMatchFailure(
+          rootOp,
+          "expected op to implement the ReifyRankedShapedTypeOpInterface");
+    }
+    if (failed(rankedShapedTypeOp.reifyResultShapes(rewriter, resultDims))) {
+      return rewriter.notifyMatchFailure(rootOp,
+                                         "failed to reify shape of the result");
+    }
+
     SmallVector<Value, 4> resultDynamicDims;
-    for (auto result : getDestinationOperands(rootOp, rewriter)) {
-      appendDynamicDims(rewriter, loc, result, resultDynamicDims);
+    for (auto output : llvm::enumerate(rootOp->getResults())) {
+      auto outputType =
+          output.value().getType().template dyn_cast<ShapedType>();
+      if (!outputType) continue;
+      for (auto dim : llvm::enumerate(outputType.getShape())) {
+        if (!ShapedType::isDynamic(dim.value())) continue;
+        resultDynamicDims.push_back(resultDims[output.index()][dim.index()]);
+      }
     }
 
     // Create a simple dispatch op with no operands, and not isolated from
@@ -747,17 +803,24 @@ struct CreateDispatchRegionOp : OpInterfaceRewritePattern<T> {
     Operation *clonedOp = en.second;
 
     // Scoped within DispatchWorkgroupOp.
-    if (auto clonedLinalgOp = dyn_cast<linalg::LinalgOp>(clonedOp)) {
-      pullInProducersInSameGroup(rewriter, dispatchOp, clonedLinalgOp,
-                                 getRootNumber(rootOp));
+    if (hasRootOpAttribute(rootOp)) {
+      if (auto clonedLinalgOp = dyn_cast<linalg::LinalgOp>(clonedOp)) {
+        pullInProducersInSameGroup(rewriter, dispatchOp, clonedLinalgOp,
+                                   getRootNumber(rootOp));
+      }
     }
-    removeRootOpAttribute(clonedOp);
     rewriter.replaceOpWithIf(rootOp, dispatchOp.getResults(),
                              [&](OpOperand &operand) {
                                return !isa<tensor::DimOp>(operand.getOwner());
                              });
+
+    transformationFilter.replaceLinalgTransformationFilter(rewriter, rootOp);
+    transformationFilter.replaceLinalgTransformationFilter(rewriter, clonedOp);
     return success();
   }
+
+ private:
+  linalg::LinalgTransformationFilter transformationFilter;
 };
 }  // namespace
 
@@ -795,6 +858,70 @@ static bool canInsOperandTieWithOutsOperand(OpOperand *insOperand) {
   return llvm::any_of(linalgOp.getOutputOperands(), canTieWithOutsOperand);
 }
 
+/// Checks if the producer and consumer LinalgOps can be fused.
+static bool areFusableLinalgOps(OpOperand &use) {
+  auto producerOp = use.get().getDefiningOp<linalg::LinalgOp>();
+  auto consumerOp = dyn_cast<linalg::LinalgOp>(use.getOwner());
+  if (!producerOp || !consumerOp) return false;
+
+  // 1. Producer has a single result.
+  if (producerOp->getNumResults() != 1) return false;
+
+  // 2. Consumer is elementwise parallel.
+  if (consumerOp.getNumLoops() != consumerOp.getNumParallelLoops())
+    return false;
+
+  // 3. In consumer the result of producer is accessed using identity indexing.
+  AffineMap consumerIndexingMap = consumerOp.getTiedIndexingMap(&use);
+  if (!consumerIndexingMap.isIdentity()) return false;
+
+  // 4. In-place bufferization requirements (for now) require that the use in
+  // the consumer
+  //    can re-use the buffer for a result.
+  return canInsOperandTieWithOutsOperand(&use);
+}
+
+/// Returns true if this is a fusable use.
+static bool isFusableWithConsumer(OpOperand &use) {
+  // Check for linalg producer -> consumer fusion with tile + fuse.
+  return areFusableLinalgOps(use);
+}
+
+/// Fuses roots with its consumers. If a root is fused with its consumer, it is
+/// no more tagged as a root to aid with the dispatch region formation.
+static void fuseRootsWithConsumers(MLIRContext *context,
+                                   ArrayRef<Operation *> roots) {
+  SmallVector<Operation *> workList(roots.begin(), roots.end());
+  // Fuse with consumers where possible.
+  while (!workList.empty()) {
+    Operation *currRoot = workList.pop_back_val();
+    assert(hasRootOpAttribute(currRoot) &&
+           "unexpected non-root op in worklist");
+    if (!currRoot->hasOneUse()) continue;
+
+    // Helper function to make the consumer the root instead of the producer
+    // when they are to be fused.
+    auto updateRootTo = [&context, &currRoot](Operation *newRoot) {
+      int64_t rootNumber = getRootNumber(currRoot);
+      setRootAttribute(context, newRoot, rootNumber);
+      removeRootOpAttribute(currRoot);
+      appendToFusionGroup(currRoot, rootNumber);
+    };
+
+    // Analyse the use to see if it is fusable.
+    OpOperand &use = *currRoot->use_begin();
+    Operation *user = use.getOwner();
+    if (hasRootOpAttribute(user) || hasFusionGroupsAttribute(user)) {
+      continue;
+    }
+
+    if (isFusableWithConsumer(use)) {
+      updateRootTo(user);
+      workList.push_back(user);
+    }
+  }
+}
+
 /// Some heuristic is needed to fuse a dispatchble op with root operations using
 /// tile + fuse. Using some heuristic, each root operation is tagged with an ID
 /// (using an IntegerAttr with name `kRootOpAttr`) and all dispatchable ops to
@@ -808,9 +935,12 @@ static unsigned decideFusableLinalgOps(FunctionOpInterface funcOp) {
   MLIRContext *context = funcOp->getContext();
   OpBuilder builder(context);
   for (Block &block : funcOp.getBody()) {
-    // Tiling and fusion works by tiling the last operation in the fusion group
-    // and then pull producer ops into the tiled loops. So go in the reverse
-    // order here.
+    // Dispatch region formation works by first cloning the root into
+    // the dispatch region and then pulling operations in.
+    // So procedure here is to
+    // - First find the roots
+    // - To fuse with consumers make the consumer the root.
+    SmallVector<Operation *> roots;
     for (Operation &op : llvm::reverse(block)) {
       // Start with a root operation and fuse its producers.
       if (hasFusionGroupsAttribute(&op) || !isRootOp(&op)) continue;
@@ -825,49 +955,43 @@ static unsigned decideFusableLinalgOps(FunctionOpInterface funcOp) {
               .Default(
                   [&](Operation *) -> linalg::OpOperandVector { return {}; });
       for (OpOperand *operand : outOperands) {
+        // Currently only fuse with producer ops that are `LinalgOp`s.
         auto producer = operand->get().getDefiningOp<linalg::LinalgOp>();
         if (!producer) continue;
+
+        // For now only fuse producers that have a single use.
+        // TODO(ravishankarm): Producer can be fused if all users are dominated
+        // by the consumer. But that requires changing the dispatch region
+        // formation in this pass. Do that as a follow up.
+        if (!producer->hasOneUse()) continue;
+
         if (producer.getNumLoops() != producer.getNumParallelLoops()) continue;
         appendToFusionGroup(producer, newGroup);
       }
+      roots.push_back(&op);
     }
+    roots = llvm::to_vector(llvm::reverse(roots));
+    fuseRootsWithConsumers(context, roots);
+  }
 
-    // To fuse root operations with their consumers, for all root ops chosen.
-    // If, 1) The root op has a single use 2) The consumer is an elementwise
-    // operation 3) The indexing map in the producer and consumer are identity
-    // maps The root operation can be fused with its consumer. To do this,
-    // mark the consumer as the root and add the operation to the fusion
-    // group.
-    for (linalg::LinalgOp linalgOp : block.getOps<linalg::LinalgOp>()) {
-      Operation *op = linalgOp.getOperation();
-      if (!hasRootOpAttribute(op)) continue;
-      if (op->getNumResults() != 1 || !op->hasOneUse()) continue;
-      OpOperand &use = *op->use_begin();
-      Operation *user = use.getOwner();
-      if (hasRootOpAttribute(user) || hasFusionGroupsAttribute(user)) {
-        continue;
-      }
-      linalg::LinalgOp consumer = dyn_cast<linalg::LinalgOp>(use.getOwner());
-      if (!consumer ||
-          consumer.getNumLoops() != consumer.getNumParallelLoops()) {
-        continue;
-      }
-      AffineMap consumerIndexingMap = consumer.getTiedIndexingMap(&use);
-      AffineMap producerIndexingMap =
-          linalgOp.getTiedIndexingMap(linalgOp.getOutputOperand(0));
-      if (!consumerIndexingMap.isIdentity() ||
-          producerIndexingMap.getResults() !=
-              consumerIndexingMap.getResults()) {
-        continue;
-      }
-      if (!canInsOperandTieWithOutsOperand(&use)) {
-        continue;
-      }
-      int64_t rootNumber = getRootNumber(op);
-      setRootAttribute(context, user, rootNumber);
-      removeRootOpAttribute(op);
-      appendToFusionGroup(op, rootNumber);
+  // Once all root linalg ops have been tagged, put all remaining generic ops
+  // into their own dispatches.
+  for (Block &block : funcOp.getBody()) {
+    SmallVector<Operation *> roots;
+    for (Operation &op : llvm::reverse(block)) {
+      // If it is part of a fusion group or root op, ignore it.
+      if (hasFusionGroupsAttribute(&op) || hasRootOpAttribute(&op)) continue;
+      // Only look for Linalg ops here. Avoid moving `linalg.fill` that aren't
+      // fused with anything else into their own dispatches since it is better
+      // to convert them to splats.
+      if (!isa<linalg::LinalgOp>(op) || isa<linalg::FillOp>(op)) continue;
+
+      unsigned newGroup = numRootOps++;
+      setRootAttribute(context, &op, newGroup);
+      roots.push_back(&op);
     }
+    roots = llvm::to_vector(llvm::reverse(roots));
+    fuseRootsWithConsumers(context, roots);
   }
 
   return numRootOps;
@@ -890,34 +1014,49 @@ struct DispatchLinalgOnTensorsPass
   Statistic numDispatches{this, "number of dispatches",
                           "Number of Flow dispatches created"};
 };
+
+// Pass to test conversion to flow patterns.
+struct ConvertToFlowPass : public ConvertToFlowBase<ConvertToFlowPass> {
+  void getDependentDialects(DialectRegistry &registry) const override {
+    registry
+        .insert<AffineDialect, IREE::Flow::FlowDialect, linalg::LinalgDialect,
+                scf::SCFDialect, tensor::TensorDialect>();
+  }
+
+  void runOnOperation() override {
+    MLIRContext *context = &getContext();
+    RewritePatternSet convertToFlowPatterns(context);
+    populateTensorToFlowConversionPatterns(context, convertToFlowPatterns);
+    memref::populateResolveRankedShapeTypeResultDimsPatterns(
+        convertToFlowPatterns);
+    if (failed(applyPatternsAndFoldGreedily(
+            getOperation(), std::move(convertToFlowPatterns)))) {
+      return signalPassFailure();
+    }
+  }
+};
+
 }  // namespace
 
 /// For all ops within `funcOp` tagged as root ops, create dispatch regions.
-LogicalResult createDispatchRegionsFromRootOps(mlir::Operation *funcOp) {
+LogicalResult createDispatchRegionsFromRootOps(mlir::Operation *funcOp,
+                                               RewritePatternSet &&patterns) {
   MLIRContext *context = funcOp->getContext();
 
   // Create the dispatch region, first without the isolate region from above
   // property.
-  {
-    RewritePatternSet patterns(context);
-    patterns.insert<CreateDispatchRegionOp<linalg::LinalgOp>,
-                    CreateDispatchRegionOp<IREE::LinalgExt::TiledOpInterface>>(
-        context);
-    if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
-      return failure();
-    }
+  if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
+    return failure();
+  }
 
-    // Run canonicalization patterns and pattern to resolve tensor.dim of result
-    // values into tensor.dim of its operands..
-    RewritePatternSet canonicalizationPatterns(context);
-    linalg::populateLinalgTilingCanonicalizationPatterns(
-        canonicalizationPatterns);
-    memref::populateResolveRankedShapeTypeResultDimsPatterns(
-        canonicalizationPatterns);
-    if (failed(applyPatternsAndFoldGreedily(
-            funcOp, std::move(canonicalizationPatterns)))) {
-      return failure();
-    }
+  // Run canonicalization patterns and pattern to resolve tensor.dim of result
+  // values into tensor.dim of its operands..
+  RewritePatternSet canonicalizationPatterns(context);
+  memref::populateResolveRankedShapeTypeResultDimsPatterns(
+      canonicalizationPatterns);
+  if (failed(applyPatternsAndFoldGreedily(
+          funcOp, std::move(canonicalizationPatterns)))) {
+    return failure();
   }
 
   LLVM_DEBUG({
@@ -942,13 +1081,27 @@ LogicalResult createDispatchRegionsFromRootOps(mlir::Operation *funcOp) {
     llvm::dbgs() << "\n\n";
   });
 
+  // Now try to see if we can tie certain results to operands in order to
+  // indicate sharing storage. This need to happen here because it needs to
+  // access region block arguments for input/output tensors, which aren't
+  // available until now.
+  funcOp->walk([&](IREE::Flow::DispatchWorkgroupsOp op) {
+    tryToTieOperandsAndResults(op);
+  });
+
+  LLVM_DEBUG({
+    llvm::dbgs() << "\n--- After tieing operands and results ---\n";
+    funcOp->print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
+    llvm::dbgs() << "\n\n";
+  });
+
   return success();
 }
 
 void DispatchLinalgOnTensorsPass::runOnOperation() {
   auto funcOp = getOperation();
   MLIRContext *context = &getContext();
-  unsigned numRoots = decideFusableLinalgOps(funcOp);
+  decideFusableLinalgOps(funcOp);
 
   LLVM_DEBUG({
     llvm::dbgs() << "\n--- After annotating linalg op fusion scheme ---\n";
@@ -956,8 +1109,22 @@ void DispatchLinalgOnTensorsPass::runOnOperation() {
     llvm::dbgs() << "\n\n";
   });
 
-  if (failed(createDispatchRegionsFromRootOps(funcOp))) {
-    return signalPassFailure();
+  {
+    linalg::LinalgTransformationFilter filterForComputeOps(
+        [](Operation *op) { return success(hasRootOpAttribute(op)); }, {},
+        StringAttr::get(context, "indispatch"));
+    filterForComputeOps.setMatchByDefault();
+    RewritePatternSet computeOpDispatchPatterns(context);
+    computeOpDispatchPatterns.insert<
+        CreateDispatchRegionOp<linalg::LinalgOp, OpInterfaceRewritePattern>,
+        CreateDispatchRegionOp<IREE::LinalgExt::TiledOpInterface,
+                               OpInterfaceRewritePattern>,
+        CreateDispatchRegionOp<tensor::InsertSliceOp, OpRewritePattern>>(
+        context, filterForComputeOps);
+    if (failed(createDispatchRegionsFromRootOps(
+            funcOp, std::move(computeOpDispatchPatterns)))) {
+      return signalPassFailure();
+    }
   }
 
   LLVM_DEBUG({
@@ -966,77 +1133,64 @@ void DispatchLinalgOnTensorsPass::runOnOperation() {
     llvm::dbgs() << "\n\n";
   });
 
-  /// Iterate over the remaining ops and pick up whatever needs to go into
-  /// dispatch regions and mark them as root ops.
-  for (Operation &op : funcOp.getBody().getOps()) {
-    // Ignore ops that
-    // - Do not implement the `LinalgOp` interface.
-    // - linalg.fill ops.
-    if (!isa<linalg::LinalgOp>(&op)) continue;
-    if (isa<linalg::FillOp>(&op)) continue;
-    assert(!hasRootOpAttribute(&op) &&
-           "unexpected root operation outside of dispatch region");
-    removeFusionGroupsAttribute(&op);
-    setRootAttribute(context, &op, numRoots++);
+  /// Convert remaining ops to Flow ops.
+  {
+    RewritePatternSet convertToFlowPatterns(context);
+    populateTensorToFlowConversionPatterns(context, convertToFlowPatterns);
+    memref::populateResolveRankedShapeTypeResultDimsPatterns(
+        convertToFlowPatterns);
+    IREE::Flow::TensorReshapeOp::getCanonicalizationPatterns(
+        convertToFlowPatterns, context);
+    if (failed(applyPatternsAndFoldGreedily(
+            funcOp, std::move(convertToFlowPatterns)))) {
+      return signalPassFailure();
+    }
   }
 
-  LLVM_DEBUG({
-    llvm::dbgs()
-        << "\n--- After annotating remaining linalg ops as roots ---\n";
-    funcOp->print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
-    llvm::dbgs() << "\n\n";
-  });
+  /// Move yet more remaining ops into dispatch region.
 
-  if (failed(createDispatchRegionsFromRootOps(funcOp))) {
-    return signalPassFailure();
+  // Start with just moving the tensor.insert_slice into its dispatch.
+  {
+    linalg::LinalgTransformationFilter filterForInsertSliceOps(
+        ArrayRef<StringAttr>{}, StringAttr::get(context, "indispatch"));
+    RewritePatternSet insertSliceOpDispatchPatterns(context);
+    insertSliceOpDispatchPatterns.insert<
+        CreateDispatchRegionOp<tensor::InsertSliceOp, OpRewritePattern>>(
+        context, filterForInsertSliceOps);
+    if (failed(createDispatchRegionsFromRootOps(
+            funcOp, std::move(insertSliceOpDispatchPatterns)))) {
+      return signalPassFailure();
+    }
   }
 
-  LLVM_DEBUG({
-    llvm::dbgs()
-        << "\n--- After second step of dispatch region formation ---\n";
-    funcOp->print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
-    llvm::dbgs() << "\n\n";
-  });
-
-  /// Iterate over the remaining ops and pick up whatever needs to go into
-  /// dispatch regions and mark them as root ops.
-  for (Operation &op : funcOp.getBody().getOps()) {
-    // Ignore ops that do not implement the `TiledOpInterface` interface.
-    if (!isa<IREE::LinalgExt::TiledOpInterface>(&op)) continue;
-    assert(!hasRootOpAttribute(&op) &&
-           "unexpected root operation outside of dispatch region");
-    removeFusionGroupsAttribute(&op);
-    setRootAttribute(context, &op, numRoots++);
+  // Now move all remaining ops that need to be cleaned up.
+  {
+    linalg::LinalgTransformationFilter filterForCleanupOps(
+        ArrayRef<StringAttr>{}, StringAttr::get(context, "indispatch"));
+    RewritePatternSet cleanUpDispatchPatterns(context);
+    cleanUpDispatchPatterns.insert<
+        CreateDispatchRegionOp<tensor::ExtractSliceOp, OpRewritePattern>>(
+        context, filterForCleanupOps);
+    if (failed(createDispatchRegionsFromRootOps(
+            funcOp, std::move(cleanUpDispatchPatterns)))) {
+      return signalPassFailure();
+    }
   }
 
-  LLVM_DEBUG({
-    llvm::dbgs() << "\n--- After annotating remaining ops as roots ---\n";
-    funcOp->print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
-    llvm::dbgs() << "\n\n";
-  });
-
-  if (failed(createDispatchRegionsFromRootOps(funcOp))) {
-    return signalPassFailure();
-  }
-
-  LLVM_DEBUG({
-    llvm::dbgs() << "\n--- After rewriting destructive updates ---\n";
-    funcOp->print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
-    llvm::dbgs() << "\n\n";
-  });
-
-  // Now try to see if we can tie certain results to operands in order to
-  // indicate sharing storage. This need to happen here because it needs to
-  // access region block arguments for input/output tensors, which aren't
-  // available until now.
-  funcOp->walk([&](IREE::Flow::DispatchWorkgroupsOp op) {
-    tryToTieOperandsAndResults(op);
+  // Finally walk all the ops and remove the attributes
+  funcOp.walk([](Operation *op) {
+    removeRootOpAttribute(op);
+    op->removeAttr(linalg::LinalgTransforms::kLinalgTransformMarker);
   });
 }
 
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createDispatchLinalgOnTensorsPass() {
   return std::make_unique<DispatchLinalgOnTensorsPass>();
+}
+
+std::unique_ptr<Pass> createConvertToFlowPass() {
+  return std::make_unique<ConvertToFlowPass>();
 }
 
 }  // namespace Flow

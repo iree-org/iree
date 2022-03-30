@@ -199,3 +199,37 @@ func @elementwise() {
 //      CHECK:       linalg.generic
 // CHECK-SAME:         ins(%[[SUB_IN2]], %[[SUB_CST]]
 // CHECK-SAME:         outs(%[[SUB_OUT2]]
+
+// -----
+
+#map0 = affine_map<()[s0] -> (s0 * 2)>
+#map1 = affine_map<(d0) -> (d0)>
+func @rank_reduced_slice() {
+  %c10 = arith.constant 10 : index
+  %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<readonly:1x40xf32>
+  %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : !flow.dispatch.tensor<writeonly:10xf32>
+  %workgroup_id_x = hal.interface.workgroup.id[0] : index
+  %workgroup_count_x = hal.interface.workgroup.count[0] : index
+  %3 = affine.apply #map0()[%workgroup_id_x]
+  %4 = affine.apply #map0()[%workgroup_count_x]
+  scf.for %arg0 = %3 to %c10 step %4 {
+    %5 = flow.dispatch.tensor.load %0, offsets = [0, %arg0], sizes = [1, 2], strides = [1, 1] : !flow.dispatch.tensor<readonly:1x40xf32> -> tensor<2xf32>
+    %2 = flow.dispatch.tensor.load %1, offsets = [%arg0], sizes = [2], strides = [1] : !flow.dispatch.tensor<writeonly:10xf32> -> tensor<2xf32>
+    %7 = linalg.generic {indexing_maps = [#map1, #map1], iterator_types = ["parallel"]} ins(%5 : tensor<2xf32>) outs(%2 : tensor<2xf32>) {
+    ^bb0(%arg1: f32, %arg2: f32):
+      %8 = arith.addf %arg1, %arg1 : f32
+      linalg.yield %8 : f32
+    } -> tensor<2xf32>
+    flow.dispatch.tensor.store %7, %1, offsets = [%arg0], sizes = [2], strides = [1] : tensor<2xf32> -> !flow.dispatch.tensor<writeonly:10xf32>
+  }
+  return
+}
+//      CHECK: func @rank_reduced_slice()
+//  CHECK-DAG:   %[[SRC_BINDING:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<1x40xf32>
+//  CHECK-DAG:   %[[DST_BINDING:.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<10xf32>
+//      CHECK:   scf.for %[[IV0:.+]] =
+//  CHECK-DAG:     %[[SRC_SUBVIEW:.+]] = memref.subview %[[SRC_BINDING]][0, %[[IV0]]] [1, 2] [1, 1] : memref<1x40xf32> to memref<2xf32
+//  CHECK-DAG:     %[[DST_SUBVIEW:.+]] = memref.subview %[[DST_BINDING]][%[[IV0]]] [2] [1] : memref<10xf32> to memref<2xf32
+//      CHECK:     linalg.generic
+// CHECK-SAME:         ins(%[[SRC_SUBVIEW]] :
+// CHECK-SAME:         outs(%[[DST_SUBVIEW]] :

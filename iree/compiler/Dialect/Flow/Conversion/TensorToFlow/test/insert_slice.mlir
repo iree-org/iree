@@ -1,4 +1,4 @@
-// RUN: iree-opt -allow-unregistered-dialect -split-input-file -iree-flow-convert-to-flow-before-dispatch-formation %s | FileCheck %s
+// RUN: iree-opt -allow-unregistered-dialect -split-input-file -iree-flow-convert-to-flow %s | FileCheck %s
 
 func @insert_slice_convert
     (%arg0 : tensor<?x24x48xf32>, %arg1 : tensor<1x4x48xf32>) ->

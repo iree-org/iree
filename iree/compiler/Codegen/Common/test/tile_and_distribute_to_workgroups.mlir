@@ -1104,6 +1104,7 @@ hal.executable private @reduce_to_scalar {
 //  CHECK-NOT:   scf.for
 
 // -----
+
 #executable_layout = #hal.executable.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
@@ -1150,3 +1151,56 @@ hal.executable private @scalar {
 // CHECK-SAME:  translation_info = #[[TRANSLATION]]
 //      CHECK: func @scalar()
 //  CHECK-NOT:   scf.for
+
+// -----
+
+#config = #iree_codegen.lowering_config<tile_sizes = [[2], [2], [0]]>
+#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>
+  ]>
+]>
+#executable_target_embedded_elf_arm_64_ = #hal.executable.target<"llvm", "embedded-elf-arm_64", {
+  data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
+  native_vector_size = 16 : index,
+  target_triple = "aarch64-unknown-unknown-eabi-elf"
+}>
+#translation = #iree_codegen.translation_info<CPUTileFuseAndVectorize>
+hal.executable private @rank_reduced_slice {
+  hal.executable.variant public @llvm, target = #executable_target_embedded_elf_arm_64_ {
+    hal.executable.entry_point public @rank_reduced_slice layout(#executable_layout) {translation_info = #translation}
+    builtin.module {
+      func @rank_reduced_slice() {
+        %in_binding = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer)
+            : !flow.dispatch.tensor<readonly:1x40xf32>
+        %out_binding = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer)
+            : !flow.dispatch.tensor<writeonly:10xf32>
+        %in = flow.dispatch.tensor.load %in_binding, offsets = [0, 10], sizes = [1, 10], strides = [1, 1]
+            : !flow.dispatch.tensor<readonly:1x40xf32> -> tensor<10xf32>
+        %out = linalg.init_tensor [10] : tensor<10xf32>
+        %val = linalg.generic {
+            indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>],
+            iterator_types = ["parallel"]}
+            ins(%in : tensor<10xf32>) outs(%out : tensor<10xf32>) attrs =  {lowering_config = #config} {
+          ^bb0(%b0 : f32, %b1 : f32):
+            %0 = arith.addf %b0, %b0 : f32
+            linalg.yield %0 : f32
+          } -> tensor<10xf32>
+        flow.dispatch.tensor.store %val, %out_binding, offsets = [0], sizes = [10], strides = [1]
+            : tensor<10xf32> -> !flow.dispatch.tensor<writeonly:10xf32>
+        return
+      }
+    }
+  }
+}
+//      CHECK: func @rank_reduced_slice()
+//  CHECK-DAG:   %[[SRC_BINDING:.+]] = hal.interface.binding.subspan set(0) binding(0)
+// CHECK-SAME:       : !flow.dispatch.tensor<readonly:1x40xf32>
+//  CHECK-DAG:   %[[DST_BINDING:.+]] = hal.interface.binding.subspan set(0) binding(1)
+// CHECK-SAME:       : !flow.dispatch.tensor<writeonly:10xf32>
+//      CHECK:   scf.for %[[IV0:.+]] =
+//      CHECK:     %[[SRC_TILE:.+]] = flow.dispatch.tensor.load %[[SRC_BINDING]]
+// CHECK-SAME:         offsets = [0, %[[IV0]]], sizes = [1, 2], strides = [1, 1]
+//      CHECK:     linalg.generic
+// CHECK-SAME:         ins(%[[SRC_TILE]] :
