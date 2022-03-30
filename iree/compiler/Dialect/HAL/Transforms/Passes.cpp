@@ -117,6 +117,15 @@ void buildHALTransformPassPipeline(OpPassManager &passManager,
   // device communicate across the ABI boundary.
   passManager.addPass(createMaterializeInterfacesPass());
 
+  // Dump a source listing of each hal.executable and update the source
+  // locations in the IR. This will allow us to easily inspect each executable
+  // and give downstream tools that can display source information something
+  // more useful and slim than the entire original source model.
+  if (!targetOptions.sourceListingPath.empty()) {
+    passManager.addPass(
+        createDumpExecutableSourcesPass(targetOptions.sourceListingPath));
+  }
+
   // TODO(benvanik): move translation after conversion; today translation
   // inserts the workgroup count logic we need to convert but we could instead
   // insert placeholder ops that are expanded after translation.

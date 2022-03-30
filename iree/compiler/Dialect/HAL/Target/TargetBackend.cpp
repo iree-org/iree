@@ -27,8 +27,14 @@ void TargetOptions::bindOptions(OptionsBinder &binder) {
   // first.
   binder.list<std::string>(
       "iree-hal-target-backends", targets,
-      llvm::cl::desc("Target backends for executable compilation"),
+      llvm::cl::desc("Target backends for executable compilation."),
       llvm::cl::ZeroOrMore, llvm::cl::cat(halTargetOptionsCategory));
+
+  binder.opt<std::string>(
+      "iree-hal-dump-executable-sources-to", sourceListingPath,
+      llvm::cl::desc("Path to write individual hal.executable input "
+                     "source listings into (- for stdout)."),
+      llvm::cl::cat(halTargetOptionsCategory));
 }
 
 // Renames |op| within |moduleOp| with a new name that is unique within both

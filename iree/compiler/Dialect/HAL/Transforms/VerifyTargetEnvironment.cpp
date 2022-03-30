@@ -44,6 +44,20 @@ class VerifyTargetEnvironmentPass
   void runOnOperation() override {
     auto moduleOp = getOperation();
 
+    // Targets are required if we need to convert host code or executables.
+    // If we only have hal.executables as input then we can bypass this.
+    // We could extend this check to be a bit smarter at the risk of false
+    // negatives - today this is just handling the standalone hal.executable
+    // compilation workflow.
+    bool anyNonExecutableOps = false;
+    for (auto &op : moduleOp.getOps()) {
+      if (!isa<IREE::HAL::ExecutableOp>(op)) {
+        anyNonExecutableOps = true;
+        break;
+      }
+    }
+    if (!anyNonExecutableOps) return;
+
     // Must have targets specified.
     auto targetsAttr = moduleOp->getAttrOfType<ArrayAttr>("hal.device.targets");
     if (!targetsAttr || targetsAttr.empty()) {
