@@ -197,6 +197,11 @@ void populateVectorizePadPatterns(RewritePatternSet &patterns,
 // LLVMCPU
 //------------------------------------------------------------------------------
 
+// Verifies that only supported IR constructs are passed to the compiler (like
+// no Linalg transform markers are set).
+std::unique_ptr<OperationPass<ModuleOp>>
+createVerifyLinalgTransformLegalityPass();
+
 /// Performs the final conversion to LLVM dialect.
 std::unique_ptr<OperationPass<ModuleOp>> createConvertToLLVMPass();
 

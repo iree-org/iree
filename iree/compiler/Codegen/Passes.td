@@ -182,6 +182,12 @@ def MemrefCopyToLinalgPass :
 // LLVMCPU
 //------------------------------------------------------------------------------
 
+def VerifyLinalgTransformLegality :
+    Pass<"iree-llvmcpu-verify-linalg-transform-legality", "ModuleOp"> {
+  let summary = "Verify that only supported IR constructs are passed to the compiler.";
+  let constructor = "mlir::iree_compiler::createVerifyLinalgTransformLegalityPass()";
+}
+
 def ConvertToLLVM :
     Pass<"iree-convert-to-llvm", "ModuleOp"> {
   let summary =
