@@ -205,3 +205,29 @@ func.func @scalarize_vector_transfer_op(%arg: vector<3xf32>) -> (vector<3xf32>) 
   vector.transfer_write %arg, %2[%c3] : vector<3xf32>, memref<20xf32>
   return %3: vector<3xf32>
 }
+
+// -----
+
+
+// CHECK-LABEL: func @scalarize_non_minor_identity_transfer_write
+//  CHECK-SAME: (%[[VALUE:.+]]: vector<4xf32>, %[[I1:.+]]: index, %[[I2:.+]]: index)
+func.func @scalarize_non_minor_identity_transfer_write(%value: vector<4xf32>, %i1: index, %i2: index) {
+  %c0 = arith.constant 0: index
+  %buffer = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : memref<1x130x130x1xf32>
+  vector.transfer_write %value, %buffer[%c0, %i1, %i2, %c0] {in_bounds = [true], permutation_map = affine_map<(d0, d1, d2, d3) -> (d2)>} : vector<4xf32>, memref<1x130x130x1xf32>
+  return
+}
+
+// CHECK: %[[C0:.+]] = arith.constant 0 : index
+// CHECK: %[[BUFFER:.+]] = hal.interface.binding.subspan
+// CHECK: %[[E0:.+]] = vector.extract %[[VALUE]][0] : vector<4xf32>
+// CHECK: memref.store %[[E0]], %[[BUFFER]][%[[C0]], %[[I1]], %[[I2]], %[[C0]]]
+// CHECK: %[[PLUS1:.+]] = affine.apply affine_map<()[s0] -> (s0 + 1)>()[%[[I2]]]
+// CHECK: %[[E1:.+]] = vector.extract %[[VALUE]][1] : vector<4xf32>
+// CHECK: memref.store %[[E1]], %[[BUFFER]][%[[C0]], %[[I1]], %[[PLUS1]], %[[C0]]]
+// CHECK: %[[PLUS2:.+]] = affine.apply affine_map<()[s0] -> (s0 + 2)>()[%[[I2]]]
+// CHECK: %[[E2:.+]] = vector.extract %[[VALUE]][2] : vector<4xf32>
+// CHECK: memref.store %[[E2]], %[[BUFFER]][%[[C0]], %[[I1]], %[[PLUS2]], %[[C0]]]
+// CHECK: %[[PLUS3:.+]] = affine.apply affine_map<()[s0] -> (s0 + 3)>()[%[[I2]]]
+// CHECK: %[[E3:.+]] = vector.extract %[[VALUE]][3] : vector<4xf32>
+// CHECK: memref.store %[[E3]], %[[BUFFER]][%[[C0]], %[[I1]], %[[PLUS3]], %[[C0]]]
