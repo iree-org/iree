@@ -8,6 +8,8 @@
 # Tests
 ################################################################################
 
+if(IREE_BUILD_TESTS AND NOT ANDROID)
+
 iree_py_test(
   NAME
     linux_device_utils_test
@@ -22,10 +24,10 @@ iree_py_test(
     "common_arguments_test.py"
 )
 
-if(IREE_BUILD_TESTS)
-  # TODO(#8708): Temporary solution to fix python path for tests.
-  set_property(TEST "build_tools/benchmarks/common/linux_device_utils_test"
-      APPEND PROPERTY ENVIRONMENT "PYTHONPATH=${BENCHMARKS_TOOL_PYTHON_DIR}:$ENV{PYTHONPATH}")
-  set_property(TEST "build_tools/benchmarks/common/common_arguments_test"
+# TODO(#8708): Temporary solution to fix python path for tests.
+set_property(TEST "build_tools/benchmarks/common/linux_device_utils_test"
     APPEND PROPERTY ENVIRONMENT "PYTHONPATH=${BENCHMARKS_TOOL_PYTHON_DIR}:$ENV{PYTHONPATH}")
+set_property(TEST "build_tools/benchmarks/common/common_arguments_test"
+  APPEND PROPERTY ENVIRONMENT "PYTHONPATH=${BENCHMARKS_TOOL_PYTHON_DIR}:$ENV{PYTHONPATH}")
+
 endif()
