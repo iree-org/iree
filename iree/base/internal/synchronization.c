@@ -569,7 +569,9 @@ void iree_notification_deinitialize(iree_notification_t* notification) {
 #if IREE_SYNCHRONIZATION_DISABLE_UNSAFE
   // No-op.
 #elif !defined(IREE_PLATFORM_HAS_FUTEX)
+  pthread_mutex_lock(&notification->mutex);
   pthread_cond_destroy(&notification->cond);
+  pthread_mutex_unlock(&notification->mutex);
   pthread_mutex_destroy(&notification->mutex);
 #endif  // IREE_PLATFORM_HAS_FUTEX
 }
