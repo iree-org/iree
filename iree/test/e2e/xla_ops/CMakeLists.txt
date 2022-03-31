@@ -492,6 +492,8 @@ iree_check_single_backend_test_suite(
   COMPILER_FLAGS
     "-iree-input-type=mhlo"
     "-iree-llvm-target-cpu-features=host"
+  LABELS
+    "local"
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
