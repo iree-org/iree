@@ -50,7 +50,7 @@ for general instructions on building using CMake):
   ```
 
 2. Build the `static_library_demo` CMake target to create the static demo. This
-target has several dependencies that will translate `simple_mul.mlir` into a
+target has several dependencies that will compile `simple_mul.mlir` into a
 static library (`simple_mul.h` & `simple_mul.c`) as well as a bytecode module
 (`simple_mul.vmfb`) which are finally built into the demo binary:
 

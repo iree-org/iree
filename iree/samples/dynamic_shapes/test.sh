@@ -21,7 +21,7 @@ ${ROOT_DIR}/build_tools/testing/run_python_notebook.sh \
   ${ROOT_DIR}/iree/samples/dynamic_shapes/dynamic_shapes.ipynb
 test -f ${ARTIFACTS_DIR}/dynamic_shapes.mlir && echo "dynamic_shapes.mlir exists"
 
-# 2. Compile the `iree-compile` tool.
+# 2. Build the `iree-compile` tool.
 cmake -B ${BUILD_DIR} -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo ${ROOT_DIR}
 cmake --build ${BUILD_DIR} --target iree_tools_iree-compile -- -k 0
 
