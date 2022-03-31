@@ -22,22 +22,22 @@ class CommonArgumentsTest(unittest.TestCase):
   def test_build_common_argument_parser_check_build_dir(self):
     arg_parser = build_common_argument_parser()
     with self.assertRaises(SystemExit):
-      arg_parser.parse_args(["non_existed"])
+      arg_parser.parse_args(["nonexistent"])
 
   def test_build_common_argument_parser_check_normal_benchmark_tool(self):
     arg_parser = build_common_argument_parser()
     with self.assertRaises(SystemExit):
-      arg_parser.parse_args(["--normal_benchmark_tool_dir=non_existed", "."])
+      arg_parser.parse_args(["--normal_benchmark_tool_dir=nonexistent", "."])
 
   def test_build_common_argument_parser_check_traced_benchmark_tool(self):
     arg_parser = build_common_argument_parser()
     with self.assertRaises(SystemExit):
-      arg_parser.parse_args(["--traced_benchmark_tool_dir=non_existed", "."])
+      arg_parser.parse_args(["--traced_benchmark_tool_dir=nonexistent", "."])
 
   def test_build_common_argument_parser_check_trace_capture_tool(self):
     arg_parser = build_common_argument_parser()
     with self.assertRaises(SystemExit):
-      arg_parser.parse_args(["--trace_capture_tool=non_existed", "."])
+      arg_parser.parse_args(["--trace_capture_tool=nonexistent", "."])
 
 
 if __name__ == "__main__":
