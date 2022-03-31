@@ -48,5 +48,5 @@ def get_linux_device_info(device_model: str = "Unknown",
       # Currently we only have x86, so CPU ABI = CPU arch.
       cpu_abi=get_linux_cpu_arch(verbose),
       cpu_features=get_linux_cpu_features(verbose),
-      # Not yet support GPU benchmark on Linux devices.
+      # We don't yet support GPU benchmark on Linux devices.
       gpu_name="Unknown")
