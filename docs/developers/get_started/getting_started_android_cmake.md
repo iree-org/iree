@@ -134,7 +134,7 @@ The above command will upload necessary build artifacts to the Android device's
 
 Alternatively, if you want to invoke a specific HAL backend on a IREE module:
 
-### VMLA HAL backend
+### VMVX HAL backend
 
 Translate a source MLIR into IREE module:
 
