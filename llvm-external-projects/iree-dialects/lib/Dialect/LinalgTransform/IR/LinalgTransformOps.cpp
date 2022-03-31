@@ -267,31 +267,35 @@ static Value getNeutralOfLinalgOp(OpBuilder &b, OpOperand &op) {
 }
 
 FailureOr<LinalgOp> transform::PadOp::applyToOne(LinalgOp target) {
+  // Disabled due to incompatibility with changes in
+  // https://github.com/llvm/llvm-project/commit/58d0da885ef46e3fdb5247295da7898b377c41e1
+
   // Copy the stack allocated options since the lambdas have a longer lifetime.
-  SmallVector<int64_t> packPaddings = extractI64Array(this->pack_paddings());
-  auto packFunc = [=](OpOperand &opOperand) {
-    return opOperand.getOperandNumber() < packPaddings.size()
-               ? packPaddings[opOperand.getOperandNumber()] != 0
-               : false;
-  };
-  SmallVector<int64_t> hoistPaddings = extractI64Array(this->hoist_paddings());
-  auto hoistingFunc = [=](OpOperand &opOperand) {
-    return opOperand.getOperandNumber() < hoistPaddings.size()
-               ? hoistPaddings[opOperand.getOperandNumber()]
-               : 0;
-  };
-  ArrayAttr transposePaddings = this->transpose_paddings().cast<ArrayAttr>();
-  auto transposeFunc = [=](OpOperand &opOperand) {
-    if (opOperand.getOperandNumber() >= transposePaddings.size())
-      return SmallVector<int64_t>();
-    return extractI64Array(
-        transposePaddings[opOperand.getOperandNumber()].cast<ArrayAttr>());
-  };
+  // SmallVector<int64_t> packPaddings = extractI64Array(this->pack_paddings());
+  // auto packFunc = [=](OpOperand &opOperand) {
+  //   return opOperand.getOperandNumber() < packPaddings.size()
+  //              ? packPaddings[opOperand.getOperandNumber()] != 0
+  //              : false;
+  // };
+  // SmallVector<int64_t> hoistPaddings =
+  // extractI64Array(this->hoist_paddings()); auto hoistingFunc = [=](OpOperand
+  // &opOperand) {
+  //   return opOperand.getOperandNumber() < hoistPaddings.size()
+  //              ? hoistPaddings[opOperand.getOperandNumber()]
+  //              : 0;
+  // };
+  // ArrayAttr transposePaddings = this->transpose_paddings().cast<ArrayAttr>();
+  // auto transposeFunc = [=](OpOperand &opOperand) {
+  //   if (opOperand.getOperandNumber() >= transposePaddings.size())
+  //     return SmallVector<int64_t>();
+  //   return extractI64Array(
+  //       transposePaddings[opOperand.getOperandNumber()].cast<ArrayAttr>());
+  // };
   LinalgPaddingOptions paddingOptions;
-  paddingOptions.setPaddingValueComputationFunction(getNeutralOfLinalgOp);
-  paddingOptions.setPaddingNoFoldComputationFunction(packFunc);
-  paddingOptions.setPaddingHoistComputationFunction(hoistingFunc);
-  paddingOptions.setPaddingTransposeComputationFunction(transposeFunc);
+  // paddingOptions.setPaddingValueComputationFunction(getNeutralOfLinalgOp);
+  // paddingOptions.setPaddingNoFoldComputationFunction(packFunc);
+  // paddingOptions.setPaddingHoistComputationFunction(hoistingFunc);
+  // paddingOptions.setPaddingTransposeComputationFunction(transposeFunc);
 
   return functional::applyAt(target, callLinalgPattern<LinalgPaddingPattern>(
                                          getContext(), paddingOptions));

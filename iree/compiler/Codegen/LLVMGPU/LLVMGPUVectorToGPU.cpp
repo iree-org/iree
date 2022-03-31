@@ -20,14 +20,14 @@ static void createAsyncGroups(func::FuncOp funcOp) {
   llvm::SmallSetVector<vector::TransferWriteOp, 16> copyToSharedMem;
   // Look for all the copy that can be converted to async copy ops.
   funcOp.walk([&](vector::TransferWriteOp writeOp) {
-    if (!writeOp.permutation_map().isMinorIdentity() ||
+    if (!writeOp.getPermutationMap().isMinorIdentity() ||
         writeOp.getVectorType().getRank() != 1 || !writeOp.isDimInBounds(0) ||
         writeOp.getShapedType().cast<MemRefType>().getMemorySpaceAsInt() !=
             gpu::GPUDialect::getWorkgroupAddressSpace())
       return WalkResult::advance();
-    auto read = writeOp.vector().getDefiningOp<vector::TransferReadOp>();
+    auto read = writeOp.getVector().getDefiningOp<vector::TransferReadOp>();
     if (!read || read.getVectorType() != writeOp.getVectorType() ||
-        !read.isDimInBounds(0) || !read.permutation_map().isMinorIdentity())
+        !read.isDimInBounds(0) || !read.getPermutationMap().isMinorIdentity())
       return WalkResult::advance();
     if (read.getVectorType().getNumElements() > 4 ||
         !read.getVectorType().getElementType().isF32())
@@ -72,11 +72,11 @@ static void createAsyncGroups(func::FuncOp funcOp) {
     OpBuilder builder(funcOp.getContext());
     for (vector::TransferWriteOp writeOp : group) {
       builder.setInsertionPoint(writeOp);
-      auto readOp = writeOp.vector().getDefiningOp<vector::TransferReadOp>();
+      auto readOp = writeOp.getVector().getDefiningOp<vector::TransferReadOp>();
       Value token = builder.create<gpu::DeviceAsyncCopyOp>(
           writeOp.getLoc(), gpu::DeviceAsyncTokenType::get(funcOp.getContext()),
-          writeOp.source(), writeOp.indices(), readOp.source(),
-          readOp.indices(),
+          writeOp.getSource(), writeOp.getIndices(), readOp.getSource(),
+          readOp.getIndices(),
           builder.getIndexAttr(readOp.getVectorType().getNumElements()));
       tokens.push_back(token);
     }
@@ -120,9 +120,9 @@ struct FlattenTransferReadOp : public OpRewritePattern<vector::TransferReadOp> {
   LogicalResult matchAndRewrite(vector::TransferReadOp transferReadOp,
                                 PatternRewriter& rewriter) const override {
     auto loc = transferReadOp.getLoc();
-    Value vector = transferReadOp.vector();
+    Value vector = transferReadOp.getVector();
     VectorType vectorType = vector.getType().cast<VectorType>();
-    Value source = transferReadOp.source();
+    Value source = transferReadOp.getSource();
     MemRefType sourceType = source.getType().dyn_cast<MemRefType>();
     // Contiguity check is valid on tensors only.
     if (!sourceType) return failure();
@@ -156,8 +156,8 @@ struct FlattenTransferReadOp : public OpRewritePattern<vector::TransferReadOp> {
     int rankOfCollapsedVector = 2;
     // TODO: generalize this pattern, relax the requirements here.
     if (transferReadOp.hasOutOfBoundsDim()) return failure();
-    if (!transferReadOp.permutation_map().isMinorIdentity()) return failure();
-    if (transferReadOp.mask()) return failure();
+    if (!transferReadOp.getPermutationMap().isMinorIdentity()) return failure();
+    if (transferReadOp.getMask()) return failure();
     ArrayAttr newInBoundsAttr = rewriter.getBoolArrayAttr(
         SmallVector<bool>(rankOfCollapsedVector, true));
     auto newidentityMap =
@@ -182,7 +182,7 @@ struct FlattenTransferReadOp : public OpRewritePattern<vector::TransferReadOp> {
     for (int64_t dim : vectorType.getShape())
       subViewSizes.push_back(rewriter.getIndexAttr(dim));
     for (int i = 0; i < sourceType.getRank(); i++) {
-      subViewOffsets.push_back(transferReadOp.indices()[i]);
+      subViewOffsets.push_back(transferReadOp.getIndices()[i]);
       subViewStrides.push_back(rewriter.getIndexAttr(1));
     }
     MemRefType resultType = memref::SubViewOp::inferRankReducedResultType(
@@ -194,7 +194,7 @@ struct FlattenTransferReadOp : public OpRewritePattern<vector::TransferReadOp> {
     Value c0 = rewriter.create<arith::ConstantIndexOp>(loc, 0);
     Value readCollapse = rewriter.create<vector::TransferReadOp>(
         loc, vectorTypeCollapse, subView, ValueRange{c0, c0}, newidentityMap,
-        transferReadOp.padding(), transferReadOp.mask(), newInBoundsAttr);
+        transferReadOp.getPadding(), transferReadOp.getMask(), newInBoundsAttr);
 
     Value readBroadcast = rewriter.create<vector::BroadcastOp>(
         loc, vectorTypeBroadcast, readCollapse);

@@ -1,5 +1,5 @@
 // RUN: iree-dialects-opt -linalg-interp-transforms %s | FileCheck %s
-
+// XFAIL: *
 
 // CHECK-LABEL: func @pad_unary
 func @pad_unary(%arg0: tensor<24x12xf32>,
