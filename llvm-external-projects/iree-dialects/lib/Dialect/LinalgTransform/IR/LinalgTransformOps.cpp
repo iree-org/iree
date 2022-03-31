@@ -161,27 +161,54 @@ LogicalResult transform::MatchOp::apply(TransformResults &results,
 // TileOp
 //===---------------------------------------------------------------------===//
 
-FailureOr<LinalgOp> transform::TileOp::applyToOne(LinalgOp target) {
+LogicalResult transform::TileOp::apply(TransformResults &transformResults,
+                                       TransformState &state) {
   LinalgTilingOptions tilingOptions;
   SmallVector<int64_t> tileSizes = extractI64Array(sizes());
+  size_t numExpectedLoops = 0;
+  for (int64_t i : tileSizes)
+    if (i)
+      ++numExpectedLoops;
+
   // "scalarize_dyn_dims" actually sets the same lambda as the tile sizes and
   // asserts that it is not already set.
   if (!tileSizes.empty() || !scalarize_dyn_dims())
     tilingOptions.setTileSizes(tileSizes);
   tilingOptions.setInterchange(extractUIntArray(interchange()));
-  tilingOptions.setPeeledLoops(extractI64Array(peel()));
   if (scalarize_dyn_dims())
     tilingOptions.scalarizeDynamicDims();
-
   LinalgTilingPattern pattern(getContext(), tilingOptions);
-  auto functionalTile = [&](LinalgOp op,
-                            PatternRewriter &rewriter) -> FailureOr<LinalgOp> {
-    auto result = pattern.returningMatchAndRewrite(op, rewriter);
-    if (failed(result))
-      return failure();
-    return result->op;
+  auto functionalTile =
+      [&](LinalgOp op, PatternRewriter &rewriter) -> FailureOr<TiledLinalgOp> {
+    return pattern.returningMatchAndRewrite(op, rewriter);
   };
-  return functional::applyAt(target, functionalTile);
+
+  SmallVector<Operation *> tiledLinalgOps;
+  SmallVector<SmallVector<Operation *>> loops(numExpectedLoops);
+
+  for (Operation *target : state.getPayloadOps(target())) {
+    auto linalgOp = cast<linalg::LinalgOp>(target);
+    FailureOr<TiledLinalgOp> tiled =
+        functional::applyAt(linalgOp, functionalTile);
+    if (failed(tiled))
+      return failure();
+
+    tiledLinalgOps.push_back(tiled->op);
+    if (tiled->loops.size() != numExpectedLoops)
+      // Not enough loops were generated. This usually means that the input size
+      // was smaller than the tiling size.
+      // TODO: LinalgTilingPattern should return failure().
+      return failure();
+    for (unsigned int i = 0; i < numExpectedLoops; ++i) {
+      loops[i].push_back(tiled->loops[i]);
+    }
+  }
+
+  transformResults.set(tiled_linalg_op().cast<OpResult>(), tiledLinalgOps);
+  for (unsigned int i = 0; i < numExpectedLoops; ++i) {
+    transformResults.set(getOperation()->getOpResult(i + 1), loops[i]);
+  }
+  return success();
 }
 
 LogicalResult transform::TileOp::verify() {
@@ -191,6 +218,38 @@ LogicalResult transform::TileOp::verify() {
                          << " attributes are mutually exclusive";
   }
   return success();
+}
+
+ParseResult transform::TileOp::parse(OpAsmParser &parser,
+                                     OperationState &result) {
+  OpAsmParser::UnresolvedOperand targetOperand;
+  SMLoc opLoc;
+  parser.getCurrentLocation(&opLoc);
+  if (parser.parseOperand(targetOperand))
+    return parser.emitError(opLoc, "expected `target` operand");
+  if (parser.parseOptionalAttrDict(result.attributes))
+    return failure();
+  Type pdlOpType = parser.getBuilder().getType<pdl::OperationType>();
+  result.addTypes(pdlOpType);
+  Attribute sizesAttr = result.attributes.get("sizes");
+  if (!sizesAttr)
+    return parser.emitError(opLoc, "expected `sizes` attribute");
+  auto sizesArrayAttr = sizesAttr.dyn_cast<ArrayAttr>();
+  if (!sizesArrayAttr)
+    return parser.emitError(opLoc, "`sizes` attribute must be an array");
+  for (int64_t tileSize : extractI64Array(sizesArrayAttr)) {
+    if (tileSize)
+      result.addTypes(pdlOpType);
+  }
+  if (parser.resolveOperand(targetOperand, pdlOpType, result.operands))
+    return failure();
+  return success();
+}
+
+void transform::TileOp::print(OpAsmPrinter &p) {
+  p << ' ';
+  p << target();
+  p.printOptionalAttrDict((*this)->getAttrs());
 }
 
 //===---------------------------------------------------------------------===//
@@ -696,7 +755,7 @@ FailureOr<scf::ForOp> transform::PeelLoopOp::applyToOne(scf::ForOp loop) {
   LogicalResult status =
       scf::peelAndCanonicalizeForLoop(rewriter, loop, result);
   if (failed(status))
-    return failure();
+    return loop;
   return result;
 }
 

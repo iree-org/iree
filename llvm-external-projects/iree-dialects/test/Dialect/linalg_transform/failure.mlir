@@ -128,7 +128,7 @@ iree_linalg_transform.sequence {
   %0 = match @pdl_target
   // expected-error @below {{failed to apply}}
   vectorize
-  tile %0
+  tile %0 {sizes = [32, 32, 32]}
 }
 
 // -----
@@ -174,6 +174,6 @@ iree_linalg_transform.sequence {
   %1 = match @pdl_target2
 
   // Add references to handles produced by match so that they are not DCE'd.
-  tile %0
-  tile %1
+  tile %0 {sizes = [32, 32, 32]}
+  tile %1 {sizes = [32, 32, 32]}
 }

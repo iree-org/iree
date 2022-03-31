@@ -99,23 +99,24 @@ def MatchOp : Transform_Op<"match"> {
 //===----------------------------------------------------------------------===//
 
 def TileOp : Linalg_Transform_Operation<"tile",
-    [TransformOpInterface, TargetableSingleOperandTransformOpTrait]> {
+    [TransformOpInterface]> {
   let description = [{Indicates that ops of a specific kind in the given
   function should be tiled with the options provided as attributes.}];
 
   let arguments = (ins PDL_Operation:$target,
                    DefaultValuedAttr<I64ArrayAttr, "{}">:$sizes,
                    DefaultValuedAttr<I64ArrayAttr, "{}">:$interchange,
-                   DefaultValuedAttr<I64ArrayAttr, "{}">:$peel,
                    DefaultValuedAttr<BoolAttr, "false">:$scalarize_dyn_dims);
-  let results = (outs PDL_Operation:$transformed);
+  let results = (outs PDL_Operation:$tiled_linalg_op,
+                      Variadic<PDL_Operation>:$loops);
 
-  let assemblyFormat = "$target attr-dict";
+  let hasCustomAssemblyFormat = 1;
   let hasVerifier = 1;
 
   let extraClassDeclaration = [{
-    ::mlir::FailureOr<::mlir::linalg::LinalgOp> applyToOne(
-        ::mlir::linalg::LinalgOp target);
+    ::mlir::LogicalResult apply(
+        ::mlir::linalg::transform::TransformResults &transformResults,
+        ::mlir::linalg::transform::TransformState &state);
   }];
 }
 

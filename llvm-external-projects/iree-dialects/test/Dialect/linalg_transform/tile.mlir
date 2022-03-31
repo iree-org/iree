@@ -41,6 +41,6 @@ pdl.pattern @pdl_target : benefit(1) {
 
 iree_linalg_transform.sequence {
   %0 = match @pdl_target
-  %1 = tile %0 {sizes = [4, 4, 4]}
+  %1, %loops:3 = tile %0 {sizes = [4, 4, 4]}
   print %1 {name = "Tiled"} 
 }
