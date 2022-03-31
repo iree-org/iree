@@ -6,7 +6,7 @@
 """Updates the TFLite integration test model documentation.
 
 When changes are made in the ../integrations/tensorflow/test/iree_tfl_tests 
-directory, please run this script to update the table of models.
+directory, please run this script to update the dashboard of models.
 """
 
 import os
@@ -35,7 +35,7 @@ def main():
   with open(os.path.join(model_dir, 'README.md'),
             'w') as tflite_model_documentation:
     tflite_model_documentation.write('# TFLite integration tests status\n\n' \
-    'This documentation shows the models that are currently being tested on IREE\'s\n' \
+    'This dashboard shows the models that are currently being tested on IREE\'s\n' \
     'presubmits.  If any tests are added or changed, please run\n' \
     'scripts/update_tflite_model_documentation.py to update this table.\n\n' \
     '|       Model        |      Status        |\n' \
@@ -45,4 +45,3 @@ def main():
 
 if __name__ == '__main__':
   main()
-  

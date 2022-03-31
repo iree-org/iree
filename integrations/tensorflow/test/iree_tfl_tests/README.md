@@ -1,6 +1,6 @@
 # TFLite integration tests status
 
-This documentation shows the models that are currently being tested on IREE's
+This dashboard shows the models that are currently being tested on IREE's
 presubmits.  If any tests are added or changed, please run
 scripts/update_tflite_model_documentation.py to update this table.
 
