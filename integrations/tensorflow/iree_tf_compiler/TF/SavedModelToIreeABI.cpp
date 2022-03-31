@@ -415,7 +415,8 @@ LogicalResult materializeABIWrapper(ModuleOp module, FuncOp internalFunc,
   OpBuilder builder(internalFunc);
   const StringAttr savedModelIndexPathIdent =
       builder.getStringAttr("tf_saved_model.index_path");
-  FunctionType internalFuncType = internalFunc.getType();
+  FunctionType internalFuncType =
+      internalFunc.getFunctionType().cast<FunctionType>();
   json::Array refArgs;
   json::Array refReturns;
 
@@ -514,7 +515,7 @@ LogicalResult materializeABIWrapper(ModuleOp module, FuncOp internalFunc,
   // Emit the call to the internal func.
   ResultRange internalResults =
       builder
-          .create<func::CallOp>(loc, internalFunc.getType().getResults(),
+          .create<func::CallOp>(loc, internalFuncType.getResults(),
                                 internalFunc.getName(), callArgs)
           .getResults();
 
