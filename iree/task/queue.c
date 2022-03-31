@@ -10,7 +10,7 @@
 #include <string.h>
 
 void iree_task_queue_initialize(iree_task_queue_t* out_queue) {
-  memset(out_queue, 0, sizeof(*out_queue));
+  memset(&out_queue->list, 0, sizeof(out_queue->list));
   iree_slim_mutex_initialize(&out_queue->mutex);
   iree_task_list_initialize(&out_queue->list);
 }
