@@ -34,14 +34,14 @@ FlowTypeConverter::FlowTypeConverter() {
   // This is a workaround for lower levels of the stack not always supporting
   // 64-bit types natively.
   // TODO(benvanik): make whether to narrow integers an option.
-  addConversion([](IntegerType integerType) -> Optional<Type> {
-    if (integerType.getWidth() > 32) {
-      // Narrow to i32 preserving signedness semantics.
-      return IntegerType::get(integerType.getContext(), 32,
-                              integerType.getSignedness());
-    }
-    return llvm::None;
-  });
+  // addConversion([](IntegerType integerType) -> Optional<Type> {
+  //   if (integerType.getWidth() > 32) {
+  //     // Narrow to i32 preserving signedness semantics.
+  //     return IntegerType::get(integerType.getContext(), 32,
+  //                             integerType.getSignedness());
+  //   }
+  //   return llvm::None;
+  // });
 
   // UNSAFE: narrow 64-bit floats to 32-bit ones.
   // This is a workaround for lower levels of the stack not always supporting
