@@ -641,6 +641,7 @@ cc_library(
         "@llvm-project//mlir:TensorDialect",
         # IR
         "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:Parser",
         "@llvm-project//mlir:Pass",
         "@llvm-project//mlir:Rewrite",
         # Interfaces

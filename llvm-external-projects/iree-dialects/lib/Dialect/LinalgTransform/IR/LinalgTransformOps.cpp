@@ -44,6 +44,7 @@
 #include "mlir/IR/Diagnostics.h"
 #include "mlir/IR/OpImplementation.h"
 #include "mlir/IR/SymbolTable.h"
+#include "mlir/Parser/Parser.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "mlir/Transforms/InliningUtils.h"
@@ -82,6 +83,16 @@ static SmallVector<int64_t> extractI64Array(ArrayAttr attr) {
   result.reserve(attr.size());
   for (APInt value : attr.getAsValueRange<IntegerAttr>())
     result.push_back(value.getSExtValue());
+  return result;
+}
+
+/// Extracts a vector of StringRef from an array attribute. Asserts if the
+/// attribute contains values other than StringRefs.
+static SmallVector<StringRef> extractStringArray(ArrayAttr attr) {
+  SmallVector<StringRef> result;
+  result.reserve(attr.size());
+  for (StringRef value : attr.getAsValueRange<StringAttr>())
+    result.push_back(value);
   return result;
 }
 
@@ -256,49 +267,44 @@ LogicalResult transform::InterchangeOp::verify() {
 // PadOp
 //===---------------------------------------------------------------------===//
 
-/// Returns the neutral value for a Linalg operation that produces the given
-/// operand, construct using the provided builder. Currently assumes the
-/// reduction in the Linalg operation is an addition and, therefore, the neutral
-/// value is zero.
-static Value getNeutralOfLinalgOp(OpBuilder &b, OpOperand &op) {
-  auto t = getElementTypeOrSelf(op.get().getType());
-  return b.create<arith::ConstantOp>(op.getOwner()->getLoc(), t,
-                                     b.getZeroAttr(t));
-}
-
 FailureOr<LinalgOp> transform::PadOp::applyToOne(LinalgOp target) {
-  // Disabled due to incompatibility with changes in
-  // https://github.com/llvm/llvm-project/commit/58d0da885ef46e3fdb5247295da7898b377c41e1
+  // Convert the integer packing flags to booleans.
+  SmallVector<bool> packPaddings;
+  for (int64_t packPadding : extractI64Array(this->pack_paddings()))
+    packPaddings.push_back(static_cast<bool>(packPadding));
 
-  // Copy the stack allocated options since the lambdas have a longer lifetime.
-  // SmallVector<int64_t> packPaddings = extractI64Array(this->pack_paddings());
-  // auto packFunc = [=](OpOperand &opOperand) {
-  //   return opOperand.getOperandNumber() < packPaddings.size()
-  //              ? packPaddings[opOperand.getOperandNumber()] != 0
-  //              : false;
-  // };
-  // SmallVector<int64_t> hoistPaddings =
-  // extractI64Array(this->hoist_paddings()); auto hoistingFunc = [=](OpOperand
-  // &opOperand) {
-  //   return opOperand.getOperandNumber() < hoistPaddings.size()
-  //              ? hoistPaddings[opOperand.getOperandNumber()]
-  //              : 0;
-  // };
-  // ArrayAttr transposePaddings = this->transpose_paddings().cast<ArrayAttr>();
-  // auto transposeFunc = [=](OpOperand &opOperand) {
-  //   if (opOperand.getOperandNumber() >= transposePaddings.size())
-  //     return SmallVector<int64_t>();
-  //   return extractI64Array(
-  //       transposePaddings[opOperand.getOperandNumber()].cast<ArrayAttr>());
-  // };
+  // Convert the padding values to attributes.
+  SmallVector<Attribute> paddingValues;
+  for (auto const &it : llvm::zip(extractStringArray(this->padding_values()),
+                                  target->getOperandTypes())) {
+    Type elementType = getElementTypeOrSelf(std::get<1>(it));
+    paddingValues.push_back(parseAttribute(std::get<0>(it), elementType));
+    if (!paddingValues.back()) {
+      return target->emitOpError("Could not parse padding value: ")
+             << std::get<0>(it) << " to type: " << elementType;
+    }
+  }
+
+  // Extract the transpose vectors.
+  SmallVector<SmallVector<int64_t>> transposePaddings;
+  for (Attribute transposeVector : this->transpose_paddings().cast<ArrayAttr>())
+    transposePaddings.push_back(
+        extractI64Array(transposeVector.cast<ArrayAttr>()));
+
   LinalgPaddingOptions paddingOptions;
-  // paddingOptions.setPaddingValueComputationFunction(getNeutralOfLinalgOp);
-  // paddingOptions.setPaddingNoFoldComputationFunction(packFunc);
-  // paddingOptions.setPaddingHoistComputationFunction(hoistingFunc);
-  // paddingOptions.setPaddingTransposeComputationFunction(transposeFunc);
-
-  return functional::applyAt(target, callLinalgPattern<LinalgPaddingPattern>(
-                                         getContext(), paddingOptions));
+  paddingOptions.setPaddingValues(paddingValues);
+  paddingOptions.setPaddingDimensions(
+      extractI64Array(this->padding_dimensions()));
+  paddingOptions.setPackPaddings(packPaddings);
+  paddingOptions.setHoistPaddings(extractI64Array(this->hoist_paddings()));
+  paddingOptions.setTransposePaddings(transposePaddings);
+  auto res = functional::applyAt(
+      target,
+      callLinalgPattern<LinalgPaddingPattern>(getContext(), paddingOptions));
+  if (failed(res))
+    return target->emitOpError()
+           << "failed to apply LinalgPaddingPattern at: " << target;
+  return res;
 }
 
 LogicalResult transform::PadOp::verify() {
@@ -309,6 +315,14 @@ LogicalResult transform::PadOp::verify() {
     return emitOpError()
            << "expects pack_paddings to contain booleans (0/1), found "
            << pack_paddings();
+  }
+  SmallVector<int64_t> paddingDimensions =
+      extractI64Array(padding_dimensions());
+  if (any_of(paddingDimensions,
+             [](int64_t paddingDimension) { return paddingDimension < 0; })) {
+    return emitOpError()
+           << "expects padding_dimensions to contain positive integers, found "
+           << padding_dimensions();
   }
   SmallVector<int64_t> hoistPaddings = extractI64Array(hoist_paddings());
   if (any_of(hoistPaddings,

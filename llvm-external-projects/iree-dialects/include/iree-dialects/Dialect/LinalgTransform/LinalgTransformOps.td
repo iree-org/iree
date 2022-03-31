@@ -179,6 +179,8 @@ def PadOp : Linalg_Transform_Operation<"pad",
   using the options provides as operation attributes.}];
 
   let arguments = (ins PDL_Operation:$target,
+                   DefaultValuedAttr<StrArrayAttr, "{}">:$padding_values,
+                   DefaultValuedAttr<I64ArrayAttr, "{}">:$padding_dimensions,
                    DefaultValuedAttr<I64ArrayAttr, "{}">:$pack_paddings,
                    DefaultValuedAttr<I64ArrayAttr, "{}">:$hoist_paddings,
                    DefaultValuedAttr<
