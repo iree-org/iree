@@ -2,10 +2,18 @@
 
 iree_linalg_transform.sequence {
   %0 = match @match
+  // expected-error@below {{expected `sizes` attribute}}
+  tile %0
+}
+
+// -----
+
+iree_linalg_transform.sequence {
+  %0 = match @match
   // expected-error@below {{result #0 has more than one use}}
-  %1 = tile %0
+  %1, %loops:3 = tile %0 {sizes = [32, 32, 32]}
   // expected-note@below {{used here as operand #0}}
-  tile %1
+  tile %1 {sizes = [32, 32, 32]}
   // expected-note@below {{used here as operand #0}}
   vectorize %1
 }
