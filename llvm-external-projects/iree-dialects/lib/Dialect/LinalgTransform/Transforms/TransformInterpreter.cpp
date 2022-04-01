@@ -165,7 +165,7 @@ static LogicalResult executeSequence(linalg::transform::SequenceOp sequence,
     if (failed(executeTransform(&transform, state))) {
       std::string str;
       llvm::raw_string_ostream ss(str);
-      ss << "failed to apply: " << transform << "\nto\n" << containerOp;
+      ss << "failed to apply: " << transform << "\nto\n" << *containerOp;
       ss.flush();
       return transform.emitError() << str;
     }

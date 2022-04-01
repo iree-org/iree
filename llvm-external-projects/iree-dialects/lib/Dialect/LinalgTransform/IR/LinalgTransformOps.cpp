@@ -191,17 +191,29 @@ LogicalResult transform::TileOp::apply(TransformResults &transformResults,
     FailureOr<TiledLinalgOp> tiled =
         functional::applyAt(linalgOp, functionalTile);
     if (failed(tiled))
-      return failure();
+      return linalgOp->emitOpError() << "Failed to apply tiling";
 
     tiledLinalgOps.push_back(tiled->op);
-    if (tiled->loops.size() != numExpectedLoops)
+
+    // Scalarizing dynamic dimensions is a special case where it is hard to
+    // know in advance how many loops we will need. The loop information is
+    // also rarely relevant.
+    // Instead, only returned the tiled op.
+    // TODO: this seems to warrant its own transformation rather than keep
+    // fused into tiling.
+    if (scalarize_dyn_dims())
+      continue;
+
+    if (tiled->loops.size() != numExpectedLoops) {
       // Not enough loops were generated. This usually means that the input size
       // was smaller than the tiling size.
       // TODO: LinalgTilingPattern should return failure().
-      return failure();
-    for (unsigned int i = 0; i < numExpectedLoops; ++i) {
-      loops[i].push_back(tiled->loops[i]);
+      return tiled->loops.front()->emitOpError()
+             << "Not enough loops generated: " << tiled->loops.size() << " vs "
+             << numExpectedLoops;
     }
+    for (unsigned int i = 0; i < numExpectedLoops; ++i)
+      loops[i].push_back(tiled->loops[i]);
   }
 
   transformResults.set(tiled_linalg_op().cast<OpResult>(), tiledLinalgOps);
