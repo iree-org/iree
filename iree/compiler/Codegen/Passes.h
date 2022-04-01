@@ -66,10 +66,6 @@ std::unique_ptr<OperationPass<func::FuncOp>> createCleanupBufferAllocViewPass();
 std::unique_ptr<OperationPass<ModuleOp>>
 createBufferizeCopyOnlyDispatchesPass();
 
-/// Create a pass to convert a model using f32 type to the equivalent one
-/// using f16.
-std::unique_ptr<OperationPass<ModuleOp>> createDemoteF32ToF16Pass();
-
 /// Flattens n-D MemRef subspan ops to 1-D MemRef and folds the byte offsets on
 /// subspan ops to the consumer load/store ops, in preparation for lowering to
 /// backends that require linearized access.

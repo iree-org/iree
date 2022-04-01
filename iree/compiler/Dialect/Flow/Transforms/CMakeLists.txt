@@ -25,7 +25,6 @@ iree_cc_library(
   HDRS
     "Passes.h"
     "Passes.h.inc"
-    "TypeConverter.h"
   SRCS
     "CaptureDispatchDynamicDims.cpp"
     "CleanupNumericNarrowing.cpp"
@@ -51,7 +50,6 @@ iree_cc_library(
     "StripAndSplatConstantVariables.cpp"
     "StripSignednessPass.cpp"
     "TestPartitionableLoopsInterface.cpp"
-    "TypeConverter.cpp"
     "VerifyInputLegality.cpp"
   DEPS
     ::PassesIncGen
