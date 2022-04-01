@@ -57,9 +57,13 @@ static void captureDims(IREE::Flow::DispatchWorkgroupsOp dispatchOp) {
     if (tensorType.hasStaticShape()) return;
 
     // Find the dimensions in the parent.
-    auto dynamicDims = IREE::Util::findDynamicDims(
+    auto maybeDynamicDims = IREE::Util::findDynamicDims(
         externalValue, dispatchOp->getBlock(), Block::iterator(dispatchOp));
-    if (!dynamicDims.hasValue()) return;
+    if (!maybeDynamicDims.hasValue()) return;
+    // Convert to a vector -- we cannot use the ValueRange directly because
+    // it might point into the operand list of this op, which we might mutate
+    // in-place.
+    auto dynamicDims = llvm::to_vector(maybeDynamicDims.getValue());
 
     // Find the insertion position. All extra arguments need to be added before
     // "writeonly" tensors corresponding to the result.
@@ -75,7 +79,7 @@ static void captureDims(IREE::Flow::DispatchWorkgroupsOp dispatchOp) {
 
     // Capture the dynamic dimensions as args in the region.
     SmallVector<Value> capturedDims;
-    for (auto dynamicDim : *dynamicDims) {
+    for (auto dynamicDim : dynamicDims) {
       auto existing = outerToInnerMap.find(dynamicDim);
       if (existing != outerToInnerMap.end()) {
         // Already captured the dimension; reuse.
