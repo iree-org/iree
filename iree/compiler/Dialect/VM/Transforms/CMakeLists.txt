@@ -30,6 +30,7 @@ iree_cc_library(
     MLIRAffineToStandard
     MLIRAffineTransforms
     MLIRAffineUtils
+    MLIRArithmeticTransforms
     MLIRFunc
     MLIRIR
     MLIRMath
