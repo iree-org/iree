@@ -69,9 +69,9 @@ SmallVector<Value> tileToSCF(PatternRewriter &rewriter, TilingInterface op,
         auto map =
             AffineMap::getMultiDimIdentityMap(ranges.size(), b.getContext());
         assert(clonedOp->getNumResults() == 1 && "expected single result op");
-        Value tiledOutput =
-            linalg::makeTiledShape(b, loc, clonedOp->getResult(0), tileSizesVec,
-                                   map, offsets, allDims, sizes);
+        Value tiledOutput = linalg::makeTiledShape(
+            b, loc, clonedOp->getResult(0), tileSizesVec, map, offsets, allDims,
+            sizes, /*omitPartialTileCheck=*/false);
         auto sliceOp = tiledOutput.getDefiningOp<tensor::ExtractSliceOp>();
         preservedUses.insert(sliceOp);
         assert(sliceOp && "expected ExtractSliceOp");
