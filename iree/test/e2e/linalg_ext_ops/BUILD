@@ -6,7 +6,6 @@
 
 load("//build_tools/bazel:enforce_glob.bzl", "enforce_glob")
 load("//build_tools/bazel:iree_check_test.bzl", "iree_check_single_backend_test_suite")
-load("//build_tools/bazel:iree_lit_test.bzl", "iree_lit_test_suite")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -23,10 +22,6 @@ iree_check_single_backend_test_suite(
             "scan.mlir",
         ],
         include = ["*.mlir"],
-        exclude = [
-            "linalg_transform.mlir",
-            "linalg_transform_spec.mlir",
-        ],
     ),
     driver = "cuda",
     tags = [
@@ -49,31 +44,9 @@ iree_check_single_backend_test_suite(
             "scan.mlir",
         ],
         include = ["*.mlir"],
-        exclude = [
-            "linalg_transform.mlir",
-            "linalg_transform_spec.mlir",
-        ],
     ),
     driver = "dylib",
     target_backend = "dylib-llvm-aot",
-)
-
-iree_lit_test_suite(
-    name = "check_linalg_transform",
-    srcs = ["linalg_transform.mlir"],
-    # linalg_transform_spec is a an MLIR file that specifies a
-    # transformation, it needs to be included as data.
-    data = [
-        "//iree/test/e2e/linalg_ext_ops:linalg_transform_spec.mlir",
-    ],
-    tags = [
-        "hostonly",
-    ],
-    tools = [
-        "//iree/tools:iree-run-mlir",
-        "@llvm-project//lld",
-        "@llvm-project//llvm:FileCheck",
-    ],
 )
 
 iree_check_single_backend_test_suite(
@@ -85,10 +58,6 @@ iree_check_single_backend_test_suite(
             "scan.mlir",
         ],
         include = ["*.mlir"],
-        exclude = [
-            "linalg_transform.mlir",
-            "linalg_transform_spec.mlir",
-        ],
     ),
     driver = "vmvx",
     target_backend = "vmvx",
@@ -106,8 +75,6 @@ iree_check_single_backend_test_suite(
             # TODO(antiagainst): scan fails on Adreno GPUs due to driver bug.
             # Re-enable this once we have new devices with up-to-date drivers.
             "scan.mlir",
-            "linalg_transform.mlir",
-            "linalg_transform_spec.mlir",
         ],
     ),
     driver = "vulkan",
