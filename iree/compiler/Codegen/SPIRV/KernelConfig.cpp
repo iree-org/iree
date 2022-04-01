@@ -359,11 +359,7 @@ static LogicalResult setDefaultOpConfig(spirv::ResourceLimitsAttr limits,
 
   // Special case for non-linalg ops.
   auto linalgOp = dyn_cast<linalg::LinalgOp>(op);
-  // TODO(#8580): Ops with buffer semantics, like those created by copy-only
-  // dispatches can be vectorized too, but that code fails compilation. So
-  // disabling that for now.
-  if (!linalgOp || linalgOp.getNumOutputs() != 1 ||
-      linalgOp.hasBufferSemantics()) {
+  if (!linalgOp || linalgOp.getNumOutputs() != 1) {
     auto pipeline =
         IREE::Codegen::DispatchLoweringPassPipeline::SPIRVDistribute;
 
@@ -394,7 +390,8 @@ static LogicalResult setDefaultOpConfig(spirv::ResourceLimitsAttr limits,
   // Whether we can try to use the vectorization pipeline.
   Optional<SmallVector<int64_t, 4>> loopBounds = linalgOp.getStaticLoopRanges();
   bool vectorizable =
-      !linalgOp.hasIndexSemantics() &&
+      // The vectorization pipeline assumes tensor semantics when tiling.
+      !linalgOp.hasBufferSemantics() && !linalgOp.hasIndexSemantics() &&
       // Skip vectorization for non-minor identity inputs as it generates
       // vector.transfer_read ops with permutation maps that we currently
       // cannot lower.
