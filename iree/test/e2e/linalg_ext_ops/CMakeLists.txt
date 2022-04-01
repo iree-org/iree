@@ -40,6 +40,21 @@ iree_check_single_backend_test_suite(
     "dylib"
 )
 
+iree_lit_test_suite(
+  NAME
+    check_linalg_transform
+  SRCS
+    "linalg_transform.mlir"
+  TOOLS
+    ${IREE_LLD_TARGET}
+    FileCheck
+    iree::tools::iree-run-mlir
+  DATA
+    iree::test::e2e::linalg_ext_ops::linalg_transform_spec.mlir
+  LABELS
+    "hostonly"
+)
+
 iree_check_single_backend_test_suite(
   NAME
     check_vmvx_vmvx
