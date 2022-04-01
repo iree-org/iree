@@ -462,7 +462,7 @@ struct ScalarizeVectorTransferWrite final
     auto addMap = AffineMap::get(0, 2, {sym0 + sym1}, context);
 
     // The result vector is 1-D and we have a projected permutation.
-    unsigned dimPos = map.getResult(0).cast<AffineDimExpr>().getPosition();
+    unsigned dimPos = map.getDimPosition(0);
 
     auto indices = llvm::to_vector<4>(writeOp.getIndices());
     Value oldIndex = indices[dimPos];
