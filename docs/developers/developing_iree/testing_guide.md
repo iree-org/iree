@@ -198,6 +198,16 @@ run with gtest style assertions (e.g. `check.expect_almost_eq(lhs, rhs)`).
 > We are in the process of transitioning them to use the check framework, but
 > that migration is incomplete, so some tests still use `iree-run-mlir`.
 
+### Building e2e tests
+
+The files needed by these tests are not built by default with CMake. You'll
+need to build the special `iree-test-deps` target to generate test files prior
+to running CTest (from the build directory):
+
+```shell
+$ cmake --build . --target iree-test-deps
+```
+
 ### Running a Test
 
 For the test
