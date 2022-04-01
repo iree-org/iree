@@ -20,7 +20,7 @@ iree_lit_test_suite(
     FileCheck
     iree::tools::iree-run-mlir
   DATA
-    iree::test::e2e::linalg_ext_ops::linalg_transform_spec.mlir
+    iree::test::e2e::linalg_transform::linalg_transform_spec.mlir
   LABELS
     "hostonly"
 )
