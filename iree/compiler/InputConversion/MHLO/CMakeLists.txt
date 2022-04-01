@@ -90,6 +90,7 @@ iree_cc_library(
     MhloToStandard
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::Util::IR
+    iree::compiler::Dialect::Util::Transforms
     iree::compiler::InputConversion::Common
     tensorflow::external_mhlo_includes
   PUBLIC
