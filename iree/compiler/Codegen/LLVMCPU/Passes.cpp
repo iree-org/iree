@@ -210,12 +210,17 @@ void addCPUBufferOpsTileAndVectorizePipeline(OpPassManager &passManager) {
   passManager.addPass(createCanonicalizerPass());
   passManager.addPass(createCSEPass());
 
-  // This pipeline should also vectorize these ops, but they arent today because
-  // of a correctness issue. See Issue #8579.
-
   // Run IREE specific passes before vector lowering expert.
   passManager.addNestedPass<func::FuncOp>(
       createRemoveSingleIterationLoopPass());
+
+  // Add the vector lowering expert.
+  {
+    OpPassManager &nestedFuncPassManager = passManager.nest<func::FuncOp>();
+    LinalgVectorLoweringPassOptions options;
+    options.splitVectorTransfersTo = "linalg-copy";
+    addLowerToVectorTransforms(nestedFuncPassManager, options);
+  }
 }
 
 void addDoubleTilingExpertPassPipeline(OpPassManager &passManager) {
