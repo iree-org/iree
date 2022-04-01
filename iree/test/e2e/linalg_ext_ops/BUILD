@@ -49,8 +49,6 @@ iree_check_single_backend_test_suite(
             "scan.mlir",
         ],
         include = ["*.mlir"],
-        # linalg_transform_spec is a an MLIR file that specifies a
-        # transformation, it needs to be included as data.
         exclude = [
             "linalg_transform.mlir",
             "linalg_transform_spec.mlir",
@@ -63,6 +61,8 @@ iree_check_single_backend_test_suite(
 iree_lit_test_suite(
     name = "check_linalg_transform",
     srcs = ["linalg_transform.mlir"],
+    # linalg_transform_spec is a an MLIR file that specifies a
+    # transformation, it needs to be included as data.
     data = [
         "//iree/test/e2e/linalg_ext_ops:linalg_transform_spec.mlir",
     ],
