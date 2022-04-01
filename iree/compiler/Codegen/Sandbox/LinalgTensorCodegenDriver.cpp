@@ -156,7 +156,6 @@ struct LinalgVectorLoweringPass
     this->vectorLoweringStage = options.vectorLoweringStage;
     this->splitVectorTransfersTo = options.splitVectorTransfersTo;
     this->lowerVectorTransposeTo = options.lowerVectorTransposeTo;
-    this->lowerShapeCast = options.lowerShapeCast;
     this->lowerVectorTransposeToAVX2 = options.lowerVectorTransposeToAVX2;
     this->lowerVectorMultiReductionTo = options.lowerVectorMultiReductionTo;
     this->lowerVectorContractionTo = options.lowerVectorContractionTo;
@@ -417,7 +416,7 @@ void LinalgVectorLoweringPass::runOnOperation() {
           .enableTransferToSCFConversion(vectorLoweringStage >= 4)
           .setVectorTransferToSCFOptions(vectorTransferToSCFOptions)
           // Lowering of vector.shape_cast.
-          .enableShapeCastLowering(vectorLoweringStage >= 5 && lowerShapeCast)
+          .enableShapeCastLowering(vectorLoweringStage >= 5)
           // Lowering of vector.transpose.
           .enableVectorTransposeLowering(vectorLoweringStage >= 6)
           .setVectorTransformsOptions(vectorTransformOptions)

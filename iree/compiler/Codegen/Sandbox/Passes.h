@@ -64,7 +64,6 @@ struct LinalgVectorLoweringPassOptions {
   int vectorLoweringStage = 0;
   std::string splitVectorTransfersTo = "";
   std::string lowerVectorTransposeTo = "eltwise";
-  bool lowerShapeCast = false;
   bool lowerVectorTransposeToAVX2 = false;
   std::string lowerVectorMultiReductionTo = "innerparallel";
   std::string lowerVectorContractionTo = "outerproduct";
