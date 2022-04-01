@@ -170,13 +170,9 @@ LogicalResult transform::TileOp::apply(TransformResults &transformResults,
     if (i)
       ++numExpectedLoops;
 
-  // "scalarize_dyn_dims" actually sets the same lambda as the tile sizes and
-  // asserts that it is not already set.
-  if (!tileSizes.empty() || !scalarize_dyn_dims())
+  if (!tileSizes.empty())
     tilingOptions.setTileSizes(tileSizes);
   tilingOptions.setInterchange(extractUIntArray(interchange()));
-  if (scalarize_dyn_dims())
-    tilingOptions.scalarizeDynamicDims();
   LinalgTilingPattern pattern(getContext(), tilingOptions);
   auto functionalTile =
       [&](LinalgOp op, PatternRewriter &rewriter) -> FailureOr<TiledLinalgOp> {
@@ -191,31 +187,25 @@ LogicalResult transform::TileOp::apply(TransformResults &transformResults,
     FailureOr<TiledLinalgOp> tiled =
         functional::applyAt(linalgOp, functionalTile);
     if (failed(tiled))
-      return failure();
+      return linalgOp->emitOpError() << "Failed to apply tiling";
 
     tiledLinalgOps.push_back(tiled->op);
-    if (tiled->loops.size() != numExpectedLoops)
+
+    if (tiled->loops.size() != numExpectedLoops) {
       // Not enough loops were generated. This usually means that the input size
       // was smaller than the tiling size.
       // TODO: LinalgTilingPattern should return failure().
-      return failure();
-    for (unsigned int i = 0; i < numExpectedLoops; ++i) {
-      loops[i].push_back(tiled->loops[i]);
+      return tiled->loops.front()->emitOpError()
+             << "Not enough loops generated: " << tiled->loops.size() << " vs "
+             << numExpectedLoops;
     }
+    for (unsigned int i = 0; i < numExpectedLoops; ++i)
+      loops[i].push_back(tiled->loops[i]);
   }
 
   transformResults.set(tiled_linalg_op().cast<OpResult>(), tiledLinalgOps);
   for (unsigned int i = 0; i < numExpectedLoops; ++i) {
     transformResults.set(getOperation()->getOpResult(i + 1), loops[i]);
-  }
-  return success();
-}
-
-LogicalResult transform::TileOp::verify() {
-  if (!sizes().empty() && scalarize_dyn_dims()) {
-    return emitOpError() << sizesAttrName() << " and "
-                         << scalarize_dyn_dimsAttrName()
-                         << " attributes are mutually exclusive";
   }
   return success();
 }
@@ -250,6 +240,24 @@ void transform::TileOp::print(OpAsmPrinter &p) {
   p << ' ';
   p << target();
   p.printOptionalAttrDict((*this)->getAttrs());
+}
+
+//===---------------------------------------------------------------------===//
+// ScalarizeOp
+//===---------------------------------------------------------------------===//
+
+FailureOr<LinalgOp> transform::ScalarizeOp::applyToOne(LinalgOp target) {
+  LinalgTilingOptions tilingOptions;
+  tilingOptions.scalarizeDynamicDims();
+  // Tiling with "scalarize_dyn_dims" actually sets the same lambda as the tile
+  // sizes and asserts that it is not already set.
+  SmallVector<int64_t> emptyTileSizes;
+  LinalgTilingPattern pattern(getContext(), tilingOptions);
+  auto maybeTiledLinalgOp =
+      functional::applyReturningPatternAt(pattern, target);
+  if (failed(maybeTiledLinalgOp))
+    return failure();
+  return maybeTiledLinalgOp->op;
 }
 
 //===---------------------------------------------------------------------===//

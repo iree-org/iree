@@ -22,14 +22,6 @@ iree_linalg_transform.sequence {
 
 iree_linalg_transform.sequence {
   %0 = match @match
-  // expected-error@below {{"sizes" and "scalarize_dyn_dims" attributes are mutually exclusive}}
-  tile %0 {sizes = [1,2,3], scalarize_dyn_dims = true}
-}
-
-// -----
-
-iree_linalg_transform.sequence {
-  %0 = match @match
   // expected-error@below {{expects iterator_interchange to be a permutation, found [1, 1]}}
   interchange %0 {iterator_interchange = [1, 1]}
 }
