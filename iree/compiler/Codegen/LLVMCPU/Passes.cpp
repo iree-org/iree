@@ -302,7 +302,9 @@ void addDoubleTilingExpertPassPipeline(OpPassManager &passManager) {
                                       memcpyFn);
 
   // Run IREE specific passes before vector lowering expert.
-  passManager.addNestedPass<FuncOp>(createRemoveSingleIterationLoopPass());
+  // TODO(hanchung): Re-enable the pass once bug fixed. There are segfaults with
+  // tile interchange when the pass is enabled.
+  // passManager.addNestedPass<FuncOp>(createRemoveSingleIterationLoopPass());
 
   // Add the vector lowering expert.
   {
