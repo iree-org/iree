@@ -368,9 +368,14 @@ class SequenceOp:
 
 class PrintOp:
 
-  def __init__(self, *, name: StringArg, loc=None, ip=None):
+  def __init__(self,
+               target: Optional[Union[ir.Value, ir.Operation, ir.OpView]],
+               *,
+               name: StringArg,
+               loc=None,
+               ip=None):
     name = _ensure_string_attr(name)
-    super().__init__(name, loc=loc, ip=ip)
+    super().__init__(target, name, loc=loc, ip=ip)
 
 
 ##===----------------------------------------------------------------------===##
