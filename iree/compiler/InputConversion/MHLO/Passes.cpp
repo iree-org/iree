@@ -6,6 +6,7 @@
 
 #include "iree/compiler/InputConversion/MHLO/Passes.h"
 
+#include "iree/compiler/Dialect/Util/Transforms/Passes.h"
 #include "iree/compiler/InputConversion/Common/Passes.h"
 #include "mlir-hlo/Dialect/mhlo/transforms/passes.h"
 #include "mlir/Conversion/ReconcileUnrealizedCasts/ReconcileUnrealizedCasts.h"
@@ -21,6 +22,19 @@
 namespace mlir {
 namespace iree_compiler {
 namespace MHLO {
+
+// TODO(#8745): remove these flags when the -iree-flow-demote-* flags can be
+// used without tripping upstream verifier issues.
+static llvm::cl::opt<bool> clDemoteI64ToI32(
+    "iree-mhlo-demote-i64-to-i32",
+    llvm::cl::desc(
+        "Converts all MHLO i64 ops and values into i32 counterparts."),
+    llvm::cl::init(true));
+static llvm::cl::opt<bool> clDemoteF64ToF32(
+    "iree-mhlo-demote-f64-to-f32",
+    llvm::cl::desc(
+        "Converts all MHLO f64 ops and values into f32 counterparts."),
+    llvm::cl::init(true));
 
 void registerMHLOConversionPassPipeline() {
   PassPipelineRegistration<> mhlo(
@@ -57,6 +71,17 @@ void buildMHLOInputConversionPassPipeline(OpPassManager &passManager) {
   // We also don't handle calls well on the old codepath; until we remove the
   // use of the CFG we can continue inlining.
   passManager.addPass(mlir::createInlinerPass());
+
+  // Hacky type conversion to work around lack of type support lower in the
+  // stack. This is often required because of implicit i64 insertion by JAX/HLO
+  // that we don't want forcing 32-bit embedded devices to support.
+  // TODO(#8745): remove these and prefer the flow pipeline options instead.
+  if (clDemoteI64ToI32) {
+    passManager.addPass(IREE::Util::createDemoteI64ToI32Pass());
+  }
+  if (clDemoteF64ToF32) {
+    passManager.addPass(IREE::Util::createDemoteF64ToF32Pass());
+  }
 
   // Perform initial cleanup. createLegalizeInputTypes could rewrite types. In
   // this context, some operations could be folded away.
