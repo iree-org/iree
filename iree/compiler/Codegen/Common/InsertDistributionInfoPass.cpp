@@ -28,27 +28,27 @@ namespace iree_compiler {
 
 /// Compute the workload per workgroup to use based on the tile sizes passed.
 static SmallVector<int64_t> getWorkloadPerWorkgroup(
-    const IREETileConfig &tileConfig) {
+    ArrayRef<int64_t> tileSizes, ArrayRef<int64_t> interchange) {
   // TODO(ravishankarm): This for now assumes that we can just drop all the
   // zero-dim tile sizes. We need to eventually change this so that we dont have
   // to do this. It is implicity linked to the dispatch region workload having
   // the consistent information. That needs to be changed to take the entire
   // iteration domain size as the argument, and then we can use the distribute
   // loop tile sizes directly.
-  SmallVector<int64_t> tileSizes;
-  if (tileConfig.interchange.empty()) {
-    tileSizes.assign(tileConfig.tileSizes);
+  SmallVector<int64_t> interchangedTileSizes;
+  if (interchange.empty()) {
+    interchangedTileSizes.assign(tileSizes.begin(), tileSizes.end());
   } else {
-    tileSizes.resize(tileConfig.tileSizes.size());
-    for (auto en : llvm::enumerate(tileConfig.interchange)) {
+    interchangedTileSizes.resize(tileSizes.size());
+    for (auto en : llvm::enumerate(interchange)) {
       // The check is needed because only the distributable dims are set.
-      if (en.value() < tileConfig.tileSizes.size()) {
-        tileSizes[en.index()] = tileConfig.tileSizes[en.value()];
+      if (en.value() < tileSizes.size()) {
+        interchangedTileSizes[en.index()] = tileSizes[en.value()];
       }
     }
   }
   SmallVector<int64_t> nonZeroTileSizes;
-  for (auto ts : tileSizes) {
+  for (auto ts : interchangedTileSizes) {
     if (!ts) continue;
     nonZeroTileSizes.push_back(ts);
   }
@@ -124,7 +124,6 @@ struct InsertDistributionInfoPass
 }  // namespace
 
 void InsertDistributionInfoPass::runOnOperation() {
-  MLIRContext *context = &getContext();
   func::FuncOp funcOp = getOperation();
   if (!isEntryPoint(funcOp)) return;
 
@@ -143,14 +142,14 @@ void InsertDistributionInfoPass::runOnOperation() {
   }
 
   // Get the tile sizes to use from lowering configuration if set.
-  FailureOr<IREETileConfig> tileConfig =
-      getTileConfigFromLoweringConfig(computeOps, context);
-  if (failed(tileConfig)) {
+  SmallVector<int64_t> tileSizes, interchange;
+  if (failed(getDistributionTileConfigFromLoweringConfig(computeOps, tileSizes,
+                                                         interchange))) {
     return signalPassFailure();
   }
-
   SmallVector<int64_t> workloadPerWorkroup =
-      getWorkloadPerWorkgroup(tileConfig.getValue());
+      getWorkloadPerWorkgroup(tileSizes, interchange);
+
   if (failed(defineWorkgroupCountRegion(funcOp, workloadPerWorkroup)) ||
       failed(updateTranslationInfoAttr(funcOp, workloadPerWorkroup))) {
     return signalPassFailure();

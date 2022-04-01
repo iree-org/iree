@@ -330,10 +330,13 @@ void eraseCompilationInfo(Operation *op) {
   op->removeAttr(kCompilationInfoAttrName);
 }
 
-FailureOr<IREETileConfig> getTileConfigFromLoweringConfig(
-    ArrayRef<Operation *> computeOps, MLIRContext *context) {
-  IREETileConfig tileConfig;
-  if (computeOps.empty()) return tileConfig;
+LogicalResult getDistributionTileConfigFromLoweringConfig(
+    ArrayRef<Operation *> computeOps,
+    SmallVectorImpl<int64_t> &distributedTileSizes,
+    SmallVectorImpl<int64_t> &interchange) {
+  distributedTileSizes.clear();
+  interchange.clear();
+  if (computeOps.empty()) return success();
 
   for (auto op : computeOps) {
     auto partitionbleLoopInterface =
@@ -342,8 +345,10 @@ FailureOr<IREETileConfig> getTileConfigFromLoweringConfig(
     IREE::Codegen::LoweringConfigAttr currLoweringConfig =
         getLoweringConfig(op);
     if (!currLoweringConfig) continue;
+
     SmallVector<unsigned> partitionableLoops =
         partitionbleLoopInterface.getPartitionableLoops(kNumMaxParallelDims);
+
     SmallVector<int64_t> tileSizes = currLoweringConfig.getTileSizeVals(0);
     SmallVector<int64_t> currInterchange =
         currLoweringConfig.getTileInterchangeVals(0);
@@ -356,18 +361,17 @@ FailureOr<IREETileConfig> getTileConfigFromLoweringConfig(
         currDistributedTileSizes[loopID] = tileSizes[loopID];
       }
     }
-    if (tileConfig.tileSizes.empty()) {
-      tileConfig.tileSizes.assign(currDistributedTileSizes);
-      tileConfig.interchange.assign(currInterchange);
-    } else if (currDistributedTileSizes != tileConfig.tileSizes ||
-               currInterchange != tileConfig.interchange) {
-      // Inconsistent distributed tile sizes. Abort.
-      return static_cast<LogicalResult>(
-          computeOps.front()->emitOpError("inconsistent distribution of ops "
-                                          "for first level of distribution"));
+    if (distributedTileSizes.empty()) {
+      distributedTileSizes.assign(currDistributedTileSizes);
+      interchange.assign(currInterchange);
+    } else if (currDistributedTileSizes != distributedTileSizes ||
+               currInterchange != interchange) {
+      return computeOps.front()->emitOpError(
+          "inconsistent distribution of ops "
+          "for first level of distribution");
     }
   }
-  return tileConfig;
+  return success();
 }
 
 }  // namespace iree_compiler

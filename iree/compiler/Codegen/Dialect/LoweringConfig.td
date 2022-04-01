@@ -207,6 +207,7 @@ def IREECodegen_CompilationInfoAttr :
     (`,` `workgroup_size` `=` $workgroupSize^)? `>`
   }];
 
+  // These builders are externally for auto-tuner to generate the attribute.
   let builders = [
     AttrBuilder<(ins "TileSizesListTypeRef":$tileSizes,
       "TileSizesListTypeRef":$tileInterchange,

@@ -124,12 +124,12 @@ void TileAndDistributeToWorkgroupsPass::runOnOperation() {
   }
 
   // Get the tile sizes to use from lowering configuration if set.
-  FailureOr<IREETileConfig> tileConfig =
-      getTileConfigFromLoweringConfig(computeOps, context);
-  if (failed(tileConfig)) {
+  SmallVector<int64_t> tileSizes, interchange;
+  if (failed(getDistributionTileConfigFromLoweringConfig(computeOps, tileSizes,
+                                                         interchange))) {
     return signalPassFailure();
   }
-  ArrayRef<int64_t> tileSizesRef(tileConfig.getValue().tileSizes);
+  ArrayRef<int64_t> tileSizesRef(tileSizes);
 
   // Add a marker to the last operation in the list.
   auto marker = StringAttr::get(context, "__workgroup_tiling__");
@@ -151,7 +151,7 @@ void TileAndDistributeToWorkgroupsPass::runOnOperation() {
       linalg::LinalgTilingOptions()
           .setDistributionOptions(getIREELinalgLoopDistributionOptions())
           .setInterchange(llvm::to_vector<4>(llvm::map_range(
-              tileConfig.getValue().interchange,
+              interchange,
               [](int64_t v) -> unsigned { return static_cast<unsigned>(v); })))
           .setLoopType(linalg::LinalgTilingLoopType::Loops)
           .setTileSizeComputationFunction(tileSizeFn);
