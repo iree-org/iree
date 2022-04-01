@@ -223,7 +223,8 @@ void addCPUBufferOpsTileAndVectorizePipeline(OpPassManager &passManager) {
   }
 }
 
-void addDoubleTilingExpertPassPipeline(OpPassManager &passManager) {
+void addDoubleTilingExpertPassPipeline(OpPassManager &passManager,
+                                       bool lowerToAVX2) {
   // Run preprocessing and verification before starting Linalg transforms.
   passManager.addNestedPass<func::FuncOp>(
       createConvertToDestinationPassingStylePass());
@@ -294,6 +295,7 @@ void addDoubleTilingExpertPassPipeline(OpPassManager &passManager) {
   {
     OpPassManager &nestedFuncPassManager = passManager.nest<func::FuncOp>();
     LinalgVectorLoweringPassOptions options;
+    options.lowerVectorTransposeToAVX2 = lowerToAVX2;
     options.splitVectorTransfersTo = "linalg-copy";
     addLowerToVectorTransforms(nestedFuncPassManager, options);
   }

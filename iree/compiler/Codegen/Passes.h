@@ -275,7 +275,8 @@ LogicalResult verifyDoubleTilingExpertPassPipelineConfig(
     Operation *op, IREE::Codegen::LoweringConfigAttr loweringConfig,
     IREE::Codegen::TranslationInfoAttr translationInfo,
     ArrayRef<int64_t> workgroupSize = {});
-void addDoubleTilingExpertPassPipeline(OpPassManager &passManager);
+void addDoubleTilingExpertPassPipeline(OpPassManager &passManager,
+                                       bool lowerToAVX2 = false);
 
 // Populates the passes needed to do tiling, decomposing, and vectorizing the
 // convolution ops using the Codegen drivers from sandbox.
