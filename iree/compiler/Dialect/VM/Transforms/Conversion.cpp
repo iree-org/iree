@@ -21,6 +21,7 @@
 #include "llvm/ADT/STLExtras.h"
 #include "mlir/Conversion/AffineToStandard/AffineToStandard.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
+#include "mlir/Dialect/Arithmetic/Transforms/Passes.h"
 #include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/IR/BuiltinOps.h"
@@ -120,6 +121,7 @@ class ConversionPass
                                    conversionPatterns);
     populateUtilToVMPatterns(context, conversionTarget, typeConverter,
                              conversionPatterns);
+    arith::populateArithmeticExpandOpsPatterns(conversionPatterns);
     populateStandardToVMPatterns(context, typeConverter, conversionPatterns);
     populateMathToVMPatterns(context, typeConverter, conversionPatterns);
     populateMemRefToVMPatterns(context, conversionTarget, typeConverter,
