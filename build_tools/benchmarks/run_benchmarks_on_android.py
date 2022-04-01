@@ -326,31 +326,33 @@ def run_benchmarks_for_category(
                           android_relative_dir,
                           verbose=verbose)
 
+      tool_flags = [
+          f"--flagfile={MODEL_FLAGFILE_NAME}",
+      ]
+      if tool == "iree-benchmark-module":
+        if benchmark_min_time:
+          tool_flags.extend([
+              f"--benchmark_min_time={benchmark_min_time}",
+          ])
+        else:
+          repetitions = get_benchmark_repetition_count(benchmark_info.runner)
+          tool_flags.extend([
+              f"--benchmark_repetitions={repetitions}",
+          ])
+
       benchmark_result_filename = None
       if normal_benchmark_tool_dir and benchmark_key not in skip_benchmarks:
         benchmark_results_basename = f"{benchmark_key}.json"
-
+        tool_flags_for_normal_benchmark_only = [
+            "--benchmark_format=json",
+            "--benchmark_out_format=json",
+            f"--benchmark_out='{benchmark_results_basename}'",
+        ]
         cmd = [
             "taskset",
             benchmark_info.deduce_taskset(),
             os.path.join(ANDROID_TMP_DIR, NORMAL_TOOL_REL_DIR, tool),
-            f"--flagfile={MODEL_FLAGFILE_NAME}"
-        ]
-        if tool == "iree-benchmark-module":
-          cmd.extend([
-              "--benchmark_format=json",
-              "--benchmark_out_format=json",
-              f"--benchmark_out='{benchmark_results_basename}'",
-          ])
-          if benchmark_min_time:
-            cmd.extend([
-                f"--benchmark_min_time={benchmark_min_time}",
-            ])
-          else:
-            repetitions = get_benchmark_repetition_count(benchmark_info.runner)
-            cmd.extend([
-                f"--benchmark_repetitions={repetitions}",
-            ])
+        ] + tool_flags + tool_flags_for_normal_benchmark_only
 
         result_json = adb_execute_and_get_output(cmd,
                                                  android_relative_dir,
@@ -374,11 +376,11 @@ def run_benchmarks_for_category(
       if do_capture and benchmark_key not in skip_captures:
         run_cmd = [
             "TRACY_NO_EXIT=1",
-            f"IREE_PRESERVE_DYLIB_TEMP_FILES={ANDROID_TMP_DIR}", "taskset",
+            f"IREE_PRESERVE_DYLIB_TEMP_FILES={ANDROID_TMP_DIR}",
+            "taskset",
             benchmark_info.deduce_taskset(),
-            os.path.join(ANDROID_TMP_DIR, TRACED_TOOL_REL_DIR,
-                         tool), f"--flagfile={MODEL_FLAGFILE_NAME}"
-        ]
+            os.path.join(ANDROID_TMP_DIR, TRACED_TOOL_REL_DIR, tool),
+        ] + tool_flags
 
         # Just launch the traced benchmark tool with TRACY_NO_EXIT=1 without
         # waiting for the adb command to complete as that won't happen.
