@@ -100,8 +100,8 @@ LogicalResult mergeSourceModuleInto(Location loc, StringRef source,
                                     OpBuilder &targetBuilder) {
   // Parse the module. This will only fail if the compiler was built wrong;
   // we're loading the embedded files from the compiler binary.
-  auto sourceModuleRef =
-      mlir::parseSourceString(source, targetBuilder.getContext());
+  auto sourceModuleRef = mlir::parseSourceString<mlir::ModuleOp>(
+      source, targetBuilder.getContext());
   if (!sourceModuleRef) {
     return mlir::emitError(
         loc, "source module failed to parse; ensure dialects are registered");
