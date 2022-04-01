@@ -148,6 +148,8 @@ def LinalgVectorLowering : Pass<"linalg-vector-lowering", "func::FuncOp"> {
           "\teltwise [default]\n"
           "\tflat_transpose (requires LLVM matrix intrinsics support)\n"
           "\tshuffle (lower 2-D transposes to shape_cast + shuffle)\n}]>,
+    Option<"lowerShapeCast", "lower-shape-cast", "bool", /*default=*/"false",
+      "Lower shape cast operation.">,
     Option<"lowerVectorTransposeToAVX2", "lower-vector-transpose-to-avx2", "bool",
       /*default=*/"false",
       "Add specific transpose to avx2 lowering patterns.">,
