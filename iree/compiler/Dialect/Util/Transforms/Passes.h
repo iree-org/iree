@@ -26,6 +26,12 @@ std::unique_ptr<OperationPass<mlir::ModuleOp>> createHoistIntoGlobalsPass();
 std::unique_ptr<OperationPass<void>> createSimplifyGlobalAccessesPass();
 std::unique_ptr<OperationPass<void>> createStripDebugOpsPass();
 
+// Type conversion.
+std::unique_ptr<OperationPass<mlir::ModuleOp>> createDemoteI64ToI32Pass();
+std::unique_ptr<OperationPass<mlir::ModuleOp>> createDemoteF32ToF16Pass();
+std::unique_ptr<OperationPass<mlir::ModuleOp>> createDemoteF64ToF32Pass();
+std::unique_ptr<OperationPass<mlir::ModuleOp>> createPromoteF16ToF32Pass();
+
 // Test passes.
 std::unique_ptr<OperationPass<void>> createTestFloatRangeAnalysis();
 
@@ -41,6 +47,12 @@ inline void registerTransformPasses() {
   createHoistIntoGlobalsPass();
   createSimplifyGlobalAccessesPass();
   createStripDebugOpsPass();
+
+  createDemoteI64ToI32Pass();
+  createDemoteF32ToF16Pass();
+  createDemoteF64ToF32Pass();
+  createPromoteF16ToF32Pass();
+
   createTestFloatRangeAnalysis();
 }
 

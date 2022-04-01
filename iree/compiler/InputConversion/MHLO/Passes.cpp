@@ -58,13 +58,6 @@ void buildMHLOInputConversionPassPipeline(OpPassManager &passManager) {
   // use of the CFG we can continue inlining.
   passManager.addPass(mlir::createInlinerPass());
 
-  // Legalize input types. We do this after flattening tuples so that we don't
-  // have to deal with them.
-  // TODO(nicolasvasilache): createLegalizeInputTypesPass is old and does not
-  // handle region conversion properly (parent cloned before children). Revisit
-  // when using ops with regions such as scf.for and linalg.generic.
-  passManager.addPass(createLegalizeInputTypesPass());
-
   // Perform initial cleanup. createLegalizeInputTypes could rewrite types. In
   // this context, some operations could be folded away.
   passManager.addNestedPass<func::FuncOp>(mlir::createCanonicalizerPass());
