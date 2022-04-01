@@ -1114,7 +1114,7 @@ module {
   util.global private @"__iree_flow_bert/encoder/layer_9/output/dense/kernel" {noinline} = dense<0.0001> : tensor<512x128xf32>
   util.global private @"__iree_flow_cls/squad/output_bias" = dense<0.1> : tensor<2xf32>
   util.global private @"__iree_flow_cls/squad/output_weights" = dense<1.0> : tensor<2x512xf32>
-  func @serving_default() attributes { iree.module.export} {
+  func.func @serving_default() attributes { iree.module.export} {
     %arg0 = util.unfoldable_constant dense<0> : tensor<1x384xi32>
     %arg1 = util.unfoldable_constant dense<0> : tensor<1x384xi32>
     %arg2 = util.unfoldable_constant dense<0> : tensor<1x384xi32>

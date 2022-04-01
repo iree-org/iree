@@ -1,7 +1,7 @@
 // RUN: iree-opt -split-input-file -iree-util-test-float-range-analysis -allow-unregistered-dialect %s | FileCheck %s
 
 // CHECK-LABEL: @scalar_const_trunc
-func @scalar_const_trunc() -> f32 {
+func.func @scalar_const_trunc() -> f32 {
   %0 = arith.constant 5.0 : f32
   // CHECK: fp-range: [5.000000, 5.000000, TRUNC]
   %1 = "iree_unregistered.test_fprange"(%0) : (f32) -> f32
@@ -10,7 +10,7 @@ func @scalar_const_trunc() -> f32 {
 
 // -----
 // CHECK-LABEL: @scalar_const_non_trunc
-func @scalar_const_non_trunc() -> f32 {
+func.func @scalar_const_non_trunc() -> f32 {
   %0 = arith.constant 5.2 : f32
   // CHECK: fp-range: [5.200000, 5.200000, !trunc]
   %1 = "iree_unregistered.test_fprange"(%0) : (f32) -> f32
@@ -19,7 +19,7 @@ func @scalar_const_non_trunc() -> f32 {
 
 // -----
 // CHECK-LABEL: @scalar_non_float
-func @scalar_non_float() -> i32 {
+func.func @scalar_non_float() -> i32 {
   %0 = arith.constant 5 : i32
   // NOTE: The least-constrained value is returned for a non-fp type. It
   // is up to the user to ensure that we are requesting stats for fp types
@@ -31,7 +31,7 @@ func @scalar_non_float() -> i32 {
 
 // -----
 // CHECK-LABEL: @tensor_const_trunc
-func @tensor_const_trunc() -> tensor<2xf32> {
+func.func @tensor_const_trunc() -> tensor<2xf32> {
   %0 = arith.constant dense<[-2.0, 2.0]> : tensor<2xf32>
   // CHECK: fp-range: [-2.000000, 2.000000, TRUNC]
   %1 = "iree_unregistered.test_fprange"(%0) : (tensor<2xf32>) -> tensor<2xf32>
@@ -40,7 +40,7 @@ func @tensor_const_trunc() -> tensor<2xf32> {
 
 // -----
 // CHECK-LABEL: @tensor_const_non_trunc
-func @tensor_const_non_trunc() -> tensor<2xf32> {
+func.func @tensor_const_non_trunc() -> tensor<2xf32> {
   %0 = arith.constant dense<[-1.2, 2.0]> : tensor<2xf32>
   // CHECK: fp-range: [-1.200000, 2.000000, !trunc]
   %1 = "iree_unregistered.test_fprange"(%0) : (tensor<2xf32>) -> tensor<2xf32>
@@ -49,7 +49,7 @@ func @tensor_const_non_trunc() -> tensor<2xf32> {
 
 // -----
 // CHECK-LABEL: @min_max_no_trunc
-func @min_max_no_trunc(%arg0 : f32) -> f32 {
+func.func @min_max_no_trunc(%arg0 : f32) -> f32 {
   %0 = arith.constant -5.0 : f32
   %1 = arith.constant 5.0 : f32
   %2 = arith.minf %arg0, %1 : f32
@@ -61,7 +61,7 @@ func @min_max_no_trunc(%arg0 : f32) -> f32 {
 
 // -----
 // CHECK-LABEL: @min_max_floor
-func @min_max_floor(%arg0 : f32) -> f32 {
+func.func @min_max_floor(%arg0 : f32) -> f32 {
   %0 = arith.constant -5.0 : f32
   %1 = arith.constant 5.0 : f32
   %2 = arith.minf %arg0, %1 : f32
@@ -74,7 +74,7 @@ func @min_max_floor(%arg0 : f32) -> f32 {
 
 // -----
 // CHECK-LABEL: @min_max_floor_adj_range
-func @min_max_floor_adj_range(%arg0 : f32) -> f32 {
+func.func @min_max_floor_adj_range(%arg0 : f32) -> f32 {
   %0 = arith.constant -5.2 : f32
   %1 = arith.constant 5.2 : f32
   %2 = arith.minf %arg0, %1 : f32
@@ -87,7 +87,7 @@ func @min_max_floor_adj_range(%arg0 : f32) -> f32 {
 
 // -----
 // CHECK-LABEL: @floor_min_max
-func @floor_min_max(%arg0 : f32) -> f32 {
+func.func @floor_min_max(%arg0 : f32) -> f32 {
   %0 = arith.constant -5.0 : f32
   %1 = arith.constant 5.0 : f32
   %2 = math.floor %arg0 : f32

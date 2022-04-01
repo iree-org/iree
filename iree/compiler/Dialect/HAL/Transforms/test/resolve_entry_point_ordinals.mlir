@@ -15,7 +15,7 @@ hal.executable @exe {
 
 // CHECK-LABEL: @dispatch_with_nested_references
 // CHECK-SAME: %[[CMD:.+]]: !hal.command_buffer
-func @dispatch_with_nested_references(%cmd : !hal.command_buffer) {
+func.func @dispatch_with_nested_references(%cmd : !hal.command_buffer) {
   %c10 = arith.constant 10 : index
   %c11 = arith.constant 11 : index
   %c12 = arith.constant 12 : index
@@ -35,7 +35,7 @@ func @dispatch_with_nested_references(%cmd : !hal.command_buffer) {
 // -----
 
 // CHECK-LABEL: @dispatch_already_using_ordinals
-func @dispatch_already_using_ordinals(
+func.func @dispatch_already_using_ordinals(
   // CHECK-SAME: %[[CMD:.+]]: !hal.command_buffer
   %cmd: !hal.command_buffer,
   // CHECK-SAME: %[[EXE:.+]]: !hal.executable
@@ -69,7 +69,7 @@ hal.executable @exe {
 }
 
 // CHECK-LABEL: @dispatch_indirect_with_nested_references
-func @dispatch_indirect_with_nested_references(
+func.func @dispatch_indirect_with_nested_references(
   // CHECK-SAME: %[[CMD:.+]]: !hal.command_buffer
   %cmd: !hal.command_buffer,
   // CHECK-SAME: %[[BUF:.+]]: !hal.buffer
@@ -90,7 +90,7 @@ func @dispatch_indirect_with_nested_references(
 // -----
 
 // CHECK-LABEL: @dispatch_indirect_already_using_ordinals
-func @dispatch_indirect_already_using_ordinals(
+func.func @dispatch_indirect_already_using_ordinals(
   // CHECK-SAME: %[[CMD:.+]]: !hal.command_buffer
   %cmd: !hal.command_buffer,
   // CHECK-SAME: %[[EXE:.+]]: !hal.executable

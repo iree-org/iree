@@ -9,14 +9,14 @@
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/Dialect/MemRef/Transforms/Passes.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 
 namespace mlir {
 namespace iree_compiler {
 namespace IREE {
 namespace Flow {
-
-namespace {
 
 /// An operation that uses `offsets`, `sizes` and `strides` (i.e. implements the
 /// `OffsetSizeAndStrideInterface`) can be mapped to flow operations that
@@ -119,6 +119,8 @@ static SmallVector<Value, 4> getDynamicDimValues(OpBuilder &b, Location loc,
   }
   return dynamicDims;
 }
+
+namespace {
 
 /// Convert tensor.insert_slice ops into flow.tensor.update ops where possible.
 struct ConvertTensorInsertSlicePattern
@@ -319,20 +321,70 @@ struct ConvertTensorFromElementsPattern
   }
 };
 
+/// Converts linalg.tensor_reshape operations into flow.tensor.reshape
+/// operations.
+template <typename TensorReshapeOp>
+struct ConvertTensorReshapePattern : public OpRewritePattern<TensorReshapeOp> {
+  using OpRewritePattern<TensorReshapeOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(TensorReshapeOp reshapeOp,
+                                PatternRewriter &rewriter) const override {
+    if (reshapeOp->template getParentOfType<Flow::DispatchWorkgroupsOp>()) {
+      return failure();
+    }
+    SmallVector<SmallVector<Value>> outputShape;
+    ReifyRankedShapedTypeOpInterface reifyShapedTypeInterface =
+        cast<ReifyRankedShapedTypeOpInterface>(reshapeOp.getOperation());
+    if (failed(reifyShapedTypeInterface.reifyResultShapes(rewriter,
+                                                          outputShape))) {
+      return failure();
+    }
+    SmallVector<Value> outputDynamicShapes;
+    for (auto shape :
+         llvm::zip(reshapeOp.getResultType().getShape(), outputShape[0])) {
+      if (std::get<0>(shape) != ShapedType::kDynamicSize) continue;
+      outputDynamicShapes.push_back(std::get<1>(shape));
+    }
+    rewriter.replaceOpWithNewOp<IREE::Flow::TensorReshapeOp>(
+        reshapeOp, reshapeOp.getResultType(), reshapeOp.src(),
+        outputDynamicShapes);
+    return success();
+  }
+};
+
+/// Converts linalg.fill ops into flow.tensor.splat ops.
+///
+/// This is expected to improve performance because we can use DMA
+/// functionalities for the fill, instead of dispatching kernels.
+struct ConvertLinalgFillPattern final
+    : public OpRewritePattern<linalg::FillOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(linalg::FillOp fillOp,
+                                PatternRewriter &rewriter) const override {
+    if (fillOp->getParentOfType<IREE::Flow::DispatchWorkgroupsOp>()) {
+      // Don't convert linalg.fill ops that were fused together with other ops.
+      return failure();
+    }
+
+    SmallVector<Value, 4> dynamicDims =
+        getDynamicDimValues(rewriter, fillOp.getLoc(), fillOp.output());
+    rewriter.replaceOpWithNewOp<TensorSplatOp>(
+        fillOp, fillOp.output().getType(), fillOp.value(), dynamicDims);
+    return success();
+  }
+};
+
 }  // namespace
 
-void populateTensorToFlowPatternsBeforeDispatchFormation(
-    MLIRContext *context, RewritePatternSet &patterns) {
+void populateTensorToFlowConversionPatterns(MLIRContext *context,
+                                            RewritePatternSet &patterns) {
   patterns
-      .insert<ConvertTensorInsertSlicePattern, ConvertTensorExtractSlicePattern,
-              ConvertTensorCastPattern, ConvertTensorFromElementsPattern>(
-          context);
-}
-
-void populateTensorToFlowPatternsAfterDispatchFormation(
-    MLIRContext *context, RewritePatternSet &patterns) {
-  patterns.insert<ConvertTensorExtractPattern, ConvertTensorCastPattern>(
-      context);
+      .insert<ConvertLinalgFillPattern, ConvertTensorCastPattern,
+              ConvertTensorExtractPattern, ConvertTensorExtractSlicePattern,
+              ConvertTensorInsertSlicePattern, ConvertTensorFromElementsPattern,
+              ConvertTensorReshapePattern<tensor::CollapseShapeOp>,
+              ConvertTensorReshapePattern<tensor::ExpandShapeOp>>(context);
 }
 
 }  // namespace Flow

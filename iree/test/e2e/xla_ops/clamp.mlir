@@ -1,4 +1,4 @@
-func @i8() {
+func.func @i8() {
   %min = util.unfoldable_constant dense<[0, 0, 0, 0]> : tensor<4xi8>
   %val = util.unfoldable_constant dense<[-2, 4, 8, 12]> : tensor<4xi8>
   %max = util.unfoldable_constant dense<[10, 10, 10, 10]> : tensor<4xi8>
@@ -7,7 +7,7 @@ func @i8() {
   return
 }
 
-func @i16() {
+func.func @i16() {
   %min = util.unfoldable_constant dense<[0, 0, 0, 0]> : tensor<4xi16>
   %val = util.unfoldable_constant dense<[-2, 4, 8, 12]> : tensor<4xi16>
   %max = util.unfoldable_constant dense<[10, 10, 10, 10]> : tensor<4xi16>
@@ -16,7 +16,7 @@ func @i16() {
   return
 }
 
-func @i32() {
+func.func @i32() {
   %min = util.unfoldable_constant dense<[0, 0, 0, 0]> : tensor<4xi32>
   %val = util.unfoldable_constant dense<[-2, 4, 8, 12]> : tensor<4xi32>
   %max = util.unfoldable_constant dense<[10, 10, 10, 10]> : tensor<4xi32>
@@ -25,7 +25,7 @@ func @i32() {
   return
 }
 
-func @f32() {
+func.func @f32() {
   %min = util.unfoldable_constant dense<[0.0, 0.0, 0.0, 0.0]> : tensor<4xf32>
   %val = util.unfoldable_constant dense<[-2.0, 4.0, 8.0, 12.0]> : tensor<4xf32>
   %max = util.unfoldable_constant dense<[10.0, 10.0, 10.0, 10.0]> : tensor<4xf32>

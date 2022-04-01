@@ -2,7 +2,7 @@
 
 // CHECK-LABEL: @dispatch
 //  CHECK-SAME: (%[[INPUT:.+]]: !stream.resource<*>, %[[INPUT_SIZE:.+]]: index, %[[DIM1:.+]]: index, %[[DIM3:.+]]: index)
-func @dispatch(%input: tensor<7x?x24x?xf32>, %dim1: index, %dim3: index) -> tensor<?x?x1024xf32> {
+func.func @dispatch(%input: tensor<7x?x24x?xf32>, %dim1: index, %dim3: index) -> tensor<?x?x1024xf32> {
   %c1 = arith.constant 1 : index
   %c2 = arith.constant 2 : index
   %c3 = arith.constant 3 : index
@@ -18,7 +18,7 @@ func @dispatch(%input: tensor<7x?x24x?xf32>, %dim1: index, %dim3: index) -> tens
 
 // CHECK-LABEL: @tiedDispatch
 //  CHECK-SAME: (%[[INPUT0:.+]]: !stream.resource<*>, %[[INPUT0_SIZE:.+]]: index, %[[INPUT1:.+]]: !stream.resource<*>, %[[INPUT1_SIZE:.+]]: index)
-func @tiedDispatch(%input0: tensor<i32>, %input1: tensor<2x3xi32>) -> tensor<3x9xi32> {
+func.func @tiedDispatch(%input0: tensor<i32>, %input1: tensor<2x3xi32>) -> tensor<3x9xi32> {
   %c1 = arith.constant 1 : index
   %c2 = arith.constant 2 : index
   %c3 = arith.constant 3 : index

@@ -42,7 +42,7 @@ struct ProgramExtractor {
     Type globalType = globalOp.type();
     auto funcType =
         builder.getType<FunctionType>(TypeRange{}, TypeRange{globalType});
-    auto funcOp = FuncOp::create(loc, name, funcType);
+    auto funcOp = func::FuncOp::create(loc, name, funcType);
     StringAttr funcSymbolName = targetSymbolTable.insert(funcOp);
     Block *entryBlock = funcOp.addEntryBlock();
 

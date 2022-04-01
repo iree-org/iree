@@ -20,8 +20,9 @@ iree_lit_test_suite(
     srcs = enforce_glob(
         [
             "iree_import_public.mlir",
-            "top_level_scf_to_cfg.mlir",
             "linalg_quantized_matmul_to_matmul.mlir",
+            "sanitize_module_names.mlir",
+            "top_level_scf_to_cfg.mlir",
         ],
         include = ["*.mlir"],
     ),

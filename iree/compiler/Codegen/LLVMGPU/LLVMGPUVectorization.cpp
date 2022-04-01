@@ -182,7 +182,7 @@ struct LLVMGPUVectorizationPass
 };
 }  // namespace
 
-std::unique_ptr<OperationPass<FuncOp>> createLLVMGPUVectorizationPass() {
+std::unique_ptr<OperationPass<func::FuncOp>> createLLVMGPUVectorizationPass() {
   return std::make_unique<LLVMGPUVectorizationPass>();
 }
 

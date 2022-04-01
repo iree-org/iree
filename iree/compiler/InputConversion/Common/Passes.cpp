@@ -21,13 +21,14 @@ namespace {
 
 void buildCommonInputConversionPassPipeline(OpPassManager &passManager) {
   passManager.addPass(createIREEImportPublicPass());
+  passManager.addPass(createSanitizeModuleNamesPass());
 }
 
 void registerCommonInputConversionPasses() {
   // Generated passes.
   registerPasses();
 
-  PassPipelineRegistration<> mhlo(
+  PassPipelineRegistration<> common(
       "iree-common-input-transformation-pipeline",
       "Runs the common input transformation pipeline",
       [](OpPassManager &passManager) {

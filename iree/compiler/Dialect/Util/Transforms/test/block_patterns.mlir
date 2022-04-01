@@ -2,7 +2,7 @@
 
 // CHECK-LABEL: @foldBrArguments
 // CHECK-SAME: (%[[COND:.+]]: i1, %[[ARG1:.+]]: index)
-func @foldBrArguments(%cond: i1, %arg1: index) -> index {
+func.func @foldBrArguments(%cond: i1, %arg1: index) -> index {
   // CHECK: cf.cond_br %[[COND]]
   cf.cond_br %cond, ^bb1, ^bb2
 ^bb1:
@@ -27,7 +27,7 @@ func @foldBrArguments(%cond: i1, %arg1: index) -> index {
 
 // CHECK-LABEL: @foldCondBrArguments
 // CHECK-SAME: (%[[COND:.+]]: i1, %[[ARG1:.+]]: index, %[[ARG2:.+]]: index)
-func @foldCondBrArguments(%cond: i1, %arg1: index, %arg2: index) -> index {
+func.func @foldCondBrArguments(%cond: i1, %arg1: index, %arg2: index) -> index {
   // CHECK: cf.cond_br %[[COND]], ^bb1, ^bb2
   cf.cond_br %cond, ^bb1(%arg1, %arg2, %arg2 : index, index, index),
                  ^bb2(%arg1, %arg1, %arg2 : index, index, index)
@@ -49,7 +49,7 @@ func @foldCondBrArguments(%cond: i1, %arg1: index, %arg2: index) -> index {
 
 // CHECK-LABEL: @elideBranchOperands
 // CHECK-SAME: (%[[ARG0:.+]]: index, %[[ARG1:.+]]: index)
-func @elideBranchOperands(%arg0: index, %arg1: index) -> i32 {
+func.func @elideBranchOperands(%arg0: index, %arg1: index) -> i32 {
   // CHECK-DAG: %[[C5I32:.+]] = arith.constant 5 : i32
   // CHECK-DAG: %[[C1I32:.+]] = arith.constant 1 : i32
   // CHECK-DAG: %[[C1:.+]] = arith.constant 1 : index

@@ -208,6 +208,25 @@ git push origin HEAD:llvm-bump
 Either fix any issues or get people to do so and land patches until the
 PR is green.
 
+A script from [iree-samples](https://github.com/google/iree-samples/blob/main/scripts/integrate/bump_llvm.py)
+repository can help with bumping the LLVM version and creating a PR.
+To use the script the steps are
+
+```
+cd ~/src/iree
+$SCRIPTS/bump_llvm.py --llvm-commit $LLVM_COMMIT
+```
+
+This creates a new in IREE repository (named bump-llvm-yyyymmdd). A PR can
+be created from that. Following that MHLO and TF can be bumped the same way
+
+```
+(cd third_party/mlir-hlo && git checkout $MHLO_COMMIT)
+sed -i "s/^TENSORFLOW_COMMIT = .*$/TENSORFLOW_COMMIT = \"$TF_COMMIT\"/" integrations/tensorflow/WORKSPACE
+git add -A
+git commit ...
+git push UPSTREAM_AUTOMATION bump-llvm-...
+```
 
 ## Cherry-picking
 

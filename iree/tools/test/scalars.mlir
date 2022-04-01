@@ -4,7 +4,7 @@
 
 // BENCHMARK-LABEL: BM_scalar
 // CHECK-LABEL: EXEC @scalar
-func @scalar(%arg0 : i32) -> i32 {
+func.func @scalar(%arg0 : i32) -> i32 {
   return %arg0 : i32
 }
 // CHECK: i32=42

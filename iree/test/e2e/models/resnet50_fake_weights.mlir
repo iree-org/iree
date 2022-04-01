@@ -326,7 +326,7 @@ module {
   util.global private @"__iree_flow___sm_node1255__m.layer-176.kernel" {noinline} = dense<0.00313479616> : tensor<2048x1000xf32>
   util.global private @"__iree_flow___sm_node1256__m.layer-176.bias" {noinline} = dense<3.125000e-03> : tensor<1000xf32>
   // CHECK-LABEL: EXEC @predict
-  func @predict(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1000xf32> attributes {iree.module.export, iree.reflection = {abi = "sip", abiv = 1 : i32, sip = "I8!S5!k0_0R3!_0"}} {
+  func.func @predict(%arg0: tensor<1x224x224x3xf32>) -> tensor<1x1000xf32> attributes {iree.module.export, iree.reflection = {abi = "sip", abiv = 1 : i32, sip = "I8!S5!k0_0R3!_0"}} {
     %0 = util.global.address @"__iree_flow___sm_node188__m.layer-2.kernel" : !util.ptr<tensor<7x7x3x64xf32>>
     %1 = util.global.address @"__iree_flow___sm_node189__m.layer-2.bias" : !util.ptr<tensor<64xf32>>
     %2 = util.global.address @"__iree_flow___sm_node195__m.layer-3.gamma" : !util.ptr<tensor<64xf32>>

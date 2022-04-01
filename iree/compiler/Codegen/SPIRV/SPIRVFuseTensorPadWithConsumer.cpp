@@ -20,7 +20,7 @@ struct SPIRVFuseTensorPadWithConsumerPass final
           SPIRVFuseTensorPadWithConsumerPass> {
   void runOnOperation() override {
     MLIRContext *context = &getContext();
-    FuncOp funcOp = getOperation();
+    func::FuncOp funcOp = getOperation();
 
     RewritePatternSet patterns(context);
     patterns.insert<linalg::ExtractSliceOfPadTensorSwapPattern>(
@@ -33,7 +33,7 @@ struct SPIRVFuseTensorPadWithConsumerPass final
 
 }  // namespace
 
-std::unique_ptr<OperationPass<FuncOp>>
+std::unique_ptr<OperationPass<func::FuncOp>>
 createSPIRVFuseTensorPadWithConsumerPass() {
   return std::make_unique<SPIRVFuseTensorPadWithConsumerPass>();
 }

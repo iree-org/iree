@@ -4,12 +4,12 @@
 iree_linalg_transform.sequence {
   // CHECK: %[[OPS:.*]] = match @{{.*}}
   %0 = match @match1
-  // CHECK: %[[TILED:.*]] = tile %[[OPS]] {
+  // CHECK: %[[TILED:.*]], %{{.*}}:3 = tile %[[OPS]] {
   // CHECK-DAG: sizes = [4, 4, 4]
   // CHECK: }
-  %1 = tile %0 {sizes = [4, 4, 4]}
-  // CHECK: %[[TILED2:.*]] = tile %[[TILED]]
-  %2 = tile %1 {sizes = [2, 2, 2]}
+  %1, %loops1:3 = tile %0 {sizes = [4, 4, 4]}
+  // CHECK: %[[TILED2:.*]], %{{.*}}:3 = tile %[[TILED]]
+  %2, %loops2:3  = tile %1 {sizes = [2, 2, 2]}
   // CHECK: %[[PADDED:.*]] = pad %[[TILED2]] {pack_paddings = [1, 1, 0]}
   %3 = pad %2 {pack_paddings = [1, 1, 0]}
   // CHECK: decompose

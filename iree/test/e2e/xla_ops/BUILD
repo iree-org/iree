@@ -537,6 +537,9 @@ iree_check_single_backend_test_suite(
         "-iree-llvm-target-cpu-features=host",
     ],
     driver = "dylib",
+    # Building and testing must be on the same architecture, which doesn't work
+    # with remote execution in general.
+    tags = ["local"],
     target_backend = "dylib-llvm-aot",
 )
 

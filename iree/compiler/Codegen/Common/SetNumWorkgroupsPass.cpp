@@ -82,7 +82,7 @@ void SetNumWorkgroupsPass::runOnOperation() {
 
   llvm::StringMap<IREE::HAL::ExecutableEntryPointOp> entryPoints =
       getAllEntryPoints(module);
-  for (auto funcOp : module.getOps<FuncOp>()) {
+  for (auto funcOp : module.getOps<func::FuncOp>()) {
     auto entryPointOp = entryPoints.lookup(funcOp.getName());
     if (!entryPointOp) continue;
 

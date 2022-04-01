@@ -1,7 +1,7 @@
 // RUN: iree-opt -split-input-file -canonicalize %s | iree-opt -split-input-file | FileCheck %s
 
 // CHECK-LABEL: @FoldSubviewsIntoCmdTOp
-func @FoldSubviewsIntoCmdTOp(%arg0: !stream.resource<transient>, %arg1: index) -> !stream.timepoint {
+func.func @FoldSubviewsIntoCmdTOp(%arg0: !stream.resource<transient>, %arg1: index) -> !stream.timepoint {
   %c0 = arith.constant 0 : index
   %c64 = arith.constant 64 : index
   %c1000 = arith.constant 1000 : index
@@ -25,7 +25,7 @@ func @FoldSubviewsIntoCmdTOp(%arg0: !stream.resource<transient>, %arg1: index) -
 // -----
 
 // CHECK-LABEL: @FoldSubviewsIntoCmdCopyOp
-func @FoldSubviewsIntoCmdCopyOp(%arg0: !stream.resource<transient>, %arg1: index) -> !stream.timepoint {
+func.func @FoldSubviewsIntoCmdCopyOp(%arg0: !stream.resource<transient>, %arg1: index) -> !stream.timepoint {
   %c0 = arith.constant 0 : index
   %c64 = arith.constant 64 : index
   %c128 = arith.constant 128 : index
@@ -45,7 +45,7 @@ func @FoldSubviewsIntoCmdCopyOp(%arg0: !stream.resource<transient>, %arg1: index
 // -----
 
 // CHECK-LABEL: @FoldSubviewsIntoCmdDispatchOp
-func @FoldSubviewsIntoCmdDispatchOp(%arg0: !stream.resource<transient>, %arg1: index) -> !stream.timepoint {
+func.func @FoldSubviewsIntoCmdDispatchOp(%arg0: !stream.resource<transient>, %arg1: index) -> !stream.timepoint {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %c64 = arith.constant 64 : index
@@ -71,7 +71,7 @@ func @FoldSubviewsIntoCmdDispatchOp(%arg0: !stream.resource<transient>, %arg1: i
 // -----
 
 // CHECK-LABEL: @ElideImmediateCmdExecuteWaits
-func @ElideImmediateCmdExecuteWaits(%arg0: !stream.resource<transient>, %arg1: index) -> !stream.timepoint {
+func.func @ElideImmediateCmdExecuteWaits(%arg0: !stream.resource<transient>, %arg1: index) -> !stream.timepoint {
   %c0 = arith.constant 0 : index
   // CHECK-NOT: stream.timepoint.immediate
   %imm = stream.timepoint.immediate => !stream.timepoint
@@ -85,7 +85,7 @@ func @ElideImmediateCmdExecuteWaits(%arg0: !stream.resource<transient>, %arg1: i
 // -----
 
 // CHECK-LABEL: @ChainCmdExecuteWaits
-func @ChainCmdExecuteWaits(%arg0: !stream.resource<transient>, %arg1: index, %arg2: !stream.timepoint) -> !stream.timepoint {
+func.func @ChainCmdExecuteWaits(%arg0: !stream.resource<transient>, %arg1: index, %arg2: !stream.timepoint) -> !stream.timepoint {
   %c0 = arith.constant 0 : index
   %c128 = arith.constant 128 : index
   // CHECK-NOT: stream.timepoint.await
@@ -101,7 +101,7 @@ func @ChainCmdExecuteWaits(%arg0: !stream.resource<transient>, %arg1: index, %ar
 // -----
 
 // CHECK-LABEL: @CloneCapturedCmdExecuteSubviewOps
-func @CloneCapturedCmdExecuteSubviewOps(%arg0: !stream.resource<transient>, %arg1: index) -> !stream.timepoint {
+func.func @CloneCapturedCmdExecuteSubviewOps(%arg0: !stream.resource<transient>, %arg1: index) -> !stream.timepoint {
   %c0 = arith.constant 0 : index
   %c64 = arith.constant 64 : index
   %c128 = arith.constant 128 : index
@@ -121,7 +121,7 @@ func @CloneCapturedCmdExecuteSubviewOps(%arg0: !stream.resource<transient>, %arg
 // -----
 
 // CHECK-LABEL: @ElideNoOpCmdExecuteOp
-func @ElideNoOpCmdExecuteOp(%arg0: !stream.resource<transient>, %arg1: index, %arg2: !stream.timepoint) -> !stream.timepoint {
+func.func @ElideNoOpCmdExecuteOp(%arg0: !stream.resource<transient>, %arg1: index, %arg2: !stream.timepoint) -> !stream.timepoint {
   // CHECK-NOT: stream.cmd.execute
   %0 = stream.cmd.execute await(%arg2) => with(%arg0 as %arg3: !stream.resource<transient>{%arg1}) {
   } => !stream.timepoint
@@ -133,7 +133,7 @@ func @ElideNoOpCmdExecuteOp(%arg0: !stream.resource<transient>, %arg1: index, %a
 // -----
 
 // CHECK-LABEL: @ElideUnusedCmdExecuteOp
-func @ElideUnusedCmdExecuteOp(%arg0: !stream.resource<transient>, %arg1: index, %arg2: !stream.timepoint) {
+func.func @ElideUnusedCmdExecuteOp(%arg0: !stream.resource<transient>, %arg1: index, %arg2: !stream.timepoint) {
   %c0 = arith.constant 0 : index
   %c128 = arith.constant 128 : index
   // CHECK-NOT: stream.cmd.execute

@@ -2,7 +2,7 @@
 
 // CHECK-LABEL: @buffer_subspan
 // CHECK-SAME: (%[[BUFFER:.+]]: !vm.ref<!hal.buffer>)
-func @buffer_subspan(%buffer : !hal.buffer) -> !hal.buffer {
+func.func @buffer_subspan(%buffer : !hal.buffer) -> !hal.buffer {
   %c42 = arith.constant 42 : index
   %c43 = arith.constant 43 : index
   // CHECK: %[[RET:.+]] = vm.call @hal.buffer.subspan(%[[BUFFER]], %c42, %c43) {nosideeffects} : (!vm.ref<!hal.buffer>, i32, i32) -> !vm.ref<!hal.buffer>
@@ -15,7 +15,7 @@ func @buffer_subspan(%buffer : !hal.buffer) -> !hal.buffer {
 
 // CHECK-LABEL: @buffer_load_i8
 // CHECK-SAME: (%[[BUFFER:.+]]: !vm.ref<!hal.buffer>)
-func @buffer_load_i8(%buffer: !hal.buffer) -> i8 {
+func.func @buffer_load_i8(%buffer: !hal.buffer) -> i8 {
   %c64 = arith.constant 64 : index
   // CHECK: %[[RET:.+]] = vm.call @hal.buffer.load(%[[BUFFER]], %c64, %c1) : (!vm.ref<!hal.buffer>, i32, i32) -> i32
   %0 = hal.buffer.load<%buffer: !hal.buffer>[%c64] : i8
@@ -27,7 +27,7 @@ func @buffer_load_i8(%buffer: !hal.buffer) -> i8 {
 
 // CHECK-LABEL: @buffer_load_i16
 // CHECK-SAME: (%[[BUFFER:.+]]: !vm.ref<!hal.buffer>)
-func @buffer_load_i16(%buffer: !hal.buffer) -> i16 {
+func.func @buffer_load_i16(%buffer: !hal.buffer) -> i16 {
   %c64 = arith.constant 64 : index
   // CHECK: %[[RET:.+]] = vm.call @hal.buffer.load(%[[BUFFER]], %c64, %c2) : (!vm.ref<!hal.buffer>, i32, i32) -> i32
   %0 = hal.buffer.load<%buffer: !hal.buffer>[%c64] : i16
@@ -39,7 +39,7 @@ func @buffer_load_i16(%buffer: !hal.buffer) -> i16 {
 
 // CHECK-LABEL: @buffer_load_i32
 // CHECK-SAME: (%[[BUFFER:.+]]: !vm.ref<!hal.buffer>)
-func @buffer_load_i32(%buffer: !hal.buffer) -> i32 {
+func.func @buffer_load_i32(%buffer: !hal.buffer) -> i32 {
   %c64 = arith.constant 64 : index
   // CHECK: %[[RET:.+]] = vm.call @hal.buffer.load(%[[BUFFER]], %c64, %c4) : (!vm.ref<!hal.buffer>, i32, i32) -> i32
   %0 = hal.buffer.load<%buffer: !hal.buffer>[%c64] : i32
@@ -51,7 +51,7 @@ func @buffer_load_i32(%buffer: !hal.buffer) -> i32 {
 
 // CHECK-LABEL: @buffer_load_i64
 // CHECK-SAME: (%[[BUFFER:.+]]: !vm.ref<!hal.buffer>)
-func @buffer_load_i64(%buffer: !hal.buffer) -> i64 {
+func.func @buffer_load_i64(%buffer: !hal.buffer) -> i64 {
   %c64 = arith.constant 64 : index
 
   // CHECK-DAG: %[[OFFSET_HI:.+]] = vm.add.i32 %c64, %c4
@@ -73,7 +73,7 @@ func @buffer_load_i64(%buffer: !hal.buffer) -> i64 {
 
 // CHECK-LABEL: @buffer_load_f32
 // CHECK-SAME: (%[[BUFFER:.+]]: !vm.ref<!hal.buffer>)
-func @buffer_load_f32(%buffer: !hal.buffer) -> f32 {
+func.func @buffer_load_f32(%buffer: !hal.buffer) -> f32 {
   %c64 = arith.constant 64 : index
   // CHECK: %[[RET_I32:.+]] = vm.call @hal.buffer.load(%[[BUFFER]], %c64, %c4) : (!vm.ref<!hal.buffer>, i32, i32) -> i32
   %0 = hal.buffer.load<%buffer: !hal.buffer>[%c64] : f32
@@ -86,7 +86,7 @@ func @buffer_load_f32(%buffer: !hal.buffer) -> f32 {
 
 // CHECK-LABEL: @buffer_store_i8
 // CHECK-SAME: (%[[BUFFER:.+]]: !vm.ref<!hal.buffer>, %[[VALUE:.+]]: i32)
-func @buffer_store_i8(%buffer: !hal.buffer, %value: i8) {
+func.func @buffer_store_i8(%buffer: !hal.buffer, %value: i8) {
   %c64 = arith.constant 64 : index
   // CHECK: vm.call @hal.buffer.store(%[[VALUE]], %[[BUFFER]], %c64, %c1) : (i32, !vm.ref<!hal.buffer>, i32, i32) -> ()
   hal.buffer.store<%buffer : !hal.buffer>[%c64] value(%value : i8)
@@ -97,7 +97,7 @@ func @buffer_store_i8(%buffer: !hal.buffer, %value: i8) {
 
 // CHECK-LABEL: @buffer_store_i16
 // CHECK-SAME: (%[[BUFFER:.+]]: !vm.ref<!hal.buffer>, %[[VALUE:.+]]: i32)
-func @buffer_store_i16(%buffer: !hal.buffer, %value: i16) {
+func.func @buffer_store_i16(%buffer: !hal.buffer, %value: i16) {
   %c64 = arith.constant 64 : index
   // CHECK: vm.call @hal.buffer.store(%[[VALUE]], %[[BUFFER]], %c64, %c2) : (i32, !vm.ref<!hal.buffer>, i32, i32) -> ()
   hal.buffer.store<%buffer : !hal.buffer>[%c64] value(%value : i16)
@@ -108,7 +108,7 @@ func @buffer_store_i16(%buffer: !hal.buffer, %value: i16) {
 
 // CHECK-LABEL: @buffer_store_i32
 // CHECK-SAME: (%[[BUFFER:.+]]: !vm.ref<!hal.buffer>, %[[VALUE:.+]]: i32)
-func @buffer_store_i32(%buffer: !hal.buffer, %value: i32) {
+func.func @buffer_store_i32(%buffer: !hal.buffer, %value: i32) {
   %c64 = arith.constant 64 : index
   // CHECK: vm.call @hal.buffer.store(%[[VALUE]], %[[BUFFER]], %c64, %c4) : (i32, !vm.ref<!hal.buffer>, i32, i32) -> ()
   hal.buffer.store<%buffer : !hal.buffer>[%c64] value(%value : i32)
@@ -119,7 +119,7 @@ func @buffer_store_i32(%buffer: !hal.buffer, %value: i32) {
 
 // CHECK-LABEL: @buffer_store_i64
 // CHECK-SAME: (%[[BUFFER:.+]]: !vm.ref<!hal.buffer>, %[[VALUE:.+]]: i64)
-func @buffer_store_i64(%buffer: !hal.buffer, %value: i64) {
+func.func @buffer_store_i64(%buffer: !hal.buffer, %value: i64) {
   %c64 = arith.constant 64 : index
 
   // CHECK-DAG: %[[VALUE_LO:.+]] = vm.trunc.i64.i32 %[[VALUE]]
@@ -138,7 +138,7 @@ func @buffer_store_i64(%buffer: !hal.buffer, %value: i64) {
 
 // CHECK-LABEL: @buffer_store_f32
 // CHECK-SAME: (%[[BUFFER:.+]]: !vm.ref<!hal.buffer>, %[[VALUE:.+]]: f32)
-func @buffer_store_f32(%buffer: !hal.buffer, %value: f32) {
+func.func @buffer_store_f32(%buffer: !hal.buffer, %value: f32) {
   %c64 = arith.constant 64 : index
   // CHECK: %[[VALUE_I32:.+]] = vm.bitcast.f32.i32 %[[VALUE]]
   // CHECK: vm.call @hal.buffer.store(%[[VALUE_I32]], %[[BUFFER]], %c64, %c4) : (i32, !vm.ref<!hal.buffer>, i32, i32) -> ()

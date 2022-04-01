@@ -1,7 +1,7 @@
 // RUN: iree-opt -split-input-file %s | iree-opt -split-input-file | FileCheck %s
 
 // CHECK-LABEL: @rangeMin
-func @rangeMin(%arg0: index, %arg1: index, %arg2: index) {
+func.func @rangeMin(%arg0: index, %arg1: index, %arg2: index) {
   // CHECK: = util.range.min %arg0 : index
   %0 = util.range.min %arg0 : index
   // CHECK: = util.range.min %arg0, %arg1, %arg2 : index
@@ -12,7 +12,7 @@ func @rangeMin(%arg0: index, %arg1: index, %arg2: index) {
 // -----
 
 // CHECK-LABEL: @rangeMax
-func @rangeMax(%arg0: index, %arg1: index, %arg2: index) {
+func.func @rangeMax(%arg0: index, %arg1: index, %arg2: index) {
   // CHECK: = util.range.max %arg0 : index
   %0 = util.range.max %arg0 : index
   // CHECK: = util.range.max %arg0, %arg1, %arg2 : index
@@ -23,7 +23,7 @@ func @rangeMax(%arg0: index, %arg1: index, %arg2: index) {
 // -----
 
 // CHECK-LABEL: @rangeExtents
-func @rangeExtents(%arg0: index, %arg1: index, %arg2: index) {
+func.func @rangeExtents(%arg0: index, %arg1: index, %arg2: index) {
   // CHECK: = util.range.extents [%arg0 for %arg2] : index
   %0:2 = util.range.extents [%arg0 for %arg2] : index
   // CHECK: = util.range.extents [%arg0 for %arg2], [%arg1 for %arg2] : index

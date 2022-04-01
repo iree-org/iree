@@ -16,7 +16,7 @@ hal.executable private @matmul_static_shape_f16 {
       translation_info = #translation
     }
     builtin.module  {
-      func @matmul_static_shape_f16() {
+      func.func @matmul_static_shape_f16() {
         %c0 = arith.constant 0 : index
         %cst = arith.constant 0.000000e+00 : f16
         %c4096 = arith.constant 4096 : index
@@ -80,7 +80,7 @@ hal.executable private @matmul_static_shape_f32 {
       translation_info = #translation
     }
     builtin.module  {
-      func @matmul_static_shape_f32() {
+      func.func @matmul_static_shape_f32() {
         %c0 = arith.constant 0 : index
         %cst = arith.constant 0.000000e+00 : f32
         %c4096 = arith.constant 4096 : index

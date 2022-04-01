@@ -1,4 +1,4 @@
-func @extract_slice_strided() {
+func.func @extract_slice_strided() {
   %0 = linalg.init_tensor [500, 750] : tensor<500x750xi32>
   %1 = linalg.generic {
       indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>],

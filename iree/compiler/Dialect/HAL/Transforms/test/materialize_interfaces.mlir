@@ -25,7 +25,7 @@ hal.executable.source public @ex {
     ]>
   ]>)
   builtin.module {
-    func @entry() {
+    func.func @entry() {
       %const0 = hal.interface.constant.load[0] : index
       %const1 = hal.interface.constant.load[1] : index
       %s0b0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%const0) alignment(32) : !flow.dispatch.tensor<readonly:4xf32>

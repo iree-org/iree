@@ -4,6 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include <assert.h>
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -288,37 +289,72 @@ static bool matmul_result_elements_agree(iree_vm_value_t expected,
   }
 }
 
-// Prints |matrix| to |file|, with |label| as caption.
-// |precision| controls how many decimals are printed for float values.
-//
-// If |other_matrix| is not NULL, then any matrix entries that disagree
-// between |matrix| and |other_matrix| (according to
-// matmul_result_elements_agree) are highlighted.
-static void print_matrix(FILE* file, const char* label, precision_t precision,
-                         int row_start, int row_end, int col_start, int col_end,
-                         iree_hal_buffer_view_t* matrix,
-                         iree_hal_buffer_view_t* other_matrix) {
+static int get_max_elem_width(precision_t precision, int row_start, int row_end,
+                              int col_start, int col_end,
+                              iree_hal_buffer_view_t* matrix) {
   iree_hal_dim_t dims[2];
   get_matrix_buffer_view_shape(matrix, dims);
   int rows = dims[0];
   int cols = dims[1];
   iree_hal_element_type_t elem_type = iree_hal_buffer_view_element_type(matrix);
-  void* data = 0;
+  void* data = NULL;
   get_buffer_view_dense_row_major_data(matrix, &data);
-  void* other_data = 0;
-  if (other_matrix) {
-    get_buffer_view_dense_row_major_data(other_matrix, &other_data);
-  }
   int max_elem_width = 0;
   for (int row = row_start; row < row_end; row++) {
     for (int col = col_start; col < col_end; col++) {
       iree_vm_value_t elem =
           read_matrix_element(rows, cols, elem_type, data, row, col);
       char buf[64];
-      max_elem_width = iree_max(
-          max_elem_width, snprintf_value(buf, sizeof buf, elem, precision));
+      int this_elem_width = snprintf_value(buf, sizeof buf, elem, precision);
+      // iree_max is a macro, may evaluate its args twice. Give it plain ints.
+      max_elem_width = iree_max(max_elem_width, this_elem_width);
     }
   }
+  return max_elem_width;
+}
+
+// Prints |matrix| to |file|, with |label| as caption.
+// |precision| controls how many decimals are printed for float values.
+//
+// If |other_matrix| is not NULL, then any matrix entries that disagree
+// between |matrix| and |other_matrix| (according to
+// matmul_result_elements_agree) are highlighted.
+//
+// |highlight| is either NULL or is a UTF-8 string that will be printed next to
+// any entry of |matrix| that disagrees with the corresponding entry of
+// |other_matrix|.
+//
+// |highlight| should be NULL if and only if |other_matrix| is NULL.
+//
+// In order for matrix columns to be properly laid out, the rendering of
+// |highlight| in a fixed-width font should have the width of two regular Latin
+// characters. According to
+// https://www.unicode.org/reports/tr11/#Recommendations, a single emoji
+// character should meet that requirement.
+static void print_matrix(FILE* file, const char* label, precision_t precision,
+                         int row_start, int row_end, int col_start, int col_end,
+                         iree_hal_buffer_view_t* matrix,
+                         iree_hal_buffer_view_t* other_matrix,
+                         const char* highlight) {
+  assert((other_matrix == NULL) == (highlight == NULL));
+  iree_hal_dim_t dims[2];
+  get_matrix_buffer_view_shape(matrix, dims);
+  int rows = dims[0];
+  int cols = dims[1];
+  iree_hal_element_type_t elem_type = iree_hal_buffer_view_element_type(matrix);
+  void* data = NULL;
+  get_buffer_view_dense_row_major_data(matrix, &data);
+  int max_elem_width = get_max_elem_width(precision, row_start, row_end,
+                                          col_start, col_end, matrix);
+  void* other_data = NULL;
+  if (other_matrix) {
+    get_buffer_view_dense_row_major_data(other_matrix, &other_data);
+    int other_matrix_max_elem_width = get_max_elem_width(
+        precision, row_start, row_end, col_start, col_end, other_matrix);
+    // iree_max is a macro, may evaluate its args twice. Give it plain ints.
+    max_elem_width = iree_max(max_elem_width, other_matrix_max_elem_width);
+  }
+
   fprintf(file,
           "%s (rows %d..%d out of %d..%d, columns %d..%d out of %d..%d)\n",
           label, row_start, row_end - 1, 0, rows - 1, col_start, col_end - 1, 0,
@@ -326,22 +362,20 @@ static void print_matrix(FILE* file, const char* label, precision_t precision,
   for (int row = row_start; row < row_end; row++) {
     for (int col = col_start; col < col_end; col++) {
       iree_vm_value_t elem =
-          read_matrix_element(rows, cols, elem_type, (void*)data, row, col);
-      bool bad_elem = false;
+          read_matrix_element(rows, cols, elem_type, data, row, col);
+      bool disagree = false;
       if (other_matrix) {
-        iree_vm_value_t other_elem = read_matrix_element(
-            rows, cols, elem_type, (void*)other_data, row, col);
-        bad_elem = !matmul_result_elements_agree(elem, other_elem);
+        iree_vm_value_t other_elem =
+            read_matrix_element(rows, cols, elem_type, other_data, row, col);
+        disagree = !matmul_result_elements_agree(elem, other_elem);
       }
       char buf[64];
       snprintf_value(buf, sizeof buf, elem, precision);
       fprintf(file, "%*s", max_elem_width, buf);
-      if (bad_elem) {
-        fprintf(file, "💩");
-      } else if (col < col_end - 1) {
-        // two spaces per https://www.unicode.org/reports/tr11/#Recommendations
-        fprintf(file, "  ");
-      }
+      // See comment on |highlight| function parameter for why 2 spaces.
+      // A 3rd space is added unconditionally to make it clear that a highlight
+      // concerns the matrix entry to its left.
+      fprintf(file, "%s ", disagree ? highlight : "  ");
     }
     fprintf(file, "\n");
   }
@@ -401,19 +435,19 @@ static iree_status_t iree_check_matmul_failure(
 
   fprintf(file, "\n");
   print_matrix(file, "left-hand side", PRECISION_LOW, m_start, m_end, k_start,
-               k_end, lhs, NULL);
+               k_end, lhs, NULL, NULL);
   fprintf(file, "\n");
   print_matrix(file, "right-hand side", PRECISION_LOW, k_start, k_end, n_start,
-               n_end, rhs, NULL);
+               n_end, rhs, NULL, NULL);
   fprintf(file, "\n");
   print_matrix(file, "input accumulator", PRECISION_LOW, m_start, m_end,
-               n_start, n_end, acc, NULL);
+               n_start, n_end, acc, NULL, NULL);
   fprintf(file, "\n");
   print_matrix(file, "expected result", PRECISION_LOW, m_start, m_end, n_start,
-               n_end, expected_result, actual_result);
+               n_end, expected_result, actual_result, "🦄");
   fprintf(file, "\n");
   print_matrix(file, "actual result", PRECISION_LOW, m_start, m_end, n_start,
-               n_end, actual_result, expected_result);
+               n_end, actual_result, expected_result, "🐛");
   fprintf(file, "\n");
   return iree_make_status(IREE_STATUS_ABORTED,
                           "matmul test failure, details logged above");

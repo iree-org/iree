@@ -19,6 +19,7 @@ iree_lit_test_suite(
     "hal_interface_constants.mlir"
     "hal_interface_workgroup_info.mlir"
     "illegal_configuration.mlir"
+    "linalg_ext_hal_to_hal.mlir"
     "linalg_transform.mlir"
     "materialize_launch_configuration.mlir"
     "synchronize_symbol_visibility.mlir"
@@ -27,6 +28,7 @@ iree_lit_test_suite(
     "unfused_fma.mlir"
     "vector_contract_to_arm_asm.mlir"
     "vector_contract_to_arm_intrinsics.mlir"
+    "verify_linalg_transform_legality.mlir"
   TOOLS
     FileCheck
     iree::tools::iree-compile

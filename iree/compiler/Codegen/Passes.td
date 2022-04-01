@@ -94,7 +94,7 @@ def OptimizeVectorTransfer :
 }
 
 def InsertDistributionInfo :
-    Pass<"iree-codegen-insert-distribution-info", "FuncOp"> {
+    Pass<"iree-codegen-insert-distribution-info", "func::FuncOp"> {
   let summary = "Insert the workgroup count region and translation info";
   let constructor = "mlir::iree_compiler::createInsertDistributionInfoPass()";
 }
@@ -130,6 +130,16 @@ def SetNumWorkgroups :
   let summary =
       "Set the number of workgroups for entry point functions";
   let constructor = "mlir::iree_compiler::createSetNumWorkgroupsPass()";
+}
+
+// TODO: Consider removing or moving to HAL/Transforms in order to avoid
+// polluting common pass declarations with HAL specific ops.
+def SetNumWorkgroupsFromLinalgExt :
+    Pass<"iree-set-num-workgroups-from-linalg-ext",
+         "mlir::iree_compiler::IREE::HAL::ExecutableVariantOp"> {
+  let summary =
+      "Propagate the number of workgroups for entry point functions";
+  let constructor = "mlir::iree_compiler::createSetNumWorkgroupsFromLinalgExtPass()";
 }
 
 // TODO: Rename argument to be fully qualified.
@@ -171,6 +181,12 @@ def MemrefCopyToLinalgPass :
 //------------------------------------------------------------------------------
 // LLVMCPU
 //------------------------------------------------------------------------------
+
+def VerifyLinalgTransformLegality :
+    Pass<"iree-llvmcpu-verify-linalg-transform-legality", "ModuleOp"> {
+  let summary = "Verify that only supported IR constructs are passed to the compiler.";
+  let constructor = "mlir::iree_compiler::createVerifyLinalgTransformLegalityPass()";
+}
 
 def ConvertToLLVM :
     Pass<"iree-convert-to-llvm", "ModuleOp"> {

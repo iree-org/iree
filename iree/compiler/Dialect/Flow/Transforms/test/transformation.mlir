@@ -1,14 +1,14 @@
 // RUN: iree-opt -split-input-file -iree-mhlo-input-transformation-pipeline -iree-flow-transformation-pipeline %s | FileCheck %s
 
 // CHECK-LABEL: @empty
-func @empty() {
+func.func @empty() {
   // CHECK-NEXT: return
   return
 }
 
 // -----
 
-func @hloElementwiseOps(%arg0 : tensor<4xf32>) -> tensor<4xf32> {
+func.func @hloElementwiseOps(%arg0 : tensor<4xf32>) -> tensor<4xf32> {
   %0 = mhlo.add %arg0, %arg0 : tensor<4xf32>
   %1 = mhlo.subtract %0, %arg0 : tensor<4xf32>
   %2 = mhlo.multiply %1, %arg0 : tensor<4xf32>
@@ -32,7 +32,7 @@ func @hloElementwiseOps(%arg0 : tensor<4xf32>) -> tensor<4xf32> {
 
 // -----
 
-func @interleavedDot(%arg0 : tensor<4x4xf32>) -> tensor<4x4xf32> {
+func.func @interleavedDot(%arg0 : tensor<4x4xf32>) -> tensor<4x4xf32> {
   %0 = mhlo.add %arg0, %arg0 : tensor<4x4xf32>
   %1 = "mhlo.dot"(%0, %arg0) : (tensor<4x4xf32>, tensor<4x4xf32>) -> tensor<4x4xf32>
   %2 = mhlo.multiply %1, %arg0 : tensor<4x4xf32>
@@ -63,7 +63,7 @@ func @interleavedDot(%arg0 : tensor<4x4xf32>) -> tensor<4x4xf32> {
 
 // -----
 
-func @reduction(%arg0 : tensor<4x8xf32>) -> tensor<4xf32> {
+func.func @reduction(%arg0 : tensor<4x8xf32>) -> tensor<4xf32> {
   %0 = arith.constant dense<0.0> : tensor<f32>
   %1 = "mhlo.reduce"(%arg0, %0) ( {
   ^bb0(%arg1 : tensor<f32>, %arg2 : tensor<f32>):

@@ -1,4 +1,4 @@
-func @conv2d_nopadding() {
+func.func @conv2d_nopadding() {
   %inputs = util.unfoldable_constant dense<[[
       [[ 1.0,  2.0], [ 3.0,  4.0], [ 5.0,  6.0], [ 7.0,  8.0]],
       [[11.0, 12.0], [13.0, 14.0], [15.0, 16.0], [17.0, 18.0]],
@@ -31,7 +31,7 @@ func @conv2d_nopadding() {
   return
 }
 
-func @conv2d_nopadding_batch_feature() {
+func.func @conv2d_nopadding_batch_feature() {
   %inputs = util.unfoldable_constant dense<[
     [[[ 1.0], [ 3.0], [ 5.0], [ 7.0]],
      [[11.0], [13.0], [15.0], [17.0]],
@@ -69,7 +69,7 @@ func @conv2d_nopadding_batch_feature() {
   return
 }
 
-func @conv2d_reorder_input_spatial() {
+func.func @conv2d_reorder_input_spatial() {
   %inputs = util.unfoldable_constant dense<[[
       [[ 1.0,  2.0], [11.0, 12.0], [21.0, 22.0], [31.0, 32.0]],
       [[ 3.0,  4.0], [13.0, 14.0], [23.0, 24.0], [33.0, 34.0]],
@@ -102,7 +102,7 @@ func @conv2d_reorder_input_spatial() {
   return
 }
 
-func @conv2d_reorder_kernel() {
+func.func @conv2d_reorder_kernel() {
   %inputs = util.unfoldable_constant dense<[[
       [[ 1.0,  2.0], [ 3.0,  4.0], [ 5.0,  6.0], [ 7.0,  8.0]],
       [[11.0, 12.0], [13.0, 14.0], [15.0, 16.0], [17.0, 18.0]],
@@ -135,7 +135,7 @@ func @conv2d_reorder_kernel() {
   return
 }
 
-func @conv2d_reorder_output() {
+func.func @conv2d_reorder_output() {
   %inputs = util.unfoldable_constant dense<[[
       [[ 1.0,  2.0], [ 3.0,  4.0], [ 5.0,  6.0], [ 7.0,  8.0]],
       [[11.0, 12.0], [13.0, 14.0], [15.0, 16.0], [17.0, 18.0]],
@@ -169,7 +169,7 @@ func @conv2d_reorder_output() {
   return
 }
 
-func @conv2d_1452x3221_same() {
+func.func @conv2d_1452x3221_same() {
   %inputs = util.unfoldable_constant dense<[[
       [[ 1.0,  2.0], [ 3.0,  4.0], [ 5.0,  6.0], [ 7.0,  8.0], [ 9.0, 10.0]],
       [[11.0, 12.0], [13.0, 14.0], [15.0, 16.0], [17.0, 18.0], [19.0, 20.0]],
@@ -205,7 +205,7 @@ func @conv2d_1452x3221_same() {
   return
 }
 
-func @conv2d_2451x2311_same() {
+func.func @conv2d_2451x2311_same() {
   %inputs = util.unfoldable_constant dense<[
       [[[ 1.0], [ 2.0], [ 3.0], [ 4.0], [ 5.0]],
        [[ 6.0], [ 7.0], [ 8.0], [ 9.0], [10.0]],
@@ -248,7 +248,7 @@ func @conv2d_2451x2311_same() {
   return
 }
 
-func @conv2d_no_padding2() {
+func.func @conv2d_no_padding2() {
   %inputs = util.unfoldable_constant dense<[
        [[[  1.0,   2.0,   3.0],
          [  4.0,   5.0,   6.0],
@@ -348,7 +348,7 @@ func @conv2d_no_padding2() {
   return
 }
 
-func @conv2d_1452x2223_dilated_valid() {
+func.func @conv2d_1452x2223_dilated_valid() {
   %inputs = util.unfoldable_constant dense<
      [[[[0.09762701,  0.43037874],
        [ 0.20552675,  0.08976637],
@@ -409,7 +409,7 @@ func @conv2d_1452x2223_dilated_valid() {
   return
 }
 
-func @depthwise_conv_non_1_channel_multiplier() {
+func.func @depthwise_conv_non_1_channel_multiplier() {
   %arg0 = util.unfoldable_constant dense<1.0> : tensor<2x4x5x2xf32>
   %arg1 = util.unfoldable_constant dense<1.0> : tensor<2x2x2x3xf32>
   %res = "mhlo.convolution"(%arg0, %arg1) {

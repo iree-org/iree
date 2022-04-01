@@ -651,3 +651,9 @@ if(IREE_BUILD_COMPILER AND IREE_BUILD_PYTHON_BINDINGS)
     )
   endif()
 endif()
+
+#-------------------------------------------------------------------------------
+# IREE benchmark tools
+#-------------------------------------------------------------------------------
+
+add_subdirectory(build_tools/benchmarks)

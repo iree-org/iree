@@ -13,7 +13,7 @@
 // CHECK-NEXT:   util.global.store %descriptor_set_layout, @_descriptor_set_layout_0 : !hal.descriptor_set_layout
 
 // CHECK-LABEL: @descriptorSetLayoutLookup
-func @descriptorSetLayoutLookup(%device : !hal.device) -> !hal.descriptor_set_layout {
+func.func @descriptorSetLayoutLookup(%device : !hal.device) -> !hal.descriptor_set_layout {
   // CHECK-NEXT: %[[LAYOUT:.+]] = util.global.load @_descriptor_set_layout_0 : !hal.descriptor_set_layout
   %0 = hal.descriptor_set_layout.lookup device(%device : !hal.device)
                                         usage(push_only)
@@ -40,7 +40,7 @@ func @descriptorSetLayoutLookup(%device : !hal.device) -> !hal.descriptor_set_la
 // CHECK-NEXT:   util.global.store %executable_layout, @_executable_layout_0 : !hal.executable_layout
 
 // CHECK-LABEL: @exeLayoutLookup
-func @exeLayoutLookup(%device : !hal.device) -> !hal.executable_layout {
+func.func @exeLayoutLookup(%device : !hal.device) -> !hal.executable_layout {
   // CHECK: %[[LAYOUT:.+]] = util.global.load @_executable_layout_0 : !hal.executable_layout
   %0 = hal.executable_layout.lookup device(%device : !hal.device)
                                     layout(#hal.executable.layout<push_constants = 1, sets = [
@@ -70,7 +70,7 @@ func @exeLayoutLookup(%device : !hal.device) -> !hal.executable_layout {
 // CHECK-NEXT:   util.global.store %executable_layout, @_executable_layout_0 : !hal.executable_layout
 
 // CHECK-LABEL: @sharedLayoutLookup
-func @sharedLayoutLookup(%device : !hal.device) -> !hal.executable_layout {
+func.func @sharedLayoutLookup(%device : !hal.device) -> !hal.executable_layout {
   // CHECK: %[[LAYOUT:.+]] = util.global.load @_executable_layout_0 : !hal.executable_layout
   %0 = hal.executable_layout.lookup device(%device : !hal.device)
                                     layout(#hal.executable.layout<push_constants = 1, sets = [
@@ -88,7 +88,7 @@ func @sharedLayoutLookup(%device : !hal.device) -> !hal.executable_layout {
 }
 
 // CHECK: @otherDescriptorSetLayoutLookup
-func @otherDescriptorSetLayoutLookup(%device : !hal.device) -> !hal.descriptor_set_layout {
+func.func @otherDescriptorSetLayoutLookup(%device : !hal.device) -> !hal.descriptor_set_layout {
   // CHECK: %[[LAYOUT:.+]] = util.global.load @_descriptor_set_layout_0 : !hal.descriptor_set_layout
   %0 = hal.descriptor_set_layout.lookup device(%device : !hal.device)
                                         usage(push_only)
@@ -161,7 +161,7 @@ hal.executable @exe {
 // CHECK:   util.global.store %[[RET]], @_executable_exe : !hal.executable
 
 // CHECK-LABEL: @exeLookup
-func @exeLookup(%device : !hal.device) -> !hal.executable {
+func.func @exeLookup(%device : !hal.device) -> !hal.executable {
   // CHECK: %[[EXE:.+]] = util.global.load @_executable_exe : !hal.executable
   %0 = hal.executable.lookup device(%device : !hal.device)
                              executable(@exe) : !hal.executable

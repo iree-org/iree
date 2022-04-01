@@ -2,7 +2,7 @@
 
 // CHECK-LABEL: vm.func private @buffer_view_dims
 // CHECK-SAME: %[[VIEW:.+]]: !vm.ref<!hal.buffer_view>
-func @buffer_view_dims(%arg0 : !hal.buffer_view) -> (index, index, index) {
+func.func @buffer_view_dims(%arg0 : !hal.buffer_view) -> (index, index, index) {
   // CHECK-DAG: %[[D0:.+]] = vm.call @hal.buffer_view.dim(%[[VIEW]], %zero)
   // CHECK-DAG: %[[D1:.+]] = vm.call @hal.buffer_view.dim(%[[VIEW]], %c1)
   // CHECK-DAG: %[[D2:.+]] = vm.call @hal.buffer_view.dim(%[[VIEW]], %c2)

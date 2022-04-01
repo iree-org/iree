@@ -101,7 +101,7 @@ hal.executable private @batch_matmul_func  {
       workgroup_size = [8 : index, 8 : index, 1 : index]
     }
 builtin.module {
-  func @batch_matmul_func() {
+  func.func @batch_matmul_func() {
     %c0 = arith.constant 0 : index
     %cst = arith.constant 0.000000e+00 : f32
     %c4 = arith.constant 4 : index
@@ -310,7 +310,7 @@ hal.executable private @conv_dispatch  {
       workgroup_size = [64 : index, 1 : index, 1 : index]
     }
     builtin.module {
-      func @conv_dispatch() {
+      func.func @conv_dispatch() {
         %c56 = arith.constant 56 : index
         %c64 = arith.constant 64 : index
         %c802816 = arith.constant 802816 : index

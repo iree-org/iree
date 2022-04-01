@@ -19,6 +19,7 @@ iree_cc_library(
     "AssignTargetDevices.cpp"
     "BenchmarkBatchDispatches.cpp"
     "ConvertToHAL.cpp"
+    "DumpExecutableSources.cpp"
     "ElideRedundantCommands.cpp"
     "InlineDeviceSwitches.cpp"
     "LinkExecutables.cpp"

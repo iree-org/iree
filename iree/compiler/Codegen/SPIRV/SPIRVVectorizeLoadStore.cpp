@@ -149,7 +149,7 @@ class MemRefUsageAnalysis {
 MemRefUsageAnalysis::MemRefUsageAnalysis(mlir::Operation *op) {
   op->walk([&](Operation *op) {
     TypeSwitch<Operation *>(op)
-        .Case<FuncOp>([this](FuncOp funcOp) {
+        .Case<func::FuncOp>([this](func::FuncOp funcOp) {
           for (Value arg : funcOp.getArguments()) {
             analyzeMemRefValue(arg);
           }
@@ -181,12 +181,13 @@ class MemRefConversionPattern : public OpConversionPattern<OpTy> {
   const MemRefUsageAnalysis &memrefUsageAnalysis;
 };
 
-class ProcessFunctionArgument final : public MemRefConversionPattern<FuncOp> {
+class ProcessFunctionArgument final
+    : public MemRefConversionPattern<func::FuncOp> {
  public:
   using MemRefConversionPattern::MemRefConversionPattern;
 
   LogicalResult matchAndRewrite(
-      FuncOp funcOp, OpAdaptor adaptor,
+      func::FuncOp funcOp, OpAdaptor adaptor,
       ConversionPatternRewriter &rewriter) const override;
 };
 
@@ -205,8 +206,9 @@ class ProcessTransferRead final
 
     Location loc = read.getLoc();
 
-    auto scalarMemrefType = read.source().getType().dyn_cast<MemRefType>();
-    auto vectorMemrefType = adaptor.source().getType().dyn_cast<MemRefType>();
+    auto scalarMemrefType = read.getSource().getType().dyn_cast<MemRefType>();
+    auto vectorMemrefType =
+        adaptor.getSource().getType().dyn_cast<MemRefType>();
     auto readVectorType = read.getVectorType();
     if (!scalarMemrefType || !vectorMemrefType) return failure();
 
@@ -225,7 +227,7 @@ class ProcessTransferRead final
 
     unsigned ratio = *vectorMemrefElemSize / *scalarMemrefElemSize;
     Value valueRatio = rewriter.create<arith::ConstantIndexOp>(loc, ratio);
-    auto indices = llvm::to_vector<4>(adaptor.indices());
+    auto indices = llvm::to_vector<4>(adaptor.getIndices());
     indices.back() = rewriter.create<AffineApplyOp>(
         loc, divMap, ValueRange{indices.back(), valueRatio});
 
@@ -234,7 +236,7 @@ class ProcessTransferRead final
     if (*vectorMemrefElemSize == *readVecSize) {
       Type elemType = vectorMemrefType.getElementType();
       Value newLoad = rewriter.create<memref::LoadOp>(
-          loc, elemType, adaptor.source(), indices);
+          loc, elemType, adaptor.getSource(), indices);
       Type serializedVecType =
           VectorType::get(read.getVectorType().getNumElements(),
                           read.getVectorType().getElementType());
@@ -244,7 +246,7 @@ class ProcessTransferRead final
           read, read.getVectorType(), newLoad);
     } else {
       rewriter.replaceOpWithNewOp<vector::TransferReadOp>(
-          read, read.getVectorType(), adaptor.source(), indices);
+          read, read.getVectorType(), adaptor.getSource(), indices);
     }
     return success();
   }
@@ -265,8 +267,9 @@ class ProcessTransferWrite final
 
     Location loc = write.getLoc();
 
-    auto scalarMemrefType = write.source().getType().dyn_cast<MemRefType>();
-    auto vectorMemrefType = adaptor.source().getType().dyn_cast<MemRefType>();
+    auto scalarMemrefType = write.getSource().getType().dyn_cast<MemRefType>();
+    auto vectorMemrefType =
+        adaptor.getSource().getType().dyn_cast<MemRefType>();
     auto writeVectorType = write.getVectorType();
     if (!scalarMemrefType || !vectorMemrefType) return failure();
 
@@ -285,7 +288,7 @@ class ProcessTransferWrite final
 
     unsigned ratio = *vectorMemrefElemSize / *scalarMemrefElemSize;
     Value valueRatio = rewriter.create<arith::ConstantIndexOp>(loc, ratio);
-    SmallVector<Value, 4> indices(adaptor.indices());
+    SmallVector<Value, 4> indices(adaptor.getIndices());
     indices.back() = rewriter.create<AffineApplyOp>(
         loc, divMap, ValueRange{indices.back(), valueRatio});
 
@@ -295,14 +298,14 @@ class ProcessTransferWrite final
       Type serializedVecType = VectorType::get(
           writeVectorType.getNumElements(), writeVectorType.getElementType());
       Value data = rewriter.create<vector::ShapeCastOp>(loc, serializedVecType,
-                                                        adaptor.vector());
+                                                        adaptor.getVector());
       data = rewriter.create<vector::BitCastOp>(
           loc, vectorMemrefType.getElementType(), data);
-      rewriter.replaceOpWithNewOp<memref::StoreOp>(write, data,
-                                                   adaptor.source(), indices);
+      rewriter.replaceOpWithNewOp<memref::StoreOp>(
+          write, data, adaptor.getSource(), indices);
     } else {
       rewriter.replaceOpWithNewOp<vector::TransferWriteOp>(
-          write, adaptor.vector(), adaptor.source(), indices);
+          write, adaptor.getVector(), adaptor.getSource(), indices);
     }
     return success();
   }
@@ -416,7 +419,7 @@ struct ScalarizeVectorTransferRead final
     VectorType vectorType = readOp.getType();
     Type scalarType = vectorType.getElementType();
     if (vectorType.getRank() != 1 ||
-        !readOp.permutation_map().isMinorIdentity())
+        !readOp.getPermutationMap().isMinorIdentity())
       return failure();
 
     MLIRContext *context = rewriter.getContext();
@@ -429,11 +432,11 @@ struct ScalarizeVectorTransferRead final
         loc, vectorType, rewriter.getZeroAttr(vectorType));
     for (int i = 0; i < vectorType.getDimSize(0); ++i) {
       Value iVal = rewriter.create<arith::ConstantIndexOp>(loc, i);
-      auto indices = llvm::to_vector<4>(readOp.indices());
+      auto indices = llvm::to_vector<4>(readOp.getIndices());
       indices.back() = rewriter.create<AffineApplyOp>(
           loc, addMap, ValueRange{indices.back(), iVal});
-      Value scalar = rewriter.create<memref::LoadOp>(loc, scalarType,
-                                                     readOp.source(), indices);
+      Value scalar = rewriter.create<memref::LoadOp>(
+          loc, scalarType, readOp.getSource(), indices);
       newVector = rewriter.create<vector::InsertOp>(loc, scalar, newVector, i);
     }
     rewriter.replaceOp(readOp, newVector);
@@ -449,7 +452,7 @@ struct ScalarizeVectorTransferWrite final
                                 PatternRewriter &rewriter) const override {
     VectorType vectorType = writeOp.getVectorType();
     if (vectorType.getRank() != 1 ||
-        !writeOp.permutation_map().isMinorIdentity())
+        !writeOp.getPermutationMap().isMinorIdentity())
       return failure();
 
     Location loc = writeOp.getLoc();
@@ -460,12 +463,13 @@ struct ScalarizeVectorTransferWrite final
 
     for (int i = 0; i < vectorType.getDimSize(0); ++i) {
       Value iVal = rewriter.create<arith::ConstantIndexOp>(loc, i);
-      auto indices = llvm::to_vector<4>(writeOp.indices());
+      auto indices = llvm::to_vector<4>(writeOp.getIndices());
       indices.back() = rewriter.create<AffineApplyOp>(
           loc, addMap, ValueRange{indices.back(), iVal});
       Value scalar =
-          rewriter.create<vector::ExtractOp>(loc, writeOp.vector(), i);
-      rewriter.create<memref::StoreOp>(loc, scalar, writeOp.source(), indices);
+          rewriter.create<vector::ExtractOp>(loc, writeOp.getVector(), i);
+      rewriter.create<memref::StoreOp>(loc, scalar, writeOp.getSource(),
+                                       indices);
     }
     rewriter.eraseOp(writeOp);
     return success();
@@ -486,7 +490,7 @@ class SPIRVVectorizeLoadStorePass final
 }  // namespace
 
 LogicalResult ProcessFunctionArgument::matchAndRewrite(
-    FuncOp funcOp, OpAdaptor adaptor,
+    func::FuncOp funcOp, OpAdaptor adaptor,
     ConversionPatternRewriter &rewriter) const {
   TypeConverter::SignatureConversion signatureConverter(
       funcOp.getFunctionType().getNumInputs());
@@ -528,7 +532,7 @@ void SPIRVVectorizeLoadStorePass::runOnOperation() {
       context);
 
   ConversionTarget target(*context);
-  target.addDynamicallyLegalOp<FuncOp>([&](FuncOp op) {
+  target.addDynamicallyLegalOp<func::FuncOp>([&](func::FuncOp op) {
     return llvm::all_of(op.getArguments(), [&](Value arg) {
       return !memrefUsageAnalysis->shouldVectorizeMemRef(arg);
     });
@@ -553,7 +557,7 @@ void SPIRVVectorizeLoadStorePass::runOnOperation() {
                                     std::move(conversionPatterns))))
     return signalPassFailure();
 
-  for (FuncOp func : module.getOps<FuncOp>()) {
+  for (func::FuncOp func : module.getOps<func::FuncOp>()) {
     RewritePatternSet rewritingPatterns(context);
     rewritingPatterns
         .add<ScalarizeVectorTransferRead, ScalarizeVectorTransferWrite>(

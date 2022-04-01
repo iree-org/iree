@@ -202,7 +202,7 @@ class LLVMGPUDistributeSharedMemoryCopyPass
     registry.insert<vector::VectorDialect, scf::SCFDialect>();
   }
   void runOnOperation() override {
-    FuncOp funcOp = getOperation();
+    func::FuncOp funcOp = getOperation();
     auto entryPointOp = getEntryPoint(funcOp);
     if (!entryPointOp) return;
     auto workgroupSize = getWorkgroupSize(entryPointOp);
@@ -291,7 +291,7 @@ class LLVMGPUDistributeSharedMemoryCopyPass
 
 }  // namespace
 
-std::unique_ptr<OperationPass<FuncOp>>
+std::unique_ptr<OperationPass<func::FuncOp>>
 createLLVMGPUDistributeSharedMemoryCopy() {
   return std::make_unique<LLVMGPUDistributeSharedMemoryCopyPass>();
 }

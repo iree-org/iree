@@ -41,7 +41,7 @@ hal.executable public @matmul_256x1024x128_div_sub {
       hal.return %0, %1, %c1 : index, index, index
     }
     builtin.module  {
-      func @matmul_256x1024x128_div_sub() {
+      func.func @matmul_256x1024x128_div_sub() {
         %c0 = arith.constant 0 : index
         %c1024 = arith.constant 1024 : index
         %c256 = arith.constant 256 : index

@@ -33,25 +33,28 @@ void buildTOSAInputConversionPassPipeline(OpPassManager &passManager) {
   // Currently we don't handle SCF ops well and have to convert them all to CFG.
   // In the future it would be nice if we could have all of flow be both scf
   // and cfg compatible.
-  passManager.addNestedPass<FuncOp>(tosa::createTosaToSCF());
-  passManager.addNestedPass<FuncOp>(createTopLevelSCFToCFGPass());
+  passManager.addNestedPass<func::FuncOp>(tosa::createTosaToSCF());
+  passManager.addNestedPass<func::FuncOp>(createTopLevelSCFToCFGPass());
 
   // We also don't handle calls well on the old codepath; until we remove the
   // use of the CFG we can continue inlining.
   passManager.addPass(mlir::createInlinerPass());
 
-  passManager.addNestedPass<FuncOp>(tosa::createTosaMakeBroadcastablePass());
-  passManager.addNestedPass<FuncOp>(tosa::createTosaToStandard());
-  passManager.addNestedPass<FuncOp>(mlir::createCanonicalizerPass());
+  passManager.addNestedPass<func::FuncOp>(
+      tosa::createTosaMakeBroadcastablePass());
+  passManager.addNestedPass<func::FuncOp>(tosa::createTosaToStandard());
+  passManager.addNestedPass<func::FuncOp>(mlir::createCanonicalizerPass());
 
   tosa::addTosaToLinalgPasses(passManager);
-  passManager.addNestedPass<FuncOp>(tosa::createTosaToStandard());
+  passManager.addNestedPass<func::FuncOp>(tosa::createTosaToStandard());
 
-  passManager.addNestedPass<FuncOp>(IREE::Flow::createStripSignednessPass());
-  passManager.addNestedPass<FuncOp>(mlir::createCanonicalizerPass());
+  passManager.addNestedPass<func::FuncOp>(
+      IREE::Flow::createStripSignednessPass());
+  passManager.addNestedPass<func::FuncOp>(mlir::createCanonicalizerPass());
 
-  passManager.addNestedPass<FuncOp>(createLinalgQuantizedMatmulToMatmulPass());
-  passManager.addNestedPass<FuncOp>(mlir::createCanonicalizerPass());
+  passManager.addNestedPass<func::FuncOp>(
+      createLinalgQuantizedMatmulToMatmulPass());
+  passManager.addNestedPass<func::FuncOp>(mlir::createCanonicalizerPass());
 
   //----------------------------------------------------------------------------
   // Entry dialect cleanup

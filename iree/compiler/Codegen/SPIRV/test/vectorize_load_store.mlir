@@ -9,7 +9,7 @@
 //       CHECK: %[[MAT:.+]] = vector.transfer_read %[[ARG0]][%[[X]], %[[IDX]]], %{{.*}} : memref<4096x1024xvector<4xf32>>, vector<32x8xf32>
 //       CHECK: vector.transfer_write %[[MAT]], %[[ALLOC]][%[[X]], %[[IDX]]] : vector<32x8xf32>, memref<128x8xvector<4xf32>, 3>
 //       CHECK: memref.dealloc %[[ALLOC]] : memref<128x8xvector<4xf32>, 3>
-func @alloc_copy(%arg0: memref<4096x4096xf32>, %x: index, %y: index) {
+func.func @alloc_copy(%arg0: memref<4096x4096xf32>, %x: index, %y: index) {
   %cst = arith.constant 0.000000e+00 : f32
   %0 = memref.alloc() : memref<128x32xf32, 3>
   %v = vector.transfer_read %arg0[%x, %y], %cst : memref<4096x4096xf32>, vector<1x4xf32>
@@ -26,7 +26,7 @@ func @alloc_copy(%arg0: memref<4096x4096xf32>, %x: index, %y: index) {
 
 // CHECK-LABEL: func @alloc_copy
 //  CHECK-SAME: %[[ARG0:.+]]: memref<4096x4096xf32>
-func @alloc_copy(%arg0: memref<4096x4096xf32>, %x: index, %y: index) {
+func.func @alloc_copy(%arg0: memref<4096x4096xf32>, %x: index, %y: index) {
   %cst = arith.constant 0.000000e+00 : f32
   %0 = memref.alloc() : memref<128x32xf32, 3>
   %s = memref.load %arg0[%x, %y] : memref<4096x4096xf32>
@@ -44,7 +44,7 @@ func @alloc_copy(%arg0: memref<4096x4096xf32>, %x: index, %y: index) {
 //     CHECK: memref.store %[[V]], %[[B]][%{{.*}}, %{{.*}}] : memref<4096x1024xvector<4xf32>>
 //     CHECK: %[[MAT:.+]] = vector.transfer_read %[[A]][%{{.*}}, %{{.*}}], %{{.*}} : memref<4096x1024xvector<4xf32>>, vector<32x8xf32>
 //     CHECK: vector.transfer_write %[[MAT]], %[[B]][%{{.*}}, %{{.*}}] {{.*}} : vector<32x8xf32>, memref<4096x1024xvector<4xf32>>
-func @resource_copy() {
+func.func @resource_copy() {
   %cst = arith.constant 0.000000e+00 : f32
   %c0 = arith.constant 0 : index
   %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<4096x4096xf32>
@@ -65,7 +65,7 @@ func @resource_copy() {
 //     CHECK: memref.store %[[V]], %[[B]][%{{.*}}, %{{.*}}] : memref<4096x1024xvector<4xf16>>
 //     CHECK: %[[MAT:.+]] = vector.transfer_read %[[A]][%{{.*}}, %{{.*}}], %{{.*}} : memref<4096x1024xvector<4xf16>>, vector<32x8xf16>
 //     CHECK: vector.transfer_write %[[MAT]], %[[B]][%{{.*}}, %{{.*}}] {{.*}} : vector<32x8xf16>, memref<4096x1024xvector<4xf16>>
-func @resource_copy_f16() {
+func.func @resource_copy_f16() {
   %cst = arith.constant 0.000000e+00 : f16
   %c0 = arith.constant 0 : index
   %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<4096x4096xf16>
@@ -86,7 +86,7 @@ func @resource_copy_f16() {
 //     CHECK: memref.store %[[V]], %[[B]][%{{.*}}, %{{.*}}] : memref<4096x512xvector<4xf32>>
 //     CHECK: %[[MAT:.+]] = vector.transfer_read %[[A]][%{{.*}}, %{{.*}}], %{{.*}} : memref<4096x512xvector<4xf32>>, vector<32x8xf16>
 //     CHECK: vector.transfer_write %[[MAT]], %[[B]][%{{.*}}, %{{.*}}] {{.*}} : vector<32x8xf16>, memref<4096x512xvector<4xf32>>
-func @resource_copy_8xf16() {
+func.func @resource_copy_8xf16() {
   %cst = arith.constant 0.000000e+00 : f16
   %c0 = arith.constant 0 : index
   %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<4096x4096xf16>
@@ -101,7 +101,7 @@ func @resource_copy_8xf16() {
 // -----
 
 // CHECK-LABEL: func @resource_copy_dynamic_shape()
-func @resource_copy_dynamic_shape() {
+func.func @resource_copy_dynamic_shape() {
   %cst = arith.constant 0.000000e+00 : f32
   %c0 = arith.constant 0 : index
   // CHECK: %[[DIM0:.+]] = hal.interface.constant.load[0] : index
@@ -129,7 +129,7 @@ func @resource_copy_dynamic_shape() {
 // -----
 
 // CHECK-LABEL: func @resource_copy_dynamic_last_dim()
-func @resource_copy_dynamic_last_dim() {
+func.func @resource_copy_dynamic_last_dim() {
   %cst = arith.constant 0.000000e+00 : f32
   %c0 = arith.constant 0 : index
   %dim = hal.interface.constant.load[0] : index
@@ -145,7 +145,7 @@ func @resource_copy_dynamic_last_dim() {
 // -----
 
 // CHECK-LABEL: func @do_not_vectorize_odd_vector_size
-func @do_not_vectorize_odd_vector_size() {
+func.func @do_not_vectorize_odd_vector_size() {
   %cst = arith.constant 0.0 : f32
   %c0 = arith.constant 0 : index
   // CHECK: hal.interface.binding.subspan
@@ -161,7 +161,7 @@ func @do_not_vectorize_odd_vector_size() {
 
 // -----
 
-func @vectorize_binding_subspan() {
+func.func @vectorize_binding_subspan() {
   %cst = arith.constant 0.000000e+00 : f32
   %c0 = arith.constant 0 : index
   // CHECK: hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<4096x1024xvector<4xf32>>
@@ -177,7 +177,7 @@ func @vectorize_binding_subspan() {
 // -----
 
 // CHECK-LABEL: func @scalarize_vector_transfer_op
-func @scalarize_vector_transfer_op(%arg: vector<3xf32>) -> (vector<3xf32>) {
+func.func @scalarize_vector_transfer_op(%arg: vector<3xf32>) -> (vector<3xf32>) {
   %c0 = arith.constant 0: index
   %c3 = arith.constant 3: index
   %f0 = arith.constant 0.0 : f32

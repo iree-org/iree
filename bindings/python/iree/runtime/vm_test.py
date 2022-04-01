@@ -17,7 +17,7 @@ import numpy as np
 def create_add_scalar_module():
   binary = iree.compiler.compile_str(
       """
-      func @add_scalar(%arg0: i32, %arg1: i32) -> i32 {
+      func.func @add_scalar(%arg0: i32, %arg1: i32) -> i32 {
         %0 = arith.addi %arg0, %arg1 : i32
         return %0 : i32
       }
@@ -32,7 +32,7 @@ def create_add_scalar_module():
 def create_simple_static_mul_module():
   binary = iree.compiler.compile_str(
       """
-      func @simple_mul(%arg0: tensor<4xf32>, %arg1: tensor<4xf32>) -> tensor<4xf32> {
+      func.func @simple_mul(%arg0: tensor<4xf32>, %arg1: tensor<4xf32>) -> tensor<4xf32> {
           %0 = "mhlo.multiply"(%arg0, %arg1) {name = "mul.1"} : (tensor<4xf32>, tensor<4xf32>) -> tensor<4xf32>
           return %0 : tensor<4xf32>
       }
@@ -49,7 +49,7 @@ def create_simple_dynamic_abs_module():
   target_backends = iree.compiler.DEFAULT_TESTING_BACKENDS
   binary = iree.compiler.compile_str(
       """
-      func @simple_mul(%arg0: tensor<?x?xf32>) -> tensor<?x?xf32> {
+      func.func @simple_mul(%arg0: tensor<?x?xf32>) -> tensor<?x?xf32> {
           %0 = "mhlo.abs"(%arg0) : (tensor<?x?xf32>) -> tensor<?x?xf32>
           return %0 : tensor<?x?xf32>
       }

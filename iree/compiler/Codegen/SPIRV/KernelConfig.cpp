@@ -156,7 +156,7 @@ LogicalResult setConvOpConfig(linalg::LinalgOp linalgOp,
     return success();
   }
 
-  auto funcOp = linalgOp->getParentOfType<FuncOp>();
+  auto funcOp = linalgOp->getParentOfType<func::FuncOp>();
   return setOpConfigAndEntryPointFnTranslation(funcOp, linalgOp, tileSizes,
                                                pipeline, workgroupSize);
 }
@@ -267,7 +267,8 @@ LogicalResult setMatmulOpConfig(linalg::LinalgOp op,
   tileSizes.push_back(invocationTileSizes);
   tileSizes.push_back(reductionTileSizes);
   return setOpConfigAndEntryPointFnTranslation(
-      op->getParentOfType<FuncOp>(), op, tileSizes, pipeline, workgroupSize);
+      op->getParentOfType<func::FuncOp>(), op, tileSizes, pipeline,
+      workgroupSize);
 }
 
 }  // namespace detail
@@ -306,7 +307,8 @@ static LogicalResult setFftOpConfig(spirv::ResourceLimitsAttr limits,
   }
   TileSizesListType tileSizes = {workgroupTileSize};
   return setOpConfigAndEntryPointFnTranslation(
-      op->getParentOfType<FuncOp>(), op, tileSizes, pipeline, workgroupSize);
+      op->getParentOfType<func::FuncOp>(), op, tileSizes, pipeline,
+      workgroupSize);
 }
 
 //===----------------------------------------------------------------------===//
@@ -316,7 +318,7 @@ static LogicalResult setFftOpConfig(spirv::ResourceLimitsAttr limits,
 static LogicalResult setDefaultOpConfig(spirv::ResourceLimitsAttr limits,
                                         Operation *op) {
   LLVM_DEBUG(llvm::dbgs() << "Using default config for op: " << *op << "\n");
-  FuncOp funcOp = op->getParentOfType<FuncOp>();
+  func::FuncOp funcOp = op->getParentOfType<func::FuncOp>();
   auto interfaceOp = cast<IREE::Flow::PartitionableLoopsInterface>(*op);
   auto partitionedLoops =
       interfaceOp.getPartitionableLoops(kNumMaxParallelDims);
@@ -588,7 +590,7 @@ LogicalResult initSPIRVLaunchConfig(ModuleOp module) {
   spirv::TargetEnv targetEnv(targetEnvAttr);
   spirv::ResourceLimitsAttr limits = targetEnv.getResourceLimits();
 
-  for (auto funcOp : module.getOps<FuncOp>()) {
+  for (auto funcOp : module.getOps<func::FuncOp>()) {
     auto entryPointOp = entryPointOps.lookup(funcOp.getName());
     if (!entryPointOp) continue;
 

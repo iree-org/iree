@@ -7,7 +7,7 @@
 // CHECK-LABEL: @flatten_func
 module @flatten_func {
   // CHECK: func @caller(%arg0: i1, %arg1: tensor<f32>) -> tensor<f32>
-  func @caller(%arg0 : i1, %arg1: tensor<f32>) -> tensor<f32> {
+  func.func @caller(%arg0 : i1, %arg1: tensor<f32>) -> tensor<f32> {
     // CHECK: %[[RESULT:.*]]:2 = call @callee(%arg0, %arg1, %arg1, %arg1) : (i1, tensor<f32>, tensor<f32>, tensor<f32>) -> (tensor<f32>, tensor<f32>)
     %0 = "mhlo.tuple"(%arg1, %arg1) : (tensor<f32>, tensor<f32>) -> tuple<tensor<f32>, tensor<f32>>
     %1 = "mhlo.tuple"(%arg1, %0) : (tensor<f32>, tuple<tensor<f32>, tensor<f32>>) -> tuple<tensor<f32>, tuple<tensor<f32>, tensor<f32>>>
@@ -18,7 +18,7 @@ module @flatten_func {
   }
 
   // CHECK: func private @callee(%arg0: i1, %arg1: tensor<f32>, %arg2: tensor<f32>, %arg3: tensor<f32>) -> (tensor<f32>, tensor<f32>)
-  func private @callee(%arg0: i1, %arg1: tuple<tensor<f32>, tuple<tensor<f32>, tensor<f32>>>) -> tuple<tensor<f32>, tensor<f32>> {
+  func.func private @callee(%arg0: i1, %arg1: tuple<tensor<f32>, tuple<tensor<f32>, tensor<f32>>>) -> tuple<tensor<f32>, tensor<f32>> {
     // CHECK-DAG: %[[RESULT0:.*]] = arith.select %arg0, %arg2, %arg1 : tensor<f32>
     // CHECK-DAG: %[[RESULT1:.*]] = arith.select %arg0, %arg3, %arg1 : tensor<f32>
     // CHECK: return %[[RESULT0]], %[[RESULT1]] : tensor<f32>, tensor<f32>

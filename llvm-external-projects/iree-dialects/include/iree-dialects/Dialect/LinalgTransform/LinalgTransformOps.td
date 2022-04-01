@@ -99,23 +99,24 @@ def MatchOp : Transform_Op<"match"> {
 //===----------------------------------------------------------------------===//
 
 def TileOp : Linalg_Transform_Operation<"tile",
-    [TransformOpInterface, TargetableSingleOperandTransformOpTrait]> {
+    [TransformOpInterface]> {
   let description = [{Indicates that ops of a specific kind in the given
   function should be tiled with the options provided as attributes.}];
 
   let arguments = (ins PDL_Operation:$target,
                    DefaultValuedAttr<I64ArrayAttr, "{}">:$sizes,
                    DefaultValuedAttr<I64ArrayAttr, "{}">:$interchange,
-                   DefaultValuedAttr<I64ArrayAttr, "{}">:$peel,
                    DefaultValuedAttr<BoolAttr, "false">:$scalarize_dyn_dims);
-  let results = (outs PDL_Operation:$transformed);
+  let results = (outs PDL_Operation:$tiled_linalg_op,
+                      Variadic<PDL_Operation>:$loops);
 
-  let assemblyFormat = "$target attr-dict";
+  let hasCustomAssemblyFormat = 1;
   let hasVerifier = 1;
 
   let extraClassDeclaration = [{
-    ::mlir::FailureOr<::mlir::linalg::LinalgOp> applyToOne(
-        ::mlir::linalg::LinalgOp target);
+    ::mlir::LogicalResult apply(
+        ::mlir::linalg::transform::TransformResults &transformResults,
+        ::mlir::linalg::transform::TransformState &state);
   }];
 }
 
@@ -179,6 +180,8 @@ def PadOp : Linalg_Transform_Operation<"pad",
   using the options provides as operation attributes.}];
 
   let arguments = (ins PDL_Operation:$target,
+                   DefaultValuedAttr<StrArrayAttr, "{}">:$padding_values,
+                   DefaultValuedAttr<I64ArrayAttr, "{}">:$padding_dimensions,
                    DefaultValuedAttr<I64ArrayAttr, "{}">:$pack_paddings,
                    DefaultValuedAttr<I64ArrayAttr, "{}">:$hoist_paddings,
                    DefaultValuedAttr<
@@ -411,6 +414,20 @@ def RewriteLinalgExtInParallelToAsyncOp :
     ::mlir::FailureOr<::mlir::Operation *> applyToOne(
         ::mlir::iree_compiler::IREE::LinalgExt::InParallelOp target);
   }];
+}
+
+def RewriteLinalgExtInParallelToHALOp :
+  Linalg_Transform_Operation<"rewrite_iree_linalg_ext_in_parallel_to_hal", [
+    DeclareOpInterfaceMethods<TransformOpInterface, ["apply"]>
+  ]> {
+
+  let description = [{Rewrite linalg_ext.in_parallel op to use HAL ops.}];
+  let arguments = (ins PDL_Operation:$target);
+  // TODO: Determine whether we want to return something here, the only natural
+  // results would be the resulting insertTensorOps.
+  // let results = (outs PDL_Operation:$transformed);
+
+  let assemblyFormat = "$target attr-dict";
 }
 
 def RewriteLinalgExtInParallelToScfForOp :

@@ -19,7 +19,7 @@ hal.executable @conv_112x112x512 {
     }> {
     hal.executable.entry_point public @conv_112x112x512 layout(#executable_layout)
     builtin.module {
-      func @conv_112x112x512() {
+      func.func @conv_112x112x512() {
         %c0 = arith.constant 0 : index
         %c512 = arith.constant 512 : index
         %c112 = arith.constant 112 : index
@@ -74,7 +74,7 @@ hal.executable @conv_112x112x32 {
     }> {
     hal.executable.entry_point public @conv_112x112x32 layout(#executable_layout)
     builtin.module {
-      func @conv_112x112x32() {
+      func.func @conv_112x112x32() {
         %c0 = arith.constant 0 : index
         %c32 = arith.constant 32 : index
         %c112 = arith.constant 112 : index
@@ -128,7 +128,7 @@ hal.executable @conv_16x16x16 {
     }> {
     hal.executable.entry_point public @conv_16x16x16 layout(#executable_layout)
     builtin.module {
-      func @conv_16x16x16() {
+      func.func @conv_16x16x16() {
         %c0 = arith.constant 0 : index
         %c16 = arith.constant 16 : index
         %cst = arith.constant 0.000000e+00 : f32
@@ -181,7 +181,7 @@ hal.executable @dwconv_28x28x144 {
     }> {
     hal.executable.entry_point public @dwconv_28x28x144 layout(#executable_layout)
     builtin.module {
-      func @dwconv_28x28x144() {
+      func.func @dwconv_28x28x144() {
         %c0 = arith.constant 0 : index
         %c144 = arith.constant 144 : index
         %c28 = arith.constant 28 : index
@@ -235,7 +235,7 @@ hal.executable @dwconv_1x2x8 {
     }> {
     hal.executable.entry_point public @dwconv_1x2x8 layout(#executable_layout)
     builtin.module {
-      func @dwconv_1x2x8() {
+      func.func @dwconv_1x2x8() {
         %c0 = arith.constant 0 : index
         %c8 = arith.constant 8 : index
         %c2 = arith.constant 2 : index

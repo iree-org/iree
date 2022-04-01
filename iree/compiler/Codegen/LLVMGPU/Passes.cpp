@@ -38,8 +38,8 @@ static Value gpuAllocationFunction(OpBuilder &builder, Location loc,
 }
 
 static void tileAndBufferize(OpPassManager &pm) {
-  pm.addNestedPass<FuncOp>(createInsertDistributionInfoPass());
-  pm.addNestedPass<FuncOp>(createTileAndDistributeToWorkgroupsPass());
+  pm.addNestedPass<func::FuncOp>(createInsertDistributionInfoPass());
+  pm.addNestedPass<func::FuncOp>(createTileAndDistributeToWorkgroupsPass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
@@ -57,22 +57,22 @@ void addGPUVectorizationPassPipeline(OpPassManager &pm) {
   tileAndBufferize(pm);
 
   // Distribute linalg onto threads within the workgroup.
-  pm.addNestedPass<FuncOp>(createLLVMGPUTileAndDistribute());
+  pm.addNestedPass<func::FuncOp>(createLLVMGPUTileAndDistribute());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
-  pm.addNestedPass<FuncOp>(createRemoveSingleIterationLoopPass());
+  pm.addNestedPass<func::FuncOp>(createRemoveSingleIterationLoopPass());
 
   // Linalg -> vector
-  pm.addNestedPass<FuncOp>(createLLVMGPUVectorizationPass());
-  pm.addNestedPass<FuncOp>(createCanonicalizerPass());
-  pm.addNestedPass<FuncOp>(createCSEPass());
-  pm.addNestedPass<FuncOp>(createOptimizeVectorTransferPass());
+  pm.addNestedPass<func::FuncOp>(createLLVMGPUVectorizationPass());
+  pm.addNestedPass<func::FuncOp>(createCanonicalizerPass());
+  pm.addNestedPass<func::FuncOp>(createCSEPass());
+  pm.addNestedPass<func::FuncOp>(createOptimizeVectorTransferPass());
 }
 
 void addGPUMatmulSimtPassPipeline(OpPassManager &pm) {
-  pm.addNestedPass<FuncOp>(createInsertDistributionInfoPass());
-  pm.addNestedPass<FuncOp>(createTileAndDistributeToWorkgroupsPass());
+  pm.addNestedPass<func::FuncOp>(createInsertDistributionInfoPass());
+  pm.addNestedPass<func::FuncOp>(createTileAndDistributeToWorkgroupsPass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
@@ -82,64 +82,64 @@ void addGPUMatmulSimtPassPipeline(OpPassManager &pm) {
   pm.addPass(createCSEPass());
 
   // Distribute linalg onto threads within the workgroup.
-  pm.addNestedPass<FuncOp>(createLLVMGPUTileAndDistribute());
-  pm.addNestedPass<FuncOp>(createMemrefCopyToLinalgPass());
-  pm.addNestedPass<FuncOp>(createLLVMGPUDistributeSharedMemoryCopy());
+  pm.addNestedPass<func::FuncOp>(createLLVMGPUTileAndDistribute());
+  pm.addNestedPass<func::FuncOp>(createMemrefCopyToLinalgPass());
+  pm.addNestedPass<func::FuncOp>(createLLVMGPUDistributeSharedMemoryCopy());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
-  pm.addNestedPass<FuncOp>(createRemoveSingleIterationLoopPass());
+  pm.addNestedPass<func::FuncOp>(createRemoveSingleIterationLoopPass());
 
   // Linalg -> vector
-  pm.addNestedPass<FuncOp>(createLLVMGPUVectorizationPass());
-  pm.addNestedPass<FuncOp>(createCanonicalizerPass());
-  pm.addNestedPass<FuncOp>(createCSEPass());
-  pm.addNestedPass<FuncOp>(createOptimizeVectorTransferPass());
+  pm.addNestedPass<func::FuncOp>(createLLVMGPUVectorizationPass());
+  pm.addNestedPass<func::FuncOp>(createCanonicalizerPass());
+  pm.addNestedPass<func::FuncOp>(createCSEPass());
+  pm.addNestedPass<func::FuncOp>(createOptimizeVectorTransferPass());
 
   // Pipeline memory operations.
-  pm.addNestedPass<FuncOp>(createLLVMGPUPipeliningPass());
+  pm.addNestedPass<func::FuncOp>(createLLVMGPUPipeliningPass());
 }
 
 void addGPUMatmulTensorCorePassPipeline(OpPassManager &pm) {
   tileAndBufferize(pm);
 
   // Distribute linalg onto warps within the workgroup.
-  pm.addNestedPass<FuncOp>(
+  pm.addNestedPass<func::FuncOp>(
       createLLVMGPUTileAndDistribute(/*distributeToWarp=*/true));
   if (pipelineDepth > 1)
-    pm.addNestedPass<FuncOp>(createLLVMGPUMultiBuffering(pipelineDepth));
-  pm.addNestedPass<FuncOp>(createMemrefCopyToLinalgPass());
-  pm.addNestedPass<FuncOp>(createLLVMGPUDistributeSharedMemoryCopy());
+    pm.addNestedPass<func::FuncOp>(createLLVMGPUMultiBuffering(pipelineDepth));
+  pm.addNestedPass<func::FuncOp>(createMemrefCopyToLinalgPass());
+  pm.addNestedPass<func::FuncOp>(createLLVMGPUDistributeSharedMemoryCopy());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
-  pm.addNestedPass<FuncOp>(createRemoveSingleIterationLoopPass());
+  pm.addNestedPass<func::FuncOp>(createRemoveSingleIterationLoopPass());
 
   // Linalg -> vector
-  pm.addNestedPass<FuncOp>(createLLVMGPUTensorCoreVectorizationPass());
-  pm.addNestedPass<FuncOp>(createCanonicalizerPass());
-  pm.addNestedPass<FuncOp>(createCSEPass());
-  pm.addNestedPass<FuncOp>(createOptimizeVectorTransferPass());
+  pm.addNestedPass<func::FuncOp>(createLLVMGPUTensorCoreVectorizationPass());
+  pm.addNestedPass<func::FuncOp>(createCanonicalizerPass());
+  pm.addNestedPass<func::FuncOp>(createCSEPass());
+  pm.addNestedPass<func::FuncOp>(createOptimizeVectorTransferPass());
 
   // Vector -> MMA ops
-  pm.addNestedPass<FuncOp>(memref::createFoldSubViewOpsPass());
-  pm.addNestedPass<FuncOp>(createLLVMGPUVectorToGPU());
+  pm.addNestedPass<func::FuncOp>(memref::createFoldSubViewOpsPass());
+  pm.addNestedPass<func::FuncOp>(createLLVMGPUVectorToGPU());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
   // Pipeline memory operations.
-  pm.addNestedPass<FuncOp>(createLLVMGPUPipeliningPass(pipelineDepth));
+  pm.addNestedPass<func::FuncOp>(createLLVMGPUPipeliningPass(pipelineDepth));
 }
 
 void addGPUSimpleDistributePassPipeline(OpPassManager &pm) {
   tileAndBufferize(pm);
 
   // Distribute linalg onto threads within the workgroup.
-  pm.addNestedPass<FuncOp>(createLLVMGPUTileAndDistribute());
+  pm.addNestedPass<func::FuncOp>(createLLVMGPUTileAndDistribute());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
-  pm.addNestedPass<FuncOp>(createRemoveSingleIterationLoopPass());
+  pm.addNestedPass<func::FuncOp>(createRemoveSingleIterationLoopPass());
 }
 
 static void addLowerToLLVMGPUPasses(OpPassManager &pm, bool useROCM) {
@@ -148,30 +148,30 @@ static void addLowerToLLVMGPUPasses(OpPassManager &pm, bool useROCM) {
   pm.addPass(createCSEPass());
 
   // LinalgExt -> SCF
-  pm.addNestedPass<FuncOp>(IREE::LinalgExt::createLinalgExtToLoopsPass());
+  pm.addNestedPass<func::FuncOp>(IREE::LinalgExt::createLinalgExtToLoopsPass());
 
   // Linalg -> SCF
-  pm.addNestedPass<FuncOp>(createMemrefCopyToLinalgPass());
-  pm.addNestedPass<FuncOp>(createConvertLinalgToLoopsPass());
-  pm.addNestedPass<FuncOp>(createCanonicalizerPass());
-  pm.addNestedPass<FuncOp>(createCSEPass());
+  pm.addNestedPass<func::FuncOp>(createMemrefCopyToLinalgPass());
+  pm.addNestedPass<func::FuncOp>(createConvertLinalgToLoopsPass());
+  pm.addNestedPass<func::FuncOp>(createCanonicalizerPass());
+  pm.addNestedPass<func::FuncOp>(createCSEPass());
 
   // Handled tensor-type constants.
   pm.addPass(arith::createConstantBufferizePass());
   pm.addPass(createFoldTensorExtractOpPass());
 
-  pm.addNestedPass<FuncOp>(createLLVMGPUVectorLoweringPass());
+  pm.addNestedPass<func::FuncOp>(createLLVMGPUVectorLoweringPass());
 
   // SCF -> STD
-  pm.addNestedPass<FuncOp>(createConvertSCFToCFPass());
-  pm.addNestedPass<FuncOp>(createCanonicalizerPass());
-  pm.addNestedPass<FuncOp>(createCSEPass());
+  pm.addNestedPass<func::FuncOp>(createConvertSCFToCFPass());
+  pm.addNestedPass<func::FuncOp>(createCanonicalizerPass());
+  pm.addNestedPass<func::FuncOp>(createCSEPass());
 
   // math dialect elementry functions -> polynomial form.
-  pm.addNestedPass<FuncOp>(createPolynomialApproximationPass());
+  pm.addNestedPass<func::FuncOp>(createPolynomialApproximationPass());
 
-  pm.addNestedPass<FuncOp>(arith::createArithmeticExpandOpsPass());
-  pm.addNestedPass<FuncOp>(memref::createExpandOpsPass());
+  pm.addNestedPass<func::FuncOp>(arith::createArithmeticExpandOpsPass());
+  pm.addNestedPass<func::FuncOp>(memref::createExpandOpsPass());
   pm.addPass(createLowerAffinePass());
 
   // Strip out the debug info for the kernel as CUDA driver doesn't diggest PTX
@@ -187,7 +187,7 @@ static void addLowerToLLVMGPUPasses(OpPassManager &pm, bool useROCM) {
 }
 
 void buildLLVMGPUTransformPassPipeline(OpPassManager &pm, bool useROCM) {
-  pm.nest<ModuleOp>().nest<FuncOp>().addPass(createTypePropagationPass());
+  pm.nest<ModuleOp>().nest<func::FuncOp>().addPass(createTypePropagationPass());
   pm.nest<ModuleOp>().addPass(createBufferizeCopyOnlyDispatchesPass());
   pm.addPass(createLLVMGPULowerExecutableTargetPass());
   OpPassManager &nestedModulePM = pm.nest<ModuleOp>();

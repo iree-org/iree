@@ -106,7 +106,7 @@ struct TileAndDistributeToWorkgroupsPass
 
 void TileAndDistributeToWorkgroupsPass::runOnOperation() {
   MLIRContext *context = &getContext();
-  FuncOp funcOp = getOperation();
+  func::FuncOp funcOp = getOperation();
   if (!isEntryPoint(funcOp)) return;
 
   SmallVector<Operation *> computeOps;
@@ -213,7 +213,7 @@ void TileAndDistributeToWorkgroupsPass::runOnOperation() {
   }
 }
 
-std::unique_ptr<OperationPass<FuncOp>>
+std::unique_ptr<OperationPass<func::FuncOp>>
 createTileAndDistributeToWorkgroupsPass() {
   return std::make_unique<TileAndDistributeToWorkgroupsPass>();
 }

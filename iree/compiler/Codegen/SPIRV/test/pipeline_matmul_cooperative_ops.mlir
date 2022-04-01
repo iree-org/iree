@@ -31,7 +31,7 @@ hal.executable public @matmul_256x1024x128_div_sub {
           subgroup_size = 32 : i32}>}> {
     hal.executable.entry_point public @matmul_256x1024x128_div_sub layout(#executable_layout)
     builtin.module  {
-      func @matmul_256x1024x128_div_sub() {
+      func.func @matmul_256x1024x128_div_sub() {
         %c0 = arith.constant 0 : index
         %c1024 = arith.constant 1024 : index
         %c256 = arith.constant 256 : index

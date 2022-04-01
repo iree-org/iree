@@ -9,7 +9,7 @@
 //////////////////////////////////////////////////////////////////////////////
 
 // -----
-func @check_in_depth_mmt_8x4x8_i8i8i32(
+func.func @check_in_depth_mmt_8x4x8_i8i8i32(
     %lhs: vector<8x4xi8>,
     %rhs: vector<8x4xi8>,
     %acc: vector<8x8xi32>) -> vector<8x8xi32> {
@@ -108,7 +108,7 @@ func @check_in_depth_mmt_8x4x8_i8i8i32(
 //////////////////////////////////////////////////////////////////////////////
 
 // -----
-func @mmt_8x1x8_f32f32f32(
+func.func @mmt_8x1x8_f32f32f32(
     %lhs: vector<8x1xf32>,
     %rhs: vector<8x1xf32>,
     %acc: vector<8x8xf32>) -> vector<8x8xf32> {
@@ -128,7 +128,7 @@ func @mmt_8x1x8_f32f32f32(
 // AARCH64-BASELINE-SAME:      {{\((vector<4xf32>(, )?){20}\)}}
 
 // -----
-func @mmt_8x1x1_f32f32f32_matvec(
+func.func @mmt_8x1x1_f32f32f32_matvec(
     %lhs: vector<8x1xf32>,
     %rhs: vector<1x1xf32>,
     %acc: vector<8x1xf32>) -> vector<8x1xf32> {
@@ -148,7 +148,7 @@ func @mmt_8x1x1_f32f32f32_matvec(
 // AARCH64-BASELINE-SAME:      {{\((vector<4xf32>, ){2}(f32, ){1}(vector<4xf32>(, )?){2}\)}}
 
 // -----
-func @mmt_1x1x8_f32f32f32_vecmat(
+func.func @mmt_1x1x8_f32f32f32_vecmat(
     %lhs: vector<1x1xf32>,
     %rhs: vector<8x1xf32>,
     %acc: vector<1x8xf32>) -> vector<1x8xf32> {
@@ -168,7 +168,7 @@ func @mmt_1x1x8_f32f32f32_vecmat(
 // AARCH64-BASELINE-SAME:      {{\((vector<4xf32>, ){2}(f32, ){1}(vector<4xf32>(, )?){2}\)}}
 
 // -----
-func @mmt_8x1x8_i8i8i32(
+func.func @mmt_8x1x8_i8i8i32(
     %lhs: vector<8x1xi8>,
     %rhs: vector<8x1xi8>,
     %acc: vector<8x8xi32>) -> vector<8x8xi32> {
@@ -190,7 +190,7 @@ func @mmt_8x1x8_i8i8i32(
 // AARCH64-BASELINE-SAME:      {{\((vector<8xi8>, ){2}(vector<4xi32>(, )?){16}\)}}
 
 // -----
-func @mmt_8x8x1_i8i8i32_matvec(
+func.func @mmt_8x8x1_i8i8i32_matvec(
     %lhs: vector<8x8xi8>,
     %rhs: vector<1x8xi8>,
     %acc: vector<8x1xi32>) -> vector<8x1xi32> {
@@ -212,7 +212,7 @@ func @mmt_8x8x1_i8i8i32_matvec(
 // AARCH64-BASELINE-SAME:      {{\((vector<16xi8>, ){4}(vector<8xi8>, ){1}(vector<4xi32>(, )?){2}\)}}
 
 // -----
-func @mmt_1x8x8_i8i8i32_matvec(
+func.func @mmt_1x8x8_i8i8i32_matvec(
     %lhs: vector<1x8xi8>,
     %rhs: vector<8x8xi8>,
     %acc: vector<1x8xi32>) -> vector<1x8xi32> {
@@ -234,7 +234,7 @@ func @mmt_1x8x8_i8i8i32_matvec(
 // AARCH64-BASELINE-SAME:      {{\((vector<16xi8>, ){4}(vector<8xi8>, ){1}(vector<4xi32>(, )?){2}\)}}
 
 // -----
-func @mmt_8x4x8_i8i8i32(
+func.func @mmt_8x4x8_i8i8i32(
     %lhs: vector<8x4xi8>,
     %rhs: vector<8x4xi8>,
     %acc: vector<8x8xi32>) -> vector<8x8xi32> {
@@ -256,7 +256,7 @@ func @mmt_8x4x8_i8i8i32(
 // AARCH64-DOTPROD-SAME:      {{\((vector<16xi8>, ){4}(vector<4xi32>(, )?){16}\)}}
 
 // -----
-func @mmt_8x4x1_i8i8i32_matvec(
+func.func @mmt_8x4x1_i8i8i32_matvec(
     %lhs: vector<8x4xi8>,
     %rhs: vector<1x4xi8>,
     %acc: vector<8x1xi32>) -> vector<8x1xi32> {
@@ -278,7 +278,7 @@ func @mmt_8x4x1_i8i8i32_matvec(
 // AARCH64-DOTPROD-SAME:      {{\((vector<16xi8>, ){2}(vector<4xi8>, ){1}(vector<4xi32>(, )?){2}\)}}
 
 // -----
-func @mmt_1x4x8_i8i8i32_vecmat(
+func.func @mmt_1x4x8_i8i8i32_vecmat(
     %lhs: vector<1x4xi8>,
     %rhs: vector<8x4xi8>,
     %acc: vector<1x8xi32>) -> vector<1x8xi32> {
@@ -300,7 +300,7 @@ func @mmt_1x4x8_i8i8i32_vecmat(
 // AARCH64-DOTPROD-SAME:      {{\((vector<16xi8>, ){2}(vector<4xi8>, ){1}(vector<4xi32>(, )?){2}\)}}
 
 // -----
-func @mmt_8x8x8_i8i8i32(
+func.func @mmt_8x8x8_i8i8i32(
     %lhs: vector<8x8xi8>,
     %rhs: vector<8x8xi8>,
     %acc: vector<8x8xi32>) -> vector<8x8xi32> {

@@ -117,7 +117,7 @@ function(iree_bytecode_module)
   endif()
 
   if (IREE_BYTECODE_MODULE_FORCE_SYSTEM_DYLIB_LINKER)
-    list(APPEND _TRANSLATION_ARGS "-iree-llvm-link-embedded=false")
+    list(APPEND _ARGS "-iree-llvm-link-embedded=false")
   endif()
 
   # Depending on the binary instead of the target here given we might not have

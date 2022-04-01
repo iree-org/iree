@@ -1,6 +1,6 @@
 // RUN: iree-opt -split-input-file -iree-mhlo-to-linalg-on-tensors -canonicalize %s | FileCheck %s
 
-func @rfft_1d(%input: tensor<32xf32>) -> (tensor<17xf32>, tensor<17xf32>) {
+func.func @rfft_1d(%input: tensor<32xf32>) -> (tensor<17xf32>, tensor<17xf32>) {
   %0 = "mhlo.fft"(%input) {
     fft_length = dense<32> : tensor<1xi64>, fft_type = #mhlo<"fft_type RFFT">
   } : (tensor<32xf32>) -> tensor<17xcomplex<f32>>
@@ -31,7 +31,7 @@ func @rfft_1d(%input: tensor<32xf32>) -> (tensor<17xf32>, tensor<17xf32>) {
 
 // -----
 
-func @rfft_2d(%input: tensor<1x32xf32>) -> (tensor<1x17xf32>, tensor<1x17xf32>) {
+func.func @rfft_2d(%input: tensor<1x32xf32>) -> (tensor<1x17xf32>, tensor<1x17xf32>) {
   %0 = "mhlo.fft"(%input) {
     fft_length = dense<32> : tensor<1xi64>, fft_type = #mhlo<"fft_type RFFT">
   } : (tensor<1x32xf32>) -> tensor<1x17xcomplex<f32>>

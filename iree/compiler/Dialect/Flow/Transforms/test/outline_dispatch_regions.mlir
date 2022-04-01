@@ -14,7 +14,7 @@
 
 // CHECK-LABEL: func @staticShapeDispatch(
 // CHECK-SAME: %[[ARG0:.+]]: tensor<8x4xf32>)
-func @staticShapeDispatch(%arg0 : tensor<8x4xf32>) -> tensor<4x8xf32> {
+func.func @staticShapeDispatch(%arg0 : tensor<8x4xf32>) -> tensor<4x8xf32> {
   // CHECK-DAG: %[[X:.+]] = arith.constant 100
   %x = arith.constant 100 : index
   // CHECK-DAG: %[[Y:.+]] = arith.constant 50
@@ -48,7 +48,7 @@ func @staticShapeDispatch(%arg0 : tensor<8x4xf32>) -> tensor<4x8xf32> {
 
 // CHECK-LABEL: func @dispatchFnMuli(
 // CHECK-SAME: %[[ARG0:.+]]: tensor<8x4xf32>)
-func @dispatchFnMuli(%arg0 : tensor<8x4xf32>) -> tensor<8x4xf32> {
+func.func @dispatchFnMuli(%arg0 : tensor<8x4xf32>) -> tensor<8x4xf32> {
   // CHECK-DAG: %[[X:.+]] = arith.constant 100
   %x = arith.constant 100 : index
   // CHECK-DAG: %[[Y:.+]] = arith.constant 50
@@ -84,7 +84,7 @@ func @dispatchFnMuli(%arg0 : tensor<8x4xf32>) -> tensor<8x4xf32> {
 // CHECK: flow.executable private @dispatchFn1_dispatch_0
 
 // CHECK-LABEL: func @dispatchFn1
-func @dispatchFn1(%arg0 : tensor<8x4xf32>) -> tensor<4x8xf32> {
+func.func @dispatchFn1(%arg0 : tensor<8x4xf32>) -> tensor<4x8xf32> {
   %x = arith.constant 100 : index
   %y = arith.constant 50 : index
   // CHECK: flow.dispatch @dispatchFn1_dispatch_0::@dispatchFn1_dispatch_0
@@ -99,7 +99,7 @@ func @dispatchFn1(%arg0 : tensor<8x4xf32>) -> tensor<4x8xf32> {
 // CHECK: flow.executable private @dispatchFn2_dispatch_0
 
 // CHECK-LABEL: func @dispatchFn2
-func @dispatchFn2(%arg0 : tensor<8x4xf32>) -> tensor<4x8xf32> {
+func.func @dispatchFn2(%arg0 : tensor<8x4xf32>) -> tensor<4x8xf32> {
   %x = arith.constant 100 : index
   %y = arith.constant 50 : index
   // CHECK: flow.dispatch @dispatchFn2_dispatch_0::@dispatchFn2_dispatch_0
@@ -130,7 +130,7 @@ func @dispatchFn2(%arg0 : tensor<8x4xf32>) -> tensor<4x8xf32> {
 
 // CHECK-LABEL: func @dynamicShapeDispatch(
 // CHECK-SAME: %[[ARG0:.+]]: tensor<7x?x24x?xf32>
-func @dynamicShapeDispatch(%arg0 : tensor<7x?x24x?xf32>) -> tensor<?x?x1024xf32> {
+func.func @dynamicShapeDispatch(%arg0 : tensor<7x?x24x?xf32>) -> tensor<?x?x1024xf32> {
   %c1 = arith.constant 1 : index
   %c3 = arith.constant 3 : index
   // CHECK-DAG: %[[DIM1:.+]] = tensor.dim %[[ARG0]], %c1

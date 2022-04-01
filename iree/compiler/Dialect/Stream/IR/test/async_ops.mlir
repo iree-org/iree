@@ -1,7 +1,7 @@
 // RUN: iree-opt -split-input-file %s | iree-opt -split-input-file | FileCheck %s
 
 // CHECK-LABEL: @asyncAlloca
-func @asyncAlloca(%arg0: index) -> !stream.resource<transient> {
+func.func @asyncAlloca(%arg0: index) -> !stream.resource<transient> {
   // CHECK: = stream.async.alloca : !stream.resource<transient>{%arg0}
   %0 = stream.async.alloca : !stream.resource<transient>{%arg0}
   return %0 : !stream.resource<transient>
@@ -10,7 +10,7 @@ func @asyncAlloca(%arg0: index) -> !stream.resource<transient> {
 // -----
 
 // CHECK-LABEL: @asyncConstant
-func @asyncConstant(%arg0: index) -> !stream.resource<transient> {
+func.func @asyncConstant(%arg0: index) -> !stream.resource<transient> {
   // CHECK: = stream.async.constant : !stream.resource<transient>{%arg0} = dense<3> : tensor<8xi32>
   %0 = stream.async.constant : !stream.resource<transient>{%arg0} = dense<3> : tensor<8xi32>
   return %0 : !stream.resource<transient>
@@ -19,7 +19,7 @@ func @asyncConstant(%arg0: index) -> !stream.resource<transient> {
 // -----
 
 // CHECK-LABEL: @asyncSplat
-func @asyncSplat(%arg0: index, %arg1: i32) -> !stream.resource<*> {
+func.func @asyncSplat(%arg0: index, %arg1: i32) -> !stream.resource<*> {
   // CHECK: = stream.async.splat %arg1 : i32 -> !stream.resource<*>{%arg0}
   %0 = stream.async.splat %arg1 : i32 -> !stream.resource<*>{%arg0}
   return %0 : !stream.resource<*>
@@ -28,7 +28,7 @@ func @asyncSplat(%arg0: index, %arg1: i32) -> !stream.resource<*> {
 // -----
 
 // CHECK-LABEL: @asyncClone
-func @asyncClone(%arg0: !stream.resource<*>, %arg1: index) -> !stream.resource<*> {
+func.func @asyncClone(%arg0: !stream.resource<*>, %arg1: index) -> !stream.resource<*> {
   // CHECK: = stream.async.clone %arg0 : !stream.resource<*>{%arg1} -> !stream.resource<*>{%arg1}
   %0 = stream.async.clone %arg0 : !stream.resource<*>{%arg1} -> !stream.resource<*>{%arg1}
   return %0 : !stream.resource<*>
@@ -37,7 +37,7 @@ func @asyncClone(%arg0: !stream.resource<*>, %arg1: index) -> !stream.resource<*
 // -----
 
 // CHECK-LABEL: @asyncSlice
-func @asyncSlice(%arg0: !stream.resource<*>, %arg1: index) -> !stream.resource<*> {
+func.func @asyncSlice(%arg0: !stream.resource<*>, %arg1: index) -> !stream.resource<*> {
   %c0 = arith.constant 0 : index
   %c128 = arith.constant 128 : index
   // CHECK: = stream.async.slice %arg0[%c0 to %c128] : !stream.resource<*>{%arg1} -> !stream.resource<*>{%c128}
@@ -48,7 +48,7 @@ func @asyncSlice(%arg0: !stream.resource<*>, %arg1: index) -> !stream.resource<*
 // -----
 
 // CHECK-LABEL: @asyncFill
-func @asyncFill(%arg0: !stream.resource<*>, %arg1: index, %arg2: i32) -> !stream.resource<*> {
+func.func @asyncFill(%arg0: !stream.resource<*>, %arg1: index, %arg2: i32) -> !stream.resource<*> {
   %c0 = arith.constant 0 : index
   %c128 = arith.constant 128 : index
   // CHECK: = stream.async.fill %arg2, %arg0[%c0 to %c128 for %c128] : i32 -> %arg0 as !stream.resource<*>{%arg1}
@@ -59,7 +59,7 @@ func @asyncFill(%arg0: !stream.resource<*>, %arg1: index, %arg2: i32) -> !stream
 // -----
 
 // CHECK-LABEL: @asyncUpdate
-func @asyncUpdate(%arg0: !stream.resource<*>, %arg1: index, %arg2: !stream.resource<*>, %arg3: index) -> !stream.resource<*> {
+func.func @asyncUpdate(%arg0: !stream.resource<*>, %arg1: index, %arg2: !stream.resource<*>, %arg3: index) -> !stream.resource<*> {
   %c0 = arith.constant 0 : index
   %c128 = arith.constant 128 : index
   // CHECK: = stream.async.update %arg2, %arg0[%c0 to %c128] : !stream.resource<*>{%arg3} -> %arg0 as !stream.resource<*>{%arg1}
@@ -70,7 +70,7 @@ func @asyncUpdate(%arg0: !stream.resource<*>, %arg1: index, %arg2: !stream.resou
 // -----
 
 // CHECK-LABEL: @asyncCopy
-func @asyncCopy(%arg0: !stream.resource<*>, %arg1: index, %arg2: !stream.resource<*>, %arg3: index) -> !stream.resource<*> {
+func.func @asyncCopy(%arg0: !stream.resource<*>, %arg1: index, %arg2: !stream.resource<*>, %arg3: index) -> !stream.resource<*> {
   %c0 = arith.constant 0 : index
   %c128 = arith.constant 128 : index
   // CHECK: = stream.async.copy %arg2[%c0 to %c128], %arg0[%c0 to %c128], %c128 : !stream.resource<*>{%arg3} -> %arg0 as !stream.resource<*>{%arg1}
@@ -81,7 +81,7 @@ func @asyncCopy(%arg0: !stream.resource<*>, %arg1: index, %arg2: !stream.resourc
 // -----
 
 // CHECK-LABEL: @asyncTransfer
-func @asyncTransfer(%arg0: !stream.resource<constant>, %arg1: index) -> !stream.resource<staging> {
+func.func @asyncTransfer(%arg0: !stream.resource<constant>, %arg1: index) -> !stream.resource<staging> {
   // CHECK: = stream.async.transfer %arg0 : !stream.resource<constant>{%arg1} -> !stream.resource<staging>{%arg1}
   %0 = stream.async.transfer %arg0 : !stream.resource<constant>{%arg1} -> !stream.resource<staging>{%arg1}
   return %0 : !stream.resource<staging>
@@ -90,7 +90,7 @@ func @asyncTransfer(%arg0: !stream.resource<constant>, %arg1: index) -> !stream.
 // -----
 
 // CHECK-LABEL: @asyncLoad
-func @asyncLoad(%arg0: !stream.resource<staging>, %arg1: index) -> f32 {
+func.func @asyncLoad(%arg0: !stream.resource<staging>, %arg1: index) -> f32 {
   %c0 = arith.constant 0 : index
   // CHECK: = stream.async.load %arg0[%c0] : !stream.resource<staging>{%arg1} -> f32
   %0 = stream.async.load %arg0[%c0] : !stream.resource<staging>{%arg1} -> f32
@@ -100,7 +100,7 @@ func @asyncLoad(%arg0: !stream.resource<staging>, %arg1: index) -> f32 {
 // -----
 
 // CHECK-LABEL: @asyncStore
-func @asyncStore(%arg0: !stream.resource<staging>, %arg1: index, %arg2: f32) -> !stream.resource<staging> {
+func.func @asyncStore(%arg0: !stream.resource<staging>, %arg1: index, %arg2: f32) -> !stream.resource<staging> {
   %c0 = arith.constant 0 : index
   // CHECK: = stream.async.store %arg2, %arg0[%c0] : f32 -> %arg0 as !stream.resource<staging>{%arg1}
   %0 = stream.async.store %arg2, %arg0[%c0] : f32 -> %arg0 as !stream.resource<staging>{%arg1}
@@ -110,7 +110,7 @@ func @asyncStore(%arg0: !stream.resource<staging>, %arg1: index, %arg2: f32) -> 
 // -----
 
 // CHECK-LABEL: @asyncDispatch
-func @asyncDispatch(%arg0: !stream.resource<*>, %arg1: index) -> !stream.resource<*> {
+func.func @asyncDispatch(%arg0: !stream.resource<*>, %arg1: index) -> !stream.resource<*> {
   %c1 = arith.constant 1 : index
   %c2 = arith.constant 2 : index
   %c3 = arith.constant 3 : index
@@ -123,7 +123,7 @@ func @asyncDispatch(%arg0: !stream.resource<*>, %arg1: index) -> !stream.resourc
 // -----
 
 // CHECK-LABEL: @asyncExecute
-func @asyncExecute(%arg0: !stream.resource<*>, %arg1: index, %arg2: !stream.timepoint) -> (!stream.resource<*>, !stream.timepoint) {
+func.func @asyncExecute(%arg0: !stream.resource<*>, %arg1: index, %arg2: !stream.timepoint) -> (!stream.resource<*>, !stream.timepoint) {
   // CHECK: = stream.async.execute await(%arg2) => with(%arg0 as %arg3: !stream.resource<*>{%arg1}) -> %arg0{%arg1} {
   %0:2 = stream.async.execute await(%arg2) => with(%arg0 as %arg3: !stream.resource<*>{%arg1}) -> %arg0 as !stream.resource<*>{%arg1} {
     // CHECK: %[[W:.+]] = stream.async.concurrent with(%arg3 as %arg4: !stream.resource<*>{%arg1}) -> %arg3{%arg1} {
@@ -140,7 +140,7 @@ func @asyncExecute(%arg0: !stream.resource<*>, %arg1: index, %arg2: !stream.time
 // -----
 
 // CHECK-LABEL: @asyncExecuteNoCaptures
-func @asyncExecuteNoCaptures(%arg0: index, %arg1: i32) -> (!stream.resource<*>, !stream.timepoint) {
+func.func @asyncExecuteNoCaptures(%arg0: index, %arg1: i32) -> (!stream.resource<*>, !stream.timepoint) {
   // CHECK: = stream.async.execute with() -> !stream.resource<*>{%arg0} {
   %0:2 = stream.async.execute with() -> !stream.resource<*>{%arg0} {
     // CHECK: %[[T:.+]] = stream.async.splat
@@ -154,7 +154,7 @@ func @asyncExecuteNoCaptures(%arg0: index, %arg1: i32) -> (!stream.resource<*>, 
 // -----
 
 // CHECK-LABEL: @asyncExecuteNoResults
-func @asyncExecuteNoResults(%arg0: !stream.resource<*>, %arg1: index, %arg2: !stream.timepoint) -> (!stream.timepoint) {
+func.func @asyncExecuteNoResults(%arg0: !stream.resource<*>, %arg1: index, %arg2: !stream.timepoint) -> (!stream.timepoint) {
   // CHECK: = stream.async.execute await(%arg2) => with(%arg0 as %arg3: !stream.resource<*>{%arg1}) {
   %0:1 = stream.async.execute await(%arg2) => with(%arg0 as %arg3: !stream.resource<*>{%arg1}) {
     // CHECK: stream.yield

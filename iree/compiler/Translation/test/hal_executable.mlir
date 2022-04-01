@@ -24,7 +24,7 @@ hal.executable.source public @executable {
   // private functions and only those with declared entry points will be
   // exported.
   builtin.module {
-    func @mul() {
+    func.func @mul() {
       // Push constants are loaded by ordinal.
       %offset = hal.interface.constant.load[0] : index
       %length = hal.interface.constant.load[1] : index

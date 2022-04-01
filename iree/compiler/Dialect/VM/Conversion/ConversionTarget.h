@@ -25,9 +25,9 @@ class VMConversionTarget : public ConversionTarget {
   // Returns a pair of (outer module, inner module).
   //
   // Example:
-  //  module { func @foo() { ... } }
+  //  module { func.func @foo() { ... } }
   // ->
-  //  module attributes {vm.toplevel} { module { func @foo() { ... } } }
+  //  module attributes {vm.toplevel} { module { func.func @foo() { ... } } }
   static std::pair<mlir::ModuleOp, mlir::ModuleOp> nestModuleForConversion(
       mlir::ModuleOp outerModuleOp);
 

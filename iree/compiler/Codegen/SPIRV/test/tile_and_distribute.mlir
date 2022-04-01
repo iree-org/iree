@@ -24,7 +24,7 @@ hal.executable private @matmul {
       translation_info = #translation
     }
     builtin.module {
-      func @matmul() {
+      func.func @matmul() {
         %c0 = arith.constant 0 : index
         %M = hal.interface.constant.load[0] : index
         %N = hal.interface.constant.load[1] : index
@@ -94,7 +94,7 @@ hal.executable private @conv_1d {
       translation_info = #translation
     }
     builtin.module {
-      func @conv_1d() {
+      func.func @conv_1d() {
         %cst = arith.constant 0.000000e+00 : f32
         %c0 = arith.constant 0 : index
         %0 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : memref<3x6x1xf32>
@@ -174,7 +174,7 @@ hal.executable private @conv_2d {
       translation_info = #translation
     }
     builtin.module {
-      func @conv_2d() {
+      func.func @conv_2d() {
         %c0 = arith.constant 0 : index
         %n = hal.interface.constant.load[0] : index
         %oh = hal.interface.constant.load[1] : index
@@ -289,7 +289,7 @@ hal.executable private @conv_3d {
       translation_info = #translation
     }
     builtin.module {
-      func @conv_3d() {
+      func.func @conv_3d() {
         %cst = arith.constant 0.000000e+00 : f32
         %c0 = arith.constant 0 : index
         %0 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : memref<2x7x7x7x2xf32>
@@ -360,7 +360,7 @@ module  {
         translation_info = #translation
       }
       builtin.module {
-        func @pooling_nhwc_max() {
+        func.func @pooling_nhwc_max() {
           %c0 = arith.constant 0 : index
           %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<2x16x16x6xf32>
           %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<3x4xf32>

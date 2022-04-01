@@ -16,7 +16,7 @@ hal.executable private @conv_static_shape_f32 {
       translation_info = #translation
     }
     builtin.module  {
-      func @conv_static_shape_f32() {
+      func.func @conv_static_shape_f32() {
         %c0 = arith.constant 0 : index
         %cst = arith.constant 0.000000e+00 : f32
         %c112 = arith.constant 112 : index
@@ -107,7 +107,7 @@ hal.executable private @depthwise_conv_static_shape_f32 {
       translation_info = #translation
     }
     builtin.module  {
-      func @depthwise_conv_static_shape_f32() {
+      func.func @depthwise_conv_static_shape_f32() {
         %c0 = arith.constant 0 : index
         %cst = arith.constant 0.000000e+00 : f32
         %c56 = arith.constant 56 : index
@@ -198,7 +198,7 @@ hal.executable private @low_padded_conv {
       translation_info = #translation
     }
     builtin.module {
-      func @low_padded_conv() {
+      func.func @low_padded_conv() {
         %cst = arith.constant 0.000000e+00 : f32
         %c0 = arith.constant 0 : index
         %c112 = arith.constant 112 : index
@@ -319,7 +319,7 @@ hal.executable private @low_high_padded_depthwise_conv {
       translation_info = #translation
     }
     builtin.module {
-      func @low_high_padded_depthwise_conv() {
+      func.func @low_high_padded_depthwise_conv() {
         %cst = arith.constant 0.000000e+00 : f32
         %c0 = arith.constant 0 : index
         %c112 = arith.constant 112 : index

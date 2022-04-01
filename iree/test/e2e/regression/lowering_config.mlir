@@ -11,7 +11,7 @@
     translation_info = <CPUDoubleTilingExpert>,
     workgroup_size = []>
 
-func @lowering_config_test() {
+func.func @lowering_config_test() {
   %a = util.unfoldable_constant dense<1.0> : tensor<128x256xf32>
   %b = util.unfoldable_constant dense<2.0> : tensor<256x512xf32>
   %c = util.unfoldable_constant dense<2.0> : tensor<256x1024xf32>

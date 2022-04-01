@@ -10,7 +10,7 @@
 stream.executable private @__builtin_splat_i64 {
   stream.executable.export public @__builtin_splat_i64
   builtin.module {
-    func @__builtin_splat_i64(%value: i64, %count: index, %out_binding: !stream.binding) {
+    func.func @__builtin_splat_i64(%value: i64, %count: index, %out_binding: !stream.binding) {
       %c0 = arith.constant 0 : index
       %out = stream.binding.subspan %out_binding[%c0] : !stream.binding -> !flow.dispatch.tensor<writeonly:?xi64>{%count}
       %workgroup_size_0 = flow.dispatch.workgroup.size[0] : index

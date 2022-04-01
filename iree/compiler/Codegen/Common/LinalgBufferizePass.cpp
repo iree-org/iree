@@ -125,7 +125,7 @@ static Value allocateBufferForResult(OpBuilder &b, Operation *op,
   } else if (auto subTensorInsertOp = dyn_cast<tensor::InsertSliceOp>(op)) {
     dynamicDims = getDynamicDims(b, loc, subTensorInsertOp.dest());
   } else if (auto transferWriteOp = dyn_cast<vector::TransferWriteOp>(op)) {
-    dynamicDims = getDynamicDims(b, loc, transferWriteOp.source());
+    dynamicDims = getDynamicDims(b, loc, transferWriteOp.getSource());
   } else {
     dynamicDims = getDynamicDims(b, loc, op->getResult(resultNum));
   }
@@ -133,7 +133,7 @@ static Value allocateBufferForResult(OpBuilder &b, Operation *op,
   // If its a static allocation hoist it all the way up at begining of the
   // function.
   if (dynamicDims.empty()) {
-    auto funcOp = op->getParentOfType<FuncOp>();
+    auto funcOp = op->getParentOfType<func::FuncOp>();
     OpBuilder::InsertionGuard g(b);
     b.setInsertionPointToStart(&funcOp.front());
     return allocationFn(b, loc, resultType.getShape(),
@@ -847,25 +847,25 @@ static LogicalResult convertVectorTransferWriteOp(OpBuilder &b,
                                                   BlockAndValueMapping &bvm,
                                                   BufferizationPlan &plan) {
   Location loc = op.getLoc();
-  Value result = op.result();
+  Value result = op.getResult();
   RankedTensorType resultType = result.getType().dyn_cast<RankedTensorType>();
   if (!resultType) return success();
   Value resultBuffer = bvm.lookup(result);
 
-  if (!plan.isEquivalent(op.source(), result) &&
+  if (!plan.isEquivalent(op.getSource(), result) &&
       // If the source is linalg.init_tensor, then we don't care about the
       // initial value and can avoid the copy.
-      !op.source().getDefiningOp<linalg::InitTensorOp>()) {
-    Value destBuffer = bvm.lookup(op.source());
+      !op.getSource().getDefiningOp<linalg::InitTensorOp>()) {
+    Value destBuffer = bvm.lookup(op.getSource());
     if (!createLinalgCopyOp(b, loc, destBuffer, resultBuffer)) {
       return failure();
     }
   }
 
   // Create a new vector.transfer_write operation without a result value.
-  b.create<vector::TransferWriteOp>(loc, op.vector(), resultBuffer,
-                                    op.indices(), op.permutation_mapAttr(),
-                                    op.mask(), op.in_boundsAttr());
+  b.create<vector::TransferWriteOp>(loc, op.getVector(), resultBuffer,
+                                    op.getIndices(), op.getPermutationMapAttr(),
+                                    op.getMask(), op.getInBoundsAttr());
   return success();
 }
 
@@ -1005,7 +1005,7 @@ class LinalgBufferizePass : public LinalgBufferizeBase<LinalgBufferizePass> {
 
 void LinalgBufferizePass::runOnOperation() {
   BufferizationPlan plan;
-  FuncOp funcOp = getOperation();
+  func::FuncOp funcOp = getOperation();
   if (failed(createTensorEquivalenceClasses(funcOp, plan))) {
     return signalPassFailure();
   }
@@ -1109,7 +1109,9 @@ void LinalgBufferizePass::runOnOperation() {
         })
         .Case<vector::TransferWriteOp>(
             [&](vector::TransferWriteOp transferWriteOp) {
-              if (!transferWriteOp.source().getType().isa<RankedTensorType>()) {
+              if (!transferWriteOp.getSource()
+                       .getType()
+                       .isa<RankedTensorType>()) {
                 // Nothing to do when source is not a tensor.
                 return success();
               }
@@ -1193,7 +1195,7 @@ static Value defaultAllocationFn(OpBuilder &builder, Location loc,
   return builder.create<memref::AllocOp>(loc, allocationType, dynamicSizes);
 }
 
-std::unique_ptr<OperationPass<FuncOp>> createLinalgBufferizePass(
+std::unique_ptr<OperationPass<func::FuncOp>> createLinalgBufferizePass(
     WorkgroupMemoryAllocationFn allocationFn) {
   return std::make_unique<LinalgBufferizePass>(
       allocationFn ? allocationFn : defaultAllocationFn);
@@ -1201,11 +1203,12 @@ std::unique_ptr<OperationPass<FuncOp>> createLinalgBufferizePass(
 
 void addLinalgBufferizePasses(OpPassManager &passManager,
                               WorkgroupMemoryAllocationFn allocationFn) {
-  passManager.addNestedPass<FuncOp>(createLinalgBufferizePass(allocationFn));
+  passManager.addNestedPass<func::FuncOp>(
+      createLinalgBufferizePass(allocationFn));
   passManager.addPass(memref::createResolveShapedTypeResultDimsPass());
-  passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
-  passManager.addNestedPass<FuncOp>(createCSEPass());
-  passManager.addNestedPass<FuncOp>(createCleanupBufferAllocViewPass());
+  passManager.addNestedPass<func::FuncOp>(createCanonicalizerPass());
+  passManager.addNestedPass<func::FuncOp>(createCSEPass());
+  passManager.addNestedPass<func::FuncOp>(createCleanupBufferAllocViewPass());
   // passManager.addPass(createBufferHoistingPass());
   // TODO(nicolasvasilache): bug in buffer loop hoisting with
   // dynamic_linalg_matmul_on_tensors_fuse_0.mlir

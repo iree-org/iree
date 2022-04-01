@@ -331,7 +331,7 @@ static iree_status_t iree_hal_vmvx_executable_issue_call(
   // Prepare call argument buffer. We've verified the signature on creation and
   // know the exact format we can assume here.
   //
-  //   func @entry(
+  //   func.func @entry(
   //       %local_memory: !vmvx.buffer,
   //       %constants: !vmvx.buffer,
   //       %bindings: !util.list<!vmvx.buffer>,

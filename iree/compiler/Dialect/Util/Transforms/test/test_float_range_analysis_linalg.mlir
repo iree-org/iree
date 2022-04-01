@@ -2,7 +2,7 @@
 
 #map0 = affine_map<(d0, d1) -> ()>
 #map1 = affine_map<(d0, d1) -> (d0, d1)>
-func @linalg_generic_traversal(%arg0 : tensor<5x6xf32>) -> (tensor<5x6xf32>, tensor<5x6xf32>, tensor<5x6xf32>) {
+func.func @linalg_generic_traversal(%arg0 : tensor<5x6xf32>) -> (tensor<5x6xf32>, tensor<5x6xf32>, tensor<5x6xf32>) {
   %cst_min = arith.constant dense<-1.270000e+02> : tensor<f32>
   %cst_max = arith.constant dense<1.270000e+02> : tensor<f32>
   %init = linalg.init_tensor [5, 6] : tensor<5x6xf32>

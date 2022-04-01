@@ -1,6 +1,6 @@
 // RUN: iree-opt -iree-codegen-rewrite-linalg-destructive-updates %s | FileCheck %s
 
-func @matmul() {
+func.func @matmul() {
   %cst = arith.constant 0.000000e+00 : f32
   %c786432 = arith.constant 786432 : index
   %c0 = arith.constant 0 : index

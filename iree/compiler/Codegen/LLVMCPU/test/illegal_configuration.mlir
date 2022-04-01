@@ -15,7 +15,7 @@ hal.executable private @matmul_tensors {
       translation_info = #translation
     }
     builtin.module {
-      func @illegal() {
+      func.func @illegal() {
         %c0 = arith.constant 0 : index
         %lhs = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<4x8xf32>
         %rhs = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<8x16xf32>
@@ -46,7 +46,7 @@ hal.executable private @matmul_tensors {
       translation_info = #translation
     }
     builtin.module {
-      func @illegal() {
+      func.func @illegal() {
         %c0 = arith.constant 0 : index
         %lhs = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<4x8xf32>
         %rhs = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<8x16xf32>
@@ -77,7 +77,7 @@ hal.executable private @matmul_tensors {
       translation_info = #translation
     }
     builtin.module {
-      func @illegal() {
+      func.func @illegal() {
         %c0 = arith.constant 0 : index
         %lhs = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<4x8xf32>
         %rhs = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<8x16xf32>
@@ -108,7 +108,7 @@ hal.executable private @matmul_tensors {
       translation_info = #translation
     }
     builtin.module {
-      func @illegal() {
+      func.func @illegal() {
         %c0 = arith.constant 0 : index
         %lhs = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<4x8xf32>
         %rhs = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<8x16xf32>

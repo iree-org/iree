@@ -1,7 +1,7 @@
 // RUN: iree-opt -split-input-file -iree-codegen-cleanup-buffer-alloc-view %s | FileCheck %s
 
 // CHECK-LABEL: func @fold_reshape()
-func @fold_reshape() {
+func.func @fold_reshape() {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   // CHECK: %[[ARG:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<readonly:3x3x96xf32>
@@ -19,7 +19,7 @@ func @fold_reshape() {
 // -----
 
 // CHECK-LABEL: func @dont_fold_reshape_with_not_full_load()
-func @dont_fold_reshape_with_not_full_load() {
+func.func @dont_fold_reshape_with_not_full_load() {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %c3 = arith.constant 3 : index
@@ -38,7 +38,7 @@ func @dont_fold_reshape_with_not_full_load() {
 // -----
 
 // CHECK-LABEL: func @dont_fold_dynamic_reshape()
-func @dont_fold_dynamic_reshape() {
+func.func @dont_fold_dynamic_reshape() {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %dim0 = hal.interface.constant.load[0] : index

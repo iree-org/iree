@@ -2,7 +2,7 @@
 
 // CHECK-LABEL: @tensorReshapePassThrough
 //  CHECK-SAME: (%[[INPUT:.+]]: !stream.resource<*>, %[[INPUT_SIZE:.+]]: index)
-func @tensorReshapePassThrough(%input: tensor<5x24x48xf32>) -> tensor<30x2x96xf32> {
+func.func @tensorReshapePassThrough(%input: tensor<5x24x48xf32>) -> tensor<30x2x96xf32> {
   // CHECK: %[[RESULT_SIZE:.+]] = stream.tensor.sizeof tensor<30x2x96xf32> : index
   // CHECK: %[[RESULT:.+]] = stream.tensor.clone %[[INPUT]] : tensor<5x24x48xf32> in !stream.resource<*>{%[[INPUT_SIZE]]} -> tensor<30x2x96xf32> in !stream.resource<*>{%[[RESULT_SIZE]]}
   %0 = flow.tensor.reshape %input : tensor<5x24x48xf32> -> tensor<30x2x96xf32>
@@ -14,7 +14,7 @@ func @tensorReshapePassThrough(%input: tensor<5x24x48xf32>) -> tensor<30x2x96xf3
 
 // CHECK-LABEL: @tensorReshapeWithSingleUse
 //  CHECK-SAME: (%[[INPUT:.+]]: !stream.resource<*>, %[[INPUT_SIZE:.+]]: index)
-func @tensorReshapeWithSingleUse(%input: tensor<5x24x48xf32>) -> tensor<30x2x96xf32> {
+func.func @tensorReshapeWithSingleUse(%input: tensor<5x24x48xf32>) -> tensor<30x2x96xf32> {
   // CHECK: %[[RESULT_SIZE:.+]] = stream.tensor.sizeof tensor<30x2x96xf32> : index
   // CHECK: %[[RESHAPE:.+]] = stream.tensor.clone %[[INPUT]] : tensor<5x24x48xf32> in !stream.resource<*>{%[[INPUT_SIZE]]} -> tensor<30x2x96xf32> in !stream.resource<*>{%[[RESULT_SIZE]]}
   %0 = flow.tensor.reshape %input : tensor<5x24x48xf32> -> tensor<30x2x96xf32>
@@ -28,7 +28,7 @@ func @tensorReshapeWithSingleUse(%input: tensor<5x24x48xf32>) -> tensor<30x2x96x
 
 // CHECK-LABEL: @tensorReshapeWithMultipleUses
 //  CHECK-SAME: (%[[INPUT:.+]]: !stream.resource<*>, %[[INPUT_SIZE:.+]]: index)
-func @tensorReshapeWithMultipleUses(%input: tensor<5x24x48xf32>)
+func.func @tensorReshapeWithMultipleUses(%input: tensor<5x24x48xf32>)
     -> (tensor<60x2x48xf32>, tensor<30x2x96xf32>) {
   // CHECK: %[[T0:.+]] = stream.tensor.clone %[[INPUT]] : tensor<5x24x48xf32> in !stream.resource<*>{%[[INPUT_SIZE]]} -> tensor<5x24x48xf32> in !stream.resource<*>{%[[INPUT_SIZE]]}
   %1 = flow.tensor.clone %input : tensor<5x24x48xf32>
@@ -48,7 +48,7 @@ func @tensorReshapeWithMultipleUses(%input: tensor<5x24x48xf32>)
 
 // CHECK-LABEL: @tensorEmpty
 //  CHECK-SAME: (%[[DIM0:.+]]: index)
-func @tensorEmpty(%dim0: index) -> tensor<?x0xf32> {
+func.func @tensorEmpty(%dim0: index) -> tensor<?x0xf32> {
   // CHECK: %[[EMPTY_SIZE:.+]] = stream.tensor.sizeof tensor<?x0xf32>{%[[DIM0]]}
   // CHECK: %[[EMPTY:.+]] = stream.tensor.empty : tensor<?x0xf32>{%[[DIM0]]} in !stream.resource<*>{%[[EMPTY_SIZE]]}
   %0 = flow.tensor.empty : tensor<?x0xf32>{%dim0}
@@ -60,7 +60,7 @@ func @tensorEmpty(%dim0: index) -> tensor<?x0xf32> {
 
 // CHECK-LABEL: @tensorSplat
 //  CHECK-SAME: (%[[VALUE:.+]]: i8, %[[DIM0:.+]]: index)
-func @tensorSplat(%value: i8, %dim0: index) -> tensor<?x128xi8> {
+func.func @tensorSplat(%value: i8, %dim0: index) -> tensor<?x128xi8> {
   // CHECK: %[[T_SIZE:.+]] = stream.tensor.sizeof tensor<?x128xi8>{%[[DIM0]]} : index
   // CHECK: %[[T:.+]] = stream.tensor.splat %[[VALUE]] : i8 -> tensor<?x128xi8>{%[[DIM0]]} in !stream.resource<*>{%[[T_SIZE]]}
   %0 = flow.tensor.splat %value : tensor<?x128xi8>{%dim0}
@@ -72,7 +72,7 @@ func @tensorSplat(%value: i8, %dim0: index) -> tensor<?x128xi8> {
 
 // CHECK-LABEL: @tensorSlice
 //  CHECK-SAME: (%[[INPUT:.+]]: !stream.resource<*>, %[[INPUT_SIZE:.+]]: index)
-func @tensorSlice(%input : tensor<5x24x48xf32>) -> tensor<3x24x48xf32> {
+func.func @tensorSlice(%input : tensor<5x24x48xf32>) -> tensor<3x24x48xf32> {
   %c0 = arith.constant 0 : index
   %c2 = arith.constant 2 : index
   %c3 = arith.constant 3 : index
@@ -89,7 +89,7 @@ func @tensorSlice(%input : tensor<5x24x48xf32>) -> tensor<3x24x48xf32> {
 
 // CHECK-LABEL: @tensorUpdate
 //  CHECK-SAME: (%[[UPDATE:.+]]: !stream.resource<*>, %[[UPDATE_SIZE:.+]]: index, %[[TARGET:.+]]: !stream.resource<*>, %[[TARGET_SIZE:.+]]: index)
-func @tensorUpdate(%update : tensor<1x1x10xf32>, %target : tensor<5x1x10xf32>) -> tensor<5x1x10xf32> {
+func.func @tensorUpdate(%update : tensor<1x1x10xf32>, %target : tensor<5x1x10xf32>) -> tensor<5x1x10xf32> {
   %c1 = arith.constant 1 : index
   %c4 = arith.constant 4 : index
   // CHECK: %[[T:.+]] = stream.tensor.update %[[UPDATE]], %[[TARGET]][%c4, %c1, %c1] : tensor<1x1x10xf32> in !stream.resource<*>{%[[UPDATE_SIZE]]} -> tensor<5x1x10xf32> in %[[TARGET]] as !stream.resource<*>{%[[TARGET_SIZE]]}
@@ -102,7 +102,7 @@ func @tensorUpdate(%update : tensor<1x1x10xf32>, %target : tensor<5x1x10xf32>) -
 
 // CHECK-LABEL: @tensorLoad
 //  CHECK-SAME: (%[[SOURCE:.+]]: !stream.resource<*>, %[[SOURCE_SIZE:.+]]: index)
-func @tensorLoad(%source : tensor<2x3xi32>) -> i32 {
+func.func @tensorLoad(%source : tensor<2x3xi32>) -> i32 {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   // CHECK: %[[T0:.+]] = stream.async.transfer %[[SOURCE]] : !stream.resource<*>{%[[SOURCE_SIZE]]} -> !stream.resource<staging>{%[[SOURCE_SIZE]]}
@@ -116,7 +116,7 @@ func @tensorLoad(%source : tensor<2x3xi32>) -> i32 {
 
 // CHECK-LABEL: @tensorStore
 //  CHECK-SAME: (%[[TARGET:.+]]: !stream.resource<*>, %[[TARGET_SIZE:.+]]: index)
-func @tensorStore(%target : tensor<2x3xi32>) -> tensor<2x3xi32> {
+func.func @tensorStore(%target : tensor<2x3xi32>) -> tensor<2x3xi32> {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %c9 = arith.constant 9 : i32

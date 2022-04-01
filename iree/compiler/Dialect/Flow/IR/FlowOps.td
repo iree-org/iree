@@ -389,6 +389,15 @@ def FLOW_DispatchTensorLoadOp : FLOW_PureOp<"dispatch.tensor.load", [
         (unsigned resultRank, IREE::Flow::DispatchTensorType sourceType,
          ArrayRef<OpFoldResult> mixedSizes);
 
+    /// Returns the list of dimensions that are dropped if the
+    /// !flow.dispatch.tensor.load is rank-reducing.
+    llvm::SmallBitVector getDroppedDims();
+
+    /// Return the result type as a `RankedTensorType`.
+    RankedTensorType getType() {
+      return result().getType().cast<RankedTensorType>();
+    }
+
     ValueRange getOperandDynamicDims(unsigned idx) { return source_dims(); }
     ValueRange getResultDynamicDims(unsigned idx) { return sizes(); }
   }];

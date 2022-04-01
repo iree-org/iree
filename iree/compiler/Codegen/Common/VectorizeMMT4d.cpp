@@ -163,7 +163,7 @@ void populateLinalgToVectorVectorizeMMT4dPatterns(MLIRContext *context,
   patterns.insert<VectorizeMMT4DOp>(context);
 }
 
-std::unique_ptr<OperationPass<FuncOp>>
+std::unique_ptr<OperationPass<func::FuncOp>>
 createLinalgToVectorVectorizeMMT4dPass() {
   return std::make_unique<LinalgToVectorVectorizeMMT4dPass>();
 }

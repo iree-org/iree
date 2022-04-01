@@ -1,4 +1,4 @@
-func @sort1D() {
+func.func @sort1D() {
   %input = util.unfoldable_constant dense<[3, 2, 1, 4]> : tensor<4xi32>
 
   %sort = "mhlo.sort"(%input) ( {
@@ -11,7 +11,7 @@ func @sort1D() {
   return
 }
 
-func @sort2D() {
+func.func @sort2D() {
   %input = util.unfoldable_constant dense<[[1, 2, 3, 4],
                                            [4, 3, 2, 1]]> : tensor<2x4xi32>
 
@@ -25,7 +25,7 @@ func @sort2D() {
   return
 }
 
-func @sort3D() {
+func.func @sort3D() {
   %input = util.unfoldable_constant dense<[[[1, 2, 3, 4],
                                             [4, 3, 2, 1]]]> : tensor<1x2x4xi32>
 
@@ -39,7 +39,7 @@ func @sort3D() {
   return
 }
 
-func @sort_to_decreasing_seq() {
+func.func @sort_to_decreasing_seq() {
   %input = util.unfoldable_constant dense<[3, 2, 1, 4]> : tensor<4xi32>
 
   %sort = "mhlo.sort"(%input) ( {

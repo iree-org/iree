@@ -10,7 +10,7 @@
 stream.executable private @__builtin_fill_i64 {
   stream.executable.export public @__builtin_fill_i64
   builtin.module {
-    func @__builtin_fill_i64(%value: i64, %offset: index, %count: index, %out_binding: !stream.binding) {
+    func.func @__builtin_fill_i64(%value: i64, %offset: index, %count: index, %out_binding: !stream.binding) {
       %out = stream.binding.subspan %out_binding[%offset] : !stream.binding -> !flow.dispatch.tensor<writeonly:?xi64>{%count}
       %workgroup_size_0 = flow.dispatch.workgroup.size[0] : index
       %workgroup_id_0 = flow.dispatch.workgroup.id[0] : index

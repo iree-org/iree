@@ -1,7 +1,7 @@
 // RUN: iree-opt -iree-convert-to-nvvm -split-input-file %s | FileCheck %s
 
 // Test that that standard and GPU ops are converted to LLVM and NVVM.
-func @abs_ex_dispatch_0() {
+func.func @abs_ex_dispatch_0() {
   %c0 = arith.constant 0 : index
   %c128 = arith.constant 128 : index
   %0 = hal.interface.binding.subspan set(0) binding(4) type(storage_buffer) offset(%c128) : memref<16xf32>
@@ -35,7 +35,7 @@ func @abs_ex_dispatch_0() {
 
 // -----
 
-func @abs_dynamic() {
+func.func @abs_dynamic() {
   %c0 = arith.constant 0 : index
   %c128 = arith.constant 128 : index
   %s = hal.interface.constant.load[1] : index
@@ -73,7 +73,7 @@ func @abs_dynamic() {
 
 // Test that we handle correctly the case where bindings are sparse (set 0
 // binding 0 is not used).
-func @dead_symbol() {
+func.func @dead_symbol() {
   %c0 = arith.constant 0 : index
   %c128 = arith.constant 128 : index
   %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<16xi32>
@@ -99,7 +99,7 @@ func @dead_symbol() {
 
 // A single binding may contain different data types.
 // Test that we cast pointers correctly.
-func @mixed_type() {
+func.func @mixed_type() {
   %c0 = arith.constant 0 : index
   %c128 = arith.constant 128 : index
   %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c128) : memref<16xf32>
@@ -132,7 +132,7 @@ func @mixed_type() {
   
 // -----
 
-func @shared_memory_lowering() {
+func.func @shared_memory_lowering() {
   %c0 = arith.constant 0 : index
   %cst = arith.constant dense<0.000000e+00> : vector<4xf32>
   %0 = memref.alloc() : memref<1x16x32xf32, 3>

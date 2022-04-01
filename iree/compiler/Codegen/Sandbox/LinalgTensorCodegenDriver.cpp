@@ -52,7 +52,7 @@ static bool getTilingOptionsFromConfig(int64_t tilingLevel,
 /// Default method to initialize the tiling options for fusion in IREE. These
 /// could be ovveridden by the command line options if specified.
 static FailureOr<LinalgTilingAndFusionOptions> getTileAndFuseOptionsFromConfig(
-    FuncOp funcOp, int64_t tilingLevel) {
+    func::FuncOp funcOp, int64_t tilingLevel) {
   SmallVector<Operation *> computeOps;
   SmallVector<mlir::iree_compiler::LoopTilingAndDistributionInfo> tiledLoops;
   mlir::iree_compiler::IREE::Codegen::LoweringConfigAttr loweringConfig;
@@ -190,20 +190,23 @@ struct OutlineOneParentLoopPass
 };
 }  // namespace
 
-/// Return the neutral element as a new Value.
-/// For now, just assume it is the zero of type.
-/// In the future, it should be the zero of type + op.
-static Value getNeutralOfLinalgOp(OpBuilder &b, OpOperand &op) {
-  auto t = getElementTypeOrSelf(op.get().getType());
-  return b.create<arith::ConstantOp>(op.getOwner()->getLoc(), t,
-                                     b.getZeroAttr(t));
-}
+/// Disabled due to incompatibility with changes in
+/// https://github.com/llvm/llvm-project/commit/58d0da885ef46e3fdb5247295da7898b377c41e1
+///
+// /// Return the neutral element as a new Value.
+// /// For now, just assume it is the zero of type.
+// /// In the future, it should be the zero of type + op.
+// static Value getNeutralOfLinalgOp(OpBuilder &b, OpOperand &op) {
+//   auto t = getElementTypeOrSelf(op.get().getType());
+//   return b.create<arith::ConstantOp>(op.getOwner()->getLoc(), t,
+//                                      b.getZeroAttr(t));
+// }
 
 /// Collect all Linalg ops, they must all have tensor semantics.
 /// For now this just fuses everything.
 // TODO: finer control.
 void LinalgFusePass::runOnOperation() {
-  FuncOp funcOp = getOperation();
+  func::FuncOp funcOp = getOperation();
 
   // Set up tiling and vectorization options.
   FailureOr<LinalgTilingAndFusionOptions> defaultTilingOptions =
@@ -226,44 +229,53 @@ void LinalgFusePass::runOnOperation() {
         ::mlir::iree_compiler::getIREELinalgLoopDistributionOptions());
   }
 
+  // Disabled due to incompatibility with changes in
+  // https://github.com/llvm/llvm-project/commit/58d0da885ef46e3fdb5247295da7898b377c41e1
+  //
   // Set up padding options.
   // TODO: Replace the lambdas by either functions defined in MLIR core or even
   // adapt the LinalgPaddingOptions to take the `hoistPaddings` and
   // `packPaddings` arrays directly.
-  auto packFunc = [&](OpOperand &opOperand) {
-    return opOperand.getOperandNumber() < packPaddings.size()
-               ? packPaddings[opOperand.getOperandNumber()]
-               : false;
-  };
-  auto hoistingFunc = [&](OpOperand &opOperand) {
-    return opOperand.getOperandNumber() < hoistPaddings.size()
-               ? hoistPaddings[opOperand.getOperandNumber()]
-               : 0;
-  };
-  auto transposeFunc = [&](OpOperand &opOperand) {
-    SmallVector<int64_t> transposeVector = {};
-    if (opOperand.getOperandNumber() >= transposePaddings.size())
-      return transposeVector;
-    SmallVector<StringRef> elems;
-    StringRef(transposePaddings[opOperand.getOperandNumber()])
-        .split(elems, ':');
-    for (StringRef elem : elems)
-      transposeVector.push_back(std::stoi(elem.str()));
-    return transposeVector;
-  };
-  LinalgPaddingOptions paddingOptions;
-  paddingOptions.setPaddingValueComputationFunction(getNeutralOfLinalgOp);
-  paddingOptions.setPaddingNoFoldComputationFunction(packFunc);
-  paddingOptions.setPaddingHoistComputationFunction(hoistingFunc);
-  paddingOptions.setPaddingTransposeComputationFunction(transposeFunc);
+  // auto packFunc = [&](OpOperand &opOperand) {
+  //   return opOperand.getOperandNumber() < packPaddings.size()
+  //              ? packPaddings[opOperand.getOperandNumber()]
+  //              : false;
+  // };
+  // auto hoistingFunc = [&](OpOperand &opOperand) {
+  //   return opOperand.getOperandNumber() < hoistPaddings.size()
+  //              ? hoistPaddings[opOperand.getOperandNumber()]
+  //              : 0;
+  // };
+  // auto transposeFunc = [&](OpOperand &opOperand) {
+  //   SmallVector<int64_t> transposeVector = {};
+  //   if (opOperand.getOperandNumber() >= transposePaddings.size())
+  //     return transposeVector;
+  //   SmallVector<StringRef> elems;
+  //   StringRef(transposePaddings[opOperand.getOperandNumber()])
+  //       .split(elems, ':');
+  //   for (StringRef elem : elems)
+  //     transposeVector.push_back(std::stoi(elem.str()));
+  //   return transposeVector;
+  // };
+  // LinalgPaddingOptions paddingOptions;
+  // Disabled due to incompatibility with changes in
+  // https://github.com/llvm/llvm-project/commit/58d0da885ef46e3fdb5247295da7898b377c41e1
+  //
+  // paddingOptions.setPaddingValueComputationFunction(getNeutralOfLinalgOp);
+  // paddingOptions.setPaddingNoFoldComputationFunction(packFunc);
+  // paddingOptions.setPaddingHoistComputationFunction(hoistingFunc);
+  // paddingOptions.setPaddingTransposeComputationFunction(transposeFunc);
 
   CodegenStrategy strategy;
-  strategy.tileAndFuseIf(doTiling, anchorOpName, tilingOptions)
-      .padIf(pad, "", paddingOptions)
+  strategy
+      .tileAndFuseIf(doTiling, anchorOpName, tilingOptions)
+      // Disabled due to incompatibility with changes in
+      // https://github.com/llvm/llvm-project/commit/58d0da885ef46e3fdb5247295da7898b377c41e1
+      // .padIf(pad, "", paddingOptions)
       .vectorizeIf(vectorize, "", nullptr, vectorizePadding);
 
   // Created a nested OpPassManager and run.
-  OpPassManager dynamicPM(FuncOp::getOperationName());
+  OpPassManager dynamicPM(func::FuncOp::getOperationName());
   strategy.configurePassPipeline(dynamicPM, funcOp.getContext());
 
   if (failed(runPipeline(dynamicPM, funcOp))) {
@@ -272,7 +284,7 @@ void LinalgFusePass::runOnOperation() {
 }
 
 void LinalgSingleTilingExpertPass::runOnOperation() {
-  FuncOp funcOp = getOperation();
+  func::FuncOp funcOp = getOperation();
 
   // Set up tiling and vectorization options.
   LinalgTilingOptions tilingOptions;
@@ -291,41 +303,49 @@ void LinalgSingleTilingExpertPass::runOnOperation() {
   }
   tilingOptions = tilingOptions.setPeeledLoops(peeledLoops);
 
-  // Set up padding options.
-  // TODO: Replace the lambdas by either functions defined in MLIR core or even
-  // adapt the LinalgPaddingOptions to take the `hoistPaddings` and
-  // `packPaddings` arrays directly.
-  auto packFunc = [&](OpOperand &opOperand) {
-    return opOperand.getOperandNumber() < packPaddings.size()
-               ? packPaddings[opOperand.getOperandNumber()]
-               : false;
-  };
-  auto hoistingFunc = [&](OpOperand &opOperand) {
-    return opOperand.getOperandNumber() < hoistPaddings.size()
-               ? hoistPaddings[opOperand.getOperandNumber()]
-               : 0;
-  };
-  auto transposeFunc = [&](OpOperand &opOperand) {
-    SmallVector<int64_t> transposeVector = {};
-    if (opOperand.getOperandNumber() >= transposePaddings.size())
-      return transposeVector;
-    SmallVector<StringRef> elems;
-    StringRef(transposePaddings[opOperand.getOperandNumber()])
-        .split(elems, ':');
-    for (StringRef elem : elems)
-      transposeVector.push_back(std::stoi(elem.str()));
-    return transposeVector;
-  };
-  LinalgPaddingOptions paddingOptions;
-  paddingOptions.setPaddingValueComputationFunction(getNeutralOfLinalgOp);
-  paddingOptions.setPaddingNoFoldComputationFunction(packFunc);
-  paddingOptions.setPaddingHoistComputationFunction(hoistingFunc);
-  paddingOptions.setPaddingTransposeComputationFunction(transposeFunc);
+  // Disabled due to incompatibility with changes in
+  // https://github.com/llvm/llvm-project/commit/58d0da885ef46e3fdb5247295da7898b377c41e1
+  //
+  // // Set up padding options.
+  // // TODO: Replace the lambdas by either functions defined in MLIR core or
+  // even
+  // // adapt the LinalgPaddingOptions to take the `hoistPaddings` and
+  // // `packPaddings` arrays directly.
+  // auto packFunc = [&](OpOperand &opOperand) {
+  //   return opOperand.getOperandNumber() < packPaddings.size()
+  //              ? packPaddings[opOperand.getOperandNumber()]
+  //              : false;
+  // };
+  // auto hoistingFunc = [&](OpOperand &opOperand) {
+  //   return opOperand.getOperandNumber() < hoistPaddings.size()
+  //              ? hoistPaddings[opOperand.getOperandNumber()]
+  //              : 0;
+  // };
+  // auto transposeFunc = [&](OpOperand &opOperand) {
+  //   SmallVector<int64_t> transposeVector = {};
+  //   if (opOperand.getOperandNumber() >= transposePaddings.size())
+  //     return transposeVector;
+  //   SmallVector<StringRef> elems;
+  //   StringRef(transposePaddings[opOperand.getOperandNumber()])
+  //       .split(elems, ':');
+  //   for (StringRef elem : elems)
+  //     transposeVector.push_back(std::stoi(elem.str()));
+  //   return transposeVector;
+  // };
+  // LinalgPaddingOptions paddingOptions;
+  // paddingOptions.setPaddingValueComputationFunction(getNeutralOfLinalgOp);
+  // paddingOptions.setPaddingNoFoldComputationFunction(packFunc);
+  // paddingOptions.setPaddingHoistComputationFunction(hoistingFunc);
+  // paddingOptions.setPaddingTransposeComputationFunction(transposeFunc);
 
   CodegenStrategy strategy;
   StringRef genericOpName = GenericOp::getOperationName();
-  strategy.tileIf(doTiling, anchorOpName, tilingOptions)
-      .padIf(pad, anchorOpName, paddingOptions)
+  strategy
+      .tileIf(doTiling, anchorOpName, tilingOptions)
+      // Disabled due to incompatibility with changes in
+      // https://github.com/llvm/llvm-project/commit/58d0da885ef46e3fdb5247295da7898b377c41e1
+      //
+      // .padIf(pad, anchorOpName, paddingOptions)
       .decomposeIf(decomposeToLowerDimOp)
       .generalizeIf(generalize, anchorOpName)
       .interchangeIf(!iteratorInterchange.empty(), iteratorInterchange)
@@ -333,7 +353,7 @@ void LinalgSingleTilingExpertPass::runOnOperation() {
                    nullptr, vectorizePadding);
 
   // Created a nested OpPassManager and run.
-  OpPassManager dynamicPM(FuncOp::getOperationName());
+  OpPassManager dynamicPM(func::FuncOp::getOperationName());
   strategy.configurePassPipeline(dynamicPM, funcOp.getContext());
   if (failed(runPipeline(dynamicPM, funcOp))) {
     return signalPassFailure();
@@ -414,8 +434,8 @@ void LinalgVectorLoweringPass::runOnOperation() {
   CodegenStrategy strategy;
   strategy.vectorLowering(vectorLoweringOptions);
   // Created a nested OpPassManager and run.
-  OpPassManager dynamicPM(FuncOp::getOperationName());
-  FuncOp funcOp = getOperation();
+  OpPassManager dynamicPM(func::FuncOp::getOperationName());
+  func::FuncOp funcOp = getOperation();
   strategy.configurePassPipeline(dynamicPM, funcOp.getContext());
   if (failed(runPipeline(dynamicPM, funcOp))) {
     return signalPassFailure();
@@ -504,41 +524,46 @@ void OutlineOneParentLoopPass::runOnOperation() {
   });
 }
 
-std::unique_ptr<OperationPass<FuncOp>> mlir::createLinalgFusePass() {
+std::unique_ptr<OperationPass<func::FuncOp>> mlir::createLinalgFusePass() {
   return std::make_unique<LinalgFusePass>();
 }
-std::unique_ptr<OperationPass<FuncOp>> mlir::createLinalgFusePass(
+std::unique_ptr<OperationPass<func::FuncOp>> mlir::createLinalgFusePass(
     const mlir::LinalgFusePassOptions &options) {
   return std::make_unique<LinalgFusePass>(options);
 }
 
-std::unique_ptr<OperationPass<FuncOp>>
+std::unique_ptr<OperationPass<func::FuncOp>>
 mlir::createLinalgSingleTilingExpertPass() {
   return std::make_unique<LinalgSingleTilingExpertPass>();
 }
-std::unique_ptr<OperationPass<FuncOp>> mlir::createLinalgSingleTilingExpertPass(
+std::unique_ptr<OperationPass<func::FuncOp>>
+mlir::createLinalgSingleTilingExpertPass(
     const LinalgSingleTilingExpertPassOptions &passOptions) {
   return std::make_unique<LinalgSingleTilingExpertPass>(passOptions);
 }
 
-std::unique_ptr<OperationPass<FuncOp>> mlir::createLinalgVectorLoweringPass(
-    int64_t vectorLoweringStage) {
+std::unique_ptr<OperationPass<func::FuncOp>>
+mlir::createLinalgVectorLoweringPass(int64_t vectorLoweringStage) {
   return std::make_unique<LinalgVectorLoweringPass>(vectorLoweringStage);
 }
-std::unique_ptr<OperationPass<FuncOp>> mlir::createLinalgVectorLoweringPass(
+std::unique_ptr<OperationPass<func::FuncOp>>
+mlir::createLinalgVectorLoweringPass(
     const LinalgVectorLoweringPassOptions &options) {
   return std::make_unique<LinalgVectorLoweringPass>(options);
 }
 
-std::unique_ptr<OperationPass<FuncOp>> mlir::createUnrollOneVectorOpPass() {
+std::unique_ptr<OperationPass<func::FuncOp>>
+mlir::createUnrollOneVectorOpPass() {
   return std::make_unique<UnrollOneVectorOpPass>();
 }
 
-std::unique_ptr<OperationPass<FuncOp>> mlir::createUnrollOneParentLoopPass() {
+std::unique_ptr<OperationPass<func::FuncOp>>
+mlir::createUnrollOneParentLoopPass() {
   return std::make_unique<UnrollOneParentLoopPass>();
 }
 
-std::unique_ptr<OperationPass<FuncOp>> mlir::createOutlineOneParentLoopPass() {
+std::unique_ptr<OperationPass<func::FuncOp>>
+mlir::createOutlineOneParentLoopPass() {
   return std::make_unique<OutlineOneParentLoopPass>();
 }
 
@@ -561,7 +586,7 @@ void mlir::addLowerToVectorTransforms(OpPassManager &passManager,
 // backend pipelines
 //===----------------------------------------------------------------------===//
 
-std::unique_ptr<OperationPass<FuncOp>>
+std::unique_ptr<OperationPass<func::FuncOp>>
 mlir::iree_compiler::createLinalgFusePass(int64_t tilingLevel, bool vectorize) {
   return std::make_unique<LinalgFusePass>(tilingLevel, vectorize);
 }

@@ -16,7 +16,7 @@ hal.executable private @matmul_tensors  {
   }> {
     hal.executable.entry_point @matmul_tensors layout(#executable_layout)
     builtin.module {
-      func @matmul_tensors() {
+      func.func @matmul_tensors() {
         %c0 = arith.constant 0 : index
         %c1 = arith.constant 1 : index
         %M = hal.interface.constant.load[0] : index
@@ -68,7 +68,7 @@ hal.executable private @add {
   }> {
     hal.executable.entry_point @add layout(#executable_layout)
     builtin.module {
-      func @add() {
+      func.func @add() {
         %c0 = arith.constant 0 : index
         %dim0 = hal.interface.constant.load[0] : index
         %dim1 = hal.interface.constant.load[1] : index
@@ -120,7 +120,7 @@ hal.executable private @add4D  {
   }> {
     hal.executable.entry_point @add4D layout(#executable_layout)
     builtin.module {
-      func @add4D() {
+      func.func @add4D() {
         %d0 = hal.interface.constant.load[0] : index
         %d1 = hal.interface.constant.load[1] : index
         %d2 = hal.interface.constant.load[2] : index
@@ -176,7 +176,7 @@ hal.executable private @batch_matmul_tensors {
   }> {
     hal.executable.entry_point @batch_matmul_tensors layout(#executable_layout)
     builtin.module {
-      func @batch_matmul_tensors() {
+      func.func @batch_matmul_tensors() {
         %cst = arith.constant 0.000000e+00 : f32
         %B = hal.interface.constant.load[0] : index
         %M = hal.interface.constant.load[1] : index
@@ -458,7 +458,7 @@ hal.executable private @conv {
   }> {
     hal.executable.entry_point public @conv layout(#executable_layout)
     builtin.module {
-      func @conv() {
+      func.func @conv() {
         %N = hal.interface.constant.load[0] : index
         %H = hal.interface.constant.load[1] : index
         %W = hal.interface.constant.load[2] : index
@@ -515,7 +515,7 @@ hal.executable private @conv_static {
   }> {
     hal.executable.entry_point public @conv_static layout(#executable_layout)
     builtin.module {
-      func @conv_static() {
+      func.func @conv_static() {
         %cst = arith.constant 0.000000e+00 : f32
         %c0 = arith.constant 0 : index
         %c607520 = arith.constant 607520 : index
@@ -557,7 +557,7 @@ hal.executable private @depthwise_conv_static {
   }> {
     hal.executable.entry_point public @depthwise_conv_static layout(#executable_layout)
     builtin.module {
-      func @depthwise_conv_static() {
+      func.func @depthwise_conv_static() {
         %cst = arith.constant 0.0 : f32
         %input_binding = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer)
             : !flow.dispatch.tensor<readonly:1x161x161x96xf32>
@@ -603,7 +603,7 @@ hal.executable private @generic_static {
   }> {
     hal.executable.entry_point public @generic_static layout(#executable_layout)
     builtin.module {
-      func @generic_static() {
+      func.func @generic_static() {
         %input_binding = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer)
             : !flow.dispatch.tensor<readonly:96x16xf32>
         %result_binding = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer)
@@ -649,7 +649,7 @@ hal.executable private @matmul_static {
   }> {
     hal.executable.entry_point public @matmul_static layout(#executable_layout)
     builtin.module {
-      func @matmul_static() {
+      func.func @matmul_static() {
         %cst = arith.constant 0.0 : f32
         %lhs_binding = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer)
             : !flow.dispatch.tensor<readonly:196x240xf32>
@@ -697,7 +697,7 @@ hal.executable private @restrict_num_workgroups {
   }> {
     hal.executable.entry_point public @restrict_num_workgroups layout(#executable_layout)
     builtin.module {
-      func @restrict_num_workgroups() {
+      func.func @restrict_num_workgroups() {
         %cst = arith.constant 0.000000e+00 : f32
         %input_binding = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer)
             : !flow.dispatch.tensor<readonly:1x11x11x576xf32>
@@ -748,7 +748,7 @@ hal.executable private @matmul_x86  {
     }> {
     hal.executable.entry_point public @matmul_x86 layout(#executable_layout)
     builtin.module {
-      func @matmul_x86() {
+      func.func @matmul_x86() {
         %cst = arith.constant 0.0 : f32
         %lhs_binding = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<readonly:384x512xf32>
         %rhs_binding = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : !flow.dispatch.tensor<readonly:512x128xf32>
@@ -796,7 +796,7 @@ hal.executable private @matmul_riscv  {
     }> {
     hal.executable.entry_point public @matmul_riscv layout(#executable_layout)
     builtin.module {
-      func @matmul_riscv() {
+      func.func @matmul_riscv() {
         %cst = arith.constant 0.0 : f32
         %lhs_binding = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<readonly:384x512xf32>
         %rhs_binding = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : !flow.dispatch.tensor<readonly:512x128xf32>
@@ -844,7 +844,7 @@ hal.executable private @reduction {
   hal.executable.variant public @embedded_elf_x86_64, target = #executable_target_embedded_elf_x86_64_ {
     hal.executable.entry_point public @predict_dispatch_86 ordinal(0) layout(#executable_layout)
     builtin.module  {
-      func @predict_dispatch_86(%arg0: !flow.dispatch.tensor<readonly:7x7x2048xf32>,
+      func.func @predict_dispatch_86(%arg0: !flow.dispatch.tensor<readonly:7x7x2048xf32>,
           %arg1: !flow.dispatch.tensor<writeonly:7xf32>) {
         %cst = arith.constant 0.0 : f32
         %cst1 = arith.constant 10.0 : f32
@@ -901,7 +901,7 @@ hal.executable private @matmul_x86_i8_i8_i32  {
     }> {
     hal.executable.entry_point public @matmul_x86_i8_i8_i32 layout(#executable_layout)
     builtin.module {
-      func @matmul_x86_i8_i8_i32() {
+      func.func @matmul_x86_i8_i8_i32() {
         %c0 = arith.constant 0 : index
         %M = hal.interface.constant.load[0] : index
         %N = hal.interface.constant.load[1] : index
@@ -951,7 +951,7 @@ hal.executable private @matmul_aarch_i8_i8_i32  {
   }> {
   hal.executable.entry_point public @matmul_aarch_i8_i8_i32 layout(#executable_layout)
     builtin.module {
-      func @matmul_aarch_i8_i8_i32() {
+      func.func @matmul_aarch_i8_i8_i32() {
         %c0 = arith.constant 0 : index
         %M = hal.interface.constant.load[0] : index
         %N = hal.interface.constant.load[1] : index
@@ -1006,7 +1006,7 @@ hal.executable private @gemm_unit_N {
   hal.executable.variant public @embedded_elf_x86_64, target = #executable_target_embedded_elf_x86_64_ {
     hal.executable.entry_point public @gemm_unit_N ordinal(0) layout(#executable_layout)
     builtin.module  {
-      func @gemm_unit_N() {
+      func.func @gemm_unit_N() {
         %c0 = arith.constant 0 : index
         %M = hal.interface.constant.load[0] : index
         %K = hal.interface.constant.load[1] : index
@@ -1057,7 +1057,7 @@ hal.executable private @gemm_unit_M_unit_N {
   hal.executable.variant public @embedded_elf_x86_64, target = #executable_target_embedded_elf_x86_64_ {
     hal.executable.entry_point public @gemm_unit_M_unit_N ordinal(0) layout(#executable_layout)
     builtin.module  {
-      func @gemm_unit_M_unit_N() {
+      func.func @gemm_unit_M_unit_N() {
         %c0 = arith.constant 0 : index
         %K = hal.interface.constant.load[0] : index
         %lhs_binding = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(32) : !flow.dispatch.tensor<readonly:1x?xf32>{%K}
@@ -1104,7 +1104,7 @@ hal.executable private @matmul_odd {
   hal.executable.variant public @embedded_elf_x86_64, target = #executable_target_embedded_elf_x86_64_ {
     hal.executable.entry_point public @matmul_odd ordinal(0) layout(#executable_layout)
     builtin.module {
-      func @matmul_odd() {
+      func.func @matmul_odd() {
         %cst = arith.constant 0.000000e+00 : f32
         %c0 = arith.constant 0 : index
         %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(32) : !flow.dispatch.tensor<readonly:33x16xf32>
@@ -1147,7 +1147,7 @@ hal.executable private @generic_unit_dims {
   }> {
     hal.executable.entry_point @generic_unit_dims layout(#executable_layout)
     builtin.module {
-      func @generic_unit_dims() {
+      func.func @generic_unit_dims() {
         %c0 = arith.constant 0 : index
         %d0 = hal.interface.constant.load[0] : index
         %d1 = hal.interface.constant.load[1] : index
@@ -1202,7 +1202,7 @@ hal.executable private @reduce_to_scalar {
   }> {
     hal.executable.entry_point @reduce_to_scalar layout(#executable_layout)
     builtin.module {
-      func @reduce_to_scalar() {
+      func.func @reduce_to_scalar() {
         %c0 = arith.constant 0 : index
         %d0 = hal.interface.constant.load[0] : index
         %in_binding = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<readonly:?xf32>{%d0}
@@ -1247,7 +1247,7 @@ hal.executable private @scalar {
   }> {
     hal.executable.entry_point @scalar layout(#executable_layout)
     builtin.module {
-      func @scalar() {
+      func.func @scalar() {
         %c0 = arith.constant 0 : index
         %in_binding = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<readonly:f32>
         %out_binding = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : !flow.dispatch.tensor<writeonly:f32>

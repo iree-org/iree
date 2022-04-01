@@ -25,10 +25,14 @@ namespace iree_compiler {
 namespace IREE {
 namespace HAL {
 
+// TODO(benvanik): remove this and replace with the pass pipeline options.
 // Controls executable translation targets.
 struct TargetOptions {
   // TODO(benvanik): multiple targets of the same type, etc.
   std::vector<std::string> targets;
+
+  // A path to write individual executable source listings into.
+  std::string sourceListingPath;
 
   // TODO(benvanik): flags for debug/optimization/etc.
   // The intent is that we can have a global debug/-ON flag that then each
@@ -176,9 +180,9 @@ class TargetBackend {
   //       hal.executable.entry_point @main_dispatch_1 attributes { ... }
   //       hal.executable.entry_point @main_dispatch_2 attributes { ... }
   //       module {
-  //         func @main_0(...) { ... }
-  //         func @main_1(...) { ... }
-  //         func @main_2(...) { ... }
+  //         func.func @main_0(...) { ... }
+  //         func.func @main_1(...) { ... }
+  //         func.func @main_2(...) { ... }
   //       }
   //     }
   //   }

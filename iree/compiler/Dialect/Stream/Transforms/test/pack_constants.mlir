@@ -12,7 +12,7 @@
 // CHECK-NEXT: ]>
 
 // CHECK-LABEL: @resourceConstants
-func @resourceConstants() -> (!stream.resource<constant>, !stream.resource<constant>, !stream.timepoint) {
+func.func @resourceConstants() -> (!stream.resource<constant>, !stream.resource<constant>, !stream.timepoint) {
   %c4 = arith.constant 4 : index
   %c8 = arith.constant 8 : index
 
@@ -73,7 +73,7 @@ func @resourceConstants() -> (!stream.resource<constant>, !stream.resource<const
 // CHECK: ]>
 
 // CHECK-LABEL: @splitResourceConstants
-func @splitResourceConstants() -> (!stream.resource<constant>, !stream.resource<constant>, !stream.timepoint)
+func.func @splitResourceConstants() -> (!stream.resource<constant>, !stream.resource<constant>, !stream.timepoint)
     attributes {stream.resources = #splitResourceConstantsConfig} {
   %c4 = arith.constant 4 : index
   %c8 = arith.constant 8 : index

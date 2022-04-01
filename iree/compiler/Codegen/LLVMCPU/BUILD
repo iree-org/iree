@@ -22,6 +22,7 @@ cc_library(
         "LLVMCPUUnfuseFMAOps.cpp",
         "Passes.cpp",
         "VectorContractCustomKernels.cpp",
+        "VerifyLinalgTransformLegality.cpp",
     ],
     hdrs = [
         "KernelDispatch.h",

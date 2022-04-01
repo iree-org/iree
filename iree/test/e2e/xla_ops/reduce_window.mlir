@@ -1,4 +1,4 @@
-func @reduce_window_nonoverlapping_1x4x6x1xf32() {
+func.func @reduce_window_nonoverlapping_1x4x6x1xf32() {
   %0 = util.unfoldable_constant dense<[[[[ 1.0], [ 2.0], [ 3.0], [ 4.0], [ 5.0], [ 6.0]],
                                         [[ 7.0], [ 8.0], [ 9.0], [10.0], [11.0], [12.0]],
                                         [[13.0], [14.0], [15.0], [16.0], [17.0], [18.0]],
@@ -14,7 +14,7 @@ func @reduce_window_nonoverlapping_1x4x6x1xf32() {
   return
 }
 
-func @reduce_window_overlapping_4x6xf32() {
+func.func @reduce_window_overlapping_4x6xf32() {
   %0 = util.unfoldable_constant dense<[[[[ 1.0], [ 2.0], [ 3.0], [ 4.0], [ 5.0], [ 6.0]],
                                         [[ 7.0], [ 8.0], [ 9.0], [10.0], [11.0], [12.0]],
                                         [[13.0], [14.0], [15.0], [16.0], [17.0], [18.0]],
@@ -33,7 +33,7 @@ func @reduce_window_overlapping_4x6xf32() {
   return
 }
 
-func @reduce_window_max_4x6xf32() {
+func.func @reduce_window_max_4x6xf32() {
   %0 = util.unfoldable_constant dense<[[[[ 1.0], [ 2.0], [ 3.0], [ 4.0], [ 5.0], [ 6.0]],
                                         [[ 7.0], [ 8.0], [ 9.0], [10.0], [11.0], [12.0]],
                                         [[13.0], [14.0], [15.0], [16.0], [17.0], [18.0]],
@@ -49,7 +49,7 @@ func @reduce_window_max_4x6xf32() {
   return
 }
 
-func @reduce_window_min_4x6xf32() {
+func.func @reduce_window_min_4x6xf32() {
   %0 = util.unfoldable_constant dense<[[[[ 1.0], [ 2.0], [ 3.0], [ 4.0], [ 5.0], [ 6.0]],
                                         [[ 7.0], [ 8.0], [ 9.0], [10.0], [11.0], [12.0]],
                                         [[13.0], [14.0], [15.0], [16.0], [17.0], [18.0]],
@@ -65,7 +65,7 @@ func @reduce_window_min_4x6xf32() {
   return
 }
 
-func @reduce_window_max_with_padding_4x6xf32() {
+func.func @reduce_window_max_with_padding_4x6xf32() {
   %0 = util.unfoldable_constant dense<[[[[ 1.0], [ 2.0], [ 3.0], [ 4.0], [ 5.0], [ 6.0]],
                                         [[ 7.0], [ 8.0], [ 9.0], [10.0], [11.0], [12.0]],
                                         [[13.0], [14.0], [15.0], [16.0], [17.0], [18.0]],
@@ -82,7 +82,7 @@ func @reduce_window_max_with_padding_4x6xf32() {
   return
 }
 
-func @cumsum_f32() {
+func.func @cumsum_f32() {
   %0 = mhlo.constant dense<0.000000e+00> : tensor<f32>
   %1 = util.unfoldable_constant dense<1.0> : tensor<2x2x2xf32>
   %res = "mhlo.reduce_window"(%1, %0) ({

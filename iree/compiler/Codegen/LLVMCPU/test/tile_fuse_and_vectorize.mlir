@@ -4,7 +4,7 @@
 #map0 = affine_map<()[s0] -> (s0 * 64)>
 #map1 = affine_map<(d0, d1) -> (d0, d1)>
 module  {
-  func @dot_384x512x128_dispatch_0() {
+  func.func @dot_384x512x128_dispatch_0() {
     %c64 = arith.constant 64 : index
     %c0 = arith.constant 0 : index
     %cst = arith.constant 0.000000e+00 : f32
@@ -76,7 +76,7 @@ module  {
 
 // -----
 
-func @matmul_gather() {
+func.func @matmul_gather() {
   %c512 = arith.constant 512 : index
   %c384 = arith.constant 384 : index
   %cst = arith.constant 0.000000e+00 : f32
@@ -139,7 +139,7 @@ func @matmul_gather() {
 
 // -----
 
-func @nonvectorizable_matmul_and_vectorizable_generic() {
+func.func @nonvectorizable_matmul_and_vectorizable_generic() {
   %c96 = arith.constant 96 : index
   %c784 = arith.constant 784 : index
   %cst = arith.constant 0.000000e+00 : f32
