@@ -6,6 +6,8 @@
 
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 
+#include <iree/compiler/Codegen/Passes.h>
+
 #include <memory>
 
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
@@ -126,6 +128,8 @@ void buildGlobalOptimizationPassPipeline(
 
 void buildFlowTransformPassPipeline(OpPassManager &passManager,
                                     const TransformOptions &transformOptions) {
+  if (clDemoteF32ToF16) passManager.addPass(createDemoteF32ToF16Pass());
+
   // Special case peephole optimizations.
   FunctionLikeNest(passManager)
       .addPass(IREE::Flow::createConvertConv2D1x1ToMatmulPass)

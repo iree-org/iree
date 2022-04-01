@@ -114,6 +114,10 @@ std::unique_ptr<Pass> createOptimizeNumericsPass();
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createStripSignednessPass();
 
+/// Create a pass to convert a model using f32 type to the equivalent one
+/// using f16.
+std::unique_ptr<OperationPass<ModuleOp>> createDemoteF32ToF16Pass();
+
 // Verifies that the input to the Flow transformation pipeline is legal.
 // This includes checking for operations from dialects that are expected
 // to be legalized before this pass.

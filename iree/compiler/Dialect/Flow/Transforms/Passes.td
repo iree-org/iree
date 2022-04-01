@@ -145,6 +145,12 @@ def StripSignedness :
   let constructor = "mlir::iree_compiler::IREE::Flow::createStripSignednessPass()";
 }
 
+def DemoteF32ToF16 :
+    Pass<"iree-flow-convert-f32-to-f16", "mlir::ModuleOp"> {
+  let summary = "Convert f32 operations and values into equivalent f16 ones.";
+  let constructor = "mlir::iree_compiler::IREE::Flow::createDemoteF32ToF16Pass()";
+}
+
 def StripAndSplatConstantVariables :
     Pass<"iree-flow-strip-and-splat-constant-variables", "mlir::ModuleOp"> {
   let summary = "Strips constant util.globals and replaces them with splats.";

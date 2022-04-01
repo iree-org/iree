@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -iree-convert-f32-to-f16 %s | FileCheck %s
+// RUN: iree-opt -split-input-file -iree-flow-convert-f32-to-f16 %s | FileCheck %s
 
 //       CHECK: util.global {{.*}} : tensor<4xf16>
 // CHECK-LABEL: func @simple_f32() -> tensor<4xf16>
@@ -34,5 +34,18 @@ module {
       "mhlo.return"(%5393) : (tensor<f32>) -> ()
     }) {dimensions = dense<1> : tensor<1xi64>} : (tensor<4x4xf32>, tensor<f32>) -> tensor<4xf32>
     return %3 : tensor<4xf32>
+  }
+}
+
+// -----
+
+// CHECK-LABEL: func @scalar_f32_constant()
+// CHECK-NOT: f32
+// CHECK: arith.constant 4.000000e+00 : f16
+// CHECK: return %{{.*}} : f16
+module {
+  func.func @scalar_f32_constant() -> f32 {
+    %1 = arith.constant 4.0 : f32
+    return %1 : f32
   }
 }

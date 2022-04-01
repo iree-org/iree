@@ -7,14 +7,17 @@
 #include <memory>
 #include <utility>
 
-#include "iree/compiler/Codegen/PassDetail.h"
-#include "iree/compiler/Codegen/Passes.h"
+#include "iree/compiler/Dialect/Flow/Transforms/PassDetail.h"
+#include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
+#include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/Attributes.h"
+#include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/PatternMatch.h"
@@ -26,6 +29,8 @@
 
 namespace mlir {
 namespace iree_compiler {
+namespace IREE {
+namespace Flow {
 namespace {
 
 /// Any fp32 derived type is illegal.
@@ -109,6 +114,13 @@ class GenericTypeConvert : public ConversionPattern {
                                                 rewriter.getF16Type());
         newAttrs.emplace_back(attr.getName(),
                               DenseElementsAttr::get(tensorType, args));
+      } else if (auto fpAttr = attr.getValue().dyn_cast<FloatAttr>()) {
+        if (!fpAttr.getType().isF32()) continue;
+        llvm::APFloat f = fpAttr.getValue();
+        bool losesInfo;
+        f.convert(APFloat::IEEEhalf(), APFloat::rmTowardZero, &losesInfo);
+        newAttrs.emplace_back(attr.getName(),
+                              FloatAttr::get(rewriter.getF16Type(), f));
       } else if (auto typeAttr = attr.getValue().dyn_cast<TypeAttr>()) {
         if (isIllegalType(typeAttr.getValue())) {
           if (auto tensorType =
@@ -169,5 +181,7 @@ std::unique_ptr<OperationPass<ModuleOp>> createDemoteF32ToF16Pass() {
   return std::make_unique<DemoteF32ToF16Pass>();
 }
 
+}  // namespace Flow
+}  // namespace IREE
 }  // namespace iree_compiler
 }  // namespace mlir

@@ -38,6 +38,7 @@ cc_library(
         "ConvertConv2DToImg2ColPass.cpp",
         "ConvertLinalgMatmulToMmt4D.cpp",
         "DeduplicateExecutables.cpp",
+        "DemoteF32ToF16.cpp",
         "DispatchLinalgOnTensors.cpp",
         "ExpandTensorShapes.cpp",
         "ExportBenchmarkFuncs.cpp",
