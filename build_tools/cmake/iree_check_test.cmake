@@ -127,6 +127,10 @@ function(iree_check_test)
     ${ARGN}
   )
 
+  if(CMAKE_CROSSCOMPILING AND "hostonly" IN_LIST _RULE_LABELS)
+    return()
+  endif()
+
   iree_package_name(_PACKAGE_NAME)
   set(_NAME "${_PACKAGE_NAME}_${_RULE_NAME}")
 
