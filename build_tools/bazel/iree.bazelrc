@@ -15,6 +15,7 @@ build --experimental_guard_against_concurrent_changes
 build --compilation_mode=opt
 # Used in TensorFlow, so we have to enable it here as well.
 common --experimental_repo_remote_exec
+build --experimental_cc_shared_library
 # Actually printing output on errors is... a useful default
 test --test_output=errors
 
