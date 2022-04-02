@@ -188,6 +188,9 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
       .addPass(mlir::createCanonicalizerPass)
       .addPass(createCSEPass);
 
+  // Initialize any empty tensors to zero.
+  passManager.addPass(createInitializeEmptyTensorsPass());
+
   // Module pass to outline the dispatch regions into their own functions
   // wrapped in executables.
   passManager.addPass(IREE::Flow::createOutlineDispatchRegionsPass());
