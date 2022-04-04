@@ -179,6 +179,18 @@ static iree_status_t iree_hal_system_executable_query_library(
           "runtime is not compiled with it enabled; add -fsanitize=address to "
           "the runtime compilation options");
 #endif  // IREE_SANITIZER_ADDRESS
+#if defined(IREE_SANITIZER_THREAD)
+    case IREE_HAL_EXECUTABLE_LIBRARY_SANITIZER_THREAD:
+      // TSAN is compiled into the host and we can load this library.
+      break;
+#else
+    case IREE_HAL_EXECUTABLE_LIBRARY_SANITIZER_THREAD:
+      return iree_make_status(
+          IREE_STATUS_UNAVAILABLE,
+          "executable library is compiled with TSAN support but the host "
+          "runtime is not compiled with it enabled; add -fsanitize=thread to "
+          "the runtime compilation options");
+#endif  // IREE_SANITIZER_THREAD
     default:
       return iree_make_status(
           IREE_STATUS_UNAVAILABLE,

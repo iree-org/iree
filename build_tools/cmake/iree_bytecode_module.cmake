@@ -116,8 +116,15 @@ function(iree_bytecode_module)
     # Note: -iree-llvm-system-linker-path is left unspecified.
   endif()
 
-  if (IREE_BYTECODE_MODULE_FORCE_SYSTEM_DYLIB_LINKER)
+  if(IREE_BYTECODE_MODULE_FORCE_SYSTEM_DYLIB_LINKER)
     list(APPEND _ARGS "-iree-llvm-link-embedded=false")
+  endif()
+
+  # Support testing in TSan build dirs. Unlike other sanitizers, TSan is an
+  # ABI break: when the host code is built with TSan, the module must be too,
+  # otherwise we get crashes calling module code.
+  if(IREE_BYTECODE_MODULE_ENABLE_TSAN)
+    list(APPEND _ARGS "-iree-llvm-sanitize=thread")
   endif()
 
   # Depending on the binary instead of the target here given we might not have
