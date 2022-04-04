@@ -2,17 +2,17 @@
 
 This dashboard shows the models that are currently being tested on IREE's
 presubmits.  If any tests are added or changed, please run
-scripts/update_tflite_model_documentation.py to update this table.
+update_tflite_model_documentation.py to update this table.
 
 |       Model        |      Status        |
 | ------------------ | ------------------ |
-person_detect        | PASS
-east_text_detector   | PASS
-vulkan_posenet_i8    | XFAIL
-cartoon_gan          | PASS
-mnasnet              | PASS
-gpt2                 | PASS
-llvmaot_posenet_i8   | PASS
-mobilenet_v3         | PASS
-llvmaot_mobilenet_v1 | PASS
-vulkan_mobilenet_v1  | XFAIL
+person_detect        | <span class="success-table-element">✓</span>
+east_text_detector   | <span class="success-table-element">✓</span>
+vulkan_posenet_i8    | <span class="failure-table-element">✗</span>
+cartoon_gan          | <span class="success-table-element">✓</span>
+mnasnet              | <span class="success-table-element">✓</span>
+gpt2                 | <span class="success-table-element">✓</span>
+llvmaot_posenet_i8   | <span class="success-table-element">✓</span>
+mobilenet_v3         | <span class="success-table-element">✓</span>
+llvmaot_mobilenet_v1 | <span class="success-table-element">✓</span>
+vulkan_mobilenet_v1  | <span class="failure-table-element">✗</span>
