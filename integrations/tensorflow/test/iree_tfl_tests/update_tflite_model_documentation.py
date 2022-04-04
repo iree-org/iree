@@ -14,8 +14,8 @@ from pathlib import Path
 from typing import Sequence
 
 # The symbols to show in the table if the operation is supported or not.
-SUCCESS_ELEMENT = '<span class="success-table-element">✓</span>'
-FAILURE_ELEMENT = '<span class="failure-table-element">✗</span>'
+SUCCESS_ELEMENT = 'PASS ✓'
+FAILURE_ELEMENT = 'FAIL ✗'
 
 
 def main():
