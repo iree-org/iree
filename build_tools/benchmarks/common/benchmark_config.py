@@ -5,10 +5,11 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 # All benchmarks' relative path against root build directory.
 
+import os
+
 from argparse import Namespace
 from dataclasses import dataclass
 from typing import Optional
-import os
 
 BENCHMARK_SUITE_REL_PATH = "benchmark_suites"
 BENCHMARK_RESULTS_REL_PATH = "benchmark-results"
@@ -17,7 +18,7 @@ CAPTURES_REL_PATH = "captures"
 
 @dataclass
 class TraceCaptureConfig:
-  """Represents the settings for capturing traces during the benchamrks.
+  """Represents the settings for capturing traces during benchamrking.
 
     traced_benchmark_tool_dir: the path to the tracing-enabled benchmark tool
       directory.
