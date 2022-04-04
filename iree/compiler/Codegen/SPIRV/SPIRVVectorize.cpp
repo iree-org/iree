@@ -21,8 +21,10 @@
 #include "mlir/Dialect/Linalg/Transforms/Hoisting.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/SPIRV/IR/TargetAndABI.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/Dialect/Vector/Transforms/VectorTransforms.h"
+#include "mlir/IR/Matchers.h"
 #include "mlir/Interfaces/VectorInterfaces.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -33,16 +35,33 @@ namespace mlir {
 namespace iree_compiler {
 namespace {
 
-int getNativeVectorSize(int64_t size) {
+int getComputeVectorSize(int64_t size) {
   // Try to use 4 first, and then 2, and then 1.
   return size % 4 == 0 ? 4 : (size % 2 == 0 ? 2 : 1);
+}
+
+int getMemoryVectorSize(Value source, Type scalarType, int64_t size) {
+  int bitwidth = scalarType.getIntOrFloatBitWidth();
+  while (auto sliceOp = source.getDefiningOp<tensor::ExtractSliceOp>())
+    source = sliceOp.source();
+  if (!matchPattern(source, m_Constant())) {
+    // If we are not reading from a constant array that is embedded in the
+    // kernel, try to use a large vector size matching the bitwidth to read in
+    // 128-bit chunks. This helps with memory access performance. Such vector
+    // sizes are not native in SPIR-V though; this relies on following passes to
+    // bitcast them to 32-bit 4-element vectors to be valid.
+    if (bitwidth <= 8 && size % 16 == 0) return 16;
+    if (bitwidth <= 16 && size % 8 == 0) return 8;
+  }
+  if (bitwidth <= 32 && size % 4 == 0) return 4;
+  return size % 2 == 0 ? 2 : 1;
 }
 
 Optional<SmallVector<int64_t, 4>> getNativeVectorShape(Operation *op) {
   if (OpTrait::hasElementwiseMappableTraits(op) && op->getNumResults() == 1) {
     if (auto vecType = op->getResultTypes()[0].dyn_cast<VectorType>()) {
       SmallVector<int64_t, 4> nativeSize(vecType.getRank(), 1);
-      nativeSize.back() = getNativeVectorSize(vecType.getShape().back());
+      nativeSize.back() = getComputeVectorSize(vecType.getShape().back());
       return nativeSize;
     }
   } else if (auto vtOp = dyn_cast<VectorTransferOpInterface>(op)) {
@@ -53,7 +72,8 @@ Optional<SmallVector<int64_t, 4>> getNativeVectorShape(Operation *op) {
       if (auto dimExpr = dim.value().dyn_cast<AffineDimExpr>()) {
         if (dimExpr.getPosition() == vtOp.permutation_map().getNumDims() - 1) {
           nativeSize[dim.index()] =
-              getNativeVectorSize(vecType.getShape()[dim.index()]);
+              getMemoryVectorSize(vtOp.source(), vecType.getElementType(),
+                                  vecType.getShape()[dim.index()]);
         }
       }
     }
@@ -105,6 +125,8 @@ class SPIRVVectorizePass : public SPIRVVectorizeBase<SPIRVVectorizePass> {
     MLIRContext *context = &getContext();
     func::FuncOp funcOp = getOperation();
 
+    // First apply vectorization to generate vectors of the original tensor
+    // shape.
     {
       RewritePatternSet patterns(context);
       populateVectorizationPatterns(patterns);
@@ -112,12 +134,14 @@ class SPIRVVectorizePass : public SPIRVVectorizeBase<SPIRVVectorizePass> {
       if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
         return signalPassFailure();
       }
+    }
 
-      RewritePatternSet foldPatterns(context);
+    // A speical peephole optimization to handle fused multiple-add ops.
+    {
+      RewritePatternSet patterns(context);
       // Fold consumer add ops into the contraction op itself.
-      vector::ContractionOp::getCanonicalizationPatterns(foldPatterns, context);
-      if (failed(
-              applyPatternsAndFoldGreedily(funcOp, std::move(foldPatterns)))) {
+      vector::ContractionOp::getCanonicalizationPatterns(patterns, context);
+      if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
         return signalPassFailure();
       }
     }
@@ -128,11 +152,12 @@ class SPIRVVectorizePass : public SPIRVVectorizeBase<SPIRVVectorizePass> {
       llvm::dbgs() << "\n\n";
     });
 
+    // Then unroll vectors to native vector size. We try to use 128-bit
+    // vectors for memory access and 4/2/1 vector sizes for computation.
     {
-      RewritePatternSet unrollPatterns(context);
-      populateVectorUnrollPatterns(unrollPatterns);
-      if (failed(applyPatternsAndFoldGreedily(funcOp,
-                                              std::move(unrollPatterns)))) {
+      RewritePatternSet patterns(context);
+      populateVectorUnrollPatterns(patterns);
+      if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
         return signalPassFailure();
       }
     }
@@ -143,6 +168,33 @@ class SPIRVVectorizePass : public SPIRVVectorizeBase<SPIRVVectorizePass> {
       llvm::dbgs() << "\n\n";
     });
 
+    // Next run canonicalization to cast away leading size-1 dimensions. They
+    // can be generated from vector unrolling and generally cause issues to
+    // cancel corresponding read/write or insert/extract op pairs. This also
+    // need to happen befor hositing, where we would make certain vectors loop
+    // carried. Once that's done, it's hard to handle the leading size-1
+    // dimensions across regions.
+    {
+      RewritePatternSet patterns(context);
+      // We need to pull in casting way leading one dims to allow cancelling
+      // some read/write ops.
+      vector::populateCastAwayVectorLeadingOneDimPatterns(patterns);
+      vector::TransferReadOp::getCanonicalizationPatterns(patterns, context);
+      vector::TransferWriteOp::getCanonicalizationPatterns(patterns, context);
+      if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
+        return signalPassFailure();
+      }
+    }
+
+    LLVM_DEBUG({
+      llvm::dbgs() << "--- After casting away leading size-1 dims ---\n";
+      funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
+      llvm::dbgs() << "\n\n";
+    });
+
+    // Next perform hoisting. This would analyze transfer read/write ops into
+    // tensors and hoist them out of loop nests. So after it we have
+    // loop-carried vectors, not loop-carried tensors anymore.
     linalg::hoistRedundantVectorTransfersOnTensor(funcOp);
 
     LLVM_DEBUG({
@@ -151,7 +203,8 @@ class SPIRVVectorizePass : public SPIRVVectorizeBase<SPIRVVectorizePass> {
       llvm::dbgs() << "\n\n";
     });
 
-    {  // Canonicalization
+    // Lower vector transfer permutation map.
+    {
       RewritePatternSet patterns(context);
       vector::ExtractStridedSliceOp::getCanonicalizationPatterns(patterns,
                                                                  context);
@@ -162,31 +215,32 @@ class SPIRVVectorizePass : public SPIRVVectorizeBase<SPIRVVectorizePass> {
     }
 
     LLVM_DEBUG({
-      llvm::dbgs() << "--- After canonicalizing vectors ---\n";
+      llvm::dbgs() << "--- After lowering transfer ops ---\n";
       funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
       llvm::dbgs() << "\n\n";
     });
 
+    // Lower vector broadcast and contraction.
     {
-      RewritePatternSet contractLoweringPatterns(context);
-      vector::populateVectorBroadcastLoweringPatterns(contractLoweringPatterns);
+      RewritePatternSet patterns(context);
+      vector::populateVectorBroadcastLoweringPatterns(patterns);
       vector::populateVectorContractLoweringPatterns(
-          contractLoweringPatterns,
+          patterns,
           vector::VectorTransformsOptions().setVectorTransformsOptions(
               vector::VectorContractLowering::OuterProduct));
-      if (failed(applyPatternsAndFoldGreedily(
-              funcOp, std::move(contractLoweringPatterns)))) {
+      if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
         return signalPassFailure();
       }
     }
 
     LLVM_DEBUG({
-      llvm::dbgs() << "--- After handling contraction ---\n";
+      llvm::dbgs() << "--- After lowering contract ops ---\n";
       funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
       llvm::dbgs() << "\n\n";
     });
 
-    {  // Canonicalization
+    // Cast away leading size-1 dimensions again.
+    {
       RewritePatternSet patterns(context);
       // We need to pull in casting way leading one dims to allow cancelling
       // some read/write ops.
