@@ -80,7 +80,7 @@ iree_cc_library(
     MLIRTensorToSPIRV
     MLIRTensorTransforms
     MLIRTosa
-    MLIRTosaToStandard
+    MLIRTosaToArith
     MLIRTransforms
     MLIRVector
     MLIRVectorInterfaces
