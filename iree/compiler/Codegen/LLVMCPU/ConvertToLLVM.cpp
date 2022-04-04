@@ -30,7 +30,7 @@
 #include "mlir/Conversion/MemRefToLLVM/MemRefToLLVM.h"
 #include "mlir/Conversion/ReconcileUnrealizedCasts/ReconcileUnrealizedCasts.h"
 #include "mlir/Conversion/SCFToControlFlow/SCFToControlFlow.h"
-#include "mlir/Conversion/TosaToStandard/TosaToStandard.h"
+#include "mlir/Conversion/TosaToArith/TosaToArith.h"
 #include "mlir/Conversion/VectorToLLVM/ConvertVectorToLLVM.h"
 #include "mlir/Conversion/VectorToSCF/VectorToSCF.h"
 #include "mlir/Dialect/ArmNeon/ArmNeonDialect.h"
@@ -941,7 +941,7 @@ void ConvertToLLVMPass::runOnOperation() {
   //   multiply or add.
   //
   // TODO(bjacob): Use a lowering that uses specific ARM/X86 intrinsics.
-  tosa::populateTosaRescaleToStandardConversionPatterns(&patterns);
+  tosa::populateTosaRescaleToArithConversionPatterns(&patterns);
 
   populateAffineToStdConversionPatterns(patterns);
   populateSCFToControlFlowConversionPatterns(patterns);

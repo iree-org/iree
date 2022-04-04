@@ -58,9 +58,10 @@ cc_library(
         "@llvm-project//mlir:Pass",
         "@llvm-project//mlir:SCFToControlFlow",
         "@llvm-project//mlir:TosaDialect",
+        "@llvm-project//mlir:TosaToArith",
         "@llvm-project//mlir:TosaToLinalg",
         "@llvm-project//mlir:TosaToSCF",
-        "@llvm-project//mlir:TosaToStandard",
+        "@llvm-project//mlir:TosaToTensor",
         "@llvm-project//mlir:Transforms",
     ],
 )

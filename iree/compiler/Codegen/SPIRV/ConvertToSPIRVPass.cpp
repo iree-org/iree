@@ -34,7 +34,7 @@
 #include "mlir/Conversion/MemRefToSPIRV/MemRefToSPIRV.h"
 #include "mlir/Conversion/SCFToSPIRV/SCFToSPIRV.h"
 #include "mlir/Conversion/TensorToSPIRV/TensorToSPIRV.h"
-#include "mlir/Conversion/TosaToStandard/TosaToStandard.h"
+#include "mlir/Conversion/TosaToArith/TosaToArith.h"
 #include "mlir/Conversion/VectorToSPIRV/VectorToSPIRV.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -343,7 +343,7 @@ void ConvertToSPIRVPass::runOnOperation() {
   //   multiply or add.
   //
   // TODO(antiagainst): Use a lowering that uses specific SPIRV intrinsics.
-  tosa::populateTosaRescaleToStandardConversionPatterns(&patterns);
+  tosa::populateTosaRescaleToArithConversionPatterns(&patterns);
 
   // Pull in MemRef patterns to convert load/store ops.
   populateMemRefToSPIRVPatterns(typeConverter, patterns);
