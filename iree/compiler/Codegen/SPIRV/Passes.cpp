@@ -101,6 +101,9 @@ static void addMemRefLoweringPasses(OpPassManager &pm) {
   // Turn scalar load/store from memrefs into vectorized ones if possible. This
   // gives better memory access patterns, which is very important for perf.
   pm.addPass(createSPIRVVectorizeLoadStore());
+  // Perform various vector-level cross-op optimizations like load-store
+  // forwarding, shape casting and casting op cancelling.
+  pm.addNestedPass<func::FuncOp>(createOptimizeVectorTransferPass());
 
   // Perform optimizations that need to across the scf.for region boundary.
   pm.addNestedPass<func::FuncOp>(createForOpCanonicalizationPass());
