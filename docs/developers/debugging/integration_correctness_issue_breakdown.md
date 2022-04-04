@@ -6,7 +6,7 @@ correctness issue.
 
 ## TF integration tests
 
-See [instructions for extracting artifacts from TF tests](https://github.com/google/iree/blob/main/docs/developers/developing_iree/e2e_benchmarking.md).
+See [instructions for reproducing failures in TF/TFLite integration tests](https://github.com/hanhanW/iree/blob/main/docs/developers/debugging/tf_integrations_test_repro.md).
 
 For input data, they are not dumped within the flagfile. You can construct the
 function inputs by looking into `log.txt`. There is an [issue](https://github.com/google/iree/issues/8658)
