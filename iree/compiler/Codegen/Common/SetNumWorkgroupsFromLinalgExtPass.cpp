@@ -6,6 +6,7 @@
 
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
+#include "iree-dialects/Dialect/LinalgExt/Transforms/Utils.h"
 #include "iree/compiler/Codegen/Dialect/LoweringConfig.h"
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
@@ -14,6 +15,7 @@
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "llvm/Support/Debug.h"
+#include "mlir/Dialect/Arithmetic/Utils/Utils.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
@@ -60,6 +62,70 @@ class OneToOneRewritePattern : public OpRewritePattern<SourceOp> {
   }
 };
 
+/// Forward LinalgExt::InParallel -> Tensor::InsertSlice -> Flow::TensorStore.
+/// This pattern is necessary for correctness, it accounts for the fact that
+/// InParallel is distributed across multiple workgroups when lowering to HAL
+/// but it then connects to a sequential tensor.insert_slice and then to
+/// flow.dispatch.tensor_store.
+///
+// TODO: All the rewrites in this file this should be done as part of InParallel
+// -> HAL rewrite. But because of dialect dependencies and layering, we have
+// some phase ordering that prevents it atm.
+class ForwardInParallelResultToFlow
+    : public OpRewritePattern<IREE::Flow::DispatchTensorStoreOp> {
+ public:
+  using OpRewritePattern<IREE::Flow::DispatchTensorStoreOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(IREE::Flow::DispatchTensorStoreOp op,
+                                PatternRewriter &rewriter) const override {
+    auto insertSliceOp = op.value().getDefiningOp<tensor::InsertSliceOp>();
+    if (!insertSliceOp) return failure();
+
+    // TODO: this should be done as part of InParallel -> HAL rewrite.
+    // But because of dialect dependencies and layering, we have some phase
+    // ordering that prevents it atm. It does not make sense to move the pattern
+    // because of this temporary layering problem, so we just ignore the
+    // condition for now.
+    //
+    // auto inParallelOp =
+    //     insertSliceOp.source().getDefiningOp<IREE::LinalgExt::InParallelOp>();
+    // if (!inParallelOp) return failure();
+
+    // Compute the sum of offsets and products of strides.
+    // Assume the sizes are well formed so we don't take the min.
+    Location loc = op.getLoc();
+    using AV = AffineValueExpr;
+    AffineExpr m, n;
+    AffineBuilder ab(rewriter, op.getLoc());
+    bindSymbols(rewriter.getContext(), m, n);
+    auto size = op.getMixedOffsets().size();
+    SmallVector<OpFoldResult> offsets(size), strides(size);
+    // Offset sums.
+    auto offsets1 = op.getMixedOffsets();
+    auto offsets2 = insertSliceOp.getMixedOffsets();
+    assert(offsets1.size() == offsets2.size());
+    for (unsigned i = 0; i < size; ++i) {
+      Value o1 = getValueOrCreateConstantIndexOp(rewriter, loc, offsets1[i]);
+      Value o2 = getValueOrCreateConstantIndexOp(rewriter, loc, offsets2[i]);
+      offsets[i] = ab.add(AV(m).bind(o1), AV(n).bind(o2));
+    }
+    // Stride products.
+    auto strides1 = op.getMixedStrides();
+    auto strides2 = insertSliceOp.getMixedStrides();
+    assert(strides1.size() == strides2.size());
+    for (unsigned i = 0; i < size; ++i) {
+      Value st1 = getValueOrCreateConstantIndexOp(rewriter, loc, strides1[i]);
+      Value st2 = getValueOrCreateConstantIndexOp(rewriter, loc, strides2[i]);
+      strides[i] = ab.mul(AV(m).bind(st1), AV(n).bind(st2));
+    }
+    rewriter.replaceOpWithNewOp<IREE::Flow::DispatchTensorStoreOp>(
+        op, insertSliceOp.source(), op.target(), op.target_dims(), offsets,
+        insertSliceOp.getMixedSizes(), strides);
+
+    return success();
+  }
+};
+
 }  // namespace
 
 void SetNumWorkgroupsFromLinalgExtPass::runOnOperation() {
@@ -77,10 +143,17 @@ void SetNumWorkgroupsFromLinalgExtPass::runOnOperation() {
                                      IREE::HAL::InterfaceWorkgroupCountOp>,
               OneToOneRewritePattern<HALReturnOp, IREE::HAL::ReturnOp>>(
           context);
-  if (failed(
-          applyPatternsAndFoldGreedily(module, std::move(oneToOneRewrites)))) {
+  if (failed(applyPatternsAndFoldGreedily(module, std::move(oneToOneRewrites))))
     return signalPassFailure();
-  }
+
+  // Perform forwarding patterns to bridge the tensor / flow gap.
+  // This is necessary for correctness.
+  // TODO: given existing bufferization tricks, this may trigger unnecessary
+  // copies that need to be further investigated.
+  RewritePatternSet forwardPatterns(context);
+  forwardPatterns.insert<ForwardInParallelResultToFlow>(context);
+  if (failed(applyPatternsAndFoldGreedily(module, std::move(forwardPatterns))))
+    return signalPassFailure();
 
   llvm::StringMap<IREE::HAL::ExecutableEntryPointOp> entryPoints =
       getAllEntryPoints(module);
@@ -116,8 +189,9 @@ void SetNumWorkgroupsFromLinalgExtPass::runOnOperation() {
     });
   }
 
-  // Apply post distribution canonicalization passes.
+  // Apply post-distribution canonicalization passes.
   RewritePatternSet canonicalization(context);
+  AffineApplyOp::getCanonicalizationPatterns(canonicalization, context);
   AffineMinOp::getCanonicalizationPatterns(canonicalization, context);
   populateAffineMinSCFCanonicalizationPattern(canonicalization);
   IREE::Flow::populateFlowDispatchCanonicalizationPatterns(canonicalization,

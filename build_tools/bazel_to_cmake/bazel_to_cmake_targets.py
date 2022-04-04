@@ -22,6 +22,9 @@ EXPLICIT_TARGET_MAPPING = {
     "//llvm-external-projects/iree-dialects:IREELinalgExtPasses": [
         "IREELinalgExtPasses"
     ],
+    "//llvm-external-projects/iree-dialects:IREELinalgExtTransforms": [
+        "IREELinalgExtTransforms"
+    ],
     "@torch-mlir-dialects//:TorchMLIRTMTensorDialect": [
         "TorchMLIRTMTensorDialect"
     ],

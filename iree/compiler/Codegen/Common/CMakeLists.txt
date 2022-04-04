@@ -53,6 +53,7 @@ iree_cc_library(
   DEPS
     IREELinalgExtDialect
     IREELinalgExtPasses
+    IREELinalgExtTransforms
     LLVMSupport
     MLIRAffine
     MLIRAffineUtils
