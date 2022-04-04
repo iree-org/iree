@@ -318,7 +318,7 @@ def LLVMGPUMultiBuffering :
 def LLVMGPUReduceBankConflicts :
     Pass<"iree-llvmgpu-reduce-bank-conflicts", "func::FuncOp"> {
   let summary = "Pass try reduce the number of bank conflicts.";
-  let constructor = "mlir::iree_compiler::createLLVMGPUReduceBankConflicts()";
+  let constructor = "mlir::iree_compiler::createLLVMGPUReduceSharedMemoryBankConflicts()";
 }
 
 def LLVMGPUVectorToGPU :

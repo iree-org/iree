@@ -97,7 +97,7 @@ struct LLVMGPUReduceBankConflictsPass
 }  // namespace
 
 std::unique_ptr<OperationPass<func::FuncOp>>
-createLLVMGPUReduceBankConflicts() {
+createLLVMGPUReduceSharedMemoryBankConflicts() {
   return std::make_unique<LLVMGPUReduceBankConflictsPass>();
 }
 
