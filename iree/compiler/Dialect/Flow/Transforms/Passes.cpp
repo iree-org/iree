@@ -27,7 +27,7 @@ static llvm::cl::opt<bool> clExportBenchmarkFuncs(
 
 // TODO(ravishankarm): Change to a pipeline option.
 static llvm::cl::opt<bool> clTraceDispatchTensors(
-    "iree-flow-trace-dispatch-tensors2",
+    "iree-flow-trace-dispatch-tensors",
     llvm::cl::desc(
         "Trace runtime input/output tensors for each dispatch function."),
     llvm::cl::init(false));
