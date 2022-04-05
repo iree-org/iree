@@ -19,11 +19,6 @@
 using namespace mlir;
 using namespace mlir::iree_compiler::IREE::LinalgExt;
 
-struct TilingResult {
-  TileOp tileOp;
-  Operation *tiledOp;
-};
-
 static TilingResult tileToTileOp(PatternRewriter &rewriter, TilingInterface op,
                                  int64_t tiledDim, Value tileSize) {
   Location loc = op->getLoc();
@@ -61,7 +56,7 @@ static TilingResult tileToTileOp(PatternRewriter &rewriter, TilingInterface op,
   return TilingResult{tileOp, tiledOp};
 }
 
-FailureOr<Operation *>
+FailureOr<TilingResult>
 mlir::iree_compiler::IREE::LinalgExt::LinalgExtTilingPattern::
     returningMatchAndRewrite(TilingInterface op,
                              PatternRewriter &rewriter) const {
@@ -102,5 +97,5 @@ mlir::iree_compiler::IREE::LinalgExt::LinalgExtTilingPattern::
   TilingResult tilingResult = tileToTileOp(rewriter, op, dim, tileSizes[dim]);
   rewriter.replaceOp(op, tilingResult.tileOp->getResults());
 
-  return tilingResult.tiledOp;
+  return tilingResult;
 }
