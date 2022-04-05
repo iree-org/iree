@@ -15,9 +15,6 @@ build --experimental_guard_against_concurrent_changes
 build --compilation_mode=opt
 # Used in TensorFlow, so we have to enable it here as well.
 common --experimental_repo_remote_exec
-# TensorFlow uses cc_shared_library, which was added behind this experimental
-# flag in Bazel 5.1.0. Since we depend TensorFlow, we have to enable it too.
-build --experimental_cc_shared_library
 # Actually printing output on errors is... a useful default
 test --test_output=errors
 

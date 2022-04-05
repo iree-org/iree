@@ -14,3 +14,7 @@ build --nocheck_visibility
 # Flags specific for working around tensorflow warnings.
 build:generic_clang --copt=-Wno-inconsistent-missing-override --host_copt=-Wno-inconsistent-missing-override
 build:generic_clang --copt=-Wno-c++11-narrowing --host_copt=-Wno-c++11-narrowing
+
+# TensorFlow uses cc_shared_library, which was added behind this experimental
+# flag in Bazel 5.1.0. Since we depend TensorFlow, we have to enable it too.
+build --experimental_cc_shared_library
