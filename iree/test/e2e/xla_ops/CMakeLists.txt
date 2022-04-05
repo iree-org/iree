@@ -493,6 +493,7 @@ iree_check_single_backend_test_suite(
     "-iree-input-type=mhlo"
     "-iree-llvm-target-cpu-features=host"
   LABELS
+    "hostonly"
     "local"
 )
 

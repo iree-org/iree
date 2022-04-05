@@ -380,13 +380,15 @@ iree_benchmark_suite(
 ################################################################################
 
 # CPU, Dylib-Sync, big/little-core, full-inference
+# NOTE: this is not enabling any SIMD extension beyond baseline Aarch64.
+# At the moment we use that for fp32 models. We would change that when new
+# devices support relevant fp32 SIMD extensions beyond that (e.g. +f32mm).
 iree_benchmark_suite(
   MODULES
     "${DEEPLABV3_FP32_MODULE}"
     "${MOBILESSD_FP32_MODULE}"
     "${POSENET_FP32_MODULE}"
     "${MOBILEBERT_FP32_MODULE}"
-    "${MOBILEBERT_INT8_MODULE}"
     "${MOBILENET_V2_MODULE}"
     "${MOBILENET_V3SMALL_MODULE}"
 
@@ -399,7 +401,32 @@ iree_benchmark_suite(
     "CPU-ARM64-v8A"
   TRANSLATION_FLAGS
     ${ANDROID_CPU_TRANSLATION_FLAGS}
+    "--iree-flow-mmt4d-target-options=arch=aarch64"
+  BENCHMARK_TOOL
+    iree-benchmark-module
+  DRIVER
+    "dylib-sync"
+)
+
+# CPU, Dylib-Sync, big/little-core, full-inference, +dotprod
+# NOTE: +dotprod is only relevant to int8, not fp32.
+# TODO: add a +i8mm variant, supported by new devices already. No rush: our i8mm
+# kernel is currently naive, not ready for benchmarking.
+iree_benchmark_suite(
+  MODULES
+    "${MOBILEBERT_INT8_MODULE}"
+
+  BENCHMARK_MODES
+    "big-core,full-inference,experimental-flags"
+    "little-core,full-inference,experimental-flags"
+  TARGET_BACKEND
+    "dylib-llvm-aot"
+  TARGET_ARCHITECTURE
+    "CPU-ARM64-v8A"
+  TRANSLATION_FLAGS
+    ${ANDROID_CPU_TRANSLATION_FLAGS}
     "--iree-flow-mmt4d-target-options=arch=aarch64 features=+dotprod"
+    "-iree-llvm-target-cpu-features=+dotprod"
   BENCHMARK_TOOL
     iree-benchmark-module
   DRIVER
@@ -410,13 +437,15 @@ iree_benchmark_suite(
 # optimizing for little cores or we can just run them occasionally
 
 # CPU, Dylib, 1 through 4 threads, big/little-core, full-inference.
+# NOTE: this is not enabling any SIMD extension beyond baseline Aarch64.
+# At the moment we use that for fp32 models. We would change that when new
+# devices support relevant fp32 SIMD extensions beyond that (e.g. f32mm).
 iree_benchmark_suite(
   MODULES
     "${DEEPLABV3_FP32_MODULE}"
     "${MOBILESSD_FP32_MODULE}"
     "${POSENET_FP32_MODULE}"
     "${MOBILEBERT_FP32_MODULE}"
-    "${MOBILEBERT_INT8_MODULE}"
     "${MOBILENET_V2_MODULE}"
     "${MOBILENET_V3SMALL_MODULE}"
 
@@ -429,7 +458,34 @@ iree_benchmark_suite(
     "CPU-ARM64-v8A"
   TRANSLATION_FLAGS
     ${ANDROID_CPU_TRANSLATION_FLAGS}
+    "--iree-flow-mmt4d-target-options=arch=aarch64"
+  BENCHMARK_TOOL
+    iree-benchmark-module
+  DRIVER
+    "dylib"
+  RUNTIME_FLAGS
+    "--task_topology_group_count=1"
+)
+
+# CPU, Dylib, 1 through 4 threads, big/little-core, full-inference, +dotprod
+# NOTE: +dotprod is only relevant to int8, not fp32.
+# TODO: add a +i8mm variant, supported by new devices already. No rush: our i8mm
+# kernel is currently naive, not ready for benchmarking.
+iree_benchmark_suite(
+  MODULES
+    "${MOBILEBERT_INT8_MODULE}"
+
+  BENCHMARK_MODES
+    "1-thread,big-core,full-inference,experimental-flags"
+    # "1-thread,little-core,full-inference,experimental-flags"
+  TARGET_BACKEND
+    "dylib-llvm-aot"
+  TARGET_ARCHITECTURE
+    "CPU-ARM64-v8A"
+  TRANSLATION_FLAGS
+    ${ANDROID_CPU_TRANSLATION_FLAGS}
     "--iree-flow-mmt4d-target-options=arch=aarch64 features=+dotprod"
+    "-iree-llvm-target-cpu-features=+dotprod"
   BENCHMARK_TOOL
     iree-benchmark-module
   DRIVER
@@ -458,7 +514,7 @@ iree_benchmark_suite(
 #     "CPU-ARM64-v8A"
 #   TRANSLATION_FLAGS
 #     ${ANDROID_CPU_TRANSLATION_FLAGS}
-#     "--iree-flow-mmt4d-target-options=arch=aarch64 features=+dotprod"
+#     "--iree-flow-mmt4d-target-options=arch=aarch64"
 #   BENCHMARK_TOOL
 #     iree-benchmark-module
 #   DRIVER
@@ -485,7 +541,7 @@ iree_benchmark_suite(
 #     "CPU-ARM64-v8A"
 #   TRANSLATION_FLAGS
 #     ${ANDROID_CPU_TRANSLATION_FLAGS}
-#     "--iree-flow-mmt4d-target-options=arch=aarch64 features=+dotprod"
+#     "--iree-flow-mmt4d-target-options=arch=aarch64"
 #   BENCHMARK_TOOL
 #     iree-benchmark-module
 #   DRIVER
@@ -494,13 +550,16 @@ iree_benchmark_suite(
 #     "--task_topology_group_count=3"
 # )
 
+# CPU, Dylib, 1 through 4 threads, big/little-core, full-inference.
+# NOTE: this is not enabling any SIMD extension beyond baseline Aarch64.
+# At the moment we use that for fp32 models. We would change that when new
+# devices support relevant fp32 SIMD extensions beyond that (e.g. f32mm).
 iree_benchmark_suite(
   MODULES
     "${DEEPLABV3_FP32_MODULE}"
     "${MOBILESSD_FP32_MODULE}"
     "${POSENET_FP32_MODULE}"
     "${MOBILEBERT_FP32_MODULE}"
-    "${MOBILEBERT_INT8_MODULE}"
     "${MOBILENET_V2_MODULE}"
     "${MOBILENET_V3SMALL_MODULE}"
 
@@ -513,7 +572,8 @@ iree_benchmark_suite(
     "CPU-ARM64-v8A"
   TRANSLATION_FLAGS
     ${ANDROID_CPU_TRANSLATION_FLAGS}
-    "--iree-flow-mmt4d-target-options=arch=aarch64 features=+dotprod"
+    "--iree-flow-mmt4d-target-options=arch=aarch64"
+
   BENCHMARK_TOOL
     iree-benchmark-module
   DRIVER
@@ -522,6 +582,33 @@ iree_benchmark_suite(
     "--task_topology_group_count=4"
 )
 
+# CPU, Dylib-Sync, big/little-core, full-inference, +dotprod
+# NOTE: +dotprod is only relevant to int8, not fp32.
+# TODO: add a +i8mm variant, supported by new devices already. No rush: our i8mm
+# kernel is currently naive, not ready for benchmarking.
+iree_benchmark_suite(
+  MODULES
+    "${MOBILEBERT_INT8_MODULE}"
+
+  BENCHMARK_MODES
+    "4-thread,big-core,full-inference,experimental-flags"
+    # "4-thread,little-core,full-inference,experimental-flags"
+  TARGET_BACKEND
+    "dylib-llvm-aot"
+  TARGET_ARCHITECTURE
+    "CPU-ARM64-v8A"
+  TRANSLATION_FLAGS
+    ${ANDROID_CPU_TRANSLATION_FLAGS}
+    "--iree-flow-mmt4d-target-options=arch=aarch64 features=+dotprod"
+    "-iree-llvm-target-cpu-features=+dotprod"
+
+  BENCHMARK_TOOL
+    iree-benchmark-module
+  DRIVER
+    "dylib"
+  RUNTIME_FLAGS
+    "--task_topology_group_count=4"
+)
 
 # CPU, VMVX, 4-thread, big-core, full-inference
 # VMVX is slow and we're not optimizing perf yet. Leaving in a single max-thread
