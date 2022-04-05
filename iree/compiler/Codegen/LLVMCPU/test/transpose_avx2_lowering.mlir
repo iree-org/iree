@@ -41,35 +41,37 @@ hal.executable private @transpose_10_8x8_pattern {
   }
 }
 
-// CHECK-LABEL: func @transpose_10_8x8_pattern
-//       CHECK: vector.shuffle %{{.*}}, %{{.*}} [0, 8, 1, 9, 4, 12, 5, 13] : vector<8xf32>, vector<8xf32>
-//  CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [2, 10, 3, 11, 6, 14, 7, 15] : vector<8xf32>, vector<8xf32>
-//  CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [0, 8, 1, 9, 4, 12, 5, 13] : vector<8xf32>, vector<8xf32>
-//  CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [2, 10, 3, 11, 6, 14, 7, 15] : vector<8xf32>, vector<8xf32>
-//  CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [0, 8, 1, 9, 4, 12, 5, 13] : vector<8xf32>, vector<8xf32>
-//  CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [2, 10, 3, 11, 6, 14, 7, 15] : vector<8xf32>, vector<8xf32>
-//  CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [0, 8, 1, 9, 4, 12, 5, 13] : vector<8xf32>, vector<8xf32>
-//  CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [2, 10, 3, 11, 6, 14, 7, 15] : vector<8xf32>, vector<8xf32>
-//  CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [2, 3, 8, 9, 6, 7, 12, 13] : vector<8xf32>, vector<8xf32>
-//  CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [2, 3, 8, 9, 6, 7, 12, 13] : vector<8xf32>, vector<8xf32>
-//  CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [2, 3, 8, 9, 6, 7, 12, 13] : vector<8xf32>, vector<8xf32>
-//  CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [2, 3, 8, 9, 6, 7, 12, 13] : vector<8xf32>, vector<8xf32>
-//  CHECK-NEXT: llvm.inline_asm asm_dialect = intel "vblendps $0, $1, $2, 0xcc", "=x,x,x" %{{.*}}, %{{.*}} : (vector<8xf32>, vector<8xf32>) -> vector<8xf32>
-//  CHECK-NEXT: llvm.inline_asm asm_dialect = intel "vblendps $0, $1, $2, 0x33", "=x,x,x" %{{.*}}, %{{.*}} : (vector<8xf32>, vector<8xf32>) -> vector<8xf32>
-//  CHECK-NEXT: llvm.inline_asm asm_dialect = intel "vblendps $0, $1, $2, 0xcc", "=x,x,x" %{{.*}}, %{{.*}} : (vector<8xf32>, vector<8xf32>) -> vector<8xf32>
-//  CHECK-NEXT: llvm.inline_asm asm_dialect = intel "vblendps $0, $1, $2, 0x33", "=x,x,x" %{{.*}}, %{{.*}} : (vector<8xf32>, vector<8xf32>) -> vector<8xf32>
-//  CHECK-NEXT: llvm.inline_asm asm_dialect = intel "vblendps $0, $1, $2, 0xcc", "=x,x,x" %{{.*}}, %{{.*}} : (vector<8xf32>, vector<8xf32>) -> vector<8xf32>
-//  CHECK-NEXT: llvm.inline_asm asm_dialect = intel "vblendps $0, $1, $2, 0x33", "=x,x,x" %{{.*}}, %{{.*}} : (vector<8xf32>, vector<8xf32>) -> vector<8xf32>
-//  CHECK-NEXT: llvm.inline_asm asm_dialect = intel "vblendps $0, $1, $2, 0xcc", "=x,x,x" %{{.*}}, %{{.*}} : (vector<8xf32>, vector<8xf32>) -> vector<8xf32>
-//  CHECK-NEXT: llvm.inline_asm asm_dialect = intel "vblendps $0, $1, $2, 0x33", "=x,x,x" %{{.*}}, %{{.*}} : (vector<8xf32>, vector<8xf32>) -> vector<8xf32>
-//  CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [0, 1, 2, 3, 8, 9, 10, 11] : vector<8xf32>, vector<8xf32>
-//  CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [0, 1, 2, 3, 8, 9, 10, 11] : vector<8xf32>, vector<8xf32>
-//  CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [0, 1, 2, 3, 8, 9, 10, 11] : vector<8xf32>, vector<8xf32>
-//  CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [0, 1, 2, 3, 8, 9, 10, 11] : vector<8xf32>, vector<8xf32>
-//  CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [4, 5, 6, 7, 12, 13, 14, 15] : vector<8xf32>, vector<8xf32>
-//  CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [4, 5, 6, 7, 12, 13, 14, 15] : vector<8xf32>, vector<8xf32>
-//  CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [4, 5, 6, 7, 12, 13, 14, 15] : vector<8xf32>, vector<8xf32>
-//  CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [4, 5, 6, 7, 12, 13, 14, 15] : vector<8xf32>, vector<8xf32>
+//   CHECK-LABEL: func @transpose_10_8x8_pattern
+// CHECK-COUNT-8: vector.load
+//    CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [0, 8, 1, 9, 4, 12, 5, 13] : vector<8xf32>, vector<8xf32>
+//    CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [2, 10, 3, 11, 6, 14, 7, 15] : vector<8xf32>, vector<8xf32>
+//    CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [0, 8, 1, 9, 4, 12, 5, 13] : vector<8xf32>, vector<8xf32>
+//    CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [2, 10, 3, 11, 6, 14, 7, 15] : vector<8xf32>, vector<8xf32>
+//    CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [0, 8, 1, 9, 4, 12, 5, 13] : vector<8xf32>, vector<8xf32>
+//    CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [2, 10, 3, 11, 6, 14, 7, 15] : vector<8xf32>, vector<8xf32>
+//    CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [0, 8, 1, 9, 4, 12, 5, 13] : vector<8xf32>, vector<8xf32>
+//    CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [2, 10, 3, 11, 6, 14, 7, 15] : vector<8xf32>, vector<8xf32>
+//    CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [2, 3, 8, 9, 6, 7, 12, 13] : vector<8xf32>, vector<8xf32>
+//    CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [2, 3, 8, 9, 6, 7, 12, 13] : vector<8xf32>, vector<8xf32>
+//    CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [2, 3, 8, 9, 6, 7, 12, 13] : vector<8xf32>, vector<8xf32>
+//    CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [2, 3, 8, 9, 6, 7, 12, 13] : vector<8xf32>, vector<8xf32>
+//    CHECK-NEXT: llvm.inline_asm asm_dialect = intel "vblendps $0, $1, $2, 0xcc", "=x,x,x" %{{.*}}, %{{.*}} : (vector<8xf32>, vector<8xf32>) -> vector<8xf32>
+//    CHECK-NEXT: llvm.inline_asm asm_dialect = intel "vblendps $0, $1, $2, 0x33", "=x,x,x" %{{.*}}, %{{.*}} : (vector<8xf32>, vector<8xf32>) -> vector<8xf32>
+//    CHECK-NEXT: llvm.inline_asm asm_dialect = intel "vblendps $0, $1, $2, 0xcc", "=x,x,x" %{{.*}}, %{{.*}} : (vector<8xf32>, vector<8xf32>) -> vector<8xf32>
+//    CHECK-NEXT: llvm.inline_asm asm_dialect = intel "vblendps $0, $1, $2, 0x33", "=x,x,x" %{{.*}}, %{{.*}} : (vector<8xf32>, vector<8xf32>) -> vector<8xf32>
+//    CHECK-NEXT: llvm.inline_asm asm_dialect = intel "vblendps $0, $1, $2, 0xcc", "=x,x,x" %{{.*}}, %{{.*}} : (vector<8xf32>, vector<8xf32>) -> vector<8xf32>
+//    CHECK-NEXT: llvm.inline_asm asm_dialect = intel "vblendps $0, $1, $2, 0x33", "=x,x,x" %{{.*}}, %{{.*}} : (vector<8xf32>, vector<8xf32>) -> vector<8xf32>
+//    CHECK-NEXT: llvm.inline_asm asm_dialect = intel "vblendps $0, $1, $2, 0xcc", "=x,x,x" %{{.*}}, %{{.*}} : (vector<8xf32>, vector<8xf32>) -> vector<8xf32>
+//    CHECK-NEXT: llvm.inline_asm asm_dialect = intel "vblendps $0, $1, $2, 0x33", "=x,x,x" %{{.*}}, %{{.*}} : (vector<8xf32>, vector<8xf32>) -> vector<8xf32>
+//    CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [0, 1, 2, 3, 8, 9, 10, 11] : vector<8xf32>, vector<8xf32>
+//    CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [0, 1, 2, 3, 8, 9, 10, 11] : vector<8xf32>, vector<8xf32>
+//    CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [0, 1, 2, 3, 8, 9, 10, 11] : vector<8xf32>, vector<8xf32>
+//    CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [0, 1, 2, 3, 8, 9, 10, 11] : vector<8xf32>, vector<8xf32>
+//    CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [4, 5, 6, 7, 12, 13, 14, 15] : vector<8xf32>, vector<8xf32>
+//    CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [4, 5, 6, 7, 12, 13, 14, 15] : vector<8xf32>, vector<8xf32>
+//    CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [4, 5, 6, 7, 12, 13, 14, 15] : vector<8xf32>, vector<8xf32>
+//    CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [4, 5, 6, 7, 12, 13, 14, 15] : vector<8xf32>, vector<8xf32>
+//    CHECK-NEXT: vector.store
 
 // -----
 
@@ -114,302 +116,37 @@ hal.executable private @transpose_021_8x8_pattern {
   }
 }
 
-// CHECK-LABEL: func @transpose_021_8x8_pattern
-//       CHECK: vector.extract
-//  CHECK-NEXT: vector.insert
-//  CHECK-NEXT: vector.extract
-//  CHECK-NEXT: vector.insert
-//  CHECK-NEXT: vector.extract
-//  CHECK-NEXT: vector.insert
-//  CHECK-NEXT: vector.extract
-//  CHECK-NEXT: vector.insert
-//  CHECK-NEXT: vector.extract
-//  CHECK-NEXT: vector.insert
-//  CHECK-NEXT: vector.extract
-//  CHECK-NEXT: vector.insert
-//  CHECK-NEXT: vector.extract
-//  CHECK-NEXT: vector.insert
-//  CHECK-NEXT: vector.extract
-//  CHECK-NEXT: vector.insert
-//  CHECK-NEXT: vector.extract
-//  CHECK-NEXT: vector.insert
-//  CHECK-NEXT: vector.extract
-//  CHECK-NEXT: vector.insert
-//  CHECK-NEXT: vector.extract
-//  CHECK-NEXT: vector.insert
-//  CHECK-NEXT: vector.extract
-//  CHECK-NEXT: vector.insert
-//  CHECK-NEXT: vector.extract
-//  CHECK-NEXT: vector.insert
-//  CHECK-NEXT: vector.extract
-//  CHECK-NEXT: vector.insert
-//  CHECK-NEXT: vector.extract
-//  CHECK-NEXT: vector.insert
-//  CHECK-NEXT: vector.extract
-//  CHECK-NEXT: vector.insert
-//  CHECK-NEXT: vector.extract
-//  CHECK-NEXT: vector.insert
-//  CHECK-NEXT: vector.extract
-//  CHECK-NEXT: vector.insert
-//  CHECK-NEXT: vector.extract
-//  CHECK-NEXT: vector.insert
-//  CHECK-NEXT: vector.extract
-//  CHECK-NEXT: vector.insert
-//  CHECK-NEXT: vector.extract
-//  CHECK-NEXT: vector.insert
-//  CHECK-NEXT: vector.extract
-//  CHECK-NEXT: vector.insert
-//  CHECK-NEXT: vector.extract
-//  CHECK-NEXT: vector.insert
-//  CHECK-NEXT: vector.extract
-//  CHECK-NEXT: vector.insert
-//  CHECK-NEXT: vector.extract
-//  CHECK-NEXT: vector.insert
-//  CHECK-NEXT: vector.extract
-//  CHECK-NEXT: vector.insert
-//  CHECK-NEXT: vector.extract
-//  CHECK-NEXT: vector.insert
-//  CHECK-NEXT: vector.extract
-//  CHECK-NEXT: vector.insert
-//  CHECK-NEXT: vector.extract
-//  CHECK-NEXT: vector.insert
-//  CHECK-NEXT: vector.extract
-//  CHECK-NEXT: vector.insert
-//  CHECK-NEXT: vector.extract
-//  CHECK-NEXT: vector.insert
-//  CHECK-NEXT: vector.extract
-//  CHECK-NEXT: vector.insert
-//  CHECK-NEXT: vector.extract
-//  CHECK-NEXT: vector.insert
-//  CHECK-NEXT: vector.extract
-//  CHECK-NEXT: vector.insert
-//  CHECK-NEXT: vector.extract
-//  CHECK-NEXT: vector.insert
-//  CHECK-NEXT: vector.extract
-//  CHECK-NEXT: vector.insert
-//  CHECK-NEXT: vector.extract
-//  CHECK-NEXT: vector.insert
-//  CHECK-NEXT: vector.extract
-//  CHECK-NEXT: vector.insert
-//  CHECK-NEXT: vector.extract
-//  CHECK-NEXT: vector.insert
-//  CHECK-NEXT: vector.extract
-//  CHECK-NEXT: vector.insert
-//  CHECK-NEXT: vector.extract
-//  CHECK-NEXT: vector.insert
-//  CHECK-NEXT: vector.extract
-//  CHECK-NEXT: vector.insert
-//  CHECK-NEXT: vector.extract
-//  CHECK-NEXT: vector.insert
-//  CHECK-NEXT: vector.extract
-//  CHECK-NEXT: vector.insert
-//  CHECK-NEXT: vector.extract
-//  CHECK-NEXT: vector.insert
-//  CHECK-NEXT: vector.extract
-//  CHECK-NEXT: vector.insert
-//  CHECK-NEXT: vector.extract
-//  CHECK-NEXT: vector.insert
-//  CHECK-NEXT: vector.extract
-//  CHECK-NEXT: vector.insert
-//  CHECK-NEXT: vector.extract
-//  CHECK-NEXT: vector.insert
-//  CHECK-NEXT: vector.extract
-//  CHECK-NEXT: vector.insert
-//  CHECK-NEXT: vector.extract
-//  CHECK-NEXT: vector.insert
-//  CHECK-NEXT: vector.extract
-//  CHECK-NEXT: vector.insert
-//  CHECK-NEXT: vector.extract
-//  CHECK-NEXT: vector.insert
-//  CHECK-NEXT: vector.extract
-//  CHECK-NEXT: vector.insert
-//  CHECK-NEXT: vector.extract
-//  CHECK-NEXT: vector.insert
-//  CHECK-NEXT: vector.extract
-//  CHECK-NEXT: vector.insert
-//  CHECK-NEXT: vector.extract
-//  CHECK-NEXT: vector.insert
-//  CHECK-NEXT: vector.extract
-//  CHECK-NEXT: vector.insert
-//  CHECK-NEXT: vector.extract
-//  CHECK-NEXT: vector.insert
-//  CHECK-NEXT: vector.extract
-//  CHECK-NEXT: vector.insert
-//  CHECK-NEXT: vector.extract
-//  CHECK-NEXT: vector.insert
-//  CHECK-NEXT: vector.extract
-//  CHECK-NEXT: vector.insert
-//  CHECK-NEXT: vector.extract
-//  CHECK-NEXT: vector.insert
-//  CHECK-NEXT: vector.extract
-//  CHECK-NEXT: vector.insert
-//  CHECK-NEXT: vector.extract
-//  CHECK-NEXT: vector.extract
-//  CHECK-NEXT: vector.extract
-//  CHECK-NEXT: vector.extract
-//  CHECK-NEXT: vector.extract
-//  CHECK-NEXT: vector.extract
-//  CHECK-NEXT: vector.extract
-//  CHECK-NEXT: vector.extract
-
-//  CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [0, 8, 1, 9, 4, 12, 5, 13] : vector<8xf32>, vector<8xf32>
-//  CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [2, 10, 3, 11, 6, 14, 7, 15] : vector<8xf32>, vector<8xf32>
-//  CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [0, 8, 1, 9, 4, 12, 5, 13] : vector<8xf32>, vector<8xf32>
-//  CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [2, 10, 3, 11, 6, 14, 7, 15] : vector<8xf32>, vector<8xf32>
-//  CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [0, 8, 1, 9, 4, 12, 5, 13] : vector<8xf32>, vector<8xf32>
-//  CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [2, 10, 3, 11, 6, 14, 7, 15] : vector<8xf32>, vector<8xf32>
-//  CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [0, 8, 1, 9, 4, 12, 5, 13] : vector<8xf32>, vector<8xf32>
-//  CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [2, 10, 3, 11, 6, 14, 7, 15] : vector<8xf32>, vector<8xf32>
-//  CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [2, 3, 8, 9, 6, 7, 12, 13] : vector<8xf32>, vector<8xf32>
-//  CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [2, 3, 8, 9, 6, 7, 12, 13] : vector<8xf32>, vector<8xf32>
-//  CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [2, 3, 8, 9, 6, 7, 12, 13] : vector<8xf32>, vector<8xf32>
-//  CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [2, 3, 8, 9, 6, 7, 12, 13] : vector<8xf32>, vector<8xf32>
-//  CHECK-NEXT: llvm.inline_asm asm_dialect = intel "vblendps $0, $1, $2, 0xcc", "=x,x,x" %{{.*}}, %{{.*}} : (vector<8xf32>, vector<8xf32>) -> vector<8xf32>
-//  CHECK-NEXT: llvm.inline_asm asm_dialect = intel "vblendps $0, $1, $2, 0x33", "=x,x,x" %{{.*}}, %{{.*}} : (vector<8xf32>, vector<8xf32>) -> vector<8xf32>
-//  CHECK-NEXT: llvm.inline_asm asm_dialect = intel "vblendps $0, $1, $2, 0xcc", "=x,x,x" %{{.*}}, %{{.*}} : (vector<8xf32>, vector<8xf32>) -> vector<8xf32>
-//  CHECK-NEXT: llvm.inline_asm asm_dialect = intel "vblendps $0, $1, $2, 0x33", "=x,x,x" %{{.*}}, %{{.*}} : (vector<8xf32>, vector<8xf32>) -> vector<8xf32>
-//  CHECK-NEXT: llvm.inline_asm asm_dialect = intel "vblendps $0, $1, $2, 0xcc", "=x,x,x" %{{.*}}, %{{.*}} : (vector<8xf32>, vector<8xf32>) -> vector<8xf32>
-//  CHECK-NEXT: llvm.inline_asm asm_dialect = intel "vblendps $0, $1, $2, 0x33", "=x,x,x" %{{.*}}, %{{.*}} : (vector<8xf32>, vector<8xf32>) -> vector<8xf32>
-//  CHECK-NEXT: llvm.inline_asm asm_dialect = intel "vblendps $0, $1, $2, 0xcc", "=x,x,x" %{{.*}}, %{{.*}} : (vector<8xf32>, vector<8xf32>) -> vector<8xf32>
-//  CHECK-NEXT: llvm.inline_asm asm_dialect = intel "vblendps $0, $1, $2, 0x33", "=x,x,x" %{{.*}}, %{{.*}} : (vector<8xf32>, vector<8xf32>) -> vector<8xf32>
-//  CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [0, 1, 2, 3, 8, 9, 10, 11] : vector<8xf32>, vector<8xf32>
-//  CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [0, 1, 2, 3, 8, 9, 10, 11] : vector<8xf32>, vector<8xf32>
-//  CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [0, 1, 2, 3, 8, 9, 10, 11] : vector<8xf32>, vector<8xf32>
-//  CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [0, 1, 2, 3, 8, 9, 10, 11] : vector<8xf32>, vector<8xf32>
-//  CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [4, 5, 6, 7, 12, 13, 14, 15] : vector<8xf32>, vector<8xf32>
-//  CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [4, 5, 6, 7, 12, 13, 14, 15] : vector<8xf32>, vector<8xf32>
-//  CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [4, 5, 6, 7, 12, 13, 14, 15] : vector<8xf32>, vector<8xf32>
-//  CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [4, 5, 6, 7, 12, 13, 14, 15] : vector<8xf32>, vector<8xf32>
-
-//  CHECK-NEXT: vector.extract
-//  CHECK-NEXT: vector.insert
-//  CHECK-NEXT: vector.extract
-//  CHECK-NEXT: vector.insert
-//  CHECK-NEXT: vector.extract
-//  CHECK-NEXT: vector.insert
-//  CHECK-NEXT: vector.extract
-//  CHECK-NEXT: vector.insert
-//  CHECK-NEXT: vector.extract
-//  CHECK-NEXT: vector.insert
-//  CHECK-NEXT: vector.extract
-//  CHECK-NEXT: vector.insert
-//  CHECK-NEXT: vector.extract
-//  CHECK-NEXT: vector.insert
-//  CHECK-NEXT: vector.extract
-//  CHECK-NEXT: vector.insert
-//  CHECK-NEXT: vector.extract
-//  CHECK-NEXT: vector.insert
-//  CHECK-NEXT: vector.extract
-//  CHECK-NEXT: vector.insert
-//  CHECK-NEXT: vector.extract
-//  CHECK-NEXT: vector.insert
-//  CHECK-NEXT: vector.extract
-//  CHECK-NEXT: vector.insert
-//  CHECK-NEXT: vector.extract
-//  CHECK-NEXT: vector.insert
-//  CHECK-NEXT: vector.extract
-//  CHECK-NEXT: vector.insert
-//  CHECK-NEXT: vector.extract
-//  CHECK-NEXT: vector.insert
-//  CHECK-NEXT: vector.extract
-//  CHECK-NEXT: vector.insert
-//  CHECK-NEXT: vector.extract
-//  CHECK-NEXT: vector.insert
-//  CHECK-NEXT: vector.extract
-//  CHECK-NEXT: vector.insert
-//  CHECK-NEXT: vector.extract
-//  CHECK-NEXT: vector.insert
-//  CHECK-NEXT: vector.extract
-//  CHECK-NEXT: vector.insert
-//  CHECK-NEXT: vector.extract
-//  CHECK-NEXT: vector.insert
-//  CHECK-NEXT: vector.extract
-//  CHECK-NEXT: vector.insert
-//  CHECK-NEXT: vector.extract
-//  CHECK-NEXT: vector.insert
-//  CHECK-NEXT: vector.extract
-//  CHECK-NEXT: vector.insert
-//  CHECK-NEXT: vector.extract
-//  CHECK-NEXT: vector.insert
-//  CHECK-NEXT: vector.extract
-//  CHECK-NEXT: vector.insert
-//  CHECK-NEXT: vector.extract
-//  CHECK-NEXT: vector.insert
-//  CHECK-NEXT: vector.extract
-//  CHECK-NEXT: vector.insert
-//  CHECK-NEXT: vector.extract
-//  CHECK-NEXT: vector.insert
-//  CHECK-NEXT: vector.extract
-//  CHECK-NEXT: vector.insert
-//  CHECK-NEXT: vector.extract
-//  CHECK-NEXT: vector.insert
-//  CHECK-NEXT: vector.extract
-//  CHECK-NEXT: vector.insert
-//  CHECK-NEXT: vector.extract
-//  CHECK-NEXT: vector.insert
-//  CHECK-NEXT: vector.extract
-//  CHECK-NEXT: vector.insert
-//  CHECK-NEXT: vector.extract
-//  CHECK-NEXT: vector.insert
-//  CHECK-NEXT: vector.extract
-//  CHECK-NEXT: vector.insert
-//  CHECK-NEXT: vector.extract
-//  CHECK-NEXT: vector.insert
-//  CHECK-NEXT: vector.extract
-//  CHECK-NEXT: vector.insert
-//  CHECK-NEXT: vector.extract
-//  CHECK-NEXT: vector.insert
-//  CHECK-NEXT: vector.extract
-//  CHECK-NEXT: vector.insert
-//  CHECK-NEXT: vector.extract
-//  CHECK-NEXT: vector.insert
-//  CHECK-NEXT: vector.extract
-//  CHECK-NEXT: vector.insert
-//  CHECK-NEXT: vector.extract
-//  CHECK-NEXT: vector.insert
-//  CHECK-NEXT: vector.extract
-//  CHECK-NEXT: vector.insert
-//  CHECK-NEXT: vector.extract
-//  CHECK-NEXT: vector.insert
-//  CHECK-NEXT: vector.extract
-//  CHECK-NEXT: vector.insert
-//  CHECK-NEXT: vector.extract
-//  CHECK-NEXT: vector.insert
-//  CHECK-NEXT: vector.extract
-//  CHECK-NEXT: vector.insert
-//  CHECK-NEXT: vector.extract
-//  CHECK-NEXT: vector.insert
-//  CHECK-NEXT: vector.extract
-//  CHECK-NEXT: vector.insert
-//  CHECK-NEXT: vector.extract
-//  CHECK-NEXT: vector.insert
-//  CHECK-NEXT: vector.extract
-//  CHECK-NEXT: vector.insert
-//  CHECK-NEXT: vector.extract
-//  CHECK-NEXT: vector.insert
-//  CHECK-NEXT: vector.extract
-//  CHECK-NEXT: vector.insert
-//  CHECK-NEXT: vector.extract
-//  CHECK-NEXT: vector.insert
-//  CHECK-NEXT: vector.extract
-//  CHECK-NEXT: vector.insert
-//  CHECK-NEXT: vector.extract
-//  CHECK-NEXT: vector.insert
-//  CHECK-NEXT: vector.extract
-//  CHECK-NEXT: vector.insert
-//  CHECK-NEXT: vector.extract
-//  CHECK-NEXT: vector.insert
-//  CHECK-NEXT: vector.extract
-//  CHECK-NEXT: vector.insert
-//  CHECK-NEXT: vector.extract
-//  CHECK-NEXT: vector.insert
-//  CHECK-NEXT: vector.extract
-//  CHECK-NEXT: vector.insert
-//  CHECK-NEXT: vector.extract
-//  CHECK-NEXT: vector.insert
-//  CHECK-NEXT: vector.extract
-//  CHECK-NEXT: vector.insert
-//  CHECK-NEXT: vector.extract %320[0, 0]
+//   CHECK-LABEL: func @transpose_021_8x8_pattern
+// CHECK-COUNT-8: vector.load
+//    CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [0, 8, 1, 9, 4, 12, 5, 13] : vector<8xf32>, vector<8xf32>
+//    CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [2, 10, 3, 11, 6, 14, 7, 15] : vector<8xf32>, vector<8xf32>
+//    CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [0, 8, 1, 9, 4, 12, 5, 13] : vector<8xf32>, vector<8xf32>
+//    CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [2, 10, 3, 11, 6, 14, 7, 15] : vector<8xf32>, vector<8xf32>
+//    CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [0, 8, 1, 9, 4, 12, 5, 13] : vector<8xf32>, vector<8xf32>
+//    CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [2, 10, 3, 11, 6, 14, 7, 15] : vector<8xf32>, vector<8xf32>
+//    CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [0, 8, 1, 9, 4, 12, 5, 13] : vector<8xf32>, vector<8xf32>
+//    CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [2, 10, 3, 11, 6, 14, 7, 15] : vector<8xf32>, vector<8xf32>
+//    CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [2, 3, 8, 9, 6, 7, 12, 13] : vector<8xf32>, vector<8xf32>
+//    CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [2, 3, 8, 9, 6, 7, 12, 13] : vector<8xf32>, vector<8xf32>
+//    CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [2, 3, 8, 9, 6, 7, 12, 13] : vector<8xf32>, vector<8xf32>
+//    CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [2, 3, 8, 9, 6, 7, 12, 13] : vector<8xf32>, vector<8xf32>
+//    CHECK-NEXT: llvm.inline_asm asm_dialect = intel "vblendps $0, $1, $2, 0xcc", "=x,x,x" %{{.*}}, %{{.*}} : (vector<8xf32>, vector<8xf32>) -> vector<8xf32>
+//    CHECK-NEXT: llvm.inline_asm asm_dialect = intel "vblendps $0, $1, $2, 0x33", "=x,x,x" %{{.*}}, %{{.*}} : (vector<8xf32>, vector<8xf32>) -> vector<8xf32>
+//    CHECK-NEXT: llvm.inline_asm asm_dialect = intel "vblendps $0, $1, $2, 0xcc", "=x,x,x" %{{.*}}, %{{.*}} : (vector<8xf32>, vector<8xf32>) -> vector<8xf32>
+//    CHECK-NEXT: llvm.inline_asm asm_dialect = intel "vblendps $0, $1, $2, 0x33", "=x,x,x" %{{.*}}, %{{.*}} : (vector<8xf32>, vector<8xf32>) -> vector<8xf32>
+//    CHECK-NEXT: llvm.inline_asm asm_dialect = intel "vblendps $0, $1, $2, 0xcc", "=x,x,x" %{{.*}}, %{{.*}} : (vector<8xf32>, vector<8xf32>) -> vector<8xf32>
+//    CHECK-NEXT: llvm.inline_asm asm_dialect = intel "vblendps $0, $1, $2, 0x33", "=x,x,x" %{{.*}}, %{{.*}} : (vector<8xf32>, vector<8xf32>) -> vector<8xf32>
+//    CHECK-NEXT: llvm.inline_asm asm_dialect = intel "vblendps $0, $1, $2, 0xcc", "=x,x,x" %{{.*}}, %{{.*}} : (vector<8xf32>, vector<8xf32>) -> vector<8xf32>
+//    CHECK-NEXT: llvm.inline_asm asm_dialect = intel "vblendps $0, $1, $2, 0x33", "=x,x,x" %{{.*}}, %{{.*}} : (vector<8xf32>, vector<8xf32>) -> vector<8xf32>
+//    CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [0, 1, 2, 3, 8, 9, 10, 11] : vector<8xf32>, vector<8xf32>
+//    CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [0, 1, 2, 3, 8, 9, 10, 11] : vector<8xf32>, vector<8xf32>
+//    CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [0, 1, 2, 3, 8, 9, 10, 11] : vector<8xf32>, vector<8xf32>
+//    CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [0, 1, 2, 3, 8, 9, 10, 11] : vector<8xf32>, vector<8xf32>
+//    CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [4, 5, 6, 7, 12, 13, 14, 15] : vector<8xf32>, vector<8xf32>
+//    CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [4, 5, 6, 7, 12, 13, 14, 15] : vector<8xf32>, vector<8xf32>
+//    CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [4, 5, 6, 7, 12, 13, 14, 15] : vector<8xf32>, vector<8xf32>
+//    CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [4, 5, 6, 7, 12, 13, 14, 15] : vector<8xf32>, vector<8xf32>
+//    CHECK-NEXT: vector.store
 
 // -----
 
@@ -454,35 +191,37 @@ hal.executable private @transpose_201_8x8_pattern {
   }
 }
 
-// CHECK-LABEL: func @transpose_201_8x8_pattern
-//       CHECK: vector.shuffle %{{.*}}, %{{.*}} [0, 8, 1, 9, 4, 12, 5, 13] : vector<8xf32>, vector<8xf32>
-//  CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [2, 10, 3, 11, 6, 14, 7, 15] : vector<8xf32>, vector<8xf32>
-//  CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [0, 8, 1, 9, 4, 12, 5, 13] : vector<8xf32>, vector<8xf32>
-//  CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [2, 10, 3, 11, 6, 14, 7, 15] : vector<8xf32>, vector<8xf32>
-//  CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [0, 8, 1, 9, 4, 12, 5, 13] : vector<8xf32>, vector<8xf32>
-//  CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [2, 10, 3, 11, 6, 14, 7, 15] : vector<8xf32>, vector<8xf32>
-//  CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [0, 8, 1, 9, 4, 12, 5, 13] : vector<8xf32>, vector<8xf32>
-//  CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [2, 10, 3, 11, 6, 14, 7, 15] : vector<8xf32>, vector<8xf32>
-//  CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [2, 3, 8, 9, 6, 7, 12, 13] : vector<8xf32>, vector<8xf32>
-//  CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [2, 3, 8, 9, 6, 7, 12, 13] : vector<8xf32>, vector<8xf32>
-//  CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [2, 3, 8, 9, 6, 7, 12, 13] : vector<8xf32>, vector<8xf32>
-//  CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [2, 3, 8, 9, 6, 7, 12, 13] : vector<8xf32>, vector<8xf32>
-//  CHECK-NEXT: llvm.inline_asm asm_dialect = intel "vblendps $0, $1, $2, 0xcc", "=x,x,x" %{{.*}}, %{{.*}} : (vector<8xf32>, vector<8xf32>) -> vector<8xf32>
-//  CHECK-NEXT: llvm.inline_asm asm_dialect = intel "vblendps $0, $1, $2, 0x33", "=x,x,x" %{{.*}}, %{{.*}} : (vector<8xf32>, vector<8xf32>) -> vector<8xf32>
-//  CHECK-NEXT: llvm.inline_asm asm_dialect = intel "vblendps $0, $1, $2, 0xcc", "=x,x,x" %{{.*}}, %{{.*}} : (vector<8xf32>, vector<8xf32>) -> vector<8xf32>
-//  CHECK-NEXT: llvm.inline_asm asm_dialect = intel "vblendps $0, $1, $2, 0x33", "=x,x,x" %{{.*}}, %{{.*}} : (vector<8xf32>, vector<8xf32>) -> vector<8xf32>
-//  CHECK-NEXT: llvm.inline_asm asm_dialect = intel "vblendps $0, $1, $2, 0xcc", "=x,x,x" %{{.*}}, %{{.*}} : (vector<8xf32>, vector<8xf32>) -> vector<8xf32>
-//  CHECK-NEXT: llvm.inline_asm asm_dialect = intel "vblendps $0, $1, $2, 0x33", "=x,x,x" %{{.*}}, %{{.*}} : (vector<8xf32>, vector<8xf32>) -> vector<8xf32>
-//  CHECK-NEXT: llvm.inline_asm asm_dialect = intel "vblendps $0, $1, $2, 0xcc", "=x,x,x" %{{.*}}, %{{.*}} : (vector<8xf32>, vector<8xf32>) -> vector<8xf32>
-//  CHECK-NEXT: llvm.inline_asm asm_dialect = intel "vblendps $0, $1, $2, 0x33", "=x,x,x" %{{.*}}, %{{.*}} : (vector<8xf32>, vector<8xf32>) -> vector<8xf32>
-//  CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [0, 1, 2, 3, 8, 9, 10, 11] : vector<8xf32>, vector<8xf32>
-//  CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [0, 1, 2, 3, 8, 9, 10, 11] : vector<8xf32>, vector<8xf32>
-//  CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [0, 1, 2, 3, 8, 9, 10, 11] : vector<8xf32>, vector<8xf32>
-//  CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [0, 1, 2, 3, 8, 9, 10, 11] : vector<8xf32>, vector<8xf32>
-//  CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [4, 5, 6, 7, 12, 13, 14, 15] : vector<8xf32>, vector<8xf32>
-//  CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [4, 5, 6, 7, 12, 13, 14, 15] : vector<8xf32>, vector<8xf32>
-//  CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [4, 5, 6, 7, 12, 13, 14, 15] : vector<8xf32>, vector<8xf32>
-//  CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [4, 5, 6, 7, 12, 13, 14, 15] : vector<8xf32>, vector<8xf32>
+//   CHECK-LABEL: func @transpose_201_8x8_pattern
+// CHECK-COUNT-8: vector.load
+//    CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [0, 8, 1, 9, 4, 12, 5, 13] : vector<8xf32>, vector<8xf32>
+//    CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [2, 10, 3, 11, 6, 14, 7, 15] : vector<8xf32>, vector<8xf32>
+//    CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [0, 8, 1, 9, 4, 12, 5, 13] : vector<8xf32>, vector<8xf32>
+//    CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [2, 10, 3, 11, 6, 14, 7, 15] : vector<8xf32>, vector<8xf32>
+//    CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [0, 8, 1, 9, 4, 12, 5, 13] : vector<8xf32>, vector<8xf32>
+//    CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [2, 10, 3, 11, 6, 14, 7, 15] : vector<8xf32>, vector<8xf32>
+//    CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [0, 8, 1, 9, 4, 12, 5, 13] : vector<8xf32>, vector<8xf32>
+//    CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [2, 10, 3, 11, 6, 14, 7, 15] : vector<8xf32>, vector<8xf32>
+//    CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [2, 3, 8, 9, 6, 7, 12, 13] : vector<8xf32>, vector<8xf32>
+//    CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [2, 3, 8, 9, 6, 7, 12, 13] : vector<8xf32>, vector<8xf32>
+//    CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [2, 3, 8, 9, 6, 7, 12, 13] : vector<8xf32>, vector<8xf32>
+//    CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [2, 3, 8, 9, 6, 7, 12, 13] : vector<8xf32>, vector<8xf32>
+//    CHECK-NEXT: llvm.inline_asm asm_dialect = intel "vblendps $0, $1, $2, 0xcc", "=x,x,x" %{{.*}}, %{{.*}} : (vector<8xf32>, vector<8xf32>) -> vector<8xf32>
+//    CHECK-NEXT: llvm.inline_asm asm_dialect = intel "vblendps $0, $1, $2, 0x33", "=x,x,x" %{{.*}}, %{{.*}} : (vector<8xf32>, vector<8xf32>) -> vector<8xf32>
+//    CHECK-NEXT: llvm.inline_asm asm_dialect = intel "vblendps $0, $1, $2, 0xcc", "=x,x,x" %{{.*}}, %{{.*}} : (vector<8xf32>, vector<8xf32>) -> vector<8xf32>
+//    CHECK-NEXT: llvm.inline_asm asm_dialect = intel "vblendps $0, $1, $2, 0x33", "=x,x,x" %{{.*}}, %{{.*}} : (vector<8xf32>, vector<8xf32>) -> vector<8xf32>
+//    CHECK-NEXT: llvm.inline_asm asm_dialect = intel "vblendps $0, $1, $2, 0xcc", "=x,x,x" %{{.*}}, %{{.*}} : (vector<8xf32>, vector<8xf32>) -> vector<8xf32>
+//    CHECK-NEXT: llvm.inline_asm asm_dialect = intel "vblendps $0, $1, $2, 0x33", "=x,x,x" %{{.*}}, %{{.*}} : (vector<8xf32>, vector<8xf32>) -> vector<8xf32>
+//    CHECK-NEXT: llvm.inline_asm asm_dialect = intel "vblendps $0, $1, $2, 0xcc", "=x,x,x" %{{.*}}, %{{.*}} : (vector<8xf32>, vector<8xf32>) -> vector<8xf32>
+//    CHECK-NEXT: llvm.inline_asm asm_dialect = intel "vblendps $0, $1, $2, 0x33", "=x,x,x" %{{.*}}, %{{.*}} : (vector<8xf32>, vector<8xf32>) -> vector<8xf32>
+//    CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [0, 1, 2, 3, 8, 9, 10, 11] : vector<8xf32>, vector<8xf32>
+//    CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [0, 1, 2, 3, 8, 9, 10, 11] : vector<8xf32>, vector<8xf32>
+//    CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [0, 1, 2, 3, 8, 9, 10, 11] : vector<8xf32>, vector<8xf32>
+//    CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [0, 1, 2, 3, 8, 9, 10, 11] : vector<8xf32>, vector<8xf32>
+//    CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [4, 5, 6, 7, 12, 13, 14, 15] : vector<8xf32>, vector<8xf32>
+//    CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [4, 5, 6, 7, 12, 13, 14, 15] : vector<8xf32>, vector<8xf32>
+//    CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [4, 5, 6, 7, 12, 13, 14, 15] : vector<8xf32>, vector<8xf32>
+//    CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [4, 5, 6, 7, 12, 13, 14, 15] : vector<8xf32>, vector<8xf32>
+//    CHECK-NEXT: vector.store
 
 // -----
 
@@ -527,35 +266,37 @@ hal.executable private @transpose_210_8x8_pattern {
   }
 }
 
-// CHECK-LABEL: func @transpose_210_8x8_pattern
-//       CHECK: vector.shuffle %{{.*}}, %{{.*}} [0, 8, 1, 9, 4, 12, 5, 13] : vector<8xf32>, vector<8xf32>
-//  CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [2, 10, 3, 11, 6, 14, 7, 15] : vector<8xf32>, vector<8xf32>
-//  CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [0, 8, 1, 9, 4, 12, 5, 13] : vector<8xf32>, vector<8xf32>
-//  CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [2, 10, 3, 11, 6, 14, 7, 15] : vector<8xf32>, vector<8xf32>
-//  CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [0, 8, 1, 9, 4, 12, 5, 13] : vector<8xf32>, vector<8xf32>
-//  CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [2, 10, 3, 11, 6, 14, 7, 15] : vector<8xf32>, vector<8xf32>
-//  CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [0, 8, 1, 9, 4, 12, 5, 13] : vector<8xf32>, vector<8xf32>
-//  CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [2, 10, 3, 11, 6, 14, 7, 15] : vector<8xf32>, vector<8xf32>
-//  CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [2, 3, 8, 9, 6, 7, 12, 13] : vector<8xf32>, vector<8xf32>
-//  CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [2, 3, 8, 9, 6, 7, 12, 13] : vector<8xf32>, vector<8xf32>
-//  CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [2, 3, 8, 9, 6, 7, 12, 13] : vector<8xf32>, vector<8xf32>
-//  CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [2, 3, 8, 9, 6, 7, 12, 13] : vector<8xf32>, vector<8xf32>
-//  CHECK-NEXT: llvm.inline_asm asm_dialect = intel "vblendps $0, $1, $2, 0xcc", "=x,x,x" %{{.*}}, %{{.*}} : (vector<8xf32>, vector<8xf32>) -> vector<8xf32>
-//  CHECK-NEXT: llvm.inline_asm asm_dialect = intel "vblendps $0, $1, $2, 0x33", "=x,x,x" %{{.*}}, %{{.*}} : (vector<8xf32>, vector<8xf32>) -> vector<8xf32>
-//  CHECK-NEXT: llvm.inline_asm asm_dialect = intel "vblendps $0, $1, $2, 0xcc", "=x,x,x" %{{.*}}, %{{.*}} : (vector<8xf32>, vector<8xf32>) -> vector<8xf32>
-//  CHECK-NEXT: llvm.inline_asm asm_dialect = intel "vblendps $0, $1, $2, 0x33", "=x,x,x" %{{.*}}, %{{.*}} : (vector<8xf32>, vector<8xf32>) -> vector<8xf32>
-//  CHECK-NEXT: llvm.inline_asm asm_dialect = intel "vblendps $0, $1, $2, 0xcc", "=x,x,x" %{{.*}}, %{{.*}} : (vector<8xf32>, vector<8xf32>) -> vector<8xf32>
-//  CHECK-NEXT: llvm.inline_asm asm_dialect = intel "vblendps $0, $1, $2, 0x33", "=x,x,x" %{{.*}}, %{{.*}} : (vector<8xf32>, vector<8xf32>) -> vector<8xf32>
-//  CHECK-NEXT: llvm.inline_asm asm_dialect = intel "vblendps $0, $1, $2, 0xcc", "=x,x,x" %{{.*}}, %{{.*}} : (vector<8xf32>, vector<8xf32>) -> vector<8xf32>
-//  CHECK-NEXT: llvm.inline_asm asm_dialect = intel "vblendps $0, $1, $2, 0x33", "=x,x,x" %{{.*}}, %{{.*}} : (vector<8xf32>, vector<8xf32>) -> vector<8xf32>
-//  CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [0, 1, 2, 3, 8, 9, 10, 11] : vector<8xf32>, vector<8xf32>
-//  CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [0, 1, 2, 3, 8, 9, 10, 11] : vector<8xf32>, vector<8xf32>
-//  CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [0, 1, 2, 3, 8, 9, 10, 11] : vector<8xf32>, vector<8xf32>
-//  CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [0, 1, 2, 3, 8, 9, 10, 11] : vector<8xf32>, vector<8xf32>
-//  CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [4, 5, 6, 7, 12, 13, 14, 15] : vector<8xf32>, vector<8xf32>
-//  CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [4, 5, 6, 7, 12, 13, 14, 15] : vector<8xf32>, vector<8xf32>
-//  CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [4, 5, 6, 7, 12, 13, 14, 15] : vector<8xf32>, vector<8xf32>
-//  CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [4, 5, 6, 7, 12, 13, 14, 15] : vector<8xf32>, vector<8xf32>
+//   CHECK-LABEL: func @transpose_210_8x8_pattern
+// CHECK-COUNT-8: vector.load
+//    CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [0, 8, 1, 9, 4, 12, 5, 13] : vector<8xf32>, vector<8xf32>
+//    CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [2, 10, 3, 11, 6, 14, 7, 15] : vector<8xf32>, vector<8xf32>
+//    CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [0, 8, 1, 9, 4, 12, 5, 13] : vector<8xf32>, vector<8xf32>
+//    CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [2, 10, 3, 11, 6, 14, 7, 15] : vector<8xf32>, vector<8xf32>
+//    CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [0, 8, 1, 9, 4, 12, 5, 13] : vector<8xf32>, vector<8xf32>
+//    CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [2, 10, 3, 11, 6, 14, 7, 15] : vector<8xf32>, vector<8xf32>
+//    CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [0, 8, 1, 9, 4, 12, 5, 13] : vector<8xf32>, vector<8xf32>
+//    CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [2, 10, 3, 11, 6, 14, 7, 15] : vector<8xf32>, vector<8xf32>
+//    CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [2, 3, 8, 9, 6, 7, 12, 13] : vector<8xf32>, vector<8xf32>
+//    CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [2, 3, 8, 9, 6, 7, 12, 13] : vector<8xf32>, vector<8xf32>
+//    CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [2, 3, 8, 9, 6, 7, 12, 13] : vector<8xf32>, vector<8xf32>
+//    CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [2, 3, 8, 9, 6, 7, 12, 13] : vector<8xf32>, vector<8xf32>
+//    CHECK-NEXT: llvm.inline_asm asm_dialect = intel "vblendps $0, $1, $2, 0xcc", "=x,x,x" %{{.*}}, %{{.*}} : (vector<8xf32>, vector<8xf32>) -> vector<8xf32>
+//    CHECK-NEXT: llvm.inline_asm asm_dialect = intel "vblendps $0, $1, $2, 0x33", "=x,x,x" %{{.*}}, %{{.*}} : (vector<8xf32>, vector<8xf32>) -> vector<8xf32>
+//    CHECK-NEXT: llvm.inline_asm asm_dialect = intel "vblendps $0, $1, $2, 0xcc", "=x,x,x" %{{.*}}, %{{.*}} : (vector<8xf32>, vector<8xf32>) -> vector<8xf32>
+//    CHECK-NEXT: llvm.inline_asm asm_dialect = intel "vblendps $0, $1, $2, 0x33", "=x,x,x" %{{.*}}, %{{.*}} : (vector<8xf32>, vector<8xf32>) -> vector<8xf32>
+//    CHECK-NEXT: llvm.inline_asm asm_dialect = intel "vblendps $0, $1, $2, 0xcc", "=x,x,x" %{{.*}}, %{{.*}} : (vector<8xf32>, vector<8xf32>) -> vector<8xf32>
+//    CHECK-NEXT: llvm.inline_asm asm_dialect = intel "vblendps $0, $1, $2, 0x33", "=x,x,x" %{{.*}}, %{{.*}} : (vector<8xf32>, vector<8xf32>) -> vector<8xf32>
+//    CHECK-NEXT: llvm.inline_asm asm_dialect = intel "vblendps $0, $1, $2, 0xcc", "=x,x,x" %{{.*}}, %{{.*}} : (vector<8xf32>, vector<8xf32>) -> vector<8xf32>
+//    CHECK-NEXT: llvm.inline_asm asm_dialect = intel "vblendps $0, $1, $2, 0x33", "=x,x,x" %{{.*}}, %{{.*}} : (vector<8xf32>, vector<8xf32>) -> vector<8xf32>
+//    CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [0, 1, 2, 3, 8, 9, 10, 11] : vector<8xf32>, vector<8xf32>
+//    CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [0, 1, 2, 3, 8, 9, 10, 11] : vector<8xf32>, vector<8xf32>
+//    CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [0, 1, 2, 3, 8, 9, 10, 11] : vector<8xf32>, vector<8xf32>
+//    CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [0, 1, 2, 3, 8, 9, 10, 11] : vector<8xf32>, vector<8xf32>
+//    CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [4, 5, 6, 7, 12, 13, 14, 15] : vector<8xf32>, vector<8xf32>
+//    CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [4, 5, 6, 7, 12, 13, 14, 15] : vector<8xf32>, vector<8xf32>
+//    CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [4, 5, 6, 7, 12, 13, 14, 15] : vector<8xf32>, vector<8xf32>
+//    CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [4, 5, 6, 7, 12, 13, 14, 15] : vector<8xf32>, vector<8xf32>
+//    CHECK-NEXT: vector.store
 
 // -----
 
@@ -600,35 +341,37 @@ hal.executable private @transpose_120_8x8_pattern {
   }
 }
 
-// CHECK-LABEL: func @transpose_120_8x8_pattern
-//       CHECK: vector.shuffle %{{.*}}, %{{.*}} [0, 8, 1, 9, 4, 12, 5, 13] : vector<8xf32>, vector<8xf32>
-//  CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [2, 10, 3, 11, 6, 14, 7, 15] : vector<8xf32>, vector<8xf32>
-//  CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [0, 8, 1, 9, 4, 12, 5, 13] : vector<8xf32>, vector<8xf32>
-//  CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [2, 10, 3, 11, 6, 14, 7, 15] : vector<8xf32>, vector<8xf32>
-//  CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [0, 8, 1, 9, 4, 12, 5, 13] : vector<8xf32>, vector<8xf32>
-//  CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [2, 10, 3, 11, 6, 14, 7, 15] : vector<8xf32>, vector<8xf32>
-//  CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [0, 8, 1, 9, 4, 12, 5, 13] : vector<8xf32>, vector<8xf32>
-//  CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [2, 10, 3, 11, 6, 14, 7, 15] : vector<8xf32>, vector<8xf32>
-//  CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [2, 3, 8, 9, 6, 7, 12, 13] : vector<8xf32>, vector<8xf32>
-//  CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [2, 3, 8, 9, 6, 7, 12, 13] : vector<8xf32>, vector<8xf32>
-//  CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [2, 3, 8, 9, 6, 7, 12, 13] : vector<8xf32>, vector<8xf32>
-//  CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [2, 3, 8, 9, 6, 7, 12, 13] : vector<8xf32>, vector<8xf32>
-//  CHECK-NEXT: llvm.inline_asm asm_dialect = intel "vblendps $0, $1, $2, 0xcc", "=x,x,x" %{{.*}}, %{{.*}} : (vector<8xf32>, vector<8xf32>) -> vector<8xf32>
-//  CHECK-NEXT: llvm.inline_asm asm_dialect = intel "vblendps $0, $1, $2, 0x33", "=x,x,x" %{{.*}}, %{{.*}} : (vector<8xf32>, vector<8xf32>) -> vector<8xf32>
-//  CHECK-NEXT: llvm.inline_asm asm_dialect = intel "vblendps $0, $1, $2, 0xcc", "=x,x,x" %{{.*}}, %{{.*}} : (vector<8xf32>, vector<8xf32>) -> vector<8xf32>
-//  CHECK-NEXT: llvm.inline_asm asm_dialect = intel "vblendps $0, $1, $2, 0x33", "=x,x,x" %{{.*}}, %{{.*}} : (vector<8xf32>, vector<8xf32>) -> vector<8xf32>
-//  CHECK-NEXT: llvm.inline_asm asm_dialect = intel "vblendps $0, $1, $2, 0xcc", "=x,x,x" %{{.*}}, %{{.*}} : (vector<8xf32>, vector<8xf32>) -> vector<8xf32>
-//  CHECK-NEXT: llvm.inline_asm asm_dialect = intel "vblendps $0, $1, $2, 0x33", "=x,x,x" %{{.*}}, %{{.*}} : (vector<8xf32>, vector<8xf32>) -> vector<8xf32>
-//  CHECK-NEXT: llvm.inline_asm asm_dialect = intel "vblendps $0, $1, $2, 0xcc", "=x,x,x" %{{.*}}, %{{.*}} : (vector<8xf32>, vector<8xf32>) -> vector<8xf32>
-//  CHECK-NEXT: llvm.inline_asm asm_dialect = intel "vblendps $0, $1, $2, 0x33", "=x,x,x" %{{.*}}, %{{.*}} : (vector<8xf32>, vector<8xf32>) -> vector<8xf32>
-//  CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [0, 1, 2, 3, 8, 9, 10, 11] : vector<8xf32>, vector<8xf32>
-//  CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [0, 1, 2, 3, 8, 9, 10, 11] : vector<8xf32>, vector<8xf32>
-//  CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [0, 1, 2, 3, 8, 9, 10, 11] : vector<8xf32>, vector<8xf32>
-//  CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [0, 1, 2, 3, 8, 9, 10, 11] : vector<8xf32>, vector<8xf32>
-//  CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [4, 5, 6, 7, 12, 13, 14, 15] : vector<8xf32>, vector<8xf32>
-//  CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [4, 5, 6, 7, 12, 13, 14, 15] : vector<8xf32>, vector<8xf32>
-//  CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [4, 5, 6, 7, 12, 13, 14, 15] : vector<8xf32>, vector<8xf32>
-//  CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [4, 5, 6, 7, 12, 13, 14, 15] : vector<8xf32>, vector<8xf32>
+//   CHECK-LABEL: func @transpose_120_8x8_pattern
+// CHECK-COUNT-8: vector.load
+//    CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [0, 8, 1, 9, 4, 12, 5, 13] : vector<8xf32>, vector<8xf32>
+//    CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [2, 10, 3, 11, 6, 14, 7, 15] : vector<8xf32>, vector<8xf32>
+//    CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [0, 8, 1, 9, 4, 12, 5, 13] : vector<8xf32>, vector<8xf32>
+//    CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [2, 10, 3, 11, 6, 14, 7, 15] : vector<8xf32>, vector<8xf32>
+//    CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [0, 8, 1, 9, 4, 12, 5, 13] : vector<8xf32>, vector<8xf32>
+//    CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [2, 10, 3, 11, 6, 14, 7, 15] : vector<8xf32>, vector<8xf32>
+//    CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [0, 8, 1, 9, 4, 12, 5, 13] : vector<8xf32>, vector<8xf32>
+//    CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [2, 10, 3, 11, 6, 14, 7, 15] : vector<8xf32>, vector<8xf32>
+//    CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [2, 3, 8, 9, 6, 7, 12, 13] : vector<8xf32>, vector<8xf32>
+//    CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [2, 3, 8, 9, 6, 7, 12, 13] : vector<8xf32>, vector<8xf32>
+//    CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [2, 3, 8, 9, 6, 7, 12, 13] : vector<8xf32>, vector<8xf32>
+//    CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [2, 3, 8, 9, 6, 7, 12, 13] : vector<8xf32>, vector<8xf32>
+//    CHECK-NEXT: llvm.inline_asm asm_dialect = intel "vblendps $0, $1, $2, 0xcc", "=x,x,x" %{{.*}}, %{{.*}} : (vector<8xf32>, vector<8xf32>) -> vector<8xf32>
+//    CHECK-NEXT: llvm.inline_asm asm_dialect = intel "vblendps $0, $1, $2, 0x33", "=x,x,x" %{{.*}}, %{{.*}} : (vector<8xf32>, vector<8xf32>) -> vector<8xf32>
+//    CHECK-NEXT: llvm.inline_asm asm_dialect = intel "vblendps $0, $1, $2, 0xcc", "=x,x,x" %{{.*}}, %{{.*}} : (vector<8xf32>, vector<8xf32>) -> vector<8xf32>
+//    CHECK-NEXT: llvm.inline_asm asm_dialect = intel "vblendps $0, $1, $2, 0x33", "=x,x,x" %{{.*}}, %{{.*}} : (vector<8xf32>, vector<8xf32>) -> vector<8xf32>
+//    CHECK-NEXT: llvm.inline_asm asm_dialect = intel "vblendps $0, $1, $2, 0xcc", "=x,x,x" %{{.*}}, %{{.*}} : (vector<8xf32>, vector<8xf32>) -> vector<8xf32>
+//    CHECK-NEXT: llvm.inline_asm asm_dialect = intel "vblendps $0, $1, $2, 0x33", "=x,x,x" %{{.*}}, %{{.*}} : (vector<8xf32>, vector<8xf32>) -> vector<8xf32>
+//    CHECK-NEXT: llvm.inline_asm asm_dialect = intel "vblendps $0, $1, $2, 0xcc", "=x,x,x" %{{.*}}, %{{.*}} : (vector<8xf32>, vector<8xf32>) -> vector<8xf32>
+//    CHECK-NEXT: llvm.inline_asm asm_dialect = intel "vblendps $0, $1, $2, 0x33", "=x,x,x" %{{.*}}, %{{.*}} : (vector<8xf32>, vector<8xf32>) -> vector<8xf32>
+//    CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [0, 1, 2, 3, 8, 9, 10, 11] : vector<8xf32>, vector<8xf32>
+//    CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [0, 1, 2, 3, 8, 9, 10, 11] : vector<8xf32>, vector<8xf32>
+//    CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [0, 1, 2, 3, 8, 9, 10, 11] : vector<8xf32>, vector<8xf32>
+//    CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [0, 1, 2, 3, 8, 9, 10, 11] : vector<8xf32>, vector<8xf32>
+//    CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [4, 5, 6, 7, 12, 13, 14, 15] : vector<8xf32>, vector<8xf32>
+//    CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [4, 5, 6, 7, 12, 13, 14, 15] : vector<8xf32>, vector<8xf32>
+//    CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [4, 5, 6, 7, 12, 13, 14, 15] : vector<8xf32>, vector<8xf32>
+//    CHECK-NEXT: vector.shuffle %{{.*}}, %{{.*}} [4, 5, 6, 7, 12, 13, 14, 15] : vector<8xf32>, vector<8xf32>
+//    CHECK-NEXT: vector.store
 
 // -----
 
