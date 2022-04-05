@@ -12,6 +12,8 @@ using namespace mlir::linalg;
 
 namespace {
 struct TestWrapScopePass : public PassWrapper<TestWrapScopePass, Pass> {
+  MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(TestWrapScopePass)
+
   TestWrapScopePass() = default;
   TestWrapScopePass(const TestWrapScopePass &other) : PassWrapper(other) {}
 

@@ -58,8 +58,8 @@ private:
           std::move(owningOp));
     } else if (localSource.asmFilePath) {
       // Parse from a file.
-      auto owningOp = mlir::parseSourceFile<mlir::ModuleOp>(
-          *localSource.asmFilePath, context);
+      auto owningOp =
+          parseSourceFile<mlir::ModuleOp>(*localSource.asmFilePath, context);
       if (!owningOp)
         return failure();
       rtlModule = std::make_shared<mlir::OwningOpRef<mlir::ModuleOp>>(
