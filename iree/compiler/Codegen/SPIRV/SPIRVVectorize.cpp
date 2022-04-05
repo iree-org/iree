@@ -193,7 +193,7 @@ class SPIRVVectorizePass : public SPIRVVectorizeBase<SPIRVVectorizePass> {
       llvm::dbgs() << "\n\n";
     });
 
-    // Now we may have vector.insert_stridec_slice inserting 1-D native vectors
+    // Now we may have vector.insert_strided_slice inserting 1-D native vectors
     // into n-D larger vectors. Break that down too. This is a companion
     // transformation of unrolling.
     {
