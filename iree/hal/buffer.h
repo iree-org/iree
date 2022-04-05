@@ -152,11 +152,6 @@ enum iree_hal_buffer_usage_bits_t {
   // The buffer can be provided as an input or output to an executable.
   // Buffers of this type may be directly used by drivers during dispatch.
   IREE_HAL_BUFFER_USAGE_DISPATCH = 1u << 3,
-
-  // Buffer may be used for any operation.
-  IREE_HAL_BUFFER_USAGE_ALL = IREE_HAL_BUFFER_USAGE_TRANSFER |
-                              IREE_HAL_BUFFER_USAGE_MAPPING |
-                              IREE_HAL_BUFFER_USAGE_DISPATCH,
 };
 typedef uint32_t iree_hal_buffer_usage_t;
 

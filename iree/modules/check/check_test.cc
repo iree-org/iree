@@ -83,7 +83,9 @@ class CheckTest : public ::testing::Test {
     iree_hal_buffer_params_t params = {0};
     params.type =
         IREE_HAL_MEMORY_TYPE_HOST_LOCAL | IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE,
-    params.usage = IREE_HAL_BUFFER_USAGE_ALL;
+    params.usage = IREE_HAL_BUFFER_USAGE_DISPATCH |
+                   IREE_HAL_BUFFER_USAGE_TRANSFER |
+                   IREE_HAL_BUFFER_USAGE_MAPPING;
     IREE_ASSERT_OK(iree_hal_buffer_view_allocate_buffer(
         allocator_, shape.data(), shape.size(), IREE_HAL_ELEMENT_TYPE_INT_32,
         IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR, params,
@@ -103,7 +105,9 @@ class CheckTest : public ::testing::Test {
     iree_hal_buffer_params_t params = {0};
     params.type =
         IREE_HAL_MEMORY_TYPE_HOST_LOCAL | IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE;
-    params.usage = IREE_HAL_BUFFER_USAGE_ALL;
+    params.usage = IREE_HAL_BUFFER_USAGE_DISPATCH |
+                   IREE_HAL_BUFFER_USAGE_TRANSFER |
+                   IREE_HAL_BUFFER_USAGE_MAPPING;
     IREE_ASSERT_OK(iree_hal_buffer_view_allocate_buffer(
         allocator_, shape.data(), shape.size(), IREE_HAL_ELEMENT_TYPE_FLOAT_16,
         IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR, params,
@@ -123,7 +127,9 @@ class CheckTest : public ::testing::Test {
     iree_hal_buffer_params_t params = {0};
     params.type =
         IREE_HAL_MEMORY_TYPE_HOST_LOCAL | IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE;
-    params.usage = IREE_HAL_BUFFER_USAGE_ALL;
+    params.usage = IREE_HAL_BUFFER_USAGE_DISPATCH |
+                   IREE_HAL_BUFFER_USAGE_TRANSFER |
+                   IREE_HAL_BUFFER_USAGE_MAPPING;
     IREE_ASSERT_OK(iree_hal_buffer_view_allocate_buffer(
         allocator_, shape.data(), shape.size(), IREE_HAL_ELEMENT_TYPE_FLOAT_32,
         IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR, params,
@@ -143,7 +149,9 @@ class CheckTest : public ::testing::Test {
     iree_hal_buffer_params_t params = {0};
     params.type =
         IREE_HAL_MEMORY_TYPE_HOST_LOCAL | IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE;
-    params.usage = IREE_HAL_BUFFER_USAGE_ALL;
+    params.usage = IREE_HAL_BUFFER_USAGE_DISPATCH |
+                   IREE_HAL_BUFFER_USAGE_TRANSFER |
+                   IREE_HAL_BUFFER_USAGE_MAPPING;
     IREE_ASSERT_OK(iree_hal_buffer_view_allocate_buffer(
         allocator_, shape.data(), shape.size(), IREE_HAL_ELEMENT_TYPE_FLOAT_64,
         IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR, params,

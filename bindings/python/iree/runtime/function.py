@@ -295,9 +295,9 @@ ABI_TYPE_TO_DTYPE = {
 
 # When we get an ndarray as an argument and are implicitly mapping it to a
 # buffer view, flags for doing so.
-IMPLICIT_BUFFER_ARG_MEMORY_TYPE = (MemoryType.DEVICE_LOCAL |
-                                   MemoryType.DEVICE_VISIBLE)
-IMPLICIT_BUFFER_ARG_USAGE = BufferUsage.ALL
+IMPLICIT_BUFFER_ARG_MEMORY_TYPE = MemoryType.DEVICE_LOCAL
+IMPLICIT_BUFFER_ARG_USAGE = (BufferUsage.DISPATCH | BufferUsage.TRANSFER |
+                             BufferUsage.MAPPING)
 
 
 def _is_ndarray_descriptor(desc):

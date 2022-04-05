@@ -194,9 +194,11 @@ class InvokeStatics {
             }
 
             retained_bv = c.allocator().AllocateBufferCopy(
-                IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL |
-                    IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE,
-                IREE_HAL_BUFFER_USAGE_ALL, host_array, hal_element_type);
+                IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL,
+                IREE_HAL_BUFFER_USAGE_DISPATCH |
+                    IREE_HAL_BUFFER_USAGE_TRANSFER |
+                    IREE_HAL_BUFFER_USAGE_MAPPING,
+                host_array, hal_element_type);
             bv = py::cast<HalBufferView *>(retained_bv);
           }
 
@@ -399,9 +401,10 @@ class InvokeStatics {
 
       // Put it on the device.
       py::object retained_bv = c.allocator().AllocateBufferCopy(
-          IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL |
-              IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE,
-          IREE_HAL_BUFFER_USAGE_ALL, host_array, hal_element_type);
+          IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL,
+          IREE_HAL_BUFFER_USAGE_DISPATCH | IREE_HAL_BUFFER_USAGE_TRANSFER |
+              IREE_HAL_BUFFER_USAGE_MAPPING,
+          host_array, hal_element_type);
       HalBufferView *bv = py::cast<HalBufferView *>(retained_bv);
 
       // TODO: If adding further manipulation here, please make this common

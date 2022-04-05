@@ -185,9 +185,9 @@ def asdevicearray(device: HalDevice,
                   dtype=None,
                   *,
                   implicit_host_transfer: bool = False,
-                  memory_type=MemoryType.DEVICE_LOCAL |
-                  MemoryType.DEVICE_VISIBLE,
-                  allowed_usage=BufferUsage.ALL,
+                  memory_type=MemoryType.DEVICE_LOCAL,
+                  allowed_usage=(BufferUsage.DISPATCH | BufferUsage.TRANSFER |
+                                 BufferUsage.MAPPING),
                   element_type: Optional[HalElementType] = None) -> DeviceArray:
   """Helper to create a DeviceArray from an arbitrary array like.
 

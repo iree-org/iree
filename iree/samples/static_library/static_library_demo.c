@@ -124,9 +124,9 @@ iree_status_t Run() {
         iree_hal_device_allocator(device), shape, IREE_ARRAYSIZE(shape),
         IREE_HAL_ELEMENT_TYPE_FLOAT_32, IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR,
         (iree_hal_buffer_params_t){
-            .type = IREE_HAL_MEMORY_TYPE_HOST_LOCAL |
-                    IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE,
-            .usage = IREE_HAL_BUFFER_USAGE_ALL,
+            .type = IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL,
+            .usage =
+                IREE_HAL_BUFFER_USAGE_DISPATCH | IREE_HAL_BUFFER_USAGE_TRANSFER,
         },
         iree_make_const_byte_span((void*)kFloat4,
                                   sizeof(float) * kElementCount),
@@ -137,9 +137,9 @@ iree_status_t Run() {
         iree_hal_device_allocator(device), shape, IREE_ARRAYSIZE(shape),
         IREE_HAL_ELEMENT_TYPE_FLOAT_32, IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR,
         (iree_hal_buffer_params_t){
-            .type = IREE_HAL_MEMORY_TYPE_HOST_LOCAL |
-                    IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE,
-            .usage = IREE_HAL_BUFFER_USAGE_ALL,
+            .type = IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL,
+            .usage =
+                IREE_HAL_BUFFER_USAGE_DISPATCH | IREE_HAL_BUFFER_USAGE_TRANSFER,
         },
         iree_make_const_byte_span((void*)kFloat2,
                                   sizeof(float) * kElementCount),

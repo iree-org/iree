@@ -80,8 +80,7 @@ TEST_P(command_buffer_dispatch_test, DispatchAbs) {
 
   // Create input and output buffers.
   iree_hal_buffer_params_t input_params = {0};
-  input_params.type =
-      IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL | IREE_HAL_MEMORY_TYPE_HOST_VISIBLE;
+  input_params.type = IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL;
   input_params.usage =
       IREE_HAL_BUFFER_USAGE_DISPATCH | IREE_HAL_BUFFER_USAGE_TRANSFER;
   iree_hal_buffer_view_t* input_buffer_view = NULL;
@@ -95,8 +94,9 @@ TEST_P(command_buffer_dispatch_test, DispatchAbs) {
   iree_hal_buffer_params_t output_params = {0};
   output_params.type =
       IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL | IREE_HAL_MEMORY_TYPE_HOST_VISIBLE;
-  output_params.usage =
-      IREE_HAL_BUFFER_USAGE_DISPATCH | IREE_HAL_BUFFER_USAGE_MAPPING;
+  output_params.usage = IREE_HAL_BUFFER_USAGE_DISPATCH |
+                        IREE_HAL_BUFFER_USAGE_TRANSFER |
+                        IREE_HAL_BUFFER_USAGE_MAPPING;
   iree_hal_buffer_t* output_buffer = NULL;
   IREE_ASSERT_OK(iree_hal_allocator_allocate_buffer(
       device_allocator_, output_params, sizeof(float),

@@ -53,7 +53,7 @@ typedef struct iree_hal_buffer_params_t {
   // limit the allowed usage bits to precisely what the actual usage will be to
   // avoid additional copies, synchronization, and expensive emulation.
   //
-  // If 0 then the usage will be set as IREE_HAL_BUFFER_USAGE_ALL.
+  // If 0 then the usage will default to all usage modes.
   iree_hal_buffer_usage_t usage;
 
   // Specifies the access allowed to the memory via the HAL APIs.
@@ -95,8 +95,13 @@ typedef struct iree_hal_buffer_params_t {
 // Canonicalizes |params| fields when zero initialization is used.
 static inline void iree_hal_buffer_params_canonicalize(
     iree_hal_buffer_params_t* params) {
-  if (!params->usage) params->usage = IREE_HAL_BUFFER_USAGE_ALL;
-  if (!params->access) params->access = IREE_HAL_MEMORY_ACCESS_ALL;
+  if (!params->usage) {
+    params->usage =
+        IREE_HAL_BUFFER_USAGE_DISPATCH | IREE_HAL_BUFFER_USAGE_TRANSFER;
+  }
+  if (!params->access) {
+    params->access = IREE_HAL_MEMORY_ACCESS_ALL;
+  }
   if (!params->queue_affinity) {
     params->queue_affinity = IREE_HAL_QUEUE_AFFINITY_ANY;
   }
@@ -106,7 +111,10 @@ static inline void iree_hal_buffer_params_canonicalize(
 static inline iree_hal_buffer_params_t iree_hal_buffer_params_with_usage(
     const iree_hal_buffer_params_t params, iree_hal_buffer_usage_t usage) {
   iree_hal_buffer_params_t result = params;
-  if (!result.usage) result.usage = IREE_HAL_BUFFER_USAGE_ALL;
+  if (!result.usage) {
+    result.usage =
+        IREE_HAL_BUFFER_USAGE_DISPATCH | IREE_HAL_BUFFER_USAGE_TRANSFER;
+  }
   result.usage |= usage;
   return result;
 }

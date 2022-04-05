@@ -517,7 +517,9 @@ static iree_status_t allocate_buffer_like(iree_hal_allocator_t* hal_allocator,
       (iree_hal_buffer_params_t){
           .type = IREE_HAL_MEMORY_TYPE_HOST_LOCAL |
                   IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE,
-          .usage = IREE_HAL_BUFFER_USAGE_ALL,
+          .usage = IREE_HAL_BUFFER_USAGE_DISPATCH |
+                   IREE_HAL_BUFFER_USAGE_TRANSFER |
+                   IREE_HAL_BUFFER_USAGE_MAPPING,
       },
       iree_const_byte_span_empty(), dst);
 }
@@ -543,7 +545,9 @@ static iree_status_t copy_buffer(iree_hal_allocator_t* hal_allocator,
       (iree_hal_buffer_params_t){
           .type = IREE_HAL_MEMORY_TYPE_HOST_LOCAL |
                   IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE,
-          .usage = IREE_HAL_BUFFER_USAGE_ALL,
+          .usage = IREE_HAL_BUFFER_USAGE_DISPATCH |
+                   IREE_HAL_BUFFER_USAGE_TRANSFER |
+                   IREE_HAL_BUFFER_USAGE_MAPPING,
       },
       src_span, dst);
 }
