@@ -222,6 +222,8 @@ namespace {
 /// Pass that executes transformations specified by a module-level
 /// iree_linalg_transform.apply operation on the same module.
 struct InterpreterPass : public PassWrapper<InterpreterPass, Pass> {
+  MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(InterpreterPass)
+
   StringRef getArgument() const final { return "linalg-interp-transforms"; }
 
   StringRef getDescription() const final {
@@ -304,6 +306,8 @@ struct InterpreterPass : public PassWrapper<InterpreterPass, Pass> {
 };
 
 struct DropSchedulePass : public PassWrapper<DropSchedulePass, Pass> {
+  MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(DropSchedulePass)
+
   StringRef getArgument() const final { return "linalg-drop-schedule"; }
 
   StringRef getDescription() const final {
