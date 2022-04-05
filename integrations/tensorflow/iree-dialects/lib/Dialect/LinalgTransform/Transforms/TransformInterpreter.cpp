@@ -4,6 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree-dialects/Dialect/LinalgTransform/LinalgTransformOps.h"
 #include "iree-dialects/Dialect/LinalgTransform/Passes.h"
 #include "iree-dialects/Dialect/LinalgTransform/TrackingCSE.h"
@@ -164,7 +165,7 @@ static LogicalResult executeSequence(linalg::transform::SequenceOp sequence,
     if (failed(executeTransform(&transform, state))) {
       std::string str;
       llvm::raw_string_ostream ss(str);
-      ss << "failed to apply: " << transform << "\nto\n" << containerOp;
+      ss << "failed to apply: " << transform << "\nto\n" << *containerOp;
       ss.flush();
       return transform.emitError() << str;
     }
@@ -233,7 +234,8 @@ struct InterpreterPass : public PassWrapper<InterpreterPass, Pass> {
 
   void getDependentDialects(DialectRegistry &registry) const override {
     // clang-format off
-    registry.insert<arith::ArithmeticDialect,
+    registry.insert<mlir::iree_compiler::IREE::LinalgExt::IREELinalgExtDialect,
+                    arith::ArithmeticDialect,
                     AffineDialect,
                     bufferization::BufferizationDialect,
                     func::FuncDialect,
@@ -275,12 +277,16 @@ struct InterpreterPass : public PassWrapper<InterpreterPass, Pass> {
     // same module as the IR. The considered ModuleOp is either `getOperation()`
     // if it is already a ModuleOp, or the first parent ModuleOp.
     if (clTransformFileName.empty()) {
+      LLVM_DEBUG(DBGS() << getArgument()
+                        << " with transform embedded in module\n");
       ModuleOp module = dyn_cast<ModuleOp>(getOperation());
       if (!module)
         module = getOperation()->getParentOfType<ModuleOp>();
       return runTransformModuleOnOperation(module, getOperation());
     }
 
+    LLVM_DEBUG(DBGS() << getArgument() << " with transform "
+                      << clTransformFileName << "\n");
     // If a transform file is specified, parse its content into a ModuleOp.
     std::string errorMessage;
     auto memoryBuffer = openInputFile(clTransformFileName, &errorMessage);

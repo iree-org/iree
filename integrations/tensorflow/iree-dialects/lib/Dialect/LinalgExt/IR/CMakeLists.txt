@@ -15,6 +15,7 @@ add_mlir_library(IREELinalgExtDialect
   MLIRArithmeticUtils
   MLIRDialectUtils
   MLIRIR
+  MLIRInferTypeOpInterface
   MLIRLinalg
   MLIRMath
   MLIRMemRef
