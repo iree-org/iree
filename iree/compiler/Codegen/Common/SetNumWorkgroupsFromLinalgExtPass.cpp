@@ -11,11 +11,11 @@
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
+#include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "llvm/Support/Debug.h"
-#include "mlir/Dialect/Arithmetic/Utils/Utils.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
@@ -91,36 +91,15 @@ class ForwardInParallelResultToFlow
     //     insertSliceOp.source().getDefiningOp<IREE::LinalgExt::InParallelOp>();
     // if (!inParallelOp) return failure();
 
-    // Compute the sum of offsets and products of strides.
-    // Assume the sizes are well formed so we don't take the min.
-    Location loc = op.getLoc();
-    using AV = AffineValueExpr;
-    AffineExpr m, n;
-    AffineBuilder ab(rewriter, op.getLoc());
-    bindSymbols(rewriter.getContext(), m, n);
-    auto size = op.getMixedOffsets().size();
-    SmallVector<OpFoldResult> offsets(size), strides(size);
-    // Offset sums.
-    auto offsets1 = op.getMixedOffsets();
-    auto offsets2 = insertSliceOp.getMixedOffsets();
-    assert(offsets1.size() == offsets2.size());
-    for (unsigned i = 0; i < size; ++i) {
-      Value o1 = getValueOrCreateConstantIndexOp(rewriter, loc, offsets1[i]);
-      Value o2 = getValueOrCreateConstantIndexOp(rewriter, loc, offsets2[i]);
-      offsets[i] = ab.add(AV(m).bind(o1), AV(n).bind(o2));
-    }
-    // Stride products.
-    auto strides1 = op.getMixedStrides();
-    auto strides2 = insertSliceOp.getMixedStrides();
-    assert(strides1.size() == strides2.size());
-    for (unsigned i = 0; i < size; ++i) {
-      Value st1 = getValueOrCreateConstantIndexOp(rewriter, loc, strides1[i]);
-      Value st2 = getValueOrCreateConstantIndexOp(rewriter, loc, strides2[i]);
-      strides[i] = ab.mul(AV(m).bind(st1), AV(n).bind(st2));
-    }
+    SmallVector<OpFoldResult> offsets, sizes, strides;
+    // `tensor.insert_slice` (i.e. the producer) folds **into**
+    // `flow.dispatch.tensor.store` (i.e. the consumer).
+    if (failed(foldOffsetsSizesAndStrides(rewriter, op.getLoc(), insertSliceOp,
+                                          op, offsets, sizes, strides)))
+      return failure();
     rewriter.replaceOpWithNewOp<IREE::Flow::DispatchTensorStoreOp>(
         op, insertSliceOp.source(), op.target(), op.target_dims(), offsets,
-        insertSliceOp.getMixedSizes(), strides);
+        sizes, strides);
 
     return success();
   }
