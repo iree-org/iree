@@ -25,6 +25,7 @@ iree_lit_test_suite(
             "distribute_wg_copy.mlir",
             "gpu_set_num_workgroups.mlir",
             "nvvm_pipeline_test.mlir",
+            "reduce_bank_conflicts.mlir",
             "rocdl_pipeline_test.mlir",
             "illegal_configuration.mlir",
             "legalize.mlir",

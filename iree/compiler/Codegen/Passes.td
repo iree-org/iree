@@ -315,6 +315,12 @@ def LLVMGPUMultiBuffering :
   let constructor = "mlir::iree_compiler::createLLVMGPUMultiBuffering()";
 }
 
+def LLVMGPUReduceBankConflicts :
+    Pass<"iree-llvmgpu-reduce-bank-conflicts", "func::FuncOp"> {
+  let summary = "Pass try reduce the number of bank conflicts.";
+  let constructor = "mlir::iree_compiler::createLLVMGPUReduceSharedMemoryBankConflicts()";
+}
+
 def LLVMGPUVectorToGPU :
     Pass<"iree-llvmgpu-vector-to-gpu", "func::FuncOp"> {
   let summary = "Pass to convert vector to gpu.";
