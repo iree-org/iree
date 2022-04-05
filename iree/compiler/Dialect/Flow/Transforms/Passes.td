@@ -80,6 +80,11 @@ def InferNumericNarrowing :
   let constructor = "mlir::iree_compiler::IREE::Flow::createInferNumericNarrowingPass()";
 }
 
+def InitializeEmptyTensors : Pass<"iree-flow-initialize-empty-tensors", ""> {
+  let summary = "Initialize empty tensors";
+  let constructor = "mlir::iree_compiler::IREE::Flow::createInitializeEmptyTensorsPass()";
+}
+
 def InjectDispatchTracing :
     InterfacePass<"iree-flow-inject-dispatch-tracing", "mlir::FunctionOpInterface"> {
   let summary = "Injects dispatch region tracing.";

@@ -16,6 +16,9 @@
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/SCF/SCF.h"
 #include "mlir/IR/BuiltinOps.h"
+#include "mlir/IR/OpDefinition.h"
+#include "mlir/IR/PatternMatch.h"
+#include "mlir/Interfaces/ViewLikeInterface.h"
 
 namespace mlir {
 namespace iree_compiler {
@@ -155,6 +158,23 @@ Operation *createLinalgCopyOp(OpBuilder &b, Location loc, Value from, Value to,
 /// Returns the option that distributes the ops using the flow workgroup
 /// ID/Count operations.
 linalg::LinalgLoopDistributionOptions getIREELinalgLoopDistributionOptions();
+
+/// Returns the `combinedOffsets`, `combinedSizes` and `combinedStrides` to use
+/// when folding a "producer" **into** a "consumer" op that implement
+/// `OffsetSizeAndStrideOpInterface`.
+/// The following computations are performed:
+///   - offsets = producer_offsets * consumer_strides + consumer_offsets,
+///   - sizes = producer_sizes
+///   - strides = producer_strides * consumer_strides.
+// TODO: Sizes should technically be combined with `min` but one often has
+// enough static knowledge to avoid this extra complexity.
+LogicalResult foldOffsetsSizesAndStrides(
+    PatternRewriter &rewriter, Location loc,
+    OffsetSizeAndStrideOpInterface producer,
+    OffsetSizeAndStrideOpInterface consumer,
+    SmallVector<OpFoldResult> &combinedOffsets,
+    SmallVector<OpFoldResult> &combinedSizes,
+    SmallVector<OpFoldResult> &combinedStrides);
 }  // namespace iree_compiler
 }  // namespace mlir
 
