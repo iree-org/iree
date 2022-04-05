@@ -10,7 +10,6 @@ func @return_zero_init(%arg0 : index, %arg1 : index) -> (tensor<?x?x42xi32>, ten
 // CHECK-SAME:     %[[ARG1:[a-zA-Z0-9]+]]: index
 //  CHECK-DAG:   %[[ZERO_INT:.+]] = arith.constant 0 : i32
 //  CHECK-DAG:   %[[ZERO_FLOAT:.+]] = arith.constant 0.000000e+00 : f32
-//  CHECK-DAG:   %[[C42:.+]] = arith.constant 42 : index
-//  CHECK-DAG:   %[[SPLAT_INT:.+]] = flow.tensor.splat %[[ZERO_INT]] : tensor<?x?x42xi32>{%[[ARG0]], %[[ARG1]], %[[C42]]}
-//  CHECK-DAG:   %[[SPLAT_FLOAT:.+]] = flow.tensor.splat %[[ZERO_FLOAT]] : tensor<?x42x?xf32>{%[[ARG1]], %[[C42]], %[[ARG0]]}
+//  CHECK-DAG:   %[[SPLAT_INT:.+]] = flow.tensor.splat %[[ZERO_INT]] : tensor<?x?x42xi32>{%[[ARG0]], %[[ARG1]]}
+//  CHECK-DAG:   %[[SPLAT_FLOAT:.+]] = flow.tensor.splat %[[ZERO_FLOAT]] : tensor<?x42x?xf32>{%[[ARG1]], %[[ARG0]]}
 //      CHECK:   return %[[SPLAT_INT]], %[[SPLAT_FLOAT]]

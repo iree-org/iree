@@ -55,10 +55,8 @@ struct RewriteInitTensorToSplat
     }
     Value value =
         rewriter.create<arith::ConstantOp>(loc, elementType, zero.getValue());
-    SmallVector<Value> sizes = getValueOrCreateConstantIndexOp(
-        rewriter, loc, initTensorOp.getMixedSizes());
     rewriter.replaceOpWithNewOp<TensorSplatOp>(initTensorOp, resultType, value,
-                                               sizes);
+                                               initTensorOp.sizes());
     return success();
   }
 };
