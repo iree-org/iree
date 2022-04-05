@@ -23,6 +23,7 @@
 #include "mlir/Dialect/SPIRV/IR/TargetAndABI.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
+#include "mlir/Dialect/Vector/Transforms/VectorRewritePatterns.h"
 #include "mlir/Dialect/Vector/Transforms/VectorTransforms.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/Interfaces/VectorInterfaces.h"
@@ -188,6 +189,23 @@ class SPIRVVectorizePass : public SPIRVVectorizeBase<SPIRVVectorizePass> {
 
     LLVM_DEBUG({
       llvm::dbgs() << "--- After casting away leading size-1 dims ---\n";
+      funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
+      llvm::dbgs() << "\n\n";
+    });
+
+    // Now we may have vector.insert_stridec_slice inserting 1-D native vectors
+    // into n-D larger vectors. Break that down too. This is a companion
+    // transformation of unrolling.
+    {
+      RewritePatternSet patterns(context);
+      vector::populateVectorInsertStridedSliceDecompositionPatterns(patterns);
+      if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
+        return signalPassFailure();
+      }
+    }
+
+    LLVM_DEBUG({
+      llvm::dbgs() << "--- After breaking down n-D inserts ---\n";
       funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
       llvm::dbgs() << "\n\n";
     });
