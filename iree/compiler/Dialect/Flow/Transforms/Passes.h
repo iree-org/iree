@@ -97,6 +97,10 @@ std::unique_ptr<Pass> createFusionOfTensorOpsPass();
 // beneficial.
 std::unique_ptr<Pass> createInferNumericNarrowingPass();
 
+// Create a pass to initialize all empty tensors after dispatch formation to
+// zero.
+std::unique_ptr<Pass> createInitializeEmptyTensorsPass();
+
 // Create a pass to interchange generic ops to force the reduction loop to be
 // the most inner loops.
 std::unique_ptr<Pass> createInterchangeGenericOpsPass();
