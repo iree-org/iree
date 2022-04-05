@@ -27,7 +27,7 @@ static llvm::cl::opt<bool> clExportBenchmarkFuncs(
 
 // TODO(ravishankarm): Change to a pipeline option.
 static llvm::cl::opt<bool> clTraceDispatchTensors(
-    "iree-flow-trace-dispatch-tensors2",
+    "iree-flow-trace-dispatch-tensors",
     llvm::cl::desc(
         "Trace runtime input/output tensors for each dispatch function."),
     llvm::cl::init(false));
@@ -187,6 +187,9 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
       .addPass(createCaptureDispatchDynamicDimsPass)
       .addPass(mlir::createCanonicalizerPass)
       .addPass(createCSEPass);
+
+  // Initialize any empty tensors to zero.
+  passManager.addPass(createInitializeEmptyTensorsPass());
 
   // Module pass to outline the dispatch regions into their own functions
   // wrapped in executables.

@@ -284,6 +284,12 @@ class LLVMAOTTargetBackend final : public TargetBackend {
           function.addFnAttr(llvm::Attribute::SanitizeAddress);
         }
       } break;
+      case SanitizerKind::kThread: {
+        libraryBuilder.setSanitizerKind(LibraryBuilder::SanitizerKind::THREAD);
+        for (auto &function : llvmModule->getFunctionList()) {
+          function.addFnAttr(llvm::Attribute::SanitizeThread);
+        }
+      } break;
     }
     auto align16 = llvm::Attribute::getWithAlignment(context, llvm::Align(16));
     for (auto entryPointOp :

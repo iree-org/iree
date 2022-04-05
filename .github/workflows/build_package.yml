@@ -75,6 +75,7 @@ jobs:
 
       # Needs the bazel manylinux image.
       # TODO: Move this to our repo and pin.
+      # TODO: update to Bazel 5.1.0
       CIBW_MANYLINUX_X86_64_IMAGE: stellaraccident/manylinux2014_x86_64-bazel-5.0.0:latest
       # CIBW_MANYLINUX_X86_64_IMAGE: manylinux2014
 

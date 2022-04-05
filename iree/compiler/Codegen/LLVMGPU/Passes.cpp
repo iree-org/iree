@@ -88,6 +88,8 @@ void addGPUMatmulSimtPassPipeline(OpPassManager &pm) {
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
+  pm.addNestedPass<func::FuncOp>(
+      createLLVMGPUReduceSharedMemoryBankConflicts());
   pm.addNestedPass<func::FuncOp>(createRemoveSingleIterationLoopPass());
 
   // Linalg -> vector
@@ -113,6 +115,8 @@ void addGPUMatmulTensorCorePassPipeline(OpPassManager &pm) {
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
+  pm.addNestedPass<func::FuncOp>(
+      createLLVMGPUReduceSharedMemoryBankConflicts());
   pm.addNestedPass<func::FuncOp>(createRemoveSingleIterationLoopPass());
 
   // Linalg -> vector
