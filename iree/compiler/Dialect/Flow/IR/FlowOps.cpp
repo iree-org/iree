@@ -815,6 +815,75 @@ std::pair<unsigned, unsigned> DispatchOp::getTiedOperandsIndexAndLength() {
 }
 
 //===----------------------------------------------------------------------===//
+// flow.tensor.clone
+//===----------------------------------------------------------------------===//
+
+LogicalResult TensorCloneOp::verify() {
+  if (failed(
+          verifyOpDynamicDims(getOperation(), {operand()}, operand_dims())) ||
+      failed(verifyOpDynamicDims(getOperation(), {result()}, operand_dims()))) {
+    return failure();
+  }
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
+// flow.tensor.empty
+//===----------------------------------------------------------------------===//
+
+LogicalResult TensorEmptyOp::verify() {
+  if (failed(verifyOpDynamicDims(getOperation(), {result()}, result_dims()))) {
+    return failure();
+  }
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
+// flow.tensor.load
+//===----------------------------------------------------------------------===//
+
+LogicalResult TensorLoadOp::verify() {
+  if (failed(verifyOpDynamicDims(getOperation(), {source()}, source_dims()))) {
+    return failure();
+  }
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
+// flow.tensor.slice
+//===----------------------------------------------------------------------===//
+
+LogicalResult TensorSliceOp::verify() {
+  if (failed(verifyOpDynamicDims(getOperation(), {source()}, source_dims())) ||
+      failed(verifyOpDynamicDims(getOperation(), {result()}, result_dims()))) {
+    return failure();
+  }
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
+// flow.tensor.splat
+//===----------------------------------------------------------------------===//
+
+LogicalResult TensorSplatOp::verify() {
+  if (failed(verifyOpDynamicDims(getOperation(), {result()}, result_dims()))) {
+    return failure();
+  }
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
+// flow.tensor.store
+//===----------------------------------------------------------------------===//
+
+LogicalResult TensorStoreOp::verify() {
+  if (failed(verifyOpDynamicDims(getOperation(), {target()}, target_dims()))) {
+    return failure();
+  }
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
 // flow.tensor.tie_shape
 //===----------------------------------------------------------------------===//
 
@@ -845,6 +914,15 @@ LogicalResult TensorTieShapeOp::reifyResultShapes(
 //===----------------------------------------------------------------------===//
 // flow.tensor.reshape
 //===----------------------------------------------------------------------===//
+
+LogicalResult TensorReshapeOp::verify() {
+  if (failed(verifyOpDynamicDims(getOperation(), {source()}, source_dims())) ||
+      failed(
+          verifyOpDynamicDims(getOperation(), {result()}, {result_dims()}))) {
+    return failure();
+  }
+  return success();
+}
 
 Value TensorReshapeOp::getTiedResult(unsigned resultIndex) {
   return IREE::Util::TiedOpInterface::findTiedBaseValue(source());
