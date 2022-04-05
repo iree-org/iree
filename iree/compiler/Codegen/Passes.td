@@ -27,12 +27,6 @@ def ConvertToDestinationPassingStyle :
   let constructor = "mlir::iree_compiler::createConvertToDestinationPassingStylePass()";
 }
 
-def DemoteF32ToF16 :
-    Pass<"iree-convert-f32-to-f16", "ModuleOp"> {
-  let summary = "Convert f32 operations and values into equivalent f16 ones.";
-  let constructor = "mlir::iree_compiler::createDemoteF32ToF16Pass()";
-}
-
 def FlattenMemRefSubspan :
   Pass<"iree-codegen-flatten-memref-subspan", "ModuleOp"> {
   let summary =

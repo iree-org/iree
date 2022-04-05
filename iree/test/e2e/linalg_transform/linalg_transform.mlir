@@ -18,14 +18,9 @@ func @matmul_static() -> tensor<5x5xf32> {
     [10.0, 09.0, 08.0, 07.0, 06.0],
     [05.0, 04.0, 03.0, 02.0, 01.0]]> : tensor<3x5xf32> -> tensor<3x5xf32>
 
-  // util.do_not_optimize on output to prevent fusing in the same dispatch
-  // region which would be subject to racy tensor semantics.
-  // Forcing different dispatches forces flow.dispatch.tensor.load which is
-  // actually side-effecting.
-  %res_in = util.do_not_optimize(%res) : tensor<5x5xf32>
   %matmul = linalg.matmul
       ins(%lhs, %rhs : tensor<5x3xf32>, tensor<3x5xf32>)
-      outs(%res_in : tensor<5x5xf32>) -> tensor<5x5xf32>
+      outs(%res : tensor<5x5xf32>) -> tensor<5x5xf32>
   %matmul_res = util.do_not_optimize(%matmul) : tensor<5x5xf32>
 
   return %matmul_res : tensor<5x5xf32>

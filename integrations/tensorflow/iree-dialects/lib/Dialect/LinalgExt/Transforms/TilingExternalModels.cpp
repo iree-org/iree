@@ -59,7 +59,8 @@ makeTiledInputShapes(OpBuilder &b, Location loc, LinalgOp linalgOp,
     AffineMap map = linalgOp.getTiedIndexingMap(opOperand);
     LLVM_DEBUG(llvm::dbgs() << ": tiled: figure out subshape...\n");
     tiledShapes.push_back(makeTiledShape(b, loc, shapedOp, tileSizes, map, lbs,
-                                         sizeBounds, subShapeSizes));
+                                         sizeBounds, subShapeSizes,
+                                         /*omitPartialTileCheck=*/false));
   }
 
   return tiledShapes;
@@ -140,7 +141,8 @@ struct LinalgOpTilingInterface
       // Append the outputs then tile both the inputs and outputs.
       valuesToTile.append(tiledDest.begin(), tiledDest.end());
       tiledOperands = makeTiledShapes(b, loc, linalgOp, valuesToTile,
-                                      tileOffsets, tileSizes, sizeBounds);
+                                      tileOffsets, tileSizes, sizeBounds,
+                                      /*omitPartialTileCheck=*/false);
     } else {
       // Only tile the inputs, then apped the outputs.
       int64_t dim = offsets.size();

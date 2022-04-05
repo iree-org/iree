@@ -143,6 +143,12 @@ def IREELinalgExt_HALExecutableEntryPointOp : Op<IREELinalgExt_Dialect, "hal.exe
   // This op only propagates information to HAL, it inherits none of the design.
   let arguments = (ins);
   let regions = (region SizedRegion<1>:$workgroup_count_region);
+
+
+  let extraClassDeclaration = [{
+    // TODO: Propagate this to avoid magic constants.
+    static unsigned getNumWorkgroupDims() { return 3; }
+  }];
 }
 
 

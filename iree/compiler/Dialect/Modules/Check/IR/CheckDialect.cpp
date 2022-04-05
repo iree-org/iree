@@ -26,9 +26,10 @@ class CheckToVmConversionInterface : public VMConversionDialectInterface {
   using VMConversionDialectInterface::VMConversionDialectInterface;
 
   OwningOpRef<mlir::ModuleOp> parseVMImportModule() const override {
-    return mlir::parseSourceString(StringRef(iree_check_imports_create()->data,
-                                             iree_check_imports_create()->size),
-                                   getDialect()->getContext());
+    return mlir::parseSourceString<mlir::ModuleOp>(
+        StringRef(iree_check_imports_create()->data,
+                  iree_check_imports_create()->size),
+        getDialect()->getContext());
   }
 
   void populateVMConversionPatterns(

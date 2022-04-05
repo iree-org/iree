@@ -312,11 +312,8 @@ struct ConvertTensorFromElementsPattern
       return failure();
     }
 
-    auto loc = op.getLoc();
-    SmallVector<Value> dimSizes(1);
-    dimSizes[0] = rewriter.create<arith::ConstantIndexOp>(loc, 1);
     rewriter.replaceOpWithNewOp<IREE::Flow::TensorSplatOp>(
-        op, op.getType(), op.getOperand(0), dimSizes);
+        op, op.getType(), op.getOperand(0), ValueRange());
     return success();
   }
 };

@@ -46,7 +46,6 @@ iree_cc_library(
     "ConvertMHLOToFlow.h"
     "ConvertMHLOToLinalgExt.cpp"
     "FlattenTuplesInCFG.cpp"
-    "LegalizeInputTypes.cpp"
     "MHLOToLinalgOnTensors.cpp"
     "MHLOToMHLOPreprocessing.cpp"
     "Passes.cpp"
@@ -90,8 +89,8 @@ iree_cc_library(
     MhloToMemrefConversion
     MhloToStandard
     iree::compiler::Dialect::Flow::IR
-    iree::compiler::Dialect::Flow::Transforms
     iree::compiler::Dialect::Util::IR
+    iree::compiler::Dialect::Util::Transforms
     iree::compiler::InputConversion::Common
     tensorflow::external_mhlo_includes
   PUBLIC

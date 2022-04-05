@@ -782,6 +782,7 @@ def FLOW_TensorReshapeOp : FLOW_PureOp<"tensor.reshape", [
     ValueRange getResultDynamicDims(unsigned idx) { return result_dims(); }
   }];
 
+  let hasVerifier = 1;
   let hasFolder = 1;
   let hasCanonicalizer = 1;
 }
@@ -830,6 +831,7 @@ def FLOW_TensorLoadOp : FLOW_PureOp<"tensor.load", [
     ValueRange getResultDynamicDims(unsigned idx) { return ValueRange{}; }
   }];
 
+  let hasVerifier = 1;
   // TODO(benvanik): canonicalize to slice+load if dims are known.
   let hasFolder = 1;
   let hasCanonicalizer = 1;
@@ -882,6 +884,7 @@ def FLOW_TensorStoreOp : FLOW_PureOp<"tensor.store", [
     ValueRange getResultDynamicDims(unsigned idx) { return target_dims(); }
   }];
 
+  let hasVerifier = 1;
   let hasFolder = 1;
 }
 
@@ -914,6 +917,7 @@ def FLOW_TensorEmptyOp : FLOW_PureOp<"tensor.empty", [
     ValueRange getResultDynamicDims(unsigned idx) { return result_dims(); }
   }];
 
+  let hasVerifier = 1;
   let hasCanonicalizer = 1;
 }
 
@@ -950,6 +954,7 @@ def FLOW_TensorSplatOp : FLOW_PureOp<"tensor.splat", [
     ValueRange getResultDynamicDims(unsigned idx) { return result_dims(); }
   }];
 
+  let hasVerifier = 1;
   let hasCanonicalizer = 1;
 }
 
@@ -994,6 +999,7 @@ def FLOW_TensorCloneOp : FLOW_PureOp<"tensor.clone", [
     ValueRange getResultDynamicDims(unsigned idx) { return operand_dims(); }
   }];
 
+  let hasVerifier = 1;
   let hasCanonicalizer = 1;
   let hasFolder = 1;
 }
@@ -1036,6 +1042,7 @@ def FLOW_TensorSliceOp : FLOW_PureOp<"tensor.slice", [
     ValueRange getResultDynamicDims(unsigned idx) { return result_dims(); }
   }];
 
+  let hasVerifier = 1;
   let hasCanonicalizer = 1;
   let hasFolder = 1;
 }

@@ -13,6 +13,7 @@
 
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
+#include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
@@ -27,88 +28,6 @@
 
 namespace mlir {
 namespace iree_compiler {
-
-/// Helper function to create `AffineExpr` from `OpFoldResult`. If the
-/// `OpFoldResult` is a `Value`, creates a `AffineSymbolExpr` and appends it to
-/// `symbols`.
-static AffineExpr getAffineExpr(OpFoldResult ofr, SmallVector<Value> &symbols) {
-  if (auto attr = ofr.dyn_cast<Attribute>()) {
-    return getAffineConstantExpr(attr.cast<IntegerAttr>().getInt(),
-                                 attr.getContext());
-  }
-  Value v = ofr.get<Value>();
-  AffineExpr expr = getAffineSymbolExpr(symbols.size(), v.getContext());
-  symbols.push_back(v);
-  return expr;
-}
-/// Converts an `AffineExpr` to `OpFoldResult` by generating an `affine.apply`
-/// operation.
-static OpFoldResult getOpFoldResult(OpBuilder &builder, Location loc,
-                                    AffineExpr expr,
-                                    SmallVector<Value> &symbols) {
-  AffineMap m = AffineMap::get(0, symbols.size(), expr);
-  return applyMapToValues(builder, loc, m, symbols)[0];
-}
-
-/// Methods to build the Affine Expr for arithmetic operations.
-static AffineExpr add(AffineExpr expr, OpFoldResult ofr,
-                      SmallVector<Value> &symbols) {
-  return expr + getAffineExpr(ofr, symbols);
-}
-static AffineExpr add(OpFoldResult lhs, OpFoldResult rhs,
-                      SmallVector<Value> &symbols) {
-  return getAffineExpr(lhs, symbols) + getAffineExpr(rhs, symbols);
-}
-static AffineExpr mul(AffineExpr expr, OpFoldResult ofr,
-                      SmallVector<Value> &symbols) {
-  return expr * getAffineExpr(ofr, symbols);
-}
-static AffineExpr mul(OpFoldResult lhs, OpFoldResult rhs,
-                      SmallVector<Value> &symbols) {
-  return getAffineExpr(lhs, symbols) * getAffineExpr(rhs, symbols);
-}
-
-/// Returns the offsets to use when combining two operations that implement the
-/// `OffsetSizeAndStrideOpInterface`. Also checks that the strides are 1.
-static LogicalResult foldOffsetsSizesAndStrides(
-    PatternRewriter &rewriter, Location loc,
-    OffsetSizeAndStrideOpInterface producer,
-    OffsetSizeAndStrideOpInterface consumer,
-    SmallVector<OpFoldResult> &combinedOffsets,
-    SmallVector<OpFoldResult> &combinedSizes,
-    SmallVector<OpFoldResult> &combinedStrides) {
-  SmallVector<OpFoldResult> producerOffsets = producer.getMixedOffsets();
-  SmallVector<OpFoldResult> producerStrides = producer.getMixedStrides();
-  SmallVector<OpFoldResult> consumerOffsets = consumer.getMixedOffsets();
-  SmallVector<OpFoldResult> consumerStrides = consumer.getMixedStrides();
-  if (producerOffsets.size() != consumerOffsets.size()) {
-    return rewriter.notifyMatchFailure(
-        consumer,
-        "expected op and producer to have same number of offset values");
-  }
-
-  combinedOffsets.resize(producerOffsets.size());
-  combinedSizes.resize(producerOffsets.size());
-  combinedStrides.resize(producerOffsets.size());
-  for (auto i : llvm::seq<unsigned>(0, producerOffsets.size())) {
-    SmallVector<Value> offsetSymbols, strideSymbols;
-    // The combined offset is computed as
-    //    producer_offset + consumer_offset * producer_strides.
-    combinedOffsets[i] = getOpFoldResult(
-        rewriter, loc,
-        add(mul(consumerOffsets[i], producerStrides[i], offsetSymbols),
-            producerOffsets[i], offsetSymbols),
-        offsetSymbols);
-    // The combined stride is computed as
-    //    producer_stride * consumer_stride.
-    combinedStrides[i] = getOpFoldResult(
-        rewriter, loc,
-        mul(producerStrides[i], consumerStrides[i], strideSymbols),
-        strideSymbols);
-  }
-  combinedSizes = consumer.getMixedSizes();
-  return success();
-}
 
 /// Returns the `hal.interface.binding` a value comes from.
 static Optional<IREE::HAL::InterfaceBindingSubspanOp> getBindingSubspanOp(
@@ -142,9 +61,11 @@ struct FoldTensorLoadWithExtractSlice
     if (!dispatchTensorLoadOp) return failure();
 
     SmallVector<OpFoldResult> offsets, sizes, strides;
+    // `tensor.extract_slice` (i.e. the producer) folds **into**
+    // `flow.dispatch.tensor.load1 (i.e. the consumer).
     if (failed(foldOffsetsSizesAndStrides(
-            rewriter, dispatchTensorLoadOp->getLoc(), dispatchTensorLoadOp,
-            extractSliceOp, offsets, sizes, strides))) {
+            rewriter, dispatchTensorLoadOp->getLoc(), extractSliceOp,
+            dispatchTensorLoadOp, offsets, sizes, strides))) {
       return failure();
     }
 
@@ -182,12 +103,11 @@ struct FoldInsertSliceWithTensorStoreOp
     }
 
     SmallVector<OpFoldResult> offsets, sizes, strides;
-    // Treat the `flow.dispatch.tensor.store` as the producer and the
-    // `tensor.insert_slice` as the consumer since that would be the case for
-    // the final subview created.
+    // `tensor.insert_slice` (i.e. the producer) folds **into**
+    // `flow.dispatch.tensor.store` (i.e. the consumer).
     if (failed(foldOffsetsSizesAndStrides(
-            rewriter, dispatchTensorStoreOp->getLoc(), dispatchTensorStoreOp,
-            insertSliceOp, offsets, sizes, strides))) {
+            rewriter, dispatchTensorStoreOp->getLoc(), insertSliceOp,
+            dispatchTensorStoreOp, offsets, sizes, strides))) {
       return failure();
     }
 

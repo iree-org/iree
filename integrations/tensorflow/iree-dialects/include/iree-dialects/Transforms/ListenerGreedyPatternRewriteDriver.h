@@ -7,6 +7,7 @@
 #include "iree-dialects/Transforms/Listener.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Rewrite/FrozenRewritePatternSet.h"
+#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 namespace mlir {
 struct GreedyRewriteConfig;

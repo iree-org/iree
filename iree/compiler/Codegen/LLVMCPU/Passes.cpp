@@ -35,6 +35,13 @@ static llvm::cl::opt<bool> clCheckIRBeforeLLVMConversion(
                    "before conversion to LLVM IR"),
     llvm::cl::init(false));
 
+// TODO: Remove this flag once we can call bufferize from the transform dialect.
+static llvm::cl::opt<bool> clDisableLinalgTransformInterpBufferization(
+    "linalg-transform-interp-disable-bufferization",
+    llvm::cl::desc("Disables bufferization when running the linalg transform "
+                   "interp pass (testing only)."),
+    llvm::cl::init(false));
+
 //===---------------------------------------------------------------------===//
 // Default allocation functions for CPU backend
 //===---------------------------------------------------------------------===//
@@ -427,6 +434,10 @@ void addLinalgTransformInterpPasses(OpPassManager &passManager) {
 
   // Sets the number of workgroups using kFakeHAL op information.
   passManager.addPass(createSetNumWorkgroupsFromLinalgExtPass());
+
+  // TODO: Remove this flag and the code below once we can call bufferize from
+  // the transform dialect.
+  if (clDisableLinalgTransformInterpBufferization) return;
 
   OpPassManager &modulePM = passManager.nest<ModuleOp>();
   // Bufferize the dispatch.

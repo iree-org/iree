@@ -68,6 +68,20 @@ auto applyAt(OpT op, PatternT &&pattern, Args &&... args) {
   return pattern(op, rewriter, std::forward<Args>(args)...);
 }
 
+template <typename OpT, typename PatternT>
+auto applyReturningPatternAt(PatternT &&pattern, OpT op) {
+  detail::SimpleRewriter rewriter(op.getContext());
+  rewriter.setInsertionPoint(op);
+  return pattern.returningMatchAndRewrite(op, rewriter);
+}
+
+template <typename PatternT>
+auto applyReturningPatternAt(PatternT &&pattern, Operation *op) {
+  detail::SimpleRewriter rewriter(op->getContext());
+  rewriter.setInsertionPoint(op);
+  return pattern.returningMatchAndRewrite(op, rewriter);
+}
+
 /// Given a scope, apply a pattern with the given arguments until the first
 /// successful match and return the result. This function instantiates a simple
 /// pattern rewriter.
