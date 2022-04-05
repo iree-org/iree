@@ -43,7 +43,7 @@ if(NOT TRACY_DEPS_FOUND)
   return()
 endif()
 
-if(NOT TRACY_CAPSTONE_DEPS)
+if(NOT TRACY_CAPSTONE_DEPS_FOUND)
   message(STATUS "Could not find capstone, a Tracy dependency (Tracy server will not be built).")
   message(STATUS "To build Tracy, install capstone (on Ubuntu/Debian, 'apt install libcapstone-dev')")
   return()
