@@ -34,7 +34,7 @@ jobs:
         uses: ad-m/github-push-action@v0.6.0
         with:
           github_token: ${{ secrets.WRITE_ACCESS_TOKEN }}
-          branch: ${{ env.ref }}
+          branch: ${{ github.ref_name }}
           tags: true
 
       - name: Create Release
