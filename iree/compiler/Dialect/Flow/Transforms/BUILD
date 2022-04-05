@@ -56,13 +56,11 @@ cc_library(
         "StripAndSplatConstantVariables.cpp",
         "StripSignednessPass.cpp",
         "TestPartitionableLoopsInterface.cpp",
-        "TypeConverter.cpp",
         "VerifyInputLegality.cpp",
     ],
     hdrs = [
         "Passes.h",
         "Passes.h.inc",
-        "TypeConverter.h",
     ],
     deps = [
         ":PassesIncGen",

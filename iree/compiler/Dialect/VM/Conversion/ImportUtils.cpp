@@ -45,8 +45,8 @@ LogicalResult appendImportModule(IREE::VM::ModuleOp importModuleOp,
 
 LogicalResult appendImportModule(StringRef importModuleSrc,
                                  ModuleOp targetModuleOp) {
-  auto importModuleRef =
-      mlir::parseSourceString(importModuleSrc, targetModuleOp.getContext());
+  auto importModuleRef = mlir::parseSourceString<mlir::ModuleOp>(
+      importModuleSrc, targetModuleOp.getContext());
   if (!importModuleRef) {
     return targetModuleOp.emitError()
            << "unable to append import module; import module failed to parse";

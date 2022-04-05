@@ -38,7 +38,6 @@ cc_library(
         "BufferizeCopyOnlyDispatchesPass.cpp",
         "CleanupBufferAllocViewPass.cpp",
         "ConvertToDestinationPassingStylePass.cpp",
-        "DemoteF32ToF16.cpp",
         "DestructiveUpdateUtils.cpp",
         "FlattenMemRefSubspanPass.cpp",
         "FoldAffineMinInDistributedLoops.cpp",
