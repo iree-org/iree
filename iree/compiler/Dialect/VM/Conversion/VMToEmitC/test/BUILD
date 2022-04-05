@@ -42,6 +42,7 @@ iree_lit_test_suite(
             "conversion_ops_f32.mlir",
             "conversion_ops_i64.mlir",
             "conversion_ops.mlir",
+            "func_op.mlir",
             "global_ops_f32.mlir",
             "global_ops_i64.mlir",
             "global_ops.mlir",
