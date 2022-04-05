@@ -88,6 +88,8 @@ namespace {
 class ConvertHALToVMPass
     : public PassWrapper<ConvertHALToVMPass, OperationPass<ModuleOp>> {
  public:
+  MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(ConvertHALToVMPass)
+
   explicit ConvertHALToVMPass(IREE::VM::TargetOptions targetOptions)
       : targetOptions_(targetOptions) {}
 

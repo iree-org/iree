@@ -20,6 +20,8 @@ namespace {
 class TestFloatRangeAnalysisPass
     : public PassWrapper<TestFloatRangeAnalysisPass, OperationPass<void>> {
  public:
+  MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(TestFloatRangeAnalysisPass)
+
   StringRef getArgument() const override {
     return "iree-util-test-float-range-analysis";
   }

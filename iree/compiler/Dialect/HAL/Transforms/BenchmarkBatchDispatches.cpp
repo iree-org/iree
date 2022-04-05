@@ -21,6 +21,8 @@ class BenchmarkBatchDispatchesPass
     : public PassWrapper<BenchmarkBatchDispatchesPass,
                          OperationPass<func::FuncOp>> {
  public:
+  MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(BenchmarkBatchDispatchesPass)
+
   explicit BenchmarkBatchDispatchesPass(unsigned repeatCount)
       : repeatCount_(repeatCount) {}
 
