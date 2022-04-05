@@ -220,20 +220,20 @@
 
   <Expand>
     <Item Name="[base]">resource</Item>
-    <Item Name="allocated_buffer" Condition="is_subspan()">allocated_buffer</Item>
-    <Item Name="allocation_size" Condition="is_subspan()">allocation_size</Item>
-    <Item Name="byte_offset" Condition="is_subspan()">byte_offset</Item>
+    <Item Name="allocated_buffer">allocated_buffer</Item>
+    <Item Name="allocation_size">allocation_size</Item>
+    <Item Name="byte_offset">byte_offset</Item>
     <Item Name="byte_length">byte_length</Item>
     <Synthetic Name="memory_type">
       <DisplayString>{(iree_hal_memory_type_bits_t)memory_type}</DisplayString>
       <Expand>
+        <Item Name="transient" Condition="memory_type&amp;(1u&lt;&lt;0)">true</Item>
         <Item Name="host_local" Condition="is_host_local()">true</Item>
-        <Item Name="host_visible" Condition="memory_type&amp;(1u&lt;&lt;0)">true</Item>
-        <Item Name="host_coherent" Condition="memory_type&amp;(1u&lt;&lt;1)">true</Item>
-        <Item Name="host_cached" Condition="memory_type&amp;(1u&lt;&lt;2)">true</Item>
+        <Item Name="host_visible" Condition="memory_type&amp;(1u&lt;&lt;1)">true</Item>
+        <Item Name="host_coherent" Condition="memory_type&amp;(1u&lt;&lt;2)">true</Item>
+        <Item Name="host_cached" Condition="memory_type&amp;(1u&lt;&lt;3)">true</Item>
         <Item Name="device_local" Condition="is_device_local()">true</Item>
         <Item Name="device_visible" Condition="memory_type&amp;(1u&lt;&lt;4)">true</Item>
-        <Item Name="transient" Condition="memory_type&amp;(1u&lt;&lt;0)">true</Item>
       </Expand>
     </Synthetic>
     <Synthetic Name="allowed_access">
@@ -243,6 +243,7 @@
         <Item Name="write" Condition="allowed_access&amp;(1u&lt;&lt;1)">true</Item>
         <Item Name="discard" Condition="allowed_access&amp;(1u&lt;&lt;2)">true</Item>
         <Item Name="may_alias" Condition="allowed_access&amp;(1u&lt;&lt;3)">true</Item>
+        <Item Name="any" Condition="allowed_access&amp;(1u&lt;&lt;4)">true</Item>
       </Expand>
     </Synthetic>
     <Synthetic Name="allowed_usage">
@@ -264,6 +265,10 @@
 <!--=========================================================================-->
 
 <Type Name="iree_hal_buffer_view_t">
+  <!--
+  TODO(benvanik): figure out why this stopped working; the
+  IREE_HAL_ELEMENT_TYPE_* enum seems to be the problem; referencing those values
+  in an expression will cause it to fail to load.
   <DisplayString Condition="shape_rank==0 &amp;&amp; element_type==IREE_HAL_ELEMENT_TYPE_INT_4">{{!hal.buffer_view&lt;i4&gt; size={byte_length}}}</DisplayString>
   <DisplayString Condition="shape_rank==0 &amp;&amp; element_type==IREE_HAL_ELEMENT_TYPE_SINT_4">{{!hal.buffer_view&lt;si4&gt; size={byte_length}}}</DisplayString>
   <DisplayString Condition="shape_rank==0 &amp;&amp; element_type==IREE_HAL_ELEMENT_TYPE_UINT_4">{{!hal.buffer_view&lt;ui4&gt; size={byte_length}}}</DisplayString>
@@ -423,11 +428,13 @@
   <DisplayString Condition="shape_rank==6 &amp;&amp; element_type==IREE_HAL_ELEMENT_TYPE_FLOAT_32">{{!hal.buffer_view&lt;{shape[0]}x{shape[1]}x{shape[2]}x{shape[3]}x{shape[4]}x{shape[5]}xf32&gt; size={byte_length}}}</DisplayString>
   <DisplayString Condition="shape_rank==6 &amp;&amp; element_type==IREE_HAL_ELEMENT_TYPE_FLOAT_64">{{!hal.buffer_view&lt;{shape[0]}x{shape[1]}x{shape[2]}x{shape[3]}x{shape[4]}x{shape[5]}xf64&gt; size={byte_length}}}</DisplayString>
   <DisplayString Condition="shape_rank==6 &amp;&amp; element_type==IREE_HAL_ELEMENT_TYPE_BFLOAT_16">{{!hal.buffer_view&lt;{shape[0]}x{shape[1]}x{shape[2]}x{shape[3]}x{shape[4]}x{shape[5]}xbf16&gt; size={byte_length}}}</DisplayString>
+  -->
 
   <Expand>
     <Item Name="[references]" ExcludeView="simple">ref_count</Item>
     <Item Name="shape" ExcludeView="simple">shape,[shape_rank]d</Item>
     <Item Name="element_type" ExcludeView="simple">(iree_hal_element_types_t)element_type</Item>
+    <Item Name="encoding_type" ExcludeView="simple">(iree_hal_encoding_types_t)encoding_type</Item>
     <Item Name="byte_length">byte_length</Item>
     <Item Name="buffer">buffer</Item>
   </Expand>
