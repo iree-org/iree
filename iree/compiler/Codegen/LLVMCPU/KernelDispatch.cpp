@@ -596,6 +596,97 @@ static LogicalResult setRootConfig(
       entryPointFn, fftOp, tileSizes, DispatchLoweringPassPipeline::CPUDefault);
 }
 
+static LogicalResult setX86DefaultParallelReductionTileSizes(
+    linalg::GenericOp genericOp, unsigned numLoops,
+    ArrayRef<int64_t> flowTileSizes, ArrayRef<int64_t> minTileSizes,
+    ArrayRef<int64_t> maxTileSizes, SmallVectorImpl<int64_t> &parallelTileSizes,
+    SmallVectorImpl<int64_t> &reductionTileSizes) {
+  parallelTileSizes.append(numLoops, 0);
+  Optional<SmallVector<int64_t, 4>> staticLoopRanges =
+      genericOp.getStaticLoopRanges();
+  for (auto loopNum : llvm::seq<unsigned>(0, numLoops)) {
+    if (flowTileSizes[loopNum]) {
+      parallelTileSizes[loopNum] =
+          getMaxTileSize(0, flowTileSizes[loopNum], minTileSizes[loopNum],
+                         minTileSizes[loopNum]);
+    } else {
+      // If the flow level tile size is zero, and static loop range is 0 as
+      // well, set the tile sizes here to zero as well.
+      parallelTileSizes[loopNum] =
+          (staticLoopRanges && staticLoopRanges.getValue()[loopNum] == 1)
+              ? 0
+              : minTileSizes[loopNum];
+    }
+  }
+
+  splitParallelAndReductionTiles(genericOp, parallelTileSizes,
+                                 reductionTileSizes);
+  return success();
+}
+
+/// Returns true if the operation is a GenericOp implementing a supported
+/// transposition.
+static bool isSupportedTransposeOp(linalg::GenericOp genericOp) {
+  // Check that the op has at least 2 dimensions.
+  if (genericOp.getNumLoops() < 2) return false;
+
+  // Check that the op has only one input and one output.
+  // TODO(diegocaballero): Generalize to multiple inputs.
+  if ((genericOp.getNumInputs() != 1) || (genericOp.getNumOutputs() != 1))
+    return false;
+
+  // Check that all the iterators are parallel.
+  auto iterator_types = genericOp.iterator_types();
+  if (std::any_of(
+          iterator_types.begin(), iterator_types.end(),
+          [](Attribute attr) { return !mlir::isParallelIterator(attr); }))
+    return false;
+
+  // Check that the two indexing maps are a permutation of each other.
+  auto indexing_maps = genericOp.getIndexingMaps();
+  if (indexing_maps.size() != 2) return false;
+  return (indexing_maps[0].isIdentity() && indexing_maps[1].isPermutation()) ||
+         (indexing_maps[0].isPermutation() && indexing_maps[1].isIdentity());
+}
+
+// Sets specific parallel and reduction tile sizes for tranpose operations.
+// Returns failure if 'genericOp' does not implement a supported transpose
+// operation or if there are no target features that would benefit from this
+// specific tiling (e.g., '+avx2').
+static LogicalResult setX86TransposeParallelReductionTileSizes(
+    linalg::GenericOp genericOp, unsigned numLoops,
+    ArrayRef<int64_t> flowTileSizes, ArrayRef<int64_t> minTileSizes,
+    ArrayRef<int64_t> maxTileSizes, SmallVectorImpl<int64_t> &parallelTileSizes,
+    SmallVectorImpl<int64_t> &reductionTileSizes) {
+  if (!hasAVX2Features(genericOp) || !isSupportedTransposeOp(genericOp))
+    return failure();
+
+  // Bail out if we plan to tile more or less than two dimensions.
+  if (numLoops < 2) return failure();
+  SmallVector<int64_t> filteredTileSizes;
+  llvm::copy_if(minTileSizes, std::back_inserter(filteredTileSizes),
+                [](int64_t tileSize) { return tileSize > 1; });
+  if (filteredTileSizes.size() != 2) return failure();
+
+  // Make sure that the original tile sizes are multiple of the tile sizes to be
+  // used for the transpose op (i.e., 8x8).
+  // TODO(diegocaballero): Enable 4x8 tile sizes if we find it useful.
+  for (int64_t tileSize : filteredTileSizes) {
+    if (tileSize < 8 || (tileSize % 8) != 0) return failure();
+  }
+
+  // Create a copy of newMinTileSizes with the new 8x8 tile sizes.
+  SmallVector<int64_t> newMinTileSizes;
+  std::replace_copy_if(
+      minTileSizes.begin(), minTileSizes.end(),
+      std::back_inserter(newMinTileSizes),
+      [](int64_t tileSize) { return tileSize > 1; }, 8);
+
+  return setX86DefaultParallelReductionTileSizes(
+      genericOp, numLoops, flowTileSizes, newMinTileSizes, maxTileSizes,
+      parallelTileSizes, reductionTileSizes);
+}
+
 /// Sets the lowering configuration for a generic op to use
 /// CPUDoubleTilingExpert pipeline.
 static LogicalResult setRootConfig(
@@ -625,27 +716,15 @@ static LogicalResult setRootConfig(
       iterationDomain, partitionableLoopsInterfaceOp, minTileSizes,
       maxTileSizes);
 
-  // Set the Next level tile sizes.
-  SmallVector<int64_t> parallelTileSizes(numLoops, 0);
-  Optional<SmallVector<int64_t, 4>> staticLoopRanges =
-      linalgOp.getStaticLoopRanges();
-  for (auto loopNum : llvm::seq<unsigned>(0, numLoops)) {
-    if (flowTileSizes[loopNum]) {
-      parallelTileSizes[loopNum] =
-          getMaxTileSize(0, flowTileSizes[loopNum], minTileSizes[loopNum],
-                         minTileSizes[loopNum]);
-    } else {
-      // If the flow level tile size is zero, and static loop range is 0 as
-      // well, set the tile sizes here to zero as well.
-      parallelTileSizes[loopNum] =
-          (staticLoopRanges && staticLoopRanges.getValue()[loopNum] == 1)
-              ? 0
-              : minTileSizes[loopNum];
-    }
-  }
+  // Set the next level tile sizes.
+  SmallVector<int64_t> parallelTileSizes;
   SmallVector<int64_t> reductionTileSizes;
-  splitParallelAndReductionTiles(linalgOp, parallelTileSizes,
-                                 reductionTileSizes);
+  if (failed(setX86TransposeParallelReductionTileSizes(
+          genericOp, numLoops, flowTileSizes, minTileSizes, maxTileSizes,
+          parallelTileSizes, reductionTileSizes)))
+    (void)setX86DefaultParallelReductionTileSizes(
+        genericOp, numLoops, flowTileSizes, minTileSizes, maxTileSizes,
+        parallelTileSizes, reductionTileSizes);
 
   TileSizesListType tileSizes;
   tileSizes.push_back(flowTileSizes);
