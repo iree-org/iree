@@ -198,14 +198,15 @@ class SPIRVVectorizePass : public SPIRVVectorizeBase<SPIRVVectorizePass> {
     // transformation of unrolling.
     {
       RewritePatternSet patterns(context);
-      vector::populateVectorInsertStridedSliceDecompositionPatterns(patterns);
+      vector::populateVectorInsertExtractStridedSliceDecompositionPatterns(
+          patterns);
       if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
         return signalPassFailure();
       }
     }
 
     LLVM_DEBUG({
-      llvm::dbgs() << "--- After breaking down n-D inserts ---\n";
+      llvm::dbgs() << "--- After breaking down n-D inserts/extracts ---\n";
       funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
       llvm::dbgs() << "\n\n";
     });
