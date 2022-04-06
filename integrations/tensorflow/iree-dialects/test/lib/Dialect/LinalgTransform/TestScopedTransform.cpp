@@ -40,6 +40,7 @@ struct TestWrapScopePass : public PassWrapper<TestWrapScopePass, Pass> {
 };
 
 struct TestUnwrapScopePass : public PassWrapper<TestUnwrapScopePass, Pass> {
+  MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(TestUnwrapScopePass)
   StringRef getArgument() const final { return "test-unwrap-scope"; }
   StringRef getDescription() const final { return "Test unwrap scope pass."; }
   bool canScheduleOn(RegisteredOperationName opName) const override {
