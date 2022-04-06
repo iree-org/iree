@@ -177,12 +177,10 @@ class TileOp:
                *,
                sizes: IntListArg = None,
                interchange: IntListArg = None,
-               scalarize_dyn_dims: BoolArg = None,
                loc=None,
                ip=None):
     sizes = _ensure_int_array_attr(sizes, [])
     interchange = _ensure_int_array_attr(interchange, [])
-    scalarize_dyn_dims = _ensure_bool_attr(scalarize_dyn_dims, False)
     operation_type = pdl.OperationType.get()
     tile_size_zero = _ensure_int_attr(0)
     # Number of loops = number of tile sizes != 0
@@ -191,9 +189,21 @@ class TileOp:
                      target,
                      sizes,
                      interchange,
-                     scalarize_dyn_dims,
                      loc=loc,
                      ip=ip)
+
+
+class ScalarizeOp:
+  """Specialization for the ScalarizeOp class."""
+
+  def __init__(self,
+               target: Union[ir.Value, ir.Operation, ir.OpView],
+               *,
+               loc=None,
+               ip=None):
+    operation_type = pdl.OperationType.get()
+
+    super().__init__(operation_type, target, loc=loc, ip=ip)
 
 
 class PeelLoopOp:
@@ -358,9 +368,14 @@ class SequenceOp:
 
 class PrintOp:
 
-  def __init__(self, *, name: StringArg, loc=None, ip=None):
+  def __init__(self,
+               target: Optional[Union[ir.Value, ir.Operation, ir.OpView]],
+               *,
+               name: StringArg,
+               loc=None,
+               ip=None):
     name = _ensure_string_attr(name)
-    super().__init__(name, loc=loc, ip=ip)
+    super().__init__(target, name, loc=loc, ip=ip)
 
 
 ##===----------------------------------------------------------------------===##

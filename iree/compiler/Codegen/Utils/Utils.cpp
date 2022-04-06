@@ -51,22 +51,49 @@ llvm::StringMap<IREE::HAL::ExecutableEntryPointOp> getAllEntryPoints(
   return entryPointOps;
 }
 
-/// Returns the LLVM Target triple associated with the `hal.executable.variant`
-/// operation if set.
-static Optional<llvm::Triple> getTargetTriple(
-    IREE::HAL::ExecutableVariantOp variantOp) {
+/// Returns the StringAttr with the name `stringAttr` in the configuration of
+/// `variantOp`, in found.
+static Optional<StringAttr> getConfigStringAttr(
+    IREE::HAL::ExecutableVariantOp variantOp, StringRef stringAttr) {
   IREE::HAL::ExecutableTargetAttr targetAttr = variantOp.target();
   if (!targetAttr) return llvm::None;
   auto config = targetAttr.getConfiguration();
   if (!config) return llvm::None;
-  auto triple = config.getAs<StringAttr>("target_triple");
+  auto attr = config.getAs<StringAttr>(stringAttr);
+  if (!attr) return llvm::None;
+  return attr;
+}
+
+/// Returns the LLVM Target triple associated with the `hal.executable.variant`
+/// operation if set.
+static Optional<llvm::Triple> getTargetTriple(
+    IREE::HAL::ExecutableVariantOp variantOp) {
+  auto triple = getConfigStringAttr(variantOp, "target_triple");
   if (!triple) return llvm::None;
   return llvm::Triple(triple.getValue().str());
+}
+
+/// Returns the CPU target features associated with the `hal.executable.variant`
+/// operation, if set.
+static Optional<StringRef> getCpuFeatures(
+    IREE::HAL::ExecutableVariantOp variantOp) {
+  auto cpuFeatures = getConfigStringAttr(variantOp, "cpu_features");
+  if (!cpuFeatures) return llvm::None;
+  return cpuFeatures->getValue();
 }
 
 bool isX86(IREE::HAL::ExecutableVariantOp variantOp) {
   Optional<llvm::Triple> triple = getTargetTriple(variantOp);
   return triple && triple.getValue().isX86();
+}
+
+// TODO(dcaballe): If we have to check for a significantly large number of
+// features in the future, we may want to consider keeping the TTI instance
+// alive and query subtarget features data structure.
+bool hasAVX2Features(IREE::HAL::ExecutableVariantOp variantOp) {
+  Optional<StringRef> features = getCpuFeatures(variantOp);
+  if (!features) return false;
+  return features->contains("+avx2");
 }
 
 bool isRISCV(IREE::HAL::ExecutableVariantOp variantOp) {
@@ -561,6 +588,88 @@ linalg::LinalgLoopDistributionOptions getIREELinalgLoopDistributionOptions() {
        linalg::DistributionMethod::Cyclic},
       DenseMap<StringRef,
                std::function<linalg::ProcInfo(OpBuilder &, Location)>>()};
+}
+
+/// Helper function to create `AffineExpr` from `OpFoldResult`. If the
+/// `OpFoldResult` is a `Value`, creates a `AffineSymbolExpr` and appends it to
+/// `symbols`.
+static AffineExpr getAffineExpr(OpFoldResult ofr, SmallVector<Value> &symbols) {
+  if (auto attr = ofr.dyn_cast<Attribute>()) {
+    return getAffineConstantExpr(attr.cast<IntegerAttr>().getInt(),
+                                 attr.getContext());
+  }
+  Value v = ofr.get<Value>();
+  AffineExpr expr = getAffineSymbolExpr(symbols.size(), v.getContext());
+  symbols.push_back(v);
+  return expr;
+}
+/// Converts an `AffineExpr` to `OpFoldResult` by generating an `affine.apply`
+/// operation.
+static OpFoldResult getOpFoldResult(OpBuilder &builder, Location loc,
+                                    AffineExpr expr,
+                                    SmallVector<Value> &symbols) {
+  AffineMap m = AffineMap::get(0, symbols.size(), expr);
+  return applyMapToValues(builder, loc, m, symbols)[0];
+}
+
+/// Methods to build the Affine Expr for arithmetic operations.
+static AffineExpr add(AffineExpr expr, OpFoldResult ofr,
+                      SmallVector<Value> &symbols) {
+  return expr + getAffineExpr(ofr, symbols);
+}
+static AffineExpr add(OpFoldResult lhs, OpFoldResult rhs,
+                      SmallVector<Value> &symbols) {
+  return getAffineExpr(lhs, symbols) + getAffineExpr(rhs, symbols);
+}
+static AffineExpr mul(AffineExpr expr, OpFoldResult ofr,
+                      SmallVector<Value> &symbols) {
+  return expr * getAffineExpr(ofr, symbols);
+}
+static AffineExpr mul(OpFoldResult lhs, OpFoldResult rhs,
+                      SmallVector<Value> &symbols) {
+  return getAffineExpr(lhs, symbols) * getAffineExpr(rhs, symbols);
+}
+
+/// Returns the offsets, sizes and strides to use when combining two operations
+/// that implement the `OffsetSizeAndStrideOpInterface`.
+LogicalResult foldOffsetsSizesAndStrides(
+    PatternRewriter &rewriter, Location loc,
+    OffsetSizeAndStrideOpInterface producer,
+    OffsetSizeAndStrideOpInterface consumer,
+    SmallVector<OpFoldResult> &combinedOffsets,
+    SmallVector<OpFoldResult> &combinedSizes,
+    SmallVector<OpFoldResult> &combinedStrides) {
+  SmallVector<OpFoldResult> consumerOffsets = consumer.getMixedOffsets();
+  SmallVector<OpFoldResult> consumerStrides = consumer.getMixedStrides();
+  SmallVector<OpFoldResult> producerOffsets = producer.getMixedOffsets();
+  SmallVector<OpFoldResult> producerStrides = producer.getMixedStrides();
+  if (consumerOffsets.size() != producerOffsets.size()) {
+    return rewriter.notifyMatchFailure(
+        producer,
+        "expected op and consumer to have same number of offset values");
+  }
+
+  combinedOffsets.resize(consumerOffsets.size());
+  combinedSizes.resize(consumerOffsets.size());
+  combinedStrides.resize(consumerOffsets.size());
+  for (auto i : llvm::seq<unsigned>(0, consumerOffsets.size())) {
+    SmallVector<Value> offsetSymbols, strideSymbols;
+    // The combined offset is computed as
+    //    consumer_offset + producer_offset * consumer_strides.
+    combinedOffsets[i] = getOpFoldResult(
+        rewriter, loc,
+        add(mul(producerOffsets[i], consumerStrides[i], offsetSymbols),
+            consumerOffsets[i], offsetSymbols),
+        offsetSymbols);
+    // The combined stride is computed as
+    //    consumer_stride * producer_stride.
+    combinedStrides[i] = getOpFoldResult(
+        rewriter, loc,
+        mul(consumerStrides[i], producerStrides[i], strideSymbols),
+        strideSymbols);
+  }
+  combinedSizes = producer.getMixedSizes();
+  return success();
 }
 
 }  // namespace iree_compiler

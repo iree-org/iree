@@ -105,18 +105,39 @@ def TileOp : Linalg_Transform_Operation<"tile",
 
   let arguments = (ins PDL_Operation:$target,
                    DefaultValuedAttr<I64ArrayAttr, "{}">:$sizes,
-                   DefaultValuedAttr<I64ArrayAttr, "{}">:$interchange,
-                   DefaultValuedAttr<BoolAttr, "false">:$scalarize_dyn_dims);
+                   DefaultValuedAttr<I64ArrayAttr, "{}">:$interchange);
   let results = (outs PDL_Operation:$tiled_linalg_op,
                       Variadic<PDL_Operation>:$loops);
 
   let hasCustomAssemblyFormat = 1;
-  let hasVerifier = 1;
 
   let extraClassDeclaration = [{
     ::mlir::LogicalResult apply(
         ::mlir::linalg::transform::TransformResults &transformResults,
         ::mlir::linalg::transform::TransformState &state);
+  }];
+}
+
+def ScalarizeOp : Linalg_Transform_Operation<"scalarize",
+    [TransformOpInterface, TargetableSingleOperandTransformOpTrait]> {
+  let description = [{Indicates that ops of a specific kind in the given
+    function should be scalarized (i.e. their dynamic dimensions tiled by 1).
+    
+    This operation returns the tiled op but not the loops.
+
+    We make this design choice because it is hard to know ahead of time the 
+    number of loops that will be produced (it depends on the number of 
+    dynamic dimensions after multiple transformations have been applied).
+  }];
+
+  let arguments = (ins PDL_Operation:$target);
+  let results = (outs PDL_Operation:$tiled_linalg_op);
+
+  let assemblyFormat = "$target attr-dict";
+
+  let extraClassDeclaration = [{
+    ::mlir::FailureOr<::mlir::linalg::LinalgOp> applyToOne(
+        ::mlir::linalg::LinalgOp target);
   }];
 }
 

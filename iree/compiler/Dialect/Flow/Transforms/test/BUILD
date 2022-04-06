@@ -28,6 +28,7 @@ iree_lit_test_suite(
             "expand_tensor_shapes.mlir",
             "export_benchmark_funcs.mlir",
             "infer_numeric_narrowing.mlir",
+            "initialize_empty_tensor.mlir",
             "inject_dispatch_tracing.mlir",
             "interchange_generic_ops.mlir",
             "matmul_to_mmt4d.mlir",

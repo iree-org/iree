@@ -54,6 +54,9 @@ struct TestPartitionableLoopsInterfacePattern
 struct TestPartitionableLoopsInterfacePass
     : public PassWrapper<TestPartitionableLoopsInterfacePass,
                          OperationPass<void>> {
+  MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(
+      TestPartitionableLoopsInterfacePass)
+
   StringRef getArgument() const override {
     return "iree-flow-test-partitionable-loops-interface";
   }

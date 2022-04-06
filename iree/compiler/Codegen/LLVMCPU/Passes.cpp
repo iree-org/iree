@@ -35,6 +35,13 @@ static llvm::cl::opt<bool> clCheckIRBeforeLLVMConversion(
                    "before conversion to LLVM IR"),
     llvm::cl::init(false));
 
+// TODO: Remove this flag once we can call bufferize from the transform dialect.
+static llvm::cl::opt<bool> clDisableLinalgTransformInterpBufferization(
+    "linalg-transform-interp-disable-bufferization",
+    llvm::cl::desc("Disables bufferization when running the linalg transform "
+                   "interp pass (testing only)."),
+    llvm::cl::init(false));
+
 //===---------------------------------------------------------------------===//
 // Default allocation functions for CPU backend
 //===---------------------------------------------------------------------===//
@@ -235,15 +242,21 @@ void addCPUBufferOpsTileAndVectorizePipeline(OpPassManager &passManager) {
   passManager.addPass(createCanonicalizerPass());
   passManager.addPass(createCSEPass());
 
-  // This pipeline should also vectorize these ops, but they arent today because
-  // of a correctness issue. See Issue #8579.
-
   // Run IREE specific passes before vector lowering expert.
   passManager.addNestedPass<func::FuncOp>(
       createRemoveSingleIterationLoopPass());
+
+  // Add the vector lowering expert.
+  {
+    OpPassManager &nestedFuncPassManager = passManager.nest<func::FuncOp>();
+    LinalgVectorLoweringPassOptions options;
+    options.splitVectorTransfersTo = "linalg-copy";
+    addLowerToVectorTransforms(nestedFuncPassManager, options);
+  }
 }
 
-void addDoubleTilingExpertPassPipeline(OpPassManager &passManager) {
+void addDoubleTilingExpertPassPipeline(OpPassManager &passManager,
+                                       bool lowerToAVX2) {
   // Run preprocessing and verification before starting Linalg transforms.
   passManager.addNestedPass<func::FuncOp>(
       createConvertToDestinationPassingStylePass());
@@ -316,6 +329,7 @@ void addDoubleTilingExpertPassPipeline(OpPassManager &passManager) {
   {
     OpPassManager &nestedFuncPassManager = passManager.nest<func::FuncOp>();
     LinalgVectorLoweringPassOptions options;
+    options.lowerVectorTransposeToAVX2 = lowerToAVX2;
     options.splitVectorTransfersTo = "linalg-copy";
     addLowerToVectorTransforms(nestedFuncPassManager, options);
   }
@@ -447,6 +461,10 @@ void addLinalgTransformInterpPasses(OpPassManager &passManager) {
 
   // Sets the number of workgroups using kFakeHAL op information.
   passManager.addPass(createSetNumWorkgroupsFromLinalgExtPass());
+
+  // TODO: Remove this flag and the code below once we can call bufferize from
+  // the transform dialect.
+  if (clDisableLinalgTransformInterpBufferization) return;
 
   OpPassManager &modulePM = passManager.nest<ModuleOp>();
   // Bufferize the dispatch.

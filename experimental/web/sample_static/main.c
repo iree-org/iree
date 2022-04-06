@@ -124,8 +124,7 @@ int run_sample(iree_sample_state_t* state, float* image_data) {
         IREE_ARRAYSIZE(buffer_shape), IREE_HAL_ELEMENT_TYPE_FLOAT_32,
         IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR,
         (iree_hal_buffer_params_t){
-            .type = IREE_HAL_MEMORY_TYPE_HOST_LOCAL |
-                    IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE,
+            .type = IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL,
             .usage =
                 IREE_HAL_BUFFER_USAGE_DISPATCH | IREE_HAL_BUFFER_USAGE_TRANSFER,
         },

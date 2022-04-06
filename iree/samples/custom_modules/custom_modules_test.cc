@@ -136,7 +136,8 @@ TEST_F(CustomModulesTest, PrintTensor) {
   iree_hal_buffer_params_t params = {0};
   params.type =
       IREE_HAL_MEMORY_TYPE_HOST_LOCAL | IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE;
-  params.usage = IREE_HAL_BUFFER_USAGE_ALL;
+  params.usage = IREE_HAL_BUFFER_USAGE_DISPATCH |
+                 IREE_HAL_BUFFER_USAGE_TRANSFER | IREE_HAL_BUFFER_USAGE_MAPPING;
   iree_hal_buffer_view_t* buffer_view = nullptr;
   IREE_ASSERT_OK(iree_hal_buffer_view_allocate_buffer(
       hal_allocator_, kShape, IREE_ARRAYSIZE(kShape),
@@ -184,7 +185,8 @@ TEST_F(CustomModulesTest, RoundTripTensor) {
   iree_hal_buffer_params_t params = {0};
   params.type =
       IREE_HAL_MEMORY_TYPE_HOST_LOCAL | IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE;
-  params.usage = IREE_HAL_BUFFER_USAGE_ALL;
+  params.usage = IREE_HAL_BUFFER_USAGE_DISPATCH |
+                 IREE_HAL_BUFFER_USAGE_TRANSFER | IREE_HAL_BUFFER_USAGE_MAPPING;
   iree_hal_buffer_view_t* buffer_view = nullptr;
   IREE_ASSERT_OK(iree_hal_buffer_view_allocate_buffer(
       hal_allocator_, kShape, IREE_ARRAYSIZE(kShape),

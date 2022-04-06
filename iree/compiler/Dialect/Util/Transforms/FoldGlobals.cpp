@@ -385,6 +385,8 @@ static bool deduplicateConstantGlobals(GlobalTable &globalTable) {
 class FoldGlobalsPass
     : public PassWrapper<FoldGlobalsPass, OperationPass<mlir::ModuleOp>> {
  public:
+  MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(FoldGlobalsPass)
+
   explicit FoldGlobalsPass() = default;
   FoldGlobalsPass(const FoldGlobalsPass &pass) {}
 

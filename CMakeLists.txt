@@ -126,6 +126,29 @@ option(IREE_ENABLE_LLD "Use lld when linking" OFF)
 option(IREE_ENABLE_ASAN "Enable address sanitizer" OFF)
 option(IREE_ENABLE_MSAN "Enable memory sanitizer" OFF)
 option(IREE_ENABLE_TSAN "Enable thread sanitizer" OFF)
+option(IREE_BYTECODE_MODULE_ENABLE_TSAN "Enable thread sanitizer in IREE modules in tests" OFF)
+
+# STREQUAL feels wrong here - we don't care about the exact true-value used,
+# ON or TRUE or something else. But we haven't been able to think of a less bad
+# alternative. https://github.com/google/iree/pull/8474#discussion_r840790062
+if(NOT IREE_ENABLE_TSAN STREQUAL IREE_BYTECODE_MODULE_ENABLE_TSAN)
+  message(SEND_ERROR
+      "IREE_ENABLE_TSAN and IREE_BYTECODE_MODULE_ENABLE_TSAN must be "
+      "simultaneously ON or OFF. "
+      "A discrepancy between the two would cause tests to crash as IREE "
+      "runtime code (controlled by IREE_ENABLE_TSAN) calls into test IREE "
+      "modules (controlled by IREE_BYTECODE_MODULE_ENABLE_TSAN)")
+endif()
+
+if(IREE_BYTECODE_MODULE_ENABLE_TSAN)
+  if(NOT IREE_BYTECODE_MODULE_FORCE_SYSTEM_DYLIB_LINKER)
+    message(SEND_ERROR
+        "When IREE_BYTECODE_MODULE_ENABLE_TSAN is ON, "
+        "IREE_BYTECODE_MODULE_FORCE_SYSTEM_DYLIB_LINKER must also be ON. "
+        "TSAN instrumentation is not currently supported in embedded modules.")
+  endif()
+endif()
+
 option(IREE_ENABLE_CCACHE "Use ccache if installed to speed up rebuilds." OFF)
 
 if(${IREE_ENABLE_CCACHE})

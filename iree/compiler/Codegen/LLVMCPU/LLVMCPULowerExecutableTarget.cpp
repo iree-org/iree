@@ -10,6 +10,7 @@
 #include "iree/compiler/Codegen/LLVMCPU/KernelDispatch.h"
 #include "iree/compiler/Codegen/PassDetail.h"
 #include "iree/compiler/Codegen/Passes.h"
+#include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
@@ -77,7 +78,7 @@ class LLVMCPULowerExecutableTargetPass
           "hal.executable.variant operation")};
 
   ListOption<int> workloadPerWorkgroup{
-      *this, "workload-per-workgroup", llvm::cl::MiscFlags::CommaSeparated,
+      *this, "workload-per-workgroup",
       llvm::cl::desc(
           "Specifies the workload per workgroup to use in x, y, z order. Is "
           "expected for use only with use-lowering-pipeline option")};
@@ -186,6 +187,7 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
       }
 
       bool lowerToVectors = !isVMVXBackend(variantOp);
+      bool lowerToAVX2 = hasAVX2Features(variantOp);
       if (!testLoweringConfiguration) {
         OpPassManager &nestedModulePM =
             executableLoweringPipeline.nest<ModuleOp>();
@@ -204,7 +206,7 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
             break;
           case IREE::Codegen::DispatchLoweringPassPipeline::
               CPUDoubleTilingExpert:
-            addDoubleTilingExpertPassPipeline(nestedModulePM);
+            addDoubleTilingExpertPassPipeline(nestedModulePM, lowerToAVX2);
             break;
           case IREE::Codegen::DispatchLoweringPassPipeline::
               CPUConvTileAndDecomposeExpert:

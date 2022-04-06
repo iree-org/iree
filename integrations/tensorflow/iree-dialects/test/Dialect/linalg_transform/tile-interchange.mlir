@@ -23,14 +23,15 @@ pdl.pattern @target_pattern : benefit(1) {
   %0 = operands
   %1 = types
   %2 = operation "linalg.generic"(%0 : !pdl.range<value>)  -> (%1 : !pdl.range<type>)
-  apply_native_constraint "nestedInFunc" [@matmul_021](%2 : !pdl.operation)
+  %3 = pdl.attribute @matmul_021
+  apply_native_constraint "nestedInFunc"(%2, %3 : !pdl.operation, !pdl.attribute)
   rewrite %2 with "iree_linalg_transform.apply"
 }
 
 iree_linalg_transform.sequence {
   %0 = match @target_pattern
-  %1 = tile %0 {interchange = [0, 2, 1], sizes = [3, 5, 14]}
-  %2 = tile %1 {sizes = [3, 5, 2]}
+  %1, %loops1:3 = tile %0 {interchange = [0, 2, 1], sizes = [3, 5, 14]}
+  %2, %loops2:3 = tile %1 {sizes = [3, 5, 2]}
   %3 = vectorize %2 {vectorize_padding = true}
 }
 
@@ -60,13 +61,14 @@ pdl.pattern @target_pattern : benefit(1) {
   %0 = operands
   %1 = types
   %2 = operation "linalg.generic"(%0 : !pdl.range<value>)  -> (%1 : !pdl.range<type>)
-  apply_native_constraint "nestedInFunc" [@matmul_210](%2 : !pdl.operation)
+  %3 = pdl.attribute @matmul_210
+  apply_native_constraint "nestedInFunc"(%2, %3 : !pdl.operation, !pdl.attribute)
   rewrite %2 with "iree_linalg_transform.apply"
 }
 
 iree_linalg_transform.sequence {
   %0 = match @target_pattern
-  %1 = tile %0 {interchange = [2, 1, 0], sizes = [3, 5, 14]}
-  %2 = tile %1 {sizes = [3, 5, 2]}
+  %1, %loops1:3 = tile %0 {interchange = [2, 1, 0], sizes = [3, 5, 14]}
+  %2, %loops2:3 = tile %1 {sizes = [3, 5, 2]}
   %3 = vectorize %2 {vectorize_padding = true}
 }

@@ -25,7 +25,6 @@ iree_cc_library(
   HDRS
     "Passes.h"
     "Passes.h.inc"
-    "TypeConverter.h"
   SRCS
     "CaptureDispatchDynamicDims.cpp"
     "CleanupNumericNarrowing.cpp"
@@ -39,6 +38,7 @@ iree_cc_library(
     "ExportBenchmarkFuncs.cpp"
     "FusionOfTensorOps.cpp"
     "InferNumericNarrowing.cpp"
+    "InitializeEmptyTensors.cpp"
     "InjectDispatchTracing.cpp"
     "InterchangeGenericOps.cpp"
     "OptimizeNumerics.cpp"
@@ -51,7 +51,6 @@ iree_cc_library(
     "StripAndSplatConstantVariables.cpp"
     "StripSignednessPass.cpp"
     "TestPartitionableLoopsInterface.cpp"
-    "TypeConverter.cpp"
     "VerifyInputLegality.cpp"
   DEPS
     ::PassesIncGen
@@ -60,6 +59,7 @@ iree_cc_library(
     LLVMSupport
     MLIRAffine
     MLIRArithmetic
+    MLIRArithmeticUtils
     MLIRControlFlow
     MLIRFunc
     MLIRIR

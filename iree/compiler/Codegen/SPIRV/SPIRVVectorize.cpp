@@ -116,6 +116,7 @@ class SPIRVVectorizePass : public SPIRVVectorizeBase<SPIRVVectorizePass> {
       RewritePatternSet foldPatterns(context);
       // Fold consumer add ops into the contraction op itself.
       vector::ContractionOp::getCanonicalizationPatterns(foldPatterns, context);
+      vector::TransposeOp::getCanonicalizationPatterns(foldPatterns, context);
       if (failed(
               applyPatternsAndFoldGreedily(funcOp, std::move(foldPatterns)))) {
         return signalPassFailure();

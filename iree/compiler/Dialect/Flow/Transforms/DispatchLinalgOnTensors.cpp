@@ -50,8 +50,7 @@ static llvm::cl::opt<int> clInlineConstantByteLength(
 
 static llvm::cl::list<int64_t> clLinalgOnTensorsTileSizes(
     "iree-flow-dispatch-linalg-on-tensors-tile-sizes",
-    llvm::cl::desc("Comma-separated list of tile sizes for tiling on tensors"),
-    llvm::cl::CommaSeparated);
+    llvm::cl::desc("Comma-separated list of tile sizes for tiling on tensors"));
 
 static const char kRootOpAttr[] = "__root_op__";
 static const char kFusionGroupsAttr[] = "__fused_op__";
