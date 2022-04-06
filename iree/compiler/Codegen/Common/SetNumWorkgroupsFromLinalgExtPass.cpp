@@ -38,30 +38,6 @@ class SetNumWorkgroupsFromLinalgExtPass
   void runOnOperation() override;
 };
 
-int64_t getBuilderArgs(HALInterfaceWorkgroupIDOp op) {
-  return op.dimension().getZExtValue();
-}
-
-int64_t getBuilderArgs(HALInterfaceWorkgroupCountOp op) {
-  return op.dimension().getZExtValue();
-}
-
-ValueRange getBuilderArgs(HALReturnOp op) { return op.getOperands(); }
-
-/// Generic implementation of one-to-one conversion from "SourceOp" to
-/// "TargetOp".
-template <typename SourceOp, typename TargetOp>
-class OneToOneRewritePattern : public OpRewritePattern<SourceOp> {
- public:
-  using OpRewritePattern<SourceOp>::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(SourceOp op,
-                                PatternRewriter &rewriter) const override {
-    rewriter.replaceOpWithNewOp<TargetOp>(op, getBuilderArgs(op));
-    return success();
-  }
-};
-
 /// Forward LinalgExt::InParallel -> Tensor::InsertSlice -> Flow::TensorStore.
 /// This pattern is necessary for correctness, it accounts for the fact that
 /// InParallel is distributed across multiple workgroups when lowering to HAL
@@ -112,19 +88,6 @@ void SetNumWorkgroupsFromLinalgExtPass::runOnOperation() {
   IREE::HAL::ExecutableVariantOp variantOp = getOperation();
   ModuleOp module = variantOp.getInnerModule();
 
-  // Perform 1-1 rewrites first: after the ExecutableEntryPointOp is
-  // modified this will be more annoying to track.
-  RewritePatternSet oneToOneRewrites(context);
-  oneToOneRewrites
-      .insert<OneToOneRewritePattern<HALInterfaceWorkgroupIDOp,
-                                     IREE::HAL::InterfaceWorkgroupIDOp>,
-              OneToOneRewritePattern<HALInterfaceWorkgroupCountOp,
-                                     IREE::HAL::InterfaceWorkgroupCountOp>,
-              OneToOneRewritePattern<HALReturnOp, IREE::HAL::ReturnOp>>(
-          context);
-  if (failed(applyPatternsAndFoldGreedily(module, std::move(oneToOneRewrites))))
-    return signalPassFailure();
-
   // Perform forwarding patterns to bridge the tensor / flow gap.
   // This is necessary for correctness.
   // TODO: given existing bufferization tricks, this may trigger unnecessary
@@ -133,40 +96,6 @@ void SetNumWorkgroupsFromLinalgExtPass::runOnOperation() {
   forwardPatterns.insert<ForwardInParallelResultToFlow>(context);
   if (failed(applyPatternsAndFoldGreedily(module, std::move(forwardPatterns))))
     return signalPassFailure();
-
-  llvm::StringMap<IREE::HAL::ExecutableEntryPointOp> entryPoints =
-      getAllEntryPoints(module);
-  for (auto funcOp : module.getOps<FuncOp>()) {
-    auto entryPointOp = entryPoints.lookup(funcOp.getName());
-    if (!entryPointOp) continue;
-
-    bool numWorkgroupIsSet = false;
-    assert(!entryPointOp.getWorkgroupCountBody() &&
-           "Expected a single entryPoint op with no workgroup_count body");
-
-    funcOp->walk([&](HALExecutableEntryPointOp op) {
-      assert(!numWorkgroupIsSet);
-      numWorkgroupIsSet = true;
-      IRRewriter rewriter(op->getContext());
-      rewriter.setInsertionPoint(entryPointOp);
-      auto clonedEntryPointOp =
-          rewriter.create<IREE::HAL::ExecutableEntryPointOp>(
-              entryPointOp.getLoc(), entryPointOp.sym_nameAttr(),
-              entryPointOp.ordinalAttr(), entryPointOp.layoutAttr(),
-              entryPointOp.workgroup_sizeAttr(),
-              entryPointOp.workgroup_local_memoryAttr());
-      Block &block = clonedEntryPointOp.workgroup_count_region().emplaceBlock();
-      rewriter.mergeBlocks(&op.workgroup_count_region().front(), &block);
-      // TODO: Don't add args post-hoc and instead replace them during
-      // `mergeBlocks`.
-      for (int64_t i = 0, e = HALExecutableEntryPointOp::getNumWorkgroupDims();
-           i < e; ++i) {
-        block.addArgument(rewriter.getIndexType(), op->getLoc());
-      }
-      op->erase();
-      entryPointOp.erase();
-    });
-  }
 
   // Apply post-distribution canonicalization passes.
   RewritePatternSet canonicalization(context);
