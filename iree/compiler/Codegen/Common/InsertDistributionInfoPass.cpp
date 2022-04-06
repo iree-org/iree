@@ -28,27 +28,15 @@ namespace iree_compiler {
 
 /// Compute the workload per workgroup to use based on the tile sizes passed.
 static SmallVector<int64_t> getWorkloadPerWorkgroup(
-    ArrayRef<int64_t> tileSizes, ArrayRef<int64_t> interchange) {
+    ArrayRef<int64_t> tileSizes) {
   // TODO(ravishankarm): This for now assumes that we can just drop all the
   // zero-dim tile sizes. We need to eventually change this so that we dont have
   // to do this. It is implicity linked to the dispatch region workload having
   // the consistent information. That needs to be changed to take the entire
   // iteration domain size as the argument, and then we can use the distribute
   // loop tile sizes directly.
-  SmallVector<int64_t> interchangedTileSizes;
-  if (interchange.empty()) {
-    interchangedTileSizes.assign(tileSizes.begin(), tileSizes.end());
-  } else {
-    interchangedTileSizes.resize(tileSizes.size());
-    for (auto en : llvm::enumerate(interchange)) {
-      // The check is needed because only the distributable dims are set.
-      if (en.value() < tileSizes.size()) {
-        interchangedTileSizes[en.index()] = tileSizes[en.value()];
-      }
-    }
-  }
   SmallVector<int64_t> nonZeroTileSizes;
-  for (auto ts : interchangedTileSizes) {
+  for (auto ts : tileSizes) {
     if (!ts) continue;
     nonZeroTileSizes.push_back(ts);
   }
@@ -57,8 +45,11 @@ static SmallVector<int64_t> getWorkloadPerWorkgroup(
 
 /// Defines the workgroup count region if the tile size for the distributed
 /// loops are known.
+/// IREE considers it without interchange at Flow level, so the arguments are
+/// not interchanged. In this context, we interchange the final yield values.
 static LogicalResult defineWorkgroupCountRegion(
-    func::FuncOp entryPointFn, ArrayRef<int64_t> workloadPerWorkgroup) {
+    func::FuncOp entryPointFn, ArrayRef<int64_t> workloadPerWorkgroup,
+    ArrayRef<int64_t> interchange) {
   if (workloadPerWorkgroup.size() > kNumMaxParallelDims) {
     // For now error out here.
     return entryPointFn.emitOpError(
@@ -66,7 +57,7 @@ static LogicalResult defineWorkgroupCountRegion(
            << kNumMaxParallelDims;
   }
   WorkgroupCountRegionBuilder regionBuilder =
-      [&workloadPerWorkgroup](
+      [&workloadPerWorkgroup, &interchange](
           OpBuilder &b, Location loc,
           std::array<Value, 3> workload) -> std::array<Value, 3> {
     Value one = b.create<arith::ConstantIndexOp>(loc, 1);
@@ -80,7 +71,24 @@ static LogicalResult defineWorkgroupCountRegion(
           AffineMap::get(0, 1, b.getAffineSymbolExpr(0).ceilDiv(it.value())),
           workload[it.index()])[0];
     }
-    return numWorkgroups;
+    if (interchange.empty()) return numWorkgroups;
+
+    // TODO(hanchung): Look into partitionable loops to see if the configuraion
+    // is reasonable. The loops are paritioned at Flow level, any interchange on
+    // non-paritioned loops might triggers issues. It's not easy to check
+    // because the information is carried on op. It's much easier when we embed
+    // make partitionable loops also part of the lowering config. Otherwise, the
+    // logic should be considered everywhere.
+    if (interchange.size() > kNumMaxParallelDims) {
+      return entryPointFn.emitOpError(
+                 "expected the number of loops is not greater than")
+             << kNumMaxParallelDims;
+    }
+    std::array<Value, 3> res = numWorkgroups;
+    for (auto en : llvm::enumerate(interchange)) {
+      res[en.value()] = numWorkgroups[en.index()];
+    }
+    return res;
   };
   OpBuilder builder(entryPointFn.getContext());
   return defineWorkgroupCountRegion(builder, entryPointFn, regionBuilder);
@@ -150,7 +158,8 @@ void InsertDistributionInfoPass::runOnOperation() {
   SmallVector<int64_t> workloadPerWorkroup =
       getWorkloadPerWorkgroup(tileSizes, interchange);
 
-  if (failed(defineWorkgroupCountRegion(funcOp, workloadPerWorkroup)) ||
+  if (failed(defineWorkgroupCountRegion(funcOp, workloadPerWorkroup,
+                                        interchange)) ||
       failed(updateTranslationInfoAttr(funcOp, workloadPerWorkroup))) {
     return signalPassFailure();
   }

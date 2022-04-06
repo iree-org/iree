@@ -1197,9 +1197,9 @@ hal.executable private @matmul_interchange {
     }
   }
 }
-//  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 32)>
-//  CHECK-DAG: #[[MAP1:.+]] = affine_map<()[s0] -> (s0 ceildiv 64)>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert, workload_per_wg = [32, 64]>
+//  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 64)>
+//  CHECK-DAG: #[[MAP1:.+]] = affine_map<()[s0] -> (s0 ceildiv 32)>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert, workload_per_wg = [64, 32]>
 //      CHECK: hal.executable.entry_point public @matmul_interchange
 // CHECK-SAME:   translation_info = #[[TRANSLATION]]
 // CHECK-NEXT:   (%[[ARG0:[a-zA-Z0-9_]+]]: index
@@ -1208,5 +1208,5 @@ hal.executable private @matmul_interchange {
 //  CHECK-DAG:    %[[C1:.+]] = arith.constant 1 : index
 //  CHECK-DAG:    %[[D0:.+]] = affine.apply #[[MAP0]]()[%[[ARG0]]]
 //  CHECK-DAG:    %[[D1:.+]] = affine.apply #[[MAP1]]()[%[[ARG1]]]
-//      CHECK:    hal.return %[[D0]], %[[D1]], %[[C1]] : index, index, index
+//      CHECK:    hal.return %[[D1]], %[[D0]], %[[C1]] : index, index, index
 //      CHECK: func @matmul_interchange()
