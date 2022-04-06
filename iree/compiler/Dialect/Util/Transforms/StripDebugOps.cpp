@@ -22,6 +22,8 @@ namespace {
 class StripDebugOpsPass
     : public PassWrapper<StripDebugOpsPass, OperationPass<void>> {
  public:
+  MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(StripDebugOpsPass)
+
   StringRef getArgument() const override { return "iree-util-strip-debug-ops"; }
 
   StringRef getDescription() const override {

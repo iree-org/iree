@@ -226,6 +226,8 @@ class SimplifyGlobalAccessesPass
     : public PassWrapper<SimplifyGlobalAccessesPass,
                          InterfacePass<CallableOpInterface>> {
  public:
+  MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(SimplifyGlobalAccessesPass)
+
   StringRef getArgument() const override {
     return "iree-util-simplify-global-accesses";
   }

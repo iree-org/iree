@@ -91,7 +91,7 @@ cc_library(
         "@llvm-project//mlir:TensorToSPIRV",
         "@llvm-project//mlir:TensorTransforms",
         "@llvm-project//mlir:TosaDialect",
-        "@llvm-project//mlir:TosaToStandard",
+        "@llvm-project//mlir:TosaToArith",
         "@llvm-project//mlir:Transforms",
         "@llvm-project//mlir:VectorInterfaces",
         "@llvm-project//mlir:VectorOps",

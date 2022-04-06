@@ -27,6 +27,8 @@ struct TestListener : public RewriteListener {
 
 struct TestListenerCanonicalizePass
     : public PassWrapper<TestListenerCanonicalizePass, Pass> {
+  MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(TestListenerCanonicalizePass)
+
   TestListenerCanonicalizePass() = default;
   TestListenerCanonicalizePass(const TestListenerCanonicalizePass &other)
       : PassWrapper(other) {}
@@ -61,6 +63,8 @@ struct TestListenerCanonicalizePass
 };
 
 struct TestListenerCSEPass : public PassWrapper<TestListenerCSEPass, Pass> {
+  MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(TestListenerCSEPass)
+
   TestListenerCSEPass() = default;
   TestListenerCSEPass(const TestListenerCSEPass &other) : PassWrapper(other) {}
 

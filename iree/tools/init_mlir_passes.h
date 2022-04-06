@@ -87,8 +87,9 @@ inline void registerMlirPasses() {
   registerConvertLinalgToSPIRVPass();
 
   // TOSA.
+  registerTosaToArithPass();
   registerTosaToLinalgPass();
-  registerTosaToStandardPass();
+  registerTosaToTensorPass();
 }
 
 }  // namespace mlir

@@ -231,6 +231,8 @@ struct DemoteI64ToI32Converter
 };
 struct DemoteI64ToI32Pass
     : public ConvertTypesPass<DemoteI64ToI32Pass, DemoteI64ToI32Converter> {
+  MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(DemoteI64ToI32Pass)
+
   StringRef getArgument() const override {
     return "iree-util-demote-i64-to-i32";
   }
@@ -254,6 +256,8 @@ struct DemoteF32ToF16Converter
 };
 struct DemoteF32ToF16Pass
     : public ConvertTypesPass<DemoteF32ToF16Pass, DemoteF32ToF16Converter> {
+  MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(DemoteF32ToF16Pass)
+
   StringRef getArgument() const override {
     return "iree-util-demote-f32-to-f16";
   }
@@ -277,6 +281,8 @@ struct PromoteF16ToF32Converter
 };
 struct PromoteF16ToF32Pass
     : public ConvertTypesPass<PromoteF16ToF32Pass, PromoteF16ToF32Converter> {
+  MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(PromoteF16ToF32Pass)
+
   StringRef getArgument() const override {
     return "iree-util-promote-f16-to-f32";
   }
@@ -300,6 +306,8 @@ struct DemoteF64ToF32Converter
 };
 struct DemoteF64ToF32Pass
     : public ConvertTypesPass<DemoteF64ToF32Pass, DemoteF64ToF32Converter> {
+  MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(DemoteF64ToF32Pass)
+
   StringRef getArgument() const override {
     return "iree-util-demote-f64-to-f32";
   }

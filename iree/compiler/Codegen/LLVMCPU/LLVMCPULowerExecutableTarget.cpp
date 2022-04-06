@@ -78,7 +78,7 @@ class LLVMCPULowerExecutableTargetPass
           "hal.executable.variant operation")};
 
   ListOption<int> workloadPerWorkgroup{
-      *this, "workload-per-workgroup", llvm::cl::MiscFlags::CommaSeparated,
+      *this, "workload-per-workgroup",
       llvm::cl::desc(
           "Specifies the workload per workgroup to use in x, y, z order. Is "
           "expected for use only with use-lowering-pipeline option")};

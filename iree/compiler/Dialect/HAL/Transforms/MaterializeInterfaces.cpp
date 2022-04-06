@@ -337,6 +337,8 @@ static LogicalResult convertFlowInfoOps(IREE::HAL::ExecutableOp executableOp) {
 class MaterializeInterfacesPass
     : public PassWrapper<MaterializeInterfacesPass, OperationPass<ModuleOp>> {
  public:
+  MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(MaterializeInterfacesPass)
+
   MaterializeInterfacesPass() = default;
 
   void getDependentDialects(DialectRegistry &registry) const override {

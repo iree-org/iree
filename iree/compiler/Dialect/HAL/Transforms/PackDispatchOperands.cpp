@@ -300,6 +300,8 @@ static void updateExportFuncOp(mlir::func::FuncOp funcOp) {
 class PackDispatchOperandsPass
     : public PassWrapper<PackDispatchOperandsPass, OperationPass<ModuleOp>> {
  public:
+  MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(PackDispatchOperandsPass)
+
   PackDispatchOperandsPass() = default;
 
   void getDependentDialects(DialectRegistry &registry) const override {

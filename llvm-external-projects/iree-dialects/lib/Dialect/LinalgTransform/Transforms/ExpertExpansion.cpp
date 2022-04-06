@@ -47,6 +47,8 @@ static void expandStrategyOps(ModuleOp module, ModuleOp expansions) {
 
 namespace {
 struct ExpertExpansion : public PassWrapper<ExpertExpansion, Pass> {
+  MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(ExpertExpansion)
+
   Pass::Option<std::string> strategyModuleName{
       *this, "strategy-module-name", llvm::cl::init("strategies"),
       llvm::cl::desc(

@@ -44,18 +44,15 @@ static llvm::cl::opt<int> clNumberOfRuntimeThreads(
 
 static llvm::cl::list<int> mmt4dWorkgroupTileSizes(
     "iree-codegen-llvm-mmt4d-workgroup-tile-sizes",
-    llvm::cl::desc("linalg.mmt4d workgroup tile size"), llvm::cl::ZeroOrMore,
-    llvm::cl::MiscFlags::CommaSeparated);
+    llvm::cl::desc("linalg.mmt4d workgroup tile size"), llvm::cl::ZeroOrMore);
 
 static llvm::cl::list<int> mmt4dL1TileSizes(
     "iree-codegen-llvm-mmt4d-l1-tile-size",
-    llvm::cl::desc("linalg.mmt4d L1 tile size"), llvm::cl::ZeroOrMore,
-    llvm::cl::MiscFlags::CommaSeparated);
+    llvm::cl::desc("linalg.mmt4d L1 tile size"), llvm::cl::ZeroOrMore);
 
 static llvm::cl::list<int> mmt4dVectorSizes(
     "iree-codegen-llvm-mmt4d-vector-size",
-    llvm::cl::desc("linalg.mmt4d vector tile size"), llvm::cl::ZeroOrMore,
-    llvm::cl::MiscFlags::CommaSeparated);
+    llvm::cl::desc("linalg.mmt4d vector tile size"), llvm::cl::ZeroOrMore);
 
 static llvm::cl::opt<int> defaultWorkgroupTileSize(
     "iree-codegen-llvm-generic-ops-workgroup-size",

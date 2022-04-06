@@ -21,6 +21,9 @@ namespace {
 class ConvertStandardToVMTestPass
     : public PassWrapper<ConvertStandardToVMTestPass,
                          OperationPass<mlir::ModuleOp>> {
+ public:
+  MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(ConvertStandardToVMTestPass)
+
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<IREE::VM::VMDialect>();
   }
