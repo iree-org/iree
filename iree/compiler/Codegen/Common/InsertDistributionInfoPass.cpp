@@ -50,6 +50,18 @@ static SmallVector<int64_t> getWorkloadPerWorkgroup(
 static LogicalResult defineWorkgroupCountRegion(
     func::FuncOp entryPointFn, ArrayRef<int64_t> workloadPerWorkgroup,
     ArrayRef<int64_t> interchange) {
+  // TODO(hanchung): Look into partitionable loops to see if the configuraion
+  // is reasonable. The loops are paritioned at Flow level, any interchange on
+  // non-paritioned loops might triggers issues. It's not easy to check
+  // because the information is carried on op. It's much easier when we embed
+  // make partitionable loops also part of the lowering config. Otherwise, the
+  // logic should be considered everywhere.
+  if (interchange.size() > kNumMaxParallelDims) {
+    return entryPointFn.emitOpError(
+               "expected the number of loops is not greater than")
+           << kNumMaxParallelDims;
+  }
+
   if (workloadPerWorkgroup.size() > kNumMaxParallelDims) {
     // For now error out here.
     return entryPointFn.emitOpError(
@@ -73,17 +85,6 @@ static LogicalResult defineWorkgroupCountRegion(
     }
     if (interchange.empty()) return numWorkgroups;
 
-    // TODO(hanchung): Look into partitionable loops to see if the configuraion
-    // is reasonable. The loops are paritioned at Flow level, any interchange on
-    // non-paritioned loops might triggers issues. It's not easy to check
-    // because the information is carried on op. It's much easier when we embed
-    // make partitionable loops also part of the lowering config. Otherwise, the
-    // logic should be considered everywhere.
-    if (interchange.size() > kNumMaxParallelDims) {
-      return entryPointFn.emitOpError(
-                 "expected the number of loops is not greater than")
-             << kNumMaxParallelDims;
-    }
     std::array<Value, 3> res = numWorkgroups;
     for (auto en : llvm::enumerate(interchange)) {
       res[en.value()] = numWorkgroups[en.index()];
