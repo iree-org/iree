@@ -25,9 +25,7 @@
 namespace mlir {
 namespace iree_compiler {
 
-namespace {
-
-}  // namespace
+namespace {}  // namespace
 
 LogicalResult defineWorkgroupCountRegion(
     OpBuilder &builder, func::FuncOp funcOp,
@@ -45,7 +43,7 @@ LogicalResult defineWorkgroupCountRegion(
   auto clonedOp = builder.create<IREE::HAL::ExecutableEntryPointOp>(
       loc, entryPointOp.sym_nameAttr(), entryPointOp.ordinalAttr(),
       entryPointOp.layoutAttr(), entryPointOp.workgroup_sizeAttr(),
-      entryPointOp.workgroup_local_memoryAttr(), 1);
+      entryPointOp.workgroup_local_memoryAttr());
   // Copy over all attributes
   for (auto attr : entryPointOp->getAttrs()) {
     if (attr.getName() != entryPointOp.sym_nameAttrName() &&
@@ -56,10 +54,12 @@ LogicalResult defineWorkgroupCountRegion(
       clonedOp->setAttr(attr.getName(), attr.getValue());
     }
   }
-  Region *region = clonedOp.getBody();
-  Block *entryBlock = builder.createBlock(region);
+  Region &region = clonedOp.workgroup_count_region();
+  Block *entryBlock = builder.createBlock(&region);
   // Add 3 index arguments for the workload.
   auto indexType = builder.getIndexType();
+  assert(IREE::HAL::ExecutableEntryPointOp::getNumWorkgroupDims() == 3 &&
+         "expected 3 dims");
   std::array<Value, 3> workload = {entryBlock->addArgument(indexType, loc),
                                    entryBlock->addArgument(indexType, loc),
                                    entryBlock->addArgument(indexType, loc)};
