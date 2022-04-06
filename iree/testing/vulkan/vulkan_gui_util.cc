@@ -56,6 +56,7 @@ std::vector<const char*> GetIreeExtensions(
 // Returns the names of the Vulkan extensions used for the given IREE
 // |vulkan_features|.
 std::vector<const char*> GetDeviceExtensions(
+    VkPhysicalDevice physical_device,
     iree_hal_vulkan_features_t vulkan_features) {
   std::vector<const char*> iree_required_extensions = GetIreeExtensions(
       IREE_HAL_VULKAN_EXTENSIBILITY_DEVICE_EXTENSIONS_REQUIRED,
@@ -64,13 +65,28 @@ std::vector<const char*> GetDeviceExtensions(
       IREE_HAL_VULKAN_EXTENSIBILITY_DEVICE_EXTENSIONS_OPTIONAL,
       vulkan_features);
 
+  uint32_t extension_count = 0;
+  check_vk_result(vkEnumerateDeviceExtensionProperties(
+      physical_device, nullptr, &extension_count, nullptr));
+  std::vector<VkExtensionProperties> extension_properties(extension_count);
+  check_vk_result(vkEnumerateDeviceExtensionProperties(
+      physical_device, nullptr, &extension_count, extension_properties.data()));
+
   // Merge extensions lists, including optional and required for simplicity.
   std::set<const char*> ext_set;
   ext_set.insert("VK_KHR_swapchain");
   ext_set.insert(iree_required_extensions.begin(),
                  iree_required_extensions.end());
-  ext_set.insert(iree_optional_extensions.begin(),
-                 iree_optional_extensions.end());
+  for (int i = 0; i < iree_optional_extensions.size(); ++i) {
+    const char* optional_extension = iree_optional_extensions[i];
+    for (int j = 0; j < extension_count; ++j) {
+      if (strcmp(optional_extension, extension_properties[j].extensionName) ==
+          0) {
+        ext_set.insert(optional_extension);
+        break;
+      }
+    }
+  }
   std::vector<const char*> extensions(ext_set.begin(), ext_set.end());
   return extensions;
 }
@@ -183,6 +199,10 @@ void SetupVulkan(iree_hal_vulkan_features_t vulkan_features,
 
     // Use the first reported GPU for simplicity.
     *physical_device = gpus[0];
+
+    VkPhysicalDeviceProperties properties;
+    vkGetPhysicalDeviceProperties(*physical_device, &properties);
+    IREE_LOG(INFO) << "Selected Vulkan device: " << properties.deviceName;
     free(gpus);
   }
 
@@ -208,7 +228,7 @@ void SetupVulkan(iree_hal_vulkan_features_t vulkan_features,
   // Create Logical Device (with 1 queue)
   {
     std::vector<const char*> device_extensions =
-        GetDeviceExtensions(vulkan_features);
+        GetDeviceExtensions(*physical_device, vulkan_features);
     const float queue_priority[] = {1.0f};
     VkDeviceQueueCreateInfo queue_info = {};
     queue_info.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
