@@ -33,7 +33,9 @@ class command_buffer_test : public CtsTestBase {
     iree_hal_buffer_params_t params = {0};
     params.type =
         IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL | IREE_HAL_MEMORY_TYPE_HOST_VISIBLE;
-    params.usage = IREE_HAL_BUFFER_USAGE_ALL;
+    params.usage = IREE_HAL_BUFFER_USAGE_DISPATCH |
+                   IREE_HAL_BUFFER_USAGE_TRANSFER |
+                   IREE_HAL_BUFFER_USAGE_MAPPING;
     iree_hal_buffer_t* device_buffer = NULL;
     IREE_CHECK_OK(iree_hal_allocator_allocate_buffer(
         iree_hal_device_allocator(device_), params, buffer_size,
@@ -139,7 +141,9 @@ TEST_P(command_buffer_test, CopyWholeBuffer) {
   iree_hal_buffer_params_t host_params = {0};
   host_params.type =
       IREE_HAL_MEMORY_TYPE_HOST_LOCAL | IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE;
-  host_params.usage = IREE_HAL_BUFFER_USAGE_ALL;
+  host_params.usage = IREE_HAL_BUFFER_USAGE_DISPATCH |
+                      IREE_HAL_BUFFER_USAGE_TRANSFER |
+                      IREE_HAL_BUFFER_USAGE_MAPPING;
   iree_hal_buffer_t* host_buffer = nullptr;
   IREE_ASSERT_OK(iree_hal_allocator_allocate_buffer(
       device_allocator_, host_params, kDefaultAllocationSize,
@@ -151,7 +155,9 @@ TEST_P(command_buffer_test, CopyWholeBuffer) {
   iree_hal_buffer_params_t device_params = {0};
   device_params.type =
       IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL | IREE_HAL_MEMORY_TYPE_HOST_VISIBLE;
-  device_params.usage = IREE_HAL_BUFFER_USAGE_ALL;
+  device_params.usage = IREE_HAL_BUFFER_USAGE_DISPATCH |
+                        IREE_HAL_BUFFER_USAGE_TRANSFER |
+                        IREE_HAL_BUFFER_USAGE_MAPPING;
   iree_hal_buffer_t* device_buffer = nullptr;
   IREE_ASSERT_OK(iree_hal_allocator_allocate_buffer(
       device_allocator_, device_params, kDefaultAllocationSize,
@@ -193,7 +199,9 @@ TEST_P(command_buffer_test, CopySubBuffer) {
   iree_hal_buffer_params_t device_params = {0};
   device_params.type =
       IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL | IREE_HAL_MEMORY_TYPE_HOST_VISIBLE;
-  device_params.usage = IREE_HAL_BUFFER_USAGE_ALL;
+  device_params.usage = IREE_HAL_BUFFER_USAGE_DISPATCH |
+                        IREE_HAL_BUFFER_USAGE_TRANSFER |
+                        IREE_HAL_BUFFER_USAGE_MAPPING;
   iree_hal_buffer_t* device_buffer = NULL;
   IREE_ASSERT_OK(iree_hal_allocator_allocate_buffer(
       device_allocator_, device_params, kDefaultAllocationSize,
@@ -208,7 +216,9 @@ TEST_P(command_buffer_test, CopySubBuffer) {
   iree_hal_buffer_params_t host_params = {0};
   host_params.type =
       IREE_HAL_MEMORY_TYPE_HOST_LOCAL | IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE;
-  host_params.usage = IREE_HAL_BUFFER_USAGE_ALL;
+  host_params.usage = IREE_HAL_BUFFER_USAGE_DISPATCH |
+                      IREE_HAL_BUFFER_USAGE_TRANSFER |
+                      IREE_HAL_BUFFER_USAGE_MAPPING;
   std::vector<uint8_t> host_buffer_data(kDefaultAllocationSize, i8_val);
   iree_hal_buffer_t* host_buffer = NULL;
   IREE_ASSERT_OK(iree_hal_allocator_allocate_buffer(

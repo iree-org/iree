@@ -361,7 +361,9 @@ extern "C" int iree_main(int argc, char** argv) {
                 IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE);
         iree_hal_buffer_usage_t input_buffer_usage =
             static_cast<iree_hal_buffer_usage_t>(
-                IREE_HAL_BUFFER_USAGE_ALL | IREE_HAL_BUFFER_USAGE_CONSTANT);
+                IREE_HAL_BUFFER_USAGE_DISPATCH |
+                IREE_HAL_BUFFER_USAGE_TRANSFER | IREE_HAL_BUFFER_USAGE_MAPPING |
+                IREE_HAL_BUFFER_USAGE_CONSTANT);
         iree_hal_buffer_params_t buffer_params;
         buffer_params.type = input_memory_type;
         buffer_params.usage = input_buffer_usage;

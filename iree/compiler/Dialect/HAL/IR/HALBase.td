@@ -52,7 +52,6 @@ def HAL_BufferUsage_Constant  : BitEnumAttrCase<"Constant", 0x0001>;  // C
 def HAL_BufferUsage_Transfer  : BitEnumAttrCase<"Transfer", 0x0002>;  // T
 def HAL_BufferUsage_Mapping   : BitEnumAttrCase<"Mapping",  0x0004>;  // M
 def HAL_BufferUsage_Dispatch  : BitEnumAttrCase<"Dispatch", 0x0008>;  // D
-def HAL_BufferUsage_All       : BitEnumAttrCase<"All",      0x000E>;
 def HAL_BufferUsageBitfieldAttr :
     BitEnumAttr<"BufferUsageBitfield", "valid BufferUsage", [
       HAL_BufferUsage_None,
@@ -60,7 +59,6 @@ def HAL_BufferUsageBitfieldAttr :
       HAL_BufferUsage_Transfer,
       HAL_BufferUsage_Mapping,
       HAL_BufferUsage_Dispatch,
-      HAL_BufferUsage_All,
     ]> {
   let cppNamespace = "mlir::iree_compiler::IREE::HAL";
 }
