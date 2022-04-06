@@ -21,6 +21,9 @@ on:
       release_id:
         description: 'Release id to upload artifacts to'
         default: ''
+      commit:
+        description: 'Last green commit to check out'
+        default: ''
 
 jobs:
   build_core:
@@ -87,6 +90,7 @@ jobs:
         with:
           path: 'main_checkout'
           submodules: true
+          ref: ${{ github.event.inputs.commit }}
 
       # Make sure we have a system python before setting up the dev path.
       - uses: actions/setup-python@v2
