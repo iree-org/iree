@@ -8,6 +8,13 @@
 # To disable autogeneration for this file entirely, delete this header.        #
 ################################################################################
 
+if(NOT "${IREE_BUILD_TORCH_MLIR_SUPPORT}")
+  iree_cc_library(
+    NAME TMTensor
+  )
+  return()
+endif()
+
 iree_add_all_subdirs()
 
 iree_tablegen_library(
@@ -49,6 +56,8 @@ iree_cc_library(
     MLIRPass
     MLIRTransforms
     TorchMLIRTMTensorDialect
+  DEFINES
+    "IREE_HAVE_TORCH_MLIR_DIALECTS"
   PUBLIC
 )
 

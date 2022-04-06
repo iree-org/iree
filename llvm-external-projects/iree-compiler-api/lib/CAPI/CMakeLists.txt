@@ -45,6 +45,13 @@ add_mlir_public_c_api_library(IREECompilerAPICompilerCAPI
     ${_OPTIONAL_LINK_LIBS}
 )
 
+if(${IREE_BUILD_TORCH_MLIR_SUPPORT})
+  target_compile_definitions(obj.IREECompilerAPICompilerCAPI
+    PUBLIC
+    -DIREE_HAVE_TORCH_MLIR_DIALECTS=1
+  )
+endif()
+
 # TODO: Fix upstream so there is a way to know what the actual compile target
 # is (versus prefixing with "obj." which is conditional).
 iree_compiler_target_includes(obj.IREECompilerAPICompilerCAPI)

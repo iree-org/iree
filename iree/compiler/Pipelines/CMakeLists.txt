@@ -18,6 +18,7 @@ iree_cc_library(
   SRCS
     "Options.cpp"
   DEPS
+    iree::compiler::InputConversion::TMTensor
     iree::compiler::Utils
   PUBLIC
 )

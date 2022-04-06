@@ -8,6 +8,10 @@
 # To disable autogeneration for this file entirely, delete this header.        #
 ################################################################################
 
+if(NOT "${IREE_BUILD_TORCH_MLIR_SUPPORT}")
+  return()
+endif()
+
 iree_add_all_subdirs()
 
 iree_lit_test_suite(
