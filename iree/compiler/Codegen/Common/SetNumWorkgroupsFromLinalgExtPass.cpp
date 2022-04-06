@@ -141,8 +141,8 @@ void SetNumWorkgroupsFromLinalgExtPass::runOnOperation() {
     if (!entryPointOp) continue;
 
     bool numWorkgroupIsSet = false;
-    assert(entryPointOp.workgroup_count_region().empty() &&
-           "Expected a single entryPoint op with no regions");
+    assert(!entryPointOp.getWorkgroupCountBody() &&
+           "Expected a single entryPoint op with no workgroup_count body");
 
     funcOp->walk([&](HALExecutableEntryPointOp op) {
       assert(!numWorkgroupIsSet);
@@ -154,15 +154,15 @@ void SetNumWorkgroupsFromLinalgExtPass::runOnOperation() {
               entryPointOp.getLoc(), entryPointOp.sym_nameAttr(),
               entryPointOp.ordinalAttr(), entryPointOp.layoutAttr(),
               entryPointOp.workgroup_sizeAttr(),
-              entryPointOp.workgroup_local_memoryAttr(), 1);
-      Block &block =
-          clonedEntryPointOp.workgroup_count_region().front().emplaceBlock();
+              entryPointOp.workgroup_local_memoryAttr());
+      Block &block = clonedEntryPointOp.workgroup_count_region().emplaceBlock();
       rewriter.mergeBlocks(&op.workgroup_count_region().front(), &block);
       // TODO: Don't add args post-hoc and instead replace them during
       // `mergeBlocks`.
-      block.addArgument(rewriter.getIndexType(), op->getLoc());
-      block.addArgument(rewriter.getIndexType(), op->getLoc());
-      block.addArgument(rewriter.getIndexType(), op->getLoc());
+      for (int64_t i = 0, e = HALExecutableEntryPointOp::getNumWorkgroupDims();
+           i < e; ++i) {
+        block.addArgument(rewriter.getIndexType(), op->getLoc());
+      }
       op->erase();
       entryPointOp.erase();
     });

@@ -1521,10 +1521,10 @@ def HAL_ExecutableEntryPointOp : HAL_Op<"executable.entry_point", [
     An entry point exported by the executable with statically-available
     information describing the IO interface it uses and other dispatch metadata.
 
-    The optional `workgroup_count_region` region represents the
-    computation that returns the number of workgroups to use. The
-    arguments to the region represents the workload along x, y and
-    z. It returns the number of workgroups along x, y, and z.
+    The `workgroup_count_region` region represents the computation that returns
+    the number of workgroups to use.
+    The arguments to the region represents the workload along x, y and z.
+    It returns the number of workgroups along x, y, and z.
 
     TODO(ravishankarm): In reality there is no need to define what the
     arguments represent. They could be any values that are needed to
@@ -1542,7 +1542,7 @@ def HAL_ExecutableEntryPointOp : HAL_Op<"executable.entry_point", [
     OptionalAttr<IndexAttr>:$workgroup_local_memory
   );
 
-  let regions = (region VariadicRegion<SizedRegion<1>>:$workgroup_count_region);
+  let regions = (region AnyRegion:$workgroup_count_region);
 
   let builders = [
     OpBuilder<(ins
@@ -1553,32 +1553,21 @@ def HAL_ExecutableEntryPointOp : HAL_Op<"executable.entry_point", [
       "::mlir::IntegerAttr":$workgroup_local_memory
     ), [{
       build($_builder, $_state, nullptr, sym_name, ordinal, layout,
-            workgroup_size, workgroup_local_memory, 0);
+            workgroup_size, workgroup_local_memory);
     }]>,
-    OpBuilder<(ins
-      "::mlir::StringAttr":$sym_name,
-      "::mlir::IntegerAttr":$ordinal,
-      "IREE::HAL::ExecutableLayoutAttr":$layout,
-      "::mlir::ArrayAttr":$workgroup_size,
-      "::mlir::IntegerAttr":$workgroup_local_memory,
-      "int":$workgroup_count_regionCount
-    ), [{
-      build($_builder, $_state, nullptr, sym_name, ordinal, layout,
-            workgroup_size, workgroup_local_memory, workgroup_count_regionCount);
-    }]>
   ];
 
   let hasVerifier = 1;
 
   let extraClassDeclaration = [{
-    Region *getBody() {
-      auto regions = workgroup_count_region();
-      if (!regions.empty()) return &regions.front();
-      return nullptr;
-    }
-    Block* getBlock() {
-      if (Region *region = getBody()) return &region->front();
-      return nullptr;
+    /// For now assume that the workload is at max 3D.
+    /// Arguments to the region are workload along x, y and z.
+    // TODO: Propogate this and avoid magic constants.
+    static int64_t getNumWorkgroupDims() { return 3; }
+
+    Block* getWorkgroupCountBody() {
+      if (workgroup_count_region().empty()) return nullptr;
+      return &workgroup_count_region().front();
     }
   }];
 }
