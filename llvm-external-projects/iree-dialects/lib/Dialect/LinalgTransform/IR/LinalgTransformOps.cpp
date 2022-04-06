@@ -983,14 +983,6 @@ transform::RewriteLinalgExtInParallelToAsyncOp::applyToOne(
   return functional::applyAt(target, functionalRewrite);
 }
 
-LogicalResult transform::RewriteLinalgExtInParallelToHALOp::apply(
-    transform::TransformResults &results, transform::TransformState &state) {
-  LinalgExt::InParallelOpToHALRewriter pattern(this->getContext());
-  ArrayRef<Operation *> targets = state.getPayloadOps(target());
-  return functional::applyReturningPatternAt(
-      pattern, cast<LinalgExt::InParallelOp>(targets.front()));
-}
-
 FailureOr<scf::ForOp>
 transform::RewriteLinalgExtInParallelToScfForOp::applyToOne(
     LinalgExt::InParallelOp target) {

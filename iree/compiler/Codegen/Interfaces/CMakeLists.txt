@@ -20,6 +20,7 @@ iree_cc_library(
   DEPS
     ::BufferizationInterfaces
     ::ProcessorOpInterfaces
+    iree::compiler::Codegen::TransformDialectExtensions
   PUBLIC
 )
 
