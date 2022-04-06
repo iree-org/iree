@@ -29,6 +29,7 @@ BACKEND_TESTS = [
     "dynamic_torch_index_select_vector.mlir",
     "linalg_ops.mlir",
     "linalg_ext_ops.mlir",
+    "strided_slice.mlir",
 ]
 
 iree_lit_test_suite(

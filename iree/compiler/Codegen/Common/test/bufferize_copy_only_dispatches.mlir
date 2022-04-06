@@ -51,8 +51,8 @@ builtin.module {
 //  CHECK-DAG:   %[[DEST:.+]] = hal.interface.binding.subspan set(0) binding(1)
 //  CHECK-DAG:   %[[OFFSET_Y:.+]] = affine.apply #[[MAP0]]()[%[[INSERT_OFFSET_Y]], %[[DEST_STRIDE_Y]], %[[DEST_OFFSET_Y]]]
 //  CHECK-DAG:   %[[OFFSET_X:.+]] = affine.apply #[[MAP0]]()[%[[INSERT_OFFSET_X]], %[[DEST_STRIDE_X]], %[[DEST_OFFSET_X]]]
-//  CHECK-DAG:   %[[STRIDE_Y:.+]] = affine.apply #[[MAP1]]()[%[[DEST_STRIDE_Y]], %[[INSERT_STRIDE_Y]]]
-//  CHECK-DAG:   %[[STRIDE_X:.+]] = affine.apply #[[MAP1]]()[%[[DEST_STRIDE_X]], %[[INSERT_STRIDE_X]]]
+//  CHECK-DAG:   %[[STRIDE_Y:.+]] = affine.apply #[[MAP1]]()[%[[INSERT_STRIDE_Y]], %[[DEST_STRIDE_Y]]]
+//  CHECK-DAG:   %[[STRIDE_X:.+]] = affine.apply #[[MAP1]]()[%[[INSERT_STRIDE_X]], %[[DEST_STRIDE_X]]]
 //  CHECK-DAG:   %[[SUBVIEW:.+]] = memref.subview %[[DEST]][%[[OFFSET_Y]], %[[OFFSET_X]]] [%[[SOURCE_SIZE_Y]], %[[SOURCE_SIZE_X]]]
 // CHECK-SAME:       [%[[STRIDE_Y]], %[[STRIDE_X]]]
 //      CHECK:   linalg.generic
@@ -105,9 +105,9 @@ builtin.module {
 //  CHECK-DAG:   %[[SOURCE:.+]] = hal.interface.binding.subspan set(0) binding(0)
 //  CHECK-DAG:   %[[DEST:.+]] = hal.interface.binding.subspan set(0) binding(1)
 //  CHECK-DAG:   %[[OFFSET_Y:.+]] = affine.apply #[[MAP0]]()[%[[EXTRACT_OFFSET_Y]], %[[SOURCE_STRIDE_Y]], %[[SOURCE_OFFSET_Y]]]
-//  CHECK-DAG:   %[[STRIDE_Y:.+]] = affine.apply #[[MAP1]]()[%[[SOURCE_STRIDE_Y]], %[[EXTRACT_STRIDE_Y]]]
+//  CHECK-DAG:   %[[STRIDE_Y:.+]] = affine.apply #[[MAP1]]()[%[[EXTRACT_STRIDE_Y]], %[[SOURCE_STRIDE_Y]]]
 //  CHECK-DAG:   %[[OFFSET_X:.+]] = affine.apply #[[MAP0]]()[%[[EXTRACT_OFFSET_X]], %[[SOURCE_STRIDE_X]], %[[SOURCE_OFFSET_X]]]
-//  CHECK-DAG:   %[[STRIDE_X:.+]] = affine.apply #[[MAP1]]()[%[[SOURCE_STRIDE_X]], %[[EXTRACT_STRIDE_X]]]
+//  CHECK-DAG:   %[[STRIDE_X:.+]] = affine.apply #[[MAP1]]()[%[[EXTRACT_STRIDE_X]], %[[SOURCE_STRIDE_X]]]
 //  CHECK-DAG:   %[[SOURCE_SUBVIEW:.+]] = memref.subview %[[SOURCE]][%[[OFFSET_Y]], %[[OFFSET_X]]] [%[[DEST_SIZE_Y]], %[[DEST_SIZE_X]]]
 // CHECK-SAME:       [%[[STRIDE_Y]], %[[STRIDE_X]]]
 //      CHECK:   linalg.generic

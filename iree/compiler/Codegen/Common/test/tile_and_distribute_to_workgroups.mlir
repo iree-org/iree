@@ -199,12 +199,13 @@ hal.executable private @add4D {
 //      CHECK: hal.executable.entry_point public @add4D
 // CHECK-SAME:   translation_info = #[[TRANSLATION]]
 //      CHECK: func @add4D()
+//      CHECK:   %[[C0:.+]] = arith.constant 0 : index
 //      CHECK:   scf.for %[[IV0:.+]] =
 //      CHECK:     scf.for %[[IV1:.+]] =
 //      CHECK:       scf.for %[[IV2:.+]] =
 //  CHECK-NOT:         scf.for
 //      CHECK:         %[[GENERIC:.+]] = linalg.generic
-//      CHECK:         flow.dispatch.tensor.store %[[GENERIC]], %{{.+}}, offsets = [0, %[[IV0]], %[[IV1]], %[[IV2]]]
+//      CHECK:         flow.dispatch.tensor.store %[[GENERIC]], %{{.+}}, offsets = [%[[C0]], %[[IV0]], %[[IV1]], %[[IV2]]]
 
 // -----
 
@@ -607,6 +608,7 @@ hal.executable private @conv {
 //      CHECK: hal.executable.entry_point public @conv
 // CHECK-SAME:  translation_info = #[[TRANSLATION]]
 //      CHECK: func @conv()
+//      CHECK:   %[[C0:.+]] = arith.constant 0
 //      CHECK:   scf.for %[[IV0:.+]] =
 //      CHECK:     scf.for %[[IV1:.+]] =
 //      CHECK:       scf.for %[[IV2:.+]] =
@@ -614,7 +616,7 @@ hal.executable private @conv {
 //  CHECK-DAG:         %[[FILTER:.+]] = flow.dispatch.tensor.load %{{.+}}, offsets = [0, 0, 0, %[[IV2]]]
 //  CHECK-DAG:         %[[INIT:.+]] = flow.dispatch.tensor.load %{{.+}}, offsets = [0, %[[IV0]], %[[IV1]], %[[IV2]]]
 //      CHECK:         %[[RESULT:.+]] = linalg.conv_2d_nhwc_hwcf
-//      CHECK:         flow.dispatch.tensor.store %[[RESULT]], %{{.+}}, offsets = [0, %[[IV0]], %[[IV1]], %[[IV2]]]
+//      CHECK:         flow.dispatch.tensor.store %[[RESULT]], %{{.+}}, offsets = [%[[C0]], %[[IV0]], %[[IV1]], %[[IV2]]]
 
 // -----
 
@@ -663,6 +665,7 @@ hal.executable private @conv_static {
 //      CHECK: hal.executable.entry_point public @conv_static
 // CHECK-SAME:  translation_info = #[[TRANSLATION]]
 //      CHECK: func @conv_static()
+//      CHECK:   %[[C0:.+]] = arith.constant 0 : index
 //      CHECK:   scf.for %[[IV0:.+]] =
 //      CHECK:     scf.for %[[IV1:.+]] =
 //      CHECK:       scf.for %[[IV2:.+]] =
@@ -671,7 +674,7 @@ hal.executable private @conv_static {
 // CHECK-SAME:             outs(%[[INIT]] :
 //      CHECK:         %[[RESULT:.+]] = linalg.depthwise_conv_2d_nhwc_hwc
 // CHECK-SAME:             outs(%[[FILL]] :
-//      CHECK:         flow.dispatch.tensor.store %[[RESULT]], %{{.+}}, offsets = [0, %[[IV0]], %[[IV1]], %[[IV2]]], sizes = [1, 20, 40, 48]
+//      CHECK:         flow.dispatch.tensor.store %[[RESULT]], %{{.+}}, offsets = [%[[C0]], %[[IV0]], %[[IV1]], %[[IV2]]], sizes = [1, 20, 40, 48]
 
 // -----
 
@@ -932,6 +935,7 @@ hal.executable private @gemm_unit_N {
 //      CHECK: hal.executable.entry_point public @gemm_unit_N
 // CHECK-SAME:  translation_info = #[[TRANSLATION]]
 //      CHECK: func @gemm_unit_N()
+//  CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
 //  CHECK-DAG:   %[[M:.+]] = hal.interface.constant.load[0]
 //  CHECK-DAG:   %[[WG_ID_X:.+]] = hal.interface.workgroup.id[0]
 //  CHECK-DAG:   %[[WG_COUNT_X:.+]] = hal.interface.workgroup.count[0]
@@ -941,7 +945,7 @@ hal.executable private @gemm_unit_N {
 //  CHECK-NOT:     scf.for
 //      CHECK:     %[[GEMM:.+]] = linalg.matmul
 //      CHECK:     flow.dispatch.tensor.store %[[GEMM]],
-// CHECK-SAME:         offsets = [%[[IV0]], 0]
+// CHECK-SAME:         offsets = [%[[IV0]], %[[C0]]]
 
 // -----
 #config = #iree_codegen.lowering_config<tile_sizes = [[0, 0, 0], [0, 0, 0], [0, 0, 16]]>
@@ -1045,12 +1049,13 @@ hal.executable private @generic_unit_dims {
 //      CHECK: hal.executable.entry_point public @generic_unit_dims
 // CHECK-SAME:  translation_info = #[[TRANSLATION]]
 //      CHECK: func @generic_unit_dims()
+//      CHECK:   %[[C0:.+]] = arith.constant 0 : index
 //      CHECK:   scf.for %[[IV0:.+]] =
 //      CHECK:     scf.for %[[IV1:.+]] =
 //      CHECK:       scf.for %[[IV2:.+]] =
 //      CHECK:         %[[GENERIC:.+]] = linalg.generic
 //      CHECK:         flow.dispatch.tensor.store %[[GENERIC]],
-// CHECK-SAME:             offsets = [0, 0, 0, 0, %[[IV0]], %[[IV1]], 0, %[[IV2]]]
+// CHECK-SAME:             offsets = [%[[C0]], %[[C0]], %[[C0]], %[[C0]], %[[IV0]], %[[IV1]], %[[C0]], %[[IV2]]]
 
 // -----
 #config = #iree_codegen.lowering_config<tile_sizes = [[0], [0], [4]]>
@@ -1201,7 +1206,7 @@ hal.executable private @rank_reduced_slice {
 // CHECK-SAME:       : !flow.dispatch.tensor<writeonly:10xf32>
 //      CHECK:   scf.for %[[IV0:.+]] =
 //      CHECK:     %[[SRC_TILE:.+]] = flow.dispatch.tensor.load %[[SRC_BINDING]]
-// CHECK-SAME:         offsets = [0, %[[IV0]]], sizes = [1, 2], strides = [1, 1]
+// CHECK-SAME:         offsets = [%[[C0]], %[[IV0]]], sizes = [1, 2], strides = [1, 1]
 //      CHECK:     linalg.generic
 // CHECK-SAME:         ins(%[[SRC_TILE]] :
 

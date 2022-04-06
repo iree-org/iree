@@ -44,6 +44,7 @@ iree_check_single_backend_test_suite(
     "linalg_ext_ops.mlir"
     "linalg_ops.mlir"
     "lowering_config.mlir"
+    "strided_slice.mlir"
   TARGET_BACKEND
     "dylib-llvm-aot"
   DRIVER
@@ -79,6 +80,7 @@ iree_check_single_backend_test_suite(
     "dynamic_torch_index_select_vector.mlir"
     "linalg_ext_ops.mlir"
     "linalg_ops.mlir"
+    "strided_slice.mlir"
   TARGET_BACKEND
     "vmvx"
   DRIVER
@@ -101,6 +103,7 @@ iree_check_single_backend_test_suite(
     "dynamic_torch_index_select_vector.mlir"
     "linalg_ext_ops.mlir"
     "linalg_ops.mlir"
+    "strided_slice.mlir"
   TARGET_BACKEND
     "vulkan-spirv"
   DRIVER
@@ -123,6 +126,7 @@ iree_check_single_backend_test_suite(
     "dynamic_torch_index_select_vector.mlir"
     "linalg_ext_ops.mlir"
     "linalg_ops.mlir"
+    "strided_slice.mlir"
   TARGET_BACKEND
     "cuda"
   DRIVER

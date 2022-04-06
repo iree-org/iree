@@ -60,18 +60,19 @@ struct FoldTensorLoadWithExtractSlice
             .getDefiningOp<IREE::Flow::DispatchTensorLoadOp>();
     if (!dispatchTensorLoadOp) return failure();
 
-    SmallVector<OpFoldResult> offsets, sizes, strides;
+    SmallVector<OpFoldResult> offsets, strides;
     // `tensor.extract_slice` (i.e. the producer) folds **into**
     // `flow.dispatch.tensor.load1 (i.e. the consumer).
-    if (failed(foldOffsetsSizesAndStrides(
-            rewriter, dispatchTensorLoadOp->getLoc(), extractSliceOp,
-            dispatchTensorLoadOp, offsets, sizes, strides))) {
+    if (failed(foldOffsetsAndStrides(rewriter, dispatchTensorLoadOp->getLoc(),
+                                     dispatchTensorLoadOp, extractSliceOp,
+                                     offsets, strides))) {
       return failure();
     }
 
     rewriter.replaceOpWithNewOp<IREE::Flow::DispatchTensorLoadOp>(
         extractSliceOp, extractSliceOp.getType(), dispatchTensorLoadOp.source(),
-        dispatchTensorLoadOp.source_dims(), offsets, sizes, strides);
+        dispatchTensorLoadOp.source_dims(), offsets,
+        extractSliceOp.getMixedSizes(), strides);
     return success();
   }
 };
@@ -102,19 +103,19 @@ struct FoldInsertSliceWithTensorStoreOp
       return failure();
     }
 
-    SmallVector<OpFoldResult> offsets, sizes, strides;
+    SmallVector<OpFoldResult> offsets, strides;
     // `tensor.insert_slice` (i.e. the producer) folds **into**
     // `flow.dispatch.tensor.store` (i.e. the consumer).
-    if (failed(foldOffsetsSizesAndStrides(
-            rewriter, dispatchTensorStoreOp->getLoc(), insertSliceOp,
-            dispatchTensorStoreOp, offsets, sizes, strides))) {
+    if (failed(foldOffsetsAndStrides(rewriter, dispatchTensorStoreOp->getLoc(),
+                                     dispatchTensorStoreOp, insertSliceOp,
+                                     offsets, strides))) {
       return failure();
     }
 
     rewriter.replaceOpWithNewOp<IREE::Flow::DispatchTensorStoreOp>(
         dispatchTensorStoreOp, insertSliceOp.source(),
         dispatchTensorStoreOp.target(), dispatchTensorStoreOp.target_dims(),
-        offsets, sizes, strides);
+        offsets, insertSliceOp.getMixedSizes(), strides);
     return success();
   }
 };
