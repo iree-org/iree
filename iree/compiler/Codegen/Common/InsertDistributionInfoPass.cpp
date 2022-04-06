@@ -156,8 +156,7 @@ void InsertDistributionInfoPass::runOnOperation() {
                                                          interchange))) {
     return signalPassFailure();
   }
-  SmallVector<int64_t> workloadPerWorkroup =
-      getWorkloadPerWorkgroup(tileSizes, interchange);
+  SmallVector<int64_t> workloadPerWorkroup = getWorkloadPerWorkgroup(tileSizes);
 
   if (failed(defineWorkgroupCountRegion(funcOp, workloadPerWorkroup,
                                         interchange)) ||
