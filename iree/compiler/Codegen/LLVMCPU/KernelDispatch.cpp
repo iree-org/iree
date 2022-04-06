@@ -377,11 +377,15 @@ static LogicalResult setX86SandboxRootConfig(func::FuncOp entryPointFn,
   // The tiling for parallel dims and reduction dims should be separated.
   SmallVector<int64_t> parallelTileSizes;
   int64_t nLoops = cast<linalg::LinalgOp>(op.getOperation()).getNumLoops();
-  parallelTileSizes.append(nLoops - 3, 1);
-  parallelTileSizes.push_back(
-      getMaxTileSize(0, flowTileSizes[nLoops - 3], 8, vectorSize));
-  parallelTileSizes.push_back(
-      getMaxTileSize(0, flowTileSizes[nLoops - 2], 32, vectorSize));
+  if (nLoops >= 3) {
+    parallelTileSizes.append(nLoops - 3, 1);
+    parallelTileSizes.push_back(
+        getMaxTileSize(0, flowTileSizes[nLoops - 3], 8, vectorSize));
+  }
+  if (nLoops >= 2) {
+    parallelTileSizes.push_back(
+        getMaxTileSize(0, flowTileSizes[nLoops - 2], 32, vectorSize));
+  }
   parallelTileSizes.push_back(0);
 
   auto lhsShapedType = op.lhs().getType().cast<ShapedType>();
@@ -409,14 +413,18 @@ static LogicalResult setARMRootConfig(func::FuncOp entryPointFn,
   // Vector tile sizes are {1, ..., v, v, v}
   SmallVector<int64_t> l1TileSizes, vectorTileSizes;
   int64_t nLoops = cast<linalg::LinalgOp>(op.getOperation()).getNumLoops();
-  l1TileSizes.append(nLoops - 3, 1);
-  l1TileSizes.push_back(
-      getMaxTileSize(0, flowTileSizes[nLoops - 3], 5 * vectorSize, vectorSize));
-  l1TileSizes.push_back(
-      getMaxTileSize(0, flowTileSizes[nLoops - 2], vectorSize, vectorSize));
-  vectorTileSizes.append(nLoops - 3, 1);
-  vectorTileSizes.push_back(vectorSize);
-  vectorTileSizes.push_back(vectorSize);
+  if (nLoops >= 3) {
+    l1TileSizes.append(nLoops - 3, 1);
+    l1TileSizes.push_back(getMaxTileSize(0, flowTileSizes[nLoops - 3],
+                                         5 * vectorSize, vectorSize));
+    vectorTileSizes.append(nLoops - 3, 1);
+    vectorTileSizes.push_back(vectorSize);
+  }
+  if (nLoops >= 2) {
+    l1TileSizes.push_back(
+        getMaxTileSize(0, flowTileSizes[nLoops - 2], vectorSize, vectorSize));
+    vectorTileSizes.push_back(vectorSize);
+  }
 
   // L1/vector tile size for k dimensions.
   auto lhsShapedType = op.lhs().getType().cast<ShapedType>();
@@ -439,6 +447,17 @@ static LogicalResult setRootConfig(
     func::FuncOp entryPointFn, linalg::ContractionOpInterface contractionOp,
     ArrayRef<LoopTilingAndDistributionInfo> tiledLoops) {
   auto linalgOp = cast<linalg::LinalgOp>(contractionOp.getOperation());
+  unsigned numLoops = linalgOp.getNumLoops();
+  {
+    SmallVector<unsigned> dims;
+    linalgOp.getReductionDims(dims);
+    if (dims.size() != 1 || dims[0] != numLoops - 1) {
+      return contractionOp.emitOpError(
+          "expected to have exactly one reduction dim, and it is the innermost "
+          "dim");
+    }
+  }
+
   // Consider all element types and use the smallest vector size. The tiling
   // sizes are chosen based on the vector size.
   auto lhsShapedType = contractionOp.lhs().getType().cast<ShapedType>();
@@ -450,7 +469,6 @@ static LogicalResult setRootConfig(
   vectorSize = std::min(vectorSize, getVectorSize(entryPointFn, resShapedType));
 
   // Use the default distribution for the matmul loops.
-  unsigned numLoops = linalgOp.getNumLoops();
   SmallVector<int64_t> minTileSizes =
       getMinTilingSizesForEachDim(entryPointFn, linalgOp);
   SmallVector<int64_t> maxTileSizes(numLoops, defaultWorkgroupTileSize);

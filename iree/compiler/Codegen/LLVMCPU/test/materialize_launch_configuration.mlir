@@ -60,6 +60,100 @@ hal.executable private @matmul_tensors  {
     #hal.descriptor_set.binding<2, storage_buffer>
   ]>
 ]>
+hal.executable private @matvec_tensors  {
+  hal.executable.variant @llvm, target = <"llvm", "embedded-elf-x86_64", {
+    data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
+    native_vector_size = 16 : index,
+    target_triple = "x86_64-unknown-linux-gnu"
+  }> {
+    hal.executable.entry_point @matvec_tensors layout(#executable_layout)
+    builtin.module {
+      func.func @matvec_tensors() {
+        %c0 = arith.constant 0 : index
+        %cst = arith.constant 0.000000e+00 : f32
+        %0 = hal.interface.constant.load[0] : i32
+        %1 = hal.interface.constant.load[1] : i32
+        %2 = hal.interface.constant.load[2] : i32
+        %3 = arith.index_cast %0 : i32 to index
+        %4 = arith.index_cast %1 : i32 to index
+        %5 = arith.index_cast %2 : i32 to index
+        %6 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:?x?xf32>{%3, %4}
+        %7 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:?xf32>{%5}
+        %8 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<writeonly:?xf32>{%3}
+        %9 = hal.interface.constant.load[0] : i32
+        %10 = arith.index_cast %9 : i32 to index
+        %11 = flow.dispatch.tensor.load %8, offsets = [0], sizes = [%10], strides = [1] : !flow.dispatch.tensor<writeonly:?xf32>{%3} -> tensor<?xf32>
+        %12 = flow.dispatch.tensor.load %6, offsets = [0, 0], sizes = [%3, %4], strides = [1, 1] : !flow.dispatch.tensor<readonly:?x?xf32>{%3, %4} -> tensor<?x?xf32>
+        %13 = flow.dispatch.tensor.load %7, offsets = [0], sizes = [%5], strides = [1] : !flow.dispatch.tensor<readonly:?xf32>{%5} -> tensor<?xf32>
+        %14 = linalg.fill ins(%cst : f32) outs(%11 : tensor<?xf32>) -> tensor<?xf32>
+        %15 = linalg.matvec ins(%12, %13 : tensor<?x?xf32>, tensor<?xf32>) outs(%14 : tensor<?xf32>) -> tensor<?xf32>
+        flow.dispatch.tensor.store %15, %8, offsets = [0], sizes = [%3], strides = [1] : tensor<?xf32> -> !flow.dispatch.tensor<writeonly:?xf32>{%3}
+        return
+      }
+    }
+  }
+}
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[64, 0], [32, 0], [0, 16]]>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert>
+//      CHECK: hal.executable.entry_point public @matvec_tensors
+// CHECK-SAME:     translation_info = #[[TRANSLATION]]
+//      CHECK: linalg.matvec
+// CHECK-SAME:     lowering_config = #[[CONFIG]]
+
+// -----
+
+#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>,
+    #hal.descriptor_set.binding<2, storage_buffer>
+  ]>
+]>
+hal.executable private @dot_tensors  {
+  hal.executable.variant @llvm, target = <"llvm", "embedded-elf-x86_64", {
+    data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
+    native_vector_size = 16 : index,
+    target_triple = "x86_64-unknown-linux-gnu"
+  }> {
+    hal.executable.entry_point @dot_tensors layout(#executable_layout)
+    builtin.module {
+      func.func @dot_tensors() {
+        %c0 = arith.constant 0 : index
+        %cst = arith.constant 0.000000e+00 : f32
+        %0 = hal.interface.constant.load[0] : i32
+        %1 = hal.interface.constant.load[1] : i32
+        %2 = arith.index_cast %0 : i32 to index
+        %3 = arith.index_cast %1 : i32 to index
+        %4 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<writeonly:f32>
+        %5 = flow.dispatch.tensor.load %4, offsets = [], sizes = [], strides = [] : !flow.dispatch.tensor<writeonly:f32> -> tensor<f32>
+        %6 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:?xf32>{%2}
+        %7 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:?xf32>{%3}
+        %8 = flow.dispatch.tensor.load %6, offsets = [0], sizes = [%2], strides = [1] : !flow.dispatch.tensor<readonly:?xf32>{%2} -> tensor<?xf32>
+        %9 = flow.dispatch.tensor.load %7, offsets = [0], sizes = [%3], strides = [1] : !flow.dispatch.tensor<readonly:?xf32>{%3} -> tensor<?xf32>
+        %10 = linalg.fill ins(%cst : f32) outs(%5 : tensor<f32>) -> tensor<f32>
+        %11 = linalg.dot ins(%8, %9 : tensor<?xf32>, tensor<?xf32>) outs(%10 : tensor<f32>) -> tensor<f32>
+        flow.dispatch.tensor.store %11, %4, offsets = [], sizes = [], strides = [] : tensor<f32> -> !flow.dispatch.tensor<writeonly:f32>
+        return
+      }
+    }
+  }
+}
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[0], [0], [16]]>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert>
+//      CHECK: hal.executable.entry_point public @dot_tensors
+// CHECK-SAME:     translation_info = #[[TRANSLATION]]
+//      CHECK: linalg.dot
+// CHECK-SAME:     lowering_config = #[[CONFIG]]
+
+// -----
+
+#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>,
+    #hal.descriptor_set.binding<2, storage_buffer>
+  ]>
+]>
 hal.executable private @add {
   hal.executable.variant @llvm, target = <"llvm", "embedded-elf-x86_64", {
     data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",

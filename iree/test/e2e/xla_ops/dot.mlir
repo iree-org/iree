@@ -50,3 +50,20 @@ func.func @large() {
   check.expect_almost_eq_const(%res, dense<409.596> : tensor<250x500xf32>) : tensor<250x500xf32>
   return
 }
+
+// TODO(#8782): Enable the test.
+// func.func @matvec() {
+//   %lhs = util.unfoldable_constant dense<1.0> : tensor<250x1024xf32>
+//   %rhs = util.unfoldable_constant dense<0.5> : tensor<1024xf32>
+//   %res = "mhlo.dot"(%lhs, %rhs) : (tensor<250x1024xf32>, tensor<1024xf32>) -> tensor<250xf32>
+//   check.expect_almost_eq_const(%res, dense<512.0> : tensor<250xf32>) : tensor<250xf32>
+//   return
+// }
+
+func.func @dot() {
+  %lhs = util.unfoldable_constant dense<1.0> : tensor<1024xf32>
+  %rhs = util.unfoldable_constant dense<0.5> : tensor<1024xf32>
+  %res = "mhlo.dot"(%lhs, %rhs) : (tensor<1024xf32>, tensor<1024xf32>) -> tensor<f32>
+  check.expect_almost_eq_const(%res, dense<512.0> : tensor<f32>) : tensor<f32>
+  return
+}
