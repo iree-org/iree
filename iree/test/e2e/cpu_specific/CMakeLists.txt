@@ -15,6 +15,7 @@ iree_check_single_backend_test_suite(
     check_dylib-llvm-aot_dylib
   SRCS
     "dot_exp.mlir"
+    "tests.mlir"
   TARGET_BACKEND
     "dylib-llvm-aot"
   DRIVER

@@ -7,6 +7,7 @@
 # Tests for end-to-end IREE support specific to the CUDA backend to be able to
 # incrementally enable features.
 
+load("//build_tools/bazel:enforce_glob.bzl", "enforce_glob")
 load("//build_tools/bazel:iree_check_test.bzl", "iree_check_single_backend_test_suite")
 
 package(
@@ -17,9 +18,14 @@ package(
 
 iree_check_single_backend_test_suite(
     name = "check_dylib-llvm-aot_dylib",
-    srcs = [
-        "dot_exp.mlir",
-    ],
+    srcs = enforce_glob(
+        # keep sorted
+        [
+            "dot_exp.mlir",
+            "tests.mlir",
+        ],
+        include = ["*.mlir"],
+    ),
     compiler_flags = [
         "-iree-input-type=mhlo",
     ],
