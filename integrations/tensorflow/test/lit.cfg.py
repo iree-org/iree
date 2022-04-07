@@ -41,6 +41,7 @@ config.excludes = [
     'test_util.py',
     'manual_test.py',
     'squad_test_data.py',
+    'imagenet_test_data.py',
 ]
 
 config.substitutions.extend([
