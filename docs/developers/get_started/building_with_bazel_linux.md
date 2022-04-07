@@ -1,15 +1,7 @@
 # Getting Started on Linux with Bazel
 
-<!--
-Notes to those updating this guide:
-
-    * This document should be __simple__ and cover essential items only.
-      Notes for optional components should go in separate files.
-
-    * This document parallels getting_started_windows_bazel.md and
-      getting_started_macos_bazel.md
-      Please keep them in sync.
--->
+**NOTE** Bazel build support is primarily for internal project infrastructure.
+We strongly recommend users build with CMake instead.
 
 This guide walks through building the core compiler and runtime parts of IREE
 from source. Auxiliary components like the Python bindings and Vulkan driver are
@@ -19,9 +11,9 @@ documented separately, as they require further setup.
 
 ### Install Bazel
 
-Install Bazel version > 2.0.0 (see
-[`.bazelversion`](https://github.com/google/iree/blob/main/.bazelversion) for
-the specific version IREE uses) by following the
+Install Bazel, matching IREE's
+[`.bazelversion`](https://github.com/google/iree/blob/main/.bazelversion) by
+following the
 [official docs](https://docs.bazel.build/versions/master/install.html).
 
 ### Install a Compiler
@@ -120,12 +112,3 @@ and execute a function in the compiled module:
 $ ./bazel-bin/iree/tools/iree-run-mlir ./iree/samples/models/simple_abs.mlir \
   -function-input="f32=-2" -iree-hal-target-backends=vmvx -print-mlir
 ```
-
-### Further Reading
-
-*   For an introduction to IREE's project structure and developer tools, see
-    [Developer Overview](../developing_iree/developer_overview.md)
-*   To target GPUs using Vulkan, see
-    [Getting Started on Linux with Vulkan](getting_started_linux_vulkan.md)
-*   To use IREE's Python bindings, see
-    [Getting Started with Python](getting_started_python.md)
