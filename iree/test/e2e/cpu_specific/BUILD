@@ -22,7 +22,6 @@ iree_check_single_backend_test_suite(
         # keep sorted
         [
             "dot_exp.mlir",
-            "tests.mlir",
         ],
         include = ["*.mlir"],
     ),
