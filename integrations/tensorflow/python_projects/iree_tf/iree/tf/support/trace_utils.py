@@ -44,7 +44,6 @@ def get_trace_dir(artifacts_dir: str, trace: "Trace") -> str:
 
 class ModuleCall:
 
-  # TODO(#8794): Adjust tolerance back to 1e-6 once the bug is fixed.
   def __init__(self,
                method: str,
                inputs: Tuple[Any],
