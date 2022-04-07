@@ -390,15 +390,21 @@ def run_benchmarks_for_category(
         # certain amount of seconds---Pixel 4 seems to have an issue that will
         # make the trace collection step get stuck. Instead wait for the
         # benchmark result to be available.
+        print("XXX adb_start_cmd has returned. process is running...")
         while True:
+          print(f"XXX blocking on readline()... note: process.poll() returns {process.poll()}")
           line = process.stdout.readline()  # pytype: disable=attribute-error
+          print(f"XXX readline() returned this line: {line}")
           if line == "" and process.poll() is not None:  # Process completed
+            print("XXX raising exception")
             raise ValueError("Cannot find benchmark result line in the log!")
           if verbose:
             print(line.strip())
           # Result available
           if re.match(r"^BM_.+/real_time", line) is not None:
+            print("XXX matched line, break")
             break
+        print("XXX after the while loop")
 
         # Now it's okay to collect the trace via the capture tool. This will
         # send the signal to let the previously waiting benchmark tool to
