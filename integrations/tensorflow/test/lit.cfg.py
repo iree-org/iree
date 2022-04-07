@@ -40,6 +40,7 @@ config.excludes = [
     'lit.site.cfg.py',
     'test_util.py',
     'manual_test.py',
+    'squad_test_data.py',
 ]
 
 config.substitutions.extend([
@@ -64,9 +65,9 @@ llvm_config.with_environment("PYTHONPATH", [
 disable_features_param = lit_config.params.get('DISABLE_FEATURES')
 disable_features = []
 if disable_features_param:
-    disable_features = disable_features_param.split(',')
+  disable_features = disable_features_param.split(',')
 if 'llvmaot' not in disable_features:
-    config.available_features.add('llvmaot')
+  config.available_features.add('llvmaot')
 features_param = lit_config.params.get('FEATURES')
 if features_param:
   config.available_features.update(features_param.split(','))
