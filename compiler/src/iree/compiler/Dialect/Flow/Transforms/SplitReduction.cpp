@@ -24,6 +24,8 @@ namespace iree_compiler {
 namespace IREE {
 namespace Flow {
 
+static const char kSplitKAttr[] = "iree_flow_split_k";
+
 // TODO(thomasraoux): Move to attributes.
 static llvm::cl::opt<int64_t> splitReductionRatio(
     "iree-flow-split-matmul-reduction", llvm::cl::desc("split ratio"),
@@ -91,10 +93,14 @@ struct SplitReductionPass : public SplitReductionBase<SplitReductionPass> {
     patterns.add<LinalgSplitReduction>(
         &getContext(),
         [&](linalg::LinalgOp op) -> linalg::SplitReductionOptions {
+          int64_t ratio = splitReductionRatio;
+          if (auto attr = op->getAttrOfType<IntegerAttr>(kSplitKAttr))
+            ratio = attr.getInt();
+          if (ratio <= 1) return {int64_t(0), 0, /*innerParallel=*/false};
           // For matmul make the new parallel dimension first so that it looks
           // like a batch_matmul and can follow the same codegen.
           if (isa<linalg::MatmulOp>(op))
-            return {int64_t(splitReductionRatio), 0, /*innerParallel=*/false};
+            return {ratio, 0, /*innerParallel=*/false};
           // Currently disable spliting reduction for non-matmul op. This will
           // get enabled after once tests are ready.
           return {int64_t(0), 0, /*innerParallel=*/false};
