@@ -165,12 +165,11 @@ linalg::LinalgLoopDistributionOptions getIREELinalgLoopDistributionOptions();
 /// The following computations are performed:
 ///   - offsets = producer_offsets * consumer_strides + consumer_offsets,
 ///   - strides = producer_strides * consumer_strides.
-LogicalResult foldOffsetsAndStrides(
-    OpBuilder &builder, Location loc,
-    OffsetSizeAndStrideOpInterface producer,
-    OffsetSizeAndStrideOpInterface consumer,
-    SmallVector<OpFoldResult> &combinedOffsets,
-    SmallVector<OpFoldResult> &combinedStrides);
+LogicalResult foldOffsetsAndStrides(OpBuilder &builder, Location loc,
+                                    OffsetSizeAndStrideOpInterface producer,
+                                    OffsetSizeAndStrideOpInterface consumer,
+                                    SmallVector<OpFoldResult> &combinedOffsets,
+                                    SmallVector<OpFoldResult> &combinedStrides);
 }  // namespace iree_compiler
 }  // namespace mlir
 
