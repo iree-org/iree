@@ -176,6 +176,54 @@ iree_generated_trace_runner_test(
 
 iree_generated_trace_runner_test(
   NAME
+    e2e_matmul_direct_f32_gpu_large_LLVMGPUMatmulSimt
+  GENERATOR
+    "generate_e2e_matmul_tests.py"
+  GENERATOR_ARGS
+    "--lhs_rhs_type=f32"
+    "--shapes=gpu_large"
+    "--compilation_info=LLVMGPUMatmulSimt"
+  TRACE_RUNNER
+    iree_tools_iree-e2e-matmul-test
+  TARGET_BACKENDS
+    "cuda"
+  DRIVERS
+    "cuda"
+  LABELS
+    "noasan"
+    "nomsan"
+    "notsan"
+    "noubsan"
+    "requires-gpu-nvidia"
+)
+
+iree_generated_trace_runner_test(
+  NAME
+    e2e_matmul_direct_f32_gpu_large_LLVMGPUMatmulTensorCore
+  GENERATOR
+    "generate_e2e_matmul_tests.py"
+  GENERATOR_ARGS
+    "--lhs_rhs_type=f32"
+    "--shapes=gpu_large"
+    "--compilation_info=LLVMGPUMatmulTensorCore"
+  TRACE_RUNNER
+    iree_tools_iree-e2e-matmul-test
+  TARGET_BACKENDS
+    "cuda"
+  DRIVERS
+    "cuda"
+  COMPILER_FLAGS
+    "--iree-cuda-llvm-target-arch=sm_80"
+  LABELS
+    "noasan"
+    "nomsan"
+    "notsan"
+    "noubsan"
+    "requires-gpu-nvidia"
+)
+
+iree_generated_trace_runner_test(
+  NAME
     e2e_matmul_direct_f32_large_split_k
   GENERATOR
     "generate_e2e_matmul_tests.py"
@@ -185,8 +233,10 @@ iree_generated_trace_runner_test(
   TRACE_RUNNER
     iree_tools_iree-e2e-matmul-test
   TARGET_BACKENDS
+    "cuda"
     "dylib-llvm-aot"
   DRIVERS
+    "cuda"
     "dylib"
   COMPILER_FLAGS
     "-iree-flow-split-matmul-reduction=4"
