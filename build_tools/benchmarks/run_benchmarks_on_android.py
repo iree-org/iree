@@ -108,9 +108,10 @@ def adb_push_to_tmp_dir(content: str,
   """
   filename = os.path.basename(content)
   android_path = os.path.join(ANDROID_TMP_DIR, relative_dir, filename)
-  execute_cmd(["adb", "push", "-p",
-               os.path.abspath(content), android_path],
-              verbose=verbose)
+  execute_cmd(
+      ["adb", "push", os.path.abspath(content), android_path],
+      verbose=verbose,
+      stdout=subprocess.DEVNULL)
   return android_path
 
 
