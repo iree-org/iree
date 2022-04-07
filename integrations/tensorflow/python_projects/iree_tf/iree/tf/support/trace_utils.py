@@ -19,7 +19,7 @@ import os
 import pickle
 import sys
 import textwrap
-from typing import Any, Callable, Dict, Sequence, Tuple, Union
+from typing import Any, Callable, Dict, Sequence, Tuple, Union, Optional
 
 from absl import logging
 from iree.tf.support import module_utils
@@ -163,7 +163,7 @@ class Trace:
   def __init__(self,
                module: Union[module_utils.CompiledModule, None],
                function: Union[Callable[["TracedModule"], None], None],
-               _load_dict: Dict[str, Any] = None):
+               _load_dict: Optional[Dict[str, Any]] = None):
     """Extracts metadata from module and function and initializes.
 
     Example usage:
