@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file --iree-tmtensor-to-linalg-ext %s | FileCheck %s
+// RUN: iree-opt -split-input-file --iree-tm-tensor-to-linalg-ext %s | FileCheck %s
 
 // -----
 func.func @scan(%in: tensor<128xi32>, %out: tensor<128xi32>, %acc: tensor<i32>) -> (tensor<128xi32>, tensor<i32>) {

@@ -39,7 +39,7 @@ struct InputDialectOptions {
     // Legalizes input defined over MHLO ops.
     mhlo,
     // Legalizes input defined over TMTensor ops.
-    tmtensor,
+    tm_tensor,
     // Special case of 'mhlo' legalization which also performs some XLA
     // cleanup activities.
     xla,

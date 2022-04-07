@@ -19,7 +19,7 @@ iree_lit_test_suite(
     name = "lit",
     srcs = enforce_glob(
         [
-            "convert_tmtensor_to_linalg_ext.mlir",
+            "convert_tm_tensor_to_linalg_ext.mlir",
         ],
         include = ["*.mlir"],
     ),
