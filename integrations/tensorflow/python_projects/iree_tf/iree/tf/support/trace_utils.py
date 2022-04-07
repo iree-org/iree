@@ -44,14 +44,15 @@ def get_trace_dir(artifacts_dir: str, trace: "Trace") -> str:
 
 class ModuleCall:
 
+  # TODO(#8794): Adjust tolerance back to 1e-6 once the bug is fixed.
   def __init__(self,
                method: str,
                inputs: Tuple[Any],
                outputs: Tuple[Any],
                serialized_inputs: Tuple[str],
                serialized_outputs: Tuple[str],
-               rtol: float = 1e-6,
-               atol: float = 1e-6):
+               rtol: float = 1e-5,
+               atol: float = 1e-5):
     """Records the details of a call to a CompiledModule."""
     self.method = method
 
