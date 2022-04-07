@@ -389,13 +389,13 @@ def run_benchmarks_for_category(
         # benchmark result to be available.
         while True:
           line = process.stdout.readline()  # pytype: disable=attribute-error
-          if line == "" and process.poll() is not None:  # Process completed
-            raise ValueError("Cannot find benchmark result line in the log!")
           if verbose:
             print(line.strip())
           # Result available
           if re.match(r"^BM_.+/real_time", line) is not None:
             break
+          if process.poll() is not None:  # Process completed
+            raise ValueError("Cannot find benchmark result line in the log!")
 
         # Now it's okay to collect the trace via the capture tool. This will
         # send the signal to let the previously waiting benchmark tool to
