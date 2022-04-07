@@ -220,36 +220,6 @@ void addSPIRVTileAndDistributePassPipeline(OpPassManager &pm) {
   addLoopMaterializationPasses(pm);
 }
 
-// An ad-hoc pipeline for tiling and distributing padding/copy ops. This is
-// needed to migrate from a bufferization-first world to a vectorization-first
-// world.
-//
-// In the former path for CodeGen, we perform bufferization first, which will
-// turn padding/copy (via flow.dispatch.tensor.load/store pairs) into
-// linalg.generic ops. Then we deduce CodeGen configuration from the linalg.copy
-// op and use a `lowering_config` attribute on it to drive transformations.
-//
-// In the latter path for CodeGen, we will see linalg.pad_tensor directly.
-// However, properly tiling and distributing it is an ongoing work. So for now
-// still perform bufferization first to expose a linalg.copy op, from which we
-// can deduce the configuration.
-void addSPIRVTileAndDistributeCopyPassPipeline(OpPassManager &pm) {
-  addLinalgBufferizePasses(pm, gpuAllocationFunction);
-  pm.addPass(createSPIRVInitConfigPass());
-
-  pm.addNestedPass<func::FuncOp>(createInsertDistributionInfoPass());
-  pm.addNestedPass<func::FuncOp>(createTileAndDistributeToWorkgroupsPass());
-  pm.addPass(createCanonicalizerPass());
-  pm.addPass(createCSEPass());
-
-  // Tile and distribute to GPU invocations.
-  pm.addNestedPass<func::FuncOp>(createSPIRVTileAndDistributePass());
-  pm.addPass(createCanonicalizerPass());
-  pm.addPass(createCSEPass());
-
-  addLoopMaterializationPasses(pm);
-}
-
 //===----------------------------------------------------------------------===//
 // Entry Point
 //===----------------------------------------------------------------------===//
