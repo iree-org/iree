@@ -51,7 +51,6 @@ cc_library(
         "PolynomialApproximationPass.cpp",
         "RemoveTrivialLoops.cpp",
         "RewriteLinalgDestructiveUpdatesPass.cpp",
-        "SetNumWorkgroupsFromLinalgExtPass.cpp",
         "SetNumWorkgroupsPass.cpp",
         "TileAndDistributeToWorkgroupsPass.cpp",
         "TypePropagationPass.cpp",
@@ -61,6 +60,7 @@ cc_library(
     hdrs = [
         "BufferizationAnalysis.h",
         "DestructiveUpdateUtils.h",
+        "Transforms.h",
     ],
     deps = [
         "//iree/compiler/Codegen:PassHeaders",
