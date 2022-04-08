@@ -26,6 +26,7 @@ iree_cc_library(
     "BufferizationAnalysis.h"
     "DestructiveUpdateUtils.h"
     "GPUUtils.h"
+    "Transforms.h"
   SRCS
     "BufferizationAnalysis.cpp"
     "BufferizeCopyOnlyDispatchesPass.cpp"
@@ -47,7 +48,6 @@ iree_cc_library(
     "PolynomialApproximationPass.cpp"
     "RemoveTrivialLoops.cpp"
     "RewriteLinalgDestructiveUpdatesPass.cpp"
-    "SetNumWorkgroupsFromLinalgExtPass.cpp"
     "SetNumWorkgroupsPass.cpp"
     "TileAndDistributeToWorkgroupsPass.cpp"
     "TypePropagationPass.cpp"

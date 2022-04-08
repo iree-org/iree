@@ -1071,8 +1071,8 @@ hal.executable private @matmul_aarch_i8_i8_i32  {
   }
 }
 
-//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[64, 64, 0], [16, 4, 64], [4, 4, 4]]>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUTileFuseAndVectorize>
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[64, 64, 0], [4, 16, 0], [0, 0, 4]{{\]}}>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert>
 //      CHECK: hal.executable.entry_point public @matmul_aarch_i8_i8_i32
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK:   linalg.matmul
