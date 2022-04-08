@@ -402,9 +402,12 @@ def run_benchmarks_for_category(
         # complete.
         capture_filename = os.path.join(captures_dir, f"{benchmark_key}.tracy")
         capture_cmd = [trace_capture_tool, "-f", "-o", capture_filename]
-        capture_log = execute_cmd_and_get_output(capture_cmd, verbose=verbose)
-        if verbose:
-          print(capture_log)
+        # If verbose, just let the subprocess print its output. The subprocess
+        # may need to detect if the output is a TTY to decide whether to log
+        # verbose progress info and use ANSI colors, so it's better to use
+        # stdout redirection than to capture the output in a string.
+        stdout_redirect = None if verbose else subprocess.DEVNULL
+        execute_cmd(capture_cmd, verbose=verbose, stdout=stdout_redirect)
 
       print("...benchmark completed")
 
