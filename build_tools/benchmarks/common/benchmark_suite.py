@@ -115,13 +115,13 @@ class BenchmarkSuite(object):
 
     chosen_cases = []
     for benchmark_case in self.suite_map[category_dir]:
-      matched_driver = (benchmark_case.driver in available_drivers) and (
-          driver_filter is None or
-          re.match(driver_filter, benchmark_case.driver) is not None)
+      driver = benchmark_case.driver[len("iree-"):].lower()
+      matched_driver = (driver in available_drivers) and (
+          driver_filter is None or re.match(driver_filter, driver) is not None)
+      target_arch = benchmark_case.target_arch.lower()
       matched_arch = (re.match(cpu_target_arch_filter,
-                               benchmark_case.target_arch) is not None or
-                      re.match(gpu_target_arch_filter,
-                               benchmark_case.target_arch) is not None)
+                               target_arch) is not None or
+                      re.match(gpu_target_arch_filter, target_arch) is not None)
       matched_mode = (mode_filter is None or re.match(
           mode_filter, benchmark_case.bench_mode) is not None)
 
@@ -152,8 +152,6 @@ class BenchmarkSuite(object):
         continue
 
       iree_driver, target_arch, bench_mode = segments
-      iree_driver = iree_driver[len("iree-"):].lower()
-      target_arch = target_arch.lower()
 
       # The path of model_dir is expected to be:
       #   <benchmark_suite_dir>/<category>/<model_name>-<model_tags>
