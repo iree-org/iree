@@ -73,6 +73,8 @@ static FailureOr<LinalgTilingAndFusionOptions> getTileAndFuseOptionsFromConfig(
   }
   LinalgTilingAndFusionOptions options;
   options.tileSizes.assign(loweringConfig.getTileSizeVals(tilingLevel));
+  options.tileInterchange.assign(
+      loweringConfig.getTileInterchangeVals(tilingLevel));
   return options;
 }
 
@@ -218,8 +220,10 @@ void LinalgFusePass::runOnOperation() {
     doTiling = true;
     tilingOptions.tileSizes = {tileSizes.begin(), tileSizes.end()};
   }
-  tilingOptions.tileInterchange = {tileInterchange.begin(),
-                                   tileInterchange.end()};
+  if (!tileInterchange.empty()) {
+    tilingOptions.tileInterchange = {tileInterchange.begin(),
+                                     tileInterchange.end()};
+  }
   if (doIREEDistribution) {
     tilingOptions.setDistributionOptions(
         ::mlir::iree_compiler::getIREELinalgLoopDistributionOptions());

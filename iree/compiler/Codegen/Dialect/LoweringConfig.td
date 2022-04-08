@@ -137,17 +137,22 @@ def IREECodegen_LoweringConfigAttr :
   }];
 
   let assemblyFormat = [{
-    `<` `tile_sizes` `=` $tileSizes (`,` `native_vector_size` `=` $nativeVectorSize^)? `>`
+    `<` `tile_sizes` `=` $tileSizes
+      (`,` `tile_interchange` `=` $tileInterchange^)?
+      (`,` `native_vector_size` `=` $nativeVectorSize^)? `>`
   }];
 
   let parameters = (ins
     AttrParameter<"ArrayAttr",
         "The tile sizes to use for different levels of tiling">:$tileSizes,
     DefaultValuedParameter<"ArrayAttr", "ArrayAttr::get($_ctx, {})",
+        "The tile interchange to use for different levels of tiling">:$tileInterchange,
+    DefaultValuedParameter<"ArrayAttr", "ArrayAttr::get($_ctx, {})",
         "The native vector size to use for the given operation">:$nativeVectorSize
   );
   let builders = [
     AttrBuilder<(ins "TileSizesListTypeRef":$tileSizes,
+        CArg<"TileSizesListTypeRef", "{}">:$tileInterchange,
         CArg<"ArrayRef<int64_t>", "{}">:$nativeVectorSize)>
   ];
   let extraClassDeclaration = [{
@@ -156,6 +161,9 @@ def IREECodegen_LoweringConfigAttr :
 
     // Returns the tile sizes for a level set for the op.
     SmallVector<int64_t> getTileSizeVals(unsigned level);
+
+    // Returns the tile interchange for a level set for the op.
+    SmallVector<int64_t> getTileInterchangeVals(unsigned level);
 
     // Returns the native vector size to use.
     SmallVector<int64_t> getNativeVectorSizeVals();
@@ -197,9 +205,11 @@ def IREECodegen_CompilationInfoAttr :
     (`,` `workgroup_size` `=` $workgroupSize^)? `>`
   }];
 
+  // These builders are externally for auto-tuner to generate the attribute.
   let builders = [
     AttrBuilder<(ins "TileSizesListTypeRef":$tileSizes,
-      "ArrayRef<int64_t>":$nativeVectorSize,
+      "TileSizesListTypeRef":$tileInterchange,
+      CArg<"ArrayRef<int64_t>", "{{}}">:$nativeVectorSize,
       CArg<"ArrayRef<int64_t>", "{}">:$workgroupSize)>,
     AttrBuilder<(ins "TileSizesListTypeRef":$tileSizes,
       "ArrayRef<int64_t>":$nativeVectorSize,
