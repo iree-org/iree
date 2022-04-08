@@ -45,33 +45,11 @@ namespace mlir {
 namespace iree_compiler {
 
 //===----------------------------------------------------------------------===//
-// Utility functions
-//===----------------------------------------------------------------------===//
-
-/// Returns a Linalg marker that matches any of the `matchMarkers` and replaces
-/// it with `replaceMarker`.
-static linalg::LinalgTransformationFilter getLinalgMatchAndReplaceMarker(
-    ArrayRef<StringRef> matchMarkers, Optional<StringRef> replaceMarker,
-    MLIRContext *context) {
-  SmallVector<StringAttr, 2> matchIds;
-  matchIds.reserve(matchMarkers.size());
-  for (StringRef marker : matchMarkers) {
-    matchIds.emplace_back(StringAttr::get(context, marker));
-  }
-
-  Optional<StringAttr> replaceId;
-  if (replaceMarker) replaceId = StringAttr::get(context, *replaceMarker);
-
-  return linalg::LinalgTransformationFilter(matchIds, replaceId);
-}
-
-//===----------------------------------------------------------------------===//
 // Invocation tiling patterns
 //===----------------------------------------------------------------------===//
 
 /// Patterns for third level tiling to target invocations.
-static void populateTilingToInvocationPatterns(MLIRContext *context,
-                                               RewritePatternSet &patterns) {
+static void populateTilingToInvocationPatterns(RewritePatternSet &patterns) {
   linalg::TileSizeComputationFunction getInnerTileSizeFn =
       [&](OpBuilder &builder, Operation *op) {
         return getTileSizes(builder, op, 1);
@@ -82,58 +60,40 @@ static void populateTilingToInvocationPatterns(MLIRContext *context,
     return getGPUProcessorIdsAndCounts<gpu::ThreadIdOp, gpu::BlockDimOp>(
         builder, loc, parallelLoopRanges.size());
   };
-  linalg::LinalgLoopDistributionOptions invocationDistributionOptions;
-  invocationDistributionOptions.procInfo = getThreadProcInfoFn;
-  invocationDistributionOptions.distributionMethod = {
+  linalg::LinalgLoopDistributionOptions distributionOptions;
+  distributionOptions.procInfo = getThreadProcInfoFn;
+  distributionOptions.distributionMethod = {
       {linalg::DistributionMethod::Cyclic, linalg::DistributionMethod::Cyclic,
        linalg::DistributionMethod::Cyclic}};
 
-  auto tilingOptions =
-      linalg::LinalgTilingOptions()
-          .setLoopType(linalg::LinalgTilingLoopType::Loops)
-          .setTileSizeComputationFunction(getInnerTileSizeFn)
-          .setDistributionOptions(invocationDistributionOptions);
+  auto tilingOptions = linalg::LinalgTilingOptions()
+                           .setLoopType(linalg::LinalgTilingLoopType::Loops)
+                           .setTileSizeComputationFunction(getInnerTileSizeFn)
+                           .setDistributionOptions(distributionOptions);
 
-  SmallVector<StringRef, 2> matchMarkers = {getWorkgroupMemoryMarker()};
-
-  linalg::LinalgTransformationFilter filterVectorized =
-      getLinalgMatchAndReplaceMarker(matchMarkers, getVectorizeMarker(),
-                                     context)
+  MLIRContext *context = patterns.getContext();
+  auto marker = StringAttr::get(context, getTileReductionMarker());
+  auto filter =
+      linalg::LinalgTransformationFilter(ArrayRef<StringAttr>(), marker)
           .setMatchByDefault();
-  linalg::TilingPatterns<linalg::Conv1DNwcWcfOp, linalg::Conv3DNdhwcDhwcfOp,
-                         linalg::DepthwiseConv2DNhwcHwcmOp, linalg::FillOp,
-                         linalg::GenericOp, linalg::PoolingNhwcMaxOp,
-                         linalg::PoolingNhwcMinOp,
-                         linalg::PoolingNhwcSumOp>::insert(patterns,
-                                                           tilingOptions,
-                                                           filterVectorized);
 
-  linalg::LinalgTransformationFilter filterTiled =
-      getLinalgMatchAndReplaceMarker(matchMarkers, getTileReductionMarker(),
-                                     context)
-          .setMatchByDefault();
-  linalg::TilingPatterns<linalg::BatchMatmulOp, linalg::Conv2DNhwcHwcfOp,
-                         linalg::DepthwiseConv2DNhwcHwcOp,
-                         linalg::MatmulOp>::insert(patterns, tilingOptions,
-                                                   filterTiled);
-
-  patterns.insert<IREE::LinalgExt::TiledOpInterfaceTilingPattern>(
-      context, tilingOptions,
-      getLinalgMatchAndReplaceMarker(matchMarkers, getVectorizeMarker(),
-                                     context)
-          .setMatchByDefault());
+  patterns.add<linalg::LinalgTilingPattern>(context, tilingOptions, filter);
+  patterns.add<IREE::LinalgExt::TiledOpInterfaceTilingPattern>(
+      context, tilingOptions, filter);
 }
 
 //====---------------------------------------------------------------------===//
 // Reduction tiling patterns
 //====---------------------------------------------------------------------===//
 
-static void populateTilingReductionPatterns(
-    MLIRContext *context, RewritePatternSet &patterns,
-    linalg::LinalgTransformationFilter marker) {
+static void populateTilingReductionPatterns(RewritePatternSet &patterns) {
   auto getTileSizeFn = [&](OpBuilder &builder, Operation *op) {
     return getTileSizes(builder, op, 2);
   };
+
+  auto filter = linalg::LinalgTransformationFilter(
+      StringAttr::get(patterns.getContext(), getTileReductionMarker()),
+      llvm::None);
 
   auto tilingOptions = linalg::LinalgTilingOptions()
                            .setLoopType(linalg::LinalgTilingLoopType::Loops)
@@ -142,7 +102,7 @@ static void populateTilingReductionPatterns(
   linalg::TilingPatterns<linalg::BatchMatmulOp, linalg::Conv2DNhwcHwcfOp,
                          linalg::DepthwiseConv2DNhwcHwcOp,
                          linalg::MatmulOp>::insert(patterns, tilingOptions,
-                                                   marker);
+                                                   filter);
 }
 
 //===----------------------------------------------------------------------===//
@@ -179,8 +139,8 @@ void SPIRVTileAndDistributePass::runOnOperation() {
   if (!entryPointOp) return;
 
   {  // Tile and distribute to invocations.
-    RewritePatternSet invocationTilingPatterns(&getContext());
-    populateTilingToInvocationPatterns(context, invocationTilingPatterns);
+    RewritePatternSet invocationTilingPatterns(context);
+    populateTilingToInvocationPatterns(invocationTilingPatterns);
     if (failed(applyPatternsAndFoldGreedily(
             funcOp, std::move(invocationTilingPatterns)))) {
       funcOp.emitOpError() << "failure in tiling";
@@ -202,10 +162,10 @@ void SPIRVTileAndDistributePass::runOnOperation() {
 
     if (failed(applyPatternsAndFoldGreedily(
             funcOp, std::move(canonicalizationPatterns)))) {
-      // TODO(#4759): Terrifyingly, this fails. Errors here were ignored for a
-      // long time and now tests for this pass actually fail if we propagate the
-      // failure correctly. Fix this.
-      // funcOp.emitOpError() << "failure canonicalizing after tiling";
+      // TODO(#4759): This does not converge after the max number of iterations.
+      // It indicates that some pattern upstream is generating ops even when the
+      // pattern failed to match. Not related to correctness, but would be good
+      // to figure out and fix.
       // return signalPassFailure();
     }
 
@@ -217,10 +177,8 @@ void SPIRVTileAndDistributePass::runOnOperation() {
   }
 
   {  // Tile reduction dimensions.
-    RewritePatternSet reductionTilingPatterns(&getContext());
-    auto marker = getLinalgMatchAndReplaceMarker(getTileReductionMarker(),
-                                                 getVectorizeMarker(), context);
-    populateTilingReductionPatterns(context, reductionTilingPatterns, marker);
+    RewritePatternSet reductionTilingPatterns(context);
+    populateTilingReductionPatterns(reductionTilingPatterns);
     if (failed(applyPatternsAndFoldGreedily(
             funcOp, std::move(reductionTilingPatterns)))) {
       funcOp.emitOpError() << "failing in tile reduction";

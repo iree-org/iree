@@ -690,15 +690,11 @@ ParseResult ExecutableEntryPointOp::parse(OpAsmParser &parser,
   }
   result.addAttribute("layout", layoutAttr);
 
-  // For now assume that the workload is at max 3D. So arguments to the region
-  // are workload along x, y and z.
   std::unique_ptr<Region> region;
   SmallVector<OpAsmParser::UnresolvedOperand, 4> regionOperands;
   SmallVector<Type, 4> regionTypes;
-  OptionalParseResult parseResult =
-      parser.parseOptionalRegion(region, regionOperands, regionTypes);
-  if (!parseResult.hasValue()) return success();
-  if (failed(*parseResult)) return failure();
+  // A missing optional region is materialized as an empty region.
+  (void)parser.parseOptionalRegion(region, regionOperands, regionTypes);
   result.addRegion(std::move(region));
 
   return success();
@@ -722,36 +718,38 @@ void ExecutableEntryPointOp::print(OpAsmPrinter &p) {
                           /*elidedAttrs=*/{"sym_name", "layout", "ordinal"});
   if (workgroup_count_region().empty()) return;
   p << " ";
-  p.printRegion(workgroup_count_region().front());
+  p.printRegion(workgroup_count_region());
 }
 
 LogicalResult ExecutableEntryPointOp::verify() {
   ExecutableEntryPointOp op = *this;
-  Region *region = op.getBody();
-  // When there is no region, nothing to verify.
-  if (!region) return success();
+  Block *body = getWorkgroupCountBody();
+  // When there is no body, nothing to verify.
+  if (!body) return success();
 
-  if (!llvm::hasSingleElement(*region)) {
-    return op.emitOpError() << "expected a single region";
+  if (!llvm::hasSingleElement(workgroup_count_region())) {
+    return op.emitOpError() << "expected a single region block";
   }
-  if (region->getNumArguments() != 3) {
-    return op.emitOpError(
-        "expected three arguments for workgroup_count_region for workload "
-        "along "
-        "x, y, and z");
+  if (body->getNumArguments() != getNumWorkgroupDims()) {
+    return op.emitOpError("expected ")
+           << getNumWorkgroupDims()
+           << " arguments for workgroup_count_region for workload "
+              "along "
+              "x, y, and z";
   }
-  for (BlockArgument &blockArg : region->getArguments()) {
+  for (BlockArgument &blockArg : body->getArguments()) {
     if (!blockArg.getType().isa<IndexType>()) {
       return op.emitOpError(
-          "expected arguments to workgroup_count_region be index type");
+          "expected arguments to workgroup_count_region body of index type");
     }
   }
   // Check that the last statement in the block is `hal.yield` operation.
   // TODO(ravishankarm): The SingleBlockImplicitTerminator<"HAL::ReturnOp">
   // should generate this check, but it doesnt.
-  auto returnOp = dyn_cast<ReturnOp>(region->front().getTerminator());
-  if (!returnOp || returnOp.operands().size() != 3) {
-    return op.emitOpError("expected operation to yield 3 values");
+  auto returnOp = dyn_cast<ReturnOp>(body->getTerminator());
+  if (!returnOp || returnOp.operands().size() != getNumWorkgroupDims()) {
+    return op.emitOpError("expected operation to yield ")
+           << getNumWorkgroupDims() << " values";
   }
   return success();
 }

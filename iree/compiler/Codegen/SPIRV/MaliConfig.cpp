@@ -34,7 +34,7 @@ LogicalResult setMaliCodeGenConfig(const spirv::TargetEnv &targetEnv,
         std::array<int64_t, 3> threadMNK;
         auto inputType = op.inputs()[0].getType().template cast<ShapedType>();
         if (inputType.getElementType().isF16()) {
-          threadMNK = {8, 8, 4};
+          threadMNK = {2, 8, 8};
         } else {
           threadMNK = {6, 4, 4};
         }

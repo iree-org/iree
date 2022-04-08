@@ -38,15 +38,13 @@ def LLVMGPU_MatmulTensorCore
 
 def SPIRV_Distribute
     : I32EnumAttrCase<"SPIRVDistribute", 11>;
-def SPIRV_DistributeCopy
-    : I32EnumAttrCase<"SPIRVDistributeCopy", 12>;
 def SPIRV_Vectorize
-    : I32EnumAttrCase<"SPIRVVectorize", 13>;
+    : I32EnumAttrCase<"SPIRVVectorize", 12>;
 def SPIRV_VectorizeToCooperativeOps
-    : I32EnumAttrCase<"SPIRVVectorizeToCooperativeOps", 14>;
+    : I32EnumAttrCase<"SPIRVVectorizeToCooperativeOps", 13>;
 
 def None
-    : I32EnumAttrCase<"None", 15>;
+    : I32EnumAttrCase<"None", 0xff>;
 
 // EnumAttrCase for all known lowerings for ops within dispatch region
 // to scalar/native-vector code.
@@ -57,7 +55,7 @@ def DispatchLoweringPassPipelineEnum : I32EnumAttr<
      CPU_ConvTileAndDecomposeExpert, CPU_TileFuseAndVectorize,
      CPU_BufferOpsTileAndVectorize, Linalg_TransformInterpCodegen,
      LLVMGPU_SimpleDistribute, LLVMGPU_Vectorize, LLVMGPU_MatmulSimt,
-     LLVMGPU_MatmulTensorCore, SPIRV_Distribute, SPIRV_DistributeCopy, SPIRV_Vectorize,
+     LLVMGPU_MatmulTensorCore, SPIRV_Distribute, SPIRV_Vectorize,
      SPIRV_VectorizeToCooperativeOps, None]> {
   let cppNamespace = "::mlir::iree_compiler::IREE::Codegen";
   // Don't generate a C++ class! We want to use the AttrDef

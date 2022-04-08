@@ -781,8 +781,8 @@ struct CmdDispatchOpPattern
       Location loc, IREE::HAL::ExecutableOp executableOp,
       IREE::HAL::ExecutableEntryPointOp entryPointOp, ValueRange workload,
       OpBuilder &builder) {
-    Region *region = entryPointOp.getBody();
-    if (region) {
+    Block *body = entryPointOp.getWorkgroupCountBody();
+    if (body) {
       return calculateDispatchWorkgroupCountFromRegion(loc, entryPointOp,
                                                        workload, builder);
     }
@@ -811,7 +811,7 @@ struct CmdDispatchOpPattern
       Location loc, IREE::HAL::ExecutableEntryPointOp entryPointOp,
       ValueRange workload, OpBuilder &builder) {
     // TODO(benvanik): replace with region inlining util.
-    Block *body = entryPointOp.getBlock();
+    Block *body = entryPointOp.getWorkgroupCountBody();
     BlockAndValueMapping bvm;
     for (auto args : llvm::enumerate(workload)) {
       bvm.map(body->getArgument(args.index()), args.value());

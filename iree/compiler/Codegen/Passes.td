@@ -339,12 +339,6 @@ def SPIRVLowerExecutableTarget :
       "mlir::iree_compiler::createSPIRVLowerExecutableTargetPass()";
 }
 
-def SPIRVInitConfig :
-    Pass<"iree-spirv-init-config-pass", "ModuleOp"> {
-  let summary = "Initialize CodeGen configuration for a given dispatch region";
-  let constructor = "mlir::iree_compiler::createSPIRVInitConfigPass()";
-}
-
 def SPIRVTile : Pass<"iree-spirv-tile", "func::FuncOp"> {
   let summary = "Tile Linalg ops with tensor semantics to invocations";
   let constructor = "mlir::iree_compiler::createSPIRVTilePass()";

@@ -23,9 +23,11 @@ if(NOT PKGCONFIG)
 else()
   include(FindPkgConfig)
   pkg_check_modules(TRACY_DEPS
-    capstone
     tbb
     libzstd
+  )
+  pkg_check_modules(TRACY_CAPSTONE_DEPS
+    capstone
   )
   pkg_check_modules(TRACY_GTK_DEPS
     freetype2
@@ -34,9 +36,16 @@ else()
   )
 endif()
 
+
 if(NOT TRACY_DEPS_FOUND)
   message(STATUS "Could not find Tracy dependencies (Tracy server will not be built).")
-  message(STATUS "To build Tracy, install packages capstone, and tbb (on Ubuntu/Debian, 'apt install libcapstone-dev libtbb-dev libzstd-dev')")
+  message(STATUS "To build Tracy, install packages libzstd, and tbb (on Ubuntu/Debian, 'apt install libcapstone-dev libtbb-dev libzstd-dev')")
+  return()
+endif()
+
+if(NOT TRACY_CAPSTONE_DEPS_FOUND)
+  message(STATUS "Could not find capstone, a Tracy dependency (Tracy server will not be built).")
+  message(STATUS "To build Tracy, install capstone (on Ubuntu/Debian, 'apt install libcapstone-dev')")
   return()
 endif()
 
@@ -63,12 +72,22 @@ function(setup_cxx_options name)
     PUBLIC
       ${TRACY_SOURCE_DIR}/imgui
       ${TRACY_DEPS_INCLUDE_DIRS}
+      ${TRACY_CAPSTONE_DEPS_INCLUDE_DIRS}
+      # capstone-next moved capstone.h to a capstone/ subdirectory, but the
+      # pkg-config isn't updated yet as of April 2022.
+      ${TRACY_CAPSTONE_DEPS_INCLUDE_DIRS}/capstone
   )
   target_link_libraries(${name}
     PRIVATE
       ${TRACY_DEPS_LIBRARIES}
+      ${TRACY_CAPSTONE_DEPS_LIBRARIES}
       ${CMAKE_DL_LIBS}
       ${CMAKE_THREAD_LIBS_INIT}
+  )
+  target_link_directories(${name}
+    PRIVATE
+      ${TRACY_DEPS_LIBRARY_DIRS}
+      ${TRACY_CAPSTONE_DEPS_LIBRARY_DIRS}
   )
 endfunction()
 
@@ -78,12 +97,16 @@ function(setup_graphics_deps name)
     DISPLAY_SERVER_X11
   )
   target_include_directories(${name}
-  PUBLIC
-    ${TRACY_GTK_DEPS_INCLUDE_DIRS}
+    PUBLIC
+      ${TRACY_GTK_DEPS_INCLUDE_DIRS}
   )
   target_link_libraries(${name}
-  PRIVATE
-    ${TRACY_GTK_DEPS_LIBRARIES}
+    PRIVATE
+      ${TRACY_GTK_DEPS_LIBRARIES}
+  )
+  target_link_directories(${name}
+    PRIVATE
+      ${TRACY_GTK_DEPS_LIBRARY_DIRS}
   )
 endfunction()
 
