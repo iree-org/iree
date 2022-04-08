@@ -60,6 +60,7 @@ cc_library(
     hdrs = [
         "BufferizationAnalysis.h",
         "DestructiveUpdateUtils.h",
+        "Transforms.h",
     ],
     deps = [
         "//iree/compiler/Codegen:PassHeaders",

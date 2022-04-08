@@ -25,6 +25,7 @@ iree_cc_library(
   HDRS
     "BufferizationAnalysis.h"
     "DestructiveUpdateUtils.h"
+    "Transforms.h"
   SRCS
     "BufferizationAnalysis.cpp"
     "BufferizeCopyOnlyDispatchesPass.cpp"

@@ -11,9 +11,11 @@
 #include "iree-dialects/Dialect/LinalgTransform/LinalgTransformOps.h"
 #include "iree-dialects/Dialect/LinalgTransform/TransformOpInterface.h"
 #include "iree-dialects/Transforms/Functional.h"
+#include "iree/compiler/Codegen/Common/Transforms.h"
 #include "iree/compiler/Codegen/Interfaces/BufferizationInterfaces.h"
 #include "iree/compiler/Codegen/Passes.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
+#include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "mlir/Dialect/Bufferization/IR/BufferizableOpInterface.h"
 #include "mlir/Dialect/Bufferization/Transforms/OneShotAnalysis.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
@@ -23,6 +25,7 @@
 #include "mlir/Pass/PassManager.h"
 
 using namespace mlir;
+using namespace mlir::iree_compiler::IREE;
 
 //===---------------------------------------------------------------------===//
 // Default allocation functions for CPU backend
@@ -140,14 +143,9 @@ class IREESetNumWorkgroupToOneOp
 
   LogicalResult apply(linalg::transform::TransformResults &results,
                       linalg::transform::TransformState &state) {
-    PassManager pm(getContext());
-    pm.addNestedPass<iree_compiler::IREE::HAL::ExecutableVariantOp>(
-        mlir::iree_compiler::createSetNumWorkgroupsPass());
-    WalkResult res = state.getTopLevel()->walk([&](ModuleOp moduleOp) {
-      if (failed(pm.run(moduleOp))) return WalkResult::interrupt();
-      return WalkResult::advance();
-    });
-    return failure(res.wasInterrupted());
+    auto variantOp = dyn_cast<HAL::ExecutableVariantOp>(state.getTopLevel());
+    if (!variantOp) return failure();
+    return iree_compiler::setNumWorkgroupsImpl(variantOp, {});
   }
 
   // let assemblyFormat = "attr-dict";
