@@ -13,8 +13,7 @@
 hal.executable @matmul_256x1024x128 {
   hal.executable.variant public @vulkan_spirv_fb, target = <"vulkan-spirv", "vulkan-spirv-fb", {
     spv.target_env = #spv.target_env<#spv.vce<v1.5, [Shader], []>, NVIDIA:DiscreteGPU,
-      {cooperative_matrix_properties_nv = [],
-       max_compute_shared_memory_size = 49152 : i32,
+      {max_compute_shared_memory_size = 49152 : i32,
        max_compute_workgroup_invocations = 1024 : i32,
        max_compute_workgroup_size = dense<[2147483647, 65535, 65535]> : vector<3xi32>,
        subgroup_size = 32 : i32}>}> {

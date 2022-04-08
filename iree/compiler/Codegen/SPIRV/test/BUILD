@@ -32,6 +32,7 @@ iree_lit_test_suite(
             "create_fast_slow_path.mlir",
             "distribute_to_invocations.mlir",
             "pipeline_matmul_cooperative_ops.mlir",
+            "pipeline_matmul_promotion.mlir",
             "pipeline_matmul_vectorization.mlir",
             "tile_and_distribute.mlir",
             "tile_and_distribute_scatter.mlir",
