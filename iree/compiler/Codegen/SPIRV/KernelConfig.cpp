@@ -276,8 +276,9 @@ LogicalResult setMatmulOpConfig(linalg::LinalgOp op, int64_t subgroupSize,
 
   TileSizesListType tileSizes;
   tileSizes.push_back(workgroupTileSizes);
-    tileSizes.push_back(invocationTileSizes);
-    tileSizes.push_back(reductionTileSizes);
+  tileSizes.push_back(invocationTileSizes);
+  tileSizes.push_back(reductionTileSizes);
+
   return setOpConfigAndEntryPointFnTranslation(
       op->getParentOfType<func::FuncOp>(), op, tileSizes, pipeline,
       workgroupSize);
