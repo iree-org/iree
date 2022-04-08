@@ -153,6 +153,10 @@ std::unique_ptr<OperationPass<>> createPolynomialApproximationPass();
 /// Creates a pass to convert memref.copy to linalg op.
 std::unique_ptr<OperationPass<func::FuncOp>> createMemrefCopyToLinalgPass();
 
+/// Converts vector ops to gpu dialect.
+std::unique_ptr<OperationPass<func::FuncOp>> createWorkGroupSwizzle(
+    unsigned swizzleLogTile = 0);
+
 //----------------------------------------------------------------------------//
 // Common codegen patterns.
 //----------------------------------------------------------------------------//
