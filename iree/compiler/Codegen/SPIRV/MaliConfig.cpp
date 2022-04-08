@@ -28,18 +28,26 @@ namespace detail {
 LogicalResult setMaliCodeGenConfig(const spirv::TargetEnv &targetEnv,
                                    Operation *rootOp) {
   int64_t subgroupSize = targetEnv.getResourceLimits().subgroup_size().getInt();
+  auto setGEMMConfig = [](linalg::LinalgOp op) {
+    std::array<int64_t, 2> workgroupXY = {8, 2};
+    std::array<int64_t, 3> threadMNK;
+    auto inputType = op.inputs()[0].getType().template cast<ShapedType>();
+    if (inputType.getElementType().isF16()) {
+      threadMNK = {2, 8, 8};
+    } else {
+      threadMNK = {6, 4, 4};
+    }
+    return setMatmulOpConfig(op, workgroupXY, threadMNK);
+  };
+  if (auto linalgOp = dyn_cast<linalg::LinalgOp>(rootOp)) {
+    if (linalg::isaContractionOpInterface(linalgOp) &&
+        linalgOp.getNumParallelLoops() >= 2) {
+      return setGEMMConfig(linalgOp);
+    }
+  }
   return TypeSwitch<Operation *, LogicalResult>(rootOp)
-      .Case<linalg::BatchMatmulOp, linalg::MatmulOp>([](auto op) {
-        std::array<int64_t, 2> workgroupXY = {8, 2};
-        std::array<int64_t, 3> threadMNK;
-        auto inputType = op.inputs()[0].getType().template cast<ShapedType>();
-        if (inputType.getElementType().isF16()) {
-          threadMNK = {2, 8, 8};
-        } else {
-          threadMNK = {6, 4, 4};
-        }
-        return setMatmulOpConfig(op, workgroupXY, threadMNK);
-      })
+      .Case<linalg::BatchMatmulOp, linalg::MatmulOp>(
+          [setGEMMConfig](auto op) { return setGEMMConfig(op); })
       .Case<linalg::Conv2DNhwcHwcfOp>([subgroupSize](auto op) {
         bool hasPaddedInput =
             op.image().template getDefiningOp<tensor::PadOp>();

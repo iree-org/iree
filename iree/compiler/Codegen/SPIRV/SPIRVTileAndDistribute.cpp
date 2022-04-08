@@ -113,7 +113,7 @@ static void populateTilingToInvocationPatterns(MLIRContext *context,
                                      context)
           .setMatchByDefault();
   linalg::TilingPatterns<linalg::BatchMatmulOp, linalg::Conv2DNhwcHwcfOp,
-                         linalg::DepthwiseConv2DNhwcHwcOp,
+                         linalg::DepthwiseConv2DNhwcHwcOp, linalg::GenericOp,
                          linalg::MatmulOp>::insert(patterns, tilingOptions,
                                                    filterTiled);
 
@@ -140,7 +140,7 @@ static void populateTilingReductionPatterns(
                            .setTileSizeComputationFunction(getTileSizeFn);
 
   linalg::TilingPatterns<linalg::BatchMatmulOp, linalg::Conv2DNhwcHwcfOp,
-                         linalg::DepthwiseConv2DNhwcHwcOp,
+                         linalg::DepthwiseConv2DNhwcHwcOp, linalg::GenericOp,
                          linalg::MatmulOp>::insert(patterns, tilingOptions,
                                                    marker);
 }

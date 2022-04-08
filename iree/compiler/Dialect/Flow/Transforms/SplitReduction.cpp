@@ -25,7 +25,7 @@ namespace Flow {
 // TODO(thomasraoux): Move to attributes.
 static llvm::cl::opt<int64_t> splitReductionRatio(
     "iree-flow-split-matmul-reduction", llvm::cl::desc("split ratio"),
-    llvm::cl::init(1));
+    llvm::cl::init(4));
 
 namespace {
 /// Pattern to wrap splitReduction transformation. This also propagates

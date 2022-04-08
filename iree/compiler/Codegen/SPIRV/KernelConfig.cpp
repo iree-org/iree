@@ -183,7 +183,12 @@ LogicalResult setMatmulOpConfig(linalg::LinalgOp op,
   if (llvm::any_of(lhsShape, ShapedType::isDynamic)) return success();
   if (llvm::any_of(rhsShape, ShapedType::isDynamic)) return success();
 
-  bool isBM = isa<linalg::BatchMatmulOp>(op);
+  bool isBM = op.getOutputOperand(0)
+                  ->get()
+                  .getType()
+                  .cast<ShapedType>()
+                  .getShape()
+                  .size() > 2;
 
   int64_t dimM = lhsShape[0 + isBM];
   int64_t dimK = lhsShape[1 + isBM];
@@ -528,21 +533,30 @@ static LogicalResult setSPIRVOpConfig(const spirv::TargetEnv &targetEnv,
   if (failed(result)) return result;
   // Check whether there is actually a configuration found. If so, it's done.
   if (getLoweringConfig(rootOp)) return result;
+  spirv::ResourceLimitsAttr limits = targetEnv.getResourceLimits();
 
+  auto setGEMMConfig = [limits](linalg::LinalgOp op) {
+    // Try to tile and vectorize first.
+    std::array<int64_t, 2> workgroupXY = {32, 2};
+    std::array<int64_t, 3> threadMNK = {8, 8, 4};
+    auto result = detail::setMatmulOpConfig(op, workgroupXY, threadMNK);
+    if (failed(result)) return result;
+    if (getLoweringConfig(op)) return result;
+
+    // If unsuccessful, try to tile and distribute.
+    return setDefaultOpConfig(limits, op);
+  };
+  if (auto linalgOp = dyn_cast<linalg::LinalgOp>(rootOp)) {
+    if (linalg::isaContractionOpInterface(linalgOp) &&
+        linalgOp.getNumParallelLoops() >= 2) {
+      return setGEMMConfig(linalgOp);
+    }
+  }
   // Otherwise fallback to use a default configuration that tiles and
   // distributes/vectorizes.
-  spirv::ResourceLimitsAttr limits = targetEnv.getResourceLimits();
   return TypeSwitch<Operation *, LogicalResult>(rootOp)
-      .Case<linalg::BatchMatmulOp, linalg::MatmulOp>([limits](auto op) {
-        // Try to tile and vectorize first.
-        std::array<int64_t, 2> workgroupXY = {32, 2};
-        std::array<int64_t, 3> threadMNK = {8, 8, 4};
-        auto result = detail::setMatmulOpConfig(op, workgroupXY, threadMNK);
-        if (failed(result)) return result;
-        if (getLoweringConfig(op)) return result;
-
-        // If unsuccessful, try to tile and distribute.
-        return setDefaultOpConfig(limits, op);
+      .Case<linalg::BatchMatmulOp, linalg::MatmulOp>([setGEMMConfig](auto op) {
+        return setGEMMConfig(op);
       })
       .Case<linalg::Conv2DNhwcHwcfOp, linalg::DepthwiseConv2DNhwcHwcOp>(
           [limits](auto op) {
