@@ -75,6 +75,16 @@ static LogicalResult cpuComprehensiveBufferizeCopyFn(OpBuilder &builder,
 // Codegen configuration verifications.
 //===---------------------------------------------------------------------===//
 
+static bool isValidInterchange(ArrayRef<int64_t> interchange, int numLoops) {
+  if (interchange.empty()) return true;
+  llvm::SmallDenseSet<int64_t> s;
+  s.insert(interchange.begin(), interchange.end());
+  for (int i = 0; i < numLoops; ++i) {
+    if (!s.contains(i)) return false;
+  }
+  return true;
+}
+
 LogicalResult verifyDoubleTilingExpertPassPipelineConfig(
     Operation *op, IREE::Codegen::LoweringConfigAttr loweringConfig,
     IREE::Codegen::TranslationInfoAttr translationInfo,
@@ -147,6 +157,21 @@ LogicalResult verifyDoubleTilingExpertPassPipelineConfig(
                    "expected only reduction dims to be set in the third "
                    "tiling sizes, got ")
                << en.index() << "-th tile size set";
+      }
+    }
+  }
+
+  // Verify interchange
+  if (!loweringConfig.getTileInterchange().empty()) {
+    for (auto level : llvm::seq<unsigned>(
+             0, static_cast<unsigned>(
+                    loweringConfig.getTileInterchange().size()))) {
+      auto tileSizes = loweringConfig.getTileSizeVals(level);
+      auto interchange = loweringConfig.getTileInterchangeVals(level);
+      if (!isValidInterchange(interchange, tileSizes.size())) {
+        return op->emitOpError("expected [0, ")
+               << tileSizes.size()
+               << ") to be set exactly once in interchange #" << level;
       }
     }
   }

@@ -29,6 +29,10 @@ static llvm::cl::opt<unsigned> pipelineDepth("iree-codegen-cuda-pipeline-depth",
                                              llvm::cl::desc("Pipeline depth"),
                                              llvm::cl::init(4));
 
+static llvm::cl::opt<unsigned> logSwizzleTile(
+    "iree-codegen-log-swizzle-tile", llvm::cl::desc("log swizzle tile value"),
+    llvm::cl::init(0));
+
 static Value gpuAllocationFunction(OpBuilder &builder, Location loc,
                                    ArrayRef<int64_t> staticShape,
                                    Type elementType,
@@ -91,6 +95,9 @@ void addGPUMatmulSimtPassPipeline(OpPassManager &pm) {
   pm.addNestedPass<func::FuncOp>(
       createLLVMGPUReduceSharedMemoryBankConflicts());
   pm.addNestedPass<func::FuncOp>(createRemoveSingleIterationLoopPass());
+  pm.addNestedPass<func::FuncOp>(createWorkGroupSwizzle(logSwizzleTile));
+  pm.addPass(createCanonicalizerPass());
+  pm.addPass(createCSEPass());
 
   // Linalg -> vector
   pm.addNestedPass<func::FuncOp>(createLLVMGPUVectorizationPass());
@@ -118,6 +125,9 @@ void addGPUMatmulTensorCorePassPipeline(OpPassManager &pm) {
   pm.addNestedPass<func::FuncOp>(
       createLLVMGPUReduceSharedMemoryBankConflicts());
   pm.addNestedPass<func::FuncOp>(createRemoveSingleIterationLoopPass());
+  pm.addNestedPass<func::FuncOp>(createWorkGroupSwizzle(logSwizzleTile));
+  pm.addPass(createCanonicalizerPass());
+  pm.addPass(createCSEPass());
 
   // Linalg -> vector
   pm.addNestedPass<func::FuncOp>(createLLVMGPUTensorCoreVectorizationPass());

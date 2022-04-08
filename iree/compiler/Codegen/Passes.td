@@ -174,6 +174,17 @@ def GPUPipelining : Pass<"iree-codegen-gpu-pipelining", "func::FuncOp"> {
   let constructor = "mlir::iree_compiler::createGPUPipeliningPass()";
 }
 
+def WorkGroupSwizzle :
+    Pass<"iree-workgroup-swizzle", "func::FuncOp"> {
+  let summary = "swizzle the workgroup ids for better cache reuse";
+  let constructor = "mlir::iree_compiler::createWorkGroupSwizzle()";
+  let options = [
+    Option<"logTile", "logTile", "unsigned",
+            /*default=*/"0",
+           "pass the tile value for unit testing">,
+  ];
+}
+
 //------------------------------------------------------------------------------
 // LLVMCPU
 //------------------------------------------------------------------------------

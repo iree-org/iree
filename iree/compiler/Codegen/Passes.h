@@ -162,6 +162,10 @@ createGPUDistributeSharedMemoryCopy();
 std::unique_ptr<OperationPass<func::FuncOp>> createGPUPipeliningPass(
     unsigned depth = 1);
 
+/// Converts vector ops to gpu dialect.
+std::unique_ptr<OperationPass<func::FuncOp>> createWorkGroupSwizzle(
+    unsigned swizzleLogTile = 0);
+
 //----------------------------------------------------------------------------//
 // Common codegen patterns.
 //----------------------------------------------------------------------------//
