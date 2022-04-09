@@ -108,9 +108,13 @@ def adb_push_to_tmp_dir(content: str,
   """
   filename = os.path.basename(content)
   android_path = os.path.join(ANDROID_TMP_DIR, relative_dir, filename)
-  execute_cmd(["adb", "push", "-p",
-               os.path.abspath(content), android_path],
-              verbose=verbose)
+  # When the output is a TTY, keep the default progress info output.
+  # In other cases, redirect progress info to null to avoid bloating log files.
+  stdout_redirect = None if sys.stdout.isatty() else subprocess.DEVNULL
+  execute_cmd(
+      ["adb", "push", os.path.abspath(content), android_path],
+      verbose=verbose,
+      stdout=stdout_redirect)
   return android_path
 
 
