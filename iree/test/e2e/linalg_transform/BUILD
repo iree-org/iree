@@ -18,7 +18,8 @@ iree_lit_test_suite(
     # linalg_transform_spec is a an MLIR file that specifies a
     # transformation, it needs to be included as data.
     data = [
-        "//iree/test/e2e/linalg_transform:linalg_transform_spec.mlir",
+        "//iree/test/e2e/linalg_transform:transform_dialect_codegen_spec.mlir",
+        "//iree/test/e2e/linalg_transform:transform_dialect_dispatch_spec.mlir",
     ],
     tags = [
         "hostonly",

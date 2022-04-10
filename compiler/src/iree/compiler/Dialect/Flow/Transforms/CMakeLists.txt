@@ -58,6 +58,7 @@ iree_cc_library(
     ::PassesIncGen
     IREELinalgExtDialect
     IREELinalgExtPasses
+    IREELinalgExtTransformOps
     LLVMSupport
     MLIRAffine
     MLIRArithmetic
@@ -70,12 +71,16 @@ iree_cc_library(
     MLIRMath
     MLIRMemRef
     MLIRMemRefTransforms
+    MLIRPDL
+    MLIRPDLInterp
+    MLIRParser
     MLIRPass
     MLIRSCF
     MLIRSupport
     MLIRTensor
     MLIRTensorUtils
     MLIRTosa
+    MLIRTransformDialect
     MLIRTransformUtils
     MLIRTransforms
     iree::compiler::Dialect::Flow::Conversion::TensorToFlow

@@ -8,6 +8,7 @@
 
 #include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree-dialects/Dialect/LinalgExt/Passes/Transforms.h"
+#include "iree-dialects/Dialect/LinalgExt/TransformOps/LinalgExtTransformOps.h"
 #include "iree/compiler/Dialect/Flow/Conversion/TensorToFlow/ConvertTensorToFlow.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
@@ -20,14 +21,18 @@
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
+#include "llvm/Support/SourceMgr.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
+#include "mlir/Dialect/PDL/IR/PDL.h"
+#include "mlir/Dialect/PDLInterp/IR/PDLInterp.h"
 #include "mlir/Dialect/SCF/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/Dialect/Transform/IR/TransformDialect.h"
 #include "mlir/IR/Block.h"
 #include "mlir/IR/BlockAndValueMapping.h"
 #include "mlir/IR/Builders.h"
@@ -38,8 +43,10 @@
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/TypeRange.h"
+#include "mlir/Parser/Parser.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
+#include "mlir/Support/FileUtilities.h"
 #include "mlir/Support/LLVM.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "mlir/Transforms/Passes.h"
@@ -61,6 +68,12 @@ static llvm::cl::opt<bool> clEnableMultiResultDispatches(
     llvm::cl::desc(
         "Enable dispatch region formation to enable multi-result dispatches"),
     llvm::cl::init(false));
+
+static llvm::cl::opt<std::string> clTransformFileName(
+    "dispatch-transform-dialect-file-name",
+    llvm::cl::desc("mlir file containing a top-level module that specifies "
+                   "the transformations to apply to form dispatch regions."),
+    llvm::cl::init(""));
 
 static const char kRootOpAttr[] = "__root_op__";
 static const char kFusionGroupsAttr[] = "__fused_op__";
@@ -1058,6 +1071,40 @@ struct DispatchLinalgOnTensorsPass
                           "Number of Flow dispatches created"};
 };
 
+/// Pass declaration.
+struct DispatchLinalgOnTensorsTransformDialectPass
+    : public DispatchLinalgOnTensorsTransformDialectBase<
+          DispatchLinalgOnTensorsTransformDialectPass> {
+  void getDependentDialects(DialectRegistry &registry) const override {
+    // clang-format off
+    registry.insert<IREE::Flow::FlowDialect,
+                    IREE::LinalgExt::IREELinalgExtDialect,
+                    arith::ArithmeticDialect,
+                    AffineDialect,
+                    //bufferization::BufferizationDialect,
+                    func::FuncDialect,
+                    linalg::LinalgDialect,
+                    // linalg::transform::LinalgTransformDialect,
+                    //LLVM::LLVMDialect,
+                    pdl::PDLDialect,
+                    pdl_interp::PDLInterpDialect,
+                    scf::SCFDialect,
+                    transform::TransformDialect,
+                    tensor::TensorDialect
+                    // vector::VectorDialect
+    >();
+    // clang-format on
+  }
+  DispatchLinalgOnTensorsTransformDialectPass() = default;
+  DispatchLinalgOnTensorsTransformDialectPass(
+      const DispatchLinalgOnTensorsTransformDialectPass &pass) {}
+  void runOnOperation() override;
+
+ private:
+  Statistic numDispatches{this, "number of dispatches",
+                          "Number of Flow dispatches created"};
+};
+
 // Pass to test conversion to flow patterns.
 struct ConvertToFlowPass : public ConvertToFlowBase<ConvertToFlowPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
@@ -1239,9 +1286,48 @@ void DispatchLinalgOnTensorsPass::runOnOperation() {
   });
 }
 
+void DispatchLinalgOnTensorsTransformDialectPass::runOnOperation() {
+  Operation *topLevel = getOperation();
+  if (topLevel->getNumRegions() != 1 ||
+      !llvm::hasSingleElement(topLevel->getRegion(0))) {
+    topLevel->emitError() << "can only run '" << getArgument()
+                          << "' on single-region single-block operations";
+    return signalPassFailure();
+  }
+
+  if (clTransformFileName.empty()) {
+    topLevel->emitError() << "expected a transform file name";
+    return signalPassFailure();
+  }
+
+  // Parse clTransformFileName content into a ModuleOp.
+  std::string errorMessage;
+  auto memoryBuffer = mlir::openInputFile(clTransformFileName, &errorMessage);
+  if (!memoryBuffer) {
+    llvm::errs() << errorMessage << "\n";
+    return signalPassFailure();
+  }
+
+  // Tell sourceMgr about this buffer, the parser will pick it up.
+  llvm::SourceMgr sourceMgr;
+  sourceMgr.AddNewSourceBuffer(std::move(memoryBuffer), llvm::SMLoc());
+  OwningOpRef<ModuleOp> transformModule(
+      parseSourceFile<ModuleOp>(sourceMgr, &getContext()));
+  transform::TransformState state(topLevel->getRegion(0), topLevel);
+  for (auto op :
+       transformModule->getBody()->getOps<transform::TransformOpInterface>()) {
+    if (failed(state.applyTransform(op))) return signalPassFailure();
+  }
+}
+
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createDispatchLinalgOnTensorsPass() {
   return std::make_unique<DispatchLinalgOnTensorsPass>();
+}
+
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
+createDispatchLinalgOnTensorsTransformDialectPass() {
+  return std::make_unique<DispatchLinalgOnTensorsTransformDialectPass>();
 }
 
 std::unique_ptr<Pass> createConvertToFlowPass() {

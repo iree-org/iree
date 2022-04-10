@@ -88,6 +88,11 @@ static llvm::cl::opt<std::string> clMmt4dTargetOptions(
                    "given architecture"),
     llvm::cl::init(""));
 
+static llvm::cl::opt<bool> clEnableFlowDispatchTransformDialect(
+    "iree-flow-dispatch-use-transform-dialect",
+    llvm::cl::desc("Use the transform dialect to create dispatch regions."),
+    llvm::cl::init(false));
+
 namespace mlir {
 namespace iree_compiler {
 namespace IREE {
@@ -214,10 +219,20 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
       .addPass(createSplitReductionPass)
       // SplitReductionPass may create reduction dimension that are not the last
       // dimension.
-      .addPass(createInterchangeGenericOpsPass)
+      .addPass(createInterchangeGenericOpsPass);
 
-      // Dispatch region formation.
-      .addPass(createDispatchLinalgOnTensorsPass)
+  // Dispatch region formation.
+  if (!clEnableFlowDispatchTransformDialect)
+    FunctionLikeNest(passManager).addPass(createDispatchLinalgOnTensorsPass);
+  else {
+    FunctionLikeNest(passManager)
+        .addPass(createDispatchLinalgOnTensorsTransformDialectPass);
+    // TODO: we may only want to use the transform dialect for some dispatch
+    // regions and let the DispatchLinalgOnTensorsPass handle the rest.
+    // .addPass(createDispatchLinalgOnTensorsPass);
+  }
+
+  FunctionLikeNest(passManager)
       .addPass(createCaptureDispatchDynamicDimsPass)
       .addPass(mlir::createCanonicalizerPass)
       .addPass(createCSEPass);

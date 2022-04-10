@@ -38,7 +38,7 @@
 using namespace mlir;
 
 static llvm::cl::opt<std::string> clTransformFileName(
-    "linalg-transform-file-name",
+    "codegen-transform-dialect-file-name",
     llvm::cl::desc("mlir file containing a top-level module that specifies "
                    "the transformations to apply."),
     llvm::cl::init(""));

@@ -56,6 +56,12 @@ def DispatchLinalgOnTensors :
   let constructor = "mlir::iree_compiler::IREE::Flow::createDispatchLinalgOnTensorsPass()";
 }
 
+def DispatchLinalgOnTensorsTransformDialect:
+    InterfacePass<"iree-flow-dispatch-linalg-on-tensors-transform-dialect-pass", "mlir::FunctionOpInterface"> {
+  let summary = "Dispatch Linalg operations on tensors by using the transform dialect interpreter";
+  let constructor = "mlir::iree_compiler::IREE::Flow::createDispatchLinalgOnTensorsTransformDialectPass()";
+}
+
 def ExpandTensorShapes :
     Pass<"iree-flow-expand-tensor-shapes", "mlir::ModuleOp"> {
   let summary = "Expands tensor shape dimensions into SSA values across the program.";

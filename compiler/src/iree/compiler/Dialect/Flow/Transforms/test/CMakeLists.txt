@@ -22,6 +22,7 @@ iree_lit_test_suite(
     "deduplicate_executables.mlir"
     "dispatch_linalg_on_tensors.mlir"
     "dispatch_linalg_on_tensors_fusion.mlir"
+    "dispatch_linalg_transform_dialect.mlir"
     "expand_tensor_shapes.mlir"
     "export_benchmark_funcs.mlir"
     "infer_numeric_narrowing.mlir"
@@ -41,6 +42,8 @@ iree_lit_test_suite(
   TOOLS
     FileCheck
     iree-opt
+  DATA
+    transform_dialect_dispatch_spec.mlir
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
