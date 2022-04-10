@@ -216,8 +216,21 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
             addConvTileAndDecomposeExpertPassPipeline(
                 executableLoweringPipeline);
             break;
+          // To  run end-to-end, transform dialect-based codegen needs
+          // to see the whole HAL::Executable to properly layer rewrites.
+          // However, there seem to be boundary assumptions on bufferization
+          // that may result in spurious alloca and copies in tensor lowering.
+          // TODO:  Remove spurious alloca + copies due to dispatch region
+          // creation, bufferization, codegen ordering.
           case IREE::Codegen::DispatchLoweringPassPipeline::
               LinalgTransformInterpCodegen:
+            // Restricting to the nestedModulePM fails because we should not
+            // limit the scope of codegen to only the module: materialization of
+            // parallelism needs to update the HAL::EntryPoint in a consistent
+            // fashion.
+            // This may happen before or after bufferization, without builtin
+            // orderings.
+            // addLinalgTransformInterpPasses(nestedModulePM);
             addLinalgTransformInterpPasses(executableLoweringPipeline);
             break;
           case IREE::Codegen::DispatchLoweringPassPipeline::

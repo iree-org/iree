@@ -452,14 +452,18 @@ void addCPUDefaultPassPipeline(OpPassManager &passManager) {
 }
 
 void addLinalgTransformInterpPasses(OpPassManager &passManager) {
+  passManager.addNestedPass<func::FuncOp>(
+      createConvertToDestinationPassingStylePass());
   // Give control to the linalg_transform dialect.
   passManager.addPass(createLinalgTransformInterpreterPass());
-
-  // Dropping the schedule is only needed if we want to embed the transform in
-  // the module: we should drop the schedule once applied.
+  // Dropping the schedule is only needed if we want to embed the transform
+  // in the IR: we should drop the schedule once applied.
   // This pass does nothing in the case where we apply a separate policy
   // through a file.
   passManager.addPass(createDropSchedulePass());
+  passManager.addPass(createCanonicalizerPass());
+  passManager.addPass(createCSEPass());
+  passManager.addPass(createCanonicalizerPass());
 }
 
 static void addLowerToLLVMPasses(OpPassManager &passManager) {
