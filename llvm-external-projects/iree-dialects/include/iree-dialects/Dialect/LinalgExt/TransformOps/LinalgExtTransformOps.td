@@ -139,21 +139,6 @@ def RewriteLinalgExtInParallelToAsyncOp :
   }];
 }
 
-def RewriteLinalgExtInParallelToHALOp :
-  Op<Transform_Dialect, "rewrite_iree_linalg_ext_in_parallel_to_hal",
-    [FunctionalStyleTransformOp, MemoryEffectsOpInterface,
-     DeclareOpInterfaceMethods<TransformOpInterface>]> {
-
-  let description = [{Rewrite linalg_ext.in_parallel op to use HAL ops.}];
-  let arguments = (ins PDL_Operation:$target);
-  // TODO: Determine whether we want to return something here, the only natural
-  // results would be the resulting insertTensorOps.
-  // let results = (outs PDL_Operation:$transformed);
-
-  let assemblyFormat = "$target attr-dict";
-  let cppNamespace = "mlir::iree_compiler::IREE::LinalgExt";
-}
-
 def RewriteLinalgExtInParallelToScfForOp :
   Op<Transform_Dialect, "rewrite_iree_linalg_ext_in_parallel_to_scf_for",
     [FunctionalStyleTransformOp, MemoryEffectsOpInterface,

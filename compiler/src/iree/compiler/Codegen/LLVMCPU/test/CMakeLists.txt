@@ -38,6 +38,8 @@ iree_lit_test_suite(
     iree::tools::iree-compile
     iree::tools::iree-opt
   DATA
+    linalg_transform_inparallel_buffers_spec.mlir
+    linalg_transform_inparallel_tensors_spec.mlir
     linalg_transform_spec.mlir
 )
 

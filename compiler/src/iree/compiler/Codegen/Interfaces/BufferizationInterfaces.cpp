@@ -11,6 +11,7 @@
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowTypes.h"
+#include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "mlir/Dialect/Arithmetic/Transforms/BufferizableOpInterfaceImpl.h"
 #include "mlir/Dialect/Bufferization/IR/BufferizableOpInterface.h"
@@ -118,6 +119,19 @@ struct DispatchTensorLoadOpInterface
 
     return success();
   }
+
+  bool bufferizesToMemoryRead(Operation *op, OpOperand &opOperand,
+                              const AnalysisState &state) const {
+    return true;
+  }
+  bool bufferizesToMemoryWrite(Operation *op, OpOperand &opOperand,
+                               const AnalysisState &state) const {
+    return false;
+  }
+  SmallVector<OpResult> getAliasingOpResult(Operation *op, OpOperand &opOperand,
+                                            const AnalysisState &state) const {
+    return {};
+  }
 };
 
 struct DispatchTensorStoreOpInterface
@@ -167,6 +181,29 @@ struct DispatchTensorStoreOpInterface
     return success();
   }
 };
+
+struct InterfaceBindingSubspanOpInterface
+    : public BufferizableOpInterface::ExternalModel<
+          InterfaceBindingSubspanOpInterface,
+          IREE::HAL::InterfaceBindingSubspanOp> {
+  bool isWritable(Operation *op, Value value,
+                  const AnalysisState &state) const {
+    return true;
+  }
+
+  LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
+                          BufferizationState &state) const {
+    auto subspanOp = cast<IREE::HAL::InterfaceBindingSubspanOp>(op);
+    auto memRefType =
+        getMemrefTypeForTensor(subspanOp.getType().cast<RankedTensorType>());
+    replaceOpWithNewBufferizedOp<IREE::HAL::InterfaceBindingSubspanOp>(
+        rewriter, op, memRefType, subspanOp.set(), subspanOp.binding(),
+        subspanOp.type(), subspanOp.byte_offset(), subspanOp.dynamic_dims(),
+        subspanOp.alignmentAttr());
+    return success();
+  }
+};
+
 }  // namespace
 
 /// Generic conversion for any LinalgExtOp on tensors.
@@ -431,6 +468,10 @@ void registerBufferizationInterfaces(DialectRegistry &registry) {
         IREE::LinalgExt::TopkOp::attachInterface<
             LinalgExtOpInterface<IREE::LinalgExt::TopkOp>>(*ctx);
       });
+  registry.addExtension(+[](MLIRContext *ctx, IREE::HAL::HALDialect *dialect) {
+    IREE::HAL::InterfaceBindingSubspanOp::attachInterface<
+        InterfaceBindingSubspanOpInterface>(*ctx);
+  });
 }
 
 void addPostAnalysisTransformations(OneShotBufferizationOptions &options) {

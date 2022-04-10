@@ -316,6 +316,33 @@ struct ParallelInsertSliceOpInterface
     return false;
   }
 };
+
+struct AssumeTiedToHALOpInterface
+    : public BufferizableOpInterface::ExternalModel<AssumeTiedToHALOpInterface,
+                                                    AssumeTiedToHALOp> {
+  bool bufferizesToMemoryRead(Operation *op, OpOperand &opOperand,
+                              const AnalysisState &state) const {
+    return true;
+  }
+  bool bufferizesToMemoryWrite(Operation *op, OpOperand &opOperand,
+                               const AnalysisState &state) const {
+    return false;
+  }
+  bool isWritable(Operation *op, Value value,
+                  const AnalysisState &state) const {
+    return true;
+  }
+  SmallVector<OpResult> getAliasingOpResult(Operation *op, OpOperand &opOperand,
+                                            const AnalysisState &state) const {
+    return {};
+  }
+  LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
+                          BufferizationState &state) const {
+    rewriter.eraseOp(op);
+    return success();
+  }
+};
+
 } // namespace LinalgExt
 } // namespace IREE
 } // namespace iree_compiler
@@ -325,6 +352,7 @@ void mlir::iree_compiler::IREE::LinalgExt::
     registerBufferizableOpInterfaceExternalModels(DialectRegistry &registry) {
   registry.addExtension(
       +[](MLIRContext *ctx, LinalgExt::IREELinalgExtDialect *dialect) {
+        AssumeTiedToHALOp::attachInterface<AssumeTiedToHALOpInterface>(*ctx);
         InParallelOp::attachInterface<InParallelOpInterface>(*ctx);
         PerformConcurrentlyOp::attachInterface<PerformConcurrentlyOpInterface>(
             *ctx);
