@@ -132,6 +132,14 @@ LinalgExt::TileToForeachOp::apply(transform::TransformResults &results,
   LinalgExt::ForeachThreadTilingPattern pattern(this->getContext(),
                                                 tilingOptions);
   ArrayRef<Operation *> targets = state.getPayloadOps(getTarget());
+  // Failure to match produces empty targets but should not fail the whole pass.
+  // Tolerate empty targets and propagate empty results.
+  // TODO: The transform dialect should have n-ary state, beyond LogicalResult.
+  if (targets.empty()) {
+    results.set(getTiledOp().cast<OpResult>(), {});
+    results.set(getTileOp().cast<OpResult>(), {});
+    return success();
+  }
   auto tilingInterfaceOp = dyn_cast<TilingInterface>(targets.front());
   if (!tilingInterfaceOp)
     return targets.front()->emitError("Cannot tile op: Not a TilingInterface");

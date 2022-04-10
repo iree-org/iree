@@ -1,4 +1,9 @@
-// RUN: iree-run-mlir %s --iree-hal-target-backends=dylib-llvm-aot --iree-codegen-use-linalg-transform-interp --linalg-transform-file-name=%p/linalg_transform_spec.mlir
+// RUN: iree-run-mlir %s --iree-hal-target-backends=dylib-llvm-aot \
+/// Specify the dispatch region formation with the transform dialect.
+// RUN:   --iree-flow-dispatch-use-transform-dialect=%p/transform_dialect_dispatch_spec.mlir \
+/// Specify the codegen strategy with the transform dialect.
+// RUN:   --iree-codegen-use-transform-dialect --codegen-transform-dialect-file-name=%p/transform_dialect_codegen_spec.mlir \
+// RUN: | FileCheck %s
 
 func.func @matmul_static() -> tensor<5x5xf32> {
   %res = flow.tensor.constant dense<[
