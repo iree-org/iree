@@ -201,7 +201,7 @@ def PadOp : Linalg_Transform_Operation<"pad",
   using the options provides as operation attributes.}];
 
   let arguments = (ins PDL_Operation:$target,
-                   DefaultValuedAttr<StrArrayAttr, "{}">:$padding_values,
+                   DefaultValuedAttr<ArrayAttr, "{}">:$padding_values,
                    DefaultValuedAttr<I64ArrayAttr, "{}">:$padding_dimensions,
                    DefaultValuedAttr<I64ArrayAttr, "{}">:$pack_paddings,
                    DefaultValuedAttr<I64ArrayAttr, "{}">:$hoist_paddings,
@@ -281,7 +281,7 @@ def LowerToLLVMOp : Transform_Op<"lower_to_llvm"> {
 }
 
 def GetParentLoopOp : Linalg_Transform_Operation<"get_parent_loop", [
-    TransformOpInterface, 
+    TransformOpInterface,
     TargetableSingleOperandTransformOpTrait
   ]> {
   let description = [{Obtains a handle to a parent loop of the given
@@ -300,7 +300,7 @@ def GetParentLoopOp : Linalg_Transform_Operation<"get_parent_loop", [
 }
 
 def UnrollLoopOp : Linalg_Transform_Operation<"unroll_loop", [
-    TransformOpInterface, 
+    TransformOpInterface,
     TargetableSingleOperandTransformOpTrait
   ]> {
   let description = [{Unrolls the given loop with the given unroll factor.}];
@@ -354,7 +354,7 @@ def OutlineLoopOp : Linalg_Transform_Operation<"outline_loop", [
   let assemblyFormat = "$target attr-dict";
 }
 
-def PrintOp : Transform_Op<"print", [ 
+def PrintOp : Transform_Op<"print", [
     DeclareOpInterfaceMethods<TransformOpInterface, ["apply"]>
   ]> {
   let arguments = (ins Optional<PDL_Operation>:$target,
@@ -367,7 +367,7 @@ def PrintOp : Transform_Op<"print", [
 // LinalgExt specific transforms
 //===----------------------------------------------------------------------===//
 
-def TileToLinalgExtTileOp : 
+def TileToLinalgExtTileOp :
     Linalg_Transform_Operation<"tile_to_iree_linalg_ext_tile_op", [
       DeclareOpInterfaceMethods<TransformOpInterface, ["apply"]>
     ]> {
