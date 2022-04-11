@@ -142,7 +142,7 @@ def ScalarizeOp : Linalg_Transform_Operation<"scalarize",
 }
 
 def FuseOp : Linalg_Transform_Operation<"fuse",
-    [TransformOpInterface, TargetableSingleOperandTransformOpTrait]> {
+    [TransformOpInterface]> {
   let description = [{Tiles the operations pointed to by the target handle and
   fuses their producers greedily using the options provided as attributes.}];
 
@@ -150,14 +150,16 @@ def FuseOp : Linalg_Transform_Operation<"fuse",
                    DefaultValuedAttr<I64ArrayAttr, "{}">:$tile_sizes,
                    DefaultValuedAttr<I64ArrayAttr, "{}">:$tile_interchange
                   );
-  let results = (outs PDL_Operation:$transformed);
+  let results = (outs PDL_Operation:$transformed,
+                      Variadic<PDL_Operation>:$loops);
 
-  let assemblyFormat = "$target attr-dict";
+  let hasCustomAssemblyFormat = 1;
   let hasVerifier = 1;
 
   let extraClassDeclaration = [{
-    ::mlir::FailureOr<::mlir::linalg::LinalgOp> applyToOne(
-        ::mlir::linalg::LinalgOp target);
+    ::mlir::LogicalResult apply(
+        ::mlir::linalg::transform::TransformResults &transformResults,
+        ::mlir::linalg::transform::TransformState &state);
   }];
 }
 
