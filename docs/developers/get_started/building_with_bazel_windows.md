@@ -1,15 +1,8 @@
 # Getting Started on Windows with Bazel
 
-<!--
-Notes to those updating this guide:
-
-    * This document should be __simple__ and cover essential items only.
-      Notes for optional components should go in separate files.
-
-    * This document parallels getting_started_linux_bazel.md and
-      getting_started_macos_bazel.md
-      Please keep them in sync.
--->
+**NOTE** Bazel build support is primarily for internal project infrastructure.
+Bazel on Windows in particular is particularly unstable and unsupported.
+We strongly recommend users build with CMake instead.
 
 This guide walks through building the core compiler and runtime parts of IREE
 from source. Auxiliary components like the Python bindings and Vulkan driver are
@@ -124,12 +117,3 @@ and execute a function in the compiled module:
 ```powershell
 > .\bazel-bin\iree\tools\iree-run-mlir.exe .\iree\samples\models\simple_abs.mlir -function-input="f32=-2" -iree-hal-target-backends=vmvx -print-mlir
 ```
-
-### Further Reading
-
-*   For an introduction to IREE's project structure and developer tools, see
-    [Developer Overview](../developing_iree/developer_overview.md)
-*   To target GPUs using Vulkan, see
-    [Getting Started on Windows with Vulkan](getting_started_windows_vulkan.md)
-*   To use IREE's Python bindings, see
-    [Getting Started with Python](getting_started_python.md)

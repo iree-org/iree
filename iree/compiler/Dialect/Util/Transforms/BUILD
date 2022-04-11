@@ -15,6 +15,7 @@ cc_library(
     srcs = [
         "ApplyPatterns.cpp",
         "CombineInitializers.cpp",
+        "ConvertPrimitiveType.cpp",
         "DropCompilerHints.cpp",
         "FixedPointIterator.cpp",
         "FoldGlobals.cpp",
@@ -37,6 +38,7 @@ cc_library(
         "//iree/compiler/Dialect/Util/IR",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:Analysis",
+        "@llvm-project//mlir:ArithmeticDialect",
         "@llvm-project//mlir:ControlFlowOps",
         "@llvm-project//mlir:FuncDialect",
         "@llvm-project//mlir:IR",

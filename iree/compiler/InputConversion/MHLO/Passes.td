@@ -23,12 +23,6 @@ def ConvertMHLOToLinalgExt
       "mlir::iree_compiler::MHLO::createConvertMHLOToLinalgExtPass()";
 }
 
-def LegalizeInputTypes :
-    Pass<"iree-mhlo-legalize-input-types", "ModuleOp"> {
-  let summary = "Legalizes input types to ones supported by the IREE flow dialect";
-  let constructor = "mlir::iree_compiler::MHLO::createLegalizeInputTypesPass()";
-}
-
 def FlattenTuplesInCFG :
     Pass<"iree-mhlo-flatten-tuples-in-cfg", "ModuleOp"> {
   let summary = "Flattens tuples in a CFG form of MHLO";

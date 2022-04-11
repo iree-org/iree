@@ -38,15 +38,13 @@ def LLVMGPU_MatmulTensorCore
 
 def SPIRV_Distribute
     : I32EnumAttrCase<"SPIRVDistribute", 11>;
-def SPIRV_DistributeCopy
-    : I32EnumAttrCase<"SPIRVDistributeCopy", 12>;
 def SPIRV_Vectorize
-    : I32EnumAttrCase<"SPIRVVectorize", 13>;
+    : I32EnumAttrCase<"SPIRVVectorize", 12>;
 def SPIRV_VectorizeToCooperativeOps
-    : I32EnumAttrCase<"SPIRVVectorizeToCooperativeOps", 14>;
+    : I32EnumAttrCase<"SPIRVVectorizeToCooperativeOps", 13>;
 
 def None
-    : I32EnumAttrCase<"None", 15>;
+    : I32EnumAttrCase<"None", 0xff>;
 
 // EnumAttrCase for all known lowerings for ops within dispatch region
 // to scalar/native-vector code.
@@ -57,7 +55,7 @@ def DispatchLoweringPassPipelineEnum : I32EnumAttr<
      CPU_ConvTileAndDecomposeExpert, CPU_TileFuseAndVectorize,
      CPU_BufferOpsTileAndVectorize, Linalg_TransformInterpCodegen,
      LLVMGPU_SimpleDistribute, LLVMGPU_Vectorize, LLVMGPU_MatmulSimt,
-     LLVMGPU_MatmulTensorCore, SPIRV_Distribute, SPIRV_DistributeCopy, SPIRV_Vectorize,
+     LLVMGPU_MatmulTensorCore, SPIRV_Distribute, SPIRV_Vectorize,
      SPIRV_VectorizeToCooperativeOps, None]> {
   let cppNamespace = "::mlir::iree_compiler::IREE::Codegen";
   // Don't generate a C++ class! We want to use the AttrDef
@@ -139,17 +137,22 @@ def IREECodegen_LoweringConfigAttr :
   }];
 
   let assemblyFormat = [{
-    `<` `tile_sizes` `=` $tileSizes (`,` `native_vector_size` `=` $nativeVectorSize^)? `>`
+    `<` `tile_sizes` `=` $tileSizes
+      (`,` `tile_interchange` `=` $tileInterchange^)?
+      (`,` `native_vector_size` `=` $nativeVectorSize^)? `>`
   }];
 
   let parameters = (ins
     AttrParameter<"ArrayAttr",
         "The tile sizes to use for different levels of tiling">:$tileSizes,
     DefaultValuedParameter<"ArrayAttr", "ArrayAttr::get($_ctx, {})",
+        "The tile interchange to use for different levels of tiling">:$tileInterchange,
+    DefaultValuedParameter<"ArrayAttr", "ArrayAttr::get($_ctx, {})",
         "The native vector size to use for the given operation">:$nativeVectorSize
   );
   let builders = [
     AttrBuilder<(ins "TileSizesListTypeRef":$tileSizes,
+        CArg<"TileSizesListTypeRef", "{}">:$tileInterchange,
         CArg<"ArrayRef<int64_t>", "{}">:$nativeVectorSize)>
   ];
   let extraClassDeclaration = [{
@@ -158,6 +161,9 @@ def IREECodegen_LoweringConfigAttr :
 
     // Returns the tile sizes for a level set for the op.
     SmallVector<int64_t> getTileSizeVals(unsigned level);
+
+    // Returns the tile interchange for a level set for the op.
+    SmallVector<int64_t> getTileInterchangeVals(unsigned level);
 
     // Returns the native vector size to use.
     SmallVector<int64_t> getNativeVectorSizeVals();
@@ -199,15 +205,21 @@ def IREECodegen_CompilationInfoAttr :
     (`,` `workgroup_size` `=` $workgroupSize^)? `>`
   }];
 
+  // These builders are externally for auto-tuner to generate the attribute.
   let builders = [
     AttrBuilder<(ins "TileSizesListTypeRef":$tileSizes,
-      "ArrayRef<int64_t>":$nativeVectorSize,
+      "TileSizesListTypeRef":$tileInterchange,
+      CArg<"ArrayRef<int64_t>", "{}">:$nativeVectorSize,
       CArg<"ArrayRef<int64_t>", "{}">:$workgroupSize)>,
     AttrBuilder<(ins "TileSizesListTypeRef":$tileSizes,
+      "TileSizesListTypeRef":$tileInterchange,
       "ArrayRef<int64_t>":$nativeVectorSize,
       "DispatchLoweringPassPipeline":$passPipeline,
       "ArrayRef<int64_t>":$workloadPerWorkgroup,
       CArg<"ArrayRef<int64_t>", "{}">:$workgroupSize)>,
+    AttrBuilder<(ins "LoweringConfigAttr":$configAttr,
+      "TranslationInfoAttr":$translationInfo,
+      "ArrayRef<int64_t>":$workloadPerWorkgroup)>,
   ];
   let extraClassDeclaration = [{
     SmallVector<int64_t> getWorkgroupSizeVals();

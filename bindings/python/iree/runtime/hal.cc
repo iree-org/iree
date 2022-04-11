@@ -347,14 +347,15 @@ void SetupHalBindings(pybind11::module m) {
       .value("TRANSFER", IREE_HAL_BUFFER_USAGE_TRANSFER)
       .value("MAPPING", IREE_HAL_BUFFER_USAGE_MAPPING)
       .value("DISPATCH", IREE_HAL_BUFFER_USAGE_DISPATCH)
-      .value("ALL", IREE_HAL_BUFFER_USAGE_ALL)
       .export_values()
       .def("__or__",
            [](enum iree_hal_buffer_usage_bits_t self,
-              enum iree_hal_buffer_usage_bits_t other) { return self | other; })
+              enum iree_hal_buffer_usage_bits_t other) {
+             return (enum iree_hal_buffer_usage_bits_t)(self | other);
+           })
       .def("__and__", [](enum iree_hal_buffer_usage_bits_t self,
                          enum iree_hal_buffer_usage_bits_t other) {
-        return self & other;
+        return (enum iree_hal_buffer_usage_bits_t)(self & other);
       });
 
   py::enum_<enum iree_hal_memory_access_bits_t>(m, "MemoryAccess")

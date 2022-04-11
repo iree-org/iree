@@ -84,12 +84,8 @@ struct ConcatenateOpConversion
           rewriter.createOrFold<arith::AddIOp>(loc, resultDimSize, size);
     }
     sizes[dim] = resultDimSize;
-    Value initTensor = rewriter.create<linalg::InitTensorOp>(
+    Value result = rewriter.create<linalg::InitTensorOp>(
         loc, resultType.getShape(), resultType.getElementType());
-    auto zeroAttr = rewriter.getZeroAttr(resultType.getElementType());
-    Value zero = rewriter.create<arith::ConstantOp>(loc, zeroAttr);
-    Value result =
-        rewriter.create<linalg::FillOp>(loc, zero, initTensor).getResult(0);
 
     auto toOpFoldResult = [](Value v) -> OpFoldResult {
       auto op = v.getDefiningOp<arith::ConstantIndexOp>();

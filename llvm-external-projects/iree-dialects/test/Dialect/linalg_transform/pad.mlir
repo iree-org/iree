@@ -44,5 +44,5 @@ pdl.pattern @pdl_target : benefit(1) {
 
 iree_linalg_transform.sequence {
   %0 = match @pdl_target
-  %1 = pad %0 {padding_values=["0.0", "0.0"], padding_dimensions=[1], pack_paddings=[1, 1], hoist_paddings=[1, 0], transpose_paddings=[[1, 0], [0, 1]]}
+  %1 = pad %0 {padding_values=[0.0 : f32, 0.0 : f32], padding_dimensions=[1], pack_paddings=[1, 1], hoist_paddings=[1, 0], transpose_paddings=[[1, 0], [0, 1]]}
 }

@@ -2,20 +2,20 @@
 
 iree_linalg_transform.sequence {
   %0 = match @match
-  // expected-error@below {{result #0 has more than one use}}
-  %1 = tile %0
-  // expected-note@below {{used here as operand #0}}
-  tile %1
-  // expected-note@below {{used here as operand #0}}
-  vectorize %1
+  // expected-error@below {{expected `sizes` attribute}}
+  tile %0
 }
 
 // -----
 
 iree_linalg_transform.sequence {
   %0 = match @match
-  // expected-error@below {{"sizes" and "scalarize_dyn_dims" attributes are mutually exclusive}}
-  tile %0 {sizes = [1,2,3], scalarize_dyn_dims = true}
+  // expected-error@below {{result #0 has more than one use}}
+  %1, %loops:3 = tile %0 {sizes = [32, 32, 32]}
+  // expected-note@below {{used here as operand #0}}
+  tile %1 {sizes = [32, 32, 32]}
+  // expected-note@below {{used here as operand #0}}
+  vectorize %1
 }
 
 // -----

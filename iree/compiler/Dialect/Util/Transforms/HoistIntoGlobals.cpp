@@ -36,6 +36,8 @@ using HoistedValueMap = llvm::DenseMap<Value, GlobalOp>;
 class HoistIntoGlobalsPass
     : public PassWrapper<HoistIntoGlobalsPass, OperationPass<mlir::ModuleOp>> {
  public:
+  MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(HoistIntoGlobalsPass)
+
   StringRef getArgument() const override {
     return "iree-util-hoist-into-globals";
   }

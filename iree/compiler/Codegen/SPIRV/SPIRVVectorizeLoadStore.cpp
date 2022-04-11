@@ -119,6 +119,8 @@ namespace {
 /// read/write ops.
 class MemRefUsageAnalysis {
  public:
+  MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(MemRefUsageAnalysis)
+
   explicit MemRefUsageAnalysis(mlir::Operation *);
 
   // Returns true if the memref should be converted to a memref of vectors.

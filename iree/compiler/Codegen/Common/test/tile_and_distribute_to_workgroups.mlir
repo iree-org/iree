@@ -199,12 +199,13 @@ hal.executable private @add4D {
 //      CHECK: hal.executable.entry_point public @add4D
 // CHECK-SAME:   translation_info = #[[TRANSLATION]]
 //      CHECK: func @add4D()
+//      CHECK:   %[[C0:.+]] = arith.constant 0 : index
 //      CHECK:   scf.for %[[IV0:.+]] =
 //      CHECK:     scf.for %[[IV1:.+]] =
 //      CHECK:       scf.for %[[IV2:.+]] =
 //  CHECK-NOT:         scf.for
 //      CHECK:         %[[GENERIC:.+]] = linalg.generic
-//      CHECK:         flow.dispatch.tensor.store %[[GENERIC]], %{{.+}}, offsets = [0, %[[IV0]], %[[IV1]], %[[IV2]]]
+//      CHECK:         flow.dispatch.tensor.store %[[GENERIC]], %{{.+}}, offsets = [%[[C0]], %[[IV0]], %[[IV1]], %[[IV2]]]
 
 // -----
 
@@ -607,6 +608,7 @@ hal.executable private @conv {
 //      CHECK: hal.executable.entry_point public @conv
 // CHECK-SAME:  translation_info = #[[TRANSLATION]]
 //      CHECK: func @conv()
+//      CHECK:   %[[C0:.+]] = arith.constant 0
 //      CHECK:   scf.for %[[IV0:.+]] =
 //      CHECK:     scf.for %[[IV1:.+]] =
 //      CHECK:       scf.for %[[IV2:.+]] =
@@ -614,7 +616,7 @@ hal.executable private @conv {
 //  CHECK-DAG:         %[[FILTER:.+]] = flow.dispatch.tensor.load %{{.+}}, offsets = [0, 0, 0, %[[IV2]]]
 //  CHECK-DAG:         %[[INIT:.+]] = flow.dispatch.tensor.load %{{.+}}, offsets = [0, %[[IV0]], %[[IV1]], %[[IV2]]]
 //      CHECK:         %[[RESULT:.+]] = linalg.conv_2d_nhwc_hwcf
-//      CHECK:         flow.dispatch.tensor.store %[[RESULT]], %{{.+}}, offsets = [0, %[[IV0]], %[[IV1]], %[[IV2]]]
+//      CHECK:         flow.dispatch.tensor.store %[[RESULT]], %{{.+}}, offsets = [%[[C0]], %[[IV0]], %[[IV1]], %[[IV2]]]
 
 // -----
 
@@ -663,6 +665,7 @@ hal.executable private @conv_static {
 //      CHECK: hal.executable.entry_point public @conv_static
 // CHECK-SAME:  translation_info = #[[TRANSLATION]]
 //      CHECK: func @conv_static()
+//      CHECK:   %[[C0:.+]] = arith.constant 0 : index
 //      CHECK:   scf.for %[[IV0:.+]] =
 //      CHECK:     scf.for %[[IV1:.+]] =
 //      CHECK:       scf.for %[[IV2:.+]] =
@@ -671,7 +674,7 @@ hal.executable private @conv_static {
 // CHECK-SAME:             outs(%[[INIT]] :
 //      CHECK:         %[[RESULT:.+]] = linalg.depthwise_conv_2d_nhwc_hwc
 // CHECK-SAME:             outs(%[[FILL]] :
-//      CHECK:         flow.dispatch.tensor.store %[[RESULT]], %{{.+}}, offsets = [0, %[[IV0]], %[[IV1]], %[[IV2]]], sizes = [1, 20, 40, 48]
+//      CHECK:         flow.dispatch.tensor.store %[[RESULT]], %{{.+}}, offsets = [%[[C0]], %[[IV0]], %[[IV1]], %[[IV2]]], sizes = [1, 20, 40, 48]
 
 // -----
 
@@ -932,6 +935,7 @@ hal.executable private @gemm_unit_N {
 //      CHECK: hal.executable.entry_point public @gemm_unit_N
 // CHECK-SAME:  translation_info = #[[TRANSLATION]]
 //      CHECK: func @gemm_unit_N()
+//  CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
 //  CHECK-DAG:   %[[M:.+]] = hal.interface.constant.load[0]
 //  CHECK-DAG:   %[[WG_ID_X:.+]] = hal.interface.workgroup.id[0]
 //  CHECK-DAG:   %[[WG_COUNT_X:.+]] = hal.interface.workgroup.count[0]
@@ -941,7 +945,7 @@ hal.executable private @gemm_unit_N {
 //  CHECK-NOT:     scf.for
 //      CHECK:     %[[GEMM:.+]] = linalg.matmul
 //      CHECK:     flow.dispatch.tensor.store %[[GEMM]],
-// CHECK-SAME:         offsets = [%[[IV0]], 0]
+// CHECK-SAME:         offsets = [%[[IV0]], %[[C0]]]
 
 // -----
 #config = #iree_codegen.lowering_config<tile_sizes = [[0, 0, 0], [0, 0, 0], [0, 0, 16]]>
@@ -1045,12 +1049,13 @@ hal.executable private @generic_unit_dims {
 //      CHECK: hal.executable.entry_point public @generic_unit_dims
 // CHECK-SAME:  translation_info = #[[TRANSLATION]]
 //      CHECK: func @generic_unit_dims()
+//      CHECK:   %[[C0:.+]] = arith.constant 0 : index
 //      CHECK:   scf.for %[[IV0:.+]] =
 //      CHECK:     scf.for %[[IV1:.+]] =
 //      CHECK:       scf.for %[[IV2:.+]] =
 //      CHECK:         %[[GENERIC:.+]] = linalg.generic
 //      CHECK:         flow.dispatch.tensor.store %[[GENERIC]],
-// CHECK-SAME:             offsets = [0, 0, 0, 0, %[[IV0]], %[[IV1]], 0, %[[IV2]]]
+// CHECK-SAME:             offsets = [%[[C0]], %[[C0]], %[[C0]], %[[C0]], %[[IV0]], %[[IV1]], %[[C0]], %[[IV2]]]
 
 // -----
 #config = #iree_codegen.lowering_config<tile_sizes = [[0], [0], [4]]>
@@ -1173,11 +1178,11 @@ hal.executable private @rank_reduced_slice {
     builtin.module {
       func.func @rank_reduced_slice() {
         %in_binding = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer)
-            : !flow.dispatch.tensor<readonly:1x40xf32>
+            : !flow.dispatch.tensor<readonly:5x40xf32>
         %out_binding = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer)
             : !flow.dispatch.tensor<writeonly:10xf32>
-        %in = flow.dispatch.tensor.load %in_binding, offsets = [0, 10], sizes = [1, 10], strides = [1, 1]
-            : !flow.dispatch.tensor<readonly:1x40xf32> -> tensor<10xf32>
+        %in = flow.dispatch.tensor.load %in_binding, offsets = [3, 10], sizes = [1, 10], strides = [2, 1]
+            : !flow.dispatch.tensor<readonly:5x40xf32> -> tensor<10xf32>
         %out = linalg.init_tensor [10] : tensor<10xf32>
         %val = linalg.generic {
             indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>],
@@ -1194,13 +1199,71 @@ hal.executable private @rank_reduced_slice {
     }
   }
 }
+//      CHECK: #[[MAP:.+]] = affine_map<()[s0] -> (s0 + 10)>
 //      CHECK: func @rank_reduced_slice()
 //  CHECK-DAG:   %[[SRC_BINDING:.+]] = hal.interface.binding.subspan set(0) binding(0)
-// CHECK-SAME:       : !flow.dispatch.tensor<readonly:1x40xf32>
+// CHECK-SAME:       : !flow.dispatch.tensor<readonly:5x40xf32>
 //  CHECK-DAG:   %[[DST_BINDING:.+]] = hal.interface.binding.subspan set(0) binding(1)
 // CHECK-SAME:       : !flow.dispatch.tensor<writeonly:10xf32>
 //      CHECK:   scf.for %[[IV0:.+]] =
+//      CHECK:     %[[OFFSET:.+]] = affine.apply #[[MAP]]()[%[[IV0]]]
 //      CHECK:     %[[SRC_TILE:.+]] = flow.dispatch.tensor.load %[[SRC_BINDING]]
-// CHECK-SAME:         offsets = [0, %[[IV0]]], sizes = [1, 2], strides = [1, 1]
+// CHECK-SAME:         offsets = [3, %[[OFFSET]]], sizes = [1, 2], strides = [2, 1]
 //      CHECK:     linalg.generic
 // CHECK-SAME:         ins(%[[SRC_TILE]] :
+
+// -----
+
+#config = #iree_codegen.lowering_config<tile_sizes = [[32, 64, 0], [8, 32, 0], [0, 0, 16]], tile_interchange = [[1, 0, 2], [], []]>
+#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>,
+    #hal.descriptor_set.binding<2, storage_buffer>,
+    #hal.descriptor_set.binding<3, storage_buffer>
+  ]>
+]>
+#executable_target_embedded_elf_x86_64_ = #hal.executable.target<"llvm", "embedded-elf-x86_64", {
+  data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
+  native_vector_size = 16 : index,
+  target_triple = "x86_64-unknown-linux-gnu"}>
+#translation = #iree_codegen.translation_info<CPUDoubleTilingExpert>
+hal.executable private @matmul_interchange {
+  hal.executable.variant public @llvm, target = #executable_target_embedded_elf_x86_64_ {
+    hal.executable.entry_point public @matmul_interchange layout(#executable_layout) {translation_info = #translation}
+    builtin.module {
+      func.func @matmul_interchange() {
+        %0 = hal.interface.constant.load[0] : index
+        %1 = hal.interface.constant.load[1] : index
+        %2 = hal.interface.constant.load[2] : index
+        %3 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer)
+            : !flow.dispatch.tensor<readonly:?x?xf32>{%0, %2}
+        %4 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer)
+            : !flow.dispatch.tensor<readonly:?x?xf32>{%2, %1}
+        %5 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer)
+            : !flow.dispatch.tensor<readonly:?x?xf32>{%0, %1}
+        %6 = hal.interface.binding.subspan set(0) binding(3) type(storage_buffer)
+            : !flow.dispatch.tensor<writeonly:?x?xf32>{%0, %1}
+        %7 = flow.dispatch.tensor.load %3, offsets = [0, 0], sizes = [%0, %2], strides = [1, 1]
+            : !flow.dispatch.tensor<readonly:?x?xf32>{%0, %2} -> tensor<?x?xf32>
+        %8 = flow.dispatch.tensor.load %4, offsets = [0, 0], sizes = [%2, %1], strides = [1, 1]
+            : !flow.dispatch.tensor<readonly:?x?xf32>{%2, %1} -> tensor<?x?xf32>
+        %9 = flow.dispatch.tensor.load %5, offsets = [0, 0], sizes = [%0, %1], strides = [1, 1]
+            : !flow.dispatch.tensor<readonly:?x?xf32>{%0, %1} -> tensor<?x?xf32>
+        %10 = linalg.matmul {lowering_config = #config}
+            ins(%7, %8 : tensor<?x?xf32>, tensor<?x?xf32>) outs(%9 : tensor<?x?xf32>) -> tensor<?x?xf32>
+        flow.dispatch.tensor.store %10, %6, offsets = [0, 0], sizes = [%0, %1], strides = [1, 1]
+            : tensor<?x?xf32> -> !flow.dispatch.tensor<writeonly:?x?xf32>{%0, %1}
+        return
+      }
+    }
+  }
+}
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert>
+//      CHECK: hal.executable.entry_point public @matmul_interchange
+// CHECK-SAME:   translation_info = #[[TRANSLATION]]
+//      CHECK: func @matmul_interchange()
+//  CHECK-DAG:   %[[D0:.+]] = hal.interface.constant.load[0] : index
+//  CHECK-DAG:   %[[D1:.+]] = hal.interface.constant.load[1] : index
+//      CHECK:   scf.for %{{.+}} = %{{.+}} to %[[D1]] step %{{.+}} {
+//      CHECK:     scf.for %{{.+}} = %{{.+}} to %[[D0]] step %{{.+}} {

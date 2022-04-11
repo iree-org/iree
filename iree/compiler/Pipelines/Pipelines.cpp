@@ -41,7 +41,7 @@ void buildIREEVMTransformPassPipeline(
     case InputDialectOptions::Type::mhlo:
       MHLO::buildMHLOInputConversionPassPipeline(passManager);
       break;
-    case InputDialectOptions::Type::tmtensor:
+    case InputDialectOptions::Type::tm_tensor:
       passManager.addNestedPass<func::FuncOp>(
           TMTensor::createConvertTMTensorToLinalgExtPass());
       break;

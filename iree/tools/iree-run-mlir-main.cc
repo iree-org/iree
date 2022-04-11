@@ -195,7 +195,7 @@ Status PrepareModule(std::string target_backend,
   llvm::SourceMgr source_mgr;
   source_mgr.AddNewSourceBuffer(std::move(file_buffer), llvm::SMLoc());
   mlir::OwningOpRef<mlir::ModuleOp> mlir_module =
-      mlir::parseSourceFile(source_mgr, &context);
+      mlir::parseSourceFile<mlir::ModuleOp>(source_mgr, &context);
   if (!mlir_module) {
     return iree_make_status(IREE_STATUS_FAILED_PRECONDITION,
                             "could not parse MLIR file");

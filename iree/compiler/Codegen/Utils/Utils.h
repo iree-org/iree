@@ -164,14 +164,11 @@ linalg::LinalgLoopDistributionOptions getIREELinalgLoopDistributionOptions();
 /// `OffsetSizeAndStrideOpInterface`.
 /// The following computations are performed:
 ///   - offsets = producer_offsets * consumer_strides + consumer_offsets,
-///   - sizes = producer_sizes
 ///   - strides = producer_strides * consumer_strides.
-// TODO: Sizes should technically be combined with `min` but one often has
-// enough static knowledge to avoid this extra complexity.
 LogicalResult foldOffsetsSizesAndStrides(
-    PatternRewriter &rewriter, Location loc,
-    OffsetSizeAndStrideOpInterface producer,
+    OpBuilder &builder, Location loc, OffsetSizeAndStrideOpInterface producer,
     OffsetSizeAndStrideOpInterface consumer,
+    const llvm::SmallBitVector &droppedProducerDims,
     SmallVector<OpFoldResult> &combinedOffsets,
     SmallVector<OpFoldResult> &combinedSizes,
     SmallVector<OpFoldResult> &combinedStrides);

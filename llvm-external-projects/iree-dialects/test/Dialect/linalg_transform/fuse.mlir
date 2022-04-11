@@ -28,5 +28,5 @@ pdl.pattern @pdl_target : benefit(1) {
 
 iree_linalg_transform.sequence {
   %0 = match @pdl_target
-  %1 = fuse %0 {tile_sizes = [32, 32], tile_interchange = [0, 1]}
+  %1, %loops:2 = fuse %0 {tile_sizes = [32, 32], tile_interchange = [0, 1]}
 }

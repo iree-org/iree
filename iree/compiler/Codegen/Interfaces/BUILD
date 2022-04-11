@@ -41,6 +41,9 @@ cc_library(
     deps = [
         ":BufferizationInterfaces",
         ":ProcessorOpInterfaces",
+        # TODO: Remove this dependency once the transform dialect extensions
+        # have a better registration mechanism.
+        "//iree/compiler/Codegen/TransformDialectExtensions",
     ],
 )
 

@@ -293,12 +293,12 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_view_generate_buffer(
   // and avoid needing to allocate the staging memory. If we can't get that
   // memory type (or the allocator doesn't want us using it) then we'll fall
   // back to allocation -> generation -> copy.
+  iree_hal_buffer_params_t mappable_params = buffer_params;
+  mappable_params.type |= IREE_HAL_MEMORY_TYPE_HOST_VISIBLE;
+  mappable_params.usage |= IREE_HAL_BUFFER_USAGE_MAPPING;
   iree_hal_buffer_compatibility_t compatibility =
-      iree_hal_allocator_query_compatibility(
-          allocator,
-          iree_hal_buffer_params_with_usage(buffer_params,
-                                            IREE_HAL_BUFFER_USAGE_MAPPING),
-          allocation_size);
+      iree_hal_allocator_query_compatibility(allocator, mappable_params,
+                                             allocation_size);
   bool is_mappable = iree_all_bits_set(
       compatibility, IREE_HAL_BUFFER_COMPATIBILITY_ALLOCATABLE);
 
@@ -307,7 +307,7 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_view_generate_buffer(
     // Compatible with allocate -> map -> generate.
     status = iree_hal_buffer_view_generate_buffer_in_situ(
         allocator, shape, shape_rank, element_type, encoding_type,
-        buffer_params, callback, user_data, out_buffer_view);
+        mappable_params, callback, user_data, out_buffer_view);
   } else {
     // Allocate host-local memory first and generate into that.
     status = iree_hal_buffer_view_generate_buffer_on_host(
@@ -397,10 +397,8 @@ static iree_status_t iree_hal_buffer_view_parse_impl(
 
   // Allocate the buffer from the provided allocator and parse directly into it.
   const iree_hal_buffer_params_t buffer_params = {
-      .type =
-          IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL | IREE_HAL_MEMORY_TYPE_HOST_VISIBLE,
-      .usage = IREE_HAL_BUFFER_USAGE_DISPATCH | IREE_HAL_BUFFER_USAGE_TRANSFER |
-               IREE_HAL_BUFFER_USAGE_MAPPING,
+      .type = IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL,
+      .usage = IREE_HAL_BUFFER_USAGE_DISPATCH | IREE_HAL_BUFFER_USAGE_TRANSFER,
   };
   iree_hal_buffer_view_parse_params_t parse_params = {
       .data_str = data_str,

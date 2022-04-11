@@ -478,6 +478,11 @@ def FLOW_DispatchTensorStoreOp : FLOW_Op<"dispatch.tensor.store", [
       return idx == 0 ? sizes() : target_dims();
     }
     ValueRange getResultDynamicDims(unsigned idx) { return {}; }
+
+    /// Returns the list of dimensions that are dropped if the
+    /// !flow.dispatch.tensor.load is rank-reducing.
+    llvm::SmallBitVector getDroppedDims();
+
   }];
 
   let hasVerifier = 1;

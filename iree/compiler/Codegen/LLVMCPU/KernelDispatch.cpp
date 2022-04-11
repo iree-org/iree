@@ -44,18 +44,15 @@ static llvm::cl::opt<int> clNumberOfRuntimeThreads(
 
 static llvm::cl::list<int> mmt4dWorkgroupTileSizes(
     "iree-codegen-llvm-mmt4d-workgroup-tile-sizes",
-    llvm::cl::desc("linalg.mmt4d workgroup tile size"), llvm::cl::ZeroOrMore,
-    llvm::cl::MiscFlags::CommaSeparated);
+    llvm::cl::desc("linalg.mmt4d workgroup tile size"), llvm::cl::ZeroOrMore);
 
 static llvm::cl::list<int> mmt4dL1TileSizes(
     "iree-codegen-llvm-mmt4d-l1-tile-size",
-    llvm::cl::desc("linalg.mmt4d L1 tile size"), llvm::cl::ZeroOrMore,
-    llvm::cl::MiscFlags::CommaSeparated);
+    llvm::cl::desc("linalg.mmt4d L1 tile size"), llvm::cl::ZeroOrMore);
 
 static llvm::cl::list<int> mmt4dVectorSizes(
     "iree-codegen-llvm-mmt4d-vector-size",
-    llvm::cl::desc("linalg.mmt4d vector tile size"), llvm::cl::ZeroOrMore,
-    llvm::cl::MiscFlags::CommaSeparated);
+    llvm::cl::desc("linalg.mmt4d vector tile size"), llvm::cl::ZeroOrMore);
 
 static llvm::cl::opt<int> defaultWorkgroupTileSize(
     "iree-codegen-llvm-generic-ops-workgroup-size",
@@ -372,26 +369,34 @@ static LogicalResult setDefaultRootConfig(
       DispatchLoweringPassPipeline::CPUDefault);
 }
 
-static LogicalResult setX86SandboxRootConfig(func::FuncOp entryPointFn,
-                                             linalg::ContractionOpInterface op,
-                                             ArrayRef<int64_t> flowTileSizes,
-                                             int vectorSize) {
-  // Hardcoded tiling sizes {1, 1, ..., 8, 32, 16}.
+static LogicalResult setSandboxRootConfig(func::FuncOp entryPointFn,
+                                          linalg::ContractionOpInterface op,
+                                          ArrayRef<int64_t> flowTileSizes,
+                                          ArrayRef<int64_t> target2ndTileSizes,
+                                          int vectorSize) {
+  assert(target2ndTileSizes.size() == 3 &&
+         "the current configuration is driven by matmul which has exactly "
+         "three loops");
   // The tiling for parallel dims and reduction dims should be separated.
   SmallVector<int64_t> parallelTileSizes;
   int64_t nLoops = cast<linalg::LinalgOp>(op.getOperation()).getNumLoops();
-  parallelTileSizes.append(nLoops - 3, 1);
-  parallelTileSizes.push_back(
-      getMaxTileSize(0, flowTileSizes[nLoops - 3], 8, vectorSize));
-  parallelTileSizes.push_back(
-      getMaxTileSize(0, flowTileSizes[nLoops - 2], 32, vectorSize));
+  if (nLoops >= 3) {
+    parallelTileSizes.append(nLoops - 3, 1);
+    parallelTileSizes.push_back(getMaxTileSize(
+        0, flowTileSizes[nLoops - 3], target2ndTileSizes[0], vectorSize));
+  }
+  if (nLoops >= 2) {
+    parallelTileSizes.push_back(getMaxTileSize(
+        0, flowTileSizes[nLoops - 2], target2ndTileSizes[1], vectorSize));
+  }
   parallelTileSizes.push_back(0);
 
   auto lhsShapedType = op.lhs().getType().cast<ShapedType>();
   int64_t K = lhsShapedType.getShape().back();
   SmallVector<int64_t> reductionTileSizes;
   reductionTileSizes.append(nLoops - 1, 0);
-  reductionTileSizes.push_back(getMaxTileSize(0, K, 16, vectorSize));
+  reductionTileSizes.push_back(
+      getMaxTileSize(0, K, target2ndTileSizes[2], vectorSize));
 
   TileSizesListType tileSizes;
   tileSizes.emplace_back(flowTileSizes.begin(), flowTileSizes.end());
@@ -412,14 +417,18 @@ static LogicalResult setARMRootConfig(func::FuncOp entryPointFn,
   // Vector tile sizes are {1, ..., v, v, v}
   SmallVector<int64_t> l1TileSizes, vectorTileSizes;
   int64_t nLoops = cast<linalg::LinalgOp>(op.getOperation()).getNumLoops();
-  l1TileSizes.append(nLoops - 3, 1);
-  l1TileSizes.push_back(
-      getMaxTileSize(0, flowTileSizes[nLoops - 3], 5 * vectorSize, vectorSize));
-  l1TileSizes.push_back(
-      getMaxTileSize(0, flowTileSizes[nLoops - 2], vectorSize, vectorSize));
-  vectorTileSizes.append(nLoops - 3, 1);
-  vectorTileSizes.push_back(vectorSize);
-  vectorTileSizes.push_back(vectorSize);
+  if (nLoops >= 3) {
+    l1TileSizes.append(nLoops - 3, 1);
+    l1TileSizes.push_back(getMaxTileSize(0, flowTileSizes[nLoops - 3],
+                                         5 * vectorSize, vectorSize));
+    vectorTileSizes.append(nLoops - 3, 1);
+    vectorTileSizes.push_back(vectorSize);
+  }
+  if (nLoops >= 2) {
+    l1TileSizes.push_back(
+        getMaxTileSize(0, flowTileSizes[nLoops - 2], vectorSize, vectorSize));
+    vectorTileSizes.push_back(vectorSize);
+  }
 
   // L1/vector tile size for k dimensions.
   auto lhsShapedType = op.lhs().getType().cast<ShapedType>();
@@ -442,6 +451,17 @@ static LogicalResult setRootConfig(
     func::FuncOp entryPointFn, linalg::ContractionOpInterface contractionOp,
     ArrayRef<LoopTilingAndDistributionInfo> tiledLoops) {
   auto linalgOp = cast<linalg::LinalgOp>(contractionOp.getOperation());
+  unsigned numLoops = linalgOp.getNumLoops();
+  {
+    SmallVector<unsigned> dims;
+    linalgOp.getReductionDims(dims);
+    if (dims.size() != 1 || dims[0] != numLoops - 1) {
+      return contractionOp.emitOpError(
+          "expected to have exactly one reduction dim, and it is the innermost "
+          "dim");
+    }
+  }
+
   // Consider all element types and use the smallest vector size. The tiling
   // sizes are chosen based on the vector size.
   auto lhsShapedType = contractionOp.lhs().getType().cast<ShapedType>();
@@ -453,7 +473,6 @@ static LogicalResult setRootConfig(
   vectorSize = std::min(vectorSize, getVectorSize(entryPointFn, resShapedType));
 
   // Use the default distribution for the matmul loops.
-  unsigned numLoops = linalgOp.getNumLoops();
   SmallVector<int64_t> minTileSizes =
       getMinTilingSizesForEachDim(entryPointFn, linalgOp);
   SmallVector<int64_t> maxTileSizes(numLoops, defaultWorkgroupTileSize);
@@ -474,18 +493,22 @@ static LogicalResult setRootConfig(
 
   // TODO(dcaballe): Find better configurations for RISC-V backends.
   if (isX86(entryPointFn) || isRISCV(entryPointFn)) {
-    // There is a tileInterchange option. If it needs to be configured, we can
-    // only apply the pipeline to linalg.matmul. Because we don't know the
-    // number of loops when adding the pass to pass manager.
-    // TODO(hanchung): Embed options into attributes, so we can control options
-    // more heuristically.
-    return setX86SandboxRootConfig(entryPointFn, contractionOp, flowTileSizes,
-                                   vectorSize);
+    SmallVector<int64_t> tileSizes = {8, 32, 16};
+    return setSandboxRootConfig(entryPointFn, contractionOp, flowTileSizes,
+                                tileSizes, vectorSize);
   }
 
   // Fall back to ARM configurations.
-  return setARMRootConfig(entryPointFn, contractionOp, flowTileSizes,
-                          vectorSize);
+  bool isQuantized =
+      lhsShapedType.getElementType() != resShapedType.getElementType();
+  if (isQuantized) {
+    SmallVector<int64_t> tileSizes = {4, 16, 4};
+    return setSandboxRootConfig(entryPointFn, contractionOp, flowTileSizes,
+                                tileSizes, vectorSize);
+  } else {
+    return setARMRootConfig(entryPointFn, contractionOp, flowTileSizes,
+                            vectorSize);
+  }
 }
 
 /// Sets the lowering configuration for dispatch region for linalg.mmt4d root

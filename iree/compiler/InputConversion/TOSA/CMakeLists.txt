@@ -47,9 +47,10 @@ iree_cc_library(
     MLIRPass
     MLIRSCFToControlFlow
     MLIRTosa
+    MLIRTosaToArith
     MLIRTosaToLinalg
     MLIRTosaToSCF
-    MLIRTosaToStandard
+    MLIRTosaToTensor
     MLIRTransforms
     iree::compiler::Dialect::Flow::Transforms
     iree::compiler::InputConversion::Common

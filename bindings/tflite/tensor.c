@@ -141,7 +141,9 @@ iree_status_t _TfLiteTensorReallocateIfNeeded(
               (iree_hal_buffer_params_t){
                   .type = IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL |
                           IREE_HAL_MEMORY_TYPE_HOST_VISIBLE,
-                  .usage = IREE_HAL_BUFFER_USAGE_ALL,
+                  .usage = IREE_HAL_BUFFER_USAGE_DISPATCH |
+                           IREE_HAL_BUFFER_USAGE_TRANSFER |
+                           IREE_HAL_BUFFER_USAGE_MAPPING,
               },
               allocation_size, iree_const_byte_span_empty(), &tensor->buffer));
 

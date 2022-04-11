@@ -14,6 +14,8 @@
 #include "iree/hal/cuda/dynamic_symbols.h"
 #include "iree/hal/cuda/status_util.h"
 
+static const char* IREE_HAL_CUDA_ALLOCATOR_ID = "CUDA";
+
 typedef struct iree_hal_cuda_allocator_t {
   iree_hal_resource_t resource;
   iree_hal_device_t* base_device;
@@ -119,6 +121,18 @@ iree_hal_cuda_allocator_query_compatibility(
     iree_hal_allocator_t* IREE_RESTRICT base_allocator,
     const iree_hal_buffer_params_t* IREE_RESTRICT params,
     iree_device_size_t allocation_size) {
+  iree_hal_cuda_allocator_t* allocator =
+      iree_hal_cuda_allocator_cast(base_allocator);
+
+  // If concurrent managed access is not supported then we disallow mapping of
+  // device local memory.
+  if (!allocator->supports_concurrent_managed_access &&
+      iree_all_bits_set(params->usage, IREE_HAL_BUFFER_USAGE_MAPPING) &&
+      iree_all_bits_set(params->type, IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL |
+                                          IREE_HAL_MEMORY_TYPE_HOST_VISIBLE)) {
+    return IREE_HAL_BUFFER_COMPATIBILITY_NONE;
+  }
+
   // All buffers can be allocated on the heap.
   iree_hal_buffer_compatibility_t compatibility =
       IREE_HAL_BUFFER_COMPATIBILITY_ALLOCATABLE;
@@ -241,6 +255,9 @@ static iree_status_t iree_hal_cuda_allocator_allocate_buffer(
   }
 
   if (iree_status_is_ok(status)) {
+    IREE_TRACE_ALLOC_NAMED(IREE_HAL_CUDA_ALLOCATOR_ID,
+                           (void*)iree_hal_cuda_buffer_device_pointer(buffer),
+                           allocation_size);
     IREE_STATISTICS(iree_hal_allocator_statistics_record_alloc(
         &allocator->statistics, memory_type, allocation_size));
     *out_buffer = buffer;
@@ -265,6 +282,9 @@ static void iree_hal_cuda_allocator_deallocate_buffer(
                             iree_hal_cuda_buffer_device_pointer(base_buffer),
                             iree_hal_cuda_buffer_host_pointer(base_buffer));
 
+  IREE_TRACE_FREE_NAMED(
+      IREE_HAL_CUDA_ALLOCATOR_ID,
+      (void*)iree_hal_cuda_buffer_device_pointer(base_buffer));
   IREE_STATISTICS(iree_hal_allocator_statistics_record_free(
       &allocator->statistics, memory_type,
       iree_hal_buffer_allocation_size(base_buffer)));

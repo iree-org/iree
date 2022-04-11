@@ -26,52 +26,9 @@ namespace iree_compiler {
 // Patterns and methods for tile and distribute of Linalg ops to workgroups.
 //===---------------------------------------------------------------------===//
 
-// Get the lowering configuration for the operation within the dispatch.
-// This looks for tile sizes by looking for lowering configuration.
-static FailureOr<SmallVector<int64_t>> getTileSizesFromLoweringConfig(
-    ArrayRef<Operation *> computeOps, MLIRContext *context) {
-  if (computeOps.empty()) return SmallVector<int64_t>{};
-
-  Optional<SmallVector<int64_t>> distributedTileSizes;
-  for (auto op : computeOps) {
-    auto partitionbleLoopInterface =
-        dyn_cast<IREE::Flow::PartitionableLoopsInterface>(op);
-    if (!partitionbleLoopInterface) continue;
-    IREE::Codegen::LoweringConfigAttr currLoweringConfig =
-        getLoweringConfig(op);
-    if (!currLoweringConfig) continue;
-    SmallVector<unsigned> partitionableLoops =
-        partitionbleLoopInterface.getPartitionableLoops(kNumMaxParallelDims);
-    SmallVector<int64_t> tileSizes = currLoweringConfig.getTileSizeVals(0);
-    SmallVector<int64_t> currDistributedTileSizes;
-    if (!partitionableLoops.empty()) {
-      currDistributedTileSizes.resize(partitionableLoops.back() + 1, 0);
-    }
-    for (auto loopID : partitionableLoops) {
-      if (loopID < tileSizes.size()) {
-        currDistributedTileSizes[loopID] = tileSizes[loopID];
-      }
-    }
-    if (distributedTileSizes) {
-      if (currDistributedTileSizes != distributedTileSizes) {
-        // Inconsistent distributed tile sizes. Abort.
-        return static_cast<LogicalResult>(
-            computeOps.front()->emitOpError("inconsistent distribution of ops "
-                                            "for first level of distribution"));
-      }
-    } else {
-      distributedTileSizes = currDistributedTileSizes;
-    }
-  }
-  if (distributedTileSizes) {
-    return distributedTileSizes.getValue();
-  }
-  return SmallVector<int64_t>{};
-}
-
 /// Compute the workload per workgroup to use based on the tile sizes passed.
 static SmallVector<int64_t> getWorkloadPerWorkgroup(
-    ArrayRef<int64_t> distributedLoopTileSizes) {
+    ArrayRef<int64_t> tileSizes) {
   // TODO(ravishankarm): This for now assumes that we can just drop all the
   // zero-dim tile sizes. We need to eventually change this so that we dont have
   // to do this. It is implicity linked to the dispatch region workload having
@@ -79,17 +36,32 @@ static SmallVector<int64_t> getWorkloadPerWorkgroup(
   // iteration domain size as the argument, and then we can use the distribute
   // loop tile sizes directly.
   SmallVector<int64_t> nonZeroTileSizes;
-  for (auto tileSizes : distributedLoopTileSizes) {
-    if (!tileSizes) continue;
-    nonZeroTileSizes.push_back(tileSizes);
+  for (auto ts : tileSizes) {
+    if (!ts) continue;
+    nonZeroTileSizes.push_back(ts);
   }
   return llvm::to_vector(llvm::reverse(nonZeroTileSizes));
 }
 
 /// Defines the workgroup count region if the tile size for the distributed
 /// loops are known.
+/// IREE considers it without interchange at Flow level, so the arguments are
+/// not interchanged. In this context, we interchange the final yield values.
 static LogicalResult defineWorkgroupCountRegion(
-    func::FuncOp entryPointFn, ArrayRef<int64_t> workloadPerWorkgroup) {
+    func::FuncOp entryPointFn, ArrayRef<int64_t> workloadPerWorkgroup,
+    ArrayRef<int64_t> interchange) {
+  // TODO(hanchung): Look into partitionable loops to see if the configuraion
+  // is reasonable. The loops are paritioned at Flow level, any interchange on
+  // non-paritioned loops might triggers issues. It's not easy to check
+  // because the information is carried on op. It's much easier when we embed
+  // make partitionable loops also part of the lowering config. Otherwise, the
+  // logic should be considered everywhere.
+  if (interchange.size() > kNumMaxParallelDims) {
+    return entryPointFn.emitOpError(
+               "expected the number of loops is not greater than")
+           << kNumMaxParallelDims;
+  }
+
   if (workloadPerWorkgroup.size() > kNumMaxParallelDims) {
     // For now error out here.
     return entryPointFn.emitOpError(
@@ -97,7 +69,7 @@ static LogicalResult defineWorkgroupCountRegion(
            << kNumMaxParallelDims;
   }
   WorkgroupCountRegionBuilder regionBuilder =
-      [&workloadPerWorkgroup](
+      [&workloadPerWorkgroup, &interchange](
           OpBuilder &b, Location loc,
           std::array<Value, 3> workload) -> std::array<Value, 3> {
     Value one = b.create<arith::ConstantIndexOp>(loc, 1);
@@ -111,7 +83,13 @@ static LogicalResult defineWorkgroupCountRegion(
           AffineMap::get(0, 1, b.getAffineSymbolExpr(0).ceilDiv(it.value())),
           workload[it.index()])[0];
     }
-    return numWorkgroups;
+    if (interchange.empty()) return numWorkgroups;
+
+    std::array<Value, 3> res = numWorkgroups;
+    for (auto en : llvm::enumerate(interchange)) {
+      res[en.value()] = numWorkgroups[en.index()];
+    }
+    return res;
   };
   OpBuilder builder(entryPointFn.getContext());
   return defineWorkgroupCountRegion(builder, entryPointFn, regionBuilder);
@@ -155,7 +133,6 @@ struct InsertDistributionInfoPass
 }  // namespace
 
 void InsertDistributionInfoPass::runOnOperation() {
-  MLIRContext *context = &getContext();
   func::FuncOp funcOp = getOperation();
   if (!isEntryPoint(funcOp)) return;
 
@@ -174,16 +151,15 @@ void InsertDistributionInfoPass::runOnOperation() {
   }
 
   // Get the tile sizes to use from lowering configuration if set.
-  FailureOr<SmallVector<int64_t>> configTileSizes =
-      getTileSizesFromLoweringConfig(computeOps, context);
-  if (failed(configTileSizes)) {
+  SmallVector<int64_t> tileSizes, interchange;
+  if (failed(getDistributionTileConfigFromLoweringConfig(computeOps, tileSizes,
+                                                         interchange))) {
     return signalPassFailure();
   }
-  ArrayRef<int64_t> configTileSizesRef(configTileSizes.getValue());
+  SmallVector<int64_t> workloadPerWorkroup = getWorkloadPerWorkgroup(tileSizes);
 
-  SmallVector<int64_t> workloadPerWorkroup =
-      getWorkloadPerWorkgroup(configTileSizesRef);
-  if (failed(defineWorkgroupCountRegion(funcOp, workloadPerWorkroup)) ||
+  if (failed(defineWorkgroupCountRegion(funcOp, workloadPerWorkroup,
+                                        interchange)) ||
       failed(updateTranslationInfoAttr(funcOp, workloadPerWorkroup))) {
     return signalPassFailure();
   }

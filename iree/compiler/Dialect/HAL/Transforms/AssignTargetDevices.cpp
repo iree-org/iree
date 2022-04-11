@@ -91,9 +91,9 @@ class AssignTargetDevicesPass
   }
 
  private:
-  ListOption<std::string> targets{
-      *this, "targets", llvm::cl::desc("List of devices to target."),
-      llvm::cl::ZeroOrMore, llvm::cl::CommaSeparated};
+  ListOption<std::string> targets{*this, "targets",
+                                  llvm::cl::desc("List of devices to target."),
+                                  llvm::cl::ZeroOrMore};
 };
 
 std::unique_ptr<OperationPass<ModuleOp>> createAssignTargetDevicesPass(
