@@ -10,41 +10,16 @@
 
 iree_add_all_subdirs()
 
-iree_check_single_backend_test_suite(
+iree_lit_test_suite(
   NAME
-    check_linalg_microbenchmarks_compilation
+    lit
   SRCS
-    "linalg_mmt4d.mlir"
     "linalg_transpose.mlir"
-  TARGET_BACKEND
-    "dylib-llvm-aot"
-  DRIVER
-    "dylib"
-  COMPILER_FLAGS
-    "-iree-llvm-target-cpu-features=host"
+  TOOLS
+    iree::tools::iree-run-mlir
   LABELS
     "hostonly"
-    "local"
-)
-
-iree_check_single_backend_test_suite(
-  NAME
-    check_mhlo_microbenchmarks_compilation
-  SRCS
-    "mhlo_conv.mlir"
-    "mhlo_dot.mlir"
-    "mhlo_dot_general.mlir"
-    "mhlo_fft_abs.mlir"
-  TARGET_BACKEND
-    "dylib-llvm-aot"
-  DRIVER
-    "dylib"
-  COMPILER_FLAGS
-    "-iree-input-type=mhlo"
-    "-iree-llvm-target-cpu-features=host"
-  LABELS
-    "hostonly"
-    "local"
+    "optonly"
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

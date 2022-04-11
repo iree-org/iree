@@ -1,17 +1,11 @@
+// RUN: iree-run-mlir --iree-hal-target-backends=dylib-llvm-aot --iree-llvm-link-embedded=true -mlir-disable-threading --iree-llvm-target-cpu-features='host' --iree-codegen-llvm-generic-ops-workgroup-size=2048 %s
+
 //===----------------------------------------------------------------------===//
 // Transpose ops.
 // Naming convention: '_'.join(
 //   [transpose,
 //    {transpose-pattern])
 //
-// To reproduce single-thread performance numbers:
-//   iree-translate
-//     -iree-mlir-to-vm-bytecode-module
-//     --iree-hal-target-backends=dylib-llvm-aot
-//     --iree-llvm-link-embedded=true -mlir-disable-threading
-//     --iree-llvm-target-cpu-features='+avx2'
-//     --iree-codegen-llvm-generic-ops-workgroup-size=20480 transpose_benchmarks.mlir
-//     -o /tmp/a.vmfb
 //===----------------------------------------------------------------------===//
 
 util.global private @"__transpose_10_input" {noinline} = dense<1.0> : tensor<512x1024xf32>
@@ -31,7 +25,6 @@ func @transpose_10() -> tensor<1024x512xf32> {
     } -> tensor<1024x512xf32>
   return %6: tensor<1024x512xf32>
 }
-
 
 util.global private @"__transpose_021_input" {noinline} = dense<1.0> : tensor<64x96x128xf32>
 
