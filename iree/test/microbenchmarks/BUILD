@@ -22,18 +22,15 @@ iree_lit_test_suite(
         [
             "linalg_transpose.mlir",
         ],
-        include =
-            [
-                "*.mlir"
-            ],
+        include = ["*.mlir"],
         exclude =
-            [
-                "linalg_mmt4d.mlir",
-                "mhlo_conv.mlir",
-                "mhlo_dot_general.mlir",
-                "mhlo_dot.mlir",
-                "mhlo_fft_abs.mlir",
-            ],
+        [
+            "linalg_mmt4d.mlir",
+            "mhlo_conv.mlir",
+            "mhlo_dot_general.mlir",
+            "mhlo_dot.mlir",
+            "mhlo_fft_abs.mlir",
+        ],
     ),
     tags = [
         "hostonly",
