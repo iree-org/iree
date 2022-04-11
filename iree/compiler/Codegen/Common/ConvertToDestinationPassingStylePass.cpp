@@ -398,14 +398,8 @@ struct RemoveCstOutsDependency
       Attribute scalarAttr = attr.getValues<Attribute>()[0];
 
       modifiedOutput = true;
-      SmallVector<Value> dynamicDims;
-      for (const auto &dim : llvm::enumerate(type.getShape())) {
-        if (dim.value() != ShapedType::kDynamicSize) continue;
-        dynamicDims.push_back(rewriter.createOrFold<tensor::DimOp>(
-            loc, opOperand->get(), dim.index()));
-      }
       Value initTensor = rewriter.create<linalg::InitTensorOp>(
-          loc, dynamicDims, type.getShape(), type.getElementType());
+          loc, type.getShape(), type.getElementType());
       Value cstOp = rewriter.create<arith::ConstantOp>(loc, scalarAttr);
       Value fillOp =
           rewriter.create<linalg::FillOp>(loc, cstOp, initTensor).result();

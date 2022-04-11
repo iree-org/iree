@@ -579,21 +579,18 @@ func.func @fill_matmul_exp() {
 // -----
 
 func @cumsum__2x2x2x2x2x2x2() {
+  %cst = arith.constant dense<0.000000e+00> : tensor<2x2x2x2x2x2x2xf32>
   %c0 = arith.constant 0 : index
-  %cst = arith.constant 0.000000e+00 : f32
   %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:3x2x2x2x2x2x2xf32>
   %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<writeonly:2x2x2x2x2x2x2xf32>
-  %2 = flow.dispatch.tensor.load %1, offsets = [0, 0, 0, 0, 0, 0, 0], sizes = [2, 2, 2, 2, 2, 2, 2], strides = [1, 1, 1, 1, 1, 1, 1] : !flow.dispatch.tensor<writeonly:2x2x2x2x2x2x2xf32> -> tensor<2x2x2x2x2x2x2xf32>
-  %3 = flow.dispatch.tensor.load %0, offsets = [0, 0, 0, 0, 0, 0, 0], sizes = [3, 2, 2, 2, 2, 2, 2], strides = [1, 1, 1, 1, 1, 1, 1] : !flow.dispatch.tensor<readonly:3x2x2x2x2x2x2xf32> -> tensor<3x2x2x2x2x2x2xf32>
-  %4 = linalg.init_tensor [2] : tensor<2xf32>
-  %5 = linalg.init_tensor [2, 2, 2, 2, 2, 2, 2] : tensor<2x2x2x2x2x2x2xf32>
-  %6 = linalg.fill ins(%cst : f32) outs(%2 : tensor<2x2x2x2x2x2x2xf32>) -> tensor<2x2x2x2x2x2x2xf32>
-  %7 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0 + d7, d1, d2, d3, d4, d5, d6)>, affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d7)>, affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1, d2, d3, d4, d5, d6)>], iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel", "parallel", "parallel", "reduction"]} ins(%3, %4 : tensor<3x2x2x2x2x2x2xf32>, tensor<2xf32>) outs(%6 : tensor<2x2x2x2x2x2x2xf32>) attrs =  {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[0, 0, 0, 0, 1, 1, 2, 0], [1, 1, 1, 1, 1, 1, 2, 0], [0, 0, 0, 0, 0, 0, 0, 4]]>} {
+  %2 = flow.dispatch.tensor.load %0, offsets = [0, 0, 0, 0, 0, 0, 0], sizes = [3, 2, 2, 2, 2, 2, 2], strides = [1, 1, 1, 1, 1, 1, 1] : !flow.dispatch.tensor<readonly:3x2x2x2x2x2x2xf32> -> tensor<3x2x2x2x2x2x2xf32>
+  %3 = linalg.init_tensor [2] : tensor<2xf32>
+  %4 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0 + d7, d1, d2, d3, d4, d5, d6)>, affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d7)>, affine_map<(d0, d1, d2, d3, d4, d5, d6, d7) -> (d0, d1, d2, d3, d4, d5, d6)>], iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel", "parallel", "parallel", "reduction"]} ins(%2, %3 : tensor<3x2x2x2x2x2x2xf32>, tensor<2xf32>) outs(%cst : tensor<2x2x2x2x2x2x2xf32>) {
   ^bb0(%arg0: f32, %arg1: f32, %arg2: f32):
-    %8 = arith.addf %arg0, %arg2 : f32
-    linalg.yield %8 : f32
+    %5 = arith.addf %arg0, %arg2 : f32
+    linalg.yield %5 : f32
   } -> tensor<2x2x2x2x2x2x2xf32>
-  flow.dispatch.tensor.store %7, %1, offsets = [0, 0, 0, 0, 0, 0, 0], sizes = [2, 2, 2, 2, 2, 2, 2], strides = [1, 1, 1, 1, 1, 1, 1] : tensor<2x2x2x2x2x2x2xf32> -> !flow.dispatch.tensor<writeonly:2x2x2x2x2x2x2xf32>
+  flow.dispatch.tensor.store %4, %1, offsets = [0, 0, 0, 0, 0, 0, 0], sizes = [2, 2, 2, 2, 2, 2, 2], strides = [1, 1, 1, 1, 1, 1, 1] : tensor<2x2x2x2x2x2x2xf32> -> !flow.dispatch.tensor<writeonly:2x2x2x2x2x2x2xf32>
   return
 }
 
