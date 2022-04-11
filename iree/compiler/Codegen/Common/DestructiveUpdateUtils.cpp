@@ -223,13 +223,15 @@ static LogicalResult foldExtractSliceOp(OpBuilder &b,
 
   SmallVector<OpFoldResult> offsets, sizes, strides;
   Location loc = op.getLoc();
-  if (failed(foldOffsetsAndStrides(b, loc, loadOp, op, offsets, strides))) {
+  if (failed(foldOffsetsSizesAndStrides(b, loc, loadOp, op,
+                                        loadOp.getDroppedDims(), offsets, sizes,
+                                        strides))) {
     return failure();
   }
 
   Value loaded = b.create<IREE::Flow::DispatchTensorLoadOp>(
       op.getLoc(), op.getType(), loadOp.source(), loadOp.source_dims(), offsets,
-      op.getMixedSizes(), strides);
+      sizes, strides);
 
   op.getResult().replaceAllUsesWith(loaded);
   op.erase();
@@ -295,16 +297,17 @@ LogicalResult rewriteDestructiveUpdateInPlace<tensor::InsertSliceOp>(
     // Kills the SSA use-def chain.
     usedResult.replaceAllUsesWith(dest);
 
-    SmallVector<OpFoldResult> offsets, strides;
+    SmallVector<OpFoldResult> offsets, sizes, strides;
     Location loc = insertSliceOp->getLoc();
-    if (failed(foldOffsetsAndStrides(b, loc, storeOp, insertSliceOp, offsets,
-                                     strides))) {
+    if (failed(foldOffsetsSizesAndStrides(b, loc, storeOp, insertSliceOp,
+                                          storeOp.getDroppedDims(), offsets,
+                                          sizes, strides))) {
       return failure();
     }
 
     b.create<IREE::Flow::DispatchTensorStoreOp>(
         insertSliceOp->getLoc(), insertSliceOp.source(), storeOp.target(),
-        storeOp.target_dims(), offsets, insertSliceOp.getMixedSizes(), strides);
+        storeOp.target_dims(), offsets, sizes, strides);
 
     return success();
   }

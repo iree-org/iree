@@ -57,3 +57,36 @@ func @stride_slice() {
     [42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42, 42]]> : tensor<10x12xi32>) : tensor<10x12xi32>
   return
 }
+
+#map = affine_map<(d0) -> (d0)>
+func @issue_8825() {
+  %c0 = arith.constant 0 : index
+  %c0_i64 = arith.constant 0 : i64
+  %c3_i64 = arith.constant 3 : i64
+  %c2_i64 = arith.constant 2 : i64
+  %arg0 = arith.constant dense<[0.0, 1.0, 2.0, 3.0]> : tensor<4xf32>
+  %0 = tensor.dim %arg0, %c0 : tensor<4xf32>
+  %1 = arith.index_cast %0 : index to i64
+  %2 = arith.addi %c2_i64, %1 : i64
+  %3 = arith.cmpi sge, %c2_i64, %c0_i64 : i64
+  %4 = arith.select %3, %c2_i64, %2 : i64
+  %5 = arith.cmpi slt, %4, %c0_i64 : i64
+  %6 = arith.select %5, %c0_i64, %4 : i64
+  %7 = arith.cmpi sgt, %6, %1 : i64
+  %8 = arith.select %7, %1, %6 : i64
+  %9 = arith.index_cast %8 : i64 to index
+  %10 = arith.cmpi sge, %0, %9 : index
+  %11 = arith.select %10, %0, %9 : index
+  %12 = arith.subi %11, %9 : index
+  %13 = tensor.extract_slice %arg0[%9] [%12] [1] : tensor<4xf32> to tensor<?xf32>
+  %14 = linalg.init_tensor [%12] : tensor<?xf32>
+  %16 = linalg.generic {indexing_maps = [#map, #map], iterator_types = ["parallel"]} ins(%13 : tensor<?xf32>) outs(%14 : tensor<?xf32>) {
+    ^bb0(%arg1: f32, %arg2: f32):
+      %16 = arith.sitofp %c3_i64 : i64 to f32
+      %17 = arith.mulf %arg1, %16 : f32
+      linalg.yield %17 : f32
+    } -> tensor<?xf32>
+  %17 = tensor.cast %16 : tensor<?xf32> to tensor<2xf32>
+  check.expect_almost_eq_const(%17, dense<[6.0, 9.0]> : tensor<2xf32>) : tensor<2xf32>
+  return
+}

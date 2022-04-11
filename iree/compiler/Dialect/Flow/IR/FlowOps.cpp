@@ -60,6 +60,27 @@ static LogicalResult verifyOpDynamicDims(Operation *op, ValueRange values,
   return success();
 }
 
+// Gets the dropped dimensions for `flow.dispatch.tensor.load/store`.
+static llvm::SmallBitVector getDroppedDimsImpl(
+    RankedTensorType slicedObjectType, ArrayRef<OpFoldResult> mixedSizes) {
+  ArrayRef<int64_t> resultShape = slicedObjectType.getShape();
+  llvm::SmallBitVector droppedDims(mixedSizes.size());
+  unsigned shapePos = 0;
+  for (const auto &size : enumerate(mixedSizes)) {
+    Optional<int64_t> sizeVal = getConstantIntValue(size.value());
+    // If the size is not 1, or if the current matched dimension of the result
+    // is the same static shape as the size value (which is 1), then the
+    // dimension is preserved.
+    if (!sizeVal || sizeVal.getValue() != 1 ||
+        (shapePos < resultShape.size() && resultShape[shapePos] == 1)) {
+      shapePos++;
+      continue;
+    }
+    droppedDims.set(size.index());
+  }
+  return droppedDims;
+}
+
 //===----------------------------------------------------------------------===//
 // flow.dispatch.tie_shape
 //===----------------------------------------------------------------------===//
@@ -187,23 +208,7 @@ RankedTensorType DispatchTensorLoadOp::inferResultType(
 }
 
 llvm::SmallBitVector DispatchTensorLoadOp::getDroppedDims() {
-  ArrayRef<int64_t> resultShape = getType().getShape();
-  SmallVector<OpFoldResult> mixedSizes = getMixedSizes();
-  llvm::SmallBitVector droppedDims(mixedSizes.size());
-  unsigned shapePos = 0;
-  for (const auto &size : enumerate(mixedSizes)) {
-    Optional<int64_t> sizeVal = getConstantIntValue(size.value());
-    // If the size is not 1, or if the current matched dimension of the result
-    // is the same static shape as the size value (which is 1), then the
-    // dimension is preserved.
-    if (!sizeVal || sizeVal.getValue() != 1 ||
-        (shapePos < resultShape.size() && resultShape[shapePos] == 1)) {
-      shapePos++;
-      continue;
-    }
-    droppedDims.set(size.index());
-  }
-  return droppedDims;
+  return getDroppedDimsImpl(getType(), getMixedSizes());
 }
 
 void DispatchTensorLoadOp::build(OpBuilder &builder, OperationState &state,
@@ -332,6 +337,11 @@ void DispatchTensorStoreOp::build(OpBuilder &builder, OperationState &state,
         builder.getI64ArrayAttr(staticSizes),
         builder.getI64ArrayAttr(staticStrides));
   state.addAttributes(attributes);
+}
+
+llvm::SmallBitVector DispatchTensorStoreOp::getDroppedDims() {
+  return getDroppedDimsImpl(value().getType().cast<RankedTensorType>(),
+                            getMixedSizes());
 }
 
 //===----------------------------------------------------------------------===//

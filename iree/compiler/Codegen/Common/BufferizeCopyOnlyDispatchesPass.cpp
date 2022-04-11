@@ -60,19 +60,19 @@ struct FoldTensorLoadWithExtractSlice
             .getDefiningOp<IREE::Flow::DispatchTensorLoadOp>();
     if (!dispatchTensorLoadOp) return failure();
 
-    SmallVector<OpFoldResult> offsets, strides;
+    SmallVector<OpFoldResult> offsets, sizes, strides;
     // `tensor.extract_slice` (i.e. the producer) folds **into**
     // `flow.dispatch.tensor.load1 (i.e. the consumer).
-    if (failed(foldOffsetsAndStrides(rewriter, dispatchTensorLoadOp->getLoc(),
-                                     dispatchTensorLoadOp, extractSliceOp,
-                                     offsets, strides))) {
+    if (failed(foldOffsetsSizesAndStrides(
+            rewriter, dispatchTensorLoadOp->getLoc(), dispatchTensorLoadOp,
+            extractSliceOp, dispatchTensorLoadOp.getDroppedDims(), offsets,
+            sizes, strides))) {
       return failure();
     }
 
     rewriter.replaceOpWithNewOp<IREE::Flow::DispatchTensorLoadOp>(
         extractSliceOp, extractSliceOp.getType(), dispatchTensorLoadOp.source(),
-        dispatchTensorLoadOp.source_dims(), offsets,
-        extractSliceOp.getMixedSizes(), strides);
+        dispatchTensorLoadOp.source_dims(), offsets, sizes, strides);
     return success();
   }
 };
@@ -103,19 +103,20 @@ struct FoldInsertSliceWithTensorStoreOp
       return failure();
     }
 
-    SmallVector<OpFoldResult> offsets, strides;
+    SmallVector<OpFoldResult> offsets, sizes, strides;
     // `tensor.insert_slice` (i.e. the producer) folds **into**
     // `flow.dispatch.tensor.store` (i.e. the consumer).
-    if (failed(foldOffsetsAndStrides(rewriter, dispatchTensorStoreOp->getLoc(),
-                                     dispatchTensorStoreOp, insertSliceOp,
-                                     offsets, strides))) {
+    if (failed(foldOffsetsSizesAndStrides(
+            rewriter, dispatchTensorStoreOp->getLoc(), dispatchTensorStoreOp,
+            insertSliceOp, dispatchTensorStoreOp.getDroppedDims(), offsets,
+            sizes, strides))) {
       return failure();
     }
 
     rewriter.replaceOpWithNewOp<IREE::Flow::DispatchTensorStoreOp>(
         dispatchTensorStoreOp, insertSliceOp.source(),
         dispatchTensorStoreOp.target(), dispatchTensorStoreOp.target_dims(),
-        offsets, insertSliceOp.getMixedSizes(), strides);
+        offsets, sizes, strides);
     return success();
   }
 };

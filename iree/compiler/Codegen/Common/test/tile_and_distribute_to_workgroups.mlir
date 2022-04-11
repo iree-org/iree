@@ -1178,11 +1178,11 @@ hal.executable private @rank_reduced_slice {
     builtin.module {
       func.func @rank_reduced_slice() {
         %in_binding = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer)
-            : !flow.dispatch.tensor<readonly:1x40xf32>
+            : !flow.dispatch.tensor<readonly:5x40xf32>
         %out_binding = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer)
             : !flow.dispatch.tensor<writeonly:10xf32>
-        %in = flow.dispatch.tensor.load %in_binding, offsets = [0, 10], sizes = [1, 10], strides = [1, 1]
-            : !flow.dispatch.tensor<readonly:1x40xf32> -> tensor<10xf32>
+        %in = flow.dispatch.tensor.load %in_binding, offsets = [3, 10], sizes = [1, 10], strides = [2, 1]
+            : !flow.dispatch.tensor<readonly:5x40xf32> -> tensor<10xf32>
         %out = linalg.init_tensor [10] : tensor<10xf32>
         %val = linalg.generic {
             indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>],
@@ -1199,14 +1199,16 @@ hal.executable private @rank_reduced_slice {
     }
   }
 }
+//      CHECK: #[[MAP:.+]] = affine_map<()[s0] -> (s0 + 10)>
 //      CHECK: func @rank_reduced_slice()
 //  CHECK-DAG:   %[[SRC_BINDING:.+]] = hal.interface.binding.subspan set(0) binding(0)
-// CHECK-SAME:       : !flow.dispatch.tensor<readonly:1x40xf32>
+// CHECK-SAME:       : !flow.dispatch.tensor<readonly:5x40xf32>
 //  CHECK-DAG:   %[[DST_BINDING:.+]] = hal.interface.binding.subspan set(0) binding(1)
 // CHECK-SAME:       : !flow.dispatch.tensor<writeonly:10xf32>
 //      CHECK:   scf.for %[[IV0:.+]] =
+//      CHECK:     %[[OFFSET:.+]] = affine.apply #[[MAP]]()[%[[IV0]]]
 //      CHECK:     %[[SRC_TILE:.+]] = flow.dispatch.tensor.load %[[SRC_BINDING]]
-// CHECK-SAME:         offsets = [%[[C0]], %[[IV0]]], sizes = [1, 2], strides = [1, 1]
+// CHECK-SAME:         offsets = [3, %[[OFFSET]]], sizes = [1, 2], strides = [2, 1]
 //      CHECK:     linalg.generic
 // CHECK-SAME:         ins(%[[SRC_TILE]] :
 
