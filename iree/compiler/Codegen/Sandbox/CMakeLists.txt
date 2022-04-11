@@ -51,6 +51,7 @@ iree_cc_library(
     MLIRControlFlow
     MLIRLinalg
     MLIRLinalgTransforms
+    MLIRParser
     MLIRPass
     MLIRSCF
     MLIRSCFUtils
