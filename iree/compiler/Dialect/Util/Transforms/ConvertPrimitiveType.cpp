@@ -13,6 +13,7 @@
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
+#include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/BuiltinOps.h"
@@ -175,12 +176,61 @@ struct GenericTypeConversionPattern : public ConversionPattern {
   }
 };
 
+template <typename OpTy, typename TypeTy,
+          typename OperandToResultWidthLegalityRelation>
+struct ConvertTypeSensitiveArithCastOp : public OpConversionPattern<OpTy> {
+  using OpConversionPattern<OpTy>::OpConversionPattern;
+  LogicalResult matchAndRewrite(
+      OpTy op, typename OpTy::Adaptor adaptor,
+      ConversionPatternRewriter &rewriter) const override {
+    auto resultType = this->getTypeConverter()
+                          ->convertType(op.getResult().getType())
+                          .template cast<TypeTy>();
+    auto operandType = this->getTypeConverter()
+                           ->convertType(op.getOperand().getType())
+                           .template cast<TypeTy>();
+    // If post-conversion, the types would be equal, then the op becomes a
+    // no-op. Note that the op does not itself allow such a configuration, so we
+    // have to catch this before creating the new op.
+    if (resultType == operandType) {
+      rewriter.replaceOp(op, adaptor.getOperands()[0]);
+      return success();
+    }
+    // If after conversion the op becomes invalid, but not same-type (which we
+    // can fold above), then bail out.
+    // TODO: In some cases, we can repair the situation here, but for integer
+    // truncation, we don't know whether we should invert with signed or
+    // unsigned extension.
+    if (!OperandToResultWidthLegalityRelation()(operandType.getWidth(),
+                                                resultType.getWidth())) {
+      return rewriter.notifyMatchFailure(op, "invalid width combination");
+    }
+    rewriter.replaceOpWithNewOp<OpTy>(op, resultType, op.getOperand());
+    return success();
+  }
+};
+
 template <typename T, typename Converter>
 struct ConvertTypesPass : public PassWrapper<T, OperationPass<mlir::ModuleOp>> {
   void runOnOperation() override {
     MLIRContext *context = &this->getContext();
     RewritePatternSet patterns(context);
     patterns.insert<GenericTypeConversionPattern>(context, typeConverter);
+    patterns.insert<ConvertTypeSensitiveArithCastOp<arith::TruncFOp, FloatType,
+                                                    std::greater<unsigned>>>(
+        typeConverter, context);
+    patterns.insert<ConvertTypeSensitiveArithCastOp<arith::ExtFOp, FloatType,
+                                                    std::less<unsigned>>>(
+        typeConverter, context);
+    patterns.insert<ConvertTypeSensitiveArithCastOp<
+        arith::TruncIOp, IntegerType, std::less<unsigned>>>(typeConverter,
+                                                            context);
+    patterns.insert<ConvertTypeSensitiveArithCastOp<arith::ExtUIOp, IntegerType,
+                                                    std::less<unsigned>>>(
+        typeConverter, context);
+    patterns.insert<ConvertTypeSensitiveArithCastOp<arith::ExtSIOp, IntegerType,
+                                                    std::less<unsigned>>>(
+        typeConverter, context);
     populateFunctionOpInterfaceTypeConversionPattern<func::FuncOp>(
         patterns, typeConverter);
     ConversionTarget target(*context);

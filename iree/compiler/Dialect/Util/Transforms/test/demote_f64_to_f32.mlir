@@ -53,3 +53,23 @@ func.func @nested_region_f64() -> (tensor<4xf64>) {
   }) {dimensions = dense<1> : tensor<1xi64>} : (tensor<4x4xf64>, tensor<f64>) -> tensor<4xf64>
   return %3 : tensor<4xf64>
 }
+
+// -----
+
+// Check handling of width-sensitive arith casts.
+
+// CHECK-LABEL:   func @arith.truncf(
+// CHECK-SAME:            %[[ARG0:.*]]: f32) -> f32 {
+// CHECK:           return %[[ARG0]] : f32
+func @arith.truncf(%arg0: f64) -> f32 {
+  %0 = arith.truncf %arg0 : f64 to f32
+  return %0 : f32
+}
+
+// CHECK-LABEL:   func @arith.extf(
+// CHECK-SAME:            %[[ARG0:.*]]: f32) -> f32 {
+// CHECK:           return %[[ARG0]] : f32
+func @arith.extf(%arg0: f32) -> f64 {
+  %0 = arith.extf %arg0 : f32 to f64
+  return %0 : f64
+}
