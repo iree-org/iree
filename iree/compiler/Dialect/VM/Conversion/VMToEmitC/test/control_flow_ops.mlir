@@ -58,7 +58,6 @@ vm.module @my_module {
 
 // -----
 
-// TODO: different operands
 vm.module @my_module {
   // CHECK: func @my_module_call_[[IMPORTFN:[^\(]+]]
   vm.import @imported_fn(%arg0 : i32) -> i32
