@@ -97,6 +97,7 @@ function(iree_benchmark_suite)
     get_filename_component(_CATEGORY "${CMAKE_CURRENT_SOURCE_DIR}" NAME)
     set(_ROOT_ARTIFACTS_DIR "${IREE_BINARY_DIR}/benchmark_suites/${_CATEGORY}")
     set(_VMFB_ARTIFACTS_DIR "${_ROOT_ARTIFACTS_DIR}/vmfb")
+    file(MAKE_DIRECTORY ${_VMFB_ARTIFACTS_DIR})
 
     # The name of any custom target that drives creation of the final source
     # MLIR file. Depending on the format of the source, this will get updated.
