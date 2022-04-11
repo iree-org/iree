@@ -209,9 +209,10 @@ def IREECodegen_CompilationInfoAttr :
   let builders = [
     AttrBuilder<(ins "TileSizesListTypeRef":$tileSizes,
       "TileSizesListTypeRef":$tileInterchange,
-      CArg<"ArrayRef<int64_t>", "{{}}">:$nativeVectorSize,
+      CArg<"ArrayRef<int64_t>", "{}">:$nativeVectorSize,
       CArg<"ArrayRef<int64_t>", "{}">:$workgroupSize)>,
     AttrBuilder<(ins "TileSizesListTypeRef":$tileSizes,
+      "TileSizesListTypeRef":$tileInterchange,
       "ArrayRef<int64_t>":$nativeVectorSize,
       "DispatchLoweringPassPipeline":$passPipeline,
       "ArrayRef<int64_t>":$workloadPerWorkgroup,
