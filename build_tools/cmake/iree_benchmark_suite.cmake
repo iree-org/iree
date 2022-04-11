@@ -164,6 +164,13 @@ function(iree_benchmark_suite)
       set(_MODULE_SOURCE_TARGET "${_TFLITE_IMPORT_TARGET}")
     endif()
 
+    # Allow an early exit for developers that just want to import module
+    # sources rather than fully compile to IREE modules for each configuration.
+    if(IREE_BUILD_BENCHMARKS_IMPORT_ONLY)
+      add_dependencies(iree-benchmark-suites "${_MODULE_SOURCE_TARGET}")
+      continue()
+    endif()
+
     # Next create the command and target for compiling the input module into
     # IREE deployable format for each benchmark mode.
     string(JOIN "-" _MODULE_DIR_NAME "${_MODULE_NAME}" "${_MODULE_TAGS}")
