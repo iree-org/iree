@@ -14,7 +14,10 @@
 #include "iree/hal/cuda/dynamic_symbols.h"
 #include "iree/hal/cuda/status_util.h"
 
+#if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_ALLOCATION_TRACKING && \
+    IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_ALLOCATION_CALLSTACKS
 static const char* IREE_HAL_CUDA_ALLOCATOR_ID = "CUDA";
+#endif
 
 typedef struct iree_hal_cuda_allocator_t {
   iree_hal_resource_t resource;
