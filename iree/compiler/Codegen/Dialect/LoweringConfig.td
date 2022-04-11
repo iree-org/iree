@@ -217,6 +217,9 @@ def IREECodegen_CompilationInfoAttr :
       "DispatchLoweringPassPipeline":$passPipeline,
       "ArrayRef<int64_t>":$workloadPerWorkgroup,
       CArg<"ArrayRef<int64_t>", "{}">:$workgroupSize)>,
+    AttrBuilder<(ins "LoweringConfigAttr":$configAttr,
+      "TranslationInfoAttr":$translationInfo,
+      "ArrayRef<int64_t>":$workloadPerWorkgroup)>,
   ];
   let extraClassDeclaration = [{
     SmallVector<int64_t> getWorkgroupSizeVals();

@@ -219,6 +219,13 @@ CompilationInfoAttr CompilationInfoAttr::get(
   return get(context, configAttr, translationInfoAttr, workgroupSizeAttr);
 }
 
+CompilationInfoAttr CompilationInfoAttr::get(
+    MLIRContext *context, LoweringConfigAttr configAttr,
+    TranslationInfoAttr translationInfo, ArrayRef<int64_t> workgroupSize) {
+  ArrayAttr workgroupSizeAttr = getI64IntegerArrayAttr(context, workgroupSize);
+  return get(context, configAttr, translationInfo, workgroupSizeAttr);
+}
+
 LogicalResult CompilationInfoAttr::verify(
     function_ref<InFlightDiagnostic()> emitError,
     LoweringConfigAttr loweringConfig, TranslationInfoAttr translationInfo,
