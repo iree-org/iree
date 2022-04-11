@@ -49,7 +49,6 @@ function generate_dylib_vmfb {
       -iree-llvm-target-cpu-features="+m,+a,+f,+d,+c,+v"
       -riscv-v-fixed-length-vector-lmul-max=8
       -riscv-v-vector-bits-min=256
-      -riscv-v-fixed-length-vector-elen-max=64
       "${BUILD_RISCV_DIR?}/tosa.mlir"
     )
   fi
