@@ -42,6 +42,7 @@ class InputType(Enum):
   NONE = "none"
   MHLO = "mhlo"
   TOSA = "tosa"
+  TM_TENSOR = "tm_tensor"
   XLA = "xla"
 
   @staticmethod

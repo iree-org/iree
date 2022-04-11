@@ -29,6 +29,7 @@ iree_lit_test_suite(
     "remove_dead_allocs.mlir"
     "remove_trivial_loops.mlir"
     "rewrite_linalg_destructive_updates.mlir"
+    "swizzle_workgroup.mlir"
     "tile_and_distribute_to_workgroups.mlir"
     "transpose_canonicalization.mlir"
     "type_propagation.mlir"

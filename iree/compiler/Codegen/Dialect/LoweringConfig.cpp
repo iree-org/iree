@@ -112,15 +112,20 @@ LogicalResult TranslationInfoAttr::verify(
 
 LoweringConfigAttr LoweringConfigAttr::get(MLIRContext *context,
                                            TileSizesListTypeRef tileSizes,
+                                           TileSizesListTypeRef tileInterchange,
                                            ArrayRef<int64_t> nativeVectorSize) {
-  auto attrList = llvm::to_vector<4>(
-      llvm::map_range(tileSizes, [&](ArrayRef<int64_t> sizes) -> Attribute {
-        return getI64IntegerArrayAttr(context, sizes);
-      }));
-  ArrayAttr tileSizesAttr = ArrayAttr::get(context, attrList);
+  auto attrList = [&](TileSizesListTypeRef lst) {
+    return llvm::to_vector<4>(
+        llvm::map_range(lst, [&](ArrayRef<int64_t> sizes) -> Attribute {
+          return getI64IntegerArrayAttr(context, sizes);
+        }));
+  };
+  ArrayAttr tileSizesAttr = ArrayAttr::get(context, attrList(tileSizes));
+  ArrayAttr tileInterchangeAttr =
+      ArrayAttr::get(context, attrList(tileInterchange));
   ArrayAttr nativeVectorSizeAttr =
       getI64IntegerArrayAttr(context, nativeVectorSize);
-  return get(context, tileSizesAttr, nativeVectorSizeAttr);
+  return get(context, tileSizesAttr, tileInterchangeAttr, nativeVectorSizeAttr);
 }
 
 TileSizesListType LoweringConfigAttr::getTileSizeVals() {
@@ -140,6 +145,13 @@ SmallVector<int64_t> LoweringConfigAttr::getTileSizeVals(unsigned level) {
   return getIntegerVals(tileSizesAttr[level].cast<ArrayAttr>());
 }
 
+SmallVector<int64_t> LoweringConfigAttr::getTileInterchangeVals(
+    unsigned level) {
+  ArrayAttr tileInterchangeAttr = getTileInterchange();
+  if (!tileInterchangeAttr || tileInterchangeAttr.size() <= level) return {};
+  return getIntegerVals(tileInterchangeAttr[level].cast<ArrayAttr>());
+}
+
 SmallVector<int64_t> LoweringConfigAttr::getNativeVectorSizeVals() {
   ArrayAttr nativeVectorSizeAttr = getNativeVectorSize();
   if (!nativeVectorSizeAttr) return {};
@@ -148,17 +160,24 @@ SmallVector<int64_t> LoweringConfigAttr::getNativeVectorSizeVals() {
 
 LogicalResult LoweringConfigAttr::verify(
     function_ref<InFlightDiagnostic()> emitError, ArrayAttr tileSizes,
-    ArrayAttr nativeVectorSize) {
+    ArrayAttr tileInterchange, ArrayAttr nativeVectorSize) {
   if (!tileSizes) {
     return emitError() << "expected tile_sizes to be specified (even is "
                           "specified as empty)";
   }
-  if (llvm::any_of(tileSizes, [](Attribute attr) {
-        auto arrayAttr = attr.dyn_cast<ArrayAttr>();
-        return !arrayAttr || !checkIntegerArrayAttr(arrayAttr);
-      })) {
+  auto hasNonIntElems = [](ArrayAttr sizes) -> bool {
+    return llvm::any_of(sizes, [](Attribute attr) {
+      auto arrayAttr = attr.dyn_cast<ArrayAttr>();
+      return !arrayAttr || !checkIntegerArrayAttr(arrayAttr);
+    });
+  };
+  if (hasNonIntElems(tileSizes)) {
     return emitError()
            << "expected all elements of tile_sizes to be a list of integers";
+  }
+  if (tileInterchange && hasNonIntElems(tileInterchange)) {
+    return emitError() << "expected all elements of tile_interchange to be a "
+                          "list of integers";
   }
   if (nativeVectorSize) {
     if (!checkIntegerArrayAttr(nativeVectorSize)) {
@@ -173,31 +192,6 @@ LogicalResult LoweringConfigAttr::verify(
 // iree.compilation_info
 //===----------------------------------------------------------------------===//
 
-CompilationInfoAttr CompilationInfoAttr::get(MLIRContext *context,
-                                             TileSizesListTypeRef tileSizes,
-                                             ArrayRef<int64_t> nativeVectorSize,
-                                             ArrayRef<int64_t> workgroupSize) {
-  LoweringConfigAttr configAttr =
-      LoweringConfigAttr::get(context, tileSizes, nativeVectorSize);
-  TranslationInfoAttr translationInfo =
-      TranslationInfoAttr::get(context, DispatchLoweringPassPipeline::None);
-  ArrayAttr workgroupSizeAttr = getI64IntegerArrayAttr(context, workgroupSize);
-  return get(context, configAttr, translationInfo, workgroupSizeAttr);
-}
-
-CompilationInfoAttr CompilationInfoAttr::get(
-    MLIRContext *context, TileSizesListTypeRef tileSizes,
-    ArrayRef<int64_t> nativeVectorSize,
-    DispatchLoweringPassPipeline passPipeline,
-    ArrayRef<int64_t> workloadPerWorkgroup, ArrayRef<int64_t> workgroupSize) {
-  LoweringConfigAttr configAttr =
-      LoweringConfigAttr::get(context, tileSizes, nativeVectorSize);
-  TranslationInfoAttr translationInfoAttr =
-      TranslationInfoAttr::get(context, passPipeline, workloadPerWorkgroup);
-  ArrayAttr workgroupSizeAttr = getI64IntegerArrayAttr(context, workgroupSize);
-  return get(context, configAttr, translationInfoAttr, workgroupSizeAttr);
-}
-
 LogicalResult CompilationInfoAttr::verify(
     function_ref<InFlightDiagnostic()> emitError,
     LoweringConfigAttr loweringConfig, TranslationInfoAttr translationInfo,
@@ -207,6 +201,7 @@ LogicalResult CompilationInfoAttr::verify(
   }
   if (failed(
           LoweringConfigAttr::verify(emitError, loweringConfig.getTileSizes(),
+                                     loweringConfig.getTileInterchange(),
                                      loweringConfig.getNativeVectorSize()))) {
     return failure();
   }
@@ -333,6 +328,50 @@ void setCompilationInfo(Operation *op,
 
 void eraseCompilationInfo(Operation *op) {
   op->removeAttr(kCompilationInfoAttrName);
+}
+
+LogicalResult getDistributionTileConfigFromLoweringConfig(
+    ArrayRef<Operation *> computeOps,
+    SmallVectorImpl<int64_t> &distributedTileSizes,
+    SmallVectorImpl<int64_t> &interchange) {
+  distributedTileSizes.clear();
+  interchange.clear();
+  if (computeOps.empty()) return success();
+
+  for (auto op : computeOps) {
+    auto partitionbleLoopInterface =
+        dyn_cast<IREE::Flow::PartitionableLoopsInterface>(op);
+    if (!partitionbleLoopInterface) continue;
+    IREE::Codegen::LoweringConfigAttr currLoweringConfig =
+        getLoweringConfig(op);
+    if (!currLoweringConfig) continue;
+
+    SmallVector<unsigned> partitionableLoops =
+        partitionbleLoopInterface.getPartitionableLoops(kNumMaxParallelDims);
+
+    SmallVector<int64_t> tileSizes = currLoweringConfig.getTileSizeVals(0);
+    SmallVector<int64_t> currInterchange =
+        currLoweringConfig.getTileInterchangeVals(0);
+    SmallVector<int64_t> currDistributedTileSizes;
+    if (!partitionableLoops.empty()) {
+      currDistributedTileSizes.resize(partitionableLoops.back() + 1, 0);
+    }
+    for (auto loopID : partitionableLoops) {
+      if (loopID < tileSizes.size()) {
+        currDistributedTileSizes[loopID] = tileSizes[loopID];
+      }
+    }
+    if (distributedTileSizes.empty()) {
+      distributedTileSizes.assign(currDistributedTileSizes);
+      interchange.assign(currInterchange);
+    } else if (currDistributedTileSizes != distributedTileSizes ||
+               currInterchange != interchange) {
+      return computeOps.front()->emitOpError(
+          "inconsistent distribution of ops "
+          "for first level of distribution");
+    }
+  }
+  return success();
 }
 
 }  // namespace iree_compiler

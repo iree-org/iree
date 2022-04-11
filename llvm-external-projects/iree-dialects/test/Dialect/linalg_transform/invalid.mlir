@@ -30,6 +30,14 @@ iree_linalg_transform.sequence {
 
 iree_linalg_transform.sequence {
   %0 = match @match
+  // expected-error@below {{expected `tile_sizes` attribute}}
+  fuse %0
+}
+
+// -----
+
+iree_linalg_transform.sequence {
+  %0 = match @match
   // expected-error@below {{expects interchange to be a permutation, found [1, 1]}}
   fuse %0 {tile_sizes=[0, 1], tile_interchange = [1, 1]}
 }

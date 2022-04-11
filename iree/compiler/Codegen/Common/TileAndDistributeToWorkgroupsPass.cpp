@@ -39,49 +39,6 @@ namespace iree_compiler {
 // Patterns and methods for tile and distribute of Linalg ops to workgroups.
 //===---------------------------------------------------------------------===//
 
-// Get the lowering configuration for the operation within the dispatch.
-// This looks for tile sizes by looking for lowering configuration.
-static FailureOr<SmallVector<int64_t>> getTileSizesFromLoweringConfig(
-    ArrayRef<Operation *> computeOps, MLIRContext *context) {
-  if (computeOps.empty()) return SmallVector<int64_t>{};
-
-  Optional<SmallVector<int64_t>> distributedTileSizes;
-  for (auto op : computeOps) {
-    auto partitionbleLoopInterface =
-        dyn_cast<IREE::Flow::PartitionableLoopsInterface>(op);
-    if (!partitionbleLoopInterface) continue;
-    IREE::Codegen::LoweringConfigAttr currLoweringConfig =
-        getLoweringConfig(op);
-    if (!currLoweringConfig) continue;
-    SmallVector<unsigned> partitionableLoops =
-        partitionbleLoopInterface.getPartitionableLoops(kNumMaxParallelDims);
-    SmallVector<int64_t> tileSizes = currLoweringConfig.getTileSizeVals(0);
-    SmallVector<int64_t> currDistributedTileSizes;
-    if (!partitionableLoops.empty()) {
-      currDistributedTileSizes.resize(partitionableLoops.back() + 1, 0);
-    }
-    for (auto loopID : partitionableLoops) {
-      if (loopID < tileSizes.size()) {
-        currDistributedTileSizes[loopID] = tileSizes[loopID];
-      }
-    }
-    if (distributedTileSizes) {
-      if (currDistributedTileSizes != distributedTileSizes) {
-        // Inconsistent distributed tile sizes. Abort.
-        return static_cast<LogicalResult>(
-            computeOps.front()->emitOpError("inconsistent distribution of ops "
-                                            "for first level of distribution"));
-      }
-    } else {
-      distributedTileSizes = currDistributedTileSizes;
-    }
-  }
-  if (distributedTileSizes) {
-    return distributedTileSizes.getValue();
-  }
-  return SmallVector<int64_t>{};
-}
-
 // Pull in producers into the tiled operation.
 static void pullInProducers(linalg::LinalgOp tiledOp,
                             ValueRange untiledOperands,
@@ -167,12 +124,12 @@ void TileAndDistributeToWorkgroupsPass::runOnOperation() {
   }
 
   // Get the tile sizes to use from lowering configuration if set.
-  FailureOr<SmallVector<int64_t>> configTileSizes =
-      getTileSizesFromLoweringConfig(computeOps, context);
-  if (failed(configTileSizes)) {
+  SmallVector<int64_t> tileSizes, interchange;
+  if (failed(getDistributionTileConfigFromLoweringConfig(computeOps, tileSizes,
+                                                         interchange))) {
     return signalPassFailure();
   }
-  ArrayRef<int64_t> configTileSizesRef(configTileSizes.getValue());
+  ArrayRef<int64_t> tileSizesRef(tileSizes);
 
   // Add a marker to the last operation in the list.
   auto marker = StringAttr::get(context, "__workgroup_tiling__");
@@ -185,7 +142,7 @@ void TileAndDistributeToWorkgroupsPass::runOnOperation() {
                         Operation *op) -> SmallVector<Value, 4> {
     // Check if tile sizes are deduced from the configuration. If so use those.
     return llvm::to_vector<4>(
-        llvm::map_range(configTileSizesRef, [&](int64_t ts) -> Value {
+        llvm::map_range(tileSizesRef, [&](int64_t ts) -> Value {
           return builder.create<arith::ConstantIndexOp>(op->getLoc(), ts);
         }));
   };
@@ -193,6 +150,9 @@ void TileAndDistributeToWorkgroupsPass::runOnOperation() {
   auto linalgTilingOptions =
       linalg::LinalgTilingOptions()
           .setDistributionOptions(getIREELinalgLoopDistributionOptions())
+          .setInterchange(llvm::to_vector<4>(llvm::map_range(
+              interchange,
+              [](int64_t v) -> unsigned { return static_cast<unsigned>(v); })))
           .setLoopType(linalg::LinalgTilingLoopType::Loops)
           .setTileSizeComputationFunction(tileSizeFn);
 
