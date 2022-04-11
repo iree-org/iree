@@ -379,6 +379,46 @@ struct AdaptLinalgInputOperandToOutputOperand
     return success();
   }
 };
+
+struct RemoveCstOutsDependency
+    : public OpInterfaceRewritePattern<linalg::LinalgOp> {
+  using OpInterfaceRewritePattern<linalg::LinalgOp>::OpInterfaceRewritePattern;
+
+  LogicalResult matchAndRewrite(linalg::LinalgOp op,
+                                PatternRewriter &rewriter) const override {
+    rewriter.startRootUpdate(op);
+    bool modifiedOutput = false;
+    Location loc = op.getLoc();
+    for (OpOperand *opOperand : op.getOutputOperands()) {
+      DenseElementsAttr attr;
+      if (!matchPattern(opOperand->get(), m_Constant(&attr))) continue;
+      if (!attr.isSplat()) continue;
+      auto type = attr.getType().dyn_cast<RankedTensorType>();
+      if (!type) continue;
+      Attribute scalarAttr = attr.getValues<Attribute>()[0];
+
+      modifiedOutput = true;
+      SmallVector<Value> dynamicDims;
+      for (const auto &dim : llvm::enumerate(type.getShape())) {
+        if (dim.value() != ShapedType::kDynamicSize) continue;
+        dynamicDims.push_back(rewriter.createOrFold<tensor::DimOp>(
+            loc, opOperand->get(), dim.index()));
+      }
+      Value initTensor = rewriter.create<linalg::InitTensorOp>(
+          loc, dynamicDims, type.getShape(), type.getElementType());
+      Value cstOp = rewriter.create<arith::ConstantOp>(loc, scalarAttr);
+      Value fillOp =
+          rewriter.create<linalg::FillOp>(loc, cstOp, initTensor).result();
+      op->setOperand(opOperand->getOperandNumber(), fillOp);
+    }
+    if (!modifiedOutput) {
+      rewriter.cancelRootUpdate(op);
+      return failure();
+    }
+    rewriter.finalizeRootUpdate(op);
+    return success();
+  }
+};
 }  // namespace
 
 void ConvertToDestinationPassingStylePass::runOnOperation() {
@@ -387,7 +427,8 @@ void ConvertToDestinationPassingStylePass::runOnOperation() {
 
   {
     RewritePatternSet patterns(context);
-    patterns.insert<AdaptLinalgInputOperandToOutputOperand>(context);
+    patterns.insert<AdaptLinalgInputOperandToOutputOperand,
+                    RemoveCstOutsDependency>(context);
     if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
       return signalPassFailure();
     }
