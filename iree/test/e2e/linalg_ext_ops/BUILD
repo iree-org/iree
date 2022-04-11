@@ -22,8 +22,6 @@ iree_check_single_backend_test_suite(
             "scan.mlir",
         ],
         include = ["*.mlir"],
-        exclude = [
-        ],
     ),
     driver = "cuda",
     tags = [
@@ -46,8 +44,6 @@ iree_check_single_backend_test_suite(
             "scan.mlir",
         ],
         include = ["*.mlir"],
-        exclude = [
-        ],
     ),
     driver = "dylib",
     target_backend = "dylib-llvm-aot",
@@ -62,8 +58,6 @@ iree_check_single_backend_test_suite(
             "scan.mlir",
         ],
         include = ["*.mlir"],
-        exclude = [
-        ],
     ),
     driver = "vmvx",
     target_backend = "vmvx",

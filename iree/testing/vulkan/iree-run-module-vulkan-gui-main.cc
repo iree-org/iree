@@ -164,6 +164,10 @@ extern "C" int iree_main(int argc, char** argv) {
   SDL_Window* window = SDL_CreateWindow(
       "IREE Samples - Vulkan Inference GUI", SDL_WINDOWPOS_CENTERED,
       SDL_WINDOWPOS_CENTERED, 1280, 720, window_flags);
+  if (!window) {
+    IREE_LOG(FATAL) << "Failed to create SDL window";
+    return 1;
+  }
 
   // Setup Vulkan
   iree_hal_vulkan_features_t iree_vulkan_features =
@@ -280,7 +284,7 @@ extern "C" int iree_main(int argc, char** argv) {
   iree_hal_driver_t* iree_vk_driver = nullptr;
   iree_string_view_t driver_identifier = iree_make_cstring_view("vulkan");
   iree_hal_vulkan_driver_options_t driver_options;
-  driver_options.api_version = VK_API_VERSION_1_0;
+  driver_options.api_version = VK_API_VERSION_1_2;
   driver_options.requested_features = static_cast<iree_hal_vulkan_features_t>(
       IREE_HAL_VULKAN_FEATURE_ENABLE_DEBUG_UTILS);
   IREE_CHECK_OK(iree_hal_vulkan_driver_create_using_instance(

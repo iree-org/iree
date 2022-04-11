@@ -102,12 +102,23 @@ struct OptimizeVectorTransferPass
         return signalPassFailure();
       }
     }
+
     // Workaround, run loop invariant code motion before hoist redudant vector
     // transfer to workaround a bug upstream.
     // TODO(thomasraoux): Remove it once the fix is merged.
     loopInvariantCodeMotion(funcOp);
     linalg::hoistRedundantVectorTransfers(funcOp);
     vector::transferOpflowOpt(funcOp);
+
+    // Move bitcast inwards from loop region boundaries to increase chances to
+    // cancel them.
+    {
+      RewritePatternSet patterns(&getContext());
+      vector::populateBubbleVectorBitCastOpPatterns(patterns);
+      if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
+        return signalPassFailure();
+      }
+    }
 
     // Second stage of patterns to flatten transfer ops.
     {

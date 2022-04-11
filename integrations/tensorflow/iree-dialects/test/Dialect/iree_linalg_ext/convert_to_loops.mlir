@@ -382,12 +382,11 @@ func @fft_1D(%real: memref<16xf32>, %imag: memref<16xf32>) {
 // CHECK-DAG:     %[[C16:.+]] = arith.constant 16 : index
 // CHECK-DAG:     %[[COEFF:.+]] = arith.constant -3.14159274 : f32
 // CHECK:         scf.for %[[K:.+]] = %[[C0]] to %[[C16]] step %[[C2]]
-// CHECK-DAG:       %[[HM:.+]] = arith.shrsi %[[C2]], %[[C1]] : index
-// CHECK:           %[[L_REAL_SLICE:.+]] = memref.subview %[[REAL]][%[[K]]] [%[[HM]]] [1]
-// CHECK:           %[[L_IMAG_SLICE:.+]] = memref.subview %[[IMAG]][%[[K]]] [%[[HM]]] [1]
-// CHECK:           %[[R_OFFSET:.+]] = arith.addi %[[K]], %[[HM]] : index
-// CHECK:           %[[R_REAL_SLICE:.+]] = memref.subview %[[REAL]][%[[R_OFFSET]]] [%[[HM]]] [1]
-// CHECK:           %[[R_IMAG_SLICE:.+]] = memref.subview %[[IMAG]][%[[R_OFFSET]]] [%[[HM]]] [1]
+// CHECK:           %[[L_REAL_SLICE:.+]] = memref.subview %[[REAL]][%[[K]]] [%[[C1]]] [1]
+// CHECK:           %[[L_IMAG_SLICE:.+]] = memref.subview %[[IMAG]][%[[K]]] [%[[C1]]] [1]
+// CHECK:           %[[R_OFFSET:.+]] = arith.addi %[[K]], %[[C1]] : index
+// CHECK:           %[[R_REAL_SLICE:.+]] = memref.subview %[[REAL]][%[[R_OFFSET]]] [%[[C1]]] [1]
+// CHECK:           %[[R_IMAG_SLICE:.+]] = memref.subview %[[IMAG]][%[[R_OFFSET]]] [%[[C1]]] [1]
 // CHECK:           linalg.generic
 // CHECK-SAME:        indexing_maps = [#[[MAP1]], #[[MAP1]], #[[MAP1]], #[[MAP1]]]
 // CHECK-SAME:        iterator_types = ["parallel"]
@@ -441,12 +440,11 @@ func @fft_2D(%real: memref<?x16xf32>, %imag: memref<?x16xf32>) {
 // CHECK-DAG:     %[[D0:.+]] = memref.dim %[[REAL]], %[[C0]] : memref<?x16xf32>
 // CHECK:         scf.for %[[I:.+]] = %[[C0]] to %[[D0]] step %[[C1]]
 // CHECK:           scf.for %[[K:.+]] = %[[C0]] to %[[C16]] step %[[C4]]
-// CHECK-DAG:         %[[HM:.+]] = arith.shrsi %[[C4]], %[[C1]] : index
-// CHECK:             %[[L_REAL_SLICE:.+]] = memref.subview %[[REAL]][%[[I]], %[[K]]] [1, %[[HM]]] [1, 1]
-// CHECK:             %[[L_IMAG_SLICE:.+]] = memref.subview %[[IMAG]][%[[I]], %[[K]]] [1, %[[HM]]] [1, 1]
-// CHECK:             %[[R_OFFSET:.+]] = arith.addi %[[K]], %[[HM]] : index
-// CHECK:             %[[R_REAL_SLICE:.+]] = memref.subview %[[REAL]][%[[I]], %[[R_OFFSET]]] [1, %[[HM]]] [1, 1]
-// CHECK:             %[[R_IMAG_SLICE:.+]] = memref.subview %[[IMAG]][%[[I]], %[[R_OFFSET]]] [1, %[[HM]]] [1, 1]
+// CHECK:             %[[L_REAL_SLICE:.+]] = memref.subview %[[REAL]][%[[I]], %[[K]]] [1, %[[C2]]] [1, 1]
+// CHECK:             %[[L_IMAG_SLICE:.+]] = memref.subview %[[IMAG]][%[[I]], %[[K]]] [1, %[[C2]]] [1, 1]
+// CHECK:             %[[R_OFFSET:.+]] = arith.addi %[[K]], %[[C2]] : index
+// CHECK:             %[[R_REAL_SLICE:.+]] = memref.subview %[[REAL]][%[[I]], %[[R_OFFSET]]] [1, %[[C2]]] [1, 1]
+// CHECK:             %[[R_IMAG_SLICE:.+]] = memref.subview %[[IMAG]][%[[I]], %[[R_OFFSET]]] [1, %[[C2]]] [1, 1]
 // CHECK:             linalg.generic
 // CHECK-SAME:          indexing_maps = [#[[MAP1]], #[[MAP1]], #[[MAP1]], #[[MAP1]]]
 // CHECK-SAME:          iterator_types = ["parallel", "parallel"]
@@ -479,12 +477,11 @@ func @fft_2D_coef_buf(%real: memref<?x16xf32>, %imag: memref<?x16xf32>,
 // CHECK-DAG:     %[[D0:.+]] = memref.dim %[[REAL]], %[[C0]] : memref<?x16xf32>
 // CHECK:         scf.for %[[I:.+]] = %[[C0]] to %[[D0]] step %[[C1]]
 // CHECK:           scf.for %[[K:.+]] = %[[C0]] to %[[C16]] step %[[C2]]
-// CHECK-DAG:         %[[HM:.+]] = arith.shrsi %[[C2]], %[[C1]] : index
-// CHECK:             %[[L_REAL_SLICE:.+]] = memref.subview %[[REAL]][%[[I]], %[[K]]] [1, %[[HM]]] [1, 1]
-// CHECK:             %[[L_IMAG_SLICE:.+]] = memref.subview %[[IMAG]][%[[I]], %[[K]]] [1, %[[HM]]] [1, 1]
-// CHECK:             %[[R_OFFSET:.+]] = arith.addi %[[K]], %[[HM]] : index
-// CHECK:             %[[R_REAL_SLICE:.+]] = memref.subview %[[REAL]][%[[I]], %[[R_OFFSET]]] [1, %[[HM]]] [1, 1]
-// CHECK:             %[[R_IMAG_SLICE:.+]] = memref.subview %[[IMAG]][%[[I]], %[[R_OFFSET]]] [1, %[[HM]]] [1, 1]
+// CHECK:             %[[L_REAL_SLICE:.+]] = memref.subview %[[REAL]][%[[I]], %[[K]]] [1, %[[C1]]] [1, 1]
+// CHECK:             %[[L_IMAG_SLICE:.+]] = memref.subview %[[IMAG]][%[[I]], %[[K]]] [1, %[[C1]]] [1, 1]
+// CHECK:             %[[R_OFFSET:.+]] = arith.addi %[[K]], %[[C1]] : index
+// CHECK:             %[[R_REAL_SLICE:.+]] = memref.subview %[[REAL]][%[[I]], %[[R_OFFSET]]] [1, %[[C1]]] [1, 1]
+// CHECK:             %[[R_IMAG_SLICE:.+]] = memref.subview %[[IMAG]][%[[I]], %[[R_OFFSET]]] [1, %[[C1]]] [1, 1]
 // CHECK:             linalg.generic
 // CHECK-SAME:          indexing_maps = [#[[MAP1]], #[[MAP1]], #[[MAP2]], #[[MAP2]], #[[MAP2]], #[[MAP2]]]
 // CHECK-SAME:          iterator_types = ["parallel", "parallel"]

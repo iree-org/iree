@@ -36,6 +36,10 @@ RUN apt-get update \
     unzip \
     wget \
     gnupg2 \
+    # Needed for installing Bazel, per https://bazel.build/install/ubuntu
+    apt-transport-https \ 
+    curl \
+    gnupg \
     # Needed for building lld with Bazel (as currently configured)
     libxml2-dev \
     # Someone is welcome to tell me a better way to just install lld-9 as lld
@@ -65,12 +69,14 @@ RUN wget "https://github.com/Kitware/CMake/releases/download/v${CMAKE_VERSION?}/
 
 ######## Bazel ########
 WORKDIR /install-bazel
-ARG BAZEL_VERSION=5.0.0
+ARG BAZEL_VERSION=5.1.0
 
-# https://docs.bazel.build/versions/master/install-ubuntu.html
-RUN wget -qO - https://bazel.build/bazel-release.pub.gpg | apt-key add - \
-  && echo "deb [arch=amd64] https://storage.googleapis.com/bazel-apt stable jdk1.8" \
-    | tee /etc/apt/sources.list.d/bazel.list \
+# https://bazel.build/install/ubuntu
+RUN curl -fsSL https://bazel.build/bazel-release.pub.gpg \
+  | gpg --dearmor >bazel-archive-keyring.gpg \
+  && mv bazel-archive-keyring.gpg /usr/share/keyrings \
+  && echo "deb [arch=amd64 signed-by=/usr/share/keyrings/bazel-archive-keyring.gpg] https://storage.googleapis.com/bazel-apt stable jdk1.8" \
+  | tee /etc/apt/sources.list.d/bazel.list \
   && apt-get update \
   && apt-get install -y "bazel=${BAZEL_VERSION?}" \
   && rm -rf /install-bazel

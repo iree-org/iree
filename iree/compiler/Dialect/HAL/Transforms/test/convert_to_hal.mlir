@@ -67,7 +67,7 @@ module attributes {hal.device.targets = [#device_target_cpu]}  {
 
     // CHECK: %[[RESULT_BUFFER:.+]] = hal.allocator.allocate<%[[ALLOCATOR]] : !hal.allocator>
     // CHECK-SAME: type("HostVisible|DeviceVisible|DeviceLocal")
-    // CHECK-SAME: usage("Transfer|Mapping|Dispatch|All")
+    // CHECK-SAME: usage("Transfer|Mapping|Dispatch")
     // CHECK-SAME: : !hal.buffer{%c16}
     %result_resource = stream.resource.alloc uninitialized : !stream.resource<external>{%c16}
 

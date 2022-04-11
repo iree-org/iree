@@ -73,6 +73,8 @@ static FailureOr<LinalgTilingAndFusionOptions> getTileAndFuseOptionsFromConfig(
   }
   LinalgTilingAndFusionOptions options;
   options.tileSizes.assign(loweringConfig.getTileSizeVals(tilingLevel));
+  options.tileInterchange.assign(
+      loweringConfig.getTileInterchangeVals(tilingLevel));
   return options;
 }
 
@@ -218,8 +220,10 @@ void LinalgFusePass::runOnOperation() {
     doTiling = true;
     tilingOptions.tileSizes = {tileSizes.begin(), tileSizes.end()};
   }
-  tilingOptions.tileInterchange = {tileInterchange.begin(),
-                                   tileInterchange.end()};
+  if (!tileInterchange.empty()) {
+    tilingOptions.tileInterchange = {tileInterchange.begin(),
+                                     tileInterchange.end()};
+  }
   if (doIREEDistribution) {
     tilingOptions.setDistributionOptions(
         ::mlir::iree_compiler::getIREELinalgLoopDistributionOptions());
@@ -415,17 +419,17 @@ void LinalgVectorLoweringPass::runOnOperation() {
           // Conversion to scf.
           .enableTransferToSCFConversion(vectorLoweringStage >= 4)
           .setVectorTransferToSCFOptions(vectorTransferToSCFOptions)
-          // Lowering of vector.shape_cast.
-          .enableShapeCastLowering(vectorLoweringStage >= 5)
           // Lowering of vector.transpose.
-          .enableVectorTransposeLowering(vectorLoweringStage >= 6)
+          .enableVectorTransposeLowering(vectorLoweringStage >= 5)
           .setVectorTransformsOptions(vectorTransformOptions)
           .enableAVX2Lowering(lowerVectorTransposeToAVX2)
           .setAVX2LoweringOptions(
               x86vector::avx2::LoweringOptions().setTransposeOptions(
                   x86vector::avx2::TransposeLoweringOptions()
                       .lower4x8xf32(lowerVectorTransposeToAVX2)
-                      .lower8x8xf32(lowerVectorTransposeToAVX2)));
+                      .lower8x8xf32(lowerVectorTransposeToAVX2)))
+          // Lowering of vector.shape_cast.
+          .enableShapeCastLowering(vectorLoweringStage >= 6);
 
   CodegenStrategy strategy;
   strategy.vectorLowering(vectorLoweringOptions);

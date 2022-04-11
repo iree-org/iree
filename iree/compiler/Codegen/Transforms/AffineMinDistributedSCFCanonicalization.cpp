@@ -169,6 +169,9 @@ struct AffineMinDistributedSCFCanonicalizationPattern
 struct AffineMinDistributedSCFCanonicalizationPass
     : public PassWrapper<AffineMinDistributedSCFCanonicalizationPass,
                          OperationPass<func::FuncOp>> {
+  MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(
+      AffineMinDistributedSCFCanonicalizationPass)
+
   StringRef getArgument() const override {
     return "iree-codegen-affinemin-scf-canonicalization";
   }

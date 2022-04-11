@@ -13,6 +13,9 @@ EXPLICIT_TARGET_MAPPING = {
     "//build_tools:dl": ["${CMAKE_DL_LIBS}"],
 
     # IREE llvm-external-projects
+    "//llvm-external-projects/iree-dialects:IREEDialectsTransforms": [
+        "IREEDialectsTransforms"
+    ],
     "//llvm-external-projects/iree-dialects:IREEInputDialect": [
         "IREEInputDialect"
     ],
@@ -21,6 +24,9 @@ EXPLICIT_TARGET_MAPPING = {
     ],
     "//llvm-external-projects/iree-dialects:IREELinalgExtPasses": [
         "IREELinalgExtPasses"
+    ],
+    "//llvm-external-projects/iree-dialects:IREELinalgExtTransforms": [
+        "IREELinalgExtTransforms"
     ],
     "@torch-mlir-dialects//:TorchMLIRTMTensorDialect": [
         "TorchMLIRTMTensorDialect"

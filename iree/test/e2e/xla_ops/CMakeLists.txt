@@ -337,6 +337,7 @@ iree_check_single_backend_test_suite(
     "reverse.mlir"
     "rng_normal.mlir"
     "rng_uniform.mlir"
+    "round.mlir"
     "rsqrt.mlir"
     "scatter.mlir"
     "scatter_dynamic.mlir"
@@ -492,6 +493,9 @@ iree_check_single_backend_test_suite(
   COMPILER_FLAGS
     "-iree-input-type=mhlo"
     "-iree-llvm-target-cpu-features=host"
+  LABELS
+    "hostonly"
+    "local"
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

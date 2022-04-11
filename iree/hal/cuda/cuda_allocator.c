@@ -119,6 +119,18 @@ iree_hal_cuda_allocator_query_compatibility(
     iree_hal_allocator_t* IREE_RESTRICT base_allocator,
     const iree_hal_buffer_params_t* IREE_RESTRICT params,
     iree_device_size_t allocation_size) {
+  iree_hal_cuda_allocator_t* allocator =
+      iree_hal_cuda_allocator_cast(base_allocator);
+
+  // If concurrent managed access is not supported then we disallow mapping of
+  // device local memory.
+  if (!allocator->supports_concurrent_managed_access &&
+      iree_all_bits_set(params->usage, IREE_HAL_BUFFER_USAGE_MAPPING) &&
+      iree_all_bits_set(params->type, IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL |
+                                          IREE_HAL_MEMORY_TYPE_HOST_VISIBLE)) {
+    return IREE_HAL_BUFFER_COMPATIBILITY_NONE;
+  }
+
   // All buffers can be allocated on the heap.
   iree_hal_buffer_compatibility_t compatibility =
       IREE_HAL_BUFFER_COMPATIBILITY_ALLOCATABLE;

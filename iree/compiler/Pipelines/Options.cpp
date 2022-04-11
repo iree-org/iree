@@ -38,7 +38,7 @@ void InputDialectOptions::bindOptions(OptionsBinder &binder) {
                      "Legalize from TOSA ops."),
           clEnumValN(InputDialectOptions::Type::mhlo, "mhlo",
                      "Legalize from MHLO ops."),
-          clEnumValN(InputDialectOptions::Type::tmtensor, "tmtensor",
+          clEnumValN(InputDialectOptions::Type::tm_tensor, "tm_tensor",
                      "Legalize from TMTensor ops."),
           clEnumValN(
               InputDialectOptions::Type::xla, "xla",

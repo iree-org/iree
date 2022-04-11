@@ -99,19 +99,41 @@ def MatchOp : Transform_Op<"match"> {
 //===----------------------------------------------------------------------===//
 
 def TileOp : Linalg_Transform_Operation<"tile",
-    [TransformOpInterface, TargetableSingleOperandTransformOpTrait]> {
+    [TransformOpInterface]> {
   let description = [{Indicates that ops of a specific kind in the given
   function should be tiled with the options provided as attributes.}];
 
   let arguments = (ins PDL_Operation:$target,
                    DefaultValuedAttr<I64ArrayAttr, "{}">:$sizes,
-                   DefaultValuedAttr<I64ArrayAttr, "{}">:$interchange,
-                   DefaultValuedAttr<I64ArrayAttr, "{}">:$peel,
-                   DefaultValuedAttr<BoolAttr, "false">:$scalarize_dyn_dims);
-  let results = (outs PDL_Operation:$transformed);
+                   DefaultValuedAttr<I64ArrayAttr, "{}">:$interchange);
+  let results = (outs PDL_Operation:$tiled_linalg_op,
+                      Variadic<PDL_Operation>:$loops);
+
+  let hasCustomAssemblyFormat = 1;
+
+  let extraClassDeclaration = [{
+    ::mlir::LogicalResult apply(
+        ::mlir::linalg::transform::TransformResults &transformResults,
+        ::mlir::linalg::transform::TransformState &state);
+  }];
+}
+
+def ScalarizeOp : Linalg_Transform_Operation<"scalarize",
+    [TransformOpInterface, TargetableSingleOperandTransformOpTrait]> {
+  let description = [{Indicates that ops of a specific kind in the given
+    function should be scalarized (i.e. their dynamic dimensions tiled by 1).
+    
+    This operation returns the tiled op but not the loops.
+
+    We make this design choice because it is hard to know ahead of time the 
+    number of loops that will be produced (it depends on the number of 
+    dynamic dimensions after multiple transformations have been applied).
+  }];
+
+  let arguments = (ins PDL_Operation:$target);
+  let results = (outs PDL_Operation:$tiled_linalg_op);
 
   let assemblyFormat = "$target attr-dict";
-  let hasVerifier = 1;
 
   let extraClassDeclaration = [{
     ::mlir::FailureOr<::mlir::linalg::LinalgOp> applyToOne(
@@ -179,6 +201,8 @@ def PadOp : Linalg_Transform_Operation<"pad",
   using the options provides as operation attributes.}];
 
   let arguments = (ins PDL_Operation:$target,
+                   DefaultValuedAttr<StrArrayAttr, "{}">:$padding_values,
+                   DefaultValuedAttr<I64ArrayAttr, "{}">:$padding_dimensions,
                    DefaultValuedAttr<I64ArrayAttr, "{}">:$pack_paddings,
                    DefaultValuedAttr<I64ArrayAttr, "{}">:$hoist_paddings,
                    DefaultValuedAttr<
@@ -257,7 +281,9 @@ def LowerToLLVMOp : Transform_Op<"lower_to_llvm"> {
 }
 
 def GetParentLoopOp : Linalg_Transform_Operation<"get_parent_loop", [
-    TransformOpInterface, TargetableSingleOperandTransformOpTrait]> {
+    TransformOpInterface, 
+    TargetableSingleOperandTransformOpTrait
+  ]> {
   let description = [{Obtains a handle to a parent loop of the given
   operation.}];
 
@@ -274,7 +300,9 @@ def GetParentLoopOp : Linalg_Transform_Operation<"get_parent_loop", [
 }
 
 def UnrollLoopOp : Linalg_Transform_Operation<"unroll_loop", [
-    TransformOpInterface, TargetableSingleOperandTransformOpTrait]> {
+    TransformOpInterface, 
+    TargetableSingleOperandTransformOpTrait
+  ]> {
   let description = [{Unrolls the given loop with the given unroll factor.}];
 
   let arguments = (ins PDL_Operation:$target,
@@ -287,8 +315,23 @@ def UnrollLoopOp : Linalg_Transform_Operation<"unroll_loop", [
   }];
 }
 
-def PipelineLoopOp : Linalg_Transform_Operation<"pipeline_loop", [
+def PeelLoopOp : Linalg_Transform_Operation<"peel_loop", [
     TransformOpInterface, TargetableSingleOperandTransformOpTrait]> {
+  let arguments = (ins PDL_Operation:$target);
+  let results = (outs PDL_Operation:$transformed);
+
+  let assemblyFormat = "$target attr-dict";
+
+  let extraClassDeclaration = [{
+    ::mlir::FailureOr<::mlir::scf::ForOp> applyToOne(::mlir::scf::ForOp loop);
+  }];
+}
+
+
+def PipelineLoopOp : Linalg_Transform_Operation<"pipeline_loop", [
+    TransformOpInterface,
+    TargetableSingleOperandTransformOpTrait
+  ]> {
   let arguments = (ins PDL_Operation:$target,
                    DefaultValuedAttr<I64Attr, "1">:$iteration_interval,
                    DefaultValuedAttr<I64Attr, "10">:$read_latency);
@@ -302,30 +345,32 @@ def PipelineLoopOp : Linalg_Transform_Operation<"pipeline_loop", [
 }
 
 def OutlineLoopOp : Linalg_Transform_Operation<"outline_loop", [
-    DeclareOpInterfaceMethods<TransformOpInterface, ["apply"]>]> {
+    DeclareOpInterfaceMethods<TransformOpInterface, ["apply"]>
+  ]> {
   let arguments = (ins PDL_Operation:$target,
                    StrAttr:$func_name);
   let results = (outs PDL_Operation:$transformed);
 
   let assemblyFormat = "$target attr-dict";
-
-  let extraClassDeclaration = [{
-    ::mlir::FailureOr<::mlir::FuncOp> applyToOne(::mlir::scf::ForOp loop);
-  }];
 }
 
-def PrintOp : Transform_Op<"print"> {
-  let arguments = (ins StrAttr:$name);
+def PrintOp : Transform_Op<"print", [ 
+    DeclareOpInterfaceMethods<TransformOpInterface, ["apply"]>
+  ]> {
+  let arguments = (ins Optional<PDL_Operation>:$target,
+                       StrAttr:$name);
   let description = [{Prints the module.}];
-  let assemblyFormat = "attr-dict";
+  let assemblyFormat = "($target^)? attr-dict";
 }
 
 //===----------------------------------------------------------------------===//
 // LinalgExt specific transforms
 //===----------------------------------------------------------------------===//
 
-def TileToLinalgExtTileOp : Linalg_Transform_Operation<"tile_to_iree_linalg_ext_tile_op",
-    [TransformOpInterface, TargetableSingleOperandTransformOpTrait]> {
+def TileToLinalgExtTileOp : 
+    Linalg_Transform_Operation<"tile_to_iree_linalg_ext_tile_op", [
+      DeclareOpInterfaceMethods<TransformOpInterface, ["apply"]>
+    ]> {
   let description = [{Tile a linalg op with linalg_ext.tile op along a single
   dimension.}];
 
@@ -338,14 +383,10 @@ def TileToLinalgExtTileOp : Linalg_Transform_Operation<"tile_to_iree_linalg_ext_
 
   let arguments = (ins PDL_Operation:$target,
                    DefaultValuedAttr<I64ArrayAttr, "{}">:$sizes);
-  let results = (outs PDL_Operation:$transformed);
+  let results = (outs PDL_Operation:$tiled_op,
+                      PDL_Operation:$tile_op);
 
   let assemblyFormat = "$target attr-dict";
-
-  let extraClassDeclaration = [{
-    ::mlir::FailureOr<Operation *> applyToOne(
-        ::mlir::TilingInterface target);
-  }];
 }
 
 def RewriteLinalgExtTileToScfForOp :
@@ -394,6 +435,20 @@ def RewriteLinalgExtInParallelToAsyncOp :
     ::mlir::FailureOr<::mlir::Operation *> applyToOne(
         ::mlir::iree_compiler::IREE::LinalgExt::InParallelOp target);
   }];
+}
+
+def RewriteLinalgExtInParallelToHALOp :
+  Linalg_Transform_Operation<"rewrite_iree_linalg_ext_in_parallel_to_hal", [
+    DeclareOpInterfaceMethods<TransformOpInterface, ["apply"]>
+  ]> {
+
+  let description = [{Rewrite linalg_ext.in_parallel op to use HAL ops.}];
+  let arguments = (ins PDL_Operation:$target);
+  // TODO: Determine whether we want to return something here, the only natural
+  // results would be the resulting insertTensorOps.
+  // let results = (outs PDL_Operation:$transformed);
+
+  let assemblyFormat = "$target attr-dict";
 }
 
 def RewriteLinalgExtInParallelToScfForOp :

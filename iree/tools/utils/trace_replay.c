@@ -713,9 +713,9 @@ static iree_status_t iree_trace_replay_parse_hal_buffer(
   IREE_RETURN_IF_ERROR(iree_hal_allocator_allocate_buffer(
       iree_hal_device_allocator(replay->device),
       (iree_hal_buffer_params_t){
-          .type = IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL |
-                  IREE_HAL_MEMORY_TYPE_HOST_VISIBLE,
-          .usage = IREE_HAL_BUFFER_USAGE_ALL,
+          .type = IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL,
+          .usage =
+              IREE_HAL_BUFFER_USAGE_DISPATCH | IREE_HAL_BUFFER_USAGE_TRANSFER,
       },
       allocation_size, iree_const_byte_span_empty(), &buffer));
 
@@ -792,11 +792,9 @@ static iree_status_t iree_trace_replay_parse_hal_buffer_view(
         iree_hal_device_allocator(replay->device), shape, shape_rank,
         element_type, encoding_type,
         (iree_hal_buffer_params_t){
-            .type = IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL |
-                    IREE_HAL_MEMORY_TYPE_HOST_VISIBLE,
-            .usage = IREE_HAL_BUFFER_USAGE_DISPATCH |
-                     IREE_HAL_BUFFER_USAGE_TRANSFER |
-                     IREE_HAL_BUFFER_USAGE_MAPPING,
+            .type = IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL,
+            .usage =
+                IREE_HAL_BUFFER_USAGE_DISPATCH | IREE_HAL_BUFFER_USAGE_TRANSFER,
         },
         iree_trace_replay_generate_hal_buffer_callback, &params, &buffer_view));
   } else {
@@ -804,11 +802,9 @@ static iree_status_t iree_trace_replay_parse_hal_buffer_view(
         iree_hal_device_allocator(replay->device), shape, shape_rank,
         element_type, encoding_type,
         (iree_hal_buffer_params_t){
-            .type = IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL |
-                    IREE_HAL_MEMORY_TYPE_HOST_VISIBLE,
-            .usage = IREE_HAL_BUFFER_USAGE_DISPATCH |
-                     IREE_HAL_BUFFER_USAGE_TRANSFER |
-                     IREE_HAL_BUFFER_USAGE_MAPPING,
+            .type = IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL,
+            .usage =
+                IREE_HAL_BUFFER_USAGE_DISPATCH | IREE_HAL_BUFFER_USAGE_TRANSFER,
         },
         iree_const_byte_span_empty(), &buffer_view));
   }

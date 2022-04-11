@@ -3,8 +3,8 @@
 // CHECK-LABEL: vm.func private @allocatorAllocate
 func.func @allocatorAllocate(%arg0 : !hal.allocator) -> !hal.buffer {
   %c1024 = arith.constant 1024 : index
-  // CHECK: %ref = vm.call @hal.allocator.allocate(%arg0, %c6, %c14, %c1024) : (!vm.ref<!hal.allocator>, i32, i32, i32) -> !vm.ref<!hal.buffer>
-  %0 = hal.allocator.allocate<%arg0 : !hal.allocator> type("HostLocal") usage("All") : !hal.buffer{%c1024}
+  // CHECK: %ref = vm.call @hal.allocator.allocate(%arg0, %c6, %c10, %c1024) : (!vm.ref<!hal.allocator>, i32, i32, i32) -> !vm.ref<!hal.buffer>
+  %0 = hal.allocator.allocate<%arg0 : !hal.allocator> type("HostLocal") usage("Dispatch|Transfer") : !hal.buffer{%c1024}
   return %0 : !hal.buffer
 }
 

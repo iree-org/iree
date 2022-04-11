@@ -75,9 +75,9 @@ class SetNumWorkgroupsPass : public SetNumWorkgroupsBase<SetNumWorkgroupsPass> {
 };
 }  // namespace
 
-void SetNumWorkgroupsPass::runOnOperation() {
-  MLIRContext *context = &getContext();
-  IREE::HAL::ExecutableVariantOp variantOp = getOperation();
+LogicalResult setNumWorkgroupsImpl(IREE::HAL::ExecutableVariantOp variantOp,
+                                   ArrayRef<int64_t> workloadPerWorkgroup) {
+  MLIRContext *context = variantOp.getContext();
   ModuleOp module = variantOp.getInnerModule();
 
   llvm::StringMap<IREE::HAL::ExecutableEntryPointOp> entryPoints =
@@ -102,9 +102,8 @@ void SetNumWorkgroupsPass::runOnOperation() {
       RewritePatternSet patterns(funcOp.getContext());
       patterns.insert<SetWorkgroupSizePattern>(funcOp.getContext(),
                                                currWorkloadPerWorkgroup);
-      if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
-        return signalPassFailure();
-      }
+      if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns))))
+        return failure();
     }
 
     // The workgroup count region might already be set by op-specific
@@ -140,8 +139,7 @@ void SetNumWorkgroupsPass::runOnOperation() {
     }
 
     OpBuilder builder(context);
-    if (failed(defineWorkgroupCountRegion(builder, funcOp, regionBuilder)))
-      return signalPassFailure();
+    return defineWorkgroupCountRegion(builder, funcOp, regionBuilder);
   }
 
   // Apply post distribution canonicalization passes.
@@ -150,10 +148,13 @@ void SetNumWorkgroupsPass::runOnOperation() {
   populateAffineMinSCFCanonicalizationPattern(canonicalization);
   IREE::Flow::populateFlowDispatchCanonicalizationPatterns(canonicalization,
                                                            context);
-  if (failed(
-          applyPatternsAndFoldGreedily(module, std::move(canonicalization)))) {
-    return signalPassFailure();
-  }
+  return applyPatternsAndFoldGreedily(module, std::move(canonicalization));
+}
+
+void SetNumWorkgroupsPass::runOnOperation() {
+  IREE::HAL::ExecutableVariantOp variantOp = getOperation();
+  if (failed(setNumWorkgroupsImpl(variantOp, workloadPerWorkgroup)))
+    signalPassFailure();
 }
 
 std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>

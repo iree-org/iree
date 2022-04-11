@@ -158,8 +158,11 @@ Attribute CompiledBinary::invokeNullaryAsAttribute(Location loc,
 }
 
 bool CompiledBinary::isSupportedResultType(Type type) {
-  // TODO: Not currently supported.
-  if (type.isa<Float16Type>() || type.isa<BFloat16Type>()) {
+  // TODO(laurenzo): Not currently supported. VMVX would need to support these
+  // and today it doesn't. We could use alternative backends (LLVM CPU/etc) if
+  // we wanted to handle f64, but f16 and bf16 often need special hardware.
+  if (type.isa<Float16Type>() || type.isa<BFloat16Type>() ||
+      type.isa<Float64Type>()) {
     return false;
   }
 

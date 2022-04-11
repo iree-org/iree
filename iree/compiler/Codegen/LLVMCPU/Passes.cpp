@@ -75,6 +75,16 @@ static LogicalResult cpuComprehensiveBufferizeCopyFn(OpBuilder &builder,
 // Codegen configuration verifications.
 //===---------------------------------------------------------------------===//
 
+static bool isValidInterchange(ArrayRef<int64_t> interchange, int numLoops) {
+  if (interchange.empty()) return true;
+  llvm::SmallDenseSet<int64_t> s;
+  s.insert(interchange.begin(), interchange.end());
+  for (int i = 0; i < numLoops; ++i) {
+    if (!s.contains(i)) return false;
+  }
+  return true;
+}
+
 LogicalResult verifyDoubleTilingExpertPassPipelineConfig(
     Operation *op, IREE::Codegen::LoweringConfigAttr loweringConfig,
     IREE::Codegen::TranslationInfoAttr translationInfo,
@@ -151,6 +161,21 @@ LogicalResult verifyDoubleTilingExpertPassPipelineConfig(
     }
   }
 
+  // Verify interchange
+  if (!loweringConfig.getTileInterchange().empty()) {
+    for (auto level : llvm::seq<unsigned>(
+             0, static_cast<unsigned>(
+                    loweringConfig.getTileInterchange().size()))) {
+      auto tileSizes = loweringConfig.getTileSizeVals(level);
+      auto interchange = loweringConfig.getTileInterchangeVals(level);
+      if (!isValidInterchange(interchange, tileSizes.size())) {
+        return op->emitOpError("expected [0, ")
+               << tileSizes.size()
+               << ") to be set exactly once in interchange #" << level;
+      }
+    }
+  }
+
   // Verify that native vector size is empty.
   SmallVector<int64_t> nativeVectorSize =
       loweringConfig.getNativeVectorSizeVals();
@@ -210,15 +235,21 @@ void addCPUBufferOpsTileAndVectorizePipeline(OpPassManager &passManager) {
   passManager.addPass(createCanonicalizerPass());
   passManager.addPass(createCSEPass());
 
-  // This pipeline should also vectorize these ops, but they arent today because
-  // of a correctness issue. See Issue #8579.
-
   // Run IREE specific passes before vector lowering expert.
   passManager.addNestedPass<func::FuncOp>(
       createRemoveSingleIterationLoopPass());
+
+  // Add the vector lowering expert.
+  {
+    OpPassManager &nestedFuncPassManager = passManager.nest<func::FuncOp>();
+    LinalgVectorLoweringPassOptions options;
+    options.splitVectorTransfersTo = "linalg-copy";
+    addLowerToVectorTransforms(nestedFuncPassManager, options);
+  }
 }
 
-void addDoubleTilingExpertPassPipeline(OpPassManager &passManager) {
+void addDoubleTilingExpertPassPipeline(OpPassManager &passManager,
+                                       bool lowerToAVX2) {
   // Run preprocessing and verification before starting Linalg transforms.
   passManager.addNestedPass<func::FuncOp>(
       createConvertToDestinationPassingStylePass());
@@ -289,6 +320,7 @@ void addDoubleTilingExpertPassPipeline(OpPassManager &passManager) {
   {
     OpPassManager &nestedFuncPassManager = passManager.nest<func::FuncOp>();
     LinalgVectorLoweringPassOptions options;
+    options.lowerVectorTransposeToAVX2 = lowerToAVX2;
     options.splitVectorTransfersTo = "linalg-copy";
     addLowerToVectorTransforms(nestedFuncPassManager, options);
   }
@@ -412,24 +444,12 @@ void addCPUDefaultPassPipeline(OpPassManager &passManager) {
 void addLinalgTransformInterpPasses(OpPassManager &passManager) {
   // Give control to the linalg_transform dialect.
   passManager.addPass(createLinalgTransformInterpreterPass());
+
   // Dropping the schedule is only needed if we want to embed the transform in
   // the module: we should drop the schedule once applied.
   // This pass does nothing in the case where we apply a separate policy
   // through a file.
   passManager.addPass(createDropSchedulePass());
-
-  // Sets the number of workgroups using kFakeHAL op information.
-  passManager.addPass(createSetNumWorkgroupsFromLinalgExtPass());
-
-  OpPassManager &modulePM = passManager.nest<ModuleOp>();
-  // Bufferize the dispatch.
-  BufferizationOptions::AllocationFn allocationFn =
-      cpuComprehensiveBufferizeAllocationFn;
-  BufferizationOptions::DeallocationFn deallocationFn =
-      cpuComprehensiveBufferizeDeallocationFn;
-  BufferizationOptions::MemCpyFn memcpyFn = cpuComprehensiveBufferizeCopyFn;
-  addIREEComprehensiveBufferizePasses(modulePM, allocationFn, deallocationFn,
-                                      memcpyFn);
 }
 
 static void addLowerToLLVMPasses(OpPassManager &passManager) {

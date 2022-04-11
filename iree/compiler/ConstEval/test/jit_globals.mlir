@@ -1,6 +1,6 @@
 // RUN: iree-opt -split-input-file -iree-consteval-jit-globals %s | FileCheck %s
 
-// TODO: Full type matrix for tests.
+// TODO(laurenzo): Full type matrix for tests.
 
 module @no_uninitialized {
   util.global private @hoisted : tensor<5x6xf32> = dense<4.0> : tensor<5x6xf32>
@@ -109,7 +109,8 @@ module @eval_f32_tensor {
 
 // -----
 // CHECK-LABEL: @eval_f64_tensor
-// CHECK: util.global private @{{.*}} = dense<[2.000000e+02, 3.200000e+03]> : tensor<2xf64>
+// Not currently supported (initializer should remain)
+// CHECK: util.initializer
 module @eval_f64_tensor {
   util.global private @hoisted : tensor<2xf64>
   func.func @main() -> tensor<2xf64> {

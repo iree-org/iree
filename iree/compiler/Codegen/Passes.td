@@ -27,12 +27,6 @@ def ConvertToDestinationPassingStyle :
   let constructor = "mlir::iree_compiler::createConvertToDestinationPassingStylePass()";
 }
 
-def DemoteF32ToF16 :
-    Pass<"iree-convert-f32-to-f16", "ModuleOp"> {
-  let summary = "Convert f32 operations and values into equivalent f16 ones.";
-  let constructor = "mlir::iree_compiler::createDemoteF32ToF16Pass()";
-}
-
 def FlattenMemRefSubspan :
   Pass<"iree-codegen-flatten-memref-subspan", "ModuleOp"> {
   let summary =
@@ -132,16 +126,6 @@ def SetNumWorkgroups :
   let constructor = "mlir::iree_compiler::createSetNumWorkgroupsPass()";
 }
 
-// TODO: Consider removing or moving to HAL/Transforms in order to avoid
-// polluting common pass declarations with HAL specific ops.
-def SetNumWorkgroupsFromLinalgExt :
-    Pass<"iree-set-num-workgroups-from-linalg-ext",
-         "mlir::iree_compiler::IREE::HAL::ExecutableVariantOp"> {
-  let summary =
-      "Propagate the number of workgroups for entry point functions";
-  let constructor = "mlir::iree_compiler::createSetNumWorkgroupsFromLinalgExtPass()";
-}
-
 // TODO: Rename argument to be fully qualified.
 def LinalgToVectorVectorizeConv :
     Pass<"iree-codegen-vectorize-linalg-conv", "func::FuncOp"> {
@@ -178,6 +162,18 @@ def MemrefCopyToLinalgPass :
   let constructor =
       "mlir::iree_compiler::createMemrefCopyToLinalgPass()";
 }
+
+def WorkGroupSwizzle :
+    Pass<"iree-workgroup-swizzle", "func::FuncOp"> {
+  let summary = "swizzle the workgroup ids for better cache reuse";
+  let constructor = "mlir::iree_compiler::createWorkGroupSwizzle()";
+  let options = [
+    Option<"logTile", "logTile", "unsigned",
+            /*default=*/"0",
+           "pass the tile value for unit testing">,
+  ];
+}
+
 //------------------------------------------------------------------------------
 // LLVMCPU
 //------------------------------------------------------------------------------
@@ -315,6 +311,12 @@ def LLVMGPUMultiBuffering :
   let constructor = "mlir::iree_compiler::createLLVMGPUMultiBuffering()";
 }
 
+def LLVMGPUReduceBankConflicts :
+    Pass<"iree-llvmgpu-reduce-bank-conflicts", "func::FuncOp"> {
+  let summary = "Pass try reduce the number of bank conflicts.";
+  let constructor = "mlir::iree_compiler::createLLVMGPUReduceSharedMemoryBankConflicts()";
+}
+
 def LLVMGPUVectorToGPU :
     Pass<"iree-llvmgpu-vector-to-gpu", "func::FuncOp"> {
   let summary = "Pass to convert vector to gpu.";
@@ -337,12 +339,6 @@ def SPIRVLowerExecutableTarget :
                 "IREE::HAL::DispatchLoweringPassPipeline";
   let constructor =
       "mlir::iree_compiler::createSPIRVLowerExecutableTargetPass()";
-}
-
-def SPIRVInitConfig :
-    Pass<"iree-spirv-init-config-pass", "ModuleOp"> {
-  let summary = "Initialize CodeGen configuration for a given dispatch region";
-  let constructor = "mlir::iree_compiler::createSPIRVInitConfigPass()";
 }
 
 def SPIRVTile : Pass<"iree-spirv-tile", "func::FuncOp"> {

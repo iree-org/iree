@@ -43,9 +43,8 @@ static llvm::cl::opt<unsigned> benchmarkDispatchRepeatCount{
     "iree-hal-benchmark-dispatch-repeat-count",
     llvm::cl::desc(
         "The number of times to repeat each hal.command_buffer.dispatch op. "
-        "(Not that this simply duplicates the dispatch op and inserts "
-        "barriers. It's meant for command buffers having linear dispatch "
-        "structures.)"),
+        "This simply duplicates the dispatch op and inserts barriers. It's "
+        "meant for command buffers having linear dispatch structures."),
     llvm::cl::init(1)};
 
 }  // namespace
@@ -116,6 +115,15 @@ void buildHALTransformPassPipeline(OpPassManager &passManager,
   // Each executable needs a hal.interface to specify how the host and
   // device communicate across the ABI boundary.
   passManager.addPass(createMaterializeInterfacesPass());
+
+  // Dump a source listing of each hal.executable and update the source
+  // locations in the IR. This will allow us to easily inspect each executable
+  // and give downstream tools that can display source information something
+  // more useful and slim than the entire original source model.
+  if (!targetOptions.sourceListingPath.empty()) {
+    passManager.addPass(
+        createDumpExecutableSourcesPass(targetOptions.sourceListingPath));
+  }
 
   // TODO(benvanik): move translation after conversion; today translation
   // inserts the workgroup count logic we need to convert but we could instead

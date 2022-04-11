@@ -44,13 +44,16 @@
 #include "mlir/IR/Diagnostics.h"
 #include "mlir/IR/OpImplementation.h"
 #include "mlir/IR/SymbolTable.h"
+#include "mlir/Parser/Parser.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "mlir/Transforms/InliningUtils.h"
 #include "mlir/Transforms/Passes.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/ScopeExit.h"
+#include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/Debug.h"
+#include "llvm/Support/FormatVariadic.h"
 
 #define DEBUG_TYPE "linalg-transform-dialect"
 #define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE << "]: ")
@@ -93,6 +96,75 @@ static SmallVector<unsigned> extractUIntArray(ArrayAttr attr) {
   for (APInt value : attr.getAsValueRange<IntegerAttr>())
     result.push_back(value.getZExtValue());
   return result;
+}
+
+/// Apply a tiling transformation to all payload ops and store both the
+/// tiled operation as well as the created tile loops.
+static LogicalResult
+applyTilingToAll(Operation *transformOp, Value target,
+                 ArrayRef<int64_t> tileSizes,
+                 transform::TransformResults &transformResults,
+                 transform::TransformState &state,
+                 std::function<FailureOr<TiledLinalgOp>(LinalgOp)> applyFn) {
+  size_t numLoops = tileSizes.size() - llvm::count(tileSizes, 0);
+
+  SmallVector<Operation *> tiledLinalgOps;
+  SmallVector<SmallVector<Operation *>> loopOps(numLoops);
+
+  for (Operation *target : state.getPayloadOps(target)) {
+    auto linalgOp = cast<linalg::LinalgOp>(target);
+    FailureOr<TiledLinalgOp> tiled = applyFn(linalgOp);
+    if (failed(tiled))
+      return failure();
+
+    tiledLinalgOps.push_back(tiled->op);
+    if (tiled->loops.size() != numLoops)
+      // Not enough loops were generated. This usually means that the input size
+      // was smaller than the tiling size.
+      // TODO: LinalgTilingPattern should return failure().
+      return failure();
+    for (unsigned int i = 0; i < numLoops; ++i) {
+      loopOps[i].push_back(tiled->loops[i]);
+    }
+  }
+
+  transformResults.set(transformOp->getOpResult(0), tiledLinalgOps);
+  for (unsigned int i = 0; i < numLoops; ++i) {
+    transformResults.set(transformOp->getOpResult(i + 1), loopOps[i]);
+  }
+  return success();
+}
+
+/// Parse a tiling operation that returns the tiled op as well as the created
+/// tile loops. The function counts the non-zero tile sizes to compute the
+/// number of results.
+static ParseResult parseTileOp(OpAsmParser &parser, OperationState &result,
+                               StringRef sizesAttrName) {
+  OpAsmParser::UnresolvedOperand targetOperand;
+  SMLoc opLoc;
+  parser.getCurrentLocation(&opLoc);
+  if (parser.parseOperand(targetOperand))
+    return parser.emitError(opLoc, "expected `target` operand");
+  if (parser.parseOptionalAttrDict(result.attributes))
+    return failure();
+  Attribute sizesAttr = result.attributes.get(sizesAttrName);
+  if (!sizesAttr) {
+    return parser.emitError(
+        opLoc, llvm::formatv("expected `{0}` attribute", sizesAttrName));
+  }
+  auto sizesArrayAttr = sizesAttr.dyn_cast<ArrayAttr>();
+  if (!sizesArrayAttr) {
+    return parser.emitError(
+        opLoc,
+        llvm::formatv("`{0}` attribute must be an array", sizesAttrName));
+  }
+  Type pdlOpType = parser.getBuilder().getType<pdl::OperationType>();
+  size_t numExpectedLoops =
+      sizesArrayAttr.size() - llvm::count(extractI64Array(sizesArrayAttr), 0);
+  result.addTypes(SmallVector<Type>(numExpectedLoops + 1, pdlOpType));
+  if (parser.resolveOperand(targetOperand, pdlOpType, result.operands))
+    return failure();
+  return success();
 }
 
 //===---------------------------------------------------------------------===//
@@ -150,56 +222,86 @@ LogicalResult transform::MatchOp::apply(TransformResults &results,
 // TileOp
 //===---------------------------------------------------------------------===//
 
-FailureOr<LinalgOp> transform::TileOp::applyToOne(LinalgOp target) {
+LogicalResult transform::TileOp::apply(TransformResults &transformResults,
+                                       TransformState &state) {
   LinalgTilingOptions tilingOptions;
   SmallVector<int64_t> tileSizes = extractI64Array(sizes());
-  // "scalarize_dyn_dims" actually sets the same lambda as the tile sizes and
-  // asserts that it is not already set.
-  if (!tileSizes.empty() || !scalarize_dyn_dims())
+
+  if (!tileSizes.empty())
     tilingOptions.setTileSizes(tileSizes);
   tilingOptions.setInterchange(extractUIntArray(interchange()));
-  tilingOptions.setPeeledLoops(extractI64Array(peel()));
-  if (scalarize_dyn_dims())
-    tilingOptions.scalarizeDynamicDims();
-
   LinalgTilingPattern pattern(getContext(), tilingOptions);
-  auto functionalTile = [&](LinalgOp op,
-                            PatternRewriter &rewriter) -> FailureOr<LinalgOp> {
-    auto result = pattern.returningMatchAndRewrite(op, rewriter);
-    if (failed(result))
-      return failure();
-    return result->op;
+  auto functionalTile =
+      [&](LinalgOp op, PatternRewriter &rewriter) -> FailureOr<TiledLinalgOp> {
+    return pattern.returningMatchAndRewrite(op, rewriter);
   };
-  return functional::applyAt(target, functionalTile);
+
+  return applyTilingToAll(getOperation(), target(), tileSizes, transformResults,
+                          state, [&](LinalgOp linalgOp) {
+                            return functional::applyAt(linalgOp,
+                                                       functionalTile);
+                          });
 }
 
-LogicalResult transform::TileOp::verify() {
-  if (!sizes().empty() && scalarize_dyn_dims()) {
-    return emitOpError() << sizesAttrName() << " and "
-                         << scalarize_dyn_dimsAttrName()
-                         << " attributes are mutually exclusive";
-  }
-  return success();
+ParseResult transform::TileOp::parse(OpAsmParser &parser,
+                                     OperationState &result) {
+  return parseTileOp(parser, result, "sizes");
+}
+
+void transform::TileOp::print(OpAsmPrinter &p) {
+  p << ' ';
+  p << target();
+  p.printOptionalAttrDict((*this)->getAttrs());
+}
+
+//===---------------------------------------------------------------------===//
+// ScalarizeOp
+//===---------------------------------------------------------------------===//
+
+FailureOr<LinalgOp> transform::ScalarizeOp::applyToOne(LinalgOp target) {
+  LinalgTilingOptions tilingOptions;
+  tilingOptions.scalarizeDynamicDims();
+  // Tiling with "scalarize_dyn_dims" actually sets the same lambda as the tile
+  // sizes and asserts that it is not already set.
+  SmallVector<int64_t> emptyTileSizes;
+  LinalgTilingPattern pattern(getContext(), tilingOptions);
+  auto maybeTiledLinalgOp =
+      functional::applyReturningPatternAt(pattern, target);
+  if (failed(maybeTiledLinalgOp))
+    return failure();
+  return maybeTiledLinalgOp->op;
 }
 
 //===---------------------------------------------------------------------===//
 // FuseOp
 //===---------------------------------------------------------------------===//
 
-FailureOr<LinalgOp> transform::FuseOp::applyToOne(LinalgOp target) {
+LogicalResult transform::FuseOp::apply(TransformResults &transformResults,
+                                       TransformState &state) {
   LinalgTilingAndFusionOptions fusionOptions;
   fusionOptions.tileSizes = extractI64Array(tile_sizes());
   fusionOptions.tileInterchange = extractI64Array(tile_interchange());
 
   LinalgTileAndFuseTensorOpsPattern pattern(getContext(), fusionOptions);
-  auto functionalFuse = [&](LinalgOp op,
-                            PatternRewriter &rewriter) -> FailureOr<LinalgOp> {
-    auto tileLoopNest = pattern.returningMatchAndRewrite(op, rewriter);
-    if (failed(tileLoopNest))
-      return failure();
-    return tileLoopNest->getRootOp();
+  auto functionalFuse =
+      [&](LinalgOp op, PatternRewriter &rewriter) -> FailureOr<TileLoopNest> {
+    return pattern.returningMatchAndRewrite(op, rewriter);
   };
-  return functional::applyAt(target, functionalFuse);
+
+  return applyTilingToAll(
+      getOperation(), target(), fusionOptions.tileSizes, transformResults,
+      state, [&](LinalgOp linalgOp) -> FailureOr<TiledLinalgOp> {
+        FailureOr<TileLoopNest> tileLoopNest =
+            functional::applyAt(linalgOp, functionalFuse);
+        if (failed(tileLoopNest))
+          return failure();
+
+        TiledLinalgOp tiledLinalgOp;
+        tiledLinalgOp.op = tileLoopNest->getRootOp();
+        tiledLinalgOp.loops = {tileLoopNest->getLoopOps().begin(),
+                               tileLoopNest->getLoopOps().end()};
+        return tiledLinalgOp;
+      });
 }
 
 LogicalResult transform::FuseOp::verify() {
@@ -211,6 +313,17 @@ LogicalResult transform::FuseOp::verify() {
                          << tile_interchange();
   }
   return success();
+}
+
+ParseResult transform::FuseOp::parse(OpAsmParser &parser,
+                                     OperationState &result) {
+  return parseTileOp(parser, result, "tile_sizes");
+}
+
+void transform::FuseOp::print(OpAsmPrinter &p) {
+  p << ' ';
+  p << target();
+  p.printOptionalAttrDict((*this)->getAttrs());
 }
 
 //===---------------------------------------------------------------------===//
@@ -256,49 +369,56 @@ LogicalResult transform::InterchangeOp::verify() {
 // PadOp
 //===---------------------------------------------------------------------===//
 
-/// Returns the neutral value for a Linalg operation that produces the given
-/// operand, construct using the provided builder. Currently assumes the
-/// reduction in the Linalg operation is an addition and, therefore, the neutral
-/// value is zero.
-static Value getNeutralOfLinalgOp(OpBuilder &b, OpOperand &op) {
-  auto t = getElementTypeOrSelf(op.get().getType());
-  return b.create<arith::ConstantOp>(op.getOwner()->getLoc(), t,
-                                     b.getZeroAttr(t));
-}
-
 FailureOr<LinalgOp> transform::PadOp::applyToOne(LinalgOp target) {
-  // Disabled due to incompatibility with changes in
-  // https://github.com/llvm/llvm-project/commit/58d0da885ef46e3fdb5247295da7898b377c41e1
+  // Convert the integer packing flags to booleans.
+  SmallVector<bool> packPaddings;
+  for (int64_t packPadding : extractI64Array(this->pack_paddings()))
+    packPaddings.push_back(static_cast<bool>(packPadding));
 
-  // Copy the stack allocated options since the lambdas have a longer lifetime.
-  // SmallVector<int64_t> packPaddings = extractI64Array(this->pack_paddings());
-  // auto packFunc = [=](OpOperand &opOperand) {
-  //   return opOperand.getOperandNumber() < packPaddings.size()
-  //              ? packPaddings[opOperand.getOperandNumber()] != 0
-  //              : false;
-  // };
-  // SmallVector<int64_t> hoistPaddings =
-  // extractI64Array(this->hoist_paddings()); auto hoistingFunc = [=](OpOperand
-  // &opOperand) {
-  //   return opOperand.getOperandNumber() < hoistPaddings.size()
-  //              ? hoistPaddings[opOperand.getOperandNumber()]
-  //              : 0;
-  // };
-  // ArrayAttr transposePaddings = this->transpose_paddings().cast<ArrayAttr>();
-  // auto transposeFunc = [=](OpOperand &opOperand) {
-  //   if (opOperand.getOperandNumber() >= transposePaddings.size())
-  //     return SmallVector<int64_t>();
-  //   return extractI64Array(
-  //       transposePaddings[opOperand.getOperandNumber()].cast<ArrayAttr>());
-  // };
+  // Convert the padding values to attributes.
+  SmallVector<Attribute> paddingValues;
+  for (auto const &it :
+       llvm::zip(this->padding_values(), target->getOperandTypes())) {
+    Attribute attr = std::get<0>(it);
+    Type elementType = getElementTypeOrSelf(std::get<1>(it));
+    // Try to parse string attributes to obtain an attribute of element type.
+    if (auto stringAttr = attr.dyn_cast<StringAttr>()) {
+      paddingValues.push_back(
+          parseAttribute(attr.cast<StringAttr>(), elementType));
+      if (!paddingValues.back()) {
+        return target->emitOpError("expects a padding value ")
+               << std::get<0>(it) << " that parses to " << elementType;
+      }
+      continue;
+    }
+    // Otherwise, add the attribute directly.
+    if (attr.getType() != elementType) {
+      return target->emitOpError("expects a padding value ")
+             << attr << " of type " << elementType;
+    }
+    paddingValues.push_back(attr);
+  }
+
+  // Extract the transpose vectors.
+  SmallVector<SmallVector<int64_t>> transposePaddings;
+  for (Attribute transposeVector : this->transpose_paddings().cast<ArrayAttr>())
+    transposePaddings.push_back(
+        extractI64Array(transposeVector.cast<ArrayAttr>()));
+
   LinalgPaddingOptions paddingOptions;
-  // paddingOptions.setPaddingValueComputationFunction(getNeutralOfLinalgOp);
-  // paddingOptions.setPaddingNoFoldComputationFunction(packFunc);
-  // paddingOptions.setPaddingHoistComputationFunction(hoistingFunc);
-  // paddingOptions.setPaddingTransposeComputationFunction(transposeFunc);
-
-  return functional::applyAt(target, callLinalgPattern<LinalgPaddingPattern>(
-                                         getContext(), paddingOptions));
+  paddingOptions.setPaddingValues(paddingValues);
+  paddingOptions.setPaddingDimensions(
+      extractI64Array(this->padding_dimensions()));
+  paddingOptions.setPackPaddings(packPaddings);
+  paddingOptions.setHoistPaddings(extractI64Array(this->hoist_paddings()));
+  paddingOptions.setTransposePaddings(transposePaddings);
+  auto res = functional::applyAt(
+      target,
+      callLinalgPattern<LinalgPaddingPattern>(getContext(), paddingOptions));
+  if (failed(res))
+    return target->emitOpError()
+           << "failed to apply LinalgPaddingPattern at: " << target;
+  return res;
 }
 
 LogicalResult transform::PadOp::verify() {
@@ -309,6 +429,14 @@ LogicalResult transform::PadOp::verify() {
     return emitOpError()
            << "expects pack_paddings to contain booleans (0/1), found "
            << pack_paddings();
+  }
+  SmallVector<int64_t> paddingDimensions =
+      extractI64Array(padding_dimensions());
+  if (any_of(paddingDimensions,
+             [](int64_t paddingDimension) { return paddingDimension < 0; })) {
+    return emitOpError()
+           << "expects padding_dimensions to contain positive integers, found "
+           << padding_dimensions();
   }
   SmallVector<int64_t> hoistPaddings = extractI64Array(hoist_paddings());
   if (any_of(hoistPaddings,
@@ -682,7 +810,7 @@ FailureOr<scf::ForOp> transform::PeelLoopOp::applyToOne(scf::ForOp loop) {
   LogicalResult status =
       scf::peelAndCanonicalizeForLoop(rewriter, loop, result);
   if (failed(status))
-    return failure();
+    return loop;
   return result;
 }
 

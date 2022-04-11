@@ -9,14 +9,6 @@ pdl.pattern @pdl_matmul_target : benefit(1) {
 }
 
 iree_linalg_transform.sequence {
-  %0 = match @pdl_matmul_target
-  // %res contains the tiled op and the linalg_ext.tile op.
-  %tiling_result:2 = tile_to_iree_linalg_ext_tile_op %0 {sizes = [2]}
-  %2 = rewrite_iree_linalg_ext_tile_to_in_parallel %tiling_result#1
-  // TODO: Ideally we would bufferize here but we can't atm.
-  rewrite_iree_linalg_ext_in_parallel_to_hal %2
-  // Bufferize happens at the IREE level on HAL operations, we cannot just 
-  // call the linalg_transform.bufferize operation here.
-  // Instead it happens automatically at the end of the linalg-transform-interp
-  // pass.
+  %0 = match @pdl_matmul_target 
+  iree_bufferize
 }

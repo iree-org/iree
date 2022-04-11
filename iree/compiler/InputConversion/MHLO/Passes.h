@@ -46,12 +46,6 @@ std::unique_ptr<OperationPass<ModuleOp>> createFlattenTuplesInCFGPass();
 // Conversions into Linalg
 //------------------------------------------------------------------------------
 
-// Legalizes the input types to those supported by the flow dialect.
-// This will fail if types that cannot be supported at all are present, however
-// conditionally supported types (based on availability, etc) may still be
-// allowed to pass through successfully.
-std::unique_ptr<OperationPass<ModuleOp>> createLegalizeInputTypesPass();
-
 /// Creates XLA-HLO to Linalg on tensors transformation pass.
 std::unique_ptr<OperationPass<func::FuncOp>> createMHLOToLinalgOnTensorsPass();
 

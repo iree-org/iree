@@ -109,7 +109,9 @@ LLVMTargetOptions getLLVMTargetOptionsFromFlags() {
       "iree-llvm-sanitize", llvm::cl::desc("Apply LLVM sanitize feature"),
       llvm::cl::init(SanitizerKind::kNone),
       llvm::cl::values(clEnumValN(SanitizerKind::kAddress, "address",
-                                  "Address sanitizer support")));
+                                  "Address sanitizer support"),
+                       clEnumValN(SanitizerKind::kThread, "thread",
+                                  "Thread sanitizer support")));
   targetOptions.sanitizerKind = clSanitizerKind;
 
   static llvm::cl::opt<std::string> clTargetABI(

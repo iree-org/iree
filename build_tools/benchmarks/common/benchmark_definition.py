@@ -86,6 +86,7 @@ def execute_cmd_and_get_output(args: Sequence[str],
 
 class PlatformType(Enum):
   ANDROID = "Android"
+  LINUX = "Linux"
 
 
 @dataclass

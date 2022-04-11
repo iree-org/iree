@@ -59,7 +59,6 @@ IREE_API_EXPORT iree_string_view_t iree_hal_buffer_usage_format(
     iree_hal_buffer_usage_t value, iree_bitfield_string_temp_t* out_temp) {
   static const iree_bitfield_string_mapping_t mappings[] = {
       // Combined:
-      {IREE_HAL_BUFFER_USAGE_ALL, IREE_SVL("ALL")},
       // Separate:
       {IREE_HAL_BUFFER_USAGE_CONSTANT, IREE_SVL("CONSTANT")},
       {IREE_HAL_BUFFER_USAGE_TRANSFER, IREE_SVL("TRANSFER")},

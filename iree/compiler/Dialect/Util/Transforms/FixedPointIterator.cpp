@@ -25,6 +25,8 @@ namespace {
 class FixedPointIteratorPass
     : public PassWrapper<FixedPointIteratorPass, OperationPass<void>> {
  public:
+  MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(FixedPointIteratorPass)
+
   FixedPointIteratorPass() = default;
   FixedPointIteratorPass(const FixedPointIteratorPass &other)
       : PassWrapper(other) {}

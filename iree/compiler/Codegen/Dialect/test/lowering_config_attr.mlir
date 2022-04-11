@@ -32,11 +32,11 @@ module {
 
 module {
   func.func @test() attributes {
-      lowering_config = #iree_codegen.lowering_config<tile_sizes = [[], [10]], native_vector_size = [32, 32]>} {
+      lowering_config = #iree_codegen.lowering_config<tile_sizes = [[], [10]], tile_interchange = [[], []], native_vector_size = [32, 32]>} {
     return
   }
 }
-// CHECK: #config = #iree_codegen.lowering_config<tile_sizes = {{\[}}[], [10]{{\]}}, native_vector_size = [32, 32]>
+// CHECK: #config = #iree_codegen.lowering_config<tile_sizes = {{\[}}[], [10]{{\]}}, tile_interchange = {{\[}}[], []], native_vector_size = [32, 32]>
 
 // -----
 

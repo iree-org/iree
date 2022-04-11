@@ -39,7 +39,7 @@ iree_cc_library(
     MLIRSCFToControlFlow
     MLIRSupport
     MLIRTensor
-    MLIRTosaToStandard
+    MLIRTosaToArith
     MLIRTransforms
     MLIRVector
     MLIRVectorToSCF

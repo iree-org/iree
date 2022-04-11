@@ -38,29 +38,21 @@ getMatchingOps(Operation *parent, const FrozenRewritePatternSet &patterns) {
 /// Hook for PDL driver to check if an operation (`values[0]`) is directly
 /// nested in a function with the name provided by an attribute (`values[1]`).
 /// TODO: PDL needs user-defined "questions".
-static LogicalResult nestedInFunc(ArrayRef<PDLValue> values,
-                                  PatternRewriter &rewriter) {
-  assert(values.size() == 2 && "expected two arguments");
-  auto *operation = values[0].cast<Operation *>();
-  auto attr = values[1].cast<Attribute>();
-
+static LogicalResult nestedInFunc(PatternRewriter &rewriter,
+                                  Operation *operation, Attribute attr) {
   auto func = operation->getParentOfType<func::FuncOp>();
-  auto functionSymbol = attr.dyn_cast<SymbolRefAttr>();
-
   if (!func)
     return rewriter.notifyMatchFailure(operation, "not nested in a function");
+  auto functionSymbol = attr.dyn_cast<SymbolRefAttr>();
   if (!functionSymbol)
     return rewriter.notifyMatchFailure(operation, "not a function identifier");
   return success(functionSymbol.getLeafReference() == func.getName());
 }
 
 /// PDL rewrite hook that does nothing.
-static void noOpRewriter(ArrayRef<PDLValue> args, PatternRewriter &rewriter,
-                         PDLResultList &results) {
-  assert(args.size() == 1 && "expected one argument");
+static void noOpRewriter(PatternRewriter &rewriter, Operation *op) {
 #ifndef NDEBUG
-  args.front().cast<Operation *>()->setAttr("iree_linalg_transform.matched",
-                                            rewriter.getUnitAttr());
+  op->setAttr("iree_linalg_transform.matched", rewriter.getUnitAttr());
 #endif
 }
 
@@ -104,9 +96,9 @@ static LogicalResult haveEquivalentBodies(LinalgOp linalgOp,
 }
 
 /// Succeed when `linalgOp` and `linalgModelOp` are deemed equivalent.
-static LogicalResult isEquivalentToOpImpl(LinalgOp linalgOp,
-                                          LinalgOp linalgModelOp,
-                                          PatternRewriter &rewriter) {
+static LogicalResult isEquivalentToOpImpl(PatternRewriter &rewriter,
+                                          LinalgOp linalgOp,
+                                          LinalgOp linalgModelOp) {
   // If basic properties do not match, return failure.
   if (linalgOp.inputs() != linalgModelOp.inputs() ||
       linalgOp.outputs() != linalgModelOp.outputs() ||
@@ -147,12 +139,9 @@ static LogicalResult isEquivalentToOpImpl(LinalgOp linalgOp,
 ///           and canonicalize to fixed point. If the result is "all zeros",
 ///           then the bodies would be equivalent (really isomorphic).
 ///   3. other cases TBD (e.g. vector.generic when available).
-static LogicalResult isEquivalentToOp(ArrayRef<PDLValue> values,
-                                      PatternRewriter &rewriter) {
-  assert(values.size() == 2 && "expected two arguments");
-  auto *operation = values[0].cast<Operation *>();
-  auto attribute = values[1].cast<Attribute>();
-
+static LogicalResult isEquivalentToOp(PatternRewriter &rewriter,
+                                      Operation *operation,
+                                      Attribute attribute) {
   auto modelOpNameAttr = attribute.dyn_cast<StringAttr>();
   if (!modelOpNameAttr)
     return failure(); // TODO: notifyMatchFailure needs an Operation* handle.
@@ -173,7 +162,7 @@ static LogicalResult isEquivalentToOp(ArrayRef<PDLValue> values,
   LinalgOp linalgOp = dyn_cast<LinalgOp>(operation);
   LinalgOp linalgModelOp = dyn_cast<LinalgOp>(modelOp);
   if (linalgOp && linalgModelOp)
-    return isEquivalentToOpImpl(linalgOp, linalgModelOp, rewriter);
+    return isEquivalentToOpImpl(rewriter, linalgOp, linalgModelOp);
 
   // 3. TBD
   return failure();
@@ -187,12 +176,8 @@ static LogicalResult isEquivalentToOp(ArrayRef<PDLValue> values,
 /// multiple of `divisor`.
 /// Note: 0 is the convention to express "do not tile", it is considered to
 /// divide everything.
-static LogicalResult isDimMultipleOf(ArrayRef<PDLValue> values,
-                                     PatternRewriter &rewriter) {
-  assert(values.size() == 2 && "expected two arguments");
-  auto operands = values[0].cast<ValueRange>();
-  auto attribute = values[1].cast<Attribute>();
-
+static LogicalResult isDimMultipleOf(PatternRewriter &rewriter,
+                                     ValueRange operands, Attribute attribute) {
   auto dict = attribute.dyn_cast<DictionaryAttr>();
   if (!dict)
     return failure(); // TODO: notifyMatchFailure needs an Operation* handle.
@@ -230,12 +215,8 @@ static LogicalResult isDimMultipleOf(ArrayRef<PDLValue> values,
 ///       IntegerAttr entries.
 /// Succeed if `value`[`operand_number`] is a ranked type whose `dim` is
 /// dynamic.
-static LogicalResult isDimStatic(ArrayRef<PDLValue> values,
-                                 PatternRewriter &rewriter) {
-  assert(values.size() == 2 && "expected two arguments");
-  auto operands = values[0].cast<ValueRange>();
-  auto attribute = values[1].cast<Attribute>();
-
+static LogicalResult isDimStatic(PatternRewriter &rewriter, ValueRange operands,
+                                 Attribute attribute) {
   auto dict = attribute.dyn_cast<DictionaryAttr>();
   if (!dict)
     return failure(); // TODO: notifyMatchFailure needs an Operation* handle.
@@ -264,12 +245,8 @@ static LogicalResult isDimStatic(ArrayRef<PDLValue> values,
 ///       IntegerAttr entries.
 /// Succeed if `value`[`operand_number`] is a ranked type whose `dim` is
 /// dynamic.
-static LogicalResult isDimDynamic(ArrayRef<PDLValue> values,
-                                  PatternRewriter &rewriter) {
-  assert(values.size() == 2 && "expected two arguments");
-  auto operands = values[0].cast<ValueRange>();
-  auto attribute = values[1].cast<Attribute>();
-
+static LogicalResult isDimDynamic(PatternRewriter &rewriter,
+                                  ValueRange operands, Attribute attribute) {
   auto dict = attribute.dyn_cast<DictionaryAttr>();
   if (!dict)
     return failure(); // TODO: notifyMatchFailure needs an Operation* handle.

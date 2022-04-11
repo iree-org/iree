@@ -18,7 +18,8 @@ pdl.pattern @pdl_target : benefit(1) {
   %args = operands
   %results = types
   %0 = operation "linalg.matmul"(%args : !pdl.range<value>) -> (%results : !pdl.range<type>)
-  apply_native_constraint "nestedInFunc"[@matmul_tensors](%0 : !pdl.operation)
+  %1 = pdl.attribute @matmul_tensors
+  apply_native_constraint "nestedInFunc"(%0, %1 : !pdl.operation, !pdl.attribute)
   // TODO: we don't want this, but it is the required terminator for pdl.pattern
   rewrite %0 with "iree_linalg_transform.apply"
 }
@@ -27,7 +28,7 @@ iree_linalg_transform.sequence {
   // This should match the strategy below.
   // EXPAND-NOT: expert apply
   // EXPAND: %[[OP:.*]] = match @pdl_target
-  // EXPAND: %[[HANDLE:.*]] = tile %[[OP]] {sizes = [4, 4, 4]}
+  // EXPAND: %[[HANDLE:.*]], %{{.*}}:3 = tile %[[OP]] {sizes = [4, 4, 4]}
   // EXPAND: %[[HANDLE2:.*]] = vectorize %[[HANDLE]] {vectorize_padding = true}
   // EXPAND: bufferize
   // EXPAND: lower_vectors {multireduction_lowering = "innerreduce"}
@@ -62,7 +63,7 @@ module @strategies {
     rewrite %root {
       %tile = operation "iree_linalg_transform.tile"(%target : !pdl.value) {
         "sizes" = %tile_sizes
-      } -> (%transformed : !pdl.type)
+      } -> (%transformed, %transformed, %transformed, %transformed : !pdl.type, !pdl.type, !pdl.type, !pdl.type)
       %handle = result 0 of %tile
 
       %vectorize = operation "iree_linalg_transform.vectorize"(%handle : !pdl.value) {
@@ -100,7 +101,8 @@ pdl.pattern @pdl_target2 : benefit(1) {
   %args = pdl.operands
   %results = pdl.types
   %0 = pdl.operation "linalg.matmul"(%args : !pdl.range<value>) -> (%results : !pdl.range<type>)
-  pdl.apply_native_constraint "nestedInFunc"[@matmul_tensors2](%0 : !pdl.operation)
+  %1 = pdl.attribute @matmul_tensors2
+  apply_native_constraint "nestedInFunc"(%0, %1 : !pdl.operation, !pdl.attribute)
   // TODO: we don't want this, but it is the required terminator for pdl.pattern
   pdl.rewrite %0 with "iree_linalg_transform.apply"
 }
@@ -109,14 +111,14 @@ iree_linalg_transform.sequence {
   // This should match the strategy below.
   // EXPAND-NOT: expert apply
   // EXPAND: %[[OP:.*]] = match @pdl_target2
-  // EXPAND: %[[HANDLE:.*]] = tile %[[OP]] {sizes = [32, 8, 8]}
-  // EXPAND: %[[HANDLE2:.*]] = tile %[[HANDLE]] {sizes = [4, 4, 4]}
+  // EXPAND: %[[HANDLE:.*]], %{{.*}}:3 = tile %[[OP]] {sizes = [32, 8, 8]}
+  // EXPAND: %[[HANDLE2:.*]], %{{.*}}:3 = tile %[[HANDLE]] {sizes = [4, 4, 4]}
   // EXPAND: %[[HANDLE3:.*]] = vectorize %[[HANDLE2]] {vectorize_padding = false}
   // EXPAND: bufferize
   // EXPAND: lower_vectors {multireduction_lowering = "innerparallel"}
   // EXPAND: lower_to_llvm
   %0 = match @pdl_target2
-  %1 = tile %0 {sizes = [32, 8, 8]}
+  %1, %loops:3 = tile %0 {sizes = [32, 8, 8]}
   expert apply "single_tiling" to %1
   {
     tile_sizes = [4, 4, 4],
@@ -144,7 +146,7 @@ module @strategies {
     rewrite %root {
       %tile = operation "iree_linalg_transform.tile"(%target : !pdl.value)  {
         "sizes" = %tile_sizes
-      } -> (%transformed : !pdl.type)
+      } -> (%transformed, %transformed, %transformed, %transformed : !pdl.type, !pdl.type, !pdl.type, !pdl.type)
       %handle = result 0 of %tile
 
       %vectorize = operation "iree_linalg_transform.vectorize"(%handle : !pdl.value) {

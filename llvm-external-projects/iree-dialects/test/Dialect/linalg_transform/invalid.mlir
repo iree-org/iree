@@ -2,10 +2,18 @@
 
 iree_linalg_transform.sequence {
   %0 = match @match
+  // expected-error@below {{expected `sizes` attribute}}
+  tile %0
+}
+
+// -----
+
+iree_linalg_transform.sequence {
+  %0 = match @match
   // expected-error@below {{result #0 has more than one use}}
-  %1 = tile %0
+  %1, %loops:3 = tile %0 {sizes = [32, 32, 32]}
   // expected-note@below {{used here as operand #0}}
-  tile %1
+  tile %1 {sizes = [32, 32, 32]}
   // expected-note@below {{used here as operand #0}}
   vectorize %1
 }
@@ -14,16 +22,16 @@ iree_linalg_transform.sequence {
 
 iree_linalg_transform.sequence {
   %0 = match @match
-  // expected-error@below {{"sizes" and "scalarize_dyn_dims" attributes are mutually exclusive}}
-  tile %0 {sizes = [1,2,3], scalarize_dyn_dims = true}
+  // expected-error@below {{expects iterator_interchange to be a permutation, found [1, 1]}}
+  interchange %0 {iterator_interchange = [1, 1]}
 }
 
 // -----
 
 iree_linalg_transform.sequence {
   %0 = match @match
-  // expected-error@below {{expects iterator_interchange to be a permutation, found [1, 1]}}
-  interchange %0 {iterator_interchange = [1, 1]}
+  // expected-error@below {{expected `tile_sizes` attribute}}
+  fuse %0
 }
 
 // -----
