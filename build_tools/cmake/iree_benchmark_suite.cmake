@@ -205,17 +205,18 @@ function(iree_benchmark_suite)
         "${PACKAGE_NAME}_iree-generate-benchmark-artifact-${_MODULE_SOURCE_BASENAME}-${_VMFB_HASH}"
       )
       if(NOT TARGET "${_TRANSLATION_TARGET_NAME}")
+        iree_get_executable_path(_COMPILE_TOOL_EXECUTABLE "iree-compile")
         add_custom_command(
           OUTPUT "${_VMFB_FILE}"
           COMMAND
-            "$<TARGET_FILE:iree::tools::iree-compile>"
+            ${_COMPILE_TOOL_EXECUTABLE}
               ${_TRANSLATION_ARGS}
               "--mlir-print-op-on-diagnostic=false"
               "${_MODULE_SOURCE}"
               -o "${_VMFB_FILE}"
           WORKING_DIRECTORY "${_VMFB_ARTIFACTS_DIR}"
           DEPENDS
-            iree::tools::iree-compile
+            ${_COMPILE_TOOL_EXECUTABLE}
             "${_MODULE_SOURCE_TARGET}"
             COMMENT "Generating VMFB for ${_COMMON_NAME_SEGMENTS}"
         )
