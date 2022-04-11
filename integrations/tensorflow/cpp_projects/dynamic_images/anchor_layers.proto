@@ -1,0 +1,27 @@
+syntax = "proto2";
+
+package iree.detection;
+
+message AnchorLayers {
+  repeated AnchorLayer anchor_layer = 1;
+}
+
+message AnchorLayer {
+  // The base sizes in pixels for each anchor in this anchor layer.
+  repeated float base_size = 1;
+
+  // The aspect ratios for each anchor in this anchor layer.
+  repeated float aspect_ratio = 2;
+
+  // The anchor height stride in pixels.
+  optional uint32 height_stride = 3;
+
+  // The anchor width stride in pixels.
+  optional uint32 width_stride = 4;
+
+  // The anchor height offset in pixels.
+  optional uint32 height_offset = 5 [default = 0];
+
+  // The anchor width offset in pixels.
+  optional uint32 width_offset = 6 [default = 0];
+}

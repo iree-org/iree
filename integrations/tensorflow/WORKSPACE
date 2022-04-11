@@ -6,8 +6,25 @@
 """Adds a local dependency on tensorflow."""
 
 load("@bazel_tools//tools/build_defs/repo:git.bzl", "git_repository")
+load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 
 TENSORFLOW_COMMIT = "fa5d2b36d097e5e2df5b487a5ac13efe62c41597"
+
+http_archive(
+    name = "stblib",
+    build_file = "@org_tensorflow_lite_support//third_party:stblib.BUILD",
+    sha256 = "13a99ad430e930907f5611325ec384168a958bf7610e63e60e2fd8e7b7379610",
+    strip_prefix = "stb-b42009b3b9d4ca35bc703f5310eedc74f584be58",
+    urls = ["https://github.com/nothings/stb/archive/b42009b3b9d4ca35bc703f5310eedc74f584be58.tar.gz"],
+)
+
+# TFLite Support
+http_archive(
+    name = "org_tensorflow_lite_support",
+    sha256 = "ccb4a238a5cd7ce34ddff285453da7c5d62df981bc1569ce8d26050d3675d023",
+    strip_prefix = "tflite-support-0.3.1",
+    urls = ["https://github.com/tensorflow/tflite-support/archive/refs/tags/v0.3.1.tar.gz"],
+)
 
 git_repository(
     name = "org_tensorflow",
