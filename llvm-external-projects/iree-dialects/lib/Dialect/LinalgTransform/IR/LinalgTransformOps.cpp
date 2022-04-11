@@ -86,16 +86,6 @@ static SmallVector<int64_t> extractI64Array(ArrayAttr attr) {
   return result;
 }
 
-/// Extracts a vector of StringRef from an array attribute. Asserts if the
-/// attribute contains values other than StringRefs.
-static SmallVector<StringRef> extractStringArray(ArrayAttr attr) {
-  SmallVector<StringRef> result;
-  result.reserve(attr.size());
-  for (StringRef value : attr.getAsValueRange<StringAttr>())
-    result.push_back(value);
-  return result;
-}
-
 /// Extracts a vector of unsigned from an array attribute. Asserts if the
 /// attribute contains values other than intergers. May truncate.
 static SmallVector<unsigned> extractUIntArray(ArrayAttr attr) {
@@ -342,14 +332,26 @@ FailureOr<LinalgOp> transform::PadOp::applyToOne(LinalgOp target) {
 
   // Convert the padding values to attributes.
   SmallVector<Attribute> paddingValues;
-  for (auto const &it : llvm::zip(extractStringArray(this->padding_values()),
-                                  target->getOperandTypes())) {
+  for (auto const &it :
+       llvm::zip(this->padding_values(), target->getOperandTypes())) {
+    Attribute attr = std::get<0>(it);
     Type elementType = getElementTypeOrSelf(std::get<1>(it));
-    paddingValues.push_back(parseAttribute(std::get<0>(it), elementType));
-    if (!paddingValues.back()) {
-      return target->emitOpError("Could not parse padding value: ")
-             << std::get<0>(it) << " to type: " << elementType;
+    // Try to parse string attributes to obtain an attribute of element type.
+    if (auto stringAttr = attr.dyn_cast<StringAttr>()) {
+      paddingValues.push_back(
+          parseAttribute(attr.cast<StringAttr>(), elementType));
+      if (!paddingValues.back()) {
+        return target->emitOpError("expects a padding value ")
+               << std::get<0>(it) << " that parses to " << elementType;
+      }
+      continue;
     }
+    // Otherwise, add the attribute directly.
+    if (attr.getType() != elementType) {
+      return target->emitOpError("expects a padding value ")
+             << attr << " of type " << elementType;
+    }
+    paddingValues.push_back(attr);
   }
 
   // Extract the transpose vectors.
