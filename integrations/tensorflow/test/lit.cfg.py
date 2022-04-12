@@ -21,7 +21,9 @@ llvm_config.with_system_environment("PYTHONPATH")
 llvm_config.with_system_environment("VK_ICD_FILENAMES")
 
 # Put execution artifacts in the temp dir.
-config.test_exec_root = os.path.join(tempfile.gettempdir(), "lit")
+config.test_exec_root = (os.environ.get("TEST_UNDECLARED_OUTPUTS_DIR") or
+                         os.environ.get("TEST_TMPDIR") or
+                         os.path.join(tempfile.gettempdir(), "lit"))
 
 # name: The name of this test suite.
 config.name = 'TENSORFLOW_TESTS'
@@ -44,21 +46,27 @@ config.excludes = [
     'imagenet_test_data.py',
 ]
 
+PYTHON_EXEC = sys.executable
+
+if PYTHON_EXEC is None:
+  PYTHON_EXEC = os.getenv("PYTHON")
+
 config.substitutions.extend([
-    ('%PYTHON', sys.executable),
+    ('%PYTHON', PYTHON_EXEC),
 ])
 
 # Add our local projects to the PYTHONPATH
 python_projects_dir = os.path.join(os.path.dirname(__file__), "..",
                                    "python_projects")
 test_src_dir = os.path.join(os.path.dirname(__file__), "python")
-llvm_config.with_environment("PYTHONPATH", [
-    test_src_dir,
-    os.path.join(python_projects_dir, "iree_tf"),
-    os.path.join(python_projects_dir, "iree_tflite"),
-    os.path.join(python_projects_dir, "iree_xla"),
-],
-                                      append_path=True)
+llvm_config.with_environment(
+    'PYTHONPATH', [
+        test_src_dir,
+        os.path.join(python_projects_dir, 'iree_tf'),
+        os.path.join(python_projects_dir, 'iree_tflite'),
+        os.path.join(python_projects_dir, 'iree_xla'),
+    ],
+    append_path=True)
 
 # Enable features based on -D FEATURES=hugetest,vulkan
 # syntax.
