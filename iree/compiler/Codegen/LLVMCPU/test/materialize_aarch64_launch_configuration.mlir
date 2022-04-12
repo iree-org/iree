@@ -208,15 +208,57 @@ hal.executable private @restrict_num_workgroups {
     #hal.descriptor_set.binding<2, storage_buffer>
   ]>
 ]>
-hal.executable private @matmul_aarch_i8_i8_i32  {
+hal.executable private @matmul_aarch_i8_i8_i32_static  {
   hal.executable.variant public @system_elf_arm_64, target = <"llvm", "system-elf-arm_64", {
     data_layout = "e-m:e-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128",
     native_vector_size = 16 : index,
     target_triple = "aarch64-none-linux-android30"
   }> {
-  hal.executable.entry_point public @matmul_aarch_i8_i8_i32 layout(#executable_layout)
+  hal.executable.entry_point public @matmul_aarch_i8_i8_i32_static layout(#executable_layout)
     builtin.module {
-      func.func @matmul_aarch_i8_i8_i32() {
+      func.func @matmul_aarch_i8_i8_i32_static() {
+        %c0_i32 = arith.constant 0 : i32
+        %c0 = arith.constant 0 : index
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:128x384xi8>
+        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<readonly:384x1536xi8>
+        %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) offset(%c0) alignment(64) : !flow.dispatch.tensor<writeonly:128x1536xi32>
+        %3 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [128, 384], strides = [1, 1] : !flow.dispatch.tensor<readonly:128x384xi8> -> tensor<128x384xi8>
+        %4 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [384, 1536], strides = [1, 1] : !flow.dispatch.tensor<readonly:384x1536xi8> -> tensor<384x1536xi8>
+        %5 = linalg.init_tensor [128, 1536] : tensor<128x1536xi32>
+        %6 = linalg.fill ins(%c0_i32 : i32) outs(%5 : tensor<128x1536xi32>) -> tensor<128x1536xi32>
+        %7 = linalg.matmul ins(%3, %4 : tensor<128x384xi8>, tensor<384x1536xi8>) outs(%6 : tensor<128x1536xi32>) -> tensor<128x1536xi32>
+        flow.dispatch.tensor.store %7, %2, offsets = [0, 0], sizes = [128, 1536], strides = [1, 1] : tensor<128x1536xi32> -> !flow.dispatch.tensor<writeonly:128x1536xi32>
+        return
+      }
+    }
+  }
+}
+
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[64, 64, 0], [4, 16, 0], [0, 0, 4]]>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert>
+//      CHECK: hal.executable.entry_point public @matmul_aarch_i8_i8_i32_static
+// CHECK-SAME:     translation_info = #[[TRANSLATION]]
+//      CHECK:   linalg.matmul
+// CHECK-SAME:       lowering_config = #[[CONFIG]]
+
+// -----
+
+#executable_layout = #hal.executable.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>,
+    #hal.descriptor_set.binding<2, storage_buffer>
+  ]>
+]>
+hal.executable private @matmul_aarch_i8_i8_i32_dynamic  {
+  hal.executable.variant public @system_elf_arm_64, target = <"llvm", "system-elf-arm_64", {
+    data_layout = "e-m:e-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128",
+    native_vector_size = 16 : index,
+    target_triple = "aarch64-none-linux-android30"
+  }> {
+  hal.executable.entry_point public @matmul_aarch_i8_i8_i32_dynamic layout(#executable_layout)
+    builtin.module {
+      func.func @matmul_aarch_i8_i8_i32_dynamic() {
         %c0 = arith.constant 0 : index
         %M = hal.interface.constant.load[0] : index
         %N = hal.interface.constant.load[1] : index
@@ -242,9 +284,9 @@ hal.executable private @matmul_aarch_i8_i8_i32  {
   }
 }
 
-//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[64, 64, 0], [4, 16, 0], [0, 0, 4]{{\]}}>
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[64, 64, 0], [1, 1, 0], [0, 0, 1]]>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert>
-//      CHECK: hal.executable.entry_point public @matmul_aarch_i8_i8_i32
+//      CHECK: hal.executable.entry_point public @matmul_aarch_i8_i8_i32_dynamic
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK:   linalg.matmul
 // CHECK-SAME:       lowering_config = #[[CONFIG]]

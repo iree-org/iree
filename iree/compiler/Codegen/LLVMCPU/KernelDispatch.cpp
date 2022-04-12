@@ -331,6 +331,23 @@ static void splitParallelAndReductionTiles(
   }
 }
 
+static void setAlwaysVectorizeSizes(linalg::LinalgOp op,
+                                    SmallVectorImpl<int64_t> &parallelSizes,
+                                    SmallVectorImpl<int64_t> &reductionSizes) {
+  Optional<SmallVector<int64_t, 4>> staticLoopRanges = op.getStaticLoopRanges();
+  for (auto en :
+       llvm::enumerate(llvm::zip(*staticLoopRanges, op.iterator_types()))) {
+    auto size = std::get<0>(en.value());
+    if (!ShapedType::isDynamic(size)) continue;
+    auto iterType = std::get<1>(en.value()).cast<StringAttr>().getValue();
+    if (iterType == getParallelIteratorTypeName()) {
+      parallelSizes[en.index()] = 1;
+    } else {
+      reductionSizes[en.index()] = 1;
+    }
+  }
+}
+
 /// Sets the default configuration to use for an operation that implements the
 /// `PartitionableLoopsInterface`, given the iteration domain of all the loops.
 static LogicalResult setDefaultRootConfig(
@@ -379,7 +396,8 @@ static LogicalResult setSandboxRootConfig(func::FuncOp entryPointFn,
          "three loops");
   // The tiling for parallel dims and reduction dims should be separated.
   SmallVector<int64_t> parallelTileSizes;
-  int64_t nLoops = cast<linalg::LinalgOp>(op.getOperation()).getNumLoops();
+  auto linalgOp = cast<linalg::LinalgOp>(op.getOperation());
+  int64_t nLoops = linalgOp.getNumLoops();
   if (nLoops >= 3) {
     parallelTileSizes.append(nLoops - 3, 1);
     parallelTileSizes.push_back(getMaxTileSize(
@@ -397,6 +415,8 @@ static LogicalResult setSandboxRootConfig(func::FuncOp entryPointFn,
   reductionTileSizes.append(nLoops - 1, 0);
   reductionTileSizes.push_back(
       getMaxTileSize(0, K, target2ndTileSizes[2], vectorSize));
+
+  setAlwaysVectorizeSizes(linalgOp, parallelTileSizes, reductionTileSizes);
 
   TileSizesListType tileSizes;
   tileSizes.emplace_back(flowTileSizes.begin(), flowTileSizes.end());
@@ -646,6 +666,7 @@ static LogicalResult setRootConfig(
   SmallVector<int64_t> reductionTileSizes;
   splitParallelAndReductionTiles(linalgOp, parallelTileSizes,
                                  reductionTileSizes);
+  setAlwaysVectorizeSizes(linalgOp, parallelTileSizes, reductionTileSizes);
 
   TileSizesListType tileSizes;
   tileSizes.push_back(flowTileSizes);
@@ -703,6 +724,7 @@ static LogicalResult setConvRootConfig(
   }
   SmallVector<int64_t> reductionTileSizes;
   splitParallelAndReductionTiles(convOp, parallelTileSizes, reductionTileSizes);
+  setAlwaysVectorizeSizes(convOp, parallelTileSizes, reductionTileSizes);
 
   TileSizesListType tileSizes;
   tileSizes.push_back(flowTileSizes);
