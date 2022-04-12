@@ -402,7 +402,7 @@ void SetupHalBindings(pybind11::module m) {
       .value("BFLOAT_16", IREE_HAL_ELEMENT_TYPE_BFLOAT_16)
       .value("BOOL_8",
              static_cast<iree_hal_element_types_t>(IREE_HAL_ELEMENT_TYPE_VALUE(
-                 IREE_HAL_NUMERICAL_TYPE_INTEGER_SIGNED, 1)))
+                 IREE_HAL_NUMERICAL_TYPE_INTEGER, 1)))
       .export_values()
       .def_static("map_to_dtype", &MapElementTypeToDType);
 
