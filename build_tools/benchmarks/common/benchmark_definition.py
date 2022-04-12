@@ -254,17 +254,6 @@ class BenchmarkInfo:
     return BenchmarkInfo(model_name, model_tags, model_source, bench_mode,
                          runner, device_info)
 
-  def deduce_taskset(self) -> str:
-    """Deduces the CPU affinity taskset mask according to benchmark modes."""
-    # TODO: we actually should check the number of cores the phone have.
-    if "big-core" in self.bench_mode:
-      return "80" if "1-thread" in self.bench_mode else "f0"
-    if "little-core" in self.bench_mode:
-      return "08" if "1-thread" in self.bench_mode else "0f"
-
-    # Not specified: use the 7th core.
-    return "80"
-
   def to_json_object(self) -> Dict[str, Any]:
     return {
         "model_name": self.model_name,

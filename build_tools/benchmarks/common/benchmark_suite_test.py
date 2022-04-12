@@ -8,7 +8,7 @@
 import os
 import tempfile
 import unittest
-
+from typing import Sequence
 from common.benchmark_suite import BenchmarkCase, BenchmarkSuite
 
 
@@ -25,13 +25,13 @@ class BenchmarkSuiteTest(unittest.TestCase):
 
   def test_filter_benchmarks_for_category(self):
     case1 = BenchmarkCase(model_name_with_tags="deepnet",
-                          bench_mode="1-thread,full-inference",
+                          bench_mode=["1-thread", "full-inference"],
                           target_arch="CPU-ARMv8",
                           driver="iree-dylib",
                           benchmark_case_dir="case1",
                           benchmark_tool_name="tool")
     case2 = BenchmarkCase(model_name_with_tags="deepnetv2-f32",
-                          bench_mode="full-inference",
+                          bench_mode=["full-inference"],
                           target_arch="GPU-Mali",
                           driver="iree-vulkan",
                           benchmark_case_dir="case2",
@@ -79,13 +79,13 @@ class BenchmarkSuiteTest(unittest.TestCase):
       pytorch_dir = os.path.join(tmp_dir, "PyTorch")
       BenchmarkSuiteTest.__create_bench(tflite_dir,
                                         model="DeepNet",
-                                        bench_mode="4-thread,full",
+                                        bench_mode=["4-thread", "full"],
                                         target_arch="CPU-ARMv8",
                                         driver="iree-dylib",
                                         tool="run-cpu-bench")
       case2 = BenchmarkSuiteTest.__create_bench(pytorch_dir,
                                                 model="DeepNetv2",
-                                                bench_mode="full-inference",
+                                                bench_mode=["full-inference"],
                                                 target_arch="GPU-Mali",
                                                 driver="iree-vulkan",
                                                 tool="run-gpu-bench")
@@ -102,9 +102,9 @@ class BenchmarkSuiteTest(unittest.TestCase):
               gpu_target_arch_filter="gpu-mali"), [case2])
 
   @staticmethod
-  def __create_bench(dir_path: str, model: str, bench_mode: str,
+  def __create_bench(dir_path: str, model: str, bench_mode: Sequence[str],
                      target_arch: str, driver: str, tool: str):
-    case_name = f"{driver}__{target_arch}__{bench_mode}"
+    case_name = f"{driver}__{target_arch}__{','.join(bench_mode)}"
     bench_path = os.path.join(dir_path, model, case_name)
     os.makedirs(bench_path)
     with open(os.path.join(bench_path, "tool"), "w") as f:
