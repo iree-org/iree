@@ -46,13 +46,13 @@ class NonDeviceHalTest(unittest.TestCase):
 
     # Enum and/or operations on MemoryType.
     self.assertEqual(
-        iree.runtime.MemoryType.TRANSIENT |
+        iree.runtime.MemoryType.DEVICE_LOCAL |
         iree.runtime.MemoryType.HOST_VISIBLE,
-        int(iree.runtime.MemoryType.TRANSIENT) |
+        int(iree.runtime.MemoryType.DEVICE_LOCAL) |
         int(iree.runtime.MemoryType.HOST_VISIBLE))
     self.assertEqual(
-        iree.runtime.MemoryType.TRANSIENT & iree.runtime.MemoryType.TRANSIENT,
-        int(iree.runtime.MemoryType.TRANSIENT))
+        iree.runtime.MemoryType.OPTIMAL & iree.runtime.MemoryType.OPTIMAL,
+        int(iree.runtime.MemoryType.OPTIMAL))
 
 
 class DeviceHalTest(unittest.TestCase):

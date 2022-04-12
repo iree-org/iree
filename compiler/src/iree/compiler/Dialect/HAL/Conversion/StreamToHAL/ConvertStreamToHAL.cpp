@@ -117,8 +117,7 @@ static LogicalResult deriveRequiredResourceBufferBits(
       break;
     case IREE::Stream::Lifetime::Transient:
       // Device local; copies required to get into external resources.
-      memoryTypes = memoryTypes | IREE::HAL::MemoryTypeBitfield::DeviceLocal |
-                    IREE::HAL::MemoryTypeBitfield::Transient;
+      memoryTypes = memoryTypes | IREE::HAL::MemoryTypeBitfield::DeviceLocal;
       break;
   }
 
@@ -252,8 +251,7 @@ struct ResourceAllocaOpPattern
 
     // Transient allocations are device-local. Copies are required to get their
     // contents back on the host/another device.
-    auto memoryTypes = IREE::HAL::MemoryTypeBitfield::DeviceLocal |
-                       IREE::HAL::MemoryTypeBitfield::Transient;
+    auto memoryTypes = IREE::HAL::MemoryTypeBitfield::DeviceLocal;
 
     // TODO(benvanik): refine usage.
     // We know by construction that transient buffers are not host visible and

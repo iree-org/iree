@@ -372,10 +372,6 @@ IREE_API_EXPORT iree_status_t iree_hal_command_buffer_wait_events(
 // After encoding a discard the buffer contents will be considered undefined.
 // This is because the discard may be used to elide write backs to host memory
 // or aggressively reuse the allocation for other purposes.
-//
-// For buffers allocated with IREE_HAL_MEMORY_TYPE_TRANSIENT this may allow
-// the device queue to reclaim the memory used by the buffer earlier than
-// otherwise possible.
 IREE_API_EXPORT iree_status_t iree_hal_command_buffer_discard_buffer(
     iree_hal_command_buffer_t* command_buffer, iree_hal_buffer_t* buffer);
 

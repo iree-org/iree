@@ -30,18 +30,17 @@ typedef struct iree_hal_allocator_t iree_hal_allocator_t;
 enum iree_hal_memory_type_bits_t {
   IREE_HAL_MEMORY_TYPE_NONE = 0u,
 
-  // Memory is lazily allocated by the device and only exists transiently.
-  // This is the optimal mode for memory used only within a single command
-  // buffer. Transient buffers, even if they have
-  // IREE_HAL_MEMORY_TYPE_HOST_VISIBLE set, should be treated as device-local
-  // and opaque as they may have no memory attached to them outside of the time
-  // they are being evaluated on devices.
+  // The allocator will choose the optimal memory type based on buffer usage.
+  // Allocation will succeed if there is a heap available for the allocator to
+  // place the memory into.
   //
-  // This flag can be treated as a hint in most cases; allocating a buffer with
-  // it set _may_ return the same as if it had not be set. Certain allocation
-  // routines may use the hint to more tightly control reuse or defer wiring the
-  // memory.
-  IREE_HAL_MEMORY_TYPE_TRANSIENT = 1u << 0,
+  // Additional bits can be provided to restrict the set of memory types that
+  // are chosen. For example, if the user knows that a bulk of the accesses will
+  // happen from device the IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL bit can be set to
+  // force the allocator to place it on device.
+  //
+  // This bit is only used during allocation.
+  IREE_HAL_MEMORY_TYPE_OPTIMAL = 1u << 0,
 
   // Memory allocated with this type can be mapped for host access using
   // iree_hal_buffer_map_range.
@@ -62,14 +61,28 @@ enum iree_hal_memory_type_bits_t {
   IREE_HAL_MEMORY_TYPE_HOST_CACHED = 1u << 3,
 
   // Memory is accessible as normal host allocated memory.
-  IREE_HAL_MEMORY_TYPE_HOST_LOCAL =
-      IREE_HAL_MEMORY_TYPE_HOST_VISIBLE | IREE_HAL_MEMORY_TYPE_HOST_COHERENT,
+  IREE_HAL_MEMORY_TYPE_HOST_LOCAL = IREE_HAL_MEMORY_TYPE_HOST_VISIBLE |
+                                    IREE_HAL_MEMORY_TYPE_HOST_COHERENT |
+                                    (1u << 5),
+
+  // The allocator will choose the optimal memory type based on buffer usage,
+  // preferring to place the allocation in host-local memory.
+  //
+  // Users should set this when it is known that a bulk of accesses to the
+  // buffer will be done by the host, such as readback/download staging buffers.
+  // It should be expected that device access will be slow.
+  //
+  // This bit is only used during allocation.
+  // Allocations will fail if there is no host-local memory type that can
+  // satisfy all requested usage.
+  IREE_HAL_MEMORY_TYPE_OPTIMAL_FOR_HOST =
+      IREE_HAL_MEMORY_TYPE_OPTIMAL | IREE_HAL_MEMORY_TYPE_HOST_LOCAL,
 
   // Memory allocated with this type is visible to the device for execution.
-  // Being device visible does not mean the same thing as
-  // IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL. Though an allocation may be visible to
-  // the device and therefore useable for execution it may require expensive
-  // mapping or implicit transfers.
+  // Being device visible does not mean the memory must reside on device (as
+  // does IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL). Though an allocation may be
+  // visible to the device and therefore useable for execution it may require
+  // expensive mapping or implicit transfers.
   IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE = 1u << 4,
 
   // Memory allocated with this type is the most efficient for device access.
@@ -79,6 +92,20 @@ enum iree_hal_memory_type_bits_t {
   // guaranteed to be fast for all operations.
   IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL =
       IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE | (1u << 5),
+
+  // The allocator will choose the optimal memory type based on buffer usage,
+  // preferring to place the allocation in device-local memory.
+  //
+  // Users should set this when it is known that a bulk of the accesses to the
+  // buffer will be done by the device, such as device transfer and dispatch
+  // operations or light usage of host -> device upload staging buffers.
+  // It should be expected that host access will be slow.
+  //
+  // This bit is only used during allocation.
+  // Allocations will fail if there is no host-local memory type that can
+  // satisfy all requested usage.
+  IREE_HAL_MEMORY_TYPE_OPTIMAL_FOR_DEVICE =
+      IREE_HAL_MEMORY_TYPE_OPTIMAL | IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL,
 };
 typedef uint32_t iree_hal_memory_type_t;
 

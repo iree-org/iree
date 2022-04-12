@@ -308,7 +308,7 @@ void SetupHalBindings(pybind11::module m) {
   // Enums.
   py::enum_<enum iree_hal_memory_type_bits_t>(m, "MemoryType")
       .value("NONE", IREE_HAL_MEMORY_TYPE_NONE)
-      .value("TRANSIENT", IREE_HAL_MEMORY_TYPE_TRANSIENT)
+      .value("OPTIMAL", IREE_HAL_MEMORY_TYPE_OPTIMAL)
       .value("HOST_VISIBLE", IREE_HAL_MEMORY_TYPE_HOST_VISIBLE)
       .value("HOST_COHERENT", IREE_HAL_MEMORY_TYPE_HOST_COHERENT)
       .value("HOST_CACHED", IREE_HAL_MEMORY_TYPE_HOST_CACHED)

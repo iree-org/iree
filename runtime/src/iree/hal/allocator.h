@@ -102,6 +102,9 @@ static inline void iree_hal_buffer_params_canonicalize(
   if (!params->access) {
     params->access = IREE_HAL_MEMORY_ACCESS_ALL;
   }
+  if (!params->type) {
+    params->type = IREE_HAL_MEMORY_TYPE_OPTIMAL;
+  }
   if (!params->queue_affinity) {
     params->queue_affinity = IREE_HAL_QUEUE_AFFINITY_ANY;
   }

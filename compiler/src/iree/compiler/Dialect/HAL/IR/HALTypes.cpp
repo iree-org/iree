@@ -93,8 +93,8 @@ static LogicalResult parseMemoryType(AsmParser &parser, Attribute &attr) {
   MemoryTypeBitfield memoryType = MemoryTypeBitfield::None;
   for (char c : shortString) {
     switch (c) {
-      case 'T':
-        memoryType = memoryType | MemoryTypeBitfield::Transient;
+      case '!':
+        memoryType = memoryType | MemoryTypeBitfield::Optimal;
         break;
       case 'h':
         memoryType = memoryType | MemoryTypeBitfield::HostVisible;
@@ -130,8 +130,8 @@ static void printMemoryType(AsmPrinter &printer,
     printer << '?';
     return;
   }
-  if (allEnumBitsSet(memoryType, MemoryTypeBitfield::Transient)) {
-    printer << 't';
+  if (allEnumBitsSet(memoryType, MemoryTypeBitfield::Optimal)) {
+    printer << '!';
   }
   if (allEnumBitsSet(memoryType, MemoryTypeBitfield::HostLocal)) {
     printer << 'H';
