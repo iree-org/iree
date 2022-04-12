@@ -256,7 +256,8 @@ static int64_t getMaxTileSize(int64_t lb, int64_t ub, int64_t maxSize,
 static SmallVector<int64_t> getDefaultDistributedLevelTileSizes(
     ArrayRef<Range> iterationDomain,
     IREE::Flow::PartitionableLoopsInterface partitionableLoopInterfaceOp,
-    ArrayRef<int64_t> minTileSizes, ArrayRef<int64_t> maxTileSizes) {
+    ArrayRef<int64_t> minTileSizes, ArrayRef<int64_t> maxTileSizes,
+    int64_t vectorSize) {
   assert(iterationDomain.size() == minTileSizes.size() &&
          "expected as many min tile sizes as number of loops");
   auto getStaticValue = [](Value v) -> int64_t {
@@ -309,7 +310,7 @@ static SmallVector<int64_t> getDefaultDistributedLevelTileSizes(
     distributedLevelTileSizes[i] =
         distributedLevelTileSizes[i] != 0
             ? getMaxTileSize(lbs[i], ubs[i], distributedLevelTileSizes[i],
-                             minTileSizes[i])
+                             minTileSizes[i] == 1 ? vectorSize : minTileSizes[i])
             : 0;
   }
   return distributedLevelTileSizes;
@@ -361,7 +362,7 @@ static LogicalResult setDefaultRootConfig(
 
   SmallVector<int64_t> flowTileSizes = getDefaultDistributedLevelTileSizes(
       iterationDomain, partitionableLoopsInterfaceOp, minTileSizes,
-      maxTileSizes);
+      maxTileSizes, 1);
   TileSizesListType tileSizes;
   tileSizes.emplace_back(std::move(flowTileSizes));
   return setOpConfigAndEntryPointFnTranslation(
@@ -489,7 +490,7 @@ static LogicalResult setRootConfig(
       iterationDomain,
       cast<IREE::Flow::PartitionableLoopsInterface>(
           contractionOp.getOperation()),
-      minTileSizes, maxTileSizes);
+      minTileSizes, maxTileSizes, vectorSize);
 
   // TODO(dcaballe): Find better configurations for RISC-V backends.
   if (isX86(entryPointFn) || isRISCV(entryPointFn)) {
@@ -623,7 +624,7 @@ static LogicalResult setRootConfig(
       cast<IREE::Flow::PartitionableLoopsInterface>(genericOp.getOperation());
   SmallVector<int64_t> flowTileSizes = getDefaultDistributedLevelTileSizes(
       iterationDomain, partitionableLoopsInterfaceOp, minTileSizes,
-      maxTileSizes);
+      maxTileSizes, 1);
 
   // Set the Next level tile sizes.
   SmallVector<int64_t> parallelTileSizes(numLoops, 0);
@@ -686,7 +687,7 @@ static LogicalResult setConvRootConfig(
       cast<IREE::Flow::PartitionableLoopsInterface>(convOp.getOperation());
   SmallVector<int64_t> flowTileSizes = getDefaultDistributedLevelTileSizes(
       iterationDomain, partitionableLoopsInterfaceOp, minTileSizes,
-      maxTileSizes);
+      maxTileSizes, vectorSize);
 
   // Shapes of N, OH, OW, OC, KH, KW, (IC)
   Optional<SmallVector<int64_t, 4>> shapes = convOp.getStaticLoopRanges();
