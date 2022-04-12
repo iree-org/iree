@@ -11,6 +11,7 @@ steps:
     commands:
       - "docker run --user=$(id -u):$(id -g) --volume=\\${HOME?}:\\${HOME?} --volume=/etc/passwd:/etc/passwd:ro --volume=/etc/group:/etc/group:ro --volume=\\$PWD:\\$IREE_DOCKER_WORKDIR --workdir=\\$IREE_DOCKER_WORKDIR --rm gcr.io/iree-oss/frontends@sha256:080d9f833bc772b53add2f4ad4ba06723cfb56a05f3a47e12e08c3de95308576 build_tools/cmake/build_android_benchmark.sh"
       - "tar --exclude='*.tar.gz' --exclude='*.tgz' --exclude='*.mlir' --exclude='*.tflite' -czvf benchmark-suites-${BUILDKITE_BUILD_NUMBER}.tgz build-host/benchmark_suites"
+      - "find build-host/benchmark_suites -name '*.mlir' | tar -czvf source-mlir-models-${BUILDKITE_BUILD_NUMBER}.tgz -T -"
       - "tar -czvf iree-android-tools-${BUILDKITE_BUILD_NUMBER}.tgz build-android/iree/tools/iree-benchmark-module build-android-trace/iree/tools/iree-benchmark-module build-android/iree/tools/build_config.txt"
     if: "build.pull_request.id == null || (build.pull_request.labels includes 'buildkite:benchmark')"
     agents:
@@ -19,6 +20,7 @@ steps:
       IREE_DOCKER_WORKDIR: "/usr/src/github/iree"
     artifact_paths:
       - "benchmark-suites-${BUILDKITE_BUILD_NUMBER}.tgz"
+      - "source-mlir-models-${BUILDKITE_BUILD_NUMBER}.tgz"
       - "iree-android-tools-${BUILDKITE_BUILD_NUMBER}.tgz"
 
   - wait
@@ -52,15 +54,15 @@ steps:
       - "tar -xzvf benchmark-suites-${BUILDKITE_BUILD_NUMBER}.tgz"
       - "tar -xzvf iree-android-tools-${BUILDKITE_BUILD_NUMBER}.tgz"
       - "tar -xzvf tracy-capture-6b340b37.tgz"
-      - "python3 build_tools/benchmarks/run_benchmarks_on_android.py --pin-cpu-freq --pin-gpu-freq --normal_benchmark_tool_dir=build-android/iree/tools/ --traced_benchmark_tool_dir=build-android-trace/iree/tools/ --trace_capture_tool=tracy-capture -o benchmark-results-galaxy-pixel6-pro-${BUILDKITE_BUILD_NUMBER}.json --capture_tarball=trace-captures-galaxy-pixel6-pro-${BUILDKITE_BUILD_NUMBER}.tgz --verbose build-host/"
+      - "python3 build_tools/benchmarks/run_benchmarks_on_android.py --pin-cpu-freq --pin-gpu-freq --normal_benchmark_tool_dir=build-android/iree/tools/ --traced_benchmark_tool_dir=build-android-trace/iree/tools/ --trace_capture_tool=tracy-capture -o benchmark-results-pixel6-pro-${BUILDKITE_BUILD_NUMBER}.json --capture_tarball=trace-captures-pixel6-pro-${BUILDKITE_BUILD_NUMBER}.tgz --verbose build-host/"
     if: "build.pull_request.id == null || (build.pull_request.labels includes 'buildkite:benchmark')"
     agents:
       - "android-soc=google-tensor"
       - "android-version=12"
       - "queue=benchmark-android"
     artifact_paths:
-      - "benchmark-results-galaxy-pixel6-pro-${BUILDKITE_BUILD_NUMBER}.json"
-      - "trace-captures-galaxy-pixel6-pro-${BUILDKITE_BUILD_NUMBER}.tgz"
+      - "benchmark-results-pixel6-pro-${BUILDKITE_BUILD_NUMBER}.json"
+      - "trace-captures-pixel6-pro-${BUILDKITE_BUILD_NUMBER}.tgz"
     timeout_in_minutes: "60"
 
   - label: "Benchmark on Moto Edge X30 (snapdragon-8gen1, adreno-730)"
