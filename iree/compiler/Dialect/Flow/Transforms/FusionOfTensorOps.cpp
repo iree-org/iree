@@ -30,10 +30,10 @@ namespace IREE {
 namespace Flow {
 
 /// Check if the producer generic op is fusable with the consumer generic op.
-static bool areFusableOps(MLIRContext *context, linalg::GenericOp producerOp,
-                          linalg::GenericOp consumerOp) {
+static bool areFusableOps(MLIRContext *context, Operation *producerOp,
+                          Operation *consumerOp) {
   // Check for i1 return types, if so aggressively fuse to avoid `i1` buffers.
-  if (llvm::all_of(producer->getResultTypes(), [](Type t) {
+  if (llvm::all_of(producerOp->getResultTypes(), [](Type t) {
         if (t.isInteger(1)) return true;
         if (auto shapedType = t.dyn_cast<ShapedType>()) {
           if (shapedType.getElementType().isInteger(1)) return true;
@@ -72,31 +72,32 @@ struct FusionOfTensorOpsPass
     // Only fuse operations where all uses of the producer are generic
     // operations. If an operation is used in a named op, it will be computed
     // anyway, so the consumers can just use that value.
-    linalg::ControlFusionFn controlFn = [](const OpResult &producerResult,
-                                           OpOperand &consumerOperand) {
-      Operation *producer = producerResult.getOwner();
-      Operation *consumer = consumerOperand.getOwner();
+    linalg::ControlFusionFn fuseElementwiseOpsControlFn =
+        [&](const OpResult &producerResult, OpOperand &consumerOperand) {
+          Operation *producer = producerResult.getOwner();
+          Operation *consumer = consumerOperand.getOwner();
 
-      // Limit the number of operands. We have hard limit (32) of bindings
-      // passing down to HAL. Set the number to be as same as the limit --
-      // IREE_HAL_MODULE_MAX_DESCRIPTOR_BINDING_COUNT.
-      constexpr int64_t kIreeMaxOperandCount = 32;
-      DenseSet<Value> operands;
-      operands.insert(producer->operand_begin(), producer->operand_end());
-      operands.insert(consumer->operand_begin(),
-                      std::next(consumer->operand_begin(),
-                                consumerOperand.getOperandNumber()));
-      operands.insert(std::next(consumer->operand_begin(),
-                                consumerOperand.getOperandNumber() + 1),
-                      consumer->operand_end());
-      if (operands.size() >= kIreeMaxOperandCount) return false;
+          // Limit the number of operands. We have hard limit (32) of bindings
+          // passing down to HAL. Set the number to be as same as the limit --
+          // IREE_HAL_MODULE_MAX_DESCRIPTOR_BINDING_COUNT.
+          constexpr int64_t kIreeMaxOperandCount = 32;
+          DenseSet<Value> operands;
+          operands.insert(producer->operand_begin(), producer->operand_end());
+          operands.insert(consumer->operand_begin(),
+                          std::next(consumer->operand_begin(),
+                                    consumerOperand.getOperandNumber()));
+          operands.insert(std::next(consumer->operand_begin(),
+                                    consumerOperand.getOperandNumber() + 1),
+                          consumer->operand_end());
+          if (operands.size() >= kIreeMaxOperandCount) return false;
 
-      return areFusableOps(context, producer, consumer);
-    };
-    linalg::populateElementwiseOpsFusionPatterns(fusionPatterns, controlFn);
+          return areFusableOps(context, producer, consumer);
+        };
+    linalg::populateElementwiseOpsFusionPatterns(fusionPatterns,
+                                                 fuseElementwiseOpsControlFn);
 
     // Always fold reshape by expansion.
-    linalg::ControlElementwiseOpsFusionFn fuseByExpansionControlFn =
+    linalg::ControlFusionFn fuseByExpansionControlFn =
         [](const OpResult &producer, const OpOperand &consumer) {
           // Do not fuse producer generic op if it has more than one user.
           if (auto producerGenericOp =
@@ -106,8 +107,8 @@ struct FusionOfTensorOpsPass
           // Fuse in all other cases.
           return true;
         };
-    linalg::populateFoldReshapeOpsByExpansionPatterns(
-        fusionPatterns, foldReshapeBetweenLinalgFn);
+    linalg::populateFoldReshapeOpsByExpansionPatterns(fusionPatterns,
+                                                      fuseByExpansionControlFn);
 
     // Constant fold Linalg operations.
     auto constantFoldControlFn = [](const OpResult &producer,
@@ -138,7 +139,7 @@ struct FusionOfTensorOpsPass
     });
 
     // For fusion by collapsing, do so if the reshape is blocking tile and fuse.
-    linalg::ControlElementwiseOpsFusionFn fuseByCollapsingControlFn =
+    linalg::ControlFusionFn fuseByCollapsingControlFn =
         [](const OpResult &producer, const OpOperand &consumer) {
           // Check the case where the producer is an expanding reshape op.
           auto reshapeOp = dyn_cast<tensor::ExpandShapeOp>(producer.getOwner());
