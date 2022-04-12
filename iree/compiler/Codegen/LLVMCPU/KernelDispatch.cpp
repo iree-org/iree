@@ -160,7 +160,8 @@ static unsigned getReferenceTypeLengthInBytes(func::FuncOp entryPointFn) {
 /// Flow level.
 static SmallVector<int64_t> getDefaultDistributedLoopTileSizes(
     ArrayRef<int64_t> lbs, ArrayRef<int64_t> ubs,
-    ArrayRef<int64_t> minTileSizes, ArrayRef<int64_t> maxTileSizes) {
+    ArrayRef<int64_t> minTileSizes, ArrayRef<int64_t> maxTileSizes,
+    ArrayRef<bool> powerFlags = {}) {
   assert(lbs.size() == ubs.size() && lbs.size() == minTileSizes.size() &&
          lbs.size() == maxTileSizes.size() &&
          "expected all vectors to be of equal size");
@@ -173,6 +174,8 @@ static SmallVector<int64_t> getDefaultDistributedLoopTileSizes(
   SmallVector<int64_t> workload(numDims, 1);
   auto ceilFn = [](int64_t a, int64_t b) { return (a + b - 1) / b; };
 
+  SmallVector<bool> usePower(numDims, false);
+
   for (auto i : llvm::seq<size_t>(0, numDims)) {
     if (ShapedType::isDynamic(lbs[i]) || ShapedType::isDynamic(ubs[i])) {
       distributedTileSizes[i] = maxTileSizes[i];
@@ -181,10 +184,29 @@ static SmallVector<int64_t> getDefaultDistributedLoopTileSizes(
     }
     int64_t candidateTileSize = 1;
     if (ubs[i] > lbs[i]) {
-      // Pick a value that evenly distributes the workload.
-      candidateTileSize = std::max<int64_t>(
-          llvm::PowerOf2Floor(static_cast<uint64_t>(ubs[i] - lbs[i]) / 2),
-          minTileSizes[i]);
+      if (!powerFlags.empty() && powerFlags[i]) {
+        candidateTileSize = static_cast<uint64_t>(ubs[i] - lbs[i]);
+        for (int64_t j = 3; j < candidateTileSize; ++j) {
+          if ((j % 2) == 0) {
+            continue;
+          }
+          if ((candidateTileSize % j) != 0) {
+            continue;
+          }
+          if ((candidateTileSize / j) > maxTileSizes[i]) {
+            continue;
+          }
+          candidateTileSize /= j;
+          usePower[i] = true;
+          break;
+        }
+      }
+      if (!usePower[i]) {
+        // Pick a value that evenly distributes the workload.
+        candidateTileSize = std::max<int64_t>(
+            llvm::PowerOf2Floor(static_cast<uint64_t>(ubs[i] - lbs[i]) / 2),
+            minTileSizes[i]);
+      }
     }
 
     // Limit the workload per workgroup to the default being the max to keep the
@@ -205,6 +227,10 @@ static SmallVector<int64_t> getDefaultDistributedLoopTileSizes(
   }
   unsigned currDim = numDims;
   while (numWorkgroups > numWorkgroupsLimit && currDim > 0) {
+    if (usePower[currDim - 1]) {
+      currDim--;
+      continue;
+    }
     if (distributedTileSizes[currDim - 1] >= maxTileSizes[currDim - 1] ||
         workload[currDim - 1] == ShapedType::kDynamicSize ||
         distributedTileSizes[currDim - 1] >= workload[currDim - 1]) {
@@ -256,7 +282,8 @@ static int64_t getMaxTileSize(int64_t lb, int64_t ub, int64_t maxSize,
 static SmallVector<int64_t> getDefaultDistributedLevelTileSizes(
     ArrayRef<Range> iterationDomain,
     IREE::Flow::PartitionableLoopsInterface partitionableLoopInterfaceOp,
-    ArrayRef<int64_t> minTileSizes, ArrayRef<int64_t> maxTileSizes) {
+    ArrayRef<int64_t> minTileSizes, ArrayRef<int64_t> maxTileSizes,
+    ArrayRef<bool> powerFlags = {}) {
   assert(iterationDomain.size() == minTileSizes.size() &&
          "expected as many min tile sizes as number of loops");
   auto getStaticValue = [](Value v) -> int64_t {
@@ -297,7 +324,8 @@ static SmallVector<int64_t> getDefaultDistributedLevelTileSizes(
   SmallVector<int64_t> distributedTileSizes =
       getDefaultDistributedLoopTileSizes(distributedLoopLbs, distributedLoopUbs,
                                          minDistributedLoopTileSizes,
-                                         maxDistributedLoopTileSizes);
+                                         maxDistributedLoopTileSizes,
+                                         powerFlags);
   SmallVector<int64_t> distributedLevelTileSizes(iterationDomain.size(), 0);
   for (auto loopID : llvm::enumerate(partitionableLoops)) {
     distributedLevelTileSizes[loopID.value()] =
@@ -686,7 +714,10 @@ static LogicalResult setConvRootConfig(
       cast<IREE::Flow::PartitionableLoopsInterface>(convOp.getOperation());
   SmallVector<int64_t> flowTileSizes = getDefaultDistributedLevelTileSizes(
       iterationDomain, partitionableLoopsInterfaceOp, minTileSizes,
-      maxTileSizes);
+      maxTileSizes, {false, false, true});
+
+  // flowTileSizes[2] = 14;
+  // flowTileSizes[3] = 48;
 
   // Shapes of N, OH, OW, OC, KH, KW, (IC)
   Optional<SmallVector<int64_t, 4>> shapes = convOp.getStaticLoopRanges();
@@ -694,13 +725,35 @@ static LogicalResult setConvRootConfig(
                                          targetTileSizes.end());
   for (auto i : llvm::seq<unsigned>(0, parallelTileSizes.size())) {
     auto tileSize = flowTileSizes[i] ? flowTileSizes[i] : shapes.getValue()[i];
-    // If the tile size is intended to be 1, do not adjust it to `vectorSize`.
-    // The ops will be decomposed to lower-rank named ops.
-    if (parallelTileSizes[i] != 1) {
-      parallelTileSizes[i] =
-          getMaxTileSize(0, tileSize, parallelTileSizes[i], vectorSize);
+    if (i == 3 && parallelTileSizes[i] > 1 && (tileSize % 4) == 0) {
+      uint64_t subTileSize = 4;
+      while((tileSize % (subTileSize * 2)) == 0
+          && (subTileSize * 2) <= parallelTileSizes[i]) {
+        subTileSize *= 2;
+      }
+      parallelTileSizes[i] = subTileSize;
+    } else {
+      // If the tile size is intended to be 1, do not adjust it to `vectorSize`.
+      // The ops will be decomposed to lower-rank named ops.
+      if (parallelTileSizes[i] != 1) {
+        parallelTileSizes[i] =
+            getMaxTileSize(0, tileSize, parallelTileSizes[i], vectorSize);
+      }
     }
   }
+
+  // parallelTileSizes[2] = 7;
+  /*
+  if (parallelTileSizes[3] > 1 && (parallelTileSizes[3] % 4) == 0) {
+    uint64_t tileSize = 4;
+    while((parallelTileSizes[3] % (tileSize * 2)) == 0) {
+      tileSize *= 2;
+    }
+    parallelTileSizes[3] = tileSize;
+  }
+  */
+  // parallelTileSizes[5] = 1;
+
   SmallVector<int64_t> reductionTileSizes;
   splitParallelAndReductionTiles(convOp, parallelTileSizes, reductionTileSizes);
 
