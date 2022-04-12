@@ -130,31 +130,34 @@ IREE_FLAG_CALLBACK(
 namespace iree {
 namespace {
 
-static void BenchmarkFunction(const std::string& benchmark_name, int batch_size,
-                              iree_vm_context_t* context,
-                              iree_vm_function_t function,
-                              iree_vm_list_t* inputs, iree_hal_device_t* device,
-                              benchmark::State& state) {
+static void BenchmarkGenericFunction(const std::string& benchmark_name,
+                                     int batch_size, iree_vm_context_t* context,
+                                     iree_vm_function_t function,
+                                     iree_vm_list_t* inputs,
+                                     iree_hal_device_t* device,
+                                     benchmark::State& state) {
   IREE_TRACE_SCOPE_DYNAMIC(benchmark_name.c_str());
   IREE_TRACE_FRAME_MARK();
+
+  vm::ref<iree_vm_list_t> outputs;
+  IREE_CHECK_OK(iree_vm_list_create(/*element_type=*/nullptr, 16,
+                                    iree_allocator_system(), &outputs));
 
   // Benchmarking loop.
   while (state.KeepRunningBatch(batch_size)) {
     IREE_TRACE_SCOPE0("BenchmarkIteration");
     IREE_TRACE_FRAME_MARK_NAMED("Iteration");
-    vm::ref<iree_vm_list_t> outputs;
-    IREE_CHECK_OK(iree_vm_list_create(/*element_type=*/nullptr, 16,
-                                      iree_allocator_system(), &outputs));
     IREE_CHECK_OK(iree_vm_invoke(
         context, function, IREE_VM_INVOCATION_FLAG_NONE, /*policy=*/nullptr,
         inputs, outputs.get(), iree_allocator_system()));
+    IREE_CHECK_OK(iree_vm_list_resize(outputs.get(), 0));
   }
 
   // Force a full flush and get the device back to an idle state.
   IREE_CHECK_OK(iree_hal_device_wait_idle(device, iree_infinite_timeout()));
 }
 
-void RegisterModuleBenchmarks(const std::string& function_name,
+void RegisterGenericBenchmark(const std::string& function_name,
                               iree_vm_context_t* context,
                               iree_vm_function_t function,
                               iree_vm_list_t* inputs,
@@ -165,8 +168,8 @@ void RegisterModuleBenchmarks(const std::string& function_name,
       benchmark_name.c_str(),
       [benchmark_name, batch_size, context, function, inputs,
        device](benchmark::State& state) -> void {
-        BenchmarkFunction(benchmark_name, batch_size, context, function, inputs,
-                          device, state);
+        BenchmarkGenericFunction(benchmark_name, batch_size, context, function,
+                                 inputs, device, state);
       })
       // By default only the main thread is included in CPU time. Include all
       // the threads instead.
@@ -181,6 +184,65 @@ void RegisterModuleBenchmarks(const std::string& function_name,
       // significant digits. If we end up wanting precision beyond microseconds,
       // we can make this setting configurable with a custom command line flag.
       ->Unit(benchmark::kMillisecond);
+}
+
+static void BenchmarkDispatchFunction(const std::string& benchmark_name,
+                                      iree_vm_context_t* context,
+                                      iree_vm_function_t function,
+                                      iree_hal_device_t* device,
+                                      benchmark::State& state) {
+  IREE_TRACE_SCOPE_DYNAMIC(benchmark_name.c_str());
+  IREE_TRACE_FRAME_MARK();
+
+  vm::ref<iree_vm_list_t> inputs;
+  IREE_CHECK_OK(iree_vm_list_create(/*element_type=*/nullptr, 16,
+                                    iree_allocator_system(), &inputs));
+  iree_vm_value_t batch_size = iree_vm_value_make_i32(FLAG_batch_size);
+  IREE_CHECK_OK(iree_vm_list_push_value(inputs.get(), &batch_size));
+
+  vm::ref<iree_vm_list_t> outputs;
+  IREE_CHECK_OK(iree_vm_list_create(/*element_type=*/nullptr, 16,
+                                    iree_allocator_system(), &outputs));
+
+  // Benchmarking loop.
+  while (state.KeepRunningBatch(FLAG_batch_size)) {
+    IREE_TRACE_SCOPE0("BenchmarkIteration");
+    IREE_TRACE_FRAME_MARK_NAMED("Iteration");
+    IREE_CHECK_OK(iree_vm_invoke(
+        context, function, IREE_VM_INVOCATION_FLAG_NONE, /*policy=*/nullptr,
+        inputs.get(), outputs.get(), iree_allocator_system()));
+    IREE_CHECK_OK(iree_vm_list_resize(outputs.get(), 0));
+  }
+
+  // Force a full flush and get the device back to an idle state.
+  IREE_CHECK_OK(iree_hal_device_wait_idle(device, iree_infinite_timeout()));
+}
+
+void RegisterDispatchBenchmark(const std::string& function_name,
+                               iree_vm_context_t* context,
+                               iree_vm_function_t function,
+                               iree_hal_device_t* device) {
+  auto benchmark_name = "BM_" + function_name;
+  benchmark::RegisterBenchmark(benchmark_name.c_str(),
+                               [benchmark_name, context, function,
+                                device](benchmark::State& state) -> void {
+                                 BenchmarkDispatchFunction(benchmark_name,
+                                                           context, function,
+                                                           device, state);
+                               })
+      // By default only the main thread is included in CPU time. Include all
+      // the threads instead.
+      ->MeasureProcessCPUTime()
+      // To make single and multi-threaded benchmarks more comparable, use the
+      // wall time to determine how many iterations to run. See
+      // https://github.com/google/benchmark#cpu-timers,
+      ->UseRealTime()
+      // Report timing in microseconds, which is the general order of magnitude
+      // of dispatches. The benchmark framework will print with precision
+      // between 0 and 3 places after the decimal while aiming for three
+      // significant digits. If we end up wanting precision beyond microseconds,
+      // we can make this setting configurable with a custom command line flag.
+      ->Unit(benchmark::kMicrosecond);
 }
 
 iree_status_t GetModuleContentsFromFlags(iree_file_contents_t** out_contents) {
@@ -283,7 +345,7 @@ class IREEBenchmark {
         iree::span<const std::string>{FLAG_function_inputs.data(),
                                       FLAG_function_inputs.size()},
         &inputs_));
-    RegisterModuleBenchmarks(function_name, context_, function, inputs_.get(),
+    RegisterGenericBenchmark(function_name, context_, function, inputs_.get(),
                              device_);
     return iree_ok_status();
   }
@@ -300,9 +362,19 @@ class IREEBenchmark {
 
       // We run anything with the 'benchmark' attribute.
       // If the attribute is not present we'll run anything that looks runnable.
-      bool known_benchmark = !iree_string_view_is_empty(
-          iree_vm_function_reflection_attr(&function, IREE_SV("benchmark")));
-      if (!known_benchmark) {
+      iree_string_view_t benchmark_type = iree_vm_function_reflection_attr(
+          &function, IREE_SV("iree.benchmark"));
+      if (iree_string_view_equal(benchmark_type, IREE_SV("dispatch"))) {
+        iree::RegisterDispatchBenchmark(
+            std::string(function_name.data, function_name.size), context_,
+            function, device_);
+      } else if (iree_string_view_equal(benchmark_type, IREE_SV("entry"))) {
+        iree::RegisterGenericBenchmark(
+            std::string(function_name.data, function_name.size), context_,
+            function,
+            /*inputs=*/nullptr, device_);
+      } else {
+        // Pick up generic () -> () functions.
         if (iree_string_view_starts_with(function_name,
                                          iree_make_cstring_view("__")) ||
             iree_string_view_find_char(function_name, '$', 0) !=
@@ -322,12 +394,12 @@ class IREEBenchmark {
           // anything).
           continue;
         }
-      }
 
-      iree::RegisterModuleBenchmarks(
-          std::string(function_name.data, function_name.size), context_,
-          function,
-          /*inputs=*/nullptr, device_);
+        iree::RegisterGenericBenchmark(
+            std::string(function_name.data, function_name.size), context_,
+            function,
+            /*inputs=*/nullptr, device_);
+      }
     }
     return iree_ok_status();
   }
@@ -350,10 +422,6 @@ int main(int argc, char** argv) {
                                IREE_FLAGS_PARSE_MODE_CONTINUE_AFTER_HELP,
                            &argc, &argv);
   ::benchmark::Initialize(&argc, argv);
-  std::cout << "NOTE: IREE is not a BLAS library and this tool is intended\n"
-            << "to be used when benchmarking entire programs. Precise timing\n"
-            << "of automatically generated device-side execution is not\n"
-            << "available here.\n";
 
   IREE_CHECK_OK(iree_hal_register_all_available_drivers(
       iree_hal_driver_registry_default()));
