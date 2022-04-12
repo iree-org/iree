@@ -78,10 +78,6 @@ struct InParallelOpInterface
                           BufferizationState &state) const {
     OpBuilder::InsertionGuard g(b);
     auto inParallelOp = cast<InParallelOp>(op);
-    Block *body = &inParallelOp.region().front();
-    Operation *oldTerminator = body->getTerminator();
-    assert(isa<PerformConcurrentlyOp>(oldTerminator) &&
-           "unexpected terminator");
 
     // Gather new results of the InParallelOp.
     SmallVector<Value> newResults;
@@ -93,22 +89,10 @@ struct InParallelOpInterface
       // Insert copies right before the PerformConcurrentlyOp terminator. They
       // should not be inside terminator (which would be the default insertion
       // point).
-      Value buffer = *state.getBuffer(
-          b, *insertDestOperands.front(), /*forceInPlace=*/false,
-          /*customCopyInsertionPoint=*/oldTerminator);
+      Value buffer = *state.getBuffer(b, *insertDestOperands.front(),
+                                      /*forceInPlace=*/false,
+                                      /*customCopyInsertionPoint=*/op);
       newResults.push_back(buffer);
-      Value destTensor = insertDestOperands.front()->get();
-
-      // Replace all uses of the insert dest tensor inside the InParallelOp
-      // with the result buffer.
-      OpBuilder::InsertionGuard g(b);
-      b.setInsertionPointToStart(body);
-      Value toTensorOp =
-          b.create<bufferization::ToTensorOp>(inParallelOp.getLoc(), buffer);
-      for (OpOperand &use : destTensor.getUses())
-        if (body->findAncestorOpInBlock(*use.getOwner()))
-          // This is a use inside the InParallelOp.
-          use.set(toTensorOp);
     }
 
     // Create new InParallelOp without any results.
@@ -127,20 +111,17 @@ struct InParallelOpInterface
     auto performConcurrentlyOp =
         cast<PerformConcurrentlyOp>(newInParallelOp.getBody()->getTerminator());
     b.setInsertionPoint(performConcurrentlyOp);
+    unsigned resultCounter = 0;
     WalkResult walkResult =
         performConcurrentlyOp.walk([&](ParallelInsertSliceOp insertOp) {
           Location loc = insertOp.getLoc();
           Type srcType = getMemRefType(
               insertOp.source().getType().cast<RankedTensorType>(),
               state.getOptions());
-          Type destType =
-              getMemRefType(insertOp.dest().getType().cast<RankedTensorType>(),
-                            state.getOptions());
           // ParallelInsertSliceOp bufferizes to a copy.
           auto srcMemref = b.create<bufferization::ToMemrefOp>(
               loc, srcType, insertOp.source());
-          auto destMemref = b.create<bufferization::ToMemrefOp>(
-              loc, destType, insertOp.dest());
+          Value destMemref = newResults[resultCounter++];
           Value subview = b.create<memref::SubViewOp>(
               loc, destMemref, insertOp.getMixedOffsets(),
               insertOp.getMixedSizes(), insertOp.getMixedStrides());
