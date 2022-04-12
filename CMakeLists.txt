@@ -39,7 +39,6 @@ option(IREE_ENABLE_THREADING "Builds IREE in with thread library support." ON)
 option(IREE_BUILD_COMPILER "Builds the IREE compiler." ON)
 option(IREE_BUILD_TESTS "Builds IREE unit tests." ON)
 option(IREE_BUILD_BENCHMARKS "Builds IREE benchmark suites." OFF)
-option(IREE_BUILD_BENCHMARKS_IMPORT_ONLY "Only imports when generating IREE benchmark suites." OFF)
 option(IREE_BUILD_DOCS "Builds IREE docs." OFF)
 option(IREE_BUILD_SAMPLES "Builds IREE sample projects." ON)
 option(IREE_BUILD_TRACY "Builds tracy server tools." OFF)
@@ -550,8 +549,9 @@ endif()
 #-------------------------------------------------------------------------------
 
 if(${IREE_BUILD_BENCHMARKS})
-  # Add a top-level custom target to drive generating benchmark suites.
+  # Add top-level custom targets to drive generating benchmark suites.
   add_custom_target(iree-benchmark-suites)
+  add_custom_target(iree-benchmark-import-models)
 endif()
 
 if(${IREE_BUILD_DOCS})
