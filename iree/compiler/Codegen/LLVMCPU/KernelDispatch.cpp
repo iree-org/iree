@@ -601,6 +601,8 @@ static LogicalResult setX86DefaultParallelReductionTileSizes(
     ArrayRef<int64_t> flowTileSizes, ArrayRef<int64_t> minTileSizes,
     ArrayRef<int64_t> maxTileSizes, SmallVectorImpl<int64_t> &parallelTileSizes,
     SmallVectorImpl<int64_t> &reductionTileSizes) {
+  if (getLoweringConfig(genericOp)) return success();
+
   parallelTileSizes.append(numLoops, 0);
   Optional<SmallVector<int64_t, 4>> staticLoopRanges =
       genericOp.getStaticLoopRanges();
@@ -650,7 +652,7 @@ static bool isSupportedTransposeOp(linalg::GenericOp genericOp) {
 }
 
 // Sets specific parallel and reduction tile sizes for tranpose operations.
-// Returns failure if 'genericOp' does not implement a supported transpose
+// Returns early if 'genericOp' does not implement a supported transpose
 // operation or if there are no target features that would benefit from this
 // specific tiling (e.g., '+avx2').
 static LogicalResult setX86TransposeParallelReductionTileSizes(
@@ -658,21 +660,23 @@ static LogicalResult setX86TransposeParallelReductionTileSizes(
     ArrayRef<int64_t> flowTileSizes, ArrayRef<int64_t> minTileSizes,
     ArrayRef<int64_t> maxTileSizes, SmallVectorImpl<int64_t> &parallelTileSizes,
     SmallVectorImpl<int64_t> &reductionTileSizes) {
+  if (getLoweringConfig(genericOp)) return success();
+
   if (!hasAVX2Features(genericOp) || !isSupportedTransposeOp(genericOp))
-    return failure();
+    return success();
 
   // Bail out if we plan to tile more or less than two dimensions.
-  if (numLoops < 2) return failure();
+  if (numLoops < 2) return success();
   SmallVector<int64_t> filteredTileSizes;
   llvm::copy_if(minTileSizes, std::back_inserter(filteredTileSizes),
                 [](int64_t tileSize) { return tileSize > 1; });
-  if (filteredTileSizes.size() != 2) return failure();
+  if (filteredTileSizes.size() != 2) return success();
 
   // Make sure that the original tile sizes are multiple of the tile sizes to be
   // used for the transpose op (i.e., 8x8).
   // TODO(diegocaballero): Enable 4x8 tile sizes if we find it useful.
   for (int64_t tileSize : filteredTileSizes) {
-    if (tileSize < 8 || (tileSize % 8) != 0) return failure();
+    if (tileSize < 8 || (tileSize % 8) != 0) return success();
   }
 
   // Create a copy of newMinTileSizes with the new 8x8 tile sizes.
@@ -722,9 +726,11 @@ static LogicalResult setRootConfig(
   if (failed(setX86TransposeParallelReductionTileSizes(
           genericOp, numLoops, flowTileSizes, minTileSizes, maxTileSizes,
           parallelTileSizes, reductionTileSizes)))
-    (void)setX86DefaultParallelReductionTileSizes(
-        genericOp, numLoops, flowTileSizes, minTileSizes, maxTileSizes,
-        parallelTileSizes, reductionTileSizes);
+    return failure();
+  if (failed(setX86DefaultParallelReductionTileSizes(
+          genericOp, numLoops, flowTileSizes, minTileSizes, maxTileSizes,
+          parallelTileSizes, reductionTileSizes)))
+    return failure();
 
   TileSizesListType tileSizes;
   tileSizes.push_back(flowTileSizes);
