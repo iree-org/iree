@@ -125,6 +125,14 @@ void buildHALTransformPassPipeline(OpPassManager &passManager,
         createDumpExecutableSourcesPass(targetOptions.sourceListingPath));
   }
 
+  // Dump standalone hal.executable benchmark modules.
+  // Today this only works for executables that have static dispatch parameters
+  // and is only useful for basic microbenchmarking.
+  if (!targetOptions.executableBenchmarksPath.empty()) {
+    passManager.addPass(createDumpExecutableBenchmarksPass(
+        targetOptions.executableBenchmarksPath));
+  }
+
   // TODO(benvanik): move translation after conversion; today translation
   // inserts the workgroup count logic we need to convert but we could instead
   // insert placeholder ops that are expanded after translation.

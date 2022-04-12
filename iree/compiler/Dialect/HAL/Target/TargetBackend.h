@@ -34,6 +34,9 @@ struct TargetOptions {
   // A path to write individual executable source listings into.
   std::string sourceListingPath;
 
+  // A path to write standalone executable benchkmarks into.
+  std::string executableBenchmarksPath;
+
   // TODO(benvanik): flags for debug/optimization/etc.
   // The intent is that we can have a global debug/-ON flag that then each
   // target backend can have tickle it's own flags in the right way. Right now
