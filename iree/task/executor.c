@@ -147,15 +147,15 @@ iree_status_t iree_task_executor_create(
       worker_local_memory += worker_local_memory_size;
       if (!iree_status_is_ok(status)) break;
     }
-    iree_atomic_task_affinity_set_store(&executor->worker_live_mask,
-                                        worker_live_mask,
-                                        iree_memory_order_relaxed);
     iree_atomic_task_affinity_set_store(&executor->worker_suspend_mask,
                                         worker_suspend_mask,
                                         iree_memory_order_relaxed);
     iree_atomic_task_affinity_set_store(&executor->worker_idle_mask,
                                         worker_idle_mask,
                                         iree_memory_order_relaxed);
+    iree_atomic_task_affinity_set_store(&executor->worker_live_mask,
+                                        worker_live_mask,
+                                        iree_memory_order_release);
   }
 
   if (!iree_status_is_ok(status)) {
@@ -518,13 +518,15 @@ iree_task_t* iree_task_executor_try_steal_task(
     iree_task_queue_t* local_task_queue) {
   IREE_TRACE_ZONE_BEGIN(z0);
 
+  iree_task_affinity_set_t worker_live_mask =
+      iree_atomic_task_affinity_set_load(&executor->worker_live_mask,
+                                         iree_memory_order_acquire);
+  iree_task_affinity_set_t worker_idle_mask =
+      iree_atomic_task_affinity_set_load(&executor->worker_idle_mask,
+                                         iree_memory_order_relaxed);
   // Limit the workers we will steal from to the ones that are currently live
   // and not idle.
-  iree_task_affinity_set_t victim_mask =
-      iree_atomic_task_affinity_set_load(&executor->worker_live_mask,
-                                         iree_memory_order_relaxed) &
-      ~iree_atomic_task_affinity_set_load(&executor->worker_idle_mask,
-                                          iree_memory_order_relaxed);
+  iree_task_affinity_set_t victim_mask = worker_live_mask & ~worker_idle_mask;
 
   // TODO(benvanik): it may be possible to rework this such that we better
   // use the prng; for example, instead of all this rotating stuff we could just
