@@ -94,8 +94,7 @@ bool hasAVX2Features(Operation *op) {
   auto variantOp = isa<IREE::HAL::ExecutableVariantOp>(op)
                        ? cast<IREE::HAL::ExecutableVariantOp>(op)
                        : op->getParentOfType<IREE::HAL::ExecutableVariantOp>();
-  if (!variantOp)
-    return false;
+  if (!variantOp) return false;
   Optional<StringRef> features = getCpuFeatures(variantOp);
   if (!features) return false;
   return features->contains("+avx2");
