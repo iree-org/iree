@@ -122,9 +122,10 @@ static SmallVector<int64_t> getMinTilingSizesForEachDim(
     // If the indexing map has result it has to be a shaped type.
     auto operandType =
         inputOutputOpOperands[map.index()]->get().getType().cast<ShapedType>();
+    int64_t opVecSize = getVectorSize(entryPointFn, operandType);
+    int64_t currMinSize = minTileSizes[fastestVaryingDim];
     minTileSizes[fastestVaryingDim] =
-        std::max<int64_t>(minTileSizes[fastestVaryingDim],
-                          getVectorSize(entryPointFn, operandType));
+        currMinSize > 1 ? std::min<int64_t>(currMinSize, opVecSize) : opVecSize;
   }
   return minTileSizes;
 }
