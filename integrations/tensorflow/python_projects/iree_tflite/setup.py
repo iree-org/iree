@@ -85,7 +85,7 @@ setup(
     version=f"{PACKAGE_VERSION}",
     author="The IREE Team",
     author_email="iree-discuss@googlegroups.com",
-    license="Apache 2.0",
+    license="Apache-2.0",
     description="IREE TFLite Compiler Tools",
     long_description=README,
     long_description_content_type="text/markdown",

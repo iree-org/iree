@@ -22,7 +22,7 @@ setup(
     description="IREE Python Runtime Components",
     long_description=README,
     long_description_content_type="text/markdown",
-    license="Apache 2.0",
+    license="Apache-2.0",
     classifiers=[
         "Development Status :: 3 - Alpha",
         "License :: OSI Approved :: Apache Software License",
