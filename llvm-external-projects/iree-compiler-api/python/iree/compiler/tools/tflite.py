@@ -132,7 +132,7 @@ def build_import_command_line(input_path: str, tfs: TempFileSaver,
   crash_reproducer_path = tfs.alloc_optional(
       "tflite-reproducer.mlir", export_as=requested_crash_reproducer_path)
   if crash_reproducer_path:
-    cl.append(f"--pass-pipeline-crash-reproducer={crash_reproducer_path}")
+    cl.append(f"--mlir-pass-pipeline-crash-reproducer={crash_reproducer_path}")
 
   # Extra args.
   cl.extend(options.import_extra_args)
