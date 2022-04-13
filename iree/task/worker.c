@@ -117,6 +117,11 @@ static bool iree_task_worker_is_zombie(iree_task_worker_t* worker) {
 void iree_task_worker_deinitialize(iree_task_worker_t* worker) {
   IREE_TRACE_ZONE_BEGIN(z0);
 
+  // Withdraw this worker from the set of candidates for stealing from.
+  iree_atomic_task_affinity_set_fetch_and(&worker->executor->worker_live_mask,
+                                          ~worker->worker_bit,
+                                          iree_memory_order_acq_rel);
+
   // Wait for the thread to enter the zombie state indicating it has exited our
   // main function - it may still be live in the OS, but it'll not be touching
   // any of our data structures again so it's fine to blast away.
