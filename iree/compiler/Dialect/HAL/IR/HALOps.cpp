@@ -13,6 +13,7 @@
 #include "llvm/Support/SMLoc.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/Attributes.h"
+#include "mlir/IR/BlockAndValueMapping.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Matchers.h"
@@ -752,6 +753,100 @@ LogicalResult ExecutableEntryPointOp::verify() {
            << getNumWorkgroupDims() << " values";
   }
   return success();
+}
+
+// Calculates the workgroup count (x, y, z) given the total N-dimensional
+// |workload| and specific |workgroupSize|.
+static std::array<Value, 3> calculateWorkloadWorkgroupCount(
+    Location loc, ValueRange workload,
+    const std::array<Value, 3> &workgroupSize, OpBuilder &builder) {
+  std::array<Value, 3> result;
+
+  auto constantOne = builder.createOrFold<arith::ConstantIndexOp>(loc, 1);
+  if (workload.size() <= 3) {
+    // 1-D to 3-D are easy (pad 2 to 0 dimensions) and divide by workgroup
+    // size.
+    for (int i = 0; i < 3; ++i) {
+      // Round up: (workload[i] + workgroup_size - 1) / workgroup_size;
+      Value workloadI = i < workload.size() ? workload[i] : constantOne;
+      workloadI = builder.createOrFold<arith::SubIOp>(
+          loc,
+          builder.createOrFold<arith::AddIOp>(loc, workloadI, workgroupSize[i]),
+          constantOne);
+      result[i] = builder.createOrFold<arith::DivUIOp>(loc, workloadI,
+                                                       workgroupSize[i]);
+    }
+  } else {
+    // TODO(#4140): remapping of N-D to 3-D: this is not how you do this!
+    Value flatWorkload = constantOne;
+    for (auto workloadI : workload) {
+      flatWorkload =
+          builder.createOrFold<arith::MulIOp>(loc, flatWorkload, workloadI);
+    }
+    for (int i = 0; i < 3; ++i) {
+      // Round up: (workload[i] + workgroup_size - 1) / workgroup_size;
+      auto rounded = builder.createOrFold<arith::SubIOp>(
+          loc,
+          builder.createOrFold<arith::AddIOp>(loc, flatWorkload,
+                                              workgroupSize[i]),
+          constantOne);
+      auto workgroupCountI =
+          builder.createOrFold<arith::DivUIOp>(loc, rounded, workgroupSize[i]);
+      result[i] = workgroupCountI;
+
+      // Multiply back out and subtract from invocations.
+      flatWorkload = builder.createOrFold<arith::SubIOp>(
+          loc, flatWorkload,
+          builder.createOrFold<arith::MulIOp>(loc, workgroupCountI, rounded));
+    }
+  }
+
+  return result;
+}
+
+static std::array<Value, 3> calculateWorkgroupCountFromRegion(
+    Location loc, Block *body, ValueRange workload, OpBuilder &builder) {
+  // TODO(benvanik): replace with region inlining util.
+  BlockAndValueMapping bvm;
+  for (auto args : llvm::enumerate(workload)) {
+    bvm.map(body->getArgument(args.index()), args.value());
+  }
+  for (Operation &op : body->without_terminator()) {
+    builder.clone(op, bvm);
+  }
+  auto returnOp = cast<IREE::HAL::ReturnOp>(body->getTerminator());
+  return {
+      bvm.lookup(returnOp.operands()[0]),
+      bvm.lookup(returnOp.operands()[1]),
+      bvm.lookup(returnOp.operands()[2]),
+  };
+}
+
+// Calculates the workgroup count (x, y, z) for dispatching to the entry point.
+// The provided N-dimensional |workload| is the total number of invocations
+// required as calculated by the generic workload logic (basically, number of
+// output elements in tensors).
+std::array<Value, 3> ExecutableEntryPointOp::calculateWorkgroupCount(
+    Location loc, ValueRange workload, OpBuilder &builder) {
+  Block *body = getWorkgroupCountBody();
+  if (body) {
+    return calculateWorkgroupCountFromRegion(loc, body, workload, builder);
+  }
+  auto workgroupSize = calculateWorkgroupSize(loc, workload, builder);
+  return calculateWorkloadWorkgroupCount(loc, workload, workgroupSize, builder);
+}
+
+// Calculates the workgroup size (x, y, z). These are the dimension numbers
+// for a single workgroup.
+std::array<Value, 3> ExecutableEntryPointOp::calculateWorkgroupSize(
+    Location loc, ValueRange workload, OpBuilder &builder) {
+  // When no workgroup size is specified we just assume [1,1,1].
+  // This yields a workgroup count that models the extents of the workload.
+  return {
+      builder.createOrFold<arith::ConstantIndexOp>(loc, 1),
+      builder.createOrFold<arith::ConstantIndexOp>(loc, 1),
+      builder.createOrFold<arith::ConstantIndexOp>(loc, 1),
+  };
 }
 
 //===----------------------------------------------------------------------===//

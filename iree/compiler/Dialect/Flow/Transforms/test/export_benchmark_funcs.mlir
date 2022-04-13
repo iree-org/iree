@@ -34,7 +34,7 @@ func.func @while(%start: tensor<i32>, %bound: tensor<i32>) -> tensor<i32> {
 
 //     CHECK: util.global private @_benchmark_input_0 {noinline} = dense<0> : tensor<i32>
 //     CHECK: util.global private @_benchmark_input_1 {noinline} = dense<0> : tensor<i32>
-//     CHECK: func @while_benchmark() attributes {iree.abi.stub, iree.reflection = {benchmark = "entry"}} {
+//     CHECK: func @while_benchmark() attributes {iree.abi.stub, iree.reflection = {iree.benchmark = "entry"}} {
 // CHECK-DAG:   %[[ARG0:.+]] = util.global.load @_benchmark_input_0 : tensor<i32>
 // CHECK-DAG:   %[[ARG1:.+]] = util.global.load @_benchmark_input_1 : tensor<i32>
 //     CHECK:   %[[RET0:.+]] = call @while(%[[ARG0]], %[[ARG1]])

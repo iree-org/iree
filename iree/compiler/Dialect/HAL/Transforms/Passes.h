@@ -84,6 +84,10 @@ createMaterializeInterfacesPass();
 std::unique_ptr<OperationPass<mlir::ModuleOp>> createDumpExecutableSourcesPass(
     StringRef path);
 
+// Dumps standalone hal.executable benchmarks to |path|.
+std::unique_ptr<OperationPass<mlir::ModuleOp>>
+createDumpExecutableBenchmarksPass(StringRef path);
+
 // Translates hal.executable.variant ops via a nested translation pipeline.
 std::unique_ptr<OperationPass<IREE::HAL::ExecutableOp>>
 createTranslateExecutablesPass();
