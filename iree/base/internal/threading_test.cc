@@ -51,10 +51,6 @@ TEST(ThreadTest, Lifetime) {
                                     iree_allocator_system(), &thread));
   EXPECT_NE(0, iree_thread_id(thread));
 
-  // Drop the thread handle; should be safe as the thread should keep itself
-  // retained as long as it needs to.
-  iree_thread_release(thread);
-
   // Wait for the thread to finish.
   iree_notification_await(
       &entry_data.barrier,
@@ -64,6 +60,11 @@ TEST(ThreadTest, Lifetime) {
                                       iree_memory_order_relaxed) == (123 + 1);
       },
       &entry_data, iree_infinite_timeout());
+
+  // By holding on to the thread object and releasing it here after the thread
+  // has finished, we ensure that destruction occurs on the main thread,
+  // avoiding data races reported by TSan.
+  iree_thread_release(thread);
   iree_notification_deinitialize(&entry_data.barrier);
 }
 
