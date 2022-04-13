@@ -558,7 +558,16 @@ endif()
 #-------------------------------------------------------------------------------
 
 if(${IREE_BUILD_BENCHMARKS})
-  # Add a top-level custom target to drive generating benchmark suites.
+  # Add top-level custom targets to drive generating benchmark suites.
+
+  # iree-benchmark-import-models imports benchmark models from their source
+  # formats, such as .tflite flatbuffers, to IREE-compatible .mlir files.
+  add_custom_target(iree-benchmark-import-models)
+
+  # iree-benchmark-suites fully prepares benchmark models for benchmarking:
+  #   * importing from source formats to IREE-compatible .mlir files
+  #   * compiling from .mlir files to benchmark-ready .vmfb files
+  #   * generating flagfiles for executing the benchmark .vmfb files
   add_custom_target(iree-benchmark-suites)
 endif()
 
