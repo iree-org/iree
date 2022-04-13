@@ -111,17 +111,25 @@ iree_status_t iree_task_poller_initialize(
     iree_thread_affinity_t ideal_thread_affinity,
     iree_task_poller_t* out_poller);
 
-// Deinitializes |poller| and joins with the wait thread.
-// Any active waits will be aborted. May block.
-// To reduce the potential for blocking issue an iree_task_poller_request_exit
-// prior to deinitializing.
-void iree_task_poller_deinitialize(iree_task_poller_t* poller);
-
 // Requests that the poller wait thread begin exiting (if it hasn't already).
 // If the wait thread is in a syscall it will be woken as soon as possible.
 //
 // May be called from any thread. Any active waits will be aborted as possible.
 void iree_task_poller_request_exit(iree_task_poller_t* poller);
+
+// Blocks the caller until |poller| has exited.
+//
+// May be called from any thread.
+void iree_task_poller_await_exit(iree_task_poller_t* poller);
+
+// Deinitializes |poller| after the thread has exited.
+// The poller must be in the IREE_TASK_POLLER_STATE_ZOMBIE state.
+//
+// Expected shutdown sequence:
+//  - request_exit
+//  - await_exit
+//  - deinitialize
+void iree_task_poller_deinitialize(iree_task_poller_t* poller);
 
 // Enqueues |wait_tasks| on the poller and kicks the wait thread.
 // The task pointers will be retained by the poller and must remain valid.

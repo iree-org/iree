@@ -161,16 +161,26 @@ iree_status_t iree_task_worker_initialize(
     iree_byte_span_t local_memory, iree_prng_splitmix64_state_t* seed_prng,
     iree_task_worker_t* out_worker);
 
-// Deinitializes a worker that has successfully exited. The worker must be in
-// the IREE_TASK_WORKER_STATE_ZOMBIE state.
-void iree_task_worker_deinitialize(iree_task_worker_t* worker);
-
 // Requests that the worker begin exiting (if it hasn't already).
 // If the worker is actively processing tasks it will wait until it has
 // completed all it can and is about to go idle prior to exiting.
 //
 // May be called from any thread (including the worker thread).
 void iree_task_worker_request_exit(iree_task_worker_t* worker);
+
+// Blocks the caller until |worker| has exited.
+//
+// May be called from any thread.
+void iree_task_worker_await_exit(iree_task_worker_t* worker);
+
+// Deinitializes a worker that has successfully exited.
+// The worker must be in the IREE_TASK_WORKER_STATE_ZOMBIE state.
+//
+// Expected shutdown sequence:
+//  - request_exit on all workers
+//  - await_exit on all workers
+//  - deinitialize all workers
+void iree_task_worker_deinitialize(iree_task_worker_t* worker);
 
 // Posts a FIFO list of tasks to the worker mailbox. The target worker takes
 // ownership of the tasks and will be woken if it is currently idle.

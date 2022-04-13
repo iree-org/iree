@@ -116,18 +116,24 @@ static bool iree_task_poller_is_zombie(iree_task_poller_t* poller) {
          IREE_TASK_POLLER_STATE_ZOMBIE;
 }
 
+void iree_task_poller_await_exit(iree_task_poller_t* poller) {
+  if (!poller->thread) return;
+  IREE_TRACE_ZONE_BEGIN(z0);
+
+  iree_task_poller_request_exit(poller);
+  iree_notification_await(&poller->state_notification,
+                          (iree_condition_fn_t)iree_task_poller_is_zombie,
+                          poller, iree_infinite_timeout());
+
+  IREE_TRACE_ZONE_END(z0);
+}
+
 void iree_task_poller_deinitialize(iree_task_poller_t* poller) {
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  // Wait for the thread to enter the zombie state indicating it has exited our
-  // main function - it may still be live in the OS, but it'll not be touching
-  // any of our data structures again so it's fine to blast away.
-  iree_task_poller_request_exit(poller);
-  if (poller->thread) {
-    iree_notification_await(&poller->state_notification,
-                            (iree_condition_fn_t)iree_task_poller_is_zombie,
-                            poller, iree_infinite_timeout());
-  }
+  // Must have called request_exit/await_exit.
+  IREE_ASSERT_TRUE(iree_task_poller_is_zombie(poller));
+
   iree_thread_release(poller->thread);
   poller->thread = NULL;
 
