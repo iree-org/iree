@@ -37,7 +37,7 @@ RUN apt-get update \
     wget \
     gnupg2 \
     # Needed for installing Bazel, per https://bazel.build/install/ubuntu
-    apt-transport-https \ 
+    apt-transport-https \
     curl \
     gnupg \
     # Needed for building lld with Bazel (as currently configured)
@@ -102,6 +102,12 @@ RUN apt-get update \
 
 ENV PYTHON_BIN /usr/bin/python3
 
+##############
+
+######## IREE CUDA DEPS ########
+COPY fetch_cuda_deps.sh /usr/local/bin
+RUN /usr/local/bin/fetch_cuda_deps.sh /usr/local/iree_cuda_deps
+ENV IREE_CUDA_DEPS_DIR="/usr/local/iree_cuda_deps"
 ##############
 
 ######## Vulkan ########
