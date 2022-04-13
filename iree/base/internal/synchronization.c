@@ -613,6 +613,21 @@ bool iree_notification_commit_wait(iree_notification_t* notification,
                                    iree_time_t deadline_ns) {
   bool result = true;
 
+#if !IREE_SYNCHRONIZATION_DISABLE_UNSAFE && !defined(IREE_PLATFORM_HAS_FUTEX)
+#define IREE_NOTIFICATION_COMMIT_WAIT_USING_PTHREAD
+#endif
+
+  // In the pthread implementation below, we need a lock around both the
+  // atomic read of notification->value and the pthread_cond_timedwait.
+  // Otherwise, it can happen that the notificiation gets posted concurrently
+  // with this function's execution, after we read notification->value and
+  // before we enter pthread_cond_timedwait, causing it to miss the
+  // notification, leading to a deadlock,
+  // https://github.com/google/iree/issues/8871.
+#ifdef IREE_NOTIFICATION_COMMIT_WAIT_USING_PTHREAD
+  pthread_mutex_lock(&notification->mutex);
+#endif
+
   // Spin until notified and the epoch increments from what we captured during
   // iree_notification_prepare_wait.
   while ((iree_atomic_load_int64(&notification->value,
@@ -625,22 +640,26 @@ bool iree_notification_commit_wait(iree_notification_t* notification,
     uint32_t timeout_ms = iree_absolute_deadline_to_timeout_ms(deadline_ns);
     status_code = iree_futex_wait(iree_notification_epoch_address(notification),
                                   wait_token, timeout_ms);
-#else
+#elif defined IREE_NOTIFICATION_COMMIT_WAIT_USING_PTHREAD
     struct timespec abs_ts = {
         .tv_sec = (time_t)(deadline_ns / 1000000000ull),
         .tv_nsec = (long)(deadline_ns % 1000000000ull),
     };
-    pthread_mutex_lock(&notification->mutex);
     int ret = pthread_cond_timedwait(&notification->cond, &notification->mutex,
                                      &abs_ts);
-    pthread_mutex_unlock(&notification->mutex);
     status_code = ret == 0 ? IREE_STATUS_OK : IREE_STATUS_DEADLINE_EXCEEDED;
-#endif  // IREE_PLATFORM_HAS_FUTEX
+#else
+#error "This case should not exist."
+#endif  // IREE_NOTIFICATION_COMMIT_WAIT_USING_PTHREAD
     if (status_code != IREE_STATUS_OK) {
       result = false;
       break;
     }
   }
+
+#ifdef IREE_NOTIFICATION_COMMIT_WAIT_USING_PTHREAD
+  pthread_mutex_unlock(&notification->mutex);
+#endif
 
   // TODO(benvanik): benchmark under real workloads.
   // iree_memory_order_relaxed would suffice for correctness but the faster
