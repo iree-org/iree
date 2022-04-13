@@ -250,25 +250,15 @@ void addCPUBufferOpsTileAndVectorizePipeline(OpPassManager &passManager) {
 
 void addDoubleTilingExpertPassPipeline(OpPassManager &passManager,
                                        bool lowerToAVX2) {
-  // Run preprocessing and verification before starting Linalg transforms.
-  passManager.addNestedPass<func::FuncOp>(
-      createConvertToDestinationPassingStylePass());
-  passManager.addPass(createCanonicalizerPass());
   passManager.addPass(createVerifyLinalgTransformLegalityPass());
 
   // Do first level of tiling and distribution.
-  passManager.addNestedPass<func::FuncOp>(createInsertDistributionInfoPass());
-  {
-    LinalgFusePassOptions options;
-    options.tilingLevel =
-        static_cast<int64_t>(StrategyTilingLevel::WorkGroupTiles);
-    options.doIREEDistribution = true;
-    passManager.addNestedPass<func::FuncOp>(createLinalgFusePass(options));
-    passManager.addNestedPass<func::FuncOp>(createCanonicalizerPass());
-    passManager.addNestedPass<func::FuncOp>(createCSEPass());
-    passManager.addNestedPass<func::FuncOp>(
-        createRewriteLinalgDestructiveUpdatesPass());
-  }
+  passManager.addNestedPass<FuncOp>(createInsertDistributionInfoPass());
+  passManager.addNestedPass<FuncOp>(createTileAndDistributeToWorkgroupsPass());
+  passManager.addPass(createCanonicalizerPass());
+  passManager.addPass(createCSEPass());
+  passManager.addNestedPass<func::FuncOp>(
+      createConvertToDestinationPassingStylePass());
 
   // Run LinalgFusePass firstly in case that we have fill + matmul + generic
   // ops. At this stage, we do not apply vectorization. The reduction dim won't
@@ -327,25 +317,15 @@ void addDoubleTilingExpertPassPipeline(OpPassManager &passManager,
 }
 
 void addConvTileAndDecomposeExpertPassPipeline(OpPassManager &passManager) {
-  // Run preprocessing and verification before starting Linalg transforms.
-  passManager.addNestedPass<func::FuncOp>(
-      createConvertToDestinationPassingStylePass());
-  passManager.addPass(createCanonicalizerPass());
   passManager.addPass(createVerifyLinalgTransformLegalityPass());
 
   // Do first level of tiling and distribution.
-  passManager.addNestedPass<func::FuncOp>(createInsertDistributionInfoPass());
-  {
-    LinalgFusePassOptions options;
-    options.tilingLevel =
-        static_cast<int64_t>(StrategyTilingLevel::WorkGroupTiles);
-    options.doIREEDistribution = true;
-    passManager.addNestedPass<func::FuncOp>(createLinalgFusePass(options));
-    passManager.addNestedPass<func::FuncOp>(createCanonicalizerPass());
-    passManager.addNestedPass<func::FuncOp>(createCSEPass());
-    passManager.addNestedPass<func::FuncOp>(
-        createRewriteLinalgDestructiveUpdatesPass());
-  }
+  passManager.addNestedPass<FuncOp>(createInsertDistributionInfoPass());
+  passManager.addNestedPass<FuncOp>(createTileAndDistributeToWorkgroupsPass());
+  passManager.addPass(createCanonicalizerPass());
+  passManager.addPass(createCSEPass());
+  passManager.addNestedPass<func::FuncOp>(
+      createConvertToDestinationPassingStylePass());
 
   // Run LinalgFusePass firstly in case that we have fill + conv + generic
   // ops. At this stage, we do not apply vectorization. The reduction dim won't
