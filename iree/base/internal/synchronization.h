@@ -286,24 +286,25 @@ void iree_slim_mutex_unlock(iree_slim_mutex_t* mutex)
 // https://github.com/concurrencykit/ck/blob/master/include/ck_ec.h
 typedef struct iree_notification_t {
 #if IREE_SYNCHRONIZATION_DISABLE_UNSAFE
-  // Nothing required.
+  // Nothing required. Unused field to make compilers happy.
+  int reserved;
 #elif !defined(IREE_PLATFORM_HAS_FUTEX)
-  // No futex on darwin, so use mutex/condvar instead.
+  // No futex on darwin/when using TSAN, so use mutex/condvar instead.
   pthread_mutex_t mutex;
   pthread_cond_t cond;
-#endif  // IREE_PLATFORM_*
+  uint32_t epoch;
+  uint32_t waiters;
+#else
   iree_atomic_int64_t value;
+#endif  // IREE_PLATFORM_*
 } iree_notification_t;
 
 #if IREE_SYNCHRONIZATION_DISABLE_UNSAFE
 #define IREE_NOTIFICATION_INIT \
   { IREE_ATOMIC_VAR_INIT(0) }
 #elif !defined(IREE_PLATFORM_HAS_FUTEX)
-#define IREE_NOTIFICATION_INIT                           \
-  {                                                      \
-    PTHREAD_MUTEX_INITIALIZER, PTHREAD_COND_INITIALIZER, \
-        IREE_ATOMIC_VAR_INIT(0),                         \
-  }
+#define IREE_NOTIFICATION_INIT \
+  { PTHREAD_MUTEX_INITIALIZER, PTHREAD_COND_INITIALIZER, 0, 0 }
 #else
 #define IREE_NOTIFICATION_INIT \
   { IREE_ATOMIC_VAR_INIT(0) }
