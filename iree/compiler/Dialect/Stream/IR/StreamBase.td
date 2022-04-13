@@ -275,11 +275,11 @@ def Stream_ResourceConfigAttr :
   let hasCustomAssemblyFormat = 1;
 }
 
-def Stream_ResourceAccess_None : BitEnumAttrCase<"None", 0x0000>;
-def Stream_ResourceAccess_Read : BitEnumAttrCase<"Read", 0x0001>;
-def Stream_ResourceAccess_Write : BitEnumAttrCase<"Write", 0x0002>;
+def Stream_ResourceAccess_None : I32BitEnumAttrCase<"None", 0x0000>;
+def Stream_ResourceAccess_Read : I32BitEnumAttrCase<"Read", 0x0001>;
+def Stream_ResourceAccess_Write : I32BitEnumAttrCase<"Write", 0x0002>;
 def Stream_ResourceAccessBitfieldAttr :
-    BitEnumAttr<"ResourceAccessBitfield", "valid ResourceAccess", [
+    I32BitEnumAttr<"ResourceAccessBitfield", "valid ResourceAccess", [
       Stream_ResourceAccess_None,
       Stream_ResourceAccess_Read,
       Stream_ResourceAccess_Write,

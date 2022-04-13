@@ -90,7 +90,7 @@ struct InParallelOpInterface
       // should not be inside terminator (which would be the default insertion
       // point).
       Value buffer = *state.getBuffer(b, *insertDestOperands.front(),
-                                      /*forceInPlace=*/false,
+                                      /*forceInPlace=*/llvm::None,
                                       /*customCopyInsertionPoint=*/op);
       newResults.push_back(buffer);
     }

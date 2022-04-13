@@ -215,7 +215,7 @@ def build_compile_command_line(input_file: str, tfs: TempFileSaver,
   crash_reproducer_path = tfs.alloc_optional(
       "core-reproducer.mlir", export_as=options.crash_reproducer_path)
   if crash_reproducer_path:
-    cl.append(f"--pass-pipeline-crash-reproducer={crash_reproducer_path}")
+    cl.append(f"--mlir-pass-pipeline-crash-reproducer={crash_reproducer_path}")
   if options.enable_tflite_bindings:
     cl.append("--iree-tflite-bindings-support")
   if options.enable_benchmark:
