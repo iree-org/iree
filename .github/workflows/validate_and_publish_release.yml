@@ -96,3 +96,4 @@ jobs:
         with:
           github_token: ${{ secrets.WRITE_ACCESS_TOKEN }}
           branch: latest-snapshot
+          force: true
