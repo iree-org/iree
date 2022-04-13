@@ -7,7 +7,7 @@
 # An image for cross-compiling IREE's TFLite Java Bindings with Gradle and
 # CMake.
 
-FROM gcr.io/iree-oss/base@sha256:7f448eb27d25642aaf033652fe2aec34165c7547f60f71384b4192d3937bede3
+FROM gcr.io/iree-oss/base@sha256:38daf908e8b906b91a58dd31e11f33f10c9c0fc70dfdb22860f6568c0ba3998f
 
 ### Java ###
 WORKDIR /install-jdk
