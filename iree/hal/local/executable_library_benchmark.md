@@ -120,7 +120,7 @@ iree-compile \
     -iree-hal-target-backends=dylib-llvm-aot \
     -iree-llvm-debug-symbols=false \
     -iree-llvm-target-triple=x86_64-pc-linux-elf \
-    -print-ir-after-all \
+    -mlir-print-ir-after-all \
     >module_dump.mlir 2>&1
 ```
 

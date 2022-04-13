@@ -62,7 +62,7 @@ int mlir::iree_compiler::runIreeTranslateMain(int argc, char **argv) {
   // Register assembly printer command-line options like
   // -mlir-print-op-generic.
   mlir::registerAsmPrinterCLOptions();
-  // Register pass manager command-line options like -print-ir-*.
+  // Register pass manager command-line options like -mlir-print-ir-*.
   mlir::registerPassManagerCLOptions();
   mlir::registerDefaultTimingManagerCLOptions();
 
