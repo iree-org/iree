@@ -7,6 +7,7 @@
 #ifndef IREE_COMPILER_CONSTEVAL_PASSES_H_
 #define IREE_COMPILER_CONSTEVAL_PASSES_H_
 
+#include "mlir/IR/BuiltinOps.h"
 #include "mlir/Pass/Pass.h"
 
 namespace mlir {
