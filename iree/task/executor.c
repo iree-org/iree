@@ -182,19 +182,26 @@ static void iree_task_executor_destroy(iree_task_executor_t* executor) {
     iree_task_worker_request_exit(worker);
   }
 
-  // Also ask the poller to exit - it'll wake from any wait it's in and abort
-  // all the remaining waits.
+  // Also ask the poller to exit - it'll wake from any system waits it's in and
+  // abort all the remaining waits.
   iree_task_poller_request_exit(&executor->poller);
 
-  // Now that all workers should be in the process of exiting we can join with
-  // them. Some may take longer than others to exit but that's fine as we can't
-  // return from here until they do anyway.
+  // Now that all workers and the poller should be in the process of exiting we
+  // can join with them. Some may take longer than others to exit but that's
+  // fine as we can't return from here until they exit anyway.
+  for (iree_host_size_t i = 0; i < executor->worker_count; ++i) {
+    iree_task_worker_t* worker = &executor->workers[i];
+    iree_task_worker_await_exit(worker);
+  }
+  iree_task_poller_await_exit(&executor->poller);
+
+  // Tear down all workers and the poller now that no more threads are live.
+  // Any live threads may still be touching their own data structures or those
+  // of others (for example when trying to steal work).
   for (iree_host_size_t i = 0; i < executor->worker_count; ++i) {
     iree_task_worker_t* worker = &executor->workers[i];
     iree_task_worker_deinitialize(worker);
   }
-
-  // Once no more workers can possibly put work on the poller we can kill it.
   iree_task_poller_deinitialize(&executor->poller);
 
   iree_event_pool_free(executor->event_pool);
