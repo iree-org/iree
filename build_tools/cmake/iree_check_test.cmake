@@ -18,8 +18,8 @@ function(iree_bytecode_module_for_iree_check_test_and_friends)
   cmake_parse_arguments(
     _RULE
     ""
-    "MODULE_NAME;SRC;TARGET_BACKEND;OPT_TOOL;MODULE_FILE_NAME"
-    "FLAGS;OPT_FLAGS;TARGET_CPU_FEATURES"
+    "MODULE_NAME;SRC;TARGET_BACKEND;MODULE_FILE_NAME"
+    "FLAGS;TARGET_CPU_FEATURES"
     ${ARGN}
   )
 
@@ -59,10 +59,6 @@ TARGET_BACKEND=${_RULE_TARGET_BACKEND}.")
       "-mlir-print-op-on-diagnostic=false"
       "--iree-hal-target-backends=${_RULE_TARGET_BACKEND}"
       ${_RULE_FLAGS}
-    OPT_TOOL
-      ${_RULE_OPT_TOOL}
-    OPT_FLAGS
-      ${_RULE_OPT_FLAGS}
     TESTONLY
   )
 endfunction()
@@ -86,10 +82,6 @@ endfunction()
 #       and input file are passed automatically.
 #   LABELS: Additional labels to apply to the test. The package path and
 #       "driver=${DRIVER}" are added automatically.
-#   OPT_TOOL: Defaulting to iree-opt. Tool used to preprocess the source files
-#       if OPT_FLAGS is specified.
-#   OPT_FLAGS: If specified, source files are preprocessed with OPT_TOOL with
-#       these flags.
 #   MODULE_FILE_NAME: Optional, specifies the absolute path to the filename
 #       to use for the generated IREE module (.vmfb).
 #   TARGET_CPU_FEATURES: If specified, a string passed as argument to
@@ -122,8 +114,8 @@ function(iree_check_test)
   cmake_parse_arguments(
     _RULE
     ""
-    "NAME;SRC;TARGET_BACKEND;DRIVER;OPT_TOOL;MODULE_FILE_NAME"
-    "COMPILER_FLAGS;RUNNER_ARGS;LABELS;OPT_FLAGS;TARGET_CPU_FEATURES"
+    "NAME;SRC;TARGET_BACKEND;DRIVER;MODULE_FILE_NAME"
+    "COMPILER_FLAGS;RUNNER_ARGS;LABELS;TARGET_CPU_FEATURES"
     ${ARGN}
   )
 
@@ -153,10 +145,6 @@ function(iree_check_test)
       "${_RULE_TARGET_BACKEND}"
     FLAGS
       ${_RULE_COMPILER_FLAGS}
-    OPT_TOOL
-      ${_RULE_OPT_TOOL}
-    OPT_FLAGS
-      ${_RULE_OPT_FLAGS}
     TARGET_CPU_FEATURES
       ${_RULE_TARGET_CPU_FEATURES}
   )
@@ -228,10 +216,6 @@ endfunction()
 #       different args per test, create a separate suite or iree_check_test.
 #   LABELS: Additional labels to apply to the generated tests. The package path is
 #       added automatically.
-#   OPT_TOOL: Defaulting to iree-opt. Tool used to preprocess the source files
-#       if OPT_FLAGS is specified.
-#   OPT_FLAGS: If specified, source files are preprocessed with OPT_TOOL with
-#       these flags.
 #   TARGET_CPU_FEATURES: If specified, a string passed as argument to
 #       --iree-llvm-target-cpu-features.
 function(iree_check_single_backend_test_suite)
@@ -246,8 +230,8 @@ function(iree_check_single_backend_test_suite)
   cmake_parse_arguments(
     _RULE
     ""
-    "NAME;TARGET_BACKEND;DRIVER;OPT_TOOL"
-    "SRCS;COMPILER_FLAGS;RUNNER_ARGS;LABELS;OPT_FLAGS;TARGET_CPU_FEATURES"
+    "NAME;TARGET_BACKEND;DRIVER"
+    "SRCS;COMPILER_FLAGS;RUNNER_ARGS;LABELS;TARGET_CPU_FEATURES"
     ${ARGN}
   )
 
@@ -300,10 +284,6 @@ function(iree_check_single_backend_test_suite)
         ${_RULE_RUNNER_ARGS}
       LABELS
         ${_RULE_LABELS}
-      OPT_TOOL
-        ${_RULE_OPT_TOOL}
-      OPT_FLAGS
-        ${_RULE_OPT_FLAGS}
       TARGET_CPU_FEATURES
         ${_RULE_TARGET_CPU_FEATURES}
     )
@@ -411,10 +391,6 @@ endfunction()
 #       test, create a separate suite or iree_check_test.
 #   LABELS: Additional labels to apply to the generated tests. The package path is
 #       added automatically.
-#   OPT_TOOL: Defaulting to iree-opt. Tool used to preprocess the source files
-#       if OPT_FLAGS is specified.
-#   OPT_FLAGS: If specified, source files are preprocessed with OPT_TOOL with
-#       these flags.
 #   TARGET_CPU_FEATURES_VARIANTS: list of target cpu features variants. Only used
 #       for drivers that vary based on the target CPU features. For each list
 #       element, a separate test is created, with the list element passed as
@@ -458,7 +434,6 @@ function(iree_check_test_suite)
     endif()
     foreach(_TARGET_CPU_FEATURES_LIST_ELEM IN LISTS _TARGET_CPU_FEATURES_VARIANTS)
       process_target_cpu_features("${_TARGET_CPU_FEATURES_LIST_ELEM}" _ENABLED _TARGET_CPU_FEATURES _TARGET_CPU_FEATURES_SUFFIX _TARGET_PASS_OPTIONS)
-      string(REPLACE "#pass_options_variant#" "${_TARGET_PASS_OPTIONS}" _PROCESSED_OPT_FLAGS "${_RULE_OPT_FLAGS}")
       string(REPLACE "#pass_options_variant#" "${_TARGET_PASS_OPTIONS}" _PROCESSED_COMPILER_FLAGS "${_RULE_COMPILER_FLAGS}")
       if (NOT _ENABLED)
         # The current entry is disabled on the target CPU architecture.
@@ -479,10 +454,6 @@ function(iree_check_test_suite)
           ${_RULE_RUNNER_ARGS}
         LABELS
           ${_RULE_LABELS}
-        OPT_TOOL
-          ${_RULE_OPT_TOOL}
-        OPT_FLAGS
-          ${_PROCESSED_OPT_FLAGS}
         TARGET_CPU_FEATURES
           ${_TARGET_CPU_FEATURES}
       )

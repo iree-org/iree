@@ -19,8 +19,6 @@ def iree_trace_runner_test(
         trace,
         compiler_flags = [],
         runner_args = [],
-        opt_tool = "//iree/tools:iree-opt",
-        opt_flags = [],
         tags = [],
         target_cpu_features = None,
         timeout = None,
@@ -38,10 +36,6 @@ def iree_trace_runner_test(
             and input file flags are passed automatically.
         tags: Additional labels to apply to the test. "driver=${DRIVER}" is added
             automatically.
-        opt_tool: Defaulting to iree-opt. Tool used to preprocess the source files
-            if opt_flags is specified.
-        opt_flags: If specified, source files are preprocessed with opt_tool with
-            these flags.
         trace_runner: trace-runner program to run.
         trace: trace file input to the trace-runner program.
         module: specifies the  path to use for the enerated IREE module (.vmfb). Mandatory,
@@ -64,8 +58,6 @@ def iree_trace_runner_test(
             "-mlir-print-op-on-diagnostic=false",
             "-iree-hal-target-backends=%s" % target_backend,
         ] + compiler_flags,
-        opt_tool = opt_tool,
-        opt_flags = opt_flags,
         visibility = ["//visibility:private"],
         **kwargs
     )
@@ -95,8 +87,6 @@ def iree_single_backend_generated_trace_runner_test(
         generator_args = [],
         compiler_flags = [],
         runner_args = [],
-        opt_tool = "//iree/tools:iree-opt",
-        opt_flags = [],
         tags = [],
         target_cpu_features = None,
         timeout = None,
@@ -122,10 +112,6 @@ def iree_single_backend_generated_trace_runner_test(
             and input file flags are passed automatically.
         tags: Additional labels to apply to the test. "driver=${DRIVER}" is added
             automatically.
-        opt_tool: Defaulting to iree-opt. Tool used to preprocess the source files
-            if opt_flags is specified.
-        opt_flags: If specified, source files are preprocessed with opt_tool with
-            these flags.
         trace_runner: trace-runner program to run.
         timeout: timeout for the generated tests.
         target_cpu_features: currently unimplemented (must be empty), will eventually allow specifying target CPU features.
@@ -166,8 +152,6 @@ def iree_single_backend_generated_trace_runner_test(
         trace = trace,
         compiler_flags = compiler_flags,
         runner_args = runner_args,
-        opt_tool = opt_tool,
-        opt_flags = opt_flags,
         tags = tags,
         timeout = timeout,
         **kwargs
@@ -181,8 +165,6 @@ def iree_generated_trace_runner_test(
         generator_args = [],
         compiler_flags = [],
         runner_args = [],
-        opt_tool = "//iree/tools:iree-opt",
-        opt_flags = [],
         tags = [],
         timeout = None,
         target_cpu_features_variants = [],
@@ -204,14 +186,6 @@ def iree_generated_trace_runner_test(
             and input file flags are passed automatically.
         tags: Additional labels to apply to the test. "driver=${DRIVER}" is added
             automatically.
-        opt_tool: Defaulting to iree-opt. Tool used to preprocess the source files
-            if opt_flags is specified.
-        opt_flags: If specified, source files are preprocessed with opt_tool with
-            these flags. The special string "#pass_options_variant#" is replaced
-            with the empty string. That may in the future be changed to some
-            automatically determined pass options for each entry in
-            target_cpu_features_variants, as is currently done in the CMake
-            build.
         trace_runner: trace-runner program to run.
         timeout: timeout for the generated tests.
         target_cpu_features_variants: list of target cpu features variants. Currently unimplemented, so each
@@ -225,7 +199,6 @@ def iree_generated_trace_runner_test(
             fail("Entry %s in target_cpu_features_variants: unimplemented" % target_cpu_features)
 
     tests = []
-    processed_opt_flags = [flag.replace("#pass_options_variant#", "") for flag in opt_flags]
     processsed_compiler_flags = [flag.replace("#pass_options_variant#", "") for flag in compiler_flags]
     for backend, driver in target_backends_and_drivers:
         # CUDA backend/driver not supported by Bazel build.
@@ -241,8 +214,6 @@ def iree_generated_trace_runner_test(
             generator_args = generator_args,
             compiler_flags = processsed_compiler_flags,
             runner_args = runner_args,
-            opt_tool = opt_tool,
-            opt_flags = processed_opt_flags,
             tags = tags,
             timeout = timeout,
             **kwargs
